@@ -17,9 +17,25 @@ AC_PROG_MAKE_SET
 
 # Check C++11 support.
 AX_CXX_COMPILE_STDCXX_11([noext], [mandatory])
-AX_CHECK_LINK_FLAG([-flto], [AX_APPEND_COMPILE_FLAGS([-flto])])
 F_SUPPORT_CXX11([], [AC_MSG_ERROR([
   [You compiler version is too old! FluffOS need g++ 4.6+ or clang 3.0+.]])])
+
+AX_APPEND_COMPILE_FLAGS([-D_GNU_SOURCE])
+AX_APPEND_COMPILE_FLAGS([-fno-omit-frame-pointer])
+
+AX_APPEND_LINK_FLAGS([-flto])
+AX_CHECK_LINK_FLAG([-flto], [
+  AX_APPEND_COMPILE_FLAGS([-flto])
+])
+
+case $host_os in
+*cygwin*|*mingw*)
+  # rdynamic doesn't work on cygwin
+  ;;
+*)
+  AX_APPEND_LINK_FLAGS([-rdynamic])
+  ;;
+esac
 
 # Checks for header files.
 AC_FUNC_ALLOCA
@@ -46,6 +62,22 @@ AC_SEARCH_LIBS([crypt], [crypt])
 AC_SEARCH_LIBS([malloc], [malloc])
 AC_SEARCH_LIBS([backtrace], [execinfo])
 
+# Checks for typedefs, structures, and compiler characteristics.
+AC_TYPE_INT64_T
+AC_TYPE_PID_T
+AC_TYPE_SIZE_T
+AC_CHECK_MEMBERS([struct stat.st_rdev])
+AC_TYPE_UINT32_T
+AC_TYPE_UINT64_T
+
+# sighandler_t is the type of the signal handler on GNU variants,
+# sig_t is the type of a signal handler on 4.4BSD's,
+# other systems use __sighandler_t.
+AC_CHECK_TYPES([sighandler_t], [], [],
+    [#include <sys/types.h>
+     #include <signal.h>])
+
+# Checks for library functions.
 AC_FUNC_ERROR_AT_LINE
 AC_FUNC_FORK
 AC_FUNC_LSTAT_FOLLOWS_SLASHED_SYMLINK
@@ -53,11 +85,7 @@ AC_FUNC_MALLOC
 AC_FUNC_MMAP
 AC_FUNC_REALLOC
 AC_FUNC_STRTOD
-AC_FUNC_WAIT3
-
-AC_CHECK_FUNCS([atexit drand48 doprnt dup2 floor getcwd gethostname gettimeofday getpagesize memchr memmove memset mkdir munmap pow putenv regcomp rmdir setlocale socket sqrt strcasecmp strchr strcspn strerror strncasecmp strpbrk strrchr strstr strtol strtoul tzset utime])
-
-AC_CHECK_FUNCS([getrusage])
+AC_CHECK_FUNCS([dup2 floor getcwd gethostname gettimeofday memchr memmove memset mkdir munmap pow putenv regcomp rmdir setlocale socket sqrt strcasecmp strchr strcspn strerror strncasecmp strpbrk strrchr strspn strstr strtol strtoul tzset])
 
 # This check must before all F_HAVE_PREDEFINE checks.
 # Checks local_options exist, use a grauntee exist predefine.
@@ -70,7 +98,6 @@ F_HAVE_PREDEFINE([HAVE_LIBEVENT], [],
 
 # Checking local_options related libraries
 F_HAVE_PREDEFINE([HAVE_ZLIB], [AC_SEARCH_LIBS([gzread], [z])])
-F_HAVE_PREDEFINE([GCMALLOC], [AC_SEARCH_LIBS([GC_init], [gc])])
 F_HAVE_PREDEFINE([PACKAGE_ASYNC], [AC_SEARCH_LIBS([pthread_create], [pthread])])
 F_HAVE_PREDEFINE([POSIX_TIMERS], [AC_SEARCH_LIBS([timer_create], [rt])])
 

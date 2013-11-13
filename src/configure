@@ -3594,6 +3594,26 @@ $as_echo "#define HAVE_CXX11 1" >>confdefs.h
 
   fi
 
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+      #include <vector>
+      int main() {
+        std::vector<int> v = {0, 1, 2};
+        for (auto& i : v);
+      }
+
+
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+
+else
+  as_fn_error $? "
+  You compiler version is too old! FluffOS need g++ 4.6+ or clang 3.0+." "$LINENO" 5
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts " >&5
 $as_echo_n "checking whether C++ compiler accepts ... " >&6; }
 if ${ax_cv_check_cxxflags__+:} false; then :
@@ -3651,6 +3671,233 @@ else
   CXXFLAGS=""
 fi
 
+
+
+for flag in -D_GNU_SOURCE; do
+  as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__$flag" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts $flag" >&5
+$as_echo_n "checking whether C++ compiler accepts $flag... " >&6; }
+if eval \${$as_CACHEVAR+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  $flag"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  eval "$as_CACHEVAR=yes"
+else
+  eval "$as_CACHEVAR=no"
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CXXFLAGS=$ax_check_save_flags
+fi
+eval ac_res=\$$as_CACHEVAR
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if test x"`eval 'as_val=${'$as_CACHEVAR'};$as_echo "$as_val"'`" = xyes; then :
+  if ${CXXFLAGS+:} false; then :
+  case " $CXXFLAGS " in
+    *" $flag "*)
+      { { $as_echo "$as_me:${as_lineno-$LINENO}: : CXXFLAGS already contains \$flag"; } >&5
+  (: CXXFLAGS already contains $flag) 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }
+      ;;
+    *)
+      { { $as_echo "$as_me:${as_lineno-$LINENO}: : CXXFLAGS=\"\$CXXFLAGS \$flag\""; } >&5
+  (: CXXFLAGS="$CXXFLAGS $flag") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }
+      CXXFLAGS="$CXXFLAGS $flag"
+      ;;
+   esac
+else
+  CXXFLAGS="$flag"
+fi
+
+else
+  :
+fi
+
+done
+
+
+
+for flag in -fno-omit-frame-pointer; do
+  as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__$flag" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts $flag" >&5
+$as_echo_n "checking whether C++ compiler accepts $flag... " >&6; }
+if eval \${$as_CACHEVAR+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  $flag"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  eval "$as_CACHEVAR=yes"
+else
+  eval "$as_CACHEVAR=no"
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CXXFLAGS=$ax_check_save_flags
+fi
+eval ac_res=\$$as_CACHEVAR
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if test x"`eval 'as_val=${'$as_CACHEVAR'};$as_echo "$as_val"'`" = xyes; then :
+  if ${CXXFLAGS+:} false; then :
+  case " $CXXFLAGS " in
+    *" $flag "*)
+      { { $as_echo "$as_me:${as_lineno-$LINENO}: : CXXFLAGS already contains \$flag"; } >&5
+  (: CXXFLAGS already contains $flag) 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }
+      ;;
+    *)
+      { { $as_echo "$as_me:${as_lineno-$LINENO}: : CXXFLAGS=\"\$CXXFLAGS \$flag\""; } >&5
+  (: CXXFLAGS="$CXXFLAGS $flag") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }
+      CXXFLAGS="$CXXFLAGS $flag"
+      ;;
+   esac
+else
+  CXXFLAGS="$flag"
+fi
+
+else
+  :
+fi
+
+done
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the linker accepts " >&5
+$as_echo_n "checking whether the linker accepts ... " >&6; }
+if ${ax_cv_check_ldflags__+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$LDFLAGS
+  LDFLAGS="$LDFLAGS  "
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"; then :
+  ax_cv_check_ldflags__=yes
+else
+  ax_cv_check_ldflags__=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+  LDFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_ldflags__" >&5
+$as_echo "$ax_cv_check_ldflags__" >&6; }
+if test x"$ax_cv_check_ldflags__" = xyes; then :
+  :
+else
+  :
+fi
+
+
+
+for flag in -flto; do
+  as_CACHEVAR=`$as_echo "ax_cv_check_ldflags__$flag" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the linker accepts $flag" >&5
+$as_echo_n "checking whether the linker accepts $flag... " >&6; }
+if eval \${$as_CACHEVAR+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$LDFLAGS
+  LDFLAGS="$LDFLAGS  $flag"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"; then :
+  eval "$as_CACHEVAR=yes"
+else
+  eval "$as_CACHEVAR=no"
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+  LDFLAGS=$ax_check_save_flags
+fi
+eval ac_res=\$$as_CACHEVAR
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if test x"`eval 'as_val=${'$as_CACHEVAR'};$as_echo "$as_val"'`" = xyes; then :
+  if ${LDFLAGS+:} false; then :
+  case " $LDFLAGS " in
+    *" $flag "*)
+      { { $as_echo "$as_me:${as_lineno-$LINENO}: : LDFLAGS already contains \$flag"; } >&5
+  (: LDFLAGS already contains $flag) 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }
+      ;;
+    *)
+      { { $as_echo "$as_me:${as_lineno-$LINENO}: : LDFLAGS=\"\$LDFLAGS \$flag\""; } >&5
+  (: LDFLAGS="$LDFLAGS $flag") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }
+      LDFLAGS="$LDFLAGS $flag"
+      ;;
+   esac
+else
+  LDFLAGS="$flag"
+fi
+
+else
+  :
+fi
+
+done
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the linker accepts -flto" >&5
 $as_echo_n "checking whether the linker accepts -flto... " >&6; }
 if ${ax_cv_check_ldflags___flto+:} false; then :
@@ -3682,6 +3929,7 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_ldflags___flto" >&5
 $as_echo "$ax_cv_check_ldflags___flto" >&6; }
 if test x"$ax_cv_check_ldflags___flto" = xyes; then :
+
 
 
 for flag in -flto; do
@@ -3745,29 +3993,83 @@ fi
 
 done
 
+
 else
   :
 fi
 
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+
+case $host_os in
+*cygwin*|*mingw*)
+  # rdynamic doesn't work on cygwin
+  ;;
+*)
+
+
+for flag in -rdynamic; do
+  as_CACHEVAR=`$as_echo "ax_cv_check_ldflags__$flag" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the linker accepts $flag" >&5
+$as_echo_n "checking whether the linker accepts $flag... " >&6; }
+if eval \${$as_CACHEVAR+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$LDFLAGS
+  LDFLAGS="$LDFLAGS  $flag"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
-      #include <vector>
-      int main() {
-        std::vector<int> v = {0, 1, 2};
-        for (auto& i : v);
-      }
+int
+main ()
+{
 
-
+  ;
+  return 0;
+}
 _ACEOF
-if ac_fn_cxx_try_compile "$LINENO"; then :
+if ac_fn_cxx_try_link "$LINENO"; then :
+  eval "$as_CACHEVAR=yes"
+else
+  eval "$as_CACHEVAR=no"
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+  LDFLAGS=$ax_check_save_flags
+fi
+eval ac_res=\$$as_CACHEVAR
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if test x"`eval 'as_val=${'$as_CACHEVAR'};$as_echo "$as_val"'`" = xyes; then :
+  if ${LDFLAGS+:} false; then :
+  case " $LDFLAGS " in
+    *" $flag "*)
+      { { $as_echo "$as_me:${as_lineno-$LINENO}: : LDFLAGS already contains \$flag"; } >&5
+  (: LDFLAGS already contains $flag) 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }
+      ;;
+    *)
+      { { $as_echo "$as_me:${as_lineno-$LINENO}: : LDFLAGS=\"\$LDFLAGS \$flag\""; } >&5
+  (: LDFLAGS="$LDFLAGS $flag") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }
+      LDFLAGS="$LDFLAGS $flag"
+      ;;
+   esac
+else
+  LDFLAGS="$flag"
+fi
 
 else
-  as_fn_error $? "
-  You compiler version is too old! FluffOS need g++ 4.6+ or clang 3.0+." "$LINENO" 5
+  :
 fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
+done
+
+  ;;
+esac
 
 # Checks for header files.
 ac_ext=cpp
@@ -5188,6 +5490,96 @@ if test "$ac_res" != no; then :
 fi
 
 
+# Checks for typedefs, structures, and compiler characteristics.
+ac_fn_c_find_intX_t "$LINENO" "64" "ac_cv_c_int64_t"
+case $ac_cv_c_int64_t in #(
+  no|yes) ;; #(
+  *)
+
+cat >>confdefs.h <<_ACEOF
+#define int64_t $ac_cv_c_int64_t
+_ACEOF
+;;
+esac
+
+ac_fn_cxx_check_type "$LINENO" "pid_t" "ac_cv_type_pid_t" "$ac_includes_default"
+if test "x$ac_cv_type_pid_t" = xyes; then :
+
+else
+
+cat >>confdefs.h <<_ACEOF
+#define pid_t int
+_ACEOF
+
+fi
+
+ac_fn_cxx_check_type "$LINENO" "size_t" "ac_cv_type_size_t" "$ac_includes_default"
+if test "x$ac_cv_type_size_t" = xyes; then :
+
+else
+
+cat >>confdefs.h <<_ACEOF
+#define size_t unsigned int
+_ACEOF
+
+fi
+
+ac_fn_cxx_check_member "$LINENO" "struct stat" "st_rdev" "ac_cv_member_struct_stat_st_rdev" "$ac_includes_default"
+if test "x$ac_cv_member_struct_stat_st_rdev" = xyes; then :
+
+cat >>confdefs.h <<_ACEOF
+#define HAVE_STRUCT_STAT_ST_RDEV 1
+_ACEOF
+
+
+fi
+
+ac_fn_c_find_uintX_t "$LINENO" "32" "ac_cv_c_uint32_t"
+case $ac_cv_c_uint32_t in #(
+  no|yes) ;; #(
+  *)
+
+$as_echo "#define _UINT32_T 1" >>confdefs.h
+
+
+cat >>confdefs.h <<_ACEOF
+#define uint32_t $ac_cv_c_uint32_t
+_ACEOF
+;;
+  esac
+
+ac_fn_c_find_uintX_t "$LINENO" "64" "ac_cv_c_uint64_t"
+case $ac_cv_c_uint64_t in #(
+  no|yes) ;; #(
+  *)
+
+$as_echo "#define _UINT64_T 1" >>confdefs.h
+
+
+cat >>confdefs.h <<_ACEOF
+#define uint64_t $ac_cv_c_uint64_t
+_ACEOF
+;;
+  esac
+
+
+# sighandler_t is the type of the signal handler on GNU variants,
+# sig_t is the type of a signal handler on 4.4BSD's,
+# other systems use __sighandler_t.
+ac_fn_cxx_check_type "$LINENO" "sighandler_t" "ac_cv_type_sighandler_t" "#include <sys/types.h>
+     #include <signal.h>
+"
+if test "x$ac_cv_type_sighandler_t" = xyes; then :
+
+cat >>confdefs.h <<_ACEOF
+#define HAVE_SIGHANDLER_T 1
+_ACEOF
+
+
+fi
+
+
+# Checks for library functions.
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for error_at_line" >&5
 $as_echo_n "checking for error_at_line... " >&6; }
 if ${ac_cv_lib_error_at_line+:} false; then :
@@ -5946,90 +6338,13 @@ fi
 
 fi
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for wait3 that fills in rusage" >&5
-$as_echo_n "checking for wait3 that fills in rusage... " >&6; }
-if ${ac_cv_func_wait3_rusage+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  if test "$cross_compiling" = yes; then :
-  ac_cv_func_wait3_rusage=no
-else
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-$ac_includes_default
-#include <sys/time.h>
-#include <sys/resource.h>
-#include <sys/wait.h>
-/* HP-UX has wait3 but does not fill in rusage at all.  */
-int
-main ()
-{
-  struct rusage r;
-  int i;
-  /* Use a field that we can force nonzero --
-     voluntary context switches.
-     For systems like NeXT and OSF/1 that don't set it,
-     also use the system CPU time.  And page faults (I/O) for Linux.  */
-  r.ru_nvcsw = 0;
-  r.ru_stime.tv_sec = 0;
-  r.ru_stime.tv_usec = 0;
-  r.ru_majflt = r.ru_minflt = 0;
-  switch (fork ())
-    {
-    case 0: /* Child.  */
-      sleep(1); /* Give up the CPU.  */
-      _exit(0);
-      break;
-    case -1: /* What can we do?  */
-      _exit(0);
-      break;
-    default: /* Parent.  */
-      wait3(&i, 0, &r);
-      /* Avoid "text file busy" from rm on fast HP-UX machines.  */
-      sleep(2);
-      return (r.ru_nvcsw == 0 && r.ru_majflt == 0 && r.ru_minflt == 0
-	      && r.ru_stime.tv_sec == 0 && r.ru_stime.tv_usec == 0);
-    }
-}
-_ACEOF
-if ac_fn_cxx_try_run "$LINENO"; then :
-  ac_cv_func_wait3_rusage=yes
-else
-  ac_cv_func_wait3_rusage=no
-fi
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-  conftest.$ac_objext conftest.beam conftest.$ac_ext
-fi
-
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_func_wait3_rusage" >&5
-$as_echo "$ac_cv_func_wait3_rusage" >&6; }
-if test $ac_cv_func_wait3_rusage = yes; then
-
-$as_echo "#define HAVE_WAIT3 1" >>confdefs.h
-
-fi
-
-
-for ac_func in atexit drand48 doprnt dup2 floor getcwd gethostname gettimeofday getpagesize memchr memmove memset mkdir munmap pow putenv regcomp rmdir setlocale socket sqrt strcasecmp strchr strcspn strerror strncasecmp strpbrk strrchr strstr strtol strtoul tzset utime
+for ac_func in dup2 floor getcwd gethostname gettimeofday memchr memmove memset mkdir munmap pow putenv regcomp rmdir setlocale socket sqrt strcasecmp strchr strcspn strerror strncasecmp strpbrk strrchr strspn strstr strtol strtoul tzset
 do :
   as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
 ac_fn_cxx_check_func "$LINENO" "$ac_func" "$as_ac_var"
 if eval test \"x\$"$as_ac_var"\" = x"yes"; then :
   cat >>confdefs.h <<_ACEOF
 #define `$as_echo "HAVE_$ac_func" | $as_tr_cpp` 1
-_ACEOF
-
-fi
-done
-
-
-for ac_func in getrusage
-do :
-  ac_fn_cxx_check_func "$LINENO" "getrusage" "ac_cv_func_getrusage"
-if test "x$ac_cv_func_getrusage" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_GETRUSAGE 1
 _ACEOF
 
 fi
@@ -6998,76 +7313,6 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_gzread" >&5
 $as_echo "$ac_cv_search_gzread" >&6; }
 ac_res=$ac_cv_search_gzread
-if test "$ac_res" != no; then :
-  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
-
-fi
-
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-      #include "local_options"
-      #ifndef GCMALLOC
-      #error not defined
-      #endif
-
-
-_ACEOF
-if ac_fn_cxx_try_compile "$LINENO"; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing GC_init" >&5
-$as_echo_n "checking for library containing GC_init... " >&6; }
-if ${ac_cv_search_GC_init+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_func_search_save_LIBS=$LIBS
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char GC_init ();
-int
-main ()
-{
-return GC_init ();
-  ;
-  return 0;
-}
-_ACEOF
-for ac_lib in '' gc; do
-  if test -z "$ac_lib"; then
-    ac_res="none required"
-  else
-    ac_res=-l$ac_lib
-    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
-  fi
-  if ac_fn_cxx_try_link "$LINENO"; then :
-  ac_cv_search_GC_init=$ac_res
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext
-  if ${ac_cv_search_GC_init+:} false; then :
-  break
-fi
-done
-if ${ac_cv_search_GC_init+:} false; then :
-
-else
-  ac_cv_search_GC_init=no
-fi
-rm conftest.$ac_ext
-LIBS=$ac_func_search_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_GC_init" >&5
-$as_echo "$ac_cv_search_GC_init" >&6; }
-ac_res=$ac_cv_search_GC_init
 if test "$ac_res" != no; then :
   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
