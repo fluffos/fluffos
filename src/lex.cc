@@ -1281,7 +1281,7 @@ int yylex()
         outp--;
         return -1;
       case '\r':
-        yywarn("^M");
+        // ignore these.
         break;
       case '\t':
 #ifdef WARN_TAB
