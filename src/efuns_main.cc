@@ -1365,7 +1365,7 @@ void f_has_gmcp()
     i = sp->u.ob->interactive->iflags & USING_GMCP;
     i = !!i; //force 1 or 0
   }
-  free_object(&sp->u.ob, "f_has_zmp");
+  free_object(&sp->u.ob, "f_has_gmcp");
   put_number(i);
 }
 #endif
