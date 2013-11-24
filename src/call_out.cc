@@ -170,9 +170,9 @@ void call_out(pending_call_t *cop)
   }
 
 #ifndef NO_SHADOWS
-  if (cop->ob)
-    while (cop->ob->shadowing) {
-      ob = cop->ob->shadowing;
+  if (ob)
+    while (ob->shadowing) {
+      ob = ob->shadowing;
     }
 #endif
   new_command_giver = 0;
