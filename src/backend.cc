@@ -43,8 +43,10 @@ tick_event *add_tick_event(int delay_secs,
   return event;
 }
 
-void call_tick_events()
+int call_tick_events()
 {
+  int num = 0;
+
   if (g_tick_queue.empty()) {
     return;
   }
@@ -73,6 +75,7 @@ void call_tick_events()
   for (auto event: all_events) {
     if (event->valid) {
       try {
+      	num++;
         event->callback();
       } catch (const char *) {
         restore_context(&econ);
@@ -81,6 +84,8 @@ void call_tick_events()
     delete event;
   }
   pop_context(&econ);
+
+  return num;
 }
 
 void clear_tick_events()
@@ -212,7 +217,7 @@ void backend(struct event_base *base)
         int64_t real_time = get_current_time();
 
         while (current_virtual_time < real_time) {
-          call_tick_events();
+          while(call_tick_events());
           current_virtual_time++;
         }
 
