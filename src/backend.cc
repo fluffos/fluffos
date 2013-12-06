@@ -49,36 +49,44 @@ void call_tick_events()
     return;
   }
 
-  auto iter_start = g_tick_queue.cbegin();
-  if (iter_start->first > current_virtual_time) {
-    return;
-  }
-  auto iter_end = g_tick_queue.upper_bound(current_virtual_time);
-
-  std::deque<tick_event *> all_events;
-
-  // Extract all eligible events
-  for (auto iter = iter_start; iter != iter_end; iter++) {
-    all_events.push_back(iter->second);
-  }
-  g_tick_queue.erase(iter_start, iter_end);
-
-  // TODO: randomly shuffle the events
-
-  // FIXME: push econ check into event callback!
+  // FIXME: push econ check into all event callback!
   error_context_t econ;
   if (!save_context(&econ)) {
     fatal("BUG: call_tick_events can not save context!");
   }
-  for (auto event: all_events) {
-    if (event->valid) {
-      try {
-        event->callback();
-      } catch (const char *) {
-        restore_context(&econ);
-      }
+
+  // Loop until there are no more events to run.
+  //
+  // NOTE: some event, like call_out(0), will add event to tick_queue during
+  // callback, We need to keep looping until there isn't any eligible events
+  // left.
+  while(true) {
+    auto iter_end = g_tick_queue.upper_bound(current_virtual_time);
+    // No eligible events.
+    if (iter_end == g_tick_queue.begin()) {
+      break;
     }
-    delete event;
+    auto iter_start = g_tick_queue.begin();
+
+    // Extract all eligible events
+    std::deque<tick_event *> all_events;
+    for (auto iter = iter_start; iter != iter_end; iter++) {
+      all_events.push_back(iter->second);
+    }
+    g_tick_queue.erase(iter_start, iter_end);
+
+    // TODO: randomly shuffle the events
+
+    for (auto event: all_events) {
+      if (event->valid) {
+        try {
+          event->callback();
+        } catch (const char *) {
+          restore_context(&econ);
+        }
+      }
+      delete event;
+    }
   }
   pop_context(&econ);
 }
