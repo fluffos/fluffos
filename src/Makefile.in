@@ -151,7 +151,7 @@ install: all
 # remove everything
 clean:
 	-$(MAKE) -C packages "A=$(A)" "O=$(O)" clean
-	-rm -rf *.$(O) *.d *.tab.cc *.tab.h
+	-rm -rf *.$(O) *.d *.tab.cc *.tab.h *.gcda *.gcno *.gcov
 	-rm -f efun_defs.cc option_defs.cc
 	-rm -f opcodes.h efunctions.h opc.h efun_protos.h
 	-rm -f malloc.cc mallocwrapper.cc
