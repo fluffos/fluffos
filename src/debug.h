@@ -30,14 +30,14 @@ void debug_level_clear(const char *);
   time(&_rawtime); \
   strftime(_tbuf, sizeof(_tbuf), "%Y-%m-%d %H:%M:%S", localtime(&_rawtime)); \
   snprintf(_buf, sizeof(_buf), __VA_ARGS__); \
-  debug_message("[%s] %s: %s", _tbuf, #x, _buf);  \
+  debug_message("[%s] %s:%d %s", _tbuf, __FILE__, __LINE__, _buf);  \
 }
 
 #else
 #define debug(x,...)
 #endif
 
-/* Would be nice to have tons of these; should go to arbitrary bitsets */
+/* bit sets here */
 #define DBG_call_out        1
 #define DBG_addr_server     2
 #define DBG_d_flag      4
