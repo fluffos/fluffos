@@ -200,9 +200,7 @@ void backend(struct event_base *base)
           slow_shut_down(tmp);
         }
 
-#if DEBUG
         try {
-#endif
           /* Run event loop for at most 1 second, this current handles
            * listening socket events, user socket events, and lpc socket events.
            *
@@ -211,12 +209,9 @@ void backend(struct event_base *base)
            * I/O to dedicated threads.
            */
           run_for_at_most_one_second(base);
-
-#if DEBUG
         } catch (...) { // catch everything
           fatal("BUG: jumped out of event loop!");
         }
-#endif
         int64_t real_time = get_current_time();
 
         while (current_virtual_time < real_time) {
