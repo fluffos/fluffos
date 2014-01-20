@@ -47,6 +47,11 @@ void init_network_threadpool()
   g_threadpool_network_ = new util::ThreadPool(4);
 }
 
+void shutdown_network_threadpool()
+{
+  delete g_threadpool_network_;
+}
+
 static void exit_after_one_second(evutil_socket_t fd, short events, void *arg)
 {
   event_base_loopbreak((struct event_base *)arg);
