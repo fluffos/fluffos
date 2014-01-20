@@ -129,7 +129,7 @@ static int cmd_in_buf(interactive_t *);
 static int call_function_interactive(interactive_t *, char *);
 static void print_prompt(interactive_t *);
 
-void new_user_handler(port_def_t *);
+void new_user_handler(interactive_t *);
 
 static void end_compression(interactive_t *);
 static void start_compression(interactive_t *);
@@ -224,17 +224,9 @@ receive_snoop(const char *buf, int len, object_t *snooper)
 /*
  * Initialize new user connection socket.
  */
-void init_user_conn()
-{
+void init_user_conn() {
   int optval;
   int i;
-  int have_fd6;
-  int fd6_which = -1;
-
-  /* Check for fd #6 open as a valid socket */
-  optval = 1;
-  have_fd6 = (setsockopt(6, SOL_SOCKET, SO_REUSEADDR, (char *) &optval,
-                         sizeof(optval)) == 0);
 
   for (i = 0; i < 5; i++) {
 #ifdef F_NETWORK_STATS
@@ -243,119 +235,91 @@ void init_user_conn()
     external_port[i].out_packets = 0;
     external_port[i].out_volume = 0;
 #endif
-    if (!external_port[i].port) {
-#if defined(FD6_KIND) && defined(FD6_PORT)
-      if (!have_fd6) {
-        continue;
-      }
-      fd6_which = i;
-      have_fd6 = 0;
-      if (FD6_KIND == PORT_UNDEFINED || FD6_PORT < 1) {
-        debug_message("Socket passed to fd 6 ignored (support is disabled).\n");
-        continue;
-      }
-
-      debug_message("Accepting connections on fd 6 (port %d).\n", FD6_PORT);
-      external_port[i].kind = FD6_KIND;
-      external_port[i].port = FD6_PORT;
-      external_port[i].fd = 6;
-#else
+    if (!external_port[i].port)
       continue;
-#endif
-    } else {
-      /*
-       * fill in socket address information.
-       */
-      struct addrinfo *res;
+    /*
+     * fill in socket address information.
+     */
+    struct addrinfo *res;
 
-      char service[NI_MAXSERV];
-      snprintf(service, sizeof(service), "%u", external_port[i].port);
+    char service[NI_MAXSERV];
+    snprintf(service, sizeof(service), "%u", external_port[i].port);
 
-      struct addrinfo hints;
-      memset(&hints, 0, sizeof(struct addrinfo));
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof(struct addrinfo));
 #ifdef IPV6
-      hints.ai_family = AF_INET6;
+    hints.ai_family = AF_INET6;
 #else
-      hints.ai_family = AF_INET;
+    hints.ai_family = AF_INET;
 #endif
-      hints.ai_socktype = SOCK_STREAM;
-      hints.ai_flags = AI_PASSIVE | AI_NUMERICSERV | AI_V4MAPPED;
-
-      int ret;
-      if (MUD_IP[0]) {
-        ret = getaddrinfo(MUD_IP, service, &hints, &res);
-      } else {
-        ret = getaddrinfo(NULL, service, &hints, &res);
-      }
-
-      if (ret) {
-        debug_message("init_user_conn: getaddrinfo error: %s \n", gai_strerror(ret));
-        exit(3);
-      }
-
-      /*
-       * create socket of proper type.
-       */
-      if ((external_port[i].fd = socket(res->ai_family, res->ai_socktype,
-                                        res->ai_protocol)) == -1) {
-        socket_perror("init_user_conn: socket", 0);
-        exit(1);
-      }
-
-      /*
-       * enable local address reuse.
-       */
-      optval = 1;
-      if (setsockopt(external_port[i].fd, SOL_SOCKET, SO_REUSEADDR,
-                     (char *) &optval, sizeof(optval)) == -1) {
-        socket_perror("init_user_conn: setsockopt", 0);
-        exit(2);
-      }
-
-#ifdef FD_CLOEXEC
-      fcntl(external_port[i].fd, F_SETFD, FD_CLOEXEC);
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE | AI_NUMERICSERV;
+#ifdef IPV6
+    hints.ai_flags |= AI_V4MAPPED;
 #endif
 
-      /*
-       * bind name to socket.
-       */
-      if (bind(external_port[i].fd, res->ai_addr, res->ai_addrlen) == -1) {
-        socket_perror("init_user_conn: bind", 0);
-        exit(3);
-      }
-
-      // cleanup
-      freeaddrinfo(res);
+    int ret;
+    if (MUD_IP[0]) {
+      ret = getaddrinfo(MUD_IP, service, &hints, &res);
+    } else {
+      ret = getaddrinfo(NULL, service, &hints, &res);
     }
+
+    if (ret) {
+      debug_message("init_user_conn: getaddrinfo error: %s \n",
+          gai_strerror(ret));
+      exit(3);
+    }
+
+    /*
+     * create socket of proper type.
+     */
+    if ((external_port[i].fd = socket(res->ai_family, res->ai_socktype,
+        res->ai_protocol)) == -1) {
+      socket_perror("init_user_conn: socket", 0);
+      exit(1);
+    }
+
+    /*
+     * enable local address reuse.
+     */
+    optval = 1;
+    if (setsockopt(external_port[i].fd, SOL_SOCKET, SO_REUSEADDR,
+        (char *) &optval, sizeof(optval)) == -1) {
+      socket_perror("init_user_conn: setsockopt", 0);
+      exit(2);
+    }
+
+    evutil_make_socket_closeonexec(external_port[i].fd);
 
     /*
      * set socket non-blocking,
      */
-    if (set_socket_nonblocking(external_port[i].fd, 1) == -1) {
+    if (evutil_make_socket_nonblocking(external_port[i].fd) == -1) {
       socket_perror("init_user_conn: set_socket_nonblocking 1", 0);
-      if (i != fd6_which) {
-        exit(8);
-      }
     }
+
+    /*
+     * bind name to socket.
+     */
+    if (bind(external_port[i].fd, res->ai_addr, res->ai_addrlen) == -1) {
+      socket_perror("init_user_conn: bind", 0);
+      exit(3);
+    }
+
     /*
      * listen on socket for connections.
      */
-    sockaddr_storage addr;
-    socklen_t len = sizeof(addr);
-    getsockname(external_port[i].fd, (sockaddr *)&addr, &len);
-    debug_message("Accepting connections on %s.\n", sockaddr_to_string((sockaddr *)&addr, len));
-
     if (listen(external_port[i].fd, 128) == -1) {
       socket_perror("init_user_conn: listen", 0);
-      if (i != fd6_which) {
-        exit(10);
-      }
     }
-    // Listen on connetion event
+    debug_message("Accepting connections on %s.\n",
+        sockaddr_to_string((sockaddr *) res->ai_addr, res->ai_addrlen));
+
+    freeaddrinfo(res);
+
+    // Listen on connection event
     new_external_port_event_listener(&external_port[i]);
-  }
-  if (have_fd6) {
-    debug_message("No more ports available; fd #6 ignored.\n");
   }
 }
 
@@ -1605,41 +1569,11 @@ static char *first_cmd_in_buf(interactive_t *ip)
   return p;
 }
 
-/*
- * This is the new user connection handler. This function is called by the
- * event handler when data is pending on the listening socket (new_user_fd).
- * If space is available, an interactive data structure is initialized and
- * the user is connected.
- */
-void new_user_handler(port_def_t *port)
-{
-  int new_socket_fd;
-  struct sockaddr_storage addr;
-  socklen_t length;
-  int i, x;
-  object_t *master, *ob;
-  svalue_t *ret;
+// Event handler for new connection
+// NOTE: Runs in network threadpool.
+void async_on_accept(int new_socket_fd, port_def_t *port) {
+  debug(connections, "async_on_accept: accepting fd %d\n", new_socket_fd);
 
-  debug(connections, "new_user_handler: accept on fd %d\n", port->fd);
-
-  length = sizeof(addr);
-  new_socket_fd = accept(port->fd, (struct sockaddr *) &addr, &length);
-  if (new_socket_fd < 0) {
-    if (socket_errno == EWOULDBLOCK) {
-      debug(connections, ("new_user_handler: accept: Operation would block\n"));
-    } else {
-      debug(connections, "new_user_handler: fd %d, accept error: %s.\n", port->fd,
-            evutil_socket_error_to_string(evutil_socket_geterror(port->fd)));
-    }
-    return;
-  }
-
-  /*
-   * according to Amylaar, 'accepted' sockets in Linux 0.99p6 don't
-   * properly inherit the nonblocking property from the listening socket.
-   * Marius, 19-Jun-2000: this happens on other platforms as well, so just
-   * do it for everyone
-   */
   if (set_socket_nonblocking(new_socket_fd, 1) == -1) {
     debug(connections, "new_user_handler: fd %d, set_socket_nonblocking 1 error: %s.\n", new_socket_fd,
           evutil_socket_error_to_string(evutil_socket_geterror(new_socket_fd)));
@@ -1652,6 +1586,56 @@ void new_user_handler(port_def_t *port)
           evutil_socket_error_to_string(evutil_socket_geterror(new_socket_fd)));
   }
 
+  /*
+   * initialize new user interactive data structure.
+   */
+  auto user = reinterpret_cast<interactive_t *>(
+      DXALLOC(sizeof(interactive_t), TAG_INTERACTIVE, "new_user_handler"));
+  memset(user, 0, sizeof(*user));
+
+  user->connection_type = port->kind;
+  user->sb_buf = (unsigned char *)DMALLOC(SB_SIZE,
+                                   TAG_PERMANENT, "new_user_handler");
+  user->sb_size = SB_SIZE;
+  user->ob = master_ob;
+  user->last_time = get_current_time();
+  user->state = TS_DATA;
+
+#ifdef USE_ICONV
+  user->trans = get_translator("UTF-8");
+#else
+  user->trans = (struct translation *) master_ob;
+  //never actually used, but avoids multiple ifdefs later on!
+#endif
+
+  for (int x = 0;  x < NSLC;  x++) {
+    user->slc[x][0] = slc_default_flags[x];
+    user->slc[x][1] = slc_default_chars[x];
+  }
+
+  user->fd = new_socket_fd;
+  user->local_port = port->port;
+  user->external_port = (port - external_port); // FIXME: pointer arith
+
+  user->addrlen = sizeof(user->addr);
+  getsockname(new_socket_fd, (sockaddr *)&user->addr, &user->addrlen);
+
+  // add event to tick_event.
+  add_tick_event(0, [=](){ new_user_handler(user); });
+}
+
+/*
+ * This is the new user connection handler. This function is called by the
+ * event handler when data is pending on the listening socket (new_user_fd).
+ * If space is available, an interactive data structure is initialized and
+ * the user is connected.
+ */
+void new_user_handler(interactive_t *user)
+{
+  debug(connections, "New connection from %s.\n",
+      sockaddr_to_string((sockaddr *)&user->addr, user->addrlen));
+
+  int i;
   /* find the first available slot */
   for (i = 0; i < max_users; i++)
     if (!all_users[i]) { break; }
@@ -1670,85 +1654,16 @@ void new_user_handler(port_def_t *port)
   }
 
   set_command_giver(master_ob);
-  master_ob->interactive =
-    (interactive_t *)
-    DXALLOC(sizeof(interactive_t), TAG_INTERACTIVE,
-            "new_user_handler");
-#ifndef NO_ADD_ACTION
-  master_ob->interactive->default_err_message.s = 0;
-#endif
-  master_ob->interactive->connection_type = port->kind;
-  master_ob->interactive->sb_buf = (unsigned char *)DMALLOC(SB_SIZE,
-                                   TAG_PERMANENT, "new_user_handler");
-  master_ob->interactive->sb_size = SB_SIZE;
   master_ob->flags |= O_ONCE_INTERACTIVE;
-  /*
-   * initialize new user interactive data structure.
-   */
-  master_ob->interactive->ob = master_ob;
-#if defined(F_INPUT_TO) || defined(F_GET_CHAR)
-  master_ob->interactive->input_to = 0;
-#endif
-  master_ob->interactive->iflags = 0;
-  master_ob->interactive->text[0] = '\0';
-  master_ob->interactive->text_end = 0;
-  master_ob->interactive->text_start = 0;
-#if defined(F_INPUT_TO) || defined(F_GET_CHAR)
-  master_ob->interactive->carryover = NULL;
-  master_ob->interactive->num_carry = 0;
-#endif
-#ifndef NO_SNOOP
-  master_ob->interactive->snooped_by = 0;
-#endif
-  master_ob->interactive->last_time = get_current_time();
-#ifdef TRACE
-  master_ob->interactive->trace_level = 0;
-  master_ob->interactive->trace_prefix = 0;
-#endif
-#ifdef OLD_ED
-  master_ob->interactive->ed_buffer = 0;
-#endif
-#ifdef HAVE_ZLIB
-  master_ob->interactive->compressed_stream = NULL;
-#endif
 
-  master_ob->interactive->message_producer = 0;
-  master_ob->interactive->message_consumer = 0;
-  master_ob->interactive->message_length = 0;
-  master_ob->interactive->state = TS_DATA;
-  master_ob->interactive->out_of_band = 0;
-  master_ob->interactive->ws_text_start = 0;
-  master_ob->interactive->ws_text_end = 0;
-  master_ob->interactive->ws_size = 0;
-#ifdef USE_ICONV
-  master_ob->interactive->trans = get_translator("UTF-8");
-#else
-  master_ob->interactive->trans = (struct translation *) master_ob;
-  //never actually used, but avoids multiple ifdefs later on!
-#endif
-  for (x = 0;  x < NSLC;  x++) {
-    master_ob->interactive->slc[x][0] = slc_default_flags[x];
-    master_ob->interactive->slc[x][1] = slc_default_chars[x];
-  }
+  master_ob->interactive = user;
   all_users[i] = master_ob->interactive;
-  all_users[i]->fd = new_socket_fd;
-#ifdef F_QUERY_IP_PORT
-  all_users[i]->local_port = port->port;
-#endif
-#ifdef F_NETWORK_STATS
-  all_users[i]->external_port = (port - external_port); // FIXME: pointer arith
-#endif
 
+  // FIXME: this belongs in async_on_accept()
   new_user_event_listener(i);
 
-  // all_users[i] setup finishes
   set_prompt("> ");
 
-  memcpy((char *) &all_users[i]->addr, (char *)&addr, length);
-  all_users[i]->addrlen = length;
-
-  debug(connections, "New connection from %s.\n",
-        sockaddr_to_string((sockaddr *)&addr, length));
   num_user++;
 
   /*
@@ -1757,9 +1672,12 @@ void new_user_handler(port_def_t *port)
    * changes during APPLY_CONNECT.  We want to free the reference on
    * the right copy of the object.
    */
+  object_t *master, *ob;
+  svalue_t *ret;
+
   master = master_ob;
   add_ref(master_ob, "new_user");
-  push_number(port->port);
+  push_number(user->local_port);
   ret = safe_apply_master_ob(APPLY_CONNECT, 1);
   /* master_ob->interactive can be zero if the master object self
      destructed in the above (don't ask) */
@@ -1770,7 +1688,7 @@ void new_user_handler(port_def_t *port)
       remove_interactive(master_ob, 0);
     }
     debug_message("Can not accept connection from %s due to error in connect().\n",
-                  sockaddr_to_string((sockaddr *)&addr, length));
+        sockaddr_to_string((sockaddr *)&all_users[i]->addr, all_users[i]->addrlen));
     return;
   }
   /*
@@ -1800,7 +1718,7 @@ void new_user_handler(port_def_t *port)
   set_command_giver(ob);
   query_name_by_addr(ob);
 
-  if (port->kind == PORT_TELNET) {
+  if (user->connection_type == PORT_TELNET) {
     /* Ask permission to ask them for their terminal type */
     add_binary_message_noflush(ob, telnet_do_ttype, sizeof(telnet_do_ttype));
     /* Ask them for their window size */

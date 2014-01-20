@@ -54,7 +54,6 @@ SRC=grammar.tab.cc lex.cc main.cc rc.cc interpret.cc simulate.cc file.cc object.
   replace_program.cc master.cc function.cc \
   debug.cc crypt.cc applies_table.cc add_action.cc eval.cc fliconv.cc console.cc \
   posix_timers.cc event.cc dns.c \
-	net/Server.cc
 
 OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
   backend.o array.o mapping.o comm.o ed.o regexp.o buffer.o crc32.o \
@@ -67,7 +66,6 @@ OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
   replace_program.o master.o function.o \
   debug.o crypt.o applies_table.o add_action.o eval.o fliconv.o console.o \
   posix_timers.o event.o dns.o \
-	net/Server.o \
 
 VPATH = .:./packages
 

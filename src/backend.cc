@@ -25,6 +25,7 @@ void CDECL alarm_loop(void *);
 #include <deque>
 #include <functional>
 #include <map>
+#include <mutex>
 
 error_context_t *current_error_context = 0;
 
@@ -33,11 +34,14 @@ error_context_t *current_error_context = 0;
  */
 long current_virtual_time;
 
+std::mutex g_tick_queue_mutex;  // protects g_tick_queue
 static std::multimap<long, tick_event *, std::less<long>> g_tick_queue;
 
 tick_event *add_tick_event(int delay_secs,
                            tick_event::callback_type callback)
 {
+  std::lock_guard<std::mutex> lock(g_tick_queue_mutex);
+
   auto event = new tick_event(callback);
   g_tick_queue.insert(std::make_pair(current_virtual_time + delay_secs, event));
   return event;
@@ -45,8 +49,11 @@ tick_event *add_tick_event(int delay_secs,
 
 void call_tick_events()
 {
-  if (g_tick_queue.empty()) {
-    return;
+  {
+    std::lock_guard<std::mutex> lock(g_tick_queue_mutex);
+    if (g_tick_queue.empty()) {
+      return;
+    }
   }
 
   // FIXME: push econ check into all event callback!
@@ -61,19 +68,24 @@ void call_tick_events()
   // callback, We need to keep looping until there isn't any eligible events
   // left.
   while(true) {
-    auto iter_end = g_tick_queue.upper_bound(current_virtual_time);
-    // No eligible events.
-    if (iter_end == g_tick_queue.begin()) {
-      break;
-    }
-    auto iter_start = g_tick_queue.begin();
-
-    // Extract all eligible events
     std::deque<tick_event *> all_events;
-    for (auto iter = iter_start; iter != iter_end; iter++) {
-      all_events.push_back(iter->second);
+    {
+      std::lock_guard<std::mutex> lock(g_tick_queue_mutex);
+
+      auto iter_end = g_tick_queue.upper_bound(current_virtual_time);
+      // No eligible events.
+      if (iter_end == g_tick_queue.begin()) {
+        break;
+      }
+      auto iter_start = g_tick_queue.begin();
+
+      // Extract all eligible events
+      all_events.clear();
+      for (auto iter = iter_start; iter != iter_end; iter++) {
+        all_events.push_back(iter->second);
+      }
+      g_tick_queue.erase(iter_start, iter_end);
     }
-    g_tick_queue.erase(iter_start, iter_end);
 
     // TODO: randomly shuffle the events
 
@@ -93,6 +105,8 @@ void call_tick_events()
 
 void clear_tick_events()
 {
+  std::lock_guard<std::mutex> lock(g_tick_queue_mutex);
+
   int i = 0;
   if (!g_tick_queue.empty()) {
     for (auto iter: g_tick_queue) {

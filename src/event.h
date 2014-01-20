@@ -17,6 +17,8 @@ typedef struct port_def_s port_def_t;
 extern struct event_base *g_event_base;
 
 event_base *init_event_base();
+void init_network_threadpool();
+
 int run_for_at_most_one_second(struct event_base *);
 
 // Listening socket event

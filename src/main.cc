@@ -21,6 +21,8 @@
 #include "event.h"
 #include "dns.h"
 
+#include "util/threadpool-incl.h"
+
 port_def_t external_port[5];
 
 static int e_flag = 0;    /* Load empty, without preloads. */
@@ -383,6 +385,7 @@ int main(int argc, char **argv)
   preload_objects(e_flag);
 
   // initialize user connection socket
+  init_network_threadpool();
   init_user_conn();
 
 #ifdef HAS_CONSOLE

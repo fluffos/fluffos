@@ -10,9 +10,12 @@
 #include "console.h" // for console
 #include "socket_efuns.h"  // for lpc sockets
 #include "eval.h" // for set_eval
+#include "util/threadpool-incl.h"
 
 //FIXME: rewrite other part so this could become static.
 struct event_base *g_event_base = NULL;
+
+static util::ThreadPool *g_threadpool_network_ = NULL;
 
 static void libevent_log(int severity, const char *msg)
 {
@@ -36,6 +39,12 @@ event_base *init_event_base()
   g_event_base = event_base_new();
   debug_message("Event backend in use: %s\n", event_base_get_method(g_event_base));
   return g_event_base;
+}
+
+// Init net threadpool
+void init_network_threadpool()
+{
+  g_threadpool_network_ = new util::ThreadPool(4);
 }
 
 static void exit_after_one_second(evutil_socket_t fd, short events, void *arg)
@@ -195,14 +204,33 @@ static void on_external_port_event(evutil_socket_t fd, short what, void *arg)
         (what & EV_WRITE)   ? " write" : "",
         (what & EV_SIGNAL)  ? " signal" : "");
 
+  debug(connections, "new_user_handler: accepting on fd %d\n", fd);
+
+  struct sockaddr_storage addr;
+  socklen_t length = sizeof(addr);
+  int new_socket_fd = accept(fd, (struct sockaddr *) &addr, &length);
+  if (new_socket_fd < 0) {
+    if (socket_errno == EWOULDBLOCK) {
+      debug(connections, ("new_user_handler: accept: Operation would block\n"));
+    } else {
+      debug(connections, "new_user_handler: fd %d, accept error: %s.\n", fd,
+            evutil_socket_error_to_string(evutil_socket_geterror(fd)));
+    }
+    return;
+  }
+
   // FIXME: remove the need to pass the argument.
-  new_user_handler((port_def_t *)arg);
+  port_def_t *port = reinterpret_cast<port_def_t *>(arg);
+  g_threadpool_network_->enqueue([=] () {
+    async_on_accept(new_socket_fd, port);
+  });
 }
 
 void new_external_port_event_listener(port_def_t *port)
 {
   port->ev_read = event_new(g_event_base, port->fd,
-                            EV_READ | EV_PERSIST, on_external_port_event, port);
+                            EV_READ | EV_PERSIST,
+                            on_external_port_event, port);
   event_add(port->ev_read, NULL);
 }
 

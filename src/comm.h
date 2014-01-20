@@ -81,12 +81,8 @@ typedef struct interactive_s {
   int fd;                     /* file descriptor for interactive object  */
   struct sockaddr_storage addr;    /* socket address of interactive object    */
   socklen_t addrlen;
-#ifdef F_QUERY_IP_PORT
   int local_port;             /* which of our ports they connected to    */
-#endif
-#ifdef F_NETWORK_STATS
   int external_port;          /* external port index for connection      */
-#endif
   const char *prompt;         /* prompt string for interactive object    */
   char text[MAX_TEXT];        /* input buffer for interactive object     */
   int text_end;               /* first free char in buffer               */
@@ -228,7 +224,8 @@ object_t *query_snooping(object_t *);
 void mark_iptable(void);
 #endif
 
-void new_user_handler(port_def_t *);
+
+void async_on_accept(int, port_def_t *);
 
 inline const char *sockaddr_to_string(const sockaddr *addr, socklen_t len)
 {
