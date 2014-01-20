@@ -2,6 +2,7 @@
 
 #include <event2/event.h>
 #include <event2/dns.h>
+#include <event2/listener.h>
 #include <event2/util.h>
 
 #include "event.h"
@@ -200,43 +201,24 @@ void new_user_event_listener(int idx)
   event_add(user->ev_command, NULL);
 }
 
-static void on_external_port_event(evutil_socket_t fd, short what, void *arg)
+static void on_external_port_event(
+    evconnlistener *listener, evutil_socket_t fd, sockaddr* sa, int socklen, void *arg)
 {
-  debug(event, "Got an event on listen socket %d:%s%s%s%s \n",
-        (int) fd,
-        (what & EV_TIMEOUT) ? " timeout" : "",
-        (what & EV_READ)    ? " read" : "",
-        (what & EV_WRITE)   ? " write" : "",
-        (what & EV_SIGNAL)  ? " signal" : "");
-
-  debug(connections, "new_user_handler: accepting on fd %d\n", fd);
-
-  struct sockaddr_storage addr;
-  socklen_t length = sizeof(addr);
-  int new_socket_fd = accept(fd, (struct sockaddr *) &addr, &length);
-  if (new_socket_fd < 0) {
-    if (socket_errno == EWOULDBLOCK) {
-      debug(connections, ("new_user_handler: accept: Operation would block\n"));
-    } else {
-      debug(connections, "new_user_handler: fd %d, accept error: %s.\n", fd,
-            evutil_socket_error_to_string(evutil_socket_geterror(fd)));
-    }
-    return;
-  }
-
-  // FIXME: remove the need to pass the argument.
   port_def_t *port = reinterpret_cast<port_def_t *>(arg);
   g_threadpool_network_->enqueue([=] () {
-    async_on_accept(new_socket_fd, port);
+    async_on_accept(fd, port, sa, socklen);
   });
 }
 
-void new_external_port_event_listener(port_def_t *port)
+void new_external_port_event_listener(port_def_t *port, sockaddr *sa, socklen_t socklen)
 {
-  port->ev_read = event_new(g_event_base, port->fd,
-                            EV_READ | EV_PERSIST,
-                            on_external_port_event, port);
-  event_add(port->ev_read, NULL);
+  port->ev_conn = evconnlistener_new_bind(
+      g_event_base, on_external_port_event,
+      port,
+      LEV_OPT_REUSEABLE | LEV_OPT_CLOSE_ON_FREE | LEV_OPT_CLOSE_ON_EXEC,
+      1024,
+      sa, socklen);
+  DEBUG_CHECK(port->ev_conn == NULL, "listening failed!");
 }
 
 void on_lpc_sock_read(evutil_socket_t fd, short what, void *arg)

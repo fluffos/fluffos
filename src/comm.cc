@@ -22,6 +22,9 @@
 
 #include <algorithm>
 
+#include <event2/event.h>
+#include <event2/listener.h>
+
 #ifndef ENOSR
 #define ENOSR 63
 #endif
@@ -225,10 +228,7 @@ receive_snoop(const char *buf, int len, object_t *snooper)
  * Initialize new user connection socket.
  */
 void init_user_conn() {
-  int optval;
-  int i;
-
-  for (i = 0; i < 5; i++) {
+  for (int i = 0; i < 5; i++) {
 #ifdef F_NETWORK_STATS
     external_port[i].in_packets = 0;
     external_port[i].in_volume = 0;
@@ -271,55 +271,14 @@ void init_user_conn() {
       exit(3);
     }
 
-    /*
-     * create socket of proper type.
-     */
-    if ((external_port[i].fd = socket(res->ai_family, res->ai_socktype,
-        res->ai_protocol)) == -1) {
-      socket_perror("init_user_conn: socket", 0);
-      exit(1);
-    }
+    // Listen on connection event
+    new_external_port_event_listener(&external_port[i],
+        res->ai_addr, res->ai_addrlen);
 
-    /*
-     * enable local address reuse.
-     */
-    optval = 1;
-    if (setsockopt(external_port[i].fd, SOL_SOCKET, SO_REUSEADDR,
-        (char *) &optval, sizeof(optval)) == -1) {
-      socket_perror("init_user_conn: setsockopt", 0);
-      exit(2);
-    }
-
-    evutil_make_socket_closeonexec(external_port[i].fd);
-
-    /*
-     * set socket non-blocking,
-     */
-    if (evutil_make_socket_nonblocking(external_port[i].fd) == -1) {
-      socket_perror("init_user_conn: set_socket_nonblocking 1", 0);
-    }
-
-    /*
-     * bind name to socket.
-     */
-    if (bind(external_port[i].fd, res->ai_addr, res->ai_addrlen) == -1) {
-      socket_perror("init_user_conn: bind", 0);
-      exit(3);
-    }
-
-    /*
-     * listen on socket for connections.
-     */
-    if (listen(external_port[i].fd, 128) == -1) {
-      socket_perror("init_user_conn: listen", 0);
-    }
     debug_message("Accepting connections on %s.\n",
         sockaddr_to_string((sockaddr *) res->ai_addr, res->ai_addrlen));
 
     freeaddrinfo(res);
-
-    // Listen on connection event
-    new_external_port_event_listener(&external_port[i]);
   }
 }
 
@@ -332,7 +291,7 @@ void shutdown_external_ports()
 
   for (i = 0; i < 5; i++) {
     if (!external_port[i].port) { continue; }
-    if (external_port[i].ev_read) event_free(external_port[i].ev_read);
+    if (external_port[i].ev_conn) evconnlistener_free(external_port[i].ev_conn);
     if (OS_socket_close(external_port[i].fd) == -1) {
       socket_perror("ipc_remove: close", 0);
     }
@@ -1571,18 +1530,19 @@ static char *first_cmd_in_buf(interactive_t *ip)
 
 // Event handler for new connection
 // NOTE: Runs in network threadpool.
-void async_on_accept(int new_socket_fd, port_def_t *port) {
-  debug(connections, "async_on_accept: accepting fd %d\n", new_socket_fd);
+void async_on_accept(int new_socket_fd, port_def_t *port, sockaddr *sa, int socklen) {
+  debug(connections, "async_on_accept: new connection from %s, fd %d\n",
+      sockaddr_to_string(sa, socklen), new_socket_fd);
 
   if (set_socket_nonblocking(new_socket_fd, 1) == -1) {
-    debug(connections, "new_user_handler: fd %d, set_socket_nonblocking 1 error: %s.\n", new_socket_fd,
+    debug(connections, "async_on_accept: fd %d, set_socket_nonblocking 1 error: %s.\n", new_socket_fd,
           evutil_socket_error_to_string(evutil_socket_geterror(new_socket_fd)));
     OS_socket_close(new_socket_fd);
     return;
   }
 
   if (set_socket_tcp_nodelay(new_socket_fd, 1) == -1) {
-    debug(connections, "new_user_handler: fd %d, set_socket_tcp_nodelay error: %s.\n", new_socket_fd,
+    debug(connections, "async_on_accept: fd %d, set_socket_tcp_nodelay error: %s.\n", new_socket_fd,
           evutil_socket_error_to_string(evutil_socket_geterror(new_socket_fd)));
   }
 

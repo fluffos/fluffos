@@ -224,8 +224,7 @@ object_t *query_snooping(object_t *);
 void mark_iptable(void);
 #endif
 
-
-void async_on_accept(int, port_def_t *);
+void async_on_accept(int , port_def_t *, sockaddr *, int);
 
 inline const char *sockaddr_to_string(const sockaddr *addr, socklen_t len)
 {

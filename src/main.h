@@ -24,7 +24,7 @@ typedef struct port_def_s {
   int out_packets;
   int out_volume;
 #endif
-  struct event *ev_read;
+  struct evconnlistener * ev_conn;
 } port_def_t;
 
 extern port_def_t external_port[5];

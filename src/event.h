@@ -24,7 +24,7 @@ void shutdown_network_threadpool();
 int run_for_at_most_one_second(struct event_base *);
 
 // Listening socket event
-void new_external_port_event_listener(port_def_t *);
+void new_external_port_event_listener(port_def_t *, sockaddr *, socklen_t);
 
 // User socket event
 struct user_event_data {
