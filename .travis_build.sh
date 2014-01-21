@@ -1,10 +1,13 @@
 #!/bin/sh
+sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+sudo apt-get update -qq
+sudo apt-get install -qq gcc-4.8 g++-4.8
 sudo apt-get install -qq bison
 
 if [ "$BUILD" = "i386" ]; then
   sudo apt-get remove libevent-dev libevent* libssl-dev
 
-  sudo apt-get install g++-multilib
+  sudo apt-get install g++-multilib g++-4.8-multilib
   sudo apt-get --no-install-recommends install valgrind:i386
 
   sudo apt-get install libevent-2.0-5:i386
