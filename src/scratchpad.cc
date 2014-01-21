@@ -58,7 +58,7 @@
 #define SIZE_WITH_HDR(x) (x + HDR_SIZE)
 
 static unsigned char scratchblock[SCRATCHPAD_SIZE];
-static sp_block_t scratch_head = { 0, 0 };
+static sp_block_t scratch_head = {0, 0};
 unsigned char *scr_last = &scratchblock[2], *scr_tail = &scratchblock[2];
 unsigned char *scratch_end = scratchblock + SCRATCHPAD_SIZE;
 
@@ -86,8 +86,7 @@ static void scratch_summary()
 }
 #endif
 
-void scratch_destroy()
-{
+void scratch_destroy() {
   sp_block_t *next, *thisb = scratch_head.next;
 
   SDEBUG(printf("scratch_destroy\n"));
@@ -102,9 +101,7 @@ void scratch_destroy()
   scr_tail = &scratchblock[2];
 }
 
-
-char *scratch_copy(const char *str)
-{
+char *scratch_copy(const char *str) {
   unsigned char *from, *to, *end;
 
   SDEBUG2(printf("scratch_copy(%s):", str));
@@ -113,7 +110,9 @@ char *scratch_copy(const char *str)
   from = Str;
   to = scr_tail + 1;
   end = scratch_end - 2; /* room for zero and len */
-  if (end > to + 255) { end = to + 255; }
+  if (end > to + 255) {
+    end = to + 255;
+  }
   while (*from && to < end) {
     *to++ = *from++;
   }
@@ -134,8 +133,7 @@ char *scratch_copy(const char *str)
   return (char *)to;
 }
 
-void scratch_free(char *ptr)
-{
+void scratch_free(char *ptr) {
   /* how do we know what this is?  first we check if it's the last string
      we made.  Otherwise, take advantage of the fact that things on the
      scratchpad have a zero two before them.  Things not on it wont
@@ -149,7 +147,8 @@ void scratch_free(char *ptr)
   } else if (*(Ptr - 2)) {
     sp_block_t *sbt;
 
-    DEBUG_CHECK(*(Ptr - 2) != SCRATCH_MAGIC, "scratch_free called on non-scratchpad string.\n");
+    DEBUG_CHECK(*(Ptr - 2) != SCRATCH_MAGIC,
+                "scratch_free called on non-scratchpad string.\n");
     SDEBUG(printf("block freed\n"));
     sbt = FIND_HDR(ptr);
     if (sbt->prev) {
@@ -165,13 +164,13 @@ void scratch_free(char *ptr)
   }
 }
 
-char *scratch_large_alloc(int size)
-{
+char *scratch_large_alloc(int size) {
   sp_block_t *spt;
 
   SDEBUG(printf("scratch_large_alloc(%i)\n", size));
 
-  spt = (sp_block_t *)DMALLOC(SIZE_WITH_HDR(size), TAG_COMPILER, "scratch_alloc");
+  spt =
+      (sp_block_t *)DMALLOC(SIZE_WITH_HDR(size), TAG_COMPILER, "scratch_alloc");
   if ((spt->next = scratch_head.next)) {
     spt->next->prev = spt;
   }
@@ -182,8 +181,7 @@ char *scratch_large_alloc(int size)
 }
 
 /* warning: unlike REALLOC(), this one only allows increases */
-char *scratch_realloc(char *ptr, int size)
-{
+char *scratch_realloc(char *ptr, int size) {
   SDEBUG(printf("scratch_realloc(%s): ", ptr));
 
   if (Ptr == scr_last) {
@@ -203,11 +201,12 @@ char *scratch_realloc(char *ptr, int size)
   } else if (*(Ptr - 2)) {
     sp_block_t *sbt, *newsbt;
 
-    DEBUG_CHECK(*(Ptr - 2) != SCRATCH_MAGIC, "scratch_realloc on non-scratchpad string.\n");
+    DEBUG_CHECK(*(Ptr - 2) != SCRATCH_MAGIC,
+                "scratch_realloc on non-scratchpad string.\n");
     SDEBUG(printf("block\n"));
     sbt = FIND_HDR(ptr);
-    newsbt = (sp_block_t *)DREALLOC(sbt, SIZE_WITH_HDR(size),
-                                    TAG_COMPILER, "scratch_realloc");
+    newsbt = (sp_block_t *)DREALLOC(sbt, SIZE_WITH_HDR(size), TAG_COMPILER,
+                                    "scratch_realloc");
     newsbt->prev->next = newsbt;
     if (newsbt->next) {
       newsbt->next->prev = newsbt;
@@ -236,8 +235,7 @@ char *scratch_realloc(char *ptr, int size)
 }
 
 /* the routines above are better than this */
-char *scratch_alloc(int size)
-{
+char *scratch_alloc(int size) {
   SDEBUG(printf("scratch_alloc(%i)\n", size));
   if (size < 256 && (scr_tail + size + 1) < scratch_end) {
     scr_last = scr_tail + 1;
@@ -249,8 +247,7 @@ char *scratch_alloc(int size)
   }
 }
 
-char *scratch_join(char *s1, char *s2)
-{
+char *scratch_join(char *s1, char *s2) {
   char *res;
   int tmp;
 
@@ -258,8 +255,10 @@ char *scratch_join(char *s1, char *s2)
   if (*(s1 - 2) || *(s2 - 2)) {
     int l = strlen(s1);
 
-    DEBUG_CHECK(*(S1 - 2) && *(S1 - 2) != SCRATCH_MAGIC, "argument 1 to scratch_join was not a scratchpad string.\n");
-    DEBUG_CHECK(*(S2 - 2) && *(S2 - 2) != SCRATCH_MAGIC, "argument 2 to scratch_join was not a scratchpad string.\n");
+    DEBUG_CHECK(*(S1 - 2) && *(S1 - 2) != SCRATCH_MAGIC,
+                "argument 1 to scratch_join was not a scratchpad string.\n");
+    DEBUG_CHECK(*(S2 - 2) && *(S2 - 2) != SCRATCH_MAGIC,
+                "argument 2 to scratch_join was not a scratchpad string.\n");
 
     res = scratch_realloc(s1, l + strlen(s2) + 1);
     strcpy(res + l, s2);
@@ -268,8 +267,12 @@ char *scratch_join(char *s1, char *s2)
   } else {
     /* This assumes that S1 and S2 were the last two things allocated.
        Make sure this is true */
-    DEBUG_CHECK(S2 != scr_last, "Argument 2 to scratch_join was not the last allocated string.\n");
-    DEBUG_CHECK(S1 != (scr_last - 1 - (*(scr_last - 1))), "Argument 1 to scratch_join was not the second to last allocated string.\n");
+    DEBUG_CHECK(
+        S2 != scr_last,
+        "Argument 2 to scratch_join was not the last allocated string.\n");
+    DEBUG_CHECK(S1 != (scr_last - 1 - (*(scr_last - 1))),
+                "Argument 1 to scratch_join was not the second to last "
+                "allocated string.\n");
 
     if ((tmp = ((scr_tail - S1) - 2)) < 256) {
       scr_tail = scr_last - 2;
@@ -290,8 +293,7 @@ char *scratch_join(char *s1, char *s2)
   }
 }
 
-char *scratch_copy_string(char *s)
-{
+char *scratch_copy_string(char *s) {
   int l;
   register unsigned char *to = scr_tail + 1;
   char *res;
@@ -299,17 +301,29 @@ char *scratch_copy_string(char *s)
   SDEBUG2(printf("scratch_copy_string\n"));
   l = scratch_end - to;
 
-  if (l > 255) { l = 255; }
+  if (l > 255) {
+    l = 255;
+  }
   s++;
   while (l--) {
     if (*s == '\\') {
       switch (*++s) {
-        case 'n': *to++ = '\n'; break;
-        case 't': *to++ = '\t'; break;
-        case 'r': *to++ = '\r'; break;
-        case 'b': *to++ = '\b'; break;
+        case 'n':
+          *to++ = '\n';
+          break;
+        case 't':
+          *to++ = '\t';
+          break;
+        case 'r':
+          *to++ = '\r';
+          break;
+        case 'b':
+          *to++ = '\b';
+          break;
         case '"':
-        case '\\': *to++ = *s; break;
+        case '\\':
+          *to++ = *s;
+          break;
         default:
           *to++ = *s;
           yywarn("Unknown \\x char.");
@@ -338,12 +352,22 @@ char *scratch_copy_string(char *s)
   for (;;) {
     if (*s == '\\') {
       switch (*++s) {
-        case 'n': *to++ = '\n'; break;
-        case 't': *to++ = '\t'; break;
-        case 'r': *to++ = '\r'; break;
-        case 'b': *to++ = '\b'; break;
+        case 'n':
+          *to++ = '\n';
+          break;
+        case 't':
+          *to++ = '\t';
+          break;
+        case 'r':
+          *to++ = '\r';
+          break;
+        case 'b':
+          *to++ = '\b';
+          break;
         case '"':
-        case '\\': *to++ = *s; break;
+        case '\\':
+          *to++ = *s;
+          break;
         default:
           *to++ = *s;
           yywarn("Unknown \\x char.");
@@ -357,6 +381,3 @@ char *scratch_copy_string(char *s)
     }
   }
 }
-
-
-

@@ -4,8 +4,7 @@
 #include <stdio.h>
 #include <errno.h>
 
-void *malloc32(int size)
-{
+void *malloc32(int size) {
   register unsigned long *res = (unsigned long *)malloc(size + sizeof(long));
   if (!res) {
     perror("malloc: ");
@@ -15,15 +14,13 @@ void *malloc32(int size)
   return &res[1];
 }
 
-void free32(void *p)
-{
+void free32(void *p) {
   register unsigned long *mem = (unsigned long *)p;
   mem--;
   free(mem);
 }
 
-void *realloc32(void *p, int size)
-{
+void *realloc32(void *p, int size) {
   register unsigned long *mem = (unsigned long *)p;
   unsigned int oldsize;
   oldsize = mem[-1];
@@ -34,8 +31,7 @@ void *realloc32(void *p, int size)
   return (void *)newmem;
 }
 
-void *calloc32(int num, int size)
-{
+void *calloc32(int num, int size) {
   register void *p;
   size *= num;
   if ((p = malloc32(size))) {

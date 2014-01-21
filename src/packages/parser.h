@@ -7,34 +7,34 @@
  * >0 is a token (OBJ, etc).
  * <=0 is a literal.
  */
-#define ERROR_TOKEN          1
-#define STR_TOKEN        2
-#define WRD_TOKEN        3
+#define ERROR_TOKEN 1
+#define STR_TOKEN 2
+#define WRD_TOKEN 3
 
-#define LIV_MODIFIER         8
-#define VIS_ONLY_MODIFIER    16
-#define PLURAL_MODIFIER      32
-#define CHOOSE_MODIFIER      64
+#define LIV_MODIFIER 8
+#define VIS_ONLY_MODIFIER 16
+#define PLURAL_MODIFIER 32
+#define CHOOSE_MODIFIER 64
 
 #define ADD_MOD(x, y) ((x) | (y))
 
-#define OBJ_A_TOKEN          4
-#define LIV_A_TOKEN          ADD_MOD(OBJ_A_TOKEN, LIV_MODIFIER)
-#define OBJ_TOKEN        ADD_MOD(OBJ_A_TOKEN, VIS_ONLY_MODIFIER)
-#define LIV_TOKEN        ADD_MOD(LIV_A_TOKEN, VIS_ONLY_MODIFIER)
-#define OBS_TOKEN        ADD_MOD(OBJ_A_TOKEN, PLURAL_MODIFIER)
-#define LVS_TOKEN        ADD_MOD(LIV_A_TOKEN, PLURAL_MODIFIER)
+#define OBJ_A_TOKEN 4
+#define LIV_A_TOKEN ADD_MOD(OBJ_A_TOKEN, LIV_MODIFIER)
+#define OBJ_TOKEN ADD_MOD(OBJ_A_TOKEN, VIS_ONLY_MODIFIER)
+#define LIV_TOKEN ADD_MOD(LIV_A_TOKEN, VIS_ONLY_MODIFIER)
+#define OBS_TOKEN ADD_MOD(OBJ_A_TOKEN, PLURAL_MODIFIER)
+#define LVS_TOKEN ADD_MOD(LIV_A_TOKEN, PLURAL_MODIFIER)
 
-#define MAX_NUM_OBJECTS      4096
+#define MAX_NUM_OBJECTS 4096
 /* must be powers of 2 */
-#define HASH_SIZE            32
-#define VERB_HASH_SIZE       128
-#define SPECIAL_HASH_SIZE    16
+#define HASH_SIZE 32
+#define VERB_HASH_SIZE 128
+#define SPECIAL_HASH_SIZE 16
 
 /* This is used to hash shared string pointers for various lookup tables */
-#define DO_HASH(x, n)         ((((POINTER_INT)x) & (n - 1)) ^ \
-                  (((POINTER_INT)x >> 8) & (n - 1)) ^ \
-                  (((POINTER_INT)x >> 16) & (n - 1)))
+#define DO_HASH(x, n)                                                 \
+  ((((POINTER_INT)x) & (n - 1)) ^ (((POINTER_INT)x >> 8) & (n - 1)) ^ \
+   (((POINTER_INT)x >> 16) & (n - 1)))
 
 /*
  * bitvec stuff.  Basically, at the start of parsing, we determine what
@@ -85,28 +85,28 @@ typedef struct {
  * The actual info will be filled in when needed, and PI_SETUP will then
  * be set to 1.  parse_refresh() actually just zeros PI_SETUP.
  */
-#define PI_SETUP        1
-#define PI_LIVING       2
-#define PI_VERB_HANDLER     4
-#define PI_REMOTE_LIVINGS   8
-#define PI_INV_ACCESSIBLE   16
-#define PI_INV_VISIBLE      32
-#define PI_REFRESH      64
+#define PI_SETUP 1
+#define PI_LIVING 2
+#define PI_VERB_HANDLER 4
+#define PI_REMOTE_LIVINGS 8
+#define PI_INV_ACCESSIBLE 16
+#define PI_INV_VISIBLE 32
+#define PI_REFRESH 64
 
 typedef struct parse_info_s {
   int flags;
   struct object_s *ob;
   int num_ids, num_adjs, num_plurals;
-  char **ids, * *adjs, * *plurals;
+  char **ids, **adjs, **plurals;
 } parse_info_t;
 
 /* HV_PERM indicates that an entry shouldn't be removed from the hash
  * table.  Currently, unused.  Good for global objects, etc
  */
-#define HV_PERM   1
-#define HV_NOUN   2
+#define HV_PERM 1
+#define HV_NOUN 2
 #define HV_PLURAL 4
-#define HV_ADJ    8
+#define HV_ADJ 8
 #define HV_NICKNAME 16
 
 /* An entry in the hash table that hashes words->interpretations;
@@ -127,7 +127,13 @@ typedef struct special_word_s {
 } special_word_t;
 
 enum sw_enum_s {
-  SW_NONE = 0, SW_ARTICLE, SW_SELF, SW_ORDINAL, SW_ALL, SW_OF, SW_AND
+  SW_NONE = 0,
+  SW_ARTICLE,
+  SW_SELF,
+  SW_ORDINAL,
+  SW_ALL,
+  SW_OF,
+  SW_AND
 };
 
 /* Each node holds informations about a given rule.  The handler for the
@@ -146,8 +152,8 @@ typedef struct verb_node_s {
  * The entry for a verb.  Links for the verb hash table, and a linked
  * list of rules.
  */
-#define VB_HAS_OBJ  1
-#define VB_IS_SYN   2
+#define VB_HAS_OBJ 1
+#define VB_IS_SYN 2
 
 typedef struct verb_s {
   struct verb_s *next;

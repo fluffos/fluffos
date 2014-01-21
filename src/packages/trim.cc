@@ -8,17 +8,18 @@ Modified by sunyucong@gmail.com.
 
 #include "../lpc_incl.h"
 
-#include <algorithm>    // std::find_if
+#include <algorithm>  // std::find_if
 #include <cctype>
 #include <functional>
 #include <locale>
 #include <string>
 
 // trim from start
-static inline std::string &ltrim(std::string &s, const std::string &charset)
-{
+static inline std::string &ltrim(std::string &s, const std::string &charset) {
   if (charset.empty()) {
-    s.erase(s.begin(), std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
+    s.erase(s.begin(),
+            std::find_if(s.begin(), s.end(),
+                         std::not1(std::ptr_fun<int, int>(std::isspace))));
   } else {
     int pos = s.find_first_not_of(charset);
     if (pos == -1)
@@ -30,10 +31,12 @@ static inline std::string &ltrim(std::string &s, const std::string &charset)
 }
 
 // trim from end
-static inline std::string &rtrim(std::string &s, const std::string &charset)
-{
+static inline std::string &rtrim(std::string &s, const std::string &charset) {
   if (charset.empty()) {
-    s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
+    s.erase(
+        std::find_if(s.rbegin(), s.rend(),
+                     std::not1(std::ptr_fun<int, int>(std::isspace))).base(),
+        s.end());
   } else {
     s.erase(s.find_last_not_of(charset) + 1);
   }
@@ -41,18 +44,17 @@ static inline std::string &rtrim(std::string &s, const std::string &charset)
 }
 
 // trim from both ends
-static inline std::string &trim(std::string &s, const std::string &charset)
-{
+static inline std::string &trim(std::string &s, const std::string &charset) {
   return ltrim(rtrim(s, charset), charset);
 }
 
 typedef std::string &(trim_func)(std::string &, const std::string &);
 
-static inline void _trim_impl(trim_func *func)
-{
+static inline void _trim_impl(trim_func *func) {
   std::string charset;
 
-  // If use 2 arguments, we get characters to remove and positioning in previous parameter.
+  // If use 2 arguments, we get characters to remove and positioning in previous
+  // parameter.
   if (st_num_arg == 2) {
     charset = sp->u.string;
     pop_stack();

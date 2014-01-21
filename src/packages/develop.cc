@@ -7,9 +7,7 @@
 static object_t *ob;
 
 #ifdef F_DEBUG_INFO
-void
-f_debug_info(void)
-{
+void f_debug_info(void) {
   svalue_t *arg;
   outbuffer_t out;
 
@@ -52,17 +50,13 @@ f_debug_info(void)
 #ifdef HAVE_ZLIB
       if (ob->interactive) {
         outbuf_addv(&out, "O_COMPRESSED      : %s\n",
-                    ob->interactive->compressed_stream ? "TRUE" :
-                    "FALSE");
+                    ob->interactive->compressed_stream ? "TRUE" : "FALSE");
         outbuf_addv(&out, "O_ZMP             : %s\n",
-                    ob->interactive->iflags & USING_ZMP ? "TRUE" :
-                    "FALSE");
+                    ob->interactive->iflags & USING_ZMP ? "TRUE" : "FALSE");
         outbuf_addv(&out, "O_GMCP            : %s\n",
-                    ob->interactive->iflags & USING_GMCP ? "TRUE" :
-                    "FALSE");
+                    ob->interactive->iflags & USING_GMCP ? "TRUE" : "FALSE");
         outbuf_addv(&out, "O_MXP             : %s\n",
-                    ob->interactive->iflags & USING_MXP ? "TRUE" :
-                    "FALSE");
+                    ob->interactive->iflags & USING_MXP ? "TRUE" : "FALSE");
       }
 #endif
 
@@ -96,17 +90,18 @@ f_debug_info(void)
 
       outbuf_addv(&out, "program ref's %d\n", ob->prog->ref);
       outbuf_addv(&out, "Name /%s\n", ob->prog->filename);
-      outbuf_addv(&out, "program size %d\n",
-                  ob->prog->program_size);
+      outbuf_addv(&out, "program size %d\n", ob->prog->program_size);
       outbuf_addv(&out, "function flags table %d (%d) \n",
                   ob->prog->last_inherited + ob->prog->num_functions_defined,
-                  (ob->prog->last_inherited + ob->prog->num_functions_defined)* sizeof(unsigned short));
+                  (ob->prog->last_inherited + ob->prog->num_functions_defined) *
+                      sizeof(unsigned short));
       outbuf_addv(&out, "compiler function table %d (%d) \n",
                   ob->prog->num_functions_defined,
                   ob->prog->num_functions_defined * sizeof(function_t));
       outbuf_addv(&out, "num strings %d\n", ob->prog->num_strings);
-      outbuf_addv(&out, "num vars %d (%d)\n", ob->prog->num_variables_defined,
-                  ob->prog->num_variables_defined * (sizeof(char *) + sizeof(short)));
+      outbuf_addv(
+          &out, "num vars %d (%d)\n", ob->prog->num_variables_defined,
+          ob->prog->num_variables_defined * (sizeof(char *) + sizeof(short)));
       outbuf_addv(&out, "num inherits %d (%d)\n", ob->prog->num_inherited,
                   ob->prog->num_inherited * sizeof(inherit_t));
       outbuf_addv(&out, "total size %d\n", ob->prog->total_size);
@@ -132,9 +127,7 @@ f_debug_info(void)
 #endif
 
 #ifdef F_REFS
-void
-f_refs(void)
-{
+void f_refs(void) {
   int r;
 
   switch (sp->type) {
@@ -168,14 +161,13 @@ f_refs(void)
       break;
   }
   free_svalue(sp, "f_refs");
-  put_number(r - 1);          /* minus 1 to compensate for being arg of
-                                 * refs() */
+  put_number(r - 1); /* minus 1 to compensate for being arg of
+                        * refs() */
 }
 #endif
 
 #ifdef F_DESTRUCTED_OBJECTS
-void f_destructed_objects(void)
-{
+void f_destructed_objects(void) {
   int i;
   array_t *ret;
   object_t *ob;
@@ -183,7 +175,7 @@ void f_destructed_objects(void)
   ret = allocate_empty_array(tot_dangling_object);
   ob = obj_list_dangling;
 
-  for (i = 0;  i < tot_dangling_object;  i++) {
+  for (i = 0; i < tot_dangling_object; i++) {
     ret->item[i].type = T_ARRAY;
     ret->item[i].u.arr = allocate_empty_array(2);
     ret->item[i].u.arr->item[0].type = T_STRING;
@@ -201,9 +193,7 @@ void f_destructed_objects(void)
 
 #if (defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS))
 #ifdef F_DEBUGMALLOC
-void
-f_debugmalloc(void)
-{
+void f_debugmalloc(void) {
   char *res;
 
   res = dump_debugmalloc((sp - 1)->u.string, sp->u.number);
@@ -214,27 +204,17 @@ f_debugmalloc(void)
 #endif
 
 #ifdef F_SET_MALLOC_MASK
-void
-f_set_malloc_mask(void)
-{
-  set_malloc_mask((sp--)->u.number);
-}
+void f_set_malloc_mask(void) { set_malloc_mask((sp--)->u.number); }
 #endif
 
 #ifdef F_CHECK_MEMORY
-void
-f_check_memory(void)
-{
-  check_all_blocks((sp--)->u.number);
-}
+void f_check_memory(void) { check_all_blocks((sp--)->u.number); }
 #endif
-#endif                          /* (defined(DEBUGMALLOC) &&
+#endif /* (defined(DEBUGMALLOC) && \
 * defined(DEBUGMALLOC_EXTENSIONS)) */
 
 #ifdef F_TRACE
-void
-f_trace(void)
-{
+void f_trace(void) {
   int ot = -1;
 
   if (command_giver && command_giver->interactive) {
@@ -246,16 +226,16 @@ f_trace(void)
 #endif
 
 #ifdef F_TRACEPREFIX
-void
-f_traceprefix(void)
-{
+void f_traceprefix(void) {
   char *old = 0;
 
   if (command_giver && command_giver->interactive) {
     old = command_giver->interactive->trace_prefix;
     if (sp->type & T_STRING) {
       const char *p = sp->u.string;
-      if (*p == '/') { p++; }
+      if (*p == '/') {
+        p++;
+      }
 
       command_giver->interactive->trace_prefix = make_shared_string(p);
       free_string_svalue(sp);
@@ -271,4 +251,3 @@ f_traceprefix(void)
   }
 }
 #endif
-

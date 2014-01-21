@@ -59,28 +59,28 @@
 
 /* Attempt to guess whether we are running Solaris or not */
 #if defined(sun) && !defined(SunOS_5)
-#  if defined(__svr4__) || defined(__sol__) || defined(SVR4)
-#    define SunOS_5
-#  else
-#    ifdef sun4
-#      define ARCH "Sun4"
-#    else
+#if defined(__svr4__) || defined(__sol__) || defined(SVR4)
+#define SunOS_5
+#else
+#ifdef sun4
+#define ARCH "Sun4"
+#else
 
-#      ifdef sun3
-#        define ARCH "Sun3"
-#      else
-#        define ARCH "Sun"
-#      endif
-#    endif
-#  endif
+#ifdef sun3
+#define ARCH "Sun3"
+#else
+#define ARCH "Sun"
+#endif
+#endif
+#endif
 #endif
 
 #if defined(SunOS_5)
-#  ifdef sparc
-#    define ARCH "Solaris SPARC"
-#  else
-#    define ARCH "Solaris x86"
-#  endif
+#ifdef sparc
+#define ARCH "Solaris SPARC"
+#else
+#define ARCH "Solaris x86"
+#endif
 #endif
 
 #ifdef _AUX_SOURCE
@@ -88,17 +88,17 @@
 #endif
 
 #if defined(__linux__)
-#  ifdef __mc68000
-#    define ARCH "Linux/m68k"
-#  elif defined(__x86_64)
-#      define ARCH "Linux/x86-64"
-#  else
-#    ifdef __alpha
-#      define ARCH "Linux/alpha"
-#    else
-#      define ARCH "Linux"
-#    endif
-#  endif
+#ifdef __mc68000
+#define ARCH "Linux/m68k"
+#elif defined(__x86_64)
+#define ARCH "Linux/x86-64"
+#else
+#ifdef __alpha
+#define ARCH "Linux/alpha"
+#else
+#define ARCH "Linux"
+#endif
+#endif
 #endif
 
 #ifdef hp68k

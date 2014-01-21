@@ -15,8 +15,7 @@
 #include "simul_efun.h"
 #include "eoperators.h"
 
-void f_and()
-{
+void f_and() {
   if (sp->type == T_ARRAY && (sp - 1)->type == T_ARRAY) {
     sp--;
     sp->u.arr = intersect_array((sp + 1)->u.arr, sp->u.arr);
@@ -29,9 +28,7 @@ void f_and()
   sp->subtype = 0;
 }
 
-void
-f_and_eq()
-{
+void f_and_eq() {
   svalue_t *argp;
 
   argp = (sp--)->u.lvalue;
@@ -51,48 +48,55 @@ f_and_eq()
   sp->subtype = 0;
 }
 
-void
-f_div_eq()
-{
+void f_div_eq() {
   svalue_t *argp = (sp--)->u.lvalue;
 
   switch (argp->type | sp->type) {
 
     case T_NUMBER: {
-      if (!sp->u.number) { error("Division by 0nn\n"); }
+      if (!sp->u.number) {
+        error("Division by 0nn\n");
+      }
       sp->u.number = argp->u.number /= sp->u.number;
       sp->subtype = 0;
       break;
     }
 
     case T_REAL: {
-      if (sp->u.real == 0.0) { error("Division by 0rr\n"); }
+      if (sp->u.real == 0.0) {
+        error("Division by 0rr\n");
+      }
       sp->u.real = argp->u.real /= sp->u.real;
       break;
     }
 
-    case T_NUMBER|T_REAL: {
+    case T_NUMBER | T_REAL: {
       if (sp->type == T_NUMBER) {
-        if (!sp->u.number) { error("Division by 0rn\n"); }
+        if (!sp->u.number) {
+          error("Division by 0rn\n");
+        }
         sp->u.real = argp->u.real /= sp->u.number;
         sp->type = T_REAL;
       } else {
-        if (sp->u.real == 0.0) { error("Division by 0nr\n"); }
+        if (sp->u.real == 0.0) {
+          error("Division by 0nr\n");
+        }
         sp->u.real = argp->u.number /= sp->u.real;
       }
       break;
     }
 
     default: {
-      if (!(sp->type & (T_NUMBER | T_REAL))) { error("Bad right type to /=\n"); }
-      else { error("Bad left type to /=\n"); }
+      if (!(sp->type & (T_NUMBER | T_REAL))) {
+        error("Bad right type to /=\n");
+      } else {
+        error("Bad left type to /=\n");
+      }
     }
   }
 }
 
-void
-f_eq()
-{
+void f_eq() {
   int i;
 
   switch (sp->type | (sp - 1)->type) {
@@ -111,7 +115,7 @@ f_eq()
       return;
     }
 
-    case T_NUMBER|T_REAL: {
+    case T_NUMBER | T_REAL: {
       if ((--sp)->type == T_NUMBER) {
         sp->u.number = sp->u.number == (sp + 1)->u.real;
       } else {
@@ -184,9 +188,7 @@ f_eq()
   put_number(i);
 }
 
-void
-f_ge()
-{
+void f_ge() {
   int i = sp->type;
   switch ((--sp)->type | i) {
     case T_NUMBER:
@@ -226,9 +228,7 @@ f_ge()
   }
 }
 
-void
-f_gt()
-{
+void f_gt() {
   int i = sp->type;
   switch ((--sp)->type | i) {
     case T_NUMBER:
@@ -244,7 +244,9 @@ f_gt()
       if (i == T_NUMBER) {
         sp->type = T_NUMBER;
         sp->u.number = sp->u.real > (sp + 1)->u.number;
-      } else { sp->u.number = sp->u.number > (sp + 1)->u.real; }
+      } else {
+        sp->u.number = sp->u.number > (sp + 1)->u.real;
+      }
       sp->subtype = 0;
       break;
     case T_STRING:
@@ -267,9 +269,7 @@ f_gt()
   }
 }
 
-void
-f_le()
-{
+void f_le() {
   int i = sp->type;
   switch ((--sp)->type | i) {
     case T_NUMBER:
@@ -281,11 +281,13 @@ f_le()
       sp->type = T_NUMBER;
       break;
 
-    case T_NUMBER|T_REAL:
+    case T_NUMBER | T_REAL:
       if (i == T_NUMBER) {
         sp->type = T_NUMBER;
         sp->u.number = sp->u.real <= (sp + 1)->u.number;
-      } else { sp->u.number = sp->u.number <= (sp + 1)->u.real; }
+      } else {
+        sp->u.number = sp->u.number <= (sp + 1)->u.real;
+      }
       break;
 
     case T_STRING:
@@ -313,9 +315,7 @@ f_le()
   sp->subtype = 0;
 }
 
-void
-f_lt()
-{
+void f_lt() {
   int i = sp->type;
   switch (i | (--sp)->type) {
     case T_NUMBER:
@@ -325,11 +325,13 @@ f_lt()
       sp->u.number = sp->u.real < (sp + 1)->u.real;
       sp->type = T_NUMBER;
       break;
-    case T_NUMBER|T_REAL:
+    case T_NUMBER | T_REAL:
       if (i == T_NUMBER) {
         sp->type = T_NUMBER;
         sp->u.number = sp->u.real < (sp + 1)->u.number;
-      } else { sp->u.number = sp->u.number < (sp + 1)->u.real; }
+      } else {
+        sp->u.number = sp->u.number < (sp + 1)->u.real;
+      }
       break;
     case T_STRING:
       i = (strcmp(sp->u.string, (sp + 1)->u.string) < 0);
@@ -355,20 +357,15 @@ f_lt()
   sp->subtype = 0;
 }
 
-void
-f_lsh()
-{
+void f_lsh() {
   CHECK_TYPES((sp - 1), T_NUMBER, 1, F_LSH);
   CHECK_TYPES(sp, T_NUMBER, 2, F_LSH);
   sp--;
   sp->u.number <<= (sp + 1)->u.number;
 }
 
-void
-f_lsh_eq()
-{
+void f_lsh_eq() {
   svalue_t *argp;
-
 
   if ((argp = sp->u.lvalue)->type != T_NUMBER) {
     error("Bad left type to <<=\n");
@@ -380,9 +377,7 @@ f_lsh_eq()
   sp->subtype = 0;
 }
 
-void
-f_mod_eq()
-{
+void f_mod_eq() {
   svalue_t *argp;
 
   if ((argp = sp->u.lvalue)->type != T_NUMBER) {
@@ -398,9 +393,7 @@ f_mod_eq()
   sp->subtype = 0;
 }
 
-void
-f_mult_eq()
-{
+void f_mult_eq() {
   svalue_t *argp = (sp--)->u.lvalue;
 
   switch (argp->type | sp->type) {
@@ -415,7 +408,7 @@ f_mult_eq()
       break;
     }
 
-    case T_NUMBER|T_REAL: {
+    case T_NUMBER | T_REAL: {
       if (sp->type == T_NUMBER) {
         sp->type = T_REAL;
         sp->u.real = argp->u.real *= sp->u.number;
@@ -435,16 +428,16 @@ f_mult_eq()
     }
 
     default: {
-      if (!(sp->type & (T_NUMBER | T_REAL | T_MAPPING))) { error("Bad right type to *=\n"); }
-      else { error("Bad left type to *=\n"); }
+      if (!(sp->type & (T_NUMBER | T_REAL | T_MAPPING))) {
+        error("Bad right type to *=\n");
+      } else {
+        error("Bad left type to *=\n");
+      }
     }
   }
 }
 
-
-void
-f_ne()
-{
+void f_ne() {
   int i;
 
   switch (sp->type | (sp - 1)->type) {
@@ -463,7 +456,7 @@ f_ne()
       return;
     }
 
-    case T_NUMBER|T_REAL: {
+    case T_NUMBER | T_REAL: {
       if ((--sp)->type == T_NUMBER) {
         sp->u.number = sp->u.number != (sp + 1)->u.real;
       } else {
@@ -539,9 +532,7 @@ f_ne()
   sp->u.number = i;
 }
 
-void
-f_or()
-{
+void f_or() {
   if (sp->type == T_ARRAY && (sp - 1)->type == T_ARRAY) {
     sp--;
     sp->u.arr = union_array(sp->u.arr, (sp + 1)->u.arr);
@@ -553,9 +544,7 @@ f_or()
   sp->u.number |= (sp + 1)->u.number;
 }
 
-void
-f_or_eq()
-{
+void f_or_eq() {
   svalue_t *argp;
 
   argp = (sp--)->u.lvalue;
@@ -575,9 +564,7 @@ f_or_eq()
   sp->subtype = 0;
 }
 
-void
-f_parse_command()
-{
+void f_parse_command() {
   svalue_t *arg;
   svalue_t *fp;
   int i;
@@ -605,10 +592,10 @@ f_parse_command()
   CHECK_STACK_OVERFLOW(num_arg + 1);
   sp += num_arg + 1;
   arg = sp;
-  *(arg--) = *(fp--);         /* move pattern to top of stack */
-  *(arg--) = *(fp--);         /* move source object or array to just below
-                                   the pattern */
-  *(arg) = *(fp);             /* move source string just below the object */
+  *(arg--) = *(fp--); /* move pattern to top of stack */
+  *(arg--) = *(fp--); /* move source object or array to just below
+                           the pattern */
+  *(arg) = *(fp); /* move source string just below the object */
   fp->type = T_NUMBER;
 
   /*
@@ -635,9 +622,7 @@ f_parse_command()
   fp->subtype = 0;
 }
 
-void
-f_range(int code)
-{
+void f_range(int code) {
   int from, to, len;
 
   if ((sp - 2)->type != T_NUMBER) {
@@ -653,20 +638,26 @@ f_range(int code)
 
       len = SVALUE_STRLEN(sp);
       to = (--sp)->u.number;
-      if (code & 0x01) { to = len - to; }
+      if (code & 0x01) {
+        to = len - to;
+      }
 #ifdef OLD_RANGE_BEHAVIOR
       else if (to < 0) {
         to += len;
       }
 #endif
       from = (--sp)->u.number;
-      if (code & 0x10) { from = len - from; }
+      if (code & 0x10) {
+        from = len - from;
+      }
 #ifdef OLD_RANGE_BEHAVIOR
       else if (from < 0) {
         from += len;
       }
 #endif
-      if (from < 0) { from = 0; }
+      if (from < 0) {
+        from = 0;
+      }
 
       if (to < from || from >= len) {
         free_string_svalue(sp + 2);
@@ -694,25 +685,37 @@ f_range(int code)
 
       len = rbuf->size;
       to = (--sp)->u.number;
-      if (code & 0x01) { to = len - to; }
+      if (code & 0x01) {
+        to = len - to;
+      }
 #ifdef OLD_RANGE_BEHAVIOR
-      if (to < 0) { to += len; }
+      if (to < 0) {
+        to += len;
+      }
 #endif
       from = (--sp)->u.number;
-      if (code & 0x10) { from = len - from; }
+      if (code & 0x10) {
+        from = len - from;
+      }
 #ifdef OLD_RANGE_BEHAVIOR
       if (from < 0) {
-        if ((from += len) < 0) { from = 0; }
+        if ((from += len) < 0) {
+          from = 0;
+        }
       }
 #else
-      if (from < 0) { from = 0; }
+      if (from < 0) {
+        from = 0;
+      }
 #endif
       if (to < from || from >= len) {
         free_buffer(rbuf);
         put_buffer(null_buffer());
         return;
       }
-      if (to >= len) { to = len - 1; }
+      if (to >= len) {
+        to = len - 1;
+      }
       {
         buffer_t *nbuf = allocate_buffer(to - from + 1);
         memcpy(nbuf->item, rbuf->item + from, to - from + 1);
@@ -726,9 +729,13 @@ f_range(int code)
     case T_ARRAY: {
       array_t *v = sp->u.arr;
       to = (--sp)->u.number;
-      if (code & 0x01) { to = v->size - to; }
+      if (code & 0x01) {
+        to = v->size - to;
+      }
       from = (--sp)->u.number;
-      if (code & 0x10) { from = v->size - from; }
+      if (code & 0x10) {
+        from = v->size - from;
+      }
       put_array(slice_array(v, from, to));
       break;
     }
@@ -739,10 +746,8 @@ f_range(int code)
   }
 }
 
-void
-f_extract_range(int code)
-{
-  int from,  len;
+void f_extract_range(int code) {
+  int from, len;
 
   if ((sp - 1)->type != T_NUMBER) {
     error("Start of range [ .. ] interval must be a number.\n");
@@ -754,13 +759,19 @@ f_extract_range(int code)
 
       len = SVALUE_STRLEN(sp);
       from = (--sp)->u.number;
-      if (code) { from = len - from; }
+      if (code) {
+        from = len - from;
+      }
 #ifdef OLD_RANGE_BEHAVIOR
       if (from < 0) {
-        if ((from += len) < 0) { from = 0; }
+        if ((from += len) < 0) {
+          from = 0;
+        }
       }
 #else
-      if (from < 0) { from = 0; }
+      if (from < 0) {
+        from = 0;
+      }
 #endif
       if (from >= len) {
         sp->type = T_STRING;
@@ -777,18 +788,25 @@ f_extract_range(int code)
       buffer_t *rbuf = sp->u.buf;
       buffer_t *nbuf;
 
-
       len = rbuf->size;
       from = (--sp)->u.number;
-      if (code) { from = len - from; }
+      if (code) {
+        from = len - from;
+      }
 #ifdef OLD_RANGE_BEHAVIOR
       if (from < 0) {
-        if ((from += len) < 0) { from = 0; }
+        if ((from += len) < 0) {
+          from = 0;
+        }
       }
 #else
-      if (from < 0) { from = 0; }
+      if (from < 0) {
+        from = 0;
+      }
 #endif
-      if (from > len) { from = len; }
+      if (from > len) {
+        from = len;
+      }
       nbuf = allocate_buffer(len - from);
       memcpy(nbuf->item, rbuf->item + from, len - from);
       free_buffer(rbuf);
@@ -800,7 +818,9 @@ f_extract_range(int code)
     case T_ARRAY: {
       array_t *v = sp->u.arr;
       from = (--sp)->u.number;
-      if (code) { from = v->size - from; }
+      if (code) {
+        from = v->size - from;
+      }
       put_array(slice_array(v, from, v->size - 1));
       break;
     }
@@ -810,18 +830,14 @@ f_extract_range(int code)
   }
 }
 
-void
-f_rsh()
-{
+void f_rsh() {
   CHECK_TYPES((sp - 1), T_NUMBER, 1, F_RSH);
   CHECK_TYPES(sp, T_NUMBER, 2, F_RSH);
   sp--;
   sp->u.number >>= (sp + 1)->u.number;
 }
 
-void
-f_rsh_eq()
-{
+void f_rsh_eq() {
   svalue_t *argp;
 
   if ((argp = sp->u.lvalue)->type != T_NUMBER) {
@@ -834,9 +850,7 @@ f_rsh_eq()
   sp->subtype = 0;
 }
 
-void
-f_sub_eq()
-{
+void f_sub_eq() {
   svalue_t *argp = (sp--)->u.lvalue;
 
   switch (argp->type | sp->type) {
@@ -851,11 +865,13 @@ f_sub_eq()
       break;
     }
 
-    case T_NUMBER|T_REAL: {
+    case T_NUMBER | T_REAL: {
       if (sp->type == T_NUMBER) {
         sp->type = T_REAL;
         sp->u.real = argp->u.real -= sp->u.number;
-      } else { sp->u.real = argp->u.number -= sp->u.real; }
+      } else {
+        sp->u.real = argp->u.number -= sp->u.real;
+      }
       break;
     }
 
@@ -878,9 +894,13 @@ f_sub_eq()
     }
 
     default: {
-      if (!(sp->type & (T_NUMBER | T_REAL | T_ARRAY))) { error("Bad right type to -=\n"); }
-      else if (!(argp->type & (T_NUMBER | T_REAL | T_ARRAY))) { error("Bad left type to -=\n"); }
-      else { error("Arguments to -= do not match in type.\n"); }
+      if (!(sp->type & (T_NUMBER | T_REAL | T_ARRAY))) {
+        error("Bad right type to -=\n");
+      } else if (!(argp->type & (T_NUMBER | T_REAL | T_ARRAY))) {
+        error("Bad left type to -=\n");
+      } else {
+        error("Arguments to -= do not match in type.\n");
+      }
     }
   }
 }
@@ -915,36 +935,33 @@ f_sub_eq()
 #define SWITCH_CASE_SIZE (sizeof(LPC_INT) + sizeof(short))
 
 /* offsets from 'pc' */
-#define SW_TYPE         0
-#define SW_TABLE        1
-#define SW_ENDTAB       3
-#define SW_DEFAULT      5
+#define SW_TYPE 0
+#define SW_TABLE 1
+#define SW_ENDTAB 3
+#define SW_DEFAULT 5
 
 /* offsets used for range (L_ for lower member, U_ for upper member) */
 #define L_LOWER 0
-#define L_TYPE  (sizeof(LPC_INT))
+#define L_TYPE (sizeof(LPC_INT))
 #define L_UPPER (SWITCH_CASE_SIZE)
-#define L_ADDR  (SWITCH_CASE_SIZE + sizeof(LPC_INT))
+#define L_ADDR (SWITCH_CASE_SIZE + sizeof(LPC_INT))
 #define U_LOWER (-SWITCH_CASE_SIZE)
-#define U_TYPE  (-SWITCH_CASE_SIZE + sizeof(LPC_INT))
+#define U_TYPE (-SWITCH_CASE_SIZE + sizeof(LPC_INT))
 #define U_UPPER 0
-#define U_ADDR  (sizeof(LPC_INT))
+#define U_ADDR (sizeof(LPC_INT))
 
 // FIXME: The variable naming scheme is horrible, need to
 // read again and rename what i, d, s, r to something meaningful.
-void f_switch()
-{
+void f_switch() {
   unsigned short offset, end_off;
-  LPC_INT  i, d, s, r;
+  LPC_INT i, d, s, r;
   char *l, *end_tab;
   static unsigned short off_tab[] = {
-    0 * SWITCH_CASE_SIZE, 1 * SWITCH_CASE_SIZE, 3 * SWITCH_CASE_SIZE,
-    7 * SWITCH_CASE_SIZE, 15 * SWITCH_CASE_SIZE, 31 * SWITCH_CASE_SIZE,
-    63 * SWITCH_CASE_SIZE, 127 * SWITCH_CASE_SIZE,
-    255 * SWITCH_CASE_SIZE, 511 * SWITCH_CASE_SIZE,
-    1023 * SWITCH_CASE_SIZE, 2047 * SWITCH_CASE_SIZE,
-    4095 * SWITCH_CASE_SIZE,
-  };
+      0 * SWITCH_CASE_SIZE,    1 * SWITCH_CASE_SIZE,    3 * SWITCH_CASE_SIZE,
+      7 * SWITCH_CASE_SIZE,    15 * SWITCH_CASE_SIZE,   31 * SWITCH_CASE_SIZE,
+      63 * SWITCH_CASE_SIZE,   127 * SWITCH_CASE_SIZE,  255 * SWITCH_CASE_SIZE,
+      511 * SWITCH_CASE_SIZE,  1023 * SWITCH_CASE_SIZE, 2047 * SWITCH_CASE_SIZE,
+      4095 * SWITCH_CASE_SIZE, };
 
   COPY_SHORT(&offset, pc + SW_TABLE);
   COPY_SHORT(&end_off, pc + SW_ENDTAB);
@@ -976,7 +993,7 @@ void f_switch()
     } else {
       bad_argument(sp, T_STRING, 1, F_SWITCH);
     }
-  } else {                    /* Integer table, check type */
+  } else {/* Integer table, check type */
     CHECK_TYPES(sp, T_NUMBER, 1, F_SWITCH);
     s = (sp--)->u.number;
     i = pc[0] & 0xf;
@@ -1035,10 +1052,9 @@ void f_switch()
             COPY_SHORT(&offset, l + U_ADDR);
             if (!offset) {
               /* range with lookup table */
-              l = pc + offset +
-                  (s - r) * sizeof(short);
+              l = pc + offset + (s - r) * sizeof(short);
               COPY_SHORT(&offset, l);
-            }       /* else normal range and offset is correct */
+            } /* else normal range and offset is correct */
             break;
           }
         }
@@ -1063,14 +1079,14 @@ void f_switch()
               /* range with lookup table */
               l = pc + offset + (s - r) * sizeof(short);
               COPY_SHORT(&offset, l);
-            }       /* else normal range and offset is correct */
+            } /* else normal range and offset is correct */
             break;
           }
         }
         /* use default address */
         COPY_SHORT(&offset, pc + SW_DEFAULT);
         break;
-      } else {            /* d >= SWITCH_CASE_SIZE */
+      } else {/* d >= SWITCH_CASE_SIZE */
         l += d;
         /* if table isn't a power of 2 in size, fix us up */
         while (l >= end_tab) {
@@ -1104,7 +1120,7 @@ void f_switch()
           /* start of range with lookup table */
           l = pc + offset;
           COPY_SHORT(&offset, l);
-        }               /* else normal range, offset is correct */
+        } /* else normal range, offset is correct */
       }
       break;
     }
@@ -1113,12 +1129,10 @@ void f_switch()
   pc += offset;
 }
 
-void
-call_simul_efun(unsigned short index, int num_arg)
-{
+void call_simul_efun(unsigned short index, int num_arg) {
   extern object_t *simul_efun_ob;
 
-  if (current_object->flags & O_DESTRUCTED) { /* No external calls allowed */
+  if (current_object->flags & O_DESTRUCTED) {/* No external calls allowed */
     pop_n_elems(num_arg);
     push_undefined();
     return;
@@ -1133,25 +1147,20 @@ call_simul_efun(unsigned short index, int num_arg)
     /* Don't need to use apply() since we have the pointer directly;
      * this saves function lookup.
      */
-    call_direct(simul_efun_ob, simuls[index].index,
-                ORIGIN_SIMUL_EFUN, num_arg);
+    call_direct(simul_efun_ob, simuls[index].index, ORIGIN_SIMUL_EFUN, num_arg);
   } else {
     error("Function is no longer a simul_efun.\n");
   }
 }
 
-void
-f_xor()
-{
+void f_xor() {
   CHECK_TYPES((sp - 1), T_NUMBER, 1, F_XOR);
   CHECK_TYPES(sp, T_NUMBER, 2, F_XOR);
   sp--;
   sp->u.number ^= (sp + 1)->u.number;
 }
 
-void
-f_xor_eq()
-{
+void f_xor_eq() {
   svalue_t *argp;
 
   if ((argp = sp->u.lvalue)->type != T_NUMBER) {
@@ -1163,9 +1172,7 @@ f_xor_eq()
   sp->u.number = argp->u.number ^= sp->u.number;
 }
 
-void
-f_function_constructor()
-{
+void f_function_constructor() {
   funptr_t *fp;
   int kind;
   unsigned short index;
@@ -1192,8 +1199,8 @@ f_function_constructor()
     case FP_FUNCTIONAL | FP_NOT_BINDABLE: {
       int num_arg;
 
-      num_arg = EXTRACT_UCHAR(pc++);  /* number of arguments */
-      LOAD_SHORT(index, pc);       /* length of functional */
+      num_arg = EXTRACT_UCHAR(pc++); /* number of arguments */
+      LOAD_SHORT(index, pc);         /* length of functional */
       fp = make_functional_funp(num_arg, 0, index, sp, kind & FP_NOT_BINDABLE);
       pop_stack();
       break;
@@ -1205,7 +1212,8 @@ f_function_constructor()
       num_arg = EXTRACT_UCHAR(pc++);
       locals = EXTRACT_UCHAR(pc++);
       LOAD_SHORT(index, pc); /* length */
-      fp = make_functional_funp(num_arg, locals, index, 0, kind & FP_NOT_BINDABLE);
+      fp = make_functional_funp(num_arg, locals, index, 0,
+                                kind & FP_NOT_BINDABLE);
       break;
     }
     default:
@@ -1214,9 +1222,7 @@ f_function_constructor()
   push_refed_funp(fp);
 }
 
-void
-f__evaluate(void)
-{
+void f__evaluate(void) {
   svalue_t *v;
   svalue_t *arg = sp - st_num_arg + 1;
 
@@ -1233,9 +1239,7 @@ f__evaluate(void)
   assign_svalue(sp, v);
 }
 
-void
-f_sscanf()
-{
+void f_sscanf() {
   svalue_t *fp;
   int i;
   int num_arg;
@@ -1254,12 +1258,12 @@ f_sscanf()
   fp = sp;
   CHECK_STACK_OVERFLOW(num_arg + 1);
   sp += num_arg + 1;
-  *sp = *(fp--);              /* move format description to top of stack */
-  *(sp - 1) = *(fp);          /* move source string just below the format
-                                 * desc. */
-  fp->type = T_NUMBER;        /* this svalue isn't invalidated below, and
-                                 * if we don't change it to something safe,
-                                 * it will get freed twice if an error occurs */
+  *sp = *(fp--);     /* move format description to top of stack */
+  *(sp - 1) = *(fp); /* move source string just below the format
+                        * desc. */
+  fp->type = T_NUMBER; /* this svalue isn't invalidated below, and
+                          * if we don't change it to something safe,
+                          * it will get freed twice if an error occurs */
   /*
    * prep area for rvalues
    */

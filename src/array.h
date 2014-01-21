@@ -11,7 +11,7 @@ typedef struct array_s {
 #endif
   int size;
 #ifdef PACKAGE_MUDLIB_STATS
-  statgroup_t stats;          /* creator of the array */
+  statgroup_t stats; /* creator of the array */
 #endif
   svalue_t item[1];
 } array_t;
@@ -66,11 +66,11 @@ array_t *union_array(array_t *, array_t *);
 array_t *copy_array(array_t *p);
 array_t *resize_array(array_t *p, unsigned int n);
 
-#define ALLOC_ARRAY(nelem) \
-    (array_t *)DCALLOC(sizeof (array_t) + \
-          sizeof(svalue_t) * (nelem - 1), 1, TAG_ARRAY, "ALLOC_ARRAY")
-#define RESIZE_ARRAY(vec, nelem) \
-    (array_t *)DREALLOC(vec, sizeof (array_t) + \
-          sizeof(svalue_t) * (nelem - 1), TAG_ARRAY, "RESIZE_ARRAY")
+#define ALLOC_ARRAY(nelem)                                                 \
+  (array_t *) DCALLOC(sizeof(array_t) + sizeof(svalue_t) * (nelem - 1), 1, \
+                      TAG_ARRAY, "ALLOC_ARRAY")
+#define RESIZE_ARRAY(vec, nelem)                                              \
+  (array_t *) DREALLOC(vec, sizeof(array_t) + sizeof(svalue_t) * (nelem - 1), \
+                       TAG_ARRAY, "RESIZE_ARRAY")
 
 #endif

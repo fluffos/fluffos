@@ -31,9 +31,9 @@ typedef struct {
 } pcre_t;
 
 struct pcre_cache_bucket_t {
-  pcre *compiled_pattern; // value1
-  svalue_t pattern;    // key
-  int size;               // size in bytes
+  pcre *compiled_pattern;  // value1
+  svalue_t pattern;        // key
+  int size;                // size in bytes
   struct pcre_cache_bucket_t *next;
 };
 
@@ -41,6 +41,4 @@ struct pcre_cache_t {
   struct pcre_cache_bucket_t *buckets[PCRE_CACHE_SIZE];
 };
 
-
 #endif
-

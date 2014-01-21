@@ -45,9 +45,10 @@
 #define TELOPT_MSSP 70
 #define TELOPT_COMPRESS 85
 #define TELOPT_COMPRESS2 86
-#define TELOPT_MXP  91  // mud extension protocol
-#define TELOPT_ZMP  93  // zenith mud protocol
-#define TELOPT_GMCP 201 // something mud communication protocol, how many do we need?
+#define TELOPT_MXP 91  // mud extension protocol
+#define TELOPT_ZMP 93  // zenith mud protocol
+#define TELOPT_GMCP \
+  201  // something mud communication protocol, how many do we need?
 
 #define MSSP_VAR 1
 #define MSSP_VAL 2
@@ -57,70 +58,69 @@
 #endif
 
 #define TELOPT_NEW_ENVIRON 39
-#define NEW_ENV_IS               0
-#define NEW_ENV_SEND             1
-#define NEW_ENV_INFO             2
-#define NEW_ENV_VAR              0
-#define NEW_ENV_VALUE            1
-#define NEW_ENV_ESC              2
-#define NEW_ENV_USERVAR          3
+#define NEW_ENV_IS 0
+#define NEW_ENV_SEND 1
+#define NEW_ENV_INFO 2
+#define NEW_ENV_VAR 0
+#define NEW_ENV_VALUE 1
+#define NEW_ENV_ESC 2
+#define NEW_ENV_USERVAR 3
 
+static unsigned char telnet_break_response[] = {28, IAC, WILL, TELOPT_TM};
+static unsigned char telnet_ip_response[] = {127, IAC, WILL, TELOPT_TM};
+static unsigned char telnet_abort_response[] = {IAC, DM};
+static unsigned char telnet_do_tm_response[] = {IAC, WILL, TELOPT_TM};
+static unsigned char telnet_do_naws[] = {IAC, DO, TELOPT_NAWS};
+static unsigned char telnet_dont_naws[] = {IAC, DONT, TELOPT_NAWS};
+static unsigned char telnet_do_ttype[] = {IAC, DO, TELOPT_TTYPE};
+static unsigned char telnet_term_query[] = {IAC,          SB,  TELOPT_TTYPE,
+                                            TELQUAL_SEND, IAC, SE};
+static unsigned char telnet_no_echo[] = {IAC, WONT, TELOPT_ECHO};
+static unsigned char telnet_no_single[] = {IAC, WONT, TELOPT_SGA};
+static unsigned char telnet_yes_echo[] = {IAC, WILL, TELOPT_ECHO};
+static unsigned char telnet_yes_single[] = {IAC, WILL, TELOPT_SGA};
+static unsigned char telnet_ga[] = {IAC, GA};
+static unsigned char telnet_ayt_response[] = {'\n', '[', '-', 'Y', 'e',
+                                              's',  '-', ']', ' ', '\n'};
+static unsigned char telnet_line_mode[] = {IAC, DO, TELOPT_LINEMODE};
+static unsigned char telnet_lm_mode[] = {
+    IAC, SB, TELOPT_LINEMODE, LM_MODE, MODE_EDIT | MODE_TRAPSIG, IAC, SE};
+static unsigned char telnet_char_mode[] = {IAC, DONT, TELOPT_LINEMODE};
 
-static unsigned char telnet_break_response[] = {  28, IAC, WILL, TELOPT_TM };
-static unsigned char telnet_ip_response[]    = { 127, IAC, WILL, TELOPT_TM };
-static unsigned char telnet_abort_response[] = { IAC, DM };
-static unsigned char telnet_do_tm_response[] = { IAC, WILL, TELOPT_TM };
-static unsigned char telnet_do_naws[]        = { IAC, DO, TELOPT_NAWS };
-static unsigned char telnet_dont_naws[]      = { IAC, DONT, TELOPT_NAWS };
-static unsigned char telnet_do_ttype[]       = { IAC, DO, TELOPT_TTYPE };
-static unsigned char telnet_term_query[]     = { IAC, SB, TELOPT_TTYPE, TELQUAL_SEND, IAC, SE };
-static unsigned char telnet_no_echo[]        = { IAC, WONT, TELOPT_ECHO };
-static unsigned char telnet_no_single[]      = { IAC, WONT, TELOPT_SGA };
-static unsigned char telnet_yes_echo[]       = { IAC, WILL, TELOPT_ECHO };
-static unsigned char telnet_yes_single[]     = { IAC, WILL, TELOPT_SGA };
-static unsigned char telnet_ga[]             = { IAC, GA };
-static unsigned char telnet_ayt_response[]   = { '\n', '[', '-', 'Y', 'e', 's', '-', ']', ' ', '\n' };
-static unsigned char telnet_line_mode[]      = { IAC, DO, TELOPT_LINEMODE };
-static unsigned char telnet_lm_mode[]        = { IAC, SB, TELOPT_LINEMODE, LM_MODE, MODE_EDIT | MODE_TRAPSIG, IAC, SE };
-static unsigned char telnet_char_mode[]      = { IAC, DONT, TELOPT_LINEMODE };
-
-static unsigned char slc_default_flags[] = { SLC_NOSUPPORT, SLC_CANTCHANGE, SLC_CANTCHANGE, SLC_CANTCHANGE, SLC_CANTCHANGE, SLC_NOSUPPORT,
-    SLC_NOSUPPORT, SLC_NOSUPPORT, SLC_CANTCHANGE, SLC_CANTCHANGE, SLC_NOSUPPORT, SLC_NOSUPPORT,
-    SLC_NOSUPPORT, SLC_NOSUPPORT, SLC_NOSUPPORT, SLC_NOSUPPORT, SLC_NOSUPPORT, SLC_NOSUPPORT
-                                           };
-static unsigned char slc_default_chars[] = { 0x00, BREAK, IP, AO, AYT, 0x00, 0x00, 0x00,
-    SUSP, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00
-                                           };
+static unsigned char slc_default_flags[] = {
+    SLC_NOSUPPORT,  SLC_CANTCHANGE, SLC_CANTCHANGE, SLC_CANTCHANGE,
+    SLC_CANTCHANGE, SLC_NOSUPPORT,  SLC_NOSUPPORT,  SLC_NOSUPPORT,
+    SLC_CANTCHANGE, SLC_CANTCHANGE, SLC_NOSUPPORT,  SLC_NOSUPPORT,
+    SLC_NOSUPPORT,  SLC_NOSUPPORT,  SLC_NOSUPPORT,  SLC_NOSUPPORT,
+    SLC_NOSUPPORT,  SLC_NOSUPPORT};
+static unsigned char slc_default_chars[] = {
+    0x00, BREAK, IP,   AO,   AYT,  0x00, 0x00, 0x00, SUSP,
+    0x08, 0x00,  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 #ifdef HAVE_ZLIB
-static unsigned char telnet_compress_send_request_v2[] = { IAC, WILL,
-    TELOPT_COMPRESS2
-                                                         };
+static unsigned char telnet_compress_send_request_v2[] = {IAC, WILL,
+                                                          TELOPT_COMPRESS2};
 
-static unsigned char telnet_compress_send_request_v1[] = { IAC, WILL,
-    TELOPT_COMPRESS
-                                                         };
+static unsigned char telnet_compress_send_request_v1[] = {IAC, WILL,
+                                                          TELOPT_COMPRESS};
 
-static unsigned char telnet_compress_v1_response[] = { IAC, SB,
-    TELOPT_COMPRESS, WILL,
-    SE
-                                                     };
-static unsigned char telnet_compress_v2_response[] = { IAC, SB,
-    TELOPT_COMPRESS2, IAC,
-    SE
-                                                     };
+static unsigned char telnet_compress_v1_response[] = {IAC,  SB, TELOPT_COMPRESS,
+                                                      WILL, SE};
+static unsigned char telnet_compress_v2_response[] = {IAC, SB, TELOPT_COMPRESS2,
+                                                      IAC, SE};
 
 #endif
-static unsigned char telnet_do_mxp[]     = { IAC, DO, TELOPT_MXP };
-static unsigned char telnet_will_mxp[]     = { IAC, SB, TELOPT_MXP, IAC, SE };
-static unsigned char telnet_will_mssp[] = { IAC, WILL, TELOPT_MSSP };
-static unsigned char telnet_start_mssp[] = { IAC, SB, TELOPT_MSSP };
-static unsigned char telnet_mssp_value[] = {MSSP_VAR, '%', 's', MSSP_VAL, '%', 's', 0};
+static unsigned char telnet_do_mxp[] = {IAC, DO, TELOPT_MXP};
+static unsigned char telnet_will_mxp[] = {IAC, SB, TELOPT_MXP, IAC, SE};
+static unsigned char telnet_will_mssp[] = {IAC, WILL, TELOPT_MSSP};
+static unsigned char telnet_start_mssp[] = {IAC, SB, TELOPT_MSSP};
+static unsigned char telnet_mssp_value[] = {MSSP_VAR, '%', 's', MSSP_VAL,
+                                            '%',      's', 0};
 static unsigned char telnet_end_sub[] = {IAC, SE};
-static unsigned char telnet_will_zmp[] = { IAC, WILL, TELOPT_ZMP};
-static unsigned char telnet_start_zmp[] = { IAC, SB, TELOPT_ZMP};
-static unsigned char telnet_do_newenv[]     = { IAC, DO, TELOPT_NEW_ENVIRON };
-static unsigned char telnet_send_uservar[]     = { IAC, SB, TELOPT_NEW_ENVIRON, NEW_ENV_SEND, IAC, SE };
+static unsigned char telnet_will_zmp[] = {IAC, WILL, TELOPT_ZMP};
+static unsigned char telnet_start_zmp[] = {IAC, SB, TELOPT_ZMP};
+static unsigned char telnet_do_newenv[] = {IAC, DO, TELOPT_NEW_ENVIRON};
+static unsigned char telnet_send_uservar[] = {
+    IAC, SB, TELOPT_NEW_ENVIRON, NEW_ENV_SEND, IAC, SE};
 static unsigned char telnet_will_gmcp[] = {IAC, WILL, TELOPT_GMCP};
 static unsigned char telnet_start_gmcp[] = {IAC, SB, TELOPT_GMCP};
 /*
@@ -141,9 +141,10 @@ static int send_compressed(interactive_t *ip, unsigned char *data, int length);
 static int flush_compressed_output(interactive_t *ip);
 
 #ifdef NO_SNOOP
-#  define handle_snoop(str, len, who)
+#define handle_snoop(str, len, who)
 #else
-#  define handle_snoop(str, len, who) if ((who)->snooped_by) receive_snoop(str, len, who->snooped_by)
+#define handle_snoop(str, len, who) \
+  if ((who)->snooped_by) receive_snoop(str, len, who->snooped_by)
 
 static void receive_snoop(const char *, int, object_t *ob);
 
@@ -155,11 +156,11 @@ static void receive_snoop(const char *, int, object_t *ob);
 fd_set readmask, writemask;
 int num_user;
 #ifdef F_SET_HIDE
-int num_hidden_users = 0;       /* for the O_HIDDEN flag.  This counter must
- * be kept up to date at all times!  If you
- * modify the O_HIDDEN flag in an object,
- * make sure that you update this counter if
- * the object is interactive. */
+int num_hidden_users = 0; /* for the O_HIDDEN flag.  This counter must
+* be kept up to date at all times!  If you
+* modify the O_HIDDEN flag in an object,
+* make sure that you update this counter if
+* the object is interactive. */
 #endif
 int add_message_calls = 0;
 #ifdef F_NETWORK_STATS
@@ -182,11 +183,10 @@ int max_users = 0;
 int has_console = -1;
 #endif
 
-static
-void set_linemode(interactive_t *ip)
-{
+static void set_linemode(interactive_t *ip) {
   if (ip->iflags & USING_LINEMODE) {
-    add_binary_message_noflush(ip->ob, telnet_line_mode, sizeof(telnet_line_mode));
+    add_binary_message_noflush(ip->ob, telnet_line_mode,
+                               sizeof(telnet_line_mode));
     add_binary_message_noflush(ip->ob, telnet_lm_mode, sizeof(telnet_lm_mode));
     flush_message(ip);
   } else {
@@ -194,9 +194,7 @@ void set_linemode(interactive_t *ip)
   }
 }
 
-static
-void set_charmode(interactive_t *ip)
-{
+static void set_charmode(interactive_t *ip) {
   if (ip->iflags & USING_LINEMODE) {
     add_binary_message(ip->ob, telnet_char_mode, sizeof(telnet_char_mode));
   } else {
@@ -205,10 +203,8 @@ void set_charmode(interactive_t *ip)
 }
 
 #ifndef NO_SNOOP
-static void
-receive_snoop(const char *buf, int len, object_t *snooper)
-{
-  /* command giver no longer set to snooper */
+static void receive_snoop(const char *buf, int len, object_t *snooper) {
+/* command giver no longer set to snooper */
 #ifdef RECEIVE_SNOOP
   char *str;
 
@@ -236,8 +232,7 @@ void init_user_conn() {
     external_port[i].out_packets = 0;
     external_port[i].out_volume = 0;
 #endif
-    if (!external_port[i].port)
-      continue;
+    if (!external_port[i].port) continue;
     /*
      * fill in socket address information.
      */
@@ -268,16 +263,17 @@ void init_user_conn() {
 
     if (ret) {
       debug_message("init_user_conn: getaddrinfo error: %s \n",
-          gai_strerror(ret));
+                    gai_strerror(ret));
       exit(3);
     }
 
     // Listen on connection event
-    new_external_port_event_listener(&external_port[i],
-        res->ai_addr, res->ai_addrlen);
+    new_external_port_event_listener(&external_port[i], res->ai_addr,
+                                     res->ai_addrlen);
 
-    debug_message("Accepting connections on %s.\n",
-        sockaddr_to_string((sockaddr *) res->ai_addr, res->ai_addrlen));
+    debug_message(
+        "Accepting connections on %s.\n",
+        sockaddr_to_string((sockaddr *)res->ai_addr, res->ai_addrlen));
 
     freeaddrinfo(res);
   }
@@ -286,12 +282,13 @@ void init_user_conn() {
 /*
  * Shut down new user accept file descriptor.
  */
-void shutdown_external_ports()
-{
+void shutdown_external_ports() {
   int i;
 
   for (i = 0; i < 5; i++) {
-    if (!external_port[i].port) { continue; }
+    if (!external_port[i].port) {
+      continue;
+    }
     if (external_port[i].ev_conn) evconnlistener_free(external_port[i].ev_conn);
     if (OS_socket_close(external_port[i].fd) == -1) {
       socket_perror("ipc_remove: close", 0);
@@ -317,8 +314,7 @@ void shutdown_external_ports()
 #endif
 
 #ifdef SHADOW_CATCH_MESSAGE
-static int shadow_catch_message(object_t *ob, const char *str)
-{
+static int shadow_catch_message(object_t *ob, const char *str) {
   if (!ob->shadowed) {
     return 0;
   }
@@ -328,8 +324,8 @@ static int shadow_catch_message(object_t *ob, const char *str)
   while (ob->shadowing) {
     copy_and_push_string(str);
     if (apply(APPLY_CATCH_TELL, ob, 1, ORIGIN_DRIVER))
-      /* this will work, since we know the */
-      /* function is defined */
+        /* this will work, since we know the */
+        /* function is defined */
     {
       return 1;
     }
@@ -343,8 +339,7 @@ static int shadow_catch_message(object_t *ob, const char *str)
  * Send a message to an interactive object. If that object is shadowed,
  * special handling is done.
  */
-void add_message(object_t *who, const char *data, int len)
-{
+void add_message(object_t *who, const char *data, int len) {
   interactive_t *ip;
   const char *cp;
   const char *end;
@@ -374,7 +369,7 @@ void add_message(object_t *who, const char *data, int len)
 #endif
     return;
   }
-#endif                          /* NO_SHADOWS */
+#endif /* NO_SHADOWS */
 
   bufferevent_write(ip->ev_buffer, data, len);
 
@@ -385,10 +380,9 @@ void add_message(object_t *who, const char *data, int len)
 #endif
 
   add_message_calls++;
-}                               /* add_message() */
+} /* add_message() */
 
-void add_vmessage(object_t *who, const char *format, ...)
-{
+void add_vmessage(object_t *who, const char *format, ...) {
   auto ip = who->interactive;
   auto buffer = bufferevent_get_output(ip->ev_buffer);
 
@@ -400,8 +394,8 @@ void add_vmessage(object_t *who, const char *format, ...)
   add_message_calls++;
 }
 
-void add_binary_message_noflush(object_t *who, const unsigned char *data, int len)
-{
+void add_binary_message_noflush(object_t *who, const unsigned char *data,
+                                int len) {
   /*
    * if who->interactive is not valid, bail
    */
@@ -416,8 +410,7 @@ void add_binary_message_noflush(object_t *who, const unsigned char *data, int le
   add_message_calls++;
 }
 
-void add_binary_message(object_t *who, const unsigned char *data, int len)
-{
+void add_binary_message(object_t *who, const unsigned char *data, int len) {
   add_binary_message_noflush(who, data, len);
   if (who && who->interactive) {
     flush_message(who->interactive);
@@ -427,8 +420,7 @@ void add_binary_message(object_t *who, const unsigned char *data, int len)
 /*
  * Flush outgoing message buffer of current interactive object.
  */
-int flush_message(interactive_t *ip)
-{
+int flush_message(interactive_t *ip) {
   int length, num_bytes;
 
   /*
@@ -444,16 +436,19 @@ int flush_message(interactive_t *ip)
   return bufferevent_flush(ip->ev_buffer, EV_WRITE, BEV_FLUSH) != -1;
 }
 
-static int send_mssp_val(mapping_t *map, mapping_node_t *el, void *obp)
-{
+static int send_mssp_val(mapping_t *map, mapping_node_t *el, void *obp) {
   object_t *ob = (object_t *)obp;
   if (el->values[0].type == T_STRING && el->values[1].type == T_STRING) {
     char buf[1024];
-    int len = sprintf(buf, (char *)telnet_mssp_value, el->values[0].u.string, el->values[1].u.string);
+    int len = sprintf(buf, (char *)telnet_mssp_value, el->values[0].u.string,
+                      el->values[1].u.string);
     add_binary_message(ob, (unsigned char *)buf, len);
-  } else if (el->values[0].type == T_STRING && el->values[1].type == T_ARRAY && el->values[1].u.arr->size > 0 && el->values[1].u.arr->item[0].type == T_STRING) {
+  } else if (el->values[0].type == T_STRING && el->values[1].type == T_ARRAY &&
+             el->values[1].u.arr->size > 0 &&
+             el->values[1].u.arr->item[0].type == T_STRING) {
     char buf[10240];
-    int len = sprintf(buf, (char *)telnet_mssp_value, el->values[0].u.string, el->values[1].u.arr->item[0].u.string);
+    int len = sprintf(buf, (char *)telnet_mssp_value, el->values[0].u.string,
+                      el->values[1].u.arr->item[0].u.string);
     add_binary_message_noflush(ob, (unsigned char *)buf, len);
     array_t *ar = el->values[1].u.arr;
     int i;
@@ -461,7 +456,9 @@ static int send_mssp_val(mapping_t *map, mapping_node_t *el, void *obp)
     for (i = 1; i < ar->size; i++) {
       if (ar->item[i].type == T_STRING) {
         add_binary_message_noflush(ob, &val, 1);
-        add_binary_message_noflush(ob, (const unsigned char *)ar->item[i].u.string, strlen(ar->item[i].u.string));
+        add_binary_message_noflush(ob,
+                                   (const unsigned char *)ar->item[i].u.string,
+                                   strlen(ar->item[i].u.string));
       }
     }
     flush_message(ob->interactive);
@@ -469,14 +466,14 @@ static int send_mssp_val(mapping_t *map, mapping_node_t *el, void *obp)
   return 0;
 }
 
-static void copy_chars(interactive_t *ip, unsigned const char *from, int num_bytes)
-{
+static void copy_chars(interactive_t *ip, unsigned const char *from,
+                       int num_bytes) {
   int i, start, x;
-  unsigned char dont_response[3] = { IAC, DONT, 0 };
-  unsigned char wont_response[3] = { IAC, WONT, 0 };
+  unsigned char dont_response[3] = {IAC, DONT, 0};
+  unsigned char wont_response[3] = {IAC, WONT, 0};
 
   start = ip->text_end;
-  for (i = 0;  i < num_bytes;  i++) {
+  for (i = 0; i < num_bytes; i++) {
     switch (ip->state) {
       case TS_DATA:
         switch ((unsigned char)from[i]) {
@@ -536,21 +533,25 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
             break;
 
           case BREAK:
-            add_binary_message(ip->ob, telnet_break_response, sizeof(telnet_break_response));
+            add_binary_message(ip->ob, telnet_break_response,
+                               sizeof(telnet_break_response));
             break;
 
-          case IP:    /* interrupt process */
-            add_binary_message(ip->ob, telnet_ip_response, sizeof(telnet_ip_response));
+          case IP: /* interrupt process */
+            add_binary_message(ip->ob, telnet_ip_response,
+                               sizeof(telnet_ip_response));
             break;
 
-          case AYT:   /* are you there?  you bet */
-            add_binary_message(ip->ob, telnet_ayt_response, sizeof(telnet_ayt_response));
+          case AYT: /* are you there?  you bet */
+            add_binary_message(ip->ob, telnet_ayt_response,
+                               sizeof(telnet_ayt_response));
             break;
 
-          case AO:    /* abort output */
+          case AO: /* abort output */
             flush_message(ip);
             ip->out_of_band = MSG_OOB;
-            add_binary_message(ip->ob, telnet_abort_response, sizeof(telnet_abort_response));
+            add_binary_message(ip->ob, telnet_abort_response,
+                               sizeof(telnet_abort_response));
             break;
 
           default:
@@ -563,7 +564,8 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
         ip->iflags |= USING_TELNET;
         switch ((unsigned char)from[i]) {
           case TELOPT_TTYPE:
-            add_binary_message(ip->ob, telnet_term_query, sizeof(telnet_term_query));
+            add_binary_message(ip->ob, telnet_term_query,
+                               sizeof(telnet_term_query));
             break;
 
           case TELOPT_LINEMODE:
@@ -577,14 +579,15 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
             /* do nothing, but don't send a dont response */
             break;
 
-          case TELOPT_MXP :
+          case TELOPT_MXP:
             /* Mxp is enabled, tell the mudlib about it. */
             apply(APPLY_MXP_ENABLE, ip->ob, 0, ORIGIN_DRIVER);
             ip->iflags |= USING_MXP;
             break;
 
-          case TELOPT_NEW_ENVIRON :
-            add_binary_message(ip->ob, telnet_send_uservar, sizeof(telnet_send_uservar));
+          case TELOPT_NEW_ENVIRON:
+            add_binary_message(ip->ob, telnet_send_uservar,
+                               sizeof(telnet_send_uservar));
             break;
 
           default:
@@ -613,18 +616,22 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
       case TS_DO:
         switch ((unsigned char)from[i]) {
           case TELOPT_TM:
-            add_binary_message(ip->ob, telnet_do_tm_response, sizeof(telnet_do_tm_response));
+            add_binary_message(ip->ob, telnet_do_tm_response,
+                               sizeof(telnet_do_tm_response));
             break;
 
           case TELOPT_SGA:
             if (ip->iflags & USING_LINEMODE) {
               ip->iflags |= SUPPRESS_GA;
-              add_binary_message(ip->ob, telnet_yes_single, sizeof(telnet_yes_single));
+              add_binary_message(ip->ob, telnet_yes_single,
+                                 sizeof(telnet_yes_single));
             } else {
               if (ip->iflags & SINGLE_CHAR) {
-                add_binary_message(ip->ob, telnet_yes_single, sizeof(telnet_yes_single));
+                add_binary_message(ip->ob, telnet_yes_single,
+                                   sizeof(telnet_yes_single));
               } else {
-                add_binary_message(ip->ob, telnet_no_single, sizeof(telnet_no_single));
+                add_binary_message(ip->ob, telnet_no_single,
+                                   sizeof(telnet_no_single));
               }
             }
             break;
@@ -636,7 +643,8 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
             /* do nothing, but don't send a wont response */
             break;
           case TELOPT_MSSP: {
-            add_binary_message(ip->ob, telnet_start_mssp, sizeof(telnet_start_mssp));
+            add_binary_message(ip->ob, telnet_start_mssp,
+                               sizeof(telnet_start_mssp));
             svalue_t *res = apply_master_ob(APPLY_GET_MUD_STATS, 0);
             mapping_t *map;
             if (res <= (svalue_t *)0 || res->type != T_MAPPING) {
@@ -647,7 +655,8 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
             } else {
               map = res->u.map;
             }
-            //ok, so we have a mapping, first make sure we send the required values
+            // ok, so we have a mapping, first make sure we send the required
+            // values
             char *tmp = findstring("NAME");
             if (tmp) {
               svalue_t *name = find_string_in_mapping(map, tmp);
@@ -657,7 +666,8 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
             }
             if (!tmp) {
               char buf[1024];
-              int len = sprintf(buf, (char *)telnet_mssp_value, "NAME", MUD_NAME);
+              int len =
+                  sprintf(buf, (char *)telnet_mssp_value, "NAME", MUD_NAME);
               add_binary_message(ip->ob, (unsigned char *)buf, len);
             }
             tmp = findstring("PLAYERS");
@@ -689,20 +699,19 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
               int len = sprintf(buf, (char *)telnet_mssp_value, "UPTIME", num);
               add_binary_message(ip->ob, (unsigned char *)buf, len);
             }
-            //now send the rest
+            // now send the rest
             mapTraverse(map, send_mssp_val, ip->ob);
             add_binary_message(ip->ob, telnet_end_sub, sizeof(telnet_end_sub));
-          }
-          break;
+          } break;
 #ifdef HAVE_ZLIB
-          case TELOPT_COMPRESS :
+          case TELOPT_COMPRESS:
             if (!ip->compressed_stream) {
               add_binary_message(ip->ob, telnet_compress_v1_response,
                                  sizeof(telnet_compress_v1_response));
               start_compression(ip);
             }
             break;
-          case TELOPT_COMPRESS2 :
+          case TELOPT_COMPRESS2:
             if (!ip->compressed_stream) {
               add_binary_message(ip->ob, telnet_compress_v2_response,
                                  sizeof(telnet_compress_v2_response));
@@ -710,7 +719,7 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
             }
             break;
 #endif
-          case TELOPT_ZMP :
+          case TELOPT_ZMP:
             ip->iflags |= USING_ZMP;
             break;
           default:
@@ -726,7 +735,8 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
           case TELOPT_SGA:
             if (ip->iflags & USING_LINEMODE) {
               ip->iflags &= ~SUPPRESS_GA;
-              add_binary_message(ip->ob, telnet_no_single, sizeof(telnet_no_single));
+              add_binary_message(ip->ob, telnet_no_single,
+                                 sizeof(telnet_no_single));
             }
             break;
 #ifdef HAVE_ZLIB
@@ -774,7 +784,7 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
             ip->sb_buf[ip->sb_pos] = 0;
             switch ((unsigned char)ip->sb_buf[0]) {
 
-              case TELOPT_NEW_ENVIRON : {
+              case TELOPT_NEW_ENVIRON: {
                 int j, k;
                 char env_buf[BUF_SIZE];
                 j = 0;
@@ -795,9 +805,10 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
                     // FIXME: we don't handle case of 2 (ESC) either.
                     // In case something is wrong, we simply ignore all
                     // environment variables, to be safe.
-                    debug_message("TELNET Environment: client %s sent malformed"
-                                  " request, skipped!\n",
-                                  sockaddr_to_string((sockaddr *)&ip->addr, ip->addrlen));
+                    debug_message(
+                        "TELNET Environment: client %s sent malformed"
+                        " request, skipped!\n",
+                        sockaddr_to_string((sockaddr *)&ip->addr, ip->addrlen));
                     env_buf[0] = '\0';
                     break;
                   }
@@ -807,14 +818,17 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
                 copy_and_push_string(env_buf);
                 apply(APPLY_RECEIVE_ENVIRON, ip->ob, 1, ORIGIN_DRIVER);
                 break;
-
               }
               case TELOPT_LINEMODE:
                 switch ((unsigned char)ip->sb_buf[1]) {
                   case LM_MODE:
                     /* Don't do anything with an ACK */
                     if (!(ip->sb_buf[2] & MODE_ACK)) {
-                      unsigned char sb_ack[] = { IAC, SB, TELOPT_LINEMODE, LM_MODE, MODE_EDIT | MODE_TRAPSIG | MODE_ACK, IAC, SE };
+                      unsigned char sb_ack[] = {
+                          IAC,                                 SB,
+                          TELOPT_LINEMODE,                     LM_MODE,
+                          MODE_EDIT | MODE_TRAPSIG | MODE_ACK, IAC,
+                          SE};
 
                       /* Accept only EDIT and TRAPSIG && force them too */
                       add_binary_message(ip->ob, sb_ack, sizeof(sb_ack));
@@ -823,21 +837,24 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
 
                   case LM_SLC: {
                     int slc_length = 4;
-                    unsigned char slc_response[SB_SIZE + 6] = { IAC, SB, TELOPT_LINEMODE, LM_SLC };
+                    unsigned char slc_response[SB_SIZE + 6] = {
+                        IAC, SB, TELOPT_LINEMODE, LM_SLC};
 
-                    for (x = 2;  x < ip->sb_pos;  x += 3) {
+                    for (x = 2; x < ip->sb_pos; x += 3) {
                       /* no response for an ack */
                       if (ip->sb_buf[x + 1] & SLC_ACK) {
                         continue;
                       }
 
-                      /* If we get { 0, SLC_DEFAULT, 0 } or { 0, SLC_VARIABLE, 0 } return a list of values */
+                      /* If we get { 0, SLC_DEFAULT, 0 } or { 0, SLC_VARIABLE, 0
+                       * } return a list of values */
                       /* If it's SLC_DEFAULT, reset to defaults first */
                       if (!ip->sb_buf[x] && !ip->sb_buf[x + 2]) {
-                        if (ip->sb_buf[x + 1] == SLC_DEFAULT || ip->sb_buf[x + 1] == SLC_VARIABLE) {
+                        if (ip->sb_buf[x + 1] == SLC_DEFAULT ||
+                            ip->sb_buf[x + 1] == SLC_VARIABLE) {
                           int n;
 
-                          for (n = 0;  n < NSLC;  n++) {
+                          for (n = 0; n < NSLC; n++) {
                             slc_response[slc_length++] = n + 1;
                             if (ip->sb_buf[x + 1] == SLC_DEFAULT) {
                               ip->slc[n][0] = slc_default_flags[n];
@@ -854,9 +871,12 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
 
                       slc_response[slc_length++] = ip->sb_buf[x]--;
 
-                      /* If the first octet is out of range, we don't support it */
-                      /* If the default flag is not supported, we don't support it */
-                      if (ip->sb_buf[x] >= NSLC || slc_default_flags[ip->sb_buf[x]] == SLC_NOSUPPORT) {
+                      /* If the first octet is out of range, we don't support it
+                       */
+                      /* If the default flag is not supported, we don't support
+                       * it */
+                      if (ip->sb_buf[x] >= NSLC ||
+                          slc_default_flags[ip->sb_buf[x]] == SLC_NOSUPPORT) {
                         slc_response[slc_length++] = SLC_NOSUPPORT;
                         slc_response[slc_length++] = ip->sb_buf[x + 2];
                         if ((unsigned char)ip->sb_buf[x + 2] == IAC) {
@@ -867,9 +887,11 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
 
                       switch ((ip->sb_buf[x + 1] & SLC_LEVELBITS)) {
                         case SLC_NOSUPPORT:
-                          if (slc_default_flags[ip->sb_buf[x]] == SLC_CANTCHANGE) {
+                          if (slc_default_flags[ip->sb_buf[x]] ==
+                              SLC_CANTCHANGE) {
                             slc_response[slc_length++] = SLC_CANTCHANGE;
-                            slc_response[slc_length++] = ip->slc[ip->sb_buf[x]][1];
+                            slc_response[slc_length++] =
+                                ip->slc[ip->sb_buf[x]][1];
                             break;
                           }
                           slc_response[slc_length++] = SLC_ACK | SLC_NOSUPPORT;
@@ -879,9 +901,11 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
                           break;
 
                         case SLC_VARIABLE:
-                          if (slc_default_flags[ip->sb_buf[x]] == SLC_CANTCHANGE) {
+                          if (slc_default_flags[ip->sb_buf[x]] ==
+                              SLC_CANTCHANGE) {
                             slc_response[slc_length++] = SLC_CANTCHANGE;
-                            slc_response[slc_length++] = ip->slc[ip->sb_buf[x]][1];
+                            slc_response[slc_length++] =
+                                ip->slc[ip->sb_buf[x]][1];
                             break;
                           }
                           slc_response[slc_length++] = SLC_ACK | SLC_VARIABLE;
@@ -898,16 +922,21 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
                           break;
 
                         case SLC_DEFAULT:
-                          slc_response[slc_length++] = slc_default_flags[ip->sb_buf[x]];
-                          slc_response[slc_length++] = slc_default_flags[ip->sb_buf[x]];
-                          ip->slc[ip->sb_buf[x]][0] = slc_default_flags[ip->sb_buf[x]];
-                          ip->slc[ip->sb_buf[x]][1] = slc_default_chars[ip->sb_buf[x]];
+                          slc_response[slc_length++] =
+                              slc_default_flags[ip->sb_buf[x]];
+                          slc_response[slc_length++] =
+                              slc_default_flags[ip->sb_buf[x]];
+                          ip->slc[ip->sb_buf[x]][0] =
+                              slc_default_flags[ip->sb_buf[x]];
+                          ip->slc[ip->sb_buf[x]][1] =
+                              slc_default_chars[ip->sb_buf[x]];
                           break;
 
                         default:
                           slc_response[slc_length++] = SLC_NOSUPPORT;
                           slc_response[slc_length++] = ip->sb_buf[x + 2];
-                          if ((unsigned char)slc_response[slc_length - 1] == IAC) {
+                          if ((unsigned char)slc_response[slc_length - 1] ==
+                              IAC) {
                             slc_response[slc_length++] = IAC;
                           }
                           break;
@@ -920,33 +949,34 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
                       slc_response[slc_length++] = SE;
                       add_binary_message(ip->ob, slc_response, slc_length);
                     }
-                  }
-                  break;
+                  } break;
 
                   case DO: {
-                    unsigned char sb_wont[] = { IAC, SB, TELOPT_LINEMODE, WONT, 0, IAC, SE };
+                    unsigned char sb_wont[] = {IAC, SB,  TELOPT_LINEMODE, WONT,
+                                               0,   IAC, SE};
 
                     /* send back IAC SB TELOPT_LINEMODE WONT x IAC SE */
                     sb_wont[4] = ip->sb_buf[2];
                     add_binary_message(ip->ob, sb_wont, sizeof(sb_wont));
-                  }
-                  break;
+                  } break;
 
                   case WILL: {
-                    unsigned char sb_dont[] = { IAC, SB, TELOPT_LINEMODE, DONT, 0, IAC, SE };
+                    unsigned char sb_dont[] = {IAC, SB,  TELOPT_LINEMODE, DONT,
+                                               0,   IAC, SE};
 
                     /* send back IAC SB TELOPT_LINEMODE DONT x IAC SE */
                     sb_dont[4] = ip->sb_buf[2];
                     add_binary_message(ip->ob, sb_dont, sizeof(sb_dont));
-                  }
-                  break;
+                  } break;
                 }
                 break;
 
               case TELOPT_NAWS:
                 if (ip->sb_pos >= 5) {
-                  push_number(((unsigned char)ip->sb_buf[1] << 8) | (unsigned char)ip->sb_buf[2]);
-                  push_number(((unsigned char)ip->sb_buf[3] << 8) | (unsigned char)ip->sb_buf[4]);
+                  push_number(((unsigned char)ip->sb_buf[1] << 8) |
+                              (unsigned char)ip->sb_buf[2]);
+                  push_number(((unsigned char)ip->sb_buf[3] << 8) |
+                              (unsigned char)ip->sb_buf[4]);
                   apply(APPLY_WINDOW_SIZE, ip->ob, 2, ORIGIN_DRIVER);
                 }
                 break;
@@ -959,7 +989,8 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
                 break;
               case TELOPT_ZMP: {
                 array_t *arr = allocate_array(max_array_size);
-                ip->sb_buf = (unsigned char *)REALLOC(ip->sb_buf, std::max(ip->sb_pos + 2, SB_SIZE));
+                ip->sb_buf = (unsigned char *)REALLOC(
+                    ip->sb_buf, std::max(ip->sb_pos + 2, SB_SIZE));
                 ip->sb_size = std::max(ip->sb_pos + 2, SB_SIZE);
                 ip->sb_buf[ip->sb_pos] = 0;
                 copy_and_push_string((char *)ip->sb_buf + 1);
@@ -970,7 +1001,8 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
                   if (off >= ip->sb_pos - 1) {
                     break;
                   }
-                  arr->item[aro].u.string = string_copy((char *)&ip->sb_buf[off], "ZMP");
+                  arr->item[aro].u.string =
+                      string_copy((char *)&ip->sb_buf[off], "ZMP");
                   arr->item[aro].type = T_STRING;
                   arr->item[aro++].subtype = STRING_MALLOC;
                 }
@@ -978,15 +1010,14 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
                 push_refed_array(arr);
                 apply(APPLY_ZMP, ip->ob, 2, ORIGIN_DRIVER);
 
-              }
-              break;
+              } break;
               case TELOPT_GMCP:
                 ip->sb_buf[ip->sb_pos] = 0;
                 copy_and_push_string((char *)&ip->sb_buf[1]);
                 apply(APPLY_GMCP, ip->ob, 1, ORIGIN_DRIVER);
                 break;
               default:
-                for (x = 0;  x < ip->sb_pos;  x++) {
+                for (x = 0; x < ip->sb_pos; x++) {
                   ip->sb_buf[x] = (ip->sb_buf[x] ? ip->sb_buf[x] : 'I');
                 }
                 copy_and_push_string((char *)ip->sb_buf);
@@ -1024,9 +1055,8 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
  * Read pending data for a user into user->interactive->text.
  * This also does telnet negotiation.
  */
-void get_user_data(interactive_t *ip)
-{
-  int  num_bytes, text_space;
+void get_user_data(interactive_t *ip) {
+  int num_bytes, text_space;
   unsigned char buf[MAX_TEXT];
   int ws_space;
 
@@ -1041,17 +1071,19 @@ void get_user_data(interactive_t *ip)
       /* check if we need more space */
       if (ws_space < MAX_TEXT / 16) {
         if (ip->ws_text_start > 0) {
-          memmove(ip->ws_text, ip->ws_text + ip->ws_text_start, ip->ws_text_end - ip->ws_text_start);
+          memmove(ip->ws_text, ip->ws_text + ip->ws_text_start,
+                  ip->ws_text_end - ip->ws_text_start);
           ws_space += ip->ws_text_start;
           ip->ws_text_end -= ip->ws_text_start;
           ip->ws_text_start = 0;
         }
       }
       if ((ip->iflags & HANDSHAKE_COMPLETE) && (!ip->ws_size) && ws_space > 8) {
-        ws_space = 8;    //only read the header or we'll end up queueing several websocket packets with no triggers to read them
+        ws_space = 8;  // only read the header or we'll end up queueing several
+                       // websocket packets with no triggers to read them
       }
       if (ip->ws_size && ws_space > ip->ws_size) {
-        ws_space = ip->ws_size;    //keep the next packet in the socket
+        ws_space = ip->ws_size;  // keep the next packet in the socket
       }
       break;
     case PORT_TELNET:
@@ -1060,7 +1092,8 @@ void get_user_data(interactive_t *ip)
       /* check if we need more space */
       if (text_space < MAX_TEXT / 16) {
         if (ip->text_start > 0) {
-          memmove(ip->text, ip->text + ip->text_start, ip->text_end - ip->text_start);
+          memmove(ip->text, ip->text + ip->text_start,
+                  ip->text_end - ip->text_start);
           text_space += ip->text_start;
           ip->text_end -= ip->text_start;
           ip->text_start = 0;
@@ -1109,7 +1142,8 @@ void get_user_data(interactive_t *ip)
         memcpy(ip->ws_text + ip->ws_text_end, buf, num_bytes);
         ip->ws_text_end += num_bytes;
         if (!ip->ws_size) {
-          unsigned char *data = (unsigned char *)&ip->ws_text[ip->ws_text_start];
+          unsigned char *data =
+              (unsigned char *)&ip->ws_text[ip->ws_text_start];
           if (ip->ws_text_end - ip->ws_text_start < 8) {
             break;
           }
@@ -1119,7 +1153,7 @@ void get_user_data(interactive_t *ip)
           if (size == 126) {
             size = (data[2] << 8) | data[3];
             ip->ws_text_start += 2;
-          } else if (size == 127) { //insane real size
+          } else if (size == 127) {  // insane real size
             ip->iflags |= NET_DEAD;
             remove_interactive(ip->ob, 0);
             return;
@@ -1128,7 +1162,9 @@ void get_user_data(interactive_t *ip)
           if (msize & 0x80) {
             memcpy(&ip->ws_mask, &ip->ws_text[ip->ws_text_start], 4);
             ip->ws_text_start += 4;
-          } else { ip->ws_mask = 0; }
+          } else {
+            ip->ws_mask = 0;
+          }
           ip->ws_maskoffs = 0;
         }
         int i;
@@ -1138,7 +1174,8 @@ void get_user_data(interactive_t *ip)
           if (ip->ws_maskoffs) {
             int newmask;
             for (i = 0; i < 4; i++) {
-              ((char *)&newmask)[i] = ((char *)&ip->ws_mask)[(i + ip->ws_maskoffs) % 4];
+              ((char *)&newmask)[i] =
+                  ((char *)&ip->ws_mask)[(i + ip->ws_maskoffs) % 4];
             }
             ip->ws_mask = newmask;
             ip->ws_maskoffs = 0;
@@ -1166,7 +1203,7 @@ void get_user_data(interactive_t *ip)
         //          for(i=0;i<num_bytes;i++)
         //              printf("%x ", buf[i]);
         //          puts("");
-        //and on with the telnet case
+        // and on with the telnet case
       } else {
         char *str = new_string(num_bytes, "PORT_WEBSOCKET");
         memcpy(str, buf, num_bytes);
@@ -1185,7 +1222,8 @@ void get_user_data(interactive_t *ip)
         set_command_giver(0);
         current_interactive = 0;
 
-        break; //they're not allowed to send the other stuff until we replied, so all data should be handshake stuff
+        break;  // they're not allowed to send the other stuff until we replied,
+                // so all data should be handshake stuff
       }
       break;
     case PORT_TELNET:
@@ -1253,8 +1291,7 @@ void get_user_data(interactive_t *ip)
 
         p = nl + 1;
       }
-    }
-    break;
+    } break;
 
 #ifndef NO_BUFFER_TYPE
     case PORT_BINARY: {
@@ -1265,14 +1302,12 @@ void get_user_data(interactive_t *ip)
 
       push_refed_buffer(buffer);
       safe_apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
-    }
-    break;
+    } break;
 #endif
   }
 }
 
-static int clean_buf(interactive_t *ip)
-{
+static int clean_buf(interactive_t *ip) {
   /* skip null input */
   while (ip->text_start < ip->text_end && !*(ip->text + ip->text_start)) {
     ip->text_start++;
@@ -1288,7 +1323,7 @@ static int clean_buf(interactive_t *ip)
   if (ip->iflags & SKIP_COMMAND) {
     char *p;
 
-    for (p = ip->text + ip->text_start;  p < ip->text + ip->text_end;  p++) {
+    for (p = ip->text + ip->text_start; p < ip->text + ip->text_end; p++) {
       if (*p == '\r' || *p == '\n') {
         ip->text_start += p - (ip->text + ip->text_start) + 1;
         ip->iflags &= ~SKIP_COMMAND;
@@ -1300,8 +1335,7 @@ static int clean_buf(interactive_t *ip)
   return (ip->text_end > ip->text_start);
 }
 
-static int cmd_in_buf(interactive_t *ip)
-{
+static int cmd_in_buf(interactive_t *ip) {
   char *p;
 
   /* do standard input buffer cleanup */
@@ -1315,7 +1349,7 @@ static int cmd_in_buf(interactive_t *ip)
   }
 
   /* search for a newline.  if found, we have a command */
-  for (p = ip->text + ip->text_start;  p < ip->text + ip->text_end;  p++) {
+  for (p = ip->text + ip->text_start; p < ip->text + ip->text_end; p++) {
     if (*p == '\r' || *p == '\n') {
       return 1;
     }
@@ -1325,8 +1359,7 @@ static int cmd_in_buf(interactive_t *ip)
   return 0;
 }
 
-static char *first_cmd_in_buf(interactive_t *ip)
-{
+static char *first_cmd_in_buf(interactive_t *ip) {
   char *p;
 #ifdef GET_CHAR_IS_BUFFERED
   static char tmp[2];
@@ -1367,8 +1400,10 @@ static char *first_cmd_in_buf(interactive_t *ip)
 
   /* check for "\r\n" or "\n\r" */
   if (ip->text_start + 1 < ip->text_end &&
-      ((ip->text[ip->text_start] == '\r' && ip->text[ip->text_start + 1] == '\n') ||
-       (ip->text[ip->text_start] == '\n' && ip->text[ip->text_start + 1] == '\r'))) {
+      ((ip->text[ip->text_start] == '\r' &&
+        ip->text[ip->text_start + 1] == '\n') ||
+       (ip->text[ip->text_start] == '\n' &&
+        ip->text[ip->text_start + 1] == '\r'))) {
     ip->text[ip->text_start++] = 0;
   }
 
@@ -1384,14 +1419,18 @@ static char *first_cmd_in_buf(interactive_t *ip)
 // NOTE: Runs in network threadpool.
 void async_on_accept(int new_socket_fd, port_def_t *port) {
   if (set_socket_nonblocking(new_socket_fd, 1) == -1) {
-    debug(connections, "async_on_accept: fd %d, set_socket_nonblocking 1 error: %s.\n", new_socket_fd,
+    debug(connections,
+          "async_on_accept: fd %d, set_socket_nonblocking 1 error: %s.\n",
+          new_socket_fd,
           evutil_socket_error_to_string(evutil_socket_geterror(new_socket_fd)));
     OS_socket_close(new_socket_fd);
     return;
   }
 
   if (set_socket_tcp_nodelay(new_socket_fd, 1) == -1) {
-    debug(connections, "async_on_accept: fd %d, set_socket_tcp_nodelay error: %s.\n", new_socket_fd,
+    debug(connections,
+          "async_on_accept: fd %d, set_socket_tcp_nodelay error: %s.\n",
+          new_socket_fd,
           evutil_socket_error_to_string(evutil_socket_geterror(new_socket_fd)));
   }
 
@@ -1403,8 +1442,8 @@ void async_on_accept(int new_socket_fd, port_def_t *port) {
   memset(user, 0, sizeof(*user));
 
   user->connection_type = port->kind;
-  user->sb_buf = (unsigned char *)DMALLOC(SB_SIZE,
-                                   TAG_PERMANENT, "new_user_handler");
+  user->sb_buf =
+      (unsigned char *)DMALLOC(SB_SIZE, TAG_PERMANENT, "new_user_handler");
   user->sb_size = SB_SIZE;
   user->ob = master_ob;
   user->last_time = get_current_time();
@@ -1413,24 +1452,24 @@ void async_on_accept(int new_socket_fd, port_def_t *port) {
 #ifdef USE_ICONV
   user->trans = get_translator("UTF-8");
 #else
-  user->trans = (struct translation *) master_ob;
-  //never actually used, but avoids multiple ifdefs later on!
+  user->trans = (struct translation *)master_ob;
+// never actually used, but avoids multiple ifdefs later on!
 #endif
 
-  for (int x = 0;  x < NSLC;  x++) {
+  for (int x = 0; x < NSLC; x++) {
     user->slc[x][0] = slc_default_flags[x];
     user->slc[x][1] = slc_default_chars[x];
   }
 
   user->fd = new_socket_fd;
   user->local_port = port->port;
-  user->external_port = (port - external_port); // FIXME: pointer arith
+  user->external_port = (port - external_port);  // FIXME: pointer arith
 
   user->addrlen = sizeof(user->addr);
   getsockname(new_socket_fd, (sockaddr *)&user->addr, &user->addrlen);
 
   // add event to tick_event.
-  add_realtime_event([=](){ new_user_handler(user); });
+  add_realtime_event([=]() { new_user_handler(user); });
 }
 
 /*
@@ -1439,23 +1478,23 @@ void async_on_accept(int new_socket_fd, port_def_t *port) {
  * If space is available, an interactive data structure is initialized and
  * the user is connected.
  */
-void new_user_handler(interactive_t *user)
-{
+void new_user_handler(interactive_t *user) {
   debug(connections, "New connection from %s.\n",
-      sockaddr_to_string((sockaddr *)&user->addr, user->addrlen));
+        sockaddr_to_string((sockaddr *)&user->addr, user->addrlen));
 
   int i;
   /* find the first available slot */
   for (i = 0; i < max_users; i++)
-    if (!all_users[i]) { break; }
+    if (!all_users[i]) {
+      break;
+    }
 
   if (i == max_users) {
     if (all_users) {
-      all_users = RESIZE(all_users, max_users + 10, interactive_t *,
-                         TAG_USERS, "new_user_handler");
+      all_users = RESIZE(all_users, max_users + 10, interactive_t *, TAG_USERS,
+                         "new_user_handler");
     } else {
-      all_users = CALLOCATE(10, interactive_t *,
-                            TAG_USERS, "new_user_handler");
+      all_users = CALLOCATE(10, interactive_t *, TAG_USERS, "new_user_handler");
     }
     while (max_users < i + 10) {
       all_users[max_users++] = 0;
@@ -1491,13 +1530,15 @@ void new_user_handler(interactive_t *user)
   /* master_ob->interactive can be zero if the master object self
      destructed in the above (don't ask) */
   set_command_giver(0);
-  if (ret == 0 || ret == (svalue_t *) - 1 || ret->type != T_OBJECT
-      || !master_ob->interactive) {
+  if (ret == 0 || ret == (svalue_t *)-1 || ret->type != T_OBJECT ||
+      !master_ob->interactive) {
     if (master_ob->interactive) {
       remove_interactive(master_ob, 0);
     }
-    debug_message("Can not accept connection from %s due to error in connect().\n",
-        sockaddr_to_string((sockaddr *)&all_users[i]->addr, all_users[i]->addrlen));
+    debug_message(
+        "Can not accept connection from %s due to error in connect().\n",
+        sockaddr_to_string((sockaddr *)&all_users[i]->addr,
+                           all_users[i]->addrlen));
     return;
   }
   /*
@@ -1556,24 +1597,28 @@ void new_user_handler(interactive_t *user)
     /* current_object no longer set */
     ret = safe_apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
     if (ret == NULL) {
-      debug_message("new_user_handler: logon() on object %s has failed, the user is left dangling.\n", ob->obname);
+      debug_message(
+          "new_user_handler: logon() on object %s has failed, the user is left "
+          "dangling.\n",
+          ob->obname);
     }
     /* function not existing is no longer fatal */
   } else {
-    debug_message("new_user_handler: object is gone before logon(), the user is left dangling. \n");
+    debug_message(
+        "new_user_handler: object is gone before logon(), the user is left "
+        "dangling. \n");
   }
 
   debug(connections, ("new_user_handler: end\n"));
   set_command_giver(0);
-}                               /* new_user_handler() */
+} /* new_user_handler() */
 
 /*
  * Return the first command of the next user in sequence that has a complete
  * command in their buffer.  A command is defined to be a single character
  * when SINGLE_CHAR is set, or a newline terminated string otherwise.
  */
-static char *get_user_command(interactive_t *ip)
-{
+static char *get_user_command(interactive_t *ip) {
   char *user_command = NULL;
 
   if (!ip || !ip->ob || (ip->ob->flags & O_DESTRUCTED)) {
@@ -1606,10 +1651,9 @@ static char *get_user_command(interactive_t *ip)
 
   ip->last_time = get_current_time();
   return user_command;
-}                               /* get_user_command() */
+} /* get_user_command() */
 
-static int escape_command(interactive_t *ip, char *user_command)
-{
+static int escape_command(interactive_t *ip, char *user_command) {
   if (user_command[0] != '!') {
     return 0;
   }
@@ -1619,15 +1663,15 @@ static int escape_command(interactive_t *ip, char *user_command)
   }
 #endif
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
-  if (ip->input_to && (!(ip->iflags & NOESC) && !(ip->iflags & I_SINGLE_CHAR))) {
+  if (ip->input_to &&
+      (!(ip->iflags & NOESC) && !(ip->iflags & I_SINGLE_CHAR))) {
     return 1;
   }
 #endif
   return 0;
 }
 
-static void process_input(interactive_t *ip, char *user_command)
-{
+static void process_input(interactive_t *ip, char *user_command) {
   svalue_t *ret;
 
   if (!(ip->iflags & HAS_PROCESS_INPUT)) {
@@ -1671,8 +1715,7 @@ static void process_input(interactive_t *ip, char *user_command)
  * This function calls get_user_command() to get a user command.
  * One user command is processed per execution of this function.
  */
-int process_user_command(interactive_t *ip)
-{
+int process_user_command(interactive_t *ip) {
   char *user_command;
 
   /*
@@ -1687,13 +1730,16 @@ int process_user_command(interactive_t *ip)
     fatal("BUG: process_user_command.");
   }
 
-  current_interactive = command_giver;    /* this is yuck phooey, sigh */
-  if (ip) { clear_notify(ip->ob); }
+  current_interactive = command_giver; /* this is yuck phooey, sigh */
+  if (ip) {
+    clear_notify(ip->ob);
+  }
 
   // FIXME: move this to somewhere else
   update_load_av();
 
-  debug(connections, "process_user_command: command_giver = /%s\n", command_giver->obname);
+  debug(connections, "process_user_command: command_giver = /%s\n",
+        command_giver->obname);
 
   if (!ip) {
     goto exit;
@@ -1701,7 +1747,8 @@ int process_user_command(interactive_t *ip)
 
   user_command = translate_easy(ip->trans->incoming, user_command);
 
-  if ((ip->iflags & USING_MXP) && user_command[0] == ' ' && user_command[1] == '[' && user_command[3] == 'z') {
+  if ((ip->iflags & USING_MXP) && user_command[0] == ' ' &&
+      user_command[1] == '[' && user_command[3] == 'z') {
     svalue_t *ret;
     copy_and_push_string(user_command);
 
@@ -1772,8 +1819,7 @@ exit:
 /*
  * Remove an interactive user immediately.
  */
-void remove_interactive(object_t *ob, int dested)
-{
+void remove_interactive(object_t *ob, int dested) {
   int idx;
   /* don't have to worry about this dangling, since this is the routine
    * that causes this to dangle elsewhere, and we are protected from
@@ -1783,7 +1829,9 @@ void remove_interactive(object_t *ob, int dested)
    */
   interactive_t *ip = ob->interactive;
 
-  if (!ip) { return; }
+  if (!ip) {
+    return;
+  }
 
   if (ip->iflags & CLOSING) {
     if (!dested) {
@@ -1863,8 +1911,11 @@ void remove_interactive(object_t *ob, int dested)
   }
 #endif
   for (idx = 0; idx < max_users; idx++)
-    if (all_users[idx] == ip) { break; }
-  DEBUG_CHECK(idx == max_users, "remove_interactive: could not find and remove user!\n");
+    if (all_users[idx] == ip) {
+      break;
+    }
+  DEBUG_CHECK(idx == max_users,
+              "remove_interactive: could not find and remove user!\n");
 
   FREE(ip->sb_buf);
   FREE(ip);
@@ -1872,11 +1923,10 @@ void remove_interactive(object_t *ob, int dested)
   all_users[idx] = 0;
   free_object(&ob, "remove_interactive");
   return;
-}                               /* remove_interactive() */
+} /* remove_interactive() */
 
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
-static int call_function_interactive(interactive_t *i, char *str)
-{
+static int call_function_interactive(interactive_t *i, char *str) {
   object_t *ob;
   funptr_t *funp;
   char *function;
@@ -1994,12 +2044,12 @@ static int call_function_interactive(interactive_t *i, char *str)
     if (function[0] == APPLY___INIT_SPECIAL_CHAR) {
       error("Illegal function name.\n");
     }
-    (void) apply(function, ob, num_arg + 1, ORIGIN_INTERNAL);
+    (void)apply(function, ob, num_arg + 1, ORIGIN_INTERNAL);
   } else {
     call_function_pointer(funp, num_arg + 1);
   }
 
-  pop_stack();                /* remove `function' from stack */
+  pop_stack(); /* remove `function' from stack */
 
 #ifdef GET_CHAR_IS_BUFFERED
   if (IP_VALID(i, ob)) {
@@ -2016,10 +2066,9 @@ static int call_function_interactive(interactive_t *i, char *str)
 #endif
 
   return (1);
-}                               /* call_function_interactive() */
+} /* call_function_interactive() */
 
-int set_call(object_t *ob, sentence_t *sent, int flags)
-{
+int set_call(object_t *ob, sentence_t *sent, int flags) {
   if (ob == 0 || sent == 0) {
     return (0);
   }
@@ -2035,21 +2084,19 @@ int set_call(object_t *ob, sentence_t *sent, int flags)
     set_charmode(ob->interactive);
   }
   return (1);
-}                               /* set_call() */
+} /* set_call() */
 #endif
 
-void set_prompt(const char *str)
-{
+void set_prompt(const char *str) {
   if (command_giver && command_giver->interactive) {
     command_giver->interactive->prompt = str;
   }
-}                               /* set_prompt() */
+} /* set_prompt() */
 
 /*
  * Print the prompt, but only if input_to not is disabled.
  */
-static void print_prompt(interactive_t *ip)
-{
+static void print_prompt(interactive_t *ip) {
   object_t *ob = ip->ob;
 
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
@@ -2065,14 +2112,18 @@ static void print_prompt(interactive_t *ip)
     }
 #endif
     else if (!apply(APPLY_WRITE_PROMPT, ip->ob, 0, ORIGIN_DRIVER)) {
-      if (!IP_VALID(ip, ob)) { return; }
+      if (!IP_VALID(ip, ob)) {
+        return;
+      }
       ip->iflags &= ~HAS_WRITE_PROMPT;
       tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
     }
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
   }
 #endif
-  if (!IP_VALID(ip, ob)) { return; }
+  if (!IP_VALID(ip, ob)) {
+    return;
+  }
   /*
    * Put the IAC GA thing in here... Moved from before writing the prompt;
    * vt src says it's a terminator. Should it be inside the no-input_to
@@ -2081,8 +2132,10 @@ static void print_prompt(interactive_t *ip)
   if ((ip->iflags & USING_TELNET) && !(ip->iflags & SUPPRESS_GA)) {
     add_binary_message(command_giver, telnet_ga, sizeof(telnet_ga));
   }
-  if (!IP_VALID(ip, ob)) { return; }
-}                               /* print_prompt() */
+  if (!IP_VALID(ip, ob)) {
+    return;
+  }
+} /* print_prompt() */
 
 /*
  * Let object 'me' snoop object 'you'. If 'you' is 0, then turn off
@@ -2096,8 +2149,7 @@ static void print_prompt(interactive_t *ip)
  * 0 or 1 depending on success.
  */
 #ifndef NO_SNOOP
-int new_set_snoop(object_t *by, object_t *victim)
-{
+int new_set_snoop(object_t *by, object_t *victim) {
   interactive_t *ip;
   object_t *tmp;
 
@@ -2162,32 +2214,31 @@ int new_set_snoop(object_t *by, object_t *victim)
   ip->snooped_by = by;
 
   return 1;
-}                               /* set_new_snoop() */
+} /* set_new_snoop() */
 #endif
 
-char *query_host_name()
-{
+char *query_host_name() {
   static char name[400];
 
   gethostname(name, sizeof(name));
-  name[sizeof(name) - 1] = '\0';      /* Just to make sure */
+  name[sizeof(name) - 1] = '\0'; /* Just to make sure */
   return (name);
-}                               /* query_host_name() */
+} /* query_host_name() */
 
 #ifndef NO_SNOOP
-object_t *query_snoop(object_t *ob)
-{
+object_t *query_snoop(object_t *ob) {
   if (!ob->interactive) {
     return 0;
   }
   return ob->interactive->snooped_by;
-}                               /* query_snoop() */
+} /* query_snoop() */
 
-object_t *query_snooping(object_t *ob)
-{
+object_t *query_snooping(object_t *ob) {
   int i;
 
-  if (!(ob->flags & O_SNOOP)) { return 0; }
+  if (!(ob->flags & O_SNOOP)) {
+    return 0;
+  }
   for (i = 0; i < max_users; i++) {
     if (all_users[i] && all_users[i]->snooped_by == ob) {
       return all_users[i]->ob;
@@ -2195,20 +2246,18 @@ object_t *query_snooping(object_t *ob)
   }
   fatal("couldn't find snoop target.\n");
   return 0;
-}                               /* query_snooping() */
+} /* query_snooping() */
 #endif
 
-int query_idle(object_t *ob)
-{
+int query_idle(object_t *ob) {
   if (!ob->interactive) {
     error("query_idle() of non-interactive object.\n");
   }
   return (get_current_time() - ob->interactive->last_time);
-}                               /* query_idle() */
+} /* query_idle() */
 
 #ifdef F_EXEC
-int replace_interactive(object_t *ob, object_t *obfrom)
-{
+int replace_interactive(object_t *ob, object_t *obfrom) {
   if (ob->interactive) {
     error("Bad argument 1 to exec()\n");
   }
@@ -2241,17 +2290,15 @@ int replace_interactive(object_t *ob, object_t *obfrom)
 
   free_object(&obfrom, "exec");
   return (1);
-}                               /* replace_interactive() */
+} /* replace_interactive() */
 #endif
 
-void outbuf_zero(outbuffer_t *outbuf)
-{
+void outbuf_zero(outbuffer_t *outbuf) {
   outbuf->real_size = 0;
   outbuf->buffer = 0;
 }
 
-int outbuf_extend(outbuffer_t *outbuf, int l)
-{
+int outbuf_extend(outbuffer_t *outbuf, int l) {
   int limit;
 
   DEBUG_CHECK(l < 0, "Negative length passed to outbuf_extend.\n");
@@ -2261,7 +2308,9 @@ int outbuf_extend(outbuffer_t *outbuf, int l)
   if (outbuf->buffer) {
     limit = MSTR_SIZE(outbuf->buffer);
     if (outbuf->real_size + l > limit) {
-      if (outbuf->real_size == MAX_STRING_LENGTH) { return 0; } /* TRUNCATED */
+      if (outbuf->real_size == MAX_STRING_LENGTH) {
+        return 0;
+      } /* TRUNCATED */
 
       /* assume it's going to grow some more */
       limit = (outbuf->real_size + l) * 2;
@@ -2279,11 +2328,12 @@ int outbuf_extend(outbuffer_t *outbuf, int l)
   return l;
 }
 
-void outbuf_add(outbuffer_t *outbuf, const char *str)
-{
+void outbuf_add(outbuffer_t *outbuf, const char *str) {
   int l, limit;
 
-  if (!outbuf) { return; }
+  if (!outbuf) {
+    return;
+  }
   l = strlen(str);
   if ((limit = outbuf_extend(outbuf, l)) > 0) {
     strncpy(outbuf->buffer + outbuf->real_size, str, limit);
@@ -2292,16 +2342,14 @@ void outbuf_add(outbuffer_t *outbuf, const char *str)
   }
 }
 
-void outbuf_addchar(outbuffer_t *outbuf, char c)
-{
+void outbuf_addchar(outbuffer_t *outbuf, char c) {
   if (outbuf && (outbuf_extend(outbuf, 1) > 0)) {
     *(outbuf->buffer + outbuf->real_size++) = c;
     *(outbuf->buffer + outbuf->real_size) = 0;
   }
 }
 
-void outbuf_addv(outbuffer_t *outbuf, const char *format, ...)
-{
+void outbuf_addv(outbuffer_t *outbuf, const char *format, ...) {
   char buf[LARGEST_PRINTABLE_STRING + 1];
   va_list args;
 
@@ -2309,20 +2357,20 @@ void outbuf_addv(outbuffer_t *outbuf, const char *format, ...)
   vsnprintf(buf, LARGEST_PRINTABLE_STRING, format, args);
   va_end(args);
 
-  if (!outbuf) { return; }
+  if (!outbuf) {
+    return;
+  }
 
   outbuf_add(outbuf, buf);
 }
 
-void outbuf_fix(outbuffer_t *outbuf)
-{
+void outbuf_fix(outbuffer_t *outbuf) {
   if (outbuf && outbuf->buffer) {
     outbuf->buffer = extend_string(outbuf->buffer, outbuf->real_size);
   }
 }
 
-void outbuf_push(outbuffer_t *outbuf)
-{
+void outbuf_push(outbuffer_t *outbuf) {
   STACK_INC;
   sp->type = T_STRING;
   if (outbuf && outbuf->buffer) {
@@ -2337,22 +2385,17 @@ void outbuf_push(outbuffer_t *outbuf)
 }
 
 #ifdef HAVE_ZLIB
-void *zlib_alloc(void *opaque, unsigned int items, unsigned int size)
-{
+void *zlib_alloc(void *opaque, unsigned int items, unsigned int size) {
   return DCALLOC(items, size, TAG_TEMPORARY, "zlib_alloc");
 }
 
-void zlib_free(void *opaque, void *address)
-{
-  FREE(address);
-}
+void zlib_free(void *opaque, void *address) { FREE(address); }
 
-static void end_compression(interactive_t *ip)
-{
+static void end_compression(interactive_t *ip) {
   unsigned char dummy[1];
 
   if (!ip->compressed_stream) {
-    return ;
+    return;
   }
 
   ip->compressed_stream->avail_in = 0;
@@ -2366,15 +2409,14 @@ static void end_compression(interactive_t *ip)
   ip->compressed_stream = NULL;
 }
 
-static void start_compression(interactive_t *ip)
-{
+static void start_compression(interactive_t *ip) {
   z_stream *zcompress;
 
   if (ip->compressed_stream) {
-    return ;
+    return;
   }
-  zcompress = (z_stream *) DXALLOC(sizeof(z_stream), TAG_INTERACTIVE,
-                                   "start_compression");
+  zcompress = (z_stream *)DXALLOC(sizeof(z_stream), TAG_INTERACTIVE,
+                                  "start_compression");
   zcompress->next_in = NULL;
   zcompress->avail_in = 0;
   zcompress->next_out = ip->compress_buf;
@@ -2386,15 +2428,14 @@ static void start_compression(interactive_t *ip)
   if (deflateInit(zcompress, 9) != Z_OK) {
     FREE(zcompress);
     fprintf(stderr, "Compression failed.\n");
-    return ;
+    return;
   }
 
   // Ok, compressing.
   ip->compressed_stream = zcompress;
 }
 
-static int flush_compressed_output(interactive_t *ip)
-{
+static int flush_compressed_output(interactive_t *ip) {
   int iStart, nBlock, nWrite, len;
   z_stream *zcompress;
   int ret = 1;
@@ -2415,20 +2456,20 @@ static int flush_compressed_output(interactive_t *ip)
       if (len - iStart < 4096) {
         nBlock = len - iStart;
       } else {
-        nBlock =  4096;
+        nBlock = 4096;
       }
-      nWrite = send(ip->fd, &ip->compress_buf[iStart], nBlock,
-                    ip->out_of_band);
+      nWrite = send(ip->fd, &ip->compress_buf[iStart], nBlock, ip->out_of_band);
       if (nWrite < 0) {
         if (errno == EAGAIN
 #ifndef WIN32
             || errno == ENOSR
 #endif
-           ) {
+            ) {
           ret = 2;
           break;
         }
-        debug(connections, "flush_compressed_output: Error sending compressed data: %s.\n",
+        debug(connections,
+              "flush_compressed_output: Error sending compressed data: %s.\n",
               evutil_socket_error_to_string(evutil_socket_geterror(ip->fd)));
 
         return FALSE; /* write error */
@@ -2442,9 +2483,7 @@ static int flush_compressed_output(interactive_t *ip)
     if (iStart) {
       /* We wrote "iStart" bytes */
       if (iStart < len) {
-        memmove(ip->compress_buf, ip->compress_buf + iStart, len -
-                iStart);
-
+        memmove(ip->compress_buf, ip->compress_buf + iStart, len - iStart);
       }
 
       zcompress->next_out = ip->compress_buf + len - iStart;
@@ -2454,9 +2493,7 @@ static int flush_compressed_output(interactive_t *ip)
   return ret;
 }
 
-
-static int send_compressed(interactive_t *ip, unsigned char *data, int length)
-{
+static int send_compressed(interactive_t *ip, unsigned char *data, int length) {
   z_stream *zcompress;
   int wr = 1;
   int first = 1;
@@ -2468,8 +2505,8 @@ static int send_compressed(interactive_t *ip, unsigned char *data, int length)
     if (wr == 2) {
       first = 0;
     }
-    zcompress->avail_out = COMPRESS_BUF_SIZE - (zcompress->next_out -
-                           ip->compress_buf);
+    zcompress->avail_out =
+        COMPRESS_BUF_SIZE - (zcompress->next_out - ip->compress_buf);
 
     if (zcompress->avail_out) {
       deflate(zcompress, Z_SYNC_FLUSH);
@@ -2484,38 +2521,45 @@ static int send_compressed(interactive_t *ip, unsigned char *data, int length)
 #endif
 
 #ifdef F_ACT_MXP
-void f_act_mxp()
-{
+void f_act_mxp() {
   add_binary_message(current_object, telnet_will_mxp, sizeof(telnet_will_mxp));
 }
 #endif
 
 #ifdef F_SEND_ZMP
-void f_send_zmp()
-{
-  add_binary_message_noflush(current_object, telnet_start_zmp, sizeof(telnet_start_zmp));
-  add_binary_message_noflush(current_object, (const unsigned char *)(sp - 1)->u.string, strlen((sp - 1)->u.string));
+void f_send_zmp() {
+  add_binary_message_noflush(current_object, telnet_start_zmp,
+                             sizeof(telnet_start_zmp));
+  add_binary_message_noflush(current_object,
+                             (const unsigned char *)(sp - 1)->u.string,
+                             strlen((sp - 1)->u.string));
   int i;
   unsigned char zero = 0;
   for (i = 0; i < sp->u.arr->size; i++) {
     if (sp->u.arr->item[i].type == T_STRING) {
       add_binary_message_noflush(current_object, &zero, 1);
-      add_binary_message_noflush(current_object, (const unsigned char *)sp->u.arr->item[i].u.string, strlen(sp->u.arr->item[i].u.string));
+      add_binary_message_noflush(
+          current_object, (const unsigned char *)sp->u.arr->item[i].u.string,
+          strlen(sp->u.arr->item[i].u.string));
     }
   }
   add_binary_message_noflush(current_object, &zero, 1);
-  add_binary_message_noflush(current_object, telnet_end_sub, sizeof(telnet_end_sub));
+  add_binary_message_noflush(current_object, telnet_end_sub,
+                             sizeof(telnet_end_sub));
   flush_message(current_object->interactive);
   pop_2_elems();
 }
 #endif
 
 #ifdef F_SEND_GMCP
-void f_send_gmcp()
-{
-  add_binary_message_noflush(current_object, telnet_start_gmcp, sizeof(telnet_start_gmcp));
-  add_binary_message_noflush(current_object, (const unsigned char *)(sp->u.string), strlen(sp->u.string));
-  add_binary_message_noflush(current_object, telnet_end_sub, sizeof(telnet_end_sub));
+void f_send_gmcp() {
+  add_binary_message_noflush(current_object, telnet_start_gmcp,
+                             sizeof(telnet_start_gmcp));
+  add_binary_message_noflush(current_object,
+                             (const unsigned char *)(sp->u.string),
+                             strlen(sp->u.string));
+  add_binary_message_noflush(current_object, telnet_end_sub,
+                             sizeof(telnet_end_sub));
   flush_message(current_object->interactive);
 
   pop_stack();
@@ -2523,22 +2567,20 @@ void f_send_gmcp()
 #endif
 
 #ifdef F_REQUEST_TERM_TYPE
-void f_request_term_type()
-{
-  add_binary_message(command_giver, telnet_term_query, sizeof(telnet_term_query));
+void f_request_term_type() {
+  add_binary_message(command_giver, telnet_term_query,
+                     sizeof(telnet_term_query));
 }
 #endif
 
 #ifdef F_START_REQUEST_TERM_TYPE
-void f_start_request_term_type()
-{
+void f_start_request_term_type() {
   add_binary_message(command_giver, telnet_do_ttype, sizeof(telnet_do_ttype));
 }
 #endif
 
 #ifdef F_REQUEST_TERM_SIZE
-void f_request_term_size()
-{
+void f_request_term_size() {
   if ((st_num_arg == 1) && (sp->u.number == 0))
     add_binary_message(command_giver, telnet_dont_naws,
                        sizeof(telnet_dont_naws));
@@ -2553,15 +2595,14 @@ void f_request_term_size()
 #endif
 
 #ifdef F_WEBSOCKET_HANDSHAKE_DONE
-void f_websocket_handshake_done()
-{
+void f_websocket_handshake_done() {
   if (!current_interactive) {
     return;
   }
 
   flush_message(current_interactive->interactive);
   current_interactive->interactive->iflags |= HANDSHAKE_COMPLETE;
-  object_t *ob = current_interactive; //command_giver;
+  object_t *ob = current_interactive;  // command_giver;
   /* Ask permission to ask them for their terminal type */
   add_binary_message_noflush(ob, telnet_do_ttype, sizeof(telnet_do_ttype));
   /* Ask them for their window size */

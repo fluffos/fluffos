@@ -30,7 +30,7 @@ typedef struct {
 /* common header */
 typedef struct {
   unsigned short ref;
-  short type;                 /* FP_* is used */
+  short type; /* FP_* is used */
 #ifdef DEBUGMALLOC_EXTENSIONS
   int extra_ref;
 #endif
@@ -61,7 +61,6 @@ int merge_arg_lists(int, struct array_s *, int);
 funptr_t *make_efun_funp(int, struct svalue_s *);
 funptr_t *make_lfun_funp(int, struct svalue_s *);
 funptr_t *make_simul_funp(int, struct svalue_s *);
-funptr_t *make_functional_funp(short, short, short,
-                               struct svalue_s *, int);
+funptr_t *make_functional_funp(short, short, short, struct svalue_s *, int);
 
 #endif

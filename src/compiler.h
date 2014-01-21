@@ -7,7 +7,7 @@
 
 #define _YACC_
 
-#define YYMAXDEPTH    600
+#define YYMAXDEPTH 600
 
 /*
  * Information for allocating a block that can grow dynamically
@@ -21,39 +21,40 @@ typedef struct {
   int max_size;
 } mem_block_t;
 
-#define START_BLOCK_SIZE        4096
+#define START_BLOCK_SIZE 4096
 
 /* NUMPAREAS ares are saved with the program code after compilation,
  * the rest are only temporary.
  */
-#define A_PROGRAM               0       /* executable code */
-#define A_FUNCTIONS             1
-#define A_STRINGS               2       /* table of strings */
-#define A_VAR_NAME              3
-#define A_VAR_TYPE              4
-#define A_LINENUMBERS           5       /* linenumber information */
-#define A_FILE_INFO             6       /* start of file line nos */
-#define A_INHERITS              7       /* table of inherited progs */
-#define A_CLASS_DEF             8
-#define A_CLASS_MEMBER          9
-#define A_ARGUMENT_TYPES        10      /* */
-#define A_ARGUMENT_INDEX        11      /* */
-#define NUMPAREAS               12
-#define A_CASES                 13      /* keep track of cases */
-#define A_STRING_NEXT           14      /* next prog string in hash chain */
-#define A_STRING_REFS           15      /* reference count of prog string */
-#define A_INCLUDES              16      /* list of included files */
-#define A_FUNCTIONALS           17
-#define A_FUNCTION_DEFS         18
-#define A_VAR_TEMP              19      /* table of variables */
-#define NUMAREAS                20
+#define A_PROGRAM 0 /* executable code */
+#define A_FUNCTIONS 1
+#define A_STRINGS 2 /* table of strings */
+#define A_VAR_NAME 3
+#define A_VAR_TYPE 4
+#define A_LINENUMBERS 5 /* linenumber information */
+#define A_FILE_INFO 6   /* start of file line nos */
+#define A_INHERITS 7    /* table of inherited progs */
+#define A_CLASS_DEF 8
+#define A_CLASS_MEMBER 9
+#define A_ARGUMENT_TYPES 10 /* */
+#define A_ARGUMENT_INDEX 11 /* */
+#define NUMPAREAS 12
+#define A_CASES 13       /* keep track of cases */
+#define A_STRING_NEXT 14 /* next prog string in hash chain */
+#define A_STRING_REFS 15 /* reference count of prog string */
+#define A_INCLUDES 16    /* list of included files */
+#define A_FUNCTIONALS 17
+#define A_FUNCTION_DEFS 18
+#define A_VAR_TEMP 19 /* table of variables */
+#define NUMAREAS 20
 
-#define TREE_MAIN               0
-#define TREE_INIT               1
-#define NUMTREES                2
+#define TREE_MAIN 0
+#define TREE_INIT 1
+#define NUMTREES 2
 
 #define CURRENT_PROGRAM_SIZE (prog_code - mem_block[A_PROGRAM].block)
-#define UPDATE_PROGRAM_SIZE mem_block[A_PROGRAM].current_size = CURRENT_PROGRAM_SIZE
+#define UPDATE_PROGRAM_SIZE \
+  mem_block[A_PROGRAM].current_size = CURRENT_PROGRAM_SIZE
 
 /*
  * Types available. The number '0' is valid as any type. These types
@@ -61,18 +62,18 @@ typedef struct {
  * the run-time types, named T_ interpret.h.
  */
 
-#define TYPE_UNKNOWN    0       /* This type must be casted */
-#define TYPE_ANY        1       /* Will match any type */
-#define TYPE_NOVALUE    2
-#define TYPE_VOID       3
-#define TYPE_NUMBER     4
-#define TYPE_STRING     5
-#define TYPE_OBJECT     6
-#define TYPE_MAPPING    7
-#define TYPE_FUNCTION   8
-#define TYPE_REAL       9
-#define TYPE_BUFFER     10
-#define TYPE_MASK       0xf
+#define TYPE_UNKNOWN 0 /* This type must be casted */
+#define TYPE_ANY 1     /* Will match any type */
+#define TYPE_NOVALUE 2
+#define TYPE_VOID 3
+#define TYPE_NUMBER 4
+#define TYPE_STRING 5
+#define TYPE_OBJECT 6
+#define TYPE_MAPPING 7
+#define TYPE_FUNCTION 8
+#define TYPE_REAL 9
+#define TYPE_BUFFER 10
+#define TYPE_MASK 0xf
 
 typedef struct {
   int runtime_index;
@@ -82,17 +83,16 @@ typedef struct {
 extern mem_block_t mem_block[NUMAREAS];
 extern const char *compiler_type_names[];
 
-#define LOOP_CONTEXT            0x1
-#define SWITCH_CONTEXT          0x2
-#define SWITCH_STRINGS          0x4
-#define SWITCH_NUMBERS          0x8
-#define SWITCH_DEFAULT          0x10
-#define SWITCH_RANGES           0x20
-#define SWITCH_NOT_EMPTY        0x40
-#define LOOP_FOREACH            0x80
-#define SPECIAL_CONTEXT         0x100
-#define ARG_LIST                0x200
-
+#define LOOP_CONTEXT 0x1
+#define SWITCH_CONTEXT 0x2
+#define SWITCH_STRINGS 0x4
+#define SWITCH_NUMBERS 0x8
+#define SWITCH_DEFAULT 0x10
+#define SWITCH_RANGES 0x20
+#define SWITCH_NOT_EMPTY 0x40
+#define LOOP_FOREACH 0x80
+#define SPECIAL_CONTEXT 0x100
+#define ARG_LIST 0x200
 
 typedef struct function_context_s {
   parse_node_t *values_list;
@@ -124,15 +124,18 @@ typedef struct compiler_temp_t {
  * Some good macros to have.
  */
 
-#define IS_CLASS(t) ((t & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) == TYPE_MOD_CLASS)
+#define IS_CLASS(t) ((t &(TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) == TYPE_MOD_CLASS)
 #define CLASS_IDX(t) (t & ~(DECL_MODS | TYPE_MOD_CLASS))
 
-#define COMP_TYPE(e, t) (!(e & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) \
-                         && (compatible[(e & ~DECL_MODS)] & (1 << (t))))
-#define IS_TYPE(e, t) (!(e & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) \
-                       && (is_type[(e & ~DECL_MODS)] & (1 << (t))))
+#define COMP_TYPE(e, t)                        \
+  (!(e & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) && \
+   (compatible[(e & ~DECL_MODS)] & (1 << (t))))
+#define IS_TYPE(e, t)                          \
+  (!(e & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) && \
+   (is_type[(e & ~DECL_MODS)] & (1 << (t))))
 
-#define FUNCTION_TEMP(n) ((compiler_temp_t *)mem_block[A_FUNCTION_DEFS].block + (n))
+#define FUNCTION_TEMP(n) \
+  ((compiler_temp_t *)mem_block[A_FUNCTION_DEFS].block + (n))
 #define FUNCTION_NEXT(n) (FUNCTION_TEMP(n)->next)
 /* function_t from A_FUNCTIONS index */
 #define FUNC(n) ((function_t *)mem_block[A_FUNCTIONS].block + (n))
@@ -140,17 +143,19 @@ typedef struct compiler_temp_t {
 #define FUNCTION_PROG(n) (FUNCTION_TEMP(n)->prog)
 #define FUNCTION_ALIAS(n) (FUNCTION_TEMP(n)->alias_for)
 /* function_t from full function index */
-#define FUNCTION_DEF(n) (FUNCTION_PROG(n) ? FUNCTION_TEMP(n)->u.func : FUNC(FUNCTION_TEMP(n)->u.index))
+#define FUNCTION_DEF(n)                        \
+  (FUNCTION_PROG(n) ? FUNCTION_TEMP(n)->u.func \
+                    : FUNC(FUNCTION_TEMP(n)->u.index))
 /* flags from full function index */
 #define FUNCTION_FLAGS(n) (FUNCTION_TEMP(n)->flags)
 
 #define NUM_INHERITS (mem_block[A_INHERITS].current_size / sizeof(inherit_t))
 
-#define INHERIT(n)  ((inherit_t *)mem_block[A_INHERITS].block + (n))
+#define INHERIT(n) ((inherit_t *)mem_block[A_INHERITS].block + (n))
 #define VAR_TEMP(n) ((variable_t *)mem_block[A_VAR_TEMP].block + (n))
-#define SIMUL(n)    (simuls[n].func)
-#define PROG_STRING(n)   (((const char **)mem_block[A_STRINGS].block)[n])
-#define CLASS(n)    ((class_def_t *)mem_block[A_CLASS_DEF].block + (n))
+#define SIMUL(n) (simuls[n].func)
+#define PROG_STRING(n) (((const char **)mem_block[A_STRINGS].block)[n])
+#define CLASS(n) ((class_def_t *)mem_block[A_CLASS_DEF].block + (n))
 
 #if !defined(__alpha) && !defined(cray) && !defined(__sparc__)
 #define align(x) (((x) + 3) & ~3)
@@ -159,12 +164,12 @@ typedef struct compiler_temp_t {
 #endif
 
 #define SOME_NUMERIC_CASE_LABELS 0x40000
-#define NO_STRING_CASE_LABELS    0x80000
+#define NO_STRING_CASE_LABELS 0x80000
 
-#define ARG_IS_PROTO             1
-#define ARG_IS_VARARGS           2
+#define ARG_IS_PROTO 1
+#define ARG_IS_VARARGS 2
 
-#define NOVALUE_USED_FLAG        1024
+#define NOVALUE_USED_FLAG 1024
 
 int validate_function_call(int, parse_node_t *);
 parse_node_t *validate_efun_call(int, parse_node_t *);
@@ -245,32 +250,31 @@ parse_node_t *do_promotions(parse_node_t *, int);
 parse_node_t *throw_away_call(parse_node_t *);
 parse_node_t *throw_away_mapping(parse_node_t *);
 
-#define realloc_mem_block(m) do { \
-    mem_block_t *M = m; \
-    M->max_size <<= 1; \
-    M->block = (char *)DREALLOC(M->block, M->max_size, TAG_COMPILER, "realloc_mem_block"); \
-} while (0)
+#define realloc_mem_block(m)                                         \
+  do {                                                               \
+    mem_block_t *M = m;                                              \
+    M->max_size <<= 1;                                               \
+    M->block = (char *)DREALLOC(M->block, M->max_size, TAG_COMPILER, \
+                                "realloc_mem_block");                \
+  } while (0)
 
-#define add_to_mem_block(n, data, size) do { \
-    mem_block_t *mbp = &mem_block[n]; \
-    int Size = size; \
-    \
-    if (mbp->current_size + Size > mbp->max_size) { \
-        do { \
-            mbp->max_size <<= 1; \
-        } while (mbp->current_size + Size > mbp->max_size); \
-        \
-        mbp->block = (char *)DREALLOC(mbp->block, mbp->max_size, TAG_COMPILER, "insert_in_mem_block"); \
-    } \
-    memcpy(mbp->block + mbp->current_size, data, Size); \
-    mbp->current_size += Size; \
-} while (0)
+#define add_to_mem_block(n, data, size)                                      \
+  do {                                                                       \
+    mem_block_t *mbp = &mem_block[n];                                        \
+    int Size = size;                                                         \
+                                                                             \
+    if (mbp->current_size + Size > mbp->max_size) {                          \
+      do {                                                                   \
+        mbp->max_size <<= 1;                                                 \
+      } while (mbp->current_size + Size > mbp->max_size);                    \
+                                                                             \
+      mbp->block = (char *)DREALLOC(mbp->block, mbp->max_size, TAG_COMPILER, \
+                                    "insert_in_mem_block");                  \
+    }                                                                        \
+    memcpy(mbp->block + mbp->current_size, data, Size);                      \
+    mbp->current_size += Size;                                               \
+  } while (0)
 
 char *allocate_in_mem_block(int, int);
 
 #endif
-
-
-
-
-

@@ -33,8 +33,7 @@ static void find_or_add_simul_efun(function_t *, int);
 static void remove_simuls(void);
 
 #ifdef DEBUGMALLOC_EXTENSIONS
-void mark_simuls()
-{
+void mark_simuls() {
   int i;
 
   for (i = 0; i < num_simul_efun; i++) {
@@ -47,8 +46,7 @@ void mark_simuls()
  * If there is a simul_efun file, then take care of it and extract all
  * information we need.
  */
-void init_simul_efun(char *file)
-{
+void init_simul_efun(char *file) {
   char buf[512];
   object_t *new_ob;
 
@@ -72,8 +70,7 @@ void init_simul_efun(char *file)
   set_simul_efun(new_ob);
 }
 
-static void remove_simuls()
-{
+static void remove_simuls() {
   int i;
   ident_hash_elem_t *ihe;
   /* inactivate all old simul_efuns */
@@ -93,9 +90,7 @@ static void remove_simuls()
   }
 }
 
-static
-void get_simul_efuns(program_t *prog)
-{
+static void get_simul_efuns(program_t *prog) {
   int i;
   int num_new = prog->num_functions_defined + prog->last_inherited;
 
@@ -107,15 +102,17 @@ void get_simul_efuns(program_t *prog)
       num_simul_efun = 0;
     } else {
       /* will be resized later */
-      simul_names = RESIZE(simul_names, num_simul_efun + num_new,
-                           simul_entry, TAG_SIMULS, "get_simul_efuns");
-      simuls = RESIZE(simuls, num_simul_efun + num_new,
-                      function_lookup_info_t, TAG_SIMULS, "get_simul_efuns: 2");
+      simul_names = RESIZE(simul_names, num_simul_efun + num_new, simul_entry,
+                           TAG_SIMULS, "get_simul_efuns");
+      simuls = RESIZE(simuls, num_simul_efun + num_new, function_lookup_info_t,
+                      TAG_SIMULS, "get_simul_efuns: 2");
     }
   } else {
     if (num_new) {
-      simul_names = CALLOCATE(num_new, simul_entry, TAG_SIMULS, "get_simul_efuns");
-      simuls = CALLOCATE(num_new, function_lookup_info_t, TAG_SIMULS, "get_simul_efuns: 2");
+      simul_names =
+          CALLOCATE(num_new, simul_entry, TAG_SIMULS, "get_simul_efuns");
+      simuls = CALLOCATE(num_new, function_lookup_info_t, TAG_SIMULS,
+                         "get_simul_efuns: 2");
     }
   }
   for (i = 0; i < num_new; i++) {
@@ -129,19 +126,17 @@ void get_simul_efuns(program_t *prog)
 
   if (num_simul_efun) {
     /* shrink to fit */
-    simul_names = RESIZE(simul_names, num_simul_efun, simul_entry,
-                         TAG_SIMULS, "get_simul_efuns");
-    simuls = RESIZE(simuls, num_simul_efun, function_lookup_info_t,
-                    TAG_SIMULS, "get_simul_efuns");
+    simul_names = RESIZE(simul_names, num_simul_efun, simul_entry, TAG_SIMULS,
+                         "get_simul_efuns");
+    simuls = RESIZE(simuls, num_simul_efun, function_lookup_info_t, TAG_SIMULS,
+                    "get_simul_efuns");
   }
 }
 
 /*
  * Define a new simul_efun
  */
-static void
-find_or_add_simul_efun(function_t *funp, int runtime_index)
-{
+static void find_or_add_simul_efun(function_t *funp, int runtime_index) {
   ident_hash_elem_t *ihe;
   int first = 0;
   int last = num_simul_efun - 1;
@@ -149,9 +144,11 @@ find_or_add_simul_efun(function_t *funp, int runtime_index)
 
   while (first <= last) {
     j = ((first + last) >> 1);
-    if (funp->funcname < simul_names[j].name) { last = j - 1; }
-    else if (funp->funcname > simul_names[j].name) { first = j + 1; }
-    else {
+    if (funp->funcname < simul_names[j].name) {
+      last = j - 1;
+    } else if (funp->funcname > simul_names[j].name) {
+      first = j + 1;
+    } else {
       ihe = find_or_add_perm_ident(simul_names[j].name);
       ihe->token |= IHE_SIMUL;
       ihe->token &= ~IHE_ORPHAN;
@@ -177,16 +174,9 @@ find_or_add_simul_efun(function_t *funp, int runtime_index)
   ref_string(funp->funcname);
 }
 
-void
-set_simul_efun(object_t *ob)
-{
+void set_simul_efun(object_t *ob) {
   get_simul_efuns(ob->prog);
 
   simul_efun_ob = ob;
   add_ref(simul_efun_ob, "set_simul_efun");
 }
-
-
-
-
-

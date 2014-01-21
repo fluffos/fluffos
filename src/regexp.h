@@ -9,18 +9,18 @@
  */
 
 #define EFUN_REGEXP 1
-#define ED_REGEXP   2
+#define ED_REGEXP 2
 
-#define NSUBEXP  10
+#define NSUBEXP 10
 typedef struct regexp {
   const char *startp[NSUBEXP];
   const char *endp[NSUBEXP];
-  char regstart;              /* Internal use only. */
-  char reganch;               /* Internal use only. */
-  char *regmust;              /* Internal use only. */
-  int regmlen;                /* Internal use only. */
-  char program[1];            /* Unwarranted chumminess with compiler. */
-}      regexp;
+  char regstart;   /* Internal use only. */
+  char reganch;    /* Internal use only. */
+  char *regmust;   /* Internal use only. */
+  int regmlen;     /* Internal use only. */
+  char program[1]; /* Unwarranted chumminess with compiler. */
+} regexp;
 
 extern int regnarrate;
 extern int regexp_user;

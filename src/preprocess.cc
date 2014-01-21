@@ -8,9 +8,9 @@ static void handle_cond(LPC_INT);
 #undef DXALLOC
 #define DXALLOC(x, y, z) malloc(x)
 #undef FREE
-#define FREE(x)   free(x)
+#define FREE(x) free(x)
 #undef ALLOCATE
-#define ALLOCATE(x, y, z) (x *)malloc(sizeof(x))
+#define ALLOCATE(x, y, z) (x *) malloc(sizeof(x))
 #undef DREALLOC
 #define DREALLOC(w, x, y, z) realloc(w, x)
 #endif
@@ -18,8 +18,7 @@ static void handle_cond(LPC_INT);
 static defn_t *defns[DEFHASH];
 static ifstate_t *iftop = 0;
 
-static defn_t *lookup_definition(const char *s)
-{
+static defn_t *lookup_definition(const char *s) {
   defn_t *p;
   int h;
 
@@ -31,8 +30,7 @@ static defn_t *lookup_definition(const char *s)
   return 0;
 }
 
-defn_t *lookup_define(const char *s)
-{
+defn_t *lookup_define(const char *s) {
   defn_t *p = lookup_definition(s);
 
   if (p && (p->flags & DEF_IS_UNDEFINED)) {
@@ -42,14 +40,17 @@ defn_t *lookup_define(const char *s)
   }
 }
 
-static void add_define(const char *name, int nargs, const char *exps)
-{
+static void add_define(const char *name, int nargs, const char *exps) {
   defn_t *p = lookup_definition(name);
   int h, len;
 
   /* trim off leading and trailing whitespace */
-  while (uisspace(*exps)) { exps++; }
-  for (len = strlen(exps);  len && uisspace(exps[len - 1]);  len--) { ; }
+  while (uisspace(*exps)) {
+    exps++;
+  }
+  for (len = strlen(exps); len && uisspace(exps[len - 1]); len--) {
+    ;
+  }
   if (*exps == '#' && *(exps + 1) == '#') {
     yyerror("'##' at start of macro definition");
     return;
@@ -61,7 +62,8 @@ static void add_define(const char *name, int nargs, const char *exps)
 
   if (p) {
     if (p->flags & DEF_IS_UNDEFINED) {
-      p->exps = (char *)DREALLOC(p->exps, len + 1, TAG_COMPILER, "add_define: redef");
+      p->exps =
+          (char *)DREALLOC(p->exps, len + 1, TAG_COMPILER, "add_define: redef");
       memcpy(p->exps, exps, len);
       p->exps[len] = 0;
       p->flags = 0;
@@ -77,7 +79,8 @@ static void add_define(const char *name, int nargs, const char *exps)
         sprintf(buf, "redefinition of #define %s\n", name);
         yywarn(buf);
 
-        p->exps = (char *)DREALLOC(p->exps, len + 1, TAG_COMPILER, "add_define: redef");
+        p->exps = (char *)DREALLOC(p->exps, len + 1, TAG_COMPILER,
+                                   "add_define: redef");
         memcpy(p->exps, exps, len);
         p->exps[len] = 0;
         p->nargs = nargs;
@@ -88,9 +91,10 @@ static void add_define(const char *name, int nargs, const char *exps)
     }
   } else {
     p = ALLOCATE(defn_t, TAG_COMPILER, "add_define: def");
-    p->name = (char *) DXALLOC(strlen(name) + 1, TAG_COMPILER, "add_define: def name");
+    p->name =
+        (char *)DXALLOC(strlen(name) + 1, TAG_COMPILER, "add_define: def name");
     strcpy(p->name, name);
-    p->exps = (char *) DXALLOC(len + 1, TAG_COMPILER, "add_define: def exps");
+    p->exps = (char *)DXALLOC(len + 1, TAG_COMPILER, "add_define: def exps");
     memcpy(p->exps, exps, len);
     p->exps[len] = 0;
     p->flags = 0;
@@ -115,7 +119,7 @@ static void handle_elif()
 
       /* pop previous condition */
       iftop = p->next;
-      FREE((char *) p);
+      FREE((char *)p);
 
 #ifdef LEXER
       *--outp = '\0';
@@ -125,92 +129,94 @@ static void handle_elif()
 #ifdef LEXER
       if (*outp++) {
         yyerror("Condition too complex in #elif");
-        while (*outp++) { ; }
+        while (*outp++) {
+          ;
+        }
 #else
       if (*outp != '\n') {
         yyerror("Condition too complex in #elif");
 #endif
-      } else { handle_cond(cond); }
+      } else {
+        handle_cond(cond);
+      }
     } else {/* EXPECT_ENDIF */
-      /*
+            /*
        * last cond was true...skip to end of
        * conditional
        */
-      skip_to("endif", (char *) 0);
+      skip_to("endif", (char *)0);
     }
   } else {
     yyerrorp("Unexpected %celif");
   }
 }
 
-static void handle_else(void)
-{
+static void handle_else(void) {
   if (iftop) {
     if (iftop->state == EXPECT_ELSE) {
       iftop->state = EXPECT_ENDIF;
     } else {
-      skip_to("endif", (char *) 0);
+      skip_to("endif", (char *)0);
     }
   } else {
     yyerrorp("Unexpected %cendif");
   }
 }
 
-static void handle_endif(void)
-{
-  if (iftop && (iftop->state == EXPECT_ENDIF ||
-                iftop->state == EXPECT_ELSE)) {
+static void handle_endif(void) {
+  if (iftop && (iftop->state == EXPECT_ENDIF || iftop->state == EXPECT_ELSE)) {
     ifstate_t *p = iftop;
 
     iftop = p->next;
-    FREE((char *) p);
+    FREE((char *)p);
   } else {
     yyerrorp("Unexpected %cendif");
   }
 }
 
-#define BNOT   1
-#define LNOT   2
+#define BNOT 1
+#define LNOT 2
 #define UMINUS 3
-#define UPLUS  4
+#define UPLUS 4
 
-#define MULT   1
-#define DIV    2
-#define MOD    3
-#define BPLUS  4
+#define MULT 1
+#define DIV 2
+#define MOD 3
+#define BPLUS 4
 #define BMINUS 5
 #define LSHIFT 6
 #define RSHIFT 7
-#define LESS   8
-#define LEQ    9
+#define LESS 8
+#define LEQ 9
 #define GREAT 10
-#define GEQ   11
-#define EQ    12
-#define NEQ   13
-#define BAND  14
-#define XOR   15
-#define BOR   16
-#define LAND  17
-#define LOR   18
+#define GEQ 11
+#define EQ 12
+#define NEQ 13
+#define BAND 14
+#define XOR 15
+#define BOR 16
+#define LAND 17
+#define LOR 18
 #define QMARK 19
 
-static char _optab[] = {
-  0, 4, 0, 0, 0, 26, 56, 0, 0, 0, 18, 14, 0, 10, 0, 22, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 30, 50, 40, 74,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 70, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 63, 0, 1
-};
+static char _optab[] = {0, 4, 0, 0, 0, 26, 56, 0, 0, 0, 18, 14, 0,  10, 0,  22,
+                        0, 0, 0, 0, 0, 0,  0,  0, 0, 0, 0,  0,  30, 50, 40, 74,
+                        0, 0, 0, 0, 0, 0,  0,  0, 0, 0, 0,  0,  0,  0,  0,  0,
+                        0, 0, 0, 0, 0, 0,  0,  0, 0, 0, 0,  0,  0,  0,  70, 0,
+                        0, 0, 0, 0, 0, 0,  0,  0, 0, 0, 0,  0,  0,  0,  0,  0,
+                        0, 0, 0, 0, 0, 0,  0,  0, 0, 0, 0,  0,  63, 0,  1};
 static char optab2[] = {
-  BNOT, 0, 0, LNOT, '=', NEQ, 7, 0, 0, UMINUS, 0, BMINUS, 10, UPLUS, 0, BPLUS, 10,
-  0, 0, MULT, 11, 0, 0, DIV, 11, 0, 0, MOD, 11,
-  0, '<', LSHIFT, 9, '=', LEQ, 8, 0, LESS, 8, 0, '>', RSHIFT, 9, '=', GEQ, 8, 0, GREAT, 8,
-  0, '=', EQ, 7, 0, 0, 0, '&', LAND, 3, 0, BAND, 6, 0, '|', LOR, 2, 0, BOR, 4,
-  0, 0, XOR, 5, 0, 0, QMARK, 1
-};
+    BNOT,   0,   0,     LNOT,  '=',   NEQ,  7,   0,   0,      UMINUS, 0,
+    BMINUS, 10,  UPLUS, 0,     BPLUS, 10,   0,   0,   MULT,   11,     0,
+    0,      DIV, 11,    0,     0,     MOD,  11,  0,   '<',    LSHIFT, 9,
+    '=',    LEQ, 8,     0,     LESS,  8,    0,   '>', RSHIFT, 9,      '=',
+    GEQ,    8,   0,     GREAT, 8,     0,    '=', EQ,  7,      0,      0,
+    0,      '&', LAND,  3,     0,     BAND, 6,   0,   '|',    LOR,    2,
+    0,      BOR, 4,     0,     0,     XOR,  5,   0,   0,      QMARK,  1};
 
-#define optab1 (_optab-' ')
+#define optab1 (_optab - ' ')
 
-static LPC_INT cond_get_exp(int priority)
-{
+static LPC_INT cond_get_exp(int priority) {
   int c;
   LPC_INT value, value2, x;
 
@@ -229,10 +235,14 @@ static LPC_INT cond_get_exp(int priority)
     } while (is_wspace(c));
     if (c != ')') {
       yyerror("bracket not paired in #if");
-      if (!c) { *--outp = '\0'; }
+      if (!c) {
+        *--outp = '\0';
+      }
     }
 #else
-    if ((c = exgetc()) != ')') { yyerrorp("bracket not paired in %cif"); }
+    if ((c = exgetc()) != ')') {
+      yyerrorp("bracket not paired in %cif");
+    }
 #endif
   } else if (ispunct(c)) {
     if (!(x = optab1[c])) {
@@ -333,7 +343,9 @@ static LPC_INT cond_get_exp(int priority)
       }
     }
     if (priority >= optab2[x + 2]) {
-      if (optab2[x]) { *--outp = value2; }
+      if (optab2[x]) {
+        *--outp = value2;
+      }
       break;
     }
     value2 = cond_get_exp(optab2[x + 2]);
@@ -411,7 +423,9 @@ static LPC_INT cond_get_exp(int priority)
           return 0;
         }
 #else
-        if ((c = exgetc()) != ':') { yyerrorp("'?' without ':' in %cif"); }
+        if ((c = exgetc()) != ':') {
+          yyerrorp("'?' without ':' in %cif");
+        }
 #endif
         if (value) {
           cond_get_exp(1);
@@ -426,9 +440,7 @@ static LPC_INT cond_get_exp(int priority)
   return value;
 }
 
-static void
-handle_cond(LPC_INT c)
-{
+static void handle_cond(LPC_INT c) {
   ifstate_t *p;
 
   if (!c) {
@@ -439,5 +451,3 @@ handle_cond(LPC_INT c)
   iftop = p;
   p->state = c ? EXPECT_ENDIF : EXPECT_ELSE;
 }
-
-

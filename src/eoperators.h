@@ -33,4 +33,3 @@ void f_sscanf(void);
  * eoperators.c
  */
 void call_simul_efun(unsigned short, int);
-

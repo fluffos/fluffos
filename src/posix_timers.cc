@@ -6,12 +6,11 @@
 #include "eval.h"
 #include "backend.h"
 
-static timer_t eval_timer_id,  hb_timer_id;
+static timer_t eval_timer_id, hb_timer_id;
 /*
  * SIGALRM handler.
  */
-void sigalrm_handler(int sig, siginfo_t *si, void *uc)
-{
+void sigalrm_handler(int sig, siginfo_t *si, void *uc) {
 #ifndef POSIX_TIMERS
   outoftime = 1;
 #else
@@ -19,11 +18,10 @@ void sigalrm_handler(int sig, siginfo_t *si, void *uc)
     outoftime = 1;
   }
 #endif
-}                               /* sigalrm_handler() */
+} /* sigalrm_handler() */
 #ifdef POSIX_TIMERS
 /* Called by main() to initialize all timers (currently only eval_cost) */
-void init_posix_timers(void)
-{
+void init_posix_timers(void) {
   struct sigevent sev;
   struct sigaction sa;
   int i;
@@ -55,8 +53,7 @@ void init_posix_timers(void)
 }
 
 /* Set the eval_timer to the given number of microseconds */
-void posix_eval_timer_set(LPC_INT micros)
-{
+void posix_eval_timer_set(LPC_INT micros) {
   struct itimerspec it;
 
   it.it_interval.tv_sec = 0;
@@ -69,8 +66,7 @@ void posix_eval_timer_set(LPC_INT micros)
 }
 
 /* Return the number of microseconds remaining on the eval_timer */
-LPC_INT posix_eval_timer_get(void)
-{
+LPC_INT posix_eval_timer_get(void) {
   struct itimerspec it;
 
   if (timer_gettime(eval_timer_id, &it) < 0) {

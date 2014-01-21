@@ -7,12 +7,12 @@
  * main.c
  */
 
-#define PORT_UNDEFINED   0
-#define PORT_TELNET      1
-#define PORT_BINARY      2
-#define PORT_ASCII       3
-#define PORT_MUD         4
-#define PORT_WEBSOCKET   5
+#define PORT_UNDEFINED 0
+#define PORT_TELNET 1
+#define PORT_BINARY 2
+#define PORT_ASCII 3
+#define PORT_MUD 4
+#define PORT_WEBSOCKET 5
 
 typedef struct port_def_s {
   int kind;
@@ -24,7 +24,7 @@ typedef struct port_def_s {
   int out_packets;
   int out_volume;
 #endif
-  struct evconnlistener * ev_conn;
+  struct evconnlistener *ev_conn;
 } port_def_t;
 
 extern port_def_t external_port[5];

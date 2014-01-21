@@ -17,18 +17,15 @@
 #include <stdio.h>
 
 #ifdef F_CRYPT
-#define SALT_LEN        8
+#define SALT_LEN 8
 #ifdef CUSTOM_CRYPT
 #define CRYPT(x, y) custom_crypt(x, y, 0)
 #endif
 
-void
-f_crypt(void)
-{
+void f_crypt(void) {
   const char *res, *p;
   char salt[SALT_LEN + 1];
-  const char *choice =
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ./";
+  const char *choice = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ./";
 
   if (sp->type == T_STRING && SVALUE_STRLEN(sp) >= 2) {
     p = sp->u.string;
@@ -52,14 +49,11 @@ f_crypt(void)
 #endif
 
 #ifdef F_OLDCRYPT
-void
-f_oldcrypt(void)
-{
+void f_oldcrypt(void) {
 #ifndef WIN32
 
   char *res, salt[3];
-  const char *choice =
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ./";
+  const char *choice = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ./";
 
   if (sp->type == T_STRING && SVALUE_STRLEN(sp) >= 2) {
     salt[0] = sp->u.string[0];
@@ -82,9 +76,7 @@ f_oldcrypt(void)
 #ifdef F_LOCALTIME
 /* FIXME: most of the #ifdefs here should be based on configure checks
    instead.  Same for rusage() */
-void
-f_localtime(void)
-{
+void f_localtime(void) {
   struct tm *tm;
   array_t *vec;
   time_t lt;
@@ -137,9 +129,7 @@ f_localtime(void)
 #endif
 
 #ifdef F_RUSAGE
-void
-f_rusage(void)
-{
+void f_rusage(void) {
   struct rusage rus;
   mapping_t *m;
   long usertime, stime, maxrss;

@@ -4,9 +4,7 @@
 #include "compiler.h"
 #include "replace_program.h"
 
-void
-dealloc_funp(funptr_t *fp)
-{
+void dealloc_funp(funptr_t *fp) {
   program_t *prog = 0;
 
   switch (fp->hdr.type) {
@@ -30,8 +28,8 @@ dealloc_funp(funptr_t *fp)
 
   if (prog) {
     prog->func_ref--;
-    debug(d_flag, "subtr func ref /%s: now %i\n",
-          prog->filename, prog->func_ref);
+    debug(d_flag, "subtr func ref /%s: now %i\n", prog->filename,
+          prog->func_ref);
     if (!prog->func_ref && !prog->ref) {
       deallocate_program(prog);
     }
@@ -40,9 +38,7 @@ dealloc_funp(funptr_t *fp)
   FREE(fp);
 }
 
-void
-free_funp(funptr_t *fp)
-{
+void free_funp(funptr_t *fp) {
   fp->hdr.ref--;
   if (fp->hdr.ref > 0) {
     return;
@@ -50,17 +46,13 @@ free_funp(funptr_t *fp)
   dealloc_funp(fp);
 }
 
-void
-push_refed_funp(funptr_t *fp)
-{
+void push_refed_funp(funptr_t *fp) {
   STACK_INC;
   sp->type = T_FUNCTION;
   sp->u.fp = fp;
 }
 
-void
-push_funp(funptr_t *fp)
-{
+void push_funp(funptr_t *fp) {
   STACK_INC;
   sp->type = T_FUNCTION;
   sp->u.fp = fp;
@@ -74,8 +66,7 @@ push_funp(funptr_t *fp)
  * if we simply pushed the args from vec at this point.  (Note that the
  * old function pointers are broken in this regard)
  */
-int merge_arg_lists(int num_arg, array_t *arr, int start)
-{
+int merge_arg_lists(int num_arg, array_t *arr, int start) {
   int num_arr_arg = arr->size - start;
   svalue_t *sptr;
 
@@ -100,13 +91,10 @@ int merge_arg_lists(int num_arg, array_t *arr, int start)
   return num_arg;
 }
 
-funptr_t *
-make_efun_funp(int opcode, svalue_t *args)
-{
+funptr_t *make_efun_funp(int opcode, svalue_t *args) {
   funptr_t *fp;
 
-  fp = (funptr_t *)DXALLOC(sizeof(funptr_t),
-                           TAG_FUNP, "make_efun_funp");
+  fp = (funptr_t *)DXALLOC(sizeof(funptr_t), TAG_FUNP, "make_efun_funp");
   fp->hdr.owner = current_object;
   add_ref(current_object, "make_efun_funp");
   fp->hdr.type = FP_EFUN;
@@ -124,25 +112,24 @@ make_efun_funp(int opcode, svalue_t *args)
   return fp;
 }
 
-funptr_t *
-make_lfun_funp(int index, svalue_t *args)
-{
+funptr_t *make_lfun_funp(int index, svalue_t *args) {
   funptr_t *fp;
   int newindex;
 
   if (replace_program_pending(current_object)) {
-    error("cannot bind an lfun fp to an object with a pending replace_program()\n");
+    error(
+        "cannot bind an lfun fp to an object with a pending "
+        "replace_program()\n");
   }
 
-  fp = (funptr_t *)DXALLOC(sizeof(funptr_hdr_t) + sizeof(local_ptr_t),
-                           TAG_FUNP, "make_lfun_funp");
+  fp = (funptr_t *)DXALLOC(sizeof(funptr_hdr_t) + sizeof(local_ptr_t), TAG_FUNP,
+                           "make_lfun_funp");
   fp->hdr.owner = current_object;
   add_ref(current_object, "make_lfun_funp");
   fp->hdr.type = FP_LOCAL | FP_NOT_BINDABLE;
 
   fp->hdr.owner->prog->func_ref++;
-  debug(d_flag, "add func ref /%s: now %i\n",
-        fp->hdr.owner->prog->filename,
+  debug(d_flag, "add func ref /%s: now %i\n", fp->hdr.owner->prog->filename,
         fp->hdr.owner->prog->func_ref);
 
   newindex = index + function_index_offset;
@@ -162,13 +149,11 @@ make_lfun_funp(int index, svalue_t *args)
   return fp;
 }
 
-funptr_t *
-make_simul_funp(int index, svalue_t *args)
-{
+funptr_t *make_simul_funp(int index, svalue_t *args) {
   funptr_t *fp;
 
-  fp = (funptr_t *)DXALLOC(sizeof(funptr_hdr_t) + sizeof(simul_ptr_t),
-                           TAG_FUNP, "make_simul_funp");
+  fp = (funptr_t *)DXALLOC(sizeof(funptr_hdr_t) + sizeof(simul_ptr_t), TAG_FUNP,
+                           "make_simul_funp");
   fp->hdr.owner = current_object;
   add_ref(current_object, "make_simul_funp");
   fp->hdr.type = FP_SIMUL;
@@ -186,13 +171,14 @@ make_simul_funp(int index, svalue_t *args)
   return fp;
 }
 
-funptr_t *
-make_functional_funp(short num_arg, short num_local, short len, svalue_t *args, int flag)
-{
+funptr_t *make_functional_funp(short num_arg, short num_local, short len,
+                               svalue_t *args, int flag) {
   funptr_t *fp;
 
   if (replace_program_pending(current_object)) {
-    error("cannot bind a functional to an object with a pending replace_program()\n");
+    error(
+        "cannot bind a functional to an object with a pending "
+        "replace_program()\n");
   }
 
   fp = (funptr_t *)DXALLOC(sizeof(funptr_hdr_t) + sizeof(functional_t),
@@ -202,8 +188,7 @@ make_functional_funp(short num_arg, short num_local, short len, svalue_t *args, 
   fp->hdr.type = FP_FUNCTIONAL + flag;
 
   current_prog->func_ref++;
-  debug(d_flag, "add func ref /%s: now %i\n",
-        current_prog->filename,
+  debug(d_flag, "add func ref /%s: now %i\n", current_prog->filename,
         current_prog->func_ref);
 
   fp->f.functional.prog = current_prog;
@@ -229,9 +214,7 @@ make_functional_funp(short num_arg, short num_local, short len, svalue_t *args, 
 typedef void (*func_t)(void);
 extern func_t efun_table[];
 
-svalue_t *
-call_function_pointer(funptr_t *funp, int num_arg)
-{
+svalue_t *call_function_pointer(funptr_t *funp, int num_arg) {
   array_t *v;
 
   if (!funp->hdr.owner || (funp->hdr.owner->flags & O_DESTRUCTED))
@@ -261,9 +244,11 @@ call_function_pointer(funptr_t *funp, int num_arg)
         }
         num_arg++;
       } else if (num_arg < instrs[i].min_arg) {
-        error("Too few arguments to efun %s in efun pointer.\n", query_instr_name(i));
+        error("Too few arguments to efun %s in efun pointer.\n",
+              query_instr_name(i));
       } else if (num_arg > instrs[i].max_arg && instrs[i].max_arg != -1) {
-        error("Too many arguments to efun %s in efun pointer.\n", query_instr_name(i));
+        error("Too many arguments to efun %s in efun pointer.\n",
+              query_instr_name(i));
       }
       /* possibly we should add TRACE, OPC, etc here;
          also on eval_cost here, which is ok for just 1 efun */
@@ -295,8 +280,10 @@ call_function_pointer(funptr_t *funp, int num_arg)
 
       fp = sp - num_arg + 1;
 
-      if (current_object->prog->function_flags[funp->f.local.index] & (FUNC_PROTOTYPE | FUNC_UNDEFINED)) {
-        error("Undefined lfun pointer called: %s\n", function_name(current_object->prog, funp->f.local.index));
+      if (current_object->prog->function_flags[funp->f.local.index] &
+          (FUNC_PROTOTYPE | FUNC_UNDEFINED)) {
+        error("Undefined lfun pointer called: %s\n",
+              function_name(current_object->prog, funp->f.local.index));
       }
       push_control_stack(FRAME_FUNCTION);
       current_prog = funp->hdr.owner->prog;
@@ -336,9 +323,7 @@ call_function_pointer(funptr_t *funp, int num_arg)
   return &apply_ret_value;
 }
 
-svalue_t *
-safe_call_function_pointer(funptr_t *funp, int num_arg)
-{
+svalue_t *safe_call_function_pointer(funptr_t *funp, int num_arg) {
   error_context_t econ;
   svalue_t *ret;
 
@@ -347,7 +332,8 @@ safe_call_function_pointer(funptr_t *funp, int num_arg)
   }
   try {
     ret = call_function_pointer(funp, num_arg);
-  } catch (const char *) {
+  }
+  catch (const char *) {
     restore_context(&econ);
     /* condition was restored to where it was when we came in */
     pop_n_elems(num_arg);

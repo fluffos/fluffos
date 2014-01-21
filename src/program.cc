@@ -3,15 +3,13 @@
 
 int total_num_prog_blocks, total_prog_block_size;
 
-void reference_prog(program_t *progp, const char *from)
-{
+void reference_prog(program_t *progp, const char *from) {
   progp->ref++;
-  debug(d_flag, "reference_prog: /%s ref %d (%s)\n",
-        progp->filename, progp->ref, from);
+  debug(d_flag, "reference_prog: /%s ref %d (%s)\n", progp->filename,
+        progp->ref, from);
 }
 
-void deallocate_program(program_t *progp)
-{
+void deallocate_program(program_t *progp) {
   int i;
 
   debug(d_flag, "free_prog: /%s\n", progp->filename);
@@ -35,7 +33,8 @@ void deallocate_program(program_t *progp)
   /* Free all inherited objects */
   for (i = 0; i < progp->num_inherited; i++) {
     program_t *tmp = progp->inherit[i].prog;
-    free_prog(&tmp); //don't want to mess up the prog pointer in the inherited ob
+    free_prog(
+        &tmp);  // don't want to mess up the prog pointer in the inherited ob
   }
   free_string(progp->filename);
 
@@ -47,7 +46,7 @@ void deallocate_program(program_t *progp)
     FREE(progp->file_info);
   }
 
-  FREE((char *) progp);
+  FREE((char *)progp);
 }
 
 /*
@@ -57,29 +56,28 @@ void deallocate_program(program_t *progp)
  * as we want to be able to read the program in again from the swap area.
  * That means that strings are not swapped.
  */
-void free_prog(program_t **progp)
-{
+void free_prog(program_t **progp) {
   (*progp)->ref--;
   if ((*progp)->ref > 0) {
-    *progp = (program_t *)2;//NULL;
+    *progp = (program_t *)2;  // NULL;
     return;
   }
   if ((*progp)->func_ref > 0) {
-    *progp = (program_t *)3;//NULL;
+    *progp = (program_t *)3;  // NULL;
     return;
   }
 
   deallocate_program(*progp);
-  *progp = (program_t *)4;//NULL;
+  *progp = (program_t *)4;  // NULL;
 }
 
-char *variable_name(program_t *prog, int idx)
-{
+char *variable_name(program_t *prog, int idx) {
   int i = prog->num_inherited - 1;
   int first;
 
   if (i > -1) {
-    first = prog->inherit[i].variable_index_offset + prog->inherit[i].prog->num_variables_total;
+    first = prog->inherit[i].variable_index_offset +
+            prog->inherit[i].prog->num_variables_total;
   } else {
     return prog->variable_table[idx];
   }
@@ -89,13 +87,12 @@ char *variable_name(program_t *prog, int idx)
   while (idx < prog->inherit[i].variable_index_offset) {
     i--;
   }
-  return variable_name(prog->inherit[i].prog, idx - prog->inherit[i].variable_index_offset);
+  return variable_name(prog->inherit[i].prog,
+                       idx - prog->inherit[i].variable_index_offset);
 }
 
-function_t *find_func_entry(program_t *prog, int index)
-{
+function_t *find_func_entry(program_t *prog, int index) {
   register int low, mid, high;
-
 
   /* Walk up the inheritance tree to the real definition */
   if (prog->function_flags[index] & FUNC_ALIAS) {
@@ -110,7 +107,9 @@ function_t *find_func_entry(program_t *prog, int index)
       mid = (low + high + 1) >> 1;
       if (prog->inherit[mid].function_index_offset > index) {
         high = mid - 1;
-      } else { low = mid; }
+      } else {
+        low = mid;
+      }
     }
     index -= prog->inherit[low].function_index_offset;
     prog = prog->inherit[low].prog;
@@ -120,4 +119,3 @@ function_t *find_func_entry(program_t *prog, int index)
 
   return prog->function_table + index;
 }
-

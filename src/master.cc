@@ -12,11 +12,10 @@ function_lookup_info_t *master_applies = 0;
  * hasn't loaded yet.  In that case, we return (svalue_t *)-1, and the
  * calling routine should let the check succeed.
  */
-svalue_t *apply_master_ob(int fun, int num_arg)
-{
+svalue_t *apply_master_ob(int fun, int num_arg) {
   if (!master_ob) {
     pop_n_elems(num_arg);
-    return (svalue_t *) - 1;
+    return (svalue_t *)-1;
   }
 
   if (master_applies[fun].func) {
@@ -26,8 +25,7 @@ svalue_t *apply_master_ob(int fun, int num_arg)
     }
 #endif
 
-    call_direct(master_ob, master_applies[fun].index,
-                ORIGIN_DRIVER, num_arg);
+    call_direct(master_ob, master_applies[fun].index, ORIGIN_DRIVER, num_arg);
     free_svalue(&apply_ret_value, "apply_master_ob");
     apply_ret_value = *sp--;
     return &apply_ret_value;
@@ -38,17 +36,15 @@ svalue_t *apply_master_ob(int fun, int num_arg)
 }
 
 /* Hmm, need something like a safe_call_direct() to do this one */
-svalue_t *safe_apply_master_ob(int fun, int num_arg)
-{
+svalue_t *safe_apply_master_ob(int fun, int num_arg) {
   if (!master_ob) {
     pop_n_elems(num_arg);
-    return (svalue_t *) - 1;
+    return (svalue_t *)-1;
   }
   return safe_apply(applies_table[fun], master_ob, num_arg, ORIGIN_DRIVER);
 }
 
-void init_master()
-{
+void init_master() {
   char buf[512];
   object_t *new_ob;
 
@@ -58,15 +54,13 @@ void init_master()
 
   new_ob = load_object(buf, compiled_version);
   if (new_ob == 0) {
-    fprintf(stderr, "The master file %s was not loaded.\n",
-            MASTER_FILE);
+    fprintf(stderr, "The master file %s was not loaded.\n", MASTER_FILE);
     exit(-1);
   }
   set_master(new_ob);
 }
 
-static void get_master_applies(object_t *ob)
-{
+static void get_master_applies(object_t *ob) {
   int i;
 
   /* master_applies will be allocated if we're recompiling master_ob */
@@ -89,8 +83,7 @@ static void get_master_applies(object_t *ob)
   }
 }
 
-void set_master(object_t *ob)
-{
+void set_master(object_t *ob) {
 #if defined(PACKAGE_UIDS) || defined(PACKAGE_MUDLIB_STATS)
   int first_load = (!master_ob);
 #endif
@@ -103,18 +96,20 @@ void set_master(object_t *ob)
   /* Make sure master_ob is never made a dangling pointer. */
   add_ref(master_ob, "set_master");
 #ifndef PACKAGE_UIDS
-#  ifdef PACKAGE_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
   if (first_load) {
     set_backbone_domain("BACKBONE");
     set_master_author("NONAME");
   }
-#  endif
+#endif
 #else
   ret = apply_master_ob(APPLY_GET_ROOT_UID, 0);
   /* can't be -1 or we wouldn't be here */
   if (!ret) {
-    debug_message("No function %s() in master object; possibly the mudlib doesn't want PACKAGE_UIDS to be defined.\n",
-                  applies_table[APPLY_GET_ROOT_UID]);
+    debug_message(
+        "No function %s() in master object; possibly the mudlib doesn't want "
+        "PACKAGE_UIDS to be defined.\n",
+        applies_table[APPLY_GET_ROOT_UID]);
     exit(-1);
   }
   if (ret->type != T_STRING) {
@@ -125,9 +120,9 @@ void set_master(object_t *ob)
   if (first_load) {
     master_ob->uid = set_root_uid(ret->u.string);
     master_ob->euid = master_ob->uid;
-#  ifdef PACKAGE_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
     set_master_author(ret->u.string);
-#  endif
+#endif
     ret = apply_master_ob(APPLY_GET_BACKBONE_UID, 0);
     if (ret == 0 || ret->type != T_STRING) {
       debug_message("%s() in the master file does not work\n",
@@ -135,9 +130,9 @@ void set_master(object_t *ob)
       exit(-1);
     }
     set_backbone_uid(ret->u.string);
-#  ifdef PACKAGE_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
     set_backbone_domain(ret->u.string);
-#  endif
+#endif
   } else {
     master_ob->uid = add_uid(ret->u.string);
     master_ob->euid = master_ob->uid;

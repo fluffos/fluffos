@@ -6,9 +6,9 @@
 
 #include <functional>
 
-#define NULL_ERROR_CONTEXT       0
-#define NORMAL_ERROR_CONTEXT     1
-#define CATCH_ERROR_CONTEXT      2
+#define NULL_ERROR_CONTEXT 0
+#define NORMAL_ERROR_CONTEXT 1
+#define CATCH_ERROR_CONTEXT 2
 #define SAFE_APPLY_ERROR_CONTEXT 4
 
 /*
@@ -23,12 +23,10 @@ extern int time_for_hb;
 struct tick_event {
   bool valid;
 
-  typedef std::function<void ()> callback_type;
+  typedef std::function<void()> callback_type;
   callback_type callback;
 
-  tick_event(callback_type &callback) :
-    valid(true),
-    callback(callback) {}
+  tick_event(callback_type &callback) : valid(true), callback(callback) {}
 };
 
 // Register a event to run on game ticks. Safe to call from any thread.

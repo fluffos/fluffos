@@ -23,11 +23,10 @@ void init_network_threadpool();
 void shutdown_network_threadpool();
 
 struct realtime_event {
-  typedef std::function<void ()> callback_type;
+  typedef std::function<void()> callback_type;
 
   callback_type callback;
-  realtime_event(callback_type &callback) :
-    callback(callback) {}
+  realtime_event(callback_type &callback) : callback(callback) {}
 };
 void add_realtime_event(realtime_event::callback_type);
 

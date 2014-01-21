@@ -10,8 +10,7 @@ static struct timeval tv;
 int outoftime = 0;
 LPC_INT max_cost;
 
-void set_eval(LPC_INT etime)
-{
+void set_eval(LPC_INT etime) {
 #ifdef POSIX_TIMERS
   posix_eval_timer_set(etime);
 #else
@@ -21,18 +20,17 @@ void set_eval(LPC_INT etime)
   outoftime = 0;
 }
 
-LPC_INT get_eval()
-{
+LPC_INT get_eval() {
 #ifndef WIN32
 #ifdef POSIX_TIMERS
   return posix_eval_timer_get();
 #else
   struct timeval now;
   gettimeofday(&now, NULL);
-  return max_cost - ((LPC_INT)(1000000) * (now.tv_sec - tv.tv_sec)) - (now.tv_usec - tv.tv_usec);
+  return max_cost - ((LPC_INT)(1000000) * (now.tv_sec - tv.tv_sec)) -
+         (now.tv_usec - tv.tv_usec);
 #endif
 #else
   return 100;
 #endif
 }
-
