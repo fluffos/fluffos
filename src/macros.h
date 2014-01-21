@@ -2,8 +2,6 @@
 #define MACROS_H
 
 /* do things both ways ... */
-#define V_START(vlist, last_arg) va_start(vlist, last_arg)
-#define V_VAR(type, var, vlist)
 #define SAFE(x) do { x } while (0)
 
 /*

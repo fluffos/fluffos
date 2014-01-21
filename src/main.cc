@@ -429,8 +429,8 @@ void debug_message(const char *fmt, ...)
   }
 
   char message[1024];
-  V_START(args, fmt);
-  V_VAR(char *, fmt, args);
+
+  va_start(args, fmt);
   vsnprintf(message, 1024, fmt, args);
   va_end(args);
 

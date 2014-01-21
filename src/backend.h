@@ -33,7 +33,11 @@ struct tick_event {
 
 // Register a event to run after a certain number of seconds.
 tick_event *add_tick_event(int, tick_event::callback_type);
+
+void virtual_time_tick();
+
 void clear_tick_events();
+
 
 void backend(struct event_base *);
 

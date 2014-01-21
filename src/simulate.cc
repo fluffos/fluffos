@@ -1646,8 +1646,7 @@ void fatal(const char *fmt, ...)
       break;
     case 0:
       in_fatal = 1;
-      V_START(args, fmt);
-      V_VAR(char *, fmt, args);
+      va_start(args, fmt);
       vsnprintf(msg_buf, 2048, fmt, args);
       va_end(args);
       debug_message("******** FATAL ERROR: %s\n", msg_buf);
@@ -1957,8 +1956,7 @@ void error(const char *const fmt, ...)
   char err_buf[2048];
   va_list args;
 
-  V_START(args, fmt);
-  V_VAR(char *, fmt, args);
+  va_start(args, fmt);
   vsnprintf(err_buf + 1, 2046, fmt, args);
   va_end(args);
   err_buf[0] = '*';           /* all system errors get a * at the start */
@@ -1976,7 +1974,7 @@ void safe_error(const char *const fmt, ...)
       return ;
     }
     va_list args;
-    V_START(args, fmt);
+    va_start(args, fmt);
     error(fmt, args);
     va_end(args);
   } catch (const char *msg) {

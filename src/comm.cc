@@ -22,6 +22,7 @@
 
 #include <algorithm>
 
+#include <event2/buffer.h>
 #include <event2/event.h>
 #include <event2/listener.h>
 
@@ -375,47 +376,10 @@ void add_message(object_t *who, const char *data, int len)
   }
 #endif                          /* NO_SHADOWS */
 
-  /*
-   * write message into ip->message_buf.
-   */
-  end = trans + translen;
-  for (cp = trans; cp < end; cp++) {
-    if (ip->message_length == MESSAGE_BUF_SIZE) {
-      if (!flush_message(ip)) {
-        debug(connections, ("Broken connection during add_message."));
-        return;
-      }
-      if (ip->message_length == MESSAGE_BUF_SIZE) {
-        break;
-      }
-    }
-    if ((*cp == '\n' || *cp == -1)
-#ifndef NO_BUFFER_TYPE
-        && ip->connection_type != PORT_BINARY
-#endif
-       ) {
-      if (ip->message_length == (MESSAGE_BUF_SIZE - 1)) {
-        if (!flush_message(ip)) {
-          debug(connections, ("Broken connection during add_message."));
-          return;
-        }
-        if (ip->message_length == (MESSAGE_BUF_SIZE - 1)) {
-          break;
-        }
-      }
-      ip->message_buf[ip->message_producer] = (*cp == '\n') ? '\r' : -1;
-      ip->message_producer = (ip->message_producer + 1)
-                             % MESSAGE_BUF_SIZE;
-      ip->message_length++;
-    }
-    ip->message_buf[ip->message_producer] = *cp;
-    ip->message_producer = (ip->message_producer + 1) % MESSAGE_BUF_SIZE;
-    ip->message_length++;
-  }
+  bufferevent_write(ip->ev_buffer, data, len);
 
   handle_snoop(data, len, ip);
 
-  event_add(ip->ev_write, NULL);
 #ifdef FLUSH_OUTPUT_IMMEDIATELY
   flush_message(ip);
 #endif
@@ -423,30 +387,21 @@ void add_message(object_t *who, const char *data, int len)
   add_message_calls++;
 }                               /* add_message() */
 
-/* WARNING: this can only handle results < LARGEST_PRINTABLE_STRING in size */
 void add_vmessage(object_t *who, const char *format, ...)
 {
-  char new_string_data[LARGEST_PRINTABLE_STRING + 1];
+  auto ip = who->interactive;
+  auto buffer = bufferevent_get_output(ip->ev_buffer);
 
   va_list args;
-  V_START(args, format);
-  V_VAR(object_t *, who, args);
-  V_VAR(char *, format, args);
-
-  new_string_data[0] = '\0';
-  // FIXME: vsnprintf returns length of string, so we could
-  // handle arbitrary length, should fix this.
-  vsnprintf(new_string_data, sizeof(new_string_data), format, args);
+  va_start(args, format);
+  evbuffer_add_vprintf(buffer, format, args);
   va_end(args);
 
-  add_message(who, new_string_data, strlen(new_string_data));
+  add_message_calls++;
 }
 
 void add_binary_message_noflush(object_t *who, const unsigned char *data, int len)
 {
-  interactive_t *ip;
-  const unsigned char *cp, *end;
-
   /*
    * if who->interactive is not valid, bail
    */
@@ -454,26 +409,10 @@ void add_binary_message_noflush(object_t *who, const unsigned char *data, int le
       (who->interactive->iflags & (NET_DEAD | CLOSING))) {
     return;
   }
-  ip = who->interactive;
+  auto ip = who->interactive;
 
-  /*
-   * write message into ip->message_buf.
-   */
-  end = data + len;
-  for (cp = data; cp < end; cp++) {
-    if (ip->message_length == MESSAGE_BUF_SIZE) {
-      if (!flush_message(ip)) {
-        debug(connections, ("Broken connection during add_message."));
-        return;
-      }
-      if (ip->message_length == MESSAGE_BUF_SIZE) {
-        break;
-      }
-    }
-    ip->message_buf[ip->message_producer] = *cp;
-    ip->message_producer = (ip->message_producer + 1) % MESSAGE_BUF_SIZE;
-    ip->message_length++;
-  }
+  bufferevent_write(ip->ev_buffer, data, len);
+
   add_message_calls++;
 }
 
@@ -499,85 +438,11 @@ int flush_message(interactive_t *ip)
     debug(connections, ("flush_message: invalid target!\n"));
     return 0;
   }
-  /*
-   * write ip->message_buf[] to socket.
-   */
-  while (ip->message_length != 0) {
-    if (ip->message_consumer < ip->message_producer) {
-      length = ip->message_producer - ip->message_consumer;
-    } else {
-      length = MESSAGE_BUF_SIZE - ip->message_consumer;
-    }
-#ifdef HAVE_ZLIB
-    if (ip->compressed_stream) {
-      num_bytes = send_compressed(ip, (unsigned char *)ip->message_buf +
-                                  ip->message_consumer,  length);
-    } else {
-#endif
-      if (ip->connection_type == PORT_WEBSOCKET && (ip->iflags & HANDSHAKE_COMPLETE)) {
-        ip->out_of_band = 0;
-        //ok we're in trouble, we have to send the whole thing at once, otherwise we don't know the size!
-        //try to get away with only sending small chunks
-        int sendsize = length;
-        if (length > 125) {
-          sendsize = 125;
-        }
-        unsigned short flags = htons(sendsize | 0x8200); //82 is final packet (of this message) type binary
-        int sendres = send(ip->fd, &flags, 2, 0);
-        if (sendres <= 0) {
-          return 1;    //wait
-        }
-        if (sendres == 1) {
-          ip->iflags |= NET_DEAD;
-          return 0;
-        }
-        num_bytes = send(ip->fd, ip->message_buf + ip->message_consumer, sendsize, 0);
-        if (num_bytes != sendsize) {
-          ip->iflags |= NET_DEAD;
-          return 0;
-        }
-      } else {
-        num_bytes = send(ip->fd, ip->message_buf + ip->message_consumer,
-                         length, ip->out_of_band | MSG_NOSIGNAL);
-      }
-#ifdef HAVE_ZLIB
-    }
-#endif
-    if (!num_bytes) {
-      ip->iflags |= NET_DEAD;
-      return 0;
-    }
-    if (num_bytes == -1) {
-      if (socket_errno == EWOULDBLOCK || socket_errno == EAGAIN) {
-        debug(connections, ("flush_message: write: Operation would block.\n"));
-        event_add(ip->ev_write, NULL);
-        return 1;
-      } else if (socket_errno == EINTR) {
-        debug(connections, ("flush_message: write: Interrupted system call.\n"));
-        event_add(ip->ev_write, NULL);
-        return 1;
-      } else {
-        debug(connections, "flush_message: write failed: %s, user connection dead.\n",
-              evutil_socket_error_to_string(evutil_socket_geterror(ip->fd)));
-        ip->iflags |= NET_DEAD;
-        return 0;
-      }
-    }
-    ip->message_consumer = (ip->message_consumer + num_bytes) %
-                           MESSAGE_BUF_SIZE;
-    ip->message_length -= num_bytes;
-    ip->out_of_band = 0;
-    inet_packets++;
-    inet_volume += num_bytes;
-#ifdef F_NETWORK_STATS
-    inet_out_packets++;
-    inet_out_volume += num_bytes;
-    external_port[ip->external_port].out_packets++;
-    external_port[ip->external_port].out_volume += num_bytes;
-#endif
-  }
-  return 1;
-}                               /* flush_message() */
+
+  // TODO: restore COMPRESS/COMPRESS2 functionality
+  // TODO: restore WEBSOCKET functionality.
+  return bufferevent_flush(ip->ev_buffer, EV_WRITE, BEV_FLUSH) != -1;
+}
 
 static int send_mssp_val(mapping_t *map, mapping_node_t *el, void *obp)
 {
@@ -1218,23 +1083,10 @@ void get_user_data(interactive_t *ip)
 
   /* read the data from the socket */
   debug(connections, "get_user_data: read on fd %d\n", ip->fd);
-  num_bytes = OS_socket_read(ip->fd, buf, text_space);
 
-  if (!num_bytes) {
-    // if (ip->iflags & CLOSING)
-    //    debug_message("get_user_data: tried to read from closing fd.\n");
-    ip->iflags |= NET_DEAD;
-    remove_interactive(ip->ob, 0);
-    return;
-  }
+  num_bytes = bufferevent_read(ip->ev_buffer, buf, text_space);
 
   if (num_bytes == -1) {
-#ifdef EWOULDBLOCK
-    if (socket_errno == EWOULDBLOCK) {
-      debug(connections, "get_user_data: read on fd %d: Operation would block.\n", ip->fd);
-      return;
-    }
-#endif
     debug(connections, "get_user_data: fd %d, read error: %s.\n", ip->fd,
           evutil_socket_error_to_string(evutil_socket_geterror(ip->fd)));
     ip->iflags |= NET_DEAD;
@@ -1530,10 +1382,7 @@ static char *first_cmd_in_buf(interactive_t *ip)
 
 // Event handler for new connection
 // NOTE: Runs in network threadpool.
-void async_on_accept(int new_socket_fd, port_def_t *port, sockaddr *sa, int socklen) {
-  debug(connections, "async_on_accept: new connection from %s, fd %d\n",
-      sockaddr_to_string(sa, socklen), new_socket_fd);
-
+void async_on_accept(int new_socket_fd, port_def_t *port) {
   if (set_socket_nonblocking(new_socket_fd, 1) == -1) {
     debug(connections, "async_on_accept: fd %d, set_socket_nonblocking 1 error: %s.\n", new_socket_fd,
           evutil_socket_error_to_string(evutil_socket_geterror(new_socket_fd)));
@@ -1620,7 +1469,7 @@ void new_user_handler(interactive_t *user)
   all_users[i] = master_ob->interactive;
 
   // FIXME: this belongs in async_on_accept()
-  new_user_event_listener(i);
+  new_user_event_listener(all_users[i], i);
 
   set_prompt("> ");
 
@@ -1981,13 +1830,9 @@ void remove_interactive(object_t *ob, int dested)
 #endif
 
   // Cleanup events
-  if (ip->ev_read != NULL) {
-    event_free(ip->ev_read);
-    ip->ev_read = NULL;
-  }
-  if (ip->ev_write != NULL) {
-    event_free(ip->ev_write);
-    ip->ev_write = NULL;
+  if (ip->ev_buffer != NULL) {
+    bufferevent_free(ip->ev_buffer);
+    ip->ev_buffer = NULL;
   }
   if (ip->ev_command != NULL) {
     event_free(ip->ev_command);
@@ -1998,11 +1843,6 @@ void remove_interactive(object_t *ob, int dested)
     ip->ev_data = NULL;
   }
 
-  debug(connections, "remove_interactive: closing fd %d\n", ip->fd);
-  if (OS_socket_close(ip->fd) == -1) {
-    debug(connections, "remove_interactive: close error: %s",
-          evutil_socket_error_to_string(evutil_socket_geterror(ip->fd)));
-  }
 #ifdef F_SET_HIDE
   if (ob->flags & O_HIDDEN) {
     num_hidden_users--;
@@ -2465,10 +2305,7 @@ void outbuf_addv(outbuffer_t *outbuf, const char *format, ...)
   char buf[LARGEST_PRINTABLE_STRING + 1];
   va_list args;
 
-  V_START(args, format);
-  V_VAR(outbuffer_t *, outbuf, args);
-  V_VAR(char *, format, args);
-
+  va_start(args, format);
   vsnprintf(buf, LARGEST_PRINTABLE_STRING, format, args);
   va_end(args);
 
@@ -2588,7 +2425,6 @@ static int flush_compressed_output(interactive_t *ip)
             || errno == ENOSR
 #endif
            ) {
-          event_add(ip->ev_write, NULL);
           ret = 2;
           break;
         }

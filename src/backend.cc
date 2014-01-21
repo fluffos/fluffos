@@ -118,6 +118,19 @@ void clear_tick_events()
   debug_message("clear_tick_events: %d leftover events cleared.\n", i);
 }
 
+void virtual_time_tick() {
+  int64_t real_time = get_current_time();
+
+  while (current_virtual_time < real_time) {
+    call_tick_events();
+    current_virtual_time++;
+  }
+#ifdef PACKAGE_ASYNC
+        // TODO: Move this into timer based.
+        check_reqs();
+#endif
+}
+
 object_t *current_heart_beat;
 static void look_for_objects_to_swap(void);
 void call_heart_beat(void);
@@ -129,7 +142,7 @@ static void report_holes(void);
 /*
  * There are global variables that must be zeroed before any execution.
  * In case of errors, there will be a LONGJMP(), and the variables will
- * have to be cleared explicitely. They are normally maintained by the
+ * have to be cleared explicitly. They are normally maintained by the
  * code that use them.
  *
  * This routine must only be called from top level, not from inside
@@ -170,6 +183,13 @@ static void report_holes()
 }
 #endif
 
+void call_remove_destructed_objects() {
+  add_tick_event(5 * 60,
+      tick_event::callback_type(call_remove_destructed_objects));
+  if (obj_list_replace || obj_list_destruct) {
+    remove_destructed_objects();
+  }
+}
 /*
  * This is the backend. We will stay here for ever (almost).
  */
@@ -184,63 +204,44 @@ void backend(struct event_base *base)
   // Register various tick events
   add_tick_event(0, tick_event::callback_type(call_heart_beat));
   add_tick_event(5 * 60, tick_event::callback_type(look_for_objects_to_swap));
-  add_tick_event(60,
-                 tick_event::callback_type(std::bind(reclaim_objects, true)));
+  add_tick_event(30 * 60, tick_event::callback_type(std::bind(reclaim_objects, true)));
 #ifdef PACKAGE_MUDLIB_STATS
   add_tick_event(60 * 60, tick_event::callback_type(mudlib_stats_decay));
 #endif
+  add_tick_event(5 * 60, tick_event::callback_type(call_remove_destructed_objects));
 
   current_virtual_time = get_current_time();
+  clear_state();
 
-  while (1)
-    try {
-      clear_state();
+  /*
+   * FIXME: this need to be converted to tick based.
+   *
+  */
 
-      while (1) {
-        if (obj_list_replace || obj_list_destruct) {
-          remove_destructed_objects();
-        }
+  try {
+    /* Run event loop for at most 1 second, this current handles
+     * listening socket events, user socket events, and lpc socket events.
+     *
+     * It currently also handles user command, longer term plan is to
+     * merge all callbacks execution into tick event loop and move all
+     * I/O to dedicated threads.
+     */
+    run_event_loop(base);
+  } catch (...) { // catch everything
+    fatal("BUG: jumped out of event loop!");
+  }
 
-        /*
-         * shut down MudOS if MudOS_is_being_shut_down is set.
-         */
-        if (MudOS_is_being_shut_down) {
-          shutdownMudOS(0);
-        }
-        if (slow_shut_down_to_do) {
-          int tmp = slow_shut_down_to_do;
+  // Shut down MudOS if MudOS_is_being_shut_down is set.
+  if (MudOS_is_being_shut_down) {
+    shutdownMudOS(0);
+  }
+  if (slow_shut_down_to_do) {
+    int tmp = slow_shut_down_to_do;
 
-          slow_shut_down_to_do = 0;
-          slow_shut_down(tmp);
-        }
+    slow_shut_down_to_do = 0;
+    slow_shut_down(tmp);
+  }
 
-        try {
-          /* Run event loop for at most 1 second, this current handles
-           * listening socket events, user socket events, and lpc socket events.
-           *
-           * It currently also handles user command, longer term plan is to
-           * merge all callbacks execution into tick event loop and move all
-           * I/O to dedicated threads.
-           */
-          run_for_at_most_one_second(base);
-        } catch (...) { // catch everything
-          fatal("BUG: jumped out of event loop!");
-        }
-        int64_t real_time = get_current_time();
-
-        while (current_virtual_time < real_time) {
-          call_tick_events();
-          current_virtual_time++;
-        }
-
-#ifdef PACKAGE_ASYNC
-        // TODO: Move this into timer based.
-        check_reqs();
-#endif
-      }
-    } catch (const char *) {
-      restore_context(&econ);
-    }
 } /* backend() */
 
 /*

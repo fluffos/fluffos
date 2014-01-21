@@ -14,7 +14,8 @@
 #include "network_incl.h"
 
 #include "fliconv.h"
-#include "event2/event.h"
+#include <event2/event.h>
+#include <event2/bufferevent.h>
 
 #define MAX_TEXT                   2048
 #define MAX_SOCKET_PACKET_SIZE     1024
@@ -128,10 +129,9 @@ typedef struct interactive_s {
   char ws_maskoffs;
 
   // libevent event handle.
-  struct event *ev_read;
-  struct event *ev_write;
-  struct event *ev_command;
+  bufferevent *ev_buffer;
   struct user_event_data *ev_data;
+  event *ev_command;
 
 } interactive_t;
 
@@ -224,7 +224,7 @@ object_t *query_snooping(object_t *);
 void mark_iptable(void);
 #endif
 
-void async_on_accept(int , port_def_t *, sockaddr *, int);
+void async_on_accept(int, port_def_t *);
 
 inline const char *sockaddr_to_string(const sockaddr *addr, socklen_t len)
 {

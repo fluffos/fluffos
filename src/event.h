@@ -21,7 +21,7 @@ event_base *init_event_base();
 void init_network_threadpool();
 void shutdown_network_threadpool();
 
-int run_for_at_most_one_second(struct event_base *);
+int run_event_loop(struct event_base *);
 
 // Listening socket event
 void new_external_port_event_listener(port_def_t *, sockaddr *, socklen_t);
@@ -30,8 +30,7 @@ void new_external_port_event_listener(port_def_t *, sockaddr *, socklen_t);
 struct user_event_data {
   int idx;
 };
-void new_user_event_listener(int);
-
+void new_user_event_listener(struct interactive_s *, int);
 // LPC socket event
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
 struct lpc_socket_event_data {
