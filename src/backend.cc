@@ -213,11 +213,6 @@ void backend(struct event_base *base)
   current_virtual_time = get_current_time();
   clear_state();
 
-  /*
-   * FIXME: this need to be converted to tick based.
-   *
-  */
-
   try {
     /* Run event loop for at most 1 second, this current handles
      * listening socket events, user socket events, and lpc socket events.
@@ -230,18 +225,7 @@ void backend(struct event_base *base)
   } catch (...) { // catch everything
     fatal("BUG: jumped out of event loop!");
   }
-
-  // Shut down MudOS if MudOS_is_being_shut_down is set.
-  if (MudOS_is_being_shut_down) {
-    shutdownMudOS(0);
-  }
-  if (slow_shut_down_to_do) {
-    int tmp = slow_shut_down_to_do;
-
-    slow_shut_down_to_do = 0;
-    slow_shut_down(tmp);
-  }
-
+  shutdownMudOS(-1);
 } /* backend() */
 
 /*

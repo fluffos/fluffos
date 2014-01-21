@@ -8,6 +8,8 @@
 #ifndef EVENT_H_
 #define EVENT_H_
 
+#include <functional>
+
 #include <event2/event.h>
 #include <event2/dns.h>
 
@@ -15,11 +17,19 @@ struct port_def_s;
 typedef struct port_def_s port_def_t;
 
 extern struct event_base *g_event_base;
-
 event_base *init_event_base();
 
 void init_network_threadpool();
 void shutdown_network_threadpool();
+
+struct realtime_event {
+  typedef std::function<void ()> callback_type;
+
+  callback_type callback;
+  realtime_event(callback_type &callback) :
+    callback(callback) {}
+};
+void add_realtime_event(realtime_event::callback_type);
 
 int run_event_loop(struct event_base *);
 

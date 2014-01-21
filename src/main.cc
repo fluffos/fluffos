@@ -442,8 +442,6 @@ void debug_message(const char *fmt, ...)
   fflush(stderr);
 }
 
-int slow_shut_down_to_do = 0;
-
 char *xalloc(int size)
 {
   char *p;
@@ -465,7 +463,6 @@ char *xalloc(int size)
       t = "Temporarily out of MEMORY. Freeing reserve.\n";
       write(1, t, strlen(t));
       reserved_area = 0;
-      slow_shut_down_to_do = 6;
       return xalloc(size);/* Try again */
     }
     going_to_exit = 1;

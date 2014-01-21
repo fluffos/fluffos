@@ -1430,7 +1430,7 @@ void async_on_accept(int new_socket_fd, port_def_t *port) {
   getsockname(new_socket_fd, (sockaddr *)&user->addr, &user->addrlen);
 
   // add event to tick_event.
-  add_tick_event(0, [=](){ new_user_handler(user); });
+  add_realtime_event([=](){ new_user_handler(user); });
 }
 
 /*

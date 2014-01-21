@@ -31,13 +31,11 @@ struct tick_event {
     callback(callback) {}
 };
 
-// Register a event to run after a certain number of seconds.
+// Register a event to run on game ticks. Safe to call from any thread.
 tick_event *add_tick_event(int, tick_event::callback_type);
 
-void virtual_time_tick();
-
+// Used in shutdownMudos()
 void clear_tick_events();
-
 
 void backend(struct event_base *);
 

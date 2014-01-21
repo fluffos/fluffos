@@ -95,6 +95,7 @@ F_HAVE_PREDEFINE([__cplusplus], [], [AC_MSG_ERROR([[You must have local_options 
 AX_LIB_EVENT([2.0])
 F_HAVE_PREDEFINE([HAVE_LIBEVENT], [],
   [AC_MSG_ERROR([[Fail to find libevent (2.0+) header/library, install libevent-dev or change --with_libevent]])])
+F_HAVE_PREDEFINE([HAVE_LIBEVENT], [AC_SEARCH_LIBS([evthread_use_pthreads], [event_pthreads])])
 
 # Checking local_options related libraries
 F_HAVE_PREDEFINE([HAVE_ZLIB], [AC_SEARCH_LIBS([gzread], [z])])

@@ -4,6 +4,7 @@
 #include <event2/event.h>
 #include <event2/dns.h>
 #include <event2/listener.h>
+#include <event2/thread.h>
 #include <event2/util.h>
 
 #include "event.h"
@@ -33,11 +34,14 @@ static void libevent_dns_log(int severity, const char *msg)
 // Init a new event loop.
 event_base *init_event_base()
 {
-#ifdef DEBUG
-  event_enable_debug_mode();
-#endif
   event_set_log_callback(libevent_log);
   evdns_set_log_fn(libevent_dns_log);
+  evthread_use_pthreads();
+
+#ifdef DEBUG
+  event_enable_debug_mode();
+  evthread_enable_lock_debuging();
+#endif
 
   g_event_base = event_base_new();
   debug_message("Event backend in use: %s\n", event_base_get_method(g_event_base));
@@ -55,8 +59,21 @@ void shutdown_network_threadpool()
   delete g_threadpool_network_;
 }
 
+static void on_main_loop_event(int fd, short what, void *arg) {
+  auto event = (realtime_event *) arg;
+  event->callback();
+  delete event;
+}
+
+// Schedule a realtime event on main loop, safe to call from any thread.
+void add_realtime_event(realtime_event::callback_type callback) {
+  auto event = new realtime_event(callback);
+  event_base_once(g_event_base, -1, EV_TIMEOUT,
+      on_main_loop_event, event, NULL);
+}
+
 extern void virtual_time_tick();
-void on_timer(int fd, short what, void *arg) {
+void on_virtual_time_tick(int fd, short what, void *arg) {
   struct timeval one_second = {1, 0};
   virtual_time_tick();
   event_add(g_ev_tick, &one_second);
@@ -67,7 +84,7 @@ int run_event_loop(struct event_base *base)
   struct timeval one_second = {1, 0};
 
   // Schedule a repeating tick for advancing virtual time.
-  g_ev_tick = evtimer_new(base, on_timer, NULL);
+  g_ev_tick = evtimer_new(base, on_virtual_time_tick, NULL);
 
   event_add(g_ev_tick, &one_second);
   return event_base_loop(base, 0);

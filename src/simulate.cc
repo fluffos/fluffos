@@ -2040,33 +2040,6 @@ void shutdownMudOS(int exit_code)
   exit(exit_code);
 }
 
-/*
- * Call this one when there is only little memory left. It will start
- * Armageddon.
- */
-void slow_shut_down(int minutes)
-{
-  /*
-   *free some memory.
-   */
-  svalue_t *amo;
-
-  push_number(minutes);
-  amo = apply_master_ob(APPLY_SLOW_SHUTDOWN, 1);
-  /* in this case, approved means the mudlib will handle it */
-  if (!MASTER_APPROVED(amo)) {
-    object_t *save_current = current_object;
-
-    current_object = 0;
-    save_command_giver(0);
-    shout_string("FluffOS driver shouts: Out of memory.\n");
-    restore_command_giver();
-    current_object = save_current;
-    startshutdownMudOS(1);
-    return;
-  }
-}
-
 void do_message(svalue_t *lclass, svalue_t *msg, array_t *scope, array_t *exclude, int recurse)
 {
   int i, j, valid;
