@@ -8,7 +8,7 @@
 # **** TARGETS AND THEIR CORRECT USAGE ****
 #
 # COMPILATION TARGETS:
-# 
+#
 # all:		compile all the files
 #
 # install:	make all, then move the files to the correct directories
@@ -25,10 +25,6 @@
 # ---- DO NOT EDIT ANYTHING BELOW HERE UNLESS YOU KNOW ALOT ABOUT HOW
 #      MUDOS WORKS INTERNALLY ----
 
-# **************************************************************************
-# **** NOTE: If you add something here, also add it to the OBJ= rule below,
-# **** or non-GNU makes will die
-# **************************************************************************
 # @configure_input@
 @SET_MAKE@
 
@@ -116,6 +112,7 @@ cc.h:
 	echo '#define COMPILER "$(CXX)"' >> cc.h
 	echo '#define CXXFLAGS "$(CXXFLAGS)"' >> cc.h
 	echo '#define OPTIMIZE "$(OPTIMIZE)"' >> cc.h
+	echo '#define SOURCE_REVISION "@SOURCE_REVISION@"' >> cc.h
 
 # the touches here are necessary to fix the modification times; link(2) does
 # 'modify' a file
@@ -184,7 +181,7 @@ test: all
 
 help:
 	@echo "***************** Configuration completed **************"
-	@echo "Compiling FluffOS as $(DRIVER_BIN) for @target@."
+	@echo "Compiling @PACKAGE_STRING@ (@SOURCE_REVISION@) as $(DRIVER_BIN) for @target@."
 	@echo
 	@echo "INSTALL: '$(INSTALL)'"
 	@echo "INSTALL DIR: '$(INSTALL_DIR)'"

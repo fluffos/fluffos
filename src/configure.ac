@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.68])
-AC_INIT([FluffOS],[v3.0-alpha8])
+AC_INIT([FluffOS], [3.0-alpha8])
 AC_CONFIG_MACRO_DIR([m4])
 
 AC_CANONICAL_TARGET
@@ -18,7 +18,7 @@ AC_PROG_MAKE_SET
 # Check C++11 support.
 AX_CXX_COMPILE_STDCXX_11([noext], [mandatory])
 F_SUPPORT_CXX11([], [AC_MSG_ERROR([
-  [You compiler version is too old! FluffOS need g++ 4.6+ or clang 3.0+.]])])
+  [You compiler version is too old! FluffOS need g++ 4.6+ or clang 3.3+.]])])
 
 AX_APPEND_COMPILE_FLAGS([-D_GNU_SOURCE])
 AX_APPEND_COMPILE_FLAGS([-fno-omit-frame-pointer])
@@ -129,6 +129,7 @@ F_HAVE_PREDEFINE([PACKAGE_PCRE], [AX_PATH_LIB_PCRE([],
 AC_SUBST([ARCH])
 AC_SUBST([DRIVER_BIN])
 AC_SUBST([OPTIMIZE])
+AC_SUBST([SOURCE_REVISION])
 
 AC_CONFIG_HEADERS([configure.h])
 AC_CONFIG_FILES([Makefile packages/Makefile])

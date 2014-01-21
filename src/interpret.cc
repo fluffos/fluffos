@@ -1,4 +1,5 @@
 #include "std.h"
+#include "cc.h"
 #include "lpc_incl.h"
 #include "efuns_incl.h"
 #include "file.h"
@@ -183,7 +184,7 @@ ref_t *make_ref(void) {
   return ref;
 }
 
-void get_version(char *buff) { sprintf(buff, "%s", PACKAGE_STRING); }
+void get_version(char *buff) { sprintf(buff, "%s (%s)", PACKAGE_STRING, SOURCE_REVISION); }
 
 /*
  * Information about assignments of values:
