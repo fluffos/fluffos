@@ -2003,11 +2003,9 @@ void shutdownMudOS(int exit_code)
 
   shout_string("FluffOS driver shouts: shutting down immediately.\n");
 
-#ifdef DEBUG
   /* clean up heap allocations so valgrind don't consider them lost.*/
   clear_call_outs();
   clear_tick_events();
-#endif
 
 #ifdef PACKAGE_MUDLIB_STATS
   save_stat_files();
