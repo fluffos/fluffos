@@ -32,26 +32,28 @@ static int nexpands = 0;
 
 FILE *yyin = 0, *yyout = 0;
 
-#define SYNTAX "edit_source [-process file] [-options] [-malloc] [-build_func_spec 'command'] [-build_efuns]\n"
+#define SYNTAX                                                          \
+  "edit_source [-process file] [-options] [-malloc] [-build_func_spec " \
+  "'command'] [-build_efuns]\n"
 
 /* The files we fool with.  (Actually, there are more.  See -process).
  *
  * TODO: teach this file how to fix bugs in the source code :)
  */
-#define OPTIONS_INCL      "options_incl.h"
-#define PACKAGES          "packages/packages"
-#define OPTIONS_H         "options.h"
+#define OPTIONS_INCL "options_incl.h"
+#define PACKAGES "packages/packages"
+#define OPTIONS_H "options.h"
 #define OPTIONS_INTERNAL_H "options_internal.h"
-#define LOCAL_OPTIONS     "local_options"
-#define OPTION_DEFINES    "option_defs.cc"
-#define FUNC_SPEC         "func.spec"
-#define FUNC_SPEC_CPP     "func.spec.generated"
-#define EFUN_TABLE        "efunctions.h"
-#define OPC_PROF          "opc.h"
-#define OPCODES           "opcodes.h"
-#define EFUN_PROTO        "efun_protos.h"
-#define EFUN_DEFS         "efun_defs.cc"
-#define APPLIES_TABLE     "applies_table.cc"
+#define LOCAL_OPTIONS "local_options"
+#define OPTION_DEFINES "option_defs.cc"
+#define FUNC_SPEC "func.spec"
+#define FUNC_SPEC_CPP "func.spec.generated"
+#define EFUN_TABLE "efunctions.h"
+#define OPC_PROF "opc.h"
+#define OPCODES "opcodes.h"
+#define EFUN_PROTO "efun_protos.h"
+#define EFUN_DEFS "efun_defs.cc"
+#define APPLIES_TABLE "applies_table.cc"
 
 #define PRAGMA_NOTE_CASE_START 1
 
@@ -82,60 +84,57 @@ static incstate *inctop = 0;
 
 static void add_define(const char *, int, const char *);
 
+int compile(char *str) { return system(str); }
 
-int compile(char *str)
-{
-  return system(str);
-}
-
-void yyerror(const char *str)
-{
+void yyerror(const char *str) {
   fprintf(stderr, "%s:%d: %s\n", current_file, current_line, str);
   exit(1);
 }
 
-void mf_fatal(const char *str)
-{
-  yyerror(str);
-}
+void mf_fatal(const char *str) { yyerror(str); }
 
-void yywarn(char *str)
-{
+void yywarn(char *str) {
   /* ignore errors :)  local_options generates redefinition warnings,
      which we don't want to see */
 }
 
-void yyerrorp(const char *str)
-{
+void yyerrorp(const char *str) {
   char buff[200];
   sprintf(buff, str, ppchar);
   fprintf(stderr, "%s:%d: %s\n", current_file, current_line, buff);
   exit(1);
 }
 
-static void add_input(const char *p)
-{
+static void add_input(const char *p) {
   int l = strlen(p);
 
-  if (outp - l < defbuf) { yyerror("Macro expansion buffer overflow.\n"); }
+  if (outp - l < defbuf) {
+    yyerror("Macro expansion buffer overflow.\n");
+  }
   strncpy(outp - l, p, l);
   outp -= l;
 }
 
-#define SKIPW(foo) while (isspace(*foo)) foo++;
+#define SKIPW(foo) \
+  while (isspace(*foo)) foo++;
 
-static char *skip_comment(char *tmp, int flag)
-{
+static char *skip_comment(char *tmp, int flag) {
   int c;
 
   for (;;) {
-    while ((c = *++tmp) !=  '*') {
-      if (c == EOF) { yyerror("End of file in a comment"); }
+    while ((c = *++tmp) != '*') {
+      if (c == EOF) {
+        yyerror("End of file in a comment");
+      }
       if (c == '\n') {
         nexpands = 0;
         current_line++;
-        if (!fgets(yytext, MAXLINE - 1, yyin)) { yyerror("End of file in a comment"); }
-        if (flag && yyout) { fputs(yytext, yyout); }
+        if (!fgets(yytext, MAXLINE - 1, yyin)) {
+          yyerror("End of file in a comment");
+        }
+        if (flag && yyout) {
+          fputs(yytext, yyout);
+        }
         tmp = yytext - 1;
       }
     }
@@ -146,16 +145,19 @@ static char *skip_comment(char *tmp, int flag)
       if (c == '\n') {
         nexpands = 0;
         current_line++;
-        if (!fgets(yytext, MAXLINE - 1, yyin)) { yyerror("End of file in a comment"); }
-        if (flag && yyout) { fputs(yytext, yyout); }
+        if (!fgets(yytext, MAXLINE - 1, yyin)) {
+          yyerror("End of file in a comment");
+        }
+        if (flag && yyout) {
+          fputs(yytext, yyout);
+        }
         tmp = yytext - 1;
       }
     } while (c == '*');
   }
 }
 
-static void refill()
-{
+static void refill() {
   register char *p, *yyp;
   int c;
 
@@ -165,19 +167,22 @@ static void refill()
         if ((c = *yyp) == '*') {
           yyp = skip_comment(yyp, 0);
           continue;
-        } else if (c == '/') { break; }
+        } else if (c == '/') {
+          break;
+        }
       }
       *p++ = c;
     }
-  } else { yyerror("End of macro definition in \\"); }
+  } else {
+    yyerror("End of macro definition in \\");
+  }
   nexpands = 0;
   current_line++;
   *p = 0;
   return;
 }
 
-static void handle_define()
-{
+static void handle_define() {
   char namebuf[NSIZE];
   char args[NARGS][NSIZE];
   char mtext[MLEN];
@@ -187,18 +192,25 @@ static void handle_define()
   q = namebuf;
   end = q + NSIZE - 1;
   while (isalunum(*tmp)) {
-    if (q < end) { *q++ = *tmp++; }
-    else { yyerror("Name too long.\n"); }
+    if (q < end) {
+      *q++ = *tmp++;
+    } else {
+      yyerror("Name too long.\n");
+    }
   }
-  if (q == namebuf) { yyerror("Macro name missing.\n"); }
-  if (*namebuf != '_' && !isalpha(*namebuf)) { yyerror("Invalid macro name.\n"); }
+  if (q == namebuf) {
+    yyerror("Macro name missing.\n");
+  }
+  if (*namebuf != '_' && !isalpha(*namebuf)) {
+    yyerror("Invalid macro name.\n");
+  }
   *q = 0;
-  if (*tmp == '(') {            /* if "function macro" */
+  if (*tmp == '(') {/* if "function macro" */
     int arg;
     int inid;
-    char *ids = (char *) NULL;
+    char *ids = (char *)NULL;
 
-    tmp++;                    /* skip '(' */
+    tmp++; /* skip '(' */
     SKIPW(tmp);
     if (*tmp == ')') {
       arg = 0;
@@ -206,12 +218,16 @@ static void handle_define()
       for (arg = 0; arg < NARGS;) {
         end = (q = args[arg]) + NSIZE - 1;
         while (isalunum(*tmp) || (*tmp == '#')) {
-          if (q < end) { *q++ = *tmp++; }
-          else { yyerror("Name too long.\n"); }
+          if (q < end) {
+            *q++ = *tmp++;
+          } else {
+            yyerror("Name too long.\n");
+          }
         }
         if (q == args[arg]) {
           char buff[200];
-          sprintf(buff, "Missing argument %d in #define parameter list", arg + 1);
+          sprintf(buff, "Missing argument %d in #define parameter list",
+                  arg + 1);
           yyerror(buff);
         }
         arg++;
@@ -224,9 +240,11 @@ static void handle_define()
         }
         SKIPW(tmp);
       }
-      if (arg == NARGS) { yyerror("Too many macro arguments"); }
+      if (arg == NARGS) {
+        yyerror("Too many macro arguments");
+      }
     }
-    tmp++;                    /* skip ')' */
+    tmp++; /* skip ')' */
     end = mtext + MLEN - 2;
     for (inid = 0, q = mtext; *tmp;) {
       if (isalunum(*tmp)) {
@@ -251,9 +269,14 @@ static void handle_define()
           inid = 0;
         }
       }
-      if ((*q = *tmp++) == MARKS) { *++q = MARKS; }
-      if (q < end) { q++; }
-      else { yyerror("Macro text too long"); }
+      if ((*q = *tmp++) == MARKS) {
+        *++q = MARKS;
+      }
+      if (q < end) {
+        q++;
+      } else {
+        yyerror("Macro text too long");
+      }
       if (!*tmp && tmp[-2] == '\\') {
         q -= 2;
         refill();
@@ -266,8 +289,11 @@ static void handle_define()
     end = mtext + MLEN - 2;
     for (q = mtext; *tmp;) {
       *q = *tmp++;
-      if (q < end) { q++; }
-      else { yyerror("Macro text too long"); }
+      if (q < end) {
+        q++;
+      } else {
+        yyerror("Macro text too long");
+      }
       if (!*tmp && tmp[-2] == '\\') {
         q -= 2;
         refill();
@@ -282,32 +308,41 @@ static void handle_define()
   return;
 }
 
-#define SKPW while (isspace(*outp)) outp++
+#define SKPW \
+  while (isspace(*outp)) outp++
 
-static int cmygetc()
-{
+static int cmygetc() {
   int c;
 
   for (;;) {
     if ((c = *outp++) == '/') {
-      if ((c = *outp) == '*') { outp = skip_comment(outp, 0); }
-      else if (c == '/') { return -1; }
-      else { return c; }
-    } else { return c; }
+      if ((c = *outp) == '*') {
+        outp = skip_comment(outp, 0);
+      } else if (c == '/') {
+        return -1;
+      } else {
+        return c;
+      }
+    } else {
+      return c;
+    }
   }
 }
 
 /* Check if yytext is a macro and expand if it is. */
-static int expand_define()
-{
+static int expand_define() {
   defn_t *p;
   char expbuf[DEFMAX];
   char *args[NARGS];
   char buf[DEFMAX];
   char *q, *e, *b;
 
-  if (nexpands++ > EXPANDMAX) { yyerror("Too many macro expansions"); }
-  if (!(p = lookup_define(yytext))) { return 0; }
+  if (nexpands++ > EXPANDMAX) {
+    yyerror("Too many macro expansions");
+  }
+  if (!(p = lookup_define(yytext))) {
+    return 0;
+  }
   if (p->nargs == -1) {
     add_input(p->exps);
   } else {
@@ -315,7 +350,9 @@ static int expand_define()
     int n;
 
     SKPW;
-    if (*outp++ != '(') { yyerror("Missing '(' in macro call"); }
+    if (*outp++ != '(') {
+      yyerror("Missing '(' in macro call");
+    }
     SKPW;
     if ((c = *outp++) == ')') {
       n = 0;
@@ -347,16 +384,21 @@ static int expand_define()
           case '#':
             if (!squote && !dquote) {
               *q++ = c;
-              if (*outp++ != '#') { yyerror("'#' expected"); }
+              if (*outp++ != '#') {
+                yyerror("'#' expected");
+              }
             }
             break;
           case '\\':
             if (squote || dquote) {
               *q++ = c;
               c = *outp++;
-            } break;
+            }
+            break;
           case '\n':
-            if (squote || dquote) { yyerror("Newline in string"); }
+            if (squote || dquote) {
+              yyerror("Newline in string");
+            }
             break;
         }
         if (c == ',' && !parcnt && !dquote && !squote) {
@@ -367,7 +409,9 @@ static int expand_define()
           n++;
           break;
         } else {
-          if (c == EOF) { yyerror("Unexpected end of file"); }
+          if (c == EOF) {
+            yyerror("Unexpected end of file");
+          }
           if (q >= expbuf + DEFMAX - 5) {
             yyerror("Macro argument overflow");
           } else {
@@ -375,8 +419,12 @@ static int expand_define()
           }
         }
         if (!squote && !dquote) {
-          if ((c = cmygetc()) < 0) { yyerror("End of macro in // comment"); }
-        } else { c = *outp++; }
+          if ((c = cmygetc()) < 0) {
+            yyerror("End of macro in // comment");
+          }
+        } else {
+          c = *outp++;
+        }
       }
       if (n == NARGS) {
         yyerror("Maximum macro argument count exceeded");
@@ -400,12 +448,16 @@ static int expand_define()
         } else {
           for (q = args[*e++ - MARKS - 1]; *q;) {
             *b++ = *q++;
-            if (b >= buf + DEFMAX) { yyerror("Macro expansion overflow"); }
+            if (b >= buf + DEFMAX) {
+              yyerror("Macro expansion overflow");
+            }
           }
         }
       } else {
         *b++ = *e++;
-        if (b >= buf + DEFMAX) { yyerror("Macro expansion overflow"); }
+        if (b >= buf + DEFMAX) {
+          yyerror("Macro expansion overflow");
+        }
       }
     }
     *b++ = 0;
@@ -414,8 +466,7 @@ static int expand_define()
   return 1;
 }
 
-static int exgetc()
-{
+static int exgetc() {
   register char c, *yyp;
 
   SKPW;
@@ -428,7 +479,9 @@ static int exgetc()
     if (!strcmp(yytext, "defined")) {
       /* handle the defined "function" in #/%if */
       SKPW;
-      if (*outp++ != '(') { yyerror("Missing ( after 'defined'"); }
+      if (*outp++ != '(') {
+        yyerror("Missing ( after 'defined'");
+      }
       SKPW;
       yyp = yytext;
       if (isalpha(c = *outp) || c == '_') {
@@ -436,9 +489,13 @@ static int exgetc()
           *yyp++ = c;
         } while (isalnum(c = *++outp) || (c == '_'));
         *yyp = '\0';
-      } else { yyerror("Incorrect definition macro after defined(\n"); }
+      } else {
+        yyerror("Incorrect definition macro after defined(\n");
+      }
       SKPW;
-      if (*outp != ')') { yyerror("Missing ) in defined"); }
+      if (*outp != ')') {
+        yyerror("Missing ) in defined");
+      }
       if (lookup_define(yytext)) {
         add_input("1 ");
       } else {
@@ -447,14 +504,15 @@ static int exgetc()
     } else {
       if (!expand_define()) {
         add_input("0 ");
-      } else { SKPW; }
+      } else {
+        SKPW;
+      }
     }
   }
   return c;
 }
 
-static int skip_to(const char *token, const char *atoken)
-{
+static int skip_to(const char *token, const char *atoken) {
   char b[20], *p, *end;
   int c;
   int nest;
@@ -465,10 +523,14 @@ static int skip_to(const char *token, const char *atoken)
     }
     current_line++;
     if ((c = *outp++) == ppchar) {
-      while (isspace(*outp)) { outp++; }
+      while (isspace(*outp)) {
+        outp++;
+      }
       end = b + sizeof b - 1;
       for (p = b; (c = *outp++) != '\n' && !isspace(c) && c != EOF;) {
-        if (p < end) { *p++ = c; }
+        if (p < end) {
+          *p++ = c;
+        }
       }
       *p = 0;
       if (!strcmp(b, "if") || !strcmp(b, "ifdef") || !strcmp(b, "ifndef")) {
@@ -504,56 +566,53 @@ static int skip_to(const char *token, const char *atoken)
 
 #include "preprocess.cc"
 
-static int maybe_open_input_file(const char *fn)
-{
+static int maybe_open_input_file(const char *fn) {
   if ((yyin = fopen(fn, "r")) == NULL) {
     return 0;
   }
-  if (current_file) { free((char *)current_file); }
+  if (current_file) {
+    free((char *)current_file);
+  }
   current_file = (char *)malloc(strlen(fn) + 1);
   current_line = 0;
   strcpy(current_file, fn);
   return 1;
 }
 
-static void open_input_file(const char *fn)
-{
+static void open_input_file(const char *fn) {
   if (!maybe_open_input_file(fn)) {
     perror(fn);
     exit(-1);
   }
 }
 
-static void open_output_file(const char *fn)
-{
+static void open_output_file(const char *fn) {
   if ((yyout = fopen(fn, "w")) == NULL) {
     perror(fn);
     exit(-1);
   }
 }
 
-static void close_output_file()
-{
+static void close_output_file() {
   fclose(yyout);
   yyout = 0;
 }
 
-static char *protect(const char *p)
-{
+static char *protect(const char *p) {
   static char buf[1024];
   char *bufp = buf;
 
   while (*p) {
-    if (*p == '"' || *p == '\\') { *bufp++ = '\\'; }
+    if (*p == '"' || *p == '\\') {
+      *bufp++ = '\\';
+    }
     *bufp++ = *p++;
   }
   *bufp = 0;
   return buf;
 }
 
-static void
-create_option_defines()
-{
+static void create_option_defines() {
   defn_t *p;
   int count = 0;
   int i;
@@ -565,8 +624,7 @@ create_option_defines()
     for (p = defns[i]; p; p = p->next)
       if (!(p->flags & DEF_IS_UNDEFINED)) {
         count++;
-        fprintf(yyout, "  \"__%s__\", \"%s\",\n",
-                p->name, protect(p->exps));
+        fprintf(yyout, "  \"__%s__\", \"%s\",\n", p->name, protect(p->exps));
         if (strncmp(p->name, "PACKAGE_", 8) == 0) {
           int len;
           char *tmp, *t;
@@ -592,8 +650,7 @@ create_option_defines()
   close_output_file();
 }
 
-static void deltrail()
-{
+static void deltrail() {
   register char *p;
 
   p = outp;
@@ -603,9 +660,7 @@ static void deltrail()
   *p = 0;
 }
 
-static void
-handle_include(char *name)
-{
+static void handle_include(char *name) {
   char *p;
   static char buf[1024];
   FILE *f;
@@ -627,20 +682,24 @@ handle_include(char *name)
     }
     return;
   }
-  for (p = ++name; *p && *p != '"'; p++) { ; }
-  if (!*p) { yyerrorp("Missing trailing \" in %cinclude"); }
+  for (p = ++name; *p && *p != '"'; p++) {
+    ;
+  }
+  if (!*p) {
+    yyerrorp("Missing trailing \" in %cinclude");
+  }
 
   *p = 0;
   if ((f = fopen(name, "r")) != NULL) {
-    is = (incstate *)
-         malloc(sizeof(incstate) /*, 61, "handle_include: 1" */);
+    is = (incstate *)malloc(sizeof(incstate) /*, 61, "handle_include: 1" */);
     is->yyin = yyin;
     is->line = current_line;
     is->file = current_file;
     is->next = inctop;
     inctop = is;
     current_line = 0;
-    current_file = (char *)malloc(strlen(name) + 1 /*, 62, "handle_include: 2" */);
+    current_file =
+        (char *)malloc(strlen(name) + 1 /*, 62, "handle_include: 2" */);
     strcpy(current_file, name);
     yyin = f;
   } else {
@@ -649,29 +708,34 @@ handle_include(char *name)
   }
 }
 
-static void
-handle_pragma(char *name)
-{
+static void handle_pragma(char *name) {
   if (!strcmp(name, "auto_note_compiler_case_start")) {
     pragmas |= PRAGMA_NOTE_CASE_START;
   } else if (!strcmp(name, "no_auto_note_compiler_case_start")) {
     pragmas &= ~PRAGMA_NOTE_CASE_START;
   } else if (!strncmp(name, "ppchar:", 7) && *(name + 8)) {
     ppchar = *(name + 8);
-  } else { yyerrorp("Unidentified %cpragma"); }
+  } else {
+    yyerrorp("Unidentified %cpragma");
+  }
 }
 
-static void
-preprocess()
-{
+static void preprocess() {
   register char *yyp, *yyp2;
   int c;
   long cond;
 
-  while (buffered ? (yyp = yyp2 = outp) : fgets(yyp = yyp2 = defbuf + (DEFMAX >> 1), MAXLINE - 1, yyin)) {
-    if (!buffered) { current_line++; }
-    else { buffered = 0; }
-    while (isspace(*yyp2)) { yyp2++; }
+  while (buffered
+             ? (yyp = yyp2 = outp)
+             : fgets(yyp = yyp2 = defbuf + (DEFMAX >> 1), MAXLINE - 1, yyin)) {
+    if (!buffered) {
+      current_line++;
+    } else {
+      buffered = 0;
+    }
+    while (isspace(*yyp2)) {
+      yyp2++;
+    }
     if ((c = *yyp2) == ppchar) {
       int quote = 0;
       char sp_buf = 0, *oldoutp;
@@ -680,29 +744,46 @@ preprocess()
         grammar_mode++;
       }
       outp = 0;
-      if (yyp != yyp2) { yyerrorp("Misplaced '%c'.\n"); }
-      while (isspace(*++yyp2)) { ; }
+      if (yyp != yyp2) {
+        yyerrorp("Misplaced '%c'.\n");
+      }
+      while (isspace(*++yyp2)) {
+        ;
+      }
       yyp++;
       for (;;) {
-        if ((c = *yyp2++) == '"') { quote ^= 1; }
-        else {
+        if ((c = *yyp2++) == '"') {
+          quote ^= 1;
+        } else {
           if (!quote && c == '/') {
             if (*yyp2 == '*') {
               yyp2 = skip_comment(yyp2, 0);
               continue;
-            } else if (*yyp2 == '/') { break; }
+            } else if (*yyp2 == '/') {
+              break;
+            }
           }
-          if (!outp && isspace(c)) { outp = yyp; }
-          if (c == '\n' || c == EOF) { break; }
+          if (!outp && isspace(c)) {
+            outp = yyp;
+          }
+          if (c == '\n' || c == EOF) {
+            break;
+          }
         }
         *yyp++ = c;
       }
 
       if (outp) {
-        if (yyout) { sp_buf = *(oldoutp = outp); }
+        if (yyout) {
+          sp_buf = *(oldoutp = outp);
+        }
         *outp++ = 0;
-        while (isspace(*outp)) { outp++; }
-      } else { outp = yyp; }
+        while (isspace(*outp)) {
+          outp++;
+        }
+      } else {
+        outp = yyp;
+      }
       *yyp = 0;
       yyp = defbuf + (DEFMAX >> 1) + 1;
 
@@ -710,8 +791,11 @@ preprocess()
         handle_define();
       } else if (!strcmp("if", yyp)) {
         cond = cond_get_exp(0);
-        if (*outp != '\n') { yyerrorp("Condition too complex in %cif"); }
-        else { handle_cond(cond); }
+        if (*outp != '\n') {
+          yyerrorp("Condition too complex in %cif");
+        } else {
+          handle_cond(cond);
+        }
       } else if (!strcmp("ifdef", yyp)) {
         deltrail();
         handle_cond(lookup_define(outp) != 0);
@@ -738,19 +822,23 @@ preprocess()
           d->flags &= ~DEF_IS_NOT_LOCAL;
         }
       } else if (!strcmp("echo", yyp)) {
-        fprintf(stderr, "echo at line %d of %s: %s\n", current_line, current_file, outp);
+        fprintf(stderr, "echo at line %d of %s: %s\n", current_line,
+                current_file, outp);
       } else if (!strcmp("include", yyp)) {
         handle_include(outp);
       } else if (!strcmp("pragma", yyp)) {
         handle_pragma(outp);
       } else if (yyout) {
         if (!strcmp("line", yyp)) {
-          fprintf(yyout, "#line %d \"%s\"\n", current_line,
-                  current_file);
+          fprintf(yyout, "#line %d \"%s\"\n", current_line, current_file);
         } else {
-          if (sp_buf) { *oldoutp = sp_buf; }
+          if (sp_buf) {
+            *oldoutp = sp_buf;
+          }
           if (pragmas & PRAGMA_NOTE_CASE_START) {
-            if (*yyp == '%') { pragmas &= ~PRAGMA_NOTE_CASE_START; }
+            if (*yyp == '%') {
+              pragmas &= ~PRAGMA_NOTE_CASE_START;
+            }
           }
           fprintf(yyout, "%s\n", yyp - 1);
         }
@@ -761,10 +849,13 @@ preprocess()
       }
     } else if (c == '/') {
       if ((c = *++yyp2) == '*') {
-        if (yyout) { fputs(yyp, yyout); }
+        if (yyout) {
+          fputs(yyp, yyout);
+        }
         yyp2 = skip_comment(yyp2, 1);
-      } else if (c == '/' && !yyout) { continue; }
-      else if (yyout) {
+      } else if (c == '/' && !yyout) {
+        continue;
+      } else if (yyout) {
         fprintf(yyout, "%s", yyp);
       }
     } else if (yyout) {
@@ -775,8 +866,12 @@ preprocess()
         line_to_print = 0;
 
         if (!in_c_case) {
-          while (isalunum(*yyp2)) { yyp2++; }
-          while (isspace(*yyp2)) { yyp2++; }
+          while (isalunum(*yyp2)) {
+            yyp2++;
+          }
+          while (isspace(*yyp2)) {
+            yyp2++;
+          }
           if (*yyp2 == ':') {
             in_c_case = 1;
             yyp2++;
@@ -795,21 +890,29 @@ preprocess()
 
               case '}': {
                 if (!cquote) {
-                  if (--block_nest < 0) { yyerror("Too many }'s"); }
+                  if (--block_nest < 0) {
+                    yyerror("Too many }'s");
+                  }
                 }
                 break;
               }
 
               case '"':
-                if (!(cquote & CHAR_QUOTE)) { cquote ^= STRING_QUOTE; }
+                if (!(cquote & CHAR_QUOTE)) {
+                  cquote ^= STRING_QUOTE;
+                }
                 break;
 
               case '\'':
-                if (!(cquote & STRING_QUOTE)) { cquote ^= CHAR_QUOTE; }
+                if (!(cquote & STRING_QUOTE)) {
+                  cquote ^= CHAR_QUOTE;
+                }
                 break;
 
               case '\\':
-                if (cquote && *yyp2) { yyp2++; }
+                if (cquote && *yyp2) {
+                  yyp2++;
+                }
                 break;
 
               case '/':
@@ -830,7 +933,9 @@ preprocess()
                 break;
 
               case ';':
-                if (!cquote && !block_nest) { in_c_case = 0; }
+                if (!cquote && !block_nest) {
+                  in_c_case = 0;
+                }
             }
           }
         }
@@ -838,7 +943,6 @@ preprocess()
         if (line_to_print) {
           fprintf(yyout, "#line %d \"%s\"\n", current_line + 1, current_file);
         }
-
       }
     }
   }
@@ -863,17 +967,17 @@ preprocess()
     current_line = p->line;
     yyin = p->yyin;
     inctop = p->next;
-    free((char *) p);
+    free((char *)p);
     preprocess();
-  } else { yyin = 0; }
+  } else {
+    yyin = 0;
+  }
 }
 
-void make_efun_tables()
-{
-#define NUM_FILES     5
-  static const char *outfiles[NUM_FILES] = {
-    EFUN_TABLE, OPC_PROF, OPCODES, EFUN_PROTO, EFUN_DEFS
-  };
+void make_efun_tables() {
+#define NUM_FILES 5
+  static const char *outfiles[NUM_FILES] = {EFUN_TABLE, OPC_PROF, OPCODES,
+                                            EFUN_PROTO, EFUN_DEFS};
   FILE *files[NUM_FILES];
   int i;
 
@@ -886,16 +990,15 @@ void make_efun_tables()
     }
     fprintf(files[i],
             "/*\n\tThis file is automatically generated by make_func.\n");
-    fprintf(files[i],
-            "\tdo not make any manual changes to this file.\n*/\n\n");
+    fprintf(files[i], "\tdo not make any manual changes to this file.\n*/\n\n");
 
     if (outfiles[i][strlen(outfiles[i]) - 1] == 'h') {
       char buf[100];
       int size = strlen(outfiles[i]) - 2;
       strncpy(buf, outfiles[i], size);
       buf[size] = '\0';
-      fprintf(files[i],
-              "#ifndef __AUTOGEN_%s_H\n#define __AUTOGEN_%s_H\n\n", buf, buf);
+      fprintf(files[i], "#ifndef __AUTOGEN_%s_H\n#define __AUTOGEN_%s_H\n\n",
+              buf, buf);
     }
   }
 
@@ -903,7 +1006,8 @@ void make_efun_tables()
   fprintf(files[0], "\ntypedef void (*func_t) (void);\n\n");
   fprintf(files[0], "func_t efun_table[] = {\n");
 
-  fprintf(files[1], "\ntypedef struct opc_s { char *name; int count; } opc_t;\n\n");
+  fprintf(files[1],
+          "\ntypedef struct opc_s { char *name; int count; } opc_t;\n\n");
   fprintf(files[1], "opc_t opc_efun[] = {\n");
 
   fprintf(files[2], "\n/* operators */\n\n");
@@ -924,9 +1028,12 @@ void make_efun_tables()
   fprintf(files[1], "};\n");
 
   if (efun_code + efun_base >= 65535) {
-    fprintf(stderr, "You have way too many efuns, and Fluffos will not function, contact developer!\n");
+    fprintf(stderr,
+            "You have way too many efuns, and Fluffos will not function, "
+            "contact developer!\n");
   }
-  fprintf(files[2], "\n/* efuns */\n#define NUM_OPCODES %d\n\n", efun_base + efun_code);
+  fprintf(files[2], "\n/* efuns */\n#define NUM_OPCODES %d\n\n",
+          efun_base + efun_code);
 
   /* Now sort the main_list */
   for (i = 0; i < num_buff; i++) {
@@ -934,8 +1041,12 @@ void make_efun_tables()
     for (j = 0; j < i; j++)
       if (strcmp(key[i], key[j]) < 0) {
         const char *tmp;
-        tmp = key[i]; key[i] = key[j]; key[j] = tmp;
-        tmp = buf[i]; buf[i] = buf[j]; buf[j] = tmp;
+        tmp = key[i];
+        key[i] = key[j];
+        key[j] = tmp;
+        tmp = buf[i];
+        buf[i] = buf[j];
+        buf[j] = tmp;
       }
   }
 
@@ -962,8 +1073,7 @@ void make_efun_tables()
   }
 }
 
-static void handle_local_defines(int check)
-{
+static void handle_local_defines(int check) {
   defn_t *p;
   int i;
   int problem = 0;
@@ -1000,8 +1110,7 @@ static void handle_local_defines(int check)
   for (i = 0; i < DEFHASH; i++)
     for (p = defns[i]; p; p = p->next) {
       if (p->flags & DEF_IS_NOT_LOCAL) {
-        fprintf(stderr, "No setting for %s in '%s'.\n",
-                p->name, LOCAL_OPTIONS);
+        fprintf(stderr, "No setting for %s in '%s'.\n", p->name, LOCAL_OPTIONS);
         problem = 1;
       }
       if (offical_defines.find(p->name) == offical_defines.end()) {
@@ -1011,7 +1120,8 @@ static void handle_local_defines(int check)
     }
 
   if (problem) {
-    fprintf(stderr, "\
+    fprintf(stderr,
+            "\
 ***This local_options file appears to have been written for an\n\
 ***earlier version of the MudOS driver.  Please lookup the new options\n\
 ***(mentioned above) in the options.h file, decide how you would like them\n\
@@ -1020,19 +1130,19 @@ static void handle_local_defines(int check)
   }
 }
 
-static void write_options_incl(int local)
-{
+static void write_options_incl(int local) {
   open_output_file(OPTIONS_INCL);
   if (local) {
-    fprintf(yyout, "#include \"options_internal.h\"\n#include \"%s\"\n", LOCAL_OPTIONS);
+    fprintf(yyout, "#include \"options_internal.h\"\n#include \"%s\"\n",
+            LOCAL_OPTIONS);
   } else {
-    fprintf(yyout, "#include \"options_internal.h\"\n#include \"%s\"\n", OPTIONS_H);
+    fprintf(yyout, "#include \"options_internal.h\"\n#include \"%s\"\n",
+            OPTIONS_H);
   }
   close_output_file();
 }
 
-static void handle_options(int full)
-{
+static void handle_options(int full) {
   open_input_file(OPTIONS_H);
   ppchar = '#';
   preprocess();
@@ -1050,7 +1160,11 @@ static void handle_options(int full)
     handle_local_defines(1);
     write_options_incl(1);
   } else {
-    fprintf(stderr, "No \"%s\" file present.  If you create one from \"%s\",\nyou can use it when you get a new driver, and you will be warned if there are\nchanges to the real %s which you should include in your local file.\n",
+    fprintf(stderr,
+            "No \"%s\" file present.  If you create one from \"%s\",\nyou can "
+            "use it when you get a new driver, and you will be warned if there "
+            "are\nchanges to the real %s which you should include in your "
+            "local file.\n",
             LOCAL_OPTIONS, OPTIONS_H, OPTIONS_H);
     write_options_incl(0);
   }
@@ -1067,8 +1181,7 @@ static void handle_options(int full)
   create_option_defines();
 }
 
-static void handle_build_func_spec(char *command)
-{
+static void handle_build_func_spec(char *command) {
   char buf[1024];
   int i;
 
@@ -1076,8 +1189,8 @@ static void handle_build_func_spec(char *command)
   sprintf(buf, "%s %s >%s", command, FUNC_SPEC, FUNC_SPEC_CPP);
   system(buf);
   for (i = 0; i < num_packages; i++) {
-    sprintf(buf, "%s -I. packages/%s.spec >>%s",
-            command, packages[i], FUNC_SPEC_CPP);
+    sprintf(buf, "%s -I. packages/%s.spec >>%s", command, packages[i],
+            FUNC_SPEC_CPP);
     system(buf);
   }
 
@@ -1094,8 +1207,7 @@ static void handle_build_func_spec(char *command)
   close_output_file();
 }
 
-static void handle_process(char *file)
-{
+static void handle_process(char *file) {
   char buf[1024];
   int l;
 
@@ -1121,8 +1233,7 @@ static void handle_process(char *file)
   close_output_file();
 }
 
-static void handle_build_efuns()
-{
+static void handle_build_efuns() {
   void yyparse();
 
   num_buff = op_code = efun_code = 0;
@@ -1132,8 +1243,7 @@ static void handle_build_efuns()
   make_efun_tables();
 }
 
-static void handle_applies()
-{
+static void handle_applies() {
   FILE *f = fopen("applies", "r");
   FILE *out = fopen("applies.h", "w");
   FILE *table = fopen(APPLIES_TABLE, "w");
@@ -1142,12 +1252,20 @@ static void handle_applies()
   char *p;
   int apply_number = 0;
 
-  fprintf(out, "/* autogenerated from 'applies' */\n#ifndef APPLIES_H\n#define APPLIES_H\n\nextern const char *applies_table[];\n\n/* the folowing must be the first character of __INIT */\n#define APPLY___INIT_SPECIAL_CHAR\t\t'#'\n");
-  fprintf(table, "/* autogenerated from 'applies' */\n\nconst char *applies_table[] = {\n");
+  fprintf(out,
+          "/* autogenerated from 'applies' */\n#ifndef APPLIES_H\n#define "
+          "APPLIES_H\n\nextern const char *applies_table[];\n\n/* the folowing "
+          "must be the first character of __INIT */\n#define "
+          "APPLY___INIT_SPECIAL_CHAR\t\t'#'\n");
+  fprintf(table,
+          "/* autogenerated from 'applies' */\n\nconst char *applies_table[] = "
+          "{\n");
 
   while (fgets(buf, 8192, f)) {
     buf[strlen(buf) - 1] = 0;
-    if (buf[0] == '#') { break; }
+    if (buf[0] == '#') {
+      break;
+    }
     if ((colon = strchr(buf, ':'))) {
       *colon++ = 0;
       fprintf(out, "#define APPLY_%-30s\t\"%s\"\n", buf, colon);
@@ -1186,8 +1304,7 @@ static void handle_applies()
   fclose(f);
 }
 
-static void handle_malloc()
-{
+static void handle_malloc() {
   const char *the_malloc = 0, *the_wrapper = 0;
 
   if (lookup_define("SYSMALLOC")) {
@@ -1208,7 +1325,9 @@ static void handle_malloc()
   }
 
   if (!the_malloc && !the_wrapper) {
-    fprintf(stderr, "Memory package and/or malloc wrapper incorrectly specified in options.h\n");
+    fprintf(stderr,
+            "Memory package and/or malloc wrapper incorrectly specified in "
+            "options.h\n");
     exit(-1);
   }
 
@@ -1233,8 +1352,7 @@ static void handle_malloc()
   }
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
   int idx = 1;
 
   while (idx < argc) {

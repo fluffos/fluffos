@@ -48,8 +48,7 @@ static parse_node_t *branch_list[3];
 static int nforward_branches, nforward_branches_max;
 static int *forward_branches = 0;
 
-static void ins_real(LPC_FLOAT l)
-{
+static void ins_real(LPC_FLOAT l) {
   LPC_FLOAT f = l;
 
   if (prog_code + sizeof(double) > prog_code_max) {
@@ -69,8 +68,7 @@ static void ins_real(LPC_FLOAT l)
  * that correct byte order is used, regardless of machine architecture.
  * Also beware that some machines can't write a word to odd addresses.
  */
-static void ins_short(short l)
-{
+static void ins_short(short l) {
   if (prog_code + 2 > prog_code_max) {
     mem_block_t *mbp = &mem_block[A_PROGRAM];
     UPDATE_PROGRAM_SIZE;
@@ -86,8 +84,7 @@ static void ins_short(short l)
  * Store a LPC int number. It is stored in such a way as to be sure
  * that correct byte order is used, regardless of machine architecture.
  */
-static void ins_int(LPC_INT l)
-{
+static void ins_int(LPC_INT l) {
 
   if (prog_code + sizeof(LPC_INT) > prog_code_max) {
     mem_block_t *mbp = &mem_block[A_PROGRAM];
@@ -100,8 +97,7 @@ static void ins_int(LPC_INT l)
   STORE_INT(prog_code, l);
 }
 
-static void ins_pointer(POINTER_INT l)
-{
+static void ins_pointer(POINTER_INT l) {
 
   if (prog_code + sizeof(POINTER_INT) > prog_code_max) {
     mem_block_t *mbp = &mem_block[A_PROGRAM];
@@ -114,19 +110,18 @@ static void ins_pointer(POINTER_INT l)
   STORE_PTR(prog_code, l);
 }
 
-static void upd_short(int offset, int l, const char *where)
-{
+static void upd_short(int offset, int l, const char *where) {
   unsigned short s;
 
   IF_DEBUG(UPDATE_PROGRAM_SIZE);
   DEBUG_CHECK2(offset > CURRENT_PROGRAM_SIZE,
-               "patch offset %x larger than current program size %x.\n",
-               offset, CURRENT_PROGRAM_SIZE);
+               "patch offset %x larger than current program size %x.\n", offset,
+               CURRENT_PROGRAM_SIZE);
   if (l > USHRT_MAX) {
     char buf[256];
 
-    sprintf(buf, "branch limit exceeded in %s, near line %i",
-            where, line_being_generated);
+    sprintf(buf, "branch limit exceeded in %s, near line %i", where,
+            line_being_generated);
     yyerror(buf);
   }
   s = l;
@@ -134,8 +129,7 @@ static void upd_short(int offset, int l, const char *where)
   COPY_SHORT(mem_block[A_PROGRAM].block + offset, &s);
 }
 
-static void ins_rel_short(int l)
-{
+static void ins_rel_short(int l) {
   if (l > USHRT_MAX) {
     char buf[256];
 
@@ -146,8 +140,7 @@ static void ins_rel_short(int l)
   ins_short(l);
 }
 
-static void ins_byte(unsigned char b)
-{
+static void ins_byte(unsigned char b) {
   if (prog_code == prog_code_max) {
     mem_block_t *mbp = &mem_block[A_PROGRAM];
     UPDATE_PROGRAM_SIZE;
@@ -159,17 +152,15 @@ static void ins_byte(unsigned char b)
   *prog_code++ = b;
 }
 
-static void upd_byte(int offset, unsigned char b)
-{
+static void upd_byte(int offset, unsigned char b) {
   IF_DEBUG(UPDATE_PROGRAM_SIZE);
   DEBUG_CHECK2(offset > CURRENT_PROGRAM_SIZE,
-               "patch offset %x larger than current program size %x.\n",
-               offset, CURRENT_PROGRAM_SIZE);
+               "patch offset %x larger than current program size %x.\n", offset,
+               CURRENT_PROGRAM_SIZE);
   mem_block[A_PROGRAM].block[offset] = b;
 }
 
-static void end_pushes(void)
-{
+static void end_pushes(void) {
   if (push_state) {
     if (push_state > 1) {
       upd_byte(push_start, push_state);
@@ -184,8 +175,7 @@ static void end_pushes(void)
 // the stack and rewriting the mult-push into the stack.
 //
 
-static void initialize_push(void)
-{
+static void initialize_push(void) {
   int what = mem_block[A_PROGRAM].block[push_start];
   int arg = 0;
 
@@ -220,21 +210,20 @@ static void initialize_push(void)
   }
 }
 
-
 /*
  * Generate the code to push a number on the stack.
  * This varies since there are several opcodes (for
  * optimizing speed and/or size).
  */
-static void write_small_number(int val)
-{
-  if (try_to_push(PUSH_NUMBER, val)) { return; }
+static void write_small_number(int val) {
+  if (try_to_push(PUSH_NUMBER, val)) {
+    return;
+  }
   ins_byte(F_BYTE);
   ins_byte(val);
 }
 
-static void write_number(LPC_INT val)
-{
+static void write_number(LPC_INT val) {
   if ((val & ~0xff) == 0) {
     write_small_number(val);
   } else {
@@ -253,17 +242,19 @@ static void write_number(LPC_INT val)
   }
 }
 
-static void
-generate_expr_list(parse_node_t *expr)
-{
+static void generate_expr_list(parse_node_t *expr) {
   parse_node_t *pn;
   int n, flag;
 
-  if (!expr) { return; }
+  if (!expr) {
+    return;
+  }
   pn = expr;
   flag = n = 0;
   do {
-    if (pn->type & 1) { flag = 1; }
+    if (pn->type & 1) {
+      flag = 1;
+    }
     i_generate_node(pn->v.expr);
     n++;
   } while ((pn = pn->r.expr));
@@ -281,9 +272,7 @@ generate_expr_list(parse_node_t *expr)
   }
 }
 
-static void
-generate_lvalue_list(parse_node_t *expr)
-{
+static void generate_lvalue_list(parse_node_t *expr) {
   while ((expr = expr->r.expr)) {
     i_generate_node(expr->l.expr);
     end_pushes();
@@ -291,9 +280,7 @@ generate_lvalue_list(parse_node_t *expr)
   }
 }
 
-static void
-switch_to_line(unsigned int line)
-{
+static void switch_to_line(unsigned int line) {
   unsigned int sz = CURRENT_PROGRAM_SIZE - last_size_generated;
   ADDRESS_TYPE s;
   unsigned char *p;
@@ -303,7 +290,8 @@ switch_to_line(unsigned int line)
 
     last_size_generated += sz;
     while (sz > 255) {
-      p = (unsigned char *)allocate_in_mem_block(A_LINENUMBERS, sizeof(ADDRESS_TYPE) + 1);
+      p = (unsigned char *)allocate_in_mem_block(A_LINENUMBERS,
+                                                 sizeof(ADDRESS_TYPE) + 1);
       *p++ = 255;
 #if !defined(USE_32BIT_ADDRESSES)
       STORE_SHORT(p, s);
@@ -312,7 +300,8 @@ switch_to_line(unsigned int line)
 #endif
       sz -= 255;
     }
-    p = (unsigned char *)allocate_in_mem_block(A_LINENUMBERS, sizeof(ADDRESS_TYPE) + 1);
+    p = (unsigned char *)allocate_in_mem_block(A_LINENUMBERS,
+                                               sizeof(ADDRESS_TYPE) + 1);
     *p++ = sz;
 #if !defined(USE_32BIT_ADDRESSES)
     STORE_SHORT(p, s);
@@ -323,9 +312,7 @@ switch_to_line(unsigned int line)
   line_being_generated = line;
 }
 
-static int
-try_to_push(int kind, int value)
-{
+static int try_to_push(int kind, int value) {
   if (push_state) {
     if (value <= PUSH_MASK) {
       if (push_state == 1) {
@@ -337,14 +324,22 @@ try_to_push(int kind, int value)
         end_pushes();
       }
       return 1;
-    } else { end_pushes(); }
+    } else {
+      end_pushes();
+    }
   } else if (value <= PUSH_MASK) {
     push_start = CURRENT_PROGRAM_SIZE;
     push_state = 1;
     switch (kind) {
-      case PUSH_STRING: ins_byte(F_SHORT_STRING); break;
-      case PUSH_LOCAL: ins_byte(F_LOCAL); break;
-      case PUSH_GLOBAL: ins_byte(F_GLOBAL); break;
+      case PUSH_STRING:
+        ins_byte(F_SHORT_STRING);
+        break;
+      case PUSH_LOCAL:
+        ins_byte(F_LOCAL);
+        break;
+      case PUSH_GLOBAL:
+        ins_byte(F_GLOBAL);
+        break;
       case PUSH_NUMBER:
         if (value == 0) {
           ins_byte(F_CONST0);
@@ -365,10 +360,10 @@ try_to_push(int kind, int value)
   return 0;
 }
 
-void
-i_generate_node(parse_node_t *expr)
-{
-  if (!expr) { return; }
+void i_generate_node(parse_node_t *expr) {
+  if (!expr) {
+    return;
+  }
 
   if (expr->line && expr->line != line_being_generated) {
     switch_to_line(expr->line);
@@ -381,8 +376,8 @@ i_generate_node(parse_node_t *expr)
       /* rest  - Sym                                              */
 
       num = FUNCTION_TEMP(expr->v.number)->u.index;
-      FUNC(num)->address = generate_function(FUNC(num),
-                                             expr->r.expr, expr->l.number);
+      FUNC(num)->address =
+          generate_function(FUNC(num), expr->r.expr, expr->l.number);
       break;
     }
     case NODE_TERNARY_OP:
@@ -390,10 +385,10 @@ i_generate_node(parse_node_t *expr)
       expr = expr->r.expr;
     case NODE_BINARY_OP:
       i_generate_node(expr->l.expr);
-      /* fall through */
+    /* fall through */
     case NODE_UNARY_OP:
       i_generate_node(expr->r.expr);
-      /* fall through */
+    /* fall through */
     case NODE_OPCODE:
       end_pushes();
       ins_byte(expr->v.number);
@@ -401,7 +396,7 @@ i_generate_node(parse_node_t *expr)
     case NODE_TERNARY_OP_1:
       i_generate_node(expr->l.expr);
       expr = expr->r.expr;
-      /* fall through */
+    /* fall through */
     case NODE_BINARY_OP_1:
       i_generate_node(expr->l.expr);
       i_generate_node(expr->r.expr);
@@ -411,18 +406,21 @@ i_generate_node(parse_node_t *expr)
       break;
     case NODE_UNARY_OP_1:
       i_generate_node(expr->r.expr);
-      /* fall through */
+    /* fall through */
     case NODE_OPCODE_1:
       if (expr->v.number == F_LOCAL) {
-        if (try_to_push(PUSH_LOCAL, expr->l.number)) { break; }
+        if (try_to_push(PUSH_LOCAL, expr->l.number)) {
+          break;
+        }
       } else if (expr->v.number == F_GLOBAL) {
-        if (try_to_push(PUSH_GLOBAL, expr->l.number)) { break; }
+        if (try_to_push(PUSH_GLOBAL, expr->l.number)) {
+          break;
+        }
       }
       end_pushes();
       ins_byte(expr->v.number);
 
-      if ((expr->v.number == F_GLOBAL) ||
-          (expr->v.number == F_GLOBAL_LVALUE)) {
+      if ((expr->v.number == F_GLOBAL) || (expr->v.number == F_GLOBAL_LVALUE)) {
         INS_GLOBAL_INDEX(expr->l.number);
       } else {
         ins_byte(expr->l.number);
@@ -451,11 +449,15 @@ i_generate_node(parse_node_t *expr)
         i_generate_node(expr->r.expr);
         end_pushes();
         ins_byte(F_RETURN);
-      } else { ins_byte(F_RETURN_ZERO); }
+      } else {
+        ins_byte(F_RETURN_ZERO);
+      }
       break;
     }
     case NODE_STRING:
-      if (try_to_push(PUSH_STRING, expr->v.number)) { break; }
+      if (try_to_push(PUSH_STRING, expr->v.number)) {
+        break;
+      }
       if (expr->v.number <= 0xff) {
         ins_byte(F_SHORT_STRING);
         ins_byte(expr->v.number);
@@ -530,7 +532,9 @@ i_generate_node(parse_node_t *expr)
     }
     case NODE_PARAMETER: {
       int which = expr->v.number + current_num_values;
-      if (try_to_push(PUSH_LOCAL, which)) { break; }
+      if (try_to_push(PUSH_LOCAL, which)) {
+        break;
+      }
       ins_byte(F_LOCAL);
       ins_byte(which);
       break;
@@ -602,8 +606,7 @@ i_generate_node(parse_node_t *expr)
           ins_byte(expr->r.expr->l.number);
         }
       }
-    }
-    break;
+    } break;
     case NODE_CASE_NUMBER:
     case NODE_CASE_STRING:
       if (expr->v.expr) {
@@ -639,13 +642,12 @@ i_generate_node(parse_node_t *expr)
        * addr is one less than it was in older drivers.
        */
       ins_byte(0xff); /* kind of table */
-      ins_short(0); /* address of table */
-      ins_short(0); /* end of table */
-      ins_short(0); /* default address */
+      ins_short(0);   /* address of table */
+      ins_short(0);   /* end of table */
+      ins_short(0);   /* default address */
       i_generate_node(expr->r.expr);
       if (expr->v.expr && expr->v.expr->kind == NODE_DEFAULT) {
-        upd_short(addr + 5, expr->v.expr->v.number - addr,
-                  "switch");
+        upd_short(addr + 5, expr->v.expr->v.number - addr, "switch");
         expr->v.expr = expr->v.expr->l.expr;
       } else {
         upd_short(addr + 5, CURRENT_PROGRAM_SIZE - addr, "switch");
@@ -765,8 +767,7 @@ i_generate_node(parse_node_t *expr)
           current_num_values = save_current_num_values;
           end_pushes();
           ins_byte(F_RETURN);
-          upd_short(addr, CURRENT_PROGRAM_SIZE - addr - 2,
-                    "function pointer");
+          upd_short(addr, CURRENT_PROGRAM_SIZE - addr - 2, "function pointer");
           break;
         }
       }
@@ -788,8 +789,7 @@ i_generate_node(parse_node_t *expr)
       addr = CURRENT_PROGRAM_SIZE;
       ins_short(0);
       i_generate_node(expr->r.expr);
-      upd_short(addr, CURRENT_PROGRAM_SIZE - addr - 2,
-                "function pointer");
+      upd_short(addr, CURRENT_PROGRAM_SIZE - addr - 2, "function pointer");
       foreach_depth = save_fd;
       break;
     }
@@ -802,10 +802,10 @@ i_generate_node(parse_node_t *expr)
       /* max_arg == -1 must use F_EFUNV so that varargs expansion works*/
       if (expr->l.number < 4 && instrs[f].max_arg != -1) {
         ins_byte(F_EFUN0 + expr->l.number); /* F_EFUN0 to F_EFUN3 */
-        ins_short(f); /* efun instruction */
+        ins_short(f);                       /* efun instruction */
       } else {
         ins_byte(F_EFUNV);
-        ins_short(f); /* efun instruction */
+        ins_short(f);             /* efun instruction */
         ins_byte(expr->l.number); /* num args */
       }
 
@@ -821,14 +821,15 @@ i_generate_node(parse_node_t *expr)
 }
 
 static void i_generate_loop(int test_first, parse_node_t *block,
-                            parse_node_t *inc, parse_node_t *test)
-{
+                            parse_node_t *inc, parse_node_t *test) {
   parse_node_t *save_breaks = branch_list[CJ_BREAK];
   parse_node_t *save_continues = branch_list[CJ_CONTINUE];
   int forever = node_always_true(test);
   int pos;
 
-  if (test_first == 2) { foreach_depth++; }
+  if (test_first == 2) {
+    foreach_depth++;
+  }
   branch_list[CJ_BREAK] = branch_list[CJ_CONTINUE] = 0;
   end_pushes();
   if (!forever && test_first) {
@@ -837,23 +838,29 @@ static void i_generate_loop(int test_first, parse_node_t *block,
   pos = CURRENT_PROGRAM_SIZE;
   i_generate_node(block);
   i_update_branch_list(branch_list[CJ_CONTINUE], "continue");
-  if (inc) { i_generate_node(inc); }
-  if (!forever && test_first) { i_update_forward_branch("loop"); }
+  if (inc) {
+    i_generate_node(inc);
+  }
+  if (!forever && test_first) {
+    i_update_forward_branch("loop");
+  }
   if (test && (test->v.number == F_LOOP_COND_LOCAL ||
                test->v.number == F_LOOP_COND_NUMBER ||
                test->v.number == F_NEXT_FOREACH)) {
     i_generate_node(test);
     ins_short(CURRENT_PROGRAM_SIZE - pos);
-  } else { i_branch_backwards(generate_conditional_branch(test), pos); }
+  } else {
+    i_branch_backwards(generate_conditional_branch(test), pos);
+  }
   i_update_branch_list(branch_list[CJ_BREAK], "break");
   branch_list[CJ_BREAK] = save_breaks;
   branch_list[CJ_CONTINUE] = save_continues;
-  if (test_first == 2) { foreach_depth--; }
+  if (test_first == 2) {
+    foreach_depth--;
+  }
 }
 
-static void
-i_generate_if_branch(parse_node_t *node, int invert)
-{
+static void i_generate_if_branch(parse_node_t *node, int invert) {
   int generate_both = 0;
   int branch = (invert ? F_BRANCH_WHEN_NON_ZERO : F_BRANCH_WHEN_ZERO);
 
@@ -909,9 +916,7 @@ i_generate_if_branch(parse_node_t *node, int invert)
   i_generate_forward_branch(branch);
 }
 
-void
-i_generate_inherited_init_call(int index, short f)
-{
+void i_generate_inherited_init_call(int index, short f) {
   end_pushes();
   ins_byte(F_CALL_INHERITED);
   ins_byte(index);
@@ -920,8 +925,7 @@ i_generate_inherited_init_call(int index, short f)
   ins_byte(F_POP_VALUE);
 }
 
-void i_generate_forward_branch(char b)
-{
+void i_generate_forward_branch(char b) {
   end_pushes();
   ins_byte(b);
   if (nforward_branches == nforward_branches_max) {
@@ -934,18 +938,14 @@ void i_generate_forward_branch(char b)
   ins_short(0);
 }
 
-void
-i_update_forward_branch(const char *what)
-{
+void i_update_forward_branch(const char *what) {
   end_pushes();
   nforward_branches--;
   upd_short(forward_branches[nforward_branches],
-            CURRENT_PROGRAM_SIZE - forward_branches[nforward_branches],
-            what);
+            CURRENT_PROGRAM_SIZE - forward_branches[nforward_branches], what);
 }
 
-void i_update_forward_branch_links(char kind, parse_node_t *link_start)
-{
+void i_update_forward_branch_links(char kind, parse_node_t *link_start) {
   int i;
 
   end_pushes();
@@ -961,9 +961,7 @@ void i_update_forward_branch_links(char kind, parse_node_t *link_start)
   } while (link_start->kind == NODE_BRANCH_LINK);
 }
 
-void
-i_branch_backwards(char b, int addr)
-{
+void i_branch_backwards(char b, int addr) {
   end_pushes();
   if (b) {
     if (b != F_WHILE_DEC) {
@@ -973,9 +971,7 @@ i_branch_backwards(char b, int addr)
   }
 }
 
-static void
-i_update_branch_list(parse_node_t *bl, const char *what)
-{
+static void i_update_branch_list(parse_node_t *bl, const char *what) {
   int current_size;
 
   end_pushes();
@@ -987,9 +983,7 @@ i_update_branch_list(parse_node_t *bl, const char *what)
   }
 }
 
-void
-i_generate_else()
-{
+void i_generate_else() {
   int old;
 
   old = forward_branches[nforward_branches - 1];
@@ -1004,9 +998,7 @@ i_generate_else()
   upd_short(old, CURRENT_PROGRAM_SIZE - old, "if");
 }
 
-void
-i_initialize_parser()
-{
+void i_initialize_parser() {
   foreach_depth = 0;
 
   if (!forward_branches) {
@@ -1026,9 +1018,7 @@ i_initialize_parser()
   last_size_generated = 0;
 }
 
-void
-i_uninitialize_parser()
-{
+void i_uninitialize_parser() {
 #ifdef DEBUGMALLOC_EXTENSIONS
   /*
    * The intention is to keep the allocated space for forward branches
@@ -1045,9 +1035,7 @@ i_uninitialize_parser()
 #endif
 }
 
-void
-i_generate_final_program(int x)
-{
+void i_generate_final_program(int x) {
   if (!x) {
     UPDATE_PROGRAM_SIZE;
     /* This needs more work */
@@ -1062,9 +1050,7 @@ i_generate_final_program(int x)
 /* Currently, this procedure handles:
  * - jump threading
  */
-void
-optimize_icode(char *start, char *pc, char *end)
-{
+void optimize_icode(char *start, char *pc, char *end) {
   int instr = 0, prev;
   if (start == 0) {
     /* we don't optimize the initializer block right now b/c all the
@@ -1120,7 +1106,9 @@ optimize_icode(char *start, char *pc, char *end)
           } else if (EXTRACT_UCHAR(tmp) == F_BBRANCH) {
             COPY_SHORT(&sarg, tmp + 1);
             tmp -= sarg - 1;
-          } else { break; }
+          } else {
+            break;
+          }
         }
         if (!sarg) {
           pc += 2;
@@ -1131,12 +1119,12 @@ optimize_icode(char *start, char *pc, char *end)
          */
         if (tmp > pc) {
           if (instr > F_BRANCH) {
-            pc[-1] -= 3;   /* change to forward branch */
+            pc[-1] -= 3; /* change to forward branch */
           }
           sarg = tmp - pc;
         } else {
           if (instr <= F_BRANCH) {
-            pc[-1] += 3;   /* change to backwards branch */
+            pc[-1] += 3; /* change to backwards branch */
           }
           sarg = pc - tmp;
         }
@@ -1159,7 +1147,9 @@ optimize_icode(char *start, char *pc, char *end)
           } else if (EXTRACT_UCHAR(tmp) == F_BBRANCH) {
             COPY_SHORT(&sarg, tmp + 1);
             tmp -= sarg - 1;
-          } else { break; }
+          } else {
+            break;
+          }
         }
         if (!sarg) {
           pc += 2;
@@ -1237,11 +1227,12 @@ optimize_icode(char *start, char *pc, char *end)
         LOAD_SHORT(stable, pc);
         LOAD_SHORT(etable, pc);
         pc += 2; /* def */
-        //break; //doesn't seem to work!
-        printf("stable: %x pc %p swstart %p etable %x\n", stable, (void *)pc, (void *)swstart, etable);
-        DEBUG_CHECK(stable < pc - swstart || etable < pc - swstart
-                    || etable < stable,
-                    "Error in switch table found while optimizing\n");
+        // break; //doesn't seem to work!
+        printf("stable: %x pc %p swstart %p etable %x\n", stable, (void *)pc,
+               (void *)swstart, etable);
+        DEBUG_CHECK(
+            stable < pc - swstart || etable < pc - swstart || etable < stable,
+            "Error in switch table found while optimizing\n");
         /* recursively optimize the inside of the switch */
         optimize_icode(start, pc, start + stable);
         pc = swstart + etable;
@@ -1258,8 +1249,8 @@ optimize_icode(char *start, char *pc, char *end)
       case F_EFUN1:
       case F_EFUN2:
       case F_EFUN3:
-        // FIXME: these are very outdated.
-        // instr = EXTRACT_UCHAR(pc++) + ONEARG_MAX;
+      // FIXME: these are very outdated.
+      // instr = EXTRACT_UCHAR(pc++) + ONEARG_MAX;
       default:
         if (instr < EFUN_BASE || instr > NUM_OPCODES) {
           printf("instr %d prev %d\n", instr, prev);
@@ -1274,7 +1265,3 @@ optimize_icode(char *start, char *pc, char *end)
     }
   }
 }
-
-
-
-

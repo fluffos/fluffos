@@ -8,7 +8,7 @@
 # **** TARGETS AND THEIR CORRECT USAGE ****
 #
 # COMPILATION TARGETS:
-# 
+#
 # all:		compile all the files
 #
 # install:	make all, then move the files to the correct directories
@@ -25,10 +25,6 @@
 # ---- DO NOT EDIT ANYTHING BELOW HERE UNLESS YOU KNOW ALOT ABOUT HOW
 #      MUDOS WORKS INTERNALLY ----
 
-# **************************************************************************
-# **** NOTE: If you add something here, also add it to the OBJ= rule below,
-# **** or non-GNU makes will die
-# **************************************************************************
 # @configure_input@
 @SET_MAKE@
 
@@ -53,7 +49,7 @@ SRC=grammar.tab.cc lex.cc main.cc rc.cc interpret.cc simulate.cc file.cc object.
   disassembler.cc uvalarm.cc \
   replace_program.cc master.cc function.cc \
   debug.cc crypt.cc applies_table.cc add_action.cc eval.cc fliconv.cc console.cc \
-  posix_timers.cc event.cc dns.c
+  posix_timers.cc event.cc dns.c \
 
 OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
   backend.o array.o mapping.o comm.o ed.o regexp.o buffer.o crc32.o \
@@ -65,7 +61,7 @@ OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
   disassembler.o uvalarm.o \
   replace_program.o master.o function.o \
   debug.o crypt.o applies_table.o add_action.o eval.o fliconv.o console.o \
-  posix_timers.o event.o dns.o
+  posix_timers.o event.o dns.o \
 
 VPATH = .:./packages
 
@@ -84,7 +80,7 @@ build_packages:
 build_binaries: $(DRIVER_BIN) portbind
 
 .cc.$(O):
-	$(CXX) -c $(CXXFLAGS) @LIBEVENT_CPPFLAGS@ -x c++ -o $@ $<
+	$(CXX) -c $(CXXFLAGS) @LIBEVENT_CPPFLAGS@ -I. -x c++ -o $@ $<
 
 # FIXME: simulate.c currently calls package_async, which depends on package/DB, this need to be fixed.
 simulate.$(O): simulate.cc
@@ -116,6 +112,7 @@ cc.h:
 	echo '#define COMPILER "$(CXX)"' >> cc.h
 	echo '#define CXXFLAGS "$(CXXFLAGS)"' >> cc.h
 	echo '#define OPTIMIZE "$(OPTIMIZE)"' >> cc.h
+	echo '#define SOURCE_REVISION "@SOURCE_REVISION@"' >> cc.h
 
 # the touches here are necessary to fix the modification times; link(2) does
 # 'modify' a file
@@ -184,7 +181,7 @@ test: all
 
 help:
 	@echo "***************** Configuration completed **************"
-	@echo "Compiling FluffOS as $(DRIVER_BIN) for @target@."
+	@echo "Compiling @PACKAGE_STRING@ (@SOURCE_REVISION@) as $(DRIVER_BIN) for @target@."
 	@echo
 	@echo "INSTALL: '$(INSTALL)'"
 	@echo "INSTALL DIR: '$(INSTALL_DIR)'"

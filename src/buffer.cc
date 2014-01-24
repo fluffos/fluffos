@@ -7,33 +7,26 @@
 #include "lpc_incl.h"
 #include "stralloc.h"
 
-buffer_t null_buf = {
-  1,                          /* Ref count, which will ensure that it will
-                                 * never be deallocated */
-  0                           /* size */
+buffer_t null_buf = {1, /* Ref count, which will ensure that it will
+                           * never be deallocated */
+                     0 /* size */
 };
 
-buffer_t *
-null_buffer()
-{
+buffer_t *null_buffer() {
   null_buf.ref++;
   return &null_buf;
-}                               /* null_buffer() */
+} /* null_buffer() */
 
-void
-free_buffer(buffer_t *b)
-{
+void free_buffer(buffer_t *b) {
   b->ref--;
   /* don't try to free the null_buffer (ref count might overflow) */
   if ((b->ref > 0) || (b == &null_buf)) {
     return;
   }
-  FREE((char *) b);
-}                               /* free_buffer() */
+  FREE((char *)b);
+} /* free_buffer() */
 
-buffer_t *
-allocate_buffer(int size)
-{
+buffer_t *allocate_buffer(int size) {
   buffer_t *buf;
 
 #ifndef NO_BUFFER_TYPE
@@ -44,8 +37,8 @@ allocate_buffer(int size)
     return null_buffer();
   }
   /* using calloc() so that memory will be zero'd out when allocated */
-  buf = (buffer_t *) DCALLOC(sizeof(buffer_t) + size - 1, 1,
-                             TAG_BUFFER, "allocate_buffer");
+  buf = (buffer_t *)DCALLOC(sizeof(buffer_t) + size - 1, 1, TAG_BUFFER,
+                            "allocate_buffer");
   buf->size = size;
   buf->ref = 1;
   return buf;
@@ -54,8 +47,7 @@ allocate_buffer(int size)
 #endif
 }
 
-int write_buffer(buffer_t *buf, int start, const char *str, int theLength)
-{
+int write_buffer(buffer_t *buf, int start, const char *str, int theLength) {
   int size;
 
   size = buf->size;
@@ -74,11 +66,9 @@ int write_buffer(buffer_t *buf, int start, const char *str, int theLength)
   }
   memcpy(buf->item + start, str, theLength);
   return 1;
-}                               /* write_buffer() */
+} /* write_buffer() */
 
-char *
-read_buffer(buffer_t *b, int start, int len, int *rlen)
-{
+char *read_buffer(buffer_t *b, int start, int len, int *rlen) {
   char *str;
   unsigned int size;
 
@@ -102,7 +92,8 @@ read_buffer(buffer_t *b, int start, int len, int *rlen)
   if ((start + len) > size) {
     len = (size - start);
   }
-  for (str = (char *)b->item + start, size = 0; *str && size < len; str++, size++) {
+  for (str = (char *)b->item + start, size = 0; *str && size < len;
+       str++, size++) {
     ;
   }
   str = new_string(size, "read_buffer: str");
@@ -110,5 +101,5 @@ read_buffer(buffer_t *b, int start, int len, int *rlen)
   str[*rlen = size] = '\0';
 
   return str;
-}                               /* read_buffer() */
+} /* read_buffer() */
 #endif

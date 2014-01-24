@@ -27,12 +27,11 @@
 #include <sqlite3.h>
 #endif
 
-
 typedef union dbconn_u {
 #ifdef USE_POSTGRES
   struct tmp_postgres {
-    PGconn      *conn;
-    PGresult    *res;
+    PGconn *conn;
+    PGresult *res;
   } postgres;
 #endif
 #ifdef USE_MSQL
@@ -80,7 +79,8 @@ typedef union dbconn_u {
  */
 typedef struct db_defn_s {
   const char *name;
-  int (*connect)(dbconn_t *, const char *, const char *, const char *, const char *);
+  int (*connect)(dbconn_t *, const char *, const char *, const char *,
+                 const char *);
   int (*close)(dbconn_t *);
   int (*execute)(dbconn_t *, const char *);
   array_t *(*fetch)(dbconn_t *, int);
@@ -91,7 +91,7 @@ typedef struct db_defn_s {
   char *(*error)(dbconn_t *);
 } db_defn_t;
 
-#define DB_FLAG_EMPTY   0x1
+#define DB_FLAG_EMPTY 0x1
 
 typedef struct _db {
   int flags;
@@ -102,6 +102,6 @@ typedef struct _db {
 void db_cleanup(void);
 svalue_t *valid_database(const char *action, array_t *info);
 db_t *find_db_conn(int handle);
-#endif  /* PACKAGES_DB */
+#endif /* PACKAGES_DB */
 
-#endif  /* PACKAGES_DB_H */
+#endif /* PACKAGES_DB_H */

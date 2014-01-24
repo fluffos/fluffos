@@ -5,7 +5,7 @@
 #include "file_incl.h"
 #include "file.h"
 
-#include <netinet/tcp.h> // TCP_NODELAY
+#include <netinet/tcp.h>  // TCP_NODELAY
 
 /*
   ioctl.c: part of the MudOS release -- Truilkan@TMI
@@ -18,8 +18,7 @@
  * set process receiving SIGIO/SIGURG signals to us.
  */
 
-int set_socket_owner(int fd, int which)
-{
+int set_socket_owner(int fd, int which) {
 #if defined(__CYGWIN__)
   return fcntl(fd, F_SETOWN, which);
 #else
@@ -35,8 +34,7 @@ int set_socket_owner(int fd, int which)
  * allow receipt of asynchronous I/O signals.
  */
 
-int set_socket_async(int fd, int which)
-{
+int set_socket_async(int fd, int which) {
   return OS_socket_ioctl(fd, FIOASYNC, &which);
 }
 
@@ -44,8 +42,7 @@ int set_socket_async(int fd, int which)
  * set socket non-blocking
  */
 
-int set_socket_nonblocking(int fd, int which)
-{
+int set_socket_nonblocking(int fd, int which) {
 #if !defined(_SEQUENT_)
   int result;
 #endif
@@ -82,59 +79,49 @@ int set_socket_nonblocking(int fd, int which)
  * set socket non-blocking
  */
 
-int set_socket_tcp_nodelay(int fd, int which)
-{
+int set_socket_tcp_nodelay(int fd, int which) {
   int flag = 1;
   return setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
 }
 
 #ifdef WIN32
-void SocketPerror(char *what, char *file)
-{
+void SocketPerror(char *what, char *file) {
   static char *errstrings[] = {
-    "Operation would block",
-    "Blocking call in progress",
-    "WSAEALREADY",
-    "Invalid socket",
-    "Missing destination",
-    "Data is too large",
-    "Wrong protocol type",
-    "Unsupported option",
-    "Unsupported protocol",
-    "Unsupported socket type",
-    "Socket can't listen",
-    "WSAEPFNOSUPPORT",
-    "Can't use address family",
-    "Addr is used",
-    "Addr is not available",
-    "WSAENETDOWN",
-    "WSAENETUNREACH",
-    "WSAENETRESET",
-    "WSAECONNABORTED",
-    "WSAECONNRESET",
-    "No buffer space",
-    "Already connected",
-    "Not connected",
-    "WSAESHUTDOWN",
-    "WSAETOOMANYREFS",
-    "Time-out",
-    "Connection refused",
-    "WSAELOOP",
-    "WSAENAMETOOLONG",
-    "WSAEHOSTDOWN",
-    "WSAEHOSTUNREACH",
-    "10066", "10067", "10068", "10069", "10070", "10071", "10072", "10073", "10074",
-    "10075", "10076", "10077", "10078", "10079", "10080", "10081", "10082", "10083",
-    "10084", "10085", "10086", "10087", "10088", "10089", "10090",
-    "WSASYSNOTREADY",
-    "WSAVERNOTSUPPORTED",
-    "Winsock not initialised",
-    "10094", "10095", "10096", "10097", "10098", "10099", "11000",
-    "WSAHOST_NOT_FOUND",
-    "WSATRY_AGAIN",
-    "WSANO_RECOVERY",
-    "WSANO_DATA"
-  };
+      "Operation would block",    "Blocking call in progress",
+      "WSAEALREADY",              "Invalid socket",
+      "Missing destination",      "Data is too large",
+      "Wrong protocol type",      "Unsupported option",
+      "Unsupported protocol",     "Unsupported socket type",
+      "Socket can't listen",      "WSAEPFNOSUPPORT",
+      "Can't use address family", "Addr is used",
+      "Addr is not available",    "WSAENETDOWN",
+      "WSAENETUNREACH",           "WSAENETRESET",
+      "WSAECONNABORTED",          "WSAECONNRESET",
+      "No buffer space",          "Already connected",
+      "Not connected",            "WSAESHUTDOWN",
+      "WSAETOOMANYREFS",          "Time-out",
+      "Connection refused",       "WSAELOOP",
+      "WSAENAMETOOLONG",          "WSAEHOSTDOWN",
+      "WSAEHOSTUNREACH",          "10066",
+      "10067",                    "10068",
+      "10069",                    "10070",
+      "10071",                    "10072",
+      "10073",                    "10074",
+      "10075",                    "10076",
+      "10077",                    "10078",
+      "10079",                    "10080",
+      "10081",                    "10082",
+      "10083",                    "10084",
+      "10085",                    "10086",
+      "10087",                    "10088",
+      "10089",                    "10090",
+      "WSASYSNOTREADY",           "WSAVERNOTSUPPORTED",
+      "Winsock not initialised",  "10094",
+      "10095",                    "10096",
+      "10097",                    "10098",
+      "10099",                    "11000",
+      "WSAHOST_NOT_FOUND",        "WSATRY_AGAIN",
+      "WSANO_RECOVERY",           "WSANO_DATA"};
 
   static char tmpstring[80];
   char *s = tmpstring;
@@ -143,11 +130,16 @@ void SocketPerror(char *what, char *file)
   sock_errno = WSAGetLastError();
 
   switch (sock_errno) {
-    case WSAEINTR:  strcpy(tmpstring, "Function interrupted");
-    case WSAEACCES: strcpy(tmpstring, "Cannot broadcast");
-    case WSAEFAULT: strcpy(tmpstring, "Buffer is invalid");
-    case WSAEINVAL: strcpy(tmpstring, "Unbound socket");
-    case WSAEMFILE: strcpy(tmpstring, "No more descriptors");
+    case WSAEINTR:
+      strcpy(tmpstring, "Function interrupted");
+    case WSAEACCES:
+      strcpy(tmpstring, "Cannot broadcast");
+    case WSAEFAULT:
+      strcpy(tmpstring, "Buffer is invalid");
+    case WSAEINVAL:
+      strcpy(tmpstring, "Unbound socket");
+    case WSAEMFILE:
+      strcpy(tmpstring, "No more descriptors");
 
     default:
       if ((sock_errno >= WSAEWOULDBLOCK) && (sock_errno <= WSANO_DATA)) {
@@ -163,8 +155,5 @@ void SocketPerror(char *what, char *file)
   }
 }
 
-void CDECL cleanup_sockets(void)
-{
-  WSACleanup();
-}
+void CDECL cleanup_sockets(void) { WSACleanup(); }
 #endif

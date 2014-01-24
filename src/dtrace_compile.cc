@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include "std.h"
-int main()
-{
+int main() {
 #ifdef DTRACE
 #ifdef _LP64
   system("dtrace -G -64 -s fluffos.dtrace *.o packages/*.o > /dev/null");

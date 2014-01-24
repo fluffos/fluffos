@@ -4,12 +4,12 @@
 /* It is usually better to include "lpc_incl.h" instead of including this
    directly */
 
-#define V_SHORT         1
-#define V_NOSPACE       2
-#define V_FUNCTION      4
+#define V_SHORT 1
+#define V_NOSPACE 2
+#define V_FUNCTION 4
 
 /* The end of a static buffer */
-#define EndOf(x) (x + sizeof(x)/sizeof(x[0]))
+#define EndOf(x) (x + sizeof(x) / sizeof(x[0]))
 
 /*
  * simulate.c

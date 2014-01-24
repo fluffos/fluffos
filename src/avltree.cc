@@ -41,22 +41,21 @@ this code, please leave my name (and Wirth's) in the comments.
 /*
  * Prototypes for local functions
  */
-static void sprout(tree **, char *, int *, int ( *)(void *, void *), int ( *)(void *));
-static int avldelete(tree **, int ( *)(void *, void *), char *, int ( *)(void *), int *, int *);
-static void del(tree **, int *, tree **, int ( *)(void *), int *);
+static void sprout(tree **, char *, int *, int (*)(void *, void *),
+                   int (*)(void *));
+static int avldelete(tree **, int (*)(void *, void *), char *, int (*)(void *),
+                     int *, int *);
+static void del(tree **, int *, tree **, int (*)(void *), int *);
 static void balanceL(tree **, int *);
 static void balanceR(tree **, int *);
 
-
-void tree_init(tree **ppr_tree)
-{
+void tree_init(tree **ppr_tree) {
   *ppr_tree = NULL;
   return;
 }
 
-
-char *tree_srch(tree *ppr_tree, int (*pfi_compare)(void *, void *), char *pc_user)
-{
+char *tree_srch(tree *ppr_tree, int (*pfi_compare)(void *, void *),
+                char *pc_user) {
   register int i_comp;
 
   while (ppr_tree) {
@@ -81,18 +80,17 @@ char *tree_srch(tree *ppr_tree, int (*pfi_compare)(void *, void *), char *pc_use
   return NULL;
 }
 
-
-void tree_add(tree **ppr_tree, int (*pfi_compare)(void *, void *), char *pc_user, int (*pfi_delete)(void *))
-{
+void tree_add(tree **ppr_tree, int (*pfi_compare)(void *, void *),
+              char *pc_user, int (*pfi_delete)(void *)) {
   int i_balance = 0;
 
   sprout(ppr_tree, pc_user, &i_balance, pfi_compare, pfi_delete);
   return;
 }
 
-
-static void sprout(tree **ppr, char *pc_data, int *pi_balance, int (*pfi_compare)(void *, void *), int (*pfi_delete)(void *))
-{
+static void sprout(tree **ppr, char *pc_data, int *pi_balance,
+                   int (*pfi_compare)(void *, void *),
+                   int (*pfi_delete)(void *)) {
   tree *p1, *p2;
   int cmp;
 
@@ -118,26 +116,25 @@ static void sprout(tree **ppr, char *pc_data, int *pi_balance, int (*pfi_compare
    * if LESS, prepare to move to the left.
    */
   if (cmp < 0) {
-    sprout(&(*ppr)->tree_l, pc_data, pi_balance,
-           pfi_compare, pfi_delete);
-    if (*pi_balance) {  /* left branch has grown longer */
+    sprout(&(*ppr)->tree_l, pc_data, pi_balance, pfi_compare, pfi_delete);
+    if (*pi_balance) {/* left branch has grown longer */
       switch ((*ppr)->tree_b) {
-        case 1:     /* right branch WAS longer; balance is ok now */
+        case 1: /* right branch WAS longer; balance is ok now */
           (*ppr)->tree_b = 0;
           *pi_balance = 0;
           break;
-        case 0:     /* balance WAS okay; now left branch longer */
+        case 0: /* balance WAS okay; now left branch longer */
           (*ppr)->tree_b = -1;
           break;
         case -1:
           /* left branch was already too long. rebalnce */
           p1 = (*ppr)->tree_l;
-          if (p1->tree_b == -1) { /* LL */
+          if (p1->tree_b == -1) {/* LL */
             (*ppr)->tree_l = p1->tree_r;
             p1->tree_r = *ppr;
             (*ppr)->tree_b = 0;
             *ppr = p1;
-          } else {    /* double LR */
+          } else {/* double LR */
             p2 = p1->tree_r;
             p1->tree_r = p2->tree_l;
             p2->tree_l = p1;
@@ -157,20 +154,19 @@ static void sprout(tree **ppr, char *pc_data, int *pi_balance, int (*pfi_compare
               p1->tree_b = 0;
             }
             *ppr = p2;
-          }       /* else */
+          } /* else */
           (*ppr)->tree_b = 0;
           *pi_balance = 0;
-      }           /* switch */
-    }           /* if */
+      } /* switch */
+    }   /* if */
     return;
-  }               /* if */
-  /*
+  } /* if */
+    /*
    * if MORE, prepare to move to the right.
    */
   if (cmp > 0) {
-    sprout(&(*ppr)->tree_r, pc_data, pi_balance,
-           pfi_compare, pfi_delete);
-    if (*pi_balance) {  /* right branch has grown longer */
+    sprout(&(*ppr)->tree_r, pc_data, pi_balance, pfi_compare, pfi_delete);
+    if (*pi_balance) {/* right branch has grown longer */
       switch ((*ppr)->tree_b) {
         case -1:
           (*ppr)->tree_b = 0;
@@ -181,12 +177,12 @@ static void sprout(tree **ppr, char *pc_data, int *pi_balance, int (*pfi_compare
           break;
         case 1:
           p1 = (*ppr)->tree_r;
-          if (p1->tree_b == 1) {  /* RR */
+          if (p1->tree_b == 1) {/* RR */
             (*ppr)->tree_r = p1->tree_l;
             p1->tree_l = *ppr;
             (*ppr)->tree_b = 0;
             *ppr = p1;
-          } else {    /* double RL */
+          } else {/* double RL */
             p2 = p1->tree_l;
             p1->tree_l = p2->tree_r;
             p2->tree_r = p1;
@@ -207,14 +203,14 @@ static void sprout(tree **ppr, char *pc_data, int *pi_balance, int (*pfi_compare
             }
 
             *ppr = p2;
-          }       /* else */
+          } /* else */
           (*ppr)->tree_b = 0;
           *pi_balance = 0;
-      }           /* switch */
-    }           /* if */
+      } /* switch */
+    }   /* if */
     return;
-  }               /* if */
-  /*
+  } /* if */
+    /*
    * not less, not more: this is the same key!  replace...
    */
   *pi_balance = 0;
@@ -225,18 +221,17 @@ static void sprout(tree **ppr, char *pc_data, int *pi_balance, int (*pfi_compare
   return;
 }
 
-
-int tree_delete(tree **ppr_p, int (*pfi_compare)(void *, void *), char *pc_user, int (*pfi_uar)(void *))
-{
+int tree_delete(tree **ppr_p, int (*pfi_compare)(void *, void *), char *pc_user,
+                int (*pfi_uar)(void *)) {
   int i_balance = 0, i_uar_called = 0;
 
-  return avldelete(ppr_p, pfi_compare, pc_user, pfi_uar,
-                   &i_balance, &i_uar_called);
+  return avldelete(ppr_p, pfi_compare, pc_user, pfi_uar, &i_balance,
+                   &i_uar_called);
 }
 
-
-static int avldelete(tree **ppr_p, int (*pfi_compare)(void *, void *), char *pc_user, int (*pfi_uar)(void *), int *pi_balance, int *pi_uar_called)
-{
+static int avldelete(tree **ppr_p, int (*pfi_compare)(void *, void *),
+                     char *pc_user, int (*pfi_uar)(void *), int *pi_balance,
+                     int *pi_uar_called) {
   tree *pr_q;
   int i_comp, i_ret;
 
@@ -265,8 +260,7 @@ static int avldelete(tree **ppr_p, int (*pfi_compare)(void *, void *), char *pc_
       *ppr_p = pr_q->tree_r;
       *pi_balance = 1;
     } else {
-      del(&pr_q->tree_l, pi_balance, &pr_q, pfi_uar,
-          pi_uar_called);
+      del(&pr_q->tree_l, pi_balance, &pr_q, pfi_uar, pi_uar_called);
       if (*pi_balance) {
         balanceL(ppr_p, pi_balance);
       }
@@ -280,12 +274,10 @@ static int avldelete(tree **ppr_p, int (*pfi_compare)(void *, void *), char *pc_
   return i_ret;
 }
 
-
-static void del(tree **ppr_r, int *pi_balance, tree **ppr_q, int (*pfi_uar)(void *), int *pi_uar_called)
-{
+static void del(tree **ppr_r, int *pi_balance, tree **ppr_q,
+                int (*pfi_uar)(void *), int *pi_uar_called) {
   if ((*ppr_r)->tree_r != NULL) {
-    del(&(*ppr_r)->tree_r, pi_balance, ppr_q, pfi_uar,
-        pi_uar_called);
+    del(&(*ppr_r)->tree_r, pi_balance, ppr_q, pfi_uar, pi_uar_called);
     if (*pi_balance) {
       balanceR(ppr_r, pi_balance);
     }
@@ -303,9 +295,7 @@ static void del(tree **ppr_r, int *pi_balance, tree **ppr_q, int (*pfi_uar)(void
   return;
 }
 
-
-static void balanceL(tree **ppr_p, int *pi_balance)
-{
+static void balanceL(tree **ppr_p, int *pi_balance) {
   tree *p1, *p2;
   int b1, b2;
 
@@ -356,9 +346,7 @@ static void balanceL(tree **ppr_p, int *pi_balance)
   return;
 }
 
-
-static void balanceR(tree **ppr_p, int *pi_balance)
-{
+static void balanceR(tree **ppr_p, int *pi_balance) {
   tree *p1, *p2;
   int b1, b2;
 
@@ -409,9 +397,7 @@ static void balanceR(tree **ppr_p, int *pi_balance)
   return;
 }
 
-
-int tree_trav(tree **ppr_tree, int (*pfi_uar)(void *))
-{
+int tree_trav(tree **ppr_tree, int (*pfi_uar)(void *)) {
   if (!*ppr_tree) {
     return 1;
   }
@@ -428,9 +414,7 @@ int tree_trav(tree **ppr_tree, int (*pfi_uar)(void *))
   return 1;
 }
 
-
-void tree_mung(tree **ppr_tree, int (*pfi_uar)(void *))
-{
+void tree_mung(tree **ppr_tree, int (*pfi_uar)(void *)) {
   if (*ppr_tree) {
     tree_mung(&(**ppr_tree).tree_l, pfi_uar);
     tree_mung(&(**ppr_tree).tree_r, pfi_uar);

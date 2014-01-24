@@ -14,7 +14,7 @@
 
 typedef struct _uid {
   char *name;
-}    userid_t;
+} userid_t;
 
 extern userid_t *backbone_uid;
 extern userid_t *root_uid;

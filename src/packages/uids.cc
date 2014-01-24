@@ -19,9 +19,7 @@
 static object_t *ob;
 
 #ifdef F_EXPORT_UID
-void
-f_export_uid(void)
-{
+void f_export_uid(void) {
   if (current_object->euid == NULL) {
     error("Illegal to export uid 0\n");
   }
@@ -38,9 +36,7 @@ f_export_uid(void)
 #endif
 
 #ifdef F_GETEUID
-void
-f_geteuid(void)
-{
+void f_geteuid(void) {
   if (sp->type & T_OBJECT) {
     ob = sp->u.ob;
     if (ob->euid) {
@@ -66,9 +62,7 @@ f_geteuid(void)
 #endif
 
 #ifdef F_GETUID
-void
-f_getuid(void)
-{
+void f_getuid(void) {
   ob = sp->u.ob;
 
   DEBUG_CHECK(ob->uid == NULL, "UID is a null pointer\n");
@@ -78,9 +72,7 @@ f_getuid(void)
 #endif
 
 #ifdef F_SETEUID
-void
-f_seteuid(void)
-{
+void f_seteuid(void) {
   svalue_t *arg;
   svalue_t *ret;
 
@@ -113,8 +105,7 @@ userid_t *backbone_uid = NULL;
 userid_t *root_uid = NULL;
 
 #ifdef DEBUGMALLOC_EXTENSIONS
-static void mark_uid_tree(tree *tr)
-{
+static void mark_uid_tree(tree *tr) {
   DO_MARK(tr, TAG_UID);
   DO_MARK(tr->tree_p, TAG_UID);
 
@@ -127,8 +118,7 @@ static void mark_uid_tree(tree *tr)
   }
 }
 
-void mark_all_uid_nodes()
-{
+void mark_all_uid_nodes() {
   if (uids) {
     mark_uid_tree(uids);
   }
@@ -137,8 +127,7 @@ void mark_all_uid_nodes()
 
 static int uidcmp(void *, void *);
 
-static int uidcmp(void *uid1, void *uid2)
-{
+static int uidcmp(void *uid1, void *uid2) {
   register char *name1, *name2;
 
   name1 = ((userid_t *)uid1)->name;
@@ -146,43 +135,40 @@ static int uidcmp(void *uid1, void *uid2)
   return (name1 < name2 ? -1 : (name1 > name2 ? 1 : 0));
 }
 
-userid_t *add_uid(const char *name)
-{
+userid_t *add_uid(const char *name) {
   userid_t *uid, t_uid;
   char *sname;
 
   sname = make_shared_string(name);
   t_uid.name = sname;
-  if ((uid = (userid_t *) tree_srch(uids, uidcmp, (char *) &t_uid))) {
+  if ((uid = (userid_t *)tree_srch(uids, uidcmp, (char *)&t_uid))) {
     free_string(sname);
   } else {
     uid = ALLOCATE(userid_t, TAG_UID, "add_uid");
     uid->name = sname;
-    tree_add(&uids, uidcmp, (char *) uid, NULL);
+    tree_add(&uids, uidcmp, (char *)uid, NULL);
   }
   return uid;
 }
 
-userid_t *set_root_uid(const char *name)
-{
+userid_t *set_root_uid(const char *name) {
   if (!root_uid) {
     return root_uid = add_uid(name);
   }
 
-  tree_delete(&uids, uidcmp, (char *) root_uid, NULL);
+  tree_delete(&uids, uidcmp, (char *)root_uid, NULL);
   root_uid->name = make_shared_string(name);
-  tree_add(&uids, uidcmp, (char *) root_uid, NULL);
+  tree_add(&uids, uidcmp, (char *)root_uid, NULL);
   return root_uid;
 }
 
-userid_t *set_backbone_uid(const char *name)
-{
+userid_t *set_backbone_uid(const char *name) {
   if (!backbone_uid) {
     return backbone_uid = add_uid(name);
   }
 
-  tree_delete(&uids, uidcmp, (char *) backbone_uid, NULL);
+  tree_delete(&uids, uidcmp, (char *)backbone_uid, NULL);
   backbone_uid->name = make_shared_string(name);
-  tree_add(&uids, uidcmp, (char *) backbone_uid, NULL);
+  tree_add(&uids, uidcmp, (char *)backbone_uid, NULL);
   return backbone_uid;
 }

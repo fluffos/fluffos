@@ -10,27 +10,17 @@ typedef struct {
   int bit;
 } debug_t;
 
-#define E(x) { #x, DBG_##x }
+#define E(x) \
+  { #x, DBG_##x }
 
-debug_t levels[] = {
-  E(call_out),
-  E(d_flag),
-  E(connections),
-  E(mapping),
-  E(sockets),
-  E(comp_func_tab),
-  E(LPC),
-  E(LPC_line),
-  E(event),
-  E(dns),
-  E(file),
-  E(add_action),
-};
+debug_t levels[] = {E(call_out), E(d_flag),   E(connections),
+                    E(mapping),  E(sockets),  E(comp_func_tab),
+                    E(LPC),      E(LPC_line), E(event),
+                    E(dns),      E(file),     E(add_action), };
 
-#define NELEM(x) (sizeof(x)/sizeof(x[0]))
+#define NELEM(x) (sizeof(x) / sizeof(x[0]))
 
-mapping_t *debug_levels()
-{
+mapping_t *debug_levels() {
   int dl = debug_level;
   mapping_t *ret = allocate_mapping(10);
   unsigned int i;
@@ -47,8 +37,7 @@ mapping_t *debug_levels()
   return ret;
 }
 
-void debug_level_set(const char *level)
-{
+void debug_level_set(const char *level) {
   unsigned int i;
 
   for (i = 0; i < NELEM(levels); i++) {
@@ -59,8 +48,7 @@ void debug_level_set(const char *level)
   }
 }
 
-void debug_level_clear(const char *level)
-{
+void debug_level_clear(const char *level) {
   unsigned int i;
 
   for (i = 0; i < NELEM(levels); i++) {

@@ -12,43 +12,37 @@
 
 typedef struct stats_s {
   unsigned int free_calls, alloc_calls, realloc_calls;
-}       stats_t;
+} stats_t;
 
 static stats_t stats;
 
-void wrappedmalloc_init()
-{
+void wrappedmalloc_init() {
   stats.free_calls = 0;
   stats.alloc_calls = 0;
   stats.realloc_calls = 0;
 }
 
-void *wrappedrealloc(void *ptr, int size)
-{
+void *wrappedrealloc(void *ptr, int size) {
   stats.realloc_calls++;
-  return (void *) REALLOC(ptr, size);
+  return (void *)REALLOC(ptr, size);
 }
 
-void *wrappedmalloc(int size)
-{
+void *wrappedmalloc(int size) {
   stats.alloc_calls++;
-  return (void *) MALLOC(size);
+  return (void *)MALLOC(size);
 }
 
-void *wrappedcalloc(int nitems, int size)
-{
+void *wrappedcalloc(int nitems, int size) {
   stats.alloc_calls++;
-  return (void *) CALLOC(nitems, size);
+  return (void *)CALLOC(nitems, size);
 }
 
-void wrappedfree(void *ptr)
-{
+void wrappedfree(void *ptr) {
   stats.free_calls++;
   FREE(ptr);
 }
 
-void dump_malloc_data(outbuffer_t *ob)
-{
+void dump_malloc_data(outbuffer_t *ob) {
   outbuf_add(ob, "using wrapped malloc:\n\n");
   outbuf_addv(ob, "#alloc calls:     %10lu\n", stats.alloc_calls);
   outbuf_addv(ob, "#free calls:      %10lu\n", stats.free_calls);

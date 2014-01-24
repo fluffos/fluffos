@@ -10,11 +10,11 @@
 #include "../comm.h"
 #include "../efun_protos.h"
 
-#define VALID_SOCKET(x) check_valid_socket((x), fd, get_socket_owner(fd), addr, port)
+#define VALID_SOCKET(x) \
+  check_valid_socket((x), fd, get_socket_owner(fd), addr, port)
 
 #ifdef F_SOCKET_CREATE
-void f_socket_create(void)
-{
+void f_socket_create(void) {
   int fd, num_arg = st_num_arg;
   svalue_t *arg;
 
@@ -38,9 +38,7 @@ void f_socket_create(void)
 #endif
 
 #ifdef F_SOCKET_BIND
-void
-f_socket_bind(void)
-{
+void f_socket_bind(void) {
   int i, fd, port, num_arg = st_num_arg;
   svalue_t *arg;
   char addr[ADDR_BUF_SIZE];
@@ -54,7 +52,8 @@ f_socket_bind(void)
   get_socket_address(fd, addr, &port, 0);
 
   if (VALID_SOCKET("bind")) {
-    i = socket_bind(fd, arg[1].u.number, (num_arg == 3 ? arg[2].u.string : NULL));
+    i = socket_bind(fd, arg[1].u.number,
+                    (num_arg == 3 ? arg[2].u.string : NULL));
     pop_n_elems(num_arg - 1);
     sp->u.number = i;
   } else {
@@ -65,9 +64,7 @@ f_socket_bind(void)
 #endif
 
 #ifdef F_SOCKET_LISTEN
-void
-f_socket_listen(void)
-{
+void f_socket_listen(void) {
   int i, fd, port;
   char addr[ADDR_BUF_SIZE];
 
@@ -86,9 +83,7 @@ f_socket_listen(void)
 #endif
 
 #ifdef F_SOCKET_ACCEPT
-void
-f_socket_accept(void)
-{
+void f_socket_accept(void) {
   int port, fd;
   char addr[ADDR_BUF_SIZE];
 
@@ -97,17 +92,14 @@ f_socket_accept(void)
   }
   get_socket_address(fd = (sp - 2)->u.number, addr, &port, 0);
 
-  (sp - 2)->u.number = VALID_SOCKET("accept") ?
-                       socket_accept(fd, (sp - 1), sp) :
-                       EESECURITY;
+  (sp - 2)->u.number =
+      VALID_SOCKET("accept") ? socket_accept(fd, (sp - 1), sp) : EESECURITY;
   pop_2_elems();
 }
 #endif
 
 #ifdef F_SOCKET_CONNECT
-void
-f_socket_connect(void)
-{
+void f_socket_connect(void) {
   int i, fd, port;
   char addr[ADDR_BUF_SIZE];
 
@@ -146,21 +138,23 @@ f_socket_connect(void)
     }
 #ifdef DEBUG
   } else {
-    debug_message("socket_connect: socket already bound to address/port: %s/%d\n", addr, port);
-    debug_message("socket_connect: but requested to connect to: %s\n", (sp - 2)->u.string);
+    debug_message(
+        "socket_connect: socket already bound to address/port: %s/%d\n", addr,
+        port);
+    debug_message("socket_connect: but requested to connect to: %s\n",
+                  (sp - 2)->u.string);
 #endif
   }
 
-  (sp - 3)->u.number = VALID_SOCKET("connect") ?
-                       socket_connect(fd, (sp - 2)->u.string, sp - 1, sp) : EESECURITY;
+  (sp - 3)->u.number = VALID_SOCKET("connect")
+                           ? socket_connect(fd, (sp - 2)->u.string, sp - 1, sp)
+                           : EESECURITY;
   pop_3_elems();
 }
 #endif
 
 #ifdef F_SOCKET_WRITE
-void
-f_socket_write(void)
-{
+void f_socket_write(void) {
   int i, fd, port;
   svalue_t *arg;
   char addr[ADDR_BUF_SIZE];
@@ -175,7 +169,7 @@ f_socket_write(void)
 
   if (VALID_SOCKET("write")) {
     i = socket_write(fd, &arg[1],
-                     (num_arg == 3) ? arg[2].u.string : (char *) NULL);
+                     (num_arg == 3) ? arg[2].u.string : (char *)NULL);
     pop_n_elems(num_arg - 1);
     sp->u.number = i;
   } else {
@@ -186,9 +180,7 @@ f_socket_write(void)
 #endif
 
 #ifdef F_SOCKET_CLOSE
-void
-f_socket_close(void)
-{
+void f_socket_close(void) {
   int fd, port;
   char addr[ADDR_BUF_SIZE];
 
@@ -200,9 +192,7 @@ f_socket_close(void)
 #endif
 
 #ifdef F_SOCKET_RELEASE
-void
-f_socket_release(void)
-{
+void f_socket_release(void) {
   int fd, port;
   char addr[ADDR_BUF_SIZE];
 
@@ -212,9 +202,10 @@ f_socket_release(void)
   fd = (sp - 2)->u.number;
   get_socket_address(fd, addr, &port, 0);
 
-  (sp - 2)->u.number = VALID_SOCKET("release") ?
-                       socket_release((sp - 2)->u.number, (sp - 1)->u.ob, sp) :
-                       EESECURITY;
+  (sp - 2)->u.number =
+      VALID_SOCKET("release")
+          ? socket_release((sp - 2)->u.number, (sp - 1)->u.ob, sp)
+          : EESECURITY;
 
   pop_stack();
   /* the object might have been dested an removed from the stack */
@@ -226,9 +217,7 @@ f_socket_release(void)
 #endif
 
 #ifdef F_SOCKET_ACQUIRE
-void
-f_socket_acquire(void)
-{
+void f_socket_acquire(void) {
   int fd, port;
   char addr[ADDR_BUF_SIZE];
 
@@ -241,31 +230,25 @@ f_socket_acquire(void)
   fd = (sp - 3)->u.number;
   get_socket_address(fd, addr, &port, 0);
 
-  (sp - 3)->u.number = VALID_SOCKET("acquire") ?
-                       socket_acquire((sp - 3)->u.number, (sp - 2),
-                                      (sp - 1), sp) : EESECURITY;
+  (sp - 3)->u.number =
+      VALID_SOCKET("acquire")
+          ? socket_acquire((sp - 3)->u.number, (sp - 2), (sp - 1), sp)
+          : EESECURITY;
 
   pop_3_elems();
 }
 #endif
 
 #ifdef F_SOCKET_ERROR
-void
-f_socket_error(void)
-{
-  put_constant_string(socket_error(sp->u.number));
-}
+void f_socket_error(void) { put_constant_string(socket_error(sp->u.number)); }
 #endif
 
 #ifdef F_SOCKET_ADDRESS
-void
-f_socket_address(void)
-{
+void f_socket_address(void) {
   char *str;
   int local, port;
   char addr[ADDR_BUF_SIZE];
   char buf[2 * ADDR_BUF_SIZE]; /* a bit of overkill to be safe */
-
 
   /*
    * Ok, we will add in a cute little check thing here to see if it is
@@ -281,8 +264,10 @@ f_socket_address(void)
     }
 
     char host[NI_MAXHOST], service[NI_MAXSERV];
-    int ret = getnameinfo((struct sockaddr *)&sp->u.ob->interactive->addr, sp->u.ob->interactive->addrlen,
-                          host, sizeof(host), service, sizeof(service), NI_NUMERICHOST | NI_NUMERICSERV);
+    int ret =
+        getnameinfo((struct sockaddr *)&sp->u.ob->interactive->addr,
+                    sp->u.ob->interactive->addrlen, host, sizeof(host), service,
+                    sizeof(service), NI_NUMERICHOST | NI_NUMERICSERV);
     if (ret) {
       strcpy(host, "0.0.0.0");
       strcpy(service, "0");
@@ -298,13 +283,11 @@ f_socket_address(void)
   sprintf(buf, "%s %d", addr, port);
   str = string_copy(buf, "f_socket_address");
   put_malloced_string(str);
-}       /* f_socket_address() */
+} /* f_socket_address() */
 #endif
 
 #ifdef F_SOCKET_STATUS
-void
-f_socket_status(void)
-{
+void f_socket_status(void) {
   array_t *info;
   int i;
 

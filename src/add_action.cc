@@ -7,17 +7,16 @@
 
 #define MAX_VERB_BUFF 100
 
-object_t   *hashed_living[CFG_LIVING_HASH_SIZE] = { 0 };
+object_t *hashed_living[CFG_LIVING_HASH_SIZE] = {0};
 
-static int      num_living_names;
-static int      num_searches = 1;
-static int      search_length = 1;
-static int      illegal_sentence_action;
-static const char        *last_verb;
-static object_t    *illegal_sentence_ob;
+static int num_living_names;
+static int num_searches = 1;
+static int search_length = 1;
+static int illegal_sentence_action;
+static const char *last_verb;
+static object_t *illegal_sentence_ob;
 
-static void notify_no_command(void)
-{
+static void notify_no_command(void) {
   union string_or_func p;
   svalue_t *v;
 
@@ -43,13 +42,13 @@ static void notify_no_command(void)
       free_string(p.s);
       command_giver->interactive->default_err_message.s = 0;
     } else {
-      tell_object(command_giver, default_fail_message, strlen(default_fail_message));
+      tell_object(command_giver, default_fail_message,
+                  strlen(default_fail_message));
     }
   }
 }
 
-void clear_notify(object_t *ob)
-{
+void clear_notify(object_t *ob) {
   union string_or_func dem;
   interactive_t *ip = ob->interactive;
 
@@ -63,13 +62,11 @@ void clear_notify(object_t *ob)
   ip->default_err_message.s = 0;
 }
 
-static int hash_living_name(const char *str)
-{
+static int hash_living_name(const char *str) {
   return whashstr(str) & (CFG_LIVING_HASH_SIZE - 1);
 }
 
-object_t *find_living_object(const char *str, int user)
-{
+object_t *find_living_object(const char *str, int user) {
   object_t **obp, *tmp;
   object_t **hl;
 
@@ -111,8 +108,7 @@ object_t *find_living_object(const char *str, int user)
   return tmp;
 }
 
-void remove_living_name(object_t *ob)
-{
+void remove_living_name(object_t *ob) {
   object_t **hl;
 
   ob->flags &= ~O_ENABLE_COMMANDS;
@@ -138,8 +134,7 @@ void remove_living_name(object_t *ob)
   ob->living_name = 0;
 }
 
-static void set_living_name(object_t *ob, const char *str)
-{
+static void set_living_name(object_t *ob, const char *str) {
   int flags = ob->flags & O_ENABLE_COMMANDS;
   object_t **hl;
 
@@ -155,16 +150,14 @@ static void set_living_name(object_t *ob, const char *str)
   ob->flags |= flags;
 }
 
-void stat_living_objects(outbuffer_t *out)
-{
+void stat_living_objects(outbuffer_t *out) {
   outbuf_add(out, "Hash table of living objects:\n");
   outbuf_add(out, "-----------------------------\n");
   outbuf_addv(out, "%d living named objects, average search length: %4.2f\n\n",
-              num_living_names, (double) search_length / num_searches);
+              num_living_names, (double)search_length / num_searches);
 }
 
-void setup_new_commands(object_t *dest, object_t *item)
-{
+void setup_new_commands(object_t *dest, object_t *item) {
   object_t *next_ob, *ob;
 
   /*
@@ -177,7 +170,7 @@ void setup_new_commands(object_t *dest, object_t *item)
    */
   if (item->flags & O_ENABLE_COMMANDS) {
     save_command_giver(item);
-    (void) apply(APPLY_INIT, dest, 0, ORIGIN_DRIVER);
+    (void)apply(APPLY_INIT, dest, 0, ORIGIN_DRIVER);
     restore_command_giver();
     if (item->super != dest) {
       return;
@@ -200,36 +193,39 @@ void setup_new_commands(object_t *dest, object_t *item)
     }
     if (ob->flags & O_ENABLE_COMMANDS) {
       save_command_giver(ob);
-      (void) apply(APPLY_INIT, item, 0, ORIGIN_DRIVER);
+      (void)apply(APPLY_INIT, item, 0, ORIGIN_DRIVER);
       restore_command_giver();
       if (dest != item->super) {
         return;
       }
     }
-    if (item->flags & O_DESTRUCTED) { /* marion */
-      error("The object to be moved was destructed at call of " APPLY_INIT "()\n");
+    if (item->flags & O_DESTRUCTED) {/* marion */
+      error("The object to be moved was destructed at call of " APPLY_INIT
+            "()\n");
     }
-    if (ob->flags & O_DESTRUCTED) { /* Alaron */
+    if (ob->flags & O_DESTRUCTED) {/* Alaron */
       error("An object was destructed at call of " APPLY_INIT "()\n");
     }
     if (item->flags & O_ENABLE_COMMANDS) {
       save_command_giver(item);
-      (void) apply(APPLY_INIT, ob, 0, ORIGIN_DRIVER);
+      (void)apply(APPLY_INIT, ob, 0, ORIGIN_DRIVER);
       restore_command_giver();
       if (dest != item->super) {
         return;
       }
     }
   }
-  if (dest->flags & O_DESTRUCTED) { /* marion */
-    error("The destination to move to was destructed at call of " APPLY_INIT "()\n");
+  if (dest->flags & O_DESTRUCTED) {/* marion */
+    error("The destination to move to was destructed at call of " APPLY_INIT
+          "()\n");
   }
-  if (item->flags & O_DESTRUCTED) { /* Alaron */
-    error("The object to be moved was destructed at call of " APPLY_INIT "()\n");
+  if (item->flags & O_DESTRUCTED) {/* Alaron */
+    error("The object to be moved was destructed at call of " APPLY_INIT
+          "()\n");
   }
   if (dest->flags & O_ENABLE_COMMANDS) {
     save_command_giver(dest);
-    (void) apply(APPLY_INIT, item, 0, ORIGIN_DRIVER);
+    (void)apply(APPLY_INIT, item, 0, ORIGIN_DRIVER);
     restore_command_giver();
   }
 }
@@ -237,13 +233,13 @@ void setup_new_commands(object_t *dest, object_t *item)
 /*
  * If enable == 1, this enables current object to use commands normally only
  * accessible by interactive users. if toggle_action == 1, it will also setup
- * actions by calling init() on this_object's environment, sibling then inventory.
+ * actions by calling init() on this_object's environment, sibling then
+ *inventory.
  *
  * Otherwise if enable == 0, it will disable commands, clear all actions,
  * make living() return false.
  */
-static void enable_commands(int enable, int toggle_action)
-{
+static void enable_commands(int enable, int toggle_action) {
 #ifndef NO_ENVIRONMENT
 
 #endif
@@ -253,8 +249,8 @@ static void enable_commands(int enable, int toggle_action)
   }
 
   if (enable) {
-    debug(add_action, "Enable commands: %s (ref %d)\n",
-          current_object->obname, current_object->ref);
+    debug(add_action, "Enable commands: %s (ref %d)\n", current_object->obname,
+          current_object->ref);
 
     current_object->flags |= O_ENABLE_COMMANDS;
     set_command_giver(current_object);
@@ -274,14 +270,15 @@ static void enable_commands(int enable, int toggle_action)
       }
     }
   } else {
-    debug(add_action, "Disable commands: %s (ref %d)\n",
-          current_object->obname, current_object->ref);
+    debug(add_action, "Disable commands: %s (ref %d)\n", current_object->obname,
+          current_object->ref);
 #ifndef NO_ENVIRONMENT
     debug(add_action, "Clearing all actions: %s\n", current_object->obname);
     /* Remove all sentences defined for the object */
     if (current_object->super) {
       remove_sent(current_object->super, current_object);
-      for (object_t *pp = current_object->super->contains; pp; pp = pp->next_inv) {
+      for (object_t *pp = current_object->super->contains; pp;
+           pp = pp->next_inv) {
         remove_sent(pp, current_object);
       }
     }
@@ -301,8 +298,7 @@ static void enable_commands(int enable, int toggle_action)
  * Return success status.
  */
 
-static int user_parser(char *buff)
-{
+static int user_parser(char *buff) {
   char verb_buff[MAX_VERB_BUFF];
   sentence_t *s;
   char *p;
@@ -371,8 +367,8 @@ static int user_parser(char *buff)
      */
 
     if (!(s->flags & V_FUNCTION))
-      debug(add_action, "Local command %s on /%s\n",
-            s->function.s, s->ob->obname);
+      debug(add_action, "Local command %s on /%s\n", s->function.s,
+            s->ob->obname);
 
     if (s->flags & V_NOSPACE) {
       int l1 = strlen(s->verb);
@@ -429,11 +425,11 @@ static int user_parser(char *buff)
       if (s == command_giver->sent) {
         char buf[256];
         if (s->flags & V_FUNCTION) {
-          sprintf(buf, "Verb '%s' bound to uncallable function pointer.\n", s->verb);
+          sprintf(buf, "Verb '%s' bound to uncallable function pointer.\n",
+                  s->verb);
           error(buf);
         } else {
-          sprintf(buf, "Function for verb '%s' not found.\n",
-                  s->verb);
+          sprintf(buf, "Function for verb '%s' not found.\n", s->verb);
           error(buf);
         }
       }
@@ -445,7 +441,7 @@ static int user_parser(char *buff)
 #ifndef NO_WIZARDS
           && !(command_giver->flags & O_IS_WIZARD)
 #endif
-         ) {
+          ) {
         add_moves(&s->ob->stats, 1);
       }
 #endif
@@ -457,10 +453,16 @@ static int user_parser(char *buff)
     if (illegal_sentence_action) {
       switch (illegal_sentence_action) {
         case 1:
-          error("Illegal to call remove_action() [caller was /%s] from a verb returning zero.\n", illegal_sentence_ob->obname);
+          error(
+              "Illegal to call remove_action() [caller was /%s] from a verb "
+              "returning zero.\n",
+              illegal_sentence_ob->obname);
           break;
         case 2:
-          error("Illegal to move or destruct an object (/%s) defining actions from a verb function(%s) in object(/%s) which returns zero.\n", illegal_sentence_ob->obname, user_verb, s->ob->obname);
+          error(
+              "Illegal to move or destruct an object (/%s) defining actions "
+              "from a verb function(%s) in object(/%s) which returns zero.\n",
+              illegal_sentence_ob->obname, user_verb, s->ob->obname);
           break;
       }
     }
@@ -476,17 +478,16 @@ static int user_parser(char *buff)
  * The command can also come from a NPC.
  * Beware that 'str' can be modified and extended !
  */
-int parse_command(char *str, object_t *ob)
-{
+int parse_command(char *str, object_t *ob) {
   int res;
 
-  /* disallow users to issue commands containing ansi escape codes */
+/* disallow users to issue commands containing ansi escape codes */
 #if defined(NO_ANSI) && !defined(STRIP_BEFORE_PROCESS_INPUT)
   char *c;
 
-  for (c = str;  *c;  c++) {
+  for (c = str; *c; c++) {
     if (*c == 27) {
-      *c = ' ';       /* replace ESC with ' ' */
+      *c = ' '; /* replace ESC with ' ' */
     }
   }
 #endif
@@ -510,8 +511,7 @@ int parse_command(char *str, object_t *ob)
  * If the call is from a shadow, make it look like it is really from
  * the shadowed object.
  */
-static void add_action(svalue_t *str, const char *cmd, int flag)
-{
+static void add_action(svalue_t *str, const char *cmd, int flag) {
   sentence_t *p;
   object_t *ob;
 
@@ -524,7 +524,8 @@ static void add_action(svalue_t *str, const char *cmd, int flag)
     ob = ob->shadowing;
   }
   /* don't allow add_actions of a static function from a shadowing object */
-  if ((ob != current_object) && str->type == T_STRING && is_static(str->u.string, ob)) {
+  if ((ob != current_object) && str->type == T_STRING &&
+      is_static(str->u.string, ob)) {
     return;
   }
 #endif
@@ -533,22 +534,22 @@ static void add_action(svalue_t *str, const char *cmd, int flag)
   }
   if (ob != command_giver
 #ifndef NO_ENVIRONMENT
-      && ob->super != command_giver &&
-      ob->super != command_giver->super && ob != command_giver->super
+      && ob->super != command_giver && ob->super != command_giver->super &&
+      ob != command_giver->super
 #endif
-     ) {
+      ) {
     return;
-  }         /* No need for an error, they know what they
-                 * did wrong. */
+  } /* No need for an error, they know what they
+         * did wrong. */
   p = alloc_sentence();
   if (str->type == T_STRING) {
-    debug(add_action, "--Add action '%s' (ob: %s func: '%s')\n",
-          cmd, ob->obname, str->u.string);
+    debug(add_action, "--Add action '%s' (ob: %s func: '%s')\n", cmd,
+          ob->obname, str->u.string);
     p->function.s = make_shared_string(str->u.string);
     p->flags = flag;
   } else {
-    debug(add_action, "--Add action '%s' (ob: %s func: <function>)\n",
-          cmd, ob->obname);
+    debug(add_action, "--Add action '%s' (ob: %s func: <function>)\n", cmd,
+          ob->obname);
 
     p->function.f = str->u.fp;
     str->u.fp->hdr.ref++;
@@ -566,8 +567,7 @@ static void add_action(svalue_t *str, const char *cmd, int flag)
  * if success.  If command_giver, remove his action, otherwise
  * remove current_object's action.
  */
-static int remove_action(const char *act, const char *verb)
-{
+static int remove_action(const char *act, const char *verb) {
   object_t *ob;
   sentence_t **s;
 
@@ -581,9 +581,8 @@ static int remove_action(const char *act, const char *verb)
     for (s = &ob->sent; *s; s = &((*s)->next)) {
       sentence_t *tmp;
 
-      if (((*s)->ob == current_object) && (!((*s)->flags & V_FUNCTION))
-          && !strcmp((*s)->function.s, act)
-          && !strcmp((*s)->verb, verb)) {
+      if (((*s)->ob == current_object) && (!((*s)->flags & V_FUNCTION)) &&
+          !strcmp((*s)->function.s, act) && !strcmp((*s)->verb, verb)) {
         tmp = *s;
         *s = tmp->next;
         free_sentence(tmp);
@@ -601,8 +600,7 @@ static int remove_action(const char *act, const char *verb)
  * 'user'
  */
 #ifndef NO_ENVIRONMENT
-void remove_sent(object_t *ob, object_t *user)
-{
+void remove_sent(object_t *ob, object_t *user) {
   sentence_t **s;
 
   if (!(user->flags & O_ENABLE_COMMANDS)) {
@@ -633,14 +631,14 @@ void remove_sent(object_t *ob, object_t *user)
 #endif
 
 #ifdef F_ADD_ACTION
-void
-f_add_action(void)
-{
+void f_add_action(void) {
   LPC_INT flag;
 
   if (st_num_arg == 3) {
     flag = (sp--)->u.number;
-  } else { flag = 0; }
+  } else {
+    flag = 0;
+  }
 
   if (sp->type == T_ARRAY) {
     int i, n = sp->u.arr->size;
@@ -670,8 +668,7 @@ f_add_action(void)
  * Return cost of the command executed if success (> 0).
  * When failure, return 0.
  */
-void f_command(void)
-{
+void f_command(void) {
   LPC_INT rc = 0;
 
   if (current_object && !(current_object->flags & O_DESTRUCTED)) {
@@ -704,30 +701,22 @@ void f_command(void)
 #endif
 
 #ifdef F_COMMANDS
-void f_commands(void)
-{
-  push_refed_array(commands(current_object));
-}
+void f_commands(void) { push_refed_array(commands(current_object)); }
 #endif
 
 #ifdef F_DISABLE_COMMANDS
-void f_disable_commands(void)
-{
-  enable_commands(0, 0);
-}
+void f_disable_commands(void) { enable_commands(0, 0); }
 #endif
 
 #ifdef F_ENABLE_COMMANDS
-void f_enable_commands(void)
-{
+void f_enable_commands(void) {
   enable_commands(1, sp->u.number);
   pop_stack();
 }
 #endif
 
 #ifdef F_FIND_LIVING
-void f_find_living(void)
-{
+void f_find_living(void) {
   object_t *ob;
 
   ob = find_living_object(sp->u.string, 0);
@@ -742,8 +731,7 @@ void f_find_living(void)
 #endif
 
 #ifdef F_FIND_PLAYER
-void f_find_player(void)
-{
+void f_find_player(void) {
   object_t *ob;
 
   ob = find_living_object(sp->u.string, 1);
@@ -758,8 +746,7 @@ void f_find_player(void)
 #endif
 
 #ifdef F_LIVING
-void f_living(void)
-{
+void f_living(void) {
   if (sp->u.ob->flags & O_ENABLE_COMMANDS) {
     free_object(&sp->u.ob, "f_living:1");
     *sp = const1;
@@ -771,19 +758,16 @@ void f_living(void)
 #endif
 
 #ifdef F_LIVINGS
-void f_livings(void)
-{
-  push_refed_array(livings());
-}
+void f_livings(void) { push_refed_array(livings()); }
 #endif
 
 #ifdef F_NOTIFY_FAIL
-void f_notify_fail(void)
-{
+void f_notify_fail(void) {
   if (command_giver && command_giver->interactive) {
     clear_notify(command_giver);
     if (sp->type == T_STRING) {
-      command_giver->interactive->default_err_message.s = make_shared_string(sp->u.string);
+      command_giver->interactive->default_err_message.s =
+          make_shared_string(sp->u.string);
     } else {
       command_giver->interactive->iflags |= NOTIFY_FAIL_FUNC;
       command_giver->interactive->default_err_message.f = sp->u.fp;
@@ -795,8 +779,7 @@ void f_notify_fail(void)
 #endif
 
 #ifdef F_QUERY_VERB
-void f_query_verb(void)
-{
+void f_query_verb(void) {
   if (!last_verb) {
     push_number(0);
     return;
@@ -806,8 +789,7 @@ void f_query_verb(void)
 #endif
 
 #ifdef F_REMOVE_ACTION
-void f_remove_action(void)
-{
+void f_remove_action(void) {
   LPC_INT success;
 
   success = remove_action((sp - 1)->u.string, sp->u.string);
@@ -818,11 +800,10 @@ void f_remove_action(void)
 #endif
 
 #ifdef F_SET_LIVING_NAME
-void f_set_living_name(void)
-{
+void f_set_living_name(void) {
   set_living_name(current_object, sp->u.string);
   free_string_svalue(sp--);
 }
 #endif
 
-#endif  /* ! NO_ADD_ACTION */
+#endif /* ! NO_ADD_ACTION */

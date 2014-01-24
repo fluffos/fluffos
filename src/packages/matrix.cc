@@ -10,12 +10,8 @@
 
 #include "matrix.h"
 
-static Matrix identity = {
-  1., 0., 0., 0.,
-  0., 1., 0., 0.,
-  0., 0., 1., 0.,
-  0., 0., 0., 1.
-};
+static Matrix identity = {1., 0., 0., 0., 0., 1., 0., 0.,
+                          0., 0., 1., 0., 0., 0., 0., 1.};
 
 static void print_matrix(Matrix, char *);
 static void print_array(Vector *, char *);
@@ -23,8 +19,7 @@ static Vector *normalize_array(Vector *);
 static Vector *cross_product(Vector *, Vector *, Vector *);
 static Vector *points_to_array(Vector *, Vector *, Vector *);
 
-void f_id_matrix(void)
-{
+void f_id_matrix(void) {
   array_t *matrix;
   int i;
 
@@ -36,8 +31,7 @@ void f_id_matrix(void)
   push_refed_array(matrix);
 }
 
-void f_translate(void)
-{
+void f_translate(void) {
   array_t *matrix;
   LPC_FLOAT x, y, z;
   Matrix current_matrix;
@@ -82,8 +76,7 @@ void f_translate(void)
   }
 }
 
-void f_scale(void)
-{
+void f_scale(void) {
   array_t *matrix;
   LPC_FLOAT x, y, z;
   Matrix current_matrix;
@@ -127,8 +120,7 @@ void f_scale(void)
   }
 }
 
-void f_rotate_x(void)
-{
+void f_rotate_x(void) {
   array_t *matrix;
   LPC_FLOAT angle;
   Matrix current_matrix;
@@ -163,8 +155,7 @@ void f_rotate_x(void)
   }
 }
 
-void f_rotate_y(void)
-{
+void f_rotate_y(void) {
   array_t *matrix;
   LPC_FLOAT angle;
   Matrix current_matrix;
@@ -199,8 +190,7 @@ void f_rotate_y(void)
   }
 }
 
-void f_rotate_z(void)
-{
+void f_rotate_z(void) {
   array_t *matrix;
   LPC_FLOAT angle;
   Matrix current_matrix;
@@ -235,8 +225,7 @@ void f_rotate_z(void)
   }
 }
 
-void f_lookat_rotate(void)
-{
+void f_lookat_rotate(void) {
   array_t *matrix;
   LPC_FLOAT x, y, z;
   Matrix current_matrix;
@@ -276,8 +265,7 @@ void f_lookat_rotate(void)
 }
 
 #ifdef F_LOOKAT_ROTATE2
-void f_lookat_rotate2(void)
-{
+void f_lookat_rotate2(void) {
   array_t *matrix;
   LPC_FLOAT ex, ey, ez, lx, ly, lz;
   Matrix current_matrix;
@@ -322,8 +310,7 @@ void f_lookat_rotate2(void)
 #endif
 
 #ifdef DEBUG
-static void print_matrix(Matrix m, char *label)
-{
+static void print_matrix(Matrix m, char *label) {
   int i;
   int j;
 
@@ -336,14 +323,12 @@ static void print_matrix(Matrix m, char *label)
   }
 }
 
-static void print_array(Vector *v, char *label)
-{
+static void print_array(Vector *v, char *label) {
   fprintf(stderr, "%s:\t%f\t%f\t%f\n", label, v->x, v->y, v->z);
 }
 #endif
 
-static Vector *normalize_array(Vector *v)
-{
+static Vector *normalize_array(Vector *v) {
   LPC_FLOAT xx, yy, zz, mm, m;
 
   xx = v->x * v->x;
@@ -359,24 +344,21 @@ static Vector *normalize_array(Vector *v)
   return (v);
 }
 
-static Vector *cross_product(Vector *v, Vector *va, Vector *vb)
-{
+static Vector *cross_product(Vector *v, Vector *va, Vector *vb) {
   v->x = (va->y * vb->z) - (va->z * vb->y);
   v->y = (va->z * vb->x) - (va->x * vb->z);
   v->z = (va->x * vb->y) - (va->y * vb->x);
   return (v);
 }
 
-static Vector *points_to_array(Vector *v, Vector *pa, Vector *pb)
-{
+static Vector *points_to_array(Vector *v, Vector *pa, Vector *pb) {
   v->x = pa->x - pb->x;
   v->y = pa->y - pb->y;
   v->z = pa->z - pb->z;
   return (v);
 }
 
-void lookat_rotate(Matrix T, LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z, Matrix M)
-{
+void lookat_rotate(Matrix T, LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z, Matrix M) {
   static Vector N, V, U;
   static Vector ep, lp;
 
@@ -433,11 +415,11 @@ void lookat_rotate(Matrix T, LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z, Matrix M)
   print_array(&V, "V = N x U");
   print_array(&U, "U = V x N");
   print_matrix(M, "final matrix");
-#endif              /* DEBUG */
+#endif /* DEBUG */
 }
 
-void lookat_rotate2(LPC_FLOAT ex, LPC_FLOAT ey, LPC_FLOAT ez, LPC_FLOAT lx, LPC_FLOAT ly, LPC_FLOAT lz, Matrix M)
-{
+void lookat_rotate2(LPC_FLOAT ex, LPC_FLOAT ey, LPC_FLOAT ez, LPC_FLOAT lx,
+                    LPC_FLOAT ly, LPC_FLOAT lz, Matrix M) {
   static Vector N, V, U;
   static Vector ep, lp;
 
@@ -494,11 +476,10 @@ void lookat_rotate2(LPC_FLOAT ex, LPC_FLOAT ey, LPC_FLOAT ez, LPC_FLOAT lx, LPC_
   print_array(&V, "V = N x U");
   print_array(&U, "U = V x N");
   print_matrix(M, "final matrix");
-#endif              /* DEBUG */
+#endif /* DEBUG */
 }
 
-void translate_matrix(LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z, Matrix m)
-{
+void translate_matrix(LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z, Matrix m) {
   m[0] = 1.;
   m[1] = 0.;
   m[2] = 0.;
@@ -517,8 +498,7 @@ void translate_matrix(LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z, Matrix m)
   m[15] = 1.;
 }
 
-void scale_matrix(LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z, Matrix m)
-{
+void scale_matrix(LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z, Matrix m) {
   m[0] = x;
   m[1] = 0.;
   m[2] = 0.;
@@ -537,8 +517,7 @@ void scale_matrix(LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z, Matrix m)
   m[15] = 1.;
 }
 
-void rotate_x_matrix(LPC_FLOAT a, Matrix m)
-{
+void rotate_x_matrix(LPC_FLOAT a, Matrix m) {
   LPC_FLOAT a_rad;
   LPC_FLOAT c, s;
 
@@ -563,8 +542,7 @@ void rotate_x_matrix(LPC_FLOAT a, Matrix m)
   m[15] = 1.;
 }
 
-void rotate_y_matrix(LPC_FLOAT a, Matrix m)
-{
+void rotate_y_matrix(LPC_FLOAT a, Matrix m) {
   LPC_FLOAT a_rad;
   LPC_FLOAT c, s;
 
@@ -589,8 +567,7 @@ void rotate_y_matrix(LPC_FLOAT a, Matrix m)
   m[15] = 1.;
 }
 
-void rotate_z_matrix(LPC_FLOAT a, Matrix m)
-{
+void rotate_z_matrix(LPC_FLOAT a, Matrix m) {
   LPC_FLOAT a_rad;
   LPC_FLOAT c, s;
 
@@ -615,8 +592,7 @@ void rotate_z_matrix(LPC_FLOAT a, Matrix m)
   m[15] = 1.;
 }
 
-void mult_matrix(Matrix ma, Matrix mb, Matrix m)
-{
+void mult_matrix(Matrix ma, Matrix mb, Matrix m) {
   m[0] = ma[0] * mb[0] + ma[1] * mb[4] + ma[2] * mb[8] + ma[3] * mb[12];
 
   m[1] = ma[0] * mb[1] + ma[1] * mb[5] + ma[2] * mb[9] + ma[3] * mb[13];

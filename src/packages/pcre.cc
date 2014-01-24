@@ -41,16 +41,21 @@
  *      string *pcre_extract(string subject, string pattern);
  *         - returns an array of captured groups specified in pattern
  *
- *      string pcre_replace(string subject, string pattern, string *replacement);
- *         - returns a string where all captured groups have been replaced by the
- *           elements of the replacement array. Number of subgroups and the size of
+ *      string pcre_replace(string subject, string pattern, string
+ **replacement);
+ *         - returns a string where all captured groups have been replaced by
+ *the
+ *           elements of the replacement array. Number of subgroups and the size
+ *of
  *           the replacement array must match.
  *
- *      string pcre_replace_callback(string subject, string pattern, function | string fun, object ob);
- *         - returns a string where all captured groups have been replaced by the
+ *      string pcre_replace_callback(string subject, string pattern, function |
+ *string fun, object ob);
+ *         - returns a string where all captured groups have been replaced by
+ *the
  *           return value of function pointe fun or function fun in object ob.
  */
-//TODO
+// TODO
 // study pattern
 // extra options when matching, greedy, lazy, possesive, etc.
 // match_all ? see previous
@@ -63,35 +68,35 @@
 #include "mapping.h"
 
 // Prototype declarations
-static void       pcre_free_memory(pcre_t *p);
-static pcre      *pcre_local_compile(pcre_t *p);
-static int        pcre_local_exec(pcre_t *p);
-static int        pcre_magic(pcre_t *p);
-static int        pcre_query_match(pcre_t *p);
-static int        pcre_match_single(svalue_t *str, svalue_t *pattern);
-static array_t   *pcre_match(array_t *v, svalue_t *pattern, int flag);
-static array_t   *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *def);
-static char      *pcre_get_replace(pcre_t *run, array_t *replacements);
-static array_t   *pcre_get_substrings(pcre_t *run);
-//Caching functions
-static int        pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat, svalue_t *pattern);
-static pcre      *pcre_get_cached_pattern(struct pcre_cache_t *table, svalue_t *pattern);
+static void pcre_free_memory(pcre_t *p);
+static pcre *pcre_local_compile(pcre_t *p);
+static int pcre_local_exec(pcre_t *p);
+static int pcre_magic(pcre_t *p);
+static int pcre_query_match(pcre_t *p);
+static int pcre_match_single(svalue_t *str, svalue_t *pattern);
+static array_t *pcre_match(array_t *v, svalue_t *pattern, int flag);
+static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok,
+                           svalue_t *def);
+static char *pcre_get_replace(pcre_t *run, array_t *replacements);
+static array_t *pcre_get_substrings(pcre_t *run);
+// Caching functions
+static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
+                              svalue_t *pattern);
+static pcre *pcre_get_cached_pattern(struct pcre_cache_t *table,
+                                     svalue_t *pattern);
 static mapping_t *pcre_get_cache();
 int pcrecachesize = 0;
 // Globals
-struct pcre_cache_t pcre_cache = {{ 0 }};
-
+struct pcre_cache_t pcre_cache = {{0}};
 
 // efuns
-void f_pcre_version(void)
-{
+void f_pcre_version(void) {
   char *version;
   version = (char *)pcre_version();
   push_constant_string(version);
 }
 
-void f_pcre_match(void)
-{
+void f_pcre_match(void) {
   array_t *v;
   int flag = 0;
 
@@ -121,8 +126,7 @@ void f_pcre_match(void)
   }
 }
 
-void f_pcre_assoc(void)
-{
+void f_pcre_assoc(void) {
   svalue_t *arg;
   array_t *vec;
 
@@ -143,18 +147,17 @@ void f_pcre_assoc(void)
 
   free_string_svalue(sp);
 
-  sp->type  = T_ARRAY;
+  sp->type = T_ARRAY;
   sp->u.arr = vec;
 }
 
-void f_pcre_extract(void)
-{
+void f_pcre_extract(void) {
   pcre_t *run;
   array_t *ret;
 
   run = CALLOCATE(1, pcre_t, TAG_TEMPORARY, "f_pcre_extract : run");
   assign_svalue_no_free(&run->pattern, sp);
-  run->subject  = (sp - 1)->u.string;
+  run->subject = (sp - 1)->u.string;
   run->s_length = SVALUE_STRLEN(sp - 1);
   run->ovector = NULL;
   run->ovecsize = 0;
@@ -169,7 +172,8 @@ void f_pcre_extract(void)
 
   /* Pop the 2 arguments from the stack */
 
-  if (run->rc < 0) { /* No match. could do handling of matching errors if wanted */
+  if (run->rc <
+      0) {/* No match. could do handling of matching errors if wanted */
     pop_2_elems();
     pcre_free_memory(run);
     push_refed_array(&the_null_array);
@@ -181,7 +185,6 @@ void f_pcre_extract(void)
     return;
   }
 
-
   ret = pcre_get_substrings(run);
   pop_2_elems();
 
@@ -191,10 +194,7 @@ void f_pcre_extract(void)
   return;
 }
 
-
-
-void f_pcre_replace(void)
-{
+void f_pcre_replace(void) {
   pcre_t *run;
   array_t *replacements;
 
@@ -211,20 +211,18 @@ void f_pcre_replace(void)
 
   run->s_length = SVALUE_STRLEN(sp - 2);
 
-
   if (pcre_magic(run) < 0) {
     pcre_free_memory(run);
     error("PCRE compilation failed at offset %d: %s\n", run->erroffset,
           run->error);
   }
 
-
-  if (run->rc < 0) { /* No match. could do handling of matching errors if wanted */
+  if (run->rc <
+      0) {/* No match. could do handling of matching errors if wanted */
     pcre_free_memory(run);
     pop_2_elems();
     return;
   }
-
 
   if (run->rc > (run->ovecsize / 3 - 1)) {
     pcre_free_memory(run);
@@ -233,22 +231,21 @@ void f_pcre_replace(void)
   if ((run->rc - 1) != replacements->size) {
     int tmp = run->rc - 1;
     pcre_free_memory(run);
-    error("Number of captured substrings and replacements do not match, "
-          "%d vs %d.\n", tmp, replacements->size);
+    error(
+        "Number of captured substrings and replacements do not match, "
+        "%d vs %d.\n",
+        tmp, replacements->size);
   }
-
-
 
   if (run->rc == 1) {
     /* No captured substrings, return subject */
     pcre_free_memory(run);
     pop_2_elems();
     return;
-    //push_malloced_string(run->subject);
+    // push_malloced_string(run->subject);
   }
 
   ret = pcre_get_replace(run, replacements);
-
 
   pop_3_elems();
   push_malloced_string(ret);
@@ -256,9 +253,8 @@ void f_pcre_replace(void)
   return;
 }
 
-//string pcre_replace_callback(string, string, function)
-void f_pcre_replace_callback(void)
-{
+// string pcre_replace_callback(string, string, function)
+void f_pcre_replace_callback(void) {
   int num_arg = st_num_arg, i;
   char *ret;
   pcre_t *run;
@@ -282,13 +278,12 @@ void f_pcre_replace_callback(void)
           run->error);
   }
 
-
-  if (run->rc < 0) { /* No match. could do handling of matching errors if wanted */
+  if (run->rc <
+      0) {/* No match. could do handling of matching errors if wanted */
     pop_n_elems(num_arg - 1);
     pcre_free_memory(run);
     return;
   }
-
 
   if (run->rc > (run->ovecsize / 3 - 1)) {
     pcre_free_memory(run);
@@ -299,13 +294,13 @@ void f_pcre_replace_callback(void)
 
   if (arg[2].type == T_FUNCTION || arg[2].type == T_STRING) {
     process_efun_callback(2, &ftc, F_PCRE_REPLACE_CALLBACK);
-  } else { // 0
+  } else {  // 0
     pcre_free_memory(run);
     error("Illegal third argument (0) to pcre_replace_callback");
   }
 
-
-  r = allocate_array(run->rc - 1); //can't use the empty variant in case we error below
+  r = allocate_array(run->rc -
+                     1);  // can't use the empty variant in case we error below
 
   push_refed_array(r);
   push_refed_array(arr);
@@ -322,8 +317,8 @@ void f_pcre_replace_callback(void)
       push_number(i);
       v = call_efun_callback(&ftc, 2);
 
-
-      /* Mimic behaviour of map(string, function) when function pointer returns null,
+      /* Mimic behaviour of map(string, function) when function pointer returns
+       null,
        ie return the input.  */
       if (v && v->type == T_STRING && v->u.string != NULL) {
         assign_svalue_no_free(&r->item[i], v);
@@ -331,7 +326,8 @@ void f_pcre_replace_callback(void)
         assign_svalue_no_free(&r->item[i], &arr->item[i]);
       }
     }
-  } catch (const char *) {
+  }
+  catch (const char *) {
     restore_context(&econ);
     /* condition was restored to where it was when we came in */
     pcre_free_memory(run);
@@ -341,15 +337,13 @@ void f_pcre_replace_callback(void)
   pop_context(&econ);
   ret = pcre_get_replace(run, r);
 
-  pop_n_elems(num_arg + 2); //refed arrays
+  pop_n_elems(num_arg + 2);  // refed arrays
   push_malloced_string(ret);
   pcre_free_memory(run);
   return;
 }
 
-
-void f_pcre_cache(void)
-{
+void f_pcre_cache(void) {
   mapping_t *m = NULL;
   m = pcre_get_cache();
   if (!m) {
@@ -359,22 +353,14 @@ void f_pcre_cache(void)
   }
 }
 
-
 // Internal functions utilized by the efuns
-static pcre *pcre_local_compile(pcre_t *p)
-{
-  p->re = pcre_compile(
-            p->pattern.u.string,
-            0,
-            &p->error,
-            &p->erroffset,
-            NULL);
+static pcre *pcre_local_compile(pcre_t *p) {
+  p->re = pcre_compile(p->pattern.u.string, 0, &p->error, &p->erroffset, NULL);
 
   return p->re;
 }
 
-static int pcre_local_exec(pcre_t *p)
-{
+static int pcre_local_exec(pcre_t *p) {
   int size;
   pcre_fullinfo(p->re, NULL, PCRE_INFO_CAPTURECOUNT, &size);
   size += 2;
@@ -382,27 +368,21 @@ static int pcre_local_exec(pcre_t *p)
   if (p->ovector) {
     FREE(p->ovector);
   }
-  p->ovector = CALLOCATE(size + 1, int, TAG_TEMPORARY, "pcre_local_exec"); //too much, but who cares
+  p->ovector = CALLOCATE(size + 1, int, TAG_TEMPORARY,
+                         "pcre_local_exec");  // too much, but who cares
   p->ovecsize = size;
-  p->rc = pcre_exec(
-            p->re,
-            NULL,
-            p->subject,
-            p->s_length,
-            0,
+  p->rc = pcre_exec(p->re, NULL, p->subject, p->s_length, 0,
 #ifndef USE_ICONV
-            PCRE_NO_UTF8_CHECK,
+                    PCRE_NO_UTF8_CHECK,
 #else
-            0,
+                    0,
 #endif
-            p->ovector,
-            size);
+                    p->ovector, size);
 
   return p->rc;
 }
 
-static int pcre_magic(pcre_t *p)
-{
+static int pcre_magic(pcre_t *p) {
   p->re = pcre_get_cached_pattern(&pcre_cache, &p->pattern);
 
   if (p->re == NULL) {
@@ -410,29 +390,23 @@ static int pcre_magic(pcre_t *p)
     pcre_cache_pattern(&pcre_cache, p->re, &p->pattern);
   }
 
-
   if (p->re == NULL) {
     return -1;
   }
 
   /* Add support for studied patterns here */
-  //if(p->study && !found)
+  // if(p->study && !found)
   // {
 
   // }
   pcre_local_exec(p);
 
-
   return 1;
 }
 
-static int pcre_query_match(pcre_t *p)
-{
-  return p->rc < 0 ? 0 : 1;
-}
+static int pcre_query_match(pcre_t *p) { return p->rc < 0 ? 0 : 1; }
 
-static int pcre_match_single(svalue_t *str, svalue_t *pattern)
-{
+static int pcre_match_single(svalue_t *str, svalue_t *pattern) {
   pcre_t *run;
   int ret;
 
@@ -440,9 +414,8 @@ static int pcre_match_single(svalue_t *str, svalue_t *pattern)
   run->ovector = NULL;
   run->ovecsize = 0;
   assign_svalue_no_free(&run->pattern, pattern);
-  run->subject  = str->u.string;
+  run->subject = str->u.string;
   run->s_length = SVALUE_STRLEN(str);
-
 
   if (pcre_magic(run) < 0) {
     error("PCRE compilation failed at offset %d: %s\n", run->erroffset,
@@ -458,8 +431,7 @@ static int pcre_match_single(svalue_t *str, svalue_t *pattern)
   return ret;
 }
 
-static array_t *pcre_match(array_t *v, svalue_t *pattern, int flag)
-{
+static array_t *pcre_match(array_t *v, svalue_t *pattern, int flag) {
   pcre_t *run;
   array_t *ret;
   svalue_t *sv1, *sv2;
@@ -489,8 +461,8 @@ static array_t *pcre_match(array_t *v, svalue_t *pattern, int flag)
     }
   }
 
-  res       = (char *)DMALLOC(size, TAG_TEMPORARY, "prcre_match: res");
-  sv1       = v->item + size;
+  res = (char *)DMALLOC(size, TAG_TEMPORARY, "prcre_match: res");
+  sv1 = v->item + size;
   num_match = 0;
 
   while (size--) {
@@ -499,12 +471,12 @@ static array_t *pcre_match(array_t *v, svalue_t *pattern, int flag)
       continue;
     }
 
-    run->subject  = sv1->u.string;
+    run->subject = sv1->u.string;
     run->s_length = SVALUE_STRLEN(sv1);
 
     pcre_local_exec(run);
 
-    if (pcre_query_match(run) != match) { //was not checking for match! (woom)
+    if (pcre_query_match(run) != match) {  // was not checking for match! (woom)
       res[size] = 0;
       continue;
     }
@@ -514,8 +486,8 @@ static array_t *pcre_match(array_t *v, svalue_t *pattern, int flag)
   }
 
   flag &= 1;
-  ret  = allocate_empty_array(num_match << flag);
-  sv2  = ret->item + (num_match << flag);
+  ret = allocate_empty_array(num_match << flag);
+  sv2 = ret->item + (num_match << flag);
   size = v->size;
 
   while (size--) {
@@ -527,7 +499,7 @@ static array_t *pcre_match(array_t *v, svalue_t *pattern, int flag)
 
       (--sv2)->type = T_STRING;
 
-      sv1  = v->item + size;
+      sv1 = v->item + size;
       *sv2 = *sv1;
 
       if (sv1->subtype & STRING_COUNTED) {
@@ -549,8 +521,8 @@ static array_t *pcre_match(array_t *v, svalue_t *pattern, int flag)
 /* This is mostly copy/paste from reg_assoc, some parts are changed
  * TODO: rewrite with new logic
  */
-static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *def)
-{
+static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok,
+                           svalue_t *def) {
   int i, size;
   const char *tmp;
   array_t *ret;
@@ -572,7 +544,7 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
       int tok_i;
       const char *begin, *end;
       struct reg_match *next;
-    } *rmp = (struct reg_match *) 0, *rmph = (struct reg_match *) 0;
+    } *rmp = (struct reg_match *)0, *rmph = (struct reg_match *)0;
     int num_match = 0, length;
     svalue_t *sv1, *sv2, *sv;
     int regindex;
@@ -606,13 +578,12 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
       }
     }
 
-
     tmp = str->u.string;
     int totalsize = SVALUE_STRLEN(str);
     int used = 0;
     while (*tmp) {
-      laststart =  0;
-      regindex  = -1;
+      laststart = 0;
+      regindex = -1;
 
       for (i = 0; i < size; i++) {
 
@@ -643,12 +614,12 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
         num_match++;
 
         if (rmp) {
-          rmp->next = ALLOCATE(struct reg_match,
-                               TAG_TEMPORARY, "pcre_assoc : rmp->next");
+          rmp->next = ALLOCATE(struct reg_match, TAG_TEMPORARY,
+                               "pcre_assoc : rmp->next");
           rmp = rmp->next;
         } else
-          rmph = rmp = ALLOCATE(struct reg_match,
-                                TAG_TEMPORARY, "pcre_assoc : rmp");
+          rmph = rmp =
+              ALLOCATE(struct reg_match, TAG_TEMPORARY, "pcre_assoc : rmp");
 
         tmpreg = rgpp[regindex];
 
@@ -659,7 +630,7 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
         rmp->end = tmp = rmpe_tmp;
         used += tmpreg->ovector[1];
         rmp->tok_i = regindex;
-        rmp->next = (struct reg_match *) 0;
+        rmp->next = (struct reg_match *)0;
       } else {
         break;
       }
@@ -669,13 +640,13 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
       }
     }
 
-    sv       = ret->item;
+    sv = ret->item;
     sv->type = T_ARRAY;
-    sv1      = (sv->u.arr = allocate_empty_array(2 * num_match + 1))->item;
+    sv1 = (sv->u.arr = allocate_empty_array(2 * num_match + 1))->item;
 
     sv++;
     sv->type = T_ARRAY;
-    sv2      = (sv->u.arr = allocate_empty_array(2 * num_match + 1))->item;
+    sv2 = (sv->u.arr = allocate_empty_array(2 * num_match + 1))->item;
 
     rmp = rmph;
 
@@ -683,10 +654,10 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
 
     while (num_match--) {
       char *svtmp;
-      length        = rmp->begin - tmp;
+      length = rmp->begin - tmp;
 
-      sv1->type     = T_STRING;
-      sv1->subtype  = STRING_MALLOC;
+      sv1->type = T_STRING;
+      sv1->subtype = STRING_MALLOC;
       sv1->u.string = svtmp = new_string(length, "pcre_assoc : sv1");
       strncpy(svtmp, tmp, length);
       svtmp[length] = 0;
@@ -695,10 +666,10 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
       assign_svalue_no_free(sv2++, def);
       tmp += length;
 
-      length        = rmp->end - rmp->begin;
+      length = rmp->end - rmp->begin;
 
-      sv1->type     = T_STRING;
-      sv1->subtype  = STRING_MALLOC;
+      sv1->type = T_STRING;
+      sv1->subtype = STRING_MALLOC;
       sv1->u.string = svtmp = new_string(length, "pcre_assoc : sv1");
       strncpy(svtmp, tmp, length);
       svtmp[length] = 0;
@@ -709,8 +680,8 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
       rmp = rmp->next;
     }
 
-    sv1->type     = T_STRING;
-    sv1->subtype  = STRING_MALLOC;
+    sv1->type = T_STRING;
+    sv1->subtype = STRING_MALLOC;
     sv1->u.string = string_copy(tmp, "pcre_assoc");
     assign_svalue_no_free(sv2, def);
 
@@ -722,7 +693,7 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
 
     while (rmp = rmph) {
       rmph = rmp->next;
-      FREE((char *) rmp);
+      FREE((char *)rmp);
     }
     return ret;
   } else {
@@ -739,8 +710,7 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
   }
 }
 
-static array_t *pcre_get_substrings(pcre_t *run)
-{
+static array_t *pcre_get_substrings(pcre_t *run) {
   array_t *ret;
   unsigned int i;
   char **matches;
@@ -751,21 +721,20 @@ static array_t *pcre_get_substrings(pcre_t *run)
     for (i = 1; i <= (run->rc - 1); i++) {
       unsigned int start, length;
       /* Allocate enough for the match */
-      length  = run->ovector[2 * i + 1] - run->ovector[2 * i];
+      length = run->ovector[2 * i + 1] - run->ovector[2 * i];
       start = run->ovector[2 * i];
       char *match = new_string(length, "pcre get substrings");
 
       sprintf(match, "%.*s", length, run->subject + start);
-      ret->item[i - 1].type     = T_STRING;
-      ret->item[i - 1].subtype  = STRING_MALLOC;
+      ret->item[i - 1].type = T_STRING;
+      ret->item[i - 1].subtype = STRING_MALLOC;
       ret->item[i - 1].u.string = match;
     }
   }
   return ret;
 }
 
-static char *pcre_get_replace(pcre_t *run, array_t *replacements)
-{
+static char *pcre_get_replace(pcre_t *run, array_t *replacements) {
   unsigned int ret_pos = 0, i;
   size_t ret_sz;
   char *ret;
@@ -776,7 +745,7 @@ static char *pcre_get_replace(pcre_t *run, array_t *replacements)
   /* Subtract total size of all substrings */
   int prev = run->ovector[2];
   for (i = 1; i <= (run->rc - 1); i++) {
-    //printf("%d %d %d\n", ret_sz, run->ovector[2*i],run->ovector[2*i+1] );
+    // printf("%d %d %d\n", ret_sz, run->ovector[2*i],run->ovector[2*i+1] );
     if (run->ovector[2 * i] >= prev) {
       ret_sz -= (size_t)(run->ovector[2 * i + 1] - run->ovector[2 * i]);
       prev = run->ovector[2 * i + 1];
@@ -787,7 +756,7 @@ static char *pcre_get_replace(pcre_t *run, array_t *replacements)
 
   /* Allocate space for the return string */
   ret = new_string((ret_sz), "pcre get replace");
-  //printf("ret_sz:%d\n", ret_sz);
+  // printf("ret_sz:%d\n", ret_sz);
 
   /* Copy start of subject up until first match */
   if (run->rc > 1) {
@@ -803,8 +772,8 @@ static char *pcre_get_replace(pcre_t *run, array_t *replacements)
     const char *rep;
     size_t rep_sz;
 
-    start     = run->ovector[2 * i];
-    end       = run->ovector[2 * i + 1];
+    start = run->ovector[2 * i];
+    end = run->ovector[2 * i + 1];
 
     if (i == (run->rc - 1)) {
       len_nxt = run->s_length - end;
@@ -813,46 +782,42 @@ static char *pcre_get_replace(pcre_t *run, array_t *replacements)
     }
 
     if (len_nxt > MAX_STRING_LENGTH) {
-      continue;    //nested ()s
+      continue;  // nested ()s
     }
 
-    rep    = replacements->item[i - 1].u.string;
+    rep = replacements->item[i - 1].u.string;
     rep_sz = SVALUE_STRLEN(&replacements->item[i - 1]);
-
 
     /* Copy first substring into return variable */
     strncpy(ret + ret_pos, rep, rep_sz);
 
-
     /* increment position in return variable by replacement size */
     ret_pos += rep_sz;
 
-
     strncpy(ret + ret_pos, run->subject + end, len_nxt);
-
 
     ret_pos += len_nxt;
   }
 
   *(ret + ret_sz) = '\0';
 
-
   return ret;
 }
 
-
-static void pcre_free_memory(pcre_t *p)
-{
+static void pcre_free_memory(pcre_t *p) {
   free_svalue(&p->pattern, "pcre_free_memory");
   if (p->ovector) {
     FREE(p->ovector);
   }
   FREE(p);
-
 }
 
-//Caching functions, add new ones at the front of the bucket so we find them faster
-static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat, svalue_t *pattern) //don't keep pointers to strings that will get freed elsewhere!
+// Caching functions, add new ones at the front of the bucket so we find them
+// faster
+static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
+                              svalue_t *pattern)  // don't keep pointers to
+                                                  // strings that will get freed
+                                                  // elsewhere!
 {
   unsigned int bucket = svalue_to_int(pattern) % PCRE_CACHE_SIZE;
   int sz;
@@ -875,12 +840,13 @@ static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat, svalue_t *
   }
 
   if (tmp) {
-    //does this even make sense? same pattern will always compile the same way?
+    // does this even make sense? same pattern will always compile the same way?
     pcre_free(tmp->compiled_pattern);
     node = tmp;
   } else {
-    node = CALLOCATE(1, struct pcre_cache_bucket_t, TAG_TEMPORARY, "pcre_cache_pattern : node");
-    node->pattern.type = T_NUMBER; //so we don't free invalids
+    node = CALLOCATE(1, struct pcre_cache_bucket_t, TAG_TEMPORARY,
+                     "pcre_cache_pattern : node");
+    node->pattern.type = T_NUMBER;  // so we don't free invalids
     if (node == NULL) {
       return -1;
     }
@@ -891,7 +857,8 @@ static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat, svalue_t *
         while (tmp->next) {
           tmp = tmp->next;
         }
-        if (tmp == table->buckets[bucket]) { //if the hash version works, most of the time
+        if (tmp == table->buckets[bucket]) {  // if the hash version works, most
+                                              // of the time
           pcre_free(tmp->compiled_pattern);
           FREE(tmp);
           table->buckets[bucket] = NULL;
@@ -899,7 +866,7 @@ static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat, svalue_t *
           struct pcre_cache_bucket_t *tmp2;
           tmp2 = table->buckets[bucket];
           while (tmp2->next != tmp) {
-            tmp2 = tmp2->next;    //shouldn't get here often
+            tmp2 = tmp2->next;  // shouldn't get here often
           }
           pcre_free(tmp->compiled_pattern);
           FREE(tmp);
@@ -913,13 +880,13 @@ static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat, svalue_t *
 
   assign_svalue(&node->pattern, pattern);
   node->compiled_pattern = cpat;
-  node->size             = sz;
+  node->size = sz;
 
   return 0;
 }
 
-static pcre *pcre_get_cached_pattern(struct pcre_cache_t *table, svalue_t *pattern)
-{
+static pcre *pcre_get_cached_pattern(struct pcre_cache_t *table,
+                                     svalue_t *pattern) {
   unsigned int bucket = svalue_to_int(pattern) % PCRE_CACHE_SIZE;
   struct pcre_cache_bucket_t *node;
   struct pcre_cache_bucket_t *lnode = NULL;
@@ -928,7 +895,7 @@ static pcre *pcre_get_cached_pattern(struct pcre_cache_t *table, svalue_t *patte
   while (node) {
     if (pattern->u.string == node->pattern.u.string) {
       if (node != table->buckets[bucket]) {
-        //not at the front, move it there, so the most used pattern is fastest
+        // not at the front, move it there, so the most used pattern is fastest
         lnode->next = node->next;
         node->next = table->buckets[bucket];
         table->buckets[bucket] = node;
@@ -941,9 +908,7 @@ static pcre *pcre_get_cached_pattern(struct pcre_cache_t *table, svalue_t *patte
   return NULL;
 }
 
-
-static mapping_t *pcre_get_cache()
-{
+static mapping_t *pcre_get_cache() {
   int size = 0, i;
   mapping_t *ret;
   struct pcre_cache_bucket_t *node;
@@ -974,5 +939,3 @@ static mapping_t *pcre_get_cache()
   }
   return ret;
 }
-
-

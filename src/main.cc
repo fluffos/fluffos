@@ -21,11 +21,13 @@
 #include "event.h"
 #include "dns.h"
 
+#include "util/threadpool-incl.h"
+
 port_def_t external_port[5];
 
-static int e_flag = 0;    /* Load empty, without preloads. */
-int t_flag = 0;     /* Disable heart beat and reset */
-int comp_flag = 0;    /* Trace compilations */
+static int e_flag = 0; /* Load empty, without preloads. */
+int t_flag = 0;        /* Disable heart beat and reset */
+int comp_flag = 0;     /* Trace compilations */
 int time_to_clean_up;
 const char *default_fail_message;
 time_t boot_time;
@@ -33,7 +35,7 @@ int max_array_size;
 int max_buffer_size;
 int max_string_length;
 static int reserved_size;
-char *reserved_area;    /* reserved for MALLOC() */
+char *reserved_area; /* reserved for MALLOC() */
 static char *mud_lib;
 
 double consts[NUM_CONSTS];
@@ -64,8 +66,7 @@ int debug_level = 0;
 
 static void setup_signal_handlers();
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
   time_t tm;
   int i, new_mudlib = 0, got_defaults = 0;
   char *p;
@@ -83,7 +84,8 @@ int main(int argc, char **argv)
     fprintf(stderr, "Error getting RLIMIT_CORE.");
   } else {
     if (rlim.rlim_cur == 0) {
-      fprintf(stderr, "WARNING: rlimit for core dump is 0, you will "
+      fprintf(stderr,
+              "WARNING: rlimit for core dump is 0, you will "
               "not get core on crash.\n");
     }
   }
@@ -94,7 +96,7 @@ int main(int argc, char **argv)
 
 #ifdef WRAPPEDMALLOC
   wrappedmalloc_init();
-#endif        /* WRAPPEDMALLOC */
+#endif /* WRAPPEDMALLOC */
 #ifdef DEBUGMALLOC
   MDinit();
 #endif
@@ -117,12 +119,12 @@ int main(int argc, char **argv)
   const0u.subtype = T_UNDEFINED;
   const0u.u.number = 0;
 
-  //fake_prog.program_size = 0; //0 anyway
+  // fake_prog.program_size = 0; //0 anyway
 
   /*
    * Check that the definition of EXTRACT_UCHAR() is correct.
    */
-  p = (char *) &i;
+  p = (char *)&i;
   *p = -10;
   if (EXTRACT_UCHAR(p) != 0x100 - 10) {
     fprintf(stderr, "Bad definition of EXTRACT_UCHAR() in interpret.h.\n");
@@ -133,10 +135,12 @@ int main(int argc, char **argv)
    * An added test: can we do EXTRACT_UCHAR(x++)?
    * (read_number, etc uses it)
    */
-  p = (char *) &i;
-  (void) EXTRACT_UCHAR(p++);
-  if ((p - (char *) &i) != 1) {
-    fprintf(stderr, "EXTRACT_UCHAR() in interpret.h evaluates its argument more than once.\n");
+  p = (char *)&i;
+  (void)EXTRACT_UCHAR(p++);
+  if ((p - (char *)&i) != 1) {
+    fprintf(stderr,
+            "EXTRACT_UCHAR() in interpret.h evaluates its argument more than "
+            "once.\n");
     exit(-1);
   }
 
@@ -146,7 +150,9 @@ int main(int argc, char **argv)
   if (CFG_LIVING_HASH_SIZE != 4 && CFG_LIVING_HASH_SIZE != 16 &&
       CFG_LIVING_HASH_SIZE != 64 && CFG_LIVING_HASH_SIZE != 256 &&
       CFG_LIVING_HASH_SIZE != 1024 && CFG_LIVING_HASH_SIZE != 4096) {
-    fprintf(stderr, "CFG_LIVING_HASH_SIZE in options.h must be one of 4, 16, 64, 256, 1024, 4096, ...\n");
+    fprintf(stderr,
+            "CFG_LIVING_HASH_SIZE in options.h must be one of 4, 16, 64, 256, "
+            "1024, 4096, ...\n");
     exit(-1);
   }
 
@@ -170,25 +176,26 @@ int main(int argc, char **argv)
   get_version(version_buf);
   if (!got_defaults) {
     fprintf(stderr, "%s for %s.\n", version_buf, ARCH);
-    fprintf(stderr, "You must specify the configuration filename as an argument.\n");
+    fprintf(stderr,
+            "You must specify the configuration filename as an argument.\n");
     exit(-1);
   }
 
   printf("Initializing internal tables....\n");
-  init_strings();   /* in stralloc.c */
-  init_otable();    /* in otable.c */
-  init_identifiers();   /* in lex.c */
-  init_locals();              /* in compiler.c */
+  init_strings();     /* in stralloc.c */
+  init_otable();      /* in otable.c */
+  init_identifiers(); /* in lex.c */
+  init_locals();      /* in compiler.c */
 
-  /*
-   * If our estimate is larger than FD_SETSIZE, then we need more file
-   * descriptors than the operating system can handle.  This is a problem
-   * that can be resolved by decreasing MAX_USERS, MAX_EFUN_SOCKS, or both.
-   *
-   * Unfortunately, since neither MAX_USERS or MAX_EFUN_SOCKS exist any more,
-   * we have no clue how many we will need.  This code really should be
-   * moved to places where ENFILE/EMFILE is returned.
-   */
+/*
+ * If our estimate is larger than FD_SETSIZE, then we need more file
+ * descriptors than the operating system can handle.  This is a problem
+ * that can be resolved by decreasing MAX_USERS, MAX_EFUN_SOCKS, or both.
+ *
+ * Unfortunately, since neither MAX_USERS or MAX_EFUN_SOCKS exist any more,
+ * we have no clue how many we will need.  This code really should be
+ * moved to places where ENFILE/EMFILE is returned.
+ */
 #if 0
   if (dtablesize > FD_SETSIZE) {
     fprintf(stderr, "Warning: File descriptor requirements exceed system capacity!\n");
@@ -227,10 +234,11 @@ int main(int argc, char **argv)
   }
   max_buffer_size = MAX_BUFFER_SIZE;
   max_string_length = MAX_STRING_LENGTH;
-  mud_lib = (char *) MUD_LIB;
+  mud_lib = (char *)MUD_LIB;
   set_inc_list(INCLUDE_DIRS);
   if (reserved_size > 0) {
-    reserved_area = (char *) DMALLOC(reserved_size, TAG_RESERVED, "main.c: reserved_area");
+    reserved_area =
+        (char *)DMALLOC(reserved_size, TAG_RESERVED, "main.c: reserved_area");
   }
   for (i = 0; i < sizeof consts / sizeof consts[0]; i++) {
     consts[i] = exp(-i / 900.0);
@@ -248,8 +256,7 @@ int main(int argc, char **argv)
     switch (argv[i][1]) {
       case 'D':
         if (argv[i][2]) {
-          lpc_predef_t *tmp = ALLOCATE(lpc_predef_t, TAG_PREDEFINES,
-                                       "predef");
+          lpc_predef_t *tmp = ALLOCATE(lpc_predef_t, TAG_PREDEFINES, "predef");
           tmp->flag = argv[i] + 2;
           tmp->next = lpc_predefs;
           lpc_predefs = tmp;
@@ -266,7 +273,7 @@ int main(int argc, char **argv)
       case 'y':
         yydebug = 1;
         continue;
-#endif        /* YYDEBUG */
+#endif /* YYDEBUG */
       case 'm':
         mud_lib = alloc_cstring(argv[i] + 2, "mudlib dir");
         if (chdir(mud_lib) == -1) {
@@ -282,7 +289,10 @@ int main(int argc, char **argv)
     exit(-1);
   }
   time(&tm);
-  debug_message("----------------------------------------------------------------------------\n%s (%s) starting up on %s - %s\n\n", MUD_NAME, version_buf, ARCH, ctime(&tm));
+  debug_message(
+      "------------------------------------------------------------------------"
+      "----\n%s (%s) starting up on %s - %s\n\n",
+      MUD_NAME, version_buf, ARCH, ctime(&tm));
 
   add_predefines();
 #ifdef WIN32
@@ -297,9 +307,11 @@ int main(int argc, char **argv)
   try {
     init_simul_efun(SIMUL_EFUN);
     init_master();
-  } catch (const char *) {
-    debug_message("The simul_efun (%s) and master (%s) objects must be loadable.\n",
-                  SIMUL_EFUN, MASTER_FILE);
+  }
+  catch (const char *) {
+    debug_message(
+        "The simul_efun (%s) and master (%s) objects must be loadable.\n",
+        SIMUL_EFUN, MASTER_FILE);
     exit(-1);
   }
   set_eval(max_cost);
@@ -329,8 +341,11 @@ int main(int argc, char **argv)
               debug_message("Shutdown by master object.\n");
               exit(0);
             }
-          } catch (const char *) {
-            debug_message("Error while calling master::flag(\"%s\"), aborting ...\n", argv[i] + 2);
+          }
+          catch (const char *) {
+            debug_message(
+                "Error while calling master::flag(\"%s\"), aborting ...\n",
+                argv[i] + 2);
             exit(-1);
           }
           pop_context(&econ);
@@ -350,7 +365,8 @@ int main(int argc, char **argv)
           }
           debug_message("Debug Level: %d\n", debug_level);
 #else
-          debug_message("Driver must be compiled with DEBUG_MACRO on to use -d.\n");
+          debug_message(
+              "Driver must be compiled with DEBUG_MACRO on to use -d.\n");
 #endif
           break;
         case 'c':
@@ -383,6 +399,7 @@ int main(int argc, char **argv)
   preload_objects(e_flag);
 
   // initialize user connection socket
+  init_network_threadpool();
   init_user_conn();
 
 #ifdef HAS_CONSOLE
@@ -398,8 +415,7 @@ int main(int argc, char **argv)
 
 static FILE *debug_message_fp = 0;
 
-void debug_message(const char *fmt, ...)
-{
+void debug_message(const char *fmt, ...) {
   static char deb_buf[1024];
   static char *deb = deb_buf;
   va_list args;
@@ -426,8 +442,8 @@ void debug_message(const char *fmt, ...)
   }
 
   char message[1024];
-  V_START(args, fmt);
-  V_VAR(char *, fmt, args);
+
+  va_start(args, fmt);
   vsnprintf(message, 1024, fmt, args);
   va_end(args);
 
@@ -439,10 +455,7 @@ void debug_message(const char *fmt, ...)
   fflush(stderr);
 }
 
-int slow_shut_down_to_do = 0;
-
-char *xalloc(int size)
-{
+char *xalloc(int size) {
   char *p;
   const char *t;
   static int going_to_exit;
@@ -455,15 +468,14 @@ char *xalloc(int size)
     fatal("Tried to allocate 0 bytes.\n");
   }
 #endif
-  p = (char *) DMALLOC(size, TAG_MISC, "main.c: xalloc");
+  p = (char *)DMALLOC(size, TAG_MISC, "main.c: xalloc");
   if (p == 0) {
     if (reserved_area) {
       FREE(reserved_area);
       t = "Temporarily out of MEMORY. Freeing reserve.\n";
       write(1, t, strlen(t));
       reserved_area = 0;
-      slow_shut_down_to_do = 6;
-      return xalloc(size);/* Try again */
+      return xalloc(size); /* Try again */
     }
     going_to_exit = 1;
     fatal("Totally out of MEMORY.\n");
@@ -471,8 +483,7 @@ char *xalloc(int size)
   return p;
 }
 
-static void setup_signal_handlers()
-{
+static void setup_signal_handlers() {
   signal(SIGFPE, sig_fpe);
   signal(SIGUSR1, sig_usr1);
   signal(SIGUSR2, sig_usr2);
@@ -502,8 +513,7 @@ static void setup_signal_handlers()
 #endif
 }
 
-static void try_dump_stacktrace()
-{
+static void try_dump_stacktrace() {
 #if !defined(__CYGWIN__) && __GNUC__ > 2
   void *bt[100];
   size_t bt_size;
@@ -514,8 +524,7 @@ static void try_dump_stacktrace()
 #endif
 }
 
-static void CDECL sig_cld(int sig)
-{
+static void CDECL sig_cld(int sig) {
 #ifndef WIN32
   int status;
   while (wait3(&status, WNOHANG, NULL) > 0) {
@@ -524,14 +533,10 @@ static void CDECL sig_cld(int sig)
 #endif
 }
 
-static void CDECL sig_fpe(int sig)
-{
-  signal(SIGFPE, sig_fpe);
-}
+static void CDECL sig_fpe(int sig) { signal(SIGFPE, sig_fpe); }
 
 #ifdef HAS_CONSOLE
-void restore_sigttin(void)
-{
+void restore_sigttin(void) {
   if (has_console >= 0) {
     signal(SIGTTIN, sig_ttin);
   }
@@ -540,8 +545,7 @@ void restore_sigttin(void)
 /* The console goes to sleep when backgrounded and can
  * be woken back up with kill -SIGTTIN <pid>
  */
-static void CDECL sig_ttin(int sig)
-{
+static void CDECL sig_ttin(int sig) {
   char junk[1024];
   int fl;
 
@@ -554,7 +558,9 @@ static void CDECL sig_ttin(int sig)
     fl = fcntl(STDIN_FILENO, F_GETFL);
     fcntl(STDIN_FILENO, F_SETFL, fl | O_NONBLOCK);
 
-    while (read(STDIN_FILENO, junk, 1023) > 0) { ; } /* ; */
+    while (read(STDIN_FILENO, junk, 1023) > 0) {
+      ;
+    } /* ; */
 
     /* leaving the output nonblocking is a bad idea.  large outputs tend
          to get truncated.
@@ -568,8 +574,7 @@ static void CDECL sig_ttin(int sig)
    which restarts the MUD should take an exit code of 1 to mean don't
    restart
  */
-static void CDECL sig_usr1(int sig)
-{
+static void CDECL sig_usr1(int sig) {
   push_constant_string("Host machine shutting down");
   push_undefined();
   push_undefined();
@@ -579,8 +584,7 @@ static void CDECL sig_usr1(int sig)
 }
 
 /* Abort evaluation */
-static void CDECL sig_usr2(int sig)
-{
+static void CDECL sig_usr2(int sig) {
   debug_message("Received SIGUSR2, current eval aborted.\n");
   outoftime = 1;
 }
@@ -589,43 +593,29 @@ static void CDECL sig_usr2(int sig)
  * Actually, doing all this stuff from a signal is probably illegal
  * -Beek
  */
-static void CDECL sig_term(int sig)
-{
-  fatal("SIGTERM: Process terminated");
-}
+static void CDECL sig_term(int sig) { fatal("SIGTERM: Process terminated"); }
 
-static void CDECL sig_int(int sig)
-{
-  fatal("SIGINT: Process interrupted");
-}
+static void CDECL sig_int(int sig) { fatal("SIGINT: Process interrupted"); }
 
-static void CDECL sig_segv(int sig)
-{
+static void CDECL sig_segv(int sig) {
   /* attempt to dump backtrace using gdb. */
   try_dump_stacktrace();
   fatal("SIGSEGV: Segmentation fault");
 }
 
-static void CDECL sig_bus(int sig)
-{
+static void CDECL sig_bus(int sig) {
   try_dump_stacktrace();
   fatal("SIGBUS: Bus error");
 }
 
-static void CDECL sig_ill(int sig)
-{
+static void CDECL sig_ill(int sig) {
   try_dump_stacktrace();
   fatal("SIGILL: Illegal instruction");
 }
 
-static void CDECL sig_abrt(int sig)
-{
+static void CDECL sig_abrt(int sig) {
   try_dump_stacktrace();
   fatal("SIGABRT: Aborted");
 }
 
-static void CDECL sig_iot(int sig)
-{
-  fatal("Aborted(IOT)");
-}
-
+static void CDECL sig_iot(int sig) { fatal("Aborted(IOT)"); }

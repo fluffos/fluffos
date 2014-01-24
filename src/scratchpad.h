@@ -13,7 +13,7 @@
  * be used by other things as well.
  */
 
-#define SCRATCHPAD_SIZE  4096
+#define SCRATCHPAD_SIZE 4096
 #define SDEBUG(x)
 #define SDEBUG2(x)
 
@@ -24,14 +24,14 @@ typedef struct sp_block_s {
   char block[2]; /* block[0] must be nonzero, usually SCRATCH_MAGIC */
 } sp_block_t;
 
-#define scratch_free_last() \
-    scr_tail = --scr_last; \
-    scr_last -= *scr_tail; \
-    while (!(*scr_last) && scr_tail != scr_last) { \
-        /* check if the one before was already freed */ \
-        scr_tail = --scr_last; \
-        scr_last -= *scr_tail; \
-    }
+#define scratch_free_last()                         \
+  scr_tail = --scr_last;                            \
+  scr_last -= *scr_tail;                            \
+  while (!(*scr_last) && scr_tail != scr_last) {    \
+    /* check if the one before was already freed */ \
+    scr_tail = --scr_last;                          \
+    scr_last -= *scr_tail;                          \
+  }
 
 extern unsigned char *scr_last;
 extern unsigned char *scr_tail;
@@ -51,4 +51,3 @@ char *scratch_copy_string(char *);
 char *scratch_large_alloc(int);
 
 #endif
-

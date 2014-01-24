@@ -34,8 +34,7 @@
 #include "../efun_protos.h"
 
 #ifdef F_HASH
-static char *hexdump(const unsigned char *data, int len)
-{
+static char *hexdump(const unsigned char *data, int len) {
   const char hexchars[] = "0123456789abcdef";
   char *result, *p;
 
@@ -51,8 +50,7 @@ static char *hexdump(const unsigned char *data, int len)
   return result;
 }
 
-void f_hash(void)
-{
+void f_hash(void) {
   const char *algo, *data;
   char *result = NULL;
   int data_len;
@@ -61,13 +59,12 @@ void f_hash(void)
   data = sp->u.string;
   data_len = SVALUE_STRLEN(sp);
 
-#define DO_HASH_IF(id, func, hash_size) SAFE( \
-   if (strcasecmp(algo, id) == 0) { \
-      unsigned char md[hash_size]; \
-      func((unsigned char *) data, data_len, md); \
-      result = hexdump(md, hash_size); \
-   } \
-)
+#define DO_HASH_IF(id, func, hash_size)                 \
+  SAFE(if (strcasecmp(algo, id) == 0) {                 \
+             unsigned char md[hash_size];               \
+             func((unsigned char *)data, data_len, md); \
+             result = hexdump(md, hash_size);           \
+           })
 
 #ifndef OPENSSL_NO_SHA1
   DO_HASH_IF("sha1", SHA1, SHA_DIGEST_LENGTH);

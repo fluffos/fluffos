@@ -6,31 +6,33 @@
 #ifndef INTERPRET_H
 #define INTERPRET_H
 
-#define PUSH_STRING    (0 << 6)
-#define PUSH_NUMBER    (1 << 6)
-#define PUSH_GLOBAL    (2 << 6)
-#define PUSH_LOCAL     (3 << 6)
+#define PUSH_STRING (0 << 6)
+#define PUSH_NUMBER (1 << 6)
+#define PUSH_GLOBAL (2 << 6)
+#define PUSH_LOCAL (3 << 6)
 
-#define PUSH_WHAT      (3 << 6)
-#define PUSH_MASK      (0xff ^ (PUSH_WHAT))
+#define PUSH_WHAT (3 << 6)
+#define PUSH_MASK (0xff ^ (PUSH_WHAT))
 
 /* Trace defines */
 #ifdef TRACE
-#  define TRACE_CALL 1
-#  define TRACE_CALL_OTHER 2
-#  define TRACE_RETURN 4
-#  define TRACE_ARGS 8
-#  define TRACE_EXEC 16
-#  define TRACE_HEART_BEAT 32
-#  define TRACE_APPLY 64
-#  define TRACE_OBJNAME 128
-#  define TRACETST(b) (command_giver->interactive->trace_level & (b))
-#  define TRACEP(b) \
-    (command_giver && command_giver->interactive && TRACETST(b) && \
-     (command_giver->interactive->trace_prefix == 0 || \
-      (current_object && strpref(command_giver->interactive->trace_prefix, \
-              current_object->obname))) )
-#  define TRACEHB (current_heart_beat == 0 || (command_giver->interactive->trace_level & TRACE_HEART_BEAT))
+#define TRACE_CALL 1
+#define TRACE_CALL_OTHER 2
+#define TRACE_RETURN 4
+#define TRACE_ARGS 8
+#define TRACE_EXEC 16
+#define TRACE_HEART_BEAT 32
+#define TRACE_APPLY 64
+#define TRACE_OBJNAME 128
+#define TRACETST(b) (command_giver->interactive->trace_level &(b))
+#define TRACEP(b)                                                       \
+  (command_giver &&command_giver->interactive &&TRACETST(b) &&          \
+   (command_giver->interactive->trace_prefix == 0 ||                    \
+    (current_object &&strpref(command_giver->interactive->trace_prefix, \
+                              current_object->obname))))
+#define TRACEHB               \
+  (current_heart_beat == 0 || \
+   (command_giver->interactive->trace_level &TRACE_HEART_BEAT))
 #endif
 
 #define EXTRACT_UCHAR(p) (*(unsigned char *)(p))
@@ -39,8 +41,8 @@
  * -- Qwer
  */
 
-#define READ_UCHAR(p) (*(unsigned char *) (p++))
-#define READ_USHORT(p) (p++, p++, *((unsigned short *) (p - 2)))
+#define READ_UCHAR(p) (*(unsigned char *)(p++))
+#define READ_USHORT(p) (p++, p++, *((unsigned short *)(p - 2)))
 
 /*
  * Control stack element.
@@ -48,16 +50,16 @@
  * when the current function is defined by inheritance.
  * The pointer, csp, will point to the values that will be used at return.
  */
-#define FRAME_FUNCTION     0
-#define FRAME_FUNP         1
-#define FRAME_CATCH        2
-#define FRAME_FAKE         3
-#define FRAME_MASK         3
+#define FRAME_FUNCTION 0
+#define FRAME_FUNP 1
+#define FRAME_CATCH 2
+#define FRAME_FAKE 3
+#define FRAME_MASK 3
 
-#define FRAME_OB_CHANGE    4
-#define FRAME_EXTERNAL     8
+#define FRAME_OB_CHANGE 4
+#define FRAME_EXTERNAL 8
 
-#define FRAME_RETURNED_FROM_CATCH   16
+#define FRAME_RETURNED_FROM_CATCH 16
 struct defer_list {
   struct defer_list *next;
   svalue_t func;
@@ -71,18 +73,18 @@ typedef struct control_stack_s {
     long table_index;
     funptr_t *funp;
   } fr;
-  object_t *ob;               /* Current object */
-  object_t *prev_ob;  /* Save previous object */
-  program_t *prog;    /* Current program */
-  char *pc; /* TODO: change this to unsigned char* */
+  object_t *ob;      /* Current object */
+  object_t *prev_ob; /* Save previous object */
+  program_t *prog;   /* Current program */
+  char *pc;          /* TODO: change this to unsigned char* */
 
   svalue_t *fp;
   struct defer_list *defers;
-  int num_local_variables;    /* Local + arguments */
-  int function_index_offset;  /* Used when executing functions in inherited
-                                 * programs */
-  int variable_index_offset;  /* Same */
-  short caller_type;          /* was this a locally called function? */
+  int num_local_variables;   /* Local + arguments */
+  int function_index_offset; /* Used when executing functions in inherited
+                                * programs */
+  int variable_index_offset; /* Same */
+  short caller_type;         /* was this a locally called function? */
   short framekind;
 } control_stack_t;
 
@@ -110,8 +112,9 @@ typedef struct {
 } function_lookup_info_t;
 
 #define IS_ZERO(x) (!(x) || (((x)->type == T_NUMBER) && ((x)->u.number == 0)))
-#define IS_UNDEFINED(x) (!(x) || (((x)->type == T_NUMBER) && \
-        ((x)->subtype == T_UNDEFINED) && ((x)->u.number == 0)))
+#define IS_UNDEFINED(x)                                                 \
+  (!(x) || (((x)->type == T_NUMBER) && ((x)->subtype == T_UNDEFINED) && \
+            ((x)->u.number == 0)))
 
 #define CHECK_TYPES(val, t, arg, inst) \
   if (!((val)->type & (t))) bad_argument(val, t, arg, inst);
@@ -119,7 +122,7 @@ typedef struct {
 /* Beek - add some sanity to joining strings */
 /* add to an svalue */
 #define EXTEND_SVALUE_STRING(x, y, z) \
-    SAFE( char *ess_res; \
+  SAFE( char *ess_res; \
         int ess_len; \
         int ess_r; \
         ess_len = (ess_r = SVALUE_STRLEN(x)) + strlen(y); \
@@ -140,23 +143,19 @@ typedef struct {
     )
 
 /* <something that needs no free> + string svalue */
-#define SVALUE_STRING_ADD_LEFT(y, z) \
-    SAFE( char *pss_res; int pss_r; int pss_len; \
-        pss_len = SVALUE_STRLEN(sp) + (pss_r = strlen(y)); \
-        if (pss_len > MAX_STRING_LENGTH) \
-            error("Maximum string length exceeded in concatenation.\n"); \
-        pss_res = new_string(pss_len, z); \
-        strcpy(pss_res, y); \
-        strcpy(pss_res + pss_r, sp->u.string); \
-        free_string_svalue(sp--); \
-        sp->type = T_STRING; \
-        sp->u.string = pss_res; \
-        sp->subtype = STRING_MALLOC; \
-     )
+#define SVALUE_STRING_ADD_LEFT(y, z)                                    \
+  SAFE(char *pss_res; int pss_r; int pss_len;                           \
+       pss_len = SVALUE_STRLEN(sp) + (pss_r = strlen(y));               \
+       if (pss_len > MAX_STRING_LENGTH)                                 \
+       error("Maximum string length exceeded in concatenation.\n");     \
+       pss_res = new_string(pss_len, z); strcpy(pss_res, y);            \
+       strcpy(pss_res + pss_r, sp->u.string); free_string_svalue(sp--); \
+       sp->type = T_STRING; sp->u.string = pss_res;                     \
+       sp->subtype = STRING_MALLOC;)
 
 /* basically, string + string; faster than using extend b/c of SVALUE_STRLEN */
 #define SVALUE_STRING_JOIN(x, y, z) \
-    SAFE( char *ssj_res; int ssj_r; int ssj_len; \
+  SAFE( char *ssj_res; int ssj_r; int ssj_len; \
         ssj_r = SVALUE_STRLEN(x); \
         ssj_len = ssj_r + SVALUE_STRLEN(y); \
         if (ssj_len > MAX_STRING_LENGTH) \
@@ -178,68 +177,41 @@ typedef struct {
     )
 
 /* macro calls */
-#define call_program(prog, offset) \
-        eval_instruction(prog->program + offset)
+#define call_program(prog, offset) eval_instruction(prog->program + offset)
 
 #ifdef DEBUG
-#define free_svalue(x,y) int_free_svalue(x,y)
+#define free_svalue(x, y) int_free_svalue(x, y)
 #else
-#define free_svalue(x,y) int_free_svalue(x)
+#define free_svalue(x, y) int_free_svalue(x)
 #endif
 
-#define CHECK_STACK_OVERFLOW(x) if (sp + (x) >= end_of_stack) SAFE( too_deep_error = 1; error("stack overflow"); )
-#define STACK_INC SAFE( CHECK_STACK_OVERFLOW(1); sp++; )
+#define CHECK_STACK_OVERFLOW(x) \
+  if (sp + (x) >= end_of_stack) \
+  SAFE(too_deep_error = 1; error("stack overflow");)
+#define STACK_INC SAFE(CHECK_STACK_OVERFLOW(1); sp++;)
 
-#define push_svalue(x) SAFE( \
-                            STACK_INC;\
-                            assign_svalue_no_free(sp, x);\
-                            )
-#define put_number(x) SAFE( \
-                           sp->type = T_NUMBER;\
-                           sp->subtype = 0;\
-                           sp->u.number = (x);\
-                           )
-#define put_buffer(x) SAFE( \
-                           sp->type = T_BUFFER;\
-                           sp->u.buf = (x);\
-                           )
-#define put_undested_object(x) SAFE(\
-                                    sp->type = T_OBJECT;\
-                                    sp->u.ob = (x);\
-                                    )
-#define put_object(x) SAFE(\
-                           if (!(x) || (x)->flags & O_DESTRUCTED) *sp = const0u;\
-                           else put_undested_object(x);\
-                           )
-#define put_unrefed_undested_object(x, y) SAFE(\
-                                               sp->type = T_OBJECT;\
-                                               sp->u.ob = (x);\
-                                               add_ref((x), y);\
-                                               )
-#define put_unrefed_object(x,y) SAFE(\
-                                     if (!(x) || (x)->flags & O_DESTRUCTED) *sp = const0u;\
-                                     else put_unrefed_undested_object(x,y);\
-                                     )
+#define push_svalue(x) SAFE(STACK_INC; assign_svalue_no_free(sp, x);)
+#define put_number(x) \
+  SAFE(sp->type = T_NUMBER; sp->subtype = 0; sp->u.number = (x);)
+#define put_buffer(x) SAFE(sp->type = T_BUFFER; sp->u.buf = (x);)
+#define put_undested_object(x) SAFE(sp->type = T_OBJECT; sp->u.ob = (x);)
+#define put_object(x)                                       \
+  SAFE(if (!(x) || (x)->flags &O_DESTRUCTED) *sp = const0u; \
+       else put_undested_object(x);)
+#define put_unrefed_undested_object(x, y) \
+  SAFE(sp->type = T_OBJECT; sp->u.ob = (x); add_ref((x), y);)
+#define put_unrefed_object(x, y)                            \
+  SAFE(if (!(x) || (x)->flags &O_DESTRUCTED) *sp = const0u; \
+       else put_unrefed_undested_object(x, y);)
 /* see comments on push_constant_string */
-#define put_constant_string(x) SAFE(\
-                                    sp->type = T_STRING;\
-                                    sp->subtype = STRING_SHARED;\
-                                    sp->u.string = make_shared_string(x);\
-                                    )
-#define put_malloced_string(x) SAFE(\
-                                    sp->type = T_STRING;\
-                                    sp->subtype = STRING_MALLOC;\
-                                    sp->u.string = (x);\
-                                    )
-#define put_array(x) SAFE(\
-                          sp->type = T_ARRAY;\
-                          sp->u.arr = (x);\
-                          )
-#define put_shared_string(x) SAFE(\
-                                  sp->type = T_STRING;\
-                                  sp->subtype = STRING_SHARED;\
-                                  sp->u.string = (x);\
-                                  )
+#define put_constant_string(x)                           \
+  SAFE(sp->type = T_STRING; sp->subtype = STRING_SHARED; \
+       sp->u.string = make_shared_string(x);)
+#define put_malloced_string(x) \
+  SAFE(sp->type = T_STRING; sp->subtype = STRING_MALLOC; sp->u.string = (x);)
+#define put_array(x) SAFE(sp->type = T_ARRAY; sp->u.arr = (x);)
+#define put_shared_string(x) \
+  SAFE(sp->type = T_STRING; sp->subtype = STRING_SHARED; sp->u.string = (x);)
 
 #define FOREACH_LEFT_GLOBAL 1
 #define FOREACH_RIGHT_GLOBAL 2
@@ -362,8 +334,6 @@ void copy_lvalue_range(svalue_t *);
 void assign_lvalue_range(svalue_t *);
 void debug_perror(const char *, const char *);
 
-
-
 #ifndef NO_SHADOWS
 int validate_shadowing(object_t *);
 #endif
@@ -387,8 +357,7 @@ void mark_svalue(svalue_t *);
 void mark_stack(void);
 #endif
 
-inline const char *origin_to_name(const int origin)
-{
+inline const char *origin_to_name(const int origin) {
   switch (origin) {
     case ORIGIN_DRIVER:
       return "driver";
@@ -411,8 +380,7 @@ inline const char *origin_to_name(const int origin)
   }
 }
 
-inline const char *access_to_name(int mode)
-{
+inline const char *access_to_name(int mode) {
   switch (mode) {
     case DECL_HIDDEN:
       return "hidden";
@@ -431,4 +399,4 @@ inline const char *access_to_name(int mode)
   }
 }
 
-#endif                          /* _INTERPRET_H */
+#endif /* _INTERPRET_H */
