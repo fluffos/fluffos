@@ -1,0 +1,10 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=${prefix}/include
+
+Name: libtelnet
+Description: TELNET protocol handling library
+Version: @VERSION@
+Libs: -L${libdir} -ltelnet @LIBS@
+Cflags: -I${includedir}

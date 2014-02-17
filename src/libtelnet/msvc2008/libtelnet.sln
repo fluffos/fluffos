@@ -1,0 +1,38 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libtelnet", "libtelnet.vcproj", "{1C94276F-6AD3-497D-AE42-C34A3BBE0B0D}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "telnet-proxy", "telnet-proxy.vcproj", "{20B4F215-FF36-4979-824A-D094B62BD04C}"
+	ProjectSection(ProjectDependencies) = postProject
+		{1C94276F-6AD3-497D-AE42-C34A3BBE0B0D} = {1C94276F-6AD3-497D-AE42-C34A3BBE0B0D}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "telnet-chatd", "telnet-chatd.vcproj", "{838296BF-E876-42CD-9E67-4866EA43DB11}"
+	ProjectSection(ProjectDependencies) = postProject
+		{1C94276F-6AD3-497D-AE42-C34A3BBE0B0D} = {1C94276F-6AD3-497D-AE42-C34A3BBE0B0D}
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1C94276F-6AD3-497D-AE42-C34A3BBE0B0D}.Debug|Win32.ActiveCfg = Debug|Win32
+		{1C94276F-6AD3-497D-AE42-C34A3BBE0B0D}.Debug|Win32.Build.0 = Debug|Win32
+		{1C94276F-6AD3-497D-AE42-C34A3BBE0B0D}.Release|Win32.ActiveCfg = Release|Win32
+		{1C94276F-6AD3-497D-AE42-C34A3BBE0B0D}.Release|Win32.Build.0 = Release|Win32
+		{20B4F215-FF36-4979-824A-D094B62BD04C}.Debug|Win32.ActiveCfg = Debug|Win32
+		{20B4F215-FF36-4979-824A-D094B62BD04C}.Debug|Win32.Build.0 = Debug|Win32
+		{20B4F215-FF36-4979-824A-D094B62BD04C}.Release|Win32.ActiveCfg = Release|Win32
+		{20B4F215-FF36-4979-824A-D094B62BD04C}.Release|Win32.Build.0 = Release|Win32
+		{838296BF-E876-42CD-9E67-4866EA43DB11}.Debug|Win32.ActiveCfg = Debug|Win32
+		{838296BF-E876-42CD-9E67-4866EA43DB11}.Debug|Win32.Build.0 = Debug|Win32
+		{838296BF-E876-42CD-9E67-4866EA43DB11}.Release|Win32.ActiveCfg = Release|Win32
+		{838296BF-E876-42CD-9E67-4866EA43DB11}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

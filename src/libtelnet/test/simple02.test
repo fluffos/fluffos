@@ -1,0 +1,6 @@
+# Test a single IAC command (IAC GA)
+
+%FF%F9
+
+%%
+IAC 249 (GA)

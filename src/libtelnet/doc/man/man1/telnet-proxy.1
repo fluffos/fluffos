@@ -1,0 +1,17 @@
+.TH telnet-proxy 1 LIBTELNET "" "TELNET Library"
+
+.SH NAME
+telnet-proxy \- create a TELNET debugging proxy
+
+.SH SYNOPSIS
+\fBtelnet-proxy\fR <\fBremote address\fR> <\fBremote port\fR> <\fBlocal port\fR>
+
+.SH DESCRIPTION
+\fBtelnet-proxy\fR creates a single-connection proxy listening on \fIlocal port\fR which forwards connections to \fIremote address\fR on port \fIremote port\fR.  All TELNET commands will be logged to \fBstdout\fR for debugging purposes.
+
+Only a single active connection is allowed at any given time.  However, after a client has disconnected, another client may connect through the proxy.
+
+\fBtelnet-proxy\fR is capable of transparently decoding and reencoding streams compressed with MCCP2.  It also includes specialized decoders and debug output for NEW-ENVIRON, TTYPE, ZMP, and MSSP subnegotiation commands.
+
+.SH SEE ALSO
+\fBtelnet-chatd\fR(1), \fBtelnet-client\fR(1), \fBtelnet\fR(1)
