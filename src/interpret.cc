@@ -15,6 +15,7 @@
 #include "regexp.h"
 #include "master.h"
 #include "eval.h"
+#include "outbuf.h"
 
 #include <algorithm>
 #include <functional>

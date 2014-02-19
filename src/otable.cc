@@ -5,6 +5,7 @@
 #include "simul_efun.h"
 #include "master.h"
 #include "object.h"
+#include "outbuf.h"
 
 /*
  * Object name hash table.  Object names are unique, so no special

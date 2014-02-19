@@ -12,6 +12,10 @@
 #include "master.h"
 #include "add_action.h"
 
+#ifdef HAVE_ZLIB
+#include <zlib.h>
+#endif
+
 #define too_deep_save_error()                                            \
   error("Mappings and/or arrays nested too deep (%d) for save_object\n", \
         MAX_SAVE_SVALUE_DEPTH);

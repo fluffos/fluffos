@@ -28,7 +28,7 @@ void f_real_time(void) { push_number(time(NULL)); }
 void f_compressedp(void) {
   int i;
 
-  i = sp->u.ob->interactive && sp->u.ob->interactive->compressed_stream;
+  i = sp->u.ob->interactive && (sp->u.ob->interactive->iflags & USING_COMPRESS);
   free_object(&sp->u.ob, "f_compressedp");
   put_number(i != 0);
 }

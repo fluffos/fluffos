@@ -10,6 +10,7 @@
 #include "port.h"
 #include "master.h"
 #include "eval.h"
+#include "outbuf.h"
 
 #include "event.h"
 

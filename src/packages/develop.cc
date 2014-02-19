@@ -3,6 +3,7 @@
 #include "../md.h"
 #include "../sprintf.h"
 #include "../efun_protos.h"
+#include "../outbuf.h"
 
 static object_t *ob;
 
@@ -49,8 +50,6 @@ void f_debug_info(void) {
                   flags & O_WILL_RESET ? "TRUE" : "FALSE");
 #ifdef HAVE_ZLIB
       if (ob->interactive) {
-        outbuf_addv(&out, "O_COMPRESSED      : %s\n",
-                    ob->interactive->compressed_stream ? "TRUE" : "FALSE");
         outbuf_addv(&out, "O_ZMP             : %s\n",
                     ob->interactive->iflags & USING_ZMP ? "TRUE" : "FALSE");
         outbuf_addv(&out, "O_GMCP            : %s\n",

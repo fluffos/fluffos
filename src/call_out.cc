@@ -7,6 +7,7 @@
 #include "eoperators.h"
 #include "sprintf.h"
 #include "eval.h"
+#include "outbuf.h"
 
 #include <unordered_map>
 

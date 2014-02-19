@@ -52,6 +52,7 @@ void debug_level_clear(const char *);
 #define DBG_dns 1024
 #define DBG_file 2048
 #define DBG_add_action 4096
+#define DBG_telnet 8192
 
-#define DBG_DEFAULT (DBG_connections | DBG_sockets | DBG_dns | DBG_call_out)
+#define DBG_DEFAULT (DBG_connections | DBG_telnet)
 #endif

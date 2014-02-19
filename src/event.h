@@ -39,7 +39,7 @@ void new_external_port_event_listener(port_def_t *, sockaddr *, socklen_t);
 struct user_event_data {
   int idx;
 };
-void new_user_event_listener(struct interactive_s *, int);
+void new_user_event_listener(struct interactive_t *, int);
 // LPC socket event
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
 struct lpc_socket_event_data {

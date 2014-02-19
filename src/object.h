@@ -90,7 +90,7 @@ typedef struct object_s {
   struct object_s *contains;
   struct object_s *super; /* Which object surround us ? */
 #endif
-  struct interactive_s *interactive; /* Data about an interactive user */
+  struct interactive_t *interactive; /* Data about an interactive user */
   char *replaced_program;            /* Program replaced with */
 #ifndef NO_LIGHT
   short total_light;
