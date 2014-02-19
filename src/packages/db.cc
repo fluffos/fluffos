@@ -74,6 +74,7 @@
 #include "../object.h"
 #include "../eoperators.h"
 #include "../backend.h"
+#include "../outbuf.h"
 
 #include "db.h"
 #ifdef PACKAGE_ASYNC

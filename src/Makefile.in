@@ -50,6 +50,9 @@ SRC=grammar.tab.cc lex.cc main.cc rc.cc interpret.cc simulate.cc file.cc object.
   replace_program.cc master.cc function.cc \
   debug.cc crypt.cc applies_table.cc add_action.cc eval.cc fliconv.cc console.cc \
   posix_timers.cc event.cc dns.c \
+	outbuf.cc \
+	libtelnet/libtelnet.c \
+	net/telnet.cc net/telnet_ext.cc net/mssp.cc \
 
 OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
   backend.o array.o mapping.o comm.o ed.o regexp.o buffer.o crc32.o \
@@ -62,6 +65,9 @@ OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
   replace_program.o master.o function.o \
   debug.o crypt.o applies_table.o add_action.o eval.o fliconv.o console.o \
   posix_timers.o event.o dns.o \
+	outbuf.o \
+	libtelnet/libtelnet.o \
+	net/telnet.o net/telnet_ext.o net/mssp.o \
 
 VPATH = .:./packages
 
@@ -80,6 +86,9 @@ build_packages:
 build_binaries: $(DRIVER_BIN) portbind
 
 .cc.$(O):
+	$(CXX) -c $(CXXFLAGS) @LIBEVENT_CPPFLAGS@ -I. -x c++ -o $@ $<
+
+.c.$(O):
 	$(CXX) -c $(CXXFLAGS) @LIBEVENT_CPPFLAGS@ -I. -x c++ -o $@ $<
 
 # FIXME: simulate.c currently calls package_async, which depends on package/DB, this need to be fixed.
@@ -148,7 +157,10 @@ install: all
 # remove everything
 clean:
 	-$(MAKE) -C packages "A=$(A)" "O=$(O)" clean
-	-rm -rf *.$(O) *.d *.tab.cc *.tab.h *.gcda *.gcno *.gcov
+	-rm -rf *.$(O) *.gcda *.gcno *.gcov
+	-rm -rf net/*.$(O) net/*.gcda net/*.gcno net/*.gcov
+	-rm -rf libtelnet/*.$(O) libtelnet/*.gcda libtelnet/*.gcno libtelnet/*.gcov
+	-rm -rf *.d *.tab.cc *.tab.h
 	-rm -f efun_defs.cc option_defs.cc
 	-rm -f opcodes.h efunctions.h opc.h efun_protos.h
 	-rm -f malloc.cc mallocwrapper.cc

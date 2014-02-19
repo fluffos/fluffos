@@ -1,0 +1,5 @@
+# Test a simple ZMP command with two argument
+
+%FF%FA%5Dzmp.test%00one%00two%00%FF%F0
+%%
+ZMP (zmp.test) [3]

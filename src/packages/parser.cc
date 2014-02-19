@@ -26,6 +26,7 @@
 #include "../md.h"
 #include "../master.h"
 #include "../efun_protos.h"
+#include "../outbuf.h"
 
 /*
  * These match routines in the LIMA mudlib.  [The fact that this file was

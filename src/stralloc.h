@@ -1,6 +1,8 @@
 #ifndef _STRALLOC_H_
 #define _STRALLOC_H_
 
+struct outbuffer_t;
+
 /* ref-count debugging code */
 #undef NOISY_DEBUG
 #define NOISY_STRING "workroom"

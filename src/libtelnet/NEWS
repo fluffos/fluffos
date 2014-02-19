@@ -1,0 +1,33 @@
+Version 0.21
+============
+
+* Visual C++ 2008/2010 compatibility, with solution files
+* va_list versions of the printf helper functions
+* fixes for ECHO, TTYPE IS, and flushing
+* improved autotools build
+
+Version 0.20
+============
+
+* added basic man pages
+* major revamp of event API
+* new APIs for ZMP, TERMINAL-TYPE, NEW-ENVIRON, and MSSP
+* added a test suite
+
+Version 0.12
+============
+
+* added pkg-config file
+* telnet_t is now a private data structure
+* telnet_init() allocates memory and returns a pointer
+* renamed telnet_printf2() to telnet_raw_printf()
+
+Version 0.11
+============
+
+* fix autoconf rules to find and use zlib
+
+Version 0.10
+============
+
+* use automake/autoconf/libtool for building

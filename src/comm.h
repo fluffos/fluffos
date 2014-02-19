@@ -6,14 +6,11 @@
 #ifndef COMM_H
 #define COMM_H
 
-#ifdef HAVE_ZLIB
-#include <zlib.h>
-#endif
-
 #include "lpc_incl.h"
 #include "network_incl.h"
 
 #include "fliconv.h"
+#include "libtelnet/libtelnet.h"
 #include <event2/event.h>
 #include <event2/bufferevent.h>
 
@@ -29,28 +26,9 @@
 #define I_WAS_SINGLE_CHAR 0x8 /* was get_char */
 #define SB_SIZE (NSLC * 3 + 3)
 
-#ifdef MINGW
-#define SIGPIPE 13
-#endif
-
 #ifdef HAVE_ZLIB
 #define COMPRESS_BUF_SIZE MESSAGE_BUF_SIZE
 #endif
-
-enum msgtypes {
-  NAMEBYIP = 0,
-  IPBYNAME,
-  DATALEN
-};
-
-#define TS_DATA 0
-#define TS_IAC 1
-#define TS_WILL 2
-#define TS_WONT 3
-#define TS_DO 4
-#define TS_DONT 5
-#define TS_SB 6
-#define TS_SB_IAC 7
 
 /* The I_* flags are input_to flags */
 #define NOECHO I_NOECHO           /* don't echo lines */
@@ -72,8 +50,9 @@ enum msgtypes {
 #define USING_ZMP 0x8000           /* we've negotiated zmp */
 #define USING_GMCP 0x10000         /* we've negotiated gmcp */
 #define HANDSHAKE_COMPLETE 0x20000 /* websocket connected */
+#define USING_COMPRESS 0x40000     /* we've negotiated compress */
 
-typedef struct interactive_s {
+struct interactive_t {
   object_t *ob; /* points to the associated object         */
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
   sentence_t *input_to; /* to be called with next input line       */
@@ -105,24 +84,10 @@ typedef struct interactive_s {
 #ifdef OLD_ED
   struct ed_buffer_s *ed_buffer; /* local ed                        */
 #endif
-#ifdef HAVE_ZLIB
-  struct z_stream_s *compressed_stream; /* Is the data stream
-                                             compressed or not */
-  unsigned char compress_buf[COMPRESS_BUF_SIZE]; /* compress message buffer*/
-#endif
-
-  int message_producer; /* message buffer producer index */
-  int message_consumer; /* message buffer consumer index */
-  int message_length;   /* message buffer length */
-  unsigned char message_buf[MESSAGE_BUF_SIZE]; /* message buffer */
   int iflags;                                  /* interactive flags */
   char out_of_band; /* Send a telnet sync operation            */
-  int state;        /* Current telnet state.  Bingly wop       */
-  int sb_pos;       /* Telnet suboption negotiation stuff      */
   struct translation *trans;
-  unsigned char *sb_buf;
-  int sb_size;
-  char slc[NSLC][2];
+
   char ws_text[MAX_TEXT]; /* input buffer for interactive object     */
   int ws_text_end;        /* first free char in buffer               */
   int ws_text_start;      /* where we are up to in user command buffer */
@@ -130,12 +95,14 @@ typedef struct interactive_s {
   int ws_mask;
   char ws_maskoffs;
 
+  // libtelnet handle
+  struct telnet_t* telnet;
+
   // libevent event handle.
   bufferevent *ev_buffer;
   struct user_event_data *ev_data;
   event *ev_command;
-
-} interactive_t;
+};
 
 /*
  * This macro is for testing whether ip is still valid, since many

@@ -1,0 +1,5 @@
+# Test a single line of regular input
+
+This is a single line of input
+%%
+DATA [30] ==> This is a single line of input

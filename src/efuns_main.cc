@@ -29,6 +29,7 @@
 #include "add_action.h"
 #include "eval.h"
 #include "interpret.h"
+#include "outbuf.h"
 
 int call_origin = 0;
 

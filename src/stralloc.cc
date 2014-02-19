@@ -3,6 +3,7 @@
 #include "stralloc.h"
 #include "hash.h"
 #include "comm.h"
+#include "outbuf.h"
 
 /* used temporarily by SVALUE_STRLEN() */
 unsigned int svalue_strlen_size;

@@ -58,6 +58,7 @@
 #include "lex.h"
 #include "stralloc.h"
 #include "master.h"
+#include "outbuf.h"
 
 #if defined(F_SPRINTF) || defined(F_PRINTF)
 

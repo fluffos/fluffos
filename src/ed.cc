@@ -78,6 +78,7 @@
 #include "comm.h"
 #include "file.h"
 #include "master.h"
+#include "outbuf.h"
 
 #include <algorithm>
 

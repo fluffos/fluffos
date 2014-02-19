@@ -10,6 +10,7 @@
 #include "md.h"
 #include "port.h"
 #include "master.h"
+#include "outbuf.h"
 
 #ifdef PACKAGE_COMPRESS
 #include <zlib.h>
