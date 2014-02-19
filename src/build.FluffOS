@@ -17,6 +17,9 @@ fi
 
 # By default driver compile to native environment, you can
 # add "-m64" to force compile under 64bit, "-m32" for 32bit.
+#
+# If you are building binary to run on another machine, you
+# should change -march=native to -mtune=generic
 COMPILER_FLAGS=${COMPILER_FLAGS:-"-march=native"}
 
 OPTIMIZE=${OPTIMIZE:-"-O3"}
