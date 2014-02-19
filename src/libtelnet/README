@@ -175,8 +175,7 @@ IIc. Sending Data
    For sending regular text is may be more convenient to use
    telnet_printf().
  
- void telnet_begin_subnegotiation(telnet_t *telnet, unsigned char
-     telopt);
+ void telnet_begin_sb(telnet_t *telnet, unsigned char telopt);
    Sends the header for a TELNET sub-negotiation command for the
    specified option.  All send data following this command will be
    part of the sub-negotiation data until a call is made to
@@ -186,7 +185,7 @@ IIc. Sending Data
    data as it will perform newline translations that usually do not
    need to be done for subnegotiation data, and may cause problems.
 
- void telnet_finish_subnegotiation(telnet_t *telnet);
+ void telnet_finish_sb(telnet_t *telnet);
    Sends the end marker for a TELNET sub-negotiation command.  This
    must be called after (and only after) a call has been made to
    telnet_begin_subnegotiation() and any negotiation data has been
@@ -434,6 +433,12 @@ IId. Event Handling
    the command name, that have been received.  The event->zmp.argv
    field is an array of strings, one for each ZMP parameter.  The
    command name will be in event->zmp.argv[0].
+
+ TELNET_EV_TTYPE:
+   The event->ttype.cmd field will be either TELNET_TTYPE_SEND,
+   TELNET_TTYPE_IS, TELNET_TTYPE_INFO.
+
+   The actual terminal type will be in event->ttype.name.
 
  TELNET_EV_ENVIRON:
    The event->environ.cmd field will be either TELNET_ENVIRON_IS,

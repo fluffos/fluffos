@@ -159,6 +159,7 @@ clean:
 	-$(MAKE) -C packages "A=$(A)" "O=$(O)" clean
 	-rm -rf *.$(O) *.gcda *.gcno *.gcov
 	-rm -rf net/*.$(O) net/*.gcda net/*.gcno net/*.gcov
+	-rm -rf libtelnet/*.$(O) libtelnet/*.gcda libtelnet/*.gcno libtelnet/*.gcov
 	-rm -rf *.d *.tab.cc *.tab.h
 	-rm -f efun_defs.cc option_defs.cc
 	-rm -f opcodes.h efunctions.h opc.h efun_protos.h

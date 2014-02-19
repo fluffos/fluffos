@@ -1460,13 +1460,13 @@ int telnet_raw_printf(telnet_t *telnet, const char *fmt, ...) {
 /* begin NEW-ENVIRON subnegotation */
 void telnet_begin_newenviron(telnet_t *telnet, unsigned char cmd) {
 	telnet_begin_sb(telnet, TELNET_TELOPT_NEW_ENVIRON);
-	telnet_send(telnet, &cmd, 1);
+	telnet_send(telnet, (const char *)&cmd, 1);
 }
 
 /* send a NEW-ENVIRON value */
 void telnet_newenviron_value(telnet_t *telnet, unsigned char type,
 		const char *string) {
-	telnet_send(telnet, (char*)&type, 1);
+	telnet_send(telnet, (const char*)&type, 1);
 
 	if (string != 0) {
 		telnet_send(telnet, string, strlen(string));
