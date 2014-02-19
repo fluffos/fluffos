@@ -9,6 +9,7 @@
 #include "debugmalloc.h"
 #include "my_malloc.h"
 #include "md.h"
+#include "outbuf.h"
 
 void fatal(const char *, ...);
 
