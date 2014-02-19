@@ -1,6 +1,7 @@
 #!/bin/sh
 sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
 sudo apt-get update -qq
+sudo apt-get install -qq autoconf
 sudo apt-get install -qq gcc-4.8 g++-4.8
 sudo apt-get install -qq bison
 
@@ -18,4 +19,4 @@ else
   sudo apt-get install libevent-dev libmysqlclient-dev libsqlite3-dev libpq-dev libz-dev libssl-dev libpcre3-dev
 fi
 
-cd src && cp local_options.$CONFIG local_options && ./build.FluffOS $TYPE && make && cd testsuite && valgrind --malloc-fill=0x75 --free-fill=0x73 --track-origins=yes --leak-check=full ../driver etc/config.test -ftest -d
+cd src && ./autogen.sh && cp local_options.$CONFIG local_options && ./build.FluffOS $TYPE && make && cd testsuite && valgrind --malloc-fill=0x75 --free-fill=0x73 --track-origins=yes --leak-check=full ../driver etc/config.test -ftest -d
