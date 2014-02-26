@@ -6,7 +6,7 @@
 #include "std.h"
 #include "file.h"
 #include "comm.h"
-#include "lex.h"
+#include "lpc/compiler/lex.h"
 #include "md.h"
 #include "port.h"
 #include "master.h"

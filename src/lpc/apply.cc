@@ -8,7 +8,7 @@
 #include "efuns_main.h"
 #include "backend.h" // current_virtual_time;
 
-#include "compiler.h" // convert_type
+#include "lpc/compiler/compiler.h" // convert_type
 #include "comm.h" // interactive_t
 
 // global static result

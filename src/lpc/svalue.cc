@@ -4,9 +4,7 @@
 
 #include "lpc_incl.h"
 
-#include "object.h" // object_t
 #include "function.h" // string_or_func
-#include "array.h" // array_t
 #include "program.h" // program_t
 #include "simulate.h" // fatal()
 

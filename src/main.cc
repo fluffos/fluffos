@@ -9,7 +9,7 @@
 #include "main.h"
 #include "otable.h"
 #include "comm.h"
-#include "compiler.h"
+#include "lpc/compiler/compiler.h"
 #include "port.h"
 #include "md.h"
 #include "main.h"

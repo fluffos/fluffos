@@ -4,7 +4,7 @@
 #include "../file_incl.h"
 #include "../file.h"
 #include "../backend.h"
-#include "../compiler.h"
+#include "../lpc/compiler/compiler.h"
 #include "../main.h"
 #include "../eoperators.h"
 #include "../efun_protos.h"
@@ -12,7 +12,6 @@
 #include "../add_action.h"
 #include "../port.h"
 #include "../applies.h"
-#include "../object.h"
 #define MAX_COLOUR_STRING 200
 
 /* should be done in configure */

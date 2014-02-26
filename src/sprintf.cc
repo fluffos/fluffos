@@ -55,7 +55,7 @@
 #include "sprintf.h"
 #include "efuns_incl.h"
 #include "simul_efun.h"
-#include "lex.h"
+#include "lpc/compiler/lex.h"
 #include "stralloc.h"
 #include "master.h"
 #include "outbuf.h"

@@ -3,9 +3,9 @@
 #define NO_SOCKETS
 #define NO_OPCODES
 #include "std.h"
-#include "lex.h"
+#include "lpc/compiler/lex.h"
 #include "lpc/svalue.h"
-#include "preprocess.h"
+#include "lpc/compiler/preprocess.h"
 #include "make_func.h"
 #include "cc.h"
 #include "hash.h"
@@ -564,7 +564,7 @@ static int skip_to(const char *token, const char *atoken) {
   }
 }
 
-#include "preprocess.cc"
+#include "lpc/compiler/preprocess.cc"
 
 static int maybe_open_input_file(const char *fn) {
   if ((yyin = fopen(fn, "r")) == NULL) {

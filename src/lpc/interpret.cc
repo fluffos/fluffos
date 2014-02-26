@@ -11,7 +11,7 @@
 #include "sprintf.h"
 #include "comm.h"
 #include "port.h"
-#include "compiler.h"
+#include "lpc/compiler/compiler.h"
 #include "regexp.h"
 #include "master.h"
 #include "eval.h"

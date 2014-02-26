@@ -4,7 +4,7 @@
 #include "hash.h"
 #include "simul_efun.h"
 #include "master.h"
-#include "object.h"
+#include "lpc/lang/object.h"
 #include "outbuf.h"
 
 /*

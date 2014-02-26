@@ -11,7 +11,7 @@
 #ifdef TRACE
 #include "comm.h"
 #endif
-#include "compiler.h"
+#include "lpc/compiler/compiler.h"
 #include "simul_efun.h"
 #include "eoperators.h"
 

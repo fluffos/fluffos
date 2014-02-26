@@ -1,7 +1,6 @@
 #include "std.h"
 #include "../lpc_incl.h"
 #include "async.h"
-#include "../function.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -15,7 +14,6 @@
 #include "../config.h"
 #include "../lpc/interpret.h"
 #include "../file.h"
-#include "../function.h"
 #include "../eval.h"
 #ifdef F_ASYNC_DB_EXEC
 #include "db.h"

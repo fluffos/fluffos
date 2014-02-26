@@ -4,10 +4,9 @@
 #include "md.h"
 #ifdef DEBUGMALLOC_EXTENSIONS
 #include "comm.h"
-#include "lex.h"
+#include "lpc/compiler/lex.h"
 #include "simul_efun.h"
 #include "call_out.h"
-#include "mapping.h"
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
 #include "socket_efuns.h"
 #endif

@@ -3,13 +3,13 @@
 %{
 extern char *outp;
 #include "std.h"
-#include "compiler.h"
-#include "lex.h"
-#include "scratchpad.h"
+#include "lpc/compiler/compiler.h"
+#include "lpc/compiler/lex.h"
+#include "lpc/compiler/scratchpad.h"
 
 #include "lpc_incl.h"
 #include "simul_efun.h"
-#include "generate.h"
+#include "lpc/compiler/generate.h"
 #include "master.h"
 
 /* gross. Necessary? - Beek */
