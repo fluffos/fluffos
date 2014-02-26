@@ -8,7 +8,7 @@
 #include "applies.h"
 
 #include "program.h"
-#include "lpc.h"
+#include "lpc/svalue.h"
 #include "function.h"
 #include "buffer.h"
 #include "object.h"
@@ -18,7 +18,8 @@
 
 #include "stralloc.h"
 #include "simulate.h"
-#include "interpret.h"
+#include "lpc/apply.h"
+#include "lpc/interpret.h"
 #include "rc.h"
 #include "main.h"
 

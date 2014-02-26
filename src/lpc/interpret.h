@@ -6,6 +6,8 @@
 #ifndef INTERPRET_H
 #define INTERPRET_H
 
+typedef struct svalue_s svalue_t;
+
 #define PUSH_STRING (0 << 6)
 #define PUSH_NUMBER (1 << 6)
 #define PUSH_GLOBAL (2 << 6)
@@ -99,7 +101,6 @@ typedef struct {
 } function_to_call_t;
 
 typedef struct error_context_s {
-  jmp_buf context;
   control_stack_t *save_csp;
   svalue_t *save_sp;
   object_t **save_cgsp;
@@ -119,71 +120,8 @@ typedef struct {
 #define CHECK_TYPES(val, t, arg, inst) \
   if (!((val)->type & (t))) bad_argument(val, t, arg, inst);
 
-/* Beek - add some sanity to joining strings */
-/* add to an svalue */
-#define EXTEND_SVALUE_STRING(x, y, z) \
-  SAFE( char *ess_res; \
-        int ess_len; \
-        int ess_r; \
-        ess_len = (ess_r = SVALUE_STRLEN(x)) + strlen(y); \
-        if (ess_len > MAX_STRING_LENGTH) \
-            error("Maximum string length exceeded in concatenation.\n"); \
-        if ((x)->subtype == STRING_MALLOC && MSTR_REF((x)->u.string) == 1) { \
-            ess_res = (char *) extend_string((x)->u.string, ess_len); \
-            if (!ess_res) fatal("Out of memory!\n"); \
-            strcpy(ess_res + ess_r, (y)); \
-        } else { \
-            ess_res = new_string(ess_len, z); \
-            strcpy(ess_res, (x)->u.string); \
-            strcpy(ess_res + ess_r, (y)); \
-            free_string_svalue(x); \
-            (x)->subtype = STRING_MALLOC; \
-        } \
-        (x)->u.string = ess_res; \
-    )
-
-/* <something that needs no free> + string svalue */
-#define SVALUE_STRING_ADD_LEFT(y, z)                                    \
-  SAFE(char *pss_res; int pss_r; int pss_len;                           \
-       pss_len = SVALUE_STRLEN(sp) + (pss_r = strlen(y));               \
-       if (pss_len > MAX_STRING_LENGTH)                                 \
-       error("Maximum string length exceeded in concatenation.\n");     \
-       pss_res = new_string(pss_len, z); strcpy(pss_res, y);            \
-       strcpy(pss_res + pss_r, sp->u.string); free_string_svalue(sp--); \
-       sp->type = T_STRING; sp->u.string = pss_res;                     \
-       sp->subtype = STRING_MALLOC;)
-
-/* basically, string + string; faster than using extend b/c of SVALUE_STRLEN */
-#define SVALUE_STRING_JOIN(x, y, z) \
-  SAFE( char *ssj_res; int ssj_r; int ssj_len; \
-        ssj_r = SVALUE_STRLEN(x); \
-        ssj_len = ssj_r + SVALUE_STRLEN(y); \
-        if (ssj_len > MAX_STRING_LENGTH) \
-            error("Maximum string length exceeded in concatenation.\n"); \
-        if ((x)->subtype == STRING_MALLOC && MSTR_REF((x)->u.string) == 1) { \
-            ssj_res = (char *) extend_string((x)->u.string, ssj_len); \
-            if (!ssj_res) fatal("Out of memory!\n"); \
-            (void) strcpy(ssj_res + ssj_r, (y)->u.string);  \
-            free_string_svalue(y); \
-        } else { \
-            ssj_res = (char *) new_string(ssj_len, z); \
-            strcpy(ssj_res, (x)->u.string);        \
-            strcpy(ssj_res + ssj_r, (y)->u.string);        \
-            free_string_svalue(y); \
-            free_string_svalue(x); \
-            (x)->subtype = STRING_MALLOC; \
-        } \
-        (x)->u.string = ssj_res; \
-    )
-
 /* macro calls */
 #define call_program(prog, offset) eval_instruction(prog->program + offset)
-
-#ifdef DEBUG
-#define free_svalue(x, y) int_free_svalue(x, y)
-#else
-#define free_svalue(x, y) int_free_svalue(x)
-#endif
 
 #define CHECK_STACK_OVERFLOW(x) \
   if (sp + (x) >= end_of_stack) \
@@ -240,10 +178,7 @@ extern program_t fake_prog;
 extern svalue_t global_lvalue_byte;
 extern int num_varargs;
 extern int st_num_arg;
-extern svalue_t const0;
-extern svalue_t const1;
-extern svalue_t const0u;
-extern svalue_t apply_ret_value;
+
 extern ref_t *global_ref_list;
 extern int lv_owner_type;
 extern refed_t *lv_owner;
@@ -251,12 +186,8 @@ extern refed_t *lv_owner;
 void kill_ref(ref_t *);
 ref_t *make_ref(void);
 
-void init_interpreter(void);
 void call_direct(object_t *, int, int, int);
 void eval_instruction(char *p);
-void assign_svalue(svalue_t *, svalue_t *);
-void assign_svalue_no_free(svalue_t *, svalue_t *);
-void copy_some_svalues(svalue_t *, svalue_t *, int);
 void transfer_push_some_svalues(svalue_t *, int);
 void push_some_svalues(svalue_t *, int);
 #ifdef DEBUG
@@ -306,8 +237,6 @@ void bad_arg(int, int);
 void bad_argument(svalue_t *, int, int, int);
 void check_for_destr(array_t *);
 int is_static(const char *, object_t *);
-int apply_low(const char *, object_t *, int);
-svalue_t *apply(const char *, object_t *, int, int);
 svalue_t *call_function_pointer(funptr_t *, int);
 svalue_t *safe_call_function_pointer(funptr_t *, int);
 svalue_t *safe_apply(const char *, object_t *, int, int);
@@ -355,6 +284,13 @@ void break_point(void);
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_svalue(svalue_t *);
 void mark_stack(void);
+#endif
+
+// TODO: move these to correct places
+void setup_varargs_variables(int, int, int);
+extern int tracedepth;
+#ifdef TRACE
+void do_trace_call(int);
 #endif
 
 inline const char *origin_to_name(const int origin) {

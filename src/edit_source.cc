@@ -4,7 +4,7 @@
 #define NO_OPCODES
 #include "std.h"
 #include "lex.h"
-#include "lpc.h"
+#include "lpc/svalue.h"
 #include "preprocess.h"
 #include "make_func.h"
 #include "cc.h"

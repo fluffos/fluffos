@@ -39,8 +39,8 @@ INSTALL=@INSTALL@
 INSTALL_DIR=@bindir@
 OPTIMIZE=@OPTIMIZE@
 
-SRC=grammar.tab.cc lex.cc main.cc rc.cc interpret.cc simulate.cc file.cc object.cc \
-  backend.cc array.cc mapping..cc comm.cc ed.cc regexp.cc buffer.cc crc32.cc \
+SRC=grammar.tab.cc lex.cc main.cc rc.cc simulate.cc file.cc object.cc \
+  backend.cc array.cc mapping.cc comm.cc ed.cc regexp.cc buffer.cc crc32.cc \
   malloc.cc mallocwrapper.cc class.cc efuns_main.cc efuns_port.cc \
   call_out.cc otable.cc dumpstat.cc stralloc.cc hash.cc \
   port.cc reclaim.cc parse.cc simul_efun.cc sprintf.cc program.cc \
@@ -53,8 +53,9 @@ SRC=grammar.tab.cc lex.cc main.cc rc.cc interpret.cc simulate.cc file.cc object.
 	outbuf.cc \
 	libtelnet/libtelnet.c \
 	net/telnet.cc net/telnet_ext.cc net/mssp.cc \
+	lpc/interpret.cc lpc/svalue.cc lpc/apply.cc lpc/apply_cache.cc \
 
-OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
+OBJ=grammar.tab.o lex.o main.o rc.o simulate.o file.o object.o \
   backend.o array.o mapping.o comm.o ed.o regexp.o buffer.o crc32.o \
   malloc.o mallocwrapper.o class.o efuns_main.o efuns_port.o \
   call_out.o otable.o dumpstat.o stralloc.o hash.o \
@@ -68,6 +69,7 @@ OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
 	outbuf.o \
 	libtelnet/libtelnet.o \
 	net/telnet.o net/telnet_ext.o net/mssp.o \
+	lpc/interpret.o lpc/svalue.o lpc/apply.o lpc/apply_cache.o \
 
 VPATH = .:./packages
 
@@ -157,9 +159,10 @@ install: all
 # remove everything
 clean:
 	-$(MAKE) -C packages "A=$(A)" "O=$(O)" clean
-	-rm -rf *.$(O) *.gcda *.gcno *.gcov
-	-rm -rf net/*.$(O) net/*.gcda net/*.gcno net/*.gcov
-	-rm -rf libtelnet/*.$(O) libtelnet/*.gcda libtelnet/*.gcno libtelnet/*.gcov
+	-find . -name "*.$(O)" | xargs rm -rf
+	-find . -name "*.gcda" | xargs rm -rf
+	-find . -name "*.gcno" | xargs rm -rf
+	-find . -name "*.gcov" | xargs rm -rf
 	-rm -rf *.d *.tab.cc *.tab.h
 	-rm -f efun_defs.cc option_defs.cc
 	-rm -f opcodes.h efunctions.h opc.h efun_protos.h

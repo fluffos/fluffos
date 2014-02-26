@@ -57,6 +57,8 @@
  * Note: use of more than 16 bits means extending flags to an unsigned long
  */
 
+typedef struct program_s program_t;
+
 typedef struct sentence_s {
 #ifndef NO_ADD_ACTION
   char *verb;

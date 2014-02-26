@@ -4,6 +4,8 @@
 /* It is usually better to include "lpc_incl.h" instead of including this
    directly */
 
+typedef struct _statgroup statgroup_t;
+
 typedef struct array_s {
   unsigned short ref;
 #ifdef DEBUGMALLOC_EXTENSIONS

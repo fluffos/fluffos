@@ -50,9 +50,7 @@ extern userid_t *backbone_uid;
 extern int call_origin;
 static int find_line(char *, const program_t *, const char **, int *);
 void push_indexed_lvalue(int);
-#ifdef TRACE
-static void do_trace_call(int);
-#endif
+
 void break_point(void);
 static void do_loop_cond_number(void);
 static void do_loop_cond_local(void);
@@ -83,7 +81,7 @@ int stack_in_use_as_temporary = 0;
 int inter_sscanf(svalue_t *, svalue_t *, svalue_t *, int);
 program_t *current_prog;
 short int caller_type;
-static int tracedepth;
+int tracedepth;
 int num_varargs;
 
 /*
@@ -110,7 +108,6 @@ char *pc;     /* Program pointer. */
 svalue_t *fp; /* Pointer to first argument. */
 
 svalue_t *sp;
-svalue_t const0, const1, const0u;
 
 int function_index_offset; /* Needed for inheritance */
 int variable_index_offset; /* Needed for inheritance */
@@ -121,9 +118,6 @@ svalue_t *end_of_stack = start_of_stack + CFG_EVALUATOR_STACK_SIZE;
 
 /* Used to throw an error to a catch */
 svalue_t catch_value = {T_NUMBER};
-
-/* used by routines that want to return a pointer to an svalue */
-svalue_t apply_ret_value = {T_NUMBER};
 
 control_stack_t control_stack[CFG_MAX_CALL_DEPTH + 5];
 control_stack_t *csp; /* Points to last element pushed */
@@ -259,8 +253,6 @@ const char *type_name(int c) {
  * can be tested simply through pointer comparison.
  */
 static program_t *ffbn_recurse(program_t *, char *, int *, int *);
-static program_t *ffbn_recurse2(program_t *, const char *, int *, int *, int *,
-                                int *);
 
 #ifndef NO_SHADOWS
 
@@ -436,101 +428,7 @@ void unlink_string_svalue(svalue_t *s) {
   }
 }
 
-/*
- * Free the data that an svalue is pointing to. Not the svalue
- * itself.
- * Use the free_svalue() define to call this
- */
-#ifdef DEBUG
-void int_free_svalue(svalue_t *v, const char *tag)
-#else
-void int_free_svalue(svalue_t *v)
-#endif
-{
-  /* Marius, 30-Mar-2001: T_FREED could be OR'd in with the type now if the
-   * svalue has been 'freed' as an optimization by the F_TRANSFER_LOCAL op.
-   * This will allow us to keep the type of the variable known for error
-   * handler purposes but not duplicate the free.
-   */
-  if (v->type == T_STRING) {
-    const char *str = v->u.string;
 
-    if (v->subtype & STRING_COUNTED) {
-#ifdef STRING_STATS
-      int size = MSTR_SIZE(str);
-#endif
-      if (DEC_COUNTED_REF(str)) {
-        SUB_STRING(size);
-        NDBG(BLOCK(str));
-        if (v->subtype & STRING_HASHED) {
-          SUB_NEW_STRING(size, sizeof(block_t));
-          deallocate_string((char *)str);
-          CHECK_STRING_STATS;
-        } else {
-          SUB_NEW_STRING(size, sizeof(malloc_block_t));
-          FREE(MSTR_BLOCK(str));
-          CHECK_STRING_STATS;
-        }
-      } else {
-        SUB_STRING(size);
-        NDBG(BLOCK(str));
-      }
-    }
-  } else if ((v->type & T_REFED) && !(v->type & T_FREED)) {
-#ifdef DEBUG
-    if (v->type == T_OBJECT) {
-      debug(d_flag, "Free_svalue %s (%d) from %s\n", v->u.ob->obname,
-            v->u.ob->ref - 1, tag);
-    }
-#endif
-    /* TODO: Set to 0 on condition that REF overflow to negative. */
-    if (v->u.refed->ref > 0) {
-      v->u.refed->ref--;
-    }
-    if (v->u.refed->ref == 0) {
-      switch (v->type) {
-        case T_OBJECT:
-          dealloc_object(v->u.ob, "free_svalue");
-          break;
-        case T_CLASS:
-          dealloc_class(v->u.arr);
-          break;
-        case T_ARRAY:
-          if (v->u.arr != &the_null_array) {
-            dealloc_array(v->u.arr);
-          }
-          break;
-#ifndef NO_BUFFER_TYPE
-        case T_BUFFER:
-          if (v->u.buf != &null_buf) {
-            FREE((char *)v->u.buf);
-          }
-          break;
-#endif
-        case T_MAPPING:
-          dealloc_mapping(v->u.map);
-          break;
-        case T_FUNCTION:
-          dealloc_funp(v->u.fp);
-          break;
-        case T_REF:
-          if (!v->u.ref->lvalue) {
-            kill_ref(v->u.ref);
-          }
-          break;
-      }
-    }
-  } else if (v->type == T_ERROR_HANDLER) {
-    (*v->u.error_handler)();
-  }
-#ifdef DEBUG
-  else if (v->type == T_FREED) {
-    fatal("T_FREED svalue freed.  Previously freed by %s.\n", v->u.string);
-  }
-  v->type = T_FREED;
-  v->u.string = tag;
-#endif
-}
 
 void process_efun_callback(int narg, function_to_call_t *ftc, int f) {
   int argc = st_num_arg;
@@ -628,65 +526,9 @@ char *add_slash(const char *const str) {
   return tmp;
 }
 
-/*
- * Assign to a svalue.
- * This is done either when element in array, or when to an identifier
- * (as all identifiers are kept in a array pointed to by the object).
- */
-
-void assign_svalue_no_free(svalue_t *to, svalue_t *from) {
-  DEBUG_CHECK(from == 0, "Attempt to assign_svalue() from a null ptr.\n");
-  DEBUG_CHECK(to == 0, "Attempt to assign_svalue() to a null ptr.\n");
-  DEBUG_CHECK((from->type & (from->type - 1)) & ~T_FREED,
-              "from->type is corrupt; >1 bit set.\n");
-
-  if (from->type == T_OBJECT &&
-      (!from->u.ob || (from->u.ob->flags & O_DESTRUCTED))) {
-    *to = const0u;
-    return;
-  }
-
-  *to = *from;
-
-  if ((to->type & T_FREED) && to->type != T_FREED) {
-    to->type &= ~T_FREED;
-  }
-
-  if (from->type == T_STRING) {
-    if (from->subtype & STRING_COUNTED) {
-      INC_COUNTED_REF(to->u.string);
-      ADD_STRING(MSTR_SIZE(to->u.string));
-      NDBG(BLOCK(to->u.string));
-    }
-  } else if (from->type & T_REFED) {
-#ifdef DEBUG_MACRO
-    if (from->type == T_OBJECT) {
-      add_ref(from->u.ob, "assign_svalue_no_free");
-    } else
-#endif
-      from->u.refed->ref++;
-  }
-}
-
-void assign_svalue(svalue_t *dest, svalue_t *v) {
-  /* First deallocate the previous value. */
-  free_svalue(dest, "assign_svalue");
-  assign_svalue_no_free(dest, v);
-}
-
 void push_some_svalues(svalue_t *v, int num) {
   while (num--) {
     push_svalue(v++);
-  }
-}
-
-/*
- * Copies an array of svalues to another location, which should be
- * free space.
- */
-void copy_some_svalues(svalue_t *dest, svalue_t *v, int num) {
-  while (num--) {
-    assign_svalue_no_free(dest + num, v + num);
   }
 }
 
@@ -1469,7 +1311,7 @@ void push_constant_string(const char *p) {
 }
 
 #ifdef TRACE
-static void do_trace_call(int offset) {
+void do_trace_call(int offset) {
   do_trace("Call direct ", current_prog->function_table[offset].funcname, " ");
   if (TRACEHB) {
     if (TRACETST(TRACE_ARGS)) {
@@ -1508,7 +1350,7 @@ void setup_variables(int actual, int local, int num_arg) {
   fp = sp - (csp->num_local_variables = local + num_arg) + 1;
 }
 
-static void setup_varargs_variables(int actual, int local, int num_arg) {
+void setup_varargs_variables(int actual, int local, int num_arg) {
   array_t *arr;
   if (actual >= num_arg) {
     int n = actual - num_arg + 1;
@@ -4018,50 +3860,6 @@ static program_t *ffbn_recurse(program_t *prog, char *name, int *indexp,
   return 0;
 }
 
-static program_t *ffbn_recurse2(program_t *prog, const char *name, int *indexp,
-                                int *runtime_index, int *fio, int *vio) {
-  register int high = prog->num_functions_defined - 1;
-  register int low = 0, mid;
-  int ri;
-  char *p;
-
-  /* Search our function table */
-  while (high >= low) {
-    mid = (high + low) >> 1;
-    p = prog->function_table[mid].funcname;
-    if (name < p) {
-      high = mid - 1;
-    } else if (name > p) {
-      low = mid + 1;
-    } else {
-      ri = mid + prog->last_inherited;
-
-      if (prog->function_flags[ri] & (FUNC_UNDEFINED | FUNC_PROTOTYPE)) {
-        return 0;
-      }
-
-      *indexp = mid;
-      *runtime_index = ri;
-      *fio = *vio = 0;
-      return prog;
-    }
-  }
-
-  /* Search inherited function tables */
-  mid = prog->num_inherited;
-  while (mid--) {
-    program_t *ret = ffbn_recurse2(prog->inherit[mid].prog, name, indexp,
-                                   runtime_index, fio, vio);
-    if (ret) {
-      *runtime_index += prog->inherit[mid].function_index_offset;
-      *fio += prog->inherit[mid].function_index_offset;
-      *vio += prog->inherit[mid].variable_index_offset;
-      return ret;
-    }
-  }
-  return 0;
-}
-
 program_t *find_function_by_name(object_t *ob, const char *name, int *indexp,
                                  int *runtime_index) {
   char *funname = findstring(name);
@@ -4070,380 +3868,6 @@ program_t *find_function_by_name(object_t *ob, const char *name, int *indexp,
     return 0;
   }
   return ffbn_recurse(ob->prog, funname, indexp, runtime_index);
-}
-
-static program_t *find_function_by_name2(object_t *ob, const char **name,
-                                         int *indexp, int *runtime_index,
-                                         int *fio, int *vio) {
-  if (!(*name = findstring(*name))) {
-    return 0;
-  }
-  return ffbn_recurse2(ob->prog, *name, indexp, runtime_index, fio, vio);
-}
-
-/*
- * Apply a fun 'fun' to the program in object 'ob', with
- * 'num_arg' arguments (already pushed on the stack).
- * If the function is not found, search in the object pointed to by the
- * inherit pointer.
- * If the function name starts with '::', search in the object pointed out
- * through the inherit pointer by the current object. The 'current_object'
- * stores the base object, not the object that has the current function being
- * evaluated. Thus, the variable current_prog will normally be the same as
- * current_object->prog, but not when executing inherited code. Then,
- * it will point to the code of the inherited object. As more than one
- * object can be inherited, the call of function by index number has to
- * be adjusted. The function number 0 in a superclass object must not remain
- * number 0 when it is inherited from a subclass object. The same problem
- * exists for variables. The global variables function_index_offset and
- * variable_index_offset keep track of how much to adjust the index when
- * executing code in the superclass objects.
- *
- * There is a special case when called from the heart beat, as
- * current_prog will be 0. When it is 0, set current_prog
- * to the 'ob->prog' sent as argument.
- *
- * Arguments are always removed from the stack.
- * If the function is not found, return 0 and nothing on the stack.
- * Otherwise, return 1, and a pushed return value on the stack.
- *
- * Note that the object 'ob' can be destructed. This must be handled by
- * the caller of apply().
- *
- * If the function failed to be called, then arguments must be deallocated
- * manually !  (Look towards end of this function.)
- */
-
-#ifdef CACHE_STATS
-unsigned int apply_low_call_others = 0;
-unsigned int apply_low_cache_hits = 0;
-unsigned int apply_low_slots_used = 0;
-unsigned int apply_low_collisions = 0;
-#endif
-
-typedef struct cache_entry_s {
-  program_t *oprogp;
-  program_t *progp;
-  function_t *funp;
-  unsigned short function_index_offset;
-  unsigned short variable_index_offset;
-} cache_entry_t;
-
-static cache_entry_t cache[APPLY_CACHE_SIZE] = {
-    {0}};  // default initialized to 0
-
-#ifdef DEBUGMALLOC_EXTENSIONS
-void mark_apply_low_cache() {
-  int i;
-  for (i = 0; i < APPLY_CACHE_SIZE; i++) {
-    if (cache[i].funp && !cache[i].progp) {
-      EXTRA_REF(BLOCK((char *)cache[i].funp))++;
-    }
-    if (cache[i].oprogp) {
-      cache[i].oprogp->extra_ref++;
-    }
-    if (cache[i].progp) {
-      cache[i].progp->extra_ref++;
-    }
-  }
-}
-#endif
-
-void check_co_args2(unsigned short *types, int num_arg, const char *name,
-                    const char *ob_name, int sparg) {
-  int argc = sparg;
-  int exptype, i = 0;
-  do {
-    argc--;
-    if ((types[i] & DECL_MODS) == LOCAL_MOD_REF) {
-      exptype = T_REF;
-    } else {
-      exptype = convert_type(types[i]);
-    }
-    i++;
-    if (exptype == T_ANY) {
-      continue;
-    }
-
-    if ((sp - argc)->type != exptype) {
-      char buf[1024];
-      if ((sp - argc)->type == T_NUMBER && !(sp - argc)->u.number) {
-        continue;
-      }
-      sprintf(
-          buf, "Bad argument %d in call to %s() in %s\nExpected: %s Got %s.\n",
-          i, name, ob_name, type_name(exptype), type_name((sp - argc)->type));
-#ifdef CALL_OTHER_WARN
-      if (current_prog) {
-        const char *file;
-        int line;
-        get_line_number_info(&file, &line);
-        int prsave = pragmas;
-        pragmas &= ~PRAGMA_ERROR_CONTEXT;
-        smart_log(file, line, buf, 1);
-        pragmas = prsave;
-      } else {
-        smart_log("driver", 0, buf, 1);
-      }
-#else
-      error(buf);
-#endif
-    }
-  } while (i < num_arg);
-}
-
-void check_co_args(int num_arg, const program_t *prog, function_t *fun,
-                   int findex) {
-#ifdef CALL_OTHER_TYPE_CHECK
-  if (num_arg != fun->num_arg) {
-    char buf[1024];
-    // if(!current_prog) what do i need this for again?
-    // current_prog = master_ob->prog;
-    sprintf(buf, "Wrong number of arguments to %s in %s.\n", fun->funcname,
-            prog->filename);
-#ifdef CALL_OTHER_WARN
-    if (current_prog) {
-      const char *file;
-      int line;
-      int prsave = pragmas;
-      pragmas &= ~PRAGMA_ERROR_CONTEXT;
-      get_line_number_info(&file, &line);
-      smart_log(file, line, buf, 1);
-      pragmas = prsave;
-    } else {
-      smart_log("driver", 0, buf, 1);
-    }
-#else
-    error(buf);
-#endif
-  }
-
-  int num_arg_check = std::min(num_arg, fun->num_arg);
-  if (num_arg_check && prog->type_start &&
-      prog->type_start[findex] != INDEX_START_NONE)
-    check_co_args2(&prog->argument_types[prog->type_start[findex]], num_arg,
-                   fun->funcname, prog->filename, num_arg);
-#endif
-}
-
-int apply_low(const char *fun, object_t *ob, int num_arg) {
-  cache_entry_t *entry;   /* The cache entry */
-  program_t *target_prog; /* The target prog to call */
-  int local_call_origin = call_origin;
-  IF_DEBUG(control_stack_t * save_csp);
-
-  if (!local_call_origin) {
-    local_call_origin = ORIGIN_DRIVER;
-  }
-  call_origin = 0;
-  ob->time_of_ref = current_virtual_time; /* Used by the swapper */
-                                          /*
- * This object will now be used, and is thus a target for reset later on
- * (when time due).
- */
-#if !defined(NO_RESETS) && defined(LAZY_RESETS)
-  try_reset(ob);
-#endif
-  if (ob->flags & O_DESTRUCTED) {
-    pop_n_elems(num_arg);
-    return 0;
-  }
-  ob->flags &= ~O_RESET_STATE;
-#ifndef NO_SHADOWS
-  /*
-   * If there is a chain of objects shadowing, start with the first of
-   * these.
-   */
-  while (ob->shadowed && ob->shadowed != current_object &&
-         (!(ob->shadowed->flags & O_DESTRUCTED))) {
-    ob = ob->shadowed;
-  }
-retry_for_shadow:
-#endif
-  DEBUG_CHECK(ob->flags & O_DESTRUCTED, "apply() on destructed object\n");
-#ifdef CACHE_STATS
-  apply_low_call_others++;
-#endif
-  /* Search in cache for this function. */
-  uint64_t ix; /* The cache index */
-  std::hash<void *> hash_fn;
-  ix = hash_fn((void *)fun);
-  ix ^= hash_fn((void *)ob->prog);
-  entry = &cache[ix % APPLY_CACHE_SIZE];
-  if (entry->oprogp == ob->prog && /* object must match */
-      (entry->progp ? (strcmp(entry->funp->funcname, fun) == 0)
-                    : /* function name must match */
-           strcmp((char *)entry->funp, fun) == 0)) {
-#ifdef CACHE_STATS
-    apply_low_cache_hits++;
-#endif
-    target_prog = entry->progp;
-  } else {/* not found in cache, search the function. */
-    int findex = 0, runtime_index = 0, fio = 0, vio = 0;
-    const char *sfun;
-
-/* 1) Erase the current entry */
-#ifdef CACHE_STATS
-    if (!entry->funp) {
-      apply_low_slots_used++;
-    } else {
-      apply_low_collisions++;
-    }
-#endif
-    if (entry->oprogp) {
-      free_prog(&entry->oprogp);
-      entry->oprogp = 0;
-    }
-    if (entry->progp) {
-      free_prog(&entry->progp);
-      entry->progp = 0;
-    } else {
-      if (entry->funp) {
-        free_string((char *)entry->funp);
-        entry->funp = 0;
-      }
-    }
-    /* 2) Search for the function */
-    sfun = fun;
-    target_prog =
-        find_function_by_name2(ob, &sfun, &findex, &runtime_index, &fio, &vio);
-    /* 3) Save result into cache */
-    entry->oprogp = ob->prog;
-    reference_prog(entry->oprogp, "apply_low() cache oprogp [miss]");
-
-    entry->progp = target_prog;
-    entry->function_index_offset = fio;
-    entry->variable_index_offset = vio;
-
-    if (entry->progp) {
-      reference_prog(entry->progp, "apply_low() cache progp [miss]");
-      entry->funp = &target_prog->function_table[findex];
-    } else {
-      if (sfun) {
-        ref_string(sfun);
-        entry->funp = (function_t *)sfun;
-      } else {
-        entry->funp = (function_t *)make_shared_string(fun);
-      }
-    }
-  } /* search in cache */
-#ifndef NO_SHADOWS
-  if (!target_prog && ob->shadowing) {
-    /*
-     * This is an object shadowing another. The function was not
-     * found, but can maybe be found in the object we are shadowing.
-     */
-    ob = ob->shadowing;
-    goto retry_for_shadow;
-  }
-#endif
-  /* This function is not found, return failure. */
-  if (!target_prog) {
-    pop_n_elems(num_arg);
-    return 0;
-  }
-  /* Ready to call the function now. */
-  {
-    int need;
-    function_t *funp = entry->funp;
-    int findex = (funp - entry->progp->function_table);
-    int funflags, runtime_index;
-
-    runtime_index =
-        findex + entry->progp->last_inherited + entry->function_index_offset;
-    funflags = entry->oprogp->function_flags[runtime_index];
-
-    need =
-        (local_call_origin == ORIGIN_DRIVER
-             ? DECL_HIDDEN
-             : ((current_object == ob || local_call_origin == ORIGIN_INTERNAL)
-                    ? DECL_PRIVATE
-                    : DECL_PUBLIC));
-
-    // Check whether caller has sufficient permission.
-    if ((funflags & DECL_ACCESS) < need) {
-      debug_message(
-          "apply() with insufficient permission: \n"
-          "cob: %s, ob: %s, function: %s, origin: %s, needs: %s, has: %s \n",
-          current_object ? current_object->obname : "null",
-          ob ? ob->obname : "null", fun, origin_to_name(local_call_origin),
-          access_to_name(need), access_to_name(funflags & DECL_ACCESS));
-      pop_n_elems(num_arg);
-      return 0;
-    }
-    /* Check arguments */
-    if (!(funflags & FUNC_VARARGS)) {
-      check_co_args(num_arg, entry->progp, funp, findex);
-    }
-    /* Setup new call frame */
-    push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE);
-    current_prog = entry->progp;
-    caller_type = local_call_origin;
-    csp->num_local_variables = num_arg;
-    function_index_offset = entry->function_index_offset;
-    variable_index_offset = entry->variable_index_offset;
-    csp->fr.table_index = findex;
-#ifdef PROFILE_FUNCTIONS
-    get_cpu_times(&(csp->entry_secs), &(csp->entry_usecs));
-    current_prog->function_table[findex].calls++;
-#endif
-    /* Setup variables */
-    if (funflags & FUNC_TRUE_VARARGS)
-      setup_varargs_variables(csp->num_local_variables, funp->num_local,
-                              funp->num_arg);
-    else
-      setup_variables(csp->num_local_variables, funp->num_local, funp->num_arg);
-#ifdef TRACE
-    tracedepth++;
-    if (TRACEP(TRACE_CALL)) {
-      do_trace_call(findex);
-    }
-#endif
-    DTRACE_PROBE3(fluffos, lpc__entry, ob->obname, fun, current_prog->filename);
-    /* Call the program */
-    previous_ob = current_object;
-    current_object = ob;
-    IF_DEBUG(save_csp = csp);
-    call_program(current_prog, funp->address);
-    DEBUG_CHECK(save_csp - 1 != csp, "Bad csp after execution in apply_low.\n");
-    return 1;
-  }
-}
-
-/*
- * Arguments are supposed to be
- * pushed (using push_string() etc) before the call. A pointer to a
- * 'svalue_t' will be returned. It will be a null pointer if the called
- * function was not found. Otherwise, it will be a pointer to a static
- * area in apply(), which will be overwritten by the next call to apply.
- * Reference counts will be updated for this value, to ensure that no pointers
- * are deallocated.
- */
-
-svalue_t *apply(const char *fun, object_t *ob, int num_arg, int where) {
-  IF_DEBUG(svalue_t * expected_sp);
-
-  tracedepth = 0;
-  call_origin = where;
-
-#ifdef TRACE
-  if (TRACEP(TRACE_APPLY)) {
-    static int inapply = 0;
-    if (!inapply) {
-      inapply = 1;
-      do_trace("Apply", "", "\n");
-      inapply = 0;
-    }
-  }
-#endif
-  IF_DEBUG(expected_sp = sp - num_arg);
-  if (apply_low(fun, ob, num_arg) == 0) {
-    return 0;
-  }
-  free_svalue(&apply_ret_value, "sapply");
-  apply_ret_value = *sp--;
-  DEBUG_CHECK(expected_sp != sp, "Corrupt stack pointer.\n");
-  return &apply_ret_value;
 }
 
 /* Reason for the following 1. save cache space 2. speed :) */

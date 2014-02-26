@@ -13,7 +13,7 @@
 #include <sys/syscall.h>
 #endif
 #include "../config.h"
-#include "../interpret.h"
+#include "../lpc/interpret.h"
 #include "../file.h"
 #include "../function.h"
 #include "../eval.h"
