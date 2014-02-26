@@ -239,7 +239,6 @@ void check_for_destr(array_t *);
 int is_static(const char *, object_t *);
 svalue_t *call_function_pointer(funptr_t *, int);
 svalue_t *safe_call_function_pointer(funptr_t *, int);
-svalue_t *safe_apply(const char *, object_t *, int, int);
 void call___INIT(object_t *);
 array_t *call_all_other(array_t *, const char *, int);
 const char *function_exists(const char *, object_t *, int);

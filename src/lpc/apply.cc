@@ -16,7 +16,7 @@ svalue_t apply_ret_value;
 
 // TODO: These should be moved somewhere else
 void check_co_args2(unsigned short *types, int num_arg, const char *name,
-                    const char *ob_name, int sparg) {
+    const char *ob_name, int sparg) {
   int argc = sparg;
   int exptype, i = 0;
   do {
@@ -36,9 +36,9 @@ void check_co_args2(unsigned short *types, int num_arg, const char *name,
       if ((sp - argc)->type == T_NUMBER && !(sp - argc)->u.number) {
         continue;
       }
-      sprintf(
-          buf, "Bad argument %d in call to %s() in %s\nExpected: %s Got %s.\n",
-          i, name, ob_name, type_name(exptype), type_name((sp - argc)->type));
+      sprintf(buf,
+          "Bad argument %d in call to %s() in %s\nExpected: %s Got %s.\n", i,
+          name, ob_name, type_name(exptype), type_name((sp - argc)->type));
 #ifdef CALL_OTHER_WARN
       if (current_prog) {
         const char *file;
@@ -60,14 +60,14 @@ void check_co_args2(unsigned short *types, int num_arg, const char *name,
 
 // util functions
 void check_co_args(int num_arg, const program_t *prog, function_t *fun,
-                   int findex) {
+    int findex) {
 #ifdef CALL_OTHER_TYPE_CHECK
   if (num_arg != fun->num_arg) {
     char buf[1024];
     // if(!current_prog) what do i need this for again?
     // current_prog = master_ob->prog;
     sprintf(buf, "Wrong number of arguments to %s in %s.\n", fun->funcname,
-            prog->filename);
+        prog->filename);
 #ifdef CALL_OTHER_WARN
     if (current_prog) {
       const char *file;
@@ -88,8 +88,8 @@ void check_co_args(int num_arg, const program_t *prog, function_t *fun,
   int num_arg_check = std::min(num_arg, fun->num_arg);
   if (num_arg_check && prog->type_start &&
       prog->type_start[findex] != INDEX_START_NONE)
-    check_co_args2(&prog->argument_types[prog->type_start[findex]], num_arg,
-                   fun->funcname, prog->filename, num_arg);
+  check_co_args2(&prog->argument_types[prog->type_start[findex]], num_arg,
+      fun->funcname, prog->filename, num_arg);
 #endif
 }
 
@@ -281,4 +281,36 @@ svalue_t *apply(const char *fun, object_t *ob, int num_arg, int where) {
   apply_ret_value = *sp--;
   DEBUG_CHECK(expected_sp != sp, "Corrupt stack pointer.\n");
   return &apply_ret_value;
+}
+
+/*
+ * this is a "safe" version of apply
+ * this allows you to have dangerous driver mudlib dependencies
+ * and not have to worry about causing serious bugs when errors occur in the
+ * applied function and the driver depends on being able to do something
+ * after the apply. (such as the ed exit function, and the net_dead function).
+ */
+svalue_t *safe_apply(const char *fun, object_t *ob, int num_arg, int where) {
+  /* Arguments are already pushed on stack */
+
+  if (ob->flags & O_DESTRUCTED) {
+    pop_n_elems(num_arg);
+    return 0;
+  }
+
+  error_context_t econ;
+  if (!save_context(&econ)) {
+    pop_n_elems(num_arg);
+    return 0;
+  }
+  svalue_t *ret = 0;
+  try {
+    ret = apply(fun, ob, num_arg, where);
+  } catch (const char *) {
+    restore_context(&econ);
+    pop_n_elems(num_arg);
+    ret = 0;
+  }
+  pop_context(&econ);
+  return ret;
 }

@@ -3929,39 +3929,6 @@ void call___INIT(object_t *ob) {
 }
 
 /*
- * this is a "safe" version of apply
- * this allows you to have dangerous driver mudlib dependencies
- * and not have to worry about causing serious bugs when errors occur in the
- * applied function and the driver depends on being able to do something
- * after the apply. (such as the ed exit function, and the net_dead function).
- * note: this function uses setjmp() and thus is fairly expensive when
- * compared to a normal apply().  Use sparingly.
- */
-
-svalue_t *safe_apply(const char *fun, object_t *ob, int num_arg, int where) {
-  svalue_t *ret;
-  error_context_t econ;
-
-  if (!save_context(&econ)) {
-    return 0;
-  }
-  try {
-    if (!(ob->flags & O_DESTRUCTED)) {
-      ret = apply(fun, ob, num_arg, where);
-    } else {
-      ret = 0;
-    }
-  }
-  catch (const char *) {
-    restore_context(&econ);
-    pop_n_elems(num_arg); /* saved state had args on stack already */
-    ret = 0;
-  }
-  pop_context(&econ);
-  return ret;
-}
-
-/*
  * Call a function in all objects in a array.
  */
 array_t *call_all_other(array_t *v, const char *func, int numargs) {
