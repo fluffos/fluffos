@@ -39,7 +39,7 @@ INSTALL=@INSTALL@
 INSTALL_DIR=@bindir@
 OPTIMIZE=@OPTIMIZE@
 
-SRC=grammar.tab.cc main.cc rc.cc simulate.cc file.cc \
+SRC=lpc/compiler/grammar.tab.cc main.cc rc.cc simulate.cc file.cc \
   backend.cc comm.cc ed.cc regexp.cc crc32.cc \
   malloc.cc mallocwrapper.cc efuns_main.cc efuns_port.cc \
   call_out.cc otable.cc dumpstat.cc stralloc.cc hash.cc \
@@ -59,7 +59,7 @@ SRC=grammar.tab.cc main.cc rc.cc simulate.cc file.cc \
 	lpc/compiler/compiler.cc lpc/compiler/generate.cc lpc/compiler/icode.cc lpc/comppiler/lex.cc \
 	lpc/compiler/scratchpad.cc lpc/compiler/trees.cc \
 
-OBJ=grammar.tab.o main.o rc.o simulate.o file.o \
+OBJ=lpc/compiler/grammar.tab.o main.o rc.o simulate.o file.o \
   backend.o comm.o ed.o regexp.o crc32.o \
   malloc.o mallocwrapper.o efuns_main.o efuns_port.o \
   call_out.o otable.o dumpstat.o stralloc.o hash.o \
@@ -106,13 +106,13 @@ build_binaries: $(DRIVER_BIN) portbind
 simulate.$(O): simulate.cc
 	$(CXX) -c $(CXXFLAGS) -I. @LIBEVENT_CPPFLAGS@ @MYSQL_CFLAGS@ @POSTGRESQL_CFLAGS@ @SQLITE3_CFLAGS@  -x c++ -o $@ $<
 
-grammar.tab.o: grammar.tab.cc opcodes.h
+lpc/compiler/grammar.tab.o: lpc/compiler/grammar.tab.cc opcodes.h
 
-grammar.tab.cc: grammar.y
-	-rm -f grammar.tab.*
-	$(YACC) -d grammar.y
-	mv y.tab.c grammar.tab.cc
-	mv y.tab.h grammar.tab.h
+lpc/compiler/grammar.tab.cc: lpc/compiler/grammar.y
+	-rm -f lpc/compiler/grammar.tab.*
+	$(YACC) -d lpc/compiler/grammar.y
+	mv y.tab.c lpc/compiler/grammar.tab.cc
+	mv y.tab.h lpc/compiler/grammar.tab.h
 
 $(DRIVER_BIN): $(OBJ) packages/*.$(O) dtrace_compile
 	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
@@ -134,9 +134,9 @@ cc.h:
 
 # the touches here are necessary to fix the modification times; link(2) does
 # 'modify' a file
-files: edit_source sysmalloc.cc debugmalloc.cc wrappedmalloc.cc options.h op.spec func.spec configure.h grammar.y.pre
-	./edit_source -options -malloc -build_func_spec '$(CXX) -E $(CXXFLAGS) -x c++' \
-	              -process grammar.y.pre
+files: edit_source sysmalloc.cc debugmalloc.cc wrappedmalloc.cc options.h lpc/op.spec lpc/func.spec configure.h lpc/compiler/grammar.y.pre
+	./edit_source -options -malloc -build_func_spec '$(CXX) -E $(CXXFLAGS) -I. -x c++' \
+	              -process lpc/compiler/grammar.y.pre
 	./edit_source -build_efuns -build_applies
 	touch mallocwrapper.cc
 	touch malloc.cc
@@ -174,8 +174,9 @@ clean:
 	-rm -f efun_defs.cc option_defs.cc
 	-rm -f opcodes.h efunctions.h opc.h efun_protos.h
 	-rm -f malloc.cc mallocwrapper.cc
-	-rm -f efun.spec.generated applies.h applies_table.cc files
-	-rm -f grammar.y comptest* a.out *.exe
+	-rm -f lpc/*.generated applies.h applies_table.cc files
+	-rm -f lpc/compiler/grammar.y lpc/compiler/grammar.tab.*
+	-rm -f comptest* a.out *.exe
 	-rm -f packages/packages
 	-rm -f Makefile.MudOS GNUmakefile.MudOS
 	-rm -f cc.h edit_source
