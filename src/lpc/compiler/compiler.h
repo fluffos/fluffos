@@ -1,9 +1,9 @@
 #ifndef COMPILER_H
 #define COMPILER_H
 
-#include "trees.h"
-#include "lex.h"
-#include "program.h"
+#include "lpc/compiler/trees.h"
+#include "lpc/compiler/lex.h"
+#include "lpc/program.h"
 
 #define _YACC_
 

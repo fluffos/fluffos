@@ -1,7 +1,7 @@
 #include "std.h"
 #include "lpc_incl.h"
 #include "eoperators.h"
-#include "compiler.h"
+#include "lpc/compiler/compiler.h"
 #include "replace_program.h"
 
 void dealloc_funp(funptr_t *fp) {

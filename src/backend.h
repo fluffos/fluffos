@@ -1,10 +1,11 @@
 #ifndef BACKEND_H
 #define BACKEND_H
 
-#include "interpret.h"
-#include "object.h"
-
 #include <functional>
+
+typedef struct object_s object_t;
+typedef struct error_context_s error_context_t;
+struct outbuffer_t;
 
 #define NULL_ERROR_CONTEXT 0
 #define NORMAL_ERROR_CONTEXT 1
@@ -26,7 +27,9 @@ struct tick_event {
   typedef std::function<void()> callback_type;
   callback_type callback;
 
-  tick_event(callback_type &callback) : valid(true), callback(callback) {}
+  tick_event(callback_type &callback) :
+      valid(true), callback(callback) {
+  }
 };
 
 // Register a event to run on game ticks. Safe to call from any thread.

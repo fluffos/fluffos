@@ -4,7 +4,6 @@
 
 #include "std.h"
 #include "lpc_incl.h"
-#include "mapping.h"
 #include "comm.h"
 #include "master.h"
 

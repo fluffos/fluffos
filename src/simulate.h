@@ -14,6 +14,8 @@
 /*
  * simulate.c
  */
+struct object_s;
+typedef struct object_s object_t;
 
 extern object_t *obj_list;
 extern object_t *obj_list_destruct;

@@ -6,11 +6,13 @@
 #include "std.h"
 #include "file.h"
 #include "comm.h"
-#include "lex.h"
+#include "lpc/compiler/lex.h"
 #include "md.h"
 #include "port.h"
 #include "master.h"
 #include "outbuf.h"
+
+#include "lpc/apply.h"
 
 #ifdef PACKAGE_COMPRESS
 #include <zlib.h>
@@ -737,7 +739,6 @@ const char *check_valid_path(const char *path, object_t *call_object,
 
   if (!master_ob && !call_object) {
     // early startup, ignore security
-    extern svalue_t apply_ret_value;
     free_svalue(&apply_ret_value, "check_valid_path");
     apply_ret_value.type = T_STRING;
     apply_ret_value.subtype = STRING_MALLOC;

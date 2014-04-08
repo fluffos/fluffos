@@ -16,7 +16,7 @@
 #include "comm.h"
 #include "dumpstat.h"
 #include "event.h"
-#include "object.h"
+#include "lpc_incl.h"
 
 #define NAME_LEN 50
 

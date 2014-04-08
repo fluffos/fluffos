@@ -11,7 +11,7 @@
 
 #include "std.h"
 #include "lpc_incl.h"
-#include "compiler.h"
+#include "lpc/compiler/compiler.h"
 #include "opcodes.h"
 
 /* our globals */

@@ -39,35 +39,46 @@ INSTALL=@INSTALL@
 INSTALL_DIR=@bindir@
 OPTIMIZE=@OPTIMIZE@
 
-SRC=grammar.tab.cc lex.cc main.cc rc.cc interpret.cc simulate.cc file.cc object.cc \
-  backend.cc array.cc mapping..cc comm.cc ed.cc regexp.cc buffer.cc crc32.cc \
-  malloc.cc mallocwrapper.cc class.cc efuns_main.cc efuns_port.cc \
+SRC=lpc/compiler/grammar.tab.cc main.cc rc.cc simulate.cc file.cc \
+  backend.cc comm.cc ed.cc regexp.cc crc32.cc \
+  malloc.cc mallocwrapper.cc efuns_main.cc efuns_port.cc \
   call_out.cc otable.cc dumpstat.cc stralloc.cc hash.cc \
-  port.cc reclaim.cc parse.cc simul_efun.cc sprintf.cc program.cc \
-  compiler.cc avltree.cc icode.cc trees.cc generate.cc scratchpad.cc \
+  port.cc reclaim.cc parse.cc simul_efun.cc sprintf.cc \
+  avltree.cc \
   socket_efuns.cc socket_ctrl.cc eoperators.cc socket_err.cc md.cc \
   disassembler.cc uvalarm.cc \
-  replace_program.cc master.cc function.cc \
+  replace_program.cc master.cc \
   debug.cc crypt.cc applies_table.cc add_action.cc eval.cc fliconv.cc console.cc \
   posix_timers.cc event.cc dns.c \
 	outbuf.cc \
 	libtelnet/libtelnet.c \
 	net/telnet.cc net/telnet_ext.cc net/mssp.cc \
+	lpc/interpret.cc lpc/svalue.cc lpc/apply.cc lpc/apply_cache.cc \
+	lpc/program.cc lpc/function.cc \
+	lpc/lang/array.cc lpc/lang/buffer.cc lpc/lang/class.cc lpc/lang/mapping.cc lpc/lang/object.cc \
+	lpc/compiler/compiler.cc lpc/compiler/generate.cc lpc/compiler/icode.cc lpc/comppiler/lex.cc \
+	lpc/compiler/scratchpad.cc lpc/compiler/trees.cc \
 
-OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
-  backend.o array.o mapping.o comm.o ed.o regexp.o buffer.o crc32.o \
-  malloc.o mallocwrapper.o class.o efuns_main.o efuns_port.o \
+OBJ=lpc/compiler/grammar.tab.o main.o rc.o simulate.o file.o \
+  backend.o comm.o ed.o regexp.o crc32.o \
+  malloc.o mallocwrapper.o efuns_main.o efuns_port.o \
   call_out.o otable.o dumpstat.o stralloc.o hash.o \
-  port.o reclaim.o parse.o simul_efun.o sprintf.o program.o \
-  compiler.o avltree.o icode.o trees.o generate.o scratchpad.o \
+  port.o reclaim.o parse.o simul_efun.o sprintf.o \
+  avltree.o \
   socket_efuns.o socket_ctrl.o eoperators.o socket_err.o md.o \
   disassembler.o uvalarm.o \
-  replace_program.o master.o function.o \
+  replace_program.o master.o \
   debug.o crypt.o applies_table.o add_action.o eval.o fliconv.o console.o \
   posix_timers.o event.o dns.o \
 	outbuf.o \
 	libtelnet/libtelnet.o \
 	net/telnet.o net/telnet_ext.o net/mssp.o \
+	lpc/interpret.o lpc/svalue.o lpc/apply.o lpc/apply_cache.o \
+	lpc/program.o lpc/function.o \
+	lpc/lang/array.o lpc/lang/buffer.o lpc/lang/class.o lpc/lang/mapping.o lpc/lang/object.o \
+	lpc/compiler/compiler.o lpc/compiler/generate.o lpc/compiler/icode.o lpc/compiler/lex.o \
+	lpc/compiler/scratchpad.o lpc/compiler/trees.o \
+
 
 VPATH = .:./packages
 
@@ -93,17 +104,15 @@ build_binaries: $(DRIVER_BIN) portbind
 
 # FIXME: simulate.c currently calls package_async, which depends on package/DB, this need to be fixed.
 simulate.$(O): simulate.cc
-	$(CXX) -c $(CXXFLAGS) @LIBEVENT_CPPFLAGS@ @MYSQL_CFLAGS@ @POSTGRESQL_CFLAGS@ @SQLITE3_CFLAGS@  -x c++ -o $@ $<
+	$(CXX) -c $(CXXFLAGS) -I. @LIBEVENT_CPPFLAGS@ @MYSQL_CFLAGS@ @POSTGRESQL_CFLAGS@ @SQLITE3_CFLAGS@  -x c++ -o $@ $<
 
-lex.o: lex.cc preprocess.cc cc.h grammar.tab.cc
+lpc/compiler/grammar.tab.o: lpc/compiler/grammar.tab.cc opcodes.h
 
-grammar.tab.o: grammar.tab.cc opcodes.h
-
-grammar.tab.cc: grammar.y
-	-rm -f grammar.tab.*
-	$(YACC) -d grammar.y
-	mv y.tab.c grammar.tab.cc
-	mv y.tab.h grammar.tab.h
+lpc/compiler/grammar.tab.cc: lpc/compiler/grammar.y
+	-rm -f lpc/compiler/grammar.tab.*
+	$(YACC) -d lpc/compiler/grammar.y
+	mv y.tab.c lpc/compiler/grammar.tab.cc
+	mv y.tab.h lpc/compiler/grammar.tab.h
 
 $(DRIVER_BIN): $(OBJ) packages/*.$(O) dtrace_compile
 	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
@@ -125,9 +134,9 @@ cc.h:
 
 # the touches here are necessary to fix the modification times; link(2) does
 # 'modify' a file
-files: edit_source sysmalloc.cc debugmalloc.cc wrappedmalloc.cc options.h op.spec func.spec configure.h grammar.y.pre
-	./edit_source -options -malloc -build_func_spec '$(CXX) -E $(CXXFLAGS) -x c++' \
-	              -process grammar.y.pre
+files: edit_source sysmalloc.cc debugmalloc.cc wrappedmalloc.cc options.h lpc/op.spec lpc/func.spec configure.h lpc/compiler/grammar.y.pre
+	./edit_source -options -malloc -build_func_spec '$(CXX) -E $(CXXFLAGS) -I. -x c++' \
+	              -process lpc/compiler/grammar.y.pre
 	./edit_source -build_efuns -build_applies
 	touch mallocwrapper.cc
 	touch malloc.cc
@@ -143,7 +152,7 @@ edit_source: edit_source.o hash.o make_func.tab.o
 	$(CXX) $(CXXFLAGS) edit_source.o hash.o make_func.tab.o -o edit_source
 
 # don't optimize these two
-edit_source.o: edit_source.cc preprocess.cc cc.h
+edit_source.o: edit_source.cc lpc/compiler/preprocess.cc cc.h
 	$(CXX) $(CXXFLAGS) -o $@ -c -x c++ $<
 
 make_func.tab.o: make_func.tab.cc
@@ -157,15 +166,17 @@ install: all
 # remove everything
 clean:
 	-$(MAKE) -C packages "A=$(A)" "O=$(O)" clean
-	-rm -rf *.$(O) *.gcda *.gcno *.gcov
-	-rm -rf net/*.$(O) net/*.gcda net/*.gcno net/*.gcov
-	-rm -rf libtelnet/*.$(O) libtelnet/*.gcda libtelnet/*.gcno libtelnet/*.gcov
+	-find . -name "*.$(O)" | xargs rm -rf
+	-find . -name "*.gcda" | xargs rm -rf
+	-find . -name "*.gcno" | xargs rm -rf
+	-find . -name "*.gcov" | xargs rm -rf
 	-rm -rf *.d *.tab.cc *.tab.h
 	-rm -f efun_defs.cc option_defs.cc
 	-rm -f opcodes.h efunctions.h opc.h efun_protos.h
 	-rm -f malloc.cc mallocwrapper.cc
-	-rm -f efun.spec.generated applies.h applies_table.cc files
-	-rm -f grammar.y comptest* a.out *.exe
+	-rm -f lpc/*.generated applies.h applies_table.cc files
+	-rm -f lpc/compiler/grammar.y lpc/compiler/grammar.tab.*
+	-rm -f comptest* a.out *.exe
 	-rm -f packages/packages
 	-rm -f Makefile.MudOS GNUmakefile.MudOS
 	-rm -f cc.h edit_source

@@ -1,6 +1,6 @@
 #include "std.h"
 #include "simul_efun.h"
-#include "lex.h"
+#include "lpc/compiler/lex.h"
 #include "otable.h"
 
 /*

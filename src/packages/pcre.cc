@@ -65,7 +65,7 @@
 #include <pcre.h>
 #include "pcre.h"
 #include "macros.h"
-#include "mapping.h"
+#include "../lpc_incl.h"
 
 // Prototype declarations
 static void pcre_free_memory(pcre_t *p);

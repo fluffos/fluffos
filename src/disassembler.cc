@@ -7,9 +7,9 @@
 #include "efuns_incl.h"
 #include "simul_efun.h"
 #include "comm.h"
-#include "lex.h"
+#include "lpc/compiler/lex.h"
 #include "file.h"
-#include "program.h"
+#include "lpc/program.h"
 
 #ifdef F_DUMP_PROG
 void dump_prog(program_t *, const char *, int);

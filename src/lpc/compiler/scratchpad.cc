@@ -1,7 +1,7 @@
 #include "std.h"
 #include "lpc_incl.h"
 #include "scratchpad.h"
-#include "compiler.h"
+#include "lpc/compiler/compiler.h"
 
 /*
  * This is a first attempt at beating malloc() for allocation of strings

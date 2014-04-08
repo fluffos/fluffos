@@ -169,7 +169,7 @@ typedef struct {
 #define ADDRESS_MAX UINT16_MAX
 #endif
 
-typedef struct {
+struct function_t {
   char *funcname;
   unsigned short type;
   unsigned char num_arg;
@@ -178,7 +178,7 @@ typedef struct {
 #ifdef PROFILE_FUNCTIONS
   unsigned long calls, self, children;
 #endif
-} function_t;
+};
 
 typedef struct {
   unsigned short classname;

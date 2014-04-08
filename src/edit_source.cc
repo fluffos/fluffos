@@ -3,9 +3,9 @@
 #define NO_SOCKETS
 #define NO_OPCODES
 #include "std.h"
-#include "lex.h"
-#include "lpc.h"
-#include "preprocess.h"
+#include "lpc/compiler/lex.h"
+#include "lpc/svalue.h"
+#include "lpc/compiler/preprocess.h"
 #include "make_func.h"
 #include "cc.h"
 #include "hash.h"
@@ -46,8 +46,8 @@ FILE *yyin = 0, *yyout = 0;
 #define OPTIONS_INTERNAL_H "options_internal.h"
 #define LOCAL_OPTIONS "local_options"
 #define OPTION_DEFINES "option_defs.cc"
-#define FUNC_SPEC "func.spec"
-#define FUNC_SPEC_CPP "func.spec.generated"
+#define FUNC_SPEC "lpc/func.spec"
+#define FUNC_SPEC_CPP "lpc/func.spec.generated"
 #define EFUN_TABLE "efunctions.h"
 #define OPC_PROF "opc.h"
 #define OPCODES "opcodes.h"
@@ -564,7 +564,7 @@ static int skip_to(const char *token, const char *atoken) {
   }
 }
 
-#include "preprocess.cc"
+#include "lpc/compiler/preprocess.cc"
 
 static int maybe_open_input_file(const char *fn) {
   if ((yyin = fopen(fn, "r")) == NULL) {
