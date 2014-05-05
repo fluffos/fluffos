@@ -60,6 +60,7 @@
 #include "lpc_incl.h"
 #include "comm.h"
 #include "ed.h"
+#include "outbuf.h"
 
 /*
  * The "internal use only" fields in regexp.h are present to pass info from
