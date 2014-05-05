@@ -17,6 +17,9 @@ fi
 
 # By default driver compile to native environment, you can
 # add "-m64" to force compile under 64bit, "-m32" for 32bit.
+#
+# If you are building binary to run on another machine, you
+# should change -march=native to -mtune=generic
 COMPILER_FLAGS=${COMPILER_FLAGS:-"-march=native"}
 
 OPTIMIZE=${OPTIMIZE:-"-O3"}
@@ -39,7 +42,8 @@ INSTALL_DIR=`dirname $(pwd)`/bin
 ####### END OF USER CONFIGURABLE OPTIONS
 
 CXXFLAGS="$CXXFLAGS $COMPILER_FLAGS $WARN $OPTIMIZE $DEBUG"
+SOURCE_REVISION="$(git describe --dirty)"
 
 # Force an reconfigure.
 rm configure.h
-CPPFLAGS=$CXXFLAGS CXXFLAGS=$CXXFLAGS MAKE=$MAKE ARCH=$ARCH DRIVER_BIN=$DRIVER_BIN OPTIMIZE=$OPTIMIZE ./configure --bindir=$INSTALL_DIR $@ && $MAKE help
+CPPFLAGS=$CXXFLAGS CXXFLAGS=$CXXFLAGS MAKE=$MAKE ARCH=$ARCH DRIVER_BIN=$DRIVER_BIN OPTIMIZE=$OPTIMIZE SOURCE_REVISION=$SOURCE_REVISION ./configure --bindir=$INSTALL_DIR $@ && $MAKE help

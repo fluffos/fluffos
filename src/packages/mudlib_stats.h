@@ -22,13 +22,12 @@ typedef struct _mstats {
   int size_array;
   int errors;
   int objects;
-}       mudlib_stats_t;
-
+} mudlib_stats_t;
 
 typedef struct _statgroup {
   mudlib_stats_t *domain;
   mudlib_stats_t *author;
-}          statgroup_t;
+} statgroup_t;
 
 #define DOMAIN_STATS_FILE_NAME "domain_stats"
 #define AUTHOR_STATS_FILE_NAME "author_stats"

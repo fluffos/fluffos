@@ -1,14 +1,15 @@
 #ifndef BACKEND_H
 #define BACKEND_H
 
-#include "interpret.h"
-#include "object.h"
-
 #include <functional>
 
-#define NULL_ERROR_CONTEXT       0
-#define NORMAL_ERROR_CONTEXT     1
-#define CATCH_ERROR_CONTEXT      2
+typedef struct object_s object_t;
+typedef struct error_context_s error_context_t;
+struct outbuffer_t;
+
+#define NULL_ERROR_CONTEXT 0
+#define NORMAL_ERROR_CONTEXT 1
+#define CATCH_ERROR_CONTEXT 2
 #define SAFE_APPLY_ERROR_CONTEXT 4
 
 /*
@@ -23,16 +24,18 @@ extern int time_for_hb;
 struct tick_event {
   bool valid;
 
-  typedef std::function<void ()> callback_type;
+  typedef std::function<void()> callback_type;
   callback_type callback;
 
   tick_event(callback_type &callback) :
-    valid(true),
-    callback(callback) {}
+      valid(true), callback(callback) {
+  }
 };
 
-// Register a event to run after a certain number of seconds.
+// Register a event to run on game ticks. Safe to call from any thread.
 tick_event *add_tick_event(int, tick_event::callback_type);
+
+// Used in shutdownMudos()
 void clear_tick_events();
 
 void backend(struct event_base *);

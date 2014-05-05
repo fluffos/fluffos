@@ -4,7 +4,7 @@
 #include "../file_incl.h"
 #include "../file.h"
 #include "../backend.h"
-#include "../compiler.h"
+#include "../lpc/compiler/compiler.h"
 #include "../main.h"
 #include "../eoperators.h"
 #include "../efun_protos.h"
@@ -12,7 +12,6 @@
 #include "../add_action.h"
 #include "../port.h"
 #include "../applies.h"
-#include "../object.h"
 #define MAX_COLOUR_STRING 200
 
 /* should be done in configure */
@@ -21,19 +20,14 @@
 #endif
 
 #ifdef F_REAL_TIME
-void
-f_real_time(void)
-{
-  push_number(time(NULL));
-}
+void f_real_time(void) { push_number(time(NULL)); }
 #endif
 
 #ifdef F_COMPRESSEDP
-void f_compressedp(void)
-{
+void f_compressedp(void) {
   int i;
 
-  i = sp->u.ob->interactive && sp->u.ob->interactive->compressed_stream;
+  i = sp->u.ob->interactive && (sp->u.ob->interactive->iflags & USING_COMPRESS);
   free_object(&sp->u.ob, "f_compressedp");
   put_number(i != 0);
 }
@@ -46,8 +40,7 @@ void f_compressedp(void)
  * substantially faster.
  */
 #ifdef F_NAMED_LIVINGS
-void f_named_livings()
-{
+void f_named_livings() {
   int i;
   int nob;
 #ifdef F_SET_HIDE
@@ -101,9 +94,7 @@ void f_named_livings()
 
 /* I forgot who wrote this, please claim it :) */
 #ifdef F_REMOVE_SHADOW
-void
-f_remove_shadow(void)
-{
+void f_remove_shadow(void) {
   object_t *ob;
 
   ob = current_object;
@@ -129,9 +120,7 @@ f_remove_shadow(void)
 /* This was originally written my Malic for Demon.  I rewrote parts of it
    when I added it (added function support, etc) -Beek */
 #ifdef F_QUERY_NOTIFY_FAIL
-void
-f_query_notify_fail(void)
-{
+void f_query_notify_fail(void) {
   char *p;
 
   if (command_giver && command_giver->interactive) {
@@ -153,9 +142,7 @@ f_query_notify_fail(void)
 
 /* Beek again */
 #ifdef F_STORE_VARIABLE
-void
-f_store_variable(void)
-{
+void f_store_variable(void) {
   int idx;
   svalue_t *sv;
   unsigned short type;
@@ -176,7 +163,7 @@ f_store_variable(void)
   idx = find_global_variable(ob->prog, name, &type, 0);
   if (idx == -1 || (type & DECL_PRIVATE)) {
     error("No variable named '%s'!\n", name);
-    return ;
+    return;
   }
   assign_svalue(&ob->variables[idx], sv);
   pop_n_elems(st_num_arg);
@@ -184,9 +171,7 @@ f_store_variable(void)
 #endif
 
 #ifdef F_FETCH_VARIABLE
-void
-f_fetch_variable(void)
-{
+void f_fetch_variable(void) {
   int idx;
   unsigned short type;
 
@@ -213,14 +198,14 @@ f_fetch_variable(void)
 
 /* Beek */
 #ifdef F_SET_PROMPT
-void
-f_set_prompt(void)
-{
+void f_set_prompt(void) {
   object_t *who;
   if (st_num_arg == 2) {
     who = sp->u.ob;
     pop_stack();
-  } else { who = command_giver; }
+  } else {
+    who = command_giver;
+  }
 
   if (!who || who->flags & O_DESTRUCTED || !who->interactive) {
     error("Prompts can only be set for interactives.\n");
@@ -241,8 +226,7 @@ static int depth;
 
 static void deep_copy_svalue(svalue_t *, svalue_t *);
 
-static array_t *deep_copy_array(array_t *arg)
-{
+static array_t *deep_copy_array(array_t *arg) {
   array_t *vec;
   int i;
 
@@ -254,8 +238,7 @@ static array_t *deep_copy_array(array_t *arg)
   return vec;
 }
 
-static array_t *deep_copy_class(array_t *arg)
-{
+static array_t *deep_copy_class(array_t *arg) {
   array_t *vec;
   int i;
 
@@ -267,8 +250,7 @@ static array_t *deep_copy_class(array_t *arg)
   return vec;
 }
 
-static int doCopy(mapping_t *map, mapping_node_t *elt, void *dest)
-{
+static int doCopy(mapping_t *map, mapping_node_t *elt, void *dest) {
   svalue_t *sv;
 
   sv = find_for_insert((mapping_t *)dest, &elt->values[0], 1);
@@ -281,24 +263,23 @@ static int doCopy(mapping_t *map, mapping_node_t *elt, void *dest)
   return 0;
 }
 
-static mapping_t *deep_copy_mapping(mapping_t *arg)
-{
+static mapping_t *deep_copy_mapping(mapping_t *arg) {
   mapping_t *map;
 
-  map = allocate_mapping(0);   /* this should be fixed.  -Beek */
-  mapTraverse(arg, doCopy, map);  /* Not horridly efficient either */
+  map = allocate_mapping(0);     /* this should be fixed.  -Beek */
+  mapTraverse(arg, doCopy, map); /* Not horridly efficient either */
   return map;
 }
 
-static void deep_copy_svalue(svalue_t *from, svalue_t *to)
-{
+static void deep_copy_svalue(svalue_t *from, svalue_t *to) {
   switch (from->type) {
     case T_ARRAY:
       depth++;
       if (depth > MAX_SAVE_SVALUE_DEPTH) {
         depth = 0;
-        error("Mappings, arrays and/or classes nested too deep (%d) for copy()\n",
-              MAX_SAVE_SVALUE_DEPTH);
+        error(
+            "Mappings, arrays and/or classes nested too deep (%d) for copy()\n",
+            MAX_SAVE_SVALUE_DEPTH);
       }
       *to = *from;
       to->u.arr = deep_copy_array(from->u.arr);
@@ -308,8 +289,9 @@ static void deep_copy_svalue(svalue_t *from, svalue_t *to)
       depth++;
       if (depth > MAX_SAVE_SVALUE_DEPTH) {
         depth = 0;
-        error("Mappings, arrays and/or classes nested too deep (%d) for copy()\n",
-              MAX_SAVE_SVALUE_DEPTH);
+        error(
+            "Mappings, arrays and/or classes nested too deep (%d) for copy()\n",
+            MAX_SAVE_SVALUE_DEPTH);
       }
       *to = *from;
       to->u.arr = deep_copy_class(from->u.arr);
@@ -319,8 +301,9 @@ static void deep_copy_svalue(svalue_t *from, svalue_t *to)
       depth++;
       if (depth > MAX_SAVE_SVALUE_DEPTH) {
         depth = 0;
-        error("Mappings, arrays and/or classes nested too deep (%d) for copy()\n",
-              MAX_SAVE_SVALUE_DEPTH);
+        error(
+            "Mappings, arrays and/or classes nested too deep (%d) for copy()\n",
+            MAX_SAVE_SVALUE_DEPTH);
       }
       *to = *from;
       to->u.map = deep_copy_mapping(from->u.map);
@@ -338,8 +321,7 @@ static void deep_copy_svalue(svalue_t *from, svalue_t *to)
   }
 }
 
-void f_copy(void)
-{
+void f_copy(void) {
   svalue_t ret;
 
   depth = 0;
@@ -352,8 +334,7 @@ void f_copy(void)
 /* Gudu@VR */
 /* flag and extra info by Beek */
 #ifdef F_FUNCTIONS
-void f_functions(void)
-{
+void f_functions(void) {
   int i, j, num, ind;
   array_t *vec, *subvec;
   function_t *funp;
@@ -365,11 +346,12 @@ void f_functions(void)
   program_t *progp = sp->u.ob->prog;
   int offset = (flag & 2) ? progp->last_inherited : 0;
 
-  num = (flag & 2) ? progp->num_functions_defined : progp->num_functions_defined + progp->last_inherited;
+  num = (flag & 2) ? progp->num_functions_defined
+                   : progp->num_functions_defined + progp->last_inherited;
 
   if (progp->num_functions_defined &&
-      progp->function_table[progp->num_functions_defined - 1].funcname[0]
-      == APPLY___INIT_SPECIAL_CHAR) {
+      progp->function_table[progp->num_functions_defined - 1].funcname[0] ==
+          APPLY___INIT_SPECIAL_CHAR) {
     num--;
   }
 
@@ -395,7 +377,9 @@ void f_functions(void)
         mid = (low + high + 1) >> 1;
         if (prog->inherit[mid].function_index_offset > ind) {
           high = mid - 1;
-        } else { low = mid; }
+        } else {
+          low = mid;
+        }
       }
       ind -= prog->inherit[low].function_index_offset;
       prog = prog->inherit[low].prog;
@@ -453,8 +437,8 @@ void f_functions(void)
 
 /* Beek */
 #ifdef F_VARIABLES
-static void fv_recurse(array_t *arr, int *idx, program_t *prog, int type, int flag)
-{
+static void fv_recurse(array_t *arr, int *idx, program_t *prog, int type,
+                       int flag) {
   int i;
   array_t *subarr;
   char buf[256];
@@ -484,8 +468,7 @@ static void fv_recurse(array_t *arr, int *idx, program_t *prog, int type, int fl
   *idx += prog->num_variables_defined;
 }
 
-void f_variables(void)
-{
+void f_variables(void) {
   int idx = 0;
   array_t *arr;
   int flag = (sp--)->u.number;
@@ -501,10 +484,7 @@ void f_variables(void)
 
 /* also Beek */
 #ifdef F_HEART_BEATS
-void f_heart_beats(void)
-{
-  push_refed_array(get_heart_beats());
-}
+void f_heart_beats(void) { push_refed_array(get_heart_beats()); }
 #endif
 
 /*Aleas@Nightmare */
@@ -546,8 +526,7 @@ void f_heart_beats(void)
 #define TC_FIRST_CHAR '%'
 #define TC_SECOND_CHAR '^'
 
-static int at_end(int i, int imax, int z, int *lens)
-{
+static int at_end(int i, int imax, int z, int *lens) {
   if (z + 1 != lens[i]) {
     return 0;
   }
@@ -559,9 +538,7 @@ static int at_end(int i, int imax, int z, int *lens)
   return 1;
 }
 
-void
-f_terminal_colour(void)
-{
+void f_terminal_colour(void) {
   const char *instr, *cp, **parts;
   char *savestr, *deststr, *ncp;
   char curcolour[MAX_COLOUR_STRING];
@@ -590,7 +567,9 @@ f_terminal_colour(void)
       wrap = -wrap;
       fillout = 1;
     }
-    if (wrap < 2 && wrap != 0) { wrap = 2; }
+    if (wrap < 2 && wrap != 0) {
+      wrap = 2;
+    }
     if (indent < 0 || indent >= wrap - 1) {
       indent = wrap - 2;
     }
@@ -612,7 +591,8 @@ f_terminal_colour(void)
   if (cp == NULL) {
     if (wrap) {
       num = 1;
-      parts = (const char **)CALLOCATE(1, char *, TAG_TEMPORARY, "f_terminal_colour: parts");
+      parts = (const char **)CALLOCATE(1, char *, TAG_TEMPORARY,
+                                       "f_terminal_colour: parts");
       parts[0] = instr;
       savestr = 0;
     } else {
@@ -621,9 +601,10 @@ f_terminal_colour(void)
     }
   } else {
     /* here we have something to parse */
-    char *newstr = (char *) cp; //must be result of the string_copy above
-    parts = (const char **) CALLOCATE(NSTRSEGS, char *, TAG_TEMPORARY, "f_terminal_colour: parts");
-    if (newstr - instr) {       /* starting seg, if not delimiter */
+    char *newstr = (char *)cp;  // must be result of the string_copy above
+    parts = (const char **)CALLOCATE(NSTRSEGS, char *, TAG_TEMPORARY,
+                                     "f_terminal_colour: parts");
+    if (newstr - instr) {/* starting seg, if not delimiter */
       num = 1;
       parts[0] = instr;
       *newstr = 0;
@@ -650,19 +631,21 @@ f_terminal_colour(void)
         if (newstr > instr) {
           if (num && num % NSTRSEGS == 0) {
             // Increase the size of the parts array.
-            parts = (const char **) RESIZE(parts, num + NSTRSEGS, char *,
-                                           TAG_TEMPORARY, "f_terminal_colour: parts realloc");
+            parts = (const char **)RESIZE(parts, num + NSTRSEGS, char *,
+                                          TAG_TEMPORARY,
+                                          "f_terminal_colour: parts realloc");
           }
           // Put it in at the current location in the parts array.
           parts[num++] = instr;
         }
       }
     }
-    if (*instr) {   /* trailing seg, if not delimiter */
+    if (*instr) {/* trailing seg, if not delimiter */
       if (num && num % NSTRSEGS == 0) {
         // Increase the size of the parts array.
-        parts = (const char **) RESIZE(parts, num + NSTRSEGS, char *,
-                                       TAG_TEMPORARY, "f_terminal_colour: parts realloc");
+        parts =
+            (const char **)RESIZE(parts, num + NSTRSEGS, char *, TAG_TEMPORARY,
+                                  "f_terminal_colour: parts realloc");
       }
       // Put it in at the current location in the parts array.
       parts[num++] = instr;
@@ -713,7 +696,7 @@ f_terminal_colour(void)
   }
 
   if (!resetstrlen) {
-    //we really really need one, so just default to ansi reset
+    // we really really need one, so just default to ansi reset
     resetstr = "\033[49;49m\033[0;10m";
     resetstrlen = 15;
     add_mapping_string(sp->u.map, "RESET", resetstr);
@@ -729,14 +712,16 @@ f_terminal_colour(void)
     // Look it up in the mapping.
     repused = 0;
     copy_and_push_string(parts[i]);
-    svalue_t *reptmp = apply(APPLY_TERMINAL_COLOUR_REPLACE, current_object, 1, ORIGIN_EFUN);
+    svalue_t *reptmp =
+        apply(APPLY_TERMINAL_COLOUR_REPLACE, current_object, 1, ORIGIN_EFUN);
     if (reptmp && reptmp->type == T_STRING) {
       rep = (char *)alloca(SVALUE_STRLEN(reptmp) + 1);
       strcpy(rep, reptmp->u.string);
       repused = 1;
     }
 
-    if ((repused && (cp = findstring(rep))) || (!repused && (cp = findstring(parts[i])))) {
+    if ((repused && (cp = findstring(rep))) ||
+        (!repused && (cp = findstring(parts[i])))) {
       static svalue_t str = {T_STRING, STRING_SHARED};
       int tmp;
       str.u.string = cp;
@@ -748,13 +733,16 @@ f_terminal_colour(void)
           parts[i] = (elt->values + 1)->u.string;
           /* Negative indicates don't count for wrapping */
           lens[i] = SVALUE_STRLEN(elt->values + 1);
-          if (wrap) { lens[i] = -lens[i]; }
+          if (wrap) {
+            lens[i] = -lens[i];
+          }
           // Do stuff for continueing colour codes.
           if (!strcmp(resetstr, parts[i])) {
             curcolour[0] = 0;
             curcolourlen = 0;
           } else {
-            if (curcolourlen + strlen((elt->values + 1)->u.string) < MAX_COLOUR_STRING - 1) {
+            if (curcolourlen + strlen((elt->values + 1)->u.string) <
+                MAX_COLOUR_STRING - 1) {
               strcat(curcolour, (elt->values + 1)->u.string);
               curcolourlen += strlen((elt->values + 1)->u.string);
             }
@@ -762,7 +750,7 @@ f_terminal_colour(void)
           break;
         }
       }
-      if (!elt) { //end of for loop, so not found!
+      if (!elt) {  // end of for loop, so not found!
         if (repused) {
           parts[i] = rep;
           lens[i] = wrap ? -SVALUE_STRLEN(reptmp) : SVALUE_STRLEN(reptmp);
@@ -997,7 +985,7 @@ f_terminal_colour(void)
         ncp += n;
         if (kind == 1 || kind == 0) {
           /* replace the space */
-          //ncp[-1] = '\n';
+          // ncp[-1] = '\n';
           ncp--;
         }
         if (kind == 2) {
@@ -1044,7 +1032,10 @@ f_terminal_colour(void)
   pop_stack();
 #ifndef DEBUG
   if (ncp - deststr != j) {
-    fatal("Length miscalculated in terminal_colour()\n    Expected: %i Was: %i\n    String: %s\n    Indent: %i Wrap: %i\n", j, ncp - deststr, sp->u.string, indent, wrap);
+    fatal(
+        "Length miscalculated in terminal_colour()\n    Expected: %i Was: %i\n "
+        "   String: %s\n    Indent: %i Wrap: %i\n",
+        j, ncp - deststr, sp->u.string, indent, wrap);
   }
 #endif
   free_string_svalue(sp);
@@ -1056,13 +1047,12 @@ f_terminal_colour(void)
 
 #ifdef F_PLURALIZE
 
-#define PLURAL_SUFFIX  1
-#define PLURAL_SAME    2
+#define PLURAL_SUFFIX 1
+#define PLURAL_SAME 2
 /* number to chop is added */
-#define PLURAL_CHOP    2
+#define PLURAL_CHOP 2
 
-static char *pluralize(const char *str)
-{
+static char *pluralize(const char *str) {
   char *pre;
   const char *p, *rel, *end;
   char *of_buf;
@@ -1074,7 +1064,9 @@ static char *pluralize(const char *str)
   const char *suffix = "s";
 
   sz = strlen(str);
-  if (!sz) { return 0; }
+  if (!sz) {
+    return 0;
+  }
 
   /* if it is of the form 'X of Y', pluralize the 'X' part */
   if ((p = strstr(str, " of "))) {
@@ -1278,7 +1270,7 @@ static char *pluralize(const char *str)
         break;
       }
       if (!strcasecmp(rel + 1, "ech")) {
-        found =  PLURAL_SUFFIX;
+        found = PLURAL_SUFFIX;
         suffix = "s";
       }
       break;
@@ -1410,15 +1402,16 @@ static char *pluralize(const char *str)
 
   /* don't have to set found to PLURAL_SUFFIX in these rules b/c
      found == 0 is interpreted as PLURAL_SUFFIX */
-  if (!found && (end != pre))
-    switch (end[-1]) {
-      case 'E': case 'e':
+  if (!found && (end != pre)) switch (end[-1]) {
+      case 'E':
+      case 'e':
         if ((end - pre) > 1 && (end[-2] == 'f' || end[-2] == 'F')) {
           found = PLURAL_CHOP + 2;
           suffix = "ves";
         }
         break;
-      case 'F': case 'f':
+      case 'F':
+      case 'f':
         if ((end - pre) > 1 && (end[-2] == 'e' || end[-2] == 'E')) {
           break;
         }
@@ -1428,7 +1421,8 @@ static char *pluralize(const char *str)
         }
         suffix = "ves";
         break;
-      case 'H': case 'h':
+      case 'H':
+      case 'h':
         if ((end - pre) > 1 && (end[-2] == 'c' || end[-2] == 's')) {
           suffix = "es";
         }
@@ -1450,18 +1444,21 @@ static char *pluralize(const char *str)
         }
         break;
 #endif
-      case 'N': case 'n':
+      case 'N':
+      case 'n':
         if ((end - pre) > 2 && end[-2] == 'a' && end[-3] == 'm') {
           found = PLURAL_CHOP + 3;
           suffix = "men";
         }
         break;
-      case 'O': case 'o':
+      case 'O':
+      case 'o':
         if ((end - pre) > 1 && end[-2] != 'o') {
           suffix = "es";
         }
         break;
-      case 'S': case 's':
+      case 'S':
+      case 's':
         if ((end - pre) > 1 && end[-2] == 'i') {
           found = PLURAL_CHOP + 2;
           suffix = "es";
@@ -1472,25 +1469,30 @@ static char *pluralize(const char *str)
           suffix = "i";
           break;
         }
-        if ((end - pre) > 1 && (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o')) {
+        if ((end - pre) > 1 &&
+            (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o')) {
           suffix = "ses";
         } else {
           suffix = "es";
         }
         break;
-      case 'X': case 'x':
+      case 'X':
+      case 'x':
         suffix = "es";
         break;
-      case 'Y': case 'y':
-        if ((end - pre) > 1 && end[-2] != 'a' && end[-2] != 'e' && end[-2] != 'i'
-            && end[-2] != 'o' && end[-2] != 'u') {
+      case 'Y':
+      case 'y':
+        if ((end - pre) > 1 && end[-2] != 'a' && end[-2] != 'e' &&
+            end[-2] != 'i' && end[-2] != 'o' && end[-2] != 'u') {
           found = PLURAL_CHOP + 1;
           suffix = "ies";
         }
         break;
-      case 'Z': case 'z':
-        if ((end - pre) > 1 && (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o'
-                                || end[-2] == 'i' || end[-2] == 'u')) {
+      case 'Z':
+      case 'z':
+        if ((end - pre) > 1 &&
+            (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o' ||
+             end[-2] == 'i' || end[-2] == 'u')) {
           suffix = "zes";
         } else {
           suffix = "es";
@@ -1504,7 +1506,7 @@ static char *pluralize(const char *str)
       break;
     default:
       plen -= (found - PLURAL_CHOP);
-      /* fallthrough */
+    /* fallthrough */
     case 0:
     case PLURAL_SUFFIX:
       slen = strlen(suffix);
@@ -1528,9 +1530,7 @@ static char *pluralize(const char *str)
   return news;
 } /* end of pluralize() */
 
-void
-f_pluralize(void)
-{
+void f_pluralize(void) {
   char *s;
 
   s = pluralize(sp->u.string);
@@ -1548,8 +1548,7 @@ f_pluralize(void)
  * file_length() efun, returns the number of lines in a file.
  * Returns -1 if no privs or file doesn't exist.
  */
-static int file_length(const char *file)
-{
+static int file_length(const char *file) {
   struct stat st;
   FILE *f;
   int ret = 0;
@@ -1559,7 +1558,9 @@ static int file_length(const char *file)
 
   file = check_valid_path(file, current_object, "file_size", 0);
 
-  if (!file) { return -1; }
+  if (!file) {
+    return -1;
+  }
   if (stat(file, &st) == -1) {
     return -1;
   }
@@ -1584,9 +1585,7 @@ static int file_length(const char *file)
   return ret;
 } /* end of file_length() */
 
-void
-f_file_length(void)
-{
+void f_file_length(void) {
   int l;
 
   l = file_length(sp->u.string);
@@ -1596,9 +1595,7 @@ f_file_length(void)
 #endif
 
 #ifdef F_UPPER_CASE
-void
-f_upper_case(void)
-{
+void f_upper_case(void) {
   const char *str;
 
   str = sp->u.string;
@@ -1608,11 +1605,11 @@ f_upper_case(void)
       char *newstr;
       int l = str - sp->u.string;
       unlink_string_svalue(sp);
-      newstr = (char *) sp->u.string + l;
-      *newstr = toupper((unsigned char) * newstr);
+      newstr = (char *)sp->u.string + l;
+      *newstr = toupper((unsigned char)*newstr);
       for (newstr++; *newstr; newstr++) {
         if (uislower((unsigned char)*newstr)) {
-          *newstr = toupper((unsigned char) * newstr);
+          *newstr = toupper((unsigned char)*newstr);
         }
       }
       return;
@@ -1622,8 +1619,7 @@ f_upper_case(void)
 #endif
 
 #ifdef F_REPLACEABLE
-void f_replaceable(void)
-{
+void f_replaceable(void) {
   object_t *obj;
   program_t *prog;
   int i, j, num, numignore, replaceable;
@@ -1659,7 +1655,9 @@ void f_replaceable(void)
   num = prog->num_functions_defined + prog->last_inherited;
 
   for (i = 0; i < num; i++) {
-    if (prog->function_flags[i] & (FUNC_INHERITED | FUNC_NO_CODE)) { continue; }
+    if (prog->function_flags[i] & (FUNC_INHERITED | FUNC_NO_CODE)) {
+      continue;
+    }
     for (j = 0; j < numignore; j++)
       if (ignore[j] == find_func_entry(prog, i)->funcname) {
         break;
@@ -1684,8 +1682,7 @@ void f_replaceable(void)
 #endif
 
 #ifdef F_PROGRAM_INFO
-void f_program_info(void)
-{
+void f_program_info(void) {
   int func_size = 0;
   int string_size = 0;
   int var_size = 0;
@@ -1708,18 +1705,21 @@ void f_program_info(void)
       prog_size += prog->program_size;
 
       /* function flags */
-      func_size += (prog->last_inherited +
-                    prog->num_functions_defined) * sizeof(unsigned short);
+      func_size += (prog->last_inherited + prog->num_functions_defined) *
+                   sizeof(unsigned short);
 
       /* definitions */
-      func_size += prog->num_functions_defined *
-                   sizeof(function_t);
+      func_size += prog->num_functions_defined * sizeof(function_t);
 
       string_size += prog->num_strings * sizeof(char *);
-      var_size += prog->num_variables_defined * (sizeof(char *) + sizeof(unsigned short));
+      var_size += prog->num_variables_defined *
+                  (sizeof(char *) + sizeof(unsigned short));
       inherit_size += prog->num_inherited * sizeof(inherit_t);
       if (prog->num_classes) {
-        class_size += prog->num_classes * sizeof(class_def_t) + (prog->classes[prog->num_classes - 1].index + prog->classes[prog->num_classes - 1].size) * sizeof(class_member_entry_t);
+        class_size += prog->num_classes * sizeof(class_def_t) +
+                      (prog->classes[prog->num_classes - 1].index +
+                       prog->classes[prog->num_classes - 1].size) *
+                          sizeof(class_member_entry_t);
       }
       type_size += prog->num_functions_defined * sizeof(short);
       n = 0;
@@ -1748,19 +1748,20 @@ void f_program_info(void)
       prog_size += prog->program_size;
 
       /* function flags */
-      func_size += (prog->last_inherited +
-                    prog->num_functions_defined) << 1;
+      func_size += (prog->last_inherited + prog->num_functions_defined) << 1;
 
       /* definitions */
-      func_size += prog->num_functions_defined *
-                   sizeof(function_t);
-
+      func_size += prog->num_functions_defined * sizeof(function_t);
 
       string_size += prog->num_strings * sizeof(char *);
-      var_size += prog->num_variables_defined * (sizeof(char *) + sizeof(unsigned short));
+      var_size += prog->num_variables_defined *
+                  (sizeof(char *) + sizeof(unsigned short));
       inherit_size += prog->num_inherited * sizeof(inherit_t);
       if (prog->num_classes) {
-        class_size += prog->num_classes * sizeof(class_def_t) + (prog->classes[prog->num_classes - 1].index + prog->classes[prog->num_classes - 1].size) * sizeof(class_member_entry_t);
+        class_size += prog->num_classes * sizeof(class_def_t) +
+                      (prog->classes[prog->num_classes - 1].index +
+                       prog->classes[prog->num_classes - 1].size) *
+                          sizeof(class_member_entry_t);
       }
       type_size += prog->num_functions_defined * sizeof(short);
       n = 0;
@@ -1804,8 +1805,7 @@ void f_program_info(void)
  */
 
 #ifdef F_REMOVE_INTERACTIVE
-void f_remove_interactive(void)
-{
+void f_remove_interactive(void) {
   if ((sp->u.ob->flags & O_DESTRUCTED) || !(sp->u.ob->interactive)) {
     free_object(&sp->u.ob, "f_remove_interactive");
     *sp = const0;
@@ -1825,17 +1825,14 @@ void f_remove_interactive(void)
  * mud.
  */
 #ifdef F_QUERY_IP_PORT
-static int query_ip_port(object_t *ob)
-{
+static int query_ip_port(object_t *ob) {
   if (!ob || ob->interactive == 0) {
     return 0;
   }
   return ob->interactive->local_port;
 }
 
-void
-f_query_ip_port(void)
-{
+void f_query_ip_port(void) {
   int tmp;
 
   if (st_num_arg) {
@@ -1859,8 +1856,7 @@ f_query_ip_port(void)
 
 #ifdef F_ZONETIME
 
-char *set_timezone(const char *timezone)
-{
+char *set_timezone(const char *timezone) {
   static char put_tz[80];
   char *old_tz;
 
@@ -1871,8 +1867,7 @@ char *set_timezone(const char *timezone)
   return old_tz;
 }
 
-void reset_timezone(const char *old_tz)
-{
+void reset_timezone(const char *old_tz) {
   static char put_tz[80];
   if (old_tz) {
     sprintf(put_tz, "TZ=%s", old_tz);
@@ -1887,8 +1882,7 @@ void reset_timezone(const char *old_tz)
   tzset();
 }
 
-void f_zonetime(void)
-{
+void f_zonetime(void) {
   const char *timezone, *old_tz;
   char *retv;
   LPC_INT time_val;
@@ -1904,19 +1898,17 @@ void f_zonetime(void)
   if (!retv) {
     reset_timezone(old_tz);
     error("bad argument to zonetime.");
-    return ;
+    return;
   }
   len = strlen(retv);
   retv[len - 1] = '\0';
   reset_timezone(old_tz);
   push_malloced_string(string_copy(retv, "zonetime"));
-
 }
 #endif
 
 #ifdef F_IS_DAYLIGHT_SAVINGS_TIME
-void f_is_daylight_savings_time(void)
-{
+void f_is_daylight_savings_time(void) {
   struct tm *t;
   LPC_INT time_to_check;
   const char *timezone;
@@ -1932,22 +1924,22 @@ void f_is_daylight_savings_time(void)
   t = localtime((time_t *)&time_to_check);
   if (t) {
     push_number((t->tm_isdst) > 0);
-  } else { push_number(-1); }
+  } else {
+    push_number(-1);
+  }
   reset_timezone(old_tz);
 }
 #endif
 
 #ifdef F_DEBUG_MESSAGE
-void f_debug_message(void)
-{
+void f_debug_message(void) {
   debug_message("%s\n", sp->u.string);
   free_string_svalue(sp--);
 }
 #endif
 
 #ifdef F_FUNCTION_OWNER
-void f_function_owner(void)
-{
+void f_function_owner(void) {
   object_t *owner = sp->u.fp->hdr.owner;
 
   free_funp(sp->u.fp);
@@ -1956,8 +1948,7 @@ void f_function_owner(void)
 #endif
 
 #ifdef F_REPEAT_STRING
-void f_repeat_string(void)
-{
+void f_repeat_string(void) {
   const char *str;
   int repeat, len, newlen;
   char *ret, *p;
@@ -1995,8 +1986,7 @@ void f_repeat_string(void)
 #ifdef F_MEMORY_SUMMARY
 static int memory_share(svalue_t *);
 
-static int node_share(mapping_t *m, mapping_node_t *elt, void *tp)
-{
+static int node_share(mapping_t *m, mapping_node_t *elt, void *tp) {
   int *t = (int *)tp;
 
   *t += sizeof(mapping_node_t) - 2 * sizeof(svalue_t);
@@ -2006,8 +1996,7 @@ static int node_share(mapping_t *m, mapping_node_t *elt, void *tp)
   return 0;
 }
 
-static int memory_share(svalue_t *sv)
-{
+static int memory_share(svalue_t *sv) {
   int i, total = sizeof(svalue_t);
   int subtotal;
   static int calldepth = 0;
@@ -2018,11 +2007,10 @@ static int memory_share(svalue_t *sv)
         case STRING_MALLOC:
           return total +
                  (1 + COUNTED_STRLEN(sv->u.string) + sizeof(malloc_block_t)) /
-                 (COUNTED_REF(sv->u.string));
+                     (COUNTED_REF(sv->u.string));
         case STRING_SHARED:
-          return total +
-                 (1 + COUNTED_STRLEN(sv->u.string) + sizeof(block_t)) /
-                 (COUNTED_REF(sv->u.string));
+          return total + (1 + COUNTED_STRLEN(sv->u.string) + sizeof(block_t)) /
+                             (COUNTED_REF(sv->u.string));
       }
       break;
     case T_ARRAY:
@@ -2090,16 +2078,14 @@ static int memory_share(svalue_t *sv)
   return total;
 }
 
-
 /*
  * The returned mapping is:
  *
  * map["program name"]["variable name"] = memory usage
  */
 #ifdef F_MEMORY_SUMMARY
-static void fms_recurse(mapping_t *map, object_t *ob,
-                        int *idx, program_t *prog)
-{
+static void fms_recurse(mapping_t *map, object_t *ob, int *idx,
+                        program_t *prog) {
   int i;
   svalue_t *entry;
   svalue_t sv;
@@ -2121,8 +2107,7 @@ static void fms_recurse(mapping_t *map, object_t *ob,
   *idx += prog->num_variables_defined;
 }
 
-void f_memory_summary(void)
-{
+void f_memory_summary(void) {
   mapping_t *result = allocate_mapping(8);
   object_t *ob;
   int idx;
@@ -2151,8 +2136,7 @@ void f_memory_summary(void)
 
 /* Marius */
 #ifdef F_QUERY_REPLACED_PROGRAM
-void f_query_replaced_program(void)
-{
+void f_query_replaced_program(void) {
   char *res = 0;
 
   if (st_num_arg) {
@@ -2177,12 +2161,11 @@ void f_query_replaced_program(void)
 
 /* Skullslayer@Realms of the Dragon */
 #ifdef F_NETWORK_STATS
-void f_network_stats(void)
-{
+void f_network_stats(void) {
   mapping_t *m;
   int i, ports = 0;
 
-  for (i = 0;  i < 5;  i++)
+  for (i = 0; i < 5; i++)
     if (external_port[i].port) {
       ports += 4;
     }
@@ -2206,7 +2189,7 @@ void f_network_stats(void)
 #endif
 
   if (ports) {
-    for (i = 0;  i < 5;  i++) {
+    for (i = 0; i < 5; i++) {
       if (external_port[i].port) {
         char buf[40];
 
@@ -2228,7 +2211,6 @@ void f_network_stats(void)
 
 #ifdef F_EVENT
 
-
 /* EVENTS!
  * Okay. This is pretty simple.
  * Calls the function "event_"+event_name in the object specified.
@@ -2242,8 +2224,7 @@ void f_network_stats(void)
 #define EVENT_PREFIX "event_"
 
 void event(svalue_t *event_ob, const char *event_fun, int numparam,
-           svalue_t *event_param)
-{
+           svalue_t *event_param) {
 
   object_t *ob, *origin;
   char *name;
@@ -2262,8 +2243,8 @@ void event(svalue_t *event_ob, const char *event_fun, int numparam,
     int ind;
 
     for (ind = 0; ind < event_ob->u.arr->size; ind++) {
-      if (event_ob->u.arr->item[ind].type != T_OBJECT
-          || event_ob->u.arr->item[ind].u.ob->flags & O_DESTRUCTED) {
+      if (event_ob->u.arr->item[ind].type != T_OBJECT ||
+          event_ob->u.arr->item[ind].u.ob->flags & O_DESTRUCTED) {
         continue;
       }
 
@@ -2272,8 +2253,7 @@ void event(svalue_t *event_ob, const char *event_fun, int numparam,
         push_svalue(event_param + i);
       }
 
-      apply(name, event_ob->u.arr->item[ind].u.ob, numparam + 1,
-            ORIGIN_EFUN);
+      apply(name, event_ob->u.arr->item[ind].u.ob, numparam + 1, ORIGIN_EFUN);
     }
   } else if (event_ob->type == T_OBJECT) {
     int count = 0;
@@ -2287,8 +2267,7 @@ void event(svalue_t *event_ob, const char *event_fun, int numparam,
     apply(name, event_ob->u.ob, numparam + 1, ORIGIN_EFUN);
 
     /* And then call it on it's inventory..., if it's still around! */
-    if (event_ob && event_ob->u.ob && !(event_ob->u.ob->flags
-                                        & O_DESTRUCTED))
+    if (event_ob && event_ob->u.ob && !(event_ob->u.ob->flags & O_DESTRUCTED))
       for (ob = event_ob->u.ob->contains; ob; ob = ob->next_inv) {
         if (ob == origin) {
           continue;
@@ -2319,8 +2298,7 @@ void event(svalue_t *event_ob, const char *event_fun, int numparam,
   FREE_MSTR(name);
 }
 
-void f_event(void)
-{
+void f_event(void) {
 
   int num;
 
@@ -2332,20 +2310,15 @@ void f_event(void)
 }
 #endif
 
-
 #ifdef F_QUERY_NUM
-void number_as_string(char *buf, LPC_INT n)
-{
-  const char *low[] =  { "ten", "eleven", "twelve", "thirteen",
-                         "fourteen", "fifteen", "sixteen", "seventeen",
-                         "eighteen", "nineteen"
-                       };
-  const char *hi[] =  { "", "", "twenty", "thirty", "forty", "fifty", "sixty",
-                        "seventy", "eighty", "ninety"
-                      };
-  const char *single[] =  { "", "one", "two", "three", "four", "five", "six",
-                            "seven", "eight", "nine"
-                          };
+void number_as_string(char *buf, LPC_INT n) {
+  const char *low[] = {"ten",      "eleven",  "twelve",  "thirteen",
+                       "fourteen", "fifteen", "sixteen", "seventeen",
+                       "eighteen", "nineteen"};
+  const char *hi[] = {"",      "",      "twenty",  "thirty", "forty",
+                      "fifty", "sixty", "seventy", "eighty", "ninety"};
+  const char *single[] = {"",     "one", "two",   "three", "four",
+                          "five", "six", "seven", "eight", "nine"};
   if (!n) {
     strcat(buf, "zero");
     return;
@@ -2366,8 +2339,7 @@ void number_as_string(char *buf, LPC_INT n)
   strcat(buf, single[n]);
 }
 
-void f_query_num(void)
-{
+void f_query_num(void) {
   char ret[100];
   int i;
   LPC_INT n, limit;
@@ -2381,7 +2353,7 @@ void f_query_num(void)
   //  pop_stack();
 
   if ((limit && n > limit) || (n < 0) || (n > 99999)) {
-    strcpy(ret,  "many"); /* this is a little pointless ... */
+    strcpy(ret, "many"); /* this is a little pointless ... */
     goto q_n_end;
   }
 
@@ -2436,8 +2408,7 @@ q_n_end:
 #endif
 
 #ifdef F_BASE_NAME
-void f_base_name(void)
-{
+void f_base_name(void) {
   char *name, *tmp;
   int i;
 
@@ -2471,18 +2442,15 @@ void f_base_name(void)
 #endif
 
 #ifdef F_GET_GARBAGE
-int garbage_check(object_t *ob, void *data)
-{
-  return (ob->ref == 1) && (ob->flags & O_CLONE) &&
-         !(ob->super
+int garbage_check(object_t *ob, void *data) {
+  return (ob->ref == 1) && (ob->flags & O_CLONE) && !(ob->super
 #ifndef NO_SHADOWS
-           || ob->shadowing
+                                                      || ob->shadowing
 #endif
-          );
+                                                      );
 }
 
-void f_get_garbage(void)
-{
+void f_get_garbage(void) {
   int count, i;
   object_t **obs;
   array_t *ret;
@@ -2492,7 +2460,7 @@ void f_get_garbage(void)
     count = max_array_size;
   }
   ret = allocate_empty_array(count);
-  for (i = 0;  i < count;  i++) {
+  for (i = 0; i < count; i++) {
     ret->item[i].type = T_OBJECT;
     ret->item[i].u.ob = obs[i];
     add_ref(obs[i], "f_get_garbage");
@@ -2505,9 +2473,7 @@ void f_get_garbage(void)
 
 #ifdef F_NUM_CLASSES
 
-void
-f_num_classes()
-{
+void f_num_classes() {
   int i = sp->u.ob->prog->num_classes;
   pop_stack();
   push_number(i);
@@ -2516,9 +2482,7 @@ f_num_classes()
 #endif
 
 #ifdef F_ASSEMBLE_CLASS
-void
-f_assemble_class()
-{
+void f_assemble_class() {
   array_t *arr = copy_array(sp->u.arr);
   pop_stack();
   push_refed_array(arr);
@@ -2528,9 +2492,7 @@ f_assemble_class()
 #endif
 
 #ifdef F_DISASSEMBLE_CLASS
-void
-f_disassemble_class()
-{
+void f_disassemble_class() {
   array_t *arr;
   if (sp->type != T_CLASS) {
     error("Argument to disassemble_class() not a class.\n");
@@ -2543,8 +2505,7 @@ f_disassemble_class()
 
 #ifdef F_FETCH_CLASS_MEMBER
 
-void f_fetch_class_member()
-{
+void f_fetch_class_member() {
   int pos = sp->u.number;
   array_t *arr;
 
@@ -2568,8 +2529,7 @@ void f_fetch_class_member()
 
 #ifdef F_STORE_CLASS_MEMBER
 
-void f_store_class_member()
-{
+void f_store_class_member() {
   int pos = (sp - 1)->u.number;
   array_t *arr;
 
@@ -2589,10 +2549,8 @@ void f_store_class_member()
 }
 #endif
 
-
 #ifdef F_ELEMENT_OF
-void f_element_of()
-{
+void f_element_of() {
   array_t *arr = sp->u.arr;
   if (!arr->size) {
     error("Can't take element from empty array.\n");
@@ -2607,8 +2565,7 @@ void f_element_of()
  * conversion by Taffyd.
  */
 
-void shuffle(array_t *args)
-{
+void shuffle(array_t *args) {
   int i, j;
   svalue_t temp;
 
@@ -2634,9 +2591,7 @@ void shuffle(array_t *args)
   /* Well, that's it. We don't need to push or anything. */
 }
 
-void
-f_shuffle()
-{
+void f_shuffle() {
   svalue_t *sv = sp - st_num_arg + 1;
 
   if (sv->type == T_ARRAY && sv->u.arr) {
@@ -2649,9 +2604,7 @@ f_shuffle()
 
 #ifdef F_MAX
 
-void
-f_max()
-{
+void f_max() {
   svalue_t *sarr = sp - 1;
   array_t *arr = sarr->u.arr;
   int max_index = 0;
@@ -2705,8 +2658,7 @@ f_max()
         if (arr->item[max_index].type != T_STRING) {
           error("Inhomogeneous array.\n");
         }
-        if (strcmp(arr->item[i].u.string,
-                   arr->item[max_index].u.string) > 0) {
+        if (strcmp(arr->item[i].u.string, arr->item[max_index].u.string) > 0) {
           max_index = i;
         }
         break;
@@ -2731,9 +2683,7 @@ f_max()
 
 #ifdef F_MIN
 
-void
-f_min()
-{
+void f_min() {
   svalue_t *sarr = sp - 1;
   array_t *arr = sarr->u.arr;
   int min_index = 0;
@@ -2787,8 +2737,7 @@ f_min()
         if (arr->item[min_index].type != T_STRING) {
           error("Inhomogeneous array.\n");
         }
-        if (strcmp(arr->item[i].u.string,
-                   arr->item[min_index].u.string) < 0) {
+        if (strcmp(arr->item[i].u.string, arr->item[min_index].u.string) < 0) {
           min_index = i;
         }
         break;
@@ -2812,9 +2761,7 @@ f_min()
 
 #ifdef F_ABS
 
-void
-f_abs()
-{
+void f_abs() {
   if (sp->type == T_REAL && sp->u.real < 0.0) {
     sp->u.real = -sp->u.real;
   } else if (sp->type == T_NUMBER && sp->u.number < 0) {
@@ -2825,9 +2772,7 @@ f_abs()
 
 #ifdef F_ROLL_MDN
 
-void
-f_roll_MdN()
-{
+void f_roll_MdN() {
   LPC_INT roll = 0;
 
   if ((sp - 1)->u.number > 0 && sp->u.number > 0) {
@@ -2836,15 +2781,14 @@ f_roll_MdN()
     }
   }
 
-  pop_stack(); // Pop one...
-  sp->u.number = roll; // And change the other!
+  pop_stack();          // Pop one...
+  sp->u.number = roll;  // And change the other!
 }
 
 #endif
 
 #ifdef F_STRING_DIFFERENCE
-int min3(int a, int b, int c)
-{
+int min3(int a, int b, int c) {
   if (a < b) {
     if (a < c) {
       return a;
@@ -2855,8 +2799,7 @@ int min3(int a, int b, int c)
   return c;
 }
 
-int levenshtein(char *a, int as, char *b, int bs)
-{
+int levenshtein(char *a, int as, char *b, int bs) {
   int *table, skew, nskew, i, j;
   // Strip common pre- and suffix.  This doesn't change the result.
   while (as > 0 && a[0] == b[0]) {
@@ -2871,7 +2814,7 @@ int levenshtein(char *a, int as, char *b, int bs)
     bs--;
   }
 
-  if (!as) {                   // Empty string needs bs insertions.
+  if (!as) {  // Empty string needs bs insertions.
     return bs;
   }
 
@@ -2899,8 +2842,7 @@ int levenshtein(char *a, int as, char *b, int bs)
   return i;
 } /* levenshtein() */
 
-void f_string_difference()
-{
+void f_string_difference() {
   int diff, as, bs;
   char *a, *b;
 
@@ -2928,8 +2870,7 @@ void f_string_difference()
 #endif
 
 #ifdef F_QUERY_CHARMODE
-static int query_charmode(object_t *ob)
-{
+static int query_charmode(object_t *ob) {
   int ret;
   if (!ob || ob->interactive == 0) {
     ret = -2;
@@ -2939,8 +2880,7 @@ static int query_charmode(object_t *ob)
   return ret;
 }
 
-void f_query_charmode(void)
-{
+void f_query_charmode(void) {
   int tmp;
 
   if (st_num_arg) {
@@ -2953,8 +2893,7 @@ void f_query_charmode(void)
 }
 
 #ifdef F_REMOVE_CHARMODE
-static int remove_charmode(object_t *ob)
-{
+static int remove_charmode(object_t *ob) {
   int ret;
   if (!ob || ob->interactive == 0) {
     ret = -2;
@@ -2964,8 +2903,7 @@ static int remove_charmode(object_t *ob)
   return ret;
 }
 
-void f_remove_charmode(void)
-{
+void f_remove_charmode(void) {
   int tmp;
 
   if (st_num_arg) {
@@ -2974,15 +2912,14 @@ void f_remove_charmode(void)
   } else {
     tmp = -1;
   }
-  //if(tmp > 0 && !(tmp & I_SINGLE_CHAR)) tmp = 1;
-  //else tmp = 0;
+  // if(tmp > 0 && !(tmp & I_SINGLE_CHAR)) tmp = 1;
+  // else tmp = 0;
   put_number(tmp);
 }
 #endif
 #endif
 #ifdef F_REMOVE_GET_CHAR
-static int remove_get_char(object_t *ob)
-{
+static int remove_get_char(object_t *ob) {
   if (!ob || ob->interactive == 0) {
     return -2;
   }
@@ -3000,8 +2937,7 @@ static int remove_get_char(object_t *ob)
   return -1;
 }
 
-void f_remove_get_char(void)
-{
+void f_remove_get_char(void) {
   int tmp;
 
   if (st_num_arg) {
@@ -3015,8 +2951,7 @@ void f_remove_get_char(void)
 
 #endif
 #ifdef F_SEND_NULLBYTE
-void f_send_nullbyte(void)
-{
+void f_send_nullbyte(void) {
   int tmp;
   object_t *who;
   tmp = 0;
@@ -3038,8 +2973,7 @@ void f_send_nullbyte(void)
 #endif
 
 #ifdef F_RESTORE_FROM_STRING
-void f_restore_from_string()
-{
+void f_restore_from_string() {
   const char *buf;
   LPC_INT noclear;
 
@@ -3048,15 +2982,16 @@ void f_restore_from_string()
   if (!noclear) {
     clear_non_statics(current_object);
   }
-  copy_and_push_string(buf); //restore_object_from_buff modifies the string in place, which is ok, copied strings aren't shared
+  copy_and_push_string(buf);  // restore_object_from_buff modifies the string in
+                              // place, which is ok, copied strings aren't
+                              // shared
   restore_object_from_buff(current_object, (char *)sp->u.string, noclear);
   pop_3_elems();
 }
 #endif
 
 #ifdef F_CLASSES
-void f_classes()
-{
+void f_classes() {
   int i, j, num, size, offset, flag;
   array_t *vec, *subvec, *subsubvec;
   char buf[256];
@@ -3082,8 +3017,8 @@ void f_classes()
       // First item of return array: the class's name.
       subvec->item[0].type = T_STRING;
       subvec->item[0].subtype = STRING_SHARED;
-      subvec->item[0].u.string = make_shared_string(
-                                   prog->strings[prog->classes[i].classname]);
+      subvec->item[0].u.string =
+          make_shared_string(prog->strings[prog->classes[i].classname]);
 
       offset = prog->classes[i].index;
 
@@ -3096,7 +3031,7 @@ void f_classes()
         subsubvec->item[0].type = T_STRING;
         subsubvec->item[0].subtype = STRING_SHARED;
         subsubvec->item[0].u.string = make_shared_string(
-                                        prog->strings[prog->class_members[offset].membername]);
+            prog->strings[prog->class_members[offset].membername]);
 
         // ...and type.
         get_type_name(buf, end, prog->class_members[offset].type);
@@ -3108,8 +3043,8 @@ void f_classes()
       // No additional info. Just pull out the class name.
       vec->item[i].type = T_STRING;
       vec->item[i].subtype = STRING_SHARED;
-      vec->item[i].u.string = make_shared_string(
-                                prog->strings[prog->classes[i].classname]);
+      vec->item[i].u.string =
+          make_shared_string(prog->strings[prog->classes[i].classname]);
     }
   }
 
@@ -3122,27 +3057,23 @@ void f_classes()
 #ifdef F_TEST_LOAD
 const char *saved_extra_name;
 object_t *testloadob;
-static void fix_object_names()
-{
+static void fix_object_names() {
   if (testloadob) {
     SETOBNAME(testloadob, saved_extra_name);
   }
 }
 
-void f_test_load()
-{
+void f_test_load() {
   const char *tmp = sp->u.string;
   object_t *new_ob;
   if ((testloadob = find_object2(sp->u.string))) {
     tmp = testloadob->obname;
     SETOBNAME(testloadob, "");
-
   }
   saved_extra_name = tmp;
   STACK_INC;
   sp->type = T_ERROR_HANDLER;
   sp->u.error_handler = fix_object_names;
-
 
   new_ob = int_load_object(tmp, 0);
   if (!new_ob) {

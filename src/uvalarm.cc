@@ -36,17 +36,16 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)ualarm.c	5.5 (Berkeley) 2/23/91";
-#endif              /* LIBC_SCCS and not lint */
+#endif /* LIBC_SCCS and not lint */
 
-#define USPS    1000000     /* # of microseconds in a second */
+#define USPS 1000000 /* # of microseconds in a second */
 
 /*
  * Generate a SIGALRM signal in ``usecs'' microseconds.
  * If ``reload'' is non-zero, keep generating SIGALRM
  * every ``reload'' microseconds after the first signal.
  */
-unsigned uvalarm(unsigned int usecs, unsigned int reload)
-{
+unsigned uvalarm(unsigned int usecs, unsigned int reload) {
   struct itimerval newv, old;
 
   newv.it_interval.tv_usec = reload % USPS;

@@ -1,7 +1,10 @@
 #ifndef EFUNS_MAIN_H
 #define EFUNS_MAIN_H
 
-#include "lpc_incl.h"
+typedef struct program_s program_t;
+typedef struct mapping_s mapping_t;
+typedef struct object_s object_t;
+typedef struct array_s array_t;
 
 /* These really should be moved somewhere else */
 /*

@@ -8,8 +8,7 @@
 #include <random>
 
 // Returns a pseudo-random number in the range 0 .. n-1
-int64_t random_number(int64_t n)
-{
+int64_t random_number(int64_t n) {
   static bool called = 0;
   static std::mt19937_64 engine;
 
@@ -32,13 +31,11 @@ int64_t random_number(int64_t n)
  * of seconds since 1970.
  */
 
-long get_current_time()
-{
-  return time(0l);    /* Just use the old time() for now */
+long get_current_time() {
+  return time(0l); /* Just use the old time() for now */
 }
 
-const char *time_string(time_t t)
-{
+const char *time_string(time_t t) {
   const char *res = ctime(&t);
   if (!res) {
     res = "ctime failed";
@@ -49,9 +46,7 @@ const char *time_string(time_t t)
 /*
  * Get a microsecond clock sample.
  */
-void
-get_usec_clock(long *sec, long *usec)
-{
+void get_usec_clock(long *sec, long *usec) {
   struct timeval tv;
 
   gettimeofday(&tv, NULL);
@@ -59,8 +54,7 @@ get_usec_clock(long *sec, long *usec)
   *usec = tv.tv_usec;
 }
 
-long get_cpu_times(unsigned long *secs, unsigned long *usecs)
-{
+long get_cpu_times(unsigned long *secs, unsigned long *usecs) {
   struct rusage rus;
 
   if (getrusage(RUSAGE_SELF, &rus) < 0) {
@@ -72,21 +66,19 @@ long get_cpu_times(unsigned long *secs, unsigned long *usecs)
 }
 
 /* return the current working directory */
-char *
-get_current_dir(char *buf, int limit)
-{
-  return getcwd(buf, limit);  /* POSIX */
+char *get_current_dir(char *buf, int limit) {
+  return getcwd(buf, limit); /* POSIX */
 }
 
 #ifdef MMAP_SBRK
-void *sbrkx(long size)
-{
+void *sbrkx(long size) {
   static void *end = 0;
   static unsigned long tsize = 0;
   void *tmp, *result;
   long long newsize;
   if (!end) {
-    tmp = mmap((void *)0x41000000, 4096, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+    tmp = mmap((void *)0x41000000, 4096, PROT_READ | PROT_WRITE,
+               MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
     tsize = 4096;
     end = (void *)0x41000000;
     if (tmp != end) {
@@ -103,7 +95,7 @@ void *sbrkx(long size)
 
   tmp = mremap((void *)0x41000000, tsize, newsize, 0);
 
-  if (tmp != (void *) 0x41000000) {
+  if (tmp != (void *)0x41000000) {
     return NULL;
   }
 
@@ -113,8 +105,7 @@ void *sbrkx(long size)
 
 #else
 
-void *sbrkx(long size)
-{
+void *sbrkx(long size) {
 #ifndef MINGW
   return sbrk(size);
 #endif

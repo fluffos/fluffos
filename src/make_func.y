@@ -3,8 +3,8 @@
 #define NO_OPCODES
 #include "std.h"
 #include "make_func.h"
-#include "lex.h"
-#include "preprocess.h"
+#include "lpc/compiler/lex.h"
+#include "lpc/compiler/preprocess.h"
 #include "edit_source.h"
 #include <stdlib.h>
 

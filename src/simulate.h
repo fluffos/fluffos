@@ -4,16 +4,18 @@
 /* It is usually better to include "lpc_incl.h" instead of including this
    directly */
 
-#define V_SHORT         1
-#define V_NOSPACE       2
-#define V_FUNCTION      4
+#define V_SHORT 1
+#define V_NOSPACE 2
+#define V_FUNCTION 4
 
 /* The end of a static buffer */
-#define EndOf(x) (x + sizeof(x)/sizeof(x[0]))
+#define EndOf(x) (x + sizeof(x) / sizeof(x[0]))
 
 /*
  * simulate.c
  */
+struct object_s;
+typedef struct object_s object_t;
 
 extern object_t *obj_list;
 extern object_t *obj_list_destruct;

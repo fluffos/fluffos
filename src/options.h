@@ -283,7 +283,8 @@
  * PRAGMA_ERROR_CONTEXT:include some text telling where on the line a
  *                      compilation error occured.
  */
-#define DEFAULT_PRAGMAS PRAGMA_WARNINGS + PRAGMA_SAVE_TYPES + PRAGMA_ERROR_CONTEXT + PRAGMA_OPTIMIZE
+#define DEFAULT_PRAGMAS \
+  PRAGMA_WARNINGS + PRAGMA_SAVE_TYPES + PRAGMA_ERROR_CONTEXT + PRAGMA_OPTIMIZE
 
 /* NO_RESETS: completely disable the periodic calling of reset() */
 #undef NO_RESETS
@@ -299,10 +300,11 @@
  */
 #undef LAZY_RESETS
 
-
-/* RANDOMIZED_RESETS: if this is defined, the reset() will be called in randomized
+/* RANDOMIZED_RESETS: if this is defined, the reset() will be called in
+ * randomized
  *   time interval. The interval vary from TIME_TO_RESET/2 to TIME_TO_RESET-1 .
- *   if this is undefined, the reset() will be called among all objects at the same time,
+ *   if this is undefined, the reset() will be called among all objects at the
+ * same time,
  *   with the interval as TIME_TO_RESET
 */
 #define RANDOMIZED_RESETS
@@ -500,14 +502,17 @@
 /*PACKAGE_ASYNC: adds some efuns for asyncronous IO */
 #define PACKAGE_ASYNC
 
-/*PACKAGE_SHA1: adds a function to calculate the sha1 hash of a string sha1(string).  Use PACKAGE_CRYPTO instead if possible. */
+/*PACKAGE_SHA1: adds a function to calculate the sha1 hash of a string
+ * sha1(string).  Use PACKAGE_CRYPTO instead if possible. */
 #define PACKAGE_SHA1
 
-/*PACKAGE_CRYPTO: adds a function that does multiple hash types hash(hash, string), needs openssl lib and includes and -lssl in system_libs*/
+/*PACKAGE_CRYPTO: adds a function that does multiple hash types hash(hash,
+ * string), needs openssl lib and includes and -lssl in system_libs*/
 #undef PACKAGE_CRYPTO
 
 /*
-  PACKAGE_TRIM: efuns for remove leading / trailing whitepsaces (or chars in provided charset)
+  PACKAGE_TRIM: efuns for remove leading / trailing whitepsaces (or chars in
+  provided charset)
   Functions:
     - trim: Remove leading and trailing whitespaces (or in provided charset).
       Example:

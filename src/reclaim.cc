@@ -21,9 +21,7 @@ static void check_svalue(svalue_t *);
 
 static int cleaned, nested;
 
-static void
-check_svalue(svalue_t *v)
-{
+static void check_svalue(svalue_t *v) {
   register int idx;
 
   nested++;
@@ -55,8 +53,8 @@ check_svalue(svalue_t *v)
         if (v->u.fp->hdr.type == (FP_LOCAL | FP_NOT_BINDABLE)) {
           prog = v->u.fp->hdr.owner->prog;
           prog->func_ref--;
-          debug(d_flag, "subtr func ref /%s: now %i\n",
-                prog->filename, prog->func_ref);
+          debug(d_flag, "subtr func ref /%s: now %i\n", prog->filename,
+                prog->func_ref);
           if (!prog->ref && !prog->func_ref) {
             deallocate_program(prog);
           }
@@ -77,9 +75,7 @@ check_svalue(svalue_t *v)
   return;
 }
 
-static void
-gc_mapping(mapping_t *m)
-{
+static void gc_mapping(mapping_t *m) {
   /* Be careful to correctly handle destructed mapping keys.  We can't
    * just call check_svalue() b/c the hash would be wrong and the '0'
    * element we add would be unreferenceable (in most cases)
@@ -115,10 +111,10 @@ gc_mapping(mapping_t *m)
   } while (j--);
 }
 
-int reclaim_objects(bool is_auto)
-{
+int reclaim_objects(bool is_auto) {
   if (is_auto) {
-    add_tick_event(30 + random_number(30), tick_event::callback_type(std::bind(reclaim_objects, true)));
+    add_tick_event(30 + random_number(30),
+                   tick_event::callback_type(std::bind(reclaim_objects, true)));
   }
   int i;
   object_t *ob;

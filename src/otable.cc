@@ -4,7 +4,8 @@
 #include "hash.h"
 #include "simul_efun.h"
 #include "master.h"
-#include "object.h"
+#include "lpc/lang/object.h"
+#include "outbuf.h"
 
 /*
  * Object name hash table.  Object names are unique, so no special
@@ -33,8 +34,7 @@ static object_t *find_obj_n(const char *);
 static object_t **obj_table = 0;
 static object_t **ch_table = 0;
 
-static char *_basename(const char *full, int *size)
-{
+static char *_basename(const char *full, int *size) {
   char *tmp;
   char *name = new_string(*size = strlen(full), "base_name: name");
   while (*full == '/') {
@@ -54,8 +54,7 @@ static char *_basename(const char *full, int *size)
   return name;
 }
 
-void init_otable()
-{
+void init_otable() {
   int x, y;
 
   /* ensure that otable_size is a power of 2 */
@@ -64,10 +63,8 @@ void init_otable()
     ;
   }
   otable_size_minus_one = otable_size - 1;
-  obj_table = CALLOCATE(otable_size, object_t *,
-                        TAG_OBJ_TBL, "init_otable");
-  ch_table = CALLOCATE(otable_size, object_t *,
-                       TAG_OBJ_TBL, "init_ch_otable");
+  obj_table = CALLOCATE(otable_size, object_t *, TAG_OBJ_TBL, "init_otable");
+  ch_table = CALLOCATE(otable_size, object_t *, TAG_OBJ_TBL, "init_ch_otable");
 
   for (x = 0; x < otable_size; x++) {
     obj_table[x] = 0;
@@ -85,8 +82,7 @@ static long obj_searches = 0, obj_probes = 0, objs_found = 0;
 static int h;
 static int ch;
 
-static object_t *find_obj_n(const char *s)
-{
+static object_t *find_obj_n(const char *s) {
   object_t *curr, *prev;
   h = ObjHash(s);
   curr = obj_table[h];
@@ -96,8 +92,8 @@ static object_t *find_obj_n(const char *s)
 
   while (curr) {
     obj_probes++;
-    if (!strcmp(curr->obname, s)) { /* found it */
-      if (prev) { /* not at head of list */
+    if (!strcmp(curr->obname, s)) {/* found it */
+      if (prev) {                  /* not at head of list */
         prev->next_hash = curr->next_hash;
         curr->next_hash = obj_table[h];
         obj_table[h] = curr;
@@ -112,8 +108,7 @@ static object_t *find_obj_n(const char *s)
   return (0); /* not found */
 }
 
-array_t *children(const char *s)
-{
+array_t *children(const char *s) {
   object_t *curr;
   array_t *vec;
   int size;
@@ -125,7 +120,7 @@ array_t *children(const char *s)
 
   vec = allocate_empty_array(max_array_size);
   while (curr && count < max_array_size) {
-    if (!strncmp(curr->obname, s, size)) { /* found one */
+    if (!strncmp(curr->obname, s, size)) {/* found one */
       vec->item[count].u.ob = curr;
       add_ref(curr, "children");
       vec->item[count].type = T_OBJECT;
@@ -147,8 +142,7 @@ array_t *children(const char *s)
 
 static int objs_in_table = 0;
 
-void enter_object_hash(object_t *ob)
-{
+void enter_object_hash(object_t *ob) {
 #ifdef DEBUG
   object_t *s;
 #endif
@@ -160,8 +154,7 @@ void enter_object_hash(object_t *ob)
   s = find_obj_n(ob->obname); /* This sets h */
   /* when these reload, the new copy comes in before the old goes out */
   if (s != master_ob && s != simul_efun_ob) {
-    DEBUG_CHECK1(s && s != ob,
-                 "Duplicate object \"/%s\" in object hash table",
+    DEBUG_CHECK1(s && s != ob, "Duplicate object \"/%s\" in object hash table",
                  ob->obname);
   }
 #endif
@@ -170,7 +163,7 @@ void enter_object_hash(object_t *ob)
   obj_table[h] = ob;
   objs_in_table++;
 
-  //for children()
+  // for children()
   base = _basename(ob->obname, &dummy);
 
   ch = ObjHash(base);
@@ -185,8 +178,7 @@ void enter_object_hash(object_t *ob)
  * is removed from the next_all list - i.e. in destruct.
  */
 
-void remove_object_hash(object_t *ob)
-{
+void remove_object_hash(object_t *ob) {
   int dummy;
   object_t *s;
   object_t *t = 0;
@@ -232,8 +224,7 @@ void remove_object_hash(object_t *ob)
 
 static long user_obj_lookups = 0, user_obj_found = 0;
 
-object_t *lookup_object_hash(const char *s)
-{
+object_t *lookup_object_hash(const char *s) {
   object_t *ob = find_obj_n(s);
 
   user_obj_lookups++;
@@ -250,24 +241,23 @@ object_t *lookup_object_hash(const char *s)
 
 static char sbuf[100];
 
-int show_otable_status(outbuffer_t *out, int verbose)
-{
+int show_otable_status(outbuffer_t *out, int verbose) {
   int starts;
 
   if (verbose == 1) {
     outbuf_add(out, "Object name hash table status:\n");
     outbuf_add(out, "------------------------------\n");
-    sprintf(sbuf, "%10.2f", objs_in_table / (float) OTABLE_SIZE);
+    sprintf(sbuf, "%10.2f", objs_in_table / (float)OTABLE_SIZE);
     outbuf_addv(out, "Average hash chain length:       %s\n", sbuf);
-    sprintf(sbuf, "%10.2f", (float) obj_probes / obj_searches);
+    sprintf(sbuf, "%10.2f", (float)obj_probes / obj_searches);
     outbuf_addv(out, "Average search length:           %s\n", sbuf);
     outbuf_addv(out, "Internal lookups (succeeded):    %lu (%lu)\n",
                 obj_searches - user_obj_lookups, objs_found - user_obj_found);
     outbuf_addv(out, "External lookups (succeeded):    %lu (%lu)\n",
                 user_obj_lookups, user_obj_found);
   }
-  starts = (long) OTABLE_SIZE * sizeof(object_t *) + objs_in_table
-           * sizeof(object_t);
+  starts =
+      (long)OTABLE_SIZE * sizeof(object_t *) + objs_in_table * sizeof(object_t);
 
   if (!verbose) {
     outbuf_addv(out, "Obj table overhead:\t\t%8d %8d\n",

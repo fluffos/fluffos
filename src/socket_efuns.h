@@ -15,18 +15,27 @@
 #endif
 
 enum socket_mode {
-  MUD, STREAM, DATAGRAM, STREAM_BINARY, DATAGRAM_BINARY
+  MUD,
+  STREAM,
+  DATAGRAM,
+  STREAM_BINARY,
+  DATAGRAM_BINARY
 };
 
 enum socket_state {
-  STATE_CLOSED, STATE_FLUSHING, STATE_UNBOUND, STATE_BOUND, STATE_LISTEN, STATE_DATA_XFER
+  STATE_CLOSED,
+  STATE_FLUSHING,
+  STATE_UNBOUND,
+  STATE_BOUND,
+  STATE_LISTEN,
+  STATE_DATA_XFER
 };
 
-#define BUF_SIZE        2048    /* max reliable packet size        */
+#define BUF_SIZE 2048 /* max reliable packet size        */
 #ifdef IPV6
 #define ADDR_BUF_SIZE INET6_ADDRSTRLEN
 #else
-#define ADDR_BUF_SIZE   64      /* max length of address string    */
+#define ADDR_BUF_SIZE 64 /* max length of address string    */
 #endif
 typedef struct {
   int fd;
@@ -56,20 +65,21 @@ typedef struct {
 extern lpc_socket_t *lpc_socks;
 extern int max_lpc_socks;
 
-#define S_RELEASE       0x001
-#define S_BLOCKED       0x002
-#define S_HEADER        0x004
-#define S_WACCEPT       0x008
-#define S_BINARY        0x010
-#define S_READ_FP       0x020
-#define S_WRITE_FP      0x040
-#define S_CLOSE_FP      0x080
-#define S_EXTERNAL      0x100
-#define S_LINKDEAD      0x200
+#define S_RELEASE 0x001
+#define S_BLOCKED 0x002
+#define S_HEADER 0x004
+#define S_WACCEPT 0x008
+#define S_BINARY 0x010
+#define S_READ_FP 0x020
+#define S_WRITE_FP 0x040
+#define S_CLOSE_FP 0x080
+#define S_EXTERNAL 0x100
+#define S_LINKDEAD 0x200
 
 array_t *socket_status(int);
 array_t *socket_status_by_fd(int);
-int check_valid_socket(const char *const, int, object_t *, const char *const, int);
+int check_valid_socket(const char *const, int, object_t *, const char *const,
+                       int);
 void socket_read_select_handler(int);
 void socket_write_select_handler(int);
 void assign_socket_owner(svalue_t *, object_t *);
@@ -92,4 +102,4 @@ void set_read_callback(int, svalue_t *);
 void set_write_callback(int, svalue_t *);
 void set_close_callback(int, svalue_t *);
 
-#endif                          /* _SOCKET_EFUNS_H_ */
+#endif /* _SOCKET_EFUNS_H_ */

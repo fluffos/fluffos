@@ -9,6 +9,7 @@
 #include "debugmalloc.h"
 #include "my_malloc.h"
 #include "md.h"
+#include "outbuf.h"
 
 void fatal(const char *, ...);
 
@@ -16,32 +17,30 @@ void fatal(const char *, ...);
 
 #ifdef NOISY_MALLOC
 #define NOISY(x) printf(x)
-#define NOISY1(x,y) printf(x,y)
-#define NOISY2(x,y,z) printf(x,y,z)
-#define NOISY3(w,x,y,z) printf(w,x,y,z)
+#define NOISY1(x, y) printf(x, y)
+#define NOISY2(x, y, z) printf(x, y, z)
+#define NOISY3(w, x, y, z) printf(w, x, y, z)
 #else
 #define NOISY(x)
-#define NOISY1(x,y)
-#define NOISY2(x,y,z)
-#define NOISY3(w,x,y,z)
+#define NOISY1(x, y)
+#define NOISY2(x, y, z)
+#define NOISY3(w, x, y, z)
 #endif
 
 typedef struct stats_s {
   unsigned int free_calls, alloc_calls, realloc_calls;
-}       stats_t;
+} stats_t;
 
 static stats_t stats;
 
-void debugmalloc_init()
-{
+void debugmalloc_init() {
   stats.free_calls = 0;
   stats.alloc_calls = 0;
   stats.realloc_calls = 0;
   MDinit();
 }
 
-void *debugrealloc(void *ptr, int size, int tag, const char *desc)
-{
+void *debugrealloc(void *ptr, int size, int tag, const char *desc) {
   void *tmp;
 
   if (size <= 0) {
@@ -50,32 +49,30 @@ void *debugrealloc(void *ptr, int size, int tag, const char *desc)
 
   NOISY3("realloc: %i (%x), %s\n", size, ptr, desc);
   stats.realloc_calls++;
-  tmp = (md_node_t *) ptr - 1;
+  tmp = (md_node_t *)ptr - 1;
   if (MDfree(tmp)) {
-    tmp = (void *) REALLOC(tmp, size + MD_OVERHEAD);
+    tmp = (void *)REALLOC(tmp, size + MD_OVERHEAD);
     MDmalloc((md_node_t *)tmp, size, tag, desc);
-    return (md_node_t *) tmp + 1;
+    return (md_node_t *)tmp + 1;
   }
-  return (void *) 0;
+  return (void *)0;
 }
 
-void *debugmalloc(int size, int tag, const char *desc)
-{
+void *debugmalloc(int size, int tag, const char *desc) {
   void *tmp;
 
   if (size <= 0) {
     fatal("illegal size in debugmalloc()");
   }
   stats.alloc_calls++;
-  tmp = (void *) MALLOC(size + MD_OVERHEAD);
+  tmp = (void *)MALLOC(size + MD_OVERHEAD);
   memset(tmp, 'M', size + MD_OVERHEAD);
   MDmalloc((md_node_t *)tmp, size, tag, desc);
   NOISY3("malloc: %i (%x), %s\n", size, (md_node_t *)tmp + 1, desc);
-  return (md_node_t *) tmp + 1;
+  return (md_node_t *)tmp + 1;
 }
 
-void *debugcalloc(int nitems, int size, int tag, const char *desc)
-{
+void *debugcalloc(int nitems, int size, int tag, const char *desc) {
   void *tmp;
 
   if (size <= 0) {
@@ -83,27 +80,25 @@ void *debugcalloc(int nitems, int size, int tag, const char *desc)
   }
 
   stats.alloc_calls++;
-  tmp = (void *) CALLOC(nitems * size + MD_OVERHEAD, 1);
+  tmp = (void *)CALLOC(nitems * size + MD_OVERHEAD, 1);
   MDmalloc((md_node_t *)tmp, nitems * size, tag, desc);
   NOISY3("calloc: %i (%x), %s\n", nitems * size, (md_node_t *)tmp + 1, desc);
-  return (md_node_t *) tmp + 1;
+  return (md_node_t *)tmp + 1;
 }
 
-void debugfree(void *ptr)
-{
+void debugfree(void *ptr) {
   md_node_t *tmp;
 
   NOISY1("free (%x)\n", ptr);
   stats.free_calls++;
-  tmp = (md_node_t *) ptr - 1;
+  tmp = (md_node_t *)ptr - 1;
   if (MDfree(tmp)) {
     memset(ptr, 'F', tmp->size);
-    FREE(tmp);      /* only free if safe to do so */
+    FREE(tmp); /* only free if safe to do so */
   }
 }
 
-void dump_malloc_data(outbuffer_t *ob)
-{
+void dump_malloc_data(outbuffer_t *ob) {
   int net;
 
   net = stats.alloc_calls - stats.free_calls;

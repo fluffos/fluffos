@@ -22,10 +22,9 @@ static int buff_size;
 
 static void read_config_file(FILE *);
 static int scan_config_line(const char *, void *, int);
-static void config_init(void);  /* don't ask */
+static void config_init(void); /* don't ask */
 
-static void config_init()
-{
+static void config_init() {
   int i;
 
   for (i = 0; i < NUM_CONFIG_INTS; i++) {
@@ -34,11 +33,9 @@ static void config_init()
   for (i = 0; i < NUM_CONFIG_STRS; i++) {
     config_str[i] = 0;
   }
-
 }
 
-static void read_config_file(FILE *file)
-{
+static void read_config_file(FILE *file) {
   char str[MAX_LINE_LENGTH * 4];
   int size = 2, len, tmp;
   char *p;
@@ -60,8 +57,8 @@ static void read_config_file(FILE *file)
       size += len + 1;
       if (size > buff_size) {
         tmp = p - buff;
-        buff = RESIZE(buff, buff_size *= 2, char,
-                      TAG_CONFIG, "read_config_file: 2");
+        buff = RESIZE(buff, buff_size *= 2, char, TAG_CONFIG,
+                      "read_config_file: 2");
         p = buff + tmp;
       }
       strncpy(p, str, len);
@@ -72,7 +69,6 @@ static void read_config_file(FILE *file)
   *p = 0;
 }
 
-
 /*
  * If the required flag is 0, it will only give a warning if the line is
  * missing from the config file.  Otherwise, it will give an error and exit
@@ -82,8 +78,7 @@ static void read_config_file(FILE *file)
       1  : Must have
       0  : optional
       -1 : warn if missing */
-static int scan_config_line(const char *fmt, void *dest, int required)
-{
+static int scan_config_line(const char *fmt, void *dest, int required) {
   char *tmp, *end;
   char missing_line[MAX_LINE_LENGTH];
 
@@ -92,28 +87,38 @@ static int scan_config_line(const char *fmt, void *dest, int required)
   *((int *)dest) = 0;
   tmp = buff;
   while (tmp) {
-    while ((tmp = (char *) strchr(tmp, '\n'))) {
-      if (*(++tmp) == fmt[0]) { break; }
+    while ((tmp = (char *)strchr(tmp, '\n'))) {
+      if (*(++tmp) == fmt[0]) {
+        break;
+      }
     }
     /* don't allow sscanf() to scan to next line for blank entries */
     end = (tmp ? strchr(tmp, '\n') : 0);
-    if (end) { *end = '\0'; }
+    if (end) {
+      *end = '\0';
+    }
     if (tmp && sscanf(tmp, fmt, dest) == 1) {
-      if (end) { *end = '\n'; }
+      if (end) {
+        *end = '\n';
+      }
       break;
     }
-    if (end) { *end = '\n'; }
+    if (end) {
+      *end = '\n';
+    }
   }
   if (!tmp) {
     strcpy(missing_line, fmt);
-    tmp = (char *) strchr(missing_line, ':');
+    tmp = (char *)strchr(missing_line, ':');
     *tmp = '\0';
     if (required == -1) {
       fprintf(stderr, "*Warning: Missing line in config file:\n\t%s\n",
               missing_line);
       return 0;
     }
-    if (!required) { return 0; }
+    if (!required) {
+      return 0;
+    }
     fprintf(stderr, "*Error in config file.  Missing line:\n\t%s\n",
             missing_line);
     exit(-1);
@@ -143,8 +148,7 @@ static char *process_config_string(char *str)
 }
 #endif
 
-void set_defaults(char *filename)
-{
+void set_defaults(char *filename) {
   FILE *def;
   char defaults[SMALL_STRING_SIZE];
   char *p;
@@ -165,19 +169,23 @@ void set_defaults(char *filename)
     }
   }
   if (!def) {
-    fprintf(stderr, "*Error: couldn't find or open config file: '%s'\n", filename);
+    fprintf(stderr, "*Error: couldn't find or open config file: '%s'\n",
+            filename);
     exit(-1);
   }
   read_config_file(def);
 
   scan_config_line("global include file : %[^\n]", tmp, 0);
-  p = CONFIG_STR(__GLOBAL_INCLUDE_FILE__) = alloc_cstring(tmp, "config file: gif");
+  p = CONFIG_STR(__GLOBAL_INCLUDE_FILE__) =
+      alloc_cstring(tmp, "config file: gif");
 
   /* check if the global include file is quoted */
   if (*p && *p != '"' && *p != '<') {
     char *ptr;
 
-    fprintf(stderr, "Missing '\"' or '<' around global include file name; adding quotes.\n");
+    fprintf(stderr,
+            "Missing '\"' or '<' around global include file name; adding "
+            "quotes.\n");
     for (ptr = p; *ptr; ptr++) {
       ;
     }
@@ -213,9 +221,11 @@ void set_defaults(char *filename)
   CONFIG_STR(__SWAP_FILE__) = alloc_cstring(tmp, "config file: sf");
   scan_config_line("debug log file : %[^\n]", tmp, -1);
   CONFIG_STR(__DEBUG_LOG_FILE__) = alloc_cstring(tmp, "config file: dlf");
-  CONFIG_STR(__PLACEHOLDER1__) = alloc_cstring("__placeholder", "config file: placeholder");
+  CONFIG_STR(__PLACEHOLDER1__) =
+      alloc_cstring("__placeholder", "config file: placeholder");
   scan_config_line("default error message : %[^\n]", tmp, 0);
-  CONFIG_STR(__DEFAULT_ERROR_MESSAGE__) = alloc_cstring(tmp, "config file: dem");
+  CONFIG_STR(__DEFAULT_ERROR_MESSAGE__) =
+      alloc_cstring(tmp, "config file: dem");
   scan_config_line("default fail message : %[^\n]", tmp, 0);
   CONFIG_STR(__DEFAULT_FAIL_MESSAGE__) = alloc_cstring(tmp, "config file: dfm");
 
@@ -232,7 +242,8 @@ void set_defaults(char *filename)
     } else if (!strcasecmp(tmp, "binary")) {
       FD6_KIND = PORT_BINARY;
     } else {
-      fprintf(stderr, "Unknown port type for fd6 kind.  fd6 support disabled.\n");
+      fprintf(stderr,
+              "Unknown port type for fd6 kind.  fd6 support disabled.\n");
       FD6_KIND = PORT_UNDEFINED;
     }
   } else {
@@ -250,12 +261,10 @@ void set_defaults(char *filename)
 
   scan_config_line("fd6 port : %d\n", &CONFIG_INT(__FD6_PORT__), 0);
 
-  scan_config_line("time to clean up : %d\n",
-                   &CONFIG_INT(__TIME_TO_CLEAN_UP__), 1);
-  scan_config_line("time to reset : %d\n",
-                   &CONFIG_INT(__TIME_TO_RESET__), 1);
-  scan_config_line("time to swap : %d\n",
-                   &CONFIG_INT(__TIME_TO_SWAP__), 1);
+  scan_config_line("time to clean up : %d\n", &CONFIG_INT(__TIME_TO_CLEAN_UP__),
+                   1);
+  scan_config_line("time to reset : %d\n", &CONFIG_INT(__TIME_TO_RESET__), 1);
+  scan_config_line("time to swap : %d\n", &CONFIG_INT(__TIME_TO_SWAP__), 1);
 
 #if 0
   /*
@@ -276,8 +285,8 @@ void set_defaults(char *filename)
   scan_config_line("maximum evaluation cost : %d\n",
                    &CONFIG_INT(__MAX_EVAL_COST__), 1);
 
-  scan_config_line("maximum array size : %d\n",
-                   &CONFIG_INT(__MAX_ARRAY_SIZE__), 1);
+  scan_config_line("maximum array size : %d\n", &CONFIG_INT(__MAX_ARRAY_SIZE__),
+                   1);
 #ifndef NO_BUFFER_TYPE
   scan_config_line("maximum buffer size : %d\n",
                    &CONFIG_INT(__MAX_BUFFER_SIZE__), 1);
@@ -294,8 +303,8 @@ void set_defaults(char *filename)
   scan_config_line("maximum read file size : %d\n",
                    &CONFIG_INT(__MAX_READ_FILE_SIZE__), 1);
 
-  scan_config_line("reserved size : %d\n",
-                   &CONFIG_INT(__RESERVED_MEM_SIZE__), 0);
+  scan_config_line("reserved size : %d\n", &CONFIG_INT(__RESERVED_MEM_SIZE__),
+                   0);
 
   scan_config_line("hash table size : %d\n",
                    &CONFIG_INT(__SHARED_STRING_HASH_TABLE_SIZE__), 1);
@@ -306,7 +315,11 @@ void set_defaults(char *filename)
   if (port_start == 1) {
     if (scan_config_line("external_port_1 : %[^\n]", tmp, 0)) {
       int port = CONFIG_INT(__MUD_PORT__);
-      fprintf(stderr, "Warning: external_port_1 already defined to be 'telnet %i' by the line\n    'port number : %i'; ignoring the line 'external_port_1 : %s'\n", port, port, tmp);
+      fprintf(stderr,
+              "Warning: external_port_1 already defined to be 'telnet %i' by "
+              "the line\n    'port number : %i'; ignoring the line "
+              "'external_port_1 : %s'\n",
+              port, port, tmp);
     }
   }
   for (i = port_start; i < 5; i++) {
@@ -320,7 +333,8 @@ void set_defaults(char *filename)
           external_port[i].kind = PORT_TELNET;
         } else if (!strcmp(kind, "binary")) {
 #ifdef NO_BUFFER_TYPE
-          fprintf(stderr, "binary ports unavailable with NO_BUFFER_TYPE defined.\n");
+          fprintf(stderr,
+                  "binary ports unavailable with NO_BUFFER_TYPE defined.\n");
           exit(-1);
 #endif
           external_port[i].kind = PORT_BINARY;
@@ -331,8 +345,7 @@ void set_defaults(char *filename)
         } else if (!strcmp(kind, "websocket")) {
           external_port[i].kind = PORT_WEBSOCKET;
         } else {
-          fprintf(stderr, "Unknown kind of external port: %s\n",
-                  kind);
+          fprintf(stderr, "Unknown kind of external port: %s\n", kind);
           exit(-1);
         }
       } else {
@@ -359,14 +372,16 @@ void set_defaults(char *filename)
   /*
    * from options.h
    */
-  config_int[__EVALUATOR_STACK_SIZE__ - BASE_CONFIG_INT] = CFG_EVALUATOR_STACK_SIZE;
-  config_int[__MAX_LOCAL_VARIABLES__ - BASE_CONFIG_INT] = CFG_MAX_LOCAL_VARIABLES;
+  config_int[__EVALUATOR_STACK_SIZE__ - BASE_CONFIG_INT] =
+      CFG_EVALUATOR_STACK_SIZE;
+  config_int[__MAX_LOCAL_VARIABLES__ - BASE_CONFIG_INT] =
+      CFG_MAX_LOCAL_VARIABLES;
   config_int[__MAX_CALL_DEPTH__ - BASE_CONFIG_INT] = CFG_MAX_CALL_DEPTH;
-  config_int[__LIVING_HASH_TABLE_SIZE__ - BASE_CONFIG_INT] = CFG_LIVING_HASH_SIZE;
+  config_int[__LIVING_HASH_TABLE_SIZE__ - BASE_CONFIG_INT] =
+      CFG_LIVING_HASH_SIZE;
 }
 
-int get_config_item(svalue_t *res, svalue_t *arg)
-{
+int get_config_item(svalue_t *res, svalue_t *arg) {
   int num;
 
   num = arg->u.number;
@@ -378,7 +393,8 @@ int get_config_item(svalue_t *res, svalue_t *arg)
     res->type = T_NUMBER;
     res->u.number = config_int[num - BASE_CONFIG_INT];
   } else {
-    if (!config_str[num]) { //obsolete value, less muds break if we don't renumber!
+    if (!config_str[num]) {  // obsolete value, less muds break if we don't
+                             // renumber!
       return 0;
     }
     res->type = T_STRING;

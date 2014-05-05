@@ -94,6 +94,8 @@ void do_tests() {
     call_out( "two_arg", 6, 1, 2);
 
     // FIXME: move the recursive test out functional test. */
+    // FIXME: Driver side implementation of this has been abandonded in 3.0.
+
     /* All call_outs set up here should be called sucessfully */
     // call_out( "spin", 0);
     // call_out( "spin", 0);

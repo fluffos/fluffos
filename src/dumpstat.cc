@@ -10,8 +10,7 @@
 static int sumSizes(mapping_t *, mapping_node_t *, void *);
 static int svalue_size(svalue_t *);
 
-static int sumSizes(mapping_t *m, mapping_node_t *elt, void *tp)
-{
+static int sumSizes(mapping_t *m, mapping_node_t *elt, void *tp) {
   int *t = (int *)tp;
 
   *t += (svalue_size(&elt->values[0]) + svalue_size(&elt->values[1]));
@@ -21,8 +20,7 @@ static int sumSizes(mapping_t *m, mapping_node_t *elt, void *tp)
 
 int depth = 0;
 
-static int svalue_size(svalue_t *v)
-{
+static int svalue_size(svalue_t *v) {
   int i, total;
 
   switch (v->type) {
@@ -92,17 +90,16 @@ static int svalue_size(svalue_t *v)
       return sizeof(buffer_t) + v->u.buf->size - 1;
 #endif
     default:
-      //some freed value or a reference (!) to one (in all my test cases
-      //anyway), it will be removed by reclaim_objects later, Wodan
-      //fatal("Illegal type: %d\n", v->type);
+      // some freed value or a reference (!) to one (in all my test cases
+      // anyway), it will be removed by reclaim_objects later, Wodan
+      // fatal("Illegal type: %d\n", v->type);
       ;
   }
   /* NOTREACHED */
   return 0;
 }
 
-int data_size(object_t *ob)
-{
+int data_size(object_t *ob) {
   int total = 0, i;
 
   if (ob->prog) {
@@ -114,8 +111,7 @@ int data_size(object_t *ob)
   return total;
 }
 
-void dumpstat(const char *tfn)
-{
+void dumpstat(const char *tfn) {
   FILE *f;
   object_t *ob;
   const char *fn;

@@ -5,7 +5,7 @@
  * This is configurable, but don't set it too high (up to say 10). But 4
  * is plenty really, 2^32 salts possible (the DES-style crypt used only 4096).
  */
-#define MD5_SALTLEN  4
+#define MD5_SALTLEN 4
 
 /* Magic string, used in hashing. Configurable. */
 #define MD5_MAGIC "xyzz"
@@ -13,7 +13,7 @@
 /* Maximum length (in bytes) of digested data.
  * This is /not/ configurable! Don't change it.
  */
-#define MD5_MAXLEN  55
+#define MD5_MAXLEN 55
 
 /* This salt value is used in generating salts. It must
  * be a valid salt as returned by md5crypt(), or the

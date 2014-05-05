@@ -17,8 +17,8 @@
 
 #ifdef F_QUERY_MULTIPLE_SHORT
 /* Hideous mangling of C code by Taffyd. */
-void query_multiple_short(svalue_t *arg, const char *type, int no_dollars, int quiet, int dark, int num_arg)
-{
+void query_multiple_short(svalue_t *arg, const char *type, int no_dollars,
+                          int quiet, int dark, int num_arg) {
   char m[] = "$M$";
   char s[] = "_short";
   char default_function[] = "a_short";
@@ -122,7 +122,7 @@ void query_multiple_short(svalue_t *arg, const char *type, int no_dollars, int q
     total_len += mlen;
 
     res = new_string(total_len, "f_query_multiple_short");
-    res[ total_len ] = '\0';
+    res[total_len] = '\0';
     memcpy(res, str, total_len);
 
     /* Clean up our temporary buffer. */
@@ -162,15 +162,14 @@ void query_multiple_short(svalue_t *arg, const char *type, int no_dollars, int q
         }
 
         if (total_len + SVALUE_STRLEN(v) < max_string_length) {
-          strncpy(str + total_len, v->u.string,
-                  (len = SVALUE_STRLEN(v)));
+          strncpy(str + total_len, v->u.string, (len = SVALUE_STRLEN(v)));
           total_len += len;
         }
 
         break;
       case T_ARRAY:
-        /* Does anyone use this? */
-        /* args[ i ] = "$"+ type +"_short:"+ file_name( args[ i ][ 1 ] ) +"$"; */
+      /* Does anyone use this? */
+      /* args[ i ] = "$"+ type +"_short:"+ file_name( args[ i ][ 1 ] ) +"$"; */
       default:
         /* Get the next element. */
         continue;
@@ -249,9 +248,7 @@ void query_multiple_short(svalue_t *arg, const char *type, int no_dollars, int q
   }
 } /* query_multiple_short() */
 
-void
-f_query_multiple_short()
-{
+void f_query_multiple_short() {
   svalue_t *sv = sp - st_num_arg + 1;
   const char *type = NULL;
   int no_dollars = 0, quiet = 0, dark = 0;
@@ -295,8 +292,8 @@ f_query_multiple_short()
 
 int _in_reference_allowed = 0;
 
-int reference_allowed(object_t *referee, object_t *referrer_obj, const char *referrer_name)
-{
+int reference_allowed(object_t *referee, object_t *referrer_obj,
+                      const char *referrer_name) {
   int invis = 0;
   int referee_creator = 0;
   svalue_t *v;
@@ -374,7 +371,7 @@ int reference_allowed(object_t *referee, object_t *referrer_obj, const char *ref
   }
 
   v = apply("query_allowed", referee, 0, ORIGIN_EFUN);
-  //printf("allow refs:%d\n", v->u.arr->ref);
+  // printf("allow refs:%d\n", v->u.arr->ref);
   if (v && v->type == T_ARRAY) {
     vec = v->u.arr;
     size = vec->size;
@@ -392,8 +389,7 @@ int reference_allowed(object_t *referee, object_t *referrer_obj, const char *ref
         }
       }
 
-      if (referrer_playtester &&
-          strcmp("playtesters", item->u.string) == 0) {
+      if (referrer_playtester && strcmp("playtesters", item->u.string) == 0) {
         playtester_match = 1;
 
         /* If we've already made a referrer match, then time
@@ -451,8 +447,7 @@ int reference_allowed(object_t *referee, object_t *referrer_obj, const char *ref
           ret = v->u.number;
         }
       }
-    }
-    break;
+    } break;
 
     default:
       /* A normal player.
@@ -466,9 +461,7 @@ int reference_allowed(object_t *referee, object_t *referrer_obj, const char *ref
   return ret;
 }
 
-void
-f_reference_allowed()
-{
+void f_reference_allowed() {
   svalue_t *sv = sp - st_num_arg + 1;
   object_t *referee = NULL;
   object_t *referrer_obj = command_giver; /* Default to this_player(). */
@@ -489,8 +482,8 @@ f_reference_allowed()
 
   if (st_num_arg > 1) {
     if (sv[1].type == T_STRING && sv[1].u.string) {
-      /* We've been passed in a string, now we need to call
-       * find_player() */
+/* We've been passed in a string, now we need to call
+ * find_player() */
 #ifdef F_FIND_PLAYER
       /* If we have a find_player() efun, then we need to sue
        * the following method.  This hasn't been tested!
@@ -533,8 +526,7 @@ f_reference_allowed()
 
 #ifdef F_ADD_A
 
-void f_add_a()
-{
+void f_add_a() {
   const char *str = sp->u.string;
   char *ret;
   char *p;
@@ -600,7 +592,7 @@ void f_add_a()
     ret = new_string(len + 3, "f_add_a");
     memcpy(ret, "an ", 3);
     p = ret + 3;
-  } else { // Add a.
+  } else {  // Add a.
     if (len + 2 > max_string_length) {
       free_string_svalue(sp);
       error("add_a() exceeded max string length.\n");
@@ -611,7 +603,7 @@ void f_add_a()
   }
 
   // Add the rest of the string.
-  memcpy(p, str, len + 1);   // + 1: get the \0.
+  memcpy(p, str, len + 1);  // + 1: get the \0.
   free_string_svalue(sp);
   sp->type = T_STRING;
   sp->subtype = STRING_MALLOC;
@@ -621,12 +613,11 @@ void f_add_a()
 #endif
 // This along with add_a() is the only sfun in /secure/simul_efun/add_a.c
 #ifdef F_VOWEL
-void f_vowel()
-{
+void f_vowel() {
   char v = (char)sp->u.number;
 
-  if (v == 'a' || v == 'e' || v == 'i' || v == 'o' || v == 'u' ||
-      v == 'A' || v == 'E' || v == 'I' || v == 'O' || v == 'U') {
+  if (v == 'a' || v == 'e' || v == 'i' || v == 'o' || v == 'u' || v == 'A' ||
+      v == 'E' || v == 'I' || v == 'O' || v == 'U') {
     sp->u.number = 1;
   } else {
     sp->u.number = 0;
@@ -634,11 +625,9 @@ void f_vowel()
 }
 #endif
 
-
 #ifdef F_REPLACE
 
-void f_replace()
-{
+void f_replace() {
   svalue_t *arg2 = sp - st_num_arg + 2;
   if (arg2->type == T_STRING && st_num_arg == 3) {
     return f_replace_string();
@@ -670,8 +659,7 @@ void f_replace()
 #endif
 
 #if defined(F_REPLACE_MXP) || defined(F_REPLACE_HTML)
-void replace_mxp_html(int html, int mxp)
-{
+void replace_mxp_html(int html, int mxp) {
   char *dst = new_string(max_string_length + 8, "f_replace_mxp_html: 2");
   const char *src = sp->u.string;
   char *dst2 = dst;
@@ -704,7 +692,7 @@ void replace_mxp_html(int html, int mxp)
           break;
         }
       default:
-def:
+      def:
         *dst2++ = *src;
     }
     src++;
@@ -718,19 +706,18 @@ def:
 
 #ifdef F_REPLACE_HTML
 
-void f_replace_html() {replace_mxp_html(1, 0);}
+void f_replace_html() { replace_mxp_html(1, 0); }
 
 #endif
 
 #ifdef F_REPLACE_MXP
 
-void f_replace_mxp() {replace_mxp_html(0, 1);}
+void f_replace_mxp() { replace_mxp_html(0, 1); }
 
 #endif
 
 #ifdef F_ROULETTE_WHEEL
-void f_roulette_wheel()
-{
+void f_roulette_wheel() {
   long num;
   mapping_t *m = sp->u.map;
   int j, found;
@@ -772,7 +759,7 @@ void f_roulette_wheel()
     }
   } while (j-- && !found);
 
-  if (!found) {     // This shouldn't happen...
+  if (!found) {  // This shouldn't happen...
     error("Something went wrong!\n");
   }
 
@@ -786,8 +773,7 @@ void f_roulette_wheel()
 #ifdef F_REPLACE_OBJECTS
 
 svalue_t replace_tmp = {T_NUMBER};
-svalue_t *replace_objects(svalue_t *thing)
-{
+svalue_t *replace_objects(svalue_t *thing) {
   int i;
   switch (thing->type) {
     case T_OBJECT: {
@@ -830,9 +816,11 @@ svalue_t *replace_objects(svalue_t *thing)
       push_number(0);
       for (i = 0; i < (sp - 2)->u.arr->size; i++) {
         svalue_t *key = sp;
-        svalue_t *tmp = find_in_mapping(thing->u.map, &(sp - 2)->u.arr->item[i]);
+        svalue_t *tmp =
+            find_in_mapping(thing->u.map, &(sp - 2)->u.arr->item[i]);
         assign_svalue(key, replace_objects(&(sp - 2)->u.arr->item[i]));
-        assign_svalue_no_free(find_for_insert((sp - 1)->u.map, key, 1), replace_objects(tmp));
+        assign_svalue_no_free(find_for_insert((sp - 1)->u.map, key, 1),
+                              replace_objects(tmp));
         if ((sp - 1)->u.map->count - i != 1) {
           printf("guilty party:%s\n", key->u.string);
         }
@@ -846,15 +834,11 @@ svalue_t *replace_objects(svalue_t *thing)
   }
 }
 
-void f_replace_objects()
-{
-  assign_svalue(sp, replace_objects(sp));
-}
+void f_replace_objects() { assign_svalue(sp, replace_objects(sp)); }
 #endif
 
 #ifdef F_REPLACE_DOLLARS
-void f_replace_dollars()
-{
+void f_replace_dollars() {
   char *newstr;
   const char *oldstr = (sp - 1)->u.string;
   char *currentnew;
@@ -897,19 +881,22 @@ void f_replace_dollars()
     }
   }
   if (newstr == currentnew) {
-    //nothing happened!
+    // nothing happened!
     FREE_MSTR(newstr);
     pop_stack();
     return;
   }
 
-  if (currentnew + COUNTED_STRLEN(oldstr) - currentold + oldstr - newstr > MAX_STRING_LENGTH) {
+  if (currentnew + COUNTED_STRLEN(oldstr) - currentold + oldstr - newstr >
+      MAX_STRING_LENGTH) {
     FREE_MSTR(newstr);
     error("string too long");
   }
 
   strcpy(currentnew, currentold);
   pop_2_elems();
-  push_malloced_string(extend_string(newstr, currentnew - newstr + COUNTED_STRLEN(oldstr) - (currentold - oldstr)));
+  push_malloced_string(extend_string(
+      newstr,
+      currentnew - newstr + COUNTED_STRLEN(oldstr) - (currentold - oldstr)));
 }
 #endif

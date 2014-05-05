@@ -8,9 +8,8 @@
 char *external_cmd[NUM_EXTERNAL_CMDS];
 
 #ifdef F_EXTERNAL_START
-int external_start(int which, svalue_t *args,
-                   svalue_t *arg1, svalue_t *arg2, svalue_t *arg3)
-{
+int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2,
+                   svalue_t *arg3) {
   int sv[2];
   char *cmd;
   int fd;
@@ -22,7 +21,9 @@ int external_start(int which, svalue_t *args,
   }
   cmd = external_cmd[which];
   fd = find_new_socket();
-  if (fd < 0) { return fd; }
+  if (fd < 0) {
+    return fd;
+  }
 
   if (socketpair(PF_UNIX, SOCK_STREAM, 0, sv) == -1) {
     return EESOCKET;
@@ -42,8 +43,8 @@ int external_start(int which, svalue_t *args,
     lpc_socks[fd].owner_ob = current_object;
     lpc_socks[fd].mode = STREAM;
     lpc_socks[fd].state = STATE_DATA_XFER;
-    memset((char *) &lpc_socks[fd].l_addr, 0, sizeof(lpc_socks[fd].l_addr));
-    memset((char *) &lpc_socks[fd].r_addr, 0, sizeof(lpc_socks[fd].r_addr));
+    memset((char *)&lpc_socks[fd].l_addr, 0, sizeof(lpc_socks[fd].l_addr));
+    memset((char *)&lpc_socks[fd].r_addr, 0, sizeof(lpc_socks[fd].r_addr));
     lpc_socks[fd].owner_ob = current_object;
     lpc_socks[fd].release_ob = NULL;
     lpc_socks[fd].r_buf = NULL;
@@ -113,7 +114,7 @@ int external_start(int which, svalue_t *args,
     close(sv[0]);
     for (i = 0; i < 5; i++)
       if (external_port[i].port) {
-        close(external_port[i].fd);    //close external ports
+        close(external_port[i].fd);  // close external ports
       }
     dup2(sv[1], 0);
     dup2(sv[1], 1);
@@ -124,14 +125,13 @@ int external_start(int which, svalue_t *args,
   }
 }
 
-void f_external_start(void)
-{
+void f_external_start(void) {
   int fd, num_arg = st_num_arg;
   svalue_t *arg = sp - num_arg + 1;
 
   if (check_valid_socket("external", -1, current_object, "N/A", -1)) {
-    fd = external_start(arg[0].u.number, arg + 1,
-                        arg + 2, arg + 3, (num_arg == 5 ? arg + 4 : 0));
+    fd = external_start(arg[0].u.number, arg + 1, arg + 2, arg + 3,
+                        (num_arg == 5 ? arg + 4 : 0));
     pop_n_elems(num_arg - 1);
     sp->u.number = fd;
   } else {

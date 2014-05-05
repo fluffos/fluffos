@@ -4,7 +4,9 @@
 #include "lpc_incl.h"
 
 /* for apply_master_ob */
-#define MASTER_APPROVED(x) (((x)==(svalue_t *)-1) || ((x) && (((x)->type != T_NUMBER) || (x)->u.number)))
+#define MASTER_APPROVED(x)    \
+  (((x) == (svalue_t *)-1) || \
+   ((x) && (((x)->type != T_NUMBER) || (x)->u.number)))
 
 extern object_t *master_ob;
 

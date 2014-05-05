@@ -1,0 +1,5 @@
+Name: libtelnet (uninstalled)
+Description: TELNET protocol handling library (uninstalled)
+Version: @VERSION@
+Libs: -L@abs_top_srcdir@/.libs -ltelnet @LIBS@
+Cflags: -I@abs_top_srcdir@
