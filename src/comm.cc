@@ -200,7 +200,7 @@ void async_on_accept(int new_socket_fd, port_def_t *port) {
   user->external_port = (port - external_port);  // FIXME: pointer arith
 
   user->addrlen = sizeof(user->addr);
-  getsockname(new_socket_fd, (sockaddr *)&user->addr, &user->addrlen);
+  getpeername(new_socket_fd, (sockaddr *)&user->addr, &user->addrlen);
 
   // network layer done, hand-off to main thread.
   add_realtime_event([=]() { new_user_handler(user); });
