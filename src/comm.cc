@@ -1371,6 +1371,11 @@ static void print_prompt(interactive_t *ip) {
   if (!IP_VALID(ip, ob)) {
     return;
   }
+  // Stavros: A lot of clients use this TELNET_GA to differentiate
+  // prompts from other text
+  if ((ip->iflags & USING_TELNET) && !(ip->iflags & SUPPRESS_GA)) {
+    telnet_iac(ip->telnet, TELNET_GA);
+  }
 } /* print_prompt() */
 
 /*
