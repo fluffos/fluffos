@@ -11,8 +11,8 @@
 */
 
 uint32_t compute_crc32(unsigned char *buf, int len) {
-  register uint32_t crc = 0xFFFFFFFFL;
-  register int j;
+  uint32_t crc = 0xFFFFFFFFL;
+  int j;
 
   j = len;
   while (j--) {

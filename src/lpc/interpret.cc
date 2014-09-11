@@ -1371,7 +1371,7 @@ void setup_varargs_variables(int actual, int local, int num_arg) {
 
 function_t *setup_new_frame(int findex) {
   function_t *func_entry;
-  register int low, high, mid;
+  int low, high, mid;
   int flags;
 
   function_index_offset = variable_index_offset = 0;
@@ -1432,7 +1432,7 @@ function_t *setup_new_frame(int findex) {
 
 function_t *setup_inherited_frame(int findex) {
   function_t *func_entry;
-  register int low, high, mid;
+  int low, high, mid;
   int flags;
 
   /* Walk up the inheritance tree to the real definition */
@@ -3821,8 +3821,8 @@ static void do_catch(char *pc, unsigned short new_pc_offset) {
 
 static program_t *ffbn_recurse(program_t *prog, char *name, int *indexp,
                                int *runtime_index) {
-  register int high = prog->num_functions_defined - 1;
-  register int low = 0, mid;
+  int high = prog->num_functions_defined - 1;
+  int low = 0, mid;
   int ri;
   char *p;
 
@@ -3972,7 +3972,7 @@ array_t *call_all_other(array_t *v, const char *func, int numargs) {
 }
 
 char *function_name(program_t *prog, int findex) {
-  register int low, high, mid;
+  int low, high, mid;
 
   /* Walk up the inheritance tree to the real definition */
   if (prog->function_flags[findex] & FUNC_ALIAS) {

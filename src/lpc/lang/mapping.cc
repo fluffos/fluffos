@@ -393,7 +393,7 @@ static mapping_t *copyMapping(mapping_t *m) {
 }
 
 int restore_hash_string(char **val, svalue_t *sv) {
-  register char *cp = *val;
+  char *cp = *val;
   char c, *start = cp;
 
   while ((c = *cp++) != '"') {

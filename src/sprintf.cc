@@ -592,7 +592,7 @@ static void add_justified(const char *str, int slen, pad_info_t *pad, int fs,
  * Returns 2 if column completed has a \n at the end.
  */
 static int add_column(cst **column, int trailing) {
-  register unsigned int done;
+  unsigned int done;
   char c;
   int space = -1;
   int ret;

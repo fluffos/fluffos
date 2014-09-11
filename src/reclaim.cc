@@ -22,7 +22,7 @@ static void check_svalue(svalue_t *);
 static int cleaned, nested;
 
 static void check_svalue(svalue_t *v) {
-  register int idx;
+  int idx;
 
   nested++;
   if (nested > MAX_RECURSION) {

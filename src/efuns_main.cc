@@ -1457,8 +1457,8 @@ void f_master(void) {
 #ifdef F_MATCH_PATH
 void f_match_path(void) {
   svalue_t *value;
-  register const char *src;
-  register char *dst;
+  const char *src;
+  char *dst;
   svalue_t *nvalue;
   mapping_t *map;
   char *tmpstr;
@@ -2415,8 +2415,8 @@ void f_replace_string(void) {
 
   const char *pattern;
   const char *replace;
-  register const char *src;
-  register char *dst1, *dst2;
+  const char *src;
+  char *dst1, *dst2;
   svalue_t *arg;
   int skip_table[256];
   const char *slimit;
@@ -3148,7 +3148,7 @@ void f_stat(void) {
  */
 
 void f_strsrch(void) {
-  register const char *big, *little, *pos;
+  const char *big, *little, *pos;
   static char buf[2]; /* should be initialized to 0 */
   int i, blen, llen;
 

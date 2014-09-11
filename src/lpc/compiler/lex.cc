@@ -333,7 +333,7 @@ static void lexerror(const char *s) {
 static int skip_to(const char *token, const char *atoken) {
   char b[20], *p;
   unsigned char c;
-  register char *yyp = outp, *startp;
+  char *yyp = outp, *startp;
   char *b_end = b + 19;
   int nest;
 
@@ -700,7 +700,7 @@ static int get_text_block(char *term) {
   int curchunk, res;          /* current chunk; this function's result */
   int i;                      /* an index counter */
   unsigned char c;            /* a char */
-  register char *yyp = outp;
+  char *yyp = outp;
 
   /*
    * initialize
@@ -862,7 +862,7 @@ static int get_text_block(char *term) {
 
 static void skip_line() {
   unsigned char c;
-  register char *yyp = outp;
+  char *yyp = outp;
 
   while (((c = *yyp++) != '\n') && (c != LEX_EOF)) {
     ;
@@ -877,7 +877,7 @@ static void skip_line() {
 
 static void skip_comment() {
   unsigned char c = '*';
-  register char *yyp = outp;
+  char *yyp = outp;
 
   for (;;) {
     while ((c = *yyp++) != '*') {
@@ -979,7 +979,7 @@ char *show_error_context() {
   static char buf[60];
   extern int yychar;
   char sub_context[25];
-  register char *yyp, *yyp2;
+  char *yyp, *yyp2;
   int len;
 
   if ((unsigned char)outp[-1] == LEX_EOF) {
@@ -1228,7 +1228,7 @@ int yylex() {
   int is_float;
   char *partp;
 
-  register char *yyp;
+  char *yyp;
   unsigned char c;
 
   yytext[0] = 0;
@@ -1862,7 +1862,7 @@ int yylex() {
       } break;
       case '"': {
         int l;
-        register unsigned char *to = scr_tail + 1;
+        unsigned char *to = scr_tail + 1;
 
         if ((l = scratch_end - to) > 255) {
           l = 255;

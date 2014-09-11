@@ -17,8 +17,8 @@
 
 static void doSwap(char *, char *, int);
 static void qSort(void *, int, int, int, int, int (*)());
-static void doSwap(register char *one, register char *two, register int size) {
-  register char t;
+static void doSwap(char *one, char *two, int size) {
+  char t;
 
   while (size--) {
     t = *one;

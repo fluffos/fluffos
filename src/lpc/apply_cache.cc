@@ -113,8 +113,8 @@ cache_entry_t* apply_cache_lookup(const char *fun, object_t *ob) {
 
 static program_t *ffbn_recurse2(program_t *prog, const char *name, int *indexp,
     int *runtime_index, int *fio, int *vio) {
-  register int high = prog->num_functions_defined - 1;
-  register int low = 0, mid;
+  int high = prog->num_functions_defined - 1;
+  int low = 0, mid;
   int ri;
   char *p;
 

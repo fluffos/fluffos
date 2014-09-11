@@ -56,7 +56,7 @@ void tree_init(tree **ppr_tree) {
 
 char *tree_srch(tree *ppr_tree, int (*pfi_compare)(void *, void *),
                 char *pc_user) {
-  register int i_comp;
+  int i_comp;
 
   while (ppr_tree) {
     i_comp = (*pfi_compare)(pc_user, ppr_tree->tree_p);

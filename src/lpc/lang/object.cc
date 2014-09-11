@@ -48,7 +48,7 @@ int *sizes = 0;
 int svalue_save_size(svalue_t *v) {
   switch (v->type) {
     case T_STRING: {
-      register const char *cp = v->u.string;
+      const char *cp = v->u.string;
       char c;
       int size = 0;
 
@@ -126,7 +126,7 @@ int svalue_save_size(svalue_t *v) {
 void save_svalue(svalue_t *v, char **buf) {
   switch (v->type) {
     case T_STRING: {
-      register char *cp = *buf;
+      char *cp = *buf;
       const char *str = v->u.string;
       char c;
 
@@ -212,7 +212,7 @@ void save_svalue(svalue_t *v, char **buf) {
 }
 
 static int restore_internal_size(const char **str, int is_mapping, int depth) {
-  register const char *cp = *str;
+  const char *cp = *str;
   int size = 0;
   char c, delim, toggle = 0;
 
@@ -333,7 +333,7 @@ static int restore_internal_size(const char **str, int is_mapping, int depth) {
 }
 
 static int restore_size(const char **str, int is_mapping) {
-  register const char *cp = *str;
+  const char *cp = *str;
   int size = 0;
   char c, delim, toggle = 0;
 
@@ -428,7 +428,7 @@ static int restore_size(const char **str, int is_mapping) {
 }
 
 static int restore_interior_string(char **val, svalue_t *sv) {
-  register char *cp = *val;
+  char *cp = *val;
   char *start = cp, *newstr;
   char c;
   int len;
@@ -1023,7 +1023,7 @@ error:
 }
 
 static int restore_string(char *val, svalue_t *sv) {
-  register char *cp = val;
+  char *cp = val;
   char *start = cp, *newstr;
   char c;
   int len;

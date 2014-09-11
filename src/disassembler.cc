@@ -111,7 +111,7 @@ void dump_prog(program_t *prog, const char *fn, int flags) {
     int flags;
     int runtime_index;
     function_t *func_entry = find_func_entry(prog, i);
-    register int low, high, mid;
+    int low, high, mid;
 
     flags = prog->function_flags[i];
     if (flags & FUNC_ALIAS) {

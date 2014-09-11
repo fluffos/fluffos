@@ -1449,7 +1449,7 @@ object_t *find_object(const char *str) {
 
 /* Look for a loaded object. Return 0 if non found. */
 object_t *find_object2(const char *str) {
-  register object_t *ob;
+  object_t *ob;
   char p[MAX_OBJECT_NAME_SIZE];
 
   if (!strip_name(str, p, sizeof p)) {

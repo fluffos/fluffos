@@ -44,7 +44,7 @@ void *malloc64(int size) {
   }
 
   if (size < 4088) {
-    register unsigned long *res = (unsigned long *)malloc(size + sizeof(long));
+    unsigned long *res = (unsigned long *)malloc(size + sizeof(long));
     if (!res) {
       perror("malloc: ");
       exit(-1);
@@ -53,7 +53,7 @@ void *malloc64(int size) {
     return &res[1];
   }
 
-  register unsigned long *res;
+  unsigned long *res;
   if (size < blocksize) {
     if (!freelist) {
       res = (unsigned long *)mmap(where, size + sizeof(long),
@@ -104,7 +104,7 @@ void *malloc64(int size) {
 }
 
 void free64(void *p) {
-  register unsigned long *mem = (unsigned long *)p;
+  unsigned long *mem = (unsigned long *)p;
   mem--;
   if (mem < (unsigned long *)sbrk(0) || mem > (unsigned long *)where) {
     free(mem);
@@ -119,7 +119,7 @@ void free64(void *p) {
 }
 
 void *realloc64(void *p, int size) {
-  register unsigned long *mem = (unsigned long *)p;
+  unsigned long *mem = (unsigned long *)p;
   unsigned int oldsize;
   mem--;
   oldsize = *mem + sizeof(long);
@@ -152,7 +152,7 @@ void *realloc64(void *p, int size) {
 }
 
 void *calloc64(int num, int size) {
-  register void *p;
+  void *p;
   size *= num;
   if ((p = malloc64(size))) {
     memset(p, 0, size);

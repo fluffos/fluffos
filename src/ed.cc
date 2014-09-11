@@ -463,7 +463,7 @@ static int dolst(int line1, int line2) {
 /* UNUSED ----
 static int esc (char ** s)
 {
-    register int rval;
+    int rval;
 
     if (**s != ESCAPE) {
         rval = **s;
@@ -1439,8 +1439,8 @@ static int shi; /* the current shift (negative for left
 /* amylaar: don't use identifier index, this is reserved in SYS V compatible
  *              environments.
  */
-static void shift(register char *text) {
-  register int indent_index;
+static void shift(char *text) {
+  int indent_index;
 
   /* first determine the number of leading spaces */
   indent_index = 0;
@@ -1458,7 +1458,7 @@ static void shift(register char *text) {
     indent_index += shi;
     if (indent_index < ED_MAXLINE) {
       char buffer[ED_MAXLINE];
-      register char *p;
+      char *p;
 
       p = buffer;
 /* fill with leading ws */
@@ -1523,9 +1523,9 @@ static void indent(char *buf) {
   static char g[] = {2, 2, 1, 7, 1, 5, 5, 1, 3, 6, 2, 2, 2, 2, 0, };
   char text[ED_MAXLINE], ident[ED_MAXLINE];
   char *p, *sp;
-  register int *ip;
-  register long indent_index;
-  register int top, token;
+  int *ip;
+  long indent_index;
+  int top, token;
   char *start;
   char do_indent;
 
@@ -1658,8 +1658,8 @@ static void indent(char *buf) {
               shift(text);
               do_indent = FALSE;
             } else {
-              register char *q;
-              register int index2;
+              char *q;
+              int index2;
 
               /*
                * find how much the comment has shifted, so the same
@@ -1793,7 +1793,7 @@ static void indent(char *buf) {
         token = ROPERATOR;
       }
       if (f[top] <= g[token]) {/* shift the token on the stack */
-        register int i;
+        int i;
 
         if (sp == stackbot) {
           /* out of stack */

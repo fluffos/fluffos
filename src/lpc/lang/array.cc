@@ -487,7 +487,7 @@ void implode_array(funptr_t *fptr, array_t *arr, svalue_t *dest,
 }
 
 array_t *users() {
-  register object_t *ob;
+  object_t *ob;
   int i, j;
   array_t *ret;
 #ifdef F_SET_HIDE

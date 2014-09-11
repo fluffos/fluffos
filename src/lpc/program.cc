@@ -92,7 +92,7 @@ char *variable_name(program_t *prog, int idx) {
 }
 
 function_t *find_func_entry(program_t *prog, int index) {
-  register int low, mid, high;
+  int low, mid, high;
 
   /* Walk up the inheritance tree to the real definition */
   if (prog->function_flags[index] & FUNC_ALIAS) {

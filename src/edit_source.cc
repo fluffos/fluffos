@@ -158,7 +158,7 @@ static char *skip_comment(char *tmp, int flag) {
 }
 
 static void refill() {
-  register char *p, *yyp;
+  char *p, *yyp;
   int c;
 
   if (fgets(p = yyp = defbuf + (DEFMAX >> 1), MAXLINE - 1, yyin)) {
@@ -187,7 +187,7 @@ static void handle_define() {
   char args[NARGS][NSIZE];
   char mtext[MLEN];
   char *end;
-  register char *tmp = outp, *q;
+  char *tmp = outp, *q;
 
   q = namebuf;
   end = q + NSIZE - 1;
@@ -467,7 +467,7 @@ static int expand_define() {
 }
 
 static int exgetc() {
-  register char c, *yyp;
+  char c, *yyp;
 
   SKPW;
   while (isalpha(c = *outp) || c == '_') {
@@ -651,7 +651,7 @@ static void create_option_defines() {
 }
 
 static void deltrail() {
-  register char *p;
+  char *p;
 
   p = outp;
   while (*p && !isspace(*p) && *p != '\n') {
@@ -721,7 +721,7 @@ static void handle_pragma(char *name) {
 }
 
 static void preprocess() {
-  register char *yyp, *yyp2;
+  char *yyp, *yyp2;
   int c;
   long cond;
 
