@@ -9,8 +9,7 @@ struct interactive_t;
 #define TELNET_TELOPT_MXP 91  // mud extension protocol
 #define TELNET_TELOPT_GMCP 201
 
-void on_telnet_do_zmp(const char **, unsigned long, interactive_t*);
+void on_telnet_do_zmp(const char**, unsigned long, interactive_t*);
 void on_telnet_do_gmcp(interactive_t* ip);
-
 
 #endif /* NET_TELNET_EXT_H_ */

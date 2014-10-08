@@ -1216,7 +1216,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
 
               add_table(temp);
             }
-          } else {/* not column or table */
+          } else {                             /* not column or table */
             const char *tmp = carg->u.string;  // work around tcc bug;
 #ifdef USE_ICONV
             int width = 0;

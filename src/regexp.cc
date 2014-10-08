@@ -966,7 +966,7 @@ static int regtry(regexp *prog, const char *string) {
  */
 static int regmatch(char *prog) {
   char *scan; /* Current node. */
-  char *nxt;           /* nxt node. */
+  char *nxt;  /* nxt node. */
 
   scan = prog;
 #ifdef DEBUG
@@ -1220,7 +1220,7 @@ static int regrepeat(char *p) {
 /*
  - regnext - dig the "nxt" pointer out of a node
  */
-static char *regnext( char *p) {
+static char *regnext(char *p) {
   int offset;
 
   if (p == &regdummy) {

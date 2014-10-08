@@ -45,8 +45,8 @@ object_t *obj_list, *obj_list_destruct;
 int tot_dangling_object = 0;
 object_t *obj_list_dangling = 0;
 #endif
-object_t *current_object; /* The object interpreting a function. */
-object_t *command_giver; /* Where the current command came from. */
+object_t *current_object;      /* The object interpreting a function. */
+object_t *command_giver;       /* Where the current command came from. */
 object_t *current_interactive; /* The user who caused this execution */
 
 #ifdef PRIVS
@@ -65,7 +65,7 @@ static void send_say(object_t *, const char *, array_t *);
 void check_legal_string(const char *s) {
   if (strlen(s) > LARGEST_PRINTABLE_STRING) {
     error("Printable strings limited to length of %d.\n",
-    LARGEST_PRINTABLE_STRING);
+          LARGEST_PRINTABLE_STRING);
   }
 }
 
@@ -110,7 +110,7 @@ static void init_privs_for_object(object_t *ob) {
 #ifdef PACKAGE_UIDS
       || !current_object->uid
 #endif
-  ) {
+      ) {
     ob->privs = NULL;
     return;
   }
@@ -155,18 +155,20 @@ static int give_uid_to_object(object_t *ob) {
   ret = apply_master_ob(APPLY_CREATOR_FILE, 1);
   if (!ret)
     error("master object: No function %s() defined!\n",
-        applies_table[APPLY_CREATOR_FILE]);
-  if (!ret || ret == (svalue_t *) -1 || ret->type != T_STRING) {
+          applies_table[APPLY_CREATOR_FILE]);
+  if (!ret || ret == (svalue_t *)-1 || ret->type != T_STRING) {
     destruct_object(ob);
     if (!ret) {
       error("Master object has no function %s().\n",
-          applies_table[APPLY_CREATOR_FILE]);
+            applies_table[APPLY_CREATOR_FILE]);
     }
-    if (ret == (svalue_t *) -1) {
+    if (ret == (svalue_t *)-1) {
       error("Can't load objects without a master object.");
     }
-    error("Illegal object to load: return value of master::%s() was not a "
-        "string.\n", applies_table[APPLY_CREATOR_FILE]);
+    error(
+        "Illegal object to load: return value of master::%s() was not a "
+        "string.\n",
+        applies_table[APPLY_CREATOR_FILE]);
   }
   creator_name = ret->u.string;
   /*
@@ -174,9 +176,9 @@ static int give_uid_to_object(object_t *ob) {
    * again, because creator_name will be lost !
    */
   if (strcmp(current_object->uid->name, creator_name) == 0) {
-    /*
-     * The loaded object has the same uid as the loader.
-     */
+/*
+ * The loaded object has the same uid as the loader.
+ */
 #ifndef COMPAT_32
     ob->uid = current_object->uid;
 #else
@@ -300,7 +302,7 @@ static object_t *load_virtual_object(const char *name, int clone) {
   /* perform the object rename */
   remove_object_hash(new_ob);
   if (new_ob->obname) {
-    FREE((char * )new_ob->obname);
+    FREE((char *)new_ob->obname);
   }
   SETOBNAME(new_ob, new_name);
   enter_object_hash(new_ob);
@@ -396,7 +398,7 @@ object_t *int_load_object(const char *lname, int callcreate) {
   }
   if (++num_objects_this_thread > INHERIT_CHAIN_SIZE) {
     error("Inherit chain too deep: > %d when trying to load '%s'.\n",
-        INHERIT_CHAIN_SIZE, lname);
+          INHERIT_CHAIN_SIZE, lname);
   }
 #ifdef PACKAGE_UIDS
   if (current_object && current_object->euid == NULL) {
@@ -408,19 +410,19 @@ object_t *int_load_object(const char *lname, int callcreate) {
   }
   if (!strip_name(lname, name, sizeof name))
     error("Filenames with consecutive /'s in them aren't allowed (%s).\n",
-        lname);
+          lname);
   if (!strip_name(pname, actualname, sizeof actualname))
     error("Filenames with consecutive /'s in them aren't allowed (%s).\n",
-        pname);
+          pname);
 
   /*
    * First check that the c-file exists.
    */
-  (void) strcpy(real_name, actualname);
-  (void) strcat(real_name, ".c");
+  (void)strcpy(real_name, actualname);
+  (void)strcat(real_name, ".c");
 
-  (void) strcpy(obname, name);
-  (void) strcat(obname, ".c");
+  (void)strcpy(obname, name);
+  (void)strcat(obname, ".c");
 
   if (stat(real_name, &c_st) == -1 || S_ISDIR(c_st.st_mode)) {
     save_command_giver(command_giver);
@@ -496,8 +498,7 @@ object_t *int_load_object(const char *lname, int callcreate) {
     } else {
       inh_obj = load_object(inhbuf, 0);
     }
-    if (!inh_obj)
-      error("Inherited file '/%s' does not exist!\n", inhbuf);
+    if (!inh_obj) error("Inherited file '/%s' does not exist!\n", inhbuf);
 
     /*
      * Yes, the following is necessary.  It is possible that when we
@@ -536,7 +537,7 @@ object_t *int_load_object(const char *lname, int callcreate) {
   if (mret && !MASTER_APPROVED(mret)) {
     destruct_object(ob);
     error("master object: %s() denied permission to load '/%s'.\n",
-        applies_table[APPLY_VALID_OBJECT], name);
+          applies_table[APPLY_VALID_OBJECT], name);
   }
 
   if (init_object(ob) && callcreate) {
@@ -559,9 +560,9 @@ object_t *int_load_object(const char *lname, int callcreate) {
 
 static char *make_new_name(const char *str) {
   static unsigned int i;
-  char *p = (char *) DXALLOC(strlen(str) + 12, TAG_OBJ_NAME, "make_new_name");
+  char *p = (char *)DXALLOC(strlen(str) + 12, TAG_OBJ_NAME, "make_new_name");
 
-  (void) sprintf(p, "%s#%u", str, i);
+  (void)sprintf(p, "%s#%u", str, i);
   i++;
   return p;
 }
@@ -611,7 +612,7 @@ object_t *clone_object(const char *str1, int num_arg) {
 
   /* We do not want the heart beat to be running for unused copied objects */
   if (ob->flags & O_HEART_BEAT) {
-    (void) set_heart_beat(ob, 0);
+    (void)set_heart_beat(ob, 0);
   }
   new_ob = get_empty_object(ob->prog->num_variables_total);
   SETOBNAME(new_ob, make_new_name(ob->obname));
@@ -808,10 +809,10 @@ void destruct_object(object_t *ob) {
     return;
   }
   remove_object_from_stack(ob);
-  /*
-   * If this is the first object being shadowed by another object, then
-   * destruct the whole list of shadows.
-   */
+/*
+ * If this is the first object being shadowed by another object, then
+ * destruct the whole list of shadows.
+ */
 #ifndef NO_SHADOWS
   if (ob->shadowed && !ob->shadowing) {
     object_t *otmp;
@@ -869,7 +870,7 @@ void destruct_object(object_t *ob) {
     push_object(super);
 
     restrict_destruct = ob->contains;
-    (void) apply(APPLY_MOVE, ob->contains, 1, ORIGIN_DRIVER);
+    (void)apply(APPLY_MOVE, ob->contains, 1, ORIGIN_DRIVER);
     restrict_destruct = save_restrict_destruct;
     /* OUCH! we could be dested by this. -Beek */
     if (ob->flags & O_DESTRUCTED) {
@@ -1184,23 +1185,23 @@ void tell_room(object_t *room, svalue_t *v, array_t *avoid) {
 
   switch (v->type) {
     case T_STRING:
-    check_legal_string(v->u.string);
-    buff = v->u.string;
-    break;
+      check_legal_string(v->u.string);
+      buff = v->u.string;
+      break;
     case T_OBJECT:
-    buff = v->u.ob->obname;
-    break;
+      buff = v->u.ob->obname;
+      break;
     case T_NUMBER:
-    buff = txt_buf;
-    sprintf(txt_buf, "%" LPC_INT_FMTSTR_P, v->u.number);
-    break;
+      buff = txt_buf;
+      sprintf(txt_buf, "%" LPC_INT_FMTSTR_P, v->u.number);
+      break;
     case T_REAL:
-    buff = txt_buf;
-    sprintf(txt_buf, "%" LPC_FLOAT_FMTSTR_P, v->u.real);
-    break;
+      buff = txt_buf;
+      sprintf(txt_buf, "%" LPC_FLOAT_FMTSTR_P, v->u.real);
+      break;
     default:
-    bad_argument(v, T_OBJECT | T_NUMBER | T_REAL | T_STRING, 2, F_TELL_ROOM);
-    IF_DEBUG(buff = 0);
+      bad_argument(v, T_OBJECT | T_NUMBER | T_REAL | T_STRING, 2, F_TELL_ROOM);
+      IF_DEBUG(buff = 0);
   }
 
   for (ob = room->contains; ob; ob = ob->next_inv) {
@@ -1359,44 +1360,44 @@ void print_svalue(svalue_t *arg) {
     tell_object(command_giver, "<NULL>", 6);
   } else
     switch (arg->type) {
-    case T_STRING:
-      len = SVALUE_STRLEN(arg);
-      if (len > LARGEST_PRINTABLE_STRING) {
-        error("Printable strings limited to length of %d.\n",
-        LARGEST_PRINTABLE_STRING);
-      }
+      case T_STRING:
+        len = SVALUE_STRLEN(arg);
+        if (len > LARGEST_PRINTABLE_STRING) {
+          error("Printable strings limited to length of %d.\n",
+                LARGEST_PRINTABLE_STRING);
+        }
 
-      tell_object(command_giver, arg->u.string, len);
-      break;
-    case T_OBJECT:
-      sprintf(tbuf, "OBJ(/%s)", arg->u.ob->obname);
-      tell_object(command_giver, tbuf, strlen(tbuf));
-      break;
-    case T_NUMBER:
-      sprintf(tbuf, "%" LPC_INT_FMTSTR_P, arg->u.number);
-      tell_object(command_giver, tbuf, strlen(tbuf));
-      break;
-    case T_REAL:
-      sprintf(tbuf, "%" LPC_FLOAT_FMTSTR_P, arg->u.real);
-      tell_object(command_giver, tbuf, strlen(tbuf));
-      break;
-    case T_ARRAY:
-      tell_object(command_giver, "<ARRAY>", strlen("<ARRAY>"));
-      break;
-    case T_MAPPING:
-      tell_object(command_giver, "<MAPPING>", strlen("<MAPPING>"));
-      break;
-    case T_FUNCTION:
-      tell_object(command_giver, "<FUNCTION>", strlen("<FUNCTION>"));
-      break;
+        tell_object(command_giver, arg->u.string, len);
+        break;
+      case T_OBJECT:
+        sprintf(tbuf, "OBJ(/%s)", arg->u.ob->obname);
+        tell_object(command_giver, tbuf, strlen(tbuf));
+        break;
+      case T_NUMBER:
+        sprintf(tbuf, "%" LPC_INT_FMTSTR_P, arg->u.number);
+        tell_object(command_giver, tbuf, strlen(tbuf));
+        break;
+      case T_REAL:
+        sprintf(tbuf, "%" LPC_FLOAT_FMTSTR_P, arg->u.real);
+        tell_object(command_giver, tbuf, strlen(tbuf));
+        break;
+      case T_ARRAY:
+        tell_object(command_giver, "<ARRAY>", strlen("<ARRAY>"));
+        break;
+      case T_MAPPING:
+        tell_object(command_giver, "<MAPPING>", strlen("<MAPPING>"));
+        break;
+      case T_FUNCTION:
+        tell_object(command_giver, "<FUNCTION>", strlen("<FUNCTION>"));
+        break;
 #ifndef NO_BUFFER_TYPE
-    case T_BUFFER:
-      tell_object(command_giver, "<BUFFER>", strlen("<BUFFER>"));
-      break;
+      case T_BUFFER:
+        tell_object(command_giver, "<BUFFER>", strlen("<BUFFER>"));
+        break;
 #endif
-    default:
-      tell_object(command_giver, "<UNKNOWN>", strlen("<UNKNOWN>"));
-      break;
+      default:
+        tell_object(command_giver, "<UNKNOWN>", strlen("<UNKNOWN>"));
+        break;
     }
   return;
 }
@@ -1515,7 +1516,7 @@ void move_object(object_t *item, object_t *dest) {
 #ifdef DEBUG
     if (!okay)
       fatal("Failed to find object /%s in super list of /%s.\n", item->obname,
-          item->super->obname);
+            item->super->obname);
 #endif
   }
   /*
@@ -1619,48 +1620,48 @@ void fatal(const char *fmt, ...) {
   va_list args;
 
   switch (in_fatal) {
-  default:
-    debug_message("Fatal error while shutting down.  Aborting.\n");
-    break;
-  case 0:
-    in_fatal = 1;
-    va_start(args, fmt);
-    vsnprintf(msg_buf, 2048, fmt, args);
-    va_end(args);
-    debug_message("******** FATAL ERROR: %s\n", msg_buf);
+    default:
+      debug_message("Fatal error while shutting down.  Aborting.\n");
+      break;
+    case 0:
+      in_fatal = 1;
+      va_start(args, fmt);
+      vsnprintf(msg_buf, 2048, fmt, args);
+      va_end(args);
+      debug_message("******** FATAL ERROR: %s\n", msg_buf);
 #ifdef DEBUG
-    // make DEBUG driver directly crash, if there is debugger
-    // it will catch the problem and allow debugging.
-    break;
+      // make DEBUG driver directly crash, if there is debugger
+      // it will catch the problem and allow debugging.
+      break;
 #endif
-    debug_message("FluffOS driver attempting to exit gracefully.\n", msg_buf);
-    if (current_file) {
-      debug_message("(occured during compilation of %s at line %d)\n",
-          current_file, current_line);
-    }
-    if (current_object) {
-      debug_message("(current object was /%s)\n", current_object->obname);
-    }
+      debug_message("FluffOS driver attempting to exit gracefully.\n", msg_buf);
+      if (current_file) {
+        debug_message("(occured during compilation of %s at line %d)\n",
+                      current_file, current_line);
+      }
+      if (current_object) {
+        debug_message("(current object was /%s)\n", current_object->obname);
+      }
 
-    dump_trace(1);
+      dump_trace(1);
 #ifdef PACKAGE_MUDLIB_STATS
-    save_stat_files();
+      save_stat_files();
 #endif
     /* fall through */
-  case 1:
-    in_fatal = 2;
+    case 1:
+      in_fatal = 2;
 #ifdef TRAP_CRASHES
-    copy_and_push_string(msg_buf);
-    push_object(command_giver);
-    push_object(current_object);
-    safe_apply_master_ob(APPLY_CRASH, 3);
-    debug_message("crash() in master called successfully.  Aborting.\n");
+      copy_and_push_string(msg_buf);
+      push_object(command_giver);
+      push_object(current_object);
+      safe_apply_master_ob(APPLY_CRASH, 3);
+      debug_message("crash() in master called successfully.  Aborting.\n");
 #endif /* TRAP_CRASHES */
   }
 
   in_fatal = 0;
 
-  /* Make sure we don't trap our abort() */
+/* Make sure we don't trap our abort() */
 #ifdef SIGABRT
   signal(SIGABRT, SIG_DFL);
 #endif
@@ -1698,7 +1699,7 @@ static int num_mudlib_error = 0;
 
 void throw_error() {
   if (((current_error_context->save_csp + 1)->framekind & FRAME_MASK) ==
-  FRAME_CATCH) {
+      FRAME_CATCH) {
     throw("throw error");
     fatal("Throw_error failed!");
   }
@@ -1708,11 +1709,11 @@ void throw_error() {
 static void debug_message_with_location(char *err) {
   if (current_object && current_prog) {
     debug_message("%sprogram: /%s, object: /%s, file: %s\n", err,
-        current_prog->filename, current_object->obname,
-        get_line_number(pc, current_prog));
+                  current_prog->filename, current_object->obname,
+                  get_line_number(pc, current_prog));
   } else if (current_object) {
     debug_message("%sprogram: (none), object: /%s, file: (none)\n", err,
-        current_object->obname);
+                  current_object->obname);
   } else {
     debug_message("%sprogram: (none), object: (none), file: (none)\n", err);
   }
@@ -1721,15 +1722,15 @@ static void debug_message_with_location(char *err) {
 static void add_message_with_location(char *err) {
   if (current_object && current_prog) {
     add_vmessage(command_giver, "%sprogram: /%s, object: /%s, file: %s\n", err,
-        current_prog->filename, current_object->obname,
-        get_line_number(pc, current_prog));
+                 current_prog->filename, current_object->obname,
+                 get_line_number(pc, current_prog));
   } else if (current_object) {
     add_vmessage(command_giver,
-        "%sprogram: (none), object: /%s, file: (none)\n", err,
-        current_object->obname);
+                 "%sprogram: (none), object: /%s, file: (none)\n", err,
+                 current_object->obname);
   } else {
     add_vmessage(command_giver,
-        "%sprogram: (none), object: (none), file: (none)\n", err);
+                 "%sprogram: (none), object: (none), file: (none)\n", err);
   }
 }
 
@@ -1744,7 +1745,7 @@ static void mudlib_error_handler(char *err, int katch) {
   add_mapping_string(m, "error", err);
   if (current_prog) {
     add_mapping_malloced_string(m, "program",
-        add_slash(current_prog->filename));
+                                add_slash(current_prog->filename));
   }
   if (current_object) {
     add_mapping_object(m, "object", current_object);
@@ -1768,7 +1769,7 @@ static void mudlib_error_handler(char *err, int katch) {
   } else {
     mret = apply_master_ob(APPLY_ERROR_HANDLER, 1);
   }
-  if ((mret == (svalue_t *) -1) || !mret) {
+  if ((mret == (svalue_t *)-1) || !mret) {
     debug_message("No error handler for error: ");
     debug_message_with_location(err);
     dump_trace(0);
@@ -1781,23 +1782,23 @@ static void mudlib_error_handler(char *err, int katch) {
 void error_handler(char *err) {
   const char *object_name;
 
-  /* in case we're going to jump out of load_object */
+/* in case we're going to jump out of load_object */
 #ifndef NO_ENVIRONMENT
   restrict_destruct = 0;
 #endif
   num_objects_this_thread = 0; /* reset the count */
 
   if (((current_error_context->save_csp + 1)->framekind & FRAME_MASK) ==
-  FRAME_CATCH) {
-    /* user catches this error */
-    /* This is added so that catches generate messages in the log file. */
+      FRAME_CATCH) {
+/* user catches this error */
+/* This is added so that catches generate messages in the log file. */
 #ifdef MUDLIB_ERROR_HANDLER
     if (num_mudlib_error) {
       debug_message("Error in error handler: ");
       num_error++;
 #endif
       debug_message_with_location(err);
-      (void) dump_trace(0);
+      (void)dump_trace(0);
 #ifdef MUDLIB_ERROR_HANDLER
       num_error--;
       num_mudlib_error = 0;
@@ -1848,7 +1849,7 @@ void error_handler(char *err) {
     if (num_mudlib_error) {
       debug_message("Error in error handler: ");
       debug_message_with_location(err);
-      (void) dump_trace(0);
+      (void)dump_trace(0);
       num_mudlib_error = 0;
     } else {
       num_mudlib_error++;
@@ -1877,15 +1878,16 @@ void error_handler(char *err) {
       if (!ob) {
         if (command_giver)
           add_vmessage(command_giver,
-              "error when executing program in destroyed object /%s\n",
-              object_name);
+                       "error when executing program in destroyed object /%s\n",
+                       object_name);
         debug_message("error when executing program in destroyed object /%s\n",
-            object_name);
+                      object_name);
       }
     }
     if (command_giver && command_giver->interactive) {
 #ifndef NO_WIZARDS
-      if ((command_giver->flags & O_IS_WIZARD) || !strlen(DEFAULT_ERROR_MESSAGE)) {
+      if ((command_giver->flags & O_IS_WIZARD) ||
+          !strlen(DEFAULT_ERROR_MESSAGE)) {
 #endif
         add_message_with_location(err + 1);
 #ifndef NO_WIZARDS
@@ -1899,7 +1901,7 @@ void error_handler(char *err) {
           "FluffOS driver tells you: You have no heart beat!\n";
       set_heart_beat(current_heart_beat, 0);
       debug_message("Heart beat in /%s turned off.\n",
-          current_heart_beat->obname);
+                    current_heart_beat->obname);
       if (current_heart_beat->interactive) {
         add_message(current_heart_beat, hb_message, sizeof(hb_message) - 1);
       }
@@ -1925,7 +1927,7 @@ void error_needs_free(char *s) {
   error_handler(err_buf);
 }
 
-void error(const char * const fmt, ...) {
+void error(const char *const fmt, ...) {
   char err_buf[2048];
   va_list args;
 
@@ -1939,7 +1941,7 @@ void error(const char * const fmt, ...) {
 
 // FIXME: error() above should be fixed to optionally not throw, so that
 // driver code that not called into LPC can still use it.
-void safe_error(const char * const fmt, ...) {
+void safe_error(const char *const fmt, ...) {
   error_context_t econ;
   try {
     if (!save_context(&econ)) {
@@ -1949,7 +1951,8 @@ void safe_error(const char * const fmt, ...) {
     va_start(args, fmt);
     error(fmt, args);
     va_end(args);
-  } catch (const char *msg) {
+  }
+  catch (const char *msg) {
     pop_context(&econ);
   }
 }
@@ -1959,9 +1962,7 @@ void safe_error(const char * const fmt, ...) {
  */
 int MudOS_is_being_shut_down;
 
-void startshutdownMudOS(int sig) {
-  MudOS_is_being_shut_down = 1;
-}
+void startshutdownMudOS(int sig) { MudOS_is_being_shut_down = 1; }
 
 /*
  * This one is called from the command "shutdown".
@@ -2011,23 +2012,23 @@ void shutdownMudOS(int exit_code) {
 }
 
 void do_message(svalue_t *lclass, svalue_t *msg, array_t *scope,
-    array_t *exclude, int recurse) {
+                array_t *exclude, int recurse) {
   int i, j, valid;
   object_t *ob;
 
   for (i = 0; i < scope->size; i++) {
     switch (scope->item[i].type) {
-    case T_STRING:
-      ob = find_object(scope->item[i].u.string);
-      if (!ob || !object_visible(ob)) {
+      case T_STRING:
+        ob = find_object(scope->item[i].u.string);
+        if (!ob || !object_visible(ob)) {
+          continue;
+        }
+        break;
+      case T_OBJECT:
+        ob = scope->item[i].u.ob;
+        break;
+      default:
         continue;
-      }
-      break;
-    case T_OBJECT:
-      ob = scope->item[i].u.ob;
-      break;
-    default:
-      continue;
     }
     if (ob->flags & O_LISTENER || ob->interactive) {
       for (valid = 1, j = 0; j < exclude->size; j++) {

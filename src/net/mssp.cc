@@ -15,16 +15,16 @@ static int send_mssp_val(mapping_t *map, mapping_node_t *el, void *data) {
 
   if (el->values[0].type == T_STRING && el->values[1].type == T_STRING) {
     char buf[1024];
-    int len = sprintf(buf, (char *) telnet_mssp_value, el->values[0].u.string,
-        el->values[1].u.string);
+    int len = sprintf(buf, (char *)telnet_mssp_value, el->values[0].u.string,
+                      el->values[1].u.string);
 
     telnet_send(ip->telnet, buf, len);
-  } else if (el->values[0].type == T_STRING && el->values[1].type == T_ARRAY
-      && el->values[1].u.arr->size > 0&&
-      el->values[1].u.arr->item[0].type == T_STRING) {
+  } else if (el->values[0].type == T_STRING && el->values[1].type == T_ARRAY &&
+             el->values[1].u.arr->size > 0 &&
+             el->values[1].u.arr->item[0].type == T_STRING) {
     char buf[10240];
-    int len = sprintf(buf, (char *) telnet_mssp_value, el->values[0].u.string,
-        el->values[1].u.arr->item[0].u.string);
+    int len = sprintf(buf, (char *)telnet_mssp_value, el->values[0].u.string,
+                      el->values[1].u.arr->item[0].u.string);
 
     telnet_send(ip->telnet, buf, len);
 
@@ -34,8 +34,8 @@ static int send_mssp_val(mapping_t *map, mapping_node_t *el, void *data) {
     for (i = 1; i < ar->size; i++) {
       if (ar->item[i].type == T_STRING) {
         telnet_send(ip->telnet, (const char *)&val, sizeof(val));
-        telnet_send(ip->telnet, (const char *) ar->item[i].u.string,
-            SVALUE_STRLEN(&ar->item[i]));
+        telnet_send(ip->telnet, (const char *)ar->item[i].u.string,
+                    SVALUE_STRLEN(&ar->item[i]));
       }
     }
     flush_message(ip);
@@ -43,10 +43,10 @@ static int send_mssp_val(mapping_t *map, mapping_node_t *el, void *data) {
   return 0;
 }
 
-void on_telnet_do_mssp(interactive_t* ip) {
+void on_telnet_do_mssp(interactive_t *ip) {
   svalue_t *res = safe_apply_master_ob(APPLY_GET_MUD_STATS, 0);
   mapping_t *map;
-  if (res <= (svalue_t *) 0 || res->type != T_MAPPING) {
+  if (res <= (svalue_t *)0 || res->type != T_MAPPING) {
     map = allocate_mapping(0);
     free_svalue(&apply_ret_value, "telnet neg");
     apply_ret_value.type = T_MAPPING;
@@ -67,7 +67,7 @@ void on_telnet_do_mssp(interactive_t* ip) {
     }
   }
   if (!tmp) {
-    telnet_printf(ip->telnet, (char *) telnet_mssp_value, "NAME", MUD_NAME);
+    telnet_printf(ip->telnet, (char *)telnet_mssp_value, "NAME", MUD_NAME);
   }
   tmp = findstring("PLAYERS");
   if (tmp) {
@@ -79,7 +79,7 @@ void on_telnet_do_mssp(interactive_t* ip) {
   if (!tmp) {
     char num[5] = {};
     snprintf(num, sizeof(num), "%d", num_user);
-    telnet_printf(ip->telnet, (char *) telnet_mssp_value, "PLAYERS", num);
+    telnet_printf(ip->telnet, (char *)telnet_mssp_value, "PLAYERS", num);
   }
   tmp = findstring("UPTIME");
   if (tmp) {
@@ -91,7 +91,7 @@ void on_telnet_do_mssp(interactive_t* ip) {
   if (!tmp) {
     char num[20] = {};
     snprintf(num, sizeof(num), "%ld", boot_time);
-    telnet_printf(ip->telnet, (char *) telnet_mssp_value, "UPTIME", num);
+    telnet_printf(ip->telnet, (char *)telnet_mssp_value, "UPTIME", num);
   }
   // now send the rest
   mapTraverse(map, send_mssp_val, ip);

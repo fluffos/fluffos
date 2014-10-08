@@ -114,7 +114,6 @@ void assign_svalue_no_free(svalue_t *, svalue_t *);
 #define free_svalue(x, y) int_free_svalue(x)
 #endif
 
-
 extern svalue_t const0, const1, const0u;
 
 /* These are not used anywhere */
@@ -176,4 +175,4 @@ extern svalue_t const0, const1, const0u;
         (x)->u.string = ssj_res; \
     )
 
-#endif  /* LPC_SVALUE_H */
+#endif /* LPC_SVALUE_H */

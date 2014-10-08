@@ -476,7 +476,7 @@ int parse(const char *cmd,       /* Command to parse */
           svalue_t *ob_or_array, /* Object or array of objects */
           const char *pattern,   /* Special parsing pattern */
           svalue_t *stack_args,  /* Pointer to lvalue args on
-                                     * stack */
+                                    * stack */
           int num_arg) {
   int pix, cix, six, fail, fword, ocix, fpix;
   svalue_t *pval;
@@ -1423,8 +1423,8 @@ static int check_adjectiv(int obix, array_t *warr, int from, int to) {
   for (il = from; il <= to;) {           /* adj1 .. adjN */
     for (back = to; back >= il; back--) {/* back from adjN to adj[il] */
                                          /*
-       * Create teststring with "adj[il] .. adj[back]"
-       */
+* Create teststring with "adj[il] .. adj[back]"
+*/
       adstr[0] = 0;
       for (sum = il; sum <= back; sum++) {
         /* test "adj[il] ..

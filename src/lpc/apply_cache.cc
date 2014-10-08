@@ -7,7 +7,7 @@
 
 // TODO: move this to somewhere else.
 program_t *find_function_by_name2(object_t *ob, const char **name, int *indexp,
-    int *runtime_index, int *fio, int *vio);
+                                  int *runtime_index, int *fio, int *vio);
 
 #ifdef CACHE_STATS
 unsigned int apply_low_call_others = 0;
@@ -22,17 +22,17 @@ static cache_entry_t cache[APPLY_CACHE_SIZE];
 
 /* Look up a entry for given fun/ob, user must validate
  * the entry content before use */
-cache_entry_t* apply_cache_get_entry(const char *fun, object_t *ob) {
+cache_entry_t *apply_cache_get_entry(const char *fun, object_t *ob) {
   /* Search in cache for this function. */
   uint64_t ix; /* The cache index */
   std::hash<void *> hash_fn;
-  ix = hash_fn((void *) fun);
-  ix ^= hash_fn((void *) ob->prog);
-  return &cache[ix % (sizeof(cache) / sizeof (cache_entry_t))];
+  ix = hash_fn((void *)fun);
+  ix ^= hash_fn((void *)ob->prog);
+  return &cache[ix % (sizeof(cache) / sizeof(cache_entry_t))];
 }
 
 /* Erase the current entry. */
-void apply_cache_clear_entry(cache_entry_t* entry) {
+void apply_cache_clear_entry(cache_entry_t *entry) {
 #ifdef CACHE_STATS
   if (!entry->funp) {
     apply_low_slots_used++;
@@ -49,15 +49,15 @@ void apply_cache_clear_entry(cache_entry_t* entry) {
     entry->progp = 0;
   } else {
     if (entry->funp) {
-      free_string((char *) entry->funp);
+      free_string((char *)entry->funp);
       entry->funp = 0;
     }
   }
 }
 
-void apply_cache_save_entry(cache_entry_t* entry, program_t* target_prog,
-    const char* sfun, const char* fun, const object_t* ob, int findex, int fio,
-    int vio) {
+void apply_cache_save_entry(cache_entry_t *entry, program_t *target_prog,
+                            const char *sfun, const char *fun,
+                            const object_t *ob, int findex, int fio, int vio) {
   entry->oprogp = ob->prog;
   reference_prog(entry->oprogp, "apply_low() cache oprogp [miss]");
 
@@ -71,24 +71,25 @@ void apply_cache_save_entry(cache_entry_t* entry, program_t* target_prog,
   } else {
     if (sfun) {
       ref_string(sfun);
-      entry->funp = (function_t *) sfun;
+      entry->funp = (function_t *)sfun;
     } else {
-      entry->funp = (function_t *) make_shared_string(fun);
+      entry->funp = (function_t *)make_shared_string(fun);
     }
   }
 }
 
 // Lookup the program, recursively check inherited object if needed,
 // If program is not defined, return nullptr.
-cache_entry_t* apply_cache_lookup(const char *fun, object_t *ob) {
+cache_entry_t *apply_cache_lookup(const char *fun, object_t *ob) {
 #ifdef CACHE_STATS
   apply_low_call_others++;
 #endif
   auto entry = apply_cache_get_entry(fun, ob);
 
   if (entry->oprogp == ob->prog && /* object must match */
-  (entry->progp ? (strcmp(entry->funp->funcname, fun) == 0) : /* function name must match */
-                  strcmp((char *) entry->funp, fun) == 0)) {
+      (entry->progp ? (strcmp(entry->funp->funcname, fun) == 0)
+                    : /* function name must match */
+           strcmp((char *)entry->funp, fun) == 0)) {
 #ifdef CACHE_STATS
     apply_low_cache_hits++;
 #endif
@@ -100,8 +101,8 @@ cache_entry_t* apply_cache_lookup(const char *fun, object_t *ob) {
     int findex = 0, runtime_index = 0, fio = 0, vio = 0;
     const char *sfun;
     sfun = fun;
-    auto target_prog = find_function_by_name2(ob, &sfun, &findex,
-        &runtime_index, &fio, &vio);
+    auto target_prog =
+        find_function_by_name2(ob, &sfun, &findex, &runtime_index, &fio, &vio);
 
     /* 3) Save result into cache */
     // TODO: fix this idiotic sfun/fun.
@@ -112,7 +113,7 @@ cache_entry_t* apply_cache_lookup(const char *fun, object_t *ob) {
 }
 
 static program_t *ffbn_recurse2(program_t *prog, const char *name, int *indexp,
-    int *runtime_index, int *fio, int *vio) {
+                                int *runtime_index, int *fio, int *vio) {
   int high = prog->num_functions_defined - 1;
   int low = 0, mid;
   int ri;
@@ -144,7 +145,7 @@ static program_t *ffbn_recurse2(program_t *prog, const char *name, int *indexp,
   mid = prog->num_inherited;
   while (mid--) {
     program_t *ret = ffbn_recurse2(prog->inherit[mid].prog, name, indexp,
-        runtime_index, fio, vio);
+                                   runtime_index, fio, vio);
     if (ret) {
       *runtime_index += prog->inherit[mid].function_index_offset;
       *fio += prog->inherit[mid].function_index_offset;
@@ -156,7 +157,7 @@ static program_t *ffbn_recurse2(program_t *prog, const char *name, int *indexp,
 }
 
 program_t *find_function_by_name2(object_t *ob, const char **name, int *indexp,
-    int *runtime_index, int *fio, int *vio) {
+                                  int *runtime_index, int *fio, int *vio) {
   // all function name is shared string, if string is not a shared string,
   // it can not be a defined function.
   if (!(*name = findstring(*name))) {
@@ -181,4 +182,3 @@ void mark_apply_low_cache() {
   }
 }
 #endif
-

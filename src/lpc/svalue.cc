@@ -4,13 +4,13 @@
 
 #include "lpc_incl.h"
 
-#include "function.h" // string_or_func
-#include "program.h" // program_t
-#include "simulate.h" // fatal()
+#include "function.h"  // string_or_func
+#include "program.h"   // program_t
+#include "simulate.h"  // fatal()
 
-#include "stralloc.h" // strings
+#include "stralloc.h"  // strings
 #include "debug.h"
-#include "main.h" // debug_message
+#include "main.h"  // debug_message
 
 // FIXME: move init from main() to compile time;
 svalue_t const0, const1, const0u;
@@ -25,10 +25,10 @@ void assign_svalue_no_free(svalue_t *to, svalue_t *from) {
   DEBUG_CHECK(from == 0, "Attempt to assign_svalue() from a null ptr.\n");
   DEBUG_CHECK(to == 0, "Attempt to assign_svalue() to a null ptr.\n");
   DEBUG_CHECK((from->type & (from->type - 1)) & ~T_FREED,
-      "from->type is corrupt; >1 bit set.\n");
+              "from->type is corrupt; >1 bit set.\n");
 
-  if (from->type == T_OBJECT
-      && (!from->u.ob || (from->u.ob->flags & O_DESTRUCTED))) {
+  if (from->type == T_OBJECT &&
+      (!from->u.ob || (from->u.ob->flags & O_DESTRUCTED))) {
     *to = const0u;
     return;
   }
@@ -79,9 +79,9 @@ void copy_some_svalues(svalue_t *dest, svalue_t *v, int num) {
 #ifdef DEBUG
 void int_free_svalue(svalue_t *v, const char *tag)
 #else
-    void int_free_svalue(svalue_t *v)
+void int_free_svalue(svalue_t *v)
 #endif
-    {
+{
   /* Marius, 30-Mar-2001: T_FREED could be OR'd in with the type now if the
    * svalue has been 'freed' as an optimization by the F_TRANSFER_LOCAL op.
    * This will allow us to keep the type of the variable known for error
@@ -95,11 +95,11 @@ void int_free_svalue(svalue_t *v, const char *tag)
       int size = MSTR_SIZE(str);
 #endif
       if (DEC_COUNTED_REF(str)) {
-        SUB_STRING (size);
+        SUB_STRING(size);
         NDBG(BLOCK(str));
         if (v->subtype & STRING_HASHED) {
           SUB_NEW_STRING(size, sizeof(block_t));
-          deallocate_string((char *) str);
+          deallocate_string((char *)str);
           CHECK_STRING_STATS;
         } else {
           SUB_NEW_STRING(size, sizeof(malloc_block_t));
@@ -107,7 +107,7 @@ void int_free_svalue(svalue_t *v, const char *tag)
           CHECK_STRING_STATS;
         }
       } else {
-        SUB_STRING (size);
+        SUB_STRING(size);
         NDBG(BLOCK(str));
       }
     }
@@ -115,7 +115,7 @@ void int_free_svalue(svalue_t *v, const char *tag)
 #ifdef DEBUG
     if (v->type == T_OBJECT) {
       debug(d_flag, "Free_svalue %s (%d) from %s\n", v->u.ob->obname,
-          v->u.ob->ref - 1, tag);
+            v->u.ob->ref - 1, tag);
     }
 #endif
     /* TODO: Set to 0 on condition that REF overflow to negative. */
@@ -124,35 +124,35 @@ void int_free_svalue(svalue_t *v, const char *tag)
     }
     if (v->u.refed->ref == 0) {
       switch (v->type) {
-      case T_OBJECT:
-        dealloc_object(v->u.ob, "free_svalue");
-        break;
-      case T_CLASS:
-        dealloc_class(v->u.arr);
-        break;
-      case T_ARRAY:
-        if (v->u.arr != &the_null_array) {
-          dealloc_array(v->u.arr);
-        }
-        break;
+        case T_OBJECT:
+          dealloc_object(v->u.ob, "free_svalue");
+          break;
+        case T_CLASS:
+          dealloc_class(v->u.arr);
+          break;
+        case T_ARRAY:
+          if (v->u.arr != &the_null_array) {
+            dealloc_array(v->u.arr);
+          }
+          break;
 #ifndef NO_BUFFER_TYPE
-      case T_BUFFER:
-        if (v->u.buf != &null_buf) {
-          FREE((char *) v->u.buf);
-        }
-        break;
+        case T_BUFFER:
+          if (v->u.buf != &null_buf) {
+            FREE((char *)v->u.buf);
+          }
+          break;
 #endif
-      case T_MAPPING:
-        dealloc_mapping(v->u.map);
-        break;
-      case T_FUNCTION:
-        dealloc_funp(v->u.fp);
-        break;
-      case T_REF:
-        if (!v->u.ref->lvalue) {
-          kill_ref(v->u.ref);
-        }
-        break;
+        case T_MAPPING:
+          dealloc_mapping(v->u.map);
+          break;
+        case T_FUNCTION:
+          dealloc_funp(v->u.fp);
+          break;
+        case T_REF:
+          if (!v->u.ref->lvalue) {
+            kill_ref(v->u.ref);
+          }
+          break;
       }
     }
   } else if (v->type == T_ERROR_HANDLER) {

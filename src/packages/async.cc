@@ -431,7 +431,7 @@ struct linux_dirent {
   unsigned short d_reclen; /* Length of this dirent */
   char d_name[];           /* Filename (null-terminated) */
                            /* length is actually (d_reclen - 2 -
-                                    offsetof(struct linux_dirent, d_name) */
+           offsetof(struct linux_dirent, d_name) */
 };
 
 void handle_getdir(struct request *req) {

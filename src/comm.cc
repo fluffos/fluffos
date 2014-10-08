@@ -246,8 +246,8 @@ void new_user_handler(interactive_t *user) {
 
   // FIXME: This current rely on ev_data.
   // Initialize libtelnet
-  user->telnet = telnet_init(
-      my_telopts, telnet_event_handler, NULL, user->ev_data);
+  user->telnet =
+      telnet_init(my_telopts, telnet_event_handler, NULL, user->ev_data);
 
   set_prompt("> ");
 
@@ -424,7 +424,7 @@ void add_message(object_t *who, const char *data, int len) {
   }
 #endif /* NO_SHADOWS */
 
-  if(ip->connection_type == PORT_TELNET) {
+  if (ip->connection_type == PORT_TELNET) {
     telnet_send(ip->telnet, data, len);
   } else {
     bufferevent_write(ip->ev_buffer, data, len);
@@ -664,7 +664,7 @@ void get_user_data(interactive_t *ip) {
       int start = ip->text_end;
 
       // this will read data into ip->text
-      telnet_recv(ip->telnet, (const char*)&buf[0], num_bytes);
+      telnet_recv(ip->telnet, (const char *)&buf[0], num_bytes);
 
       if (ip->text_end > start) {
         /* handle snooping - snooper does not see type-ahead due to
@@ -1555,11 +1555,11 @@ void f_request_term_size() {
   auto ip = command_giver->interactive;
 
   if ((st_num_arg == 1) && (sp->u.number == 0)) {
-    telnet_negotiate(command_giver->interactive->telnet,
-        TELNET_DONT, TELNET_TELOPT_NAWS);
+    telnet_negotiate(command_giver->interactive->telnet, TELNET_DONT,
+                     TELNET_TELOPT_NAWS);
   } else {
-    telnet_negotiate(command_giver->interactive->telnet,
-        TELNET_DO, TELNET_TELOPT_NAWS);
+    telnet_negotiate(command_giver->interactive->telnet, TELNET_DO,
+                     TELNET_TELOPT_NAWS);
   }
 
   if (st_num_arg == 1) {

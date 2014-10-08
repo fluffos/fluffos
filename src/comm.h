@@ -84,7 +84,7 @@ struct interactive_t {
 #ifdef OLD_ED
   struct ed_buffer_s *ed_buffer; /* local ed                        */
 #endif
-  int iflags;                                  /* interactive flags */
+  int iflags;       /* interactive flags */
   char out_of_band; /* Send a telnet sync operation            */
   struct translation *trans;
 
@@ -96,7 +96,7 @@ struct interactive_t {
   char ws_maskoffs;
 
   // libtelnet handle
-  struct telnet_t* telnet;
+  struct telnet_t *telnet;
 
   // libevent event handle.
   bufferevent *ev_buffer;

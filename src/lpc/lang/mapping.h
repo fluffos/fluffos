@@ -40,9 +40,9 @@ typedef struct mapping_s {
 #endif
   mapping_node_t **table;  /* the hash table */
   unsigned int table_size; /* # of buckets in hash table == power of 2 */
-  unsigned int
-      unfilled; /* # of buckets among 80% of total buckets that do not have
-                   entries */
+  unsigned int unfilled; /* # of buckets among 80% of total buckets that do not
+                            have
+                            entries */
   unsigned int count; /* total # of nodes actually in mapping  */
 #ifdef PACKAGE_MUDLIB_STATS
   statgroup_t stats; /* creators of the mapping */

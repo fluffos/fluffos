@@ -29,7 +29,7 @@ void f_send_gmcp() {
   auto ip = current_object->interactive;
   if (ip) {
     telnet_subnegotiation(ip->telnet, TELNET_TELOPT_GMCP, sp->u.string,
-        SVALUE_STRLEN(sp));
+                          SVALUE_STRLEN(sp));
     flush_message(ip);
   }
   pop_stack();
@@ -38,15 +38,16 @@ void f_send_gmcp() {
 
 /* ZMP */
 
-void on_telnet_do_zmp(const char **argv, unsigned long argc, interactive_t* ip) {
+void on_telnet_do_zmp(const char** argv, unsigned long argc,
+                      interactive_t* ip) {
   ip->iflags |= USING_ZMP;
 
   // Push the command
   copy_and_push_string(argv[0]);
 
   // Push the array
-  array_t *arr = allocate_array(argc - 1);
-  for(int i = 1; i < argc; i++) {
+  array_t* arr = allocate_array(argc - 1);
+  for (int i = 1; i < argc; i++) {
     arr->item[i].u.string = string_copy(argv[i], "ZMP");
     arr->item[i].type = T_STRING;
     arr->item[i].subtype = STRING_MALLOC;

@@ -16,7 +16,7 @@ static long blocksize = 0;
 void *malloc64(int size) {
   if (!blocksize) {
     char *tmp = (char *)sbrk(0);  // end of heap
-    char *tmp2 = (char *)&size;  // end of stack
+    char *tmp2 = (char *)&size;   // end of stack
     char *tmp3 =
         (char *)0x4000000000;  // libs, how do we get the actual address??
     // printf("%ul %ul %ul", tmp, tmp2, tmp3);

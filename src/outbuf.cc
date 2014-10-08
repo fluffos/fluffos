@@ -3,7 +3,6 @@
 #include "main.h"
 #include "outbuf.h"
 
-
 void outbuf_zero(outbuffer_t *outbuf) {
   outbuf->real_size = 0;
   outbuf->buffer = 0;

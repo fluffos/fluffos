@@ -228,15 +228,15 @@ typedef struct program_s {
   inherit_t *inherit;             /* List of inherited prgms */
   int total_size;                 /* Sum of all data in this struct */
                                   /*
-   * The types of function arguments are saved where 'argument_types'
-   * points. It can be a variable number of arguments, so allocation is
-   * done dynamically. To know where first argument is found for function
-   * 'n' (number of function), use 'type_start[n]'. These two arrays will
-   * only be allocated if '#pragma save_types' has been specified. This
-   * #pragma should be specified in files that are commonly used for
-   * inheritance. There are several lines of code that depends on the type
-   * length (16 bits) of 'type_start' (sorry !).
-   */
+* The types of function arguments are saved where 'argument_types'
+* points. It can be a variable number of arguments, so allocation is
+* done dynamically. To know where first argument is found for function
+* 'n' (number of function), use 'type_start[n]'. These two arrays will
+* only be allocated if '#pragma save_types' has been specified. This
+* #pragma should be specified in files that are commonly used for
+* inheritance. There are several lines of code that depends on the type
+* length (16 bits) of 'type_start' (sorry !).
+*/
   unsigned short *argument_types;
 #define INDEX_START_NONE 65535
   unsigned short *type_start;

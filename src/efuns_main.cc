@@ -119,7 +119,8 @@ void f_bind(void) {
     error("Illegal to rebind a pointer to a local function.\n");
   }
   if (old_fp->hdr.type & FP_NOT_BINDABLE) {
-    error("Illegal to rebind a functional that references globals or local "
+    error(
+        "Illegal to rebind a functional that references globals or local "
         "functions.\n");
   }
 
@@ -147,8 +148,8 @@ void f_bind(void) {
   if ((old_fp->hdr.type & 0x0f) == FP_FUNCTIONAL) {
     new_fp->f.functional.prog->func_ref++;
     debug(d_flag, "add func ref /%s: now %i\n",
-        new_fp->f.functional.prog->filename,
-        new_fp->f.functional.prog->func_ref);
+          new_fp->f.functional.prog->filename,
+          new_fp->f.functional.prog->func_ref);
   }
 
   free_funp(old_fp);
@@ -162,16 +163,16 @@ static void print_cache_stats(outbuffer_t *ob) {
   outbuf_add(ob, "Function cache information\n");
   outbuf_add(ob, "-------------------------------\n");
   outbuf_addv(ob, "%% cache hits:    %10.2f\n",
-      100 * ((LPC_FLOAT) apply_low_cache_hits / apply_low_call_others));
+              100 * ((LPC_FLOAT)apply_low_cache_hits / apply_low_call_others));
   outbuf_addv(ob, "call_others:     %10lu\n", apply_low_call_others);
   outbuf_addv(ob, "cache hits:      %10lu\n", apply_low_cache_hits);
   outbuf_addv(ob, "cache size:      %10lu\n", APPLY_CACHE_SIZE);
   outbuf_addv(ob, "slots used:      %10lu\n", apply_low_slots_used);
   outbuf_addv(ob, "%% slots used:    %10.2f\n",
-      100 * ((LPC_FLOAT) apply_low_slots_used / APPLY_CACHE_SIZE));
+              100 * ((LPC_FLOAT)apply_low_slots_used / APPLY_CACHE_SIZE));
   outbuf_addv(ob, "collisions:      %10lu\n", apply_low_collisions);
   outbuf_addv(ob, "%% collisions:    %10.2f\n",
-      100 * ((LPC_FLOAT) apply_low_collisions / apply_low_call_others));
+              100 * ((LPC_FLOAT)apply_low_collisions / apply_low_call_others));
 }
 
 void f_cache_stats(void) {
@@ -228,13 +229,14 @@ void f__call_other(void) {
       error("call_other() couldn't find object\n");
     }
   }
-  /* Send the remaining arguments to the function. */
+/* Send the remaining arguments to the function. */
 #ifdef TRACE
   if (TRACEP(TRACE_CALL_OTHER)) {
     do_trace("Call other ", funcname, "\n");
   }
 #endif
-  if (apply(funcname, ob, num_arg - 2, ORIGIN_CALL_OTHER) == 0) {/* Function not found */
+  if (apply(funcname, ob, num_arg - 2, ORIGIN_CALL_OTHER) ==
+      0) {/* Function not found */
     pop_2_elems();
     push_undefined();
     return;
@@ -268,17 +270,16 @@ void f_call_out(void) {
 #endif
 
 #ifdef F_CALL_OUT_INFO
-void f_call_out_info(void) {
-  push_refed_array(get_all_call_outs());
-}
+void f_call_out_info(void) { push_refed_array(get_all_call_outs()); }
 #endif
 
 #if defined(F_CALL_STACK) || defined(F_ORIGIN)
 static const char *origin_name(int orig) {
   /* FIXME: this should use ffs() if available (BSD) */
   int i = 0;
-  static const char *origins[] = { "driver", "local", "call_other", "simul",
-      "internal", "efun", "function pointer", "functional" };
+  static const char *origins[] = {"driver",           "local",     "call_other",
+                                  "simul",            "internal",  "efun",
+                                  "function pointer", "functional"};
   while (orig >>= 1) {
     i++;
   }
@@ -298,77 +299,79 @@ void f_call_stack(void) {
   ret = allocate_empty_array(n);
 
   switch (sp->u.number) {
-  case 0:
-    ret->item[0].type = T_STRING;
-    ret->item[0].subtype = STRING_MALLOC;
-    ret->item[0].u.string = add_slash(current_prog->filename);
-    for (i = 1; i < n; i++) {
-      ret->item[i].type = T_STRING;
-      ret->item[i].subtype = STRING_MALLOC;
-      ret->item[i].u.string = add_slash((csp - i + 1)->prog->filename);
-    }
-    break;
-  case 1:
-    ret->item[0].type = T_OBJECT;
-    ret->item[0].u.ob = current_object;
-    add_ref(current_object, "f_call_stack: curr");
-    for (i = 1; i < n; i++) {
-      ret->item[i].type = T_OBJECT;
-      ret->item[i].u.ob = (csp - i + 1)->ob;
-      add_ref((csp - i + 1)->ob, "f_call_stack");
-    }
-    break;
-  case 2:
-    for (i = 0; i < n; i++) {
-      ret->item[i].type = T_STRING;
-      if (((csp - i)->framekind & FRAME_MASK) == FRAME_FUNCTION) {
-        const program_t *prog = (i ? (csp - i + 1)->prog : current_prog);
-        int index = (csp - i)->fr.table_index;
-        function_t *cfp = &prog->function_table[index];
-
-        ret->item[i].subtype = STRING_SHARED;
-        ret->item[i].u.string = cfp->funcname;
-        ref_string(cfp->funcname);
-      } else {
-        ret->item[i].subtype = STRING_CONSTANT;
-        ret->item[i].u.string =
-            (((csp - i)->framekind & FRAME_MASK) == FRAME_CATCH) ?
-                "CATCH" : "<function>";
-      }
-    }
-    break;
-  case 3:
-    ret->item[0].type = T_STRING;
-    ret->item[0].subtype = STRING_CONSTANT;
-    ret->item[0].u.string = origin_name(caller_type);
-
-    for (i = 1; i < n; i++) {
-      ret->item[i].type = T_STRING;
-      ret->item[i].subtype = STRING_CONSTANT;
-      ret->item[i].u.string = origin_name((csp - i + 1)->caller_type);
-    }
-    break;
-  case 4:
-    for (i = 0; i < n; i++) {
-      ret->item[i].type = T_STRING;
-      if (1 || ((csp - i)->framekind & FRAME_MASK) == FRAME_FUNCTION
-          || ((csp - i)->framekind & FRAME_MASK) == FRAME_FUNP) {
-        const program_t *prog = (i ? (csp - i + 1)->prog : current_prog);
-        int index = (csp - i)->fr.table_index;
-        char *progc = (i ? (csp - i + 1)->pc : pc);
-        function_t *cfp = &prog->function_table[index];
+    case 0:
+      ret->item[0].type = T_STRING;
+      ret->item[0].subtype = STRING_MALLOC;
+      ret->item[0].u.string = add_slash(current_prog->filename);
+      for (i = 1; i < n; i++) {
         ret->item[i].type = T_STRING;
         ret->item[i].subtype = STRING_MALLOC;
-        ret->item[i].u.string = string_copy(get_line_number(progc, prog),
-            "call_stack");
-      } else {
-        ret->item[i].subtype = STRING_CONSTANT;
-        ret->item[i].u.string =
-            (((csp - i)->framekind & FRAME_MASK) == FRAME_CATCH) ?
-                "CATCH" : "<function>";
+        ret->item[i].u.string = add_slash((csp - i + 1)->prog->filename);
       }
-    }
-    break;
+      break;
+    case 1:
+      ret->item[0].type = T_OBJECT;
+      ret->item[0].u.ob = current_object;
+      add_ref(current_object, "f_call_stack: curr");
+      for (i = 1; i < n; i++) {
+        ret->item[i].type = T_OBJECT;
+        ret->item[i].u.ob = (csp - i + 1)->ob;
+        add_ref((csp - i + 1)->ob, "f_call_stack");
+      }
+      break;
+    case 2:
+      for (i = 0; i < n; i++) {
+        ret->item[i].type = T_STRING;
+        if (((csp - i)->framekind & FRAME_MASK) == FRAME_FUNCTION) {
+          const program_t *prog = (i ? (csp - i + 1)->prog : current_prog);
+          int index = (csp - i)->fr.table_index;
+          function_t *cfp = &prog->function_table[index];
+
+          ret->item[i].subtype = STRING_SHARED;
+          ret->item[i].u.string = cfp->funcname;
+          ref_string(cfp->funcname);
+        } else {
+          ret->item[i].subtype = STRING_CONSTANT;
+          ret->item[i].u.string =
+              (((csp - i)->framekind & FRAME_MASK) == FRAME_CATCH)
+                  ? "CATCH"
+                  : "<function>";
+        }
+      }
+      break;
+    case 3:
+      ret->item[0].type = T_STRING;
+      ret->item[0].subtype = STRING_CONSTANT;
+      ret->item[0].u.string = origin_name(caller_type);
+
+      for (i = 1; i < n; i++) {
+        ret->item[i].type = T_STRING;
+        ret->item[i].subtype = STRING_CONSTANT;
+        ret->item[i].u.string = origin_name((csp - i + 1)->caller_type);
+      }
+      break;
+    case 4:
+      for (i = 0; i < n; i++) {
+        ret->item[i].type = T_STRING;
+        if (1 || ((csp - i)->framekind & FRAME_MASK) == FRAME_FUNCTION ||
+            ((csp - i)->framekind & FRAME_MASK) == FRAME_FUNP) {
+          const program_t *prog = (i ? (csp - i + 1)->prog : current_prog);
+          int index = (csp - i)->fr.table_index;
+          char *progc = (i ? (csp - i + 1)->pc : pc);
+          function_t *cfp = &prog->function_table[index];
+          ret->item[i].type = T_STRING;
+          ret->item[i].subtype = STRING_MALLOC;
+          ret->item[i].u.string =
+              string_copy(get_line_number(progc, prog), "call_stack");
+        } else {
+          ret->item[i].subtype = STRING_CONSTANT;
+          ret->item[i].u.string =
+              (((csp - i)->framekind & FRAME_MASK) == FRAME_CATCH)
+                  ? "CATCH"
+                  : "<function>";
+        }
+      }
+      break;
   }
 
   put_array(ret);
@@ -380,7 +383,7 @@ void f_capitalize(void) {
   if (uislower(sp->u.string[0])) {
     unlink_string_svalue(sp);
     // unlinked, so this is ok
-    ((char *) (sp->u.string))[0] = toupper((unsigned char) sp->u.string[0]);
+    ((char *)(sp->u.string))[0] = toupper((unsigned char)sp->u.string[0]);
   }
 }
 #endif
@@ -414,7 +417,7 @@ void f_clear_bit(void) {
 
   if (sp->u.number > MAX_BITS) {
     error("clear_bit() bit requested : %d > maximum bits: %d\n", sp->u.number,
-        MAX_BITS);
+          MAX_BITS);
   }
   bit = (sp--)->u.number;
   if (bit < 0) {
@@ -427,7 +430,7 @@ void f_clear_bit(void) {
     return; /* return first arg unmodified */
   }
   unlink_string_svalue(sp);
-  str = (char *) sp->u.string;
+  str = (char *)sp->u.string;
 
   if (str[ind] > 0x3f + ' ' || str[ind] < ' ') {
     error("Illegal bit pattern in clear_bit character %d\n", ind);
@@ -483,7 +486,7 @@ void f_crc32(void) {
 
   if (sp->type == T_STRING) {
     len = SVALUE_STRLEN(sp);
-    buf = (unsigned char *) sp->u.string;
+    buf = (unsigned char *)sp->u.string;
 #ifndef NO_BUFFER_TYPE
   } else if (sp->type == T_BUFFER) {
     len = sp->u.buf->size;
@@ -508,10 +511,10 @@ void f_ctime(void) {
   char *p;
   int l;
   if (st_num_arg) {
-    cp = time_string((time_t) sp->u.number);
+    cp = time_string((time_t)sp->u.number);
   } else {
     push_number(0);
-    cp = time_string((time_t) get_current_time());
+    cp = time_string((time_t)get_current_time());
   }
   if ((nl = strchr(cp, '\n'))) {
     l = nl - cp;
@@ -568,15 +571,15 @@ void f_debug_levels(void) {
 void f_deep_inventory(void) {
   array_t *vec;
   int args = st_num_arg;
-  if (st_num_arg == 2 && sp->type == T_FUNCTION
-      && ((sp - 1)->type == T_ARRAY || (sp - 1)->type == T_OBJECT)) {
+  if (st_num_arg == 2 && sp->type == T_FUNCTION &&
+      ((sp - 1)->type == T_ARRAY || (sp - 1)->type == T_OBJECT)) {
     if ((sp - 1)->type == T_ARRAY) {
       vec = deep_inventory_array((sp - 1)->u.arr, 1, sp->u.fp);
     } else {/*(sp-1)->type==T_OBJECT*/
       vec = deep_inventory((sp - 1)->u.ob, 0, sp->u.fp);
     }
-  } else if (st_num_arg == 1
-      && (sp->type == T_FUNCTION || sp->type == T_ARRAY || sp->type == T_OBJECT)) {
+  } else if (st_num_arg == 1 && (sp->type == T_FUNCTION ||
+                                 sp->type == T_ARRAY || sp->type == T_OBJECT)) {
     if (sp->type == T_FUNCTION) {
       vec = deep_inventory(current_object, 0, sp->u.fp);
     } else if (sp->type == T_ARRAY) {
@@ -655,13 +658,13 @@ void f_ed(void) {
     if (sp->type == T_NUMBER) {
       if (sp->u.number == 1)
         ed_start((sp - 2)->u.string, 0, (sp - 1)->u.string, sp->u.number,
-            current_object, 0);
+                 current_object, 0);
       else
         ed_start((sp - 2)->u.string, 0, (sp - 1)->u.string, 0, current_object,
-            sp->u.number);
+                 sp->u.number);
     } else if (sp->type == T_STRING) {
       ed_start((sp - 2)->u.string, (sp - 1)->u.string, sp->u.string, 0,
-          current_object, 0);
+               current_object, 0);
     } else {
       bad_argument(sp, T_NUMBER | T_STRING, 3, F_ED);
     }
@@ -684,10 +687,10 @@ void f_ed(void) {
 
     if (sp->u.number == 1)
       ed_start((sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.string,
-          sp->u.number, current_object, 0);
+               sp->u.number, current_object, 0);
     else
       ed_start((sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.string, 0,
-          current_object, sp->u.number);
+               current_object, sp->u.number);
     pop_n_elems(4);
   } else {/* st_num_arg == 5 */
     /* ed(fname, writefn, exitfn, restricted, scroll_lines) */
@@ -708,7 +711,7 @@ void f_ed(void) {
     }
 
     ed_start((sp - 4)->u.string, (sp - 3)->u.string, (sp - 2)->u.string,
-        (sp - 1)->u.number, current_object, sp->u.number);
+             (sp - 1)->u.number, current_object, sp->u.number);
 
     pop_n_elems(5);
   }
@@ -877,8 +880,8 @@ void f_explode(void) {
 
   int len = SVALUE_STRLEN(sp - 1);
 
-  vec = explode_string((sp - 1)->u.string, len, sp->u.string,
-      SVALUE_STRLEN(sp));
+  vec =
+      explode_string((sp - 1)->u.string, len, sp->u.string, SVALUE_STRLEN(sp));
   free_string_svalue(sp--);
   free_string_svalue(sp);
   put_array(vec);
@@ -890,7 +893,7 @@ void f_file_name(void) {
   char *res;
 
   /* This function now returns a leading '/' */
-  res = (char *) add_slash(sp->u.ob->obname);
+  res = (char *)add_slash(sp->u.ob->obname);
   free_object(&sp->u.ob, "f_file_name");
   put_malloced_string(res);
 }
@@ -968,7 +971,7 @@ void f_function_profile(void) {
     map = allocate_mapping(3);
     add_mapping_pair(map, "calls", prog->function_table[j].calls);
     add_mapping_pair(map, "self", prog->function_table[j].self -
-        prog->function_table[j].children);
+                                      prog->function_table[j].children);
     add_mapping_pair(map, "children", prog->function_table[j].children);
     add_mapping_shared_string(map, "name", prog->function_table[j].funcname);
     vec->item[j].type = T_MAPPING;
@@ -1091,7 +1094,8 @@ void f_implode(void) {
   if (st_num_arg == 3) {
     args = (sp - 2);
     if (args[1].type == T_STRING) {
-      error("Third argument to implode() is illegal with implode(array, "
+      error(
+          "Third argument to implode() is illegal with implode(array, "
           "string)\n");
     }
     flag = 1;
@@ -1348,17 +1352,17 @@ void f_link(void) {
 void f_lower_case(void) {
   char *str;
 
-  str = (char *) sp->u.string;
+  str = (char *)sp->u.string;
   /* find first upper case letter, if any */
   for (; *str; str++) {
     if (uisupper(*str)) {
       int l = str - sp->u.string;
       unlink_string_svalue(sp);
-      str = (char *) sp->u.string + l;
-      *str = tolower((unsigned char) *str);
+      str = (char *)sp->u.string + l;
+      *str = tolower((unsigned char)*str);
       for (str++; *str; str++) {
         if (uisupper(*str)) {
-          *str = tolower((unsigned char) *str);
+          *str = tolower((unsigned char)*str);
         }
       }
       return;
@@ -1465,7 +1469,7 @@ void f_match_path(void) {
 
   value = &const0u;
 
-  tmpstr = (char *) DMALLOC(SVALUE_STRLEN(sp) + 1, TAG_STRING, "match_path");
+  tmpstr = (char *)DMALLOC(SVALUE_STRLEN(sp) + 1, TAG_STRING, "match_path");
 
   src = sp->u.string;
   dst = tmpstr;
@@ -1563,80 +1567,80 @@ void f_member_array(void) {
         tmp = size - tmp - 1;
       }
       switch (find->type | (sv = v->item + tmp)->type) {
-      case T_STRING:
-        if (flag & 1) {
-          if (flen && (sv->subtype & STRING_COUNTED)
-              && flen > MSTR_SIZE(sv->u.string)) {
-            continue;
+        case T_STRING:
+          if (flag & 1) {
+            if (flen && (sv->subtype & STRING_COUNTED) &&
+                flen > MSTR_SIZE(sv->u.string)) {
+              continue;
+            }
+            if (strncmp(find->u.string, sv->u.string, flen)) {
+              continue;
+            }
+          } else {
+            if (flen && (sv->subtype & STRING_COUNTED) &&
+                flen != MSTR_SIZE(sv->u.string)) {
+              continue;
+            }
+            if (strcmp(find->u.string, sv->u.string)) {
+              continue;
+            }
           }
-          if (strncmp(find->u.string, sv->u.string, flen)) {
-            continue;
-          }
-        } else {
-          if (flen && (sv->subtype & STRING_COUNTED)
-              && flen != MSTR_SIZE(sv->u.string)) {
-            continue;
-          }
-          if (strcmp(find->u.string, sv->u.string)) {
-            continue;
-          }
-        }
-        break;
-      case T_NUMBER:
-        if (find->u.number == sv->u.number) {
           break;
-        }
-        continue;
-      case T_REAL:
-        if (find->u.real == sv->u.real) {
-          break;
-        }
-        continue;
-      case T_ARRAY:
-        if (find->u.arr == sv->u.arr) {
-          break;
-        }
-        continue;
-      case T_CLASS:
-        if (find->u.arr == sv->u.arr) {
-          break;
-        }
-        continue;
-      case T_OBJECT: {
-        if (sv->u.ob->flags & O_DESTRUCTED) {
-          assign_svalue(sv, &const0u);
-          continue;
-        }
-        if (find->u.ob == sv->u.ob) {
-          break;
-        }
-        continue;
-      }
-      case T_MAPPING:
-        if (find->u.map == sv->u.map) {
-          break;
-        }
-        continue;
-      case T_FUNCTION:
-        if (find->u.fp == sv->u.fp) {
-          break;
-        }
-        continue;
-#ifndef NO_BUFFER_TYPE
-      case T_BUFFER:
-        if (find->u.buf == sv->u.buf) {
-          break;
-        }
-        continue;
-#endif
-      default:
-        if (sv->type == T_OBJECT && (sv->u.ob->flags & O_DESTRUCTED)) {
-          assign_svalue(sv, &const0u);
-          if (find->type == T_NUMBER && !find->u.number) {
+        case T_NUMBER:
+          if (find->u.number == sv->u.number) {
             break;
           }
+          continue;
+        case T_REAL:
+          if (find->u.real == sv->u.real) {
+            break;
+          }
+          continue;
+        case T_ARRAY:
+          if (find->u.arr == sv->u.arr) {
+            break;
+          }
+          continue;
+        case T_CLASS:
+          if (find->u.arr == sv->u.arr) {
+            break;
+          }
+          continue;
+        case T_OBJECT: {
+          if (sv->u.ob->flags & O_DESTRUCTED) {
+            assign_svalue(sv, &const0u);
+            continue;
+          }
+          if (find->u.ob == sv->u.ob) {
+            break;
+          }
+          continue;
         }
-        continue;
+        case T_MAPPING:
+          if (find->u.map == sv->u.map) {
+            break;
+          }
+          continue;
+        case T_FUNCTION:
+          if (find->u.fp == sv->u.fp) {
+            break;
+          }
+          continue;
+#ifndef NO_BUFFER_TYPE
+        case T_BUFFER:
+          if (find->u.buf == sv->u.buf) {
+            break;
+          }
+          continue;
+#endif
+        default:
+          if (sv->type == T_OBJECT && (sv->u.ob->flags & O_DESTRUCTED)) {
+            assign_svalue(sv, &const0u);
+            if (find->type == T_NUMBER && !find->u.number) {
+              break;
+            }
+          }
+          continue;
       }
       break;
     }
@@ -1662,50 +1666,50 @@ void f_message(void) {
 
   args = sp - num_arg + 1;
   switch (args[2].type) {
-  case T_OBJECT:
-  case T_STRING:
-    use = allocate_empty_array(1);
-    use->item[0] = args[2];
-    args[2].type = T_ARRAY;
-    args[2].u.arr = use;
-    break;
-  case T_ARRAY:
-    use = args[2].u.arr;
-    break;
-  case T_NUMBER:
-    if (args[2].u.number == 0) {
-      int len = SVALUE_STRLEN(args + 1);
+    case T_OBJECT:
+    case T_STRING:
+      use = allocate_empty_array(1);
+      use->item[0] = args[2];
+      args[2].type = T_ARRAY;
+      args[2].u.arr = use;
+      break;
+    case T_ARRAY:
+      use = args[2].u.arr;
+      break;
+    case T_NUMBER:
+      if (args[2].u.number == 0) {
+        int len = SVALUE_STRLEN(args + 1);
 
-      /* this is really bad and probably should be rm'ed -Beek;
-       * on the other hand, we don't have a debug_message() efun yet.
-       * Well, there is one in contrib now ...
-       */
-      /* for compatibility (write() simul_efuns, etc)  -bobf */
-      if (len > LARGEST_PRINTABLE_STRING)
-        error("Printable strings limited to length of %d.\n",
-        LARGEST_PRINTABLE_STRING);
+        /* this is really bad and probably should be rm'ed -Beek;
+         * on the other hand, we don't have a debug_message() efun yet.
+         * Well, there is one in contrib now ...
+         */
+        /* for compatibility (write() simul_efuns, etc)  -bobf */
+        if (len > LARGEST_PRINTABLE_STRING)
+          error("Printable strings limited to length of %d.\n",
+                LARGEST_PRINTABLE_STRING);
 
-      add_message(command_giver, args[1].u.string, len);
-      pop_n_elems(num_arg);
-      return;
-    }
-  default:
-    bad_argument(&args[2], T_OBJECT | T_STRING | T_ARRAY | T_NUMBER, 3,
-    F_MESSAGE);
+        add_message(command_giver, args[1].u.string, len);
+        pop_n_elems(num_arg);
+        return;
+      }
+    default:
+      bad_argument(&args[2], T_OBJECT | T_STRING | T_ARRAY | T_NUMBER, 3,
+                   F_MESSAGE);
   }
   if (num_arg == 4) {
     switch (args[3].type) {
-    case T_OBJECT:
-      avoid = allocate_empty_array(1);
-      avoid->item[0] = args[3];
-      args[3].type = T_ARRAY;
-      args[3].u.arr = avoid;
-      break;
-    case T_ARRAY:
-      avoid = args[3].u.arr;
-      break;
-    default:
-      avoid = &the_null_array;
+      case T_OBJECT:
+        avoid = allocate_empty_array(1);
+        avoid->item[0] = args[3];
+        args[3].type = T_ARRAY;
+        args[3].u.arr = avoid;
+        break;
+      case T_ARRAY:
+        avoid = args[3].u.arr;
+        break;
+      default:
+        avoid = &the_null_array;
     }
   } else {
     avoid = &the_null_array;
@@ -1779,12 +1783,13 @@ void f_mud_status(void) {
     }
 
     outbuf_addv(&ob, "current working directory: %s\n\n",
-        get_current_dir(dir_buf, 1024));
+                get_current_dir(dir_buf, 1024));
     outbuf_add(&ob, "add_message statistics\n");
     outbuf_add(&ob, "------------------------------\n");
-    outbuf_addv(&ob,
+    outbuf_addv(
+        &ob,
         "Calls to add_message: %d   Packets: %d   Average packet size: %f\n\n",
-        add_message_calls, inet_packets, (float) inet_volume / inet_packets);
+        add_message_calls, inet_packets, (float)inet_volume / inet_packets);
 
     stat_living_objects(&ob);
 
@@ -1802,16 +1807,16 @@ void f_mud_status(void) {
   } else {
     /* !verbose */
     outbuf_addv(&ob, "Sentences:\t\t\t%8d %8d\n", tot_alloc_sentence,
-        tot_alloc_sentence * sizeof(sentence_t));
+                tot_alloc_sentence * sizeof(sentence_t));
 #ifndef DEBUG
     outbuf_addv(&ob, "Objects:\t\t\t%8d %8d\n", tot_alloc_object,
-        tot_alloc_object_size);
+                tot_alloc_object_size);
 #else
     outbuf_addv(&ob, "Objects:\t\t\t%8d %8d (%8d dangling)\n", tot_alloc_object,
-        tot_alloc_object_size, tot_dangling_object);
+                tot_alloc_object_size, tot_dangling_object);
 #endif
     outbuf_addv(&ob, "Prog blocks:\t\t\t%8d %8d\n", total_num_prog_blocks,
-        total_prog_block_size);
+                total_prog_block_size);
 #ifdef ARRAY_STATS
     outbuf_addv(&ob, "Arrays:\t\t\t\t%8d %8d\n", num_arrays, total_array_size);
 #else
@@ -1824,24 +1829,24 @@ void f_mud_status(void) {
 #endif
 
     outbuf_addv(&ob, "Mappings:\t\t\t%8d %8d\n", num_mappings,
-        total_mapping_size);
+                total_mapping_size);
     outbuf_addv(&ob, "Mappings(nodes):\t\t%8d\n", total_mapping_nodes);
     outbuf_addv(&ob, "Interactives:\t\t\t%8d %8d\n", num_user,
-        num_user * sizeof(interactive_t));
+                num_user * sizeof(interactive_t));
 
-    tot = show_otable_status(&ob, verbose) + heart_beat_status(&ob, verbose)
-        + add_string_status(&ob, verbose) + print_call_out_usage(&ob, verbose);
+    tot = show_otable_status(&ob, verbose) + heart_beat_status(&ob, verbose) +
+          add_string_status(&ob, verbose) + print_call_out_usage(&ob, verbose);
   }
 
   tot += total_prog_block_size +
 #ifdef ARRAY_STATS
-      total_array_size +
+         total_array_size +
 #endif
 #ifdef CLASS_STATS
-      total_class_size +
+         total_class_size +
 #endif
-      total_mapping_size + tot_alloc_sentence * sizeof(sentence_t)
-      + tot_alloc_object_size + num_user * sizeof(interactive_t) + res;
+         total_mapping_size + tot_alloc_sentence * sizeof(sentence_t) +
+         tot_alloc_object_size + num_user * sizeof(interactive_t) + res;
 
   if (!verbose) {
     outbuf_add(&ob, "\t\t\t\t\t --------\n");
@@ -1875,9 +1880,7 @@ void f_opcprof(void) {
 #endif
 
 #ifdef F_ORIGIN
-void f_origin(void) {
-  push_constant_string(origin_name(caller_type));
-}
+void f_origin(void) { push_constant_string(origin_name(caller_type)); }
 #endif
 
 #ifdef F_POINTERP
@@ -1957,7 +1960,7 @@ void f_previous_object(void) {
       i = 0;
     }
     do {
-      if ((p->framekind & FRAME_OB_CHANGE) && (ob = p->prev_ob)) {
+      if ((p->framekind &FRAME_OB_CHANGE) && (ob = p->prev_ob)) {
         if (!(ob->flags & O_DESTRUCTED)) {
           v->item[i].type = T_OBJECT;
           v->item[i].u.ob = ob;
@@ -1990,7 +1993,7 @@ void f_printf(void) {
 
   if (command_giver) {
     ret = string_print_formatted((sp - num_arg + 1)->u.string, num_arg - 1,
-        sp - num_arg + 2);
+                                 sp - num_arg + 2);
     if (ret) {
       tell_object(command_giver, ret, COUNTED_STRLEN(ret));
       FREE_MSTR(ret);
@@ -2094,15 +2097,12 @@ void f_query_ip_number(void) {
     copy_and_push_string(tmp);
   }
 
-  if (tmp)
-    free_string(tmp);
+  if (tmp) free_string(tmp);
 }
 #endif
 
 #ifdef F_QUERY_LOAD_AVERAGE
-void f_query_load_average(void) {
-  copy_and_push_string(query_load_av());
-}
+void f_query_load_average(void) { copy_and_push_string(query_load_av()); }
 #endif
 
 #ifdef F_QUERY_PRIVS
@@ -2226,18 +2226,18 @@ void f_read_file(void) {
   int start = 0, len = 0;
 
   switch (st_num_arg) {
-  case 3:
-    len = sp->u.number;
-    pop_stack();
+    case 3:
+      len = sp->u.number;
+      pop_stack();
     /* fall through */
-  case 2:
-    start = sp->u.number;
-    pop_stack();
+    case 2:
+      start = sp->u.number;
+      pop_stack();
     /* fall through */
-  case 1:
-    break;
-  default:
-    error("Wrong number of arguments!");
+    case 1:
+      break;
+    default:
+      error("Wrong number of arguments!");
   }
   str = read_file(sp->u.string, start, len);
   pop_stack();
@@ -2257,7 +2257,7 @@ void f_receive(void) {
 
       if (len > LARGEST_PRINTABLE_STRING)
         error("Printable strings limited to length of %d.\n",
-        LARGEST_PRINTABLE_STRING);
+              LARGEST_PRINTABLE_STRING);
 
       add_message(current_object, sp->u.string, len);
     }
@@ -2266,7 +2266,7 @@ void f_receive(void) {
 #ifndef NO_BUFFER_TYPE
   else {
     if (current_object->interactive) {
-      add_message(current_object, (char *) sp->u.buf->item, sp->u.buf->size);
+      add_message(current_object, (char *)sp->u.buf->item, sp->u.buf->size);
     }
 
     free_buffer((sp--)->u.buf);
@@ -2287,7 +2287,7 @@ void f_reg_assoc(void) {
   }
 
   vec = reg_assoc(arg, arg[1].u.arr, arg[2].u.arr,
-      st_num_arg > 3 ? &arg[3] : &const0);
+                  st_num_arg > 3 ? &arg[3] : &const0);
 
   if (st_num_arg == 4) {
     pop_3_elems();
@@ -2481,7 +2481,7 @@ void f_replace_string(void) {
       skip_table[j] = plen;
     }
     for (j = 0; j < plen; j++) {
-      skip_table[(unsigned char) pattern[j]] = plen - j - 1;
+      skip_table[(unsigned char)pattern[j]] = plen - j - 1;
     }
     slen = SVALUE_STRLEN(arg);
     slimit = src + slen;
@@ -2491,11 +2491,11 @@ void f_replace_string(void) {
 
   if (rlen <= plen) {
     /* in string replacement */
-    dst2 = dst1 = (char *) arg->u.string;
+    dst2 = dst1 = (char *)arg->u.string;
 
     if (plen > 1) {/* pattern length > 1, jump table most efficient */
       while (src < flimit) {
-        if ((skip = skip_table[(unsigned char) src[probe]])) {
+        if ((skip = skip_table[(unsigned char)src[probe]])) {
           for (climit = dst2 + skip; dst2 < climit; *dst2++ = *src++) {
             ;
           }
@@ -2532,7 +2532,7 @@ void f_replace_string(void) {
             cur++;
 
             if (cur >= first && cur <= last) {
-              *(char *) src = *replace;
+              *(char *)src = *replace;
             }
           }
           src++;
@@ -2542,7 +2542,7 @@ void f_replace_string(void) {
           if (*src++ == *pattern) {
             cur++;
             if (cur >= first) {
-              dst2 = (char *) src - 1;
+              dst2 = (char *)src - 1;
               while (*src) {
                 if (*src == *pattern) {
                   cur++;
@@ -2572,7 +2572,7 @@ void f_replace_string(void) {
 
     if (plen > 1) {
       while (src < flimit) {
-        if ((skip = skip_table[(unsigned char) src[probe]])) {
+        if ((skip = skip_table[(unsigned char)src[probe]])) {
           for (climit = dst2 + skip; dst2 < climit; *dst2++ = *src++) {
             ;
           }
@@ -2699,7 +2699,7 @@ void f_restore_variable(void) {
   v.type = T_NUMBER;
 
   // unlinked string
-  restore_variable(&v, (char *) sp->u.string);
+  restore_variable(&v, (char *)sp->u.string);
   FREE_MSTR(sp->u.string);
   *sp = v;
 }
@@ -2783,15 +2783,15 @@ void f_save_variable(void) {
 #ifdef F_SAY
 void f_say(void) {
   array_t *avoid;
-  static array_t vtmp = { 1,
+  static array_t vtmp = {1,
 #ifdef DEBUGMALLOC_EXTENSIONS
-      1,
+                         1,
 #endif
-      1,
+                         1,
 #ifdef PACKAGE_MUDLIB_STATS
-      { (mudlib_stats_t *) NULL, (mudlib_stats_t *) NULL }
+                         {(mudlib_stats_t *)NULL, (mudlib_stats_t *)NULL}
 #endif
-      };
+  };
 
   if (st_num_arg == 1) {
     avoid = &the_null_array;
@@ -2817,19 +2817,19 @@ void f_say(void) {
  */
 void f_set_eval_limit(void) {
   switch (sp->u.number) {
-  case 0:
-    sp->u.number = max_cost;
-    set_eval(max_cost);
-    break;
-  case -1:
-    sp->u.number = get_eval();
-    break;
-  case 1:
-    sp->u.number = max_cost;
-    break;
-  default:
-    max_cost = sp->u.number;
-    break;
+    case 0:
+      sp->u.number = max_cost;
+      set_eval(max_cost);
+      break;
+    case -1:
+      sp->u.number = get_eval();
+      break;
+    case 1:
+      sp->u.number = max_cost;
+      break;
+    default:
+      max_cost = sp->u.number;
+      break;
   }
 }
 #endif
@@ -2841,7 +2841,7 @@ void f_set_bit(void) {
 
   if (sp->u.number > MAX_BITS) {
     error("set_bit() bit requested: %d > maximum bits: %d\n", sp->u.number,
-        MAX_BITS);
+          MAX_BITS);
   }
   bit = (sp--)->u.number;
   if (bit < 0) {
@@ -2855,7 +2855,7 @@ void f_set_bit(void) {
   }
   if (ind < old_len) {
     unlink_string_svalue(sp);
-    str = (char *) sp->u.string;
+    str = (char *)sp->u.string;
   } else {
     str = new_string(len, "f_set_bit: str");
     str[len] = '\0';
@@ -3014,31 +3014,31 @@ void f_sizeof(void) {
   int i;
 
   switch (sp->type) {
-  case T_CLASS:
-    i = sp->u.arr->size;
-    free_class(sp->u.arr);
-    break;
-  case T_ARRAY:
-    i = sp->u.arr->size;
-    free_array(sp->u.arr);
-    break;
-  case T_MAPPING:
-    i = sp->u.map->count;
-    free_mapping(sp->u.map);
-    break;
+    case T_CLASS:
+      i = sp->u.arr->size;
+      free_class(sp->u.arr);
+      break;
+    case T_ARRAY:
+      i = sp->u.arr->size;
+      free_array(sp->u.arr);
+      break;
+    case T_MAPPING:
+      i = sp->u.map->count;
+      free_mapping(sp->u.map);
+      break;
 #ifndef NO_BUFFER_TYPE
-  case T_BUFFER:
-    i = sp->u.buf->size;
-    free_buffer(sp->u.buf);
-    break;
+    case T_BUFFER:
+      i = sp->u.buf->size;
+      free_buffer(sp->u.buf);
+      break;
 #endif
-  case T_STRING:
-    i = SVALUE_STRLEN(sp);
-    free_string_svalue(sp);
-    break;
-  default:
-    i = 0;
-    free_svalue(sp, "f_sizeof");
+    case T_STRING:
+      i = SVALUE_STRLEN(sp);
+      free_string_svalue(sp);
+      break;
+    default:
+      i = 0;
+      free_svalue(sp, "f_sizeof");
   }
   put_number(i);
 }
@@ -3056,8 +3056,8 @@ void f_snoop(void) {
       *sp = const0;
     }
   } else {
-    if (!new_set_snoop((sp - 1)->u.ob, sp->u.ob)
-        || (sp->u.ob->flags & O_DESTRUCTED)) {
+    if (!new_set_snoop((sp - 1)->u.ob, sp->u.ob) ||
+        (sp->u.ob->flags & O_DESTRUCTED)) {
       free_object(&(sp--)->u.ob, "f_snoop:2");
       free_object(&sp->u.ob, "f_snoop:3");
       *sp = const0;
@@ -3075,7 +3075,7 @@ void f_sprintf(void) {
   int num_arg = st_num_arg;
 
   s = string_print_formatted((sp - num_arg + 1)->u.string, num_arg - 1,
-      sp - num_arg + 2);
+                             sp - num_arg + 2);
   pop_n_elems(num_arg);
 
   STACK_INC;
@@ -3157,7 +3157,7 @@ void f_strsrch(void) {
   blen = SVALUE_STRLEN(sp - 1);
   if (sp->type == T_NUMBER) {
     little = buf;
-    if ((buf[0] = (char) sp->u.number)) {
+    if ((buf[0] = (char)sp->u.number)) {
       llen = 1;
     } else {
       llen = 0;
@@ -3175,17 +3175,17 @@ void f_strsrch(void) {
     if (!little[1]) {/* 1 char srch pattern */
       pos = strchr(big, little[0]);
     } else {
-      pos = (char *) strstr(big, little);
+      pos = (char *)strstr(big, little);
     }
     /* start at right */
-  } else { /* XXX: maybe test for -1 */
+  } else {           /* XXX: maybe test for -1 */
     if (!little[1]) {/* 1 char srch pattern */
       pos = strrchr(big, little[0]);
     } else {
       char c = *little;
 
       pos = big + blen; /* find end */
-      pos -= llen; /* find rightmost pos it _can_ be */
+      pos -= llen;      /* find rightmost pos it _can_ be */
       do {
         do {
           if (*pos == c) {
@@ -3265,15 +3265,15 @@ void f_tell_object(void) {
 #ifdef F_TELL_ROOM
 void f_tell_room(void) {
   array_t *avoid;
-  static array_t vtmp = { 1,
+  static array_t vtmp = {1,
 #ifdef DEBUGMALLOC_EXTENSIONS
-      1,
+                         1,
 #endif
-      1,
+                         1,
 #ifdef PACKAGE_MUDLIB_STATS
-      { (mudlib_stats_t *) NULL, (mudlib_stats_t *) NULL }
+                         {(mudlib_stats_t *)NULL, (mudlib_stats_t *)NULL}
 #endif
-      };
+  };
 
   int num_arg = st_num_arg;
   svalue_t *arg = sp - num_arg + 1;
@@ -3395,9 +3395,7 @@ void f_next_bit(void) {
 #endif
 
 #ifdef F__THIS_OBJECT
-void f__this_object(void) {
-  push_object(current_object);
-}
+void f__this_object(void) { push_object(current_object); }
 #endif
 
 #ifdef F_THIS_PLAYER
@@ -3440,9 +3438,7 @@ void f_throw(void) {
 #endif
 
 #ifdef F_TIME
-void f_time(void) {
-  push_number(get_current_time());
-}
+void f_time(void) { push_number(get_current_time()); }
 #endif
 
 #ifdef F__TO_FLOAT
@@ -3450,15 +3446,15 @@ void f__to_float(void) {
   LPC_FLOAT temp = 0;
 
   switch (sp->type) {
-  case T_NUMBER:
-    sp->type = T_REAL;
-    sp->u.real = (LPC_FLOAT) sp->u.number;
-    break;
-  case T_STRING:
-    temp = strtod(sp->u.string, NULL);
-    free_string_svalue(sp);
-    sp->type = T_REAL;
-    sp->u.real = temp;
+    case T_NUMBER:
+      sp->type = T_REAL;
+      sp->u.real = (LPC_FLOAT)sp->u.number;
+      break;
+    case T_STRING:
+      temp = strtod(sp->u.string, NULL);
+      free_string_svalue(sp);
+      sp->type = T_REAL;
+      sp->u.real = temp;
   }
 }
 #endif
@@ -3466,58 +3462,58 @@ void f__to_float(void) {
 #ifdef F__TO_INT
 void f__to_int(void) {
   switch (sp->type) {
-  case T_REAL:
-    sp->type = T_NUMBER;
-    sp->u.number = (LPC_INT) sp->u.real;
-    break;
-  case T_STRING: {
-    LPC_INT temp;
-    char *p;
+    case T_REAL:
+      sp->type = T_NUMBER;
+      sp->u.number = (LPC_INT)sp->u.real;
+      break;
+    case T_STRING: {
+      LPC_INT temp;
+      char *p;
 
-    temp = strtoll(sp->u.string, &p, 10);
-    if (*p) {
-      /* have to be a little careful here.  Checkign if p ==
-       * sp->u.string isn't good enough.
-       *
-       * Odd cases:
-       * to_int("  foo")  // p == sp->u.string + 2
-       *
-       * POSIX guarantees the strtoll() works in terms of isspace(),
-       * though.  If there is something other than whitespace, then
-       * there was a valid character consistent with the base,
-       * so we were successful.
-       *
-       * (note: this means to_int("10x") == 10.  If you want to
-       *  detect trailing garbage, use sscanf(str, "%d%s", ...).
-       */
-      while (p > sp->u.string && uisspace(*(p - 1))) {
-        p--;
-      }
+      temp = strtoll(sp->u.string, &p, 10);
+      if (*p) {
+        /* have to be a little careful here.  Checkign if p ==
+         * sp->u.string isn't good enough.
+         *
+         * Odd cases:
+         * to_int("  foo")  // p == sp->u.string + 2
+         *
+         * POSIX guarantees the strtoll() works in terms of isspace(),
+         * though.  If there is something other than whitespace, then
+         * there was a valid character consistent with the base,
+         * so we were successful.
+         *
+         * (note: this means to_int("10x") == 10.  If you want to
+         *  detect trailing garbage, use sscanf(str, "%d%s", ...).
+         */
+        while (p > sp->u.string && uisspace(*(p - 1))) {
+          p--;
+        }
 
-      if (p == sp->u.string) {
-        free_string_svalue(sp);
-        *sp = const0u;
-        break;
+        if (p == sp->u.string) {
+          free_string_svalue(sp);
+          *sp = const0u;
+          break;
+        }
       }
+      free_string_svalue(sp);
+      sp->u.number = temp;
+      sp->type = T_NUMBER;
+      break;
     }
-    free_string_svalue(sp);
-    sp->u.number = temp;
-    sp->type = T_NUMBER;
-    break;
-  }
 #ifndef NO_BUFFER_TYPE
-  case T_BUFFER:
-    if (sp->u.buf->size < sizeof(int)) {
-      free_buffer(sp->u.buf);
-      *sp = const0;
-    } else {
-      int hostint, netint;
+    case T_BUFFER:
+      if (sp->u.buf->size < sizeof(int)) {
+        free_buffer(sp->u.buf);
+        *sp = const0;
+      } else {
+        int hostint, netint;
 
-      memcpy((char *) &netint, sp->u.buf->item, sizeof(int));
-      hostint = ntohl(netint);
-      free_buffer(sp->u.buf);
-      put_number(hostint);
-    }
+        memcpy((char *)&netint, sp->u.buf->item, sizeof(int));
+        hostint = ntohl(netint);
+        free_buffer(sp->u.buf);
+        put_number(hostint);
+      }
 #endif
   }
 }
@@ -3548,9 +3544,7 @@ void f_undefinedp(void) {
 #endif
 
 #ifdef F_UPTIME
-void f_uptime(void) {
-  push_number(get_current_time() - boot_time);
-}
+void f_uptime(void) { push_number(get_current_time() - boot_time); }
 #endif
 
 #ifdef F_USERP
@@ -3564,9 +3558,7 @@ void f_userp(void) {
 #endif
 
 #ifdef F_USERS
-void f_users(void) {
-  push_refed_array(users());
-}
+void f_users(void) { push_refed_array(users()); }
 #endif
 
 #ifdef F_WIZARDP
@@ -3601,42 +3593,42 @@ void f_write_bytes(void) {
   int i;
 
   switch (sp->type) {
-  case T_NUMBER: {
-    int netint;
-    char *netbuf;
+    case T_NUMBER: {
+      int netint;
+      char *netbuf;
 
-    if (!sp->u.number) {
-      bad_arg(3, F_WRITE_BYTES);
+      if (!sp->u.number) {
+        bad_arg(3, F_WRITE_BYTES);
+      }
+      /* convert to network byte-order */
+      netint = htonl(sp->u.number);
+      netbuf = (char *)&netint;
+      i = write_bytes((sp - 2)->u.string, (sp - 1)->u.number, netbuf,
+                      sizeof(int));
+      break;
     }
-    /* convert to network byte-order */
-    netint = htonl(sp->u.number);
-    netbuf = (char *) &netint;
-    i = write_bytes((sp - 2)->u.string, (sp - 1)->u.number, netbuf,
-        sizeof(int));
-    break;
-  }
 
 #ifndef NO_BUFFER_TYPE
-  case T_BUFFER: {
-    i = write_bytes((sp - 2)->u.string, (sp - 1)->u.number,
-        (char *) sp->u.buf->item, sp->u.buf->size);
-    break;
-  }
+    case T_BUFFER: {
+      i = write_bytes((sp - 2)->u.string, (sp - 1)->u.number,
+                      (char *)sp->u.buf->item, sp->u.buf->size);
+      break;
+    }
 #endif
 
-  case T_STRING: {
-    i = write_bytes((sp - 2)->u.string, (sp - 1)->u.number, sp->u.string,
-        SVALUE_STRLEN(sp));
-    break;
-  }
+    case T_STRING: {
+      i = write_bytes((sp - 2)->u.string, (sp - 1)->u.number, sp->u.string,
+                      SVALUE_STRLEN(sp));
+      break;
+    }
 
-  default: {
+    default: {
 #ifdef NO_BUFFER_TYPE
-    bad_argument(sp, T_STRING | T_NUMBER, 3, F_WRITE_BYTES);
+      bad_argument(sp, T_STRING | T_NUMBER, 3, F_WRITE_BYTES);
 #else
-    bad_argument(sp, T_BUFFER | T_STRING | T_NUMBER, 3, F_WRITE_BYTES);
+      bad_argument(sp, T_BUFFER | T_STRING | T_NUMBER, 3, F_WRITE_BYTES);
 #endif
-  }
+    }
   }
   free_svalue(sp--, "f_write_bytes");
   free_string_svalue(--sp);
@@ -3654,32 +3646,33 @@ void f_write_buffer(void) {
   }
 
   switch (sp->type) {
-  case T_NUMBER: {
-    int netint;
-    char *netbuf;
+    case T_NUMBER: {
+      int netint;
+      char *netbuf;
 
-    /* convert to network byte-order */
-    netint = htonl(sp->u.number);
-    netbuf = (char *) &netint;
-    i = write_buffer((sp - 2)->u.buf, (sp - 1)->u.number, netbuf, sizeof(int));
-    break;
-  }
+      /* convert to network byte-order */
+      netint = htonl(sp->u.number);
+      netbuf = (char *)&netint;
+      i = write_buffer((sp - 2)->u.buf, (sp - 1)->u.number, netbuf,
+                       sizeof(int));
+      break;
+    }
 
-  case T_BUFFER: {
-    i = write_buffer((sp - 2)->u.buf, (sp - 1)->u.number,
-        (char *) sp->u.buf->item, sp->u.buf->size);
-    break;
-  }
+    case T_BUFFER: {
+      i = write_buffer((sp - 2)->u.buf, (sp - 1)->u.number,
+                       (char *)sp->u.buf->item, sp->u.buf->size);
+      break;
+    }
 
-  case T_STRING: {
-    i = write_buffer((sp - 2)->u.buf, (sp - 1)->u.number, sp->u.string,
-        SVALUE_STRLEN(sp));
-    break;
-  }
+    case T_STRING: {
+      i = write_buffer((sp - 2)->u.buf, (sp - 1)->u.number, sp->u.string,
+                       SVALUE_STRLEN(sp));
+      break;
+    }
 
-  default: {
-    bad_argument(sp, T_BUFFER | T_STRING | T_NUMBER, 3, F_WRITE_BUFFER);
-  }
+    default: {
+      bad_argument(sp, T_BUFFER | T_STRING | T_NUMBER, 3, F_WRITE_BUFFER);
+    }
   }
   free_svalue(sp--, "f_write_buffer");
   free_svalue(--sp, "f_write_buffer");
@@ -3710,9 +3703,7 @@ void f_dump_file_descriptors(void) {
 #endif
 
 #ifdef F_RECLAIM_OBJECTS
-void f_reclaim_objects(void) {
-  push_number(reclaim_objects(false));
-}
+void f_reclaim_objects(void) { push_number(reclaim_objects(false)); }
 #endif
 
 #ifdef F_MEMORY_INFO
@@ -3730,16 +3721,16 @@ void f_memory_info(void) {
     }
     tot = total_prog_block_size +
 #ifdef ARRAY_STATS
-        total_array_size +
+          total_array_size +
 #endif
 #ifdef CLASS_STATS
-        total_class_size +
+          total_class_size +
 #endif
-        total_mapping_size + tot_alloc_object_size
-        + tot_alloc_sentence * sizeof(sentence_t)
-        + num_user * sizeof(interactive_t) + show_otable_status(0, -1)
-        + heart_beat_status(0, -1) + add_string_status(0, -1)
-        + print_call_out_usage(0, -1) + res;
+          total_mapping_size + tot_alloc_object_size +
+          tot_alloc_sentence * sizeof(sentence_t) +
+          num_user * sizeof(interactive_t) + show_otable_status(0, -1) +
+          heart_beat_status(0, -1) + add_string_status(0, -1) +
+          print_call_out_usage(0, -1) + res;
     push_number(tot);
     return;
   }
@@ -3788,8 +3779,8 @@ void f_set_reset(void) {
     free_object(&(--sp)->u.ob, "f_set_reset:1");
     sp--;
   } else {
-    sp->u.ob->next_reset = current_virtual_time + TIME_TO_RESET/ 2 +
-    random_number(TIME_TO_RESET / 2);
+    sp->u.ob->next_reset = current_virtual_time + TIME_TO_RESET / 2 +
+                           random_number(TIME_TO_RESET / 2);
     free_object(&(sp--)->u.ob, "f_set_reset:2");
   }
 }
@@ -3864,7 +3855,7 @@ void f_next_inventory(void) {
 
 #ifdef F_DEFER
 void f_defer() {
-  struct defer_list *newlist = (struct defer_list *) DXALLOC(
+  struct defer_list *newlist = (struct defer_list *)DXALLOC(
       sizeof(struct defer_list), TAG_TEMPORARY, "defer: new item");
 
 // In reverse mode, newlist always will be the last data.
@@ -3892,8 +3883,7 @@ void f_defer() {
   else {
     // Search last defer.
     struct defer_list *last_defer = csp->defers;
-    while (last_defer->next)
-      last_defer = last_defer->next;
+    while (last_defer->next) last_defer = last_defer->next;
 
     last_defer->next = newlist;
   }

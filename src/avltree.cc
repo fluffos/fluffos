@@ -162,8 +162,8 @@ static void sprout(tree **ppr, char *pc_data, int *pi_balance,
     return;
   } /* if */
     /*
-   * if MORE, prepare to move to the right.
-   */
+ * if MORE, prepare to move to the right.
+ */
   if (cmp > 0) {
     sprout(&(*ppr)->tree_r, pc_data, pi_balance, pfi_compare, pfi_delete);
     if (*pi_balance) {/* right branch has grown longer */
@@ -211,8 +211,8 @@ static void sprout(tree **ppr, char *pc_data, int *pi_balance,
     return;
   } /* if */
     /*
-   * not less, not more: this is the same key!  replace...
-   */
+ * not less, not more: this is the same key!  replace...
+ */
   *pi_balance = 0;
   if (pfi_delete) {
     (*pfi_delete)((*ppr)->tree_p);

@@ -141,9 +141,9 @@ static void handle_elif()
       }
     } else {/* EXPECT_ENDIF */
             /*
-       * last cond was true...skip to end of
-       * conditional
-       */
+ * last cond was true...skip to end of
+ * conditional
+ */
       skip_to("endif", (char *)0);
     }
   } else {

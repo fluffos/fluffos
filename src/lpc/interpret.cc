@@ -179,7 +179,9 @@ ref_t *make_ref(void) {
   return ref;
 }
 
-void get_version(char *buff) { sprintf(buff, "%s (%s)", PACKAGE_STRING, SOURCE_REVISION); }
+void get_version(char *buff) {
+  sprintf(buff, "%s (%s)", PACKAGE_STRING, SOURCE_REVISION);
+}
 
 /*
  * Information about assignments of values:
@@ -427,8 +429,6 @@ void unlink_string_svalue(svalue_t *s) {
       break;
   }
 }
-
-
 
 void process_efun_callback(int narg, function_to_call_t *ftc, int f) {
   int argc = st_num_arg;

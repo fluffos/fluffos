@@ -89,7 +89,7 @@ typedef struct {
   unsigned short arg_type4; /* Type of argument 2 */
   short arg_index;          /* Index pointing to where to find arg type */
   short Default;            /* an efun to use as default for last
-                    * argument */
+         * argument */
 } keyword_t;
 
 typedef struct lpc_predef_s {
