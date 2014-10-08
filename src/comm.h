@@ -10,7 +10,7 @@
 #include "network_incl.h"
 
 #include "fliconv.h"
-#include "libtelnet/libtelnet.h"
+#include "thirdparty/libtelnet/libtelnet.h"
 #include <event2/event.h>
 #include <event2/bufferevent.h>
 

@@ -1,6 +1,6 @@
 #include "net/mssp.h"
 
-#include "libtelnet/libtelnet.h"
+#include "thirdparty/libtelnet/libtelnet.h"
 
 #include "std.h"
 #include "lpc_incl.h"

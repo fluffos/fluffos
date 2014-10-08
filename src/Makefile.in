@@ -51,7 +51,7 @@ SRC=lpc/compiler/grammar.tab.cc main.cc rc.cc simulate.cc file.cc \
   debug.cc crypt.cc applies_table.cc add_action.cc eval.cc fliconv.cc console.cc \
   posix_timers.cc event.cc dns.c \
 	outbuf.cc \
-	libtelnet/libtelnet.c \
+	thirdparty/libtelnet/libtelnet.c \
 	net/telnet.cc net/telnet_ext.cc net/mssp.cc \
 	lpc/interpret.cc lpc/svalue.cc lpc/apply.cc lpc/apply_cache.cc \
 	lpc/program.cc lpc/function.cc \
@@ -71,7 +71,7 @@ OBJ=lpc/compiler/grammar.tab.o main.o rc.o simulate.o file.o \
   debug.o crypt.o applies_table.o add_action.o eval.o fliconv.o console.o \
   posix_timers.o event.o dns.o \
 	outbuf.o \
-	libtelnet/libtelnet.o \
+	thirdparty/libtelnet/libtelnet.o \
 	net/telnet.o net/telnet_ext.o net/mssp.o \
 	lpc/interpret.o lpc/svalue.o lpc/apply.o lpc/apply_cache.o \
 	lpc/program.o lpc/function.o \

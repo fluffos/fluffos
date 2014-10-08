@@ -10,7 +10,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stdarg.h>
-#include "libtelnet/libtelnet.h"
+#include "thirdparty/libtelnet/libtelnet.h"
 
 // FIXME
 #include "comm.h"  // interactive_t *
