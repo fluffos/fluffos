@@ -13,13 +13,13 @@
 #include "console.h"       // for console
 #include "socket_efuns.h"  // for lpc sockets
 #include "eval.h"          // for set_eval
-#include "util/threadpool-incl.h"
+#include "thirdparty/ThreadPool/ThreadPool.h"
 
 // FIXME: rewrite other part so this could become static.
 struct event_base *g_event_base = NULL;
 struct event *g_ev_tick = NULL;
 
-static util::ThreadPool *g_threadpool_network_ = NULL;
+static ThreadPool *g_threadpool_network_ = NULL;
 
 static void libevent_log(int severity, const char *msg) {
   debug(event, "%d:%s\n", severity, msg);
@@ -48,7 +48,7 @@ event_base *init_event_base() {
 
 // Init net threadpool
 void init_network_threadpool() {
-  g_threadpool_network_ = new util::ThreadPool(4);
+  g_threadpool_network_ = new ThreadPool(4);
 }
 
 void shutdown_network_threadpool() { delete g_threadpool_network_; }

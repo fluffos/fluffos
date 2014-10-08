@@ -20,6 +20,6 @@
 #--lineend=linux \
 #"
 
-for f in `find . -regextype posix-extended -regex ".*\.(cc|h)$" | grep -v "compat" | grep -v "testsuite" `; do
+for f in `find . -regextype posix-extended -regex ".*\.(cc|h)$" | grep -v "thirdparty" | grep -v "compat" | grep -v "testsuite" `; do
   if [ -s $f ]; then $1 -i --style="google" $f; fi
 done

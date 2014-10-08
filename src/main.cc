@@ -21,7 +21,7 @@
 #include "event.h"
 #include "dns.h"
 
-#include "util/threadpool-incl.h"
+#include "thirdparty/ThreadPool/ThreadPool.h"
 
 port_def_t external_port[5];
 

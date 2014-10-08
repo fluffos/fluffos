@@ -160,7 +160,7 @@ IIc. Sending Data
  void telnet_negotiate(telnet_t *telnet, unsigned char cmd,
      unsigned char opt);
    Sends a TELNET negotiation command.  The cmd parameter must be one
-   of TELNET_WILL, TELNET_DONT, TELNET_DO, or TELNET_DONT.  The opt
+   of TELNET_WILL, TELNET_WONT, TELNET_DO, or TELNET_DONT.  The opt
    parameter is the option to negotiate.
 
    Unless in PROXY mode, the RFC1143 support may delay or ellide the
