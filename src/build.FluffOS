@@ -5,7 +5,7 @@ if test $# -ne 0; then
     develop)
       echo Preparing to build developmental version of MudOS driver ...
       OPTIMIZE="-O0"
-      DEBUG="-g -gdwarf-2 -Wall -Weffc++ -pedantic -D_FORTIFY_SOURCE=2 -DDEBUG -DDEBUG_MACRO"
+      DEBUG="-g -Wall -Weffc++ -pedantic -D_FORTIFY_SOURCE=2 -DDEBUG -DDEBUG_MACRO"
       shift
       ;;
     *)
@@ -23,8 +23,7 @@ fi
 COMPILER_FLAGS=${COMPILER_FLAGS:-"-march=native"}
 
 OPTIMIZE=${OPTIMIZE:-"-O3"}
-# GCC 4.8 default to dwarf-4, but old gdb etc can't read them.
-DEBUG=${DEBUG:-"-g -gdwarf-2"}
+DEBUG=${DEBUG:-"-g0"}
 
 # Change this if you want to use another make.
 MAKE=make
@@ -42,7 +41,7 @@ INSTALL_DIR=`dirname $(pwd)`/bin
 ####### END OF USER CONFIGURABLE OPTIONS
 
 CXXFLAGS="$CXXFLAGS $COMPILER_FLAGS $WARN $OPTIMIZE $DEBUG"
-SOURCE_REVISION="$(git describe --dirty)"
+SOURCE_REVISION="$(git describe --dirty --always)"
 
 # Force an reconfigure.
 rm configure.h
