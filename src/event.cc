@@ -19,8 +19,6 @@
 struct event_base *g_event_base = NULL;
 struct event *g_ev_tick = NULL;
 
-static ThreadPool *g_threadpool_network_ = NULL;
-
 static void libevent_log(int severity, const char *msg) {
   debug(event, "%d:%s\n", severity, msg);
 }
@@ -45,13 +43,6 @@ event_base *init_event_base() {
                 event_base_get_method(g_event_base));
   return g_event_base;
 }
-
-// Init net threadpool
-void init_network_threadpool() {
-  g_threadpool_network_ = new ThreadPool(4);
-}
-
-void shutdown_network_threadpool() { delete g_threadpool_network_; }
 
 static void on_main_loop_event(int fd, short what, void *arg) {
   auto event = (realtime_event *)arg;
@@ -206,10 +197,8 @@ static void on_external_port_event(evconnlistener *listener, evutil_socket_t fd,
                                    sockaddr *sa, int socklen, void *arg) {
   debug(event, "on_external_port_event: fd %d, addr: %s\n", fd,
         sockaddr_to_string(sa, socklen));
-
-  port_def_t *port = reinterpret_cast<port_def_t *>(arg);
-
-  g_threadpool_network_->enqueue([=]() { async_on_accept(fd, port); });
+  auto *port = reinterpret_cast<port_def_t *>(arg);
+  new_user_handler(fd, sa, socklen, port);
 }
 
 void new_external_port_event_listener(port_def_t *port, sockaddr *sa,

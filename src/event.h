@@ -13,9 +13,6 @@
 #include <event2/event.h>
 #include <event2/dns.h>
 
-struct port_def_s;
-typedef struct port_def_s port_def_t;
-
 extern struct event_base *g_event_base;
 event_base *init_event_base();
 
@@ -33,7 +30,7 @@ void add_realtime_event(realtime_event::callback_type);
 int run_event_loop(struct event_base *);
 
 // Listening socket event
-void new_external_port_event_listener(port_def_t *, sockaddr *, socklen_t);
+void new_external_port_event_listener(struct port_def_t *, sockaddr *, socklen_t);
 
 // User socket event
 struct user_event_data {

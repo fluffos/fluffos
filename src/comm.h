@@ -194,7 +194,8 @@ object_t *query_snooping(object_t *);
 void mark_iptable(void);
 #endif
 
-void async_on_accept(int, port_def_t *);
+// New user API handler.
+void new_user_handler(int, struct sockaddr *, size_t, port_def_t *);
 
 inline const char *sockaddr_to_string(const sockaddr *addr, socklen_t len) {
   static char result[NI_MAXHOST + NI_MAXSERV];

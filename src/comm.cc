@@ -158,63 +158,14 @@ void shutdown_external_ports() {
   debug_message("closed external ports\n");
 }
 
-// Event handler for new connection
-// NOTE: Runs in network threadpool.
-void async_on_accept(int new_socket_fd, port_def_t *port) {
-  if (set_socket_nonblocking(new_socket_fd, 1) == -1) {
-    debug(connections,
-          "async_on_accept: fd %d, set_socket_nonblocking 1 error: %s.\n",
-          new_socket_fd,
-          evutil_socket_error_to_string(evutil_socket_geterror(new_socket_fd)));
-    OS_socket_close(new_socket_fd);
-    return;
-  }
-
-  if (set_socket_tcp_nodelay(new_socket_fd, 1) == -1) {
-    debug(connections,
-          "async_on_accept: fd %d, set_socket_tcp_nodelay error: %s.\n",
-          new_socket_fd,
-          evutil_socket_error_to_string(evutil_socket_geterror(new_socket_fd)));
-  }
-
-  /*
-   * initialize new user interactive data structure.
-   */
-  auto user = reinterpret_cast<interactive_t *>(
-      DXALLOC(sizeof(interactive_t), TAG_INTERACTIVE, "new_user_handler"));
-  memset(user, 0, sizeof(*user));
-
-  user->connection_type = port->kind;
-  user->ob = master_ob;
-  user->last_time = get_current_time();
-
-#ifdef USE_ICONV
-  user->trans = get_translator("UTF-8");
-#else
-  user->trans = (struct translation *)master_ob;
-// never actually used, but avoids multiple ifdefs later on!
-#endif
-
-  user->fd = new_socket_fd;
-  user->local_port = port->port;
-  user->external_port = (port - external_port);  // FIXME: pointer arith
-
-  user->addrlen = sizeof(user->addr);
-  getpeername(new_socket_fd, (sockaddr *)&user->addr, &user->addrlen);
-
-  // network layer done, hand-off to main thread.
-  add_realtime_event([=]() { new_user_handler(user); });
-}
-
 /*
  * This is the new user connection handler. This function is called by the
  * event handler when data is pending on the listening socket (new_user_fd).
  * If space is available, an interactive data structure is initialized and
  * the user is connected.
  */
-void new_user_handler(interactive_t *user) {
-  debug(connections, "New connection from %s.\n",
-        sockaddr_to_string((sockaddr *)&user->addr, user->addrlen));
+void new_user_handler(int fd, struct sockaddr *addr, size_t addrlen, port_def_t *port) {
+  debug(connections, "New connection from %s.\n", sockaddr_to_string(addr, addrlen));
 
   int i;
   /* find the first available slot */
@@ -235,6 +186,38 @@ void new_user_handler(interactive_t *user) {
     }
   }
 
+  if (set_socket_tcp_nodelay(fd, 1) == -1) {
+    debug(connections,
+          "async_on_accept: fd %d, set_socket_tcp_nodelay error: %s.\n",
+          fd,
+          evutil_socket_error_to_string(evutil_socket_geterror(fd)));
+  }
+
+  /*
+   * initialize new user interactive data structure.
+   */
+  auto user = reinterpret_cast<interactive_t *>(
+      DXALLOC(sizeof(interactive_t), TAG_INTERACTIVE, "new_user_handler"));
+  memset(user, 0, sizeof(*user));
+
+  user->connection_type = port->kind;
+  user->ob = master_ob;
+  user->last_time = get_current_time();
+
+#ifdef USE_ICONV
+  user->trans = get_translator("UTF-8");
+#else
+  user->trans = (struct translation *)master_ob;
+// never actually used, but avoids multiple ifdefs later on!
+#endif
+
+  user->fd = fd;
+  user->local_port = port->port;
+  user->external_port = (port - external_port);  // FIXME: pointer arith
+
+  memcpy(&user->addr, addr, addrlen);
+  user->addrlen = addrlen;
+
   set_command_giver(master_ob);
   master_ob->flags |= O_ONCE_INTERACTIVE;
 
@@ -246,8 +229,7 @@ void new_user_handler(interactive_t *user) {
 
   // FIXME: This current rely on ev_data.
   // Initialize libtelnet
-  user->telnet =
-      telnet_init(my_telopts, telnet_event_handler, NULL, user->ev_data);
+  user->telnet = telnet_init(my_telopts, telnet_event_handler, NULL, user->ev_data);
 
   set_prompt("> ");
 

@@ -1988,7 +1988,6 @@ void shutdownMudOS(int exit_code) {
 #ifdef PACKAGE_DB
   db_cleanup();
 #endif
-  shutdown_network_threadpool();
   shutdown_external_ports();
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
   for (i = 0; i < max_lpc_socks; i++) {
