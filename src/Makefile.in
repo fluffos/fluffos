@@ -51,13 +51,13 @@ SRC=lpc/compiler/grammar.tab.cc main.cc rc.cc simulate.cc file.cc \
   debug.cc crypt.cc applies_table.cc add_action.cc eval.cc fliconv.cc console.cc \
   posix_timers.cc event.cc dns.c \
 	outbuf.cc \
-	thirdparty/libtelnet/libtelnet.c \
 	net/telnet.cc net/telnet_ext.cc net/mssp.cc \
 	lpc/interpret.cc lpc/svalue.cc lpc/apply.cc lpc/apply_cache.cc \
 	lpc/program.cc lpc/function.cc \
 	lpc/lang/array.cc lpc/lang/buffer.cc lpc/lang/class.cc lpc/lang/mapping.cc lpc/lang/object.cc \
 	lpc/compiler/compiler.cc lpc/compiler/generate.cc lpc/compiler/icode.cc lpc/comppiler/lex.cc \
 	lpc/compiler/scratchpad.cc lpc/compiler/trees.cc \
+	thirdparty/libtelnet/libtelnet.c
 
 OBJ=lpc/compiler/grammar.tab.o main.o rc.o simulate.o file.o \
   backend.o comm.o ed.o regexp.o crc32.o \
@@ -71,14 +71,13 @@ OBJ=lpc/compiler/grammar.tab.o main.o rc.o simulate.o file.o \
   debug.o crypt.o applies_table.o add_action.o eval.o fliconv.o console.o \
   posix_timers.o event.o dns.o \
 	outbuf.o \
-	thirdparty/libtelnet/libtelnet.o \
 	net/telnet.o net/telnet_ext.o net/mssp.o \
 	lpc/interpret.o lpc/svalue.o lpc/apply.o lpc/apply_cache.o \
 	lpc/program.o lpc/function.o \
 	lpc/lang/array.o lpc/lang/buffer.o lpc/lang/class.o lpc/lang/mapping.o lpc/lang/object.o \
 	lpc/compiler/compiler.o lpc/compiler/generate.o lpc/compiler/icode.o lpc/compiler/lex.o \
 	lpc/compiler/scratchpad.o lpc/compiler/trees.o \
-
+	thirdparty/libtelnet/libtelnet.o
 
 VPATH = .:./packages
 
@@ -97,10 +96,18 @@ build_packages:
 build_binaries: $(DRIVER_BIN) portbind
 
 .cc.$(O):
-	$(CXX) -c $(CXXFLAGS) @LIBEVENT_CPPFLAGS@ -I. -x c++ -o $@ $<
+	$(CXX) -c $(CXXFLAGS) @zlib_CFLAGS@ @LIBEVENT_CPPFLAGS@ -I. -x c++ -o $@ $<
 
 .c.$(O):
-	$(CXX) -c $(CXXFLAGS) @LIBEVENT_CPPFLAGS@ -I. -x c++ -o $@ $<
+	$(CXX) -c $(CXXFLAGS) @zlib_CFLAGS@ @LIBEVENT_CPPFLAGS@ -I. -x c++ -o $@ $<
+
+# Hack to work around brokeness in libtelnet.c
+thirdparty/libtelnet/libtelnet.o: thirdparty/libtelnet/libtelnet.c
+	if [ -n "@zlib_LIBS@" ]; then \
+		$(CXX) -c $(CXXFLAGS) -DHAVE_ZLIB @zlib_CFLAGS@ @LIBEVENT_CPPFLAGS@ -I. -x c++ -o $@ $< ; \
+	else \
+		$(CXX) -c $(CXXFLAGS) @zlib_CFLAGS@ @LIBEVENT_CPPFLAGS@ -I. -x c++ -o $@ $< ; \
+	fi
 
 # FIXME: simulate.c currently calls package_async, which depends on package/DB, this need to be fixed.
 simulate.$(O): simulate.cc
@@ -116,7 +123,7 @@ lpc/compiler/grammar.tab.cc: lpc/compiler/grammar.y
 
 $(DRIVER_BIN): $(OBJ) packages/*.$(O) dtrace_compile
 	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
-	$(CXX) $(LDFLAGS) $(OBJ) packages/*.$(O) `./dtrace_compile` -o $(DRIVER_BIN) $(LIBS) @MYSQL_LDFLAGS@ @POSTGRESQL_LDFLAGS@ @SQLITE3_LDFLAGS@ @OPENSSL_LDFLAGS@ @OPENSSL_LIBS@ @PCRE_LIBS@ @LIBEVENT_LIBS@ @LIBEVENT_LDFLAGS@
+	$(CXX) $(LDFLAGS) $(OBJ) packages/*.$(O) `./dtrace_compile` -o $(DRIVER_BIN) $(LIBS) @MYSQL_LDFLAGS@ @POSTGRESQL_LDFLAGS@ @SQLITE3_LDFLAGS@ @OPENSSL_LDFLAGS@ @OPENSSL_LIBS@ @PCRE_LIBS@ @LIBEVENT_LIBS@ @LIBEVENT_LDFLAGS@ @zlib_LIBS@
 
 dtrace_compile: dtrace_compile.cc
 	$(CXX) $(CXXFLAGS) -x c++ dtrace_compile.cc -o dtrace_compile
@@ -209,8 +216,8 @@ help:
 	@echo "INSTALL: '$(INSTALL)'"
 	@echo "INSTALL DIR: '$(INSTALL_DIR)'"
 	@echo "BISON/YACC: '$(YACC)'"
-	@echo "PREPROCESSING: '$(CXX) -E $(CXXFLAGS)'"
-	@echo "COMPILE: '$(CXX) $(CXXFLAGS)'"
+	@echo "PREPROCESSING: '$(CXX) -E $(CPPFLAGS) $(CXXFLAGS)'"
+	@echo "COMPILE: '$(CXX) $(CFALGS) $(CXXFLAGS)'"
 	@echo "LINK: '$(CXX) $(LDFLAGS)'"
 	@echo
 	@if [ -n "@LIBEVENT_LIBS@" ]; then echo "LIBEVENT: '@LIBEVENT_LIBS@', '@LIBEVENT_CPPFLAGS@', '@LIBEVENT_LDFLAGS@'"; fi

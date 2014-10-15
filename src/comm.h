@@ -15,8 +15,6 @@
 #include <event2/bufferevent.h>
 
 #define MAX_TEXT 2048
-#define MAX_SOCKET_PACKET_SIZE 1024
-#define DESIRED_SOCKET_PACKET_SIZE 800
 #define MESSAGE_BUF_SIZE MESSAGE_BUFFER_SIZE /* from options.h */
 #define OUT_BUF_SIZE 2048
 #define DFAULT_PROTO 0        /* use the appropriate protocol */
@@ -25,10 +23,6 @@
 #define I_SINGLE_CHAR 0x4     /* get_char */
 #define I_WAS_SINGLE_CHAR 0x8 /* was get_char */
 #define SB_SIZE (NSLC * 3 + 3)
-
-#ifdef HAVE_ZLIB
-#define COMPRESS_BUF_SIZE MESSAGE_BUF_SIZE
-#endif
 
 /* The I_* flags are input_to flags */
 #define NOECHO I_NOECHO           /* don't echo lines */

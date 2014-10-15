@@ -96,8 +96,12 @@ AX_LIB_EVENT([2.0])
 F_HAVE_PREDEFINE([HAVE_LIBEVENT], [],
   [AC_MSG_ERROR([[Fail to find libevent (2.0+) header/library, install libevent-dev or change --with_libevent]])])
 
-# Checking local_options related libraries
-F_HAVE_PREDEFINE([HAVE_ZLIB], [AC_SEARCH_LIBS([gzread], [z])])
+# Checks for zlib.
+PKG_CHECK_MODULES([zlib],
+  [zlib],
+  [AC_DEFINE([HAVE_ZLIB], [1], [Define to 1 if you have zlib.])],
+  [])
+
 F_HAVE_PREDEFINE([PACKAGE_ASYNC], [AC_SEARCH_LIBS([pthread_create], [pthread])])
 F_HAVE_PREDEFINE([POSIX_TIMERS], [AC_SEARCH_LIBS([timer_create], [rt])])
 
