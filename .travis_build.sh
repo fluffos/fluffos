@@ -10,13 +10,12 @@ sudo update-alternatives --auto gcc
 sudo update-alternatives --query gcc
 
 if [ "$BUILD" = "i386" ]; then
-  sudo apt-get remove libevent-dev libevent* libssl-dev
+  sudo apt-get remove libevent-dev libevent-* libssl-dev
 
   sudo apt-get install g++-multilib g++-4.8-multilib
   sudo apt-get --no-install-recommends install valgrind:i386
 
   sudo apt-get install libevent-2.0-5:i386
-  sudo apt-get install libevent-dev:i386
   sudo apt-get --no-install-recommends install libz-dev:i386
 else
   sudo apt-get install valgrind

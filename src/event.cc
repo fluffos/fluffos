@@ -4,7 +4,6 @@
 #include <event2/event.h>
 #include <event2/dns.h>
 #include <event2/listener.h>
-#include <event2/thread.h>
 #include <event2/util.h>
 
 #include "event.h"
@@ -13,7 +12,6 @@
 #include "console.h"       // for console
 #include "socket_efuns.h"  // for lpc sockets
 #include "eval.h"          // for set_eval
-#include "thirdparty/ThreadPool/ThreadPool.h"
 
 // FIXME: rewrite other part so this could become static.
 struct event_base *g_event_base = NULL;
@@ -29,11 +27,8 @@ static void libevent_dns_log(int severity, const char *msg) {
 event_base *init_event_base() {
   event_set_log_callback(libevent_log);
   evdns_set_log_fn(libevent_dns_log);
-  evthread_use_pthreads();
-
 #ifdef DEBUG
   event_enable_debug_mode();
-  evthread_enable_lock_debuging();
 #endif
 
   g_event_base = event_base_new();
@@ -47,7 +42,7 @@ static void on_main_loop_event(int fd, short what, void *arg) {
   delete event;
 }
 
-// Schedule a realtime event on main loop, safe to call from any thread.
+// Schedule a immediate event on main loop.
 void add_realtime_event(realtime_event::callback_type callback) {
   auto event = new realtime_event(callback);
   event_base_once(g_event_base, -1, EV_TIMEOUT, on_main_loop_event, event, NULL);
