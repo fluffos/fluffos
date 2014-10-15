@@ -160,7 +160,7 @@ outbuffer_t current_ed_results;
 
 #define ED_BUFFER (current_ed_buffer)
 #ifdef OLD_ED
-#define P_NET_DEAD (command_giver->interactive->iflags &NET_DEAD)
+#define P_NET_DEAD (command_giver->interactive->iflags & NET_DEAD)
 #else
 #define P_NET_DEAD 0 /* objects are never net dead :) */
 #endif
@@ -185,21 +185,21 @@ outbuffer_t current_ed_results;
 #define P_SHIFTWIDTH (ED_BUFFER->shiftwidth)
 #define P_FLAGS (ED_BUFFER->flags)
 #define NFLG_MASK 0x0010
-#define P_NFLG (P_FLAGS &NFLG_MASK)
+#define P_NFLG (P_FLAGS & NFLG_MASK)
 #define LFLG_MASK 0x0020
-#define P_LFLG (P_FLAGS &LFLG_MASK)
+#define P_LFLG (P_FLAGS & LFLG_MASK)
 #define PFLG_MASK 0x0040
-#define P_PFLG (P_FLAGS &PFLG_MASK)
+#define P_PFLG (P_FLAGS & PFLG_MASK)
 #define EIGHTBIT_MASK 0x0080
-#define P_EIGHTBIT (P_FLAGS &EIGHTBIT_MASK)
+#define P_EIGHTBIT (P_FLAGS & EIGHTBIT_MASK)
 #define AUTOINDFLG_MASK 0x0100
-#define P_AUTOINDFLG (P_FLAGS &AUTOINDFLG_MASK)
+#define P_AUTOINDFLG (P_FLAGS & AUTOINDFLG_MASK)
 #define EXCOMPAT_MASK 0x0200
-#define P_EXCOMPAT (P_FLAGS &EXCOMPAT_MASK)
+#define P_EXCOMPAT (P_FLAGS & EXCOMPAT_MASK)
 #define DPRINT_MASK 0x0400
-#define P_DPRINT (P_FLAGS &DPRINT_MASK)
+#define P_DPRINT (P_FLAGS & DPRINT_MASK)
 #define VERBOSE_MASK 0x0800
-#define P_VERBOSE (P_FLAGS &VERBOSE_MASK)
+#define P_VERBOSE (P_FLAGS & VERBOSE_MASK)
 #define SHIFTWIDTH_MASK 0x000f
 #define ALL_FLAGS_MASK 0x0ff0
 #define P_APPENDING (ED_BUFFER->appending)
@@ -215,27 +215,29 @@ static struct tbl {
   const char *t_str;
   int t_and_mask;
   int t_or_mask;
-} *t, tbl[] = {{"number", ~FALSE, NFLG_MASK},
-               {"nonumber", ~NFLG_MASK, FALSE},
-               {"list", ~FALSE, LFLG_MASK},
-               {"nolist", ~LFLG_MASK, FALSE},
-               {"print", ~FALSE, PFLG_MASK},
-               {"noprint", ~PFLG_MASK, FALSE},
-               {"eightbit", ~FALSE, EIGHTBIT_MASK},
-               {"noeightbit", ~EIGHTBIT_MASK, FALSE},
-               {"autoindent", ~FALSE, AUTOINDFLG_MASK},
-               {"noautoindent", ~AUTOINDFLG_MASK, FALSE},
-               {"excompatible", ~FALSE, EXCOMPAT_MASK},
-               {"noexcompatible", ~EXCOMPAT_MASK, FALSE},
-               {"dprint", ~FALSE, DPRINT_MASK},
-               {"nodprint", ~DPRINT_MASK, FALSE},
-               {"verbose", ~FALSE, VERBOSE_MASK},
-               {"noverbose", ~VERBOSE_MASK, FALSE}, };
+} *t, tbl[] = {
+          {"number", ~FALSE, NFLG_MASK},
+          {"nonumber", ~NFLG_MASK, FALSE},
+          {"list", ~FALSE, LFLG_MASK},
+          {"nolist", ~LFLG_MASK, FALSE},
+          {"print", ~FALSE, PFLG_MASK},
+          {"noprint", ~PFLG_MASK, FALSE},
+          {"eightbit", ~FALSE, EIGHTBIT_MASK},
+          {"noeightbit", ~EIGHTBIT_MASK, FALSE},
+          {"autoindent", ~FALSE, AUTOINDFLG_MASK},
+          {"noautoindent", ~AUTOINDFLG_MASK, FALSE},
+          {"excompatible", ~FALSE, EXCOMPAT_MASK},
+          {"noexcompatible", ~EXCOMPAT_MASK, FALSE},
+          {"dprint", ~FALSE, DPRINT_MASK},
+          {"nodprint", ~DPRINT_MASK, FALSE},
+          {"verbose", ~FALSE, VERBOSE_MASK},
+          {"noverbose", ~VERBOSE_MASK, FALSE},
+};
 
 /*________  Macros  ________________________________________________________*/
 
-#define nextln(l) ((l) + 1 > P_LASTLN ? 0 : (l) + 1)
-#define prevln(l) ((l) - 1 < 0 ? P_LASTLN : (l) - 1)
+#define nextln(l) ((l)+1 > P_LASTLN ? 0 : (l)+1)
+#define prevln(l) ((l)-1 < 0 ? P_LASTLN : (l)-1)
 
 #define gettxtl(lin) ((lin)->l_buff)
 #define gettxt(num) (gettxtl(getptr(num)))
@@ -680,8 +682,8 @@ static int egets(char *str, int size, FILE *stream) {
       P_NULLCHAR++; /* count nulls */
     } else {
       if (c > 127) {
-        if (!P_EIGHTBIT) {/* if not saving eighth bit */
-          c = c & 127;    /* strip eigth bit */
+        if (!P_EIGHTBIT) { /* if not saving eighth bit */
+          c = c & 127;     /* strip eigth bit */
         }
         P_NONASCII++; /* count it */
       }
@@ -764,8 +766,7 @@ static int dowrite(int from, int to, const char *fname, int apflg) {
 
     push_malloced_string(add_slash(fname));
     push_number(0);
-    res =
-        safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, 2, ORIGIN_INTERNAL);
+    res = safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, 2, ORIGIN_INTERNAL);
     if (IS_ZERO(res)) {
       return (EDERR);
     }
@@ -903,7 +904,7 @@ static int getnum(int first) {
 
   Skip_White_Space;
 
-  if (*inptr >= '0' && *inptr <= '9') {/* line number */
+  if (*inptr >= '0' && *inptr <= '9') { /* line number */
     for (num = 0; *inptr >= '0' && *inptr <= '9'; ++inptr) {
       num = (num * 10) + (*inptr - '0');
     }
@@ -1013,12 +1014,12 @@ static ed_line_t *getptr(int num) {
   ed_line_t *ptr;
   int j;
 
-  if (2 * num > P_LASTLN && num <= P_LASTLN) {/* high line numbers */
+  if (2 * num > P_LASTLN && num <= P_LASTLN) { /* high line numbers */
     ptr = P_LINE0.l_prev;
     for (j = P_LASTLN; j > num; j--) {
       ptr = ptr->l_prev;
     }
-  } else {/* low line numbers */
+  } else { /* low line numbers */
     ptr = &P_LINE0;
     for (j = 0; j < num; j++) {
       ptr = ptr->l_next;
@@ -1033,7 +1034,7 @@ static int getrhs(char *sub) {
   char delim = *inptr++;
   char *outmax = sub + MAXPAT;
 
-  if (delim == NL || *inptr == NL) {/* check for eol */
+  if (delim == NL || *inptr == NL) { /* check for eol */
     return (EDERR);
   }
   while (*inptr != delim && *inptr != NL) {
@@ -1117,8 +1118,7 @@ static int ins(const char *str) {
     len = cp - str;
     /* cp now points to end of first or only line */
 
-    if ((newl = (ed_line_t *)DXALLOC(sizeof(ed_line_t) + len, TAG_ED,
-                                     "ins: new")) == NULL) {
+    if ((newl = (ed_line_t *)DXALLOC(sizeof(ed_line_t) + len, TAG_ED, "ins: new")) == NULL) {
       return (MEM_FAIL); /* no memory */
     }
 
@@ -1245,8 +1245,7 @@ static regexp *optpat() {
     return P_OLDPAT;
   }
   cp = str;
-  while (*inptr != delim && *inptr != NL && *inptr != EOS &&
-         cp < str + MAXPAT - 1) {
+  while (*inptr != delim && *inptr != NL && *inptr != EOS && cp < str + MAXPAT - 1) {
     if (*inptr == ESCAPE && inptr[1] != NL) {
       *cp++ = *inptr++;
     }
@@ -1283,8 +1282,7 @@ static int set() {
     pos += sprintf(pos, "ed version %d.%d\n", version / 100, version % 100);
     limit = tbl + (sizeof(tbl) / sizeof(struct tbl));
     for (t = tbl; t < limit; t += 2) {
-      pos += sprintf(pos, "%s:%s ", t->t_str,
-                     P_FLAGS & t->t_or_mask ? "on" : "off");
+      pos += sprintf(pos, "%s:%s ", t->t_str, P_FLAGS & t->t_or_mask ? "on" : "off");
     }
     pos += sprintf(pos, "\nshiftwidth:%d\n", P_SHIFTWIDTH);
 
@@ -1370,7 +1368,7 @@ static int subst(regexp *pat, char *sub, int gflg, int pflag) {
         /* Copy leading text */
         int diff = pat->startp[0] - txtptr;
 
-        if ((space -= diff) < 0) {/* amylaar */
+        if ((space -= diff) < 0) { /* amylaar */
           return SUB_FAIL;
         }
         strncpy(newc, txtptr, diff);
@@ -1378,7 +1376,7 @@ static int subst(regexp *pat, char *sub, int gflg, int pflag) {
         /* Do substitution */
         old = newc;
         newc = regsub(pat, sub, newc, space);
-        if (!newc || (space -= newc - old) < 0) {/* amylaar */
+        if (!newc || (space -= newc - old) < 0) { /* amylaar */
           return SUB_FAIL;
         }
         if (txtptr == pat->endp[0]) {
@@ -1449,12 +1447,11 @@ static void shift(char *text) {
       indent_index++;
     } else {
       // indent_index = (indent_index + 8) & ~7;
-      indent_index =
-          indent_index + ED_TAB_WIDTH - (indent_index % ED_TAB_WIDTH);
+      indent_index = indent_index + ED_TAB_WIDTH - (indent_index % ED_TAB_WIDTH);
     }
   }
 
-  if (*text != '\0') {/* don't shift lines with ws only */
+  if (*text != '\0') { /* don't shift lines with ws only */
     indent_index += shi;
     if (indent_index < ED_MAXLINE) {
       char buffer[ED_MAXLINE];
@@ -1519,8 +1516,12 @@ static int last_term_len;
  *              indentation.
  */
 static void indent(char *buf) {
-  static char f[] = {7, 1, 7, 1, 2, 1, 1, 6, 4, 2, 6, 7, 7, 2, 0, };
-  static char g[] = {2, 2, 1, 7, 1, 5, 5, 1, 3, 6, 2, 2, 2, 2, 0, };
+  static char f[] = {
+      7, 1, 7, 1, 2, 1, 1, 6, 4, 2, 6, 7, 7, 2, 0,
+  };
+  static char g[] = {
+      2, 2, 1, 7, 1, 5, 5, 1, 3, 6, 2, 2, 2, 2, 0,
+  };
   char text[ED_MAXLINE], ident[ED_MAXLINE];
   char *p, *sp;
   int *ip;
@@ -1567,8 +1568,7 @@ static void indent(char *buf) {
         indent_index++;
       } else {
         // indent_index = (indent_index + 8) & ~7;
-        indent_index =
-            indent_index + ED_TAB_WIDTH - (indent_index % ED_TAB_WIDTH);
+        indent_index = indent_index + ED_TAB_WIDTH - (indent_index % ED_TAB_WIDTH);
       }
     }
     if (*p == '\0') {
@@ -1585,7 +1585,6 @@ static void indent(char *buf) {
   /* process this line */
   start = p;
   while (*p != '\0') {
-
     /* lexical scanning: find the next token */
     ident[0] = '\0';
     if (in_comment) {
@@ -1650,7 +1649,7 @@ static void indent(char *buf) {
           return;
         }
         case '/':
-          if (*p == '*' || *p == '/') {/* start of a comment    */
+          if (*p == '*' || *p == '/') { /* start of a comment    */
             in_comment = (*p == '*') ? 1 : 2;
             if (do_indent) {
               /* this line hasn't been indented yet */
@@ -1671,8 +1670,7 @@ static void indent(char *buf) {
                 if (*q++ == '\t') {
                   // indent_index = (indent_index + 8) & ~7;
                   // index2 = (index2 + 8) & ~7;
-                  indent_index = indent_index + ED_TAB_WIDTH -
-                                 (indent_index % ED_TAB_WIDTH);
+                  indent_index = indent_index + ED_TAB_WIDTH - (indent_index % ED_TAB_WIDTH);
                   index2 = index2 + ED_TAB_WIDTH - (index2 % ED_TAB_WIDTH);
 
                 } else {
@@ -1735,9 +1733,8 @@ static void indent(char *buf) {
           break;
         case ']':
           if (*p == ')' && (*stack == LHOOK2 ||
-                            (*stack != XEOT &&
-                             (stack[1] == LHOOK2 || (stack[1] == ROPERATOR &&
-                                                     stack[2] == LHOOK2))))) {
+                            (*stack != XEOT && (stack[1] == LHOOK2 ||
+                                                (stack[1] == ROPERATOR && stack[2] == LHOOK2))))) {
             p++;
           }
         case ')':
@@ -1771,7 +1768,7 @@ static void indent(char *buf) {
               token = WHILE;
             } else if (strcmp(ident, "do") == 0) {
               token = XDO;
-            } else {/* not a keyword_t */
+            } else { /* not a keyword_t */
               token = TOKEN;
             }
           } else {
@@ -1792,7 +1789,7 @@ static void indent(char *buf) {
         /* ) after LOPERATOR is ROPERATOR */
         token = ROPERATOR;
       }
-      if (f[top] <= g[token]) {/* shift the token on the stack */
+      if (f[top] <= g[token]) { /* shift the token on the stack */
         int i;
 
         if (sp == stackbot) {
@@ -1802,8 +1799,7 @@ static void indent(char *buf) {
         /* handle indentation */
         i = *ip;
         /* if needed, reduce indentation prior to shift */
-        if ((token == LBRACKET &&
-             (*sp == ROPERATOR || *sp == ELSE || *sp == XDO)) ||
+        if ((token == LBRACKET && (*sp == ROPERATOR || *sp == ELSE || *sp == XDO)) ||
             token == RBRACKET || (token == IF && *sp == ELSE)) {
           /* back up */
           i -= P_SHIFTWIDTH;
@@ -1835,7 +1831,7 @@ static void indent(char *buf) {
           }
           case LOPERATOR:
           case LHOOK:
-          case LHOOK2: {/* Is this right? */
+          case LHOOK2: { /* Is this right? */
             /* half indent after ( [ ({ ([ */
             i += P_SHIFTWIDTH / 2;
             break;
@@ -2140,8 +2136,7 @@ static int docmd(int glob) {
       } else {
         P_FLAGS |= NFLG_MASK;
       }
-      ED_OUTPUTV(ED_DEST, "number %s, list %s\n", P_NFLG ? "on" : "off",
-                 P_LFLG ? "on" : "off");
+      ED_OUTPUTV(ED_DEST, "number %s, list %s\n", P_NFLG ? "on" : "off", P_LFLG ? "on" : "off");
       break;
 
     case 'I':
@@ -2322,8 +2317,7 @@ static int docmd(int glob) {
             scr = P_LINE1 - 1;
           }
 
-          if ((st = doprnt(P_LINE1 - (scr), P_LINE1 + ED_BUFFER->scroll_lines -
-                                                (scr + 2))) < 0) {
+          if ((st = doprnt(P_LINE1 - (scr), P_LINE1 + ED_BUFFER->scroll_lines - (scr + 2))) < 0) {
             return st;
           }
           break;
@@ -2341,8 +2335,7 @@ static int docmd(int glob) {
           while (*(++inptr) == '+') {
             scr += ED_BUFFER->scroll_lines - 2;
           }
-          if ((st = doprnt(P_LINE1 + (scr), P_LINE1 + ED_BUFFER->scroll_lines +
-                                                (scr) - 2)) < 0) {
+          if ((st = doprnt(P_LINE1 + (scr), P_LINE1 + ED_BUFFER->scroll_lines + (scr)-2)) < 0) {
             return st;
           }
           break;
@@ -2367,8 +2360,7 @@ static int docmd(int glob) {
             scr = P_LINE1 - 1;
           }
 
-          if ((st = doprnt(P_LINE1 - (scr), P_LINE1 + ED_BUFFER->scroll_lines -
-                                                (scr - 3))) < 0) {
+          if ((st = doprnt(P_LINE1 - (scr), P_LINE1 + ED_BUFFER->scroll_lines - (scr - 3))) < 0) {
             return st;
           }
           break;
@@ -2386,8 +2378,7 @@ static int docmd(int glob) {
           while (*(++inptr) == '+') {
             scr += ED_BUFFER->scroll_lines + 3;
           }
-          if ((st = doprnt(P_LINE1 + (scr), P_LINE1 + ED_BUFFER->scroll_lines +
-                                                (scr) + 3)) < 0) {
+          if ((st = doprnt(P_LINE1 + (scr), P_LINE1 + ED_BUFFER->scroll_lines + (scr)+3)) < 0) {
             return st;
           }
           break;
@@ -2448,8 +2439,8 @@ static int doglob() {
  * code to maintain a list of locked files.
  */
 #ifdef OLD_ED
-void ed_start(const char *file_arg, const char *write_fn, const char *exit_fn,
-              int restricted, object_t *exit_ob, int scroll_lines) {
+void ed_start(const char *file_arg, const char *write_fn, const char *exit_fn, int restricted,
+              object_t *exit_ob, int scroll_lines) {
   svalue_t *setup;
 
   regexp_user = ED_REGEXP;
@@ -2473,8 +2464,7 @@ void ed_start(const char *file_arg, const char *write_fn, const char *exit_fn,
   ED_BUFFER->shiftwidth = ED_INDENT_SPACES;
   push_object(current_editor);
   setup = apply_master_ob(APPLY_RETRIEVE_ED_SETUP, 1);
-  if (setup && setup != (svalue_t *)-1 && setup->type == T_NUMBER &&
-      setup->u.number) {
+  if (setup && setup != (svalue_t *)-1 && setup->type == T_NUMBER && setup->u.number) {
     ED_BUFFER->flags = setup->u.number & ALL_FLAGS_MASK;
     ED_BUFFER->shiftwidth = setup->u.number & SHIFTWIDTH_MASK;
   }
@@ -2515,8 +2505,7 @@ void ed_start(const char *file_arg, const char *write_fn, const char *exit_fn,
    * Check for read on startup, since the buffer is read in. But don't
    * check for write, since we may want to change the file name.
    */
-  if (file_arg &&
-      (file_arg = check_valid_path(file_arg, current_editor, "ed_start", 0)) &&
+  if (file_arg && (file_arg = check_valid_path(file_arg, current_editor, "ed_start", 0)) &&
       !doread(0, file_arg)) {
     setCurLn(1);
   }
@@ -3025,8 +3014,8 @@ that help is desired for. \n",
       } else if (ret->type == T_ARRAY) {
         outstr = (char *)0;
 
-        curp = P_HELPOUT = (struct strlst *)DMALLOC(sizeof(struct strlst),
-                                                    TAG_TEMPORARY, "ed: help");
+        curp = P_HELPOUT =
+            (struct strlst *)DMALLOC(sizeof(struct strlst), TAG_TEMPORARY, "ed: help");
         curp->screen = 0;
         curp->next = 0;
 
@@ -3035,14 +3024,12 @@ that help is desired for. \n",
             continue;  // dumb.  just skip.
           }
 
-          curp->next = (struct strlst *)DMALLOC(sizeof(struct strlst),
-                                                TAG_TEMPORARY, "ed: help");
+          curp->next = (struct strlst *)DMALLOC(sizeof(struct strlst), TAG_TEMPORARY, "ed: help");
           curp = curp->next;
 
           curp->next = 0;
-          curp->screen =
-              DMALLOC(sizeof(char) * (strlen(ret->u.arr->item[i].u.string) + 1),
-                      TAG_TEMPORARY, "ed: help");
+          curp->screen = DMALLOC(sizeof(char) * (strlen(ret->u.arr->item[i].u.string) + 1),
+                                 TAG_TEMPORARY, "ed: help");
           strcpy(curp->screen, ret->u.arr->item[i].u.string);
         }
 
@@ -3060,8 +3047,8 @@ that help is desired for. \n",
         char tmpc;
         int lines = 0;
 
-        curp = P_HELPOUT = (struct strlst *)DMALLOC(sizeof(struct strlst),
-                                                    TAG_TEMPORARY, "ed: help");
+        curp = P_HELPOUT =
+            (struct strlst *)DMALLOC(sizeof(struct strlst), TAG_TEMPORARY, "ed: help");
         curp->next = 0;
 
         brkpt = outstr;
@@ -3081,12 +3068,11 @@ that help is desired for. \n",
                 *(brkpt + 1) = '\0';
               }
 
-              curp->next = (struct strlst *)DMALLOC(sizeof(struct strlst),
-                                                    TAG_TEMPORARY, "ed: help");
+              curp->next =
+                  (struct strlst *)DMALLOC(sizeof(struct strlst), TAG_TEMPORARY, "ed: help");
               curp = curp->next;
               curp->screen =
-                  (char *)DMALLOC(sizeof(char) * (strlen(outstr) + 1),
-                                  TAG_TEMPORARY, "ed: help");
+                  (char *)DMALLOC(sizeof(char) * (strlen(outstr) + 1), TAG_TEMPORARY, "ed: help");
               strcpy(curp->screen, outstr);
 
               curp->next = 0;
@@ -3189,8 +3175,7 @@ static void object_free_ed_buffer() {
   current_editor->flags &= ~O_IN_EDIT;
 }
 
-char *object_ed_start(object_t *ob, const char *fname, int restricted,
-                      int scroll_lines) {
+char *object_ed_start(object_t *ob, const char *fname, int restricted, int scroll_lines) {
   svalue_t *setup;
 
   /* ensure that the result buffer is initialized */
@@ -3204,8 +3189,7 @@ char *object_ed_start(object_t *ob, const char *fname, int restricted,
 
   push_object(current_editor);
   setup = apply_master_ob(APPLY_RETRIEVE_ED_SETUP, 1);
-  if (setup && setup != (svalue_t *)-1 && setup->type == T_NUMBER &&
-      setup->u.number) {
+  if (setup && setup != (svalue_t *)-1 && setup->type == T_NUMBER && setup->u.number) {
     ED_BUFFER->flags = setup->u.number & ALL_FLAGS_MASK;
     ED_BUFFER->shiftwidth = setup->u.number & SHIFTWIDTH_MASK;
   }
@@ -3227,8 +3211,7 @@ char *object_ed_start(object_t *ob, const char *fname, int restricted,
    * Check for read on startup, since the buffer is read in. But don't
    * check for write, since we may want to change the file name.
    */
-  if (fname &&
-      (fname = check_valid_path(fname, current_editor, "ed_start", 0)) &&
+  if (fname && (fname = check_valid_path(fname, current_editor, "ed_start", 0)) &&
       !doread(0, fname)) {
     setCurLn(1);
   }

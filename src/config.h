@@ -13,8 +13,8 @@
  * file (config.example)
  */
 
-#define CONFIG_STR(x) config_str[(x) - BASE_CONFIG_STR]
-#define CONFIG_INT(x) config_int[(x) - BASE_CONFIG_INT]
+#define CONFIG_STR(x) config_str[(x)-BASE_CONFIG_STR]
+#define CONFIG_INT(x) config_int[(x)-BASE_CONFIG_INT]
 
 #define MUD_NAME CONFIG_STR(__MUD_NAME__)
 #define ADDR_SERVER_IP CONFIG_STR(__ADDR_SERVER_IP__)

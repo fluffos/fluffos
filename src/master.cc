@@ -67,8 +67,8 @@ static void get_master_applies(object_t *ob) {
   if (master_applies) {
     FREE(master_applies);
   }
-  master_applies = CALLOCATE(NUM_MASTER_APPLIES, function_lookup_info_t,
-                             TAG_SIMULS, "get_master_applies");
+  master_applies =
+      CALLOCATE(NUM_MASTER_APPLIES, function_lookup_info_t, TAG_SIMULS, "get_master_applies");
 
   for (i = 0; i < NUM_MASTER_APPLIES; i++) {
     const char *name = applies_table[i];
@@ -113,8 +113,7 @@ void set_master(object_t *ob) {
     exit(-1);
   }
   if (ret->type != T_STRING) {
-    debug_message("%s() in master object does not work.\n",
-                  applies_table[APPLY_GET_ROOT_UID]);
+    debug_message("%s() in master object does not work.\n", applies_table[APPLY_GET_ROOT_UID]);
     exit(-1);
   }
   if (first_load) {

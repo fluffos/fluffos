@@ -60,8 +60,7 @@
 #endif
 
 #define ALLOCATE(type, tag, desc) ((type *)DXALLOC(sizeof(type), tag, desc))
-#define CALLOCATE(num, type, tag, desc) \
-  ((type *)DCALLOC(sizeof(type[1]), num, tag, desc))
+#define CALLOCATE(num, type, tag, desc) ((type *)DCALLOC(sizeof(type[1]), num, tag, desc))
 #define RESIZE(ptr, num, type, tag, desc) \
   ((type *)DREALLOC((void *)ptr, sizeof(type) * (num), tag, desc))
 

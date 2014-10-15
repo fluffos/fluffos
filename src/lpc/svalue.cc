@@ -24,11 +24,9 @@ svalue_t const0, const1, const0u;
 void assign_svalue_no_free(svalue_t *to, svalue_t *from) {
   DEBUG_CHECK(from == 0, "Attempt to assign_svalue() from a null ptr.\n");
   DEBUG_CHECK(to == 0, "Attempt to assign_svalue() to a null ptr.\n");
-  DEBUG_CHECK((from->type & (from->type - 1)) & ~T_FREED,
-              "from->type is corrupt; >1 bit set.\n");
+  DEBUG_CHECK((from->type & (from->type - 1)) & ~T_FREED, "from->type is corrupt; >1 bit set.\n");
 
-  if (from->type == T_OBJECT &&
-      (!from->u.ob || (from->u.ob->flags & O_DESTRUCTED))) {
+  if (from->type == T_OBJECT && (!from->u.ob || (from->u.ob->flags & O_DESTRUCTED))) {
     *to = const0u;
     return;
   }
@@ -114,8 +112,7 @@ void int_free_svalue(svalue_t *v)
   } else if ((v->type & T_REFED) && !(v->type & T_FREED)) {
 #ifdef DEBUG
     if (v->type == T_OBJECT) {
-      debug(d_flag, "Free_svalue %s (%d) from %s\n", v->u.ob->obname,
-            v->u.ob->ref - 1, tag);
+      debug(d_flag, "Free_svalue %s (%d) from %s\n", v->u.ob->obname, v->u.ob->ref - 1, tag);
     }
 #endif
     /* TODO: Set to 0 on condition that REF overflow to negative. */

@@ -11,8 +11,7 @@
 // ANSI
 static const int ANSI_SUBSTITUTE = 0x20;
 
-static inline void on_telnet_data(const char *buffer, unsigned long size,
-                                  interactive_t *ip) {
+static inline void on_telnet_data(const char *buffer, unsigned long size, interactive_t *ip) {
   for (int i = 0; i < size; i++) {
     unsigned char c = (unsigned char)buffer[i];
     switch (c) {
@@ -38,8 +37,7 @@ static inline void on_telnet_data(const char *buffer, unsigned long size,
   }
 }
 
-static inline void on_telnet_send(const char *buffer, unsigned long size,
-                                  interactive_t *ip) {
+static inline void on_telnet_send(const char *buffer, unsigned long size, interactive_t *ip) {
   bufferevent_write(ip->ev_buffer, buffer, size);
 }
 
@@ -51,19 +49,18 @@ static inline void on_telnet_iac(unsigned char cmd, interactive_t *ip) {
       telnet_negotiate(ip->telnet, TELNET_WILL, TELNET_TELOPT_TM);
       break;
     }
-    case TELNET_IP: {/* interrupt process */
+    case TELNET_IP: { /* interrupt process */
       const char response = 127;
       telnet_send(ip->telnet, &response, sizeof(response));
       telnet_negotiate(ip->telnet, TELNET_WILL, TELNET_TELOPT_TM);
       break;
     }
-    case TELNET_AYT: {/* are you there?  you bet */
-      const char response[] = {'\n', '[', '-', 'Y', 'e',
-                               's',  '-', ']', ' ', '\n'};
+    case TELNET_AYT: { /* are you there?  you bet */
+      const char response[] = {'\n', '[', '-', 'Y', 'e', 's', '-', ']', ' ', '\n'};
       telnet_send(ip->telnet, response, sizeof(response));
       break;
     }
-    case TELNET_AO: {/* abort output */
+    case TELNET_AO: { /* abort output */
       flush_message(ip);
       ip->out_of_band = MSG_OOB;
       telnet_iac(ip->telnet, TELNET_DM);
@@ -92,8 +89,7 @@ static inline void on_telnet_will(unsigned char cmd, interactive_t *ip) {
     }
     case TELNET_TELOPT_NEW_ENVIRON: {
       char buf[] = {TELNET_ENVIRON_SEND};
-      telnet_subnegotiation(ip->telnet, TELNET_TELOPT_NEW_ENVIRON, buf,
-                            sizeof(buf));
+      telnet_subnegotiation(ip->telnet, TELNET_TELOPT_NEW_ENVIRON, buf, sizeof(buf));
       break;
     }
     case TELNET_TELOPT_MXP:
@@ -164,8 +160,7 @@ static inline void on_telnet_dont(unsigned char cmd, interactive_t *ip) {
 }
 
 // We just need to handle the rest.
-static inline void on_telnet_subnegotiation(unsigned char cmd, const char *buf,
-                                            unsigned long size,
+static inline void on_telnet_subnegotiation(unsigned char cmd, const char *buf, unsigned long size,
                                             interactive_t *ip) {
   switch (cmd) {
     case TELNET_TELOPT_COMPRESS2:
@@ -187,10 +182,9 @@ static inline void on_telnet_subnegotiation(unsigned char cmd, const char *buf,
           /* Don't do anything with an ACK */
           if (!(buf[1] & MODE_ACK)) {
             /* Accept only EDIT and TRAPSIG && force them too */
-            const unsigned char sb_ack[] = {
-                LM_MODE, MODE_EDIT | MODE_TRAPSIG | MODE_ACK};
-            telnet_subnegotiation(ip->telnet, TELNET_TELOPT_LINEMODE,
-                                  (const char *)sb_ack, sizeof(sb_ack));
+            const unsigned char sb_ack[] = {LM_MODE, MODE_EDIT | MODE_TRAPSIG | MODE_ACK};
+            telnet_subnegotiation(ip->telnet, TELNET_TELOPT_LINEMODE, (const char *)sb_ack,
+                                  sizeof(sb_ack));
           }
           break;
         case LM_SLC: {
@@ -201,14 +195,14 @@ static inline void on_telnet_subnegotiation(unsigned char cmd, const char *buf,
         /* refuse FORWARDMASK */
         case DO: {
           const unsigned char sb_wont[] = {WONT, (unsigned char)buf[1]};
-          telnet_subnegotiation(ip->telnet, TELNET_TELOPT_LINEMODE,
-                                (const char *)sb_wont, sizeof(sb_wont));
+          telnet_subnegotiation(ip->telnet, TELNET_TELOPT_LINEMODE, (const char *)sb_wont,
+                                sizeof(sb_wont));
           break;
         }
         case WILL: {
           const unsigned char sb_dont[] = {DONT, (unsigned char)buf[1]};
-          telnet_subnegotiation(ip->telnet, TELNET_TELOPT_LINEMODE,
-                                (const char *)sb_dont, sizeof(sb_dont));
+          telnet_subnegotiation(ip->telnet, TELNET_TELOPT_LINEMODE, (const char *)sb_dont,
+                                sizeof(sb_dont));
           break;
         }
         default:
@@ -248,8 +242,8 @@ static inline void on_telnet_subnegotiation(unsigned char cmd, const char *buf,
   }
 }
 
-static inline void on_telnet_environ(const struct telnet_environ_t *values,
-                                     unsigned long size, interactive_t *ip) {
+static inline void on_telnet_environ(const struct telnet_environ_t *values, unsigned long size,
+                                     interactive_t *ip) {
   static const int ENV_FILLER = 0x1e;
 
   std::string str = "";
@@ -270,8 +264,7 @@ static inline void on_telnet_ttype(const char *name, interactive_t *ip) {
 }
 
 // Main event handler.
-void telnet_event_handler(telnet_t *telnet, telnet_event_t *ev,
-                          void *user_data) {
+void telnet_event_handler(telnet_t *telnet, telnet_event_t *ev, void *user_data) {
   auto ip = all_users[((user_event_data *)user_data)->idx];
 
   switch (ev->type) {
@@ -308,8 +301,7 @@ void telnet_event_handler(telnet_t *telnet, telnet_event_t *ev,
       break;
     }
     case TELNET_EV_SUBNEGOTIATION: {
-      on_telnet_subnegotiation(ev->sub.telopt, ev->sub.buffer, ev->sub.size,
-                               ip);
+      on_telnet_subnegotiation(ev->sub.telopt, ev->sub.buffer, ev->sub.size, ip);
       break;
     }
     case TELNET_EV_COMPRESS: {
@@ -398,8 +390,7 @@ void set_linemode(interactive_t *ip) {
   telnet_negotiate(ip->telnet, TELNET_DO, TELNET_TELOPT_LINEMODE);
 
   const unsigned char sb_mode[] = {LM_MODE, MODE_EDIT | MODE_TRAPSIG};
-  telnet_subnegotiation(ip->telnet, TELNET_TELOPT_LINEMODE,
-                        (const char *)sb_mode, sizeof(sb_mode));
+  telnet_subnegotiation(ip->telnet, TELNET_TELOPT_LINEMODE, (const char *)sb_mode, sizeof(sb_mode));
 
   flush_message(ip);
 }
@@ -412,7 +403,6 @@ void set_charmode(interactive_t *ip) {
 }
 
 void set_echo(interactive_t *ip, bool enable) {
-  telnet_negotiate(ip->telnet, enable ? TELNET_WILL : TELNET_WONT,
-                   TELNET_TELOPT_ECHO);
+  telnet_negotiate(ip->telnet, enable ? TELNET_WILL : TELNET_WONT, TELNET_TELOPT_ECHO);
   flush_message(ip);
 }

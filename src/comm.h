@@ -129,7 +129,7 @@ struct interactive_t {
  * for it (i.e. define a failure label, and are set up to deal with
  * branching to it from arbitrary points).
  */
-#define IP_VALID(ip, ob) (ob &&ip &&ob->interactive == ip)
+#define IP_VALID(ip, ob) (ob && ip && ob->interactive == ip)
 #define VALIDATE_IP(ip, ob) \
   if (!IP_VALID(ip, ob)) goto failure
 
@@ -210,8 +210,7 @@ inline const char *sockaddr_to_string(const sockaddr *addr, socklen_t len) {
     return result;
   }
 
-  snprintf(result, sizeof(result),
-           strchr(host, ':') != NULL ? "[%s]:%s" : "%s:%s", host, service);
+  snprintf(result, sizeof(result), strchr(host, ':') != NULL ? "[%s]:%s" : "%s:%s", host, service);
 
   return result;
 }

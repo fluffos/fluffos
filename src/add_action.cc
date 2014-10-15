@@ -44,8 +44,7 @@ static void notify_no_command(void) {
       free_string(p.s);
       command_giver->interactive->default_err_message.s = 0;
     } else {
-      tell_object(command_giver, default_fail_message,
-                  strlen(default_fail_message));
+      tell_object(command_giver, default_fail_message, strlen(default_fail_message));
     }
   }
 }
@@ -64,9 +63,7 @@ void clear_notify(object_t *ob) {
   ip->default_err_message.s = 0;
 }
 
-static int hash_living_name(const char *str) {
-  return whashstr(str) & (CFG_LIVING_HASH_SIZE - 1);
-}
+static int hash_living_name(const char *str) { return whashstr(str) & (CFG_LIVING_HASH_SIZE - 1); }
 
 object_t *find_living_object(const char *str, int user) {
   object_t **obp, *tmp;
@@ -127,9 +124,7 @@ void remove_living_name(object_t *ob) {
     }
     hl = &(*hl)->next_hashed_living;
   }
-  DEBUG_CHECK1(*hl == 0,
-               "remove_living_name: Object named %s no in hash list.\n",
-               ob->living_name);
+  DEBUG_CHECK1(*hl == 0, "remove_living_name: Object named %s no in hash list.\n", ob->living_name);
   *hl = ob->next_hashed_living;
   free_string(ob->living_name);
   ob->next_hashed_living = 0;
@@ -155,8 +150,8 @@ static void set_living_name(object_t *ob, const char *str) {
 void stat_living_objects(outbuffer_t *out) {
   outbuf_add(out, "Hash table of living objects:\n");
   outbuf_add(out, "-----------------------------\n");
-  outbuf_addv(out, "%d living named objects, average search length: %4.2f\n\n",
-              num_living_names, (double)search_length / num_searches);
+  outbuf_addv(out, "%d living named objects, average search length: %4.2f\n\n", num_living_names,
+              (double)search_length / num_searches);
 }
 
 void setup_new_commands(object_t *dest, object_t *item) {
@@ -201,11 +196,10 @@ void setup_new_commands(object_t *dest, object_t *item) {
         return;
       }
     }
-    if (item->flags & O_DESTRUCTED) {/* marion */
-      error("The object to be moved was destructed at call of " APPLY_INIT
-            "()\n");
+    if (item->flags & O_DESTRUCTED) { /* marion */
+      error("The object to be moved was destructed at call of " APPLY_INIT "()\n");
     }
-    if (ob->flags & O_DESTRUCTED) {/* Alaron */
+    if (ob->flags & O_DESTRUCTED) { /* Alaron */
       error("An object was destructed at call of " APPLY_INIT "()\n");
     }
     if (item->flags & O_ENABLE_COMMANDS) {
@@ -217,13 +211,11 @@ void setup_new_commands(object_t *dest, object_t *item) {
       }
     }
   }
-  if (dest->flags & O_DESTRUCTED) {/* marion */
-    error("The destination to move to was destructed at call of " APPLY_INIT
-          "()\n");
+  if (dest->flags & O_DESTRUCTED) { /* marion */
+    error("The destination to move to was destructed at call of " APPLY_INIT "()\n");
   }
-  if (item->flags & O_DESTRUCTED) {/* Alaron */
-    error("The object to be moved was destructed at call of " APPLY_INIT
-          "()\n");
+  if (item->flags & O_DESTRUCTED) { /* Alaron */
+    error("The object to be moved was destructed at call of " APPLY_INIT "()\n");
   }
   if (dest->flags & O_ENABLE_COMMANDS) {
     save_command_giver(dest);
@@ -279,8 +271,7 @@ static void enable_commands(int enable, int toggle_action) {
     /* Remove all sentences defined for the object */
     if (current_object->super) {
       remove_sent(current_object->super, current_object);
-      for (object_t *pp = current_object->super->contains; pp;
-           pp = pp->next_inv) {
+      for (object_t *pp = current_object->super->contains; pp; pp = pp->next_inv) {
         remove_sent(pp, current_object);
       }
     }
@@ -369,8 +360,7 @@ static int user_parser(char *buff) {
      */
 
     if (!(s->flags & V_FUNCTION))
-      debug(add_action, "Local command %s on /%s\n", s->function.s,
-            s->ob->obname);
+      debug(add_action, "Local command %s on /%s\n", s->function.s, s->ob->obname);
 
     if (s->flags & V_NOSPACE) {
       int l1 = strlen(s->verb);
@@ -427,8 +417,7 @@ static int user_parser(char *buff) {
       if (s == command_giver->sent) {
         char buf[256];
         if (s->flags & V_FUNCTION) {
-          sprintf(buf, "Verb '%s' bound to uncallable function pointer.\n",
-                  s->verb);
+          sprintf(buf, "Verb '%s' bound to uncallable function pointer.\n", s->verb);
           error(buf);
         } else {
           sprintf(buf, "Function for verb '%s' not found.\n", s->verb);
@@ -526,8 +515,7 @@ static void add_action(svalue_t *str, const char *cmd, int flag) {
     ob = ob->shadowing;
   }
   /* don't allow add_actions of a static function from a shadowing object */
-  if ((ob != current_object) && str->type == T_STRING &&
-      is_static(str->u.string, ob)) {
+  if ((ob != current_object) && str->type == T_STRING && is_static(str->u.string, ob)) {
     return;
   }
 #endif
@@ -545,13 +533,11 @@ static void add_action(svalue_t *str, const char *cmd, int flag) {
          * did wrong. */
   p = alloc_sentence();
   if (str->type == T_STRING) {
-    debug(add_action, "--Add action '%s' (ob: %s func: '%s')\n", cmd,
-          ob->obname, str->u.string);
+    debug(add_action, "--Add action '%s' (ob: %s func: '%s')\n", cmd, ob->obname, str->u.string);
     p->function.s = make_shared_string(str->u.string);
     p->flags = flag;
   } else {
-    debug(add_action, "--Add action '%s' (ob: %s func: <function>)\n", cmd,
-          ob->obname);
+    debug(add_action, "--Add action '%s' (ob: %s func: <function>)\n", cmd, ob->obname);
 
     p->function.f = str->u.fp;
     str->u.fp->hdr.ref++;
@@ -615,8 +601,8 @@ void remove_sent(object_t *ob, object_t *user) {
     if ((*s)->ob == ob) {
 #ifdef DEBUG
       if (!((*s)->flags & V_FUNCTION)) {
-        debug(add_action, "--Unlinking sentence %s (user: %s ob: %s)\n",
-              (*s)->function.s, user->obname, ob->obname);
+        debug(add_action, "--Unlinking sentence %s (user: %s ob: %s)\n", (*s)->function.s,
+              user->obname, ob->obname);
       }
 #endif
 
@@ -768,8 +754,7 @@ void f_notify_fail(void) {
   if (command_giver && command_giver->interactive) {
     clear_notify(command_giver);
     if (sp->type == T_STRING) {
-      command_giver->interactive->default_err_message.s =
-          make_shared_string(sp->u.string);
+      command_giver->interactive->default_err_message.s = make_shared_string(sp->u.string);
     } else {
       command_giver->interactive->iflags |= NOTIFY_FAIL_FUNC;
       command_giver->interactive->default_err_message.f = sp->u.fp;

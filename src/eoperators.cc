@@ -52,7 +52,6 @@ void f_div_eq() {
   svalue_t *argp = (sp--)->u.lvalue;
 
   switch (argp->type | sp->type) {
-
     case T_NUMBER: {
       if (!sp->u.number) {
         error("Division by 0nn\n");
@@ -595,7 +594,7 @@ void f_parse_command() {
   *(arg--) = *(fp--); /* move pattern to top of stack */
   *(arg--) = *(fp--); /* move source object or array to just below
                            the pattern */
-  *(arg) = *(fp); /* move source string just below the object */
+  *(arg) = *(fp);     /* move source string just below the object */
   fp->type = T_NUMBER;
 
   /*
@@ -741,8 +740,7 @@ void f_range(int code) {
     }
 
     default:
-      error("Cannot index type '%s' using [ .. ] operator.\n",
-            type_name(sp->type));
+      error("Cannot index type '%s' using [ .. ] operator.\n", type_name(sp->type));
   }
 }
 
@@ -961,7 +959,8 @@ void f_switch() {
       7 * SWITCH_CASE_SIZE,    15 * SWITCH_CASE_SIZE,   31 * SWITCH_CASE_SIZE,
       63 * SWITCH_CASE_SIZE,   127 * SWITCH_CASE_SIZE,  255 * SWITCH_CASE_SIZE,
       511 * SWITCH_CASE_SIZE,  1023 * SWITCH_CASE_SIZE, 2047 * SWITCH_CASE_SIZE,
-      4095 * SWITCH_CASE_SIZE, };
+      4095 * SWITCH_CASE_SIZE,
+  };
 
   COPY_SHORT(&offset, pc + SW_TABLE);
   COPY_SHORT(&end_off, pc + SW_ENDTAB);
@@ -993,7 +992,7 @@ void f_switch() {
     } else {
       bad_argument(sp, T_STRING, 1, F_SWITCH);
     }
-  } else {/* Integer table, check type */
+  } else { /* Integer table, check type */
     CHECK_TYPES(sp, T_NUMBER, 1, F_SWITCH);
     s = (sp--)->u.number;
     i = pc[0] & 0xf;
@@ -1086,7 +1085,7 @@ void f_switch() {
         /* use default address */
         COPY_SHORT(&offset, pc + SW_DEFAULT);
         break;
-      } else {/* d >= SWITCH_CASE_SIZE */
+      } else { /* d >= SWITCH_CASE_SIZE */
         l += d;
         /* if table isn't a power of 2 in size, fix us up */
         while (l >= end_tab) {
@@ -1132,7 +1131,7 @@ void f_switch() {
 void call_simul_efun(unsigned short index, int num_arg) {
   extern object_t *simul_efun_ob;
 
-  if (current_object->flags & O_DESTRUCTED) {/* No external calls allowed */
+  if (current_object->flags & O_DESTRUCTED) { /* No external calls allowed */
     pop_n_elems(num_arg);
     push_undefined();
     return;
@@ -1212,8 +1211,7 @@ void f_function_constructor() {
       num_arg = EXTRACT_UCHAR(pc++);
       locals = EXTRACT_UCHAR(pc++);
       LOAD_SHORT(index, pc); /* length */
-      fp = make_functional_funp(num_arg, locals, index, 0,
-                                kind & FP_NOT_BINDABLE);
+      fp = make_functional_funp(num_arg, locals, index, 0, kind & FP_NOT_BINDABLE);
       break;
     }
     default:
@@ -1258,9 +1256,9 @@ void f_sscanf() {
   fp = sp;
   CHECK_STACK_OVERFLOW(num_arg + 1);
   sp += num_arg + 1;
-  *sp = *(fp--);     /* move format description to top of stack */
-  *(sp - 1) = *(fp); /* move source string just below the format
-                        * desc. */
+  *sp = *(fp--);       /* move format description to top of stack */
+  *(sp - 1) = *(fp);   /* move source string just below the format
+                          * desc. */
   fp->type = T_NUMBER; /* this svalue isn't invalidated below, and
                           * if we don't change it to something safe,
                           * it will get freed twice if an error occurs */

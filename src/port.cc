@@ -31,9 +31,7 @@ int64_t random_number(int64_t n) {
  * of seconds since 1970.
  */
 
-long get_current_time() {
-  return time(0l); /* Just use the old time() for now */
-}
+long get_current_time() { return time(0l); /* Just use the old time() for now */ }
 
 const char *time_string(time_t t) {
   const char *res = ctime(&t);
@@ -66,9 +64,7 @@ long get_cpu_times(unsigned long *secs, unsigned long *usecs) {
 }
 
 /* return the current working directory */
-char *get_current_dir(char *buf, int limit) {
-  return getcwd(buf, limit); /* POSIX */
-}
+char *get_current_dir(char *buf, int limit) { return getcwd(buf, limit); /* POSIX */ }
 
 #ifdef MMAP_SBRK
 void *sbrkx(long size) {

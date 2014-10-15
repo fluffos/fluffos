@@ -7,21 +7,20 @@
 #include "comm.h"
 #include "master.h"
 
-static const unsigned char telnet_mssp_value[] = {
-    TELNET_MSSP_VAR, '%', 's', TELNET_MSSP_VAL, '%', 's', 0};
+static const unsigned char telnet_mssp_value[] = {TELNET_MSSP_VAR, '%', 's', TELNET_MSSP_VAL,
+                                                  '%',             's', 0};
 
 static int send_mssp_val(mapping_t *map, mapping_node_t *el, void *data) {
   auto ip = (interactive_t *)data;
 
   if (el->values[0].type == T_STRING && el->values[1].type == T_STRING) {
     char buf[1024];
-    int len = sprintf(buf, (char *)telnet_mssp_value, el->values[0].u.string,
-                      el->values[1].u.string);
+    int len =
+        sprintf(buf, (char *)telnet_mssp_value, el->values[0].u.string, el->values[1].u.string);
 
     telnet_send(ip->telnet, buf, len);
   } else if (el->values[0].type == T_STRING && el->values[1].type == T_ARRAY &&
-             el->values[1].u.arr->size > 0 &&
-             el->values[1].u.arr->item[0].type == T_STRING) {
+             el->values[1].u.arr->size > 0 && el->values[1].u.arr->item[0].type == T_STRING) {
     char buf[10240];
     int len = sprintf(buf, (char *)telnet_mssp_value, el->values[0].u.string,
                       el->values[1].u.arr->item[0].u.string);
@@ -34,8 +33,7 @@ static int send_mssp_val(mapping_t *map, mapping_node_t *el, void *data) {
     for (i = 1; i < ar->size; i++) {
       if (ar->item[i].type == T_STRING) {
         telnet_send(ip->telnet, (const char *)&val, sizeof(val));
-        telnet_send(ip->telnet, (const char *)ar->item[i].u.string,
-                    SVALUE_STRLEN(&ar->item[i]));
+        telnet_send(ip->telnet, (const char *)ar->item[i].u.string, SVALUE_STRLEN(&ar->item[i]));
       }
     }
     flush_message(ip);

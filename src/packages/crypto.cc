@@ -59,12 +59,12 @@ void f_hash(void) {
   data = sp->u.string;
   data_len = SVALUE_STRLEN(sp);
 
-#define DO_HASH_IF(id, func, hash_size)                 \
-  SAFE(if (strcasecmp(algo, id) == 0) {                 \
-             unsigned char md[hash_size];               \
-             func((unsigned char *)data, data_len, md); \
-             result = hexdump(md, hash_size);           \
-           })
+#define DO_HASH_IF(id, func, hash_size)        \
+  SAFE(if (strcasecmp(algo, id) == 0) {        \
+    unsigned char md[hash_size];               \
+    func((unsigned char *)data, data_len, md); \
+    result = hexdump(md, hash_size);           \
+  })
 
 #ifndef OPENSSL_NO_SHA1
   DO_HASH_IF("sha1", SHA1, SHA_DIGEST_LENGTH);

@@ -28,8 +28,7 @@ void dealloc_funp(funptr_t *fp) {
 
   if (prog) {
     prog->func_ref--;
-    debug(d_flag, "subtr func ref /%s: now %i\n", prog->filename,
-          prog->func_ref);
+    debug(d_flag, "subtr func ref /%s: now %i\n", prog->filename, prog->func_ref);
     if (!prog->func_ref && !prog->ref) {
       deallocate_program(prog);
     }
@@ -122,8 +121,7 @@ funptr_t *make_lfun_funp(int index, svalue_t *args) {
         "replace_program()\n");
   }
 
-  fp = (funptr_t *)DXALLOC(sizeof(funptr_hdr_t) + sizeof(local_ptr_t), TAG_FUNP,
-                           "make_lfun_funp");
+  fp = (funptr_t *)DXALLOC(sizeof(funptr_hdr_t) + sizeof(local_ptr_t), TAG_FUNP, "make_lfun_funp");
   fp->hdr.owner = current_object;
   add_ref(current_object, "make_lfun_funp");
   fp->hdr.type = FP_LOCAL | FP_NOT_BINDABLE;
@@ -152,8 +150,7 @@ funptr_t *make_lfun_funp(int index, svalue_t *args) {
 funptr_t *make_simul_funp(int index, svalue_t *args) {
   funptr_t *fp;
 
-  fp = (funptr_t *)DXALLOC(sizeof(funptr_hdr_t) + sizeof(simul_ptr_t), TAG_FUNP,
-                           "make_simul_funp");
+  fp = (funptr_t *)DXALLOC(sizeof(funptr_hdr_t) + sizeof(simul_ptr_t), TAG_FUNP, "make_simul_funp");
   fp->hdr.owner = current_object;
   add_ref(current_object, "make_simul_funp");
   fp->hdr.type = FP_SIMUL;
@@ -171,8 +168,8 @@ funptr_t *make_simul_funp(int index, svalue_t *args) {
   return fp;
 }
 
-funptr_t *make_functional_funp(short num_arg, short num_local, short len,
-                               svalue_t *args, int flag) {
+funptr_t *make_functional_funp(short num_arg, short num_local, short len, svalue_t *args,
+                               int flag) {
   funptr_t *fp;
 
   if (replace_program_pending(current_object)) {
@@ -181,15 +178,14 @@ funptr_t *make_functional_funp(short num_arg, short num_local, short len,
         "replace_program()\n");
   }
 
-  fp = (funptr_t *)DXALLOC(sizeof(funptr_hdr_t) + sizeof(functional_t),
-                           TAG_FUNP, "make_functional_funp");
+  fp = (funptr_t *)DXALLOC(sizeof(funptr_hdr_t) + sizeof(functional_t), TAG_FUNP,
+                           "make_functional_funp");
   fp->hdr.owner = current_object;
   add_ref(current_object, "make_functional_funp");
   fp->hdr.type = FP_FUNCTIONAL + flag;
 
   current_prog->func_ref++;
-  debug(d_flag, "add func ref /%s: now %i\n", current_prog->filename,
-        current_prog->func_ref);
+  debug(d_flag, "add func ref /%s: now %i\n", current_prog->filename, current_prog->func_ref);
 
   fp->f.functional.prog = current_prog;
   fp->f.functional.offset = pc - current_prog->program;
@@ -235,8 +231,7 @@ svalue_t *call_function_pointer(funptr_t *funp, int num_arg) {
       fp = sp - num_arg + 1;
 
       i = funp->f.efun.index;
-      if (num_arg == instrs[i].min_arg - 1 &&
-          ((def = instrs[i].Default) != DEFAULT_NONE)) {
+      if (num_arg == instrs[i].min_arg - 1 && ((def = instrs[i].Default) != DEFAULT_NONE)) {
         if (def == DEFAULT_THIS_OBJECT) {
           push_object(current_object);
         } else {
@@ -244,11 +239,9 @@ svalue_t *call_function_pointer(funptr_t *funp, int num_arg) {
         }
         num_arg++;
       } else if (num_arg < instrs[i].min_arg) {
-        error("Too few arguments to efun %s in efun pointer.\n",
-              query_instr_name(i));
+        error("Too few arguments to efun %s in efun pointer.\n", query_instr_name(i));
       } else if (num_arg > instrs[i].max_arg && instrs[i].max_arg != -1) {
-        error("Too many arguments to efun %s in efun pointer.\n",
-              query_instr_name(i));
+        error("Too many arguments to efun %s in efun pointer.\n", query_instr_name(i));
       }
       /* possibly we should add TRACE, OPC, etc here;
          also on eval_cost here, which is ok for just 1 efun */
@@ -298,7 +291,6 @@ svalue_t *call_function_pointer(funptr_t *funp, int num_arg) {
     }
     case FP_FUNCTIONAL:
     case FP_FUNCTIONAL | FP_NOT_BINDABLE: {
-
       fp = sp - num_arg + 1;
       push_control_stack(FRAME_FUNP);
       current_prog = funp->f.functional.prog;
@@ -306,8 +298,7 @@ svalue_t *call_function_pointer(funptr_t *funp, int num_arg) {
 
       caller_type = ORIGIN_FUNCTIONAL;
 
-      setup_variables(num_arg, funp->f.functional.num_local,
-                      funp->f.functional.num_arg);
+      setup_variables(num_arg, funp->f.functional.num_local, funp->f.functional.num_arg);
 
       function_index_offset = funp->f.functional.fio;
       variable_index_offset = funp->f.functional.vio;
@@ -332,8 +323,7 @@ svalue_t *safe_call_function_pointer(funptr_t *funp, int num_arg) {
   }
   try {
     ret = call_function_pointer(funp, num_arg);
-  }
-  catch (const char *) {
+  } catch (const char *) {
     restore_context(&econ);
     /* condition was restored to where it was when we came in */
     pop_n_elems(num_arg);

@@ -147,8 +147,7 @@ void scratch_free(char *ptr) {
   } else if (*(Ptr - 2)) {
     sp_block_t *sbt;
 
-    DEBUG_CHECK(*(Ptr - 2) != SCRATCH_MAGIC,
-                "scratch_free called on non-scratchpad string.\n");
+    DEBUG_CHECK(*(Ptr - 2) != SCRATCH_MAGIC, "scratch_free called on non-scratchpad string.\n");
     SDEBUG(printf("block freed\n"));
     sbt = FIND_HDR(ptr);
     if (sbt->prev) {
@@ -169,8 +168,7 @@ char *scratch_large_alloc(int size) {
 
   SDEBUG(printf("scratch_large_alloc(%i)\n", size));
 
-  spt =
-      (sp_block_t *)DMALLOC(SIZE_WITH_HDR(size), TAG_COMPILER, "scratch_alloc");
+  spt = (sp_block_t *)DMALLOC(SIZE_WITH_HDR(size), TAG_COMPILER, "scratch_alloc");
   if ((spt->next = scratch_head.next)) {
     spt->next->prev = spt;
   }
@@ -201,12 +199,10 @@ char *scratch_realloc(char *ptr, int size) {
   } else if (*(Ptr - 2)) {
     sp_block_t *sbt, *newsbt;
 
-    DEBUG_CHECK(*(Ptr - 2) != SCRATCH_MAGIC,
-                "scratch_realloc on non-scratchpad string.\n");
+    DEBUG_CHECK(*(Ptr - 2) != SCRATCH_MAGIC, "scratch_realloc on non-scratchpad string.\n");
     SDEBUG(printf("block\n"));
     sbt = FIND_HDR(ptr);
-    newsbt = (sp_block_t *)DREALLOC(sbt, SIZE_WITH_HDR(size), TAG_COMPILER,
-                                    "scratch_realloc");
+    newsbt = (sp_block_t *)DREALLOC(sbt, SIZE_WITH_HDR(size), TAG_COMPILER, "scratch_realloc");
     newsbt->prev->next = newsbt;
     if (newsbt->next) {
       newsbt->next->prev = newsbt;
@@ -267,9 +263,7 @@ char *scratch_join(char *s1, char *s2) {
   } else {
     /* This assumes that S1 and S2 were the last two things allocated.
        Make sure this is true */
-    DEBUG_CHECK(
-        S2 != scr_last,
-        "Argument 2 to scratch_join was not the last allocated string.\n");
+    DEBUG_CHECK(S2 != scr_last, "Argument 2 to scratch_join was not the last allocated string.\n");
     DEBUG_CHECK(S1 != (scr_last - 1 - (*(scr_last - 1))),
                 "Argument 1 to scratch_join was not the second to last "
                 "allocated string.\n");

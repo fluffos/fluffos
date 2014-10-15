@@ -121,8 +121,8 @@ static block_t *sfindblock(const char *s, int h) {
 #ifdef STRING_STATS
     search_len++;
 #endif
-    if (*(STRING(curr)) == *s && !strcmp(STRING(curr), s)) {/* found it */
-      if (prev) {/* not at head of list */
+    if (*(STRING(curr)) == *s && !strcmp(STRING(curr), s)) { /* found it */
+      if (prev) {                                            /* not at head of list */
         NEXT(prev) = NEXT(curr);
         NEXT(curr) = base_table[h];
         base_table[h] = curr;
@@ -223,8 +223,7 @@ void free_string(const char *str) {
   int h;
 
   b = BLOCK(str);
-  DEBUG_CHECK1(b != findblock(str),
-               "stralloc.c: free_string called on non-shared string: %s.\n",
+  DEBUG_CHECK1(b != findblock(str), "stralloc.c: free_string called on non-shared string: %s.\n",
                str);
 
   /*
@@ -275,9 +274,7 @@ void deallocate_string(char *str) {
     }
     prev = &(NEXT(b));
   }
-  DEBUG_CHECK1(
-      !b, "stralloc.c: deallocate_string called on non-shared string: %s.\n",
-      str);
+  DEBUG_CHECK1(!b, "stralloc.c: deallocate_string called on non-shared string: %s.\n", str);
   // printf("freeing string: %s\n", str);
   FREE(b);
 }
@@ -289,15 +286,14 @@ int add_string_status(outbuffer_t *out, int verbose) {
     outbuf_add(out, "-------------------------\t Strings    Bytes\n");
   }
   if (verbose != -1)
-    outbuf_addv(out, "All strings:\t\t\t%8d %8d + %d overhead\n",
-                num_distinct_strings, bytes_distinct_strings, overhead_bytes);
+    outbuf_addv(out, "All strings:\t\t\t%8d %8d + %d overhead\n", num_distinct_strings,
+                bytes_distinct_strings, overhead_bytes);
   if (verbose == 1) {
-    outbuf_addv(out, "Total asked for\t\t\t%8d %8d\n", allocd_strings,
-                allocd_bytes);
+    outbuf_addv(out, "Total asked for\t\t\t%8d %8d\n", allocd_strings, allocd_bytes);
     outbuf_addv(out, "Space actually required/total string bytes %d%%\n",
                 (bytes_distinct_strings + overhead_bytes) * 100 / allocd_bytes);
-    outbuf_addv(out, "Searches: %d    Average search length: %6.3f\n",
-                num_str_searches, (double)search_len / num_str_searches);
+    outbuf_addv(out, "Searches: %d    Average search length: %6.3f\n", num_str_searches,
+                (double)search_len / num_str_searches);
   }
   return (bytes_distinct_strings + overhead_bytes);
 #else
@@ -336,8 +332,7 @@ char *int_new_string(int size)
   }
 #endif
 
-  mbt = (malloc_block_t *)DXALLOC(size + sizeof(malloc_block_t) + 1,
-                                  TAG_MALLOC_STRING, tag);
+  mbt = (malloc_block_t *)DXALLOC(size + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, tag);
   if (size < UINT_MAX) {
     mbt->size = size;
     ADD_NEW_STRING(size, sizeof(malloc_block_t));
@@ -357,8 +352,7 @@ char *extend_string(const char *str, int len) {
   int oldsize = MSTR_SIZE(str);
 #endif
 
-  mbt = (malloc_block_t *)DREALLOC(MSTR_BLOCK(str),
-                                   len + sizeof(malloc_block_t) + 1,
+  mbt = (malloc_block_t *)DREALLOC(MSTR_BLOCK(str), len + sizeof(malloc_block_t) + 1,
                                    TAG_MALLOC_STRING, "extend_string");
   if (len < UINT_MAX) {
     mbt->size = len;
@@ -421,14 +415,13 @@ char *int_string_unlink(const char *str)
   if (mbt->size == USHRT_MAX) {
     int l = strlen(str + USHRT_MAX) + USHRT_MAX; /* ouch */
 
-    newmbt = (malloc_block_t *)DXALLOC(l + sizeof(malloc_block_t) + 1,
-                                       TAG_MALLOC_STRING, desc);
+    newmbt = (malloc_block_t *)DXALLOC(l + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, desc);
     memcpy((char *)(newmbt + 1), (char *)(mbt + 1), l + 1);
     newmbt->size = USHRT_MAX;
     ADD_NEW_STRING(USHRT_MAX, sizeof(malloc_block_t));
   } else {
-    newmbt = (malloc_block_t *)DXALLOC(mbt->size + sizeof(malloc_block_t) + 1,
-                                       TAG_MALLOC_STRING, desc);
+    newmbt =
+        (malloc_block_t *)DXALLOC(mbt->size + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, desc);
     memcpy((char *)(newmbt + 1), (char *)(mbt + 1), mbt->size + 1);
     newmbt->size = mbt->size;
     ADD_NEW_STRING(mbt->size, sizeof(malloc_block_t));

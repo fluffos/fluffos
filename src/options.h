@@ -283,8 +283,7 @@
  * PRAGMA_ERROR_CONTEXT:include some text telling where on the line a
  *                      compilation error occured.
  */
-#define DEFAULT_PRAGMAS \
-  PRAGMA_WARNINGS + PRAGMA_SAVE_TYPES + PRAGMA_ERROR_CONTEXT + PRAGMA_OPTIMIZE
+#define DEFAULT_PRAGMAS PRAGMA_WARNINGS + PRAGMA_SAVE_TYPES + PRAGMA_ERROR_CONTEXT + PRAGMA_OPTIMIZE
 
 /* NO_RESETS: completely disable the periodic calling of reset() */
 #undef NO_RESETS

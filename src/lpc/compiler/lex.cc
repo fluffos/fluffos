@@ -35,17 +35,14 @@
 #define LEX_EOF ((unsigned char)EOF)
 
 char lex_ctype[256] = {
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 #define is_wspace(c) lex_ctype[(unsigned char)(c)]
 
@@ -53,7 +50,7 @@ int current_line;       /* line number in this file */
 int current_line_base;  /* number of lines from other files */
 int current_line_saved; /* last line in this file where line num
                            info was saved */
-int total_lines; /* Used to compute average compiled lines/s */
+int total_lines;        /* Used to compute average compiled lines/s */
 char *current_file;
 int current_file_id;
 
@@ -189,7 +186,8 @@ keyword_t predefs[] =
             {"time_expression", L_TIME_EXPRESSION, 0},
             {"varargs", L_TYPE_MODIFIER, FUNC_VARARGS},
             {"void", L_BASIC_TYPE, TYPE_VOID},
-            {"while", L_WHILE, 0}, };
+            {"while", L_WHILE, 0},
+};
 
 static ident_hash_elem_t **ident_hash_table;
 static ident_hash_elem_t **ident_hash_head;
@@ -262,11 +260,11 @@ static void merge(char *name, char *dest) {
   char *from;
 
   strcpy(dest, current_file);
-  if ((from = strrchr(dest, '/'))) {/* strip filename */
+  if ((from = strrchr(dest, '/'))) { /* strip filename */
     *from = 0;
   } else
-      /* current_file was the file_name */
-      /* include from the root directory */
+  /* current_file was the file_name */
+  /* include from the root directory */
   {
     *dest = 0;
   }
@@ -281,11 +279,11 @@ static void merge(char *name, char *dest) {
     if (!strncmp(from, "../", 3)) {
       char *tmp;
 
-      if (*dest == 0) {/* including from above mudlib is NOT allowed */
+      if (*dest == 0) { /* including from above mudlib is NOT allowed */
         break;
       }
       tmp = strrchr(dest, '/');
-      if (tmp == NULL) {/* 1 component in dest */
+      if (tmp == NULL) { /* 1 component in dest */
         *dest = 0;
       } else {
         *tmp = 0;
@@ -293,7 +291,7 @@ static void merge(char *name, char *dest) {
       from += 3; /* skip "../" */
     } else if (!strncmp(from, "./", 2)) {
       from += 2;
-    } else {/* append first component to dest */
+    } else { /* append first component to dest */
       char *q;
 
       if (*dest) {
@@ -301,8 +299,8 @@ static void merge(char *name, char *dest) {
       }
       q = strchr(from, '/');
 
-      if (q) {                /* from has 2 or more components */
-        while (*from == '/') {/* find the start */
+      if (q) {                 /* from has 2 or more components */
+        while (*from == '/') { /* find the start */
           from++;
         }
         strncat(dest, from, q - from);
@@ -536,16 +534,15 @@ static int get_terminator(char *terminator) {
 #define MAXCHUNK (MAXLINE * 4)
 #define NUMCHUNKS (DEFMAX / MAXCHUNK)
 
-#define NEWCHUNK(line)                                               \
-  if (len == MAXCHUNK - 1) {                                         \
-    line[curchunk][MAXCHUNK - 1] = '\0';                             \
-    if (curchunk == NUMCHUNKS - 1) {                                 \
-      res = -2;                                                      \
-      break;                                                         \
-    }                                                                \
-    line[++curchunk] =                                               \
-        (char *)DXALLOC(MAXCHUNK, TAG_COMPILER, "array/text chunk"); \
-    len = 0;                                                         \
+#define NEWCHUNK(line)                                                              \
+  if (len == MAXCHUNK - 1) {                                                        \
+    line[curchunk][MAXCHUNK - 1] = '\0';                                            \
+    if (curchunk == NUMCHUNKS - 1) {                                                \
+      res = -2;                                                                     \
+      break;                                                                        \
+    }                                                                               \
+    line[++curchunk] = (char *)DXALLOC(MAXCHUNK, TAG_COMPILER, "array/text chunk"); \
+    len = 0;                                                                        \
   }
 
 static int get_array_block(char *term) {
@@ -664,8 +661,7 @@ static int get_array_block(char *term) {
           outp = yyp;
           break;
         }
-        array_line[++curchunk] =
-            (char *)DXALLOC(MAXCHUNK, TAG_COMPILER, "array_block");
+        array_line[++curchunk] = (char *)DXALLOC(MAXCHUNK, TAG_COMPILER, "array_block");
         len = 0;
       }
       /*
@@ -834,8 +830,7 @@ static int get_text_block(char *term) {
           outp = yyp;
           break;
         }
-        text_line[++curchunk] =
-            (char *)DXALLOC(MAXCHUNK, TAG_COMPILER, "text_block");
+        text_line[++curchunk] = (char *)DXALLOC(MAXCHUNK, TAG_COMPILER, "text_block");
         len = 0;
       }
       /*
@@ -1120,12 +1115,11 @@ static void refill_buffer() {
         memcpy(outp - MAXLINE - 1, outp - 1, size);
         outp -= MAXLINE;
         p = outp + size - 1;
-      } else {/* No space, need to allocate new buffer */
+      } else { /* No space, need to allocate new buffer */
         linked_buf_t *new_lbuf;
         char *new_outp;
 
-        if (!(new_lbuf =
-                  ALLOCATE(linked_buf_t, TAG_COMPILER, "refill_bufer"))) {
+        if (!(new_lbuf = ALLOCATE(linked_buf_t, TAG_COMPILER, "refill_bufer"))) {
           lexerror("Out of memory when allocating new buffer.\n");
           return;
         }
@@ -1281,8 +1275,7 @@ int yylex() {
         if (iftop) {
           ifstate_t *p = iftop;
 
-          yyerror(p->state == EXPECT_ENDIF ? "Missing #endif"
-                                           : "Missing #else/#elif");
+          yyerror(p->state == EXPECT_ENDIF ? "Missing #endif" : "Missing #else/#elif");
           while (iftop) {
             p = iftop;
             iftop = p->next;
@@ -1519,8 +1512,7 @@ int yylex() {
             yyerror("In function parameter $num, num must be >= 1.");
           } else if (yylval.number > 254) {
             yyerror("only 255 parameters allowed.");
-          } else if (yylval.number >=
-                     current_function_context->num_parameters) {
+          } else if (yylval.number >= current_function_context->num_parameters) {
             current_function_context->num_parameters = yylval.number + 1;
           }
           return L_PARAMETER;
@@ -1612,7 +1604,6 @@ int yylex() {
           yyp = yytext;
 
           for (quote = 0;;) {
-
             if (c == '"') {
               quote ^= 1;
             } else if (c == '/' && !quote) {
@@ -1834,7 +1825,7 @@ int yylex() {
           } else if (rc == -1) {
             lexerror("End of file in array block");
             return LEX_EOF;
-          } else {/* if rc == -2 */
+          } else { /* if rc == -2 */
             yyerror("Array block exceeded maximum length");
           }
         } else {
@@ -1855,7 +1846,7 @@ int yylex() {
           } else if (rc == -1) {
             lexerror("End of file in text block");
             return LEX_EOF;
-          } else {/* if (rc == -2) */
+          } else { /* if (rc == -2) */
             yyerror("Text block exceeded maximum length");
           }
         }
@@ -2180,14 +2171,11 @@ int yylex() {
           *yyp = 0;
           if (c == '#') {
             if (*outp++ != '#') {
-              lexerror(
-                  "Single '#' in identifier -- use '##' for token pasting");
+              lexerror("Single '#' in identifier -- use '##' for token pasting");
             }
             outp -= 2;
             if (!expand_define()) {
-              if (partp + (r = strlen(yytext)) + (function_flag ? 3 : 0) -
-                      partial >
-                  MAXLINE) {
+              if (partp + (r = strlen(yytext)) + (function_flag ? 3 : 0) - partial > MAXLINE) {
                 lexerror("Pasted token is too long");
               }
               if (function_flag) {
@@ -2552,65 +2540,53 @@ static void init_instrs() {
   add_instr_name("&=", "f_and_eq();\n", F_AND_EQ, T_NUMBER);
   add_instr_name("index", "c_index();\n", F_INDEX, T_ANY);
   add_instr_name("member", "c_member(%i);\n", F_MEMBER, T_ANY);
-  add_instr_name("new_empty_class", "c_new_class(%i, 0);\n", F_NEW_EMPTY_CLASS,
-                 T_ANY);
+  add_instr_name("new_empty_class", "c_new_class(%i, 0);\n", F_NEW_EMPTY_CLASS, T_ANY);
   add_instr_name("new_class", "c_new_class(%i, 1);\n", F_NEW_CLASS, T_ANY);
   add_instr_name("rindex", "c_rindex();\n", F_RINDEX, T_ANY);
-  add_instr_name("loop_cond_local", "C_LOOP_COND_LV(%i, %i); if (lpc_int)\n",
-                 F_LOOP_COND_LOCAL, -1);
-  add_instr_name("loop_cond_number", "C_LOOP_COND_NUM(%i, %i); if (lpc_int)\n",
-                 F_LOOP_COND_NUMBER, -1);
+  add_instr_name("loop_cond_local", "C_LOOP_COND_LV(%i, %i); if (lpc_int)\n", F_LOOP_COND_LOCAL,
+                 -1);
+  add_instr_name("loop_cond_number", "C_LOOP_COND_NUM(%i, %i); if (lpc_int)\n", F_LOOP_COND_NUMBER,
+                 -1);
   add_instr_name("loop_incr", "C_LOOP_INCR(%i);\n", F_LOOP_INCR, -1);
   add_instr_name("foreach", 0, F_FOREACH, -1);
   add_instr_name("exit_foreach", "c_exit_foreach();\n", F_EXIT_FOREACH, -1);
   add_instr_name("expand_varargs", 0, F_EXPAND_VARARGS, -1);
   add_instr_name("next_foreach", "c_next_foreach();\n", F_NEXT_FOREACH, -1);
-  add_instr_name("member_lvalue", "c_member_lvalue(%i);\n", F_MEMBER_LVALUE,
-                 T_LVALUE);
+  add_instr_name("member_lvalue", "c_member_lvalue(%i);\n", F_MEMBER_LVALUE, T_LVALUE);
   add_instr_name("index_lvalue", "push_indexed_lvalue(0);\n", F_INDEX_LVALUE,
                  T_LVALUE | T_LVALUE_BYTE);
   add_instr_name("rindex_lvalue", "push_indexed_lvalue(1);\n", F_RINDEX_LVALUE,
                  T_LVALUE | T_LVALUE_BYTE);
-  add_instr_name("nn_range_lvalue", "push_lvalue_range(0x00);\n",
-                 F_NN_RANGE_LVALUE, T_LVALUE_RANGE);
-  add_instr_name("nr_range_lvalue", "push_lvalue_range(0x01);\n",
-                 F_NR_RANGE_LVALUE, T_LVALUE_RANGE);
-  add_instr_name("rr_range_lvalue", "push_lvalue_range(0x11);\n",
-                 F_RR_RANGE_LVALUE, T_LVALUE_RANGE);
-  add_instr_name("rn_range_lvalue", "push_lvalue_range(0x10);\n",
-                 F_RN_RANGE_LVALUE, T_LVALUE_RANGE);
-  add_instr_name("nn_range", "f_range(0x00);\n", F_NN_RANGE,
-                 T_ARRAY | T_STRING OR_BUFFER);
-  add_instr_name("rr_range", "f_range(0x11);\n", F_RR_RANGE,
-                 T_ARRAY | T_STRING OR_BUFFER);
-  add_instr_name("nr_range", "f_range(0x01);\n", F_NR_RANGE,
-                 T_ARRAY | T_STRING OR_BUFFER);
-  add_instr_name("rn_range", "f_range(0x10);\n", F_RN_RANGE,
-                 T_ARRAY | T_STRING OR_BUFFER);
-  add_instr_name("re_range", "f_extract_range(1);\n", F_RE_RANGE,
-                 T_ARRAY | T_STRING OR_BUFFER);
-  add_instr_name("ne_range", "f_extract_range(0);\n", F_NE_RANGE,
-                 T_ARRAY | T_STRING OR_BUFFER);
+  add_instr_name("nn_range_lvalue", "push_lvalue_range(0x00);\n", F_NN_RANGE_LVALUE,
+                 T_LVALUE_RANGE);
+  add_instr_name("nr_range_lvalue", "push_lvalue_range(0x01);\n", F_NR_RANGE_LVALUE,
+                 T_LVALUE_RANGE);
+  add_instr_name("rr_range_lvalue", "push_lvalue_range(0x11);\n", F_RR_RANGE_LVALUE,
+                 T_LVALUE_RANGE);
+  add_instr_name("rn_range_lvalue", "push_lvalue_range(0x10);\n", F_RN_RANGE_LVALUE,
+                 T_LVALUE_RANGE);
+  add_instr_name("nn_range", "f_range(0x00);\n", F_NN_RANGE, T_ARRAY | T_STRING OR_BUFFER);
+  add_instr_name("rr_range", "f_range(0x11);\n", F_RR_RANGE, T_ARRAY | T_STRING OR_BUFFER);
+  add_instr_name("nr_range", "f_range(0x01);\n", F_NR_RANGE, T_ARRAY | T_STRING OR_BUFFER);
+  add_instr_name("rn_range", "f_range(0x10);\n", F_RN_RANGE, T_ARRAY | T_STRING OR_BUFFER);
+  add_instr_name("re_range", "f_extract_range(1);\n", F_RE_RANGE, T_ARRAY | T_STRING OR_BUFFER);
+  add_instr_name("ne_range", "f_extract_range(0);\n", F_NE_RANGE, T_ARRAY | T_STRING OR_BUFFER);
   add_instr_name("global", "C_GLOBAL(%i);\n", F_GLOBAL, T_ANY);
   add_instr_name("local", "C_LOCAL(%i);\n", F_LOCAL, T_ANY);
   add_instr_name("make_ref", "c_make_ref(%i);\n", F_MAKE_REF, T_REF);
   add_instr_name("kill_refs", "c_kill_refs(%i);\n", F_KILL_REFS, T_ANY);
   add_instr_name("ref", "C_REF(%i);\n", F_REF, T_ANY);
   add_instr_name("ref_lvalue", "C_REF_LVALUE(%i);\n", F_REF_LVALUE, T_LVALUE);
-  add_instr_name("transfer_local", "C_TRANSFER_LOCAL(%i);\n", F_TRANSFER_LOCAL,
-                 T_ANY);
+  add_instr_name("transfer_local", "C_TRANSFER_LOCAL(%i);\n", F_TRANSFER_LOCAL, T_ANY);
   add_instr_name("number", 0, F_NUMBER, T_NUMBER);
   add_instr_name("real", 0, F_REAL, T_REAL);
-  add_instr_name("local_lvalue", "C_LVALUE(fp + %i);\n", F_LOCAL_LVALUE,
-                 T_LVALUE);
-  add_instr_name("while_dec", "C_WHILE_DEC(%i); if (lpc_int)\n", F_WHILE_DEC,
-                 -1);
+  add_instr_name("local_lvalue", "C_LVALUE(fp + %i);\n", F_LOCAL_LVALUE, T_LVALUE);
+  add_instr_name("while_dec", "C_WHILE_DEC(%i); if (lpc_int)\n", F_WHILE_DEC, -1);
   add_instr_name("const1", "push_number(1);\n", F_CONST1, T_NUMBER);
-  add_instr_name("subtract", "c_subtract();\n", F_SUBTRACT,
-                 T_NUMBER | T_REAL | T_ARRAY);
+  add_instr_name("subtract", "c_subtract();\n", F_SUBTRACT, T_NUMBER | T_REAL | T_ARRAY);
   add_instr_name("(void)assign", "c_void_assign();\n", F_VOID_ASSIGN, T_NUMBER);
-  add_instr_name("(void)assign_local", "c_void_assign_local(fp + %i);\n",
-                 F_VOID_ASSIGN_LOCAL, T_NUMBER);
+  add_instr_name("(void)assign_local", "c_void_assign_local(fp + %i);\n", F_VOID_ASSIGN_LOCAL,
+                 T_NUMBER);
   add_instr_name("assign", "c_assign();\n", F_ASSIGN, T_ANY);
   add_instr_name("branch", 0, F_BRANCH, -1);
   add_instr_name("bbranch", 0, F_BBRANCH, -1);
@@ -2639,20 +2615,15 @@ static void init_instrs() {
 #ifdef F_JUMP
   add_instr_name("jump", F_JUMP, -1);
 #endif
-  add_instr_name("return_zero", "c_return_zero();\nreturn;\n", F_RETURN_ZERO,
-                 -1);
+  add_instr_name("return_zero", "c_return_zero();\nreturn;\n", F_RETURN_ZERO, -1);
   add_instr_name("return", "c_return();\nreturn;\n", F_RETURN, -1);
   add_instr_name("sscanf", "c_sscanf(%i);\n", F_SSCANF, T_NUMBER);
-  add_instr_name("parse_command", "c_parse_command(%i);\n", F_PARSE_COMMAND,
-                 T_NUMBER);
+  add_instr_name("parse_command", "c_parse_command(%i);\n", F_PARSE_COMMAND, T_NUMBER);
   add_instr_name("string", 0, F_STRING, T_STRING);
   add_instr_name("short_string", 0, F_SHORT_STRING, T_STRING);
-  add_instr_name("call", "c_call(%i, %i);\n", F_CALL_FUNCTION_BY_ADDRESS,
-                 T_ANY);
-  add_instr_name("call_inherited", "c_call_inherited(%i, %i, %i);\n",
-                 F_CALL_INHERITED, T_ANY);
-  add_instr_name("aggregate_assoc", "C_AGGREGATE_ASSOC(%i);\n",
-                 F_AGGREGATE_ASSOC, T_MAPPING);
+  add_instr_name("call", "c_call(%i, %i);\n", F_CALL_FUNCTION_BY_ADDRESS, T_ANY);
+  add_instr_name("call_inherited", "c_call_inherited(%i, %i, %i);\n", F_CALL_INHERITED, T_ANY);
+  add_instr_name("aggregate_assoc", "C_AGGREGATE_ASSOC(%i);\n", F_AGGREGATE_ASSOC, T_MAPPING);
 #ifdef DEBUG
   add_instr_name("break_point", "break_point();\n", F_BREAK_POINT, -1);
 #endif
@@ -2663,10 +2634,9 @@ static void init_instrs() {
                  "call_simul_efun(%i, (lpc_int = %i + num_varargs, num_varargs "
                  "= 0, lpc_int));\n",
                  F_SIMUL_EFUN, T_ANY);
-  add_instr_name(
-      "global_lvalue",
-      "C_LVALUE(&current_object->variables[variable_index_offset + %i]);\n",
-      F_GLOBAL_LVALUE, T_LVALUE);
+  add_instr_name("global_lvalue",
+                 "C_LVALUE(&current_object->variables[variable_index_offset + %i]);\n",
+                 F_GLOBAL_LVALUE, T_LVALUE);
   add_instr_name("|", "f_or();\n", F_OR, T_ARRAY | T_NUMBER);
   add_instr_name("<<", "f_lsh();\n", F_LSH, T_NUMBER);
   add_instr_name(">>", "f_rsh();\n", F_RSH, T_NUMBER);
@@ -2683,10 +2653,8 @@ static void init_instrs() {
   add_instr_name("~", "c_compl();\n", F_COMPL, T_NUMBER);
   add_instr_name("++x", "c_pre_inc();\n", F_PRE_INC, T_NUMBER | T_REAL);
   add_instr_name("--x", "c_pre_dec();\n", F_PRE_DEC, T_NUMBER | T_REAL);
-  add_instr_name("*", "c_multiply();\n", F_MULTIPLY,
-                 T_REAL | T_NUMBER | T_MAPPING);
-  add_instr_name("*=", "f_mult_eq();\n", F_MULT_EQ,
-                 T_REAL | T_NUMBER | T_MAPPING);
+  add_instr_name("*", "c_multiply();\n", F_MULTIPLY, T_REAL | T_NUMBER | T_MAPPING);
+  add_instr_name("*=", "f_mult_eq();\n", F_MULT_EQ, T_REAL | T_NUMBER | T_MAPPING);
   add_instr_name("/", "c_divide();\n", F_DIVIDE, T_REAL | T_NUMBER);
   add_instr_name("/=", "f_div_eq();\n", F_DIV_EQ, T_NUMBER | T_REAL);
   add_instr_name("%", "c_mod();\n", F_MOD, T_NUMBER);
@@ -2774,7 +2742,7 @@ static void handle_define(char *yyt) {
   strcat(p, " ");
   q = namebuf;
   GETALPHA(p, q, namebuf + NSIZE - 1, "Invalid macro name");
-  if (*p == '(') {/* if "function macro" */
+  if (*p == '(') { /* if "function macro" */
     int squote, dquote;
     int arg;
     int inid;
@@ -2809,7 +2777,7 @@ static void handle_define(char *yyt) {
     *q++ = ' ';
     squote = dquote = 0;
     for (inid = 0; *p;) {
-      if (isalunum((unsigned char)*p)) {/* FIXME */
+      if (isalunum((unsigned char)*p)) { /* FIXME */
         if (!inid) {
           inid++;
           ids = p;
@@ -2966,17 +2934,14 @@ static void add_predefine(const char *name, int nargs, const char *exps) {
       sprintf(buf, "redefinition of #define %s\n", name);
       yywarn(buf);
     }
-    p->exps = (char *)DREALLOC(p->exps, strlen(exps) + 1, TAG_PREDEFINES,
-                               "add_define: redef");
+    p->exps = (char *)DREALLOC(p->exps, strlen(exps) + 1, TAG_PREDEFINES, "add_define: redef");
     strcpy(p->exps, exps);
     p->nargs = nargs;
   } else {
     p = ALLOCATE(defn_t, TAG_PREDEFINES, "add_define: def");
-    p->name = (char *)DXALLOC(strlen(name) + 1, TAG_PREDEFINES,
-                              "add_define: def name");
+    p->name = (char *)DXALLOC(strlen(name) + 1, TAG_PREDEFINES, "add_define: def name");
     strcpy(p->name, name);
-    p->exps = (char *)DXALLOC(strlen(exps) + 1, TAG_PREDEFINES,
-                              "add_define: def exps");
+    p->exps = (char *)DXALLOC(strlen(exps) + 1, TAG_PREDEFINES, "add_define: def exps");
     strcpy(p->exps, exps);
     p->flags = DEF_IS_PREDEF;
     p->nargs = nargs;
@@ -3084,7 +3049,6 @@ static int extract_args(char **argv, char *argb) {
 
     /* negative parcnt means we're done collecting args */
     if (parcnt < 0 || (c == ',' && !parcnt && !dquote && !squote)) {
-
       /* strip off trailing whitespace char if there was one */
       if (uisspace(*(out - 1))) {
         *(out - 1) = 0;
@@ -3098,8 +3062,7 @@ static int extract_args(char **argv, char *argb) {
     } else {
       /* don't save leading whitespace and don't accumulate trailing whitespace
        */
-      if (!uisspace(c) || dquote || squote ||
-          (out > argv[argc] && !uisspace(*(out - 1)))) {
+      if (!uisspace(c) || dquote || squote || (out > argv[argc] && !uisspace(*(out - 1)))) {
         if (out >= argb + DEFMAX - NARGS) {
           lexerror("Macro argument overflow");
           return -1;
@@ -3165,8 +3128,7 @@ static char *expand_define2(char *text) {
   }
 
   if (!argc) {
-    expand_buffer = (char *)DXALLOC(strlen(macro->exps) + 1, TAG_COMPILER,
-                                    "expand_define2");
+    expand_buffer = (char *)DXALLOC(strlen(macro->exps) + 1, TAG_COMPILER, "expand_define2");
     strcpy(expand_buffer, macro->exps);
     expand_depth--;
     return expand_buffer;
@@ -3178,29 +3140,27 @@ static char *expand_define2(char *text) {
 
 #define SAVECHAR(x)                                                   \
   SAFE(if (out + 1 < expand_buffer + DEFMAX) { *out++ = (x); } else { \
-             if (freeme) FREE(freeme);                                \
-             FREE(expand_buffer);                                     \
-             lexerror("Macro expansion overflow");                    \
-             expand_depth--;                                          \
-             return 0;                                                \
-           })
+    if (freeme) FREE(freeme);                                         \
+    FREE(expand_buffer);                                              \
+    lexerror("Macro expansion overflow");                             \
+    expand_depth--;                                                   \
+    return 0;                                                         \
+  })
 
-#define SAVESTR(x, y) \
-  SAFE(\
-                        if (out + (y) < expand_buffer + DEFMAX) {\
-                            memcpy(out, (x), (y));\
-                            out += (y);\
-                        } else {\
-                            if (freeme) FREE(freeme);\
-                            FREE(expand_buffer);\
-                            lexerror("Macro expansion overflow");\
-                            expand_depth--;\
-                            return 0;\
-                        }\
-                        if (freeme) {\
-                            FREE(freeme);\
-                            freeme = 0;\
-                        })
+#define SAVESTR(x, y)                            \
+  SAFE(if (out + (y) < expand_buffer + DEFMAX) { \
+    memcpy(out, (x), (y));                       \
+    out += (y);                                  \
+  } else {                                       \
+    if (freeme) FREE(freeme);                    \
+    FREE(expand_buffer);                         \
+    lexerror("Macro expansion overflow");        \
+    expand_depth--;                              \
+    return 0;                                    \
+  } if (freeme) {                                \
+    FREE(freeme);                                \
+    freeme = 0;                                  \
+  })
 
   while (*in) {
     char *skip = in + 1;
@@ -3364,8 +3324,7 @@ void set_inc_list(char *list) {
 
   if (list == 0) {
     fprintf(stderr, "The config string 'include dirs' must bet set.\n");
-    fprintf(stderr,
-            "It should contain a list of all directories to be searched\n");
+    fprintf(stderr, "It should contain a list of all directories to be searched\n");
     fprintf(stderr, "for include files, separated by a ':'.\n");
     exit(-1);
   }
@@ -3485,16 +3444,15 @@ ident_hash_elem_t *find_or_add_perm_ident(const char *name) {
       }
       hptr2 = hptr2->next;
     }
-    hptr =
-        ALLOCATE(ident_hash_elem_t, TAG_PERM_IDENT, "find_or_add_perm_ident:1");
+    hptr = ALLOCATE(ident_hash_elem_t, TAG_PERM_IDENT, "find_or_add_perm_ident:1");
     hptr->next = ident_hash_head[h]->next;
     ident_hash_head[h]->next = hptr;
     if (ident_hash_head[h] == ident_hash_tail[h]) {
       ident_hash_tail[h] = hptr;
     }
   } else {
-    hptr = (ident_hash_table[h] = ALLOCATE(ident_hash_elem_t, TAG_PERM_IDENT,
-                                           "find_or_add_perm_ident:2"));
+    hptr = (ident_hash_table[h] =
+                ALLOCATE(ident_hash_elem_t, TAG_PERM_IDENT, "find_or_add_perm_ident:2"));
     ident_hash_head[h] = hptr;
     ident_hash_tail[h] = hptr;
     hptr->next = hptr;
@@ -3665,8 +3623,7 @@ static ident_hash_elem_t *quick_alloc_ident_entry() {
     return &(ihe_list->items[num_free]);
   } else {
     ident_hash_elem_list_t *ihel;
-    ihel = ALLOCATE(ident_hash_elem_list_t, TAG_COMPILER,
-                    "quick_alloc_ident_entry");
+    ihel = ALLOCATE(ident_hash_elem_list_t, TAG_COMPILER, "quick_alloc_ident_entry");
     ihel->next = ihe_list;
     ihe_list = ihel;
     num_free = 127;
@@ -3753,11 +3710,10 @@ void init_identifiers() {
   init_instrs();
 
   /* allocate all three tables together */
-  ident_hash_table = CALLOCATE(IDENT_HASH_SIZE * 3, ident_hash_elem_t *,
-                               TAG_IDENT_TABLE, "init_identifiers");
+  ident_hash_table =
+      CALLOCATE(IDENT_HASH_SIZE * 3, ident_hash_elem_t *, TAG_IDENT_TABLE, "init_identifiers");
   ident_hash_head = (ident_hash_elem_t **)&ident_hash_table[IDENT_HASH_SIZE];
-  ident_hash_tail =
-      (ident_hash_elem_t **)&ident_hash_table[2 * IDENT_HASH_SIZE];
+  ident_hash_tail = (ident_hash_elem_t **)&ident_hash_table[2 * IDENT_HASH_SIZE];
 
   /* clean all three tables */
   for (i = 0; i < IDENT_HASH_SIZE * 3; i++) {

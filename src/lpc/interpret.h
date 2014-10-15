@@ -26,15 +26,14 @@ typedef struct svalue_s svalue_t;
 #define TRACE_HEART_BEAT 32
 #define TRACE_APPLY 64
 #define TRACE_OBJNAME 128
-#define TRACETST(b) (command_giver->interactive->trace_level &(b))
-#define TRACEP(b)                                                       \
-  (command_giver &&command_giver->interactive &&TRACETST(b) &&          \
-   (command_giver->interactive->trace_prefix == 0 ||                    \
-    (current_object &&strpref(command_giver->interactive->trace_prefix, \
-                              current_object->obname))))
-#define TRACEHB               \
-  (current_heart_beat == 0 || \
-   (command_giver->interactive->trace_level &TRACE_HEART_BEAT))
+#define TRACETST(b) (command_giver->interactive->trace_level & (b))
+#define TRACEP(b)                                                \
+  (command_giver && command_giver->interactive && TRACETST(b) && \
+   (command_giver->interactive->trace_prefix == 0 ||             \
+    (current_object &&                                           \
+     strpref(command_giver->interactive->trace_prefix, current_object->obname))))
+#define TRACEHB \
+  (current_heart_beat == 0 || (command_giver->interactive->trace_level & TRACE_HEART_BEAT))
 #endif
 
 #define EXTRACT_UCHAR(p) (*(unsigned char *)(p))
@@ -113,9 +112,8 @@ typedef struct {
 } function_lookup_info_t;
 
 #define IS_ZERO(x) (!(x) || (((x)->type == T_NUMBER) && ((x)->u.number == 0)))
-#define IS_UNDEFINED(x)                                                 \
-  (!(x) || (((x)->type == T_NUMBER) && ((x)->subtype == T_UNDEFINED) && \
-            ((x)->u.number == 0)))
+#define IS_UNDEFINED(x) \
+  (!(x) || (((x)->type == T_NUMBER) && ((x)->subtype == T_UNDEFINED) && ((x)->u.number == 0)))
 
 #define CHECK_TYPES(val, t, arg, inst) \
   if (!((val)->type & (t))) bad_argument(val, t, arg, inst);
@@ -124,27 +122,23 @@ typedef struct {
 #define call_program(prog, offset) eval_instruction(prog->program + offset)
 
 #define CHECK_STACK_OVERFLOW(x) \
-  if (sp + (x) >= end_of_stack) \
-  SAFE(too_deep_error = 1; error("stack overflow");)
+  if (sp + (x) >= end_of_stack) SAFE(too_deep_error = 1; error("stack overflow");)
 #define STACK_INC SAFE(CHECK_STACK_OVERFLOW(1); sp++;)
 
 #define push_svalue(x) SAFE(STACK_INC; assign_svalue_no_free(sp, x);)
-#define put_number(x) \
-  SAFE(sp->type = T_NUMBER; sp->subtype = 0; sp->u.number = (x);)
+#define put_number(x) SAFE(sp->type = T_NUMBER; sp->subtype = 0; sp->u.number = (x);)
 #define put_buffer(x) SAFE(sp->type = T_BUFFER; sp->u.buf = (x);)
 #define put_undested_object(x) SAFE(sp->type = T_OBJECT; sp->u.ob = (x);)
-#define put_object(x)                                       \
-  SAFE(if (!(x) || (x)->flags &O_DESTRUCTED) *sp = const0u; \
-       else put_undested_object(x);)
+#define put_object(x) \
+  SAFE(if (!(x) || (x)->flags & O_DESTRUCTED) *sp = const0u; else put_undested_object(x);)
 #define put_unrefed_undested_object(x, y) \
   SAFE(sp->type = T_OBJECT; sp->u.ob = (x); add_ref((x), y);)
-#define put_unrefed_object(x, y)                            \
-  SAFE(if (!(x) || (x)->flags &O_DESTRUCTED) *sp = const0u; \
+#define put_unrefed_object(x, y)                             \
+  SAFE(if (!(x) || (x)->flags & O_DESTRUCTED) *sp = const0u; \
        else put_unrefed_undested_object(x, y);)
 /* see comments on push_constant_string */
-#define put_constant_string(x)                           \
-  SAFE(sp->type = T_STRING; sp->subtype = STRING_SHARED; \
-       sp->u.string = make_shared_string(x);)
+#define put_constant_string(x) \
+  SAFE(sp->type = T_STRING; sp->subtype = STRING_SHARED; sp->u.string = make_shared_string(x);)
 #define put_malloced_string(x) \
   SAFE(sp->type = T_STRING; sp->subtype = STRING_MALLOC; sp->u.string = (x);)
 #define put_array(x) SAFE(sp->type = T_ARRAY; sp->u.arr = (x);)

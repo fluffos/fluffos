@@ -147,8 +147,7 @@ void f_bind(void) {
   }
   if ((old_fp->hdr.type & 0x0f) == FP_FUNCTIONAL) {
     new_fp->f.functional.prog->func_ref++;
-    debug(d_flag, "add func ref /%s: now %i\n",
-          new_fp->f.functional.prog->filename,
+    debug(d_flag, "add func ref /%s: now %i\n", new_fp->f.functional.prog->filename,
           new_fp->f.functional.prog->func_ref);
   }
 
@@ -193,7 +192,7 @@ void f__call_other(void) {
   int num_arg = st_num_arg;
   object_t *ob;
 
-  if (current_object->flags & O_DESTRUCTED) {/* No external calls allowed */
+  if (current_object->flags & O_DESTRUCTED) { /* No external calls allowed */
     pop_n_elems(num_arg);
     push_undefined();
     return;
@@ -201,7 +200,7 @@ void f__call_other(void) {
   arg = sp - num_arg + 1;
   if (arg[1].type == T_STRING) {
     funcname = arg[1].u.string;
-  } else {/* must be T_ARRAY then */
+  } else { /* must be T_ARRAY then */
     array_t *v = arg[1].u.arr;
     svalue_t *sv;
 
@@ -235,8 +234,7 @@ void f__call_other(void) {
     do_trace("Call other ", funcname, "\n");
   }
 #endif
-  if (apply(funcname, ob, num_arg - 2, ORIGIN_CALL_OTHER) ==
-      0) {/* Function not found */
+  if (apply(funcname, ob, num_arg - 2, ORIGIN_CALL_OTHER) == 0) { /* Function not found */
     pop_2_elems();
     push_undefined();
     return;
@@ -277,9 +275,8 @@ void f_call_out_info(void) { push_refed_array(get_all_call_outs()); }
 static const char *origin_name(int orig) {
   /* FIXME: this should use ffs() if available (BSD) */
   int i = 0;
-  static const char *origins[] = {"driver",           "local",     "call_other",
-                                  "simul",            "internal",  "efun",
-                                  "function pointer", "functional"};
+  static const char *origins[] = {"driver",   "local", "call_other",       "simul",
+                                  "internal", "efun",  "function pointer", "functional"};
   while (orig >>= 1) {
     i++;
   }
@@ -333,9 +330,7 @@ void f_call_stack(void) {
         } else {
           ret->item[i].subtype = STRING_CONSTANT;
           ret->item[i].u.string =
-              (((csp - i)->framekind & FRAME_MASK) == FRAME_CATCH)
-                  ? "CATCH"
-                  : "<function>";
+              (((csp - i)->framekind & FRAME_MASK) == FRAME_CATCH) ? "CATCH" : "<function>";
         }
       }
       break;
@@ -361,14 +356,11 @@ void f_call_stack(void) {
           function_t *cfp = &prog->function_table[index];
           ret->item[i].type = T_STRING;
           ret->item[i].subtype = STRING_MALLOC;
-          ret->item[i].u.string =
-              string_copy(get_line_number(progc, prog), "call_stack");
+          ret->item[i].u.string = string_copy(get_line_number(progc, prog), "call_stack");
         } else {
           ret->item[i].subtype = STRING_CONSTANT;
           ret->item[i].u.string =
-              (((csp - i)->framekind & FRAME_MASK) == FRAME_CATCH)
-                  ? "CATCH"
-                  : "<function>";
+              (((csp - i)->framekind & FRAME_MASK) == FRAME_CATCH) ? "CATCH" : "<function>";
         }
       }
       break;
@@ -416,8 +408,7 @@ void f_clear_bit(void) {
   int len, ind, bit;
 
   if (sp->u.number > MAX_BITS) {
-    error("clear_bit() bit requested : %d > maximum bits: %d\n", sp->u.number,
-          MAX_BITS);
+    error("clear_bit() bit requested : %d > maximum bits: %d\n", sp->u.number, MAX_BITS);
   }
   bit = (sp--)->u.number;
   if (bit < 0) {
@@ -575,16 +566,16 @@ void f_deep_inventory(void) {
       ((sp - 1)->type == T_ARRAY || (sp - 1)->type == T_OBJECT)) {
     if ((sp - 1)->type == T_ARRAY) {
       vec = deep_inventory_array((sp - 1)->u.arr, 1, sp->u.fp);
-    } else {/*(sp-1)->type==T_OBJECT*/
+    } else { /*(sp-1)->type==T_OBJECT*/
       vec = deep_inventory((sp - 1)->u.ob, 0, sp->u.fp);
     }
-  } else if (st_num_arg == 1 && (sp->type == T_FUNCTION ||
-                                 sp->type == T_ARRAY || sp->type == T_OBJECT)) {
+  } else if (st_num_arg == 1 &&
+             (sp->type == T_FUNCTION || sp->type == T_ARRAY || sp->type == T_OBJECT)) {
     if (sp->type == T_FUNCTION) {
       vec = deep_inventory(current_object, 0, sp->u.fp);
     } else if (sp->type == T_ARRAY) {
       vec = deep_inventory_array(sp->u.arr, 1, 0);
-    } else {/*sp->type==T_OBJECT*/
+    } else { /*sp->type==T_OBJECT*/
       vec = deep_inventory(sp->u.ob, 0, 0);
     }
   } else {
@@ -657,14 +648,11 @@ void f_ed(void) {
 
     if (sp->type == T_NUMBER) {
       if (sp->u.number == 1)
-        ed_start((sp - 2)->u.string, 0, (sp - 1)->u.string, sp->u.number,
-                 current_object, 0);
+        ed_start((sp - 2)->u.string, 0, (sp - 1)->u.string, sp->u.number, current_object, 0);
       else
-        ed_start((sp - 2)->u.string, 0, (sp - 1)->u.string, 0, current_object,
-                 sp->u.number);
+        ed_start((sp - 2)->u.string, 0, (sp - 1)->u.string, 0, current_object, sp->u.number);
     } else if (sp->type == T_STRING) {
-      ed_start((sp - 2)->u.string, (sp - 1)->u.string, sp->u.string, 0,
-               current_object, 0);
+      ed_start((sp - 2)->u.string, (sp - 1)->u.string, sp->u.string, 0, current_object, 0);
     } else {
       bad_argument(sp, T_NUMBER | T_STRING, 3, F_ED);
     }
@@ -686,13 +674,13 @@ void f_ed(void) {
     }
 
     if (sp->u.number == 1)
-      ed_start((sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.string,
-               sp->u.number, current_object, 0);
+      ed_start((sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.string, sp->u.number,
+               current_object, 0);
     else
-      ed_start((sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.string, 0,
-               current_object, sp->u.number);
+      ed_start((sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.string, 0, current_object,
+               sp->u.number);
     pop_n_elems(4);
-  } else {/* st_num_arg == 5 */
+  } else { /* st_num_arg == 5 */
     /* ed(fname, writefn, exitfn, restricted, scroll_lines) */
     if (!(sp->type == T_NUMBER)) {
       bad_argument(sp, T_NUMBER, 5, F_ED);
@@ -710,8 +698,8 @@ void f_ed(void) {
       bad_argument(sp - 4, T_STRING, 1, F_ED);
     }
 
-    ed_start((sp - 4)->u.string, (sp - 3)->u.string, (sp - 2)->u.string,
-             (sp - 1)->u.number, current_object, sp->u.number);
+    ed_start((sp - 4)->u.string, (sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.number,
+             current_object, sp->u.number);
 
     pop_n_elems(5);
   }
@@ -880,8 +868,7 @@ void f_explode(void) {
 
   int len = SVALUE_STRLEN(sp - 1);
 
-  vec =
-      explode_string((sp - 1)->u.string, len, sp->u.string, SVALUE_STRLEN(sp));
+  vec = explode_string((sp - 1)->u.string, len, sp->u.string, SVALUE_STRLEN(sp));
   free_string_svalue(sp--);
   free_string_svalue(sp);
   put_array(vec);
@@ -926,7 +913,7 @@ void f_find_call_out(void) {
   int i;
   if (sp->type == T_NUMBER) {
     i = find_call_out_by_handle(current_object, sp->u.number);
-  } else {/* T_STRING */
+  } else { /* T_STRING */
     i = find_call_out(current_object, sp->u.string);
     free_string_svalue(sp);
   }
@@ -970,8 +957,7 @@ void f_function_profile(void) {
   for (j = 0; j < nf; j++) {
     map = allocate_mapping(3);
     add_mapping_pair(map, "calls", prog->function_table[j].calls);
-    add_mapping_pair(map, "self", prog->function_table[j].self -
-                                      prog->function_table[j].children);
+    add_mapping_pair(map, "self", prog->function_table[j].self - prog->function_table[j].children);
     add_mapping_pair(map, "children", prog->function_table[j].children);
     add_mapping_shared_string(map, "name", prog->function_table[j].funcname);
     vec->item[j].type = T_MAPPING;
@@ -1114,7 +1100,7 @@ void f_implode(void) {
     free_string_svalue(sp--);
     free_array(arr);
     put_malloced_string(str);
-  } else {/* function */
+  } else { /* function */
     funptr_t *funp = args[1].u.fp;
 
     /* this pulls the extra arg off the stack if it exists */
@@ -1533,8 +1519,7 @@ void f_member_array(void) {
     }
     CHECK_TYPES(sp - 1, T_NUMBER, 1, F_MEMBER_ARRAY);
     if (i > SVALUE_STRLEN(sp)) {
-      error(
-          "Index to start search from in member_array() is > string length.\n");
+      error("Index to start search from in member_array() is > string length.\n");
     }
     if ((res = strchr(sp->u.string + i, (sp - 1)->u.number))) {
       i = res - sp->u.string;
@@ -1569,16 +1554,14 @@ void f_member_array(void) {
       switch (find->type | (sv = v->item + tmp)->type) {
         case T_STRING:
           if (flag & 1) {
-            if (flen && (sv->subtype & STRING_COUNTED) &&
-                flen > MSTR_SIZE(sv->u.string)) {
+            if (flen && (sv->subtype & STRING_COUNTED) && flen > MSTR_SIZE(sv->u.string)) {
               continue;
             }
             if (strncmp(find->u.string, sv->u.string, flen)) {
               continue;
             }
           } else {
-            if (flen && (sv->subtype & STRING_COUNTED) &&
-                flen != MSTR_SIZE(sv->u.string)) {
+            if (flen && (sv->subtype & STRING_COUNTED) && flen != MSTR_SIZE(sv->u.string)) {
               continue;
             }
             if (strcmp(find->u.string, sv->u.string)) {
@@ -1686,16 +1669,14 @@ void f_message(void) {
          */
         /* for compatibility (write() simul_efuns, etc)  -bobf */
         if (len > LARGEST_PRINTABLE_STRING)
-          error("Printable strings limited to length of %d.\n",
-                LARGEST_PRINTABLE_STRING);
+          error("Printable strings limited to length of %d.\n", LARGEST_PRINTABLE_STRING);
 
         add_message(command_giver, args[1].u.string, len);
         pop_n_elems(num_arg);
         return;
       }
     default:
-      bad_argument(&args[2], T_OBJECT | T_STRING | T_ARRAY | T_NUMBER, 3,
-                   F_MESSAGE);
+      bad_argument(&args[2], T_OBJECT | T_STRING | T_ARRAY | T_NUMBER, 3, F_MESSAGE);
   }
   if (num_arg == 4) {
     switch (args[3].type) {
@@ -1782,14 +1763,11 @@ void f_mud_status(void) {
       outbuf_addv(&ob, "Open file test failed: %s\n", strerror(errno));
     }
 
-    outbuf_addv(&ob, "current working directory: %s\n\n",
-                get_current_dir(dir_buf, 1024));
+    outbuf_addv(&ob, "current working directory: %s\n\n", get_current_dir(dir_buf, 1024));
     outbuf_add(&ob, "add_message statistics\n");
     outbuf_add(&ob, "------------------------------\n");
-    outbuf_addv(
-        &ob,
-        "Calls to add_message: %d   Packets: %d   Average packet size: %f\n\n",
-        add_message_calls, inet_packets, (float)inet_volume / inet_packets);
+    outbuf_addv(&ob, "Calls to add_message: %d   Packets: %d   Average packet size: %f\n\n",
+                add_message_calls, inet_packets, (float)inet_volume / inet_packets);
 
     stat_living_objects(&ob);
 
@@ -1809,14 +1787,12 @@ void f_mud_status(void) {
     outbuf_addv(&ob, "Sentences:\t\t\t%8d %8d\n", tot_alloc_sentence,
                 tot_alloc_sentence * sizeof(sentence_t));
 #ifndef DEBUG
-    outbuf_addv(&ob, "Objects:\t\t\t%8d %8d\n", tot_alloc_object,
-                tot_alloc_object_size);
+    outbuf_addv(&ob, "Objects:\t\t\t%8d %8d\n", tot_alloc_object, tot_alloc_object_size);
 #else
     outbuf_addv(&ob, "Objects:\t\t\t%8d %8d (%8d dangling)\n", tot_alloc_object,
                 tot_alloc_object_size, tot_dangling_object);
 #endif
-    outbuf_addv(&ob, "Prog blocks:\t\t\t%8d %8d\n", total_num_prog_blocks,
-                total_prog_block_size);
+    outbuf_addv(&ob, "Prog blocks:\t\t\t%8d %8d\n", total_num_prog_blocks, total_prog_block_size);
 #ifdef ARRAY_STATS
     outbuf_addv(&ob, "Arrays:\t\t\t\t%8d %8d\n", num_arrays, total_array_size);
 #else
@@ -1828,11 +1804,9 @@ void f_mud_status(void) {
     outbuf_add(&ob, "<Class statistics disabled, no information available>\n");
 #endif
 
-    outbuf_addv(&ob, "Mappings:\t\t\t%8d %8d\n", num_mappings,
-                total_mapping_size);
+    outbuf_addv(&ob, "Mappings:\t\t\t%8d %8d\n", num_mappings, total_mapping_size);
     outbuf_addv(&ob, "Mappings(nodes):\t\t%8d\n", total_mapping_nodes);
-    outbuf_addv(&ob, "Interactives:\t\t\t%8d %8d\n", num_user,
-                num_user * sizeof(interactive_t));
+    outbuf_addv(&ob, "Interactives:\t\t\t%8d %8d\n", num_user, num_user * sizeof(interactive_t));
 
     tot = show_otable_status(&ob, verbose) + heart_beat_status(&ob, verbose) +
           add_string_status(&ob, verbose) + print_call_out_usage(&ob, verbose);
@@ -1845,8 +1819,8 @@ void f_mud_status(void) {
 #ifdef CLASS_STATS
          total_class_size +
 #endif
-         total_mapping_size + tot_alloc_sentence * sizeof(sentence_t) +
-         tot_alloc_object_size + num_user * sizeof(interactive_t) + res;
+         total_mapping_size + tot_alloc_sentence * sizeof(sentence_t) + tot_alloc_object_size +
+         num_user * sizeof(interactive_t) + res;
 
   if (!verbose) {
     outbuf_add(&ob, "\t\t\t\t\t --------\n");
@@ -1960,7 +1934,7 @@ void f_previous_object(void) {
       i = 0;
     }
     do {
-      if ((p->framekind &FRAME_OB_CHANGE) && (ob = p->prev_ob)) {
+      if ((p->framekind & FRAME_OB_CHANGE) && (ob = p->prev_ob)) {
         if (!(ob->flags & O_DESTRUCTED)) {
           v->item[i].type = T_OBJECT;
           v->item[i].u.ob = ob;
@@ -1992,8 +1966,7 @@ void f_printf(void) {
   char *ret;
 
   if (command_giver) {
-    ret = string_print_formatted((sp - num_arg + 1)->u.string, num_arg - 1,
-                                 sp - num_arg + 2);
+    ret = string_print_formatted((sp - num_arg + 1)->u.string, num_arg - 1, sp - num_arg + 2);
     if (ret) {
       tell_object(command_giver, ret, COUNTED_STRLEN(ret));
       FREE_MSTR(ret);
@@ -2199,13 +2172,13 @@ void f_read_buffer(void) {
   if (arg[0].type == T_STRING) {
     from_file = 1; /* new line */
     str = read_bytes(arg[0].u.string, start, len, &rlen);
-  } else {/* T_BUFFER */
+  } else { /* T_BUFFER */
     str = read_buffer(arg[0].u.buf, start, len, &rlen);
   }
   pop_n_elems(num_arg);
   if (str == 0) {
     push_number(0);
-  } else if (from_file) {/* changed */
+  } else if (from_file) { /* changed */
     buffer_t *buf;
 
     buf = allocate_buffer(rlen);
@@ -2214,7 +2187,7 @@ void f_read_buffer(void) {
     sp->type = T_BUFFER;
     sp->u.buf = buf;
     FREE_MSTR(str);
-  } else {/* T_BUFFER */
+  } else { /* T_BUFFER */
     push_malloced_string(str);
   }
 }
@@ -2256,8 +2229,7 @@ void f_receive(void) {
       int len = SVALUE_STRLEN(sp);
 
       if (len > LARGEST_PRINTABLE_STRING)
-        error("Printable strings limited to length of %d.\n",
-              LARGEST_PRINTABLE_STRING);
+        error("Printable strings limited to length of %d.\n", LARGEST_PRINTABLE_STRING);
 
       add_message(current_object, sp->u.string, len);
     }
@@ -2286,8 +2258,7 @@ void f_reg_assoc(void) {
     error("Bad argument 3 to reg_assoc()\n");
   }
 
-  vec = reg_assoc(arg, arg[1].u.arr, arg[2].u.arr,
-                  st_num_arg > 3 ? &arg[3] : &const0);
+  vec = reg_assoc(arg, arg[1].u.arr, arg[2].u.arr, st_num_arg > 3 ? &arg[3] : &const0);
 
   if (st_num_arg == 4) {
     pop_3_elems();
@@ -2453,7 +2424,7 @@ void f_replace_string(void) {
     last = max_string_length;
   }
 
-  if (first > last) {/* just return it */
+  if (first > last) { /* just return it */
     pop_n_elems(st_num_arg - 1);
     return;
   }
@@ -2493,7 +2464,7 @@ void f_replace_string(void) {
     /* in string replacement */
     dst2 = dst1 = (char *)arg->u.string;
 
-    if (plen > 1) {/* pattern length > 1, jump table most efficient */
+    if (plen > 1) { /* pattern length > 1, jump table most efficient */
       while (src < flimit) {
         if ((skip = skip_table[(unsigned char)src[probe]])) {
           for (climit = dst2 + skip; dst2 < climit; *dst2++ = *src++) {
@@ -2523,7 +2494,7 @@ void f_replace_string(void) {
       dst2 += (slimit - src);
       *dst2 = 0;
       arg->u.string = extend_string(dst1, dst2 - dst1);
-    } else {/* pattern length <= 1, brute force most efficient */
+    } else { /* pattern length <= 1, brute force most efficient */
       /* Beek - if it was zero, we already returned, so plen == 1 */
       /* assume source string is a string < maximum string length */
       if (rlen) {
@@ -2537,7 +2508,7 @@ void f_replace_string(void) {
           }
           src++;
         }
-      } else {/* rlen is zero */
+      } else { /* rlen is zero */
         while (*src) {
           if (*src++ == *pattern) {
             cur++;
@@ -2626,7 +2597,7 @@ void f_replace_string(void) {
       }
       memmove(dst2, src, slimit - src);
       dst2 += (slimit - src);
-    } else {/* plen <= 1 */
+    } else { /* plen <= 1 */
       /* Beek: plen == 1 */
       while (*src != '\0') {
         if (*src == *pattern) {
@@ -2802,7 +2773,7 @@ void f_say(void) {
       vtmp.item[0].type = T_OBJECT;
       vtmp.item[0].u.ob = sp->u.ob;
       avoid = &vtmp;
-    } else {/* must be an array... */
+    } else { /* must be an array... */
       avoid = sp->u.arr;
     }
     say(sp - 1, avoid);
@@ -2840,8 +2811,7 @@ void f_set_bit(void) {
   int len, old_len, ind, bit;
 
   if (sp->u.number > MAX_BITS) {
-    error("set_bit() bit requested: %d > maximum bits: %d\n", sp->u.number,
-          MAX_BITS);
+    error("set_bit() bit requested: %d > maximum bits: %d\n", sp->u.number, MAX_BITS);
   }
   bit = (sp--)->u.number;
   if (bit < 0) {
@@ -2878,9 +2848,7 @@ void f_set_bit(void) {
 #endif
 
 #ifdef F_SET_HEART_BEAT
-void f_set_heart_beat(void) {
-  set_heart_beat(current_object, (sp--)->u.number);
-}
+void f_set_heart_beat(void) { set_heart_beat(current_object, (sp--)->u.number); }
 #endif
 
 #ifdef F_QUERY_HEART_BEAT
@@ -3056,8 +3024,7 @@ void f_snoop(void) {
       *sp = const0;
     }
   } else {
-    if (!new_set_snoop((sp - 1)->u.ob, sp->u.ob) ||
-        (sp->u.ob->flags & O_DESTRUCTED)) {
+    if (!new_set_snoop((sp - 1)->u.ob, sp->u.ob) || (sp->u.ob->flags & O_DESTRUCTED)) {
       free_object(&(sp--)->u.ob, "f_snoop:2");
       free_object(&sp->u.ob, "f_snoop:3");
       *sp = const0;
@@ -3074,8 +3041,7 @@ void f_sprintf(void) {
   char *s;
   int num_arg = st_num_arg;
 
-  s = string_print_formatted((sp - num_arg + 1)->u.string, num_arg - 1,
-                             sp - num_arg + 2);
+  s = string_print_formatted((sp - num_arg + 1)->u.string, num_arg - 1, sp - num_arg + 2);
   pop_n_elems(num_arg);
 
   STACK_INC;
@@ -3104,7 +3070,7 @@ void f_stat(void) {
     return;
   }
   if (stat(path, &buf) != -1) {
-    if (buf.st_mode & S_IFREG) {/* if a regular file */
+    if (buf.st_mode & S_IFREG) { /* if a regular file */
       v = allocate_empty_array(3);
       v->item[0].type = T_NUMBER;
       v->item[0].subtype = 0;
@@ -3172,14 +3138,14 @@ void f_strsrch(void) {
 
     /* start at left */
   } else if (!((sp + 1)->u.number)) {
-    if (!little[1]) {/* 1 char srch pattern */
+    if (!little[1]) { /* 1 char srch pattern */
       pos = strchr(big, little[0]);
     } else {
       pos = (char *)strstr(big, little);
     }
     /* start at right */
-  } else {           /* XXX: maybe test for -1 */
-    if (!little[1]) {/* 1 char srch pattern */
+  } else {            /* XXX: maybe test for -1 */
+    if (!little[1]) { /* 1 char srch pattern */
       pos = strrchr(big, little[0]);
     } else {
       char c = *little;
@@ -3281,7 +3247,7 @@ void f_tell_room(void) {
 
   if (arg->type == T_OBJECT) {
     ob = arg[0].u.ob;
-  } else {/* must be a string... */
+  } else { /* must be a string... */
     ob = find_object(arg[0].u.string);
     if (!ob || !object_visible(ob)) {
       error("Bad argument 1 to tell_room()\n");
@@ -3603,22 +3569,20 @@ void f_write_bytes(void) {
       /* convert to network byte-order */
       netint = htonl(sp->u.number);
       netbuf = (char *)&netint;
-      i = write_bytes((sp - 2)->u.string, (sp - 1)->u.number, netbuf,
-                      sizeof(int));
+      i = write_bytes((sp - 2)->u.string, (sp - 1)->u.number, netbuf, sizeof(int));
       break;
     }
 
 #ifndef NO_BUFFER_TYPE
     case T_BUFFER: {
-      i = write_bytes((sp - 2)->u.string, (sp - 1)->u.number,
-                      (char *)sp->u.buf->item, sp->u.buf->size);
+      i = write_bytes((sp - 2)->u.string, (sp - 1)->u.number, (char *)sp->u.buf->item,
+                      sp->u.buf->size);
       break;
     }
 #endif
 
     case T_STRING: {
-      i = write_bytes((sp - 2)->u.string, (sp - 1)->u.number, sp->u.string,
-                      SVALUE_STRLEN(sp));
+      i = write_bytes((sp - 2)->u.string, (sp - 1)->u.number, sp->u.string, SVALUE_STRLEN(sp));
       break;
     }
 
@@ -3653,26 +3617,22 @@ void f_write_buffer(void) {
       /* convert to network byte-order */
       netint = htonl(sp->u.number);
       netbuf = (char *)&netint;
-      i = write_buffer((sp - 2)->u.buf, (sp - 1)->u.number, netbuf,
-                       sizeof(int));
+      i = write_buffer((sp - 2)->u.buf, (sp - 1)->u.number, netbuf, sizeof(int));
       break;
     }
 
     case T_BUFFER: {
-      i = write_buffer((sp - 2)->u.buf, (sp - 1)->u.number,
-                       (char *)sp->u.buf->item, sp->u.buf->size);
+      i = write_buffer((sp - 2)->u.buf, (sp - 1)->u.number, (char *)sp->u.buf->item,
+                       sp->u.buf->size);
       break;
     }
 
     case T_STRING: {
-      i = write_buffer((sp - 2)->u.buf, (sp - 1)->u.number, sp->u.string,
-                       SVALUE_STRLEN(sp));
+      i = write_buffer((sp - 2)->u.buf, (sp - 1)->u.number, sp->u.string, SVALUE_STRLEN(sp));
       break;
     }
 
-    default: {
-      bad_argument(sp, T_BUFFER | T_STRING | T_NUMBER, 3, F_WRITE_BUFFER);
-    }
+    default: { bad_argument(sp, T_BUFFER | T_STRING | T_NUMBER, 3, F_WRITE_BUFFER); }
   }
   free_svalue(sp--, "f_write_buffer");
   free_svalue(--sp, "f_write_buffer");
@@ -3726,11 +3686,9 @@ void f_memory_info(void) {
 #ifdef CLASS_STATS
           total_class_size +
 #endif
-          total_mapping_size + tot_alloc_object_size +
-          tot_alloc_sentence * sizeof(sentence_t) +
-          num_user * sizeof(interactive_t) + show_otable_status(0, -1) +
-          heart_beat_status(0, -1) + add_string_status(0, -1) +
-          print_call_out_usage(0, -1) + res;
+          total_mapping_size + tot_alloc_object_size + tot_alloc_sentence * sizeof(sentence_t) +
+          num_user * sizeof(interactive_t) + show_otable_status(0, -1) + heart_beat_status(0, -1) +
+          add_string_status(0, -1) + print_call_out_usage(0, -1) + res;
     push_number(tot);
     return;
   }
@@ -3779,8 +3737,8 @@ void f_set_reset(void) {
     free_object(&(--sp)->u.ob, "f_set_reset:1");
     sp--;
   } else {
-    sp->u.ob->next_reset = current_virtual_time + TIME_TO_RESET / 2 +
-                           random_number(TIME_TO_RESET / 2);
+    sp->u.ob->next_reset =
+        current_virtual_time + TIME_TO_RESET / 2 + random_number(TIME_TO_RESET / 2);
     free_object(&(sp--)->u.ob, "f_set_reset:2");
   }
 }
@@ -3855,8 +3813,8 @@ void f_next_inventory(void) {
 
 #ifdef F_DEFER
 void f_defer() {
-  struct defer_list *newlist = (struct defer_list *)DXALLOC(
-      sizeof(struct defer_list), TAG_TEMPORARY, "defer: new item");
+  struct defer_list *newlist =
+      (struct defer_list *)DXALLOC(sizeof(struct defer_list), TAG_TEMPORARY, "defer: new item");
 
 // In reverse mode, newlist always will be the last data.
 #ifdef REVERSE_DEFER

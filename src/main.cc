@@ -147,9 +147,8 @@ int main(int argc, char **argv) {
   /*
    * Check the living hash table size
    */
-  if (CFG_LIVING_HASH_SIZE != 4 && CFG_LIVING_HASH_SIZE != 16 &&
-      CFG_LIVING_HASH_SIZE != 64 && CFG_LIVING_HASH_SIZE != 256 &&
-      CFG_LIVING_HASH_SIZE != 1024 && CFG_LIVING_HASH_SIZE != 4096) {
+  if (CFG_LIVING_HASH_SIZE != 4 && CFG_LIVING_HASH_SIZE != 16 && CFG_LIVING_HASH_SIZE != 64 &&
+      CFG_LIVING_HASH_SIZE != 256 && CFG_LIVING_HASH_SIZE != 1024 && CFG_LIVING_HASH_SIZE != 4096) {
     fprintf(stderr,
             "CFG_LIVING_HASH_SIZE in options.h must be one of 4, 16, 64, 256, "
             "1024, 4096, ...\n");
@@ -176,8 +175,7 @@ int main(int argc, char **argv) {
   get_version(version_buf);
   if (!got_defaults) {
     fprintf(stderr, "%s for %s.\n", version_buf, ARCH);
-    fprintf(stderr,
-            "You must specify the configuration filename as an argument.\n");
+    fprintf(stderr, "You must specify the configuration filename as an argument.\n");
     exit(-1);
   }
 
@@ -237,8 +235,7 @@ int main(int argc, char **argv) {
   mud_lib = (char *)MUD_LIB;
   set_inc_list(INCLUDE_DIRS);
   if (reserved_size > 0) {
-    reserved_area =
-        (char *)DMALLOC(reserved_size, TAG_RESERVED, "main.c: reserved_area");
+    reserved_area = (char *)DMALLOC(reserved_size, TAG_RESERVED, "main.c: reserved_area");
   }
   for (i = 0; i < sizeof consts / sizeof consts[0]; i++) {
     consts[i] = exp(-i / 900.0);
@@ -307,11 +304,9 @@ int main(int argc, char **argv) {
   try {
     init_simul_efun(SIMUL_EFUN);
     init_master();
-  }
-  catch (const char *) {
-    debug_message(
-        "The simul_efun (%s) and master (%s) objects must be loadable.\n",
-        SIMUL_EFUN, MASTER_FILE);
+  } catch (const char *) {
+    debug_message("The simul_efun (%s) and master (%s) objects must be loadable.\n", SIMUL_EFUN,
+                  MASTER_FILE);
     exit(-1);
   }
   set_eval(max_cost);
@@ -341,11 +336,8 @@ int main(int argc, char **argv) {
               debug_message("Shutdown by master object.\n");
               exit(0);
             }
-          }
-          catch (const char *) {
-            debug_message(
-                "Error while calling master::flag(\"%s\"), aborting ...\n",
-                argv[i] + 2);
+          } catch (const char *) {
+            debug_message("Error while calling master::flag(\"%s\"), aborting ...\n", argv[i] + 2);
             exit(-1);
           }
           pop_context(&econ);
@@ -365,8 +357,7 @@ int main(int argc, char **argv) {
           }
           debug_message("Debug Level: %d\n", debug_level);
 #else
-          debug_message(
-              "Driver must be compiled with DEBUG_MACRO on to use -d.\n");
+          debug_message("Driver must be compiled with DEBUG_MACRO on to use -d.\n");
 #endif
           break;
         case 'c':

@@ -152,9 +152,8 @@ void dumpstat(const char *tfn) {
     } else {
       tmp = 0;
     }
-    fprintf(f, "%-20s %ld ref %2d %s %s (%d)\n", ob->obname,
-            tmp + data_size(ob) + sizeof(object_t), ob->ref,
-            ob->flags & O_HEART_BEAT ? "HB" : "  ",
+    fprintf(f, "%-20s %ld ref %2d %s %s (%d)\n", ob->obname, tmp + data_size(ob) + sizeof(object_t),
+            ob->ref, ob->flags & O_HEART_BEAT ? "HB" : "  ",
 #ifndef NO_ENVIRONMENT
             ob->super ? ob->super->obname : "--",
 #else

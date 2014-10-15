@@ -214,16 +214,14 @@ static parse_node_t *optimize(parse_node_t *expr) {
 
 #ifdef DEBUG
 const char *lpc_tree_name[] = {
-    "return",        "two values",       "opcode",        "opcode_1",
-    "opcode_2",      "unary op",         "unary op_1",    "binary op",
-    "binary op_1",   "ternary op",       "ternary op_1",  "control jump",
-    "loop",          "call",             "call_1",        "call_2",
-    "&& ||",         "foreach",          "lvalue_efun",   "switch_range",
-    "switch_string", "switch_direct",    "switch_number", "case_number",
-    "case_string",   "default",          "if",            "branch link",
-    "parameter",     "parameter_lvalue", "efun",          "anon func",
-    "real",          "number",           "string",        "function",
-    "catch"};
+    "return",        "two values",    "opcode",        "opcode_1",    "opcode_2",
+    "unary op",      "unary op_1",    "binary op",     "binary op_1", "ternary op",
+    "ternary op_1",  "control jump",  "loop",          "call",        "call_1",
+    "call_2",        "&& ||",         "foreach",       "lvalue_efun", "switch_range",
+    "switch_string", "switch_direct", "switch_number", "case_number", "case_string",
+    "default",       "if",            "branch link",   "parameter",   "parameter_lvalue",
+    "efun",          "anon func",     "real",          "number",      "string",
+    "function",      "catch"};
 
 static void lpc_tree(parse_node_t *dest, int num) {
   parse_node_t *pn;
@@ -249,13 +247,9 @@ static void lpc_tree(parse_node_t *dest, int num) {
   }
 }
 
-static void lpc_tree_number(parse_node_t *dest, LPC_INT num) {
-  CREATE_NUMBER(dest->v.expr, num);
-}
+static void lpc_tree_number(parse_node_t *dest, LPC_INT num) { CREATE_NUMBER(dest->v.expr, num); }
 
-static void lpc_tree_real(parse_node_t *dest, LPC_FLOAT real) {
-  CREATE_REAL(dest->v.expr, real);
-}
+static void lpc_tree_real(parse_node_t *dest, LPC_FLOAT real) { CREATE_REAL(dest->v.expr, real); }
 
 static void lpc_tree_expr(parse_node_t *dest, parse_node_t *expr) {
   dest->v.expr = new_node_no_line();
@@ -286,8 +280,7 @@ static void lpc_tree_list(parse_node_t *dest, parse_node_t *expr) {
   }
 }
 
-#define lpc_tree_opc(x, y) \
-  lpc_tree_string(x, query_instr_name(y & ~NOVALUE_USED_FLAG))
+#define lpc_tree_opc(x, y) lpc_tree_string(x, query_instr_name(y & ~NOVALUE_USED_FLAG))
 
 #define ARG_1 dest->r.expr
 #define ARG_2 dest->r.expr->r.expr
@@ -456,8 +449,7 @@ generate(parse_node_t *node) {
 
 static void optimizer_start_function(int n) {
   if (n) {
-    last_local_refs =
-        CALLOCATE(n, parse_node_t *, TAG_COMPILER, "c_start_function");
+    last_local_refs = CALLOCATE(n, parse_node_t *, TAG_COMPILER, "c_start_function");
     optimizer_num_locals = n;
     while (n--) {
       last_local_refs[n] = 0;
@@ -614,12 +606,11 @@ void dump_tree(parse_node_t *expr) {
       printf(" %" LPC_INT_FMTSTR_P ")", expr->l.number);
       break;
     case NODE_OPCODE_1:
-      printf("(%s %" LPC_INT_FMTSTR_P ")", instrs[expr->v.number].name,
-             expr->l.number);
+      printf("(%s %" LPC_INT_FMTSTR_P ")", instrs[expr->v.number].name, expr->l.number);
       break;
     case NODE_OPCODE_2:
-      printf("(%s %" LPC_INT_FMTSTR_P " %" LPC_INT_FMTSTR_P ")",
-             instrs[expr->v.number].name, expr->l.number, expr->r.number);
+      printf("(%s %" LPC_INT_FMTSTR_P " %" LPC_INT_FMTSTR_P ")", instrs[expr->v.number].name,
+             expr->l.number, expr->r.number);
       break;
     case NODE_RETURN:
       if (expr->r.expr) {
@@ -656,21 +647,20 @@ void dump_tree(parse_node_t *expr) {
       printf(")");
       break;
     case NODE_CALL_2:
-      printf("(%s %" LPC_INT_FMTSTR_P " %" LPC_INT_FMTSTR_P " %i ",
-             instrs[expr->v.number].name, expr->l.number >> 16,
-             expr->l.number & 0xffff, (expr->r.expr ? expr->r.expr->kind : 0));
+      printf("(%s %" LPC_INT_FMTSTR_P " %" LPC_INT_FMTSTR_P " %i ", instrs[expr->v.number].name,
+             expr->l.number >> 16, expr->l.number & 0xffff,
+             (expr->r.expr ? expr->r.expr->kind : 0));
       dump_expr_list(expr->r.expr);
       printf(")");
       break;
     case NODE_CALL_1:
-      printf("(%s %" LPC_INT_FMTSTR_P " %i ", instrs[expr->v.number].name,
-             expr->l.number, (expr->r.expr ? expr->r.expr->kind : 0));
+      printf("(%s %" LPC_INT_FMTSTR_P " %i ", instrs[expr->v.number].name, expr->l.number,
+             (expr->r.expr ? expr->r.expr->kind : 0));
       dump_expr_list(expr->r.expr);
       printf(")");
       break;
     case NODE_CALL:
-      printf("(%s %" LPC_INT_FMTSTR_P " ", instrs[expr->v.number].name,
-             expr->l.number);
+      printf("(%s %" LPC_INT_FMTSTR_P " ", instrs[expr->v.number].name, expr->l.number);
       dump_expr_list(expr->r.expr);
       printf(")");
       break;
@@ -779,8 +769,8 @@ void dump_tree(parse_node_t *expr) {
       printf(" %" LPC_INT_FMTSTR_P ")", expr->v.number >> 8);
       break;
     case NODE_ANON_FUNC:
-      printf("(anon-func %" LPC_INT_FMTSTR_P " %" LPC_INT_FMTSTR_P " ",
-             expr->v.number, expr->l.number);
+      printf("(anon-func %" LPC_INT_FMTSTR_P " %" LPC_INT_FMTSTR_P " ", expr->v.number,
+             expr->l.number);
       dump_tree(expr->r.expr);
       printf(")");
       break;

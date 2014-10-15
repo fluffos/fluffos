@@ -57,8 +57,7 @@ static void read_config_file(FILE *file) {
       size += len + 1;
       if (size > buff_size) {
         tmp = p - buff;
-        buff = RESIZE(buff, buff_size *= 2, char, TAG_CONFIG,
-                      "read_config_file: 2");
+        buff = RESIZE(buff, buff_size *= 2, char, TAG_CONFIG, "read_config_file: 2");
         p = buff + tmp;
       }
       strncpy(p, str, len);
@@ -112,15 +111,13 @@ static int scan_config_line(const char *fmt, void *dest, int required) {
     tmp = (char *)strchr(missing_line, ':');
     *tmp = '\0';
     if (required == -1) {
-      fprintf(stderr, "*Warning: Missing line in config file:\n\t%s\n",
-              missing_line);
+      fprintf(stderr, "*Warning: Missing line in config file:\n\t%s\n", missing_line);
       return 0;
     }
     if (!required) {
       return 0;
     }
-    fprintf(stderr, "*Error in config file.  Missing line:\n\t%s\n",
-            missing_line);
+    fprintf(stderr, "*Error in config file.  Missing line:\n\t%s\n", missing_line);
     exit(-1);
   }
   return 1;
@@ -169,15 +166,13 @@ void set_defaults(char *filename) {
     }
   }
   if (!def) {
-    fprintf(stderr, "*Error: couldn't find or open config file: '%s'\n",
-            filename);
+    fprintf(stderr, "*Error: couldn't find or open config file: '%s'\n", filename);
     exit(-1);
   }
   read_config_file(def);
 
   scan_config_line("global include file : %[^\n]", tmp, 0);
-  p = CONFIG_STR(__GLOBAL_INCLUDE_FILE__) =
-      alloc_cstring(tmp, "config file: gif");
+  p = CONFIG_STR(__GLOBAL_INCLUDE_FILE__) = alloc_cstring(tmp, "config file: gif");
 
   /* check if the global include file is quoted */
   if (*p && *p != '"' && *p != '<') {
@@ -221,11 +216,9 @@ void set_defaults(char *filename) {
   CONFIG_STR(__SWAP_FILE__) = alloc_cstring(tmp, "config file: sf");
   scan_config_line("debug log file : %[^\n]", tmp, -1);
   CONFIG_STR(__DEBUG_LOG_FILE__) = alloc_cstring(tmp, "config file: dlf");
-  CONFIG_STR(__PLACEHOLDER1__) =
-      alloc_cstring("__placeholder", "config file: placeholder");
+  CONFIG_STR(__PLACEHOLDER1__) = alloc_cstring("__placeholder", "config file: placeholder");
   scan_config_line("default error message : %[^\n]", tmp, 0);
-  CONFIG_STR(__DEFAULT_ERROR_MESSAGE__) =
-      alloc_cstring(tmp, "config file: dem");
+  CONFIG_STR(__DEFAULT_ERROR_MESSAGE__) = alloc_cstring(tmp, "config file: dem");
   scan_config_line("default fail message : %[^\n]", tmp, 0);
   CONFIG_STR(__DEFAULT_FAIL_MESSAGE__) = alloc_cstring(tmp, "config file: dfm");
 
@@ -242,8 +235,7 @@ void set_defaults(char *filename) {
     } else if (!strcasecmp(tmp, "binary")) {
       FD6_KIND = PORT_BINARY;
     } else {
-      fprintf(stderr,
-              "Unknown port type for fd6 kind.  fd6 support disabled.\n");
+      fprintf(stderr, "Unknown port type for fd6 kind.  fd6 support disabled.\n");
       FD6_KIND = PORT_UNDEFINED;
     }
   } else {
@@ -256,13 +248,11 @@ void set_defaults(char *filename) {
     port_start = 1;
   }
 
-  scan_config_line("address server port : %d\n",
-                   &CONFIG_INT(__ADDR_SERVER_PORT__), 0);
+  scan_config_line("address server port : %d\n", &CONFIG_INT(__ADDR_SERVER_PORT__), 0);
 
   scan_config_line("fd6 port : %d\n", &CONFIG_INT(__FD6_PORT__), 0);
 
-  scan_config_line("time to clean up : %d\n", &CONFIG_INT(__TIME_TO_CLEAN_UP__),
-                   1);
+  scan_config_line("time to clean up : %d\n", &CONFIG_INT(__TIME_TO_CLEAN_UP__), 1);
   scan_config_line("time to reset : %d\n", &CONFIG_INT(__TIME_TO_RESET__), 1);
   scan_config_line("time to swap : %d\n", &CONFIG_INT(__TIME_TO_SWAP__), 1);
 
@@ -280,36 +270,24 @@ void set_defaults(char *filename) {
                    &CONFIG_INT(__LIVING_HASH_TABLE_SIZE__), 0);
 #endif
 
-  scan_config_line("inherit chain size : %d\n",
-                   &CONFIG_INT(__INHERIT_CHAIN_SIZE__), 1);
-  scan_config_line("maximum evaluation cost : %d\n",
-                   &CONFIG_INT(__MAX_EVAL_COST__), 1);
+  scan_config_line("inherit chain size : %d\n", &CONFIG_INT(__INHERIT_CHAIN_SIZE__), 1);
+  scan_config_line("maximum evaluation cost : %d\n", &CONFIG_INT(__MAX_EVAL_COST__), 1);
 
-  scan_config_line("maximum array size : %d\n", &CONFIG_INT(__MAX_ARRAY_SIZE__),
-                   1);
+  scan_config_line("maximum array size : %d\n", &CONFIG_INT(__MAX_ARRAY_SIZE__), 1);
 #ifndef NO_BUFFER_TYPE
-  scan_config_line("maximum buffer size : %d\n",
-                   &CONFIG_INT(__MAX_BUFFER_SIZE__), 1);
+  scan_config_line("maximum buffer size : %d\n", &CONFIG_INT(__MAX_BUFFER_SIZE__), 1);
 #endif
-  scan_config_line("maximum mapping size : %d\n",
-                   &CONFIG_INT(__MAX_MAPPING_SIZE__), 1);
-  scan_config_line("maximum string length : %d\n",
-                   &CONFIG_INT(__MAX_STRING_LENGTH__), 1);
-  scan_config_line("maximum bits in a bitfield : %d\n",
-                   &CONFIG_INT(__MAX_BITFIELD_BITS__), 1);
+  scan_config_line("maximum mapping size : %d\n", &CONFIG_INT(__MAX_MAPPING_SIZE__), 1);
+  scan_config_line("maximum string length : %d\n", &CONFIG_INT(__MAX_STRING_LENGTH__), 1);
+  scan_config_line("maximum bits in a bitfield : %d\n", &CONFIG_INT(__MAX_BITFIELD_BITS__), 1);
 
-  scan_config_line("maximum byte transfer : %d\n",
-                   &CONFIG_INT(__MAX_BYTE_TRANSFER__), 1);
-  scan_config_line("maximum read file size : %d\n",
-                   &CONFIG_INT(__MAX_READ_FILE_SIZE__), 1);
+  scan_config_line("maximum byte transfer : %d\n", &CONFIG_INT(__MAX_BYTE_TRANSFER__), 1);
+  scan_config_line("maximum read file size : %d\n", &CONFIG_INT(__MAX_READ_FILE_SIZE__), 1);
 
-  scan_config_line("reserved size : %d\n", &CONFIG_INT(__RESERVED_MEM_SIZE__),
-                   0);
+  scan_config_line("reserved size : %d\n", &CONFIG_INT(__RESERVED_MEM_SIZE__), 0);
 
-  scan_config_line("hash table size : %d\n",
-                   &CONFIG_INT(__SHARED_STRING_HASH_TABLE_SIZE__), 1);
-  scan_config_line("object table size : %d\n",
-                   &CONFIG_INT(__OBJECT_HASH_TABLE_SIZE__), 1);
+  scan_config_line("hash table size : %d\n", &CONFIG_INT(__SHARED_STRING_HASH_TABLE_SIZE__), 1);
+  scan_config_line("object table size : %d\n", &CONFIG_INT(__OBJECT_HASH_TABLE_SIZE__), 1);
 
   /* check for ports */
   if (port_start == 1) {
@@ -333,8 +311,7 @@ void set_defaults(char *filename) {
           external_port[i].kind = PORT_TELNET;
         } else if (!strcmp(kind, "binary")) {
 #ifdef NO_BUFFER_TYPE
-          fprintf(stderr,
-                  "binary ports unavailable with NO_BUFFER_TYPE defined.\n");
+          fprintf(stderr, "binary ports unavailable with NO_BUFFER_TYPE defined.\n");
           exit(-1);
 #endif
           external_port[i].kind = PORT_BINARY;
@@ -372,13 +349,10 @@ void set_defaults(char *filename) {
   /*
    * from options.h
    */
-  config_int[__EVALUATOR_STACK_SIZE__ - BASE_CONFIG_INT] =
-      CFG_EVALUATOR_STACK_SIZE;
-  config_int[__MAX_LOCAL_VARIABLES__ - BASE_CONFIG_INT] =
-      CFG_MAX_LOCAL_VARIABLES;
+  config_int[__EVALUATOR_STACK_SIZE__ - BASE_CONFIG_INT] = CFG_EVALUATOR_STACK_SIZE;
+  config_int[__MAX_LOCAL_VARIABLES__ - BASE_CONFIG_INT] = CFG_MAX_LOCAL_VARIABLES;
   config_int[__MAX_CALL_DEPTH__ - BASE_CONFIG_INT] = CFG_MAX_CALL_DEPTH;
-  config_int[__LIVING_HASH_TABLE_SIZE__ - BASE_CONFIG_INT] =
-      CFG_LIVING_HASH_SIZE;
+  config_int[__LIVING_HASH_TABLE_SIZE__ - BASE_CONFIG_INT] = CFG_LIVING_HASH_SIZE;
 }
 
 int get_config_item(svalue_t *res, svalue_t *arg) {

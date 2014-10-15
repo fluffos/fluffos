@@ -91,8 +91,7 @@ void call_tick_events() {
       if (event->valid) {
         try {
           event->callback();
-        }
-        catch (const char *) {
+        } catch (const char *) {
           restore_context(&econ);
         }
       }
@@ -181,8 +180,7 @@ static void report_holes()
 #endif
 
 void call_remove_destructed_objects() {
-  add_tick_event(5 * 60,
-                 tick_event::callback_type(call_remove_destructed_objects));
+  add_tick_event(5 * 60, tick_event::callback_type(call_remove_destructed_objects));
   if (obj_list_replace || obj_list_destruct) {
     remove_destructed_objects();
   }
@@ -200,13 +198,11 @@ void backend(struct event_base *base) {
   // Register various tick events
   add_tick_event(0, tick_event::callback_type(call_heart_beat));
   add_tick_event(5 * 60, tick_event::callback_type(look_for_objects_to_swap));
-  add_tick_event(30 * 60,
-                 tick_event::callback_type(std::bind(reclaim_objects, true)));
+  add_tick_event(30 * 60, tick_event::callback_type(std::bind(reclaim_objects, true)));
 #ifdef PACKAGE_MUDLIB_STATS
   add_tick_event(60 * 60, tick_event::callback_type(mudlib_stats_decay));
 #endif
-  add_tick_event(5 * 60,
-                 tick_event::callback_type(call_remove_destructed_objects));
+  add_tick_event(5 * 60, tick_event::callback_type(call_remove_destructed_objects));
 
   current_virtual_time = get_current_time();
   clear_state();
@@ -220,8 +216,7 @@ void backend(struct event_base *base) {
      * I/O to dedicated threads.
      */
     run_event_loop(base);
-  }
-  catch (...) {  // catch everything
+  } catch (...) {  // catch everything
     fatal("BUG: jumped out of event loop!");
   }
   shutdownMudOS(-1);
@@ -259,7 +254,6 @@ static void look_for_objects_to_swap() {
   last_good_ob = obj_list;
   save_context(&econ);
   while (1) try {
-
       while ((ob = (object_t *)next_ob)) {
         int ready_for_clean_up = 0;
 
@@ -282,8 +276,7 @@ static void look_for_objects_to_swap() {
         /*
          * Should this object have reset(1) called ?
          */
-        if ((ob->flags & O_WILL_RESET) &&
-            (ob->next_reset <= current_virtual_time) &&
+        if ((ob->flags & O_WILL_RESET) && (ob->next_reset <= current_virtual_time) &&
             !(ob->flags & O_RESET_STATE)) {
           debug(d_flag, "RESET /%s\n", ob->obname);
           set_eval(max_cost);
@@ -342,10 +335,9 @@ static void look_for_objects_to_swap() {
         last_good_ob = ob;
       }
       break;
+    } catch (const char *) {
+      restore_context(&econ);
     }
-  catch (const char *) {
-    restore_context(&econ);
-  }
   pop_context(&econ);
 } /* look_for_objects_to_swap() */
 
@@ -380,8 +372,7 @@ static float perc_hb_probes = 100.0; /* decaying avge of how many complete */
 
 void call_heart_beat() {
   // Register for next call
-  add_tick_event(HEARTBEAT_INTERVAL,
-                 tick_event::callback_type(call_heart_beat));
+  add_tick_event(HEARTBEAT_INTERVAL, tick_event::callback_type(call_heart_beat));
 
   object_t *ob;
   heart_beat_t *curr_hb;
@@ -395,8 +386,7 @@ void call_heart_beat() {
     save_context(&econ);
     while (1) {
       ob = (curr_hb = &heart_beats[heart_beat_index])->ob;
-      DEBUG_CHECK(!(ob->flags & O_HEART_BEAT),
-                  "Heartbeat not set in object on heartbeat list!");
+      DEBUG_CHECK(!(ob->flags & O_HEART_BEAT), "Heartbeat not set in object on heartbeat list!");
       /* is it time to do a heart beat ? */
       curr_hb->heart_beat_ticks--;
 
@@ -429,8 +419,7 @@ void call_heart_beat() {
             current_interactive = 0;
             pop_stack(); /* pop the return value */
             restore_command_giver();
-          }
-          catch (const char *) {
+          } catch (const char *) {
             restore_context(&econ);
           }
 
@@ -503,8 +492,7 @@ int set_heart_beat(object_t *ob, int to) {
     }
 
     if ((num = (num_hb_objs - (index + 1)))) {
-      memmove(heart_beats + index, heart_beats + (index + 1),
-              num * sizeof(heart_beat_t));
+      memmove(heart_beats + index, heart_beats + (index + 1), num * sizeof(heart_beat_t));
     }
 
     num_hb_objs--;
@@ -520,23 +508,21 @@ int set_heart_beat(object_t *ob, int to) {
     index = num_hb_objs;
     while (index--) {
       if (heart_beats[index].ob == ob) {
-        heart_beats[index].time_to_heart_beat =
-            heart_beats[index].heart_beat_ticks = to;
+        heart_beats[index].time_to_heart_beat = heart_beats[index].heart_beat_ticks = to;
         break;
       }
     }
-    DEBUG_CHECK(index < 0,
-                "Couldn't find enabled object in heart_beat list!\n");
+    DEBUG_CHECK(index < 0, "Couldn't find enabled object in heart_beat list!\n");
   } else {
     heart_beat_t *hb;
 
     if (!max_heart_beats)
-      heart_beats = CALLOCATE(max_heart_beats = HEART_BEAT_CHUNK, heart_beat_t,
-                              TAG_HEART_BEAT, "set_heart_beat: 1");
+      heart_beats = CALLOCATE(max_heart_beats = HEART_BEAT_CHUNK, heart_beat_t, TAG_HEART_BEAT,
+                              "set_heart_beat: 1");
     else if (num_hb_objs == max_heart_beats) {
       max_heart_beats += HEART_BEAT_CHUNK;
-      heart_beats = RESIZE(heart_beats, max_heart_beats, heart_beat_t,
-                           TAG_HEART_BEAT, "set_heart_beat: 1");
+      heart_beats =
+          RESIZE(heart_beats, max_heart_beats, heart_beat_t, TAG_HEART_BEAT, "set_heart_beat: 1");
     }
 
     hb = &heart_beats[num_hb_objs++];
@@ -558,8 +544,8 @@ int heart_beat_status(outbuffer_t *ob, int verbose) {
   if (verbose == 1) {
     outbuf_add(ob, "Heart beat information:\n");
     outbuf_add(ob, "-----------------------\n");
-    outbuf_addv(ob, "Number of objects with heart beat: %d, starts: %d\n",
-                num_hb_objs, num_hb_calls);
+    outbuf_addv(ob, "Number of objects with heart beat: %d, starts: %d\n", num_hb_objs,
+                num_hb_calls);
 
     /* passing floats to varargs isn't highly portable so let sprintf
      handle it */
@@ -586,8 +572,7 @@ void preload_objects(int eflag) {
   try {
     push_number(eflag);
     ret = apply_master_ob(APPLY_EPILOG, 1);
-  }
-  catch (const char *) {
+  } catch (const char *) {
     restore_context(&econ);
     pop_context(&econ);
     return;
@@ -621,11 +606,10 @@ void preload_objects(int eflag) {
       }
       free_array((array_t *)prefiles);
       break;
+    } catch (const char *) {
+      restore_context(&econ);
+      ix++;
     }
-  catch (const char *) {
-    restore_context(&econ);
-    ix++;
-  }
   pop_context(&econ);
 } /* preload_objects() */
 

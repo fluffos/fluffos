@@ -21,33 +21,22 @@ void f_debug_info(void) {
 
       ob = arg[1].u.ob;
       flags = ob->flags;
-      outbuf_addv(&out, "O_HEART_BEAT      : %s\n",
-                  flags & O_HEART_BEAT ? "TRUE" : "FALSE");
+      outbuf_addv(&out, "O_HEART_BEAT      : %s\n", flags & O_HEART_BEAT ? "TRUE" : "FALSE");
 #ifndef NO_WIZARDS
-      outbuf_addv(&out, "O_IS_WIZARD       : %s\n",
-                  flags & O_IS_WIZARD ? "TRUE" : "FALSE");
+      outbuf_addv(&out, "O_IS_WIZARD       : %s\n", flags & O_IS_WIZARD ? "TRUE" : "FALSE");
 #endif
 #ifdef NO_ADD_ACTION
-      outbuf_addv(&out, "O_LISTENER        : %s\n",
-                  flags & O_LISTENER ? "TRUE" : "FALSE");
+      outbuf_addv(&out, "O_LISTENER        : %s\n", flags & O_LISTENER ? "TRUE" : "FALSE");
 #else
-      outbuf_addv(&out, "O_ENABLE_COMMANDS : %s\n",
-                  flags & O_ENABLE_COMMANDS ? "TRUE" : "FALSE");
+      outbuf_addv(&out, "O_ENABLE_COMMANDS : %s\n", flags & O_ENABLE_COMMANDS ? "TRUE" : "FALSE");
 #endif
-      outbuf_addv(&out, "O_CLONE           : %s\n",
-                  flags & O_CLONE ? "TRUE" : "FALSE");
-      outbuf_addv(&out, "O_VIRTUAL         : %s\n",
-                  flags & O_VIRTUAL ? "TRUE" : "FALSE");
-      outbuf_addv(&out, "O_DESTRUCTED      : %s\n",
-                  flags & O_DESTRUCTED ? "TRUE" : "FALSE");
-      outbuf_addv(&out, "O_ONCE_INTERACTIVE: %s\n",
-                  flags & O_ONCE_INTERACTIVE ? "TRUE" : "FALSE");
-      outbuf_addv(&out, "O_RESET_STATE     : %s\n",
-                  flags & O_RESET_STATE ? "TRUE" : "FALSE");
-      outbuf_addv(&out, "O_WILL_CLEAN_UP   : %s\n",
-                  flags & O_WILL_CLEAN_UP ? "TRUE" : "FALSE");
-      outbuf_addv(&out, "O_WILL_RESET      : %s\n",
-                  flags & O_WILL_RESET ? "TRUE" : "FALSE");
+      outbuf_addv(&out, "O_CLONE           : %s\n", flags & O_CLONE ? "TRUE" : "FALSE");
+      outbuf_addv(&out, "O_VIRTUAL         : %s\n", flags & O_VIRTUAL ? "TRUE" : "FALSE");
+      outbuf_addv(&out, "O_DESTRUCTED      : %s\n", flags & O_DESTRUCTED ? "TRUE" : "FALSE");
+      outbuf_addv(&out, "O_ONCE_INTERACTIVE: %s\n", flags & O_ONCE_INTERACTIVE ? "TRUE" : "FALSE");
+      outbuf_addv(&out, "O_RESET_STATE     : %s\n", flags & O_RESET_STATE ? "TRUE" : "FALSE");
+      outbuf_addv(&out, "O_WILL_CLEAN_UP   : %s\n", flags & O_WILL_CLEAN_UP ? "TRUE" : "FALSE");
+      outbuf_addv(&out, "O_WILL_RESET      : %s\n", flags & O_WILL_RESET ? "TRUE" : "FALSE");
 #ifdef HAVE_ZLIB
       if (ob->interactive) {
         outbuf_addv(&out, "O_ZMP             : %s\n",
@@ -71,15 +60,13 @@ void f_debug_info(void) {
       outbuf_addv(&out, "extra_ref   : %d\n", ob->extra_ref);
 #endif
       outbuf_addv(&out, "name        : '/%s'\n", ob->obname);
-      outbuf_addv(&out, "next_all    : OBJ(/%s)\n",
-                  ob->next_all ? ob->next_all->obname : "NULL");
+      outbuf_addv(&out, "next_all    : OBJ(/%s)\n", ob->next_all ? ob->next_all->obname : "NULL");
       if (obj_list == ob) {
         outbuf_add(&out, "This object is the head of the object list.\n");
       }
       for (obj2 = obj_list, i = 1; obj2; obj2 = obj2->next_all, i++)
         if (obj2->next_all == ob) {
-          outbuf_addv(&out, "Previous object in object list: OBJ(/%s)\n",
-                      obj2->obname);
+          outbuf_addv(&out, "Previous object in object list: OBJ(/%s)\n", obj2->obname);
           outbuf_addv(&out, "position in object list:%d\n", i);
         }
       break;
@@ -90,17 +77,15 @@ void f_debug_info(void) {
       outbuf_addv(&out, "program ref's %d\n", ob->prog->ref);
       outbuf_addv(&out, "Name /%s\n", ob->prog->filename);
       outbuf_addv(&out, "program size %d\n", ob->prog->program_size);
-      outbuf_addv(&out, "function flags table %d (%d) \n",
-                  ob->prog->last_inherited + ob->prog->num_functions_defined,
-                  (ob->prog->last_inherited + ob->prog->num_functions_defined) *
-                      sizeof(unsigned short));
-      outbuf_addv(&out, "compiler function table %d (%d) \n",
-                  ob->prog->num_functions_defined,
+      outbuf_addv(
+          &out, "function flags table %d (%d) \n",
+          ob->prog->last_inherited + ob->prog->num_functions_defined,
+          (ob->prog->last_inherited + ob->prog->num_functions_defined) * sizeof(unsigned short));
+      outbuf_addv(&out, "compiler function table %d (%d) \n", ob->prog->num_functions_defined,
                   ob->prog->num_functions_defined * sizeof(function_t));
       outbuf_addv(&out, "num strings %d\n", ob->prog->num_strings);
-      outbuf_addv(
-          &out, "num vars %d (%d)\n", ob->prog->num_variables_defined,
-          ob->prog->num_variables_defined * (sizeof(char *) + sizeof(short)));
+      outbuf_addv(&out, "num vars %d (%d)\n", ob->prog->num_variables_defined,
+                  ob->prog->num_variables_defined * (sizeof(char *) + sizeof(short)));
       outbuf_addv(&out, "num inherits %d (%d)\n", ob->prog->num_inherited,
                   ob->prog->num_inherited * sizeof(inherit_t));
       outbuf_addv(&out, "total size %d\n", ob->prog->total_size);

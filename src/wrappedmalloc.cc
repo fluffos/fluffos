@@ -10,9 +10,7 @@
 #include "lpc_incl.h"
 #include "comm.h"
 
-typedef struct stats_s {
-  unsigned int free_calls, alloc_calls, realloc_calls;
-} stats_t;
+typedef struct stats_s { unsigned int free_calls, alloc_calls, realloc_calls; } stats_t;
 
 static stats_t stats;
 
@@ -46,7 +44,6 @@ void dump_malloc_data(outbuffer_t *ob) {
   outbuf_add(ob, "using wrapped malloc:\n\n");
   outbuf_addv(ob, "#alloc calls:     %10lu\n", stats.alloc_calls);
   outbuf_addv(ob, "#free calls:      %10lu\n", stats.free_calls);
-  outbuf_addv(ob, "#alloc - #free:   %10lu\n",
-              stats.alloc_calls - stats.free_calls);
+  outbuf_addv(ob, "#alloc - #free:   %10lu\n", stats.alloc_calls - stats.free_calls);
   outbuf_addv(ob, "#realloc calls:   %10lu\n", stats.realloc_calls);
 }

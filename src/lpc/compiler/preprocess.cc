@@ -62,8 +62,7 @@ static void add_define(const char *name, int nargs, const char *exps) {
 
   if (p) {
     if (p->flags & DEF_IS_UNDEFINED) {
-      p->exps =
-          (char *)DREALLOC(p->exps, len + 1, TAG_COMPILER, "add_define: redef");
+      p->exps = (char *)DREALLOC(p->exps, len + 1, TAG_COMPILER, "add_define: redef");
       memcpy(p->exps, exps, len);
       p->exps[len] = 0;
       p->flags = 0;
@@ -79,8 +78,7 @@ static void add_define(const char *name, int nargs, const char *exps) {
         sprintf(buf, "redefinition of #define %s\n", name);
         yywarn(buf);
 
-        p->exps = (char *)DREALLOC(p->exps, len + 1, TAG_COMPILER,
-                                   "add_define: redef");
+        p->exps = (char *)DREALLOC(p->exps, len + 1, TAG_COMPILER, "add_define: redef");
         memcpy(p->exps, exps, len);
         p->exps[len] = 0;
         p->nargs = nargs;
@@ -91,8 +89,7 @@ static void add_define(const char *name, int nargs, const char *exps) {
     }
   } else {
     p = ALLOCATE(defn_t, TAG_COMPILER, "add_define: def");
-    p->name =
-        (char *)DXALLOC(strlen(name) + 1, TAG_COMPILER, "add_define: def name");
+    p->name = (char *)DXALLOC(strlen(name) + 1, TAG_COMPILER, "add_define: def name");
     strcpy(p->name, name);
     p->exps = (char *)DXALLOC(len + 1, TAG_COMPILER, "add_define: def exps");
     memcpy(p->exps, exps, len);
@@ -139,11 +136,11 @@ static void handle_elif()
       } else {
         handle_cond(cond);
       }
-    } else {/* EXPECT_ENDIF */
-            /*
- * last cond was true...skip to end of
- * conditional
- */
+    } else { /* EXPECT_ENDIF */
+             /*
+  * last cond was true...skip to end of
+  * conditional
+  */
       skip_to("endif", (char *)0);
     }
   } else {
@@ -199,20 +196,17 @@ static void handle_endif(void) {
 #define LOR 18
 #define QMARK 19
 
-static char _optab[] = {0, 4, 0, 0, 0, 26, 56, 0, 0, 0, 18, 14, 0,  10, 0,  22,
-                        0, 0, 0, 0, 0, 0,  0,  0, 0, 0, 0,  0,  30, 50, 40, 74,
-                        0, 0, 0, 0, 0, 0,  0,  0, 0, 0, 0,  0,  0,  0,  0,  0,
-                        0, 0, 0, 0, 0, 0,  0,  0, 0, 0, 0,  0,  0,  0,  70, 0,
-                        0, 0, 0, 0, 0, 0,  0,  0, 0, 0, 0,  0,  0,  0,  0,  0,
-                        0, 0, 0, 0, 0, 0,  0,  0, 0, 0, 0,  0,  63, 0,  1};
+static char _optab[] = {0, 4, 0, 0, 0, 26, 56, 0, 0, 0,  18, 14, 0,  10, 0, 22, 0,  0, 0,
+                        0, 0, 0, 0, 0, 0,  0,  0, 0, 30, 50, 40, 74, 0,  0, 0,  0,  0, 0,
+                        0, 0, 0, 0, 0, 0,  0,  0, 0, 0,  0,  0,  0,  0,  0, 0,  0,  0, 0,
+                        0, 0, 0, 0, 0, 70, 0,  0, 0, 0,  0,  0,  0,  0,  0, 0,  0,  0, 0,
+                        0, 0, 0, 0, 0, 0,  0,  0, 0, 0,  0,  0,  0,  0,  0, 0,  63, 0, 1};
 static char optab2[] = {
-    BNOT,   0,   0,     LNOT,  '=',   NEQ,  7,   0,   0,      UMINUS, 0,
-    BMINUS, 10,  UPLUS, 0,     BPLUS, 10,   0,   0,   MULT,   11,     0,
-    0,      DIV, 11,    0,     0,     MOD,  11,  0,   '<',    LSHIFT, 9,
-    '=',    LEQ, 8,     0,     LESS,  8,    0,   '>', RSHIFT, 9,      '=',
-    GEQ,    8,   0,     GREAT, 8,     0,    '=', EQ,  7,      0,      0,
-    0,      '&', LAND,  3,     0,     BAND, 6,   0,   '|',    LOR,    2,
-    0,      BOR, 4,     0,     0,     XOR,  5,   0,   0,      QMARK,  1};
+    BNOT, 0,   0,   LNOT, '=', NEQ,  7, 0,   0,   UMINUS, 0, BMINUS, 10,   UPLUS, 0,   BPLUS,
+    10,   0,   0,   MULT, 11,  0,    0, DIV, 11,  0,      0, MOD,    11,   0,     '<', LSHIFT,
+    9,    '=', LEQ, 8,    0,   LESS, 8, 0,   '>', RSHIFT, 9, '=',    GEQ,  8,     0,   GREAT,
+    8,    0,   '=', EQ,   7,   0,    0, 0,   '&', LAND,   3, 0,      BAND, 6,     0,   '|',
+    LOR,  2,   0,   BOR,  4,   0,    0, XOR, 5,   0,      0, QMARK,  1};
 
 #define optab1 (_optab - ' ')
 

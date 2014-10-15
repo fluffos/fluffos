@@ -50,9 +50,7 @@ LPC_INT sval_hash(svalue_t x) {
   table).
 */
 
-static unsigned long node_hash(mapping_node_t *mn) {
-  return MAP_SVAL_HASH(mn->values[0]);
-}
+static unsigned long node_hash(mapping_node_t *mn) { return MAP_SVAL_HASH(mn->values[0]); }
 
 int growMap(mapping_t *m) {
   int oldsize = m->table_size + 1;
@@ -61,8 +59,7 @@ int growMap(mapping_t *m) {
   mapping_node_t **a, **b, **eltp, *elt;
 
   /* resize the hash table to be twice the old size */
-  m->table = a =
-      RESIZE(m->table, newsize, mapping_node_t *, TAG_MAP_TBL, "growMap");
+  m->table = a = RESIZE(m->table, newsize, mapping_node_t *, TAG_MAP_TBL, "growMap");
   if (!a) {
     /*
       We couldn't grow the hash table.  Rather than die, we just
@@ -75,8 +72,7 @@ int growMap(mapping_t *m) {
   }
   /* hash table doubles in size -- keep track of the memory used */
   total_mapping_size += sizeof(mapping_node_t *) * oldsize;
-  debug(mapping, "mapping.c: growMap ptr = %p, size = %d\n", (void *)m,
-        newsize);
+  debug(mapping, "mapping.c: growMap ptr = %p, size = %d\n", (void *)m, newsize);
   m->unfilled = oldsize * (unsigned)FILL_PERCENT / (unsigned)100;
   m->table_size = newsize - 1;
   /* zero out the new storage area (2nd half of table) */
@@ -113,8 +109,7 @@ int growMap(mapping_t *m) {
   -- Truilkan 92/07/19
 */
 
-mapping_t *mapTraverse(mapping_t *m,
-                       int (*func)(mapping_t *, mapping_node_t *, void *),
+mapping_t *mapTraverse(mapping_t *m, int (*func)(mapping_t *, mapping_node_t *, void *),
                        void *extra) {
   mapping_node_t *elt, *nelt;
   int j = m->table_size;
@@ -141,8 +136,7 @@ void dealloc_mapping(mapping_t *m) {
     mapping_node_t *elt, *nelt, **a = m->table;
 
     total_mapping_size -=
-        (sizeof(mapping_t) + sizeof(mapping_node_t *) * (j + 1) +
-         sizeof(mapping_node_t) * c);
+        (sizeof(mapping_t) + sizeof(mapping_node_t *) * (j + 1) + sizeof(mapping_node_t) * c);
     total_mapping_nodes -= c;
 #ifdef PACKAGE_MUDLIB_STATS
     add_array_size(&m->stats, -(c << 1));
@@ -257,8 +251,7 @@ mapping_t *allocate_mapping(int n) {
     n = MAX_MAPPING_SIZE;
   }
   newmap = ALLOCATE(mapping_t, TAG_MAPPING, "allocate_mapping: 1");
-  debug(mapping, "mapping.c: allocate_mapping begin, newmap = %p\n",
-        (void *)newmap);
+  debug(mapping, "mapping.c: allocate_mapping begin, newmap = %p\n", (void *)newmap);
   if (newmap == NULL) {
     error("Allocate_mapping - out of memory.\n");
   }
@@ -276,8 +269,8 @@ mapping_t *allocate_mapping(int n) {
   }
   /* The size is actually 1 higher */
   newmap->unfilled = n * (unsigned)FILL_PERCENT / (unsigned)100;
-  a = newmap->table = (mapping_node_t **)DXALLOC(
-      n *= sizeof(mapping_node_t *), TAG_MAP_TBL, "allocate_mapping: 3");
+  a = newmap->table =
+      (mapping_node_t **)DXALLOC(n *= sizeof(mapping_node_t *), TAG_MAP_TBL, "allocate_mapping: 3");
   if (!a) {
     error("Allocate_mapping 2 - out of memory.\n");
   }
@@ -355,8 +348,7 @@ static mapping_t *copyMapping(mapping_t *m) {
   newmap->table_size = k++;
   newmap->unfilled = m->unfilled;
   newmap->ref = 1;
-  c = newmap->table =
-      CALLOCATE(k, mapping_node_t *, TAG_MAP_TBL, "copy_mapping: 2");
+  c = newmap->table = CALLOCATE(k, mapping_node_t *, TAG_MAP_TBL, "copy_mapping: 2");
   if (!c) {
     FREE((char *)newmap);
     error("copyMapping 2 - out of memory.\n");
@@ -364,8 +356,8 @@ static mapping_t *copyMapping(mapping_t *m) {
   newmap->count = m->count;
   total_mapping_nodes += MAP_COUNT(m);
   memset(c, 0, k * sizeof(mapping_node_t *));
-  total_mapping_size += (sizeof(mapping_t) + sizeof(mapping_node_t *) * k +
-                         sizeof(mapping_node_t) * MAP_COUNT(m));
+  total_mapping_size +=
+      (sizeof(mapping_t) + sizeof(mapping_node_t *) * k + sizeof(mapping_node_t) * MAP_COUNT(m));
 
 #ifdef PACKAGE_MUDLIB_STATS
   if (current_object) {
@@ -492,8 +484,7 @@ void mapping_delete(mapping_t *m, svalue_t *lv) {
       if (msameval(elt->values, lv)) {
         if (!(*prev = elt->next) && !m->table[i]) {
           m->unfilled++;
-          debug(mapping, "mapping delete: bucket empty, unfilled = %i",
-                m->unfilled);
+          debug(mapping, "mapping delete: bucket empty, unfilled = %i", m->unfilled);
         }
         m->count--;
         total_mapping_nodes--;
@@ -597,8 +588,7 @@ void f_unique_mapping(void) {
 
   // for each item in the array, call the callback and group
   // item with same result together.
-  typedef std::map<svalue_t, std::deque<svalue_t *>, unique_svalue_compare>
-      MapResult;
+  typedef std::map<svalue_t, std::deque<svalue_t *>, unique_svalue_compare> MapResult;
   MapResult result;
   int size = v->size;
   while (size--) {
@@ -672,8 +662,7 @@ mapping_t *load_mapping_from_aggregate(svalue_t *sp, int n) {
   int mask, i, oi, count = 0;
   mapping_node_t **a, *elt, *elt2;
 
-  debug(mapping, "mapping.c: load_mapping_from_aggregate begin, size = %d\n",
-        n);
+  debug(mapping, "mapping.c: load_mapping_from_aggregate begin, size = %d\n", n);
   m = allocate_mapping(n >> 1);
   if (!n) {
     return m;
@@ -951,8 +940,7 @@ void absorb_mapping(mapping_t *m1, mapping_t *m2) {
 mapping_t *add_mapping(mapping_t *m1, mapping_t *m2) {
   mapping_t *newmap;
 
-  debug(mapping, "mapping.c: add_mapping begin: %p, %p", (void *)m1,
-        (void *)m2);
+  debug(mapping, "mapping.c: add_mapping begin: %p, %p", (void *)m1, (void *)m2);
   if (MAP_COUNT(m1) >= MAP_COUNT(m2)) {
     if (MAP_COUNT(m2)) {
       add_to_mapping(newmap = copyMapping(m1), m2, 1);
@@ -1120,7 +1108,7 @@ mapping_t *compose_mapping(mapping_t *m1, mapping_t *m2, unsigned short flag) {
         if ((elt2 = b[svalue_to_int(sv) & mask])) {
           do {
             if (msameval(sv, elt2->values)) {
-              if (sv != elt2->values + 1) {/* if m1 == m2 */
+              if (sv != elt2->values + 1) { /* if m1 == m2 */
                 assign_svalue(sv, elt2->values + 1);
               }
               break;

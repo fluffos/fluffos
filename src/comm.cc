@@ -122,18 +122,15 @@ void init_user_conn() {
     }
 
     if (ret) {
-      debug_message("init_user_conn: getaddrinfo error: %s \n",
-                    gai_strerror(ret));
+      debug_message("init_user_conn: getaddrinfo error: %s \n", gai_strerror(ret));
       exit(3);
     }
 
     // Listen on connection event
-    new_external_port_event_listener(&external_port[i], res->ai_addr,
-                                     res->ai_addrlen);
+    new_external_port_event_listener(&external_port[i], res->ai_addr, res->ai_addrlen);
 
-    debug_message(
-        "Accepting connections on %s.\n",
-        sockaddr_to_string((sockaddr *)res->ai_addr, res->ai_addrlen));
+    debug_message("Accepting connections on %s.\n",
+                  sockaddr_to_string((sockaddr *)res->ai_addr, res->ai_addrlen));
 
     freeaddrinfo(res);
   }
@@ -176,8 +173,7 @@ void new_user_handler(int fd, struct sockaddr *addr, size_t addrlen, port_def_t 
 
   if (i == max_users) {
     if (all_users) {
-      all_users = RESIZE(all_users, max_users + 10, interactive_t *, TAG_USERS,
-                         "new_user_handler");
+      all_users = RESIZE(all_users, max_users + 10, interactive_t *, TAG_USERS, "new_user_handler");
     } else {
       all_users = CALLOCATE(10, interactive_t *, TAG_USERS, "new_user_handler");
     }
@@ -187,9 +183,7 @@ void new_user_handler(int fd, struct sockaddr *addr, size_t addrlen, port_def_t 
   }
 
   if (set_socket_tcp_nodelay(fd, 1) == -1) {
-    debug(connections,
-          "async_on_accept: fd %d, set_socket_tcp_nodelay error: %s.\n",
-          fd,
+    debug(connections, "async_on_accept: fd %d, set_socket_tcp_nodelay error: %s.\n", fd,
           evutil_socket_error_to_string(evutil_socket_geterror(fd)));
   }
 
@@ -251,15 +245,12 @@ void new_user_handler(int fd, struct sockaddr *addr, size_t addrlen, port_def_t 
   /* master_ob->interactive can be zero if the master object self
      destructed in the above (don't ask) */
   set_command_giver(0);
-  if (ret == 0 || ret == (svalue_t *)-1 || ret->type != T_OBJECT ||
-      !master_ob->interactive) {
+  if (ret == 0 || ret == (svalue_t *)-1 || ret->type != T_OBJECT || !master_ob->interactive) {
     if (master_ob->interactive) {
       remove_interactive(master_ob, 0);
     }
-    debug_message(
-        "Can not accept connection from %s due to error in connect().\n",
-        sockaddr_to_string((sockaddr *)&all_users[i]->addr,
-                           all_users[i]->addrlen));
+    debug_message("Can not accept connection from %s due to error in connect().\n",
+                  sockaddr_to_string((sockaddr *)&all_users[i]->addr, all_users[i]->addrlen));
     return;
   }
   /*
@@ -359,8 +350,8 @@ static int shadow_catch_message(object_t *ob, const char *str) {
   while (ob->shadowing) {
     copy_and_push_string(str);
     if (apply(APPLY_CATCH_TELL, ob, 1, ORIGIN_DRIVER))
-        /* this will work, since we know the */
-        /* function is defined */
+    /* this will work, since we know the */
+    /* function is defined */
     {
       return 1;
     }
@@ -433,8 +424,7 @@ void add_vmessage(object_t *who, const char *format, ...) {
   add_message_calls++;
 }
 
-void add_binary_message_noflush(object_t *who, const unsigned char *data,
-                                int len) {
+void add_binary_message_noflush(object_t *who, const unsigned char *data, int len) {
   /*
    * if who->interactive is not valid, bail
    */
@@ -508,8 +498,7 @@ void get_user_data(interactive_t *ip) {
       /* check if we need more space */
       if (text_space < MAX_TEXT / 16) {
         if (ip->text_start > 0) {
-          memmove(ip->text, ip->text + ip->text_start,
-                  ip->text_end - ip->text_start);
+          memmove(ip->text, ip->text + ip->text_start, ip->text_end - ip->text_start);
           text_space += ip->text_start;
           ip->text_end -= ip->text_start;
           ip->text_start = 0;
@@ -558,8 +547,7 @@ void get_user_data(interactive_t *ip) {
         memcpy(ip->ws_text + ip->ws_text_end, buf, num_bytes);
         ip->ws_text_end += num_bytes;
         if (!ip->ws_size) {
-          unsigned char *data =
-              (unsigned char *)&ip->ws_text[ip->ws_text_start];
+          unsigned char *data = (unsigned char *)&ip->ws_text[ip->ws_text_start];
           if (ip->ws_text_end - ip->ws_text_start < 8) {
             break;
           }
@@ -590,8 +578,7 @@ void get_user_data(interactive_t *ip) {
           if (ip->ws_maskoffs) {
             int newmask;
             for (i = 0; i < 4; i++) {
-              ((char *)&newmask)[i] =
-                  ((char *)&ip->ws_mask)[(i + ip->ws_maskoffs) % 4];
+              ((char *)&newmask)[i] = ((char *)&ip->ws_mask)[(i + ip->ws_maskoffs) % 4];
             }
             ip->ws_mask = newmask;
             ip->ws_maskoffs = 0;
@@ -829,10 +816,8 @@ static char *first_cmd_in_buf(interactive_t *ip) {
 
   /* check for "\r\n" or "\n\r" */
   if (ip->text_start + 1 < ip->text_end &&
-      ((ip->text[ip->text_start] == '\r' &&
-        ip->text[ip->text_start + 1] == '\n') ||
-       (ip->text[ip->text_start] == '\n' &&
-        ip->text[ip->text_start + 1] == '\r'))) {
+      ((ip->text[ip->text_start] == '\r' && ip->text[ip->text_start + 1] == '\n') ||
+       (ip->text[ip->text_start] == '\n' && ip->text[ip->text_start + 1] == '\r'))) {
     ip->text[ip->text_start++] = 0;
   }
 
@@ -894,8 +879,7 @@ static int escape_command(interactive_t *ip, char *user_command) {
   }
 #endif
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
-  if (ip->input_to &&
-      (!(ip->iflags & NOESC) && !(ip->iflags & I_SINGLE_CHAR))) {
+  if (ip->input_to && (!(ip->iflags & NOESC) && !(ip->iflags & I_SINGLE_CHAR))) {
     return 1;
   }
 #endif
@@ -969,8 +953,7 @@ int process_user_command(interactive_t *ip) {
   // FIXME: move this to somewhere else
   update_load_av();
 
-  debug(connections, "process_user_command: command_giver = /%s\n",
-        command_giver->obname);
+  debug(connections, "process_user_command: command_giver = /%s\n", command_giver->obname);
 
   if (!ip) {
     goto exit;
@@ -978,8 +961,8 @@ int process_user_command(interactive_t *ip) {
 
   user_command = translate_easy(ip->trans->incoming, user_command);
 
-  if ((ip->iflags & USING_MXP) && user_command[0] == ' ' &&
-      user_command[1] == '[' && user_command[3] == 'z') {
+  if ((ip->iflags & USING_MXP) && user_command[0] == ' ' && user_command[1] == '[' &&
+      user_command[3] == 'z') {
     svalue_t *ret;
     copy_and_push_string(user_command);
 
@@ -1145,8 +1128,7 @@ void remove_interactive(object_t *ob, int dested) {
     if (all_users[idx] == ip) {
       break;
     }
-  DEBUG_CHECK(idx == max_users,
-              "remove_interactive: could not find and remove user!\n");
+  DEBUG_CHECK(idx == max_users, "remove_interactive: could not find and remove user!\n");
   FREE(ip);
   ob->interactive = 0;
   all_users[idx] = 0;
@@ -1537,11 +1519,9 @@ void f_request_term_size() {
   auto ip = command_giver->interactive;
 
   if ((st_num_arg == 1) && (sp->u.number == 0)) {
-    telnet_negotiate(command_giver->interactive->telnet, TELNET_DONT,
-                     TELNET_TELOPT_NAWS);
+    telnet_negotiate(command_giver->interactive->telnet, TELNET_DONT, TELNET_TELOPT_NAWS);
   } else {
-    telnet_negotiate(command_giver->interactive->telnet, TELNET_DO,
-                     TELNET_TELOPT_NAWS);
+    telnet_negotiate(command_giver->interactive->telnet, TELNET_DO, TELNET_TELOPT_NAWS);
   }
 
   if (st_num_arg == 1) {

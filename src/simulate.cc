@@ -64,8 +64,7 @@ static void send_say(object_t *, const char *, array_t *);
 
 void check_legal_string(const char *s) {
   if (strlen(s) > LARGEST_PRINTABLE_STRING) {
-    error("Printable strings limited to length of %d.\n",
-          LARGEST_PRINTABLE_STRING);
+    error("Printable strings limited to length of %d.\n", LARGEST_PRINTABLE_STRING);
   }
 }
 
@@ -153,14 +152,11 @@ static int give_uid_to_object(object_t *ob) {
   push_malloced_string(add_slash(ob->obname));
 
   ret = apply_master_ob(APPLY_CREATOR_FILE, 1);
-  if (!ret)
-    error("master object: No function %s() defined!\n",
-          applies_table[APPLY_CREATOR_FILE]);
+  if (!ret) error("master object: No function %s() defined!\n", applies_table[APPLY_CREATOR_FILE]);
   if (!ret || ret == (svalue_t *)-1 || ret->type != T_STRING) {
     destruct_object(ob);
     if (!ret) {
-      error("Master object has no function %s().\n",
-            applies_table[APPLY_CREATOR_FILE]);
+      error("Master object has no function %s().\n", applies_table[APPLY_CREATOR_FILE]);
     }
     if (ret == (svalue_t *)-1) {
       error("Can't load objects without a master object.");
@@ -230,8 +226,7 @@ static int init_object(object_t *ob) {
   add_objects(&ob->stats, 1);
 #endif
 #ifdef NO_ADD_ACTION
-  if (function_exists(APPLY_CATCH_TELL, ob, 1) ||
-      function_exists(APPLY_RECEIVE_MESSAGE, ob, 1)) {
+  if (function_exists(APPLY_CATCH_TELL, ob, 1) || function_exists(APPLY_RECEIVE_MESSAGE, ob, 1)) {
     ob->flags |= O_LISTENER;
   }
 #endif
@@ -397,8 +392,7 @@ object_t *int_load_object(const char *lname, int callcreate) {
     error("Read access denied.\n");
   }
   if (++num_objects_this_thread > INHERIT_CHAIN_SIZE) {
-    error("Inherit chain too deep: > %d when trying to load '%s'.\n",
-          INHERIT_CHAIN_SIZE, lname);
+    error("Inherit chain too deep: > %d when trying to load '%s'.\n", INHERIT_CHAIN_SIZE, lname);
   }
 #ifdef PACKAGE_UIDS
   if (current_object && current_object->euid == NULL) {
@@ -409,11 +403,9 @@ object_t *int_load_object(const char *lname, int callcreate) {
     error("Cannot load a clone.\n");
   }
   if (!strip_name(lname, name, sizeof name))
-    error("Filenames with consecutive /'s in them aren't allowed (%s).\n",
-          lname);
+    error("Filenames with consecutive /'s in them aren't allowed (%s).\n", lname);
   if (!strip_name(pname, actualname, sizeof actualname))
-    error("Filenames with consecutive /'s in them aren't allowed (%s).\n",
-          pname);
+    error("Filenames with consecutive /'s in them aren't allowed (%s).\n", pname);
 
   /*
    * First check that the c-file exists.
@@ -590,7 +582,7 @@ object_t *clone_object(const char *str1, int num_arg) {
   /*
    * If the object self-destructed...
    */
-  if (ob == 0) {/* fix from 3.1.1 */
+  if (ob == 0) { /* fix from 3.1.1 */
     restore_command_giver();
     pop_n_elems(num_arg);
     return (0);
@@ -687,8 +679,7 @@ object_t *object_present(svalue_t *v, object_t *ob) {
         return 0;
       }
     }
-    if (v->u.ob->super == ob ||
-        (v->u.ob->super == ob->super && ob->super != 0)) {
+    if (v->u.ob->super == ob || (v->u.ob->super == ob->super && ob->super != 0)) {
       return v->u.ob->super;
     }
     return 0;
@@ -1363,8 +1354,7 @@ void print_svalue(svalue_t *arg) {
       case T_STRING:
         len = SVALUE_STRLEN(arg);
         if (len > LARGEST_PRINTABLE_STRING) {
-          error("Printable strings limited to length of %d.\n",
-                LARGEST_PRINTABLE_STRING);
+          error("Printable strings limited to length of %d.\n", LARGEST_PRINTABLE_STRING);
         }
 
         tell_object(command_giver, arg->u.string, len);
@@ -1442,7 +1432,7 @@ object_t *find_object(const char *str) {
     return ob;
   }
   ob = load_object(tmpbuf, 0);
-  if (!ob || (ob->flags & O_DESTRUCTED)) {/* *sigh* */
+  if (!ob || (ob->flags & O_DESTRUCTED)) { /* *sigh* */
     return 0;
   }
   return ob;
@@ -1515,8 +1505,7 @@ void move_object(object_t *item, object_t *dest) {
     }
 #ifdef DEBUG
     if (!okay)
-      fatal("Failed to find object /%s in super list of /%s.\n", item->obname,
-            item->super->obname);
+      fatal("Failed to find object /%s in super list of /%s.\n", item->obname, item->super->obname);
 #endif
   }
   /*
@@ -1636,8 +1625,8 @@ void fatal(const char *fmt, ...) {
 #endif
       debug_message("FluffOS driver attempting to exit gracefully.\n", msg_buf);
       if (current_file) {
-        debug_message("(occured during compilation of %s at line %d)\n",
-                      current_file, current_line);
+        debug_message("(occured during compilation of %s at line %d)\n", current_file,
+                      current_line);
       }
       if (current_object) {
         debug_message("(current object was /%s)\n", current_object->obname);
@@ -1698,8 +1687,7 @@ static int num_mudlib_error = 0;
  */
 
 void throw_error() {
-  if (((current_error_context->save_csp + 1)->framekind & FRAME_MASK) ==
-      FRAME_CATCH) {
+  if (((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) {
     throw("throw error");
     fatal("Throw_error failed!");
   }
@@ -1708,12 +1696,10 @@ void throw_error() {
 
 static void debug_message_with_location(char *err) {
   if (current_object && current_prog) {
-    debug_message("%sprogram: /%s, object: /%s, file: %s\n", err,
-                  current_prog->filename, current_object->obname,
-                  get_line_number(pc, current_prog));
+    debug_message("%sprogram: /%s, object: /%s, file: %s\n", err, current_prog->filename,
+                  current_object->obname, get_line_number(pc, current_prog));
   } else if (current_object) {
-    debug_message("%sprogram: (none), object: /%s, file: (none)\n", err,
-                  current_object->obname);
+    debug_message("%sprogram: (none), object: /%s, file: (none)\n", err, current_object->obname);
   } else {
     debug_message("%sprogram: (none), object: (none), file: (none)\n", err);
   }
@@ -1722,15 +1708,12 @@ static void debug_message_with_location(char *err) {
 static void add_message_with_location(char *err) {
   if (current_object && current_prog) {
     add_vmessage(command_giver, "%sprogram: /%s, object: /%s, file: %s\n", err,
-                 current_prog->filename, current_object->obname,
-                 get_line_number(pc, current_prog));
+                 current_prog->filename, current_object->obname, get_line_number(pc, current_prog));
   } else if (current_object) {
-    add_vmessage(command_giver,
-                 "%sprogram: (none), object: /%s, file: (none)\n", err,
+    add_vmessage(command_giver, "%sprogram: (none), object: /%s, file: (none)\n", err,
                  current_object->obname);
   } else {
-    add_vmessage(command_giver,
-                 "%sprogram: (none), object: (none), file: (none)\n", err);
+    add_vmessage(command_giver, "%sprogram: (none), object: (none), file: (none)\n", err);
   }
 }
 
@@ -1744,8 +1727,7 @@ static void mudlib_error_handler(char *err, int katch) {
   m = allocate_mapping(6);
   add_mapping_string(m, "error", err);
   if (current_prog) {
-    add_mapping_malloced_string(m, "program",
-                                add_slash(current_prog->filename));
+    add_mapping_malloced_string(m, "program", add_slash(current_prog->filename));
   }
   if (current_object) {
     add_mapping_object(m, "object", current_object);
@@ -1788,8 +1770,7 @@ void error_handler(char *err) {
 #endif
   num_objects_this_thread = 0; /* reset the count */
 
-  if (((current_error_context->save_csp + 1)->framekind & FRAME_MASK) ==
-      FRAME_CATCH) {
+  if (((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) {
 /* user catches this error */
 /* This is added so that catches generate messages in the log file. */
 #ifdef MUDLIB_ERROR_HANDLER
@@ -1828,9 +1809,7 @@ void error_handler(char *err) {
 
   if (num_error > 0) {
     /* This can happen via errors in the object_name() apply. */
-    debug_message(
-        "Error '%s' while trying to print error trace -- trace suppressed.\n",
-        err);
+    debug_message("Error '%s' while trying to print error trace -- trace suppressed.\n", err);
     too_deep_error = max_eval_error = 0;
     if (current_error_context) {
       throw("error handler error");
@@ -1877,17 +1856,14 @@ void error_handler(char *err) {
       ob = find_object2(object_name);
       if (!ob) {
         if (command_giver)
-          add_vmessage(command_giver,
-                       "error when executing program in destroyed object /%s\n",
+          add_vmessage(command_giver, "error when executing program in destroyed object /%s\n",
                        object_name);
-        debug_message("error when executing program in destroyed object /%s\n",
-                      object_name);
+        debug_message("error when executing program in destroyed object /%s\n", object_name);
       }
     }
     if (command_giver && command_giver->interactive) {
 #ifndef NO_WIZARDS
-      if ((command_giver->flags & O_IS_WIZARD) ||
-          !strlen(DEFAULT_ERROR_MESSAGE)) {
+      if ((command_giver->flags & O_IS_WIZARD) || !strlen(DEFAULT_ERROR_MESSAGE)) {
 #endif
         add_message_with_location(err + 1);
 #ifndef NO_WIZARDS
@@ -1897,11 +1873,9 @@ void error_handler(char *err) {
 #endif
     }
     if (current_heart_beat) {
-      static char hb_message[] =
-          "FluffOS driver tells you: You have no heart beat!\n";
+      static char hb_message[] = "FluffOS driver tells you: You have no heart beat!\n";
       set_heart_beat(current_heart_beat, 0);
-      debug_message("Heart beat in /%s turned off.\n",
-                    current_heart_beat->obname);
+      debug_message("Heart beat in /%s turned off.\n", current_heart_beat->obname);
       if (current_heart_beat->interactive) {
         add_message(current_heart_beat, hb_message, sizeof(hb_message) - 1);
       }
@@ -1951,8 +1925,7 @@ void safe_error(const char *const fmt, ...) {
     va_start(args, fmt);
     error(fmt, args);
     va_end(args);
-  }
-  catch (const char *msg) {
+  } catch (const char *msg) {
     pop_context(&econ);
   }
 }
@@ -2010,8 +1983,7 @@ void shutdownMudOS(int exit_code) {
   exit(exit_code);
 }
 
-void do_message(svalue_t *lclass, svalue_t *msg, array_t *scope,
-                array_t *exclude, int recurse) {
+void do_message(svalue_t *lclass, svalue_t *msg, array_t *scope, array_t *exclude, int recurse) {
   int i, j, valid;
   object_t *ob;
 

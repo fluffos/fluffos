@@ -51,15 +51,13 @@ void f_compress_file(void) {
       push_number(0);
       return;
     }
-    tmpout =
-        new_string(strlen(input_file) + strlen(GZ_EXTENSION), "compress_file");
+    tmpout = new_string(strlen(input_file) + strlen(GZ_EXTENSION), "compress_file");
     strcpy(tmpout, input_file);
     strcat(tmpout, GZ_EXTENSION);
     output_file = tmpout;
   }
 
-  real_output_file =
-      check_valid_path(output_file, current_object, "compress_file", 1);
+  real_output_file = check_valid_path(output_file, current_object, "compress_file", 1);
   if (!real_output_file) {
     pop_n_elems(num_arg);
     push_number(0);
@@ -73,8 +71,7 @@ void f_compress_file(void) {
   }
   output_file = outname;
 
-  real_input_file =
-      check_valid_path(input_file, current_object, "compress_file", 0);
+  real_input_file = check_valid_path(input_file, current_object, "compress_file", 0);
   if (!real_input_file) {
     pop_n_elems(num_arg);
     push_number(0);
@@ -154,8 +151,7 @@ void f_uncompress_file(void) {
     output_file = tmp;
   }
 
-  real_output_file =
-      check_valid_path(output_file, current_object, "compress_file", 1);
+  real_output_file = check_valid_path(output_file, current_object, "compress_file", 1);
   if (!real_output_file) {
     if (num_arg != 2) {
       FREE_MSTR(output_file);
@@ -172,8 +168,7 @@ void f_uncompress_file(void) {
   }
   output_file = outname;
 
-  real_input_file =
-      check_valid_path(input_file, current_object, "compress_file", 0);
+  real_input_file = check_valid_path(input_file, current_object, "compress_file", 0);
   if (!real_input_file) {
     pop_n_elems(num_arg);
     push_number(0);
@@ -267,8 +262,7 @@ void f_uncompress(void) {
     return;
   }
 
-  compressed = (z_stream *)DXALLOC(sizeof(z_stream), TAG_INTERACTIVE,
-                                   "start_compression");
+  compressed = (z_stream *)DXALLOC(sizeof(z_stream), TAG_INTERACTIVE, "start_compression");
   compressed->next_in = buffer->item;
   compressed->avail_in = buffer->size;
   compressed->next_out = compress_buf;
@@ -291,8 +285,7 @@ void f_uncompress(void) {
       pos = len;
       len += COMPRESS_BUF_SIZE - compressed->avail_out;
       if (!output_data) {
-        output_data =
-            (unsigned char *)DXALLOC(len, TAG_TEMPORARY, "uncompress");
+        output_data = (unsigned char *)DXALLOC(len, TAG_TEMPORARY, "uncompress");
       } else {
         output_data = (unsigned char *)REALLOC(output_data, len);
       }

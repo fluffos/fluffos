@@ -102,22 +102,19 @@ static void get_simul_efuns(program_t *prog) {
       num_simul_efun = 0;
     } else {
       /* will be resized later */
-      simul_names = RESIZE(simul_names, num_simul_efun + num_new, simul_entry,
-                           TAG_SIMULS, "get_simul_efuns");
-      simuls = RESIZE(simuls, num_simul_efun + num_new, function_lookup_info_t,
-                      TAG_SIMULS, "get_simul_efuns: 2");
+      simul_names =
+          RESIZE(simul_names, num_simul_efun + num_new, simul_entry, TAG_SIMULS, "get_simul_efuns");
+      simuls = RESIZE(simuls, num_simul_efun + num_new, function_lookup_info_t, TAG_SIMULS,
+                      "get_simul_efuns: 2");
     }
   } else {
     if (num_new) {
-      simul_names =
-          CALLOCATE(num_new, simul_entry, TAG_SIMULS, "get_simul_efuns");
-      simuls = CALLOCATE(num_new, function_lookup_info_t, TAG_SIMULS,
-                         "get_simul_efuns: 2");
+      simul_names = CALLOCATE(num_new, simul_entry, TAG_SIMULS, "get_simul_efuns");
+      simuls = CALLOCATE(num_new, function_lookup_info_t, TAG_SIMULS, "get_simul_efuns: 2");
     }
   }
   for (i = 0; i < num_new; i++) {
-    if (prog->function_flags[i] &
-        (FUNC_NO_CODE | DECL_PROTECTED | DECL_PRIVATE | DECL_HIDDEN)) {
+    if (prog->function_flags[i] & (FUNC_NO_CODE | DECL_PROTECTED | DECL_PRIVATE | DECL_HIDDEN)) {
       continue;
     }
 
@@ -126,10 +123,8 @@ static void get_simul_efuns(program_t *prog) {
 
   if (num_simul_efun) {
     /* shrink to fit */
-    simul_names = RESIZE(simul_names, num_simul_efun, simul_entry, TAG_SIMULS,
-                         "get_simul_efuns");
-    simuls = RESIZE(simuls, num_simul_efun, function_lookup_info_t, TAG_SIMULS,
-                    "get_simul_efuns");
+    simul_names = RESIZE(simul_names, num_simul_efun, simul_entry, TAG_SIMULS, "get_simul_efuns");
+    simuls = RESIZE(simuls, num_simul_efun, function_lookup_info_t, TAG_SIMULS, "get_simul_efuns");
   }
 }
 

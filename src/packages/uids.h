@@ -12,9 +12,7 @@
 
 #include "../std.h"
 
-typedef struct _uid {
-  char *name;
-} userid_t;
+typedef struct _uid { char *name; } userid_t;
 
 extern userid_t *backbone_uid;
 extern userid_t *root_uid;

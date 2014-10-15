@@ -40,10 +40,10 @@ typedef struct mapping_s {
 #endif
   mapping_node_t **table;  /* the hash table */
   unsigned int table_size; /* # of buckets in hash table == power of 2 */
-  unsigned int unfilled; /* # of buckets among 80% of total buckets that do not
-                            have
-                            entries */
-  unsigned int count; /* total # of nodes actually in mapping  */
+  unsigned int unfilled;   /* # of buckets among 80% of total buckets that do not
+                              have
+                              entries */
+  unsigned int count;      /* total # of nodes actually in mapping  */
 #ifdef PACKAGE_MUDLIB_STATS
   statgroup_t stats; /* creators of the mapping */
 #endif
@@ -61,9 +61,7 @@ typedef struct vinfo_s {
   int pos, size, w;
 } vinfo_t;
 
-typedef struct minfo_s {
-  mapping_t *map, *newmap;
-} minfo_t;
+typedef struct minfo_s { mapping_t *map, *newmap; } minfo_t;
 
 #define mapping_too_large() \
   error("Mapping exceeded maximum allowed size of %d.\n", MAX_MAPPING_SIZE);
@@ -78,8 +76,7 @@ extern mapping_node_t *locked_map_nodes;
 
 int msameval(svalue_t *, svalue_t *);
 int mapping_save_size(mapping_t *);
-mapping_t *mapTraverse(mapping_t *,
-                       int (*)(mapping_t *, mapping_node_t *, void *), void *);
+mapping_t *mapTraverse(mapping_t *, int (*)(mapping_t *, mapping_node_t *, void *), void *);
 mapping_t *load_mapping_from_aggregate(svalue_t *, int);
 mapping_t *allocate_mapping(int);
 mapping_t *allocate_mapping2(array_t *, svalue_t *);

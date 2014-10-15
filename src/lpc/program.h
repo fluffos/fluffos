@@ -90,13 +90,11 @@
 #ifndef SENSIBLE_MODIFIERS
 #define DECL_VISIBLE 0x4000 /* Force inherit through private */
 
-#define DECL_ACCESS \
-  (DECL_HIDDEN | DECL_PRIVATE | DECL_PROTECTED | DECL_PUBLIC | DECL_VISIBLE)
+#define DECL_ACCESS (DECL_HIDDEN | DECL_PRIVATE | DECL_PROTECTED | DECL_PUBLIC | DECL_VISIBLE)
 
-#define DECL_MODIFY(x, y)                              \
-  ((((x) | (y)) & DECL_VISIBLE)                        \
-       ? ((((x) | (y)) & ~DECL_ACCESS) | DECL_VISIBLE) \
-       : DECL_MODIFY2(x, y))
+#define DECL_MODIFY(x, y)                                                       \
+  ((((x) | (y)) & DECL_VISIBLE) ? ((((x) | (y)) & ~DECL_ACCESS) | DECL_VISIBLE) \
+                                : DECL_MODIFY2(x, y))
 #else
 #define DECL_ACCESS (DECL_HIDDEN | DECL_PRIVATE | DECL_PROTECTED | DECL_PUBLIC)
 
@@ -104,15 +102,14 @@
 #endif
 #define DECL_MODS (DECL_ACCESS | DECL_NOMASK | DECL_NOSAVE)
 
-#define DECL_MODIFY2(t, mod)                     \
-  ((((t) & DECL_ACCESS) > ((mod) & DECL_ACCESS)) \
-       ? ((t) & ~DECL_ACCESS) | (mod)            \
-       : (t) | ((mod) & ~DECL_ACCESS))
+#define DECL_MODIFY2(t, mod)                                                \
+  ((((t)&DECL_ACCESS) > ((mod)&DECL_ACCESS)) ? ((t) & ~DECL_ACCESS) | (mod) \
+                                             : (t) | ((mod) & ~DECL_ACCESS))
 
 /* only the flags that should be copied up through inheritance levels */
-#define FUNC_MASK                                                       \
-  (FUNC_VARARGS | FUNC_UNDEFINED | FUNC_STRICT_TYPES | FUNC_PROTOTYPE | \
-   FUNC_TRUE_VARARGS | FUNC_ALIAS | DECL_MODS)
+#define FUNC_MASK                                                                           \
+  (FUNC_VARARGS | FUNC_UNDEFINED | FUNC_STRICT_TYPES | FUNC_PROTOTYPE | FUNC_TRUE_VARARGS | \
+   FUNC_ALIAS | DECL_MODS)
 
 /* a function that isn't 'real' */
 #define FUNC_NO_CODE (FUNC_ALIAS | FUNC_PROTOTYPE | FUNC_UNDEFINED)
@@ -243,8 +240,8 @@ typedef struct program_s {
   /*
    * And now some general size information.
    */
-  unsigned short heart_beat; /* Index of the heart beat function. 0 means
-                                * no heart beat */
+  unsigned short heart_beat;   /* Index of the heart beat function. 0 means
+                                  * no heart beat */
   unsigned short program_size; /* size of this instruction code */
   unsigned short num_classes;
   unsigned short num_functions_defined;

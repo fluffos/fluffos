@@ -1,5 +1,4 @@
 void f_thread() {
-
   int sv[2];
   fd = find_new_socket();
   if (fd < 0) {
@@ -49,7 +48,6 @@ void f_thread() {
   }
   svalue_t *res = call_efun_callback(&cb, 1);
   switch (res->type) {
-
     case T_OBJECT:
       break;
     default:
@@ -59,8 +57,7 @@ void f_thread() {
         OS_socket_write(sv[1], "\x00\x00\x00\x11\"result too big\"", 21);
         break;
       }
-      char *buf =
-          (char *)DMALLOC(len + 5, TAG_TEMPORARY, "socket_write: default");
+      char *buf = (char *)DMALLOC(len + 5, TAG_TEMPORARY, "socket_write: default");
       if (buf == NULL) {
         break;
       }

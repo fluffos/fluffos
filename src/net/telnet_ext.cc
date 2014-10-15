@@ -28,8 +28,7 @@ void on_telnet_do_gmcp(interactive_t* ip) {
 void f_send_gmcp() {
   auto ip = current_object->interactive;
   if (ip) {
-    telnet_subnegotiation(ip->telnet, TELNET_TELOPT_GMCP, sp->u.string,
-                          SVALUE_STRLEN(sp));
+    telnet_subnegotiation(ip->telnet, TELNET_TELOPT_GMCP, sp->u.string, SVALUE_STRLEN(sp));
     flush_message(ip);
   }
   pop_stack();
@@ -38,8 +37,7 @@ void f_send_gmcp() {
 
 /* ZMP */
 
-void on_telnet_do_zmp(const char** argv, unsigned long argc,
-                      interactive_t* ip) {
+void on_telnet_do_zmp(const char** argv, unsigned long argc, interactive_t* ip) {
   ip->iflags |= USING_ZMP;
 
   // Push the command

@@ -10,19 +10,19 @@
  * See the GNU General Public License for more details.
  */
 #ifndef S_ISDIR
-#define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+#define S_ISDIR(m) (((m)&S_IFMT) == S_IFDIR)
 #endif
 
 #ifndef S_ISREG
-#define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+#define S_ISREG(m) (((m)&S_IFMT) == S_IFREG)
 #endif
 
 #ifndef S_ISCHR
-#define S_ISCHR(m) (((m) & S_IFMT) == S_IFCHR)
+#define S_ISCHR(m) (((m)&S_IFMT) == S_IFCHR)
 #endif
 
 #ifndef S_ISBLK
-#define S_ISBLK(m) (((m) & S_IFMT) == S_IFBLK)
+#define S_ISBLK(m) (((m)&S_IFMT) == S_IFBLK)
 #endif
 
 /*

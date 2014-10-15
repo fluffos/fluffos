@@ -181,8 +181,7 @@ array_t *get_dir(const char *path, int flags) {
  */
 #ifdef WIN32
   do {
-    if (!do_match &&
-        (!strcmp(FindBuffer.name, ".") || !strcmp(FindBuffer.name, ".."))) {
+    if (!do_match && (!strcmp(FindBuffer.name, ".") || !strcmp(FindBuffer.name, ".."))) {
       continue;
     }
     if (do_match && !match_string(regexppath, FindBuffer.name)) {
@@ -197,8 +196,7 @@ array_t *get_dir(const char *path, int flags) {
 #else
   for (de = readdir(dirp); de; de = readdir(dirp)) {
     namelen = strlen(de->d_name);
-    if (!do_match &&
-        (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)) {
+    if (!do_match && (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)) {
       continue;
     }
     if (do_match && !match_string(regexppath, de->d_name)) {
@@ -233,8 +231,7 @@ array_t *get_dir(const char *path, int flags) {
   strcat(endtemp++, "/");
   i = 0;
   do {
-    if (!do_match &&
-        (!strcmp(FindBuffer.name, ".") || !strcmp(FindBuffer.name, ".."))) {
+    if (!do_match && (!strcmp(FindBuffer.name, ".") || !strcmp(FindBuffer.name, ".."))) {
       continue;
     }
     if (do_match && !match_string(regexppath, FindBuffer.name)) {
@@ -256,8 +253,7 @@ array_t *get_dir(const char *path, int flags) {
 
   for (i = 0, de = readdir(dirp); i < count; de = readdir(dirp)) {
     namelen = strlen(de->d_name);
-    if (!do_match &&
-        (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)) {
+    if (!do_match && (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)) {
       continue;
     }
     if (do_match && !match_string(regexppath, de->d_name)) {
@@ -279,8 +275,7 @@ array_t *get_dir(const char *path, int flags) {
 #endif /* OS2 */
 
   /* Sort the names. */
-  qsort((void *)v->item, count, sizeof v->item[0],
-        (flags == -1) ? parrcmp : pstrcmp);
+  qsort((void *)v->item, count, sizeof v->item[0], (flags == -1) ? parrcmp : pstrcmp);
   return v;
 }
 
@@ -316,12 +311,12 @@ int legal_path(const char *path) {
     return 0;
   }
   p = path;
-  while (p) {/* Zak, 930530 - do better checking */
+  while (p) { /* Zak, 930530 - do better checking */
     if (p[0] == '.') {
-      if (p[1] == '\0') {/* trailing `.' ok */
+      if (p[1] == '\0') { /* trailing `.' ok */
         break;
       }
-      if (p[1] == '.') {/* check for `..' or `../' */
+      if (p[1] == '.') { /* check for `..' or `../' */
         p++;
       }
       if (p[1] == '/' || p[1] == '\0') {
@@ -355,9 +350,9 @@ void smart_log(const char *error_file, int line, const char *what, int flag) {
   svalue_t *mret;
   extern int pragmas;
 
-  buff = (char *)DMALLOC(strlen(error_file) + strlen(what) +
-                             ((pragmas & PRAGMA_ERROR_CONTEXT) ? 100 : 40),
-                         TAG_TEMPORARY, "smart_log: 1");
+  buff = (char *)DMALLOC(
+      strlen(error_file) + strlen(what) + ((pragmas & PRAGMA_ERROR_CONTEXT) ? 100 : 40),
+      TAG_TEMPORARY, "smart_log: 1");
 
   if (flag) {
     sprintf(buff, "/%s line %d: Warning: %s", error_file, line, what);
@@ -496,8 +491,7 @@ char *read_file(const char *file, int start, int lines) {
   }
 
   if (!theBuff) {
-    theBuff = (char *)DXALLOC(2 * READ_FILE_MAX_SIZE + 1, TAG_PERMANENT,
-                              "read_file: theBuff");
+    theBuff = (char *)DXALLOC(2 * READ_FILE_MAX_SIZE + 1, TAG_PERMANENT, "read_file: theBuff");
   }
 
 #ifndef PACKAGE_COMPRESS
@@ -733,8 +727,8 @@ int file_size(const char *file) {
  * Otherwise, the returned path is temporarily allocated by apply(), which
  * means it will be deallocated at next apply().
  */
-const char *check_valid_path(const char *path, object_t *call_object,
-                             const char *const call_fun, int writeflg) {
+const char *check_valid_path(const char *path, object_t *call_object, const char *const call_fun,
+                             int writeflg) {
   svalue_t *v;
 
   if (!master_ob && !call_object) {
@@ -925,8 +919,7 @@ static int do_move(const char *from, const char *to, int flag) {
 #ifdef WIN32
     if (!strcmp(from, to))
 #else
-    if (from_stats.st_dev == to_stats.st_dev &&
-        from_stats.st_ino == to_stats.st_ino)
+    if (from_stats.st_dev == to_stats.st_dev && from_stats.st_ino == to_stats.st_ino)
 #endif
     {
       error("`/%s' and `/%s' are the same file", from, to);
@@ -987,7 +980,7 @@ static int do_move(const char *from, const char *to, int flag) {
   }
 #ifdef F_LINK
   else if (flag == F_LINK) {
-    if (symlink(from, to) == 0) {/* symbolic link */
+    if (symlink(from, to) == 0) { /* symbolic link */
       return 0;
     }
   }
@@ -1115,8 +1108,7 @@ int copy_file(const char *from, const char *to) {
 #ifdef WIN32
     if (!strcmp(from, to))
 #else
-    if (from_stats.st_dev == to_stats.st_dev &&
-        from_stats.st_ino == to_stats.st_ino)
+    if (from_stats.st_dev == to_stats.st_dev && from_stats.st_ino == to_stats.st_ino)
 #endif
     {
       error("`/%s' and `/%s' are the same file", from, to);
@@ -1183,8 +1175,7 @@ void dump_file_descriptors(outbuffer_t *out) {
   struct stat stbuf;
 
   outbuf_add(out, "Fd  Device Number  Inode   Mode    Uid    Gid      Size\n");
-  outbuf_add(out,
-             "--  -------------  -----  ------  -----  -----  ----------\n");
+  outbuf_add(out, "--  -------------  -----  ------  -----  -----  ----------\n");
 
   for (i = 0; i < FD_SETSIZE; i++) {
     /* bug in NeXT OS 2.1, st_mode == 0 for sockets */
@@ -1205,7 +1196,6 @@ void dump_file_descriptors(outbuffer_t *out) {
     outbuf_add(out, "  ");
 
     switch (stbuf.st_mode & S_IFMT) {
-
       case S_IFDIR:
         outbuf_add(out, "d");
         break;

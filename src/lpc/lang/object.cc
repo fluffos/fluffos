@@ -16,9 +16,8 @@
 #include <zlib.h>
 #endif
 
-#define too_deep_save_error()                                            \
-  error("Mappings and/or arrays nested too deep (%d) for save_object\n", \
-        MAX_SAVE_SVALUE_DEPTH);
+#define too_deep_save_error() \
+  error("Mappings and/or arrays nested too deep (%d) for save_object\n", MAX_SAVE_SVALUE_DEPTH);
 
 object_t *previous_ob;
 int tot_alloc_object, tot_alloc_object_size;
@@ -101,8 +100,7 @@ int svalue_save_size(svalue_t *v) {
       }
       do {
         for (elt = a[j]; elt; elt = elt->next) {
-          size +=
-              svalue_save_size(elt->values) + svalue_save_size(elt->values + 1);
+          size += svalue_save_size(elt->values) + svalue_save_size(elt->values + 1);
         }
       } while (j--);
       save_svalue_depth--;
@@ -267,14 +265,12 @@ static int restore_internal_size(const char **str, int is_mapping, int depth) {
             while (max_depth <= depth) {
               max_depth <<= 1;
             }
-            sizes = CALLOCATE(max_depth, int, TAG_TEMPORARY,
-                              "restore_internal_size");
+            sizes = CALLOCATE(max_depth, int, TAG_TEMPORARY, "restore_internal_size");
           } else if (depth >= max_depth) {
             while ((max_depth <<= 1) <= depth) {
               ;
             }
-            sizes = RESIZE(sizes, max_depth, int, TAG_TEMPORARY,
-                           "restore_internal_size");
+            sizes = RESIZE(sizes, max_depth, int, TAG_TEMPORARY, "restore_internal_size");
           }
           sizes[depth] = size;
           return 1;
@@ -292,14 +288,12 @@ static int restore_internal_size(const char **str, int is_mapping, int depth) {
             while (max_depth <= depth) {
               max_depth <<= 1;
             }
-            sizes = CALLOCATE(max_depth, int, TAG_TEMPORARY,
-                              "restore_internal_size");
+            sizes = CALLOCATE(max_depth, int, TAG_TEMPORARY, "restore_internal_size");
           } else if (depth >= max_depth) {
             while ((max_depth <<= 1) <= depth) {
               ;
             }
-            sizes = RESIZE(sizes, max_depth, int, TAG_TEMPORARY,
-                           "restore_internal_size");
+            sizes = RESIZE(sizes, max_depth, int, TAG_TEMPORARY, "restore_internal_size");
           }
           sizes[depth] = size;
           return 1;
@@ -473,7 +467,9 @@ static int restore_interior_string(char **val, svalue_t *sv) {
         }
       }
 
-      case '\0': { return ROB_STRING_ERROR; }
+      case '\0': {
+        return ROB_STRING_ERROR;
+      }
     }
   }
 
@@ -1064,7 +1060,9 @@ static int restore_string(char *val, svalue_t *sv) {
         }
       }
 
-      case '\0': { return ROB_STRING_ERROR; }
+      case '\0': {
+        return ROB_STRING_ERROR;
+      }
     }
   }
 
@@ -1201,8 +1199,8 @@ static int safe_restore_svalue(char *cp, svalue_t *v) {
   return 0;
 }
 
-static int fgv_recurse(program_t *prog, int *idx, char *name,
-                       unsigned short *type, int check_nosave) {
+static int fgv_recurse(program_t *prog, int *idx, char *name, unsigned short *type,
+                       int check_nosave) {
   int i;
   for (i = 0; i < prog->num_inherited; i++) {
     if (fgv_recurse(prog->inherit[i].prog, idx, name, type, check_nosave)) {
@@ -1223,8 +1221,8 @@ static int fgv_recurse(program_t *prog, int *idx, char *name,
   return 0;
 }
 
-int find_global_variable(program_t *prog, const char *const name,
-                         unsigned short *type, int check_nosave) {
+int find_global_variable(program_t *prog, const char *const name, unsigned short *type,
+                         int check_nosave) {
   int idx = 0;
   char *str = findstring(name);
 
@@ -1244,7 +1242,7 @@ void restore_object_from_line(object_t *ob, char *line, int noclear) {
   int rc;
   unsigned short t;
 
-  if (line[0] == '#') {/* ignore 'comments' in savefiles */
+  if (line[0] == '#') { /* ignore 'comments' in savefiles */
     return;
   }
   space = strchr(line, ' ');
@@ -1258,7 +1256,6 @@ void restore_object_from_line(object_t *ob, char *line, int noclear) {
     push_number(0);
     rc = restore_svalue(space + 1, sp);
   } else {
-
     v = &sv[idx];
     if (noclear) {
       rc = safe_restore_svalue(space + 1, v);
@@ -1268,23 +1265,17 @@ void restore_object_from_line(object_t *ob, char *line, int noclear) {
   }
   if (rc & ROB_ERROR) {
     if (rc & ROB_GENERAL_ERROR) {
-      error("restore_object(): Illegal general format while restoring %s.\n",
-            var);
+      error("restore_object(): Illegal general format while restoring %s.\n", var);
     } else if (rc & ROB_NUMERAL_ERROR) {
-      error("restore_object(): Illegal numeric format while restoring %s.\n",
-            var);
+      error("restore_object(): Illegal numeric format while restoring %s.\n", var);
     } else if (rc & ROB_ARRAY_ERROR) {
-      error("restore_object(): Illegal array format while restoring %s.\n",
-            var);
+      error("restore_object(): Illegal array format while restoring %s.\n", var);
     } else if (rc & ROB_MAPPING_ERROR) {
-      error("restore_object(): Illegal mapping format while restoring %s.\n",
-            var);
+      error("restore_object(): Illegal mapping format while restoring %s.\n", var);
     } else if (rc & ROB_STRING_ERROR) {
-      error("restore_object(): Illegal string format while restoring %s.\n",
-            var);
+      error("restore_object(): Illegal string format while restoring %s.\n", var);
     } else if (rc & ROB_CLASS_ERROR) {
-      error("restore_object(): Illegal class format while restoring %s.\n",
-            var);
+      error("restore_object(): Illegal class format while restoring %s.\n", var);
     }
   }
   if (idx == -1) {
@@ -1294,8 +1285,7 @@ void restore_object_from_line(object_t *ob, char *line, int noclear) {
 }
 
 #ifdef HAVE_ZLIB
-int restore_object_from_gzip(object_t *ob, gzFile gzf, int noclear,
-                             int *count) {
+int restore_object_from_gzip(object_t *ob, gzFile gzf, int noclear, int *count) {
   static char *buff = NULL;
   static long buffsize = 0;
   const char *tmp = "";
@@ -1345,7 +1335,6 @@ void restore_object_from_buff(object_t *ob, char *theBuff, int noclear) {
 
   nextBuff = theBuff;
   while ((buff = nextBuff) && *buff) {
-
     if ((tmp = strchr(buff, '\n'))) {
       *tmp = '\0';
       if (tmp > buff && tmp[-1] == '\r') {
@@ -1366,11 +1355,10 @@ void restore_object_from_buff(object_t *ob, char *theBuff, int noclear) {
  * If 'save_zeros' is set, 0 valued variables will be saved
  */
 #ifdef HAVE_ZLIB
-static int save_object_recurse(program_t *prog, svalue_t **svp, int type,
-                               int save_zeros, FILE *f, gzFile gzf)
+static int save_object_recurse(program_t *prog, svalue_t **svp, int type, int save_zeros, FILE *f,
+                               gzFile gzf)
 #else
-static int save_object_recurse(program_t *prog, svalue_t **svp, int type,
-                               int save_zeros, FILE *f)
+static int save_object_recurse(program_t *prog, svalue_t **svp, int type, int save_zeros, FILE *f)
 #endif
 {
   int i;
@@ -1382,13 +1370,11 @@ static int save_object_recurse(program_t *prog, svalue_t **svp, int type,
 
   for (i = 0; i < prog->num_inherited; i++) {
 #ifdef HAVE_ZLIB
-    if (!(tmp = save_object_recurse(prog->inherit[i].prog, svp,
-                                    prog->inherit[i].type_mod | type,
+    if (!(tmp = save_object_recurse(prog->inherit[i].prog, svp, prog->inherit[i].type_mod | type,
                                     save_zeros, f, gzf)))
 #else
 
-    if (!(tmp = save_object_recurse(prog->inherit[i].prog, svp,
-                                    prog->inherit[i].type_mod | type,
+    if (!(tmp = save_object_recurse(prog->inherit[i].prog, svp, prog->inherit[i].type_mod | type,
                                     save_zeros, f)))
 #endif
       return 0;
@@ -1420,10 +1406,9 @@ static int save_object_recurse(program_t *prog, svalue_t **svp, int type,
     *new_str = '\0';
     p = new_str;
     save_svalue((*svp)++, &p);
-    DEBUG_CHECK(p - new_str != theSize - 1,
-                "Length miscalculated in save_object!");
+    DEBUG_CHECK(p - new_str != theSize - 1, "Length miscalculated in save_object!");
     /* FIXME: shouldn't use fprintf() */
-    if (save_zeros || new_str[0] != '0' || new_str[1] != 0) {/* Armidale */
+    if (save_zeros || new_str[0] != '0' || new_str[1] != 0) { /* Armidale */
       textsize += theSize;
       textsize += strlen(prog->variable_table[i]);
       textsize += 2;
@@ -1457,8 +1442,8 @@ static int save_object_recurse(program_t *prog, svalue_t **svp, int type,
  * If 'save_zeros' is set, 0 valued variables will be saved
  */
 
-static int save_object_recurse_str(program_t *prog, svalue_t **svp, int type,
-                                   int save_zeros, char *buf, int bufsize) {
+static int save_object_recurse_str(program_t *prog, svalue_t **svp, int type, int save_zeros,
+                                   char *buf, int bufsize) {
   int i;
   int textsize = 1;
   int tmp;
@@ -1467,9 +1452,9 @@ static int save_object_recurse_str(program_t *prog, svalue_t **svp, int type,
   char *new_str, *p;
 
   for (i = 0; i < prog->num_inherited; i++) {
-    if (!(tmp = save_object_recurse_str(
-              prog->inherit[i].prog, svp, prog->inherit[i].type_mod | type,
-              save_zeros, buf + textsize - 1, bufsize))) {
+    if (!(tmp =
+              save_object_recurse_str(prog->inherit[i].prog, svp, prog->inherit[i].type_mod | type,
+                                      save_zeros, buf + textsize - 1, bufsize))) {
       return 0;
     }
     textsize += tmp - 1;
@@ -1503,11 +1488,9 @@ static int save_object_recurse_str(program_t *prog, svalue_t **svp, int type,
     *new_str = '\0';
     p = new_str;
     save_svalue((*svp)++, &p);
-    DEBUG_CHECK(p - new_str != theSize - 1,
-                "Length miscalculated in save_object!");
-    if (save_zeros || new_str[0] != '0' || new_str[1] != 0) {/* Armidale */
-      if (sprintf(buf + textsize - 1, "%s %s\n", prog->variable_table[i],
-                  new_str) < 0) {
+    DEBUG_CHECK(p - new_str != theSize - 1, "Length miscalculated in save_object!");
+    if (save_zeros || new_str[0] != '0' || new_str[1] != 0) { /* Armidale */
+      if (sprintf(buf + textsize - 1, "%s %s\n", prog->variable_table[i], new_str) < 0) {
         debug_perror("save_object: fprintf", 0);
         FREE(new_str);
         return 0;
@@ -1713,8 +1696,7 @@ char *save_variable(svalue_t *var) {
   *new_str = '\0';
   p = new_str;
   save_svalue(var, &p);
-  DEBUG_CHECK(p - new_str != theSize - 1,
-              "Length miscalculated in save_variable");
+  DEBUG_CHECK(p - new_str != theSize - 1, "Length miscalculated in save_variable");
   return new_str;
 }
 
@@ -1783,7 +1765,6 @@ int restore_object(object_t *ob, const char *file, int noclear) {
   if (strcmp(file + len - sel, SAVE_EXTENSION) == 0) {
     len -= sel;
   }
-
 #ifdef HAVE_ZLIB
   else {
     if (len >= SAVE_EXTENSION_GZ_LENGTH &&
@@ -1844,8 +1825,7 @@ int restore_object(object_t *ob, const char *file, int noclear) {
       }
     }
     gzclose(gzf);
-  }
-  catch (const char *) {
+  } catch (const char *) {
     restore_context(&econ);
     pop_context(&econ);
     gzclose(gzf);
@@ -1957,9 +1937,8 @@ void dealloc_object(object_t *ob, const char *from) {
 
   if (!(ob->flags & O_DESTRUCTED)) {
     if (ob->next_all != ob) /* This is fatal, and should never happen. */
-      fatal(
-          "FATAL: Object 0x%x /%s ref count 0, but not destructed (from %s).\n",
-          ob, ob->obname, from);
+      fatal("FATAL: Object 0x%x /%s ref count 0, but not destructed (from %s).\n", ob, ob->obname,
+            from);
     else {
       destruct_object(ob);
       return;
@@ -1972,8 +1951,7 @@ void dealloc_object(object_t *ob, const char *from) {
    */
   if (ob->prog) {
     tot_alloc_object_size -=
-        (ob->prog->num_variables_total - 1) * sizeof(svalue_t) +
-        sizeof(object_t);
+        (ob->prog->num_variables_total - 1) * sizeof(svalue_t) + sizeof(object_t);
     free_prog(&ob->prog);
     ob->prog = 0;
   }
@@ -2071,8 +2049,7 @@ object_t *get_empty_object(int num_var) {
 void reset_object(object_t *ob) {
 /* Be sure to update time first ! */
 #ifdef RANDOMIZED_RESETS
-  ob->next_reset = current_virtual_time + TIME_TO_RESET / 2 +
-                   random_number(TIME_TO_RESET / 2);
+  ob->next_reset = current_virtual_time + TIME_TO_RESET / 2 + random_number(TIME_TO_RESET / 2);
 #else
   ob->next_reset = current_virtual_time + TIME_TO_RESET;
 #endif
@@ -2088,8 +2065,7 @@ void reset_object(object_t *ob) {
 
 void call_create(object_t *ob, int num_arg) {
   /* Be sure to update time first ! */
-  ob->next_reset = current_virtual_time + TIME_TO_RESET / 2 +
-                   random_number(TIME_TO_RESET / 2);
+  ob->next_reset = current_virtual_time + TIME_TO_RESET / 2 + random_number(TIME_TO_RESET / 2);
 
   call___INIT(ob);
 
@@ -2179,8 +2155,7 @@ void reload_object(object_t *obj) {
   call_create(obj, 0);
 }
 
-void get_objects(object_t ***list, int *size, get_objectsfn_t callback,
-                 void *data) {
+void get_objects(object_t ***list, int *size, get_objectsfn_t callback, void *data) {
   object_t *ob;
 #ifdef F_SET_HIDE
   int display_hidden = 0;
@@ -2193,13 +2168,10 @@ void get_objects(object_t ***list, int *size, get_objectsfn_t callback,
     }
   }
   *list = (object_t **)new_string(
-      ((tot_alloc_object - (display_hidden ? 0 : num_hidden)) *
-       sizeof(object_t *)) -
-          1,
+      ((tot_alloc_object - (display_hidden ? 0 : num_hidden)) * sizeof(object_t *)) - 1,
       "get_objects");
 #else
-  *list = (object_t **)new_string((tot_alloc_object * sizeof(object_t *)) - 1,
-                                  "get_objects");
+  *list = (object_t **)new_string((tot_alloc_object * sizeof(object_t *)) - 1, "get_objects");
 #endif
 
   if (!*list) {
@@ -2239,8 +2211,7 @@ void mark_command_giver_stack(void) {
 
 /* set a new command giver, saving the old one */
 void save_command_giver(object_t *ob) {
-  DEBUG_CHECK(cgsp == &command_giver_stack[CFG_MAX_CALL_DEPTH],
-              "command_giver stack overflow");
+  DEBUG_CHECK(cgsp == &command_giver_stack[CFG_MAX_CALL_DEPTH], "command_giver stack overflow");
   *(++cgsp) = command_giver;
 
   command_giver = ob;

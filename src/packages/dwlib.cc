@@ -17,8 +17,8 @@
 
 #ifdef F_QUERY_MULTIPLE_SHORT
 /* Hideous mangling of C code by Taffyd. */
-void query_multiple_short(svalue_t *arg, const char *type, int no_dollars,
-                          int quiet, int dark, int num_arg) {
+void query_multiple_short(svalue_t *arg, const char *type, int no_dollars, int quiet, int dark,
+                          int num_arg) {
   char m[] = "$M$";
   char s[] = "_short";
   char default_function[] = "a_short";
@@ -57,8 +57,7 @@ void query_multiple_short(svalue_t *arg, const char *type, int no_dollars,
    }
    } */
 
-  if (no_dollars && arr->item->type == T_OBJECT && !dark && command_giver &&
-      command_giver->super) {
+  if (no_dollars && arr->item->type == T_OBJECT && !dark && command_giver && command_giver->super) {
     call_origin = ORIGIN_EFUN;
     if (!apply_low("query_light", command_giver->super, 0)) {
       push_number(0);
@@ -292,8 +291,7 @@ void f_query_multiple_short() {
 
 int _in_reference_allowed = 0;
 
-int reference_allowed(object_t *referee, object_t *referrer_obj,
-                      const char *referrer_name) {
+int reference_allowed(object_t *referee, object_t *referrer_obj, const char *referrer_name) {
   int invis = 0;
   int referee_creator = 0;
   svalue_t *v;
@@ -616,8 +614,8 @@ void f_add_a() {
 void f_vowel() {
   char v = (char)sp->u.number;
 
-  if (v == 'a' || v == 'e' || v == 'i' || v == 'o' || v == 'u' || v == 'A' ||
-      v == 'E' || v == 'I' || v == 'O' || v == 'U') {
+  if (v == 'a' || v == 'e' || v == 'i' || v == 'o' || v == 'u' || v == 'A' || v == 'E' ||
+      v == 'I' || v == 'O' || v == 'U') {
     sp->u.number = 1;
   } else {
     sp->u.number = 0;
@@ -777,7 +775,6 @@ svalue_t *replace_objects(svalue_t *thing) {
   int i;
   switch (thing->type) {
     case T_OBJECT: {
-
       char buf[2000];
       strcpy(buf, thing->u.ob->obname);
       svalue_t *tmp = 0;
@@ -816,11 +813,9 @@ svalue_t *replace_objects(svalue_t *thing) {
       push_number(0);
       for (i = 0; i < (sp - 2)->u.arr->size; i++) {
         svalue_t *key = sp;
-        svalue_t *tmp =
-            find_in_mapping(thing->u.map, &(sp - 2)->u.arr->item[i]);
+        svalue_t *tmp = find_in_mapping(thing->u.map, &(sp - 2)->u.arr->item[i]);
         assign_svalue(key, replace_objects(&(sp - 2)->u.arr->item[i]));
-        assign_svalue_no_free(find_for_insert((sp - 1)->u.map, key, 1),
-                              replace_objects(tmp));
+        assign_svalue_no_free(find_for_insert((sp - 1)->u.map, key, 1), replace_objects(tmp));
         if ((sp - 1)->u.map->count - i != 1) {
           printf("guilty party:%s\n", key->u.string);
         }
@@ -887,16 +882,14 @@ void f_replace_dollars() {
     return;
   }
 
-  if (currentnew + COUNTED_STRLEN(oldstr) - currentold + oldstr - newstr >
-      MAX_STRING_LENGTH) {
+  if (currentnew + COUNTED_STRLEN(oldstr) - currentold + oldstr - newstr > MAX_STRING_LENGTH) {
     FREE_MSTR(newstr);
     error("string too long");
   }
 
   strcpy(currentnew, currentold);
   pop_2_elems();
-  push_malloced_string(extend_string(
-      newstr,
-      currentnew - newstr + COUNTED_STRLEN(oldstr) - (currentold - oldstr)));
+  push_malloced_string(
+      extend_string(newstr, currentnew - newstr + COUNTED_STRLEN(oldstr) - (currentold - oldstr)));
 }
 #endif

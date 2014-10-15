@@ -138,8 +138,7 @@ extern int efun_arg_types[];
 extern char yytext[MAXLINE];
 extern keyword_t predefs[];
 extern int lex_fatal;
-extern int arrow_efun, evaluate_efun, this_efun, to_float_efun, to_int_efun,
-    new_efun;
+extern int arrow_efun, evaluate_efun, this_efun, to_float_efun, to_int_efun, new_efun;
 
 void push_function_context(void);
 void pop_function_context(void);

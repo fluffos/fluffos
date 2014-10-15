@@ -15,8 +15,8 @@
 svalue_t apply_ret_value;
 
 // TODO: These should be moved somewhere else
-void check_co_args2(unsigned short *types, int num_arg, const char *name,
-                    const char *ob_name, int sparg) {
+void check_co_args2(unsigned short *types, int num_arg, const char *name, const char *ob_name,
+                    int sparg) {
   int argc = sparg;
   int exptype, i = 0;
   do {
@@ -36,9 +36,8 @@ void check_co_args2(unsigned short *types, int num_arg, const char *name,
       if ((sp - argc)->type == T_NUMBER && !(sp - argc)->u.number) {
         continue;
       }
-      sprintf(
-          buf, "Bad argument %d in call to %s() in %s\nExpected: %s Got %s.\n",
-          i, name, ob_name, type_name(exptype), type_name((sp - argc)->type));
+      sprintf(buf, "Bad argument %d in call to %s() in %s\nExpected: %s Got %s.\n", i, name,
+              ob_name, type_name(exptype), type_name((sp - argc)->type));
 #ifdef CALL_OTHER_WARN
       if (current_prog) {
         const char *file;
@@ -59,15 +58,13 @@ void check_co_args2(unsigned short *types, int num_arg, const char *name,
 }
 
 // util functions
-void check_co_args(int num_arg, const program_t *prog, function_t *fun,
-                   int findex) {
+void check_co_args(int num_arg, const program_t *prog, function_t *fun, int findex) {
 #ifdef CALL_OTHER_TYPE_CHECK
   if (num_arg != fun->num_arg) {
     char buf[1024];
     // if(!current_prog) what do i need this for again?
     // current_prog = master_ob->prog;
-    sprintf(buf, "Wrong number of arguments to %s in %s.\n", fun->funcname,
-            prog->filename);
+    sprintf(buf, "Wrong number of arguments to %s in %s.\n", fun->funcname, prog->filename);
 #ifdef CALL_OTHER_WARN
     if (current_prog) {
       const char *file;
@@ -86,10 +83,9 @@ void check_co_args(int num_arg, const program_t *prog, function_t *fun,
   }
 
   int num_arg_check = std::min(num_arg, fun->num_arg);
-  if (num_arg_check && prog->type_start &&
-      prog->type_start[findex] != INDEX_START_NONE)
-    check_co_args2(&prog->argument_types[prog->type_start[findex]], num_arg,
-                   fun->funcname, prog->filename, num_arg);
+  if (num_arg_check && prog->type_start && prog->type_start[findex] != INDEX_START_NONE)
+    check_co_args2(&prog->argument_types[prog->type_start[findex]], num_arg, fun->funcname,
+                   prog->filename, num_arg);
 #endif
 }
 
@@ -186,25 +182,22 @@ retry_for_shadow:
     int findex = (funp - entry->progp->function_table);
     int funflags, runtime_index;
 
-    runtime_index =
-        findex + entry->progp->last_inherited + entry->function_index_offset;
+    runtime_index = findex + entry->progp->last_inherited + entry->function_index_offset;
     funflags = entry->oprogp->function_flags[runtime_index];
 
-    need =
-        (local_call_origin == ORIGIN_DRIVER
-             ? DECL_HIDDEN
-             : ((current_object == ob || local_call_origin == ORIGIN_INTERNAL)
-                    ? DECL_PRIVATE
-                    : DECL_PUBLIC));
+    need = (local_call_origin == ORIGIN_DRIVER
+                ? DECL_HIDDEN
+                : ((current_object == ob || local_call_origin == ORIGIN_INTERNAL) ? DECL_PRIVATE
+                                                                                  : DECL_PUBLIC));
 
     // Check whether caller has sufficient permission.
     if ((funflags & DECL_ACCESS) < need) {
       debug_message(
           "apply() with insufficient permission: \n"
           "cob: %s, ob: %s, function: %s, origin: %s, needs: %s, has: %s \n",
-          current_object ? current_object->obname : "null",
-          ob ? ob->obname : "null", fun, origin_to_name(local_call_origin),
-          access_to_name(need), access_to_name(funflags & DECL_ACCESS));
+          current_object ? current_object->obname : "null", ob ? ob->obname : "null", fun,
+          origin_to_name(local_call_origin), access_to_name(need),
+          access_to_name(funflags & DECL_ACCESS));
       pop_n_elems(num_arg);
       return 0;
     }
@@ -226,8 +219,7 @@ retry_for_shadow:
 #endif
     /* Setup variables */
     if (funflags & FUNC_TRUE_VARARGS)
-      setup_varargs_variables(csp->num_local_variables, funp->num_local,
-                              funp->num_arg);
+      setup_varargs_variables(csp->num_local_variables, funp->num_local, funp->num_arg);
     else
       setup_variables(csp->num_local_variables, funp->num_local, funp->num_arg);
 #ifdef TRACE
@@ -308,8 +300,7 @@ svalue_t *safe_apply(const char *fun, object_t *ob, int num_arg, int where) {
   svalue_t *ret = 0;
   try {
     ret = apply(fun, ob, num_arg, where);
-  }
-  catch (const char *) {
+  } catch (const char *) {
     restore_context(&econ);
     pop_n_elems(num_arg);
     ret = 0;
