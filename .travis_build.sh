@@ -16,6 +16,7 @@ if [ "$BUILD" = "i386" ]; then
   sudo apt-get --no-install-recommends install valgrind:i386
 
   sudo apt-get install libevent-2.0-5:i386
+  sudo apt-get install libevent-dev:i386
   sudo apt-get --no-install-recommends install libz-dev:i386
 else
   sudo apt-get install valgrind
