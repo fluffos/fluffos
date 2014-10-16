@@ -637,6 +637,9 @@ ALLOCA
 EGREP
 GREP
 CXXCPP
+GCOV
+GCOV_LIBS
+GCOV_CFLAGS
 HAVE_CXX11
 SET_MAKE
 INSTALL_DATA
@@ -704,6 +707,7 @@ SHELL'
 ac_subst_files=''
 ac_user_opts='
 enable_option_checking
+enable_gcov
 with_libevent
 with_mysql
 with_postgresql
@@ -1342,6 +1346,13 @@ if test -n "$ac_init_help"; then
      short | recursive ) echo "Configuration of FluffOS 3.0-alpha8:";;
    esac
   cat <<\_ACEOF
+
+Optional Features:
+  --disable-option-checking  ignore unrecognized --enable/--with options
+  --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
+  --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
+  --enable-gcov           compile with coverage profiling instrumentation (gcc
+                          only)
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -4087,6 +4098,93 @@ done
 
   ;;
 esac
+
+# check for gcov options
+
+  # Check whether --enable-gcov was given.
+if test "${enable_gcov+set}" = set; then :
+  enableval=$enable_gcov; enable_gcov=$enableval
+else
+  enable_gcov=no
+fi
+
+
+  if test x$enable_gcov = xyes; then
+    GCOV_CFLAGS="-fprofile-arcs -ftest-coverage"
+    GCOV_LIBS=-lgcov
+
+
+    GCOV=`echo $CC | sed s/gcc/gcov/g`
+
+
+    # Force the user to turn off optimization
+    { $as_echo "$as_me:${as_lineno-$LINENO}: gcov enabled, adding \"-g -O0\" to CFLAGS" >&5
+$as_echo "$as_me: gcov enabled, adding \"-g -O0\" to CFLAGS" >&6;}
+
+
+for flag in "-g -O0"; do
+  as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__$flag" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts $flag" >&5
+$as_echo_n "checking whether C++ compiler accepts $flag... " >&6; }
+if eval \${$as_CACHEVAR+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  $flag"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  eval "$as_CACHEVAR=yes"
+else
+  eval "$as_CACHEVAR=no"
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CXXFLAGS=$ax_check_save_flags
+fi
+eval ac_res=\$$as_CACHEVAR
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if test x"`eval 'as_val=${'$as_CACHEVAR'};$as_echo "$as_val"'`" = xyes; then :
+  if ${CXXFLAGS+:} false; then :
+  case " $CXXFLAGS " in
+    *" $flag "*)
+      { { $as_echo "$as_me:${as_lineno-$LINENO}: : CXXFLAGS already contains \$flag"; } >&5
+  (: CXXFLAGS already contains $flag) 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }
+      ;;
+    *)
+      { { $as_echo "$as_me:${as_lineno-$LINENO}: : CXXFLAGS=\"\$CXXFLAGS \$flag\""; } >&5
+  (: CXXFLAGS="$CXXFLAGS $flag") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }
+      CXXFLAGS="$CXXFLAGS $flag"
+      ;;
+   esac
+else
+  CXXFLAGS="$flag"
+fi
+
+else
+  :
+fi
+
+done
+
+  fi
+
 
 # Checks for header files.
 ac_ext=cpp

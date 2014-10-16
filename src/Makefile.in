@@ -29,9 +29,9 @@
 @SET_MAKE@
 
 CXX=@CXX@
-CXXFLAGS=@CXXFLAGS@
+CXXFLAGS=@CXXFLAGS@ @zlib_CFLAGS@ @LIBEVENT_CPPFLAGS@ @GCOV_CFLAGS@
 LDFLAGS=@CXXFLAGS@ @LDFLAGS@
-LIBS=@LIBS@
+LIBS=@LIBS@ @GCOV_LIBS@
 YACC=@YACC@
 O=@OBJEXT@
 DRIVER_BIN=@DRIVER_BIN@@EXEEXT@
@@ -97,27 +97,27 @@ all: local_options files
 	$(MAKE) build_binaries
 
 build_packages:
-	$(MAKE) -C packages 'CC=$(CXX)' 'CXXFLAGS=$(CXXFLAGS)' 'A=$(A)' 'O=$(O)'
+	$(MAKE) -C packages 'CC=$(CXX)' 'CXXFLAGS=$(CXXFLAGS) @GCOV_CFLAGS' 'A=$(A)' 'O=$(O)'
 
 build_binaries: $(DRIVER_BIN) portbind
 
 .cc.$(O):
-	$(CXX) -c $(CXXFLAGS) @zlib_CFLAGS@ @LIBEVENT_CPPFLAGS@ -I. -x c++ -o $@ $<
+	$(CXX) -c $(CXXFLAGS) -I. -x c++ -o $@ $<
 
 .c.$(O):
-	$(CXX) -c $(CXXFLAGS) @zlib_CFLAGS@ @LIBEVENT_CPPFLAGS@ -I. -x c++ -o $@ $<
+	$(CXX) -c $(CXXFLAGS) -I. -x c++ -o $@ $<
 
 # Hack to work around brokeness in libtelnet.c
 thirdparty/libtelnet/libtelnet.o: thirdparty/libtelnet/libtelnet.c
 	if [ -n "@zlib_LIBS@" ]; then \
-		$(CXX) -c $(CXXFLAGS) -DHAVE_ZLIB @zlib_CFLAGS@ @LIBEVENT_CPPFLAGS@ -I. -x c++ -o $@ $< ; \
+		$(CXX) -c $(CXXFLAGS) -DHAVE_ZLIB -I. -x c++ -o $@ $< ; \
 	else \
-		$(CXX) -c $(CXXFLAGS) @zlib_CFLAGS@ @LIBEVENT_CPPFLAGS@ -I. -x c++ -o $@ $< ; \
+		$(CXX) -c $(CXXFLAGS) -I. -x c++ -o $@ $< ; \
 	fi
 
 # FIXME: simulate.c currently calls package_async, which depends on package/DB, this need to be fixed.
 simulate.$(O): simulate.cc
-	$(CXX) -c $(CXXFLAGS) -I. @LIBEVENT_CPPFLAGS@ @MYSQL_CFLAGS@ @POSTGRESQL_CFLAGS@ @SQLITE3_CFLAGS@  -x c++ -o $@ $<
+	$(CXX) -c $(CXXFLAGS) -I. @MYSQL_CFLAGS@ @POSTGRESQL_CFLAGS@ @SQLITE3_CFLAGS@  -x c++ -o $@ $<
 
 lpc/compiler/grammar.tab.o: lpc/compiler/grammar.tab.cc opcodes.h
 

@@ -12,7 +12,10 @@ compiler:
   - gcc
 
 env:
-  - COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev"
-  - COMPILER_FLAGS="-m64 -mtune=generic" TYPE="" CONFIG="testrelease"
+  - BUILD="x86_64" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev"
+  - BUILD="x86_64" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="" CONFIG="testrelease"
   - BUILD="i386" COMPILER_FLAGS="-m32 -mtune=generic" TYPE="develop" CONFIG="testdev32"
   - BUILD="i386" COMPILER_FLAGS="-m32 -mtune=generic" TYPE="" CONFIG="testrelease32"
+# gcov builds
+  - BUILD="x86_64" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev" GCOV="yes"
+  - BUILD="i386"   COMPILER_FLAGS="-m32 -mtune=generic" TYPE="develop" CONFIG="testdev32" GCOV="yes"

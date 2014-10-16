@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
 sudo apt-get update -qq
 sudo apt-get install -qq autoconf
@@ -23,4 +23,23 @@ else
   sudo apt-get install libevent-dev libmysqlclient-dev libsqlite3-dev libpq-dev libz-dev libssl-dev libpcre3-dev
 fi
 
-cd src && ./autogen.sh && cp local_options.$CONFIG local_options && ./build.FluffOS $TYPE && make -j 4 && cd testsuite && valgrind --malloc-fill=0x75 --free-fill=0x73 --track-origins=yes --leak-check=full ../driver etc/config.test -ftest -d
+# stop on first error down below
+set -e
+cd src
+./autogen.sh
+cp local_options.$CONFIG local_options
+if [ -n "$GCOV" ]; then
+  ./build.FluffOS $TYPE --enable-gcov=yes
+else
+  ./build.FluffOS $TYPE
+
+make -j 2
+cd testsuite
+
+if [ -n "$GCOV" ]; then
+  # run in gcov mode and submit the result
+  ../driver etc/config.test -ftest -d
+  sudo pip install cpp-coveralls
+  coveralls --exclude thirdparty --gcov-options '\-lp'
+else
+  valgrind --malloc-fill=0x75 --free-fill=0x73 --track-origins=yes --leak-check=full ../driver etc/config.test -ftest -d

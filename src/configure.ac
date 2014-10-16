@@ -37,6 +37,9 @@ case $host_os in
   ;;
 esac
 
+# check for gcov options
+FLUFFOS_CHECK_GCOV
+
 # Checks for header files.
 AC_FUNC_ALLOCA
 AC_HEADER_RESOLV
