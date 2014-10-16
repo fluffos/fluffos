@@ -97,7 +97,7 @@ all: local_options files
 	$(MAKE) build_binaries
 
 build_packages:
-	$(MAKE) -C packages 'CC=$(CXX)' 'CXXFLAGS=$(CXXFLAGS) @GCOV_CFLAGS' 'A=$(A)' 'O=$(O)'
+	$(MAKE) -C packages 'CC=$(CXX)' 'CXXFLAGS=$(CXXFLAGS)' 'A=$(A)' 'O=$(O)'
 
 build_binaries: $(DRIVER_BIN) portbind
 

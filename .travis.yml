@@ -3,19 +3,24 @@ language: cpp
 before_install:
   - travis_retry sudo apt-get update -qq
 
-script: sh -x ./.travis_build.sh
+script: bash -x ./.travis_build.sh
 
 after_failure: cat src/config.log; tail -n 50 src/testsuite/log/*
 
 compiler:
-  - clang
   - gcc
 
 env:
-  - BUILD="x86_64" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev"
-  - BUILD="x86_64" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="" CONFIG="testrelease"
-  - BUILD="i386" COMPILER_FLAGS="-m32 -mtune=generic" TYPE="develop" CONFIG="testdev32"
-  - BUILD="i386" COMPILER_FLAGS="-m32 -mtune=generic" TYPE="" CONFIG="testrelease32"
+# clang builds
+  - BUILD="x86_64" COMPILER="clang" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev"
+  - BUILD="x86_64" COMPILER="clang" COMPILER_FLAGS="-m64 -mtune=generic" TYPE=""        CONFIG="testrelease"
+  - BUILD="i386"   COMPILER="clang" COMPILER_FLAGS="-m32 -mtune=generic" TYPE="develop" CONFIG="testdev32"
+  - BUILD="i386"   COMPILER="clang" COMPILER_FLAGS="-m32 -mtune=generic" TYPE=""        CONFIG="testrelease32"
+# gcc builds
+  - BUILD="x86_64" COMPILER="gcc" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev"
+  - BUILD="x86_64" COMPILER="gcc" COMPILER_FLAGS="-m64 -mtune=generic" TYPE=""        CONFIG="testrelease"
+  - BUILD="i386"   COMPILER="gcc" COMPILER_FLAGS="-m32 -mtune=generic" TYPE="develop" CONFIG="testdev32"
+  - BUILD="i386"   COMPILER="gcc" COMPILER_FLAGS="-m32 -mtune=generic" TYPE=""        CONFIG="testrelease32"
 # gcov builds
-  - BUILD="x86_64" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev" GCOV="yes"
-  - BUILD="i386"   COMPILER_FLAGS="-m32 -mtune=generic" TYPE="develop" CONFIG="testdev32" GCOV="yes"
+  - BUILD="x86_64" COMPILER="gcc" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev" GCOV="yes"
+  - BUILD="i386"   COMPILER="gcc" COMPILER_FLAGS="-m32 -mtune=generic" TYPE="develop" CONFIG="testdev32" GCOV="yes"
