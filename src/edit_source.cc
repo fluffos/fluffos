@@ -33,7 +33,7 @@ static int nexpands = 0;
 FILE *yyin = 0, *yyout = 0;
 
 #define SYNTAX                                                          \
-  "edit_source [-process file] [-options] [-malloc] [-build_func_spec " \
+  "edit_source [-process file] [-options] [-build_func_spec " \
   "'command'] [-build_efuns]\n"
 
 /* The files we fool with.  (Actually, there are more.  See -process).
@@ -1122,11 +1122,13 @@ static void handle_local_defines(int check) {
 
 static void write_options_incl(int local) {
   open_output_file(OPTIONS_INCL);
+  fprintf(yyout, "// IWYU pragma: begin_exports\n");
   if (local) {
     fprintf(yyout, "#include \"options_internal.h\"\n#include \"%s\"\n", LOCAL_OPTIONS);
   } else {
     fprintf(yyout, "#include \"options_internal.h\"\n#include \"%s\"\n", OPTIONS_H);
   }
+  fprintf(yyout, "// IWYU pragma: end_exports\n");
   close_output_file();
 }
 
@@ -1291,53 +1293,6 @@ static void handle_applies() {
   fclose(f);
 }
 
-static void handle_malloc() {
-  const char *the_malloc = 0, *the_wrapper = 0;
-
-  if (lookup_define("SYSMALLOC")) {
-    the_malloc = "sysmalloc.cc";
-  }
-  if (lookup_define("MALLOC64")) {
-    the_malloc = "64bitmalloc.cc";
-  }
-  if (lookup_define("MALLOC32")) {
-    the_malloc = "32bitmalloc.cc";
-  }
-
-  if (lookup_define("WRAPPEDMALLOC")) {
-    the_wrapper = "wrappedmalloc.cc";
-  }
-  if (lookup_define("DEBUGMALLOC")) {
-    the_wrapper = "debugmalloc.cc";
-  }
-
-  if (!the_malloc && !the_wrapper) {
-    fprintf(stderr,
-            "Memory package and/or malloc wrapper incorrectly specified in "
-            "options.h\n");
-    exit(-1);
-  }
-
-  if (unlink("malloc.c") == -1 && errno != ENOENT) {
-    perror("unlink malloc.cc");
-  }
-  if (unlink("mallocwrapper.c") == -1 && errno != ENOENT) {
-    perror("unlink mallocwrapper.cc");
-  }
-
-  if (the_wrapper) {
-    printf("Using memory allocation package: %s\n\t\tWrapped with: %s\n", the_malloc, the_wrapper);
-    if (link(the_wrapper, "mallocwrapper.cc") == -1) {
-      perror("link mallocwrapper.cc");
-    }
-  } else {
-    printf("Using memory allocation package: %s\n", the_malloc);
-  }
-  if (link(the_malloc, "malloc.cc") == -1) {
-    perror("link malloc.cc");
-  }
-}
-
 int main(int argc, char **argv) {
   int idx = 1;
 
@@ -1351,8 +1306,6 @@ int main(int argc, char **argv) {
       handle_process(argv[++idx]);
     } else if (strcmp(argv[idx], "-options") == 0) {
       handle_options(1);
-    } else if (strcmp(argv[idx], "-malloc") == 0) {
-      handle_malloc();
     } else if (strcmp(argv[idx], "-build_applies") == 0) {
       handle_applies();
     } else if (strcmp(argv[idx], "-build_func_spec") == 0) {

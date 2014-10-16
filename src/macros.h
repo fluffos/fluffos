@@ -7,56 +7,24 @@
     x           \
   } while (0)
 
-/*
-   Define for MALLOC, FREE, REALLOC, and CALLOC depend upon what malloc
-   package and optional wrapper is used.  This technique is used because
-   overlaying system malloc with another function also named malloc doesn't
-   work on most mahines that have shared libraries.  It will also let
-   us keep malloc stats even when system malloc is used.
-
-   Please refer to options.h for selecting malloc package and wrapper.
-*/
-#if (defined(SYSMALLOC) + defined(MALLOC64) + defined(MALLOC32)) > 1
-#error Only one malloc package should be defined
-#endif
-
-#if (defined(WRAPPEDMALLOC) + defined(DEBUGMALLOC)) > 1
-#error Only one wrapper (at most) should be defined
-#endif
-
-#if defined(WRAPPEDMALLOC) && !defined(IN_MALLOC_WRAPPER)
-
-#define MALLOC(x) wrappedmalloc(x)
-#define FREE(x) wrappedfree(x)
-#define REALLOC(x, y) wrappedrealloc(x, y)
-#define CALLOC(x, y) wrappedcalloc(x, y)
-#define DXALLOC(x, t, d) xalloc(x)
-#define DMALLOC(x, t, d) MALLOC(x)
-#define DREALLOC(x, y, t, d) REALLOC(x, y)
-#define DCALLOC(x, y, t, d) CALLOC(x, y)
-
-#else
-
-#if defined(DEBUGMALLOC) && !defined(IN_MALLOC_WRAPPER)
-
+#if defined(DEBUGMALLOC)
 #define MALLOC(x) debugmalloc(x, 0, (char *)0)
-#define DMALLOC(x, t, d) debugmalloc(x, t, d)
-#define DXALLOC(x, t, d) debugmalloc(x, t, d)
 #define FREE(x) debugfree(x)
 #define REALLOC(x, y) debugrealloc(x, y, 0, (char *)0)
-#define DREALLOC(x, y, tag, desc) debugrealloc(x, y, tag, desc)
 #define CALLOC(x, y) debugcalloc(x, y, 0, (char *)0)
+#define DXALLOC(x, t, d) debugmalloc(x, t, d)
+#define DMALLOC(x, t, d) debugmalloc(x, t, d)
+#define DREALLOC(x, y, tag, desc) debugrealloc(x, y, tag, desc)
 #define DCALLOC(x, y, tag, desc) debugcalloc(x, y, tag, desc)
-
 #else
-
-#include "my_malloc.h"
-
-#endif
-#endif
-
-#if !defined(MALLOC) && !defined(EDIT_SOURCE)
-#error You need to specify a malloc package in local_options/options.h
+#define MALLOC(x) malloc(x)
+#define FREE(x) free(x)
+#define REALLOC(x, y) realloc(x, y)
+#define CALLOC(x, y) calloc(x, y)
+#define DXALLOC(x, tag, desc) xalloc(x)
+#define DMALLOC(x, tag, desc) MALLOC(x)
+#define DREALLOC(x, y, tag, desc) REALLOC(x, y)
+#define DCALLOC(x, y, tag, desc) CALLOC(x, y)
 #endif
 
 #define ALLOCATE(type, tag, desc) ((type *)DXALLOC(sizeof(type), tag, desc))

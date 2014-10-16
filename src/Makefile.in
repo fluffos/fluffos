@@ -41,11 +41,13 @@ OPTIMIZE=@OPTIMIZE@
 
 SRC=lpc/compiler/grammar.tab.cc main.cc rc.cc simulate.cc file.cc \
   backend.cc comm.cc ed.cc regexp.cc crc32.cc \
-  malloc.cc mallocwrapper.cc efuns_main.cc efuns_port.cc \
-  call_out.cc otable.cc dumpstat.cc stralloc.cc hash.cc \
+  efuns_main.cc efuns_port.cc \
+  call_out.cc otable.cc dumpstat.cc stralloc.cc \
+	debugmalloc.cc md.cc \
+	hash.cc \
   port.cc reclaim.cc parse.cc simul_efun.cc sprintf.cc \
   avltree.cc \
-  socket_efuns.cc socket_ctrl.cc eoperators.cc socket_err.cc md.cc \
+  socket_efuns.cc socket_ctrl.cc eoperators.cc socket_err.cc \
   disassembler.cc uvalarm.cc \
   replace_program.cc master.cc \
   debug.cc crypt.cc applies_table.cc add_action.cc eval.cc fliconv.cc console.cc \
@@ -61,11 +63,13 @@ SRC=lpc/compiler/grammar.tab.cc main.cc rc.cc simulate.cc file.cc \
 
 OBJ=lpc/compiler/grammar.tab.o main.o rc.o simulate.o file.o \
   backend.o comm.o ed.o regexp.o crc32.o \
-  malloc.o mallocwrapper.o efuns_main.o efuns_port.o \
-  call_out.o otable.o dumpstat.o stralloc.o hash.o \
+  efuns_main.o efuns_port.o \
+  call_out.o otable.o dumpstat.o stralloc.o \
+	debugmalloc.o md.o \
+	hash.o \
   port.o reclaim.o parse.o simul_efun.o sprintf.o \
   avltree.o \
-  socket_efuns.o socket_ctrl.o eoperators.o socket_err.o md.o \
+  socket_efuns.o socket_ctrl.o eoperators.o socket_err.o \
   disassembler.o uvalarm.o \
   replace_program.o master.o \
   debug.o crypt.o applies_table.o add_action.o eval.o fliconv.o console.o \
@@ -141,12 +145,10 @@ cc.h:
 
 # the touches here are necessary to fix the modification times; link(2) does
 # 'modify' a file
-files: edit_source sysmalloc.cc debugmalloc.cc wrappedmalloc.cc options.h lpc/op.spec lpc/func.spec configure.h lpc/compiler/grammar.y.pre
-	./edit_source -options -malloc -build_func_spec '$(CXX) -E $(CXXFLAGS) -I. -x c++' \
+files: edit_source options.h lpc/op.spec lpc/func.spec configure.h lpc/compiler/grammar.y.pre
+	./edit_source -options -build_func_spec '$(CXX) -E $(CXXFLAGS) -I. -x c++' \
 	              -process lpc/compiler/grammar.y.pre
 	./edit_source -build_efuns -build_applies
-	touch mallocwrapper.cc
-	touch malloc.cc
 	touch files
 
 make_func.tab.cc: make_func.y cc.h
@@ -180,7 +182,6 @@ clean:
 	-rm -rf *.d *.tab.cc *.tab.h
 	-rm -f efun_defs.cc option_defs.cc
 	-rm -f opcodes.h efunctions.h opc.h efun_protos.h
-	-rm -f malloc.cc mallocwrapper.cc
 	-rm -f lpc/*.generated applies.h applies_table.cc files
 	-rm -f lpc/compiler/grammar.y lpc/compiler/grammar.tab.*
 	-rm -f comptest* a.out *.exe

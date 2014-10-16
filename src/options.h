@@ -34,33 +34,6 @@
  */
 
 /****************************************************************************
- *                              MALLOC                                      *
- *                             --------                                     *
- * For performance reasons, LP drivers have a variety of memory allocation  *
- * packages.  If you don't care, use the default one on your system:        *
- * #define SYSMALLOC, #undef the others.                                    *
- ****************************************************************************/
-
-/* You must choose exactly one of these malloc packages:
- *     ~~~~
- * SYSMALLOC:
- *   * Built-in system malloc.
- *   * No statistics.
- *   * SYSMALLOC incurs no additional CPU or memory overhead.
- *
- * MALLOC64
- *   * Wodan's malloc, uses system malloc for small allocations and spreads
- *   * large allocations through the 64 bit memory space
- *   * won't work on 32 bit systems.
- * MALLOC32
- *   * fixes realloc by always doing a malloc/memcpy/free instead, try this
- *   * if you use more memory than expected (or MALLOC64 on a 64bit system).
- */
-#define SYSMALLOC
-#undef MALLOC64
-#undef MALLOC32
-
-/****************************************************************************
  *                          COMPATIBILITY                                   *
  *                         ---------------                                  *
  * The MudOS driver has evolved quite a bit over the years.  These defines  *

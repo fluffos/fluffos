@@ -1362,24 +1362,12 @@ void f_malloc_status(void) {
   outbuffer_t ob;
 
   outbuf_zero(&ob);
-
-#ifdef MMALLOC
-  outbuf_add(&ob, "Using mmap malloc");
-#endif
-#ifdef SYSMALLOC
   outbuf_add(&ob, "Using system malloc");
-#endif
 #ifdef DEBUGMALLOC
   outbuf_add(&ob, ", wrapped with debugmalloc");
 #endif
-#ifdef WRAPPEDMALLOC
-  outbuf_add(&ob, ", wrapped with wrappedmalloc");
-#endif
   outbuf_add(&ob, ".\n");
-#ifdef DO_MSTATS
-  show_mstats(&ob, "malloc_status()");
-#endif
-#if (defined(WRAPPEDMALLOC) || defined(DEBUGMALLOC))
+#if defined(DEBUGMALLOC)
   dump_malloc_data(&ob);
 #endif
   outbuf_push(&ob);

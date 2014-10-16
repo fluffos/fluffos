@@ -1,7 +1,6 @@
 #ifndef MALLOC_INCL_H
 #define MALLOC_INCL_H
 
-#include "wrappedmalloc.h"
 #include "debugmalloc.h"
 
 #ifdef DEBUGMALLOC

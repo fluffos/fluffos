@@ -1,15 +1,16 @@
 /*
    wrapper functions for system malloc -- keep malloc stats.
-   Truilkan@TMI - 92/04/17
 */
+#include "options_incl.h" // IWYU pragma: keep
 
-#define IN_MALLOC_WRAPPER
-#define NO_OPCODES
-#include "std.h"
+#ifdef DEBUGMALLOC
+
 #include "debugmalloc.h"
-#include "my_malloc.h"
-#include "md.h"
-#include "outbuf.h"
+
+#include <cstdlib>                      // for calloc, free, malloc, etc
+#include "md.h"                         // for md_node_t, MDmalloc, etc
+#include "outbuf.h"                     // for outbuf_addv, outbuf_add, etc
+
 
 void fatal(const char *, ...);
 
@@ -49,7 +50,7 @@ void *debugrealloc(void *ptr, int size, int tag, const char *desc) {
   stats.realloc_calls++;
   tmp = (md_node_t *)ptr - 1;
   if (MDfree(tmp)) {
-    tmp = (void *)REALLOC(tmp, size + MD_OVERHEAD);
+    tmp = (void *)realloc(tmp, size + MD_OVERHEAD);
     MDmalloc((md_node_t *)tmp, size, tag, desc);
     return (md_node_t *)tmp + 1;
   }
@@ -63,8 +64,7 @@ void *debugmalloc(int size, int tag, const char *desc) {
     fatal("illegal size in debugmalloc()");
   }
   stats.alloc_calls++;
-  tmp = (void *)MALLOC(size + MD_OVERHEAD);
-  memset(tmp, 'M', size + MD_OVERHEAD);
+  tmp = (void *)malloc(size + MD_OVERHEAD);
   MDmalloc((md_node_t *)tmp, size, tag, desc);
   NOISY3("malloc: %i (%x), %s\n", size, (md_node_t *)tmp + 1, desc);
   return (md_node_t *)tmp + 1;
@@ -78,7 +78,7 @@ void *debugcalloc(int nitems, int size, int tag, const char *desc) {
   }
 
   stats.alloc_calls++;
-  tmp = (void *)CALLOC(nitems * size + MD_OVERHEAD, 1);
+  tmp = (void *)calloc(nitems * size + MD_OVERHEAD, 1);
   MDmalloc((md_node_t *)tmp, nitems * size, tag, desc);
   NOISY3("calloc: %i (%x), %s\n", nitems * size, (md_node_t *)tmp + 1, desc);
   return (md_node_t *)tmp + 1;
@@ -91,8 +91,7 @@ void debugfree(void *ptr) {
   stats.free_calls++;
   tmp = (md_node_t *)ptr - 1;
   if (MDfree(tmp)) {
-    memset(ptr, 'F', tmp->size);
-    FREE(tmp); /* only free if safe to do so */
+    free(tmp); /* only free if safe to do so */
   }
 }
 
@@ -110,3 +109,4 @@ void dump_malloc_data(outbuffer_t *ob) {
   outbuf_addv(ob, "#alloc - #free:   %10lu\n", net);
   outbuf_addv(ob, "#realloc calls:   %10lu\n", stats.realloc_calls);
 }
+#endif // DEBUGMALLOC
