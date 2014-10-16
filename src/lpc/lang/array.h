@@ -40,7 +40,6 @@ array_t *subtract_array(array_t *, array_t *);
 array_t *slice_array(array_t *, int, int);
 array_t *explode_string(const char *, int, const char *, int);
 char *implode_string(array_t *, const char *, int);
-array_t *users(void);
 array_t *commands(object_t *);
 void filter_array(svalue_t *, int);
 void filter_string(svalue_t *, int);

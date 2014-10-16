@@ -5,59 +5,58 @@
 
 #ifdef DEBUGMALLOC
 /* tags */
-#define TAG_TEMPORARY (1 << 8)
-#define TAG_PERMANENT (2 << 8)
-#define TAG_COMPILER (3 << 8)
-#define TAG_DATA (4 << 8)
-#define TAG_MISC (5 << 8)
-#define TAG_MARKED (1 << 12)
+static const int TAG_TEMPORARY = (1 << 8);
+static const int TAG_PERMANENT = (2 << 8);
+static const int TAG_COMPILER = (3 << 8);
+static const int TAG_DATA = (4 << 8);
+static const int TAG_MISC = (5 << 8);
+static const int TAG_MARKED = (1 << 12);
 
-#define TAG_PROGRAM (TAG_PERMANENT + 11)
-#define TAG_CALL_OUT (TAG_PERMANENT + 12)
-#define TAG_INTERACTIVE (TAG_PERMANENT + 13)
-#define TAG_ED (TAG_PERMANENT + 14)
+static const int TAG_PROGRAM = (TAG_PERMANENT + 11);
+static const int TAG_CALL_OUT = (TAG_PERMANENT + 12);
+static const int TAG_INTERACTIVE = (TAG_PERMANENT + 13);
+static const int TAG_ED = (TAG_PERMANENT + 14);
 
-#define TAG_INC_LIST (TAG_PERMANENT + 16)
-#define TAG_PERM_IDENT (TAG_PERMANENT + 17)
-#define TAG_IDENT_TABLE (TAG_PERMANENT + 18)
-#define TAG_RESERVED (TAG_PERMANENT + 19)
-#define TAG_MUDLIB_STATS (TAG_PERMANENT + 20)
-#define TAG_OBJECT (TAG_PERMANENT + 21)
-#define TAG_OBJ_TBL (TAG_PERMANENT + 22)
-#define TAG_CONFIG (TAG_PERMANENT + 23)
-#define TAG_SIMULS (TAG_PERMANENT + 24)
-#define TAG_SENTENCE (TAG_PERMANENT + 25)
-#define TAG_STR_TBL (TAG_PERMANENT + 26)
-#define TAG_SWAP (TAG_PERMANENT + 27)
-#define TAG_UID (TAG_PERMANENT + 28)
-#define TAG_OBJ_NAME (TAG_PERMANENT + 29)
-#define TAG_PREDEFINES (TAG_PERMANENT + 30)
-#define TAG_LINENUMBERS (TAG_PERMANENT + 31)
-#define TAG_LOCALS (TAG_PERMANENT + 32)
-#define TAG_LPC_OBJECT (TAG_PERMANENT + 33)
-#define TAG_USERS (TAG_PERMANENT + 34)
-#define TAG_DEBUGMALLOC (TAG_PERMANENT + 35)
-#define TAG_HEART_BEAT (TAG_PERMANENT + 36)
+static const int TAG_INC_LIST = (TAG_PERMANENT + 16);
+static const int TAG_PERM_IDENT = (TAG_PERMANENT + 17);
+static const int TAG_IDENT_TABLE = (TAG_PERMANENT + 18);
+static const int TAG_RESERVED = (TAG_PERMANENT + 19);
+static const int TAG_MUDLIB_STATS = (TAG_PERMANENT + 20);
+static const int TAG_OBJECT = (TAG_PERMANENT + 21);
+static const int TAG_OBJ_TBL = (TAG_PERMANENT + 22);
+static const int TAG_CONFIG = (TAG_PERMANENT + 23);
+static const int TAG_SIMULS = (TAG_PERMANENT + 24);
+static const int TAG_SENTENCE = (TAG_PERMANENT + 25);
+static const int TAG_STR_TBL = (TAG_PERMANENT + 26);
+static const int TAG_SWAP = (TAG_PERMANENT + 27);
+static const int TAG_UID = (TAG_PERMANENT + 28);
+static const int TAG_OBJ_NAME = (TAG_PERMANENT + 29);
+static const int TAG_PREDEFINES = (TAG_PERMANENT + 30);
+static const int TAG_LINENUMBERS = (TAG_PERMANENT + 31);
+static const int TAG_LOCALS = (TAG_PERMANENT + 32);
+static const int TAG_LPC_OBJECT = (TAG_PERMANENT + 33);
+static const int TAG_DEBUGMALLOC = (TAG_PERMANENT + 35);
+static const int TAG_HEART_BEAT = (TAG_PERMANENT + 36);
 #ifdef PACKAGE_PARSER
-#define TAG_PARSER (TAG_PERMANENT + 37)
+static const int TAG_PARSER = (TAG_PERMANENT + 37);
 #endif
-#define TAG_INPUT_TO (TAG_PERMANENT + 38)
-#define TAG_SOCKETS (TAG_PERMANENT + 39)
+static const int TAG_INPUT_TO = (TAG_PERMANENT + 38);
+static const int TAG_SOCKETS = (TAG_PERMANENT + 39);
 #ifdef PACKAGE_DB
-#define TAG_DB (TAG_PERMANENT + 40)
+static const int TAG_DB = (TAG_PERMANENT + 40);
 #endif
-#define TAG_INTERPRETER (TAG_PERMANENT + 41)
+static const int TAG_INTERPRETER = (TAG_PERMANENT + 41);
 
-#define TAG_STRING (TAG_DATA + 40)
-#define TAG_MALLOC_STRING (TAG_DATA + 41)
-#define TAG_SHARED_STRING (TAG_DATA + 42)
-#define TAG_FUNP (TAG_DATA + 43)
-#define TAG_ARRAY (TAG_DATA + 44)
-#define TAG_MAPPING (TAG_DATA + 45)
-#define TAG_MAP_NODE_BLOCK (TAG_DATA + 46)
-#define TAG_MAP_TBL (TAG_DATA + 47)
-#define TAG_BUFFER (TAG_DATA + 48)
-#define TAG_CLASS (TAG_DATA + 49)
+static const int TAG_STRING = (TAG_DATA + 40);
+static const int TAG_MALLOC_STRING = (TAG_DATA + 41);
+static const int TAG_SHARED_STRING = (TAG_DATA + 42);
+static const int TAG_FUNP = (TAG_DATA + 43);
+static const int TAG_ARRAY = (TAG_DATA + 44);
+static const int TAG_MAPPING = (TAG_DATA + 45);
+static const int TAG_MAP_NODE_BLOCK = (TAG_DATA + 46);
+static const int TAG_MAP_TBL = (TAG_DATA + 47);
+static const int TAG_BUFFER = (TAG_DATA + 48);
+static const int TAG_CLASS = (TAG_DATA + 49);
 #endif
 
 #endif

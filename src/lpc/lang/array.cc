@@ -482,42 +482,6 @@ void implode_array(funptr_t *fptr, array_t *arr, svalue_t *dest, int first_on_st
   free_array(arr);
 }
 
-array_t *users() {
-  object_t *ob;
-  int i, j;
-  array_t *ret;
-#ifdef F_SET_HIDE
-  int display_hidden = 0;
-
-  if (num_hidden_users > 0) {
-    if (current_object->flags & O_HIDDEN) {
-      display_hidden = 1;
-    } else {
-      display_hidden = valid_hide(current_object);
-    }
-  }
-  ret = allocate_empty_array(num_user - (display_hidden ? 0 : num_hidden_users));
-#else
-  ret = allocate_empty_array(num_user);
-#endif
-  for (i = j = 0; i < max_users; i++) {
-    if (!all_users[i]) {
-      continue;
-    }
-    ob = all_users[i]->ob;
-#ifdef F_SET_HIDE
-    if (!display_hidden && (ob->flags & O_HIDDEN)) {
-      continue;
-    }
-#endif
-    ret->item[j].type = T_OBJECT;
-    ret->item[j].u.ob = ob;
-    add_ref(ob, "users");
-    j++;
-  }
-  return ret;
-}
-
 /*
  * Slice of an array.
  * It now frees the passed array

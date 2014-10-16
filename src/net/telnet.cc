@@ -265,7 +265,7 @@ static inline void on_telnet_ttype(const char *name, interactive_t *ip) {
 
 // Main event handler.
 void telnet_event_handler(telnet_t *telnet, telnet_event_t *ev, void *user_data) {
-  auto ip = all_users[((user_event_data *)user_data)->idx];
+  auto ip = reinterpret_cast<interactive_t *>(user_data);
 
   switch (ev->type) {
     case TELNET_EV_DATA: {

@@ -78,9 +78,7 @@ static void on_user_command(evutil_socket_t fd, short what, void *arg) {
   debug(event, "User has an full command ready: %d:%s%s%s%s \n", (int)fd,
         (what & EV_TIMEOUT) ? " timeout" : "", (what & EV_READ) ? " read" : "",
         (what & EV_WRITE) ? " write" : "", (what & EV_SIGNAL) ? " signal" : "");
-
-  auto data = (user_event_data *)arg;
-  auto user = all_users[data->idx];
+  auto user = reinterpret_cast<interactive_t *>(arg);
 
   if (user == NULL) {
     fatal("on_user_command: user == NULL, Driver BUG.");
@@ -116,15 +114,12 @@ static void on_user_command(evutil_socket_t fd, short what, void *arg) {
 }
 
 static void on_user_read(bufferevent *bev, void *arg) {
-  auto data = (user_event_data *)arg;
-  auto user = all_users[data->idx];
+  auto user = reinterpret_cast<interactive_t *>(arg);
 
   if (user == NULL) {
     fatal("on_user_read: user == NULL, Driver BUG.");
     return;
   }
-
-  debug(event, "on_user_read, idx: %d.\n", data->idx);
 
   // Read user input
   get_user_data(user);
@@ -134,25 +129,16 @@ static void on_user_read(bufferevent *bev, void *arg) {
 }
 
 static void on_user_write(bufferevent *bev, void *arg) {
-  auto data = (user_event_data *)arg;
-  auto user = all_users[data->idx];
-
+  auto user = reinterpret_cast<interactive_t *>(arg);
   if (user == NULL) {
     fatal("on_user_write: user == NULL, Driver BUG.");
     return;
   }
-
-  debug(event, "on_user_write, idx: %d, leftover: %lu.\n", data->idx,
-        evbuffer_get_length(bufferevent_get_output(user->ev_buffer)));
-
   // nothing to do.
 }
 
 static void on_user_events(bufferevent *bev, short events, void *arg) {
-  debug(event, "on_user_events: %d\n", events);
-
-  auto data = (user_event_data *)arg;
-  auto user = all_users[data->idx];
+  auto user = reinterpret_cast<interactive_t *>(arg);
 
   if (user == NULL) {
     fatal("on_user_events: user == NULL, Driver BUG.");
@@ -162,15 +148,14 @@ static void on_user_events(bufferevent *bev, short events, void *arg) {
   if ((events & BEV_EVENT_EOF) || (events & BEV_EVENT_TIMEOUT)) {
     user->iflags |= NET_DEAD;
     remove_interactive(user->ob, 0);
+  } else {
+    debug(event, "on_user_events: ignored unknown events: %d\n", events);
   }
 }
 
-void new_user_event_listener(interactive_t *user, int idx) {
-  user->ev_data = new user_event_data;
-  user->ev_data->idx = idx;
-
-  auto bev = bufferevent_socket_new(g_event_base, user->fd, BEV_OPT_CLOSE_ON_FREE);
-  bufferevent_setcb(bev, on_user_read, on_user_write, on_user_events, user->ev_data);
+void new_user_event_listener(interactive_t *user) {
+  auto bev = bufferevent_socket_new(g_event_base, user->fd, BEV_OPT_CLOSE_ON_FREE | BEV_OPT_DEFER_CALLBACKS);
+  bufferevent_setcb(bev, on_user_read, on_user_write, on_user_events, user);
   bufferevent_enable(bev, EV_READ | EV_WRITE);
 
   const timeval timeout_write = {10, 0};
@@ -178,7 +163,7 @@ void new_user_event_listener(interactive_t *user, int idx) {
 
   user->ev_buffer = bev;
   user->ev_command =
-      event_new(g_event_base, -1, EV_TIMEOUT | EV_PERSIST, on_user_command, user->ev_data);
+      event_new(g_event_base, -1, EV_TIMEOUT | EV_PERSIST, on_user_command, user);
 }
 
 static void on_external_port_event(evconnlistener *listener, evutil_socket_t fd, sockaddr *sa,

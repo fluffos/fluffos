@@ -3,7 +3,9 @@
 #include "file.h"
 #include "md.h"
 #ifdef DEBUGMALLOC_EXTENSIONS
-#include "comm.h"
+#include "interactive.h"
+#include "user.h"
+#include "comm.h" // TODO: for mark_iptable
 #include "lpc/compiler/lex.h"
 #include "simul_efun.h"
 #include "call_out.h"
@@ -789,8 +791,8 @@ void check_all_blocks(int flag) {
     if (blocks[TAG_MAP_TBL & 0xff] != num_mappings)
       outbuf_addv(&out, "WARNING: %i tables for %i mappings\n", blocks[TAG_MAP_TBL & 0xff],
                   num_mappings);
-    if (blocks[TAG_INTERACTIVE & 0xff] != num_user)
-      outbuf_addv(&out, "WATNING: num_user is: %i should be: %i\n", num_user,
+    if (blocks[TAG_INTERACTIVE & 0xff] != users_num(true))
+      outbuf_addv(&out, "WATNING: num_user is: %i should be: %i\n", users_num(true),
                   blocks[TAG_INTERACTIVE & 0xff]);
 #ifdef STRING_STATS
     check_string_stats(&out);
@@ -805,29 +807,28 @@ void check_all_blocks(int flag) {
 #endif
 
     /* now do a mark and sweep check to see what should be alloc'd */
-    for (i = 0; i < max_users; i++)
-      if (all_users[i]) {
-        DO_MARK(all_users[i], TAG_INTERACTIVE);
-        all_users[i]->ob->extra_ref++;
-        // FIXME(sunyc): I can't explain this, appearently somewhere
-        // is giving interactive object an addtional ref.
-        all_users[i]->ob->extra_ref++;
+    for (auto &user: users(true)) {
+      DO_MARK(user, TAG_INTERACTIVE);
+      user->ob->extra_ref++;
+      // FIXME(sunyc): I can't explain this, appearently somewhere
+      // is giving interactive object an addtional ref.
+      user->ob->extra_ref++;
 
-        if (all_users[i]->input_to) {
-          all_users[i]->input_to->ob->extra_ref++;
-          DO_MARK(all_users[i]->input_to, TAG_SENTENCE);
-          mark_sentence(all_users[i]->input_to);
-          if (all_users[i]->num_carry) {
-            for (j = 0; j < all_users[i]->num_carry; j++) {
-              mark_svalue(all_users[i]->carryover + j);
-            }
+      if (user->input_to) {
+        user->input_to->ob->extra_ref++;
+        DO_MARK(user->input_to, TAG_SENTENCE);
+        mark_sentence(user->input_to);
+        if (user->num_carry) {
+          for (j = 0; j < user->num_carry; j++) {
+            mark_svalue(user->carryover + j);
           }
         }
+      }
 #ifndef NO_ADD_ACTION
-        if (all_users[i]->iflags & NOTIFY_FAIL_FUNC) {
-          all_users[i]->default_err_message.f->hdr.extra_ref++;
-        } else if (all_users[i]->default_err_message.s) {
-          EXTRA_REF(BLOCK(all_users[i]->default_err_message.s))++;
+        if (user->iflags & NOTIFY_FAIL_FUNC) {
+          user->default_err_message.f->hdr.extra_ref++;
+        } else if (user->default_err_message.s) {
+          EXTRA_REF(BLOCK(user->default_err_message.s))++;
         }
 #endif
       }
@@ -1152,7 +1153,6 @@ void check_all_blocks(int flag) {
           case TAG_STR_TBL:
           case TAG_LOCALS:
           case TAG_CALL_OUT:
-          case TAG_USERS:
           case TAG_HEART_BEAT:
           case TAG_INPUT_TO:
             break;

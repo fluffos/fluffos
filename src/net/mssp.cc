@@ -5,6 +5,7 @@
 #include "std.h"
 #include "lpc_incl.h"
 #include "comm.h"
+#include "user.h"
 #include "master.h"
 
 static const unsigned char telnet_mssp_value[] = {TELNET_MSSP_VAR, '%', 's', TELNET_MSSP_VAL,
@@ -76,7 +77,7 @@ void on_telnet_do_mssp(interactive_t *ip) {
   }
   if (!tmp) {
     char num[5] = {};
-    snprintf(num, sizeof(num), "%d", num_user);
+    snprintf(num, sizeof(num), "%d", users_num(true));
     telnet_printf(ip->telnet, (char *)telnet_mssp_value, "PLAYERS", num);
   }
   tmp = findstring("UPTIME");

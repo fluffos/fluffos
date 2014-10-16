@@ -1,6 +1,7 @@
 #include "../std.h"
 #include "../lpc_incl.h"
 #include "../comm.h"
+#include "../interactive.h"
 #include "../file_incl.h"
 #include "../file.h"
 #include "../backend.h"

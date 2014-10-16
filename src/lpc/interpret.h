@@ -6,6 +6,8 @@
 #ifndef INTERPRET_H
 #define INTERPRET_H
 
+#include "interactive.h" // for interactive_t
+
 typedef struct svalue_s svalue_t;
 
 #define PUSH_STRING (0 << 6)

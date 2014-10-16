@@ -7,6 +7,8 @@
 #include "lpc/compiler/compiler.h"
 #include "otable.h"
 #include "comm.h"
+#include "interactive.h"
+#include "user.h"
 #include "socket_efuns.h"
 #include "md.h"
 #include "eoperators.h"
@@ -889,11 +891,11 @@ void destruct_object(object_t *ob) {
 #ifndef NO_SNOOP
   if (ob->flags & O_SNOOP) {
     int i;
-    for (i = 0; i < max_users; i++) {
-      if (all_users[i] && all_users[i]->snooped_by == ob) {
-        all_users[i]->snooped_by = 0;
+    users_foreach([ob](interactive_t * user) {
+      if (user->snooped_by == ob) {
+        user->snooped_by = 0;
       }
-    }
+    });
     ob->flags &= ~O_SNOOP;
   }
 #endif
@@ -1972,11 +1974,7 @@ void shutdownMudOS(int exit_code) {
     }
   }
 #endif
-  for (i = 0; i < max_users; i++) {
-    if (all_users[i] && !(all_users[i]->iflags & CLOSING)) {
-      flush_message(all_users[i]);
-    }
-  }
+  flush_message_all();
 #ifdef PROFILING
   monitor(0, 0, 0, 0, 0); /* cause gmon.out to be written */
 #endif

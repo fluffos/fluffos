@@ -12,6 +12,8 @@
 #include "file_incl.h"
 #include "file.h"
 #include "comm.h"
+#include "interactive.h"
+#include "user.h"
 #include "dns.h"
 #include "parse.h"
 #include "sprintf.h"
@@ -1794,7 +1796,8 @@ void f_mud_status(void) {
 
     outbuf_addv(&ob, "Mappings:\t\t\t%8d %8d\n", num_mappings, total_mapping_size);
     outbuf_addv(&ob, "Mappings(nodes):\t\t%8d\n", total_mapping_nodes);
-    outbuf_addv(&ob, "Interactives:\t\t\t%8d %8d\n", num_user, num_user * sizeof(interactive_t));
+
+    outbuf_addv(&ob, "Interactives:\t\t\t%8d %8d\n", users_num(true), users_num(true) * sizeof(interactive_t));
 
     tot = show_otable_status(&ob, verbose) + heart_beat_status(&ob, verbose) +
           add_string_status(&ob, verbose) + print_call_out_usage(&ob, verbose);
@@ -1808,7 +1811,8 @@ void f_mud_status(void) {
          total_class_size +
 #endif
          total_mapping_size + tot_alloc_sentence * sizeof(sentence_t) + tot_alloc_object_size +
-         num_user * sizeof(interactive_t) + res;
+         users_num(true) * sizeof(interactive_t) +
+         res;
 
   if (!verbose) {
     outbuf_add(&ob, "\t\t\t\t\t --------\n");
@@ -2855,15 +2859,9 @@ void f_set_hide(void) {
   }
   if ((sp--)->u.number) {
     num_hidden++;
-    if (!(current_object->flags & O_HIDDEN) && current_object->interactive) {
-      num_hidden_users++;
-    }
     current_object->flags |= O_HIDDEN;
   } else {
     num_hidden--;
-    if ((current_object->flags & O_HIDDEN) && current_object->interactive) {
-      num_hidden_users--;
-    }
     current_object->flags &= ~O_HIDDEN;
   }
 }
@@ -3512,7 +3510,23 @@ void f_userp(void) {
 #endif
 
 #ifdef F_USERS
-void f_users(void) { push_refed_array(users()); }
+void f_users(void) {
+  bool include_hidden = true;
+#ifdef F_SET_HIDE
+  include_hidden = (current_object->flags & O_HIDDEN) || (valid_hide(current_object));
+#endif
+
+  auto users_ = users(include_hidden);
+  array_t *ret = allocate_empty_array(users_.size());
+
+  for (int i=0; i < users_.size(); i++) {
+    auto ob = users_[i]->ob;
+    ret->item[i].type = T_OBJECT;
+    ret->item[i].u.ob = ob;
+    add_ref(ob, "f_users");
+  }
+  push_refed_array(ret);
+}
 #endif
 
 #ifdef F_WIZARDP
@@ -3675,7 +3689,7 @@ void f_memory_info(void) {
           total_class_size +
 #endif
           total_mapping_size + tot_alloc_object_size + tot_alloc_sentence * sizeof(sentence_t) +
-          num_user * sizeof(interactive_t) + show_otable_status(0, -1) + heart_beat_status(0, -1) +
+          users_num(1) * sizeof(interactive_t) + show_otable_status(0, -1) + heart_beat_status(0, -1) +
           add_string_status(0, -1) + print_call_out_usage(0, -1) + res;
     push_number(tot);
     return;
@@ -3752,12 +3766,8 @@ void f_flush_messages(void) {
     }
     pop_stack();
   } else {
-    int i;
-
-    for (i = 0; i < max_users; i++) {
-      if (all_users[i] && !(all_users[i]->iflags & CLOSING)) {
-        flush_message(all_users[i]);
-      }
+    for (auto user: users(true)) {
+      flush_message(user);
     }
   }
 }

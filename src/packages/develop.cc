@@ -1,5 +1,6 @@
 #include "../lpc_incl.h"
 #include "../comm.h"
+#include "../interactive.h"
 #include "../md.h"
 #include "../sprintf.h"
 #include "../efun_protos.h"

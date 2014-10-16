@@ -8,6 +8,7 @@
 #include "../include/socket_err.h"
 #include "../socket_efuns.h"
 #include "../comm.h"
+#include "../interactive.h"
 #include "../efun_protos.h"
 
 #define VALID_SOCKET(x) check_valid_socket((x), fd, get_socket_owner(fd), addr, port)

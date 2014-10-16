@@ -76,6 +76,7 @@
 #include "std.h"
 #include "ed.h"
 #include "comm.h"
+#include "interactive.h"
 #include "file.h"
 #include "master.h"
 #include "outbuf.h"
