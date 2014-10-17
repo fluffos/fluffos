@@ -90,13 +90,11 @@
 #ifndef SENSIBLE_MODIFIERS
 #define DECL_VISIBLE 0x4000 /* Force inherit through private */
 
-#define DECL_ACCESS \
-  (DECL_HIDDEN | DECL_PRIVATE | DECL_PROTECTED | DECL_PUBLIC | DECL_VISIBLE)
+#define DECL_ACCESS (DECL_HIDDEN | DECL_PRIVATE | DECL_PROTECTED | DECL_PUBLIC | DECL_VISIBLE)
 
-#define DECL_MODIFY(x, y)                              \
-  ((((x) | (y)) & DECL_VISIBLE)                        \
-       ? ((((x) | (y)) & ~DECL_ACCESS) | DECL_VISIBLE) \
-       : DECL_MODIFY2(x, y))
+#define DECL_MODIFY(x, y)                                                       \
+  ((((x) | (y)) & DECL_VISIBLE) ? ((((x) | (y)) & ~DECL_ACCESS) | DECL_VISIBLE) \
+                                : DECL_MODIFY2(x, y))
 #else
 #define DECL_ACCESS (DECL_HIDDEN | DECL_PRIVATE | DECL_PROTECTED | DECL_PUBLIC)
 
@@ -104,15 +102,14 @@
 #endif
 #define DECL_MODS (DECL_ACCESS | DECL_NOMASK | DECL_NOSAVE)
 
-#define DECL_MODIFY2(t, mod)                     \
-  ((((t) & DECL_ACCESS) > ((mod) & DECL_ACCESS)) \
-       ? ((t) & ~DECL_ACCESS) | (mod)            \
-       : (t) | ((mod) & ~DECL_ACCESS))
+#define DECL_MODIFY2(t, mod)                                                \
+  ((((t)&DECL_ACCESS) > ((mod)&DECL_ACCESS)) ? ((t) & ~DECL_ACCESS) | (mod) \
+                                             : (t) | ((mod) & ~DECL_ACCESS))
 
 /* only the flags that should be copied up through inheritance levels */
-#define FUNC_MASK                                                       \
-  (FUNC_VARARGS | FUNC_UNDEFINED | FUNC_STRICT_TYPES | FUNC_PROTOTYPE | \
-   FUNC_TRUE_VARARGS | FUNC_ALIAS | DECL_MODS)
+#define FUNC_MASK                                                                           \
+  (FUNC_VARARGS | FUNC_UNDEFINED | FUNC_STRICT_TYPES | FUNC_PROTOTYPE | FUNC_TRUE_VARARGS | \
+   FUNC_ALIAS | DECL_MODS)
 
 /* a function that isn't 'real' */
 #define FUNC_NO_CODE (FUNC_ALIAS | FUNC_PROTOTYPE | FUNC_UNDEFINED)
@@ -228,23 +225,23 @@ typedef struct program_s {
   inherit_t *inherit;             /* List of inherited prgms */
   int total_size;                 /* Sum of all data in this struct */
                                   /*
-   * The types of function arguments are saved where 'argument_types'
-   * points. It can be a variable number of arguments, so allocation is
-   * done dynamically. To know where first argument is found for function
-   * 'n' (number of function), use 'type_start[n]'. These two arrays will
-   * only be allocated if '#pragma save_types' has been specified. This
-   * #pragma should be specified in files that are commonly used for
-   * inheritance. There are several lines of code that depends on the type
-   * length (16 bits) of 'type_start' (sorry !).
-   */
+* The types of function arguments are saved where 'argument_types'
+* points. It can be a variable number of arguments, so allocation is
+* done dynamically. To know where first argument is found for function
+* 'n' (number of function), use 'type_start[n]'. These two arrays will
+* only be allocated if '#pragma save_types' has been specified. This
+* #pragma should be specified in files that are commonly used for
+* inheritance. There are several lines of code that depends on the type
+* length (16 bits) of 'type_start' (sorry !).
+*/
   unsigned short *argument_types;
 #define INDEX_START_NONE 65535
   unsigned short *type_start;
   /*
    * And now some general size information.
    */
-  unsigned short heart_beat; /* Index of the heart beat function. 0 means
-                                * no heart beat */
+  unsigned short heart_beat;   /* Index of the heart beat function. 0 means
+                                  * no heart beat */
   unsigned short program_size; /* size of this instruction code */
   unsigned short num_classes;
   unsigned short num_functions_defined;

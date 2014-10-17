@@ -13,6 +13,6 @@ struct cache_entry_t {
   unsigned short variable_index_offset;
 };
 
-cache_entry_t* apply_cache_lookup(const char *, object_t *);
+cache_entry_t *apply_cache_lookup(const char *, object_t *);
 
 #endif /* LPC_APPLY_CACHE_H_ */

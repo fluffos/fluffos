@@ -19,18 +19,9 @@
 #include "db.h"
 #endif
 
-enum atypes {
-  aread,
-  awrite,
-  agetdir,
-  adbexec,
-  done
-};
+enum atypes { aread, awrite, agetdir, adbexec, done };
 
-enum astates {
-  BUSY,
-  DONE
-};
+enum astates { BUSY, DONE };
 
 struct request {
   char path[MAXPATHLEN];
@@ -211,9 +202,9 @@ int aio_gzread(struct request *req) {
 }
 
 void *gzwritethread(struct request *req) {
-  int fd = open(req->path, req->flags & 1 ? O_CREAT | O_WRONLY | O_TRUNC
-                                          : O_CREAT | O_WRONLY | O_APPEND,
-                S_IRWXU | S_IRWXG);
+  int fd =
+      open(req->path, req->flags & 1 ? O_CREAT | O_WRONLY | O_TRUNC : O_CREAT | O_WRONLY | O_APPEND,
+           S_IRWXU | S_IRWXG);
   gzFile file = gzdopen(fd, "wb");
   req->ret = gzwrite(file, (void *)(req->buf), req->size);
   req->status = DONE;
@@ -229,9 +220,9 @@ int aio_gzwrite(struct request *req) {
 #endif
 
 void *writethread(struct request *req) {
-  int fd = open(req->path, req->flags & 1 ? O_CREAT | O_WRONLY | O_TRUNC
-                                          : O_CREAT | O_WRONLY | O_APPEND,
-                S_IRWXU | S_IRWXG);
+  int fd =
+      open(req->path, req->flags & 1 ? O_CREAT | O_WRONLY | O_TRUNC : O_CREAT | O_WRONLY | O_APPEND,
+           S_IRWXU | S_IRWXG);
 
   req->ret = write(fd, req->buf, req->size);
 
@@ -310,8 +301,7 @@ void *getdirthread(struct request *req) {
     return NULL;
   }
   req->ret = size;
-  while ((size = syscall(SYS_getdents, fd, req->buf + req->ret,
-                         req->size - req->ret))) {
+  while ((size = syscall(SYS_getdents, fd, req->buf + req->ret, req->size - req->ret))) {
     if (size == -1) {
       close(fd);
       req->status = DONE;
@@ -371,8 +361,7 @@ int add_getdir(const char *fname, function_to_call_t *fun) {
 }
 #endif
 
-int add_write(const char *fname, const char *buf, int size, char flags,
-              function_to_call_t *fun) {
+int add_write(const char *fname, const char *buf, int size, char flags, function_to_call_t *fun) {
   if (fname) {
     struct request *req = get_req();
     req->buf = buf;
@@ -431,7 +420,7 @@ struct linux_dirent {
   unsigned short d_reclen; /* Length of this dirent */
   char d_name[];           /* Filename (null-terminated) */
                            /* length is actually (d_reclen - 2 -
-                                    offsetof(struct linux_dirent, d_name) */
+           offsetof(struct linux_dirent, d_name) */
 };
 
 void handle_getdir(struct request *req) {
@@ -443,8 +432,7 @@ void handle_getdir(struct request *req) {
   int i = 0;
   if (val > 0) {
     struct linux_dirent *de = (struct linux_dirent *)req->buf;
-    for (i = 0; i < MAX_ARRAY_SIZE && ((char *)de) - (char *)(req->buf) < val;
-         i++) {
+    for (i = 0; i < MAX_ARRAY_SIZE && ((char *)de) - (char *)(req->buf) < val; i++) {
       svalue_t *vp = &(ret->item[i]);
       vp->type = T_STRING;
       vp->subtype = STRING_MALLOC;
@@ -542,8 +530,7 @@ void f_async_read() {
   function_to_call_t *cb = get_cb();
   process_efun_callback(1, cb, F_ASYNC_READ);
   cb->f.fp->hdr.ref++;
-  add_read(check_valid_path((sp - 1)->u.string, current_object, "read_file", 0),
-           cb);
+  add_read(check_valid_path((sp - 1)->u.string, current_object, "read_file", 0), cb);
   pop_2_elems();
 }
 #endif
@@ -553,9 +540,8 @@ void f_async_write() {
   function_to_call_t *cb = get_cb();
   process_efun_callback(3, cb, F_ASYNC_WRITE);
   cb->f.fp->hdr.ref++;
-  add_write(
-      check_valid_path((sp - 3)->u.string, current_object, "write_file", 1),
-      (sp - 2)->u.string, strlen((sp - 2)->u.string), (sp - 1)->u.number, cb);
+  add_write(check_valid_path((sp - 3)->u.string, current_object, "write_file", 1),
+            (sp - 2)->u.string, strlen((sp - 2)->u.string), (sp - 1)->u.number, cb);
   pop_n_elems(4);
 }
 #endif
@@ -565,8 +551,7 @@ void f_async_getdir() {
   function_to_call_t *cb = get_cb();
   process_efun_callback(1, cb, F_ASYNC_READ);
   cb->f.fp->hdr.ref++;
-  add_getdir(check_valid_path((sp - 1)->u.string, current_object, "get_dir", 0),
-             cb);
+  add_getdir(check_valid_path((sp - 1)->u.string, current_object, "get_dir", 0), cb);
   pop_2_elems();
 }
 #endif

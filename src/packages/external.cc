@@ -8,8 +8,7 @@
 char *external_cmd[NUM_EXTERNAL_CMDS];
 
 #ifdef F_EXTERNAL_START
-int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2,
-                   svalue_t *arg3) {
+int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, svalue_t *arg3) {
   int sv[2];
   char *cmd;
   int fd;
@@ -130,8 +129,7 @@ void f_external_start(void) {
   svalue_t *arg = sp - num_arg + 1;
 
   if (check_valid_socket("external", -1, current_object, "N/A", -1)) {
-    fd = external_start(arg[0].u.number, arg + 1, arg + 2, arg + 3,
-                        (num_arg == 5 ? arg + 4 : 0));
+    fd = external_start(arg[0].u.number, arg + 1, arg + 2, arg + 3, (num_arg == 5 ? arg + 4 : 0));
     pop_n_elems(num_arg - 1);
     sp->u.number = fd;
   } else {

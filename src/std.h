@@ -20,10 +20,10 @@
 #include "macros.h"
 
 #ifndef _FUNC_SPEC_
-  #include "std_incl.h"
-  #include "malloc_incl.h"
+#include "std_incl.h"
+#include "malloc_incl.h"
 #ifndef NO_OPCODES
-    #include "opcodes.h"
+#include "opcodes.h"
 #endif
 #endif
 

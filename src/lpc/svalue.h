@@ -17,9 +17,7 @@ typedef double LPC_FLOAT;
 #define LPC_FLOAT_MIN DBL_MIN
 #define LPC_FLOAT_FMTSTR_P "f"
 
-typedef struct {
-  unsigned short ref;
-} refed_t;
+typedef struct { unsigned short ref; } refed_t;
 
 union u {
   const char *string;
@@ -87,8 +85,7 @@ typedef struct ref_s {
 #ifdef NO_BUFFER_TYPE
 #define T_REFED (T_ARRAY | T_OBJECT | T_MAPPING | T_FUNCTION | T_CLASS | T_REF)
 #else
-#define T_REFED \
-  (T_ARRAY | T_OBJECT | T_MAPPING | T_FUNCTION | T_BUFFER | T_CLASS | T_REF)
+#define T_REFED (T_ARRAY | T_OBJECT | T_MAPPING | T_FUNCTION | T_BUFFER | T_CLASS | T_REF)
 #endif
 #define T_ANY (T_REFED | T_STRING | T_NUMBER | T_REAL)
 
@@ -114,66 +111,54 @@ void assign_svalue_no_free(svalue_t *, svalue_t *);
 #define free_svalue(x, y) int_free_svalue(x)
 #endif
 
-
 extern svalue_t const0, const1, const0u;
 
 /* These are not used anywhere */
 
 /* Beek - add some sanity to joining strings */
 /* add to an svalue */
-#define EXTEND_SVALUE_STRING(x, y, z) \
-  SAFE( char *ess_res; \
-        int ess_len; \
-        int ess_r; \
-        ess_len = (ess_r = SVALUE_STRLEN(x)) + strlen(y); \
-        if (ess_len > MAX_STRING_LENGTH) \
-            error("Maximum string length exceeded in concatenation.\n"); \
-        if ((x)->subtype == STRING_MALLOC && MSTR_REF((x)->u.string) == 1) { \
-            ess_res = (char *) extend_string((x)->u.string, ess_len); \
-            if (!ess_res) fatal("Out of memory!\n"); \
-            strcpy(ess_res + ess_r, (y)); \
-        } else { \
-            ess_res = new_string(ess_len, z); \
-            strcpy(ess_res, (x)->u.string); \
-            strcpy(ess_res + ess_r, (y)); \
-            free_string_svalue(x); \
-            (x)->subtype = STRING_MALLOC; \
-        } \
-        (x)->u.string = ess_res; \
-    )
+#define EXTEND_SVALUE_STRING(x, y, z)                                                           \
+  SAFE(char *ess_res; int ess_len; int ess_r; ess_len = (ess_r = SVALUE_STRLEN(x)) + strlen(y); \
+       if (ess_len > MAX_STRING_LENGTH)                                                         \
+       error("Maximum string length exceeded in concatenation.\n");                             \
+       if ((x)->subtype == STRING_MALLOC && MSTR_REF((x)->u.string) == 1) {                     \
+    ess_res = (char *)extend_string((x)->u.string, ess_len);                                    \
+    if (!ess_res) fatal("Out of memory!\n");                                                    \
+    strcpy(ess_res + ess_r, (y));                                                               \
+       } else {                                                                                 \
+    ess_res = new_string(ess_len, z);                                                           \
+    strcpy(ess_res, (x)->u.string);                                                             \
+    strcpy(ess_res + ess_r, (y));                                                               \
+    free_string_svalue(x);                                                                      \
+    (x)->subtype = STRING_MALLOC;                                                               \
+       }(x)->u.string = ess_res;)
 
 /* <something that needs no free> + string svalue */
-#define SVALUE_STRING_ADD_LEFT(y, z)                                    \
-  SAFE(char *pss_res; int pss_r; int pss_len;                           \
-       pss_len = SVALUE_STRLEN(sp) + (pss_r = strlen(y));               \
-       if (pss_len > MAX_STRING_LENGTH)                                 \
-       error("Maximum string length exceeded in concatenation.\n");     \
-       pss_res = new_string(pss_len, z); strcpy(pss_res, y);            \
-       strcpy(pss_res + pss_r, sp->u.string); free_string_svalue(sp--); \
-       sp->type = T_STRING; sp->u.string = pss_res;                     \
-       sp->subtype = STRING_MALLOC;)
+#define SVALUE_STRING_ADD_LEFT(y, z)                                                             \
+  SAFE(char *pss_res; int pss_r; int pss_len; pss_len = SVALUE_STRLEN(sp) + (pss_r = strlen(y)); \
+       if (pss_len > MAX_STRING_LENGTH)                                                          \
+       error("Maximum string length exceeded in concatenation.\n");                              \
+       pss_res = new_string(pss_len, z); strcpy(pss_res, y);                                     \
+       strcpy(pss_res + pss_r, sp->u.string); free_string_svalue(sp--); sp->type = T_STRING;     \
+       sp->u.string = pss_res; sp->subtype = STRING_MALLOC;)
 
 /* basically, string + string; faster than using extend b/c of SVALUE_STRLEN */
-#define SVALUE_STRING_JOIN(x, y, z) \
-  SAFE( char *ssj_res; int ssj_r; int ssj_len; \
-        ssj_r = SVALUE_STRLEN(x); \
-        ssj_len = ssj_r + SVALUE_STRLEN(y); \
-        if (ssj_len > MAX_STRING_LENGTH) \
-            error("Maximum string length exceeded in concatenation.\n"); \
-        if ((x)->subtype == STRING_MALLOC && MSTR_REF((x)->u.string) == 1) { \
-            ssj_res = (char *) extend_string((x)->u.string, ssj_len); \
-            if (!ssj_res) fatal("Out of memory!\n"); \
-            (void) strcpy(ssj_res + ssj_r, (y)->u.string);  \
-            free_string_svalue(y); \
-        } else { \
-            ssj_res = (char *) new_string(ssj_len, z); \
-            strcpy(ssj_res, (x)->u.string);        \
-            strcpy(ssj_res + ssj_r, (y)->u.string);        \
-            free_string_svalue(y); \
-            free_string_svalue(x); \
-            (x)->subtype = STRING_MALLOC; \
-        } \
-        (x)->u.string = ssj_res; \
-    )
+#define SVALUE_STRING_JOIN(x, y, z)                                         \
+  SAFE(char *ssj_res; int ssj_r; int ssj_len; ssj_r = SVALUE_STRLEN(x);     \
+       ssj_len = ssj_r + SVALUE_STRLEN(y); if (ssj_len > MAX_STRING_LENGTH) \
+       error("Maximum string length exceeded in concatenation.\n");         \
+       if ((x)->subtype == STRING_MALLOC && MSTR_REF((x)->u.string) == 1) { \
+    ssj_res = (char *)extend_string((x)->u.string, ssj_len);                \
+    if (!ssj_res) fatal("Out of memory!\n");                                \
+    (void) strcpy(ssj_res + ssj_r, (y)->u.string);                          \
+    free_string_svalue(y);                                                  \
+       } else {                                                             \
+    ssj_res = (char *)new_string(ssj_len, z);                               \
+    strcpy(ssj_res, (x)->u.string);                                         \
+    strcpy(ssj_res + ssj_r, (y)->u.string);                                 \
+    free_string_svalue(y);                                                  \
+    free_string_svalue(x);                                                  \
+    (x)->subtype = STRING_MALLOC;                                           \
+       }(x)->u.string = ssj_res;)
 
-#endif  /* LPC_SVALUE_H */
+#endif /* LPC_SVALUE_H */

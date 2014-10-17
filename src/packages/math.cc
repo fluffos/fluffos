@@ -205,8 +205,7 @@ void f_norm(void) {
 
 #if defined(F_DOTPROD) | defined(F_DISTANCE) | defined(F_ANGLE)
 static LPC_FLOAT vector_op(array_t *a, array_t *b,
-                           LPC_FLOAT (*func)(const LPC_FLOAT,
-                                             const LPC_FLOAT)) {
+                           LPC_FLOAT (*func)(const LPC_FLOAT, const LPC_FLOAT)) {
   LPC_INT len = a->size;
   LPC_FLOAT total = 0.0;
 
@@ -217,8 +216,7 @@ static LPC_FLOAT vector_op(array_t *a, array_t *b,
   while (len-- > 0) {
     if (b->item[len].type == T_NUMBER) {
       if (a->item[len].type == T_NUMBER)
-        total += func((LPC_FLOAT)a->item[len].u.number,
-                      (LPC_FLOAT)b->item[len].u.number);
+        total += func((LPC_FLOAT)a->item[len].u.number, (LPC_FLOAT)b->item[len].u.number);
       else if (a->item[len].type == T_REAL)
         total += func(a->item[len].u.real, (LPC_FLOAT)b->item[len].u.number);
       else {
@@ -243,14 +241,10 @@ static LPC_FLOAT vector_op(array_t *a, array_t *b,
 #endif
 
 #ifdef F_DOTPROD
-static LPC_FLOAT dotprod_mult(const LPC_FLOAT a, const LPC_FLOAT b) {
-  return a * b;
-}
+static LPC_FLOAT dotprod_mult(const LPC_FLOAT a, const LPC_FLOAT b) { return a * b; }
 
 /* dot product of two vectors */
-static LPC_FLOAT dotprod(array_t *a, array_t *b) {
-  return vector_op(a, b, dotprod_mult);
-}
+static LPC_FLOAT dotprod(array_t *a, array_t *b) { return vector_op(a, b, dotprod_mult); }
 
 void f_dotprod(void) {
   LPC_FLOAT total = vector_op((sp - 1)->u.arr, sp->u.arr, dotprod_mult);
@@ -273,9 +267,7 @@ void f_dotprod(void) {
 #endif
 
 #ifdef F_DISTANCE
-static LPC_FLOAT distance_mult(const LPC_FLOAT a, const LPC_FLOAT b) {
-  return SQUARE(b - a);
-}
+static LPC_FLOAT distance_mult(const LPC_FLOAT a, const LPC_FLOAT b) { return SQUARE(b - a); }
 
 /* The (Euclidian) distance between two points */
 void f_distance(void) {
@@ -283,8 +275,7 @@ void f_distance(void) {
 
   if (total == -INT_MAX) {
     pop_2_elems();
-    error(
-        "distance: cannot take the distance of vectors of different sizes.\n");
+    error("distance: cannot take the distance of vectors of different sizes.\n");
     return;
   }
 

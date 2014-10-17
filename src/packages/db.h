@@ -79,8 +79,7 @@ typedef union dbconn_u {
  */
 typedef struct db_defn_s {
   const char *name;
-  int (*connect)(dbconn_t *, const char *, const char *, const char *,
-                 const char *);
+  int (*connect)(dbconn_t *, const char *, const char *, const char *, const char *);
   int (*close)(dbconn_t *);
   int (*execute)(dbconn_t *, const char *);
   array_t *(*fetch)(dbconn_t *, int);

@@ -92,8 +92,8 @@ static object_t *find_obj_n(const char *s) {
 
   while (curr) {
     obj_probes++;
-    if (!strcmp(curr->obname, s)) {/* found it */
-      if (prev) {                  /* not at head of list */
+    if (!strcmp(curr->obname, s)) { /* found it */
+      if (prev) {                   /* not at head of list */
         prev->next_hash = curr->next_hash;
         curr->next_hash = obj_table[h];
         obj_table[h] = curr;
@@ -120,7 +120,7 @@ array_t *children(const char *s) {
 
   vec = allocate_empty_array(max_array_size);
   while (curr && count < max_array_size) {
-    if (!strncmp(curr->obname, s, size)) {/* found one */
+    if (!strncmp(curr->obname, s, size)) { /* found one */
       vec->item[count].u.ob = curr;
       add_ref(curr, "children");
       vec->item[count].type = T_OBJECT;
@@ -154,8 +154,7 @@ void enter_object_hash(object_t *ob) {
   s = find_obj_n(ob->obname); /* This sets h */
   /* when these reload, the new copy comes in before the old goes out */
   if (s != master_ob && s != simul_efun_ob) {
-    DEBUG_CHECK1(s && s != ob, "Duplicate object \"/%s\" in object hash table",
-                 ob->obname);
+    DEBUG_CHECK1(s && s != ob, "Duplicate object \"/%s\" in object hash table", ob->obname);
   }
 #endif
 
@@ -189,8 +188,7 @@ void remove_object_hash(object_t *ob) {
     fatal("couldn't find object %s in obj_table", ob->obname);
   }
 
-  DEBUG_CHECK1(s != ob, "Remove object \"/%s\": found a different object!",
-               ob->obname);
+  DEBUG_CHECK1(s != ob, "Remove object \"/%s\": found a different object!", ob->obname);
 
   obj_table[h] = ob->next_hash;
   ob->next_hash = 0;
@@ -253,15 +251,13 @@ int show_otable_status(outbuffer_t *out, int verbose) {
     outbuf_addv(out, "Average search length:           %s\n", sbuf);
     outbuf_addv(out, "Internal lookups (succeeded):    %lu (%lu)\n",
                 obj_searches - user_obj_lookups, objs_found - user_obj_found);
-    outbuf_addv(out, "External lookups (succeeded):    %lu (%lu)\n",
-                user_obj_lookups, user_obj_found);
+    outbuf_addv(out, "External lookups (succeeded):    %lu (%lu)\n", user_obj_lookups,
+                user_obj_found);
   }
-  starts =
-      (long)OTABLE_SIZE * sizeof(object_t *) + objs_in_table * sizeof(object_t);
+  starts = (long)OTABLE_SIZE * sizeof(object_t *) + objs_in_table * sizeof(object_t);
 
   if (!verbose) {
-    outbuf_addv(out, "Obj table overhead:\t\t%8d %8d\n",
-                OTABLE_SIZE * sizeof(object_t *), starts);
+    outbuf_addv(out, "Obj table overhead:\t\t%8d %8d\n", OTABLE_SIZE * sizeof(object_t *), starts);
   }
   return starts;
 }

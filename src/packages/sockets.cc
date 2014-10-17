@@ -8,10 +8,10 @@
 #include "../include/socket_err.h"
 #include "../socket_efuns.h"
 #include "../comm.h"
+#include "../interactive.h"
 #include "../efun_protos.h"
 
-#define VALID_SOCKET(x) \
-  check_valid_socket((x), fd, get_socket_owner(fd), addr, port)
+#define VALID_SOCKET(x) check_valid_socket((x), fd, get_socket_owner(fd), addr, port)
 
 #ifdef F_SOCKET_CREATE
 void f_socket_create(void) {
@@ -52,8 +52,7 @@ void f_socket_bind(void) {
   get_socket_address(fd, addr, &port, 0);
 
   if (VALID_SOCKET("bind")) {
-    i = socket_bind(fd, arg[1].u.number,
-                    (num_arg == 3 ? arg[2].u.string : NULL));
+    i = socket_bind(fd, arg[1].u.number, (num_arg == 3 ? arg[2].u.string : NULL));
     pop_n_elems(num_arg - 1);
     sp->u.number = i;
   } else {
@@ -92,8 +91,7 @@ void f_socket_accept(void) {
   }
   get_socket_address(fd = (sp - 2)->u.number, addr, &port, 0);
 
-  (sp - 2)->u.number =
-      VALID_SOCKET("accept") ? socket_accept(fd, (sp - 1), sp) : EESECURITY;
+  (sp - 2)->u.number = VALID_SOCKET("accept") ? socket_accept(fd, (sp - 1), sp) : EESECURITY;
   pop_2_elems();
 }
 #endif
@@ -138,17 +136,13 @@ void f_socket_connect(void) {
     }
 #ifdef DEBUG
   } else {
-    debug_message(
-        "socket_connect: socket already bound to address/port: %s/%d\n", addr,
-        port);
-    debug_message("socket_connect: but requested to connect to: %s\n",
-                  (sp - 2)->u.string);
+    debug_message("socket_connect: socket already bound to address/port: %s/%d\n", addr, port);
+    debug_message("socket_connect: but requested to connect to: %s\n", (sp - 2)->u.string);
 #endif
   }
 
-  (sp - 3)->u.number = VALID_SOCKET("connect")
-                           ? socket_connect(fd, (sp - 2)->u.string, sp - 1, sp)
-                           : EESECURITY;
+  (sp - 3)->u.number =
+      VALID_SOCKET("connect") ? socket_connect(fd, (sp - 2)->u.string, sp - 1, sp) : EESECURITY;
   pop_3_elems();
 }
 #endif
@@ -168,8 +162,7 @@ void f_socket_write(void) {
   get_socket_address(fd, addr, &port, 0);
 
   if (VALID_SOCKET("write")) {
-    i = socket_write(fd, &arg[1],
-                     (num_arg == 3) ? arg[2].u.string : (char *)NULL);
+    i = socket_write(fd, &arg[1], (num_arg == 3) ? arg[2].u.string : (char *)NULL);
     pop_n_elems(num_arg - 1);
     sp->u.number = i;
   } else {
@@ -203,9 +196,7 @@ void f_socket_release(void) {
   get_socket_address(fd, addr, &port, 0);
 
   (sp - 2)->u.number =
-      VALID_SOCKET("release")
-          ? socket_release((sp - 2)->u.number, (sp - 1)->u.ob, sp)
-          : EESECURITY;
+      VALID_SOCKET("release") ? socket_release((sp - 2)->u.number, (sp - 1)->u.ob, sp) : EESECURITY;
 
   pop_stack();
   /* the object might have been dested an removed from the stack */
@@ -230,10 +221,9 @@ void f_socket_acquire(void) {
   fd = (sp - 3)->u.number;
   get_socket_address(fd, addr, &port, 0);
 
-  (sp - 3)->u.number =
-      VALID_SOCKET("acquire")
-          ? socket_acquire((sp - 3)->u.number, (sp - 2), (sp - 1), sp)
-          : EESECURITY;
+  (sp - 3)->u.number = VALID_SOCKET("acquire")
+                           ? socket_acquire((sp - 3)->u.number, (sp - 2), (sp - 1), sp)
+                           : EESECURITY;
 
   pop_3_elems();
 }
@@ -265,9 +255,8 @@ void f_socket_address(void) {
 
     char host[NI_MAXHOST], service[NI_MAXSERV];
     int ret =
-        getnameinfo((struct sockaddr *)&sp->u.ob->interactive->addr,
-                    sp->u.ob->interactive->addrlen, host, sizeof(host), service,
-                    sizeof(service), NI_NUMERICHOST | NI_NUMERICSERV);
+        getnameinfo((struct sockaddr *)&sp->u.ob->interactive->addr, sp->u.ob->interactive->addrlen,
+                    host, sizeof(host), service, sizeof(service), NI_NUMERICHOST | NI_NUMERICSERV);
     if (ret) {
       strcpy(host, "0.0.0.0");
       strcpy(service, "0");

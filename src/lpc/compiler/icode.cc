@@ -29,8 +29,7 @@ static void ins_int(LPC_INT);
 static void ins_pointer(POINTER_INT);
 void i_generate_node(parse_node_t *);
 static void i_generate_if_branch(parse_node_t *, int);
-static void i_generate_loop(int, parse_node_t *, parse_node_t *,
-                            parse_node_t *);
+static void i_generate_loop(int, parse_node_t *, parse_node_t *, parse_node_t *);
 static void i_update_branch_list(parse_node_t *, const char *);
 static int try_to_push(int, int);
 
@@ -85,7 +84,6 @@ static void ins_short(short l) {
  * that correct byte order is used, regardless of machine architecture.
  */
 static void ins_int(LPC_INT l) {
-
   if (prog_code + sizeof(LPC_INT) > prog_code_max) {
     mem_block_t *mbp = &mem_block[A_PROGRAM];
     UPDATE_PROGRAM_SIZE;
@@ -98,7 +96,6 @@ static void ins_int(LPC_INT l) {
 }
 
 static void ins_pointer(POINTER_INT l) {
-
   if (prog_code + sizeof(POINTER_INT) > prog_code_max) {
     mem_block_t *mbp = &mem_block[A_PROGRAM];
     UPDATE_PROGRAM_SIZE;
@@ -120,8 +117,7 @@ static void upd_short(int offset, int l, const char *where) {
   if (l > USHRT_MAX) {
     char buf[256];
 
-    sprintf(buf, "branch limit exceeded in %s, near line %i", where,
-            line_being_generated);
+    sprintf(buf, "branch limit exceeded in %s, near line %i", where, line_being_generated);
     yyerror(buf);
   }
   s = l;
@@ -133,8 +129,7 @@ static void ins_rel_short(int l) {
   if (l > USHRT_MAX) {
     char buf[256];
 
-    sprintf(buf, "branch limit exceeded in switch table, near line %i",
-            line_being_generated);
+    sprintf(buf, "branch limit exceeded in switch table, near line %i", line_being_generated);
     yyerror(buf);
   }
   ins_short(l);
@@ -290,8 +285,7 @@ static void switch_to_line(unsigned int line) {
 
     last_size_generated += sz;
     while (sz > 255) {
-      p = (unsigned char *)allocate_in_mem_block(A_LINENUMBERS,
-                                                 sizeof(ADDRESS_TYPE) + 1);
+      p = (unsigned char *)allocate_in_mem_block(A_LINENUMBERS, sizeof(ADDRESS_TYPE) + 1);
       *p++ = 255;
 #if !defined(USE_32BIT_ADDRESSES)
       STORE_SHORT(p, s);
@@ -300,8 +294,7 @@ static void switch_to_line(unsigned int line) {
 #endif
       sz -= 255;
     }
-    p = (unsigned char *)allocate_in_mem_block(A_LINENUMBERS,
-                                               sizeof(ADDRESS_TYPE) + 1);
+    p = (unsigned char *)allocate_in_mem_block(A_LINENUMBERS, sizeof(ADDRESS_TYPE) + 1);
     *p++ = sz;
 #if !defined(USE_32BIT_ADDRESSES)
     STORE_SHORT(p, s);
@@ -376,8 +369,7 @@ void i_generate_node(parse_node_t *expr) {
       /* rest  - Sym                                              */
 
       num = FUNCTION_TEMP(expr->v.number)->u.index;
-      FUNC(num)->address =
-          generate_function(FUNC(num), expr->r.expr, expr->l.number);
+      FUNC(num)->address = generate_function(FUNC(num), expr->r.expr, expr->l.number);
       break;
     }
     case NODE_TERNARY_OP:
@@ -599,7 +591,6 @@ void i_generate_node(parse_node_t *expr) {
       }
 
       if (expr->r.expr) {
-
         if (tmp & FOREACH_RIGHT_GLOBAL) {
           INS_GLOBAL_INDEX(expr->r.expr->l.number);
         } else {
@@ -820,8 +811,8 @@ void i_generate_node(parse_node_t *expr) {
   }
 }
 
-static void i_generate_loop(int test_first, parse_node_t *block,
-                            parse_node_t *inc, parse_node_t *test) {
+static void i_generate_loop(int test_first, parse_node_t *block, parse_node_t *inc,
+                            parse_node_t *test) {
   parse_node_t *save_breaks = branch_list[CJ_BREAK];
   parse_node_t *save_continues = branch_list[CJ_CONTINUE];
   int forever = node_always_true(test);
@@ -844,8 +835,7 @@ static void i_generate_loop(int test_first, parse_node_t *block,
   if (!forever && test_first) {
     i_update_forward_branch("loop");
   }
-  if (test && (test->v.number == F_LOOP_COND_LOCAL ||
-               test->v.number == F_LOOP_COND_NUMBER ||
+  if (test && (test->v.number == F_LOOP_COND_LOCAL || test->v.number == F_LOOP_COND_NUMBER ||
                test->v.number == F_NEXT_FOREACH)) {
     i_generate_node(test);
     ins_short(CURRENT_PROGRAM_SIZE - pos);
@@ -930,8 +920,8 @@ void i_generate_forward_branch(char b) {
   ins_byte(b);
   if (nforward_branches == nforward_branches_max) {
     nforward_branches_max += 10;
-    forward_branches = RESIZE(forward_branches, nforward_branches_max, int,
-                              TAG_COMPILER, "forward_branches");
+    forward_branches =
+        RESIZE(forward_branches, nforward_branches_max, int, TAG_COMPILER, "forward_branches");
   }
 
   forward_branches[nforward_branches++] = CURRENT_PROGRAM_SIZE;
@@ -951,8 +941,7 @@ void i_update_forward_branch_links(char kind, parse_node_t *link_start) {
   end_pushes();
   nforward_branches--;
   upd_short(forward_branches[nforward_branches],
-            CURRENT_PROGRAM_SIZE - forward_branches[nforward_branches],
-            "&& or ||");
+            CURRENT_PROGRAM_SIZE - forward_branches[nforward_branches], "&& or ||");
   do {
     i = link_start->v.number;
     upd_byte(i - 1, kind);
@@ -1228,11 +1217,10 @@ void optimize_icode(char *start, char *pc, char *end) {
         LOAD_SHORT(etable, pc);
         pc += 2; /* def */
         // break; //doesn't seem to work!
-        printf("stable: %x pc %p swstart %p etable %x\n", stable, (void *)pc,
-               (void *)swstart, etable);
-        DEBUG_CHECK(
-            stable < pc - swstart || etable < pc - swstart || etable < stable,
-            "Error in switch table found while optimizing\n");
+        printf("stable: %x pc %p swstart %p etable %x\n", stable, (void *)pc, (void *)swstart,
+               etable);
+        DEBUG_CHECK(stable < pc - swstart || etable < pc - swstart || etable < stable,
+                    "Error in switch table found while optimizing\n");
         /* recursively optimize the inside of the switch */
         optimize_icode(start, pc, start + stable);
         pc = swstart + etable;

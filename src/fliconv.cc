@@ -24,10 +24,8 @@ struct translation *get_translator(const char *encoding) {
   if (ret) {
     return ret;
   }
-  ret = (struct translation *)DMALLOC(sizeof(struct translation), TAG_PERMANENT,
-                                      "get_translator");
-  char *name = (char *)DMALLOC(strlen(encoding) + 18 + 1, TAG_PERMANENT,
-                               "get_translator");
+  ret = (struct translation *)DMALLOC(sizeof(struct translation), TAG_PERMANENT, "get_translator");
+  char *name = (char *)DMALLOC(strlen(encoding) + 18 + 1, TAG_PERMANENT, "get_translator");
   strcpy(name, encoding);
 #ifdef __linux__
   strcat(name, "//TRANSLIT//IGNORE");
@@ -37,7 +35,7 @@ struct translation *get_translator(const char *encoding) {
   ret->outgoing = iconv_open(name, "UTF-8");
 
   ret->next = 0;
-  if (ret->incoming == (iconv_t) - 1 || ret->outgoing == (iconv_t) - 1) {
+  if (ret->incoming == (iconv_t)-1 || ret->outgoing == (iconv_t)-1) {
     FREE(name);
     FREE(ret);
     return 0;
@@ -81,7 +79,6 @@ char *translate(iconv_t tr, const char *mes, int inlen, int *outlen) {
     if (0) {
 #endif
     } else {
-
       if (E2BIG == errno) {
         errno = 0;
         tmp = (unsigned char *)mes;
@@ -165,8 +162,7 @@ void f_str_to_arr() {
     translate_easy(newt->outgoing, " ");
   }
   int len;
-  int *trans = (int *)translate(newt->outgoing, sp->u.string,
-                                SVALUE_STRLEN(sp) + 1, &len);
+  int *trans = (int *)translate(newt->outgoing, sp->u.string, SVALUE_STRLEN(sp) + 1, &len);
   len /= 4;
   array_t *arr = allocate_array(len);
   while (len--) {
@@ -185,16 +181,14 @@ void f_arr_to_str() {
     newt = get_translator("UTF-32");
   }
   int len = sp->u.arr->size;
-  int *in =
-      (int *)DMALLOC(sizeof(int) * (len + 1), TAG_TEMPORARY, "f_arr_to_str");
+  int *in = (int *)DMALLOC(sizeof(int) * (len + 1), TAG_TEMPORARY, "f_arr_to_str");
   char *trans;
   in[len] = 0;
   while (len--) {
     in[len] = sp->u.arr->item[len].u.number;
   }
 
-  trans =
-      translate(newt->incoming, (char *)in, (sp->u.arr->size + 1) * 4, &len);
+  trans = translate(newt->incoming, (char *)in, (sp->u.arr->size + 1) * 4, &len);
   FREE(in);
   pop_stack();
   copy_and_push_string(trans);

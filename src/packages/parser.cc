@@ -114,14 +114,11 @@ static void clear_parallel_errors(saved_error_t **);
 static svalue_t *get_the_error(parser_error_t *, int);
 
 #define isignore(x) (!uisprint(x) || x == '\'')
-#define iskeep(x) \
-  (uisalnum(x) || x == '*' || x == '?' || x == '!' || x == '.' || x == ':')
+#define iskeep(x) (uisalnum(x) || x == '*' || x == '?' || x == '!' || x == '.' || x == ':')
 
-#define SHARED_STRING(x) \
-  ((x)->subtype == STRING_SHARED ? (x)->u.string : findstring((x)->u.string))
+#define SHARED_STRING(x) ((x)->subtype == STRING_SHARED ? (x)->u.string : findstring((x)->u.string))
 
-#define NEED_REFRESH(ob) \
-  (ob->pinfo &&((ob->pinfo->flags &(PI_SETUP | PI_REFRESH)) != PI_SETUP))
+#define NEED_REFRESH(ob) (ob->pinfo && ((ob->pinfo->flags & (PI_SETUP | PI_REFRESH)) != PI_SETUP))
 
 /* parse_init() - setup the object
  * parse_refresh() - refresh an object's parse data
@@ -146,7 +143,7 @@ void parser_mark_verbs() {
     }
 #endif
     if (best_result->parallel)
-        /* mark parallel errors */ {
+    /* mark parallel errors */ {
       ;
     }
 
@@ -283,11 +280,10 @@ static int intersect(bitvec_t *bv1, bitvec_t *bv2) {
 }
 
 static int bitvec_count(bitvec_t *bv) {
-  static int counts[16] = {
-      /* 0000 */ 0, /* 0001 */ 1, /* 0010 */ 1, /* 0011 */ 2,
-      /* 0100 */ 1, /* 0101 */ 2, /* 0110 */ 2, /* 0111 */ 3,
-      /* 1000 */ 1, /* 1001 */ 2, /* 1010 */ 2, /* 1011 */ 3,
-      /* 1100 */ 2, /* 1101 */ 3, /* 1110 */ 3, /* 1111 */ 4};
+  static int counts[16] = {/* 0000 */ 0, /* 0001 */ 1, /* 0010 */ 1, /* 0011 */ 2,
+                           /* 0100 */ 1, /* 0101 */ 2, /* 0110 */ 2, /* 0111 */ 3,
+                           /* 1000 */ 1, /* 1001 */ 2, /* 1010 */ 2, /* 1011 */ 3,
+                           /* 1100 */ 2, /* 1101 */ 3, /* 1110 */ 3, /* 1111 */ 4};
 
   int ret = 0;
   int i, j;
@@ -358,8 +354,7 @@ static int parse_copy_array(array_t *arr, char ***sarrp) {
     return 0;
   }
 
-  table2 = *sarrp =
-      CALLOCATE(arr->size, char *, TAG_PARSER, "parse_copy_array");
+  table2 = *sarrp = CALLOCATE(arr->size, char *, TAG_PARSER, "parse_copy_array");
   table = (const char **)table2;
   for (j = 0; j < arr->size; j++) {
     if (arr->item[j].type == T_STRING) {
@@ -380,8 +375,7 @@ static int parse_copy_array(array_t *arr, char ***sarrp) {
 static void add_special_word(const char *wrd, int kind, int arg) {
   char *p = make_shared_string(wrd);
   int h = DO_HASH(p, SPECIAL_HASH_SIZE);
-  special_word_t *swp =
-      ALLOCATE(special_word_t, TAG_PARSER, "add_special_word");
+  special_word_t *swp = ALLOCATE(special_word_t, TAG_PARSER, "add_special_word");
 
   swp->wrd = p;
   swp->kind = kind;
@@ -562,8 +556,7 @@ void f_parse_refresh(void) {
   }
 
   if (!(pi = current_object->pinfo))
-    error("/%s is not known by the parser.  Call parse_init() first.\n",
-          current_object->obname);
+    error("/%s is not known by the parser.  Call parse_init() first.\n", current_object->obname);
 
   if (pi->flags & PI_SETUP) {
     pi->flags &= PI_VERB_HANDLER;
@@ -618,8 +611,7 @@ static void hash_clean(void) {
   hash_entry_t **nodep, *next;
 
   for (i = 0; i < HASH_SIZE; i++) {
-    for (nodep = &hash_table[i]; *nodep && ((*nodep)->flags & HV_PERM);
-         nodep = &((*nodep)->next)) {
+    for (nodep = &hash_table[i]; *nodep && ((*nodep)->flags & HV_PERM); nodep = &((*nodep)->next)) {
       ;
     }
     while (*nodep) {
@@ -1026,8 +1018,7 @@ static void add_objects_from_array(array_t *arr, int flags) {
     }
     last_flags = 0;
     last_was_me = 0;
-    if (arr->item[i].type == T_OBJECT &&
-        !((ob = arr->item[i].u.ob)->flags & O_DESTRUCTED)) {
+    if (arr->item[i].type == T_OBJECT && !((ob = arr->item[i].u.ob)->flags & O_DESTRUCTED)) {
       if (ob->pinfo) {
         if (num_objects == MAX_NUM_OBJECTS) {
           return;
@@ -1318,11 +1309,10 @@ static void load_objects(void) {
 }
 
 static int get_single(bitvec_t *bv) {
-  static int answer[16] = {
-      /* 0000 */ -1, /* 0001 */ 0,  /* 0010 */ 1,  /* 0011 */ -1,
-      /* 0100 */ 2,  /* 0101 */ -1, /* 0110 */ -1, /* 0111 */ -1,
-      /* 1000 */ 3,  /* 1001 */ -1, /* 1010 */ -1, /* 1011 */ -1,
-      /* 1100 */ -1, /* 1101 */ -1, /* 1110 */ -1, /* 1111 */ -1};
+  static int answer[16] = {/* 0000 */ -1, /* 0001 */ 0,  /* 0010 */ 1,  /* 0011 */ -1,
+                           /* 0100 */ 2,  /* 0101 */ -1, /* 0110 */ -1, /* 0111 */ -1,
+                           /* 1000 */ 3,  /* 1001 */ -1, /* 1010 */ -1, /* 1011 */ -1,
+                           /* 1100 */ -1, /* 1101 */ -1, /* 1110 */ -1, /* 1111 */ -1};
 
   int i, res = -1;
   unsigned int tmp;
@@ -1385,8 +1375,7 @@ static char *query_the_short(char *start, char *end, object_t *ob) {
   if (ob == NULL || (intptr_t)ob == 0x9 || ob == 0x0) {
     return strput(start, end, "the thing");
   }
-  if ((ob->flags &O_DESTRUCTED) ||
-      (!(ret = apply("the_short", ob, 0, ORIGIN_DRIVER))) ||
+  if ((ob->flags & O_DESTRUCTED) || (!(ret = apply("the_short", ob, 0, ORIGIN_DRIVER))) ||
       (ret->type != T_STRING)) {
     return strput(start, end, "the thing");
   }
@@ -1504,8 +1493,7 @@ static void parse_obj(int tok, parse_state_t *state, int ordinal) {
         singular_legal = 0;
         ord_seen = 1;
         if (state->word_index < num_words &&
-            check_special_word(words[state->word_index].string, &tmp) ==
-                SW_OF) {
+            check_special_word(words[state->word_index].string, &tmp) == SW_OF) {
           state->word_index++;
           continue;
         }
@@ -1517,8 +1505,7 @@ static void parse_obj(int tok, parse_state_t *state, int ordinal) {
           mp->ordinal = 0;
         } else {
           free_parser_error(&current_error_info);
-          mp = add_match(&local_state, ERROR_TOKEN, start,
-                         state->word_index - 1);
+          mp = add_match(&local_state, ERROR_TOKEN, start, state->word_index - 1);
           current_error_info.error_type = ERR_BAD_MULTIPLE;
         }
         parse_rule(&local_state);
@@ -1563,8 +1550,7 @@ static void parse_obj(int tok, parse_state_t *state, int ordinal) {
         }
 
         if (singular_legal && (hnode->flags & HV_NOUN)) {
-          int explore_errors =
-              !best_match && state->num_errors < best_num_errors;
+          int explore_errors = !best_match && state->num_errors < best_num_errors;
           DEBUG_P(("Found noun: %s", str));
           local_state = *state;
           bitvec_copy(&save_obs, &objects);
@@ -1610,8 +1596,7 @@ static void parse_obj(int tok, parse_state_t *state, int ordinal) {
               goto we_have_an_error;
             }
           }
-          mp = add_match(&local_state, tok & ~PLURAL_MODIFIER, start,
-                         state->word_index - 1);
+          mp = add_match(&local_state, tok & ~PLURAL_MODIFIER, start, state->word_index - 1);
           bitvec_copy(&mp->val.obs, &objects);
           if (ordinal != 0) {
             mp->ordinal = ordinal;
@@ -1622,8 +1607,7 @@ static void parse_obj(int tok, parse_state_t *state, int ordinal) {
           goto do_the_parse;
 
         we_have_an_error:
-          mp = add_match(&local_state, ERROR_TOKEN, start,
-                         state->word_index - 1);
+          mp = add_match(&local_state, ERROR_TOKEN, start, state->word_index - 1);
 
         do_the_parse:
           parse_rule(&local_state);
@@ -1632,8 +1616,7 @@ static void parse_obj(int tok, parse_state_t *state, int ordinal) {
           bitvec_copy(&objects, &save_obs);
         }
         if ((ordinal == 0) && (hnode->flags & HV_PLURAL)) {
-          int explore_errors =
-              !best_match && state->num_errors < best_num_errors;
+          int explore_errors = !best_match && state->num_errors < best_num_errors;
           DEBUG_P(("Found plural: %s", str));
           local_state = *state;
           bitvec_copy(&save_obs, &objects);
@@ -1695,8 +1678,7 @@ static void parse_obj(int tok, parse_state_t *state, int ordinal) {
           goto p_do_the_parse;
 
         p_we_have_an_error:
-          mp = add_match(&local_state, ERROR_TOKEN, start,
-                         state->word_index - 1);
+          mp = add_match(&local_state, ERROR_TOKEN, start, state->word_index - 1);
 
         p_do_the_parse:
           parse_rule(&local_state);
@@ -1762,13 +1744,11 @@ static void make_error_message(int which, parser_error_t *err) {
           p = strput(p, end, literals[-(tok + 1)]);
           *p++ = ' ';
         } else {
-          if (cnt == which - 1 || ++ocnt >= which ||
-              (matches[cnt].token & PLURAL_MODIFIER)) {
+          if (cnt == which - 1 || ++ocnt >= which || (matches[cnt].token & PLURAL_MODIFIER)) {
             p = strput(p, end, "that ");
           } else {
             /* FIXME */
-            p = query_the_short(p, end,
-                                loaded_objects[matches[cnt].val.number]);
+            p = query_the_short(p, end, loaded_objects[matches[cnt].val.number]);
             *p++ = ' ';
           }
           cnt++;
@@ -1830,8 +1810,7 @@ static int process_answer(parse_state_t *state, svalue_t *sv, int which) {
  * 0 - no function
  * -1 - generated or ridiculous error
  */
-static int parallel_process_answer(parse_state_t *state, svalue_t *sv,
-                                   int which) {
+static int parallel_process_answer(parse_state_t *state, svalue_t *sv, int which) {
   if (!sv) {
     return 0;
   }
@@ -1855,8 +1834,7 @@ static int parallel_process_answer(parse_state_t *state, svalue_t *sv,
   free_parser_error(&parallel_error_info);
   if (sv->u.string[0] == '#') {
     parallel_error_info.error_type = ERR_ALLOCATED;
-    parallel_error_info.err.str =
-        string_copy(sv->u.string + 1, "process_answer");
+    parallel_error_info.err.str = string_copy(sv->u.string + 1, "process_answer");
     return -1;
   } else {
     parallel_error_info.error_type = ERR_ALLOCATED;
@@ -1907,11 +1885,11 @@ static char *rule_string(verb_node_t *vn) {
         break;
       case OBS_TOKEN:
 
-      case ADD_MOD(OBS_TOKEN, VIS_ONLY_MODIFIER) :
+      case ADD_MOD(OBS_TOKEN, VIS_ONLY_MODIFIER):
         p = strput(p, end, "OBS ");
         break;
       case LVS_TOKEN:
-      case ADD_MOD(LVS_TOKEN, VIS_ONLY_MODIFIER) :
+      case ADD_MOD(LVS_TOKEN, VIS_ONLY_MODIFIER):
         p = strput(p, end, "LVS ");
         break;
       case STR_TOKEN:
@@ -2011,8 +1989,8 @@ static const char *prefixes[] = {
     /* Belgarat: names for the second pass with filled object arguments */
     "direct_", "indirect_"};
 
-static int make_function(char *buf, char *end, int which, parse_state_t *state,
-                         int tryy, object_t *target) {
+static int make_function(char *buf, char *end, int which, parse_state_t *state, int tryy,
+                         object_t *target) {
   int index = 0, match = 0, omatch = 0;
   int on_stack = 0;
   int tok;
@@ -2048,9 +2026,8 @@ static int make_function(char *buf, char *end, int which, parse_state_t *state,
         goto put_obj_value;
 
       case OBS_TOKEN:
-      case ADD_MOD(OBS_TOKEN, VIS_ONLY_MODIFIER) :
-        if (omatch + 1 >= which || !(matches[match].token & PLURAL_MODIFIER) ||
-            (which >= 4)) {
+      case ADD_MOD(OBS_TOKEN, VIS_ONLY_MODIFIER):
+        if (omatch + 1 >= which || !(matches[match].token & PLURAL_MODIFIER) || (which >= 4)) {
           buf = strput(buf, end, "obj");
         } else {
           buf = strput(buf, end, "obs");
@@ -2058,9 +2035,8 @@ static int make_function(char *buf, char *end, int which, parse_state_t *state,
         goto put_obj_value;
 
       case LVS_TOKEN:
-      case ADD_MOD(LVS_TOKEN, VIS_ONLY_MODIFIER) :
-        if (omatch + 1 >= which || !(matches[match].token & PLURAL_MODIFIER) ||
-            (which >= 4)) {
+      case ADD_MOD(LVS_TOKEN, VIS_ONLY_MODIFIER):
+        if (omatch + 1 >= which || !(matches[match].token & PLURAL_MODIFIER) || (which >= 4)) {
           buf = strput(buf, end, "liv");
         } else {
           buf = strput(buf, end, "lvs");
@@ -2081,8 +2057,7 @@ static int make_function(char *buf, char *end, int which, parse_state_t *state,
           if (omatch == 1) {
             push_object(loaded_objects[direct_object >= 0 ? direct_object : 0]);
           } else {
-            push_object(
-                loaded_objects[indirect_object >= 0 ? indirect_object : 0]);
+            push_object(loaded_objects[indirect_object >= 0 ? indirect_object : 0]);
           }
         } else if (omatch == which) {
           push_object(target);
@@ -2097,8 +2072,7 @@ static int make_function(char *buf, char *end, int which, parse_state_t *state,
         } else if (loaded_objects[matches[match].val.number] == NULL ||
                    loaded_objects[matches[match].val.number] == 0x0 ||
                    (intptr_t)loaded_objects[matches[match].val.number] == 0x9 ||
-                   loaded_objects[matches[match].val.number]->flags &
-                       O_DESTRUCTED) {
+                   loaded_objects[matches[match].val.number]->flags & O_DESTRUCTED) {
           push_number(0);
         } else {
           push_object(loaded_objects[matches[match].val.number]);
@@ -2109,8 +2083,7 @@ static int make_function(char *buf, char *end, int which, parse_state_t *state,
       case STR_TOKEN: {
         char tmp[1024];
         buf = strput(buf, end, "str");
-        strput_words(tmp, EndOf(tmp), matches[match].first,
-                     matches[match].last);
+        strput_words(tmp, EndOf(tmp), matches[match].first, matches[match].last);
         push_malloced_string(string_copy(tmp, "push_real_names"));
         match++;
         on_stack++;
@@ -2211,8 +2184,7 @@ static int save_last_parallel_error(int ob) {
   return 1;
 }
 
-static int parallel_check_functions(object_t *obj, parse_state_t *state,
-                                    int which) {
+static int parallel_check_functions(object_t *obj, parse_state_t *state, int which) {
   object_t *ob;
   char func[CHAR_FUNC];
   int tryy, ret, args;
@@ -2227,8 +2199,7 @@ static int parallel_check_functions(object_t *obj, parse_state_t *state,
       args = make_function(func, EndOf(func), which, state, tryy % 4, obj);
       args += push_real_names(tryy % 4, which);
       DEBUG_P(("Trying %s ... (/%s)", func, ob->obname));
-      ret = parallel_process_answer(state, apply(func, ob, args, ORIGIN_DRIVER),
-                                    which);
+      ret = parallel_process_answer(state, apply(func, ob, args, ORIGIN_DRIVER), which);
       if (ob->flags & O_DESTRUCTED) {
         return 0;
       }
@@ -2243,8 +2214,7 @@ static int parallel_check_functions(object_t *obj, parse_state_t *state,
   return ret == 1;
 }
 
-static void singular_check_functions(int which, parse_state_t *state,
-                                     match_t *m) {
+static void singular_check_functions(int which, parse_state_t *state, match_t *m) {
   bitvec_t *bv = &m->val.obs;
   int i, k, ambig = 0, match = -1;
   unsigned int j;
@@ -2259,8 +2229,7 @@ static void singular_check_functions(int which, parse_state_t *state,
       k = 0;
       while (j) {
         if (bv->b[i] & j) {
-          int ret = parallel_check_functions(loaded_objects[BPI * i + k], state,
-                                             which);
+          int ret = parallel_check_functions(loaded_objects[BPI * i + k], state, which);
           if (ret) {
             if (has_ordinal) {
               ord2--;
@@ -2363,8 +2332,7 @@ static void singular_check_functions(int which, parse_state_t *state,
   return;
 }
 
-static void plural_check_functions(int which, parse_state_t *state,
-                                   match_t *m) {
+static void plural_check_functions(int which, parse_state_t *state, match_t *m) {
   bitvec_t *bv = &m->val.obs;
   int i, k;
   unsigned int j;
@@ -2376,8 +2344,7 @@ static void plural_check_functions(int which, parse_state_t *state,
       k = 0;
       while (j) {
         if (bv->b[i] & j) {
-          int ret = parallel_check_functions(loaded_objects[BPI * i + k], state,
-                                             which);
+          int ret = parallel_check_functions(loaded_objects[BPI * i + k], state, which);
           if (!ret || save_last_parallel_error(BPI * i + k)) {
             bv->b[i] &= ~j;
           } else {
@@ -2408,8 +2375,7 @@ static int cache_last_parallel_error(parser_error_t *storage) {
   return 1;
 }
 
-static int use_cached_parallel_error(parse_state_t *state,
-                                     parser_error_t *err) {
+static int use_cached_parallel_error(parse_state_t *state, parser_error_t *err) {
   if (!err->error_type) {
     return 0;
   }
@@ -2421,8 +2387,7 @@ static int use_cached_parallel_error(parse_state_t *state,
   return 1;
 }
 
-static void dependent_check_functions(int which, parse_state_t *state,
-                                      match_t *m) {
+static void dependent_check_functions(int which, parse_state_t *state, match_t *m) {
   bitvec_t *bv = &m->val.obs;
   int i, k;
   unsigned int j;
@@ -2436,8 +2401,7 @@ static void dependent_check_functions(int which, parse_state_t *state,
       k = 0;
       while (j) {
         if (bv->b[i] & j) {
-          int ret = parallel_check_functions(loaded_objects[BPI * i + k], state,
-                                             which);
+          int ret = parallel_check_functions(loaded_objects[BPI * i + k], state, which);
           if (!ret || cache_last_parallel_error(&errinfo)) {
             bv->b[i] &= ~j;
           } else {
@@ -2455,8 +2419,8 @@ static void dependent_check_functions(int which, parse_state_t *state,
       }
     }
   }
-  if (!found_one && (use_cached_parallel_error(state, &errinfo) ||
-                     use_last_parallel_error(state))) {
+  if (!found_one &&
+      (use_cached_parallel_error(state, &errinfo) || use_last_parallel_error(state))) {
     m->token = ERROR_TOKEN;
   }
   /* Translate me!
@@ -2489,8 +2453,7 @@ static void dependent_check_functions(int which, parse_state_t *state,
  * If it returns ERROR_RELATION, there's some error (that should be saved for
  * further processing).
  */
-static int check_one_relation(parse_state_t *state, int direct_first,
-                              parser_error_t *errinfo) {
+static int check_one_relation(parse_state_t *state, int direct_first, parser_error_t *errinfo) {
   int res;
   int ob;
   parser_error_t err;
@@ -2498,9 +2461,8 @@ static int check_one_relation(parse_state_t *state, int direct_first,
   res = 0;
   err.error_type = 0;
   ob = direct_first ? direct_object : indirect_object;
-  res = parallel_check_functions(
-      loaded_objects[direct_first ? direct_object : indirect_object], state,
-      direct_first ? 4 : 5);
+  res = parallel_check_functions(loaded_objects[direct_first ? direct_object : indirect_object],
+                                 state, direct_first ? 4 : 5);
   if (!res) {
     /* The object doesn't exist, returned 0 or "#error". This object
      * can not be used for the rule.
@@ -2518,9 +2480,8 @@ static int check_one_relation(parse_state_t *state, int direct_first,
     res |= CHECK_ERROR_RELATION;
   }
   /* checking the other object in the pair */
-  res = parallel_check_functions(
-      loaded_objects[direct_first ? indirect_object : direct_object], state,
-      direct_first ? 5 : 4);
+  res = parallel_check_functions(loaded_objects[direct_first ? indirect_object : direct_object],
+                                 state, direct_first ? 5 : 4);
   if (!res) {
     /* the same as above, but for the other object */
     if (err.error_type) {
@@ -2683,8 +2644,7 @@ static void check_object_relations(parse_state_t *state) {
                         free_parser_error(&current_error_info);
 
                         current_error_info.error_type = ERR_AMBIG;
-                        bitvec_copy(&current_error_info.err.obs,
-                                    &matches[indirect].val.obs);
+                        bitvec_copy(&current_error_info.err.obs, &matches[indirect].val.obs);
                       }
                       free_parser_error(&err);
                       return;
@@ -2694,16 +2654,14 @@ static void check_object_relations(parse_state_t *state) {
                     direct_ordinal--;
                   }
 
-                  if (direct_ordinal <= 0 && direct_unique &&
-                      found_direct >= 0) {
+                  if (direct_ordinal <= 0 && direct_unique && found_direct >= 0) {
                     if (found_direct != direct_object) {
                       matches[indirect].token = ERROR_TOKEN;
                       if (state->num_errors++ == 0) {
                         free_parser_error(&current_error_info);
 
                         current_error_info.error_type = ERR_AMBIG;
-                        bitvec_copy(&current_error_info.err.obs,
-                                    &matches[direct].val.obs);
+                        bitvec_copy(&current_error_info.err.obs, &matches[direct].val.obs);
                       }
                       free_parser_error(&err);
                       return;
@@ -2731,8 +2689,7 @@ static void check_object_relations(parse_state_t *state) {
             }
           /* end of processing of direct object */
           if (found_direct &&
-              (!direct_ordinal ||
-               (direct_unique && (matches[direct].token & CHOOSE_MODIFIER)))) {
+              (!direct_ordinal || (direct_unique && (matches[direct].token & CHOOSE_MODIFIER)))) {
             finished = 1;
             break;
           }
@@ -2757,13 +2714,11 @@ static void check_object_relations(parse_state_t *state) {
   }
 
   if (found_direct < 0) {
-    if (use_cached_parallel_error(state, &err) ||
-        use_last_parallel_error(state)) {
+    if (use_cached_parallel_error(state, &err) || use_last_parallel_error(state)) {
       matches[direct].token = ERROR_TOKEN;
     }
   } else if (found_indirect < 0) {
-    if (use_cached_parallel_error(state, &err) ||
-        use_last_parallel_error(state)) {
+    if (use_cached_parallel_error(state, &err) || use_last_parallel_error(state)) {
       matches[indirect].token = ERROR_TOKEN;
     }
   }
@@ -2794,8 +2749,7 @@ static void we_are_finished(parse_state_t *state) {
       DEBUG_DEC;
       return;
     }
-    if (state->num_errors == best_num_errors &&
-        parse_vn->weight < best_error_match) {
+    if (state->num_errors == best_num_errors && parse_vn->weight < best_error_match) {
       DEBUG_DEC;
       return;
     }
@@ -2884,8 +2838,8 @@ static void we_are_finished(parse_state_t *state) {
         sp -= args;
       }
     }
-    DEBUG_P(("Saving successful match: %s (%s)", best_result->res[0].func,
-             best_result->ob->obname));
+    DEBUG_P(
+        ("Saving successful match: %s (%s)", best_result->res[0].func, best_result->ob->obname));
   }
   DEBUG_DEC;
 }
@@ -2921,13 +2875,11 @@ static void do_the_call(void) {
     }
     best_result->res[i].args = 0;
     DEBUG_P(("Calling %s ...", best_result->res[i].func));
-    if (apply(best_result->res[i].func, ob, best_result->res[i].num,
-              ORIGIN_DRIVER)) {
+    if (apply(best_result->res[i].func, ob, best_result->res[i].num, ORIGIN_DRIVER)) {
       return;
     }
   }
-  error("Parse accepted, but no do_* function found in object /%s!\n",
-        ob->obname);
+  error("Parse accepted, but no do_* function found in object /%s!\n", ob->obname);
 }
 
 static void parse_rule(parse_state_t *state) {
@@ -2958,9 +2910,9 @@ static void parse_rule(parse_state_t *state) {
       case OBJ_A_TOKEN:
       case LIV_A_TOKEN:
       case OBS_TOKEN:
-      case ADD_MOD(OBS_TOKEN, VIS_ONLY_MODIFIER) :
+      case ADD_MOD(OBS_TOKEN, VIS_ONLY_MODIFIER):
       case LVS_TOKEN:
-      case ADD_MOD(LVS_TOKEN, VIS_ONLY_MODIFIER) :
+      case ADD_MOD(LVS_TOKEN, VIS_ONLY_MODIFIER):
         local_state = *state;
         parse_obj(tok, &local_state, 0);
         if (!best_match && !best_error_match) {
@@ -2968,8 +2920,7 @@ static void parse_rule(parse_state_t *state) {
           while (state->word_index <= num_words) {
             local_state = *state;
             free_parser_error(&current_error_info);
-            mp = add_match(&local_state, ERROR_TOKEN, start,
-                           state->word_index - 1);
+            mp = add_match(&local_state, ERROR_TOKEN, start, state->word_index - 1);
             current_error_info.error_type = ERR_THERE_IS_NO;
             current_error_info.err.str_problem.start = start;
             current_error_info.err.str_problem.end = state->word_index - 1;
@@ -3029,13 +2980,12 @@ static void parse_rule(parse_state_t *state) {
             case OBJ_A_TOKEN:
             case LIV_A_TOKEN:
             case OBS_TOKEN:
-            case ADD_MOD(OBS_TOKEN, VIS_ONLY_MODIFIER) :
+            case ADD_MOD(OBS_TOKEN, VIS_ONLY_MODIFIER):
             case LVS_TOKEN:
-            case ADD_MOD(LVS_TOKEN, VIS_ONLY_MODIFIER) : {
+            case ADD_MOD(LVS_TOKEN, VIS_ONLY_MODIFIER): {
               match_t *last;
 
-              while (literals[-(tok + 1)] !=
-                     words[state->word_index++].string) {
+              while (literals[-(tok + 1)] != words[state->word_index++].string) {
                 if (state->word_index == num_words) {
                   DEBUG_P(("Literal not found in forward search"));
                   DEBUG_DEC;
@@ -3087,8 +3037,7 @@ static void parse_rules(void) {
     if ((!parse_restricted || parse_vn->handler == parse_restricted) &&
         (best_match <= parse_vn->weight)) {
       pos = 0;
-      if ((parse_vn->lit[0] == -1 ||
-           (pos = check_literal(parse_vn->lit[0], 1))) &&
+      if ((parse_vn->lit[0] == -1 || (pos = check_literal(parse_vn->lit[0], 1))) &&
           (parse_vn->lit[1] == -1 || check_literal(parse_vn->lit[1], pos))) {
         DEBUG_P(("Trying rule: %s", rule_string(parse_vn)));
 
@@ -3288,8 +3237,7 @@ static void parse_sentence(const char *input) {
           num_words = 1;
           words[0].start = (char *)orig_starts[0];
           words[0].end = (char *)orig_ends[i - 1];
-          parse_recurse((char **)&starts[i], (char **)&orig_starts[i],
-                        (char **)&orig_ends[i]);
+          parse_recurse((char **)&starts[i], (char **)&orig_starts[i], (char **)&orig_ends[i]);
         }
         ve = ve->next;
       }
@@ -3343,8 +3291,7 @@ static svalue_t *get_the_error(parser_error_t *err, int obj) {
 
 void f_parse_sentence(void) {
   if (!current_object->pinfo)
-    error("/%s is not known by the parser.  Call parse_init() first.\n",
-          current_object->obname);
+    error("/%s is not known by the parser.  Call parse_init() first.\n", current_object->obname);
 
   // if (pi)
   //  error("Illegal to call parse_sentence() recursively.\n");
@@ -3424,11 +3371,9 @@ void f_parse_my_rules(void) {
   int flag = (st_num_arg == 3 ? (sp--)->u.number : 0);
 
   if (!(sp - 1)->u.ob->pinfo)
-    error("/%s is not known by the parser.  Call parse_init() first.\n",
-          (sp - 1)->u.ob->obname);
+    error("/%s is not known by the parser.  Call parse_init() first.\n", (sp - 1)->u.ob->obname);
   if (!current_object->pinfo)
-    error("/%s is not known by the parser.  Call parse_init() first.\n",
-          current_object->obname);
+    error("/%s is not known by the parser.  Call parse_init() first.\n", current_object->obname);
 
   if (pi) {
     error("Illegal to call parse_sentence() recursively.\n");
@@ -3457,11 +3402,9 @@ void f_parse_my_rules(void) {
       n = best_result->res[3].num;
       arr = allocate_empty_array(n);
       if (n) {
-        memcpy((char *)arr->item, best_result->res[3].args,
-               n * sizeof(svalue_t));
+        memcpy((char *)arr->item, best_result->res[3].args, n * sizeof(svalue_t));
         while (n--) {
-          if (arr->item[n].type == T_OBJECT &&
-              arr->item[n].u.ob->flags & O_DESTRUCTED) {
+          if (arr->item[n].type == T_OBJECT && arr->item[n].u.ob->flags & O_DESTRUCTED) {
             free_object(&arr->item[n].u.ob, "parse_my_rules");
             arr->item[n] = const0u;
           }
@@ -3530,8 +3473,7 @@ void f_parse_add_rule() {
   verb_entry = 0;
   handler = current_object;
   if (!(handler->pinfo))
-    error("/%s is not known by the parser.  Call parse_init() first.\n",
-          handler->obname);
+    error("/%s is not known by the parser.  Call parse_init() first.\n", handler->obname);
 
   /* We need the literals */
   interrogate_master();
@@ -3580,8 +3522,8 @@ void f_parse_add_rule() {
     lit[j++] = -1;
   }
 
-  verb_node = (verb_node_t *)DXALLOC(sizeof(verb_node_t) + sizeof(int) * i,
-                                     TAG_PARSER, "parse_add_rule");
+  verb_node =
+      (verb_node_t *)DXALLOC(sizeof(verb_node_t) + sizeof(int) * i, TAG_PARSER, "parse_add_rule");
 
   verb_node->lit[0] = lit[0];
   verb_node->lit[1] = lit[1];
@@ -3656,8 +3598,7 @@ void f_parse_add_synonym() {
   if (new_verb) {
     verb_entry = verbs[DO_HASH(new_verb, VERB_HASH_SIZE)];
     while (verb_entry) {
-      if (verb_entry->real_name == new_verb &&
-          verb_entry->match_name == old_verb) {
+      if (verb_entry->real_name == new_verb && verb_entry->match_name == old_verb) {
         if (rule) {
           if ((verb_entry->flags & VB_IS_SYN) == 0) {
             break;
@@ -3714,8 +3655,8 @@ void f_parse_add_synonym() {
       error("Rule owned by different object.\n");
     }
 
-    verb_node = (verb_node_t *)DXALLOC(sizeof(verb_node_t) + sizeof(int) * i,
-                                       TAG_PARSER, "parse_add_rule");
+    verb_node =
+        (verb_node_t *)DXALLOC(sizeof(verb_node_t) + sizeof(int) * i, TAG_PARSER, "parse_add_rule");
     memcpy(verb_node, vn, sizeof(verb_node_t) + sizeof(int) * i);
     for (i = 0; vn->token[i]; i++)
       if (vn->token[i] >= OBJ_A_TOKEN) {
@@ -3754,8 +3695,7 @@ void f_parse_dump(void) {
         outbuf_addv(&ob, "Verb %s (%s):\n", v->real_name, v->match_name);
       }
       if (v->flags & VB_IS_SYN) {
-        outbuf_addv(&ob, "  Synonym for: %s\n",
-                    ((verb_syn_t *)v)->real->real_name);
+        outbuf_addv(&ob, "  Synonym for: %s\n", ((verb_syn_t *)v)->real->real_name);
         continue;
       }
       while (vn) {

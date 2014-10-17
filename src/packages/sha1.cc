@@ -10,21 +10,19 @@
 #define rotateleft(x, n) ((x) << (n) | ((x) >> (32 - (n))))
 
 #ifdef F_SHA1
-static inline void sha1_hash_block(const unsigned char *block, uint32_t *h0,
-                                   uint32_t *h1, uint32_t *h2, uint32_t *h3,
-                                   uint32_t *h4) {
+static inline void sha1_hash_block(const unsigned char *block, uint32_t *h0, uint32_t *h1,
+                                   uint32_t *h2, uint32_t *h3, uint32_t *h4) {
   uint32_t a = *h0, b = *h1, c = *h2, d = *h3, e = *h4, tmp;
   uint32_t word[80];
   int i, f, k;
 
   for (i = 0; i < 16; i++) {
-    word[i] = block[i * 4 + 0] << 24 | block[i * 4 + 1] << 16 |
-              block[i * 4 + 2] << 8 | block[i * 4 + 3] << 0;
+    word[i] = block[i * 4 + 0] << 24 | block[i * 4 + 1] << 16 | block[i * 4 + 2] << 8 |
+              block[i * 4 + 3] << 0;
   }
 
   for (i = 16; i < 80; i++) {
-    word[i] = rotateleft(
-        (word[i - 3] ^ word[i - 8] ^ word[i - 14] ^ word[i - 16]), 1);
+    word[i] = rotateleft((word[i - 3] ^ word[i - 8] ^ word[i - 14] ^ word[i - 16]), 1);
   }
 
   for (i = 0; i < 80; i++) {

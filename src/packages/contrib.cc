@@ -1,6 +1,7 @@
 #include "../std.h"
 #include "../lpc_incl.h"
 #include "../comm.h"
+#include "../interactive.h"
 #include "../file_incl.h"
 #include "../file.h"
 #include "../backend.h"
@@ -277,9 +278,8 @@ static void deep_copy_svalue(svalue_t *from, svalue_t *to) {
       depth++;
       if (depth > MAX_SAVE_SVALUE_DEPTH) {
         depth = 0;
-        error(
-            "Mappings, arrays and/or classes nested too deep (%d) for copy()\n",
-            MAX_SAVE_SVALUE_DEPTH);
+        error("Mappings, arrays and/or classes nested too deep (%d) for copy()\n",
+              MAX_SAVE_SVALUE_DEPTH);
       }
       *to = *from;
       to->u.arr = deep_copy_array(from->u.arr);
@@ -289,9 +289,8 @@ static void deep_copy_svalue(svalue_t *from, svalue_t *to) {
       depth++;
       if (depth > MAX_SAVE_SVALUE_DEPTH) {
         depth = 0;
-        error(
-            "Mappings, arrays and/or classes nested too deep (%d) for copy()\n",
-            MAX_SAVE_SVALUE_DEPTH);
+        error("Mappings, arrays and/or classes nested too deep (%d) for copy()\n",
+              MAX_SAVE_SVALUE_DEPTH);
       }
       *to = *from;
       to->u.arr = deep_copy_class(from->u.arr);
@@ -301,9 +300,8 @@ static void deep_copy_svalue(svalue_t *from, svalue_t *to) {
       depth++;
       if (depth > MAX_SAVE_SVALUE_DEPTH) {
         depth = 0;
-        error(
-            "Mappings, arrays and/or classes nested too deep (%d) for copy()\n",
-            MAX_SAVE_SVALUE_DEPTH);
+        error("Mappings, arrays and/or classes nested too deep (%d) for copy()\n",
+              MAX_SAVE_SVALUE_DEPTH);
       }
       *to = *from;
       to->u.map = deep_copy_mapping(from->u.map);
@@ -437,16 +435,14 @@ void f_functions(void) {
 
 /* Beek */
 #ifdef F_VARIABLES
-static void fv_recurse(array_t *arr, int *idx, program_t *prog, int type,
-                       int flag) {
+static void fv_recurse(array_t *arr, int *idx, program_t *prog, int type, int flag) {
   int i;
   array_t *subarr;
   char buf[256];
   char *end = EndOf(buf);
 
   for (i = 0; i < prog->num_inherited; i++) {
-    fv_recurse(arr, idx, prog->inherit[i].prog,
-               type | prog->inherit[i].type_mod, flag);
+    fv_recurse(arr, idx, prog->inherit[i].prog, type | prog->inherit[i].type_mod, flag);
   }
   for (i = 0; i < prog->num_variables_defined; i++) {
     if (flag) {
@@ -591,8 +587,7 @@ void f_terminal_colour(void) {
   if (cp == NULL) {
     if (wrap) {
       num = 1;
-      parts = (const char **)CALLOCATE(1, char *, TAG_TEMPORARY,
-                                       "f_terminal_colour: parts");
+      parts = (const char **)CALLOCATE(1, char *, TAG_TEMPORARY, "f_terminal_colour: parts");
       parts[0] = instr;
       savestr = 0;
     } else {
@@ -602,9 +597,8 @@ void f_terminal_colour(void) {
   } else {
     /* here we have something to parse */
     char *newstr = (char *)cp;  // must be result of the string_copy above
-    parts = (const char **)CALLOCATE(NSTRSEGS, char *, TAG_TEMPORARY,
-                                     "f_terminal_colour: parts");
-    if (newstr - instr) {/* starting seg, if not delimiter */
+    parts = (const char **)CALLOCATE(NSTRSEGS, char *, TAG_TEMPORARY, "f_terminal_colour: parts");
+    if (newstr - instr) { /* starting seg, if not delimiter */
       num = 1;
       parts[0] = instr;
       *newstr = 0;
@@ -631,8 +625,7 @@ void f_terminal_colour(void) {
         if (newstr > instr) {
           if (num && num % NSTRSEGS == 0) {
             // Increase the size of the parts array.
-            parts = (const char **)RESIZE(parts, num + NSTRSEGS, char *,
-                                          TAG_TEMPORARY,
+            parts = (const char **)RESIZE(parts, num + NSTRSEGS, char *, TAG_TEMPORARY,
                                           "f_terminal_colour: parts realloc");
           }
           // Put it in at the current location in the parts array.
@@ -640,12 +633,11 @@ void f_terminal_colour(void) {
         }
       }
     }
-    if (*instr) {/* trailing seg, if not delimiter */
+    if (*instr) { /* trailing seg, if not delimiter */
       if (num && num % NSTRSEGS == 0) {
         // Increase the size of the parts array.
-        parts =
-            (const char **)RESIZE(parts, num + NSTRSEGS, char *, TAG_TEMPORARY,
-                                  "f_terminal_colour: parts realloc");
+        parts = (const char **)RESIZE(parts, num + NSTRSEGS, char *, TAG_TEMPORARY,
+                                      "f_terminal_colour: parts realloc");
       }
       // Put it in at the current location in the parts array.
       parts[num++] = instr;
@@ -685,8 +677,7 @@ void f_terminal_colour(void) {
     tmp = MAP_SVAL_HASH(str);
 
     for (elt = mtab[tmp & k]; elt; elt = elt->next) {
-      if (elt->values->type == T_STRING &&
-          (elt->values + 1)->type == T_STRING &&
+      if (elt->values->type == T_STRING && (elt->values + 1)->type == T_STRING &&
           resetstrname == elt->values->u.string) {
         resetstr = (elt->values + 1)->u.string;
         resetstrlen = strlen((elt->values + 1)->u.string);
@@ -712,23 +703,20 @@ void f_terminal_colour(void) {
     // Look it up in the mapping.
     repused = 0;
     copy_and_push_string(parts[i]);
-    svalue_t *reptmp =
-        apply(APPLY_TERMINAL_COLOUR_REPLACE, current_object, 1, ORIGIN_EFUN);
+    svalue_t *reptmp = apply(APPLY_TERMINAL_COLOUR_REPLACE, current_object, 1, ORIGIN_EFUN);
     if (reptmp && reptmp->type == T_STRING) {
       rep = (char *)alloca(SVALUE_STRLEN(reptmp) + 1);
       strcpy(rep, reptmp->u.string);
       repused = 1;
     }
 
-    if ((repused && (cp = findstring(rep))) ||
-        (!repused && (cp = findstring(parts[i])))) {
+    if ((repused && (cp = findstring(rep))) || (!repused && (cp = findstring(parts[i])))) {
       static svalue_t str = {T_STRING, STRING_SHARED};
       int tmp;
       str.u.string = cp;
       tmp = MAP_SVAL_HASH(str);
       for (elt = mtab[tmp & k]; elt; elt = elt->next) {
-        if (elt->values->type == T_STRING &&
-            (elt->values + 1)->type == T_STRING &&
+        if (elt->values->type == T_STRING && (elt->values + 1)->type == T_STRING &&
             cp == elt->values->u.string) {
           parts[i] = (elt->values + 1)->u.string;
           /* Negative indicates don't count for wrapping */
@@ -741,8 +729,7 @@ void f_terminal_colour(void) {
             curcolour[0] = 0;
             curcolourlen = 0;
           } else {
-            if (curcolourlen + strlen((elt->values + 1)->u.string) <
-                MAX_COLOUR_STRING - 1) {
+            if (curcolourlen + strlen((elt->values + 1)->u.string) < MAX_COLOUR_STRING - 1) {
               strcat(curcolour, (elt->values + 1)->u.string);
               curcolourlen += strlen((elt->values + 1)->u.string);
             }
@@ -1469,8 +1456,7 @@ static char *pluralize(const char *str) {
           suffix = "i";
           break;
         }
-        if ((end - pre) > 1 &&
-            (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o')) {
+        if ((end - pre) > 1 && (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o')) {
           suffix = "ses";
         } else {
           suffix = "es";
@@ -1482,17 +1468,16 @@ static char *pluralize(const char *str) {
         break;
       case 'Y':
       case 'y':
-        if ((end - pre) > 1 && end[-2] != 'a' && end[-2] != 'e' &&
-            end[-2] != 'i' && end[-2] != 'o' && end[-2] != 'u') {
+        if ((end - pre) > 1 && end[-2] != 'a' && end[-2] != 'e' && end[-2] != 'i' &&
+            end[-2] != 'o' && end[-2] != 'u') {
           found = PLURAL_CHOP + 1;
           suffix = "ies";
         }
         break;
       case 'Z':
       case 'z':
-        if ((end - pre) > 1 &&
-            (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o' ||
-             end[-2] == 'i' || end[-2] == 'u')) {
+        if ((end - pre) > 1 && (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o' ||
+                                end[-2] == 'i' || end[-2] == 'u')) {
           suffix = "zes";
         } else {
           suffix = "es";
@@ -1705,15 +1690,13 @@ void f_program_info(void) {
       prog_size += prog->program_size;
 
       /* function flags */
-      func_size += (prog->last_inherited + prog->num_functions_defined) *
-                   sizeof(unsigned short);
+      func_size += (prog->last_inherited + prog->num_functions_defined) * sizeof(unsigned short);
 
       /* definitions */
       func_size += prog->num_functions_defined * sizeof(function_t);
 
       string_size += prog->num_strings * sizeof(char *);
-      var_size += prog->num_variables_defined *
-                  (sizeof(char *) + sizeof(unsigned short));
+      var_size += prog->num_variables_defined * (sizeof(char *) + sizeof(unsigned short));
       inherit_size += prog->num_inherited * sizeof(inherit_t);
       if (prog->num_classes) {
         class_size += prog->num_classes * sizeof(class_def_t) +
@@ -1754,8 +1737,7 @@ void f_program_info(void) {
       func_size += prog->num_functions_defined * sizeof(function_t);
 
       string_size += prog->num_strings * sizeof(char *);
-      var_size += prog->num_variables_defined *
-                  (sizeof(char *) + sizeof(unsigned short));
+      var_size += prog->num_variables_defined * (sizeof(char *) + sizeof(unsigned short));
       inherit_size += prog->num_inherited * sizeof(inherit_t);
       if (prog->num_classes) {
         class_size += prog->num_classes * sizeof(class_def_t) +
@@ -2009,8 +1991,8 @@ static int memory_share(svalue_t *sv) {
                  (1 + COUNTED_STRLEN(sv->u.string) + sizeof(malloc_block_t)) /
                      (COUNTED_REF(sv->u.string));
         case STRING_SHARED:
-          return total + (1 + COUNTED_STRLEN(sv->u.string) + sizeof(block_t)) /
-                             (COUNTED_REF(sv->u.string));
+          return total +
+                 (1 + COUNTED_STRLEN(sv->u.string) + sizeof(block_t)) / (COUNTED_REF(sv->u.string));
       }
       break;
     case T_ARRAY:
@@ -2084,8 +2066,7 @@ static int memory_share(svalue_t *sv) {
  * map["program name"]["variable name"] = memory usage
  */
 #ifdef F_MEMORY_SUMMARY
-static void fms_recurse(mapping_t *map, object_t *ob, int *idx,
-                        program_t *prog) {
+static void fms_recurse(mapping_t *map, object_t *ob, int *idx, program_t *prog) {
   int i;
   svalue_t *entry;
   svalue_t sv;
@@ -2223,17 +2204,14 @@ void f_network_stats(void) {
 
 #define EVENT_PREFIX "event_"
 
-void event(svalue_t *event_ob, const char *event_fun, int numparam,
-           svalue_t *event_param) {
-
+void event(svalue_t *event_ob, const char *event_fun, int numparam, svalue_t *event_param) {
   object_t *ob, *origin;
   char *name;
   int i;
 
   origin = current_object;
 
-  name = new_string(strlen(event_fun) + strlen(EVENT_PREFIX) + 1,
-                    "newmoon.c: au_event");
+  name = new_string(strlen(event_fun) + strlen(EVENT_PREFIX) + 1, "newmoon.c: au_event");
   push_malloced_string(name);
 
   strcpy(name, EVENT_PREFIX);
@@ -2299,7 +2277,6 @@ void event(svalue_t *event_ob, const char *event_fun, int numparam,
 }
 
 void f_event(void) {
-
   int num;
 
   num = st_num_arg;
@@ -2312,9 +2289,8 @@ void f_event(void) {
 
 #ifdef F_QUERY_NUM
 void number_as_string(char *buf, LPC_INT n) {
-  const char *low[] = {"ten",      "eleven",  "twelve",  "thirteen",
-                       "fourteen", "fifteen", "sixteen", "seventeen",
-                       "eighteen", "nineteen"};
+  const char *low[] = {"ten",     "eleven",  "twelve",    "thirteen", "fourteen",
+                       "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"};
   const char *hi[] = {"",      "",      "twenty",  "thirty", "forty",
                       "fifty", "sixty", "seventy", "eighty", "ninety"};
   const char *single[] = {"",     "one", "two",   "three", "four",
@@ -2443,11 +2419,12 @@ void f_base_name(void) {
 
 #ifdef F_GET_GARBAGE
 int garbage_check(object_t *ob, void *data) {
-  return (ob->ref == 1) && (ob->flags & O_CLONE) && !(ob->super
+  return (ob->ref == 1) && (ob->flags & O_CLONE) &&
+         !(ob->super
 #ifndef NO_SHADOWS
-                                                      || ob->shadowing
+           || ob->shadowing
 #endif
-                                                      );
+           );
 }
 
 void f_get_garbage(void) {
@@ -2614,8 +2591,7 @@ void f_max() {
     error("Can't find max of an empty array.\n");
   }
 
-  if (arr->item->type != T_NUMBER && arr->item->type != T_REAL &&
-      arr->item->type != T_STRING) {
+  if (arr->item->type != T_NUMBER && arr->item->type != T_REAL && arr->item->type != T_STRING) {
     error("Array must consist of ints, floats or strings.\n");
   }
 
@@ -2693,8 +2669,7 @@ void f_min() {
     error("Can't find min of an empty array.\n");
   }
 
-  if (arr->item->type != T_NUMBER && arr->item->type != T_REAL &&
-      arr->item->type != T_STRING) {
+  if (arr->item->type != T_NUMBER && arr->item->type != T_REAL && arr->item->type != T_STRING) {
     error("Array must consist of ints, floats or strings.\n");
   }
 
@@ -3017,8 +2992,7 @@ void f_classes() {
       // First item of return array: the class's name.
       subvec->item[0].type = T_STRING;
       subvec->item[0].subtype = STRING_SHARED;
-      subvec->item[0].u.string =
-          make_shared_string(prog->strings[prog->classes[i].classname]);
+      subvec->item[0].u.string = make_shared_string(prog->strings[prog->classes[i].classname]);
 
       offset = prog->classes[i].index;
 
@@ -3030,8 +3004,8 @@ void f_classes() {
         // Each subarray contains the member's name...
         subsubvec->item[0].type = T_STRING;
         subsubvec->item[0].subtype = STRING_SHARED;
-        subsubvec->item[0].u.string = make_shared_string(
-            prog->strings[prog->class_members[offset].membername]);
+        subsubvec->item[0].u.string =
+            make_shared_string(prog->strings[prog->class_members[offset].membername]);
 
         // ...and type.
         get_type_name(buf, end, prog->class_members[offset].type);
@@ -3043,8 +3017,7 @@ void f_classes() {
       // No additional info. Just pull out the class name.
       vec->item[i].type = T_STRING;
       vec->item[i].subtype = STRING_SHARED;
-      vec->item[i].u.string =
-          make_shared_string(prog->strings[prog->classes[i].classname]);
+      vec->item[i].u.string = make_shared_string(prog->strings[prog->classes[i].classname]);
     }
   }
 

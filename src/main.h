@@ -14,7 +14,7 @@
 #define PORT_MUD 4
 #define PORT_WEBSOCKET 5
 
-typedef struct port_def_s {
+struct port_def_t {
   int kind;
   int port;
   int fd;
@@ -25,7 +25,7 @@ typedef struct port_def_s {
   int out_volume;
 #endif
   struct evconnlistener *ev_conn;
-} port_def_t;
+};
 
 extern port_def_t external_port[5];
 #ifdef PACKAGE_EXTERNAL

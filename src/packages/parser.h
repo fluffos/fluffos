@@ -64,9 +64,7 @@ typedef struct {
  *   noun: (ob2 and ob3)
  *   adj:  (ob1)
  */
-typedef struct {
-  bitvec_t noun, plural, adj;
-} parse_val_t;
+typedef struct { bitvec_t noun, plural, adj; } parse_val_t;
 
 #define WORD_ALLOCATED 1
 
@@ -126,15 +124,7 @@ typedef struct special_word_s {
   short arg;
 } special_word_t;
 
-enum sw_enum_s {
-  SW_NONE = 0,
-  SW_ARTICLE,
-  SW_SELF,
-  SW_ORDINAL,
-  SW_ALL,
-  SW_OF,
-  SW_AND
-};
+enum sw_enum_s { SW_NONE = 0, SW_ARTICLE, SW_SELF, SW_ORDINAL, SW_ALL, SW_OF, SW_AND };
 
 /* Each node holds informations about a given rule.  The handler for the
  * rule, the literals it contains, and the token string (OBJ, "to", OBJ)

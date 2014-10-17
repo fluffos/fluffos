@@ -34,33 +34,6 @@
  */
 
 /****************************************************************************
- *                              MALLOC                                      *
- *                             --------                                     *
- * For performance reasons, LP drivers have a variety of memory allocation  *
- * packages.  If you don't care, use the default one on your system:        *
- * #define SYSMALLOC, #undef the others.                                    *
- ****************************************************************************/
-
-/* You must choose exactly one of these malloc packages:
- *     ~~~~
- * SYSMALLOC:
- *   * Built-in system malloc.
- *   * No statistics.
- *   * SYSMALLOC incurs no additional CPU or memory overhead.
- *
- * MALLOC64
- *   * Wodan's malloc, uses system malloc for small allocations and spreads
- *   * large allocations through the 64 bit memory space
- *   * won't work on 32 bit systems.
- * MALLOC32
- *   * fixes realloc by always doing a malloc/memcpy/free instead, try this
- *   * if you use more memory than expected (or MALLOC64 on a 64bit system).
- */
-#define SYSMALLOC
-#undef MALLOC64
-#undef MALLOC32
-
-/****************************************************************************
  *                          COMPATIBILITY                                   *
  *                         ---------------                                  *
  * The MudOS driver has evolved quite a bit over the years.  These defines  *
@@ -283,8 +256,7 @@
  * PRAGMA_ERROR_CONTEXT:include some text telling where on the line a
  *                      compilation error occured.
  */
-#define DEFAULT_PRAGMAS \
-  PRAGMA_WARNINGS + PRAGMA_SAVE_TYPES + PRAGMA_ERROR_CONTEXT + PRAGMA_OPTIMIZE
+#define DEFAULT_PRAGMAS PRAGMA_WARNINGS + PRAGMA_SAVE_TYPES + PRAGMA_ERROR_CONTEXT + PRAGMA_OPTIMIZE
 
 /* NO_RESETS: completely disable the periodic calling of reset() */
 #undef NO_RESETS
@@ -630,9 +602,10 @@
 /* PACKAGE_COMPRESS: Enable MCCP support and compressed save files
    SAVE_GZ_EXTENSION: save extension for compressed files
  */
-#define HAVE_ZLIB
+#ifdef HAVE_ZLIB
 #define PACKAGE_COMPRESS
 #define SAVE_GZ_EXTENSION ".o.gz"
+#endif
 
 /* USE_ICONV: Use iconv to translate input and output from/to the users char
  * encoding

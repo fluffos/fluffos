@@ -10,8 +10,7 @@
 
 #include "matrix.h"
 
-static Matrix identity = {1., 0., 0., 0., 0., 1., 0., 0.,
-                          0., 0., 1., 0., 0., 0., 0., 1.};
+static Matrix identity = {1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.};
 
 static void print_matrix(Matrix, char *);
 static void print_array(Vector *, char *);
@@ -418,8 +417,8 @@ void lookat_rotate(Matrix T, LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z, Matrix M) {
 #endif /* DEBUG */
 }
 
-void lookat_rotate2(LPC_FLOAT ex, LPC_FLOAT ey, LPC_FLOAT ez, LPC_FLOAT lx,
-                    LPC_FLOAT ly, LPC_FLOAT lz, Matrix M) {
+void lookat_rotate2(LPC_FLOAT ex, LPC_FLOAT ey, LPC_FLOAT ez, LPC_FLOAT lx, LPC_FLOAT ly,
+                    LPC_FLOAT lz, Matrix M) {
   static Vector N, V, U;
   static Vector ep, lp;
 

@@ -39,16 +39,8 @@ Misc:
   * new LPC predefine __CXXFLAGS__.
   * /doc is restored and content will be updated for each EFUN/Apply changes.
 
-TODOs:
-  Seperate out LPC runtime library.
-  Mulit-threading networking layer.
-  remove SQLITE2 support from package/db.c
-  bundle with google-glog library.
-  LPC JIT compiler (bundle with LLVM).
-  switch to automake.
-
 Known Issues:
-  "-MAX_INT" is not parsed correctly in LPC(pre-existing bug), see
+  "-MAX_INT" will not be parsed correctly in LPC(pre-existing bug), see
     src/testsuite/single/tests/64bit.c for details.
 
 ================================================================================

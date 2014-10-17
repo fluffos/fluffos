@@ -75,15 +75,12 @@ static int pcre_magic(pcre_t *p);
 static int pcre_query_match(pcre_t *p);
 static int pcre_match_single(svalue_t *str, svalue_t *pattern);
 static array_t *pcre_match(array_t *v, svalue_t *pattern, int flag);
-static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok,
-                           svalue_t *def);
+static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *def);
 static char *pcre_get_replace(pcre_t *run, array_t *replacements);
 static array_t *pcre_get_substrings(pcre_t *run);
 // Caching functions
-static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
-                              svalue_t *pattern);
-static pcre *pcre_get_cached_pattern(struct pcre_cache_t *table,
-                                     svalue_t *pattern);
+static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat, svalue_t *pattern);
+static pcre *pcre_get_cached_pattern(struct pcre_cache_t *table, svalue_t *pattern);
 static mapping_t *pcre_get_cache();
 int pcrecachesize = 0;
 // Globals
@@ -136,8 +133,7 @@ void f_pcre_assoc(void) {
     error("Bad argument 3 to pcre_assoc()\n");
   }
 
-  vec = pcre_assoc(arg, (arg + 1)->u.arr, (arg + 2)->u.arr,
-                   st_num_arg > 3 ? (arg + 3) : &const0);
+  vec = pcre_assoc(arg, (arg + 1)->u.arr, (arg + 2)->u.arr, st_num_arg > 3 ? (arg + 3) : &const0);
 
   if (st_num_arg == 4) {
     pop_3_elems();
@@ -163,8 +159,7 @@ void f_pcre_extract(void) {
   run->ovecsize = 0;
 
   if (pcre_magic(run) < 0) {
-    error("PCRE compilation failed at offset %d: %s\n", run->erroffset,
-          run->error);
+    error("PCRE compilation failed at offset %d: %s\n", run->erroffset, run->error);
     pop_2_elems();
     pcre_free_memory(run);
     return;
@@ -172,8 +167,7 @@ void f_pcre_extract(void) {
 
   /* Pop the 2 arguments from the stack */
 
-  if (run->rc <
-      0) {/* No match. could do handling of matching errors if wanted */
+  if (run->rc < 0) { /* No match. could do handling of matching errors if wanted */
     pop_2_elems();
     pcre_free_memory(run);
     push_refed_array(&the_null_array);
@@ -213,12 +207,10 @@ void f_pcre_replace(void) {
 
   if (pcre_magic(run) < 0) {
     pcre_free_memory(run);
-    error("PCRE compilation failed at offset %d: %s\n", run->erroffset,
-          run->error);
+    error("PCRE compilation failed at offset %d: %s\n", run->erroffset, run->error);
   }
 
-  if (run->rc <
-      0) {/* No match. could do handling of matching errors if wanted */
+  if (run->rc < 0) { /* No match. could do handling of matching errors if wanted */
     pcre_free_memory(run);
     pop_2_elems();
     return;
@@ -274,12 +266,10 @@ void f_pcre_replace_callback(void) {
 
   if (pcre_magic(run) < 0) {
     pcre_free_memory(run);
-    error("PCRE compilation failed at offset %d: %s\n", run->erroffset,
-          run->error);
+    error("PCRE compilation failed at offset %d: %s\n", run->erroffset, run->error);
   }
 
-  if (run->rc <
-      0) {/* No match. could do handling of matching errors if wanted */
+  if (run->rc < 0) { /* No match. could do handling of matching errors if wanted */
     pop_n_elems(num_arg - 1);
     pcre_free_memory(run);
     return;
@@ -299,8 +289,7 @@ void f_pcre_replace_callback(void) {
     error("Illegal third argument (0) to pcre_replace_callback");
   }
 
-  r = allocate_array(run->rc -
-                     1);  // can't use the empty variant in case we error below
+  r = allocate_array(run->rc - 1);  // can't use the empty variant in case we error below
 
   push_refed_array(r);
   push_refed_array(arr);
@@ -326,8 +315,7 @@ void f_pcre_replace_callback(void) {
         assign_svalue_no_free(&r->item[i], &arr->item[i]);
       }
     }
-  }
-  catch (const char *) {
+  } catch (const char *) {
     restore_context(&econ);
     /* condition was restored to where it was when we came in */
     pcre_free_memory(run);
@@ -418,8 +406,7 @@ static int pcre_match_single(svalue_t *str, svalue_t *pattern) {
   run->s_length = SVALUE_STRLEN(str);
 
   if (pcre_magic(run) < 0) {
-    error("PCRE compilation failed at offset %d: %s\n", run->erroffset,
-          run->error);
+    error("PCRE compilation failed at offset %d: %s\n", run->erroffset, run->error);
     pcre_free_memory(run);
     return 0;
   }
@@ -521,8 +508,7 @@ static array_t *pcre_match(array_t *v, svalue_t *pattern, int flag) {
 /* This is mostly copy/paste from reg_assoc, some parts are changed
  * TODO: rewrite with new logic
  */
-static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok,
-                           svalue_t *def) {
+static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *def) {
   int i, size;
   const char *tmp;
   array_t *ret;
@@ -586,7 +572,6 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok,
       regindex = -1;
 
       for (i = 0; i < size; i++) {
-
         rgpp[i]->subject = tmp;
         rgpp[i]->s_length = totalsize - used;
 
@@ -614,12 +599,10 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok,
         num_match++;
 
         if (rmp) {
-          rmp->next = ALLOCATE(struct reg_match, TAG_TEMPORARY,
-                               "pcre_assoc : rmp->next");
+          rmp->next = ALLOCATE(struct reg_match, TAG_TEMPORARY, "pcre_assoc : rmp->next");
           rmp = rmp->next;
         } else
-          rmph = rmp =
-              ALLOCATE(struct reg_match, TAG_TEMPORARY, "pcre_assoc : rmp");
+          rmph = rmp = ALLOCATE(struct reg_match, TAG_TEMPORARY, "pcre_assoc : rmp");
 
         tmpreg = rgpp[regindex];
 
@@ -767,7 +750,6 @@ static char *pcre_get_replace(pcre_t *run, array_t *replacements) {
   }
 
   for (i = 1; i <= (run->rc - 1); i++) {
-
     unsigned int start, end, len_nxt;
     const char *rep;
     size_t rep_sz;
@@ -844,8 +826,7 @@ static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
     pcre_free(tmp->compiled_pattern);
     node = tmp;
   } else {
-    node = CALLOCATE(1, struct pcre_cache_bucket_t, TAG_TEMPORARY,
-                     "pcre_cache_pattern : node");
+    node = CALLOCATE(1, struct pcre_cache_bucket_t, TAG_TEMPORARY, "pcre_cache_pattern : node");
     node->pattern.type = T_NUMBER;  // so we don't free invalids
     if (node == NULL) {
       return -1;
@@ -885,8 +866,7 @@ static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
   return 0;
 }
 
-static pcre *pcre_get_cached_pattern(struct pcre_cache_t *table,
-                                     svalue_t *pattern) {
+static pcre *pcre_get_cached_pattern(struct pcre_cache_t *table, svalue_t *pattern) {
   unsigned int bucket = svalue_to_int(pattern) % PCRE_CACHE_SIZE;
   struct pcre_cache_bucket_t *node;
   struct pcre_cache_bucket_t *lnode = NULL;

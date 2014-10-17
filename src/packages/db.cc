@@ -86,80 +86,69 @@ static int create_db_conn(void);
 static void free_db_conn(db_t *);
 
 #ifdef USE_MSQL
-static int msql_connect(dbconn_t *, const char *, const char *, const char *,
-                        const char *);
+static int msql_connect(dbconn_t *, const char *, const char *, const char *, const char *);
 static int msql_close(dbconn_t *);
 static int msql_execute(dbconn_t *, const char *);
 static array_t *msql_fetch(dbconn_t *, int);
 static void msql_cleanup(dbconn_t *);
 static char *msql_errormsg(dbconn_t *);
 
-static db_defn_t msql = {"mSQL",     msql_connect, msql_close, msql_execute,
-                         msql_fetch, NULL,         NULL,       msql_cleanup,
-                         NULL,       msql_errormsg};
+static db_defn_t msql = {"mSQL", msql_connect, msql_close,   msql_execute, msql_fetch,
+                         NULL,   NULL,         msql_cleanup, NULL,         msql_errormsg};
 #endif
 
 #ifdef USE_MYSQL
-static int MySQL_connect(dbconn_t *, const char *, const char *, const char *,
-                         const char *);
+static int MySQL_connect(dbconn_t *, const char *, const char *, const char *, const char *);
 static int MySQL_close(dbconn_t *);
 static int MySQL_execute(dbconn_t *, const char *);
 static array_t *MySQL_fetch(dbconn_t *, int);
 static void MySQL_cleanup(dbconn_t *);
 static char *MySQL_errormsg(dbconn_t *);
 
-static db_defn_t mysql = {
-    "MySQL", MySQL_connect, MySQL_close,   MySQL_execute, MySQL_fetch,
-    NULL,    NULL,          MySQL_cleanup, NULL,          MySQL_errormsg};
+static db_defn_t mysql = {"MySQL", MySQL_connect, MySQL_close,   MySQL_execute, MySQL_fetch,
+                          NULL,    NULL,          MySQL_cleanup, NULL,          MySQL_errormsg};
 #endif
 
 #ifdef USE_POSTGRES
-static int Postgres_connect(dbconn_t *, const char *, const char *,
-                            const char *, const char *);
+static int Postgres_connect(dbconn_t *, const char *, const char *, const char *, const char *);
 static int Postgres_close(dbconn_t *);
 static int Postgres_execute(dbconn_t *, const char *);
 static array_t *Postgres_fetch(dbconn_t *, int);
 static void Postgres_cleanup(dbconn_t *);
 static char *Postgres_errormsg(dbconn_t *);
 
-static db_defn_t postgres = {"Postgres",       Postgres_connect, Postgres_close,
-                             Postgres_execute, Postgres_fetch,   NULL,
-                             NULL,             Postgres_cleanup, NULL,
-                             Postgres_errormsg};
+static db_defn_t postgres = {"Postgres",     Postgres_connect, Postgres_close, Postgres_execute,
+                             Postgres_fetch, NULL,             NULL,           Postgres_cleanup,
+                             NULL,           Postgres_errormsg};
 #endif
 
 #ifdef USE_SQLITE2
-static int SQLite2_connect(dbconn_t *, const char *, const char *, const char *,
-                           const char *);
+static int SQLite2_connect(dbconn_t *, const char *, const char *, const char *, const char *);
 static int SQLite2_close(dbconn_t *);
 static int SQLite2_execute(dbconn_t *, const char *);
 static array_t *SQLite2_fetch(dbconn_t *, int);
 static void SQLite2_cleanup(dbconn_t *);
 static char *SQLite2_errormsg(dbconn_t *);
 
-static db_defn_t SQLite2 = {"SQLite2",       SQLite2_connect, SQLite2_close,
-                            SQLite2_execute, SQLite2_fetch,   NULL,
-                            NULL,            SQLite2_cleanup, NULL,
-                            SQLite2_errormsg};
+static db_defn_t SQLite2 = {"SQLite2",     SQLite2_connect, SQLite2_close, SQLite2_execute,
+                            SQLite2_fetch, NULL,            NULL,          SQLite2_cleanup,
+                            NULL,          SQLite2_errormsg};
 #endif
 
 #ifdef USE_SQLITE3
-static int SQLite3_connect(dbconn_t *, const char *, const char *, const char *,
-                           const char *);
+static int SQLite3_connect(dbconn_t *, const char *, const char *, const char *, const char *);
 static int SQLite3_close(dbconn_t *);
 static int SQLite3_execute(dbconn_t *, const char *);
 static array_t *SQLite3_fetch(dbconn_t *, int);
 static void SQLite3_cleanup(dbconn_t *);
 static char *SQLite3_errormsg(dbconn_t *);
 
-static db_defn_t SQLite3 = {"SQLite3",       SQLite3_connect, SQLite3_close,
-                            SQLite3_execute, SQLite3_fetch,   NULL,
-                            NULL,            SQLite3_cleanup, NULL,
-                            SQLite3_errormsg};
+static db_defn_t SQLite3 = {"SQLite3",     SQLite3_connect, SQLite3_close, SQLite3_execute,
+                            SQLite3_fetch, NULL,            NULL,          SQLite3_cleanup,
+                            NULL,          SQLite3_errormsg};
 #endif
 
-static db_defn_t no_db = {"None", NULL, NULL, NULL, NULL,
-                          NULL,   NULL, NULL, NULL, NULL};
+static db_defn_t no_db = {"None", NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
 
 /* valid_database
  *
@@ -181,9 +170,8 @@ svalue_t *valid_database(const char *action, array_t *info) {
   push_refed_array(info);
 
   ret = apply_master_ob(APPLY_VALID_DATABASE, 3);
-  if (ret &&
-      (ret == (svalue_t *)-1 ||
-       (ret->type == T_STRING || (ret->type == T_NUMBER && ret->u.number)))) {
+  if (ret && (ret == (svalue_t *)-1 ||
+              (ret->type == T_STRING || (ret->type == T_NUMBER && ret->u.number)))) {
     return ret;
   }
 
@@ -293,8 +281,7 @@ void f_db_connect(void) {
 
   info = allocate_empty_array(3);
   info->item[0].type = info->item[1].type = info->item[2].type = T_STRING;
-  info->item[0].subtype = info->item[1].subtype = info->item[2].subtype =
-      STRING_MALLOC;
+  info->item[0].subtype = info->item[1].subtype = info->item[2].subtype = STRING_MALLOC;
   info->item[0].u.string = string_copy(database, "f_db_connect:1");
   if (*host) {
     info->item[1].u.string = string_copy(host, "f_db_connect:2");
@@ -354,10 +341,9 @@ void f_db_connect(void) {
   }
 
   if (db->type->connect) {
-    ret = db->type->connect(
-        &(db->c), host, database, user,
-        (mret != (svalue_t *)-1 && mret->type == T_STRING ? mret->u.string
-                                                          : 0));
+    ret =
+        db->type->connect(&(db->c), host, database, user,
+                          (mret != (svalue_t *)-1 && mret->type == T_STRING ? mret->u.string : 0));
   }
 
   pop_n_elems(args);
@@ -589,8 +575,7 @@ int create_db_conn(void) {
 #ifdef PACKAGE_ASYNC
       pthread_mutex_lock(db_mut);
 #endif
-      dbConnList =
-          RESIZE(dbConnList, dbConnAlloc, db_t, TAG_DB, "create_db_conn");
+      dbConnList = RESIZE(dbConnList, dbConnAlloc, db_t, TAG_DB, "create_db_conn");
 #ifdef PACKAGE_ASYNC
       pthread_mutex_unlock(db_mut);
 #endif
@@ -613,16 +598,14 @@ int create_db_conn(void) {
 }
 
 db_t *find_db_conn(int handle) {
-  if (handle < 1 || handle > dbConnAlloc ||
-      dbConnList[handle - 1].flags & DB_FLAG_EMPTY) {
+  if (handle < 1 || handle > dbConnAlloc || dbConnList[handle - 1].flags & DB_FLAG_EMPTY) {
     return 0;
   }
   return &(dbConnList[handle - 1]);
 }
 
 void free_db_conn(db_t *db) {
-  DEBUG_CHECK(db->flags & DB_FLAG_EMPTY,
-              "Freeing DB connection that is already freed\n");
+  DEBUG_CHECK(db->flags & DB_FLAG_EMPTY, "Freeing DB connection that is already freed\n");
   DEBUG_CHECK(!dbConnUsed, "Freeing DB connection when dbConnUsed == 0\n");
   dbConnUsed--;
   db->flags |= DB_FLAG_EMPTY;
@@ -777,16 +760,16 @@ static array_t *MySQL_fetch(dbconn_t *c, int row) {
 #define MYSQL_SOCKET_ADDRESS "/tmp/mysql.sock"
 #endif
 
-static int MySQL_connect(dbconn_t *c, const char *host, const char *database,
-                         const char *username, const char *password) {
+static int MySQL_connect(dbconn_t *c, const char *host, const char *database, const char *username,
+                         const char *password) {
   int ret;
   MYSQL *tmp;
 
   tmp = ALLOCATE(MYSQL, TAG_DB, "MySQL_connect");
   tmp = mysql_init(tmp);
   *(c->mysql.errormsg) = 0;
-  c->mysql.handle = mysql_real_connect(tmp, host, username, password, database,
-                                       0, MYSQL_SOCKET_ADDRESS, 0);
+  c->mysql.handle =
+      mysql_real_connect(tmp, host, username, password, database, 0, MYSQL_SOCKET_ADDRESS, 0);
   // c->mysql.handle = mysql_connect(tmp, host, username, password);
   if (!c->mysql.handle) {
     strncpy(c->mysql.errormsg, mysql_error(tmp), sizeof(c->mysql.errormsg));
@@ -797,8 +780,7 @@ static int MySQL_connect(dbconn_t *c, const char *host, const char *database,
 
   ret = mysql_select_db(c->mysql.handle, database);
   if (ret) {
-    strncpy(c->mysql.errormsg, mysql_error(c->mysql.handle),
-            sizeof(c->mysql.errormsg));
+    strncpy(c->mysql.errormsg, mysql_error(c->mysql.handle), sizeof(c->mysql.errormsg));
     c->mysql.errormsg[sizeof(c->mysql.errormsg) - 1] = 0;
     mysql_close(c->mysql.handle);
     c->mysql.handle = 0;
@@ -906,8 +888,7 @@ static array_t *msql_fetch(dbconn_t *c, int row) {
   return v;
 }
 
-static int msql_connect(dbconn_t *c, char *host, char *database, char *username,
-                        char *password) {
+static int msql_connect(dbconn_t *c, char *host, char *database, char *username, char *password) {
   c->msql.handle = msqlConnect(host);
   if (c->msql.handle < 1) {
     return 0;
@@ -922,9 +903,7 @@ static int msql_connect(dbconn_t *c, char *host, char *database, char *username,
   return 1;
 }
 
-static char *msql_errormsg(dbconn_t *c) {
-  return string_copy(msqlErrMsg, "msql_errormsg");
-}
+static char *msql_errormsg(dbconn_t *c) { return string_copy(msqlErrMsg, "msql_errormsg"); }
 #endif
 
 /*
@@ -994,8 +973,8 @@ static int SQLite2_execute(dbconn_t *c, const char *s) {
 
   /* Oddly enough a sqlite_get_table will execute sql that inserts and updates!
    */
-  if (sqlite_get_table(c->SQLite2.handle, s, &result, &c->SQLite2.nrows,
-                       &c->SQLite2.ncolumns, NULL) != SQLITE_OK) {
+  if (sqlite_get_table(c->SQLite2.handle, s, &result, &c->SQLite2.nrows, &c->SQLite2.ncolumns,
+                       NULL) != SQLITE_OK) {
     sqlite_free_table(result);
     return 0;
   } else {
@@ -1054,16 +1033,14 @@ static array_t *SQLite2_fetch(dbconn_t *c, int row) {
    * sure we use the values here before we step again.
    */
   if (row == 0) {
-    c->SQLite2.step_res = sqlite_step(c->SQLite2.vm, NULL, &c->SQLite2.values,
-                                      &c->SQLite2.col_names);
-    if (c->SQLite2.step_res == SQLITE_ROW ||
-        c->SQLite2.step_res == SQLITE_DONE) {
+    c->SQLite2.step_res =
+        sqlite_step(c->SQLite2.vm, NULL, &c->SQLite2.values, &c->SQLite2.col_names);
+    if (c->SQLite2.step_res == SQLITE_ROW || c->SQLite2.step_res == SQLITE_DONE) {
       v = allocate_empty_array(c->SQLite2.ncolumns);
       for (i = 0; i < c->SQLite2.ncolumns; i++) {
         v->item[i].type = T_STRING;
         v->item[i].subtype = STRING_MALLOC;
-        v->item[i].u.string =
-            string_copy((char *)c->SQLite2.col_names[i], "SQLite2_fetch");
+        v->item[i].u.string = string_copy((char *)c->SQLite2.col_names[i], "SQLite2_fetch");
       }
 
       return v;
@@ -1110,8 +1087,8 @@ static array_t *SQLite2_fetch(dbconn_t *c, int row) {
    */
   if ((row != last_row) && (last_row < row)) {
     for (i = last_row; i < row; i++) {
-      c->SQLite2.step_res = sqlite_step(c->SQLite2.vm, NULL, &c->SQLite2.values,
-                                        &c->SQLite2.col_names);
+      c->SQLite2.step_res =
+          sqlite_step(c->SQLite2.vm, NULL, &c->SQLite2.values, &c->SQLite2.col_names);
       if (c->SQLite2.step_res == SQLITE_ROW) {
         break;
       } else {
@@ -1156,8 +1133,7 @@ static array_t *SQLite2_fetch(dbconn_t *c, int row) {
       /* The conversion failed so assume it's a string */
       v->item[i].type = T_STRING;
       v->item[i].subtype = STRING_MALLOC;
-      v->item[i].u.string =
-          string_copy((char *)c->SQLite2.values[i], "SQLite2_fetch");
+      v->item[i].u.string = string_copy((char *)c->SQLite2.values[i], "SQLite2_fetch");
     } else if (*p_end != 0) {
       /* The conversion left trailing characters behind, see if its a float */
       errno = 0;
@@ -1166,8 +1142,7 @@ static array_t *SQLite2_fetch(dbconn_t *c, int row) {
         /* The conversion to float failed so it must be a string */
         v->item[i].type = T_STRING;
         v->item[i].subtype = STRING_MALLOC;
-        v->item[i].u.string =
-            string_copy((char *)c->SQLite2.values[i], "SQLite2_fetch");
+        v->item[i].u.string = string_copy((char *)c->SQLite2.values[i], "SQLite2_fetch");
       } else {
         /* It was a floating point number */
         v->item[i].type = T_REAL;
@@ -1200,8 +1175,7 @@ static char *SQLite2_errormsg(dbconn_t *c) {
 static int SQLite3_connect(dbconn_t *c, const char *host, const char *database,
                            const char *username, const char *password) {
   if (sqlite3_open(database, &c->SQLite3.handle)) {
-    strncpy(c->SQLite3.errormsg, sqlite3_errmsg(c->SQLite3.handle),
-            sizeof(c->SQLite3.errormsg));
+    strncpy(c->SQLite3.errormsg, sqlite3_errmsg(c->SQLite3.handle), sizeof(c->SQLite3.errormsg));
     c->SQLite3.errormsg[sizeof(c->SQLite3.errormsg) - 1] = 0;
     sqlite3_close(c->SQLite3.handle);
     return 0;
@@ -1239,10 +1213,8 @@ static void SQLite3_cleanup(dbconn_t *c) {
 static int SQLite3_execute(dbconn_t *c, const char *s) {
   char **result;
 
-  if (sqlite3_prepare(c->SQLite3.handle, s, -1, &c->SQLite3.results, 0) !=
-      SQLITE_OK) {
-    strncpy(c->SQLite3.errormsg, sqlite3_errmsg(c->SQLite3.handle),
-            sizeof(c->SQLite3.errormsg));
+  if (sqlite3_prepare(c->SQLite3.handle, s, -1, &c->SQLite3.results, 0) != SQLITE_OK) {
+    strncpy(c->SQLite3.errormsg, sqlite3_errmsg(c->SQLite3.handle), sizeof(c->SQLite3.errormsg));
     c->SQLite3.errormsg[sizeof(c->SQLite3.errormsg) - 1] = 0;
     return 0;
   }
@@ -1258,8 +1230,8 @@ static int SQLite3_execute(dbconn_t *c, const char *s) {
    * total.. expensive time wise unfortunately.
    */
   if (c->SQLite3.results) {
-    if (sqlite3_get_table(c->SQLite3.handle, s, &result, &c->SQLite3.nrows,
-                          &c->SQLite3.ncolumns, NULL) != SQLITE_OK) {
+    if (sqlite3_get_table(c->SQLite3.handle, s, &result, &c->SQLite3.nrows, &c->SQLite3.ncolumns,
+                          NULL) != SQLITE_OK) {
       sqlite3_free_table(result);
       sqlite3_finalize(c->SQLite3.results);
       return 0;
@@ -1307,8 +1279,8 @@ static array_t *SQLite3_fetch(dbconn_t *c, int row) {
     for (i = 0; i < cols; i++) {
       v->item[i].type = T_STRING;
       v->item[i].subtype = STRING_MALLOC;
-      v->item[i].u.string = string_copy(
-          (char *)sqlite3_column_name(c->SQLite3.results, i), "SQLite3_fetch");
+      v->item[i].u.string =
+          string_copy((char *)sqlite3_column_name(c->SQLite3.results, i), "SQLite3_fetch");
     }
 
     return v;
@@ -1366,16 +1338,14 @@ static array_t *SQLite3_fetch(dbconn_t *c, int row) {
 
       case SQLITE_FLOAT:
         v->item[i].type = T_REAL;
-        v->item[i].u.real =
-            (double)sqlite3_column_double(c->SQLite3.results, i);
+        v->item[i].u.real = (double)sqlite3_column_double(c->SQLite3.results, i);
         break;
 
       case SQLITE3_TEXT:
         v->item[i].type = T_STRING;
         v->item[i].subtype = STRING_MALLOC;
         v->item[i].u.string =
-            string_copy((char *)sqlite3_column_text(c->SQLite3.results, i),
-                        "SQLite3_fetch");
+            string_copy((char *)sqlite3_column_text(c->SQLite3.results, i), "SQLite3_fetch");
         break;
 
       case SQLITE_BLOB:
@@ -1383,8 +1353,7 @@ static array_t *SQLite3_fetch(dbconn_t *c, int row) {
         length = sqlite3_column_bytes(c->SQLite3.results, i);
         v->item[i].type = T_BUFFER;
         v->item[i].u.buf = allocate_buffer(length);
-        write_buffer(v->item[i].u.buf, 0,
-                     (char *)sqlite3_column_blob(c->SQLite3.results, i),
+        write_buffer(v->item[i].u.buf, 0, (char *)sqlite3_column_blob(c->SQLite3.results, i),
                      length);
 #else
         v->item[i] = const0u;
@@ -1406,8 +1375,7 @@ static char *SQLite3_errormsg(dbconn_t *c) {
     return string_copy((char *)c->SQLite3.errormsg, "SQLite3_errormsg:1");
   }
 
-  return string_copy((char *)sqlite3_errmsg(c->SQLite3.handle),
-                     "SQLite3_errormsg:2");
+  return string_copy((char *)sqlite3_errmsg(c->SQLite3.handle), "SQLite3_errormsg:2");
 }
 #endif
 /*
@@ -1437,8 +1405,7 @@ static int Postgres_execute(dbconn_t *c, const char *s) {
     return 0;
   }
 
-  fprintf(stderr, "FT: Query failed: \"%s\"\n",
-          PQresultErrorMessage(c->postgres.res));
+  fprintf(stderr, "FT: Query failed: \"%s\"\n", PQresultErrorMessage(c->postgres.res));
   return -1;
 }
 
@@ -1447,8 +1414,8 @@ static int Postgres_connect(dbconn_t *c, const char *host, const char *database,
   int buffsize;
 
   const char *connstr = "host = '%s' dbname = '%s' user = '%s' password = '%s'";
-  buffsize = strlen(connstr) + strlen(host) + strlen(database) +
-             strlen(username) + strlen(password);
+  buffsize =
+      strlen(connstr) + strlen(host) + strlen(database) + strlen(username) + strlen(password);
   char *conninfo = (char *)malloc(buffsize);
   if (conninfo != NULL) {
     sprintf(conninfo, connstr, host, database, username, password);
@@ -1486,8 +1453,7 @@ static array_t *Postgres_fetch(dbconn_t *c, int row) {
     for (i = 0; i < num_fields; i++) {
       v->item[i].type = T_STRING;
       v->item[i].subtype = STRING_MALLOC;
-      v->item[i].u.string =
-          string_copy(PQfname(c->postgres.res, i), "f_db_fetch");
+      v->item[i].u.string = string_copy(PQfname(c->postgres.res, i), "f_db_fetch");
     }
   }
 
@@ -1499,8 +1465,7 @@ static array_t *Postgres_fetch(dbconn_t *c, int row) {
       } else {
         v->item[i].type = T_STRING;
         v->item[i].subtype = STRING_MALLOC;
-        v->item[i].u.string =
-            string_copy(PQgetvalue(c->postgres.res, row, i), "postgres_fetch");
+        v->item[i].u.string = string_copy(PQgetvalue(c->postgres.res, row, i), "postgres_fetch");
       }
     }
   }

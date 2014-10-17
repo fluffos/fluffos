@@ -14,13 +14,7 @@
 #include <ws2tcpip.h>
 #endif
 
-enum socket_mode {
-  MUD,
-  STREAM,
-  DATAGRAM,
-  STREAM_BINARY,
-  DATAGRAM_BINARY
-};
+enum socket_mode { MUD, STREAM, DATAGRAM, STREAM_BINARY, DATAGRAM_BINARY };
 
 enum socket_state {
   STATE_CLOSED,
@@ -78,8 +72,7 @@ extern int max_lpc_socks;
 
 array_t *socket_status(int);
 array_t *socket_status_by_fd(int);
-int check_valid_socket(const char *const, int, object_t *, const char *const,
-                       int);
+int check_valid_socket(const char *const, int, object_t *, const char *const, int);
 void socket_read_select_handler(int);
 void socket_write_select_handler(int);
 void assign_socket_owner(svalue_t *, object_t *);

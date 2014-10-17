@@ -13,10 +13,10 @@ typedef struct {
 #define E(x) \
   { #x, DBG_##x }
 
-debug_t levels[] = {E(call_out), E(d_flag),   E(connections),
-                    E(mapping),  E(sockets),  E(comp_func_tab),
-                    E(LPC),      E(LPC_line), E(event),
-                    E(dns),      E(file),     E(add_action), };
+debug_t levels[] = {
+    E(call_out), E(d_flag),   E(connections), E(mapping), E(sockets), E(comp_func_tab),
+    E(LPC),      E(LPC_line), E(event),       E(dns),     E(file),    E(add_action),
+};
 
 #define NELEM(x) (sizeof(x) / sizeof(x[0]))
 

@@ -39,8 +39,7 @@ array_t *allocate_class(class_def_t *cld, int has_values) {
   total_class_size += sizeof(array_t) + sizeof(svalue_t) * (n - 1);
 #endif
 
-  p = (array_t *)DXALLOC(sizeof(array_t) + sizeof(svalue_t) * (n - 1),
-                         TAG_CLASS, "allocate_class");
+  p = (array_t *)DXALLOC(sizeof(array_t) + sizeof(svalue_t) * (n - 1), TAG_CLASS, "allocate_class");
   n = cld->size;
   p->ref = 1;
   p->size = n;
@@ -63,8 +62,8 @@ array_t *allocate_class_by_size(int size) {
   num_classes++;
   total_class_size += sizeof(array_t) + sizeof(svalue_t) * (size - 1);
 #endif
-  p = (array_t *)DXALLOC(sizeof(array_t) + sizeof(svalue_t) * (size - 1),
-                         TAG_CLASS, "allocate_class");
+  p = (array_t *)DXALLOC(sizeof(array_t) + sizeof(svalue_t) * (size - 1), TAG_CLASS,
+                         "allocate_class");
   p->ref = 1;
   p->size = size;
 
@@ -82,8 +81,8 @@ array_t *allocate_empty_class_by_size(int size) {
   num_classes++;
   total_class_size += sizeof(array_t) + sizeof(svalue_t) * (size - 1);
 #endif
-  p = (array_t *)DXALLOC(sizeof(array_t) + sizeof(svalue_t) * (size - 1),
-                         TAG_CLASS, "allocate_class");
+  p = (array_t *)DXALLOC(sizeof(array_t) + sizeof(svalue_t) * (size - 1), TAG_CLASS,
+                         "allocate_class");
   p->ref = 1;
   p->size = size;
 

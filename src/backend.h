@@ -27,9 +27,7 @@ struct tick_event {
   typedef std::function<void()> callback_type;
   callback_type callback;
 
-  tick_event(callback_type &callback) :
-      valid(true), callback(callback) {
-  }
+  tick_event(callback_type &callback) : valid(true), callback(callback) {}
 };
 
 // Register a event to run on game ticks. Safe to call from any thread.

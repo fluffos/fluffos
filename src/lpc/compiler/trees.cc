@@ -115,8 +115,7 @@ parse_node_t *new_node_no_line() {
 }
 
 /* quick routine to make a generic branched node */
-parse_node_t *make_branched_node(short kind, char type, parse_node_t *l,
-                                 parse_node_t *r) {
+parse_node_t *make_branched_node(short kind, char type, parse_node_t *l, parse_node_t *r) {
   parse_node_t *ret;
 
   ret = new_node();
@@ -128,8 +127,7 @@ parse_node_t *make_branched_node(short kind, char type, parse_node_t *l,
 }
 
 /* create an optimized typical binary integer operator */
-parse_node_t *binary_int_op(parse_node_t *l, parse_node_t *r, char op,
-                            const char *name) {
+parse_node_t *binary_int_op(parse_node_t *l, parse_node_t *r, char op, const char *name) {
   parse_node_t *ret;
 
   if (exact_types) {
@@ -200,8 +198,7 @@ parse_node_t *binary_int_op(parse_node_t *l, parse_node_t *r, char op,
   return ret;
 }
 
-parse_node_t *make_range_node(int code, parse_node_t *expr, parse_node_t *l,
-                              parse_node_t *r) {
+parse_node_t *make_range_node(int code, parse_node_t *expr, parse_node_t *l, parse_node_t *r) {
   parse_node_t *newnode;
 
   if (r) {
@@ -421,8 +418,7 @@ parse_node_t *pop_value(parse_node_t *pn) {
     parse_node_t *ret = insert_pop_value(pn);
 
     if (!ret) {
-      if (pn->kind == NODE_BINARY_OP && pn->v.number >= F_EQ &&
-          pn->v.number <= F_GT) {
+      if (pn->kind == NODE_BINARY_OP && pn->v.number >= F_EQ && pn->v.number <= F_GT) {
         yywarn("Value of conditional expression is unused");
       } else {
         yywarn("Expression has no side effects, and the value is unused");
@@ -460,14 +456,11 @@ parse_node_t *optimize_loop_test(parse_node_t *pn) {
     return 0;
   }
 
-  if (IS_NODE(pn, NODE_BINARY_OP, F_LT) &&
-      IS_NODE(pn->l.expr, NODE_OPCODE_1, F_LOCAL)) {
+  if (IS_NODE(pn, NODE_BINARY_OP, F_LT) && IS_NODE(pn->l.expr, NODE_OPCODE_1, F_LOCAL)) {
     if (IS_NODE(pn->r.expr, NODE_OPCODE_1, F_LOCAL)) {
-      CREATE_OPCODE_2(ret, F_LOOP_COND_LOCAL, 0, pn->l.expr->l.number,
-                      pn->r.expr->l.number);
+      CREATE_OPCODE_2(ret, F_LOOP_COND_LOCAL, 0, pn->l.expr->l.number, pn->r.expr->l.number);
     } else if (pn->r.expr->kind == NODE_NUMBER) {
-      CREATE_OPCODE_2(ret, F_LOOP_COND_NUMBER, 0, pn->l.expr->l.number,
-                      pn->r.expr->v.number);
+      CREATE_OPCODE_2(ret, F_LOOP_COND_NUMBER, 0, pn->l.expr->l.number, pn->r.expr->v.number);
     } else {
       ret = pn;
     }

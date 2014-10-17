@@ -37,8 +37,7 @@ void replace_programs(void) {
   for (r_ob = obj_list_replace; r_ob; r_ob = r_next) {
     program_t *old_prog;
 
-    num_fewer = r_ob->ob->prog->num_variables_total -
-                r_ob->new_prog->num_variables_total;
+    num_fewer = r_ob->ob->prog->num_variables_total - r_ob->new_prog->num_variables_total;
 
     debug(d_flag, "%d less variables\n", num_fewer);
 
@@ -70,8 +69,7 @@ void replace_programs(void) {
       FREE_MSTR(r_ob->ob->replaced_program);
       r_ob->ob->replaced_program = 0;
     }
-    r_ob->ob->replaced_program =
-        string_copy(r_ob->new_prog->filename, "replace_programs");
+    r_ob->ob->replaced_program = string_copy(r_ob->new_prog->filename, "replace_programs");
 
     reference_prog(r_ob->new_prog, "replace_programs");
     old_prog = r_ob->ob->prog;

@@ -105,8 +105,7 @@ int check_valid_stat_entry(mudlib_stats_t *se) {
  * stat list manipulation
  **************************/
 
-static mudlib_stats_t *insert_stat_entry(mudlib_stats_t *entry,
-                                         mudlib_stats_t **list) {
+static mudlib_stats_t *insert_stat_entry(mudlib_stats_t *entry, mudlib_stats_t **list) {
   entry->next = *list;
   *list = entry;
   return *list;
@@ -539,7 +538,7 @@ static mapping_t *get_stats(const char *str, mudlib_stats_t *list) {
 
   if (str) {
     for (dl = list; dl; dl = dl->next) {
-      if (!strcmp(str, dl->name)) {/* are these both shared strings? */
+      if (!strcmp(str, dl->name)) { /* are these both shared strings? */
         break;
       }
     }

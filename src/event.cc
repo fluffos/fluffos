@@ -4,7 +4,6 @@
 #include <event2/event.h>
 #include <event2/dns.h>
 #include <event2/listener.h>
-#include <event2/thread.h>
 #include <event2/util.h>
 
 #include "event.h"
@@ -13,17 +12,12 @@
 #include "console.h"       // for console
 #include "socket_efuns.h"  // for lpc sockets
 #include "eval.h"          // for set_eval
-#include "util/threadpool-incl.h"
 
 // FIXME: rewrite other part so this could become static.
 struct event_base *g_event_base = NULL;
 struct event *g_ev_tick = NULL;
 
-static util::ThreadPool *g_threadpool_network_ = NULL;
-
-static void libevent_log(int severity, const char *msg) {
-  debug(event, "%d:%s\n", severity, msg);
-}
+static void libevent_log(int severity, const char *msg) { debug(event, "%d:%s\n", severity, msg); }
 
 static void libevent_dns_log(int severity, const char *msg) {
   debug(dns, "%d:%s\n", severity, msg);
@@ -33,25 +27,14 @@ static void libevent_dns_log(int severity, const char *msg) {
 event_base *init_event_base() {
   event_set_log_callback(libevent_log);
   evdns_set_log_fn(libevent_dns_log);
-  evthread_use_pthreads();
-
 #ifdef DEBUG
   event_enable_debug_mode();
-  evthread_enable_lock_debuging();
 #endif
 
   g_event_base = event_base_new();
-  debug_message("Event backend in use: %s\n",
-                event_base_get_method(g_event_base));
+  debug_message("Event backend in use: %s\n", event_base_get_method(g_event_base));
   return g_event_base;
 }
-
-// Init net threadpool
-void init_network_threadpool() {
-  g_threadpool_network_ = new util::ThreadPool(4);
-}
-
-void shutdown_network_threadpool() { delete g_threadpool_network_; }
 
 static void on_main_loop_event(int fd, short what, void *arg) {
   auto event = (realtime_event *)arg;
@@ -59,11 +42,10 @@ static void on_main_loop_event(int fd, short what, void *arg) {
   delete event;
 }
 
-// Schedule a realtime event on main loop, safe to call from any thread.
+// Schedule a immediate event on main loop.
 void add_realtime_event(realtime_event::callback_type callback) {
   auto event = new realtime_event(callback);
-  event_base_once(g_event_base, -1, EV_TIMEOUT, on_main_loop_event, event,
-                  NULL);
+  event_base_once(g_event_base, -1, EV_TIMEOUT, on_main_loop_event, event, NULL);
 }
 
 extern void virtual_time_tick();
@@ -96,9 +78,7 @@ static void on_user_command(evutil_socket_t fd, short what, void *arg) {
   debug(event, "User has an full command ready: %d:%s%s%s%s \n", (int)fd,
         (what & EV_TIMEOUT) ? " timeout" : "", (what & EV_READ) ? " read" : "",
         (what & EV_WRITE) ? " write" : "", (what & EV_SIGNAL) ? " signal" : "");
-
-  auto data = (user_event_data *)arg;
-  auto user = all_users[data->idx];
+  auto user = reinterpret_cast<interactive_t *>(arg);
 
   if (user == NULL) {
     fatal("on_user_command: user == NULL, Driver BUG.");
@@ -114,8 +94,7 @@ static void on_user_command(evutil_socket_t fd, short what, void *arg) {
   set_eval(max_cost);
   try {
     process_user_command(user);
-  }
-  catch (const char *) {
+  } catch (const char *) {
     restore_context(&econ);
   }
   pop_context(&econ);
@@ -135,15 +114,12 @@ static void on_user_command(evutil_socket_t fd, short what, void *arg) {
 }
 
 static void on_user_read(bufferevent *bev, void *arg) {
-  auto data = (user_event_data *)arg;
-  auto user = all_users[data->idx];
+  auto user = reinterpret_cast<interactive_t *>(arg);
 
   if (user == NULL) {
     fatal("on_user_read: user == NULL, Driver BUG.");
     return;
   }
-
-  debug(event, "on_user_read, idx: %d.\n", data->idx);
 
   // Read user input
   get_user_data(user);
@@ -153,25 +129,16 @@ static void on_user_read(bufferevent *bev, void *arg) {
 }
 
 static void on_user_write(bufferevent *bev, void *arg) {
-  auto data = (user_event_data *)arg;
-  auto user = all_users[data->idx];
-
+  auto user = reinterpret_cast<interactive_t *>(arg);
   if (user == NULL) {
     fatal("on_user_write: user == NULL, Driver BUG.");
     return;
   }
-
-  debug(event, "on_user_write, idx: %d, leftover: %lu.\n", data->idx,
-        evbuffer_get_length(bufferevent_get_output(user->ev_buffer)));
-
   // nothing to do.
 }
 
 static void on_user_events(bufferevent *bev, short events, void *arg) {
-  debug(event, "on_user_events: %d\n", events);
-
-  auto data = (user_event_data *)arg;
-  auto user = all_users[data->idx];
+  auto user = reinterpret_cast<interactive_t *>(arg);
 
   if (user == NULL) {
     fatal("on_user_events: user == NULL, Driver BUG.");
@@ -181,43 +148,35 @@ static void on_user_events(bufferevent *bev, short events, void *arg) {
   if ((events & BEV_EVENT_EOF) || (events & BEV_EVENT_TIMEOUT)) {
     user->iflags |= NET_DEAD;
     remove_interactive(user->ob, 0);
+  } else {
+    debug(event, "on_user_events: ignored unknown events: %d\n", events);
   }
 }
 
-void new_user_event_listener(interactive_t *user, int idx) {
-  user->ev_data = new user_event_data;
-  user->ev_data->idx = idx;
-
-  auto bev =
-      bufferevent_socket_new(g_event_base, user->fd, BEV_OPT_CLOSE_ON_FREE);
-  bufferevent_setcb(bev, on_user_read, on_user_write, on_user_events,
-                    user->ev_data);
+void new_user_event_listener(interactive_t *user) {
+  auto bev = bufferevent_socket_new(g_event_base, user->fd, BEV_OPT_CLOSE_ON_FREE | BEV_OPT_DEFER_CALLBACKS);
+  bufferevent_setcb(bev, on_user_read, on_user_write, on_user_events, user);
   bufferevent_enable(bev, EV_READ | EV_WRITE);
 
   const timeval timeout_write = {10, 0};
   bufferevent_set_timeouts(bev, NULL, &timeout_write);
 
   user->ev_buffer = bev;
-  user->ev_command = event_new(g_event_base, -1, EV_TIMEOUT | EV_PERSIST,
-                               on_user_command, user->ev_data);
+  user->ev_command =
+      event_new(g_event_base, -1, EV_TIMEOUT | EV_PERSIST, on_user_command, user);
 }
 
-static void on_external_port_event(evconnlistener *listener, evutil_socket_t fd,
-                                   sockaddr *sa, int socklen, void *arg) {
-  debug(event, "on_external_port_event: fd %d, addr: %s\n", fd,
-        sockaddr_to_string(sa, socklen));
-
-  port_def_t *port = reinterpret_cast<port_def_t *>(arg);
-
-  g_threadpool_network_->enqueue([=]() { async_on_accept(fd, port); });
+static void on_external_port_event(evconnlistener *listener, evutil_socket_t fd, sockaddr *sa,
+                                   int socklen, void *arg) {
+  debug(event, "on_external_port_event: fd %d, addr: %s\n", fd, sockaddr_to_string(sa, socklen));
+  auto *port = reinterpret_cast<port_def_t *>(arg);
+  new_user_handler(fd, sa, socklen, port);
 }
 
-void new_external_port_event_listener(port_def_t *port, sockaddr *sa,
-                                      socklen_t socklen) {
+void new_external_port_event_listener(port_def_t *port, sockaddr *sa, socklen_t socklen) {
   port->ev_conn = evconnlistener_new_bind(
       g_event_base, on_external_port_event, port,
-      LEV_OPT_REUSEABLE | LEV_OPT_CLOSE_ON_FREE | LEV_OPT_CLOSE_ON_EXEC, 1024,
-      sa, socklen);
+      LEV_OPT_REUSEABLE | LEV_OPT_CLOSE_ON_FREE | LEV_OPT_CLOSE_ON_EXEC, 1024, sa, socklen);
   DEBUG_CHECK(port->ev_conn == NULL, "listening failed!");
 }
 
@@ -242,10 +201,9 @@ void on_lpc_sock_write(evutil_socket_t fd, short what, void *arg) {
 void new_lpc_socket_event_listener(int idx, evutil_socket_t real_fd) {
   auto data = new lpc_socket_event_data;
   data->idx = idx;
-  lpc_socks[idx].ev_read = event_new(
-      g_event_base, real_fd, EV_READ | EV_PERSIST, on_lpc_sock_read, data);
-  lpc_socks[idx].ev_write =
-      event_new(g_event_base, real_fd, EV_WRITE, on_lpc_sock_write, data);
+  lpc_socks[idx].ev_read =
+      event_new(g_event_base, real_fd, EV_READ | EV_PERSIST, on_lpc_sock_read, data);
+  lpc_socks[idx].ev_write = event_new(g_event_base, real_fd, EV_WRITE, on_lpc_sock_write, data);
   lpc_socks[idx].ev_data = data;
 }
 
@@ -266,8 +224,7 @@ void init_console(struct event_base *base) {
   if (has_console > 0) {
     debug_message("Opening console... \n");
     struct event *ev_console = NULL;
-    ev_console = event_new(base, STDIN_FILENO, EV_READ | EV_PERSIST,
-                           on_console_event, ev_console);
+    ev_console = event_new(base, STDIN_FILENO, EV_READ | EV_PERSIST, on_console_event, ev_console);
     event_add(ev_console, NULL);
   }
 }

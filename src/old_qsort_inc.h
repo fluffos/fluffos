@@ -17,8 +17,8 @@
 
 static void doSwap(char *, char *, int);
 static void qSort(void *, int, int, int, int, int (*)());
-static void doSwap(register char *one, register char *two, register int size) {
-  register char t;
+static void doSwap(char *one, char *two, int size) {
+  char t;
 
   while (size--) {
     t = *one;
@@ -49,8 +49,7 @@ static void qSort(void *v, int left, int right, int size, int rightmost,
   qSort(v, last + 1, right, size, rightmost, compar);
 }
 
-void old_quickSort(void *a, int nmemb, int size,
-                   int (*compar)(const void *, const void *)) {
+void old_quickSort(void *a, int nmemb, int size, int (*compar)(const void *, const void *)) {
   if (nmemb < 2) {
     return;
   }

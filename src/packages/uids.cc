@@ -128,7 +128,7 @@ void mark_all_uid_nodes() {
 static int uidcmp(void *, void *);
 
 static int uidcmp(void *uid1, void *uid2) {
-  register char *name1, *name2;
+  char *name1, *name2;
 
   name1 = ((userid_t *)uid1)->name;
   name2 = ((userid_t *)uid2)->name;

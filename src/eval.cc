@@ -27,8 +27,7 @@ LPC_INT get_eval() {
 #else
   struct timeval now;
   gettimeofday(&now, NULL);
-  return max_cost - ((LPC_INT)(1000000) * (now.tv_sec - tv.tv_sec)) -
-         (now.tv_usec - tv.tv_usec);
+  return max_cost - ((LPC_INT)(1000000) * (now.tv_sec - tv.tv_sec)) - (now.tv_usec - tv.tv_usec);
 #endif
 #else
   return 100;

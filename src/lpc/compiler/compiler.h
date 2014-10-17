@@ -53,8 +53,7 @@ typedef struct {
 #define NUMTREES 2
 
 #define CURRENT_PROGRAM_SIZE (prog_code - mem_block[A_PROGRAM].block)
-#define UPDATE_PROGRAM_SIZE \
-  mem_block[A_PROGRAM].current_size = CURRENT_PROGRAM_SIZE
+#define UPDATE_PROGRAM_SIZE mem_block[A_PROGRAM].current_size = CURRENT_PROGRAM_SIZE
 
 /*
  * Types available. The number '0' is valid as any type. These types
@@ -124,18 +123,15 @@ typedef struct compiler_temp_t {
  * Some good macros to have.
  */
 
-#define IS_CLASS(t) ((t &(TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) == TYPE_MOD_CLASS)
+#define IS_CLASS(t) ((t & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) == TYPE_MOD_CLASS)
 #define CLASS_IDX(t) (t & ~(DECL_MODS | TYPE_MOD_CLASS))
 
-#define COMP_TYPE(e, t)                        \
-  (!(e & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) && \
-   (compatible[(e & ~DECL_MODS)] & (1 << (t))))
-#define IS_TYPE(e, t)                          \
-  (!(e & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) && \
-   (is_type[(e & ~DECL_MODS)] & (1 << (t))))
+#define COMP_TYPE(e, t) \
+  (!(e & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) && (compatible[(e & ~DECL_MODS)] & (1 << (t))))
+#define IS_TYPE(e, t) \
+  (!(e & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) && (is_type[(e & ~DECL_MODS)] & (1 << (t))))
 
-#define FUNCTION_TEMP(n) \
-  ((compiler_temp_t *)mem_block[A_FUNCTION_DEFS].block + (n))
+#define FUNCTION_TEMP(n) ((compiler_temp_t *)mem_block[A_FUNCTION_DEFS].block + (n))
 #define FUNCTION_NEXT(n) (FUNCTION_TEMP(n)->next)
 /* function_t from A_FUNCTIONS index */
 #define FUNC(n) ((function_t *)mem_block[A_FUNCTIONS].block + (n))
@@ -143,9 +139,8 @@ typedef struct compiler_temp_t {
 #define FUNCTION_PROG(n) (FUNCTION_TEMP(n)->prog)
 #define FUNCTION_ALIAS(n) (FUNCTION_TEMP(n)->alias_for)
 /* function_t from full function index */
-#define FUNCTION_DEF(n)                        \
-  (FUNCTION_PROG(n) ? FUNCTION_TEMP(n)->u.func \
-                    : FUNC(FUNCTION_TEMP(n)->u.index))
+#define FUNCTION_DEF(n) \
+  (FUNCTION_PROG(n) ? FUNCTION_TEMP(n)->u.func : FUNC(FUNCTION_TEMP(n)->u.index))
 /* flags from full function index */
 #define FUNCTION_FLAGS(n) (FUNCTION_TEMP(n)->flags)
 
@@ -158,9 +153,9 @@ typedef struct compiler_temp_t {
 #define CLASS(n) ((class_def_t *)mem_block[A_CLASS_DEF].block + (n))
 
 #if !defined(__alpha) && !defined(cray) && !defined(__sparc__)
-#define align(x) (((x) + 3) & ~3)
+#define align(x) (((x)+3) & ~3)
 #else
-#define align(x) (((x) + 7) & ~7)
+#define align(x) (((x)+7) & ~7)
 #endif
 
 #define SOME_NUMERIC_CASE_LABELS 0x40000
@@ -250,29 +245,28 @@ parse_node_t *do_promotions(parse_node_t *, int);
 parse_node_t *throw_away_call(parse_node_t *);
 parse_node_t *throw_away_mapping(parse_node_t *);
 
-#define realloc_mem_block(m)                                         \
-  do {                                                               \
-    mem_block_t *M = m;                                              \
-    M->max_size <<= 1;                                               \
-    M->block = (char *)DREALLOC(M->block, M->max_size, TAG_COMPILER, \
-                                "realloc_mem_block");                \
+#define realloc_mem_block(m)                                                               \
+  do {                                                                                     \
+    mem_block_t *M = m;                                                                    \
+    M->max_size <<= 1;                                                                     \
+    M->block = (char *)DREALLOC(M->block, M->max_size, TAG_COMPILER, "realloc_mem_block"); \
   } while (0)
 
-#define add_to_mem_block(n, data, size)                                      \
-  do {                                                                       \
-    mem_block_t *mbp = &mem_block[n];                                        \
-    int Size = size;                                                         \
-                                                                             \
-    if (mbp->current_size + Size > mbp->max_size) {                          \
-      do {                                                                   \
-        mbp->max_size <<= 1;                                                 \
-      } while (mbp->current_size + Size > mbp->max_size);                    \
-                                                                             \
-      mbp->block = (char *)DREALLOC(mbp->block, mbp->max_size, TAG_COMPILER, \
-                                    "insert_in_mem_block");                  \
-    }                                                                        \
-    memcpy(mbp->block + mbp->current_size, data, Size);                      \
-    mbp->current_size += Size;                                               \
+#define add_to_mem_block(n, data, size)                                                     \
+  do {                                                                                      \
+    mem_block_t *mbp = &mem_block[n];                                                       \
+    int Size = size;                                                                        \
+                                                                                            \
+    if (mbp->current_size + Size > mbp->max_size) {                                         \
+      do {                                                                                  \
+        mbp->max_size <<= 1;                                                                \
+      } while (mbp->current_size + Size > mbp->max_size);                                   \
+                                                                                            \
+      mbp->block =                                                                          \
+          (char *)DREALLOC(mbp->block, mbp->max_size, TAG_COMPILER, "insert_in_mem_block"); \
+    }                                                                                       \
+    memcpy(mbp->block + mbp->current_size, data, Size);                                     \
+    mbp->current_size += Size;                                                              \
   } while (0)
 
 char *allocate_in_mem_block(int, int);
