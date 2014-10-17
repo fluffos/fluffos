@@ -24,3 +24,5 @@ env:
 # gcov builds
   - BUILD="x86_64" COMPILER="gcc" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev" GCOV="yes"
   - BUILD="i386"   COMPILER="gcc" COMPILER_FLAGS="-m32 -mtune=generic" TYPE="develop" CONFIG="testdev32" GCOV="yes"
+# coverity
+  - BUILD="x86_64" COMPILER="gcc" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev" COVERITY="yes"
