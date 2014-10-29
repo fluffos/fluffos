@@ -12,14 +12,19 @@
 #include "file_incl.h"
 #include "include/localtime.h"
 #include "port.h"
-#include "crypt.h"
+#include "custom_crypt.h"
 #include "efun_protos.h"
 #include <stdio.h>
 
 #ifdef F_CRYPT
 #define SALT_LEN 8
+
 #ifdef CUSTOM_CRYPT
 #define CRYPT(x, y) custom_crypt(x, y, 0)
+#define OLDCRYPT(x, y) crypt(x, y)
+#else
+#define CRYPT(x, y) crypt(x, y)
+#define OLDCRYPT(x, y) crypt(x, y)
 #endif
 
 void f_crypt(void) {

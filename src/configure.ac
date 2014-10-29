@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.68])
-AC_INIT([FluffOS], [3.0-alpha8])
+AC_INIT([FluffOS],[3.0-alpha8])
 AC_CONFIG_MACRO_DIR([m4])
 
 AC_CANONICAL_TARGET
@@ -100,10 +100,7 @@ F_HAVE_PREDEFINE([HAVE_LIBEVENT], [],
   [AC_MSG_ERROR([[Fail to find libevent (2.0+) header/library, install libevent-dev or change --with_libevent]])])
 
 # Checks for zlib.
-PKG_CHECK_MODULES([zlib],
-  [zlib],
-  [AC_DEFINE([HAVE_ZLIB], [1], [Define to 1 if you have zlib.])],
-  [])
+AX_CHECK_ZLIB()
 
 F_HAVE_PREDEFINE([PACKAGE_ASYNC], [AC_SEARCH_LIBS([pthread_create], [pthread])])
 F_HAVE_PREDEFINE([POSIX_TIMERS], [AC_SEARCH_LIBS([timer_create], [rt])])

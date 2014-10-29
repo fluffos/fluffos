@@ -1850,7 +1850,7 @@ int restore_object(object_t *ob, const char *file, int noclear) {
     if (theBuff) {
       FREE(theBuff);
     }
-    theBuff = DXALLOC(tmp_len + 1, TAG_PERMANENT, "restore_object: 4");
+    theBuff = (char *)DXALLOC(tmp_len + 1, TAG_PERMANENT, "restore_object: 4");
     buff_len = tmp_len;
   }
 #ifdef WIN32

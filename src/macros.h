@@ -181,14 +181,6 @@ char *int_alloc_cstring(const char *);
 /* Compare two number */
 #define COMPARE_NUMS(x, y) (((x) > (y) ? 1 : ((x) < (y) ? -1 : 0)))
 
-#ifdef CUSTOM_CRYPT
-#define CRYPT(x, y) custom_crypt(x, y, 0)
-#define OLDCRYPT(x, y) crypt(x, y)
-#else
-#define CRYPT(x, y) crypt(x, y)
-#define OLDCRYPT(x, y) crypt(x, y)
-#endif
-
 /* FIXME: This is planned to become core functionaltiy set, remove this define
  * entirely. */
 #ifndef DEBUG_MACRO

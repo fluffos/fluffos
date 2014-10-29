@@ -38,11 +38,23 @@ else
 fi
 }
 
+if [ -n "$(git branch | grep coverity_scan)" ]; then
+  if [ -z "$COVERITY" ]; then
+    echo "Only doing coverity scan in this branch, skipping this build"
+    exit 0
+  fi
+else
+  if [ -n "$COVERITY" ]; then
+    echo "Skipping coverity on this branch."
+    exit 0
+  fi
+fi
+
 # do setup
 setup
 
 # stop on first error down below
-set -e
+set -eo pipefail
 
 # testing part
 cd src
@@ -55,7 +67,30 @@ else
   ./build.FluffOS $TYPE
 fi
 
+# For coverity, we don't need to actually run tests, just build
+if [ -n "$COVERITY" ]; then
+  if [ "$(git branch)" != "coverity_scan" ]; then
+    echo "Not on branch coverity_scan, skipping"
+    exit 0
+  fi
+
+
+  wget https://scan.coverity.com/download/linux-64 --post-data "token=DW98q3VnP4QKLy4wwLwReQ&project=fluffos%2Ffluffos" -O coverity_tool.tgz
+  tar zxvf coverity_tool.tgz
+  $PWD/cov-analysis-linux64-7.5.0/bin/cov-build --dir cov-int make -j 2
+  tar czvf cov.tgz cov-int
+  curl --form token=DW98q3VnP4QKLy4wwLwReQ \
+       --form email=sunyucong@gmail.com \
+       --form file=@cov.tgz \
+       --form version="$(git describe --always)" \
+       --form description="FluffOS Autobuild" \
+       https://scan.coverity.com/builds?project=fluffos%2Ffluffos
+  exit 0
+fi
+
+# Otherwise, continue
 make -j 2
+
 cd testsuite
 
 if [ -n "$GCOV" ]; then

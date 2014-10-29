@@ -43,7 +43,7 @@
 
 #include "std.h"
 #include "port.h"
-#include "crypt.h"
+#include "custom_crypt.h"
 
 #ifdef CUSTOM_CRYPT
 

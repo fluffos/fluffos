@@ -1,5 +1,6 @@
 [![Build Status](https://travis-ci.org/fluffos/fluffos.svg?branch=next-3.0)](https://travis-ci.org/fluffos/fluffos)
-[![Coverage Status](https://img.shields.io/coveralls/fluffos/fluffos.svg)](https://coveralls.io/r/fluffos/fluffos)
+[![Coverage Status](https://coveralls.io/repos/fluffos/fluffos/badge.png?branch=next-3.0)](https://coveralls.io/r/fluffos/fluffos?branch=next-3.0)
+[![Coverity Status](https://scan.coverity.com/projects/483/badge.svg)](https://scan.coverity.com/projects/483)
 
 FluffOS
 =======

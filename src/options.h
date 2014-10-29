@@ -602,10 +602,8 @@
 /* PACKAGE_COMPRESS: Enable MCCP support and compressed save files
    SAVE_GZ_EXTENSION: save extension for compressed files
  */
-#ifdef HAVE_ZLIB
 #define PACKAGE_COMPRESS
 #define SAVE_GZ_EXTENSION ".o.gz"
-#endif
 
 /* USE_ICONV: Use iconv to translate input and output from/to the users char
  * encoding
