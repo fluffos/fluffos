@@ -29,7 +29,7 @@
 @SET_MAKE@
 
 CXX=@CXX@
-CXXFLAGS=@CXXFLAGS@ @zlib_CFLAGS@ @LIBEVENT_CPPFLAGS@ @GCOV_CFLAGS@
+CXXFLAGS=@CXXFLAGS@ @LIBEVENT_CPPFLAGS@ @GCOV_CFLAGS@
 LDFLAGS=@CXXFLAGS@ @LDFLAGS@
 LIBS=@LIBS@ @GCOV_LIBS@
 YACC=@YACC@
@@ -109,11 +109,7 @@ build_binaries: $(DRIVER_BIN) portbind
 
 # Hack to work around brokeness in libtelnet.c
 thirdparty/libtelnet/libtelnet.o: thirdparty/libtelnet/libtelnet.c
-	if [ -n "@zlib_LIBS@" ]; then \
-		$(CXX) -c $(CXXFLAGS) -DHAVE_ZLIB -I. -x c++ -o $@ $< ; \
-	else \
-		$(CXX) -c $(CXXFLAGS) -I. -x c++ -o $@ $< ; \
-	fi
+	$(CXX) -c $(CXXFLAGS) -DHAVE_ZLIB -I. -x c++ -o $@ $<
 
 # FIXME: simulate.c currently calls package_async, which depends on package/DB, this need to be fixed.
 simulate.$(O): simulate.cc
@@ -129,7 +125,7 @@ lpc/compiler/grammar.tab.cc: lpc/compiler/grammar.y
 
 $(DRIVER_BIN): $(OBJ) packages/*.$(O) dtrace_compile
 	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
-	$(CXX) $(LDFLAGS) $(OBJ) packages/*.$(O) `./dtrace_compile` -o $(DRIVER_BIN) $(LIBS) @MYSQL_LDFLAGS@ @POSTGRESQL_LDFLAGS@ @SQLITE3_LDFLAGS@ @OPENSSL_LDFLAGS@ @OPENSSL_LIBS@ @PCRE_LIBS@ @LIBEVENT_LIBS@ @LIBEVENT_LDFLAGS@ @zlib_LIBS@
+	$(CXX) $(LDFLAGS) $(OBJ) packages/*.$(O) `./dtrace_compile` -o $(DRIVER_BIN) $(LIBS) @MYSQL_LDFLAGS@ @POSTGRESQL_LDFLAGS@ @SQLITE3_LDFLAGS@ @OPENSSL_LDFLAGS@ @OPENSSL_LIBS@ @PCRE_LIBS@ @LIBEVENT_LIBS@ @LIBEVENT_LDFLAGS@
 
 dtrace_compile: dtrace_compile.cc
 	$(CXX) $(CXXFLAGS) -x c++ dtrace_compile.cc -o dtrace_compile
