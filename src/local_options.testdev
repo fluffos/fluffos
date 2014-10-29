@@ -12,11 +12,6 @@
 #undef NO_WIZARDS
 #define POSIX_TIMERS
 
-#define PACKAGE_DB
-#define USE_POSTGRES 1
-#define USE_MYSQL 2
-#define USE_SQLITE3 3
-
 #define PACKAGE_CRYPTO
 #define PACKAGE_PCRE
 #define PACKAGE_PARSER

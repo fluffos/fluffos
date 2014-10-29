@@ -50,7 +50,7 @@ SRC=lpc/compiler/grammar.tab.cc main.cc rc.cc simulate.cc file.cc \
   socket_efuns.cc socket_ctrl.cc eoperators.cc socket_err.cc \
   disassembler.cc uvalarm.cc \
   replace_program.cc master.cc \
-  debug.cc crypt.cc applies_table.cc add_action.cc eval.cc fliconv.cc console.cc \
+  debug.cc custom_crypt.cc applies_table.cc add_action.cc eval.cc fliconv.cc console.cc \
   posix_timers.cc event.cc dns.c \
 	outbuf.cc \
 	net/telnet.cc net/telnet_ext.cc net/mssp.cc \
@@ -73,7 +73,7 @@ OBJ=lpc/compiler/grammar.tab.o main.o rc.o simulate.o file.o \
   socket_efuns.o socket_ctrl.o eoperators.o socket_err.o \
   disassembler.o uvalarm.o \
   replace_program.o master.o \
-  debug.o crypt.o applies_table.o add_action.o eval.o fliconv.o console.o \
+  debug.o custom_crypt.o applies_table.o add_action.o eval.o fliconv.o console.o \
   posix_timers.o event.o dns.o \
 	outbuf.o \
 	net/telnet.o net/telnet_ext.o net/mssp.o \
@@ -102,18 +102,18 @@ build_packages:
 build_binaries: $(DRIVER_BIN) portbind
 
 .cc.$(O):
-	$(CXX) -c $(CXXFLAGS) -I. -x c++ -o $@ $<
+	$(CXX) -c $(CXXFLAGS) -iquote. -x c++ -o $@ $<
 
 .c.$(O):
-	$(CXX) -c $(CXXFLAGS) -I. -x c++ -o $@ $<
+	$(CXX) -c $(CXXFLAGS) -iquote. -x c++ -o $@ $<
 
 # Hack to work around brokeness in libtelnet.c
 thirdparty/libtelnet/libtelnet.o: thirdparty/libtelnet/libtelnet.c
-	$(CXX) -c $(CXXFLAGS) -DHAVE_ZLIB -I. -x c++ -o $@ $<
+	$(CXX) -c $(CXXFLAGS) -DHAVE_ZLIB -iquote. -x c++ -o $@ $<
 
 # FIXME: simulate.c currently calls package_async, which depends on package/DB, this need to be fixed.
 simulate.$(O): simulate.cc
-	$(CXX) -c $(CXXFLAGS) -I. @MYSQL_CFLAGS@ @POSTGRESQL_CFLAGS@ @SQLITE3_CFLAGS@  -x c++ -o $@ $<
+	$(CXX) -c $(CXXFLAGS) -iquote. @MYSQL_CFLAGS@ @POSTGRESQL_CFLAGS@ @SQLITE3_CFLAGS@  -x c++ -o $@ $<
 
 lpc/compiler/grammar.tab.o: lpc/compiler/grammar.tab.cc opcodes.h
 
@@ -144,7 +144,7 @@ cc.h:
 # the touches here are necessary to fix the modification times; link(2) does
 # 'modify' a file
 files: edit_source options.h lpc/op.spec lpc/func.spec configure.h lpc/compiler/grammar.y.pre
-	./edit_source -options -build_func_spec '$(CXX) -E $(CXXFLAGS) -I. -x c++' \
+	./edit_source -options -build_func_spec '$(CXX) -E $(CXXFLAGS) -iquote. -x c++' \
 	              -process lpc/compiler/grammar.y.pre
 	./edit_source -build_efuns -build_applies
 	touch files

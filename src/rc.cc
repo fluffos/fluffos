@@ -223,6 +223,15 @@ void set_defaults(char *filename) {
   CONFIG_STR(__DEFAULT_FAIL_MESSAGE__) = alloc_cstring(tmp, "config file: dfm");
 
   scan_config_line("mud ip : %[^\n]", tmp, 0);
+#ifdef IPV6
+  // common fix for mud ip.
+  if (!strcmp(tmp, "127.0.0.1")) {
+    strcpy(tmp, "::1");
+  }
+  if (!strcmp(tmp, "0.0.0.0")) {
+    strcpy(tmp, "::");
+  }
+#endif
   CONFIG_STR(__MUD_IP__) = alloc_cstring(tmp, "config file: mi");
 
   if (scan_config_line("fd6 kind : %[^\n]", tmp, 0)) {

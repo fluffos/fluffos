@@ -3,7 +3,7 @@ dnl
 dnl Test for the libevent library of a particular version (or newer).
 dnl
 dnl If no path to the installed libevent is given, the macro will first try
-dnl using no -I or -L flags, then searches under /usr, /usr/local, /opt,
+dnl using no -isystem or -L flags, then searches under /usr, /usr/local, /opt,
 dnl and /opt/libevent.
 dnl If these all fail, it will try the $LIBEVENT_ROOT environment variable.
 dnl
@@ -45,7 +45,7 @@ AC_DEFUN([AX_LIB_EVENT_DO_CHECK],
 
           # Set our flags if we are checking a specific directory.
           if test -n "$ax_libevent_path" ; then
-            LIBEVENT_CPPFLAGS="-I$ax_libevent_path/include"
+            LIBEVENT_CPPFLAGS="-isystem$ax_libevent_path/include"
             LIBEVENT_LDFLAGS="-L$ax_libevent_path/lib"
             LD_LIBRARY_PATH="$ax_libevent_path/lib:$LD_LIBRARY_PATH"
           else

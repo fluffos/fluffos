@@ -177,7 +177,8 @@ void new_external_port_event_listener(port_def_t *port, sockaddr *sa, socklen_t 
   port->ev_conn = evconnlistener_new_bind(
       g_event_base, on_external_port_event, port,
       LEV_OPT_REUSEABLE | LEV_OPT_CLOSE_ON_FREE | LEV_OPT_CLOSE_ON_EXEC, 1024, sa, socklen);
-  DEBUG_CHECK(port->ev_conn == NULL, "listening failed!");
+      DEBUG_CHECK1(port->ev_conn == NULL, "listening failed: %s !",
+                   evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
 }
 
 void on_lpc_sock_read(evutil_socket_t fd, short what, void *arg) {
