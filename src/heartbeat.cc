@@ -48,6 +48,12 @@ void call_heart_beat() {
 
   num_hb_calls++;
 
+  if (!heartbeats_next.empty()) {
+    for (auto hb: heartbeats_next) {
+      heartbeats.push_back(hb);
+    }
+    heartbeats_next.clear();
+  }
   // During the execution of heartbeat func, object can add/delete heartbeats, thus we can't use a
   // simple loop here. Instead, we extract each heartbeats, execute it, add it to
   // heartbeats_next. After all execution, heartbeats_after and heartbeats is swapped.
@@ -55,26 +61,28 @@ void call_heart_beat() {
   // NOTE: The order of heartbeat execution is preserved.
   while (!heartbeats.empty()) {
     auto curr_hb = heartbeats.front();
-    heartbeats.pop_front();
+
+    // Move heartbeat into heartbeat_next
+    {
+      heartbeats.pop_front();
+      // Skip if we should be deleted.
+      if (!(curr_hb->ob->flags & O_HEART_BEAT) || curr_hb->ob->flags & O_DESTRUCTED) {
+        delete curr_hb;
+        continue;
+      }
+      heartbeats_next.push_back(curr_hb);
+    }
 
     auto ob = curr_hb->ob;
-    // Skip if we are already removed.
-    if (!(ob->flags & O_HEART_BEAT)) {
-      delete curr_hb;
-      continue;
-    }
 
-    curr_hb->heart_beat_ticks--;
-    // Not yet its turn
-    if (curr_hb->heart_beat_ticks > 0) {
+    if (--curr_hb->heart_beat_ticks > 0) {
       continue;
+    } else {
+      curr_hb->heart_beat_ticks = curr_hb->time_to_heart_beat;
     }
-
-    curr_hb->heart_beat_ticks = curr_hb->time_to_heart_beat;
 
     // No heartbeat function
-    if (ob->prog->heart_beat != 0) {
-      // TODO: should log a warning
+    if (ob->prog->heart_beat == 0) {
       continue;
     }
 
@@ -98,43 +106,32 @@ void call_heart_beat() {
     if (ob->interactive) {  // note, NOT same as new_command_giver
       current_interactive = ob;
     }
-
-    current_interactive = nullptr;
     g_current_heartbeat_obj = ob;
     g_current_heartbeat = curr_hb;
 
     error_context_t econ;
     try {
-      set_eval(max_cost);
       save_context(&econ);
+
+      set_eval(max_cost);
       // TODO: provide a safe_call_direct()
       call_direct(ob, ob->prog->heart_beat - 1, ORIGIN_DRIVER, 0);
 
       pop_stack(); /* pop the return value */
-      restore_command_giver();
 
       pop_context(&econ);
     } catch (const char *) {
       restore_context(&econ);
     }
 
-    current_object = nullptr;
-    current_prog = nullptr;
+    restore_command_giver();
     g_current_heartbeat_obj = nullptr;
     g_current_heartbeat = nullptr;
-
-    // see if we have been removed.
-    if (!(ob->flags & O_HEART_BEAT)) {
-      delete curr_hb;
-      continue;
-    }
-    // schedule for next round execution
-    heartbeats_next.push_back(curr_hb);
   }
   std::swap(heartbeats, heartbeats_next);
 } /* call_heart_beat() */
 
-// Query how many ticks remaining for a object
+// Query heartbeat interval for a object
 // NOTE: Not a very efficient function.
 int query_heart_beat(object_t *ob) {
   if (!(ob->flags & O_HEART_BEAT)) {
@@ -175,13 +172,34 @@ int set_heart_beat(object_t *ob, int to) {
     return 1;
   }
 
-  // NOTE: New heartbeat should be added to heartbeats_next.
-  auto *hb = new heart_beat_t();
-  hb->ob = ob;
-  hb->time_to_heart_beat = to;
-  hb->heart_beat_ticks = to;
-  ob->flags |= O_HEART_BEAT;
-  heartbeats_next.push_front(hb);
+  if (!(ob->flags & O_HEART_BEAT)) {
+    // NOTE: New heartbeat should be added to heartbeats_next.
+    ob->flags |= O_HEART_BEAT;
+
+    auto *hb = new heart_beat_t();
+    hb->ob = ob;
+    hb->time_to_heart_beat = to;
+    hb->heart_beat_ticks = to;
+    heartbeats_next.push_back(hb);
+    return 1;
+  }
+
+  if (g_current_heartbeat_obj == ob) {
+    g_current_heartbeat->time_to_heart_beat = to;
+    return 1;
+  }
+  for (auto hb: heartbeats) {
+    if (hb->ob == ob) {
+      hb->time_to_heart_beat = to;
+      return 1;
+    }
+  }
+  for (auto hb: heartbeats_next) {
+    if (hb->ob == ob) {
+      hb->time_to_heart_beat = to;
+      return 1;
+    }
+  }
 
   return 1;
 }
@@ -232,14 +250,10 @@ array_t *get_heart_beats() {
 void clear_heartbeats() {
   // TODO: instead of clearing everything blindly, should go through all objects with heartbeat flag
   // and delete corresponding heartbeats, thus exposing leftovers.
-  for (auto hb: heartbeats) {
+  for (auto hb : heartbeats) {
     delete hb;
   }
-  for (auto hb: heartbeats_next) {
+  for (auto hb : heartbeats_next) {
     delete hb;
-  }
-  if (g_current_heartbeat != nullptr) {
-    delete g_current_heartbeat;
   }
 }
-
