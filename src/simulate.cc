@@ -1955,6 +1955,7 @@ void shutdownMudOS(int exit_code) {
   /* clean up heap allocations so valgrind don't consider them lost.*/
   clear_call_outs();
   clear_tick_events();
+  clear_heartbeats();
 
 #ifdef PACKAGE_MUDLIB_STATS
   save_stat_files();

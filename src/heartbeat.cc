@@ -228,3 +228,18 @@ array_t *get_heart_beats() {
   return arr;
 }
 #endif
+
+void clear_heartbeats() {
+  // TODO: instead of clearing everything blindly, should go through all objects with heartbeat flag
+  // and delete corresponding heartbeats, thus exposing leftovers.
+  for (auto hb: heartbeats) {
+    delete hb;
+  }
+  for (auto hb: heartbeats_next) {
+    delete hb;
+  }
+  if (g_current_heartbeat != nullptr) {
+    delete g_current_heartbeat;
+  }
+}
+

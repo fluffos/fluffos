@@ -17,6 +17,9 @@ extern object_t *g_current_heartbeat_obj;
 int set_heart_beat(object_t *, int);
 int query_heart_beat(object_t *);
 int heart_beat_status(outbuffer_t *, int);
-array_t *get_heart_beats(void);
+array_t *get_heart_beats();
+
+// Shutdown hook
+void clear_heartbeats();
 
 #endif /* HEARTBEAT_H_ */
