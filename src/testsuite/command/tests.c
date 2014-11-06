@@ -51,7 +51,9 @@ int main(string fun)
 {
   string leaks;
   object tp = this_player();
-
+#if defined(__DEBUGMALLOC__) && defined(__DEBUGMALLOC_EXTENSIONS__) && defined(__PACKAGE_DEVELOP__)
+  write("WARNING: Possible RELEASE build, check_memory() is not executed.");
+#endif
   if (!fun || fun == "") {
     recurse("/single/tests/");
     write("Checks succeeded.\n");
