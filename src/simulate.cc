@@ -1,4 +1,5 @@
 #include "std.h"
+
 #include "lpc_incl.h"
 #include "file_incl.h"
 #include "call_out.h"
@@ -26,6 +27,8 @@
 #else
 #define DTRACE_PROBE1(x, y, z)
 #endif
+
+#include "heartbeat.h"
 
 /*
  * 'inherit_file' is used as a flag. If it is set to a string
@@ -306,7 +309,7 @@ static object_t *load_virtual_object(const char *name, int clone) {
 
   /* finish initialization */
   new_ob->flags |= O_VIRTUAL;
-  new_ob->load_time = current_virtual_time;
+  new_ob->load_time = g_current_virtual_time;
 #ifdef PACKAGE_MUDLIB_STATS
   init_stats_for_object(new_ob);
   add_objects(&new_ob->stats, 1);
@@ -507,7 +510,7 @@ object_t *int_load_object(const char *lname, int callcreate) {
         num_objects_this_thread--;
         return 0;
       }
-      ob->load_time = current_virtual_time;
+      ob->load_time = g_current_virtual_time;
     }
     num_objects_this_thread--;
     return ob;
@@ -546,7 +549,7 @@ object_t *int_load_object(const char *lname, int callcreate) {
     debug(d_flag, "--/%s loaded", ob->obname);
   }
 
-  ob->load_time = current_virtual_time;
+  ob->load_time = g_current_virtual_time;
   num_objects_this_thread--;
 
   return ob;
@@ -891,7 +894,7 @@ void destruct_object(object_t *ob) {
 #ifndef NO_SNOOP
   if (ob->flags & O_SNOOP) {
     int i;
-    users_foreach([ob](interactive_t * user) {
+    users_foreach([ob](interactive_t *user) {
       if (user->snooped_by == ob) {
         user->snooped_by = 0;
       }
@@ -1874,15 +1877,15 @@ void error_handler(char *err) {
       }
 #endif
     }
-    if (current_heart_beat) {
+    if (g_current_heartbeat_obj) {
       static char hb_message[] = "FluffOS driver tells you: You have no heart beat!\n";
-      set_heart_beat(current_heart_beat, 0);
-      debug_message("Heart beat in /%s turned off.\n", current_heart_beat->obname);
-      if (current_heart_beat->interactive) {
-        add_message(current_heart_beat, hb_message, sizeof(hb_message) - 1);
+      set_heart_beat(g_current_heartbeat_obj, 0);
+      debug_message("Heart beat in /%s turned off.\n", g_current_heartbeat_obj->obname);
+      if (g_current_heartbeat_obj->interactive) {
+        add_message(g_current_heartbeat_obj, hb_message, sizeof(hb_message) - 1);
       }
 
-      current_heart_beat = 0;
+      g_current_heartbeat_obj = 0;
     }
   }
   num_error--;
@@ -2029,7 +2032,7 @@ void do_message(svalue_t *lclass, svalue_t *msg, array_t *scope, array_t *exclud
 
 #if !defined(NO_RESETS) && defined(LAZY_RESETS)
 void try_reset(object_t *ob) {
-  if ((ob->next_reset < current_virtual_time) && !(ob->flags & O_RESET_STATE)) {
+  if ((ob->next_reset < g_current_virtual_time) && !(ob->flags & O_RESET_STATE)) {
     debug(d_flag, ("(lazy) RESET /%s\n", ob->obname));
 
     /* need to set the flag here to prevent infinite loops in apply_low */

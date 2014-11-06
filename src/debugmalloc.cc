@@ -1,16 +1,15 @@
 /*
    wrapper functions for system malloc -- keep malloc stats.
 */
-#include "options_incl.h" // IWYU pragma: keep
+#include "options_incl.h"  // IWYU pragma: keep
 
 #ifdef DEBUGMALLOC
 
 #include "debugmalloc.h"
 
-#include <cstdlib>                      // for calloc, free, malloc, etc
-#include "md.h"                         // for md_node_t, MDmalloc, etc
-#include "outbuf.h"                     // for outbuf_addv, outbuf_add, etc
-
+#include <cstdlib>   // for calloc, free, malloc, etc
+#include "md.h"      // for md_node_t, MDmalloc, etc
+#include "outbuf.h"  // for outbuf_addv, outbuf_add, etc
 
 void fatal(const char *, ...);
 
@@ -109,4 +108,4 @@ void dump_malloc_data(outbuffer_t *ob) {
   outbuf_addv(ob, "#alloc - #free:   %10lu\n", net);
   outbuf_addv(ob, "#realloc calls:   %10lu\n", stats.realloc_calls);
 }
-#endif // DEBUGMALLOC
+#endif  // DEBUGMALLOC

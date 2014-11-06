@@ -39,20 +39,20 @@ struct interactive_t {
   object_t *ob; /* points to the associated object         */
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
   sentence_t *input_to; /* to be called with next input line       */
-  svalue_t *carryover; /* points to args for input_to             */
-  int num_carry; /* number of args for input_to             */
+  svalue_t *carryover;  /* points to args for input_to             */
+  int num_carry;        /* number of args for input_to             */
 #endif
-  int connection_type; /* the type of connection this is          */
-  int fd; /* file descriptor for interactive object  */
+  int connection_type;          /* the type of connection this is          */
+  int fd;                       /* file descriptor for interactive object  */
   struct sockaddr_storage addr; /* socket address of interactive object    */
   socklen_t addrlen;
-  int local_port; /* which of our ports they connected to    */
-  int external_port; /* external port index for connection      */
-  const char *prompt; /* prompt string for interactive object    */
+  int local_port;      /* which of our ports they connected to    */
+  int external_port;   /* external port index for connection      */
+  const char *prompt;  /* prompt string for interactive object    */
   char text[MAX_TEXT]; /* input buffer for interactive object     */
-  int text_end; /* first free char in buffer               */
-  int text_start; /* where we are up to in user command buffer */
-  int last_time; /* time of last command executed           */
+  int text_end;        /* first free char in buffer               */
+  int text_start;      /* where we are up to in user command buffer */
+  int last_time;       /* time of last command executed           */
 #ifndef NO_SNOOP
   object_t *snooped_by;
 #endif
@@ -61,19 +61,19 @@ struct interactive_t {
   union string_or_func default_err_message;
 #endif
 #ifdef TRACE
-  int trace_level; /* debug flags -- 0 means no debugging     */
+  int trace_level;    /* debug flags -- 0 means no debugging     */
   char *trace_prefix; /* trace only object which has this as name  */
 #endif
 #ifdef OLD_ED
   struct ed_buffer_s *ed_buffer; /* local ed                        */
 #endif
-  int iflags; /* interactive flags */
+  int iflags;       /* interactive flags */
   char out_of_band; /* Send a telnet sync operation            */
   struct translation *trans;
 
   char ws_text[MAX_TEXT]; /* input buffer for interactive object     */
-  int ws_text_end; /* first free char in buffer               */
-  int ws_text_start; /* where we are up to in user command buffer */
+  int ws_text_end;        /* first free char in buffer               */
+  int ws_text_start;      /* where we are up to in user command buffer */
   int ws_size;
   int ws_mask;
   char ws_maskoffs;

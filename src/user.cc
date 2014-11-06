@@ -17,8 +17,8 @@
 static std::vector<interactive_t *> all_users;
 
 interactive_t *user_add() {
-  auto user = reinterpret_cast<interactive_t *>(DXALLOC(sizeof(interactive_t), TAG_INTERACTIVE,
-                                                        "new_user_handler"));
+  auto user = reinterpret_cast<interactive_t *>(
+      DXALLOC(sizeof(interactive_t), TAG_INTERACTIVE, "new_user_handler"));
   memset(user, 0, sizeof(*user));
   all_users.push_back(user);
   return user;
@@ -30,14 +30,13 @@ void user_del(interactive_t *user) {
 }
 
 // Get a copy of all users
-const std::vector<interactive_t*> users(bool include_hidden) {
+const std::vector<interactive_t *> users(bool include_hidden) {
   if (include_hidden) {
     return all_users;
   } else {
     std::vector<interactive_t *> result;
-    std::copy_if(all_users.begin(), all_users.end(), result.begin(), [](interactive_t *user) {
-      return (user->ob->flags & O_HIDDEN) == 0;
-    });
+    std::copy_if(all_users.begin(), all_users.end(), result.begin(),
+                 [](interactive_t *user) { return (user->ob->flags & O_HIDDEN) == 0; });
     return result;
   }
 }
@@ -47,9 +46,8 @@ int users_num(bool include_hidden) {
   if (include_hidden) {
     return all_users.size();
   } else {
-    return std::count_if(all_users.begin(), all_users.end(), [](interactive_t * user) {
-      return (user->ob->flags & O_HIDDEN) == 0;
-    });
+    return std::count_if(all_users.begin(), all_users.end(),
+                         [](interactive_t *user) { return (user->ob->flags & O_HIDDEN) == 0; });
   }
 }
 

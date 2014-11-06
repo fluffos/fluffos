@@ -8,6 +8,9 @@
  */
 
 #include "std.h"
+
+#include "heartbeat.h"  // for heart_beat_status etc
+
 #include "efuns_main.h"
 #include "file_incl.h"
 #include "file.h"
@@ -1797,7 +1800,8 @@ void f_mud_status(void) {
     outbuf_addv(&ob, "Mappings:\t\t\t%8d %8d\n", num_mappings, total_mapping_size);
     outbuf_addv(&ob, "Mappings(nodes):\t\t%8d\n", total_mapping_nodes);
 
-    outbuf_addv(&ob, "Interactives:\t\t\t%8d %8d\n", users_num(true), users_num(true) * sizeof(interactive_t));
+    outbuf_addv(&ob, "Interactives:\t\t\t%8d %8d\n", users_num(true),
+                users_num(true) * sizeof(interactive_t));
 
     tot = show_otable_status(&ob, verbose) + heart_beat_status(&ob, verbose) +
           add_string_status(&ob, verbose) + print_call_out_usage(&ob, verbose);
@@ -1811,8 +1815,7 @@ void f_mud_status(void) {
          total_class_size +
 #endif
          total_mapping_size + tot_alloc_sentence * sizeof(sentence_t) + tot_alloc_object_size +
-         users_num(true) * sizeof(interactive_t) +
-         res;
+         users_num(true) * sizeof(interactive_t) + res;
 
   if (!verbose) {
     outbuf_add(&ob, "\t\t\t\t\t --------\n");
@@ -3519,7 +3522,7 @@ void f_users(void) {
   auto users_ = users(include_hidden);
   array_t *ret = allocate_empty_array(users_.size());
 
-  for (int i=0; i < users_.size(); i++) {
+  for (int i = 0; i < users_.size(); i++) {
     auto ob = users_[i]->ob;
     ret->item[i].type = T_OBJECT;
     ret->item[i].u.ob = ob;
@@ -3689,8 +3692,8 @@ void f_memory_info(void) {
           total_class_size +
 #endif
           total_mapping_size + tot_alloc_object_size + tot_alloc_sentence * sizeof(sentence_t) +
-          users_num(1) * sizeof(interactive_t) + show_otable_status(0, -1) + heart_beat_status(0, -1) +
-          add_string_status(0, -1) + print_call_out_usage(0, -1) + res;
+          users_num(1) * sizeof(interactive_t) + show_otable_status(0, -1) +
+          heart_beat_status(0, -1) + add_string_status(0, -1) + print_call_out_usage(0, -1) + res;
     push_number(tot);
     return;
   }
@@ -3735,12 +3738,12 @@ void f_query_shadowing(void) {
 #ifdef F_SET_RESET
 void f_set_reset(void) {
   if (st_num_arg == 2) {
-    (sp - 1)->u.ob->next_reset = current_virtual_time + sp->u.number;
+    (sp - 1)->u.ob->next_reset = g_current_virtual_time + sp->u.number;
     free_object(&(--sp)->u.ob, "f_set_reset:1");
     sp--;
   } else {
     sp->u.ob->next_reset =
-        current_virtual_time + TIME_TO_RESET / 2 + random_number(TIME_TO_RESET / 2);
+        g_current_virtual_time + TIME_TO_RESET / 2 + random_number(TIME_TO_RESET / 2);
     free_object(&(sp--)->u.ob, "f_set_reset:2");
   }
 }
@@ -3766,7 +3769,7 @@ void f_flush_messages(void) {
     }
     pop_stack();
   } else {
-    for (auto user: users(true)) {
+    for (auto user : users(true)) {
       flush_message(user);
     }
   }

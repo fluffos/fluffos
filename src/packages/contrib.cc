@@ -13,6 +13,9 @@
 #include "../add_action.h"
 #include "../port.h"
 #include "../applies.h"
+
+#include "../heartbeat.h"
+
 #define MAX_COLOUR_STRING 200
 
 /* should be done in configure */

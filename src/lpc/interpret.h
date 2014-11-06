@@ -6,7 +6,7 @@
 #ifndef INTERPRET_H
 #define INTERPRET_H
 
-#include "interactive.h" // for interactive_t
+#include "interactive.h"  // for interactive_t
 
 typedef struct svalue_s svalue_t;
 
@@ -35,7 +35,7 @@ typedef struct svalue_s svalue_t;
     (current_object &&                                           \
      strpref(command_giver->interactive->trace_prefix, current_object->obname))))
 #define TRACEHB \
-  (current_heart_beat == 0 || (command_giver->interactive->trace_level & TRACE_HEART_BEAT))
+  (g_current_heartbeat_obj == 0 || (command_giver->interactive->trace_level & TRACE_HEART_BEAT))
 #endif
 
 #define EXTRACT_UCHAR(p) (*(unsigned char *)(p))

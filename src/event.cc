@@ -154,7 +154,8 @@ static void on_user_events(bufferevent *bev, short events, void *arg) {
 }
 
 void new_user_event_listener(interactive_t *user) {
-  auto bev = bufferevent_socket_new(g_event_base, user->fd, BEV_OPT_CLOSE_ON_FREE | BEV_OPT_DEFER_CALLBACKS);
+  auto bev = bufferevent_socket_new(g_event_base, user->fd,
+                                    BEV_OPT_CLOSE_ON_FREE | BEV_OPT_DEFER_CALLBACKS);
   bufferevent_setcb(bev, on_user_read, on_user_write, on_user_events, user);
   bufferevent_enable(bev, EV_READ | EV_WRITE);
 
@@ -162,8 +163,7 @@ void new_user_event_listener(interactive_t *user) {
   bufferevent_set_timeouts(bev, NULL, &timeout_write);
 
   user->ev_buffer = bev;
-  user->ev_command =
-      event_new(g_event_base, -1, EV_TIMEOUT | EV_PERSIST, on_user_command, user);
+  user->ev_command = event_new(g_event_base, -1, EV_TIMEOUT | EV_PERSIST, on_user_command, user);
 }
 
 static void on_external_port_event(evconnlistener *listener, evutil_socket_t fd, sockaddr *sa,
@@ -177,8 +177,8 @@ void new_external_port_event_listener(port_def_t *port, sockaddr *sa, socklen_t 
   port->ev_conn = evconnlistener_new_bind(
       g_event_base, on_external_port_event, port,
       LEV_OPT_REUSEABLE | LEV_OPT_CLOSE_ON_FREE | LEV_OPT_CLOSE_ON_EXEC, 1024, sa, socklen);
-      DEBUG_CHECK1(port->ev_conn == NULL, "listening failed: %s !",
-                   evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
+  DEBUG_CHECK1(port->ev_conn == NULL, "listening failed: %s !",
+               evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
 }
 
 void on_lpc_sock_read(evutil_socket_t fd, short what, void *arg) {

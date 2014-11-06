@@ -40,7 +40,7 @@ INSTALL_DIR=@bindir@
 OPTIMIZE=@OPTIMIZE@
 
 SRC=lpc/compiler/grammar.tab.cc main.cc rc.cc simulate.cc file.cc \
-  backend.cc comm.cc ed.cc regexp.cc crc32.cc \
+  backend.cc heartbeat.cc comm.cc ed.cc regexp.cc crc32.cc \
   efuns_main.cc efuns_port.cc \
   call_out.cc otable.cc dumpstat.cc stralloc.cc \
 	debugmalloc.cc md.cc \
@@ -63,7 +63,7 @@ SRC=lpc/compiler/grammar.tab.cc main.cc rc.cc simulate.cc file.cc \
 	thirdparty/libtelnet/libtelnet.c
 
 OBJ=lpc/compiler/grammar.tab.o main.o rc.o simulate.o file.o \
-  backend.o comm.o ed.o regexp.o crc32.o \
+  backend.o heartbeat.o comm.o ed.o regexp.o crc32.o \
   efuns_main.o efuns_port.o \
   call_out.o otable.o dumpstat.o stralloc.o \
 	debugmalloc.o md.o \
