@@ -79,8 +79,8 @@ int execute(string fun)
 }
 
 int main() {
-#if defined(__DEBUGMALLOC__) && defined(__DEBUGMALLOC_EXTENSIONS__) && defined(__PACKAGE_DEVELOP__)
-  write("WARNING: Possible RELEASE build, check_memory() is not executed.\n");
+#if !(defined(__DEBUGMALLOC__) && defined(__DEBUGMALLOC_EXTENSIONS__) && defined(__PACKAGE_DEVELOP__))
+  write("WARNING: Possible RELEASE build, check_memory() is not being executed.\n");
 #endif
   return execute("");
 }
