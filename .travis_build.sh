@@ -102,7 +102,7 @@ if [ -n "$GCOV" ]; then
 else
   # FIXME: currently RELEASE build would report leak on valgrind, thus ignoring it for now.
   if [ "$TYPE" = "develop" ]; then
-    VALGRIND="valgrind --error-exitcode=255"
+    VALGRIND="valgrind --error-exitcode=255 --suppressions=../valgrind.supp"
   else
     VALGRIND="valgrind"
   fi
