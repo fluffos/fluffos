@@ -106,7 +106,7 @@ else
   fi
 
   if [ "$TELNET" = "yes" ]; then
-    ( sleep 4 ; expect telnet_test.expect ) &
+    ( sleep 4 ; expect telnet_test.expect localhost 4000 ) &
     ( $VALGRIND --malloc-fill=0x75 --free-fill=0x73 --track-origins=yes --leak-check=full ../driver etc/config.test -d ) &
     wait $!
     exit $?
