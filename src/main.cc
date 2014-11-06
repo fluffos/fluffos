@@ -21,8 +21,6 @@
 #include "event.h"
 #include "dns.h"
 
-#include "thirdparty/ThreadPool/ThreadPool.h"
-
 port_def_t external_port[5];
 
 static int e_flag = 0; /* Load empty, without preloads. */
@@ -155,7 +153,7 @@ int main(int argc, char **argv) {
     exit(-1);
   }
 
-  current_virtual_time = get_current_time();
+  g_current_virtual_time = get_current_time();
 #ifdef POSIX_TIMERS
   /*
    * Initialize the POSIX timers.

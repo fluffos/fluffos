@@ -130,11 +130,11 @@ int apply_low(const char *fun, object_t *ob, int num_arg) {
     local_call_origin = ORIGIN_DRIVER;
   }
   call_origin = 0;
-  ob->time_of_ref = current_virtual_time; /* Used by the swapper */
-                                          /*
- * This object will now be used, and is thus a target for reset later on
- * (when time due).
- */
+  ob->time_of_ref = g_current_virtual_time; /* Used by the swapper */
+                                            /*
+   * This object will now be used, and is thus a target for reset later on
+   * (when time due).
+   */
 #if !defined(NO_RESETS) && defined(LAZY_RESETS)
   try_reset(ob);
 #endif

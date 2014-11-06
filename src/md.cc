@@ -5,7 +5,7 @@
 #ifdef DEBUGMALLOC_EXTENSIONS
 #include "interactive.h"
 #include "user.h"
-#include "comm.h" // TODO: for mark_iptable
+#include "comm.h"  // TODO: for mark_iptable
 #include "lpc/compiler/lex.h"
 #include "simul_efun.h"
 #include "call_out.h"
@@ -807,7 +807,7 @@ void check_all_blocks(int flag) {
 #endif
 
     /* now do a mark and sweep check to see what should be alloc'd */
-    for (auto &user: users(true)) {
+    for (auto &user : users(true)) {
       DO_MARK(user, TAG_INTERACTIVE);
       user->ob->extra_ref++;
       // FIXME(sunyc): I can't explain this, appearently somewhere
@@ -825,13 +825,13 @@ void check_all_blocks(int flag) {
         }
       }
 #ifndef NO_ADD_ACTION
-        if (user->iflags & NOTIFY_FAIL_FUNC) {
-          user->default_err_message.f->hdr.extra_ref++;
-        } else if (user->default_err_message.s) {
-          EXTRA_REF(BLOCK(user->default_err_message.s))++;
-        }
-#endif
+      if (user->iflags & NOTIFY_FAIL_FUNC) {
+        user->default_err_message.f->hdr.extra_ref++;
+      } else if (user->default_err_message.s) {
+        EXTRA_REF(BLOCK(user->default_err_message.s))++;
       }
+#endif
+    }
 
     if (*(DEFAULT_FAIL_MESSAGE)) {
       char buf[8192];
@@ -1153,7 +1153,6 @@ void check_all_blocks(int flag) {
           case TAG_STR_TBL:
           case TAG_LOCALS:
           case TAG_CALL_OUT:
-          case TAG_HEART_BEAT:
           case TAG_INPUT_TO:
             break;
           default:

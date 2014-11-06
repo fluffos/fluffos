@@ -35,8 +35,9 @@ static const int TAG_PREDEFINES = (TAG_PERMANENT + 30);
 static const int TAG_LINENUMBERS = (TAG_PERMANENT + 31);
 static const int TAG_LOCALS = (TAG_PERMANENT + 32);
 static const int TAG_LPC_OBJECT = (TAG_PERMANENT + 33);
+static const int _OBSOLETE_TAG_USER = (TAG_PERMANENT + 34);
 static const int TAG_DEBUGMALLOC = (TAG_PERMANENT + 35);
-static const int TAG_HEART_BEAT = (TAG_PERMANENT + 36);
+static const int _OBSOLETE_TAG_HEART_BEAT = (TAG_PERMANENT + 36);
 #ifdef PACKAGE_PARSER
 static const int TAG_PARSER = (TAG_PERMANENT + 37);
 #endif

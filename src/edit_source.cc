@@ -32,7 +32,7 @@ static int nexpands = 0;
 
 FILE *yyin = 0, *yyout = 0;
 
-#define SYNTAX                                                          \
+#define SYNTAX                                                \
   "edit_source [-process file] [-options] [-build_func_spec " \
   "'command'] [-build_efuns]\n"
 

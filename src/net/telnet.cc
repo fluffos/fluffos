@@ -70,6 +70,7 @@ static inline void on_telnet_iac(unsigned char cmd, interactive_t *ip) {
       debug(telnet, "on_telnet_iac: unsupported cmd %d.\n", cmd);
       break;
   }
+  flush_message(ip);
 }
 
 static inline void on_telnet_will(unsigned char cmd, interactive_t *ip) {
@@ -101,6 +102,7 @@ static inline void on_telnet_will(unsigned char cmd, interactive_t *ip) {
       debug(telnet, "on_telnet_will: unimplemented command %d.\n", cmd);
       break;
   }
+  flush_message(ip);
 }
 
 static inline void on_telnet_wont(unsigned char cmd, interactive_t *ip) {
@@ -342,7 +344,6 @@ void telnet_event_handler(telnet_t *telnet, telnet_event_t *ev, void *user_data)
       debug(telnet, "unhandled event: %d", ev->type);
       break;
   }
-  flush_message(ip);
 }
 
 // Server initiated negotiations.

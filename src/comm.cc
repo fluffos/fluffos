@@ -84,8 +84,7 @@ void init_user_conn() {
     external_port[i].out_packets = 0;
     external_port[i].out_volume = 0;
 #endif
-    if (!external_port[i].port)
-      continue;
+    if (!external_port[i].port) continue;
     /*
      * fill in socket address information.
      */
@@ -123,7 +122,7 @@ void init_user_conn() {
     new_external_port_event_listener(&external_port[i], res->ai_addr, res->ai_addrlen);
 
     debug_message("Accepting connections on %s.\n",
-                  sockaddr_to_string((sockaddr *) res->ai_addr, res->ai_addrlen));
+                  sockaddr_to_string((sockaddr *)res->ai_addr, res->ai_addrlen));
 
     freeaddrinfo(res);
   }
@@ -139,8 +138,7 @@ void shutdown_external_ports() {
     if (!external_port[i].port) {
       continue;
     }
-    if (external_port[i].ev_conn)
-      evconnlistener_free(external_port[i].ev_conn);
+    if (external_port[i].ev_conn) evconnlistener_free(external_port[i].ev_conn);
     if (OS_socket_close(external_port[i].fd) == -1) {
       socket_perror("ipc_remove: close", 0);
     }
@@ -216,12 +214,12 @@ void new_user_handler(int fd, struct sockaddr *addr, size_t addrlen, port_def_t 
   /* master_ob->interactive can be zero if the master object self
    destructed in the above (don't ask) */
   set_command_giver(0);
-  if (ret == 0 || ret == (svalue_t *) -1 || ret->type != T_OBJECT || !master_ob->interactive) {
+  if (ret == 0 || ret == (svalue_t *)-1 || ret->type != T_OBJECT || !master_ob->interactive) {
     if (master_ob->interactive) {
       remove_interactive(master_ob, 0);
     }
     debug_message("Can not accept connection from %s due to error in connect().\n",
-                  sockaddr_to_string((sockaddr *) &user->addr, user->addrlen));
+                  sockaddr_to_string((sockaddr *)&user->addr, user->addrlen));
     return;
   }
   /*
@@ -255,14 +253,16 @@ void new_user_handler(int fd, struct sockaddr *addr, size_t addrlen, port_def_t 
     /* current_object no longer set */
     ret = safe_apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
     if (ret == NULL) {
-      debug_message("new_user_handler: logon() on object %s has failed, the user is left "
-                    "dangling.\n",
-                    ob->obname);
+      debug_message(
+          "new_user_handler: logon() on object %s has failed, the user is left "
+          "dangling.\n",
+          ob->obname);
     }
     /* function not existing is no longer fatal */
   } else {
-    debug_message("new_user_handler: object is gone before logon(), the user is left "
-                  "dangling. \n");
+    debug_message(
+        "new_user_handler: object is gone before logon(), the user is left "
+        "dangling. \n");
   }
 
   debug(connections, ("new_user_handler: end\n"));
@@ -271,7 +271,7 @@ void new_user_handler(int fd, struct sockaddr *addr, size_t addrlen, port_def_t 
 
 #ifndef NO_SNOOP
 static void receive_snoop(const char *buf, int len, object_t *snooper) {
-  /* command giver no longer set to snooper */
+/* command giver no longer set to snooper */
 #ifdef RECEIVE_SNOOP
   char *str;
 
@@ -339,8 +339,8 @@ void add_message(object_t *who, const char *data, int len) {
    * if who->interactive is not valid, write message on stderr.
    * (maybe)
    */
-  if (!who || (who->flags & O_DESTRUCTED) || !who->interactive
-      || (who->interactive->iflags & (NET_DEAD | CLOSING))) {
+  if (!who || (who->flags & O_DESTRUCTED) || !who->interactive ||
+      (who->interactive->iflags & (NET_DEAD | CLOSING))) {
 #ifdef NONINTERACTIVE_STDERR_WRITE
     putc(']', stderr);
     fwrite(data, len, 1, stderr);
@@ -392,8 +392,8 @@ void add_binary_message_noflush(object_t *who, const unsigned char *data, int le
   /*
    * if who->interactive is not valid, bail
    */
-  if (!who || (who->flags & O_DESTRUCTED) || !who->interactive
-      || (who->interactive->iflags & (NET_DEAD | CLOSING))) {
+  if (!who || (who->flags & O_DESTRUCTED) || !who->interactive ||
+      (who->interactive->iflags & (NET_DEAD | CLOSING))) {
     return;
   }
   auto ip = who->interactive;
@@ -418,13 +418,28 @@ int flush_message(interactive_t *ip) {
     debug(connections, ("flush_message: invalid target!\n"));
     return 0;
   }
-  return bufferevent_flush(ip->ev_buffer, EV_WRITE, BEV_FLUSH) != -1;
+  // For socket bufferevent, bufferevent_flush is actually a no-op, thus we have to
+  // implement our own.
+
+  // return bufferevent_flush(ip->ev_buffer, EV_WRITE, BEV_FLUSH) != -1;
+  auto fd = bufferevent_getfd(ip->ev_buffer);
+  if (fd == -1) {
+    return 0;
+  }
+
+  auto output = bufferevent_get_output(ip->ev_buffer);
+  auto total = evbuffer_get_length(output);
+  if (total > 0) {
+    evbuffer_unfreeze(output, 1);
+    auto wrote = evbuffer_write(output, fd);
+    evbuffer_freeze(output, 1);
+    return wrote != -1;
+  }
+  return 0;
 }
 
 void flush_message_all() {
-  users_foreach([](interactive_t * user) {
-    flush_message(user);
-  });
+  users_foreach([](interactive_t *user) { flush_message(user); });
 }
 
 /*
@@ -480,7 +495,7 @@ void get_user_data(interactive_t *ip) {
       if (ip->text_end < 4) {
         text_space = 4 - ip->text_end;
       } else {
-        text_space = *(volatile int *) ip->text - ip->text_end + 4;
+        text_space = *(volatile int *)ip->text - ip->text_end + 4;
       }
       break;
 
@@ -517,7 +532,7 @@ void get_user_data(interactive_t *ip) {
         memcpy(ip->ws_text + ip->ws_text_end, buf, num_bytes);
         ip->ws_text_end += num_bytes;
         if (!ip->ws_size) {
-          unsigned char *data = (unsigned char *) &ip->ws_text[ip->ws_text_start];
+          unsigned char *data = (unsigned char *)&ip->ws_text[ip->ws_text_start];
           if (ip->ws_text_end - ip->ws_text_start < 8) {
             break;
           }
@@ -543,12 +558,12 @@ void get_user_data(interactive_t *ip) {
         }
         int i;
         if (ip->ws_size) {
-          int *wdata = (int *) &ip->ws_text[ip->ws_text_start];
-          int *dest = (int *) &buf[0];
+          int *wdata = (int *)&ip->ws_text[ip->ws_text_start];
+          int *dest = (int *)&buf[0];
           if (ip->ws_maskoffs) {
             int newmask;
             for (i = 0; i < 4; i++) {
-              ((char *) &newmask)[i] = ((char *) &ip->ws_mask)[(i + ip->ws_maskoffs) % 4];
+              ((char *)&newmask)[i] = ((char *)&ip->ws_mask)[(i + ip->ws_maskoffs) % 4];
             }
             ip->ws_mask = newmask;
             ip->ws_maskoffs = 0;
@@ -603,7 +618,7 @@ void get_user_data(interactive_t *ip) {
       int start = ip->text_end;
 
       // this will read data into ip->text
-      telnet_recv(ip->telnet, (const char *) &buf[0], num_bytes);
+      telnet_recv(ip->telnet, (const char *)&buf[0], num_bytes);
 
       if (ip->text_end > start) {
         /* handle snooping - snooper does not see type-ahead due to
@@ -626,8 +641,8 @@ void get_user_data(interactive_t *ip) {
 
       if (num_bytes == text_space) {
         if (ip->text_end == 4) {
-          *(volatile int *) ip->text = ntohl(*(int *) ip->text);
-          if (*(volatile int *) ip->text > MAX_TEXT - 5) {
+          *(volatile int *)ip->text = ntohl(*(int *)ip->text);
+          if (*(volatile int *)ip->text > MAX_TEXT - 5) {
             remove_interactive(ip->ob, 0);
           }
         } else {
@@ -653,7 +668,7 @@ void get_user_data(interactive_t *ip) {
       ip->text_end += num_bytes;
 
       p = ip->text + ip->text_start;
-      while ((nl = (char *) memchr(p, '\n', ip->text_end - ip->text_start))) {
+      while ((nl = (char *)memchr(p, '\n', ip->text_end - ip->text_start))) {
         ip->text_start = (nl + 1) - ip->text;
 
         *nl = 0;
@@ -677,8 +692,7 @@ void get_user_data(interactive_t *ip) {
 
         p = nl + 1;
       }
-    }
-      break;
+    } break;
 
 #ifndef NO_BUFFER_TYPE
     case PORT_BINARY: {
@@ -689,8 +703,7 @@ void get_user_data(interactive_t *ip) {
 
       push_refed_buffer(buffer);
       safe_apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
-    }
-      break;
+    } break;
 #endif
   }
 }
@@ -787,9 +800,9 @@ static char *first_cmd_in_buf(interactive_t *ip) {
   }
 
   /* check for "\r\n" or "\n\r" */
-  if (ip->text_start + 1 < ip->text_end
-      && ((ip->text[ip->text_start] == '\r' && ip->text[ip->text_start + 1] == '\n')
-          || (ip->text[ip->text_start] == '\n' && ip->text[ip->text_start + 1] == '\r'))) {
+  if (ip->text_start + 1 < ip->text_end &&
+      ((ip->text[ip->text_start] == '\r' && ip->text[ip->text_start + 1] == '\n') ||
+       (ip->text[ip->text_start] == '\n' && ip->text[ip->text_start + 1] == '\r'))) {
     ip->text[ip->text_start++] = 0;
   }
 
@@ -830,7 +843,7 @@ static char *get_user_command(interactive_t *ip) {
 #ifndef GET_CHAR_IS_BUFFERED
   if (ip->iflags & NOECHO) {
 #else
-    if ((ip->iflags & NOECHO) && !(ip->iflags & SINGLE_CHAR)) {
+  if ((ip->iflags & NOECHO) && !(ip->iflags & SINGLE_CHAR)) {
 #endif
     /* must not enable echo before the user input is received */
     set_echo(command_giver->interactive, false);
@@ -922,7 +935,7 @@ int process_user_command(interactive_t *ip) {
     clear_notify(ip->ob);
   }
 
-// FIXME: move this to somewhere else
+  // FIXME: move this to somewhere else
   update_load_av();
 
   debug(connections, "process_user_command: command_giver = /%s\n", command_giver->obname);
@@ -933,8 +946,8 @@ int process_user_command(interactive_t *ip) {
 
   user_command = translate_easy(ip->trans->incoming, user_command);
 
-  if ((ip->iflags & USING_MXP) && user_command[0] == ' ' && user_command[1] == '['
-      && user_command[3] == 'z') {
+  if ((ip->iflags & USING_MXP) && user_command[0] == ' ' && user_command[1] == '[' &&
+      user_command[3] == 'z') {
     svalue_t *ret;
     copy_and_push_string(user_command);
 
@@ -985,7 +998,7 @@ int process_user_command(interactive_t *ip) {
 
   process_input(ip, user_command);
 
-  exit:
+exit:
   /*
    * Print a prompt if user is still here.
    */
@@ -1025,7 +1038,7 @@ void remove_interactive(object_t *ob, int dested) {
     return;
   }
   debug(connections, "Closing connection from %s.\n",
-        sockaddr_to_string((struct sockaddr * )&ip->addr, ip->addrlen));
+        sockaddr_to_string((struct sockaddr *)&ip->addr, ip->addrlen));
   flush_message(ip);
   ip->iflags |= CLOSING;
 
@@ -1056,7 +1069,7 @@ void remove_interactive(object_t *ob, int dested) {
   }
 #endif
 
-// Cleanup events
+  // Cleanup events
   if (ip->ev_buffer != NULL) {
     bufferevent_free(ip->ev_buffer);
     ip->ev_buffer = NULL;
@@ -1066,7 +1079,7 @@ void remove_interactive(object_t *ob, int dested) {
     ip->ev_command = NULL;
   }
 
-// Free telnet handle
+  // Free telnet handle
   if (ip->telnet != NULL) {
     telnet_free(ip->telnet);
     ip->telnet = NULL;
@@ -1211,7 +1224,7 @@ static int call_function_interactive(interactive_t *i, char *str) {
     if (function[0] == APPLY___INIT_SPECIAL_CHAR) {
       error("Illegal function name.\n");
     }
-    (void) apply(function, ob, num_arg + 1, ORIGIN_INTERNAL);
+    (void)apply(function, ob, num_arg + 1, ORIGIN_INTERNAL);
   } else {
     call_function_pointer(funp, num_arg + 1);
   }
@@ -1291,8 +1304,8 @@ static void print_prompt(interactive_t *ip) {
   if (!IP_VALID(ip, ob)) {
     return;
   }
-// Stavros: A lot of clients use this TELNET_GA to differentiate
-// prompts from other text
+  // Stavros: A lot of clients use this TELNET_GA to differentiate
+  // prompts from other text
   if ((ip->iflags & USING_TELNET) && !(ip->iflags & SUPPRESS_GA)) {
     telnet_iac(ip->telnet, TELNET_GA);
   }
@@ -1331,7 +1344,7 @@ int new_set_snoop(object_t *by, object_t *victim) {
      * Stop snoop.
      */
     if (by->flags & O_SNOOP) {
-      users_foreach([by](interactive_t * user) {
+      users_foreach([by](interactive_t *user) {
         if (user->snooped_by == by) {
           user->snooped_by = 0;
         }
@@ -1359,7 +1372,7 @@ int new_set_snoop(object_t *by, object_t *victim) {
    */
   new_set_snoop(by, NULL);
 
-// setup new snoop
+  // setup new snoop
   if (ip->snooped_by) {
     ip->snooped_by->flags &= ~O_SNOOP;
   }
@@ -1395,8 +1408,8 @@ object_t *query_snooping(object_t *ob) {
       return user->ob;
     }
   }
-// TODO: change this to dfatal
-// fatal("couldn't find snoop target.\n");
+  // TODO: change this to dfatal
+  // fatal("couldn't find snoop target.\n");
   return 0;
 } /* query_snooping() */
 #endif
@@ -1484,15 +1497,15 @@ void f_websocket_handshake_done() {
   telnet_negotiate(user->telnet, TELNET_DO, TELNET_TELOPT_TTYPE);
   /* Ask them for their window size */
   telnet_negotiate(user->telnet, TELNET_DO, TELNET_TELOPT_NAMS);
-// Ask them if they support mxp.
+  // Ask them if they support mxp.
   telnet_negotiate(user->telnet, TELNET_DO, TELNET_TELOPT_MXP);
-// And we support mssp
+  // And we support mssp
   telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_MSSP);
-// May as well ask for zmp while we're there!
+  // May as well ask for zmp while we're there!
   telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_ZMP);
-// Also newenv
+  // Also newenv
   telnet_negotiate(user->telnet, TELNET_DO, TELNET_TELOPT_NEW_ENVIRON);
-// gmcp *yawn*
+  // gmcp *yawn*
   telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_GMCP);
 }
 #endif

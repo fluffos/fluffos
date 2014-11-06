@@ -1,12 +1,12 @@
 #include <globals.h>
 
-int main(string fun);
+int execute(string fun);
 
 void recurse(string dir) {
   mixed leaks;
 
   foreach (string file in sort_array(get_dir(dir + "*.c"), (: random(2) - random(2) :))) {
-    main(dir + file);
+    execute(dir + file);
   }
   foreach (string subdir in map(filter(get_dir(dir + "*", -1),
           (: $1[1] == -2 :)),
@@ -47,7 +47,7 @@ void recurse(string dir) {
     }
   }
 }
-int main(string fun)
+int execute(string fun)
 {
   string leaks;
   object tp = this_player();
@@ -76,4 +76,11 @@ int main(string fun)
   }
 #endif
   return 1;
+}
+
+int main() {
+#if !(defined(__DEBUGMALLOC__) && defined(__DEBUGMALLOC_EXTENSIONS__) && defined(__PACKAGE_DEVELOP__))
+  write("WARNING: Possible RELEASE build, check_memory() is not being executed.\n");
+#endif
+  return execute("");
 }

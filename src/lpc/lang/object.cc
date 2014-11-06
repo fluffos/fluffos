@@ -1,4 +1,5 @@
 #include "std.h"
+
 #include "lpc_incl.h"
 #include "file_incl.h"
 #include "otable.h"
@@ -11,6 +12,9 @@
 #include "hash.h"
 #include "master.h"
 #include "add_action.h"
+
+// FIXME: required by reload_object()
+#include "heartbeat.h"  // for set_heart_beat.
 
 #ifdef HAVE_ZLIB
 #include <zlib.h>
@@ -36,7 +40,7 @@ int valid_hide(object_t *obj) {
     return 0;
   }
   push_object(obj);
-  ret = apply_master_ob(APPLY_VALID_HIDE, 1);
+  ret = safe_apply_master_ob(APPLY_VALID_HIDE, 1);
   return (!IS_ZERO(ret));
 }
 #endif
@@ -2049,9 +2053,9 @@ object_t *get_empty_object(int num_var) {
 void reset_object(object_t *ob) {
 /* Be sure to update time first ! */
 #ifdef RANDOMIZED_RESETS
-  ob->next_reset = current_virtual_time + TIME_TO_RESET / 2 + random_number(TIME_TO_RESET / 2);
+  ob->next_reset = g_current_virtual_time + TIME_TO_RESET / 2 + random_number(TIME_TO_RESET / 2);
 #else
-  ob->next_reset = current_virtual_time + TIME_TO_RESET;
+  ob->next_reset = g_current_virtual_time + TIME_TO_RESET;
 #endif
 
   save_command_giver(0);
@@ -2065,7 +2069,7 @@ void reset_object(object_t *ob) {
 
 void call_create(object_t *ob, int num_arg) {
   /* Be sure to update time first ! */
-  ob->next_reset = current_virtual_time + TIME_TO_RESET / 2 + random_number(TIME_TO_RESET / 2);
+  ob->next_reset = g_current_virtual_time + TIME_TO_RESET / 2 + random_number(TIME_TO_RESET / 2);
 
   call___INIT(ob);
 
