@@ -1952,11 +1952,6 @@ void shutdownMudOS(int exit_code) {
 
   shout_string("FluffOS driver shouts: shutting down immediately.\n");
 
-  /* clean up heap allocations so valgrind don't consider them lost.*/
-  clear_call_outs();
-  clear_tick_events();
-  clear_heartbeats();
-
 #ifdef PACKAGE_MUDLIB_STATS
   save_stat_files();
 #endif
@@ -1979,6 +1974,11 @@ void shutdownMudOS(int exit_code) {
   }
 #endif
   flush_message_all();
+
+  /* clean up heap allocations so valgrind don't consider them lost.*/
+  clear_call_outs();
+  clear_tick_events();
+  clear_heartbeats();
 #ifdef PROFILING
   monitor(0, 0, 0, 0, 0); /* cause gmon.out to be written */
 #endif

@@ -418,7 +418,24 @@ int flush_message(interactive_t *ip) {
     debug(connections, ("flush_message: invalid target!\n"));
     return 0;
   }
-  return bufferevent_flush(ip->ev_buffer, EV_WRITE, BEV_FLUSH) != -1;
+  // For socket bufferevent, bufferevent_flush is actually a no-op, thus we have to
+  // implement our own.
+
+  // return bufferevent_flush(ip->ev_buffer, EV_WRITE, BEV_FLUSH) != -1;
+  auto fd = bufferevent_getfd(ip->ev_buffer);
+  if (fd == -1) {
+    return 0;
+  }
+
+  auto output = bufferevent_get_output(ip->ev_buffer);
+  auto total = evbuffer_get_length(output);
+  if (total > 0) {
+    evbuffer_unfreeze(output, 1);
+    auto wrote = evbuffer_write(output, fd);
+    evbuffer_freeze(output, 1);
+    return wrote != -1;
+  }
+  return 0;
 }
 
 void flush_message_all() {
