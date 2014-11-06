@@ -100,5 +100,12 @@ if [ -n "$GCOV" ]; then
   sudo pip install cpp-coveralls
   coveralls --exclude packages --exclude thirdparty --exclude testsuite --exclude-pattern '.*.tab.+$' --gcov /usr/bin/gcov-4.8 --gcov-options '\-lp' -r $PWD -b $PWD
 else
-  valgrind --malloc-fill=0x75 --free-fill=0x73 --track-origins=yes --leak-check=full ../driver etc/config.test -ftest -d
+  # FIXME: currently RELEASE build would report leak on valgrind, thus ignoring it for now.
+  if [ "$TYPE" = "develop" ]; then
+    VALGRIND="valgrind --error-exitcode=255"
+  else
+    VALGRIND="valgrind"
+  fi
+
+    $VALGRIND --malloc-fill=0x75 --free-fill=0x73 --track-origins=yes --leak-check=full ../driver etc/config.test -ftest -d
 fi
