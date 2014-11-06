@@ -1,8 +1,7 @@
 #!/bin/bash
 
 setup () {
-sudo apt-get install -qq bison
-sudo apt-get install -qq autoconf
+sudo apt-get install -qq bison autoconf expect telnet
 
 # clang needs the updated libstdc++
 sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
@@ -74,7 +73,6 @@ if [ -n "$COVERITY" ]; then
     exit 0
   fi
 
-
   wget https://scan.coverity.com/download/linux-64 --post-data "token=DW98q3VnP4QKLy4wwLwReQ&project=fluffos%2Ffluffos" -O coverity_tool.tgz
   tar zxvf coverity_tool.tgz
   $PWD/cov-analysis-linux64-7.5.0/bin/cov-build --dir cov-int make -j 2
@@ -107,5 +105,12 @@ else
     VALGRIND="valgrind"
   fi
 
+  if [ "$TELNET" = "yes" ]; then
+    ( sleep 4 ; expect telnet_test.expect ) &
+    ( $VALGRIND --malloc-fill=0x75 --free-fill=0x73 --track-origins=yes --leak-check=full ../driver etc/config.test -d ) &
+    wait $!
+    exit $?
+  else
     $VALGRIND --malloc-fill=0x75 --free-fill=0x73 --track-origins=yes --leak-check=full ../driver etc/config.test -ftest -d
+  fi
 fi
