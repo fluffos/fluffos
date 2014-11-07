@@ -215,11 +215,11 @@ void new_user_handler(int fd, struct sockaddr *addr, size_t addrlen, port_def_t 
    destructed in the above (don't ask) */
   set_command_giver(0);
   if (ret == 0 || ret == (svalue_t *)-1 || ret->type != T_OBJECT || !master_ob->interactive) {
+    debug_message("Can not accept connection from %s due to error in connect().\n",
+                  sockaddr_to_string((sockaddr *)&user->addr, user->addrlen));
     if (master_ob->interactive) {
       remove_interactive(master_ob, 0);
     }
-    debug_message("Can not accept connection from %s due to error in connect().\n",
-                  sockaddr_to_string((sockaddr *)&user->addr, user->addrlen));
     return;
   }
   /*
