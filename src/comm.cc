@@ -1403,7 +1403,7 @@ object_t *query_snooping(object_t *ob) {
   if (!(ob->flags & O_SNOOP)) {
     return 0;
   }
-  for (auto &user : users(true)) {
+  for (auto &user : users()) {
     if (user->snooped_by == ob) {
       return user->ob;
     }

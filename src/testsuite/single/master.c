@@ -30,7 +30,6 @@ object connect()
   mixed err;
 
   err = catch(login_ob = new(LOGIN_OB));
-  write(sprintf("%o", users()) + "\n");
 
   if (err) {
     write("It looks like someone is working on the player object.\n");

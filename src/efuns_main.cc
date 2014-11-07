@@ -37,6 +37,8 @@
 #include "lpc/apply.h"
 #include "outbuf.h"
 
+#include <algorithm>
+
 int call_origin = 0;
 
 int data_size(object_t *ob);
@@ -3519,15 +3521,25 @@ void f_users(void) {
   include_hidden = (current_object->flags & O_HIDDEN) || (valid_hide(current_object));
 #endif
 
-  auto users_ = users(include_hidden);
-  array_t *ret = allocate_empty_array(users_.size());
+  auto total = users_num(include_hidden);
+  array_t *ret = allocate_empty_array(total);
 
-  for (int i = 0; i < users_.size(); i++) {
-    auto ob = users_[i]->ob;
+  int i = 0;
+  for(auto user : users()) {
+    if (!include_hidden) {
+      if ((user->ob->flags & O_HIDDEN) != 0) {
+        continue;
+      }
+    }
+
+    DEBUG_CHECK(i >= total, "Driver BUG: f_users()");
+
     ret->item[i].type = T_OBJECT;
-    ret->item[i].u.ob = ob;
-    add_ref(ob, "f_users");
+    ret->item[i].u.ob = user->ob;
+    add_ref(user->ob, "f_users");
+    i++;
   }
+
   push_refed_array(ret);
 }
 #endif
@@ -3769,9 +3781,7 @@ void f_flush_messages(void) {
     }
     pop_stack();
   } else {
-    for (auto user : users(true)) {
-      flush_message(user);
-    }
+    flush_message_all();
   }
 }
 #endif
