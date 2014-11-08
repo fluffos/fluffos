@@ -37,7 +37,7 @@ else
 fi
 }
 
-if [ "$(git branch | grep coverity_scan)" =~ ^.+coverity_scan$ ]; then
+if [[ "$(git branch | grep coverity_scan)" =~ ^.+coverity_scan$ ]]; then
   if [ -z "$COVERITY" ]; then
     echo "Only doing coverity scan in this branch, skipping this build"
     exit 0
@@ -68,7 +68,7 @@ fi
 
 # For coverity, we don't need to actually run tests, just build
 if [ -n "$COVERITY" ]; then
-  if [ "$(git branch | grep coverity_scan)" =~ ^.+coverity_scan$ ]; then
+  if [[ "$(git branch | grep coverity_scan)" =~ ^.+coverity_scan$ ]]; then
     wget https://scan.coverity.com/download/linux-64 --post-data "token=DW98q3VnP4QKLy4wwLwReQ&project=fluffos%2Ffluffos" -O coverity_tool.tgz
     tar zxvf coverity_tool.tgz
     $PWD/cov-analysis-linux64-7.5.0/bin/cov-build --dir cov-int make -j 2
