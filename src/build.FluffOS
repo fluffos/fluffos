@@ -1,19 +1,4 @@
-#!/bin/sh
-
-if test $# -ne 0; then
-  case $1 in
-    develop)
-      echo Preparing to build developmental version of MudOS driver ...
-      OPTIMIZE="-O0"
-      DEBUG="-g -Wall -Weffc++ -pedantic -D_FORTIFY_SOURCE=2 -DDEBUG -DDEBUG_MACRO"
-      shift
-      ;;
-    *)
-      ;;
-  esac
-else
-  echo Preparing to build standard driver ...
-fi
+#!/bin/bash
 
 # By default driver compile to native environment, you can
 # add "-m64" to force compile under 64bit, "-m32" for 32bit.
@@ -22,8 +7,8 @@ fi
 # should change -march=native to -mtune=generic
 COMPILER_FLAGS=${COMPILER_FLAGS:-"-march=native"}
 
-OPTIMIZE=${OPTIMIZE:-"-O3"}
-DEBUG=${DEBUG:-"-g"}
+OPTIMIZE="-O3"
+DEBUG="-g"
 
 # Change this if you want to use another make.
 MAKE=make
@@ -36,13 +21,48 @@ DRIVER_BIN=driver
 INSTALL_DIR=`dirname $(pwd)`/bin
 
 #Enable warnings from the compiler (g++), if wanted.
-#WARN=-Wall
+WARN=(
+"-Wall"
+"-Wformat-security"
+# Turn off some warnings from GCC.
+"-Wno-char-subscripts"
+"-Wno-sign-compare"
+"-Wno-return-type"
+# GCC's warning produces too many false positives:
+# https://groups.google.com/a/google.com/forum/#!topic/c-users/jLRfP804wuc
+# https://groups.google.com/a/google.com/d/msg/c-users/jLRfP804wuc/sKe4Ba2PKwAJ
+"-Wno-overloaded-virtual"
+# GCC's warning produces false positives:
+# https://groups.google.com/a/google.com/d/msg/llvm-team/Mq_7JNPqE2o/lh2XpArujl8J
+"-Wno-non-virtual-dtor"
+# features
+"-fdiagnostics-show-option"
+"-fmessage-length=0"
+"-funsigned-char"
+)
+WARN="$(IFS=' '; echo "${WARN[*]}")"
+
+
+if test $# -ne 0; then
+  case $1 in
+    develop)
+      echo Preparing to build developmental version of MudOS driver ...
+      OPTIMIZE="-O0"
+      DEBUG="$DEBUG -g -D_FORTIFY_SOURCE=2 -DDEBUG -DDEBUG_MACRO"
+      shift
+      ;;
+    *)
+      ;;
+  esac
+else
+  echo Preparing to build standard driver ...
+fi
 
 ####### END OF USER CONFIGURABLE OPTIONS
 
-CXXFLAGS="$CXXFLAGS $COMPILER_FLAGS $WARN $OPTIMIZE $DEBUG"
+CFLAGS="$CFLAGS $COMPILER_FLAGS $WARN $OPTIMIZE $DEBUG"
 SOURCE_REVISION="$(git describe --dirty --always)"
 
 # Force an reconfigure.
 rm configure.h
-CPPFLAGS=$CXXFLAGS CXXFLAGS=$CXXFLAGS MAKE=$MAKE ARCH=$ARCH DRIVER_BIN=$DRIVER_BIN OPTIMIZE=$OPTIMIZE SOURCE_REVISION=$SOURCE_REVISION ./configure --bindir=$INSTALL_DIR $@ && $MAKE help
+CFLAGS=$CFLAGS MAKE=$MAKE ARCH=$ARCH DRIVER_BIN=$DRIVER_BIN OPTIMIZE=$OPTIMIZE SOURCE_REVISION=$SOURCE_REVISION ./configure --bindir=$INSTALL_DIR $@ && $MAKE help

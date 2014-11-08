@@ -807,7 +807,7 @@ void check_all_blocks(int flag) {
 #endif
 
     /* now do a mark and sweep check to see what should be alloc'd */
-    for (auto &user : users(true)) {
+    for (auto &user : users()) {
       DO_MARK(user, TAG_INTERACTIVE);
       user->ob->extra_ref++;
       // FIXME(sunyc): I can't explain this, appearently somewhere

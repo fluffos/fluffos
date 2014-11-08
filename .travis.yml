@@ -17,15 +17,9 @@ env:
   - BUILD="i386"   COMPILER="clang" COMPILER_FLAGS="-m32 -mtune=generic" TYPE="develop" CONFIG="testdev32"
   - BUILD="i386"   COMPILER="clang" COMPILER_FLAGS="-m32 -mtune=generic" TYPE=""        CONFIG="testrelease32"
 # gcc builds
-  - BUILD="x86_64" COMPILER="gcc" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev"
+  - BUILD="x86_64" COMPILER="gcc" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev" GCOV="yes"
   - BUILD="x86_64" COMPILER="gcc" COMPILER_FLAGS="-m64 -mtune=generic" TYPE=""        CONFIG="testrelease"
   - BUILD="i386"   COMPILER="gcc" COMPILER_FLAGS="-m32 -mtune=generic" TYPE="develop" CONFIG="testdev32"
   - BUILD="i386"   COMPILER="gcc" COMPILER_FLAGS="-m32 -mtune=generic" TYPE=""        CONFIG="testrelease32"
-# gcov builds
-  - BUILD="x86_64" COMPILER="gcc" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev" GCOV="yes"
-  - BUILD="i386"   COMPILER="gcc" COMPILER_FLAGS="-m32 -mtune=generic" TYPE="develop" CONFIG="testdev32" GCOV="yes"
-# telnet client tests
-  - BUILD="x86_64" COMPILER="gcc" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev" TELNET="yes"
-  - BUILD="i386"   COMPILER="gcc" COMPILER_FLAGS="-m32 -mtune=generic" TYPE="develop" CONFIG="testdev32" TELNET="yes"
 # coverity
   - BUILD="x86_64" COMPILER="gcc" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev" COVERITY="yes"

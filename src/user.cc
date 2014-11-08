@@ -30,15 +30,8 @@ void user_del(interactive_t *user) {
 }
 
 // Get a copy of all users
-const std::vector<interactive_t *> users(bool include_hidden) {
-  if (include_hidden) {
-    return all_users;
-  } else {
-    std::vector<interactive_t *> result;
-    std::copy_if(all_users.begin(), all_users.end(), result.begin(),
-                 [](interactive_t *user) { return (user->ob->flags & O_HIDDEN) == 0; });
-    return result;
-  }
+const std::vector<interactive_t *> users() {
+  return all_users;
 }
 
 // Count users

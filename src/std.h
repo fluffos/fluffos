@@ -4,6 +4,7 @@
 // IWYU pragma: begin_exports
 
 /* This stuff should be included EVERYWHERE */
+#define _REENTRANT
 #define __STDC_LIMIT_MACROS
 #define __STDC_FORMAT_MACROS
 /* the definition of ARCH */
