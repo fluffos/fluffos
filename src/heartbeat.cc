@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <deque>
+#include <set>
 
 struct heart_beat_t {
   object_t *ob;
@@ -153,7 +154,13 @@ int query_heart_beat(object_t *ob) {
   return 0;
 } /* query_heart_beat() */
 
-// Add or remove an object from the heart beat list.
+// Modifying heartbeat for a object.
+//
+// NOTE: This may get called during heartbeat. Care must be taken to
+// make sure it works.
+//
+// Removing heartbeat just need to remove the flag from objects.
+// New heartbeats must be added to heartbeats_next.
 int set_heart_beat(object_t *ob, int to) {
   if (ob->flags & O_DESTRUCTED) {
     return 0;
@@ -165,43 +172,57 @@ int set_heart_beat(object_t *ob, int to) {
     to = 1;
   }
 
-  // Removing heartbeat just need to remove the flag, will be deleted during next heartbeat
-  // execution.
-  if (!to) {
+  // Here are 3 possible cases:
+  // 1) Object currently doesn't have heartbeat.
+  // 2) Object currently have heartbeat and is in the queue.
+  // 3) Object is modifying itself during its heartbeat execution.
+
+  // Removal: 1,2,3 is same, just unset the flag on objects.
+  if (to == 0) {
     ob->flags &= ~O_HEART_BEAT;
     return 1;
-  }
-
-  if (!(ob->flags & O_HEART_BEAT)) {
-    // NOTE: New heartbeat should be added to heartbeats_next.
+  } else {
     ob->flags |= O_HEART_BEAT;
-
-    auto *hb = new heart_beat_t();
-    hb->ob = ob;
-    hb->time_to_heart_beat = to;
-    hb->heart_beat_ticks = to;
-    heartbeats_next.push_back(hb);
-    return 1;
   }
+  // Now we have to determine if we are adding or modifying existing
+  // heartbeat, by searching through 3 possible places.
+  heart_beat_t *target_hb = nullptr;
 
   if (g_current_heartbeat_obj == ob) {
-    g_current_heartbeat->time_to_heart_beat = to;
+    target_hb = g_current_heartbeat;
+  }
+  if (target_hb == nullptr) {
+    for (auto hb: heartbeats_next) {
+      if (hb->ob == ob) {
+        target_hb = hb;
+        break;
+      }
+    }
+  }
+  if (target_hb == nullptr) {
+    for (auto hb: heartbeats) {
+      if (hb->ob == ob) {
+        target_hb = hb;
+      }
+    }
+  }
+  // Didn't find target_hb, we need to create a new one.
+  if (target_hb == nullptr) {
+    target_hb = new heart_beat_t();
+    heartbeats_next.push_back(target_hb);
+
+    target_hb->ob = ob;
+    target_hb->time_to_heart_beat = to;
+    target_hb->heart_beat_ticks = to;
+    return 1;
+  } else {
+    // target_hb is found, we are just modifying.
+    DEBUG_CHECK(target_hb->ob != ob, "Driver BUG: set_heart_beat");
+    target_hb->time_to_heart_beat = to;
+    target_hb->heart_beat_ticks = to;
     return 1;
   }
-  for (auto hb: heartbeats) {
-    if (hb->ob == ob) {
-      hb->time_to_heart_beat = to;
-      return 1;
-    }
-  }
-  for (auto hb: heartbeats_next) {
-    if (hb->ob == ob) {
-      hb->time_to_heart_beat = to;
-      return 1;
-    }
-  }
-
-  return 1;
+  return 0;
 }
 
 int heart_beat_status(outbuffer_t *buf, int verbose) {
@@ -246,6 +267,19 @@ array_t *get_heart_beats() {
   return arr;
 }
 #endif
+
+void check_heartbeats() {
+  std::set<object_t *> objset;
+  for (auto hb : heartbeats) {
+    objset.insert(hb->ob);
+  }
+  for (auto hb : heartbeats_next) {
+    objset.insert(hb->ob);
+  }
+  DEBUG_CHECK(
+    (objset.size() != heartbeats.size() + heartbeats_next.size()),
+    "Driver BUG: Duplicated heartbeats found");
+}
 
 void clear_heartbeats() {
   // TODO: instead of clearing everything blindly, should go through all objects with heartbeat flag

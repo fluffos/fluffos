@@ -19,6 +19,8 @@ int query_heart_beat(object_t *);
 int heart_beat_status(outbuffer_t *, int);
 array_t *get_heart_beats();
 
+// Used by md.cc for verifying.
+void check_heartbeats();
 // Shutdown hook
 void clear_heartbeats();
 

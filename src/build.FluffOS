@@ -48,7 +48,7 @@ if test $# -ne 0; then
     develop)
       echo Preparing to build developmental version of MudOS driver ...
       OPTIMIZE="-O0"
-      DEBUG="$DEBUG -g -D_FORTIFY_SOURCE=2 -DDEBUG -DDEBUG_MACRO"
+      DEBUG="$DEBUG -D_FORTIFY_SOURCE=2 -DDEBUG -DDEBUG_MACRO"
       shift
       ;;
     *)
