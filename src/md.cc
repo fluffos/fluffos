@@ -20,7 +20,7 @@
 #include "packages/parser.h"
 #endif
 
-#include "heartbeat.h" // for check_heartbeats()
+#include "heartbeat.h"  // for check_heartbeats()
 
 /*
    note: do not use MALLOC() etc. in this module.  Unbridled recursion
@@ -814,14 +814,12 @@ void check_all_blocks(int flag) {
     // Verify every objects that has O_HEART_BEAT flag has a corespodning HB
     for (ob = obj_list; ob; ob = ob->next_all) {
       if ((ob->flags & O_HEART_BEAT) != 0) {
-        DEBUG_CHECK(query_heart_beat(ob) == 0,
-                    "Driver BUG: object with heartbeat not in hb table");
+        DEBUG_CHECK(query_heart_beat(ob) == 0, "Driver BUG: object with heartbeat not in hb table");
       }
     }
     for (ob = obj_list_destruct; ob; ob = ob->next_all) {
       if ((ob->flags & O_HEART_BEAT) != 0) {
-        DEBUG_CHECK(query_heart_beat(ob) == 0,
-                    "Driver BUG: object with heartbeat not in hb table");
+        DEBUG_CHECK(query_heart_beat(ob) == 0, "Driver BUG: object with heartbeat not in hb table");
       }
     }
 

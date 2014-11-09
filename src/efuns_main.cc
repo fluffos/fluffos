@@ -3525,7 +3525,7 @@ void f_users(void) {
   array_t *ret = allocate_empty_array(total);
 
   int i = 0;
-  for(auto user : users()) {
+  for (auto user : users()) {
     if (!include_hidden) {
       if ((user->ob->flags & O_HIDDEN) != 0) {
         continue;

@@ -30,9 +30,7 @@ void user_del(interactive_t *user) {
 }
 
 // Get a copy of all users
-const std::vector<interactive_t *> users() {
-  return all_users;
-}
+const std::vector<interactive_t *> users() { return all_users; }
 
 // Count users
 int users_num(bool include_hidden) {

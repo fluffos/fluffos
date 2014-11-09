@@ -223,7 +223,7 @@ void set_defaults(char *filename) {
   CONFIG_STR(__DEFAULT_FAIL_MESSAGE__) = alloc_cstring(tmp, "config file: dfm");
 
   scan_config_line("mud ip : %[^\n]", tmp, 0);
-  // CYGWIN lack support of AI_V4MAPPED, V4 address doesn't work!
+// CYGWIN lack support of AI_V4MAPPED, V4 address doesn't work!
 #ifdef CYGWIN
 #ifdef IPV6
   // common fix for mud ip.

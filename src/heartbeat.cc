@@ -50,7 +50,7 @@ void call_heart_beat() {
   num_hb_calls++;
 
   if (!heartbeats_next.empty()) {
-    for (auto hb: heartbeats_next) {
+    for (auto hb : heartbeats_next) {
       heartbeats.push_back(hb);
     }
     heartbeats_next.clear();
@@ -192,7 +192,7 @@ int set_heart_beat(object_t *ob, int to) {
     target_hb = g_current_heartbeat;
   }
   if (target_hb == nullptr) {
-    for (auto hb: heartbeats_next) {
+    for (auto hb : heartbeats_next) {
       if (hb->ob == ob) {
         target_hb = hb;
         break;
@@ -200,7 +200,7 @@ int set_heart_beat(object_t *ob, int to) {
     }
   }
   if (target_hb == nullptr) {
-    for (auto hb: heartbeats) {
+    for (auto hb : heartbeats) {
       if (hb->ob == ob) {
         target_hb = hb;
       }
@@ -276,9 +276,8 @@ void check_heartbeats() {
   for (auto hb : heartbeats_next) {
     objset.insert(hb->ob);
   }
-  DEBUG_CHECK(
-    (objset.size() != heartbeats.size() + heartbeats_next.size()),
-    "Driver BUG: Duplicated heartbeats found");
+  DEBUG_CHECK((objset.size() != heartbeats.size() + heartbeats_next.size()),
+              "Driver BUG: Duplicated heartbeats found");
 }
 
 void clear_heartbeats() {
