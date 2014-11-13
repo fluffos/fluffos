@@ -114,7 +114,7 @@ thirdparty/libtelnet/libtelnet.o: thirdparty/libtelnet/libtelnet.c
 
 # FIXME: simulate.c currently calls package_async, which depends on package/DB, this need to be fixed.
 simulate.$(O): simulate.cc
-	$(CXX) -c $(CXXFLAGS) -iquote. @MYSQL_CFLAGS@ @POSTGRESQL_CFLAGS@ @SQLITE3_CFLAGS@  -x c++ -o $@ $<
+	$(CXX) -c $(CXXFLAGS) -iquote. @MYSQL_CFLAGS@ @POSTGRESQL_CPPFLAGS@ @SQLITE3_CFLAGS@  -x c++ -o $@ $<
 
 lpc/compiler/grammar.tab.o: lpc/compiler/grammar.tab.cc opcodes.h
 
@@ -222,7 +222,7 @@ help:
 	@echo
 	@if [ -n "@LIBEVENT_LIBS@" ]; then echo "LIBEVENT: '@LIBEVENT_LIBS@', '@LIBEVENT_CPPFLAGS@', '@LIBEVENT_LDFLAGS@'"; fi
 	@if [ -n "@MYSQL_VERSION@" ]; then echo "MYSQL: '@MYSQL_VERSION@', '@MYSQL_CFLAGS@', '@MYSQL_LDFLAGS@'"; fi
-	@if [ -n "@POSTGRESQL_VERSION@" ];then echo "POSTGRESQL: '@POSTGRESQL_VERSION@', '@POSTGRESQL_CFLAGS@', '@POSTGRESQL_LDFLAGS@'"; fi
+	@if [ -n "@POSTGRESQL_VERSION@" ];then echo "POSTGRESQL: '@POSTGRESQL_VERSION@', '@POSTGRESQL_CPPFLAGS@', '@POSTGRESQL_LDFLAGS@'"; fi
 	@if [ -n "@SQLITE3_VERSION@" ]; then echo "SQLite3: '@SQLITE3_VERSION@', '@SQLITE3_CFLAGS@', '@SQLITE3_LDFLAGS@'"; fi
 	@if [ -n "@OPENSSL_LIBS@" ]; then echo "OPENSSL: '@OPENSSL_LIBS@', '@OPENSSL_INCLUDES@', '@OPENSSL_LDFLAGS@'"; fi
 	@if [ -n "@PCRE_LIBS@" ]; then echo "PCRE: '@PCRE_LIBS@', '@PCRE_CFLAGS@'"; fi

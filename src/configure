@@ -634,7 +634,7 @@ SQLITE3_VERSION
 SQLITE3_LDFLAGS
 SQLITE3_CFLAGS
 POSTGRESQL_LDFLAGS
-POSTGRESQL_CFLAGS
+POSTGRESQL_CPPFLAGS
 POSTGRESQL_VERSION
 PG_CONFIG
 MYSQL_LDFLAGS
@@ -3845,62 +3845,7 @@ fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts " >&5
-$as_echo_n "checking whether C++ compiler accepts ... " >&6; }
-if ${ax_cv_check_cxxflags__+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
 
-  ax_check_save_flags=$CXXFLAGS
-  CXXFLAGS="$CXXFLAGS  "
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-int
-main ()
-{
-
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_cxx_try_compile "$LINENO"; then :
-  ax_cv_check_cxxflags__=yes
-else
-  ax_cv_check_cxxflags__=no
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CXXFLAGS=$ax_check_save_flags
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags__" >&5
-$as_echo "$ax_cv_check_cxxflags__" >&6; }
-if test x"$ax_cv_check_cxxflags__" = xyes; then :
-  :
-else
-  :
-fi
-
-if ${CXXFLAGS+:} false; then :
-  case " $CXXFLAGS " in
-    *"  "*)
-      { { $as_echo "$as_me:${as_lineno-$LINENO}: : CXXFLAGS already contains "; } >&5
-  (: CXXFLAGS already contains ) 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }
-      ;;
-    *)
-      { { $as_echo "$as_me:${as_lineno-$LINENO}: : CXXFLAGS=\"\$CXXFLAGS \""; } >&5
-  (: CXXFLAGS="$CXXFLAGS ") 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }
-      CXXFLAGS="$CXXFLAGS "
-      ;;
-   esac
-else
-  CXXFLAGS=""
-fi
 
 
 
@@ -3967,6 +3912,8 @@ done
 
 
 
+
+
 for flag in -fno-omit-frame-pointer; do
   as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__$flag" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts $flag" >&5
@@ -4029,41 +3976,7 @@ fi
 done
 
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the linker accepts " >&5
-$as_echo_n "checking whether the linker accepts ... " >&6; }
-if ${ax_cv_check_ldflags__+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
 
-  ax_check_save_flags=$LDFLAGS
-  LDFLAGS="$LDFLAGS  "
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-int
-main ()
-{
-
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_cxx_try_link "$LINENO"; then :
-  ax_cv_check_ldflags__=yes
-else
-  ax_cv_check_ldflags__=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-  LDFLAGS=$ax_check_save_flags
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_ldflags__" >&5
-$as_echo "$ax_cv_check_ldflags__" >&6; }
-if test x"$ax_cv_check_ldflags__" = xyes; then :
-  :
-else
-  :
-fi
 
 
 
@@ -4163,6 +4076,8 @@ if test x"$ax_cv_check_ldflags___flto" = xyes; then :
 
 
 
+
+
 for flag in -flto; do
   as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__$flag" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts $flag" >&5
@@ -4235,6 +4150,8 @@ case $host_os in
   # rdynamic doesn't work on cygwin
   ;;
 *)
+
+
 
 
 for flag in -rdynamic; do
@@ -4323,6 +4240,8 @@ fi
     # Force the user to turn off optimization
     { $as_echo "$as_me:${as_lineno-$LINENO}: gcov enabled, adding \"-g -O0\" to CFLAGS" >&5
 $as_echo "$as_me: gcov enabled, adding \"-g -O0\" to CFLAGS" >&6;}
+
+
 
 
 for flag in "-g -O0"; do
@@ -7300,10 +7219,11 @@ ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
                               if test "$cross_compiling" = yes; then :
-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "cannot run test program while cross compiling
-See \`config.log' for more details" "$LINENO" 5; }
+
+          { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Cross compiling, no version check possible!" >&5
+$as_echo "$as_me: WARNING: Cross compiling, no version check possible!" >&2;}
+          success=yes
+
 else
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
@@ -7431,10 +7351,11 @@ ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
                               if test "$cross_compiling" = yes; then :
-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "cannot run test program while cross compiling
-See \`config.log' for more details" "$LINENO" 5; }
+
+          { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Cross compiling, no version check possible!" >&5
+$as_echo "$as_me: WARNING: Cross compiling, no version check possible!" >&2;}
+          success=yes
+
 else
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
@@ -8415,7 +8336,7 @@ else
 fi
 
 
-    POSTGRESQL_CFLAGS=""
+    POSTGRESQL_CPPFLAGS=""
     POSTGRESQL_LDFLAGS=""
     POSTGRESQL_VERSION=""
 
@@ -8475,8 +8396,8 @@ fi
             { $as_echo "$as_me:${as_lineno-$LINENO}: checking for PostgreSQL libraries" >&5
 $as_echo_n "checking for PostgreSQL libraries... " >&6; }
 
-            POSTGRESQL_CFLAGS="-I`$PG_CONFIG --includedir`"
-            POSTGRESQL_LDFLAGS="-L`$PG_CONFIG --libdir` -lpq"
+            POSTGRESQL_CPPFLAGS="-I`$PG_CONFIG --includedir`"
+            POSTGRESQL_LDFLAGS="-L`$PG_CONFIG --libdir`"
 
             POSTGRESQL_VERSION=`$PG_CONFIG --version | sed -e 's#PostgreSQL ##'`
 

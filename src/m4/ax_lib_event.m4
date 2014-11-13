@@ -125,6 +125,9 @@ AC_DEFUN([AX_LIB_EVENT_DO_CHECK],
           return 0;
           ]])], [
           success=yes
+          ],[],[
+          AC_MSG_WARN([Cross compiling, no version check possible!])
+          success=yes
           ])
           AC_LANG_POP([C])
 
