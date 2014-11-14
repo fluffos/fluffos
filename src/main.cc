@@ -92,9 +92,6 @@ int main(int argc, char **argv) {
   setlocale(LC_ALL, "C");
 #endif
 
-#ifdef WRAPPEDMALLOC
-  wrappedmalloc_init();
-#endif /* WRAPPEDMALLOC */
 #ifdef DEBUGMALLOC
   MDinit();
 #endif
