@@ -82,7 +82,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
       }
     }
 
-    argv = CALLOCATE(n + 1, char *, TAG_TEMPORARY, "external args");
+    argv = (char **)DCALLOC(n + 1, sizeof(char *), TAG_TEMPORARY, "external args");
 
     argv[0] = cmd;
 

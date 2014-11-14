@@ -251,7 +251,8 @@ int main(int argc, char **argv) {
     switch (argv[i][1]) {
       case 'D':
         if (argv[i][2]) {
-          lpc_predef_t *tmp = ALLOCATE(lpc_predef_t, TAG_PREDEFINES, "predef");
+          lpc_predef_t *tmp =
+              (lpc_predef_t *)DMALLOC(sizeof(lpc_predef_t), TAG_PREDEFINES, "predef");
           tmp->flag = argv[i] + 2;
           tmp->next = lpc_predefs;
           lpc_predefs = tmp;

@@ -802,7 +802,7 @@ void f_unique_array(void) {
     }
   }
 
-  unlist = ALLOCATE(unique_list_t, TAG_TEMPORARY, "f_unique_array:1");
+  unlist = (unique_list_t *)DMALLOC(sizeof(unique_list_t), TAG_TEMPORARY, "f_unique_array:1");
   unlist->next = g_u_list;
   unlist->head = 0;
   head = &unlist->head;
@@ -835,8 +835,8 @@ void f_unique_array(void) {
       }
       if (!uptr) {
         numkeys++;
-        uptr = ALLOCATE(unique_t, TAG_TEMPORARY, "f_unique_array:3");
-        uptr->indices = ALLOCATE(int, TAG_TEMPORARY, "f_unique_array:4");
+        uptr = (unique_t *)DMALLOC(sizeof(unique_t), TAG_TEMPORARY, "f_unique_array:3");
+        uptr->indices = (int *)DMALLOC(sizeof(int), TAG_TEMPORARY, "f_unique_array:4");
         uptr->count = 1;
         uptr->indices[0] = i;
         uptr->next = *head;
@@ -1504,7 +1504,7 @@ static svalue_t *alist_sort(array_t *inlist) {
     return (svalue_t *)NULL;
   }
   if ((flag = (inlist->ref > 1))) {
-    sv_tab = CALLOCATE(size, svalue_t, TAG_TEMPORARY, "alist_sort: sv_tab");
+    sv_tab = (svalue_t *)DCALLOC(size, sizeof(svalue_t), TAG_TEMPORARY, "alist_sort: sv_tab");
     sv_ptr = inlist->item;
     for (j = 0; j < size; j++) {
       if (((tmp = (sv_ptr + j))->type == T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
@@ -1557,7 +1557,7 @@ static svalue_t *alist_sort(array_t *inlist) {
     }
   }
 
-  table = CALLOCATE(size, svalue_t, TAG_TEMPORARY, "alist_sort: table");
+  table = (svalue_t *)DCALLOC(size, sizeof(svalue_t), TAG_TEMPORARY, "alist_sort: table");
 
   for (j = 0; j < size; j++) {
     table[j] = sv_tab[0];
@@ -1669,7 +1669,7 @@ array_t *intersect_array(array_t *a1, array_t *a2) {
 
   svt_1 = alist_sort(a1);
   if ((flag = (a2->ref > 1))) {
-    sv_tab = CALLOCATE(a2s, svalue_t, TAG_TEMPORARY, "intersect_array: sv2_tab");
+    sv_tab = (svalue_t *)DCALLOC(a2s, sizeof(svalue_t), TAG_TEMPORARY, "intersect_array: sv2_tab");
     sv_ptr = a2->item;
     for (j = 0; j < a2s; j++) {
       if (((tmp = (sv_ptr + j))->type == T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
@@ -1822,7 +1822,7 @@ array_t *union_array(array_t *a1, array_t *a2) {
 
   svt_1 = alist_sort(a1);
   if ((flag = (a2->ref > 1))) {
-    sv_tab = CALLOCATE(a2s, svalue_t, TAG_TEMPORARY, "union_array: sv2_tab");
+    sv_tab = (svalue_t *)DCALLOC(a2s, sizeof(svalue_t), TAG_TEMPORARY, "union_array: sv2_tab");
     sv_ptr = a2->item;
     for (j = 0; j < a2s; j++) {
       if (((tmp = (sv_ptr + j))->type == T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
@@ -2204,7 +2204,8 @@ array_t *reg_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *def) {
     struct regexp *tmpreg;
     const char *laststart, *currstart;
 
-    rgpp = CALLOCATE(size, struct regexp *, TAG_TEMPORARY, "reg_assoc : rgpp");
+    rgpp =
+        (struct regexp **)DCALLOC(size, sizeof(struct regexp *), TAG_TEMPORARY, "reg_assoc : rgpp");
     for (i = 0; i < size; i++) {
       if (!(rgpp[i] = regcomp((unsigned char *)pat->item[i].u.string, 0))) {
         while (i--) {
@@ -2242,10 +2243,12 @@ array_t *reg_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *def) {
       if (regindex >= 0) {
         num_match++;
         if (rmp) {
-          rmp->next = ALLOCATE(struct reg_match, TAG_TEMPORARY, "reg_assoc : rmp->next");
+          rmp->next = (struct reg_match *)DMALLOC(sizeof(struct reg_match), TAG_TEMPORARY,
+                                                  "reg_assoc : rmp->next");
           rmp = rmp->next;
         } else
-          rmph = rmp = ALLOCATE(struct reg_match, TAG_TEMPORARY, "reg_assoc : rmp");
+          rmph = rmp = (struct reg_match *)DMALLOC(sizeof(struct reg_match), TAG_TEMPORARY,
+                                                   "reg_assoc : rmp");
         tmpreg = rgpp[regindex];
         rmp->begin = tmpreg->startp[0];
         rmp->end = tmp = tmpreg->endp[0];

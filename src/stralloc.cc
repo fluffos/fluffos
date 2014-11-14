@@ -91,7 +91,7 @@ void init_strings() {
     ;
   }
   htable_size_minus_one = htable_size - 1;
-  base_table = CALLOCATE(htable_size, block_t *, TAG_STR_TBL, "init_strings");
+  base_table = (block_t **)DCALLOC(htable_size, sizeof(block_t *), TAG_STR_TBL, "init_strings");
 #ifdef STRING_STATS
   overhead_bytes += (sizeof(block_t *) * htable_size);
 #endif

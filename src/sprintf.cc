@@ -215,7 +215,7 @@ static void pop_sprintf_state(void) {
 static void push_sprintf_state(void) {
   sprintf_state_t *state;
 
-  state = ALLOCATE(sprintf_state_t, TAG_TEMPORARY, "push_sprintf_state");
+  state = (sprintf_state_t *)DMALLOC(sizeof(sprintf_state_t), TAG_TEMPORARY, "push_sprintf_state");
   outbuf_zero(&(state->obuff));
   state->csts = NULL;
   state->cur_arg = -1;
@@ -773,7 +773,7 @@ static pad_info_t *make_pad(pad_info_t *p) {
   if (p->len == 0) {
     return 0;
   }
-  x = ALLOCATE(pad_info_t, TAG_TEMPORARY, "make_pad");
+  x = (pad_info_t *)DMALLOC(sizeof(pad_info_t), TAG_TEMPORARY, "make_pad");
   x->what = p->what;
   x->len = p->len;
   return x;
@@ -1088,7 +1088,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
               if (pres > fs) {
                 pres = fs;
               }
-              *temp = ALLOCATE(cst, TAG_TEMPORARY, "string_print: 3");
+              *temp = (cst *)DMALLOC(sizeof(cst), TAG_TEMPORARY, "string_print: 3");
               (*temp)->next = 0;
               (*temp)->d.col = carg->u.string;
               (*temp)->pad = make_pad(&pad);
@@ -1111,7 +1111,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
               const char *p1, *p2;
 
 #define TABLE carg->u.string
-              (*temp) = ALLOCATE(cst, TAG_TEMPORARY, "string_print: 4");
+              (*temp) = (cst *)DMALLOC(sizeof(cst), TAG_TEMPORARY, "string_print: 4");
               (*temp)->d.tab = 0;
               (*temp)->pad = make_pad(&pad);
               (*temp)->info = finfo;
@@ -1173,7 +1173,8 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
                 pres = n;
               }
 
-              (*temp)->d.tab = CALLOCATE(pres + 1, tab_data_t, TAG_TEMPORARY, "string_print: 5");
+              (*temp)->d.tab = (tab_data_t *)DCALLOC(pres + 1, sizeof(tab_data_t), TAG_TEMPORARY,
+                                                     "string_print: 5");
               (*temp)->nocols = pres; /* heavy sigh */
               (*temp)->d.tab[0].start = TABLE;
               if (pres == 1) {

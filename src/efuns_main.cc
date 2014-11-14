@@ -145,7 +145,7 @@ void f_bind(void) {
     error("Master object denied permission to bind() function pointer.\n");
   }
 
-  new_fp = ALLOCATE(funptr_t, TAG_FUNP, "f_bind");
+  new_fp = (funptr_t *)DMALLOC(sizeof(funptr_t), TAG_FUNP, "f_bind");
   *new_fp = *old_fp;
   new_fp->hdr.ref = 1;
   new_fp->hdr.owner = ob; /* one ref from being on stack */

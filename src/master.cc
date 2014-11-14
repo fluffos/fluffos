@@ -67,8 +67,8 @@ static void get_master_applies(object_t *ob) {
   if (master_applies) {
     FREE(master_applies);
   }
-  master_applies =
-      CALLOCATE(NUM_MASTER_APPLIES, function_lookup_info_t, TAG_SIMULS, "get_master_applies");
+  master_applies = (function_lookup_info_t *)DCALLOC(
+      NUM_MASTER_APPLIES, sizeof(function_lookup_info_t), TAG_SIMULS, "get_master_applies");
 
   for (i = 0; i < NUM_MASTER_APPLIES; i++) {
     const char *name = applies_table[i];

@@ -95,7 +95,7 @@ static void sprout(tree **ppr, char *pc_data, int *pi_balance, int (*pfi_compare
    * flag, then exit.
    */
   if (!*ppr) {
-    *ppr = ALLOCATE(tree, TAG_UID, "sprout");
+    *ppr = (tree *)DMALLOC(sizeof(tree), TAG_UID, "sprout");
     (*ppr)->tree_l = NULL;
     (*ppr)->tree_r = NULL;
     (*ppr)->tree_b = 0;

@@ -41,7 +41,7 @@ static void read_config_file(FILE *file) {
   char *p;
 
   buff_size = MAX_LINE_LENGTH * (NUM_CONFIG_INTS + 1) * (NUM_CONFIG_STRS + 1);
-  p = buff = CALLOCATE(buff_size, char, TAG_CONFIG, "read_config_file: 1");
+  p = buff = (char *)DCALLOC(buff_size, sizeof(char), TAG_CONFIG, "read_config_file: 1");
   *p++ = '\n';
 
   while (1) {

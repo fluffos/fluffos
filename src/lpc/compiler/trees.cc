@@ -72,7 +72,7 @@ parse_node_t *new_node() {
   if ((cur_block = free_block_list)) {
     free_block_list = cur_block->next;
   } else {
-    cur_block = ALLOCATE(parse_node_block_t, TAG_COMPILER, "new_node");
+    cur_block = (parse_node_block_t *)DMALLOC(sizeof(parse_node_block_t), TAG_COMPILER, "new_node");
     memset(cur_block, 0, sizeof(parse_node_block_t));
   }
   /* add to block list */
@@ -101,7 +101,7 @@ parse_node_t *new_node_no_line() {
   if ((cur_block = free_block_list)) {
     free_block_list = cur_block->next;
   } else {
-    cur_block = ALLOCATE(parse_node_block_t, TAG_COMPILER, "new_node");
+    cur_block = (parse_node_block_t *)DMALLOC(sizeof(parse_node_block_t), TAG_COMPILER, "new_node");
     memset(cur_block, 0, sizeof(parse_node_block_t));
   }
   /* add to block list */

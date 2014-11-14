@@ -476,7 +476,7 @@ static void handle_include(char *name, int global) {
   if (++incnum == MAX_INCLUDE_DEPTH) {
     include_error("Maximum include depth exceeded.", global);
   } else if ((f = inc_open(buf, name, delim == '"')) != -1) {
-    is = ALLOCATE(incstate_t, TAG_COMPILER, "handle_include: 1");
+    is = (incstate_t *)DMALLOC(sizeof(incstate_t), TAG_COMPILER, "handle_include: 1");
     is->yyin_desc = yyin_desc;
     is->line = current_line;
     is->file = current_file;
@@ -1119,7 +1119,8 @@ static void refill_buffer() {
         linked_buf_t *new_lbuf;
         char *new_outp;
 
-        if (!(new_lbuf = ALLOCATE(linked_buf_t, TAG_COMPILER, "refill_bufer"))) {
+        if (!(new_lbuf =
+                  (linked_buf_t *)DMALLOC(sizeof(linked_buf_t), TAG_COMPILER, "refill_bufer"))) {
           lexerror("Out of memory when allocating new buffer.\n");
           return;
         }
@@ -2884,7 +2885,7 @@ static void add_input(const char *p) {
     cur_lbuf->outp = q + 1;
     cur_lbuf->last_nl = last_nl;
 
-    new_lbuf = ALLOCATE(linked_buf_t, TAG_COMPILER, "add_input");
+    new_lbuf = (linked_buf_t *)DMALLOC(sizeof(linked_buf_t), TAG_COMPILER, "add_input");
     new_lbuf->term_type = TERM_ADD_INPUT;
     new_lbuf->prev = cur_lbuf;
     buf = new_lbuf->buf;
@@ -2938,7 +2939,7 @@ static void add_predefine(const char *name, int nargs, const char *exps) {
     strcpy(p->exps, exps);
     p->nargs = nargs;
   } else {
-    p = ALLOCATE(defn_t, TAG_PREDEFINES, "add_define: def");
+    p = (defn_t *)DMALLOC(sizeof(defn_t), TAG_PREDEFINES, "add_define: def");
     p->name = (char *)DMALLOC(strlen(name) + 1, TAG_PREDEFINES, "add_define: def name");
     strcpy(p->name, name);
     p->exps = (char *)DMALLOC(strlen(exps) + 1, TAG_PREDEFINES, "add_define: def exps");
@@ -3338,7 +3339,7 @@ void set_inc_list(char *list) {
     size++;
     p++;
   }
-  inc_list = CALLOCATE(size, char *, TAG_INC_LIST, "set_inc_list");
+  inc_list = (char **)DCALLOC(size, sizeof(char *), TAG_INC_LIST, "set_inc_list");
   inc_list_size = size;
   for (i = size - 1; i >= 0; i--) {
     p = strrchr(list, ':');
@@ -3444,15 +3445,16 @@ ident_hash_elem_t *find_or_add_perm_ident(const char *name) {
       }
       hptr2 = hptr2->next;
     }
-    hptr = ALLOCATE(ident_hash_elem_t, TAG_PERM_IDENT, "find_or_add_perm_ident:1");
+    hptr = (ident_hash_elem_t *)DMALLOC(sizeof(ident_hash_elem_t), TAG_PERM_IDENT,
+                                        "find_or_add_perm_ident:1");
     hptr->next = ident_hash_head[h]->next;
     ident_hash_head[h]->next = hptr;
     if (ident_hash_head[h] == ident_hash_tail[h]) {
       ident_hash_tail[h] = hptr;
     }
   } else {
-    hptr = (ident_hash_table[h] =
-                ALLOCATE(ident_hash_elem_t, TAG_PERM_IDENT, "find_or_add_perm_ident:2"));
+    hptr = (ident_hash_table[h] = (ident_hash_elem_t *)DMALLOC(
+                sizeof(ident_hash_elem_t), TAG_PERM_IDENT, "find_or_add_perm_ident:2"));
     ident_hash_head[h] = hptr;
     ident_hash_tail[h] = hptr;
     hptr->next = hptr;
@@ -3484,7 +3486,8 @@ static char *alloc_local_name(const char *name) {
 
   if (lb_index + len > 4096) {
     lname_linked_buf_t *new_buf;
-    new_buf = ALLOCATE(lname_linked_buf_t, TAG_COMPILER, "alloc_local_name");
+    new_buf =
+        (lname_linked_buf_t *)DMALLOC(sizeof(lname_linked_buf_t), TAG_COMPILER, "alloc_local_name");
     new_buf->next = lnamebuf;
     lnamebuf = new_buf;
     lb_index = 0;
@@ -3623,7 +3626,8 @@ static ident_hash_elem_t *quick_alloc_ident_entry() {
     return &(ihe_list->items[num_free]);
   } else {
     ident_hash_elem_list_t *ihel;
-    ihel = ALLOCATE(ident_hash_elem_list_t, TAG_COMPILER, "quick_alloc_ident_entry");
+    ihel = (ident_hash_elem_list_t *)DMALLOC(sizeof(ident_hash_elem_list_t), TAG_COMPILER,
+                                             "quick_alloc_ident_entry");
     ihel->next = ihe_list;
     ihe_list = ihel;
     num_free = 127;
@@ -3710,8 +3714,8 @@ void init_identifiers() {
   init_instrs();
 
   /* allocate all three tables together */
-  ident_hash_table =
-      CALLOCATE(IDENT_HASH_SIZE * 3, ident_hash_elem_t *, TAG_IDENT_TABLE, "init_identifiers");
+  ident_hash_table = (ident_hash_elem_t **)DCALLOC(IDENT_HASH_SIZE * 3, sizeof(ident_hash_elem_t *),
+                                                   TAG_IDENT_TABLE, "init_identifiers");
   ident_hash_head = (ident_hash_elem_t **)&ident_hash_table[IDENT_HASH_SIZE];
   ident_hash_tail = (ident_hash_elem_t **)&ident_hash_table[2 * IDENT_HASH_SIZE];
 

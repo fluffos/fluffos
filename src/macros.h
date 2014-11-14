@@ -9,22 +9,16 @@
 
 #if defined(DEBUGMALLOC)
 #define FREE(x) debugfree(x)
-#define REALLOC(x, y) debugrealloc(x, y, 0, (char *)0)
-#define CALLOC(x, y) debugcalloc(x, y, 0, (char *)0)
 #define DMALLOC(x, t, d) debugmalloc(x, t, d)
 #define DREALLOC(x, y, tag, desc) debugrealloc(x, y, tag, desc)
 #define DCALLOC(x, y, tag, desc) debugcalloc(x, y, tag, desc)
 #else
 #define FREE(x) free(x)
-#define REALLOC(x, y) realloc(x, y)
-#define CALLOC(x, y) calloc(x, y)
-#define DMALLOC(x, tag, desc) MALLOC(x)
-#define DREALLOC(x, y, tag, desc) REALLOC(x, y)
-#define DCALLOC(x, y, tag, desc) CALLOC(x, y)
+#define DMALLOC(x, tag, desc) malloc(x)
+#define DREALLOC(x, y, tag, desc) realloc(x, y)
+#define DCALLOC(x, y, tag, desc) calloc(x, y)
 #endif
 
-#define ALLOCATE(type, tag, desc) ((type *)DMALLOC(sizeof(type), tag, desc))
-#define CALLOCATE(num, type, tag, desc) ((type *)DCALLOC(sizeof(type[1]), num, tag, desc))
 #define RESIZE(ptr, num, type, tag, desc) \
   ((type *)DREALLOC((void *)ptr, sizeof(type) * (num), tag, desc))
 

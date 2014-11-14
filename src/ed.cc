@@ -2456,7 +2456,7 @@ void ed_start(const char *file_arg, const char *write_fn, const char *exit_fn, i
   }
 
   current_ed_buffer = command_giver->interactive->ed_buffer =
-      ALLOCATE(ed_buffer_t, TAG_ED, "ed_start: ED_BUFFER");
+      (ed_buffer_t *)DMALLOC(sizeof(ed_buffer_t), TAG_ED, "ed_start: ED_BUFFER");
   memset((char *)ED_BUFFER, '\0', sizeof(ed_buffer_t));
 
   current_editor = command_giver;
@@ -3140,7 +3140,7 @@ static ed_buffer_t *ed_buffer_list;
 static ed_buffer_t *add_ed_buffer(object_t *ob) {
   ed_buffer_t *ret;
 
-  ret = ALLOCATE(ed_buffer_t, TAG_ED, "ed_start: ED_BUFFER");
+  ret = (ed_buffer_t *)DMALLOC(sizeof(ed_buffer_t), TAG_ED, "ed_start: ED_BUFFER");
   memset((char *)ret, '\0', sizeof(ed_buffer_t));
 
   ob->flags |= O_IN_EDIT;

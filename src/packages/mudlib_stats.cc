@@ -136,7 +136,7 @@ static mudlib_stats_t *add_stat_entry(const char *str, mudlib_stats_t **list) {
   if ((entry = find_stat_entry(str, *list))) {
     return entry;
   }
-  entry = ALLOCATE(mudlib_stats_t, TAG_MUDLIB_STATS, "add_stat_entry");
+  entry = (mudlib_stats_t *)DMALLOC(sizeof(mudlib_stats_t), TAG_MUDLIB_STATS, "add_stat_entry");
   entry->name = make_shared_string(str);
   entry->length = strlen(str);
   entry->moves = 0;

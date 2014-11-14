@@ -269,7 +269,7 @@ static int restore_internal_size(const char **str, int is_mapping, int depth) {
             while (max_depth <= depth) {
               max_depth <<= 1;
             }
-            sizes = CALLOCATE(max_depth, int, TAG_TEMPORARY, "restore_internal_size");
+            sizes = (int *)DCALLOC(max_depth, sizeof(int), TAG_TEMPORARY, "restore_internal_size");
           } else if (depth >= max_depth) {
             while ((max_depth <<= 1) <= depth) {
               ;
@@ -292,7 +292,7 @@ static int restore_internal_size(const char **str, int is_mapping, int depth) {
             while (max_depth <= depth) {
               max_depth <<= 1;
             }
-            sizes = CALLOCATE(max_depth, int, TAG_TEMPORARY, "restore_internal_size");
+            sizes = (int *)DCALLOC(max_depth, sizeof(int), TAG_TEMPORARY, "restore_internal_size");
           } else if (depth >= max_depth) {
             while ((max_depth <<= 1) <= depth) {
               ;

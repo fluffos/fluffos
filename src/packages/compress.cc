@@ -240,7 +240,7 @@ void f_compress(void) {
 
 #ifdef F_UNCOMPRESS
 static void *zlib_alloc(void *opaque, unsigned int items, unsigned int size) {
-  return CALLOC(items, size);
+  return DCALLOC(items, size, TAG_TEMPORARY, "zlib_alloc");
 }
 
 static void zlib_free(void *opaque, void *address) { FREE(address); }
@@ -287,7 +287,7 @@ void f_uncompress(void) {
       if (!output_data) {
         output_data = (unsigned char *)DMALLOC(len, TAG_TEMPORARY, "uncompress");
       } else {
-        output_data = (unsigned char *)REALLOC(output_data, len);
+        output_data = (unsigned char *)DREALLOC(output_data, len, TAG_TEMPORARY, "uncompress");
       }
       memcpy(output_data + pos, compress_buf, len - pos);
       compressed->next_out = compress_buf;

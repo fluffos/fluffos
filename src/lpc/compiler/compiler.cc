@@ -97,8 +97,10 @@ char *get_two_types(char *where, char *end, int type1, int type2) {
 }
 
 void init_locals() {
-  type_of_locals = CALLOCATE(CFG_MAX_LOCAL_VARIABLES, unsigned short, TAG_LOCALS, "init_locals:1");
-  locals = CALLOCATE(CFG_MAX_LOCAL_VARIABLES, local_info_t, TAG_LOCALS, "init_locals:2");
+  type_of_locals = (unsigned short *)DCALLOC(CFG_MAX_LOCAL_VARIABLES, sizeof(unsigned short),
+                                             TAG_LOCALS, "init_locals:1");
+  locals = (local_info_t *)DCALLOC(CFG_MAX_LOCAL_VARIABLES, sizeof(local_info_t), TAG_LOCALS,
+                                   "init_locals:2");
   type_of_locals_ptr = type_of_locals;
   locals_ptr = locals;
   locals_size = type_of_locals_size = CFG_MAX_LOCAL_VARIABLES;
@@ -428,7 +430,8 @@ parse_node_t *reorder_class_values(int which, parse_node_t *node) {
   int i;
 
   cd = ((class_def_t *)mem_block[A_CLASS_DEF].block) + which;
-  tmp = CALLOCATE(cd->size, parse_node_t *, TAG_COMPILER, "reorder_class_values");
+  tmp = (parse_node_t **)DCALLOC(cd->size, sizeof(parse_node_t *), TAG_COMPILER,
+                                 "reorder_class_values");
 
   for (i = 0; i < cd->size; i++) {
     tmp[i] = 0;
@@ -696,7 +699,7 @@ static void overload_function(program_t *prog, int index, program_t *defprog, in
       p = strput(p, end, prog->filename);
       p = strput(p, end, ".");
 
-      ow = ALLOCATE(ovlwarn_t, TAG_COMPILER, "overload warning");
+      ow = (ovlwarn_t *)DMALLOC(sizeof(ovlwarn_t), TAG_COMPILER, "overload warning");
       ow->next = overload_warnings;
       ow->func = definition->funcname;
       ow->warn = alloc_cstring(buf, "overload warning");
@@ -711,7 +714,7 @@ static void overload_function(program_t *prog, int index, program_t *defprog, in
    * later.
    */
 
-  newdef = ALLOCATE(compiler_temp_t, TAG_COMPILER, "overload_function");
+  newdef = (compiler_temp_t *)DMALLOC(sizeof(compiler_temp_t), TAG_COMPILER, "overload_function");
 
   /* The resolution order is given in above comments */
   if (oldflags & FUNC_ALIAS) {
@@ -1219,7 +1222,8 @@ int define_new_function(const char *name, int num_arg, int num_local, int flags,
     newfunc = FUNCTION_TEMP(newindex);
     newfunc->next = (compiler_temp_t *)NULL;
   } else {
-    newfunc = ALLOCATE(compiler_temp_t, TAG_TEMPORARY, "define_new_function");
+    newfunc =
+        (compiler_temp_t *)DMALLOC(sizeof(compiler_temp_t), TAG_TEMPORARY, "define_new_function");
     *newfunc = *FUNCTION_TEMP(oldindex);
 
     /* We are going to rewrite stuff at oldindex */
@@ -2214,8 +2218,10 @@ static void handle_functions() {
 
   num_func = total_func = mem_block[A_FUNCTIONS].current_size / sizeof(function_t);
   if (num_func) {
-    func_index_map = CALLOCATE(num_func, unsigned short, TAG_TEMPORARY, "handle_functions");
-    comp_sorted_funcs = CALLOCATE(num_func, unsigned short, TAG_TEMPORARY, "handle_functions");
+    func_index_map = (unsigned short *)DCALLOC(num_func, sizeof(unsigned short), TAG_TEMPORARY,
+                                               "handle_functions");
+    comp_sorted_funcs = (unsigned short *)DCALLOC(num_func, sizeof(unsigned short), TAG_TEMPORARY,
+                                                  "handle_functions");
 
     i = num_func;
     while (i--) {
@@ -2258,9 +2264,10 @@ static void handle_functions() {
 
   num_def = mem_block[A_FUNCTION_DEFS].current_size / sizeof(compiler_temp_t);
   if (num_def) {
-    comp_def_index_map = CALLOCATE(num_def, unsigned short, TAG_TEMPORARY, "handle functions");
-    prog_flags = CALLOCATE(comp_last_inherited + total_func, unsigned short, TAG_TEMPORARY,
-                           "handle_functions");
+    comp_def_index_map = (unsigned short *)DCALLOC(num_def, sizeof(unsigned short), TAG_TEMPORARY,
+                                                   "handle functions");
+    prog_flags = (unsigned short *)DCALLOC(comp_last_inherited + total_func, sizeof(unsigned short),
+                                           TAG_TEMPORARY, "handle_functions");
 
     for (i = 0; i < num_def; i++) {
       cur_def = FUNCTION_TEMP(i);

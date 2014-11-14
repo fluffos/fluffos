@@ -426,7 +426,7 @@ static void push_parse_globals() {
   sp->type = T_ERROR_HANDLER;
   sp->u.error_handler = parse_clean_up;
 
-  pg = ALLOCATE(parse_global_t, TAG_TEMPORARY, "push_parse_globals");
+  pg = (parse_global_t *)DMALLOC(sizeof(parse_global_t), TAG_TEMPORARY, "push_parse_globals");
   pg->next = globals;
   globals = pg;
 

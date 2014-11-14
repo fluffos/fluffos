@@ -58,7 +58,7 @@ void f_named_livings() {
   apply_valid_hide = 1;
 #endif
 
-  obtab = CALLOCATE(max_array_size, object_t *, TAG_TEMPORARY, "named_livings");
+  obtab = (object_t **)DCALLOC(max_array_size, sizeof(object_t *), TAG_TEMPORARY, "named_livings");
 
   for (i = 0; i < CFG_LIVING_HASH_SIZE; i++) {
     for (ob = hashed_living[i]; ob; ob = ob->next_hashed_living) {
@@ -590,7 +590,7 @@ void f_terminal_colour(void) {
   if (cp == NULL) {
     if (wrap) {
       num = 1;
-      parts = (const char **)CALLOCATE(1, char *, TAG_TEMPORARY, "f_terminal_colour: parts");
+      parts = (const char **)DCALLOC(1, sizeof(char *), TAG_TEMPORARY, "f_terminal_colour: parts");
       parts[0] = instr;
       savestr = 0;
     } else {
@@ -600,7 +600,8 @@ void f_terminal_colour(void) {
   } else {
     /* here we have something to parse */
     char *newstr = (char *)cp;  // must be result of the string_copy above
-    parts = (const char **)CALLOCATE(NSTRSEGS, char *, TAG_TEMPORARY, "f_terminal_colour: parts");
+    parts =
+        (const char **)DCALLOC(NSTRSEGS, sizeof(char *), TAG_TEMPORARY, "f_terminal_colour: parts");
     if (newstr - instr) { /* starting seg, if not delimiter */
       num = 1;
       parts[0] = instr;
@@ -663,7 +664,7 @@ void f_terminal_colour(void) {
 
   /* Could keep track of the lens as we create parts, removing the need
      for a strlen() below */
-  lens = CALLOCATE(num, int, TAG_TEMPORARY, "f_terminal_colour: lens");
+  lens = (int *)DCALLOC(num, sizeof(int), TAG_TEMPORARY, "f_terminal_colour: lens");
   mtab = sp->u.map->table;
 
   // First setup some little things.
@@ -1616,7 +1617,7 @@ void f_replaceable(void) {
   if (st_num_arg == 2) {
     numignore = sp->u.arr->size;
     if (numignore) {
-      ignore = CALLOCATE(numignore + 2, char *, TAG_TEMPORARY, "replaceable");
+      ignore = (char **)DCALLOC(numignore + 2, sizeof(char *), TAG_TEMPORARY, "replaceable");
     } else {
       ignore = 0;
     }
@@ -1633,7 +1634,7 @@ void f_replaceable(void) {
     obj = (sp - 1)->u.ob;
   } else {
     numignore = 2;
-    ignore = CALLOCATE(2, char *, TAG_TEMPORARY, "replaceable");
+    ignore = (char **)DCALLOC(2, sizeof(char *), TAG_TEMPORARY, "replaceable");
     ignore[0] = findstring(APPLY_CREATE);
     ignore[1] = findstring(APPLY___INIT);
     obj = sp->u.ob;
@@ -2796,7 +2797,7 @@ int levenshtein(char *a, int as, char *b, int bs) {
     return bs;
   }
 
-  table = CALLOCATE(bs + 1, int, TAG_TEMPORARY, "levenshtein");
+  table = (int *)DCALLOC(bs + 1, sizeof(int), TAG_TEMPORARY, "levenshtein");
   for (i = 1; i <= bs; i++) {
     table[i] = i;
   }

@@ -63,8 +63,8 @@ void init_otable() {
     ;
   }
   otable_size_minus_one = otable_size - 1;
-  obj_table = CALLOCATE(otable_size, object_t *, TAG_OBJ_TBL, "init_otable");
-  ch_table = CALLOCATE(otable_size, object_t *, TAG_OBJ_TBL, "init_ch_otable");
+  obj_table = (object_t **)DCALLOC(otable_size, sizeof(object_t *), TAG_OBJ_TBL, "init_otable");
+  ch_table = (object_t **)DCALLOC(otable_size, sizeof(object_t *), TAG_OBJ_TBL, "init_ch_otable");
 
   for (x = 0; x < otable_size; x++) {
     obj_table[x] = 0;

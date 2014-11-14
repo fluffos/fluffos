@@ -80,7 +80,8 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, int delay, int num_args, svalu
 
   DBG_CALLOUT("new_call_out: /%s delay %i\n", ob->obname, delay);
 
-  pending_call_t *cop = CALLOCATE(1, pending_call_t, TAG_CALL_OUT, "new_call_out");
+  pending_call_t *cop =
+      (pending_call_t *)DCALLOC(1, sizeof(pending_call_t), TAG_CALL_OUT, "new_call_out");
 
   cop->target_time = g_current_virtual_time + delay;
   DBG_CALLOUT("  target_time: %ld\n", cop->target_time);

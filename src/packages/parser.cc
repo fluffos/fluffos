@@ -354,7 +354,7 @@ static int parse_copy_array(array_t *arr, char ***sarrp) {
     return 0;
   }
 
-  table2 = *sarrp = CALLOCATE(arr->size, char *, TAG_PARSER, "parse_copy_array");
+  table2 = *sarrp = (char **)DCALLOC(arr->size, sizeof(char *), TAG_PARSER, "parse_copy_array");
   table = (const char **)table2;
   for (j = 0; j < arr->size; j++) {
     if (arr->item[j].type == T_STRING) {
@@ -375,7 +375,8 @@ static int parse_copy_array(array_t *arr, char ***sarrp) {
 static void add_special_word(const char *wrd, int kind, int arg) {
   char *p = make_shared_string(wrd);
   int h = DO_HASH(p, SPECIAL_HASH_SIZE);
-  special_word_t *swp = ALLOCATE(special_word_t, TAG_PARSER, "add_special_word");
+  special_word_t *swp =
+      (special_word_t *)DMALLOC(sizeof(special_word_t), TAG_PARSER, "add_special_word");
 
   swp->wrd = p;
   swp->kind = kind;
@@ -505,7 +506,8 @@ void f_parse_init(void) {
     return;
   }
 
-  pi = current_object->pinfo = ALLOCATE(parse_info_t, TAG_PARSER, "parse_init");
+  pi = current_object->pinfo =
+      (parse_info_t *)DMALLOC(sizeof(parse_info_t), TAG_PARSER, "parse_init");
   pi->ob = current_object;
   pi->flags = 0;
 }
@@ -1100,7 +1102,7 @@ static hash_entry_t *add_hash_entry(const char *str) {
     he = he->next;
   }
 
-  he = ALLOCATE(hash_entry_t, TAG_PARSER, "add_hash_entry");
+  he = (hash_entry_t *)DMALLOC(sizeof(hash_entry_t), TAG_PARSER, "add_hash_entry");
   he->name = ref_string(str);
   bitvec_zero(&he->pv.noun);
   bitvec_zero(&he->pv.plural);
@@ -1125,7 +1127,7 @@ void mark_hash_entry(const char *str) {
     he = he->next;
   }
 
-  he = ALLOCATE(hash_entry_t, TAG_PARSER, "mark_hash_entry");
+  he = (hash_entry_t *)DMALLOC(sizeof(hash_entry_t), TAG_PARSER, "mark_hash_entry");
   he->name = ref_string(str);
   bitvec_zero(&he->pv.noun);
   bitvec_zero(&he->pv.plural);
@@ -2175,7 +2177,7 @@ static int save_last_parallel_error(int ob) {
   if (!parallel_error_info.error_type) {
     return 0;
   }
-  n = ALLOCATE(saved_error_t, TAG_PARSER, "save_last_parallel_error");
+  n = (saved_error_t *)DMALLOC(sizeof(saved_error_t), TAG_PARSER, "save_last_parallel_error");
   n->next = parallel_errors;
   n->obj = ob;
   n->err = parallel_error_info;
@@ -2816,7 +2818,7 @@ static void we_are_finished(parse_state_t *state) {
     if (best_result) {
       free_parse_result(best_result);
     }
-    best_result = ALLOCATE(parse_result_t, TAG_PARSER, "we_are_finished");
+    best_result = (parse_result_t *)DMALLOC(sizeof(parse_result_t), TAG_PARSER, "we_are_finished");
     clear_result(best_result);
     if (parse_vn->handler->flags & O_DESTRUCTED) {
       DEBUG_DEC;
@@ -2833,7 +2835,7 @@ static void we_are_finished(parse_state_t *state) {
       best_result->res[tryy].num = args;
       if (args) {
         p = (char *)(best_result->res[tryy].args =
-                         CALLOCATE(args, svalue_t, TAG_PARSER, "best_result"));
+                         (svalue_t *)DCALLOC(args, sizeof(svalue_t), TAG_PARSER, "best_result"));
         memcpy(p, (char *)(sp - args + 1), args * sizeof(svalue_t));
         sp -= args;
       }
@@ -3501,7 +3503,7 @@ void f_parse_add_rule() {
     }
 
     h = DO_HASH(verb, VERB_HASH_SIZE);
-    verb_entry = ALLOCATE(verb_t, TAG_PARSER, "parse_add_rule");
+    verb_entry = (verb_t *)DMALLOC(sizeof(verb_t), TAG_PARSER, "parse_add_rule");
     verb_entry->real_name = verb;
     ref_string(verb);
     verb_entry->match_name = verb;
@@ -3622,7 +3624,7 @@ void f_parse_add_synonym() {
     ref_string(old_verb);
 
     h = DO_HASH(new_verb, VERB_HASH_SIZE);
-    verb_entry = ALLOCATE(verb_t, TAG_PARSER, "parse_add_rule");
+    verb_entry = (verb_t *)DMALLOC(sizeof(verb_t), TAG_PARSER, "parse_add_rule");
     verb_entry->real_name = new_verb;
     verb_entry->match_name = old_verb;
     verb_entry->node = 0;

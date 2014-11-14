@@ -9,8 +9,6 @@ static void handle_cond(LPC_INT);
 #define DMALLOC(x, y, z) malloc(x)
 #undef FREE
 #define FREE(x) free(x)
-#undef ALLOCATE
-#define ALLOCATE(x, y, z) (x *) malloc(sizeof(x))
 #undef DREALLOC
 #define DREALLOC(w, x, y, z) realloc(w, x)
 #endif
@@ -88,7 +86,7 @@ static void add_define(const char *name, int nargs, const char *exps) {
 #endif
     }
   } else {
-    p = ALLOCATE(defn_t, TAG_COMPILER, "add_define: def");
+    p = (defn_t *)DMALLOC(sizeof(defn_t), TAG_COMPILER, "add_define: def");
     p->name = (char *)DMALLOC(strlen(name) + 1, TAG_COMPILER, "add_define: def name");
     strcpy(p->name, name);
     p->exps = (char *)DMALLOC(len + 1, TAG_COMPILER, "add_define: def exps");
@@ -440,7 +438,7 @@ static void handle_cond(LPC_INT c) {
   if (!c) {
     skip_to("else", "endif");
   }
-  p = ALLOCATE(ifstate_t, TAG_COMPILER, "handle_cond");
+  p = (ifstate_t *)DMALLOC(sizeof(ifstate_t), TAG_COMPILER, "handle_cond");
   p->next = iftop;
   iftop = p;
   p->state = c ? EXPECT_ENDIF : EXPECT_ELSE;

@@ -166,7 +166,7 @@ void kill_ref(ref_t *ref) {
 }
 
 ref_t *make_ref(void) {
-  ref_t *ref = ALLOCATE(ref_t, TAG_TEMPORARY, "make_ref");
+  ref_t *ref = (ref_t *)DMALLOC(sizeof(ref_t), TAG_TEMPORARY, "make_ref");
   ref->next = global_ref_list;
   ref->prev = NULL;
   if (ref->next) {

@@ -1551,7 +1551,7 @@ sentence_t *alloc_sentence() {
   sentence_t *p;
 
   if (sent_free == 0) {
-    p = ALLOCATE(sentence_t, TAG_SENTENCE, "alloc_sentence");
+    p = (sentence_t *)DMALLOC(sizeof(sentence_t), TAG_SENTENCE, "alloc_sentence");
     tot_alloc_sentence++;
   } else {
     p = sent_free;
