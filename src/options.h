@@ -573,11 +573,6 @@
  */
 #define LARGEST_PRINTABLE_STRING 8192
 
-/* MESSAGE_BUFFER_SIZE: determines the size of the buffer for output that
- *   is sent to users.
- */
-#define MESSAGE_BUFFER_SIZE 4096
-
 /* TRACE: define this to enable the trace() and traceprefix() efuns.
  *   (keeping this undefined will cause the driver to run faster).
  */

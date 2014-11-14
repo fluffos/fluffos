@@ -15,8 +15,6 @@
 #include <event2/bufferevent.h>
 #include <vector>
 
-#define MESSAGE_BUF_SIZE MESSAGE_BUFFER_SIZE /* from options.h */
-
 /*
  * This macro is for testing whether ip is still valid, since many
  * functions call LPC code, which could otherwise use
