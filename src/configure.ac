@@ -102,8 +102,10 @@ F_HAVE_PREDEFINE([HAVE_LIBEVENT], [],
 # Checks for zlib.
 AX_CHECK_ZLIB()
 
+# FluffOS uses posix timers
+AC_SEARCH_LIBS([timer_create], [rt])
+
 F_HAVE_PREDEFINE([PACKAGE_ASYNC], [AC_SEARCH_LIBS([pthread_create], [pthread])])
-F_HAVE_PREDEFINE([POSIX_TIMERS], [AC_SEARCH_LIBS([timer_create], [rt])])
 
 # iconv has redirect on CYGWIN.
 F_HAVE_PREDEFINE([USE_ICONV], [AC_SEARCH_LIBS([iconv_open], [iconv])])

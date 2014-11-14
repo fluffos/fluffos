@@ -627,12 +627,6 @@
 /* static user space dtrace probes, try them if you have dtrace! */
 #undef DTRACE
 
-/* use POSIX timers for eval_cost.
- *
- * Old code should works fine with this added.
- */
-#define POSIX_TIMERS
-
 /*
   REVERSE_DEFER:
 

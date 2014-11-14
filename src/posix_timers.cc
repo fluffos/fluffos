@@ -6,20 +6,15 @@
 #include "eval.h"
 #include "backend.h"
 
-static timer_t eval_timer_id, hb_timer_id;
+static timer_t eval_timer_id;
 /*
  * SIGALRM handler.
  */
 void sigalrm_handler(int sig, siginfo_t *si, void *uc) {
-#ifndef POSIX_TIMERS
-  outoftime = 1;
-#else
   if (!si->si_value.sival_ptr) {
     outoftime = 1;
   }
-#endif
 } /* sigalrm_handler() */
-#ifdef POSIX_TIMERS
 /* Called by main() to initialize all timers (currently only eval_cost) */
 void init_posix_timers(void) {
   struct sigevent sev;
@@ -75,4 +70,3 @@ LPC_INT posix_eval_timer_get(void) {
 
   return it.it_value.tv_sec * (LPC_INT)(1000000) + it.it_value.tv_nsec / 1000;
 }
-#endif
