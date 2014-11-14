@@ -12,11 +12,11 @@
 #include <event2/buffer.h>
 #include <event2/event.h>
 #include <event2/listener.h>
+#include <netinet/tcp.h> // for TCP_NODELAY
 
 #include "main.h"
 #include "socket_efuns.h"
 #include "backend.h"
-#include "socket_ctrl.h"
 #include "debug.h"
 #include "ed.h"
 #include "file.h"
@@ -156,7 +156,8 @@ void shutdown_external_ports() {
 void new_user_handler(int fd, struct sockaddr *addr, size_t addrlen, port_def_t *port) {
   debug(connections, "New connection from %s.\n", sockaddr_to_string(addr, addrlen));
 
-  if (set_socket_tcp_nodelay(fd, 1) == -1) {
+  int one = 1;
+  if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) == -1) {
     debug(connections, "async_on_accept: fd %d, set_socket_tcp_nodelay error: %s.\n", fd,
           evutil_socket_error_to_string(evutil_socket_geterror(fd)));
   }

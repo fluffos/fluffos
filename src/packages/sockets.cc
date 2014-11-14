@@ -4,7 +4,6 @@
 */
 
 #include "../lpc_incl.h"
-#include "../socket_err.h"
 #include "../include/socket_err.h"
 #include "../socket_efuns.h"
 #include "../comm.h"

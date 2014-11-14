@@ -8,15 +8,16 @@
 #include "std.h"
 
 #include "socket_efuns.h"
-#include "socket_err.h"
 #include "include/socket_err.h"
-#include "socket_ctrl.h"
 #include "comm.h"
 #include "file.h"
 #include "master.h"
 #include "event.h"
 
+#include <event2/util.h>
+
 #include <deque>
+#include <string>
 
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
 
@@ -29,9 +30,71 @@ static std::deque<lpc_socket_t> lpc_socks;
 #define SC_FINAL_CLOSE 4
 
 #ifdef PACKAGE_SOCKETS
-static int string_to_sockaddr(const char *, struct sockaddr *, socklen_t *len);
 static char *old_sockaddr_to_string(struct sockaddr *, socklen_t);
 #endif
+
+
+const char *error_strings[ERROR_STRINGS] = {
+    "Problem creating socket",           "Problem with setsockopt",
+    "Problem setting non-blocking mode", "No more available efun sockets",
+    "Descriptor out of range",           "Socket is closed",
+    "Security violation attempted",      "Socket is already bound",
+    "Address already in use",            "Problem with bind",
+    "Problem with getsockname",          "Socket mode not supported",
+    "Socket not bound to an address",    "Socket is already connected",
+    "Problem with listen",               "Socket not listening",
+    "Operation would block",             "Interrupted system call",
+    "Problem with accept",               "Socket is listening",
+    "Problem with address format",       "Operation already in progress",
+    "Connection refused",                "Problem with connect",
+    "Socket not connected",              "Object type not supported",
+    "Problem with sendto",               "Problem with send",
+    "Wait for callback",                 "Socket already released",
+    "Socket not released",               "Data nested too deeply"};
+
+/*
+ * Convert a string representation of an address to a sockaddr_in
+ * The format of the string is "ip port", the delimiter is a whitespace.
+ */
+static bool lpcaddr_to_sockaddr(const char *name, struct sockaddr *addr, socklen_t *len) {
+  const char *cp = strchr(name, ' ');
+  if (cp == NULL) {
+    debug(sockets, "lpcaddr_to_sockaddr: malformed address: %s", name);
+    return false;
+  }
+
+  char host[NI_MAXHOST], service[NI_MAXSERV];
+
+  memset(host, 0, sizeof(host));
+  memset(service, 0, sizeof(service));
+
+  memcpy(host, name, cp - name);
+  strncpy(service, cp + 1, sizeof(service) - 1);
+
+  struct addrinfo hints, *res;
+
+#ifdef IPV6
+  hints.ai_family = AF_INET6;
+#else
+  hints.ai_family = AF_INET;
+#endif
+ hints.ai_socktype = SOCK_STREAM;
+  hints.ai_protocol = 0;
+  hints.ai_flags = AI_V4MAPPED | AI_NUMERICHOST | AI_NUMERICSERV;
+
+  int ret;
+  if ((ret = getaddrinfo(host, service, &hints, &res))) {
+    debug(sockets, "lpcaddr_to_sockaddr: getaddrinfo error: %s", gai_strerror(ret));
+   return false;
+  }
+
+  memcpy(addr, res->ai_addr, res->ai_addrlen);
+  if (len != NULL) *len = res->ai_addrlen;
+
+  freeaddrinfo(res);
+
+  return true;
+}
 
 /*
  * check permission
@@ -202,7 +265,7 @@ int find_new_socket() {
  * Create an LPC efun socket
  */
 int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *close_callback) {
-  int type, i, fd, optval;
+  int type, i, fd;
 #ifndef NO_BUFFER_TYPE
   int binary = 0;
 
@@ -238,25 +301,17 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
             evutil_socket_error_to_string(evutil_socket_geterror(fd)));
       return EESOCKET;
     }
-    optval = 1;
-    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char *)&optval, sizeof(optval)) == -1) {
+    if (evutil_make_listen_socket_reuseable(fd) == -1) {
       debug(sockets, "socket_create: setsockopt error: %s.\n",
             evutil_socket_error_to_string(evutil_socket_geterror(fd)));
       OS_socket_close(fd);
       return EESETSOCKOPT;
     }
-    if (set_socket_nonblocking(fd, 1) == -1) {
+    if (evutil_make_socket_nonblocking(fd) == -1) {
       debug(sockets, "socket_create: set_socket_nonblocking error: %s.\n",
             evutil_socket_error_to_string(evutil_socket_geterror(fd)));
       OS_socket_close(fd);
       return EENONBLOCK;
-    }
-
-    if (type == SOCK_STREAM) {
-      if (set_socket_tcp_nodelay(fd, 1) == -1) {
-        debug(sockets, "socket_accept: set_socket_tcp_nodelay error: %s.\n",
-              evutil_socket_error_to_string(evutil_socket_geterror(fd)));
-      }
     }
 
 #ifdef FD_CLOEXEC
@@ -295,12 +350,6 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
  * Bind an address to an LPC efun socket
  */
 int socket_bind(int fd, int port, const char *addr) {
-  struct sockaddr_storage sockaddr;
-  socklen_t len;
-
-  memset(&sockaddr, 0, sizeof(sockaddr));
-  len = sizeof(sockaddr);
-
   if (fd < 0 || fd >= lpc_socks.size()) {
     return EEFDRANGE;
   }
@@ -314,42 +363,46 @@ int socket_bind(int fd, int port, const char *addr) {
     return EEISBOUND;
   }
 
-  char service[NI_MAXSERV];
-  snprintf(service, sizeof(service), "%u", port);
+  struct sockaddr_storage sockaddr = { 0 };
+  socklen_t len = sizeof(sockaddr);
 
-  struct addrinfo hints;
-  memset(&hints, 0, sizeof(struct addrinfo));
-#ifdef IPV6
-  hints.ai_family = AF_INET6;
-#else
-  hints.ai_family = AF_INET;
-#endif
-  hints.ai_socktype = SOCK_STREAM;
-  hints.ai_flags = AI_PASSIVE | AI_V4MAPPED;
-  hints.ai_protocol = 0; /* Any protocol */
-
-  if (!addr) {
-    int ret;
-    struct addrinfo *result = NULL;
-    if (MUD_IP[0] != '\0') {
-      debug(sockets, "socket_bind: binding to mud ip: %s.\n", MUD_IP);
-      ret = getaddrinfo(MUD_IP, service, &hints, &result);
-    } else {
-      debug(sockets, "socket_bind: binding to any address.\n");
-      ret = getaddrinfo(NULL, service, &hints, &result);
-    }
-    if (ret) {
-      debug(sockets, "socket_bind: error %s \n", gai_strerror(ret));
-      return EEBADADDR;
-    }
-
-    memcpy(&sockaddr, result->ai_addr, result->ai_addrlen);
-    len = result->ai_addrlen;
-    freeaddrinfo(result);
+  if (addr != nullptr) {
+    if (!lpcaddr_to_sockaddr(addr, (struct sockaddr *)&sockaddr, &len)) {
+       debug(sockets, "socket_bind: unable to parse: '%s'.\n", addr);
+       return EEBADADDR;
+     }
   } else {
-    if (!string_to_sockaddr(addr, (struct sockaddr *)&sockaddr, &len)) {
-      return EEBADADDR;
-    }
+    char service[NI_MAXSERV];
+    snprintf(service, sizeof(service), "%u", port);
+
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof(struct addrinfo));
+  #ifdef IPV6
+    hints.ai_family = AF_INET6;
+  #else
+    hints.ai_family = AF_INET;
+  #endif
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE | AI_V4MAPPED;
+    hints.ai_protocol = 0; /* Any protocol */
+
+      int ret;
+      struct addrinfo *result = NULL;
+      if (MUD_IP[0] != '\0') {
+        debug(sockets, "socket_bind: binding to mud ip: %s.\n", MUD_IP);
+        ret = getaddrinfo(MUD_IP, service, &hints, &result);
+      } else {
+        debug(sockets, "socket_bind: binding to any address.\n");
+        ret = getaddrinfo(NULL, service, &hints, &result);
+      }
+      if (ret) {
+        debug(sockets, "socket_bind: error %s \n", gai_strerror(ret));
+        return EEBADADDR;
+      }
+
+      memcpy(&sockaddr, result->ai_addr, result->ai_addrlen);
+      len = result->ai_addrlen;
+      freeaddrinfo(result);
   }
 
   if (bind(lpc_socks[fd].fd, (struct sockaddr *)&sockaddr, len) == -1) {
@@ -468,23 +521,11 @@ int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback) {
     }
   }
 
-  /*
-   * according to Amylaar, 'accepted' sockets in Linux 0.99p6 don't
-   * properly inherit the nonblocking property from the listening socket.
-   * Marius, 19-Jun-2000: this happens on other platforms as well, so just
-   * do it for everyone
-   * better reset the close on exec as well then
-   */
-  if (set_socket_nonblocking(accept_fd, 1) == -1) {
+  if (evutil_make_socket_nonblocking(accept_fd) == -1) {
     debug(sockets, "socket_accept: set_socket_nonblocking 1 error: %s.\n",
           evutil_socket_error_to_string(evutil_socket_geterror(accept_fd)));
     OS_socket_close(accept_fd);
     return EENONBLOCK;
-  }
-
-  if (set_socket_tcp_nodelay(accept_fd, 1) == -1) {
-    debug(sockets, "socket_accept: set_socket_tcp_nodelay error: %s.\n",
-          evutil_socket_error_to_string(evutil_socket_geterror(accept_fd)));
   }
 
 #ifdef FD_CLOEXEC
@@ -556,8 +597,9 @@ int socket_connect(int fd, const char *name, svalue_t *read_callback, svalue_t *
     case STATE_DATA_XFER:
       return EEISCONN;
   }
-  if (!string_to_sockaddr(name, (sockaddr *)&lpc_socks[fd].r_addr, &lpc_socks[fd].r_addrlen)) {
-    debug(sockets, "socket_connect: bad address: %s", name);
+
+  if (!lpcaddr_to_sockaddr(name, (sockaddr *)&lpc_socks[fd].r_addr, &lpc_socks[fd].r_addrlen)) {
+    debug(sockets, "socket_connect: bad address: %s.\n", name);
     return EEBADADDR;
   }
 
@@ -600,6 +642,8 @@ int socket_connect(int fd, const char *name, svalue_t *read_callback, svalue_t *
 
 /*
  * Write a message on an LPC efun socket
+ *
+ * NOTE: name format is "ip port", whitespace as delimiter.
  */
 int socket_write(int fd, svalue_t *message, const char *name) {
   int len, off;
@@ -621,7 +665,7 @@ int socket_write(int fd, svalue_t *message, const char *name) {
     if (name == NULL) {
       return EENOADDR;
     }
-    if (!string_to_sockaddr(name, (sockaddr *)&addr, &addrlen)) {
+    if (!lpcaddr_to_sockaddr(name, (sockaddr *)&addr, &addrlen)) {
       return EEBADADDR;
     }
   } else {
@@ -1364,54 +1408,6 @@ void assign_socket_owner(svalue_t *sv, object_t *ob) {
     assign_svalue_no_free(sv, &const0u);
   }
 }
-
-#ifdef PACKAGE_SOCKETS
-
-/*
- * Convert a string representation of an address to a sockaddr_in
- * The format of the string is "ip port", the delimiter is a whitespace.
- */
-static int string_to_sockaddr(const char *name, struct sockaddr *addr, socklen_t *len) {
-  const char *cp = strchr(name, ' ');
-  if (cp == NULL) {
-    debug(sockets, "socket_name_to_sin: malformed address: %s", name);
-    return 0;
-  }
-
-  char host[NI_MAXHOST], service[NI_MAXSERV];
-
-  memset(host, 0, sizeof(host));
-  memset(service, 0, sizeof(service));
-
-  memcpy(host, name, cp - name);
-  strncpy(service, cp + 1, sizeof(service) - 1);
-
-  struct addrinfo hints, *res;
-
-#ifdef IPV6
-  hints.ai_family = AF_INET6;
-#else
-  hints.ai_family = AF_INET;
-#endif
-  hints.ai_socktype = SOCK_STREAM;
-  hints.ai_protocol = 0;
-  hints.ai_flags = AI_V4MAPPED | AI_NUMERICHOST | AI_NUMERICSERV;
-
-  int ret;
-  if ((ret = getaddrinfo(host, service, &hints, &res))) {
-    debug(sockets, "socket_name_to_sin: getaddrinfo error: %s", gai_strerror(ret));
-    return 0;
-  }
-
-  memcpy(addr, res->ai_addr, res->ai_addrlen);
-  if (len != NULL) *len = res->ai_addrlen;
-
-  freeaddrinfo(res);
-
-  return 1;
-}
-
-#endif /* PACKAGE_SOCKETS */
 
 /*
  * Close any sockets owned by ob
