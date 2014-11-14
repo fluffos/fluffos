@@ -1,12 +1,12 @@
 #ifndef MACROS_H
 #define MACROS_H
 
-/* do things both ways ... */
 #define SAFE(x) \
   do {          \
     x           \
   } while (0)
 
+/* malloc wrappers */
 #if defined(DEBUGMALLOC)
 #define FREE(x) debugfree(x)
 #define DMALLOC(x, t, d) debugmalloc(x, t, d)
@@ -22,6 +22,7 @@
 #define RESIZE(ptr, num, type, tag, desc) \
   ((type *)DREALLOC((void *)ptr, sizeof(type) * (num), tag, desc))
 
+/* DEBIG wrappers */
 #ifdef DEBUG
 #define IF_DEBUG(x) x
 #define DEBUG_CHECK(x, y) \

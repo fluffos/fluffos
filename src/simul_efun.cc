@@ -62,7 +62,7 @@ void init_simul_efun(char *file) {
     strcat(buf, ".c");
   }
 
-  new_ob = load_object(buf, compiled_version);
+  new_ob = load_object(buf, 1);
   if (new_ob == 0) {
     fprintf(stderr, "The simul_efun file %s was not loaded.\n", buf);
     exit(-1);

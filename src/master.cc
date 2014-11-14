@@ -52,7 +52,7 @@ void init_master() {
     error("Illegal master file name '%s'\n", MASTER_FILE);
   }
 
-  new_ob = load_object(buf, compiled_version);
+  new_ob = load_object(buf, 1);
   if (new_ob == 0) {
     fprintf(stderr, "The master file %s was not loaded.\n", MASTER_FILE);
     exit(-1);

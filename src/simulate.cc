@@ -384,7 +384,7 @@ int strip_name(const char *src, char *dest, int size) {
  * it.
  *
  */
-object_t *int_load_object(const char *lname, int callcreate) {
+object_t *load_object(const char *lname, int callcreate) {
   int f;
   program_t *prog;
   object_t *ob;
@@ -493,7 +493,7 @@ object_t *int_load_object(const char *lname, int callcreate) {
     if ((inh_obj = lookup_object_hash(inhbuf))) {
       IF_DEBUG(fatal("Inherited object is already loaded!"));
     } else {
-      inh_obj = load_object(inhbuf, 0);
+      inh_obj = load_object(inhbuf, 1);
     }
     if (!inh_obj) error("Inherited file '/%s' does not exist!\n", inhbuf);
 
@@ -504,7 +504,7 @@ object_t *int_load_object(const char *lname, int callcreate) {
      * -Beek
      */
     if (!(ob = lookup_object_hash(name))) {
-      ob = load_object(name, 0);
+      ob = load_object(name, 1);
       /* sigh, loading the inherited file removed us */
       if (!ob) {
         num_objects_this_thread--;
@@ -944,7 +944,7 @@ void destruct_object(object_t *ob) {
     SETOBNAME(ob, "");
 
     /* handle these two carefully, since they are rather vital */
-    new_ob = load_object(tmp, compiled_version);
+    new_ob = load_object(tmp, 1);
     if (!new_ob) {
       SETOBNAME(ob, tmp);
       sp--;
@@ -1436,7 +1436,7 @@ object_t *find_object(const char *str) {
   if ((ob = lookup_object_hash(tmpbuf))) {
     return ob;
   }
-  ob = load_object(tmpbuf, 0);
+  ob = load_object(tmpbuf, 1);
   if (!ob || (ob->flags & O_DESTRUCTED)) { /* *sigh* */
     return 0;
   }

@@ -3052,7 +3052,7 @@ void f_test_load() {
   sp->type = T_ERROR_HANDLER;
   sp->u.error_handler = fix_object_names;
 
-  new_ob = int_load_object(tmp, 0);
+  new_ob = load_object(tmp, 0);
   if (!new_ob) {
     if (testloadob) {
       SETOBNAME(testloadob, tmp);
