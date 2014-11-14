@@ -369,10 +369,6 @@ void add_message(object_t *who, const char *data, int len) {
 
   handle_snoop(data, len, ip);
 
-#ifdef FLUSH_OUTPUT_IMMEDIATELY
-  flush_message(ip);
-#endif
-
   add_message_calls++;
 } /* add_message() */
 
@@ -414,7 +410,7 @@ int flush_message(interactive_t *ip) {
   /*
    * if ip is not valid, do nothing.
    */
-  if (!ip || (ip->iflags & (NET_DEAD | CLOSING))) {
+  if (!ip) {
     debug(connections, ("flush_message: invalid target!\n"));
     return 0;
   }

@@ -338,11 +338,6 @@
  */
 #define CALLOUT_LOOP_PROTECTION
 
-/* FLUSH_OUTPUT_IMMEDIATELY: Causes output to be written to sockets
- * immediately after being generated.  Useful for debugging.
- */
-#undef FLUSH_OUTPUT_IMMEDIATELY
-
 /* PRIVS: define this if you want object privileges.  Your mudlib must
  *   explicitly make use of this functionality to be useful.  Defining this
  *   this will increase the size of the object structure by 4 bytes (8 bytes

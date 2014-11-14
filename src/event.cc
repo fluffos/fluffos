@@ -145,7 +145,7 @@ static void on_user_events(bufferevent *bev, short events, void *arg) {
     return;
   }
 
-  if ((events & BEV_EVENT_EOF) || (events & BEV_EVENT_TIMEOUT)) {
+  if (events & (BEV_EVENT_ERROR | BEV_EVENT_EOF)) {
     user->iflags |= NET_DEAD;
     remove_interactive(user->ob, 0);
   } else {
@@ -159,8 +159,7 @@ void new_user_event_listener(interactive_t *user) {
   bufferevent_setcb(bev, on_user_read, on_user_write, on_user_events, user);
   bufferevent_enable(bev, EV_READ | EV_WRITE);
 
-  const timeval timeout_write = {10, 0};
-  bufferevent_set_timeouts(bev, NULL, &timeout_write);
+  bufferevent_set_timeouts(bev, NULL, NULL);
 
   user->ev_buffer = bev;
   user->ev_command = event_new(g_event_base, -1, EV_TIMEOUT | EV_PERSIST, on_user_command, user);
