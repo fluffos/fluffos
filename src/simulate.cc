@@ -1963,15 +1963,9 @@ void shutdownMudOS(int exit_code) {
   db_cleanup();
 #endif
   shutdown_external_ports();
+
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
-  for (i = 0; i < max_lpc_socks; i++) {
-    if (lpc_socks[i].state == STATE_CLOSED) {
-      continue;
-    }
-    while (OS_socket_close(lpc_socks[i].fd) == -1 && errno == EINTR) {
-      ;
-    }
-  }
+  lpc_socks_closeall();
 #endif
   flush_message_all();
 
