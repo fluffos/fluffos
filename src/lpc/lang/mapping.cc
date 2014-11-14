@@ -270,7 +270,7 @@ mapping_t *allocate_mapping(int n) {
   /* The size is actually 1 higher */
   newmap->unfilled = n * (unsigned)FILL_PERCENT / (unsigned)100;
   a = newmap->table =
-      (mapping_node_t **)DXALLOC(n *= sizeof(mapping_node_t *), TAG_MAP_TBL, "allocate_mapping: 3");
+      (mapping_node_t **)DMALLOC(n *= sizeof(mapping_node_t *), TAG_MAP_TBL, "allocate_mapping: 3");
   if (!a) {
     error("Allocate_mapping 2 - out of memory.\n");
   }

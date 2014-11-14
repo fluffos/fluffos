@@ -1960,7 +1960,7 @@ expr0:
 			n2 = $3->v.number;
 			s1 = PROG_STRING(n1);
 			s2 = PROG_STRING(n2);
-			news = (char *)DXALLOC( (l = strlen(s1))+strlen(s2)+1, TAG_COMPILER, "combine string" );
+			news = (char *)DMALLOC( (l = strlen(s1))+strlen(s2)+1, TAG_COMPILER, "combine string" );
 			strcpy(news, s1);
 			strcat(news + l, s2);
 			/* free old strings (ordering may help shrink table) */

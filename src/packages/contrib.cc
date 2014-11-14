@@ -1072,20 +1072,20 @@ static char *pluralize(const char *str) {
   if (str[0] == 'a' || str[0] == 'A') {
     if (str[1] == ' ') {
       plen = sz - 2;
-      pre = (char *)DXALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
+      pre = (char *)DMALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
       strncpy(pre, str + 2, plen);
     } else if (sz > 2 && str[1] == 'n' && str[2] == ' ') {
       plen = sz - 3;
-      pre = (char *)DXALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
+      pre = (char *)DMALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
       strncpy(pre, str + 3, plen);
     } else {
       plen = sz;
-      pre = (char *)DXALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
+      pre = (char *)DMALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
       strncpy(pre, str, plen);
     }
   } else {
     plen = sz;
-    pre = (char *)DXALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
+    pre = (char *)DMALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
     strncpy(pre, str, plen);
   }
   pre[plen] = 0;

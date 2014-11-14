@@ -226,7 +226,7 @@ void f_compress(void) {
 
   new_size = compressBound(size);
   // Make it a little larger as specified in the docs.
-  buffer = (unsigned char *)DXALLOC(new_size, TAG_TEMPORARY, "compress");
+  buffer = (unsigned char *)DMALLOC(new_size, TAG_TEMPORARY, "compress");
   compress(buffer, &new_size, input, size);
 
   // Shrink it down.
@@ -262,7 +262,7 @@ void f_uncompress(void) {
     return;
   }
 
-  compressed = (z_stream *)DXALLOC(sizeof(z_stream), TAG_INTERACTIVE, "start_compression");
+  compressed = (z_stream *)DMALLOC(sizeof(z_stream), TAG_INTERACTIVE, "start_compression");
   compressed->next_in = buffer->item;
   compressed->avail_in = buffer->size;
   compressed->next_out = compress_buf;
@@ -285,7 +285,7 @@ void f_uncompress(void) {
       pos = len;
       len += COMPRESS_BUF_SIZE - compressed->avail_out;
       if (!output_data) {
-        output_data = (unsigned char *)DXALLOC(len, TAG_TEMPORARY, "uncompress");
+        output_data = (unsigned char *)DMALLOC(len, TAG_TEMPORARY, "uncompress");
       } else {
         output_data = (unsigned char *)REALLOC(output_data, len);
       }

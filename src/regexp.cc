@@ -302,7 +302,7 @@ regexp *regcomp(unsigned char *exp, int excompat) /* \( \) operators like in uni
     FAIL("NULL argument\n");
   }
 
-  exp2 = (short *)DXALLOC((strlen((char *)exp) + 1) * (sizeof(short[8]) / sizeof(char[8])),
+  exp2 = (short *)DMALLOC((strlen((char *)exp) + 1) * (sizeof(short[8]) / sizeof(char[8])),
                           TAG_TEMPORARY, "regcomp: 1");
   for (scan = exp, dest = exp2; (c = *scan++);) {
     switch (c) {
@@ -375,7 +375,7 @@ regexp *regcomp(unsigned char *exp, int excompat) /* \( \) operators like in uni
   }
 
   /* Allocate space. */
-  r = (regexp *)DXALLOC(sizeof(regexp) + (unsigned)regsize, TAG_TEMPORARY, "regcomp: 2");
+  r = (regexp *)DMALLOC(sizeof(regexp) + (unsigned)regsize, TAG_TEMPORARY, "regcomp: 2");
   if (r == (regexp *)NULL) {
     FREE(exp2);
     FAIL("out of space\n");

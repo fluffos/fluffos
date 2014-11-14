@@ -5,8 +5,8 @@ static LPC_INT cond_get_exp(int);
 static void handle_cond(LPC_INT);
 
 #ifndef LEXER
-#undef DXALLOC
-#define DXALLOC(x, y, z) malloc(x)
+#undef DMALLOC
+#define DMALLOC(x, y, z) malloc(x)
 #undef FREE
 #define FREE(x) free(x)
 #undef ALLOCATE
@@ -89,9 +89,9 @@ static void add_define(const char *name, int nargs, const char *exps) {
     }
   } else {
     p = ALLOCATE(defn_t, TAG_COMPILER, "add_define: def");
-    p->name = (char *)DXALLOC(strlen(name) + 1, TAG_COMPILER, "add_define: def name");
+    p->name = (char *)DMALLOC(strlen(name) + 1, TAG_COMPILER, "add_define: def name");
     strcpy(p->name, name);
-    p->exps = (char *)DXALLOC(len + 1, TAG_COMPILER, "add_define: def exps");
+    p->exps = (char *)DMALLOC(len + 1, TAG_COMPILER, "add_define: def exps");
     memcpy(p->exps, exps, len);
     p->exps[len] = 0;
     p->flags = 0;

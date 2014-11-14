@@ -3523,7 +3523,7 @@ void f_parse_add_rule() {
   }
 
   verb_node =
-      (verb_node_t *)DXALLOC(sizeof(verb_node_t) + sizeof(int) * i, TAG_PARSER, "parse_add_rule");
+      (verb_node_t *)DMALLOC(sizeof(verb_node_t) + sizeof(int) * i, TAG_PARSER, "parse_add_rule");
 
   verb_node->lit[0] = lit[0];
   verb_node->lit[1] = lit[1];
@@ -3656,7 +3656,7 @@ void f_parse_add_synonym() {
     }
 
     verb_node =
-        (verb_node_t *)DXALLOC(sizeof(verb_node_t) + sizeof(int) * i, TAG_PARSER, "parse_add_rule");
+        (verb_node_t *)DMALLOC(sizeof(verb_node_t) + sizeof(int) * i, TAG_PARSER, "parse_add_rule");
     memcpy(verb_node, vn, sizeof(verb_node_t) + sizeof(int) * i);
     for (i = 0; vn->token[i]; i++)
       if (vn->token[i] >= OBJ_A_TOKEN) {

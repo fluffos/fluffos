@@ -4699,7 +4699,7 @@ int inter_sscanf(svalue_t *arg, svalue_t *s0, svalue_t *s1, int num_arg) {
           }
           {
             int n = tmp - fmt;
-            char *buf = (char *)DXALLOC(n + 1, TAG_TEMPORARY, "sscanf regexp");
+            char *buf = (char *)DMALLOC(n + 1, TAG_TEMPORARY, "sscanf regexp");
             memcpy(buf, fmt, n);
             buf[n] = 0;
             regexp_user = EFUN_REGEXP;
@@ -4829,7 +4829,7 @@ int inter_sscanf(svalue_t *arg, svalue_t *s0, svalue_t *s1, int num_arg) {
             }
             {
               int n = tmp - fmt;
-              char *buf = (char *)DXALLOC(n + 1, TAG_TEMPORARY, "sscanf regexp");
+              char *buf = (char *)DMALLOC(n + 1, TAG_TEMPORARY, "sscanf regexp");
               memcpy(buf, fmt, n);
               buf[n] = 0;
               regexp_user = EFUN_REGEXP;

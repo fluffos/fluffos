@@ -1119,7 +1119,7 @@ static int ins(const char *str) {
     len = cp - str;
     /* cp now points to end of first or only line */
 
-    if ((newl = (ed_line_t *)DXALLOC(sizeof(ed_line_t) + len, TAG_ED, "ins: new")) == NULL) {
+    if ((newl = (ed_line_t *)DMALLOC(sizeof(ed_line_t) + len, TAG_ED, "ins: new")) == NULL) {
       return (MEM_FAIL); /* no memory */
     }
 

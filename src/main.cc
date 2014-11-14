@@ -443,34 +443,6 @@ void debug_message(const char *fmt, ...) {
   fflush(stderr);
 }
 
-char *xalloc(int size) {
-  char *p;
-  const char *t;
-  static int going_to_exit;
-
-  if (going_to_exit) {
-    exit(3);
-  }
-#ifdef DEBUG
-  if (size == 0) {
-    fatal("Tried to allocate 0 bytes.\n");
-  }
-#endif
-  p = (char *)DMALLOC(size, TAG_MISC, "main.c: xalloc");
-  if (p == 0) {
-    if (reserved_area) {
-      FREE(reserved_area);
-      t = "Temporarily out of MEMORY. Freeing reserve.\n";
-      write(1, t, strlen(t));
-      reserved_area = 0;
-      return xalloc(size); /* Try again */
-    }
-    going_to_exit = 1;
-    fatal("Totally out of MEMORY.\n");
-  }
-  return p;
-}
-
 static void setup_signal_handlers() {
   signal(SIGFPE, sig_fpe);
   signal(SIGUSR1, sig_usr1);

@@ -491,7 +491,7 @@ char *read_file(const char *file, int start, int lines) {
   }
 
   if (!theBuff) {
-    theBuff = (char *)DXALLOC(2 * READ_FILE_MAX_SIZE + 1, TAG_PERMANENT, "read_file: theBuff");
+    theBuff = (char *)DMALLOC(2 * READ_FILE_MAX_SIZE + 1, TAG_PERMANENT, "read_file: theBuff");
   }
 
 #ifndef PACKAGE_COMPRESS

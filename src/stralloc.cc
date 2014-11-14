@@ -157,7 +157,7 @@ static block_t *alloc_new_string(const char *string, int h) {
     cut = 1;
   }
   size = sizeof(block_t) + len + 1;
-  b = (block_t *)DXALLOC(size, TAG_SHARED_STRING, "alloc_new_string");
+  b = (block_t *)DMALLOC(size, TAG_SHARED_STRING, "alloc_new_string");
   strncpy(STRING(b), string, len);
   STRING(b)[len] = '\0'; /* strncpy doesn't put on \0 if 'from' too
                             * long */
@@ -332,7 +332,7 @@ char *int_new_string(int size)
   }
 #endif
 
-  mbt = (malloc_block_t *)DXALLOC(size + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, tag);
+  mbt = (malloc_block_t *)DMALLOC(size + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, tag);
   if (size < UINT_MAX) {
     mbt->size = size;
     ADD_NEW_STRING(size, sizeof(malloc_block_t));
@@ -373,7 +373,7 @@ char *int_alloc_cstring(const char *str)
 {
   char *ret;
 
-  ret = (char *)DXALLOC(strlen(str) + 1, TAG_STRING, tag);
+  ret = (char *)DMALLOC(strlen(str) + 1, TAG_STRING, tag);
   strcpy(ret, str);
   return ret;
 }
@@ -415,13 +415,13 @@ char *int_string_unlink(const char *str)
   if (mbt->size == USHRT_MAX) {
     int l = strlen(str + USHRT_MAX) + USHRT_MAX; /* ouch */
 
-    newmbt = (malloc_block_t *)DXALLOC(l + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, desc);
+    newmbt = (malloc_block_t *)DMALLOC(l + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, desc);
     memcpy((char *)(newmbt + 1), (char *)(mbt + 1), l + 1);
     newmbt->size = USHRT_MAX;
     ADD_NEW_STRING(USHRT_MAX, sizeof(malloc_block_t));
   } else {
     newmbt =
-        (malloc_block_t *)DXALLOC(mbt->size + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, desc);
+        (malloc_block_t *)DMALLOC(mbt->size + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, desc);
     memcpy((char *)(newmbt + 1), (char *)(mbt + 1), mbt->size + 1);
     newmbt->size = mbt->size;
     ADD_NEW_STRING(mbt->size, sizeof(malloc_block_t));

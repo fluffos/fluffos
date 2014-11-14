@@ -557,7 +557,7 @@ object_t *int_load_object(const char *lname, int callcreate) {
 
 static char *make_new_name(const char *str) {
   static unsigned int i;
-  char *p = (char *)DXALLOC(strlen(str) + 12, TAG_OBJ_NAME, "make_new_name");
+  char *p = (char *)DMALLOC(strlen(str) + 12, TAG_OBJ_NAME, "make_new_name");
 
   (void)sprintf(p, "%s#%u", str, i);
   i++;

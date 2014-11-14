@@ -541,7 +541,7 @@ static int get_terminator(char *terminator) {
       res = -2;                                                                     \
       break;                                                                        \
     }                                                                               \
-    line[++curchunk] = (char *)DXALLOC(MAXCHUNK, TAG_COMPILER, "array/text chunk"); \
+    line[++curchunk] = (char *)DMALLOC(MAXCHUNK, TAG_COMPILER, "array/text chunk"); \
     len = 0;                                                                        \
   }
 
@@ -559,7 +559,7 @@ static int get_array_block(char *term) {
    * initialize
    */
   termlen = strlen(term);
-  array_line[0] = (char *)DXALLOC(MAXCHUNK, TAG_COMPILER, "array_block");
+  array_line[0] = (char *)DMALLOC(MAXCHUNK, TAG_COMPILER, "array_block");
   array_line[0][0] = '(';
   array_line[0][1] = '{';
   array_line[0][2] = '"';
@@ -661,7 +661,7 @@ static int get_array_block(char *term) {
           outp = yyp;
           break;
         }
-        array_line[++curchunk] = (char *)DXALLOC(MAXCHUNK, TAG_COMPILER, "array_block");
+        array_line[++curchunk] = (char *)DMALLOC(MAXCHUNK, TAG_COMPILER, "array_block");
         len = 0;
       }
       /*
@@ -702,7 +702,7 @@ static int get_text_block(char *term) {
    * initialize
    */
   termlen = strlen(term);
-  text_line[0] = (char *)DXALLOC(MAXCHUNK, TAG_COMPILER, "text_block");
+  text_line[0] = (char *)DMALLOC(MAXCHUNK, TAG_COMPILER, "text_block");
   text_line[0][0] = '"';
   text_line[0][1] = '\0';
   len = 1;
@@ -830,7 +830,7 @@ static int get_text_block(char *term) {
           outp = yyp;
           break;
         }
-        text_line[++curchunk] = (char *)DXALLOC(MAXCHUNK, TAG_COMPILER, "text_block");
+        text_line[++curchunk] = (char *)DMALLOC(MAXCHUNK, TAG_COMPILER, "text_block");
         len = 0;
       }
       /*
@@ -2939,9 +2939,9 @@ static void add_predefine(const char *name, int nargs, const char *exps) {
     p->nargs = nargs;
   } else {
     p = ALLOCATE(defn_t, TAG_PREDEFINES, "add_define: def");
-    p->name = (char *)DXALLOC(strlen(name) + 1, TAG_PREDEFINES, "add_define: def name");
+    p->name = (char *)DMALLOC(strlen(name) + 1, TAG_PREDEFINES, "add_define: def name");
     strcpy(p->name, name);
-    p->exps = (char *)DXALLOC(strlen(exps) + 1, TAG_PREDEFINES, "add_define: def exps");
+    p->exps = (char *)DMALLOC(strlen(exps) + 1, TAG_PREDEFINES, "add_define: def exps");
     strcpy(p->exps, exps);
     p->flags = DEF_IS_PREDEF;
     p->nargs = nargs;
@@ -3090,7 +3090,7 @@ static char *expand_define2(char *text) {
 
   /* special handling for __LINE__ macro */
   if (!strcmp(text, "__LINE__")) {
-    expand_buffer = (char *)DXALLOC(20, TAG_COMPILER, "expand_define2");
+    expand_buffer = (char *)DMALLOC(20, TAG_COMPILER, "expand_define2");
     sprintf(expand_buffer, "%i", current_line);
     return expand_buffer;
   }
@@ -3128,7 +3128,7 @@ static char *expand_define2(char *text) {
   }
 
   if (!argc) {
-    expand_buffer = (char *)DXALLOC(strlen(macro->exps) + 1, TAG_COMPILER, "expand_define2");
+    expand_buffer = (char *)DMALLOC(strlen(macro->exps) + 1, TAG_COMPILER, "expand_define2");
     strcpy(expand_buffer, macro->exps);
     expand_depth--;
     return expand_buffer;
@@ -3136,7 +3136,7 @@ static char *expand_define2(char *text) {
 
   /* Perform expansion with args */
   in = macro->exps;
-  out = expand_buffer = (char *)DXALLOC(DEFMAX, TAG_COMPILER, "expand_define2");
+  out = expand_buffer = (char *)DMALLOC(DEFMAX, TAG_COMPILER, "expand_define2");
 
 #define SAVECHAR(x)                                                   \
   SAFE(if (out + 1 < expand_buffer + DEFMAX) { *out++ = (x); } else { \

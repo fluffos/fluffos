@@ -2414,7 +2414,7 @@ static program_t *epilog(void) {
     size += align(num_func * sizeof(unsigned short));
   }
 
-  p = (char *)DXALLOC(size, TAG_PROGRAM, "epilog: 1");
+  p = (char *)DMALLOC(size, TAG_PROGRAM, "epilog: 1");
   prog = (program_t *)p;
   *prog = NULL_program;
   prog->total_size = size;
@@ -2442,7 +2442,7 @@ static program_t *epilog(void) {
   lnoff = 2 + (mem_block[A_FILE_INFO].current_size / sizeof(short));
   lnsz = lnoff * sizeof(short) + mem_block[A_LINENUMBERS].current_size;
 
-  prog->file_info = (unsigned short *)DXALLOC(lnsz, TAG_LINENUMBERS, "epilog");
+  prog->file_info = (unsigned short *)DMALLOC(lnsz, TAG_LINENUMBERS, "epilog");
 
   prog->file_info[0] = (unsigned short)lnsz;
   prog->file_info[1] = (unsigned short)lnoff;
@@ -2580,7 +2580,7 @@ static void prolog(int f, char *name) {
    * will be stored.
    */
   for (i = 0; i < NUMAREAS; i++) {
-    mem_block[i].block = (char *)DXALLOC(START_BLOCK_SIZE, TAG_COMPILER, "prolog: 2");
+    mem_block[i].block = (char *)DMALLOC(START_BLOCK_SIZE, TAG_COMPILER, "prolog: 2");
     mem_block[i].current_size = 0;
     mem_block[i].max_size = START_BLOCK_SIZE;
   }

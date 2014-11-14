@@ -8,26 +8,22 @@
   } while (0)
 
 #if defined(DEBUGMALLOC)
-#define MALLOC(x) debugmalloc(x, 0, (char *)0)
 #define FREE(x) debugfree(x)
 #define REALLOC(x, y) debugrealloc(x, y, 0, (char *)0)
 #define CALLOC(x, y) debugcalloc(x, y, 0, (char *)0)
-#define DXALLOC(x, t, d) debugmalloc(x, t, d)
 #define DMALLOC(x, t, d) debugmalloc(x, t, d)
 #define DREALLOC(x, y, tag, desc) debugrealloc(x, y, tag, desc)
 #define DCALLOC(x, y, tag, desc) debugcalloc(x, y, tag, desc)
 #else
-#define MALLOC(x) malloc(x)
 #define FREE(x) free(x)
 #define REALLOC(x, y) realloc(x, y)
 #define CALLOC(x, y) calloc(x, y)
-#define DXALLOC(x, tag, desc) xalloc(x)
 #define DMALLOC(x, tag, desc) MALLOC(x)
 #define DREALLOC(x, y, tag, desc) REALLOC(x, y)
 #define DCALLOC(x, y, tag, desc) CALLOC(x, y)
 #endif
 
-#define ALLOCATE(type, tag, desc) ((type *)DXALLOC(sizeof(type), tag, desc))
+#define ALLOCATE(type, tag, desc) ((type *)DMALLOC(sizeof(type), tag, desc))
 #define CALLOCATE(num, type, tag, desc) ((type *)DCALLOC(sizeof(type[1]), num, tag, desc))
 #define RESIZE(ptr, num, type, tag, desc) \
   ((type *)DREALLOC((void *)ptr, sizeof(type) * (num), tag, desc))

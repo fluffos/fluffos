@@ -3825,7 +3825,7 @@ void f_next_inventory(void) {
 #ifdef F_DEFER
 void f_defer() {
   struct defer_list *newlist =
-      (struct defer_list *)DXALLOC(sizeof(struct defer_list), TAG_TEMPORARY, "defer: new item");
+      (struct defer_list *)DMALLOC(sizeof(struct defer_list), TAG_TEMPORARY, "defer: new item");
 
 // In reverse mode, newlist always will be the last data.
 #ifdef REVERSE_DEFER
