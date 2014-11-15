@@ -150,12 +150,10 @@ int main(int argc, char **argv) {
   }
 
   g_current_virtual_time = get_current_time();
-#ifdef POSIX_TIMERS
   /*
    * Initialize the POSIX timers.
    */
   init_posix_timers();
-#endif
 
   /* read in the configuration file */
 

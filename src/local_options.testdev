@@ -10,7 +10,6 @@
 #undef NO_SNOOP
 #undef NO_ENVIRONMENT
 #undef NO_WIZARDS
-#define POSIX_TIMERS
 
 #define PACKAGE_CRYPTO
 #define PACKAGE_PCRE
