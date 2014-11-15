@@ -1700,7 +1700,7 @@ void f_mkdir(void) {
   const char *path;
 
   path = check_valid_path(sp->u.string, current_object, "mkdir", 1);
-  if (!path || OS_mkdir(path, 0770) == -1) {
+  if (!path || mkdir(path, 0770) == -1) {
     free_string_svalue(sp);
     *sp = const0;
   } else {
@@ -3674,7 +3674,7 @@ void f_dump_file_descriptors(void) {
   outbuffer_t out;
 
   outbuf_zero(&out);
-  dump_file_descriptors(&out);
+  outbuf_add(&out, "ERROR: dump_file_descriptors is no longer supported.");
   outbuf_push(&out);
 }
 #endif

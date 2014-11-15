@@ -18,11 +18,6 @@
 #include "packages/async.h"
 #endif
 
-#ifdef WIN32
-#include <process.h>
-void CDECL alarm_loop(void *);
-#endif
-
 #include <deque>
 #include <functional>
 #include <map>

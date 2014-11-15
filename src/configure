@@ -7486,6 +7486,7 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
 
 # Checks for zlib.
+# NOTE: used a custom action for set HAVE_ZLIB instead.
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
 ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
@@ -7747,11 +7748,16 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
     # If both library and header were found, action-if-found
     #
 
-                CPPFLAGS="$CPPFLAGS -I${ZLIB_HOME}/include"
-                LDFLAGS="$LDFLAGS -L${ZLIB_HOME}/lib"
-                LIBS="-lz $LIBS"
+                # Restore variables
+                LDFLAGS="$ZLIB_OLD_LDFLAGS"
+                CPPFLAGS="$ZLIB_OLD_CPPFLAGS"
 
-$as_echo "#define HAVE_LIBZ 1" >>confdefs.h
+  CPPFLAGS="$CPPFLAGS -I${ZLIB_HOME}/include"
+  LDFLAGS="$LDFLAGS -L${ZLIB_HOME}/lib"
+  LIBS="-lz $LIBS"
+
+$as_echo "#define HAVE_ZLIB 1" >>confdefs.h
+
 
 
   else

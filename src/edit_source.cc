@@ -12,17 +12,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#ifdef WIN32
-#include <process.h>
-#include <malloc.h>
-#endif
-
-#if defined(DEBUG) || defined(WIN32)
-#define TO_DEV_NULL ""
-#else
-#define TO_DEV_NULL ">/dev/null 2>&1"
-#endif
-
 #include <set>
 #include <string>
 

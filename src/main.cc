@@ -38,22 +38,21 @@ static char *mud_lib;
 
 double consts[NUM_CONSTS];
 
-static void CDECL sig_fpe(int);
-static void CDECL sig_cld(int);
+static void sig_fpe(int);
+static void sig_cld(int);
 
 #ifdef HAS_CONSOLE
-static void CDECL sig_ttin(int);
+static void sig_ttin(int);
 #endif
-
-static void CDECL sig_usr1(int);
-static void CDECL sig_usr2(int);
-static void CDECL sig_term(int);
-static void CDECL sig_int(int);
-static void CDECL sig_abrt(int);
-static void CDECL sig_segv(int);
-static void CDECL sig_ill(int);
-static void CDECL sig_bus(int);
-static void CDECL sig_iot(int);
+static void sig_usr1(int);
+static void sig_usr2(int);
+static void sig_term(int);
+static void sig_int(int);
+static void sig_abrt(int);
+static void sig_segv(int);
+static void sig_ill(int);
+static void sig_bus(int);
+static void sig_iot(int);
 
 #ifdef DEBUG_MACRO
 /* used by debug.h: please leave this in here -- Tru (you can change its
@@ -288,9 +287,6 @@ int main(int argc, char **argv) {
       MUD_NAME, version_buf, ARCH, ctime(&tm));
 
   add_predefines();
-#ifdef WIN32
-  _tzset();
-#endif
 
   auto base = init_event_base();
   init_dns_event_base(base);
@@ -482,16 +478,14 @@ static void try_dump_stacktrace() {
 #endif
 }
 
-static void CDECL sig_cld(int sig) {
-#ifndef WIN32
+static void  sig_cld(int sig) {
   int status;
   while (wait3(&status, WNOHANG, NULL) > 0) {
     ;
   }
-#endif
 }
 
-static void CDECL sig_fpe(int sig) { signal(SIGFPE, sig_fpe); }
+static void  sig_fpe(int sig) { signal(SIGFPE, sig_fpe); }
 
 #ifdef HAS_CONSOLE
 void restore_sigttin(void) {
@@ -503,7 +497,7 @@ void restore_sigttin(void) {
 /* The console goes to sleep when backgrounded and can
  * be woken back up with kill -SIGTTIN <pid>
  */
-static void CDECL sig_ttin(int sig) {
+static void  sig_ttin(int sig) {
   char junk[1024];
   int fl;
 
@@ -532,7 +526,7 @@ static void CDECL sig_ttin(int sig) {
    which restarts the MUD should take an exit code of 1 to mean don't
    restart
  */
-static void CDECL sig_usr1(int sig) {
+static void  sig_usr1(int sig) {
   push_constant_string("Host machine shutting down");
   push_undefined();
   push_undefined();
@@ -542,7 +536,7 @@ static void CDECL sig_usr1(int sig) {
 }
 
 /* Abort evaluation */
-static void CDECL sig_usr2(int sig) {
+static void  sig_usr2(int sig) {
   debug_message("Received SIGUSR2, current eval aborted.\n");
   outoftime = 1;
 }
@@ -551,29 +545,29 @@ static void CDECL sig_usr2(int sig) {
  * Actually, doing all this stuff from a signal is probably illegal
  * -Beek
  */
-static void CDECL sig_term(int sig) { fatal("SIGTERM: Process terminated"); }
+static void  sig_term(int sig) { fatal("SIGTERM: Process terminated"); }
 
-static void CDECL sig_int(int sig) { fatal("SIGINT: Process interrupted"); }
+static void  sig_int(int sig) { fatal("SIGINT: Process interrupted"); }
 
-static void CDECL sig_segv(int sig) {
+static void  sig_segv(int sig) {
   /* attempt to dump backtrace using gdb. */
   try_dump_stacktrace();
   fatal("SIGSEGV: Segmentation fault");
 }
 
-static void CDECL sig_bus(int sig) {
+static void  sig_bus(int sig) {
   try_dump_stacktrace();
   fatal("SIGBUS: Bus error");
 }
 
-static void CDECL sig_ill(int sig) {
+static void  sig_ill(int sig) {
   try_dump_stacktrace();
   fatal("SIGILL: Illegal instruction");
 }
 
-static void CDECL sig_abrt(int sig) {
+static void  sig_abrt(int sig) {
   try_dump_stacktrace();
   fatal("SIGABRT: Aborted");
 }
 
-static void CDECL sig_iot(int sig) { fatal("Aborted(IOT)"); }
+static void  sig_iot(int sig) { fatal("Aborted(IOT)"); }

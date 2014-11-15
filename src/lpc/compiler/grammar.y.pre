@@ -12,10 +12,6 @@ extern char *outp;
 #include "lpc/compiler/generate.h"
 #include "master.h"
 
-/* gross. Necessary? - Beek */
-#ifdef WIN32
-#define MSDOS
-#endif
 #define YYSTACK_USE_ALLOCA 0
 %line
 /*

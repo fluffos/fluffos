@@ -139,8 +139,10 @@ void shutdown_external_ports() {
       continue;
     }
     if (external_port[i].ev_conn) evconnlistener_free(external_port[i].ev_conn);
-    if (OS_socket_close(external_port[i].fd) == -1) {
-      socket_perror("ipc_remove: close", 0);
+    if (evutil_closesocket(external_port[i].fd) == -1) {
+      debug_message("shutdown_external_ports: failed: %s",
+                    evutil_socket_error_to_string(
+                        evutil_socket_geterror(external_port[i].fd)));
     }
   }
 

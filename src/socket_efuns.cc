@@ -295,7 +295,7 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
 #else
     fd = socket(AF_INET, type, 0);
 #endif
-    if (fd == INVALID_SOCKET) {
+    if (fd == -1) {
       debug(sockets, "socket_create: socket error: %s.\n",
             evutil_socket_error_to_string(evutil_socket_geterror(fd)));
       return EESOCKET;
@@ -303,13 +303,13 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
     if (evutil_make_listen_socket_reuseable(fd) == -1) {
       debug(sockets, "socket_create: setsockopt error: %s.\n",
             evutil_socket_error_to_string(evutil_socket_geterror(fd)));
-      OS_socket_close(fd);
+      close(fd);
       return EESETSOCKOPT;
     }
     if (evutil_make_socket_nonblocking(fd) == -1) {
       debug(sockets, "socket_create: set_socket_nonblocking error: %s.\n",
             evutil_socket_error_to_string(evutil_socket_geterror(fd)));
-      OS_socket_close(fd);
+      close(fd);
       return EENONBLOCK;
     }
 
@@ -405,7 +405,7 @@ int socket_bind(int fd, int port, const char *addr) {
   }
 
   if (bind(lpc_socks[fd].fd, (struct sockaddr *)&sockaddr, len) == -1) {
-    switch (socket_errno) {
+    switch (errno) {
       case EADDRINUSE:
         debug(sockets, "socket_bind: address is in use.");
         return EEADDRINUSE;
@@ -506,7 +506,7 @@ int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback) {
   addrlen = sizeof(addr);
   accept_fd = accept(lpc_socks[fd].fd, (struct sockaddr *)&addr, &addrlen);
   if (accept_fd == -1) {
-    switch (socket_errno) {
+    switch (errno) {
 #ifdef EWOULDBLOCK
       case EWOULDBLOCK:
         return EEWOULDBLOCK;
@@ -523,7 +523,7 @@ int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback) {
   if (evutil_make_socket_nonblocking(accept_fd) == -1) {
     debug(sockets, "socket_accept: set_socket_nonblocking 1 error: %s.\n",
           evutil_socket_error_to_string(evutil_socket_geterror(accept_fd)));
-    OS_socket_close(accept_fd);
+    close(accept_fd);
     return EENONBLOCK;
   }
 
@@ -563,7 +563,7 @@ int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback) {
     debug(sockets, "socket_accept: accept on socket %d\n", fd);
     debug(sockets, "socket_accept: new socket %d on fd %d\n", i, accept_fd);
   } else {
-    OS_socket_close(accept_fd);
+    close(accept_fd);
   }
 
   return i;
@@ -609,7 +609,7 @@ int socket_connect(int fd, const char *name, svalue_t *read_callback, svalue_t *
 
   if (connect(lpc_socks[fd].fd, (struct sockaddr *)&lpc_socks[fd].r_addr,
               lpc_socks[fd].r_addrlen) == -1) {
-    switch (socket_errno) {
+    switch (errno) {
       case EINTR:
         return EEINTR;
       case EADDRINUSE:
@@ -817,14 +817,14 @@ int socket_write(int fd, svalue_t *message, const char *name) {
     return EESUCCESS;
   }
   debug(sockets, "socket_write: message size %d.\n", len);
-  off = OS_socket_write(lpc_socks[fd].fd, buf, len);
+  off = send(lpc_socks[fd].fd, buf, len, 0);
   if (off <= 0) {
     FREE(buf);
-    if (off == -1 && socket_errno == EWOULDBLOCK) {
+    if (off == -1 && errno == EWOULDBLOCK) {
       debug(sockets, "socket_write: write would block.\n");
       return EEWOULDBLOCK;
     }
-    if (off == -1 && socket_errno == EINTR) {
+    if (off == -1 && errno == EINTR) {
       debug(sockets, "socket_write: write interrupted.\n");
       return EEINTR;
     }
@@ -991,8 +991,8 @@ void socket_read_select_handler(int fd) {
           debug(sockets, ("read_socket_handler: DATA_XFER MUD\n"));
           if (lpc_socks[fd].flags & S_HEADER) {
             cc =
-                OS_socket_read(lpc_socks[fd].fd, (char *)&lpc_socks[fd].r_len + lpc_socks[fd].r_off,
-                               4 - lpc_socks[fd].r_off);
+                recv(lpc_socks[fd].fd, (char *)&lpc_socks[fd].r_len + lpc_socks[fd].r_off,
+                               4 - lpc_socks[fd].r_off, 0);
             if (cc <= 0) {
               break;
             }
@@ -1024,8 +1024,8 @@ void socket_read_select_handler(int fd) {
             debug(sockets, "read_socket_handler: svalue len is %d.\n", lpc_socks[fd].r_len);
           }
           if (lpc_socks[fd].r_off < lpc_socks[fd].r_len) {
-            cc = OS_socket_read(lpc_socks[fd].fd, lpc_socks[fd].r_buf + lpc_socks[fd].r_off,
-                                lpc_socks[fd].r_len - lpc_socks[fd].r_off);
+            cc = recv(lpc_socks[fd].fd, lpc_socks[fd].r_buf + lpc_socks[fd].r_off,
+                                lpc_socks[fd].r_len - lpc_socks[fd].r_off, 0);
             if (cc <= 0) {
               break;
             }
@@ -1064,7 +1064,7 @@ void socket_read_select_handler(int fd) {
 
         case STREAM:
           debug(sockets, ("read_socket_handler: DATA_XFER STREAM\n"));
-          cc = OS_socket_read(lpc_socks[fd].fd, buf, sizeof(buf) - 1);
+          cc = recv(lpc_socks[fd].fd, buf, sizeof(buf) - 1, 0);
           if (cc <= 0) {
             break;
           }
@@ -1107,7 +1107,7 @@ void socket_read_select_handler(int fd) {
       break;
   }
   if (cc == -1) {
-    switch (socket_errno) {
+    switch (errno) {
       case ECONNREFUSED:
         /* Evidentally, on Linux 1.2.1, ECONNREFUSED gets returned
          * if an ICMP_PORT_UNREACHED error happens internally.  Why
@@ -1148,8 +1148,8 @@ void socket_write_select_handler(int fd) {
   }
 
   if (lpc_socks[fd].w_buf != NULL) {
-    cc = OS_socket_write(lpc_socks[fd].fd, lpc_socks[fd].w_buf + lpc_socks[fd].w_off,
-                         lpc_socks[fd].w_len);
+    cc = send(lpc_socks[fd].fd, lpc_socks[fd].w_buf + lpc_socks[fd].w_off,
+                         lpc_socks[fd].w_len, 0);
     if (cc < 0) {
       if (cc == -1 && (errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR)) {
         event_add(lpc_socks[fd].ev_write, NULL);
@@ -1248,7 +1248,7 @@ int socket_close(int fd, int flags) {
     lpc_socks[fd].ev_data = NULL;
   }
 
-  while (OS_socket_close(lpc_socks[fd].fd) == -1 && socket_errno == EINTR) {
+  while (close(lpc_socks[fd].fd) == -1 && errno == EINTR) {
     ; /* empty while */
   }
   if (lpc_socks[fd].r_buf != NULL) {
@@ -1539,7 +1539,7 @@ void lpc_socks_closeall() {
     if (sock.state == STATE_CLOSED) {
       continue;
     }
-    while (OS_socket_close(sock.fd) == -1 && errno == EINTR) {
+    while (close(sock.fd) == -1 && errno == EINTR) {
       ;
     }
   }

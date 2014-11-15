@@ -79,9 +79,6 @@
 /* Define to 1 if you have the `pcre' library (-lpcre). */
 #undef HAVE_LIBPCRE
 
-/* Define to 1 if you have `z' library (-lz) */
-#undef HAVE_LIBZ
-
 /* Define to 1 if you have the <limits.h> header file. */
 #undef HAVE_LIMITS_H
 
@@ -277,6 +274,9 @@
 
 /* Define to 1 if `vfork' works. */
 #undef HAVE_WORKING_VFORK
+
+/* Define to 1 if you have `z' library (-lz) */
+#undef HAVE_ZLIB
 
 /* Define to 1 if `lstat' dereferences a symlink specified with a trailing
    slash. */

@@ -68,7 +68,7 @@ extern int has_console;
 extern void restore_sigttin(void);
 #endif
 
-void CDECL add_vmessage(object_t *, const char *, ...);
+void add_vmessage(object_t *, const char *, ...);
 void add_message(object_t *, const char *, int);
 void add_binary_message_noflush(object_t *, const unsigned char *, int);
 void add_binary_message(object_t *, const unsigned char *, int);

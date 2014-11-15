@@ -1625,10 +1625,6 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
     debug_message("Failed to completely save file. Disk could be full.\n");
     unlink(tmp_name);
   } else {
-#ifdef WIN32
-    /* Need to erase it to write over it. */
-    unlink(file);
-#endif
     if (rename(tmp_name, file) < 0) {
       debug_perror("save_object", file);
       debug_message("Failed to rename /%s to /%s\n", tmp_name, file);
@@ -1857,11 +1853,7 @@ int restore_object(object_t *ob, const char *file, int noclear) {
     theBuff = (char *)DMALLOC(tmp_len + 1, TAG_PERMANENT, "restore_object: 4");
     buff_len = tmp_len;
   }
-#ifdef WIN32
-  tmp_len = read(_fileno(f), theBuff, tmp_len);
-#else
   fread(theBuff, 1, tmp_len, f);
-#endif
 
   fclose(f);
   theBuff[tmp_len] = '\0';

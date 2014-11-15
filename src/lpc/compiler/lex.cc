@@ -17,11 +17,7 @@
 #include "file_incl.h"
 #include "lpc_incl.h"
 #include "compiler.h"
-#if defined(WIN32) && !defined(MINGW)
-#include "grammar_tab.h"
-#else
 #include "grammar.tab.h"
-#endif
 #include "scratchpad.h"
 #include "preprocess.h"
 #include "md.h"
@@ -1012,28 +1008,6 @@ char *show_error_context() {
   return buf;
 }
 
-#ifdef WIN32
-int correct_read(int handle, char *buf, unsigned int count) {
-  unsigned int tmp, size = 0;
-
-  do {
-    tmp = read(handle, buf, count);
-    if (tmp < 0) {
-      return tmp;
-    }
-    if (tmp == 0) {
-      return size;
-    }
-    size += tmp;
-    count -= tmp;
-    buf += tmp;
-  } while (count > 0);
-  return size;
-}
-#else
-#define correct_read read
-#endif
-
 static void refill_buffer() {
   if (cur_lbuf != &head_lbuf) {
     if (outp >= cur_lbuf->buf_end && cur_lbuf->term_type == TERM_ADD_INPUT) {
@@ -1073,7 +1047,7 @@ static void refill_buffer() {
         p = outp + size - 1;
       }
 
-      size = correct_read(yyin_desc, p, MAXLINE);
+      size = read(yyin_desc, p, MAXLINE);
       cur_lbuf->buf_end = p += size;
       if (size < MAXLINE) {
         *(last_nl = p) = LEX_EOF;
@@ -1136,7 +1110,7 @@ static void refill_buffer() {
         flag = 1;
       }
 
-      size = correct_read(yyin_desc, p, MAXLINE);
+      size = read(yyin_desc, p, MAXLINE);
       end = p += size;
       if (flag) {
         cur_lbuf->buf_end = p;
@@ -2334,15 +2308,6 @@ void add_predefines() {
 
   add_predefine("MUDOS", -1, "");
   add_predefine("FLUFFOS", -1, "");
-#ifdef WIN32
-  add_predefine("__WIN32__", -1, "");
-#endif
-#ifdef RUSAGE
-  add_predefine("__HAS_RUSAGE__", -1, "");
-#endif
-#ifdef M64
-  add_predefine("__M64__", -1, "");
-#endif
 #ifdef PACKAGE_DB
   add_predefine("__PACKAGE_DB__", -1, "");
 #endif
@@ -2353,12 +2318,6 @@ void add_predefines() {
 #ifdef PACKAGE_DWLIB
   add_predefine("__DWLIB__", -1, "");
 #endif
-#ifdef FD_SETSIZE
-  sprintf(save_buf, "%d", FD_SETSIZE);
-#else
-  sprintf(save_buf, "%d", 64);
-#endif
-  add_predefine("__FD_SETSIZE__", -1, save_buf);
   get_version(save_buf);
   add_quoted_predefine("__VERSION__", save_buf);
   sprintf(save_buf, "%d", external_port[0].port);

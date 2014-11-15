@@ -19,9 +19,6 @@
 #define MAX_COLOUR_STRING 200
 
 /* should be done in configure */
-#ifdef WIN32
-#define strcasecmp(X, Y) stricmp(X, Y)
-#endif
 
 #ifdef F_REAL_TIME
 void f_real_time(void) { push_number(time(NULL)); }

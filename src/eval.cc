@@ -5,7 +5,6 @@
 #include "backend.h"
 #include "posix_timers.h"
 
-static struct timeval tv;
 int outoftime = 0;
 LPC_INT max_cost;
 

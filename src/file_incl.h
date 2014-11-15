@@ -45,14 +45,4 @@
 #include <crypt.h>
 #endif
 
-#ifdef WIN32
-#include <direct.h>
-#include <io.h>
-
-#define OS_mkdir(x, y) mkdir(x)
-#define lstat(x, y) stat(x, y)
-#else
-#define OS_mkdir(x, y) mkdir(x, y)
-#endif
-
 #endif

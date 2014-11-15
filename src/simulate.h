@@ -32,9 +32,9 @@ extern int tot_dangling_object;
 
 char *strput(char *, char *, const char *);
 char *strput_int(char *, char *, int);
-void CDECL debug_fatal(char *, ...);
-void CDECL fatal(const char *, ...);
-void CDECL error(const char *const, ...);
+void debug_fatal(char *, ...);
+void fatal(const char *, ...);
+void error(const char *const, ...);
 void check_legal_string(const char *);
 #ifndef NO_LIGHT
 void add_light(object_t *, int);

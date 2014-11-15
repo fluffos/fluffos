@@ -99,8 +99,15 @@ AX_LIB_EVENT([2.0])
 F_HAVE_PREDEFINE([HAVE_LIBEVENT], [],
   [AC_MSG_ERROR([[Fail to find libevent (2.0+) header/library, install libevent-dev or change --with_libevent]])])
 
-# Checks for zlib.
-AX_CHECK_ZLIB()
+# Checks for zlib. 
+# NOTE: used a custom action for set HAVE_ZLIB instead.
+AX_CHECK_ZLIB([
+  CPPFLAGS="$CPPFLAGS -I${ZLIB_HOME}/include"
+  LDFLAGS="$LDFLAGS -L${ZLIB_HOME}/lib"
+  LIBS="-lz $LIBS"
+  AC_DEFINE([HAVE_ZLIB], [1],
+            [Define to 1 if you have `z' library (-lz)])
+])
 
 # FluffOS uses posix timers
 AC_SEARCH_LIBS([timer_create], [rt])
