@@ -570,7 +570,7 @@ int create_db_conn(void) {
     i = dbConnAlloc;
     dbConnAlloc += 10;
     if (!dbConnList) {
-      dbConnList = CALLOCATE(dbConnAlloc, db_t, TAG_DB, "create_db_conn");
+      dbConnList = (db_t *)DCALLOC(dbConnAlloc, sizeof(db_t), TAG_DB, "create_db_conn");
     } else {
 #ifdef PACKAGE_ASYNC
       pthread_mutex_lock(db_mut);
@@ -765,7 +765,7 @@ static int MySQL_connect(dbconn_t *c, const char *host, const char *database, co
   int ret;
   MYSQL *tmp;
 
-  tmp = ALLOCATE(MYSQL, TAG_DB, "MySQL_connect");
+  tmp = (MYSQL *) DMALLOC(sizeof(MYSQL), TAG_DB, "MySQL_connect");
   tmp = mysql_init(tmp);
   *(c->mysql.errormsg) = 0;
   c->mysql.handle =

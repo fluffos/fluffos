@@ -15,6 +15,14 @@
 #define PACKAGE_PCRE
 #define PACKAGE_PARSER
 
+#define PACKAGE_DB
+#ifdef PACKAGE_DB
+#define USE_POSTGRES 1
+#define USE_MYSQL 2
+#define USE_SQLITE3 3
+#endif
+
+
 #define REVERSE_DEFER
 
 #define USE_ICONV

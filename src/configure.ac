@@ -125,7 +125,9 @@ F_HAVE_PREDEFINE([USE_MYSQL], [F_HAVE_PREDEFINE([HAVE_MYSQL], [],
   [AC_MSG_ERROR([[Fail to find MYSQL header/library, try changing --with_mysql flag]])])])
 
 F_HAVE_PREDEFINE([USE_POSTGRES], [AX_LIB_POSTGRESQL()])
-F_HAVE_PREDEFINE([USE_POSTGRES], [F_HAVE_PREDEFINE([HAVE_POSTGRESQL], [],
+F_HAVE_PREDEFINE([USE_POSTGRES], [F_HAVE_PREDEFINE([HAVE_POSTGRESQL], [
+  AC_SEARCH_LIBS([PQconnectdb], [pq])
+],
   [AC_MSG_ERROR([[Fail to find POSTGRESQL header/library, try changing --with_postgresql flag.]])])])
 
 F_HAVE_PREDEFINE([USE_SQLITE3], [AX_LIB_SQLITE3()])
