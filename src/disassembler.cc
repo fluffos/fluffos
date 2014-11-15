@@ -15,7 +15,7 @@
 void dump_prog(program_t *, const char *, int);
 static void disassemble(FILE *, char *, int, int, program_t *);
 static const char *disassem_string(const char *);
-static int CDECL short_compare(const void *, const void *);
+static int short_compare(const void *, const void *);
 static void dump_line_numbers(FILE *, program_t *);
 
 void f_dump_prog(void) {
@@ -213,7 +213,7 @@ static const char *disassem_string(const char *str) {
 #define NUM_STRS prog->num_strings
 #define CLSS prog->classes
 
-static int CDECL short_compare(const void *a, const void *b) {
+static int short_compare(const void *a, const void *b) {
   int x = *(unsigned short *)a;
   int y = *(unsigned short *)b;
 

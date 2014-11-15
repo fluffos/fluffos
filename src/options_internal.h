@@ -8,16 +8,10 @@
 /* You may optionally choose one (or none) of these malloc wrappers.  These
  * can be used in conjunction with any of the above malloc packages.
  *
- * WRAPPEDMALLOC:
- *   * Limited statistics.
- *   * Limited additional cpu overhead and no additional memory overhead.
- *
  * DEBUGMALLOC:
- *   * Statistics on precisely how much memory has been malloc'd (as well
- *     as the stats provided by WRAPPEDMALLOC).
+ *   * Statistics on precisely how much memory has been malloc'd.
  *   * Incurs a fair amount of overhead (both memory and CPU)
  */
-#undef WRAPPEDMALLOC
 #undef DEBUGMALLOC
 
 /* The following add certain bells and whistles to malloc: */

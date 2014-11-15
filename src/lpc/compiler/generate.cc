@@ -449,7 +449,8 @@ generate(parse_node_t *node) {
 
 static void optimizer_start_function(int n) {
   if (n) {
-    last_local_refs = CALLOCATE(n, parse_node_t *, TAG_COMPILER, "c_start_function");
+    last_local_refs =
+        (parse_node_t **)DCALLOC(n, sizeof(parse_node_t *), TAG_COMPILER, "c_start_function");
     optimizer_num_locals = n;
     while (n--) {
       last_local_refs[n] = 0;

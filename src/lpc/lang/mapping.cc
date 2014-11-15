@@ -191,7 +191,8 @@ mapping_node_t *new_map_node() {
   if ((ret = free_nodes)) {
     free_nodes = ret->next;
   } else {
-    mnb = ALLOCATE(mapping_node_block_t, TAG_MAP_NODE_BLOCK, "new_map_node");
+    mnb = (mapping_node_block_t *)DMALLOC(sizeof(mapping_node_block_t), TAG_MAP_NODE_BLOCK,
+                                          "new_map_node");
     mnb->next = mapping_node_blocks;
     mapping_node_blocks = mnb;
     mnb->nodes[MNB_SIZE - 1].next = 0;
@@ -250,7 +251,7 @@ mapping_t *allocate_mapping(int n) {
   if (n > MAX_MAPPING_SIZE) {
     n = MAX_MAPPING_SIZE;
   }
-  newmap = ALLOCATE(mapping_t, TAG_MAPPING, "allocate_mapping: 1");
+  newmap = (mapping_t *)DMALLOC(sizeof(mapping_t), TAG_MAPPING, "allocate_mapping: 1");
   debug(mapping, "mapping.c: allocate_mapping begin, newmap = %p\n", (void *)newmap);
   if (newmap == NULL) {
     error("Allocate_mapping - out of memory.\n");
@@ -270,7 +271,7 @@ mapping_t *allocate_mapping(int n) {
   /* The size is actually 1 higher */
   newmap->unfilled = n * (unsigned)FILL_PERCENT / (unsigned)100;
   a = newmap->table =
-      (mapping_node_t **)DXALLOC(n *= sizeof(mapping_node_t *), TAG_MAP_TBL, "allocate_mapping: 3");
+      (mapping_node_t **)DMALLOC(n *= sizeof(mapping_node_t *), TAG_MAP_TBL, "allocate_mapping: 3");
   if (!a) {
     error("Allocate_mapping 2 - out of memory.\n");
   }
@@ -341,14 +342,15 @@ static mapping_t *copyMapping(mapping_t *m) {
   int k = m->table_size;
   mapping_node_t *elt, *nelt, **a, **b = m->table, **c;
 
-  newmap = ALLOCATE(mapping_t, TAG_MAPPING, "copy_mapping: 1");
+  newmap = (mapping_t *)DMALLOC(sizeof(mapping_t), TAG_MAPPING, "copy_mapping: 1");
   if (newmap == NULL) {
     error("copyMapping - out of memory.\n");
   }
   newmap->table_size = k++;
   newmap->unfilled = m->unfilled;
   newmap->ref = 1;
-  c = newmap->table = CALLOCATE(k, mapping_node_t *, TAG_MAP_TBL, "copy_mapping: 2");
+  c = newmap->table =
+      (mapping_node_t **)DCALLOC(k, sizeof(mapping_node_t *), TAG_MAP_TBL, "copy_mapping: 2");
   if (!c) {
     FREE((char *)newmap);
     error("copyMapping 2 - out of memory.\n");

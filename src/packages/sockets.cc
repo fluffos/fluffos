@@ -4,7 +4,6 @@
 */
 
 #include "../lpc_incl.h"
-#include "../socket_err.h"
 #include "../include/socket_err.h"
 #include "../socket_efuns.h"
 #include "../comm.h"
@@ -290,12 +289,13 @@ void f_socket_status(void) {
       sp->u.arr = info;
     }
   } else {
-    info = allocate_empty_array(max_lpc_socks);
-    for (i = 0; i < max_lpc_socks; i++) {
+    info = allocate_empty_array(lpc_socks_num());
+    for (i = 0; i < lpc_socks_num(); i++) {
       info->item[i].type = T_ARRAY;
       info->item[i].u.arr = socket_status(i);
     }
     push_refed_array(info);
   }
 }
+
 #endif

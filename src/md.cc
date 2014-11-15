@@ -9,9 +9,6 @@
 #include "lpc/compiler/lex.h"
 #include "simul_efun.h"
 #include "call_out.h"
-#if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
-#include "socket_efuns.h"
-#endif
 #endif
 #include "master.h"
 #include "outbuf.h"
@@ -20,7 +17,8 @@
 #include "packages/parser.h"
 #endif
 
-#include "heartbeat.h" // for check_heartbeats()
+#include "heartbeat.h"  // for check_heartbeats()
+#include "socket_efuns.h"
 
 /*
    note: do not use MALLOC() etc. in this module.  Unbridled recursion
@@ -461,31 +459,6 @@ static void mark_config(void) {
   }
 }
 
-#if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
-void mark_sockets(void) {
-  int i;
-  char *s;
-
-  for (i = 0; i < max_lpc_socks; i++) {
-    if (lpc_socks[i].flags & S_READ_FP) {
-      lpc_socks[i].read_callback.f->hdr.extra_ref++;
-    } else if ((s = lpc_socks[i].read_callback.s)) {
-      EXTRA_REF(BLOCK(s))++;
-    }
-    if (lpc_socks[i].flags & S_WRITE_FP) {
-      lpc_socks[i].write_callback.f->hdr.extra_ref++;
-    } else if ((s = lpc_socks[i].write_callback.s)) {
-      EXTRA_REF(BLOCK(s))++;
-    }
-    if (lpc_socks[i].flags & S_CLOSE_FP) {
-      lpc_socks[i].close_callback.f->hdr.extra_ref++;
-    } else if ((s = lpc_socks[i].close_callback.s)) {
-      EXTRA_REF(BLOCK(s))++;
-    }
-  }
-}
-#endif
-
 #ifdef STRING_STATS
 static int base_overhead = 0;
 
@@ -814,14 +787,12 @@ void check_all_blocks(int flag) {
     // Verify every objects that has O_HEART_BEAT flag has a corespodning HB
     for (ob = obj_list; ob; ob = ob->next_all) {
       if ((ob->flags & O_HEART_BEAT) != 0) {
-        DEBUG_CHECK(query_heart_beat(ob) == 0,
-                    "Driver BUG: object with heartbeat not in hb table");
+        DEBUG_CHECK(query_heart_beat(ob) == 0, "Driver BUG: object with heartbeat not in hb table");
       }
     }
     for (ob = obj_list_destruct; ob; ob = ob->next_all) {
       if ((ob->flags & O_HEART_BEAT) != 0) {
-        DEBUG_CHECK(query_heart_beat(ob) == 0,
-                    "Driver BUG: object with heartbeat not in hb table");
+        DEBUG_CHECK(query_heart_beat(ob) == 0, "Driver BUG: object with heartbeat not in hb table");
       }
     }
 
@@ -869,9 +840,7 @@ void check_all_blocks(int flag) {
 #ifdef PACKAGE_MUDLIB_STATS
     mark_mudlib_stats();
 #endif
-#if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
     mark_sockets();
-#endif
 #ifdef PACKAGE_PARSER
     parser_mark_verbs();
 #endif

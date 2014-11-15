@@ -315,9 +315,7 @@ void raise_error error(string);
 int uptime();
 int strcmp(string, string);
 
-#ifndef WIN32
 mapping rusage();
-#endif
 
 void flush_messages(void | object);
 

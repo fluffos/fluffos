@@ -166,7 +166,7 @@ void kill_ref(ref_t *ref) {
 }
 
 ref_t *make_ref(void) {
-  ref_t *ref = ALLOCATE(ref_t, TAG_TEMPORARY, "make_ref");
+  ref_t *ref = (ref_t *)DMALLOC(sizeof(ref_t), TAG_TEMPORARY, "make_ref");
   ref->next = global_ref_list;
   ref->prev = NULL;
   if (ref->next) {
@@ -4699,7 +4699,7 @@ int inter_sscanf(svalue_t *arg, svalue_t *s0, svalue_t *s1, int num_arg) {
           }
           {
             int n = tmp - fmt;
-            char *buf = (char *)DXALLOC(n + 1, TAG_TEMPORARY, "sscanf regexp");
+            char *buf = (char *)DMALLOC(n + 1, TAG_TEMPORARY, "sscanf regexp");
             memcpy(buf, fmt, n);
             buf[n] = 0;
             regexp_user = EFUN_REGEXP;
@@ -4829,7 +4829,7 @@ int inter_sscanf(svalue_t *arg, svalue_t *s0, svalue_t *s1, int num_arg) {
             }
             {
               int n = tmp - fmt;
-              char *buf = (char *)DXALLOC(n + 1, TAG_TEMPORARY, "sscanf regexp");
+              char *buf = (char *)DMALLOC(n + 1, TAG_TEMPORARY, "sscanf regexp");
               memcpy(buf, fmt, n);
               buf[n] = 0;
               regexp_user = EFUN_REGEXP;

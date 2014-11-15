@@ -15,8 +15,6 @@
 #include <event2/bufferevent.h>
 #include <vector>
 
-#define MESSAGE_BUF_SIZE MESSAGE_BUFFER_SIZE /* from options.h */
-
 /*
  * This macro is for testing whether ip is still valid, since many
  * functions call LPC code, which could otherwise use
@@ -70,7 +68,7 @@ extern int has_console;
 extern void restore_sigttin(void);
 #endif
 
-void CDECL add_vmessage(object_t *, const char *, ...);
+void add_vmessage(object_t *, const char *, ...);
 void add_message(object_t *, const char *, int);
 void add_binary_message_noflush(object_t *, const unsigned char *, int);
 void add_binary_message(object_t *, const unsigned char *, int);

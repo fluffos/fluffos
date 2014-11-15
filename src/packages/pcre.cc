@@ -151,7 +151,7 @@ void f_pcre_extract(void) {
   pcre_t *run;
   array_t *ret;
 
-  run = CALLOCATE(1, pcre_t, TAG_TEMPORARY, "f_pcre_extract : run");
+  run = (pcre_t *)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "f_pcre_extract : run");
   assign_svalue_no_free(&run->pattern, sp);
   run->subject = (sp - 1)->u.string;
   run->s_length = SVALUE_STRLEN(sp - 1);
@@ -192,10 +192,9 @@ void f_pcre_replace(void) {
   pcre_t *run;
   array_t *replacements;
 
-  unsigned int i;
   char *ret;
 
-  run = CALLOCATE(1, pcre_t, TAG_TEMPORARY, "f_pcre_replace: run");
+  run = (pcre_t *)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "f_pcre_replace: run");
 
   run->ovector = NULL;
   run->ovecsize = 0;
@@ -256,7 +255,7 @@ void f_pcre_replace_callback(void) {
 
   arg = sp - num_arg + 1;
 
-  run = CALLOCATE(1, pcre_t, TAG_TEMPORARY, "f_pcre_replace: run");
+  run = (pcre_t *)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "f_pcre_replace: run");
   run->ovector = NULL;
   run->ovecsize = 0;
   run->subject = arg->u.string;
@@ -356,8 +355,8 @@ static int pcre_local_exec(pcre_t *p) {
   if (p->ovector) {
     FREE(p->ovector);
   }
-  p->ovector = CALLOCATE(size + 1, int, TAG_TEMPORARY,
-                         "pcre_local_exec");  // too much, but who cares
+  p->ovector = (int *)DCALLOC(size + 1, sizeof(int), TAG_TEMPORARY,
+                              "pcre_local_exec");  // too much, but who cares
   p->ovecsize = size;
   p->rc = pcre_exec(p->re, NULL, p->subject, p->s_length, 0,
 #ifndef USE_ICONV
@@ -398,7 +397,7 @@ static int pcre_match_single(svalue_t *str, svalue_t *pattern) {
   pcre_t *run;
   int ret;
 
-  run = CALLOCATE(1, pcre_t, TAG_TEMPORARY, "pcre_match_single : run");
+  run = (pcre_t *)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "pcre_match_single : run");
   run->ovector = NULL;
   run->ovecsize = 0;
   assign_svalue_no_free(&run->pattern, pattern);
@@ -429,7 +428,7 @@ static array_t *pcre_match(array_t *v, svalue_t *pattern, int flag) {
     return &the_null_array;
   }
 
-  run = CALLOCATE(1, pcre_t, TAG_TEMPORARY, "pcre_match : run");
+  run = (pcre_t *)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "pcre_match : run");
   run->ovector = NULL;
   run->ovecsize = 0;
   assign_svalue_no_free(&run->pattern, pattern);
@@ -537,10 +536,10 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
     pcre_t *tmpreg;
     int laststart;
 
-    rgpp = CALLOCATE(size, pcre_t *, TAG_TEMPORARY, "pcre_assoc : rgpp");
+    rgpp = (pcre_t **)DCALLOC(size, sizeof(pcre_t *), TAG_TEMPORARY, "pcre_assoc : rgpp");
 
     for (i = 0; i < size; i++) {
-      rgpp[i] = CALLOCATE(1, pcre_t, TAG_TEMPORARY, "pcre_assoc : rgpp[i]");
+      rgpp[i] = (pcre_t *)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "pcre_assoc : rgpp[i]");
       rgpp[i]->ovector = NULL;
       rgpp[i]->ovecsize = 0;
       assign_svalue_no_free(&rgpp[i]->pattern, &pat->item[i]);
@@ -578,7 +577,6 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
         pcre_local_exec(tmpreg = rgpp[i]);
 
         if (pcre_query_match(tmpreg)) {
-          char *curr_temp;
           size_t curr_temp_sz;
 
           curr_temp_sz = totalsize - used - tmpreg->ovector[0];
@@ -595,14 +593,15 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
 
       if (regindex >= 0) {
         const char *rmpb_tmp, *rmpe_tmp;
-        size_t rmpb_tmp_sz, rmpe_tmp_sz;
         num_match++;
 
         if (rmp) {
-          rmp->next = ALLOCATE(struct reg_match, TAG_TEMPORARY, "pcre_assoc : rmp->next");
+          rmp->next = (struct reg_match *)DMALLOC(sizeof(struct reg_match), TAG_TEMPORARY,
+                                                  "pcre_assoc : rmp->next");
           rmp = rmp->next;
         } else
-          rmph = rmp = ALLOCATE(struct reg_match, TAG_TEMPORARY, "pcre_assoc : rmp");
+          rmph = rmp = (struct reg_match *)DMALLOC(sizeof(struct reg_match), TAG_TEMPORARY,
+                                                   "pcre_assoc : rmp");
 
         tmpreg = rgpp[regindex];
 
@@ -826,7 +825,8 @@ static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
     pcre_free(tmp->compiled_pattern);
     node = tmp;
   } else {
-    node = CALLOCATE(1, struct pcre_cache_bucket_t, TAG_TEMPORARY, "pcre_cache_pattern : node");
+    node = (struct pcre_cache_bucket_t *)DCALLOC(1, sizeof(struct pcre_cache_bucket_t),
+                                                 TAG_TEMPORARY, "pcre_cache_pattern : node");
     node->pattern.type = T_NUMBER;  // so we don't free invalids
     if (node == NULL) {
       return -1;

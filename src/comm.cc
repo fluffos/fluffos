@@ -12,11 +12,11 @@
 #include <event2/buffer.h>
 #include <event2/event.h>
 #include <event2/listener.h>
+#include <netinet/tcp.h>  // for TCP_NODELAY
 
 #include "main.h"
 #include "socket_efuns.h"
 #include "backend.h"
-#include "socket_ctrl.h"
 #include "debug.h"
 #include "ed.h"
 #include "file.h"
@@ -139,8 +139,10 @@ void shutdown_external_ports() {
       continue;
     }
     if (external_port[i].ev_conn) evconnlistener_free(external_port[i].ev_conn);
-    if (OS_socket_close(external_port[i].fd) == -1) {
-      socket_perror("ipc_remove: close", 0);
+    if (evutil_closesocket(external_port[i].fd) == -1) {
+      debug_message("shutdown_external_ports: failed: %s",
+                    evutil_socket_error_to_string(
+                        evutil_socket_geterror(external_port[i].fd)));
     }
   }
 
@@ -156,7 +158,8 @@ void shutdown_external_ports() {
 void new_user_handler(int fd, struct sockaddr *addr, size_t addrlen, port_def_t *port) {
   debug(connections, "New connection from %s.\n", sockaddr_to_string(addr, addrlen));
 
-  if (set_socket_tcp_nodelay(fd, 1) == -1) {
+  int one = 1;
+  if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) == -1) {
     debug(connections, "async_on_accept: fd %d, set_socket_tcp_nodelay error: %s.\n", fd,
           evutil_socket_error_to_string(evutil_socket_geterror(fd)));
   }
@@ -360,51 +363,32 @@ void add_message(object_t *who, const char *data, int len) {
     return;
   }
 #endif /* NO_SHADOWS */
-
-  if (ip->connection_type == PORT_TELNET) {
-    telnet_send(ip->telnet, data, len);
-  } else {
-    bufferevent_write(ip->ev_buffer, data, len);
-  }
-
   handle_snoop(data, len, ip);
 
-#ifdef FLUSH_OUTPUT_IMMEDIATELY
-  flush_message(ip);
-#endif
+  if (ip->connection_type == PORT_TELNET) {
+    telnet_send(ip->telnet, trans, translen);
+  } else {
+    bufferevent_write(ip->ev_buffer, trans, translen);
+  }
 
   add_message_calls++;
 } /* add_message() */
 
 void add_vmessage(object_t *who, const char *format, ...) {
   auto ip = who->interactive;
-  auto buffer = bufferevent_get_output(ip->ev_buffer);
 
+  // FIXME: This data is clearly not passed through icovn.
   va_list args;
   va_start(args, format);
-  evbuffer_add_vprintf(buffer, format, args);
+  if (ip->connection_type == PORT_TELNET) {
+    telnet_raw_vprintf(ip->telnet, format, args);
+  } else {
+    auto buffer = bufferevent_get_output(ip->ev_buffer);
+    evbuffer_add_vprintf(buffer, format, args);
+  }
   va_end(args);
 
   add_message_calls++;
-}
-
-void add_binary_message_noflush(object_t *who, const unsigned char *data, int len) {
-  /*
-   * if who->interactive is not valid, bail
-   */
-  if (!who || (who->flags & O_DESTRUCTED) || !who->interactive ||
-      (who->interactive->iflags & (NET_DEAD | CLOSING))) {
-    return;
-  }
-  auto ip = who->interactive;
-  bufferevent_write(ip->ev_buffer, data, len);
-
-  add_message_calls++;
-}
-
-void add_binary_message(object_t *who, const unsigned char *data, int len) {
-  add_binary_message_noflush(who, data, len);
-  flush_message(who->interactive);
 }
 
 /*
@@ -414,14 +398,18 @@ int flush_message(interactive_t *ip) {
   /*
    * if ip is not valid, do nothing.
    */
-  if (!ip || (ip->iflags & (NET_DEAD | CLOSING))) {
+  if (!ip) {
     debug(connections, ("flush_message: invalid target!\n"));
     return 0;
   }
+
+  // Flush things normally.
+  if (bufferevent_flush(ip->ev_buffer, EV_WRITE, BEV_FLUSH) == -1) {
+    return 0;
+  }
+
   // For socket bufferevent, bufferevent_flush is actually a no-op, thus we have to
   // implement our own.
-
-  // return bufferevent_flush(ip->ev_buffer, EV_WRITE, BEV_FLUSH) != -1;
   auto fd = bufferevent_getfd(ip->ev_buffer);
   if (fd == -1) {
     return 0;
@@ -762,9 +750,7 @@ static int cmd_in_buf(interactive_t *ip) {
 
 static char *first_cmd_in_buf(interactive_t *ip) {
   char *p;
-#ifdef GET_CHAR_IS_BUFFERED
   static char tmp[2];
-#endif
 
   /* do standard input buffer cleanup */
   if (!clean_buf(ip)) {
@@ -778,20 +764,12 @@ static char *first_cmd_in_buf(interactive_t *ip) {
     if (*p == 8 || *p == 127) {
       *p = 0;
     }
-#ifndef GET_CHAR_IS_BUFFERED
-    ip->text_start++;
-    if (!clean_buf(ip)) {
-      ip->iflags &= ~CMD_IN_BUF;
-    }
-    return p;
-#else
     tmp[0] = *p;
     ip->text[ip->text_start++] = 0;
     if (!clean_buf(ip)) {
       ip->iflags &= ~CMD_IN_BUF;
     }
     return tmp;
-#endif
   }
 
   /* search for the newline */
@@ -840,13 +818,9 @@ static char *get_user_command(interactive_t *ip) {
   debug(connections, "get_user_command: user_command = (%s)\n", user_command);
   save_command_giver(ip->ob);
 
-#ifndef GET_CHAR_IS_BUFFERED
-  if (ip->iflags & NOECHO) {
-#else
   if ((ip->iflags & NOECHO) && !(ip->iflags & SINGLE_CHAR)) {
-#endif
     /* must not enable echo before the user input is received */
-    set_echo(command_giver->interactive, false);
+    set_localecho(command_giver->interactive, true);
     ip->iflags &= ~NOECHO;
   }
 
@@ -962,16 +936,14 @@ int process_user_command(interactive_t *ip) {
       /* only 1 char ... switch to line buffer mode */
       ip->iflags |= WAS_SINGLE_CHAR;
       ip->iflags &= ~SINGLE_CHAR;
-#ifdef GET_CHAR_IS_BUFFERED
       ip->text_start = ip->text_end = *ip->text = 0;
-#endif
-      set_linemode(ip);
+      set_linemode(ip, true);
     } else {
       if (ip->iflags & WAS_SINGLE_CHAR) {
         /* we now have a string ... switch back to char mode */
         ip->iflags &= ~WAS_SINGLE_CHAR;
         ip->iflags |= SINGLE_CHAR;
-        set_charmode(ip);
+        set_charmode(ip, true);
         if (!IP_VALID(ip, command_giver)) {
           goto exit;
         }
@@ -1113,10 +1085,8 @@ static int call_function_interactive(interactive_t *i, char *str) {
   svalue_t *args;
   sentence_t *sent;
   int num_arg;
-#ifdef GET_CHAR_IS_BUFFERED
   int was_single = 0;
   int was_noecho = 0;
-#endif
 
   i->iflags &= ~NOESC;
   if (!(sent = i->input_to)) {
@@ -1143,15 +1113,11 @@ static int call_function_interactive(interactive_t *i, char *str) {
        * clear single character mode
        */
       i->iflags &= ~SINGLE_CHAR;
-#ifndef GET_CHAR_IS_BUFFERED
-      set_linemode(i);
-#else
-      was_single = 1;
+      set_linemode(i, true);
       if (i->iflags & NOECHO) {
-        was_noecho = 1;
         i->iflags &= ~NOECHO;
+        set_localecho(i, true);
       }
-#endif
     }
 
     return (0);
@@ -1198,15 +1164,11 @@ static int call_function_interactive(interactive_t *i, char *str) {
      * clear single character mode
      */
     i->iflags &= ~SINGLE_CHAR;
-#ifndef GET_CHAR_IS_BUFFERED
-    set_linemode(i);
-#else
     was_single = 1;
     if (i->iflags & NOECHO) {
       was_noecho = 1;
       i->iflags &= ~NOECHO;
     }
-#endif
   }
 
   copy_and_push_string(str);
@@ -1224,26 +1186,22 @@ static int call_function_interactive(interactive_t *i, char *str) {
     if (function[0] == APPLY___INIT_SPECIAL_CHAR) {
       error("Illegal function name.\n");
     }
-    (void)apply(function, ob, num_arg + 1, ORIGIN_INTERNAL);
+    (void)safe_apply(function, ob, num_arg + 1, ORIGIN_INTERNAL);
   } else {
-    call_function_pointer(funp, num_arg + 1);
+    safe_call_function_pointer(funp, num_arg + 1);
   }
 
   pop_stack(); /* remove `function' from stack */
 
-#ifdef GET_CHAR_IS_BUFFERED
-  if (IP_VALID(i, ob)) {
-    if (was_single && !(i->iflags & SINGLE_CHAR)) {
-      i->text_start = i->text_end = 0;
-      i->text[0] = '\0';
-      i->iflags &= ~CMD_IN_BUF;
-      set_linemode(i);
-    }
-    if (was_noecho && !(i->iflags & NOECHO)) {
-      set_echo(i, false);
-    }
+  if (was_single && !(i->iflags & SINGLE_CHAR)) {
+    i->text_start = i->text_end = 0;
+    i->text[0] = '\0';
+    i->iflags &= ~CMD_IN_BUF;
+    set_linemode(i, true);
   }
-#endif
+  if (was_noecho && !(i->iflags & NOECHO)) {
+    set_localecho(i, true);
+  }
 
   return (1);
 } /* call_function_interactive() */
@@ -1258,7 +1216,7 @@ int set_call(object_t *ob, sentence_t *sent, int flags) {
   ob->interactive->input_to = sent;
   ob->interactive->iflags |= (flags & (I_NOECHO | I_NOESC | I_SINGLE_CHAR));
   if (flags & I_NOECHO) {
-    set_echo(ob->interactive, true);
+    set_localecho(ob->interactive, false);
   }
   if (flags & I_SINGLE_CHAR) {
     set_charmode(ob->interactive);

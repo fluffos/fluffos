@@ -384,7 +384,7 @@ int strip_name(const char *src, char *dest, int size) {
  * it.
  *
  */
-object_t *int_load_object(const char *lname, int callcreate) {
+object_t *load_object(const char *lname, int callcreate) {
   int f;
   program_t *prog;
   object_t *ob;
@@ -493,7 +493,7 @@ object_t *int_load_object(const char *lname, int callcreate) {
     if ((inh_obj = lookup_object_hash(inhbuf))) {
       IF_DEBUG(fatal("Inherited object is already loaded!"));
     } else {
-      inh_obj = load_object(inhbuf, 0);
+      inh_obj = load_object(inhbuf, 1);
     }
     if (!inh_obj) error("Inherited file '/%s' does not exist!\n", inhbuf);
 
@@ -504,7 +504,7 @@ object_t *int_load_object(const char *lname, int callcreate) {
      * -Beek
      */
     if (!(ob = lookup_object_hash(name))) {
-      ob = load_object(name, 0);
+      ob = load_object(name, 1);
       /* sigh, loading the inherited file removed us */
       if (!ob) {
         num_objects_this_thread--;
@@ -557,7 +557,7 @@ object_t *int_load_object(const char *lname, int callcreate) {
 
 static char *make_new_name(const char *str) {
   static unsigned int i;
-  char *p = (char *)DXALLOC(strlen(str) + 12, TAG_OBJ_NAME, "make_new_name");
+  char *p = (char *)DMALLOC(strlen(str) + 12, TAG_OBJ_NAME, "make_new_name");
 
   (void)sprintf(p, "%s#%u", str, i);
   i++;
@@ -944,7 +944,7 @@ void destruct_object(object_t *ob) {
     SETOBNAME(ob, "");
 
     /* handle these two carefully, since they are rather vital */
-    new_ob = load_object(tmp, compiled_version);
+    new_ob = load_object(tmp, 1);
     if (!new_ob) {
       SETOBNAME(ob, tmp);
       sp--;
@@ -1436,7 +1436,7 @@ object_t *find_object(const char *str) {
   if ((ob = lookup_object_hash(tmpbuf))) {
     return ob;
   }
-  ob = load_object(tmpbuf, 0);
+  ob = load_object(tmpbuf, 1);
   if (!ob || (ob->flags & O_DESTRUCTED)) { /* *sigh* */
     return 0;
   }
@@ -1551,7 +1551,7 @@ sentence_t *alloc_sentence() {
   sentence_t *p;
 
   if (sent_free == 0) {
-    p = ALLOCATE(sentence_t, TAG_SENTENCE, "alloc_sentence");
+    p = (sentence_t *)DMALLOC(sizeof(sentence_t), TAG_SENTENCE, "alloc_sentence");
     tot_alloc_sentence++;
   } else {
     p = sent_free;
@@ -1963,15 +1963,9 @@ void shutdownMudOS(int exit_code) {
   db_cleanup();
 #endif
   shutdown_external_ports();
+
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
-  for (i = 0; i < max_lpc_socks; i++) {
-    if (lpc_socks[i].state == STATE_CLOSED) {
-      continue;
-    }
-    while (OS_socket_close(lpc_socks[i].fd) == -1 && errno == EINTR) {
-      ;
-    }
-  }
+  lpc_socks_closeall();
 #endif
   flush_message_all();
 

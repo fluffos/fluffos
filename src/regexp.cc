@@ -196,29 +196,9 @@
 #define ISMULT(c) ((c) == ASTERIX || (c) == PLUSS || (c) == QMARK)
 #define META "^$.[()|?+*\\"
 
-/* Linux seems to define CHARBITS to 8 in values.h; not sure what system
- * defines CHARBITS in a form we can use or how to tell (check in configure?)
- * Just use 8 bits for now.
- */
-#if 0
-#if defined(__linux__)
-#ifndef CHARBITS
-#define CHARBITS 0xff
-#endif
-#define UCHARAT(p) (*(unsigned char *)(p))
-#else
-#ifndef CHARBITS
-#define CHARBITS 0xff
-#define UCHARAT(p) (*(unsigned char *)(p))
-#else
-#define UCHARAT(p) (*(p)&CHARBITS)
-#endif
-#endif
-#else
 #undef CHARBITS
 #define CHARBITS 0xff
 #define UCHARAT(p) (*(unsigned char *)(p))
-#endif
 
 #define ISWORDPART(c) (isalnum((unsigned char)c) || (c) == '_')
 
@@ -245,25 +225,19 @@ static int regsize;   /* Code size. */
 /*
  * Forward declarations for regcomp()'s friends.
  */
-#ifndef STATIC
-#define STATIC static
-#endif
-STATIC char *reg(int, int *);
-STATIC char *regbranch(int *);
-STATIC char *regpiece(int *);
-STATIC char *regatom(int *);
-STATIC char *regnode(char);
-STATIC char *regnext(char *);
-STATIC void regc(char);
-STATIC void reginsert(char, char *);
-STATIC void regtail(char *, char *);
-STATIC void regoptail(char *, char *);
 
-#ifdef STRCSPN
-STATIC int strcspn();
-#endif
+static char *reg(int, int *);
+static char *regbranch(int *);
+static char *regpiece(int *);
+static char *regatom(int *);
+static char *regnode(char);
+static char *regnext(char *);
+static void regc(char);
+static void reginsert(char, char *);
+static void regtail(char *, char *);
+static void regoptail(char *, char *);
 
-STATIC void regerror(const char *s) {
+static void regerror(const char *s) {
   switch (regexp_user) {
     case ED_REGEXP:
       ED_OUTPUTV(ED_DEST, "ed: regular expression error: %s", s);
@@ -302,7 +276,7 @@ regexp *regcomp(unsigned char *exp, int excompat) /* \( \) operators like in uni
     FAIL("NULL argument\n");
   }
 
-  exp2 = (short *)DXALLOC((strlen((char *)exp) + 1) * (sizeof(short[8]) / sizeof(char[8])),
+  exp2 = (short *)DMALLOC((strlen((char *)exp) + 1) * (sizeof(short[8]) / sizeof(char[8])),
                           TAG_TEMPORARY, "regcomp: 1");
   for (scan = exp, dest = exp2; (c = *scan++);) {
     switch (c) {
@@ -375,7 +349,7 @@ regexp *regcomp(unsigned char *exp, int excompat) /* \( \) operators like in uni
   }
 
   /* Allocate space. */
-  r = (regexp *)DXALLOC(sizeof(regexp) + (unsigned)regsize, TAG_TEMPORARY, "regcomp: 2");
+  r = (regexp *)DMALLOC(sizeof(regexp) + (unsigned)regsize, TAG_TEMPORARY, "regcomp: 2");
   if (r == (regexp *)NULL) {
     FREE(exp2);
     FAIL("out of space\n");
@@ -854,14 +828,14 @@ static const char **regendp;   /* Ditto for endp. */
 /*
  * Forwards.
  */
-STATIC int regtry(regexp *, const char *);
-STATIC int regmatch(char *);
-STATIC int regrepeat(char *);
+static int regtry(regexp *, const char *);
+static int regmatch(char *);
+static int regrepeat(char *);
 
 #ifdef DEBUG
 int regnarrate = 0;
 void regdump(regexp *);
-STATIC char *regprop(char *);
+static char *regprop(char *);
 
 #endif
 
@@ -1233,7 +1207,7 @@ static char *regnext(char *p) {
 
 #ifdef DEBUG
 
-STATIC char *regprop(char *);
+static char *regprop(char *);
 
 /*
  - regdump - dump a regexp onto stdout in vaguely comprehensible form
@@ -1371,33 +1345,6 @@ static char *regprop(char *op) {
 }
 #endif
 
-/*
- * The following is provided for those people who do not have strcspn() in
- * their C libraries.  They should get off their butts and do something
- * about it; at least one public-domain implementation of those (highly
- * useful) string routines has been published on Usenet.
- */
-#ifdef STRCSPN
-/*
- * strcspn - find length of initial segment of s1 consisting entirely
- * of characters not from s2
- */
-static int strcspn(char *s1, char *s2) {
-  char *scan1;
-  char *scan2;
-  int count;
-
-  count = 0;
-  for (scan1 = s1; *scan1 != '\0'; scan1++) {
-    for (scan2 = s2; *scan2 != '\0';) /* ++ moved down. */
-      if (*scan1 == *scan2++) {
-        return (count);
-      }
-    count++;
-  }
-  return (count);
-}
-#endif
 
 /*
  - regsub - perform substitutions after a regexp match

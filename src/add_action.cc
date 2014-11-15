@@ -671,11 +671,7 @@ void f_command(void) {
     buff[sizeof(buff) - 1] = 0;
 
     if (parse_command(buff, current_object)) {
-#ifndef WIN32
       rc = save_eval_cost - get_eval();
-#else
-      rc = 1;
-#endif
       // return at least 1 eval cost on success.
       if (rc <= 0) {
         rc = 1;

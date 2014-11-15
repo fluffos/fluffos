@@ -145,7 +145,7 @@ static void on_user_events(bufferevent *bev, short events, void *arg) {
     return;
   }
 
-  if ((events & BEV_EVENT_EOF) || (events & BEV_EVENT_TIMEOUT)) {
+  if (events & (BEV_EVENT_ERROR | BEV_EVENT_EOF)) {
     user->iflags |= NET_DEAD;
     remove_interactive(user->ob, 0);
   } else {
@@ -159,8 +159,7 @@ void new_user_event_listener(interactive_t *user) {
   bufferevent_setcb(bev, on_user_read, on_user_write, on_user_events, user);
   bufferevent_enable(bev, EV_READ | EV_WRITE);
 
-  const timeval timeout_write = {10, 0};
-  bufferevent_set_timeouts(bev, NULL, &timeout_write);
+  bufferevent_set_timeouts(bev, NULL, NULL);
 
   user->ev_buffer = bev;
   user->ev_command = event_new(g_event_base, -1, EV_TIMEOUT | EV_PERSIST, on_user_command, user);
@@ -199,13 +198,12 @@ void on_lpc_sock_write(evutil_socket_t fd, short what, void *arg) {
 }
 
 // Initialize LPC socket data structure and register events
-void new_lpc_socket_event_listener(int idx, evutil_socket_t real_fd) {
+void new_lpc_socket_event_listener(int idx, lpc_socket_t *sock, evutil_socket_t real_fd) {
   auto data = new lpc_socket_event_data;
   data->idx = idx;
-  lpc_socks[idx].ev_read =
-      event_new(g_event_base, real_fd, EV_READ | EV_PERSIST, on_lpc_sock_read, data);
-  lpc_socks[idx].ev_write = event_new(g_event_base, real_fd, EV_WRITE, on_lpc_sock_write, data);
-  lpc_socks[idx].ev_data = data;
+  sock->ev_read = event_new(g_event_base, real_fd, EV_READ | EV_PERSIST, on_lpc_sock_read, data);
+  sock->ev_write = event_new(g_event_base, real_fd, EV_WRITE, on_lpc_sock_write, data);
+  sock->ev_data = data;
 }
 
 #ifdef HAS_CONSOLE

@@ -33,25 +33,27 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
     error("fork() in external_start() failed: %s\n", strerror(errno));
   }
   if (ret) {
+    auto sock = lpc_socks_get(fd);
+
     close(sv[1]);
-    lpc_socks[fd].fd = sv[0];
-    lpc_socks[fd].flags = S_EXTERNAL;
+    sock->fd = sv[0];
+    sock->flags = S_EXTERNAL;
     set_read_callback(fd, arg1);
     set_write_callback(fd, arg2);
     set_close_callback(fd, arg3);
-    lpc_socks[fd].owner_ob = current_object;
-    lpc_socks[fd].mode = STREAM;
-    lpc_socks[fd].state = STATE_DATA_XFER;
-    memset((char *)&lpc_socks[fd].l_addr, 0, sizeof(lpc_socks[fd].l_addr));
-    memset((char *)&lpc_socks[fd].r_addr, 0, sizeof(lpc_socks[fd].r_addr));
-    lpc_socks[fd].owner_ob = current_object;
-    lpc_socks[fd].release_ob = NULL;
-    lpc_socks[fd].r_buf = NULL;
-    lpc_socks[fd].r_off = 0;
-    lpc_socks[fd].r_len = 0;
-    lpc_socks[fd].w_buf = NULL;
-    lpc_socks[fd].w_off = 0;
-    lpc_socks[fd].w_len = 0;
+    sock->owner_ob = current_object;
+    sock->mode = STREAM;
+    sock->state = STATE_DATA_XFER;
+    memset((char *)&sock->l_addr, 0, sizeof(sock->l_addr));
+    memset((char *)&sock->r_addr, 0, sizeof(sock->r_addr));
+    sock->owner_ob = current_object;
+    sock->release_ob = NULL;
+    sock->r_buf = NULL;
+    sock->r_off = 0;
+    sock->r_len = 0;
+    sock->w_buf = NULL;
+    sock->w_off = 0;
+    sock->w_len = 0;
 
     current_object->flags |= O_EFUN_SOCKET;
     return fd;
@@ -80,7 +82,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
       }
     }
 
-    argv = CALLOCATE(n + 1, char *, TAG_TEMPORARY, "external args");
+    argv = (char **)DCALLOC(n + 1, sizeof(char *), TAG_TEMPORARY, "external args");
 
     argv[0] = cmd;
 

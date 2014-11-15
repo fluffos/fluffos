@@ -145,7 +145,7 @@ void f_bind(void) {
     error("Master object denied permission to bind() function pointer.\n");
   }
 
-  new_fp = ALLOCATE(funptr_t, TAG_FUNP, "f_bind");
+  new_fp = (funptr_t *)DMALLOC(sizeof(funptr_t), TAG_FUNP, "f_bind");
   *new_fp = *old_fp;
   new_fp->hdr.ref = 1;
   new_fp->hdr.owner = ob; /* one ref from being on stack */
@@ -1700,7 +1700,7 @@ void f_mkdir(void) {
   const char *path;
 
   path = check_valid_path(sp->u.string, current_object, "mkdir", 1);
-  if (!path || OS_mkdir(path, 0770) == -1) {
+  if (!path || mkdir(path, 0770) == -1) {
     free_string_svalue(sp);
     *sp = const0;
   } else {
@@ -3525,7 +3525,7 @@ void f_users(void) {
   array_t *ret = allocate_empty_array(total);
 
   int i = 0;
-  for(auto user : users()) {
+  for (auto user : users()) {
     if (!include_hidden) {
       if ((user->ob->flags & O_HIDDEN) != 0) {
         continue;
@@ -3674,7 +3674,7 @@ void f_dump_file_descriptors(void) {
   outbuffer_t out;
 
   outbuf_zero(&out);
-  dump_file_descriptors(&out);
+  outbuf_add(&out, "ERROR: dump_file_descriptors is no longer supported.");
   outbuf_push(&out);
 }
 #endif
@@ -3825,7 +3825,7 @@ void f_next_inventory(void) {
 #ifdef F_DEFER
 void f_defer() {
   struct defer_list *newlist =
-      (struct defer_list *)DXALLOC(sizeof(struct defer_list), TAG_TEMPORARY, "defer: new item");
+      (struct defer_list *)DMALLOC(sizeof(struct defer_list), TAG_TEMPORARY, "defer: new item");
 
 // In reverse mode, newlist always will be the last data.
 #ifdef REVERSE_DEFER

@@ -43,6 +43,6 @@ extern int max_string_length;
 extern char *reserved_area;
 extern double consts[];
 
-void CDECL debug_message(const char *, ...);
+void debug_message(const char *, ...);
 
 #endif

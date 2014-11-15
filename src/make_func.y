@@ -8,11 +8,6 @@
 #include "edit_source.h"
 #include <stdlib.h>
 
-#ifdef WIN32
-#define MSDOS
-#include <process.h>
-#endif
-
     void mf_fatal(const char *);
     void yyerror(char const *);
 

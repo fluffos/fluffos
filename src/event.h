@@ -42,7 +42,7 @@ void new_user_event_listener(struct interactive_t *);
 struct lpc_socket_event_data {
   int idx;
 };
-void new_lpc_socket_event_listener(int, evutil_socket_t);
+void new_lpc_socket_event_listener(int, struct lpc_socket_t *sock, evutil_socket_t);
 #endif
 
 // Console STDIN socket event

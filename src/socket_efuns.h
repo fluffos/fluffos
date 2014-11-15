@@ -10,9 +10,7 @@
 #include "lpc_incl.h"
 #include "network_incl.h"
 
-#ifdef MINGW
-#include <ws2tcpip.h>
-#endif
+#include <deque>
 
 enum socket_mode { MUD, STREAM, DATAGRAM, STREAM_BINARY, DATAGRAM_BINARY };
 
@@ -31,7 +29,7 @@ enum socket_state {
 #else
 #define ADDR_BUF_SIZE 64 /* max length of address string    */
 #endif
-typedef struct {
+struct lpc_socket_t {
   int fd;
   short flags;
   enum socket_mode mode;
@@ -54,10 +52,7 @@ typedef struct {
   struct event *ev_read;
   struct event *ev_write;
   struct lpc_socket_event_data *ev_data;
-} lpc_socket_t;
-
-extern lpc_socket_t *lpc_socks;
-extern int max_lpc_socks;
+};
 
 #define S_RELEASE 0x001
 #define S_BLOCKED 0x002
@@ -94,5 +89,11 @@ int find_new_socket(void);
 void set_read_callback(int, svalue_t *);
 void set_write_callback(int, svalue_t *);
 void set_close_callback(int, svalue_t *);
+
+int lpc_socks_num();
+lpc_socket_t *lpc_socks_get(int i);
+void mark_sockets();
+
+void lpc_socks_closeall();
 
 #endif /* _SOCKET_EFUNS_H_ */

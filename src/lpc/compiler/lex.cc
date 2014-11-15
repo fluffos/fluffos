@@ -17,11 +17,7 @@
 #include "file_incl.h"
 #include "lpc_incl.h"
 #include "compiler.h"
-#if defined(WIN32) && !defined(MINGW)
-#include "grammar_tab.h"
-#else
 #include "grammar.tab.h"
-#endif
 #include "scratchpad.h"
 #include "preprocess.h"
 #include "md.h"
@@ -476,7 +472,7 @@ static void handle_include(char *name, int global) {
   if (++incnum == MAX_INCLUDE_DEPTH) {
     include_error("Maximum include depth exceeded.", global);
   } else if ((f = inc_open(buf, name, delim == '"')) != -1) {
-    is = ALLOCATE(incstate_t, TAG_COMPILER, "handle_include: 1");
+    is = (incstate_t *)DMALLOC(sizeof(incstate_t), TAG_COMPILER, "handle_include: 1");
     is->yyin_desc = yyin_desc;
     is->line = current_line;
     is->file = current_file;
@@ -541,7 +537,7 @@ static int get_terminator(char *terminator) {
       res = -2;                                                                     \
       break;                                                                        \
     }                                                                               \
-    line[++curchunk] = (char *)DXALLOC(MAXCHUNK, TAG_COMPILER, "array/text chunk"); \
+    line[++curchunk] = (char *)DMALLOC(MAXCHUNK, TAG_COMPILER, "array/text chunk"); \
     len = 0;                                                                        \
   }
 
@@ -559,7 +555,7 @@ static int get_array_block(char *term) {
    * initialize
    */
   termlen = strlen(term);
-  array_line[0] = (char *)DXALLOC(MAXCHUNK, TAG_COMPILER, "array_block");
+  array_line[0] = (char *)DMALLOC(MAXCHUNK, TAG_COMPILER, "array_block");
   array_line[0][0] = '(';
   array_line[0][1] = '{';
   array_line[0][2] = '"';
@@ -661,7 +657,7 @@ static int get_array_block(char *term) {
           outp = yyp;
           break;
         }
-        array_line[++curchunk] = (char *)DXALLOC(MAXCHUNK, TAG_COMPILER, "array_block");
+        array_line[++curchunk] = (char *)DMALLOC(MAXCHUNK, TAG_COMPILER, "array_block");
         len = 0;
       }
       /*
@@ -702,7 +698,7 @@ static int get_text_block(char *term) {
    * initialize
    */
   termlen = strlen(term);
-  text_line[0] = (char *)DXALLOC(MAXCHUNK, TAG_COMPILER, "text_block");
+  text_line[0] = (char *)DMALLOC(MAXCHUNK, TAG_COMPILER, "text_block");
   text_line[0][0] = '"';
   text_line[0][1] = '\0';
   len = 1;
@@ -830,7 +826,7 @@ static int get_text_block(char *term) {
           outp = yyp;
           break;
         }
-        text_line[++curchunk] = (char *)DXALLOC(MAXCHUNK, TAG_COMPILER, "text_block");
+        text_line[++curchunk] = (char *)DMALLOC(MAXCHUNK, TAG_COMPILER, "text_block");
         len = 0;
       }
       /*
@@ -1012,28 +1008,6 @@ char *show_error_context() {
   return buf;
 }
 
-#ifdef WIN32
-int correct_read(int handle, char *buf, unsigned int count) {
-  unsigned int tmp, size = 0;
-
-  do {
-    tmp = read(handle, buf, count);
-    if (tmp < 0) {
-      return tmp;
-    }
-    if (tmp == 0) {
-      return size;
-    }
-    size += tmp;
-    count -= tmp;
-    buf += tmp;
-  } while (count > 0);
-  return size;
-}
-#else
-#define correct_read read
-#endif
-
 static void refill_buffer() {
   if (cur_lbuf != &head_lbuf) {
     if (outp >= cur_lbuf->buf_end && cur_lbuf->term_type == TERM_ADD_INPUT) {
@@ -1073,7 +1047,7 @@ static void refill_buffer() {
         p = outp + size - 1;
       }
 
-      size = correct_read(yyin_desc, p, MAXLINE);
+      size = read(yyin_desc, p, MAXLINE);
       cur_lbuf->buf_end = p += size;
       if (size < MAXLINE) {
         *(last_nl = p) = LEX_EOF;
@@ -1119,7 +1093,8 @@ static void refill_buffer() {
         linked_buf_t *new_lbuf;
         char *new_outp;
 
-        if (!(new_lbuf = ALLOCATE(linked_buf_t, TAG_COMPILER, "refill_bufer"))) {
+        if (!(new_lbuf =
+                  (linked_buf_t *)DMALLOC(sizeof(linked_buf_t), TAG_COMPILER, "refill_bufer"))) {
           lexerror("Out of memory when allocating new buffer.\n");
           return;
         }
@@ -1135,7 +1110,7 @@ static void refill_buffer() {
         flag = 1;
       }
 
-      size = correct_read(yyin_desc, p, MAXLINE);
+      size = read(yyin_desc, p, MAXLINE);
       end = p += size;
       if (flag) {
         cur_lbuf->buf_end = p;
@@ -2333,33 +2308,16 @@ void add_predefines() {
 
   add_predefine("MUDOS", -1, "");
   add_predefine("FLUFFOS", -1, "");
-#ifdef WIN32
-  add_predefine("__WIN32__", -1, "");
-#endif
-#ifdef RUSAGE
-  add_predefine("__HAS_RUSAGE__", -1, "");
-#endif
-#ifdef M64
-  add_predefine("__M64__", -1, "");
-#endif
 #ifdef PACKAGE_DB
   add_predefine("__PACKAGE_DB__", -1, "");
 #endif
-#ifdef GET_CHAR_IS_BUFFERED
   add_predefine("__GET_CHAR_IS_BUFFERED__", -1, "");
-#endif
 #ifdef PACKAGE_DSLIB
   add_predefine("__DSLIB__", -1, "");
 #endif
 #ifdef PACKAGE_DWLIB
   add_predefine("__DWLIB__", -1, "");
 #endif
-#ifdef FD_SETSIZE
-  sprintf(save_buf, "%d", FD_SETSIZE);
-#else
-  sprintf(save_buf, "%d", 64);
-#endif
-  add_predefine("__FD_SETSIZE__", -1, save_buf);
   get_version(save_buf);
   add_quoted_predefine("__VERSION__", save_buf);
   sprintf(save_buf, "%d", external_port[0].port);
@@ -2884,7 +2842,7 @@ static void add_input(const char *p) {
     cur_lbuf->outp = q + 1;
     cur_lbuf->last_nl = last_nl;
 
-    new_lbuf = ALLOCATE(linked_buf_t, TAG_COMPILER, "add_input");
+    new_lbuf = (linked_buf_t *)DMALLOC(sizeof(linked_buf_t), TAG_COMPILER, "add_input");
     new_lbuf->term_type = TERM_ADD_INPUT;
     new_lbuf->prev = cur_lbuf;
     buf = new_lbuf->buf;
@@ -2938,10 +2896,10 @@ static void add_predefine(const char *name, int nargs, const char *exps) {
     strcpy(p->exps, exps);
     p->nargs = nargs;
   } else {
-    p = ALLOCATE(defn_t, TAG_PREDEFINES, "add_define: def");
-    p->name = (char *)DXALLOC(strlen(name) + 1, TAG_PREDEFINES, "add_define: def name");
+    p = (defn_t *)DMALLOC(sizeof(defn_t), TAG_PREDEFINES, "add_define: def");
+    p->name = (char *)DMALLOC(strlen(name) + 1, TAG_PREDEFINES, "add_define: def name");
     strcpy(p->name, name);
-    p->exps = (char *)DXALLOC(strlen(exps) + 1, TAG_PREDEFINES, "add_define: def exps");
+    p->exps = (char *)DMALLOC(strlen(exps) + 1, TAG_PREDEFINES, "add_define: def exps");
     strcpy(p->exps, exps);
     p->flags = DEF_IS_PREDEF;
     p->nargs = nargs;
@@ -3090,7 +3048,7 @@ static char *expand_define2(char *text) {
 
   /* special handling for __LINE__ macro */
   if (!strcmp(text, "__LINE__")) {
-    expand_buffer = (char *)DXALLOC(20, TAG_COMPILER, "expand_define2");
+    expand_buffer = (char *)DMALLOC(20, TAG_COMPILER, "expand_define2");
     sprintf(expand_buffer, "%i", current_line);
     return expand_buffer;
   }
@@ -3128,7 +3086,7 @@ static char *expand_define2(char *text) {
   }
 
   if (!argc) {
-    expand_buffer = (char *)DXALLOC(strlen(macro->exps) + 1, TAG_COMPILER, "expand_define2");
+    expand_buffer = (char *)DMALLOC(strlen(macro->exps) + 1, TAG_COMPILER, "expand_define2");
     strcpy(expand_buffer, macro->exps);
     expand_depth--;
     return expand_buffer;
@@ -3136,7 +3094,7 @@ static char *expand_define2(char *text) {
 
   /* Perform expansion with args */
   in = macro->exps;
-  out = expand_buffer = (char *)DXALLOC(DEFMAX, TAG_COMPILER, "expand_define2");
+  out = expand_buffer = (char *)DMALLOC(DEFMAX, TAG_COMPILER, "expand_define2");
 
 #define SAVECHAR(x)                                                   \
   SAFE(if (out + 1 < expand_buffer + DEFMAX) { *out++ = (x); } else { \
@@ -3338,7 +3296,7 @@ void set_inc_list(char *list) {
     size++;
     p++;
   }
-  inc_list = CALLOCATE(size, char *, TAG_INC_LIST, "set_inc_list");
+  inc_list = (char **)DCALLOC(size, sizeof(char *), TAG_INC_LIST, "set_inc_list");
   inc_list_size = size;
   for (i = size - 1; i >= 0; i--) {
     p = strrchr(list, ':');
@@ -3444,15 +3402,16 @@ ident_hash_elem_t *find_or_add_perm_ident(const char *name) {
       }
       hptr2 = hptr2->next;
     }
-    hptr = ALLOCATE(ident_hash_elem_t, TAG_PERM_IDENT, "find_or_add_perm_ident:1");
+    hptr = (ident_hash_elem_t *)DMALLOC(sizeof(ident_hash_elem_t), TAG_PERM_IDENT,
+                                        "find_or_add_perm_ident:1");
     hptr->next = ident_hash_head[h]->next;
     ident_hash_head[h]->next = hptr;
     if (ident_hash_head[h] == ident_hash_tail[h]) {
       ident_hash_tail[h] = hptr;
     }
   } else {
-    hptr = (ident_hash_table[h] =
-                ALLOCATE(ident_hash_elem_t, TAG_PERM_IDENT, "find_or_add_perm_ident:2"));
+    hptr = (ident_hash_table[h] = (ident_hash_elem_t *)DMALLOC(
+                sizeof(ident_hash_elem_t), TAG_PERM_IDENT, "find_or_add_perm_ident:2"));
     ident_hash_head[h] = hptr;
     ident_hash_tail[h] = hptr;
     hptr->next = hptr;
@@ -3484,7 +3443,8 @@ static char *alloc_local_name(const char *name) {
 
   if (lb_index + len > 4096) {
     lname_linked_buf_t *new_buf;
-    new_buf = ALLOCATE(lname_linked_buf_t, TAG_COMPILER, "alloc_local_name");
+    new_buf =
+        (lname_linked_buf_t *)DMALLOC(sizeof(lname_linked_buf_t), TAG_COMPILER, "alloc_local_name");
     new_buf->next = lnamebuf;
     lnamebuf = new_buf;
     lb_index = 0;
@@ -3623,7 +3583,8 @@ static ident_hash_elem_t *quick_alloc_ident_entry() {
     return &(ihe_list->items[num_free]);
   } else {
     ident_hash_elem_list_t *ihel;
-    ihel = ALLOCATE(ident_hash_elem_list_t, TAG_COMPILER, "quick_alloc_ident_entry");
+    ihel = (ident_hash_elem_list_t *)DMALLOC(sizeof(ident_hash_elem_list_t), TAG_COMPILER,
+                                             "quick_alloc_ident_entry");
     ihel->next = ihe_list;
     ihe_list = ihel;
     num_free = 127;
@@ -3710,8 +3671,8 @@ void init_identifiers() {
   init_instrs();
 
   /* allocate all three tables together */
-  ident_hash_table =
-      CALLOCATE(IDENT_HASH_SIZE * 3, ident_hash_elem_t *, TAG_IDENT_TABLE, "init_identifiers");
+  ident_hash_table = (ident_hash_elem_t **)DCALLOC(IDENT_HASH_SIZE * 3, sizeof(ident_hash_elem_t *),
+                                                   TAG_IDENT_TABLE, "init_identifiers");
   ident_hash_head = (ident_hash_elem_t **)&ident_hash_table[IDENT_HASH_SIZE];
   ident_hash_tail = (ident_hash_elem_t **)&ident_hash_table[2 * IDENT_HASH_SIZE];
 

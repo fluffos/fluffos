@@ -67,8 +67,9 @@ struct interactive_t {
 #ifdef OLD_ED
   struct ed_buffer_s *ed_buffer; /* local ed                        */
 #endif
-  int iflags;       /* interactive flags */
-  char out_of_band; /* Send a telnet sync operation            */
+  int iflags; /* interactive flags */
+
+  // iconv handle
   struct translation *trans;
 
   char ws_text[MAX_TEXT]; /* input buffer for interactive object     */

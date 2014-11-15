@@ -72,7 +72,7 @@ struct stuff *get_stuff() {
     ((struct stuff_mem *)ret)->next = 0;
     pthread_mutex_unlock(&mem_mut);
   } else {
-    ret = (struct stuff *)MALLOC(sizeof(struct stuff_mem));
+    ret = (struct stuff *)DMALLOC(sizeof(struct stuff_mem), TAG_PERMANENT, "get_stuff");
     ((struct stuff_mem *)ret)->next = 0;
   }
   return ret;
@@ -140,7 +140,7 @@ function_to_call_t *get_cb() {
     cbs = cbs->next;
     ((struct cb_mem *)ret)->next = 0;
   } else {
-    ret = (function_to_call_t *)MALLOC(sizeof(struct cb_mem));
+    ret = (function_to_call_t *)DMALLOC(sizeof(struct cb_mem), TAG_PERMANENT, "get_cb");
     ((struct cb_mem *)ret)->next = 0;
   }
   memset(ret, 0, sizeof(function_to_call_t));
@@ -160,7 +160,7 @@ struct request *get_req() {
     reqms = reqms->next;
     ((struct req_mem *)ret)->next = 0;
   } else {
-    ret = (struct request *)MALLOC(sizeof(struct req_mem));
+    ret = (struct request *)DMALLOC(sizeof(struct req_mem), TAG_PERMANENT, "get_cb");
     ((struct req_mem *)ret)->next = 0;
   }
   return ret;
@@ -326,7 +326,7 @@ int add_read(const char *fname, function_to_call_t *fun) {
   if (fname) {
     struct request *req = get_req();
     // printf("fname: %s\n", fname);
-    req->buf = (char *)MALLOC(READ_FILE_MAX_SIZE);
+    req->buf = (char *)DMALLOC(READ_FILE_MAX_SIZE, TAG_PERMANENT, "add_read");
     req->size = READ_FILE_MAX_SIZE;
     req->fun = fun;
     req->type = aread;
@@ -348,7 +348,7 @@ int add_getdir(const char *fname, function_to_call_t *fun) {
   if (fname) {
     // printf("fname: %s\n", fname);
     struct request *req = get_req();
-    req->buf = (char *)MALLOC(sizeof(struct dirent) * max_array_size);
+    req->buf = (char *)DMALLOC(sizeof(struct dirent) * max_array_size, TAG_PERMANENT, "add_getdir");
     req->size = sizeof(struct dirent) * max_array_size;
     req->fun = fun;
     req->type = agetdir;

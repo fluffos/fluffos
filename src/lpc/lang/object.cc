@@ -269,7 +269,7 @@ static int restore_internal_size(const char **str, int is_mapping, int depth) {
             while (max_depth <= depth) {
               max_depth <<= 1;
             }
-            sizes = CALLOCATE(max_depth, int, TAG_TEMPORARY, "restore_internal_size");
+            sizes = (int *)DCALLOC(max_depth, sizeof(int), TAG_TEMPORARY, "restore_internal_size");
           } else if (depth >= max_depth) {
             while ((max_depth <<= 1) <= depth) {
               ;
@@ -292,7 +292,7 @@ static int restore_internal_size(const char **str, int is_mapping, int depth) {
             while (max_depth <= depth) {
               max_depth <<= 1;
             }
-            sizes = CALLOCATE(max_depth, int, TAG_TEMPORARY, "restore_internal_size");
+            sizes = (int *)DCALLOC(max_depth, sizeof(int), TAG_TEMPORARY, "restore_internal_size");
           } else if (depth >= max_depth) {
             while ((max_depth <<= 1) <= depth) {
               ;
@@ -1302,7 +1302,7 @@ int restore_object_from_gzip(object_t *ob, gzFile gzf, int noclear, int *count) 
   }
 
   if (!buff) {
-    buff = (char *)DXALLOC(t, TAG_PERMANENT, "restore_object: 6");
+    buff = (char *)DMALLOC(t, TAG_PERMANENT, "restore_object: 6");
     buffsize = t;
   }
 
@@ -1403,7 +1403,7 @@ static int save_object_recurse(program_t *prog, svalue_t **svp, int type, int sa
       if (new_str) {
         FREE(new_str);
       }
-      new_str = (char *)DXALLOC(theSize, TAG_PERMANENT, "save_object: 2");
+      new_str = (char *)DMALLOC(theSize, TAG_PERMANENT, "save_object: 2");
       oldSize = theSize;
     }
 
@@ -1485,7 +1485,7 @@ static int save_object_recurse_str(program_t *prog, svalue_t **svp, int type, in
       if (new_str) {
         FREE(new_str);
       }
-      new_str = (char *)DXALLOC(theSize, TAG_PERMANENT, "save_object: 2");
+      new_str = (char *)DMALLOC(theSize, TAG_PERMANENT, "save_object: 2");
       oldSize = theSize;
     }
 
@@ -1625,10 +1625,6 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
     debug_message("Failed to completely save file. Disk could be full.\n");
     unlink(tmp_name);
   } else {
-#ifdef WIN32
-    /* Need to erase it to write over it. */
-    unlink(file);
-#endif
     if (rename(tmp_name, file) < 0) {
       debug_perror("save_object", file);
       debug_message("Failed to rename /%s to /%s\n", tmp_name, file);
@@ -1854,14 +1850,10 @@ int restore_object(object_t *ob, const char *file, int noclear) {
     if (theBuff) {
       FREE(theBuff);
     }
-    theBuff = (char *)DXALLOC(tmp_len + 1, TAG_PERMANENT, "restore_object: 4");
+    theBuff = (char *)DMALLOC(tmp_len + 1, TAG_PERMANENT, "restore_object: 4");
     buff_len = tmp_len;
   }
-#ifdef WIN32
-  tmp_len = read(_fileno(f), theBuff, tmp_len);
-#else
   fread(theBuff, 1, tmp_len, f);
-#endif
 
   fclose(f);
   theBuff[tmp_len] = '\0';
@@ -2033,7 +2025,7 @@ object_t *get_empty_object(int num_var) {
 
   tot_alloc_object++;
   tot_alloc_object_size += size;
-  ob = (object_t *)DXALLOC(size, TAG_OBJECT, "get_empty_object");
+  ob = (object_t *)DMALLOC(size, TAG_OBJECT, "get_empty_object");
   /*
    * marion Don't initialize via memset, this is incorrect. E.g. the bull
    * machines have a (char *)0 which is not zero. We have structure

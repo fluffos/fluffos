@@ -186,7 +186,7 @@ void f_replace_program(void) {
     error("program to replace the current with has to be inherited\n");
   }
   if (!(tmp = retrieve_replace_program_entry())) {
-    tmp = ALLOCATE(replace_ob_t, TAG_TEMPORARY, "replace_program");
+    tmp = (replace_ob_t *)DMALLOC(sizeof(replace_ob_t), TAG_TEMPORARY, "replace_program");
     tmp->ob = current_object;
     tmp->next = obj_list_replace;
     obj_list_replace = tmp;

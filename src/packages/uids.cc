@@ -144,7 +144,7 @@ userid_t *add_uid(const char *name) {
   if ((uid = (userid_t *)tree_srch(uids, uidcmp, (char *)&t_uid))) {
     free_string(sname);
   } else {
-    uid = ALLOCATE(userid_t, TAG_UID, "add_uid");
+    uid = (userid_t *)DMALLOC(sizeof(userid_t), TAG_UID, "add_uid");
     uid->name = sname;
     tree_add(&uids, uidcmp, (char *)uid, NULL);
   }

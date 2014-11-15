@@ -62,7 +62,7 @@ void init_simul_efun(char *file) {
     strcat(buf, ".c");
   }
 
-  new_ob = load_object(buf, compiled_version);
+  new_ob = load_object(buf, 1);
   if (new_ob == 0) {
     fprintf(stderr, "The simul_efun file %s was not loaded.\n", buf);
     exit(-1);
@@ -109,8 +109,10 @@ static void get_simul_efuns(program_t *prog) {
     }
   } else {
     if (num_new) {
-      simul_names = CALLOCATE(num_new, simul_entry, TAG_SIMULS, "get_simul_efuns");
-      simuls = CALLOCATE(num_new, function_lookup_info_t, TAG_SIMULS, "get_simul_efuns: 2");
+      simul_names =
+          (simul_entry *)DCALLOC(num_new, sizeof(simul_entry), TAG_SIMULS, "get_simul_efuns");
+      simuls = (function_lookup_info_t *)DCALLOC(num_new, sizeof(function_lookup_info_t),
+                                                 TAG_SIMULS, "get_simul_efuns: 2");
     }
   }
   for (i = 0; i < num_new; i++) {

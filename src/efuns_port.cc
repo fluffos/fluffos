@@ -55,8 +55,6 @@ void f_crypt(void) {
 
 #ifdef F_OLDCRYPT
 void f_oldcrypt(void) {
-#ifndef WIN32
-
   char *res, salt[3];
   const char *choice = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ./";
 
@@ -74,7 +72,6 @@ void f_oldcrypt(void) {
   free_string_svalue(sp);
   sp->subtype = STRING_MALLOC;
   sp->u.string = res;
-#endif
 }
 #endif
 

@@ -41,7 +41,7 @@ static void read_config_file(FILE *file) {
   char *p;
 
   buff_size = MAX_LINE_LENGTH * (NUM_CONFIG_INTS + 1) * (NUM_CONFIG_STRS + 1);
-  p = buff = CALLOCATE(buff_size, char, TAG_CONFIG, "read_config_file: 1");
+  p = buff = (char *)DCALLOC(buff_size, sizeof(char), TAG_CONFIG, "read_config_file: 1");
   *p++ = '\n';
 
   while (1) {
@@ -223,7 +223,7 @@ void set_defaults(char *filename) {
   CONFIG_STR(__DEFAULT_FAIL_MESSAGE__) = alloc_cstring(tmp, "config file: dfm");
 
   scan_config_line("mud ip : %[^\n]", tmp, 0);
-  // CYGWIN lack support of AI_V4MAPPED, V4 address doesn't work!
+// CYGWIN lack support of AI_V4MAPPED, V4 address doesn't work!
 #ifdef CYGWIN
 #ifdef IPV6
   // common fix for mud ip.

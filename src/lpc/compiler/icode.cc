@@ -991,7 +991,7 @@ void i_initialize_parser() {
   foreach_depth = 0;
 
   if (!forward_branches) {
-    forward_branches = CALLOCATE(10, int, TAG_COMPILER, "forward_branches");
+    forward_branches = (int *)DCALLOC(10, sizeof(int), TAG_COMPILER, "forward_branches");
     nforward_branches_max = 10;
   }
   nforward_branches = 0;

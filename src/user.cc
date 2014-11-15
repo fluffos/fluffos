@@ -18,7 +18,7 @@ static std::vector<interactive_t *> all_users;
 
 interactive_t *user_add() {
   auto user = reinterpret_cast<interactive_t *>(
-      DXALLOC(sizeof(interactive_t), TAG_INTERACTIVE, "new_user_handler"));
+      DMALLOC(sizeof(interactive_t), TAG_INTERACTIVE, "new_user_handler"));
   memset(user, 0, sizeof(*user));
   all_users.push_back(user);
   return user;
@@ -30,9 +30,7 @@ void user_del(interactive_t *user) {
 }
 
 // Get a copy of all users
-const std::vector<interactive_t *> users() {
-  return all_users;
-}
+const std::vector<interactive_t *> users() { return all_users; }
 
 // Count users
 int users_num(bool include_hidden) {

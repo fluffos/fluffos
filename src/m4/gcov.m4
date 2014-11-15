@@ -2,8 +2,7 @@ dnl Profide a configure option to enable gcov compiler flags.
 AC_DEFUN([FLUFFOS_CHECK_GCOV],
 [
   AC_ARG_ENABLE(gcov,
-    AC_HELP_STRING([--enable-gcov],
-      [compile with coverage profiling instrumentation (gcc only)]),
+    AS_HELP_STRING([--enable-gcov],[compile with coverage profiling instrumentation (gcc only)]),
     enable_gcov=$enableval,
     enable_gcov=no)
 

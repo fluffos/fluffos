@@ -426,7 +426,7 @@ static void push_parse_globals() {
   sp->type = T_ERROR_HANDLER;
   sp->u.error_handler = parse_clean_up;
 
-  pg = ALLOCATE(parse_global_t, TAG_TEMPORARY, "push_parse_globals");
+  pg = (parse_global_t *)DMALLOC(sizeof(parse_global_t), TAG_TEMPORARY, "push_parse_globals");
   pg->next = globals;
   globals = pg;
 
@@ -1380,7 +1380,7 @@ static int check_adjectiv(int obix, array_t *warr, int from, int to) {
     return 0;
   }
 
-  adstr = (char *)DXALLOC(sum, TAG_TEMPORARY, "check_adjectiv");
+  adstr = (char *)DMALLOC(sum, TAG_TEMPORARY, "check_adjectiv");
 
   /*
    * If we now have: "adj1 adj2 adj3 ... adjN"

@@ -23,10 +23,10 @@ crypto.$(O): crypto.cc
 
 # special db stuff
 async.$(O): async.cc
-	$(CXX) -c $(CXXFLAGS) -I.. @MYSQL_CFLAGS@ @POSTGRESQL_CFLAGS@ @SQLITE3_CFLAGS@ -x c++ -o $@ $<
+	$(CXX) -c $(CXXFLAGS) -I.. @MYSQL_CFLAGS@ @POSTGRESQL_CPPFLAGS@ @SQLITE3_CFLAGS@ -x c++ -o $@ $<
 
 db.$(O): db.cc
-	$(CXX) -c $(CXXFLAGS) -I.. @MYSQL_CFLAGS@ @POSTGRESQL_CFLAGS@ @SQLITE3_CFLAGS@ -x c++ -o $@ $<
+	$(CXX) -c $(CXXFLAGS) -I.. @MYSQL_CFLAGS@ @POSTGRESQL_CPPFLAGS@ @SQLITE3_CFLAGS@ -x c++ -o $@ $<
 
 # pcre
 pcre.$(O): pcre.cc

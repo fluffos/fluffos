@@ -48,7 +48,11 @@ if test $# -ne 0; then
     develop)
       echo Preparing to build developmental version of MudOS driver ...
       OPTIMIZE="-O0"
-      DEBUG="$DEBUG -D_FORTIFY_SOURCE=2 -DDEBUG -DDEBUG_MACRO"
+      DEBUG="$DEBUG -DDEBUG -DDEBUG_MACRO"
+      # Hardening mode activated, for more error visibility
+      DEBUG="$DEBUG -D_FORTIFY_SOURCE=2 -fstack-protector-all"
+      DEBUG="$DEBUG -fwrapv -fPIE -Wstack-protector"
+      DEBUG="$DEBUG --param ssp-buffer-size=1"
       shift
       ;;
     *)
@@ -65,4 +69,4 @@ SOURCE_REVISION="$(git describe --dirty --always)"
 
 # Force an reconfigure.
 rm configure.h
-CFLAGS=$CFLAGS MAKE=$MAKE ARCH=$ARCH DRIVER_BIN=$DRIVER_BIN OPTIMIZE=$OPTIMIZE SOURCE_REVISION=$SOURCE_REVISION ./configure --bindir=$INSTALL_DIR $@ && $MAKE help
+CFLAGS=$CFLAGS CXXFLAGS=$CFLAGS MAKE=$MAKE ARCH=$ARCH DRIVER_BIN=$DRIVER_BIN OPTIMIZE=$OPTIMIZE SOURCE_REVISION=$SOURCE_REVISION ./configure --bindir=$INSTALL_DIR $@ && $MAKE help

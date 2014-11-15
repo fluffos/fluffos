@@ -32,9 +32,9 @@ extern int tot_dangling_object;
 
 char *strput(char *, char *, const char *);
 char *strput_int(char *, char *, int);
-void CDECL debug_fatal(char *, ...);
-void CDECL fatal(const char *, ...);
-void CDECL error(const char *const, ...);
+void debug_fatal(char *, ...);
+void fatal(const char *, ...);
+void error(const char *const, ...);
 void check_legal_string(const char *);
 #ifndef NO_LIGHT
 void add_light(object_t *, int);
@@ -47,8 +47,7 @@ int get_char(svalue_t *, int, int, svalue_t *);
 
 int strip_name(const char *, char *, int);
 char *check_name(char *);
-#define load_object(x, y) int_load_object(x, 1)
-object_t *int_load_object(const char *, int);
+object_t *load_object(const char *, int);
 object_t *clone_object(const char *, int);
 object_t *environment(svalue_t *);
 object_t *first_inventory(svalue_t *);

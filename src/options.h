@@ -338,11 +338,6 @@
  */
 #define CALLOUT_LOOP_PROTECTION
 
-/* FLUSH_OUTPUT_IMMEDIATELY: Causes output to be written to sockets
- * immediately after being generated.  Useful for debugging.
- */
-#undef FLUSH_OUTPUT_IMMEDIATELY
-
 /* PRIVS: define this if you want object privileges.  Your mudlib must
  *   explicitly make use of this functionality to be useful.  Defining this
  *   this will increase the size of the object structure by 4 bytes (8 bytes
@@ -573,11 +568,6 @@
  */
 #define LARGEST_PRINTABLE_STRING 8192
 
-/* MESSAGE_BUFFER_SIZE: determines the size of the buffer for output that
- *   is sent to users.
- */
-#define MESSAGE_BUFFER_SIZE 4096
-
 /* TRACE: define this to enable the trace() and traceprefix() efuns.
  *   (keeping this undefined will cause the driver to run faster).
  */
@@ -588,16 +578,6 @@
  *   twice as fast when this is not defined (for the most common eoperators).
  */
 #undef TRACE_CODE
-
-/* GET_CHAR_IS_BUFFERED: Normally get_char() is unbuffered.  That is, once
- * a character is received for get_char(), anything else is in the input
- * stream is immediately thrown away.  This can be very undesirable, especially
- * if you're calling get_char() again from the handler from the previous call.
- * Define this if you want get_char() to be buffered.  In this case, the buffer
- * will only get flushed if get_char() is not called from the first get_char()'s
- * LPC callback handler.
- */
-#undef GET_CHAR_IS_BUFFERED
 
 /* PACKAGE_COMPRESS: Enable MCCP support and compressed save files
    SAVE_GZ_EXTENSION: save extension for compressed files
@@ -626,12 +606,6 @@
 
 /* static user space dtrace probes, try them if you have dtrace! */
 #undef DTRACE
-
-/* use POSIX timers for eval_cost.
- *
- * Old code should works fine with this added.
- */
-#define POSIX_TIMERS
 
 /*
   REVERSE_DEFER:
