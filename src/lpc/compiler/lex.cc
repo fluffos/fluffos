@@ -2346,9 +2346,7 @@ void add_predefines() {
 #ifdef PACKAGE_DB
   add_predefine("__PACKAGE_DB__", -1, "");
 #endif
-#ifdef GET_CHAR_IS_BUFFERED
   add_predefine("__GET_CHAR_IS_BUFFERED__", -1, "");
-#endif
 #ifdef PACKAGE_DSLIB
   add_predefine("__DSLIB__", -1, "");
 #endif

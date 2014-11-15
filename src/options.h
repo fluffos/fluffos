@@ -579,16 +579,6 @@
  */
 #undef TRACE_CODE
 
-/* GET_CHAR_IS_BUFFERED: Normally get_char() is unbuffered.  That is, once
- * a character is received for get_char(), anything else is in the input
- * stream is immediately thrown away.  This can be very undesirable, especially
- * if you're calling get_char() again from the handler from the previous call.
- * Define this if you want get_char() to be buffered.  In this case, the buffer
- * will only get flushed if get_char() is not called from the first get_char()'s
- * LPC callback handler.
- */
-#undef GET_CHAR_IS_BUFFERED
-
 /* PACKAGE_COMPRESS: Enable MCCP support and compressed save files
    SAVE_GZ_EXTENSION: save extension for compressed files
  */
