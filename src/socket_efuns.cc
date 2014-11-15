@@ -33,7 +33,6 @@ static std::deque<lpc_socket_t> lpc_socks;
 static char *old_sockaddr_to_string(struct sockaddr *, socklen_t);
 #endif
 
-
 const char *error_strings[ERROR_STRINGS] = {
     "Problem creating socket",           "Problem with setsockopt",
     "Problem setting non-blocking mode", "No more available efun sockets",
@@ -78,14 +77,14 @@ static bool lpcaddr_to_sockaddr(const char *name, struct sockaddr *addr, socklen
 #else
   hints.ai_family = AF_INET;
 #endif
- hints.ai_socktype = SOCK_STREAM;
+  hints.ai_socktype = SOCK_STREAM;
   hints.ai_protocol = 0;
   hints.ai_flags = AI_V4MAPPED | AI_NUMERICHOST | AI_NUMERICSERV;
 
   int ret;
   if ((ret = getaddrinfo(host, service, &hints, &res))) {
     debug(sockets, "lpcaddr_to_sockaddr: getaddrinfo error: %s", gai_strerror(ret));
-   return false;
+    return false;
   }
 
   memcpy(addr, res->ai_addr, res->ai_addrlen);
@@ -363,46 +362,46 @@ int socket_bind(int fd, int port, const char *addr) {
     return EEISBOUND;
   }
 
-  struct sockaddr_storage sockaddr = { 0 };
+  struct sockaddr_storage sockaddr = {0};
   socklen_t len = sizeof(sockaddr);
 
   if (addr != nullptr) {
     if (!lpcaddr_to_sockaddr(addr, (struct sockaddr *)&sockaddr, &len)) {
-       debug(sockets, "socket_bind: unable to parse: '%s'.\n", addr);
-       return EEBADADDR;
-     }
+      debug(sockets, "socket_bind: unable to parse: '%s'.\n", addr);
+      return EEBADADDR;
+    }
   } else {
     char service[NI_MAXSERV];
     snprintf(service, sizeof(service), "%u", port);
 
     struct addrinfo hints;
     memset(&hints, 0, sizeof(struct addrinfo));
-  #ifdef IPV6
+#ifdef IPV6
     hints.ai_family = AF_INET6;
-  #else
+#else
     hints.ai_family = AF_INET;
-  #endif
+#endif
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE | AI_V4MAPPED;
     hints.ai_protocol = 0; /* Any protocol */
 
-      int ret;
-      struct addrinfo *result = NULL;
-      if (MUD_IP[0] != '\0') {
-        debug(sockets, "socket_bind: binding to mud ip: %s.\n", MUD_IP);
-        ret = getaddrinfo(MUD_IP, service, &hints, &result);
-      } else {
-        debug(sockets, "socket_bind: binding to any address.\n");
-        ret = getaddrinfo(NULL, service, &hints, &result);
-      }
-      if (ret) {
-        debug(sockets, "socket_bind: error %s \n", gai_strerror(ret));
-        return EEBADADDR;
-      }
+    int ret;
+    struct addrinfo *result = NULL;
+    if (MUD_IP[0] != '\0') {
+      debug(sockets, "socket_bind: binding to mud ip: %s.\n", MUD_IP);
+      ret = getaddrinfo(MUD_IP, service, &hints, &result);
+    } else {
+      debug(sockets, "socket_bind: binding to any address.\n");
+      ret = getaddrinfo(NULL, service, &hints, &result);
+    }
+    if (ret) {
+      debug(sockets, "socket_bind: error %s \n", gai_strerror(ret));
+      return EEBADADDR;
+    }
 
-      memcpy(&sockaddr, result->ai_addr, result->ai_addrlen);
-      len = result->ai_addrlen;
-      freeaddrinfo(result);
+    memcpy(&sockaddr, result->ai_addr, result->ai_addrlen);
+    len = result->ai_addrlen;
+    freeaddrinfo(result);
   }
 
   if (bind(lpc_socks[fd].fd, (struct sockaddr *)&sockaddr, len) == -1) {

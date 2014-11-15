@@ -12,7 +12,7 @@
 #include <event2/buffer.h>
 #include <event2/event.h>
 #include <event2/listener.h>
-#include <netinet/tcp.h> // for TCP_NODELAY
+#include <netinet/tcp.h>  // for TCP_NODELAY
 
 #include "main.h"
 #include "socket_efuns.h"
@@ -364,10 +364,10 @@ void add_message(object_t *who, const char *data, int len) {
   handle_snoop(data, len, ip);
 
   if (ip->connection_type == PORT_TELNET) {
-     telnet_send(ip->telnet, trans, translen);
-   } else {
-     bufferevent_write(ip->ev_buffer, trans, translen);
-   }
+    telnet_send(ip->telnet, trans, translen);
+  } else {
+    bufferevent_write(ip->ev_buffer, trans, translen);
+  }
 
   add_message_calls++;
 } /* add_message() */

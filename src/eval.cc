@@ -14,6 +14,4 @@ void set_eval(LPC_INT etime) {
   outoftime = 0;
 }
 
-LPC_INT get_eval() {
-  return posix_eval_timer_get();
-}
+LPC_INT get_eval() { return posix_eval_timer_get(); }

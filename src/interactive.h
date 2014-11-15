@@ -67,7 +67,7 @@ struct interactive_t {
 #ifdef OLD_ED
   struct ed_buffer_s *ed_buffer; /* local ed                        */
 #endif
-  int iflags;       /* interactive flags */
+  int iflags; /* interactive flags */
 
   // iconv handle
   struct translation *trans;

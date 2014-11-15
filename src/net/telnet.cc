@@ -162,8 +162,8 @@ static inline void on_telnet_dont(unsigned char cmd, interactive_t *ip) {
       break;
     case TELOPT_SGA:
       if (ip->iflags & USING_LINEMODE) {
-            ip->iflags &= ~SUPPRESS_GA;
-            telnet_negotiate(ip->telnet, TELOPT_SGA, TELNET_WONT);
+        ip->iflags &= ~SUPPRESS_GA;
+        telnet_negotiate(ip->telnet, TELOPT_SGA, TELNET_WONT);
       }
       break;
     default:

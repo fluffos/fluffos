@@ -64,7 +64,8 @@ void call_heart_beat() {
       }
 
       // Skip if we are in some weird situation.
-      if (curr_hb->ob == nullptr || !(curr_hb->ob->flags & O_HEART_BEAT) || curr_hb->ob->flags & O_DESTRUCTED) {
+      if (curr_hb->ob == nullptr || !(curr_hb->ob->flags & O_HEART_BEAT) ||
+          curr_hb->ob->flags & O_DESTRUCTED) {
         delete curr_hb;
         continue;
       }

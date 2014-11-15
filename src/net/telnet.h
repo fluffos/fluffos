@@ -38,8 +38,8 @@ void telnet_event_handler(telnet_t *, telnet_event_t *, void *);
 void send_initial_telent_negotiantions(interactive_t *user);
 
 // Change terminal mode
-void set_linemode(interactive_t *ip, bool flush=true);
-void set_charmode(interactive_t *ip, bool flush=true);
-void set_localecho(interactive_t *ip, bool enable, bool flush=true);
+void set_linemode(interactive_t *ip, bool flush = true);
+void set_charmode(interactive_t *ip, bool flush = true);
+void set_localecho(interactive_t *ip, bool enable, bool flush = true);
 
 #endif /* TELNET_H_ */
