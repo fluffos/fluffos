@@ -8,6 +8,7 @@
 #include "comm.h"
 
 #include <algorithm>
+#include <memory>
 
 #include <event2/buffer.h>
 #include <event2/event.h>
@@ -334,11 +335,6 @@ static int shadow_catch_message(object_t *ob, const char *str) {
  * special handling is done.
  */
 void add_message(object_t *who, const char *data, int len) {
-  interactive_t *ip;
-  const char *cp;
-  const char *end;
-  char *trans;
-  int translen;
   /*
    * if who->interactive is not valid, write message on stderr.
    * (maybe)
@@ -351,9 +347,16 @@ void add_message(object_t *who, const char *data, int len) {
 #endif
     return;
   }
-  ip = who->interactive;
-  trans = translate(ip->trans->outgoing, data, len, &translen);
+  auto ip = who->interactive;
+  int translen;
+  char *trans = translate(ip->trans->outgoing, data, len, &translen);
 #ifdef SHADOW_CATCH_MESSAGE
+  if (ip->connection_type == PORT_TELNET) {
+    telnet_send(ip->telnet, trans, translen);
+  } else {
+    bufferevent_write(ip->ev_buffer, trans, translen);
+  }
+
   /*
    * shadow handling.
    */
@@ -366,30 +369,22 @@ void add_message(object_t *who, const char *data, int len) {
 #endif /* NO_SHADOWS */
   handle_snoop(data, len, ip);
 
-  if (ip->connection_type == PORT_TELNET) {
-    telnet_send(ip->telnet, trans, translen);
-  } else {
-    bufferevent_write(ip->ev_buffer, trans, translen);
-  }
-
   add_message_calls++;
 } /* add_message() */
 
 void add_vmessage(object_t *who, const char *format, ...) {
-  auto ip = who->interactive;
-
-  // FIXME: This data is clearly not passed through icovn.
   va_list args;
   va_start(args, format);
-  if (ip->connection_type == PORT_TELNET) {
-    telnet_raw_vprintf(ip->telnet, format, args);
-  } else {
-    auto buffer = bufferevent_get_output(ip->ev_buffer);
-    evbuffer_add_vprintf(buffer, format, args);
-  }
+  do {
+    int result = vsnprintf(nullptr, 0, format, args);
+    if (result < 0) break;
+    std::unique_ptr<char> msg(new char[result]);
+    result = vsnprintf(msg.get(), result, format, args);
+    if (result < 0) break;
+    add_message(who, msg.get(), strlen(msg.get()));
+    break;
+  } while(false);
   va_end(args);
-
-  add_message_calls++;
 }
 
 /*
