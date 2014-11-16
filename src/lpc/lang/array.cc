@@ -86,6 +86,8 @@ static array_t *int_allocate_empty_array(unsigned int n) {
 }
 
 array_t *allocate_empty_array(int n) {
+  auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
+
   if (n < 0 || n > max_array_size) {
     error("Illegal array size.\n");
   }
@@ -222,6 +224,8 @@ array_t *resize_array(array_t *p, unsigned int n) {
 }
 
 array_t *explode_string(const char *str, int slen, const char *del, int len) {
+  auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
+
   const char *p, *beg, *lastdel = 0;
   int num, j, limit;
   array_t *ret;
@@ -235,6 +239,7 @@ array_t *explode_string(const char *str, int slen, const char *del, int len) {
   /* return an array of length strlen(str) -w- one character per element */
   if (len == 0) {
     sz = 1;
+    auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
     if (slen > max_array_size) {
       slen = max_array_size;
@@ -487,6 +492,8 @@ void implode_array(funptr_t *fptr, array_t *arr, svalue_t *dest, int first_on_st
  * It now frees the passed array
  */
 array_t *slice_array(array_t *p, int from, int to) {
+  auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
+
   int cnt;
   svalue_t *sv1, *sv2;
 
@@ -560,6 +567,8 @@ array_t *copy_array(array_t *p) {
 
 #ifdef F_COMMANDS
 array_t *commands(object_t *ob) {
+  auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
+
   sentence_t *s;
   array_t *v, *p;
   int cnt = 0;
@@ -882,6 +891,8 @@ void f_unique_array(void) {
 /* Concatenation of two arrays into one
  */
 array_t *add_array(array_t *p, array_t *r) {
+  auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
+
   int cnt, res;
   array_t *d; /* destination */
 
@@ -950,6 +961,8 @@ array_t *add_array(array_t *p, array_t *r) {
 #ifndef NO_ENVIRONMENT
 /* Returns an array of all objects contained in 'ob' */
 array_t *all_inventory(object_t *ob, int override) {
+  auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
+
   array_t *d;
   object_t *cur;
   int cnt, res;
@@ -1337,6 +1350,8 @@ static void deep_inventory_collect(object_t *ob, array_t *inv, int *i, int max, 
 }
 
 array_t *deep_inventory(object_t *ob, int take_top, funptr_t *fp) {
+  auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
+
   array_t *dinv;
   int i, o;
   svalue_t *fp_result;
@@ -1404,6 +1419,8 @@ array_t *deep_inventory(object_t *ob, int take_top, funptr_t *fp) {
 }
 
 array_t *deep_inventory_array(array_t *arr, int take_top, funptr_t *fp) {
+  auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
+
   array_t *dinv;
   int i, o, c;
   svalue_t *fp_result;
@@ -1792,6 +1809,8 @@ settle_business:
 }
 
 array_t *union_array(array_t *a1, array_t *a2) {
+  auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
+
   int a1s = a1->size, a2s = a2->size;
   long d, l, j, i, cnt, flag;
   array_t *a3; /* destination */
@@ -2075,6 +2094,8 @@ array_t *inherit_list(object_t *ob) {
 static int livings_filter(object_t *ob, void *data) { return (ob->flags & O_ENABLE_COMMANDS); }
 
 array_t *livings() {
+  auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
+
   int count;
   object_t **list;
   array_t *ret;
@@ -2098,6 +2119,8 @@ array_t *livings() {
 
 #ifdef F_OBJECTS
 void f_objects(void) {
+  auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
+
   int count, i;
   const char *func = 0;
   object_t **list;

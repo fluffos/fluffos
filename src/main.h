@@ -32,16 +32,8 @@ extern port_def_t external_port[5];
 extern char *external_cmd[NUM_EXTERNAL_CMDS];
 #endif
 
-extern int t_flag;
-extern int comp_flag;
-extern int time_to_clean_up;
-extern const char *default_fail_message;
+// TODO: These should all be deleted soon.
 extern time_t boot_time;
-extern int max_array_size;
-extern int max_buffer_size;
-extern int max_string_length;
-extern char *reserved_area;
-extern double consts[];
 
 void debug_message(const char *, ...);
 

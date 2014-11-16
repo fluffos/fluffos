@@ -765,7 +765,7 @@ static int MySQL_connect(dbconn_t *c, const char *host, const char *database, co
   int ret;
   MYSQL *tmp;
 
-  tmp = (MYSQL *) DMALLOC(sizeof(MYSQL), TAG_DB, "MySQL_connect");
+  tmp = (MYSQL *)DMALLOC(sizeof(MYSQL), TAG_DB, "MySQL_connect");
   tmp = mysql_init(tmp);
   *(c->mysql.errormsg) = 0;
   c->mysql.handle =

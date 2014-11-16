@@ -44,17 +44,17 @@ svalue_t *safe_apply_master_ob(int fun, int num_arg) {
   return safe_apply(applies_table[fun], master_ob, num_arg, ORIGIN_DRIVER);
 }
 
-void init_master() {
+void init_master(const char *master_file) {
   char buf[512];
   object_t *new_ob;
 
-  if (!strip_name(MASTER_FILE, buf, sizeof buf)) {
-    error("Illegal master file name '%s'\n", MASTER_FILE);
+  if (!strip_name(master_file, buf, sizeof buf)) {
+    error("Illegal master file name '%s'\n", master_file);
   }
 
   new_ob = load_object(buf, 1);
   if (new_ob == 0) {
-    fprintf(stderr, "The master file %s was not loaded.\n", MASTER_FILE);
+    fprintf(stderr, "The master file %s was not loaded.\n", master_file);
     exit(-1);
   }
   set_master(new_ob);

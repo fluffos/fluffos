@@ -13,7 +13,9 @@
 #include "main.h"  // debug_message
 
 // FIXME: move init from main() to compile time;
-svalue_t const0, const1, const0u;
+svalue_t const0{T_NUMBER, 0, {0}};
+svalue_t const1{T_NUMBER, 0, {1}};
+svalue_t const0u{T_NUMBER, T_UNDEFINED, {0}};
 
 /*
  * Assign to a svalue.

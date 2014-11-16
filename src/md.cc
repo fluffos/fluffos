@@ -823,10 +823,10 @@ void check_all_blocks(int flag) {
 #endif
     }
 
-    if (*(DEFAULT_FAIL_MESSAGE)) {
+    auto dfm = CONFIG_STR(__DEFAULT_FAIL_MESSAGE__);
+    if (dfm != nullptr && strlen(dfm) > 0) {
       char buf[8192];
-
-      strcpy(buf, DEFAULT_FAIL_MESSAGE);
+      strcpy(buf, dfm);
       strcat(buf, "\n");
       char *target = findstring(buf);
       if (target) {

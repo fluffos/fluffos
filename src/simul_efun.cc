@@ -46,7 +46,7 @@ void mark_simuls() {
  * If there is a simul_efun file, then take care of it and extract all
  * information we need.
  */
-void init_simul_efun(char *file) {
+void init_simul_efun(const char *file) {
   char buf[512];
   object_t *new_ob;
 
@@ -55,7 +55,7 @@ void init_simul_efun(char *file) {
     return;
   }
   if (!strip_name(file, buf, sizeof buf)) {
-    error("Ilegal simul_efun file name '%s'\n", file);
+    error("Illegal simul_efun file name '%s'\n", file);
   }
 
   if (file[strlen(file) - 2] != '.') {

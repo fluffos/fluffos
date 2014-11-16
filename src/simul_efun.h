@@ -10,7 +10,7 @@
 extern object_t *simul_efun_ob;
 extern function_lookup_info_t *simuls;
 
-void init_simul_efun(char *);
+void init_simul_efun(const char *);
 void set_simul_efun(object_t *);
 
 #ifdef DEBUGMALLOC_EXTENSIONS

@@ -86,7 +86,7 @@ void init_strings() {
   int x, y;
 
   /* ensure that htable size is a power of 2 */
-  y = HTABLE_SIZE;
+  y = CONFIG_INT(__SHARED_STRING_HASH_TABLE_SIZE__);
   for (htable_size = 1; htable_size < y; htable_size *= 2) {
     ;
   }
@@ -148,6 +148,8 @@ char *findstring(const char *s) {
 /* alloc_new_string: Make a space for a string.  */
 
 static block_t *alloc_new_string(const char *string, int h) {
+  auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
+
   block_t *b;
   int len = strlen(string);
   int size;
@@ -384,6 +386,9 @@ char *int_string_copy(const char *const str, const char *desc)
 char *int_string_copy(const char *const str)
 #endif
 {
+  // TODO: probabaly not a good idea to have it here.
+  auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
+
   char *p;
   int len;
 

@@ -2043,11 +2043,13 @@ object_t *get_empty_object(int num_var) {
 }
 
 void reset_object(object_t *ob) {
+  auto time_to_reset = CONFIG_INT(__TIME_TO_RESET__);
+
 /* Be sure to update time first ! */
 #ifdef RANDOMIZED_RESETS
-  ob->next_reset = g_current_virtual_time + TIME_TO_RESET / 2 + random_number(TIME_TO_RESET / 2);
+  ob->next_reset = g_current_virtual_time + time_to_reset / 2 + random_number(time_to_reset / 2);
 #else
-  ob->next_reset = g_current_virtual_time + TIME_TO_RESET;
+  ob->next_reset = g_current_virtual_time + time_to_reset;
 #endif
 
   save_command_giver(0);
@@ -2060,8 +2062,9 @@ void reset_object(object_t *ob) {
 }
 
 void call_create(object_t *ob, int num_arg) {
+  auto time_to_reset = CONFIG_INT(__TIME_TO_RESET__);
   /* Be sure to update time first ! */
-  ob->next_reset = g_current_virtual_time + TIME_TO_RESET / 2 + random_number(TIME_TO_RESET / 2);
+  ob->next_reset = g_current_virtual_time + time_to_reset / 2 + random_number(time_to_reset / 2);
 
   call___INIT(ob);
 

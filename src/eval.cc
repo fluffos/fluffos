@@ -5,7 +5,9 @@
 #include "backend.h"
 #include "posix_timers.h"
 
-int outoftime = 0;
+// This variable is used in the signal handler, so it must be marked as volatile.
+volatile int outoftime = 0;
+
 LPC_INT max_cost;
 
 void set_eval(LPC_INT etime) {

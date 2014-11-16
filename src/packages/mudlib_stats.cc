@@ -449,7 +449,7 @@ static void save_stat_list(const char *file, mudlib_stats_t *list) {
       }
       f = fopen(file, "w");
     } else {
-      sprintf(fname, "%s/%s", LOG_DIR, file);
+      sprintf(fname, "%s/%s", CONFIG_STR(__LOG_DIR__), file);
       if (fname[0] == '/') {
         fname++;
       }
@@ -483,7 +483,7 @@ static void restore_stat_list(const char *file, mudlib_stats_t **list) {
       }
       f = fopen(file, "r");
     } else {
-      sprintf(fname, "%s/%s", LOG_DIR, file);
+      sprintf(fname, "%s/%s", CONFIG_STR(__LOG_DIR__), file);
       if (fname[0] == '/') {
         fname++;
       }

@@ -224,12 +224,6 @@
  */
 #define MUDLIB_ERROR_HANDLER
 
-/* CONFIG_FILE_DIR specifies a directory in which the driver will search for
- *   config files by default.  If you don't wish to use this define, you may
- *   always specify a full path to the config file when starting the driver.
- */
-#define CONFIG_FILE_DIR "/home/atuin/bin"
-
 /* DEFAULT_PRAGMAS:  This should be a sum of pragmas you want to always
  * be on, i.e.
  *

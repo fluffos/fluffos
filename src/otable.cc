@@ -58,7 +58,8 @@ void init_otable() {
   int x, y;
 
   /* ensure that otable_size is a power of 2 */
-  y = OTABLE_SIZE;
+  y = CONFIG_INT(__OBJECT_HASH_TABLE_SIZE__);
+
   for (otable_size = 1; otable_size < y; otable_size *= 2) {
     ;
   }
@@ -109,6 +110,8 @@ static object_t *find_obj_n(const char *s) {
 }
 
 array_t *children(const char *s) {
+  auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
+
   object_t *curr;
   array_t *vec;
   int size;
@@ -240,12 +243,14 @@ object_t *lookup_object_hash(const char *s) {
 static char sbuf[100];
 
 int show_otable_status(outbuffer_t *out, int verbose) {
+  const auto object_hash_table_size = CONFIG_INT(__OBJECT_HASH_TABLE_SIZE__);
+
   int starts;
 
   if (verbose == 1) {
     outbuf_add(out, "Object name hash table status:\n");
     outbuf_add(out, "------------------------------\n");
-    sprintf(sbuf, "%10.2f", objs_in_table / (float)OTABLE_SIZE);
+    sprintf(sbuf, "%10.2f", objs_in_table / (float)object_hash_table_size);
     outbuf_addv(out, "Average hash chain length:       %s\n", sbuf);
     sprintf(sbuf, "%10.2f", (float)obj_probes / obj_searches);
     outbuf_addv(out, "Average search length:           %s\n", sbuf);
@@ -254,10 +259,11 @@ int show_otable_status(outbuffer_t *out, int verbose) {
     outbuf_addv(out, "External lookups (succeeded):    %lu (%lu)\n", user_obj_lookups,
                 user_obj_found);
   }
-  starts = (long)OTABLE_SIZE * sizeof(object_t *) + objs_in_table * sizeof(object_t);
+  starts = (long)object_hash_table_size * sizeof(object_t *) + objs_in_table * sizeof(object_t);
 
   if (!verbose) {
-    outbuf_addv(out, "Obj table overhead:\t\t%8d %8d\n", OTABLE_SIZE * sizeof(object_t *), starts);
+    outbuf_addv(out, "Obj table overhead:\t\t%8d %8d\n",
+                object_hash_table_size * sizeof(object_t *), starts);
   }
   return starts;
 }

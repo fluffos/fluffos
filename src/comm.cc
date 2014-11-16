@@ -107,8 +107,10 @@ void init_user_conn() {
 #endif
 
     int ret;
-    if (MUD_IP[0]) {
-      ret = getaddrinfo(MUD_IP, service, &hints, &res);
+
+    auto mudip = CONFIG_STR(__MUD_IP__);
+    if (mudip != nullptr && strlen(mudip) > 0) {
+      ret = getaddrinfo(mudip, service, &hints, &res);
     } else {
       ret = getaddrinfo(NULL, service, &hints, &res);
     }
@@ -141,8 +143,7 @@ void shutdown_external_ports() {
     if (external_port[i].ev_conn) evconnlistener_free(external_port[i].ev_conn);
     if (evutil_closesocket(external_port[i].fd) == -1) {
       debug_message("shutdown_external_ports: failed: %s",
-                    evutil_socket_error_to_string(
-                        evutil_socket_geterror(external_port[i].fd)));
+                    evutil_socket_error_to_string(evutil_socket_geterror(external_port[i].fd)));
     }
   }
 

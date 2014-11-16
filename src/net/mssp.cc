@@ -66,7 +66,7 @@ void on_telnet_do_mssp(interactive_t *ip) {
     }
   }
   if (!tmp) {
-    telnet_printf(ip->telnet, (char *)telnet_mssp_value, "NAME", MUD_NAME);
+    telnet_printf(ip->telnet, (char *)telnet_mssp_value, "NAME", CONFIG_STR(__MUD_NAME__));
   }
   tmp = findstring("PLAYERS");
   if (tmp) {

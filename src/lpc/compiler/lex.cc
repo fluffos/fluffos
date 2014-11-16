@@ -2332,7 +2332,7 @@ void add_predefines() {
 
 /* Backwards Compat */
 #ifndef CDLIB
-  add_quoted_predefine("MUD_NAME", MUD_NAME);
+  add_quoted_predefine("MUD_NAME", CONFIG_STR(__MUD_NAME__));
 #endif
 #ifdef F_ED
   add_predefine("HAS_ED", -1, "");
@@ -2417,11 +2417,13 @@ void start_new_file(int f) {
   current_line_base = 0;
   current_line_saved = 0;
   function_flag = 0;
-  if (*GLOBAL_INCLUDE_FILE) {
+
+  auto glf = CONFIG_STR(__GLOBAL_INCLUDE_FILE__);
+  if (glf != nullptr && strlen(glf) > 0) {
     char *gifile;
 
     /* need a writable copy */
-    gifile = alloc_cstring(GLOBAL_INCLUDE_FILE, "global include");
+    gifile = alloc_cstring(glf, "global include");
     handle_include(gifile, 1);
     FREE(gifile);
   } else {
