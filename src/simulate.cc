@@ -1933,6 +1933,7 @@ void shutdownMudOS(int exit_code) {
   flush_message_all();
 
   /* clean up heap allocations so valgrind don't consider them lost.*/
+  reset_machine(0);
   clear_call_outs();
   clear_tick_events();
   clear_heartbeats();
