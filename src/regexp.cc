@@ -1345,7 +1345,6 @@ static char *regprop(char *op) {
 }
 #endif
 
-
 /*
  - regsub - perform substitutions after a regexp match
  */

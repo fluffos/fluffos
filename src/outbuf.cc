@@ -9,23 +9,25 @@ void outbuf_zero(outbuffer_t *outbuf) {
 }
 
 int outbuf_extend(outbuffer_t *outbuf, int l) {
+  const auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
+
   int limit;
 
   DEBUG_CHECK(l < 0, "Negative length passed to outbuf_extend.\n");
 
-  l = (l > MAX_STRING_LENGTH ? MAX_STRING_LENGTH : l);
+  l = (l > max_string_length ? max_string_length : l);
 
   if (outbuf->buffer) {
     limit = MSTR_SIZE(outbuf->buffer);
     if (outbuf->real_size + l > limit) {
-      if (outbuf->real_size == MAX_STRING_LENGTH) {
+      if (outbuf->real_size == max_string_length) {
         return 0;
       } /* TRUNCATED */
 
       /* assume it's going to grow some more */
       limit = (outbuf->real_size + l) * 2;
-      if (limit > MAX_STRING_LENGTH) {
-        limit = MAX_STRING_LENGTH;
+      if (limit > max_string_length) {
+        limit = max_string_length;
         outbuf->buffer = extend_string(outbuf->buffer, limit);
         return limit - outbuf->real_size;
       }

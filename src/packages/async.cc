@@ -323,11 +323,13 @@ int aio_getdir(struct request *req) {
 #endif
 
 int add_read(const char *fname, function_to_call_t *fun) {
+  const auto read_file_max_size = CONFIG_INT(__MAX_READ_FILE_SIZE__);
+
   if (fname) {
     struct request *req = get_req();
     // printf("fname: %s\n", fname);
-    req->buf = (char *)DMALLOC(READ_FILE_MAX_SIZE, TAG_PERMANENT, "add_read");
-    req->size = READ_FILE_MAX_SIZE;
+    req->buf = (char *)DMALLOC(read_file_max_size, TAG_PERMANENT, "add_read");
+    req->size = read_file_max_size;
     req->fun = fun;
     req->type = aread;
     strcpy(req->path, fname);
@@ -345,6 +347,8 @@ int add_read(const char *fname, function_to_call_t *fun) {
 #ifdef F_ASYNC_GETDIR
 extern int max_array_size;
 int add_getdir(const char *fname, function_to_call_t *fun) {
+  auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
+
   if (fname) {
     // printf("fname: %s\n", fname);
     struct request *req = get_req();
@@ -424,15 +428,17 @@ struct linux_dirent {
 };
 
 void handle_getdir(struct request *req) {
+  auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
+
   int val = req->ret;
-  if (val > MAX_ARRAY_SIZE) {
-    val = MAX_ARRAY_SIZE;
+  if (val > max_array_size) {
+    val = max_array_size;
   }
   array_t *ret = allocate_empty_array(val);
   int i = 0;
   if (val > 0) {
     struct linux_dirent *de = (struct linux_dirent *)req->buf;
-    for (i = 0; i < MAX_ARRAY_SIZE && ((char *)de) - (char *)(req->buf) < val; i++) {
+    for (i = 0; i < max_array_size && ((char *)de) - (char *)(req->buf) < val; i++) {
       svalue_t *vp = &(ret->item[i]);
       vp->type = T_STRING;
       vp->subtype = STRING_MALLOC;

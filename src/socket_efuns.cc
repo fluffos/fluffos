@@ -387,9 +387,11 @@ int socket_bind(int fd, int port, const char *addr) {
 
     int ret;
     struct addrinfo *result = NULL;
-    if (MUD_IP[0] != '\0') {
-      debug(sockets, "socket_bind: binding to mud ip: %s.\n", MUD_IP);
-      ret = getaddrinfo(MUD_IP, service, &hints, &result);
+
+    auto mudip = CONFIG_STR(__MUD_IP__);
+    if (mudip != nullptr && strlen(mudip) > 0) {
+      debug(sockets, "socket_bind: binding to mud ip: %s.\n", mudip);
+      ret = getaddrinfo(mudip, service, &hints, &result);
     } else {
       debug(sockets, "socket_bind: binding to any address.\n");
       ret = getaddrinfo(NULL, service, &hints, &result);
@@ -891,6 +893,8 @@ static void call_callback(int fd, int what, int num_arg) {
  * Handle LPC efun socket read select events
  */
 void socket_read_select_handler(int fd) {
+  const auto max_byte_transfer = CONFIG_INT(__MAX_BYTE_TRANSFER__);
+
   int cc = 0;
   char buf[BUF_SIZE];
   svalue_t value;
@@ -990,9 +994,8 @@ void socket_read_select_handler(int fd) {
         case MUD:
           debug(sockets, ("read_socket_handler: DATA_XFER MUD\n"));
           if (lpc_socks[fd].flags & S_HEADER) {
-            cc =
-                recv(lpc_socks[fd].fd, (char *)&lpc_socks[fd].r_len + lpc_socks[fd].r_off,
-                               4 - lpc_socks[fd].r_off, 0);
+            cc = recv(lpc_socks[fd].fd, (char *)&lpc_socks[fd].r_len + lpc_socks[fd].r_off,
+                      4 - lpc_socks[fd].r_off, 0);
             if (cc <= 0) {
               break;
             }
@@ -1013,7 +1016,7 @@ void socket_read_select_handler(int fd) {
             lpc_socks[fd].flags &= ~S_HEADER;
             lpc_socks[fd].r_off = 0;
             lpc_socks[fd].r_len = ntohl(lpc_socks[fd].r_len);
-            if (lpc_socks[fd].r_len <= 0 || lpc_socks[fd].r_len > MAX_BYTE_TRANSFER) {
+            if (lpc_socks[fd].r_len <= 0 || lpc_socks[fd].r_len > max_byte_transfer) {
               break;
             }
             lpc_socks[fd].r_buf = (char *)DMALLOC(lpc_socks[fd].r_len + 1, TAG_TEMPORARY,
@@ -1025,7 +1028,7 @@ void socket_read_select_handler(int fd) {
           }
           if (lpc_socks[fd].r_off < lpc_socks[fd].r_len) {
             cc = recv(lpc_socks[fd].fd, lpc_socks[fd].r_buf + lpc_socks[fd].r_off,
-                                lpc_socks[fd].r_len - lpc_socks[fd].r_off, 0);
+                      lpc_socks[fd].r_len - lpc_socks[fd].r_off, 0);
             if (cc <= 0) {
               break;
             }
@@ -1148,8 +1151,7 @@ void socket_write_select_handler(int fd) {
   }
 
   if (lpc_socks[fd].w_buf != NULL) {
-    cc = send(lpc_socks[fd].fd, lpc_socks[fd].w_buf + lpc_socks[fd].w_off,
-                         lpc_socks[fd].w_len, 0);
+    cc = send(lpc_socks[fd].fd, lpc_socks[fd].w_buf + lpc_socks[fd].w_off, lpc_socks[fd].w_len, 0);
     if (cc < 0) {
       if (cc == -1 && (errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR)) {
         event_add(lpc_socks[fd].ev_write, NULL);

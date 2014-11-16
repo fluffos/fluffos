@@ -6,6 +6,9 @@
 #ifndef _MAPPING_H
 #define _MAPPING_H
 
+// TODO: remove this.
+#define MAX_MAPPING_SIZE CONFIG_INT(__MAX_MAPPING_SIZE__)
+
 #define MAP_SVAL_HASH(x) sval_hash(x)
 #include "hash.h"
 #include "stralloc.h"

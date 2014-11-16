@@ -42,6 +42,8 @@ void f_compressedp(void) {
  */
 #ifdef F_NAMED_LIVINGS
 void f_named_livings() {
+  auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
+
   int i;
   int nob;
 #ifdef F_SET_HIDE
@@ -535,6 +537,8 @@ static int at_end(int i, int imax, int z, int *lens) {
 }
 
 void f_terminal_colour(void) {
+  auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
+
   const char *instr, *cp, **parts;
   char *savestr, *deststr, *ncp;
   char curcolour[MAX_COLOUR_STRING];
@@ -1932,6 +1936,8 @@ void f_function_owner(void) {
 
 #ifdef F_REPEAT_STRING
 void f_repeat_string(void) {
+  auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
+
   const char *str;
   int repeat, len, newlen;
   char *ret, *p;
@@ -2429,6 +2435,8 @@ int garbage_check(object_t *ob, void *data) {
 }
 
 void f_get_garbage(void) {
+  auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
+
   int count, i;
   object_t **obs;
   array_t *ret;

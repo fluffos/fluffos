@@ -23,8 +23,8 @@ int legal_path(const char *);
 static int match_string(char *, char *);
 static int copy(const char *from, const char *to);
 static int do_move(const char *from, const char *to, int flag);
-static int  pstrcmp(const void *, const void *);
-static int  parrcmp(const void *, const void *);
+static int pstrcmp(const void *, const void *);
+static int parrcmp(const void *, const void *);
 static void encode_stat(svalue_t *, int, char *, struct stat *);
 
 #define MAX_LINES 50
@@ -32,14 +32,14 @@ static void encode_stat(svalue_t *, int, char *, struct stat *);
 /*
  * These are used by qsort in get_dir().
  */
-static int  pstrcmp(const void *p1, const void *p2) {
+static int pstrcmp(const void *p1, const void *p2) {
   svalue_t *x = (svalue_t *)p1;
   svalue_t *y = (svalue_t *)p2;
 
   return strcmp(x->u.string, y->u.string);
 }
 
-static int  parrcmp(const void *p1, const void *p2) {
+static int parrcmp(const void *p1, const void *p2) {
   svalue_t *x = (svalue_t *)p1;
   svalue_t *y = (svalue_t *)p2;
 
@@ -92,6 +92,8 @@ static void encode_stat(svalue_t *vp, int flags, char *str, struct stat *st) {
 #define MAX_FNAME_SIZE 255
 #define MAX_PATH_LEN 1024
 array_t *get_dir(const char *path, int flags) {
+  auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
+
   array_t *v;
   int i, count = 0;
   DIR *dirp;
@@ -156,9 +158,9 @@ array_t *get_dir(const char *path, int flags) {
   if ((dirp = opendir(temppath)) == 0) {
     return 0;
   }
-/*
- * Count files
- */
+  /*
+   * Count files
+   */
   for (de = readdir(dirp); de; de = readdir(dirp)) {
     namelen = strlen(de->d_name);
     if (!do_match && (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)) {
@@ -178,7 +180,7 @@ array_t *get_dir(const char *path, int flags) {
    */
   v = allocate_empty_array(count);
   if (count == 0) {
-/* This is the easy case :-) */
+    /* This is the easy case :-) */
     closedir(dirp);
     return v;
   }
@@ -356,6 +358,8 @@ int write_file(const char *file, const char *str, int flags) {
  * Returns a malloced_string.
  */
 char *read_file(const char *file, int start, int lines) {
+  const auto read_file_max_size = CONFIG_INT(__MAX_READ_FILE_SIZE__);
+
   struct stat st;
   // Try and keep one buffer for droping all reads into.
   static char *theBuff = NULL;
@@ -405,14 +409,14 @@ char *read_file(const char *file, int start, int lines) {
   }
 
   if (!theBuff) {
-    theBuff = (char *)DMALLOC(2 * READ_FILE_MAX_SIZE + 1, TAG_PERMANENT, "read_file: theBuff");
+    theBuff = (char *)DMALLOC(2 * read_file_max_size + 1, TAG_PERMANENT, "read_file: theBuff");
   }
 
 #ifndef PACKAGE_COMPRESS
   chunk = fread(theBuff, 1, 2 * READ_FILE_MAX_SIZE, f);
   fclose(f);
 #else
-  chunk = gzread(f, theBuff, 2 * READ_FILE_MAX_SIZE);
+  chunk = gzread(f, theBuff, 2 * read_file_max_size);
   gzclose(f);
 #endif
 
@@ -443,7 +447,7 @@ char *read_file(const char *file, int start, int lines) {
 
   // search forward for "lines" of '\n' for the end
   if (lines == 0) {
-    ptr_end = ptr_start + READ_FILE_MAX_SIZE;
+    ptr_end = ptr_start + read_file_max_size;
     if (ptr_end > theBuff + chunk) {
       ptr_end = theBuff + chunk + 1;
     }
@@ -462,7 +466,7 @@ char *read_file(const char *file, int start, int lines) {
 
   *ptr_end = '\0';
   // result is too big.
-  if (strlen(ptr_start) > READ_FILE_MAX_SIZE) {
+  if (strlen(ptr_start) > read_file_max_size) {
     debug(file, "read_file: result too big: %s.\n", file);
     return 0;
   }
@@ -472,6 +476,8 @@ char *read_file(const char *file, int start, int lines) {
 }
 
 char *read_bytes(const char *file, int start, int len, int *rlen) {
+  const auto max_byte_transfer = CONFIG_INT(__MAX_BYTE_TRANSFER__);
+
   struct stat st;
   FILE *fptr;
   char *str;
@@ -499,7 +505,7 @@ char *read_bytes(const char *file, int start, int len, int *rlen) {
   if (len == 0) {
     len = size;
   }
-  if (len > MAX_BYTE_TRANSFER) {
+  if (len > max_byte_transfer) {
     fclose(fptr);
     error("Transfer exceeded maximum allowed number of bytes.\n");
     return 0;
@@ -537,6 +543,8 @@ char *read_bytes(const char *file, int start, int len, int *rlen) {
 }
 
 int write_bytes(const char *file, int start, const char *str, int theLength) {
+  const auto max_byte_transfer = CONFIG_INT(__MAX_BYTE_TRANSFER__);
+
   struct stat st;
   int size;
   FILE *fptr;
@@ -546,7 +554,7 @@ int write_bytes(const char *file, int start, const char *str, int theLength) {
   if (!file) {
     return 0;
   }
-  if (theLength > MAX_BYTE_TRANSFER) {
+  if (theLength > max_byte_transfer) {
     return 0;
   }
   /* Under system V, it isn't possible change existing data in a file
@@ -795,8 +803,7 @@ static int do_move(const char *from, const char *to, int flag) {
     return 1;
   }
   if (lstat(to, &to_stats) == 0) {
-    if (from_stats.st_dev == to_stats.st_dev && from_stats.st_ino == to_stats.st_ino)
-    {
+    if (from_stats.st_dev == to_stats.st_dev && from_stats.st_ino == to_stats.st_ino) {
       error("`/%s' and `/%s' are the same file", from, to);
       return 1;
     }
@@ -808,7 +815,7 @@ static int do_move(const char *from, const char *to, int flag) {
     error("/%s: unknown error\n", to);
     return 1;
   }
-      if ((flag == F_RENAME) && (rename(from, to) == 0)) {
+  if ((flag == F_RENAME) && (rename(from, to) == 0)) {
     return 0;
   }
 #ifdef F_LINK
@@ -965,8 +972,7 @@ int copy_file(const char *from, const char *to) {
     return 1;
   }
   if (lstat(to, &to_stats) == 0) {
-    if (from_stats.st_dev == to_stats.st_dev && from_stats.st_ino == to_stats.st_ino)
-    {
+    if (from_stats.st_dev == to_stats.st_dev && from_stats.st_ino == to_stats.st_ino) {
       error("`/%s' and `/%s' are the same file", from, to);
       return 1;
     }

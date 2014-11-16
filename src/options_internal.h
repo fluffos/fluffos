@@ -50,6 +50,7 @@
  *   22 bites : (1  << 22) * (3 * 8 + 2 * 2) ~= 112MB.
  */
 #define APPLY_CACHE_BITS 22
+#define APPLY_CACHE_SIZE (1 << APPLY_CACHE_BITS)
 
 /* CACHE_STATS: define this if you want call_other (apply_low) cache
  * statistics.  Causes HAS_CACHE_STATS to be defined in all LPC objects.

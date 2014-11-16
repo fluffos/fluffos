@@ -2,6 +2,8 @@
 #define LPC_INCL_H
 
 #include "std.h"
+
+#include "base/strput.h"
 #include "include/function.h"
 #include "origin.h"
 #include "config.h"

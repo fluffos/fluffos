@@ -28,6 +28,8 @@ void free_buffer(buffer_t *b) {
 } /* free_buffer() */
 
 buffer_t *allocate_buffer(int size) {
+  auto max_buffer_size = CONFIG_INT(__MAX_BUFFER_SIZE__);
+
   buffer_t *buf;
 
 #ifndef NO_BUFFER_TYPE

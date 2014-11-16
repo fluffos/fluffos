@@ -44,7 +44,8 @@ static void notify_no_command(void) {
       free_string(p.s);
       command_giver->interactive->default_err_message.s = 0;
     } else {
-      tell_object(command_giver, default_fail_message, strlen(default_fail_message));
+      auto dfm = CONFIG_STR(__DEFAULT_FAIL_MESSAGE__);
+      tell_object(command_giver, dfm, strlen(dfm));
     }
   }
 }

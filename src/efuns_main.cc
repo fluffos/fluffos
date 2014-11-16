@@ -414,8 +414,9 @@ void f_clear_bit(void) {
   char *str;
   int len, ind, bit;
 
-  if (sp->u.number > MAX_BITS) {
-    error("clear_bit() bit requested : %d > maximum bits: %d\n", sp->u.number, MAX_BITS);
+  auto max_bitfield_bits = CONFIG_INT(__MAX_BITFIELD_BITS__);
+  if (sp->u.number > max_bitfield_bits) {
+    error("clear_bit() bit requested : %d > maximum bits: %d\n", sp->u.number, max_bitfield_bits);
   }
   bit = (sp--)->u.number;
   if (bit < 0) {
@@ -1734,17 +1735,11 @@ void f_move_object(void) {
 
 #ifdef F_MUD_STATUS
 void f_mud_status(void) {
-  int tot, res, verbose = 0;
+  int tot, verbose = 0;
   outbuffer_t ob;
 
   outbuf_zero(&ob);
   verbose = (sp--)->u.number;
-
-  if (reserved_area) {
-    res = RESERVED_SIZE;
-  } else {
-    res = 0;
-  }
 
   if (verbose) {
     char dir_buf[1024];
@@ -1817,7 +1812,7 @@ void f_mud_status(void) {
          total_class_size +
 #endif
          total_mapping_size + tot_alloc_sentence * sizeof(sentence_t) + tot_alloc_object_size +
-         users_num(true) * sizeof(interactive_t) + res;
+         users_num(true) * sizeof(interactive_t);
 
   if (!verbose) {
     outbuf_add(&ob, "\t\t\t\t\t --------\n");
@@ -2379,6 +2374,8 @@ void f_rename(void) {
  */
 
 void f_replace_string(void) {
+  auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
+
   int plen, rlen, dlen, slen, first, last, cur, j;
 
   const char *pattern;
@@ -2700,6 +2697,8 @@ void f_rmdir(void) {
 
 #ifdef F_SAVE_OBJECT
 void f_save_object(void) {
+  const auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
+
   int flag;
   if (st_num_arg == 2) {
     flag = (sp--)->u.number;
@@ -2721,9 +2720,9 @@ void f_save_object(void) {
     put_number(flag);
   } else {
     pop_n_elems(st_num_arg);
-    char *saved = new_string(MAX_STRING_LENGTH, "save_object_str");
+    char *saved = new_string(max_string_length, "save_object_str");
     push_malloced_string(saved);
-    int left = MAX_STRING_LENGTH;
+    int left = max_string_length;
     flag = save_object_str(current_object, flag, saved, left);
     if (!flag) {
       pop_stack();
@@ -2807,8 +2806,9 @@ void f_set_bit(void) {
   char *str;
   int len, old_len, ind, bit;
 
-  if (sp->u.number > MAX_BITS) {
-    error("set_bit() bit requested: %d > maximum bits: %d\n", sp->u.number, MAX_BITS);
+  auto max_bitfield_bits = CONFIG_INT(__MAX_BITFIELD_BITS__);
+  if (sp->u.number > max_bitfield_bits) {
+    error("set_bit() bit requested: %d > maximum bits: %d\n", sp->u.number, max_bitfield_bits);
   }
   bit = (sp--)->u.number;
   if (bit < 0) {
@@ -3689,13 +3689,8 @@ void f_memory_info(void) {
   object_t *ob;
 
   if (st_num_arg == 0) {
-    int res, tot;
+    int tot;
 
-    if (reserved_area) {
-      res = RESERVED_SIZE;
-    } else {
-      res = 0;
-    }
     tot = total_prog_block_size +
 #ifdef ARRAY_STATS
           total_array_size +
@@ -3705,7 +3700,7 @@ void f_memory_info(void) {
 #endif
           total_mapping_size + tot_alloc_object_size + tot_alloc_sentence * sizeof(sentence_t) +
           users_num(1) * sizeof(interactive_t) + show_otable_status(0, -1) +
-          heart_beat_status(0, -1) + add_string_status(0, -1) + print_call_out_usage(0, -1) + res;
+          heart_beat_status(0, -1) + add_string_status(0, -1) + print_call_out_usage(0, -1);
     push_number(tot);
     return;
   }
@@ -3749,13 +3744,15 @@ void f_query_shadowing(void) {
 
 #ifdef F_SET_RESET
 void f_set_reset(void) {
+  const auto time_to_reset = CONFIG_INT(__TIME_TO_RESET__);
+
   if (st_num_arg == 2) {
     (sp - 1)->u.ob->next_reset = g_current_virtual_time + sp->u.number;
     free_object(&(--sp)->u.ob, "f_set_reset:1");
     sp--;
   } else {
     sp->u.ob->next_reset =
-        g_current_virtual_time + TIME_TO_RESET / 2 + random_number(TIME_TO_RESET / 2);
+        g_current_virtual_time + time_to_reset / 2 + random_number(time_to_reset / 2);
     free_object(&(sp--)->u.ob, "f_set_reset:2");
   }
 }

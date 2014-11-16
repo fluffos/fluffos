@@ -717,6 +717,8 @@ static array_t *pcre_get_substrings(pcre_t *run) {
 }
 
 static char *pcre_get_replace(pcre_t *run, array_t *replacements) {
+  const auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
+
   unsigned int ret_pos = 0, i;
   size_t ret_sz;
   char *ret;
@@ -762,7 +764,7 @@ static char *pcre_get_replace(pcre_t *run, array_t *replacements) {
       len_nxt = run->ovector[2 * i + 2] - end;
     }
 
-    if (len_nxt > MAX_STRING_LENGTH) {
+    if (len_nxt > max_string_length) {
       continue;  // nested ()s
     }
 

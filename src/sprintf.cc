@@ -134,7 +134,8 @@ typedef unsigned int format_info;
 
 #define ADD_CHAR(x)                                                                    \
   {                                                                                    \
-    if (sprintf_state->obuff.real_size == MAX_STRING_LENGTH) ERROR(ERR_BUFF_OVERFLOW); \
+    const auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);                  \
+    if (sprintf_state->obuff.real_size == max_string_length) ERROR(ERR_BUFF_OVERFLOW); \
     outbuf_addchar(&(sprintf_state->obuff), x);                                        \
   }
 
@@ -1066,7 +1067,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
           if (carg->type == T_NUMBER && carg->u.number == 0) {
             sprintf_state->clean.type = T_STRING;
             sprintf_state->clean.subtype = STRING_MALLOC;
-            sprintf_state->clean.u.string = string_copy(NULL_MSG, "sprintf NULL");
+            sprintf_state->clean.u.string = string_copy("0", "sprintf NULL");
             carg = &(sprintf_state->clean);
           } else if (carg->type != T_STRING) {
             ERROR(ERR_INCORRECT_ARG_S);
