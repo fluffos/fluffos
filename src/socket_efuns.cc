@@ -255,7 +255,7 @@ int find_new_socket() {
       return i;
     }
   }
-  lpc_socks.emplace_back();
+  lpc_socks.emplace_back(lpc_socket_t{0});
   return lpc_socks.size() - 1;
 }
 
@@ -533,7 +533,7 @@ int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback) {
 
   i = find_new_socket();
   if (i >= 0) {
-    new_lpc_socket_event_listener(i, &lpc_socks[fd], accept_fd);
+    new_lpc_socket_event_listener(i, &lpc_socks[i], accept_fd);
 
     lpc_socks[i].fd = accept_fd;
     lpc_socks[i].flags = S_HEADER | (lpc_socks[fd].flags & S_BINARY);
