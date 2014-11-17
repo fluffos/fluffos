@@ -40,7 +40,7 @@ INSTALL=@INSTALL@
 INSTALL_DIR=@bindir@
 OPTIMIZE=@OPTIMIZE@
 
-SRC=lpc/compiler/grammar.tab.cc main.cc rc.cc simulate.cc file.cc \
+SRC=lpc/compiler/grammar.tab.cc rc.cc simulate.cc file.cc \
   backend.cc heartbeat.cc comm.cc ed.cc regexp.cc crc32.cc \
   efuns_main.cc efuns_port.cc \
   call_out.cc otable.cc dumpstat.cc stralloc.cc \
@@ -61,9 +61,10 @@ SRC=lpc/compiler/grammar.tab.cc main.cc rc.cc simulate.cc file.cc \
 	lpc/compiler/compiler.cc lpc/compiler/generate.cc lpc/compiler/icode.cc lpc/comppiler/lex.cc \
 	lpc/compiler/scratchpad.cc lpc/compiler/trees.cc \
 	user.cc \
+	base\strput.c \
 	thirdparty/libtelnet/libtelnet.c
 
-OBJ=lpc/compiler/grammar.tab.o main.o rc.o simulate.o file.o \
+OBJ=lpc/compiler/grammar.tab.o rc.o simulate.o file.o \
   backend.o heartbeat.o comm.o ed.o regexp.o crc32.o \
   efuns_main.o efuns_port.o \
   call_out.o otable.o dumpstat.o stralloc.o \
@@ -84,6 +85,7 @@ OBJ=lpc/compiler/grammar.tab.o main.o rc.o simulate.o file.o \
 	lpc/compiler/compiler.o lpc/compiler/generate.o lpc/compiler/icode.o lpc/compiler/lex.o \
 	lpc/compiler/scratchpad.o lpc/compiler/trees.o \
 	user.o \
+	base/strput.o \
 	thirdparty/libtelnet/libtelnet.o
 
 VPATH = .:./packages
@@ -124,15 +126,15 @@ lpc/compiler/grammar.tab.cc: lpc/compiler/grammar.y
 	mv y.tab.c lpc/compiler/grammar.tab.cc
 	mv y.tab.h lpc/compiler/grammar.tab.h
 
-$(DRIVER_BIN): $(OBJ) packages/*.$(O) dtrace_compile
+$(DRIVER_BIN): $(OBJ) packages/*.$(O) dtrace_compile main.o
 	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
-	$(CXX) $(LDFLAGS) $(OBJ) packages/*.$(O) `./dtrace_compile` -o $(DRIVER_BIN) $(LIBS) @MYSQL_LDFLAGS@ @POSTGRESQL_LDFLAGS@ @SQLITE3_LDFLAGS@ @OPENSSL_LDFLAGS@ @OPENSSL_LIBS@ @PCRE_LIBS@ @LIBEVENT_LIBS@ @LIBEVENT_LDFLAGS@
+	$(CXX) $(LDFLAGS) main.o $(OBJ) packages/*.$(O) `./dtrace_compile` -o $(DRIVER_BIN) $(LIBS) @MYSQL_LDFLAGS@ @POSTGRESQL_LDFLAGS@ @SQLITE3_LDFLAGS@ @OPENSSL_LDFLAGS@ @OPENSSL_LIBS@ @PCRE_LIBS@ @LIBEVENT_LIBS@ @LIBEVENT_LDFLAGS@
 
 dtrace_compile: dtrace_compile.cc
-	$(CXX) $(CXXFLAGS) -x c++ dtrace_compile.cc -o dtrace_compile
+	$(CXX) $(CXXFLAGS) -iquote. -x c++ dtrace_compile.cc -o dtrace_compile
 
 portbind: portbind.o
-	$(CXX) $(LDFLAGS) portbind.o -o portbind $(LIBS)
+	$(CXX) $(LDFLAGS) -iquote. portbind.o -o portbind $(LIBS)
 
 cc.h:
 	rm -f cc.h
@@ -161,10 +163,10 @@ edit_source: edit_source.o hash.o make_func.tab.o
 
 # don't optimize these two
 edit_source.o: edit_source.cc lpc/compiler/preprocess.cc cc.h
-	$(CXX) $(CXXFLAGS) -o $@ -c -x c++ $<
+	$(CXX) $(CXXFLAGS) -iquote. -o $@ -c -x c++ $<
 
 make_func.tab.o: make_func.tab.cc
-	$(CXX) $(CXXFLAGS) -o $@ -c -x c++ $<
+	$(CXX) $(CXXFLAGS) -iquote. -o $@ -c -x c++ $<
 
 install: all
 	-mkdir $(INSTALL_DIR)

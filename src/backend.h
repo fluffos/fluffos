@@ -3,8 +3,6 @@
 
 #include <functional>
 
-typedef struct object_s object_t;
-typedef struct error_context_s error_context_t;
 struct outbuffer_t;
 
 /*
@@ -33,9 +31,11 @@ void clear_tick_events();
 
 void backend(struct event_base *);
 
+// Call epilog() on master ob and load all returned objects.
+void preload_objects();
+
 void clear_state(void);
 int parse_command(char *, object_t *);
-void preload_objects(int);
 void remove_destructed_objects(void);
 void update_load_av(void);
 void update_compile_av(int);

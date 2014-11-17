@@ -8,9 +8,8 @@
 
 #include "options_incl.h"
 
-#ifdef HAS_CONSOLE
+void console_init(struct event_base *);
 void on_console_input();
 void console_command(char *);
-#endif
 
 #endif

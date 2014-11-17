@@ -1,0 +1,6 @@
+BASE is the common stuff that shared across the driver.
+
+All code (Excluding packages) in the driver must include "base/base.h" as the first line. 
+And nothing else in base should be included.
+
+For writing packages, please see packages/package.h

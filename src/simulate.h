@@ -14,8 +14,7 @@
 /*
  * simulate.c
  */
-struct object_s;
-typedef struct object_s object_t;
+struct object_t;
 
 extern object_t *obj_list;
 extern object_t *obj_list_destruct;
@@ -30,8 +29,6 @@ extern object_t *obj_list_dangling;
 extern int tot_dangling_object;
 #endif
 
-char *strput(char *, char *, const char *);
-char *strput_int(char *, char *, int);
 void debug_fatal(char *, ...);
 void fatal(const char *, ...);
 void error(const char *const, ...);

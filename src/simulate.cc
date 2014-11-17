@@ -1,4 +1,4 @@
-#include "std.h"
+#include "base/std.h"
 
 #include "lpc_incl.h"
 #include "file_incl.h"
@@ -71,39 +71,6 @@ void check_legal_string(const char *s) {
   if (strlen(s) > LARGEST_PRINTABLE_STRING) {
     error("Printable strings limited to length of %d.\n", LARGEST_PRINTABLE_STRING);
   }
-}
-
-/* equivalent to strcpy(x, y); return x + strlen(y), but faster and safer */
-/* Code like:
- *
- * char buf[256];
- * strcpy(buf, ...);
- * strcat(buf, ...);
- * strcat(buf, ...);
- *
- * Should be replaced with:
- *
- * char buf[256];
- * char *p, *end = EndOf(buf);
- * p = strput(buf, end, ...);
- * p = strput(p, end, ...);
- * p = strput(p, end, ...);
- */
-// TODO: Move strput and strput_int to stralloc.c or somewhere similar.
-char *strput(char *x, char *limit, const char *y) {
-  while ((*x++ = *y++)) {
-    if (x == limit) {
-      *(x - 1) = 0;
-      break;
-    }
-  }
-  return x - 1;
-}
-
-char *strput_int(char *x, char *limit, int num) {
-  char buf[20];
-  sprintf(buf, "%d", num);
-  return strput(x, limit, buf);
 }
 
 #ifdef PRIVS
@@ -385,6 +352,8 @@ int strip_name(const char *src, char *dest, int size) {
  *
  */
 object_t *load_object(const char *lname, int callcreate) {
+  auto inherit_chain_size = CONFIG_INT(__INHERIT_CHAIN_SIZE__);
+
   int f;
   program_t *prog;
   object_t *ob;
@@ -396,8 +365,8 @@ object_t *load_object(const char *lname, int callcreate) {
   if (!pname) {
     error("Read access denied.\n");
   }
-  if (++num_objects_this_thread > INHERIT_CHAIN_SIZE) {
-    error("Inherit chain too deep: > %d when trying to load '%s'.\n", INHERIT_CHAIN_SIZE, lname);
+  if (++num_objects_this_thread > inherit_chain_size) {
+    error("Inherit chain too deep: > %d when trying to load '%s'.\n", inherit_chain_size, lname);
   }
 #ifdef PACKAGE_UIDS
   if (current_object && current_object->euid == NULL) {
@@ -436,10 +405,6 @@ object_t *load_object(const char *lname, int callcreate) {
     error("Illegal path name '/%s'.\n", real_name);
   }
 
-  /* maybe move this section into compile_file? */
-  if (comp_flag) {
-    debug_message(" compiling /%s ...", real_name);
-  }
   f = open(real_name, O_RDONLY);
   if (f == -1) {
     debug_perror("compile_file", real_name);
@@ -448,9 +413,6 @@ object_t *load_object(const char *lname, int callcreate) {
   save_command_giver(command_giver);
   prog = compile_file(f, obname);
   restore_command_giver();
-  if (comp_flag) {
-    debug_message(" done\n");
-  }
   update_compile_av(total_lines);
   total_lines = 0;
   close(f);
@@ -1866,14 +1828,15 @@ void error_handler(char *err) {
         debug_message("error when executing program in destroyed object /%s\n", object_name);
       }
     }
+    auto default_error_message = CONFIG_STR(__DEFAULT_ERROR_MESSAGE__);
     if (command_giver && command_giver->interactive) {
 #ifndef NO_WIZARDS
-      if ((command_giver->flags & O_IS_WIZARD) || !strlen(DEFAULT_ERROR_MESSAGE)) {
+      if ((command_giver->flags & O_IS_WIZARD) || !strlen(default_error_message)) {
 #endif
         add_message_with_location(err + 1);
 #ifndef NO_WIZARDS
       } else {
-        add_vmessage(command_giver, "%s\n", DEFAULT_ERROR_MESSAGE);
+        add_vmessage(command_giver, "%s\n", default_error_message);
       }
 #endif
     }
@@ -1970,6 +1933,7 @@ void shutdownMudOS(int exit_code) {
   flush_message_all();
 
   /* clean up heap allocations so valgrind don't consider them lost.*/
+  reset_machine(0);
   clear_call_outs();
   clear_tick_events();
   clear_heartbeats();

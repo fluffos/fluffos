@@ -1,5 +1,5 @@
 /* 92/04/18 - cleaned up stylistically by Sulam@TMI */
-#include "std.h"
+#include "base/std.h"
 #include "lpc_incl.h"
 #include "backend.h"
 #include "comm.h"
@@ -25,8 +25,14 @@
 
 error_context_t *current_error_context = 0;
 
+// TODO: Figure out what to do with this.
+static const int kNumConst = 5;
+static const double consts[kNumConst] {
+    exp(0 / 900.0), exp(-1 / 900.0), exp(-2 / 900.0), exp(-3 / 900.0), exp(-4 / 900.0),
+};
+
 /*
- * The 'current_time' is updated in the backend loop.
+ * This the current game time, which is updated in the backend loop.
  */
 long g_current_virtual_time;
 
@@ -179,11 +185,8 @@ void call_remove_destructed_objects() {
  * This is the backend. We will stay here for ever (almost).
  */
 void backend(struct event_base *base) {
-  // FIXME: handle this in call_tick_events().
-  error_context_t econ;
-  save_context(&econ);
-
   clear_state();
+  g_current_virtual_time = get_current_time();
 
   // Register various tick events
   add_tick_event(0, tick_event::callback_type(call_heart_beat));
@@ -193,9 +196,6 @@ void backend(struct event_base *base) {
   add_tick_event(60 * 60, tick_event::callback_type(mudlib_stats_decay));
 #endif
   add_tick_event(5 * 60, tick_event::callback_type(call_remove_destructed_objects));
-
-  g_current_virtual_time = get_current_time();
-  clear_state();
 
   try {
     /* Run event loop for at most 1 second, this current handles
@@ -228,6 +228,8 @@ void backend(struct event_base *base) {
  * special care has to be taken of how the linked list is used.
  */
 static void look_for_objects_to_swap() {
+  auto time_to_clean_up = CONFIG_INT(__TIME_TO_CLEAN_UP__);
+
   /* Next time is in 5 minutes */
   add_tick_event(5 * 60, tick_event::callback_type(look_for_objects_to_swap));
 
@@ -331,62 +333,40 @@ static void look_for_objects_to_swap() {
   pop_context(&econ);
 } /* look_for_objects_to_swap() */
 
-/* New version used when not in -o mode. The epilog() in master.c is
- * supposed to return an array of files (castles in 2.4.5) to load. The array
- * returned by apply() will be freed at next call of apply(), which means that
- * the ref count has to be incremented to protect against deallocation.
- *
- * The master object is asked to do the actual loading.
+/* The epilog() in master.c is supposed to return an array of files to load.
+ * The preload() in master object called to do the actual loading.
  */
-void preload_objects(int eflag) {
-  volatile array_t *prefiles;
-  svalue_t *ret;
-  volatile int ix;
-  error_context_t econ;
+void preload_objects() {
+  // Legacy: epilog() has a int param to make it to avoid load anything.
+  // I'm not sure who would use that.
+  push_number(0);
+  auto ret = safe_apply_master_ob(APPLY_EPILOG, 1);
 
-  save_context(&econ);
-  try {
-    push_number(eflag);
-    ret = apply_master_ob(APPLY_EPILOG, 1);
-  } catch (const char *) {
-    restore_context(&econ);
-    pop_context(&econ);
-    return;
-  }
-
-  pop_context(&econ);
   if ((ret == 0) || (ret == (svalue_t *)-1) || (ret->type != T_ARRAY)) {
     return;
-  } else {
-    prefiles = ret->u.arr;
   }
-  if ((prefiles == 0) || (prefiles->size < 1)) {
+
+  auto prefiles = ret->u.arr;
+  if ((prefiles == nullptr) || (prefiles->size < 1)) {
     return;
   }
 
-  debug_message("\nLoading preloaded files ...\n");
+  // prefiles (the global apply return value) would have been freed on next apply call.
+  // so we have to increase ref here to make sure it is around.
   prefiles->ref++;
-  ix = 0;
-  /* in case of an error, effectively do a 'continue' */
-  save_context(&econ);
-  while (1) try {
-      for (; ix < prefiles->size; ix++) {
-        if (prefiles->item[ix].type != T_STRING) {
-          continue;
-        }
 
-        set_eval(max_cost);
+  debug_message("\nLoading preload files ...\n");
 
-        push_svalue(((array_t *)prefiles)->item + ix);
-        (void)apply_master_ob(APPLY_PRELOAD, 1);
-      }
-      free_array((array_t *)prefiles);
-      break;
-    } catch (const char *) {
-      restore_context(&econ);
-      ix++;
+  for (int i = 0; i < prefiles->size; i++) {
+    if (prefiles->item[i].type != T_STRING) {
+      continue;
     }
-  pop_context(&econ);
+    push_svalue(&prefiles->item[i]);
+    debug_message("%s...\n", prefiles->item[i].u.string);
+    set_eval(max_cost);
+    safe_apply_master_ob(APPLY_PRELOAD, 1);
+  }
+  free_array(prefiles);
 } /* preload_objects() */
 
 /* All destructed objects are moved into a sperate linked list,
@@ -418,7 +398,7 @@ void update_load_av() {
     return;
   }
   n = g_current_virtual_time - last_time;
-  if (n < NUM_CONSTS) {
+  if (n < kNumConst) {
     c = consts[n];
   } else {
     c = exp(-n / 900.0);
@@ -441,7 +421,7 @@ void update_compile_av(int lines) {
     return;
   }
   n = g_current_virtual_time - last_time;
-  if (n < NUM_CONSTS) {
+  if (n < kNumConst) {
     c = consts[n];
   } else {
     c = exp(-n / 900.0);
