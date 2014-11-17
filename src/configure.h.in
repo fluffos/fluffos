@@ -188,7 +188,7 @@
 /* Define to 1 if `vfork' works. */
 #undef HAVE_WORKING_VFORK
 
-/* Define to 1 if you have `z' library (-lz) */
+/* Define to 1 if you have 'z' library (-lz) */
 #undef HAVE_ZLIB
 
 /* Define to 1 if `lstat' dereferences a symlink specified with a trailing

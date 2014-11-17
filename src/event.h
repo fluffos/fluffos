@@ -45,9 +45,4 @@ struct lpc_socket_event_data {
 void new_lpc_socket_event_listener(int, struct lpc_socket_t *sock, evutil_socket_t);
 #endif
 
-// Console STDIN socket event
-#ifdef HAS_CONSOLE
-void init_console(struct event_base *);
-#endif
-
 #endif /* EVENT_H_ */

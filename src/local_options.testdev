@@ -1,5 +1,3 @@
-#include "options.h"
-
 #define DEBUGMALLOC
 #define DEBUGMALLOC_EXTENSIONS
 #define CHECK_MEMORY

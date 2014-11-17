@@ -1,4 +1,4 @@
-#if !defined(STD_INCL_H) && !defined(_FUNC_SPEC_)
+#ifndef STD_INCL_H
 #define STD_INCL_H
 
 #include <stdio.h>

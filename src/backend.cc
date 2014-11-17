@@ -1,33 +1,33 @@
 /* 92/04/18 - cleaned up stylistically by Sulam@TMI */
-#include "std.h"
-#include "lpc_incl.h"
+#include "base/std.h"
+
 #include "backend.h"
-#include "comm.h"
-#include "replace_program.h"
-#include "reclaim.h"
-#include "socket_efuns.h"
-#include "call_out.h"
-#include "port.h"
-#include "master.h"
-#include "eval.h"
-#include "outbuf.h"
-
-#include "event.h"
-
-#ifdef PACKAGE_ASYNC
-#include "packages/async.h"
-#endif
 
 #include <deque>
+#include <event2/event.h>
 #include <functional>
 #include <map>
 #include <mutex>
+#include <math.h>
 
-error_context_t *current_error_context = 0;
+#include "vm/vm.h"
+
+#ifdef PACKAGE_ASYNC
+#include "packages/async/async.h"
+#endif
+#include "packages/core/replace_program.h"
+#include "packages/core/reclaim.h"
+#ifdef PACKAGE_MUDLIB_STATS
+#include "packages/mudlib_stats/mudlib_stats.h"
+#endif
+
+// TODO: remove the need for this
+static struct event *g_ev_tick = NULL;
+static void on_virtual_time_tick(int fd, short what, void *arg);
 
 // TODO: Figure out what to do with this.
 static const int kNumConst = 5;
-static const double consts[kNumConst] {
+static const double consts[kNumConst]{
     exp(0 / 900.0), exp(-1 / 900.0), exp(-2 / 900.0), exp(-3 / 900.0), exp(-4 / 900.0),
 };
 
@@ -175,6 +175,8 @@ static void report_holes()
 }
 #endif
 
+// FIXME:
+extern struct object_t *obj_list_destruct;
 void call_remove_destructed_objects() {
   add_tick_event(5 * 60, tick_event::callback_type(call_remove_destructed_objects));
   if (obj_list_replace || obj_list_destruct) {
@@ -205,13 +207,26 @@ void backend(struct event_base *base) {
      * merge all callbacks execution into tick event loop and move all
      * I/O to dedicated threads.
      */
-    run_event_loop(base);
+    struct timeval one_second = {1, 0};
+
+    // Schedule a repeating tick for advancing virtual time.
+    g_ev_tick = evtimer_new(base, on_virtual_time_tick, NULL);
+
+    event_add(g_ev_tick, &one_second);
+    event_base_loop(base, 0);
   } catch (...) {  // catch everything
     fatal("BUG: jumped out of event loop!");
   }
+  // We've reached here meaning we are in shutdown sequence.
   shutdownMudOS(-1);
 } /* backend() */
 
+static void on_virtual_time_tick(int fd, short what, void *arg) {
+  virtual_time_tick();
+
+  struct timeval one_second = {1, 0};
+  event_add(g_ev_tick, &one_second);
+}
 /*
  * Despite the name, this routine takes care of several things.
  * It will run once every 5 minutes.
@@ -332,42 +347,6 @@ static void look_for_objects_to_swap() {
     }
   pop_context(&econ);
 } /* look_for_objects_to_swap() */
-
-/* The epilog() in master.c is supposed to return an array of files to load.
- * The preload() in master object called to do the actual loading.
- */
-void preload_objects() {
-  // Legacy: epilog() has a int param to make it to avoid load anything.
-  // I'm not sure who would use that.
-  push_number(0);
-  auto ret = safe_apply_master_ob(APPLY_EPILOG, 1);
-
-  if ((ret == 0) || (ret == (svalue_t *)-1) || (ret->type != T_ARRAY)) {
-    return;
-  }
-
-  auto prefiles = ret->u.arr;
-  if ((prefiles == nullptr) || (prefiles->size < 1)) {
-    return;
-  }
-
-  // prefiles (the global apply return value) would have been freed on next apply call.
-  // so we have to increase ref here to make sure it is around.
-  prefiles->ref++;
-
-  debug_message("\nLoading preload files ...\n");
-
-  for (int i = 0; i < prefiles->size; i++) {
-    if (prefiles->item[i].type != T_STRING) {
-      continue;
-    }
-    push_svalue(&prefiles->item[i]);
-    debug_message("%s...\n", prefiles->item[i].u.string);
-    set_eval(max_cost);
-    safe_apply_master_ob(APPLY_PRELOAD, 1);
-  }
-  free_array(prefiles);
-} /* preload_objects() */
 
 /* All destructed objects are moved into a sperate linked list,
  * and deallocated after program execution.  */
