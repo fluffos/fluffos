@@ -4,14 +4,17 @@
  *  Created on: Oct 16, 2014
  *      Author: sunyc
  */
+#include "base/std.h"
+
 #include "user.h"
+#include "lpc_incl.h" // for O_HIDDEN
+
+#include "interactive.h" // for interactive_t->ob
 
 #include <algorithm>
 #include <cstring>
 #include <functional>
 #include <vector>
-
-#include "interactive.h"
 
 // structure that holds all users
 static std::vector<interactive_t *> all_users;

@@ -1,9 +1,7 @@
 #ifndef INTERACITVE_H
 #define INTERACITVE_H
 
-// TODO: reduce header
-#include "std.h"
-#include "lpc_incl.h"
+#include <sys/socket.h> // for sockaddr_storage
 
 #define MAX_TEXT 2048
 
@@ -36,10 +34,10 @@
 #define USING_COMPRESS 0x40000     /* we've negotiated compress */
 
 struct interactive_t {
-  object_t *ob; /* points to the associated object         */
+  struct object_t *ob; /* points to the associated object         */
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
-  sentence_t *input_to; /* to be called with next input line       */
-  svalue_t *carryover;  /* points to args for input_to             */
+  struct sentence_t *input_to; /* to be called with next input line       */
+  struct svalue_t *carryover;  /* points to args for input_to             */
   int num_carry;        /* number of args for input_to             */
 #endif
   int connection_type;          /* the type of connection this is          */

@@ -3,7 +3,7 @@
  *            Dwayne Fontenot (Jacques@TMI)
  */
 
-#include "std.h"
+#include "base/std.h"
 
 #include "comm.h"
 
@@ -197,9 +197,8 @@ void new_user_handler(int fd, struct sockaddr *addr, size_t addrlen, port_def_t 
   // FIXME: this belongs in async_on_accept()
   new_user_event_listener(user);
 
-  // FIXME: This current rely on ev_data.
-  // Initialize libtelnet
-  user->telnet = telnet_init(my_telopts, telnet_event_handler, 0, user);
+  // Initialize telnet support
+  user->telnet = net_telnet_init(user);
 
   set_prompt("> ");
 
@@ -1365,7 +1364,7 @@ int replace_interactive(object_t *ob, object_t *obfrom) {
 #ifdef F_REQUEST_TERM_TYPE
 void f_request_term_type() {
   auto ip = command_giver->interactive;
-  telnet_begin_sb(ip->telnet, TELNET_TTYPE_SEND);
+  telnet_request_ttype(ip->telnet);
   flush_message(ip);
 }
 #endif
@@ -1373,7 +1372,7 @@ void f_request_term_type() {
 #ifdef F_START_REQUEST_TERM_TYPE
 void f_start_request_term_type() {
   auto ip = command_giver->interactive;
-  telnet_negotiate(ip->telnet, TELNET_DO, TELNET_TELOPT_TTYPE);
+  telnet_start_request_ttype(ip->telnet);
   flush_message(ip);
 }
 #endif
@@ -1383,9 +1382,9 @@ void f_request_term_size() {
   auto ip = command_giver->interactive;
 
   if ((st_num_arg == 1) && (sp->u.number == 0)) {
-    telnet_negotiate(command_giver->interactive->telnet, TELNET_DONT, TELNET_TELOPT_NAWS);
+    telnet_dont_naws(ip->telnet);
   } else {
-    telnet_negotiate(command_giver->interactive->telnet, TELNET_DO, TELNET_TELOPT_NAWS);
+    telnet_do_naws(ip->telnet);
   }
 
   if (st_num_arg == 1) {
@@ -1400,25 +1399,26 @@ void f_websocket_handshake_done() {
   if (!current_interactive) {
     return;
   }
-
-  flush_message(current_interactive->interactive);
-  current_interactive->interactive->iflags |= HANDSHAKE_COMPLETE;
-  object_t *ob = current_interactive;  // command_giver;
-
-  auto user = current_interactive->interactive;
-  /* Ask permission to ask them for their terminal type */
-  telnet_negotiate(user->telnet, TELNET_DO, TELNET_TELOPT_TTYPE);
-  /* Ask them for their window size */
-  telnet_negotiate(user->telnet, TELNET_DO, TELNET_TELOPT_NAMS);
-  // Ask them if they support mxp.
-  telnet_negotiate(user->telnet, TELNET_DO, TELNET_TELOPT_MXP);
-  // And we support mssp
-  telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_MSSP);
-  // May as well ask for zmp while we're there!
-  telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_ZMP);
-  // Also newenv
-  telnet_negotiate(user->telnet, TELNET_DO, TELNET_TELOPT_NEW_ENVIRON);
-  // gmcp *yawn*
-  telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_GMCP);
+  auto ip = current_interactive->interactive;
+  ip->iflags |= HANDSHAKE_COMPLETE;
+  send_initial_telent_negotiantions(ip);
 }
 #endif
+
+const char *sockaddr_to_string(const sockaddr *addr, socklen_t len) {
+  static char result[NI_MAXHOST + NI_MAXSERV];
+
+  char host[NI_MAXHOST], service[NI_MAXSERV];
+  int ret = getnameinfo(addr, len, host, sizeof(host), service, sizeof(service),
+                        NI_NUMERICHOST | NI_NUMERICSERV);
+
+  if (ret) {
+    debug(sockets, "sockaddr_to_string fail: %s.\n", evutil_gai_strerror(ret));
+    strcpy(result, "<invalid address>");
+    return result;
+  }
+
+  snprintf(result, sizeof(result), strchr(host, ':') != NULL ? "[%s]:%s" : "%s:%s", host, service);
+
+  return result;
+}

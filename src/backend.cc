@@ -1,5 +1,5 @@
 /* 92/04/18 - cleaned up stylistically by Sulam@TMI */
-#include "std.h"
+#include "base/std.h"
 #include "lpc_incl.h"
 #include "backend.h"
 #include "comm.h"

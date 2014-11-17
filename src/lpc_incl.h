@@ -1,7 +1,10 @@
 #ifndef LPC_INCL_H
 #define LPC_INCL_H
 
-#include "std.h"
+#include <cstdint>
+
+// Pre-generated driver codes.
+#include "opcodes.h"
 
 #include "base/strput.h"
 #include "include/function.h"
@@ -24,5 +27,8 @@
 #include "lpc/interpret.h"
 #include "rc.h"
 #include "main.h"
+
+#include "opcodes.h"
+
 
 #endif

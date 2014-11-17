@@ -1,4 +1,4 @@
-#include "std.h"
+#include "base/std.h"
 
 #include <event2/buffer.h>
 #include <event2/event.h>
@@ -205,26 +205,3 @@ void new_lpc_socket_event_listener(int idx, lpc_socket_t *sock, evutil_socket_t 
   sock->ev_write = event_new(g_event_base, real_fd, EV_WRITE, on_lpc_sock_write, data);
   sock->ev_data = data;
 }
-
-#ifdef HAS_CONSOLE
-static void on_console_event(evutil_socket_t fd, short what, void *arg) {
-  debug(event, "Got an event on stdin socket %d:%s%s%s%s \n", (int)fd,
-        (what & EV_TIMEOUT) ? " timeout" : "", (what & EV_READ) ? " read" : "",
-        (what & EV_WRITE) ? " write" : "", (what & EV_SIGNAL) ? " signal" : "");
-
-  if (has_console <= 0) {
-    event_del((struct event *)arg);
-    return;
-  }
-  on_console_input();
-}
-
-void init_console(struct event_base *base) {
-  if (has_console > 0) {
-    debug_message("Opening console... \n");
-    struct event *ev_console = NULL;
-    ev_console = event_new(base, STDIN_FILENO, EV_READ | EV_PERSIST, on_console_event, ev_console);
-    event_add(ev_console, NULL);
-  }
-}
-#endif

@@ -3,8 +3,6 @@
 
 #include <functional>
 
-typedef struct object_s object_t;
-typedef struct error_context_s error_context_t;
 struct outbuffer_t;
 
 /*

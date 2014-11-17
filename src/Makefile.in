@@ -131,10 +131,10 @@ $(DRIVER_BIN): $(OBJ) packages/*.$(O) dtrace_compile main.o
 	$(CXX) $(LDFLAGS) main.o $(OBJ) packages/*.$(O) `./dtrace_compile` -o $(DRIVER_BIN) $(LIBS) @MYSQL_LDFLAGS@ @POSTGRESQL_LDFLAGS@ @SQLITE3_LDFLAGS@ @OPENSSL_LDFLAGS@ @OPENSSL_LIBS@ @PCRE_LIBS@ @LIBEVENT_LIBS@ @LIBEVENT_LDFLAGS@
 
 dtrace_compile: dtrace_compile.cc
-	$(CXX) $(CXXFLAGS) -x c++ dtrace_compile.cc -o dtrace_compile
+	$(CXX) $(CXXFLAGS) -iquote. -x c++ dtrace_compile.cc -o dtrace_compile
 
 portbind: portbind.o
-	$(CXX) $(LDFLAGS) portbind.o -o portbind $(LIBS)
+	$(CXX) $(LDFLAGS) -iquote. portbind.o -o portbind $(LIBS)
 
 cc.h:
 	rm -f cc.h
@@ -163,10 +163,10 @@ edit_source: edit_source.o hash.o make_func.tab.o
 
 # don't optimize these two
 edit_source.o: edit_source.cc lpc/compiler/preprocess.cc cc.h
-	$(CXX) $(CXXFLAGS) -o $@ -c -x c++ $<
+	$(CXX) $(CXXFLAGS) -iquote. -o $@ -c -x c++ $<
 
 make_func.tab.o: make_func.tab.cc
-	$(CXX) $(CXXFLAGS) -o $@ -c -x c++ $<
+	$(CXX) $(CXXFLAGS) -iquote. -o $@ -c -x c++ $<
 
 install: all
 	-mkdir $(INSTALL_DIR)

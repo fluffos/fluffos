@@ -1,4 +1,4 @@
-#include "std.h"
+#include "base/std.h"
 #include "port.h"
 #include "file_incl.h"
 #include "network_incl.h"
@@ -65,45 +65,3 @@ long get_cpu_times(unsigned long *secs, unsigned long *usecs) {
 
 /* return the current working directory */
 char *get_current_dir(char *buf, int limit) { return getcwd(buf, limit); /* POSIX */ }
-
-#ifdef MMAP_SBRK
-void *sbrkx(long size) {
-  static void *end = 0;
-  static unsigned long tsize = 0;
-  void *tmp, *result;
-  long long newsize;
-  if (!end) {
-    tmp = mmap((void *)0x41000000, 4096, PROT_READ | PROT_WRITE,
-               MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
-    tsize = 4096;
-    end = (void *)0x41000000;
-    if (tmp != end) {
-      return NULL;
-    }
-  }
-
-  newsize = (long)end + size;
-  result = end;
-  end = newsize;
-  newsize &= 0xFFFFF000;
-  newsize += 0x1000;
-  newsize -= 0x41000000;
-
-  tmp = mremap((void *)0x41000000, tsize, newsize, 0);
-
-  if (tmp != (void *)0x41000000) {
-    return NULL;
-  }
-
-  tsize = newsize;
-  return result;
-}
-
-#else
-
-void *sbrkx(long size) {
-#ifndef MINGW
-  return sbrk(size);
-#endif
-}
-#endif

@@ -2,7 +2,7 @@
 
 #include "thirdparty/libtelnet/libtelnet.h"
 
-#include "std.h"
+#include "base/std.h"
 #include "lpc_incl.h"
 #include "comm.h"
 #include "user.h"
