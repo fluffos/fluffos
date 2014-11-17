@@ -10,13 +10,89 @@
  *               Isaac Charles (Hamlet@Discworld, etc) -- Jul 2008
  */
 
-#include "std.h"
+#include "base/std.h"
+
+#include "console.h"
+
+#include <event2/event.h>
+#include <errno.h>
+#include <signal.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdlib.h>  // for qsort
 
 #ifdef HAS_CONSOLE
-#include "comm.h"
-#include "dumpstat.h"
-#include "event.h"
-#include "lpc_incl.h"
+int has_console = -1;
+#endif
+
+#ifdef HAS_CONSOLE
+#include "packages/core/dumpstat.h"
+#endif
+
+#include "vm/vm.h"
+
+#ifdef HAS_CONSOLE
+static void sig_ttin(int);
+#endif
+
+void restore_sigttin(void) {
+  if (has_console >= 0) {
+    signal(SIGTTIN, sig_ttin);
+  }
+}
+
+/* The console goes to sleep when backgrounded and can
+ * be woken back up with kill -SIGTTIN <pid>
+ */
+static void sig_ttin(int sig) {
+  char junk[1024];
+  int fl;
+
+  has_console = !has_console;
+
+  signal(SIGTTIN, SIG_IGN);
+
+  if (has_console) {
+    /* now eat all the gibberish they typed in the console when it was dead */
+    fl = fcntl(STDIN_FILENO, F_GETFL);
+    fcntl(STDIN_FILENO, F_SETFL, fl | O_NONBLOCK);
+
+    while (read(STDIN_FILENO, junk, 1023) > 0) {
+      ;
+    } /* ; */
+
+    /* leaving the output nonblocking is a bad idea.  large outputs tend
+         to get truncated.
+     */
+    fcntl(STDIN_FILENO, F_SETFL, fl);
+  }
+}
+
+static void on_console_event(evutil_socket_t fd, short what, void *arg) {
+  debug(event, "Got an event on stdin socket %d:%s%s%s%s \n", (int)fd,
+        (what & EV_TIMEOUT) ? " timeout" : "", (what & EV_READ) ? " read" : "",
+        (what & EV_WRITE) ? " write" : "", (what & EV_SIGNAL) ? " signal" : "");
+
+  if (has_console <= 0) {
+    event_del((struct event *)arg);
+    return;
+  }
+  on_console_input();
+}
+
+void console_init(struct event_base *base) {
+  if (has_console >= 0) {
+    signal(SIGTTIN, sig_ttin);
+  }
+  signal(SIGTTOU, SIG_IGN);
+
+  if (has_console > 0) {
+    debug_message("Opening console... \n");
+    struct event *ev_console = NULL;
+    ev_console = event_new(base, STDIN_FILENO, EV_READ | EV_PERSIST, on_console_event, ev_console);
+    event_add(ev_console, NULL);
+  }
+}
 
 #define NAME_LEN 50
 
@@ -362,4 +438,3 @@ static int objcmpidle(const void *a, const void *b) {
 
   return arft - brft;
 }
-#endif

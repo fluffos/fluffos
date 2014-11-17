@@ -1,0 +1,1 @@
+string hash(string, string);

@@ -3,17 +3,9 @@
 
 #include <functional>
 
-typedef struct object_s object_t;
-typedef struct error_context_s error_context_t;
-struct outbuffer_t;
-
 /*
  * backend.c
  */
-extern long g_current_virtual_time;
-extern object_t *g_current_heartbeat_obj;
-extern error_context_t *current_error_context;
-extern int time_for_hb;
 
 // API for register event to be executed on each tick.
 struct tick_event {
@@ -37,7 +29,7 @@ void backend(struct event_base *);
 void preload_objects();
 
 void clear_state(void);
-int parse_command(char *, object_t *);
+int parse_command(char *, struct object_t *);
 void remove_destructed_objects(void);
 void update_load_av(void);
 void update_compile_av(int);

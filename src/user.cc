@@ -4,6 +4,8 @@
  *  Created on: Oct 16, 2014
  *      Author: sunyc
  */
+#include "base/std.h"
+
 #include "user.h"
 
 #include <algorithm>
@@ -11,7 +13,8 @@
 #include <functional>
 #include <vector>
 
-#include "interactive.h"
+#include "interactive.h"  // for interactive_t->ob
+#include "vm/vm.h"
 
 // structure that holds all users
 static std::vector<interactive_t *> all_users;
