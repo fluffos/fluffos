@@ -1,7 +1,12 @@
 /* portbind.c: Tim Hollebeek, Oct 28, 1996 */
+#include "base/std.h"
 
-#include "std.h"
-#include "network_incl.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
 
 #define HANDLE_ERROR(routine, call) \
   if ((call) == -1) {               \

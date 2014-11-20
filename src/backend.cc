@@ -1,32 +1,38 @@
 /* 92/04/18 - cleaned up stylistically by Sulam@TMI */
-#include "std.h"
-#include "lpc_incl.h"
+#include "base/std.h"
+
 #include "backend.h"
-#include "comm.h"
-#include "replace_program.h"
-#include "reclaim.h"
-#include "socket_efuns.h"
-#include "call_out.h"
-#include "port.h"
-#include "master.h"
-#include "eval.h"
-#include "outbuf.h"
-
-#include "event.h"
-
-#ifdef PACKAGE_ASYNC
-#include "packages/async.h"
-#endif
 
 #include <deque>
+#include <event2/event.h>
 #include <functional>
 #include <map>
 #include <mutex>
+#include <math.h>
 
-error_context_t *current_error_context = 0;
+#include "vm/vm.h"
+
+#ifdef PACKAGE_ASYNC
+#include "packages/async/async.h"
+#endif
+#include "packages/core/replace_program.h"
+#include "packages/core/reclaim.h"
+#ifdef PACKAGE_MUDLIB_STATS
+#include "packages/mudlib_stats/mudlib_stats.h"
+#endif
+
+// TODO: remove the need for this
+static struct event *g_ev_tick = NULL;
+static void on_virtual_time_tick(int fd, short what, void *arg);
+
+// TODO: Figure out what to do with this.
+static const int kNumConst = 5;
+static const double consts[kNumConst]{
+    exp(0 / 900.0), exp(-1 / 900.0), exp(-2 / 900.0), exp(-3 / 900.0), exp(-4 / 900.0),
+};
 
 /*
- * The 'current_time' is updated in the backend loop.
+ * This the current game time, which is updated in the backend loop.
  */
 long g_current_virtual_time;
 
@@ -169,6 +175,8 @@ static void report_holes()
 }
 #endif
 
+// FIXME:
+extern struct object_t *obj_list_destruct;
 void call_remove_destructed_objects() {
   add_tick_event(5 * 60, tick_event::callback_type(call_remove_destructed_objects));
   if (obj_list_replace || obj_list_destruct) {
@@ -179,11 +187,8 @@ void call_remove_destructed_objects() {
  * This is the backend. We will stay here for ever (almost).
  */
 void backend(struct event_base *base) {
-  // FIXME: handle this in call_tick_events().
-  error_context_t econ;
-  save_context(&econ);
-
   clear_state();
+  g_current_virtual_time = get_current_time();
 
   // Register various tick events
   add_tick_event(0, tick_event::callback_type(call_heart_beat));
@@ -194,9 +199,6 @@ void backend(struct event_base *base) {
 #endif
   add_tick_event(5 * 60, tick_event::callback_type(call_remove_destructed_objects));
 
-  g_current_virtual_time = get_current_time();
-  clear_state();
-
   try {
     /* Run event loop for at most 1 second, this current handles
      * listening socket events, user socket events, and lpc socket events.
@@ -205,13 +207,26 @@ void backend(struct event_base *base) {
      * merge all callbacks execution into tick event loop and move all
      * I/O to dedicated threads.
      */
-    run_event_loop(base);
+    struct timeval one_second = {1, 0};
+
+    // Schedule a repeating tick for advancing virtual time.
+    g_ev_tick = evtimer_new(base, on_virtual_time_tick, NULL);
+
+    event_add(g_ev_tick, &one_second);
+    event_base_loop(base, 0);
   } catch (...) {  // catch everything
     fatal("BUG: jumped out of event loop!");
   }
+  // We've reached here meaning we are in shutdown sequence.
   shutdownMudOS(-1);
 } /* backend() */
 
+static void on_virtual_time_tick(int fd, short what, void *arg) {
+  virtual_time_tick();
+
+  struct timeval one_second = {1, 0};
+  event_add(g_ev_tick, &one_second);
+}
 /*
  * Despite the name, this routine takes care of several things.
  * It will run once every 5 minutes.
@@ -228,6 +243,8 @@ void backend(struct event_base *base) {
  * special care has to be taken of how the linked list is used.
  */
 static void look_for_objects_to_swap() {
+  auto time_to_clean_up = CONFIG_INT(__TIME_TO_CLEAN_UP__);
+
   /* Next time is in 5 minutes */
   add_tick_event(5 * 60, tick_event::callback_type(look_for_objects_to_swap));
 
@@ -331,64 +348,6 @@ static void look_for_objects_to_swap() {
   pop_context(&econ);
 } /* look_for_objects_to_swap() */
 
-/* New version used when not in -o mode. The epilog() in master.c is
- * supposed to return an array of files (castles in 2.4.5) to load. The array
- * returned by apply() will be freed at next call of apply(), which means that
- * the ref count has to be incremented to protect against deallocation.
- *
- * The master object is asked to do the actual loading.
- */
-void preload_objects(int eflag) {
-  volatile array_t *prefiles;
-  svalue_t *ret;
-  volatile int ix;
-  error_context_t econ;
-
-  save_context(&econ);
-  try {
-    push_number(eflag);
-    ret = apply_master_ob(APPLY_EPILOG, 1);
-  } catch (const char *) {
-    restore_context(&econ);
-    pop_context(&econ);
-    return;
-  }
-
-  pop_context(&econ);
-  if ((ret == 0) || (ret == (svalue_t *)-1) || (ret->type != T_ARRAY)) {
-    return;
-  } else {
-    prefiles = ret->u.arr;
-  }
-  if ((prefiles == 0) || (prefiles->size < 1)) {
-    return;
-  }
-
-  debug_message("\nLoading preloaded files ...\n");
-  prefiles->ref++;
-  ix = 0;
-  /* in case of an error, effectively do a 'continue' */
-  save_context(&econ);
-  while (1) try {
-      for (; ix < prefiles->size; ix++) {
-        if (prefiles->item[ix].type != T_STRING) {
-          continue;
-        }
-
-        set_eval(max_cost);
-
-        push_svalue(((array_t *)prefiles)->item + ix);
-        (void)apply_master_ob(APPLY_PRELOAD, 1);
-      }
-      free_array((array_t *)prefiles);
-      break;
-    } catch (const char *) {
-      restore_context(&econ);
-      ix++;
-    }
-  pop_context(&econ);
-} /* preload_objects() */
-
 /* All destructed objects are moved into a sperate linked list,
  * and deallocated after program execution.  */
 
@@ -418,7 +377,7 @@ void update_load_av() {
     return;
   }
   n = g_current_virtual_time - last_time;
-  if (n < NUM_CONSTS) {
+  if (n < kNumConst) {
     c = consts[n];
   } else {
     c = exp(-n / 900.0);
@@ -441,7 +400,7 @@ void update_compile_av(int lines) {
     return;
   }
   n = g_current_virtual_time - last_time;
-  if (n < NUM_CONSTS) {
+  if (n < kNumConst) {
     c = consts[n];
   } else {
     c = exp(-n / 900.0);

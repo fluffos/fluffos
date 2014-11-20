@@ -8,7 +8,7 @@
 COMPILER_FLAGS=${COMPILER_FLAGS:-"-march=native"}
 
 OPTIMIZE="-O3"
-DEBUG="-g"
+DEBUG="-DNDEBUG -g"
 
 # Change this if you want to use another make.
 MAKE=make
@@ -23,11 +23,14 @@ INSTALL_DIR=`dirname $(pwd)`/bin
 #Enable warnings from the compiler (g++), if wanted.
 WARN=(
 "-Wall"
+"-Wextra"
 "-Wformat-security"
 # Turn off some warnings from GCC.
 "-Wno-char-subscripts"
 "-Wno-sign-compare"
 "-Wno-return-type"
+"-Wno-unused-parameter"
+"-Wno-missing-field-initializers"
 # GCC's warning produces too many false positives:
 # https://groups.google.com/a/google.com/forum/#!topic/c-users/jLRfP804wuc
 # https://groups.google.com/a/google.com/d/msg/c-users/jLRfP804wuc/sKe4Ba2PKwAJ
@@ -38,7 +41,10 @@ WARN=(
 # features
 "-fdiagnostics-show-option"
 "-fmessage-length=0"
+# Less undefined behavior
 "-funsigned-char"
+"-fwrapv"
+"-fPIE"
 )
 WARN="$(IFS=' '; echo "${WARN[*]}")"
 
@@ -48,11 +54,10 @@ if test $# -ne 0; then
     develop)
       echo Preparing to build developmental version of MudOS driver ...
       OPTIMIZE="-O0"
-      DEBUG="$DEBUG -DDEBUG -DDEBUG_MACRO"
+      DEBUG="-g -DDEBUG"
       # Hardening mode activated, for more error visibility
       DEBUG="$DEBUG -D_FORTIFY_SOURCE=2 -fstack-protector-all"
-      DEBUG="$DEBUG -fwrapv -fPIE -Wstack-protector"
-      DEBUG="$DEBUG --param ssp-buffer-size=1"
+      DEBUG="$DEBUG -Wstack-protector --param ssp-buffer-size=1 -fstrict-aliasing"
       shift
       ;;
     *)
