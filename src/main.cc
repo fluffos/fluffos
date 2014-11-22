@@ -186,8 +186,9 @@ static void setup_signal_handlers() {
     exit(5);
   }
 }
-
+#ifndef __CYGWIN__
 #include <execinfo.h>
+#endif 
 #include <unistd.h>
 static void try_dump_stacktrace() {
 #if !defined(__CYGWIN__) && __GNUC__ > 2

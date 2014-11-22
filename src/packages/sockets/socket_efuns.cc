@@ -14,6 +14,10 @@
 #include <string>
 #include <unistd.h>  // for close
 
+#ifdef __CYGWIN__
+#include <errno.h>
+#endif
+
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
 
 // Hold all the LPC socks
