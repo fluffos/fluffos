@@ -148,7 +148,9 @@ int main(int argc, char **argv) {
     exit(1);
   }
   // Initialize user connection socket
-  init_user_conn();
+  if (!init_user_conn()) {
+    exit(1);
+  }
 
 #ifdef HAS_CONSOLE
   console_init(base);
