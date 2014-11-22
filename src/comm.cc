@@ -76,7 +76,7 @@ static void new_user_handler(struct evconnlistener *, evutil_socket_t, struct so
 /*
  * Initialize new user connection socket.
  */
-void init_user_conn() {
+bool init_user_conn() {
   for (int i = 0; i < 5; i++) {
 #ifdef F_NETWORK_STATS
     external_port[i].in_packets = 0;
@@ -117,7 +117,7 @@ void init_user_conn() {
 
     if (ret) {
       debug_message("init_user_conn: getaddrinfo error: %s \n", gai_strerror(ret));
-      exit(3);
+      return false;
     }
 
 #ifdef IPV6
@@ -128,7 +128,30 @@ void init_user_conn() {
     if (fd == -1) {
       debug_message("socket_create: socket error: %s.\n",
                     evutil_socket_error_to_string(evutil_socket_geterror(fd)));
-      exit(1);
+      return false;
+    }
+    if (evutil_make_socket_nonblocking(fd) == -1) {
+      debug(sockets, "socket_accept: set_socket_nonblocking error: %s.\n",
+            evutil_socket_error_to_string(evutil_socket_geterror(accept_fd)));
+      evutil_closesocket(fd);
+      return false;
+    }
+    if (evutil_make_socket_closeonexec(fd) == -1) {
+      debug(sockets, "socket_accept: make_socket_closeonexec error: %s.\n",
+            evutil_socket_error_to_string(evutil_socket_geterror(accept_fd)));
+      evutil_closesocket(fd);
+      return false;
+    }
+    {
+      int one = 1;
+      if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (void*)&one, sizeof(one))<0) {
+        evutil_closesocket(fd);
+        return false;
+      }
+    }
+    if (evutil_make_listen_socket_reuseable(fd) < 0) {
+      evutil_closesocket(fd);
+      return false;
     }
 #ifdef __CYGWIN__
 #ifdef IPV6
@@ -139,22 +162,16 @@ void init_user_conn() {
         debug_message("socket_create: setsockopt error: %s.\n",
                       evutil_socket_error_to_string(evutil_socket_geterror(fd)));
         evutil_closesocket(fd);
-        exit(1);
+        return false;
       }
     }
 #endif
 #endif
-    if (evutil_make_socket_nonblocking(fd) == -1) {
-      debug(sockets, "socket_accept: set_socket_nonblocking 1 error: %s.\n",
-            evutil_socket_error_to_string(evutil_socket_geterror(accept_fd)));
-      evutil_closesocket(fd);
-      exit(1);
-    }
     if (bind(fd, res->ai_addr, res->ai_addrlen) == -1) {
       debug_message("socket_create: bind error: %s.\n",
                     evutil_socket_error_to_string(evutil_socket_geterror(fd)));
       evutil_closesocket(fd);
-      exit(1);
+      return false;
     }
 
     // Listen on connection event
@@ -163,7 +180,7 @@ void init_user_conn() {
         LEV_OPT_REUSEABLE | LEV_OPT_CLOSE_ON_FREE | LEV_OPT_CLOSE_ON_EXEC, 1024, fd);
     if (conn == NULL) {
       debug_message("listening failed: %s !", evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
-      exit(1);
+      return false;
     }
     external_port[i].ev_conn = conn;
     debug_message("Accepting connections on %s.\n",
@@ -171,6 +188,7 @@ void init_user_conn() {
 
     freeaddrinfo(res);
   }
+  return true;
 }
 
 /*
@@ -420,17 +438,18 @@ void add_message(object_t *who, const char *data, int len) {
 } /* add_message() */
 
 void add_vmessage(object_t *who, const char *format, ...) {
-  va_list args;
+  va_list args, args2;
   va_start(args, format);
+  va_copy(args2, args);
   do {
     int result = vsnprintf(nullptr, 0, format, args);
     if (result < 0) break;
-    std::unique_ptr<char> msg(new char[result]);
-    result = vsnprintf(msg.get(), result, format, args);
+    std::unique_ptr<char[]> msg(new char[result+1]);
+    result = vsnprintf(msg.get(), result+1, format, args2);
     if (result < 0) break;
     add_message(who, msg.get(), strlen(msg.get()));
-    break;
-  } while (false);
+  } while (0);
+  va_end(args2);
   va_end(args);
 }
 
