@@ -9,11 +9,11 @@
 
 #include "base/internal/rc.h"
 
-#include <stdlib.h> // for exit
 #include <cstring>  // for strlen
 #include <deque>
 #include <fstream>
 #include <sstream>
+#include <stdlib.h>  // for exit
 #include <string>
 
 #include "base/internal/stralloc.h"
@@ -194,18 +194,6 @@ void read_config(char *filename) {
   }
 
   scan_config_line("mud ip : %[^\n]", tmp, 0);
-// CYGWIN lack support of AI_V4MAPPED, V4 address doesn't work!
-#ifdef CYGWIN
-#ifdef IPV6
-  // common fix for mud ip.
-  if (!strcmp(tmp, "127.0.0.1")) {
-    strcpy(tmp, "::1");
-  }
-  if (!strcmp(tmp, "0.0.0.0")) {
-    strcpy(tmp, "::");
-  }
-#endif
-#endif
   CONFIG_STR(__MUD_IP__) = alloc_cstring(tmp, "config file: mi");
 
   scan_config_line("time to clean up : %d\n", &CONFIG_INT(__TIME_TO_CLEAN_UP__), 1);

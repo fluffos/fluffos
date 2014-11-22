@@ -2,10 +2,15 @@
 
 #include "main.h"
 
+#ifdef HAVE_EXECINFO_H
+#include <execinfo.h>
+#endif
 #include <locale>
-#include <sys/resource.h>  // for getrlimit
-#include <time.h>
 #include <signal.h>
+#ifdef HAVE_SYS_RESOURCE_H
+#include <sys/resource.h>  // for getrlimit
+#endif
+#include <time.h>
 #include <unistd.h>
 
 #include "cc.h"       // source revision
@@ -16,7 +21,6 @@
 #include "vm/vm.h"    // to interact with VM layer.
 
 #include "packages/core/dns.h"  // for init_dns_event_base.
-
 
 time_t boot_time;
 
@@ -187,8 +191,6 @@ static void setup_signal_handlers() {
   }
 }
 
-#include <execinfo.h>
-#include <unistd.h>
 static void try_dump_stacktrace() {
 #if !defined(__CYGWIN__) && __GNUC__ > 2
   static void *bt[100];

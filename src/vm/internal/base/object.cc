@@ -1,8 +1,11 @@
 #include "base/std.h"
 
-#include <stdlib.h>
 #include <ctype.h>  // for isdigit
 #include <math.h>   // for pow
+#ifdef HAVE_SYS_STAT_H
+#include <sys/stat.h>
+#endif
+#include <stdlib.h>
 #ifdef HAVE_ZLIB
 #include <zlib.h>
 #endif

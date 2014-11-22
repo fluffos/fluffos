@@ -29,9 +29,6 @@ void add_realtime_event(realtime_event::callback_type);
 
 int run_event_loop(struct event_base *);
 
-// Listening socket event
-void new_external_port_event_listener(struct port_def_t *, sockaddr *, socklen_t);
-
 // User socket event
 struct user_event_data {
   int idx;

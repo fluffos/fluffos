@@ -8,7 +8,6 @@
 #ifndef SRC_BASE_PACKAGE_API_H_
 #define SRC_BASE_PACKAGE_API_H_
 
-
 // FIXME: avoid this?
 #include "base/std.h"
 

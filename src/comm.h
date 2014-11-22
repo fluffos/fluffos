@@ -87,9 +87,6 @@ struct object_t *query_snooping(struct object_t *);
 void mark_iptable(void);
 #endif
 
-// New user API handler.
-void new_user_handler(int, struct sockaddr *, size_t, port_def_t *);
-
 const char *sockaddr_to_string(const sockaddr *addr, socklen_t len);
 
 #endif /* COMM_H */

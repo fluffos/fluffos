@@ -6,11 +6,61 @@
 
 #include "packages/core/file.h"
 
+#include <errno.h>
+#if HAVE_DIRENT_H
+#include <dirent.h>
+#define NAMLEN(dirent) strlen((dirent)->d_name)
+#else
+#define dirent direct
+#define NAMLEN(dirent) (dirent)->d_namlen
+#if HAVE_SYS_NDIR_H
+#include <sys/ndir.h>
+#endif
+#if HAVE_SYS_DIR_H
+#include <sys/dir.h>
+#endif
+#if HAVE_NDIR_H
+#include <ndir.h>
+#endif
+#endif
+#ifdef HAVE_SYS_STAT_H
+#include <sys/stat.h>
+#endif
+#ifdef HAVE_SYS_FILIO_H
+#include <sys/filio.h>
+#endif
+#ifdef HAVE_SYS_SOCKIO_H
+#include <sys/sockio.h>
+#endif
+#ifdef HAVE_SYS_MKDEV_H
+#include <sys/mkdev.h>
+#endif
+#include <fcntl.h>
+
+/*
+ * Credits for some of the code below goes to Free Software Foundation
+ * Copyright (C) 1990 Free Software Foundation, Inc.
+ * See the GNU General Public License for more details.
+ */
+#ifndef S_ISDIR
+#define S_ISDIR(m) (((m)&S_IFMT) == S_IFDIR)
+#endif
+
+#ifndef S_ISREG
+#define S_ISREG(m) (((m)&S_IFMT) == S_IFREG)
+#endif
+
+#ifndef S_ISCHR
+#define S_ISCHR(m) (((m)&S_IFMT) == S_IFCHR)
+#endif
+
+#ifndef S_ISBLK
+#define S_ISBLK(m) (((m)&S_IFMT) == S_IFBLK)
+#endif
+
 #ifdef PACKAGE_COMPRESS
 #include <zlib.h>
 #endif
-
-#include <fcntl.h>
 
 static int match_string(char *, char *);
 static int copy(const char *from, const char *to);

@@ -7,6 +7,9 @@
 #ifdef PACKAGE_MUDLIB_STATS
 #include "packages/mudlib_stats/mudlib_stats.h"
 #endif
+#ifndef SANE_SORTING
+#include "vm/internal/base/old_qsort_inc.h"
+#endif
 
 /*
  * This file contains functions used to manipulate arrays.
