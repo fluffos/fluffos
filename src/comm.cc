@@ -69,6 +69,10 @@ int inet_socket_out_volume = 0;
 int inet_packets = 0;
 int inet_volume = 0;
 
+// Handler for new user connections.
+static void new_user_handler(struct evconnlistener *, evutil_socket_t, struct sockaddr *, int,
+                             void *arg);
+
 /*
  * Initialize new user connection socket.
  */
@@ -116,9 +120,52 @@ void init_user_conn() {
       exit(3);
     }
 
-    // Listen on connection event
-    new_external_port_event_listener(&external_port[i], res->ai_addr, res->ai_addrlen);
+#ifdef IPV6
+    auto fd = socket(AF_INET6, SOCK_STREAM, 0);
+#else
+    auto fd = socket(AF_INET, SOCK_STREAM, 0);
+#endif
+    if (fd == -1) {
+      debug_message("socket_create: socket error: %s.\n",
+                    evutil_socket_error_to_string(evutil_socket_geterror(fd)));
+      exit(1);
+    }
+#ifdef __CYGWIN__
+#ifdef IPV6
+    // On windows, IPv6 sockets are IPv6 only by default. We have to change it.
+    {
+      auto zero = 0;
+      if (setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, (void *)&zero, sizeof(zero)) == -1) {
+        debug_message("socket_create: setsockopt error: %s.\n",
+                      evutil_socket_error_to_string(evutil_socket_geterror(fd)));
+        evutil_closesocket(fd);
+        exit(1);
+      }
+    }
+#endif
+#endif
+    if (evutil_make_socket_nonblocking(fd) == -1) {
+      debug(sockets, "socket_accept: set_socket_nonblocking 1 error: %s.\n",
+            evutil_socket_error_to_string(evutil_socket_geterror(accept_fd)));
+      evutil_closesocket(fd);
+      exit(1);
+    }
+    if (bind(fd, res->ai_addr, res->ai_addrlen) == -1) {
+      debug_message("socket_create: bind error: %s.\n",
+                    evutil_socket_error_to_string(evutil_socket_geterror(fd)));
+      evutil_closesocket(fd);
+      exit(1);
+    }
 
+    // Listen on connection event
+    auto conn = evconnlistener_new(
+        g_event_base, new_user_handler, &external_port[i],
+        LEV_OPT_REUSEABLE | LEV_OPT_CLOSE_ON_FREE | LEV_OPT_CLOSE_ON_EXEC, 1024, fd);
+    if (conn == NULL) {
+      debug_message("listening failed: %s !", evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
+      exit(1);
+    }
+    external_port[i].ev_conn = conn;
     debug_message("Accepting connections on %s.\n",
                   sockaddr_to_string((sockaddr *)res->ai_addr, res->ai_addrlen));
 
@@ -152,13 +199,20 @@ void shutdown_external_ports() {
  * If space is available, an interactive data structure is initialized and
  * the user is connected.
  */
-void new_user_handler(int fd, struct sockaddr *addr, size_t addrlen, port_def_t *port) {
+static void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct sockaddr *addr,
+                             int addrlen, void *arg) {
   debug(connections, "New connection from %s.\n", sockaddr_to_string(addr, addrlen));
 
-  int one = 1;
-  if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) == -1) {
-    debug(connections, "async_on_accept: fd %d, set_socket_tcp_nodelay error: %s.\n", fd,
-          evutil_socket_error_to_string(evutil_socket_geterror(fd)));
+  // TODO: we don't really need to pass in port, we can figure out by
+  // evconnlistener_get_fd and compare it
+  auto *port = reinterpret_cast<port_def_t *>(arg);
+
+  {
+    int one = 1;
+    if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) == -1) {
+      debug(connections, "new_user_handler: user fd %d, set_socket_tcp_nodelay error: %s.\n", fd,
+            evutil_socket_error_to_string(evutil_socket_geterror(fd)));
+    }
   }
 
   /*
@@ -189,9 +243,8 @@ void new_user_handler(int fd, struct sockaddr *addr, size_t addrlen, port_def_t 
 
   master_ob->interactive = user;
 
-  // FIXME: this belongs in async_on_accept()
+  // TODO: merge event.cc into here.
   new_user_event_listener(user);
-
   // Initialize telnet support
   user->telnet = net_telnet_init(user);
 

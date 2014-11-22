@@ -2,6 +2,7 @@
 
 #include "event.h"
 
+#include <errno.h>
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
 #include <event2/event.h>
@@ -148,21 +149,6 @@ void new_user_event_listener(interactive_t *user) {
 
   user->ev_buffer = bev;
   user->ev_command = event_new(g_event_base, -1, EV_TIMEOUT | EV_PERSIST, on_user_command, user);
-}
-
-static void on_external_port_event(evconnlistener *listener, evutil_socket_t fd, sockaddr *sa,
-                                   int socklen, void *arg) {
-  debug(event, "on_external_port_event: fd %d, addr: %s\n", fd, sockaddr_to_string(sa, socklen));
-  auto *port = reinterpret_cast<port_def_t *>(arg);
-  new_user_handler(fd, sa, socklen, port);
-}
-
-void new_external_port_event_listener(port_def_t *port, sockaddr *sa, socklen_t socklen) {
-  port->ev_conn = evconnlistener_new_bind(
-      g_event_base, on_external_port_event, port,
-      LEV_OPT_REUSEABLE | LEV_OPT_CLOSE_ON_FREE | LEV_OPT_CLOSE_ON_EXEC, 1024, sa, socklen);
-  DEBUG_CHECK1(port->ev_conn == NULL, "listening failed: %s !",
-               evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
 }
 
 void on_lpc_sock_read(evutil_socket_t fd, short what, void *arg) {

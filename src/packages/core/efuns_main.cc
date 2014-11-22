@@ -9,8 +9,19 @@
 
 #include "base/package_api.h"
 
-#include <sys/stat.h>
 #include <algorithm>
+#ifdef HAVE_CRYPT_H
+#include <crypt.h>
+#endif
+#ifdef HAVE_SYS_STAT_H
+#include <sys/stat.h>
+#endif
+#ifdef HAVE_SYS_RESOURCE_H
+#include <sys/resource.h>
+#endif
+#ifdef HAVE_SYS_RUSAGE_H
+#include <sys/rusage.h>
+#endif
 #include <unistd.h>  // for rmdir(), FIXME
 
 #include "packages/core/call_out.h"
