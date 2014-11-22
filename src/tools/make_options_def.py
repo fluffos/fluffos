@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 
 # This python program accept a list of "#define key value"
 # and output a c++ header file
@@ -25,7 +25,7 @@ TPL_FOOTER = """
 """
 
 if len(sys.argv) != 2:
-  print "Usage: echo "<defines>" | make_options_def.py <output file>"
+  print("Usage: echo "<defines>" | make_options_def.py <output file>")
   sys.exit(1)
 
 result = TPL_HEADER
@@ -33,7 +33,7 @@ result = TPL_HEADER
 for line in sys.stdin.readlines():
   m = DEFINE_RE.match(line)
   if not m:
-    print "Unexpected line: %s " % line
+    print("Unexpected line: %s " % line)
     os.exit(1)
 
   key = m.group(1)
