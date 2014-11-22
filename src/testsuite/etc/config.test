@@ -15,11 +15,6 @@ port number : 4000
 # Restrict IP binding, if omitted, bind to all addresses.
 mud ip : 127.0.0.1
 
-# the address server is an external program that lets the mud translate
-# internet names to numbers (and vice versa).  select an unused port.
-address server ip : localhost
-address server port : 7374
-
 # absolute pathname of mudlib
 mudlib directory : ./
 
@@ -99,11 +94,6 @@ maximum read file size : 200000
 # max number of bytes you allow to be read and written with read_bytes 
 # and write_bytes
 maximum byte transfer : 10000
-
-# Reserve an extra memory area from malloc(), to free when we run out
-# of memory and allow the mudlib to shutdown.
-# If this value is 0, no area will be reserved.
-reserved size : 0
 
 # Define the size of the shared string hash table.  This number should
 # a prime, probably between 1000 and 30000; if you set it to about 1/5
