@@ -17,7 +17,6 @@
 
 #include "packages/core/dns.h"  // for init_dns_event_base.
 
-
 time_t boot_time;
 
 static void sig_cld(int);

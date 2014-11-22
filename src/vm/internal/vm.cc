@@ -25,10 +25,10 @@
 void preload_objects();
 
 void vm_init() {
-  init_strings(); /* in stralloc.c */
+  init_strings();     /* in stralloc.c */
   init_identifiers(); /* in lex.c */
-  init_locals(); /* in compiler.c */
-  init_otable(); /* in otable.c */
+  init_locals();      /* in compiler.c */
+  init_otable();      /* in otable.c */
 
   max_cost = CONFIG_INT(__MAX_EVAL_COST__);
   set_inc_list(CONFIG_STR(__INCLUDE_DIRS__));
