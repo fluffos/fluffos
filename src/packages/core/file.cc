@@ -10,6 +10,7 @@
 #include <zlib.h>
 #endif
 
+#include <errno.h> // needed in CYGWIN
 #include <fcntl.h>
 
 static int match_string(char *, char *);
