@@ -1,8 +1,17 @@
+#include "base/std.h"
+
 #include "fliconv.h"
+
 #include <errno.h>
-#include "std.h"
-#include "lpc_incl.h"
+
 #include "comm.h"
+#include "vm/vm.h"
+
+#ifdef USE_ICONV
+#include <iconv.h>
+#else
+typedef void *iconv_t;
+#endif
 
 #ifdef USE_ICONV
 

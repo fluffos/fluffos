@@ -1,9 +1,8 @@
 #ifndef INTERACITVE_H
 #define INTERACITVE_H
 
-// TODO: reduce header
-#include "std.h"
-#include "lpc_incl.h"
+#include <sys/socket.h>  // for sockaddr_storage
+#include "vm/vm.h"       // FIXME: for union string_or_func
 
 #define MAX_TEXT 2048
 
@@ -36,11 +35,11 @@
 #define USING_COMPRESS 0x40000     /* we've negotiated compress */
 
 struct interactive_t {
-  object_t *ob; /* points to the associated object         */
+  struct object_t *ob; /* points to the associated object         */
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
-  sentence_t *input_to; /* to be called with next input line       */
-  svalue_t *carryover;  /* points to args for input_to             */
-  int num_carry;        /* number of args for input_to             */
+  struct sentence_t *input_to; /* to be called with next input line       */
+  struct svalue_t *carryover;  /* points to args for input_to             */
+  int num_carry;               /* number of args for input_to             */
 #endif
   int connection_type;          /* the type of connection this is          */
   int fd;                       /* file descriptor for interactive object  */
@@ -54,7 +53,7 @@ struct interactive_t {
   int text_start;      /* where we are up to in user command buffer */
   int last_time;       /* time of last command executed           */
 #ifndef NO_SNOOP
-  object_t *snooped_by;
+  struct object_t *snooped_by;
 #endif
 #ifndef NO_ADD_ACTION
   /* this or What ? is printed when error    */
@@ -67,8 +66,9 @@ struct interactive_t {
 #ifdef OLD_ED
   struct ed_buffer_s *ed_buffer; /* local ed                        */
 #endif
-  int iflags;       /* interactive flags */
-  char out_of_band; /* Send a telnet sync operation            */
+  int iflags; /* interactive flags */
+
+  // iconv handle
   struct translation *trans;
 
   char ws_text[MAX_TEXT]; /* input buffer for interactive object     */

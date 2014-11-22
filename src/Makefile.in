@@ -30,181 +30,205 @@
 
 CXX=@CXX@
 # FIXME: should not have jam everything into CXXFLAGS
-CXXFLAGS=@CFLAGS@ @CXXFLAGS@ @GCOV_CFLAGS@ @CPPFLAGS@ @LIBEVENT_CPPFLAGS@
-LDFLAGS=@CFLAGS@ @CXXFLAGS@ @LDFLAGS@
+CXXFLAGS=@CXXFLAGS@ @GCOV_CFLAGS@ @CPPFLAGS@ @LIBEVENT_CPPFLAGS@
+LDFLAGS=@CXXFLAGS@ @LDFLAGS@
 LIBS=@LIBS@ @GCOV_LIBS@
-YACC=@YACC@
-O=@OBJEXT@
+BISON=@BISON@
 DRIVER_BIN=@DRIVER_BIN@@EXEEXT@
 INSTALL=@INSTALL@
 INSTALL_DIR=@bindir@
 OPTIMIZE=@OPTIMIZE@
 
-SRC=lpc/compiler/grammar.tab.cc main.cc rc.cc simulate.cc file.cc \
-  backend.cc heartbeat.cc comm.cc ed.cc regexp.cc crc32.cc \
-  efuns_main.cc efuns_port.cc \
-  call_out.cc otable.cc dumpstat.cc stralloc.cc \
-	debugmalloc.cc md.cc \
-	hash.cc \
-  port.cc reclaim.cc parse.cc simul_efun.cc sprintf.cc \
-  avltree.cc \
-  socket_efuns.cc socket_ctrl.cc eoperators.cc socket_err.cc \
-  disassembler.cc uvalarm.cc \
-  replace_program.cc master.cc \
-  debug.cc custom_crypt.cc applies_table.cc add_action.cc eval.cc fliconv.cc console.cc \
-  posix_timers.cc event.cc dns.c \
-	outbuf.cc \
-	net/telnet.cc net/telnet_ext.cc net/mssp.cc \
-	lpc/interpret.cc lpc/svalue.cc lpc/apply.cc lpc/apply_cache.cc \
-	lpc/program.cc lpc/function.cc \
-	lpc/lang/array.cc lpc/lang/buffer.cc lpc/lang/class.cc lpc/lang/mapping.cc lpc/lang/object.cc \
-	lpc/compiler/compiler.cc lpc/compiler/generate.cc lpc/compiler/icode.cc lpc/comppiler/lex.cc \
-	lpc/compiler/scratchpad.cc lpc/compiler/trees.cc \
-	user.cc \
-	thirdparty/libtelnet/libtelnet.c
+# for packages/db and packages/async
+MYSQL_CFLAGS=@MYSQL_CFLAGS@
+POSTGRESQL_CPPFLAGS=@POSTGRESQL_CPPFLAGS@
+SQLITE3_CFLAGS=@SQLITE3_CFLAGS@
 
-OBJ=lpc/compiler/grammar.tab.o main.o rc.o simulate.o file.o \
-  backend.o heartbeat.o comm.o ed.o regexp.o crc32.o \
-  efuns_main.o efuns_port.o \
-  call_out.o otable.o dumpstat.o stralloc.o \
-	debugmalloc.o md.o \
-	hash.o \
-  port.o reclaim.o parse.o simul_efun.o sprintf.o \
-  avltree.o \
-  socket_efuns.o socket_ctrl.o eoperators.o socket_err.o \
-  disassembler.o uvalarm.o \
-  replace_program.o master.o \
-  debug.o custom_crypt.o applies_table.o add_action.o eval.o fliconv.o console.o \
-  posix_timers.o event.o dns.o \
-	outbuf.o \
-	net/telnet.o net/telnet_ext.o net/mssp.o \
-	lpc/interpret.o lpc/svalue.o lpc/apply.o lpc/apply_cache.o \
-	lpc/program.o lpc/function.o \
-	lpc/lang/array.o lpc/lang/buffer.o lpc/lang/class.o lpc/lang/mapping.o lpc/lang/object.o \
-	lpc/compiler/compiler.o lpc/compiler/generate.o lpc/compiler/icode.o lpc/compiler/lex.o \
-	lpc/compiler/scratchpad.o lpc/compiler/trees.o \
-	user.o \
-	thirdparty/libtelnet/libtelnet.o
+# For packages/crypto
+OPENSSL_INCLUDES=@OPENSSL_INCLUDES@
 
-VPATH = .:./packages
+# For packages/pcre
+PCRE_CFLAGS=@PCRE_CFLAGS@
 
 # ---- BUILD STEPS:
-# 1) build edit_source
-# 2) use edit_source preprocess stuff.
-# 3) main build.
+# 1) generate all GENFILES, using several script in tools/
+# 2) main build.
 
-all: local_options files
-	$(MAKE) build_packages
-	$(MAKE) build_binaries
+.PHONY: all clean install test help
 
-build_packages:
-	$(MAKE) -C packages 'CC=$(CXX)' 'CXXFLAGS=$(CXXFLAGS)' 'A=$(A)' 'O=$(O)'
+all: $(GENFILES) $(DRIVER_BIN) portbind
 
-build_binaries: $(DRIVER_BIN) portbind
+%.o: %.cc
+	@echo [CC] $@
+	@$(CXX) $(CXXFLAGS) -MMD -MP -x c++ -o $@ -c $<
 
-.cc.$(O):
-	$(CXX) -c $(CXXFLAGS) -iquote. -x c++ -o $@ $<
+# Automatically include all dependencies
+DEPFILES=$(shell find ./ -type f -name '*.d')
+-include $(DEPFILES)
 
-.c.$(O):
-	$(CXX) -c $(CXXFLAGS) -iquote. -x c++ -o $@ $<
+BASE_OBJS= \
+	base/internal/debugmalloc.o \
+	base/internal/external_port.o \
+	base/internal/file.o \
+	base/internal/hash.o \
+	base/internal/log.o \
+	base/internal/md.o \
+	base/internal/outbuf.o \
+	base/internal/port.o \
+	base/internal/rc.o \
+	base/internal/stralloc.o \
+	base/internal/strput.o
+
+VM_OBJS= \
+	vm/internal/applies_table.autogen.o \
+	vm/internal/efuns.autogen.o \
+	vm/internal/apply.o \
+	vm/internal/eval.o \
+	vm/internal/master.o \
+	vm/internal/otable.o \
+	vm/internal/posix_timers.o \
+	vm/internal/simul_efun.o \
+	vm/internal/simulate.o \
+	vm/internal/vm.o
+
+VM_BASE_OBJS= \
+	vm/internal/base/apply_cache.o \
+	vm/internal/base/array.o \
+	vm/internal/base/buffer.o \
+	vm/internal/base/class.o \
+	vm/internal/base/function.o \
+	vm/internal/base/interpret.o \
+	vm/internal/base/mapping.o \
+	vm/internal/base/object.o \
+	vm/internal/base/program.o \
+	vm/internal/base/svalue.o
+
+VM_COMPILER_OBJS= \
+	vm/internal/compiler/compiler.o \
+	vm/internal/compiler/icode.o \
+	vm/internal/compiler/generate.o \
+	vm/internal/compiler/grammar.autogen.o \
+	vm/internal/compiler/lex.o \
+	vm/internal/compiler/scratchpad.o \
+	vm/internal/compiler/trees.o \
+
+DRIVER_OBJS= \
+	backend.o \
+	comm.o \
+	console.o \
+	event.o \
+	fliconv.o \
+	main.o \
+	user.o \
+	net/telnet.o \
+	thirdparty/libtelnet/libtelnet.o
+
+# All generated files.
+GENFILES= \
+	cc.h \
+	packages/packages.autogen.spec \
+	packages/packages.autogen.fullspec \
+	packages/packages.autogen.makefile \
+	vm/internal/applies_table.autogen.h \
+	vm/internal/applies_table.autogen.cc \
+	vm/internal/options.autogen.h \
+	vm/internal/efuns.autogen.cc \
+	vm/internal/efuns.autogen.h \
+	vm/internal/compiler/grammar.autogen.cc \
+	vm/internal/compiler/grammar.autogen.h
+
+$(GENFILES): local_options tools/build_packages_genfiles.sh tools/build_applies.autogen tools/make_func.autogen tools/make_grammar.sh tools/make_options_def.py vm/internal/applies vm/internal/compiler/grammar.y.pre
+	@echo [Generating cc.h]
+	@-rm -f cc.h
+	@echo "/* this file automatically generated by the Makefile */" > cc.h
+	@echo '#define COMPILER "$(CXX)"' >> cc.h
+	@echo '#define CXXFLAGS "$(CXXFLAGS)"' >> cc.h
+	@echo '#define OPTIMIZE "$(OPTIMIZE)"' >> cc.h
+	@echo '#define SOURCE_REVISION "@SOURCE_REVISION@"' >> cc.h
+	@echo [Generating Packages]
+	@./tools/build_packages_genfiles.sh $(CXX) $(CXXFLAGS)
+	@echo [Generating applies table...]
+	@./tools/build_applies.autogen
+	@echo [Generating efun tables...]
+	@./tools/make_func.autogen packages/packages.autogen.fullspec
+	@echo [Generating grammar...]
+	@./tools/make_grammar.sh $(CXX) $(CXXFLAGS)
+	@$(BISON) -o vm/internal/compiler/grammar.autogen.cc \
+		--defines=vm/internal/compiler/grammar.autogen.h \
+		vm/internal/compiler/grammar.autogen.y
+	@echo [Generating options_def...]
+	@$(CXX) $(CXXFLAGS) -E -undef -dM base/internal/options_incl.h | tools/make_options_def.py vm/internal/options.autogen.h
+
+-include packages/packages.autogen.makefile
+
+tools/build_applies.autogen: tools/build_applies.o
+	@echo [Linking] $@
+	@$(CXX) $(LDFLAGS) tools/build_applies.o -o tools/build_applies.autogen $(LIBS)
+
+tools/make_func.autogen: tools/make_func.autogen.o
+	@echo [Linking] $@
+	@$(CXX) $(LDFLAGS) tools/make_func.autogen.o -o tools/make_func.autogen $(LIBS)
+
+tools/make_func.autogen.cc: tools/make_func.y
+	@echo [Generating] $@
+	@$(BISON) -o tools/make_func.autogen.cc tools/make_func.y
+
+$(DRIVER_BIN): $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS) dtrace_compile
+	@-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
+	@echo [Linking $@]
+	@$(CXX) $(LDFLAGS) $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS) `./dtrace_compile` -o $(DRIVER_BIN) $(LIBS) \
+		@MYSQL_LDFLAGS@ @POSTGRESQL_LDFLAGS@ @SQLITE3_LDFLAGS@ \
+		@OPENSSL_LDFLAGS@ @OPENSSL_LIBS@ @PCRE_LIBS@ \
+		@LIBEVENT_LIBS@ @LIBEVENT_LDFLAGS@
 
 # Hack to work around brokeness in libtelnet.c
 thirdparty/libtelnet/libtelnet.o: thirdparty/libtelnet/libtelnet.c
-	$(CXX) -c $(CXXFLAGS) -DHAVE_ZLIB -iquote. -x c++ -o $@ $<
-
-# FIXME: simulate.c currently calls package_async, which depends on package/DB, this need to be fixed.
-simulate.$(O): simulate.cc
-	$(CXX) -c $(CXXFLAGS) -iquote. @MYSQL_CFLAGS@ @POSTGRESQL_CFLAGS@ @SQLITE3_CFLAGS@  -x c++ -o $@ $<
-
-lpc/compiler/grammar.tab.o: lpc/compiler/grammar.tab.cc opcodes.h
-
-lpc/compiler/grammar.tab.cc: lpc/compiler/grammar.y
-	-rm -f lpc/compiler/grammar.tab.*
-	$(YACC) -d lpc/compiler/grammar.y
-	mv y.tab.c lpc/compiler/grammar.tab.cc
-	mv y.tab.h lpc/compiler/grammar.tab.h
-
-$(DRIVER_BIN): $(OBJ) packages/*.$(O) dtrace_compile
-	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
-	$(CXX) $(LDFLAGS) $(OBJ) packages/*.$(O) `./dtrace_compile` -o $(DRIVER_BIN) $(LIBS) @MYSQL_LDFLAGS@ @POSTGRESQL_LDFLAGS@ @SQLITE3_LDFLAGS@ @OPENSSL_LDFLAGS@ @OPENSSL_LIBS@ @PCRE_LIBS@ @LIBEVENT_LIBS@ @LIBEVENT_LDFLAGS@
+	@echo [CC] $@
+	@$(CXX) -c $(CXXFLAGS) -DHAVE_ZLIB -x c++ -o $@ $<
 
 dtrace_compile: dtrace_compile.cc
+	@echo [Linking] $@
 	$(CXX) $(CXXFLAGS) -x c++ dtrace_compile.cc -o dtrace_compile
 
 portbind: portbind.o
-	$(CXX) $(LDFLAGS) portbind.o -o portbind $(LIBS)
-
-cc.h:
-	rm -f cc.h
-	echo "/* this file automatically generated by the Makefile */" > cc.h
-	echo '#define COMPILER "$(CXX)"' >> cc.h
-	echo '#define CXXFLAGS "$(CXXFLAGS)"' >> cc.h
-	echo '#define OPTIMIZE "$(OPTIMIZE)"' >> cc.h
-	echo '#define SOURCE_REVISION "@SOURCE_REVISION@"' >> cc.h
-
-# the touches here are necessary to fix the modification times; link(2) does
-# 'modify' a file
-files: edit_source options.h lpc/op.spec lpc/func.spec configure.h lpc/compiler/grammar.y.pre
-	./edit_source -options -build_func_spec '$(CXX) -E $(CXXFLAGS) -iquote. -x c++' \
-	              -process lpc/compiler/grammar.y.pre
-	./edit_source -build_efuns -build_applies
-	touch files
-
-make_func.tab.cc: make_func.y cc.h
-	-rm -f make_func.tab.*
-	$(YACC) -d make_func.y
-	mv y.tab.h make_func.tab.h
-	mv y.tab.c make_func.tab.cc
-
-edit_source: edit_source.o hash.o make_func.tab.o
-	$(CXX) $(CXXFLAGS) edit_source.o hash.o make_func.tab.o -o edit_source
-
-# don't optimize these two
-edit_source.o: edit_source.cc lpc/compiler/preprocess.cc cc.h
-	$(CXX) $(CXXFLAGS) -o $@ -c -x c++ $<
-
-make_func.tab.o: make_func.tab.cc
-	$(CXX) $(CXXFLAGS) -o $@ -c -x c++ $<
-
-install: all
-	-mkdir $(INSTALL_DIR)
-	$(INSTALL) $(DRIVER_BIN) $(INSTALL_DIR)
-	$(INSTALL) portbind $(INSTALL_DIR)
+	@echo [Linking] $@
+	@$(CXX) $(LDFLAGS) portbind.o -o portbind $(LIBS)
 
 # remove everything
 clean:
-	-$(MAKE) -C packages "A=$(A)" "O=$(O)" clean
-	-find . -name "*.$(O)" | xargs rm -rf
-	-find . -name "*.gcda" | xargs rm -rf
-	-find . -name "*.gcno" | xargs rm -rf
-	-find . -name "*.gcov" | xargs rm -rf
-	-rm -rf *.d *.tab.cc *.tab.h
-	-rm -f efun_defs.cc option_defs.cc
-	-rm -f opcodes.h efunctions.h opc.h efun_protos.h
-	-rm -f lpc/*.generated applies.h applies_table.cc files
-	-rm -f lpc/compiler/grammar.y lpc/compiler/grammar.tab.*
-	-rm -f comptest* a.out *.exe
-	-rm -f packages/packages
-	-rm -f Makefile.MudOS GNUmakefile.MudOS
-	-rm -f cc.h edit_source
-	-rm -f core y.output testsuite/core testsuite/tmp/*
-	-rm -f testsuite/OPCPROF.* testsuite/opc.*
-	-rm -rf testsuite/binaries testsuite/single/swapfile.*
-	-rm -f testsuite/OBJ_DUMP* testsuite/test_file testsuite/testfile
-	-rm -f testsuite/tmp_eval_file.c testsuite/sf.o testsuite/ed_test
-	-rm -f testsuite/log/log testsuite/log/debug.log testsuite/log/compile
-	-find . -name "*~" -print | xargs rm
-	-find . -name "*.orig" -print | xargs rm
-	-find . -name "*.rej" -print | xargs rm
-	-rm -f *.ln tags TAGS
-	-rm -f $(DRIVER_BIN) $(DRIVER_BIN).old portbind *.exe
-	-rm -f 1.out 2.out
-	-rm -f dtrace_compile
-	-rm -f testsuite/log/author_stats testsuite/log/domain_stats
-	-rm -f testsuite/tmp.o                                  
-
-reconfigure: clean
-	rm -f conf.h configure.h options_incl.h
+	@echo [Cleaning ...]
+	@-find . -name "*.o" | xargs rm -rf
+	@-find . -name "*.d" | xargs rm -rf
+	@-find . -name "*.gcda" | xargs rm -rf
+	@-find . -name "*.gcno" | xargs rm -rf
+	@-find . -name "*.gcov" | xargs rm -rf
+	@-find . -name "*.autogen*" | xargs rm -rf
+	@-rm -f tools/make_func.autogen tools/build_applies.autogen
+	@-rm -rf *.d *.tab.cc *.tab.h
+	@-rm -f efun_defs.cc option_defs.cc
+	@-rm -f opcodes.h efunctions.h opc.h efun_protos.h
+	@-rm -f lpc/*.generated applies.h applies_table.cc files
+	@-rm -f lpc/compiler/grammar.y lpc/compiler/grammar.tab.*
+	@-rm -f comptest* a.out *.exe
+	@-rm -f packages/packages
+	@-rm -f Makefile.MudOS GNUmakefile.MudOS
+	@-rm -f cc.h edit_source
+	@-rm -f core y.output testsuite/core testsuite/tmp/*
+	@-rm -f testsuite/OPCPROF.* testsuite/opc.*
+	@-rm -rf testsuite/binaries testsuite/single/swapfile.*
+	@-rm -f testsuite/OBJ_DUMP* testsuite/test_file testsuite/testfile
+	@-rm -f testsuite/tmp_eval_file.c testsuite/sf.o testsuite/ed_test
+	@-rm -f testsuite/log/log testsuite/log/debug.log testsuite/log/compile
+	@-find . -name "*~" -print | xargs rm
+	@-find . -name "*.orig" -print | xargs rm
+	@-find . -name "*.rej" -print | xargs rm
+	@-rm -f *.ln tags TAGS
+	@-rm -f $(DRIVER_BIN) $(DRIVER_BIN).old portbind *.exe
+	@-rm -f 1.out 2.out
+	@-rm -f dtrace_compile
+	@-rm -f testsuite/log/author_stats testsuite/log/domain_stats
+	@-rm -f testsuite/tmp.o
+	@echo [Done]
 
 test: all
 	cd testsuite && ../driver -d -ftest etc/config.test
@@ -215,18 +239,19 @@ help:
 	@echo
 	@echo "INSTALL: '$(INSTALL)'"
 	@echo "INSTALL DIR: '$(INSTALL_DIR)'"
-	@echo "BISON/YACC: '$(YACC)'"
-	@echo "PREPROCESSING: '$(CXX) -E $(CXXFLAGS)'"
-	@echo "COMPILE: '$(CXX) $(CFALGS) $(CXXFLAGS)'"
+	@echo "BISON: '$(BISON)'"
+	@echo "COMPILE: '$(CXX) $(CXXFLAGS)'"
 	@echo "LINK: '$(CXX) $(LDFLAGS)'"
 	@echo
 	@if [ -n "@LIBEVENT_LIBS@" ]; then echo "LIBEVENT: '@LIBEVENT_LIBS@', '@LIBEVENT_CPPFLAGS@', '@LIBEVENT_LDFLAGS@'"; fi
 	@if [ -n "@MYSQL_VERSION@" ]; then echo "MYSQL: '@MYSQL_VERSION@', '@MYSQL_CFLAGS@', '@MYSQL_LDFLAGS@'"; fi
-	@if [ -n "@POSTGRESQL_VERSION@" ];then echo "POSTGRESQL: '@POSTGRESQL_VERSION@', '@POSTGRESQL_CFLAGS@', '@POSTGRESQL_LDFLAGS@'"; fi
+	@if [ -n "@POSTGRESQL_VERSION@" ];then echo "POSTGRESQL: '@POSTGRESQL_VERSION@', '@POSTGRESQL_CPPFLAGS@', '@POSTGRESQL_LDFLAGS@'"; fi
 	@if [ -n "@SQLITE3_VERSION@" ]; then echo "SQLite3: '@SQLITE3_VERSION@', '@SQLITE3_CFLAGS@', '@SQLITE3_LDFLAGS@'"; fi
 	@if [ -n "@OPENSSL_LIBS@" ]; then echo "OPENSSL: '@OPENSSL_LIBS@', '@OPENSSL_INCLUDES@', '@OPENSSL_LDFLAGS@'"; fi
 	@if [ -n "@PCRE_LIBS@" ]; then echo "PCRE: '@PCRE_LIBS@', '@PCRE_CFLAGS@'"; fi
 	@echo
+	@echo "Make Version:"
+	-@$(MAKE) -v
 	@echo "Compiler Version:"
 	-@$(CXX) -v
 	@echo "Edit Makefile if this is not what you want"

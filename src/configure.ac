@@ -11,7 +11,10 @@ AC_LANG(C++)
 
 # Checks for programs.
 AC_PROG_CXX
-AC_PROG_YACC
+AC_CHECK_PROG(BISON, bison, bison, no)
+if test $BISON = no; then
+  AC_MSG_ERROR("bison is required")
+fi
 AC_PROG_INSTALL
 AC_PROG_MAKE_SET
 
@@ -22,10 +25,16 @@ F_SUPPORT_CXX11([], [AC_MSG_ERROR([
 
 AX_APPEND_COMPILE_FLAGS([-D_GNU_SOURCE])
 AX_APPEND_COMPILE_FLAGS([-fno-omit-frame-pointer])
+AX_APPEND_COMPILE_FLAGS([-iquote.])
 
-AX_APPEND_LINK_FLAGS([-flto])
 AX_CHECK_LINK_FLAG([-flto], [
   AX_APPEND_COMPILE_FLAGS([-flto])
+  AX_APPEND_LINK_FLAGS([-flto])
+])
+
+AX_CHECK_LINK_FLAG([-pie], [
+  AX_APPEND_COMPILE_FLAGS([-fPIE])
+  AX_APPEND_LINK_FLAGS([-pie])
 ])
 
 case $host_os in
@@ -88,7 +97,7 @@ AC_FUNC_MALLOC
 AC_FUNC_MMAP
 AC_FUNC_REALLOC
 AC_FUNC_STRTOD
-AC_CHECK_FUNCS([dup2 floor getcwd gethostname gettimeofday memchr memmove memset mkdir munmap pow putenv regcomp rmdir setlocale socket sqrt strcasecmp strchr strcspn strerror strncasecmp strpbrk strrchr strspn strstr strtol strtoul tzset])
+#AC_CHECK_FUNCS([dup2 floor getcwd gethostname gettimeofday memchr memmove memset mkdir munmap pow putenv regcomp rmdir setlocale socket sqrt strcasecmp strchr strcspn strerror strncasecmp strpbrk strrchr strspn strstr strtol strtoul tzset])
 
 # This check must before all F_HAVE_PREDEFINE checks.
 # Checks local_options exist, use a grauntee exist predefine.
@@ -99,29 +108,47 @@ AX_LIB_EVENT([2.0])
 F_HAVE_PREDEFINE([HAVE_LIBEVENT], [],
   [AC_MSG_ERROR([[Fail to find libevent (2.0+) header/library, install libevent-dev or change --with_libevent]])])
 
-# Checks for zlib.
-AX_CHECK_ZLIB()
+# Checks for zlib. 
+# NOTE: used a custom action for set HAVE_ZLIB instead.
+AX_CHECK_ZLIB([
+  CPPFLAGS="$CPPFLAGS -I${ZLIB_HOME}/include"
+  LDFLAGS="$LDFLAGS -L${ZLIB_HOME}/lib"
+  LIBS="-lz $LIBS"
+  AC_DEFINE([HAVE_ZLIB], [1],
+            [Define to 1 if you have 'z' library (-lz)])
+])
+
+# FluffOS uses posix timers
+AC_SEARCH_LIBS([timer_create], [rt])
 
 F_HAVE_PREDEFINE([PACKAGE_ASYNC], [AC_SEARCH_LIBS([pthread_create], [pthread])])
-F_HAVE_PREDEFINE([POSIX_TIMERS], [AC_SEARCH_LIBS([timer_create], [rt])])
 
 # iconv has redirect on CYGWIN.
 F_HAVE_PREDEFINE([USE_ICONV], [AC_SEARCH_LIBS([iconv_open], [iconv])])
 F_HAVE_PREDEFINE([USE_ICONV], [AC_SEARCH_LIBS([libiconv_open], [iconv])])
 
-F_HAVE_PREDEFINE([USE_MSQL], [AC_SEARCH_LIBS([msqlConnect], [msql])])
 
-F_HAVE_PREDEFINE([USE_MYSQL], [AX_LIB_MYSQL()])
-F_HAVE_PREDEFINE([USE_MYSQL], [F_HAVE_PREDEFINE([HAVE_MYSQL], [],
-  [AC_MSG_ERROR([[Fail to find MYSQL header/library, try changing --with_mysql flag]])])])
-
-F_HAVE_PREDEFINE([USE_POSTGRES], [AX_LIB_POSTGRESQL()])
-F_HAVE_PREDEFINE([USE_POSTGRES], [F_HAVE_PREDEFINE([HAVE_POSTGRESQL], [],
-  [AC_MSG_ERROR([[Fail to find POSTGRESQL header/library, try changing --with_postgresql flag.]])])])
-
-F_HAVE_PREDEFINE([USE_SQLITE3], [AX_LIB_SQLITE3()])
-F_HAVE_PREDEFINE([USE_SQLITE3], [F_HAVE_PREDEFINE([HAVE_SQLITE3], [],
-  [AC_MSG_ERROR([[Fail to find SQLITE3 header/library, try changing --with_sqlite3 flag.]])])])
+F_HAVE_PREDEFINE([PACKAGE_DB], [
+  F_HAVE_PREDEFINE([USE_MYSQL], [
+    AX_LIB_MYSQL()
+    F_HAVE_PREDEFINE([HAVE_MYSQL], [], [
+      AC_MSG_ERROR([[Fail to find MYSQL header/library, try changing --with_mysql flag]])
+    ])
+  ])
+  F_HAVE_PREDEFINE([USE_POSTGRES], [
+    AX_LIB_POSTGRESQL()
+    AC_SEARCH_LIBS([PQconnectdb], [pq])
+    F_HAVE_PREDEFINE([HAVE_POSTGRESQL], [], [
+      AC_MSG_ERROR([[Fail to find POSTGRESQL header/library, try changing --with_postgresql flag.]])
+    ])
+  ])
+  F_HAVE_PREDEFINE([USE_SQLITE3], [
+    AX_LIB_SQLITE3()
+    F_HAVE_PREDEFINE([HAVE_SQLITE3], [], [
+      AC_MSG_ERROR([[Fail to find SQLITE3 header/library, try changing --with_sqlite3 flag.]])
+    ])
+  ])
+])
 
 F_HAVE_PREDEFINE([PACKAGE_CRYPTO], [AX_CHECK_OPENSSL([],
   [AC_MSG_ERROR([[Fail to find OPENSSL header/library, try changing --with_openssl flag.]])])])
@@ -135,6 +162,6 @@ AC_SUBST([OPTIMIZE])
 AC_SUBST([SOURCE_REVISION])
 
 AC_CONFIG_HEADERS([configure.h])
-AC_CONFIG_FILES([Makefile packages/Makefile])
+AC_CONFIG_FILES([Makefile])
 
 AC_OUTPUT

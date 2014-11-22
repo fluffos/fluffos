@@ -1,5 +1,3 @@
-#include "options.h"
-
 #define DEBUGMALLOC
 #define DEBUGMALLOC_EXTENSIONS
 #define CHECK_MEMORY
@@ -10,11 +8,18 @@
 #undef NO_SNOOP
 #undef NO_ENVIRONMENT
 #undef NO_WIZARDS
-#define POSIX_TIMERS
 
 #define PACKAGE_CRYPTO
 #define PACKAGE_PCRE
 #define PACKAGE_PARSER
+
+#define PACKAGE_DB
+#ifdef PACKAGE_DB
+#define USE_POSTGRES 1
+#define USE_MYSQL 2
+#define USE_SQLITE3 3
+#endif
+
 
 #define REVERSE_DEFER
 

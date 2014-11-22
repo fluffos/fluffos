@@ -1,7 +1,12 @@
 /* portbind.c: Tim Hollebeek, Oct 28, 1996 */
+#include "base/std.h"
 
-#include "std.h"
-#include "network_incl.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
 
 #define HANDLE_ERROR(routine, call) \
   if ((call) == -1) {               \
@@ -10,7 +15,6 @@
   }
 
 int main(int argc, char **argv) {
-#ifndef WIN32
   int port = -1;
   char *ipaddress = 0;
   const char *driver_name = "./driver";
@@ -112,6 +116,5 @@ int main(int argc, char **argv) {
   argv[0] = (char *)driver_name;
   /* exec the driver */
   HANDLE_ERROR(execv, execv(driver_name, argv));
-#endif
   return 0;
 }

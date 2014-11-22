@@ -1,12 +1,37 @@
+#include "base/std.h"
+
 #include "net/telnet.h"
 
-#include "comm.h"
-#include "std.h"
-#include "lpc_incl.h"
-
-#include "event.h"  // user_event_data
-
+#include <arpa/telnet.h>  // for LM, MODE_EDIT, TRAPSIG etc
+#include <event2/buffer.h>
+#include <event2/bufferevent.h>
 #include <string>
+
+#include "comm.h"
+#include "packages/core/mssp.h"
+#include "packages/core/telnet_ext.h"
+#include "thirdparty/libtelnet/libtelnet.h"  // for telnet_t, telnet_event_t*
+#include "vm/vm.h"
+
+static const telnet_telopt_t my_telopts[] = {{TELNET_TELOPT_TM, TELNET_WILL, TELNET_DO},
+                                             {TELNET_TELOPT_SGA, TELNET_WILL, TELNET_DO},
+                                             {TELNET_TELOPT_NAWS, TELNET_WILL, TELNET_DO},
+                                             {TELNET_TELOPT_LINEMODE, TELNET_WONT, TELNET_DO},
+                                             {TELNET_TELOPT_ECHO, TELNET_WILL, TELNET_DO},
+                                             {TELNET_TELOPT_TTYPE, TELNET_WONT, TELNET_DO},
+                                             {TELNET_TELOPT_NEW_ENVIRON, TELNET_WONT, TELNET_DO},
+                                             {TELNET_TELOPT_COMPRESS2, TELNET_WILL, TELNET_DO},
+                                             {TELNET_TELOPT_ZMP, TELNET_WILL, TELNET_DO},
+                                             {TELNET_TELOPT_MSSP, TELNET_WILL, TELNET_DO},
+                                             {TELNET_TELOPT_GMCP, TELNET_WILL, TELNET_DO},
+                                             {-1, 0, 0}};
+
+// Telnet event handler
+static void telnet_event_handler(telnet_t *, telnet_event_t *, void *);
+
+struct telnet_t *net_telnet_init(interactive_t *user) {
+  return telnet_init(my_telopts, telnet_event_handler, 0, user);
+}
 
 // ANSI
 static const int ANSI_SUBSTITUTE = 0x20;
@@ -62,7 +87,8 @@ static inline void on_telnet_iac(unsigned char cmd, interactive_t *ip) {
     }
     case TELNET_AO: { /* abort output */
       flush_message(ip);
-      ip->out_of_band = MSG_OOB;
+      // Driver use to send response as OOB, but bufferevent doesn't support it.
+      // We just send it non-OOB-ly. It's not like it matters to anyone anymore anyway.
       telnet_iac(ip->telnet, TELNET_DM);
       break;
     }
@@ -94,9 +120,9 @@ static inline void on_telnet_will(unsigned char cmd, interactive_t *ip) {
       break;
     }
     case TELNET_TELOPT_MXP:
+      ip->iflags |= USING_MXP;
       /* Mxp is enabled, tell the mudlib about it. */
       safe_apply(APPLY_MXP_ENABLE, ip->ob, 0, ORIGIN_DRIVER);
-      ip->iflags |= USING_MXP;
       break;
     default:
       debug(telnet, "on_telnet_will: unimplemented command %d.\n", cmd);
@@ -107,7 +133,10 @@ static inline void on_telnet_will(unsigned char cmd, interactive_t *ip) {
 
 static inline void on_telnet_wont(unsigned char cmd, interactive_t *ip) {
   switch (cmd) {
-    case TELOPT_LINEMODE:
+    case TELNET_TELOPT_ECHO:
+      // do nothing.
+      break;
+    case TELNET_TELOPT_LINEMODE:
       /* If we're in single char mode, we just requested for
        * linemode to be disabled, so don't remove our flag.
        */
@@ -124,13 +153,14 @@ static inline void on_telnet_wont(unsigned char cmd, interactive_t *ip) {
 static inline void on_telnet_do(unsigned char cmd, interactive_t *ip) {
   switch (cmd) {
     case TELNET_TELOPT_TM:
-      // no need to do anything, already answered.
+      telnet_negotiate(ip->telnet, TELNET_TELOPT_TM, TELNET_WILL);
       break;
-    case TELOPT_ECHO:
+    case TELNET_TELOPT_ECHO:
       /* do nothing, but don't send a wont response */
       break;
     case TELNET_TELOPT_SGA:
-      /* do nothing, we don't send GA anyway. */
+      ip->iflags |= SUPPRESS_GA;
+      telnet_negotiate(ip->telnet, TELNET_TELOPT_SGA, TELNET_WILL);
       break;
     case TELNET_TELOPT_GMCP:
       on_telnet_do_gmcp(ip);
@@ -139,21 +169,27 @@ static inline void on_telnet_do(unsigned char cmd, interactive_t *ip) {
       on_telnet_do_mssp(ip);
       break;
     case TELNET_TELOPT_ZMP:
-      // on_telnet_do_zmp(ip);
+      ip->iflags |= USING_ZMP;
+      // real event is triggered in on_telnet_event;
       break;
     default:
       debug(telnet, "on_telnet_do: unimplemented code: %d.\n", cmd);
+      telnet_negotiate(ip->telnet, cmd, TELNET_WONT);
       break;
   }
+  flush_message(ip);
 }
 
 static inline void on_telnet_dont(unsigned char cmd, interactive_t *ip) {
   switch (cmd) {
-    case TELOPT_ECHO:
+    case TELNET_TELOPT_ECHO:
       /* do nothing */
       break;
-    case TELOPT_SGA:
-      /* Client don't want to suppress GA, we just ignore them. */
+    case TELNET_TELOPT_SGA:
+      if (ip->iflags & USING_LINEMODE) {
+        ip->iflags &= ~SUPPRESS_GA;
+        telnet_negotiate(ip->telnet, TELNET_TELOPT_SGA, TELNET_WONT);
+      }
       break;
     default:
       debug(telnet, "on_telnet_dont: unimplemented code: %d.\n", cmd);
@@ -195,13 +231,13 @@ static inline void on_telnet_subnegotiation(unsigned char cmd, const char *buf, 
           break;
         }
         /* refuse FORWARDMASK */
-        case DO: {
+        case TELNET_DO: {
           const unsigned char sb_wont[] = {WONT, (unsigned char)buf[1]};
           telnet_subnegotiation(ip->telnet, TELNET_TELOPT_LINEMODE, (const char *)sb_wont,
                                 sizeof(sb_wont));
           break;
         }
-        case WILL: {
+        case TELNET_WILL: {
           const unsigned char sb_dont[] = {DONT, (unsigned char)buf[1]};
           telnet_subnegotiation(ip->telnet, TELNET_TELOPT_LINEMODE, (const char *)sb_dont,
                                 sizeof(sb_dont));
@@ -242,6 +278,7 @@ static inline void on_telnet_subnegotiation(unsigned char cmd, const char *buf, 
       break;
     }
   }
+  flush_message(ip);
 }
 
 static inline void on_telnet_environ(const struct telnet_environ_t *values, unsigned long size,
@@ -350,9 +387,9 @@ void telnet_event_handler(telnet_t *telnet, telnet_event_t *ev, void *user_data)
 //
 // NOTE: Some options need to be sent DO first, and some
 // needs WILL, don't change or you will risk breaking clients.
-void send_initial_telent_negotiantions(interactive_t *user) {
+void send_initial_telent_negotiantions(struct interactive_t *user) {
   // Default request linemode, save bytes/cpu.
-  set_linemode(user);
+  set_linemode(user, false);
 
   // Get rid of GA, save some byte
   telnet_negotiate(user->telnet, TELNET_DO, TELNET_TELOPT_SGA);
@@ -383,27 +420,44 @@ void send_initial_telent_negotiantions(interactive_t *user) {
 
   // gmcp *yawn*
   telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_GMCP);
-
-  flush_message(user);
 }
 
-void set_linemode(interactive_t *ip) {
+void set_linemode(interactive_t *ip, bool flush) {
   telnet_negotiate(ip->telnet, TELNET_DO, TELNET_TELOPT_LINEMODE);
 
   const unsigned char sb_mode[] = {LM_MODE, MODE_EDIT | MODE_TRAPSIG};
   telnet_subnegotiation(ip->telnet, TELNET_TELOPT_LINEMODE, (const char *)sb_mode, sizeof(sb_mode));
 
-  flush_message(ip);
+  if (flush) {
+    flush_message(ip);
+  }
 }
 
-void set_charmode(interactive_t *ip) {
+void set_charmode(interactive_t *ip, bool flush) {
   if (ip->iflags & USING_LINEMODE) {
     telnet_negotiate(ip->telnet, TELNET_DONT, TELNET_TELOPT_LINEMODE);
   }
-  flush_message(ip);
+  if (flush) {
+    flush_message(ip);
+  }
 }
 
-void set_echo(interactive_t *ip, bool enable) {
-  telnet_negotiate(ip->telnet, enable ? TELNET_WILL : TELNET_WONT, TELNET_TELOPT_ECHO);
-  flush_message(ip);
+void set_localecho(interactive_t *ip, bool enable, bool flush) {
+  telnet_negotiate(ip->telnet, enable ? TELNET_WONT : TELNET_WILL, TELNET_TELOPT_ECHO);
+  if (flush) {
+    flush_message(ip);
+  }
 }
+
+void telnet_do_naws(struct telnet_t *telnet) {
+  telnet_negotiate(telnet, TELNET_DO, TELNET_TELOPT_NAWS);
+}
+
+void telnet_dont_naws(struct telnet_t *telnet) {
+  telnet_negotiate(telnet, TELNET_DONT, TELNET_TELOPT_NAWS);
+}
+void telnet_start_request_ttype(struct telnet_t *telnet) {
+  telnet_negotiate(telnet, TELNET_DO, TELNET_TELOPT_TTYPE);
+}
+void telnet_request_ttype(struct telnet_t *telnet) { telnet_begin_sb(telnet, TELNET_TTYPE_SEND); }
+void telnet_request_term_size(struct telnet_t *) {}

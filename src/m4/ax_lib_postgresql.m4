@@ -27,7 +27,7 @@
 #
 #   This macro calls:
 #
-#     AC_SUBST(POSTGRESQL_CFLAGS)
+#     AC_SUBST(POSTGRESQL_CPPFLAGS)
 #     AC_SUBST(POSTGRESQL_LDFLAGS)
 #     AC_SUBST(POSTGRESQL_VERSION)
 #
@@ -38,13 +38,14 @@
 # LICENSE
 #
 #   Copyright (c) 2008 Mateusz Loskot <mateusz@loskot.net>
+#   Copyright (c) 2014 Sree Harsha Totakura <sreeharsha@totakura.in>
 #
 #   Copying and distribution of this file, with or without modification, are
 #   permitted in any medium without royalty provided the copyright notice
 #   and this notice are preserved. This file is offered as-is, without any
 #   warranty.
 
-#serial 9
+#serial 10
 
 AC_DEFUN([AX_LIB_POSTGRESQL],
 [
@@ -65,7 +66,7 @@ AC_DEFUN([AX_LIB_POSTGRESQL],
         [want_postgresql="yes"]
     )
 
-    POSTGRESQL_CFLAGS=""
+    POSTGRESQL_CPPFLAGS=""
     POSTGRESQL_LDFLAGS=""
     POSTGRESQL_VERSION=""
 
@@ -88,8 +89,8 @@ AC_DEFUN([AX_LIB_POSTGRESQL],
         if test "$PG_CONFIG" != "no"; then
             AC_MSG_CHECKING([for PostgreSQL libraries])
 
-            POSTGRESQL_CFLAGS="-I`$PG_CONFIG --includedir`"
-            POSTGRESQL_LDFLAGS="-L`$PG_CONFIG --libdir` -lpq"
+            POSTGRESQL_CPPFLAGS="-I`$PG_CONFIG --includedir`"
+            POSTGRESQL_LDFLAGS="-L`$PG_CONFIG --libdir`"
 
             POSTGRESQL_VERSION=`$PG_CONFIG --version | sed -e 's#PostgreSQL ##'`
 
@@ -150,6 +151,6 @@ AC_DEFUN([AX_LIB_POSTGRESQL],
     fi
 
     AC_SUBST([POSTGRESQL_VERSION])
-    AC_SUBST([POSTGRESQL_CFLAGS])
+    AC_SUBST([POSTGRESQL_CPPFLAGS])
     AC_SUBST([POSTGRESQL_LDFLAGS])
 ])

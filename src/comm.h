@@ -6,16 +6,7 @@
 #ifndef COMM_H
 #define COMM_H
 
-#include "lpc_incl.h"
-#include "network_incl.h"
-
-#include "fliconv.h"
-#include "thirdparty/libtelnet/libtelnet.h"
-#include <event2/event.h>
-#include <event2/bufferevent.h>
-#include <vector>
-
-#define MESSAGE_BUF_SIZE MESSAGE_BUFFER_SIZE /* from options.h */
+#include <sys/socket.h>  // for sockaddr, socklen_t
 
 /*
  * This macro is for testing whether ip is still valid, since many
@@ -65,61 +56,37 @@ extern int inet_socket_out_volume;
 #endif
 extern int add_message_calls;
 
-#ifdef HAS_CONSOLE
-extern int has_console;
-extern void restore_sigttin(void);
-#endif
-
-void CDECL add_vmessage(object_t *, const char *, ...);
-void add_message(object_t *, const char *, int);
-void add_binary_message_noflush(object_t *, const unsigned char *, int);
-void add_binary_message(object_t *, const unsigned char *, int);
+void add_vmessage(struct object_t *, const char *, ...);
+void add_message(struct object_t *, const char *, int);
+void add_binary_message_noflush(struct object_t *, const unsigned char *, int);
+void add_binary_message(struct object_t *, const unsigned char *, int);
 
 void update_ref_counts_for_users(void);
 void make_selectmasks(void);
-void init_user_conn(void);
+bool init_user_conn(void);
 void shutdown_external_ports(void);
 void set_prompt(const char *);
 void process_io(void);
-void get_user_data(interactive_t *);
-int process_user_command(interactive_t *);
-int replace_interactive(object_t *, object_t *);
-int set_call(object_t *, sentence_t *, int);
-void remove_interactive(object_t *, int);
+void get_user_data(struct interactive_t *);
+int process_user_command(struct interactive_t *);
+int replace_interactive(struct object_t *, struct object_t *);
+int set_call(struct object_t *, struct sentence_t *, int);
+void remove_interactive(struct object_t *, int);
 
-int flush_message(interactive_t *);
+int flush_message(struct interactive_t *);
 void flush_message_all();
 
-int query_idle(object_t *);
+int query_idle(struct object_t *);
 #ifndef NO_SNOOP
-int new_set_snoop(object_t *, object_t *);
-object_t *query_snoop(object_t *);
-object_t *query_snooping(object_t *);
+int new_set_snoop(struct object_t *, struct object_t *);
+struct object_t *query_snoop(struct object_t *);
+struct object_t *query_snooping(struct object_t *);
 #endif
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_iptable(void);
 #endif
 
-// New user API handler.
-void new_user_handler(int, struct sockaddr *, size_t, port_def_t *);
-
-inline const char *sockaddr_to_string(const sockaddr *addr, socklen_t len) {
-  static char result[NI_MAXHOST + NI_MAXSERV];
-
-  char host[NI_MAXHOST], service[NI_MAXSERV];
-  int ret = getnameinfo(addr, len, host, sizeof(host), service, sizeof(service),
-                        NI_NUMERICHOST | NI_NUMERICSERV);
-
-  if (ret) {
-    debug(sockets, "sockaddr_to_string fail: %s.\n", evutil_gai_strerror(ret));
-    strcpy(result, "<invalid address>");
-    return result;
-  }
-
-  snprintf(result, sizeof(result), strchr(host, ':') != NULL ? "[%s]:%s" : "%s:%s", host, service);
-
-  return result;
-}
+const char *sockaddr_to_string(const sockaddr *addr, socklen_t len);
 
 #endif /* COMM_H */

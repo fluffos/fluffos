@@ -6,11 +6,10 @@
 #ifndef CONSOLE_H
 #define CONSOLE_H
 
-#include "options_incl.h"
+extern int has_console;
+extern void restore_sigttin(void);
 
-#ifdef HAS_CONSOLE
+void console_init(struct event_base *);
 void on_console_input();
-void console_command(char *);
-#endif
 
 #endif

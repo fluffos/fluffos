@@ -29,9 +29,6 @@ void add_realtime_event(realtime_event::callback_type);
 
 int run_event_loop(struct event_base *);
 
-// Listening socket event
-void new_external_port_event_listener(struct port_def_t *, sockaddr *, socklen_t);
-
 // User socket event
 struct user_event_data {
   int idx;
@@ -42,12 +39,7 @@ void new_user_event_listener(struct interactive_t *);
 struct lpc_socket_event_data {
   int idx;
 };
-void new_lpc_socket_event_listener(int, evutil_socket_t);
-#endif
-
-// Console STDIN socket event
-#ifdef HAS_CONSOLE
-void init_console(struct event_base *);
+void new_lpc_socket_event_listener(int, struct lpc_socket_t *sock, evutil_socket_t);
 #endif
 
 #endif /* EVENT_H_ */
