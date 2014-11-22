@@ -344,13 +344,13 @@ void add_message(object_t *who, const char *data, int len) {
   auto ip = who->interactive;
   int translen;
   char *trans = translate(ip->trans->outgoing, data, len, &translen);
-#ifdef SHADOW_CATCH_MESSAGE
   if (ip->connection_type == PORT_TELNET) {
     telnet_send(ip->telnet, trans, translen);
   } else {
     bufferevent_write(ip->ev_buffer, trans, translen);
   }
 
+#ifdef SHADOW_CATCH_MESSAGE
   /*
    * shadow handling.
    */

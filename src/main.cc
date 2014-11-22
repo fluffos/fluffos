@@ -31,6 +31,7 @@ static void setup_signal_handlers();
 int main(int argc, char **argv) {
   setlocale(LC_ALL, "C");
   tzset();
+  boot_time = get_current_time();
 
   /* Warn on core dump limit. */
   {

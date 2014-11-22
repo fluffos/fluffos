@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # This python program accept a list of "#define key value"
 # and output a c++ header file
