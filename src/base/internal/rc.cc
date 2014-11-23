@@ -120,6 +120,9 @@ void read_config(char *filename) {
     if (strlen(tmp) == kMaxConfigLineLength - 1) {
       fprintf(stderr, "*Warning: possible truncated config line: %s", tmp);
     }
+    if (strlen(tmp) == 0 || strcmp(tmp, "") == 0) {
+      continue;
+    }
     // Deal with possible CRLF
     if (strlen(tmp) > 2 && tmp[strlen(tmp) - 2] == '\r') {
       tmp[strlen(tmp) - 2] = '\0';
