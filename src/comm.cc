@@ -889,6 +889,23 @@ static char *get_user_command(interactive_t *ip) {
   return user_command;
 } /* get_user_command() */
 
+static int escape_command(interactive_t *ip, char *user_command) {
+  if (user_command[0] != '!') {
+    return 0;
+  }
+#ifdef OLD_ED
+  if (ip->ed_buffer) {
+    return 1;
+  }
+#endif
+#if defined(F_INPUT_TO) || defined(F_GET_CHAR)
+  if (ip->input_to && (!(ip->iflags & NOESC) && !(ip->iflags & I_SINGLE_CHAR))) {
+    return 1;
+  }
+#endif
+  return 0;
+}
+
 static void process_input(interactive_t *ip, char *user_command) {
   svalue_t *ret;
 
@@ -973,6 +990,30 @@ int process_user_command(interactive_t *ip) {
     if (ret && ret->type == T_NUMBER && ret->u.number) {
       goto exit;
     }
+  }
+
+  if (escape_command(ip, user_command)) {
+    if (ip->iflags & SINGLE_CHAR) {
+      /* only 1 char ... switch to line buffer mode */
+      ip->iflags |= WAS_SINGLE_CHAR;
+      ip->iflags &= ~SINGLE_CHAR;
+      ip->text_start = ip->text_end = *ip->text = 0;
+      set_linemode(ip, true);
+    } else {
+      if (ip->iflags & WAS_SINGLE_CHAR) {
+        /* we now have a string ... switch back to char mode */
+        ip->iflags &= ~WAS_SINGLE_CHAR;
+        ip->iflags |= SINGLE_CHAR;
+        set_charmode(ip, true);
+        if (!IP_VALID(ip, command_giver)) {
+          goto exit;
+        }
+      }
+
+      process_input(ip, user_command + 1);
+    }
+
+    goto exit;
   }
 
 #ifdef OLD_ED
