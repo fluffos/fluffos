@@ -85,41 +85,6 @@ bool init_user_conn() {
     external_port[i].out_volume = 0;
 #endif
     if (!external_port[i].port) continue;
-    /*
-     * fill in socket address information.
-     */
-    struct addrinfo *res;
-
-    char service[NI_MAXSERV];
-    snprintf(service, sizeof(service), "%u", external_port[i].port);
-
-    struct addrinfo hints;
-    memset(&hints, 0, sizeof(struct addrinfo));
-#ifdef IPV6
-    hints.ai_family = AF_INET6;
-#else
-    hints.ai_family = AF_INET;
-#endif
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE | AI_NUMERICSERV;
-#ifdef IPV6
-    hints.ai_flags |= AI_V4MAPPED;
-#endif
-
-    int ret;
-
-    auto mudip = CONFIG_STR(__MUD_IP__);
-    if (mudip != nullptr && strlen(mudip) > 0) {
-      ret = getaddrinfo(mudip, service, &hints, &res);
-    } else {
-      ret = getaddrinfo(NULL, service, &hints, &res);
-    }
-
-    if (ret) {
-      debug_message("init_user_conn: getaddrinfo error: %s \n", gai_strerror(ret));
-      return false;
-    }
-
 #ifdef IPV6
     auto fd = socket(AF_INET6, SOCK_STREAM, 0);
 #else
@@ -144,7 +109,7 @@ bool init_user_conn() {
     }
     {
       int one = 1;
-      if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (void*)&one, sizeof(one))<0) {
+      if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (void *)&one, sizeof(one)) < 0) {
         evutil_closesocket(fd);
         return false;
       }
@@ -167,13 +132,51 @@ bool init_user_conn() {
     }
 #endif
 #endif
-    if (bind(fd, res->ai_addr, res->ai_addrlen) == -1) {
-      debug_message("socket_create: bind error: %s.\n",
-                    evutil_socket_error_to_string(evutil_socket_geterror(fd)));
-      evutil_closesocket(fd);
-      return false;
-    }
+    {
+      /*
+       * fill in socket address information.
+       */
+      struct addrinfo *res;
 
+      char service[NI_MAXSERV];
+      snprintf(service, sizeof(service), "%u", external_port[i].port);
+
+      struct addrinfo hints;
+      memset(&hints, 0, sizeof(struct addrinfo));
+#ifdef IPV6
+      hints.ai_family = AF_INET6;
+#else
+      hints.ai_family = AF_INET;
+#endif
+      hints.ai_socktype = SOCK_STREAM;
+      hints.ai_flags = AI_PASSIVE | AI_NUMERICSERV;
+#ifdef IPV6
+      hints.ai_flags |= AI_V4MAPPED;
+#endif
+      int ret;
+
+      auto mudip = CONFIG_STR(__MUD_IP__);
+      if (mudip != nullptr && strlen(mudip) > 0) {
+        ret = getaddrinfo(mudip, service, &hints, &res);
+      } else {
+        ret = getaddrinfo(NULL, service, &hints, &res);
+      }
+      if (ret) {
+        debug_message("init_user_conn: getaddrinfo error: %s \n", gai_strerror(ret));
+        return false;
+      }
+
+      if (bind(fd, res->ai_addr, res->ai_addrlen) == -1) {
+        debug_message("socket_create: bind error: %s.\n",
+                      evutil_socket_error_to_string(evutil_socket_geterror(fd)));
+        evutil_closesocket(fd);
+        freeaddrinfo(res);
+        return false;
+      }
+      debug_message("Accepting connections on %s.\n",
+                    sockaddr_to_string((sockaddr *)res->ai_addr, res->ai_addrlen));
+      freeaddrinfo(res);
+    }
     // Listen on connection event
     auto conn = evconnlistener_new(
         g_event_base, new_user_handler, &external_port[i],
@@ -183,10 +186,6 @@ bool init_user_conn() {
       return false;
     }
     external_port[i].ev_conn = conn;
-    debug_message("Accepting connections on %s.\n",
-                  sockaddr_to_string((sockaddr *)res->ai_addr, res->ai_addrlen));
-
-    freeaddrinfo(res);
   }
   return true;
 }
@@ -444,8 +443,8 @@ void add_vmessage(object_t *who, const char *format, ...) {
   do {
     int result = vsnprintf(nullptr, 0, format, args);
     if (result < 0) break;
-    std::unique_ptr<char[]> msg(new char[result+1]);
-    result = vsnprintf(msg.get(), result+1, format, args2);
+    std::unique_ptr<char[]> msg(new char[result + 1]);
+    result = vsnprintf(msg.get(), result + 1, format, args2);
     if (result < 0) break;
     add_message(who, msg.get(), strlen(msg.get()));
   } while (0);
@@ -890,6 +889,23 @@ static char *get_user_command(interactive_t *ip) {
   return user_command;
 } /* get_user_command() */
 
+static int escape_command(interactive_t *ip, char *user_command) {
+  if (user_command[0] != '!') {
+    return 0;
+  }
+#ifdef OLD_ED
+  if (ip->ed_buffer) {
+    return 1;
+  }
+#endif
+#if defined(F_INPUT_TO) || defined(F_GET_CHAR)
+  if (ip->input_to && (!(ip->iflags & NOESC) && !(ip->iflags & I_SINGLE_CHAR))) {
+    return 1;
+  }
+#endif
+  return 0;
+}
+
 static void process_input(interactive_t *ip, char *user_command) {
   svalue_t *ret;
 
@@ -974,6 +990,30 @@ int process_user_command(interactive_t *ip) {
     if (ret && ret->type == T_NUMBER && ret->u.number) {
       goto exit;
     }
+  }
+
+  if (escape_command(ip, user_command)) {
+    if (ip->iflags & SINGLE_CHAR) {
+      /* only 1 char ... switch to line buffer mode */
+      ip->iflags |= WAS_SINGLE_CHAR;
+      ip->iflags &= ~SINGLE_CHAR;
+      ip->text_start = ip->text_end = *ip->text = 0;
+      set_linemode(ip, true);
+    } else {
+      if (ip->iflags & WAS_SINGLE_CHAR) {
+        /* we now have a string ... switch back to char mode */
+        ip->iflags &= ~WAS_SINGLE_CHAR;
+        ip->iflags |= SINGLE_CHAR;
+        set_charmode(ip, true);
+        if (!IP_VALID(ip, command_giver)) {
+          goto exit;
+        }
+      }
+
+      process_input(ip, user_command + 1);
+    }
+
+    goto exit;
   }
 
 #ifdef OLD_ED
