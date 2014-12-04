@@ -5,20 +5,22 @@
 #ifdef HAVE_EXECINFO_H
 #include <execinfo.h>
 #endif
-#include <locale>
-#include <signal.h>
+#include <locale.h>  // for setlocale, LC_ALL
+#include <signal.h>  // for signal, SIG_DFL, SIGABRT, etc
+#include <stddef.h>  // for size_t
+#include <stdio.h>   // for fprintf, stderr, printf, etc
+#include <stdlib.h>  // for exit
 #ifdef HAVE_SYS_RESOURCE_H
 #include <sys/resource.h>  // for getrlimit
 #endif
 #include <time.h>
 #include <unistd.h>
 
-#include "cc.h"       // source revision
-#include "backend.h"  // for preload_objects
+#include "backend.h"  // for backend, init_backend
+#include "cc.h"       // for SOURCE_REVISION
 #include "comm.h"     // for init_user_conn
-#include "console.h"  // for has_console
-#include "event.h"    // for init_event_base, init_dns_event_base.
-#include "vm/vm.h"    // to interact with VM layer.
+#include "console.h"  // for console_init, has_console
+#include "vm/vm.h"    // for push_constant_string, etc
 
 #include "packages/core/dns.h"  // for init_dns_event_base.
 
@@ -102,7 +104,7 @@ int main(int argc, char **argv) {
   }
 
   // Initialize libevent, This should be done before executing LPC.
-  auto base = init_event_base();
+  auto base = init_backend();
   init_dns_event_base(base);
 
   // Initiliaze VM layer

@@ -3,22 +3,29 @@
 
 #include "backend.h"
 
-#include <deque>
-#include <event2/event.h>
-#include <functional>
-#include <map>
-#include <mutex>
-#include <math.h>
+#include <event2/dns.h>    // for evdns_set_log_fn
+#include <event2/event.h>  // for event_add, etc
+#include <math.h>          // for exp
+#include <stdio.h>         // for NULL, sprintf
+#include <sys/time.h>      // for timeval
+#include <sys/types.h>     // for int64_t
+#include <deque>           // for deque
+#include <functional>      // for _Bind, less, bind, function
+#include <map>             // for multimap, _Rb_tree_iterator
+#include <utility>         // for pair, make_pair
 
 #include "vm/vm.h"
 
 #ifdef PACKAGE_ASYNC
 #include "packages/async/async.h"
 #endif
-#include "packages/core/replace_program.h"
+#include "packages/core/heartbeat.h"
 #include "packages/core/reclaim.h"
 #ifdef PACKAGE_MUDLIB_STATS
 #include "packages/mudlib_stats/mudlib_stats.h"
+#endif
+#ifdef PACKAGE_SOCKETS
+#include "packages/sockets/socket_efuns.h"
 #endif
 
 // TODO: remove the need for this
@@ -118,58 +125,46 @@ void virtual_time_tick() {
 #endif
 }
 
-static void look_for_objects_to_swap(void);
+static void libevent_log(int severity, const char *msg) { debug(event, "%d:%s\n", severity, msg); }
 
-/*
- * There are global variables that must be zeroed before any execution.
- * In case of errors, there will be a LONGJMP(), and the variables will
- * have to be cleared explicitly. They are normally maintained by the
- * code that use them.
- *
- * This routine must only be called from top level, not from inside
- * stack machine execution (as stack will be cleared).
- */
-void clear_state() {
-  current_object = 0;
-  set_command_giver(0);
-  current_interactive = 0;
-  previous_ob = 0;
-  current_prog = 0;
-  caller_type = 0;
-  reset_machine(0); /* Pop down the stack. */
-} /* clear_state() */
-
-#if 0
-static void report_holes()
-{
-  if (current_object && current_object->name) {
-    debug_message("current_object is /%s\n", current_object->name);
-  }
-  if (command_giver && command_giver->name) {
-    debug_message("command_giver is /%s\n", command_giver->name);
-  }
-  if (current_interactive && current_interactive->name) {
-    debug_message("current_interactive is /%s\n", current_interactive->name);
-  }
-  if (previous_ob && previous_ob->name) {
-    debug_message("previous_ob is /%s\n", previous_ob->name);
-  }
-  if (current_prog && current_prog->name) {
-    debug_message("current_prog is /%s\n", current_prog->name);
-  }
-  if (caller_type) {
-    debug_message("caller_type is %s\n", caller_type);
-  }
+static void libevent_dns_log(int severity, const char *msg) {
+  debug(dns, "%d:%s\n", severity, msg);
 }
+
+// FIXME: rewrite other part so this could become static.
+struct event_base *g_event_base = NULL;
+
+// Init a new event loop.
+event_base *init_backend() {
+  event_set_log_callback(libevent_log);
+  evdns_set_log_fn(libevent_dns_log);
+#ifdef DEBUG
+  event_enable_debug_mode();
 #endif
 
+  g_event_base = event_base_new();
+  debug_message("Event backend in use: %s\n", event_base_get_method(g_event_base));
+  return g_event_base;
+}
+
+static void on_main_loop_event(int fd, short what, void *arg) {
+  auto event = (realtime_event *)arg;
+  event->callback();
+  delete event;
+}
+
+// Schedule a immediate event on main loop.
+void add_realtime_event(realtime_event::callback_type callback) {
+  auto event = new realtime_event(callback);
+  event_base_once(g_event_base, -1, EV_TIMEOUT, on_main_loop_event, event, NULL);
+}
+
+static void look_for_objects_to_swap(void);
+
 // FIXME:
-extern struct object_t *obj_list_destruct;
 void call_remove_destructed_objects() {
   add_tick_event(5 * 60, tick_event::callback_type(call_remove_destructed_objects));
-  if (obj_list_replace || obj_list_destruct) {
-    remove_destructed_objects();
-  }
+  remove_destructed_objects();
 }
 /*
  * This is the backend. We will stay here for ever (almost).
@@ -179,6 +174,9 @@ void backend(struct event_base *base) {
   g_current_virtual_time = get_current_time();
 
   // Register various tick events
+
+  // TODO: Have package_core register it instead.
+  void call_heart_beat(void);
   add_tick_event(0, tick_event::callback_type(call_heart_beat));
   add_tick_event(5 * 60, tick_event::callback_type(look_for_objects_to_swap));
   add_tick_event(30 * 60, tick_event::callback_type(std::bind(reclaim_objects, true)));
@@ -335,22 +333,6 @@ static void look_for_objects_to_swap() {
     }
   pop_context(&econ);
 } /* look_for_objects_to_swap() */
-
-/* All destructed objects are moved into a sperate linked list,
- * and deallocated after program execution.  */
-
-void remove_destructed_objects() {
-  object_t *ob, *next;
-
-  if (obj_list_replace) {
-    replace_programs();
-  }
-  for (ob = obj_list_destruct; ob; ob = next) {
-    next = ob->next_all;
-    destruct2(ob);
-  }
-  obj_list_destruct = 0;
-} /* remove_destructed_objects() */
 
 static double load_av = 0.0;
 

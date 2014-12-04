@@ -2,14 +2,14 @@
 
 #include "fliconv.h"
 
-#include <errno.h>
+#include <errno.h>        // for errno, E2BIG
+#include <iconv.h>        // for iconv_open, iconv_t, iconv
+#include <stddef.h>       // for size_t
+#include <string.h>       // for strlen, strcat, strcmp, etc
+#include "interactive.h"  // for interactive_t
+#include "vm/vm.h"        // for sp, pop_stack, svalue_t, u, etc
 
-#include "comm.h"
-#include "vm/vm.h"
-
-#ifdef USE_ICONV
-#include <iconv.h>
-#else
+#ifndef USE_ICONV
 typedef void *iconv_t;
 #endif
 

@@ -7,16 +7,22 @@
 
 #include "comm.h"
 
-#include <algorithm>
-#include <event2/buffer.h>
-#include <event2/bufferevent.h>
-#include <event2/event.h>
-#include <event2/listener.h>
-#include <memory>
-#include <netinet/tcp.h>  // for TCP_NODELAY
-#include <unistd.h>       // for gethostname
+#include <event2/buffer.h>       // for evbuffer_freeze, etc
+#include <event2/bufferevent.h>  // for bufferevent_enable, etc
+#include <event2/event.h>        // for event_active, EV_TIMEOUT, etc
+#include <event2/listener.h>     // for evconnlistener_free, etc
+#include <event2/util.h>         // for evutil_closesocket, etc
+#include <netdb.h>               // for addrinfo, freeaddrinfo, etc
+#include <netinet/in.h>          // for ntohl, IPPROTO_TCP
+#include <netinet/tcp.h>         // for TCP_NODELAY
+#include <sys/socket.h>          // for SOCK_STREAM
+#include <stdarg.h>              // for va_end, va_list, va_copy, etc
+#include <stdio.h>               // for snprintf, vsnprintf, fwrite, etc
+#include <string.h>              // for NULL, memcpy, strlen, etc
+#include <unistd.h>              // for gethostname
+#include <memory>                // for unique_ptr
 
-#include "event.h"
+#include "backend.h"
 #include "fliconv.h"
 #include "interactive.h"
 #include "thirdparty/libtelnet/libtelnet.h"
@@ -24,13 +30,12 @@
 #include "user.h"
 #include "vm/vm.h"
 
+#include "packages/core/add_action.h"  // FIXME?
 #include "packages/core/dns.h"         // FIXME?
 #include "packages/core/ed.h"          // FIXME?
-#include "packages/core/add_action.h"  // FIXME?
 
 // in backend.cc
 extern void update_load_av();
-
 /*
  * local function prototypes.
  */
@@ -69,9 +74,239 @@ int inet_socket_out_volume = 0;
 int inet_packets = 0;
 int inet_volume = 0;
 
-// Handler for new user connections.
-static void new_user_handler(struct evconnlistener *, evutil_socket_t, struct sockaddr *, int,
-                             void *arg);
+namespace {
+// User socket event
+struct user_event_data {
+  int idx;
+};
+
+void maybe_schedule_user_command(interactive_t *user) {
+  // If user has a complete command, schedule a command execution.
+  if (user->iflags & CMD_IN_BUF) {
+    event_active(user->ev_command, EV_TIMEOUT, 0);
+  }
+}
+
+void on_user_command(evutil_socket_t fd, short what, void *arg) {
+  debug(event, "User has an full command ready: %d:%s%s%s%s \n", (int)fd,
+        (what & EV_TIMEOUT) ? " timeout" : "", (what & EV_READ) ? " read" : "",
+        (what & EV_WRITE) ? " write" : "", (what & EV_SIGNAL) ? " signal" : "");
+  auto user = reinterpret_cast<interactive_t *>(arg);
+
+  if (user == NULL) {
+    fatal("on_user_command: user == NULL, Driver BUG.");
+    return;
+  }
+
+  // FIXME: this function currently calls into mudlib and will throw errors
+  // This catch block should be moved one level down.
+  error_context_t econ;
+  if (!save_context(&econ)) {
+    fatal("BUG: on_user_comamnd can not save context!");
+  }
+  set_eval(max_cost);
+  try {
+    process_user_command(user);
+  } catch (const char *) {
+    restore_context(&econ);
+  }
+  pop_context(&econ);
+
+  /* Has to be cleared if we jumped out of process_user_command() */
+  current_interactive = 0;
+
+  // if user still have pending command, continue to schedule it.
+  //
+  // NOTE: It is important to only execute one command here, then schedule next
+  // command at the tail, This ensure users have a fair chance that no one can
+  // keep running commands.
+  //
+  // currently command scehduling is done inside process_user_command().
+  //
+  // maybe_schedule_user_command(user);
+}
+
+void on_user_read(bufferevent *bev, void *arg) {
+  auto user = reinterpret_cast<interactive_t *>(arg);
+
+  if (user == NULL) {
+    fatal("on_user_read: user == NULL, Driver BUG.");
+    return;
+  }
+
+  // Read user input
+  get_user_data(user);
+
+  // TODO: currently get_user_data() will schedule command execution.
+  // should probably move it here.
+}
+
+void on_user_write(bufferevent *bev, void *arg) {
+  auto user = reinterpret_cast<interactive_t *>(arg);
+  if (user == NULL) {
+    fatal("on_user_write: user == NULL, Driver BUG.");
+    return;
+  }
+  // nothing to do.
+}
+
+void on_user_events(bufferevent *bev, short events, void *arg) {
+  auto user = reinterpret_cast<interactive_t *>(arg);
+
+  if (user == NULL) {
+    fatal("on_user_events: user == NULL, Driver BUG.");
+    return;
+  }
+
+  if (events & (BEV_EVENT_ERROR | BEV_EVENT_EOF)) {
+    user->iflags |= NET_DEAD;
+    remove_interactive(user->ob, 0);
+  } else {
+    debug(event, "on_user_events: ignored unknown events: %d\n", events);
+  }
+}
+
+void new_user_event_listener(interactive_t *user) {
+  auto bev = bufferevent_socket_new(g_event_base, user->fd,
+                                    BEV_OPT_CLOSE_ON_FREE | BEV_OPT_DEFER_CALLBACKS);
+  bufferevent_setcb(bev, on_user_read, on_user_write, on_user_events, user);
+  bufferevent_enable(bev, EV_READ | EV_WRITE);
+
+  bufferevent_set_timeouts(bev, NULL, NULL);
+
+  user->ev_buffer = bev;
+  user->ev_command = event_new(g_event_base, -1, EV_TIMEOUT | EV_PERSIST, on_user_command, user);
+}
+
+/*
+ * This is the new user connection handler. This function is called by the
+ * event handler when data is pending on the listening socket (new_user_fd).
+ * If space is available, an interactive data structure is initialized and
+ * the user is connected.
+ */
+void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct sockaddr *addr,
+                      int addrlen, void *arg) {
+  debug(connections, "New connection from %s.\n", sockaddr_to_string(addr, addrlen));
+
+  // TODO: we don't really need to pass in port, we can figure out by
+  // evconnlistener_get_fd and compare it
+  auto *port = reinterpret_cast<port_def_t *>(arg);
+
+  {
+    int one = 1;
+    if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) == -1) {
+      debug(connections, "new_user_handler: user fd %d, set_socket_tcp_nodelay error: %s.\n", fd,
+            evutil_socket_error_to_string(evutil_socket_geterror(fd)));
+    }
+  }
+
+  /*
+   * initialize new user interactive data structure.
+   */
+  auto user = user_add();
+
+  user->connection_type = port->kind;
+  user->ob = master_ob;
+  user->last_time = get_current_time();
+
+#ifdef USE_ICONV
+  user->trans = get_translator("UTF-8");
+#else
+  user->trans = (struct translation *)master_ob;
+// never actually used, but avoids multiple ifdefs later on!
+#endif
+
+  user->fd = fd;
+  user->local_port = port->port;
+  user->external_port = (port - external_port);  // FIXME: pointer arith
+
+  memcpy(&user->addr, addr, addrlen);
+  user->addrlen = addrlen;
+
+  set_command_giver(master_ob);
+  master_ob->flags |= O_ONCE_INTERACTIVE;
+
+  master_ob->interactive = user;
+
+  // TODO: merge event.cc into here.
+  new_user_event_listener(user);
+  // Initialize telnet support
+  user->telnet = net_telnet_init(user);
+
+  set_prompt("> ");
+
+  /*
+   * The user object has one extra reference. It is asserted that the
+   * master_ob is loaded.  Save a pointer to the master ob incase it
+   * changes during APPLY_CONNECT.  We want to free the reference on
+   * the right copy of the object.
+   */
+  object_t *master, *ob;
+  svalue_t *ret;
+
+  master = master_ob;
+  add_ref(master_ob, "new_user");
+  push_number(user->local_port);
+  ret = safe_apply_master_ob(APPLY_CONNECT, 1);
+  /* master_ob->interactive can be zero if the master object self
+   destructed in the above (don't ask) */
+  set_command_giver(0);
+  if (ret == 0 || ret == (svalue_t *)-1 || ret->type != T_OBJECT || !master_ob->interactive) {
+    debug_message("Can not accept connection from %s due to error in connect().\n",
+                  sockaddr_to_string((sockaddr *)&user->addr, user->addrlen));
+    if (master_ob->interactive) {
+      remove_interactive(master_ob, 0);
+    }
+    return;
+  }
+  /*
+   * There was an object returned from connect(). Use this as the user
+   * object.
+   */
+  ob = ret->u.ob;
+  ob->interactive = master_ob->interactive;
+  ob->interactive->ob = ob;
+  ob->flags |= O_ONCE_INTERACTIVE;
+  /*
+   * assume the existance of write_prompt and process_input in user.c
+   * until proven wrong (after trying to call them).
+   */
+  ob->interactive->iflags |= (HAS_WRITE_PROMPT | HAS_PROCESS_INPUT);
+
+  free_object(&master, "new_user");
+
+  master_ob->flags &= ~O_ONCE_INTERACTIVE;
+  master_ob->interactive = 0;
+  add_ref(ob, "new_user");
+  set_command_giver(ob);
+  query_name_by_addr(ob);
+
+  if (user->connection_type == PORT_TELNET) {
+    send_initial_telent_negotiantions(user);
+  }
+
+  // Call logon() on the object.
+  if (!(ob->flags & O_DESTRUCTED)) {
+    /* current_object no longer set */
+    ret = safe_apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
+    if (ret == NULL) {
+      debug_message(
+          "new_user_handler: logon() on object %s has failed, the user is left "
+          "dangling.\n",
+          ob->obname);
+    }
+    /* function not existing is no longer fatal */
+  } else {
+    debug_message(
+        "new_user_handler: object is gone before logon(), the user is left "
+        "dangling. \n");
+  }
+
+  debug(connections, ("new_user_handler: end\n"));
+  set_command_giver(0);
+} /* new_user_handler() */
+
+}  // namespace
 
 /*
  * Initialize new user connection socket.
@@ -209,153 +444,6 @@ void shutdown_external_ports() {
 
   debug_message("closed external ports\n");
 }
-
-/*
- * This is the new user connection handler. This function is called by the
- * event handler when data is pending on the listening socket (new_user_fd).
- * If space is available, an interactive data structure is initialized and
- * the user is connected.
- */
-static void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct sockaddr *addr,
-                             int addrlen, void *arg) {
-  debug(connections, "New connection from %s.\n", sockaddr_to_string(addr, addrlen));
-
-  // TODO: we don't really need to pass in port, we can figure out by
-  // evconnlistener_get_fd and compare it
-  auto *port = reinterpret_cast<port_def_t *>(arg);
-
-  {
-    int one = 1;
-    if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) == -1) {
-      debug(connections, "new_user_handler: user fd %d, set_socket_tcp_nodelay error: %s.\n", fd,
-            evutil_socket_error_to_string(evutil_socket_geterror(fd)));
-    }
-  }
-
-  /*
-   * initialize new user interactive data structure.
-   */
-  auto user = user_add();
-
-  user->connection_type = port->kind;
-  user->ob = master_ob;
-  user->last_time = get_current_time();
-
-#ifdef USE_ICONV
-  user->trans = get_translator("UTF-8");
-#else
-  user->trans = (struct translation *)master_ob;
-// never actually used, but avoids multiple ifdefs later on!
-#endif
-
-  user->fd = fd;
-  user->local_port = port->port;
-  user->external_port = (port - external_port);  // FIXME: pointer arith
-
-  memcpy(&user->addr, addr, addrlen);
-  user->addrlen = addrlen;
-
-  set_command_giver(master_ob);
-  master_ob->flags |= O_ONCE_INTERACTIVE;
-
-  master_ob->interactive = user;
-
-  // TODO: merge event.cc into here.
-  new_user_event_listener(user);
-  // Initialize telnet support
-  user->telnet = net_telnet_init(user);
-
-  set_prompt("> ");
-
-  /*
-   * The user object has one extra reference. It is asserted that the
-   * master_ob is loaded.  Save a pointer to the master ob incase it
-   * changes during APPLY_CONNECT.  We want to free the reference on
-   * the right copy of the object.
-   */
-  object_t *master, *ob;
-  svalue_t *ret;
-
-  master = master_ob;
-  add_ref(master_ob, "new_user");
-  push_number(user->local_port);
-  ret = safe_apply_master_ob(APPLY_CONNECT, 1);
-  /* master_ob->interactive can be zero if the master object self
-   destructed in the above (don't ask) */
-  set_command_giver(0);
-  if (ret == 0 || ret == (svalue_t *)-1 || ret->type != T_OBJECT || !master_ob->interactive) {
-    debug_message("Can not accept connection from %s due to error in connect().\n",
-                  sockaddr_to_string((sockaddr *)&user->addr, user->addrlen));
-    if (master_ob->interactive) {
-      remove_interactive(master_ob, 0);
-    }
-    return;
-  }
-  /*
-   * There was an object returned from connect(). Use this as the user
-   * object.
-   */
-  ob = ret->u.ob;
-  ob->interactive = master_ob->interactive;
-  ob->interactive->ob = ob;
-  ob->flags |= O_ONCE_INTERACTIVE;
-  /*
-   * assume the existance of write_prompt and process_input in user.c
-   * until proven wrong (after trying to call them).
-   */
-  ob->interactive->iflags |= (HAS_WRITE_PROMPT | HAS_PROCESS_INPUT);
-
-  free_object(&master, "new_user");
-
-  master_ob->flags &= ~O_ONCE_INTERACTIVE;
-  master_ob->interactive = 0;
-  add_ref(ob, "new_user");
-  set_command_giver(ob);
-  query_name_by_addr(ob);
-
-  if (user->connection_type == PORT_TELNET) {
-    send_initial_telent_negotiantions(user);
-  }
-
-  // Call logon() on the object.
-  if (!(ob->flags & O_DESTRUCTED)) {
-    /* current_object no longer set */
-    ret = safe_apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
-    if (ret == NULL) {
-      debug_message(
-          "new_user_handler: logon() on object %s has failed, the user is left "
-          "dangling.\n",
-          ob->obname);
-    }
-    /* function not existing is no longer fatal */
-  } else {
-    debug_message(
-        "new_user_handler: object is gone before logon(), the user is left "
-        "dangling. \n");
-  }
-
-  debug(connections, ("new_user_handler: end\n"));
-  set_command_giver(0);
-} /* new_user_handler() */
-
-#ifndef NO_SNOOP
-static void receive_snoop(const char *buf, int len, object_t *snooper) {
-/* command giver no longer set to snooper */
-#ifdef RECEIVE_SNOOP
-  char *str;
-
-  str = new_string(len, "receive_snoop");
-  memcpy(str, buf, len);
-  str[len] = 0;
-  push_malloced_string(str);
-  apply(APPLY_RECEIVE_SNOOP, snooper, 1, ORIGIN_DRIVER);
-#else
-  /* snoop output is now % in all cases */
-  add_message(snooper, "%", 1);
-  add_message(snooper, buf, len);
-#endif
-}
-#endif
 
 /*
  * If there is a shadow for this object, then the message should be
@@ -1329,6 +1417,25 @@ static void print_prompt(interactive_t *ip) {
     telnet_iac(ip->telnet, TELNET_GA);
   }
 } /* print_prompt() */
+
+#ifndef NO_SNOOP
+static void receive_snoop(const char *buf, int len, object_t *snooper) {
+/* command giver no longer set to snooper */
+#ifdef RECEIVE_SNOOP
+  char *str;
+
+  str = new_string(len, "receive_snoop");
+  memcpy(str, buf, len);
+  str[len] = 0;
+  push_malloced_string(str);
+  apply(APPLY_RECEIVE_SNOOP, snooper, 1, ORIGIN_DRIVER);
+#else
+  /* snoop output is now % in all cases */
+  add_message(snooper, "%", 1);
+  add_message(snooper, buf, len);
+#endif
+}
+#endif
 
 /*
  * Let object 'me' snoop object 'you'. If 'you' is 0, then turn off

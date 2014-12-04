@@ -116,7 +116,6 @@ DRIVER_OBJS= \
 	backend.o \
 	comm.o \
 	console.o \
-	event.o \
 	fliconv.o \
 	main.o \
 	user.o \

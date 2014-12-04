@@ -14,22 +14,28 @@
 
 #include "console.h"
 
-#include <event2/event.h>
-#include <errno.h>
-#include <signal.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <stdlib.h>  // for qsort
+#include <errno.h>         // for errno
+#include <event2/event.h>  // for EV_READ, event_add, etc
+#include <event2/util.h>   // for evutil_socket_t
+#include <fcntl.h>         // for fcntl, F_SETFL, F_GETFL, etc
+#include <limits.h>        // for INT_MAX
+#include <signal.h>        // for signal, SIGTTIN, SIG_IGN, etc
+#include <stddef.h>        // for size_t
+#include <stdio.h>         // for printf, puts, sscanf, etc
+#include <stdlib.h>        // for qsort, NULL
+#include <string.h>        // for strlen, strncmp, strchr, etc
+#include <time.h>          // for time
+#include <unistd.h>        // for STDIN_FILENO, read
 
-#ifdef HAS_CONSOLE
-int has_console = -1;
-#endif
+#include "vm/vm.h"
 
 #ifdef HAS_CONSOLE
 #include "packages/core/dumpstat.h"
 #endif
 
-#include "vm/vm.h"
+#ifdef HAS_CONSOLE
+int has_console = -1;
+#endif
 
 #ifdef HAS_CONSOLE
 static void sig_ttin(int);
