@@ -8,10 +8,10 @@
 
 #include "user.h"
 
-#include <algorithm>
-#include <cstring>
-#include <functional>
-#include <vector>
+#include <algorithm>   // for count_if, for_each, remove
+#include <cstring>     // for memset
+#include <functional>  // for function
+#include <vector>      // for vector
 
 #include "interactive.h"  // for interactive_t->ob
 #include "vm/vm.h"

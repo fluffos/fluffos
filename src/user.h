@@ -19,7 +19,7 @@ void user_del(interactive_t *);
 // Returns all users
 const std::vector<interactive_t *> users();
 // Count users
-int users_num(bool include_hidden);
+int users_num(bool);
 void users_foreach(std::function<void(interactive_t *)>);
 
 #endif /* USER_H_ */
