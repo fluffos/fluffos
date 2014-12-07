@@ -3451,6 +3451,9 @@ function_call:
 		} else if ((f=$1->dn.efun_num) != -1) {
 		    $$ = validate_efun_call(f, $4);
 		} else {
+			// TODO(sunyc): when exact_type is on, we should simply
+			// return error in this case.
+
 		    /* This here is a really nasty case that only occurs with
 		     * exact_types off.  The user has done something gross like:
 		     *
