@@ -850,10 +850,7 @@ int copy_functions(program_t *from, int typemod) {
     funp = prog->function_table + index;
 
     ihe = lookup_ident(funp->funcname);
-    // See grammar.y.pre:3549-3550, and testsuite/single/tests/crasher/16.c
-    // When function is not defined, it will be setup as if it was inherited.
-    // Thus we need to check for funp->address here to see if it is really undefined.
-    if (funp->address && ihe && ((num = ihe->dn.function_num) != -1)) {
+    if (ihe && ((num = ihe->dn.function_num) != -1)) {
       /* The function has already been defined in this object */
       overload_function(from, i, prog, index, num, typemod);
     } else {

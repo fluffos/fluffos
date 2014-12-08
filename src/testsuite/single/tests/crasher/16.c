@@ -1,5 +1,6 @@
-void test() {
+void do_tests() {
   // undefined
-  do_tests();
+  something();
+  write("crasher 16: OK.\n");
 }
-inherit "/single/tests/crasher/1.c";
+inherit "/single/tests/crasher/16b.c";
