@@ -71,5 +71,5 @@ uint64_t posix_eval_timer_get(void) {
     return 100;
   }
 
-  return it.it_value.tv_sec * (uint64_t)(1000000) + it.it_value.tv_nsec / 1000;
+  return it.it_value.tv_sec * static_cast<uint64_t>(1000000) + it.it_value.tv_nsec / 1000;
 }

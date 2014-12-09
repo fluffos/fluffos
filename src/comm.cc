@@ -39,11 +39,11 @@ extern void update_load_av();
 /*
  * local function prototypes.
  */
-static char *get_user_command(interactive_t *);
-static char *first_cmd_in_buf(interactive_t *);
-static int cmd_in_buf(interactive_t *);
-static int call_function_interactive(interactive_t *, char *);
-static void print_prompt(interactive_t *);
+static char *get_user_command(interactive_t * /*ip*/);
+static char *first_cmd_in_buf(interactive_t * /*ip*/);
+static int cmd_in_buf(interactive_t * /*ip*/);
+static int call_function_interactive(interactive_t * /*i*/, char * /*str*/);
+static void print_prompt(interactive_t * /*ip*/);
 
 #ifdef NO_SNOOP
 #define handle_snoop(str, len, who)
@@ -51,7 +51,7 @@ static void print_prompt(interactive_t *);
 #define handle_snoop(str, len, who) \
   if ((who)->snooped_by) receive_snoop(str, len, who->snooped_by)
 
-static void receive_snoop(const char *, int, object_t *ob);
+static void receive_snoop(const char * /*buf*/, int /*len*/, object_t *ob);
 
 #endif
 
@@ -253,7 +253,7 @@ void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
   set_command_giver(0);
   if (ret == 0 || ret == (svalue_t *)-1 || ret->type != T_OBJECT || !master_ob->interactive) {
     debug_message("Can not accept connection from %s due to error in connect().\n",
-                  sockaddr_to_string((sockaddr *)&user->addr, user->addrlen));
+                  sockaddr_to_string(reinterpret_cast<sockaddr *>(&user->addr), user->addrlen));
     if (master_ob->interactive) {
       remove_interactive(master_ob, 0);
     }
@@ -409,7 +409,7 @@ bool init_user_conn() {
         return false;
       }
       debug_message("Accepting connections on %s.\n",
-                    sockaddr_to_string((sockaddr *)res->ai_addr, res->ai_addrlen));
+                    sockaddr_to_string(res->ai_addr, res->ai_addrlen));
       freeaddrinfo(res);
     }
     // Listen on connection event
@@ -632,7 +632,7 @@ void get_user_data(interactive_t *ip) {
       if (ip->text_end < 4) {
         text_space = 4 - ip->text_end;
       } else {
-        text_space = *(volatile int *)ip->text - ip->text_end + 4;
+        text_space = *reinterpret_cast<volatile int *>(ip->text) - ip->text_end + 4;
       }
       break;
 
@@ -669,7 +669,7 @@ void get_user_data(interactive_t *ip) {
         memcpy(ip->ws_text + ip->ws_text_end, buf, num_bytes);
         ip->ws_text_end += num_bytes;
         if (!ip->ws_size) {
-          unsigned char *data = (unsigned char *)&ip->ws_text[ip->ws_text_start];
+          unsigned char *data = reinterpret_cast<unsigned char *>(&ip->ws_text[ip->ws_text_start]);
           if (ip->ws_text_end - ip->ws_text_start < 8) {
             break;
           }
@@ -695,12 +695,13 @@ void get_user_data(interactive_t *ip) {
         }
         int i;
         if (ip->ws_size) {
-          int *wdata = (int *)&ip->ws_text[ip->ws_text_start];
-          int *dest = (int *)&buf[0];
+          int *wdata = reinterpret_cast<int *>(&ip->ws_text[ip->ws_text_start]);
+          int *dest = reinterpret_cast<int *>(&buf[0]);
           if (ip->ws_maskoffs) {
             int newmask;
             for (i = 0; i < 4; i++) {
-              ((char *)&newmask)[i] = ((char *)&ip->ws_mask)[(i + ip->ws_maskoffs) % 4];
+              (reinterpret_cast<char *>(&newmask))[i] =
+                  (reinterpret_cast<char *>(&ip->ws_mask))[(i + ip->ws_maskoffs) % 4];
             }
             ip->ws_mask = newmask;
             ip->ws_maskoffs = 0;
@@ -755,7 +756,7 @@ void get_user_data(interactive_t *ip) {
       int start = ip->text_end;
 
       // this will read data into ip->text
-      telnet_recv(ip->telnet, (const char *)&buf[0], num_bytes);
+      telnet_recv(ip->telnet, reinterpret_cast<const char *>(&buf[0]), num_bytes);
 
       if (ip->text_end > start) {
         /* handle snooping - snooper does not see type-ahead due to
@@ -778,8 +779,8 @@ void get_user_data(interactive_t *ip) {
 
       if (num_bytes == text_space) {
         if (ip->text_end == 4) {
-          *(volatile int *)ip->text = ntohl(*(int *)ip->text);
-          if (*(volatile int *)ip->text > MAX_TEXT - 5) {
+          *reinterpret_cast<volatile int *>(ip->text) = ntohl(*reinterpret_cast<int *>(ip->text));
+          if (*reinterpret_cast<volatile int *>(ip->text) > MAX_TEXT - 5) {
             remove_interactive(ip->ob, 0);
           }
         } else {
@@ -805,7 +806,7 @@ void get_user_data(interactive_t *ip) {
       ip->text_end += num_bytes;
 
       p = ip->text + ip->text_start;
-      while ((nl = (char *)memchr(p, '\n', ip->text_end - ip->text_start))) {
+      while ((nl = reinterpret_cast<char *>(memchr(p, '\n', ip->text_end - ip->text_start)))) {
         ip->text_start = (nl + 1) - ip->text;
 
         *nl = 0;

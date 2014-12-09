@@ -35,7 +35,7 @@ function_lookup_info_t *simuls = 0;
 int num_simul_efun = 0;
 object_t *simul_efun_ob;
 
-static void find_or_add_simul_efun(function_t *, int);
+static void find_or_add_simul_efun(function_t * /*funp*/, int /*runtime_index*/);
 static void remove_simuls(void);
 
 #ifdef DEBUGMALLOC_EXTENSIONS
@@ -115,10 +115,10 @@ static void get_simul_efuns(program_t *prog) {
     }
   } else {
     if (num_new) {
-      simul_names =
-          (simul_entry *)DCALLOC(num_new, sizeof(simul_entry), TAG_SIMULS, "get_simul_efuns");
-      simuls = (function_lookup_info_t *)DCALLOC(num_new, sizeof(function_lookup_info_t),
-                                                 TAG_SIMULS, "get_simul_efuns: 2");
+      simul_names = reinterpret_cast<simul_entry *>(
+          DCALLOC(num_new, sizeof(simul_entry), TAG_SIMULS, "get_simul_efuns"));
+      simuls = reinterpret_cast<function_lookup_info_t *>(
+          DCALLOC(num_new, sizeof(function_lookup_info_t), TAG_SIMULS, "get_simul_efuns: 2"));
     }
   }
   for (i = 0; i < num_new; i++) {

@@ -6,11 +6,11 @@
  * Write statistics about objects on file.
  */
 
-static int sumSizes(mapping_t *, mapping_node_t *, void *);
-static int svalue_size(svalue_t *);
+static int sumSizes(mapping_t * /*m*/, mapping_node_t * /*elt*/, void * /*tp*/);
+static int svalue_size(svalue_t * /*v*/);
 
 static int sumSizes(mapping_t *m, mapping_node_t *elt, void *tp) {
-  int *t = (int *)tp;
+  int *t = reinterpret_cast<int *>(tp);
 
   *t += (svalue_size(&elt->values[0]) + svalue_size(&elt->values[1]));
   *t += sizeof(mapping_node_t);

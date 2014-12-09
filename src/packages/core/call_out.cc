@@ -30,9 +30,9 @@ static CalloutObjectMapType g_callout_object_handle_map;
 // that wrong call.
 static uint64_t unique = 1;
 
-static void free_call(pending_call_t *);
-static void free_called_call(pending_call_t *);
-void remove_all_call_out(object_t *);
+static void free_call(pending_call_t * /*cop*/);
+static void free_called_call(pending_call_t * /*cop*/);
+void remove_all_call_out(object_t * /*obj*/);
 
 /*
  * Free a call out structure.
@@ -76,8 +76,8 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, int delay, int num_args, svalu
 
   DBG_CALLOUT("new_call_out: /%s delay %i\n", ob->obname, delay);
 
-  pending_call_t *cop =
-      (pending_call_t *)DCALLOC(1, sizeof(pending_call_t), TAG_CALL_OUT, "new_call_out");
+  pending_call_t *cop = reinterpret_cast<pending_call_t *>(
+      DCALLOC(1, sizeof(pending_call_t), TAG_CALL_OUT, "new_call_out"));
 
   cop->target_time = g_current_virtual_time + delay;
   DBG_CALLOUT("  target_time: %ld\n", cop->target_time);
@@ -161,10 +161,11 @@ void call_out(pending_call_t *cop) {
   }
 
 #ifndef NO_SHADOWS
-  if (ob)
+  if (ob) {
     while (ob->shadowing) {
       ob = ob->shadowing;
     }
+  }
 #endif
   new_command_giver = 0;
 #ifdef THIS_PLAYER_IN_CALL_OUT
@@ -347,10 +348,11 @@ int print_call_out_usage(outbuffer_t *ob, int verbose) {
     outbuf_addv(ob, "Number of garbage entry in object map: %d\n",
                 g_callout_object_handle_map.size() - g_callout_handle_map.size());
   } else {
-    if (verbose != -1)
+    if (verbose != -1) {
       outbuf_addv(ob, "call out:\t\t\t%8d %8d (load_factor %f)\n", g_callout_handle_map.size(),
                   g_callout_handle_map.size() * sizeof(pending_call_t),
                   g_callout_handle_map.load_factor());
+    }
   }
   return g_callout_handle_map.size() * sizeof(pending_call_t);
 }

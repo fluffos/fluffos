@@ -46,7 +46,8 @@ void f_named_livings() {
   apply_valid_hide = 1;
 #endif
 
-  obtab = (object_t **)DCALLOC(max_array_size, sizeof(object_t *), TAG_TEMPORARY, "named_livings");
+  obtab = reinterpret_cast<object_t **>(
+      DCALLOC(max_array_size, sizeof(object_t *), TAG_TEMPORARY, "named_livings"));
 
   for (i = 0; i < CFG_LIVING_HASH_SIZE; i++) {
     for (ob = hashed_living[i]; ob; ob = ob->next_hashed_living) {
@@ -216,7 +217,7 @@ void f_set_prompt(void) {
 #ifdef F_COPY
 static int depth;
 
-static void deep_copy_svalue(svalue_t *, svalue_t *);
+static void deep_copy_svalue(svalue_t * /*from*/, svalue_t * /*to*/);
 
 static array_t *deep_copy_array(array_t *arg) {
   array_t *vec;
@@ -245,7 +246,7 @@ static array_t *deep_copy_class(array_t *arg) {
 static int doCopy(mapping_t *map, mapping_node_t *elt, void *dest) {
   svalue_t *sv;
 
-  sv = find_for_insert((mapping_t *)dest, &elt->values[0], 1);
+  sv = find_for_insert(reinterpret_cast<mapping_t *>(dest), &elt->values[0], 1);
   if (!sv) {
     mapping_too_large();
     return 1;
@@ -580,7 +581,8 @@ void f_terminal_colour(void) {
   if (cp == NULL) {
     if (wrap) {
       num = 1;
-      parts = (const char **)DCALLOC(1, sizeof(char *), TAG_TEMPORARY, "f_terminal_colour: parts");
+      parts = reinterpret_cast<const char **>(
+          DCALLOC(1, sizeof(char *), TAG_TEMPORARY, "f_terminal_colour: parts"));
       parts[0] = instr;
       savestr = 0;
     } else {
@@ -589,9 +591,9 @@ void f_terminal_colour(void) {
     }
   } else {
     /* here we have something to parse */
-    char *newstr = (char *)cp;  // must be result of the string_copy above
-    parts =
-        (const char **)DCALLOC(NSTRSEGS, sizeof(char *), TAG_TEMPORARY, "f_terminal_colour: parts");
+    char *newstr = const_cast<char *>(cp);  // must be result of the string_copy above
+    parts = reinterpret_cast<const char **>(
+        DCALLOC(NSTRSEGS, sizeof(char *), TAG_TEMPORARY, "f_terminal_colour: parts"));
     if (newstr - instr) { /* starting seg, if not delimiter */
       num = 1;
       parts[0] = instr;
@@ -654,7 +656,8 @@ void f_terminal_colour(void) {
 
   /* Could keep track of the lens as we create parts, removing the need
      for a strlen() below */
-  lens = (int *)DCALLOC(num, sizeof(int), TAG_TEMPORARY, "f_terminal_colour: lens");
+  lens =
+      reinterpret_cast<int *>(DCALLOC(num, sizeof(int), TAG_TEMPORARY, "f_terminal_colour: lens"));
   mtab = sp->u.map->table;
 
   // First setup some little things.
@@ -699,7 +702,7 @@ void f_terminal_colour(void) {
     copy_and_push_string(parts[i]);
     svalue_t *reptmp = apply(APPLY_TERMINAL_COLOUR_REPLACE, current_object, 1, ORIGIN_EFUN);
     if (reptmp && reptmp->type == T_STRING) {
-      rep = (char *)alloca(SVALUE_STRLEN(reptmp) + 1);
+      rep = reinterpret_cast<char *>(alloca(SVALUE_STRLEN(reptmp) + 1));
       strcpy(rep, reptmp->u.string);
       repused = 1;
     }
@@ -1063,20 +1066,20 @@ static char *pluralize(const char *str) {
   if (str[0] == 'a' || str[0] == 'A') {
     if (str[1] == ' ') {
       plen = sz - 2;
-      pre = (char *)DMALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
+      pre = reinterpret_cast<char *>(DMALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre"));
       strncpy(pre, str + 2, plen);
     } else if (sz > 2 && str[1] == 'n' && str[2] == ' ') {
       plen = sz - 3;
-      pre = (char *)DMALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
+      pre = reinterpret_cast<char *>(DMALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre"));
       strncpy(pre, str + 3, plen);
     } else {
       plen = sz;
-      pre = (char *)DMALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
+      pre = reinterpret_cast<char *>(DMALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre"));
       strncpy(pre, str, plen);
     }
   } else {
     plen = sz;
-    pre = (char *)DMALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
+    pre = reinterpret_cast<char *>(DMALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre"));
     strncpy(pre, str, plen);
   }
   pre[plen] = 0;
@@ -1383,7 +1386,8 @@ static char *pluralize(const char *str) {
 
   /* don't have to set found to PLURAL_SUFFIX in these rules b/c
      found == 0 is interpreted as PLURAL_SUFFIX */
-  if (!found && (end != pre)) switch (end[-1]) {
+  if (!found && (end != pre)) {
+    switch (end[-1]) {
       case 'E':
       case 'e':
         if ((end - pre) > 1 && (end[-2] == 'f' || end[-2] == 'F')) {
@@ -1477,6 +1481,7 @@ static char *pluralize(const char *str) {
           suffix = "es";
         }
     }
+  }
 
   switch (found) {
     case PLURAL_SAME:
@@ -1553,7 +1558,7 @@ static int file_length(const char *file) {
   do {
     num = fread(buf, 1, 2048, f);
     p = buf - 1;
-    while ((newp = (char *)memchr(p + 1, '\n', num))) {
+    while ((newp = reinterpret_cast<char *>(memchr(p + 1, '\n', num)))) {
       num -= (newp - p);
       p = newp;
       ret++;
@@ -1584,11 +1589,11 @@ void f_upper_case(void) {
       char *newstr;
       int l = str - sp->u.string;
       unlink_string_svalue(sp);
-      newstr = (char *)sp->u.string + l;
-      *newstr = toupper((unsigned char)*newstr);
+      newstr = const_cast<char *>(sp->u.string) + l;
+      *newstr = toupper(static_cast<unsigned char>(*newstr));
       for (newstr++; *newstr; newstr++) {
         if (uislower((unsigned char)*newstr)) {
-          *newstr = toupper((unsigned char)*newstr);
+          *newstr = toupper(static_cast<unsigned char>(*newstr));
         }
       }
       return;
@@ -1607,7 +1612,8 @@ void f_replaceable(void) {
   if (st_num_arg == 2) {
     numignore = sp->u.arr->size;
     if (numignore) {
-      ignore = (char **)DCALLOC(numignore + 2, sizeof(char *), TAG_TEMPORARY, "replaceable");
+      ignore = reinterpret_cast<char **>(
+          DCALLOC(numignore + 2, sizeof(char *), TAG_TEMPORARY, "replaceable"));
     } else {
       ignore = 0;
     }
@@ -1624,7 +1630,7 @@ void f_replaceable(void) {
     obj = (sp - 1)->u.ob;
   } else {
     numignore = 2;
-    ignore = (char **)DCALLOC(2, sizeof(char *), TAG_TEMPORARY, "replaceable");
+    ignore = reinterpret_cast<char **>(DCALLOC(2, sizeof(char *), TAG_TEMPORARY, "replaceable"));
     ignore[0] = findstring(APPLY_CREATE);
     ignore[1] = findstring(APPLY___INIT);
     obj = sp->u.ob;
@@ -1637,10 +1643,11 @@ void f_replaceable(void) {
     if (prog->function_flags[i] & (FUNC_INHERITED | FUNC_NO_CODE)) {
       continue;
     }
-    for (j = 0; j < numignore; j++)
+    for (j = 0; j < numignore; j++) {
       if (ignore[j] == find_func_entry(prog, i)->funcname) {
         break;
       }
+    }
     if (j == numignore) {
       break;
     }
@@ -1848,9 +1855,10 @@ void reset_timezone(const char *old_tz) {
   if (old_tz) {
     sprintf(put_tz, "TZ=%s", old_tz);
     putenv(put_tz);
-  } else
+  } else {
 #ifndef MINGW
     unsetenv("TZ");
+  }
 #else
     putenv("TZ=");
 #endif
@@ -1870,7 +1878,7 @@ void f_zonetime(void) {
   pop_stack();
 
   old_tz = set_timezone(timezone);
-  retv = ctime((time_t *)&time_val);
+  retv = ctime(&time_val);
   if (!retv) {
     reset_timezone(old_tz);
     error("bad argument to zonetime.");
@@ -1897,7 +1905,7 @@ void f_is_daylight_savings_time(void) {
 
   old_tz = set_timezone(timezone);
 
-  t = localtime((time_t *)&time_to_check);
+  t = localtime(&time_to_check);
   if (t) {
     push_number((t->tm_isdst) > 0);
   } else {
@@ -1962,10 +1970,10 @@ void f_repeat_string(void) {
 #endif
 
 #ifdef F_MEMORY_SUMMARY
-static int memory_share(svalue_t *);
+static int memory_share(svalue_t * /*sv*/);
 
 static int node_share(mapping_t *m, mapping_node_t *elt, void *tp) {
-  int *t = (int *)tp;
+  int *t = reinterpret_cast<int *>(tp);
 
   *t += sizeof(mapping_node_t) - 2 * sizeof(svalue_t);
   *t += memory_share(&elt->values[0]);
@@ -2142,15 +2150,16 @@ void f_network_stats(void) {
   mapping_t *m;
   int i, ports = 0;
 
-  for (i = 0; i < 5; i++)
+  for (i = 0; i < 5; i++) {
     if (external_port[i].port) {
       ports += 4;
     }
+  }
 
 #ifndef PACKAGE_SOCKETS
   m = allocate_mapping(ports + 4);
 #else
-  m = allocate_mapping(ports + 8);
+    m = allocate_mapping(ports + 8);
 #endif
 
   add_mapping_pair(m, "incoming packets total", inet_in_packets);
@@ -2241,7 +2250,7 @@ void event(svalue_t *event_ob, const char *event_fun, int numparam, svalue_t *ev
     apply(name, event_ob->u.ob, numparam + 1, ORIGIN_EFUN);
 
     /* And then call it on it's inventory..., if it's still around! */
-    if (event_ob && event_ob->u.ob && !(event_ob->u.ob->flags & O_DESTRUCTED))
+    if (event_ob && event_ob->u.ob && !(event_ob->u.ob->flags & O_DESTRUCTED)) {
       for (ob = event_ob->u.ob->contains; ob; ob = ob->next_inv) {
         if (ob == origin) {
           continue;
@@ -2253,6 +2262,7 @@ void event(svalue_t *event_ob, const char *event_fun, int numparam, svalue_t *ev
         push_object(ob);
         count++;
       }
+    }
     while (count--) {
       ob = sp->u.ob;
       pop_stack();
@@ -2390,7 +2400,7 @@ void f_base_name(void) {
       *sp = const0;
       return;
     }
-    name = (char *)add_slash(sp->u.ob->obname);
+    name = add_slash(sp->u.ob->obname);
   } else {
     name = string_copy(sp->u.string, "f_base_name: name");
   }
@@ -2791,7 +2801,7 @@ int levenshtein(char *a, int as, char *b, int bs) {
     return bs;
   }
 
-  table = (int *)DCALLOC(bs + 1, sizeof(int), TAG_TEMPORARY, "levenshtein");
+  table = reinterpret_cast<int *>(DCALLOC(bs + 1, sizeof(int), TAG_TEMPORARY, "levenshtein"));
   for (i = 1; i <= bs; i++) {
     table[i] = i;
   }
@@ -2819,8 +2829,8 @@ void f_string_difference() {
   int diff, as, bs;
   char *a, *b;
 
-  a = (char *)sp->u.string;
-  b = (char *)(sp - 1)->u.string;
+  a = const_cast<char *>(sp->u.string);
+  b = const_cast<char *>((sp - 1)->u.string);
 
   if (!strcmp(a, b)) {
     diff = 0;
@@ -2958,7 +2968,7 @@ void f_restore_from_string() {
   copy_and_push_string(buf);  // restore_object_from_buff modifies the string in
                               // place, which is ok, copied strings aren't
                               // shared
-  restore_object_from_buff(current_object, (char *)sp->u.string, noclear);
+  restore_object_from_buff(current_object, const_cast<char *>(sp->u.string), noclear);
   pop_3_elems();
 }
 #endif

@@ -104,44 +104,44 @@ static int version = 601;
 
 static int EdErr = 0;
 
-static int append(int, int);
-static int more_append(const char *);
+static int append(int /*line*/, int /*glob*/);
+static int more_append(const char * /*str*/);
 static int ckglob(void);
-static int deflt(int, int);
-static int del(int, int);
-static int dolst(int, int);
+static int deflt(int /*def1*/, int /*def2*/);
+static int del(int /*from*/, int /*to*/);
+static int dolst(int /*line1*/, int /*line2*/);
 /* This seems completely unused; -Beek
 static int esc (char **);
 */
 
-static void do_output(char *);
-static int doprnt(int, int);
-static int prntln(char *, char *, int, int);
-static int egets(char *, int, FILE *);
-static int doread(int, const char *);
-static int dowrite(int, int, const char *, int);
-static int find(regexp *, int);
-static char *getfn(int);
-static int getnum(int);
+static void do_output(char * /*str*/);
+static int doprnt(int /*from*/, int /*to*/);
+static int prntln(char * /*str*/, char * /*outstr*/, int /*vflg*/, int /*lineno*/);
+static int egets(char * /*str*/, int /*size*/, FILE * /*stream*/);
+static int doread(int /*lin*/, const char * /*fname*/);
+static int dowrite(int /*from*/, int /*to*/, const char * /*fname*/, int /*apflg*/);
+static int find(regexp * /*pat*/, int /*dir*/);
+static char *getfn(int /*writeflg*/);
+static int getnum(int /*first*/);
 static int getone(void);
 static int getlst(void);
-static ed_line_t *getptr(int);
-static int getrhs(char *);
-static int ins(const char *);
-static int join(int, int);
-static int move(int);
-static int transfer(int);
+static ed_line_t *getptr(int /*num*/);
+static int getrhs(char * /*sub*/);
+static int ins(const char * /*str*/);
+static int join(int /*first*/, int /*last*/);
+static int move(int /*num*/);
+static int transfer(int /*num*/);
 static regexp *optpat(void);
 static int set(void);
 static void set_ed_buf(void);
-static int subst(regexp *, char *, int, int);
-static int docmd(int);
+static int subst(regexp * /*pat*/, char * /*sub*/, int /*gflg*/, int /*pflag*/);
+static int docmd(int /*glob*/);
 static int doglob(void);
-static void free_ed_buffer(object_t *);
-static void shift(char *);
-static void indent(char *);
+static void free_ed_buffer(object_t * /*who*/);
+static void shift(char * /*text*/);
+static void indent(char * /*buf*/);
 static int indent_code(void);
-static void report_status(int);
+static void report_status(int /*status*/);
 
 #ifndef OLD_ED
 static char *object_ed_results(void);
@@ -695,10 +695,11 @@ static int egets(char *str, int size, FILE *stream) {
   if (c != NL) {
     ED_OUTPUT(ED_DEST, "truncating line\n");
     P_TRUNCATED++;
-    while ((c = getc(stream)) != EOF)
+    while ((c = getc(stream)) != EOF) {
       if (c == NL) {
         break;
       }
+    }
   }
   return (count);
 } /* egets */
@@ -1118,7 +1119,8 @@ static int ins(const char *str) {
     len = cp - str;
     /* cp now points to end of first or only line */
 
-    if ((newl = (ed_line_t *)DMALLOC(sizeof(ed_line_t) + len, TAG_ED, "ins: new")) == NULL) {
+    if ((newl = reinterpret_cast<ed_line_t *>(
+             DMALLOC(sizeof(ed_line_t) + len, TAG_ED, "ins: new"))) == NULL) {
       return (MEM_FAIL); /* no memory */
     }
 
@@ -1259,7 +1261,7 @@ static regexp *optpat() {
   if (P_OLDPAT) {
     FREE((char *)P_OLDPAT);
   }
-  return P_OLDPAT = regcomp((unsigned char *)str, P_EXCOMPAT);
+  return P_OLDPAT = regcomp(reinterpret_cast<unsigned char *>(str), P_EXCOMPAT);
 }
 
 static int set() {
@@ -1853,7 +1855,7 @@ static void indent(char *buf) {
       do {
         top = *sp++;
         ip++;
-      } while (f[(int)*sp] >= g[top]);
+      } while (f[static_cast<int>(*sp)] >= g[top]);
     }
     stack = sp;
     ind = ip;
@@ -2455,8 +2457,8 @@ void ed_start(const char *file_arg, const char *write_fn, const char *exit_fn, i
   }
 
   current_ed_buffer = command_giver->interactive->ed_buffer =
-      (ed_buffer_t *)DMALLOC(sizeof(ed_buffer_t), TAG_ED, "ed_start: ED_BUFFER");
-  memset((char *)ED_BUFFER, '\0', sizeof(ed_buffer_t));
+      reinterpret_cast<ed_buffer_t *>(DMALLOC(sizeof(ed_buffer_t), TAG_ED, "ed_start: ED_BUFFER"));
+  memset(reinterpret_cast<char *> ED_BUFFER, '\0', sizeof(ed_buffer_t));
 
   current_editor = command_giver;
 
@@ -3047,8 +3049,8 @@ that help is desired for. \n",
         char tmpc;
         int lines = 0;
 
-        curp = P_HELPOUT =
-            (struct strlst *)DMALLOC(sizeof(struct strlst), TAG_TEMPORARY, "ed: help");
+        curp = P_HELPOUT = reinterpret_cast<struct strlst *>(
+            DMALLOC(sizeof(struct strlst), TAG_TEMPORARY, "ed: help"));
         curp->next = 0;
 
         brkpt = outstr;
@@ -3068,11 +3070,11 @@ that help is desired for. \n",
                 *(brkpt + 1) = '\0';
               }
 
-              curp->next =
-                  (struct strlst *)DMALLOC(sizeof(struct strlst), TAG_TEMPORARY, "ed: help");
+              curp->next = reinterpret_cast<struct strlst *>(
+                  DMALLOC(sizeof(struct strlst), TAG_TEMPORARY, "ed: help"));
               curp = curp->next;
-              curp->screen =
-                  (char *)DMALLOC(sizeof(char) * (strlen(outstr) + 1), TAG_TEMPORARY, "ed: help");
+              curp->screen = reinterpret_cast<char *>(
+                  DMALLOC(sizeof(char) * (strlen(outstr) + 1), TAG_TEMPORARY, "ed: help"));
               strcpy(curp->screen, outstr);
 
               curp->next = 0;
@@ -3349,10 +3351,11 @@ void f_ed(void) {
     }
 
     if (sp->type == T_NUMBER) {
-      if (sp->u.number == 1)
+      if (sp->u.number == 1) {
         ed_start((sp - 2)->u.string, 0, (sp - 1)->u.string, sp->u.number, current_object, 0);
-      else
+      } else {
         ed_start((sp - 2)->u.string, 0, (sp - 1)->u.string, 0, current_object, sp->u.number);
+      }
     } else if (sp->type == T_STRING) {
       ed_start((sp - 2)->u.string, (sp - 1)->u.string, sp->u.string, 0, current_object, 0);
     } else {
@@ -3375,12 +3378,13 @@ void f_ed(void) {
       bad_argument(sp - 3, T_STRING, 1, F_ED);
     }
 
-    if (sp->u.number == 1)
+    if (sp->u.number == 1) {
       ed_start((sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.string, sp->u.number,
                current_object, 0);
-    else
+    } else {
       ed_start((sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.string, 0, current_object,
                sp->u.number);
+    }
     pop_n_elems(4);
   } else { /* st_num_arg == 5 */
     /* ed(fname, writefn, exitfn, restricted, scroll_lines) */

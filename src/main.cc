@@ -26,10 +26,10 @@
 
 time_t boot_time;
 
-static void sig_cld(int);
+static void sig_cld(int /*sig*/);
 
-static void sig_usr1(int);
-static void sig_usr2(int);
+static void sig_usr1(int /*sig*/);
+static void sig_usr2(int /*sig*/);
 
 static void attempt_shutdown(int sig);
 static void setup_signal_handlers();

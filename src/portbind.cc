@@ -99,7 +99,7 @@ int main(int argc, char **argv) {
   /* setup our address */
   sin.sin_family = AF_INET;
   sin.sin_addr.s_addr = (ipaddress ? inet_addr(ipaddress) : INADDR_ANY);
-  sin.sin_port = htons((unsigned short)port);
+  sin.sin_port = htons(static_cast<unsigned short>(port));
 
   /* bind to our address */
   HANDLE_ERROR(bind, bind(6, (struct sockaddr *)&sin, sizeof(sin)));
@@ -113,7 +113,7 @@ int main(int argc, char **argv) {
     HANDLE_ERROR(setuid, setuid(uid));
   }
 
-  argv[0] = (char *)driver_name;
+  argv[0] = const_cast<char *>(driver_name);
   /* exec the driver */
   HANDLE_ERROR(execv, execv(driver_name, argv));
   return 0;

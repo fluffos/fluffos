@@ -148,7 +148,7 @@ event_base *init_backend() {
 }
 
 static void on_main_loop_event(int fd, short what, void *arg) {
-  auto event = (realtime_event *)arg;
+  auto event = reinterpret_cast<realtime_event *>(arg);
   event->callback();
   delete event;
 }
@@ -246,7 +246,8 @@ static void look_for_objects_to_swap() {
   next_ob = obj_list;
   last_good_ob = obj_list;
   save_context(&econ);
-  while (1) try {
+  while (1) {
+    try {
       while ((ob = (object_t *)next_ob)) {
         int ready_for_clean_up = 0;
 
@@ -331,6 +332,7 @@ static void look_for_objects_to_swap() {
     } catch (const char *) {
       restore_context(&econ);
     }
+  }
   pop_context(&econ);
 } /* look_for_objects_to_swap() */
 

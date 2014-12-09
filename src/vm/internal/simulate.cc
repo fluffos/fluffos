@@ -108,13 +108,13 @@ object_t *current_interactive; /* The user who caused this execution */
 static void init_privs_for_object(object_t *);
 #endif
 #ifdef PACKAGE_UIDS
-static int give_uid_to_object(object_t *);
+static int give_uid_to_object(object_t * /*ob*/);
 #endif
-static int init_object(object_t *);
-static object_t *load_virtual_object(const char *, int);
-static char *make_new_name(const char *);
+static int init_object(object_t * /*ob*/);
+static object_t *load_virtual_object(const char * /*name*/, int /*clone*/);
+static char *make_new_name(const char * /*str*/);
 #ifndef NO_ENVIRONMENT
-static void send_say(object_t *, const char *, array_t *);
+static void send_say(object_t * /*ob*/, const char * /*text*/, array_t * /*avoid*/);
 #endif
 
 void check_legal_string(const char *s) {
@@ -426,10 +426,12 @@ object_t *load_object(const char *lname, int callcreate) {
   if (strrchr(pname, '#')) {
     error("Cannot load a clone.\n");
   }
-  if (!filename_to_obname(lname, name, sizeof name))
+  if (!filename_to_obname(lname, name, sizeof name)) {
     error("Filenames with consecutive /'s in them aren't allowed (%s).\n", lname);
-  if (!filename_to_obname(pname, actualname, sizeof actualname))
+  }
+  if (!filename_to_obname(pname, actualname, sizeof actualname)) {
     error("Filenames with consecutive /'s in them aren't allowed (%s).\n", pname);
+  }
 
   /*
    * First check that the c-file exists.
@@ -571,7 +573,7 @@ object_t *load_object(const char *lname, int callcreate) {
 
 static char *make_new_name(const char *str) {
   static unsigned int i;
-  char *p = (char *)DMALLOC(strlen(str) + 12, TAG_OBJ_NAME, "make_new_name");
+  char *p = reinterpret_cast<char *>(DMALLOC(strlen(str) + 12, TAG_OBJ_NAME, "make_new_name"));
 
   (void)sprintf(p, "%s#%u", str, i);
   i++;
@@ -675,7 +677,7 @@ object_t *environment(svalue_t *arg) {
  */
 
 #ifdef F_PRESENT
-static object_t *object_present2(const char *, object_t *);
+static object_t *object_present2(const char * /*str*/, object_t * /*ob*/);
 
 object_t *object_present(svalue_t *v, object_t *ob) {
   svalue_t *ret;
@@ -1289,7 +1291,7 @@ int input_to(svalue_t *fun, int flag, int num_arg, svalue_t *args) {
      */
     if (num_arg) {
       i = num_arg * sizeof(svalue_t);
-      if ((x = (svalue_t *)DMALLOC(i, TAG_INPUT_TO, "input_to: 1")) == NULL) {
+      if ((x = reinterpret_cast<svalue_t *>(DMALLOC(i, TAG_INPUT_TO, "input_to: 1"))) == NULL) {
         fatal("Out of memory!\n");
       }
       memcpy(x, args, i);
@@ -1337,7 +1339,7 @@ int get_char(svalue_t *fun, int flag, int num_arg, svalue_t *args) {
      */
     if (num_arg) {
       i = num_arg * sizeof(svalue_t);
-      if ((x = (svalue_t *)DMALLOC(i, TAG_TEMPORARY, "get_char: 1")) == NULL) {
+      if ((x = reinterpret_cast<svalue_t *>(DMALLOC(i, TAG_TEMPORARY, "get_char: 1"))) == NULL) {
         fatal("Out of memory!\n");
       }
       memcpy(x, args, i);
@@ -1370,7 +1372,7 @@ void print_svalue(svalue_t *arg) {
 
   if (arg == 0) {
     tell_object(command_giver, "<NULL>", 6);
-  } else
+  } else {
     switch (arg->type) {
       case T_STRING:
         len = SVALUE_STRLEN(arg);
@@ -1410,6 +1412,7 @@ void print_svalue(svalue_t *arg) {
         tell_object(command_giver, "<UNKNOWN>", strlen("<UNKNOWN>"));
         break;
     }
+  }
   return;
 }
 
@@ -1487,10 +1490,11 @@ void move_object(object_t *item, object_t *dest) {
   save_command_giver(command_giver);
 
   /* Recursive moves are not allowed. */
-  for (ob = dest; ob; ob = ob->super)
+  for (ob = dest; ob; ob = ob->super) {
     if (ob == item) {
       error("Can't move object inside itself.\n");
     }
+  }
 #ifndef NO_SHADOWS
   if (item->shadowing) {
     error("Can't move an object that is shadowing.\n");
@@ -1525,8 +1529,9 @@ void move_object(object_t *item, object_t *dest) {
       okay = 1;
     }
 #ifdef DEBUG
-    if (!okay)
+    if (!okay) {
       fatal("Failed to find object /%s in super list of /%s.\n", item->obname, item->super->obname);
+    }
 #endif
   }
   /*
@@ -1567,7 +1572,7 @@ sentence_t *alloc_sentence() {
   sentence_t *p;
 
   if (sent_free == 0) {
-    p = (sentence_t *)DMALLOC(sizeof(sentence_t), TAG_SENTENCE, "alloc_sentence");
+    p = reinterpret_cast<sentence_t *>(DMALLOC(sizeof(sentence_t), TAG_SENTENCE, "alloc_sentence"));
     tot_alloc_sentence++;
   } else {
     p = sent_free;
@@ -1876,9 +1881,10 @@ void error_handler(char *err) {
 
       ob = find_object2(object_name);
       if (!ob) {
-        if (command_giver)
+        if (command_giver) {
           add_vmessage(command_giver, "error when executing program in destroyed object /%s\n",
                        object_name);
+        }
         debug_message("error when executing program in destroyed object /%s\n", object_name);
       }
     }

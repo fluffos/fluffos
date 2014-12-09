@@ -66,7 +66,7 @@ void f_sha1(void) {
     input_length = sp->u.buf->size;
   } else {
 #endif
-    str = (const unsigned char *)sp->u.string;
+    str = reinterpret_cast<const unsigned char *>(sp->u.string);
     input_length = SVALUE_STRLEN(sp);
 #ifndef NO_BUFFER_TYPE
   }
@@ -113,7 +113,7 @@ void f_sha1(void) {
     sha1_hash_block(final + 64, &h0, &h1, &h2, &h3, &h4);
   }
 
-  sprintf((char *)final, "%08x%08x%08x%08x%08x", h0, h1, h2, h3, h4);
+  sprintf(reinterpret_cast<char *>(final), "%08x%08x%08x%08x%08x", h0, h1, h2, h3, h4);
   pop_stack();
   push_malloced_string(string_copy((char *)final, "f_sha1"));
 }

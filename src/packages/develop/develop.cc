@@ -62,11 +62,12 @@ void f_debug_info(void) {
       if (obj_list == ob) {
         outbuf_add(&out, "This object is the head of the object list.\n");
       }
-      for (obj2 = obj_list, i = 1; obj2; obj2 = obj2->next_all, i++)
+      for (obj2 = obj_list, i = 1; obj2; obj2 = obj2->next_all, i++) {
         if (obj2->next_all == ob) {
           outbuf_addv(&out, "Previous object in object list: OBJ(/%s)\n", obj2->obname);
           outbuf_addv(&out, "position in object list:%d\n", i);
         }
+      }
       break;
     }
     case 1:

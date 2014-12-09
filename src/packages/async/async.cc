@@ -71,17 +71,18 @@ struct stuff *get_stuff() {
     pthread_mutex_lock(&mem_mut);
     ret = &stuffs->stuff;
     stuffs = stuffs->next;
-    ((struct stuff_mem *)ret)->next = 0;
+    (reinterpret_cast<struct stuff_mem *>(ret))->next = 0;
     pthread_mutex_unlock(&mem_mut);
   } else {
-    ret = (struct stuff *)DMALLOC(sizeof(struct stuff_mem), TAG_PERMANENT, "get_stuff");
-    ((struct stuff_mem *)ret)->next = 0;
+    ret = reinterpret_cast<struct stuff *>(
+        DMALLOC(sizeof(struct stuff_mem), TAG_PERMANENT, "get_stuff"));
+    (reinterpret_cast<struct stuff_mem *>(ret))->next = 0;
   }
   return ret;
 }
 
 void free_stuff(struct stuff *stuff) {
-  struct stuff_mem *stufft = (struct stuff_mem *)stuff;
+  struct stuff_mem *stufft = reinterpret_cast<struct stuff_mem *>(stuff);
   pthread_mutex_lock(&mem_mut);
   stufft->next = stuffs;
   stuffs = stufft;
@@ -140,17 +141,18 @@ function_to_call_t *get_cb() {
   if (cbs) {
     ret = &cbs->cb;
     cbs = cbs->next;
-    ((struct cb_mem *)ret)->next = 0;
+    (reinterpret_cast<struct cb_mem *>(ret))->next = 0;
   } else {
-    ret = (function_to_call_t *)DMALLOC(sizeof(struct cb_mem), TAG_PERMANENT, "get_cb");
-    ((struct cb_mem *)ret)->next = 0;
+    ret = reinterpret_cast<function_to_call_t *>(
+        DMALLOC(sizeof(struct cb_mem), TAG_PERMANENT, "get_cb"));
+    (reinterpret_cast<struct cb_mem *>(ret))->next = 0;
   }
   memset(ret, 0, sizeof(function_to_call_t));
   return ret;
 }
 
 void free_cb(function_to_call_t *cb) {
-  struct cb_mem *cbt = (struct cb_mem *)cb;
+  struct cb_mem *cbt = reinterpret_cast<struct cb_mem *>(cb);
   cbt->next = cbs;
   cbs = cbt;
 }
@@ -160,16 +162,17 @@ struct request *get_req() {
   if (reqms) {
     ret = &reqms->req;
     reqms = reqms->next;
-    ((struct req_mem *)ret)->next = 0;
+    (reinterpret_cast<struct req_mem *>(ret))->next = 0;
   } else {
-    ret = (struct request *)DMALLOC(sizeof(struct req_mem), TAG_PERMANENT, "get_cb");
-    ((struct req_mem *)ret)->next = 0;
+    ret = reinterpret_cast<struct request *>(
+        DMALLOC(sizeof(struct req_mem), TAG_PERMANENT, "get_cb"));
+    (reinterpret_cast<struct req_mem *>(ret))->next = 0;
   }
   return ret;
 }
 
 void free_req(struct request *req) {
-  struct req_mem *reqt = (struct req_mem *)req;
+  struct req_mem *reqt = reinterpret_cast<struct req_mem *>(req);
   reqt->next = reqms;
   reqms = reqt;
 }
@@ -330,7 +333,7 @@ int add_read(const char *fname, function_to_call_t *fun) {
   if (fname) {
     struct request *req = get_req();
     // printf("fname: %s\n", fname);
-    req->buf = (char *)DMALLOC(read_file_max_size, TAG_PERMANENT, "add_read");
+    req->buf = reinterpret_cast<char *>(DMALLOC(read_file_max_size, TAG_PERMANENT, "add_read"));
     req->size = read_file_max_size;
     req->fun = fun;
     req->type = aread;
@@ -354,7 +357,8 @@ int add_getdir(const char *fname, function_to_call_t *fun) {
   if (fname) {
     // printf("fname: %s\n", fname);
     struct request *req = get_req();
-    req->buf = (char *)DMALLOC(sizeof(struct dirent) * max_array_size, TAG_PERMANENT, "add_getdir");
+    req->buf = reinterpret_cast<char *>(
+        DMALLOC(sizeof(struct dirent) * max_array_size, TAG_PERMANENT, "add_getdir"));
     req->size = sizeof(struct dirent) * max_array_size;
     req->fun = fun;
     req->type = agetdir;
@@ -380,9 +384,10 @@ int add_write(const char *fname, const char *buf, int size, char flags, function
 #ifdef PACKAGE_COMPRESS
     if (flags & 2) {
       return aio_gzwrite(req);
-    } else
+    } else {
 #endif
       return aio_write(req);
+    }
   } else {
     error("permission denied\n");
   }
@@ -410,7 +415,7 @@ void handle_read(struct request *req) {
     return;
   }
   char *file = new_string(val, "read_file_async: str");
-  memcpy(file, (char *)(req->buf), val);
+  memcpy(file, const_cast<char *>(req->buf), val);
   file[val] = 0;
   push_malloced_string(file);
   FREE((void *)req->buf);
@@ -440,12 +445,14 @@ void handle_getdir(struct request *req) {
   int i = 0;
   if (val > 0) {
     struct linux_dirent *de = (struct linux_dirent *)req->buf;
-    for (i = 0; i < max_array_size && ((char *)de) - (char *)(req->buf) < val; i++) {
+    for (i = 0;
+         i < max_array_size && (reinterpret_cast<char *>(de)) - const_cast<char *>(req->buf) < val;
+         i++) {
       svalue_t *vp = &(ret->item[i]);
       vp->type = T_STRING;
       vp->subtype = STRING_MALLOC;
       vp->u.string = string_copy(de->d_name, "encode_stat");
-      de = (struct linux_dirent *)(((char *)de) + de->d_reclen);
+      de = reinterpret_cast<struct linux_dirent *>((reinterpret_cast<char *>(de)) + de->d_reclen);
     }
   }
   ret = resize_array(ret, i);

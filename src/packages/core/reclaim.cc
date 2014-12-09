@@ -15,8 +15,8 @@
 
 #define MAX_RECURSION 25
 
-static void gc_mapping(mapping_t *);
-static void check_svalue(svalue_t *);
+static void gc_mapping(mapping_t * /*m*/);
+static void check_svalue(svalue_t * /*v*/);
 
 static int cleaned, nested;
 
@@ -120,11 +120,13 @@ int reclaim_objects(bool is_auto) {
   reclaim_call_outs();
 
   cleaned = nested = 0;
-  for (ob = obj_list; ob; ob = ob->next_all)
-    if (ob->prog)
+  for (ob = obj_list; ob; ob = ob->next_all) {
+    if (ob->prog) {
       for (i = 0; i < ob->prog->num_variables_total; i++) {
         check_svalue(&ob->variables[i]);
       }
+    }
+  }
 
   return cleaned;
 }

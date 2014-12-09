@@ -21,10 +21,11 @@ static inline std::string &ltrim(std::string &s, const std::string &charset) {
             std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
   } else {
     int pos = s.find_first_not_of(charset);
-    if (pos == -1)
+    if (pos == -1) {
       s.clear();
-    else
+    } else {
       s.erase(s.begin(), s.begin() + pos);
+    }
   }
   return s;
 }

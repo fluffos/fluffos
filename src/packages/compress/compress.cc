@@ -226,13 +226,13 @@ void f_compress(void) {
 
   new_size = compressBound(size);
   // Make it a little larger as specified in the docs.
-  buffer = (unsigned char *)DMALLOC(new_size, TAG_TEMPORARY, "compress");
+  buffer = reinterpret_cast<unsigned char *>(DMALLOC(new_size, TAG_TEMPORARY, "compress"));
   compress(buffer, &new_size, input, size);
 
   // Shrink it down.
   pop_n_elems(st_num_arg);
   real_buffer = allocate_buffer(new_size);
-  write_buffer(real_buffer, 0, (char *)buffer, new_size);
+  write_buffer(real_buffer, 0, reinterpret_cast<char *>(buffer), new_size);
   FREE(buffer);
   push_buffer(real_buffer);
 }
@@ -262,7 +262,8 @@ void f_uncompress(void) {
     return;
   }
 
-  compressed = (z_stream *)DMALLOC(sizeof(z_stream), TAG_INTERACTIVE, "start_compression");
+  compressed =
+      reinterpret_cast<z_stream *>(DMALLOC(sizeof(z_stream), TAG_INTERACTIVE, "start_compression"));
   compressed->next_in = buffer->item;
   compressed->avail_in = buffer->size;
   compressed->next_out = compress_buf;
@@ -285,9 +286,10 @@ void f_uncompress(void) {
       pos = len;
       len += COMPRESS_BUF_SIZE - compressed->avail_out;
       if (!output_data) {
-        output_data = (unsigned char *)DMALLOC(len, TAG_TEMPORARY, "uncompress");
+        output_data = reinterpret_cast<unsigned char *>(DMALLOC(len, TAG_TEMPORARY, "uncompress"));
       } else {
-        output_data = (unsigned char *)DREALLOC(output_data, len, TAG_TEMPORARY, "uncompress");
+        output_data = reinterpret_cast<unsigned char *>(
+            DREALLOC(output_data, len, TAG_TEMPORARY, "uncompress"));
       }
       memcpy(output_data + pos, compress_buf, len - pos);
       compressed->next_out = compress_buf;
@@ -301,7 +303,7 @@ void f_uncompress(void) {
 
   if (ret == Z_STREAM_END) {
     buffer = allocate_buffer(len);
-    write_buffer(buffer, 0, (char *)output_data, len);
+    write_buffer(buffer, 0, reinterpret_cast<char *>(output_data), len);
     FREE(output_data);
     push_buffer(buffer);
   } else {

@@ -31,11 +31,11 @@ LPC_INT sval_hash(svalue_t x) {
     case T_STRING:
       return HASH(BLOCK(x.u.string));
     case T_NUMBER:
-      return (unsigned long)x.u.number;
+      return static_cast<unsigned long>(x.u.number);
     case T_OBJECT:
     // return HASH(BLOCK(x.u.ob->obname));
     default:
-      return (LPC_INT)(((POINTER_INT)((x).u.number)) >> 5);
+      return ((((x).u.number)) >> 5);
   }
 }
 /*
@@ -71,7 +71,7 @@ int growMap(mapping_t *m) {
   /* hash table doubles in size -- keep track of the memory used */
   total_mapping_size += sizeof(mapping_node_t *) * oldsize;
   debug(mapping, "mapping.c: growMap ptr = %p, size = %d\n", (void *)m, newsize);
-  m->unfilled = oldsize * (unsigned)FILL_PERCENT / (unsigned)100;
+  m->unfilled = oldsize * static_cast<unsigned>(FILL_PERCENT) / static_cast<unsigned>(100);
   m->table_size = newsize - 1;
   /* zero out the new storage area (2nd half of table) */
   memset(a += oldsize, 0, oldsize * sizeof(mapping_node_t *));
@@ -189,8 +189,8 @@ mapping_node_t *new_map_node() {
   if ((ret = free_nodes)) {
     free_nodes = ret->next;
   } else {
-    mnb = (mapping_node_block_t *)DMALLOC(sizeof(mapping_node_block_t), TAG_MAP_NODE_BLOCK,
-                                          "new_map_node");
+    mnb = reinterpret_cast<mapping_node_block_t *>(
+        DMALLOC(sizeof(mapping_node_block_t), TAG_MAP_NODE_BLOCK, "new_map_node"));
     mnb->next = mapping_node_blocks;
     mapping_node_blocks = mnb;
     mnb->nodes[MNB_SIZE - 1].next = 0;
@@ -249,7 +249,8 @@ mapping_t *allocate_mapping(int n) {
   if (n > MAX_MAPPING_SIZE) {
     n = MAX_MAPPING_SIZE;
   }
-  newmap = (mapping_t *)DMALLOC(sizeof(mapping_t), TAG_MAPPING, "allocate_mapping: 1");
+  newmap =
+      reinterpret_cast<mapping_t *>(DMALLOC(sizeof(mapping_t), TAG_MAPPING, "allocate_mapping: 1"));
   debug(mapping, "mapping.c: allocate_mapping begin, newmap = %p\n", (void *)newmap);
   if (newmap == NULL) {
     error("Allocate_mapping - out of memory.\n");
@@ -267,9 +268,9 @@ mapping_t *allocate_mapping(int n) {
     newmap->table_size = (n = MAP_HASH_TABLE_SIZE) - 1;
   }
   /* The size is actually 1 higher */
-  newmap->unfilled = n * (unsigned)FILL_PERCENT / (unsigned)100;
-  a = newmap->table =
-      (mapping_node_t **)DMALLOC(n *= sizeof(mapping_node_t *), TAG_MAP_TBL, "allocate_mapping: 3");
+  newmap->unfilled = n * static_cast<unsigned>(FILL_PERCENT) / static_cast<unsigned>(100);
+  a = newmap->table = reinterpret_cast<mapping_node_t **>(
+      DMALLOC(n *= sizeof(mapping_node_t *), TAG_MAP_TBL, "allocate_mapping: 3"));
   if (!a) {
     error("Allocate_mapping 2 - out of memory.\n");
   }
@@ -340,15 +341,16 @@ static mapping_t *copyMapping(mapping_t *m) {
   int k = m->table_size;
   mapping_node_t *elt, *nelt, **a, **b = m->table, **c;
 
-  newmap = (mapping_t *)DMALLOC(sizeof(mapping_t), TAG_MAPPING, "copy_mapping: 1");
+  newmap =
+      reinterpret_cast<mapping_t *>(DMALLOC(sizeof(mapping_t), TAG_MAPPING, "copy_mapping: 1"));
   if (newmap == NULL) {
     error("copyMapping - out of memory.\n");
   }
   newmap->table_size = k++;
   newmap->unfilled = m->unfilled;
   newmap->ref = 1;
-  c = newmap->table =
-      (mapping_node_t **)DCALLOC(k, sizeof(mapping_node_t *), TAG_MAP_TBL, "copy_mapping: 2");
+  c = newmap->table = reinterpret_cast<mapping_node_t **>(
+      DCALLOC(k, sizeof(mapping_node_t *), TAG_MAP_TBL, "copy_mapping: 2"));
   if (!c) {
     FREE((char *)newmap);
     error("copyMapping 2 - out of memory.\n");
@@ -460,7 +462,7 @@ LPC_INT svalue_to_int(svalue_t *v) {
 int msameval(svalue_t *arg1, svalue_t *arg2) {
   if (sizeof(long) == 8) {
     return (arg1->u.number == arg2->u.number);
-  } else
+  } else {
     switch (arg1->type | arg2->type) {
       case T_NUMBER:
         return arg1->u.number == arg2->u.number;
@@ -469,6 +471,7 @@ int msameval(svalue_t *arg1, svalue_t *arg2) {
       default:
         return arg1->u.arr == arg2->u.arr;
     }
+  }
 }
 
 /*

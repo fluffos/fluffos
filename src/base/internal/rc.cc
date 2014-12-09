@@ -28,7 +28,7 @@ char *external_cmd[NUM_EXTERNAL_CMDS];
 
 static std::deque<std::string> config_lines;
 
-static int scan_config_line(const char *, void *, int);
+static int scan_config_line(const char * /*fmt*/, void * /*dest*/, int /*required*/);
 static void config_init(void); /* don't ask */
 
 static void config_init() {
@@ -56,7 +56,7 @@ static void config_init() {
 static int scan_config_line(const char *fmt, void *dest, int required) {
   /* zero the destination.  It is either a pointer to an int or a char
      buffer, so this will work */
-  *((int *)dest) = 0;
+  *(reinterpret_cast<int *>(dest)) = 0;
 
   bool found = false;
   for (auto line : config_lines) {

@@ -40,7 +40,7 @@ int legal_path(const char *path) {
         return 0; /* check for `./', `..', or `../' */
       }
     }
-    p = (char *)strstr(p, "/."); /* search next component */
+    p = const_cast<char *>(strstr(p, "/.")); /* search next component */
     if (p) {
       p++; /* step over `/' */
     }

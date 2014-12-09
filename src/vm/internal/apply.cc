@@ -11,7 +11,7 @@
 // global static result
 svalue_t apply_ret_value;
 
-int convert_type(int);
+int convert_type(int /*type*/);
 
 int convert_type(int type) {
   switch (type & (~DECL_MODS)) {
@@ -253,10 +253,11 @@ retry_for_shadow:
     current_prog->function_table[findex].calls++;
 #endif
     /* Setup variables */
-    if (funflags & FUNC_TRUE_VARARGS)
+    if (funflags & FUNC_TRUE_VARARGS) {
       setup_varargs_variables(csp->num_local_variables, funp->num_local, funp->num_arg);
-    else
+    } else {
       setup_variables(csp->num_local_variables, funp->num_local, funp->num_arg);
+    }
 #ifdef TRACE
     tracedepth++;
     if (TRACEP(TRACE_CALL)) {

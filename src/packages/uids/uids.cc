@@ -123,13 +123,13 @@ void mark_all_uid_nodes() {
 }
 #endif
 
-static int uidcmp(void *, void *);
+static int uidcmp(void * /*uid1*/, void * /*uid2*/);
 
 static int uidcmp(void *uid1, void *uid2) {
   char *name1, *name2;
 
-  name1 = ((userid_t *)uid1)->name;
-  name2 = ((userid_t *)uid2)->name;
+  name1 = (reinterpret_cast<userid_t *>(uid1))->name;
+  name2 = (reinterpret_cast<userid_t *>(uid2))->name;
   return (name1 < name2 ? -1 : (name1 > name2 ? 1 : 0));
 }
 
@@ -139,12 +139,13 @@ userid_t *add_uid(const char *name) {
 
   sname = make_shared_string(name);
   t_uid.name = sname;
-  if ((uid = (userid_t *)tree_srch(uids, uidcmp, (char *)&t_uid))) {
+  if ((uid = reinterpret_cast<userid_t *>(
+           tree_srch(uids, uidcmp, reinterpret_cast<char *>(&t_uid))))) {
     free_string(sname);
   } else {
-    uid = (userid_t *)DMALLOC(sizeof(userid_t), TAG_UID, "add_uid");
+    uid = reinterpret_cast<userid_t *>(DMALLOC(sizeof(userid_t), TAG_UID, "add_uid"));
     uid->name = sname;
-    tree_add(&uids, uidcmp, (char *)uid, NULL);
+    tree_add(&uids, uidcmp, reinterpret_cast<char *>(uid), NULL);
   }
   return uid;
 }
@@ -154,9 +155,9 @@ userid_t *set_root_uid(const char *name) {
     return root_uid = add_uid(name);
   }
 
-  tree_delete(&uids, uidcmp, (char *)root_uid, NULL);
+  tree_delete(&uids, uidcmp, reinterpret_cast<char *>(root_uid), NULL);
   root_uid->name = make_shared_string(name);
-  tree_add(&uids, uidcmp, (char *)root_uid, NULL);
+  tree_add(&uids, uidcmp, reinterpret_cast<char *>(root_uid), NULL);
   return root_uid;
 }
 
@@ -165,8 +166,8 @@ userid_t *set_backbone_uid(const char *name) {
     return backbone_uid = add_uid(name);
   }
 
-  tree_delete(&uids, uidcmp, (char *)backbone_uid, NULL);
+  tree_delete(&uids, uidcmp, reinterpret_cast<char *>(backbone_uid), NULL);
   backbone_uid->name = make_shared_string(name);
-  tree_add(&uids, uidcmp, (char *)backbone_uid, NULL);
+  tree_add(&uids, uidcmp, reinterpret_cast<char *>(backbone_uid), NULL);
   return backbone_uid;
 }
