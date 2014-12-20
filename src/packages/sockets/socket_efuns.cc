@@ -341,10 +341,21 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
       close(fd);
       return EENONBLOCK;
     }
+    if (evutil_make_socket_closeonexec(fd) == -1) {
+      debug(sockets, "socket_create: make_socket_closeonexec error: %s.\n",
+            evutil_socket_error_to_string(evutil_socket_geterror(fd)));
+      close(fd);
+      return EESETSOCKOPT;
+    }
 
-#ifdef FD_CLOEXEC
-    fcntl(fd, F_SETFD, FD_CLOEXEC);
-#endif
+    // Set send buffer to 256K
+    {
+      int sendbuf = 256 * 1024;
+      if (setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sendbuf, sizeof(sendbuf)) == -1) {
+        debug(sockets, "socket_create: setsockopt so_sndbuf error: %s.\n",
+              evutil_socket_error_to_string(evutil_socket_geterror(fd)));
+      }
+    }
 
     new_lpc_socket_event_listener(i, &lpc_socks[i], fd);
 
