@@ -8,6 +8,7 @@
 #ifndef SRC_VM_INTERNAL_BASE_MACHINE_H_
 #define SRC_VM_INTERNAL_BASE_MACHINE_H_
 
+#include <chrono>
 #include <sys/types.h>
 
 // FIXME: make this more obvious
@@ -39,6 +40,9 @@ extern object_t *current_interactive;
 
 // TODO: defined in backend.cc
 extern uint64_t g_current_gametick;
+// Util to help translate gameticks with time.
+int time_to_gametick(std::chrono::milliseconds msec);
+std::chrono::milliseconds gametick_to_time(int ticks);
 
 // TODO: defined in interpret.cc
 extern struct error_context_t *current_error_context;

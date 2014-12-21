@@ -38,6 +38,10 @@ tick_event *add_walltime_event(std::chrono::milliseconds delay_msecs,
 // Used in shutdownMudos()
 void clear_tick_events();
 
+// Util to help translate gameticks with time.
+int time_to_gametick(std::chrono::milliseconds msec);
+std::chrono::milliseconds gametick_to_time(int ticks);
+
 void update_load_av(void);
 void update_compile_av(int);
 char *query_load_av(void);

@@ -2059,10 +2059,7 @@ void set_nextreset(object_t *ob) {
 #ifdef RANDOMIZED_RESETS
   time_to_reset_secs = time_to_reset_secs / 2 + random_number(time_to_reset_secs / 2);
 #endif
-  /* Be sure to update time first ! */
-  auto time_to_reset_ticks = std::chrono::seconds(time_to_reset_secs) /
-                             std::chrono::milliseconds(CONFIG_INT(__GAMETICK_MSEC__));
-  ob->next_reset = g_current_gametick + time_to_reset_ticks;
+  ob->next_reset = g_current_gametick + time_to_gametick(std::chrono::seconds(time_to_reset_secs));
 }
 }  // namespace
 
@@ -2079,6 +2076,7 @@ void reset_object(object_t *ob) {
 }
 
 void call_create(object_t *ob, int num_arg) {
+  /* Be sure to update time first ! */
   set_nextreset(ob);
 
   call___INIT(ob);

@@ -3379,12 +3379,14 @@ void f_set_reset(void) {
   const auto time_to_reset = CONFIG_INT(__TIME_TO_RESET__);
 
   if (st_num_arg == 2) {
-    (sp - 1)->u.ob->next_reset = g_current_gametick + sp->u.number;
+    (sp - 1)->u.ob->next_reset =
+        g_current_gametick + time_to_gametick(std::chrono::seconds(sp->u.number));
     free_object(&(--sp)->u.ob, "f_set_reset:1");
     sp--;
   } else {
     sp->u.ob->next_reset =
-        g_current_gametick + time_to_reset / 2 + random_number(time_to_reset / 2);
+        g_current_gametick + time_to_gametick(std::chrono::seconds(
+                                 time_to_reset / 2 + random_number(time_to_reset / 2)));
     free_object(&(sp--)->u.ob, "f_set_reset:2");
   }
 }

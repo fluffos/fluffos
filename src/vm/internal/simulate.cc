@@ -326,7 +326,7 @@ static object_t *load_virtual_object(const char *name, int clone) {
 
   /* finish initialization */
   new_ob->flags |= O_VIRTUAL;
-  new_ob->load_time = g_current_gametick;
+  new_ob->load_time = get_current_time();
 #ifdef PACKAGE_MUDLIB_STATS
   init_stats_for_object(new_ob);
   add_objects(&new_ob->stats, 1);
@@ -526,7 +526,7 @@ object_t *load_object(const char *lname, int callcreate) {
         num_objects_this_thread--;
         return 0;
       }
-      ob->load_time = g_current_gametick;
+      ob->load_time = get_current_time();
     }
     num_objects_this_thread--;
     return ob;
@@ -565,7 +565,7 @@ object_t *load_object(const char *lname, int callcreate) {
     debug(d_flag, "--/%s loaded", ob->obname);
   }
 
-  ob->load_time = g_current_gametick;
+  ob->load_time = get_current_time();
   num_objects_this_thread--;
 
   return ob;

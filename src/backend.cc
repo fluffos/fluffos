@@ -52,6 +52,14 @@ event_base *init_backend() {
 // to avoid dealing with rollover.
 uint64_t g_current_gametick;
 
+int time_to_gametick(std::chrono::milliseconds msecs) {
+  return msecs.count() / CONFIG_INT(__GAMETICK_MSEC__);
+}
+
+std::chrono::milliseconds gametick_to_time(int ticks) {
+  return std::chrono::milliseconds(CONFIG_INT(__GAMETICK_MSEC__)) * ticks;
+}
+
 namespace {
 // TODO: remove the need for this
 // Global variable for game ticket event handle.
@@ -126,8 +134,8 @@ void on_game_tick(int fd, short what, void *arg) {
 tick_event *add_gametick_event(std::chrono::milliseconds delay_msecs,
                                tick_event::callback_type callback) {
   auto event = new tick_event(callback);
-  g_tick_queue.insert(TickQueue::value_type(
-      g_current_gametick + delay_msecs.count() / CONFIG_INT(__GAMETICK_MSEC__), event));
+  g_tick_queue.insert(
+      TickQueue::value_type(g_current_gametick + time_to_gametick(delay_msecs), event));
   return event;
 }
 
@@ -262,8 +270,7 @@ void look_for_objects_to_swap() {
       /*
        * Check reference time before reset() is called.
        */
-      if (std::chrono::milliseconds((g_current_gametick - ob->time_of_ref) *
-                                    CONFIG_INT(__GAMETICK_MSEC__)) >=
+      if (gametick_to_time(g_current_gametick - ob->time_of_ref) >=
           std::chrono::seconds(time_to_clean_up)) {
         ready_for_clean_up = 1;
       }
@@ -271,7 +278,7 @@ void look_for_objects_to_swap() {
       /*
        * Should this object have reset(1) called ?
        */
-      if ((ob->flags & O_WILL_RESET) && (ob->next_reset <= g_current_gametick) &&
+      if ((ob->flags & O_WILL_RESET) && (g_current_gametick >= ob->next_reset) &&
           !(ob->flags & O_RESET_STATE)) {
         debug(d_flag, "RESET /%s\n", ob->obname);
         reset_object(ob);
@@ -340,46 +347,48 @@ double load_av = 0.0;
 }
 
 void update_load_av() {
-  static int last_time;
+  static long last_time;
   int n;
   double c;
   static int acc = 0;
 
+  auto now = get_current_time();
   acc++;
-  if (g_current_gametick == last_time) {
+  if (now == last_time) {
     return;
   }
-  n = g_current_gametick - last_time;
+  n = now - last_time;
   if (n < kNumConst) {
     c = consts[n];
   } else {
     c = exp(-n / 900.0);
   }
   load_av = c * load_av + acc * (1 - c) / n;
-  last_time = g_current_gametick;
+  last_time = now;
   acc = 0;
 } /* update_load_av() */
 
 static double compile_av = 0.0;
 
 void update_compile_av(int lines) {
-  static int last_time;
+  static long last_time;
   int n;
   double c;
   static int acc = 0;
 
+  auto now = get_current_time();
   acc += lines;
-  if (g_current_gametick == last_time) {
+  if (now == last_time) {
     return;
   }
-  n = g_current_gametick - last_time;
+  n = now - last_time;
   if (n < kNumConst) {
     c = consts[n];
   } else {
     c = exp(-n / 900.0);
   }
   compile_av = c * compile_av + acc * (1 - c) / n;
-  last_time = g_current_gametick;
+  last_time = now;
   acc = 0;
 } /* update_compile_av() */
 
