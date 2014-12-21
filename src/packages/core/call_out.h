@@ -1,14 +1,14 @@
 #ifndef CALL_OUT_H
 #define CALL_OUT_H
 
-struct tick_event;
-
 /*
  * call_out.c
  */
 
+#include <sys/time.h>
+
 typedef struct pending_call_s {
-  long target_time;
+  uint64_t target_time;
   union string_or_func function;
   object_t *ob;
   array_t *vs;
@@ -17,6 +17,7 @@ typedef struct pending_call_s {
 #endif
   LPC_INT handle;
   struct tick_event *tick_event;
+  bool is_walltime;
 } pending_call_t;
 
 void call_out(pending_call_t *cop);

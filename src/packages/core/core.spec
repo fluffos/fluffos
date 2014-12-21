@@ -61,11 +61,14 @@ string file_name(object default: F__THIS_OBJECT);
 string capitalize(string);
 string *explode(string, string);
 mixed implode(mixed *, string | function, void | mixed);
+
 #ifdef CALLOUT_HANDLES
 int call_out(string | function, int, ...);
 #else
 void call_out(string | function, int, ...);
 #endif
+int call_out_walltime(string | function, int, ...);
+
 int member_array(mixed, string | mixed *, void | int, void | int);
 int input_to(string | function, ...);
 int random(int);

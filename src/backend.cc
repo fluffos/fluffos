@@ -29,12 +29,28 @@
 #include "packages/sockets/socket_efuns.h"
 #endif
 
+// FIXME: rewrite other part so this could become static.
+struct event_base *g_event_base = NULL;
+
+namespace {
+void libevent_log(int severity, const char *msg) { debug(event, "%d:%s\n", severity, msg); }
+void libevent_dns_log(int severity, const char *msg) { debug(dns, "%d:%s\n", severity, msg); }
+}
+// Initialize backend
+event_base *init_backend() {
+  event_set_log_callback(libevent_log);
+  evdns_set_log_fn(libevent_dns_log);
+#ifdef DEBUG
+  event_enable_debug_mode();
+#endif
+  g_event_base = event_base_new();
+  debug_message("Event backend in use: %s\n", event_base_get_method(g_event_base));
+  return g_event_base;
+}
+
 // This the current game time, which is updated in on_virtual_time_tick. Note we use a large type
 // to avoid dealing with rollover.
 uint64_t g_current_gametick;
-
-// FIXME: rewrite other part so this could become static.
-struct event_base *g_event_base = NULL;
 
 namespace {
 // TODO: remove the need for this
@@ -115,34 +131,6 @@ tick_event *add_gametick_event(std::chrono::milliseconds delay_msecs,
   return event;
 }
 
-void clear_tick_events() {
-  int i = 0;
-  if (!g_tick_queue.empty()) {
-    for (auto iter : g_tick_queue) {
-      delete iter.second;
-      i++;
-    }
-    g_tick_queue.clear();
-  }
-  debug_message("clear_tick_events: %d leftover events cleared.\n", i);
-}
-
-namespace {
-void libevent_log(int severity, const char *msg) { debug(event, "%d:%s\n", severity, msg); }
-void libevent_dns_log(int severity, const char *msg) { debug(dns, "%d:%s\n", severity, msg); }
-}
-// Initialize backend
-event_base *init_backend() {
-  event_set_log_callback(libevent_log);
-  evdns_set_log_fn(libevent_dns_log);
-#ifdef DEBUG
-  event_enable_debug_mode();
-#endif
-  g_event_base = event_base_new();
-  debug_message("Event backend in use: %s\n", event_base_get_method(g_event_base));
-  return g_event_base;
-}
-
 namespace {
 void on_walltime_event(int fd, short what, void *arg) {
   auto event = reinterpret_cast<tick_event *>(arg);
@@ -154,7 +142,7 @@ void on_walltime_event(int fd, short what, void *arg) {
 } // namespace
 
 // Schedule a immediate event on main loop.
-void add_walltime_event(std::chrono::milliseconds delay_msecs, tick_event::callback_type callback) {
+tick_event * add_walltime_event(std::chrono::milliseconds delay_msecs, tick_event::callback_type callback) {
   auto event = new tick_event(callback);
   struct timeval val {
       delay_msecs.count() / 1000,
@@ -165,6 +153,19 @@ void add_walltime_event(std::chrono::milliseconds delay_msecs, tick_event::callb
     delay_ptr = &val;
   }
   event_base_once(g_event_base, -1, EV_TIMEOUT, on_walltime_event, event, delay_ptr);
+  return event;
+}
+
+void clear_tick_events() {
+  int i = 0;
+  if (!g_tick_queue.empty()) {
+    for (auto iter : g_tick_queue) {
+      delete iter.second;
+      i++;
+    }
+    g_tick_queue.clear();
+  }
+  debug_message("clear_tick_events: %d leftover events cleared.\n", i);
 }
 
 namespace {

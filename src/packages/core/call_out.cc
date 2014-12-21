@@ -70,18 +70,25 @@ static void free_call(pending_call_t *cop) {
 /*
  * Setup a new call out.
  */
-LPC_INT new_call_out(object_t *ob, svalue_t *fun, int delay_secs, int num_args, svalue_t *arg) {
+LPC_INT new_call_out(object_t *ob, svalue_t *fun, int delay_secs, int num_args, svalue_t *arg, bool walltime) {
   if (delay_secs < 0) {
     delay_secs = 0;
   }
 
-  DBG_CALLOUT("new_call_out: /%s delay %i\n", ob->obname, delay_secs);
+  DBG_CALLOUT("new_call_out: /%s delay secs %i\n", ob->obname, delay_secs);
 
   pending_call_t *cop = reinterpret_cast<pending_call_t *>(
       DCALLOC(1, sizeof(pending_call_t), TAG_CALL_OUT, "new_call_out"));
 
-  cop->target_time = g_current_gametick + delay_secs;
-  DBG_CALLOUT("  target_time: %ld\n", cop->target_time);
+  cop->is_walltime = walltime;
+
+  if (cop->is_walltime) {
+    cop->target_time = get_current_time() + delay_secs;
+  } else {
+    cop->target_time = g_current_gametick + (delay_secs * 1000 / CONFIG_INT(__GAMETICK_MSEC__));
+  }
+  DBG_CALLOUT("  is_walltime: %d\n", cop->is_walltime ? 1 : 0);
+  DBG_CALLOUT("  target_time: %lu\n", cop->target_time);
 
   if (fun->type == T_STRING) {
     DBG_CALLOUT("  function: %s\n", fun->u.string);
@@ -119,9 +126,13 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, int delay_secs, int num_args, 
   }
 
   auto callback = std::bind(call_out, cop);
-  cop->tick_event =
-      add_gametick_event(std::chrono::seconds(delay_secs), tick_event::callback_type(callback));
-
+  if (walltime) {
+    cop->tick_event =
+        add_walltime_event(std::chrono::seconds(delay_secs), tick_event::callback_type(callback));
+  } else {
+    cop->tick_event =
+        add_gametick_event(std::chrono::seconds(delay_secs), tick_event::callback_type(callback));
+  }
   return cop->handle;
 }
 
@@ -139,9 +150,9 @@ void call_out(pending_call_t *cop) {
   DBG_CALLOUT("Executing callout: %s\n", ob ? ob->obname : "(null)");
 
   DBG_CALLOUT("  handle: %ld\n", cop->handle);
-
-  DBG_CALLOUT("  target_time: %ld, current_time: %ld, real_time: %ld\n", cop->target_time,
-              g_current_gametick, get_current_time());
+  DBG_CALLOUT("  is_walltime: %i\n", cop->is_walltime ? 1 : 0);
+  DBG_CALLOUT("  target_time: %lu vs current: %lu\n",
+              cop->target_time, cop->is_walltime? get_current_time() : g_current_gametick);
 
   // Remove self from callout map
   {
@@ -216,10 +227,11 @@ void call_out(pending_call_t *cop) {
 }
 
 static int time_left(pending_call_t *cop) {
-  // FIXME: This is not fully correct, call_out actually operates in
-  // real time, but target_time was set base on current_time, so we need to
-  // substract current_time here to get a correct value.
-  return cop->target_time - g_current_gametick;
+  if (cop->is_walltime) {
+    return cop->target_time - get_current_time();
+  } else {
+    return (cop->target_time - g_current_gametick) * CONFIG_INT(__GAMETICK_MSEC__) / 1000;
+  }
 }
 
 /*
@@ -534,14 +546,15 @@ void reclaim_call_outs() {
   DBG_CALLOUT("reclaim_call_outs: %d callouts with command_giver gone.\n", i);
 #endif
 }
-#ifdef F_CALL_OUT
-void f_call_out(void) {
+
+namespace {
+inline void int_call_out(bool walltime) {
   svalue_t *arg = sp - st_num_arg + 1;
   int num = st_num_arg - 2;
   LPC_INT ret;
 
   if (!(current_object->flags & O_DESTRUCTED)) {
-    ret = new_call_out(current_object, arg, arg[1].u.number, num, arg + 2);
+    ret = new_call_out(current_object, arg, arg[1].u.number, num, arg + 2, walltime);
     /* args have been transfered; don't free them;
      also don't need to free the int */
     sp -= num + 1;
@@ -553,6 +566,18 @@ void f_call_out(void) {
   /* the function */
   free_svalue(sp, "call_out");
   put_number(ret);
+}
+}
+
+#ifdef F_CALL_OUT
+void f_call_out(void) {
+  int_call_out(false);
+}
+#endif
+
+#ifdef F_CALL_OUT_WALLTIME
+void f_call_out_walltime(void) {
+  int_call_out(true);
 }
 #endif
 

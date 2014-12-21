@@ -28,12 +28,10 @@ struct tick_event {
   tick_event(callback_type &callback) : valid(true), callback(callback) {}
 };
 
-// Register a event to run on game ticks. Safe to call from any thread.
+// Register a event to run on game ticks.
 tick_event *add_gametick_event(std::chrono::milliseconds delay_msecs, tick_event::callback_type callback);
-
-// Realtime event will be executed as close to designated walltime as possible. Be careful
-// that once registered, there is no way to cancel it.
-void add_walltime_event(std::chrono::milliseconds delay_msecs, tick_event::callback_type);
+// Realtime event will be executed as close to designated walltime as possible.
+tick_event* add_walltime_event(std::chrono::milliseconds delay_msecs, tick_event::callback_type callback);
 
 // Used in shutdownMudos()
 void clear_tick_events();
