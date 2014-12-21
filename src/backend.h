@@ -17,16 +17,6 @@ struct event_base *init_backend();
 // This is the main game loop.
 void backend(struct event_base *);
 
-// API for register realtime event.
-// Realtime event will be executed as close to designated walltime as possible.
-struct realtime_event {
-  typedef std::function<void()> callback_type;
-
-  callback_type callback;
-  realtime_event(callback_type &callback) : callback(callback) {}
-};
-void add_realtime_event(realtime_event::callback_type);
-
 // API for registering game tick event.
 // Game ticks provides guaranteed spacing intervals between each invocation.
 struct tick_event {
@@ -39,7 +29,11 @@ struct tick_event {
 };
 
 // Register a event to run on game ticks. Safe to call from any thread.
-tick_event *add_tick_event(std::chrono::milliseconds, tick_event::callback_type);
+tick_event *add_gametick_event(std::chrono::milliseconds delay_msecs, tick_event::callback_type callback);
+
+// Realtime event will be executed as close to designated walltime as possible. Be careful
+// that once registered, there is no way to cancel it.
+void add_walltime_event(std::chrono::milliseconds delay_msecs, tick_event::callback_type);
 
 // Used in shutdownMudos()
 void clear_tick_events();

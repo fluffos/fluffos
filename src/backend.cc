@@ -107,7 +107,7 @@ void on_game_tick(int fd, short what, void *arg) {
 
 }  // namespace
 
-tick_event *add_tick_event(std::chrono::milliseconds delay_msecs,
+tick_event *add_gametick_event(std::chrono::milliseconds delay_msecs,
                            tick_event::callback_type callback) {
   auto event = new tick_event(callback);
   g_tick_queue.insert(TickQueue::value_type(
@@ -143,16 +143,28 @@ event_base *init_backend() {
   return g_event_base;
 }
 
-static void on_main_loop_event(int fd, short what, void *arg) {
-  auto event = reinterpret_cast<realtime_event *>(arg);
-  event->callback();
+namespace {
+void on_walltime_event(int fd, short what, void *arg) {
+  auto event = reinterpret_cast<tick_event *>(arg);
+  if (event->valid) {
+    event->callback();
+  }
   delete event;
 }
+} // namespace
 
 // Schedule a immediate event on main loop.
-void add_realtime_event(realtime_event::callback_type callback) {
-  auto event = new realtime_event(callback);
-  event_base_once(g_event_base, -1, EV_TIMEOUT, on_main_loop_event, event, NULL);
+void add_walltime_event(std::chrono::milliseconds delay_msecs, tick_event::callback_type callback) {
+  auto event = new tick_event(callback);
+  struct timeval val {
+      delay_msecs.count() / 1000,
+      delay_msecs.count() % 1000 * 1000,
+  };
+  struct timeval *delay_ptr = nullptr;
+  if (delay_msecs.count() != 0) {
+    delay_ptr = &val;
+  }
+  event_base_once(g_event_base, -1, EV_TIMEOUT, on_walltime_event, event, delay_ptr);
 }
 
 namespace {
@@ -161,7 +173,7 @@ void look_for_objects_to_swap(void);
 
 // FIXME:
 void call_remove_destructed_objects() {
-  add_tick_event(std::chrono::minutes(5),
+  add_gametick_event(std::chrono::minutes(5),
                  tick_event::callback_type(call_remove_destructed_objects));
   remove_destructed_objects();
 }
@@ -173,14 +185,14 @@ void backend(struct event_base *base) {
   g_current_gametick = 0;
 
   // Register various tick events
-  add_tick_event(std::chrono::seconds(0), tick_event::callback_type(call_heart_beat));
-  add_tick_event(std::chrono::minutes(5), tick_event::callback_type(look_for_objects_to_swap));
-  add_tick_event(std::chrono::minutes(30),
+  add_gametick_event(std::chrono::seconds(0), tick_event::callback_type(call_heart_beat));
+  add_gametick_event(std::chrono::minutes(5), tick_event::callback_type(look_for_objects_to_swap));
+  add_gametick_event(std::chrono::minutes(30),
                  tick_event::callback_type(std::bind(reclaim_objects, true)));
 #ifdef PACKAGE_MUDLIB_STATS
-  add_tick_event(std::chrono::minutes(60), tick_event::callback_type(mudlib_stats_decay));
+  add_gametick_event(std::chrono::minutes(60), tick_event::callback_type(mudlib_stats_decay));
 #endif
-  add_tick_event(std::chrono::minutes(5),
+  add_gametick_event(std::chrono::minutes(5),
                  tick_event::callback_type(call_remove_destructed_objects));
 
   // NOTE: we don't use EV_PERSITENT here because that use fix-rate scheduling.
@@ -222,7 +234,7 @@ void look_for_objects_to_swap() {
   auto time_to_clean_up = CONFIG_INT(__TIME_TO_CLEAN_UP__);
 
   /* Next time is in 5 minutes */
-  add_tick_event(std::chrono::seconds(5 * 60), tick_event::callback_type(look_for_objects_to_swap));
+  add_gametick_event(std::chrono::seconds(5 * 60), tick_event::callback_type(look_for_objects_to_swap));
 
   object_t *ob, *next_ob, *last_good_ob;
   /*

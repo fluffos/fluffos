@@ -120,7 +120,7 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, int delay_secs, int num_args, 
 
   auto callback = std::bind(call_out, cop);
   cop->tick_event =
-      add_tick_event(std::chrono::seconds(delay_secs), tick_event::callback_type(callback));
+      add_gametick_event(std::chrono::seconds(delay_secs), tick_event::callback_type(callback));
 
   return cop->handle;
 }
