@@ -443,17 +443,6 @@ void check_all_blocks(int flag) {
   for (hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
     for (entry = table[hsh]; entry; entry = entry->next) {
       entry->tag &= ~TAG_MARKED;
-#ifdef CHECK_MEMORY
-      if (LEFT_MAGIC(entry) != MD_MAGIC) {
-        outbuf_addv(&out, "WARNING: left side of entry corrupt: %s %08lx at %lx\n", entry->desc,
-                    entry->tag, entry);
-      }
-      FETCH_RIGHT_MAGIC(tmp, entry);
-      if (tmp != MD_MAGIC) {
-        outbuf_addv(&out, "WARNING: right side of entry corrupt: %s %08lx at %lx\n", entry->desc,
-                    entry->tag, entry);
-      }
-#endif
       switch (entry->tag & 0xff00) {
         case TAG_TEMPORARY:
           if (!(flag & 2)) {
