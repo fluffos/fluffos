@@ -1869,7 +1869,7 @@ void reset_timezone(const char *old_tz) {
 void f_zonetime(void) {
   const char *timezone, *old_tz;
   char *retv;
-  LPC_INT time_val;
+  time_t time_val;
   int len;
 
   time_val = sp->u.number;
@@ -1894,17 +1894,19 @@ void f_zonetime(void) {
 #ifdef F_IS_DAYLIGHT_SAVINGS_TIME
 void f_is_daylight_savings_time(void) {
   struct tm *t;
-  LPC_INT time_to_check;
   const char *timezone;
   char *old_tz;
 
-  time_to_check = sp->u.number;
+  time_t time_to_check = sp->u.number;
   pop_stack();
   timezone = sp->u.string;
   pop_stack();
 
   old_tz = set_timezone(timezone);
 
+  if (time_to_check < 0) {
+    time_to_check = 0;
+  }
   t = localtime(&time_to_check);
   if (t) {
     push_number((t->tm_isdst) > 0);
