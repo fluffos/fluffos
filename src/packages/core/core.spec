@@ -63,11 +63,11 @@ string *explode(string, string);
 mixed implode(mixed *, string | function, void | mixed);
 
 #ifdef CALLOUT_HANDLES
-int call_out(string | function, int, ...);
+int call_out(string | function, int|float, ...);
 #else
-void call_out(string | function, int, ...);
+void call_out(string | function, int|float, ...);
 #endif
-int call_out_walltime(string | function, int, ...);
+int call_out_walltime(string | function, int|float, ...);
 
 int member_array(mixed, string | mixed *, void | int, void | int);
 int input_to(string | function, ...);

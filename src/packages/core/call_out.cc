@@ -3,8 +3,9 @@
 #include "packages/core/call_out.h"
 
 #include <chrono>
-#include <unordered_map>
 #include <functional>
+#include <math.h>
+#include <unordered_map>
 
 #include "packages/core/sprintf.h"
 
@@ -70,12 +71,9 @@ static void free_call(pending_call_t *cop) {
 /*
  * Setup a new call out.
  */
-LPC_INT new_call_out(object_t *ob, svalue_t *fun, int delay_secs, int num_args, svalue_t *arg, bool walltime) {
-  if (delay_secs < 0) {
-    delay_secs = 0;
-  }
-
-  DBG_CALLOUT("new_call_out: /%s delay secs %i\n", ob->obname, delay_secs);
+LPC_INT new_call_out(object_t *ob, svalue_t *fun, std::chrono::milliseconds delay_msecs,
+                     int num_args, svalue_t *arg, bool walltime) {
+  DBG_CALLOUT("new_call_out: /%s delay msecs %ld\n", ob->obname, delay_msecs.count());
 
   pending_call_t *cop = reinterpret_cast<pending_call_t *>(
       DCALLOC(1, sizeof(pending_call_t), TAG_CALL_OUT, "new_call_out"));
@@ -83,9 +81,11 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, int delay_secs, int num_args, 
   cop->is_walltime = walltime;
 
   if (cop->is_walltime) {
-    cop->target_time = get_current_time() + delay_secs;
+    cop->target_time =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            (std::chrono::high_resolution_clock::now() + delay_msecs).time_since_epoch()).count();
   } else {
-    cop->target_time = g_current_gametick + (delay_secs * 1000 / CONFIG_INT(__GAMETICK_MSEC__));
+    cop->target_time = g_current_gametick + (delay_msecs.count() / CONFIG_INT(__GAMETICK_MSEC__));
   }
   DBG_CALLOUT("  is_walltime: %d\n", cop->is_walltime ? 1 : 0);
   DBG_CALLOUT("  target_time: %lu\n", cop->target_time);
@@ -127,11 +127,9 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, int delay_secs, int num_args, 
 
   auto callback = std::bind(call_out, cop);
   if (walltime) {
-    cop->tick_event =
-        add_walltime_event(std::chrono::seconds(delay_secs), tick_event::callback_type(callback));
+    cop->tick_event = add_walltime_event(delay_msecs, tick_event::callback_type(callback));
   } else {
-    cop->tick_event =
-        add_gametick_event(std::chrono::seconds(delay_secs), tick_event::callback_type(callback));
+    cop->tick_event = add_gametick_event(delay_msecs, tick_event::callback_type(callback));
   }
   return cop->handle;
 }
@@ -151,8 +149,12 @@ void call_out(pending_call_t *cop) {
 
   DBG_CALLOUT("  handle: %ld\n", cop->handle);
   DBG_CALLOUT("  is_walltime: %i\n", cop->is_walltime ? 1 : 0);
-  DBG_CALLOUT("  target_time: %lu vs current: %lu\n",
-              cop->target_time, cop->is_walltime? get_current_time() : g_current_gametick);
+
+  DBG_CALLOUT("  target_time: %lu vs current: %lu\n", cop->target_time,
+              cop->is_walltime
+                  ? std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::high_resolution_clock::now().time_since_epoch()).count()
+                  : g_current_gametick);
 
   // Remove self from callout map
   {
@@ -228,7 +230,8 @@ void call_out(pending_call_t *cop) {
 
 static int time_left(pending_call_t *cop) {
   if (cop->is_walltime) {
-    return cop->target_time - get_current_time();
+    return (cop->target_time - std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()).count()) / 1000;
   } else {
     return (cop->target_time - g_current_gametick) * CONFIG_INT(__GAMETICK_MSEC__) / 1000;
   }
@@ -553,8 +556,22 @@ inline void int_call_out(bool walltime) {
   int num = st_num_arg - 2;
   LPC_INT ret;
 
+  LPC_INT delay_msecs = 0;
+  switch (arg[1].type) {
+    case T_NUMBER:
+      delay_msecs = arg[1].u.number * 1000;
+      break;
+    case T_REAL:
+      delay_msecs = floor(arg[1].u.real * 1000.0);
+      break;
+  }
+  if (delay_msecs < 0) {
+    delay_msecs = 0;
+  }
+
   if (!(current_object->flags & O_DESTRUCTED)) {
-    ret = new_call_out(current_object, arg, arg[1].u.number, num, arg + 2, walltime);
+    ret = new_call_out(current_object, arg, std::chrono::milliseconds(delay_msecs), num, arg + 2,
+                       walltime);
     /* args have been transfered; don't free them;
      also don't need to free the int */
     sp -= num + 1;
@@ -570,15 +587,11 @@ inline void int_call_out(bool walltime) {
 }
 
 #ifdef F_CALL_OUT
-void f_call_out(void) {
-  int_call_out(false);
-}
+void f_call_out(void) { int_call_out(false); }
 #endif
 
 #ifdef F_CALL_OUT_WALLTIME
-void f_call_out_walltime(void) {
-  int_call_out(true);
-}
+void f_call_out_walltime(void) { int_call_out(true); }
 #endif
 
 #ifdef F_CALL_OUT_INFO
