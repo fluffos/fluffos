@@ -7,11 +7,12 @@
 #include "packages/core/file.h"
 
 #ifdef F_DUMP_PROG
-void dump_prog(program_t *, const char *, int);
-static void disassemble(FILE *, char *, int, int, program_t *);
-static const char *disassem_string(const char *);
-static int short_compare(const void *, const void *);
-static void dump_line_numbers(FILE *, program_t *);
+void dump_prog(program_t * /*prog*/, const char * /*fn*/, int /*flags*/);
+static void disassemble(FILE * /*f*/, char * /*code*/, int /*start*/, int /*end*/,
+                        program_t * /*prog*/);
+static const char *disassem_string(const char * /*str*/);
+static int short_compare(const void * /*a*/, const void * /*b*/);
+static void dump_line_numbers(FILE * /*f*/, program_t * /*prog*/);
 
 void f_dump_prog(void) {
   program_t *prog;
@@ -82,15 +83,16 @@ void dump_prog(program_t *prog, const char *fn, int flags) {
   fprintf(f, "INHERITS:\n");
   fprintf(f, "\tname                    fio    vio\n");
   fprintf(f, "\t----------------        ---    ---\n");
-  for (i = 0; i < prog->num_inherited; i++)
+  for (i = 0; i < prog->num_inherited; i++) {
     fprintf(f, "\t%-20s  %5d  %5d\n", prog->inherit[i].prog->filename,
             prog->inherit[i].function_index_offset, prog->inherit[i].variable_index_offset);
+  }
   fprintf(f, "PROGRAM:");
   for (i = 0; i < prog->program_size; i++) {
     if (i % 16 == 0) {
-      fprintf(f, "\n\t%04x: ", (unsigned int)i);
+      fprintf(f, "\n\t%04x: ", static_cast<unsigned int>(i));
     }
-    fprintf(f, "%02d ", (unsigned char)prog->program[i]);
+    fprintf(f, "%02d ", static_cast<unsigned char>(prog->program[i]));
   }
   fputc('\n', f);
   fprintf(f, "FUNCTIONS:\n");
@@ -145,8 +147,9 @@ void dump_prog(program_t *prog, const char *fn, int flags) {
     }
   }
   fprintf(f, "VARIABLES:\n");
-  for (i = 0; i < prog->num_variables_defined; i++)
+  for (i = 0; i < prog->num_variables_defined; i++) {
     fprintf(f, "%4d: %-12s\n", i, prog->variable_table[i]);
+  }
   fprintf(f, "STRINGS:\n");
   for (i = 0; i < prog->num_strings; i++) {
     fprintf(f, "%4d: ", i);
@@ -230,7 +233,7 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
 
   if (start == 0) {
     /* sort offsets of functions */
-    offsets = (short *)malloc(NUM_FUNS_D * 2 * sizeof(short));
+    offsets = reinterpret_cast<short *>(malloc(NUM_FUNS_D * 2 * sizeof(short)));
     for (i = 0; i < NUM_FUNS_D; i++) {
       ri = i + prog->last_inherited;
 
@@ -241,7 +244,7 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
       }
       offsets[(i << 1) + 1] = i;
     }
-    qsort((char *)&offsets[0], NUM_FUNS_D, sizeof(short) * 2, short_compare);
+    qsort(reinterpret_cast<char *>(&offsets[0]), NUM_FUNS_D, sizeof(short) * 2, short_compare);
     next_func = 0;
   } else {
     offsets = 0;
@@ -259,7 +262,7 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
       }
     }
 
-    fprintf(f, "%04x: ", (unsigned)(pc - code));
+    fprintf(f, "%04x: ", static_cast<unsigned>(pc - code));
 
     pc++;
     buff[0] = 0;
@@ -293,16 +296,16 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
       case F_LAND:
 #endif
         COPY_SHORT(&sarg, pc);
-        offset = (pc - code) + (unsigned short)sarg;
-        sprintf(buff, "%04x (%04x)", (unsigned)sarg, (unsigned)offset);
+        offset = (pc - code) + sarg;
+        sprintf(buff, "%04x (%04x)", static_cast<unsigned>(sarg), static_cast<unsigned>(offset));
         pc += 2;
         break;
 
       case F_NEXT_FOREACH:
       case F_BBRANCH_LT:
         COPY_SHORT(&sarg, pc);
-        offset = (pc - code) - (unsigned short)sarg;
-        sprintf(buff, "%04x (%04x)", (unsigned)sarg, (unsigned)offset);
+        offset = (pc - code) - sarg;
+        sprintf(buff, "%04x (%04x)", static_cast<unsigned>(sarg), static_cast<unsigned>(offset));
         pc += 2;
         break;
 
@@ -338,8 +341,8 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
       case F_BBRANCH_WHEN_NON_ZERO:
       case F_BBRANCH:
         COPY_SHORT(&sarg, pc);
-        offset = (pc - code) - (unsigned short)sarg;
-        sprintf(buff, "%04x (%04x)", (unsigned)sarg, (unsigned)offset);
+        offset = (pc - code) - sarg;
+        sprintf(buff, "%04x (%04x)", static_cast<unsigned>(sarg), static_cast<unsigned>(offset));
         pc += 2;
         break;
 
@@ -352,7 +355,7 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
 #endif
       case F_CATCH:
         COPY_SHORT(&sarg, pc);
-        sprintf(buff, "%04x", (unsigned)sarg);
+        sprintf(buff, "%04x", static_cast<unsigned>(sarg));
         pc += 2;
         break;
 
@@ -390,9 +393,9 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
       case F_CALL_FUNCTION_BY_ADDRESS:
         COPY_SHORT(&sarg, pc);
         pc += 3;
-        if (sarg < NUM_FUNS)
+        if (sarg < NUM_FUNS) {
           sprintf(buff, "%-12s %5d", function_name(prog, sarg), sarg);
-        else {
+        } else {
           sprintf(buff, "<out of range %d>", sarg);
         }
         break;
@@ -403,15 +406,16 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
         newprog = (prog->inherit + EXTRACT_UCHAR(pc++))->prog;
         COPY_SHORT(&sarg, pc);
         pc += 3;
-        if (sarg < (newprog->num_functions_defined + newprog->last_inherited))
+        if (sarg < (newprog->num_functions_defined + newprog->last_inherited)) {
           sprintf(buff, "%30s::%-12s %5d", newprog->filename, function_name(newprog, sarg), sarg);
-        else
+        } else {
           sprintf(buff, "<out of range in %30s - %d>", newprog->filename, sarg);
+        }
         break;
       }
       case F_GLOBAL_LVALUE:
       case F_GLOBAL:
-        if ((unsigned)(iarg = EXTRACT_UCHAR(pc)) < NUM_VARS) {
+        if (static_cast<unsigned>(iarg = EXTRACT_UCHAR(pc)) < NUM_VARS) {
           sprintf(buff, "%s", variable_name(prog, iarg));
         } else {
           sprintf(buff, "<out of range %ld>", iarg);
@@ -425,9 +429,9 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
         break;
       case F_WHILE_DEC:
         COPY_SHORT(&sarg, pc + 1);
-        offset = (pc - code) - (unsigned short)sarg;
-        sprintf(buff, "LV%d--, branch %04x (%04x)", EXTRACT_UCHAR(pc), (unsigned)sarg,
-                (unsigned)offset);
+        offset = (pc - code) - sarg;
+        sprintf(buff, "LV%d--, branch %04x (%04x)", EXTRACT_UCHAR(pc), static_cast<unsigned>(sarg),
+                static_cast<unsigned>(offset));
         pc += 3;
         break;
       case F_TRANSFER_LOCAL:
@@ -444,7 +448,7 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
         COPY_INT(&iarg, pc);
         pc += 4;
         COPY_SHORT(&sarg, pc);
-        offset = (pc - code) - (unsigned short)sarg;
+        offset = (pc - code) - sarg;
         pc += 2;
         sprintf(buff, "LV%ld < %ld bbranch_when_non_zero %04x (%04x)", i, iarg, sarg, offset);
         break;
@@ -452,7 +456,7 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
         i = EXTRACT_UCHAR(pc++);
         iarg = *pc++;
         COPY_SHORT(&sarg, pc);
-        offset = (pc - code) - (unsigned short)sarg;
+        offset = (pc - code) - sarg;
         pc += 2;
         sprintf(buff, "LV%ld < LV%ld bbranch_when_non_zero %04x (%04x)", i, iarg, sarg, offset);
         break;
@@ -562,13 +566,13 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
         aptr = pc;
 
         fprintf(f, "switch\n");
-        fprintf(f, "      type: %02x table: %04x-%04x deflt: %04x\n", (unsigned)ttype,
+        fprintf(f, "      type: %02x table: %04x-%04x deflt: %04x\n", static_cast<unsigned>(ttype),
                 addr + stable, addr + etable, addr + def);
         /* recursively disassemble stuff in switch */
         disassemble(f, code, pc - code + 7, addr + stable, prog);
 
         /* now print out table - ugly... */
-        fprintf(f, "      switch table (for %04x)\n", (unsigned)(pc - code - 1));
+        fprintf(f, "      switch table (for %04x)\n", static_cast<unsigned>(pc - code - 1));
         if (ttype == 0xfe) {
           ttype = 0; /* direct lookup */
         } else if (ttype >> 4 == 0xf) {
@@ -646,12 +650,12 @@ static void dump_line_numbers(FILE *f, program_t *prog) {
   }
 
   fi = prog->file_info;
-  li_end = (unsigned char *)(((char *)fi) + fi[0]);
-  li_start = (unsigned char *)(fi + fi[1]);
+  li_end = reinterpret_cast<unsigned char *>((reinterpret_cast<char *>(fi)) + fi[0]);
+  li_start = reinterpret_cast<unsigned char *>(fi + fi[1]);
 
   fi += 2;
   fprintf(f, "\nabsolute line -> (file, line) table:\n");
-  while (fi < (unsigned short *)li_start) {
+  while (fi < reinterpret_cast<unsigned short *>(li_start)) {
     fprintf(f, "%i lines from %i [%s]\n", fi[0], fi[1], prog->strings[fi[1] - 1]);
     fi += 2;
   }

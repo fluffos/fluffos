@@ -68,7 +68,7 @@ void f_sqrt(void) {
   LPC_FLOAT val;
 
   if (sp->type == T_NUMBER) {
-    val = (LPC_FLOAT)sp->u.number;
+    val = static_cast<LPC_FLOAT>(sp->u.number);
   } else {
     val = sp->u.real;
   }
@@ -77,7 +77,7 @@ void f_sqrt(void) {
     error("math: sqrt(x) with (x < 0.0)\n");
     return;
   }
-  sp->u.real = (LPC_FLOAT)sqrt(val);
+  sp->u.real = sqrt(val);
   sp->type = T_REAL;
 }
 #endif
@@ -97,7 +97,7 @@ void f_log10(void) {
   LPC_FLOAT val;
 
   if (sp->type == T_NUMBER) {
-    val = (LPC_FLOAT)sp->u.number;
+    val = static_cast<LPC_FLOAT>(sp->u.number);
   } else {
     val = sp->u.real;
   }
@@ -116,7 +116,7 @@ void f_log2(void) {
   LPC_FLOAT val;
 
   if (sp->type == T_NUMBER) {
-    val = (LPC_FLOAT)sp->u.number;
+    val = static_cast<LPC_FLOAT>(sp->u.number);
   } else {
     val = sp->u.real;
   }
@@ -125,7 +125,7 @@ void f_log2(void) {
     error("math: log2(x) with (x <= 0.0)\n");
     return;
   }
-  sp->u.real = (LPC_FLOAT)log2((LPC_FLOAT)val);
+  sp->u.real = log2(val);
   sp->type = T_REAL;
 }
 #endif
@@ -135,13 +135,13 @@ void f_pow(void) {
   LPC_FLOAT val, val2;
 
   if ((sp - 1)->type == T_NUMBER) {
-    val = (LPC_FLOAT)(sp - 1)->u.number;
+    val = static_cast<LPC_FLOAT>((sp - 1)->u.number);
   } else {
     val = (sp - 1)->u.real;
   }
 
   if (sp->type == T_NUMBER) {
-    val2 = (LPC_FLOAT)sp->u.number;
+    val2 = static_cast<LPC_FLOAT>(sp->u.number);
   } else {
     val2 = sp->u.real;
   }
@@ -165,7 +165,7 @@ void f_ceil(void) { sp->u.real = ceil(sp->u.real); }
 #endif
 
 #ifdef F_ROUND
-void f_round(void) { sp->u.real = (LPC_FLOAT)round(sp->u.real); }
+void f_round(void) { sp->u.real = round(sp->u.real); }
 #endif
 
 #ifdef F_NORM
@@ -177,7 +177,7 @@ static LPC_FLOAT norm(array_t *a) {
   LPC_INT len = sp->u.arr->size;
   LPC_FLOAT total = 0.0;
 
-  while (len-- > 0)
+  while (len-- > 0) {
     if (a->item[len].type == T_NUMBER) {
       total += SQUARE((LPC_FLOAT)a->item[len].u.number);
     } else if (a->item[len].type == T_REAL) {
@@ -185,8 +185,9 @@ static LPC_FLOAT norm(array_t *a) {
     } else {
       return -INT_MAX + 1;
     }
+  }
 
-  return (LPC_FLOAT)sqrt(total);
+  return sqrt(total);
 }
 
 void f_norm(void) {
@@ -215,18 +216,19 @@ static LPC_FLOAT vector_op(array_t *a, array_t *b,
 
   while (len-- > 0) {
     if (b->item[len].type == T_NUMBER) {
-      if (a->item[len].type == T_NUMBER)
-        total += func((LPC_FLOAT)a->item[len].u.number, (LPC_FLOAT)b->item[len].u.number);
-      else if (a->item[len].type == T_REAL)
-        total += func(a->item[len].u.real, (LPC_FLOAT)b->item[len].u.number);
-      else {
+      if (a->item[len].type == T_NUMBER) {
+        total += func(static_cast<LPC_FLOAT>(a->item[len].u.number),
+                      static_cast<LPC_FLOAT>(b->item[len].u.number));
+      } else if (a->item[len].type == T_REAL) {
+        total += func(a->item[len].u.real, static_cast<LPC_FLOAT>(b->item[len].u.number));
+      } else {
         return -INT_MAX + 1;
       }
     } else if (b->item[len].type == T_REAL) {
-      if (a->item[len].type == T_NUMBER)
-        total += func((LPC_FLOAT)a->item[len].u.number, b->item[len].u.real);
+      if (a->item[len].type == T_NUMBER) {
+        total += func(static_cast<LPC_FLOAT>(a->item[len].u.number), b->item[len].u.real);
 
-      else if (a->item[len].type == T_REAL) {
+      } else if (a->item[len].type == T_REAL) {
         total += func(a->item[len].u.real, b->item[len].u.real);
       } else {
         return -INT_MAX + 1;
@@ -286,7 +288,7 @@ void f_distance(void) {
   }
 
   pop_2_elems();
-  push_real((LPC_FLOAT)sqrt(total));
+  push_real(sqrt(total));
 }
 #endif
 
@@ -325,6 +327,6 @@ void f_angle(void) {
   }
 
   pop_2_elems();
-  push_real((LPC_FLOAT)acos(dot / (norma * normb)));
+  push_real(acos(dot / (norma * normb)));
 }
 #endif

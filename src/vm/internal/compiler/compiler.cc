@@ -36,7 +36,7 @@ extern object_t *simul_efun_ob;
 extern svalue_t *safe_apply_master_ob(int, int);
 
 static void clean_parser(void);
-static void prolog(int, char *);
+static void prolog(int /*f*/, char * /*name*/);
 static program_t *epilog(void);
 static void show_overload_warnings(void);
 
@@ -122,10 +122,10 @@ char *get_two_types(char *where, char *end, int type1, int type2) {
 }
 
 void init_locals() {
-  type_of_locals = (unsigned short *)DCALLOC(CFG_MAX_LOCAL_VARIABLES, sizeof(unsigned short),
-                                             TAG_LOCALS, "init_locals:1");
-  locals = (local_info_t *)DCALLOC(CFG_MAX_LOCAL_VARIABLES, sizeof(local_info_t), TAG_LOCALS,
-                                   "init_locals:2");
+  type_of_locals = reinterpret_cast<unsigned short *>(
+      DCALLOC(CFG_MAX_LOCAL_VARIABLES, sizeof(unsigned short), TAG_LOCALS, "init_locals:1"));
+  locals = reinterpret_cast<local_info_t *>(
+      DCALLOC(CFG_MAX_LOCAL_VARIABLES, sizeof(local_info_t), TAG_LOCALS, "init_locals:2"));
   type_of_locals_ptr = type_of_locals;
   locals_ptr = locals;
   locals_size = type_of_locals_size = CFG_MAX_LOCAL_VARIABLES;
@@ -363,8 +363,8 @@ static int find_class_member(int which, char *name, unsigned short *type) {
 
   DEBUG_CHECK(!findstring(name), "name in find_class_member must be a shared string.\n");
 
-  cd = ((class_def_t *)mem_block[A_CLASS_DEF].block) + which;
-  cme = ((class_member_entry_t *)mem_block[A_CLASS_MEMBER].block) + cd->index;
+  cd = (reinterpret_cast<class_def_t *>(mem_block[A_CLASS_DEF].block)) + which;
+  cme = (reinterpret_cast<class_member_entry_t *>(mem_block[A_CLASS_MEMBER].block)) + cd->index;
   for (i = 0; i < cd->size; i++) {
     if (PROG_STRING(cme[i].membername) == name) {
       break;
@@ -433,7 +433,7 @@ int lookup_class_member(int which, char *name, unsigned short *type) {
   }
 
   if (ret == -1) {
-    class_def_t *cd = ((class_def_t *)mem_block[A_CLASS_DEF].block) + which;
+    class_def_t *cd = (reinterpret_cast<class_def_t *>(mem_block[A_CLASS_DEF].block)) + which;
     char buf[256];
     char *end = EndOf(buf);
     char *p;
@@ -454,16 +454,16 @@ parse_node_t *reorder_class_values(int which, parse_node_t *node) {
   parse_node_t **tmp;
   int i;
 
-  cd = ((class_def_t *)mem_block[A_CLASS_DEF].block) + which;
-  tmp = (parse_node_t **)DCALLOC(cd->size, sizeof(parse_node_t *), TAG_COMPILER,
-                                 "reorder_class_values");
+  cd = (reinterpret_cast<class_def_t *>(mem_block[A_CLASS_DEF].block)) + which;
+  tmp = reinterpret_cast<parse_node_t **>(
+      DCALLOC(cd->size, sizeof(parse_node_t *), TAG_COMPILER, "reorder_class_values"));
 
   for (i = 0; i < cd->size; i++) {
     tmp[i] = 0;
   }
 
   while (node) {
-    i = lookup_class_member(which, (char *)node->l.expr, 0);
+    i = lookup_class_member(which, reinterpret_cast<char *>(node->l.expr), 0);
     if (i != -1) {
       if (tmp[i]) {
         char buf[256];
@@ -471,7 +471,7 @@ parse_node_t *reorder_class_values(int which, parse_node_t *node) {
         char *p;
 
         p = strput(buf, end, "Redefinition of member '");
-        p = strput(p, end, (char *)node->l.expr);
+        p = strput(p, end, reinterpret_cast<char *>(node->l.expr));
         p = strput(p, end, "' in instantiation of class  '");
         p = strput(p, end, PROG_STRING(cd->classname));
         p = strput(p, end, "'");
@@ -480,7 +480,7 @@ parse_node_t *reorder_class_values(int which, parse_node_t *node) {
         tmp[i] = node->v.expr;
       }
     }
-    scratch_free((char *)node->l.expr);
+    scratch_free(reinterpret_cast<char *>(node->l.expr));
 
     node = node->r.expr;
   }
@@ -523,7 +523,7 @@ static void check_class(char *name, const program_t *prog, int idx, int nidx) {
   }
 
   sme1 = &prog->class_members[sd1->index];
-  sme2 = (class_member_entry_t *)mem_block[A_CLASS_MEMBER].block + sd2->index;
+  sme2 = reinterpret_cast<class_member_entry_t *>(mem_block[A_CLASS_MEMBER].block) + sd2->index;
 
   for (i = 0; i < n; i++) {
     int newtype;
@@ -578,13 +578,13 @@ void copy_structures(const program_t *prog) {
       check_class(str, prog, i, ihe->dn.class_num);
       continue;
     }
-    sd = (class_def_t *)allocate_in_mem_block(A_CLASS_DEF, sizeof(class_def_t));
+    sd = reinterpret_cast<class_def_t *>(allocate_in_mem_block(A_CLASS_DEF, sizeof(class_def_t)));
     sd->classname = store_prog_string(str);
     sd->size = prog->classes[i].size;
     sd->index = sm_off;
     sm_off += sd->size;
-    sme = (class_member_entry_t *)allocate_in_mem_block(A_CLASS_MEMBER,
-                                                        sizeof(class_member_entry_t) * sd->size);
+    sme = reinterpret_cast<class_member_entry_t *>(
+        allocate_in_mem_block(A_CLASS_MEMBER, sizeof(class_member_entry_t) * sd->size));
     offset = prog->classes[i].index;
     for (j = 0; j < sd->size; j++) {
       int oldtype = prog->class_members[offset + j].type;
@@ -724,7 +724,8 @@ static void overload_function(program_t *prog, int index, program_t *defprog, in
       p = strput(p, end, prog->filename);
       p = strput(p, end, ".");
 
-      ow = (ovlwarn_t *)DMALLOC(sizeof(ovlwarn_t), TAG_COMPILER, "overload warning");
+      ow = reinterpret_cast<ovlwarn_t *>(
+          DMALLOC(sizeof(ovlwarn_t), TAG_COMPILER, "overload warning"));
       ow->next = overload_warnings;
       ow->func = definition->funcname;
       ow->warn = alloc_cstring(buf, "overload warning");
@@ -739,7 +740,8 @@ static void overload_function(program_t *prog, int index, program_t *defprog, in
    * later.
    */
 
-  newdef = (compiler_temp_t *)DMALLOC(sizeof(compiler_temp_t), TAG_COMPILER, "overload_function");
+  newdef = reinterpret_cast<compiler_temp_t *>(
+      DMALLOC(sizeof(compiler_temp_t), TAG_COMPILER, "overload_function"));
 
   /* The resolution order is given in above comments */
   if (oldflags & FUNC_ALIAS) {
@@ -1037,7 +1039,7 @@ int arrange_call_inherited(char *name, parse_node_t *node) {
   num_inherits = NUM_INHERITS;
   /* no need to look for it unless its in the shared string table */
   if ((shared_string = findstring(real_name))) {
-    ip = (inherit_t *)mem_block[A_INHERITS].block;
+    ip = reinterpret_cast<inherit_t *>(mem_block[A_INHERITS].block);
     for (; num_inherits > 0; ip++, num_inherits--) {
       int tmp;
 
@@ -1061,7 +1063,7 @@ int arrange_call_inherited(char *name, parse_node_t *node) {
         }
 
         ret = node->l.number + ip->function_index_offset;
-        node->l.number |= ((ip - (inherit_t *)mem_block[A_INHERITS].block) << 16);
+        node->l.number |= ((ip - reinterpret_cast<inherit_t *>(mem_block[A_INHERITS].block)) << 16);
         return ret;
       }
     }
@@ -1233,7 +1235,7 @@ int define_new_function(const char *name, int num_arg, int num_local, int flags,
   }
   if (!funp) {
     num = mem_block[A_FUNCTIONS].current_size / sizeof(function_t);
-    funp = (function_t *)allocate_in_mem_block(A_FUNCTIONS, sizeof(function_t));
+    funp = reinterpret_cast<function_t *>(allocate_in_mem_block(A_FUNCTIONS, sizeof(function_t)));
     funp->funcname = make_shared_string(name);
     argument_start_index = INDEX_START_NONE;
     add_to_mem_block(A_ARGUMENT_INDEX, (char *)&argument_start_index, sizeof argument_start_index);
@@ -1247,8 +1249,8 @@ int define_new_function(const char *name, int num_arg, int num_local, int flags,
     newfunc = FUNCTION_TEMP(newindex);
     newfunc->next = (compiler_temp_t *)NULL;
   } else {
-    newfunc =
-        (compiler_temp_t *)DMALLOC(sizeof(compiler_temp_t), TAG_TEMPORARY, "define_new_function");
+    newfunc = reinterpret_cast<compiler_temp_t *>(
+        DMALLOC(sizeof(compiler_temp_t), TAG_TEMPORARY, "define_new_function"));
     *newfunc = *FUNCTION_TEMP(oldindex);
 
     /* We are going to rewrite stuff at oldindex */
@@ -1295,7 +1297,7 @@ int define_new_function(const char *name, int num_arg, int num_local, int flags,
         }
       }
     }
-    *((unsigned short *)mem_block[A_ARGUMENT_INDEX].block + num) =
+    *(reinterpret_cast<unsigned short *>(mem_block[A_ARGUMENT_INDEX].block) + num) =
         mem_block[A_ARGUMENT_TYPES].current_size / sizeof(unsigned short);
     add_to_mem_block(A_ARGUMENT_TYPES, (char *)type_of_locals_ptr,
                      num_arg * sizeof(*type_of_locals_ptr));
@@ -1364,7 +1366,7 @@ int define_variable(char *name, int type) {
     }
   }
 
-  dummy = (variable_t *)allocate_in_mem_block(A_VAR_TEMP, sizeof(variable_t));
+  dummy = reinterpret_cast<variable_t *>(allocate_in_mem_block(A_VAR_TEMP, sizeof(variable_t)));
   dummy->name = name;
   dummy->type = type;
 
@@ -1379,9 +1381,10 @@ int define_new_variable(char *name, int type) {
   var_defined = 1;
   name = make_shared_string(name);
   n = define_variable(name, type);
-  np = (char **)allocate_in_mem_block(A_VAR_NAME, sizeof(char *));
+  np = reinterpret_cast<char **>(allocate_in_mem_block(A_VAR_NAME, sizeof(char *)));
   *np = name;
-  tp = (unsigned short *)allocate_in_mem_block(A_VAR_TYPE, sizeof(unsigned short));
+  tp =
+      reinterpret_cast<unsigned short *>(allocate_in_mem_block(A_VAR_TYPE, sizeof(unsigned short)));
   *tp = type;
 
   return n;
@@ -1530,8 +1533,8 @@ short store_prog_string(const char *str) {
   mask = 1 << (hash & 7);
   tagp = &string_tags[hash >> 3];
 
-  p = (char **)&PROG_STRING(0);
-  next_tab = (short *)mem_block[A_STRING_NEXT].block;
+  p = const_cast<char **>(&PROG_STRING(0));
+  next_tab = reinterpret_cast<short *>(mem_block[A_STRING_NEXT].block);
 
   if (*tagp & mask) {
     /* search hash chain to see if it's there */
@@ -1539,7 +1542,7 @@ short store_prog_string(const char *str) {
       if (p[i] == str) {
         free_string(str); /* needed as string is only free'ed
                                    * once. */
-        ((short *)mem_block[A_STRING_REFS].block)[i]++;
+        (reinterpret_cast<short *>(mem_block[A_STRING_REFS].block))[i]++;
         return i;
       }
     }
@@ -1577,8 +1580,8 @@ short store_prog_string(const char *str) {
     i = mem_block[A_STRINGS].current_size / sizeof str - 1;
   }
   PROG_STRING(i) = str;
-  ((short *)mem_block[A_STRING_NEXT].block)[i] = next;
-  ((short *)mem_block[A_STRING_REFS].block)[i] = 1;
+  (reinterpret_cast<short *>(mem_block[A_STRING_NEXT].block))[i] = next;
+  (reinterpret_cast<short *>(mem_block[A_STRING_REFS].block))[i] = 1;
   *idxp = i;
   return i;
 }
@@ -1593,12 +1596,12 @@ void free_prog_string(short num) {
     yyerror("free_prog_string: index out of range.\n");
     return;
   }
-  if (--((short *)mem_block[A_STRING_REFS].block)[num] >= 1) {
+  if (--(reinterpret_cast<short *>(mem_block[A_STRING_REFS].block))[num] >= 1) {
     return;
   }
 
-  p = (char **)mem_block[A_STRINGS].block;
-  next_tab = (short *)mem_block[A_STRING_NEXT].block;
+  p = reinterpret_cast<char **>(mem_block[A_STRINGS].block);
+  next_tab = reinterpret_cast<short *>(mem_block[A_STRING_NEXT].block);
 
   str = p[num];
   STRING_HASH(hash, str);
@@ -1716,9 +1719,9 @@ int validate_function_call(int f, parse_node_t *args) {
       }
     } else {
       int which = FUNCTION_TEMP(f)->u.index;
-      int start = *((unsigned short *)mem_block[A_ARGUMENT_INDEX].block + which);
+      int start = *(reinterpret_cast<unsigned short *>(mem_block[A_ARGUMENT_INDEX].block) + which);
       if (start != INDEX_START_NONE) {
-        arg_types = (unsigned short *)mem_block[A_ARGUMENT_TYPES].block + start;
+        arg_types = reinterpret_cast<unsigned short *>(mem_block[A_ARGUMENT_TYPES].block) + start;
       }
     }
 
@@ -1731,7 +1734,7 @@ int validate_function_call(int f, parse_node_t *args) {
         fnarg--;
       }
 
-      for (i = 0; (unsigned)i < fnarg && i < num_arg; i++) {
+      for (i = 0; static_cast<unsigned>(i) < fnarg && i < num_arg; i++) {
         if (enode->type & 1) {
           break;
         }
@@ -1806,7 +1809,7 @@ parse_node_t *promote_to_int(parse_node_t *node) {
 
 parse_node_t *add_type_check(parse_node_t *node, int intype) {
   parse_node_t *expr, *expr2;
-  int type;
+  int type = 0;
 
   if (!(pragmas & PRAGMA_STRICT_TYPES)) {
     return node;
@@ -1841,10 +1844,8 @@ parse_node_t *add_type_check(parse_node_t *node, int intype) {
     default:
       if (intype & TYPE_MOD_ARRAY) {
         type = T_ARRAY;
-      } else if (intype & TYPE_MOD_CLASS) {
-        type = T_CLASS;
       } else {
-        fatal("unknown type %d in type check\n", intype);
+        type = T_CLASS;
       }
   }
 
@@ -2210,10 +2211,10 @@ static void handle_functions() {
 
   num_func = total_func = mem_block[A_FUNCTIONS].current_size / sizeof(function_t);
   if (num_func) {
-    func_index_map = (unsigned short *)DCALLOC(num_func, sizeof(unsigned short), TAG_TEMPORARY,
-                                               "handle_functions");
-    comp_sorted_funcs = (unsigned short *)DCALLOC(num_func, sizeof(unsigned short), TAG_TEMPORARY,
-                                                  "handle_functions");
+    func_index_map = reinterpret_cast<unsigned short *>(
+        DCALLOC(num_func, sizeof(unsigned short), TAG_TEMPORARY, "handle_functions"));
+    comp_sorted_funcs = reinterpret_cast<unsigned short *>(
+        DCALLOC(num_func, sizeof(unsigned short), TAG_TEMPORARY, "handle_functions"));
 
     i = num_func;
     while (i--) {
@@ -2256,10 +2257,11 @@ static void handle_functions() {
 
   num_def = mem_block[A_FUNCTION_DEFS].current_size / sizeof(compiler_temp_t);
   if (num_def) {
-    comp_def_index_map = (unsigned short *)DCALLOC(num_def, sizeof(unsigned short), TAG_TEMPORARY,
-                                                   "handle functions");
-    prog_flags = (unsigned short *)DCALLOC(comp_last_inherited + total_func, sizeof(unsigned short),
-                                           TAG_TEMPORARY, "handle_functions");
+    comp_def_index_map = reinterpret_cast<unsigned short *>(
+        DCALLOC(num_def, sizeof(unsigned short), TAG_TEMPORARY, "handle functions"));
+    prog_flags = reinterpret_cast<unsigned short *>(DCALLOC(comp_last_inherited + total_func,
+                                                            sizeof(unsigned short), TAG_TEMPORARY,
+                                                            "handle_functions"));
 
     for (i = 0; i < num_def; i++) {
       cur_def = FUNCTION_TEMP(i);
@@ -2391,11 +2393,12 @@ static program_t *epilog(void) {
     mem_block[A_ARGUMENT_INDEX].current_size = 0;
   }
 
-  for (i = 0; i < NUMPAREAS; i++)
+  for (i = 0; i < NUMPAREAS; i++) {
     if (i != A_LINENUMBERS && i != A_FILE_INFO && i != A_FUNCTION_DEFS && i != A_FUNCTIONS &&
         i != A_ARGUMENT_INDEX) {
       size += align(mem_block[i].current_size);
     }
+  }
 
   num_func = mem_block[A_FUNCTIONS].current_size / sizeof(function_t);
 
@@ -2413,8 +2416,8 @@ static program_t *epilog(void) {
     size += align(num_func * sizeof(unsigned short));
   }
 
-  p = (char *)DMALLOC(size, TAG_PROGRAM, "epilog: 1");
-  prog = (program_t *)p;
+  p = reinterpret_cast<char *>(DMALLOC(size, TAG_PROGRAM, "epilog: 1"));
+  prog = reinterpret_cast<program_t *>(p);
   *prog = NULL_program;
   prog->total_size = size;
   prog->ref = 0;
@@ -2441,16 +2444,16 @@ static program_t *epilog(void) {
   lnoff = 2 + (mem_block[A_FILE_INFO].current_size / sizeof(short));
   lnsz = lnoff * sizeof(short) + mem_block[A_LINENUMBERS].current_size;
 
-  prog->file_info = (unsigned short *)DMALLOC(lnsz, TAG_LINENUMBERS, "epilog");
+  prog->file_info = reinterpret_cast<unsigned short *>(DMALLOC(lnsz, TAG_LINENUMBERS, "epilog"));
 
-  prog->file_info[0] = (unsigned short)lnsz;
-  prog->file_info[1] = (unsigned short)lnoff;
+  prog->file_info[0] = static_cast<unsigned short>(lnsz);
+  prog->file_info[1] = static_cast<unsigned short>(lnoff);
 
-  memcpy(((char *)&prog->file_info[2]), mem_block[A_FILE_INFO].block,
+  memcpy((reinterpret_cast<char *>(&prog->file_info[2])), mem_block[A_FILE_INFO].block,
          mem_block[A_FILE_INFO].current_size);
 
-  prog->line_info = (unsigned char *)(&prog->file_info[lnoff]);
-  memcpy(((char *)&prog->file_info[lnoff]), mem_block[A_LINENUMBERS].block,
+  prog->line_info = reinterpret_cast<unsigned char *>(&prog->file_info[lnoff]);
+  memcpy((reinterpret_cast<char *>(&prog->file_info[lnoff])), mem_block[A_LINENUMBERS].block,
          mem_block[A_LINENUMBERS].current_size);
 
   p += align(sizeof(program_t));
@@ -2462,14 +2465,14 @@ static program_t *epilog(void) {
   prog->last_inherited = comp_last_inherited;
   prog->num_functions_defined = num_func;
 
-  prog->function_table = (function_t *)p;
+  prog->function_table = reinterpret_cast<function_t *>(p);
   for (i = 0; i < num_func; i++) {
     prog->function_table[i] = *FUNC(func_index_map[i]);
   }
 
   p += align(sizeof(function_t) * num_func);
 
-  prog->function_flags = (unsigned short *)p;
+  prog->function_flags = reinterpret_cast<unsigned short *>(p);
   if (prog_flags) {
     memcpy(p, prog_flags, (comp_last_inherited + num_func) * sizeof(unsigned short));
     FREE((char *)prog_flags);
@@ -2479,50 +2482,52 @@ static program_t *epilog(void) {
   if (mem_block[A_ARGUMENT_INDEX].current_size) {
     unsigned short *dest;
 
-    prog->argument_types = (unsigned short *)p;
+    prog->argument_types = reinterpret_cast<unsigned short *>(p);
     copy_in(A_ARGUMENT_TYPES, &p);
 
-    dest = prog->type_start = (unsigned short *)p;
+    dest = prog->type_start = reinterpret_cast<unsigned short *>(p);
     i = num_func;
-    while (i--)
-      dest[i] = *((unsigned short *)mem_block[A_ARGUMENT_INDEX].block + func_index_map[i]);
+    while (i--) {
+      dest[i] = *(reinterpret_cast<unsigned short *>(mem_block[A_ARGUMENT_INDEX].block) +
+                  func_index_map[i]);
+    }
     p += align(num_func * sizeof(unsigned short));
   } else {
     prog->argument_types = 0;
     prog->type_start = 0;
   }
 
-  prog->classes = (class_def_t *)p;
+  prog->classes = reinterpret_cast<class_def_t *>(p);
   prog->num_classes = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
   copy_in(A_CLASS_DEF, &p);
 
-  prog->class_members = (class_member_entry_t *)p;
+  prog->class_members = reinterpret_cast<class_member_entry_t *>(p);
   copy_in(A_CLASS_MEMBER, &p);
 
-  prog->strings = (char **)p;
+  prog->strings = reinterpret_cast<char **>(p);
   prog->num_strings = mem_block[A_STRINGS].current_size / sizeof(char *);
   copy_in(A_STRINGS, &p);
 
   prog->num_variables_defined = mem_block[A_VAR_NAME].current_size / sizeof(char *);
   prog->num_variables_total = mem_block[A_VAR_TEMP].current_size / sizeof(variable_t);
 
-  prog->variable_table = (char **)p;
+  prog->variable_table = reinterpret_cast<char **>(p);
   copy_in(A_VAR_NAME, &p);
-  prog->variable_types = (unsigned short *)p;
+  prog->variable_types = reinterpret_cast<unsigned short *>(p);
   copy_in(A_VAR_TYPE, &p);
 
   prog->num_inherited = mem_block[A_INHERITS].current_size / sizeof(inherit_t);
   if (prog->num_inherited) {
-    prog->inherit = (inherit_t *)p;
+    prog->inherit = reinterpret_cast<inherit_t *>(p);
     copy_in(A_INHERITS, &p);
   } else {
     prog->inherit = 0;
   }
 
 #ifdef DEBUG
-  if (p - (char *)prog != size) {
+  if (p - reinterpret_cast<char *>(prog) != size) {
     debug_message("Program size miscalculated for /%s.\n", prog->filename);
-    debug_message("is: %ld, expected: %d\n", p - (char *)prog, size);
+    debug_message("is: %ld, expected: %d\n", p - reinterpret_cast<char *>(prog), size);
   }
 #endif
 
@@ -2551,7 +2556,7 @@ static program_t *epilog(void) {
       loaded and not the last inherited
   */
   reference_prog(prog, "epilog");
-  for (i = 0; (unsigned)i < prog->num_inherited; i++) {
+  for (i = 0; static_cast<unsigned>(i) < prog->num_inherited; i++) {
     reference_prog(prog->inherit[i].prog, "inheritance");
   }
   release_tree();
@@ -2579,7 +2584,8 @@ static void prolog(int f, char *name) {
    * will be stored.
    */
   for (i = 0; i < NUMAREAS; i++) {
-    mem_block[i].block = (char *)DMALLOC(START_BLOCK_SIZE, TAG_COMPILER, "prolog: 2");
+    mem_block[i].block =
+        reinterpret_cast<char *>(DMALLOC(START_BLOCK_SIZE, TAG_COMPILER, "prolog: 2"));
     mem_block[i].current_size = 0;
     mem_block[i].max_size = START_BLOCK_SIZE;
   }
@@ -2637,11 +2643,11 @@ static void clean_parser() {
 
   n = mem_block[A_STRINGS].current_size / sizeof(char *);
   for (i = 0; i < n; i++) {
-    free_string(*((char **)mem_block[A_STRINGS].block + i));
+    free_string(*(reinterpret_cast<char **>(mem_block[A_STRINGS].block) + i));
   }
   n = mem_block[A_VAR_NAME].current_size / sizeof(char *);
   for (i = 0; i < n; i++) {
-    free_string(*((char **)mem_block[A_VAR_NAME].block + i));
+    free_string(*(reinterpret_cast<char **>(mem_block[A_VAR_NAME].block) + i));
   }
 
   prog = 0;
@@ -2707,8 +2713,8 @@ static int string_case_compare(const void *c1, const void *c2) {
   }
   x = (*(parse_node_t **)c1)->r.number;
   y = (*(parse_node_t **)c2)->r.number;
-  x = x ? ((LPC_INT)((POINTER_INT)PROG_STRING(x))) : 0;
-  y = y ? ((LPC_INT)((POINTER_INT)PROG_STRING(y))) : 0;
+  x = x ? (((POINTER_INT)PROG_STRING(x))) : 0;
+  y = y ? (((POINTER_INT)PROG_STRING(y))) : 0;
   return COMPARE_NUMS(x, y);
 }
 
@@ -2718,9 +2724,9 @@ void prepare_cases(parse_node_t *pn, int start) {
   int end;
   int direct = 1;
 
-  ce_start = (parse_node_t **)&mem_block[A_CASES].block[start];
+  ce_start = reinterpret_cast<parse_node_t **>(&mem_block[A_CASES].block[start]);
   end = mem_block[A_CASES].current_size;
-  ce_end = (parse_node_t **)&mem_block[A_CASES].block[end];
+  ce_end = reinterpret_cast<parse_node_t **>(&mem_block[A_CASES].block[end]);
 
   if (ce_start == ce_end) {
     /* no cases */
@@ -2729,10 +2735,11 @@ void prepare_cases(parse_node_t *pn, int start) {
     return;
   }
 
-  if (pn->kind == NODE_SWITCH_STRINGS)
+  if (pn->kind == NODE_SWITCH_STRINGS) {
     qsort(ce_start, ce_end - ce_start, sizeof(parse_node_t *), string_case_compare);
-  else
+  } else {
     qsort(ce_start, ce_end - ce_start, sizeof(parse_node_t *), case_compare);
+  }
 
   ce = ce_start;
   if ((*ce)->kind == NODE_DEFAULT) {
@@ -2767,9 +2774,10 @@ void prepare_cases(parse_node_t *pn, int start) {
       save_file_info(current_file_id, current_line - current_line_saved);
       current_line_saved = current_line;
 
-      translate_absolute_line((*ce)->line, (unsigned short *)mem_block[A_FILE_INFO].block, &fi1,
-                              &l1);
-      translate_absolute_line((*(ce - 1))->line, (unsigned short *)mem_block[A_FILE_INFO].block,
+      translate_absolute_line(
+          (*ce)->line, reinterpret_cast<unsigned short *>(mem_block[A_FILE_INFO].block), &fi1, &l1);
+      translate_absolute_line((*(ce - 1))->line,
+                              reinterpret_cast<unsigned short *>(mem_block[A_FILE_INFO].block),
                               &fi2, &l2);
       f1 = PROG_STRING(fi1 - 1);
       f2 = PROG_STRING(fi2 - 1);
@@ -2837,7 +2845,8 @@ char *allocate_in_mem_block(int n, int size) {
       mbp->max_size <<= 1;
     } while (mbp->current_size + size > mbp->max_size);
 
-    mbp->block = (char *)DREALLOC(mbp->block, mbp->max_size, TAG_COMPILER, "insert_in_mem_block");
+    mbp->block = reinterpret_cast<char *>(
+        DREALLOC(mbp->block, mbp->max_size, TAG_COMPILER, "insert_in_mem_block"));
   }
   ret = mbp->block + mbp->current_size;
   mbp->current_size += size;
@@ -2853,9 +2862,9 @@ void smart_log(const char *error_file, int line, const char *what, int flag) {
   svalue_t *mret;
   extern int pragmas;
 
-  buff = (char *)DMALLOC(
-      strlen(error_file) + strlen(what) + ((pragmas & PRAGMA_ERROR_CONTEXT) ? 100 : 40),
-      TAG_TEMPORARY, "smart_log: 1");
+  buff = reinterpret_cast<char *>(
+      DMALLOC(strlen(error_file) + strlen(what) + ((pragmas & PRAGMA_ERROR_CONTEXT) ? 100 : 40),
+              TAG_TEMPORARY, "smart_log: 1"));
 
   if (flag) {
     sprintf(buff, "/%s line %d: Warning: %s", error_file, line, what);
@@ -2867,7 +2876,7 @@ void smart_log(const char *error_file, int line, const char *what, int flag) {
     char *ls = strrchr(buff, '\n');
     unsigned char *tmp;
     if (ls) {
-      tmp = (unsigned char *)ls + 1;
+      tmp = reinterpret_cast<unsigned char *>(ls) + 1;
       while (*tmp && isspace(*tmp)) {
         tmp++;
       }

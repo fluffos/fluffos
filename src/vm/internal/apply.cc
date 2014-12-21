@@ -11,7 +11,7 @@
 // global static result
 svalue_t apply_ret_value;
 
-int convert_type(int);
+int convert_type(int /*type*/);
 
 int convert_type(int type) {
   switch (type & (~DECL_MODS)) {
@@ -165,11 +165,11 @@ int apply_low(const char *fun, object_t *ob, int num_arg) {
     local_call_origin = ORIGIN_DRIVER;
   }
   call_origin = 0;
-  ob->time_of_ref = g_current_virtual_time; /* Used by the swapper */
-                                            /*
-   * This object will now be used, and is thus a target for reset later on
-   * (when time due).
-   */
+  ob->time_of_ref = g_current_gametick; /* Used by the swapper */
+                                        /*
+* This object will now be used, and is thus a target for reset later on
+* (when time due).
+*/
 #if !defined(NO_RESETS) && defined(LAZY_RESETS)
   try_reset(ob);
 #endif
@@ -253,10 +253,11 @@ retry_for_shadow:
     current_prog->function_table[findex].calls++;
 #endif
     /* Setup variables */
-    if (funflags & FUNC_TRUE_VARARGS)
+    if (funflags & FUNC_TRUE_VARARGS) {
       setup_varargs_variables(csp->num_local_variables, funp->num_local, funp->num_arg);
-    else
+    } else {
       setup_variables(csp->num_local_variables, funp->num_local, funp->num_arg);
+    }
 #ifdef TRACE
     tracedepth++;
     if (TRACEP(TRACE_CALL)) {

@@ -12,7 +12,7 @@ void init_dns_event_base(struct event_base *base) {
   g_dns_base = evdns_base_new(base, 1);
 }
 
-static void add_ip_entry(struct sockaddr *, socklen_t size, char *);
+static void add_ip_entry(struct sockaddr * /*addr*/, socklen_t size, char * /*name*/);
 
 typedef struct addr_name_query_s {
   sockaddr_storage addr;
@@ -22,16 +22,16 @@ typedef struct addr_name_query_s {
 
 // Reverse DNS lookup.
 void on_addr_name_result(int err, char type, int count, int ttl, void *addresses, void *arg) {
-  auto query = (addr_name_query_t *)arg;
+  auto query = reinterpret_cast<addr_name_query_t *>(arg);
 
   if (err) {
     debug(dns, "DNS reverse lookup fail: %s.\n", evdns_err_to_string(err));
   } else if (count == 0) {
     debug(dns, "DNS reverse lookup returns no result.\n");
   } else {
-    auto result = *((char **)addresses);
+    auto result = *(reinterpret_cast<char **>(addresses));
     debug(dns, "DNS reverse lookup result: %d: %s\n", type, result);
-    add_ip_entry((sockaddr *)&query->addr, query->addrlen, result);
+    add_ip_entry(reinterpret_cast<sockaddr *>(&query->addr), query->addrlen, result);
   }
   delete query;
 }
@@ -51,9 +51,9 @@ void query_name_by_addr(object_t *ob) {
 
   // Check for mapped v4 address, if we are querying for v6 address.
   if (query->addr.ss_family == AF_INET6) {
-    in6_addr *addr6 = &(((sockaddr_in6 *)(&query->addr))->sin6_addr);
+    in6_addr *addr6 = &((reinterpret_cast<sockaddr_in6 *>(&query->addr))->sin6_addr);
     if (IN6_IS_ADDR_V4MAPPED(addr6) || IN6_IS_ADDR_V4COMPAT(addr6)) {
-      in_addr *addr4 = &((in_addr *)(addr6))[3];
+      in_addr *addr4 = &(reinterpret_cast<in_addr *>(addr6))[3];
       debug(dns, "Found mapped v4 address, using extracted v4 address to resolve.\n") query->req =
           evdns_base_resolve_reverse(g_dns_base, addr4, 0, on_addr_name_result, query);
     } else {
@@ -61,7 +61,7 @@ void query_name_by_addr(object_t *ob) {
           evdns_base_resolve_reverse_ipv6(g_dns_base, addr6, 0, on_addr_name_result, query);
     }
   } else {
-    in_addr *addr4 = &((sockaddr_in *)&query->addr)->sin_addr;
+    in_addr *addr4 = &(reinterpret_cast<sockaddr_in *>(&query->addr))->sin_addr;
     query->req = evdns_base_resolve_reverse(g_dns_base, addr4, 0, on_addr_name_result, query);
   }
 }
@@ -120,12 +120,12 @@ void on_query_addr_by_name_finish(addr_number_query *query) {
 
 // intermediate result from evdns_getaddrinfo
 void on_getaddr_result(int err, evutil_addrinfo *res, void *arg) {
-  auto query = (addr_number_query *)arg;
+  auto query = reinterpret_cast<addr_number_query *>(arg);
   query->err = err;
   query->res = res;
 
   // Schedule an immediate event to call LPC callback.
-  add_realtime_event(std::bind(on_query_addr_by_name_finish, query));
+  add_gametick_event(std::chrono::milliseconds(0), std::bind(on_query_addr_by_name_finish, query));
 }
 
 /*
@@ -224,7 +224,7 @@ const char *query_ip_number(object_t *ob) {
     return 0;
   }
   char host[NI_MAXHOST];
-  getnameinfo((sockaddr *)&ob->interactive->addr, sizeof(ob->interactive->addr), host, sizeof(host),
-              NULL, 0, NI_NUMERICHOST);
+  getnameinfo(reinterpret_cast<sockaddr *>(&ob->interactive->addr), sizeof(ob->interactive->addr),
+              host, sizeof(host), NULL, 0, NI_NUMERICHOST);
   return make_shared_string(host);
 }

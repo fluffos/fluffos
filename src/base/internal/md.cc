@@ -26,7 +26,7 @@ unsigned int hiwater = 0L;
 void MDinit() {
   int j;
 
-  table = (md_node_t **)calloc(MD_TABLE_SIZE, sizeof(md_node_t *));
+  table = reinterpret_cast<md_node_t **>(calloc(MD_TABLE_SIZE, sizeof(md_node_t *)));
   for (j = 0; j < MAX_CATEGORY; j++) {
     totals[j] = 0;
   }

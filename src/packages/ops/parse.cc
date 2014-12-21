@@ -287,27 +287,35 @@ static parse_global_t *globals = 0;
 #define parse_patarr (globals->patarr)
 #define parse_obarr (globals->obarr)
 
-static void load_lpc_info(int, object_t *);
+static void load_lpc_info(int /*ix*/, object_t * /*ob*/);
 static void parse_clean_up(void);
 static void push_parse_globals(void);
 static void pop_parse_globals(void);
-static void store_value(svalue_t *, int, int, svalue_t *);
-static void store_words_slice(svalue_t *, int, int, array_t *, int, int);
-static svalue_t *sub_parse(array_t *, array_t *, int *, array_t *, int *, int *, svalue_t *);
-static svalue_t *one_parse(array_t *, const char *, array_t *, int *, int *, svalue_t *);
-static svalue_t *number_parse(array_t *, array_t *, int *, int *);
-static svalue_t *item_parse(array_t *, array_t *, int *, int *);
+static void store_value(svalue_t * /*sp*/, int /*pos*/, int /*num*/, svalue_t * /*what*/);
+static void store_words_slice(svalue_t * /*sp*/, int /*pos*/, int /*num*/, array_t * /*warr*/,
+                              int /*from*/, int /*to*/);
+static svalue_t *sub_parse(array_t * /*obarr*/, array_t * /*patarr*/, int * /*pix_in*/,
+                           array_t * /*warr*/, int * /*cix_in*/, int * /*fail*/, svalue_t * /*sp*/);
+static svalue_t *one_parse(array_t * /*obarr*/, const char * /*pat*/, array_t * /*warr*/,
+                           int * /*cix_in*/, int * /*fail*/, svalue_t * /*prep_param*/);
+static svalue_t *number_parse(array_t * /*obarr*/, array_t * /*warr*/, int * /*cix_in*/,
+                              int * /*fail*/);
+static svalue_t *item_parse(array_t * /*obarr*/, array_t * /*warr*/, int * /*cix_in*/,
+                            int * /*fail*/);
 #ifndef NO_ADD_ACTION
-static svalue_t *living_parse(array_t *, array_t *, int *, int *);
+static svalue_t *living_parse(array_t * /*obarr*/, array_t * /*warr*/, int * /*cix_in*/,
+                              int * /*fail*/);
 #endif
-static svalue_t *single_parse(array_t *, array_t *, int *, int *);
-static svalue_t *prepos_parse(array_t *, int *, int *, svalue_t *);
-static int match_object(int, array_t *, int *, int *);
-static int find_string(const char *, array_t *, int *);
-static int check_adjectiv(int, array_t *, int, int);
-static int member_string(const char *, array_t *);
-static const char *parse_to_plural(const char *);
-static const char *parse_one_plural(const char *);
+static svalue_t *single_parse(array_t * /*obarr*/, array_t * /*warr*/, int * /*cix_in*/,
+                              int * /*fail*/);
+static svalue_t *prepos_parse(array_t * /*warr*/, int * /*cix_in*/, int * /*fail*/,
+                              svalue_t * /*prepos*/);
+static int match_object(int /*obix*/, array_t * /*warr*/, int * /*cix_in*/, int * /*plur*/);
+static int find_string(const char * /*str*/, array_t * /*warr*/, int * /*cix_in*/);
+static int check_adjectiv(int /*obix*/, array_t * /*warr*/, int /*from*/, int /*to*/);
+static int member_string(const char * /*str*/, array_t * /*sarr*/);
+static const char *parse_to_plural(const char * /*str*/);
+static const char *parse_one_plural(const char * /*str*/);
 
 /*
  * Function name:       load_lpc_info
@@ -427,7 +435,8 @@ static void push_parse_globals() {
   sp->type = T_ERROR_HANDLER;
   sp->u.error_handler = parse_clean_up;
 
-  pg = (parse_global_t *)DMALLOC(sizeof(parse_global_t), TAG_TEMPORARY, "push_parse_globals");
+  pg = reinterpret_cast<parse_global_t *>(
+      DMALLOC(sizeof(parse_global_t), TAG_TEMPORARY, "push_parse_globals"));
   pg->next = globals;
   globals = pg;
 
@@ -477,7 +486,7 @@ int parse(const char *cmd,       /* Command to parse */
           int num_arg) {
   int pix, cix, six, fail, fword, ocix, fpix;
   svalue_t *pval;
-  array_t *obarr;
+  array_t *obarr = nullptr;
 
   /*
    * Pattern and commands can not be empty
@@ -514,9 +523,6 @@ int parse(const char *cmd,       /* Command to parse */
     parse_obarr = obarr = deep_inventory(ob_or_array->u.ob, 1, NULL);
   }
 #endif
-  else {
-    error("Bad second argument to parse_command()\n");
-  }
 
   check_for_destr(obarr);
 
@@ -912,7 +918,7 @@ static svalue_t *number_parse(array_t *obarr, array_t *warr, int *cix_in, int *f
     return &parse_ret;
   }
   /* This next double loop is incredibly stupid. -Beek */
-  for (ten = 0; ten < 10; ten++)
+  for (ten = 0; ten < 10; ten++) {
     for (ones = 0; ones < 10; ones++) {
       sprintf(buf, "%s%s", num10[ten], (ten > 1) ? num1[ones] : num1[ten * 10 + ones]);
       if (EQ(buf, warr->item[cix].u.string)) {
@@ -922,9 +928,10 @@ static svalue_t *number_parse(array_t *obarr, array_t *warr, int *cix_in, int *f
         return &parse_ret;
       }
     }
+  }
 
   /* this one too */
-  for (ten = 0; ten < 10; ten++)
+  for (ten = 0; ten < 10; ten++) {
     for (ones = 0; ones < 10; ones++) {
       sprintf(buf, "%s%s", (ones) ? ord10[ten] : sord10[ten],
               (ten > 1) ? ord1[ones] : ord1[ten * 10 + ones]);
@@ -935,6 +942,7 @@ static svalue_t *number_parse(array_t *obarr, array_t *warr, int *cix_in, int *f
         return &parse_ret;
       }
     }
+  }
 
   *fail = 1;
   return 0;
@@ -1054,10 +1062,11 @@ static svalue_t *living_parse(array_t *obarr, array_t *warr, int *cix_in, int *f
   tix = 0;
   *fail = 0;
 
-  for (obix = 0; obix < obarr->size; obix++)
+  for (obix = 0; obix < obarr->size; obix++) {
     if (obarr->item[obix].u.ob->flags & O_ENABLE_COMMANDS) {
       assign_svalue_no_free(&live->item[tix++], &obarr->item[obix]);
     }
+  }
 
   if (tix) {
     pval = item_parse(live, warr, cix_in, fail);
@@ -1381,7 +1390,7 @@ static int check_adjectiv(int obix, array_t *warr, int from, int to) {
     return 0;
   }
 
-  adstr = (char *)DMALLOC(sum, TAG_TEMPORARY, "check_adjectiv");
+  adstr = reinterpret_cast<char *>(DMALLOC(sum, TAG_TEMPORARY, "check_adjectiv"));
 
   /*
    * If we now have: "adj1 adj2 adj3 ... adjN"

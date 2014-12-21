@@ -1,5 +1,6 @@
 #include "base/std.h"
 
+#include <chrono>
 #include <ctype.h>  // for isdigit
 #include <math.h>   // for pow
 #ifdef HAVE_SYS_STAT_H
@@ -31,8 +32,8 @@ object_t *previous_ob;
 int tot_alloc_object, tot_alloc_object_size;
 
 char *save_mapping(mapping_t *m);
-static int restore_array(char **str, svalue_t *);
-static int restore_class(char **str, svalue_t *);
+static int restore_array(char **str, svalue_t * /*ret*/);
+static int restore_class(char **str, svalue_t * /*ret*/);
 
 #ifdef F_SET_HIDE
 int num_hidden = 0;
@@ -226,10 +227,11 @@ static int restore_internal_size(const char **str, int is_mapping, int depth) {
   while ((c = *cp++)) {
     switch (c) {
       case '"': {
-        while ((c = *cp++) != '"')
+        while ((c = *cp++) != '"') {
           if ((c == '\0') || (c == '\\' && !*cp++)) {
             return 0;
           }
+        }
         if (*cp++ != delim) {
           return 0;
         }
@@ -273,7 +275,8 @@ static int restore_internal_size(const char **str, int is_mapping, int depth) {
             while (max_depth <= depth) {
               max_depth <<= 1;
             }
-            sizes = (int *)DCALLOC(max_depth, sizeof(int), TAG_TEMPORARY, "restore_internal_size");
+            sizes = reinterpret_cast<int *>(
+                DCALLOC(max_depth, sizeof(int), TAG_TEMPORARY, "restore_internal_size"));
           } else if (depth >= max_depth) {
             while ((max_depth <<= 1) <= depth) {
               ;
@@ -296,7 +299,8 @@ static int restore_internal_size(const char **str, int is_mapping, int depth) {
             while (max_depth <= depth) {
               max_depth <<= 1;
             }
-            sizes = (int *)DCALLOC(max_depth, sizeof(int), TAG_TEMPORARY, "restore_internal_size");
+            sizes = reinterpret_cast<int *>(
+                DCALLOC(max_depth, sizeof(int), TAG_TEMPORARY, "restore_internal_size"));
           } else if (depth >= max_depth) {
             while ((max_depth <<= 1) <= depth) {
               ;
@@ -344,10 +348,11 @@ static int restore_size(const char **str, int is_mapping) {
   while ((c = *cp++)) {
     switch (c) {
       case '"': {
-        while ((c = *cp++) != '"')
+        while ((c = *cp++) != '"') {
           if ((c == '\0') || (c == '\\' && !*cp++)) {
             return 0;
           }
+        }
 
         if (*cp++ != delim) {
           return -1;
@@ -1306,7 +1311,7 @@ int restore_object_from_gzip(object_t *ob, gzFile gzf, int noclear, int *count) 
   }
 
   if (!buff) {
-    buff = (char *)DMALLOC(t, TAG_PERMANENT, "restore_object: 6");
+    buff = reinterpret_cast<char *>(DMALLOC(t, TAG_PERMANENT, "restore_object: 6"));
     buffsize = t;
   }
 
@@ -1379,13 +1384,14 @@ static int save_object_recurse(program_t *prog, svalue_t **svp, int type, int sa
   for (i = 0; i < prog->num_inherited; i++) {
 #ifdef HAVE_ZLIB
     if (!(tmp = save_object_recurse(prog->inherit[i].prog, svp, prog->inherit[i].type_mod | type,
-                                    save_zeros, f, gzf)))
+                                    save_zeros, f, gzf))) {
 #else
 
     if (!(tmp = save_object_recurse(prog->inherit[i].prog, svp, prog->inherit[i].type_mod | type,
                                     save_zeros, f)))
 #endif
       return 0;
+    }
     textsize += tmp;
   }
   if (type & DECL_NOSAVE) {
@@ -1407,7 +1413,7 @@ static int save_object_recurse(program_t *prog, svalue_t **svp, int type, int sa
       if (new_str) {
         FREE(new_str);
       }
-      new_str = (char *)DMALLOC(theSize, TAG_PERMANENT, "save_object: 2");
+      new_str = reinterpret_cast<char *>(DMALLOC(theSize, TAG_PERMANENT, "save_object: 2"));
       oldSize = theSize;
     }
 
@@ -1489,7 +1495,7 @@ static int save_object_recurse_str(program_t *prog, svalue_t **svp, int type, in
       if (new_str) {
         FREE(new_str);
       }
-      new_str = (char *)DMALLOC(theSize, TAG_PERMANENT, "save_object: 2");
+      new_str = reinterpret_cast<char *>(DMALLOC(theSize, TAG_PERMANENT, "save_object: 2"));
       oldSize = theSize;
     }
 
@@ -1923,9 +1929,10 @@ void tell_object(object_t *ob, const char *str, int len) {
 #ifndef INTERACTIVE_CATCH_TELL
   if (ob->interactive) {
     add_message(ob, str, len);
-  } else
+  } else {
 #endif
     tell_npc(ob, str);
+  }
 }
 
 void dealloc_object(object_t *ob, const char *from) {
@@ -1936,10 +1943,10 @@ void dealloc_object(object_t *ob, const char *from) {
   debug(d_flag, "free_object: /%s.\n", ob->obname);
 
   if (!(ob->flags & O_DESTRUCTED)) {
-    if (ob->next_all != ob) /* This is fatal, and should never happen. */
+    if (ob->next_all != ob) { /* This is fatal, and should never happen. */
       fatal("FATAL: Object 0x%x /%s ref count 0, but not destructed (from %s).\n", ob, ob->obname,
             from);
-    else {
+    } else {
       destruct_object(ob);
       return;
     }
@@ -2029,7 +2036,7 @@ object_t *get_empty_object(int num_var) {
 
   tot_alloc_object++;
   tot_alloc_object_size += size;
-  ob = (object_t *)DMALLOC(size, TAG_OBJECT, "get_empty_object");
+  ob = reinterpret_cast<object_t *>(DMALLOC(size, TAG_OBJECT, "get_empty_object"));
   /*
    * marion Don't initialize via memset, this is incorrect. E.g. the bull
    * machines have a (char *)0 which is not zero. We have structure
@@ -2046,18 +2053,21 @@ object_t *get_empty_object(int num_var) {
   return ob;
 }
 
-void reset_object(object_t *ob) {
-  auto time_to_reset = CONFIG_INT(__TIME_TO_RESET__);
-
-/* Be sure to update time first ! */
+namespace {
+void set_nextreset(object_t *ob) {
+  auto time_to_reset_secs = CONFIG_INT(__TIME_TO_RESET__);
 #ifdef RANDOMIZED_RESETS
-  ob->next_reset = g_current_virtual_time + time_to_reset / 2 + random_number(time_to_reset / 2);
-#else
-  ob->next_reset = g_current_virtual_time + time_to_reset;
+  time_to_reset_secs = time_to_reset_secs / 2 + random_number(time_to_reset_secs / 2);
 #endif
+  ob->next_reset = g_current_gametick + time_to_gametick(std::chrono::seconds(time_to_reset_secs));
+}
+}  // namespace
 
+void reset_object(object_t *ob) {
+  set_nextreset(ob);
   save_command_giver(0);
-  if (!apply(APPLY_RESET, ob, 0, ORIGIN_DRIVER)) {
+  set_eval(max_cost);
+  if (!safe_apply(APPLY_RESET, ob, 0, ORIGIN_DRIVER)) {
     /* no reset() in the object */
     ob->flags &= ~O_WILL_RESET; /* don't call it next time */
   }
@@ -2066,9 +2076,8 @@ void reset_object(object_t *ob) {
 }
 
 void call_create(object_t *ob, int num_arg) {
-  auto time_to_reset = CONFIG_INT(__TIME_TO_RESET__);
   /* Be sure to update time first ! */
-  ob->next_reset = g_current_virtual_time + time_to_reset / 2 + random_number(time_to_reset / 2);
+  set_nextreset(ob);
 
   call___INIT(ob);
 
@@ -2170,9 +2179,9 @@ void get_objects(object_t ***list, int *size, get_objectsfn_t callback, void *da
       display_hidden = valid_hide(current_object);
     }
   }
-  *list = (object_t **)new_string(
-      ((tot_alloc_object - (display_hidden ? 0 : num_hidden)) * sizeof(object_t *)) - 1,
-      "get_objects");
+  *list = reinterpret_cast<object_t **>(
+      new_string(((tot_alloc_object - (display_hidden ? 0 : num_hidden)) * sizeof(object_t *)) - 1,
+                 "get_objects"));
 #else
   *list = (object_t **)new_string((tot_alloc_object * sizeof(object_t *)) - 1, "get_objects");
 #endif
@@ -2180,7 +2189,7 @@ void get_objects(object_t ***list, int *size, get_objectsfn_t callback, void *da
   if (!*list) {
     fatal("Out of memory!\n");
   }
-  push_malloced_string((char *)*list);
+  push_malloced_string(reinterpret_cast<char *>(*list));
 
   for (*size = 0, ob = obj_list; ob; ob = ob->next_all) {
 #ifdef F_SET_HIDE

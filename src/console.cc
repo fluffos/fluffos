@@ -38,7 +38,7 @@ int has_console = -1;
 #endif
 
 #ifdef HAS_CONSOLE
-static void sig_ttin(int);
+static void sig_ttin(int /*sig*/);
 #endif
 
 void restore_sigttin(void) {
@@ -80,7 +80,7 @@ static void on_console_event(evutil_socket_t fd, short what, void *arg) {
         (what & EV_WRITE) ? " write" : "", (what & EV_SIGNAL) ? " signal" : "");
 
   if (has_console <= 0) {
-    event_del((struct event *)arg);
+    event_del(reinterpret_cast<struct event *>(arg));
     return;
   }
   on_console_input();
@@ -111,15 +111,15 @@ typedef struct {
 } ITEMS;
 
 static int strcmpalpha(const char *aname, const char *bname, int depth);
-static int objcmpalpha(const void *, const void *);
-static int itemcmpsize(const void *, const void *);
-static int objcmpsize(const void *, const void *);
-static int objcmpidle(const void *, const void *);
+static int objcmpalpha(const void * /*a*/, const void * /*b*/);
+static int itemcmpsize(const void * /*a*/, const void * /*b*/);
+static int objcmpsize(const void * /*a*/, const void * /*b*/);
+static int objcmpidle(const void * /*a*/, const void * /*b*/);
 
 static void console_command(char *s);
 
 static void print_obj(int refs, int cpy, const char *obname, long lastref, long sz) {
-  printf("%4d %4d %-*s %5ld %10ld\n", refs, cpy, NAME_LEN, obname, ((long)time(0) - lastref), sz);
+  printf("%4d %4d %-*s %5ld %10ld\n", refs, cpy, NAME_LEN, obname, (time(0) - lastref), sz);
 }
 
 void on_console_input() {
@@ -228,7 +228,7 @@ static void console_command(char *s) {
         char *pos2;
         int i;
         long totsz = 0, sz;
-        char TOTALS = (char)0;
+        char TOTALS = static_cast<char>(0);
 
         /* allow 'objects depth:3 10' */
         if (numargs && ((pos2 = strpbrk(args[0], ":=")) != NULL)) {
@@ -245,14 +245,14 @@ static void console_command(char *s) {
 
         if (numargs) {
           if (strncmp("alpha", args[0], strlen(args[0])) == 0) {
-            qsort(list, (size_t)count, sizeof(object_t *), objcmpalpha);
+            qsort(list, static_cast<size_t>(count), sizeof(object_t *), objcmpalpha);
           } else if (strncmp("size", args[0], strlen(args[0])) == 0) {
-            qsort(list, (size_t)count, sizeof(object_t *), objcmpsize);
+            qsort(list, static_cast<size_t>(count), sizeof(object_t *), objcmpsize);
           } else if (strncmp("idle", args[0], strlen(args[0])) == 0) {
-            qsort(list, (size_t)count, sizeof(object_t *), objcmpidle);
+            qsort(list, static_cast<size_t>(count), sizeof(object_t *), objcmpidle);
           } else { /* This should be "totals" or "depth" */
-            TOTALS = (char)1;
-            qsort(list, (size_t)count, sizeof(object_t *), objcmpalpha);
+            TOTALS = static_cast<char>(1);
+            qsort(list, static_cast<size_t>(count), sizeof(object_t *), objcmpalpha);
           }
         }
 
@@ -272,13 +272,14 @@ static void console_command(char *s) {
               const char *slash = list[i]->obname;
               lst++;
 
-              for (sl = 0; sl < DEPTH; sl++)
+              for (sl = 0; sl < DEPTH; sl++) {
                 if ((slash = strchr(slash, '/')) == NULL) {
                   slash = list[i]->obname + strlen(list[i]->obname);
                   break;
                 } else {
                   slash++;
                 }
+              }
 
               strncpy(it[lst].name, list[i]->obname + (((slash - list[i]->obname) > NAME_LEN)
                                                            ? ((slash - list[i]->obname) - NAME_LEN)
@@ -295,12 +296,12 @@ static void console_command(char *s) {
             it[lst].cpy++;
             it[lst].ref += list[i]->ref;
             it[lst].mem += list[i]->prog->total_size + data_size(list[i]) + sizeof(object_t);
-            if (((long)list[i]->time_of_ref < it[lst].idle) || !it[lst].idle) {
-              it[lst].idle = (long)list[i]->time_of_ref;
+            if ((static_cast<long>(list[i]->time_of_ref) < it[lst].idle) || !it[lst].idle) {
+              it[lst].idle = static_cast<long>(list[i]->time_of_ref);
             }
           }
 
-          qsort(it + 1, (size_t)lst, sizeof(ITEMS), itemcmpsize);
+          qsort(it + 1, static_cast<size_t>(lst), sizeof(ITEMS), itemcmpsize);
 
           if (num[0] >= lst) {
             num[0] = lst - 1;
@@ -348,9 +349,11 @@ static void console_command(char *s) {
 
           for (i = num[0]; i <= num[1]; i++) {
             if (!prefix || (strncmp(list[i]->obname, prefix, plen) == 0)) {
-              print_obj((int)list[i]->ref, 1, list[i]->obname, (long)list[i]->time_of_ref,
-                        sz = (long)list[i]->prog->total_size + (long)data_size(list[i]) +
-                             (long)sizeof(object_t));
+              print_obj(static_cast<int>(list[i]->ref), 1, list[i]->obname,
+                        static_cast<long>(list[i]->time_of_ref),
+                        sz = static_cast<long>(list[i]->prog->total_size) +
+                             static_cast<long>(data_size(list[i])) +
+                             static_cast<long>(sizeof(object_t)));
               totsz += sz;
             }
           }
@@ -400,7 +403,7 @@ static int strcmpalpha(const char *aname, const char *bname, int depth) {
     return -1;
   }
 
-  return (int)(*aname - *bname);
+  return (*aname - *bname);
 }
 
 static int objcmpalpha(const void *a, const void *b) {
@@ -418,7 +421,7 @@ static int itemcmpsize(const void *a, const void *b) {
     return strcmpalpha((*((ITEMS *)a)).name, (*((ITEMS *)b)).name, 1000);
   }
 
-  return (int)(bsz - asz);
+  return static_cast<int>(bsz - asz);
 }
 
 static int objcmpsize(const void *a, const void *b) {

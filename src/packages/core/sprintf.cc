@@ -176,7 +176,7 @@ typedef struct _sprintf_state {
 
 static sprintf_state_t *sprintf_state = NULL;
 
-static void add_space(outbuffer_t *, int indent);
+static void add_space(outbuffer_t * /*outbuf*/, int indent);
 static void add_justified(const char *str, int slen, pad_info_t *pad, int fs, format_info finfo,
                           short int trailing);
 static int add_column(cst **column, int trailing);
@@ -211,7 +211,8 @@ static void pop_sprintf_state(void) {
 static void push_sprintf_state(void) {
   sprintf_state_t *state;
 
-  state = (sprintf_state_t *)DMALLOC(sizeof(sprintf_state_t), TAG_TEMPORARY, "push_sprintf_state");
+  state = reinterpret_cast<sprintf_state_t *>(
+      DMALLOC(sizeof(sprintf_state_t), TAG_TEMPORARY, "push_sprintf_state"));
   outbuf_zero(&(state->obuff));
   state->csts = NULL;
   state->cur_arg = -1;
@@ -338,8 +339,9 @@ void svalue_to_string(svalue_t *obj, outbuffer_t *outbuf, int indent, int traili
       outbuf_add(outbuf, "CLASS( ");
       outbuf_addv(outbuf, "%d", n);
       outbuf_add(outbuf, n == 1 ? " element\n" : " elements\n");
-      for (i = 0; i < (obj->u.arr->size) - 1; i++)
+      for (i = 0; i < (obj->u.arr->size) - 1; i++) {
         svalue_to_string(&(obj->u.arr->item[i]), outbuf, indent + 2, 1, 0);
+      }
       if (obj->u.arr->size) svalue_to_string(&(obj->u.arr->item[i]), outbuf, indent + 2, 0, 0);
       outbuf_add(outbuf, "\n");
       add_space(outbuf, indent);
@@ -769,7 +771,7 @@ static pad_info_t *make_pad(pad_info_t *p) {
   if (p->len == 0) {
     return 0;
   }
-  x = (pad_info_t *)DMALLOC(sizeof(pad_info_t), TAG_TEMPORARY, "make_pad");
+  x = reinterpret_cast<pad_info_t *>(DMALLOC(sizeof(pad_info_t), TAG_TEMPORARY, "make_pad"));
   x->what = p->what;
   x->len = p->len;
   return x;
@@ -827,10 +829,11 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
         temp = &(sprintf_state->csts);
         while (*temp) {
           if ((*temp)->info & INFO_COLS) {
-            if (*((*temp)->d.col - 1) != '\n')
+            if (*((*temp)->d.col - 1) != '\n') {
               while (*((*temp)->d.col) == ' ') {
                 (*temp)->d.col++;
               }
+            }
             add_pad(0, (*temp)->start - get_curpos());
             column_stat = add_column(temp, 0);
             if (!column_stat) {
@@ -1084,7 +1087,8 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
               if (pres > fs) {
                 pres = fs;
               }
-              *temp = (cst *)DMALLOC(sizeof(cst), TAG_TEMPORARY, "string_print: 3");
+              *temp =
+                  reinterpret_cast<cst *>(DMALLOC(sizeof(cst), TAG_TEMPORARY, "string_print: 3"));
               (*temp)->next = 0;
               (*temp)->d.col = carg->u.string;
               (*temp)->pad = make_pad(&pad);
@@ -1107,7 +1111,8 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
               const char *p1, *p2;
 
 #define TABLE carg->u.string
-              (*temp) = (cst *)DMALLOC(sizeof(cst), TAG_TEMPORARY, "string_print: 4");
+              (*temp) =
+                  reinterpret_cast<cst *>(DMALLOC(sizeof(cst), TAG_TEMPORARY, "string_print: 4"));
               (*temp)->d.tab = 0;
               (*temp)->pad = make_pad(&pad);
               (*temp)->info = finfo;
@@ -1169,8 +1174,8 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
                 pres = n;
               }
 
-              (*temp)->d.tab = (tab_data_t *)DCALLOC(pres + 1, sizeof(tab_data_t), TAG_TEMPORARY,
-                                                     "string_print: 5");
+              (*temp)->d.tab = reinterpret_cast<tab_data_t *>(
+                  DCALLOC(pres + 1, sizeof(tab_data_t), TAG_TEMPORARY, "string_print: 5"));
               (*temp)->nocols = pres; /* heavy sigh */
               (*temp)->d.tab[0].start = TABLE;
               if (pres == 1) {
@@ -1203,7 +1208,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
             int width = 0;
             int i;
             if (pres) {
-              for (i = 0; i < slen && width != pres; i++)
+              for (i = 0; i < slen && width != pres; i++) {
                 if (tmp[i] & 0x80) {
                   if (!(tmp[i + 1] & 0x80)) {
                     width++;
@@ -1211,6 +1216,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
                 } else {
                   width++;
                 }
+              }
               if (width == pres) {
                 slen = i;
               }

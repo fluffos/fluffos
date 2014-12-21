@@ -9,19 +9,19 @@ static const unsigned char telnet_mssp_value[] = {TELNET_MSSP_VAR, '%', 's', TEL
                                                   '%',             's', 0};
 
 static int send_mssp_val(mapping_t *map, mapping_node_t *el, void *data) {
-  auto ip = (interactive_t *)data;
+  auto ip = reinterpret_cast<interactive_t *>(data);
 
   if (el->values[0].type == T_STRING && el->values[1].type == T_STRING) {
     char buf[1024];
-    int len =
-        sprintf(buf, (char *)telnet_mssp_value, el->values[0].u.string, el->values[1].u.string);
+    int len = sprintf(buf, reinterpret_cast<const char *>(telnet_mssp_value),
+                      el->values[0].u.string, el->values[1].u.string);
 
     telnet_send(ip->telnet, buf, len);
   } else if (el->values[0].type == T_STRING && el->values[1].type == T_ARRAY &&
              el->values[1].u.arr->size > 0 && el->values[1].u.arr->item[0].type == T_STRING) {
     char buf[10240];
-    int len = sprintf(buf, (char *)telnet_mssp_value, el->values[0].u.string,
-                      el->values[1].u.arr->item[0].u.string);
+    int len = sprintf(buf, reinterpret_cast<const char *>(telnet_mssp_value),
+                      el->values[0].u.string, el->values[1].u.arr->item[0].u.string);
 
     telnet_send(ip->telnet, buf, len);
 
@@ -30,8 +30,8 @@ static int send_mssp_val(mapping_t *map, mapping_node_t *el, void *data) {
     unsigned char val = TELNET_MSSP_VAL;
     for (i = 1; i < ar->size; i++) {
       if (ar->item[i].type == T_STRING) {
-        telnet_send(ip->telnet, (const char *)&val, sizeof(val));
-        telnet_send(ip->telnet, (const char *)ar->item[i].u.string, SVALUE_STRLEN(&ar->item[i]));
+        telnet_send(ip->telnet, reinterpret_cast<const char *>(&val), sizeof(val));
+        telnet_send(ip->telnet, ar->item[i].u.string, SVALUE_STRLEN(&ar->item[i]));
       }
     }
     flush_message(ip);
@@ -63,7 +63,8 @@ void on_telnet_do_mssp(interactive_t *ip) {
     }
   }
   if (!tmp) {
-    telnet_printf(ip->telnet, (char *)telnet_mssp_value, "NAME", CONFIG_STR(__MUD_NAME__));
+    telnet_printf(ip->telnet, reinterpret_cast<const char *>(telnet_mssp_value), "NAME",
+                  CONFIG_STR(__MUD_NAME__));
   }
   tmp = findstring("PLAYERS");
   if (tmp) {
@@ -75,7 +76,7 @@ void on_telnet_do_mssp(interactive_t *ip) {
   if (!tmp) {
     char num[5] = {};
     snprintf(num, sizeof(num), "%d", users_num(true));
-    telnet_printf(ip->telnet, (char *)telnet_mssp_value, "PLAYERS", num);
+    telnet_printf(ip->telnet, reinterpret_cast<const char *>(telnet_mssp_value), "PLAYERS", num);
   }
   tmp = findstring("UPTIME");
   if (tmp) {
@@ -87,7 +88,7 @@ void on_telnet_do_mssp(interactive_t *ip) {
   if (!tmp) {
     char num[20] = {};
     snprintf(num, sizeof(num), "%ld", boot_time);
-    telnet_printf(ip->telnet, (char *)telnet_mssp_value, "UPTIME", num);
+    telnet_printf(ip->telnet, reinterpret_cast<const char *>(telnet_mssp_value), "UPTIME", num);
   }
   // now send the rest
   mapTraverse(map, send_mssp_val, ip);

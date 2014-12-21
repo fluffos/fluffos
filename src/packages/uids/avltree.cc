@@ -42,11 +42,14 @@ this code, please leave my name (and Wirth's) in the comments.
 /*
  * Prototypes for local functions
  */
-static void sprout(tree **, char *, int *, int (*)(void *, void *), int (*)(void *));
-static int avldelete(tree **, int (*)(void *, void *), char *, int (*)(void *), int *, int *);
-static void del(tree **, int *, tree **, int (*)(void *), int *);
-static void balanceL(tree **, int *);
-static void balanceR(tree **, int *);
+static void sprout(tree ** /*ppr*/, char * /*pc_data*/, int * /*pi_balance*/,
+                   int (* /*pfi_compare*/)(void *, void *), int (* /*pfi_delete*/)(void *));
+static int avldelete(tree ** /*ppr_p*/, int (* /*pfi_compare*/)(void *, void *), char * /*pc_user*/,
+                     int (* /*pfi_uar*/)(void *), int * /*pi_balance*/, int * /*pi_uar_called*/);
+static void del(tree ** /*ppr_r*/, int * /*pi_balance*/, tree ** /*ppr_q*/,
+                int (* /*pfi_uar*/)(void *), int * /*pi_uar_called*/);
+static void balanceL(tree ** /*ppr_p*/, int * /*pi_balance*/);
+static void balanceR(tree ** /*ppr_p*/, int * /*pi_balance*/);
 
 void tree_init(tree **ppr_tree) {
   *ppr_tree = NULL;
@@ -96,7 +99,7 @@ static void sprout(tree **ppr, char *pc_data, int *pi_balance, int (*pfi_compare
    * flag, then exit.
    */
   if (!*ppr) {
-    *ppr = (tree *)DMALLOC(sizeof(tree), TAG_UID, "sprout");
+    *ppr = reinterpret_cast<tree *>(DMALLOC(sizeof(tree), TAG_UID, "sprout"));
     (*ppr)->tree_l = NULL;
     (*ppr)->tree_r = NULL;
     (*ppr)->tree_b = 0;

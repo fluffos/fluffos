@@ -11,7 +11,7 @@
 
 replace_ob_t *obj_list_replace = 0;
 
-static program_t *search_inherited(char *, program_t *, int *);
+static program_t *search_inherited(char * /*str*/, program_t * /*prg*/, int * /*offpnt*/);
 static replace_ob_t *retrieve_replace_program_entry(void);
 
 int replace_program_pending(object_t *ob) {
@@ -170,7 +170,7 @@ void f_replace_program(void) {
   }
 
   name_len = SVALUE_STRLEN(sp);
-  name = (char *)DMALLOC(name_len + 3, TAG_TEMPORARY, "replace_program");
+  name = reinterpret_cast<char *>(DMALLOC(name_len + 3, TAG_TEMPORARY, "replace_program"));
   xname = name;
   strcpy(name, sp->u.string);
   if (name[name_len - 2] != '.' || name[name_len - 1] != 'c') {
@@ -185,7 +185,8 @@ void f_replace_program(void) {
     error("program to replace the current with has to be inherited\n");
   }
   if (!(tmp = retrieve_replace_program_entry())) {
-    tmp = (replace_ob_t *)DMALLOC(sizeof(replace_ob_t), TAG_TEMPORARY, "replace_program");
+    tmp = reinterpret_cast<replace_ob_t *>(
+        DMALLOC(sizeof(replace_ob_t), TAG_TEMPORARY, "replace_program"));
     tmp->ob = current_object;
     tmp->next = obj_list_replace;
     obj_list_replace = tmp;

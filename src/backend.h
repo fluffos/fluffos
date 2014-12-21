@@ -1,6 +1,7 @@
 #ifndef BACKEND_H
 #define BACKEND_H
 
+#include <chrono>
 #include <functional>
 
 /*
@@ -16,16 +17,6 @@ struct event_base *init_backend();
 // This is the main game loop.
 void backend(struct event_base *);
 
-// API for register realtime event.
-// Realtime event will be executed as close to designated walltime as possible.
-struct realtime_event {
-  typedef std::function<void()> callback_type;
-
-  callback_type callback;
-  realtime_event(callback_type &callback) : callback(callback) {}
-};
-void add_realtime_event(realtime_event::callback_type);
-
 // API for registering game tick event.
 // Game ticks provides guaranteed spacing intervals between each invocation.
 struct tick_event {
@@ -37,11 +28,19 @@ struct tick_event {
   tick_event(callback_type &callback) : valid(true), callback(callback) {}
 };
 
-// Register a event to run on game ticks. Safe to call from any thread.
-tick_event *add_tick_event(int, tick_event::callback_type);
+// Register a event to run on game ticks.
+tick_event *add_gametick_event(std::chrono::milliseconds delay_msecs,
+                               tick_event::callback_type callback);
+// Realtime event will be executed as close to designated walltime as possible.
+tick_event *add_walltime_event(std::chrono::milliseconds delay_msecs,
+                               tick_event::callback_type callback);
 
 // Used in shutdownMudos()
 void clear_tick_events();
+
+// Util to help translate gameticks with time.
+int time_to_gametick(std::chrono::milliseconds msec);
+std::chrono::milliseconds gametick_to_time(int ticks);
 
 void update_load_av(void);
 void update_compile_av(int);

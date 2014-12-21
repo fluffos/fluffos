@@ -62,12 +62,12 @@
 #include <zlib.h>
 #endif
 
-static int match_string(char *, char *);
+static int match_string(char * /*match*/, char * /*str*/);
 static int copy(const char *from, const char *to);
 static int do_move(const char *from, const char *to, int flag);
-static int pstrcmp(const void *, const void *);
-static int parrcmp(const void *, const void *);
-static void encode_stat(svalue_t *, int, char *, struct stat *);
+static int pstrcmp(const void * /*p1*/, const void * /*p2*/);
+static int parrcmp(const void * /*p1*/, const void * /*p2*/);
+static void encode_stat(svalue_t * /*vp*/, int /*flags*/, char * /*str*/, struct stat * /*st*/);
 
 #define MAX_LINES 50
 
@@ -285,9 +285,10 @@ int write_file(const char *file, const char *str, int flags) {
 #ifdef PACKAGE_COMPRESS
   if (flags & 2) {
     gf = gzopen(file, (flags & 1) ? "w" : "a");
-    if (!gf)
+    if (!gf) {
       error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n", file,
             (flags & 1) ? "overwrite" : "append", strerror(errno));
+    }
   } else {
 #endif
     f = fopen(file, (flags & 1) ? "w" : "a");
@@ -299,15 +300,17 @@ int write_file(const char *file, const char *str, int flags) {
   }
   if (flags & 2) {
     gzwrite(gf, str, strlen(str));
-  } else
+  } else {
 #endif
     fwrite(str, strlen(str), 1, f);
+  }
 #ifdef PACKAGE_COMPRESS
   if (flags & 2) {
     gzclose(gf);
-  } else
+  } else {
 #endif
     fclose(f);
+  }
   return 1;
 }
 
@@ -366,7 +369,8 @@ char *read_file(const char *file, int start, int lines) {
   }
 
   if (!theBuff) {
-    theBuff = (char *)DMALLOC(2 * read_file_max_size + 1, TAG_PERMANENT, "read_file: theBuff");
+    theBuff = reinterpret_cast<char *>(
+        DMALLOC(2 * read_file_max_size + 1, TAG_PERMANENT, "read_file: theBuff"));
   }
 
 #ifndef PACKAGE_COMPRESS
@@ -659,10 +663,11 @@ again:
       if (*match == '\0') {
         return 1;
       }
-      for (i = 0; str[i] != '\0'; i++)
+      for (i = 0; str[i] != '\0'; i++) {
         if (match_string(match, str + i)) {
           return 1;
         }
+      }
       return 0;
     case '\0':
       return 0;

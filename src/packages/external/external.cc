@@ -46,8 +46,8 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
     sock->owner_ob = current_object;
     sock->mode = STREAM;
     sock->state = STATE_DATA_XFER;
-    memset((char *)&sock->l_addr, 0, sizeof(sock->l_addr));
-    memset((char *)&sock->r_addr, 0, sizeof(sock->r_addr));
+    memset(reinterpret_cast<char *>(&sock->l_addr), 0, sizeof(sock->l_addr));
+    memset(reinterpret_cast<char *>(&sock->r_addr), 0, sizeof(sock->r_addr));
     sock->owner_ob = current_object;
     sock->release_ob = NULL;
     sock->r_buf = NULL;
@@ -84,7 +84,8 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
       }
     }
 
-    argv = (char **)DCALLOC(n + 1, sizeof(char *), TAG_TEMPORARY, "external args");
+    argv =
+        reinterpret_cast<char **>(DCALLOC(n + 1, sizeof(char *), TAG_TEMPORARY, "external args"));
 
     argv[0] = cmd;
 
@@ -115,10 +116,11 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
     argv[i] = 0;
 
     close(sv[0]);
-    for (i = 0; i < 5; i++)
+    for (i = 0; i < 5; i++) {
       if (external_port[i].port) {
         close(external_port[i].fd);  // close external ports
       }
+    }
     dup2(sv[1], 0);
     dup2(sv[1], 1);
     dup2(sv[1], 2);

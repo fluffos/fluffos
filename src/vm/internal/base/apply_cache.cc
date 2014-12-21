@@ -7,8 +7,9 @@
 #include "vm/internal/base/program.h"
 
 // TODO: move this to somewhere else.
-static struct program_t *find_function_by_name2(struct program_t *, const char **, int *, int *,
-                                                int *, int *);
+static struct program_t *find_function_by_name2(struct program_t * /*prog*/, const char ** /*name*/,
+                                                int * /*indexp*/, int * /*runtime_index*/,
+                                                int * /*fio*/, int * /*vio*/);
 
 #ifdef CACHE_STATS
 unsigned int apply_low_call_others = 0;
@@ -50,7 +51,7 @@ void apply_cache_clear_entry(cache_entry_t *entry) {
     entry->progp = 0;
   } else {
     if (entry->funp) {
-      free_string((char *)entry->funp);
+      free_string(reinterpret_cast<char *>(entry->funp));
       entry->funp = 0;
     }
   }
@@ -73,7 +74,7 @@ void apply_cache_save_entry(cache_entry_t *entry, program_t *target_prog, const 
       ref_string(sfun);
       entry->funp = (function_t *)sfun;
     } else {
-      entry->funp = (function_t *)make_shared_string(fun);
+      entry->funp = reinterpret_cast<function_t *>(make_shared_string(fun));
     }
   }
 }
@@ -88,7 +89,7 @@ cache_entry_t *apply_cache_lookup(const char *fun, program_t *prog) {
 
   if (entry->oprogp == prog &&                                    /* prog must match */
       (entry->progp ? (strcmp(entry->funp->funcname, fun) == 0) : /* function name must match */
-           strcmp((char *)entry->funp, fun) == 0)) {
+           strcmp(reinterpret_cast<char *>(entry->funp), fun) == 0)) {
 #ifdef CACHE_STATS
     apply_low_cache_hits++;
 #endif

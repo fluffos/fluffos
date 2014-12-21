@@ -549,10 +549,6 @@
  */
 #undef USE_32BIT_ADDRESSES
 
-/* HEARTBEAT_INTERVAL: define heartbeat interval in seconds.
- */
-#define HEARTBEAT_INTERVAL 1
-
 /* LARGEST_PRINTABLE_STRING: defines the size of the vsprintf() buffer in
  *   comm.c's add_message(). Instead of blindly making this value larger,
  *   your mudlib should be coded to not send huge strings to users.
