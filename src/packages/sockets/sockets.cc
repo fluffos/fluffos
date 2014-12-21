@@ -20,9 +20,9 @@ void f_socket_create(void) {
   }
   if (check_valid_socket("create", -1, current_object, "N/A", -1)) {
     if (num_arg == 2) {
-      fd = socket_create((enum socket_mode)arg[0].u.number, &arg[1], NULL);
+      fd = socket_create(static_cast<enum socket_mode>(arg[0].u.number), &arg[1], NULL);
     } else {
-      fd = socket_create((enum socket_mode)arg[0].u.number, &arg[1], &arg[2]);
+      fd = socket_create(static_cast<enum socket_mode>(arg[0].u.number), &arg[1], &arg[2]);
     }
     pop_n_elems(num_arg - 1);
     sp->u.number = fd;
@@ -250,9 +250,9 @@ void f_socket_address(void) {
     }
 
     char host[NI_MAXHOST], service[NI_MAXSERV];
-    int ret =
-        getnameinfo((struct sockaddr *)&sp->u.ob->interactive->addr, sp->u.ob->interactive->addrlen,
-                    host, sizeof(host), service, sizeof(service), NI_NUMERICHOST | NI_NUMERICSERV);
+    int ret = getnameinfo(reinterpret_cast<struct sockaddr *>(&sp->u.ob->interactive->addr),
+                          sp->u.ob->interactive->addrlen, host, sizeof(host), service,
+                          sizeof(service), NI_NUMERICHOST | NI_NUMERICSERV);
     if (ret) {
       strcpy(host, "0.0.0.0");
       strcpy(service, "0");

@@ -95,7 +95,7 @@ int merge_arg_lists(int num_arg, array_t *arr, int start) {
 funptr_t *make_efun_funp(int opcode, svalue_t *args) {
   funptr_t *fp;
 
-  fp = (funptr_t *)DMALLOC(sizeof(funptr_t), TAG_FUNP, "make_efun_funp");
+  fp = reinterpret_cast<funptr_t *>(DMALLOC(sizeof(funptr_t), TAG_FUNP, "make_efun_funp"));
   fp->hdr.owner = current_object;
   add_ref(current_object, "make_efun_funp");
   fp->hdr.type = FP_EFUN;
@@ -123,7 +123,8 @@ funptr_t *make_lfun_funp(int index, svalue_t *args) {
         "replace_program()\n");
   }
 
-  fp = (funptr_t *)DMALLOC(sizeof(funptr_hdr_t) + sizeof(local_ptr_t), TAG_FUNP, "make_lfun_funp");
+  fp = reinterpret_cast<funptr_t *>(
+      DMALLOC(sizeof(funptr_hdr_t) + sizeof(local_ptr_t), TAG_FUNP, "make_lfun_funp"));
   fp->hdr.owner = current_object;
   add_ref(current_object, "make_lfun_funp");
   fp->hdr.type = FP_LOCAL | FP_NOT_BINDABLE;
@@ -152,7 +153,8 @@ funptr_t *make_lfun_funp(int index, svalue_t *args) {
 funptr_t *make_simul_funp(int index, svalue_t *args) {
   funptr_t *fp;
 
-  fp = (funptr_t *)DMALLOC(sizeof(funptr_hdr_t) + sizeof(simul_ptr_t), TAG_FUNP, "make_simul_funp");
+  fp = reinterpret_cast<funptr_t *>(
+      DMALLOC(sizeof(funptr_hdr_t) + sizeof(simul_ptr_t), TAG_FUNP, "make_simul_funp"));
   fp->hdr.owner = current_object;
   add_ref(current_object, "make_simul_funp");
   fp->hdr.type = FP_SIMUL;
@@ -180,8 +182,8 @@ funptr_t *make_functional_funp(short num_arg, short num_local, short len, svalue
         "replace_program()\n");
   }
 
-  fp = (funptr_t *)DMALLOC(sizeof(funptr_hdr_t) + sizeof(functional_t), TAG_FUNP,
-                           "make_functional_funp");
+  fp = reinterpret_cast<funptr_t *>(
+      DMALLOC(sizeof(funptr_hdr_t) + sizeof(functional_t), TAG_FUNP, "make_functional_funp"));
   fp->hdr.owner = current_object;
   add_ref(current_object, "make_functional_funp");
   fp->hdr.type = FP_FUNCTIONAL + flag;
@@ -215,9 +217,10 @@ extern func_t efun_table[];
 svalue_t *call_function_pointer(funptr_t *funp, int num_arg) {
   array_t *v;
 
-  if (!funp->hdr.owner || (funp->hdr.owner->flags & O_DESTRUCTED))
+  if (!funp->hdr.owner || (funp->hdr.owner->flags & O_DESTRUCTED)) {
     error("Owner (/%s) of function pointer is destructed.\n",
           (funp->hdr.owner ? funp->hdr.owner->obname : "(null)"));
+  }
   setup_fake_frame(funp);
   if ((v = funp->hdr.args)) {
     check_for_destr(v);

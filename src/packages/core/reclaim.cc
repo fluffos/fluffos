@@ -15,8 +15,8 @@
 
 #define MAX_RECURSION 25
 
-static void gc_mapping(mapping_t *);
-static void check_svalue(svalue_t *);
+static void gc_mapping(mapping_t * /*m*/);
+static void check_svalue(svalue_t * /*v*/);
 
 static int cleaned, nested;
 
@@ -111,8 +111,8 @@ static void gc_mapping(mapping_t *m) {
 
 int reclaim_objects(bool is_auto) {
   if (is_auto) {
-    add_tick_event(30 + random_number(30),
-                   tick_event::callback_type(std::bind(reclaim_objects, true)));
+    add_gametick_event(std::chrono::seconds(30 + random_number(30)),
+                       tick_event::callback_type(std::bind(reclaim_objects, true)));
   }
   int i;
   object_t *ob;
@@ -120,11 +120,13 @@ int reclaim_objects(bool is_auto) {
   reclaim_call_outs();
 
   cleaned = nested = 0;
-  for (ob = obj_list; ob; ob = ob->next_all)
-    if (ob->prog)
+  for (ob = obj_list; ob; ob = ob->next_all) {
+    if (ob->prog) {
       for (i = 0; i < ob->prog->num_variables_total; i++) {
         check_svalue(&ob->variables[i]);
       }
+    }
+  }
 
   return cleaned;
 }

@@ -115,6 +115,9 @@ default fail message : What?
 # default message when error() occurs (optional)
 default error message :
 
+gametick msec : 100
+heartbeat interval msec : 1000
+
 ###############################################################################
 #          The following aren't currently used or implemented (yet)           #
 ###############################################################################

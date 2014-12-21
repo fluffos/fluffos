@@ -138,7 +138,7 @@ void f_bind(void) {
     error("Master object denied permission to bind() function pointer.\n");
   }
 
-  new_fp = (funptr_t *)DMALLOC(sizeof(funptr_t), TAG_FUNP, "f_bind");
+  new_fp = reinterpret_cast<funptr_t *>(DMALLOC(sizeof(funptr_t), TAG_FUNP, "f_bind"));
   *new_fp = *old_fp;
   new_fp->hdr.ref = 1;
   new_fp->hdr.owner = ob; /* one ref from being on stack */
@@ -162,16 +162,16 @@ static void print_cache_stats(outbuffer_t *ob) {
   outbuf_add(ob, "Function cache information\n");
   outbuf_add(ob, "-------------------------------\n");
   outbuf_addv(ob, "%% cache hits:    %10.2f\n",
-              100 * ((LPC_FLOAT)apply_low_cache_hits / apply_low_call_others));
+              100 * (static_cast<LPC_FLOAT>(apply_low_cache_hits) / apply_low_call_others));
   outbuf_addv(ob, "call_others:     %10lu\n", apply_low_call_others);
   outbuf_addv(ob, "cache hits:      %10lu\n", apply_low_cache_hits);
   outbuf_addv(ob, "cache size:      %10lu\n", APPLY_CACHE_SIZE);
   outbuf_addv(ob, "slots used:      %10lu\n", apply_low_slots_used);
   outbuf_addv(ob, "%% slots used:    %10.2f\n",
-              100 * ((LPC_FLOAT)apply_low_slots_used / APPLY_CACHE_SIZE));
+              100 * (static_cast<LPC_FLOAT>(apply_low_slots_used) / APPLY_CACHE_SIZE));
   outbuf_addv(ob, "collisions:      %10lu\n", apply_low_collisions);
   outbuf_addv(ob, "%% collisions:    %10.2f\n",
-              100 * ((LPC_FLOAT)apply_low_collisions / apply_low_call_others));
+              100 * (static_cast<LPC_FLOAT>(apply_low_collisions) / apply_low_call_others));
 }
 
 void f_cache_stats(void) {
@@ -202,10 +202,10 @@ void f__call_other(void) {
     funcname = arg[1].u.string;
   } else { /* must be T_ARRAY then */
     array_t *v = arg[1].u.arr;
-    svalue_t *sv;
+    svalue_t *sv = nullptr;
 
     check_for_destr(v);
-    if (((i = v->size) < 1) || !((sv = v->item)->type == T_STRING)) {
+    if (!((sv = v->item)->type == T_STRING)) {
       error("call_other: 1st elem of array for arg 2 must be a string\n");
     }
     funcname = sv->u.string;
@@ -349,7 +349,7 @@ void f_capitalize(void) {
   if (uislower(sp->u.string[0])) {
     unlink_string_svalue(sp);
     // unlinked, so this is ok
-    ((char *)(sp->u.string))[0] = toupper((unsigned char)sp->u.string[0]);
+    (const_cast<char *>(sp->u.string))[0] = toupper(static_cast<unsigned char>(sp->u.string[0]));
   }
 }
 #endif
@@ -396,7 +396,7 @@ void f_clear_bit(void) {
     return; /* return first arg unmodified */
   }
   unlink_string_svalue(sp);
-  str = (char *)sp->u.string;
+  str = const_cast<char *>(sp->u.string);
 
   if (str[ind] > 0x3f + ' ' || str[ind] < ' ') {
     error("Illegal bit pattern in clear_bit character %d\n", ind);
@@ -439,10 +439,10 @@ void f_ctime(void) {
   char *p;
   int l;
   if (st_num_arg) {
-    cp = time_string((time_t)sp->u.number);
+    cp = time_string(sp->u.number);
   } else {
     push_number(0);
-    cp = time_string((time_t)get_current_time());
+    cp = time_string(get_current_time());
   }
   if ((nl = strchr(cp, '\n'))) {
     l = nl - cp;
@@ -566,7 +566,7 @@ void f_disable_wizard(void) {
 
 #ifdef F_ENVIRONMENT
 void f_environment(void) {
-  object_t *ob;
+  object_t *ob = nullptr;
 
   if (st_num_arg) {
     if ((ob = sp->u.ob)->flags & O_DESTRUCTED) {
@@ -574,10 +574,8 @@ void f_environment(void) {
     }
     ob = ob->super;
     free_object(&(sp--)->u.ob, "f_environment");
-  } else if (!(current_object->flags & O_DESTRUCTED)) {
-    ob = current_object->super;
   } else {
-    error("environment() of destructed object.\n");
+    ob = current_object->super;
   }
 
   if (ob && object_visible(ob)) {
@@ -623,7 +621,7 @@ void f_file_name(void) {
   char *res;
 
   /* This function now returns a leading '/' */
-  res = (char *)add_slash(sp->u.ob->obname);
+  res = add_slash(sp->u.ob->obname);
   free_object(&sp->u.ob, "f_file_name");
   put_malloced_string(res);
 }
@@ -1006,17 +1004,17 @@ void f_values(void) {
 void f_lower_case(void) {
   char *str;
 
-  str = (char *)sp->u.string;
+  str = const_cast<char *>(sp->u.string);
   /* find first upper case letter, if any */
   for (; *str; str++) {
     if (uisupper(*str)) {
       int l = str - sp->u.string;
       unlink_string_svalue(sp);
-      str = (char *)sp->u.string + l;
-      *str = tolower((unsigned char)*str);
+      str = const_cast<char *>(sp->u.string) + l;
+      *str = tolower(static_cast<unsigned char>(*str));
       for (str++; *str; str++) {
         if (uisupper(*str)) {
-          *str = tolower((unsigned char)*str);
+          *str = tolower(static_cast<unsigned char>(*str));
         }
       }
       return;
@@ -1111,7 +1109,7 @@ void f_match_path(void) {
 
   value = &const0u;
 
-  tmpstr = (char *)DMALLOC(SVALUE_STRLEN(sp) + 1, TAG_STRING, "match_path");
+  tmpstr = reinterpret_cast<char *>(DMALLOC(SVALUE_STRLEN(sp) + 1, TAG_STRING, "match_path"));
 
   src = sp->u.string;
   dst = tmpstr;
@@ -1299,7 +1297,7 @@ void f_member_array(void) {
 
 #ifdef F_MESSAGE
 void f_message(void) {
-  array_t *use, *avoid;
+  array_t *use = nullptr, *avoid;
   int num_arg = st_num_arg;
   svalue_t *args;
 
@@ -1315,22 +1313,22 @@ void f_message(void) {
     case T_ARRAY:
       use = args[2].u.arr;
       break;
-    case T_NUMBER:
-      if (args[2].u.number == 0) {
-        int len = SVALUE_STRLEN(args + 1);
+    case T_NUMBER: {
+      int len = SVALUE_STRLEN(args + 1);
 
-        /* this is really bad and probably should be rm'ed -Beek;
-         * on the other hand, we don't have a debug_message() efun yet.
-         * Well, there is one in contrib now ...
-         */
-        /* for compatibility (write() simul_efuns, etc)  -bobf */
-        if (len > LARGEST_PRINTABLE_STRING)
-          error("Printable strings limited to length of %d.\n", LARGEST_PRINTABLE_STRING);
-
-        add_message(command_giver, args[1].u.string, len);
-        pop_n_elems(num_arg);
-        return;
+      /* this is really bad and probably should be rm'ed -Beek;
+       * on the other hand, we don't have a debug_message() efun yet.
+       * Well, there is one in contrib now ...
+       */
+      /* for compatibility (write() simul_efuns, etc)  -bobf */
+      if (len > LARGEST_PRINTABLE_STRING) {
+        error("Printable strings limited to length of %d.\n", LARGEST_PRINTABLE_STRING);
       }
+
+      add_message(command_giver, args[1].u.string, len);
+      pop_n_elems(num_arg);
+      return;
+    }
     default:
       bad_argument(&args[2], T_OBJECT | T_STRING | T_ARRAY | T_NUMBER, 3, F_MESSAGE);
   }
@@ -1392,7 +1390,7 @@ void f_mud_status(void) {
     outbuf_add(&ob, "add_message statistics\n");
     outbuf_add(&ob, "------------------------------\n");
     outbuf_addv(&ob, "Calls to add_message: %d   Packets: %d   Average packet size: %f\n\n",
-                add_message_calls, inet_packets, (float)inet_volume / inet_packets);
+                add_message_calls, inet_packets, static_cast<float>(inet_volume) / inet_packets);
 
     stat_living_objects(&ob);
 
@@ -1521,7 +1519,7 @@ void f_present(void) {
 void f_previous_object(void) {
   control_stack_t *p;
   int i;
-  object_t *ob;
+  object_t *ob = nullptr;
 
   if ((i = sp->u.number) > 0) {
     if (i >= CONFIG_INT(__MAX_CALL_DEPTH__)) {
@@ -1574,8 +1572,6 @@ void f_previous_object(void) {
     } while (--p >= control_stack);
     put_array(v);
     return;
-  } else if (i < 0) {
-    error("Illegal negative argument to previous_object()\n");
   } else {
     ob = previous_ob;
   }
@@ -1855,8 +1851,9 @@ void f_receive(void) {
     if (current_object->interactive) {
       int len = SVALUE_STRLEN(sp);
 
-      if (len > LARGEST_PRINTABLE_STRING)
+      if (len > LARGEST_PRINTABLE_STRING) {
         error("Printable strings limited to length of %d.\n", LARGEST_PRINTABLE_STRING);
+      }
 
       add_message(current_object, sp->u.string, len);
     }
@@ -1865,7 +1862,7 @@ void f_receive(void) {
 #ifndef NO_BUFFER_TYPE
   else {
     if (current_object->interactive) {
-      add_message(current_object, (char *)sp->u.buf->item, sp->u.buf->size);
+      add_message(current_object, reinterpret_cast<char *>(sp->u.buf->item), sp->u.buf->size);
     }
 
     free_buffer((sp--)->u.buf);
@@ -2081,7 +2078,7 @@ void f_replace_string(void) {
       skip_table[j] = plen;
     }
     for (j = 0; j < plen; j++) {
-      skip_table[(unsigned char)pattern[j]] = plen - j - 1;
+      skip_table[static_cast<unsigned char>(pattern[j])] = plen - j - 1;
     }
     slen = SVALUE_STRLEN(arg);
     slimit = src + slen;
@@ -2091,11 +2088,11 @@ void f_replace_string(void) {
 
   if (rlen <= plen) {
     /* in string replacement */
-    dst2 = dst1 = (char *)arg->u.string;
+    dst2 = dst1 = const_cast<char *>(arg->u.string);
 
     if (plen > 1) { /* pattern length > 1, jump table most efficient */
       while (src < flimit) {
-        if ((skip = skip_table[(unsigned char)src[probe]])) {
+        if ((skip = skip_table[static_cast<unsigned char>(src[probe])])) {
           for (climit = dst2 + skip; dst2 < climit; *dst2++ = *src++) {
             ;
           }
@@ -2132,7 +2129,7 @@ void f_replace_string(void) {
             cur++;
 
             if (cur >= first && cur <= last) {
-              *(char *)src = *replace;
+              *const_cast<char *>(src) = *replace;
             }
           }
           src++;
@@ -2142,7 +2139,7 @@ void f_replace_string(void) {
           if (*src++ == *pattern) {
             cur++;
             if (cur >= first) {
-              dst2 = (char *)src - 1;
+              dst2 = const_cast<char *>(src) - 1;
               while (*src) {
                 if (*src == *pattern) {
                   cur++;
@@ -2172,7 +2169,7 @@ void f_replace_string(void) {
 
     if (plen > 1) {
       while (src < flimit) {
-        if ((skip = skip_table[(unsigned char)src[probe]])) {
+        if ((skip = skip_table[static_cast<unsigned char>(src[probe])])) {
           for (climit = dst2 + skip; dst2 < climit; *dst2++ = *src++) {
             ;
           }
@@ -2299,7 +2296,7 @@ void f_restore_variable(void) {
   v.type = T_NUMBER;
 
   // unlinked string
-  restore_variable(&v, (char *)sp->u.string);
+  restore_variable(&v, const_cast<char *>(sp->u.string));
   FREE_MSTR(sp->u.string);
   *sp = v;
 }
@@ -2457,7 +2454,7 @@ void f_set_bit(void) {
   }
   if (ind < old_len) {
     unlink_string_svalue(sp);
-    str = (char *)sp->u.string;
+    str = const_cast<char *>(sp->u.string);
   } else {
     str = new_string(len, "f_set_bit: str");
     str[len] = '\0';
@@ -2749,7 +2746,7 @@ void f_strsrch(void) {
   blen = SVALUE_STRLEN(sp - 1);
   if (sp->type == T_NUMBER) {
     little = buf;
-    if ((buf[0] = (char)sp->u.number)) {
+    if ((buf[0] = static_cast<char>(sp->u.number))) {
       llen = 1;
     } else {
       llen = 0;
@@ -2767,7 +2764,7 @@ void f_strsrch(void) {
     if (!little[1]) { /* 1 char srch pattern */
       pos = strchr(big, little[0]);
     } else {
-      pos = (char *)strstr(big, little);
+      pos = const_cast<char *>(strstr(big, little));
     }
     /* start at right */
   } else {            /* XXX: maybe test for -1 */
@@ -3040,7 +3037,7 @@ void f__to_float(void) {
   switch (sp->type) {
     case T_NUMBER:
       sp->type = T_REAL;
-      sp->u.real = (LPC_FLOAT)sp->u.number;
+      sp->u.real = static_cast<LPC_FLOAT>(sp->u.number);
       break;
     case T_STRING:
       temp = strtod(sp->u.string, NULL);
@@ -3056,7 +3053,7 @@ void f__to_int(void) {
   switch (sp->type) {
     case T_REAL:
       sp->type = T_NUMBER;
-      sp->u.number = (LPC_INT)sp->u.real;
+      sp->u.number = static_cast<LPC_INT>(sp->u.real);
       break;
     case T_STRING: {
       LPC_INT temp;
@@ -3101,7 +3098,7 @@ void f__to_int(void) {
       } else {
         int hostint, netint;
 
-        memcpy((char *)&netint, sp->u.buf->item, sizeof(int));
+        memcpy(reinterpret_cast<char *>(&netint), sp->u.buf->item, sizeof(int));
         hostint = ntohl(netint);
         free_buffer(sp->u.buf);
         put_number(hostint);
@@ -3208,7 +3205,7 @@ void f_write(void) {
 
 #ifdef F_WRITE_BYTES
 void f_write_bytes(void) {
-  int i;
+  int i = 0;
 
   switch (sp->type) {
     case T_NUMBER: {
@@ -3220,15 +3217,15 @@ void f_write_bytes(void) {
       }
       /* convert to network byte-order */
       netint = htonl(sp->u.number);
-      netbuf = (char *)&netint;
+      netbuf = reinterpret_cast<char *>(&netint);
       i = write_bytes((sp - 2)->u.string, (sp - 1)->u.number, netbuf, sizeof(int));
       break;
     }
 
 #ifndef NO_BUFFER_TYPE
     case T_BUFFER: {
-      i = write_bytes((sp - 2)->u.string, (sp - 1)->u.number, (char *)sp->u.buf->item,
-                      sp->u.buf->size);
+      i = write_bytes((sp - 2)->u.string, (sp - 1)->u.number,
+                      reinterpret_cast<char *>(sp->u.buf->item), sp->u.buf->size);
       break;
     }
 #endif
@@ -3254,7 +3251,7 @@ void f_write_bytes(void) {
 
 #ifdef F_WRITE_BUFFER
 void f_write_buffer(void) {
-  int i;
+  int i = 0;
 
   if ((sp - 2)->type == T_STRING) {
     f_write_bytes();
@@ -3268,14 +3265,14 @@ void f_write_buffer(void) {
 
       /* convert to network byte-order */
       netint = htonl(sp->u.number);
-      netbuf = (char *)&netint;
+      netbuf = reinterpret_cast<char *>(&netint);
       i = write_buffer((sp - 2)->u.buf, (sp - 1)->u.number, netbuf, sizeof(int));
       break;
     }
 
     case T_BUFFER: {
-      i = write_buffer((sp - 2)->u.buf, (sp - 1)->u.number, (char *)sp->u.buf->item,
-                       sp->u.buf->size);
+      i = write_buffer((sp - 2)->u.buf, (sp - 1)->u.number,
+                       reinterpret_cast<char *>(sp->u.buf->item), sp->u.buf->size);
       break;
     }
 
@@ -3382,12 +3379,14 @@ void f_set_reset(void) {
   const auto time_to_reset = CONFIG_INT(__TIME_TO_RESET__);
 
   if (st_num_arg == 2) {
-    (sp - 1)->u.ob->next_reset = g_current_virtual_time + sp->u.number;
+    (sp - 1)->u.ob->next_reset =
+        g_current_gametick + time_to_gametick(std::chrono::seconds(sp->u.number));
     free_object(&(--sp)->u.ob, "f_set_reset:1");
     sp--;
   } else {
     sp->u.ob->next_reset =
-        g_current_virtual_time + time_to_reset / 2 + random_number(time_to_reset / 2);
+        g_current_gametick + time_to_gametick(std::chrono::seconds(
+                                 time_to_reset / 2 + random_number(time_to_reset / 2)));
     free_object(&(sp--)->u.ob, "f_set_reset:2");
   }
 }
@@ -3456,8 +3455,8 @@ void f_next_inventory(void) {
 
 #ifdef F_DEFER
 void f_defer() {
-  struct defer_list *newlist =
-      (struct defer_list *)DMALLOC(sizeof(struct defer_list), TAG_TEMPORARY, "defer: new item");
+  struct defer_list *newlist = reinterpret_cast<struct defer_list *>(
+      DMALLOC(sizeof(struct defer_list), TAG_TEMPORARY, "defer: new item"));
 
 // In reverse mode, newlist always will be the last data.
 #ifdef REVERSE_DEFER
@@ -3479,9 +3478,9 @@ void f_defer() {
 // In reverse mode, if list is not null, then add new item to the end.
 #ifdef REVERSE_DEFER
   // If list is null, then init it with new item.
-  if (csp->defers == NULL)
+  if (csp->defers == NULL) {
     csp->defers = newlist;
-  else {
+  } else {
     // Search last defer.
     struct defer_list *last_defer = csp->defers;
     while (last_defer->next) last_defer = last_defer->next;

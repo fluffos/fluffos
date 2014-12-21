@@ -125,14 +125,14 @@ char *scratch_copy(const char *str) {
     *to++ = 0;
     scr_tail = to;
     *to = to - scr_last;
-    return (char *)scr_last;
+    return reinterpret_cast<char *>(scr_last);
   }
   SDEBUG(printf(" mallocing ... "));
 
   /* ACK! no room. strlen(str) == (from - str) + strlen(from) */
   to = Scratch_large_alloc((from - Str) + Strlen(from) + 1);
   Strcpy(to, str);
-  return (char *)to;
+  return reinterpret_cast<char *>(to);
 }
 
 void scratch_free(char *ptr) {
@@ -170,14 +170,14 @@ char *scratch_large_alloc(int size) {
 
   SDEBUG(printf("scratch_large_alloc(%i)\n", size));
 
-  spt = (sp_block_t *)DMALLOC(SIZE_WITH_HDR(size), TAG_COMPILER, "scratch_alloc");
+  spt = reinterpret_cast<sp_block_t *>(DMALLOC(SIZE_WITH_HDR(size), TAG_COMPILER, "scratch_alloc"));
   if ((spt->next = scratch_head.next)) {
     spt->next->prev = spt;
   }
-  spt->prev = (sp_block_t *)&scratch_head;
+  spt->prev = &scratch_head;
   spt->block[0] = SCRATCH_MAGIC;
   scratch_head.next = spt;
-  return (char *)&spt->block[2];
+  return &spt->block[2];
 }
 
 /* warning: unlike REALLOC(), this one only allows increases */
@@ -204,12 +204,13 @@ char *scratch_realloc(char *ptr, int size) {
     DEBUG_CHECK(*(Ptr - 2) != SCRATCH_MAGIC, "scratch_realloc on non-scratchpad string.\n");
     SDEBUG(printf("block\n"));
     sbt = FIND_HDR(ptr);
-    newsbt = (sp_block_t *)DREALLOC(sbt, SIZE_WITH_HDR(size), TAG_COMPILER, "scratch_realloc");
+    newsbt = reinterpret_cast<sp_block_t *>(
+        DREALLOC(sbt, SIZE_WITH_HDR(size), TAG_COMPILER, "scratch_realloc"));
     newsbt->prev->next = newsbt;
     if (newsbt->next) {
       newsbt->next->prev = newsbt;
     }
-    return (char *)&newsbt->block[2];
+    return &newsbt->block[2];
   } else {
     char *res;
 
@@ -221,7 +222,7 @@ char *scratch_realloc(char *ptr, int size) {
       Strcpy(scr_last, ptr);
       scr_tail = scr_last + size;
       *scr_tail = size;
-      res = (char *)scr_last;
+      res = reinterpret_cast<char *>(scr_last);
     } else {
       SDEBUG(printf("copy off ... "));
       res = scratch_large_alloc(size);
@@ -239,7 +240,7 @@ char *scratch_alloc(int size) {
     scr_last = scr_tail + 1;
     scr_tail = scr_last + size;
     *scr_tail = size;
-    return (char *)scr_last;
+    return reinterpret_cast<char *>(scr_last);
   } else {
     return scratch_large_alloc(size);
   }
@@ -335,7 +336,7 @@ char *scratch_copy_string(char *s) {
       scr_last = scr_tail + 1;
       scr_tail = to;
       *to = to - scr_last;
-      return (char *)scr_last;
+      return reinterpret_cast<char *>(scr_last);
     } else {
       *to++ = *s++;
     }

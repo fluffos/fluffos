@@ -12,7 +12,7 @@
 #include "vm/internal/compiler/lex.h"       // for pragmas
 #include "vm/internal/compiler/icode.h"     // for IS_NODE.
 
-static parse_node_t *optimize(parse_node_t *);
+static parse_node_t *optimize(parse_node_t * /*expr*/);
 static parse_node_t **last_local_refs = 0;
 static int optimizer_num_locals;
 
@@ -236,8 +236,8 @@ ADDRESS_TYPE generate(parse_node_t *node) {
 
 static void optimizer_start_function(int n) {
   if (n) {
-    last_local_refs =
-        (parse_node_t **)DCALLOC(n, sizeof(parse_node_t *), TAG_COMPILER, "c_start_function");
+    last_local_refs = reinterpret_cast<parse_node_t **>(
+        DCALLOC(n, sizeof(parse_node_t *), TAG_COMPILER, "c_start_function"));
     optimizer_num_locals = n;
     while (n--) {
       last_local_refs[n] = 0;
@@ -250,10 +250,11 @@ static void optimizer_start_function(int n) {
 static void optimizer_end_function(void) {
   int i;
   if (last_local_refs) {
-    for (i = 0; i < optimizer_num_locals; i++)
+    for (i = 0; i < optimizer_num_locals; i++) {
       if (last_local_refs[i]) {
         last_local_refs[i]->v.number = F_TRANSFER_LOCAL;
       }
+    }
     FREE(last_local_refs);
     last_local_refs = 0;
   }

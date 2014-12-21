@@ -33,4 +33,10 @@
 // init vm layer.
 void vm_init();
 
+// Reset vm
+void clear_state(void);
+
+// Remove destructed objects
+void remove_destructed_objects(void);
+
 #endif /* SRC_VM_INCL_H_ */

@@ -11,4 +11,4 @@ GRAMMAR_Y=vm/internal/compiler/grammar.autogen.y
   -imacros $OPTIONS_H $GRAMMAR_Y_PRE > $GRAMMAR_Y
 
 # Second step is to run through sed, replacing $include into #include
-sed -e 's/$include/#include/g' -i $GRAMMAR_Y
+sed -e 's/\/\/ #include/#include/g' -i $GRAMMAR_Y

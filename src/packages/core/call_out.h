@@ -1,14 +1,15 @@
 #ifndef CALL_OUT_H
 #define CALL_OUT_H
 
-struct tick_event;
-
 /*
  * call_out.c
  */
 
+#include <chrono>
+#include <sys/time.h>
+
 typedef struct pending_call_s {
-  long target_time;
+  uint64_t target_time;
   union string_or_func function;
   object_t *ob;
   array_t *vs;
@@ -17,6 +18,7 @@ typedef struct pending_call_s {
 #endif
   LPC_INT handle;
   struct tick_event *tick_event;
+  bool is_walltime;
 } pending_call_t;
 
 void call_out(pending_call_t *cop);
@@ -27,7 +29,7 @@ void clear_call_outs(void);
 void reclaim_call_outs(void);
 int find_call_out_by_handle(object_t *, LPC_INT);
 int remove_call_out_by_handle(object_t *, LPC_INT);
-LPC_INT new_call_out(object_t *, svalue_t *, int, int, svalue_t *);
+LPC_INT new_call_out(object_t *, svalue_t *, std::chrono::milliseconds delay_msec, int, svalue_t *);
 int remove_call_out(object_t *, const char *);
 void remove_all_call_out(object_t *);
 int find_call_out(object_t *, const char *);

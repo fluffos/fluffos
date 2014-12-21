@@ -965,11 +965,11 @@ void f_switch() {
       sp--;
     } else if (sp->type == T_STRING) {
       if (sp->subtype == STRING_SHARED) {
-        s = (LPC_INT)((POINTER_INT)sp->u.string);
+        s = ((POINTER_INT)sp->u.string);
         free_string(sp->u.string);
         sp--;
       } else {
-        s = (LPC_INT)((POINTER_INT)findstring(sp->u.string));
+        s = ((POINTER_INT)findstring(sp->u.string));
         free_string_svalue(sp--);
       }
       if (s == 0) {
@@ -1140,7 +1140,7 @@ void f_xor_eq() {
 }
 
 void f_function_constructor() {
-  funptr_t *fp;
+  funptr_t *fp = nullptr;
   int kind;
   unsigned short index;
 

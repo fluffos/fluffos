@@ -71,7 +71,7 @@ int num_str_searches = 0;
 #define hfindblock(s, h) sfindblock(s, h = StrHash(s))
 #define findblock(s) sfindblock(s, StrHash(s))
 
-static block_t *sfindblock(const char *, int);
+static block_t *sfindblock(const char * /*s*/, int /*h*/);
 
 /*
  * hash table - list of pointers to heads of string chains.
@@ -85,7 +85,7 @@ static block_t **base_table = (block_t **)0;
 static int htable_size;
 static int htable_size_minus_one;
 
-static block_t *alloc_new_string(const char *, int);
+static block_t *alloc_new_string(const char * /*string*/, int /*h*/);
 
 void init_strings() {
   int x, y;
@@ -96,7 +96,8 @@ void init_strings() {
     ;
   }
   htable_size_minus_one = htable_size - 1;
-  base_table = (block_t **)DCALLOC(htable_size, sizeof(block_t *), TAG_STR_TBL, "init_strings");
+  base_table = reinterpret_cast<block_t **>(
+      DCALLOC(htable_size, sizeof(block_t *), TAG_STR_TBL, "init_strings"));
 #ifdef STRING_STATS
   overhead_bytes += (sizeof(block_t *) * htable_size);
 #endif
@@ -164,7 +165,7 @@ static block_t *alloc_new_string(const char *string, int h) {
     cut = 1;
   }
   size = sizeof(block_t) + len + 1;
-  b = (block_t *)DMALLOC(size, TAG_SHARED_STRING, "alloc_new_string");
+  b = reinterpret_cast<block_t *>(DMALLOC(size, TAG_SHARED_STRING, "alloc_new_string"));
   strncpy(STRING(b), string, len);
   STRING(b)[len] = '\0'; /* strncpy doesn't put on \0 if 'from' too
                             * long */
@@ -289,15 +290,16 @@ int add_string_status(outbuffer_t *out, int verbose) {
     outbuf_add(out, "All strings:\n");
     outbuf_add(out, "-------------------------\t Strings    Bytes\n");
   }
-  if (verbose != -1)
+  if (verbose != -1) {
     outbuf_addv(out, "All strings:\t\t\t%8d %8d + %d overhead\n", num_distinct_strings,
                 bytes_distinct_strings, overhead_bytes);
+  }
   if (verbose == 1) {
     outbuf_addv(out, "Total asked for\t\t\t%8d %8d\n", allocd_strings, allocd_bytes);
     outbuf_addv(out, "Space actually required/total string bytes %d%%\n",
                 (bytes_distinct_strings + overhead_bytes) * 100 / allocd_bytes);
     outbuf_addv(out, "Searches: %d    Average search length: %6.3f\n", num_str_searches,
-                (double)search_len / num_str_searches);
+                static_cast<double>(search_len) / num_str_searches);
   }
   return (bytes_distinct_strings + overhead_bytes);
 #else
@@ -336,7 +338,8 @@ char *int_new_string(int size)
   }
 #endif
 
-  mbt = (malloc_block_t *)DMALLOC(size + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, tag);
+  mbt = reinterpret_cast<malloc_block_t *>(
+      DMALLOC(size + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, tag));
   if (size < UINT_MAX) {
     mbt->size = size;
     ADD_NEW_STRING(size, sizeof(malloc_block_t));
@@ -347,7 +350,7 @@ char *int_new_string(int size)
   mbt->ref = 1;
   ADD_STRING(mbt->size);
   CHECK_STRING_STATS;
-  return (char *)(mbt + 1);
+  return reinterpret_cast<char *>(mbt + 1);
 }
 
 char *extend_string(const char *str, int len) {
@@ -356,8 +359,8 @@ char *extend_string(const char *str, int len) {
   int oldsize = MSTR_SIZE(str);
 #endif
 
-  mbt = (malloc_block_t *)DREALLOC(MSTR_BLOCK(str), len + sizeof(malloc_block_t) + 1,
-                                   TAG_MALLOC_STRING, "extend_string");
+  mbt = reinterpret_cast<malloc_block_t *>(DREALLOC(
+      MSTR_BLOCK(str), len + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, "extend_string"));
   if (len < UINT_MAX) {
     mbt->size = len;
   } else {
@@ -366,7 +369,7 @@ char *extend_string(const char *str, int len) {
   ADD_STRING_SIZE(mbt->size - oldsize);
   CHECK_STRING_STATS;
 
-  return (char *)(mbt + 1);
+  return reinterpret_cast<char *>(mbt + 1);
 }
 
 #ifdef DEBUGMALLOC
@@ -377,7 +380,7 @@ char *int_alloc_cstring(const char *str)
 {
   char *ret;
 
-  ret = (char *)DMALLOC(strlen(str) + 1, TAG_STRING, tag);
+  ret = reinterpret_cast<char *>(DMALLOC(strlen(str) + 1, TAG_STRING, tag));
   strcpy(ret, str);
   return ret;
 }
@@ -422,19 +425,20 @@ char *int_string_unlink(const char *str)
   if (mbt->size == USHRT_MAX) {
     int l = strlen(str + USHRT_MAX) + USHRT_MAX; /* ouch */
 
-    newmbt = (malloc_block_t *)DMALLOC(l + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, desc);
-    memcpy((char *)(newmbt + 1), (char *)(mbt + 1), l + 1);
+    newmbt = reinterpret_cast<malloc_block_t *>(
+        DMALLOC(l + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, desc));
+    memcpy(reinterpret_cast<char *>(newmbt + 1), reinterpret_cast<char *>(mbt + 1), l + 1);
     newmbt->size = USHRT_MAX;
     ADD_NEW_STRING(USHRT_MAX, sizeof(malloc_block_t));
   } else {
-    newmbt =
-        (malloc_block_t *)DMALLOC(mbt->size + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, desc);
-    memcpy((char *)(newmbt + 1), (char *)(mbt + 1), mbt->size + 1);
+    newmbt = reinterpret_cast<malloc_block_t *>(
+        DMALLOC(mbt->size + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, desc));
+    memcpy(reinterpret_cast<char *>(newmbt + 1), reinterpret_cast<char *>(mbt + 1), mbt->size + 1);
     newmbt->size = mbt->size;
     ADD_NEW_STRING(mbt->size, sizeof(malloc_block_t));
   }
   newmbt->ref = 1;
   CHECK_STRING_STATS;
 
-  return (char *)(newmbt + 1);
+  return reinterpret_cast<char *>(newmbt + 1);
 }

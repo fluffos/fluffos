@@ -18,46 +18,12 @@
 #include "vm/internal/compiler/lex.h"       // for add_predefines, fixme!
 #include "vm/internal/compiler/compiler.h"  // for init_locals, fixme!
 
+#include "packages/core/replace_program.h"
 #ifdef PACKAGE_MUDLIB_STATS
 #include "packages/mudlib_stats/mudlib_stats.h"
 #endif
 
-void preload_objects();
-
-void vm_init() {
-  init_strings();     /* in stralloc.c */
-  init_identifiers(); /* in lex.c */
-  init_locals();      /* in compiler.c */
-  init_otable();      /* in otable.c */
-
-  max_cost = CONFIG_INT(__MAX_EVAL_COST__);
-  set_inc_list(CONFIG_STR(__INCLUDE_DIRS__));
-
-  add_predefines();
-  reset_machine(1);
-
-  error_context_t econ;
-  save_context(&econ);
-  try {
-    init_simul_efun(CONFIG_STR(__SIMUL_EFUN_FILE__));
-    init_master(CONFIG_STR(__MASTER_FILE__));
-  } catch (const char *) {
-    debug_message("The simul_efun (%s) and master (%s) objects must be loadable.\n",
-                  CONFIG_STR(__SIMUL_EFUN_FILE__), CONFIG_STR(__MASTER_FILE__));
-    exit(-1);
-  }
-  pop_context(&econ);
-
-  // init posix timers
-  init_posix_timers();
-
-#ifdef PACKAGE_MUDLIB_STATS
-  restore_stat_files();
-#endif
-
-  preload_objects();
-}
-
+namespace {
 /* The epilog() in master.c is supposed to return an array of files to load.
  * The preload() in master object called to do the actual loading.
  */
@@ -93,3 +59,74 @@ void preload_objects() {
   }
   free_array(prefiles);
 } /* preload_objects() */
+
+}  // namespace
+
+void vm_init() {
+  init_strings();     /* in stralloc.c */
+  init_identifiers(); /* in lex.c */
+  init_locals();      /* in compiler.c */
+  init_otable();      /* in otable.c */
+
+  max_cost = CONFIG_INT(__MAX_EVAL_COST__);
+  set_inc_list(CONFIG_STR(__INCLUDE_DIRS__));
+
+  add_predefines();
+  reset_machine(1);
+
+  error_context_t econ;
+  save_context(&econ);
+  try {
+    init_simul_efun(CONFIG_STR(__SIMUL_EFUN_FILE__));
+    init_master(CONFIG_STR(__MASTER_FILE__));
+  } catch (const char *) {
+    debug_message("The simul_efun (%s) and master (%s) objects must be loadable.\n",
+                  CONFIG_STR(__SIMUL_EFUN_FILE__), CONFIG_STR(__MASTER_FILE__));
+    exit(-1);
+  }
+  pop_context(&econ);
+
+  // init posix timers
+  init_posix_timers();
+
+#ifdef PACKAGE_MUDLIB_STATS
+  restore_stat_files();
+#endif
+
+  preload_objects();
+}
+
+/*
+ * There are global variables that must be zeroed before any execution.
+ *
+ * This routine must only be called from top level, not from inside
+ * stack machine execution (as stack will be cleared).
+ */
+void clear_state() {
+  current_object = 0;
+  set_command_giver(0);
+  current_interactive = 0;
+  previous_ob = 0;
+  current_prog = 0;
+  caller_type = 0;
+  reset_machine(0); /* Pop down the stack. */
+} /* clear_state() */
+
+/* All destructed objects are moved into a sperate linked list,
+ * and deallocated after program execution.  */
+// TODO: find where they are
+extern object_t *obj_list_destruct;
+void remove_destructed_objects() {
+  if (obj_list_replace) {
+    replace_programs();
+  }
+
+  if (obj_list_destruct) {
+    object_t *ob, *next;
+    for (ob = obj_list_destruct; ob; ob = next) {
+      next = ob->next_all;
+      destruct2(ob);
+    }
+    obj_list_destruct = nullptr;
+  }
+} /* remove_destructed_objects() */

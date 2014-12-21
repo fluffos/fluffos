@@ -18,7 +18,7 @@
 static int otable_size;
 static int otable_size_minus_one;
 
-static object_t *find_obj_n(const char *);
+static object_t *find_obj_n(const char * /*s*/);
 
 /*
  * Object hash function, ripped off from stralloc.c.
@@ -63,8 +63,10 @@ void init_otable() {
     ;
   }
   otable_size_minus_one = otable_size - 1;
-  obj_table = (object_t **)DCALLOC(otable_size, sizeof(object_t *), TAG_OBJ_TBL, "init_otable");
-  ch_table = (object_t **)DCALLOC(otable_size, sizeof(object_t *), TAG_OBJ_TBL, "init_ch_otable");
+  obj_table = reinterpret_cast<object_t **>(
+      DCALLOC(otable_size, sizeof(object_t *), TAG_OBJ_TBL, "init_otable"));
+  ch_table = reinterpret_cast<object_t **>(
+      DCALLOC(otable_size, sizeof(object_t *), TAG_OBJ_TBL, "init_ch_otable"));
 
   for (x = 0; x < otable_size; x++) {
     obj_table[x] = 0;
@@ -249,16 +251,17 @@ int show_otable_status(outbuffer_t *out, int verbose) {
   if (verbose == 1) {
     outbuf_add(out, "Object name hash table status:\n");
     outbuf_add(out, "------------------------------\n");
-    sprintf(sbuf, "%10.2f", objs_in_table / (float)object_hash_table_size);
+    sprintf(sbuf, "%10.2f", objs_in_table / static_cast<float>(object_hash_table_size));
     outbuf_addv(out, "Average hash chain length:       %s\n", sbuf);
-    sprintf(sbuf, "%10.2f", (float)obj_probes / obj_searches);
+    sprintf(sbuf, "%10.2f", static_cast<float>(obj_probes) / obj_searches);
     outbuf_addv(out, "Average search length:           %s\n", sbuf);
     outbuf_addv(out, "Internal lookups (succeeded):    %lu (%lu)\n",
                 obj_searches - user_obj_lookups, objs_found - user_obj_found);
     outbuf_addv(out, "External lookups (succeeded):    %lu (%lu)\n", user_obj_lookups,
                 user_obj_found);
   }
-  starts = (long)object_hash_table_size * sizeof(object_t *) + objs_in_table * sizeof(object_t);
+  starts = static_cast<long>(object_hash_table_size) * sizeof(object_t *) +
+           objs_in_table * sizeof(object_t);
 
   if (!verbose) {
     outbuf_addv(out, "Obj table overhead:\t\t%8d %8d\n",

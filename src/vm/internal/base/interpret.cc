@@ -43,19 +43,20 @@ static const char *type_names[] = {"int",      "string", "array",  "object", "ma
 extern userid_t *backbone_uid;
 #endif
 extern int call_origin;
-static int find_line(char *, const program_t *, const char **, int *);
-void push_indexed_lvalue(int);
+static int find_line(char * /*p*/, const program_t * /*progp*/, const char ** /*ret_file*/,
+                     int * /*ret_line*/);
+void push_indexed_lvalue(int /*code*/);
 
 void break_point(void);
 static void do_loop_cond_number(void);
 static void do_loop_cond_local(void);
-static void do_catch(char *, unsigned short);
+static void do_catch(char * /*pc*/, unsigned short /*new_pc_offset*/);
 int last_instructions(void);
 #ifdef TRACE_CODE
 static char *get_arg(int, int);
 #endif
-extern inline const char *access_to_name(int);
-extern inline const char *origin_to_name(int);
+extern inline const char *access_to_name(int /*mode*/);
+extern inline const char *origin_to_name(int /*origin*/);
 
 #ifdef DEBUG
 int stack_in_use_as_temporary = 0;
@@ -73,7 +74,7 @@ int stack_in_use_as_temporary = 0;
 #error CFG_MAX_GLOBAL_VARIABLES must not be greater than 65536
 #endif
 
-int inter_sscanf(svalue_t *, svalue_t *, svalue_t *, int);
+int inter_sscanf(svalue_t * /*arg*/, svalue_t * /*s0*/, svalue_t * /*s1*/, int /*num_arg*/);
 program_t *current_prog;
 short int caller_type;
 int tracedepth;
@@ -162,7 +163,7 @@ void kill_ref(ref_t *ref) {
 }
 
 ref_t *make_ref(void) {
-  ref_t *ref = (ref_t *)DMALLOC(sizeof(ref_t), TAG_TEMPORARY, "make_ref");
+  ref_t *ref = reinterpret_cast<ref_t *>(DMALLOC(sizeof(ref_t), TAG_TEMPORARY, "make_ref"));
   ref->next = global_ref_list;
   ref->prev = NULL;
   if (ref->next) {
@@ -248,7 +249,8 @@ const char *type_name(int c) {
  * function names are pointers to shared strings, which means that equality
  * can be tested simply through pointer comparison.
  */
-static program_t *ffbn_recurse(program_t *, char *, int *, int *);
+static program_t *ffbn_recurse(program_t * /*prog*/, char * /*name*/, int * /*indexp*/,
+                               int * /*runtime_index*/);
 
 #ifndef NO_SHADOWS
 
@@ -382,7 +384,7 @@ void free_string_svalue(svalue_t *v) {
       NDBG(BLOCK(str));
       if (v->subtype & STRING_HASHED) {
         SUB_NEW_STRING(size, sizeof(block_t));
-        deallocate_string((char *)str);
+        deallocate_string(const_cast<char *>(str));
         CHECK_STRING_STATS;
       } else {
         SUB_NEW_STRING(size, sizeof(malloc_block_t));
@@ -563,7 +565,7 @@ void push_indexed_lvalue(int code) {
       sp->u.lvalue = lv;
 #ifdef REF_RESERVED_WORD
       lv_owner_type = T_MAPPING;
-      lv_owner = (refed_t *)lv->u.map;
+      lv_owner = reinterpret_cast<refed_t *>(lv->u.map);
 #endif
       return;
     }
@@ -610,7 +612,7 @@ void push_indexed_lvalue(int code) {
         global_lvalue_byte.u.lvalue_byte = &lv->u.buf->item[ind];
 #ifdef REF_RESERVED_WORD
         lv_owner_type = T_BUFFER;
-        lv_owner = (refed_t *)lv->u.buf;
+        lv_owner = reinterpret_cast<refed_t *>(lv->u.buf);
 #endif
         break;
       }
@@ -627,7 +629,7 @@ void push_indexed_lvalue(int code) {
         sp->u.lvalue = lv->u.arr->item + ind;
 #ifdef REF_RESERVED_WORD
         lv_owner_type = T_ARRAY;
-        lv_owner = (refed_t *)lv->u.arr;
+        lv_owner = reinterpret_cast<refed_t *>(lv->u.arr);
 #endif
         break;
       }
@@ -650,7 +652,7 @@ void push_indexed_lvalue(int code) {
       sp->u.map->ref--;
 #ifdef REF_RESERVED_WORD
       lv_owner_type = T_MAPPING;
-      lv_owner = (refed_t *)sp->u.map;
+      lv_owner = reinterpret_cast<refed_t *>(sp->u.map);
 #endif
       free_svalue(--sp, "push_indexed_lvalue: 2");
       sp->type = T_LVALUE;
@@ -681,7 +683,7 @@ void push_indexed_lvalue(int code) {
         sp->u.buf->ref--;
 #ifdef REF_RESERVED_WORD
         lv_owner_type = T_BUFFER;
-        lv_owner = (refed_t *)sp->u.buf;
+        lv_owner = reinterpret_cast<refed_t *>(sp->u.buf);
 #endif
         (--sp)->type = T_LVALUE;
         sp->u.lvalue = &global_lvalue_byte;
@@ -701,7 +703,7 @@ void push_indexed_lvalue(int code) {
         sp->u.arr->ref--;
 #ifdef REF_RESERVED_WORD
         lv_owner_type = T_ARRAY;
-        lv_owner = (refed_t *)sp->u.arr;
+        lv_owner = reinterpret_cast<refed_t *>(sp->u.arr);
 #endif
         (--sp)->type = T_LVALUE;
         sp->u.lvalue = (sp + 1)->u.arr->item + ind;
@@ -725,10 +727,10 @@ static struct lvalue_range {
 static svalue_t global_lvalue_range_sv = {T_LVALUE_RANGE};
 
 static void push_lvalue_range(int code) {
-  int ind1, ind2, size;
+  int ind1, ind2, size = 0;
   svalue_t *lv;
 
-  if (sp->type == T_LVALUE) {
+  {
     switch ((lv = global_lvalue_range.owner = sp->u.lvalue)->type) {
       case T_ARRAY:
         size = lv->u.arr->size;
@@ -749,8 +751,6 @@ static void push_lvalue_range(int code) {
         size = 0;
 #endif
     }
-  } else {
-    error("Range lvalue on illegal type\n");
   }
 
   if (!((--sp)->type == T_NUMBER)) {
@@ -866,9 +866,9 @@ void copy_lvalue_range(svalue_t *from) {
         /* since fsize >= 0, ind2 - ind1 <= strlen(orig string) */
         /* because both of them can only range from 0 to len */
 
-        strncpy(((char *)(owner->u.string)) + ind1, from->u.string, fsize);
+        strncpy((const_cast<char *>(owner->u.string)) + ind1, from->u.string, fsize);
       } else {
-        char *tmp, *dstr = (char *)(owner->u.string);
+        char *tmp, *dstr = const_cast<char *>(owner->u.string);
 
         owner->u.string = tmp = new_string(size - ind2 + ind1 + fsize, "copy_lvalue_range");
         if (ind1 >= 1) {
@@ -989,10 +989,10 @@ void assign_lvalue_range(svalue_t *from) {
         /* since fsize >= 0, ind2 - ind1 <= strlen(orig string) */
         /* because both of them can only range from 0 to len */
 
-        strncpy(((char *)(owner->u.string)) + ind1, from->u.string, fsize);
+        strncpy((const_cast<char *>(owner->u.string)) + ind1, from->u.string, fsize);
       } else {
         char *tmp;
-        const char *dstr = (char *)(owner->u.string);
+        const char *dstr = const_cast<char *>(owner->u.string);
 
         owner->u.string = tmp = new_string(size - ind2 + ind1 + fsize, "assign_lvalue_range");
         if (ind1 >= 1) {
@@ -1403,8 +1403,9 @@ function_t *setup_new_frame(int findex) {
   /* Remove excessive arguments */
   if (flags & FUNC_TRUE_VARARGS) {
     setup_varargs_variables(csp->num_local_variables, func_entry->num_local, func_entry->num_arg);
-  } else
+  } else {
     setup_variables(csp->num_local_variables, func_entry->num_local, func_entry->num_arg);
+  }
 #ifdef TRACE
   tracedepth++;
   if (TRACEP(TRACE_CALL)) {
@@ -1456,10 +1457,11 @@ function_t *setup_inherited_frame(int findex) {
 #endif
 
   /* Remove excessive arguments */
-  if (flags & FUNC_TRUE_VARARGS)
+  if (flags & FUNC_TRUE_VARARGS) {
     setup_varargs_variables(csp->num_local_variables, func_entry->num_local, func_entry->num_arg);
-  else
+  } else {
     setup_variables(csp->num_local_variables, func_entry->num_local, func_entry->num_arg);
+  }
 #ifdef TRACE
   tracedepth++;
   if (TRACEP(TRACE_CALL)) {
@@ -1515,7 +1517,7 @@ void setup_fake_frame(funptr_t *fun) {
   csp->variable_index_offset = variable_index_offset;
   csp->num_local_variables = 0;
 
-  pc = (char *)&fake_program;
+  pc = reinterpret_cast<char *>(&fake_program);
   caller_type = ORIGIN_FUNCTION_POINTER;
   current_prog = &fake_prog;
   previous_ob = current_object;
@@ -1923,7 +1925,7 @@ void eval_instruction(char *p) {
             break;
           case T_LVALUE_BYTE:
             if (global_lvalue_byte.subtype == 0 &&
-                *global_lvalue_byte.u.lvalue_byte == (unsigned char)255) {
+                *global_lvalue_byte.u.lvalue_byte == static_cast<unsigned char>(255)) {
               error("Strings cannot contain 0 bytes.\n");
             }
             ++*global_lvalue_byte.u.lvalue_byte;
@@ -1969,7 +1971,7 @@ void eval_instruction(char *p) {
           ref->sv.type = lv_owner_type;
           ref->sv.subtype = STRING_MALLOC; /* ignored if non-string */
           if (lv_owner_type == T_STRING) {
-            ref->sv.u.string = (char *)lv_owner;
+            ref->sv.u.string = reinterpret_cast<char *>(lv_owner);
             INC_COUNTED_REF(lv_owner);
             ADD_STRING(MSTR_SIZE(lv_owner));
             NDBG(BLOCK(lv_owner));
@@ -1977,7 +1979,7 @@ void eval_instruction(char *p) {
             ref->sv.u.refed = lv_owner;
             lv_owner->ref++;
             if (lv_owner_type == T_MAPPING) {
-              ((mapping_t *)lv_owner)->count |= MAP_LOCKED;
+              (reinterpret_cast<mapping_t *>(lv_owner))->count |= MAP_LOCKED;
             }
           }
         } else {
@@ -1996,9 +1998,9 @@ void eval_instruction(char *p) {
       }
       case F_REF: {
         svalue_t *s = fp + EXTRACT_UCHAR(pc++);
-        svalue_t *reflval;
+        svalue_t *reflval = nullptr;
 
-        if (s->type == T_REF) {
+        {
           reflval = s->u.ref->lvalue;
           if (!reflval) {
             error("Reference is invalid.\n");
@@ -2008,8 +2010,6 @@ void eval_instruction(char *p) {
             push_number(*global_lvalue_byte.u.lvalue_byte);
             break;
           }
-        } else {
-          error("Non-reference value passed as reference argument.\n");
         }
 
         if (reflval->type == T_OBJECT && (reflval->u.ob->flags & O_DESTRUCTED)) {
@@ -2346,9 +2346,10 @@ void eval_instruction(char *p) {
               free_mapping(sp->u.map);
               sp->u.map = map;
               break;
-            } else
+            } else {
               error("Bad type argument to +. Had %s and %s\n", type_name((sp - 1)->type),
                     type_name(sp->type));
+            }
           } /* end of x + T_MAPPING */
           case T_STRING: {
             switch ((sp - 1)->type) {
@@ -2547,7 +2548,7 @@ void eval_instruction(char *p) {
           STACK_INC;
           sp->type = T_LVALUE;
           if (flags & FOREACH_LEFT_GLOBAL) {
-            sp->u.lvalue = find_value((int)(READ_GLOBAL_INDEX(pc) + variable_index_offset));
+            sp->u.lvalue = find_value((READ_GLOBAL_INDEX(pc) + variable_index_offset));
           } else {
             sp->u.lvalue = fp + EXTRACT_UCHAR(pc++);
           }
@@ -2568,7 +2569,7 @@ void eval_instruction(char *p) {
         if (flags & FOREACH_RIGHT_GLOBAL) {
           STACK_INC;
           sp->type = T_LVALUE;
-          sp->u.lvalue = find_value((int)(READ_GLOBAL_INDEX(pc) + variable_index_offset));
+          sp->u.lvalue = find_value((READ_GLOBAL_INDEX(pc) + variable_index_offset));
         } else if (flags & FOREACH_REF) {
           ref_t *ref = make_ref();
           svalue_t *loc = fp + EXTRACT_UCHAR(pc++);
@@ -2619,7 +2620,7 @@ void eval_instruction(char *p) {
             if ((sp - 2)->type == T_STRING) {
               if (sp->type == T_REF) {
                 sp->u.ref->lvalue = &global_lvalue_byte;
-                global_lvalue_byte.u.lvalue_byte = (unsigned char *)((sp - 1)->u.lvalue_byte++);
+                global_lvalue_byte.u.lvalue_byte = ((sp - 1)->u.lvalue_byte++);
               } else {
                 free_svalue(sp->u.lvalue, "foreach-string");
                 sp->u.lvalue->type = T_NUMBER;
@@ -3014,7 +3015,7 @@ void eval_instruction(char *p) {
       case F_GLOBAL: {
         svalue_t *s;
 
-        s = find_value((int)(READ_GLOBAL_INDEX(pc) + variable_index_offset));
+        s = find_value((READ_GLOBAL_INDEX(pc) + variable_index_offset));
 
         /*
          * If variable points to a destructed object, replace it
@@ -3041,7 +3042,7 @@ void eval_instruction(char *p) {
             break;
           case T_LVALUE_BYTE:
             if (global_lvalue_byte.subtype == 0 &&
-                *global_lvalue_byte.u.lvalue_byte == (unsigned char)255) {
+                *global_lvalue_byte.u.lvalue_byte == static_cast<unsigned char>(255)) {
               error("Strings cannot contain 0 bytes.\n");
             }
             sp->type = T_NUMBER;
@@ -3086,7 +3087,7 @@ void eval_instruction(char *p) {
         sp->u.lvalue = arr->item + i;
 #ifdef REF_RESERVED_WORD
         lv_owner_type = T_CLASS;
-        lv_owner = (refed_t *)arr;
+        lv_owner = reinterpret_cast<refed_t *>(arr);
 #endif
         free_class(arr);
         break;
@@ -3130,7 +3131,7 @@ void eval_instruction(char *p) {
             if ((i > SVALUE_STRLEN(sp)) || (i < 0)) {
               error("String index out of bounds.\n");
             }
-            i = (unsigned char)sp->u.string[i];
+            i = static_cast<unsigned char>(sp->u.string[i]);
             free_string_svalue(sp);
             (--sp)->u.number = i;
             break;
@@ -3192,7 +3193,7 @@ void eval_instruction(char *p) {
             if ((i > len) || (i < 0)) {
               error("String index out of bounds.\n");
             }
-            i = (unsigned char)sp->u.string[i];
+            i = static_cast<unsigned char>(sp->u.string[i]);
             free_string_svalue(sp);
             (--sp)->u.number = i;
             break;
@@ -3383,7 +3384,7 @@ void eval_instruction(char *p) {
             break;
           case T_LVALUE_BYTE:
             if (global_lvalue_byte.subtype == 0 &&
-                *global_lvalue_byte.u.lvalue_byte == (unsigned char)255) {
+                *global_lvalue_byte.u.lvalue_byte == static_cast<unsigned char>(255)) {
               error("Strings cannot contain 0 bytes.\n");
             }
             sp->type = T_NUMBER;
@@ -3397,7 +3398,7 @@ void eval_instruction(char *p) {
       case F_GLOBAL_LVALUE:
         STACK_INC;
         sp->type = T_LVALUE;
-        sp->u.lvalue = find_value((int)(READ_GLOBAL_INDEX(pc) + variable_index_offset));
+        sp->u.lvalue = find_value((READ_GLOBAL_INDEX(pc) + variable_index_offset));
         break;
       case F_INDEX_LVALUE:
         push_indexed_lvalue(0);
@@ -3720,8 +3721,9 @@ void eval_instruction(char *p) {
 
         (*efun_table[instruction - EFUN_BASE])();
 
-        if (expected_stack != sp)
+        if (expected_stack != sp) {
           fatal("Bad stack after efun. Instruction %d, num arg %d\n", instruction, num_arg);
+        }
 #endif
     } /* switch (instruction) */
     DEBUG_CHECK1(sp < fp + csp->num_local_variables - 1,
@@ -4037,7 +4039,7 @@ void call_direct(object_t *ob, int offset, int origin, int num_arg) {
   function_t *funp;
   program_t *prog = ob->prog;
 
-  ob->time_of_ref = g_current_virtual_time;
+  ob->time_of_ref = g_current_gametick;
   push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE);
   caller_type = origin;
   csp->num_local_variables = num_arg;
@@ -4657,7 +4659,7 @@ int inter_sscanf(svalue_t *arg, svalue_t *s0, svalue_t *s1, int num_arg) {
         LPC_INT tmp_num;
 
         tmp = in_string;
-        tmp_num = strtoll((char *)in_string, (char **)&in_string, base);
+        tmp_num = strtoll(const_cast<char *>(in_string), const_cast<char **>(&in_string), base);
         if (tmp == in_string) {
           return number_of_matches;
         }
@@ -4671,7 +4673,7 @@ int inter_sscanf(svalue_t *arg, svalue_t *s0, svalue_t *s1, int num_arg) {
         LPC_FLOAT tmp_num;
 
         tmp = in_string;
-        tmp_num = strtod((char *)in_string, (char **)&in_string);
+        tmp_num = strtod(const_cast<char *>(in_string), const_cast<char **>(&in_string));
         if (tmp == in_string) {
           return number_of_matches;
         }
@@ -4709,11 +4711,11 @@ int inter_sscanf(svalue_t *arg, svalue_t *s0, svalue_t *s1, int num_arg) {
           }
           {
             int n = tmp - fmt;
-            char *buf = (char *)DMALLOC(n + 1, TAG_TEMPORARY, "sscanf regexp");
+            char *buf = reinterpret_cast<char *>(DMALLOC(n + 1, TAG_TEMPORARY, "sscanf regexp"));
             memcpy(buf, fmt, n);
             buf[n] = 0;
             regexp_user = EFUN_REGEXP;
-            reg = regcomp((unsigned char *)buf, 0);
+            reg = regcomp(reinterpret_cast<unsigned char *>(buf), 0);
             FREE(buf);
             if (!reg) {
               error(regexp_error);
@@ -4839,11 +4841,11 @@ int inter_sscanf(svalue_t *arg, svalue_t *s0, svalue_t *s1, int num_arg) {
             }
             {
               int n = tmp - fmt;
-              char *buf = (char *)DMALLOC(n + 1, TAG_TEMPORARY, "sscanf regexp");
+              char *buf = reinterpret_cast<char *>(DMALLOC(n + 1, TAG_TEMPORARY, "sscanf regexp"));
               memcpy(buf, fmt, n);
               buf[n] = 0;
               regexp_user = EFUN_REGEXP;
-              reg = regcomp((unsigned char *)buf, 0);
+              reg = regcomp(reinterpret_cast<unsigned char *>(buf), 0);
               FREE(buf);
               if (!reg) {
                 error(regexp_error);
@@ -4899,7 +4901,7 @@ int inter_sscanf(svalue_t *arg, svalue_t *s0, svalue_t *s1, int num_arg) {
         case 'x':
           base = 16;
         case 'd': {
-          num = strtoll((char *)in_string, (char **)&in_string, base);
+          num = strtoll(const_cast<char *>(in_string), const_cast<char **>(&in_string), base);
           /* We already knew it would be matched - Sym */
           if (!skipme2) {
             SSCANF_ASSIGN_SVALUE_NUMBER(num);
@@ -4908,7 +4910,8 @@ int inter_sscanf(svalue_t *arg, svalue_t *s0, svalue_t *s1, int num_arg) {
           continue;
         }
         case 'f': {
-          LPC_FLOAT tmp_num = strtod((char *)in_string, (char **)&in_string);
+          LPC_FLOAT tmp_num =
+              strtod(const_cast<char *>(in_string), const_cast<char **>(&in_string));
           if (!skipme2) {
             SSCANF_ASSIGN_SVALUE(T_REAL, u.real, tmp_num);
           }
@@ -5164,10 +5167,11 @@ void remove_object_from_stack(object_t *ob) {
 }
 
 int strpref(const char *p, const char *s) {
-  while (*p)
+  while (*p) {
     if (*p++ != *s++) {
       return 0;
     }
+  }
   return 1;
 }
 

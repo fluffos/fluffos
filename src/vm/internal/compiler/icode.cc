@@ -27,19 +27,20 @@
 #error CFG_MAX_GLOBAL_VARIABLES must not be greater than 65536
 #endif
 
-static void ins_real(LPC_FLOAT);
-static void ins_short(short);
-static void upd_short(int, int, const char *);
-static void ins_byte(unsigned char);
-static void upd_byte(int, unsigned char);
-static void write_number(LPC_INT);
-static void ins_int(LPC_INT);
+static void ins_real(LPC_FLOAT /*l*/);
+static void ins_short(short /*l*/);
+static void upd_short(int /*offset*/, int /*l*/, const char * /*where*/);
+static void ins_byte(unsigned char /*b*/);
+static void upd_byte(int /*offset*/, unsigned char /*b*/);
+static void write_number(LPC_INT /*val*/);
+static void ins_int(LPC_INT /*l*/);
 static void ins_pointer(POINTER_INT);
-void i_generate_node(parse_node_t *);
-static void i_generate_if_branch(parse_node_t *, int);
-static void i_generate_loop(int, parse_node_t *, parse_node_t *, parse_node_t *);
-static void i_update_branch_list(parse_node_t *, const char *);
-static int try_to_push(int, int);
+void i_generate_node(parse_node_t * /*expr*/);
+static void i_generate_if_branch(parse_node_t * /*node*/, int /*invert*/);
+static void i_generate_loop(int /*test_first*/, parse_node_t * /*block*/, parse_node_t * /*inc*/,
+                            parse_node_t * /*test*/);
+static void i_update_branch_list(parse_node_t * /*bl*/, const char * /*what*/);
+static int try_to_push(int /*kind*/, int /*value*/);
 
 static int foreach_depth = 0;
 
@@ -297,7 +298,8 @@ static void switch_to_line(unsigned int line) {
 
     last_size_generated += sz;
     while (sz > 255) {
-      p = (unsigned char *)allocate_in_mem_block(A_LINENUMBERS, sizeof(ADDRESS_TYPE) + 1);
+      p = reinterpret_cast<unsigned char *>(
+          allocate_in_mem_block(A_LINENUMBERS, sizeof(ADDRESS_TYPE) + 1));
       *p++ = 255;
 #if !defined(USE_32BIT_ADDRESSES)
       STORE_SHORT(p, s);
@@ -306,7 +308,8 @@ static void switch_to_line(unsigned int line) {
 #endif
       sz -= 255;
     }
-    p = (unsigned char *)allocate_in_mem_block(A_LINENUMBERS, sizeof(ADDRESS_TYPE) + 1);
+    p = reinterpret_cast<unsigned char *>(
+        allocate_in_mem_block(A_LINENUMBERS, sizeof(ADDRESS_TYPE) + 1));
     *p++ = sz;
 #if !defined(USE_32BIT_ADDRESSES)
     STORE_SHORT(p, s);
@@ -670,7 +673,7 @@ void i_generate_node(parse_node_t *expr) {
           pn = pn->l.expr;
         }
         ins_int(expr->v.expr->r.number);
-        mem_block[A_PROGRAM].block[addr] = (char)0xfe;
+        mem_block[A_PROGRAM].block[addr] = static_cast<char>(0xfe);
       } else {
         int table_size = 0;
         int power_of_two = 1;
@@ -680,9 +683,9 @@ void i_generate_node(parse_node_t *expr) {
         while (pn) {
           if (expr->kind == NODE_SWITCH_STRINGS) {
             if (pn->r.number) {
-              ins_int((LPC_INT)((POINTER_INT)(PROG_STRING(pn->r.number))));
+              ins_int(((POINTER_INT)(PROG_STRING(pn->r.number))));
             } else {
-              ins_int((LPC_INT)0);
+              ins_int(static_cast<LPC_INT>(0));
             }
           } else {
             ins_int(pn->r.number);
@@ -700,9 +703,9 @@ void i_generate_node(parse_node_t *expr) {
           i++;
         }
         if (expr->kind != NODE_SWITCH_STRINGS) {
-          mem_block[A_PROGRAM].block[addr] = (char)(0xf0 + i);
+          mem_block[A_PROGRAM].block[addr] = static_cast<char>(0xf0 + i);
         } else {
-          mem_block[A_PROGRAM].block[addr] = (char)(i * 0x10 + 0x0f);
+          mem_block[A_PROGRAM].block[addr] = static_cast<char>(i * 0x10 + 0x0f);
         }
       }
       i_update_branch_list(branch_list[CJ_BREAK_SWITCH], "switch break");
@@ -1003,7 +1006,8 @@ void i_initialize_parser() {
   foreach_depth = 0;
 
   if (!forward_branches) {
-    forward_branches = (int *)DCALLOC(10, sizeof(int), TAG_COMPILER, "forward_branches");
+    forward_branches =
+        reinterpret_cast<int *>(DCALLOC(10, sizeof(int), TAG_COMPILER, "forward_branches"));
     nforward_branches_max = 10;
   }
   nforward_branches = 0;

@@ -64,17 +64,17 @@ static mudlib_stats_t *backbone_domain = 0;
 static mudlib_stats_t *authors = 0;
 static mudlib_stats_t *master_author = 0;
 
-static mudlib_stats_t *find_stat_entry(const char *, mudlib_stats_t *);
-static mudlib_stats_t *add_stat_entry(const char *, mudlib_stats_t **);
-static void init_author_for_ob(object_t *);
-static const char *author_for_file(const char *);
-static void init_domain_for_ob(object_t *);
-static const char *domain_for_file(const char *);
-static void save_stat_list(const char *, mudlib_stats_t *);
-static void restore_stat_list(const char *, mudlib_stats_t **);
-static mapping_t *get_info(mudlib_stats_t *);
-static mapping_t *get_stats(const char *, mudlib_stats_t *);
-static mudlib_stats_t *insert_stat_entry(mudlib_stats_t *, mudlib_stats_t **);
+static mudlib_stats_t *find_stat_entry(const char * /*name*/, mudlib_stats_t * /*list*/);
+static mudlib_stats_t *add_stat_entry(const char * /*str*/, mudlib_stats_t ** /*list*/);
+static void init_author_for_ob(object_t * /*ob*/);
+static const char *author_for_file(const char * /*file*/);
+static void init_domain_for_ob(object_t * /*ob*/);
+static const char *domain_for_file(const char * /*file*/);
+static void save_stat_list(const char * /*file*/, mudlib_stats_t * /*list*/);
+static void restore_stat_list(const char * /*file*/, mudlib_stats_t ** /*list*/);
+static mapping_t *get_info(mudlib_stats_t * /*dl*/);
+static mapping_t *get_stats(const char * /*str*/, mudlib_stats_t * /*list*/);
+static mudlib_stats_t *insert_stat_entry(mudlib_stats_t * /*entry*/, mudlib_stats_t ** /*list*/);
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 /* debugging */
@@ -118,10 +118,11 @@ static mudlib_stats_t *find_stat_entry(const char *name, mudlib_stats_t *list) {
   int length;
 
   length = strlen(name);
-  for (; list; list = list->next)
+  for (; list; list = list->next) {
     if (list->length == length && strcmp(list->name, name) == 0) {
       return list;
     }
+  }
   return 0;
 }
 
@@ -134,7 +135,8 @@ static mudlib_stats_t *add_stat_entry(const char *str, mudlib_stats_t **list) {
   if ((entry = find_stat_entry(str, *list))) {
     return entry;
   }
-  entry = (mudlib_stats_t *)DMALLOC(sizeof(mudlib_stats_t), TAG_MUDLIB_STATS, "add_stat_entry");
+  entry = reinterpret_cast<mudlib_stats_t *>(
+      DMALLOC(sizeof(mudlib_stats_t), TAG_MUDLIB_STATS, "add_stat_entry"));
   entry->name = make_shared_string(str);
   entry->length = strlen(str);
   entry->moves = 0;
@@ -254,7 +256,7 @@ void add_objects(statgroup_t *st, int objects) {
  *    heart_beats -= 10%
  */
 void mudlib_stats_decay() {
-  add_tick_event(60 * 60, tick_event::callback_type(mudlib_stats_decay));
+  add_gametick_event(std::chrono::hours(1), tick_event::callback_type(mudlib_stats_decay));
 
   mudlib_stats_t *dl;
   for (dl = domains; dl; dl = dl->next) {

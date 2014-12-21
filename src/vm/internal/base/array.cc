@@ -22,10 +22,10 @@ int num_arrays;
 int total_array_size;
 #endif
 
-static int builtin_sort_array_cmp_fwd(const void *, const void *);
-static int builtin_sort_array_cmp_rev(const void *, const void *);
-static int sort_array_cmp(const void *, const void *);
-static long alist_cmp(svalue_t *, svalue_t *);
+static int builtin_sort_array_cmp_fwd(const void * /*vp1*/, const void * /*vp2*/);
+static int builtin_sort_array_cmp_rev(const void * /*vp1*/, const void * /*vp2*/);
+static int sort_array_cmp(const void * /*vp1*/, const void * /*vp2*/);
+static long alist_cmp(svalue_t * /*p1*/, svalue_t * /*p2*/);
 /*
  * Make an empty array for everyone to use, never to be deallocated.
  * It is cheaper to reuse it, than to use MALLOC() and allocate.
@@ -673,7 +673,7 @@ void filter_string(svalue_t *arg, int num_arg) {
 
     unlink_string_svalue(arg);
     size = SVALUE_STRLEN(arg);
-    str = (char *)arg->u.string;
+    str = const_cast<char *>(arg->u.string);
 
     process_efun_callback(1, &ftc, F_FILTER);
 
@@ -815,7 +815,8 @@ void f_unique_array(void) {
     }
   }
 
-  unlist = (unique_list_t *)DMALLOC(sizeof(unique_list_t), TAG_TEMPORARY, "f_unique_array:1");
+  unlist = reinterpret_cast<unique_list_t *>(
+      DMALLOC(sizeof(unique_list_t), TAG_TEMPORARY, "f_unique_array:1"));
   unlist->next = g_u_list;
   unlist->head = 0;
   head = &unlist->head;
@@ -848,8 +849,10 @@ void f_unique_array(void) {
       }
       if (!uptr) {
         numkeys++;
-        uptr = (unique_t *)DMALLOC(sizeof(unique_t), TAG_TEMPORARY, "f_unique_array:3");
-        uptr->indices = (int *)DMALLOC(sizeof(int), TAG_TEMPORARY, "f_unique_array:4");
+        uptr = reinterpret_cast<unique_t *>(
+            DMALLOC(sizeof(unique_t), TAG_TEMPORARY, "f_unique_array:3"));
+        uptr->indices =
+            reinterpret_cast<int *>(DMALLOC(sizeof(int), TAG_TEMPORARY, "f_unique_array:4"));
         uptr->count = 1;
         uptr->indices[0] = i;
         uptr->next = *head;
@@ -987,9 +990,10 @@ array_t *all_inventory(object_t *ob, int override) {
       if (display_hidden) {
         cnt++;
       }
-    } else
+    } else {
 #endif
       cnt++;
+    }
   }
 
   if (!cnt) {
@@ -1073,7 +1077,7 @@ void map_string(svalue_t *arg, int num_arg) {
      error (note it is also in the right spot for the return value).
    */
   unlink_string_svalue(arg);
-  arr = (char *)arg->u.string;
+  arr = const_cast<char *>(arg->u.string);
 
   if (arg[1].type == T_FUNCTION) {
     fptr = arg[1].u.fp;
@@ -1104,7 +1108,7 @@ void map_string(svalue_t *arg, int num_arg) {
   }
 
   for (p = arr; *p; p++) {
-    push_number((unsigned char)*p);
+    push_number(static_cast<unsigned char>(*p));
     if (numex) {
       push_some_svalues(extra, numex);
     }
@@ -1120,7 +1124,7 @@ void map_string(svalue_t *arg, int num_arg) {
       break;
     }
     if (v->type == T_NUMBER && v->u.number != 0) {
-      *p = ((char)(v->u.number));
+      *p = (static_cast<char>(v->u.number));
     }
   }
 
@@ -1133,7 +1137,7 @@ void map_string(svalue_t *arg, int num_arg) {
 static function_to_call_t *sort_array_ftc;
 
 array_t *builtin_sort_array(array_t *inlist, int dir) {
-  qsort((char *)inlist->item, inlist->size, sizeof(inlist->item),
+  qsort(reinterpret_cast<char *>(inlist->item), inlist->size, sizeof(inlist->item),
         (dir < 0) ? builtin_sort_array_cmp_rev : builtin_sort_array_cmp_fwd);
 
   return inlist;
@@ -1245,7 +1249,7 @@ void f_sort_array(void) {
       tmp = copy_array(tmp);
       push_refed_array(tmp);
 #ifdef SANE_SORTING
-      qsort((char *)tmp->item, tmp->size, sizeof(tmp->item), sort_array_cmp);
+      qsort(reinterpret_cast<char *>(tmp->item), tmp->size, sizeof(tmp->item), sort_array_cmp);
 #else
       old_quickSort((char *)tmp->item, tmp->size, sizeof(tmp->item), sort_array_cmp);
 #endif
@@ -1525,7 +1529,8 @@ static svalue_t *alist_sort(array_t *inlist) {
     return (svalue_t *)NULL;
   }
   if ((flag = (inlist->ref > 1))) {
-    sv_tab = (svalue_t *)DCALLOC(size, sizeof(svalue_t), TAG_TEMPORARY, "alist_sort: sv_tab");
+    sv_tab = reinterpret_cast<svalue_t *>(
+        DCALLOC(size, sizeof(svalue_t), TAG_TEMPORARY, "alist_sort: sv_tab"));
     sv_ptr = inlist->item;
     for (j = 0; j < size; j++) {
       if (((tmp = (sv_ptr + j))->type == T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
@@ -1578,7 +1583,8 @@ static svalue_t *alist_sort(array_t *inlist) {
     }
   }
 
-  table = (svalue_t *)DCALLOC(size, sizeof(svalue_t), TAG_TEMPORARY, "alist_sort: table");
+  table = reinterpret_cast<svalue_t *>(
+      DCALLOC(size, sizeof(svalue_t), TAG_TEMPORARY, "alist_sort: table"));
 
   for (j = 0; j < size; j++) {
     table[j] = sv_tab[0];
@@ -1690,7 +1696,8 @@ array_t *intersect_array(array_t *a1, array_t *a2) {
 
   svt_1 = alist_sort(a1);
   if ((flag = (a2->ref > 1))) {
-    sv_tab = (svalue_t *)DCALLOC(a2s, sizeof(svalue_t), TAG_TEMPORARY, "intersect_array: sv2_tab");
+    sv_tab = reinterpret_cast<svalue_t *>(
+        DCALLOC(a2s, sizeof(svalue_t), TAG_TEMPORARY, "intersect_array: sv2_tab"));
     sv_ptr = a2->item;
     for (j = 0; j < a2s; j++) {
       if (((tmp = (sv_ptr + j))->type == T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
@@ -1845,7 +1852,8 @@ array_t *union_array(array_t *a1, array_t *a2) {
 
   svt_1 = alist_sort(a1);
   if ((flag = (a2->ref > 1))) {
-    sv_tab = (svalue_t *)DCALLOC(a2s, sizeof(svalue_t), TAG_TEMPORARY, "union_array: sv2_tab");
+    sv_tab = reinterpret_cast<svalue_t *>(
+        DCALLOC(a2s, sizeof(svalue_t), TAG_TEMPORARY, "union_array: sv2_tab"));
     sv_ptr = a2->item;
     for (j = 0; j < a2s; j++) {
       if (((tmp = (sv_ptr + j))->type == T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {

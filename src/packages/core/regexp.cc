@@ -223,16 +223,16 @@ static int regsize;   /* Code size. */
  * Forward declarations for regcomp()'s friends.
  */
 
-static char *reg(int, int *);
-static char *regbranch(int *);
-static char *regpiece(int *);
-static char *regatom(int *);
-static char *regnode(char);
-static char *regnext(char *);
-static void regc(char);
-static void reginsert(char, char *);
-static void regtail(char *, char *);
-static void regoptail(char *, char *);
+static char *reg(int /*paren*/, int * /*flagp*/);
+static char *regbranch(int * /*flagp*/);
+static char *regpiece(int * /*flagp*/);
+static char *regatom(int * /*flagp*/);
+static char *regnode(char /*op*/);
+static char *regnext(char * /*p*/);
+static void regc(char /*b*/);
+static void reginsert(char /*op*/, char * /*opnd*/);
+static void regtail(char * /*p*/, char * /*val*/);
+static void regoptail(char * /*p*/, char * /*val*/);
 
 static void regerror(const char *s) {
   switch (regexp_user) {
@@ -273,8 +273,9 @@ regexp *regcomp(unsigned char *exp, int excompat) /* \( \) operators like in uni
     FAIL("NULL argument\n");
   }
 
-  exp2 = (short *)DMALLOC((strlen((char *)exp) + 1) * (sizeof(short[8]) / sizeof(char[8])),
-                          TAG_TEMPORARY, "regcomp: 1");
+  exp2 = reinterpret_cast<short *>(
+      DMALLOC((strlen((char *)exp) + 1) * (sizeof(short[8]) / sizeof(char[8])), TAG_TEMPORARY,
+              "regcomp: 1"));
   for (scan = exp, dest = exp2; (c = *scan++);) {
     switch (c) {
       case '(':
@@ -333,7 +334,7 @@ regexp *regcomp(unsigned char *exp, int excompat) /* \( \) operators like in uni
   regnpar = 1;
   regsize = 0L;
   regcode = &regdummy;
-  regc((char)MAGIC);
+  regc(static_cast<char>(MAGIC));
   if (reg(0, &flags) == (char *)NULL) {
     FREE(exp2);
     return ((regexp *)NULL);
@@ -346,7 +347,8 @@ regexp *regcomp(unsigned char *exp, int excompat) /* \( \) operators like in uni
   }
 
   /* Allocate space. */
-  r = (regexp *)DMALLOC(sizeof(regexp) + (unsigned)regsize, TAG_TEMPORARY, "regcomp: 2");
+  r = reinterpret_cast<regexp *>(
+      DMALLOC(sizeof(regexp) + (unsigned)regsize, TAG_TEMPORARY, "regcomp: 2"));
   if (r == (regexp *)NULL) {
     FREE(exp2);
     FAIL("out of space\n");
@@ -356,7 +358,7 @@ regexp *regcomp(unsigned char *exp, int excompat) /* \( \) operators like in uni
   regparse = exp2;
   regnpar = 1;
   regcode = (char *)(r->program);
-  regc((char)MAGIC);
+  regc(static_cast<char>(MAGIC));
   if (reg(0, &flags) == NULL) {
     FREE(exp2);
     FREE(r);
@@ -368,8 +370,8 @@ regexp *regcomp(unsigned char *exp, int excompat) /* \( \) operators like in uni
   r->reganch = 0;
   r->regmust = NULL;
   r->regmlen = 0;
-  scan = (unsigned char *)(r->program + 1); /* First BRANCH. */
-  if (OP(regnext((char *)scan)) == END) {   /* Only one top-level choice. */
+  scan = reinterpret_cast<unsigned char *>(r->program + 1); /* First BRANCH. */
+  if (OP(regnext((char *)scan)) == END) {                   /* Only one top-level choice. */
     scan = OPERAND(scan);
 
     /* Starting-point info. */
@@ -390,8 +392,9 @@ regexp *regcomp(unsigned char *exp, int excompat) /* \( \) operators like in uni
     if (flags & SPSTART) {
       longest = NULL;
       len = 0;
-      for (; scan != NULL; scan = (unsigned char *)regnext((char *)scan)) {
-        char *tmp = (char *)OPERAND(scan);
+      for (; scan != NULL;
+           scan = reinterpret_cast<unsigned char *>(regnext(reinterpret_cast<char *>(scan)))) {
+        char *tmp = reinterpret_cast<char *> OPERAND(scan);
         int tlen;
         if (OP(scan) == EXACTLY && (tlen = strlen(tmp)) >= len) {
           longest = tmp;
@@ -825,14 +828,14 @@ static const char **regendp;   /* Ditto for endp. */
 /*
  * Forwards.
  */
-static int regtry(regexp *, const char *);
-static int regmatch(char *);
-static int regrepeat(char *);
+static int regtry(regexp * /*prog*/, const char * /*string*/);
+static int regmatch(char * /*prog*/);
+static int regrepeat(char * /*p*/);
 
 #ifdef DEBUG
 int regnarrate = 0;
-void regdump(regexp *);
-static char *regprop(char *);
+void regdump(regexp * /*r*/);
+static char *regprop(char * /*op*/);
 
 #endif
 
@@ -875,20 +878,21 @@ int regexec(regexp *prog, const char *string) {
 
   /* Messy cases:  unanchored match. */
   s = string;
-  if (prog->regstart != '\0') /* We know what char it must start with. */
+  if (prog->regstart != '\0') { /* We know what char it must start with. */
     while ((s = strchr(s, prog->regstart)) != (char *)NULL) {
       if (regtry(prog, s)) {
         return (1);
       }
       s++;
     }
-  else
+  } else {
     /* We don't -- general case. */
     do {
       if (regtry(prog, s)) {
         return (1);
       }
     } while (*s++ != '\0');
+  }
 
   /* Failure. */
   return (0);
@@ -1107,10 +1111,11 @@ static int regmatch(char *prog) {
         no = regrepeat(OPERAND(scan));
         while (no >= minimum) {
           /* If it could work, try it. */
-          if (nextch == '\0' || *reginput == nextch)
+          if (nextch == '\0' || *reginput == nextch) {
             if (regmatch(nxt)) {
               return (1);
             }
+          }
           /* Couldn't or didn't -- back up. */
           no--;
           reginput = save + no;
@@ -1204,7 +1209,7 @@ static char *regnext(char *p) {
 
 #ifdef DEBUG
 
-static char *regprop(char *);
+static char *regprop(char * /*op*/);
 
 /*
  - regdump - dump a regexp onto stdout in vaguely comprehensible form
@@ -1459,8 +1464,8 @@ array_t *reg_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *def) {
     struct regexp *tmpreg;
     const char *laststart, *currstart;
 
-    rgpp =
-        (struct regexp **)DCALLOC(size, sizeof(struct regexp *), TAG_TEMPORARY, "reg_assoc : rgpp");
+    rgpp = reinterpret_cast<struct regexp **>(
+        DCALLOC(size, sizeof(struct regexp *), TAG_TEMPORARY, "reg_assoc : rgpp"));
     for (i = 0; i < size; i++) {
       if (!(rgpp[i] = regcomp((unsigned char *)pat->item[i].u.string, 0))) {
         while (i--) {
@@ -1498,12 +1503,13 @@ array_t *reg_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *def) {
       if (regindex >= 0) {
         num_match++;
         if (rmp) {
-          rmp->next = (struct reg_match *)DMALLOC(sizeof(struct reg_match), TAG_TEMPORARY,
-                                                  "reg_assoc : rmp->next");
+          rmp->next = reinterpret_cast<struct reg_match *>(
+              DMALLOC(sizeof(struct reg_match), TAG_TEMPORARY, "reg_assoc : rmp->next"));
           rmp = rmp->next;
-        } else
-          rmph = rmp = (struct reg_match *)DMALLOC(sizeof(struct reg_match), TAG_TEMPORARY,
-                                                   "reg_assoc : rmp");
+        } else {
+          rmph = rmp = reinterpret_cast<struct reg_match *>(
+              DMALLOC(sizeof(struct reg_match), TAG_TEMPORARY, "reg_assoc : rmp"));
+        }
         tmpreg = rgpp[regindex];
         rmp->begin = tmpreg->startp[0];
         rmp->end = tmp = tmpreg->endp[0];
@@ -1603,7 +1609,7 @@ array_t *match_regexp(array_t *v, const char *pattern, int flag) {
   if (!reg) {
     error(regexp_error);
   }
-  res = (char *)DMALLOC(size, TAG_TEMPORARY, "match_regexp: res");
+  res = reinterpret_cast<char *>(DMALLOC(size, TAG_TEMPORARY, "match_regexp: res"));
   sv1 = v->item + size;
   num_match = 0;
   while (size--) {

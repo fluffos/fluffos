@@ -88,7 +88,7 @@ void int_free_svalue(svalue_t *v)
         NDBG(BLOCK(str));
         if (v->subtype & STRING_HASHED) {
           SUB_NEW_STRING(size, sizeof(block_t));
-          deallocate_string((char *)str);
+          deallocate_string(const_cast<char *>(str));
           CHECK_STRING_STATS;
         } else {
           SUB_NEW_STRING(size, sizeof(malloc_block_t));

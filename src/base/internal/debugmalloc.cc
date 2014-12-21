@@ -46,11 +46,11 @@ void *debugrealloc(void *ptr, int size, int tag, const char *desc) {
 
   NOISY3("realloc: %i (%x), %s\n", size, ptr, desc);
   stats.realloc_calls++;
-  tmp = (md_node_t *)ptr - 1;
+  tmp = reinterpret_cast<md_node_t *>(ptr) - 1;
   if (MDfree(tmp)) {
-    tmp = (void *)realloc(tmp, size + MD_OVERHEAD);
-    MDmalloc((md_node_t *)tmp, size, tag, desc);
-    return (md_node_t *)tmp + 1;
+    tmp = realloc(tmp, size + MD_OVERHEAD);
+    MDmalloc(reinterpret_cast<md_node_t *>(tmp), size, tag, desc);
+    return reinterpret_cast<md_node_t *>(tmp) + 1;
   }
   return (void *)0;
 }
@@ -62,10 +62,10 @@ void *debugmalloc(int size, int tag, const char *desc) {
     fatal("illegal size in debugmalloc()");
   }
   stats.alloc_calls++;
-  tmp = (void *)malloc(size + MD_OVERHEAD);
-  MDmalloc((md_node_t *)tmp, size, tag, desc);
+  tmp = malloc(size + MD_OVERHEAD);
+  MDmalloc(reinterpret_cast<md_node_t *>(tmp), size, tag, desc);
   NOISY3("malloc: %i (%x), %s\n", size, (md_node_t *)tmp + 1, desc);
-  return (md_node_t *)tmp + 1;
+  return reinterpret_cast<md_node_t *>(tmp) + 1;
 }
 
 void *debugcalloc(int nitems, int size, int tag, const char *desc) {
@@ -76,10 +76,10 @@ void *debugcalloc(int nitems, int size, int tag, const char *desc) {
   }
 
   stats.alloc_calls++;
-  tmp = (void *)calloc(nitems * size + MD_OVERHEAD, 1);
-  MDmalloc((md_node_t *)tmp, nitems * size, tag, desc);
+  tmp = calloc(nitems * size + MD_OVERHEAD, 1);
+  MDmalloc(reinterpret_cast<md_node_t *>(tmp), nitems * size, tag, desc);
   NOISY3("calloc: %i (%x), %s\n", nitems * size, (md_node_t *)tmp + 1, desc);
-  return (md_node_t *)tmp + 1;
+  return reinterpret_cast<md_node_t *>(tmp) + 1;
 }
 
 void debugfree(void *ptr) {
@@ -87,7 +87,7 @@ void debugfree(void *ptr) {
 
   NOISY1("free (%x)\n", ptr);
   stats.free_calls++;
-  tmp = (md_node_t *)ptr - 1;
+  tmp = reinterpret_cast<md_node_t *>(ptr) - 1;
   if (MDfree(tmp)) {
     free(tmp); /* only free if safe to do so */
   }

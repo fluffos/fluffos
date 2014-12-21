@@ -32,7 +32,8 @@ static std::deque<heart_beat_t *> heartbeats, heartbeats_next;
 
 void call_heart_beat() {
   // Register for next call
-  add_tick_event(HEARTBEAT_INTERVAL, tick_event::callback_type(call_heart_beat));
+  add_gametick_event(std::chrono::milliseconds(CONFIG_INT(__HEARTBEAT_INTERVAL_MSEC__)),
+                     tick_event::callback_type(call_heart_beat));
 
   if (!heartbeats_next.empty()) {
     for (auto hb : heartbeats_next) {

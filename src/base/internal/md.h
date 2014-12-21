@@ -17,9 +17,6 @@ typedef struct md_node_s {
   int tag;
   const char *desc;
 #endif
-#ifdef CHECK_MEMORY
-  int magic;
-#endif
 } md_node_t;
 
 #ifdef CHECK_MEMORY
@@ -66,16 +63,5 @@ int MDfree(void *);
 #ifdef DEBUGMALLOC_EXTENSIONS
 void set_tag(const void *, int);
 #endif
-
-#define LEFT_MAGIC(node) ((node)->magic)
-#define RIGHT_MAGIC_ADDR(node) ((unsigned char *)(node) + sizeof(md_node_t) + (node)->size)
-#define STORE_RIGHT_MAGIC(node)                                  \
-  *(RIGHT_MAGIC_ADDR(node)) = (char)(MD_MAGIC >> 24) & 0xff;     \
-  *(RIGHT_MAGIC_ADDR(node) + 1) = (char)(MD_MAGIC >> 16) & 0xff; \
-  *(RIGHT_MAGIC_ADDR(node) + 2) = (char)(MD_MAGIC >> 8) & 0xff;  \
-  *(RIGHT_MAGIC_ADDR(node) + 3) = (char)MD_MAGIC & 0xff
-#define FETCH_RIGHT_MAGIC(l, node)                                                \
-  l = (*(RIGHT_MAGIC_ADDR(node)) << 24) + (*(RIGHT_MAGIC_ADDR(node) + 1) << 16) + \
-      (*(RIGHT_MAGIC_ADDR(node) + 2) << 8) + (*(RIGHT_MAGIC_ADDR(node) + 3))
 
 #endif

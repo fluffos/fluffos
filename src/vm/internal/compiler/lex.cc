@@ -231,38 +231,38 @@ typedef struct linked_buf_s {
 static linked_buf_t head_lbuf = {NULL, TERM_START};
 static linked_buf_t *cur_lbuf;
 
-static void handle_define(char *);
+static void handle_define(char * /*yyt*/);
 static void free_defines(void);
-static void add_define(const char *, int, const char *);
-static void add_predefine(const char *, int, const char *);
+static void add_define(const char * /*name*/, int /*nargs*/, const char * /*exps*/);
+static void add_predefine(const char * /*name*/, int /*nargs*/, const char * /*exps*/);
 static int expand_define(void);
-static void add_input(const char *);
+static void add_input(const char * /*p*/);
 static void merge(char *name, char *dest);
-static void add_quoted_predefine(const char *, const char *);
-static void lexerror(const char *);
-static int skip_to(const char *, const char *);
-static int inc_open(char *, char *, int);
-static void include_error(const char *, int);
-static void handle_include(char *, int);
-static int get_terminator(char *);
-static int get_array_block(char *);
-static int get_text_block(char *);
+static void add_quoted_predefine(const char * /*def*/, const char * /*val*/);
+static void lexerror(const char * /*s*/);
+static int skip_to(const char * /*token*/, const char * /*atoken*/);
+static int inc_open(char * /*buf*/, char * /*name*/, int /*check_local*/);
+static void include_error(const char * /*msg*/, int /*global*/);
+static void handle_include(char * /*name*/, int /*global*/);
+static int get_terminator(char * /*terminator*/);
+static int get_array_block(char * /*term*/);
+static int get_text_block(char * /*term*/);
 static void skip_line(void);
 static void skip_comment(void);
-static void deltrail(char *);
-static void handle_pragma(char *);
+static void deltrail(char * /*sp*/);
+static void handle_pragma(char * /*str*/);
 static int cmygetc(void);
 static void refill(void);
 static void refill_buffer(void);
 static int exgetc(void);
 static int old_func(void);
 static ident_hash_elem_t *quick_alloc_ident_entry(void);
-static void yyerrorp(const char *);
+static void yyerrorp(const char * /*s*/);
 
 #define LEXER
 
-static LPC_INT cond_get_exp(int);
-static void handle_cond(LPC_INT);
+static LPC_INT cond_get_exp(int /*priority*/);
+static void handle_cond(LPC_INT /*c*/);
 
 static defn_t *defns[DEFHASH];
 static ifstate_t *iftop = 0;
@@ -272,10 +272,11 @@ static defn_t *lookup_definition(const char *s) {
   int h;
 
   h = defhash(s);
-  for (p = defns[h]; p; p = p->next)
+  for (p = defns[h]; p; p = p->next) {
     if (strcmp(s, p->name) == 0) {
       return p;
     }
+  }
   return 0;
 }
 
@@ -311,7 +312,8 @@ static void add_define(const char *name, int nargs, const char *exps) {
 
   if (p) {
     if (p->flags & DEF_IS_UNDEFINED) {
-      p->exps = (char *)DREALLOC(p->exps, len + 1, TAG_COMPILER, "add_define: redef");
+      p->exps =
+          reinterpret_cast<char *>(DREALLOC(p->exps, len + 1, TAG_COMPILER, "add_define: redef"));
       memcpy(p->exps, exps, len);
       p->exps[len] = 0;
       p->flags = 0;
@@ -327,7 +329,8 @@ static void add_define(const char *name, int nargs, const char *exps) {
         sprintf(buf, "redefinition of #define %s\n", name);
         yywarn(buf);
 
-        p->exps = (char *)DREALLOC(p->exps, len + 1, TAG_COMPILER, "add_define: redef");
+        p->exps =
+            reinterpret_cast<char *>(DREALLOC(p->exps, len + 1, TAG_COMPILER, "add_define: redef"));
         memcpy(p->exps, exps, len);
         p->exps[len] = 0;
         p->nargs = nargs;
@@ -337,10 +340,11 @@ static void add_define(const char *name, int nargs, const char *exps) {
 #endif
     }
   } else {
-    p = (defn_t *)DMALLOC(sizeof(defn_t), TAG_COMPILER, "add_define: def");
-    p->name = (char *)DMALLOC(strlen(name) + 1, TAG_COMPILER, "add_define: def name");
+    p = reinterpret_cast<defn_t *>(DMALLOC(sizeof(defn_t), TAG_COMPILER, "add_define: def"));
+    p->name =
+        reinterpret_cast<char *>(DMALLOC(strlen(name) + 1, TAG_COMPILER, "add_define: def name"));
     strcpy(p->name, name);
-    p->exps = (char *)DMALLOC(len + 1, TAG_COMPILER, "add_define: def exps");
+    p->exps = reinterpret_cast<char *>(DMALLOC(len + 1, TAG_COMPILER, "add_define: def exps"));
     memcpy(p->exps, exps, len);
     p->exps[len] = 0;
     p->flags = 0;
@@ -689,7 +693,7 @@ static void handle_cond(LPC_INT c) {
   if (!c) {
     skip_to("else", "endif");
   }
-  p = (ifstate_t *)DMALLOC(sizeof(ifstate_t), TAG_COMPILER, "handle_cond");
+  p = reinterpret_cast<ifstate_t *>(DMALLOC(sizeof(ifstate_t), TAG_COMPILER, "handle_cond"));
   p->next = iftop;
   iftop = p;
   p->state = c ? EXPECT_ENDIF : EXPECT_ELSE;
@@ -927,7 +931,8 @@ static void handle_include(char *name, int global) {
   if (++incnum == MAX_INCLUDE_DEPTH) {
     include_error("Maximum include depth exceeded.", global);
   } else if ((f = inc_open(buf, name, delim == '"')) != -1) {
-    is = (incstate_t *)DMALLOC(sizeof(incstate_t), TAG_COMPILER, "handle_include: 1");
+    is = reinterpret_cast<incstate_t *>(
+        DMALLOC(sizeof(incstate_t), TAG_COMPILER, "handle_include: 1"));
     is->yyin_desc = yyin_desc;
     is->line = current_line;
     is->file = current_file;
@@ -1010,7 +1015,7 @@ static int get_array_block(char *term) {
    * initialize
    */
   termlen = strlen(term);
-  array_line[0] = (char *)DMALLOC(MAXCHUNK, TAG_COMPILER, "array_block");
+  array_line[0] = reinterpret_cast<char *>(DMALLOC(MAXCHUNK, TAG_COMPILER, "array_block"));
   array_line[0][0] = '(';
   array_line[0][1] = '{';
   array_line[0][2] = '"';
@@ -1112,7 +1117,8 @@ static int get_array_block(char *term) {
           outp = yyp;
           break;
         }
-        array_line[++curchunk] = (char *)DMALLOC(MAXCHUNK, TAG_COMPILER, "array_block");
+        array_line[++curchunk] =
+            reinterpret_cast<char *>(DMALLOC(MAXCHUNK, TAG_COMPILER, "array_block"));
         len = 0;
       }
       /*
@@ -1153,7 +1159,7 @@ static int get_text_block(char *term) {
    * initialize
    */
   termlen = strlen(term);
-  text_line[0] = (char *)DMALLOC(MAXCHUNK, TAG_COMPILER, "text_block");
+  text_line[0] = reinterpret_cast<char *>(DMALLOC(MAXCHUNK, TAG_COMPILER, "text_block"));
   text_line[0][0] = '"';
   text_line[0][1] = '\0';
   len = 1;
@@ -1281,7 +1287,8 @@ static int get_text_block(char *term) {
           outp = yyp;
           break;
         }
-        text_line[++curchunk] = (char *)DMALLOC(MAXCHUNK, TAG_COMPILER, "text_block");
+        text_line[++curchunk] =
+            reinterpret_cast<char *>(DMALLOC(MAXCHUNK, TAG_COMPILER, "text_block"));
         len = 0;
       }
       /*
@@ -1428,7 +1435,7 @@ char *show_error_context() {
   char *yyp, *yyp2;
   int len;
 
-  if ((unsigned char)outp[-1] == LEX_EOF) {
+  if (static_cast<unsigned char>(outp[-1]) == LEX_EOF) {
     strcpy(buf, " at the end of the file\n");
     return buf;
   }
@@ -1447,7 +1454,7 @@ char *show_error_context() {
         strcat(buf, "the end of line");
       }
       break;
-    } else if ((unsigned char)*yyp == LEX_EOF) {
+    } else if (static_cast<unsigned char>(*yyp) == LEX_EOF) {
       if (len == 19) {
         strcat(buf, "the end of file");
       }
@@ -1548,8 +1555,8 @@ static void refill_buffer() {
         linked_buf_t *new_lbuf;
         char *new_outp;
 
-        if (!(new_lbuf =
-                  (linked_buf_t *)DMALLOC(sizeof(linked_buf_t), TAG_COMPILER, "refill_bufer"))) {
+        if (!(new_lbuf = reinterpret_cast<linked_buf_t *>(
+                  DMALLOC(sizeof(linked_buf_t), TAG_COMPILER, "refill_bufer")))) {
           lexerror("Out of memory when allocating new buffer.\n");
           return;
         }
@@ -2197,7 +2204,7 @@ int yylex() {
               }
               break;
             case 'x':
-              if (!isxdigit((unsigned char)*outp)) {
+              if (!isxdigit(static_cast<unsigned char>(*outp))) {
                 yylval.number = 'x';
                 yywarn(
                     "\\x must be followed by a valid hex value; interpreting "
@@ -2298,7 +2305,7 @@ int yylex() {
               *to++ = 0;
               if (!l && (to == scratch_end)) {
                 char *res = scratch_large_alloc(to - scr_tail - 1);
-                strcpy(res, (char *)(scr_tail + 1));
+                strcpy(res, reinterpret_cast<char *>(scr_tail + 1));
                 yylval.string = res;
                 return L_STRING;
               }
@@ -2306,7 +2313,7 @@ int yylex() {
               scr_last = scr_tail + 1;
               scr_tail = to;
               *to = to - scr_last;
-              yylval.string = (char *)scr_last;
+              yylval.string = reinterpret_cast<char *>(scr_last);
               return L_STRING;
 
             case '\n':
@@ -2320,7 +2327,7 @@ int yylex() {
 
             case '\\':
               /* Don't copy the \ in yet */
-              switch ((unsigned char)*outp++) {
+              switch (static_cast<unsigned char>(*outp++)) {
                 case '\n':
                   current_line++;
                   total_lines++;
@@ -2378,7 +2385,7 @@ int yylex() {
                 }
                 case 'x': {
                   int tmp;
-                  if (!isxdigit((unsigned char)*outp)) {
+                  if (!isxdigit(static_cast<unsigned char>(*outp))) {
                     *to++ = 'x';
                     yywarn(
                         "\\x must be followed by a valid hex value; "
@@ -2417,7 +2424,7 @@ int yylex() {
               char *res;
               *yyp++ = '\0';
               res = scratch_large_alloc((yyp - yytext) + (to - scr_tail) - 1);
-              strncpy(res, (char *)(scr_tail + 1), (to - scr_tail) - 1);
+              strncpy(res, reinterpret_cast<char *>(scr_tail + 1), (to - scr_tail) - 1);
               strcpy(res + (to - scr_tail) - 1, yytext);
               yylval.string = res;
               return L_STRING;
@@ -2434,7 +2441,7 @@ int yylex() {
 
             case '\\':
               /* Don't copy the \ in yet */
-              switch ((unsigned char)*outp++) {
+              switch (static_cast<unsigned char>(*outp++)) {
                 case '\n':
                   current_line++;
                   total_lines++;
@@ -2492,7 +2499,7 @@ int yylex() {
                 }
                 case 'x': {
                   int tmp;
-                  if (!isxdigit((unsigned char)*outp)) {
+                  if (!isxdigit(static_cast<unsigned char>(*outp))) {
                     *yyp++ = 'x';
                     yywarn(
                         "\\x must be followed by a valid hex value; "
@@ -2524,7 +2531,7 @@ int yylex() {
         {
           char *res;
           res = scratch_large_alloc((yyp - yytext) + (to - scr_tail) - 1);
-          strncpy(res, (char *)(scr_tail + 1), (to - scr_tail) - 1);
+          strncpy(res, reinterpret_cast<char *>(scr_tail + 1), (to - scr_tail) - 1);
           strcpy(res + (to - scr_tail) - 1, yytext);
           yylval.string = res;
           return L_STRING;
@@ -2537,7 +2544,7 @@ int yylex() {
           for (;;) {
             c = *outp++;
             SAVEC;
-            if (!isxdigit((unsigned char)c)) {
+            if (!isxdigit(c)) {
               break;
             }
           }
@@ -2570,7 +2577,7 @@ int yylex() {
               outp--;
               break;
             }
-          } else if (!isdigit((unsigned char)c)) {
+          } else if (!isdigit(c)) {
             break;
           }
           SAVEC;
@@ -2585,7 +2592,7 @@ int yylex() {
           return L_NUMBER;
         }
       default:
-        if (isalpha((unsigned char)c) || c == '_') {
+        if (isalpha(c) || c == '_') {
           int r;
 
         parse_identifier:
@@ -2593,7 +2600,7 @@ int yylex() {
           *yyp++ = c;
           for (;;) {
             c = *outp++;
-            if (!isalnum((unsigned char)c) && (c != '_')) {
+            if (!isalnum(c) && (c != '_')) {
               break;
             }
             SAVEC;
@@ -2703,7 +2710,8 @@ badlex : {
 #ifdef DEBUG
   char buff[100];
 
-  sprintf(buff, "Illegal character (hex %02x) '%c'", (unsigned)c, (char)c);
+  sprintf(buff, "Illegal character (hex %02x) '%c'", static_cast<unsigned>(c),
+          static_cast<char>(c));
   yyerror(buff);
 #endif
   return ' ';
@@ -2846,7 +2854,7 @@ void start_new_file(int f) {
     int ln;
 
     ln = strlen(current_file);
-    dir = (char *)DMALLOC(ln + 4, TAG_COMPILER, "start_new_file");
+    dir = reinterpret_cast<char *>(DMALLOC(ln + 4, TAG_COMPILER, "start_new_file"));
     dir[0] = '"';
     dir[1] = '/';
     memcpy(dir + 2, current_file, ln);
@@ -3288,7 +3296,7 @@ static void add_input(const char *p) {
 
     q = outp;
 
-    while (*q != '\n' && (unsigned char)*q != LEX_EOF) {
+    while (*q != '\n' && static_cast<unsigned char>(*q) != LEX_EOF) {
       q++;
     }
     /* Incorporate EOF later */
@@ -3300,7 +3308,8 @@ static void add_input(const char *p) {
     cur_lbuf->outp = q + 1;
     cur_lbuf->last_nl = last_nl;
 
-    new_lbuf = (linked_buf_t *)DMALLOC(sizeof(linked_buf_t), TAG_COMPILER, "add_input");
+    new_lbuf =
+        reinterpret_cast<linked_buf_t *>(DMALLOC(sizeof(linked_buf_t), TAG_COMPILER, "add_input"));
     new_lbuf->term_type = TERM_ADD_INPUT;
     new_lbuf->prev = cur_lbuf;
     buf = new_lbuf->buf;
@@ -3350,14 +3359,17 @@ static void add_predefine(const char *name, int nargs, const char *exps) {
       sprintf(buf, "redefinition of #define %s\n", name);
       yywarn(buf);
     }
-    p->exps = (char *)DREALLOC(p->exps, strlen(exps) + 1, TAG_PREDEFINES, "add_define: redef");
+    p->exps = reinterpret_cast<char *>(
+        DREALLOC(p->exps, strlen(exps) + 1, TAG_PREDEFINES, "add_define: redef"));
     strcpy(p->exps, exps);
     p->nargs = nargs;
   } else {
-    p = (defn_t *)DMALLOC(sizeof(defn_t), TAG_PREDEFINES, "add_define: def");
-    p->name = (char *)DMALLOC(strlen(name) + 1, TAG_PREDEFINES, "add_define: def name");
+    p = reinterpret_cast<defn_t *>(DMALLOC(sizeof(defn_t), TAG_PREDEFINES, "add_define: def"));
+    p->name =
+        reinterpret_cast<char *>(DMALLOC(strlen(name) + 1, TAG_PREDEFINES, "add_define: def name"));
     strcpy(p->name, name);
-    p->exps = (char *)DMALLOC(strlen(exps) + 1, TAG_PREDEFINES, "add_define: def exps");
+    p->exps =
+        reinterpret_cast<char *>(DMALLOC(strlen(exps) + 1, TAG_PREDEFINES, "add_define: def exps"));
     strcpy(p->exps, exps);
     p->flags = DEF_IS_PREDEF;
     p->nargs = nargs;
@@ -3506,7 +3518,7 @@ static char *expand_define2(char *text) {
 
   /* special handling for __LINE__ macro */
   if (!strcmp(text, "__LINE__")) {
-    expand_buffer = (char *)DMALLOC(20, TAG_COMPILER, "expand_define2");
+    expand_buffer = reinterpret_cast<char *>(DMALLOC(20, TAG_COMPILER, "expand_define2"));
     sprintf(expand_buffer, "%i", current_line);
     return expand_buffer;
   }
@@ -3544,7 +3556,8 @@ static char *expand_define2(char *text) {
   }
 
   if (!argc) {
-    expand_buffer = (char *)DMALLOC(strlen(macro->exps) + 1, TAG_COMPILER, "expand_define2");
+    expand_buffer =
+        reinterpret_cast<char *>(DMALLOC(strlen(macro->exps) + 1, TAG_COMPILER, "expand_define2"));
     strcpy(expand_buffer, macro->exps);
     expand_depth--;
     return expand_buffer;
@@ -3552,7 +3565,7 @@ static char *expand_define2(char *text) {
 
   /* Perform expansion with args */
   in = macro->exps;
-  out = expand_buffer = (char *)DMALLOC(DEFMAX, TAG_COMPILER, "expand_define2");
+  out = expand_buffer = reinterpret_cast<char *>(DMALLOC(DEFMAX, TAG_COMPILER, "expand_define2"));
 
 #define SAVECHAR(x)                                                   \
   SAFE(if (out + 1 < expand_buffer + DEFMAX) { *out++ = (x); } else { \
@@ -3754,7 +3767,7 @@ void set_inc_list(char *list) {
     size++;
     p++;
   }
-  inc_list = (char **)DCALLOC(size, sizeof(char *), TAG_INC_LIST, "set_inc_list");
+  inc_list = reinterpret_cast<char **>(DCALLOC(size, sizeof(char *), TAG_INC_LIST, "set_inc_list"));
   inc_list_size = size;
   for (i = size - 1; i >= 0; i--) {
     p = strrchr(list, ':');
@@ -3860,16 +3873,16 @@ ident_hash_elem_t *find_or_add_perm_ident(const char *name) {
       }
       hptr2 = hptr2->next;
     }
-    hptr = (ident_hash_elem_t *)DMALLOC(sizeof(ident_hash_elem_t), TAG_PERM_IDENT,
-                                        "find_or_add_perm_ident:1");
+    hptr = reinterpret_cast<ident_hash_elem_t *>(
+        DMALLOC(sizeof(ident_hash_elem_t), TAG_PERM_IDENT, "find_or_add_perm_ident:1"));
     hptr->next = ident_hash_head[h]->next;
     ident_hash_head[h]->next = hptr;
     if (ident_hash_head[h] == ident_hash_tail[h]) {
       ident_hash_tail[h] = hptr;
     }
   } else {
-    hptr = (ident_hash_table[h] = (ident_hash_elem_t *)DMALLOC(
-                sizeof(ident_hash_elem_t), TAG_PERM_IDENT, "find_or_add_perm_ident:2"));
+    hptr = (ident_hash_table[h] = reinterpret_cast<ident_hash_elem_t *>(
+                DMALLOC(sizeof(ident_hash_elem_t), TAG_PERM_IDENT, "find_or_add_perm_ident:2")));
     ident_hash_head[h] = hptr;
     ident_hash_tail[h] = hptr;
     hptr->next = hptr;
@@ -3901,8 +3914,8 @@ static char *alloc_local_name(const char *name) {
 
   if (lb_index + len > 4096) {
     lname_linked_buf_t *new_buf;
-    new_buf =
-        (lname_linked_buf_t *)DMALLOC(sizeof(lname_linked_buf_t), TAG_COMPILER, "alloc_local_name");
+    new_buf = reinterpret_cast<lname_linked_buf_t *>(
+        DMALLOC(sizeof(lname_linked_buf_t), TAG_COMPILER, "alloc_local_name"));
     new_buf->next = lnamebuf;
     lnamebuf = new_buf;
     lb_index = 0;
@@ -4008,10 +4021,11 @@ void free_unused_identifiers() {
     ident_dirty_list = ident_dirty_list->next_dirty;
   }
 
-  for (i = 0; i < IDENT_HASH_SIZE; i++)
+  for (i = 0; i < IDENT_HASH_SIZE; i++) {
     if ((ident_hash_table[i] = ident_hash_head[i])) {
       ident_hash_tail[i]->next = ident_hash_head[i];
     }
+  }
 
   ihel = ihe_list;
   while (ihel) {
@@ -4041,8 +4055,8 @@ static ident_hash_elem_t *quick_alloc_ident_entry() {
     return &(ihe_list->items[num_free]);
   } else {
     ident_hash_elem_list_t *ihel;
-    ihel = (ident_hash_elem_list_t *)DMALLOC(sizeof(ident_hash_elem_list_t), TAG_COMPILER,
-                                             "quick_alloc_ident_entry");
+    ihel = reinterpret_cast<ident_hash_elem_list_t *>(
+        DMALLOC(sizeof(ident_hash_elem_list_t), TAG_COMPILER, "quick_alloc_ident_entry"));
     ihel->next = ihe_list;
     ihe_list = ihel;
     num_free = 127;
@@ -4109,15 +4123,15 @@ static void add_keyword_t(const char *name, keyword_t *entry) {
 
   if (ident_hash_table[h]) {
     entry->next = ident_hash_head[h]->next;
-    ident_hash_head[h]->next = (ident_hash_elem_t *)entry;
+    ident_hash_head[h]->next = reinterpret_cast<ident_hash_elem_t *>(entry);
     if (ident_hash_head[h] == ident_hash_tail[h]) {
-      ident_hash_tail[h] = (ident_hash_elem_t *)entry;
+      ident_hash_tail[h] = reinterpret_cast<ident_hash_elem_t *>(entry);
     }
   } else {
-    ident_hash_head[h] = (ident_hash_elem_t *)entry;
-    ident_hash_tail[h] = (ident_hash_elem_t *)entry;
-    ident_hash_table[h] = (ident_hash_elem_t *)entry;
-    entry->next = (ident_hash_elem_t *)entry;
+    ident_hash_head[h] = reinterpret_cast<ident_hash_elem_t *>(entry);
+    ident_hash_tail[h] = reinterpret_cast<ident_hash_elem_t *>(entry);
+    ident_hash_table[h] = reinterpret_cast<ident_hash_elem_t *>(entry);
+    entry->next = reinterpret_cast<ident_hash_elem_t *>(entry);
   }
   entry->token |= IHE_RESWORD;
 }
@@ -4129,10 +4143,10 @@ void init_identifiers() {
   init_instrs();
 
   /* allocate all three tables together */
-  ident_hash_table = (ident_hash_elem_t **)DCALLOC(IDENT_HASH_SIZE * 3, sizeof(ident_hash_elem_t *),
-                                                   TAG_IDENT_TABLE, "init_identifiers");
-  ident_hash_head = (ident_hash_elem_t **)&ident_hash_table[IDENT_HASH_SIZE];
-  ident_hash_tail = (ident_hash_elem_t **)&ident_hash_table[2 * IDENT_HASH_SIZE];
+  ident_hash_table = reinterpret_cast<ident_hash_elem_t **>(DCALLOC(
+      IDENT_HASH_SIZE * 3, sizeof(ident_hash_elem_t *), TAG_IDENT_TABLE, "init_identifiers"));
+  ident_hash_head = &ident_hash_table[IDENT_HASH_SIZE];
+  ident_hash_tail = &ident_hash_table[2 * IDENT_HASH_SIZE];
 
   /* clean all three tables */
   for (i = 0; i < IDENT_HASH_SIZE * 3; i++) {

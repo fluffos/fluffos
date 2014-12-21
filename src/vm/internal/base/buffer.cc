@@ -39,7 +39,8 @@ buffer_t *allocate_buffer(int size) {
     return null_buffer();
   }
   /* using calloc() so that memory will be zero'd out when allocated */
-  buf = (buffer_t *)DCALLOC(sizeof(buffer_t) + size - 1, 1, TAG_BUFFER, "allocate_buffer");
+  buf = reinterpret_cast<buffer_t *>(
+      DCALLOC(sizeof(buffer_t) + size - 1, 1, TAG_BUFFER, "allocate_buffer"));
   buf->size = size;
   buf->ref = 1;
   return buf;
@@ -93,7 +94,8 @@ char *read_buffer(buffer_t *b, int start, int len, int *rlen) {
   if ((start + len) > size) {
     len = (size - start);
   }
-  for (str = (char *)b->item + start, size = 0; *str && size < len; str++, size++) {
+  for (str = reinterpret_cast<char *>(b->item) + start, size = 0; *str && size < len;
+       str++, size++) {
     ;
   }
   str = new_string(size, "read_buffer: str");
