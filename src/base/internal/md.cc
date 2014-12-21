@@ -45,10 +45,6 @@ void MDmalloc(md_node_t *node, int size, int tag, const char *desc) {
   h = MD_HASH(node);
   node->size = size;
   node->next = table[h];
-#ifdef CHECK_MEMORY
-  LEFT_MAGIC(node) = MD_MAGIC;
-  STORE_RIGHT_MAGIC(node);
-#endif
 #ifdef DEBUGMALLOC_EXTENSIONS
   if ((tag & 0xff) < MAX_CATEGORY) {
     totals[tag & 0xff] += size;
@@ -111,17 +107,6 @@ int MDfree(void *ptr) {
     }
   }
   if (entry) {
-#ifdef CHECK_MEMORY
-    if (LEFT_MAGIC(entry) != MD_MAGIC) {
-      debug_message("MDfree: left side of entry corrupt: %s %04x at %lx\n", entry->desc, entry->tag,
-                    entry);
-    }
-    FETCH_RIGHT_MAGIC(tmp, entry);
-    if (tmp != MD_MAGIC) {
-      debug_message("MDfree: right side of entry corrupt: %s %04x at %lx\n", entry->desc,
-                    entry->tag, entry);
-    }
-#endif
 #ifdef DEBUGMALLOC_EXTENSIONS
     if ((entry->tag & 0xff) < MAX_CATEGORY) {
       totals[entry->tag & 0xff] -= entry->size;
