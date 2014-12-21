@@ -19,19 +19,16 @@
 #include "base/internal/stralloc.h"
 #include "base/internal/external_port.h"
 
-static const int kMaxConfigLineLength = 120;
-
 char *config_str[NUM_CONFIG_STRS];
 int config_int[NUM_CONFIG_INTS];
-
 char *external_cmd[NUM_EXTERNAL_CMDS];
 
-static std::deque<std::string> config_lines;
+namespace {
 
-static int scan_config_line(const char * /*fmt*/, void * /*dest*/, int /*required*/);
-static void config_init(void); /* don't ask */
+const int kMaxConfigLineLength = 120;
+std::deque<std::string> config_lines;
 
-static void config_init() {
+void config_init() {
   int i;
 
   for (i = 0; i < NUM_CONFIG_INTS; i++) {
@@ -48,14 +45,14 @@ static void config_init() {
  * if the line isn't there.
  */
 /* required:
-      1  : Must have
-      0  : optional
-      -1 : warn if missing
-      -2 : warn if found.
+ 1  : Must have
+ 0  : optional
+ -1 : warn if missing
+ -2 : warn if found.
  */
-static int scan_config_line(const char *fmt, void *dest, int required) {
+bool scan_config_line(const char *fmt, void *dest, int required) {
   /* zero the destination.  It is either a pointer to an int or a char
-     buffer, so this will work */
+   buffer, so this will work */
   *(reinterpret_cast<int *>(dest)) = 0;
 
   bool found = false;
@@ -78,26 +75,28 @@ static int scan_config_line(const char *fmt, void *dest, int required) {
         // obsolete
         fprintf(stderr, "*Warning: obsolete line in config file, please delete:\n\t%s\n",
                 line.c_str());
-        return 0;
+        return false;
     }
-    return 1;
+    return true;
   } else {
     switch (required) {
       case -1:
         // optional but warn
         fprintf(stderr, "*Warning: Missing line in config file:\n\t%s\n", line.c_str());
-        return 0;
+        return false;
       case 0:
         // optional
-        return 0;
+        return false;
       case 1:
         // required
         fprintf(stderr, "*Error in config file.  Missing line:\n\t%s\n", line.c_str());
         exit(-1);
     }
   }
-  return 0;
+  return false;
 }
+
+}  // namespace
 
 void read_config(char *filename) {
   /* needed for string_copy() below */
@@ -209,13 +208,13 @@ void read_config(char *filename) {
    * not currently used...see options.h
    */
   scan_config_line("evaluator stack size : %d\n",
-                   &CONFIG_INT(__EVALUATOR_STACK_SIZE__), 0);
+      &CONFIG_INT(__EVALUATOR_STACK_SIZE__), 0);
   scan_config_line("maximum local variables : %d\n",
-                   &CONFIG_INT(__MAX_LOCAL_VARIABLES__), 0);
+      &CONFIG_INT(__MAX_LOCAL_VARIABLES__), 0);
   scan_config_line("maximum call depth : %d\n",
-                   &CONFIG_INT(__MAX_CALL_DEPTH__), 0);
+      &CONFIG_INT(__MAX_CALL_DEPTH__), 0);
   scan_config_line("living hash table size : %d\n",
-                   &CONFIG_INT(__LIVING_HASH_TABLE_SIZE__), 0);
+      &CONFIG_INT(__LIVING_HASH_TABLE_SIZE__), 0);
 #endif
 
   scan_config_line("inherit chain size : %d\n", &CONFIG_INT(__INHERIT_CHAIN_SIZE__), 1);
@@ -303,6 +302,15 @@ void read_config(char *filename) {
     }
   }
 #endif
+
+  if (!scan_config_line("gametick msec : %d\n", &CONFIG_INT(__GAMETICK_MSEC__), -1)) {
+    CONFIG_INT(__GAMETICK_MSEC__) = 1000;  // default to 1s.
+  }
+  if (!scan_config_line("heartbeat interval msec : %d\n", &CONFIG_INT(__HEARTBEAT_INTERVAL_MSEC__),
+                        -1)) {
+    CONFIG_INT(__HEARTBEAT_INTERVAL_MSEC__) =
+        CONFIG_INT(__GAMETICK_MSEC__);  // default to match gametick.
+  }
 
   /*
    * from options.h

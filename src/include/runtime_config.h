@@ -8,9 +8,7 @@
  * in options.h, but the mudlib doesn't have to know...
  *
  * Note for backwards compatibility:
- *
- *    get_config(__MUD_NAME__) == MUD_NAME
- *    get_config(__MUD_PORT__) == __PORT__
+ *   Neither the name or the number can be changed, or reused, avoid breaking mudlib code.
  */
 
 #ifndef RUNTIME_CONFIG_H
@@ -41,7 +39,6 @@
 /*
  * These config settings return an int (ie number)
  */
-
 #define BASE_CONFIG_INT (BASE_CONFIG_STR + 15)
 #define CFG_INT(x) ((x)+BASE_CONFIG_INT)
 
@@ -69,13 +66,7 @@
 #define __LIVING_HASH_TABLE_SIZE__ CFG_INT(21)
 #define __RC_INT_22__ CFG_INT(22)
 #define __RC_INT_23__ CFG_INT(23)
-#define RUNTIME_CONFIG_NEXT CFG_INT(24)
-
-/*
- * The following is for internal use (ie driver) only
- */
-
-#define NUM_CONFIG_STRS (BASE_CONFIG_INT - BASE_CONFIG_STR)
-#define NUM_CONFIG_INTS (RUNTIME_CONFIG_NEXT - BASE_CONFIG_INT)
+#define __GAMETICK_MSEC__ CFG_INT(24)
+#define __HEARTBEAT_INTERVAL_MSEC__ CFG_INT(25)
 
 #endif /* RUNTIME_CONFIG_H */

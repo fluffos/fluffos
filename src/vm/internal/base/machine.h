@@ -8,6 +8,8 @@
 #ifndef SRC_VM_INTERNAL_BASE_MACHINE_H_
 #define SRC_VM_INTERNAL_BASE_MACHINE_H_
 
+#include <sys/types.h>
+
 // FIXME: make this more obvious
 #include "vm/internal/efuns.autogen.h"
 
@@ -36,7 +38,7 @@ extern object_t *command_giver;
 extern object_t *current_interactive;
 
 // TODO: defined in backend.cc
-extern long g_current_virtual_time;
+extern uint64_t g_current_gametick;
 
 // TODO: defined in interpret.cc
 extern struct error_context_t *current_error_context;

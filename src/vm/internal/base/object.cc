@@ -1,5 +1,6 @@
 #include "base/std.h"
 
+#include <chrono>
 #include <ctype.h>  // for isdigit
 #include <math.h>   // for pow
 #ifdef HAVE_SYS_STAT_H
@@ -2052,18 +2053,24 @@ object_t *get_empty_object(int num_var) {
   return ob;
 }
 
-void reset_object(object_t *ob) {
-  auto time_to_reset = CONFIG_INT(__TIME_TO_RESET__);
-
-/* Be sure to update time first ! */
+namespace {
+void set_nextreset(object_t *ob) {
+  auto time_to_reset_secs = CONFIG_INT(__TIME_TO_RESET__);
 #ifdef RANDOMIZED_RESETS
-  ob->next_reset = g_current_virtual_time + time_to_reset / 2 + random_number(time_to_reset / 2);
-#else
-  ob->next_reset = g_current_virtual_time + time_to_reset;
+  time_to_reset_secs = time_to_reset_secs / 2 + random_number(time_to_reset_secs / 2);
 #endif
+  /* Be sure to update time first ! */
+  auto time_to_reset_ticks = std::chrono::seconds(time_to_reset_secs) /
+                             std::chrono::milliseconds(CONFIG_INT(__GAMETICK_MSEC__));
+  ob->next_reset = g_current_gametick + time_to_reset_ticks;
+}
+}  // namespace
 
+void reset_object(object_t *ob) {
+  set_nextreset(ob);
   save_command_giver(0);
-  if (!apply(APPLY_RESET, ob, 0, ORIGIN_DRIVER)) {
+  set_eval(max_cost);
+  if (!safe_apply(APPLY_RESET, ob, 0, ORIGIN_DRIVER)) {
     /* no reset() in the object */
     ob->flags &= ~O_WILL_RESET; /* don't call it next time */
   }
@@ -2072,9 +2079,7 @@ void reset_object(object_t *ob) {
 }
 
 void call_create(object_t *ob, int num_arg) {
-  auto time_to_reset = CONFIG_INT(__TIME_TO_RESET__);
-  /* Be sure to update time first ! */
-  ob->next_reset = g_current_virtual_time + time_to_reset / 2 + random_number(time_to_reset / 2);
+  set_nextreset(ob);
 
   call___INIT(ob);
 

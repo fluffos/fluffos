@@ -2,6 +2,7 @@
 
 #include "packages/core/call_out.h"
 
+#include <chrono>
 #include <unordered_map>
 #include <functional>
 
@@ -69,17 +70,17 @@ static void free_call(pending_call_t *cop) {
 /*
  * Setup a new call out.
  */
-LPC_INT new_call_out(object_t *ob, svalue_t *fun, int delay, int num_args, svalue_t *arg) {
-  if (delay < 0) {
-    delay = 0;
+LPC_INT new_call_out(object_t *ob, svalue_t *fun, int delay_secs, int num_args, svalue_t *arg) {
+  if (delay_secs < 0) {
+    delay_secs = 0;
   }
 
-  DBG_CALLOUT("new_call_out: /%s delay %i\n", ob->obname, delay);
+  DBG_CALLOUT("new_call_out: /%s delay %i\n", ob->obname, delay_secs);
 
   pending_call_t *cop = reinterpret_cast<pending_call_t *>(
       DCALLOC(1, sizeof(pending_call_t), TAG_CALL_OUT, "new_call_out"));
 
-  cop->target_time = g_current_virtual_time + delay;
+  cop->target_time = g_current_gametick + delay_secs;
   DBG_CALLOUT("  target_time: %ld\n", cop->target_time);
 
   if (fun->type == T_STRING) {
@@ -94,7 +95,7 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, int delay, int num_args, svalu
     cop->ob = 0;
   }
 
-  cop->handle = g_current_virtual_time + (++unique);
+  cop->handle = g_current_gametick + (++unique);
   if (unique > 0xffffffff) {
     unique = 1;  // force wrapping around.
   }
@@ -118,7 +119,8 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, int delay, int num_args, svalu
   }
 
   auto callback = std::bind(call_out, cop);
-  cop->tick_event = add_tick_event(delay, tick_event::callback_type(callback));
+  cop->tick_event =
+      add_tick_event(std::chrono::seconds(delay_secs), tick_event::callback_type(callback));
 
   return cop->handle;
 }
@@ -139,7 +141,7 @@ void call_out(pending_call_t *cop) {
   DBG_CALLOUT("  handle: %ld\n", cop->handle);
 
   DBG_CALLOUT("  target_time: %ld, current_time: %ld, real_time: %ld\n", cop->target_time,
-              g_current_virtual_time, get_current_time());
+              g_current_gametick, get_current_time());
 
   // Remove self from callout map
   {
@@ -217,7 +219,7 @@ static int time_left(pending_call_t *cop) {
   // FIXME: This is not fully correct, call_out actually operates in
   // real time, but target_time was set base on current_time, so we need to
   // substract current_time here to get a correct value.
-  return cop->target_time - g_current_virtual_time;
+  return cop->target_time - g_current_gametick;
 }
 
 /*

@@ -1,6 +1,7 @@
 #ifndef BACKEND_H
 #define BACKEND_H
 
+#include <chrono>
 #include <functional>
 
 /*
@@ -38,7 +39,7 @@ struct tick_event {
 };
 
 // Register a event to run on game ticks. Safe to call from any thread.
-tick_event *add_tick_event(int, tick_event::callback_type);
+tick_event *add_tick_event(std::chrono::milliseconds, tick_event::callback_type);
 
 // Used in shutdownMudos()
 void clear_tick_events();
