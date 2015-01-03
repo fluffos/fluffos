@@ -29,7 +29,6 @@
   error("Mappings and/or arrays nested too deep (%d) for save_object\n", MAX_SAVE_SVALUE_DEPTH);
 
 object_t *previous_ob;
-int tot_alloc_object, tot_alloc_object_size;
 
 char *save_mapping(mapping_t *m);
 static int restore_array(char **str, svalue_t * /*ret*/);

@@ -150,8 +150,6 @@ typedef int (*get_objectsfn_t)(object_t *, void *);
 #define SETOBNAME(ob, name) (*(const char **)&(ob->obname) = (char *)name)
 
 extern object_t *previous_ob;
-extern int tot_alloc_object;
-extern int tot_alloc_object_size;
 extern int save_svalue_depth;
 extern object_t **cgsp;
 #ifdef F_SET_HIDE

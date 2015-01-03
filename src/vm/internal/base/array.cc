@@ -17,11 +17,6 @@
  * by the MudOS driver.
  */
 
-#ifdef ARRAY_STATS
-int num_arrays;
-int total_array_size;
-#endif
-
 static int builtin_sort_array_cmp_fwd(const void * /*vp1*/, const void * /*vp2*/);
 static int builtin_sort_array_cmp_rev(const void * /*vp1*/, const void * /*vp2*/);
 static int sort_array_cmp(const void * /*vp1*/, const void * /*vp2*/);
@@ -205,7 +200,8 @@ static array_t *fix_array(array_t *p, unsigned int n) {
 
 array_t *resize_array(array_t *p, unsigned int n) {
 #ifdef ARRAY_STATS
-  total_array_size += (n - p->size) * sizeof(svalue_t);
+    // it is possible that n < p->size, be careful to not upgrade the result to unsigned.
+    total_array_size += (int)((int)n - (int)p->size) * int(sizeof(svalue_t));
 #endif
   if (n) {
     ms_remove_stats(p);

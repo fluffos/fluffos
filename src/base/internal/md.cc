@@ -11,11 +11,12 @@
 
 #include <cassert>  // for assert()
 #include <cstdlib>  // malloc etc
+#include <inttypes.h>
 
 #include "base/internal/log.h"
 
-int totals[MAX_CATEGORY];
-int blocks[MAX_CATEGORY];
+uint64_t totals[MAX_CATEGORY];
+uint64_t blocks[MAX_CATEGORY];
 
 int malloc_mask = 121;
 

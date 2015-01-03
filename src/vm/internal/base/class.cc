@@ -2,11 +2,6 @@
 
 #include "vm/internal/base/machine.h"
 
-#ifdef CLASS_STATS
-int num_classes;
-int total_class_size;
-#endif
-
 void dealloc_class(array_t *p) {
   int i;
 

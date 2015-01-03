@@ -55,25 +55,6 @@ static void receive_snoop(const char * /*buf*/, int /*len*/, object_t *ob);
 
 #endif
 
-/*
- * public local variables.
- */
-int add_message_calls = 0;
-#ifdef F_NETWORK_STATS
-int inet_out_packets = 0;
-int inet_out_volume = 0;
-int inet_in_packets = 0;
-int inet_in_volume = 0;
-#ifdef PACKAGE_SOCKETS
-int inet_socket_in_packets = 0;
-int inet_socket_in_volume = 0;
-int inet_socket_out_packets = 0;
-int inet_socket_out_volume = 0;
-#endif
-#endif
-int inet_packets = 0;
-int inet_volume = 0;
-
 namespace {
 // User socket event
 struct user_event_data {
