@@ -376,9 +376,7 @@ void free_string_svalue(svalue_t *v) {
   const char *str = v->u.string;
 
   if (v->subtype & STRING_COUNTED) {
-#ifdef STRING_STATS
     int size = MSTR_SIZE(str);
-#endif
     if (DEC_COUNTED_REF(str)) {
       SUB_STRING(size);
       NDBG(BLOCK(str));

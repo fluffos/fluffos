@@ -35,15 +35,6 @@
  */
 #undef CHECK_MEMORY
 
-/*
- * Keep statistics about allocated strings, etc.  Which can be viewed with
- * the mud_status() efun.  If this is off, mud_status() and memory_info()
- * ignore allocated strings, but string operations run faster.
- */
-#define STRING_STATS
-#define ARRAY_STATS
-#define CLASS_STATS
-
 /* APPLY_CACHE_BITS: defines the number of bits to use in the func lookup cache
  *   (in interpret.c).
  *

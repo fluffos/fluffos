@@ -1416,16 +1416,8 @@ void f_mud_status(void) {
     outbuf_addv(&ob, "Objects:\t\t\t%8" PRIu64 " %8" PRIu64 " (%8" PRIu64 " dangling)\n", tot_alloc_object, tot_alloc_object_size, tot_dangling_object);
 #endif
     outbuf_addv(&ob, "Prog blocks:\t\t\t%8" PRIu64 " %8" PRIu64 "\n", total_num_prog_blocks, total_prog_block_size);
-#ifdef ARRAY_STATS
     outbuf_addv(&ob, "Arrays:\t\t\t\t%8" PRIu64 " %8" PRIu64 "\n", num_arrays, total_array_size);
-#else
-    outbuf_add(&ob, "<Array statistics disabled, no information available>\n");
-#endif
-#ifdef CLASS_STATS
     outbuf_addv(&ob, "Classes:\t\t\t%8" PRIu64 " %8" PRIu64 "\n", num_classes, total_class_size);
-#else
-    outbuf_add(&ob, "<Class statistics disabled, no information available>\n");
-#endif
 
     outbuf_addv(&ob, "Mappings:\t\t\t%8" PRIu64 " %8" PRIu64 "\n", num_mappings, total_mapping_size);
     outbuf_addv(&ob, "Mappings(nodes):\t\t%8" PRIu64 "\n", total_mapping_nodes);
@@ -1438,12 +1430,8 @@ void f_mud_status(void) {
   }
 
   tot += total_prog_block_size +
-#ifdef ARRAY_STATS
          total_array_size +
-#endif
-#ifdef CLASS_STATS
          total_class_size +
-#endif
          total_mapping_size + tot_alloc_sentence * sizeof(sentence_t) + tot_alloc_object_size +
          users_num(true) * sizeof(interactive_t);
 
@@ -3324,12 +3312,8 @@ void f_memory_info(void) {
     int tot;
 
     tot = total_prog_block_size +
-#ifdef ARRAY_STATS
           total_array_size +
-#endif
-#ifdef CLASS_STATS
           total_class_size +
-#endif
           total_mapping_size + tot_alloc_object_size + tot_alloc_sentence * sizeof(sentence_t) +
           users_num(1) * sizeof(interactive_t) + show_otable_status(0, -1) +
           heart_beat_status(0, -1) + add_string_status(0, -1) + print_call_out_usage(0, -1);

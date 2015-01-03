@@ -289,7 +289,6 @@ static void mark_config(void) {
   }
 }
 
-#ifdef STRING_STATS
 static int base_overhead = 0;
 
 /* Compute the correct values of allocd_strings, allocd_bytes, and
@@ -409,7 +408,6 @@ void check_string_stats(outbuffer_t *out) {
     dump_stralloc();
   }
 }
-#endif
 
 /* currently: 1 - debug, 2 - suppress leak checks */
 void check_all_blocks(int flag) {
@@ -562,23 +560,18 @@ void check_all_blocks(int flag) {
     if (blocks[TAG_PROGRAM & 0xff] != total_num_prog_blocks)
       outbuf_addv(&out, "WARNING: total_num_prog_blocks is: %" PRIu64 " should be: %" PRIu64 "\n",
                   total_num_prog_blocks, blocks[TAG_PROGRAM & 0xff]);
-#ifdef ARRAY_STATS
     if (blocks[TAG_ARRAY & 0xff] != num_arrays)
       outbuf_addv(&out, "WARNING: num_arrays is: %" PRIu64 " should be: %" PRIu64 "\n", num_arrays,
                   blocks[TAG_ARRAY & 0xff]);
     if (totals[TAG_ARRAY & 0xff] != total_array_size)
       outbuf_addv(&out, "WARNING: total_array_size is: %" PRIu64 " should be: %" PRIu64 "\n", total_array_size,
                   totals[TAG_ARRAY & 0xff]);
-#endif
-#ifdef CLASS_STATS
     if (blocks[TAG_CLASS & 0xff] != num_classes)
       outbuf_addv(&out, "WARNING: num_classes is: %" PRIu64 " should be: %" PRIu64 "\n", num_classes,
                   blocks[TAG_CLASS & 0xff]);
     if (totals[TAG_CLASS & 0xff] != total_class_size)
       outbuf_addv(&out, "WARNING: total_class_size is: %" PRIu64 " should be: %" PRIu64 "\n", total_class_size,
                   totals[TAG_CLASS & 0xff]);
-#endif
-
     if (blocks[TAG_MAPPING & 0xff] != num_mappings)
       outbuf_addv(&out, "WARNING: num_mappings is: %" PRIu64 " should be: %" PRIu64 "\n", num_mappings,
                   blocks[TAG_MAPPING & 0xff]);
@@ -588,9 +581,7 @@ void check_all_blocks(int flag) {
     if (blocks[TAG_INTERACTIVE & 0xff] != users_num(true))
       outbuf_addv(&out, "WATNING: num_user is: %" PRIu64 " should be: %" PRIu64 "\n", users_num(true),
                   blocks[TAG_INTERACTIVE & 0xff]);
-#ifdef STRING_STATS
     check_string_stats(&out);
-#endif
 
 #ifdef PACKAGE_EXTERNAL
     for (i = 0; i < NUM_EXTERNAL_CMDS; i++) {
