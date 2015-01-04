@@ -40,21 +40,6 @@
 /*
  * comm.c
  */
-extern int inet_packets;
-extern int inet_volume;
-#ifdef F_NETWORK_STATS
-extern int inet_out_packets;
-extern int inet_out_volume;
-extern int inet_in_packets;
-extern int inet_in_volume;
-#ifdef PACKAGE_SOCKETS
-extern int inet_socket_in_packets;
-extern int inet_socket_in_volume;
-extern int inet_socket_out_packets;
-extern int inet_socket_out_volume;
-#endif
-#endif
-extern int add_message_calls;
 
 void add_vmessage(struct object_t *, const char *, ...);
 void add_message(struct object_t *, const char *, int);

@@ -236,7 +236,7 @@ static int time_left(pending_call_t *cop) {
            1000;
   } else {
     return std::chrono::duration_cast<std::chrono::seconds>(
-        gametick_to_time(cop->target_time - g_current_gametick)).count();
+               gametick_to_time(cop->target_time - g_current_gametick)).count();
   }
 }
 

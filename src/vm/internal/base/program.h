@@ -232,8 +232,6 @@ struct program_t {
   unsigned short num_inherited;
 };
 
-extern int total_num_prog_blocks;
-extern int total_prog_block_size;
 void reference_prog(program_t *, const char *);
 void free_prog(program_t **);
 void deallocate_program(program_t *);

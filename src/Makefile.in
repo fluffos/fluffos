@@ -76,6 +76,7 @@ BASE_OBJS= \
 	base/internal/outbuf.o \
 	base/internal/port.o \
 	base/internal/rc.o \
+	base/internal/stats.o \
 	base/internal/stralloc.o \
 	base/internal/strput.o
 

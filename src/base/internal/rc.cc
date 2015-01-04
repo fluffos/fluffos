@@ -306,8 +306,8 @@ void read_config(char *filename) {
   if (!scan_config_line("gametick msec : %d\n", &CONFIG_INT(__GAMETICK_MSEC__), -1)) {
     CONFIG_INT(__GAMETICK_MSEC__) = 1000;  // default to 1s.
   }
-  if (!scan_config_line("heartbeat interval msec : %d\n",
-                        &CONFIG_INT(__HEARTBEAT_INTERVAL_MSEC__), -1)) {
+  if (!scan_config_line("heartbeat interval msec : %d\n", &CONFIG_INT(__HEARTBEAT_INTERVAL_MSEC__),
+                        -1)) {
     CONFIG_INT(__HEARTBEAT_INTERVAL_MSEC__) =
         CONFIG_INT(__GAMETICK_MSEC__);  // default to match gametick.
   }

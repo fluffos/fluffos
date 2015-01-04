@@ -3,6 +3,8 @@
 #ifndef BASE_INTERNAL_MD_H
 #define BASE_INTERNAL_MD_H
 
+#include <inttypes.h>
+
 #include "base/internal/options_incl.h"
 
 #if defined(CHECK_MEMORY) && !defined(DEBUGMALLOC_EXTENSIONS)
@@ -50,8 +52,8 @@ void check_all_blocks(int);
 
 #define MAX_CATEGORY 130
 extern md_node_t **table;
-extern int totals[MAX_CATEGORY];
-extern int blocks[MAX_CATEGORY];
+extern uint64_t totals[MAX_CATEGORY];
+extern uint64_t blocks[MAX_CATEGORY];
 
 extern int malloc_mask;
 extern unsigned int total_malloced;

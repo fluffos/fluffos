@@ -158,6 +158,8 @@
 
 #include "base/internal/rc.h"
 
+#include "base/internal/stats.h"
+
 #include "base/internal/stralloc.h"
 
 #include "base/internal/strput.h"

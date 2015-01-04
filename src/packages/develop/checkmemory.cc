@@ -78,7 +78,7 @@ char *dump_debugmalloc(const char *tfn, int mask) {
   fprintf(fp, "ave. bytes per chunk = %7.2f\n\n", (float)total / chunks);
   fprintf(fp, "categories:\n\n");
   for (j = 0; j < MAX_CATEGORY; j++) {
-    fprintf(fp, "%4d: %10d\n", j, totals[j]);
+    fprintf(fp, "%4d: %10" PRIu64 "\n", j, totals[j]);
     total2 += totals[j];
   }
   fprintf(fp, "\ntotal = %11d\n", total2);
@@ -289,7 +289,6 @@ static void mark_config(void) {
   }
 }
 
-#ifdef STRING_STATS
 static int base_overhead = 0;
 
 /* Compute the correct values of allocd_strings, allocd_bytes, and
@@ -409,7 +408,6 @@ void check_string_stats(outbuffer_t *out) {
     dump_stralloc();
   }
 }
-#endif
 
 /* currently: 1 - debug, 2 - suppress leak checks */
 void check_all_blocks(int flag) {
@@ -554,43 +552,36 @@ void check_all_blocks(int flag) {
     }
 
     if (blocks[TAG_SENTENCE & 0xff] != tot_alloc_sentence)
-      outbuf_addv(&out, "WARNING: tot_alloc_sentence is: %i should be: %i\n", tot_alloc_sentence,
-                  blocks[TAG_SENTENCE & 0xff]);
+      outbuf_addv(&out, "WARNING: tot_alloc_sentence is: %" PRIu64 " should be: %" PRIu64 "\n",
+                  tot_alloc_sentence, blocks[TAG_SENTENCE & 0xff]);
     if (blocks[TAG_OBJECT & 0xff] != tot_alloc_object)
-      outbuf_addv(&out, "WARNING: tot_alloc_object is: %i should be: %i\n", tot_alloc_object,
-                  blocks[TAG_OBJECT & 0xff]);
+      outbuf_addv(&out, "WARNING: tot_alloc_object is: %" PRIu64 " should be: %" PRIu64 "\n",
+                  tot_alloc_object, blocks[TAG_OBJECT & 0xff]);
     if (blocks[TAG_PROGRAM & 0xff] != total_num_prog_blocks)
-      outbuf_addv(&out, "WARNING: total_num_prog_blocks is: %i should be: %i\n",
+      outbuf_addv(&out, "WARNING: total_num_prog_blocks is: %" PRIu64 " should be: %" PRIu64 "\n",
                   total_num_prog_blocks, blocks[TAG_PROGRAM & 0xff]);
-#ifdef ARRAY_STATS
     if (blocks[TAG_ARRAY & 0xff] != num_arrays)
-      outbuf_addv(&out, "WARNING: num_arrays is: %i should be: %i\n", num_arrays,
+      outbuf_addv(&out, "WARNING: num_arrays is: %" PRIu64 " should be: %" PRIu64 "\n", num_arrays,
                   blocks[TAG_ARRAY & 0xff]);
     if (totals[TAG_ARRAY & 0xff] != total_array_size)
-      outbuf_addv(&out, "WARNING: total_array_size is: %i should be: %i\n", total_array_size,
-                  totals[TAG_ARRAY & 0xff]);
-#endif
-#ifdef CLASS_STATS
+      outbuf_addv(&out, "WARNING: total_array_size is: %" PRIu64 " should be: %" PRIu64 "\n",
+                  total_array_size, totals[TAG_ARRAY & 0xff]);
     if (blocks[TAG_CLASS & 0xff] != num_classes)
-      outbuf_addv(&out, "WARNING: num_classes is: %i should be: %i\n", num_classes,
-                  blocks[TAG_CLASS & 0xff]);
+      outbuf_addv(&out, "WARNING: num_classes is: %" PRIu64 " should be: %" PRIu64 "\n",
+                  num_classes, blocks[TAG_CLASS & 0xff]);
     if (totals[TAG_CLASS & 0xff] != total_class_size)
-      outbuf_addv(&out, "WARNING: total_class_size is: %i should be: %i\n", total_class_size,
-                  totals[TAG_CLASS & 0xff]);
-#endif
-
+      outbuf_addv(&out, "WARNING: total_class_size is: %" PRIu64 " should be: %" PRIu64 "\n",
+                  total_class_size, totals[TAG_CLASS & 0xff]);
     if (blocks[TAG_MAPPING & 0xff] != num_mappings)
-      outbuf_addv(&out, "WARNING: num_mappings is: %i should be: %i\n", num_mappings,
-                  blocks[TAG_MAPPING & 0xff]);
+      outbuf_addv(&out, "WARNING: num_mappings is: %" PRIu64 " should be: %" PRIu64 "\n",
+                  num_mappings, blocks[TAG_MAPPING & 0xff]);
     if (blocks[TAG_MAP_TBL & 0xff] != num_mappings)
-      outbuf_addv(&out, "WARNING: %i tables for %i mappings\n", blocks[TAG_MAP_TBL & 0xff],
-                  num_mappings);
+      outbuf_addv(&out, "WARNING: %" PRIu64 " tables for %" PRIu64 " mappings\n",
+                  blocks[TAG_MAP_TBL & 0xff], num_mappings);
     if (blocks[TAG_INTERACTIVE & 0xff] != users_num(true))
-      outbuf_addv(&out, "WATNING: num_user is: %i should be: %i\n", users_num(true),
-                  blocks[TAG_INTERACTIVE & 0xff]);
-#ifdef STRING_STATS
+      outbuf_addv(&out, "WATNING: num_user is: %" PRIu64 " should be: %" PRIu64 "\n",
+                  users_num(true), blocks[TAG_INTERACTIVE & 0xff]);
     check_string_stats(&out);
-#endif
 
 #ifdef PACKAGE_EXTERNAL
     for (i = 0; i < NUM_EXTERNAL_CMDS; i++) {

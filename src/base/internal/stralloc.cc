@@ -56,7 +56,6 @@ void bp(void) {}
  * next element in the chain (which you specify when you call the functions).
  */
 
-#ifdef STRING_STATS
 int num_distinct_strings = 0;
 int bytes_distinct_strings = 0;
 int overhead_bytes = 0;
@@ -64,7 +63,6 @@ int allocd_strings = 0;
 int allocd_bytes = 0;
 int search_len = 0;
 int num_str_searches = 0;
-#endif
 
 #define StrHash(s) (whashstr((s)) & (htable_size_minus_one))
 
@@ -98,9 +96,7 @@ void init_strings() {
   htable_size_minus_one = htable_size - 1;
   base_table = reinterpret_cast<block_t **>(
       DCALLOC(htable_size, sizeof(block_t *), TAG_STR_TBL, "init_strings"));
-#ifdef STRING_STATS
   overhead_bytes += (sizeof(block_t *) * htable_size);
-#endif
 
   for (x = 0; x < htable_size; x++) {
     base_table[x] = 0;
@@ -119,14 +115,11 @@ static block_t *sfindblock(const char *s, int h) {
 
   curr = base_table[h];
   prev = NULL;
-#ifdef STRING_STATS
   num_str_searches++;
-#endif
 
   while (curr) {
-#ifdef STRING_STATS
     search_len++;
-#endif
+
     if (*(STRING(curr)) == *s && !strcmp(STRING(curr), s)) { /* found it */
       if (prev) {                                            /* not at head of list */
         NEXT(prev) = NEXT(curr);
@@ -285,7 +278,6 @@ void deallocate_string(char *str) {
 }
 
 int add_string_status(outbuffer_t *out, int verbose) {
-#ifdef STRING_STATS
   if (verbose == 1) {
     outbuf_add(out, "All strings:\n");
     outbuf_add(out, "-------------------------\t Strings    Bytes\n");
@@ -302,12 +294,6 @@ int add_string_status(outbuffer_t *out, int verbose) {
                 static_cast<double>(search_len) / num_str_searches);
   }
   return (bytes_distinct_strings + overhead_bytes);
-#else
-  if (verbose) {
-    outbuf_add(out, "<String statistics disabled, no information available>\n");
-  }
-  return 0;
-#endif
 }
 
 #ifdef DEBUGMALLOC_EXTENSIONS
@@ -355,9 +341,7 @@ char *int_new_string(int size)
 
 char *extend_string(const char *str, int len) {
   malloc_block_t *mbt;
-#ifdef STRING_STATS
   int oldsize = MSTR_SIZE(str);
-#endif
 
   mbt = reinterpret_cast<malloc_block_t *>(DREALLOC(
       MSTR_BLOCK(str), len + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, "extend_string"));

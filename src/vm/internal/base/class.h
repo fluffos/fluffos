@@ -1,11 +1,6 @@
 #ifndef CLASS_H
 #define CLASS_H
 
-#ifdef CLASS_STATS
-extern int num_classes;
-extern int total_class_size;
-#endif
-
 struct class_def_t {
   unsigned short classname;
   unsigned short type;

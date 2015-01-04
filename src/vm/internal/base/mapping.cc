@@ -7,10 +7,6 @@
 
 #include "vm/internal/base/machine.h"
 
-int num_mappings = 0;
-int total_mapping_size = 0;
-int total_mapping_nodes = 0;
-
 mapping_node_t *locked_map_nodes = 0;
 
 /*

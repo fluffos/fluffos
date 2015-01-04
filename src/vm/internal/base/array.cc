@@ -17,11 +17,6 @@
  * by the MudOS driver.
  */
 
-#ifdef ARRAY_STATS
-int num_arrays;
-int total_array_size;
-#endif
-
 static int builtin_sort_array_cmp_fwd(const void * /*vp1*/, const void * /*vp2*/);
 static int builtin_sort_array_cmp_rev(const void * /*vp1*/, const void * /*vp2*/);
 static int sort_array_cmp(const void * /*vp1*/, const void * /*vp2*/);
@@ -77,10 +72,9 @@ static void ms_setup_stats(array_t *p) {
 static array_t *int_allocate_empty_array(unsigned int n) {
   array_t *p;
 
-#ifdef ARRAY_STATS
   num_arrays++;
   total_array_size += sizeof(array_t) + sizeof(svalue_t) * (n - 1);
-#endif
+
   p = ALLOC_ARRAY(n);
   p->ref = 1;
   p->size = n;
@@ -150,10 +144,10 @@ array_t *allocate_array2(int n, svalue_t *svp) {
 
 static void dealloc_empty_array(array_t *p) {
   ms_remove_stats(p);
-#ifdef ARRAY_STATS
+
   num_arrays--;
   total_array_size -= sizeof(array_t) + sizeof(svalue_t) * (p->size - 1);
-#endif
+
   FREE((char *)p);
 }
 
@@ -186,10 +180,9 @@ void free_empty_array(array_t *p) {
    size n */
 static array_t *fix_array(array_t *p, unsigned int n) {
   if (n) {
-#ifdef ARRAY_STATS
     num_arrays++;
     total_array_size += sizeof(array_t) + sizeof(svalue_t) * (n - 1);
-#endif
+
     p->size = n;
     p->ref = 1;
     ms_setup_stats(p);
@@ -204,9 +197,8 @@ static array_t *fix_array(array_t *p, unsigned int n) {
 }
 
 array_t *resize_array(array_t *p, unsigned int n) {
-#ifdef ARRAY_STATS
-  total_array_size += (n - p->size) * sizeof(svalue_t);
-#endif
+  // it is possible that n < p->size, be careful to not upgrade the result to unsigned.
+  total_array_size += (int)((int)n - (int)p->size) * int(sizeof(svalue_t));
   if (n) {
     ms_remove_stats(p);
     p = RESIZE_ARRAY(p, n);
