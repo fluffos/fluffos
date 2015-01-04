@@ -1931,7 +1931,9 @@ void tell_object(object_t *ob, const char *str, int len) {
   } else {
 #endif
     tell_npc(ob, str);
+#ifndef INTERACTIVE_CATCH_TELL
   }
+#endif
 }
 
 void dealloc_object(object_t *ob, const char *from) {
