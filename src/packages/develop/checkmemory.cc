@@ -552,11 +552,11 @@ void check_all_blocks(int flag) {
     }
 
     if (blocks[TAG_SENTENCE & 0xff] != tot_alloc_sentence)
-      outbuf_addv(&out, "WARNING: tot_alloc_sentence is: %" PRIu64 " should be: %" PRIu64 "\n", tot_alloc_sentence,
-                  blocks[TAG_SENTENCE & 0xff]);
+      outbuf_addv(&out, "WARNING: tot_alloc_sentence is: %" PRIu64 " should be: %" PRIu64 "\n",
+                  tot_alloc_sentence, blocks[TAG_SENTENCE & 0xff]);
     if (blocks[TAG_OBJECT & 0xff] != tot_alloc_object)
-      outbuf_addv(&out, "WARNING: tot_alloc_object is: %" PRIu64 " should be: %" PRIu64 "\n", tot_alloc_object,
-                  blocks[TAG_OBJECT & 0xff]);
+      outbuf_addv(&out, "WARNING: tot_alloc_object is: %" PRIu64 " should be: %" PRIu64 "\n",
+                  tot_alloc_object, blocks[TAG_OBJECT & 0xff]);
     if (blocks[TAG_PROGRAM & 0xff] != total_num_prog_blocks)
       outbuf_addv(&out, "WARNING: total_num_prog_blocks is: %" PRIu64 " should be: %" PRIu64 "\n",
                   total_num_prog_blocks, blocks[TAG_PROGRAM & 0xff]);
@@ -564,23 +564,23 @@ void check_all_blocks(int flag) {
       outbuf_addv(&out, "WARNING: num_arrays is: %" PRIu64 " should be: %" PRIu64 "\n", num_arrays,
                   blocks[TAG_ARRAY & 0xff]);
     if (totals[TAG_ARRAY & 0xff] != total_array_size)
-      outbuf_addv(&out, "WARNING: total_array_size is: %" PRIu64 " should be: %" PRIu64 "\n", total_array_size,
-                  totals[TAG_ARRAY & 0xff]);
+      outbuf_addv(&out, "WARNING: total_array_size is: %" PRIu64 " should be: %" PRIu64 "\n",
+                  total_array_size, totals[TAG_ARRAY & 0xff]);
     if (blocks[TAG_CLASS & 0xff] != num_classes)
-      outbuf_addv(&out, "WARNING: num_classes is: %" PRIu64 " should be: %" PRIu64 "\n", num_classes,
-                  blocks[TAG_CLASS & 0xff]);
+      outbuf_addv(&out, "WARNING: num_classes is: %" PRIu64 " should be: %" PRIu64 "\n",
+                  num_classes, blocks[TAG_CLASS & 0xff]);
     if (totals[TAG_CLASS & 0xff] != total_class_size)
-      outbuf_addv(&out, "WARNING: total_class_size is: %" PRIu64 " should be: %" PRIu64 "\n", total_class_size,
-                  totals[TAG_CLASS & 0xff]);
+      outbuf_addv(&out, "WARNING: total_class_size is: %" PRIu64 " should be: %" PRIu64 "\n",
+                  total_class_size, totals[TAG_CLASS & 0xff]);
     if (blocks[TAG_MAPPING & 0xff] != num_mappings)
-      outbuf_addv(&out, "WARNING: num_mappings is: %" PRIu64 " should be: %" PRIu64 "\n", num_mappings,
-                  blocks[TAG_MAPPING & 0xff]);
+      outbuf_addv(&out, "WARNING: num_mappings is: %" PRIu64 " should be: %" PRIu64 "\n",
+                  num_mappings, blocks[TAG_MAPPING & 0xff]);
     if (blocks[TAG_MAP_TBL & 0xff] != num_mappings)
-      outbuf_addv(&out, "WARNING: %" PRIu64 " tables for %" PRIu64 " mappings\n", blocks[TAG_MAP_TBL & 0xff],
-                  num_mappings);
+      outbuf_addv(&out, "WARNING: %" PRIu64 " tables for %" PRIu64 " mappings\n",
+                  blocks[TAG_MAP_TBL & 0xff], num_mappings);
     if (blocks[TAG_INTERACTIVE & 0xff] != users_num(true))
-      outbuf_addv(&out, "WATNING: num_user is: %" PRIu64 " should be: %" PRIu64 "\n", users_num(true),
-                  blocks[TAG_INTERACTIVE & 0xff]);
+      outbuf_addv(&out, "WATNING: num_user is: %" PRIu64 " should be: %" PRIu64 "\n",
+                  users_num(true), blocks[TAG_INTERACTIVE & 0xff]);
     check_string_stats(&out);
 
 #ifdef PACKAGE_EXTERNAL

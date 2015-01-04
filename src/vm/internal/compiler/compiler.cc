@@ -25,7 +25,7 @@
 
 // Align to pointer-size boundary, this will work fine for both x86 & x86_64, because we don't use
 // long double (16-bytes).
-#define align(x) (((x)+ (sizeof(void *)-1)) & ~(sizeof(void *)-1))
+#define align(x) (((x) + (sizeof(void *) - 1)) & ~(sizeof(void *) - 1))
 
 /*
  * 'inherit_file' is used as a flag. If it is set to a string

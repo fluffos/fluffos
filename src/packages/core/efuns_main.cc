@@ -1390,7 +1390,8 @@ void f_mud_status(void) {
     outbuf_addv(&ob, "current working directory: %s\n\n", get_current_dir(dir_buf, 1024));
     outbuf_add(&ob, "add_message statistics\n");
     outbuf_add(&ob, "------------------------------\n");
-    outbuf_addv(&ob, "Calls to add_message: %8" PRIu64 "   Packets: %8" PRIu64 "   Average packet size: %.2lf\n\n",
+    outbuf_addv(&ob, "Calls to add_message: %8" PRIu64 "   Packets: %8" PRIu64
+                     "   Average packet size: %.2lf\n\n",
                 add_message_calls, inet_packets, static_cast<double>(inet_volume) / inet_packets);
 
     stat_living_objects(&ob);
@@ -1411,15 +1412,19 @@ void f_mud_status(void) {
     outbuf_addv(&ob, "Sentences:\t\t\t%8d %8d\n", tot_alloc_sentence,
                 tot_alloc_sentence * sizeof(sentence_t));
 #ifndef DEBUG
-    outbuf_addv(&ob, "Objects:\t\t\t%8" PRIu64 " %8" PRIu64 "\n", tot_alloc_object, tot_alloc_object_size);
+    outbuf_addv(&ob, "Objects:\t\t\t%8" PRIu64 " %8" PRIu64 "\n", tot_alloc_object,
+                tot_alloc_object_size);
 #else
-    outbuf_addv(&ob, "Objects:\t\t\t%8" PRIu64 " %8" PRIu64 " (%8" PRIu64 " dangling)\n", tot_alloc_object, tot_alloc_object_size, tot_dangling_object);
+    outbuf_addv(&ob, "Objects:\t\t\t%8" PRIu64 " %8" PRIu64 " (%8" PRIu64 " dangling)\n",
+                tot_alloc_object, tot_alloc_object_size, tot_dangling_object);
 #endif
-    outbuf_addv(&ob, "Prog blocks:\t\t\t%8" PRIu64 " %8" PRIu64 "\n", total_num_prog_blocks, total_prog_block_size);
+    outbuf_addv(&ob, "Prog blocks:\t\t\t%8" PRIu64 " %8" PRIu64 "\n", total_num_prog_blocks,
+                total_prog_block_size);
     outbuf_addv(&ob, "Arrays:\t\t\t\t%8" PRIu64 " %8" PRIu64 "\n", num_arrays, total_array_size);
     outbuf_addv(&ob, "Classes:\t\t\t%8" PRIu64 " %8" PRIu64 "\n", num_classes, total_class_size);
 
-    outbuf_addv(&ob, "Mappings:\t\t\t%8" PRIu64 " %8" PRIu64 "\n", num_mappings, total_mapping_size);
+    outbuf_addv(&ob, "Mappings:\t\t\t%8" PRIu64 " %8" PRIu64 "\n", num_mappings,
+                total_mapping_size);
     outbuf_addv(&ob, "Mappings(nodes):\t\t%8" PRIu64 "\n", total_mapping_nodes);
 
     outbuf_addv(&ob, "Interactives:\t\t\t%8d %8" PRIu64 "\n", users_num(true),
@@ -1429,10 +1434,8 @@ void f_mud_status(void) {
           add_string_status(&ob, verbose) + print_call_out_usage(&ob, verbose);
   }
 
-  tot += total_prog_block_size +
-         total_array_size +
-         total_class_size +
-         total_mapping_size + tot_alloc_sentence * sizeof(sentence_t) + tot_alloc_object_size +
+  tot += total_prog_block_size + total_array_size + total_class_size + total_mapping_size +
+         tot_alloc_sentence * sizeof(sentence_t) + tot_alloc_object_size +
          users_num(true) * sizeof(interactive_t);
 
   if (!verbose) {
@@ -3311,10 +3314,8 @@ void f_memory_info(void) {
   if (st_num_arg == 0) {
     int tot;
 
-    tot = total_prog_block_size +
-          total_array_size +
-          total_class_size +
-          total_mapping_size + tot_alloc_object_size + tot_alloc_sentence * sizeof(sentence_t) +
+    tot = total_prog_block_size + total_array_size + total_class_size + total_mapping_size +
+          tot_alloc_object_size + tot_alloc_sentence * sizeof(sentence_t) +
           users_num(1) * sizeof(interactive_t) + show_otable_status(0, -1) +
           heart_beat_status(0, -1) + add_string_status(0, -1) + print_call_out_usage(0, -1);
     push_number(tot);
