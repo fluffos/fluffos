@@ -483,6 +483,10 @@ void add_message(object_t *who, const char *data, int len) {
   auto ip = who->interactive;
   int translen;
   char *trans = translate(ip->trans->outgoing, data, len, &translen);
+
+  inet_packets++;
+  inet_volume += translen;
+
   if (ip->connection_type == PORT_TELNET) {
     telnet_send(ip->telnet, trans, translen);
   } else {
