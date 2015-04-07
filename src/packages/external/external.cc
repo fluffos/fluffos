@@ -9,6 +9,8 @@
 #include "include/socket_err.h"
 #include "packages/sockets/socket_efuns.h"
 
+void new_lpc_socket_event_listener(int idx, lpc_socket_t *sock, evutil_socket_t real_fd);
+
 #ifdef F_EXTERNAL_START
 int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, svalue_t *arg3) {
   int sv[2];
@@ -37,6 +39,8 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
   if (ret) {
     auto sock = lpc_socks_get(fd);
 
+    new_lpc_socket_event_listener(fd, sock, sv[0]);
+
     close(sv[1]);
     sock->fd = sv[0];
     sock->flags = S_EXTERNAL;
@@ -58,6 +62,9 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
     sock->w_len = 0;
 
     current_object->flags |= O_EFUN_SOCKET;
+
+    event_add(sock->ev_read, NULL);
+
     return fd;
   } else {
     int flag = 1;
