@@ -9,8 +9,6 @@
 #include "include/socket_err.h"
 #include "packages/sockets/socket_efuns.h"
 
-void new_lpc_socket_event_listener(int idx, lpc_socket_t *sock, evutil_socket_t real_fd);
-
 #ifdef F_EXTERNAL_START
 int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, svalue_t *arg3) {
   int sv[2];
