@@ -17,20 +17,16 @@ case $COMPILER in
     $CXX -v
     ;;
   clang)
-    sudo wget -q http://llvm.org/releases/3.5.0/clang+llvm-3.5.0-x86_64-linux-gnu-ubuntu-14.04.tar.xz
-    sudo tar axvf clang+llvm-3.5.0-x86_64-linux-gnu-ubuntu-14.04.tar.xz
-    export CXX="$PWD/clang+llvm-3.5.0-x86_64-linux-gnu/bin/clang++"
+    sudo wget -q http://llvm.org/releases/3.5.2/clang+llvm-3.5.2-x86_64-linux-gnu-ubuntu-14.04.tar.xz
+    sudo tar axvf clang+llvm-3.5.2-x86_64-linux-gnu-ubuntu-14.04.tar.xz
+    export CXX="$PWD/clang+llvm-3.5.2-x86_64-linux-gnu/bin/clang++ -Wno-error=unused-command-line-argument"
     $CXX -v
     ;;
 esac
 
 if [ "$BUILD" = "i386" ]; then
   sudo apt-get remove libevent-dev libevent-* libssl-dev
-  sudo apt-get install g++-multilib g++-4.8-multilib
-  sudo apt-get --no-install-recommends install valgrind:i386
-  sudo apt-get install libevent-2.0-5:i386
-  sudo apt-get install libevent-dev:i386
-  sudo apt-get --no-install-recommends install libz-dev:i386
+  sudo apt-get -f --no-install-recommends install g++-multilib g++-4.8-multilib valgrind:i386 libevent-dev:i386 libz-dev:i386
 else
   sudo apt-get install valgrind
   sudo apt-get install libevent-dev libmysqlclient-dev libsqlite3-dev libpq-dev libz-dev libssl-dev libpcre3-dev
