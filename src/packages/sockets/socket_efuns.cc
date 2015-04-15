@@ -42,6 +42,8 @@ void on_lpc_sock_write(evutil_socket_t fd, short what, void *arg) {
   socket_write_select_handler(data->idx);
 }
 
+}  // namespace
+
 // Initialize LPC socket data structure and register events
 void new_lpc_socket_event_listener(int idx, lpc_socket_t *sock, evutil_socket_t real_fd) {
   auto data = new lpc_socket_event_data;
@@ -50,8 +52,6 @@ void new_lpc_socket_event_listener(int idx, lpc_socket_t *sock, evutil_socket_t 
   sock->ev_write = event_new(g_event_base, real_fd, EV_WRITE, on_lpc_sock_write, data);
   sock->ev_data = data;
 }
-
-}  // namespace
 
 /* flags for socket_close */
 #define SC_FORCE 1
