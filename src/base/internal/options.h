@@ -2,8 +2,8 @@
  * options.h: defines for the compile-time configuration of the MudOS driver
  */
 
-#ifndef _OPTIONS_H_
-#define _OPTIONS_H_
+#ifndef _BASE_INTERNAL_OPTIONS_H_
+#define _BASE_INTERNAL_OPTIONS_H_
 
 /*
  * YOU SHOULD NOT MODIFY THIS FILE DIRECTLY.
@@ -603,4 +603,4 @@
 */
 #undef REVERSE_DEFER
 
-#endif /* _OPTIONS_H */
+#endif /* _BASE_INTERNAL_OPTIONS_H_ */
