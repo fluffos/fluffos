@@ -304,7 +304,10 @@ int write_file(const char *file, const char *str, int flags) {
   } else {
 #endif
     fwrite(str, strlen(str), 1, f);
+#ifdef PACKAGE_COMPRESS
   }
+#endif
+
 #ifdef PACKAGE_COMPRESS
   if (flags & 2) {
     gzclose(gf);
