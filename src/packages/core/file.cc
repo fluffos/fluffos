@@ -36,6 +36,7 @@
 #include <sys/mkdev.h>
 #endif
 #include <fcntl.h>
+#include <unistd.h>
 
 /*
  * Credits for some of the code below goes to Free Software Foundation
@@ -303,14 +304,19 @@ int write_file(const char *file, const char *str, int flags) {
   } else {
 #endif
     fwrite(str, strlen(str), 1, f);
+#ifdef PACKAGE_COMPRESS
   }
+#endif
+
 #ifdef PACKAGE_COMPRESS
   if (flags & 2) {
     gzclose(gf);
   } else {
 #endif
     fclose(f);
+#ifdef PACKAGE_COMPRESS
   }
+#endif
   return 1;
 }
 
@@ -358,7 +364,7 @@ char *read_file(const char *file, int start, int lines) {
   }
 
 #ifndef PACKAGE_COMPRESS
-  f = fopen(real_file, FOPEN_READ);
+  f = fopen(real_file, "r");
 #else
   f = gzopen(real_file, "rb");
 #endif
@@ -374,7 +380,7 @@ char *read_file(const char *file, int start, int lines) {
   }
 
 #ifndef PACKAGE_COMPRESS
-  chunk = fread(theBuff, 1, 2 * READ_FILE_MAX_SIZE, f);
+  chunk = fread(theBuff, 1, 2 * read_file_max_size, f);
   fclose(f);
 #else
   chunk = gzread(f, theBuff, 2 * read_file_max_size);

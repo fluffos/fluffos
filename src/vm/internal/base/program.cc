@@ -2,8 +2,6 @@
 
 #include "vm/internal/base/machine.h"
 
-int total_num_prog_blocks, total_prog_block_size;
-
 void reference_prog(program_t *progp, const char *from) {
   progp->ref++;
   debug(d_flag, "reference_prog: /%s ref %d (%s)\n", progp->filename, progp->ref, from);

@@ -97,7 +97,6 @@ static object_t *restrict_destruct;
 
 object_t *obj_list, *obj_list_destruct;
 #ifdef DEBUG
-int tot_dangling_object = 0;
 object_t *obj_list_dangling = 0;
 #endif
 object_t *current_object;      /* The object interpreting a function. */
@@ -1566,7 +1565,7 @@ void add_light(object_t *p, int n) {
 #endif
 
 static sentence_t *sent_free = 0;
-int tot_alloc_sentence;
+uint64_t tot_alloc_sentence;
 
 sentence_t *alloc_sentence() {
   sentence_t *p;

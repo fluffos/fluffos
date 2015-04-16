@@ -1,5 +1,5 @@
-#ifndef _OPTIONS_INTERNAL_H
-#define _OPTIONS_INTERNAL_H
+#ifndef _BASE_INTERNAL_OPTIONS_INTERNAL_H
+#define _BASE_INTERNAL_OPTIONS_INTERNAL_H
 
 /* DO NOT MODIFY:  Everything in here is either very internal to the driver or
  * planned to be removed. You should not depends on any of the values here.
@@ -34,15 +34,6 @@
  * more memory.  Mainly for debugging.
  */
 #undef CHECK_MEMORY
-
-/*
- * Keep statistics about allocated strings, etc.  Which can be viewed with
- * the mud_status() efun.  If this is off, mud_status() and memory_info()
- * ignore allocated strings, but string operations run faster.
- */
-#define STRING_STATS
-#define ARRAY_STATS
-#define CLASS_STATS
 
 /* APPLY_CACHE_BITS: defines the number of bits to use in the func lookup cache
  *   (in interpret.c).
@@ -203,4 +194,4 @@
 /* This must be one of 4, 16, 64, 256, 1024, 4096 */
 #define CFG_LIVING_HASH_SIZE 256
 
-#endif
+#endif /* _BASE_INTERNAL_OPTIONS_INTERNAL_H */

@@ -9,6 +9,7 @@
 
 #include <sys/socket.h>
 #include <deque>
+#include <event2/util.h>
 
 enum socket_mode { MUD, STREAM, DATAGRAM, STREAM_BINARY, DATAGRAM_BINARY };
 
@@ -93,5 +94,7 @@ lpc_socket_t *lpc_socks_get(int i);
 void mark_sockets();
 
 void lpc_socks_closeall();
+
+void new_lpc_socket_event_listener(int idx, lpc_socket_t *sock, evutil_socket_t real_fd);
 
 #endif /* _SOCKET_EFUNS_H_ */
