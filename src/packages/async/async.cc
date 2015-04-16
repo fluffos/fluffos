@@ -14,6 +14,7 @@
 #endif
 #include <sys/syscall.h>
 #endif
+#include <unistd.h>
 
 #ifdef F_ASYNC_DB_EXEC
 #include "packages/db/db.h"
@@ -387,7 +388,9 @@ int add_write(const char *fname, const char *buf, int size, char flags, function
     } else {
 #endif
       return aio_write(req);
+#ifdef PACKAGE_COMPRESS
     }
+#endif
   } else {
     error("permission denied\n");
   }

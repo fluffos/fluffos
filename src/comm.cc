@@ -7,6 +7,7 @@
 
 #include "comm.h"
 
+#include <errno.h>               // for errno
 #include <event2/buffer.h>       // for evbuffer_freeze, etc
 #include <event2/bufferevent.h>  // for bufferevent_enable, etc
 #include <event2/event.h>        // for event_active, EV_TIMEOUT, etc
