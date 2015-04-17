@@ -1385,9 +1385,8 @@ static int save_object_recurse(program_t *prog, svalue_t **svp, int type, int sa
     if (!(tmp = save_object_recurse(prog->inherit[i].prog, svp, prog->inherit[i].type_mod | type,
                                     save_zeros, f, gzf))) {
 #else
-
     if (!(tmp = save_object_recurse(prog->inherit[i].prog, svp, prog->inherit[i].type_mod | type,
-                                    save_zeros, f)))
+                                    save_zeros, f))) {
 #endif
       return 0;
     }
