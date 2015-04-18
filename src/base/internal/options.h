@@ -50,24 +50,6 @@
  *          instructions for details.                                       *
  ****************************************************************************/
 
-/* explode():
- *
- * The old behavior (#undef both of the below) strips any number of
- * delimiters at the start of the string, and one at the end.  So
- * explode("..x.y..z..", ".") gives ({ "x", "y", "", "z", "" })
- *
- * SANE_EXPLODE_STRING strips off at most one leading delimiter, and
- * still strips off one at the end, so the example above gives
- * ({ "", "x", "y", "", "z", "" }).
- *
- * REVERSIBLE_EXPLODE_STRING overrides SANE_EXPLODE_STRING, and makes
- * it so that implode(explode(x, y), y) is always x; i.e. no delimiters
- * are ever stripped.  So the example above gives
- * ({ "", "", "x", "y", "", "z", "", "" }).
- */
-#define SANE_EXPLODE_STRING
-#undef REVERSIBLE_EXPLODE_STRING
-
 /* NO_ADD_ACTION: define this to remove add_action, commands, livings, etc.
  * process_input() then becomes the only way to deal with player input.
  *

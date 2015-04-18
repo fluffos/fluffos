@@ -2841,6 +2841,14 @@ void add_predefines() {
 
   sprintf(save_buf, "%" LPC_FLOAT_FMTSTR_P, LPC_FLOAT_MIN);
   add_predefine("MIN_FLOAT", -1, save_buf);
+
+  // Following compile time configs has been changed into runtime configs.
+  if (CONFIG_INT(__SANE_EXPLODE_STRING__)) {
+    add_predefine("__SANE_EXPLODE_STRING__", -1, "");
+  }
+  if (CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__)) {
+    add_predefine("__REVERSIBLE_EXPLODE_STRING__", -1, "");
+  }
 }
 
 void start_new_file(int f) {

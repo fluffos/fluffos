@@ -320,6 +320,13 @@ void read_config(char *filename) {
   CONFIG_INT(__MAX_CALL_DEPTH__) = CFG_MAX_CALL_DEPTH;
   CONFIG_INT(__LIVING_HASH_TABLE_SIZE__) = CFG_LIVING_HASH_SIZE;
 
+  if (!scan_config_line("sane explode string : %d\n", &CONFIG_INT(__SANE_EXPLODE_STRING__), -1)) {
+    CONFIG_INT(__SANE_EXPLODE_STRING__) = 1;
+  }
+  if (!scan_config_line("reversible explode string: %d\n", &CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__), -1)) {
+    CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__) = 0;
+  }
+
   // Complain about obsolete config lines.
   scan_config_line("address server ip : %[^\n]", tmp, -2);
   scan_config_line("address server port : %d\n", tmp, -2);
