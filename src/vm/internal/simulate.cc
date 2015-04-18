@@ -1497,9 +1497,9 @@ void move_object(object_t *item, object_t *dest) {
   }
 #endif
 
-#if !defined(NO_RESETS) && defined(LAZY_RESETS)
-  try_reset(dest);
-#endif
+  if (!CONFIG_INT(__NO_RESETS__) && CONFIG_INT(__LAZY_RESETS__)) {
+    try_reset(dest);
+  }
   if (item->super) {
     int okay = 0;
 
@@ -1977,17 +1977,15 @@ void do_message(svalue_t *lclass, svalue_t *msg, array_t *scope, array_t *exclud
   }
 }
 
-#if !defined(NO_RESETS) && defined(LAZY_RESETS)
 void try_reset(object_t *ob) {
   if ((ob->next_reset < g_current_gametick) && !(ob->flags & O_RESET_STATE)) {
-    debug(d_flag, ("(lazy) RESET /%s\n", ob->obname));
+    debug(d_flag, "(lazy) RESET /%s\n", ob->obname);
 
     /* need to set the flag here to prevent infinite loops in apply_low */
     ob->flags |= O_RESET_STATE;
     reset_object(ob);
   }
 }
-#endif
 
 #ifndef NO_ENVIRONMENT
 #ifdef F_FIRST_INVENTORY

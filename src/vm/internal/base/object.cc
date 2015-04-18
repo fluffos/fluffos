@@ -2057,9 +2057,9 @@ object_t *get_empty_object(int num_var) {
 namespace {
 void set_nextreset(object_t *ob) {
   auto time_to_reset_secs = CONFIG_INT(__TIME_TO_RESET__);
-#ifdef RANDOMIZED_RESETS
-  time_to_reset_secs = time_to_reset_secs / 2 + random_number(time_to_reset_secs / 2);
-#endif
+  if (CONFIG_INT(__RANDOMIZED_RESETS__)) {
+    time_to_reset_secs = time_to_reset_secs / 2 + random_number(time_to_reset_secs / 2);
+  }
   ob->next_reset = g_current_gametick + time_to_gametick(std::chrono::seconds(time_to_reset_secs));
 }
 }  // namespace

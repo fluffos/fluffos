@@ -46,9 +46,9 @@ void f_debug_info(void) {
       }
 #endif
 
-#ifndef NO_RESETS
-      outbuf_addv(&out, "next_reset  : %d\n", ob->next_reset);
-#endif
+      if (!CONFIG_INT(__NO_RESETS__)) {
+        outbuf_addv(&out, "next_reset  : %d\n", ob->next_reset);
+      }
       outbuf_addv(&out, "time_of_ref : %d\n", ob->time_of_ref);
       outbuf_addv(&out, "ref         : %d\n", ob->ref);
 #ifdef DEBUGMALLOC_EXTENSIONS

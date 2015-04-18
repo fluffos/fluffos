@@ -1491,11 +1491,11 @@ void f_present(void) {
   svalue_t *arg = sp - num_arg + 1;
   object_t *ob;
 
-#if !defined(NO_RESETS) && defined(LAZY_RESETS)
-  if (num_arg == 2) {
-    try_reset(arg[1].u.ob);
+  if (!CONFIG_INT(__NO_RESETS__) && CONFIG_INT(__LAZY_RESETS__)) {
+    if (num_arg == 2) {
+      try_reset(arg[1].u.ob);
+    }
   }
-#endif
   ob = object_present(arg, num_arg == 1 ? 0 : arg[1].u.ob);
   pop_n_elems(num_arg);
   if (ob && object_visible(ob)) {

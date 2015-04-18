@@ -207,9 +207,7 @@ void debug_perror(const char *, const char *);
 int validate_shadowing(object_t *);
 #endif
 
-#if !defined(NO_RESETS) && defined(LAZY_RESETS)
 void try_reset(object_t *);
-#endif
 
 void pop_context(error_context_t *);
 void restore_context(error_context_t *);

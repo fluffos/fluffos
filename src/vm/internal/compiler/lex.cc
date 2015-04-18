@@ -2864,6 +2864,15 @@ void add_predefines() {
   if (CONFIG_INT(__MUDLIB_ERROR_HANDLER__)) {
     add_predefine("__MUDLIB_ERROR_HANDLER__", -1, "");
   }
+  if (CONFIG_INT(__NO_RESETS__)) {
+    add_predefine("__NO_RESETS__", -1, "");
+  }
+  if (CONFIG_INT(__LAZY_RESETS__)) {
+    add_predefine("__LAZY_RESETS__", -1, "");
+  }
+  if (CONFIG_INT(__RANDOMIZED_RESETS__)) {
+    add_predefine("__RANDOMIZED_RESETS__", -1, "");
+  }
 }
 
 void start_new_file(int f) {

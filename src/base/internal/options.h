@@ -172,29 +172,6 @@
  */
 #define DEFAULT_PRAGMAS PRAGMA_WARNINGS + PRAGMA_SAVE_TYPES + PRAGMA_ERROR_CONTEXT + PRAGMA_OPTIMIZE
 
-/* NO_RESETS: completely disable the periodic calling of reset() */
-#undef NO_RESETS
-
-/* LAZY_RESETS: if this is defined, an object will only have reset()
- *   called in it when it is touched via call_other() or move_object()
- *   (assuming enough time has passed since the last reset).  If LAZY_RESETS
- *   is #undef'd, then reset() will be called as always (which guaranteed that
- *   reset would always be called at least once).  The advantage of lazy
- *   resets is that reset doesn't get called in an object that is touched
- *   once and never again (which can save memory since some objects won't get
- *   reloaded that otherwise would).
- */
-#undef LAZY_RESETS
-
-/* RANDOMIZED_RESETS: if this is defined, the reset() will be called in
- * randomized
- *   time interval. The interval vary from TIME_TO_RESET/2 to TIME_TO_RESET-1 .
- *   if this is undefined, the reset() will be called among all objects at the
- * same time,
- *   with the interval as TIME_TO_RESET
-*/
-#define RANDOMIZED_RESETS
-
 /* SAVE_EXTENSION: defines the file extension used by save_object().
  *   and restore_object().  Some sysadmins run scripts that periodically
  *   scan for and remove files ending in .o (but many mudlibs are already

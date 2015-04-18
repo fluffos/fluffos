@@ -344,6 +344,15 @@ void read_config(char *filename) {
   if (!scan_config_line("mudlib error handler : %d\n", &CONFIG_INT(__MUDLIB_ERROR_HANDLER__), -1)) {
       CONFIG_INT(__MUDLIB_ERROR_HANDLER__) = 1;
   }
+  if (!scan_config_line("no reset : %d\n", &CONFIG_INT(__NO_RESETS__), -1)) {
+      CONFIG_INT(__NO_RESETS__) = 0;
+  }
+  if (!scan_config_line("lazy resets : %d\n", &CONFIG_INT(__LAZY_RESETS__), -1)) {
+      CONFIG_INT(__LAZY_RESETS__) = 0;
+  }
+  if (!scan_config_line("randomized resets : %d\n", &CONFIG_INT(__RANDOMIZED_RESETS__), -1)) {
+      CONFIG_INT(__RANDOMIZED_RESETS__) = 1;
+  }
 
   // Complain about obsolete config lines.
   scan_config_line("address server ip : %[^\n]", tmp, -2);

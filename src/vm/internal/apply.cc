@@ -176,9 +176,9 @@ int apply_low(const char *fun, object_t *ob, int num_arg) {
 * This object will now be used, and is thus a target for reset later on
 * (when time due).
 */
-#if !defined(NO_RESETS) && defined(LAZY_RESETS)
-  try_reset(ob);
-#endif
+  if (!CONFIG_INT(__NO_RESETS__) && CONFIG_INT(__LAZY_RESETS__)) {
+    try_reset(ob);
+  }
   if (ob->flags & O_DESTRUCTED) {
     pop_n_elems(num_arg);
     return 0;
