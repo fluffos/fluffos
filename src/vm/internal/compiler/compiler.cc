@@ -1303,17 +1303,17 @@ int define_new_function(const char *name, int num_arg, int num_local, int flags,
         mem_block[A_ARGUMENT_TYPES].current_size / sizeof(unsigned short);
     add_to_mem_block(A_ARGUMENT_TYPES, (char *)type_of_locals_ptr,
                      num_arg * sizeof(*type_of_locals_ptr));
-#ifndef SUPPRESS_ARGUMENT_WARNINGS
-    if (flags & FUNC_PROTOTYPE) {
-      int i;
+    if (!CONFIG_INT(__SUPPRESS_ARGUMENT_WARNINGS__)) {
+      if (flags & FUNC_PROTOTYPE) {
+        int i;
 
-      for (i = 0; i < num_arg; i++) {
-        if (*locals_ptr[i].ihe->name) {
-          type_of_locals_ptr[i] |= LOCAL_MOD_UNUSED;
+        for (i = 0; i < num_arg; i++) {
+          if (*locals_ptr[i].ihe->name) {
+            type_of_locals_ptr[i] |= LOCAL_MOD_UNUSED;
+          }
         }
       }
     }
-#endif
   }
   return newindex;
 }

@@ -21,7 +21,7 @@
 
 char *config_str[NUM_CONFIG_STRS];
 int config_int[NUM_CONFIG_INTS];
-char *external_cmd[NUM_EXTERNAL_CMDS];
+char *external_cmd[g_num_external_cmds];
 
 namespace {
 
@@ -292,7 +292,7 @@ void read_config(char *filename) {
   {
     char kind[kMaxConfigLineLength];
 
-    for (int i = 0; i < NUM_EXTERNAL_CMDS; i++) {
+    for (int i = 0; i < g_num_external_cmds; i++) {
       sprintf(kind, "external_cmd_%i : %%[^\n]", i + 1);
       if (scan_config_line(kind, tmp, 0)) {
         external_cmd[i] = alloc_cstring(tmp, "external cmd");
@@ -397,6 +397,9 @@ void read_config(char *filename) {
   }
   if (!scan_config_line("warn old range behavior : %d\n", &CONFIG_INT(__WARN_OLD_RANGE_BEHAVIOR__), -1)) {
       CONFIG_INT(__WARN_OLD_RANGE_BEHAVIOR__) = 1;
+  }
+  if (!scan_config_line("suppress argument warnings : %d\n", &CONFIG_INT(__SUPPRESS_ARGUMENT_WARNINGS__), -1)) {
+      CONFIG_INT(__SUPPRESS_ARGUMENT_WARNINGS__) = 1;
   }
 
   // Complain about obsolete config lines.

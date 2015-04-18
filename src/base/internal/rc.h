@@ -14,8 +14,8 @@
 #define NUM_CONFIG_INTS (RUNTIME_CONFIG_NEXT - BASE_CONFIG_INT)
 
 // How many external cmds are supported.
-constexpr int NUM_EXTERNAL_CMDS = 100;
-extern char *external_cmd[NUM_EXTERNAL_CMDS];
+constexpr int g_num_external_cmds = 100;
+extern char *external_cmd[g_num_external_cmds];
 
 void read_config(char *);
 

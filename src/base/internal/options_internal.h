@@ -80,12 +80,6 @@
 /* use struct keyword for lpc structs */
 #define STRUCT_STRUCT
 
-/* supress warnings about unused arguments; only warn about unused local
- * variables.  Makes older code (where argument names were required) compile
- * more quietly.
- */
-#define SUPPRESS_ARGUMENT_WARNINGS
-
 /* Some maximum string sizes
  */
 #define SMALL_STRING_SIZE 100
@@ -115,7 +109,6 @@
 #define CFG_MAX_CALL_DEPTH 150
 /* This must be one of 4, 16, 64, 256, 1024, 4096 */
 #define CFG_LIVING_HASH_SIZE 256
-
 
 /* USE_32BIT_ADDRESSES: Use 32 bits for addresses of function, instead of
  * the usual 16 bits.  This increases the maximum program size from 64k

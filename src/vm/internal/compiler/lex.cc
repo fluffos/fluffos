@@ -2918,6 +2918,9 @@ void add_predefines() {
   if (CONFIG_INT(__WARN_OLD_RANGE_BEHAVIOR__)) {
     add_predefine("__WARN_OLD_RANGE_BEHAVIOR__", -1, "");
   }
+  if (CONFIG_INT(__SUPPRESS_ARGUMENT_WARNINGS__)) {
+    add_predefine("__SUPPRESS_ARGUMENT_WARNINGS__", -1, "");
+  }
 }
 
 void start_new_file(int f) {
