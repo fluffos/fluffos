@@ -2908,6 +2908,9 @@ void add_predefines() {
   if (CONFIG_INT(__TRAP_CRASHES__)) {
     add_predefine("__TRAP_CRASHES__", -1, "");
   }
+  if (CONFIG_INT(__OLD_TYPE_BEHAVIOR__)) {
+    add_predefine("__OLD_TYPE_BEHAVIOR__", -1, "");
+  }
 }
 
 void start_new_file(int f) {

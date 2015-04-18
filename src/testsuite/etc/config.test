@@ -299,6 +299,15 @@ noninteractive stderr write : 1
 #
 trap crashes : 1
 
+# OLD_TYPE_BEHAVIOR: reintroduces a bug in type-checking that effectively
+#  renders compile time type checking useless.  For backwards compatibility.
+#
+#  Compat status: dealing with all the resulting compile errors can be
+#  a huge pain even if they are correct, and the impact on the code is
+#  small.
+#
+old type behavior : 0
+
 ###############################################################################
 #          The following aren't currently used or implemented (yet)           #
 ###############################################################################

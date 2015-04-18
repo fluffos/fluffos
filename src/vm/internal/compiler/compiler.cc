@@ -885,10 +885,10 @@ void type_error(const char *str, int type) {
 /* This one really is t1->t2; it isn't symmetric, since int->void isn't allowed.
  */
 int compatible_types(int t1, int t2) {
-#ifdef OLD_TYPE_BEHAVIOR
-  /* The old version effectively was almost always was true */
-  return 1;
-#else
+  if (CONFIG_INT(__OLD_TYPE_BEHAVIOR__)) {
+    /* The old version effectively was almost always was true */
+    return 1;
+  }
   t1 &= ~DECL_MODS;
   t2 &= ~DECL_MODS;
   if (t1 == TYPE_ANY || t2 == TYPE_ANY) {
@@ -915,15 +915,14 @@ int compatible_types(int t1, int t2) {
     fatal("compiler.c: unknown type in compatible_types()");
   }
   return compatible[t1] & (1 << t2);
-#endif
 }
 
 /* This one is symmetric.  Used for comparison operators, etc */
 int compatible_types2(int t1, int t2) {
-#ifdef OLD_TYPE_BEHAVIOR
-  /* The old version effectively was almost always was true */
-  return 1;
-#else
+  if (CONFIG_INT(__OLD_TYPE_BEHAVIOR__)) {
+    /* The old version effectively was almost always was true */
+    return 1;
+  }
   t1 &= ~DECL_MODS;
   t2 &= ~DECL_MODS;
   if (t1 == TYPE_ANY || t2 == TYPE_ANY) {
@@ -950,7 +949,6 @@ int compatible_types2(int t1, int t2) {
     return 1;
   }
   return compatible[t2] & (1 << t1);
-#endif
 }
 
 /*

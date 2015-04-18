@@ -80,15 +80,6 @@
 /* use struct keyword for lpc structs */
 #define STRUCT_STRUCT
 
-/* OLD_TYPE_BEHAVIOR: reintroduces a bug in type-checking that effectively
- * renders compile time type checking useless.  For backwards compatibility.
- *
- * Compat status: dealing with all the resulting compile errors can be
- * a huge pain even if they are correct, and the impact on the code is
- * small.
- */
-#undef OLD_TYPE_BEHAVIOR
-
 /* OLD_RANGE_BEHAVIOR: define this if you want negative indexes in string
  * or buffer range values (not lvalue, i.e. x[-2..-1]; for e.g. not
  * x[-2..-1] = foo, the latter is always illegal) to mean counting from the

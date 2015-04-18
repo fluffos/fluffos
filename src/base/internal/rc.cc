@@ -389,6 +389,9 @@ void read_config(char *filename) {
   if (!scan_config_line("trap crashes : %d\n", &CONFIG_INT(__TRAP_CRASHES__), -1)) {
       CONFIG_INT(__TRAP_CRASHES__) = 1;
   }
+  if (!scan_config_line("old type behavior : %d\n", &CONFIG_INT(__OLD_TYPE_BEHAVIOR__), -1)) {
+      CONFIG_INT(__OLD_TYPE_BEHAVIOR__) = 0;
+  }
 
   // Complain about obsolete config lines.
   scan_config_line("address server ip : %[^\n]", tmp, -2);
