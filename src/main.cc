@@ -118,11 +118,11 @@ int main(int argc, char **argv) {
        * Look at flags. ignore those already been tested.
        */
       switch (argv[i][1]) {
-#ifdef HAS_CONSOLE
         case 'C':
-          has_console = 1;
+          if (CONFIG_INT(__HAS_CONSOLE__)) {
+            has_console = 1;
+          }
           continue;
-#endif
         case 'f':
           debug_message("Calling master::flag(\"%s\")...\n", argv[i] + 2);
           push_constant_string(argv[i] + 2);
@@ -154,9 +154,9 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
-#ifdef HAS_CONSOLE
-  console_init(base);
-#endif
+  if (has_console == 1) {
+    console_init(base);
+  }
 
   debug_message("Initializations complete.\n\n");
 

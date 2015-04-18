@@ -393,16 +393,6 @@
  */
 #undef USE_ICONV
 
-/* HAS_CONSOLE: If defined, the driver can take the argument -C
- *   which will give the driver an interactive console (you can type
- *   commands at the terminal.)  Backgrounding the driver will turn off
- *   the console, but sending signal SIGTTIN (kill -21) to the driver can
- *   turn it back on.  Typing 'help' will display commands available.
- *   The intent is to allow the inspection of things that are difficult
- *   to inspect from inside the mud.
- */
-#define HAS_CONSOLE
-
 /* IPV6: Use IP version 6 instead of 4, for most people the only difference
  * will be that numerical IP addresses get ::ffff: added in front.*/
 #define IPV6

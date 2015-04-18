@@ -2894,6 +2894,9 @@ void add_predefines() {
   if (CONFIG_INT(__REVERSE_DEFER__)) {
     add_predefine("__REVERSE_DEFER__", -1, "");
   }
+  if (CONFIG_INT(__HAS_CONSOLE__)) {
+    add_predefine("__HAS_CONSOLE__", -1, "");
+  }
 }
 
 void start_new_file(int f) {
