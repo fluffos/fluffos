@@ -51,18 +51,18 @@ struct cb_mem {
 struct req_mem {
   struct request req;
   struct req_mem *next;
-} *reqms;
+} * reqms;
 
 struct stuff {
   void *(*func)(struct request *);
   struct request *data;
   struct stuff *next;
-} *todo, *lasttodo;
+} * todo, *lasttodo;
 
 struct stuff_mem {
   struct stuff stuff;
   struct stuff_mem *next;
-} *stuffs;
+} * stuffs;
 
 pthread_mutex_t mem_mut;
 

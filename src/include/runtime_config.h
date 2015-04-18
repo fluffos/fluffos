@@ -15,7 +15,7 @@
 #define RUNTIME_CONFIG_H
 
 #define BASE_CONFIG_STR 0
-#define CFG_STR(x) ((x)+BASE_CONFIG_STR)
+#define CFG_STR(x) ((x) + BASE_CONFIG_STR)
 /*
  * These config settings return a string
  */
@@ -40,7 +40,7 @@
  * These config settings return an int (ie number)
  */
 #define BASE_CONFIG_INT (BASE_CONFIG_STR + 15)
-#define CFG_INT(x) ((x)+BASE_CONFIG_INT)
+#define CFG_INT(x) ((x) + BASE_CONFIG_INT)
 
 #define __MUD_PORT__ CFG_INT(0)
 #define __RC_INT_1__ CFG_INT(1)

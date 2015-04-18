@@ -43,11 +43,11 @@ this code, please leave my name (and Wirth's) in the comments.
  * Prototypes for local functions
  */
 static void sprout(tree ** /*ppr*/, char * /*pc_data*/, int * /*pi_balance*/,
-                   int (* /*pfi_compare*/)(void *, void *), int (* /*pfi_delete*/)(void *));
-static int avldelete(tree ** /*ppr_p*/, int (* /*pfi_compare*/)(void *, void *), char * /*pc_user*/,
-                     int (* /*pfi_uar*/)(void *), int * /*pi_balance*/, int * /*pi_uar_called*/);
+                   int (*/*pfi_compare*/)(void *, void *), int (*/*pfi_delete*/)(void *));
+static int avldelete(tree ** /*ppr_p*/, int (*/*pfi_compare*/)(void *, void *), char * /*pc_user*/,
+                     int (*/*pfi_uar*/)(void *), int * /*pi_balance*/, int * /*pi_uar_called*/);
 static void del(tree ** /*ppr_r*/, int * /*pi_balance*/, tree ** /*ppr_q*/,
-                int (* /*pfi_uar*/)(void *), int * /*pi_uar_called*/);
+                int (*/*pfi_uar*/)(void *), int * /*pi_uar_called*/);
 static void balanceL(tree ** /*ppr_p*/, int * /*pi_balance*/);
 static void balanceR(tree ** /*ppr_p*/, int * /*pi_balance*/);
 

@@ -228,7 +228,7 @@ void f__call_other(void) {
       error("call_other() couldn't find object\n");
     }
   }
-/* Send the remaining arguments to the function. */
+  /* Send the remaining arguments to the function. */
   if (CONFIG_INT(__TRACE__)) {
     if (TRACEP(TRACE_CALL_OTHER)) {
       do_trace("Call other ", funcname, "\n");
@@ -249,8 +249,8 @@ void f__call_other(void) {
 static const char *origin_name(int orig) {
   /* FIXME: this should use ffs() if available (BSD) */
   int i = 0;
-  static const char *origins[] = {"driver",   "local", "call_other",       "simul",
-                                  "internal", "efun",  "function pointer", "functional"};
+  static const char *origins[] = {"driver", "local", "call_other", "simul", "internal", "efun",
+                                  "function pointer", "functional"};
   while (orig >>= 1) {
     i++;
   }
@@ -3414,8 +3414,8 @@ void f_next_inventory(void) {
 
 #ifdef F_DEFER
 void f_defer() {
-  struct defer_list *newlist = reinterpret_cast<struct defer_list *>(DMALLOC(
-      sizeof(struct defer_list), TAG_TEMPORARY, "defer: new item"));
+  struct defer_list *newlist = reinterpret_cast<struct defer_list *>(
+      DMALLOC(sizeof(struct defer_list), TAG_TEMPORARY, "defer: new item"));
 
   if (CONFIG_INT(__REVERSE_DEFER__)) {
     // In reverse mode, newlist always will be the last data.
@@ -3441,8 +3441,7 @@ void f_defer() {
     } else {
       // Search last defer.
       struct defer_list *last_defer = csp->defers;
-      while (last_defer->next)
-        last_defer = last_defer->next;
+      while (last_defer->next) last_defer = last_defer->next;
 
       last_defer->next = newlist;
     }

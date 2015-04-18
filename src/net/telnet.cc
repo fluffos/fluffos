@@ -56,7 +56,7 @@ static inline void on_telnet_data(const char *buffer, unsigned long size, intera
           ip->text[ip->text_end++] = ANSI_SUBSTITUTE;
           break;
         }
-        // fallthrough
+      // fallthrough
       default:
         ip->text[ip->text_end++] = c;
         break;
