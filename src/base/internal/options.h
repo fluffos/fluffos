@@ -179,18 +179,6 @@
  */
 #define SAVE_EXTENSION ".o"
 
-/* OPCPROF: define this if you wish to enable OPC profiling. Allows a dump
- *   of the # of times each efun is invoked (via the opcprof() efun).
- */
-#undef OPCPROF
-
-/* OPCPROF_2D: define this if you wish to enable 2-D OPC profiling. Allows a
- *   dump of the # of times each *pair* of eoperators is invoked.
- *
- * You can't use this and OPCPROF at the same time.
- */
-#undef OPCPROF_2D
-
 /* PRIVS: define this if you want object privileges.  Your mudlib must
  *   explicitly make use of this functionality to be useful.  Defining this
  *   this will increase the size of the object structure by 4 bytes (8 bytes

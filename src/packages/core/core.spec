@@ -368,10 +368,6 @@ mapping debug_levels();
 void clear_debug_level(string);
 #endif
 
-#if defined(OPCPROF) || defined(OPCPROF_2D)
-void opcprof(string | void);
-#endif
-
 #ifdef PROFILE_FUNCTIONS
 mapping *function_profile(object default:F__THIS_OBJECT);
 #endif

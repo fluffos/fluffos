@@ -1458,17 +1458,6 @@ void f_objectp(void) {
 }
 #endif
 
-#ifdef F_OPCPROF
-void f_opcprof(void) {
-  if (st_num_arg == 1) {
-    opcdump(sp->u.string);
-    free_string_svalue(sp--);
-  } else {
-    opcdump("/OPCPROF");
-  }
-}
-#endif
-
 #ifdef F_ORIGIN
 void f_origin(void) { push_constant_string(origin_name(caller_type)); }
 #endif

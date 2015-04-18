@@ -16,22 +16,10 @@
 int call_origin = 0;
 error_context_t *current_error_context = 0;
 
-#ifdef OPCPROF
-#include "opc.h"
-
-static int opc_eoper[EFUN_BASE];
-#endif
-
 #ifdef DTRACE
 #include <sys/sdt.h>
 #else
 #define DTRACE_PROBE3(x, y, z, zz, zzz)
-#endif
-
-#ifdef OPCPROF_2D
-/* warning, this is typically 4 * 100 * 100 = 40k */
-static int opc_eoper_2d[EFUN_BASE + 1][EFUN_BASE + 1];
-static int last_eop = 0;
 #endif
 
 static const char *type_names[] = {"int",      "string", "array",  "object", "mapping",
@@ -1837,26 +1825,6 @@ void eval_instruction(char *p) {
           do_trace("Exec ", query_instr_name(real_instruction), "\n");
         }
       }
-#ifdef OPCPROF
-    if (real_instruction < EFUN_BASE) {
-      opc_eoper[real_instruction]++;
-    } else {
-      opc_efun[real_instruction - EFUN_BASE].count++;
-    }
-#endif
-#ifdef OPCPROF_2D
-    if (real_instruction < EFUN_BASE) {
-      if (last_eop) {
-        opc_eoper_2d[last_eop][real_instruction]++;
-      }
-      last_eop = real_instruction;
-    } else {
-      if (last_eop) {
-        opc_eoper_2d[last_eop][EFUN_BASE]++;
-      }
-      last_eop = EFUN_BASE;
-    }
-#endif
     }
     if (outoftime) {
       debug_message("object /%s: eval_cost too big %d\n", current_object->obname, max_cost);
@@ -4959,106 +4927,6 @@ int inter_sscanf(svalue_t *arg, svalue_t *s0, svalue_t *s1, int num_arg) {
   }
   return number_of_matches;
 }
-
-/* dump # of times each efun has been used */
-#ifdef OPCPROF
-void opcdump(const char *tfn) {
-  int i, len, limit;
-  char tbuf[SMALL_STRING_SIZE];
-  const char *fn;
-  FILE *fp;
-
-  if ((len = strlen(tfn)) >= (SMALL_STRING_SIZE - 7)) {
-    error("Path '%s' too long.\n", tfn);
-    return;
-  }
-  strcpy(tbuf, tfn);
-  strcpy(tbuf + len, ".efun");
-  fn = check_valid_path(tbuf, current_object, "opcprof", 1);
-  if (!fn) {
-    error("Invalid path '%s' for writing.\n", tbuf);
-    return;
-  }
-  fp = fopen(fn, "w");
-  if (!fp) {
-    error("Unable to open %s.\n", fn);
-    return;
-  }
-  limit = sizeof(opc_efun) / sizeof(opc_t);
-  for (i = 0; i < limit; i++) {
-    fprintf(fp, "%-30s: %10d\n", opc_efun[i].name, opc_efun[i].count);
-  }
-  fclose(fp);
-
-  strcpy(tbuf, tfn);
-  strcpy(tbuf + len, ".eoper");
-  fn = check_valid_path(tbuf, current_object, "opcprof", 1);
-  if (!fn) {
-    error("Invalid path '%s' for writing.\n", tbuf);
-    return;
-  }
-  fp = fopen(fn, "w");
-  if (!fp) {
-    error("Unable to open %s for writing.\n", fn);
-    return;
-  }
-  for (i = 0; i < EFUN_BASE; i++) {
-    fprintf(fp, "%-30s: %10d\n", query_instr_name(i), opc_eoper[i]);
-  }
-  fclose(fp);
-}
-#endif
-
-/* dump # of times each efun has been used */
-#ifdef OPCPROF_2D
-typedef struct {
-  int op1, op2;
-  int num_calls;
-} sort_elem_t;
-
-int sort_elem_cmp(const sort_elem_t *se1, const sort_elem_t *se2) {
-  return COMPARE_NUMS(se2->num_calls, se1->num_calls);
-}
-
-void opcdump(char *tfn) {
-  int ind, i, j, len;
-  char tbuf[SMALL_STRING_SIZE], *fn;
-  FILE *fp;
-  sort_elem_t ops[(EFUN_BASE + 1) * (EFUN_BASE + 1)];
-
-  if ((len = strlen(tfn)) >= (SMALL_STRING_SIZE - 10)) {
-    error("Path '%s' too long.\n", tfn);
-    return;
-  }
-  strcpy(tbuf, tfn);
-  strcpy(tbuf + len, ".eop-2d");
-  fn = check_valid_path(tbuf, current_object, "opcprof", 1);
-  if (!fn) {
-    error("Invalid path '%s' for writing.\n", tbuf);
-    return;
-  }
-  fp = fopen(fn, "w");
-  if (!fp) {
-    error("Unable to open %s for writing.\n", fn);
-    return;
-  }
-  for (i = 0; i <= EFUN_BASE; i++) {
-    for (j = 0; j <= EFUN_BASE; j++) {
-      ind = i * (EFUN_BASE + 1) + j;
-      ops[ind].num_calls = opc_eoper_2d[i][j];
-      ops[ind].op1 = i;
-      ops[ind].op2 = j;
-    }
-  }
-  qsort((char *)ops, (EFUN_BASE + 1) * (BASE + 1), sizeof(sort_elem_t), sort_elem_cmp);
-  for (i = 0; i < (EFUN_BASE + 1) * (EFUN_BASE + 1); i++) {
-    if (ops[i].num_calls)
-      fprintf(fp, "%-30s %-30s: %10d\n", query_instr_name(ops[i].op1), query_instr_name(ops[i].op2),
-              ops[i].num_calls);
-  }
-  fclose(fp);
-}
-#endif
 
 /*
  * Reset the virtual stack machine.
