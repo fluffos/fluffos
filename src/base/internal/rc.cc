@@ -44,12 +44,18 @@ void config_init() {
  * missing from the config file.  Otherwise, it will give an error and exit
  * if the line isn't there.
  */
+
 /* required:
  1  : Must have
  0  : optional
  -1 : warn if missing
  -2 : warn if found.
  */
+const static int kMustHave = 1;
+const static int kOptional = 0;
+const static int kWarnMissing = -1;
+const static int kWarnFound = -2;
+
 bool scan_config_line(const char *fmt, void *dest, int required) {
   /* zero the destination.  It is either a pointer to an int or a char
    buffer, so this will work */
@@ -71,7 +77,7 @@ bool scan_config_line(const char *fmt, void *dest, int required) {
 
   if (found) {
     switch (required) {
-      case -2:
+      case kWarnFound:
         // obsolete
         fprintf(stderr, "*Warning: obsolete line in config file, please delete:\n\t%s\n",
                 line.c_str());
@@ -80,14 +86,14 @@ bool scan_config_line(const char *fmt, void *dest, int required) {
     return true;
   } else {
     switch (required) {
-      case -1:
+      case kWarnMissing:
         // optional but warn
         fprintf(stderr, "*Warning: Missing line in config file:\n\t%s\n", line.c_str());
         return false;
-      case 0:
+      case kOptional:
         // optional
         return false;
-      case 1:
+      case kMustHave:
         // required
         fprintf(stderr, "*Error in config file.  Missing line:\n\t%s\n", line.c_str());
         exit(-1);
@@ -308,8 +314,8 @@ void read_config(char *filename) {
   }
   if (!scan_config_line("heartbeat interval msec : %d\n", &CONFIG_INT(__HEARTBEAT_INTERVAL_MSEC__),
                         -1)) {
-    CONFIG_INT(__HEARTBEAT_INTERVAL_MSEC__) =
-        CONFIG_INT(__GAMETICK_MSEC__);  // default to match gametick.
+    // default to match gametick.
+    CONFIG_INT(__HEARTBEAT_INTERVAL_MSEC__) = CONFIG_INT(__GAMETICK_MSEC__);
   }
 
   /*
