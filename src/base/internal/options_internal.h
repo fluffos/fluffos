@@ -42,11 +42,6 @@
  */
 #define APPLY_CACHE_BITS 22
 
-/* CACHE_STATS: define this if you want call_other (apply_low) cache
- * statistics.  Causes HAS_CACHE_STATS to be defined in all LPC objects.
- */
-#define CACHE_STATS
-
 /* NONINTERACTIVE_STDERR_WRITE: if defined, all writes/tells/etc to
  *   noninteractive objects will be written to stderr prefixed with a ']'
  *   (old behavior).

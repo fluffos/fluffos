@@ -327,10 +327,7 @@ string ed_cmd(string);
 int query_ed_mode();
 #endif
 
-#ifdef CACHE_STATS
 string cache_stats();
-#endif
-
 mixed filter(string | mixed * | mapping, string | function, ...);
 mixed filter_array filter(mixed *, string | function, ...);
 mapping filter_mapping filter(mapping, string | function, ...);

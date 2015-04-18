@@ -2842,6 +2842,12 @@ void add_predefines() {
   sprintf(save_buf, "%" LPC_FLOAT_FMTSTR_P, LPC_FLOAT_MIN);
   add_predefine("MIN_FLOAT", -1, save_buf);
 
+  // Following compile time configs are now always true
+  add_predefine("__CACHE_STATS__", -1, "");
+  add_predefine("__STRING_STATS__", -1, "");
+  add_predefine("__CLASS_STATS__", -1, "");
+  add_predefine("__ARRAY_STATS__", -1, "");
+
   // Following compile time configs has been changed into runtime configs.
   if (CONFIG_INT(__SANE_EXPLODE_STRING__)) {
     add_predefine("__SANE_EXPLODE_STRING__", -1, "");
