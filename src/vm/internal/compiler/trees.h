@@ -64,7 +64,7 @@ struct parse_node_t {
 #if !defined(USE_32BIT_ADDRESSES)
   short line;
 #else
-  unsigned int line;
+  uint32_t line;
 #endif
   unsigned short type;
   union parse_value v, l, r; /* left, right, and value */

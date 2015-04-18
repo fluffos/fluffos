@@ -363,25 +363,6 @@
  * Most of these options will probably be of no interest to many users.  *
  *************************************************************************/
 
-/* USE_32BIT_ADDRESSES: Use 32 bits for addresses of function, instead of
- * the usual 16 bits.  This increases the maximum program size from 64k
- * of LPC bytecode (NOT source) to 4 GB.  Branches are still 16 bits,
- * imposing a 64k limit on catch(), if(), switch(), loops, and most other
- * control structures.  It would take an extremely large function to hit
- * those limits, though.
- *
- * Overhead: 2 bytes/function with LPC->C off.  Having LPC->C on forces
- * this option, since it needs 4 bytes to store the function pointers
- * anyway, and this setting is ignored.
- */
-#undef USE_32BIT_ADDRESSES
-
-/* LARGEST_PRINTABLE_STRING: defines the size of the vsprintf() buffer in
- *   comm.c's add_message(). Instead of blindly making this value larger,
- *   your mudlib should be coded to not send huge strings to users.
- */
-#define LARGEST_PRINTABLE_STRING 8192
-
 /* PACKAGE_COMPRESS: Enable MCCP support and compressed save files
    SAVE_GZ_EXTENSION: save extension for compressed files
  */
