@@ -190,9 +190,6 @@ static keyword_t reswords[] = {
 #ifndef SENSIBLE_MODIFIERS
     {"static", L_TYPE_MODIFIER, DECL_NOSAVE | DECL_PROTECTED},
 #endif
-#ifdef HAS_STATUS_TYPE
-    {"status", L_BASIC_TYPE, TYPE_NUMBER},
-#endif
     {"string", L_BASIC_TYPE, TYPE_STRING},
 #ifdef STRUCT_STRUCT
     {"struct", L_CLASS, 0},

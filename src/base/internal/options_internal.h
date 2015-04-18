@@ -80,13 +80,6 @@
 /* use struct keyword for lpc structs */
 #define STRUCT_STRUCT
 
-/* HAS_STATUS_TYPE: old MudOS drivers had a 'status' type which was
- * identical to the 'int' type.  Define this to bring it back.
- *
- * Compat status: very archaic, but easy to support.
- */
-#undef HAS_STATUS_TYPE
-
 /* OLD_TYPE_BEHAVIOR: reintroduces a bug in type-checking that effectively
  * renders compile time type checking useless.  For backwards compatibility.
  *
