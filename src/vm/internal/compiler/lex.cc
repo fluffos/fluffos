@@ -1725,9 +1725,9 @@ int yylex() {
         // ignore these.
         break;
       case '\t':
-#ifdef WARN_TAB
-        yywarn("<TAB>");
-#endif
+        if(CONFIG_INT(__WARN_TAB__)) {
+          yywarn("<TAB>");
+        }
         break;
       case '\n':
         nexpands = 0;

@@ -348,11 +348,6 @@ void dumpallobj(string | void);
 string dump_file_descriptors();
 string query_load_average();
 
-#ifndef NO_LIGHT
-/* set_light should die a dark death */
-int set_light(int);
-#endif
-
 string origin();
 
 /* the infrequently used functions */

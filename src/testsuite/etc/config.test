@@ -157,6 +157,11 @@ reversible explode string : 0
 #
 sane sorting : 1
 
+# WARN_TAB: Some versions of the editor built in indent function use
+#   tabs for indenting. This options turns on a warning message for
+#   files indented with tabs instead of spaces.
+#
+warn tab : 0
 
 ###############################################################################
 #          The following aren't currently used or implemented (yet)           #

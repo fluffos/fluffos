@@ -323,11 +323,14 @@ void read_config(char *filename) {
   if (!scan_config_line("sane explode string : %d\n", &CONFIG_INT(__SANE_EXPLODE_STRING__), -1)) {
     CONFIG_INT(__SANE_EXPLODE_STRING__) = 1;
   }
-  if (!scan_config_line("reversible explode string: %d\n", &CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__), -1)) {
+  if (!scan_config_line("reversible explode string : %d\n", &CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__), -1)) {
     CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__) = 0;
   }
-  if (!scan_config_line("sane sorting: %d\n", &CONFIG_INT(__SANE_SORTING__), -1)) {
+  if (!scan_config_line("sane sorting : %d\n", &CONFIG_INT(__SANE_SORTING__), -1)) {
     CONFIG_INT(__SANE_SORTING__) = 1;
+  }
+  if (!scan_config_line("warn tab : %d\n", &CONFIG_INT(__WARN_TAB__), -1)) {
+      CONFIG_INT(__WARN_TAB__) = 0;
   }
 
   // Complain about obsolete config lines.

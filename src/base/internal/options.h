@@ -113,12 +113,6 @@
  */
 #define SENSIBLE_MODIFIERS
 
-/* WARN_TAB: Some versions of the editor built in indent function use
- *   tabs for indenting. This options turns on a warning message for
- *   files indented with tabs instead of spaces.
- */
-#undef WARN_TAB
-
 /* WOMBLES: don't allow spaces between start/end of array/mapping/functional
  * token chars so ({1,2,3}) still works, but ( { 1 , 2 , 3 } ) doesn't
  * and ({ 1 , 2 , 3 }) does.*/
