@@ -2861,6 +2861,9 @@ void add_predefines() {
   if (CONFIG_INT(__CALL_OTHER_WARN__)) {
     add_predefine("__CALL_OTHER_WARN__", -1, "");
   }
+  if (CONFIG_INT(__MUDLIB_ERROR_HANDLER__)) {
+    add_predefine("__MUDLIB_ERROR_HANDLER__", -1, "");
+  }
 }
 
 void start_new_file(int f) {

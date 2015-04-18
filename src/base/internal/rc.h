@@ -10,7 +10,6 @@
 /*
  * The following is for internal use (ie driver) only
  */
-#define RUNTIME_CONFIG_NEXT CFG_INT(26)
 #define NUM_CONFIG_STRS (BASE_CONFIG_INT - BASE_CONFIG_STR)
 #define NUM_CONFIG_INTS (RUNTIME_CONFIG_NEXT - BASE_CONFIG_INT)
 

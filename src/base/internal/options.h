@@ -144,18 +144,6 @@
  */
 #undef COMPAT_32
 
-/* MUDLIB_ERROR_HANDLER: If you define this, the driver doesn't do any
- *   handling of runtime errors, other than to turn the heartbeats of
- *   objects off.  Information about the error is passed in a mapping
- *   to the error_handler() function in the master object.  Whatever is
- *   returned is put in the debug.log.
- *
- * A good mudlib error handler is one of the best tools for tracking down
- * errors.  Unfortunately, you need to have one.  Check the testsuite or
- * other libs for an example.
- */
-#define MUDLIB_ERROR_HANDLER
-
 /* DEFAULT_PRAGMAS:  This should be a sum of pragmas you want to always
  * be on, i.e.
  *

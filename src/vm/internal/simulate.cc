@@ -1664,10 +1664,7 @@ void fatal(const char *fmt, ...) {
 }
 
 static int num_error = 0;
-
-#ifdef MUDLIB_ERROR_HANDLER
 static int num_mudlib_error = 0;
-#endif
 
 /*
  * Error() has been "fixed" so that users can catch and throw them.
@@ -1714,7 +1711,6 @@ static void add_message_with_location(char *err) {
   }
 }
 
-#ifdef MUDLIB_ERROR_HANDLER
 static void mudlib_error_handler(char *err, int katch) {
   mapping_t *m;
   const char *file = NULL;
@@ -1756,11 +1752,53 @@ static void mudlib_error_handler(char *err, int katch) {
     debug_message("%s", mret->u.string);
   }
 }
-#endif
 
-void error_handler(char *err) {
+void _error_handler(char *err) {
   const char *object_name;
 
+  debug_message_with_location(err + 1);
+#if defined(DEBUG) && defined(TRACE_CODE)
+  object_name = dump_trace(1);
+#else
+  object_name = dump_trace(0);
+#endif
+  if (object_name) {
+    object_t *ob;
+
+    ob = find_object2(object_name);
+    if (!ob) {
+      if (command_giver) {
+        add_vmessage(command_giver, "error when executing program in destroyed object /%s\n",
+                     object_name);
+      }
+      debug_message("error when executing program in destroyed object /%s\n", object_name);
+    }
+  }
+  auto default_error_message = CONFIG_STR(__DEFAULT_ERROR_MESSAGE__);
+  if (command_giver && command_giver->interactive) {
+#ifndef NO_WIZARDS
+    if ((command_giver->flags & O_IS_WIZARD) || !strlen(default_error_message)) {
+#endif
+      add_message_with_location(err + 1);
+#ifndef NO_WIZARDS
+    } else {
+      add_vmessage(command_giver, "%s\n", default_error_message);
+    }
+#endif
+  }
+  if (g_current_heartbeat_obj) {
+    static char hb_message[] = "FluffOS driver tells you: You have no heart beat!\n";
+    set_heart_beat(g_current_heartbeat_obj, 0);
+    debug_message("Heart beat in /%s turned off.\n", g_current_heartbeat_obj->obname);
+    if (g_current_heartbeat_obj->interactive) {
+      add_message(g_current_heartbeat_obj, hb_message, sizeof(hb_message) - 1);
+    }
+
+    g_current_heartbeat_obj = 0;
+  }
+}
+
+void error_handler(char *err) {
 /* in case we're going to jump out of load_object */
 #ifndef NO_ENVIRONMENT
   restrict_destruct = 0;
@@ -1768,30 +1806,32 @@ void error_handler(char *err) {
   num_objects_this_thread = 0; /* reset the count */
 
   if (((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) {
-/* user catches this error */
-/* This is added so that catches generate messages in the log file. */
-#ifdef MUDLIB_ERROR_HANDLER
-    if (num_mudlib_error) {
-      debug_message("Error in error handler: ");
-      num_error++;
-#endif
+    /* user catches this error */
+    /* This is added so that catches generate messages in the log file. */
+    if (!CONFIG_INT(__MUDLIB_ERROR_HANDLER__)) {
       debug_message_with_location(err);
       (void)dump_trace(0);
-#ifdef MUDLIB_ERROR_HANDLER
-      num_error--;
-      num_mudlib_error = 0;
     } else {
-      if (max_eval_error) {
-        outoftime = 0;
-      }
+      if (num_mudlib_error) {
+        debug_message("Error in error handler: ");
+        num_error++;
+        debug_message_with_location(err);
+        (void)dump_trace(0);
+        num_error--;
+        num_mudlib_error = 0;
+      } else {
+        if (max_eval_error) {
+          outoftime = 0;
+        }
 
-      if (!too_deep_error) {
-        num_mudlib_error++;
-        mudlib_error_handler(err, 1);
-        num_mudlib_error--;
+        if (!too_deep_error) {
+          num_mudlib_error++;
+          mudlib_error_handler(err, 1);
+          num_mudlib_error--;
+        }
       }
     }
-#endif
+
     if (max_eval_error) {
       outoftime = 1;
     }
@@ -1820,66 +1860,28 @@ void error_handler(char *err) {
     add_errors(&current_object->stats, 1);
   }
 #endif
-#ifdef MUDLIB_ERROR_HANDLER
-  if (!too_deep_error) {
-    if (num_mudlib_error) {
-      debug_message("Error in error handler: ");
-      debug_message_with_location(err);
-      (void)dump_trace(0);
-      num_mudlib_error = 0;
-    } else {
-      num_mudlib_error++;
-      num_error--;
-      outoftime = 0;
-      mudlib_error_handler(err, 0);
-      if (max_eval_error) {
-        outoftime = 1;
-      }
-      num_mudlib_error--;
-      num_error++;
-    }
-  } else
-#endif
-  {
-    debug_message_with_location(err + 1);
-#if defined(DEBUG) && defined(TRACE_CODE)
-    object_name = dump_trace(1);
-#else
-    object_name = dump_trace(0);
-#endif
-    if (object_name) {
-      object_t *ob;
-
-      ob = find_object2(object_name);
-      if (!ob) {
-        if (command_giver) {
-          add_vmessage(command_giver, "error when executing program in destroyed object /%s\n",
-                       object_name);
-        }
-        debug_message("error when executing program in destroyed object /%s\n", object_name);
-      }
-    }
-    auto default_error_message = CONFIG_STR(__DEFAULT_ERROR_MESSAGE__);
-    if (command_giver && command_giver->interactive) {
-#ifndef NO_WIZARDS
-      if ((command_giver->flags & O_IS_WIZARD) || !strlen(default_error_message)) {
-#endif
-        add_message_with_location(err + 1);
-#ifndef NO_WIZARDS
+  if (!CONFIG_INT(__MUDLIB_ERROR_HANDLER__)) {
+    _error_handler(err);
+  } else {
+    if (!too_deep_error) {
+      if (num_mudlib_error) {
+        debug_message("Error in error handler: ");
+        debug_message_with_location(err);
+        (void)dump_trace(0);
+        num_mudlib_error = 0;
       } else {
-        add_vmessage(command_giver, "%s\n", default_error_message);
+        num_mudlib_error++;
+        num_error--;
+        outoftime = 0;
+        mudlib_error_handler(err, 0);
+        if (max_eval_error) {
+          outoftime = 1;
+        }
+        num_mudlib_error--;
+        num_error++;
       }
-#endif
-    }
-    if (g_current_heartbeat_obj) {
-      static char hb_message[] = "FluffOS driver tells you: You have no heart beat!\n";
-      set_heart_beat(g_current_heartbeat_obj, 0);
-      debug_message("Heart beat in /%s turned off.\n", g_current_heartbeat_obj->obname);
-      if (g_current_heartbeat_obj->interactive) {
-        add_message(g_current_heartbeat_obj, hb_message, sizeof(hb_message) - 1);
-      }
-
-      g_current_heartbeat_obj = 0;
+    } else {
+      _error_handler(err);
     }
   }
   num_error--;
