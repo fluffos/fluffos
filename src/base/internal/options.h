@@ -179,24 +179,6 @@
  */
 #define SAVE_EXTENSION ".o"
 
-/* NO_ANSI: define if you wish to disallow users from typing in commands that
- *   contain ANSI escape sequences.  Defining NO_ANSI causes all escapes
- *   (ASCII 27) to be replaced with a space ' ' before the string is passed
- *   to the action routines added with add_action.
- *
- * STRIP_BEFORE_PROCESS_INPUT allows the location where the stripping is
- * done to be controlled.  If it is defined, then process_input() doesn't
- * see ANSI characters either; if it is undefined ESC chars can be processed
- * by process_input(), but are stripped before add_actions are called.
- * Note that if NO_ADD_ACTION is defined, then #define NO_ANSI without
- * #define STRIP_BEFORE_PROCESS_INPUT is the same as #undef NO_ANSI.
- *
- * If you anticipate problems with users intentionally typing in ANSI codes
- * to make your terminal flash, etc define this.
- */
-#define NO_ANSI
-#define STRIP_BEFORE_PROCESS_INPUT
-
 /* OPCPROF: define this if you wish to enable OPC profiling. Allows a dump
  *   of the # of times each efun is invoked (via the opcprof() efun).
  */

@@ -353,6 +353,12 @@ void read_config(char *filename) {
   if (!scan_config_line("randomized resets : %d\n", &CONFIG_INT(__RANDOMIZED_RESETS__), -1)) {
       CONFIG_INT(__RANDOMIZED_RESETS__) = 1;
   }
+  if (!scan_config_line("no ansi : %d\n", &CONFIG_INT(__NO_ANSI__), -1)) {
+      CONFIG_INT(__NO_ANSI__) = 1;
+  }
+  if (!scan_config_line("strip before process input : %d\n", &CONFIG_INT(__STRIP_BEFORE_PROCESS_INPUT__), -1)) {
+      CONFIG_INT(__STRIP_BEFORE_PROCESS_INPUT__) = 1;
+  }
 
   // Complain about obsolete config lines.
   scan_config_line("address server ip : %[^\n]", tmp, -2);
