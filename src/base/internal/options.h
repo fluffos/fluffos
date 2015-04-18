@@ -113,27 +113,6 @@
  */
 #define SENSIBLE_MODIFIERS
 
-/* SANE_SORTING: Use system provided fastest sorting routine for various
- * sorting, including sort_array EFUN.
- *
- * This replace the old internal version qsort which only sorts to one
- * direction repetitively. so following LPC code:
- *
- *    sort_array(({4,3,2,1}), (: -($1<$2) :));
- *
- * can still return ({1,2,3,4}), even though it only returns -1 and 0.
- *
- * It is recommended to fix your LPC code to not rely on this behavior.
- *
- * Your LPC code should return 1, 0, -1 for situation where first argument
- * is less than, equal to, or greater than the second argument. This will
- * will work with both implementation.
- *
- * Old code should work fine with this added, easy to inspect by searching
- * for sort_array.
- */
-#define SANE_SORTING
-
 /* WARN_TAB: Some versions of the editor built in indent function use
  *   tabs for indenting. This options turns on a warning message for
  *   files indented with tabs instead of spaces.

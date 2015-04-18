@@ -1240,11 +1240,11 @@ void f_sort_array(void) {
 
       tmp = copy_array(tmp);
       push_refed_array(tmp);
-#ifdef SANE_SORTING
-      qsort(reinterpret_cast<char *>(tmp->item), tmp->size, sizeof(tmp->item), sort_array_cmp);
-#else
-      old_quickSort((char *)tmp->item, tmp->size, sizeof(tmp->item), sort_array_cmp);
-#endif
+      if (CONFIG_INT(__SANE_SORTING__)) {
+        qsort(reinterpret_cast<char *>(tmp->item), tmp->size, sizeof(tmp->item), sort_array_cmp);
+      } else {
+        old_quickSort((char *)tmp->item, tmp->size, sizeof(tmp->item), sort_array_cmp);
+      }
       sort_array_ftc = old_ptr;
       sp--;  // remove tmp from stack, but we don't want to free it!
       break;

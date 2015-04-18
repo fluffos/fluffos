@@ -2849,6 +2849,9 @@ void add_predefines() {
   if (CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__)) {
     add_predefine("__REVERSIBLE_EXPLODE_STRING__", -1, "");
   }
+  if (CONFIG_INT(__SANE_SORTING__)) {
+    add_predefine("__SANE_SORTING__", -1, "");
+  }
 }
 
 void start_new_file(int f) {
