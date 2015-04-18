@@ -4158,11 +4158,9 @@ const char *dump_trace(int how) {
   char *fname;
   int num_arg = -1, num_local = -1;
 
-#if defined(ARGUMENTS_IN_TRACEBACK) || defined(LOCALS_IN_TRACEBACK)
   svalue_t *ptr;
   int i, context_saved = 0;
   error_context_t econ;
-#endif
 
   if (current_prog == 0) {
     return 0;
@@ -4171,7 +4169,6 @@ const char *dump_trace(int how) {
     return 0;
   }
 
-#if defined(ARGUMENTS_IN_TRACEBACK) || defined(LOCALS_IN_TRACEBACK)
   /*
    * save context here because svalue_to_string could generate an error
    * which would throw us into a bad state in the error handler.  this
@@ -4182,7 +4179,6 @@ const char *dump_trace(int how) {
    */
   if (!save_context(&econ)) return 0;
   try {
-#endif
     if (CONFIG_INT(__TRACE_CODE__)) {
       if (how) {
         last_instructions();
@@ -4233,7 +4229,6 @@ const char *dump_trace(int how) {
           fatal("unknown type of frame\n");
 #endif
       }
-#ifdef ARGUMENTS_IN_TRACEBACK
       if (num_arg != -1) {
         ptr = p[1].fp;
         debug_message("arguments were (");
@@ -4251,8 +4246,6 @@ const char *dump_trace(int how) {
         }
         debug_message(")\n");
       }
-#endif
-#ifdef LOCALS_IN_TRACEBACK
       if (num_local > 0 && num_arg != -1) {
         ptr = p[1].fp + num_arg;
         debug_message("locals were: ");
@@ -4270,7 +4263,6 @@ const char *dump_trace(int how) {
         }
         debug_message("\n");
       }
-#endif
     }
     switch (p[0].framekind & FRAME_MASK) {
       case FRAME_FUNCTION:
@@ -4307,7 +4299,6 @@ const char *dump_trace(int how) {
         num_arg = -1;
         break;
     }
-#ifdef ARGUMENTS_IN_TRACEBACK
     if (num_arg != -1) {
       debug_message("arguments were (");
       for (i = 0; i < num_arg; i++) {
@@ -4324,8 +4315,6 @@ const char *dump_trace(int how) {
       }
       debug_message(")\n");
     }
-#endif
-#ifdef LOCALS_IN_TRACEBACK
     if (num_local > 0 && num_arg != -1) {
       ptr = fp + num_arg;
       debug_message("locals were: ");
@@ -4343,15 +4332,12 @@ const char *dump_trace(int how) {
       }
       debug_message("\n");
     }
-#endif
     debug_message("--- end trace ---\n");
-#if defined(ARGUMENTS_IN_TRACEBACK) || defined(LOCALS_IN_TRACEBACK)
   } catch (const char *) {
     restore_context(&econ);
     ret = 0;
   }
   pop_context(&econ);
-#endif
   return ret;
 }
 
@@ -4364,10 +4350,8 @@ array_t *get_svalue_trace() {
   char *fname;
   int num_arg, num_local = -1;
 
-#if defined(ARGUMENTS_IN_TRACEBACK) || defined(LOCALS_IN_TRACEBACK)
   svalue_t *ptr;
   int i;
-#endif
 
   if (current_prog == 0) {
     return &the_null_array;
@@ -4418,7 +4402,6 @@ array_t *get_svalue_trace() {
     get_explicit_line_number_info(p[1].pc, p[1].prog, &file, &line);
     add_mapping_malloced_string(m, "file", add_slash(file));
     add_mapping_pair(m, "line", line);
-#ifdef ARGUMENTS_IN_TRACEBACK
     if (num_arg != -1) {
       array_t *v2;
 
@@ -4430,8 +4413,6 @@ array_t *get_svalue_trace() {
       add_mapping_array(m, "arguments", v2);
       v2->ref--;
     }
-#endif
-#ifdef LOCALS_IN_TRACEBACK
     if (num_local > 0 && num_arg != -1) {
       array_t *v2;
 
@@ -4443,7 +4424,6 @@ array_t *get_svalue_trace() {
       add_mapping_array(m, "locals", v2);
       v2->ref--;
     }
-#endif
     v->item[(p - &control_stack[0])].type = T_MAPPING;
     v->item[(p - &control_stack[0])].u.map = m;
   }
@@ -4483,7 +4463,6 @@ array_t *get_svalue_trace() {
   get_line_number_info(&file, &line);
   add_mapping_malloced_string(m, "file", add_slash(file));
   add_mapping_pair(m, "line", line);
-#ifdef ARGUMENTS_IN_TRACEBACK
   if (num_arg != -1) {
     array_t *v2;
 
@@ -4494,8 +4473,6 @@ array_t *get_svalue_trace() {
     add_mapping_array(m, "arguments", v2);
     v2->ref--;
   }
-#endif
-#ifdef LOCALS_IN_TRACEBACK
   if (num_local > 0 && num_arg != -1) {
     array_t *v2;
 
@@ -4506,7 +4483,6 @@ array_t *get_svalue_trace() {
     add_mapping_array(m, "locals", v2);
     v2->ref--;
   }
-#endif
   v->item[(csp - &control_stack[0])].type = T_MAPPING;
   v->item[(csp - &control_stack[0])].u.map = m;
   /* return a reference zero array */

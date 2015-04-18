@@ -80,32 +80,6 @@
 /* use struct keyword for lpc structs */
 #define STRUCT_STRUCT
 
-/* ARGUMENTS_IN_TRACEBACK: prints out function call arguments in error
- *   tracebacks, to aid in debugging.  Note: it prints the values of
- *   the arguments at the time of the error, not when the function
- *   was called.  It looks like this:
- *
- * Failed to load file: read_buffer
- * program: command/update.c, object: command/update line 15
- * '    commandHook' in '        clone/user.c' ('        clone/user#1')line 72
- * arguments were ("/read_buffer.c")
- * '           main' in '    command/update.c' ('      command/update')line 15
- * arguments were ("/read_buffer.c")
- *
- * The only down side is some people like their logs shorter
- */
-#define ARGUMENTS_IN_TRACEBACK
-
-/* LOCALS_IN_TRACEBACK: similar to ARGUMENTS_IN_TRACEBACK, but for local
- *   variables.  The output looks more or less like:
- *
- * locals: 1, "local_value"
- *
- * Same as above.  Tends to produce even longer logs, but very useful for
- * tracking errors.
- */
-#define LOCALS_IN_TRACEBACK
-
 /* supress warnings about unused arguments; only warn about unused local
  * variables.  Makes older code (where argument names were required) compile
  * more quietly.
