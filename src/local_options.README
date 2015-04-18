@@ -1,13 +1,4 @@
-/*
- * options.h: defines for the compile-time configuration of the MudOS driver
- */
-
-#ifndef _BASE_INTERNAL_OPTIONS_H_
-#define _BASE_INTERNAL_OPTIONS_H_
-
-/*
- * YOU SHOULD NOT MODIFY THIS FILE DIRECTLY.
- */
+// This file contains detailed readme for each local_options option.
 
 /****************************************************************************
  * EVERY time you change ANYTHING in this file, RECOMPILE from scratch.     *
@@ -56,7 +47,7 @@
  * Compat status: next to impossible to simulate, hard to replace, and
  * very, very widely used.
  */
-#define NO_ADD_ACTION
+#undef NO_ADD_ACTION
 
 /* NO_SNOOP: disables the snoop() efun and all related functionality.
  */
@@ -82,7 +73,7 @@
  *
  * Compat status: easy to simulate and dated.
  */
-#define NO_WIZARDS
+#undef NO_WIZARDS
 
 /* OLD_ED: ed() efun backwards compatible with the old version.  The new
  * version requires/allows a mudlib front end.
@@ -209,17 +200,6 @@
 /* NO_SHADOWS: define this if you want to disable shadows in your driver.
  */
 #undef NO_SHADOWS
-
-/* PROFILE_FUNCTIONS: define this to be able to measure the CPU time used by
- *   all of the user-defined functions in each LPC object.  Note: defining
- *   this adds three long ints (12 bytes on 32-bit machines) to the function
- *   header structs.  Also note that the resolution of the getrusage() timer
- *   may not be high enough on some machines to give non-zero execution
- *   times to very small (fast) functions.  In particular if the clock
- *   resolution is 1/60 of a second, then any time less than approxmately 15k
- *   microseconds will resolve to zero (0).
- */
-#undef PROFILE_FUNCTIONS
 
 /****************************************************************************
  *                              PACKAGES                                    *
@@ -357,28 +337,10 @@
 #undef AUTO_TRUST_BACKBONE
 #endif
 
-/*************************************************************************
- *                       FOR EXPERIENCED USERS                           *
- *                      -----------------------                          *
- * Most of these options will probably be of no interest to many users.  *
- *************************************************************************/
-
 /* PACKAGE_COMPRESS: Enable MCCP support and compressed save files
    SAVE_GZ_EXTENSION: save extension for compressed files
  */
 #define PACKAGE_COMPRESS
 #define SAVE_GZ_EXTENSION ".o.gz"
 
-/* USE_ICONV: Use iconv to translate input and output from/to the users char
- * encoding
- */
-#undef USE_ICONV
-
-/* IPV6: Use IP version 6 instead of 4, for most people the only difference
- * will be that numerical IP addresses get ::ffff: added in front.*/
-#define IPV6
-
-/* static user space dtrace probes, try them if you have dtrace! */
-#undef DTRACE
-
-#endif /* _BASE_INTERNAL_OPTIONS_H_ */
+#endif /* _LOCAL_OPTIONS_H_ */

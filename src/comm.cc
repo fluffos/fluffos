@@ -478,10 +478,10 @@ void add_message(object_t *who, const char *data, int len) {
    */
   if (!who || (who->flags & O_DESTRUCTED) || !who->interactive ||
       (who->interactive->iflags & (NET_DEAD | CLOSING))) {
-#ifdef NONINTERACTIVE_STDERR_WRITE
-    putc(']', stderr);
-    fwrite(data, len, 1, stderr);
-#endif
+    if (CONFIG_INT(__NONINTERACTIVE_STDERR_WRITE__)) {
+      putc(']', stderr);
+      fwrite(data, len, 1, stderr);
+    }
     return;
   }
   auto ip = who->interactive;

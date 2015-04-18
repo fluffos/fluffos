@@ -5,6 +5,24 @@
  * planned to be removed. You should not depends on any of the values here.
  */
 
+/*************************************************************************
+ *                       FOR EXPERIENCED USERS                           *
+ *                      -----------------------                          *
+ * Most of these options will probably be of no interest to many users.  *
+ *************************************************************************/
+
+/* USE_ICONV: Use iconv to translate input and output from/to the users char
+ * encoding
+ */
+#define USE_ICONV
+
+/* IPV6: Use IP version 6 instead of 4, for most people the only difference
+ * will be that numerical IP addresses get ::ffff: added in front.*/
+#define IPV6
+
+/* static user space dtrace probes, try them if you have dtrace! */
+#undef DTRACE
+
 /* You may optionally choose one (or none) of these malloc wrappers.  These
  * can be used in conjunction with any of the above malloc packages.
  *
@@ -128,5 +146,16 @@
  *   your mudlib should be coded to not send huge strings to users.
  */
 #define LARGEST_PRINTABLE_STRING 8192
+
+/* PROFILE_FUNCTIONS: define this to be able to measure the CPU time used by
+ *   all of the user-defined functions in each LPC object.  Note: defining
+ *   this adds three long ints (12 bytes on 32-bit machines) to the function
+ *   header structs.  Also note that the resolution of the getrusage() timer
+ *   may not be high enough on some machines to give non-zero execution
+ *   times to very small (fast) functions.  In particular if the clock
+ *   resolution is 1/60 of a second, then any time less than approxmately 15k
+ *   microseconds will resolve to zero (0).
+ */
+#undef PROFILE_FUNCTIONS
 
 #endif /* _BASE_INTERNAL_OPTIONS_INTERNAL_H */
