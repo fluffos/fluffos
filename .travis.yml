@@ -14,12 +14,12 @@ env:
 # clang builds
   - BUILD="x86_64" COMPILER="clang" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev"
   - BUILD="x86_64" COMPILER="clang" COMPILER_FLAGS="-m64 -mtune=generic" TYPE=""        CONFIG="testrelease"
-  - BUILD="i386"   COMPILER="clang" COMPILER_FLAGS="-m32 -mtune=generic" TYPE="develop" CONFIG="testdev32"
-  - BUILD="i386"   COMPILER="clang" COMPILER_FLAGS="-m32 -mtune=generic" TYPE=""        CONFIG="testrelease32"
+#  - BUILD="i386"   COMPILER="clang" COMPILER_FLAGS="-m32 -mtune=generic" TYPE="develop" CONFIG="testdev32"
+#  - BUILD="i386"   COMPILER="clang" COMPILER_FLAGS="-m32 -mtune=generic" TYPE=""        CONFIG="testrelease32"
 # gcc builds
   - BUILD="x86_64" COMPILER="gcc" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev" GCOV="yes"
   - BUILD="x86_64" COMPILER="gcc" COMPILER_FLAGS="-m64 -mtune=generic" TYPE=""        CONFIG="testrelease"
-  - BUILD="i386"   COMPILER="gcc" COMPILER_FLAGS="-m32 -mtune=generic" TYPE="develop" CONFIG="testdev32"
-  - BUILD="i386"   COMPILER="gcc" COMPILER_FLAGS="-m32 -mtune=generic" TYPE=""        CONFIG="testrelease32"
+#  - BUILD="i386"   COMPILER="gcc" COMPILER_FLAGS="-m32 -mtune=generic" TYPE="develop" CONFIG="testdev32"
+#  - BUILD="i386"   COMPILER="gcc" COMPILER_FLAGS="-m32 -mtune=generic" TYPE=""        CONFIG="testrelease32"
 # coverity
   - BUILD="x86_64" COMPILER="gcc" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev" COVERITY="yes"
