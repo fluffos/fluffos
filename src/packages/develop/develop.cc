@@ -46,9 +46,6 @@ void f_debug_info(void) {
       }
 #endif
 
-#ifndef NO_LIGHT
-      outbuf_addv(&out, "total light : %d\n", ob->total_light);
-#endif
 #ifndef NO_RESETS
       outbuf_addv(&out, "next_reset  : %d\n", ob->next_reset);
 #endif

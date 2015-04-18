@@ -15,4 +15,7 @@
     "local_options: NUM_EXTERNAL_CMDS is no longer a compile time options, please remove it."
 #endif
 
+#ifdef NO_LIGHT
+#error "NO_LIGHT is always defined now, please remove it from local_options to continue."
+#endif
 // IWYU pragma: end_exports

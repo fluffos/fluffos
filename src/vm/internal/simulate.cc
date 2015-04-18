@@ -923,9 +923,6 @@ void destruct_object(object_t *ob) {
    * defined by this object from all objects here.
    */
   if (ob->super) {
-#ifndef NO_LIGHT
-    add_light(ob->super, -ob->total_light);
-#endif
     remove_sent(ob->super, ob);
     remove_sent(ob, ob->super);
     for (pp = &ob->super->contains; *pp;) {
@@ -1503,17 +1500,11 @@ void move_object(object_t *item, object_t *dest) {
 #if !defined(NO_RESETS) && defined(LAZY_RESETS)
   try_reset(dest);
 #endif
-#ifndef NO_LIGHT
-  add_light(dest, item->total_light);
-#endif
   if (item->super) {
     int okay = 0;
 
     remove_sent(item->super, item);
     remove_sent(item, item->super);
-#ifndef NO_LIGHT
-    add_light(item->super, -item->total_light);
-#endif
     for (pp = &item->super->contains; *pp;) {
       if (*pp != item) {
         remove_sent(item, *pp);
@@ -1542,25 +1533,6 @@ void move_object(object_t *item, object_t *dest) {
 
   setup_new_commands(dest, item);
   restore_command_giver();
-}
-#endif
-
-#ifndef NO_LIGHT
-/*
- * Every object has a count of the number of light sources it contains.
- * Update this.
- */
-
-void add_light(object_t *p, int n) {
-  if (n == 0) {
-    return;
-  }
-  p->total_light += n;
-#ifndef NO_ENVIRONMENT
-  while ((p = p->super)) {
-    p->total_light += n;
-  }
-#endif
 }
 #endif
 

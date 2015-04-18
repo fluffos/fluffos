@@ -7,9 +7,6 @@
 
 /*
  * YOU SHOULD NOT MODIFY THIS FILE DIRECTLY.
- *
- * Do 'cp options.h local_options' and edit that instead.
- *
  */
 
 /****************************************************************************
@@ -70,13 +67,6 @@
  */
 #define SANE_EXPLODE_STRING
 #undef REVERSIBLE_EXPLODE_STRING
-
-/* NO_LIGHT: define this to disable the set_light() and driver maintenance
- *   of light levels in objects.  You can simulate it via LPC if you want...
- *
- * Compat status: Very dated, easy to simulate, and gross.
- */
-#define NO_LIGHT
 
 /* NO_ADD_ACTION: define this to remove add_action, commands, livings, etc.
  * process_input() then becomes the only way to deal with player input.
