@@ -414,17 +414,6 @@
  */
 #define LARGEST_PRINTABLE_STRING 8192
 
-/* TRACE: define this to enable the trace() and traceprefix() efuns.
- *   (keeping this undefined will cause the driver to run faster).
- */
-#define TRACE
-
-/* TRACE_CODE: define this to enable code tracing (the driver will print
- *   out the previous lines of code to an error) eval_instruction() runs about
- *   twice as fast when this is not defined (for the most common eoperators).
- */
-#undef TRACE_CODE
-
 /* PACKAGE_COMPRESS: Enable MCCP support and compressed save files
    SAVE_GZ_EXTENSION: save extension for compressed files
  */

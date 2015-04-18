@@ -2876,6 +2876,12 @@ void add_predefines() {
   if (CONFIG_INT(__THIS_PLAYER_IN_CALL_OUT__)) {
     add_predefine("__THIS_PLAYER_IN_CALL_OUT__", -1, "");
   }
+  if (CONFIG_INT(__TRACE__)) {
+    add_predefine("__TRACE__", -1, "");
+  }
+  if (CONFIG_INT(__TRACE_CODE__)) {
+    add_predefine("__TRACE_CODE__", -1, "");
+  }
 }
 
 void start_new_file(int f) {

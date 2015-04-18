@@ -10,7 +10,6 @@
 #include "interactive.h"              // FIXME: for TRACE* macro
 
 /* Trace defines */
-#ifdef TRACE
 #define TRACE_CALL 1
 #define TRACE_CALL_OTHER 2
 #define TRACE_RETURN 4
@@ -27,7 +26,6 @@
      strpref(command_giver->interactive->trace_prefix, current_object->obname))))
 #define TRACEHB \
   (g_current_heartbeat_obj == 0 || (command_giver->interactive->trace_level & TRACE_HEART_BEAT))
-#endif
 
 /*
  * Control stack element.
@@ -227,9 +225,7 @@ void mark_stack(void);
 // TODO: move these to correct places
 void setup_varargs_variables(int, int, int);
 extern int tracedepth;
-#ifdef TRACE
 void do_trace_call(int);
-#endif
 
 inline const char *access_to_name(int mode) {
   switch (mode) {

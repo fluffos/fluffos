@@ -1757,8 +1757,12 @@ void _error_handler(char *err) {
   const char *object_name;
 
   debug_message_with_location(err + 1);
-#if defined(DEBUG) && defined(TRACE_CODE)
-  object_name = dump_trace(1);
+#if defined(DEBUG)
+  if (CONFIG_INT(__TRACE_CODE__)) {
+    object_name = dump_trace(1);
+  } else {
+    object_name = dump_trace(0);
+  }
 #else
   object_name = dump_trace(0);
 #endif

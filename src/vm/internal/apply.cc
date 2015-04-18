@@ -264,12 +264,12 @@ retry_for_shadow:
     } else {
       setup_variables(csp->num_local_variables, funp->num_local, funp->num_arg);
     }
-#ifdef TRACE
-    tracedepth++;
-    if (TRACEP(TRACE_CALL)) {
-      do_trace_call(findex);
+    if (CONFIG_INT(__TRACE__)) {
+      tracedepth++;
+      if (TRACEP(TRACE_CALL)) {
+        do_trace_call(findex);
+      }
     }
-#endif
 #ifdef DTRACE
     DTRACE_PROBE3(fluffos, lpc__entry, ob->obname, fun, current_prog->filename);
 #endif
@@ -303,16 +303,16 @@ svalue_t *apply(const char *fun, object_t *ob, int num_arg, int where) {
   tracedepth = 0;
   call_origin = where;
 
-#ifdef TRACE
-  if (TRACEP(TRACE_APPLY)) {
-    static int inapply = 0;
-    if (!inapply) {
-      inapply = 1;
-      do_trace("Apply", "", "\n");
-      inapply = 0;
+  if (CONFIG_INT(__TRACE__)) {
+    if (TRACEP(TRACE_APPLY)) {
+      static int inapply = 0;
+      if (!inapply) {
+        inapply = 1;
+        do_trace("Apply", "", "\n");
+        inapply = 0;
+      }
     }
   }
-#endif
 #ifdef DEBUG
   expected_sp = sp - num_arg;
 #endif

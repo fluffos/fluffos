@@ -234,6 +234,17 @@ strip before process input: 1
 #
 this_player in call_out : 1
 
+# TRACE: define this to enable the trace() and traceprefix() efuns.
+#   (keeping this undefined will cause the driver to run faster).
+#
+trace : 1
+
+# TRACE_CODE: define this to enable code tracing (the driver will print
+#   out the previous lines of code to an error) eval_instruction() runs about
+#   twice as fast when this is not defined (for the most common eoperators).
+#
+trace code : 0
+
 ###############################################################################
 #          The following aren't currently used or implemented (yet)           #
 ###############################################################################

@@ -229,11 +229,11 @@ void f__call_other(void) {
     }
   }
 /* Send the remaining arguments to the function. */
-#ifdef TRACE
-  if (TRACEP(TRACE_CALL_OTHER)) {
-    do_trace("Call other ", funcname, "\n");
+  if (CONFIG_INT(__TRACE__)) {
+    if (TRACEP(TRACE_CALL_OTHER)) {
+      do_trace("Call other ", funcname, "\n");
+    }
   }
-#endif
   if (apply(funcname, ob, num_arg - 2, ORIGIN_CALL_OTHER) == 0) { /* Function not found */
     pop_2_elems();
     push_undefined();
