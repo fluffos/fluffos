@@ -1863,20 +1863,20 @@ int yylex() {
         return L_ASSIGN;
       case '(':
         yyp = outp;
-#ifdef WOMBLES
-        c = *yyp++;
-#else
-        while (isspace(c = *yyp++)) {
-          if (c == '\n') {
-            current_line++;
-            if (yyp == last_nl + 1) {
-              outp = yyp;
-              refill_buffer();
-              yyp = outp;
+        if (CONFIG_INT(__WOMBLES__)) {
+          c = *yyp++;
+        } else {
+          while (isspace(c = *yyp++)) {
+            if (c == '\n') {
+              current_line++;
+              if (yyp == last_nl + 1) {
+                outp = yyp;
+                refill_buffer();
+                yyp = outp;
+              }
             }
           }
         }
-#endif
         switch (c) {
           case '{': {
             outp = yyp;
@@ -2851,6 +2851,15 @@ void add_predefines() {
   }
   if (CONFIG_INT(__SANE_SORTING__)) {
     add_predefine("__SANE_SORTING__", -1, "");
+  }
+  if (CONFIG_INT(__WOMBLES__)) {
+    add_predefine("__WOMBLES__", -1, "");
+  }
+  if (CONFIG_INT(__CALL_OTHER_TYPE_CHECK__)) {
+    add_predefine("__CALL_OTHER_TYPE_CHECK__", -1, "");
+  }
+  if (CONFIG_INT(__CALL_OTHER_WARN__)) {
+    add_predefine("__CALL_OTHER_WARN__", -1, "");
   }
 }
 

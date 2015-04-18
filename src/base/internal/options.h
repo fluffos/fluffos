@@ -113,19 +113,6 @@
  */
 #define SENSIBLE_MODIFIERS
 
-/* WOMBLES: don't allow spaces between start/end of array/mapping/functional
- * token chars so ({1,2,3}) still works, but ( { 1 , 2 , 3 } ) doesn't
- * and ({ 1 , 2 , 3 }) does.*/
-#undef WOMBLES
-
-/* CALL_OTHER_TYPE_CHECK: enable type checking for call_other()
- * (-> operator on objects)
- */
-#undef CALL_OTHER_TYPE_CHECK
-
-/* CALL_OTHER_WARN, make it warning instead of errors */
-#undef CALL_OTHER_WARN
-
 /****************************************************************************
  *                           MISCELLANEOUS                                  *
  *                          ---------------                                 *

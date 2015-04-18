@@ -72,5 +72,8 @@
 #define __REVERSIBLE_EXPLODE_STRING__ CFG_INT(27)
 #define __SANE_SORTING__ CFG_INT(28)
 #define __WARN_TAB__ CFG_INT(29)
+#define __WOMBLES__ CFG_INT(30)
+#define __CALL_OTHER_TYPE_CHECK__ CFG_INT(31)
+#define __CALL_OTHER_WARN__ CFG_INT(32)
 
 #endif /* RUNTIME_CONFIG_H */

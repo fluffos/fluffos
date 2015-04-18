@@ -1,12 +1,14 @@
 #include "base/std.h"
 
-#include "vm/internal/base/apply_cache.h"
 #include "vm/internal/apply.h"
 
+#include <algorithm> // for std::min
 #include <cstdio>  // for sprintf
 
+#include "vm/internal/base/apply_cache.h"
 #include "vm/internal/base/machine.h"
 #include "vm/internal/compiler/compiler.h"
+#include "vm/internal/compiler/lex.h"
 
 // global static result
 svalue_t apply_ret_value;
@@ -47,8 +49,8 @@ int convert_type(int type) {
 }
 
 // TODO: These should be moved somewhere else
-void check_co_args2(unsigned short *types, int num_arg, const char *name, const char *ob_name,
-                    int sparg) {
+void check_co_args2(unsigned short *types, int num_arg, const char *name,
+                    const char *ob_name, int sparg) {
   int argc = sparg;
   int exptype, i = 0;
   do {
@@ -68,57 +70,61 @@ void check_co_args2(unsigned short *types, int num_arg, const char *name, const 
       if ((sp - argc)->type == T_NUMBER && !(sp - argc)->u.number) {
         continue;
       }
-      sprintf(buf, "Bad argument %d in call to %s() in %s\nExpected: %s Got %s.\n", i, name,
-              ob_name, type_name(exptype), type_name((sp - argc)->type));
-#ifdef CALL_OTHER_WARN
-      if (current_prog) {
-        const char *file;
-        int line;
-        get_line_number_info(&file, &line);
-        int prsave = pragmas;
-        pragmas &= ~PRAGMA_ERROR_CONTEXT;
-        smart_log(file, line, buf, 1);
-        pragmas = prsave;
+      sprintf(buf,
+              "Bad argument %d in call to %s() in %s\nExpected: %s Got %s.\n",
+              i, name, ob_name, type_name(exptype),
+              type_name((sp - argc)->type));
+      if (CONFIG_INT(__CALL_OTHER_WARN__)) {
+        if (current_prog) {
+          const char *file;
+          int line;
+          get_line_number_info(&file, &line);
+          int prsave = pragmas;
+          pragmas &= ~PRAGMA_ERROR_CONTEXT;
+          smart_log(file, line, buf, 1);
+          pragmas = prsave;
+        } else {
+          smart_log("driver", 0, buf, 1);
+        }
       } else {
-        smart_log("driver", 0, buf, 1);
+        error(buf);
       }
-#else
-      error(buf);
-#endif
     }
   } while (i < num_arg);
 }
 
 // util functions
-void check_co_args(int num_arg, const program_t *prog, function_t *fun, int findex) {
-#ifdef CALL_OTHER_TYPE_CHECK
-  if (num_arg != fun->num_arg) {
-    char buf[1024];
-    // if(!current_prog) what do i need this for again?
-    // current_prog = master_ob->prog;
-    sprintf(buf, "Wrong number of arguments to %s in %s.\n", fun->funcname, prog->filename);
-#ifdef CALL_OTHER_WARN
-    if (current_prog) {
-      const char *file;
-      int line;
-      int prsave = pragmas;
-      pragmas &= ~PRAGMA_ERROR_CONTEXT;
-      get_line_number_info(&file, &line);
-      smart_log(file, line, buf, 1);
-      pragmas = prsave;
-    } else {
-      smart_log("driver", 0, buf, 1);
+void check_co_args(int num_arg, const program_t *prog, function_t *fun,
+                   int findex) {
+  if (CONFIG_INT(__CALL_OTHER_TYPE_CHECK__)) {
+    if (num_arg != fun->num_arg) {
+      char buf[1024];
+      // if(!current_prog) what do i need this for again?
+      // current_prog = master_ob->prog;
+      sprintf(buf, "Wrong number of arguments to %s in %s.\n", fun->funcname,
+              prog->filename);
+      if (CONFIG_INT(__CALL_OTHER_WARN__)) {
+        if (current_prog) {
+          const char *file;
+          int line;
+          int prsave = pragmas;
+          pragmas &= ~PRAGMA_ERROR_CONTEXT;
+          get_line_number_info(&file, &line);
+          smart_log(file, line, buf, 1);
+          pragmas = prsave;
+        } else {
+          smart_log("driver", 0, buf, 1);
+        }
+      } else {
+        error(buf);
+      }
     }
-#else
-    error(buf);
-#endif
+    int num_arg_check = std::min((unsigned char)num_arg, fun->num_arg);
+    if (num_arg_check && prog->type_start
+        && prog->type_start[findex] != INDEX_START_NONE)
+      check_co_args2(&prog->argument_types[prog->type_start[findex]], num_arg,
+                     fun->funcname, prog->filename, num_arg);
   }
-
-  int num_arg_check = std::min(num_arg, fun->num_arg);
-  if (num_arg_check && prog->type_start && prog->type_start[findex] != INDEX_START_NONE)
-    check_co_args2(&prog->argument_types[prog->type_start[findex]], num_arg, fun->funcname,
-                   prog->filename, num_arg);
-#endif
 }
 
 /*

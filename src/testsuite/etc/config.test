@@ -163,6 +163,19 @@ sane sorting : 1
 #
 warn tab : 0
 
+# WOMBLES: don't allow spaces between start/end of array/mapping/functional
+# token chars so ({1,2,3}) still works, but ( { 1 , 2 , 3 } ) doesn't
+# and ({ 1 , 2 , 3 }) does.
+wombles : 0
+
+# CALL_OTHER_TYPE_CHECK: enable type checking for call_other()
+# (-> operator on objects)
+#
+call other type check : 0
+
+# CALL_OTHER_WARN, make it warning instead of errors
+call other warn : 0
+
 ###############################################################################
 #          The following aren't currently used or implemented (yet)           #
 ###############################################################################

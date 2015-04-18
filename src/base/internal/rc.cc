@@ -332,6 +332,15 @@ void read_config(char *filename) {
   if (!scan_config_line("warn tab : %d\n", &CONFIG_INT(__WARN_TAB__), -1)) {
       CONFIG_INT(__WARN_TAB__) = 0;
   }
+  if (!scan_config_line("wombles : %d\n", &CONFIG_INT(__WOMBLES__), -1)) {
+      CONFIG_INT(__WOMBLES__) = 0;
+  }
+  if (!scan_config_line("call other type check : %d\n", &CONFIG_INT(__CALL_OTHER_TYPE_CHECK__), -1)) {
+      CONFIG_INT(__CALL_OTHER_TYPE_CHECK__) = 0;
+  }
+  if (!scan_config_line("call other warn : %d\n", &CONFIG_INT(__CALL_OTHER_WARN__), -1)) {
+      CONFIG_INT(__CALL_OTHER_WARN__) = 0;
+  }
 
   // Complain about obsolete config lines.
   scan_config_line("address server ip : %[^\n]", tmp, -2);
