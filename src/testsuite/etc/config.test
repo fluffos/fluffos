@@ -245,6 +245,35 @@ trace : 1
 #
 trace code : 0
 
+# INTERACTIVE_CATCH_TELL: define this if you want catch_tell called on
+#   interactives as well as NPCs.  If this is defined, user.c will need a
+#   catch_tell(msg) method that calls receive(msg);
+#
+interactive catch tell : 0
+
+# RECEIVE_SNOOP: define this if you want snoop text to be sent to
+#   the receive_snoop() function in the snooper object (instead of being
+#   sent directly via add_message()).  This is useful if you want to
+#  build a smart client that does something different with snoop messages.
+#
+receive snoop : 1
+
+# SNOOP_SHADOWED: define this if you want snoop to report what is
+#   sent to the player even in the event that the player's catch_tell() is
+#   shadowed and the player may not be seeing what is being sent.  Messages
+#   of this sort will be prefixed with $$.
+#
+snoop shadowed : 0
+
+#
+#  REVERSE_DEFER:
+#
+#  If not defined executes defer functions in LIFO mode.
+#
+#  If defined executes defer functions in FIFO mode.
+#
+reverse defer : 0
+
 ###############################################################################
 #          The following aren't currently used or implemented (yet)           #
 ###############################################################################

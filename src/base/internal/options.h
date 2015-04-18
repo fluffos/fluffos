@@ -191,12 +191,6 @@
  */
 #undef PRIVS
 
-/* INTERACTIVE_CATCH_TELL: define this if you want catch_tell called on
- *   interactives as well as NPCs.  If this is defined, user.c will need a
- *   catch_tell(msg) method that calls receive(msg);
-*/
-#undef INTERACTIVE_CATCH_TELL
-
 /* RECEIVE_ED: define this if you want normal ed output to go to a
      receive_ed() apply in the player ob.  Some errors still go directly
      to output.  Useful for post-processing (perhaps colorizing?) ed
@@ -215,20 +209,6 @@
 /* NO_SHADOWS: define this if you want to disable shadows in your driver.
  */
 #undef NO_SHADOWS
-
-/* SNOOP_SHADOWED: define this if you want snoop to report what is
- *   sent to the player even in the event that the player's catch_tell() is
- *   shadowed and the player may not be seeing what is being sent.  Messages
- *   of this sort will be prefixed with $$.
- */
-#undef SNOOP_SHADOWED
-
-/* RECEIVE_SNOOP: define this if you want snoop text to be sent to
- *   the receive_snoop() function in the snooper object (instead of being
- *   sent directly via add_message()).  This is useful if you want to
- *   build a smart client that does something different with snoop messages.
- */
-#define RECEIVE_SNOOP
 
 /* PROFILE_FUNCTIONS: define this to be able to measure the CPU time used by
  *   all of the user-defined functions in each LPC object.  Note: defining
@@ -429,14 +409,5 @@
 
 /* static user space dtrace probes, try them if you have dtrace! */
 #undef DTRACE
-
-/*
-  REVERSE_DEFER:
-
-  If not defined executes defer functions in LIFO mode.
-
-  If defined executes defer functions in FIFO mode.
-*/
-#undef REVERSE_DEFER
 
 #endif /* _BASE_INTERNAL_OPTIONS_H_ */

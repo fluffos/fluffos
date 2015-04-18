@@ -1924,16 +1924,16 @@ void tell_object(object_t *ob, const char *str, int len) {
     add_message(0, str, len);
     return;
   }
-/* if this is on, EVERYTHING goes through catch_tell() */
-#ifndef INTERACTIVE_CATCH_TELL
-  if (ob->interactive) {
-    add_message(ob, str, len);
-  } else {
-#endif
+  if (CONFIG_INT(__INTERACTIVE_CATCH_TELL__)) {
     tell_npc(ob, str);
-#ifndef INTERACTIVE_CATCH_TELL
+  } else {
+    /* if this is on, EVERYTHING goes through catch_tell() */
+    if (ob->interactive) {
+      add_message(ob, str, len);
+    } else {
+      tell_npc(ob, str);
+    }
   }
-#endif
 }
 
 void dealloc_object(object_t *ob, const char *from) {

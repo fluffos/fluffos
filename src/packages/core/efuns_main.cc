@@ -3414,17 +3414,16 @@ void f_next_inventory(void) {
 
 #ifdef F_DEFER
 void f_defer() {
-  struct defer_list *newlist = reinterpret_cast<struct defer_list *>(
-      DMALLOC(sizeof(struct defer_list), TAG_TEMPORARY, "defer: new item"));
+  struct defer_list *newlist = reinterpret_cast<struct defer_list *>(DMALLOC(
+      sizeof(struct defer_list), TAG_TEMPORARY, "defer: new item"));
 
-// In reverse mode, newlist always will be the last data.
-#ifdef REVERSE_DEFER
-  newlist->next = NULL;
-// In normal mode, newlist always will be the first data.
-#else
-  newlist->next = csp->defers;
-#endif
-
+  if (CONFIG_INT(__REVERSE_DEFER__)) {
+    // In reverse mode, newlist always will be the last data.
+    newlist->next = NULL;
+  } else {
+    // In normal mode, newlist always will be the first data.
+    newlist->next = csp->defers;
+  }
   // Configure the new item.
   newlist->func = *sp--;
   if (command_giver) {
@@ -3434,23 +3433,23 @@ void f_defer() {
     newlist->tp = const0;
   }
 
-// In reverse mode, if list is not null, then add new item to the end.
-#ifdef REVERSE_DEFER
-  // If list is null, then init it with new item.
-  if (csp->defers == NULL) {
-    csp->defers = newlist;
+  // In reverse mode, if list is not null, then add new item to the end.
+  if (CONFIG_INT(__REVERSE_DEFER__)) {
+    // If list is null, then init it with new item.
+    if (csp->defers == NULL) {
+      csp->defers = newlist;
+    } else {
+      // Search last defer.
+      struct defer_list *last_defer = csp->defers;
+      while (last_defer->next)
+        last_defer = last_defer->next;
+
+      last_defer->next = newlist;
+    }
   } else {
-    // Search last defer.
-    struct defer_list *last_defer = csp->defers;
-    while (last_defer->next) last_defer = last_defer->next;
-
-    last_defer->next = newlist;
+    // In normal mode, actual newlist will be init of defers list.
+    csp->defers = newlist;
   }
-
-// In normal mode, actual newlist will be init of defers list.
-#else
-  csp->defers = newlist;
-#endif
 }
 #endif
 

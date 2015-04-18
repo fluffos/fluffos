@@ -2882,6 +2882,18 @@ void add_predefines() {
   if (CONFIG_INT(__TRACE_CODE__)) {
     add_predefine("__TRACE_CODE__", -1, "");
   }
+  if (CONFIG_INT(__INTERACTIVE_CATCH_TELL__)) {
+    add_predefine("__INTERACTIVE_CATCH_TELL__", -1, "");
+  }
+  if (CONFIG_INT(__RECEIVE_SNOOP__)) {
+    add_predefine("__RECEIVE_SNOOP__", -1, "");
+  }
+  if (CONFIG_INT(__SNOOP_SHADOWED__)) {
+    add_predefine("__SNOOP_SHADOWED__", -1, "");
+  }
+  if (CONFIG_INT(__REVERSE_DEFER__)) {
+    add_predefine("__REVERSE_DEFER__", -1, "");
+  }
 }
 
 void start_new_file(int f) {

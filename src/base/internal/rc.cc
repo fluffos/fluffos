@@ -368,6 +368,18 @@ void read_config(char *filename) {
   if (!scan_config_line("trace code : %d\n", &CONFIG_INT(__TRACE_CODE__), -1)) {
       CONFIG_INT(__TRACE_CODE__) = 0;
   }
+  if (!scan_config_line("interactive catch tell : %d\n", &CONFIG_INT(__INTERACTIVE_CATCH_TELL__), -1)) {
+      CONFIG_INT(__INTERACTIVE_CATCH_TELL__) = 0;
+  }
+  if (!scan_config_line("receive snoop : %d\n", &CONFIG_INT(__RECEIVE_SNOOP__), -1)) {
+      CONFIG_INT(__RECEIVE_SNOOP__) = 1;
+  }
+  if (!scan_config_line("snoop shadowed : %d\n", &CONFIG_INT(__SNOOP_SHADOWED__), -1)) {
+      CONFIG_INT(__SNOOP_SHADOWED__) = 0;
+  }
+  if (!scan_config_line("reverse defer : %d\n", &CONFIG_INT(__REVERSE_DEFER__), -1)) {
+      CONFIG_INT(__REVERSE_DEFER__) = 0;
+  }
 
   // Complain about obsolete config lines.
   scan_config_line("address server ip : %[^\n]", tmp, -2);
