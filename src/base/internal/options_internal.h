@@ -141,12 +141,6 @@
  */
 #define SUPPRESS_ARGUMENT_WARNINGS
 
-/* TRAP_CRASHES:  define this if you want MudOS to call crash() in master.c
- *   and then shutdown when signals are received that would normally crash the
- *   driver.
- */
-#define TRAP_CRASHES
-
 /* Some maximum string sizes
  */
 #define SMALL_STRING_SIZE 100

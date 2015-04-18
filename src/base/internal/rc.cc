@@ -386,6 +386,9 @@ void read_config(char *filename) {
   if (!scan_config_line("noninteractive stderr write : %d\n", &CONFIG_INT(__NONINTERACTIVE_STDERR_WRITE__), -1)) {
       CONFIG_INT(__NONINTERACTIVE_STDERR_WRITE__) = 0;
   }
+  if (!scan_config_line("trap crashes : %d\n", &CONFIG_INT(__TRAP_CRASHES__), -1)) {
+      CONFIG_INT(__TRAP_CRASHES__) = 1;
+  }
 
   // Complain about obsolete config lines.
   scan_config_line("address server ip : %[^\n]", tmp, -2);

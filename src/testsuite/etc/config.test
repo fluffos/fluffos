@@ -293,6 +293,12 @@ has console : 1
 #
 noninteractive stderr write : 1
 
+# TRAP_CRASHES:  define this if you want MudOS to call crash() in master.c
+#   and then shutdown when signals are received that would normally crash the
+#   driver.
+#
+trap crashes : 1
+
 ###############################################################################
 #          The following aren't currently used or implemented (yet)           #
 ###############################################################################

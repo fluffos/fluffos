@@ -1636,13 +1636,13 @@ void fatal(const char *fmt, ...) {
     /* fall through */
     case 1:
       in_fatal = 2;
-#ifdef TRAP_CRASHES
-      copy_and_push_string(msg_buf);
-      push_object(command_giver);
-      push_object(current_object);
-      safe_apply_master_ob(APPLY_CRASH, 3);
-      debug_message("crash() in master called successfully.  Aborting.\n");
-#endif /* TRAP_CRASHES */
+      if (CONFIG_INT(__TRAP_CRASHES__)) {
+        copy_and_push_string(msg_buf);
+        push_object(command_giver);
+        push_object(current_object);
+        safe_apply_master_ob(APPLY_CRASH, 3);
+        debug_message("crash() in master called successfully.  Aborting.\n");
+      }
   }
 
   in_fatal = 0;
