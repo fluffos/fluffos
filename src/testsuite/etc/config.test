@@ -308,6 +308,21 @@ trap crashes : 1
 #
 old type behavior : 0
 
+# OLD_RANGE_BEHAVIOR: define this if you want negative indexes in string
+# or buffer range values (not lvalue, i.e. x[-2..-1]; for e.g. not
+# x[-2..-1] = foo, the latter is always illegal) to mean counting from the
+# end
+#
+# Compat status: Not horribly difficult to replace reliance on this, but not
+# trivial, and cannot be simulated.
+#
+old range behavior : 0
+
+# define to get a warning for code that might use the old range behavior
+# when you're not actually using the old range behavior
+warn old range behavior : 1
+
+
 ###############################################################################
 #          The following aren't currently used or implemented (yet)           #
 ###############################################################################

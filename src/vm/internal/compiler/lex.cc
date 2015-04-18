@@ -2911,6 +2911,12 @@ void add_predefines() {
   if (CONFIG_INT(__OLD_TYPE_BEHAVIOR__)) {
     add_predefine("__OLD_TYPE_BEHAVIOR__", -1, "");
   }
+  if (CONFIG_INT(__OLD_RANGE_BEHAVIOR__)) {
+    add_predefine("__OLD_RANGE_BEHAVIOR__", -1, "");
+  }
+  if (CONFIG_INT(__WARN_OLD_RANGE_BEHAVIOR__)) {
+    add_predefine("__WARN_OLD_RANGE_BEHAVIOR__", -1, "");
+  }
 }
 
 void start_new_file(int f) {

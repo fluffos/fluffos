@@ -392,6 +392,12 @@ void read_config(char *filename) {
   if (!scan_config_line("old type behavior : %d\n", &CONFIG_INT(__OLD_TYPE_BEHAVIOR__), -1)) {
       CONFIG_INT(__OLD_TYPE_BEHAVIOR__) = 0;
   }
+  if (!scan_config_line("old range behavior : %d\n", &CONFIG_INT(__OLD_RANGE_BEHAVIOR__), -1)) {
+      CONFIG_INT(__OLD_RANGE_BEHAVIOR__) = 0;
+  }
+  if (!scan_config_line("warn old range behavior : %d\n", &CONFIG_INT(__WARN_OLD_RANGE_BEHAVIOR__), -1)) {
+      CONFIG_INT(__WARN_OLD_RANGE_BEHAVIOR__) = 1;
+  }
 
   // Complain about obsolete config lines.
   scan_config_line("address server ip : %[^\n]", tmp, -2);

@@ -80,19 +80,6 @@
 /* use struct keyword for lpc structs */
 #define STRUCT_STRUCT
 
-/* OLD_RANGE_BEHAVIOR: define this if you want negative indexes in string
- * or buffer range values (not lvalue, i.e. x[-2..-1]; for e.g. not
- * x[-2..-1] = foo, the latter is always illegal) to mean counting from the
- * end
- *
- * Compat status: Not horribly difficult to replace reliance on this, but not
- * trivial, and cannot be simulated.
- */
-#undef OLD_RANGE_BEHAVIOR
-/* define to get a warning for code that might use the old range behavior
- * when you're not actually using the old range behavior*/
-#undef WARN_OLD_RANGE_BEHAVIOR
-
 /* ARGUMENTS_IN_TRACEBACK: prints out function call arguments in error
  *   tracebacks, to aid in debugging.  Note: it prints the values of
  *   the arguments at the time of the error, not when the function
