@@ -10,13 +10,12 @@
 /*
  * The following is for internal use (ie driver) only
  */
-#define RUNTIME_CONFIG_NEXT CFG_INT(26)
 #define NUM_CONFIG_STRS (BASE_CONFIG_INT - BASE_CONFIG_STR)
 #define NUM_CONFIG_INTS (RUNTIME_CONFIG_NEXT - BASE_CONFIG_INT)
 
 // How many external cmds are supported.
-constexpr int NUM_EXTERNAL_CMDS = 100;
-extern char *external_cmd[NUM_EXTERNAL_CMDS];
+constexpr int g_num_external_cmds = 100;
+extern char *external_cmd[g_num_external_cmds];
 
 void read_config(char *);
 

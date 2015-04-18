@@ -17,7 +17,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
   char **argv;
   pid_t ret;
 
-  if (--which < 0 || which > (NUM_EXTERNAL_CMDS - 1) || !external_cmd[which]) {
+  if (--which < 0 || which > (g_num_external_cmds - 1) || !external_cmd[which]) {
     error("Bad argument 1 to external_start()\n");
   }
   cmd = external_cmd[which];

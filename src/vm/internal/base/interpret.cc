@@ -16,22 +16,10 @@
 int call_origin = 0;
 error_context_t *current_error_context = 0;
 
-#ifdef OPCPROF
-#include "opc.h"
-
-static int opc_eoper[EFUN_BASE];
-#endif
-
 #ifdef DTRACE
 #include <sys/sdt.h>
 #else
 #define DTRACE_PROBE3(x, y, z, zz, zzz)
-#endif
-
-#ifdef OPCPROF_2D
-/* warning, this is typically 4 * 100 * 100 = 40k */
-static int opc_eoper_2d[EFUN_BASE + 1][EFUN_BASE + 1];
-static int last_eop = 0;
 #endif
 
 static const char *type_names[] = {"int",      "string", "array",  "object", "mapping",
@@ -52,9 +40,7 @@ static void do_loop_cond_number(void);
 static void do_loop_cond_local(void);
 static void do_catch(char * /*pc*/, unsigned short /*new_pc_offset*/);
 int last_instructions(void);
-#ifdef TRACE_CODE
 static char *get_arg(int, int);
-#endif
 extern inline const char *access_to_name(int /*mode*/);
 extern inline const char *origin_to_name(int /*origin*/);
 
@@ -1298,7 +1284,6 @@ void push_constant_string(const char *p) {
   sp->u.string = p;
 }
 
-#ifdef TRACE
 void do_trace_call(int offset) {
   do_trace("Call direct ", current_prog->function_table[offset].funcname, " ");
   if (TRACEHB) {
@@ -1316,7 +1301,6 @@ void do_trace_call(int offset) {
     add_message(command_giver, "\n", 1);
   }
 }
-#endif
 
 /*
  * Argument is the function to execute. If it is defined by inheritance,
@@ -1404,12 +1388,12 @@ function_t *setup_new_frame(int findex) {
   } else {
     setup_variables(csp->num_local_variables, func_entry->num_local, func_entry->num_arg);
   }
-#ifdef TRACE
-  tracedepth++;
-  if (TRACEP(TRACE_CALL)) {
-    do_trace_call(findex);
+  if (CONFIG_INT(__TRACE__)) {
+    tracedepth++;
+    if (TRACEP(TRACE_CALL)) {
+      do_trace_call(findex);
+    }
   }
-#endif
   DTRACE_PROBE3(fluffos, lpc__entry, current_object->obname,
                 current_prog->function_table[findex].funcname, current_prog->filename);
 
@@ -1460,12 +1444,12 @@ function_t *setup_inherited_frame(int findex) {
   } else {
     setup_variables(csp->num_local_variables, func_entry->num_local, func_entry->num_arg);
   }
-#ifdef TRACE
-  tracedepth++;
-  if (TRACEP(TRACE_CALL)) {
-    do_trace_call(findex);
+  if (CONFIG_INT(__TRACE__)) {
+    tracedepth++;
+    if (TRACEP(TRACE_CALL)) {
+      do_trace_call(findex);
+    }
   }
-#endif
   DTRACE_PROBE3(fluffos, lpc__entry, csp->ob->obname, current_prog->function_table[findex].funcname,
                 current_prog->filename);
 
@@ -1789,12 +1773,10 @@ bail_hard:
  * all called efuns knows that they won't have destructed objects as
  * arguments.
  */
-#ifdef TRACE_CODE
 static int previous_instruction[60];
 static int stack_size[60];
 static char *previous_pc[60];
 static int last;
-#endif
 
 void eval_instruction(char *p) {
 #ifdef DEBUG
@@ -1804,9 +1786,7 @@ void eval_instruction(char *p) {
   LPC_FLOAT real;
   svalue_t *lval;
   int instruction;
-#if defined(TRACE_CODE) || defined(TRACE) || defined(OPCPROF) || defined(OPCPROF_2D)
   int real_instruction;
-#endif
   unsigned short offset;
 
 #ifdef DEBUG
@@ -1825,47 +1805,27 @@ void eval_instruction(char *p) {
       show_lpc_line(f, l);
     }
     instruction = EXTRACT_UCHAR(pc++);
-#if defined(TRACE_CODE) || defined(TRACE) || defined(OPCPROF) || defined(OPCPROF_2D)
-    real_instruction = instruction;
-    /* real EFUN is stored as an short after F_EFUN0 - F_EFUNV instructions */
-    if (instruction >= F_EFUN0 && instruction <= F_EFUNV) {
-      COPY_SHORT(&real_instruction, pc);
-      if (real_instruction < EFUN_BASE || real_instruction > NUM_OPCODES) {
-        fatal("Error in icode.");
+    if (CONFIG_INT(__TRACE__) || CONFIG_INT(__TRACE_CODE__)) {
+      real_instruction = instruction;
+      /* real EFUN is stored as an short after F_EFUN0 - F_EFUNV instructions */
+      if (instruction >= F_EFUN0 && instruction <= F_EFUNV) {
+        COPY_SHORT(&real_instruction, pc);
+        if (real_instruction < EFUN_BASE || real_instruction > NUM_OPCODES) {
+          fatal("Error in icode.");
+        }
+      }
+      if (CONFIG_INT(__TRACE_CODE__)) {
+        previous_instruction[last] = real_instruction;
+        previous_pc[last] = pc - 1;
+        stack_size[last] = sp - fp - csp->num_local_variables;
+        last = (last + 1) % (sizeof previous_instruction / sizeof(int));
+      }
+      if (CONFIG_INT(__TRACE__)) {
+        if (TRACEP(TRACE_EXEC)) {
+          do_trace("Exec ", query_instr_name(real_instruction), "\n");
+        }
       }
     }
-#ifdef TRACE_CODE
-    previous_instruction[last] = real_instruction;
-    previous_pc[last] = pc - 1;
-    stack_size[last] = sp - fp - csp->num_local_variables;
-    last = (last + 1) % (sizeof previous_instruction / sizeof(int));
-#endif
-#ifdef TRACE
-    if (TRACEP(TRACE_EXEC)) {
-      do_trace("Exec ", query_instr_name(real_instruction), "\n");
-    }
-#endif
-#ifdef OPCPROF
-    if (real_instruction < EFUN_BASE) {
-      opc_eoper[real_instruction]++;
-    } else {
-      opc_efun[real_instruction - EFUN_BASE].count++;
-    }
-#endif
-#ifdef OPCPROF_2D
-    if (real_instruction < EFUN_BASE) {
-      if (last_eop) {
-        opc_eoper_2d[last_eop][real_instruction]++;
-      }
-      last_eop = real_instruction;
-    } else {
-      if (last_eop) {
-        opc_eoper_2d[last_eop][EFUN_BASE]++;
-      }
-      last_eop = EFUN_BASE;
-    }
-#endif
-#endif
     if (outoftime) {
       debug_message("object /%s: eval_cost too big %d\n", current_object->obname, max_cost);
       set_eval(max_cost);
@@ -3453,20 +3413,20 @@ void eval_instruction(char *p) {
         DEBUG_CHECK(sp != fp, "Bad stack at F_RETURN_ZERO\n");
         *sp = const0;
         pop_control_stack();
-#ifdef TRACE
-        tracedepth--;
-        if (TRACEP(TRACE_RETURN)) {
-          do_trace("Return", "", "");
-          if (TRACEHB) {
-            if (TRACETST(TRACE_ARGS)) {
-              static char msg[] = "with value: 0";
+        if (CONFIG_INT(__TRACE__)) {
+          tracedepth--;
+          if (TRACEP(TRACE_RETURN)) {
+            do_trace("Return", "", "");
+            if (TRACEHB) {
+              if (TRACETST(TRACE_ARGS)) {
+                static char msg[] = "with value: 0";
 
-              add_message(command_giver, msg, sizeof(msg) - 1);
+                add_message(command_giver, msg, sizeof(msg) - 1);
+              }
+              add_message(command_giver, "\n", 1);
             }
-            add_message(command_giver, "\n", 1);
           }
         }
-#endif
         /* The control stack was popped just before */
         if (csp[1].framekind & (FRAME_EXTERNAL | FRAME_RETURNED_FROM_CATCH)) {
           return;
@@ -3496,21 +3456,21 @@ void eval_instruction(char *p) {
  * maintained */
         }
         pop_control_stack();
-#ifdef TRACE
-        tracedepth--;
-        if (TRACEP(TRACE_RETURN)) {
-          do_trace("Return", "", "");
-          if (TRACEHB) {
-            if (TRACETST(TRACE_ARGS)) {
-              char msg[] = " with value: ";
+        if (CONFIG_INT(__TRACE__)) {
+          tracedepth--;
+          if (TRACEP(TRACE_RETURN)) {
+            do_trace("Return", "", "");
+            if (TRACEHB) {
+              if (TRACETST(TRACE_ARGS)) {
+                char msg[] = " with value: ";
 
-              add_message(command_giver, msg, sizeof(msg) - 1);
-              print_svalue(sp);
+                add_message(command_giver, msg, sizeof(msg) - 1);
+                print_svalue(sp);
+              }
+              add_message(command_giver, "\n", 1);
             }
-            add_message(command_giver, "\n", 1);
           }
         }
-#endif
         /* The control stack was popped just before */
         if (csp[1].framekind & (FRAME_EXTERNAL | FRAME_RETURNED_FROM_CATCH)) {
           return;
@@ -3741,9 +3701,13 @@ static void do_catch(char *pc, unsigned short new_pc_offset) {
   }
   push_control_stack(FRAME_CATCH);
   csp->pc = current_prog->program + new_pc_offset;
-#if defined(DEBUG) || defined(TRACE_CODE)
-  csp->num_local_variables = (csp - 1)->num_local_variables; /* marion */
+  if (CONFIG_INT(__TRACE_CODE__)) {
+    csp->num_local_variables = (csp - 1)->num_local_variables; /* marion */
+  } else {
+#if defined(DEBUG)
+    csp->num_local_variables = (csp - 1)->num_local_variables; /* marion */
 #endif
+  }
 
   try {
     assign_svalue(&catch_value, &const1);
@@ -3835,11 +3799,11 @@ void call___INIT(object_t *ob) {
 
   tracedepth = 0;
 
-#ifdef TRACE
-  if (TRACEP(TRACE_APPLY)) {
-    do_trace("Apply", "", "\n");
+  if (CONFIG_INT(__TRACE__)) {
+    if (TRACEP(TRACE_APPLY)) {
+      do_trace("Apply", "", "\n");
+    }
   }
-#endif
 
 #ifdef DEBUG
   expected_sp = sp;
@@ -4194,11 +4158,9 @@ const char *dump_trace(int how) {
   char *fname;
   int num_arg = -1, num_local = -1;
 
-#if defined(ARGUMENTS_IN_TRACEBACK) || defined(LOCALS_IN_TRACEBACK)
   svalue_t *ptr;
   int i, context_saved = 0;
   error_context_t econ;
-#endif
 
   if (current_prog == 0) {
     return 0;
@@ -4207,7 +4169,6 @@ const char *dump_trace(int how) {
     return 0;
   }
 
-#if defined(ARGUMENTS_IN_TRACEBACK) || defined(LOCALS_IN_TRACEBACK)
   /*
    * save context here because svalue_to_string could generate an error
    * which would throw us into a bad state in the error handler.  this
@@ -4218,13 +4179,11 @@ const char *dump_trace(int how) {
    */
   if (!save_context(&econ)) return 0;
   try {
-#endif
-
-#ifdef TRACE_CODE
-    if (how) {
-      last_instructions();
+    if (CONFIG_INT(__TRACE_CODE__)) {
+      if (how) {
+        last_instructions();
+      }
     }
-#endif
     debug_message("--- trace ---\n");
     for (p = &control_stack[0]; p < csp; p++) {
       switch (p[0].framekind & FRAME_MASK) {
@@ -4270,7 +4229,6 @@ const char *dump_trace(int how) {
           fatal("unknown type of frame\n");
 #endif
       }
-#ifdef ARGUMENTS_IN_TRACEBACK
       if (num_arg != -1) {
         ptr = p[1].fp;
         debug_message("arguments were (");
@@ -4288,8 +4246,6 @@ const char *dump_trace(int how) {
         }
         debug_message(")\n");
       }
-#endif
-#ifdef LOCALS_IN_TRACEBACK
       if (num_local > 0 && num_arg != -1) {
         ptr = p[1].fp + num_arg;
         debug_message("locals were: ");
@@ -4307,7 +4263,6 @@ const char *dump_trace(int how) {
         }
         debug_message("\n");
       }
-#endif
     }
     switch (p[0].framekind & FRAME_MASK) {
       case FRAME_FUNCTION:
@@ -4344,7 +4299,6 @@ const char *dump_trace(int how) {
         num_arg = -1;
         break;
     }
-#ifdef ARGUMENTS_IN_TRACEBACK
     if (num_arg != -1) {
       debug_message("arguments were (");
       for (i = 0; i < num_arg; i++) {
@@ -4361,8 +4315,6 @@ const char *dump_trace(int how) {
       }
       debug_message(")\n");
     }
-#endif
-#ifdef LOCALS_IN_TRACEBACK
     if (num_local > 0 && num_arg != -1) {
       ptr = fp + num_arg;
       debug_message("locals were: ");
@@ -4380,15 +4332,12 @@ const char *dump_trace(int how) {
       }
       debug_message("\n");
     }
-#endif
     debug_message("--- end trace ---\n");
-#if defined(ARGUMENTS_IN_TRACEBACK) || defined(LOCALS_IN_TRACEBACK)
   } catch (const char *) {
     restore_context(&econ);
     ret = 0;
   }
   pop_context(&econ);
-#endif
   return ret;
 }
 
@@ -4401,10 +4350,8 @@ array_t *get_svalue_trace() {
   char *fname;
   int num_arg, num_local = -1;
 
-#if defined(ARGUMENTS_IN_TRACEBACK) || defined(LOCALS_IN_TRACEBACK)
   svalue_t *ptr;
   int i;
-#endif
 
   if (current_prog == 0) {
     return &the_null_array;
@@ -4455,7 +4402,6 @@ array_t *get_svalue_trace() {
     get_explicit_line_number_info(p[1].pc, p[1].prog, &file, &line);
     add_mapping_malloced_string(m, "file", add_slash(file));
     add_mapping_pair(m, "line", line);
-#ifdef ARGUMENTS_IN_TRACEBACK
     if (num_arg != -1) {
       array_t *v2;
 
@@ -4467,8 +4413,6 @@ array_t *get_svalue_trace() {
       add_mapping_array(m, "arguments", v2);
       v2->ref--;
     }
-#endif
-#ifdef LOCALS_IN_TRACEBACK
     if (num_local > 0 && num_arg != -1) {
       array_t *v2;
 
@@ -4480,7 +4424,6 @@ array_t *get_svalue_trace() {
       add_mapping_array(m, "locals", v2);
       v2->ref--;
     }
-#endif
     v->item[(p - &control_stack[0])].type = T_MAPPING;
     v->item[(p - &control_stack[0])].u.map = m;
   }
@@ -4520,7 +4463,6 @@ array_t *get_svalue_trace() {
   get_line_number_info(&file, &line);
   add_mapping_malloced_string(m, "file", add_slash(file));
   add_mapping_pair(m, "line", line);
-#ifdef ARGUMENTS_IN_TRACEBACK
   if (num_arg != -1) {
     array_t *v2;
 
@@ -4531,8 +4473,6 @@ array_t *get_svalue_trace() {
     add_mapping_array(m, "arguments", v2);
     v2->ref--;
   }
-#endif
-#ifdef LOCALS_IN_TRACEBACK
   if (num_local > 0 && num_arg != -1) {
     array_t *v2;
 
@@ -4543,7 +4483,6 @@ array_t *get_svalue_trace() {
     add_mapping_array(m, "locals", v2);
     v2->ref--;
   }
-#endif
   v->item[(csp - &control_stack[0])].type = T_MAPPING;
   v->item[(csp - &control_stack[0])].u.map = m;
   /* return a reference zero array */
@@ -4965,106 +4904,6 @@ int inter_sscanf(svalue_t *arg, svalue_t *s0, svalue_t *s1, int num_arg) {
   return number_of_matches;
 }
 
-/* dump # of times each efun has been used */
-#ifdef OPCPROF
-void opcdump(const char *tfn) {
-  int i, len, limit;
-  char tbuf[SMALL_STRING_SIZE];
-  const char *fn;
-  FILE *fp;
-
-  if ((len = strlen(tfn)) >= (SMALL_STRING_SIZE - 7)) {
-    error("Path '%s' too long.\n", tfn);
-    return;
-  }
-  strcpy(tbuf, tfn);
-  strcpy(tbuf + len, ".efun");
-  fn = check_valid_path(tbuf, current_object, "opcprof", 1);
-  if (!fn) {
-    error("Invalid path '%s' for writing.\n", tbuf);
-    return;
-  }
-  fp = fopen(fn, "w");
-  if (!fp) {
-    error("Unable to open %s.\n", fn);
-    return;
-  }
-  limit = sizeof(opc_efun) / sizeof(opc_t);
-  for (i = 0; i < limit; i++) {
-    fprintf(fp, "%-30s: %10d\n", opc_efun[i].name, opc_efun[i].count);
-  }
-  fclose(fp);
-
-  strcpy(tbuf, tfn);
-  strcpy(tbuf + len, ".eoper");
-  fn = check_valid_path(tbuf, current_object, "opcprof", 1);
-  if (!fn) {
-    error("Invalid path '%s' for writing.\n", tbuf);
-    return;
-  }
-  fp = fopen(fn, "w");
-  if (!fp) {
-    error("Unable to open %s for writing.\n", fn);
-    return;
-  }
-  for (i = 0; i < EFUN_BASE; i++) {
-    fprintf(fp, "%-30s: %10d\n", query_instr_name(i), opc_eoper[i]);
-  }
-  fclose(fp);
-}
-#endif
-
-/* dump # of times each efun has been used */
-#ifdef OPCPROF_2D
-typedef struct {
-  int op1, op2;
-  int num_calls;
-} sort_elem_t;
-
-int sort_elem_cmp(const sort_elem_t *se1, const sort_elem_t *se2) {
-  return COMPARE_NUMS(se2->num_calls, se1->num_calls);
-}
-
-void opcdump(char *tfn) {
-  int ind, i, j, len;
-  char tbuf[SMALL_STRING_SIZE], *fn;
-  FILE *fp;
-  sort_elem_t ops[(EFUN_BASE + 1) * (EFUN_BASE + 1)];
-
-  if ((len = strlen(tfn)) >= (SMALL_STRING_SIZE - 10)) {
-    error("Path '%s' too long.\n", tfn);
-    return;
-  }
-  strcpy(tbuf, tfn);
-  strcpy(tbuf + len, ".eop-2d");
-  fn = check_valid_path(tbuf, current_object, "opcprof", 1);
-  if (!fn) {
-    error("Invalid path '%s' for writing.\n", tbuf);
-    return;
-  }
-  fp = fopen(fn, "w");
-  if (!fp) {
-    error("Unable to open %s for writing.\n", fn);
-    return;
-  }
-  for (i = 0; i <= EFUN_BASE; i++) {
-    for (j = 0; j <= EFUN_BASE; j++) {
-      ind = i * (EFUN_BASE + 1) + j;
-      ops[ind].num_calls = opc_eoper_2d[i][j];
-      ops[ind].op1 = i;
-      ops[ind].op2 = j;
-    }
-  }
-  qsort((char *)ops, (EFUN_BASE + 1) * (BASE + 1), sizeof(sort_elem_t), sort_elem_cmp);
-  for (i = 0; i < (EFUN_BASE + 1) * (EFUN_BASE + 1); i++) {
-    if (ops[i].num_calls)
-      fprintf(fp, "%-30s %-30s: %10d\n", query_instr_name(ops[i].op1), query_instr_name(ops[i].op2),
-              ops[i].num_calls);
-  }
-  fclose(fp);
-}
-#endif
-
 /*
  * Reset the virtual stack machine.
  */
@@ -5080,7 +4919,6 @@ void reset_machine(int first) {
   }
 }
 
-#ifdef TRACE_CODE
 static char *get_arg(int a, int b) {
   static char buff[50];
   char *from, *to;
@@ -5126,9 +4964,6 @@ int last_instructions() {
   return last;
 }
 
-#endif /* TRACE_CODE */
-
-#ifdef TRACE
 /* Generate a debug message to the user */
 void do_trace(const char *msg, const char *fname, const char *post) {
   const char *objname;
@@ -5142,7 +4977,6 @@ void do_trace(const char *msg, const char *fname, const char *post) {
   add_vmessage(command_giver, "*** %d %*s %s %s %s%s", tracedepth, tracedepth, "", msg, objname,
                fname, post);
 }
-#endif
 
 /*
  * When an object is destructed, all references to it must be removed

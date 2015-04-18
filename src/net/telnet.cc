@@ -41,11 +41,6 @@ static inline void on_telnet_data(const char *buffer, unsigned long size, intera
   for (int i = 0; i < size; i++) {
     unsigned char c = static_cast<unsigned char>(buffer[i]);
     switch (c) {
-#if defined(NO_ANSI) && defined(STRIP_BEFORE_PROCESS_INPUT)
-      case 0x1b:
-        ip->text[ip->text_end++] = ANSI_SUBSTITUTE;
-        break;
-#endif
       case 0x08:
       case 0x7f:
         if (ip->iflags & SINGLE_CHAR) {
@@ -56,6 +51,12 @@ static inline void on_telnet_data(const char *buffer, unsigned long size, intera
           }
         }
         break;
+      case 0x1b:
+        if (CONFIG_INT(__NO_ANSI__) && CONFIG_INT(__STRIP_BEFORE_PROCESS_INPUT__)) {
+          ip->text[ip->text_end++] = ANSI_SUBSTITUTE;
+          break;
+        }
+        // fallthrough
       default:
         ip->text[ip->text_end++] = c;
         break;

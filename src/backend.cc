@@ -275,19 +275,19 @@ void look_for_objects_to_swap() {
           std::chrono::seconds(time_to_clean_up)) {
         ready_for_clean_up = 1;
       }
-#if !defined(NO_RESETS) && !defined(LAZY_RESETS)
-      /*
-       * Should this object have reset(1) called ?
-       */
-      if ((ob->flags & O_WILL_RESET) && (g_current_gametick >= ob->next_reset) &&
-          !(ob->flags & O_RESET_STATE)) {
-        debug(d_flag, "RESET /%s\n", ob->obname);
-        reset_object(ob);
-        if (ob->flags & O_DESTRUCTED) {
-          continue;
+      if (!CONFIG_INT(__NO_RESETS__) && CONFIG_INT(__LAZY_RESETS__)) {
+        /*
+         * Should this object have reset(1) called ?
+         */
+        if ((ob->flags & O_WILL_RESET) && (g_current_gametick >= ob->next_reset) &&
+            !(ob->flags & O_RESET_STATE)) {
+          debug(d_flag, "RESET /%s\n", ob->obname);
+          reset_object(ob);
+          if (ob->flags & O_DESTRUCTED) {
+            continue;
+          }
         }
       }
-#endif
       if (time_to_clean_up > 0) {
         /*
          * Has enough time passed, to give the object a chance to

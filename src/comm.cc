@@ -438,12 +438,15 @@ void shutdown_external_ports() {
  * INTERACTIVE_CATCH_TELL, since catch_tell() was already called
  * _instead of_ add_message(), and shadows got their chance then.
  */
-#if !defined(INTERACTIVE_CATCH_TELL) && !defined(NO_SHADOWS)
+#if !defined(NO_SHADOWS)
 #define SHADOW_CATCH_MESSAGE
 #endif
 
 #ifdef SHADOW_CATCH_MESSAGE
 static int shadow_catch_message(object_t *ob, const char *str) {
+  if (CONFIG_INT(__INTERACTIVE_CATCH_TELL__)) {
+    return 0;
+  }
   if (!ob->shadowed) {
     return 0;
   }
@@ -475,10 +478,10 @@ void add_message(object_t *who, const char *data, int len) {
    */
   if (!who || (who->flags & O_DESTRUCTED) || !who->interactive ||
       (who->interactive->iflags & (NET_DEAD | CLOSING))) {
-#ifdef NONINTERACTIVE_STDERR_WRITE
-    putc(']', stderr);
-    fwrite(data, len, 1, stderr);
-#endif
+    if (CONFIG_INT(__NONINTERACTIVE_STDERR_WRITE__)) {
+      putc(']', stderr);
+      fwrite(data, len, 1, stderr);
+    }
     return;
   }
   auto ip = who->interactive;
@@ -499,9 +502,9 @@ void add_message(object_t *who, const char *data, int len) {
    * shadow handling.
    */
   if (shadow_catch_message(who, data)) {
-#ifdef SNOOP_SHADOWED
-    handle_snoop(data, len, ip);
-#endif
+    if (CONFIG_INT(__SNOOP_SHADOWED__)) {
+      handle_snoop(data, len, ip);
+    }
     return;
   }
 #endif /* NO_SHADOWS */
@@ -1408,19 +1411,19 @@ static void print_prompt(interactive_t *ip) {
 #ifndef NO_SNOOP
 static void receive_snoop(const char *buf, int len, object_t *snooper) {
 /* command giver no longer set to snooper */
-#ifdef RECEIVE_SNOOP
-  char *str;
+  if (CONFIG_INT(__RECEIVE_SNOOP__)) {
+    char *str;
 
-  str = new_string(len, "receive_snoop");
-  memcpy(str, buf, len);
-  str[len] = 0;
-  push_malloced_string(str);
-  apply(APPLY_RECEIVE_SNOOP, snooper, 1, ORIGIN_DRIVER);
-#else
-  /* snoop output is now % in all cases */
-  add_message(snooper, "%", 1);
-  add_message(snooper, buf, len);
-#endif
+    str = new_string(len, "receive_snoop");
+    memcpy(str, buf, len);
+    str[len] = 0;
+    push_malloced_string(str);
+    apply(APPLY_RECEIVE_SNOOP, snooper, 1, ORIGIN_DRIVER);
+  } else {
+    /* snoop output is now % in all cases */
+    add_message(snooper, "%", 1);
+    add_message(snooper, buf, len);
+  }
 }
 #endif
 

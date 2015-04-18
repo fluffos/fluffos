@@ -118,6 +118,218 @@ default error message :
 gametick msec : 100
 heartbeat interval msec : 1000
 
+# explode():
+#
+# The old behavior (#undef both of the below) strips any number of
+# delimiters at the start of the string, and one at the end.  So
+# explode("..x.y..z..", ".") gives ({ "x", "y", "", "z", "" })
+#
+# SANE_EXPLODE_STRING strips off at most one leading delimiter, and
+# still strips off one at the end, so the example above gives
+# ({ "", "x", "y", "", "z", "" }).
+#
+# REVERSIBLE_EXPLODE_STRING overrides SANE_EXPLODE_STRING, and makes
+# it so that implode(explode(x, y), y) is always x; i.e. no delimiters
+# are ever stripped.  So the example above gives
+# ({ "", "", "x", "y", "", "z", "", "" }).
+#
+sane explode string : 1
+reversible explode string : 0
+
+# SANE_SORTING: Use system provided fastest sorting routine for various
+# sorting, including sort_array EFUN.
+#
+# This replace the old internal version qsort which only sorts to one
+# direction repetitively. so following LPC code:
+#
+#    sort_array(({4,3,2,1}), (: -($1<$2) :));
+#
+# can still return ({1,2,3,4}), even though it only returns -1 and 0.
+#
+# It is recommended to fix your LPC code to not rely on this behavior.
+#
+# Your LPC code should return 1, 0, -1 for situation where first argument
+# is less than, equal to, or greater than the second argument. This will
+# will work with both implementation.
+#
+# Old code should work fine with this added, easy to inspect by searching
+# for sort_array.
+#
+sane sorting : 1
+
+# WARN_TAB: Some versions of the editor built in indent function use
+#   tabs for indenting. This options turns on a warning message for
+#   files indented with tabs instead of spaces.
+#
+warn tab : 0
+
+# WOMBLES: don't allow spaces between start/end of array/mapping/functional
+# token chars so ({1,2,3}) still works, but ( { 1 , 2 , 3 } ) doesn't
+# and ({ 1 , 2 , 3 }) does.
+wombles : 0
+
+# CALL_OTHER_TYPE_CHECK: enable type checking for call_other()
+# (-> operator on objects)
+#
+call other type check : 0
+
+# CALL_OTHER_WARN, make it warning instead of errors
+call other warn : 0
+
+# MUDLIB_ERROR_HANDLER: If you define this, the driver doesn't do any
+#   handling of runtime errors, other than to turn the heartbeats of
+#   objects off.  Information about the error is passed in a mapping
+#   to the error_handler() function in the master object.  Whatever is
+#   returned is put in the debug.log.
+#
+# A good mudlib error handler is one of the best tools for tracking down
+# errors.  Unfortunately, you need to have one.  Check the testsuite or
+# other libs for an example.
+#
+mudlib error handler : 1
+
+# NO_RESETS: completely disable the periodic calling of reset()
+no resets : 0
+
+# LAZY_RESETS: if this is defined, an object will only have reset()
+#   called in it when it is touched via call_other() or move_object()
+#   (assuming enough time has passed since the last reset).  If LAZY_RESETS
+#   is #undef'd, then reset() will be called as always (which guaranteed that
+#   reset would always be called at least once).  The advantage of lazy
+#   resets is that reset doesn't get called in an object that is touched
+#   once and never again (which can save memory since some objects won't get
+#   reloaded that otherwise would).
+#
+lazy resets : 0
+
+# RANDOMIZED_RESETS: if this is defined, the reset() will be called in
+# randomized
+#   time interval. The interval vary from TIME_TO_RESET/2 to TIME_TO_RESET-1 .
+#   if this is undefined, the reset() will be called among all objects at the
+# same time,
+#   with the interval as TIME_TO_RESET
+#
+randomized resets : 1
+
+# NO_ANSI: define if you wish to disallow users from typing in commands that
+#   contain ANSI escape sequences.  Defining NO_ANSI causes all escapes
+#   (ASCII 27) to be replaced with a space ' ' before the string is passed
+#   to the action routines added with add_action.
+#
+# STRIP_BEFORE_PROCESS_INPUT allows the location where the stripping is
+# done to be controlled.  If it is defined, then process_input() doesn't
+# see ANSI characters either; if it is undefined ESC chars can be processed
+# by process_input(), but are stripped before add_actions are called.
+# Note that if NO_ADD_ACTION is defined, then #define NO_ANSI without
+# #define STRIP_BEFORE_PROCESS_INPUT is the same as #undef NO_ANSI.
+#
+# If you anticipate problems with users intentionally typing in ANSI codes
+# to make your terminal flash, etc define this.
+#
+no ansi : 1
+strip before process input: 1
+
+# THIS_PLAYER_IN_CALL_OUT: define this if you wish this_player() to be
+#   usable from within call_out() callbacks.
+#
+this_player in call_out : 1
+
+# TRACE: define this to enable the trace() and traceprefix() efuns.
+#   (keeping this undefined will cause the driver to run faster).
+#
+trace : 1
+
+# TRACE_CODE: define this to enable code tracing (the driver will print
+#   out the previous lines of code to an error) eval_instruction() runs about
+#   twice as fast when this is not defined (for the most common eoperators).
+#
+trace code : 0
+
+# INTERACTIVE_CATCH_TELL: define this if you want catch_tell called on
+#   interactives as well as NPCs.  If this is defined, user.c will need a
+#   catch_tell(msg) method that calls receive(msg);
+#
+interactive catch tell : 0
+
+# RECEIVE_SNOOP: define this if you want snoop text to be sent to
+#   the receive_snoop() function in the snooper object (instead of being
+#   sent directly via add_message()).  This is useful if you want to
+#  build a smart client that does something different with snoop messages.
+#
+receive snoop : 1
+
+# SNOOP_SHADOWED: define this if you want snoop to report what is
+#   sent to the player even in the event that the player's catch_tell() is
+#   shadowed and the player may not be seeing what is being sent.  Messages
+#   of this sort will be prefixed with $$.
+#
+snoop shadowed : 0
+
+#
+#  REVERSE_DEFER:
+#
+#  If not defined executes defer functions in LIFO mode.
+#
+#  If defined executes defer functions in FIFO mode.
+#
+reverse defer : 0
+
+# HAS_CONSOLE: If defined, the driver can take the argument -C
+#   which will give the driver an interactive console (you can type
+#   commands at the terminal.)  Backgrounding the driver will turn off
+#   the console, but sending signal SIGTTIN (kill -21) to the driver can
+#   turn it back on.  Typing 'help' will display commands available.
+#   The intent is to allow the inspection of things that are difficult
+#   to inspect from inside the mud.
+#
+has console : 1
+
+# NONINTERACTIVE_STDERR_WRITE: if defined, all writes/tells/etc to
+#   noninteractive objects will be written to stderr prefixed with a ']'
+#   (old behavior).
+#
+# Compat status: Easy to support, and also on the "It's a bug!  No, it's
+# a feature!" religious war list.
+#
+noninteractive stderr write : 1
+
+# TRAP_CRASHES:  define this if you want MudOS to call crash() in master.c
+#   and then shutdown when signals are received that would normally crash the
+#   driver.
+#
+trap crashes : 1
+
+# OLD_TYPE_BEHAVIOR: reintroduces a bug in type-checking that effectively
+#  renders compile time type checking useless.  For backwards compatibility.
+#
+#  Compat status: dealing with all the resulting compile errors can be
+#  a huge pain even if they are correct, and the impact on the code is
+#  small.
+#
+old type behavior : 0
+
+# OLD_RANGE_BEHAVIOR: define this if you want negative indexes in string
+# or buffer range values (not lvalue, i.e. x[-2..-1]; for e.g. not
+# x[-2..-1] = foo, the latter is always illegal) to mean counting from the
+# end
+#
+# Compat status: Not horribly difficult to replace reliance on this, but not
+# trivial, and cannot be simulated.
+#
+old range behavior : 0
+
+# define to get a warning for code that might use the old range behavior
+# when you're not actually using the old range behavior
+warn old range behavior : 1
+
+# supress warnings about unused arguments; only warn about unused local
+# variables.  Makes older code (where argument names were required) compile
+# more quietly.
+#
+suppress argument warnings : 1
+
+
+
 ###############################################################################
 #          The following aren't currently used or implemented (yet)           #
 ###############################################################################

@@ -54,6 +54,7 @@ set -eo pipefail
 # testing part
 cd src
 ./autogen.sh
+cp local_options local_options.default
 cp local_options.$CONFIG local_options
 
 if [ -n "$GCOV" ]; then

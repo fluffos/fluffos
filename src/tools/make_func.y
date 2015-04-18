@@ -500,14 +500,6 @@ void make_efun_tables() {
   }
   fprintf(f, "};\n");
 
-  fprintf(f, "\n// OPC tables\n\n");
-
-  fprintf(f, "opc_t opc_efun[] = {\n");
-  for (int i = 0; i < efun_code; i++) {
-    fprintf(f, "    {\"%s\", 0},\n", efun_names[i]);
-  }
-  fprintf(f, "};\n");
-
   fclose(f);
 
   // Now generating Header
@@ -543,12 +535,6 @@ void make_efun_tables() {
   }
   fprintf(f, "typedef void (*func_t) (void);\n\n");
   fprintf(f, "extern func_t efun_table[];");
-
-  fprintf(f, "\n/* OPC counter */\n");
-  fprintf(f, "\nstruct opc_t { const char *name; int count; };\n\n");
-
-  fprintf(f, "extern opc_t opc_efun[];\n");
-
 
   /* Now sort the main_list */
   for (int i = 0; i < num_buff; i++) {

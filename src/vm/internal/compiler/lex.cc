@@ -190,9 +190,6 @@ static keyword_t reswords[] = {
 #ifndef SENSIBLE_MODIFIERS
     {"static", L_TYPE_MODIFIER, DECL_NOSAVE | DECL_PROTECTED},
 #endif
-#ifdef HAS_STATUS_TYPE
-    {"status", L_BASIC_TYPE, TYPE_NUMBER},
-#endif
     {"string", L_BASIC_TYPE, TYPE_STRING},
 #ifdef STRUCT_STRUCT
     {"struct", L_CLASS, 0},
@@ -1725,9 +1722,9 @@ int yylex() {
         // ignore these.
         break;
       case '\t':
-#ifdef WARN_TAB
-        yywarn("<TAB>");
-#endif
+        if(CONFIG_INT(__WARN_TAB__)) {
+          yywarn("<TAB>");
+        }
         break;
       case '\n':
         nexpands = 0;
@@ -1863,20 +1860,20 @@ int yylex() {
         return L_ASSIGN;
       case '(':
         yyp = outp;
-#ifdef WOMBLES
-        c = *yyp++;
-#else
-        while (isspace(c = *yyp++)) {
-          if (c == '\n') {
-            current_line++;
-            if (yyp == last_nl + 1) {
-              outp = yyp;
-              refill_buffer();
-              yyp = outp;
+        if (CONFIG_INT(__WOMBLES__)) {
+          c = *yyp++;
+        } else {
+          while (isspace(c = *yyp++)) {
+            if (c == '\n') {
+              current_line++;
+              if (yyp == last_nl + 1) {
+                outp = yyp;
+                refill_buffer();
+                yyp = outp;
+              }
             }
           }
         }
-#endif
         switch (c) {
           case '{': {
             outp = yyp;
@@ -2841,6 +2838,89 @@ void add_predefines() {
 
   sprintf(save_buf, "%" LPC_FLOAT_FMTSTR_P, LPC_FLOAT_MIN);
   add_predefine("MIN_FLOAT", -1, save_buf);
+
+  // Following compile time configs are now always true
+  add_predefine("__CACHE_STATS__", -1, "");
+  add_predefine("__STRING_STATS__", -1, "");
+  add_predefine("__CLASS_STATS__", -1, "");
+  add_predefine("__ARRAY_STATS__", -1, "");
+  add_predefine("__CALLOUT_HANDLES__", -1, "");
+  add_predefine("__ARGUMENTS_IN_TRACEBACK__", -1 , "");
+  add_predefine("__LOCALS_IN_TRACEBACK__", -1 , "");
+
+  // Following compile time configs has been changed into runtime configs.
+  if (CONFIG_INT(__SANE_EXPLODE_STRING__)) {
+    add_predefine("__SANE_EXPLODE_STRING__", -1, "");
+  }
+  if (CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__)) {
+    add_predefine("__REVERSIBLE_EXPLODE_STRING__", -1, "");
+  }
+  if (CONFIG_INT(__SANE_SORTING__)) {
+    add_predefine("__SANE_SORTING__", -1, "");
+  }
+  if (CONFIG_INT(__WOMBLES__)) {
+    add_predefine("__WOMBLES__", -1, "");
+  }
+  if (CONFIG_INT(__CALL_OTHER_TYPE_CHECK__)) {
+    add_predefine("__CALL_OTHER_TYPE_CHECK__", -1, "");
+  }
+  if (CONFIG_INT(__CALL_OTHER_WARN__)) {
+    add_predefine("__CALL_OTHER_WARN__", -1, "");
+  }
+  if (CONFIG_INT(__MUDLIB_ERROR_HANDLER__)) {
+    add_predefine("__MUDLIB_ERROR_HANDLER__", -1, "");
+  }
+  if (CONFIG_INT(__NO_RESETS__)) {
+    add_predefine("__NO_RESETS__", -1, "");
+  }
+  if (CONFIG_INT(__LAZY_RESETS__)) {
+    add_predefine("__LAZY_RESETS__", -1, "");
+  }
+  if (CONFIG_INT(__RANDOMIZED_RESETS__)) {
+    add_predefine("__RANDOMIZED_RESETS__", -1, "");
+  }
+  if (CONFIG_INT(__THIS_PLAYER_IN_CALL_OUT__)) {
+    add_predefine("__THIS_PLAYER_IN_CALL_OUT__", -1, "");
+  }
+  if (CONFIG_INT(__TRACE__)) {
+    add_predefine("__TRACE__", -1, "");
+  }
+  if (CONFIG_INT(__TRACE_CODE__)) {
+    add_predefine("__TRACE_CODE__", -1, "");
+  }
+  if (CONFIG_INT(__INTERACTIVE_CATCH_TELL__)) {
+    add_predefine("__INTERACTIVE_CATCH_TELL__", -1, "");
+  }
+  if (CONFIG_INT(__RECEIVE_SNOOP__)) {
+    add_predefine("__RECEIVE_SNOOP__", -1, "");
+  }
+  if (CONFIG_INT(__SNOOP_SHADOWED__)) {
+    add_predefine("__SNOOP_SHADOWED__", -1, "");
+  }
+  if (CONFIG_INT(__REVERSE_DEFER__)) {
+    add_predefine("__REVERSE_DEFER__", -1, "");
+  }
+  if (CONFIG_INT(__HAS_CONSOLE__)) {
+    add_predefine("__HAS_CONSOLE__", -1, "");
+  }
+  if (CONFIG_INT(__NONINTERACTIVE_STDERR_WRITE__)) {
+    add_predefine("__NONINTERACTIVE_STDERR_WRITE__", -1, "");
+  }
+  if (CONFIG_INT(__TRAP_CRASHES__)) {
+    add_predefine("__TRAP_CRASHES__", -1, "");
+  }
+  if (CONFIG_INT(__OLD_TYPE_BEHAVIOR__)) {
+    add_predefine("__OLD_TYPE_BEHAVIOR__", -1, "");
+  }
+  if (CONFIG_INT(__OLD_RANGE_BEHAVIOR__)) {
+    add_predefine("__OLD_RANGE_BEHAVIOR__", -1, "");
+  }
+  if (CONFIG_INT(__WARN_OLD_RANGE_BEHAVIOR__)) {
+    add_predefine("__WARN_OLD_RANGE_BEHAVIOR__", -1, "");
+  }
+  if (CONFIG_INT(__SUPPRESS_ARGUMENT_WARNINGS__)) {
+    add_predefine("__SUPPRESS_ARGUMENT_WARNINGS__", -1, "");
+  }
 }
 
 void start_new_file(int f) {

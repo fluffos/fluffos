@@ -21,7 +21,7 @@
 
 char *config_str[NUM_CONFIG_STRS];
 int config_int[NUM_CONFIG_INTS];
-char *external_cmd[NUM_EXTERNAL_CMDS];
+char *external_cmd[g_num_external_cmds];
 
 namespace {
 
@@ -44,12 +44,18 @@ void config_init() {
  * missing from the config file.  Otherwise, it will give an error and exit
  * if the line isn't there.
  */
+
 /* required:
  1  : Must have
  0  : optional
  -1 : warn if missing
  -2 : warn if found.
  */
+const static int kMustHave = 1;
+const static int kOptional = 0;
+const static int kWarnMissing = -1;
+const static int kWarnFound = -2;
+
 bool scan_config_line(const char *fmt, void *dest, int required) {
   /* zero the destination.  It is either a pointer to an int or a char
    buffer, so this will work */
@@ -71,7 +77,7 @@ bool scan_config_line(const char *fmt, void *dest, int required) {
 
   if (found) {
     switch (required) {
-      case -2:
+      case kWarnFound:
         // obsolete
         fprintf(stderr, "*Warning: obsolete line in config file, please delete:\n\t%s\n",
                 line.c_str());
@@ -80,14 +86,14 @@ bool scan_config_line(const char *fmt, void *dest, int required) {
     return true;
   } else {
     switch (required) {
-      case -1:
+      case kWarnMissing:
         // optional but warn
         fprintf(stderr, "*Warning: Missing line in config file:\n\t%s\n", line.c_str());
         return false;
-      case 0:
+      case kOptional:
         // optional
         return false;
-      case 1:
+      case kMustHave:
         // required
         fprintf(stderr, "*Error in config file.  Missing line:\n\t%s\n", line.c_str());
         exit(-1);
@@ -292,7 +298,7 @@ void read_config(char *filename) {
   {
     char kind[kMaxConfigLineLength];
 
-    for (int i = 0; i < NUM_EXTERNAL_CMDS; i++) {
+    for (int i = 0; i < g_num_external_cmds; i++) {
       sprintf(kind, "external_cmd_%i : %%[^\n]", i + 1);
       if (scan_config_line(kind, tmp, 0)) {
         external_cmd[i] = alloc_cstring(tmp, "external cmd");
@@ -308,8 +314,8 @@ void read_config(char *filename) {
   }
   if (!scan_config_line("heartbeat interval msec : %d\n", &CONFIG_INT(__HEARTBEAT_INTERVAL_MSEC__),
                         -1)) {
-    CONFIG_INT(__HEARTBEAT_INTERVAL_MSEC__) =
-        CONFIG_INT(__GAMETICK_MSEC__);  // default to match gametick.
+    // default to match gametick.
+    CONFIG_INT(__HEARTBEAT_INTERVAL_MSEC__) = CONFIG_INT(__GAMETICK_MSEC__);
   }
 
   /*
@@ -319,6 +325,88 @@ void read_config(char *filename) {
   CONFIG_INT(__MAX_LOCAL_VARIABLES__) = CFG_MAX_LOCAL_VARIABLES;
   CONFIG_INT(__MAX_CALL_DEPTH__) = CFG_MAX_CALL_DEPTH;
   CONFIG_INT(__LIVING_HASH_TABLE_SIZE__) = CFG_LIVING_HASH_SIZE;
+
+  if (!scan_config_line("sane explode string : %d\n", &CONFIG_INT(__SANE_EXPLODE_STRING__), -1)) {
+    CONFIG_INT(__SANE_EXPLODE_STRING__) = 1;
+  }
+  if (!scan_config_line("reversible explode string : %d\n", &CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__), -1)) {
+    CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__) = 0;
+  }
+  if (!scan_config_line("sane sorting : %d\n", &CONFIG_INT(__SANE_SORTING__), -1)) {
+    CONFIG_INT(__SANE_SORTING__) = 1;
+  }
+  if (!scan_config_line("warn tab : %d\n", &CONFIG_INT(__WARN_TAB__), -1)) {
+      CONFIG_INT(__WARN_TAB__) = 0;
+  }
+  if (!scan_config_line("wombles : %d\n", &CONFIG_INT(__WOMBLES__), -1)) {
+      CONFIG_INT(__WOMBLES__) = 0;
+  }
+  if (!scan_config_line("call other type check : %d\n", &CONFIG_INT(__CALL_OTHER_TYPE_CHECK__), -1)) {
+      CONFIG_INT(__CALL_OTHER_TYPE_CHECK__) = 0;
+  }
+  if (!scan_config_line("call other warn : %d\n", &CONFIG_INT(__CALL_OTHER_WARN__), -1)) {
+      CONFIG_INT(__CALL_OTHER_WARN__) = 0;
+  }
+  if (!scan_config_line("mudlib error handler : %d\n", &CONFIG_INT(__MUDLIB_ERROR_HANDLER__), -1)) {
+      CONFIG_INT(__MUDLIB_ERROR_HANDLER__) = 1;
+  }
+  if (!scan_config_line("no resets : %d\n", &CONFIG_INT(__NO_RESETS__), -1)) {
+      CONFIG_INT(__NO_RESETS__) = 0;
+  }
+  if (!scan_config_line("lazy resets : %d\n", &CONFIG_INT(__LAZY_RESETS__), -1)) {
+      CONFIG_INT(__LAZY_RESETS__) = 0;
+  }
+  if (!scan_config_line("randomized resets : %d\n", &CONFIG_INT(__RANDOMIZED_RESETS__), -1)) {
+      CONFIG_INT(__RANDOMIZED_RESETS__) = 1;
+  }
+  if (!scan_config_line("no ansi : %d\n", &CONFIG_INT(__NO_ANSI__), -1)) {
+      CONFIG_INT(__NO_ANSI__) = 1;
+  }
+  if (!scan_config_line("strip before process input : %d\n", &CONFIG_INT(__STRIP_BEFORE_PROCESS_INPUT__), -1)) {
+      CONFIG_INT(__STRIP_BEFORE_PROCESS_INPUT__) = 1;
+  }
+  if (!scan_config_line("this_player in call_out : %d\n", &CONFIG_INT(__THIS_PLAYER_IN_CALL_OUT__), -1)) {
+      CONFIG_INT(__THIS_PLAYER_IN_CALL_OUT__) = 1;
+  }
+  if (!scan_config_line("trace : %d\n", &CONFIG_INT(__TRACE__), -1)) {
+      CONFIG_INT(__TRACE__) = 1;
+  }
+  if (!scan_config_line("trace code : %d\n", &CONFIG_INT(__TRACE_CODE__), -1)) {
+      CONFIG_INT(__TRACE_CODE__) = 0;
+  }
+  if (!scan_config_line("interactive catch tell : %d\n", &CONFIG_INT(__INTERACTIVE_CATCH_TELL__), -1)) {
+      CONFIG_INT(__INTERACTIVE_CATCH_TELL__) = 0;
+  }
+  if (!scan_config_line("receive snoop : %d\n", &CONFIG_INT(__RECEIVE_SNOOP__), -1)) {
+      CONFIG_INT(__RECEIVE_SNOOP__) = 1;
+  }
+  if (!scan_config_line("snoop shadowed : %d\n", &CONFIG_INT(__SNOOP_SHADOWED__), -1)) {
+      CONFIG_INT(__SNOOP_SHADOWED__) = 0;
+  }
+  if (!scan_config_line("reverse defer : %d\n", &CONFIG_INT(__REVERSE_DEFER__), -1)) {
+      CONFIG_INT(__REVERSE_DEFER__) = 0;
+  }
+  if (!scan_config_line("has console : %d\n", &CONFIG_INT(__HAS_CONSOLE__), -1)) {
+      CONFIG_INT(__HAS_CONSOLE__) = 1;
+  }
+  if (!scan_config_line("noninteractive stderr write : %d\n", &CONFIG_INT(__NONINTERACTIVE_STDERR_WRITE__), -1)) {
+      CONFIG_INT(__NONINTERACTIVE_STDERR_WRITE__) = 0;
+  }
+  if (!scan_config_line("trap crashes : %d\n", &CONFIG_INT(__TRAP_CRASHES__), -1)) {
+      CONFIG_INT(__TRAP_CRASHES__) = 1;
+  }
+  if (!scan_config_line("old type behavior : %d\n", &CONFIG_INT(__OLD_TYPE_BEHAVIOR__), -1)) {
+      CONFIG_INT(__OLD_TYPE_BEHAVIOR__) = 0;
+  }
+  if (!scan_config_line("old range behavior : %d\n", &CONFIG_INT(__OLD_RANGE_BEHAVIOR__), -1)) {
+      CONFIG_INT(__OLD_RANGE_BEHAVIOR__) = 0;
+  }
+  if (!scan_config_line("warn old range behavior : %d\n", &CONFIG_INT(__WARN_OLD_RANGE_BEHAVIOR__), -1)) {
+      CONFIG_INT(__WARN_OLD_RANGE_BEHAVIOR__) = 1;
+  }
+  if (!scan_config_line("suppress argument warnings : %d\n", &CONFIG_INT(__SUPPRESS_ARGUMENT_WARNINGS__), -1)) {
+      CONFIG_INT(__SUPPRESS_ARGUMENT_WARNINGS__) = 1;
+  }
 
   // Complain about obsolete config lines.
   scan_config_line("address server ip : %[^\n]", tmp, -2);

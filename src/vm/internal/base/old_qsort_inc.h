@@ -9,8 +9,6 @@
 #ifndef _OLD_QSORT_INC_H
 #define _OLD_QSORT_INC_H
 
-#ifndef SANE_SORTING
-
 #define LEN sizeof(svalue_t)
 #define MAX_LEN 1000
 
@@ -54,7 +52,5 @@ void old_quickSort(void *a, int nmemb, int size, int (*compar)(const void *, con
   }
   qSort(a, 0, nmemb - 1, size, nmemb - 1, compar);
 }
-
-#endif /* !SANE_SORTING */
 
 #endif /* _OLD_QSORT_INC_H */

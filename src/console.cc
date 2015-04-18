@@ -29,17 +29,9 @@
 
 #include "vm/vm.h"
 
-#ifdef HAS_CONSOLE
 #include "packages/core/dumpstat.h"
-#endif
-
-#ifdef HAS_CONSOLE
 int has_console = -1;
-#endif
-
-#ifdef HAS_CONSOLE
 static void sig_ttin(int /*sig*/);
-#endif
 
 void restore_sigttin(void) {
   if (has_console >= 0) {

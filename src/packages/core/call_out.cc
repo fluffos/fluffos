@@ -48,12 +48,12 @@ static void free_called_call(pending_call_t *cop) {
   }
   cop->ob = NULL;
   cop->function.s = NULL;
-#ifdef THIS_PLAYER_IN_CALL_OUT
-  if (cop->command_giver) {
-    free_object(&cop->command_giver, "free_call");
-    cop->command_giver = 0;
+  if (CONFIG_INT(__THIS_PLAYER_IN_CALL_OUT__)) {
+    if (cop->command_giver) {
+      free_object(&cop->command_giver, "free_call");
+      cop->command_giver = 0;
+    }
   }
-#endif
   if (cop->tick_event != NULL) {
     cop->tick_event->valid = false;  // Will be freed by tick loop itself.
     cop->tick_event = NULL;
@@ -112,12 +112,12 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, std::chrono::milliseconds dela
   g_callout_object_handle_map.insert(
       std::make_pair(cop->ob ? cop->ob : fun->u.fp->hdr.owner, cop->handle));
 
-#ifdef THIS_PLAYER_IN_CALL_OUT
-  cop->command_giver = command_giver; /* save current user context */
-  if (command_giver) {
-    add_ref(command_giver, "new_call_out"); /* Bump its ref */
+  if (CONFIG_INT(__THIS_PLAYER_IN_CALL_OUT__)) {
+    cop->command_giver = command_giver; /* save current user context */
+    if (command_giver) {
+      add_ref(command_giver, "new_call_out"); /* Bump its ref */
+    }
   }
-#endif
   if (num_args > 0) {
     cop->vs = allocate_empty_array(num_args);
     memcpy(cop->vs->item, arg, sizeof(svalue_t) * num_args);
@@ -183,16 +183,16 @@ void call_out(pending_call_t *cop) {
   }
 #endif
   new_command_giver = 0;
-#ifdef THIS_PLAYER_IN_CALL_OUT
-  if (cop->command_giver && !(cop->command_giver->flags & O_DESTRUCTED)) {
-    new_command_giver = cop->command_giver;
-  } else if (ob && (ob->flags & O_LISTENER)) {
-    new_command_giver = ob;
+  if (CONFIG_INT(__THIS_PLAYER_IN_CALL_OUT__)) {
+    if (cop->command_giver && !(cop->command_giver->flags & O_DESTRUCTED)) {
+      new_command_giver = cop->command_giver;
+    } else if (ob && (ob->flags & O_LISTENER)) {
+      new_command_giver = ob;
+    }
+    if (new_command_giver) {
+      DBG_CALLOUT("  command_giver: /%s\n", new_command_giver->obname);
+    }
   }
-  if (new_command_giver) {
-    DBG_CALLOUT("  command_giver: /%s\n", new_command_giver->obname);
-  }
-#endif
   int num_callout_args = 0;
 
   if (cop->vs) {
@@ -390,11 +390,11 @@ void mark_call_outs() {
     } else {
       cop->function.f->hdr.extra_ref++;
     }
-#ifdef THIS_PLAYER_IN_CALL_OUT
-    if (cop->command_giver) {
-      cop->command_giver->extra_ref++;
+    if (CONFIG_INT(__THIS_PLAYER_IN_CALL_OUT__)) {
+      if (cop->command_giver) {
+        cop->command_giver->extra_ref++;
+      }
     }
-#endif
   }
 }
 #endif
@@ -539,18 +539,18 @@ void reclaim_call_outs() {
   }
   DBG_CALLOUT("reclaim_call_outs: %d garbage in object handle map.\n", i);
 
-#ifdef THIS_PLAYER_IN_CALL_OUT
-  i = 0;
-  for (auto iter = g_callout_handle_map.cbegin(); iter != g_callout_handle_map.cend(); iter++) {
-    auto cop = iter->second;
-    if (cop->command_giver && (cop->command_giver->flags & O_DESTRUCTED)) {
-      free_object(&cop->command_giver, "reclaim_call_outs");
-      cop->command_giver = 0;
-      i++;
+  if (CONFIG_INT(__THIS_PLAYER_IN_CALL_OUT__)) {
+    i = 0;
+    for (auto iter = g_callout_handle_map.cbegin(); iter != g_callout_handle_map.cend(); iter++) {
+      auto cop = iter->second;
+      if (cop->command_giver && (cop->command_giver->flags & O_DESTRUCTED)) {
+        free_object(&cop->command_giver, "reclaim_call_outs");
+        cop->command_giver = 0;
+        i++;
+      }
     }
+    DBG_CALLOUT("reclaim_call_outs: %d callouts with command_giver gone.\n", i);
   }
-  DBG_CALLOUT("reclaim_call_outs: %d callouts with command_giver gone.\n", i);
-#endif
 }
 
 namespace {

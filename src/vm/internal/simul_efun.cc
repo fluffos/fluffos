@@ -194,11 +194,11 @@ void call_simul_efun(unsigned short index, int num_arg) {
   }
 
   if (simuls[index].func) {
-#ifdef TRACE
-    if (TRACEP(TRACE_CALL_OTHER)) {
-      do_trace("simul_efun ", simuls[index].func->funcname, "\n");
+    if (CONFIG_INT(__TRACE__)) {
+      if (TRACEP(TRACE_CALL_OTHER)) {
+        do_trace("simul_efun ", simuls[index].func->funcname, "\n");
+      }
     }
-#endif
     /* Don't need to use apply() since we have the pointer directly;
      * this saves function lookup.
      */

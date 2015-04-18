@@ -13,9 +13,7 @@ typedef struct pending_call_s {
   union string_or_func function;
   object_t *ob;
   array_t *vs;
-#ifdef THIS_PLAYER_IN_CALL_OUT
   object_t *command_giver;
-#endif
   LPC_INT handle;
   struct tick_event *tick_event;
   bool is_walltime;

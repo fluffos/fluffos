@@ -584,7 +584,7 @@ void check_all_blocks(int flag) {
     check_string_stats(&out);
 
 #ifdef PACKAGE_EXTERNAL
-    for (i = 0; i < NUM_EXTERNAL_CMDS; i++) {
+    for (i = 0; i < g_num_external_cmds; i++) {
       if (external_cmd[i]) {
         DO_MARK(external_cmd[i], TAG_STRING);
       }

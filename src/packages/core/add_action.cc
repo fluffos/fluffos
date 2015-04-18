@@ -471,15 +471,15 @@ int parse_command(char *str, object_t *ob) {
   int res;
 
 /* disallow users to issue commands containing ansi escape codes */
-#if defined(NO_ANSI) && !defined(STRIP_BEFORE_PROCESS_INPUT)
-  char *c;
+  if (CONFIG_INT(__NO_ANSI__) && !CONFIG_INT(__STRIP_BEFORE_PROCESS_INPUT__)) {
+    char *c;
 
-  for (c = str; *c; c++) {
-    if (*c == 27) {
-      *c = ' '; /* replace ESC with ' ' */
+    for (c = str; *c; c++) {
+      if (*c == 27) {
+        *c = ' '; /* replace ESC with ' ' */
+      }
     }
   }
-#endif
 
   save_command_giver(ob);
   res = user_parser(str);
