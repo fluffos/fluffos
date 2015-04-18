@@ -11,7 +11,6 @@
 
 #ifndef SANE_SORTING
 
-#include "std.h"
 #define LEN sizeof(svalue_t)
 #define MAX_LEN 1000
 

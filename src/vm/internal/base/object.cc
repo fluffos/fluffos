@@ -10,6 +10,7 @@
 #ifdef HAVE_ZLIB
 #include <zlib.h>
 #endif
+#include <unistd.h>
 
 #include "comm.h"  // add_message FIXME: reverse API
 #include "vm/internal/base/machine.h"
