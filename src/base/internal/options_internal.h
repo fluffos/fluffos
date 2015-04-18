@@ -147,9 +147,6 @@
  */
 #define TRAP_CRASHES
 
-/* This define has became default, define it has no value.*/
-#define CALLOUT_HANDLES
-
 /* Some maximum string sizes
  */
 #define SMALL_STRING_SIZE 100

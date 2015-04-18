@@ -2848,6 +2848,8 @@ void add_predefines() {
   add_predefine("__CLASS_STATS__", -1, "");
   add_predefine("__ARRAY_STATS__", -1, "");
 
+  add_predefine("__CALLOUT_HANDLES__", -1, "");
+
   // Following compile time configs has been changed into runtime configs.
   if (CONFIG_INT(__SANE_EXPLODE_STRING__)) {
     add_predefine("__SANE_EXPLODE_STRING__", -1, "");
