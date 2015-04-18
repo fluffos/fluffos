@@ -103,6 +103,11 @@ AC_FUNC_STRTOD
 # Checks local_options exist, use a grauntee exist predefine.
 F_HAVE_PREDEFINE([__cplusplus], [], [AC_MSG_ERROR([[You must have local_options file, see options.h.]])])
 
+grep -o -f ./outdated_define.txt local_options
+if [[ $? == 0 ]]; then
+  AC_MSG_ERROR([[ Your local_options contains outdated defines that has been moved to runtime config. see outdated_define.txt ]])
+fi
+
 # FluffOS need libevent 2.0+
 AX_LIB_EVENT([2.0])
 F_HAVE_PREDEFINE([HAVE_LIBEVENT], [],
