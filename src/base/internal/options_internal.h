@@ -42,15 +42,6 @@
  */
 #define APPLY_CACHE_BITS 22
 
-/* NONINTERACTIVE_STDERR_WRITE: if defined, all writes/tells/etc to
- *   noninteractive objects will be written to stderr prefixed with a ']'
- *   (old behavior).
- *
- * Compat status: Easy to support, and also on the "It's a bug!  No, it's
- * a feature!" religious war list.
- */
-#undef NONINTERACTIVE_STDERR_WRITE
-
 /* NO_BUFFER_TYPE: if this is #define'd then LPC code using the 'buffer'
  *   type won't be allowed to compile (since the 'buffer' type won't be
  *   recognized by the lexer).

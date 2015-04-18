@@ -2903,6 +2903,9 @@ void add_predefines() {
   if (CONFIG_INT(__HAS_CONSOLE__)) {
     add_predefine("__HAS_CONSOLE__", -1, "");
   }
+  if (CONFIG_INT(__NONINTERACTIVE_STDERR_WRITE__)) {
+    add_predefine("__NONINTERACTIVE_STDERR_WRITE__", -1, "");
+  }
 }
 
 void start_new_file(int f) {

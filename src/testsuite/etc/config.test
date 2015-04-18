@@ -284,6 +284,15 @@ reverse defer : 0
 #
 has console : 1
 
+# NONINTERACTIVE_STDERR_WRITE: if defined, all writes/tells/etc to
+#   noninteractive objects will be written to stderr prefixed with a ']'
+#   (old behavior).
+#
+# Compat status: Easy to support, and also on the "It's a bug!  No, it's
+# a feature!" religious war list.
+#
+noninteractive stderr write : 1
+
 ###############################################################################
 #          The following aren't currently used or implemented (yet)           #
 ###############################################################################
