@@ -191,11 +191,6 @@
  */
 #undef OPCPROF_2D
 
-/* THIS_PLAYER_IN_CALL_OUT: define this if you wish this_player() to be
- *   usable from within call_out() callbacks.
- */
-#define THIS_PLAYER_IN_CALL_OUT
-
 /* PRIVS: define this if you want object privileges.  Your mudlib must
  *   explicitly make use of this functionality to be useful.  Defining this
  *   this will increase the size of the object structure by 4 bytes (8 bytes

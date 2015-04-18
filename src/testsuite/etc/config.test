@@ -229,6 +229,11 @@ randomized resets : 1
 no ansi : 1
 strip before process input: 1
 
+# THIS_PLAYER_IN_CALL_OUT: define this if you wish this_player() to be
+#   usable from within call_out() callbacks.
+#
+this_player in call_out : 1
+
 ###############################################################################
 #          The following aren't currently used or implemented (yet)           #
 ###############################################################################

@@ -2873,6 +2873,9 @@ void add_predefines() {
   if (CONFIG_INT(__RANDOMIZED_RESETS__)) {
     add_predefine("__RANDOMIZED_RESETS__", -1, "");
   }
+  if (CONFIG_INT(__THIS_PLAYER_IN_CALL_OUT__)) {
+    add_predefine("__THIS_PLAYER_IN_CALL_OUT__", -1, "");
+  }
 }
 
 void start_new_file(int f) {
