@@ -6822,6 +6822,41 @@ if [ $? == 0 ]; then
   as_fn_error $? " Your local_options contains outdated defines that has been moved to runtime config. see outdated_define.txt " "$LINENO" 5
 fi
 
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+      #include "base/internal/options_incl.h"
+      #ifndef PACKAGE_CORE
+      #error not defined
+      #endif
+
+
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+
+else
+  as_fn_error $? "Fail to find PACKAGE_CORE in your local_options, the driver will not work." "$LINENO" 5
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+      #include "base/internal/options_incl.h"
+      #ifndef PACKAGE_OPS
+      #error not defined
+      #endif
+
+
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+
+else
+  as_fn_error $? "Fail to find PACKAGE_OPS in your local_options, the driver will not work." "$LINENO" 5
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+
 # FluffOS need libevent 2.0+
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
