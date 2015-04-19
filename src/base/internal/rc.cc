@@ -329,83 +329,91 @@ void read_config(char *filename) {
   if (!scan_config_line("sane explode string : %d\n", &CONFIG_INT(__SANE_EXPLODE_STRING__), -1)) {
     CONFIG_INT(__SANE_EXPLODE_STRING__) = 1;
   }
-  if (!scan_config_line("reversible explode string : %d\n", &CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__), -1)) {
+  if (!scan_config_line("reversible explode string : %d\n",
+                        &CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__), -1)) {
     CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__) = 0;
   }
   if (!scan_config_line("sane sorting : %d\n", &CONFIG_INT(__SANE_SORTING__), -1)) {
     CONFIG_INT(__SANE_SORTING__) = 1;
   }
   if (!scan_config_line("warn tab : %d\n", &CONFIG_INT(__WARN_TAB__), -1)) {
-      CONFIG_INT(__WARN_TAB__) = 0;
+    CONFIG_INT(__WARN_TAB__) = 0;
   }
   if (!scan_config_line("wombles : %d\n", &CONFIG_INT(__WOMBLES__), -1)) {
-      CONFIG_INT(__WOMBLES__) = 0;
+    CONFIG_INT(__WOMBLES__) = 0;
   }
-  if (!scan_config_line("call other type check : %d\n", &CONFIG_INT(__CALL_OTHER_TYPE_CHECK__), -1)) {
-      CONFIG_INT(__CALL_OTHER_TYPE_CHECK__) = 0;
+  if (!scan_config_line("call other type check : %d\n", &CONFIG_INT(__CALL_OTHER_TYPE_CHECK__),
+                        -1)) {
+    CONFIG_INT(__CALL_OTHER_TYPE_CHECK__) = 0;
   }
   if (!scan_config_line("call other warn : %d\n", &CONFIG_INT(__CALL_OTHER_WARN__), -1)) {
-      CONFIG_INT(__CALL_OTHER_WARN__) = 0;
+    CONFIG_INT(__CALL_OTHER_WARN__) = 0;
   }
   if (!scan_config_line("mudlib error handler : %d\n", &CONFIG_INT(__MUDLIB_ERROR_HANDLER__), -1)) {
-      CONFIG_INT(__MUDLIB_ERROR_HANDLER__) = 1;
+    CONFIG_INT(__MUDLIB_ERROR_HANDLER__) = 1;
   }
   if (!scan_config_line("no resets : %d\n", &CONFIG_INT(__NO_RESETS__), -1)) {
-      CONFIG_INT(__NO_RESETS__) = 0;
+    CONFIG_INT(__NO_RESETS__) = 0;
   }
   if (!scan_config_line("lazy resets : %d\n", &CONFIG_INT(__LAZY_RESETS__), -1)) {
-      CONFIG_INT(__LAZY_RESETS__) = 0;
+    CONFIG_INT(__LAZY_RESETS__) = 0;
   }
   if (!scan_config_line("randomized resets : %d\n", &CONFIG_INT(__RANDOMIZED_RESETS__), -1)) {
-      CONFIG_INT(__RANDOMIZED_RESETS__) = 1;
+    CONFIG_INT(__RANDOMIZED_RESETS__) = 1;
   }
   if (!scan_config_line("no ansi : %d\n", &CONFIG_INT(__NO_ANSI__), -1)) {
-      CONFIG_INT(__NO_ANSI__) = 1;
+    CONFIG_INT(__NO_ANSI__) = 1;
   }
-  if (!scan_config_line("strip before process input : %d\n", &CONFIG_INT(__STRIP_BEFORE_PROCESS_INPUT__), -1)) {
-      CONFIG_INT(__STRIP_BEFORE_PROCESS_INPUT__) = 1;
+  if (!scan_config_line("strip before process input : %d\n",
+                        &CONFIG_INT(__STRIP_BEFORE_PROCESS_INPUT__), -1)) {
+    CONFIG_INT(__STRIP_BEFORE_PROCESS_INPUT__) = 1;
   }
-  if (!scan_config_line("this_player in call_out : %d\n", &CONFIG_INT(__THIS_PLAYER_IN_CALL_OUT__), -1)) {
-      CONFIG_INT(__THIS_PLAYER_IN_CALL_OUT__) = 1;
+  if (!scan_config_line("this_player in call_out : %d\n", &CONFIG_INT(__THIS_PLAYER_IN_CALL_OUT__),
+                        -1)) {
+    CONFIG_INT(__THIS_PLAYER_IN_CALL_OUT__) = 1;
   }
   if (!scan_config_line("trace : %d\n", &CONFIG_INT(__TRACE__), -1)) {
-      CONFIG_INT(__TRACE__) = 1;
+    CONFIG_INT(__TRACE__) = 1;
   }
   if (!scan_config_line("trace code : %d\n", &CONFIG_INT(__TRACE_CODE__), -1)) {
-      CONFIG_INT(__TRACE_CODE__) = 0;
+    CONFIG_INT(__TRACE_CODE__) = 0;
   }
-  if (!scan_config_line("interactive catch tell : %d\n", &CONFIG_INT(__INTERACTIVE_CATCH_TELL__), -1)) {
-      CONFIG_INT(__INTERACTIVE_CATCH_TELL__) = 0;
+  if (!scan_config_line("interactive catch tell : %d\n", &CONFIG_INT(__INTERACTIVE_CATCH_TELL__),
+                        -1)) {
+    CONFIG_INT(__INTERACTIVE_CATCH_TELL__) = 0;
   }
   if (!scan_config_line("receive snoop : %d\n", &CONFIG_INT(__RECEIVE_SNOOP__), -1)) {
-      CONFIG_INT(__RECEIVE_SNOOP__) = 1;
+    CONFIG_INT(__RECEIVE_SNOOP__) = 1;
   }
   if (!scan_config_line("snoop shadowed : %d\n", &CONFIG_INT(__SNOOP_SHADOWED__), -1)) {
-      CONFIG_INT(__SNOOP_SHADOWED__) = 0;
+    CONFIG_INT(__SNOOP_SHADOWED__) = 0;
   }
   if (!scan_config_line("reverse defer : %d\n", &CONFIG_INT(__REVERSE_DEFER__), -1)) {
-      CONFIG_INT(__REVERSE_DEFER__) = 0;
+    CONFIG_INT(__REVERSE_DEFER__) = 0;
   }
   if (!scan_config_line("has console : %d\n", &CONFIG_INT(__HAS_CONSOLE__), -1)) {
-      CONFIG_INT(__HAS_CONSOLE__) = 1;
+    CONFIG_INT(__HAS_CONSOLE__) = 1;
   }
-  if (!scan_config_line("noninteractive stderr write : %d\n", &CONFIG_INT(__NONINTERACTIVE_STDERR_WRITE__), -1)) {
-      CONFIG_INT(__NONINTERACTIVE_STDERR_WRITE__) = 0;
+  if (!scan_config_line("noninteractive stderr write : %d\n",
+                        &CONFIG_INT(__NONINTERACTIVE_STDERR_WRITE__), -1)) {
+    CONFIG_INT(__NONINTERACTIVE_STDERR_WRITE__) = 0;
   }
   if (!scan_config_line("trap crashes : %d\n", &CONFIG_INT(__TRAP_CRASHES__), -1)) {
-      CONFIG_INT(__TRAP_CRASHES__) = 1;
+    CONFIG_INT(__TRAP_CRASHES__) = 1;
   }
   if (!scan_config_line("old type behavior : %d\n", &CONFIG_INT(__OLD_TYPE_BEHAVIOR__), -1)) {
-      CONFIG_INT(__OLD_TYPE_BEHAVIOR__) = 0;
+    CONFIG_INT(__OLD_TYPE_BEHAVIOR__) = 0;
   }
   if (!scan_config_line("old range behavior : %d\n", &CONFIG_INT(__OLD_RANGE_BEHAVIOR__), -1)) {
-      CONFIG_INT(__OLD_RANGE_BEHAVIOR__) = 0;
+    CONFIG_INT(__OLD_RANGE_BEHAVIOR__) = 0;
   }
-  if (!scan_config_line("warn old range behavior : %d\n", &CONFIG_INT(__WARN_OLD_RANGE_BEHAVIOR__), -1)) {
-      CONFIG_INT(__WARN_OLD_RANGE_BEHAVIOR__) = 1;
+  if (!scan_config_line("warn old range behavior : %d\n", &CONFIG_INT(__WARN_OLD_RANGE_BEHAVIOR__),
+                        -1)) {
+    CONFIG_INT(__WARN_OLD_RANGE_BEHAVIOR__) = 1;
   }
-  if (!scan_config_line("suppress argument warnings : %d\n", &CONFIG_INT(__SUPPRESS_ARGUMENT_WARNINGS__), -1)) {
-      CONFIG_INT(__SUPPRESS_ARGUMENT_WARNINGS__) = 1;
+  if (!scan_config_line("suppress argument warnings : %d\n",
+                        &CONFIG_INT(__SUPPRESS_ARGUMENT_WARNINGS__), -1)) {
+    CONFIG_INT(__SUPPRESS_ARGUMENT_WARNINGS__) = 1;
   }
 
   // Complain about obsolete config lines.

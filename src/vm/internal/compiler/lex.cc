@@ -1722,7 +1722,7 @@ int yylex() {
         // ignore these.
         break;
       case '\t':
-        if(CONFIG_INT(__WARN_TAB__)) {
+        if (CONFIG_INT(__WARN_TAB__)) {
           yywarn("<TAB>");
         }
         break;
@@ -2845,8 +2845,8 @@ void add_predefines() {
   add_predefine("__CLASS_STATS__", -1, "");
   add_predefine("__ARRAY_STATS__", -1, "");
   add_predefine("__CALLOUT_HANDLES__", -1, "");
-  add_predefine("__ARGUMENTS_IN_TRACEBACK__", -1 , "");
-  add_predefine("__LOCALS_IN_TRACEBACK__", -1 , "");
+  add_predefine("__ARGUMENTS_IN_TRACEBACK__", -1, "");
+  add_predefine("__LOCALS_IN_TRACEBACK__", -1, "");
 
   // Following compile time configs has been changed into runtime configs.
   if (CONFIG_INT(__SANE_EXPLODE_STRING__)) {

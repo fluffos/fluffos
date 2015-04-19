@@ -114,7 +114,7 @@ typedef struct malloc_block_s {
  */
 #define COUNTED_STRLEN(x)               \
   ((svalue_strlen_size = MSTR_SIZE(x)), \
-   svalue_strlen_size != UINT_MAX ? svalue_strlen_size : strlen((x)+UINT_MAX) + UINT_MAX)
+   svalue_strlen_size != UINT_MAX ? svalue_strlen_size : strlen((x) + UINT_MAX) + UINT_MAX)
 /* return the number of references to a STRING_MALLOC or STRING_SHARED
    string */
 #define COUNTED_REF(x) MSTR_REF(x)

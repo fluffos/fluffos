@@ -28,23 +28,15 @@ void check_string_stats(struct outbuffer_t *);
 outbuffer_t out;
 
 static const char *sources[] = {
-    "*",                     "temporary blocks",  "permanent blocks",
-    "compiler blocks",       "data blocks",       "miscellaneous blocks",
-    "<#6>",                  "<#7>",              "<#8>",
-    "<#9>",                  "<#10>",             "program blocks",
-    "call_out blocks",       "interactives",      "ed blocks",
-    "<#15>",                 "include list",      "permanent identifiers",
-    "identifier hash table", "reserved block",    "mudlib stats",
-    "objects",               "object table",      "config table",
-    "simul_efuns",           "sentences",         "string table",
-    "free swap blocks",      "uids",              "object names",
-    "predefines",            "line numbers",      "compiler local blocks",
-    "compiled program",      "users",             "debugmalloc overhead",
-    "heart_beat list",       "parser",            "input_to",
-    "sockets",               "strings",           "malloc strings",
-    "shared strings",        "function pointers", "arrays",
-    "mappings",              "mapping nodes",     "mapping tables",
-    "buffers",               "classes"};
+    "*", "temporary blocks", "permanent blocks", "compiler blocks", "data blocks",
+    "miscellaneous blocks", "<#6>", "<#7>", "<#8>", "<#9>", "<#10>", "program blocks",
+    "call_out blocks", "interactives", "ed blocks", "<#15>", "include list",
+    "permanent identifiers", "identifier hash table", "reserved block", "mudlib stats", "objects",
+    "object table", "config table", "simul_efuns", "sentences", "string table", "free swap blocks",
+    "uids", "object names", "predefines", "line numbers", "compiler local blocks",
+    "compiled program", "users", "debugmalloc overhead", "heart_beat list", "parser", "input_to",
+    "sockets", "strings", "malloc strings", "shared strings", "function pointers", "arrays",
+    "mappings", "mapping nodes", "mapping tables", "buffers", "classes"};
 
 void mark_svalue(svalue_t *sv);
 
@@ -310,13 +302,13 @@ void compute_string_totals(int *asp, int *abp, int *bp) {
         msbl = NODET_TO_PTR(entry, malloc_block_t *);
         *bp += msbl->size + 1;
         *asp += msbl->ref;
-        *abp += msbl->ref * (msbl->size + 1);
+        *abp += msbl->ref *(msbl->size + 1);
       }
       if (entry->tag == TAG_SHARED_STRING) {
         ssbl = NODET_TO_PTR(entry, block_t *);
         *bp += ssbl->size + 1;
         *asp += ssbl->refs;
-        *abp += ssbl->refs * (ssbl->size + 1);
+        *abp += ssbl->refs *(ssbl->size + 1);
       }
     }
   }

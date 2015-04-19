@@ -1410,7 +1410,7 @@ static void print_prompt(interactive_t *ip) {
 
 #ifndef NO_SNOOP
 static void receive_snoop(const char *buf, int len, object_t *snooper) {
-/* command giver no longer set to snooper */
+  /* command giver no longer set to snooper */
   if (CONFIG_INT(__RECEIVE_SNOOP__)) {
     char *str;
 

@@ -256,19 +256,19 @@ array_t *explode_string(const char *str, int slen, const char *del, int len) {
     delimeter = *del;
 
     if (!CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__)) {
-		/*
-		 * Skip leading 'del' strings, if any.
-		 */
-		while (*str == delimeter) {
-		  str++;
-		  slen--;
-		  if (str[0] == '\0') {
-			return &the_null_array;
-		  }
-		  if (CONFIG_INT(__SANE_EXPLODE_STRING__) != 0) {
-			  break;
-		  }
-		}
+      /*
+       * Skip leading 'del' strings, if any.
+       */
+      while (*str == delimeter) {
+        str++;
+        slen--;
+        if (str[0] == '\0') {
+          return &the_null_array;
+        }
+        if (CONFIG_INT(__SANE_EXPLODE_STRING__) != 0) {
+          break;
+        }
+      }
     }
     /*
      * Find number of occurences of the delimiter 'del'.
@@ -286,15 +286,15 @@ array_t *explode_string(const char *str, int slen, const char *del, int len) {
      * or, one more.
      */
     limit = max_array_size;
-	if (CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__)) {
-		num++;
-		limit--;
-	} else {
-		if (lastdel != (str + slen - 1)) {
-		  num++;
-		  limit--;
-		}
-	}
+    if (CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__)) {
+      num++;
+      limit--;
+    } else {
+      if (lastdel != (str + slen - 1)) {
+        num++;
+        limit--;
+      }
+    }
     if (num > max_array_size) {
       num = max_array_size;
     }
@@ -316,35 +316,35 @@ array_t *explode_string(const char *str, int slen, const char *del, int len) {
       }
     }
 
-	if (CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__)) {
-		ret->item[num].type = T_STRING;
-		ret->item[num].subtype = STRING_MALLOC;
-		ret->item[num].u.string = string_copy(beg, "explode_string: last, len == 1");
-	} else {
-		/* Copy last occurence, if there was not a 'del' at the end. */
-		if (*beg != '\0' && num != limit) {
-		  ret->item[num].type = T_STRING;
-		  ret->item[num].subtype = STRING_MALLOC;
-		  ret->item[num].u.string = string_copy(beg, "explode_string: last, len == 1");
-		}
-	}
-	return ret;
+    if (CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__)) {
+      ret->item[num].type = T_STRING;
+      ret->item[num].subtype = STRING_MALLOC;
+      ret->item[num].u.string = string_copy(beg, "explode_string: last, len == 1");
+    } else {
+      /* Copy last occurence, if there was not a 'del' at the end. */
+      if (*beg != '\0' && num != limit) {
+        ret->item[num].type = T_STRING;
+        ret->item[num].subtype = STRING_MALLOC;
+        ret->item[num].u.string = string_copy(beg, "explode_string: last, len == 1");
+      }
+    }
+    return ret;
   } /* len == 1 */
 
-  if(!CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__)) {
-	  /*
-	   * Skip leading 'del' strings, if any.
-	   */
-	  while (strncmp(str, del, len) == 0) {
-		str += len;
-		slen -= len;
-		if (str[0] == '\0') {
-		  return &the_null_array;
-		}
-		if(CONFIG_INT(__SANE_EXPLODE_STRING__)) {
-			break;
-		}
-	  }
+  if (!CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__)) {
+    /*
+     * Skip leading 'del' strings, if any.
+     */
+    while (strncmp(str, del, len) == 0) {
+      str += len;
+      slen -= len;
+      if (str[0] == '\0') {
+        return &the_null_array;
+      }
+      if (CONFIG_INT(__SANE_EXPLODE_STRING__)) {
+        break;
+      }
+    }
   }
   /*
    * Find number of occurences of the delimiter 'del'.
@@ -359,17 +359,17 @@ array_t *explode_string(const char *str, int slen, const char *del, int len) {
     }
   }
 
-/*
- * Compute number of array items. It is either number of delimiters, or,
- * one more.
- */
-if (CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__)) {
-	num++;
-} else {
-	if (lastdel != (str + slen - len)) {
-		num++;
-	}
-}
+  /*
+   * Compute number of array items. It is either number of delimiters, or,
+   * one more.
+   */
+  if (CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__)) {
+    num++;
+  } else {
+    if (lastdel != (str + slen - len)) {
+      num++;
+    }
+  }
   if (num > max_array_size) {
     num = max_array_size;
   }
@@ -395,17 +395,17 @@ if (CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__)) {
     }
   }
 
-/* Copy last occurence, if there was not a 'del' at the end. */
+  /* Copy last occurence, if there was not a 'del' at the end. */
   if (CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__)) {
     ret->item[num].type = T_STRING;
     ret->item[num].subtype = STRING_MALLOC;
     ret->item[num].u.string = string_copy(beg, "explode_string: last, len != 1");
   } else {
-      if (*beg != '\0' && num != limit) {
+    if (*beg != '\0' && num != limit) {
       ret->item[num].type = T_STRING;
       ret->item[num].subtype = STRING_MALLOC;
       ret->item[num].u.string = string_copy(beg, "explode_string: last, len != 1");
-	  }
+    }
   }
   return ret;
 }

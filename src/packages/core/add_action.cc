@@ -430,7 +430,7 @@ static int user_parser(char *buff) {
 #ifndef NO_WIZARDS
           && !(command_giver->flags & O_IS_WIZARD)
 #endif
-          ) {
+              ) {
         add_moves(&s->ob->stats, 1);
       }
 #endif
@@ -470,7 +470,7 @@ static int user_parser(char *buff) {
 int parse_command(char *str, object_t *ob) {
   int res;
 
-/* disallow users to issue commands containing ansi escape codes */
+  /* disallow users to issue commands containing ansi escape codes */
   if (CONFIG_INT(__NO_ANSI__) && !CONFIG_INT(__STRIP_BEFORE_PROCESS_INPUT__)) {
     char *c;
 
