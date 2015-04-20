@@ -14,11 +14,11 @@
 /* USE_ICONV: Use iconv to translate input and output from/to the users char
  * encoding
  */
-#define USE_ICONV
+#undef USE_ICONV
 
 /* IPV6: Use IP version 6 instead of 4, for most people the only difference
  * will be that numerical IP addresses get ::ffff: added in front.*/
-#define IPV6
+#undef IPV6
 
 /* static user space dtrace probes, try them if you have dtrace! */
 #undef DTRACE
