@@ -11,18 +11,6 @@
  * Most of these options will probably be of no interest to many users.  *
  *************************************************************************/
 
-/* USE_ICONV: Use iconv to translate input and output from/to the users char
- * encoding
- */
-#undef USE_ICONV
-
-/* IPV6: Use IP version 6 instead of 4, for most people the only difference
- * will be that numerical IP addresses get ::ffff: added in front.*/
-#undef IPV6
-
-/* static user space dtrace probes, try them if you have dtrace! */
-#undef DTRACE
-
 /* You may optionally choose one (or none) of these malloc wrappers.  These
  * can be used in conjunction with any of the above malloc packages.
  *
