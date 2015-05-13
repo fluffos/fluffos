@@ -333,6 +333,10 @@ suppress argument warnings : 1
 #
 enable_commands call init : 0
 
+# sprintf: Make format like "%10s" ignore ANSI escape code length, as they
+# are not visible in the client.
+#
+sprintf add_justified ignore ANSI colors : 0
 
 
 ###############################################################################

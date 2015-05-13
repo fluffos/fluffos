@@ -421,6 +421,11 @@ void read_config(char *filename) {
     CONFIG_INT(__ENABLE_COMMANDS_CALL_INIT__) = 1;
   }
 
+  if (!scan_config_line("sprintf add_justified ignore ANSI colors : %d\n",
+                        &CONFIG_INT(__SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__), -1)) {
+    CONFIG_INT(__SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__) = 0;
+  }
+
   // Complain about obsolete config lines.
   scan_config_line("address server ip : %[^\n]", tmp, -2);
   scan_config_line("address server port : %d\n", tmp, -2);
