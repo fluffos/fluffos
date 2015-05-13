@@ -416,6 +416,11 @@ void read_config(char *filename) {
     CONFIG_INT(__SUPPRESS_ARGUMENT_WARNINGS__) = 1;
   }
 
+  if (!scan_config_line("enable_commands call init : %d\n",
+                        &CONFIG_INT(__ENABLE_COMMANDS_CALL_INIT__), -1)) {
+    CONFIG_INT(__ENABLE_COMMANDS_CALL_INIT__) = 1;
+  }
+
   // Complain about obsolete config lines.
   scan_config_line("address server ip : %[^\n]", tmp, -2);
   scan_config_line("address server port : %d\n", tmp, -2);

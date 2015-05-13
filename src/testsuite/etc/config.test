@@ -328,6 +328,11 @@ warn old range behavior : 1
 #
 suppress argument warnings : 1
 
+# add_action: Make enable_commands() always re-call init(). same as
+# calling enable_commands(1).
+#
+enable_commands call init : 0
+
 
 
 ###############################################################################
