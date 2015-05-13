@@ -70,7 +70,17 @@ fi
 ####### END OF USER CONFIGURABLE OPTIONS
 
 CFLAGS="$CFLAGS $COMPILER_FLAGS $WARN $OPTIMIZE $DEBUG"
-SOURCE_REVISION="$(git describe --dirty --always)"
+
+if [ -d $(pwd)/../.git ]; then
+    if [ "$(git --no-pager show -s --format='%ae')" == "sunyucong@gmail.com" ]; then
+        SOURCE_REVISION="git"
+    else
+        SOURCE_REVISION="git-local"
+    fi
+    SOURCE_REVISION="$SOURCE_REVISION-$(git --no-pager show -s --format='%h-%ct')"
+else
+    SOURCE_REVISION="unknown-nongit"
+fi
 
 # Force an reconfigure.
 rm configure.h
