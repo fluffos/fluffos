@@ -46,8 +46,11 @@ object connect()
 
 mixed compile_object(string file)
 {
-  //	return (mixed)VIRTUAL_D->compile_object(file);
-  return 0;
+    write("MASTER: compile_object is called, file : " + file + "\n");
+    if (file=="/test/virtual") {
+        return load_object("/single/void");
+    }
+    return 0;
 }
 
 // This is called when there is a driver segmentation fault or a bus error,
