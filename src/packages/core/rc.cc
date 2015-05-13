@@ -30,3 +30,27 @@ void f_get_config(void) {
   }
 }
 #endif
+
+#ifdef F_SET_CONFIG
+void f_set_config() {
+  auto num = (sp-1)->u.number;
+  auto value = sp;
+
+  if (num < 0 || num >= RUNTIME_CONFIG_NEXT) {
+    pop_2_elems();
+    error("Bad 1st argument to set_config()\n");
+  }
+  if (num < BASE_CONFIG_INT) {
+    pop_2_elems();
+    error("Can not set string config through set_config() yet.\n");
+  }
+
+  if (value->type != T_NUMBER) {
+    pop_2_elems();
+    error("Bad 2nd argument to set_config()\n");
+  }
+
+  CONFIG_INT(num) = value->u.number;
+  pop_2_elems();
+}
+#endif
