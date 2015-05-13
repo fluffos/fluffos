@@ -3286,7 +3286,7 @@ void f_memory_info(void) {
   object_t *ob;
 
   if (st_num_arg == 0) {
-    int tot;
+    LPC_INT tot;
 
     tot = total_prog_block_size + total_array_size + total_class_size + total_mapping_size +
           tot_alloc_object_size + tot_alloc_sentence * sizeof(sentence_t) +
