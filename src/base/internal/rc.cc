@@ -426,6 +426,11 @@ void read_config(char *filename) {
     CONFIG_INT(__SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__) = 0;
   }
 
+  if (!scan_config_line("apply cache bits : %d\n",
+                        &CONFIG_INT(__APPLY_CACHE_BITS__), -1)) {
+    CONFIG_INT(__APPLY_CACHE_BITS__) = 22;
+  }
+
   // Complain about obsolete config lines.
   scan_config_line("address server ip : %[^\n]", tmp, -2);
   scan_config_line("address server port : %d\n", tmp, -2);

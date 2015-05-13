@@ -139,9 +139,6 @@
 /* Compare two number */
 #define COMPARE_NUMS(x, y) (((x) > (y) ? 1 : ((x) < (y) ? -1 : 0)))
 
-// FIXME: move this somewhere else
-#define APPLY_CACHE_SIZE (1 << APPLY_CACHE_BITS)
-
 #include "base/internal/debugmalloc.h"
 #include "base/internal/md.h"
 

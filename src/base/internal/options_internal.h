@@ -41,13 +41,6 @@
  */
 #undef CHECK_MEMORY
 
-/* APPLY_CACHE_BITS: defines the number of bits to use in the func lookup cache
- *   (in interpret.c).
- *
- *   22 bites : (1  << 22) * (3 * 8 + 2 * 2) ~= 112MB.
- */
-#define APPLY_CACHE_BITS 22
-
 /* NO_BUFFER_TYPE: if this is #define'd then LPC code using the 'buffer'
  *   type won't be allowed to compile (since the 'buffer' type won't be
  *   recognized by the lexer).

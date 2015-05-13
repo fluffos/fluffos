@@ -11,14 +11,12 @@ static struct program_t *find_function_by_name2(struct program_t * /*prog*/, con
                                                 int * /*indexp*/, int * /*runtime_index*/,
                                                 int * /*fio*/, int * /*vio*/);
 
-unsigned int apply_low_call_others = 0;
-unsigned int apply_low_cache_hits = 0;
-unsigned int apply_low_slots_used = 0;
-unsigned int apply_low_collisions = 0;
+static cache_entry_t* cache;
 
-// TODO: this should be changed to allocated on heap.
-// default initialized to 0
-static cache_entry_t cache[APPLY_CACHE_SIZE];
+void apply_cache_init() {
+  apply_cache_size = 1 << CONFIG_INT(__APPLY_CACHE_BITS__);
+  cache = (cache_entry_t*) DCALLOC(apply_cache_size, sizeof(cache_entry_t), TAG_PERMANENT, "apply_cache");
+}
 
 /* Look up a entry for given fun/ob, user must validate
  * the entry content before use */
@@ -28,7 +26,7 @@ cache_entry_t *apply_cache_get_entry(const char *fun, const program_t *prog) {
   std::hash<void *> hash_fn;
   ix = hash_fn((void *)fun);
   ix ^= hash_fn((void *)prog);
-  return &cache[ix % (sizeof(cache) / sizeof(cache_entry_t))];
+  return &cache[ix % apply_cache_size];
 }
 
 /* Erase the current entry. */
@@ -159,7 +157,7 @@ static struct program_t *find_function_by_name2(program_t *prog, const char **na
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_apply_low_cache() {
   int i;
-  for (i = 0; i < APPLY_CACHE_SIZE; i++) {
+  for (i = 0; i < apply_cache_size; i++) {
     if (cache[i].funp && !cache[i].progp) {
       EXTRA_REF(BLOCK((char *)cache[i].funp))++;
     }

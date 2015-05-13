@@ -14,6 +14,9 @@
 // details about machine
 #include "vm/vm.h"
 
+// FIXME: apply_cache
+#include "vm/internal/base/apply_cache.h"
+
 // FIXME: efuns_main.cc needs this
 #include "vm/internal/otable.h"
 
