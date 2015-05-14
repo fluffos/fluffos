@@ -35,7 +35,7 @@ void check_all_blocks(int);
 
 #define PTR(x) ((void *)(x + 1))
 #define NODET_TO_PTR(x, y) ((y)(x + 1))
-#define PTR_TO_NODET(x) ((md_node_t *)(x) - 1)
+#define PTR_TO_NODET(x) ((md_node_t *)(x)-1)
 
 #define DO_MARK(ptr, kind)                                                                      \
   if (PTR_TO_NODET(ptr)->tag != kind)                                                           \

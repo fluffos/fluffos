@@ -668,7 +668,7 @@ static void dump_line_numbers(FILE *f, program_t *prog) {
 #if !defined(USE_32BIT_ADDRESSES)
     COPY_SHORT(&s, li);
 #else
-    COPY_INT(&s, li);
+    COPY4(&s, li);
 #endif
     li += sizeof(ADDRESS_TYPE);
     fprintf(f, "%4x-%4x: %i\n", addr, addr + sz - 1, s);

@@ -100,7 +100,7 @@ char *read_buffer(buffer_t *b, int start, int len, int *rlen) {
   }
   str = new_string(size, "read_buffer: str");
   memcpy(str, b->item + start, size);
-  str[*rlen = size] = '\0';
+  str[ *rlen = size] = '\0';
 
   return str;
 } /* read_buffer() */

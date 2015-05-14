@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.68])
-AC_INIT([FluffOS],[3.0-alpha8.1])
+AC_INIT([FluffOS],[3.0-alpha8])
 AC_CONFIG_MACRO_DIR([m4])
 
 AC_CANONICAL_TARGET
@@ -102,6 +102,16 @@ AC_FUNC_STRTOD
 # This check must before all F_HAVE_PREDEFINE checks.
 # Checks local_options exist, use a grauntee exist predefine.
 F_HAVE_PREDEFINE([__cplusplus], [], [AC_MSG_ERROR([[You must have local_options file, see options.h.]])])
+
+grep -o -f ./outdated_define.txt local_options
+if [[ $? == 0 ]]; then
+  AC_MSG_ERROR([[ Your local_options contains outdated defines that has been moved to runtime config. see outdated_define.txt ]])
+fi
+
+F_HAVE_PREDEFINE([PACKAGE_CORE], [],
+  [AC_MSG_ERROR([[Fail to find PACKAGE_CORE in your local_options, the driver will not work.]])])
+F_HAVE_PREDEFINE([PACKAGE_OPS], [],
+  [AC_MSG_ERROR([[Fail to find PACKAGE_OPS in your local_options, the driver will not work.]])])
 
 # FluffOS need libevent 2.0+
 AX_LIB_EVENT([2.0])

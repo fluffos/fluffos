@@ -10,6 +10,7 @@
 #ifdef HAVE_ZLIB
 #include <zlib.h>
 #endif
+#include <unistd.h>
 
 #include "comm.h"  // add_message FIXME: reverse API
 #include "vm/internal/base/machine.h"
@@ -1385,9 +1386,8 @@ static int save_object_recurse(program_t *prog, svalue_t **svp, int type, int sa
     if (!(tmp = save_object_recurse(prog->inherit[i].prog, svp, prog->inherit[i].type_mod | type,
                                     save_zeros, f, gzf))) {
 #else
-
     if (!(tmp = save_object_recurse(prog->inherit[i].prog, svp, prog->inherit[i].type_mod | type,
-                                    save_zeros, f)))
+                                    save_zeros, f))) {
 #endif
       return 0;
     }
@@ -1924,16 +1924,16 @@ void tell_object(object_t *ob, const char *str, int len) {
     add_message(0, str, len);
     return;
   }
-/* if this is on, EVERYTHING goes through catch_tell() */
-#ifndef INTERACTIVE_CATCH_TELL
-  if (ob->interactive) {
-    add_message(ob, str, len);
-  } else {
-#endif
+  if (CONFIG_INT(__RC_INTERACTIVE_CATCH_TELL__)) {
     tell_npc(ob, str);
-#ifndef INTERACTIVE_CATCH_TELL
+  } else {
+    /* if this is on, EVERYTHING goes through catch_tell() */
+    if (ob->interactive) {
+      add_message(ob, str, len);
+    } else {
+      tell_npc(ob, str);
+    }
   }
-#endif
 }
 
 void dealloc_object(object_t *ob, const char *from) {
@@ -2057,9 +2057,9 @@ object_t *get_empty_object(int num_var) {
 namespace {
 void set_nextreset(object_t *ob) {
   auto time_to_reset_secs = CONFIG_INT(__TIME_TO_RESET__);
-#ifdef RANDOMIZED_RESETS
-  time_to_reset_secs = time_to_reset_secs / 2 + random_number(time_to_reset_secs / 2);
-#endif
+  if (CONFIG_INT(__RC_RANDOMIZED_RESETS__)) {
+    time_to_reset_secs = time_to_reset_secs / 2 + random_number(time_to_reset_secs / 2);
+  }
   ob->next_reset = g_current_gametick + time_to_gametick(std::chrono::seconds(time_to_reset_secs));
 }
 }  // namespace
@@ -2155,9 +2155,6 @@ void reload_object(object_t *obj) {
   remove_living_name(obj);
   set_heart_beat(obj, 0);
   remove_all_call_out(obj);
-#ifndef NO_LIGHT
-  add_light(obj, -(obj->total_light));
-#endif
 #ifdef PACKAGE_UIDS
 #ifdef AUTO_SETEUID
   obj->euid = obj->uid;

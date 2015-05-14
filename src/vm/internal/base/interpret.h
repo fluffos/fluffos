@@ -10,7 +10,6 @@
 #include "interactive.h"              // FIXME: for TRACE* macro
 
 /* Trace defines */
-#ifdef TRACE
 #define TRACE_CALL 1
 #define TRACE_CALL_OTHER 2
 #define TRACE_RETURN 4
@@ -27,7 +26,6 @@
      strpref(command_giver->interactive->trace_prefix, current_object->obname))))
 #define TRACEHB \
   (g_current_heartbeat_obj == 0 || (command_giver->interactive->trace_level & TRACE_HEART_BEAT))
-#endif
 
 /*
  * Control stack element.
@@ -142,10 +140,6 @@ extern int too_deep_error;
 extern int max_eval_error;
 extern int function_index_offset;
 extern int variable_index_offset;
-extern unsigned int apply_low_call_others;
-extern unsigned int apply_low_cache_hits;
-extern unsigned int apply_low_slots_used;
-extern unsigned int apply_low_collisions;
 extern int simul_efun_is_loading;
 extern program_t fake_prog;
 extern svalue_t global_lvalue_byte;
@@ -207,9 +201,7 @@ void debug_perror(const char *, const char *);
 int validate_shadowing(object_t *);
 #endif
 
-#if !defined(NO_RESETS) && defined(LAZY_RESETS)
 void try_reset(object_t *);
-#endif
 
 void pop_context(error_context_t *);
 void restore_context(error_context_t *);
@@ -229,9 +221,7 @@ void mark_stack(void);
 // TODO: move these to correct places
 void setup_varargs_variables(int, int, int);
 extern int tracedepth;
-#ifdef TRACE
 void do_trace_call(int);
-#endif
 
 inline const char *access_to_name(int mode) {
   switch (mode) {

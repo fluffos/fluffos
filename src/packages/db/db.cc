@@ -112,9 +112,8 @@ static array_t *Postgres_fetch(dbconn_t *, int);
 static void Postgres_cleanup(dbconn_t *);
 static char *Postgres_errormsg(dbconn_t *);
 
-static db_defn_t postgres = {"Postgres",     Postgres_connect, Postgres_close, Postgres_execute,
-                             Postgres_fetch, NULL,             NULL,           Postgres_cleanup,
-                             NULL,           Postgres_errormsg};
+static db_defn_t postgres = {"Postgres", Postgres_connect, Postgres_close, Postgres_execute,
+                             Postgres_fetch, NULL, NULL, Postgres_cleanup, NULL, Postgres_errormsg};
 #endif
 
 #ifdef USE_SQLITE2
@@ -125,9 +124,8 @@ static array_t *SQLite2_fetch(dbconn_t *, int);
 static void SQLite2_cleanup(dbconn_t *);
 static char *SQLite2_errormsg(dbconn_t *);
 
-static db_defn_t SQLite2 = {"SQLite2",     SQLite2_connect, SQLite2_close, SQLite2_execute,
-                            SQLite2_fetch, NULL,            NULL,          SQLite2_cleanup,
-                            NULL,          SQLite2_errormsg};
+static db_defn_t SQLite2 = {"SQLite2", SQLite2_connect, SQLite2_close, SQLite2_execute,
+                            SQLite2_fetch, NULL, NULL, SQLite2_cleanup, NULL, SQLite2_errormsg};
 #endif
 
 #ifdef USE_SQLITE3
@@ -138,9 +136,8 @@ static array_t *SQLite3_fetch(dbconn_t *, int);
 static void SQLite3_cleanup(dbconn_t *);
 static char *SQLite3_errormsg(dbconn_t *);
 
-static db_defn_t SQLite3 = {"SQLite3",     SQLite3_connect, SQLite3_close, SQLite3_execute,
-                            SQLite3_fetch, NULL,            NULL,          SQLite3_cleanup,
-                            NULL,          SQLite3_errormsg};
+static db_defn_t SQLite3 = {"SQLite3", SQLite3_connect, SQLite3_close, SQLite3_execute,
+                            SQLite3_fetch, NULL, NULL, SQLite3_cleanup, NULL, SQLite3_errormsg};
 #endif
 
 static db_defn_t no_db = {"None", NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};

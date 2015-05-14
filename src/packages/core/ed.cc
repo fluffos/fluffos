@@ -215,28 +215,28 @@ static struct tbl {
   const char *t_str;
   int t_and_mask;
   int t_or_mask;
-} *t, tbl[] = {
-          {"number", ~FALSE, NFLG_MASK},
-          {"nonumber", ~NFLG_MASK, FALSE},
-          {"list", ~FALSE, LFLG_MASK},
-          {"nolist", ~LFLG_MASK, FALSE},
-          {"print", ~FALSE, PFLG_MASK},
-          {"noprint", ~PFLG_MASK, FALSE},
-          {"eightbit", ~FALSE, EIGHTBIT_MASK},
-          {"noeightbit", ~EIGHTBIT_MASK, FALSE},
-          {"autoindent", ~FALSE, AUTOINDFLG_MASK},
-          {"noautoindent", ~AUTOINDFLG_MASK, FALSE},
-          {"excompatible", ~FALSE, EXCOMPAT_MASK},
-          {"noexcompatible", ~EXCOMPAT_MASK, FALSE},
-          {"dprint", ~FALSE, DPRINT_MASK},
-          {"nodprint", ~DPRINT_MASK, FALSE},
-          {"verbose", ~FALSE, VERBOSE_MASK},
-          {"noverbose", ~VERBOSE_MASK, FALSE},
+} * t, tbl[] = {
+           {"number", ~FALSE, NFLG_MASK},
+           {"nonumber", ~NFLG_MASK, FALSE},
+           {"list", ~FALSE, LFLG_MASK},
+           {"nolist", ~LFLG_MASK, FALSE},
+           {"print", ~FALSE, PFLG_MASK},
+           {"noprint", ~PFLG_MASK, FALSE},
+           {"eightbit", ~FALSE, EIGHTBIT_MASK},
+           {"noeightbit", ~EIGHTBIT_MASK, FALSE},
+           {"autoindent", ~FALSE, AUTOINDFLG_MASK},
+           {"noautoindent", ~AUTOINDFLG_MASK, FALSE},
+           {"excompatible", ~FALSE, EXCOMPAT_MASK},
+           {"noexcompatible", ~EXCOMPAT_MASK, FALSE},
+           {"dprint", ~FALSE, DPRINT_MASK},
+           {"nodprint", ~DPRINT_MASK, FALSE},
+           {"verbose", ~FALSE, VERBOSE_MASK},
+           {"noverbose", ~VERBOSE_MASK, FALSE},
 };
 
 /*________  Macros  ________________________________________________________*/
 
-#define nextln(l) ((l)+1 > P_LASTLN ? 0 : (l)+1)
+#define nextln(l) ((l) + 1 > P_LASTLN ? 0 : (l) + 1)
 #define prevln(l) ((l)-1 < 0 ? P_LASTLN : (l)-1)
 
 #define gettxtl(lin) ((lin)->l_buff)
@@ -629,7 +629,8 @@ static int prntln(char *str, char *outstr, int vflg, int lineno) {
       line += sprintf(line, "messing up end of a long line\n");
       break;
     }
-    if (*str < ' ' || *str >= DEL) {
+    // output special ASCII control code
+    if (*str < ' ' || *str == DEL) {
       switch (*str) {
         case '\t':
           /* have to be smart about this or the indentor will fail */
@@ -646,6 +647,7 @@ static int prntln(char *str, char *outstr, int vflg, int lineno) {
           break;
       }
     } else {
+      // copy rest of ANSI code as is.
       *line++ = *str;
     }
     str++;
@@ -2380,7 +2382,7 @@ static int docmd(int glob) {
           while (*(++inptr) == '+') {
             scr += ED_BUFFER->scroll_lines + 3;
           }
-          if ((st = doprnt(P_LINE1 + (scr), P_LINE1 + ED_BUFFER->scroll_lines + (scr)+3)) < 0) {
+          if ((st = doprnt(P_LINE1 + (scr), P_LINE1 + ED_BUFFER->scroll_lines + (scr) + 3)) < 0) {
             return st;
           }
           break;

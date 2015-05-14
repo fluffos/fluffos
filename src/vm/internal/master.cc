@@ -28,11 +28,11 @@ svalue_t *apply_master_ob(int fun, int num_arg) {
   }
 
   if (master_applies[fun].func) {
-#ifdef TRACE
-    if (TRACEP(TRACE_APPLY)) {
-      do_trace("master apply", master_applies[fun].func->funcname, "\n");
+    if (CONFIG_INT(__RC_TRACE__)) {
+      if (TRACEP(TRACE_APPLY)) {
+        do_trace("master apply", master_applies[fun].func->funcname, "\n");
+      }
     }
-#endif
 
     call_direct(master_ob, master_applies[fun].index, ORIGIN_DRIVER, num_arg);
     free_svalue(&apply_ret_value, "apply_master_ob");

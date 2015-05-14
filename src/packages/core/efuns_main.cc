@@ -165,10 +165,10 @@ static void print_cache_stats(outbuffer_t *ob) {
               100 * (static_cast<LPC_FLOAT>(apply_low_cache_hits) / apply_low_call_others));
   outbuf_addv(ob, "call_others:     %10lu\n", apply_low_call_others);
   outbuf_addv(ob, "cache hits:      %10lu\n", apply_low_cache_hits);
-  outbuf_addv(ob, "cache size:      %10lu\n", APPLY_CACHE_SIZE);
+  outbuf_addv(ob, "cache size:      %10lu\n", apply_cache_size);
   outbuf_addv(ob, "slots used:      %10lu\n", apply_low_slots_used);
   outbuf_addv(ob, "%% slots used:    %10.2f\n",
-              100 * (static_cast<LPC_FLOAT>(apply_low_slots_used) / APPLY_CACHE_SIZE));
+              100 * (static_cast<LPC_FLOAT>(apply_low_slots_used) / apply_cache_size));
   outbuf_addv(ob, "collisions:      %10lu\n", apply_low_collisions);
   outbuf_addv(ob, "%% collisions:    %10.2f\n",
               100 * (static_cast<LPC_FLOAT>(apply_low_collisions) / apply_low_call_others));
@@ -228,12 +228,12 @@ void f__call_other(void) {
       error("call_other() couldn't find object\n");
     }
   }
-/* Send the remaining arguments to the function. */
-#ifdef TRACE
-  if (TRACEP(TRACE_CALL_OTHER)) {
-    do_trace("Call other ", funcname, "\n");
+  /* Send the remaining arguments to the function. */
+  if (CONFIG_INT(__RC_TRACE__)) {
+    if (TRACEP(TRACE_CALL_OTHER)) {
+      do_trace("Call other ", funcname, "\n");
+    }
   }
-#endif
   if (apply(funcname, ob, num_arg - 2, ORIGIN_CALL_OTHER) == 0) { /* Function not found */
     pop_2_elems();
     push_undefined();
@@ -249,8 +249,8 @@ void f__call_other(void) {
 static const char *origin_name(int orig) {
   /* FIXME: this should use ffs() if available (BSD) */
   int i = 0;
-  static const char *origins[] = {"driver",   "local", "call_other",       "simul",
-                                  "internal", "efun",  "function pointer", "functional"};
+  static const char *origins[] = {"driver", "local", "call_other", "simul", "internal", "efun",
+                                  "function pointer", "functional"};
   while (orig >>= 1) {
     i++;
   }
@@ -1458,17 +1458,6 @@ void f_objectp(void) {
 }
 #endif
 
-#ifdef F_OPCPROF
-void f_opcprof(void) {
-  if (st_num_arg == 1) {
-    opcdump(sp->u.string);
-    free_string_svalue(sp--);
-  } else {
-    opcdump("/OPCPROF");
-  }
-}
-#endif
-
 #ifdef F_ORIGIN
 void f_origin(void) { push_constant_string(origin_name(caller_type)); }
 #endif
@@ -1491,11 +1480,11 @@ void f_present(void) {
   svalue_t *arg = sp - num_arg + 1;
   object_t *ob;
 
-#if !defined(NO_RESETS) && defined(LAZY_RESETS)
-  if (num_arg == 2) {
-    try_reset(arg[1].u.ob);
+  if (!CONFIG_INT(__RC_NO_RESETS__) && CONFIG_INT(__RC_LAZY_RESETS__)) {
+    if (num_arg == 2) {
+      try_reset(arg[1].u.ob);
+    }
   }
-#endif
   ob = object_present(arg, num_arg == 1 ? 0 : arg[1].u.ob);
   pop_n_elems(num_arg);
   if (ob && object_visible(ob)) {
@@ -2495,21 +2484,6 @@ void f_set_hide(void) {
 }
 #endif
 
-#ifdef F_SET_LIGHT
-void f_set_light(void) {
-  object_t *o1;
-
-  add_light(current_object, sp->u.number);
-  o1 = current_object;
-#ifndef NO_ENVIRONMENT
-  while (o1->super) {
-    o1 = o1->super;
-  }
-#endif
-  sp->u.number = o1->total_light;
-}
-#endif
-
 #ifdef F_SET_PRIVS
 void f_set_privs(void) {
   object_t *ob;
@@ -3312,7 +3286,7 @@ void f_memory_info(void) {
   object_t *ob;
 
   if (st_num_arg == 0) {
-    int tot;
+    LPC_INT tot;
 
     tot = total_prog_block_size + total_array_size + total_class_size + total_mapping_size +
           tot_alloc_object_size + tot_alloc_sentence * sizeof(sentence_t) +
@@ -3443,14 +3417,13 @@ void f_defer() {
   struct defer_list *newlist = reinterpret_cast<struct defer_list *>(
       DMALLOC(sizeof(struct defer_list), TAG_TEMPORARY, "defer: new item"));
 
-// In reverse mode, newlist always will be the last data.
-#ifdef REVERSE_DEFER
-  newlist->next = NULL;
-// In normal mode, newlist always will be the first data.
-#else
-  newlist->next = csp->defers;
-#endif
-
+  if (CONFIG_INT(__RC_REVERSE_DEFER__)) {
+    // In reverse mode, newlist always will be the last data.
+    newlist->next = NULL;
+  } else {
+    // In normal mode, newlist always will be the first data.
+    newlist->next = csp->defers;
+  }
   // Configure the new item.
   newlist->func = *sp--;
   if (command_giver) {
@@ -3460,23 +3433,22 @@ void f_defer() {
     newlist->tp = const0;
   }
 
-// In reverse mode, if list is not null, then add new item to the end.
-#ifdef REVERSE_DEFER
-  // If list is null, then init it with new item.
-  if (csp->defers == NULL) {
-    csp->defers = newlist;
+  // In reverse mode, if list is not null, then add new item to the end.
+  if (CONFIG_INT(__RC_REVERSE_DEFER__)) {
+    // If list is null, then init it with new item.
+    if (csp->defers == NULL) {
+      csp->defers = newlist;
+    } else {
+      // Search last defer.
+      struct defer_list *last_defer = csp->defers;
+      while (last_defer->next) last_defer = last_defer->next;
+
+      last_defer->next = newlist;
+    }
   } else {
-    // Search last defer.
-    struct defer_list *last_defer = csp->defers;
-    while (last_defer->next) last_defer = last_defer->next;
-
-    last_defer->next = newlist;
+    // In normal mode, actual newlist will be init of defers list.
+    csp->defers = newlist;
   }
-
-// In normal mode, actual newlist will be init of defers list.
-#else
-  csp->defers = newlist;
-#endif
 }
 #endif
 

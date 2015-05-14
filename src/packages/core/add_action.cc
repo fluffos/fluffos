@@ -246,7 +246,7 @@ static void enable_commands(int enable, int toggle_action) {
 
     current_object->flags |= O_ENABLE_COMMANDS;
     set_command_giver(current_object);
-    if (toggle_action) {
+    if (toggle_action || CONFIG_INT(__RC_ENABLE_COMMANDS_CALL_INIT__) != 0) {
       // NOTE: gotcha for re-enabling commands after disabling commands.
       //
       // Imagine in room A, player B, has a item C.
@@ -430,7 +430,7 @@ static int user_parser(char *buff) {
 #ifndef NO_WIZARDS
           && !(command_giver->flags & O_IS_WIZARD)
 #endif
-          ) {
+              ) {
         add_moves(&s->ob->stats, 1);
       }
 #endif
@@ -470,16 +470,16 @@ static int user_parser(char *buff) {
 int parse_command(char *str, object_t *ob) {
   int res;
 
-/* disallow users to issue commands containing ansi escape codes */
-#if defined(NO_ANSI) && !defined(STRIP_BEFORE_PROCESS_INPUT)
-  char *c;
+  /* disallow users to issue commands containing ansi escape codes */
+  if (CONFIG_INT(__RC_NO_ANSI__) && !CONFIG_INT(__RC_STRIP_BEFORE_PROCESS_INPUT__)) {
+    char *c;
 
-  for (c = str; *c; c++) {
-    if (*c == 27) {
-      *c = ' '; /* replace ESC with ' ' */
+    for (c = str; *c; c++) {
+      if (*c == 27) {
+        *c = ' '; /* replace ESC with ' ' */
+      }
     }
   }
-#endif
 
   save_command_giver(ob);
   res = user_parser(str);

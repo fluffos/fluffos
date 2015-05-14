@@ -423,11 +423,11 @@ def:
       /* Handle type checking here so we know whether to typecheck
          'argument' */
       if ($1 & 0xffff) {
-#ifdef OLD_TYPE_BEHAVIOR
-        exact_types = 0;
-#else
-        exact_types = ($1& 0xffff) | $2;
-#endif
+        if (CONFIG_INT(__RC_OLD_TYPE_BEHAVIOR__)) {
+          exact_types = 0;
+        } else {
+          exact_types = ($1& 0xffff) | $2;
+        }
       } else {
         if (pragmas & PRAGMA_STRICT_TYPES) {
           if (strcmp($3, "create") != 0)
@@ -2810,13 +2810,13 @@ expr4:
     }
   | expr4 '[' comma_expr L_RANGE comma_expr ']'
     {
-#ifndef OLD_RANGE_BEHAVIOR
-#ifdef WARN_OLD_RANGE_BEHAVIOR
+    if (!CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
+      if (CONFIG_INT(__RC_WARN_OLD_RANGE_BEHAVIOR__)) {
       if ($1->type != TYPE_MAPPING &&
           $5->kind == NODE_NUMBER && $5->v.number < 0)
         yywarn("A negative constant as the second element of arr[x..y] no longer means indexing from the end.  Use arr[x..<y]");
-#endif
-#endif
+      }
+    }
       $$ = make_range_node(F_NN_RANGE, $1, $3, $5);
     }
   | expr4 '[' '<' comma_expr L_RANGE comma_expr ']'
@@ -3016,10 +3016,11 @@ expr4:
   | l_new_function_open ':' ')'
 #endif
     {
-#ifdef WOMBLES
-      if(*(outp-2) != ':')
-        yyerror("End of functional not found");
-#endif
+      if (CONFIG_INT(__RC_WOMBLES__)) {
+        if(*(outp-2) != ':') {
+          yyerror("End of functional not found");
+        }
+      }
       $$ = new_node();
       $$->kind = NODE_FUNCTION_CONSTRUCTOR;
       $$->type = TYPE_FUNCTION;
@@ -3053,10 +3054,11 @@ expr4:
     }
   | l_new_function_open ',' expr_list2 ':' ')'
     {
-#ifdef WOMBLES
-      if(*(outp-2) != ':')
-        yyerror("End of functional not found");
-#endif
+      if (CONFIG_INT(__RC_WOMBLES__)) {
+        if(*(outp-2) != ':') {
+          yyerror("End of functional not found");
+        }
+      }
       $$ = new_node();
       $$->kind = NODE_FUNCTION_CONSTRUCTOR;
       $$->type = TYPE_FUNCTION;
@@ -3147,10 +3149,11 @@ expr4:
     }
   | L_FUNCTION_OPEN comma_expr ':' ')'
     {
-#ifdef WOMBLES
-      if(*(outp-2) != ':')
-        yyerror("End of functional not found");
-#endif
+      if (CONFIG_INT(__RC_WOMBLES__)) {
+        if(*(outp-2) != ':') {
+          yyerror("End of functional not found");
+        }
+      }
       if (current_function_context->num_locals)
         yyerror("Illegal to use local variable in functional.");
       if (current_function_context->values_list->r.expr)
@@ -3169,18 +3172,20 @@ expr4:
     }
   | L_MAPPING_OPEN expr_list3 ']' ')'
     {
-#ifdef WOMBLES
-      if(*(outp-2) != ']')
-        yyerror("End of mapping not found");
-#endif
+      if (CONFIG_INT(__RC_WOMBLES__)) {
+        if(*(outp-2) != ']') {
+          yyerror("End of mapping not found");
+        }
+      }
       CREATE_CALL($$, F_AGGREGATE_ASSOC, TYPE_MAPPING, $2);
     }
   | L_ARRAY_OPEN expr_list '}' ')'
     {
-#ifdef WOMBLES
-      if(*(outp-2) != '}')
-        yyerror("End of array not found");
-#endif
+      if (CONFIG_INT(__RC_WOMBLES__)) {
+        if(*(outp-2) != '}') {
+          yyerror("End of array not found");
+        }
+      }
       CREATE_CALL($$, F_AGGREGATE, TYPE_ANY | TYPE_MOD_ARRAY, $2);
     }
 ;

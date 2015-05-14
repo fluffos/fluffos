@@ -125,6 +125,7 @@
  * Note that calling isdigit(x) where x is a signed char with x < 0 (i.e.
  * high bit set) invokes undefined behavior.
  */
+#include <ctype.h>
 #define uisdigit(x) isdigit((unsigned char)x)
 #define uislower(x) islower((unsigned char)x)
 #define uisspace(x) isspace((unsigned char)x)
@@ -137,9 +138,6 @@
 
 /* Compare two number */
 #define COMPARE_NUMS(x, y) (((x) > (y) ? 1 : ((x) < (y) ? -1 : 0)))
-
-// FIXME: move this somewhere else
-#define APPLY_CACHE_SIZE (1 << APPLY_CACHE_BITS)
 
 #include "base/internal/debugmalloc.h"
 #include "base/internal/md.h"

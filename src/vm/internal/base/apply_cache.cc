@@ -11,16 +11,12 @@ static struct program_t *find_function_by_name2(struct program_t * /*prog*/, con
                                                 int * /*indexp*/, int * /*runtime_index*/,
                                                 int * /*fio*/, int * /*vio*/);
 
-#ifdef CACHE_STATS
-unsigned int apply_low_call_others = 0;
-unsigned int apply_low_cache_hits = 0;
-unsigned int apply_low_slots_used = 0;
-unsigned int apply_low_collisions = 0;
-#endif
+static cache_entry_t* cache;
 
-// TODO: this should be changed to allocated on heap.
-// default initialized to 0
-static cache_entry_t cache[APPLY_CACHE_SIZE];
+void apply_cache_init() {
+  apply_cache_size = 1 << CONFIG_INT(__RC_APPLY_CACHE_BITS__);
+  cache = (cache_entry_t*) DCALLOC(apply_cache_size, sizeof(cache_entry_t), TAG_PERMANENT, "apply_cache");
+}
 
 /* Look up a entry for given fun/ob, user must validate
  * the entry content before use */
@@ -30,18 +26,16 @@ cache_entry_t *apply_cache_get_entry(const char *fun, const program_t *prog) {
   std::hash<void *> hash_fn;
   ix = hash_fn((void *)fun);
   ix ^= hash_fn((void *)prog);
-  return &cache[ix % (sizeof(cache) / sizeof(cache_entry_t))];
+  return &cache[ix % apply_cache_size];
 }
 
 /* Erase the current entry. */
 void apply_cache_clear_entry(cache_entry_t *entry) {
-#ifdef CACHE_STATS
   if (!entry->funp) {
     apply_low_slots_used++;
   } else {
     apply_low_collisions++;
   }
-#endif
   if (entry->oprogp) {
     free_prog(&entry->oprogp);
     entry->oprogp = 0;
@@ -82,17 +76,13 @@ void apply_cache_save_entry(cache_entry_t *entry, program_t *target_prog, const 
 // Lookup the program, recursively check inherited object if needed,
 // If program is not defined, return nullptr.
 cache_entry_t *apply_cache_lookup(const char *fun, program_t *prog) {
-#ifdef CACHE_STATS
   apply_low_call_others++;
-#endif
   auto entry = apply_cache_get_entry(fun, prog);
 
   if (entry->oprogp == prog &&                                    /* prog must match */
       (entry->progp ? (strcmp(entry->funp->funcname, fun) == 0) : /* function name must match */
            strcmp(reinterpret_cast<char *>(entry->funp), fun) == 0)) {
-#ifdef CACHE_STATS
     apply_low_cache_hits++;
-#endif
   } else { /* not found in cache, search the function. */
     /* 1) Clean current entry */
     apply_cache_clear_entry(entry);
@@ -167,7 +157,7 @@ static struct program_t *find_function_by_name2(program_t *prog, const char **na
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_apply_low_cache() {
   int i;
-  for (i = 0; i < APPLY_CACHE_SIZE; i++) {
+  for (i = 0; i < apply_cache_size; i++) {
     if (cache[i].funp && !cache[i].progp) {
       EXTRA_REF(BLOCK((char *)cache[i].funp))++;
     }

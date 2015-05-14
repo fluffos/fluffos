@@ -1,12 +1,14 @@
 #include "base/std.h"
 
-#include "vm/internal/base/apply_cache.h"
 #include "vm/internal/apply.h"
 
-#include <cstdio>  // for sprintf
+#include <algorithm>  // for std::min
+#include <cstdio>     // for sprintf
 
+#include "vm/internal/base/apply_cache.h"
 #include "vm/internal/base/machine.h"
 #include "vm/internal/compiler/compiler.h"
+#include "vm/internal/compiler/lex.h"
 
 // global static result
 svalue_t apply_ret_value;
@@ -70,55 +72,54 @@ void check_co_args2(unsigned short *types, int num_arg, const char *name, const 
       }
       sprintf(buf, "Bad argument %d in call to %s() in %s\nExpected: %s Got %s.\n", i, name,
               ob_name, type_name(exptype), type_name((sp - argc)->type));
-#ifdef CALL_OTHER_WARN
-      if (current_prog) {
-        const char *file;
-        int line;
-        get_line_number_info(&file, &line);
-        int prsave = pragmas;
-        pragmas &= ~PRAGMA_ERROR_CONTEXT;
-        smart_log(file, line, buf, 1);
-        pragmas = prsave;
+      if (CONFIG_INT(__RC_CALL_OTHER_WARN__)) {
+        if (current_prog) {
+          const char *file;
+          int line;
+          get_line_number_info(&file, &line);
+          int prsave = pragmas;
+          pragmas &= ~PRAGMA_ERROR_CONTEXT;
+          smart_log(file, line, buf, 1);
+          pragmas = prsave;
+        } else {
+          smart_log("driver", 0, buf, 1);
+        }
       } else {
-        smart_log("driver", 0, buf, 1);
+        error(buf);
       }
-#else
-      error(buf);
-#endif
     }
   } while (i < num_arg);
 }
 
 // util functions
 void check_co_args(int num_arg, const program_t *prog, function_t *fun, int findex) {
-#ifdef CALL_OTHER_TYPE_CHECK
-  if (num_arg != fun->num_arg) {
-    char buf[1024];
-    // if(!current_prog) what do i need this for again?
-    // current_prog = master_ob->prog;
-    sprintf(buf, "Wrong number of arguments to %s in %s.\n", fun->funcname, prog->filename);
-#ifdef CALL_OTHER_WARN
-    if (current_prog) {
-      const char *file;
-      int line;
-      int prsave = pragmas;
-      pragmas &= ~PRAGMA_ERROR_CONTEXT;
-      get_line_number_info(&file, &line);
-      smart_log(file, line, buf, 1);
-      pragmas = prsave;
-    } else {
-      smart_log("driver", 0, buf, 1);
+  if (CONFIG_INT(__RC_CALL_OTHER_TYPE_CHECK__)) {
+    if (num_arg != fun->num_arg) {
+      char buf[1024];
+      // if(!current_prog) what do i need this for again?
+      // current_prog = master_ob->prog;
+      sprintf(buf, "Wrong number of arguments to %s in %s.\n", fun->funcname, prog->filename);
+      if (CONFIG_INT(__RC_CALL_OTHER_WARN__)) {
+        if (current_prog) {
+          const char *file;
+          int line;
+          int prsave = pragmas;
+          pragmas &= ~PRAGMA_ERROR_CONTEXT;
+          get_line_number_info(&file, &line);
+          smart_log(file, line, buf, 1);
+          pragmas = prsave;
+        } else {
+          smart_log("driver", 0, buf, 1);
+        }
+      } else {
+        error(buf);
+      }
     }
-#else
-    error(buf);
-#endif
+    int num_arg_check = std::min((unsigned char)num_arg, fun->num_arg);
+    if (num_arg_check && prog->type_start && prog->type_start[findex] != INDEX_START_NONE)
+      check_co_args2(&prog->argument_types[prog->type_start[findex]], num_arg, fun->funcname,
+                     prog->filename, num_arg);
   }
-
-  int num_arg_check = std::min(num_arg, fun->num_arg);
-  if (num_arg_check && prog->type_start && prog->type_start[findex] != INDEX_START_NONE)
-    check_co_args2(&prog->argument_types[prog->type_start[findex]], num_arg, fun->funcname,
-                   prog->filename, num_arg);
-#endif
 }
 
 /*
@@ -170,9 +171,9 @@ int apply_low(const char *fun, object_t *ob, int num_arg) {
 * This object will now be used, and is thus a target for reset later on
 * (when time due).
 */
-#if !defined(NO_RESETS) && defined(LAZY_RESETS)
-  try_reset(ob);
-#endif
+  if (!CONFIG_INT(__RC_NO_RESETS__) && CONFIG_INT(__RC_LAZY_RESETS__)) {
+    try_reset(ob);
+  }
   if (ob->flags & O_DESTRUCTED) {
     pop_n_elems(num_arg);
     return 0;
@@ -258,12 +259,12 @@ retry_for_shadow:
     } else {
       setup_variables(csp->num_local_variables, funp->num_local, funp->num_arg);
     }
-#ifdef TRACE
-    tracedepth++;
-    if (TRACEP(TRACE_CALL)) {
-      do_trace_call(findex);
+    if (CONFIG_INT(__RC_TRACE__)) {
+      tracedepth++;
+      if (TRACEP(TRACE_CALL)) {
+        do_trace_call(findex);
+      }
     }
-#endif
 #ifdef DTRACE
     DTRACE_PROBE3(fluffos, lpc__entry, ob->obname, fun, current_prog->filename);
 #endif
@@ -297,16 +298,16 @@ svalue_t *apply(const char *fun, object_t *ob, int num_arg, int where) {
   tracedepth = 0;
   call_origin = where;
 
-#ifdef TRACE
-  if (TRACEP(TRACE_APPLY)) {
-    static int inapply = 0;
-    if (!inapply) {
-      inapply = 1;
-      do_trace("Apply", "", "\n");
-      inapply = 0;
+  if (CONFIG_INT(__RC_TRACE__)) {
+    if (TRACEP(TRACE_APPLY)) {
+      static int inapply = 0;
+      if (!inapply) {
+        inapply = 1;
+        do_trace("Apply", "", "\n");
+        inapply = 0;
+      }
     }
   }
-#endif
 #ifdef DEBUG
   expected_sp = sp - num_arg;
 #endif

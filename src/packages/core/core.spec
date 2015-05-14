@@ -62,12 +62,11 @@ string capitalize(string);
 string *explode(string, string);
 mixed implode(mixed *, string | function, void | mixed);
 
-#ifdef CALLOUT_HANDLES
 int call_out(string | function, int|float, ...);
-#else
-void call_out(string | function, int|float, ...);
-#endif
 int call_out_walltime(string | function, int|float, ...);
+mixed *call_out_info();
+int find_call_out(int | string);
+int remove_call_out(int | void | string);
 
 int member_array(mixed, string | mixed *, void | int, void | int);
 int input_to(string | function, ...);
@@ -131,11 +130,6 @@ void message(mixed, mixed, string | string * | object | object *,
 
 object find_object(string, int default: 0);
 object load_object find_object(string, int default: 1);
-#ifdef CALLOUT_HANDLES
-int find_call_out(int | string);
-#else
-int find_call_out(string);
-#endif
 
 /* mapping functions */
 
@@ -183,7 +177,7 @@ void replace_program(string);
 mixed regexp(string | string *, string, void | int);
 mixed *reg_assoc(string, string *, mixed *, mixed | void);
 mixed *allocate(int, void | mixed);
-mixed *call_out_info();
+
 
 /* 32-bit cyclic redundancy code - see crc32.c and crctab.h */
 int crc32(string OR_BUFFER);
@@ -232,11 +226,6 @@ string query_ip_number(void | object);
 object snoop(object, void | object);
 object query_snoop(object);
 object query_snooping(object);
-#endif
-#ifdef CALLOUT_HANDLES
-int remove_call_out(int | void | string);
-#else
-int remove_call_out(void | string);
 #endif
 void set_heart_beat(int);
 int query_heart_beat(object default:F__THIS_OBJECT);
@@ -295,7 +284,10 @@ object master();
  * various mudlib statistics
  */
 int memory_info(object | void);
+
+/* Runtime configs */
 mixed get_config(int);
+void set_config(int, mixed);
 
 #ifdef PRIVS
 /* privledge functions */
@@ -327,10 +319,7 @@ string ed_cmd(string);
 int query_ed_mode();
 #endif
 
-#ifdef CACHE_STATS
 string cache_stats();
-#endif
-
 mixed filter(string | mixed * | mapping, string | function, ...);
 mixed filter_array filter(mixed *, string | function, ...);
 mapping filter_mapping filter(mapping, string | function, ...);
@@ -347,11 +336,6 @@ void dumpallobj(string | void);
 
 string dump_file_descriptors();
 string query_load_average();
-
-#ifndef NO_LIGHT
-/* set_light should die a dark death */
-int set_light(int);
-#endif
 
 string origin();
 
@@ -371,10 +355,6 @@ int get_eval_cost set_eval_limit(int default: -1);
 void set_debug_level(int | string);
 mapping debug_levels();
 void clear_debug_level(string);
-#endif
-
-#if defined(OPCPROF) || defined(OPCPROF_2D)
-void opcprof(string | void);
 #endif
 
 #ifdef PROFILE_FUNCTIONS

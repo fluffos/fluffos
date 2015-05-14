@@ -629,23 +629,29 @@ void f_range(int code) {
 
       len = SVALUE_STRLEN(sp);
       to = (--sp)->u.number;
-      if (code & 0x01) {
-        to = len - to;
+
+      if (!CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
+        if (code & 0x01) {
+          to = len - to;
+        }
+        from = (--sp)->u.number;
+        if (code & 0x10) {
+          from = len - from;
+        }
+      } else {
+        if (code & 0x01) {
+          to = len - to;
+        } else if (to < 0) {
+          to += len;
+        }
+        from = (--sp)->u.number;
+        if (code & 0x10) {
+          from = len - from;
+        } else if (from < 0) {
+          from += len;
+        }
       }
-#ifdef OLD_RANGE_BEHAVIOR
-      else if (to < 0) {
-        to += len;
-      }
-#endif
-      from = (--sp)->u.number;
-      if (code & 0x10) {
-        from = len - from;
-      }
-#ifdef OLD_RANGE_BEHAVIOR
-      else if (from < 0) {
-        from += len;
-      }
-#endif
+
       if (from < 0) {
         from = 0;
       }
@@ -679,26 +685,26 @@ void f_range(int code) {
       if (code & 0x01) {
         to = len - to;
       }
-#ifdef OLD_RANGE_BEHAVIOR
-      if (to < 0) {
-        to += len;
+      if (CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
+        if (to < 0) {
+          to += len;
+        }
       }
-#endif
       from = (--sp)->u.number;
       if (code & 0x10) {
         from = len - from;
       }
-#ifdef OLD_RANGE_BEHAVIOR
-      if (from < 0) {
-        if ((from += len) < 0) {
+      if (CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
+        if (from < 0) {
+          if ((from += len) < 0) {
+            from = 0;
+          }
+        }
+      } else {
+        if (from < 0) {
           from = 0;
         }
       }
-#else
-      if (from < 0) {
-        from = 0;
-      }
-#endif
       if (to < from || from >= len) {
         free_buffer(rbuf);
         put_buffer(null_buffer());
@@ -752,17 +758,17 @@ void f_extract_range(int code) {
       if (code) {
         from = len - from;
       }
-#ifdef OLD_RANGE_BEHAVIOR
-      if (from < 0) {
-        if ((from += len) < 0) {
+      if (CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
+        if (from < 0) {
+          if ((from += len) < 0) {
+            from = 0;
+          }
+        }
+      } else {
+        if (from < 0) {
           from = 0;
         }
       }
-#else
-      if (from < 0) {
-        from = 0;
-      }
-#endif
       if (from >= len) {
         sp->type = T_STRING;
         sp->subtype = STRING_CONSTANT;
@@ -783,17 +789,17 @@ void f_extract_range(int code) {
       if (code) {
         from = len - from;
       }
-#ifdef OLD_RANGE_BEHAVIOR
-      if (from < 0) {
-        if ((from += len) < 0) {
+      if (CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
+        if (from < 0) {
+          if ((from += len) < 0) {
+            from = 0;
+          }
+        }
+      } else {
+        if (from < 0) {
           from = 0;
         }
       }
-#else
-      if (from < 0) {
-        from = 0;
-      }
-#endif
       if (from > len) {
         from = len;
       }
