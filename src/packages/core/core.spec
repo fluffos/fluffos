@@ -284,7 +284,10 @@ object master();
  * various mudlib statistics
  */
 int memory_info(object | void);
+
+/* Runtime configs */
 mixed get_config(int);
+void set_config(int, mixed);
 
 #ifdef PRIVS
 /* privledge functions */

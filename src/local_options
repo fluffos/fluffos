@@ -42,6 +42,10 @@
 #define SAVE_EXTENSION ".o"
 #define SAVE_GZ_EXTENSION ".o.gz"
 
+#undef USE_ICONV
+#undef IPV6
+#undef DTRACE
+
 /****************************************************************************
  *                              PACKAGES                                    *
  ****************************************************************************/

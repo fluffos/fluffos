@@ -9,6 +9,7 @@ struct cache_entry_t {
   unsigned short variable_index_offset;
 };
 
+void apply_cache_init();
 cache_entry_t *apply_cache_lookup(const char *, struct program_t *);
 
 #endif /* LPC_APPLY_CACHE_H_ */

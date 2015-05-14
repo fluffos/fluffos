@@ -328,7 +328,21 @@ warn old range behavior : 1
 #
 suppress argument warnings : 1
 
+# add_action: Make enable_commands() always re-call init(). same as
+# calling enable_commands(1).
+#
+enable_commands call init : 0
 
+# sprintf: Make format like "%10s" ignore ANSI escape code length, as they
+# are not visible in the client.
+#
+sprintf add_justified ignore ANSI colors : 0
+
+# APPLY_CACHE_BITS: defines the number of bits to use in the func lookup cache.
+#
+#   22 bits : (1  << 22) * (3 * 8 + 2 * 2) ~= 112MB.
+#
+apply cache bits : 22
 
 ###############################################################################
 #          The following aren't currently used or implemented (yet)           #

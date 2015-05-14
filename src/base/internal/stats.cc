@@ -42,3 +42,10 @@ uint64_t total_class_size = 0;
 uint64_t num_mappings = 0;
 uint64_t total_mapping_size = 0;
 uint64_t total_mapping_nodes = 0;
+
+// Apply cache stats
+uint64_t apply_low_call_others = 0;
+uint64_t apply_low_cache_hits = 0;
+uint64_t apply_low_slots_used = 0;
+uint64_t apply_low_collisions = 0;
+uint64_t apply_cache_size = 0;

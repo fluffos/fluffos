@@ -246,7 +246,7 @@ static void enable_commands(int enable, int toggle_action) {
 
     current_object->flags |= O_ENABLE_COMMANDS;
     set_command_giver(current_object);
-    if (toggle_action) {
+    if (toggle_action || CONFIG_INT(__ENABLE_COMMANDS_CALL_INIT__) != 0) {
       // NOTE: gotcha for re-enabling commands after disabling commands.
       //
       // Imagine in room A, player B, has a item C.

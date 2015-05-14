@@ -11,18 +11,6 @@
  * Most of these options will probably be of no interest to many users.  *
  *************************************************************************/
 
-/* USE_ICONV: Use iconv to translate input and output from/to the users char
- * encoding
- */
-#define USE_ICONV
-
-/* IPV6: Use IP version 6 instead of 4, for most people the only difference
- * will be that numerical IP addresses get ::ffff: added in front.*/
-#define IPV6
-
-/* static user space dtrace probes, try them if you have dtrace! */
-#undef DTRACE
-
 /* You may optionally choose one (or none) of these malloc wrappers.  These
  * can be used in conjunction with any of the above malloc packages.
  *
@@ -52,13 +40,6 @@
  * more memory.  Mainly for debugging.
  */
 #undef CHECK_MEMORY
-
-/* APPLY_CACHE_BITS: defines the number of bits to use in the func lookup cache
- *   (in interpret.c).
- *
- *   22 bites : (1  << 22) * (3 * 8 + 2 * 2) ~= 112MB.
- */
-#define APPLY_CACHE_BITS 22
 
 /* NO_BUFFER_TYPE: if this is #define'd then LPC code using the 'buffer'
  *   type won't be allowed to compile (since the 'buffer' type won't be

@@ -416,6 +416,21 @@ void read_config(char *filename) {
     CONFIG_INT(__SUPPRESS_ARGUMENT_WARNINGS__) = 1;
   }
 
+  if (!scan_config_line("enable_commands call init : %d\n",
+                        &CONFIG_INT(__ENABLE_COMMANDS_CALL_INIT__), -1)) {
+    CONFIG_INT(__ENABLE_COMMANDS_CALL_INIT__) = 1;
+  }
+
+  if (!scan_config_line("sprintf add_justified ignore ANSI colors : %d\n",
+                        &CONFIG_INT(__SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__), -1)) {
+    CONFIG_INT(__SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__) = 0;
+  }
+
+  if (!scan_config_line("apply cache bits : %d\n",
+                        &CONFIG_INT(__APPLY_CACHE_BITS__), -1)) {
+    CONFIG_INT(__APPLY_CACHE_BITS__) = 22;
+  }
+
   // Complain about obsolete config lines.
   scan_config_line("address server ip : %[^\n]", tmp, -2);
   scan_config_line("address server port : %d\n", tmp, -2);

@@ -165,10 +165,10 @@ static void print_cache_stats(outbuffer_t *ob) {
               100 * (static_cast<LPC_FLOAT>(apply_low_cache_hits) / apply_low_call_others));
   outbuf_addv(ob, "call_others:     %10lu\n", apply_low_call_others);
   outbuf_addv(ob, "cache hits:      %10lu\n", apply_low_cache_hits);
-  outbuf_addv(ob, "cache size:      %10lu\n", APPLY_CACHE_SIZE);
+  outbuf_addv(ob, "cache size:      %10lu\n", apply_cache_size);
   outbuf_addv(ob, "slots used:      %10lu\n", apply_low_slots_used);
   outbuf_addv(ob, "%% slots used:    %10.2f\n",
-              100 * (static_cast<LPC_FLOAT>(apply_low_slots_used) / APPLY_CACHE_SIZE));
+              100 * (static_cast<LPC_FLOAT>(apply_low_slots_used) / apply_cache_size));
   outbuf_addv(ob, "collisions:      %10lu\n", apply_low_collisions);
   outbuf_addv(ob, "%% collisions:    %10.2f\n",
               100 * (static_cast<LPC_FLOAT>(apply_low_collisions) / apply_low_call_others));
@@ -3286,7 +3286,7 @@ void f_memory_info(void) {
   object_t *ob;
 
   if (st_num_arg == 0) {
-    int tot;
+    LPC_INT tot;
 
     tot = total_prog_block_size + total_array_size + total_class_size + total_mapping_size +
           tot_alloc_object_size + tot_alloc_sentence * sizeof(sentence_t) +
