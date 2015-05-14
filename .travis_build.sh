@@ -68,7 +68,7 @@ if [ -n "$COVERITY" ]; then
   if [[ "$(git branch | grep coverity_scan)" =~ ^.+coverity_scan$ ]]; then
     wget https://scan.coverity.com/download/linux-64 --post-data "token=DW98q3VnP4QKLy4wwLwReQ&project=fluffos%2Ffluffos" -O coverity_tool.tgz
     tar zxvf coverity_tool.tgz
-    $PWD/cov-analysis-linux64-7.5.0/bin/cov-build --dir cov-int make -j 2
+    $PWD/cov-analysis-linux64-*/bin/cov-build --dir cov-int make -j 2
     tar czvf cov.tgz cov-int
     curl --form token=DW98q3VnP4QKLy4wwLwReQ \
          --form email=sunyucong@gmail.com \
