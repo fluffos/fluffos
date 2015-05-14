@@ -1497,7 +1497,7 @@ void move_object(object_t *item, object_t *dest) {
   }
 #endif
 
-  if (!CONFIG_INT(__NO_RESETS__) && CONFIG_INT(__LAZY_RESETS__)) {
+  if (!CONFIG_INT(__RC_NO_RESETS__) && CONFIG_INT(__RC_LAZY_RESETS__)) {
     try_reset(dest);
   }
   if (item->super) {
@@ -1636,7 +1636,7 @@ void fatal(const char *fmt, ...) {
     /* fall through */
     case 1:
       in_fatal = 2;
-      if (CONFIG_INT(__TRAP_CRASHES__)) {
+      if (CONFIG_INT(__RC_TRAP_CRASHES__)) {
         copy_and_push_string(msg_buf);
         push_object(command_giver);
         push_object(current_object);
@@ -1758,7 +1758,7 @@ void _error_handler(char *err) {
 
   debug_message_with_location(err + 1);
 #if defined(DEBUG)
-  if (CONFIG_INT(__TRACE_CODE__)) {
+  if (CONFIG_INT(__RC_TRACE_CODE__)) {
     object_name = dump_trace(1);
   } else {
     object_name = dump_trace(0);
@@ -1812,7 +1812,7 @@ void error_handler(char *err) {
   if (((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) {
     /* user catches this error */
     /* This is added so that catches generate messages in the log file. */
-    if (!CONFIG_INT(__MUDLIB_ERROR_HANDLER__)) {
+    if (!CONFIG_INT(__RC_MUDLIB_ERROR_HANDLER__)) {
       debug_message_with_location(err);
       (void)dump_trace(0);
     } else {
@@ -1864,7 +1864,7 @@ void error_handler(char *err) {
     add_errors(&current_object->stats, 1);
   }
 #endif
-  if (!CONFIG_INT(__MUDLIB_ERROR_HANDLER__)) {
+  if (!CONFIG_INT(__RC_MUDLIB_ERROR_HANDLER__)) {
     _error_handler(err);
   } else {
     if (!too_deep_error) {

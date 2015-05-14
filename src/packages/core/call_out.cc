@@ -48,7 +48,7 @@ static void free_called_call(pending_call_t *cop) {
   }
   cop->ob = NULL;
   cop->function.s = NULL;
-  if (CONFIG_INT(__THIS_PLAYER_IN_CALL_OUT__)) {
+  if (CONFIG_INT(__RC_THIS_PLAYER_IN_CALL_OUT__)) {
     if (cop->command_giver) {
       free_object(&cop->command_giver, "free_call");
       cop->command_giver = 0;
@@ -112,7 +112,7 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, std::chrono::milliseconds dela
   g_callout_object_handle_map.insert(
       std::make_pair(cop->ob ? cop->ob : fun->u.fp->hdr.owner, cop->handle));
 
-  if (CONFIG_INT(__THIS_PLAYER_IN_CALL_OUT__)) {
+  if (CONFIG_INT(__RC_THIS_PLAYER_IN_CALL_OUT__)) {
     cop->command_giver = command_giver; /* save current user context */
     if (command_giver) {
       add_ref(command_giver, "new_call_out"); /* Bump its ref */
@@ -183,7 +183,7 @@ void call_out(pending_call_t *cop) {
   }
 #endif
   new_command_giver = 0;
-  if (CONFIG_INT(__THIS_PLAYER_IN_CALL_OUT__)) {
+  if (CONFIG_INT(__RC_THIS_PLAYER_IN_CALL_OUT__)) {
     if (cop->command_giver && !(cop->command_giver->flags & O_DESTRUCTED)) {
       new_command_giver = cop->command_giver;
     } else if (ob && (ob->flags & O_LISTENER)) {
@@ -390,7 +390,7 @@ void mark_call_outs() {
     } else {
       cop->function.f->hdr.extra_ref++;
     }
-    if (CONFIG_INT(__THIS_PLAYER_IN_CALL_OUT__)) {
+    if (CONFIG_INT(__RC_THIS_PLAYER_IN_CALL_OUT__)) {
       if (cop->command_giver) {
         cop->command_giver->extra_ref++;
       }
@@ -539,7 +539,7 @@ void reclaim_call_outs() {
   }
   DBG_CALLOUT("reclaim_call_outs: %d garbage in object handle map.\n", i);
 
-  if (CONFIG_INT(__THIS_PLAYER_IN_CALL_OUT__)) {
+  if (CONFIG_INT(__RC_THIS_PLAYER_IN_CALL_OUT__)) {
     i = 0;
     for (auto iter = g_callout_handle_map.cbegin(); iter != g_callout_handle_map.cend(); iter++) {
       auto cop = iter->second;

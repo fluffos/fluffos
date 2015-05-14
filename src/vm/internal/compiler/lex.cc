@@ -1722,7 +1722,7 @@ int yylex() {
         // ignore these.
         break;
       case '\t':
-        if (CONFIG_INT(__WARN_TAB__)) {
+        if (CONFIG_INT(__RC_WARN_TAB__)) {
           yywarn("<TAB>");
         }
         break;
@@ -1860,7 +1860,7 @@ int yylex() {
         return L_ASSIGN;
       case '(':
         yyp = outp;
-        if (CONFIG_INT(__WOMBLES__)) {
+        if (CONFIG_INT(__RC_WOMBLES__)) {
           c = *yyp++;
         } else {
           while (isspace(c = *yyp++)) {
@@ -2849,76 +2849,76 @@ void add_predefines() {
   add_predefine("__LOCALS_IN_TRACEBACK__", -1, "");
 
   // Following compile time configs has been changed into runtime configs.
-  if (CONFIG_INT(__SANE_EXPLODE_STRING__)) {
+  if (CONFIG_INT(__RC_SANE_EXPLODE_STRING__)) {
     add_predefine("__SANE_EXPLODE_STRING__", -1, "");
   }
-  if (CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__)) {
+  if (CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__)) {
     add_predefine("__REVERSIBLE_EXPLODE_STRING__", -1, "");
   }
-  if (CONFIG_INT(__SANE_SORTING__)) {
+  if (CONFIG_INT(__RC_SANE_SORTING__)) {
     add_predefine("__SANE_SORTING__", -1, "");
   }
-  if (CONFIG_INT(__WOMBLES__)) {
+  if (CONFIG_INT(__RC_WOMBLES__)) {
     add_predefine("__WOMBLES__", -1, "");
   }
-  if (CONFIG_INT(__CALL_OTHER_TYPE_CHECK__)) {
+  if (CONFIG_INT(__RC_CALL_OTHER_TYPE_CHECK__)) {
     add_predefine("__CALL_OTHER_TYPE_CHECK__", -1, "");
   }
-  if (CONFIG_INT(__CALL_OTHER_WARN__)) {
+  if (CONFIG_INT(__RC_CALL_OTHER_WARN__)) {
     add_predefine("__CALL_OTHER_WARN__", -1, "");
   }
-  if (CONFIG_INT(__MUDLIB_ERROR_HANDLER__)) {
+  if (CONFIG_INT(__RC_MUDLIB_ERROR_HANDLER__)) {
     add_predefine("__MUDLIB_ERROR_HANDLER__", -1, "");
   }
-  if (CONFIG_INT(__NO_RESETS__)) {
+  if (CONFIG_INT(__RC_NO_RESETS__)) {
     add_predefine("__NO_RESETS__", -1, "");
   }
-  if (CONFIG_INT(__LAZY_RESETS__)) {
+  if (CONFIG_INT(__RC_LAZY_RESETS__)) {
     add_predefine("__LAZY_RESETS__", -1, "");
   }
-  if (CONFIG_INT(__RANDOMIZED_RESETS__)) {
+  if (CONFIG_INT(__RC_RANDOMIZED_RESETS__)) {
     add_predefine("__RANDOMIZED_RESETS__", -1, "");
   }
-  if (CONFIG_INT(__THIS_PLAYER_IN_CALL_OUT__)) {
+  if (CONFIG_INT(__RC_THIS_PLAYER_IN_CALL_OUT__)) {
     add_predefine("__THIS_PLAYER_IN_CALL_OUT__", -1, "");
   }
-  if (CONFIG_INT(__TRACE__)) {
+  if (CONFIG_INT(__RC_TRACE__)) {
     add_predefine("__TRACE__", -1, "");
   }
-  if (CONFIG_INT(__TRACE_CODE__)) {
+  if (CONFIG_INT(__RC_TRACE_CODE__)) {
     add_predefine("__TRACE_CODE__", -1, "");
   }
-  if (CONFIG_INT(__INTERACTIVE_CATCH_TELL__)) {
+  if (CONFIG_INT(__RC_INTERACTIVE_CATCH_TELL__)) {
     add_predefine("__INTERACTIVE_CATCH_TELL__", -1, "");
   }
-  if (CONFIG_INT(__RECEIVE_SNOOP__)) {
+  if (CONFIG_INT(__RC_RECEIVE_SNOOP__)) {
     add_predefine("__RECEIVE_SNOOP__", -1, "");
   }
-  if (CONFIG_INT(__SNOOP_SHADOWED__)) {
+  if (CONFIG_INT(__RC_SNOOP_SHADOWED__)) {
     add_predefine("__SNOOP_SHADOWED__", -1, "");
   }
-  if (CONFIG_INT(__REVERSE_DEFER__)) {
+  if (CONFIG_INT(__RC_REVERSE_DEFER__)) {
     add_predefine("__REVERSE_DEFER__", -1, "");
   }
-  if (CONFIG_INT(__HAS_CONSOLE__)) {
+  if (CONFIG_INT(__RC_HAS_CONSOLE__)) {
     add_predefine("__HAS_CONSOLE__", -1, "");
   }
-  if (CONFIG_INT(__NONINTERACTIVE_STDERR_WRITE__)) {
+  if (CONFIG_INT(__RC_NONINTERACTIVE_STDERR_WRITE__)) {
     add_predefine("__NONINTERACTIVE_STDERR_WRITE__", -1, "");
   }
-  if (CONFIG_INT(__TRAP_CRASHES__)) {
+  if (CONFIG_INT(__RC_TRAP_CRASHES__)) {
     add_predefine("__TRAP_CRASHES__", -1, "");
   }
-  if (CONFIG_INT(__OLD_TYPE_BEHAVIOR__)) {
+  if (CONFIG_INT(__RC_OLD_TYPE_BEHAVIOR__)) {
     add_predefine("__OLD_TYPE_BEHAVIOR__", -1, "");
   }
-  if (CONFIG_INT(__OLD_RANGE_BEHAVIOR__)) {
+  if (CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
     add_predefine("__OLD_RANGE_BEHAVIOR__", -1, "");
   }
-  if (CONFIG_INT(__WARN_OLD_RANGE_BEHAVIOR__)) {
+  if (CONFIG_INT(__RC_WARN_OLD_RANGE_BEHAVIOR__)) {
     add_predefine("__WARN_OLD_RANGE_BEHAVIOR__", -1, "");
   }
-  if (CONFIG_INT(__SUPPRESS_ARGUMENT_WARNINGS__)) {
+  if (CONFIG_INT(__RC_SUPPRESS_ARGUMENT_WARNINGS__)) {
     add_predefine("__SUPPRESS_ARGUMENT_WARNINGS__", -1, "");
   }
 }

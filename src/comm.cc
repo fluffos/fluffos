@@ -444,7 +444,7 @@ void shutdown_external_ports() {
 
 #ifdef SHADOW_CATCH_MESSAGE
 static int shadow_catch_message(object_t *ob, const char *str) {
-  if (CONFIG_INT(__INTERACTIVE_CATCH_TELL__)) {
+  if (CONFIG_INT(__RC_INTERACTIVE_CATCH_TELL__)) {
     return 0;
   }
   if (!ob->shadowed) {
@@ -478,7 +478,7 @@ void add_message(object_t *who, const char *data, int len) {
    */
   if (!who || (who->flags & O_DESTRUCTED) || !who->interactive ||
       (who->interactive->iflags & (NET_DEAD | CLOSING))) {
-    if (CONFIG_INT(__NONINTERACTIVE_STDERR_WRITE__)) {
+    if (CONFIG_INT(__RC_NONINTERACTIVE_STDERR_WRITE__)) {
       putc(']', stderr);
       fwrite(data, len, 1, stderr);
     }
@@ -502,7 +502,7 @@ void add_message(object_t *who, const char *data, int len) {
    * shadow handling.
    */
   if (shadow_catch_message(who, data)) {
-    if (CONFIG_INT(__SNOOP_SHADOWED__)) {
+    if (CONFIG_INT(__RC_SNOOP_SHADOWED__)) {
       handle_snoop(data, len, ip);
     }
     return;
@@ -1411,7 +1411,7 @@ static void print_prompt(interactive_t *ip) {
 #ifndef NO_SNOOP
 static void receive_snoop(const char *buf, int len, object_t *snooper) {
   /* command giver no longer set to snooper */
-  if (CONFIG_INT(__RECEIVE_SNOOP__)) {
+  if (CONFIG_INT(__RC_RECEIVE_SNOOP__)) {
     char *str;
 
     str = new_string(len, "receive_snoop");

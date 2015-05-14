@@ -46,7 +46,7 @@ void f_debug_info(void) {
       }
 #endif
 
-      if (!CONFIG_INT(__NO_RESETS__)) {
+      if (!CONFIG_INT(__RC_NO_RESETS__)) {
         outbuf_addv(&out, "next_reset  : %d\n", ob->next_reset);
       }
       outbuf_addv(&out, "time_of_ref : %d\n", ob->time_of_ref);

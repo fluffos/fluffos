@@ -630,7 +630,7 @@ void f_range(int code) {
       len = SVALUE_STRLEN(sp);
       to = (--sp)->u.number;
 
-      if (!CONFIG_INT(__OLD_RANGE_BEHAVIOR__)) {
+      if (!CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
         if (code & 0x01) {
           to = len - to;
         }
@@ -685,7 +685,7 @@ void f_range(int code) {
       if (code & 0x01) {
         to = len - to;
       }
-      if (CONFIG_INT(__OLD_RANGE_BEHAVIOR__)) {
+      if (CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
         if (to < 0) {
           to += len;
         }
@@ -694,7 +694,7 @@ void f_range(int code) {
       if (code & 0x10) {
         from = len - from;
       }
-      if (CONFIG_INT(__OLD_RANGE_BEHAVIOR__)) {
+      if (CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
         if (from < 0) {
           if ((from += len) < 0) {
             from = 0;
@@ -758,7 +758,7 @@ void f_extract_range(int code) {
       if (code) {
         from = len - from;
       }
-      if (CONFIG_INT(__OLD_RANGE_BEHAVIOR__)) {
+      if (CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
         if (from < 0) {
           if ((from += len) < 0) {
             from = 0;
@@ -789,7 +789,7 @@ void f_extract_range(int code) {
       if (code) {
         from = len - from;
       }
-      if (CONFIG_INT(__OLD_RANGE_BEHAVIOR__)) {
+      if (CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
         if (from < 0) {
           if ((from += len) < 0) {
             from = 0;

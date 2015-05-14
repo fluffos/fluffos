@@ -246,7 +246,7 @@ static void enable_commands(int enable, int toggle_action) {
 
     current_object->flags |= O_ENABLE_COMMANDS;
     set_command_giver(current_object);
-    if (toggle_action || CONFIG_INT(__ENABLE_COMMANDS_CALL_INIT__) != 0) {
+    if (toggle_action || CONFIG_INT(__RC_ENABLE_COMMANDS_CALL_INIT__) != 0) {
       // NOTE: gotcha for re-enabling commands after disabling commands.
       //
       // Imagine in room A, player B, has a item C.
@@ -471,7 +471,7 @@ int parse_command(char *str, object_t *ob) {
   int res;
 
   /* disallow users to issue commands containing ansi escape codes */
-  if (CONFIG_INT(__NO_ANSI__) && !CONFIG_INT(__STRIP_BEFORE_PROCESS_INPUT__)) {
+  if (CONFIG_INT(__RC_NO_ANSI__) && !CONFIG_INT(__RC_STRIP_BEFORE_PROCESS_INPUT__)) {
     char *c;
 
     for (c = str; *c; c++) {

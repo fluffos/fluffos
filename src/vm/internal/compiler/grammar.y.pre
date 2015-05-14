@@ -423,7 +423,7 @@ def:
       /* Handle type checking here so we know whether to typecheck
          'argument' */
       if ($1 & 0xffff) {
-        if (CONFIG_INT(__OLD_TYPE_BEHAVIOR__)) {
+        if (CONFIG_INT(__RC_OLD_TYPE_BEHAVIOR__)) {
           exact_types = 0;
         } else {
           exact_types = ($1& 0xffff) | $2;
@@ -2810,8 +2810,8 @@ expr4:
     }
   | expr4 '[' comma_expr L_RANGE comma_expr ']'
     {
-    if (!CONFIG_INT(__OLD_RANGE_BEHAVIOR__)) {
-      if (CONFIG_INT(__WARN_OLD_RANGE_BEHAVIOR__)) {
+    if (!CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
+      if (CONFIG_INT(__RC_WARN_OLD_RANGE_BEHAVIOR__)) {
       if ($1->type != TYPE_MAPPING &&
           $5->kind == NODE_NUMBER && $5->v.number < 0)
         yywarn("A negative constant as the second element of arr[x..y] no longer means indexing from the end.  Use arr[x..<y]");
@@ -3016,7 +3016,7 @@ expr4:
   | l_new_function_open ':' ')'
 #endif
     {
-      if (CONFIG_INT(__WOMBLES__)) {
+      if (CONFIG_INT(__RC_WOMBLES__)) {
         if(*(outp-2) != ':') {
           yyerror("End of functional not found");
         }
@@ -3054,7 +3054,7 @@ expr4:
     }
   | l_new_function_open ',' expr_list2 ':' ')'
     {
-      if (CONFIG_INT(__WOMBLES__)) {
+      if (CONFIG_INT(__RC_WOMBLES__)) {
         if(*(outp-2) != ':') {
           yyerror("End of functional not found");
         }
@@ -3149,7 +3149,7 @@ expr4:
     }
   | L_FUNCTION_OPEN comma_expr ':' ')'
     {
-      if (CONFIG_INT(__WOMBLES__)) {
+      if (CONFIG_INT(__RC_WOMBLES__)) {
         if(*(outp-2) != ':') {
           yyerror("End of functional not found");
         }
@@ -3172,7 +3172,7 @@ expr4:
     }
   | L_MAPPING_OPEN expr_list3 ']' ')'
     {
-      if (CONFIG_INT(__WOMBLES__)) {
+      if (CONFIG_INT(__RC_WOMBLES__)) {
         if(*(outp-2) != ']') {
           yyerror("End of mapping not found");
         }
@@ -3181,7 +3181,7 @@ expr4:
     }
   | L_ARRAY_OPEN expr_list '}' ')'
     {
-      if (CONFIG_INT(__WOMBLES__)) {
+      if (CONFIG_INT(__RC_WOMBLES__)) {
         if(*(outp-2) != '}') {
           yyerror("End of array not found");
         }

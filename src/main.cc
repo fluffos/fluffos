@@ -119,7 +119,7 @@ int main(int argc, char **argv) {
        */
       switch (argv[i][1]) {
         case 'C':
-          if (CONFIG_INT(__HAS_CONSOLE__)) {
+          if (CONFIG_INT(__RC_HAS_CONSOLE__)) {
             has_console = 1;
           }
           continue;

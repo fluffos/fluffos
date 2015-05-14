@@ -1924,7 +1924,7 @@ void tell_object(object_t *ob, const char *str, int len) {
     add_message(0, str, len);
     return;
   }
-  if (CONFIG_INT(__INTERACTIVE_CATCH_TELL__)) {
+  if (CONFIG_INT(__RC_INTERACTIVE_CATCH_TELL__)) {
     tell_npc(ob, str);
   } else {
     /* if this is on, EVERYTHING goes through catch_tell() */
@@ -2057,7 +2057,7 @@ object_t *get_empty_object(int num_var) {
 namespace {
 void set_nextreset(object_t *ob) {
   auto time_to_reset_secs = CONFIG_INT(__TIME_TO_RESET__);
-  if (CONFIG_INT(__RANDOMIZED_RESETS__)) {
+  if (CONFIG_INT(__RC_RANDOMIZED_RESETS__)) {
     time_to_reset_secs = time_to_reset_secs / 2 + random_number(time_to_reset_secs / 2);
   }
   ob->next_reset = g_current_gametick + time_to_gametick(std::chrono::seconds(time_to_reset_secs));
