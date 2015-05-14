@@ -52,7 +52,7 @@ static inline void on_telnet_data(const char *buffer, unsigned long size, intera
         }
         break;
       case 0x1b:
-        if (CONFIG_INT(__NO_ANSI__) && CONFIG_INT(__STRIP_BEFORE_PROCESS_INPUT__)) {
+        if (CONFIG_INT(__RC_NO_ANSI__) && CONFIG_INT(__RC_STRIP_BEFORE_PROCESS_INPUT__)) {
           ip->text[ip->text_end++] = ANSI_SUBSTITUTE;
           break;
         }

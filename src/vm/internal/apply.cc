@@ -72,7 +72,7 @@ void check_co_args2(unsigned short *types, int num_arg, const char *name, const 
       }
       sprintf(buf, "Bad argument %d in call to %s() in %s\nExpected: %s Got %s.\n", i, name,
               ob_name, type_name(exptype), type_name((sp - argc)->type));
-      if (CONFIG_INT(__CALL_OTHER_WARN__)) {
+      if (CONFIG_INT(__RC_CALL_OTHER_WARN__)) {
         if (current_prog) {
           const char *file;
           int line;
@@ -93,13 +93,13 @@ void check_co_args2(unsigned short *types, int num_arg, const char *name, const 
 
 // util functions
 void check_co_args(int num_arg, const program_t *prog, function_t *fun, int findex) {
-  if (CONFIG_INT(__CALL_OTHER_TYPE_CHECK__)) {
+  if (CONFIG_INT(__RC_CALL_OTHER_TYPE_CHECK__)) {
     if (num_arg != fun->num_arg) {
       char buf[1024];
       // if(!current_prog) what do i need this for again?
       // current_prog = master_ob->prog;
       sprintf(buf, "Wrong number of arguments to %s in %s.\n", fun->funcname, prog->filename);
-      if (CONFIG_INT(__CALL_OTHER_WARN__)) {
+      if (CONFIG_INT(__RC_CALL_OTHER_WARN__)) {
         if (current_prog) {
           const char *file;
           int line;
@@ -171,7 +171,7 @@ int apply_low(const char *fun, object_t *ob, int num_arg) {
 * This object will now be used, and is thus a target for reset later on
 * (when time due).
 */
-  if (!CONFIG_INT(__NO_RESETS__) && CONFIG_INT(__LAZY_RESETS__)) {
+  if (!CONFIG_INT(__RC_NO_RESETS__) && CONFIG_INT(__RC_LAZY_RESETS__)) {
     try_reset(ob);
   }
   if (ob->flags & O_DESTRUCTED) {
@@ -259,7 +259,7 @@ retry_for_shadow:
     } else {
       setup_variables(csp->num_local_variables, funp->num_local, funp->num_arg);
     }
-    if (CONFIG_INT(__TRACE__)) {
+    if (CONFIG_INT(__RC_TRACE__)) {
       tracedepth++;
       if (TRACEP(TRACE_CALL)) {
         do_trace_call(findex);
@@ -298,7 +298,7 @@ svalue_t *apply(const char *fun, object_t *ob, int num_arg, int where) {
   tracedepth = 0;
   call_origin = where;
 
-  if (CONFIG_INT(__TRACE__)) {
+  if (CONFIG_INT(__RC_TRACE__)) {
     if (TRACEP(TRACE_APPLY)) {
       static int inapply = 0;
       if (!inapply) {

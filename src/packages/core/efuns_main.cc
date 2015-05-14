@@ -229,7 +229,7 @@ void f__call_other(void) {
     }
   }
   /* Send the remaining arguments to the function. */
-  if (CONFIG_INT(__TRACE__)) {
+  if (CONFIG_INT(__RC_TRACE__)) {
     if (TRACEP(TRACE_CALL_OTHER)) {
       do_trace("Call other ", funcname, "\n");
     }
@@ -1480,7 +1480,7 @@ void f_present(void) {
   svalue_t *arg = sp - num_arg + 1;
   object_t *ob;
 
-  if (!CONFIG_INT(__NO_RESETS__) && CONFIG_INT(__LAZY_RESETS__)) {
+  if (!CONFIG_INT(__RC_NO_RESETS__) && CONFIG_INT(__RC_LAZY_RESETS__)) {
     if (num_arg == 2) {
       try_reset(arg[1].u.ob);
     }
@@ -3417,7 +3417,7 @@ void f_defer() {
   struct defer_list *newlist = reinterpret_cast<struct defer_list *>(
       DMALLOC(sizeof(struct defer_list), TAG_TEMPORARY, "defer: new item"));
 
-  if (CONFIG_INT(__REVERSE_DEFER__)) {
+  if (CONFIG_INT(__RC_REVERSE_DEFER__)) {
     // In reverse mode, newlist always will be the last data.
     newlist->next = NULL;
   } else {
@@ -3434,7 +3434,7 @@ void f_defer() {
   }
 
   // In reverse mode, if list is not null, then add new item to the end.
-  if (CONFIG_INT(__REVERSE_DEFER__)) {
+  if (CONFIG_INT(__RC_REVERSE_DEFER__)) {
     // If list is null, then init it with new item.
     if (csp->defers == NULL) {
       csp->defers = newlist;

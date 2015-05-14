@@ -1388,7 +1388,7 @@ function_t *setup_new_frame(int findex) {
   } else {
     setup_variables(csp->num_local_variables, func_entry->num_local, func_entry->num_arg);
   }
-  if (CONFIG_INT(__TRACE__)) {
+  if (CONFIG_INT(__RC_TRACE__)) {
     tracedepth++;
     if (TRACEP(TRACE_CALL)) {
       do_trace_call(findex);
@@ -1444,7 +1444,7 @@ function_t *setup_inherited_frame(int findex) {
   } else {
     setup_variables(csp->num_local_variables, func_entry->num_local, func_entry->num_arg);
   }
-  if (CONFIG_INT(__TRACE__)) {
+  if (CONFIG_INT(__RC_TRACE__)) {
     tracedepth++;
     if (TRACEP(TRACE_CALL)) {
       do_trace_call(findex);
@@ -1805,7 +1805,7 @@ void eval_instruction(char *p) {
       show_lpc_line(f, l);
     }
     instruction = EXTRACT_UCHAR(pc++);
-    if (CONFIG_INT(__TRACE__) || CONFIG_INT(__TRACE_CODE__)) {
+    if (CONFIG_INT(__RC_TRACE__) || CONFIG_INT(__RC_TRACE_CODE__)) {
       real_instruction = instruction;
       /* real EFUN is stored as an short after F_EFUN0 - F_EFUNV instructions */
       if (instruction >= F_EFUN0 && instruction <= F_EFUNV) {
@@ -1814,13 +1814,13 @@ void eval_instruction(char *p) {
           fatal("Error in icode.");
         }
       }
-      if (CONFIG_INT(__TRACE_CODE__)) {
+      if (CONFIG_INT(__RC_TRACE_CODE__)) {
         previous_instruction[last] = real_instruction;
         previous_pc[last] = pc - 1;
         stack_size[last] = sp - fp - csp->num_local_variables;
         last = (last + 1) % (sizeof previous_instruction / sizeof(int));
       }
-      if (CONFIG_INT(__TRACE__)) {
+      if (CONFIG_INT(__RC_TRACE__)) {
         if (TRACEP(TRACE_EXEC)) {
           do_trace("Exec ", query_instr_name(real_instruction), "\n");
         }
@@ -3413,7 +3413,7 @@ void eval_instruction(char *p) {
         DEBUG_CHECK(sp != fp, "Bad stack at F_RETURN_ZERO\n");
         *sp = const0;
         pop_control_stack();
-        if (CONFIG_INT(__TRACE__)) {
+        if (CONFIG_INT(__RC_TRACE__)) {
           tracedepth--;
           if (TRACEP(TRACE_RETURN)) {
             do_trace("Return", "", "");
@@ -3456,7 +3456,7 @@ void eval_instruction(char *p) {
  * maintained */
         }
         pop_control_stack();
-        if (CONFIG_INT(__TRACE__)) {
+        if (CONFIG_INT(__RC_TRACE__)) {
           tracedepth--;
           if (TRACEP(TRACE_RETURN)) {
             do_trace("Return", "", "");
@@ -3701,7 +3701,7 @@ static void do_catch(char *pc, unsigned short new_pc_offset) {
   }
   push_control_stack(FRAME_CATCH);
   csp->pc = current_prog->program + new_pc_offset;
-  if (CONFIG_INT(__TRACE_CODE__)) {
+  if (CONFIG_INT(__RC_TRACE_CODE__)) {
     csp->num_local_variables = (csp - 1)->num_local_variables; /* marion */
   } else {
 #if defined(DEBUG)
@@ -3799,7 +3799,7 @@ void call___INIT(object_t *ob) {
 
   tracedepth = 0;
 
-  if (CONFIG_INT(__TRACE__)) {
+  if (CONFIG_INT(__RC_TRACE__)) {
     if (TRACEP(TRACE_APPLY)) {
       do_trace("Apply", "", "\n");
     }
@@ -4179,7 +4179,7 @@ const char *dump_trace(int how) {
    */
   if (!save_context(&econ)) return 0;
   try {
-    if (CONFIG_INT(__TRACE_CODE__)) {
+    if (CONFIG_INT(__RC_TRACE_CODE__)) {
       if (how) {
         last_instructions();
       }

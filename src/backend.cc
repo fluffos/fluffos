@@ -53,11 +53,11 @@ event_base *init_backend() {
 uint64_t g_current_gametick;
 
 int time_to_gametick(std::chrono::milliseconds msecs) {
-  return msecs.count() / CONFIG_INT(__GAMETICK_MSEC__);
+  return msecs.count() / CONFIG_INT(__RC_GAMETICK_MSEC__);
 }
 
 std::chrono::milliseconds gametick_to_time(int ticks) {
-  return std::chrono::milliseconds(CONFIG_INT(__GAMETICK_MSEC__)) * ticks;
+  return std::chrono::milliseconds(CONFIG_INT(__RC_GAMETICK_MSEC__)) * ticks;
 }
 
 namespace {
@@ -67,8 +67,8 @@ struct event *g_ev_tick = NULL;
 
 inline struct timeval gametick_timeval() {
   static struct timeval val {
-    CONFIG_INT(__GAMETICK_MSEC__) / 1000,             // secs
-        CONFIG_INT(__GAMETICK_MSEC__) % 1000 * 1000,  // usecs
+    CONFIG_INT(__RC_GAMETICK_MSEC__) / 1000,             // secs
+        CONFIG_INT(__RC_GAMETICK_MSEC__) % 1000 * 1000,  // usecs
   };
   return val;
 }
@@ -275,7 +275,7 @@ void look_for_objects_to_swap() {
           std::chrono::seconds(time_to_clean_up)) {
         ready_for_clean_up = 1;
       }
-      if (!CONFIG_INT(__NO_RESETS__) && CONFIG_INT(__LAZY_RESETS__)) {
+      if (!CONFIG_INT(__RC_NO_RESETS__) && CONFIG_INT(__RC_LAZY_RESETS__)) {
         /*
          * Should this object have reset(1) called ?
          */

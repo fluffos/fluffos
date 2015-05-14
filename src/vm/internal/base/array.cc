@@ -255,7 +255,7 @@ array_t *explode_string(const char *str, int slen, const char *del, int len) {
 
     delimeter = *del;
 
-    if (!CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__)) {
+    if (!CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__)) {
       /*
        * Skip leading 'del' strings, if any.
        */
@@ -265,7 +265,7 @@ array_t *explode_string(const char *str, int slen, const char *del, int len) {
         if (str[0] == '\0') {
           return &the_null_array;
         }
-        if (CONFIG_INT(__SANE_EXPLODE_STRING__) != 0) {
+        if (CONFIG_INT(__RC_SANE_EXPLODE_STRING__) != 0) {
           break;
         }
       }
@@ -286,7 +286,7 @@ array_t *explode_string(const char *str, int slen, const char *del, int len) {
      * or, one more.
      */
     limit = max_array_size;
-    if (CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__)) {
+    if (CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__)) {
       num++;
       limit--;
     } else {
@@ -316,7 +316,7 @@ array_t *explode_string(const char *str, int slen, const char *del, int len) {
       }
     }
 
-    if (CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__)) {
+    if (CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__)) {
       ret->item[num].type = T_STRING;
       ret->item[num].subtype = STRING_MALLOC;
       ret->item[num].u.string = string_copy(beg, "explode_string: last, len == 1");
@@ -331,7 +331,7 @@ array_t *explode_string(const char *str, int slen, const char *del, int len) {
     return ret;
   } /* len == 1 */
 
-  if (!CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__)) {
+  if (!CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__)) {
     /*
      * Skip leading 'del' strings, if any.
      */
@@ -341,7 +341,7 @@ array_t *explode_string(const char *str, int slen, const char *del, int len) {
       if (str[0] == '\0') {
         return &the_null_array;
       }
-      if (CONFIG_INT(__SANE_EXPLODE_STRING__)) {
+      if (CONFIG_INT(__RC_SANE_EXPLODE_STRING__)) {
         break;
       }
     }
@@ -363,7 +363,7 @@ array_t *explode_string(const char *str, int slen, const char *del, int len) {
    * Compute number of array items. It is either number of delimiters, or,
    * one more.
    */
-  if (CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__)) {
+  if (CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__)) {
     num++;
   } else {
     if (lastdel != (str + slen - len)) {
@@ -396,7 +396,7 @@ array_t *explode_string(const char *str, int slen, const char *del, int len) {
   }
 
   /* Copy last occurence, if there was not a 'del' at the end. */
-  if (CONFIG_INT(__REVERSIBLE_EXPLODE_STRING__)) {
+  if (CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__)) {
     ret->item[num].type = T_STRING;
     ret->item[num].subtype = STRING_MALLOC;
     ret->item[num].u.string = string_copy(beg, "explode_string: last, len != 1");
@@ -1240,7 +1240,7 @@ void f_sort_array(void) {
 
       tmp = copy_array(tmp);
       push_refed_array(tmp);
-      if (CONFIG_INT(__SANE_SORTING__)) {
+      if (CONFIG_INT(__RC_SANE_SORTING__)) {
         qsort(reinterpret_cast<char *>(tmp->item), tmp->size, sizeof(tmp->item), sort_array_cmp);
       } else {
         old_quickSort((char *)tmp->item, tmp->size, sizeof(tmp->item), sort_array_cmp);

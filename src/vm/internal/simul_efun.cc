@@ -194,7 +194,7 @@ void call_simul_efun(unsigned short index, int num_arg) {
   }
 
   if (simuls[index].func) {
-    if (CONFIG_INT(__TRACE__)) {
+    if (CONFIG_INT(__RC_TRACE__)) {
       if (TRACEP(TRACE_CALL_OTHER)) {
         do_trace("simul_efun ", simuls[index].func->funcname, "\n");
       }

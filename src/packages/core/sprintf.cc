@@ -528,7 +528,7 @@ static void add_justified(const char *str, int slen, pad_info_t *pad, int fs, fo
   // Strip ANSI codes from input string.
   // https://en.wikipedia.org/wiki/ANSI_escape_code#Colors
   // format is "\x1b[X;Ym"
-  if (CONFIG_INT(__SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__)) {
+  if (CONFIG_INT(__RC_SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__)) {
     const char* str_a;
     for(str_a = str; str_a - str < slen; ) {
       if( *str_a=='\x1B' ) {

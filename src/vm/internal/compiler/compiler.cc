@@ -885,7 +885,7 @@ void type_error(const char *str, int type) {
 /* This one really is t1->t2; it isn't symmetric, since int->void isn't allowed.
  */
 int compatible_types(int t1, int t2) {
-  if (CONFIG_INT(__OLD_TYPE_BEHAVIOR__)) {
+  if (CONFIG_INT(__RC_OLD_TYPE_BEHAVIOR__)) {
     /* The old version effectively was almost always was true */
     return 1;
   }
@@ -919,7 +919,7 @@ int compatible_types(int t1, int t2) {
 
 /* This one is symmetric.  Used for comparison operators, etc */
 int compatible_types2(int t1, int t2) {
-  if (CONFIG_INT(__OLD_TYPE_BEHAVIOR__)) {
+  if (CONFIG_INT(__RC_OLD_TYPE_BEHAVIOR__)) {
     /* The old version effectively was almost always was true */
     return 1;
   }
@@ -1303,7 +1303,7 @@ int define_new_function(const char *name, int num_arg, int num_local, int flags,
         mem_block[A_ARGUMENT_TYPES].current_size / sizeof(unsigned short);
     add_to_mem_block(A_ARGUMENT_TYPES, (char *)type_of_locals_ptr,
                      num_arg * sizeof(*type_of_locals_ptr));
-    if (!CONFIG_INT(__SUPPRESS_ARGUMENT_WARNINGS__)) {
+    if (!CONFIG_INT(__RC_SUPPRESS_ARGUMENT_WARNINGS__)) {
       if (flags & FUNC_PROTOTYPE) {
         int i;
 
