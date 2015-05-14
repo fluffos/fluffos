@@ -629,7 +629,8 @@ static int prntln(char *str, char *outstr, int vflg, int lineno) {
       line += sprintf(line, "messing up end of a long line\n");
       break;
     }
-    if (*str < ' ' || *str >= '\0') {
+    // output special ASCII control code
+    if (*str < ' ' || *str == DEL) {
       switch (*str) {
         case '\t':
           /* have to be smart about this or the indentor will fail */
@@ -646,6 +647,7 @@ static int prntln(char *str, char *outstr, int vflg, int lineno) {
           break;
       }
     } else {
+      // copy rest of ANSI code as is.
       *line++ = *str;
     }
     str++;
