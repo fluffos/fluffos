@@ -275,7 +275,7 @@ void look_for_objects_to_swap() {
           std::chrono::seconds(time_to_clean_up)) {
         ready_for_clean_up = 1;
       }
-      if (!CONFIG_INT(__RC_NO_RESETS__) && CONFIG_INT(__RC_LAZY_RESETS__)) {
+      if (!CONFIG_INT(__RC_NO_RESETS__) && !CONFIG_INT(__RC_LAZY_RESETS__)) {
         /*
          * Should this object have reset(1) called ?
          */
