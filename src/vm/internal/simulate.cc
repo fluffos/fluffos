@@ -1918,23 +1918,6 @@ void error(const char *const fmt, ...) {
   error_handler(err_buf);
 }
 
-// FIXME: error() above should be fixed to optionally not throw, so that
-// driver code that not called into LPC can still use it.
-void safe_error(const char *const fmt, ...) {
-  error_context_t econ;
-  try {
-    if (!save_context(&econ)) {
-      return;
-    }
-    va_list args;
-    va_start(args, fmt);
-    error(fmt, args);
-    va_end(args);
-  } catch (const char *msg) {
-    pop_context(&econ);
-  }
-}
-
 void do_message(svalue_t *lclass, svalue_t *msg, array_t *scope, array_t *exclude, int recurse) {
   int i, j, valid;
   object_t *ob;

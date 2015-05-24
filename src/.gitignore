@@ -3,3 +3,13 @@
 *.gcda
 *.gcno
 *.gcov
+*autogen*
+Makefile
+cc.h
+config.*
+configure.*
+driver
+driver.old
+portbind
+dtrace_compile
+

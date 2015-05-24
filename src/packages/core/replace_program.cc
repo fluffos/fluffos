@@ -166,7 +166,7 @@ void f_replace_program(void) {
   }
 
   if (current_object->prog->func_ref) {
-    error("cannot replace a program with function references.\n");
+    debug_message("%s: cannot replace a program with function references, ignored.\n", current_object->prog->filename);
   }
 
   name_len = SVALUE_STRLEN(sp);
