@@ -10,7 +10,7 @@
 #include <errno.h>               // for errno
 #include <event2/buffer.h>       // for evbuffer_freeze, etc
 #include <event2/bufferevent.h>  // for bufferevent_enable, etc
-#include <event2/event.h>        // for event_active, EV_TIMEOUT, etc
+#include <event2/event.h>        // for EV_TIMEOUT, etc
 #include <event2/listener.h>     // for evconnlistener_free, etc
 #include <event2/util.h>         // for evutil_closesocket, etc
 #include <netdb.h>               // for addrinfo, freeaddrinfo, etc
@@ -65,7 +65,9 @@ struct user_event_data {
 void maybe_schedule_user_command(interactive_t *user) {
   // If user has a complete command, schedule a command execution.
   if (user->iflags & CMD_IN_BUF) {
-    event_active(user->ev_command, EV_TIMEOUT, 0);
+    struct timeval zero_sec = { 0, 0 };
+    evtimer_del(user->ev_command);
+    evtimer_add(user->ev_command, &zero_sec);
   }
 }
 
@@ -157,7 +159,7 @@ void new_user_event_listener(interactive_t *user) {
   bufferevent_set_timeouts(bev, NULL, NULL);
 
   user->ev_buffer = bev;
-  user->ev_command = event_new(g_event_base, -1, EV_TIMEOUT | EV_PERSIST, on_user_command, user);
+  user->ev_command = evtimer_new(g_event_base, on_user_command, user);
 }
 
 /*
@@ -268,20 +270,21 @@ void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
   }
 
   // Call logon() on the object.
-  if (!(ob->flags & O_DESTRUCTED)) {
-    /* current_object no longer set */
-    ret = safe_apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
-    if (ret == NULL) {
+  ret = safe_apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
+  if (ret == NULL) {
       debug_message(
-          "new_user_handler: logon() on object %s has failed, the user is left "
-          "dangling.\n",
+          "new_user_handler: logon() on object %s has failed, the user is disconnected.\n",
           ob->obname);
-    }
-    /* function not existing is no longer fatal */
-  } else {
+      remove_interactive(ob, ob->flags & O_DESTRUCTED ? 1 : 0);
+      return;
+  }
+
+  // logon() may decide not to allow user connect by destroying objects.
+  if (ob->flags & O_DESTRUCTED) {
     debug_message(
-        "new_user_handler: object is gone before logon(), the user is left "
-        "dangling. \n");
+        "new_user_handler: object is gone after logon(), the user is disconnected.\n");
+    remove_interactive(ob, 1);
+    return;
   }
 
   debug(connections, ("new_user_handler: end\n"));
@@ -757,7 +760,9 @@ void get_user_data(interactive_t *ip) {
         // If we read something, search for command.
         if (cmd_in_buf(ip)) {
           ip->iflags |= CMD_IN_BUF;
-          event_active(ip->ev_command, EV_TIMEOUT, 0);
+          struct timeval zero_sec = { 0, 0 };
+          evtimer_del(ip->ev_command);
+          evtimer_add(ip->ev_command, &zero_sec);
         }
       }
       break;
@@ -1117,7 +1122,9 @@ exit:
     print_prompt(ip);
     // FIXME: this doesn't belong here, should be moved to event.cc
     if (ip->iflags & CMD_IN_BUF) {
-      event_active(ip->ev_command, EV_TIMEOUT, 0);
+        struct timeval zero_sec = { 0, 0 };
+        evtimer_del(ip->ev_command);
+        evtimer_add(ip->ev_command, &zero_sec);
     }
   }
 
@@ -1186,6 +1193,7 @@ void remove_interactive(object_t *ob, int dested) {
     ip->ev_buffer = NULL;
   }
   if (ip->ev_command != NULL) {
+    evtimer_del(ip->ev_command);
     event_free(ip->ev_command);
     ip->ev_command = NULL;
   }
@@ -1310,6 +1318,17 @@ static int call_function_interactive(interactive_t *i, char *str) {
     }
   }
 
+  // FIXME: this logic can be combined with above.
+  if (was_single && !(i->iflags & SINGLE_CHAR)) {
+      i->text_start = i->text_end = 0;
+      i->text[0] = '\0';
+      i->iflags &= ~CMD_IN_BUF;
+      set_linemode(i, true);
+  }
+  if (was_noecho && !(i->iflags & NOECHO)) {
+      set_localecho(i, true);
+  }
+
   copy_and_push_string(str);
   /*
    * If we have args, we have to push them onto the stack in the order they
@@ -1329,19 +1348,9 @@ static int call_function_interactive(interactive_t *i, char *str) {
   } else {
     safe_call_function_pointer(funp, num_arg + 1);
   }
-
+  // NOTE: we can't use "i" here anymore, it is possible that it
+  // has been freed.
   pop_stack(); /* remove `function' from stack */
-
-  if (was_single && !(i->iflags & SINGLE_CHAR)) {
-    i->text_start = i->text_end = 0;
-    i->text[0] = '\0';
-    i->iflags &= ~CMD_IN_BUF;
-    set_linemode(i, true);
-  }
-  if (was_noecho && !(i->iflags & NOECHO)) {
-    set_localecho(i, true);
-  }
-
   return (1);
 } /* call_function_interactive() */
 
