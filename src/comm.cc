@@ -262,12 +262,15 @@ void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
   master_ob->flags &= ~O_ONCE_INTERACTIVE;
   master_ob->interactive = 0;
   add_ref(ob, "new_user");
-  set_command_giver(ob);
+
+  // start reverse DNS probing.
   query_name_by_addr(ob);
 
   if (user->connection_type == PORT_TELNET) {
     send_initial_telent_negotiantions(user);
   }
+
+  set_command_giver(ob);
 
   // Call logon() on the object.
   ret = safe_apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
@@ -275,20 +278,14 @@ void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
       debug_message(
           "new_user_handler: logon() on object %s has failed, the user is disconnected.\n",
           ob->obname);
-      remove_interactive(ob, ob->flags & O_DESTRUCTED ? 1 : 0);
-      return;
+      destruct_object(ob);
+      ob = NULL;
+  } else if (ob->flags & O_DESTRUCTED) {
+    // logon() may decide not to allow user connect by destroying objects.
   }
-
-  // logon() may decide not to allow user connect by destroying objects.
-  if (ob->flags & O_DESTRUCTED) {
-    debug_message(
-        "new_user_handler: object is gone after logon(), the user is disconnected.\n");
-    remove_interactive(ob, 1);
-    return;
-  }
+  set_command_giver(0);
 
   debug(connections, ("new_user_handler: end\n"));
-  set_command_giver(0);
 } /* new_user_handler() */
 
 }  // namespace
