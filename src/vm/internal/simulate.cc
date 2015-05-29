@@ -2002,3 +2002,35 @@ object_t *first_inventory(svalue_t *arg) {
 }
 #endif
 #endif
+
+void tell_npc(object_t *ob, const char *str) {
+  copy_and_push_string(str);
+  apply(APPLY_CATCH_TELL, ob, 1, ORIGIN_DRIVER);
+}
+
+/*
+ * tell_object: send a message to an object.
+ * If it is an interactive object, it will go to his
+ * screen. Otherwise, it will go to a local function
+ * catch_tell() in that object. This enables communications
+ * between users and NPC's, and between other NPC's.
+ * If INTERACTIVE_CATCH_TELL is defined then the message always
+ * goes to catch_tell unless the target of tell_object is interactive
+ * and is the current_object in which case it is written via add_message().
+ */
+void tell_object(object_t *ob, const char *str, int len) {
+  if (!ob || (ob->flags & O_DESTRUCTED)) {
+    add_message(0, str, len);
+    return;
+  }
+  if (CONFIG_INT(__RC_INTERACTIVE_CATCH_TELL__)) {
+    tell_npc(ob, str);
+  } else {
+    /* if this is on, EVERYTHING goes through catch_tell() */
+    if (ob->interactive) {
+      add_message(ob, str, len);
+    } else {
+      tell_npc(ob, str);
+    }
+  }
+}

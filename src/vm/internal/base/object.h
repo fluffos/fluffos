@@ -149,7 +149,6 @@ void save_svalue(svalue_t *, char **);
 int restore_svalue(char *, svalue_t *);
 int save_object(object_t *, const char *, int);
 int save_object_str(object_t *, int, char *, int);
-char *save_variable(svalue_t *);
 int restore_object(object_t *, const char *, int);
 void restore_variable(svalue_t *, char *);
 object_t *get_empty_object(int);
@@ -163,8 +162,6 @@ int object_visible(object_t *);
 #else
 #define object_visible(x) 1
 #endif
-void tell_npc(object_t *, const char *);
-void tell_object(object_t *, const char *, int);
 int find_global_variable(program_t *, const char *const, unsigned short *, int);
 void dealloc_object(object_t *, const char *);
 void get_objects(object_t ***, int *, get_objectsfn_t, void *);
