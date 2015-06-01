@@ -431,6 +431,11 @@ void read_config(char *filename) {
     CONFIG_INT(__RC_APPLY_CACHE_BITS__) = 22;
   }
 
+  if (!scan_config_line("call_out(0) nest level : %d\n",
+                        &CONFIG_INT(__RC_CALL_OUT_ZERO_NEST_LEVEL__), -1)) {
+    CONFIG_INT(__RC_CALL_OUT_ZERO_NEST_LEVEL__) = 10;
+  }
+
   // Complain about obsolete config lines.
   scan_config_line("address server ip : %[^\n]", tmp, -2);
   scan_config_line("address server port : %d\n", tmp, -2);
