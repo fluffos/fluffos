@@ -2,10 +2,6 @@
 
 #include "base/package_api.h"
 
-char *save_mapping(mapping_t *m);
-static int restore_array(char **str, svalue_t * /*ret*/);
-static int restore_class(char **str, svalue_t * /*ret*/);
-
 #ifdef F_SAVE_OBJECT
 void f_save_object(void) {
   const auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
