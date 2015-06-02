@@ -1697,15 +1697,9 @@ int restore_object(object_t *ob, const char *file, int noclear) {
   }
 
   // valid read permission.
-  char *name = new_string(filename.length(), "restore_object");
-  strncpy(name, filename.c_str(), filename.length());
-  name[filename.length()] = '\0';
-  push_malloced_string(name); /* error will deallocate it. */
-
-  file = check_valid_path(name, ob, "restore_object", 0);
-  free_string_svalue(sp--);
+  file = check_valid_path(filename.c_str(), ob, "restore_object", 0);
   if (!file) {
-    error("Denied read permission in restore_object().\n");
+      error("restore_object: read permission denied: %s.\n", filename.c_str());
   }
 
   // We always use zlib functions here and below, as it handls non-gzip file as wel.
