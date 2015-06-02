@@ -22,18 +22,25 @@ void sigalrm_handler(int sig, siginfo_t *si, void *uc) {
 void init_posix_timers(void) {
   struct sigevent sev;
   struct sigaction sa;
-  int i;
-
   /* This mimics the behavior of setitimer in uvalarm.c */
   memset(&sev, 0, sizeof(sev));
   sev.sigev_signo = SIGVTALRM;
   sev.sigev_notify = SIGEV_SIGNAL;
   sev.sigev_value.sival_ptr = NULL;
-#if defined(__CYGWIN__) || defined(__FreeBSD__)
-  i = timer_create(CLOCK_REALTIME, &sev, &eval_timer_id);
-#else
-  i = timer_create(CLOCK_THREAD_CPUTIME_ID, &sev, &eval_timer_id);
+
+  int i = 0;
+  // Only CLOCK_REALTIME is standard.
+#if defined(CLOCK_MONOTONIC_COARSE)
+  i = timer_create(CLOCK_MONOTONIC_COARSE, &sev, &eval_timer_id);
 #endif
+#if defined(CLOCK_MONOTONIC)
+  if (i < 0) {
+    i = timer_create(CLOCK_MONOTONIC, &sev, &eval_timer_id);
+  }
+#endif
+  if (i < 0) {
+    i = timer_create(CLOCK_REALTIME, &sev, &eval_timer_id);
+  }
   if (i < 0) {
     perror("init_posix_timers: timer_create");
     exit(-1);

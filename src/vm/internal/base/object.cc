@@ -2,15 +2,17 @@
 
 #include <chrono>
 #include <ctype.h>  // for isdigit
+#include <cstdio> // for std::remove
 #include <math.h>   // for pow
+#include <memory> // for std::unique_ptr
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif
 #include <stdlib.h>
-#ifdef HAVE_ZLIB
-#include <zlib.h>
-#endif
 #include <unistd.h>
+#include <vector>
+#include <zlib.h>
+
 
 #include "comm.h"  // add_message FIXME: reverse API
 #include "vm/internal/base/machine.h"
@@ -31,7 +33,6 @@
 
 object_t *previous_ob;
 
-char *save_mapping(mapping_t *m);
 static int restore_array(char **str, svalue_t * /*ret*/);
 static int restore_class(char **str, svalue_t * /*ret*/);
 
@@ -1297,52 +1298,6 @@ void restore_object_from_line(object_t *ob, char *line, int noclear) {
   }
 }
 
-#ifdef HAVE_ZLIB
-int restore_object_from_gzip(object_t *ob, gzFile gzf, int noclear, int *count) {
-  static char *buff = NULL;
-  static long buffsize = 0;
-  const char *tmp = "";
-  int t;
-
-  t = 65536 << *count;  // should be big enough most of the time
-  if (buff && buffsize < t) {
-    FREE(buff);
-    buff = NULL;
-  }
-
-  if (!buff) {
-    buff = reinterpret_cast<char *>(DMALLOC(t, TAG_PERMANENT, "restore_object: 6"));
-    buffsize = t;
-  }
-
-  t = buffsize;
-
-  while (!gzeof(gzf) && tmp != Z_NULL) {
-    buff[t - 2] = 0;
-    // gzgets appaears to pay attension to zero termination even on short
-    // strings
-    buff[0] = 0;
-    tmp = gzgets(gzf, buff, t);
-
-    if (buff[t - 2] != 0 && buff[t - 2] != '\n' && !gzeof(gzf)) {
-      return -1;  // retry with bigger buffer
-    }
-
-    if (buff[0]) {
-      char *tmp2 = strchr(buff, '\n');
-      if (tmp2) {
-        *tmp2 = '\0';
-        if (tmp2 > buff && tmp2[-1] == '\r') {
-          *(--tmp2) = '\0';
-        }
-      }
-      restore_object_from_line(ob, buff, noclear);
-    }
-  }
-  return 0;
-}
-#endif
-
 void restore_object_from_buff(object_t *ob, char *theBuff, int noclear) {
   char *buff, *nextBuff, *tmp;
 
@@ -1367,13 +1322,8 @@ void restore_object_from_buff(object_t *ob, char *theBuff, int noclear) {
  * to assertain that the write is legal.
  * If 'save_zeros' is set, 0 valued variables will be saved
  */
-#ifdef HAVE_ZLIB
 static int save_object_recurse(program_t *prog, svalue_t **svp, int type, int save_zeros, FILE *f,
-                               gzFile gzf)
-#else
-static int save_object_recurse(program_t *prog, svalue_t **svp, int type, int save_zeros, FILE *f)
-#endif
-{
+                               gzFile gzf) {
   int i;
   int textsize = 1;
   int tmp;
@@ -1382,13 +1332,8 @@ static int save_object_recurse(program_t *prog, svalue_t **svp, int type, int sa
   char *new_str, *p;
 
   for (i = 0; i < prog->num_inherited; i++) {
-#ifdef HAVE_ZLIB
     if (!(tmp = save_object_recurse(prog->inherit[i].prog, svp, prog->inherit[i].type_mod | type,
                                     save_zeros, f, gzf))) {
-#else
-    if (!(tmp = save_object_recurse(prog->inherit[i].prog, svp, prog->inherit[i].type_mod | type,
-                                    save_zeros, f))) {
-#endif
       return 0;
     }
     textsize += tmp;
@@ -1425,20 +1370,16 @@ static int save_object_recurse(program_t *prog, svalue_t **svp, int type, int sa
       textsize += theSize;
       textsize += strlen(prog->variable_table[i]);
       textsize += 2;
-#ifdef HAVE_ZLIB
+      int result;
       if (gzf) {
-        gzputs(gzf, prog->variable_table[i]);
-        gzputs(gzf, " ");
-        gzputs(gzf, new_str);
-        gzputs(gzf, "\n");
-      } else
-#endif
-      {
-        if (fprintf(f, "%s %s\n", prog->variable_table[i], new_str) < 0) {
-          debug_perror("save_object: fprintf", 0);
-          FREE(new_str);
-          return 0;
-        }
+        result = gzprintf(gzf, "%s %s\n", prog->variable_table[i], new_str);
+      } else {
+        result = fprintf(f, "%s %s\n", prog->variable_table[i], new_str);
+      }
+      if (result < 0) {
+        debug_perror("save_object: printf", 0);
+        FREE(new_str);
+        return 0;
       }
     }
   }
@@ -1521,9 +1462,7 @@ static int save_object_recurse_str(program_t *prog, svalue_t **svp, int type, in
 
 int sel = -1;
 
-#ifdef HAVE_ZLIB
 static const int SAVE_EXTENSION_GZ_LENGTH = strlen(SAVE_GZ_EXTENSION);
-#endif
 
 int save_object(object_t *ob, const char *file, int save_zeros) {
   char *name, *p;
@@ -1532,7 +1471,7 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
   FILE *f;
   int success;
   svalue_t *v;
-#ifdef HAVE_ZLIB
+
   gzFile gzf;
   int save_compressed;
 
@@ -1542,7 +1481,6 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
   } else {
     save_compressed = 0;
   }
-#endif
 
   if (ob->flags & O_DESTRUCTED) {
     return 0;
@@ -1559,14 +1497,12 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
   if (strcmp(file + len - sel, SAVE_EXTENSION) == 0) {
     len -= sel;
   }
-#ifdef HAVE_ZLIB
+
   if (save_compressed) {
     name = new_string(len + SAVE_EXTENSION_GZ_LENGTH, "save_object");
     strcpy(name, file);
     strcpy(name + len, SAVE_GZ_EXTENSION);
-  } else
-#endif
-  {
+  } else {
     name = new_string(len + sel, "save_object");
     strcpy(name, file);
     strcpy(name + len, SAVE_EXTENSION);
@@ -1595,35 +1531,29 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
    */
   sprintf(tmp_name, "%.250s.tmp", file);
 
-#ifdef HAVE_ZLIB
   gzf = NULL;
   f = NULL;
   if (save_compressed) {
-    gzf = gzopen(tmp_name, "w");
+    gzf = gzopen(tmp_name, "wb");
     if (!gzf) {
       error("Could not open /%s for a save.\n", tmp_name);
     }
     if (!gzprintf(gzf, "#/%s\n", ob->prog->filename)) {
       error("Could not open /%s for a save.\n", tmp_name);
     }
-  } else
-#endif
-  {
+  } else {
     if (!(f = fopen(tmp_name, "w")) || fprintf(f, "#/%s\n", save_name) < 0) {
       error("Could not open /%s for a save.\n", tmp_name);
     }
   }
   v = ob->variables;
-#ifdef HAVE_ZLIB
+
   success = save_object_recurse(ob->prog, &v, 0, save_zeros, f, gzf);
 
   if (gzf && gzclose(gzf)) {
     debug_perror("save_object", file);
     success = 0;
   }
-#else
-  success = save_object_recurse(ob->prog, &v, 0, save_zeros, f);
-#endif
 
   if (f && fclose(f) < 0) {
     debug_perror("save_object", file);
@@ -1632,24 +1562,21 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
 
   if (!success) {
     debug_message("Failed to completely save file. Disk could be full.\n");
-    unlink(tmp_name);
+    std::remove(tmp_name);
   } else {
     if (rename(tmp_name, file) < 0) {
       debug_perror("save_object", file);
       debug_message("Failed to rename /%s to /%s\n", tmp_name, file);
       debug_message("Failed to save object!\n");
-      unlink(tmp_name);
-    }
-#ifdef HAVE_ZLIB
-    else if (save_compressed) {
+      std::remove(tmp_name);
+    } else if (save_compressed) {
       char buf[1024];
       // When compressed, unlink the uncompressed name too.
       strcpy(buf, file);
       len = strlen(buf) - SAVE_EXTENSION_GZ_LENGTH;
       strcpy(buf + len, SAVE_EXTENSION);
-      unlink(buf);
+      std::remove(buf);
     }
-#endif
   }
 
   return success;
@@ -1691,24 +1618,6 @@ int save_object_str(object_t *ob, int save_zeros, char *saved, int size) {
   return success;
 }
 
-/*
- * return a string representing an svalue in the form that save_object()
- * would write it.
- */
-char *save_variable(svalue_t *var) {
-  int theSize;
-  char *new_str, *p;
-
-  save_svalue_depth = 0;
-  theSize = svalue_save_size(var);
-  new_str = new_string(theSize - 1, "save_variable");
-  *new_str = '\0';
-  p = new_str;
-  save_svalue(var, &p);
-  DEBUG_CHECK(p - new_str != theSize - 1, "Length miscalculated in save_variable");
-  return new_str;
-}
-
 static void cns_just_count(int *idx, program_t *prog) {
   int i;
 
@@ -1742,64 +1651,56 @@ void clear_non_statics(object_t *ob) {
   cns_recurse(ob, &idx, ob->prog);
 }
 
+namespace {
+inline bool beginWith(const std::string str,const std::string needle){
+     return (!str.compare(0,needle.length(),needle));
+ }
+
+inline  bool endWith(const std::string str,const std::string needle){
+     if (str.length() >= needle.length()) {
+         return (0 == str.compare (str.length() - needle.length(), needle.length(), needle));
+     }
+     return false;
+ }
+ } // namespace
+
 int restore_object(object_t *ob, const char *file, int noclear) {
-  char *name;
-  int len;
   object_t *save = current_object;
-  struct stat st;
-#ifdef HAVE_ZLIB
-  int pos;
-  gzFile gzf;
-  static int count = 0;
-#else
-  FILE *f;
-  // Try and keep one buffer for droping all the restores into
-  static char *theBuff = NULL;
-  static int buff_len = 0;
-  int tmp_len;
-#endif
 
   if (ob->flags & O_DESTRUCTED) {
     return 0;
   }
 
-  len = strlen(file);
-  if (file[len - 2] == '.' && file[len - 1] == 'c') {
-    len -= 2;
+  std::string filename(file);
+
+  // Eliminate leading '/'
+  while(filename[0] == '/') {
+    filename = filename.substr(1);
   }
 
-  if (sel == -1) {
-    sel = strlen(SAVE_EXTENSION);
-  }
-  if (strcmp(file + len - sel, SAVE_EXTENSION) == 0) {
-    len -= sel;
-  }
-#ifdef HAVE_ZLIB
-  else {
-    if (len >= SAVE_EXTENSION_GZ_LENGTH &&
-        strcmp(file + len - SAVE_EXTENSION_GZ_LENGTH, SAVE_GZ_EXTENSION) == 0) {
-      len -= SAVE_EXTENSION_GZ_LENGTH;
-    }
-  }
-  name = new_string(len + SAVE_EXTENSION_GZ_LENGTH, "restore_object");
-  strncpy(name, file, len);
-  strcpy(name + len, SAVE_GZ_EXTENSION);
-  pos = 0;
-  while (name[pos] == '/') {
-    pos++;
-  }
-  // See if the gz file exists.
-  if (stat(name + pos, &st) == -1) {
-    FREE_MSTR(name);
-#else
-  {
-#endif
-    name = new_string(len + sel, "restore_object");
-    strncpy(name, file, len);
-    strcpy(name + len, SAVE_EXTENSION);
+  // First get rid of all extensions.
+  if (endWith(filename, ".c")) {
+    filename = filename.substr(0, filename.length() - 2);
+  } else if (endWith(filename, SAVE_EXTENSION)) {
+    filename = filename.substr(0, filename.length() - strlen(SAVE_EXTENSION));
+  } else if (endWith(filename, SAVE_GZ_EXTENSION)){
+    filename = filename.substr(0, filename.length() - SAVE_EXTENSION_GZ_LENGTH);
   }
 
-  push_malloced_string(name); /* errors */
+  // Check if GZ file exists.
+  struct stat st;
+  std::string filename_gz = filename + SAVE_GZ_EXTENSION;
+  if (stat(filename_gz.c_str(), &st) != -1) {
+    filename = filename_gz;
+  } else {
+    filename = filename + SAVE_EXTENSION;
+  }
+
+  // valid read permission.
+  char *name = new_string(filename.length(), "restore_object");
+  strncpy(name, filename.c_str(), filename.length());
+  name[filename.length()] = '\0';
+  push_malloced_string(name); /* error will deallocate it. */
 
   file = check_valid_path(name, ob, "restore_object", 0);
   free_string_svalue(sp--);
@@ -1807,65 +1708,48 @@ int restore_object(object_t *ob, const char *file, int noclear) {
     error("Denied read permission in restore_object().\n");
   }
 
-#ifdef HAVE_ZLIB
-  gzf = gzopen(file, "r");
-  if (!gzf) {
-    if (gzf) {
-      (void)gzclose(gzf);
-    }
-    return 0;
+  // We always use zlib functions here and below, as it handls non-gzip file as wel.
+  gzFile gzf = gzopen(file, "rb");
+  if (gzf == nullptr) {
+    error("restore_object: Error opening file: %s.\n", file);
   }
 
-  /* This next bit added by Armidale@Cyberworld 1/1/93
-   * If 'noclear' flag is not set, all non-static variables will be
-   * initialized to 0 when restored.
-   */
-  if (!noclear) {
-    clear_non_statics(ob);
-  }
-  error_context_t econ;
-  save_context(&econ);
-  try {
-    while ((restore_object_from_gzip(ob, gzf, noclear, &count))) {
-      count++;
-      gzseek(gzf, 0, SEEK_SET);
-      if (!noclear) {
-        clear_non_statics(ob);
+  // It is possible to have a gzip that decompress into infinite memory, we
+  // obviously want to prevent that..
+  const int max_memory = 1 << 30; // 1GB
+
+  int memory = 65535;
+  std::vector<char> buf;
+  buf.reserve(memory);
+  while(true) {
+      int bytes_read;
+      bytes_read = gzread(gzf, buf.data(), buf.capacity() - 1);
+
+      // Error reading gzip file.
+      if (bytes_read == -1) {
+        int err;
+        std::string errstr(gzerror(gzf, &err));
+        gzclose(gzf);
+        error("restore_object: Error reading file: %s,  error: %s.\n", file, errstr.c_str());
       }
-    }
-    gzclose(gzf);
-  } catch (const char *) {
-    restore_context(&econ);
-    pop_context(&econ);
-    gzclose(gzf);
-    return 0;
-  }
-  pop_context(&econ);
-#else
-  f = fopen(file, "r");
-  if (!f || fstat(fileno(f), &st) == -1) {
-    if (f) {
-      (void)fclose(f);
-    }
-    return 0;
-  }
 
-  if (!(tmp_len = st.st_size)) {
-    (void)fclose(f);
-    return 0;
-  }
+      // Buffer was not big enough, try again.
+      if (bytes_read == sizeof(buf) -1) {
+        memory *= 2;
 
-  if (tmp_len > buff_len) {
-    if (theBuff) {
-      FREE(theBuff);
-    }
-    theBuff = (char *)DMALLOC(tmp_len + 1, TAG_PERMANENT, "restore_object: 4");
-    buff_len = tmp_len;
-  }
-  fread(theBuff, 1, tmp_len, f);
+        if (memory >= max_memory) {
+          error("restore_object: Maximum memory limit %d reached trying to read file: %s.\n", max_memory, file);
+        }
+        buf.reserve(memory);
+        continue;
+      }
 
-  fclose(f);
-  theBuff[tmp_len] = '\0';
+      // Read successfuly
+      buf[bytes_read] = '\0';
+      break;
+  }
+  gzclose(gzf);
+
   current_object = ob;
 
   /* This next bit added by Armidale@Cyberworld 1/1/93
@@ -1876,8 +1760,15 @@ int restore_object(object_t *ob, const char *file, int noclear) {
     clear_non_statics(ob);
   }
 
-  restore_object_from_buff(ob, theBuff, noclear);
-#endif
+  error_context_t econ;
+  save_context(&econ);
+  try {
+    restore_object_from_buff(ob, buf.data(), noclear);
+  } catch (const char *) {
+    pop_context(&econ);
+    return 0;
+  }
+
   current_object = save;
   debug(d_flag, "Object /%s restored from /%s.\n", ob->obname, file);
 
@@ -1900,38 +1791,6 @@ void restore_variable(svalue_t *var, char *str) {
       error("restore_object(): Illegal mapping format.\n");
     } else if (rc & ROB_STRING_ERROR) {
       error("restore_object(): Illegal string format.\n");
-    }
-  }
-}
-
-void tell_npc(object_t *ob, const char *str) {
-  copy_and_push_string(str);
-  apply(APPLY_CATCH_TELL, ob, 1, ORIGIN_DRIVER);
-}
-
-/*
- * tell_object: send a message to an object.
- * If it is an interactive object, it will go to his
- * screen. Otherwise, it will go to a local function
- * catch_tell() in that object. This enables communications
- * between users and NPC's, and between other NPC's.
- * If INTERACTIVE_CATCH_TELL is defined then the message always
- * goes to catch_tell unless the target of tell_object is interactive
- * and is the current_object in which case it is written via add_message().
- */
-void tell_object(object_t *ob, const char *str, int len) {
-  if (!ob || (ob->flags & O_DESTRUCTED)) {
-    add_message(0, str, len);
-    return;
-  }
-  if (CONFIG_INT(__RC_INTERACTIVE_CATCH_TELL__)) {
-    tell_npc(ob, str);
-  } else {
-    /* if this is on, EVERYTHING goes through catch_tell() */
-    if (ob->interactive) {
-      add_message(ob, str, len);
-    } else {
-      tell_npc(ob, str);
     }
   }
 }
