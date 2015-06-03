@@ -172,5 +172,5 @@ void save_command_giver(object_t *);
 void restore_command_giver(void);
 void set_command_giver(object_t *);
 void clear_non_statics(object_t *ob);
-void restore_object_from_buff(object_t *ob, char *theBuff, int noclear);
+void restore_object_from_buff(object_t *, const char *, int);
 #endif
