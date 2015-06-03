@@ -1,7 +1,7 @@
 #ifndef OBJECT_H
 #define OBJECT_H
 
-#include <cstdint> // for uint32_t
+#include <cstdint>  // for uint32_t
 
 #ifdef PACKAGE_MUDLIB_STATS
 #include "packages/mudlib_stats/mudlib_stats.h"
@@ -68,7 +68,7 @@ struct sentence_t {
 };
 
 struct object_t {
-  uint32_t ref;   /* Reference count. */
+  uint32_t ref;         /* Reference count. */
   unsigned short flags; /* Bits or'ed together from above */
 #ifdef DEBUGMALLOC_EXTENSIONS
   unsigned int extra_ref; /* Used to check ref count. */
@@ -120,11 +120,11 @@ struct object_t {
 
 typedef int (*get_objectsfn_t)(object_t *, void *);
 
-#define add_ref(ob, str)             \
-  SAFE(if (ob->ref++ > 0xfffffff0) {      \
-    debug_message("Ref count dangerously high: %s (%d) calling from %s\n", ob->obname, ob->ref, str); \
-  } \
-)
+#define add_ref(ob, str)                                                                        \
+  SAFE(if (ob->ref++ > 0xfffffff0) {                                                            \
+    debug_message("Ref count dangerously high: %s (%d) calling from %s\n", ob->obname, ob->ref, \
+                  str);                                                                         \
+  })
 
 #define ROB_STRING_ERROR 1
 #define ROB_ARRAY_ERROR 2
@@ -172,5 +172,5 @@ void save_command_giver(object_t *);
 void restore_command_giver(void);
 void set_command_giver(object_t *);
 void clear_non_statics(object_t *ob);
-void restore_object_from_buff(object_t *ob, char *theBuff, int noclear);
+void restore_object_from_buff(object_t *, const char *, int);
 #endif

@@ -37,11 +37,11 @@ static void free_called_call(pending_call_t * /*cop*/);
 void remove_all_call_out(object_t * /*obj*/);
 
 namespace {
-   // NOTE: For call_out(0) prevention.
-   // This is the last gametick when a new call_out(0) is scheduled.
-   int new_call_out_zero_last_gametick = 0;
-   // Total number of call_out(0) that was scheduled on this gametick.
-   int new_call_out_zero_scheduled_on_this_gametick = 0;
+// NOTE: For call_out(0) prevention.
+// This is the last gametick when a new call_out(0) is scheduled.
+int new_call_out_zero_last_gametick = 0;
+// Total number of call_out(0) that was scheduled on this gametick.
+int new_call_out_zero_scheduled_on_this_gametick = 0;
 }
 
 /*
@@ -87,14 +87,16 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, std::chrono::milliseconds dela
   // will be executed on the same gametick, and when the total exceed the limit
   // new_call_out will error(), thus breaking the loop.
   if (delay_msecs == std::chrono::milliseconds(0)) {
-    if (g_current_gametick !=  new_call_out_zero_last_gametick) {
+    if (g_current_gametick != new_call_out_zero_last_gametick) {
       // First time call_out(0) on this tick.
       new_call_out_zero_last_gametick = g_current_gametick;
       new_call_out_zero_scheduled_on_this_gametick = 1;
     } else {
-      new_call_out_zero_scheduled_on_this_gametick ++;
-      if (new_call_out_zero_scheduled_on_this_gametick > CONFIG_INT(__RC_CALL_OUT_ZERO_NEST_LEVEL__)) {
-        error("Nesting call_out(0) level limit exceeded: %d", CONFIG_INT(__RC_CALL_OUT_ZERO_NEST_LEVEL__));
+      new_call_out_zero_scheduled_on_this_gametick++;
+      if (new_call_out_zero_scheduled_on_this_gametick >
+          CONFIG_INT(__RC_CALL_OUT_ZERO_NEST_LEVEL__)) {
+        error("Nesting call_out(0) level limit exceeded: %d",
+              CONFIG_INT(__RC_CALL_OUT_ZERO_NEST_LEVEL__));
       }
     }
   }

@@ -312,8 +312,8 @@ void read_config(char *filename) {
   if (!scan_config_line("gametick msec : %d\n", &CONFIG_INT(__RC_GAMETICK_MSEC__), -1)) {
     CONFIG_INT(__RC_GAMETICK_MSEC__) = 1000;  // default to 1s.
   }
-  if (!scan_config_line("heartbeat interval msec : %d\n", &CONFIG_INT(__RC_HEARTBEAT_INTERVAL_MSEC__),
-                        -1)) {
+  if (!scan_config_line("heartbeat interval msec : %d\n",
+                        &CONFIG_INT(__RC_HEARTBEAT_INTERVAL_MSEC__), -1)) {
     // default to match gametick.
     CONFIG_INT(__RC_HEARTBEAT_INTERVAL_MSEC__) = CONFIG_INT(__RC_GAMETICK_MSEC__);
   }
@@ -326,7 +326,8 @@ void read_config(char *filename) {
   CONFIG_INT(__MAX_CALL_DEPTH__) = CFG_MAX_CALL_DEPTH;
   CONFIG_INT(__LIVING_HASH_TABLE_SIZE__) = CFG_LIVING_HASH_SIZE;
 
-  if (!scan_config_line("sane explode string : %d\n", &CONFIG_INT(__RC_SANE_EXPLODE_STRING__), -1)) {
+  if (!scan_config_line("sane explode string : %d\n", &CONFIG_INT(__RC_SANE_EXPLODE_STRING__),
+                        -1)) {
     CONFIG_INT(__RC_SANE_EXPLODE_STRING__) = 1;
   }
   if (!scan_config_line("reversible explode string : %d\n",
@@ -349,7 +350,8 @@ void read_config(char *filename) {
   if (!scan_config_line("call other warn : %d\n", &CONFIG_INT(__RC_CALL_OTHER_WARN__), -1)) {
     CONFIG_INT(__RC_CALL_OTHER_WARN__) = 0;
   }
-  if (!scan_config_line("mudlib error handler : %d\n", &CONFIG_INT(__RC_MUDLIB_ERROR_HANDLER__), -1)) {
+  if (!scan_config_line("mudlib error handler : %d\n", &CONFIG_INT(__RC_MUDLIB_ERROR_HANDLER__),
+                        -1)) {
     CONFIG_INT(__RC_MUDLIB_ERROR_HANDLER__) = 1;
   }
   if (!scan_config_line("no resets : %d\n", &CONFIG_INT(__RC_NO_RESETS__), -1)) {
@@ -368,8 +370,8 @@ void read_config(char *filename) {
                         &CONFIG_INT(__RC_STRIP_BEFORE_PROCESS_INPUT__), -1)) {
     CONFIG_INT(__RC_STRIP_BEFORE_PROCESS_INPUT__) = 1;
   }
-  if (!scan_config_line("this_player in call_out : %d\n", &CONFIG_INT(__RC_THIS_PLAYER_IN_CALL_OUT__),
-                        -1)) {
+  if (!scan_config_line("this_player in call_out : %d\n",
+                        &CONFIG_INT(__RC_THIS_PLAYER_IN_CALL_OUT__), -1)) {
     CONFIG_INT(__RC_THIS_PLAYER_IN_CALL_OUT__) = 1;
   }
   if (!scan_config_line("trace : %d\n", &CONFIG_INT(__RC_TRACE__), -1)) {
@@ -407,8 +409,8 @@ void read_config(char *filename) {
   if (!scan_config_line("old range behavior : %d\n", &CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__), -1)) {
     CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__) = 0;
   }
-  if (!scan_config_line("warn old range behavior : %d\n", &CONFIG_INT(__RC_WARN_OLD_RANGE_BEHAVIOR__),
-                        -1)) {
+  if (!scan_config_line("warn old range behavior : %d\n",
+                        &CONFIG_INT(__RC_WARN_OLD_RANGE_BEHAVIOR__), -1)) {
     CONFIG_INT(__RC_WARN_OLD_RANGE_BEHAVIOR__) = 1;
   }
   if (!scan_config_line("suppress argument warnings : %d\n",
@@ -426,8 +428,7 @@ void read_config(char *filename) {
     CONFIG_INT(__RC_SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__) = 0;
   }
 
-  if (!scan_config_line("apply cache bits : %d\n",
-                        &CONFIG_INT(__RC_APPLY_CACHE_BITS__), -1)) {
+  if (!scan_config_line("apply cache bits : %d\n", &CONFIG_INT(__RC_APPLY_CACHE_BITS__), -1)) {
     CONFIG_INT(__RC_APPLY_CACHE_BITS__) = 22;
   }
 

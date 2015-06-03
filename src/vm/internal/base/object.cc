@@ -2,17 +2,17 @@
 
 #include <chrono>
 #include <ctype.h>  // for isdigit
-#include <cstdio> // for std::remove
+#include <cstdio>   // for std::remove
 #include <math.h>   // for pow
-#include <memory> // for std::unique_ptr
+#include <memory>   // for std::unique_ptr
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif
 #include <stdlib.h>
+#include <sstream>
 #include <unistd.h>
 #include <vector>
 #include <zlib.h>
-
 
 #include "comm.h"  // add_message FIXME: reverse API
 #include "vm/internal/base/machine.h"
@@ -1298,24 +1298,6 @@ void restore_object_from_line(object_t *ob, char *line, int noclear) {
   }
 }
 
-void restore_object_from_buff(object_t *ob, char *theBuff, int noclear) {
-  char *buff, *nextBuff, *tmp;
-
-  nextBuff = theBuff;
-  while ((buff = nextBuff) && *buff) {
-    if ((tmp = strchr(buff, '\n'))) {
-      *tmp = '\0';
-      if (tmp > buff && tmp[-1] == '\r') {
-        *(--tmp) = '\0';
-      }
-      nextBuff = tmp + 1;
-    } else {
-      nextBuff = 0;
-    }
-    restore_object_from_line(ob, buff, noclear);
-  }
-}
-
 /*
  * Save an object to a file.
  * The routine checks with the function "valid_write()" in /obj/master.c
@@ -1652,17 +1634,33 @@ void clear_non_statics(object_t *ob) {
 }
 
 namespace {
-inline bool beginWith(const std::string str,const std::string needle){
-     return (!str.compare(0,needle.length(),needle));
- }
+inline bool beginWith(const std::string str, const std::string needle) {
+  return (!str.compare(0, needle.length(), needle));
+}
 
-inline  bool endWith(const std::string str,const std::string needle){
-     if (str.length() >= needle.length()) {
-         return (0 == str.compare (str.length() - needle.length(), needle.length(), needle));
-     }
-     return false;
- }
- } // namespace
+inline bool endWith(const std::string str, const std::string needle) {
+  if (str.length() >= needle.length()) {
+    return (0 == str.compare(str.length() - needle.length(), needle.length(), needle));
+  }
+  return false;
+}
+}  // namespace
+
+void restore_object_from_buff(object_t *ob, const char *buf, int noclear) {
+  std::istringstream input(buf);
+  for (std::string line; std::getline(input, line);) {
+    if (endWith(line, "\r")) {
+      line = line.substr(0, line.length() - 1);
+    }
+    // FIXME: some restore function needs to modify string inplace.
+    std::vector<char> tmp(line.length() + 1);
+    std::copy(line.begin(), line.end(), tmp.begin());
+    tmp[line.length()] = '\0';
+
+    // May error().
+    restore_object_from_line(ob, tmp.data(), noclear);
+  }
+}
 
 int restore_object(object_t *ob, const char *file, int noclear) {
   object_t *save = current_object;
@@ -1674,7 +1672,7 @@ int restore_object(object_t *ob, const char *file, int noclear) {
   std::string filename(file);
 
   // Eliminate leading '/'
-  while(filename[0] == '/') {
+  while (filename[0] == '/') {
     filename = filename.substr(1);
   }
 
@@ -1683,7 +1681,7 @@ int restore_object(object_t *ob, const char *file, int noclear) {
     filename = filename.substr(0, filename.length() - 2);
   } else if (endWith(filename, SAVE_EXTENSION)) {
     filename = filename.substr(0, filename.length() - strlen(SAVE_EXTENSION));
-  } else if (endWith(filename, SAVE_GZ_EXTENSION)){
+  } else if (endWith(filename, SAVE_GZ_EXTENSION)) {
     filename = filename.substr(0, filename.length() - SAVE_EXTENSION_GZ_LENGTH);
   }
 
@@ -1697,15 +1695,9 @@ int restore_object(object_t *ob, const char *file, int noclear) {
   }
 
   // valid read permission.
-  char *name = new_string(filename.length(), "restore_object");
-  strncpy(name, filename.c_str(), filename.length());
-  name[filename.length()] = '\0';
-  push_malloced_string(name); /* error will deallocate it. */
-
-  file = check_valid_path(name, ob, "restore_object", 0);
-  free_string_svalue(sp--);
+  file = check_valid_path(filename.c_str(), ob, "restore_object", 0);
   if (!file) {
-    error("Denied read permission in restore_object().\n");
+    error("restore_object: read permission denied: %s.\n", filename.c_str());
   }
 
   // We always use zlib functions here and below, as it handls non-gzip file as wel.
@@ -1716,37 +1708,36 @@ int restore_object(object_t *ob, const char *file, int noclear) {
 
   // It is possible to have a gzip that decompress into infinite memory, we
   // obviously want to prevent that..
-  const int max_memory = 1 << 30; // 1GB
+  const int max_memory = 1 << 30;  // 1GB
 
-  int memory = 65535;
-  std::vector<char> buf;
-  buf.reserve(memory);
-  while(true) {
-      int bytes_read;
-      bytes_read = gzread(gzf, buf.data(), buf.capacity() - 1);
+  int chunk = 65536;
+  std::vector<char> buf(chunk);
+  int total_bytes_read = 0;
+  while (true) {
+    int bytes_read = gzread(gzf, buf.data() + total_bytes_read, chunk);
 
-      // Error reading gzip file.
-      if (bytes_read == -1) {
-        int err;
-        std::string errstr(gzerror(gzf, &err));
-        gzclose(gzf);
-        error("restore_object: Error reading file: %s,  error: %s.\n", file, errstr.c_str());
+    // Error reading gzip file.
+    if (bytes_read <= 0) {
+      int err;
+      std::string errstr(gzerror(gzf, &err));
+      gzclose(gzf);
+      error("restore_object: Error reading file: %s,  error: %s.\n", file, errstr.c_str());
+    }
+    // Read successfully
+    total_bytes_read += bytes_read;
+
+    // Avoid use up all memory.
+    if (bytes_read == chunk) {
+      if (buf.size() >= max_memory) {
+        error("restore_object: Maximum memory limit %d reached trying to read file: %s.\n",
+              max_memory, file);
       }
+      buf.resize(buf.size() + chunk);
+      continue;
+    }
 
-      // Buffer was not big enough, try again.
-      if (bytes_read == sizeof(buf) -1) {
-        memory *= 2;
-
-        if (memory >= max_memory) {
-          error("restore_object: Maximum memory limit %d reached trying to read file: %s.\n", max_memory, file);
-        }
-        buf.reserve(memory);
-        continue;
-      }
-
-      // Read successfuly
-      buf[bytes_read] = '\0';
-      break;
+    buf[total_bytes_read] = '\0';
+    break;
   }
   gzclose(gzf);
 
