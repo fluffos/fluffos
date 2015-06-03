@@ -1756,9 +1756,10 @@ int restore_object(object_t *ob, const char *file, int noclear) {
   try {
     restore_object_from_buff(ob, buf.data(), noclear);
   } catch (const char *) {
-    pop_context(&econ);
+    restore_context(&econ);
     return 0;
   }
+  pop_context(&econ);
 
   current_object = save;
   debug(d_flag, "Object /%s restored from /%s.\n", ob->obname, file);
