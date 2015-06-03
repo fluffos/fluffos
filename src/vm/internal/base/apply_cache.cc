@@ -11,11 +11,12 @@ static struct program_t *find_function_by_name2(struct program_t * /*prog*/, con
                                                 int * /*indexp*/, int * /*runtime_index*/,
                                                 int * /*fio*/, int * /*vio*/);
 
-static cache_entry_t* cache;
+static cache_entry_t *cache;
 
 void apply_cache_init() {
   apply_cache_size = 1 << CONFIG_INT(__RC_APPLY_CACHE_BITS__);
-  cache = (cache_entry_t*) DCALLOC(apply_cache_size, sizeof(cache_entry_t), TAG_PERMANENT, "apply_cache");
+  cache = (cache_entry_t *)DCALLOC(apply_cache_size, sizeof(cache_entry_t), TAG_PERMANENT,
+                                   "apply_cache");
 }
 
 /* Look up a entry for given fun/ob, user must validate

@@ -29,7 +29,7 @@ void init_posix_timers(void) {
   sev.sigev_value.sival_ptr = NULL;
 
   int i = 0;
-  // Only CLOCK_REALTIME is standard.
+// Only CLOCK_REALTIME is standard.
 #if defined(CLOCK_MONOTONIC_COARSE)
   i = timer_create(CLOCK_MONOTONIC_COARSE, &sev, &eval_timer_id);
 #endif

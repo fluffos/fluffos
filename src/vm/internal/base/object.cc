@@ -2,9 +2,9 @@
 
 #include <chrono>
 #include <ctype.h>  // for isdigit
-#include <cstdio> // for std::remove
+#include <cstdio>   // for std::remove
 #include <math.h>   // for pow
-#include <memory> // for std::unique_ptr
+#include <memory>   // for std::unique_ptr
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif
@@ -13,7 +13,6 @@
 #include <unistd.h>
 #include <vector>
 #include <zlib.h>
-
 
 #include "comm.h"  // add_message FIXME: reverse API
 #include "vm/internal/base/machine.h"
@@ -1635,26 +1634,26 @@ void clear_non_statics(object_t *ob) {
 }
 
 namespace {
-inline bool beginWith(const std::string str,const std::string needle){
-     return (!str.compare(0,needle.length(),needle));
- }
+inline bool beginWith(const std::string str, const std::string needle) {
+  return (!str.compare(0, needle.length(), needle));
+}
 
-inline  bool endWith(const std::string str,const std::string needle){
-     if (str.length() >= needle.length()) {
-         return (0 == str.compare (str.length() - needle.length(), needle.length(), needle));
-     }
-     return false;
- }
- } // namespace
+inline bool endWith(const std::string str, const std::string needle) {
+  if (str.length() >= needle.length()) {
+    return (0 == str.compare(str.length() - needle.length(), needle.length(), needle));
+  }
+  return false;
+}
+}  // namespace
 
 void restore_object_from_buff(object_t *ob, const char *buf, int noclear) {
   std::istringstream input(buf);
-  for (std::string line; std::getline(input, line); ) {
+  for (std::string line; std::getline(input, line);) {
     if (endWith(line, "\r")) {
-      line = line.substr(0, line.length()-1);
+      line = line.substr(0, line.length() - 1);
     }
     // FIXME: some restore function needs to modify string inplace.
-    std::vector<char> tmp(line.length()+1);
+    std::vector<char> tmp(line.length() + 1);
     std::copy(line.begin(), line.end(), tmp.begin());
     tmp[line.length()] = '\0';
 
@@ -1673,7 +1672,7 @@ int restore_object(object_t *ob, const char *file, int noclear) {
   std::string filename(file);
 
   // Eliminate leading '/'
-  while(filename[0] == '/') {
+  while (filename[0] == '/') {
     filename = filename.substr(1);
   }
 
@@ -1682,7 +1681,7 @@ int restore_object(object_t *ob, const char *file, int noclear) {
     filename = filename.substr(0, filename.length() - 2);
   } else if (endWith(filename, SAVE_EXTENSION)) {
     filename = filename.substr(0, filename.length() - strlen(SAVE_EXTENSION));
-  } else if (endWith(filename, SAVE_GZ_EXTENSION)){
+  } else if (endWith(filename, SAVE_GZ_EXTENSION)) {
     filename = filename.substr(0, filename.length() - SAVE_EXTENSION_GZ_LENGTH);
   }
 
@@ -1698,7 +1697,7 @@ int restore_object(object_t *ob, const char *file, int noclear) {
   // valid read permission.
   file = check_valid_path(filename.c_str(), ob, "restore_object", 0);
   if (!file) {
-      error("restore_object: read permission denied: %s.\n", filename.c_str());
+    error("restore_object: read permission denied: %s.\n", filename.c_str());
   }
 
   // We always use zlib functions here and below, as it handls non-gzip file as wel.
@@ -1709,38 +1708,38 @@ int restore_object(object_t *ob, const char *file, int noclear) {
 
   // It is possible to have a gzip that decompress into infinite memory, we
   // obviously want to prevent that..
-  const int max_memory = 1 << 30; // 1GB
+  const int max_memory = 1 << 30;  // 1GB
 
   int chunk = 65536;
   std::vector<char> buf(chunk);
   int total_bytes_read = 0;
-  while(true) {
-      int bytes_read = gzread(gzf, buf.data() + total_bytes_read, chunk);
+  while (true) {
+    int bytes_read = gzread(gzf, buf.data() + total_bytes_read, chunk);
 
-      // Error reading gzip file.
-      if (bytes_read <= 0) {
-        int err;
-        std::string errstr(gzerror(gzf, &err));
-        gzclose(gzf);
-        error("restore_object: Error reading file: %s,  error: %s.\n", file, errstr.c_str());
+    // Error reading gzip file.
+    if (bytes_read <= 0) {
+      int err;
+      std::string errstr(gzerror(gzf, &err));
+      gzclose(gzf);
+      error("restore_object: Error reading file: %s,  error: %s.\n", file, errstr.c_str());
+    }
+    // Read successfully
+    total_bytes_read += bytes_read;
+
+    // Avoid use up all memory.
+    if (bytes_read == chunk) {
+      if (buf.size() >= max_memory) {
+        error("restore_object: Maximum memory limit %d reached trying to read file: %s.\n",
+              max_memory, file);
       }
-      // Read successfully
-      total_bytes_read += bytes_read;
+      buf.resize(buf.size() + chunk);
+      continue;
+    }
 
-      // Avoid use up all memory.
-      if (bytes_read == chunk) {
-        if (buf.size() >= max_memory) {
-            error("restore_object: Maximum memory limit %d reached trying to read file: %s.\n", max_memory, file);
-        }
-        buf.resize(buf.size() + chunk);
-        continue;
-      }
-
-      buf[total_bytes_read] = '\0';
-      break;
+    buf[total_bytes_read] = '\0';
+    break;
   }
   gzclose(gzf);
-
 
   current_object = ob;
 

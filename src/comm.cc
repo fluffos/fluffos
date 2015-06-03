@@ -65,7 +65,7 @@ struct user_event_data {
 void maybe_schedule_user_command(interactive_t *user) {
   // If user has a complete command, schedule a command execution.
   if (user->iflags & CMD_IN_BUF) {
-    struct timeval zero_sec = { 0, 0 };
+    struct timeval zero_sec = {0, 0};
     evtimer_del(user->ev_command);
     evtimer_add(user->ev_command, &zero_sec);
   }
@@ -275,11 +275,10 @@ void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
   // Call logon() on the object.
   ret = safe_apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
   if (ret == NULL) {
-      debug_message(
-          "new_user_handler: logon() on object %s has failed, the user is disconnected.\n",
-          ob->obname);
-      destruct_object(ob);
-      ob = NULL;
+    debug_message("new_user_handler: logon() on object %s has failed, the user is disconnected.\n",
+                  ob->obname);
+    destruct_object(ob);
+    ob = NULL;
   } else if (ob->flags & O_DESTRUCTED) {
     // logon() may decide not to allow user connect by destroying objects.
   }
@@ -757,7 +756,7 @@ void get_user_data(interactive_t *ip) {
         // If we read something, search for command.
         if (cmd_in_buf(ip)) {
           ip->iflags |= CMD_IN_BUF;
-          struct timeval zero_sec = { 0, 0 };
+          struct timeval zero_sec = {0, 0};
           evtimer_del(ip->ev_command);
           evtimer_add(ip->ev_command, &zero_sec);
         }
@@ -1119,9 +1118,9 @@ exit:
     print_prompt(ip);
     // FIXME: this doesn't belong here, should be moved to event.cc
     if (ip->iflags & CMD_IN_BUF) {
-        struct timeval zero_sec = { 0, 0 };
-        evtimer_del(ip->ev_command);
-        evtimer_add(ip->ev_command, &zero_sec);
+      struct timeval zero_sec = {0, 0};
+      evtimer_del(ip->ev_command);
+      evtimer_add(ip->ev_command, &zero_sec);
     }
   }
 
@@ -1317,13 +1316,13 @@ static int call_function_interactive(interactive_t *i, char *str) {
 
   // FIXME: this logic can be combined with above.
   if (was_single && !(i->iflags & SINGLE_CHAR)) {
-      i->text_start = i->text_end = 0;
-      i->text[0] = '\0';
-      i->iflags &= ~CMD_IN_BUF;
-      set_linemode(i, true);
+    i->text_start = i->text_end = 0;
+    i->text[0] = '\0';
+    i->iflags &= ~CMD_IN_BUF;
+    set_linemode(i, true);
   }
   if (was_noecho && !(i->iflags & NOECHO)) {
-      set_localecho(i, true);
+    set_localecho(i, true);
   }
 
   copy_and_push_string(str);
