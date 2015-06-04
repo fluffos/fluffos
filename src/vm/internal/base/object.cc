@@ -1702,7 +1702,8 @@ int restore_object(object_t *ob, const char *file, int noclear) {
   // We always use zlib functions here and below, as it handls non-gzip file as wel.
   gzFile gzf = gzopen(file, "rb");
   if (gzf == nullptr) {
-    error("restore_object: Error opening file: %s.\n", file);
+    // Compat: do not return error, if there are no save files.
+    return 0;
   }
 
   // It is possible to have a gzip that decompress into infinite memory, we
