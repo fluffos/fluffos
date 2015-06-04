@@ -1671,11 +1671,6 @@ int restore_object(object_t *ob, const char *file, int noclear) {
 
   std::string filename(file);
 
-  // Eliminate leading '/'
-  while (filename[0] == '/') {
-    filename = filename.substr(1);
-  }
-
   // First get rid of all extensions.
   if (endWith(filename, ".c")) {
     filename = filename.substr(0, filename.length() - 2);
@@ -1688,8 +1683,12 @@ int restore_object(object_t *ob, const char *file, int noclear) {
   // Check if GZ file exists.
   struct stat st;
   std::string filename_gz = filename + SAVE_GZ_EXTENSION;
+  // Eliminate leading '/' for checking with stat().
+  while (filename_gz[0] == '/') {
+    filename_gz = filename_gz.substr(1);
+  }
   if (stat(filename_gz.c_str(), &st) != -1) {
-    filename = filename_gz;
+    filename = "/" + filename_gz;
   } else {
     filename = filename + SAVE_EXTENSION;
   }
