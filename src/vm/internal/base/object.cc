@@ -1717,7 +1717,7 @@ int restore_object(object_t *ob, const char *file, int noclear) {
     int bytes_read = gzread(gzf, buf.data() + total_bytes_read, chunk);
 
     // Error reading gzip file.
-    if (bytes_read <= 0) {
+    if (bytes_read < 0) {
       int err;
       std::string errstr(gzerror(gzf, &err));
       gzclose(gzf);
@@ -1740,6 +1740,11 @@ int restore_object(object_t *ob, const char *file, int noclear) {
     break;
   }
   gzclose(gzf);
+
+  // Compat: ignore empty file.
+  if (total_bytes_read == 0) {
+    return 0;
+  }
 
   current_object = ob;
 
