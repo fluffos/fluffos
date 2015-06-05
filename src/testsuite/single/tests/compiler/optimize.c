@@ -10,6 +10,18 @@ void bug(){
     };
     // No more statement below.
 }
+
+void bug2() {
+    int cost, a, b;
+
+    a = 0;
+    b = 1;
+
+    cost = time_expression{
+        a = a + b;
+    };
+}
 void do_tests() {
     bug();
+    bug2();
 }
