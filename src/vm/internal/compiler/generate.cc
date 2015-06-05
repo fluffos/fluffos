@@ -214,9 +214,13 @@ static parse_node_t *optimize(parse_node_t *expr) {
     case NODE_ANON_FUNC:
       break;
     case NODE_EFUN:
+    case NODE_TIME_EXPRESSION:
       optimize_expr_list(expr->r.expr);
       break;
     default:
+      // This should not happen!
+      // see src/testsuite/single/tests/compiler/optimize.c
+      debug_message("optimizer: unknown node kind: %d.", expr->kind);
       break;
   }
   return expr;
