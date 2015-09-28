@@ -5,6 +5,7 @@
 #ifdef HAVE_EXECINFO_H
 #include <execinfo.h>
 #endif
+#include <iostream>  // for cout
 #include <locale.h>  // for setlocale, LC_ALL
 #include <signal.h>  // for signal, SIG_DFL, SIGABRT, etc
 #include <stddef.h>  // for size_t
@@ -16,11 +17,12 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "backend.h"  // for backend, init_backend
-#include "cc.h"       // for SOURCE_REVISION
-#include "comm.h"     // for init_user_conn
-#include "console.h"  // for console_init, has_console
-#include "vm/vm.h"    // for push_constant_string, etc
+#include "backend.h"                                        // for backend, init_backend
+#include "cc.h"                                             // for SOURCE_REVISION
+#include "comm.h"                                           // for init_user_conn
+#include "console.h"                                        // for console_init, has_console
+#include "thirdparty/jemalloc/include/jemalloc/jemalloc.h"  // for mallctl
+#include "vm/vm.h"                                          // for push_constant_string, etc
 
 #include "packages/core/dns.h"  // for init_dns_event_base.
 
@@ -34,40 +36,78 @@ static void sig_usr2(int /*sig*/);
 static void attempt_shutdown(int sig);
 static void setup_signal_handlers();
 
+inline void print_sep() { std::cout << std::string(72, '=') << std::endl; }
+
+void print_version_and_time() {
+  print_sep();
+
+  /* Print current time */
+  {
+    time_t tm;
+    time(&tm);
+    std::cout << "Boot Time: " << ctime(&tm);
+  }
+
+  /* Print FluffOS version */
+  std::cout << "FluffOS Version: " << PACKAGE_VERSION << "(" << SOURCE_REVISION << ")"
+            << "@ (" << ARCH << ")" << std::endl;
+
+  /* Print jemalloc version */
+  {
+    const char *ver;
+    size_t resultlen = sizeof(ver);
+    mallctl("version", &ver, &resultlen, NULL, 0);
+    std::cout << "Jemalloc Version: " << ver << std::endl;
+  }
+}
+
+void print_rlimit() {
+  struct rlimit rlim;
+  if (getrlimit(RLIMIT_CORE, &rlim)) {
+    perror("Error reading RLIMIT_CORE: ");
+    exit(1);
+  } else {
+    std::cout << "Core Dump: " << (rlim.rlim_cur == 0 ? "No" : "Yes") << ", ";
+  }
+
+  if (getrlimit(RLIMIT_NOFILE, &rlim)) {
+    perror("Error reading RLIMIT_NOFILE: ");
+    exit(1);
+  } else {
+    std::cout << "Max FD: " << rlim.rlim_cur << std::endl;
+  }
+}
+
 int main(int argc, char **argv) {
   setlocale(LC_ALL, "C");
   tzset();
   boot_time = get_current_time();
 
-  /* Warn on core dump limit. */
+  print_version_and_time();
+
+  // try to bump FD limits.
   {
     struct rlimit rlim;
-    if (getrlimit(RLIMIT_CORE, &rlim)) {
-      fprintf(stderr, "Error getting RLIMIT_CORE.");
-    } else {
-      if (rlim.rlim_cur == 0) {
-        fprintf(stderr,
-                "WARNING: rlimit for core dump is 0, you will "
-                "not get core on crash.\n");
-      }
+    rlim.rlim_cur = 65535;
+    rlim.rlim_max = rlim.rlim_cur;
+    if (setrlimit(RLIMIT_NOFILE, &rlim)) {
+      // ignore this error.
     }
   }
+
+  print_rlimit();
+
+  std::cout << "Command: " << argv[0] << " ";
+  for (int i = 1; i < argc; i++) {
+    std::cout << argv[i] << " ";
+  }
+  std::cout << std::endl;
+
+  print_sep();
 
 #ifdef DEBUGMALLOC
   MDinit();
 #endif
-
-  /*
-   * Check the living hash table size
-   */
-  /*
-  if (CFG_LIVING_HASH_SIZE != 4 && CFG_LIVING_HASH_SIZE != 16 && CFG_LIVING_HASH_SIZE != 64 &&
-      CFG_LIVING_HASH_SIZE != 256 && CFG_LIVING_HASH_SIZE != 1024 && CFG_LIVING_HASH_SIZE != 4096) {
-    fprintf(stderr,
-            "CFG_LIVING_HASH_SIZE in options.h must be one of 4, 16, 64, 256, "
-            "1024, 4096, ...\n");
-    exit(-1);
-  }*/
 
   /* read in the configuration file */
   bool got_config = false;
@@ -79,10 +119,13 @@ int main(int argc, char **argv) {
     }
   }
   if (!got_config) {
-    fprintf(stderr, "You must specify the configuration filename as an argument.\n");
+    fprintf(stderr, "Usage: %s config_file\n", argv[0]);
     exit(-1);
   }
 
+  // TODO: dump configs
+
+  // Make sure mudlib dir is correct.
   if (chdir(CONFIG_STR(__MUD_LIB_DIR__)) == -1) {
     fprintf(stderr, "Bad mudlib directory: %s\n", CONFIG_STR(__MUD_LIB_DIR__));
     exit(-1);
@@ -90,24 +133,11 @@ int main(int argc, char **argv) {
 
   printf("Initializing internal stuff ....\n");
 
-  // Init base layer.
-  {
-    time_t tm;
-    time(&tm);
-    char version_buf[80];
-    sprintf(version_buf, "%s", SOURCE_REVISION);
-
-    debug_message(
-        "------------------------------------------------------------------------"
-        "----\n%s (%s) starting up on %s - %s\n\n",
-        CONFIG_STR(__MUD_NAME__), version_buf, ARCH, ctime(&tm));
-  }
-
   // Initialize libevent, This should be done before executing LPC.
   auto base = init_backend();
   init_dns_event_base(base);
 
-  // Initiliaze VM layer
+  // Initialize VM layer
   vm_init();
 
   for (int i = 1; i < argc; i++) {
@@ -208,15 +238,15 @@ static void try_dump_stacktrace() {
 
 static void sig_cld(int sig) {
   /*FIXME: restore this
-  int status;
-  while (wait3(&status, WNOHANG, NULL) > 0) {
-    ;
-  }*/
+   int status;
+   while (wait3(&status, WNOHANG, NULL) > 0) {
+   ;
+   }*/
 }
 
 /* send this signal when the machine is about to reboot.  The script
-   which restarts the MUD should take an exit code of 1 to mean don't
-   restart
+ which restarts the MUD should take an exit code of 1 to mean don't
+ restart
  */
 static void sig_usr1(int sig) {
   push_constant_string("Host machine shutting down");
