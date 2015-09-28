@@ -109,7 +109,8 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, std::chrono::milliseconds dela
   if (cop->is_walltime) {
     cop->target_time =
         std::chrono::duration_cast<std::chrono::milliseconds>(
-            (std::chrono::high_resolution_clock::now() + delay_msecs).time_since_epoch()).count();
+            (std::chrono::high_resolution_clock::now() + delay_msecs).time_since_epoch())
+            .count();
   } else {
     cop->target_time = g_current_gametick + time_to_gametick(delay_msecs);
   }
@@ -179,7 +180,8 @@ void call_out(pending_call_t *cop) {
   DBG_CALLOUT("  target_time: %lu vs current: %lu\n", cop->target_time,
               cop->is_walltime
                   ? std::chrono::duration_cast<std::chrono::milliseconds>(
-                        std::chrono::high_resolution_clock::now().time_since_epoch()).count()
+                        std::chrono::high_resolution_clock::now().time_since_epoch())
+                        .count()
                   : g_current_gametick);
 
   // Remove self from callout map
@@ -258,11 +260,13 @@ static int time_left(pending_call_t *cop) {
   if (cop->is_walltime) {
     return (cop->target_time -
             std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::high_resolution_clock::now().time_since_epoch()).count()) /
+                std::chrono::high_resolution_clock::now().time_since_epoch())
+                .count()) /
            1000;
   } else {
     return std::chrono::duration_cast<std::chrono::seconds>(
-               gametick_to_time(cop->target_time - g_current_gametick)).count();
+               gametick_to_time(cop->target_time - g_current_gametick))
+        .count();
   }
 }
 

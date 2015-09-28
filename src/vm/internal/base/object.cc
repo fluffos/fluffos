@@ -14,6 +14,7 @@
 #include <vector>
 #include <zlib.h>
 
+#include "base/internal/strutils.h" // for startsWith, endsWith
 #include "comm.h"  // add_message FIXME: reverse API
 #include "vm/internal/base/machine.h"
 #include "vm/internal/otable.h"  // FIXME:
@@ -1633,23 +1634,10 @@ void clear_non_statics(object_t *ob) {
   cns_recurse(ob, &idx, ob->prog);
 }
 
-namespace {
-inline bool beginWith(const std::string str, const std::string needle) {
-  return (!str.compare(0, needle.length(), needle));
-}
-
-inline bool endWith(const std::string str, const std::string needle) {
-  if (str.length() >= needle.length()) {
-    return (0 == str.compare(str.length() - needle.length(), needle.length(), needle));
-  }
-  return false;
-}
-}  // namespace
-
 void restore_object_from_buff(object_t *ob, const char *buf, int noclear) {
   std::istringstream input(buf);
   for (std::string line; std::getline(input, line);) {
-    if (endWith(line, "\r")) {
+    if (ends_with(line, "\r")) {
       line = line.substr(0, line.length() - 1);
     }
     // FIXME: some restore function needs to modify string inplace.
@@ -1672,11 +1660,11 @@ int restore_object(object_t *ob, const char *file, int noclear) {
   std::string filename(file);
 
   // First get rid of all extensions.
-  if (endWith(filename, ".c")) {
+  if (ends_with(filename, ".c")) {
     filename = filename.substr(0, filename.length() - 2);
-  } else if (endWith(filename, SAVE_EXTENSION)) {
+  } else if (ends_with(filename, SAVE_EXTENSION)) {
     filename = filename.substr(0, filename.length() - strlen(SAVE_EXTENSION));
-  } else if (endWith(filename, SAVE_GZ_EXTENSION)) {
+  } else if (ends_with(filename, SAVE_GZ_EXTENSION)) {
     filename = filename.substr(0, filename.length() - SAVE_EXTENSION_GZ_LENGTH);
   }
 

@@ -371,7 +371,7 @@ static int strcmpalpha(const char *aname, const char *bname, int depth) {
   int slash = 0;
 
   for (; (*aname == *bname) && (*aname != '#') && (*bname != '#') && (*aname != '\0') &&
-             (*bname != '\0');
+         (*bname != '\0');
        aname++, bname++) {
     if (*aname == '/') {
       slash++;

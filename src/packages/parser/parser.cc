@@ -1985,7 +1985,7 @@ static void push_bitvec_as_array(bitvec_t *bv, int errors_too) {
  *  called sometimes more than once
  */
 static const char *prefixes[] = {
-    "can_",    "direct_",  "indirect_", "do_",
+    "can_", "direct_", "indirect_", "do_",
     /* Belgarat: names for the second pass with filled object arguments */
     "direct_", "indirect_"};
 

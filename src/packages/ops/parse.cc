@@ -859,10 +859,10 @@ static svalue_t *one_parse(array_t *obarr, const char *pat, array_t *warr, int *
 */
 #ifndef PARSE_FOREIGN
 
-static const char *ord1[] = {"", "first", "second", "third", "fourth", "fifth", "sixth", "seventh",
-                             "eighth", "ninth", "tenth", "eleventh", "twelfth", "thirteenth",
-                             "fourteenth", "fifteenth", "sixteenth", "seventeenth", "eighteenth",
-                             "nineteenth"};
+static const char *ord1[] = {"",          "first",     "second",      "third",      "fourth",
+                             "fifth",     "sixth",     "seventh",     "eighth",     "ninth",
+                             "tenth",     "eleventh",  "twelfth",     "thirteenth", "fourteenth",
+                             "fifteenth", "sixteenth", "seventeenth", "eighteenth", "nineteenth"};
 
 static const char *ord10[] = {"",      "",      "twenty",  "thirty", "forty",
                               "fifty", "sixty", "seventy", "eighty", "ninety"};

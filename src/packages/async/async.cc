@@ -15,6 +15,7 @@
 #include <sys/syscall.h>
 #endif
 #include <unistd.h>
+#include <zlib.h>
 
 #ifdef F_ASYNC_DB_EXEC
 #include "packages/db/db.h"
@@ -190,9 +191,6 @@ void add_req(struct request *req) {
   lastreq = req;
 }
 
-#ifdef PACKAGE_COMPRESS
-#include <zlib.h>
-
 void *gzreadthread(struct request *req) {
   gzFile file = gzopen(req->path, "rb");
   req->ret = gzread(file, (void *)(req->buf), req->size);
@@ -339,11 +337,7 @@ int add_read(const char *fname, function_to_call_t *fun) {
     req->fun = fun;
     req->type = aread;
     strcpy(req->path, fname);
-#ifdef PACKAGE_COMPRESS
     return aio_gzread(req);
-#else
-    return aio_read(req);
-#endif
   } else {
     error("permission denied\n");
   }
@@ -382,15 +376,11 @@ int add_write(const char *fname, const char *buf, int size, char flags, function
     req->flags = flags;
     strcpy(req->path, fname);
     assign_svalue_no_free(&req->tmp, sp - 2);
-#ifdef PACKAGE_COMPRESS
     if (flags & 2) {
       return aio_gzwrite(req);
     } else {
-#endif
       return aio_write(req);
-#ifdef PACKAGE_COMPRESS
     }
-#endif
   } else {
     error("permission denied\n");
   }
@@ -600,5 +590,4 @@ void f_async_db_exec() {
   add_db_exec((sp - 2)->u.number, cb);
   pop_3_elems();
 }
-#endif
 #endif
