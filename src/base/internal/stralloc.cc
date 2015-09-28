@@ -160,8 +160,9 @@ static block_t *alloc_new_string(const char *string, int h) {
   size = sizeof(block_t) + len + 1;
   b = reinterpret_cast<block_t *>(DMALLOC(size, TAG_SHARED_STRING, "alloc_new_string"));
   strncpy(STRING(b), string, len);
-  STRING(b)[len] = '\0'; /* strncpy doesn't put on \0 if 'from' too
-                            * long */
+  STRING(b)
+  [len] = '\0'; /* strncpy doesn't put on \0 if 'from' too
+                   * long */
   if (cut) {
     h = whashstr(STRING(b)) & htable_size_minus_one;
   }

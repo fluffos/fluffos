@@ -5,8 +5,8 @@
 
 #include "thirdparty/libtelnet/libtelnet.h"  // FIXME?
 
-static const unsigned char telnet_mssp_value[] = {TELNET_MSSP_VAR, '%', 's', TELNET_MSSP_VAL, '%',
-                                                  's', 0};
+static const unsigned char telnet_mssp_value[] = {
+    TELNET_MSSP_VAR, '%', 's', TELNET_MSSP_VAL, '%', 's', 0};
 
 static int send_mssp_val(mapping_t *map, mapping_node_t *el, void *data) {
   auto ip = reinterpret_cast<interactive_t *>(data);

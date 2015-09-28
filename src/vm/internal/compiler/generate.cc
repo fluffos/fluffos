@@ -337,12 +337,19 @@ int generate_conditional_branch(parse_node_t *node) {
 // FIXME: originally found in generate.cc
 
 #ifdef DEBUG
-const char *lpc_tree_name[] = {
-    "return", "two values", "opcode", "opcode_1", "opcode_2", "unary op", "unary op_1", "binary op",
-    "binary op_1", "ternary op", "ternary op_1", "control jump", "loop", "call", "call_1", "call_2",
-    "&& ||", "foreach", "lvalue_efun", "switch_range", "switch_string", "switch_direct",
-    "switch_number", "case_number", "case_string", "default", "if", "branch link", "parameter",
-    "parameter_lvalue", "efun", "anon func", "real", "number", "string", "function", "catch"};
+const char *lpc_tree_name[] = {"return",        "two values",    "opcode",
+                               "opcode_1",      "opcode_2",      "unary op",
+                               "unary op_1",    "binary op",     "binary op_1",
+                               "ternary op",    "ternary op_1",  "control jump",
+                               "loop",          "call",          "call_1",
+                               "call_2",        "&& ||",         "foreach",
+                               "lvalue_efun",   "switch_range",  "switch_string",
+                               "switch_direct", "switch_number", "case_number",
+                               "case_string",   "default",       "if",
+                               "branch link",   "parameter",     "parameter_lvalue",
+                               "efun",          "anon func",     "real",
+                               "number",        "string",        "function",
+                               "catch"};
 
 static void lpc_tree(parse_node_t *dest, int num) {
   parse_node_t *pn;

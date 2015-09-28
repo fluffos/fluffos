@@ -249,8 +249,8 @@ void f__call_other(void) {
 static const char *origin_name(int orig) {
   /* FIXME: this should use ffs() if available (BSD) */
   int i = 0;
-  static const char *origins[] = {"driver", "local", "call_other", "simul", "internal", "efun",
-                                  "function pointer", "functional"};
+  static const char *origins[] = {"driver",   "local", "call_other",       "simul",
+                                  "internal", "efun",  "function pointer", "functional"};
   while (orig >>= 1) {
     i++;
   }

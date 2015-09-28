@@ -453,7 +453,7 @@ static char *reg(int paren, /* Parenthesized? */
   if (!(flags & HASWIDTH)) {
     *flagp &= ~HASWIDTH;
   }
-  *flagp |= flags &SPSTART;
+  *flagp |= flags & SPSTART;
   while (*regparse == OR_OP) {
     regparse++;
     br = regbranch(&flags);
@@ -464,7 +464,7 @@ static char *reg(int paren, /* Parenthesized? */
     if (!(flags & HASWIDTH)) {
       *flagp &= ~HASWIDTH;
     }
-    *flagp |= flags &SPSTART;
+    *flagp |= flags & SPSTART;
   }
 
   /* Make a closing node, and hook it on the end. */
@@ -510,9 +510,9 @@ static char *regbranch(int *flagp) {
     if (latest == (char *)NULL) {
       return ((char *)NULL);
     }
-    *flagp |= flags &HASWIDTH;
+    *flagp |= flags & HASWIDTH;
     if (chain == (char *)NULL) { /* First piece. */
-      *flagp |= flags &SPSTART;
+      *flagp |= flags & SPSTART;
     } else {
       regtail(chain, latest);
     }
@@ -664,7 +664,7 @@ static char *regatom(int *flagp) {
       if (ret == (char *)NULL) {
         return ((char *)NULL);
       }
-      *flagp |= flags &(HASWIDTH | SPSTART);
+      *flagp |= flags & (HASWIDTH | SPSTART);
       break;
     case '\0':
     case OR_OP:
