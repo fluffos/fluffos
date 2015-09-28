@@ -5,7 +5,10 @@ before_install:
 
 script: bash -x ./.travis_build.sh
 
-after_failure: cat src/config.log; tail -n 50 src/testsuite/log/*
+after_failure:
+    - cat src/thirdparty/jemalloc/config.log
+    - cat src/config.log
+    - tail -n 50 src/testsuite/log/*
 
 compiler:
   - gcc
