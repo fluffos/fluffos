@@ -1553,5 +1553,5 @@ void telnet_begin_zmp(telnet_t *telnet, const char *cmd) {
 
 /* send a ZMP argument */
 void telnet_zmp_arg(telnet_t *telnet, const char* arg) {
-	telnet_send(telnet, arg, strlen(arg) + 1);
+  telnet_send(telnet, arg, strlen(arg) + 1);
 }

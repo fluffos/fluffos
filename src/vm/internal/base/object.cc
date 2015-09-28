@@ -14,8 +14,8 @@
 #include <vector>
 #include <zlib.h>
 
-#include "base/internal/strutils.h" // for startsWith, endsWith
-#include "comm.h"  // add_message FIXME: reverse API
+#include "base/internal/strutils.h"  // for startsWith, endsWith
+#include "comm.h"                    // add_message FIXME: reverse API
 #include "vm/internal/base/machine.h"
 #include "vm/internal/otable.h"  // FIXME:
 

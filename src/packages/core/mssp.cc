@@ -17,7 +17,7 @@ static int send_mssp_val(mapping_t *map, mapping_node_t *el, void *data) {
   } else if (el->values[0].type == T_STRING && el->values[1].type == T_ARRAY &&
              el->values[1].u.arr->size > 0 && el->values[1].u.arr->item[0].type == T_STRING) {
     telnet_printf(ip->telnet, reinterpret_cast<const char *>(telnet_mssp_value),
-                      el->values[0].u.string, el->values[1].u.arr->item[0].u.string);
+                  el->values[0].u.string, el->values[1].u.arr->item[0].u.string);
     array_t *ar = el->values[1].u.arr;
     int i;
     unsigned char val = TELNET_MSSP_VAL;

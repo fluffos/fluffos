@@ -37,63 +37,63 @@ struct flagEntry {
 };
 
 static const flagEntry kDefaultFlags[] = {
-    { "time to clean up", __TIME_TO_CLEAN_UP__, 600},
-    { "time to reset", __TIME_TO_RESET__, 900},
-    { "time to swap", __TIME_TO_SWAP__, 300},
+    {"time to clean up", __TIME_TO_CLEAN_UP__, 600},
+    {"time to reset", __TIME_TO_RESET__, 900},
+    {"time to swap", __TIME_TO_SWAP__, 300},
 
     // __COMPILER_STACK_SIZE__
-    { "evaluator stack size",__EVALUATOR_STACK_SIZE__, CFG_EVALUATOR_STACK_SIZE},
+    {"evaluator stack size", __EVALUATOR_STACK_SIZE__, CFG_EVALUATOR_STACK_SIZE},
 
-    { "inherit chain size", __INHERIT_CHAIN_SIZE__, 30 },
-    { "maximum evaluation cost", __MAX_EVAL_COST__, 30000000 },
-    { "maximum local variables",__MAX_LOCAL_VARIABLES__, CFG_MAX_LOCAL_VARIABLES},
-    { "maximum call depth",__MAX_CALL_DEPTH__, CFG_MAX_CALL_DEPTH },
+    {"inherit chain size", __INHERIT_CHAIN_SIZE__, 30},
+    {"maximum evaluation cost", __MAX_EVAL_COST__, 30000000},
+    {"maximum local variables", __MAX_LOCAL_VARIABLES__, CFG_MAX_LOCAL_VARIABLES},
+    {"maximum call depth", __MAX_CALL_DEPTH__, CFG_MAX_CALL_DEPTH},
 
-    { "maximum array size", __MAX_ARRAY_SIZE__, 15000 },
-    { "maximum buffer size", __MAX_BUFFER_SIZE__, 400000 },
-    { "maximum mapping size", __MAX_MAPPING_SIZE__, 150000 },
-    { "maximum string length", __MAX_STRING_LENGTH__, 200000 },
-    { "maximum bits in a bitfield", __MAX_BITFIELD_BITS__, 12000 },
-    { "maximum byte transfer", __MAX_BYTE_TRANSFER__, 200000 },
-    { "maximum read file size", __MAX_READ_FILE_SIZE__, 200000 },
+    {"maximum array size", __MAX_ARRAY_SIZE__, 15000},
+    {"maximum buffer size", __MAX_BUFFER_SIZE__, 400000},
+    {"maximum mapping size", __MAX_MAPPING_SIZE__, 150000},
+    {"maximum string length", __MAX_STRING_LENGTH__, 200000},
+    {"maximum bits in a bitfield", __MAX_BITFIELD_BITS__, 12000},
+    {"maximum byte transfer", __MAX_BYTE_TRANSFER__, 200000},
+    {"maximum read file size", __MAX_READ_FILE_SIZE__, 200000},
 
-    { "hash table size", __SHARED_STRING_HASH_TABLE_SIZE__, 7001},
-    { "object table size", __OBJECT_HASH_TABLE_SIZE__, 1501},
-    { "living hash table size", __LIVING_HASH_TABLE_SIZE__, CFG_LIVING_HASH_SIZE},
+    {"hash table size", __SHARED_STRING_HASH_TABLE_SIZE__, 7001},
+    {"object table size", __OBJECT_HASH_TABLE_SIZE__, 1501},
+    {"living hash table size", __LIVING_HASH_TABLE_SIZE__, CFG_LIVING_HASH_SIZE},
 
-    { "gametick msec", __RC_GAMETICK_MSEC__, 1000},
-    { "heartbeat interval msec", __RC_HEARTBEAT_INTERVAL_MSEC__, 1000},
-    { "sane explode string", __RC_SANE_EXPLODE_STRING__, 1 },
-    { "reversible explode string", __RC_REVERSIBLE_EXPLODE_STRING__, 0 },
-    { "sane sorting", __RC_SANE_SORTING__, 1 },
-    { "warn tab", __RC_WARN_TAB__, 0 },
-    { "wombles", __RC_WOMBLES__, 0 },
-    { "call other type check", __RC_CALL_OTHER_TYPE_CHECK__, 0 },
-    { "call other warn", __RC_CALL_OTHER_WARN__, 0 },
-    { "mudlib error handler", __RC_MUDLIB_ERROR_HANDLER__, 1 },
-    { "no resets", __RC_NO_RESETS__, 0 },
-    { "lazy resets", __RC_LAZY_RESETS__, 0 },
-    { "randomized resets", __RC_RANDOMIZED_RESETS__, 1 },
-    { "no ansi", __RC_NO_ANSI__, 1 },
-    { "strip before process input", __RC_STRIP_BEFORE_PROCESS_INPUT__, 1 },
-    { "this_player in call_out", __RC_THIS_PLAYER_IN_CALL_OUT__, 1 },
-    { "trace", __RC_TRACE__, 1 },
-    { "trace code", __RC_TRACE_CODE__, 0 },
-    { "interactive catch tell", __RC_INTERACTIVE_CATCH_TELL__, 0 },
-    { "receive snoop", __RC_RECEIVE_SNOOP__, 1 },
-    { "snoop shadowed", __RC_SNOOP_SHADOWED__, 0 },
-    { "reverse defer", __RC_REVERSE_DEFER__, 0 },
-    { "has console", __RC_HAS_CONSOLE__, 1 },
-    { "noninteractive stderr write", __RC_NONINTERACTIVE_STDERR_WRITE__, 0 },
-    { "trap crashes", __RC_TRAP_CRASHES__, 1 },
-    { "old type behavior", __RC_OLD_TYPE_BEHAVIOR__, 0 },
-    { "old range behavior", __RC_OLD_RANGE_BEHAVIOR__, 0 },
-    { "warn old range behavior", __RC_WARN_OLD_RANGE_BEHAVIOR__, 1 },
-    { "suppress argument warnings", __RC_SUPPRESS_ARGUMENT_WARNINGS__, 1},
-    { "enable_commands call init", __RC_ENABLE_COMMANDS_CALL_INIT__, 1 },
-    { "sprintf add_justified ignore ANSI colors", __RC_SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__, 1 },
-    { "apply cache bits", __RC_APPLY_CACHE_BITS__, 22 },
-    { "call_out(0) nest level", __RC_CALL_OUT_ZERO_NEST_LEVEL__, 1000 },
+    {"gametick msec", __RC_GAMETICK_MSEC__, 1000},
+    {"heartbeat interval msec", __RC_HEARTBEAT_INTERVAL_MSEC__, 1000},
+    {"sane explode string", __RC_SANE_EXPLODE_STRING__, 1},
+    {"reversible explode string", __RC_REVERSIBLE_EXPLODE_STRING__, 0},
+    {"sane sorting", __RC_SANE_SORTING__, 1},
+    {"warn tab", __RC_WARN_TAB__, 0},
+    {"wombles", __RC_WOMBLES__, 0},
+    {"call other type check", __RC_CALL_OTHER_TYPE_CHECK__, 0},
+    {"call other warn", __RC_CALL_OTHER_WARN__, 0},
+    {"mudlib error handler", __RC_MUDLIB_ERROR_HANDLER__, 1},
+    {"no resets", __RC_NO_RESETS__, 0},
+    {"lazy resets", __RC_LAZY_RESETS__, 0},
+    {"randomized resets", __RC_RANDOMIZED_RESETS__, 1},
+    {"no ansi", __RC_NO_ANSI__, 1},
+    {"strip before process input", __RC_STRIP_BEFORE_PROCESS_INPUT__, 1},
+    {"this_player in call_out", __RC_THIS_PLAYER_IN_CALL_OUT__, 1},
+    {"trace", __RC_TRACE__, 1},
+    {"trace code", __RC_TRACE_CODE__, 0},
+    {"interactive catch tell", __RC_INTERACTIVE_CATCH_TELL__, 0},
+    {"receive snoop", __RC_RECEIVE_SNOOP__, 1},
+    {"snoop shadowed", __RC_SNOOP_SHADOWED__, 0},
+    {"reverse defer", __RC_REVERSE_DEFER__, 0},
+    {"has console", __RC_HAS_CONSOLE__, 1},
+    {"noninteractive stderr write", __RC_NONINTERACTIVE_STDERR_WRITE__, 0},
+    {"trap crashes", __RC_TRAP_CRASHES__, 1},
+    {"old type behavior", __RC_OLD_TYPE_BEHAVIOR__, 0},
+    {"old range behavior", __RC_OLD_RANGE_BEHAVIOR__, 0},
+    {"warn old range behavior", __RC_WARN_OLD_RANGE_BEHAVIOR__, 1},
+    {"suppress argument warnings", __RC_SUPPRESS_ARGUMENT_WARNINGS__, 1},
+    {"enable_commands call init", __RC_ENABLE_COMMANDS_CALL_INIT__, 1},
+    {"sprintf add_justified ignore ANSI colors", __RC_SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__, 1},
+    {"apply cache bits", __RC_APPLY_CACHE_BITS__, 22},
+    {"call_out(0) nest level", __RC_CALL_OUT_ZERO_NEST_LEVEL__, 1000},
 };
 
 void config_init() {
@@ -213,7 +213,8 @@ void read_config(char *filename) {
               "Missing '\"' or '<' around global include file name; adding "
               "quotes.\n");
       // not very efficient, but who cares.
-      CONFIG_STR(__GLOBAL_INCLUDE_FILE__) = alloc_cstring(("\"" + v + "\"").c_str(), "config file: gif");
+      CONFIG_STR(__GLOBAL_INCLUDE_FILE__) =
+          alloc_cstring(("\"" + v + "\"").c_str(), "config file: gif");
     } else {
       CONFIG_STR(__GLOBAL_INCLUDE_FILE__) = alloc_cstring(tmp, "config file: gif");
     }
@@ -358,8 +359,7 @@ void read_config(char *filename) {
     if (scan_config_line(buf, &value, kOptional)) {
       if (value != kDefaultFlags[i].defaultValue) {
         CONFIG_INT(kDefaultFlags[i].pos) = value;
-        std::cout << "* Config '" << kDefaultFlags[i].key
-            << "' New Value: " << value << std::endl;
+        std::cout << "* Config '" << kDefaultFlags[i].key << "' New Value: " << value << std::endl;
       }
     }
   }
