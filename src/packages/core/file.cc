@@ -37,6 +37,7 @@
 #endif
 #include <fcntl.h>
 #include <unistd.h>
+#include <zlib.h>
 
 /*
  * Credits for some of the code below goes to Free Software Foundation
@@ -57,10 +58,6 @@
 
 #ifndef S_ISBLK
 #define S_ISBLK(m) (((m)&S_IFMT) == S_IFBLK)
-#endif
-
-#ifdef PACKAGE_COMPRESS
-#include <zlib.h>
 #endif
 
 static int match_string(char * /*match*/, char * /*str*/);
@@ -275,15 +272,12 @@ int remove_file(const char *path) {
  */
 int write_file(const char *file, const char *str, int flags) {
   FILE *f;
-#ifdef PACKAGE_COMPRESS
   gzFile gf;
-#endif
 
   file = check_valid_path(file, current_object, "write_file", 1);
   if (!file) {
     return 0;
   }
-#ifdef PACKAGE_COMPRESS
   if (flags & 2) {
     gf = gzopen(file, (flags & 1) ? "w" : "a");
     if (!gf) {
@@ -291,32 +285,23 @@ int write_file(const char *file, const char *str, int flags) {
             (flags & 1) ? "overwrite" : "append", strerror(errno));
     }
   } else {
-#endif
     f = fopen(file, (flags & 1) ? "w" : "a");
     if (f == 0) {
       error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n", file,
             (flags & 1) ? "overwrite" : "append", strerror(errno));
     }
-#ifdef PACKAGE_COMPRESS
   }
   if (flags & 2) {
     gzwrite(gf, str, strlen(str));
   } else {
-#endif
     fwrite(str, strlen(str), 1, f);
-#ifdef PACKAGE_COMPRESS
   }
-#endif
 
-#ifdef PACKAGE_COMPRESS
   if (flags & 2) {
     gzclose(gf);
   } else {
-#endif
     fclose(f);
-#ifdef PACKAGE_COMPRESS
   }
-#endif
   return 1;
 }
 
@@ -330,11 +315,7 @@ char *read_file(const char *file, int start, int lines) {
   // Try and keep one buffer for droping all reads into.
   static char *theBuff = NULL;
   char *result = NULL;
-#ifndef PACKAGE_COMPRESS
-  FILE *f = NULL;
-#else
   gzFile f = NULL;
-#endif
   int chunk;
   char *ptr_start, *ptr_end;
   const char *real_file;
@@ -363,11 +344,7 @@ char *read_file(const char *file, int start, int lines) {
     return result;
   }
 
-#ifndef PACKAGE_COMPRESS
-  f = fopen(real_file, "r");
-#else
   f = gzopen(real_file, "rb");
-#endif
 
   if (f == 0) {
     debug(file, "read_file: fail to open: %s.\n", file);
@@ -379,13 +356,8 @@ char *read_file(const char *file, int start, int lines) {
         DMALLOC(2 * read_file_max_size + 1, TAG_PERMANENT, "read_file: theBuff"));
   }
 
-#ifndef PACKAGE_COMPRESS
-  chunk = fread(theBuff, 1, 2 * read_file_max_size, f);
-  fclose(f);
-#else
   chunk = gzread(f, theBuff, 2 * read_file_max_size);
   gzclose(f);
-#endif
 
   if (chunk == 0) {
     debug(file, "read_file: read error: %s.\n", file);
