@@ -4,9 +4,15 @@
 // IWYU pragma: begin_exports
 
 /* This stuff should be included EVERYWHERE */
+#ifndef _REENTRANT
 #define _REENTRANT
+#endif
+#ifndef __STDC_LIMIT_MACROS
 #define __STDC_LIMIT_MACROS
+#endif
+#ifndef __STDC_FORMAT_MACROS
 #define __STDC_FORMAT_MACROS
+#endif
 
 /* autoconf generated. */
 #include "configure.h"
