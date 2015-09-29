@@ -1366,6 +1366,8 @@ int telnet_vprintf(telnet_t *telnet, const char *fmt, va_list va) {
 	char *output = buffer;
 	int rs, i, l;
 
+  va_list va2;
+  va_copy(va2, va);
 	/* format */
 	rs = vsnprintf(buffer, sizeof(buffer), fmt, va);
 	if (rs >= sizeof(buffer)) {
@@ -1375,8 +1377,10 @@ int telnet_vprintf(telnet_t *telnet, const char *fmt, va_list va) {
 					"malloc() failed: %s", strerror(errno));
 			return -1;
 		}
-		rs = vsnprintf(output, rs + 1, fmt, va);
+		rs = vsnprintf(output, rs + 1, fmt, va2);
 	}
+	va_end(va2);
+	va_end(va);
 
 	/* send */
 	for (l = i = 0; i != rs; ++i) {
@@ -1431,6 +1435,8 @@ int telnet_raw_vprintf(telnet_t *telnet, const char *fmt, va_list va) {
 	char *output = buffer;
 	int rs;
 
+	va_list va2;
+	va_copy(va2, va);
 	/* format; allocate more space if necessary */
 	rs = vsnprintf(buffer, sizeof(buffer), fmt, va);
 	if (rs >= sizeof(buffer)) {
@@ -1440,8 +1446,10 @@ int telnet_raw_vprintf(telnet_t *telnet, const char *fmt, va_list va) {
 					"malloc() failed: %s", strerror(errno));
 			return -1;
 		}
-		rs = vsnprintf(output, rs + 1, fmt, va);
+		rs = vsnprintf(output, rs + 1, fmt, va2);
 	}
+  va_end(va2);
+  va_end(va);
 
 	/* send out the formatted data */
 	telnet_send(telnet, output, rs);
@@ -1545,5 +1553,5 @@ void telnet_begin_zmp(telnet_t *telnet, const char *cmd) {
 
 /* send a ZMP argument */
 void telnet_zmp_arg(telnet_t *telnet, const char* arg) {
-	telnet_send(telnet, arg, strlen(arg) + 1);
+  telnet_send(telnet, arg, strlen(arg) + 1);
 }

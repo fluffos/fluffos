@@ -2847,6 +2847,7 @@ void add_predefines() {
   add_predefine("__CALLOUT_HANDLES__", -1, "");
   add_predefine("__ARGUMENTS_IN_TRACEBACK__", -1, "");
   add_predefine("__LOCALS_IN_TRACEBACK__", -1, "");
+  add_predefine("__DEBUG_MACRO__", -1, "");
 
   // Following compile time configs has been changed into runtime configs.
   if (CONFIG_INT(__RC_SANE_EXPLODE_STRING__)) {

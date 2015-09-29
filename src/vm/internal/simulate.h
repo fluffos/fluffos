@@ -61,4 +61,7 @@ void slow_shut_down(int);
 void mark_free_sentences(void);
 #endif
 
+void tell_npc(object_t *, const char *);
+void tell_object(object_t *, const char *, int);
+
 #endif

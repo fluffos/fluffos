@@ -89,10 +89,10 @@ static int svalue_size(svalue_t *v) {
       return sizeof(buffer_t) + v->u.buf->size - 1;
 #endif
     default:
-      // some freed value or a reference (!) to one (in all my test cases
-      // anyway), it will be removed by reclaim_objects later, Wodan
-      // fatal("Illegal type: %d\n", v->type);
-      ;
+        // some freed value or a reference (!) to one (in all my test cases
+        // anyway), it will be removed by reclaim_objects later, Wodan
+        // fatal("Illegal type: %d\n", v->type);
+        ;
   }
   /* NOTREACHED */
   return 0;

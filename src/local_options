@@ -56,7 +56,7 @@
 #define PACKAGE_CORE
 #define PACKAGE_CRYPTO
 
-#undef PACKAGE_DB
+#define PACKAGE_DB
 #ifdef PACKAGE_DB
 #define USE_MYSQL 1
 #undef USE_POSTGRES

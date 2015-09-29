@@ -5,33 +5,26 @@
 
 #include "thirdparty/libtelnet/libtelnet.h"  // FIXME?
 
-static const unsigned char telnet_mssp_value[] = {TELNET_MSSP_VAR, '%', 's', TELNET_MSSP_VAL, '%',
-                                                  's', 0};
+static const unsigned char telnet_mssp_value[] = {
+    TELNET_MSSP_VAR, '%', 's', TELNET_MSSP_VAL, '%', 's', 0};
 
 static int send_mssp_val(mapping_t *map, mapping_node_t *el, void *data) {
   auto ip = reinterpret_cast<interactive_t *>(data);
 
   if (el->values[0].type == T_STRING && el->values[1].type == T_STRING) {
-    char buf[1024];
-    int len = sprintf(buf, reinterpret_cast<const char *>(telnet_mssp_value),
-                      el->values[0].u.string, el->values[1].u.string);
-
-    telnet_send(ip->telnet, buf, len);
+    telnet_printf(ip->telnet, reinterpret_cast<const char *>(telnet_mssp_value),
+                  el->values[0].u.string, el->values[1].u.string);
   } else if (el->values[0].type == T_STRING && el->values[1].type == T_ARRAY &&
              el->values[1].u.arr->size > 0 && el->values[1].u.arr->item[0].type == T_STRING) {
-    char buf[10240];
-    int len = sprintf(buf, reinterpret_cast<const char *>(telnet_mssp_value),
-                      el->values[0].u.string, el->values[1].u.arr->item[0].u.string);
-
-    telnet_send(ip->telnet, buf, len);
-
+    telnet_printf(ip->telnet, reinterpret_cast<const char *>(telnet_mssp_value),
+                  el->values[0].u.string, el->values[1].u.arr->item[0].u.string);
     array_t *ar = el->values[1].u.arr;
     int i;
     unsigned char val = TELNET_MSSP_VAL;
     for (i = 1; i < ar->size; i++) {
       if (ar->item[i].type == T_STRING) {
-        telnet_send(ip->telnet, reinterpret_cast<const char *>(&val), sizeof(val));
-        telnet_send(ip->telnet, ar->item[i].u.string, SVALUE_STRLEN(&ar->item[i]));
+        telnet_printf(ip->telnet, "%s", reinterpret_cast<const char *>(&val));
+        telnet_printf(ip->telnet, "%s", ar->item[i].u.string);
       }
     }
     flush_message(ip);

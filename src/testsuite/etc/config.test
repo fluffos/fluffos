@@ -344,6 +344,13 @@ sprintf add_justified ignore ANSI colors : 0
 #
 apply cache bits : 22
 
+# call_out(0) loop prvention:
+#
+# This is the number of call_out(.., 0) call can be scheduled on the same
+# gametick.
+#
+call_out(0) nest level : 10
+
 ###############################################################################
 #          The following aren't currently used or implemented (yet)           #
 ###############################################################################

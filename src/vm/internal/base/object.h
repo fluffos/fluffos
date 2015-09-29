@@ -1,7 +1,7 @@
 #ifndef OBJECT_H
 #define OBJECT_H
 
-#include "vm/internal/base/object.h"
+#include <cstdint>  // for uint32_t
 
 #ifdef PACKAGE_MUDLIB_STATS
 #include "packages/mudlib_stats/mudlib_stats.h"
@@ -68,7 +68,7 @@ struct sentence_t {
 };
 
 struct object_t {
-  unsigned short ref;   /* Reference count. */
+  uint32_t ref;         /* Reference count. */
   unsigned short flags; /* Bits or'ed together from above */
 #ifdef DEBUGMALLOC_EXTENSIONS
   unsigned int extra_ref; /* Used to check ref count. */
@@ -120,21 +120,11 @@ struct object_t {
 
 typedef int (*get_objectsfn_t)(object_t *, void *);
 
-#ifdef DEBUG
-#define add_ref(ob, str)             \
-  SAFE(if (ob->ref++ > 32000) {      \
-    ob->flags |= O_BEING_DESTRUCTED; \
-    destruct_object(ob);             \
-    error("ref count too high!\n");  \
-  } debug(d_flag, "Add_ref %s (%d) from %s\n", ob->obname, ob->ref, str);)
-#else
-#define add_ref(ob, str)             \
-  if (ob->ref++ > 32000) {           \
-    ob->flags |= O_BEING_DESTRUCTED; \
-    destruct_object(ob);             \
-    error("ref count too high!\n");  \
-  }
-#endif
+#define add_ref(ob, str)                                                                        \
+  SAFE(if (ob->ref++ > 0xfffffff0) {                                                            \
+    debug_message("Ref count dangerously high: %s (%d) calling from %s\n", ob->obname, ob->ref, \
+                  str);                                                                         \
+  })
 
 #define ROB_STRING_ERROR 1
 #define ROB_ARRAY_ERROR 2
@@ -159,7 +149,6 @@ void save_svalue(svalue_t *, char **);
 int restore_svalue(char *, svalue_t *);
 int save_object(object_t *, const char *, int);
 int save_object_str(object_t *, int, char *, int);
-char *save_variable(svalue_t *);
 int restore_object(object_t *, const char *, int);
 void restore_variable(svalue_t *, char *);
 object_t *get_empty_object(int);
@@ -173,8 +162,6 @@ int object_visible(object_t *);
 #else
 #define object_visible(x) 1
 #endif
-void tell_npc(object_t *, const char *);
-void tell_object(object_t *, const char *, int);
 int find_global_variable(program_t *, const char *const, unsigned short *, int);
 void dealloc_object(object_t *, const char *);
 void get_objects(object_t ***, int *, get_objectsfn_t, void *);
@@ -185,5 +172,5 @@ void save_command_giver(object_t *);
 void restore_command_giver(void);
 void set_command_giver(object_t *);
 void clear_non_statics(object_t *ob);
-void restore_object_from_buff(object_t *ob, char *theBuff, int noclear);
+void restore_object_from_buff(object_t *, const char *, int);
 #endif

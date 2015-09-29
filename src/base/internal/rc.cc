@@ -12,12 +12,14 @@
 #include <cstring>  // for strlen
 #include <deque>
 #include <fstream>
+#include <iostream>
 #include <sstream>
 #include <stdlib.h>  // for exit
 #include <string>
 
-#include "base/internal/stralloc.h"
 #include "base/internal/external_port.h"
+#include "base/internal/stralloc.h"
+#include "base/internal/strutils.h"
 
 char *config_str[NUM_CONFIG_STRS];
 int config_int[NUM_CONFIG_INTS];
@@ -27,6 +29,72 @@ namespace {
 
 const int kMaxConfigLineLength = 120;
 std::deque<std::string> config_lines;
+
+struct flagEntry {
+  std::string key;
+  int pos;
+  int defaultValue;
+};
+
+static const flagEntry kDefaultFlags[] = {
+    {"time to clean up", __TIME_TO_CLEAN_UP__, 600},
+    {"time to reset", __TIME_TO_RESET__, 900},
+    {"time to swap", __TIME_TO_SWAP__, 300},
+
+    // __COMPILER_STACK_SIZE__
+    {"evaluator stack size", __EVALUATOR_STACK_SIZE__, CFG_EVALUATOR_STACK_SIZE},
+
+    {"inherit chain size", __INHERIT_CHAIN_SIZE__, 30},
+    {"maximum evaluation cost", __MAX_EVAL_COST__, 30000000},
+    {"maximum local variables", __MAX_LOCAL_VARIABLES__, CFG_MAX_LOCAL_VARIABLES},
+    {"maximum call depth", __MAX_CALL_DEPTH__, CFG_MAX_CALL_DEPTH},
+
+    {"maximum array size", __MAX_ARRAY_SIZE__, 15000},
+    {"maximum buffer size", __MAX_BUFFER_SIZE__, 400000},
+    {"maximum mapping size", __MAX_MAPPING_SIZE__, 150000},
+    {"maximum string length", __MAX_STRING_LENGTH__, 200000},
+    {"maximum bits in a bitfield", __MAX_BITFIELD_BITS__, 12000},
+    {"maximum byte transfer", __MAX_BYTE_TRANSFER__, 200000},
+    {"maximum read file size", __MAX_READ_FILE_SIZE__, 200000},
+
+    {"hash table size", __SHARED_STRING_HASH_TABLE_SIZE__, 7001},
+    {"object table size", __OBJECT_HASH_TABLE_SIZE__, 1501},
+    {"living hash table size", __LIVING_HASH_TABLE_SIZE__, CFG_LIVING_HASH_SIZE},
+
+    {"gametick msec", __RC_GAMETICK_MSEC__, 1000},
+    {"heartbeat interval msec", __RC_HEARTBEAT_INTERVAL_MSEC__, 1000},
+    {"sane explode string", __RC_SANE_EXPLODE_STRING__, 1},
+    {"reversible explode string", __RC_REVERSIBLE_EXPLODE_STRING__, 0},
+    {"sane sorting", __RC_SANE_SORTING__, 1},
+    {"warn tab", __RC_WARN_TAB__, 0},
+    {"wombles", __RC_WOMBLES__, 0},
+    {"call other type check", __RC_CALL_OTHER_TYPE_CHECK__, 0},
+    {"call other warn", __RC_CALL_OTHER_WARN__, 0},
+    {"mudlib error handler", __RC_MUDLIB_ERROR_HANDLER__, 1},
+    {"no resets", __RC_NO_RESETS__, 0},
+    {"lazy resets", __RC_LAZY_RESETS__, 0},
+    {"randomized resets", __RC_RANDOMIZED_RESETS__, 1},
+    {"no ansi", __RC_NO_ANSI__, 1},
+    {"strip before process input", __RC_STRIP_BEFORE_PROCESS_INPUT__, 1},
+    {"this_player in call_out", __RC_THIS_PLAYER_IN_CALL_OUT__, 1},
+    {"trace", __RC_TRACE__, 1},
+    {"trace code", __RC_TRACE_CODE__, 0},
+    {"interactive catch tell", __RC_INTERACTIVE_CATCH_TELL__, 0},
+    {"receive snoop", __RC_RECEIVE_SNOOP__, 1},
+    {"snoop shadowed", __RC_SNOOP_SHADOWED__, 0},
+    {"reverse defer", __RC_REVERSE_DEFER__, 0},
+    {"has console", __RC_HAS_CONSOLE__, 1},
+    {"noninteractive stderr write", __RC_NONINTERACTIVE_STDERR_WRITE__, 0},
+    {"trap crashes", __RC_TRAP_CRASHES__, 1},
+    {"old type behavior", __RC_OLD_TYPE_BEHAVIOR__, 0},
+    {"old range behavior", __RC_OLD_RANGE_BEHAVIOR__, 0},
+    {"warn old range behavior", __RC_WARN_OLD_RANGE_BEHAVIOR__, 1},
+    {"suppress argument warnings", __RC_SUPPRESS_ARGUMENT_WARNINGS__, 1},
+    {"enable_commands call init", __RC_ENABLE_COMMANDS_CALL_INIT__, 1},
+    {"sprintf add_justified ignore ANSI colors", __RC_SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__, 1},
+    {"apply cache bits", __RC_APPLY_CACHE_BITS__, 22},
+    {"call_out(0) nest level", __RC_CALL_OUT_ZERO_NEST_LEVEL__, 1000},
+};
 
 void config_init() {
   int i;
@@ -110,13 +178,14 @@ void read_config(char *filename) {
 
   config_init();
 
+  fprintf(stdout, "Processing config file: %s\n", filename);
+
   std::ifstream f(filename);
-  if (f.is_open()) {
-    fprintf(stderr, "using config file: %s\n", filename);
-  } else {
-    fprintf(stderr, "*Error: couldn't find or open config file: '%s'\n", filename);
+  if (!f.is_open()) {
+    perror("Error: couldn't open config file: ");
     exit(-1);
   }
+
   std::stringstream buffer;
   buffer << f.rdbuf();
 
@@ -125,38 +194,29 @@ void read_config(char *filename) {
     if (strlen(tmp) == kMaxConfigLineLength - 1) {
       fprintf(stderr, "*Warning: possible truncated config line: %s", tmp);
     }
-    if (strlen(tmp) == 0 || strcmp(tmp, "") == 0) {
+    std::string v = std::string(tmp);
+    trim(v);
+    if (v.length() == 0) {
       continue;
     }
-    // Deal with possible CRLF
-    if (strlen(tmp) > 2 && tmp[strlen(tmp) - 2] == '\r') {
-      tmp[strlen(tmp) - 2] = '\0';
-    }
-    config_lines.push_back(std::string(tmp));
+    config_lines.push_back(v + "\n");
   }
 
+  // Process global include file.
   {
     scan_config_line("global include file : %[^\n]", tmp, 0);
-    char *p;
-    p = CONFIG_STR(__GLOBAL_INCLUDE_FILE__) = alloc_cstring(tmp, "config file: gif");
 
     /* check if the global include file is quoted */
-    if (*p && *p != '"' && *p != '<') {
-      char *ptr;
-
+    std::string v(tmp);
+    if (!starts_with(v, "\"") && !starts_with(v, "<")) {
       fprintf(stderr,
               "Missing '\"' or '<' around global include file name; adding "
               "quotes.\n");
-      for (ptr = p; *ptr; ptr++) {
-        ;
-      }
-      ptr[2] = 0;
-      ptr[1] = '"';
-      while (ptr > p) {
-        *ptr = ptr[-1];
-        ptr--;
-      }
-      *p = '"';
+      // not very efficient, but who cares.
+      CONFIG_STR(__GLOBAL_INCLUDE_FILE__) =
+          alloc_cstring(("\"" + v + "\"").c_str(), "config file: gif");
+    } else {
+      CONFIG_STR(__GLOBAL_INCLUDE_FILE__) = alloc_cstring(tmp, "config file: gif");
     }
   }
 
@@ -204,42 +264,7 @@ void read_config(char *filename) {
   scan_config_line("mud ip : %[^\n]", tmp, 0);
   CONFIG_STR(__MUD_IP__) = alloc_cstring(tmp, "config file: mi");
 
-  scan_config_line("time to clean up : %d\n", &CONFIG_INT(__TIME_TO_CLEAN_UP__), 1);
-  scan_config_line("time to reset : %d\n", &CONFIG_INT(__TIME_TO_RESET__), 1);
-  scan_config_line("time to swap : %d\n", &CONFIG_INT(__TIME_TO_SWAP__), 1);
-
-// TODO(sunyc): process these.
-#if 0
-  /*
-   * not currently used...see options.h
-   */
-  scan_config_line("evaluator stack size : %d\n",
-      &CONFIG_INT(__EVALUATOR_STACK_SIZE__), 0);
-  scan_config_line("maximum local variables : %d\n",
-      &CONFIG_INT(__MAX_LOCAL_VARIABLES__), 0);
-  scan_config_line("maximum call depth : %d\n",
-      &CONFIG_INT(__MAX_CALL_DEPTH__), 0);
-  scan_config_line("living hash table size : %d\n",
-      &CONFIG_INT(__LIVING_HASH_TABLE_SIZE__), 0);
-#endif
-
-  scan_config_line("inherit chain size : %d\n", &CONFIG_INT(__INHERIT_CHAIN_SIZE__), 1);
-  scan_config_line("maximum evaluation cost : %d\n", &CONFIG_INT(__MAX_EVAL_COST__), 1);
-
-  scan_config_line("maximum array size : %d\n", &CONFIG_INT(__MAX_ARRAY_SIZE__), 1);
-#ifndef NO_BUFFER_TYPE
-  scan_config_line("maximum buffer size : %d\n", &CONFIG_INT(__MAX_BUFFER_SIZE__), 1);
-#endif
-  scan_config_line("maximum mapping size : %d\n", &CONFIG_INT(__MAX_MAPPING_SIZE__), 1);
-  scan_config_line("maximum string length : %d\n", &CONFIG_INT(__MAX_STRING_LENGTH__), 1);
-  scan_config_line("maximum bits in a bitfield : %d\n", &CONFIG_INT(__MAX_BITFIELD_BITS__), 1);
-
-  scan_config_line("maximum byte transfer : %d\n", &CONFIG_INT(__MAX_BYTE_TRANSFER__), 1);
-  scan_config_line("maximum read file size : %d\n", &CONFIG_INT(__MAX_READ_FILE_SIZE__), 1);
-
-  scan_config_line("hash table size : %d\n", &CONFIG_INT(__SHARED_STRING_HASH_TABLE_SIZE__), 1);
-  scan_config_line("object table size : %d\n", &CONFIG_INT(__OBJECT_HASH_TABLE_SIZE__), 1);
-
+  /* Process ports */
   {
     int i, port, port_start = 0;
     if (scan_config_line("port number : %d\n", &CONFIG_INT(__MUD_PORT__), 0)) {
@@ -309,128 +334,6 @@ void read_config(char *filename) {
   }
 #endif
 
-  if (!scan_config_line("gametick msec : %d\n", &CONFIG_INT(__RC_GAMETICK_MSEC__), -1)) {
-    CONFIG_INT(__RC_GAMETICK_MSEC__) = 1000;  // default to 1s.
-  }
-  if (!scan_config_line("heartbeat interval msec : %d\n", &CONFIG_INT(__RC_HEARTBEAT_INTERVAL_MSEC__),
-                        -1)) {
-    // default to match gametick.
-    CONFIG_INT(__RC_HEARTBEAT_INTERVAL_MSEC__) = CONFIG_INT(__RC_GAMETICK_MSEC__);
-  }
-
-  /*
-   * from options.h
-   */
-  CONFIG_INT(__EVALUATOR_STACK_SIZE__) = CFG_EVALUATOR_STACK_SIZE;
-  CONFIG_INT(__MAX_LOCAL_VARIABLES__) = CFG_MAX_LOCAL_VARIABLES;
-  CONFIG_INT(__MAX_CALL_DEPTH__) = CFG_MAX_CALL_DEPTH;
-  CONFIG_INT(__LIVING_HASH_TABLE_SIZE__) = CFG_LIVING_HASH_SIZE;
-
-  if (!scan_config_line("sane explode string : %d\n", &CONFIG_INT(__RC_SANE_EXPLODE_STRING__), -1)) {
-    CONFIG_INT(__RC_SANE_EXPLODE_STRING__) = 1;
-  }
-  if (!scan_config_line("reversible explode string : %d\n",
-                        &CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__), -1)) {
-    CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__) = 0;
-  }
-  if (!scan_config_line("sane sorting : %d\n", &CONFIG_INT(__RC_SANE_SORTING__), -1)) {
-    CONFIG_INT(__RC_SANE_SORTING__) = 1;
-  }
-  if (!scan_config_line("warn tab : %d\n", &CONFIG_INT(__RC_WARN_TAB__), -1)) {
-    CONFIG_INT(__RC_WARN_TAB__) = 0;
-  }
-  if (!scan_config_line("wombles : %d\n", &CONFIG_INT(__RC_WOMBLES__), -1)) {
-    CONFIG_INT(__RC_WOMBLES__) = 0;
-  }
-  if (!scan_config_line("call other type check : %d\n", &CONFIG_INT(__RC_CALL_OTHER_TYPE_CHECK__),
-                        -1)) {
-    CONFIG_INT(__RC_CALL_OTHER_TYPE_CHECK__) = 0;
-  }
-  if (!scan_config_line("call other warn : %d\n", &CONFIG_INT(__RC_CALL_OTHER_WARN__), -1)) {
-    CONFIG_INT(__RC_CALL_OTHER_WARN__) = 0;
-  }
-  if (!scan_config_line("mudlib error handler : %d\n", &CONFIG_INT(__RC_MUDLIB_ERROR_HANDLER__), -1)) {
-    CONFIG_INT(__RC_MUDLIB_ERROR_HANDLER__) = 1;
-  }
-  if (!scan_config_line("no resets : %d\n", &CONFIG_INT(__RC_NO_RESETS__), -1)) {
-    CONFIG_INT(__RC_NO_RESETS__) = 0;
-  }
-  if (!scan_config_line("lazy resets : %d\n", &CONFIG_INT(__RC_LAZY_RESETS__), -1)) {
-    CONFIG_INT(__RC_LAZY_RESETS__) = 0;
-  }
-  if (!scan_config_line("randomized resets : %d\n", &CONFIG_INT(__RC_RANDOMIZED_RESETS__), -1)) {
-    CONFIG_INT(__RC_RANDOMIZED_RESETS__) = 1;
-  }
-  if (!scan_config_line("no ansi : %d\n", &CONFIG_INT(__RC_NO_ANSI__), -1)) {
-    CONFIG_INT(__RC_NO_ANSI__) = 1;
-  }
-  if (!scan_config_line("strip before process input : %d\n",
-                        &CONFIG_INT(__RC_STRIP_BEFORE_PROCESS_INPUT__), -1)) {
-    CONFIG_INT(__RC_STRIP_BEFORE_PROCESS_INPUT__) = 1;
-  }
-  if (!scan_config_line("this_player in call_out : %d\n", &CONFIG_INT(__RC_THIS_PLAYER_IN_CALL_OUT__),
-                        -1)) {
-    CONFIG_INT(__RC_THIS_PLAYER_IN_CALL_OUT__) = 1;
-  }
-  if (!scan_config_line("trace : %d\n", &CONFIG_INT(__RC_TRACE__), -1)) {
-    CONFIG_INT(__RC_TRACE__) = 1;
-  }
-  if (!scan_config_line("trace code : %d\n", &CONFIG_INT(__RC_TRACE_CODE__), -1)) {
-    CONFIG_INT(__RC_TRACE_CODE__) = 0;
-  }
-  if (!scan_config_line("interactive catch tell : %d\n", &CONFIG_INT(__RC_INTERACTIVE_CATCH_TELL__),
-                        -1)) {
-    CONFIG_INT(__RC_INTERACTIVE_CATCH_TELL__) = 0;
-  }
-  if (!scan_config_line("receive snoop : %d\n", &CONFIG_INT(__RC_RECEIVE_SNOOP__), -1)) {
-    CONFIG_INT(__RC_RECEIVE_SNOOP__) = 1;
-  }
-  if (!scan_config_line("snoop shadowed : %d\n", &CONFIG_INT(__RC_SNOOP_SHADOWED__), -1)) {
-    CONFIG_INT(__RC_SNOOP_SHADOWED__) = 0;
-  }
-  if (!scan_config_line("reverse defer : %d\n", &CONFIG_INT(__RC_REVERSE_DEFER__), -1)) {
-    CONFIG_INT(__RC_REVERSE_DEFER__) = 0;
-  }
-  if (!scan_config_line("has console : %d\n", &CONFIG_INT(__RC_HAS_CONSOLE__), -1)) {
-    CONFIG_INT(__RC_HAS_CONSOLE__) = 1;
-  }
-  if (!scan_config_line("noninteractive stderr write : %d\n",
-                        &CONFIG_INT(__RC_NONINTERACTIVE_STDERR_WRITE__), -1)) {
-    CONFIG_INT(__RC_NONINTERACTIVE_STDERR_WRITE__) = 0;
-  }
-  if (!scan_config_line("trap crashes : %d\n", &CONFIG_INT(__RC_TRAP_CRASHES__), -1)) {
-    CONFIG_INT(__RC_TRAP_CRASHES__) = 1;
-  }
-  if (!scan_config_line("old type behavior : %d\n", &CONFIG_INT(__RC_OLD_TYPE_BEHAVIOR__), -1)) {
-    CONFIG_INT(__RC_OLD_TYPE_BEHAVIOR__) = 0;
-  }
-  if (!scan_config_line("old range behavior : %d\n", &CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__), -1)) {
-    CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__) = 0;
-  }
-  if (!scan_config_line("warn old range behavior : %d\n", &CONFIG_INT(__RC_WARN_OLD_RANGE_BEHAVIOR__),
-                        -1)) {
-    CONFIG_INT(__RC_WARN_OLD_RANGE_BEHAVIOR__) = 1;
-  }
-  if (!scan_config_line("suppress argument warnings : %d\n",
-                        &CONFIG_INT(__RC_SUPPRESS_ARGUMENT_WARNINGS__), -1)) {
-    CONFIG_INT(__RC_SUPPRESS_ARGUMENT_WARNINGS__) = 1;
-  }
-
-  if (!scan_config_line("enable_commands call init : %d\n",
-                        &CONFIG_INT(__RC_ENABLE_COMMANDS_CALL_INIT__), -1)) {
-    CONFIG_INT(__RC_ENABLE_COMMANDS_CALL_INIT__) = 1;
-  }
-
-  if (!scan_config_line("sprintf add_justified ignore ANSI colors : %d\n",
-                        &CONFIG_INT(__RC_SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__), -1)) {
-    CONFIG_INT(__RC_SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__) = 0;
-  }
-
-  if (!scan_config_line("apply cache bits : %d\n",
-                        &CONFIG_INT(__RC_APPLY_CACHE_BITS__), -1)) {
-    CONFIG_INT(__RC_APPLY_CACHE_BITS__) = 22;
-  }
-
   // Complain about obsolete config lines.
   scan_config_line("address server ip : %[^\n]", tmp, -2);
   scan_config_line("address server port : %d\n", tmp, -2);
@@ -442,6 +345,22 @@ void read_config(char *filename) {
   for (int i = 0; i < NUM_CONFIG_STRS; i++) {
     if (config_str[i] == nullptr) {
       config_str[i] = alloc_cstring("", "rc_obsolete");
+    }
+  }
+
+  // process int flags
+  for (int i = 0; i < (sizeof(kDefaultFlags) / sizeof(flagEntry)); i++) {
+    CONFIG_INT(kDefaultFlags[i].pos) = kDefaultFlags[i].defaultValue;
+
+    int value = 0;
+    char buf[256];
+    sprintf(buf, "%s : %%d\n", kDefaultFlags[i].key.c_str());
+
+    if (scan_config_line(buf, &value, kOptional)) {
+      if (value != kDefaultFlags[i].defaultValue) {
+        CONFIG_INT(kDefaultFlags[i].pos) = value;
+        std::cout << "* Config '" << kDefaultFlags[i].key << "' New Value: " << value << std::endl;
+      }
     }
   }
 

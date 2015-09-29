@@ -6,6 +6,7 @@
 
 #include "packages/core/file.h"
 
+#include <iostream>
 #include <errno.h>
 #if HAVE_DIRENT_H
 #include <dirent.h>
@@ -36,7 +37,11 @@
 #include <sys/mkdev.h>
 #endif
 #include <fcntl.h>
+#include <sstream>
 #include <unistd.h>
+#include <zlib.h>
+
+#include "base/internal/strutils.h"
 
 /*
  * Credits for some of the code below goes to Free Software Foundation
@@ -57,10 +62,6 @@
 
 #ifndef S_ISBLK
 #define S_ISBLK(m) (((m)&S_IFMT) == S_IFBLK)
-#endif
-
-#ifdef PACKAGE_COMPRESS
-#include <zlib.h>
 #endif
 
 static int match_string(char * /*match*/, char * /*str*/);
@@ -275,15 +276,12 @@ int remove_file(const char *path) {
  */
 int write_file(const char *file, const char *str, int flags) {
   FILE *f;
-#ifdef PACKAGE_COMPRESS
   gzFile gf;
-#endif
 
   file = check_valid_path(file, current_object, "write_file", 1);
   if (!file) {
     return 0;
   }
-#ifdef PACKAGE_COMPRESS
   if (flags & 2) {
     gf = gzopen(file, (flags & 1) ? "w" : "a");
     if (!gf) {
@@ -291,32 +289,23 @@ int write_file(const char *file, const char *str, int flags) {
             (flags & 1) ? "overwrite" : "append", strerror(errno));
     }
   } else {
-#endif
     f = fopen(file, (flags & 1) ? "w" : "a");
     if (f == 0) {
       error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n", file,
             (flags & 1) ? "overwrite" : "append", strerror(errno));
     }
-#ifdef PACKAGE_COMPRESS
   }
   if (flags & 2) {
     gzwrite(gf, str, strlen(str));
   } else {
-#endif
     fwrite(str, strlen(str), 1, f);
-#ifdef PACKAGE_COMPRESS
   }
-#endif
 
-#ifdef PACKAGE_COMPRESS
   if (flags & 2) {
     gzclose(gf);
   } else {
-#endif
     fclose(f);
-#ifdef PACKAGE_COMPRESS
   }
-#endif
   return 1;
 }
 
@@ -326,29 +315,19 @@ int write_file(const char *file, const char *str, int flags) {
 char *read_file(const char *file, int start, int lines) {
   const auto read_file_max_size = CONFIG_INT(__MAX_READ_FILE_SIZE__);
 
-  struct stat st;
-  // Try and keep one buffer for droping all reads into.
-  static char *theBuff = NULL;
-  char *result = NULL;
-#ifndef PACKAGE_COMPRESS
-  FILE *f = NULL;
-#else
-  gzFile f = NULL;
-#endif
-  int chunk;
-  char *ptr_start, *ptr_end;
-  const char *real_file;
-
   if (lines < 0) {
     debug(file, "read_file: trying to read negative lines: %d", lines);
     return 0;
   }
 
-  real_file = check_valid_path(file, current_object, "read_file", 0);
+  const char *real_file;
 
+  real_file = check_valid_path(file, current_object, "read_file", 0);
   if (!real_file) {
     return 0;
   }
+
+  struct stat st;
   /*
    * file doesn't exist, or is really a directory
    */
@@ -358,52 +337,44 @@ char *read_file(const char *file, int start, int lines) {
 
   if (st.st_size == 0) {
     /* zero length file */
-    result = new_string(0, "read_file: empty");
+    char *result = new_string(0, "read_file: empty");
     result[0] = '\0';
     return result;
   }
 
-#ifndef PACKAGE_COMPRESS
-  f = fopen(real_file, "r");
-#else
-  f = gzopen(real_file, "rb");
-#endif
+  gzFile f = gzopen(real_file, "rb");
 
-  if (f == 0) {
+  if (f == nullptr) {
     debug(file, "read_file: fail to open: %s.\n", file);
     return 0;
   }
 
+  static char *theBuff = nullptr;
   if (!theBuff) {
     theBuff = reinterpret_cast<char *>(
         DMALLOC(2 * read_file_max_size + 1, TAG_PERMANENT, "read_file: theBuff"));
   }
 
-#ifndef PACKAGE_COMPRESS
-  chunk = fread(theBuff, 1, 2 * read_file_max_size, f);
-  fclose(f);
-#else
-  chunk = gzread(f, theBuff, 2 * read_file_max_size);
+  int total_bytes_read = gzread(f, (void *)theBuff, 2 * read_file_max_size);
   gzclose(f);
-#endif
 
-  if (chunk == 0) {
+  if (total_bytes_read <= 0) {
     debug(file, "read_file: read error: %s.\n", file);
     return 0;
   }
-
-  if (memchr(theBuff, '\0', chunk)) {
-    debug(file, "read_file: file contains '\\0': %s.\n", file);
-    return 0;
-  }
-  theBuff[chunk] = '\0';
+  theBuff[total_bytes_read] = '\0';
 
   // skip forward until the "start"-th line
-  ptr_start = theBuff;
-  while (start > 1 && ptr_start < theBuff + chunk) {
-    if (*ptr_start++ == '\n') {
+  char *ptr_start = theBuff;
+  while (start > 1 && ptr_start < theBuff + total_bytes_read) {
+    if (*ptr_start == '\0') {
+      debug(file, "read_file: file contains '\\0': %s.\n", file);
+      return 0;
+    }
+    if (*ptr_start == '\n') {
       start--;
     }
+    ptr_start++;
   }
 
   // not found
@@ -412,22 +383,23 @@ char *read_file(const char *file, int start, int lines) {
     return 0;
   }
 
+  char *ptr_end = nullptr;
   // search forward for "lines" of '\n' for the end
   if (lines == 0) {
     ptr_end = ptr_start + read_file_max_size;
-    if (ptr_end > theBuff + chunk) {
-      ptr_end = theBuff + chunk + 1;
+    if (ptr_end > theBuff + total_bytes_read) {
+      ptr_end = theBuff + total_bytes_read + 1;
     }
   } else {
     ptr_end = ptr_start;
-    while (lines > 0 && ptr_end < theBuff + chunk) {
+    while (lines > 0 && ptr_end < theBuff + total_bytes_read) {
       if (*ptr_end++ == '\n') {
         lines--;
       }
     }
     // not enough lines, directly go to the end.
     if (lines > 0) {
-      ptr_end = theBuff + chunk + 1;
+      ptr_end = theBuff + total_bytes_read + 1;
     }
   }
 
@@ -438,8 +410,20 @@ char *read_file(const char *file, int start, int lines) {
     return 0;
   }
 
-  result = string_copy(ptr_start, "read_file: result");
-  return result;
+  bool found_crlf = strchr(ptr_start, '\r') != nullptr;
+  if (found_crlf) {
+    // Deal with CRLF.
+    std::istringstream input(ptr_start);
+    std::ostringstream output;
+    for (std::string line; std::getline(input, line);) {
+      if (ends_with(line, "\r")) {
+        line = line.substr(0, line.length() - 1);
+      }
+      output << line << std::endl;
+    }
+    return string_copy(output.str().c_str(), "read file: CRLF result");
+  }
+  return string_copy(ptr_start, "read_file: result");
 }
 
 char *read_bytes(const char *file, int start, int len, int *rlen) {

@@ -6,6 +6,9 @@
 
 #define PACKAGE_DB
 #ifdef PACKAGE_DB
+#undef USE_POSTGRES
+#undef USE_MYSQL
+#undef USE_SQLITE3
 #define USE_POSTGRES 1
 #define USE_MYSQL 2
 #define USE_SQLITE3 3

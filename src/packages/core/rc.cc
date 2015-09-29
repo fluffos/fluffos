@@ -33,7 +33,7 @@ void f_get_config(void) {
 
 #ifdef F_SET_CONFIG
 void f_set_config() {
-  auto num = (sp-1)->u.number;
+  auto num = (sp - 1)->u.number;
   auto value = sp;
 
   if (num < 0 || num >= RUNTIME_CONFIG_NEXT) {

@@ -694,7 +694,7 @@ mapping_t *load_mapping_from_aggregate(svalue_t *sp, int n) {
 #ifdef PACKAGE_MUDLIB_STATS
         add_array_size(&m->stats, count << 1);
 #endif
-        total_mapping_size += sizeof(mapping_node_t) *(m->count = count);
+        total_mapping_size += sizeof(mapping_node_t) * (m->count = count);
         total_mapping_nodes += count;
         free_mapping(m);
         error("Out of memory\n");
@@ -705,7 +705,7 @@ mapping_t *load_mapping_from_aggregate(svalue_t *sp, int n) {
 #ifdef PACKAGE_MUDLIB_STATS
       add_array_size(&m->stats, (--count) << 1);
 #endif
-      total_mapping_size += sizeof(mapping_node_t) *(m->count = count);
+      total_mapping_size += sizeof(mapping_node_t) * (m->count = count);
       total_mapping_nodes += count;
 
       free_mapping(m);
@@ -720,7 +720,7 @@ mapping_t *load_mapping_from_aggregate(svalue_t *sp, int n) {
 #ifdef PACKAGE_MUDLIB_STATS
   add_array_size(&m->stats, count << 1);
 #endif
-  total_mapping_size += sizeof(mapping_node_t) *(m->count = count);
+  total_mapping_size += sizeof(mapping_node_t) * (m->count = count);
   total_mapping_nodes += count;
   debug(mapping, ("mapping.c: load_mapping_from_aggregate end\n"));
   return m;

@@ -123,6 +123,9 @@ DRIVER_OBJS= \
 	net/telnet.o \
 	thirdparty/libtelnet/libtelnet.o
 
+THIRDPARTY_OBJS= \
+	thirdparty/jemalloc/lib/libjemalloc_pic.a
+
 # All generated files.
 GENFILES= \
 	cc.h \
@@ -174,13 +177,17 @@ tools/make_func.autogen.cc: tools/make_func.y
 	@echo [Generating] $@
 	@$(BISON) -o tools/make_func.autogen.cc tools/make_func.y
 
-$(DRIVER_BIN): $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS) dtrace_compile
+$(DRIVER_BIN): $(THIRDPARTY_OBJS) $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS) dtrace_compile
 	@-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
 	@echo [Linking $@]
-	@$(CXX) $(LDFLAGS) $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS) `./dtrace_compile` -o $(DRIVER_BIN) $(LIBS) \
+	@$(CXX) $(LDFLAGS) $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS) $(THIRDPARTY_OBJS) `./dtrace_compile` -o $(DRIVER_BIN) $(LIBS) \
 		@MYSQL_LDFLAGS@ @POSTGRESQL_LDFLAGS@ @SQLITE3_LDFLAGS@ \
 		@OPENSSL_LDFLAGS@ @OPENSSL_LIBS@ @PCRE_LIBS@ \
 		@LIBEVENT_LIBS@ @LIBEVENT_LDFLAGS@
+
+thirdparty/jemalloc/lib/libjemalloc_pic.a:
+	@echo [Building jemalloc] $@
+	@cd thirdparty/jemalloc && GIT_DIR=./.git ./configure --enable-prof && make && cd -
 
 # Hack to work around brokeness in libtelnet.c
 thirdparty/libtelnet/libtelnet.o: thirdparty/libtelnet/libtelnet.c
@@ -229,6 +236,7 @@ clean:
 	@-rm -f dtrace_compile
 	@-rm -f testsuite/log/author_stats testsuite/log/domain_stats
 	@-rm -f testsuite/tmp.o
+	@-cd thirdparty/jemalloc && make clean && cd -
 	@echo [Done]
 
 test: all

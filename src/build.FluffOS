@@ -1,4 +1,5 @@
 #!/bin/bash
+set -eo pipefail
 
 # By default driver compile to native environment, you can
 # add "-m64" to force compile under 64bit, "-m32" for 32bit.
@@ -44,6 +45,7 @@ WARN=(
 # Less undefined behavior
 "-funsigned-char"
 "-fwrapv"
+"-pthread"
 "-fPIE"
 )
 WARN="$(IFS=' '; echo "${WARN[*]}")"
@@ -83,5 +85,6 @@ else
 fi
 
 # Force an reconfigure.
-rm configure.h
-CFLAGS=$CFLAGS CXXFLAGS=$CFLAGS MAKE=$MAKE ARCH=$ARCH DRIVER_BIN=$DRIVER_BIN OPTIMIZE=$OPTIMIZE SOURCE_REVISION=$SOURCE_REVISION ./configure --bindir=$INSTALL_DIR $@ && $MAKE help
+rm -f configure.h
+CFLAGS=$CFLAGS CXXFLAGS=$CFLAGS MAKE=$MAKE ARCH=$ARCH DRIVER_BIN=$DRIVER_BIN OPTIMIZE=$OPTIMIZE SOURCE_REVISION=$SOURCE_REVISION ./configure --bindir=$INSTALL_DIR $@
+$MAKE help
