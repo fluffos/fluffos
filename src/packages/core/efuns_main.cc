@@ -2405,6 +2405,21 @@ void f_set_hide(void) {
 }
 #endif
 
+#ifdef F_SET_LIGHT
+void f_set_light(void) {
+  object_t *o1;
+
+  add_light(current_object, sp->u.number);
+  o1 = current_object;
+#ifndef NO_ENVIRONMENT
+  while (o1->super) {
+    o1 = o1->super;
+  }
+#endif
+  sp->u.number = o1->total_light;
+}
+#endif
+
 #ifdef F_SET_PRIVS
 void f_set_privs(void) {
   object_t *ob;

@@ -75,6 +75,13 @@
  */
 #undef NO_WIZARDS
 
+ /* NO_LIGHT: define this to disable the set_light() and driver maintenance
+ *   of light levels in objects.  You can simulate it via LPC if you want...
+ *
+ * Compat status: Very dated, easy to simulate, and gross.
+ */
+#undef NO_LIGHT
+
 /* OLD_ED: ed() efun backwards compatible with the old version.  The new
  * version requires/allows a mudlib front end.
  *

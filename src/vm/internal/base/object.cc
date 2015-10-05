@@ -1999,6 +1999,9 @@ void reload_object(object_t *obj) {
   remove_living_name(obj);
   set_heart_beat(obj, 0);
   remove_all_call_out(obj);
+#ifndef NO_LIGHT
+  add_light(obj, -(obj->total_light));
+#endif
 #ifdef PACKAGE_UIDS
 #ifdef AUTO_SETEUID
   obj->euid = obj->uid;

@@ -23,6 +23,9 @@ extern object_t *obj_list_dangling;
 void debug_fatal(char *, ...);
 void fatal(const char *, ...);
 void check_legal_string(const char *);
+#ifndef NO_LIGHT
+void add_light(object_t *, int);
+#endif
 void free_sentence(sentence_t *);
 
 sentence_t *alloc_sentence(void);
