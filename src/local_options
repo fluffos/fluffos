@@ -26,6 +26,7 @@
 #undef NO_ENVIRONMENT
 #undef NO_WIZARDS
 #undef NO_SHADOWS
+#define NO_LIGHT
 #undef PRIVS
 #define SENSIBLE_MODIFIERS
 

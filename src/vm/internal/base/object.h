@@ -92,6 +92,9 @@ struct object_t {
 #endif
   struct interactive_t *interactive; /* Data about an interactive user */
   char *replaced_program;            /* Program replaced with */
+#ifndef NO_LIGHT
+  short total_light;
+#endif
 #ifndef NO_SHADOWS
   struct object_t *shadowing; /* Is this object shadowing ? */
   struct object_t *shadowed;  /* Is this object shadowed ? */
