@@ -21,7 +21,9 @@
 #include "cc.h"                                             // for SOURCE_REVISION
 #include "comm.h"                                           // for init_user_conn
 #include "console.h"                                        // for console_init, has_console
+#if USE_JEMALLOC == 1
 #include "thirdparty/jemalloc/include/jemalloc/jemalloc.h"  // for mallctl
+#endif
 #include "vm/vm.h"                                          // for push_constant_string, etc
 
 #include "packages/core/dns.h"  // for init_dns_event_base.
@@ -52,6 +54,7 @@ void print_version_and_time() {
   std::cout << "FluffOS Version: " << PACKAGE_VERSION << "(" << SOURCE_REVISION << ")"
             << "@ (" << ARCH << ")" << std::endl;
 
+#if USE_JEMALLOC ==1
   /* Print jemalloc version */
   {
     const char *ver;
@@ -59,6 +62,7 @@ void print_version_and_time() {
     mallctl("version", &ver, &resultlen, NULL, 0);
     std::cout << "Jemalloc Version: " << ver << std::endl;
   }
+#endif
 }
 
 void print_rlimit() {

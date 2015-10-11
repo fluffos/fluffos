@@ -38,6 +38,7 @@ DRIVER_BIN=@DRIVER_BIN@@EXEEXT@
 INSTALL=@INSTALL@
 INSTALL_DIR=@bindir@
 OPTIMIZE=@OPTIMIZE@
+USE_JEMALLOC=@USE_JEMALLOC@
 
 # for packages/db and packages/async
 MYSQL_CFLAGS=@MYSQL_CFLAGS@
@@ -123,8 +124,10 @@ DRIVER_OBJS= \
 	net/telnet.o \
 	thirdparty/libtelnet/libtelnet.o
 
-THIRDPARTY_OBJS= \
+ifeq ($(USE_JEMALLOC), 1)
+JEMALLOC_OBJS= \
 	thirdparty/jemalloc/lib/libjemalloc_pic.a
+endif
 
 # All generated files.
 GENFILES= \
@@ -148,6 +151,7 @@ $(GENFILES): local_options tools/build_packages_genfiles.sh tools/build_applies.
 	@echo '#define CXXFLAGS "$(CXXFLAGS)"' >> cc.h
 	@echo '#define OPTIMIZE "$(OPTIMIZE)"' >> cc.h
 	@echo '#define SOURCE_REVISION "@SOURCE_REVISION@"' >> cc.h
+	@echo '#define USE_JEMALLOC @USE_JEMALLOC@' >> cc.h
 	@echo [Generating Packages]
 	@./tools/build_packages_genfiles.sh $(CXX) $(CXXFLAGS)
 	@echo [Generating applies table...]
@@ -177,10 +181,10 @@ tools/make_func.autogen.cc: tools/make_func.y
 	@echo [Generating] $@
 	@$(BISON) -o tools/make_func.autogen.cc tools/make_func.y
 
-$(DRIVER_BIN): $(THIRDPARTY_OBJS) $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS) dtrace_compile
+$(DRIVER_BIN): $(JEMALLOC_OBJS) $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS) dtrace_compile
 	@-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
 	@echo [Linking $@]
-	@$(CXX) $(LDFLAGS) $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS) $(THIRDPARTY_OBJS) `./dtrace_compile` -o $(DRIVER_BIN) $(LIBS) \
+	@$(CXX) $(LDFLAGS) $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS) $(JEMALLOC_OBJS) `./dtrace_compile` -o $(DRIVER_BIN) $(LIBS) \
 		@MYSQL_LDFLAGS@ @POSTGRESQL_LDFLAGS@ @SQLITE3_LDFLAGS@ \
 		@OPENSSL_LDFLAGS@ @OPENSSL_LIBS@ @PCRE_LIBS@ \
 		@LIBEVENT_LIBS@ @LIBEVENT_LDFLAGS@
