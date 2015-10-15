@@ -45,8 +45,6 @@ WARN=(
 # Less undefined behavior
 "-funsigned-char"
 "-fwrapv"
-"-pthread"
-"-fPIE"
 )
 WARN="$(IFS=' '; echo "${WARN[*]}")"
 

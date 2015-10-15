@@ -5,6 +5,7 @@ AC_PREREQ([2.68])
 AC_INIT([FluffOS],[3.0-alpha9.0])
 AC_CONFIG_MACRO_DIR([m4])
 
+
 AC_CANONICAL_TARGET
 
 AC_LANG(C++)
@@ -32,19 +33,26 @@ AX_CHECK_LINK_FLAG([-flto], [
   AX_APPEND_LINK_FLAGS([-flto])
 ])
 
-AX_CHECK_LINK_FLAG([-pie], [
-  AX_APPEND_COMPILE_FLAGS([-fPIE])
-  AX_APPEND_LINK_FLAGS([-pie])
-])
-
-case $host_os in
-*cygwin*|*mingw*)
-  # rdynamic doesn't work on cygwin
-  ;;
-*)
-  AX_APPEND_LINK_FLAGS([-rdynamic])
-  ;;
+# CYGWIN oddities
+# JEMALLOC doesn't work on CYGWIN
+case "${host}" in
+    *-*-cygwin*)
+        USE_JEMALLOC=0
+        ;;
+    *)
+        USE_JEMALLOC=1
+        AX_APPEND_LINK_FLAGS([-rdynamic])
+        AX_CHECK_LINK_FLAG([-pie], [
+          AX_APPEND_COMPILE_FLAGS([-fPIE])
+          AX_APPEND_LINK_FLAGS([-pie])
+        ])
+        ;;
 esac
+
+AX_CHECK_LINK_FLAG([-pthread], [
+  AX_APPEND_COMPILE_FLAGS([-pthread])
+  AX_APPEND_LINK_FLAGS([-pthread])
+])
 
 # check for gcov options
 FLUFFOS_CHECK_GCOV
@@ -98,6 +106,8 @@ AC_FUNC_MMAP
 AC_FUNC_REALLOC
 AC_FUNC_STRTOD
 #AC_CHECK_FUNCS([dup2 floor getcwd gethostname gettimeofday memchr memmove memset mkdir munmap pow putenv regcomp rmdir setlocale socket sqrt strcasecmp strchr strcspn strerror strncasecmp strpbrk strrchr strspn strstr strtol strtoul tzset])
+
+
 
 # This check must before all F_HAVE_PREDEFINE checks.
 # Checks local_options exist, use a grauntee exist predefine.
@@ -170,6 +180,7 @@ AC_SUBST([ARCH])
 AC_SUBST([DRIVER_BIN])
 AC_SUBST([OPTIMIZE])
 AC_SUBST([SOURCE_REVISION])
+AC_SUBST([USE_JEMALLOC])
 
 AC_CONFIG_HEADERS([configure.h])
 AC_CONFIG_FILES([Makefile])
