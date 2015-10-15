@@ -491,6 +491,7 @@ void add_message(object_t *who, const char *data, int len) {
   inet_volume += translen;
 
   if (ip->connection_type == PORT_TELNET) {
+    DEBUG_CHECK((trans[translen] != '\0'), "Calling with not null terminated string.");
     telnet_printf(ip->telnet, "%s", trans);
   } else {
     bufferevent_write(ip->ev_buffer, trans, translen);
