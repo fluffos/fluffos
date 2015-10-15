@@ -23,7 +23,7 @@ static int send_mssp_val(mapping_t *map, mapping_node_t *el, void *data) {
     unsigned char val = TELNET_MSSP_VAL;
     for (i = 1; i < ar->size; i++) {
       if (ar->item[i].type == T_STRING) {
-        telnet_printf(ip->telnet, "%s", reinterpret_cast<const char *>(&val));
+        telnet_send(ip->telnet, reinterpret_cast<const char *>(&val), sizeof(val));
         telnet_printf(ip->telnet, "%s", ar->item[i].u.string);
       }
     }
