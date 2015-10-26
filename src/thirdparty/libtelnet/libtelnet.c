@@ -1288,6 +1288,42 @@ void telnet_send(telnet_t *telnet, const char *buffer,
 	}
 }
 
+/* send non-command data (escapes IAC bytes), also
+ * translating CRLF and CRNUL */
+void telnet_send_text(telnet_t *telnet, const char *buffer,
+    size_t size) {
+  static const char CRLF[] = { '\r', '\n' };
+  static const char CRNUL[] = { '\r', '\0' };
+  size_t i, l;
+
+  for (l = i = 0; i != size; ++i) {
+    /* special characters */
+    if (buffer[i] == (char)TELNET_IAC || buffer[i] == '\r' ||
+        buffer[i] == '\n') {
+      /* dump prior portion of text */
+      if (i != l)
+        _send(telnet, buffer + l, i - l);
+      l = i + 1;
+
+      /* IAC -> IAC IAC */
+      if (buffer[i] == (char)TELNET_IAC)
+        telnet_iac(telnet, TELNET_IAC);
+      /* automatic translation of \r -> CRNUL */
+      else if (buffer[i] == '\r')
+        _send(telnet, CRNUL, 2);
+      /* automatic translation of \n -> CRLF */
+      else if (buffer[i] == '\n')
+        _send(telnet, CRLF, 2);
+    }
+  }
+
+  /* send whatever portion of data is left */
+  if (i != l) {
+    _send(telnet, buffer + l, i - l);
+  }
+}
+
+
 /* send subnegotiation header */
 void telnet_begin_sb(telnet_t *telnet, unsigned char telopt) {
 	unsigned char sb[3];
@@ -1360,11 +1396,9 @@ void telnet_begin_compress2(telnet_t *telnet) {
 
 /* send formatted data with \r and \n translation in addition to IAC IAC */
 int telnet_vprintf(telnet_t *telnet, const char *fmt, va_list va) {
-    static const char CRLF[] = { '\r', '\n' };
-    static const char CRNUL[] = { '\r', '\0' };
 	char buffer[1024];
 	char *output = buffer;
-	int rs, i, l;
+	int rs;
 
   va_list va2;
   va_copy(va2, va);
@@ -1379,35 +1413,12 @@ int telnet_vprintf(telnet_t *telnet, const char *fmt, va_list va) {
 		}
 		rs = vsnprintf(output, rs + 1, fmt, va2);
 	}
+	/* send */
+	telnet_send_text(telnet, output, rs);
+
 	va_end(va2);
 	va_end(va);
 
-	/* send */
-	for (l = i = 0; i != rs; ++i) {
-		/* special characters */
-		if (output[i] == (char)TELNET_IAC || output[i] == '\r' ||
-				output[i] == '\n') {
-			/* dump prior portion of text */
-			if (i != l)
-				_send(telnet, output + l, i - l);
-			l = i + 1;
-
-			/* IAC -> IAC IAC */
-			if (output[i] == (char)TELNET_IAC)
-				telnet_iac(telnet, TELNET_IAC);
-			/* automatic translation of \r -> CRNUL */
-			else if (output[i] == '\r')
-				_send(telnet, CRNUL, 2);
-			/* automatic translation of \n -> CRLF */
-			else if (output[i] == '\n')
-				_send(telnet, CRLF, 2);
-		}
-	}
-
-	/* send whatever portion of output is left */
-	if (i != l) {
-		_send(telnet, output + l, i - l);
-	}
 
 	/* free allocated memory, if any */
 	if (output != buffer) {

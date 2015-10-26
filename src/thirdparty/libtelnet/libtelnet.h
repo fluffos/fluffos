@@ -435,6 +435,18 @@ extern void telnet_send(telnet_t *telnet,
 		const char *buffer, size_t size);
 
 /*!
+ * Send non-command data (escapes IAC bytes), also.
+ * translate CRLU and CRNUL.
+ *
+ * \param telnet Telnet state tracker object.
+ * \param buffer Buffer of bytes to send.
+ * \param size   Number of bytes to send.
+ */
+extern void telnet_send_text(telnet_t *telnet,
+    const char *buffer, size_t size);
+
+
+/*!
  * \brief Begin a sub-negotiation command.
  *
  * Sends IAC SB followed by the telopt code.  All following data sent
