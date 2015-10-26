@@ -483,18 +483,19 @@ void add_message(object_t *who, const char *data, int len) {
     }
     return;
   }
-  auto ip = who->interactive;
-  int translen;
-  char *trans = translate(ip->trans->outgoing, data, len, &translen);
 
   inet_packets++;
-  inet_volume += translen;
 
+  auto ip = who->interactive;
   if (ip->connection_type == PORT_TELNET) {
-    DEBUG_CHECK((trans[translen] != '\0'), "Calling with not null terminated string.");
-    telnet_printf(ip->telnet, "%s", trans);
+    int translen;
+    char *trans = translate(ip->trans->outgoing, data, len, &translen);
+
+    inet_volume += translen;
+    telnet_send_text(ip->telnet, trans, translen);
   } else {
-    bufferevent_write(ip->ev_buffer, trans, translen);
+    inet_volume += len;
+    bufferevent_write(ip->ev_buffer, data, len);
   }
 
 #ifdef SHADOW_CATCH_MESSAGE
@@ -523,7 +524,7 @@ void add_vmessage(object_t *who, const char *format, ...) {
     std::unique_ptr<char[]> msg(new char[result + 1]);
     result = vsnprintf(msg.get(), result + 1, format, args2);
     if (result < 0) break;
-    add_message(who, msg.get(), strlen(msg.get()));
+    add_message(who, msg.get(), result);
   } while (0);
   va_end(args2);
   va_end(args);
