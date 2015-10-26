@@ -5,7 +5,6 @@ AC_PREREQ([2.68])
 AC_INIT([FluffOS],[3.0-alpha9.0])
 AC_CONFIG_MACRO_DIR([m4])
 
-
 AC_CANONICAL_TARGET
 
 AC_LANG(C++)
@@ -27,11 +26,8 @@ F_SUPPORT_CXX11([], [AC_MSG_ERROR([
 AX_APPEND_COMPILE_FLAGS([-D_GNU_SOURCE])
 AX_APPEND_COMPILE_FLAGS([-fno-omit-frame-pointer])
 AX_APPEND_COMPILE_FLAGS([-iquote.])
-
-AX_CHECK_LINK_FLAG([-flto], [
-  AX_APPEND_COMPILE_FLAGS([-flto])
-  AX_APPEND_LINK_FLAGS([-flto])
-])
+# This flag must be check for LINK.
+AX_CHECK_LINK_FLAG([-flto], [AX_APPEND_COMPILE_FLAGS([-flto])])
 
 # CYGWIN oddities
 # JEMALLOC doesn't work on CYGWIN
@@ -42,17 +38,12 @@ case "${host}" in
     *)
         USE_JEMALLOC=1
         AX_APPEND_LINK_FLAGS([-rdynamic])
-        AX_CHECK_LINK_FLAG([-pie], [
-          AX_APPEND_COMPILE_FLAGS([-fPIE])
-          AX_APPEND_LINK_FLAGS([-pie])
-        ])
+        AX_APPEND_COMPILE_FLAGS([-fPIE])
+        AX_APPEND_COMPILE_FLAGS([-pie])
         ;;
 esac
 
-AX_CHECK_LINK_FLAG([-pthread], [
-  AX_APPEND_COMPILE_FLAGS([-pthread])
-  AX_APPEND_LINK_FLAGS([-pthread])
-])
+AX_APPEND_COMPILE_FLAGS([-pthread])
 
 # check for gcov options
 FLUFFOS_CHECK_GCOV

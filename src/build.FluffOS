@@ -8,7 +8,7 @@ set -eo pipefail
 # should change -march=native to -mtune=generic
 COMPILER_FLAGS=${COMPILER_FLAGS:-"-march=native"}
 
-OPTIMIZE="-O3"
+OPTIMIZE="-O3 -funroll-loops"
 DEBUG="-DNDEBUG -g"
 
 # Change this if you want to use another make.
