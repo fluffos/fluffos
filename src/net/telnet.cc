@@ -199,9 +199,26 @@ static inline void on_telnet_dont(unsigned char cmd, interactive_t *ip) {
   }
 }
 
-// We just need to handle the rest.
 static inline void on_telnet_subnegotiation(unsigned char cmd, const char *buf, unsigned long size,
                                             interactive_t *ip) {
+  // NOTE: I received bug report that with following data sequences:
+  // 000000 ff fc 22 ff fa 22 ff f0 ff ff fc 03 ff fc 18 ff
+  // 000010 fc 1f ff fc 27 ff fe 56 ff fc 5b ff fe 46 ff fe
+  // 000020 5d ff fe c9
+  // 000024
+  // Which translate into WONT LINEMODE, an empty SB LINEMODE (weird), (ff ff fc 03) some lingering data,
+  // and other DOs and DONTs. It is suspected that this is sent by a broken client.
+  // This causes crash for the driver since "buf" will be empty, which it should never do for SB LINEMODE.
+  //
+  // Data shows that multiple crash all caused by conns from 208.100.* ip address, which is a huge
+  // IP space of hosting company, some google search suggest it maybe doing port scanning or attacking.
+  // There might be a issue in their client code which caused this problem.
+  //
+  // Nonetheless, checking buf and size here will be good safeguard for similar problems.
+  if (buf == nullptr || size == 0) {
+    return;
+  }
+
   switch (cmd) {
     case TELNET_TELOPT_COMPRESS2:
     case TELNET_TELOPT_ZMP:
@@ -209,7 +226,7 @@ static inline void on_telnet_subnegotiation(unsigned char cmd, const char *buf, 
     case TELNET_TELOPT_ENVIRON:
     case TELNET_TELOPT_NEW_ENVIRON:
     case TELNET_TELOPT_MSSP:
-      // These are handled by the libtelnet.
+      // These are handled by the libtelnet. We just need to handle the rest.
       break;
     case TELNET_TELOPT_LINEMODE: {
       // The example at the end of RFC1184 is very useful to understand
