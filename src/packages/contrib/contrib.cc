@@ -542,8 +542,8 @@ void f_terminal_colour(void) {
   int space_garbage = 0;
   mapping_node_t *elt, **mtab;
   int buflen, max_buflen, space_buflen;
-  int wrap = 0;
-  int indent = 0;
+  LPC_INT wrap = 0;
+  LPC_INT indent = 0;
   int fillout = 0;
   char *rep;
   int repused;
