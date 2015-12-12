@@ -2794,9 +2794,7 @@ void add_predefines() {
   add_quoted_predefine("__OPTIMIZATION__", OPTIMIZE);
 
 /* Backwards Compat */
-#ifndef CDLIB
   add_quoted_predefine("MUD_NAME", CONFIG_STR(__MUD_NAME__));
-#endif
 #ifdef F_ED
   add_predefine("HAS_ED", -1, "");
 #endif
