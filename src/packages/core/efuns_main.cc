@@ -744,21 +744,6 @@ void f_function_exists(void) {
 }
 #endif
 
-#ifdef F_GENERATE_SOURCE
-void f_generate_source(void) {
-  int i;
-
-  if (st_num_arg == 2) {
-    i = generate_source(sp - 1, sp->u.string);
-    pop_stack();
-  } else {
-    i = generate_source(sp, 0);
-  }
-  free_svalue(sp, "f_generate_source");
-  put_number(i);
-}
-#endif
-
 #ifdef F_GET_CHAR
 void f_get_char(void) {
   svalue_t *arg;
