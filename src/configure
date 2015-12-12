@@ -6782,7 +6782,7 @@ fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
 
-grep -o -f ./outdated_define.txt local_options
+grep -o -w -f ./outdated_define.txt local_options
 if [ $? == 0 ]; then
   as_fn_error $? " Your local_options contains outdated defines that has been moved to runtime config. see outdated_define.txt " "$LINENO" 5
 fi
