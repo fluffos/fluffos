@@ -24,9 +24,10 @@
 /****************************************************************************
  *                          COMPATIBILITY                                   *
  *                         ---------------                                  *
- * The MudOS driver has evolved quite a bit over the years.  These defines  *
- * are mainly to preserve old behavior in case people didn't want to        *
- * rewrite the relevant portions of their code.                             *
+ * The MudOS driver and following this the extensions making up the FluffOS *
+ * driver has evolved quite a bit over the years.  These defines are mainly *
+ * to preserve old behavior in case people didn't want to rewrite the       *
+ * relevant portions of their code.                                         *
  *                                                                          *
  * In most cases, code which needs these defines should be rewritten when   *
  * possible.  The 'Compat status' field is designed to give an idea how     *
@@ -174,6 +175,8 @@
  *   and restore_object().  Some sysadmins run scripts that periodically
  *   scan for and remove files ending in .o (but many mudlibs are already
  *   set up to use .o thus we leave .o as the default).
+ *   If you are changing this and using the builtin compression via
+ *   PACKAGE_COMPRESS you might want to change SAVE_GZ_EXTENSION below too.
  */
 #define SAVE_EXTENSION ".o"
 
@@ -230,6 +233,7 @@
  * and the efuns in packages/xyzzy_spec.c will be added to the driver.      *
  ****************************************************************************/
 
+/* base packages, you won't undef these two */
 #define PACKAGE_OPS
 #define PACKAGE_CORE
 
@@ -318,9 +322,14 @@
  */
 #define PACKAGE_TRIM
 
+/*
+   PACKAGE PCRE:
+    efuns for perl compatible regular expressionsi
+ */
+#define PACKAGE_PCRE
+
 /*PACKAGE DWLIB: some discworld mudlib simuls coded in C (well just one right
   now) */
-
 #undef PACKAGE_DWLIB
 
 /****************************************************************************
@@ -361,5 +370,7 @@
  */
 #define PACKAGE_COMPRESS
 #define SAVE_GZ_EXTENSION ".o.gz"
+
+#undef PACKAGE_THREAD
 
 #endif /* _LOCAL_OPTIONS_H_ */
