@@ -278,13 +278,21 @@
 /* PACKAGE_DB: efuns for external database access using msql */
 #undef PACKAGE_DB
 
-/* If PACKAGE_DB is defined above, you must pick ONE of the following supported
+/* If PACKAGE_DB is defined above, you must pick at least one of the following supported
  * databases
+ *
+ * ATTENTION:
+ * no two choices must use the same number and if more then one type is
+ * choosen the mudlib should provide a corresponding headerfile for use with
+ * efun::db_connect()
  */
 #ifdef PACKAGE_DB
 #define USE_MYSQL 1
+#undef USE_MSQL
 #undef USE_POSTGRES
 #undef USE_SQLITE3
+
+#define DEFAULT_DB  USE_MYSQL
 #endif
 
 /*PACKAGE_ASYNC: adds some efuns for asyncronous IO */
