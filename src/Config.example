@@ -1,5 +1,5 @@
 ###############################################################################
-#              Customizable runtime config file for MudOS v21                 #
+#              Customizable runtime config file for FluffOS                   #
 ###############################################################################
 # NOTE: All paths specified here are relative to the mudlib directory except  #
 #       for mudlib directory, and binary directory.                           #
@@ -7,24 +7,18 @@
 ###############################################################################
 
 # name of this mud
+# should be changed prioir to the 'mud ip', otherwise it might yield strange
+# results to either yourself or other users of this mudlib!
 name : testsuite
 
 # for machines with multiple IP addresses, this specifies which one to use.  this
 # replaces the SERVER_IP compile-time define.
 #mud ip : 255.255.255.255
+mud ip : 127.0.0.1
 
-# if MudOS inherits an open file descriptor #6 from its parent process, it uses
-# that as an additional login port.  the 'port #' for internal purposes (debug
-# messages, argument to connect, etc.) and kind should be set here.  acceptable
-# port types are: ascii, binary, mud or telnet.  this replaces the FD6_KIND and
-# FD6_PORT compile-time defines.
-#fd6 kind : telnet
-#fd6 port : 23
-
-# the address server is an external program that lets the mud translate
-# internet names to numbers (and vice versa).  select an unused port.
-address server ip : localhost
-address server port : 9997
+# the external ports we support
+external_port_1 : telnet 4000
+external_port_2 : binary 4001
 
 # absolute pathname of mudlib
 mudlib directory : /home/mmessier/mudos/mudos/beta/testsuite
@@ -32,15 +26,18 @@ mudlib directory : /home/mmessier/mudos/mudos/beta/testsuite
 # absolute pathname of driver/config dir
 binary directory : /home/mmessier/mudos/mudos/beta/testsuite
 
+# ------------------------------------------------------------------------
+#
+# You shouldn't change anything below this point unless you know what
+# you're changing.... =)
+#
+
 # debug.log and author/domain stats are stored here
 log directory : /log
 
 # the directories which are searched by #include <...>
 # for multiple dirs, separate each path with a ':'
 include directories : /include
-
-# Directory to save binaries in.  (if BINARIES is defined)
-save binaries directory : /binaries
 
 # the file which defines the master object
 master file : /single/master
@@ -57,6 +54,12 @@ debug log file : debug.log
 # This is an include file which is automatically #include'd in all objects
 global include file : "/include/globals.h"
 
+# default no-matching-action message
+default fail message : What?
+
+# default message when error() occurs (optional)
+default error message :
+
 # if an object is left alone for a certain time, then the
 # function clean_up will be called. This function can do anything,
 # like destructing the object. If the function isn't defined by the
@@ -64,25 +67,37 @@ global include file : "/include/globals.h"
 # This time should be substantially longer than the swapping time.
 time to clean up : 1200
 
+# How many seconds until an object is reset again.
+# This value should be somewhere reasonable in between 'time to clean up' and
+# 'time to swap'.
+time to reset : 800
+
 # How long time until an unused object is swapped out.
 # Machine with too many players and too little memory: 900 (15 minutes)
 # Machine with few players and lot of memory: 10000
 # Machine with infinite memory: 0 (never swap).
 time to swap : 600
 
-# How many seconds until an object is reset again.
-time to reset : 1800
+# Set the size of the compiler stack. This defines how complex expressions
+# the compiler can parse.  (unused currently)
+compiler stack size : 600
 
-# Maximum number of bits in a bit field. They are stored in printable
-# strings, 6 bits per byte.
-maximum bits in a bitfield : 1200
+# Set the maximum stack size of the stack machine. This stack will also
+# contain all local variables and arguments.
+evaluator stack size : 6000
 
-# Max number of local variables in a function.
-maximum local variables : 30
+# Max inherit chain size
+inherit chain size : 30
 
 # Maximum amount of "eval cost" per thread - execution is halted when 
 # it is exceeded.
-maximum evaluation cost : 500000
+maximum evaluation cost : 30000000
+
+# Max number of local variables in a function.
+maximum local variables : 50
+
+# Set the maximum call depth for functions.
+maximum call depth : 150
 
 # This is the maximum array size allowed for one single array.
 maximum array size : 15000
@@ -91,68 +106,219 @@ maximum array size : 15000
 maximum buffer size : 400000
 
 # Max size for a mapping
-maximum mapping size : 15000
-
-# Max inherit chain size
-inherit chain size : 30
+maximum mapping size : 150000
 
 # maximum length of a string variable
 maximum string length : 200000
 
-# Max size of a file allowed to be read by 'read_file()'.
-maximum read file size : 200000
+# Maximum number of bits in a bit field. They are stored in printable
+# strings, 6 bits per byte.
+maximum bits in a bitfield : 12000
 
 # max number of bytes you allow to be read and written with read_bytes 
 # and write_bytes
 maximum byte transfer : 200000
 
-# Reserve an extra memory area from malloc(), to free when we run out
-# of memory and allow the mudlib to shutdown.
-# If this value is 0, no area will be reserved.
-reserved size : 0
+# Max size of a file allowed to be read by 'read_file()'.
+maximum read file size : 200000
 
-# Define the size of the shared string hash table.  This number should
-# a prime, probably between 1000 and 30000; if you set it to about 1/5
-# of the number of distinct strings you have, you will get a hit ratio
-# (number of comparisons to find a string) very close to 1, as found strings
-# are automatically moved to the head of a hash chain.  You will never
-# need more, and you will still get good results with a smaller table.
+# Set the size of the shared string hash table.  This number should a prime,
+# probably between 1000 and 30000; if you set it to about 1/5 of the number
+# of distinct strings you have, you will get a hit ratio (number of
+# comparisons to find a string) very close to 1, as found strings are
+# automatically moved to the head of a hash chain.  You will never need more,
+# and you will still get good results with a smaller table.
 hash table size : 7001
 
-# Object hash table size.
-# Define this like you did with the strings; probably set to about 1/4 of
-# the number of objects in a game, as the distribution of accesses to
-# objects is somewhat more uniform than that of strings.
+# Set this like you did with the strings; probably set to about 1/4 of the
+# number of objects in a game, as the distribution of accesses to objects is
+# somewhat more uniform than that of strings.
 object table size : 1501
 
-# default no-matching-action message
-default fail message : What?
+# There is a hash table for living objects, used by find_living().
+# This must be one of 4, 16, 64, 256, 1024, 4096
+living hash table size : 256
 
-# default message when error() occurs (optional)
-default error message :
+# Set the granularity of game-time (shortest time interval visible ingame)
+gametick msec : 1000
 
-# the external ports we support
-external_port_1 : telnet 4000
-external_port_2 : binary 4001
+# Set heartbeat interval in milliseconds (ms).
+heartbeat interval msec : 1000
 
-###############################################################################
-#          The following aren't currently used or implemented (yet)           #
-###############################################################################
+# explode():
+#
+# The old behavior (#undef both of the below) strips any number of delimiters
+# at the start of the string, and one at the end.  So explode("..x.y..z..",
+# ".") gives ({ "x", "y", "", "z", "" })
+#
+# sane explode string strips off at most one leading delimiter, and still
+# strips off one at the end, so the example above gives
+# ({ "", "x", "y", "", "z", "" }).
+#
+# reversible explode string overrides SANE_EXPLODE_STRING, and makes it so
+# that implode(explode(x, y), y) is always x; i.e. no delimiters are ever
+# stripped.  So the example above gives
+# ({ "", "", "x", "y", "", "z", "", "" }).
+sane explode string : 1
+reversible explode string : 0
+
+#
+sane sorting : 1
+
+# Some versions of the editor built in indent function use tabs for
+# indenting. This options turns on a warning message for files indented with
+# tabs instead of spaces.
+warn tab : 0
+
+# Don't allow spaces between start/end of array/mapping/functional token
+# chars so ({1,2,3}) still works, but ( { 1 , 2 , 3 } ) doesn't and
+# ({ 1 , 2 , 3 }) does.
+wombles : 0
+
+# Enable type checking for call_other() (-> operator on objects)
+call other type check : 0
+
+# Make it warning instead of errors
+call other warn : 0
+
+# If you set this, the driver doesn't do any handling of runtime errors,
+# other than to turn the heartbeats of objects off.  Information about the
+# error is passed in a mapping to the error_handler() function in the master
+# object.  Whatever is returned is put in the debug.log.
+#
+# A good mudlib error handler is one of the best tools for tracking down
+# errors.  Unfortunately, you need to have one.  Check the testsuite or other
+# libs for an example.
+mudlib error handler : 1
+
+# Completely disable the periodic calling of reset()
+no resets : 0
+
+# If this option is set, an object will only have reset() called in it when
+# it is touched via call_other() or move_object() (assuming enough time has
+# passed since the last reset).  If it is unset, then reset() will be called
+# as always (which guaranteed that reset would always be called at least
+# once).  The advantage of lazy resets is that reset doesn't get called in an
+# object that is touched once and never again (which can save memory since
+# some objects won't get reloaded that otherwise would).
+lazy resets : 0
+
+#
+randomized resets : 1
+
+# Set if you wish to disallow users from typing in commands that contain ANSI
+# escape sequences.  Setting NO_ANSI causes all escapes (ASCII 27) to be
+# replaced with a space ' ' before the string is passed to the action
+# routines added with add_action.
+no ansi : 1
+
+# 'strip before process input' allows the location where the stripping is
+# done to be controlled.  If it is set, then process_input() doesn't see ANSI
+# characters either; if it is unset ESC chars can be processed by
+# process_input(), but are stripped before add_actions are called.  Note that
+# if NO_ADD_ACTION is defined, then setting 'no ansi' without
+# 'strip before process input' is the same as unsetting 'no ansi'.
+#
+# If you anticipate problems with users intentionally typing in ANSI codes to
+# make your terminal flash, etc set this.
+strip before process input : 1
+
+# Set this if you wish this_player() to be usable from within call_out()
+# callbacks.
+this player in call_out : 1
+
+# Set this to enable the trace() and traceprefix() efuns.  (keeping this
+# unset will cause the driver to run faster).
+trace : 1
+
+# Set this to enable code tracing (the driver will print out the previous
+# lines of code to an error) eval_instruction() runs about twice as fast when
+# this is not set (for the most common eoperators).
+trace code : 0
+
+# Set this if you want catch_tell called on interactives as well as NPCs.  If
+# this is set, the user object will need a catch_tell(msg) method that calls
+# receive(msg);
+interactive catch tell : 0
+
+# Set this if you want snoop text to be sent to the receive_snoop() function
+# in the snooper object (instead of being sent directly via add_message()).
+# This is useful if you want to build a smart client that does something
+# different with snoop messages.
+receive snoop : 1
+
+# Set this if you want snoop to report what is sent to the player even in the
+# event that the player's catch_tell() is shadowed and the player may not be
+# seeing what is being sent.  Messages of this sort will be prefixed with $$.
+snoop shadowed : 0
+
+#
+reverse defer : 0
+
+# If set, the driver can take the argument '-C' which will give the driver an
+# interactive console (you can type commands at the terminal.)  Backgrounding
+# the driver will turn off the console, but sending signal SIGTTIN (kill -21)
+# to the driver can turn it back on.  Typing 'help' will display commands
+# available.  The intent is to allow the inspection of things that are
+# difficult to inspect from inside the mud.
+has console : 1
+
+# If set, all writes/tells/etc to noninteractive objects will be written to
+# stderr prefixed with a ']' (old behavior).
+#
+# Compat status: Easy to support, and also on the "It's a bug!  No, it's
+# a feature!" religious war list.
+noninteractive stderr write : 0
+
+# Set this if you want FluffOS to call crash() in master.c and then shutdown
+# when signals are received that would normally crash the driver.
+trap crashes : 1
+
+# Reintroduces a bug in type-checking that effectively renders compile time
+# type checking useless.  For backwards compatibility.
+#
+# Compat status: dealing with all the resulting compile errors can be a huge
+# pain even if they are correct, and the impact on the code is small.
+old type behavior : 0
+
+# Set this if you want negative indexes in string or buffer range values
+# (i.e.  foo = x[-2..-1]; not lvalue for e.g. not x[-2..-1] = foo, the latter is always
+# illegal) to mean counting from the end 
+#
+# Compat status: Not horribly difficult to replace reliance on this, but not
+# trivial, and cannot be simulated.
+old range behavior : 0
+warn old range behavior : 1
+
+# supress warnings about unused arguments; only warn about unused local
+# variables.  Makes older code (where argument names were required) compile
+# more quietly.
+supress argument warnings : 1
+
+#
+enable_commands call init : 1
+
+#
+sprintf add_justified ignore ANSI colors : 1
+
+# Defines the number of bits to use in the call_other cache (in interpret.c).
+# 
+# Memory overhead is (1 << APPLY_CACHE_BITS)*16.
+# [assuming 32 bit pointers and 16 bit shorts]
+#
+# ACB:     entries:     overhead:
+#   6           64            1k
+#   8          256            4k
+#  10        1,024           16k
+#  12        4,096           64k
+#  14       16,384          256k
+#  16       65,536            1M
+#  20    1,048,576           16M
+#  22    4,194,304           64M
+apply cache bits : 22
+
+#
+call_out(0) next level : 1000
 
 # maximum number of users in the game (unused currently)
 maximum users : 40
-
-# Define the maximum stack size of the stack machine. This stack will also
-# contain all local variables and arguments.  (unused currently)
-evaluator stack size : 1000
-
-# Define the size of the compiler stack. This defines how complex
-# expressions the compiler can parse.  (unused currently)
-compiler stack size : 200
-
-# Define the maximum call depth for functions. (unused currently)
-maximum call depth : 30
-
-# There is a hash table for living objects, used by find_living().
-# (unused currently)
-living hash table size : 100
