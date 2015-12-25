@@ -5,7 +5,7 @@
 valid_override - controls the use of efun:: 
 
 .SH SYNOPSIS
-int valid_override( string file, string efun_name );
+int valid_override( string file, string efun_name , string main_file );
 
 .SH DESCRIPTION
 Add valid_override to master.c in order to control the use of the efun::
@@ -16,16 +16,18 @@ valid_override provides a way to modify the behavior of efuns that isn't
 circumventable via the efun:: prefix (by having a simul_efun of the same
 name as the efun to be modified and having valid_override disallow that
 simul_efun from being overriden).
+File will be the actual file the call appears in; mainfile will be the file
+being compiled (the two can differ due to #include)
 .PP
 If you wish to have the original 3.1.2 efun:: behavior, simply add
 a line to master.c that looks like this:
 .TP
-   int valid_override(string file, string efun) { return 1; }
+   int valid_override(string file, string efun, string main_file) { return 1; }
 .PP
 Here is an example valid_override that is more restrictive:
 .PP
   int
-  valid_override(string file, string name)
+  valid_override(string file, string name, string main_file)
   {
       if (file == "/adm/obj/simul_efun") {
           return 1;
