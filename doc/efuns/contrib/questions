@@ -1,0 +1,25 @@
+is commamd_giver this_interactive?
+assume ys#es
+
+functions
+- what's the meankng of flag bit 1?
+
+heart_beats
+- get_heart_beats() returns what?
+
+replaceable
+- what's the meaning of object->prog->func_ref
+
+function_owner
+- what's the meaning of u.fp->hdr.owner
+
+query_replaced_program
+- what's the meaning of object->replaced_program
+
+get_garbage:
+- what's the meaning of object->super
+
+remove_get_char
+- what's the meankng of
+    interactive->ce#arryover?
+    interactive->num_carry?

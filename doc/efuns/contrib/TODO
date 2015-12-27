@@ -1,0 +1,36 @@
+base_name.3
+- possible bug: where is default value???
+
+event.3
+- possible bug: what if '#define NO_ENVIRONMENT'?
+
+is_daylight_savings_time.3
+- unsecured code dependency on zonetime
+
+memory_summary.3
+- '#ifdef F_MEMORY_SUMMARY' inside '#ifdef F_MEMORY_SUMMARY'
+
+network_stats.3
+- make maximum number of ports configurable?
+    if yes look for possible buffer overflows!!!
+
+program_info.3
+- rework code (code doubling between if and else)
+- possible bug in /* function flags */ (else part)
+    '<< 1' should be '* sizeof(short)'
+
+query_num.3
+- rework code: uses goto
+
+replaceable.3
+- code change: fast bailout for simul_efun
+
+roll_MdN.3
+- missing from spec file!
+
+string_difference.3
+- rename? there are different kind ofmstring differences...
+
+
+*_class*.3
+- understand class internals
