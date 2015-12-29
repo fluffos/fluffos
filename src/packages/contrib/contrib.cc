@@ -1668,58 +1668,66 @@ void f_replaceable(void) {
 #endif
 
 #ifdef F_PROGRAM_INFO
+typedef struct {
+    int h_c,    // how many headers?
+        p_s,    // how big are the compiled programs?
+        ff_c,   // how many functions flags?
+        fd_c,   // how many function definitions?
+        s_c,    // how many strings?
+        v_c,    // how many variables?
+        i_c,    // how many inherits?
+        nc_c,   // how many classes (structs)?
+        mc_c,   // how many class members?
+        t_c,    // how mamy saved types (#pragma save_types)?
+        total;  // how big all together?
+} program_info_t;
+
+inline void sum_program_info(const program_t * const p, program_info_t &info) {
+  int n;
+
+  info.h_c++;
+  info.p_s += p->program_size;
+
+  /* function flags */
+  info.ff_c += (p->last_inherited + p->num_functions_defined);
+
+  /* definitions */
+  info.fd_c += p->num_functions_defined;
+
+  info.s_c += p->num_strings;
+  info.v_c += p->num_variables_defined;
+  info.i_c += p->num_inherited;
+  if (p->num_classes) {
+    info.nc_c += p->num_classes;
+    info.mc_c += p->classes[p->num_classes - 1].index +
+        p->classes[p->num_classes - 1].size;
+  }
+  info.t_c += p->num_functions_defined;
+  n = 0;
+  if (p->type_start) {
+    unsigned short *ts = p->type_start;
+    int nfd = p->num_functions_defined;
+
+    for (int i = 0; i < nfd; i++) {
+      if (ts[i] == INDEX_START_NONE) {
+        continue;
+      }
+      n += p->function_table[i].num_arg;
+    }
+  }
+  info.t_c += n;
+  info.total += p->total_size;
+}
+
 void f_program_info(void) {
-  int func_size = 0;
-  int string_size = 0;
-  int var_size = 0;
-  int inherit_size = 0;
-  int prog_size = 0;
-  int hdr_size = 0;
-  int class_size = 0;
-  int type_size = 0;
-  int total_size = 0;
+  program_info_t info{ 0 }; // initialize all elements to 0
   object_t *ob;
   mapping_t *m;
-  program_t *prog;
-  int i, n;
 
   if (st_num_arg == 1) {
     ob = sp->u.ob;
-    prog = ob->prog;
     if (!(ob->flags & O_CLONE)) {
-      hdr_size += sizeof(program_t);
-      prog_size += prog->program_size;
-
-      /* function flags */
-      func_size += (prog->last_inherited + prog->num_functions_defined) * sizeof(unsigned short);
-
-      /* definitions */
-      func_size += prog->num_functions_defined * sizeof(function_t);
-
-      string_size += prog->num_strings * sizeof(char *);
-      var_size += prog->num_variables_defined * (sizeof(char *) + sizeof(unsigned short));
-      inherit_size += prog->num_inherited * sizeof(inherit_t);
-      if (prog->num_classes) {
-        class_size += prog->num_classes * sizeof(class_def_t) +
-                      (prog->classes[prog->num_classes - 1].index +
-                       prog->classes[prog->num_classes - 1].size) *
-                          sizeof(class_member_entry_t);
-      }
-      type_size += prog->num_functions_defined * sizeof(short);
-      n = 0;
-      if (prog->type_start) {
-        unsigned short *ts = prog->type_start;
-        int nfd = prog->num_functions_defined;
-
-        for (i = 0; i < nfd; i++) {
-          if (ts[i] == INDEX_START_NONE) {
-            continue;
-          }
-          n += prog->function_table[i].num_arg;
-        }
-      }
-      type_size += n * sizeof(short);
-      total_size += prog->total_size;
+        sum_program_info(ob->prog, info);
     }
     pop_stack();
   } else {
@@ -1727,54 +1735,21 @@ void f_program_info(void) {
       if (ob->flags & O_CLONE) {
         continue;
       }
-      prog = ob->prog;
-      hdr_size += sizeof(program_t);
-      prog_size += prog->program_size;
-
-      /* function flags */
-      func_size += (prog->last_inherited + prog->num_functions_defined) << 1;
-
-      /* definitions */
-      func_size += prog->num_functions_defined * sizeof(function_t);
-
-      string_size += prog->num_strings * sizeof(char *);
-      var_size += prog->num_variables_defined * (sizeof(char *) + sizeof(unsigned short));
-      inherit_size += prog->num_inherited * sizeof(inherit_t);
-      if (prog->num_classes) {
-        class_size += prog->num_classes * sizeof(class_def_t) +
-                      (prog->classes[prog->num_classes - 1].index +
-                       prog->classes[prog->num_classes - 1].size) *
-                          sizeof(class_member_entry_t);
-      }
-      type_size += prog->num_functions_defined * sizeof(short);
-      n = 0;
-      if (prog->type_start) {
-        unsigned short *ts = prog->type_start;
-        int nfd = prog->num_functions_defined;
-
-        for (i = 0; i < nfd; i++) {
-          if (ts[i] == INDEX_START_NONE) {
-            continue;
-          }
-          n += prog->function_table[i].num_arg;
-        }
-      }
-      type_size += n * sizeof(short);
-      total_size += prog->total_size;
+        sum_program_info(ob->prog, info);
     }
   }
 
   m = allocate_mapping(0);
-  add_mapping_pair(m, "header size", hdr_size);
-  add_mapping_pair(m, "code size", prog_size);
-  add_mapping_pair(m, "function size", func_size);
-  add_mapping_pair(m, "string size", string_size);
-  add_mapping_pair(m, "var size", var_size);
-  add_mapping_pair(m, "class size", class_size);
-  add_mapping_pair(m, "inherit size", inherit_size);
-  add_mapping_pair(m, "saved type size", type_size);
+  add_mapping_pair(m, "header size",     info.h_c  *  sizeof(program_t));
+  add_mapping_pair(m, "code size",       info.p_s);
+  add_mapping_pair(m, "function size",   info.ff_c *  sizeof(unsigned short) + info.fd_c * sizeof(function_t));
+  add_mapping_pair(m, "string size",     info.s_c  *  sizeof(char *));
+  add_mapping_pair(m, "var size",        info.v_c  * (sizeof(char *) + sizeof(unsigned short)));
+  add_mapping_pair(m, "class size",      info.nc_c *  sizeof(class_def_t) + info.mc_c * sizeof(class_member_entry_t));
+  add_mapping_pair(m, "inherit size",    info.i_c  *  sizeof(inherit_t));
+  add_mapping_pair(m, "saved type size", info.t_c  *  sizeof(short));
 
-  add_mapping_pair(m, "total size", total_size);
+  add_mapping_pair(m, "total size",      info.total);
 
   push_refed_mapping(m);
 }
