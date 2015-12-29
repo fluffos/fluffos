@@ -1837,7 +1837,7 @@ void f_query_ip_port(void) {
  ** mud time or GMT, and this isn't always correct.
  */
 
-#ifdef F_ZONETIME
+#if defined F_ZONETIME || defined F_IS_DAYLIGHT_SAVINGS_TIME
 
 char *set_timezone(const char *timezone) {
   static char put_tz[80];
@@ -1865,6 +1865,10 @@ void reset_timezone(const char *old_tz) {
 
   tzset();
 }
+
+#endif
+
+#ifdef F_ZONETIME
 
 void f_zonetime(void) {
   const char *timezone, *old_tz;
