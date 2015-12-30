@@ -2251,6 +2251,7 @@ void event(svalue_t *event_ob, const char *event_fun, int numparam, svalue_t *ev
 
     apply(name, event_ob->u.ob, numparam + 1, ORIGIN_EFUN);
 
+#ifndef NO_ENVIRONMENT
     /* And then call it on it's inventory..., if it's still around! */
     if (event_ob && event_ob->u.ob && !(event_ob->u.ob->flags & O_DESTRUCTED)) {
       for (ob = event_ob->u.ob->contains; ob; ob = ob->next_inv) {
@@ -2279,6 +2280,8 @@ void event(svalue_t *event_ob, const char *event_fun, int numparam, svalue_t *ev
         apply(name, ob, numparam + 1, ORIGIN_EFUN);
       }
     }
+#endif
+
   }
   sp--;
   FREE_MSTR(name);
