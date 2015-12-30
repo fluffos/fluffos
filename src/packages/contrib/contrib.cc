@@ -1610,58 +1610,65 @@ void f_replaceable(void) {
   char **ignore;
 
   if (st_num_arg == 2) {
-    numignore = sp->u.arr->size;
-    if (numignore) {
-      ignore = reinterpret_cast<char **>(
-          DCALLOC(numignore + 2, sizeof(char *), TAG_TEMPORARY, "replaceable"));
-    } else {
-      ignore = 0;
-    }
-    ignore[0] = findstring(APPLY_CREATE);
-    ignore[1] = findstring(APPLY___INIT);
-    for (i = 0; i < numignore; i++) {
-      if (sp->u.arr->item[i].type == T_STRING) {
-        ignore[i + 2] = findstring(sp->u.arr->item[i].u.string);
-      } else {
-        ignore[i + 2] = 0;
-      }
-    }
-    numignore += 2;
     obj = (sp - 1)->u.ob;
-  } else {
-    numignore = 2;
-    ignore = reinterpret_cast<char **>(DCALLOC(2, sizeof(char *), TAG_TEMPORARY, "replaceable"));
-    ignore[0] = findstring(APPLY_CREATE);
-    ignore[1] = findstring(APPLY___INIT);
+  }
+  else {
     obj = sp->u.ob;
   }
 
   prog = obj->prog;
-  num = prog->num_functions_defined + prog->last_inherited;
-
-  for (i = 0; i < num; i++) {
-    if (prog->function_flags[i] & (FUNC_INHERITED | FUNC_NO_CODE)) {
-      continue;
+  if (obj == simul_efun_ob || prog->func_ref) {
+    replaceable = 0;
+  }
+  else {
+    if (st_num_arg == 2) {
+      numignore = sp->u.arr->size;
+      if (numignore) {
+        ignore = reinterpret_cast<char **>(
+            DCALLOC(numignore + 2, sizeof(char *), TAG_TEMPORARY, "replaceable"));
+      } else {
+        ignore = 0;
+      }
+      ignore[0] = findstring(APPLY_CREATE);
+      ignore[1] = findstring(APPLY___INIT);
+      for (i = 0; i < numignore; i++) {
+        if (sp->u.arr->item[i].type == T_STRING) {
+          ignore[i + 2] = findstring(sp->u.arr->item[i].u.string);
+        } else {
+          ignore[i + 2] = 0;
+        }
+      }
+      numignore += 2;
+    } else {
+      numignore = 2;
+      ignore = reinterpret_cast<char **>(DCALLOC(2, sizeof(char *), TAG_TEMPORARY, "replaceable"));
+      ignore[0] = findstring(APPLY_CREATE);
+      ignore[1] = findstring(APPLY___INIT);
     }
-    for (j = 0; j < numignore; j++) {
-      if (ignore[j] == find_func_entry(prog, i)->funcname) {
+
+    num = prog->num_functions_defined + prog->last_inherited;
+
+    for (i = 0; i < num; i++) {
+      if (prog->function_flags[i] & (FUNC_INHERITED | FUNC_NO_CODE)) {
+        continue;
+      }
+      for (j = 0; j < numignore; j++) {
+        if (ignore[j] == find_func_entry(prog, i)->funcname) {
+          break;
+        }
+      }
+      if (j == numignore) {
         break;
       }
     }
-    if (j == numignore) {
-      break;
-    }
-  }
 
-  replaceable = (i == num);
-  if (obj == simul_efun_ob || prog->func_ref) {
-    replaceable = 0;
+    replaceable = (i == num);
+    FREE(ignore);
   }
 
   if (st_num_arg == 2) {
     free_array((sp--)->u.arr);
   }
-  FREE(ignore);
   free_svalue(sp, "f_replaceable");
   put_number(replaceable);
 }
