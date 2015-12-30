@@ -2430,12 +2430,15 @@ void f_base_name(void) {
 
 #ifdef F_GET_GARBAGE
 int garbage_check(object_t *ob, void *data) {
-  return (ob->ref == 1) && (ob->flags & O_CLONE) &&
-         !(ob->super
-#ifndef NO_SHADOWS
-           || ob->shadowing
+  return (ob->ref == 1) && (ob->flags & O_CLONE)
+#if defined NO_ENVIRONMENT && !defined NO_SHADOWS
+      && !ob->shadowing
+#elif !defined NO_ENVIRONMENT && defined NO_SHADOWS
+      && !ob->super
+#elif !defined NO_ENVIRONMENT && !defined NO_SHADOWS
+      && !(ob->super || ob->shadowing)
 #endif
-           );
+      ;
 }
 
 void f_get_garbage(void) {
