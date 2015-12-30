@@ -1,9 +1,17 @@
-mixed min(mixed *, int default:0);
+.\"search for the minimum in an array
+.TH min 3 "30 Dec 2015" FluffOS "LPC Library Functions"
 
-searches miniimum value for (int|float|string) arrays
+.SH NAME
+min() - searches for the minimum value inside an array
 
-returns:
-- int == 0: return miniimum value
-- int != 0: return 1st index of miniimum value
+.SH SYNOPSIS
+mixed min(mixed * arr)
+mixed min(mixed * arr, int flag);
 
-see max(3)
+.SH DESCRIPTION
+Searches minimum value for (int|float|string) arrays.
+If flag is 0 or omitted the minimum value will be returned, otherwise the
+first index of its occurrence.
+
+.SH SEE ALSO
+max(3)

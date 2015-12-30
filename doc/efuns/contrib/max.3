@@ -1,9 +1,17 @@
-mixed max(mixed *, int default:0);
+.\"search for the maximum in an array
+.TH max 3 "30 Dec 2015" FluffOS "LPC Library Functions"
 
-searches maximum value for (int|float|string) arrays
+.SH NAME
+max() - searches for the maximum value inside an array
 
-returns:
-- int == 0: return maximum value
-- int != 0: return 1st index of maximum value
+.SH SYNOPSIS
+mixed max(mixed * arr)
+mixed max(mixed * arr, int flag);
 
-see min(3)
+.SH DESCRIPTION
+Searches maximum value for (int|float|string) arrays.
+If flag is 0 or omitted the maximum value will be returned, otherwise the
+first index of its occurrence.
+
+.SH SEE ALSO
+min(3)
