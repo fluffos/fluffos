@@ -1,0 +1,13 @@
+network_stats.3
+- make maximum number of ports configurable?
+    if yes look for possible buffer overflows!!!
+
+query_num.3
+- rework code: uses goto
+
+string_difference.3
+- rename? there are different kind ofmstring differences...
+
+
+*_class*.3
+- understand class internals
