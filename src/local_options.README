@@ -97,6 +97,22 @@
 #undef ED_INDENT_CASE
 #define ED_INDENT_SPACES 4
 
+/* RECEIVE_ED: define this if you want normal ed output to go to a
+     receive_ed() apply in the player ob.  Some errors still go directly
+     to output.  Useful for post-processing (perhaps colorizing?) ed
+     output. Prototype:  mixed receive_ed(string txt, string fname);
+     If fname, return a string that ed will output, 0 to let ed handle
+     the output in the default way, or 1 to handle the output yourself.
+     If fname == 0, output is help text and you may return any of the above
+     or an array of strings that will be more'ed.
+     This works wirh OLD_ED enabled only!!!
+*/
+#undef RECEIVE_ED
+
+/* RESTRICTED_ED: define this if you want restricted ed mode enabled.
+ */
+#define RESTRICTED_ED
+
 /* SENSIBLE_MODIFIERS:
  * Turning this on changes a few things, which may break old code:
  *
@@ -191,21 +207,6 @@
  *  the inherits() efun and the 'valid_object' apply to master.]
  */
 #undef PRIVS
-
-/* RECEIVE_ED: define this if you want normal ed output to go to a
-     receive_ed() apply in the player ob.  Some errors still go directly
-     to output.  Useful for post-processing (perhaps colorizing?) ed
-     output. Prototype:  mixed receive_ed(string txt, string fname);
-     If fname, return a string that ed will output, 0 to let ed handle
-     the output in the default way, or 1 to handle the output yourself.
-     If fname == 0, output is help text and you may return any of the above
-     or an array of strings that will be more'ed.
-*/
-#undef RECEIVE_ED
-
-/* RESTRICTED_ED: define this if you want restricted ed mode enabled.
- */
-#define RESTRICTED_ED
 
 /* NO_SHADOWS: define this if you want to disable shadows in your driver.
  */
