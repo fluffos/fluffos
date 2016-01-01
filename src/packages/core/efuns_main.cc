@@ -33,6 +33,7 @@
 #include "packages/core/outbuf.h"
 #include "packages/core/reclaim.h"
 #include "packages/core/custom_crypt.h"
+#include "packages/core/ed.h"
 
 int data_size(object_t *ob);
 void reload_object(object_t *obj);
