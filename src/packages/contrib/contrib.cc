@@ -2075,7 +2075,6 @@ static int memory_share(svalue_t *sv) {
  *
  * map["program name"]["variable name"] = memory usage
  */
-#ifdef F_MEMORY_SUMMARY
 static void fms_recurse(mapping_t *map, object_t *ob, int *idx, program_t *prog) {
   int i;
   svalue_t *entry;
@@ -2121,7 +2120,6 @@ void f_memory_summary(void) {
   }
   push_refed_mapping(result);
 }
-#endif
 
 #endif
 
