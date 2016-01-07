@@ -1675,7 +1675,7 @@ void f_replaceable(void) {
 #endif
 
 #ifdef F_PROGRAM_INFO
-typedef struct {
+struct program_info_s {
     int h_c,    // how many headers?
         p_s,    // how big are the compiled programs?
         ff_c,   // how many functions flags?
@@ -1687,9 +1687,9 @@ typedef struct {
         mc_c,   // how many class members?
         t_c,    // how mamy saved types (#pragma save_types)?
         total;  // how big all together?
-} program_info_t;
+};
 
-inline void sum_program_info(const program_t * const p, program_info_t &info) {
+inline void sum_program_info(const program_t * const p, program_info_s &info) {
   int n;
 
   info.h_c++;
@@ -1727,7 +1727,7 @@ inline void sum_program_info(const program_t * const p, program_info_t &info) {
 }
 
 void f_program_info(void) {
-  program_info_t info{ 0 }; // initialize all elements to 0
+  program_info_s info{ 0 }; // initialize all elements to 0
   object_t *ob;
   mapping_t *m;
 
