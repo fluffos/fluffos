@@ -1,4 +1,4 @@
-inherit "/testsuite/single/tests/efuns/replaceable_inh";
+inherit "/clone/replaceable_inh";
 
 void create(void)
 {
