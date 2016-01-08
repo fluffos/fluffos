@@ -1610,116 +1610,131 @@ void f_replaceable(void) {
   char **ignore;
 
   if (st_num_arg == 2) {
-    numignore = sp->u.arr->size;
-    if (numignore) {
-      ignore = reinterpret_cast<char **>(
-          DCALLOC(numignore + 2, sizeof(char *), TAG_TEMPORARY, "replaceable"));
-    } else {
-      ignore = 0;
-    }
-    ignore[0] = findstring(APPLY_CREATE);
-    ignore[1] = findstring(APPLY___INIT);
-    for (i = 0; i < numignore; i++) {
-      if (sp->u.arr->item[i].type == T_STRING) {
-        ignore[i + 2] = findstring(sp->u.arr->item[i].u.string);
-      } else {
-        ignore[i + 2] = 0;
-      }
-    }
-    numignore += 2;
     obj = (sp - 1)->u.ob;
-  } else {
-    numignore = 2;
-    ignore = reinterpret_cast<char **>(DCALLOC(2, sizeof(char *), TAG_TEMPORARY, "replaceable"));
-    ignore[0] = findstring(APPLY_CREATE);
-    ignore[1] = findstring(APPLY___INIT);
+  }
+  else {
     obj = sp->u.ob;
   }
 
   prog = obj->prog;
-  num = prog->num_functions_defined + prog->last_inherited;
-
-  for (i = 0; i < num; i++) {
-    if (prog->function_flags[i] & (FUNC_INHERITED | FUNC_NO_CODE)) {
-      continue;
+  if (obj == simul_efun_ob || prog->func_ref) {
+    replaceable = 0;
+  }
+  else {
+    if (st_num_arg == 2) {
+      numignore = sp->u.arr->size;
+      if (numignore) {
+        ignore = reinterpret_cast<char **>(
+            DCALLOC(numignore + 2, sizeof(char *), TAG_TEMPORARY, "replaceable"));
+      } else {
+        ignore = 0;
+      }
+      ignore[0] = findstring(APPLY_CREATE);
+      ignore[1] = findstring(APPLY___INIT);
+      for (i = 0; i < numignore; i++) {
+        if (sp->u.arr->item[i].type == T_STRING) {
+          ignore[i + 2] = findstring(sp->u.arr->item[i].u.string);
+        } else {
+          ignore[i + 2] = 0;
+        }
+      }
+      numignore += 2;
+    } else {
+      numignore = 2;
+      ignore = reinterpret_cast<char **>(DCALLOC(2, sizeof(char *), TAG_TEMPORARY, "replaceable"));
+      ignore[0] = findstring(APPLY_CREATE);
+      ignore[1] = findstring(APPLY___INIT);
     }
-    for (j = 0; j < numignore; j++) {
-      if (ignore[j] == find_func_entry(prog, i)->funcname) {
+
+    num = prog->num_functions_defined + prog->last_inherited;
+
+    for (i = 0; i < num; i++) {
+      if (prog->function_flags[i] & (FUNC_INHERITED | FUNC_NO_CODE)) {
+        continue;
+      }
+      for (j = 0; j < numignore; j++) {
+        if (ignore[j] == find_func_entry(prog, i)->funcname) {
+          break;
+        }
+      }
+      if (j == numignore) {
         break;
       }
     }
-    if (j == numignore) {
-      break;
-    }
-  }
 
-  replaceable = (i == num);
-  if (obj == simul_efun_ob || prog->func_ref) {
-    replaceable = 0;
+    replaceable = (i == num);
+    FREE(ignore);
   }
 
   if (st_num_arg == 2) {
     free_array((sp--)->u.arr);
   }
-  FREE(ignore);
   free_svalue(sp, "f_replaceable");
   put_number(replaceable);
 }
 #endif
 
 #ifdef F_PROGRAM_INFO
+struct program_info_s {
+    int h_c,    // how many headers?
+        p_s,    // how big are the compiled programs?
+        ff_c,   // how many functions flags?
+        fd_c,   // how many function definitions?
+        s_c,    // how many strings?
+        v_c,    // how many variables?
+        i_c,    // how many inherits?
+        nc_c,   // how many classes (structs)?
+        mc_c,   // how many class members?
+        t_c,    // how mamy saved types (#pragma save_types)?
+        total;  // how big all together?
+};
+
+inline void sum_program_info(const program_t * const p, program_info_s &info) {
+  int n;
+
+  info.h_c++;
+  info.p_s += p->program_size;
+
+  /* function flags */
+  info.ff_c += (p->last_inherited + p->num_functions_defined);
+
+  /* definitions */
+  info.fd_c += p->num_functions_defined;
+
+  info.s_c += p->num_strings;
+  info.v_c += p->num_variables_defined;
+  info.i_c += p->num_inherited;
+  if (p->num_classes) {
+    info.nc_c += p->num_classes;
+    info.mc_c += p->classes[p->num_classes - 1].index +
+        p->classes[p->num_classes - 1].size;
+  }
+  info.t_c += p->num_functions_defined;
+  n = 0;
+  if (p->type_start) {
+    unsigned short *ts = p->type_start;
+    int nfd = p->num_functions_defined;
+
+    for (int i = 0; i < nfd; i++) {
+      if (ts[i] == INDEX_START_NONE) {
+        continue;
+      }
+      n += p->function_table[i].num_arg;
+    }
+  }
+  info.t_c += n;
+  info.total += p->total_size;
+}
+
 void f_program_info(void) {
-  int func_size = 0;
-  int string_size = 0;
-  int var_size = 0;
-  int inherit_size = 0;
-  int prog_size = 0;
-  int hdr_size = 0;
-  int class_size = 0;
-  int type_size = 0;
-  int total_size = 0;
+  program_info_s info{ 0 }; // initialize all elements to 0
   object_t *ob;
   mapping_t *m;
-  program_t *prog;
-  int i, n;
 
   if (st_num_arg == 1) {
     ob = sp->u.ob;
-    prog = ob->prog;
     if (!(ob->flags & O_CLONE)) {
-      hdr_size += sizeof(program_t);
-      prog_size += prog->program_size;
-
-      /* function flags */
-      func_size += (prog->last_inherited + prog->num_functions_defined) * sizeof(unsigned short);
-
-      /* definitions */
-      func_size += prog->num_functions_defined * sizeof(function_t);
-
-      string_size += prog->num_strings * sizeof(char *);
-      var_size += prog->num_variables_defined * (sizeof(char *) + sizeof(unsigned short));
-      inherit_size += prog->num_inherited * sizeof(inherit_t);
-      if (prog->num_classes) {
-        class_size += prog->num_classes * sizeof(class_def_t) +
-                      (prog->classes[prog->num_classes - 1].index +
-                       prog->classes[prog->num_classes - 1].size) *
-                          sizeof(class_member_entry_t);
-      }
-      type_size += prog->num_functions_defined * sizeof(short);
-      n = 0;
-      if (prog->type_start) {
-        unsigned short *ts = prog->type_start;
-        int nfd = prog->num_functions_defined;
-
-        for (i = 0; i < nfd; i++) {
-          if (ts[i] == INDEX_START_NONE) {
-            continue;
-          }
-          n += prog->function_table[i].num_arg;
-        }
-      }
-      type_size += n * sizeof(short);
-      total_size += prog->total_size;
+        sum_program_info(ob->prog, info);
     }
     pop_stack();
   } else {
@@ -1727,54 +1742,21 @@ void f_program_info(void) {
       if (ob->flags & O_CLONE) {
         continue;
       }
-      prog = ob->prog;
-      hdr_size += sizeof(program_t);
-      prog_size += prog->program_size;
-
-      /* function flags */
-      func_size += (prog->last_inherited + prog->num_functions_defined) << 1;
-
-      /* definitions */
-      func_size += prog->num_functions_defined * sizeof(function_t);
-
-      string_size += prog->num_strings * sizeof(char *);
-      var_size += prog->num_variables_defined * (sizeof(char *) + sizeof(unsigned short));
-      inherit_size += prog->num_inherited * sizeof(inherit_t);
-      if (prog->num_classes) {
-        class_size += prog->num_classes * sizeof(class_def_t) +
-                      (prog->classes[prog->num_classes - 1].index +
-                       prog->classes[prog->num_classes - 1].size) *
-                          sizeof(class_member_entry_t);
-      }
-      type_size += prog->num_functions_defined * sizeof(short);
-      n = 0;
-      if (prog->type_start) {
-        unsigned short *ts = prog->type_start;
-        int nfd = prog->num_functions_defined;
-
-        for (i = 0; i < nfd; i++) {
-          if (ts[i] == INDEX_START_NONE) {
-            continue;
-          }
-          n += prog->function_table[i].num_arg;
-        }
-      }
-      type_size += n * sizeof(short);
-      total_size += prog->total_size;
+        sum_program_info(ob->prog, info);
     }
   }
 
   m = allocate_mapping(0);
-  add_mapping_pair(m, "header size", hdr_size);
-  add_mapping_pair(m, "code size", prog_size);
-  add_mapping_pair(m, "function size", func_size);
-  add_mapping_pair(m, "string size", string_size);
-  add_mapping_pair(m, "var size", var_size);
-  add_mapping_pair(m, "class size", class_size);
-  add_mapping_pair(m, "inherit size", inherit_size);
-  add_mapping_pair(m, "saved type size", type_size);
+  add_mapping_pair(m, "header size",     info.h_c  *  sizeof(program_t));
+  add_mapping_pair(m, "code size",       info.p_s);
+  add_mapping_pair(m, "function size",   info.ff_c *  sizeof(unsigned short) + info.fd_c * sizeof(function_t));
+  add_mapping_pair(m, "string size",     info.s_c  *  sizeof(char *));
+  add_mapping_pair(m, "var size",        info.v_c  * (sizeof(char *) + sizeof(unsigned short)));
+  add_mapping_pair(m, "class size",      info.nc_c *  sizeof(class_def_t) + info.mc_c * sizeof(class_member_entry_t));
+  add_mapping_pair(m, "inherit size",    info.i_c  *  sizeof(inherit_t));
+  add_mapping_pair(m, "saved type size", info.t_c  *  sizeof(short));
 
-  add_mapping_pair(m, "total size", total_size);
+  add_mapping_pair(m, "total size",      info.total);
 
   push_refed_mapping(m);
 }
