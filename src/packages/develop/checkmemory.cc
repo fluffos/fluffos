@@ -694,7 +694,6 @@ void check_all_blocks(int flag) {
     mark_command_giver_stack();
     mark_call_outs();
     mark_simuls();
-    mark_apply_low_cache();
     mark_mapping_node_blocks();
     mark_config();
 

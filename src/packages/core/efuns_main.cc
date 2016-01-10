@@ -160,19 +160,14 @@ void f_bind(void) {
 
 #ifdef F_CACHE_STATS
 static void print_cache_stats(outbuffer_t *ob) {
-  outbuf_add(ob, "Function cache information\n");
+  outbuf_add(ob, "Apply lookup cache information\n");
   outbuf_add(ob, "-------------------------------\n");
   outbuf_addv(ob, "%% cache hits:    %10.2f\n",
-              100 * (static_cast<LPC_FLOAT>(apply_low_cache_hits) / apply_low_call_others));
-  outbuf_addv(ob, "call_others:     %10lu\n", apply_low_call_others);
-  outbuf_addv(ob, "cache hits:      %10lu\n", apply_low_cache_hits);
-  outbuf_addv(ob, "cache size:      %10lu\n", apply_cache_size);
-  outbuf_addv(ob, "slots used:      %10lu\n", apply_low_slots_used);
-  outbuf_addv(ob, "%% slots used:    %10.2f\n",
-              100 * (static_cast<LPC_FLOAT>(apply_low_slots_used) / apply_cache_size));
-  outbuf_addv(ob, "collisions:      %10lu\n", apply_low_collisions);
-  outbuf_addv(ob, "%% collisions:    %10.2f\n",
-              100 * (static_cast<LPC_FLOAT>(apply_low_collisions) / apply_low_call_others));
+              100 * (static_cast<LPC_FLOAT>(apply_cache_hits) / apply_cache_lookups));
+  outbuf_addv(ob, "total lookup:     %10lu\n", apply_cache_lookups);
+  outbuf_addv(ob, "cache hits:      %10lu\n", apply_cache_hits);
+  outbuf_addv(ob, "cache size (bytes w/o overhead):  %10lu\n",
+              apply_cache_items * sizeof(lookup_entry_s));
 }
 
 void f_cache_stats(void) {

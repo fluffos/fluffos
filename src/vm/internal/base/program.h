@@ -2,6 +2,7 @@
 #define PROGRAM_H
 
 #include <cstdint>
+#include <unordered_map>
 
 /*
  * A compiled program consists of several data blocks, all allocated
@@ -182,6 +183,13 @@ struct inherit_t {
   unsigned short type_mod;
 };
 
+struct lookup_entry_s {
+  struct program_t *progp;
+  struct function_t *funp;
+  unsigned short function_index_offset;
+  unsigned short variable_index_offset;
+};
+
 struct program_t {
   const char *filename; /* Name of file that defined prog */
   unsigned short flags;
@@ -230,6 +238,18 @@ struct program_t {
   unsigned short num_variables_total;
   unsigned short num_variables_defined;
   unsigned short num_inherited;
+
+  // A lookup table to make lookup function by name faster.
+  //
+  // This table is filled on first use, and used by apply_low().
+  //
+  // Key: pointer of function name (must be shared-string)
+  // Value: lookup_entry_s.
+  //
+  // TODO: we need to use pointer here because compiler.c use malloc
+  // directly to allocate memory for program, which doesn't work for STL containers.
+  // This value is new'ed in apply_cache.cc and deallocated on deallocate_program.
+  std::unordered_map<intptr_t, lookup_entry_s> *apply_lookup_table;
 };
 
 void reference_prog(program_t *, const char *);
