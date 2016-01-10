@@ -92,7 +92,6 @@ static const flagEntry kDefaultFlags[] = {
     {"suppress argument warnings", __RC_SUPPRESS_ARGUMENT_WARNINGS__, 1},
     {"enable_commands call init", __RC_ENABLE_COMMANDS_CALL_INIT__, 1},
     {"sprintf add_justified ignore ANSI colors", __RC_SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__, 1},
-    {"apply cache bits", __RC_APPLY_CACHE_BITS__, 22},
     {"call_out(0) nest level", __RC_CALL_OUT_ZERO_NEST_LEVEL__, 1000},
 };
 

@@ -192,11 +192,10 @@ retry_for_shadow:
 #endif
   DEBUG_CHECK(ob->flags & O_DESTRUCTED, "apply() on destructed object\n");
 
-  // Look up function from the cache
   auto entry = apply_cache_lookup(fun, ob->prog);
 
 #ifndef NO_SHADOWS
-  if (!entry->progp && ob->shadowing) {
+  if (!entry.progp && ob->shadowing) {
     /*
      * This is an object shadowing another. The function was not
      * found, but can maybe be found in the object we are shadowing.
@@ -207,19 +206,19 @@ retry_for_shadow:
 #endif
 
   /* This function is not found, return failure. */
-  if (!entry->progp) {
+  if (!entry.progp) {
     pop_n_elems(num_arg);
     return 0;
   }
   /* Ready to call the function now. */
   {
     int need;
-    function_t *funp = entry->funp;
-    int findex = (funp - entry->progp->function_table);
+    function_t *funp = entry.funp;
+    int findex = (funp - entry.progp->function_table);
     int funflags, runtime_index;
 
-    runtime_index = findex + entry->progp->last_inherited + entry->function_index_offset;
-    funflags = entry->oprogp->function_flags[runtime_index];
+    runtime_index = findex + entry.progp->last_inherited + entry.function_index_offset;
+    funflags = ob->prog->function_flags[runtime_index];
 
     need = (local_call_origin == ORIGIN_DRIVER
                 ? DECL_HIDDEN
@@ -239,15 +238,15 @@ retry_for_shadow:
     }
     /* Check arguments */
     if (!(funflags & FUNC_VARARGS)) {
-      check_co_args(num_arg, entry->progp, funp, findex);
+      check_co_args(num_arg, entry.progp, funp, findex);
     }
     /* Setup new call frame */
     push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE);
-    current_prog = entry->progp;
+    current_prog = entry.progp;
     caller_type = local_call_origin;
     csp->num_local_variables = num_arg;
-    function_index_offset = entry->function_index_offset;
-    variable_index_offset = entry->variable_index_offset;
+    function_index_offset = entry.function_index_offset;
+    variable_index_offset = entry.variable_index_offset;
     csp->fr.table_index = findex;
 #ifdef PROFILE_FUNCTIONS
     get_cpu_times(&(csp->entry_secs), &(csp->entry_usecs));

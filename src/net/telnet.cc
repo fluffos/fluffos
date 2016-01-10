@@ -206,12 +206,15 @@ static inline void on_telnet_subnegotiation(unsigned char cmd, const char *buf, 
   // 000010 fc 1f ff fc 27 ff fe 56 ff fc 5b ff fe 46 ff fe
   // 000020 5d ff fe c9
   // 000024
-  // Which translate into WONT LINEMODE, an empty SB LINEMODE (weird), (ff ff fc 03) some lingering data,
-  // and other DOs and DONTs. It is suspected that this is sent by a broken client.
-  // This causes crash for the driver since "buf" will be empty, which it should never do for SB LINEMODE.
+  // Which translate into WONT LINEMODE, an empty SB LINEMODE (weird), (ff ff fc 03) some lingering
+  // data, and other DOs and DONTs. It is suspected that this is sent by a broken client.
+  // This causes crash for the driver since "buf" will be empty, which it should never do for SB
+  // LINEMODE.
   //
   // Data shows that multiple crash all caused by conns from 208.100.* ip address, which is a huge
-  // IP space of hosting company, some google search suggest it maybe doing port scanning or attacking.
+  // IP space of hosting company, some google search suggest it maybe doing port scanning or
+  // attacking.
+  //
   // There might be a issue in their client code which caused this problem.
   //
   // Nonetheless, checking buf and size here will be good safeguard for similar problems.

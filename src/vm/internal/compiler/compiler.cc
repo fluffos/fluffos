@@ -2526,6 +2526,8 @@ static program_t *epilog(void) {
     prog->inherit = 0;
   }
 
+  prog->apply_lookup_table = nullptr;
+
 #ifdef DEBUG
   if (p - reinterpret_cast<char *>(prog) != size) {
     debug_message("Program size miscalculated for /%s.\n", prog->filename);

@@ -45,10 +45,8 @@ extern uint64_t num_classes, total_class_size;
 extern uint64_t num_mappings, total_mapping_size, total_mapping_nodes;
 
 // Apply cache stats
-extern uint64_t apply_low_call_others;
-extern uint64_t apply_low_cache_hits;
-extern uint64_t apply_low_slots_used;
-extern uint64_t apply_low_collisions;
-extern uint64_t apply_cache_size;
+extern uint64_t apply_cache_lookups;
+extern uint64_t apply_cache_hits;
+extern uint64_t apply_cache_items;
 
 #endif
