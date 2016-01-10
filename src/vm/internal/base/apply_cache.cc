@@ -24,9 +24,8 @@ void apply_cache_init() {
 cache_entry_t *apply_cache_get_entry(const char *fun, const program_t *prog) {
   /* Search in cache for this function. */
   uint64_t ix; /* The cache index */
-  std::hash<void *> hash_fn;
-  ix = hash_fn((void *)fun);
-  ix ^= hash_fn((void *)prog);
+  ix = whashstr(prog->filename);
+  ix ^= whashstr(fun);
   return &cache[ix % apply_cache_size];
 }
 
