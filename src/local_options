@@ -24,10 +24,12 @@
 #undef NO_SNOOP
 #undef NO_ENVIRONMENT
 #undef NO_WIZARDS
-#define NO_LIGHT
+#undef NO_LIGHT
 #define OLD_ED
 #undef ED_INDENT_CASE
 #define ED_INDENT_SPACES 4
+#undef RECEIVE_ED
+#define RESTRICTED_ED
 #define SENSIBLE_MODIFIERS
 
 /****************************************************************************
@@ -38,8 +40,6 @@
 #define DEFAULT_PRAGMAS PRAGMA_WARNINGS + PRAGMA_SAVE_TYPES + PRAGMA_ERROR_CONTEXT + PRAGMA_OPTIMIZE
 #define SAVE_EXTENSION ".o"
 #undef PRIVS
-#undef RECEIVE_ED
-#define RESTRICTED_ED
 #undef NO_SHADOWS
 #undef USE_ICONV
 #undef IPV6
@@ -57,17 +57,19 @@
 #undef PACKAGE_MATRIX
 #define PACKAGE_MUDLIB_STATS
 #define PACKAGE_SOCKETS
-#define PACKAGE_PARSER
+#undef PACKAGE_PARSER
 #define PACKAGE_EXTERNAL
 #undef PACKAGE_DB
 #ifdef PACKAGE_DB
 #define USE_MYSQL 1
+#undef USE_MSQL
 #undef USE_POSTGRES
 #undef USE_SQLITE3
+#define DEFAULT_DB  USE_MYSQL
 #endif
 #define PACKAGE_ASYNC
 #define PACKAGE_SHA1
-#define PACKAGE_CRYPTO
+#undef PACKAGE_CRYPTO
 #define PACKAGE_TRIM
 #define PACKAGE_PCRE
 #undef PACKAGE_DWLIB
@@ -79,6 +81,5 @@
 #define PACKAGE_COMPRESS
 #define SAVE_GZ_EXTENSION ".o.gz"
 #undef PACKAGE_THREAD
-
 
 #endif /* _LOCAL_OPTIONS_H_ */
