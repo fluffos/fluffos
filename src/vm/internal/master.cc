@@ -139,6 +139,13 @@ void set_master(object_t *ob) {
     }
     set_backbone_uid(ret->u.string);
 #ifdef PACKAGE_MUDLIB_STATS
+    push_constant_string("/");
+    ret = apply_master_ob(APPLY_DOMAIN_FILE, 1);
+    if (ret == 0 || ret->type != T_STRING) {
+      debug_message("%s() in the master file does not work\n",
+                    applies_table[APPLY_DOMAIN_FILE]);
+      exit(-1);
+    }
     set_backbone_domain(ret->u.string);
 #endif
   } else {
