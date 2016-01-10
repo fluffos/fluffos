@@ -6,6 +6,9 @@
  * cause the driver to behave oddly.                                        *
  ****************************************************************************/
 
+#ifndef _LOCAL_OPTIONS_H_ 
+#define _LOCAL_OPTIONS_H_ 
+
 /* NOTES:
  * Many of the configurable options are now set via the configuration file
  *  that is specified as the first argument to the driver.
@@ -54,9 +57,6 @@
  */
 #undef NO_SNOOP
 
-/* NO_ADD_ACTION: define this to remove add_action, commands, livings, etc.
-   process_input() then becomes the only way to deal with player input. */
-
 /* NO_ENVIRONMENT: define this to remove the handling of object containment
  * relationships by the driver
  *
@@ -76,7 +76,7 @@
  */
 #undef NO_WIZARDS
 
- /* NO_LIGHT: define this to disable the set_light() and driver maintenance
+/* NO_LIGHT: define this to disable the set_light() and driver maintenance
  *   of light levels in objects.  You can simulate it via LPC if you want...
  *
  * Compat status: Very dated, easy to simulate, and gross.
@@ -98,15 +98,15 @@
 #define ED_INDENT_SPACES 4
 
 /* RECEIVE_ED: define this if you want normal ed output to go to a
-     receive_ed() apply in the player ob.  Some errors still go directly
-     to output.  Useful for post-processing (perhaps colorizing?) ed
-     output. Prototype:  mixed receive_ed(string txt, string fname);
-     If fname, return a string that ed will output, 0 to let ed handle
-     the output in the default way, or 1 to handle the output yourself.
-     If fname == 0, output is help text and you may return any of the above
-     or an array of strings that will be more'ed.
-     This works wirh OLD_ED enabled only!!!
-*/
+ *   receive_ed() apply in the player ob.  Some errors still go directly
+ *   to output.  Useful for post-processing (perhaps colorizing?) ed
+ *   output. Prototype:  mixed receive_ed(string txt, string fname);
+ *   If fname, return a string that ed will output, 0 to let ed handle
+ *   the output in the default way, or 1 to handle the output yourself.
+ *   If fname == 0, output is help text and you may return any of the above
+ *   or an array of strings that will be more'ed.
+ *   This works wirh OLD_ED enabled only!!!
+ */
 #undef RECEIVE_ED
 
 /* RESTRICTED_ED: define this if you want restricted ed mode enabled.
@@ -234,7 +234,7 @@
  * and the efuns in packages/xyzzy_spec.c will be added to the driver.      *
  ****************************************************************************/
 
-/* base packages, you won't undef these two */
+/* base packages, you don't want to undef these two */
 #define PACKAGE_OPS
 #define PACKAGE_CORE
 
