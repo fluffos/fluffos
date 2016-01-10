@@ -2793,7 +2793,7 @@ void add_predefines() {
   add_quoted_predefine("__CXXFLAGS__", CXXFLAGS);
   add_quoted_predefine("__OPTIMIZATION__", OPTIMIZE);
 
-/* Backwards Compat */
+  /* Backwards Compat */
   add_quoted_predefine("MUD_NAME", CONFIG_STR(__MUD_NAME__));
 #ifdef F_ED
   add_predefine("HAS_ED", -1, "");

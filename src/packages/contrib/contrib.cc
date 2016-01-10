@@ -1611,16 +1611,14 @@ void f_replaceable(void) {
 
   if (st_num_arg == 2) {
     obj = (sp - 1)->u.ob;
-  }
-  else {
+  } else {
     obj = sp->u.ob;
   }
 
   prog = obj->prog;
   if (obj == simul_efun_ob || prog->func_ref) {
     replaceable = 0;
-  }
-  else {
+  } else {
     if (st_num_arg == 2) {
       numignore = sp->u.arr->size;
       if (numignore) {
@@ -1676,20 +1674,20 @@ void f_replaceable(void) {
 
 #ifdef F_PROGRAM_INFO
 struct program_info_s {
-    int h_c,    // how many headers?
-        p_s,    // how big are the compiled programs?
-        ff_c,   // how many functions flags?
-        fd_c,   // how many function definitions?
-        s_c,    // how many strings?
-        v_c,    // how many variables?
-        i_c,    // how many inherits?
-        nc_c,   // how many classes (structs)?
-        mc_c,   // how many class members?
-        t_c,    // how mamy saved types (#pragma save_types)?
-        total;  // how big all together?
+  int h_c,    // how many headers?
+      p_s,    // how big are the compiled programs?
+      ff_c,   // how many functions flags?
+      fd_c,   // how many function definitions?
+      s_c,    // how many strings?
+      v_c,    // how many variables?
+      i_c,    // how many inherits?
+      nc_c,   // how many classes (structs)?
+      mc_c,   // how many class members?
+      t_c,    // how mamy saved types (#pragma save_types)?
+      total;  // how big all together?
 };
 
-inline void sum_program_info(const program_t * const p, program_info_s &info) {
+inline void sum_program_info(const program_t *const p, program_info_s &info) {
   int n;
 
   info.h_c++;
@@ -1706,8 +1704,7 @@ inline void sum_program_info(const program_t * const p, program_info_s &info) {
   info.i_c += p->num_inherited;
   if (p->num_classes) {
     info.nc_c += p->num_classes;
-    info.mc_c += p->classes[p->num_classes - 1].index +
-        p->classes[p->num_classes - 1].size;
+    info.mc_c += p->classes[p->num_classes - 1].index + p->classes[p->num_classes - 1].size;
   }
   info.t_c += p->num_functions_defined;
   n = 0;
@@ -1727,14 +1724,14 @@ inline void sum_program_info(const program_t * const p, program_info_s &info) {
 }
 
 void f_program_info(void) {
-  program_info_s info{ 0 }; // initialize all elements to 0
+  program_info_s info{0};  // initialize all elements to 0
   object_t *ob;
   mapping_t *m;
 
   if (st_num_arg == 1) {
     ob = sp->u.ob;
     if (!(ob->flags & O_CLONE)) {
-        sum_program_info(ob->prog, info);
+      sum_program_info(ob->prog, info);
     }
     pop_stack();
   } else {
@@ -1742,21 +1739,23 @@ void f_program_info(void) {
       if (ob->flags & O_CLONE) {
         continue;
       }
-        sum_program_info(ob->prog, info);
+      sum_program_info(ob->prog, info);
     }
   }
 
   m = allocate_mapping(0);
-  add_mapping_pair(m, "header size",     info.h_c  *  sizeof(program_t));
-  add_mapping_pair(m, "code size",       info.p_s);
-  add_mapping_pair(m, "function size",   info.ff_c *  sizeof(unsigned short) + info.fd_c * sizeof(function_t));
-  add_mapping_pair(m, "string size",     info.s_c  *  sizeof(char *));
-  add_mapping_pair(m, "var size",        info.v_c  * (sizeof(char *) + sizeof(unsigned short)));
-  add_mapping_pair(m, "class size",      info.nc_c *  sizeof(class_def_t) + info.mc_c * sizeof(class_member_entry_t));
-  add_mapping_pair(m, "inherit size",    info.i_c  *  sizeof(inherit_t));
-  add_mapping_pair(m, "saved type size", info.t_c  *  sizeof(short));
+  add_mapping_pair(m, "header size", info.h_c * sizeof(program_t));
+  add_mapping_pair(m, "code size", info.p_s);
+  add_mapping_pair(m, "function size",
+                   info.ff_c * sizeof(unsigned short) + info.fd_c * sizeof(function_t));
+  add_mapping_pair(m, "string size", info.s_c * sizeof(char *));
+  add_mapping_pair(m, "var size", info.v_c * (sizeof(char *) + sizeof(unsigned short)));
+  add_mapping_pair(m, "class size",
+                   info.nc_c * sizeof(class_def_t) + info.mc_c * sizeof(class_member_entry_t));
+  add_mapping_pair(m, "inherit size", info.i_c * sizeof(inherit_t));
+  add_mapping_pair(m, "saved type size", info.t_c * sizeof(short));
 
-  add_mapping_pair(m, "total size",      info.total);
+  add_mapping_pair(m, "total size", info.total);
 
   push_refed_mapping(m);
 }
@@ -2265,7 +2264,6 @@ void event(svalue_t *event_ob, const char *event_fun, int numparam, svalue_t *ev
       }
     }
 #endif
-
   }
   sp--;
   FREE_MSTR(name);
@@ -2416,11 +2414,11 @@ void f_base_name(void) {
 int garbage_check(object_t *ob, void *data) {
   return (ob->ref == 1) && (ob->flags & O_CLONE)
 #if defined NO_ENVIRONMENT && !defined NO_SHADOWS
-      && !ob->shadowing
+         && !ob->shadowing
 #elif !defined NO_ENVIRONMENT && defined NO_SHADOWS
-      && !ob->super
+           && !ob->super
 #elif !defined NO_ENVIRONMENT && !defined NO_SHADOWS
-      && !(ob->super || ob->shadowing)
+           && !(ob->super || ob->shadowing)
 #endif
       ;
 }
