@@ -56,8 +56,9 @@ static inline void fill_lookup_table_recurse(void *table, program_t *prog, uint1
   int i = prog->num_inherited;
   while (i--) {
     auto inherit = prog->inherit[i];
-    fill_lookup_table_recurse(table, inherit.prog, inherit.function_index_offset,
-                              inherit.variable_index_offset);
+    fill_lookup_table_recurse(table, inherit.prog,
+                              fio + inherit.function_index_offset,
+                              vio + inherit.variable_index_offset);
   }
 }
 

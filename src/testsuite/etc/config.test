@@ -338,12 +338,6 @@ enable_commands call init : 0
 #
 sprintf add_justified ignore ANSI colors : 0
 
-# APPLY_CACHE_BITS: defines the number of bits to use in the func lookup cache.
-#
-#   22 bits : (1  << 22) * (3 * 8 + 2 * 2) ~= 112MB.
-#
-apply cache bits : 22
-
 # call_out(0) loop prvention:
 #
 # This is the number of call_out(.., 0) call can be scheduled on the same
