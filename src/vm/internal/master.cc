@@ -142,11 +142,12 @@ void set_master(object_t *ob) {
     push_constant_string("/");
     ret = apply_master_ob(APPLY_DOMAIN_FILE, 1);
     if (ret == 0 || ret->type != T_STRING) {
-      debug_message("%s() in the master file does not work\n",
+      debug_message("%s() in the master file does not work, using bb_uid\n",
                     applies_table[APPLY_DOMAIN_FILE]);
-      exit(-1);
+      set_backbone_domain(backbone_uid->name);
+    } else {
+      set_backbone_domain(ret->u.string);
     }
-    set_backbone_domain(ret->u.string);
 #endif
   } else {
     master_ob->uid = add_uid(ret->u.string);
