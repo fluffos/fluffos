@@ -119,6 +119,8 @@ int yylex(void);
 void init_num_args(void);
 const char *query_instr_name(int);
 char *get_f_name(int);
+void init_include_path(void);
+void deinit_include_path(void);
 void set_inc_list(char *);
 void start_new_file(int);
 void end_new_file(void);
