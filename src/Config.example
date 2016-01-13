@@ -37,6 +37,7 @@ log directory : /log
 
 # the directories which are searched by #include <...>
 # for multiple dirs, separate each path with a ':'
+# see also 'master::get_include_path'
 include directories : /include
 
 # the file which defines the master object
