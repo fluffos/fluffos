@@ -1463,7 +1463,7 @@ static void shift(char *text) {
 
       p = buffer;
 /* fill with leading ws */
-#ifdef USE_TABS
+#ifdef ED_USE_TABS
       while (indent_index >= ED_TAB_WIDTH) {
         *p++ = '\t';
         indent_index -= ED_TAB_WIDTH;
@@ -2891,7 +2891,7 @@ list       will print control characters in p(rint) and z command like in l(ist)
 print      will show current line after a single substitution\n\
 eightbit\n\
 autoindent will preserve current indentation while entering text.\n\
-           use ^D or ^K to get back one step back to the right.\n\
+           use ^D or ^K to get one step back to the right.\n\
 excompatible will exchange the meaning of \\( and ( as well as \\) and )\n\
 dprint     will print out the current line after deleting text.\n\
 \n\

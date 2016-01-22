@@ -97,6 +97,12 @@
 #undef ED_INDENT_CASE
 #define ED_INDENT_SPACES 4
 
+/* use tab's for auto-indent? */
+#undef ED_USE_TABS
+
+/* every which column is a tab stop? */
+#define ED_TAB_WIDTH 8
+
 /* RECEIVE_ED: define this if you want normal ed output to go to a
  *   receive_ed() apply in the player ob.  Some errors still go directly
  *   to output.  Useful for post-processing (perhaps colorizing?) ed
