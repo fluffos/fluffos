@@ -5,20 +5,29 @@
 typeof() - return the type of an expression
 
 .SH SYNOPSIS
-int typeof( mixed var );
+string typeof( mixed var );
 
 .SH DESCRIPTION
 Return the type of an expression.  The return values are given in
-<typeof.h>.  They are:
+<type.h>.  They are:
 
-INT             2
-STRING  	4
-ARRAY   	8
-OBJECT  	16
-MAPPING         32
-FUNCTION        64
-FLOAT           128
-BUFFER          256
+T_INT           "int"
+T_STRING        "string"
+T_ARRAY         "array"
+T_OBJECT        "object"
+T_MAPPING       "mapping"
+T_FUNCTION      "function"
+T_FLOAT         "float"
+T_BUFFER        "buffer"
+T_CLASS         "class"
+
+T_INVALID       "*invalid*"
+T_LVALUE        "*lvalue*"
+T_LVALUE_BYTE   "*lvalue_byte*"
+T_LVALUE_RANGE  "*lvalue_range*"
+T_ERROR_HANDLER "*error_handler*"
+T_FREED         "*freed*"
+T_UNKNOWN       "*unknown*"
 
 .SH SEE ALSO
 allocate(3), allocate_mapping(3), strlen(3)
