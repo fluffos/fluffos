@@ -409,7 +409,7 @@ void telnet_event_handler(telnet_t *telnet, telnet_event_t *ev, void *user_data)
 //
 // NOTE: Some options need to be sent DO first, and some
 // needs WILL, don't change or you will risk breaking clients.
-void send_initial_telent_negotiantions(struct interactive_t *user) {
+void send_initial_telnet_negotiations(struct interactive_t *user) {
   // Default request linemode, save bytes/cpu.
   set_linemode(user, false);
 

@@ -5,7 +5,7 @@
 struct telnet_t *net_telnet_init(struct interactive_t *user);
 
 // Send initial negotiations.
-void send_initial_telent_negotiantions(struct interactive_t *user);
+void send_initial_telnet_negotiations(struct interactive_t *user);
 
 // Change terminal mode
 void set_linemode(struct interactive_t *ip, bool flush = true);
