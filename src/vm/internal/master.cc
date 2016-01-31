@@ -101,19 +101,45 @@ void set_master(object_t *ob) {
 #endif
 
   get_master_applies(ob);
-  master_ob = ob;
+  master_ob = ob; // from here on apply_master_ob returns -1 only as return from the apply
+
   /* Make sure master_ob is never made a dangling pointer. */
   add_ref(master_ob, "set_master");
 #ifndef PACKAGE_UIDS
 #ifdef PACKAGE_MUDLIB_STATS
   if (first_load) {
-    set_backbone_domain("BACKBONE");
-    set_master_author("NONAME");
+      // 'master::domain_file' should return an apropriate "domain" for each
+      // file (directory), as such we should get the backbone domain by
+      // asking for 'master::domain_file("/")'
+    push_constant_string("/");
+    ret = apply_master_ob(APPLY_DOMAIN_FILE, 1);
+    if (ret == 0 || ret->type != T_STRING) {
+        // we didn't got the expected value?
+        // emit warning and fall back to old behavior
+      debug_message("%s() in the master file does not work, using 'BACKBONE'\n",
+                    applies_table[APPLY_DOMAIN_FILE]);
+      set_backbone_domain("BACKBONE");
+    } else {
+      set_backbone_domain(ret->u.string);
+    }
+      // 'master::author_file' should return an apropriate "author" for each
+      // file (directory), as such we should get the master author by
+      // asking for 'master::author_file(__MASTER_FILE__)'
+    push_malloced_string(add_slash(CONFIG_STR(__MASTER_FILE__)));
+    ret = apply_master_ob(APPLY_AUTHOR_FILE, 1);
+    if (ret == 0 || ret->type != T_STRING) {
+        // we didn't got the expected value?
+        // emit warning and fall back to old behavior
+      debug_message("%s() in the master file does not work, using 'NONAME'\n",
+                    applies_table[APPLY_AUTHOR_FILE]);
+      set_master_author("NONAME");
+    } else {
+      set_master_author(ret->u.string);
+    }
   }
 #endif
 #else
   ret = apply_master_ob(APPLY_GET_ROOT_UID, 0);
-  /* can't be -1 or we wouldn't be here */
   if (!ret) {
     debug_message(
         "No function %s() in master object; possibly the mudlib doesn't want "
@@ -129,7 +155,20 @@ void set_master(object_t *ob) {
     master_ob->uid = set_root_uid(ret->u.string);
     master_ob->euid = master_ob->uid;
 #ifdef PACKAGE_MUDLIB_STATS
-    set_master_author(ret->u.string);
+      // 'master::author_file' should return an apropriate "author" for each
+      // file (directory), as such we should get the master author by
+      // asking for 'master::author_file(__MASTER_FILE__)'
+    push_malloced_string(add_slash(CONFIG_STR(__MASTER_FILE__)));
+    ret = apply_master_ob(APPLY_AUTHOR_FILE, 1);
+    if (ret == 0 || ret->type != T_STRING) {
+        // we didn't got the expected value?
+        // emit warning and fall back to old behavior
+      debug_message("%s() in the master file does not work, using root_uid\n",
+                    applies_table[APPLY_AUTHOR_FILE]);
+      set_master_author(master_ob->uid->name);
+    } else {
+      set_master_author(ret->u.string);
+    }
 #endif
     ret = apply_master_ob(APPLY_GET_BACKBONE_UID, 0);
     if (ret == 0 || ret->type != T_STRING) {
@@ -139,7 +178,20 @@ void set_master(object_t *ob) {
     }
     set_backbone_uid(ret->u.string);
 #ifdef PACKAGE_MUDLIB_STATS
-    set_backbone_domain(ret->u.string);
+      // 'master::domain_file' should return an apropriate "domain" for each
+      // file (directory), as such we should get the backbone domain by
+      // asking for 'master::domain_file("/")'
+    push_constant_string("/");
+    ret = apply_master_ob(APPLY_DOMAIN_FILE, 1);
+    if (ret == 0 || ret->type != T_STRING) {
+        // we didn't got the expected value?
+        // emit warning and fall back to old behavior
+      debug_message("%s() in the master file does not work, using bb_uid\n",
+                    applies_table[APPLY_DOMAIN_FILE]);
+      set_backbone_domain(backbone_uid->name);
+    } else {
+      set_backbone_domain(ret->u.string);
+    }
 #endif
   } else {
     master_ob->uid = add_uid(ret->u.string);
