@@ -267,7 +267,7 @@ void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
   query_name_by_addr(ob);
 
   if (user->connection_type == PORT_TELNET) {
-    send_initial_telent_negotiantions(user);
+    send_initial_telnet_negotiations(user);
   }
 
   set_command_giver(ob);
@@ -1612,7 +1612,7 @@ void f_websocket_handshake_done() {
   }
   auto ip = current_interactive->interactive;
   ip->iflags |= HANDSHAKE_COMPLETE;
-  send_initial_telent_negotiantions(ip);
+  send_initial_telnet_negotiations(ip);
 }
 #endif
 
