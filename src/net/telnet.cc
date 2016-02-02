@@ -293,7 +293,7 @@ static inline void on_telnet_subnegotiation(unsigned char cmd, const char *buf, 
       char *str = new_string(size, "telnet suboption");
       str[size] = '\0';
       for (int i = 0; i < size; i++) {
-        str[i] = (buf[i] ? buf[1] : 'I');
+        str[i] = (buf[i] ? buf[i] : 'I');
       }
       push_malloced_string(str);
       safe_apply(APPLY_TELNET_SUBOPTION, ip->ob, 1, ORIGIN_DRIVER);
