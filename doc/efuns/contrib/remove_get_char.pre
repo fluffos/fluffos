@@ -1,7 +1,7 @@
 int remove_get_char(object);
 
 cancels active input_to
-set's interactive->ce#arryover = NULL
+set's interactive->carryover = NULL
 set's interactive->num_carry = 0
 
 returns -3 if argument missing

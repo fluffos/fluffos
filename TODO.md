@@ -11,7 +11,7 @@
 - expand docs for efun:implode (missing three arg form)
 - missing docs for efun::defer
 
-## packages/contrib/ckntrib.cc ##
+## packages/contrib/contrib.cc ##
 network\_stats
 - make maximum number of ports configurable?
   - if yes look for possible buffer overflows!!!
