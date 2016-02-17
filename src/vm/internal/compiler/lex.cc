@@ -187,7 +187,10 @@ static keyword_t reswords[] = {
 #endif
     {"return", L_RETURN, 0},
     {"sscanf", L_SSCANF, 0},
-#ifndef SENSIBLE_MODIFIERS
+#ifdef SENSIBLE_MODIFIERS
+    // keep old mudlib compatible
+    {"static", L_TYPE_MODIFIER, 0},
+#else
     {"static", L_TYPE_MODIFIER, DECL_NOSAVE | DECL_PROTECTED},
 #endif
     {"string", L_BASIC_TYPE, TYPE_STRING},

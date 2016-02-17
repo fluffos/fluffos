@@ -9,7 +9,6 @@
 
 #include "vm/internal/eval.h"
 
-static timer_t eval_timer_id;
 /*
  * SIGALRM handler.
  */
@@ -18,6 +17,27 @@ void sigalrm_handler(int sig, siginfo_t *si, void *uc) {
     outoftime = 1;
   }
 } /* sigalrm_handler() */
+
+#ifdef __MACH__
+
+// Notice missing: tiemr_create(), timer_settime(), timer_gettime(),
+// TMR option group of the POSIX API, not implemented in Mac OS X
+// see: http://www.lists.apple.com/archives/unix-porting/2009/May/msg00004.html
+
+void init_posix_timers(void) {
+}
+
+void posix_eval_timer_set(uint64_t micros) {
+}
+
+uint64_t posix_eval_timer_get(void) {
+  return 100;
+}
+
+#else
+
+static timer_t eval_timer_id;
+
 /* Called by main() to initialize all timers (currently only eval_cost) */
 void init_posix_timers(void) {
   struct sigevent sev;
@@ -80,3 +100,5 @@ uint64_t posix_eval_timer_get(void) {
 
   return it.it_value.tv_sec * static_cast<uint64_t>(1000000) + it.it_value.tv_nsec / 1000;
 }
+
+#endif
