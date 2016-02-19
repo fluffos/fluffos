@@ -1,0 +1,12 @@
+language: cpp
+compiler:
+  - clang
+  - gcc
+os:
+  - linux
+before_install:
+  - libtoolize
+  - aclocal
+  - autoheader
+  - automake --add-missing
+  - autoconf
