@@ -59,7 +59,11 @@ void print_version_and_time() {
   {
     const char *ver;
     size_t resultlen = sizeof(ver);
+#ifdef __MACH__
+    je_mallctl("version", &ver, &resultlen, NULL, 0);
+#else
     mallctl("version", &ver, &resultlen, NULL, 0);
+#endif
     std::cout << "Jemalloc Version: " << ver << std::endl;
   }
 #endif

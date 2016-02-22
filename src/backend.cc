@@ -153,10 +153,17 @@ void on_walltime_event(int fd, short what, void *arg) {
 tick_event *add_walltime_event(std::chrono::milliseconds delay_msecs,
                                tick_event::callback_type callback) {
   auto event = new tick_event(callback);
+#ifdef __MACH__
+  struct timeval val {
+    static_cast<__darwin_time_t>(delay_msecs.count() / 1000),
+    static_cast<__darwin_suseconds_t>(delay_msecs.count() % 1000 * 1000),
+  };
+#else
   struct timeval val {
     static_cast<time_t>(delay_msecs.count() / 1000),
         static_cast<time_t>(delay_msecs.count() % 1000 * 1000),
   };
+#endif
   struct timeval *delay_ptr = nullptr;
   if (delay_msecs.count() != 0) {
     delay_ptr = &val;
