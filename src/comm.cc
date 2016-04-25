@@ -615,12 +615,11 @@ void get_user_data(interactive_t *ip) {
           ip->text_end -= ip->text_start;
           ip->text_start = 0;
         }
-        if (text_space < MAX_TEXT / 16)
-    		{
-    			ip->iflags |= SKIP_COMMAND;
-    			ip->text_start = ip->text_end = 0;
-    			text_space = MAX_TEXT;
-    		}
+        if (text_space < MAX_TEXT / 16){
+          ip->iflags |= SKIP_COMMAND;
+          ip->text_start = ip->text_end = 0;
+          text_space = MAX_TEXT;
+        }
         
       }
       break;
