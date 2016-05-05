@@ -847,17 +847,9 @@ static int skip_to(const char *token, const char *atoken) {
 }
 
 void init_include_path() {
-  svalue_t *ret;
-  array_t *arr;
-  const char *elem;
-  char * *path;
-  int size;
-  int i,                    // index into returned array
-      j,                    // index into dynamic path array
-      k;                    // index into static path array
-
   push_malloced_string(add_slash(current_file));        // does master has an include path?
-  ret = apply_master_ob(APPLY_GET_INCLUDE_PATH, 1);
+  svalue_t *ret = apply_master_ob(APPLY_GET_INCLUDE_PATH, 1);
+
   if (!ret || ret == (svalue_t *)-1) {                  // either no or no master yet
       return;                                           // just use the runtime configuration
   }
@@ -865,21 +857,26 @@ void init_include_path() {
       debug_message("'master::get_include_path' must return 'string *'\n");
       return;                                           // we still have the runtime configuration
   }
-  arr  = ret->u.arr;
-  size = arr->size;
+  array_t *arr  = ret->u.arr;
+  int size = arr->size;
 
   if(!size) {                                           // empty path?
       debug_message("got empty include path for 'master::get_include_path(%s)'\n", current_file);
       return;                                           // we still have the runtime configuration
   }
-  path = static_cast<char **>(DMALLOC(sizeof(char*) * size, TAG_COMPILER, "compiler:init_include_path"));
+  char **path = static_cast<char **>(DMALLOC(sizeof(char*) * size, TAG_COMPILER, "compiler:init_include_path"));
 
   // check elements and build working copy
+  int i,                    // index into returned array
+      j,                    // index into dynamic path array
+      k;                    // index into static path array
   for (i = j = 0; i < arr->size;) {                     // can't use size since it might change
     if (arr->item[i].type != T_STRING) {                // wrong type of element
       debug_message("'master::get_include_path(%s)' must return 'string *'\n", current_file);
       goto init_include_path_cleanup;                   // clean exit
     }
+
+    const char *elem;
     if(!strcmp(elem = arr->item[i].u.string, ":DEFAULT:")) { // replace with runtime configuration
       size += inc_list_size - 1;                        // get additional space
       path = static_cast<char **>(DREALLOC(path, sizeof(char *) * size, TAG_COMPILER, "compiler:init_include_path"));
