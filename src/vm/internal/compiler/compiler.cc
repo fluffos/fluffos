@@ -2607,6 +2607,8 @@ static void prolog(int f, char *name) {
   current_file = make_shared_string(name);
   current_file_id = add_program_file(name, 1);
 
+  init_include_path();
+
   /*
    * if we've got a simul_efun object and we're not reloading it, make a copy
    * of its class definitions in the object we're compiling now.
@@ -2626,6 +2628,7 @@ static void clean_parser() {
   function_t *funp;
   compiler_temp_t *fundefp, *nextdefp;
 
+  deinit_include_path();
   /*
    * Free function stuff.
    */
