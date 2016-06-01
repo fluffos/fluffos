@@ -283,7 +283,7 @@ void read_config(char *filename) {
                 port, port, tmp);
       }
     }
-    for (i = port_start; i < 5; i++) {
+    for (i = port_start; i < 5; i++) {  // attention: maximum portnr also in vm/internal/compiler/lex.cc for predefine __PORT_CONFIG__
       external_port[i].kind = 0;
       external_port[i].fd = -1;
 
