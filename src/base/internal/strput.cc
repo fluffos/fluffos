@@ -16,6 +16,6 @@ char *strput(char *x, const char *limit, const char *y) {
 
 char *strput_int(char *x, const char *limit, int num) {
   char buf[20];
-  sprintf(buf, "%d", num);
+  snprintf(buf, 20, "%d", num);
   return strput(x, limit, buf);
 }
