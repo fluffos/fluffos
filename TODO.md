@@ -4,6 +4,11 @@
   possible overflow in strcat(buf, ".c") change to strncat!!!
   search complete source for other occurances
 
+## base/internal/rc.cc
+- rewrite!
+  possible buffer overflows while parsing overlong config options of type
+  string
+
 # Have Time #
 ## documentation ##
 - complete docs/efun/contrib [packages/contrib]
