@@ -20,4 +20,7 @@
 char *strput(char *, const char *, const char *);
 char *strput_int(char *, const char *, int);
 
+/* The end of a static buffer */
+#define EndOf(x) (x + sizeof(x) / sizeof(x[0]))
+
 #endif /* SRC_BASE_STRPUT_H_ */
