@@ -259,7 +259,6 @@ static void refill_buffer(void);
 static int exgetc(void);
 static int old_func(void);
 static ident_hash_elem_t *quick_alloc_ident_entry(void);
-static void yyerrorp(const char * /*s*/);
 
 #define LEXER
 
@@ -399,7 +398,7 @@ static void handle_elif()
       skip_to("endif", (char *)0);
     }
   } else {
-    yyerrorp("Unexpected %celif");
+    lexerror("Unexpected #elif");
   }
 }
 
@@ -411,7 +410,7 @@ static void handle_else(void) {
       skip_to("endif", (char *)0);
     }
   } else {
-    yyerrorp("Unexpected %cendif");
+    lexerror("Unexpected #endif");
   }
 }
 
@@ -422,7 +421,7 @@ static void handle_endif(void) {
     iftop = p->next;
     FREE((char *)p);
   } else {
-    yyerrorp("Unexpected %cendif");
+    lexerror("Unexpected #endif");
   }
 }
 
@@ -490,12 +489,12 @@ static LPC_INT cond_get_exp(int priority) {
     }
 #else
     if ((c = exgetc()) != ')') {
-      yyerrorp("bracket not paired in %cif");
+      lexerror("bracket not paired in #if");
     }
 #endif
   } else if (ispunct(c)) {
     if (!(x = optab1[c])) {
-      yyerrorp("illegal character in %cif");
+      lexerror("illegal character in #if");
       return 0;
     }
     value = cond_get_exp(12);
@@ -513,7 +512,7 @@ static LPC_INT cond_get_exp(int priority) {
         // nothing
         break;
       default:
-        yyerrorp("illegal unary operator in %cif");
+        lexerror("illegal unary operator in #if");
     }
   } else {
     int base;
@@ -524,9 +523,9 @@ static LPC_INT cond_get_exp(int priority) {
 #else
       if (c == '\n') {
 #endif
-        yyerrorp("missing expression in %cif");
+        lexerror("missing expression in #if");
       } else {
-        yyerrorp("illegal character in %cif");
+        lexerror("illegal character in #if");
       }
       return 0;
     }
@@ -582,7 +581,7 @@ static LPC_INT cond_get_exp(int priority) {
       if (!optab2[x]) {
         outp--;
         if (!optab2[x + 1]) {
-          yyerrorp("illegal operator use in %cif");
+          lexerror("illegal operator use in #if");
           return 0;
         }
         break;
@@ -606,14 +605,14 @@ static LPC_INT cond_get_exp(int priority) {
         if (value2) {
           value /= value2;
         } else {
-          yyerrorp("division by 0 in %cif");
+          lexerror("division by 0 in #if");
         }
         break;
       case MOD:
         if (value2) {
           value %= value2;
         } else {
-          yyerrorp("modulo by 0 in %cif");
+          lexerror("modulo by 0 in #if");
         }
         break;
       case BPLUS:
@@ -673,7 +672,7 @@ static LPC_INT cond_get_exp(int priority) {
         }
 #else
         if ((c = exgetc()) != ':') {
-          yyerrorp("'?' without ':' in %cif");
+          lexerror("'?' without ':' in #if");
         }
 #endif
         if (value) {
@@ -771,13 +770,6 @@ static void merge(char *name, char *dest) {
       }
     }
   }
-}
-
-static void yyerrorp(const char *s) {
-  char buf[200];
-  sprintf(buf, s, '#');
-  yyerror(buf);
-  lex_fatal++;
 }
 
 static void lexerror(const char *s) {
