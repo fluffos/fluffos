@@ -7,6 +7,7 @@
  * Aug 29, 1998: modified by Gorta
  */
 
+#include "base/internal/strput.h"
 #include "base/internal/rc.h"
 
 #include <cstring>  // for strlen
@@ -189,6 +190,9 @@ void read_config(char *filename) {
   buffer << f.rdbuf();
 
   char tmp[kMaxConfigLineLength];
+  char *eot = EndOf(tmp);
+  char *p;
+
   while (buffer.getline(&tmp[0], sizeof(tmp), '\n')) {
     if (strlen(tmp) == kMaxConfigLineLength - 1) {
       fprintf(stderr, "*Warning: possible truncated config line: %s", tmp);
@@ -252,7 +256,7 @@ void read_config(char *filename) {
   {
     scan_config_line("default fail message : %[^\n]", tmp, 0);
     if (strlen(tmp) == 0) {
-      strcpy(tmp, "What?\n");
+      p = strput(tmp, eot, "What?\n");
     }
     if (strlen(tmp) <= kMaxConfigLineLength - 2) {
       strcat(tmp, "\n");
@@ -288,7 +292,7 @@ void read_config(char *filename) {
       external_port[i].fd = -1;
 
       char kind[kMaxConfigLineLength];
-      sprintf(kind, "external_port_%i : %%[^\n]", i + 1);
+      snprintf(kind, kMaxConfigLineLength, "external_port_%i : %%[^\n]", i + 1);
       if (scan_config_line(kind, tmp, 0)) {
         if (sscanf(tmp, "%s %d", kind, &port) == 2) {
           external_port[i].port = port;
@@ -323,7 +327,7 @@ void read_config(char *filename) {
     char kind[kMaxConfigLineLength];
 
     for (int i = 0; i < g_num_external_cmds; i++) {
-      sprintf(kind, "external_cmd_%i : %%[^\n]", i + 1);
+      snprintf(kind, kMaxConfigLineLength, "external_cmd_%i : %%[^\n]", i + 1);
       if (scan_config_line(kind, tmp, 0)) {
         external_cmd[i] = alloc_cstring(tmp, "external cmd");
       } else {
@@ -353,7 +357,7 @@ void read_config(char *filename) {
 
     int value = 0;
     char buf[256];
-    sprintf(buf, "%s : %%d\n", kDefaultFlags[i].key.c_str());
+    snprintf(buf, 256, "%s : %%d\n", kDefaultFlags[i].key.c_str());
 
     if (scan_config_line(buf, &value, kOptional)) {
       if (value != kDefaultFlags[i].defaultValue) {

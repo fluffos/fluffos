@@ -4,7 +4,7 @@
 
 #include <cstdio>
 
-char *strput(char *x, char *limit, const char *y) {
+char *strput(char *x, const char *limit, const char *y) {
   while ((*x++ = *y++)) {
     if (x == limit) {
       *(x - 1) = 0;
@@ -14,8 +14,8 @@ char *strput(char *x, char *limit, const char *y) {
   return x - 1;
 }
 
-char *strput_int(char *x, char *limit, int num) {
+char *strput_int(char *x, const char *limit, int num) {
   char buf[20];
-  sprintf(buf, "%d", num);
+  snprintf(buf, 20, "%d", num);
   return strput(x, limit, buf);
 }
