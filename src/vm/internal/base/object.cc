@@ -1252,7 +1252,6 @@ void restore_object_from_line(object_t *ob, char *line, int noclear) {
   char *space;
   svalue_t *v;
   char var[100];
-  char *eov = EndOf(var);
   int idx;
   svalue_t *sv = ob->variables;
   int rc;
@@ -1265,7 +1264,8 @@ void restore_object_from_line(object_t *ob, char *line, int noclear) {
   if (!space || ((space - line) >= sizeof(var))) {
     error("restore_object(): Illegal file format - 1 (%s).\n", line);
   }
-  strput(var, eov, line);
+  (void)strncpy(var, line, space - line);
+  var[space - line] = '\0';
   idx = find_global_variable(current_object->prog, var, &t, 1);
   if (idx == -1) {
     push_number(0);
