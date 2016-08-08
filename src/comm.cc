@@ -1020,9 +1020,8 @@ static void process_input(interactive_t *ip, char *user_command) {
 #ifndef NO_ADD_ACTION
   if (ret->type == T_STRING) {
     static char buf[MAX_TEXT];
-    static const char *eob = EndOf(buf);
 
-    (void)strput(buf, eob, ret->u.string);
+    strncpy(buf, ret->u.string, MAX_TEXT - 1);
     parse_command(buf, command_giver);
   } else {
     if (ret->type != T_NUMBER || !ret->u.number) {
@@ -1625,7 +1624,6 @@ void f_websocket_handshake_done() {
 
 const char *sockaddr_to_string(const sockaddr *addr, socklen_t len) {
   static char result[NI_MAXHOST + NI_MAXSERV];
-  static const char *eor = EndOf(result);
 
   char host[NI_MAXHOST], service[NI_MAXSERV];
   int ret = getnameinfo(addr, len, host, sizeof(host), service, sizeof(service),
@@ -1633,7 +1631,7 @@ const char *sockaddr_to_string(const sockaddr *addr, socklen_t len) {
 
   if (ret) {
     debug(sockets, "sockaddr_to_string fail: %s.\n", evutil_gai_strerror(ret));
-    (void)strput(result, eor, "<invalid address>");
+    strcpy(result, "<invalid address>");
     return result;
   }
 

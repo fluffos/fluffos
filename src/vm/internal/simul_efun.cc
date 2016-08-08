@@ -64,7 +64,7 @@ void init_simul_efun(const char *file) {
     error("Illegal simul_efun file name '%s'\n", file);
   }
 
-  if ((strlen(buf) < 509) && (file[strlen(file) - 2] != '.')) {
+  if (file[strlen(file) - 2] != '.') {
     strcat(buf, ".c");
   }
 

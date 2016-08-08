@@ -472,7 +472,7 @@ static int restore_interior_string(char **val, svalue_t *sv) {
           *news = '\0';
           *val = cp;
           newstr = new_string(len = (news - start), "restore_string");
-          strput(newstr, &(newstr[len-1]), start);
+          strcpy(newstr, start);
           sv->u.string = newstr;
           sv->type = T_STRING;
           sv->subtype = STRING_MALLOC;
@@ -492,7 +492,7 @@ static int restore_interior_string(char **val, svalue_t *sv) {
   *--cp = '\0';
   len = cp - start;
   newstr = new_string(len, "restore_string");
-  strput(newstr, &(newstr[len-1]), start);
+  strcpy(newstr, start);
   sv->u.string = newstr;
   sv->type = T_STRING;
   sv->subtype = STRING_MALLOC;
@@ -1066,8 +1066,8 @@ static int restore_string(char *val, svalue_t *sv) {
             return ROB_STRING_ERROR;
           }
           *news = '\0';
-          newstr = new_string(len = news - start, "restore_string");
-          strput(newstr, &(newstr[len-1]), start);
+          newstr = new_string(news - start, "restore_string");
+          strcpy(newstr, start);
           sv->u.string = newstr;
           sv->type = T_STRING;
           sv->subtype = STRING_MALLOC;
@@ -1087,7 +1087,7 @@ static int restore_string(char *val, svalue_t *sv) {
   *cp = '\0';
   len = cp - start;
   newstr = new_string(len, "restore_string");
-  strput(newstr, &(newstr[len-1]), start);
+  strcpy(newstr, start);
   sv->u.string = newstr;
   sv->type = T_STRING;
   sv->subtype = STRING_MALLOC;
@@ -1252,7 +1252,6 @@ void restore_object_from_line(object_t *ob, char *line, int noclear) {
   char *space;
   svalue_t *v;
   char var[100];
-  char *eov = EndOf(var);
   int idx;
   svalue_t *sv = ob->variables;
   int rc;
@@ -1265,7 +1264,8 @@ void restore_object_from_line(object_t *ob, char *line, int noclear) {
   if (!space || ((space - line) >= sizeof(var))) {
     error("restore_object(): Illegal file format - 1 (%s).\n", line);
   }
-  strput(var, eov, line);
+  (void)strncpy(var, line, space - line);
+  var[space - line] = '\0';
   idx = find_global_variable(current_object->prog, var, &t, 1);
   if (idx == -1) {
     push_number(0);
@@ -1447,14 +1447,9 @@ int sel = -1;
 
 static const int SAVE_EXTENSION_GZ_LENGTH = strlen(SAVE_GZ_EXTENSION);
 
-#define SAVE_NAME_SIZE  256
 int save_object(object_t *ob, const char *file, int save_zeros) {
   char *name, *p;
-  static char save_name[SAVE_NAME_SIZE], tmp_name[SAVE_NAME_SIZE];
-  static char *eosn = EndOf(save_name);
-  static char *eotn = EndOf(tmp_name);
-  char *ps, *pt;
-
+  static char save_name[256], tmp_name[256];
   int len;
   FILE *f;
   int success;
@@ -1488,18 +1483,12 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
 
   if (save_compressed) {
     name = new_string(len + SAVE_EXTENSION_GZ_LENGTH, "save_object");
-    char *eon = &(name[len + SAVE_EXTENSION_GZ_LENGTH - 1]);
-    char *p;
-
-    p = strput(name, eon, file);
-    strput(p, eon, SAVE_GZ_EXTENSION);
+    strcpy(name, file);
+    strcpy(name + len, SAVE_GZ_EXTENSION);
   } else {
     name = new_string(len + sel, "save_object");
-    char *eon = &(name[len + sel - 1]);
-    char *p;
-
-    p = strput(name, eon, file);
-    strput(p, eon, SAVE_EXTENSION);
+    strcpy(name, file);
+    strcpy(name + len, SAVE_EXTENSION);
   }
 
   push_malloced_string(name); /* errors */
@@ -1510,19 +1499,20 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
     error("Denied write permission in save_object().\n");
   }
 
-  ps = strput(save_name, eosn, ob->obname);
+  strcpy(save_name, ob->obname);
   if ((p = strrchr(save_name, '#')) != 0) {
-    *(ps = p) = '\0';
+    *p = '\0';
   }
-  if (*(ps - 1) != 'c' && *(ps - 2) != '.') {
-    ps = strput(ps, eosn, ".c");
+  p = save_name + strlen(save_name) - 1;
+  if (*p != 'c' && *(p - 1) != '.') {
+    strcat(p, ".c");
   }
 
   /*
    * Write the save-files to different directories, just in case
    * they are on different file systems.
    */
-  snprintf(tmp_name, SAVE_NAME_SIZE, "%.250s.tmp", file);
+  sprintf(tmp_name, "%.250s.tmp", file);
 
   gzf = NULL;
   f = NULL;
@@ -1564,12 +1554,10 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
       std::remove(tmp_name);
     } else if (save_compressed) {
       char buf[1024];
-      char *eob = EndOf(buf);
-      char *p;
       // When compressed, unlink the uncompressed name too.
-      p = strput(buf, eob, file);
-      p -= SAVE_EXTENSION_GZ_LENGTH;
-      strput(p, eob, SAVE_EXTENSION);
+      strcpy(buf, file);
+      len = strlen(buf) - SAVE_EXTENSION_GZ_LENGTH;
+      strcpy(buf + len, SAVE_EXTENSION);
       std::remove(buf);
     }
   }
