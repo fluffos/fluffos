@@ -409,9 +409,6 @@ object_t *load_object(const char *lname, int callcreate) {
   svalue_t *mret;
   struct stat c_st;
   char real_name[400], name[400], actualname[400], obname[400];
-  char *eorn = EndOf(real_name);
-  char *eoon = EndOf(obname);
-  char  *p;
 
   const char *pname = check_valid_path(lname, master_ob, "load_object", 0);
   if (!pname) {
@@ -438,11 +435,11 @@ object_t *load_object(const char *lname, int callcreate) {
   /*
    * First check that the c-file exists.
    */
-  p = strput(real_name, eorn, actualname);
-  (void)strput(p, eorn, ".c");
+  (void)strcpy(real_name, actualname);
+  (void)strcat(real_name, ".c");
 
-  p = strput(obname, eoon, name);
-  (void)strput(p, eoon, ".c");
+  (void)strcpy(obname, name);
+  (void)strcat(obname, ".c");
 
   if (stat(real_name, &c_st) == -1 || S_ISDIR(c_st.st_mode)) {
     save_command_giver(command_giver);

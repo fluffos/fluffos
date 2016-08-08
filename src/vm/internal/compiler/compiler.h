@@ -5,6 +5,9 @@
 #include "vm/internal/base/program.h"   // for DECL_MODS etc
 #include "vm/internal/compiler/trees.h"
 
+/* The end of a static buffer */
+#define EndOf(x) (x + sizeof(x) / sizeof(x[0]))
+
 #define _YACC_
 
 #define YYMAXDEPTH 600
