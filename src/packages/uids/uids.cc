@@ -108,22 +108,11 @@ userid_t *backbone_uid = nullptr;
 userid_t *root_uid = nullptr;
 
 #ifdef DEBUGMALLOC_EXTENSIONS
-static void mark_uid_tree(tree *tr) {
-  DO_MARK(tr, TAG_UID);
-  DO_MARK(tr->tree_p, TAG_UID);
-
-  EXTRA_REF(BLOCK(((userid_t *)tr->tree_p)->name))++;
-  if (tr->tree_l) {
-    mark_uid_tree(tr->tree_l);
-  }
-  if (tr->tree_r) {
-    mark_uid_tree(tr->tree_r);
-  }
-}
-
-void mark_all_uid_nodes() {
-  if (uids) {
-    mark_uid_tree(uids);
+void mark_all_uid_nodes() 
+{
+  for(auto i : uids)
+  {
+      ++EXTRA_REF(BLOCK(i->name);
   }
 }
 #endif
