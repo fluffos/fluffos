@@ -174,6 +174,9 @@ static inline void on_telnet_do(unsigned char cmd, interactive_t *ip) {
       ip->iflags |= USING_ZMP;
       // real event is triggered in on_telnet_event;
       break;
+    case TELNET_TELOPT_COMPRESS2:
+      telnet_begin_compress2(ip->telnet);
+      break;
     default:
       debug(telnet, "on_telnet_do: unimplemented code: %d.\n", cmd);
       telnet_negotiate(ip->telnet, cmd, TELNET_WONT);
