@@ -922,7 +922,10 @@ void check_all_blocks(int flag) {
                         entry->tag);
             break;
           case TAG_UID:
+              // not sure this is still relevant with the change in data structure
+              /*
             outbuf_addv(&out, "WARNING: Found orphan uid node: %s %04x\n", entry->desc, entry->tag);
+            */
             break;
           case TAG_SENTENCE:
             sent = NODET_TO_PTR(entry, sentence_t *);
