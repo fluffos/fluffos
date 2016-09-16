@@ -119,22 +119,22 @@ void mark_all_uid_nodes()
 
 userid_t *add_uid(const char *name) 
 {
-  userid_t *uid, t_uid;
+  userid_t *uid = nullptr;
+  userid_t t_uid;
 
   t_uid.name = make_shared_string(name);
   auto i = uids.find(&t_uid);
   if (i != uids.end())
   {
 	  free_string(t_uid.name);
-	  return *i;
   }
   else
   {
 	  uid = reinterpret_cast<userid_t *>(DMALLOC(sizeof(userid_t), TAG_UID, "add_uid"));
 	  uid->name = t_uid.name;
 	  uids.insert(uid);
-	  return uid;
   }
+  return uid;
 }
 
 userid_t *set_root_uid(const char *name) 
