@@ -112,7 +112,7 @@ void mark_all_uid_nodes()
 {
   for(auto i : uids)
   {
-      ++EXTRA_REF(BLOCK(i->name);
+      ++EXTRA_REF(BLOCK(i->name));
   }
 }
 #endif
