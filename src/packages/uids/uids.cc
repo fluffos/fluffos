@@ -119,7 +119,7 @@ void mark_all_uid_nodes()
 
 userid_t *add_uid(const char *name) 
 {
-  userid_t *uid = nullptr;
+  userid_t *uid;
   userid_t t_uid;
 
   t_uid.name = make_shared_string(name);
