@@ -44,7 +44,7 @@ void ObjectTable::insert(struct object_t * ob) {
             DEBUG_CHECK1(s && s != ob,
 				"Duplicate object \"/%s\" in object hash table",
 				ob->obname);
-            objects_.remove(i);
+            objects_.erase(i);
         }
 #endif
         objects_.insert( std::make_pair(ob->obname,ob) );
