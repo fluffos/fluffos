@@ -8,6 +8,10 @@
 #include <cassert>
 #include <cstdio>
 
+#ifdef SILENUS_DEBUG
+#include <iostream>
+#endif
+
 /*
  * Object name hash table.  Object names are unique, so no special
  * problems - like stralloc.c.  For non-unique hashed names, we need
@@ -33,7 +37,7 @@ ObjectTable* ObjectTable::getInstance() { return instance_; }
  * guaranteed to be behind the real entry if a real entry exists.
  */
 
-void ObjectTable::insert(struct object_t * ob) {
+bool ObjectTable::insert(struct object_t * ob) {
         
 #ifdef DEBUG
         auto i = objects_.find(ob->obname);
@@ -59,7 +63,7 @@ void ObjectTable::insert(struct object_t * ob) {
         {
 			children_.insert( std::make_pair(base,std::list<decltype(ob)>{ob} ) );
         }
-	return;
+	return true;
 }
 
 /*
@@ -68,13 +72,17 @@ void ObjectTable::insert(struct object_t * ob) {
  */
 
 //need to check for exceptions.
-void ObjectTable::remove(struct object_t * ob) 
+bool ObjectTable::remove(struct object_t * ob) 
 {
         auto i = objects_.find(ob->obname);
         searches_++;
         if( i == objects_.end() )
         {
+#ifndef SILENUS_DEBUG
             fatal("couldn't find object %s in obj_table", ob->obname);
+#else
+            return false;
+#endif
         }
         else
         {
@@ -87,7 +95,11 @@ void ObjectTable::remove(struct object_t * ob)
             
             if( k == (j->second).end() )
             {
+#ifndef SILENUS_DEBUG
                 fatal("object not found in children list");
+#else
+                return false;
+#endif
             }
             else
             {
@@ -114,10 +126,13 @@ object_t *ObjectTable::find(const char * s)
         return nullptr;
 }
 
+#ifndef SILENUS_DEBUG 
 array_t *ObjectTable::children(const char * s) 
 {
-    
+  
         auto max_array_size = CONFIG_INT( __MAX_ARRAY_SIZE__ );
+        auto max_array_size = 1024;
+
 	auto base = basename(s);
 	auto i = children_.find(base);
 	assert(i != children_.end()); // at least one entry should exist
@@ -134,7 +149,7 @@ array_t *ObjectTable::children(const char * s)
 	ret = resize_array(ret, k);
 	return ret;
 }
-
+#endif
 
 /*
  * Print stats, returns the total size of the object table.  All objects
@@ -155,8 +170,11 @@ int ObjectTable::show_otable_status(outbuffer_t * out, int verbose) {
 		ss << "Average hash chain length:       " << objects_.size() / (float)objects_.max_size() << std::endl;
 		ss << "Internal lookups (succeeded):    " << searches_ - userLookups_ << "(" << found_ - userFound_ << ")" << std::endl;
 		ss << "External lookups(succeeded) :    " << userLookups_ << "(" << userFound_ << ")" << std::endl;
-
+#ifndef SILENUS_DEBUG
 		outbuf_addv( out, ss.str().c_str() );
+#else
+                std::cout << ss.str();
+#endif
 
 //		sprintf(sbuf, "%10.2f", (float) obj_probes / obj_searches);
 //		outbuf_addv(out, "Average search length:           %s\n", sbuf);
@@ -169,7 +187,11 @@ int ObjectTable::show_otable_status(outbuffer_t * out, int verbose) {
 
 	if (!verbose) {
 		ss << "Obj table overhead:\t\t" << sizeof(object_t*) * objects_.max_size() << " " << starts << std::endl;
-		outbuf_addv(out, ss.str().c_str());
+#ifndef SILENUS_DEBUG
+		outbuf_addv( out, ss.str().c_str() );
+#else
+                std::cout << ss.str();
+#endif                
 	}
 	return starts;
 }
@@ -177,13 +199,9 @@ int ObjectTable::show_otable_status(outbuffer_t * out, int verbose) {
 std::string ObjectTable::basename(const char *full) {
 
 	std::string s = { full };
-	for (auto i = 0; i < s.length(); ++i)
-	{
-		if (s[i] == '#')
-		{
-			s.erase(s.begin() + i, s.end());
-			break;
-		}
-	}
+        
+        auto i = s.find("#");
+        if(i != std::string::npos)       
+            s.erase(s.begin()+i, s.end());
 	return s;
 }
