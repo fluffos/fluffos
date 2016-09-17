@@ -117,11 +117,12 @@ object_t *ObjectTable::find(const char * s)
 array_t *ObjectTable::children(const char * s) 
 {
     
+        auto max_array_size = CONFIG_INT( __MAX_ARRAY_SIZE__ );
 	auto base = basename(s);
 	auto i = children_.find(base);
-	assert(i != children_.end());
+	assert(i != children_.end()); // at least one entry should exist
 
-	auto ret = allocate_empty_array((i->second).size());
+	auto ret = allocate_empty_array( max_array_size );
 	auto k = 0;
 	for (auto ob : i->second)
 	{
