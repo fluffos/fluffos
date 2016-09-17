@@ -41,7 +41,7 @@ void ObjectTable::insert(struct object_t * ob) {
         if( i != objects_.end() && i->second != master_ob && i->second != simul_efun_ob)
         {
             found_++;
-            DEBUG_CHECK1(s && s != ob,
+            DEBUG_CHECK1(*i && *i != ob,
 				"Duplicate object \"/%s\" in object hash table",
 				ob->obname);
             objects_.erase(i);
