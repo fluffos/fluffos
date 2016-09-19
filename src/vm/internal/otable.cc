@@ -126,13 +126,12 @@ object_t *ObjectTable::find(const char * s)
         return nullptr;
 }
 
+//TODO: change  this to return std::vector and have the array code convert std::vector into array_t
 #ifndef SILENUS_DEBUG 
 array_t *ObjectTable::children(const char * s) 
 {
   
         auto max_array_size = CONFIG_INT( __MAX_ARRAY_SIZE__ );
-        auto max_array_size = 1024;
-
 	auto base = basename(s);
 	auto i = children_.find(base);
 	assert(i != children_.end()); // at least one entry should exist
@@ -159,7 +158,8 @@ array_t *ObjectTable::children(const char * s)
 //need to revise these statistics since they aren't quite right anymore.
 //print out bucket and stl statistics?
 //change to use a std::string and an string ostream?
-int ObjectTable::show_otable_status(outbuffer_t * out, int verbose) {
+int ObjectTable::show_otable_status(outbuffer_t * out, int verbose) 
+{
 
 	std::stringstream ss;
 
@@ -167,7 +167,7 @@ int ObjectTable::show_otable_status(outbuffer_t * out, int verbose) {
 	{
 		ss << "Object name hash table status:" << std::endl;
 		ss << "------------------------------" << std::endl;
-		ss << "Average hash chain length:       " << objects_.size() / (float)objects_.max_size() << std::endl;
+//		ss << "Average hash chain length:       " << objects_.size() / (float)objects_.size() << std::endl;
 		ss << "Internal lookups (succeeded):    " << searches_ - userLookups_ << "(" << found_ - userFound_ << ")" << std::endl;
 		ss << "External lookups(succeeded) :    " << userLookups_ << "(" << userFound_ << ")" << std::endl;
 #ifndef SILENUS_DEBUG
@@ -186,7 +186,7 @@ int ObjectTable::show_otable_status(outbuffer_t * out, int verbose) {
 			* sizeof(object_t);
 
 	if (!verbose) {
-		ss << "Obj table overhead:\t\t" << sizeof(object_t*) * objects_.max_size() << " " << starts << std::endl;
+		ss << "Obj table overhead:\t\t" << sizeof(object_t*) * objects_.size() << " " << starts << std::endl;
 #ifndef SILENUS_DEBUG
 		outbuf_addv( out, ss.str().c_str() );
 #else
@@ -196,7 +196,8 @@ int ObjectTable::show_otable_status(outbuffer_t * out, int verbose) {
 	return starts;
 }
 
-std::string ObjectTable::basename(const char *full) {
+std::string ObjectTable::basename(const char *full) 
+{
 
 	std::string s = { full };
         
