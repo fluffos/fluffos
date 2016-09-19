@@ -48,10 +48,12 @@ bool ObjectTable::insert(struct object_t * ob) {
             DEBUG_CHECK1(i->second && i->second != ob,
 				"Duplicate object \"/%s\" in object hash table",
 				ob->obname);
+            //TODO remove ref to object_t here
             objects_.erase(i);
         }
 #endif
         objects_.insert( std::make_pair(ob->obname,ob) );
+        //TODO add ref to object_t here.
 		auto base = basename(ob->obname);
 
         auto j = children_.find(base);
@@ -62,6 +64,7 @@ bool ObjectTable::insert(struct object_t * ob) {
         else
         {
 			children_.insert( std::make_pair(base,std::list<decltype(ob)>{ob} ) );
+                        //TODO add ref to object_t here
         }
 	return true;
 }
@@ -87,6 +90,7 @@ bool ObjectTable::remove(struct object_t * ob)
         else
         {
             found_++;
+            //TODO remove ref to object_t here.
             objects_.erase(i);
             
             auto base = basename(ob->obname);
@@ -103,6 +107,7 @@ bool ObjectTable::remove(struct object_t * ob)
             }
             else
             {
+                //TODO remove ref to object_t here
                 (j->second).remove(ob);
             }
         }
