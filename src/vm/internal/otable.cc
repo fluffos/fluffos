@@ -206,11 +206,26 @@ int ObjectTable::show_otable_status(outbuffer_t * out, int verbose)
 
 std::string ObjectTable::basename(const char *full) 
 {
-
+//TODO: this function could be alot simplier if it didn't do arguments parsing and made certain sane assumptions about the name passed in
+//revise rest of the driver code to make sure that the assumptions are not violated i.e. no (multiple) trailing ".c" and no multiple leading '/'
 	std::string s = { full };
         
-        auto i = s.find("#");
-        if(i != std::string::npos)       
-            s.erase(s.begin()+i, s.end());
+        auto i = s.begin();
+        for(;i != s.end() && *i == '/' ;++i); 
+        if( i != s.begin() )
+            s.erase(s.begin(),i);
+        
+        
+        auto j = s.find("#");
+        if(j != std::string::npos)       
+            s.erase(s.begin()+j, s.end());
+        else 
+        {
+            auto l = s.length();
+            auto k = l;
+            for(;k > 2 && s[k-2] == '.' && s[k-1] == 'c';k-=2);
+            if( k != l )
+                s.erase(k, std::string::npos);
+        }
 	return s;
 }
