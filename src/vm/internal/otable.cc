@@ -67,7 +67,7 @@ bool ObjectTable::insert(struct object_t * ob) {
         else
         {
             
-			children_.insert( std::make_pair(base,std::list<decltype(ob)>{} ) );
+			children_.insert( std::make_pair(base,std::list<decltype(ob)>{ob} ) );
                         //add_ref(ob,"ObjectTable");
                         //TODO add ref to object_t here
                         //base object isn't it's own child in fluffos
@@ -107,6 +107,14 @@ bool ObjectTable::remove(struct object_t * ob)
             {
                 //free_object(*k);
                 (j->second).erase(k);
+            }
+            else
+            {
+#ifndef SILENUS_DEBUG
+                fatal("object not found in children list");
+#else
+                return false;
+#endif
             }
         }
 }
