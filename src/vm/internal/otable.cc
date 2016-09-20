@@ -103,15 +103,7 @@ bool ObjectTable::remove(struct object_t * ob)
             auto j = children_.find(base);
             auto k = std::find( (j->second).begin(), (j->second).end(), ob );
             
-            if( k == (j->second).end() )
-            {
-#ifndef SILENUS_DEBUG
-                fatal("object not found in children list");
-#else
-                return false;
-#endif
-            }
-            else
+            if( k != (j->second).end() )
             {
                 //free_object(*k);
                 (j->second).erase(k);
