@@ -49,10 +49,12 @@ bool ObjectTable::insert(struct object_t * ob) {
 				"Duplicate object \"/%s\" in object hash table",
 				ob->obname);
             //TODO remove ref to object_t here
+            //free_object(*i);
             objects_.erase(i);
         }
 #endif
         objects_.insert( std::make_pair(ob->obname,ob) );
+        //add_ref(ob,"ObjectTable");
         //TODO add ref to object_t here.
 		auto base = basename(ob->obname);
 
@@ -60,10 +62,13 @@ bool ObjectTable::insert(struct object_t * ob) {
         if(j != children_.end() )
         {
             (j->second).push_back(ob);
+            //add_ref(ob,"ObjectTable");
         }
         else
         {
+            
 			children_.insert( std::make_pair(base,std::list<decltype(ob)>{ob} ) );
+                        //add_ref(ob,"ObjectTable");
                         //TODO add ref to object_t here
         }
 	return true;
@@ -90,7 +95,7 @@ bool ObjectTable::remove(struct object_t * ob)
         else
         {
             found_++;
-            //TODO remove ref to object_t here.
+            //free_object(i->second);
             objects_.erase(i);
             
             auto base = basename(ob->obname);
@@ -107,8 +112,8 @@ bool ObjectTable::remove(struct object_t * ob)
             }
             else
             {
-                //TODO remove ref to object_t here
-                (j->second).remove(ob);
+                //free_object(*k);
+                (j->second).erase(k);
             }
         }
 }
@@ -146,7 +151,7 @@ array_t *ObjectTable::children(const char * s)
 	auto ret = allocate_empty_array( max_array_size );
 	auto k = 0;
         
-        if(i != children.end()
+        if(i != children_.end() )
         {
             for (auto ob : i->second)
             {
