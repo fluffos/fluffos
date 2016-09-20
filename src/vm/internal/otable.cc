@@ -139,17 +139,23 @@ array_t *ObjectTable::children(const char * s)
         auto max_array_size = CONFIG_INT( __MAX_ARRAY_SIZE__ );
 	auto base = basename(s);
 	auto i = children_.find(base);
-	assert(i != children_.end()); // at least one entry should exist
+        
+        
+	// assert(i != children_.end()); // at least one entry should exist
 
 	auto ret = allocate_empty_array( max_array_size );
 	auto k = 0;
-	for (auto ob : i->second)
-	{
+        
+        if(i != children.end()
+        {
+            for (auto ob : i->second)
+            {
 		ret->item[k].type = T_OBJECT;
 		ret->item[k].u.ob = ob;
 		add_ref(ob, "children");
 		++k;
-	}
+            }
+        }
 	ret = resize_array(ret, k);
 	return ret;
 }
