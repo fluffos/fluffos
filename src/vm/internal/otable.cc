@@ -140,7 +140,7 @@ array_t *ObjectTable::children(const char * s)
         
 	// assert(i != children_.end()); // at least one entry should exist
 
-	auto ret = allocate_empty_array( (i->second).size() );
+	auto ret = allocate_empty_array( CONFIG_INT(__MAX_ARRAY_SIZE__) );
 	auto k = 0;
         
         if(i != children_.end() )
