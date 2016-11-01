@@ -7,12 +7,13 @@
  *   11-1-92 - Erik Kay - initial creation
  *   94.07.14 - Robocoder - replaced linked list with AVL tree, and
  *                made uids into shared strings
+ * 2016.09.15 - Carter Cheng - replaced AVL tree with std::set.
  */
 #include "base/package_api.h"
 
 #include "packages/uids/uids.h"
 
-#include "packages/uids/avltree.h"
+#include<set>
 
 static object_t *ob;
 
@@ -98,76 +99,73 @@ void f_seteuid(void) {
 #endif
 
 /* Support functions */
-static tree *uids = NULL;
-userid_t *backbone_uid = NULL;
-userid_t *root_uid = NULL;
+static auto comp = [](userid_t* uid1, userid_t* uid2) { return uid1->name < uid2->name; };
+static auto uids = std::set<userid_t*, decltype(comp)>(comp);
+
+
+// static tree *uids = NULL;
+userid_t *backbone_uid = nullptr;
+userid_t *root_uid = nullptr;
 
 #ifdef DEBUGMALLOC_EXTENSIONS
-static void mark_uid_tree(tree *tr) {
-  DO_MARK(tr, TAG_UID);
-  DO_MARK(tr->tree_p, TAG_UID);
-
-  EXTRA_REF(BLOCK(((userid_t *)tr->tree_p)->name))++;
-  if (tr->tree_l) {
-    mark_uid_tree(tr->tree_l);
-  }
-  if (tr->tree_r) {
-    mark_uid_tree(tr->tree_r);
-  }
-}
-
-void mark_all_uid_nodes() {
-  if (uids) {
-    mark_uid_tree(uids);
+void mark_all_uid_nodes() 
+{
+  for(auto i : uids)
+  {
+      ++EXTRA_REF(BLOCK(i->name));
   }
 }
 #endif
 
-static int uidcmp(void * /*uid1*/, void * /*uid2*/);
+userid_t *add_uid(const char *name) 
+{
+  userid_t *uid;
+  userid_t t_uid;
 
-static int uidcmp(void *uid1, void *uid2) {
-  char *name1, *name2;
-
-  name1 = (reinterpret_cast<userid_t *>(uid1))->name;
-  name2 = (reinterpret_cast<userid_t *>(uid2))->name;
-  return (name1 < name2 ? -1 : (name1 > name2 ? 1 : 0));
-}
-
-userid_t *add_uid(const char *name) {
-  userid_t *uid, t_uid;
-  char *sname;
-
-  sname = make_shared_string(name);
-  t_uid.name = sname;
-  if ((uid = reinterpret_cast<userid_t *>(
-           tree_srch(uids, uidcmp, reinterpret_cast<char *>(&t_uid))))) {
-    free_string(sname);
-  } else {
-    uid = reinterpret_cast<userid_t *>(DMALLOC(sizeof(userid_t), TAG_UID, "add_uid"));
-    uid->name = sname;
-    tree_add(&uids, uidcmp, reinterpret_cast<char *>(uid), NULL);
+  t_uid.name = make_shared_string(name);
+  auto i = uids.find(&t_uid);
+  if (i != uids.end())
+  {
+	  free_string(t_uid.name);
+          return *i;
   }
-  return uid;
+  else
+  {
+	  uid = reinterpret_cast<userid_t *>(DMALLOC(sizeof(userid_t), TAG_UID, "add_uid"));
+	  uid->name = t_uid.name;
+	  uids.insert(uid);
+          return uid;
+  }
 }
 
-userid_t *set_root_uid(const char *name) {
-  if (!root_uid) {
+userid_t *set_root_uid(const char *name) 
+{
+  if (!root_uid) 
+  {
     return root_uid = add_uid(name);
   }
-
-  tree_delete(&uids, uidcmp, reinterpret_cast<char *>(root_uid), NULL);
-  root_uid->name = make_shared_string(name);
-  tree_add(&uids, uidcmp, reinterpret_cast<char *>(root_uid), NULL);
-  return root_uid;
+  else
+  {
+	  auto i = uids.find(root_uid);
+	  uids.erase(i);
+	  root_uid->name = make_shared_string(name);
+	  uids.insert(root_uid);
+	  return root_uid;
+  }
 }
 
-userid_t *set_backbone_uid(const char *name) {
-  if (!backbone_uid) {
+userid_t *set_backbone_uid(const char *name) 
+{
+  if (!backbone_uid) 
+  {
     return backbone_uid = add_uid(name);
   }
-
-  tree_delete(&uids, uidcmp, reinterpret_cast<char *>(backbone_uid), NULL);
-  backbone_uid->name = make_shared_string(name);
-  tree_add(&uids, uidcmp, reinterpret_cast<char *>(backbone_uid), NULL);
-  return backbone_uid;
+  else
+  {
+	  auto i = uids.find(backbone_uid);
+	  uids.erase(i);
+	  backbone_uid->name = make_shared_string(name);
+	  uids.insert(backbone_uid);
+	  return backbone_uid;
+  }
 }
