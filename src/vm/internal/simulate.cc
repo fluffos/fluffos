@@ -232,6 +232,9 @@ static int give_uid_to_object(object_t *ob) {
 #else
   ob->euid = NULL;
 #endif
+  ObjectTable::cleanup();
+  
+  
   return 1;
 }
 #endif

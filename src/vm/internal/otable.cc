@@ -30,6 +30,12 @@ void ObjectTable::init()
     
 ObjectTable* ObjectTable::getInstance() { return instance_; }
 
+void ObjectTable::cleanup()
+{
+    delete instance_;
+}
+
+
 /*
  * Add an object to the table - can't have duplicate names.
  * 

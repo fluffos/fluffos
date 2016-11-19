@@ -3,6 +3,7 @@
 #define OTABLE_H
 
 #include<list>
+#include<memory>
 #include<string>
 #include<unordered_map>
 
@@ -16,7 +17,8 @@ class ObjectTable
 public:
     static void init(); 
     static ObjectTable* getInstance();
-
+    static void cleanup();
+    
     bool insert(struct object_t *);
     bool remove(struct object_t *);
     object_t *find(const char *);
