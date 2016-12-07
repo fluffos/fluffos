@@ -644,3 +644,29 @@ telnet-proxy will display status information about the data passing
 through both ends of the tunnel.  telnet-proxy can only support a
 single tunnel at a time.  It will continue running until an error
 occurs or a terminating signal is sent to the proxy process.
+
+IX. HOW TO BUILD
+=======================================================================
+
+libtool, autoconf, automake required, for Mac, install them with brew:
+
+$ brew install libtool
+(GNU libtool installed as glibtool & glibtoolize to avoid conflict with 
+Apple libtool)
+
+$ brew install automake
+(autoconf will auto be installed as dependency)
+
+$ libtoolize
+$ aclocal
+$ autoheader
+$ automake --add-missing
+$ autoconf
+(if autoconf fail, run ./configure, if fails, vi ./configure, go to line
+13288, comment the error lines)
+
+$ make
+
+
+
+

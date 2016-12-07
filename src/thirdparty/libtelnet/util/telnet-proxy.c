@@ -158,9 +158,9 @@ static void print_buffer(const char *buffer, size_t size) {
 			printf("%c", (char)buffer[i]);
 		else if (buffer[i] == '\n')
 			printf("<" COLOR_BOLD "0x%02X" COLOR_UNBOLD ">\n",
-					(int)buffer[i]);
+					((int)buffer[i]) & 0xff);
 		else
-			printf("<" COLOR_BOLD "0x%02X" COLOR_UNBOLD ">", (int)buffer[i]);
+			printf("<" COLOR_BOLD "0x%02X" COLOR_UNBOLD ">", ((int)buffer[i]) & 0xff);
 	}
 }
 
@@ -195,6 +195,10 @@ static void _event_handler(telnet_t *telnet, telnet_event_t *ev,
 	/* data received */
 	case TELNET_EV_DATA:
 		printf("%s DATA: ", conn->name);
+		char buf[1024];
+		strncpy(buf, ev->data.buffer, ev->data.size);
+		buf[ev->data.size] = '\0';
+		printf(buf);
 		print_buffer(ev->data.buffer, ev->data.size);
 		printf(COLOR_NORMAL "\n");
 
