@@ -3,7 +3,8 @@
 *.gcda
 *.gcno
 *.gcov
-*autogen*
+*.autogen.*
+*.autogen
 /Makefile
 /cc.h
 /config.status
