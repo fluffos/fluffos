@@ -862,7 +862,7 @@ void init_include_path() {
   int i,                    // index into returned array
       j,                    // index into dynamic path array
       k;                    // index into static path array
-  for (i = j = 0; i < arr->size;) {                     // can't use size since it might change
+  for (i = j = 0; i < arr->size; i++) {                 // can't use size since it might change
     if (arr->item[i].type != T_STRING) {                // wrong type of element
       debug_message("'master::get_include_path(%s)' must return 'string *'\n", current_file);
       goto init_include_path_cleanup;                   // clean exit
@@ -875,11 +875,17 @@ void init_include_path() {
       for (k = 0; k < inc_list_size;) {                 // and copy runtime configuration
         path[j++] = make_shared_string(inc_list[k++]);
       }
-    } else if (!legal_path(elem)) {                     // illegal value
-      debug_message("'master::get_include_path(%s)' must give paths without any '..'\n", current_file);
-      goto init_include_path_cleanup;                   // clean exit
     } else {
-      path[j++] = make_shared_string(elem);             // valid directory
+      const char *check = elem;
+      if (elem[0] == '/') {
+        check = &elem[1];
+      }
+      if (!legal_path(check)) {                     // illegal value
+        debug_message("'master::get_include_path(%s)' returns invalid value '%s', must give paths without any '..'\n", current_file, elem);
+        goto init_include_path_cleanup;                   // clean exit
+      } else {
+        path[j++] = make_shared_string(elem);             // valid directory
+      }
     }
   }
   inc_path = path;                                      // with this we may continue
