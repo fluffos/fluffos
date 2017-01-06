@@ -26,6 +26,15 @@
 # define vsnprintf _vsnprintf
 # define __func__ __FUNCTION__
 # define ZLIB_WINAPI 1
+# if defined(_MSC_VER)
+/* va_copy() is directly supported starting in Visual Studio 2013
+ * https://msdn.microsoft.com/en-us/library/kb57fad8(v=vs.110).aspx
+ * https://msdn.microsoft.com/en-us/library/kb57fad8(v=vs.120).aspx
+ */
+#  if _MSC_VER <= 1700
+#   define va_copy(dest, src) (dest = src)
+#  endif
+# endif
 #endif
 
 #if defined(HAVE_ZLIB)
@@ -135,7 +144,7 @@ static telnet_error_t _error(telnet_t *telnet, unsigned line,
 	ev.error.line = line;
 	ev.error.msg = buffer;
 	telnet->eh(telnet, &ev, telnet->ud);
-	
+
 	return err;
 }
 
@@ -500,7 +509,7 @@ static int _environ_telnet(telnet_t *telnet, unsigned char type,
 
 	/* first byte must be a valid command */
 	if ((unsigned)buffer[0] != TELNET_ENVIRON_SEND &&
-			(unsigned)buffer[0] != TELNET_ENVIRON_IS && 
+			(unsigned)buffer[0] != TELNET_ENVIRON_IS &&
 			(unsigned)buffer[0] != TELNET_ENVIRON_INFO) {
 		_error(telnet, __LINE__, __func__, TELNET_EPROTOCOL, 0,
 				"telopt %d subneg has invalid command", type);
@@ -1103,7 +1112,7 @@ static void _process(telnet_t *telnet, const char *buffer, size_t size) {
 		}
 	}
 
-	/* pass through any remaining bytes */ 
+	/* pass through any remaining bytes */
 	if (telnet->state == TELNET_STATE_DATA && i != start) {
 		ev.type = TELNET_EV_DATA;
 		ev.data.buffer = buffer + start;
@@ -1192,7 +1201,7 @@ void telnet_negotiate(telnet_t *telnet, unsigned char cmd,
 		_sendu(telnet, bytes, 3);
 		return;
 	}
-	
+
 	/* get current option states */
 	q = _get_rfc1143(telnet, telopt);
 

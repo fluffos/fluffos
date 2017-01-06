@@ -152,16 +152,15 @@ static const char *get_opt(unsigned char opt) {
 }
 
 static void print_buffer(const char *buffer, size_t size) {
+	printf("%.*s", (int)size, buffer);
+
 	size_t i;
+	printf(" [");
 	for (i = 0; i != size; ++i) {
-		if (buffer[i] == ' ' || (isprint(buffer[i]) && !isspace(buffer[i])))
-			printf("%c", (char)buffer[i]);
-		else if (buffer[i] == '\n')
-			printf("<" COLOR_BOLD "0x%02X" COLOR_UNBOLD ">\n",
-					(int)buffer[i]);
-		else
-			printf("<" COLOR_BOLD "0x%02X" COLOR_UNBOLD ">", (int)buffer[i]);
+		printf("<" COLOR_BOLD "0x%02X" COLOR_UNBOLD ">", (unsigned char)buffer[i]);
+		if(buffer[i] == '\n') printf("%c", '\n');
 	}
+	printf("]");
 }
 
 static void _send(int sock, const char *buffer, size_t size) {
