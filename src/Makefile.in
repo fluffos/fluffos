@@ -191,7 +191,7 @@ $(DRIVER_BIN): $(JEMALLOC_OBJS) $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM
 
 thirdparty/jemalloc/lib/libjemalloc_pic.a:
 	@echo [Building jemalloc] $@
-	@cd thirdparty/jemalloc && GIT_DIR=./.git ./configure --enable-prof && make && cd -
+	@cd thirdparty/jemalloc && GIT_DIR=./.git ./autogen.sh --enable-prof && make && cd -
 
 # Hack to work around brokeness in libtelnet.c
 thirdparty/libtelnet/libtelnet.o: thirdparty/libtelnet/libtelnet.c
