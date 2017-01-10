@@ -82,7 +82,7 @@ void print_rlimit() {
   }
 }
 
-int main(int argc, char **argv) {
+int real_main(int argc, char **argv) {
   setlocale(LC_ALL, "C");
   tzset();
   boot_time = get_current_time();
@@ -309,3 +309,7 @@ static void attempt_shutdown(int sig) {
   try_dump_stacktrace();
   fatal(msg);
 }
+
+/*int main(int argc, char **argv) {
+  return real_main(argc, argv);
+}*/

@@ -181,13 +181,16 @@ tools/make_func.autogen.cc: tools/make_func.y
 	@echo [Generating] $@
 	@$(BISON) -o tools/make_func.autogen.cc tools/make_func.y
 
-$(DRIVER_BIN): $(JEMALLOC_OBJS) $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS) dtrace_compile
+libdriver.a: $(JEMALLOC_OBJS) $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS) dtrace_compile
+	gcc-ar rcsT $@ $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS) $(JEMALLOC_OBJS) `./dtrace_compile`
+
+$(DRIVER_BIN): libdriver.a main.go
 	@-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
 	@echo [Linking $@]
-	@$(CXX) $(LDFLAGS) $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS) $(JEMALLOC_OBJS) `./dtrace_compile` -o $(DRIVER_BIN) $(LIBS) \
+	@CGO_LDFLAGS="-L. -ldriver -lstdc++ -lm $(LIBS) \
 		@MYSQL_LDFLAGS@ @POSTGRESQL_LDFLAGS@ @SQLITE3_LDFLAGS@ \
 		@OPENSSL_LDFLAGS@ @OPENSSL_LIBS@ @PCRE_LIBS@ \
-		@LIBEVENT_LIBS@ @LIBEVENT_LDFLAGS@
+		@LIBEVENT_LIBS@ @LIBEVENT_LDFLAGS@" go build -o $(DRIVER_BIN) main.go
 
 thirdparty/jemalloc/lib/libjemalloc_pic.a:
 	@echo [Building jemalloc] $@
