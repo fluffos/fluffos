@@ -436,13 +436,13 @@ void handle_getdir(struct request *req) {
     tmp_buf_size += de->d_reclen;
   }
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
-  int val = req->ret;
+  // int val = req->ret;
   if (ret_size > max_array_size) {
     ret_size = max_array_size;
   }
   array_t *ret = allocate_empty_array(ret_size);
   int i = 0;
-  if (val > 0) {
+  if (ret_size > 0) {
     struct linux_dirent *de = (struct linux_dirent *)req->buf;
     for (i = 0;
          i < ret_size;// && (reinterpret_cast<char *>(de)) - const_cast<char *>(req->buf) < val;
