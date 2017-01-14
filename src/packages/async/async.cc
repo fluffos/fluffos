@@ -440,10 +440,9 @@ void handle_getdir(struct request *req) {
     ret_size = max_array_size;
   }
   array_t *ret = allocate_empty_array(ret_size);
-  int i = 0;
   if (ret_size > 0) {
     struct linux_dirent *de = (struct linux_dirent *)req->buf;
-    for (i = 0; i < ret_size; i++) {
+    for (int i = 0; i < ret_size; i++) {
       svalue_t *vp = &(ret->item[i]);
       vp->type = T_STRING;
       vp->subtype = STRING_MALLOC;
