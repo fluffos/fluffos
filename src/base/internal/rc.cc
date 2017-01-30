@@ -266,10 +266,13 @@ void read_config(char *filename) {
   /* Process ports */
   {
     int i, port, port_start = 0;
+    char cfg_line[1024];
+
     if (scan_config_line("port number : %d\n", &CONFIG_INT(__MUD_PORT__), 0)) {
       external_port[0].port = CONFIG_INT(__MUD_PORT__);
       external_port[0].kind = PORT_TELNET;
       port_start = 1;
+      sprintf(cfg_line, "0x%04X:0x%02X ", external_port[0].port, external_port[0].kind);
     }
 
     /* check for ports */
@@ -310,12 +313,15 @@ void read_config(char *filename) {
             fprintf(stderr, "Unknown kind of external port: %s\n", kind);
             exit(-1);
           }
+          sprintf(cfg_line + i * 12, "0x%04X:0x%02X ", external_port[i].port, external_port[i].kind);
         } else {
           fprintf(stderr, "Syntax error in port specification\n");
           exit(-1);
         }
       }
     }
+    cfg_line[5 * 12 - 1] = '\0';    // remove last ' '
+    CONFIG_STR(__PORT_CONFIG__) = alloc_cstring(cfg_line, "config file: pc");
   }
 #ifdef PACKAGE_EXTERNAL
   /* check for commands */

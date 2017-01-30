@@ -8,12 +8,7 @@
 #ifndef BASE_INTERNAL_EXTERNAL_PORT_H_
 #define BASE_INTERNAL_EXTERNAL_PORT_H_
 
-#define PORT_UNDEFINED 0
-#define PORT_TELNET 1
-#define PORT_BINARY 2
-#define PORT_ASCII 3
-#define PORT_MUD 4
-#define PORT_WEBSOCKET 5
+#include "include/port_config.h"
 
 struct port_def_t {
   int kind;

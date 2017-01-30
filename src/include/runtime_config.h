@@ -35,11 +35,12 @@
 #define __DEFAULT_FAIL_MESSAGE__ CFG_STR(12)
 #define __GLOBAL_INCLUDE_FILE__ CFG_STR(13)
 #define __MUD_IP__ CFG_STR(14)
+#define __PORT_CONFIG__ CFG_STR(15)
 
 /*
  * These config settings return an int (ie number)
  */
-#define BASE_CONFIG_INT (BASE_CONFIG_STR + 15)
+#define BASE_CONFIG_INT (BASE_CONFIG_STR + 100)
 #define CFG_INT(x) ((x) + BASE_CONFIG_INT)
 
 #define __MUD_PORT__ CFG_INT(0)
