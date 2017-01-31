@@ -93,14 +93,14 @@ else
 fi
 
 # Run standard test first
-$VALGRIND --malloc-fill=0x75 --free-fill=0x73 --track-origins=yes --leak-check=full ../driver etc/config.test -ftest -d
+$VALGRIND --malloc-fill=0x75 --free-fill=0x73 --track-origins=yes --leak-check=full ../driver -d 0 -f test etc/config.test
 wait $!
 if [ $? -ne 0 ]; then
   exit $?
 fi
 # run special interactive tests
 ( sleep 30 ; expect telnet_test.expect localhost 4000 ) &
-( ../driver etc/config.test -d ) &
+( ../driver etc/config.test ) &
 wait $!
 if [ $? -ne 0 ]; then
   exit $?

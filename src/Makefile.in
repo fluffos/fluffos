@@ -185,7 +185,7 @@ libdriver.a: $(JEMALLOC_OBJS) $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_B
 	gcc-ar rcsT $@ $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS) $(JEMALLOC_OBJS) `./dtrace_compile`
 
 $(DRIVER_BIN): libdriver.a main.go
-	@-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
+	@-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old > /dev/null 2>&1 || true
 	@echo [Linking $@]
 	@CGO_LDFLAGS="-L. -ldriver -lstdc++ -lm $(LIBS) \
 		@MYSQL_LDFLAGS@ @POSTGRESQL_LDFLAGS@ @SQLITE3_LDFLAGS@ \
@@ -238,7 +238,8 @@ clean:
 	@-find . -name "*.orig" -print | xargs rm
 	@-find . -name "*.rej" -print | xargs rm
 	@-rm -f *.ln tags TAGS
-	@-rm -f $(DRIVER_BIN) $(DRIVER_BIN).old portbind *.exe
+	@-rm -rf _obj
+	@-rm -f $(DRIVER_BIN) $(DRIVER_BIN).old portbind *.exe libdriver.a
 	@-rm -f 1.out 2.out
 	@-rm -f dtrace_compile
 	@-rm -f testsuite/log/author_stats testsuite/log/domain_stats
@@ -247,7 +248,7 @@ clean:
 	@echo [Done]
 
 test: all
-	cd testsuite && ../driver -d -ftest etc/config.test
+	cd testsuite && ../driver -d 0 -f test etc/config.test
 
 help:
 	@echo "***************** Configuration completed **************"

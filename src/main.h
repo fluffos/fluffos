@@ -13,7 +13,16 @@ extern time_t boot_time;
 #ifdef __cplusplus
 extern "C" {
 #endif
-  int real_main(int argc, char **argv);
+  void init_env();
+  void init_md();
+  void init_config(const char* file);
+  void print_version_and_time();
+  const char* get_mudlib_dir();
+  int get_is_shutdown();
+  void* init_libevent();
+  void init_vm();
+  void call_master_flag(const char * flag);
+  void real_main(void*);
 #ifdef __cplusplus
 }
 #endif

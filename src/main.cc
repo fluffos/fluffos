@@ -38,18 +38,7 @@ static void sig_usr2(int /*sig*/);
 static void attempt_shutdown(int sig);
 static void setup_signal_handlers();
 
-inline void print_sep() { std::cout << std::string(72, '=') << std::endl; }
-
 void print_version_and_time() {
-  print_sep();
-
-  /* Print current time */
-  {
-    time_t tm;
-    time(&tm);
-    std::cout << "Boot Time: " << ctime(&tm);
-  }
-
   /* Print FluffOS version */
   std::cout << "FluffOS Version: " << PACKAGE_VERSION << "(" << SOURCE_REVISION << ")"
             << "@ (" << ARCH << ")" << std::endl;
@@ -65,146 +54,56 @@ void print_version_and_time() {
 #endif
 }
 
-void print_rlimit() {
-  struct rlimit rlim;
-  if (getrlimit(RLIMIT_CORE, &rlim)) {
-    perror("Error reading RLIMIT_CORE: ");
-    exit(1);
-  } else {
-    std::cout << "Core Dump: " << (rlim.rlim_cur == 0 ? "No" : "Yes") << ", ";
-  }
-
-  if (getrlimit(RLIMIT_NOFILE, &rlim)) {
-    perror("Error reading RLIMIT_NOFILE: ");
-    exit(1);
-  } else {
-    std::cout << "Max FD: " << rlim.rlim_cur << std::endl;
-  }
-}
-
-int real_main(int argc, char **argv) {
+void init_env() {
   setlocale(LC_ALL, "C");
   tzset();
   boot_time = get_current_time();
+}
 
-  print_version_and_time();
-
-  // try to bump FD limits.
-  {
-    struct rlimit rlim;
-    rlim.rlim_cur = 65535;
-    rlim.rlim_max = rlim.rlim_cur;
-    if (setrlimit(RLIMIT_NOFILE, &rlim)) {
-      // ignore this error.
-    }
-  }
-
-  print_rlimit();
-
-  std::cout << "Command: " << argv[0] << " ";
-  for (int i = 1; i < argc; i++) {
-    std::cout << argv[i] << " ";
-  }
-  std::cout << std::endl;
-
-  print_sep();
-
+void init_md() {
 #ifdef DEBUGMALLOC
   MDinit();
 #endif
+}
 
-  /* read in the configuration file */
-  bool got_config = false;
-  for (int i = 1; i < argc; i++) {
-    if (argv[i][0] != '-') {
-      read_config(argv[i]);
-      got_config = true;
-      break;
-    }
-  }
-  if (!got_config) {
-    fprintf(stderr, "Usage: %s config_file\n", argv[0]);
-    exit(-1);
-  }
+void init_config(const char* file) {
+  read_config(file);
+}
 
-  // TODO: dump configs
+const char* get_mudlib_dir() {
+  return CONFIG_STR(__MUD_LIB_DIR__);
+}
 
-  // Make sure mudlib dir is correct.
-  if (chdir(CONFIG_STR(__MUD_LIB_DIR__)) == -1) {
-    fprintf(stderr, "Bad mudlib directory: %s\n", CONFIG_STR(__MUD_LIB_DIR__));
-    exit(-1);
-  }
-
-  printf("Initializing internal stuff ....\n");
-
+void* init_libevent() {
   // Initialize libevent, This should be done before executing LPC.
   auto base = init_backend();
   init_dns_event_base(base);
+  return base;
+}
 
+void init_vm() {
   // Initialize VM layer
   vm_init();
+}
 
-  for (int i = 1; i < argc; i++) {
-    if (argv[i][0] != '-') {
-      continue;
-    } else {
-      /*
-       * Look at flags. ignore those already been tested.
-       */
-      switch (argv[i][1]) {
-        case 'C':
-          if (CONFIG_INT(__RC_HAS_CONSOLE__)) {
-            has_console = 1;
-          }
-          continue;
-        case 'f':
-          debug_message("Calling master::flag(\"%s\")...\n", argv[i] + 2);
-          push_constant_string(argv[i] + 2);
-          safe_apply_master_ob(APPLY_FLAG, 1);
-          if (MudOS_is_being_shut_down) {
-            debug_message("Shutdown by master object.\n");
-            exit(0);
-          }
-          continue;
-        case 'd':
-          if (argv[i][2]) {
-            debug_level_set(&argv[i][2]);
-          } else {
-            debug_level |= DBG_DEFAULT;
-          }
-          debug_message("Debug Level: %d\n", debug_level);
-          continue;
-        default:
-          debug_message("Unknown flag: %s\n", argv[i]);
-          exit(-1);
-      }
-    }
-  }
-  if (MudOS_is_being_shut_down) {
-    exit(1);
-  }
-  // Initialize user connection socket
-  if (!init_user_conn()) {
-    exit(1);
-  }
+void call_master_flag(const char * flag) {
+  debug_message("Calling master::flag(\"%s\")...\n", flag);
+  push_constant_string(flag);
+  safe_apply_master_ob(APPLY_FLAG, 1);
+}
 
-  if (has_console == 1) {
-    console_init(base);
-  }
+int get_is_shutdown() {
+  return MudOS_is_being_shut_down;
+}
 
-  debug_message("Initializations complete.\n\n");
-
-  setup_signal_handlers();
-
-  backend(base);
-
-  return 0;
+void real_main(void* base) {
+  backend(reinterpret_cast<event_base *>(base));
 }
 
 static void setup_signal_handlers() {
   signal(SIGFPE, attempt_shutdown);
   signal(SIGTERM, attempt_shutdown);
-  signal(SIGINT, attempt_shutdown);
+  // signal(SIGINT, attempt_shutdown);
   signal(SIGABRT, attempt_shutdown);
   signal(SIGBUS, attempt_shutdown);
   signal(SIGSEGV, attempt_shutdown);
