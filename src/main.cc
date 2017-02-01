@@ -74,6 +74,10 @@ const char* get_mudlib_dir() {
   return CONFIG_STR(__MUD_LIB_DIR__);
 }
 
+int get_gametick_ms() {
+    return CONFIG_INT(__RC_GAMETICK_MSEC__);
+}
+
 void* init_libevent() {
   // Initialize libevent, This should be done before executing LPC.
   auto base = init_backend();
@@ -98,6 +102,16 @@ int get_is_shutdown() {
 
 void real_main(void* base) {
   backend(reinterpret_cast<event_base *>(base));
+}
+
+void wrap_backend_once() {
+  backend_once();
+}
+
+// In comm.c
+void new_user_handler(int , int, char* , int);
+void wrap_new_user_handler(int idx, int connIdx, char * addr, int port) {
+    new_user_handler(idx, connIdx, addr, port);
 }
 
 static void setup_signal_handlers() {
@@ -209,6 +223,6 @@ static void attempt_shutdown(int sig) {
   fatal(msg);
 }
 
-/*int main(int argc, char **argv) {
-  return real_main(argc, argv);
-}*/
+const char* get_mud_ip() {
+    return CONFIG_STR(__MUD_IP__);
+}

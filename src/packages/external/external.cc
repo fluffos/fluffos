@@ -123,7 +123,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
     close(sv[0]);
     for (i = 0; i < 5; i++) {
       if (external_port[i].port) {
-        close(external_port[i].fd);  // close external ports
+        // close(external_port[i].fd);  // close external ports
       }
     }
     dup2(sv[1], 0);

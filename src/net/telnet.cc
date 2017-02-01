@@ -13,6 +13,13 @@
 #include "thirdparty/libtelnet/libtelnet.h"  // for telnet_t, telnet_event_t*
 #include "vm/vm.h"
 
+// These are defined in Go.
+extern "C" {
+void ConnWrite(int, const char*, int);
+void ConnFlush(int);
+void ConnClose(int);
+}
+
 static const telnet_telopt_t my_telopts[] = {{TELNET_TELOPT_TM, TELNET_WILL, TELNET_DO},
                                              {TELNET_TELOPT_SGA, TELNET_WILL, TELNET_DO},
                                              {TELNET_TELOPT_NAWS, TELNET_WILL, TELNET_DO},
@@ -65,7 +72,7 @@ static inline void on_telnet_data(const char *buffer, unsigned long size, intera
 }
 
 static inline void on_telnet_send(const char *buffer, unsigned long size, interactive_t *ip) {
-  bufferevent_write(ip->ev_buffer, buffer, size);
+  ConnWrite(ip->id, buffer, size);
 }
 
 static inline void on_telnet_iac(unsigned char cmd, interactive_t *ip) {

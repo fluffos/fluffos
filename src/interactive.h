@@ -35,6 +35,7 @@
 #define USING_COMPRESS 0x40000     /* we've negotiated compress */
 
 struct interactive_t {
+  int id; /* Used by go code to track connections */
   struct object_t *ob; /* points to the associated object         */
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
   struct sentence_t *input_to; /* to be called with next input line       */
@@ -43,9 +44,8 @@ struct interactive_t {
 #endif
   int connection_type;          /* the type of connection this is          */
   int fd;                       /* file descriptor for interactive object  */
-  struct sockaddr_storage addr; /* socket address of interactive object    */
-  socklen_t addrlen;
-  int local_port;      /* which of our ports they connected to    */
+  char* remote_addr;             /* user's IP address */
+  int remote_port;              /* user's port number */
   int external_port;   /* external port index for connection      */
   const char *prompt;  /* prompt string for interactive object    */
   char text[MAX_TEXT]; /* input buffer for interactive object     */
@@ -78,10 +78,6 @@ struct interactive_t {
 
   // libtelnet handle
   struct telnet_t *telnet;
-
-  // libevent event handle.
-  struct bufferevent *ev_buffer;
-  struct event *ev_command;
 };
 
 #endif /* INTERACTIVE_H */

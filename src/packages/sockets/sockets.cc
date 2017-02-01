@@ -250,13 +250,13 @@ void f_socket_address(void) {
     }
 
     char host[NI_MAXHOST], service[NI_MAXSERV];
-    int ret = getnameinfo(reinterpret_cast<struct sockaddr *>(&sp->u.ob->interactive->addr),
-                          sp->u.ob->interactive->addrlen, host, sizeof(host), service,
-                          sizeof(service), NI_NUMERICHOST | NI_NUMERICSERV);
-    if (ret) {
+//    int ret = getnameinfo(reinterpret_cast<struct sockaddr *>(&sp->u.ob->interactive->addr),
+//                          sp->u.ob->interactive->addrlen, host, sizeof(host), service,
+//                          sizeof(service), NI_NUMERICHOST | NI_NUMERICSERV);
+//    if (ret) {
       strcpy(host, "0.0.0.0");
       strcpy(service, "0");
-    }
+//    }
     sprintf(buf, "%s %s", host, service);
 
     str = string_copy(buf, "f_socket_address");

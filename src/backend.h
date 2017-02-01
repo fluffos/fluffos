@@ -17,6 +17,9 @@ struct event_base *init_backend();
 // This is the main game loop.
 void backend(struct event_base *);
 
+// FIXME
+void backend_once();
+
 // API for registering game tick event.
 // Game ticks provides guaranteed spacing intervals between each invocation.
 struct tick_event {

@@ -285,7 +285,6 @@ void read_config(const char *filename) {
     }
     for (i = port_start; i < 5; i++) {
       external_port[i].kind = 0;
-      external_port[i].fd = -1;
 
       char kind[kMaxConfigLineLength];
       sprintf(kind, "external_port_%i : %%[^\n]", i + 1);

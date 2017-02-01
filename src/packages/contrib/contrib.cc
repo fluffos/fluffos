@@ -1793,7 +1793,7 @@ static int query_ip_port(object_t *ob) {
   if (!ob || ob->interactive == 0) {
     return 0;
   }
-  return ob->interactive->local_port;
+  return external_port[ob->interactive->external_port].port;
 }
 
 void f_query_ip_port(void) {

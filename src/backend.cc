@@ -6,6 +6,7 @@
 #include <chrono>
 #include <event2/dns.h>    // for evdns_set_log_fn
 #include <event2/event.h>  // for event_add, etc
+#include <event2/thread.h>  // for evthread_use_pthreads().
 #include <math.h>          // for exp
 #include <stdio.h>         // for NULL, sprintf
 #include <sys/time.h>      // for timeval
@@ -60,18 +61,17 @@ std::chrono::milliseconds gametick_to_time(int ticks) {
   return std::chrono::milliseconds(CONFIG_INT(__RC_GAMETICK_MSEC__)) * ticks;
 }
 
-namespace {
 // TODO: remove the need for this
 // Global variable for game ticket event handle.
-struct event *g_ev_tick = NULL;
-
-inline struct timeval gametick_timeval() {
-  static struct timeval val {
-    CONFIG_INT(__RC_GAMETICK_MSEC__) / 1000,             // secs
-        CONFIG_INT(__RC_GAMETICK_MSEC__) % 1000 * 1000,  // usecs
-  };
-  return val;
-}
+//struct event *g_ev_tick = NULL;
+//
+//inline struct timeval gametick_timeval() {
+//  static struct timeval val {
+//    CONFIG_INT(__RC_GAMETICK_MSEC__) / 1000,             // secs
+//        CONFIG_INT(__RC_GAMETICK_MSEC__) % 1000 * 1000,  // usecs
+//  };
+//  return val;
+//}
 
 // Global structure to holding all events to be executed on gameticks.
 typedef std::multimap<decltype(g_current_gametick), tick_event *,
@@ -120,16 +120,13 @@ inline void call_tick_events() {
 #endif
 }
 
-void on_game_tick(int fd, short what, void *arg) {
-  call_tick_events();
-  g_current_gametick++;
+void backend_once() {
+    // temporial hack
+    event_base_loop(g_event_base, EVLOOP_NONBLOCK);
 
-  auto ev = *(reinterpret_cast<struct event **>(arg));
-  auto t = gametick_timeval();
-  event_add(ev, &t);
+    call_tick_events();
+    g_current_gametick++;
 }
-
-}  // namespace
 
 tick_event *add_gametick_event(std::chrono::milliseconds delay_msecs,
                                tick_event::callback_type callback) {
@@ -187,6 +184,7 @@ void call_remove_destructed_objects() {
                      tick_event::callback_type(call_remove_destructed_objects));
   remove_destructed_objects();
 }
+
 /*
  * This is the backend. We will stay here for ever (almost).
  */
@@ -205,23 +203,23 @@ void backend(struct event_base *base) {
   add_gametick_event(std::chrono::minutes(5),
                      tick_event::callback_type(call_remove_destructed_objects));
 
-  // NOTE: we don't use EV_PERSITENT here because that use fix-rate scheduling.
-  //
-  // Schedule a repeating tick for advancing virtual time.
-  // Gametick provides a fixed-delay scheduling with a guaranteed minimum delay for
-  // heartbeats, callouts, and various cleaning function.
-  g_ev_tick = evtimer_new(base, on_game_tick, &g_ev_tick);
-
-  auto t = gametick_timeval();
-  event_add(g_ev_tick, &t);
-
-  try {
-    event_base_loop(base, 0);
-  } catch (...) {  // catch everything
-    fatal("BUG: jumped out of event loop!");
-  }
-  // We've reached here meaning we are in shutdown sequence.
-  shutdownMudOS(-1);
+//  // NOTE: we don't use EV_PERSITENT here because that use fix-rate scheduling.
+//  //
+//  // Schedule a repeating tick for advancing virtual time.
+//  // Gametick provides a fixed-delay scheduling with a guaranteed minimum delay for
+//  // heartbeats, callouts, and various cleaning function.
+//  g_ev_tick = evtimer_new(base, on_game_tick, &g_ev_tick);
+//
+//  auto t = gametick_timeval();
+//  event_add(g_ev_tick, &t);
+//
+//  try {
+//    event_base_loop(base, 0);
+//  } catch (...) {  // catch everything
+//    fatal("BUG: jumped out of event loop!");
+//  }
+//  // We've reached here meaning we are in shutdown sequence.
+//  shutdownMudOS(-1);
 } /* backend() */
 
 namespace {

@@ -48,7 +48,6 @@ void add_binary_message(struct object_t *, const unsigned char *, int);
 
 void update_ref_counts_for_users(void);
 void make_selectmasks(void);
-bool init_user_conn(void);
 void shutdown_external_ports(void);
 void set_prompt(const char *);
 void process_io(void);
