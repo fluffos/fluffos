@@ -2857,6 +2857,17 @@ void add_predefines() {
 
   sprintf(save_buf, "%d", external_port[0].port);
   add_predefine("__PORT__", -1, save_buf);
+  strcpy(save_buf, "([ ");
+  for (i = 0; i < 5; i++)           // attention: maximum portnr. also in base/internal/rc.cc [Process ports]
+  {
+      // attention: in case of change:
+      // format of format string has to have constant length independent of
+      // portnr and configured values!
+      sprintf(save_buf + i * 30 + 3, "\"port_d\": ({ 0x%04X, 0x%02X }), ",
+              i, external_port[i].port, external_port[i].kind);
+  }
+  strcpy(save_buf + 151, " ])");
+  add_predefine("__PORT_CONFIG__", -1, save_buf);
   for (i = 0; i < (sizeof(option_defs) / sizeof(const char *)); i += 2) {
     add_predefine(option_defs[i], -1, option_defs[i + 1]);
   }
