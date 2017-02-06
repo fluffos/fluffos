@@ -2316,6 +2316,8 @@ static program_t *epilog(void) {
   program_t *prog;
   compiler_temp_t *fundefp, *nextdefp;
 
+  deinit_include_path();
+
   if (num_parse_error > 0 || inherit_file) {
     /* don't print these; they can be wrong, since we didn't parse the
        entire file */
@@ -2628,7 +2630,6 @@ static void clean_parser() {
   function_t *funp;
   compiler_temp_t *fundefp, *nextdefp;
 
-  deinit_include_path();
   /*
    * Free function stuff.
    */

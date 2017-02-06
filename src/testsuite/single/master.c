@@ -251,7 +251,7 @@ staticf void error_handler(mapping map, int flag) {
   if (!flag && ob) tell_object(ob, str);
 }
 
-mixed get_inclide_path(string file)
+mixed get_include_path(string file)
 {
   switch(file)
   {

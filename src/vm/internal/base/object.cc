@@ -501,7 +501,7 @@ static int restore_interior_string(char **val, svalue_t *sv) {
 
 static int parse_numeric(char **cpp, unsigned char c, svalue_t *dest) {
   char *cp = *cpp;
-  LPC_INT res, neg;
+  LPC_FLOAT res, neg;
 
   if (c == '-') {
     neg = 1;

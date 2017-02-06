@@ -164,7 +164,7 @@ int retrieve_ed_setup(object who)
   string file;
   int code;
 
-#ifdef __PACKAGE_UIDS__   
+#ifdef __PACKAGE_UIDS__
   file = user_path(getuid(who)) + ".edrc";
 #else
   file = "/.edrc";
@@ -249,4 +249,25 @@ staticf void error_handler(mapping map, int flag) {
                      "No program") :)), "\n"));
   write_file("/log/log", str);
   if (!flag && ob) tell_object(ob, str);
+}
+
+mixed get_include_path(string file)
+{
+  switch(file)
+  {
+    case "/clone/mgip1":
+    case "/clone/mgip1.c":
+      return ({ "/include/m_gip1", "/include" });
+    case "/clone/mgip2":
+    case "/clone/mgip2.c":
+      return ({ "/include/m_gip2", "/include" });
+    case "/clone/mgip3":
+    case "/clone/mgip3.c":
+      return ({ "/include", "/include/m_gip1" });
+    case "/clone/mgip4":
+    case "/clone/mgip4.c":
+      return ({});          // should yield error message
+    default:
+      return ({ ":DEFAULT:" });;
+  }
 }
