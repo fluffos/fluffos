@@ -66,11 +66,11 @@ bool ObjectTable::insert(struct object_t * ob) {
 				"Duplicate object \"/%s\" in object hash table",
 				ob->obname);
             //TODO remove ref to object_t here
-            //free_object(*i);
+            //free_object(&ob,"ObjectTable::insert");
             objects_.erase(i);
         }
 #endif
-        objects_.insert( std::make_pair(ob->obname,ob) );
+        objects_.insert( std::make_pair( std::string(ob->obname),ob) );
         //add_ref(ob,"ObjectTable");
         //TODO add ref to object_t here.
 		auto base = basename(ob->obname);
@@ -79,7 +79,7 @@ bool ObjectTable::insert(struct object_t * ob) {
         if(j != children_.end() )
         {
             (j->second).push_back(ob);
-            //add_ref(ob,"ObjectTable");
+            //add_ref(ob,"ObjectTable::children");
         }
         else
         {
