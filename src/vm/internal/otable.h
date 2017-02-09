@@ -16,30 +16,34 @@ class ObjectTable
 {
 public:
     static void init(); 
-    static ObjectTable* getInstance();
-    static void cleanup();
+//    static ObjectTable* getInstance();
+//    static void cleanup();
     
-    bool insert(struct object_t *);
-    bool remove(struct object_t *);
-    object_t *find(const char *);
-    int show_otable_status (outbuffer_t *, int);
+    static bool insert(struct object_t *);
+    static bool remove(struct object_t *);
+    static object_t *find(const char *);
+    static int show_otable_status (outbuffer_t *, int);
 #ifndef SILENUS_DEBUG
-    struct array_t *children(const char *);
+    //TODO: change this to return std::vector add function in array.cc to convert std::vector to array_t
+    static struct array_t *children(const char *);
 #endif
 protected:
-    std::string basename(const char *full);
+    static std::string basename(const char *full);
+    /*
     ObjectTable()
     :searches_(0), found_(0), userLookups_(0), userFound_(0)
     {}
+    */
 private:	
     
-    static ObjectTable* instance_;
+    // static ObjectTable* instance_;
 
-    std::unordered_map< std::string, struct object_t* > objects_;
-    std::unordered_map< std::string, std::list<struct object_t*> > children_;
-    long searches_, found_;
-    long userLookups_;
-    long userFound_;
+    static std::unordered_map< std::string, struct object_t* > objects_;
+    static std::unordered_map< std::string, std::list<struct object_t*> > children_;
+    static long searches_;
+    static long found_;
+    static long userLookups_;
+    static long userFound_;
 };
 
 #endif

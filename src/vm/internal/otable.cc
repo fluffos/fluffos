@@ -21,20 +21,31 @@
  * Note: if you change an object name, you must remove it and reenter it.
  */
 
-ObjectTable* ObjectTable::instance_ = nullptr;
+
+std::unordered_map< std::string, struct object_t* > ObjectTable::objects_;
+std::unordered_map< std::string, std::list<struct object_t*> > ObjectTable::children_;
+
+
+long ObjectTable::searches_ = 0;
+long ObjectTable::found_ = 0;
+long ObjectTable::userLookups_ = 0;
+long ObjectTable::userFound_ = 0;
+
+// ObjectTable* ObjectTable::instance_ = nullptr;
 
 void ObjectTable::init() 
 {
-    instance_ = new ObjectTable;
+    // instance_ = new ObjectTable;
 }
     
-ObjectTable* ObjectTable::getInstance() { return instance_; }
+// ObjectTable* ObjectTable::getInstance() { return instance_; }
 
+/*
 void ObjectTable::cleanup()
 {
     delete instance_;
 }
-
+*/
 
 /*
  * Add an object to the table - can't have duplicate names.
