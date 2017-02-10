@@ -50,8 +50,6 @@ extern void update_load_av();
  * local function prototypes.
  */
 static char *get_user_command(interactive_t * /*ip*/);
-static char *first_cmd_in_buf(interactive_t * /*ip*/);
-static int cmd_in_buf(interactive_t * /*ip*/);
 static int call_function_interactive(interactive_t * /*i*/, char * /*str*/);
 static void print_prompt(interactive_t * /*ip*/);
 
@@ -79,17 +77,11 @@ struct user_event_data {
 //  }
 //}
 
-void on_user_command(evutil_socket_t fd, short what, void *arg) {
-  debug(event, "User has an full command ready: %d:%s%s%s%s \n", (int)fd,
-        (what & EV_TIMEOUT) ? " timeout" : "", (what & EV_READ) ? " read" : "",
-        (what & EV_WRITE) ? " write" : "", (what & EV_SIGNAL) ? " signal" : "");
-  auto user = reinterpret_cast<interactive_t *>(arg);
-
-  if (user == NULL) {
-    fatal("on_user_command: user == NULL, Driver BUG.");
-    return;
+void on_user_command(struct interactive_t *ip, char *command) {
+  /* handle snooping - snooper does not see type-ahead due to telnet being in linemode */
+  if (!(ip->iflags & NOECHO)) {
+    handle_snoop(command, strlen(command), ip);
   }
-
   // FIXME: this function currently calls into mudlib and will throw errors
   // This catch block should be moved one level down.
   error_context_t econ;
@@ -98,7 +90,7 @@ void on_user_command(evutil_socket_t fd, short what, void *arg) {
   }
   set_eval(max_cost);
   try {
-    process_user_command(user);
+    process_user_command(ip, command);
   } catch (const char *) {
     restore_context(&econ);
   }
@@ -106,69 +98,7 @@ void on_user_command(evutil_socket_t fd, short what, void *arg) {
 
   /* Has to be cleared if we jumped out of process_user_command() */
   current_interactive = 0;
-
-  // if user still have pending command, continue to schedule it.
-  //
-  // NOTE: It is important to only execute one command here, then schedule next
-  // command at the tail, This ensure users have a fair chance that no one can
-  // keep running commands.
-  //
-  // currently command scehduling is done inside process_user_command().
-  //
-  // maybe_schedule_user_command(user);
 }
-
-void on_user_read(bufferevent *bev, void *arg) {
-  auto user = reinterpret_cast<interactive_t *>(arg);
-
-  if (user == NULL) {
-    fatal("on_user_read: user == NULL, Driver BUG.");
-    return;
-  }
-
-  // Read user input
-  get_user_data(user);
-
-  // TODO: currently get_user_data() will schedule command execution.
-  // should probably move it here.
-}
-
-void on_user_write(bufferevent *bev, void *arg) {
-  auto user = reinterpret_cast<interactive_t *>(arg);
-  if (user == NULL) {
-    fatal("on_user_write: user == NULL, Driver BUG.");
-    return;
-  }
-  // nothing to do.
-}
-
-void on_user_events(bufferevent *bev, short events, void *arg) {
-  auto user = reinterpret_cast<interactive_t *>(arg);
-
-  if (user == NULL) {
-    fatal("on_user_events: user == NULL, Driver BUG.");
-    return;
-  }
-
-  if (events & (BEV_EVENT_ERROR | BEV_EVENT_EOF)) {
-    user->iflags |= NET_DEAD;
-    remove_interactive(user->ob, 0);
-  } else {
-    debug(event, "on_user_events: ignored unknown events: %d\n", events);
-  }
-}
-
-//void new_user_event_listener(interactive_t *user) {
-//  auto bev = bufferevent_socket_new(g_event_base, user->fd,
-//                                    BEV_OPT_CLOSE_ON_FREE | BEV_OPT_DEFER_CALLBACKS);
-//  bufferevent_setcb(bev, on_user_read, on_user_write, on_user_events, user);
-//  bufferevent_enable(bev, EV_READ | EV_WRITE);
-//
-//  bufferevent_set_timeouts(bev, NULL, NULL);
-//
-//  user->ev_buffer = bev;
-//  user->ev_command = evtimer_new(g_event_base, on_user_command, user);
-//}
 
 /*
  * This is the new user connection handler. This function is called by the
@@ -176,7 +106,7 @@ void on_user_events(bufferevent *bev, short events, void *arg) {
  * If space is available, an interactive data structure is initialized and
  * the user is connected.
  */
-void new_user_handler(int external_port_idx, int connIdx, char* remote_addr, int remote_port) {
+struct interactive_t* new_user_handler(int external_port_idx, int connIdx, char* remote_addr, int remote_port) {
   auto port = external_port[external_port_idx];
   /*
    * initialize new user interactive data structure.
@@ -228,7 +158,7 @@ void new_user_handler(int external_port_idx, int connIdx, char* remote_addr, int
     if (master_ob->interactive) {
       remove_interactive(master_ob, 0);
     }
-    return;
+    return nullptr;
   }
   /*
    * There was an object returned from connect(). Use this as the user
@@ -272,7 +202,7 @@ void new_user_handler(int external_port_idx, int connIdx, char* remote_addr, int
   }
   set_command_giver(0);
 
-  debug(connections, ("new_user_handler: end\n"));
+  return user;
 } /* new_user_handler() */
 
 /*
@@ -408,412 +338,113 @@ void flush_message_all() {
   users_foreach([](interactive_t *user) { flush_message(user); });
 }
 
+void on_mud_data(interactive_t *ip, const char *buf, int num_bytes) {
+//  memcpy(ip->text + ip->text_end, buf, num_bytes);
+//  ip->text_end += num_bytes;
+//
+//  if (num_bytes == text_space) {
+//    if (ip->text_end == 4) {
+//      *reinterpret_cast<volatile int *>(ip->text) = ntohl(*reinterpret_cast<int *>(ip->text));
+//      if (*reinterpret_cast<volatile int *>(ip->text) > MAX_TEXT - 5) {
+//        remove_interactive(ip->ob, 0);
+//      }
+//    } else {
+//      svalue_t value;
+//
+//      ip->text[ip->text_end] = 0;
+//      if (restore_svalue(ip->text + 4, &value) == 0) {
+//        STACK_INC;
+//        *sp = value;
+//      } else {
+//        push_undefined();
+//      }
+//      ip->text_end = 0;
+//      safe_apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
+//    }
+//  }
+}
+
+void on_ascii_data(interactive_t *ip, const char *buf, int num_bytes) {
+//  char *nl, *p;
+//
+//  memcpy(ip->text + ip->text_end, buf, num_bytes);
+//  ip->text_end += num_bytes;
+//
+//  p = ip->text + ip->text_start;
+//  while ((nl = reinterpret_cast<char *>(memchr(p, '\n', ip->text_end - ip->text_start)))) {
+//    ip->text_start = (nl + 1) - ip->text;
+//
+//    *nl = 0;
+//    if (*(nl - 1) == '\r') {
+//      *--nl = 0;
+//    }
+//
+//    if (!(ip->ob->flags & O_DESTRUCTED)) {
+//      char *str;
+//
+//      str = new_string(nl - p, "PORT_ASCII");
+//      memcpy(str, p, nl - p + 1);
+//      push_malloced_string(str);
+//      safe_apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
+//    }
+//
+//    if (ip->text_start == ip->text_end) {
+//      ip->text_start = ip->text_end = 0;
+//      break;
+//    }
+//
+//    p = nl + 1;
+//  }
+}
+
+void on_buffer_data(interactive_t *ip, const char *buf, int num_bytes) {
+  buffer_t *buffer;
+
+  buffer = allocate_buffer(num_bytes);
+  memcpy(buffer->item, buf, num_bytes);
+
+  push_refed_buffer(buffer);
+  safe_apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
+}
+
+
 /*
- * Read pending data for a user into user->interactive->text.
- * This also does telnet negotiation.
+ * Called by Go when there are data to process.
+ * NOTE: PORT_TELNET processing is done in the go, and it will call
+ *       on_telnet_data directly.
  */
-void get_user_data(interactive_t *ip) {
-  int num_bytes, text_space;
-  unsigned char buf[MAX_TEXT];
-  int ws_space;
-
-  text_space = sizeof(buf);
-
-  debug(connections, "get_user_data: USER %d\n", ip->fd);
-
-  /* compute how much data we can read right now */
-  switch (ip->connection_type) {
-    case PORT_WEBSOCKET:
-      ws_space = MAX_TEXT - ip->ws_text_end;
-      /* check if we need more space */
-      if (ws_space < MAX_TEXT / 16) {
-        if (ip->ws_text_start > 0) {
-          memmove(ip->ws_text, ip->ws_text + ip->ws_text_start,
-                  ip->ws_text_end - ip->ws_text_start);
-          ws_space += ip->ws_text_start;
-          ip->ws_text_end -= ip->ws_text_start;
-          ip->ws_text_start = 0;
-        }
-      }
-      if ((ip->iflags & HANDSHAKE_COMPLETE) && (!ip->ws_size) && ws_space > 8) {
-        ws_space = 8;  // only read the header or we'll end up queueing several
-                       // websocket packets with no triggers to read them
-      }
-      if (ip->ws_size && ws_space > ip->ws_size) {
-        ws_space = ip->ws_size;  // keep the next packet in the socket
-      }
-      break;
-    case PORT_TELNET:
-      text_space = MAX_TEXT - ip->text_end;
-
-      /* check if we need more space */
-      if (text_space < MAX_TEXT / 16) {
-        if (ip->text_start > 0) {
-          memmove(ip->text, ip->text + ip->text_start, ip->text_end - ip->text_start);
-          text_space += ip->text_start;
-          ip->text_end -= ip->text_start;
-          ip->text_start = 0;
-        }
-        if (text_space < MAX_TEXT / 16){
-          ip->iflags |= SKIP_COMMAND;
-          ip->text_start = ip->text_end = 0;
-          text_space = MAX_TEXT;
-        }
-        
-      }
-      break;
-
-    case PORT_MUD:
-      if (ip->text_end < 4) {
-        text_space = 4 - ip->text_end;
-      } else {
-        text_space = *reinterpret_cast<volatile int *>(ip->text) - ip->text_end + 4;
-      }
-      break;
-
-    default:
-      text_space = sizeof(buf);
-      break;
-  }
-
+void on_conn_data(interactive_t *ip, const char *buf, int num_bytes) {
   /* read the data from the socket */
-  debug(connections, "get_user_data: read on fd %d\n", ip->fd);
-
-  //num_bytes = bufferevent_read(ip->ev_buffer, buf, text_space);
-
-  if (num_bytes == -1) {
-    debug(connections, "get_user_data: fd %d, read error: %s.\n", ip->fd,
-          evutil_socket_error_to_string(evutil_socket_geterror(ip->fd)));
-    ip->iflags |= NET_DEAD;
-    remove_interactive(ip->ob, 0);
-    return;
-  }
+  debug(connections, "on_conn_data: read on conn %d\n", ip->id);
 
 #ifdef F_NETWORK_STATS
+  // FIXME: This is actaully now the wrong place to count, it should be moved to Go.
   inet_in_packets++;
   inet_in_volume += num_bytes;
   external_port[ip->external_port].in_packets++;
   external_port[ip->external_port].in_volume += num_bytes;
 #endif
 
-  /* process the data that we've just read */
-
   switch (ip->connection_type) {
     case PORT_WEBSOCKET:
-      if (ip->iflags & HANDSHAKE_COMPLETE) {
-        memcpy(ip->ws_text + ip->ws_text_end, buf, num_bytes);
-        ip->ws_text_end += num_bytes;
-        if (!ip->ws_size) {
-          unsigned char *data = reinterpret_cast<unsigned char *>(&ip->ws_text[ip->ws_text_start]);
-          if (ip->ws_text_end - ip->ws_text_start < 8) {
-            break;
-          }
-          unsigned char msize = data[1];
-          int size = msize & 0x7f;
-          ip->ws_text_start += 2;
-          if (size == 126) {
-            size = (data[2] << 8) | data[3];
-            ip->ws_text_start += 2;
-          } else if (size == 127) {  // insane real size
-            ip->iflags |= NET_DEAD;
-            remove_interactive(ip->ob, 0);
-            return;
-          }
-          ip->ws_size = size;
-          if (msize & 0x80) {
-            memcpy(&ip->ws_mask, &ip->ws_text[ip->ws_text_start], 4);
-            ip->ws_text_start += 4;
-          } else {
-            ip->ws_mask = 0;
-          }
-          ip->ws_maskoffs = 0;
-        }
-        int i;
-        if (ip->ws_size) {
-          int *wdata = reinterpret_cast<int *>(&ip->ws_text[ip->ws_text_start]);
-          int *dest = reinterpret_cast<int *>(&buf[0]);
-          if (ip->ws_maskoffs) {
-            int newmask;
-            for (i = 0; i < 4; i++) {
-              (reinterpret_cast<char *>(&newmask))[i] =
-                  (reinterpret_cast<char *>(&ip->ws_mask))[(i + ip->ws_maskoffs) % 4];
-            }
-            ip->ws_mask = newmask;
-            ip->ws_maskoffs = 0;
-          }
-          i = 0;
-          while (ip->ws_size > 3 && ip->ws_text_end - ip->ws_text_start > 3) {
-            dest[i] = wdata[i] ^ ip->ws_mask;
-            i++;
-            ip->ws_text_start += 4;
-            ip->ws_size -= 4;
-          }
-          num_bytes = i * 4;
-          int left = ip->ws_size;
-          if (left > ip->ws_text_end - ip->ws_text_start) {
-            left = ip->ws_text_end - ip->ws_text_start;
-          }
-          if (left) {
-            ip->ws_maskoffs = left;
-            dest[i] = wdata[i] ^ ip->ws_mask;
-            num_bytes += left;
-            ip->ws_text_start += left;
-            ip->ws_size -= left;
-          }
-        }
-        //          for(i=0;i<num_bytes;i++)
-        //              printf("%x ", buf[i]);
-        //          puts("");
-        // and on with the telnet case
-      } else {
-        char *str = new_string(num_bytes, "PORT_WEBSOCKET");
-        memcpy(str, buf, num_bytes);
-        ip->ws_size = 0;
-        ip->ws_text_end = 0;
-        str[num_bytes] = 0;
-        push_malloced_string(str);
-        if (current_interactive) {
-          fatal("eek! someone already here\n");
-          return;
-        }
-        object_t *ob = ip->ob;
-        set_command_giver(ob);
-        current_interactive = ob;
-        safe_apply(APPLY_PROCESS_INPUT, ob, 1, ORIGIN_DRIVER);
-        set_command_giver(0);
-        current_interactive = 0;
-
-        break;  // they're not allowed to send the other stuff until we replied,
-                // so all data should be handshake stuff
-      }
+      // TODO: restore this.
       break;
-    case PORT_TELNET: {
-      int start = ip->text_end;
-
-      // this will read data into ip->text
-      telnet_recv(ip->telnet, reinterpret_cast<const char *>(&buf[0]), num_bytes);
-
-      if (ip->text_end > start) {
-        /* handle snooping - snooper does not see type-ahead due to
-         telnet being in linemode */
-        if (!(ip->iflags & NOECHO)) {
-          handle_snoop(ip->text + start, ip->text_end - start, ip);
-        }
-
-        // If we read something, search for command.
-        if (cmd_in_buf(ip)) {
-          ip->iflags |= CMD_IN_BUF;
-//          struct timeval zero_sec = {0, 0};
-//          evtimer_del(ip->ev_command);
-//          evtimer_add(ip->ev_command, &zero_sec);
-        }
-      }
+    case PORT_TELNET:
+      // impossbile
       break;
-    }
     case PORT_MUD:
-      memcpy(ip->text + ip->text_end, buf, num_bytes);
-      ip->text_end += num_bytes;
-
-      if (num_bytes == text_space) {
-        if (ip->text_end == 4) {
-          *reinterpret_cast<volatile int *>(ip->text) = ntohl(*reinterpret_cast<int *>(ip->text));
-          if (*reinterpret_cast<volatile int *>(ip->text) > MAX_TEXT - 5) {
-            remove_interactive(ip->ob, 0);
-          }
-        } else {
-          svalue_t value;
-
-          ip->text[ip->text_end] = 0;
-          if (restore_svalue(ip->text + 4, &value) == 0) {
-            STACK_INC;
-            *sp = value;
-          } else {
-            push_undefined();
-          }
-          ip->text_end = 0;
-          safe_apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
-        }
-      }
+      on_mud_data(ip, buf, num_bytes);
       break;
-
-    case PORT_ASCII: {
-      char *nl, *p;
-
-      memcpy(ip->text + ip->text_end, buf, num_bytes);
-      ip->text_end += num_bytes;
-
-      p = ip->text + ip->text_start;
-      while ((nl = reinterpret_cast<char *>(memchr(p, '\n', ip->text_end - ip->text_start)))) {
-        ip->text_start = (nl + 1) - ip->text;
-
-        *nl = 0;
-        if (*(nl - 1) == '\r') {
-          *--nl = 0;
-        }
-
-        if (!(ip->ob->flags & O_DESTRUCTED)) {
-          char *str;
-
-          str = new_string(nl - p, "PORT_ASCII");
-          memcpy(str, p, nl - p + 1);
-          push_malloced_string(str);
-          safe_apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
-        }
-
-        if (ip->text_start == ip->text_end) {
-          ip->text_start = ip->text_end = 0;
-          break;
-        }
-
-        p = nl + 1;
-      }
-    } break;
-
+    case PORT_ASCII:
+      on_ascii_data(ip, buf, num_bytes);
+      break;
 #ifndef NO_BUFFER_TYPE
-    case PORT_BINARY: {
-      buffer_t *buffer;
-
-      buffer = allocate_buffer(num_bytes);
-      memcpy(buffer->item, buf, num_bytes);
-
-      push_refed_buffer(buffer);
-      safe_apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
-    } break;
+    case PORT_BINARY:
+      on_buffer_data(ip, buf, num_bytes);
+      break;
 #endif
   }
 }
-
-static int clean_buf(interactive_t *ip) {
-  /* skip null input */
-  while (ip->text_start < ip->text_end && !*(ip->text + ip->text_start)) {
-    ip->text_start++;
-  }
-
-  /* if we've advanced beyond the end of the buffer, reset it */
-  if (ip->text_start >= ip->text_end) {
-    ip->text_start = ip->text_end = 0;
-  }
-
-  /* if we're skipping the current command, check to see if it has been
-   completed yet.  if it has, flush it and clear the skip bit */
-  if (ip->iflags & SKIP_COMMAND) {
-    char *p;
-
-    for (p = ip->text + ip->text_start; p < ip->text + ip->text_end; p++) {
-      if (*p == '\r' || *p == '\n') {
-        ip->text_start += p - (ip->text + ip->text_start) + 1;
-        ip->iflags &= ~SKIP_COMMAND;
-        return clean_buf(ip);
-      }
-    }
-  }
-
-  return (ip->text_end > ip->text_start);
-}
-
-static int cmd_in_buf(interactive_t *ip) {
-  char *p;
-
-  /* do standard input buffer cleanup */
-  if (!clean_buf(ip)) {
-    return 0;
-  }
-
-  /* if we're in single character mode, we've got input */
-  if (ip->iflags & SINGLE_CHAR) {
-    return 1;
-  }
-
-  /* search for a newline.  if found, we have a command */
-  for (p = ip->text + ip->text_start; p < ip->text + ip->text_end; p++) {
-    if (*p == '\r' || *p == '\n') {
-      return 1;
-    }
-  }
-
-  /* duh, no command */
-  return 0;
-}
-
-static char *first_cmd_in_buf(interactive_t *ip) {
-  char *p;
-  static char tmp[2];
-
-  /* do standard input buffer cleanup */
-  if (!clean_buf(ip)) {
-    return 0;
-  }
-
-  p = ip->text + ip->text_start;
-
-  /* if we're in single character mode, we've got input */
-  if (ip->iflags & SINGLE_CHAR) {
-    if (*p == 8 || *p == 127) {
-      *p = 0;
-    }
-    tmp[0] = *p;
-    ip->text[ip->text_start++] = 0;
-    if (!clean_buf(ip)) {
-      ip->iflags &= ~CMD_IN_BUF;
-    }
-    return tmp;
-  }
-
-  /* search for the newline */
-  while (ip->text[ip->text_start] != '\n' && ip->text[ip->text_start] != '\r') {
-    ip->text_start++;
-  }
-
-  /* check for "\r\n" or "\n\r" */
-  if (ip->text_start + 1 < ip->text_end &&
-      ((ip->text[ip->text_start] == '\r' && ip->text[ip->text_start + 1] == '\n') ||
-       (ip->text[ip->text_start] == '\n' && ip->text[ip->text_start + 1] == '\r'))) {
-    ip->text[ip->text_start++] = 0;
-  }
-
-  ip->text[ip->text_start++] = 0;
-  if (!cmd_in_buf(ip)) {
-    ip->iflags &= ~CMD_IN_BUF;
-  }
-
-  return p;
-}
-
-/*
- * Return the first command of the next user in sequence that has a complete
- * command in their buffer.  A command is defined to be a single character
- * when SINGLE_CHAR is set, or a newline terminated string otherwise.
- */
-static char *get_user_command(interactive_t *ip) {
-  char *user_command = NULL;
-
-  if (!ip || !ip->ob || (ip->ob->flags & O_DESTRUCTED)) {
-    return NULL;
-  }
-
-  /* if there's a command in the buffer, pull it out! */
-  if (ip->iflags & CMD_IN_BUF) {
-    user_command = first_cmd_in_buf(ip);
-  }
-
-  /* no command found - return NULL */
-  if (!user_command) {
-    return NULL;
-  }
-
-  /* got a command - return it and set command_giver */
-  debug(connections, "get_user_command: user_command = (%s)\n", user_command);
-  save_command_giver(ip->ob);
-
-  if ((ip->iflags & NOECHO) && !(ip->iflags & SINGLE_CHAR)) {
-    /* must not enable echo before the user input is received */
-    set_localecho(command_giver->interactive, true);
-    ip->iflags &= ~NOECHO;
-  }
-
-  ip->last_time = get_current_time();
-  return user_command;
-} /* get_user_command() */
 
 static int escape_command(interactive_t *ip, char *user_command) {
   if (user_command[0] != '!') {
@@ -876,16 +507,23 @@ static void process_input(interactive_t *ip, char *user_command) {
  * This function calls get_user_command() to get a user command.
  * One user command is processed per execution of this function.
  */
-int process_user_command(interactive_t *ip) {
-  char *user_command;
-
-  /*
-   * WARNING: get_user_command() sets command_giver via
-   * save_command_giver(), but only when the return is non-zero!
-   */
-  if (!(user_command = get_user_command(ip))) {
+int process_user_command(interactive_t *ip, char* user_command) {
+  if (!ip || !ip->ob || (ip->ob->flags & O_DESTRUCTED)) {
     return 0;
   }
+
+  /* got a command - return it and set command_giver */
+  debug(connections, "process_user_command: user_command = (%s)\n", user_command);
+  save_command_giver(ip->ob);
+
+  if ((ip->iflags & NOECHO) && !(ip->iflags & SINGLE_CHAR)) {
+    /* must not enable echo before the user input is received */
+    set_localecho(command_giver->interactive, true);
+    ip->iflags &= ~NOECHO;
+  }
+
+  ip->last_time = get_current_time();
+
 
   if (ip != command_giver->interactive) {
     fatal("BUG: process_user_command.");
@@ -900,10 +538,6 @@ int process_user_command(interactive_t *ip) {
   update_load_av();
 
   debug(connections, "process_user_command: command_giver = /%s\n", command_giver->obname);
-
-  if (!ip) {
-    goto exit;
-  }
 
   user_command = translate_easy(ip->trans->incoming, user_command);
 
@@ -923,7 +557,6 @@ int process_user_command(interactive_t *ip) {
       /* only 1 char ... switch to line buffer mode */
       ip->iflags |= WAS_SINGLE_CHAR;
       ip->iflags &= ~SINGLE_CHAR;
-      ip->text_start = ip->text_end = *ip->text = 0;
       set_linemode(ip, true);
     } else {
       if (ip->iflags & WAS_SINGLE_CHAR) {
@@ -935,7 +568,6 @@ int process_user_command(interactive_t *ip) {
           goto exit;
         }
       }
-
       process_input(ip, user_command + 1);
     }
 
@@ -963,12 +595,6 @@ exit:
    */
   if (IP_VALID(ip, command_giver)) {
     print_prompt(ip);
-    // FIXME: this doesn't belong here, should be moved to event.cc
-    if (ip->iflags & CMD_IN_BUF) {
-      struct timeval zero_sec = {0, 0};
-//      evtimer_del(ip->ev_command);
-//      evtimer_add(ip->ev_command, &zero_sec);
-    }
   }
 
   current_interactive = 0;
@@ -1153,9 +779,6 @@ static int call_function_interactive(interactive_t *i, char *str) {
 
   // FIXME: this logic can be combined with above.
   if (was_single && !(i->iflags & SINGLE_CHAR)) {
-    i->text_start = i->text_end = 0;
-    i->text[0] = '\0';
-    i->iflags &= ~CMD_IN_BUF;
     set_linemode(i, true);
   }
   if (was_noecho && !(i->iflags & NOECHO)) {

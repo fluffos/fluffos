@@ -10,6 +10,7 @@
 
 #include "backend.h"  // for clear_tick_events , FIXME
 #include "user.h"     // for users_foreach, FIXME
+#include "vm/vm.h"
 #include "vm/internal/otable.h"
 #include "vm/internal/base/machine.h"
 #include "vm/internal/compiler/lex.h"  // for total_lines, FIXME

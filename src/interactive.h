@@ -1,8 +1,15 @@
 #ifndef INTERACITVE_H
 #define INTERACITVE_H
 
-#include <sys/socket.h>  // for sockaddr_storage
-#include "vm/vm.h"       // FIXME: for union string_or_func
+#ifndef __cplusplus
+// HACK for main.go
+union string_or_func {
+    struct funptr_t *f;
+    char *s;
+};
+#else
+    #include "vm/vm.h"       // FIXME: for union string_or_func
+#endif
 
 #define MAX_TEXT 2048
 
@@ -43,14 +50,11 @@ struct interactive_t {
   int num_carry;               /* number of args for input_to             */
 #endif
   int connection_type;          /* the type of connection this is          */
-  int fd;                       /* file descriptor for interactive object  */
+  //int fd;                       /* file descriptor for interactive object  */
   char* remote_addr;             /* user's IP address */
   int remote_port;              /* user's port number */
   int external_port;   /* external port index for connection      */
   const char *prompt;  /* prompt string for interactive object    */
-  char text[MAX_TEXT]; /* input buffer for interactive object     */
-  int text_end;        /* first free char in buffer               */
-  int text_start;      /* where we are up to in user command buffer */
   int last_time;       /* time of last command executed           */
 #ifndef NO_SNOOP
   struct object_t *snooped_by;
@@ -68,13 +72,6 @@ struct interactive_t {
 
   // iconv handle
   struct translation *trans;
-
-  char ws_text[MAX_TEXT]; /* input buffer for interactive object     */
-  int ws_text_end;        /* first free char in buffer               */
-  int ws_text_start;      /* where we are up to in user command buffer */
-  int ws_size;
-  int ws_mask;
-  char ws_maskoffs;
 
   // libtelnet handle
   struct telnet_t *telnet;

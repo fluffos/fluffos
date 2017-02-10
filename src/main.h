@@ -23,9 +23,17 @@ extern "C" {
   void wrap_backend_once();
   int get_gametick_ms();
 
-  void wrap_new_user_handler(int, int, char*, int);
+  struct new_user_result_t {
+      struct interactive_t* user;
+      struct telnet_t* telnet;
+  };
 
+  struct new_user_result_t wrap_new_user_handler(int, int, char*, int);
 
+  void wrap_on_user_command(struct interactive_t *, char*); // in comm.cc
+  int is_no_ansi_and_strip(); // in comm.cc
+  int is_single_char(struct interactive_t*); // in comm.cc
+  void on_conn_error(struct interactive_t*); // in comm.cc
 
 #ifdef __cplusplus
 }

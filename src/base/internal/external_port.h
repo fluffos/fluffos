@@ -12,12 +12,12 @@
 extern "C" {
 #endif
 
-#define PORT_UNDEFINED 0
-#define PORT_TELNET 1
-#define PORT_BINARY 2
-#define PORT_ASCII 3
-#define PORT_MUD 4
-#define PORT_WEBSOCKET 5
+static const int PORT_UNDEFINED = 0;
+static const int PORT_TELNET = 1;
+static const int PORT_BINARY = 2;
+static const int PORT_ASCII = 3;
+static const int PORT_MUD = 4;
+static const int PORT_WEBSOCKET = 5;
 
 struct port_def_t {
   int kind;

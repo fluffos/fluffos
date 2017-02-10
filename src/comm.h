@@ -52,7 +52,7 @@ void shutdown_external_ports(void);
 void set_prompt(const char *);
 void process_io(void);
 void get_user_data(struct interactive_t *);
-int process_user_command(struct interactive_t *);
+int process_user_command(struct interactive_t *, char *);
 int replace_interactive(struct object_t *, struct object_t *);
 int set_call(struct object_t *, struct sentence_t *, int);
 void remove_interactive(struct object_t *, int);

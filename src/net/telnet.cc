@@ -15,6 +15,7 @@
 
 // These are defined in Go.
 extern "C" {
+void OnTelnetData(int, const char*, unsigned long);
 void ConnWrite(int, const char*, int);
 void ConnFlush(int);
 void ConnClose(int);
@@ -45,30 +46,7 @@ struct telnet_t *net_telnet_init(interactive_t *user) {
 static const int ANSI_SUBSTITUTE = 0x20;
 
 static inline void on_telnet_data(const char *buffer, unsigned long size, interactive_t *ip) {
-  for (int i = 0; i < size; i++) {
-    unsigned char c = static_cast<unsigned char>(buffer[i]);
-    switch (c) {
-      case 0x08:
-      case 0x7f:
-        if (ip->iflags & SINGLE_CHAR) {
-          ip->text[ip->text_end++] = c;
-        } else {
-          if (ip->text_end > 0) {
-            ip->text_end--;
-          }
-        }
-        break;
-      case 0x1b:
-        if (CONFIG_INT(__RC_NO_ANSI__) && CONFIG_INT(__RC_STRIP_BEFORE_PROCESS_INPUT__)) {
-          ip->text[ip->text_end++] = ANSI_SUBSTITUTE;
-          break;
-        }
-      // fallthrough
-      default:
-        ip->text[ip->text_end++] = c;
-        break;
-    }
-  }
+    OnTelnetData(ip->id, buffer, size);
 }
 
 static inline void on_telnet_send(const char *buffer, unsigned long size, interactive_t *ip) {

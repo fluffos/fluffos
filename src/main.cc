@@ -108,10 +108,32 @@ void wrap_backend_once() {
   backend_once();
 }
 
+int is_no_ansi_and_strip() {
+  return (CONFIG_INT(__RC_NO_ANSI__) && CONFIG_INT(__RC_STRIP_BEFORE_PROCESS_INPUT__));
+}
+
+int is_single_char(interactive_t* ip) {
+  return (ip->iflags & SINGLE_CHAR) != 0;
+}
+
+// On Connection Errors.
+void on_conn_error(struct interactive_t* ip) {
+  ip->iflags |= NET_DEAD;
+  remove_interactive(ip->ob, 0);
+}
+
+void on_user_command(struct interactive_t *, char*); // in comm.cc
+void wrap_on_user_command(struct interactive_t* ip, char* command) {
+  on_user_command(ip, command);
+}
+
 // In comm.c
-void new_user_handler(int , int, char* , int);
-void wrap_new_user_handler(int idx, int connIdx, char * addr, int port) {
-    new_user_handler(idx, connIdx, addr, port);
+struct interactive_t* new_user_handler(int , int, char* , int);
+struct new_user_result_t wrap_new_user_handler(int idx, int connIdx, char * addr, int port) {
+    struct new_user_result_t res;
+    res.user = new_user_handler(idx, connIdx, addr, port);
+    if (res.user) res.telnet = res.user->telnet;
+    return res;
 }
 
 static void setup_signal_handlers() {
