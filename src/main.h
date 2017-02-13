@@ -28,9 +28,12 @@ extern "C" {
       struct telnet_t* telnet;
   };
 
-  struct new_user_result_t wrap_new_user_handler(int, int, char*, int);
-
+  struct new_user_result_t wrap_new_user_handler(int, int, char*);
   void wrap_on_user_command(struct interactive_t *, char*); // in comm.cc
+  void wrap_on_binary_data(struct interactive_t* ip, const char* buf, int);
+  void wrap_on_ascii_data(struct interactive_t* ip, const char* buf);
+  void wrap_on_mud_data(struct interactive_t* ip, char* buf);
+
   int is_no_ansi_and_strip(); // in comm.cc
   int is_single_char(struct interactive_t*); // in comm.cc
   void on_conn_error(struct interactive_t*); // in comm.cc

@@ -27,6 +27,7 @@
 #include "vm/vm.h"  // for push_constant_string, etc
 
 #include "packages/core/dns.h"  // for init_dns_event_base.
+#include "comm.h"
 
 time_t boot_time;
 
@@ -122,16 +123,23 @@ void on_conn_error(struct interactive_t* ip) {
   remove_interactive(ip->ob, 0);
 }
 
-void on_user_command(struct interactive_t *, char*); // in comm.cc
 void wrap_on_user_command(struct interactive_t* ip, char* command) {
   on_user_command(ip, command);
 }
 
-// In comm.c
-struct interactive_t* new_user_handler(int , int, char* , int);
-struct new_user_result_t wrap_new_user_handler(int idx, int connIdx, char * addr, int port) {
+void wrap_on_binary_data(struct interactive_t* ip, const char* buf, int len) {
+    on_binary_data(ip, buf, len);
+}
+void wrap_on_ascii_data(struct interactive_t* ip, const char* buf) {
+    on_ascii_data(ip, buf);
+}
+void wrap_on_mud_data(struct interactive_t* ip, char* buf) {
+    on_mud_data(ip, buf);
+}
+
+struct new_user_result_t wrap_new_user_handler(int idx, int connIdx, char *hostport) {
     struct new_user_result_t res;
-    res.user = new_user_handler(idx, connIdx, addr, port);
+    res.user = new_user_handler(idx, connIdx, hostport);
     if (res.user) res.telnet = res.user->telnet;
     return res;
 }

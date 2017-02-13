@@ -24,6 +24,7 @@
 #endif
 #include <unistd.h>  // for rmdir(), FIXME
 
+#include "cgo.autogen.h" // for NetworkStats etc
 #include "packages/core/call_out.h"
 #include "packages/core/dns.h"
 #include "packages/core/add_action.h"  // stat_living_objects
@@ -1368,12 +1369,13 @@ void f_mud_status(void) {
 
   if (verbose) {
     char dir_buf[1024];
+    auto r = GetNetworkStats(); // in port.go
     outbuf_addv(&ob, "current working directory: %s\n\n", get_current_dir(dir_buf, 1024));
     outbuf_add(&ob, "add_message statistics\n");
     outbuf_add(&ob, "------------------------------\n");
     outbuf_addv(&ob, "Calls to add_message: %8" PRIu64 "   Packets: %8" PRIu64
                      "   Average packet size: %.2lf\n\n",
-                add_message_calls, inet_packets, static_cast<double>(inet_volume) / inet_packets);
+                add_message_calls, r.r0, static_cast<double>(r.r1) / r.r0);
 
     stat_living_objects(&ob);
 

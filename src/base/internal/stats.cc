@@ -9,13 +9,6 @@
  */
 uint64_t add_message_calls = 0;
 
-uint64_t inet_packets = 0;
-uint64_t inet_volume = 0;
-
-uint64_t inet_out_packets = 0;
-uint64_t inet_out_volume = 0;
-uint64_t inet_in_packets = 0;
-uint64_t inet_in_volume = 0;
 uint64_t inet_socket_in_packets = 0;
 uint64_t inet_socket_in_volume = 0;
 uint64_t inet_socket_out_packets = 0;

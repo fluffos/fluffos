@@ -7,19 +7,12 @@
 #include <event2/bufferevent.h>
 #include <string>
 
+#include "cgo.autogen.h"
 #include "comm.h"
 #include "packages/core/mssp.h"
 #include "packages/core/telnet_ext.h"
 #include "thirdparty/libtelnet/libtelnet.h"  // for telnet_t, telnet_event_t*
 #include "vm/vm.h"
-
-// These are defined in Go.
-extern "C" {
-void OnTelnetData(int, const char*, unsigned long);
-void ConnWrite(int, const char*, int);
-void ConnFlush(int);
-void ConnClose(int);
-}
 
 static const telnet_telopt_t my_telopts[] = {{TELNET_TELOPT_TM, TELNET_WILL, TELNET_DO},
                                              {TELNET_TELOPT_SGA, TELNET_WILL, TELNET_DO},
@@ -46,11 +39,11 @@ struct telnet_t *net_telnet_init(interactive_t *user) {
 static const int ANSI_SUBSTITUTE = 0x20;
 
 static inline void on_telnet_data(const char *buffer, unsigned long size, interactive_t *ip) {
-    OnTelnetData(ip->id, buffer, size);
+    OnTelnetData(ip->id, (char*)buffer, size);
 }
 
 static inline void on_telnet_send(const char *buffer, unsigned long size, interactive_t *ip) {
-  ConnWrite(ip->id, buffer, size);
+  ConnWrite(ip->id, ip->external_port, (char*)buffer, size);
 }
 
 static inline void on_telnet_iac(unsigned char cmd, interactive_t *ip) {

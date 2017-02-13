@@ -24,6 +24,11 @@ case $COMPILER in
     ;;
 esac
 
+# Install Go 1.7
+sudo wget -q https://storage.googleapis.com/golang/go1.7.5.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go*.tar.gz
+export PATH=/usr/local/go/bin:$PATH
+
 if [ "$BUILD" = "i386" ]; then
   sudo apt-get remove libevent-dev libevent-* libssl-dev
   sudo apt-get -f --no-install-recommends install g++-multilib g++-4.8-multilib valgrind:i386 libevent-dev:i386 libz-dev:i386

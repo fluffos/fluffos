@@ -7,22 +7,13 @@
 
 #include "comm.h"
 
-#include <errno.h>               // for errno
-#include <event2/buffer.h>       // for evbuffer_freeze, etc
-#include <event2/bufferevent.h>  // for bufferevent_enable, etc
-#include <event2/event.h>        // for EV_TIMEOUT, etc
-#include <event2/listener.h>     // for evconnlistener_free, etc
-#include <event2/util.h>         // for evutil_closesocket, etc
-#include <netdb.h>               // for addrinfo, freeaddrinfo, etc
-#include <netinet/in.h>          // for ntohl, IPPROTO_TCP
-#include <netinet/tcp.h>         // for TCP_NODELAY
-#include <sys/socket.h>          // for SOCK_STREAM
 #include <stdarg.h>              // for va_end, va_list, va_copy, etc
 #include <stdio.h>               // for snprintf, vsnprintf, fwrite, etc
 #include <string.h>              // for NULL, memcpy, strlen, etc
 #include <unistd.h>              // for gethostname
 #include <memory>                // for unique_ptr
 
+#include "cgo.autogen.h" // for Go exported stuff
 #include "backend.h"
 #include "fliconv.h"
 #include "interactive.h"
@@ -35,21 +26,11 @@
 #include "packages/core/dns.h"         // FIXME?
 #include "packages/core/ed.h"          // FIXME?
 
-
-// These are defined in Go.
-extern "C" {
-void ConnWrite(int, const char*, int);
-void ConnFlush(int);
-void ConnClose(int);
-}
-
-
 // in backend.cc
 extern void update_load_av();
 /*
  * local function prototypes.
  */
-static char *get_user_command(interactive_t * /*ip*/);
 static int call_function_interactive(interactive_t * /*i*/, char * /*str*/);
 static void print_prompt(interactive_t * /*ip*/);
 
@@ -62,20 +43,6 @@ static void print_prompt(interactive_t * /*ip*/);
 static void receive_snoop(const char * /*buf*/, int /*len*/, object_t *ob);
 
 #endif
-
-// User socket event
-struct user_event_data {
-  int idx;
-};
-
-//void maybe_schedule_user_command(interactive_t *user) {
-//  // If user has a complete command, schedule a command execution.
-//  if (user->iflags & CMD_IN_BUF) {
-//    struct timeval zero_sec = {0, 0};
-//    evtimer_del(user->ev_command);
-//    evtimer_add(user->ev_command, &zero_sec);
-//  }
-//}
 
 void on_user_command(struct interactive_t *ip, char *command) {
   /* handle snooping - snooper does not see type-ahead due to telnet being in linemode */
@@ -106,7 +73,7 @@ void on_user_command(struct interactive_t *ip, char *command) {
  * If space is available, an interactive data structure is initialized and
  * the user is connected.
  */
-struct interactive_t* new_user_handler(int external_port_idx, int connIdx, char* remote_addr, int remote_port) {
+struct interactive_t* new_user_handler(int external_port_idx, int connIdx, char* remote_hostport) {
   auto port = external_port[external_port_idx];
   /*
    * initialize new user interactive data structure.
@@ -126,8 +93,7 @@ struct interactive_t* new_user_handler(int external_port_idx, int connIdx, char*
 
   user->external_port = external_port_idx;
 
-  user->remote_addr = remote_addr;
-  user->remote_port = remote_port;
+  user->remote_hostport = remote_hostport;
 
   set_command_giver(master_ob);
   master_ob->flags |= O_ONCE_INTERACTIVE;
@@ -153,8 +119,8 @@ struct interactive_t* new_user_handler(int external_port_idx, int connIdx, char*
    destructed in the above (don't ask) */
   set_command_giver(0);
   if (ret == 0 || ret == (svalue_t *)-1 || ret->type != T_OBJECT || !master_ob->interactive) {
-    debug_message("Can not accept connection from %s:%d due to error in connect().\n",
-                  user->remote_addr, user->remote_port);
+    debug_message("Can not accept connection from %s due to error in connect().\n",
+                  user->remote_hostport);
     if (master_ob->interactive) {
       remove_interactive(master_ob, 0);
     }
@@ -181,7 +147,7 @@ struct interactive_t* new_user_handler(int external_port_idx, int connIdx, char*
   add_ref(ob, "new_user");
 
   // start reverse DNS probing.
-  // query_name_by_addr(ob);
+  query_name_by_addr(ob);
 
   user->telnet = net_telnet_init(user);
   if (user->connection_type == PORT_TELNET) {
@@ -271,18 +237,14 @@ void add_message(object_t *who, const char *data, int len) {
     return;
   }
 
-  inet_packets++;
-
   auto ip = who->interactive;
   if (ip->connection_type == PORT_TELNET) {
     int translen;
     char *trans = translate(ip->trans->outgoing, data, len, &translen);
 
-    inet_volume += translen;
     telnet_send_text(ip->telnet, trans, translen);
   } else {
-    inet_volume += len;
-    ConnWrite(ip->id, data, len);
+    ConnWrite(ip->id, ip->external_port, (char *)data, len);
   }
 
 #ifdef SHADOW_CATCH_MESSAGE
@@ -338,112 +300,30 @@ void flush_message_all() {
   users_foreach([](interactive_t *user) { flush_message(user); });
 }
 
-void on_mud_data(interactive_t *ip, const char *buf, int num_bytes) {
-//  memcpy(ip->text + ip->text_end, buf, num_bytes);
-//  ip->text_end += num_bytes;
-//
-//  if (num_bytes == text_space) {
-//    if (ip->text_end == 4) {
-//      *reinterpret_cast<volatile int *>(ip->text) = ntohl(*reinterpret_cast<int *>(ip->text));
-//      if (*reinterpret_cast<volatile int *>(ip->text) > MAX_TEXT - 5) {
-//        remove_interactive(ip->ob, 0);
-//      }
-//    } else {
-//      svalue_t value;
-//
-//      ip->text[ip->text_end] = 0;
-//      if (restore_svalue(ip->text + 4, &value) == 0) {
-//        STACK_INC;
-//        *sp = value;
-//      } else {
-//        push_undefined();
-//      }
-//      ip->text_end = 0;
-//      safe_apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
-//    }
-//  }
+void on_mud_data(interactive_t *ip, char *command) {
+      svalue_t value;
+      if (restore_svalue(command, &value) == 0) {
+        STACK_INC;
+        *sp = value;
+      } else {
+        push_undefined();
+      }
+      safe_apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
 }
 
-void on_ascii_data(interactive_t *ip, const char *buf, int num_bytes) {
-//  char *nl, *p;
-//
-//  memcpy(ip->text + ip->text_end, buf, num_bytes);
-//  ip->text_end += num_bytes;
-//
-//  p = ip->text + ip->text_start;
-//  while ((nl = reinterpret_cast<char *>(memchr(p, '\n', ip->text_end - ip->text_start)))) {
-//    ip->text_start = (nl + 1) - ip->text;
-//
-//    *nl = 0;
-//    if (*(nl - 1) == '\r') {
-//      *--nl = 0;
-//    }
-//
-//    if (!(ip->ob->flags & O_DESTRUCTED)) {
-//      char *str;
-//
-//      str = new_string(nl - p, "PORT_ASCII");
-//      memcpy(str, p, nl - p + 1);
-//      push_malloced_string(str);
-//      safe_apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
-//    }
-//
-//    if (ip->text_start == ip->text_end) {
-//      ip->text_start = ip->text_end = 0;
-//      break;
-//    }
-//
-//    p = nl + 1;
-//  }
+void on_ascii_data(interactive_t *ip, const char *command) {
+    if (!(ip->ob->flags & O_DESTRUCTED)) {
+      copy_and_push_string(command);
+      safe_apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
+    }
 }
 
-void on_buffer_data(interactive_t *ip, const char *buf, int num_bytes) {
-  buffer_t *buffer;
-
-  buffer = allocate_buffer(num_bytes);
+void on_binary_data(interactive_t *ip, const char *buf, int num_bytes) {
+  auto buffer = allocate_buffer(num_bytes);
   memcpy(buffer->item, buf, num_bytes);
 
   push_refed_buffer(buffer);
   safe_apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
-}
-
-
-/*
- * Called by Go when there are data to process.
- * NOTE: PORT_TELNET processing is done in the go, and it will call
- *       on_telnet_data directly.
- */
-void on_conn_data(interactive_t *ip, const char *buf, int num_bytes) {
-  /* read the data from the socket */
-  debug(connections, "on_conn_data: read on conn %d\n", ip->id);
-
-#ifdef F_NETWORK_STATS
-  // FIXME: This is actaully now the wrong place to count, it should be moved to Go.
-  inet_in_packets++;
-  inet_in_volume += num_bytes;
-  external_port[ip->external_port].in_packets++;
-  external_port[ip->external_port].in_volume += num_bytes;
-#endif
-
-  switch (ip->connection_type) {
-    case PORT_WEBSOCKET:
-      // TODO: restore this.
-      break;
-    case PORT_TELNET:
-      // impossbile
-      break;
-    case PORT_MUD:
-      on_mud_data(ip, buf, num_bytes);
-      break;
-    case PORT_ASCII:
-      on_ascii_data(ip, buf, num_bytes);
-      break;
-#ifndef NO_BUFFER_TYPE
-    case PORT_BINARY:
-      on_buffer_data(ip, buf, num_bytes);
-      break;
-#endif
-  }
 }
 
 static int escape_command(interactive_t *ip, char *user_command) {
@@ -624,8 +504,7 @@ void remove_interactive(object_t *ob, int dested) {
     }
     return;
   }
-  debug(connections, "Closing connection from %s:%d.\n",
-        ip->remote_addr, ip->remote_port);
+  debug(connections, "Closing connection from %s.\n", ip->remote_hostport);
   flush_message(ip);
   ip->iflags |= CLOSING;
 
@@ -1073,21 +952,3 @@ void f_websocket_handshake_done() {
   send_initial_telnet_negotiations(ip);
 }
 #endif
-
-const char *sockaddr_to_string(const sockaddr *addr, socklen_t len) {
-  static char result[NI_MAXHOST + NI_MAXSERV];
-
-  char host[NI_MAXHOST], service[NI_MAXSERV];
-  int ret = getnameinfo(addr, len, host, sizeof(host), service, sizeof(service),
-                        NI_NUMERICHOST | NI_NUMERICSERV);
-
-  if (ret) {
-    debug(sockets, "sockaddr_to_string fail: %s.\n", evutil_gai_strerror(ret));
-    strcpy(result, "<invalid address>");
-    return result;
-  }
-
-  snprintf(result, sizeof(result), strchr(host, ':') != NULL ? "[%s]:%s" : "%s:%s", host, service);
-
-  return result;
-}

@@ -2,6 +2,7 @@
 
 #include <sys/stat.h>  // for struct stat
 
+#include "cgo.autogen.h"
 #include "packages/core/add_action.h"
 #include "packages/core/file.h"
 
@@ -2146,11 +2147,11 @@ void f_network_stats(void) {
 #else
     m = allocate_mapping(ports + 8);
 #endif
-
-  add_mapping_pair(m, "incoming packets total", inet_in_packets);
-  add_mapping_pair(m, "incoming volume total", inet_in_volume);
-  add_mapping_pair(m, "outgoing packets total", inet_out_packets);
-  add_mapping_pair(m, "outgoing volume total", inet_out_volume);
+  auto r = GetNetworkStats();
+  add_mapping_pair(m, "incoming packets total", r.r0);
+  add_mapping_pair(m, "incoming volume total", r.r1);
+  add_mapping_pair(m, "outgoing packets total", r.r2);
+  add_mapping_pair(m, "outgoing volume total", r.r3);
 
 #ifdef PACKAGE_SOCKETS
   add_mapping_pair(m, "incoming packets sockets", inet_socket_in_packets);

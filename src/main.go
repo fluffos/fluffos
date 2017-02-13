@@ -7,11 +7,11 @@ import (
 	"io"
 	"net"
 	"os"
-	"strconv"
 	"sync"
 	"syscall"
 	"time"
 	"unsafe"
+	"encoding/binary"
 )
 
 // #include <stdlib.h>  // for exit
@@ -24,14 +24,12 @@ var (
 	fFlag  = flag.String("f", "", "master::flag to call")
 	fDebug = flag.Int("d", 0, "Debug level")
 
-	users         = make(map[int]*User)
+	users         = make(map[int]*TelnetUser)
 	userTotal int = 0
 	userMutex     = &sync.Mutex{} // protect users and userTotal
 
 	// Channel for run a callback in main driver loop, thus avoiding the GDL.
-	cBlockingRunInMainLoop = make(chan func(), 1)
-
-	//cUserDisconnect = make(chan *UserDisconnectEvent, 10)
+	cBlockingRunInMainLoop = make(chan func())
 )
 
 func BlockingRunInMainLoop(f func()) {
@@ -44,16 +42,19 @@ func BlockingRunInMainLoop(f func()) {
 }
 
 func main() {
+	flag.Parse()
+
+	if flag.NArg() != 1 {
+		fmt.Fprintf(os.Stderr, "Usage: %s config_file", os.Args[0])
+		os.Exit(-1)
+	}
+
+	C.init_env()
+
 	fmt.Println("=== FLUFFOS-GO Starting ===")
 	fmt.Println("Boot Time: ", time.Now().String())
 	fmt.Println("Full Command: ", os.Args)
-
-	flag.Parse()
-
-	{
-		C.init_env()
-		C.print_version_and_time()
-	}
+	C.print_version_and_time()
 
 	// show FD limits and core dump support.
 	{
@@ -72,16 +73,7 @@ func main() {
 
 	fmt.Println("===========================")
 
-	{
-		C.init_md()
-	}
-	fmt.Println("I'm here!")
-
-	/* read in the configuration file */
-	if flag.NArg() != 1 {
-		fmt.Fprintf(os.Stderr, "Usage: %s config_file", os.Args[0])
-		os.Exit(-1)
-	}
+	C.init_md()
 
 	// Process configs
 	{
@@ -110,6 +102,8 @@ func main() {
 	//if *fDebug {
 	//	C.set_debug_level(*fDebug)
 	//}
+
+
 	// process -f
 	if *fFlag != "" {
 		s := C.CString(*fFlag)
@@ -184,16 +178,14 @@ type NewUserInputEvent struct {
 
 func init_user_conn(c chan NewConnEvent) (bool, error) {
 	for i := 0; i < (C.sizeof_external_port / C.sizeof_struct_port_def_t); i++ {
-		// for F_NETWORK_STATS
-		C.external_port[i].in_packets = 0
-		C.external_port[i].in_volume = 0
-		C.external_port[i].out_packets = 0
-		C.external_port[i].out_volume = 0
+		port := C.external_port[i]
 
-		if C.external_port[i].port == 0 {
+		// skip unconfigured port
+		if port.port == 0 {
 			continue
 		}
-		s := fmt.Sprintf("%s:%d", C.GoString(C.get_mud_ip()), C.external_port[i].port)
+
+		s := fmt.Sprintf("%s:%d", C.GoString(C.get_mud_ip()), port.port)
 		laddr, err := net.ResolveTCPAddr("tcp", s)
 		if err != nil {
 			return false, err
@@ -203,24 +195,36 @@ func init_user_conn(c chan NewConnEvent) (bool, error) {
 			return false, err
 		}
 		fmt.Printf("Accepting connection on %s.\n", ln.Addr().String())
-		go func(idx int, ln *net.TCPListener) {
+		go func(port_idx int, port_type int, ln *net.TCPListener) {
 			for {
 				conn, err := ln.AcceptTCP()
 				if err != nil {
 					// do something
+					continue
 				}
-				// process new connection
-				go handle_connection(idx, conn)
+				fmt.Printf("New Connection on port %d from: %s.\n", port_idx, conn.RemoteAddr().String())
+
+				// Setup keepalive for all connections.
+				conn.SetKeepAlive(true)
+				conn.SetKeepAlivePeriod(30 * time.Second)
+
+				if (port_type == PORT_TELNET) {
+					conn.SetNoDelay(true)
+				}
+
+				go handle_connection(port_idx, port_type, conn)
 			}
-		}(i, ln)
+		}(i, int(port.kind), ln)
 	}
 	return true, nil
 }
 
-type User struct {
+type TelnetUser struct {
 	idx int
 
-	// The processed telnet text data buffer
+	// The processed telnet text data buffer, it is only ever
+	// accessed by one thread, either through telnet_recv
+	// (OnTelnetData) or in the connection goroutine.
 	buf *bytes.Buffer
 
 	ip     *C.struct_interactive_t
@@ -229,105 +233,159 @@ type User struct {
 	netTCPConn *net.TCPConn
 }
 
-func handle_connection(port_idx int, conn *net.TCPConn) {
-	// debug(connections, "New connection from %s.\n", sockaddr_to_string(addr, addrlen));
-	fmt.Printf("New Connection %d from: %s.\n", port_idx, conn.RemoteAddr().String())
+func NewUser(port_idx int, conn *net.TCPConn) *TelnetUser {
+	userMutex.Lock()
 
-	// Setup some basics
-	conn.SetKeepAlive(true)
-	conn.SetKeepAlivePeriod(30 * time.Second)
-	conn.SetNoDelay(true)
-
-	// This need to be done before calling new_user_handler.
-	var user *User
-
-	{
-		userMutex.Lock()
-
-		userIdx := userTotal
-		userTotal = userTotal + 1
-		user = &User{
-			idx:        userIdx,
-			buf:        &bytes.Buffer{},
-			ip:         nil,
-			telnet:     nil,
-			netTCPConn: conn,
-		}
-		users[userIdx] = user
-
-		userMutex.Unlock()
+	userIdx := userTotal
+	userTotal = userTotal + 1
+	user := &TelnetUser{
+		idx:        userIdx,
+		buf:        &bytes.Buffer{},
+		ip:         nil,
+		telnet:     nil,
+		netTCPConn: conn,
 	}
+	users[userIdx] = user
 
-	// Initilizaitions
+	userMutex.Unlock()
+
+	// Initializations
 	{
-		addr, port, err := net.SplitHostPort(conn.RemoteAddr().String())
-		if err != nil {
-			// not possible
-		}
-		caddr := C.CString(addr)
-		cport, err := strconv.Atoi(port)
-		if err != nil {
-			// not possible
-		}
-		// take ownership of caddr
-		// block
+		hostport := C.CString(conn.RemoteAddr().String())
 		res := &C.struct_new_user_result_t{}
 		BlockingRunInMainLoop(func() {
-			*res = C.wrap_new_user_handler(C.int(port_idx), C.int(user.idx), caddr, C.int(cport))
+			// take ownership of hostport
+			*res = C.wrap_new_user_handler(C.int(port_idx), C.int(user.idx), hostport)
 		})
 		if res.user == nil {
 			// Didn't return a IP pointer meaning the connection was terminated.
-			conn.Close()
-			userMutex.Lock()
-			delete(users, user.idx)
-			userMutex.Unlock()
-			return
-			// deal with error cases
+			return nil
 		}
 		user.ip = res.user
 		user.telnet = res.telnet
 	}
 
-	// creating context
+	return user;
+}
 
-	// Buffer for telnet_recv
+func DeleteUser(user *TelnetUser) {
+	user.netTCPConn.Close()
+	userMutex.Lock()
+	delete(users, user.idx)
+	userMutex.Unlock()
+}
+
+func handle_connection(port_idx int, port_type int, conn *net.TCPConn) {
+	user := NewUser(port_idx, conn)
+	if user == nil {
+		return
+	}
+	defer DeleteUser(user)
+
 	buf := make([]byte, 4096)
-
-	// How many bytes we already peeked in the last round, we only
-	// process new bytes that arrives.
-	lastPeeked := 0
-
-	// now we just need to wait for Text data to appear in our buffer!
 	for {
-		// Reading from TCP connection
-		{
-			n, err := user.netTCPConn.Read(buf)
-			if n <= 0 && err != nil {
-				// Connection gone bad.
-				break
-			}
+		n, err := user.netTCPConn.Read(buf)
+		if n <= 0 && err != nil {
+			BlockingRunInMainLoop(func() {
+				C.on_conn_error(user.ip)
+			})
+			return
+		}
+
+		// Network accounting
+		RecordIngress(port_idx, uint64(n))
+
+		switch(port_type) {
+		case PORT_TELNET:
 			fmt.Printf("calling telnet_recv with %v (len: %d)\n", buf[:n], n)
 			BlockingRunInMainLoop(func() {
 				C.telnet_recv(user.telnet, (*C.char)(unsafe.Pointer(&(buf[:n][0]))), C.size_t(n))
 				// will call onTelnetData
 			})
 			fmt.Printf("telnet_recv done.\n")
+			handle_telnet_read(user);
+		case PORT_BINARY:
+			user.buf.Write(buf)
+			handle_binary_read(user)
+		case PORT_ASCII:
+			user.buf.Write(buf)
+			handle_ascii_read(user)
+		case PORT_MUD:
+			user.buf.Write(buf)
+			handle_mud_read(user)
+		case PORT_WEBSOCKET:
+		// do something
 		}
+	}
+}
 
-		fmt.Printf("Starting to wait for command! \n")
-
-		if user.buf.Len() <= lastPeeked {
-			fmt.Println("No more data in buffer, waiting")
-			continue
+func handle_mud_read(user *TelnetUser) {
+	// Mud protocol is that every message is 4 bytes length + data.
+	shouldContinue := true
+	for shouldContinue {
+		buf := user.buf.Bytes()
+		size :=  binary.BigEndian.Uint32(buf[:4])
+		// TODO: for security, here should have some limit on size
+		if len(buf) < int(uint32(4) + size) {
+			shouldContinue = false
+			return
 		}
-		fmt.Printf("We've got data, buffer content: %v \n", user.buf.Bytes())
+		// Process it
+		_ = user.buf.Next(4)
+		buf = user.buf.Next(int(size))
+		buf = append(buf, byte(0))
 
+		BlockingRunInMainLoop(func() {
+			C.wrap_on_mud_data(user.ip, (*C.char)(unsafe.Pointer(&buf[0])))
+		})
+
+		shouldContinue = user.buf.Len() > 0
+	}
+}
+
+func handle_ascii_read(user *TelnetUser) {
+	shouldContinue := true
+	for shouldContinue {
+		buf := user.buf.Bytes()
+		// Look for '\n' in the buffer
+		if i := bytes.IndexByte(buf, '\n') ; i != -1 {
+			buf = user.buf.Next(i+1)
+			// remove last '\n'
+			buf = buf[:len(buf)-1]
+			// If there is a '\r', get rid of it too.
+			if buf[len(buf)-1] == '\r' {
+				buf = buf[:len(buf) - 1 ]
+			}
+			buf = append(buf, byte(0))
+			BlockingRunInMainLoop(func() {
+				C.wrap_on_ascii_data(user.ip, (*C.char)(unsafe.Pointer(&buf[0])))
+			})
+			shouldContinue = user.buf.Len() > 0
+		} else {
+			shouldContinue = false
+			return
+		}
+	}
+}
+
+func handle_binary_read(user *TelnetUser) {
+	buf := user.buf.Next(user.buf.Len())
+
+	BlockingRunInMainLoop(func() {
+		C.wrap_on_binary_data(user.ip, (*C.char)(unsafe.Pointer(&buf[0])), C.int(len(buf)))
+	})
+}
+
+func handle_telnet_read(user *TelnetUser) {
+	shouldContinue := true
+
+	for shouldContinue {
 		// skip null byte
 		for {
 			b, err := user.buf.ReadByte()
 			if err == io.EOF {
-				// reached end
-				goto finish
+				shouldContinue = false;
+				return
 			}
 			if b == byte(0) {
 				continue
@@ -337,12 +395,12 @@ func handle_connection(port_idx int, conn *net.TCPConn) {
 			}
 		}
 
-		// Unfortunelty, the real processing need to be done in main loop for now.
+		// Unfortunately, the real processing need to be done in main loop for now.
 		// due to accessing various flags.
 		BlockingRunInMainLoop(func() {
-			/* if we're in single character mode, we've got input */
 			var command []byte
 
+			/* if we're in single character mode, we've got input */
 			if C.is_single_char(user.ip) != 0 {
 				// Skip ASCII code 8 and 127 (I don't know why, but the
 				// existing code does this.
@@ -350,6 +408,7 @@ func handle_connection(port_idx int, conn *net.TCPConn) {
 					b, err := user.buf.ReadByte()
 					if err == io.EOF {
 						// reached end, no valid command
+						shouldContinue = false
 						return
 					}
 					if b == byte(0) || b == byte(8) || b == byte(127) {
@@ -363,28 +422,26 @@ func handle_connection(port_idx int, conn *net.TCPConn) {
 				// This is just for peeking
 				raw := user.buf.Bytes()
 
-				i := lastPeeked // start from where last time ends
+				i := 0 // start from where last time ends
 				for ; i < len(raw); i++ {
 					if raw[i] == '\r' || raw[i] == '\n' {
 						break
 					}
 				}
-				if i == len(raw) { // not found
+				if i == len(raw) {
+					// not found
 					// No command this time, wait for next read
-					lastPeeked = i
+					shouldContinue = false
 					return
 				}
-
 				// check next character , if it is part of '\n\r' or
 				// '\r\n', then consume that too
-				if i+1 < len(raw) &&
-					((raw[i] == '\r' && raw[i+1] == '\n') || (raw[i] == '\n' && raw[i+1] == '\r')) {
+				if i + 1 < len(raw) &&
+					((raw[i] == '\r' && raw[i + 1] == '\n') || (raw[i] == '\n' && raw[i + 1] == '\r')) {
 					i = i + 1
 				}
-
 				// Now that we formally have a command, formally read it out from buffer.
 				raw = user.buf.Next(i + 1)
-				lastPeeked = 0
 
 				// trim the end on first '\r','\n' or NUL byte.
 				for i = 0; i < len(raw); i++ {
@@ -392,23 +449,7 @@ func handle_connection(port_idx int, conn *net.TCPConn) {
 						break
 					}
 				}
-				raw = raw[:i]
-
-				// Construct real user command
-				ANSI_SUBSTITUTE := byte(0x20)
-				for i := 0; i < len(raw); i++ {
-					c := raw[i]
-					switch c {
-					case 0x1b:
-						if C.is_no_ansi_and_strip() != 0 {
-							command = append(command, ANSI_SUBSTITUTE)
-							break
-						}
-					default:
-						command = append(command, c)
-						break
-					}
-				}
+				command = raw[:i]
 			}
 			// add trialing NULL
 			command = append(command, 0)
@@ -418,24 +459,11 @@ func handle_connection(port_idx int, conn *net.TCPConn) {
 			C.wrap_on_user_command(user.ip, (*C.char)(tmp))
 			C.free(tmp)
 		})
-		// we processed everything, move on waiting for more data
-	finish:
+
+		shouldContinue = user.buf.Len() > 0
 	}
-	// if we reach here, meaning connection dead.
-	// clean up!
-	user.netTCPConn.Close()
-	// Deal with errors.
-	// Notify VM
-	BlockingRunInMainLoop(func() {
-		C.on_conn_error(user.ip)
-	})
-	userMutex.Lock()
-	delete(users, user.idx)
-	userMutex.Unlock()
-	user.ip = nil
-	user.telnet = nil
-	// Done
 }
+
 
 //export OnTelnetData
 func OnTelnetData(idx C.int, buffer *C.char, size C.int) {
@@ -450,11 +478,27 @@ func OnTelnetData(idx C.int, buffer *C.char, size C.int) {
 	// the buffer here comes from Write() function above, use this trick to avoid
 	// Copy, since we just need to write it to buffer anyway.
 	buf := (*[1 << 30]byte)(unsafe.Pointer(buffer))[:size:size]
+
+
+	// Do ANSI SUBSTITUTION
+	if C.is_no_ansi_and_strip() != 0 {
+		ANSI_SUBSTITUTE := byte(0x20)
+		for i := 0; i < len(buf); i++ {
+			c := buf[i]
+			switch c {
+			case 0x1b:
+				buf[i] = ANSI_SUBSTITUTE
+				break
+			default:
+			}
+		}
+	}
+
 	user.buf.Write(buf)
 }
 
 //export ConnWrite
-func ConnWrite(idx C.int, data *C.char, l C.int) {
+func ConnWrite(idx C.int, port_idx C.int, data *C.char, l C.int) {
 	userMutex.Lock()
 	user, ok := users[int(idx)]
 	userMutex.Unlock()
@@ -466,6 +510,9 @@ func ConnWrite(idx C.int, data *C.char, l C.int) {
 	buf := (*[1 << 30]byte)(unsafe.Pointer(data))[:l:l]
 	fmt.Printf("ConnWrite: %v, (len: %d) \n", buf, len(buf))
 	user.netTCPConn.Write(buf)
+
+	// TODO: pass port here for correct network accounting
+	RecordEgress(int(port_idx), uint64(l))
 }
 
 //export ConnFlush

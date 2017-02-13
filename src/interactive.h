@@ -51,8 +51,7 @@ struct interactive_t {
 #endif
   int connection_type;          /* the type of connection this is          */
   //int fd;                       /* file descriptor for interactive object  */
-  char* remote_addr;             /* user's IP address */
-  int remote_port;              /* user's port number */
+  char* remote_hostport;             /* user's IP address and port number */
   int external_port;   /* external port index for connection      */
   const char *prompt;  /* prompt string for interactive object    */
   int last_time;       /* time of last command executed           */

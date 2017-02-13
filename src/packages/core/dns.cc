@@ -37,34 +37,33 @@ void on_addr_name_result(int err, char type, int count, int ttl, void *addresses
 }
 
 // Start a reverse lookup.
-//void query_name_by_addr(object_t *ob) {
-//  auto query = new addr_name_query_t;
-//
-//  const char *addr = query_ip_number(ob);
-//  debug(dns, "query_name_by_addr: starting lookup for %s.\n", addr);
-//  free_string(addr);
-//
-//  // By the time resolve finish, ob may be already gone, we have to
-//  // copy the address.
-//  memcpy(&query->addr, &ob->interactive->addr, ob->interactive->addrlen);
-//  query->addrlen = ob->interactive->addrlen;
-//
-//  // Check for mapped v4 address, if we are querying for v6 address.
-//  if (query->addr.ss_family == AF_INET6) {
-//    in6_addr *addr6 = &((reinterpret_cast<sockaddr_in6 *>(&query->addr))->sin6_addr);
-//    if (IN6_IS_ADDR_V4MAPPED(addr6) || IN6_IS_ADDR_V4COMPAT(addr6)) {
-//      in_addr *addr4 = &(reinterpret_cast<in_addr *>(addr6))[3];
-//      debug(dns, "Found mapped v4 address, using extracted v4 address to resolve.\n") query->req =
-//          evdns_base_resolve_reverse(g_dns_base, addr4, 0, on_addr_name_result, query);
-//    } else {
-//      query->req =
-//          evdns_base_resolve_reverse_ipv6(g_dns_base, addr6, 0, on_addr_name_result, query);
-//    }
-//  } else {
-//    in_addr *addr4 = &(reinterpret_cast<sockaddr_in *>(&query->addr))->sin_addr;
-//    query->req = evdns_base_resolve_reverse(g_dns_base, addr4, 0, on_addr_name_result, query);
-//  }
-//}
+void query_name_by_addr(object_t *ob) {
+  auto query = new addr_name_query_t;
+
+  const char *addr = query_ip_number(ob);
+  debug(dns, "query_name_by_addr: starting lookup for %s.\n", addr);
+  free_string(addr);
+
+  int addrlen = sizeof(query->addr);
+  evutil_parse_sockaddr_port(ob->interactive->remote_hostport, (sockaddr *)&query->addr, &addrlen);
+  query->addrlen = addrlen;
+
+  // Check for mapped v4 address, if we are querying for v6 address.
+  if (query->addr.ss_family == AF_INET6) {
+    in6_addr *addr6 = &((reinterpret_cast<sockaddr_in6 *>(&query->addr))->sin6_addr);
+    if (IN6_IS_ADDR_V4MAPPED(addr6) || IN6_IS_ADDR_V4COMPAT(addr6)) {
+      in_addr *addr4 = &(reinterpret_cast<in_addr *>(addr6))[3];
+      debug(dns, "Found mapped v4 address, using extracted v4 address to resolve.\n") query->req =
+          evdns_base_resolve_reverse(g_dns_base, addr4, 0, on_addr_name_result, query);
+    } else {
+      query->req =
+          evdns_base_resolve_reverse_ipv6(g_dns_base, addr6, 0, on_addr_name_result, query);
+    }
+  } else {
+    in_addr *addr4 = &(reinterpret_cast<sockaddr_in *>(&query->addr))->sin_addr;
+    query->req = evdns_base_resolve_reverse(g_dns_base, addr4, 0, on_addr_name_result, query);
+  }
+}
 
 struct addr_number_query {
   LPC_INT key;
@@ -188,15 +187,17 @@ const char *query_ip_name(object_t *ob) {
   if (!ob || ob->interactive == 0) {
     return NULL;
   }
-//  for (i = 0; i < IPSIZE; i++) {
-//    if (iptable[i].addrlen == ob->interactive->addrlen &&
-//        !memcmp(&iptable[i].addr, &ob->interactive->addr, ob->interactive->addrlen) &&
-//        iptable[i].name) {
-//      return (iptable[i].name);
-//    }
-//  }
-//  return query_ip_number(ob);
-  return "broken:0";
+  for (i = 0; i < IPSIZE; i++) {
+    struct sockaddr_storage addr;
+    int addrlen = sizeof(addr);
+    evutil_parse_sockaddr_port(ob->interactive->remote_hostport, (sockaddr *)&addr, &addrlen);
+    if (iptable[i].addrlen == addrlen &&
+        !memcmp(&iptable[i].addr, &addr, iptable[i].addrlen) &&
+        iptable[i].name) {
+      return (iptable[i].name);
+    }
+  }
+  return query_ip_number(ob);
 }
 
 static void add_ip_entry(struct sockaddr *addr, socklen_t size, char *name) {
@@ -225,7 +226,9 @@ const char *query_ip_number(object_t *ob) {
     return 0;
   }
   char host[NI_MAXHOST];
-//  getnameinfo(reinterpret_cast<sockaddr *>(&ob->interactive->addr), sizeof(ob->interactive->addr),
-//              host, sizeof(host), NULL, 0, NI_NUMERICHOST);
-  return make_shared_string("127.0.0.1");
+  struct sockaddr_storage addr;
+  int addrlen = sizeof(addr);
+  evutil_parse_sockaddr_port(ob->interactive->remote_hostport, (sockaddr *)&addr, &addrlen);
+  getnameinfo((sockaddr *)&addr, addrlen, host, sizeof(host), NULL, 0, NI_NUMERICHOST);
+  return make_shared_string(host);
 }

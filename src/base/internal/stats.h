@@ -15,14 +15,6 @@
 
 extern uint64_t add_message_calls;
 
-extern uint64_t inet_packets;
-extern uint64_t inet_volume;
-
-extern uint64_t inet_out_packets;
-extern uint64_t inet_out_volume;
-extern uint64_t inet_in_packets;
-extern uint64_t inet_in_volume;
-
 extern uint64_t inet_socket_in_packets;
 extern uint64_t inet_socket_in_volume;
 extern uint64_t inet_socket_out_packets;
