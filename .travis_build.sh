@@ -86,7 +86,7 @@ if [ -n "$COVERITY" ]; then
 fi
 
 # Otherwise, continue
-make -j 2
+make
 
 cd testsuite
 
@@ -94,7 +94,7 @@ cd testsuite
 if [ "$TYPE" = "develop" ]; then
   VALGRIND="valgrind --error-exitcode=255 --suppressions=../valgrind.supp"
 else
-  VALGRIND="valgrind"
+  VALGRIND="valgrind --error-exitcode=0 --suppressions=../valgrind.supp"
 fi
 
 # Run standard test first
