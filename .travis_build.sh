@@ -14,12 +14,14 @@ case $COMPILER in
     sudo update-alternatives --auto gcc
     sudo update-alternatives --query gcc
     export CXX="/usr/bin/g++"
+    export CC="/usr/bin/gcc"
     $CXX -v
     ;;
   clang)
     sudo wget -q http://llvm.org/releases/3.5.2/clang+llvm-3.5.2-x86_64-linux-gnu-ubuntu-14.04.tar.xz
     sudo tar axvf clang+llvm-3.5.2-x86_64-linux-gnu-ubuntu-14.04.tar.xz
     export CXX="$PWD/clang+llvm-3.5.2-x86_64-linux-gnu/bin/clang++ -Wno-error=unused-command-line-argument"
+    export CC="$PWD/clang+llvm-3.5.2-x86_64-linux-gnu/bin/clang -Wno-error=unused-command-line-argument"
     $CXX -v
     ;;
 esac
