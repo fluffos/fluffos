@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/signal"
 	"sync"
 	"syscall"
 	"time"
@@ -103,24 +104,33 @@ func main() {
 	//	C.set_debug_level(*fDebug)
 	//}
 
-
 	// process -f
 	if *fFlag != "" {
 		s := C.CString(*fFlag)
 		defer C.free(unsafe.Pointer(s))
 
 		C.call_master_flag(s)
-		if C.get_is_shutdown() != 0 {
-			fmt.Println("Shutdown by master object.")
-			os.Exit(0)
-		}
 	}
 
-	cNewConn := make(chan NewConnEvent, 10)
-	defer close(cNewConn)
+	// setup signal handler, on these signal will try to exit driver gracefully
+	cSigShutdown := make(chan os.Signal, 1)
+	signal.Notify(cSigShutdown, os.Interrupt, syscall.SIGHUP)
+
+	cSigAbort := make(chan os.Signal, 1)
+	signal.Notify(cSigAbort, syscall.SIGQUIT, syscall.SIGABRT, syscall.SIGILL, syscall.SIGSYS)
+
+	CSigUser := make(chan os.Signal, 1)
+	signal.Notify(CSigUser, syscall.SIGUSR1, syscall.SIGUSR2)
+
+	// Register attempt_shutdown for all other cases that will run during panic
+	defer func() {
+		tmp := C.CString("FluffOS aborted.")
+		defer C.free(unsafe.Pointer(tmp))
+		C.wrap_call_fatal(tmp)
+	}()
 
 	// Initialize user connection socket
-	if ok, err := init_user_conn(cNewConn); !ok {
+	if ok, err := init_user_conn(); !ok {
 		fmt.Fprintf(os.Stderr, "Error Listening: %s", err)
 		os.Exit(-1)
 	}
@@ -132,7 +142,7 @@ func main() {
 	fmt.Println("Initializations complete.")
 	// TODO: setup_signal_handlers();
 
-	C.real_main(base)
+	C.init_backend(base)
 
 	d := time.Duration(int(C.get_gametick_ms())) * time.Millisecond
 	tick := time.After(d)
@@ -144,6 +154,22 @@ func main() {
 	// this queue serves as an global lock.
 	for {
 		select {
+		case <-cSigShutdown:
+			fmt.Println("Process Interrupted, shutting down.")
+			goto shutdown
+		case c := <-cSigAbort:
+			signal.Stop(cSigAbort)
+			fmt.Fprintf(os.Stderr, "Shutdown caused by Signal %s.\n", c.String())
+			// run deferred abort sequence.
+			return
+		case c := <-CSigUser:
+			if c == syscall.SIGUSR1 {
+				C.wrap_call_crash()
+				os.Exit(-1) // will not run defer
+			}
+			if c == syscall.SIGUSR2 {
+				C.wrap_set_outoftime(1)
+			}
 		case <-tick:
 			C.wrap_backend_once()
 			tick = time.After(d)
@@ -151,16 +177,11 @@ func main() {
 			callback() // executing main loop callback
 		}
 	}
-}
 
-type NewConnEvent struct {
-	idx  int
-	conn *net.TCPConn
-}
-
-type NewUserInputEvent struct {
-	ip    *C.struct_interactive_t
-	input []byte
+	shutdown:
+	// Shutdown
+	C.wrap_shutdownMudOS(0)
+	os.Exit(0) // will not run defer
 }
 
 //
@@ -176,7 +197,7 @@ type NewUserInputEvent struct {
 // goroutine to call telnet_send().
 // 5. on_telnet_send just call netTCPConn.Write()
 
-func init_user_conn(c chan NewConnEvent) (bool, error) {
+func init_user_conn() (bool, error) {
 	for i := 0; i < (C.sizeof_external_port / C.sizeof_struct_port_def_t); i++ {
 		port := C.external_port[i]
 

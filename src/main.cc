@@ -31,14 +31,6 @@
 
 time_t boot_time;
 
-static void sig_cld(int /*sig*/);
-
-static void sig_usr1(int /*sig*/);
-static void sig_usr2(int /*sig*/);
-
-static void attempt_shutdown(int sig);
-static void setup_signal_handlers();
-
 void print_version_and_time() {
   /* Print FluffOS version */
   std::cout << "FluffOS Version: " << PACKAGE_VERSION << "(" << SOURCE_REVISION << ")"
@@ -97,11 +89,7 @@ void call_master_flag(const char * flag) {
   safe_apply_master_ob(APPLY_FLAG, 1);
 }
 
-int get_is_shutdown() {
-  return MudOS_is_being_shut_down;
-}
-
-void real_main(void* base) {
+void init_backend(void* base) {
   backend(reinterpret_cast<event_base *>(base));
 }
 
@@ -144,115 +132,28 @@ struct new_user_result_t wrap_new_user_handler(int idx, int connIdx, char *hostp
     return res;
 }
 
-static void setup_signal_handlers() {
-  signal(SIGFPE, attempt_shutdown);
-  signal(SIGTERM, attempt_shutdown);
-  // signal(SIGINT, attempt_shutdown);
-  signal(SIGABRT, attempt_shutdown);
-  signal(SIGBUS, attempt_shutdown);
-  signal(SIGSEGV, attempt_shutdown);
-  signal(SIGILL, attempt_shutdown);
-
-  // User signal
-  signal(SIGUSR1, sig_usr1);
-  signal(SIGUSR2, sig_usr2);
-
-  // shutdown
-  signal(SIGHUP, startshutdownMudOS);
-
-  // for external events?
-  signal(SIGCHLD, sig_cld);
-
-  /*
-   * we use nonblocking socket, must ignore SIGPIPE.
-   */
-  if (signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
-    debug_perror("can't ignore signal SIGPIPE", 0);
-    exit(5);
-  }
-}
-
-static void try_dump_stacktrace() {
-#if !defined(__CYGWIN__) && __GNUC__ > 2
-  static void *bt[100];
-  size_t bt_size;
-  bt_size = backtrace(bt, 100);
-  backtrace_symbols_fd(bt, bt_size, STDERR_FILENO);
-#else
-  debug_message("Not able to generate backtrace, please use core.\n");
-#endif
-}
-
-static void sig_cld(int sig) {
-  /*FIXME: restore this
-   int status;
-   while (wait3(&status, WNOHANG, NULL) > 0) {
-   ;
-   }*/
-}
-
-/* send this signal when the machine is about to reboot.  The script
- which restarts the MUD should take an exit code of 1 to mean don't
- restart
- */
-static void sig_usr1(int sig) {
+void wrap_call_crash() {
   push_constant_string("Host machine shutting down");
   push_undefined();
   push_undefined();
   apply_master_ob(APPLY_CRASH, 3);
   debug_message("Received SIGUSR1, calling exit(-1)\n");
-  exit(-1);
 }
 
-/* Abort evaluation */
-static void sig_usr2(int sig) {
-  debug_message("Received SIGUSR2, current eval aborted.\n");
-  outoftime = 1;
+void shutdownMudOS(int exit_code); // in simulate.cc
+void wrap_shutdownMudOS(int exitCode) {
+    shutdownMudOS(exitCode);
 }
 
-/*
- * Actually, doing all this stuff from a signal is probably illegal
- * -Beek
- */
-static void attempt_shutdown(int sig) {
-  const char *msg = "Unkonwn signal!";
-  switch (sig) {
-    case SIGABRT:
-      msg = "SIGABRT: Aborted";
-      break;
-    case SIGTERM:
-      msg = "SIGTERM: Process terminated";
-      break;
-    case SIGINT:
-      msg = "SIGINT: Process interrupted";
-      break;
-    case SIGSEGV:
-      msg = "SIGSEGV: Segmentation fault";
-      break;
-    case SIGFPE:
-      msg = "SIGFPE: Floating point exception";
-      break;
-    case SIGBUS:
-      msg = "SIGBUS: Bus error";
-      break;
-    case SIGILL:
-      msg = "SIGILL: Illegal instruction";
-      break;
-  }
-
-  // Reverse all traps
-  signal(SIGFPE, SIG_DFL);
-  signal(SIGTERM, SIG_DFL);
-  signal(SIGINT, SIG_DFL);
-  signal(SIGABRT, SIG_DFL);
-  signal(SIGBUS, SIG_DFL);
-  signal(SIGSEGV, SIG_DFL);
-  signal(SIGILL, SIG_DFL);
-
-  try_dump_stacktrace();
-  fatal(msg);
+void wrap_call_fatal(const char *msg) {
+    fatal(msg);
 }
 
 const char* get_mud_ip() {
     return CONFIG_STR(__MUD_IP__);
+}
+
+extern volatile int outoftime; // in interpret.cc
+void wrap_set_outoftime(int i) {
+    outoftime = i;
 }

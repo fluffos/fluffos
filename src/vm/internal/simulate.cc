@@ -44,13 +44,6 @@ void db_cleanup(void);  // FIXME
 #include "comm.h"  // FIXME
 
 /*
- * This one is called from HUP.
- */
-int MudOS_is_being_shut_down;
-
-void startshutdownMudOS(int sig) { MudOS_is_being_shut_down = 1; }
-
-/*
  * This one is called from the command "shutdown".
  * We don't call it directly from HUP, because it is dangerous when being
  * in an interrupt.

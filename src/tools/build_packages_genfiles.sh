@@ -9,9 +9,9 @@ PACKAGES_SPEC_FULL=packages/packages.autogen.fullspec
 PACKAGES_MAKEFILE=packages/packages.autogen.makefile
 
 # do cleanup
-rm $PACKAGES_SPEC 2>&1 >/dev/null || true
-rm $PACKAGES_MAKEFILE 2>&1 >/dev/null || true
-rm $PACKAGES_SPEC_FULL 2>&1 >/dev/null || true
+rm $PACKAGES_SPEC > /dev/null 2>&1 || true
+rm $PACKAGES_MAKEFILE > /dev/null 2>&1 || true
+rm $PACKAGES_SPEC_FULL > /dev/null 2>&1 || true
 
 PACKAGES=$("$@" -E -undef -dM $ALL_OPTIONS_H | grep PACKAGE_ | cut -d " " -f 2)
 

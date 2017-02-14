@@ -15,7 +15,6 @@ struct object_t;
 extern object_t *obj_list;
 extern object_t *obj_list_destruct;
 extern uint64_t tot_alloc_sentence;
-extern int MudOS_is_being_shut_down;
 #ifdef DEBUG
 extern object_t *obj_list_dangling;
 #endif
