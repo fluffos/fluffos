@@ -5,7 +5,9 @@
 }
 
 {
-  golang stuff
+  golang_stuff
   Memcheck:Leak
-  fun:runtime.asmcgocall
+  ...
+  fun:runtime.*
+  ...
 }
