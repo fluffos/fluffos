@@ -112,21 +112,32 @@ func main() {
 		C.call_master_flag(s)
 	}
 
-	// setup signal handler, on these signal will try to exit driver gracefully
-	cSigShutdown := make(chan os.Signal, 1)
-	signal.Notify(cSigShutdown, os.Interrupt, syscall.SIGHUP)
-
-	cSigAbort := make(chan os.Signal, 1)
-	signal.Notify(cSigAbort, syscall.SIGQUIT, syscall.SIGABRT, syscall.SIGILL, syscall.SIGSYS)
-
-	CSigUser := make(chan os.Signal, 1)
-	signal.Notify(CSigUser, syscall.SIGUSR1, syscall.SIGUSR2)
-
-	// Register attempt_shutdown for all other cases that will run during panic
+	// Register an crash handler that will run during panic
 	defer func() {
-		tmp := C.CString("FluffOS aborted.")
+		tmp := C.CString("FluffOS aborted by signal.")
 		defer C.free(unsafe.Pointer(tmp))
 		C.wrap_call_fatal(tmp)
+	}()
+
+	// setup signal handler, these signal will be handled on main loop.
+	cSigShutdown := make(chan os.Signal, 1)
+	signal.Notify(cSigShutdown, os.Interrupt, syscall.SIGHUP, syscall.SIGTERM)
+
+	// For abort, run the deferred func.
+	// see discussion at  https://groups.google.com/forum/#!topic/golang-nuts/q22Fx9DkFAo
+	cSigAbort := make(chan os.Signal, 1)
+	signal.Notify(cSigAbort, syscall.SIGABRT)
+
+	CSigUser1 := make(chan os.Signal, 1)
+	signal.Notify(CSigUser1, syscall.SIGUSR1) // handle it on main loop
+
+	CSigUser2 := make(chan os.Signal, 1)
+	signal.Notify(CSigUser2, syscall.SIGUSR2) // handle it inline.
+	go func() {
+		for {
+			<-CSigUser2
+			C.wrap_set_outoftime(1) // this is racey, but we are okay with it for now.
+		}
 	}()
 
 	// Initialize user connection socket
@@ -158,18 +169,8 @@ func main() {
 			fmt.Println("Process Interrupted, shutting down.")
 			goto shutdown
 		case c := <-cSigAbort:
-			signal.Stop(cSigAbort)
-			fmt.Fprintf(os.Stderr, "Shutdown caused by Signal %s.\n", c.String())
-			// run deferred abort sequence.
-			return
-		case c := <-CSigUser:
-			if c == syscall.SIGUSR1 {
-				C.wrap_call_crash()
-				os.Exit(-1) // will not run defer
-			}
-			if c == syscall.SIGUSR2 {
-				C.wrap_set_outoftime(1)
-			}
+			// directly panic
+			panic(c)
 		case <-tick:
 			C.wrap_backend_once()
 			tick = time.After(d)
