@@ -427,20 +427,22 @@ struct linux_dirent {
            offsetof(struct linux_dirent, d_name) */
 };
 
-void handle_getdir(struct request *req) {
-  auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
-
-  int val = req->ret;
-  if (val > max_array_size) {
-    val = max_array_size;
+void handle_getdir(struct request *req) {  
+  int tmp_buf_size = 0;
+  int ret_size = 0;
+  while (tmp_buf_size < req->ret) {
+    struct linux_dirent *de = (struct linux_dirent *)(req->buf + tmp_buf_size);
+    ++ret_size;
+    tmp_buf_size += de->d_reclen;
   }
-  array_t *ret = allocate_empty_array(val);
-  int i = 0;
-  if (val > 0) {
+  auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
+  if (ret_size > max_array_size) {
+    ret_size = max_array_size;
+  }
+  array_t *ret = allocate_empty_array(ret_size);
+  if (ret_size > 0) {
     struct linux_dirent *de = (struct linux_dirent *)req->buf;
-    for (i = 0;
-         i < max_array_size && (reinterpret_cast<char *>(de)) - const_cast<char *>(req->buf) < val;
-         i++) {
+    for (int i = 0; i < ret_size; i++) {
       svalue_t *vp = &(ret->item[i]);
       vp->type = T_STRING;
       vp->subtype = STRING_MALLOC;
@@ -448,8 +450,6 @@ void handle_getdir(struct request *req) {
       de = reinterpret_cast<struct linux_dirent *>((reinterpret_cast<char *>(de)) + de->d_reclen);
     }
   }
-  ret = resize_array(ret, i);
-  ret->size = i;
   push_refed_array(ret);
   FREE((void *)req->buf);
   set_eval(max_cost);

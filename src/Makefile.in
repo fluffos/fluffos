@@ -223,7 +223,7 @@ $(DRIVER_BIN): libdriver.a $(GOFILES)
 
 thirdparty/jemalloc/lib/libjemalloc_pic.a:
 	@echo [Building jemalloc] $@
-	@cd thirdparty/jemalloc && make && cd -
+	@cd thirdparty/jemalloc && GIT_DIR=./.git ./autogen.sh && make && cd -
 
 # Hack to work around brokeness in libtelnet.c
 thirdparty/libtelnet/libtelnet.o: thirdparty/libtelnet/libtelnet.c
