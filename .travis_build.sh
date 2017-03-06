@@ -14,15 +14,22 @@ case $COMPILER in
     sudo update-alternatives --auto gcc
     sudo update-alternatives --query gcc
     export CXX="/usr/bin/g++"
+    export CC="/usr/bin/gcc"
     $CXX -v
     ;;
   clang)
     sudo wget -q http://llvm.org/releases/3.5.2/clang+llvm-3.5.2-x86_64-linux-gnu-ubuntu-14.04.tar.xz
     sudo tar axvf clang+llvm-3.5.2-x86_64-linux-gnu-ubuntu-14.04.tar.xz
     export CXX="$PWD/clang+llvm-3.5.2-x86_64-linux-gnu/bin/clang++ -Wno-error=unused-command-line-argument"
+    export CC="$PWD/clang+llvm-3.5.2-x86_64-linux-gnu/bin/clang -Wno-error=unused-command-line-argument"
     $CXX -v
     ;;
 esac
+
+# Install Go 1.7
+sudo wget -q https://storage.googleapis.com/golang/go1.7.5.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go*.tar.gz
+export PATH=/usr/local/go/bin:$PATH
 
 if [ "$BUILD" = "i386" ]; then
   sudo apt-get remove libevent-dev libevent-* libssl-dev
@@ -81,7 +88,7 @@ if [ -n "$COVERITY" ]; then
 fi
 
 # Otherwise, continue
-make -j 2
+make
 
 cd testsuite
 
@@ -89,18 +96,18 @@ cd testsuite
 if [ "$TYPE" = "develop" ]; then
   VALGRIND="valgrind --error-exitcode=255 --suppressions=../valgrind.supp"
 else
-  VALGRIND="valgrind"
+  VALGRIND="valgrind --error-exitcode=0 --suppressions=../valgrind.supp"
 fi
 
 # Run standard test first
-$VALGRIND --malloc-fill=0x75 --free-fill=0x73 --track-origins=yes --leak-check=full ../driver etc/config.test -ftest -d
+$VALGRIND --malloc-fill=0x75 --free-fill=0x73 --track-origins=yes --leak-check=full ../driver -d 0 -f test etc/config.test
 wait $!
 if [ $? -ne 0 ]; then
   exit $?
 fi
 # run special interactive tests
 ( sleep 30 ; expect telnet_test.expect localhost 4000 ) &
-( ../driver etc/config.test -d ) &
+( ../driver etc/config.test ) &
 wait $!
 if [ $? -ne 0 ]; then
   exit $?

@@ -10,6 +10,7 @@
 
 #include "backend.h"  // for clear_tick_events , FIXME
 #include "user.h"     // for users_foreach, FIXME
+#include "vm/vm.h"
 #include "vm/internal/otable.h"
 #include "vm/internal/base/machine.h"
 #include "vm/internal/compiler/lex.h"  // for total_lines, FIXME
@@ -41,13 +42,6 @@ void db_cleanup(void);  // FIXME
 #endif
 
 #include "comm.h"  // FIXME
-
-/*
- * This one is called from HUP.
- */
-int MudOS_is_being_shut_down;
-
-void startshutdownMudOS(int sig) { MudOS_is_being_shut_down = 1; }
 
 /*
  * This one is called from the command "shutdown".

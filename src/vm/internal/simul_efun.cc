@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 
+#include "vm/internal/apply.h"
 #include "vm/internal/base/machine.h"
 #include "vm/internal/simulate.h"
 #include "vm/internal/compiler/lex.h"  // for ident_hash_elem_t etc, fix me!

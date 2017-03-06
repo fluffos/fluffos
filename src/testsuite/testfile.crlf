@@ -12,8 +12,11 @@ void flag(string str) {
     case "test":
       "/command/tests"->main();
       break;
+    case "speed":
+      "/command/speed"->main();
+      break;
     default:
-      write("The only supproted flag is 'test', got '" + str + "'.\n");
+      write("The only supproted flag is 'test', 'speed', got '" + str + "'.\n");
       break;
   }
   if (has_error) { shutdown(-1); }

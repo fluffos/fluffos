@@ -171,7 +171,7 @@ bool scan_config_line(const char *fmt, void *dest, int required) {
 
 }  // namespace
 
-void read_config(char *filename) {
+void read_config(const char *filename) {
   /* needed for string_copy() below */
   CONFIG_INT(__MAX_STRING_LENGTH__) = 128;
 
@@ -285,7 +285,6 @@ void read_config(char *filename) {
     }
     for (i = port_start; i < 5; i++) {
       external_port[i].kind = 0;
-      external_port[i].fd = -1;
 
       char kind[kMaxConfigLineLength];
       sprintf(kind, "external_port_%i : %%[^\n]", i + 1);

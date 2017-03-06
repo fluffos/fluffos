@@ -85,4 +85,5 @@ fi
 # Force an reconfigure.
 rm -f configure.h
 CFLAGS=$CFLAGS CXXFLAGS=$CFLAGS MAKE=$MAKE ARCH=$ARCH DRIVER_BIN=$DRIVER_BIN OPTIMIZE=$OPTIMIZE SOURCE_REVISION=$SOURCE_REVISION ./configure --bindir=$INSTALL_DIR $@
+cd thirdparty/jemalloc && GIT_DIR=./.git ./autogen.sh $@ && cd -
 $MAKE help

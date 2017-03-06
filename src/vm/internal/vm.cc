@@ -9,6 +9,7 @@
 
 #include <cstdlib>
 
+#include "vm/internal/applies_table.autogen.h"
 #include "vm/internal/eval.h"
 #include "vm/internal/master.h"
 #include "vm/internal/simul_efun.h"
@@ -116,6 +117,10 @@ void clear_state() {
 /* All destructed objects are moved into a sperate linked list,
  * and deallocated after program execution.  */
 // TODO: find where they are
+
+// in simulate.h
+extern void destruct2(object_t *);
+
 extern object_t *obj_list_destruct;
 void remove_destructed_objects() {
   if (obj_list_replace) {

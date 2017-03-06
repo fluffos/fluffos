@@ -42,6 +42,23 @@ void on_lpc_sock_write(evutil_socket_t fd, short what, void *arg) {
   socket_write_select_handler(data->idx);
 }
 
+const char *sockaddr_to_string(const sockaddr *addr, socklen_t len) {
+  static char result[NI_MAXHOST + NI_MAXSERV];
+
+  char host[NI_MAXHOST], service[NI_MAXSERV];
+  int ret = getnameinfo(addr, len, host, sizeof(host), service, sizeof(service),
+                        NI_NUMERICHOST | NI_NUMERICSERV);
+
+  if (ret) {
+    debug(sockets, "sockaddr_to_string fail: %s.\n", evutil_gai_strerror(ret));
+    strcpy(result, "<invalid address>");
+    return result;
+  }
+
+  snprintf(result, sizeof(result), strchr(host, ':') != NULL ? "[%s]:%s" : "%s:%s", host, service);
+
+  return result;
+}
 }  // namespace
 
 // Initialize LPC socket data structure and register events
@@ -861,8 +878,6 @@ int socket_write(int fd, svalue_t *message, const char *name) {
 
 #ifdef F_NETWORK_STATS
       if (!(lpc_socks[fd].flags & S_EXTERNAL)) {
-        inet_out_packets++;
-        inet_out_volume += off;
         inet_socket_out_packets++;
         inet_socket_out_volume += off;
       }
@@ -900,8 +915,6 @@ int socket_write(int fd, svalue_t *message, const char *name) {
 
 #ifdef F_NETWORK_STATS
   if (!(lpc_socks[fd].flags & S_EXTERNAL)) {
-    inet_out_packets++;
-    inet_out_volume += off;
     inet_socket_out_packets++;
     inet_socket_out_volume += off;
   }
@@ -989,8 +1002,6 @@ void socket_read_select_handler(int fd) {
           }
 #ifdef F_NETWORK_STATS
           if (!(lpc_socks[fd].flags & S_EXTERNAL)) {
-            inet_in_packets++;
-            inet_in_volume += cc;
             inet_socket_in_packets++;
             inet_socket_in_volume++;
           }
@@ -1061,8 +1072,6 @@ void socket_read_select_handler(int fd) {
             }
 #ifdef F_NETWORK_STATS
             if (!(lpc_socks[fd].flags & S_EXTERNAL)) {
-              inet_in_packets++;
-              inet_in_volume += cc;
               inet_socket_in_packets++;
               inet_socket_in_volume += cc;
             }
@@ -1094,8 +1103,6 @@ void socket_read_select_handler(int fd) {
             }
 #ifdef F_NETWORK_STATS
             if (!(lpc_socks[fd].flags & S_EXTERNAL)) {
-              inet_in_packets++;
-              inet_in_volume += cc;
               inet_socket_in_packets++;
               inet_socket_in_volume += cc;
             }
@@ -1133,8 +1140,6 @@ void socket_read_select_handler(int fd) {
           }
 #ifdef F_NETWORK_STATS
           if (!(lpc_socks[fd].flags & S_EXTERNAL)) {
-            inet_in_packets++;
-            inet_in_volume += cc;
             inet_socket_in_packets++;
             inet_socket_in_volume += cc;
           }
@@ -1232,8 +1237,6 @@ void socket_write_select_handler(int fd) {
     }
 #ifdef F_NETWORK_STATS
     if (!(lpc_socks[fd].flags & S_EXTERNAL)) {
-      inet_out_packets++;
-      inet_out_volume += cc;
       inet_socket_out_packets++;
       inet_socket_out_volume += cc;
     }

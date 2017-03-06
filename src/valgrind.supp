@@ -3,3 +3,11 @@
    Memcheck:Cond
    obj:*/libz.so.1.2.3*
 }
+
+{
+  golang_stuff
+  Memcheck:Leak
+  ...
+  fun:runtime.*
+  ...
+}

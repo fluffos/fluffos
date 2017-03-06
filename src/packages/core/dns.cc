@@ -44,10 +44,9 @@ void query_name_by_addr(object_t *ob) {
   debug(dns, "query_name_by_addr: starting lookup for %s.\n", addr);
   free_string(addr);
 
-  // By the time resolve finish, ob may be already gone, we have to
-  // copy the address.
-  memcpy(&query->addr, &ob->interactive->addr, ob->interactive->addrlen);
-  query->addrlen = ob->interactive->addrlen;
+  int addrlen = sizeof(query->addr);
+  evutil_parse_sockaddr_port(ob->interactive->remote_hostport, (sockaddr *)&query->addr, &addrlen);
+  query->addrlen = addrlen;
 
   // Check for mapped v4 address, if we are querying for v6 address.
   if (query->addr.ss_family == AF_INET6) {
@@ -189,8 +188,11 @@ const char *query_ip_name(object_t *ob) {
     return NULL;
   }
   for (i = 0; i < IPSIZE; i++) {
-    if (iptable[i].addrlen == ob->interactive->addrlen &&
-        !memcmp(&iptable[i].addr, &ob->interactive->addr, ob->interactive->addrlen) &&
+    struct sockaddr_storage addr;
+    int addrlen = sizeof(addr);
+    evutil_parse_sockaddr_port(ob->interactive->remote_hostport, (sockaddr *)&addr, &addrlen);
+    if (iptable[i].addrlen == addrlen &&
+        !memcmp(&iptable[i].addr, &addr, iptable[i].addrlen) &&
         iptable[i].name) {
       return (iptable[i].name);
     }
@@ -224,7 +226,9 @@ const char *query_ip_number(object_t *ob) {
     return 0;
   }
   char host[NI_MAXHOST];
-  getnameinfo(reinterpret_cast<sockaddr *>(&ob->interactive->addr), sizeof(ob->interactive->addr),
-              host, sizeof(host), NULL, 0, NI_NUMERICHOST);
+  struct sockaddr_storage addr;
+  int addrlen = sizeof(addr);
+  evutil_parse_sockaddr_port(ob->interactive->remote_hostport, (sockaddr *)&addr, &addrlen);
+  getnameinfo((sockaddr *)&addr, addrlen, host, sizeof(host), NULL, 0, NI_NUMERICHOST);
   return make_shared_string(host);
 }

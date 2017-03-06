@@ -8,12 +8,16 @@
 #ifndef BASE_INTERNAL_EXTERNAL_PORT_H_
 #define BASE_INTERNAL_EXTERNAL_PORT_H_
 
-#define PORT_UNDEFINED 0
-#define PORT_TELNET 1
-#define PORT_BINARY 2
-#define PORT_ASCII 3
-#define PORT_MUD 4
-#define PORT_WEBSOCKET 5
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+static const int PORT_UNDEFINED = 0;
+static const int PORT_TELNET = 1;
+static const int PORT_BINARY = 2;
+static const int PORT_ASCII = 3;
+static const int PORT_MUD = 4;
+static const int PORT_WEBSOCKET = 5;
 
 struct port_def_t {
   int kind;
@@ -24,9 +28,12 @@ struct port_def_t {
   int in_volume;
   int out_packets;
   int out_volume;
-  struct evconnlistener *ev_conn;
 };
 
-extern port_def_t external_port[5];
+extern struct port_def_t external_port[5];
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /* BASE_INTERNAL_EXTERNAL_PORT_H_ */

@@ -4,6 +4,7 @@
 
 #include <cstdio>  // for snprintf
 
+#include "vm/vm.h"
 #include "vm/internal/base/machine.h"
 
 /*
