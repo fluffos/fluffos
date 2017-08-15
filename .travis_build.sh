@@ -1,38 +1,5 @@
 #!/bin/bash
 
-setup () {
-sudo apt-get install -qq bison autoconf expect telnet
-
-# clang needs the updated libstdc++
-sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
-sudo apt-get update -qq
-sudo apt-get install -qq gcc-4.8 g++-4.8
-
-case $COMPILER in
-  gcc)
-    sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.8 100 --slave /usr/bin/g++ g++ /usr/bin/g++-4.8
-    sudo update-alternatives --auto gcc
-    sudo update-alternatives --query gcc
-    export CXX="/usr/bin/g++"
-    $CXX -v
-    ;;
-  clang)
-    sudo wget -q http://releases.llvm.org/4.0.1/clang+llvm-4.0.1-x86_64-linux-gnu-debian8.tar.xz
-    sudo tar axvf clang+llvm-*.tar.xz
-    export CXX="$PWD/clang+llvm-4.0.1-x86_64-linux-gnu-debian8/bin/clang++ -Wno-error=unused-command-line-argument"
-    $CXX -v
-    ;;
-esac
-
-if [ "$BUILD" = "i386" ]; then
-  sudo apt-get remove libevent-dev libevent-* libssl-dev
-  sudo apt-get -f --no-install-recommends install g++-multilib g++-4.8-multilib valgrind:i386 libevent-dev:i386 libz-dev:i386
-else
-  sudo apt-get install valgrind
-  sudo apt-get install libevent-dev libmysqlclient-dev libsqlite3-dev libpq-dev libz-dev libssl-dev libpcre3-dev
-fi
-}
-
 if [[ "$(git branch | grep coverity_scan)" =~ ^.+coverity_scan$ ]]; then
   if [ -z "$COVERITY" ]; then
     echo "Only doing coverity scan in this branch, skipping this build"
@@ -44,6 +11,23 @@ else
     exit 0
   fi
 fi
+
+setup () {
+
+case $COMPILER in
+  gcc)
+    export CXX="/usr/bin/g++"
+    $CXX -v
+    ;;
+  clang)
+    wget -q http://releases.llvm.org/4.0.0/clang+llvm-4.0.0-x86_64-linux-gnu-ubuntu-14.04.tar.xz
+    tar axvf clang+llvm-*.tar.xz
+    export CXX="$PWD/clang+llvm-4.0.0-x86_64-linux-gnu-ubuntu-14.04/bin/clang++ -Wno-error=unused-command-line-argument"
+    $CXX -v
+    ;;
+esac
+
+}
 
 # do setup
 setup
@@ -108,6 +92,6 @@ fi
 
 if [ -n "$GCOV" ]; then
   cd ..
-  sudo pip install cpp-coveralls
+  pip install cpp-coveralls
   coveralls --exclude packages --exclude thirdparty --exclude testsuite --exclude-pattern '.*.tab.+$' --gcov /usr/bin/gcov-4.8 --gcov-options '\-lp' -r $PWD -b $PWD
 fi
