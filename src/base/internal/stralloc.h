@@ -9,12 +9,12 @@
 #ifdef DEBUGMALLOC
 char *int_string_copy(const char *const, const char *);
 char *int_string_unlink(const char *, const char *);
-char *int_new_string(int, const char *);
+char *int_new_string(unsigned int, const char *);
 char *int_alloc_cstring(const char *, const char *);
 #else
 char *int_string_copy(const char *const);
 char *int_string_unlink(const char *);
-char *int_new_string(int);
+char *int_new_string(unsigned int);
 char *int_alloc_cstring(const char *);
 #endif
 

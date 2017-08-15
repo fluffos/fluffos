@@ -310,9 +310,9 @@ char *the_null_string = (char *)&the_null_string_blocks[1];
 */
 
 #ifdef DEBUGMALLOC
-char *int_new_string(int size, const char *tag)
+char *int_new_string(unsigned int size, const char *tag)
 #else
-char *int_new_string(int size)
+char *int_new_string(unsigned int size)
 #endif
 {
   malloc_block_t *mbt;
