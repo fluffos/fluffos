@@ -17,9 +17,9 @@ case $COMPILER in
     $CXX -v
     ;;
   clang)
-    sudo wget -q http://llvm.org/releases/3.5.2/clang+llvm-3.5.2-x86_64-linux-gnu-ubuntu-14.04.tar.xz
-    sudo tar axvf clang+llvm-3.5.2-x86_64-linux-gnu-ubuntu-14.04.tar.xz
-    export CXX="$PWD/clang+llvm-3.5.2-x86_64-linux-gnu/bin/clang++ -Wno-error=unused-command-line-argument"
+    sudo wget -q http://releases.llvm.org/4.0.1/clang+llvm-4.0.1-x86_64-linux-gnu-debian8.tar.xz
+    sudo tar axvf clang+llvm-*.tar.xz
+    export CXX="$PWD/clang+llvm-4.0.1-x86_64-linux-gnu-debian8/bin/clang++ -Wno-error=unused-command-line-argument"
     $CXX -v
     ;;
 esac
