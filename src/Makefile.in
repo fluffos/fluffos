@@ -157,7 +157,7 @@ $(GENFILES): local_options tools/build_packages_genfiles.sh tools/build_applies.
 	@echo [Generating applies table...]
 	@./tools/build_applies.autogen
 	@echo [Generating efun tables...]
-	@./tools/make_func.autogen packages/packages.autogen.fullspec
+	@ASAN_OPTIONS="detect_leaks=0" ./tools/make_func.autogen packages/packages.autogen.fullspec
 	@echo [Generating grammar...]
 	@./tools/make_grammar.sh $(CXX) $(CXXFLAGS)
 	@$(BISON) -o vm/internal/compiler/grammar.autogen.cc \

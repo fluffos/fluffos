@@ -25,7 +25,9 @@ INSTALL_DIR=`dirname $(pwd)`/bin
 WARN=(
 "-Wall"
 "-Wextra"
-"-Wformat-security"
+"-Wformat"
+"-Werror=format-security"
+"-Werror=array-bounds"
 # Turn off some warnings from GCC.
 "-Wno-char-subscripts"
 "-Wno-sign-compare"
@@ -48,6 +50,8 @@ WARN=(
 )
 WARN="$(IFS=' '; echo "${WARN[*]}")"
 
+# Use JEMALLOC in release build.
+USE_JEMALLOC=1
 
 if test $# -ne 0; then
   case $1 in
@@ -57,7 +61,8 @@ if test $# -ne 0; then
       DEBUG="-g -DDEBUG"
       # Hardening mode activated, for more error visibility
       DEBUG="$DEBUG -D_FORTIFY_SOURCE=2 -fstack-protector-all"
-      DEBUG="$DEBUG -Wstack-protector --param ssp-buffer-size=1 -fstrict-aliasing"
+      DEBUG="$DEBUG -Wstack-protector --param ssp-buffer-size=1 -fstrict-aliasing -fsanitize=address,undefined -fno-omit-frame-pointer"
+      USE_JEMALLOC=0
       shift
       ;;
     *)
@@ -84,5 +89,5 @@ fi
 
 # Force an reconfigure.
 rm -f configure.h
-CFLAGS=$CFLAGS CXXFLAGS=$CFLAGS MAKE=$MAKE ARCH=$ARCH DRIVER_BIN=$DRIVER_BIN OPTIMIZE=$OPTIMIZE SOURCE_REVISION=$SOURCE_REVISION ./configure --bindir=$INSTALL_DIR $@
+USE_JEMALLOC=$USE_JEMALLOC CFLAGS=$CFLAGS CXXFLAGS=$CFLAGS MAKE=$MAKE ARCH=$ARCH DRIVER_BIN=$DRIVER_BIN OPTIMIZE=$OPTIMIZE SOURCE_REVISION=$SOURCE_REVISION ./configure --bindir=$INSTALL_DIR $@
 $MAKE help
