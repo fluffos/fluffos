@@ -5,12 +5,16 @@ language: cpp
 
 addons:
   apt:
+    sources:
+      - ubuntu-toolchain-r-test
+      - llvm-toolchain-trusty-4.0
     packages:
+      - g++-5
+      - clang-4.0
       - bison
       - autoconf
       - expect
       - telnet
-      - valgrind
       - libevent-dev
       - libmysqlclient-dev
       - libsqlite3-dev

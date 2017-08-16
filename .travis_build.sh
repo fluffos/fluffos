@@ -16,13 +16,13 @@ setup () {
 
 case $COMPILER in
   gcc)
-    export CXX="/usr/bin/g++"
+    export CC="gcc-5 -fuse-ld=gold"
+    export CXX="g++-5 -fuse-ld=gold"
     $CXX -v
     ;;
   clang)
-    wget -q http://releases.llvm.org/4.0.0/clang+llvm-4.0.0-x86_64-linux-gnu-ubuntu-14.04.tar.xz
-    tar axvf clang+llvm-*.tar.xz
-    export CXX="$PWD/clang+llvm-4.0.0-x86_64-linux-gnu-ubuntu-14.04/bin/clang++ -Wno-error=unused-command-line-argument"
+    export CC="clang-4.0"
+    export CXX="clang++-4.0"
     $CXX -v
     ;;
 esac
@@ -67,18 +67,11 @@ fi
 # Otherwise, continue
 make -j 2
 
-cd testsuite
-
-# FIXME: currently RELEASE build would report leak on valgrind, thus ignoring it for now.
-if [ "$TYPE" = "develop" ]; then
-  VALGRIND="valgrind --error-exitcode=255 --suppressions=../valgrind.supp"
-else
-  VALGRIND="valgrind"
-fi
-
 # Run standard test first
-$VALGRIND --malloc-fill=0x75 --free-fill=0x73 --track-origins=yes --leak-check=full ../driver etc/config.test -ftest -d
+cd testsuite
+../driver etc/config.test -ftest -d
 wait $!
+
 if [ $? -ne 0 ]; then
   exit $?
 fi
