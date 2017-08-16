@@ -33,10 +33,10 @@ AX_CHECK_LINK_FLAG([-flto], [AX_APPEND_COMPILE_FLAGS([-flto])])
 # JEMALLOC doesn't work on CYGWIN
 case "${host}" in
     *-*-cygwin*)
+        echo "JEMALLOC doesn't work on CYGWIN, force disabling."
         USE_JEMALLOC=0
         ;;
     *)
-        USE_JEMALLOC=1
         AX_APPEND_LINK_FLAGS([-rdynamic])
         AX_APPEND_COMPILE_FLAGS([-fPIE])
         AX_APPEND_COMPILE_FLAGS([-pie])
@@ -92,9 +92,6 @@ AC_CHECK_TYPES([sighandler_t], [], [],
 AC_FUNC_ERROR_AT_LINE
 AC_FUNC_FORK
 AC_FUNC_LSTAT_FOLLOWS_SLASHED_SYMLINK
-AC_FUNC_MALLOC
-AC_FUNC_MMAP
-AC_FUNC_REALLOC
 AC_FUNC_STRTOD
 #AC_CHECK_FUNCS([dup2 floor getcwd gethostname gettimeofday memchr memmove memset mkdir munmap pow putenv regcomp rmdir setlocale socket sqrt strcasecmp strchr strcspn strerror strncasecmp strpbrk strrchr strspn strstr strtol strtoul tzset])
 
