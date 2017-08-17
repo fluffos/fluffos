@@ -33,6 +33,9 @@
 // init vm layer.
 void vm_init();
 
+// Start running VM, this include load master/simul_efun objects and doing preload.
+void vm_start();
+
 // Reset vm
 void clear_state(void);
 
