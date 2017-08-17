@@ -144,6 +144,9 @@ int main(int argc, char **argv) {
   // Initialize VM layer
   vm_init();
 
+  // Start running.
+  vm_start();
+
   for (int i = 1; i < argc; i++) {
     if (argv[i][0] != '-') {
       continue;

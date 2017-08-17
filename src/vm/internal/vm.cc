@@ -64,6 +64,8 @@ void preload_objects() {
 }  // namespace
 
 void vm_init() {
+  init_posix_timers(); /* in posix_timer.cc */
+
   init_strings();     /* in stralloc.c */
   init_identifiers(); /* in lex.c */
   init_locals();      /* in compiler.c */
@@ -74,7 +76,9 @@ void vm_init() {
 
   add_predefines();
   reset_machine(1);
+}
 
+void vm_start() {
   error_context_t econ;
   save_context(&econ);
   try {
@@ -83,13 +87,12 @@ void vm_init() {
   } catch (const char *) {
     debug_message("The simul_efun (%s) and master (%s) objects must be loadable.\n",
                   CONFIG_STR(__SIMUL_EFUN_FILE__), CONFIG_STR(__MASTER_FILE__));
+    debug_message("Please check log files for exact error. \n");
     exit(-1);
   }
   pop_context(&econ);
 
-  // init posix timers
-  init_posix_timers();
-
+  // TODO: move this to correct location.
 #ifdef PACKAGE_MUDLIB_STATS
   restore_stat_files();
 #endif
