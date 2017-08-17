@@ -13,7 +13,7 @@
 #include "vm/internal/master.h"
 #include "vm/internal/simul_efun.h"
 #include "vm/internal/posix_timers.h"
-#include "vm/internal/otable.h"             // for init_otable
+#include "vm/internal/otable.h"             // for ObjectTable::init()
 #include "vm/internal/base/apply_cache.h"   // for apply_cache_init
 #include "vm/internal/base/machine.h"       // for reset_machine
 #include "vm/internal/compiler/lex.h"       // for add_predefines, fixme!
@@ -69,7 +69,7 @@ void vm_init() {
   init_strings();     /* in stralloc.c */
   init_identifiers(); /* in lex.c */
   init_locals();      /* in compiler.c */
-  init_otable();      /* in otable.c */
+  ObjectTable::init();      /* in otable.c */
 
   max_cost = CONFIG_INT(__MAX_EVAL_COST__);
   set_inc_list(CONFIG_STR(__INCLUDE_DIRS__));
