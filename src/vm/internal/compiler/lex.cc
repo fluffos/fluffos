@@ -3049,6 +3049,13 @@ void start_new_file(int f) {
 const char *query_instr_name(int instr) {
   const char *name;
   static char num_buf[20];
+
+  // The param is clearly wrong, however to be safe, we just return something here.
+  if (instr < 0 || instr >= (sizeof(instrs) / sizeof(instrs[0]))) {
+    sprintf(num_buf, "op_invalid");
+    return num_buf;
+  }
+
   name = instrs[instr].name;
 
   if (name) {

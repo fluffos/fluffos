@@ -264,7 +264,7 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
 
     fprintf(f, "%04x: ", static_cast<unsigned>(pc - code));
 
-    pc++;
+    instr = *pc++;
     buff[0] = 0;
     sarg = 0;
 
@@ -612,14 +612,14 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
       }
       case F_EFUNV:
         LOAD_SHORT(instr, pc);
-        sprintf(buff, "%d", EXTRACT_UCHAR(pc++));
+        sprintf(buff, "EFUN_V ARGS: %d", EXTRACT_UCHAR(pc++));
         break;
       case F_EFUN0:
       case F_EFUN1:
       case F_EFUN2:
       case F_EFUN3:
         LOAD_SHORT(instr, pc);
-        sprintf(buff, "%ld", instr);
+        sprintf(buff, "EFUN: %ld", instr);
         break;
       case 0:
         fprintf(f, "*** zero opcode ***\n");
