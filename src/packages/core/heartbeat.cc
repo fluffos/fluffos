@@ -22,6 +22,10 @@ struct heart_beat_t {
 object_t *g_current_heartbeat_obj;
 static heart_beat_t *g_current_heartbeat;
 
+/*
+ * TODO: ideally we should be using vector here for performance, however dealing with
+ * enable/disable heartbeat during execution make it diffcult to implement correctly.
+*/
 static std::deque<heart_beat_t *> heartbeats, heartbeats_next;
 
 /* Call all heart_beat() functions in all objects.
