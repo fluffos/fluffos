@@ -1,6 +1,6 @@
 BASE is the common stuff that shared across the driver.
 
-All code (Excluding base/ and package/) in the driver must include "base/base.h" as the first line.
+All code (Excluding base/ and package/) in the driver must include "base/std.h" as the first line.
 And nothing else in base should be included.
 
 All code in base/internal must include necessary headers itself.
