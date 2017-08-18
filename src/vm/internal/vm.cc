@@ -24,6 +24,8 @@
 #include "packages/mudlib_stats/mudlib_stats.h"
 #endif
 
+time_t boot_time;
+
 namespace {
 /* The epilog() in master.c is supposed to return an array of files to load.
  * The preload() in master object called to do the actual loading.
@@ -64,6 +66,8 @@ void preload_objects() {
 }  // namespace
 
 void vm_init() {
+  boot_time = get_current_time();
+
   init_posix_timers(); /* in posix_timer.cc */
 
   init_strings();     /* in stralloc.c */

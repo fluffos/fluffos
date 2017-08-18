@@ -1,7 +1,5 @@
 #include "base/std.h"
 
-#include "main.h"
-
 #ifdef HAVE_EXECINFO_H
 #include <execinfo.h>
 #endif
@@ -27,8 +25,6 @@
 #include "vm/vm.h"  // for push_constant_string, etc
 
 #include "packages/core/dns.h"  // for init_dns_event_base.
-
-time_t boot_time;
 
 static void sig_cld(int /*sig*/);
 

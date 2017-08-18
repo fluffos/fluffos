@@ -33,6 +33,10 @@
 // init vm layer.
 void vm_init();
 
+#include <ctime>  // for time_t
+// VM boot time, inited in vm_init().
+extern time_t boot_time;
+
 // Start running VM, this include load master/simul_efun objects and doing preload.
 void vm_start();
 

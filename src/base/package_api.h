@@ -40,6 +40,5 @@
 #include "event.h"
 #include "comm.h"  // reverse API, FIXME
 #include "user.h"  // reverse API
-#include "main.h"  // reverse API
 
 #endif /* SRC_BASE_PACKAGE_API_H_ */
