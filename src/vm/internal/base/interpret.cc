@@ -48,17 +48,6 @@ extern inline const char *origin_to_name(int /*origin*/);
 int stack_in_use_as_temporary = 0;
 #endif
 
-/*
- * Macro for extracting global variable indices.
- */
-
-#if CFG_MAX_GLOBAL_VARIABLES <= 256
-#define READ_GLOBAL_INDEX READ_UCHAR
-#elif CFG_MAX_GLOBAL_VARIABLES <= 65536
-#define READ_GLOBAL_INDEX READ_USHORT
-#else
-#error CFG_MAX_GLOBAL_VARIABLES must not be greater than 65536
-#endif
 
 int inter_sscanf(svalue_t * /*arg*/, svalue_t * /*s0*/, svalue_t * /*s1*/, int /*num_arg*/);
 program_t *current_prog;
@@ -2506,7 +2495,9 @@ void eval_instruction(char *p) {
           STACK_INC;
           sp->type = T_LVALUE;
           if (flags & FOREACH_LEFT_GLOBAL) {
-            sp->u.lvalue = find_value((READ_GLOBAL_INDEX(pc) + variable_index_offset));
+            unsigned short idx = 0;
+            LOAD2(idx, pc);
+            sp->u.lvalue = find_value(idx + variable_index_offset);
           } else {
             sp->u.lvalue = fp + EXTRACT_UCHAR(pc++);
           }
@@ -2525,9 +2516,12 @@ void eval_instruction(char *p) {
         }
 
         if (flags & FOREACH_RIGHT_GLOBAL) {
+          short idx = 0;
+          LOAD2(idx, pc);
+
           STACK_INC;
           sp->type = T_LVALUE;
-          sp->u.lvalue = find_value((READ_GLOBAL_INDEX(pc) + variable_index_offset));
+          sp->u.lvalue = find_value(idx + variable_index_offset);
         } else if (flags & FOREACH_REF) {
           ref_t *ref = make_ref();
           svalue_t *loc = fp + EXTRACT_UCHAR(pc++);
@@ -2973,7 +2967,9 @@ void eval_instruction(char *p) {
       case F_GLOBAL: {
         svalue_t *s;
 
-        s = find_value((READ_GLOBAL_INDEX(pc) + variable_index_offset));
+        unsigned short idx = 0;
+        LOAD2(idx, pc);
+        s = find_value(idx + variable_index_offset);
 
         /*
          * If variable points to a destructed object, replace it
@@ -3353,11 +3349,14 @@ void eval_instruction(char *p) {
             error("++ of non-numeric argument\n");
         }
         break;
-      case F_GLOBAL_LVALUE:
+      case F_GLOBAL_LVALUE: {
+        unsigned short idx = 0;
+        LOAD2(idx, pc);
         STACK_INC;
         sp->type = T_LVALUE;
-        sp->u.lvalue = find_value((READ_GLOBAL_INDEX(pc) + variable_index_offset));
+        sp->u.lvalue = find_value(idx + variable_index_offset);
         break;
+      }
       case F_INDEX_LVALUE:
         push_indexed_lvalue(0);
         break;

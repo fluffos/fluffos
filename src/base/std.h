@@ -36,8 +36,7 @@
 
 // These shall be moved.
 #define EXTRACT_UCHAR(p) (*(unsigned char *)(p))
-#define READ_UCHAR(p) (*(unsigned char *)(p++))
-#define READ_USHORT(p) (p++, p++, *((unsigned short *)(p - 2)))
+#define READ_USHORT(p) (*(unsigned short *)(p++))
 
 #define COPY2(x, y)                    \
   ((char *)(x))[0] = ((char *)(y))[0]; \
