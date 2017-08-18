@@ -28,14 +28,7 @@ void fatal(const char *, ...);
 
 typedef struct stats_s { unsigned int free_calls, alloc_calls, realloc_calls; } stats_t;
 
-static stats_t stats;
-
-void debugmalloc_init() {
-  stats.free_calls = 0;
-  stats.alloc_calls = 0;
-  stats.realloc_calls = 0;
-  MDinit();
-}
+static stats_t stats = {0, 0, 0};
 
 void *debugrealloc(void *ptr, int size, int tag, const char *desc) {
   void *tmp;
