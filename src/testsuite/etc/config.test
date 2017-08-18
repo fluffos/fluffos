@@ -336,7 +336,7 @@ enable_commands call init : 0
 # sprintf: Make format like "%10s" ignore ANSI escape code length, as they
 # are not visible in the client.
 #
-sprintf add_justified ignore ANSI colors : 0
+sprintf add_justified ignore ANSI colors : 1
 
 # call_out(0) loop prvention:
 #
