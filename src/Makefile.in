@@ -182,7 +182,7 @@ tools/make_func.autogen.cc: tools/make_func.y
 	@$(BISON) -o tools/make_func.autogen.cc tools/make_func.y
 
 $(DRIVER_BIN): $(JEMALLOC_OBJS) $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS) dtrace_compile
-	@-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old 2>/dev/null
+	@mv -f $(DRIVER_BIN) $(DRIVER_BIN).old 2>/dev/null || true
 	@echo [Linking $@]
 	@$(CXX) $(LDFLAGS) $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS) $(JEMALLOC_OBJS) `./dtrace_compile` -o $(DRIVER_BIN) $(LIBS) \
 		@MYSQL_LDFLAGS@ @POSTGRESQL_LDFLAGS@ @SQLITE3_LDFLAGS@ \
