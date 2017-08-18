@@ -106,7 +106,7 @@
 #error CFG_MAX_GLOBAL_VARIABLES must not be greater than 65536
 #endif
 
-#define CFG_EVALUATOR_STACK_SIZE 6000
+#define CFG_EVALUATOR_STACK_SIZE 65536
 #define CFG_COMPILER_STACK_SIZE 600
 #define CFG_MAX_CALL_DEPTH 150
 /* This must be one of 4, 16, 64, 256, 1024, 4096 */
