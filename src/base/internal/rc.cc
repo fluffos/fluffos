@@ -105,6 +105,11 @@ void config_init() {
   for (i = 0; i < NUM_CONFIG_STRS; i++) {
     config_str[i] = nullptr;
   }
+
+  // populate default value for int flags.
+  for (int i = 0; i < (sizeof(kDefaultFlags) / sizeof(flagEntry)); i++) {
+    CONFIG_INT(kDefaultFlags[i].pos) = kDefaultFlags[i].defaultValue;
+  }
 }
 
 /*
@@ -173,9 +178,6 @@ bool scan_config_line(const char *fmt, void *dest, int required) {
 }  // namespace
 
 void read_config(char *filename) {
-  /* needed for string_copy() below */
-  CONFIG_INT(__MAX_STRING_LENGTH__) = 128;
-
   config_init();
 
   fprintf(stdout, "Processing config file: %s\n", filename);
@@ -351,8 +353,6 @@ void read_config(char *filename) {
   std::cout << "==== Runtime Config Table ==== " << std::endl;
   // process int flags
   for (int i = 0; i < (sizeof(kDefaultFlags) / sizeof(flagEntry)); i++) {
-    CONFIG_INT(kDefaultFlags[i].pos) = kDefaultFlags[i].defaultValue;
-
     std::cout << kDefaultFlags[i].key << ": " << kDefaultFlags[i].defaultValue;
 
     int value = 0;

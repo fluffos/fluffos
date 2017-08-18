@@ -19,13 +19,7 @@
  * Macro for inserting global variable indices.
  */
 
-#if CFG_MAX_GLOBAL_VARIABLES <= 256
-#define INS_GLOBAL_INDEX ins_byte
-#elif CFG_MAX_GLOBAL_VARIABLES <= 65536
 #define INS_GLOBAL_INDEX ins_short
-#else
-#error CFG_MAX_GLOBAL_VARIABLES must not be greater than 65536
-#endif
 
 static void ins_real(LPC_FLOAT /*l*/);
 static void ins_short(short /*l*/);

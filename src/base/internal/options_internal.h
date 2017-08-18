@@ -98,10 +98,13 @@
 #define CFG_MAX_LOCAL_VARIABLES 50
 
 /* CFG_MAX_GLOBAL_VARIABLES: This value determines the maximum number of
- *   global variables per object.  The maximum value is 65536.  There is
- *   a marginal memory increase for a value over 256.
+ *   global variables per object.  The maximum value is 65536.
  */
 #define CFG_MAX_GLOBAL_VARIABLES 65536
+
+#if CFG_MAX_GLOBAL_VARIABLES > 65536
+#error CFG_MAX_GLOBAL_VARIABLES must not be greater than 65536
+#endif
 
 #define CFG_EVALUATOR_STACK_SIZE 6000
 #define CFG_COMPILER_STACK_SIZE 600
@@ -120,7 +123,7 @@
  * this option, since it needs 4 bytes to store the function pointers
  * anyway, and this setting is ignored.
  */
-#undef USE_32BIT_ADDRESSES
+#define USE_32BIT_ADDRESSES
 
 /* LARGEST_PRINTABLE_STRING: defines the size of the vsprintf() buffer in
  *   comm.c's add_message(). Instead of blindly making this value larger,

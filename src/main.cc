@@ -127,8 +127,6 @@ int main(int argc, char **argv) {
     exit(-1);
   }
 
-  // TODO: dump configs
-
   // Make sure mudlib dir is correct.
   if (chdir(CONFIG_STR(__MUD_LIB_DIR__)) == -1) {
     fprintf(stderr, "Bad mudlib directory: %s\n", CONFIG_STR(__MUD_LIB_DIR__));
