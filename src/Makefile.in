@@ -117,12 +117,14 @@ VM_COMPILER_OBJS= \
 DRIVER_OBJS= \
 	backend.o \
 	comm.o \
-	console.o \
 	fliconv.o \
-	main.o \
+	mainlib.o \
 	user.o \
 	net/telnet.o \
 	thirdparty/libtelnet/libtelnet.o
+
+DRIVER_EXEC_OBJS= \
+  main.o
 
 ifeq ($(USE_JEMALLOC), 1)
 JEMALLOC_OBJS= \
@@ -181,10 +183,15 @@ tools/make_func.autogen.cc: tools/make_func.y
 	@echo [Generating] $@
 	@$(BISON) -o tools/make_func.autogen.cc tools/make_func.y
 
-$(DRIVER_BIN): $(JEMALLOC_OBJS) $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS) dtrace_compile
+libdriver.a : $(JEMALLOC_OBJS) $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS)
+	@echo [Generating $@]
+	@gcc-ar rcs libdriver.a $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS)
+
+$(DRIVER_BIN): libdriver.a $(DRIVER_EXEC_OBJS) $(JEMALLOC_OBJS)
 	@mv -f $(DRIVER_BIN) $(DRIVER_BIN).old 2>/dev/null || true
 	@echo [Linking $@]
-	@$(CXX) $(LDFLAGS) $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS) $(JEMALLOC_OBJS) `./dtrace_compile` -o $(DRIVER_BIN) $(LIBS) \
+	@$(CXX) $(LDFLAGS) -o $(DRIVER_BIN) $(DRIVER_EXEC_OBJS) libdriver.a $(JEMALLOC_OBJS) \
+	  $(LIBS) \
 		@MYSQL_LDFLAGS@ @POSTGRESQL_LDFLAGS@ @SQLITE3_LDFLAGS@ \
 		@OPENSSL_LDFLAGS@ @OPENSSL_LIBS@ @PCRE_LIBS@ \
 		@LIBEVENT_LIBS@ @LIBEVENT_LDFLAGS@
@@ -197,10 +204,6 @@ thirdparty/jemalloc/lib/libjemalloc_pic.a:
 thirdparty/libtelnet/libtelnet.o: thirdparty/libtelnet/libtelnet.c
 	@echo [CC] $@
 	@$(CXX) -c $(CXXFLAGS) -DHAVE_ZLIB -x c++ -o $@ $<
-
-dtrace_compile: dtrace_compile.cc
-	@echo [Linking] $@
-	$(CXX) $(CXXFLAGS) -x c++ dtrace_compile.cc -o dtrace_compile
 
 portbind: portbind.o
 	@echo [Linking] $@
@@ -237,7 +240,6 @@ clean:
 	@-rm -f *.ln tags TAGS
 	@-rm -f $(DRIVER_BIN) $(DRIVER_BIN).old portbind *.exe
 	@-rm -f 1.out 2.out
-	@-rm -f dtrace_compile
 	@-rm -f testsuite/log/author_stats testsuite/log/domain_stats
 	@-rm -f testsuite/tmp.o
 	@-cd thirdparty/jemalloc && make clean && cd -

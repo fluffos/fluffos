@@ -51,14 +51,13 @@ void check_all_blocks(int);
 #endif
 
 #define MAX_CATEGORY 130
-extern md_node_t **table;
+extern md_node_t *table[];
 extern uint64_t totals[MAX_CATEGORY];
 extern uint64_t blocks[MAX_CATEGORY];
 
 extern int malloc_mask;
 extern unsigned int total_malloced;
 extern unsigned int hiwater;
-void MDinit(void);
 void MDmalloc(md_node_t *, int, int, const char *);
 int MDfree(void *);
 

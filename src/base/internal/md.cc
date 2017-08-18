@@ -20,18 +20,9 @@ uint64_t blocks[MAX_CATEGORY];
 
 int malloc_mask = 121;
 
-md_node_t **table;
+md_node_t *table[MD_TABLE_SIZE];
 unsigned int total_malloced = 0L;
 unsigned int hiwater = 0L;
-
-void MDinit() {
-  int j;
-
-  table = reinterpret_cast<md_node_t **>(calloc(MD_TABLE_SIZE, sizeof(md_node_t *)));
-  for (j = 0; j < MAX_CATEGORY; j++) {
-    totals[j] = 0;
-  }
-}
 
 void MDmalloc(md_node_t *node, int size, int tag, const char *desc) {
   unsigned long h;
