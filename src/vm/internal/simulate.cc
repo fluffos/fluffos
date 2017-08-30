@@ -1783,19 +1783,16 @@ static void mudlib_error_handler(char *err, int katch) {
   }
 }
 
+namespace {
 void _error_handler(char *err) {
   const char *object_name;
 
   debug_message_with_location(err + 1);
-#if defined(DEBUG)
   if (CONFIG_INT(__RC_TRACE_CODE__)) {
     object_name = dump_trace(1);
   } else {
     object_name = dump_trace(0);
   }
-#else
-  object_name = dump_trace(0);
-#endif
   if (object_name) {
     object_t *ob;
 
@@ -1831,6 +1828,9 @@ void _error_handler(char *err) {
     g_current_heartbeat_obj = 0;
   }
 }
+
+} // namespace
+
 
 void error_handler(char *err) {
 /* in case we're going to jump out of load_object */

@@ -335,10 +335,8 @@ svalue_t *safe_apply(const char *fun, object_t *ob, int num_arg, int where) {
   }
 
   error_context_t econ;
-  if (!save_context(&econ)) {
-    pop_n_elems(num_arg);
-    return 0;
-  }
+  save_context(&econ);
+
   svalue_t *ret = 0;
   try {
     ret = apply(fun, ob, num_arg, where);

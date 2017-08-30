@@ -203,7 +203,7 @@ void try_reset(object_t *);
 
 void pop_context(error_context_t *);
 void restore_context(error_context_t *);
-int save_context(error_context_t *);
+void save_context(error_context_t *);
 
 void pop_control_stack(void);
 function_t *setup_new_frame(int);
