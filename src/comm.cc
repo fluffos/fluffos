@@ -85,9 +85,7 @@ void on_user_command(evutil_socket_t fd, short what, void *arg) {
   // FIXME: this function currently calls into mudlib and will throw errors
   // This catch block should be moved one level down.
   error_context_t econ;
-  if (!save_context(&econ)) {
-    fatal("BUG: on_user_comamnd can not save context!");
-  }
+  save_context(&econ);
   set_eval(max_cost);
   try {
     process_user_command(user);

@@ -71,11 +71,6 @@ void int_free_svalue(svalue_t *v, const char *tag)
 void int_free_svalue(svalue_t *v)
 #endif
 {
-  /* Marius, 30-Mar-2001: T_FREED could be OR'd in with the type now if the
-   * svalue has been 'freed' as an optimization by the F_TRANSFER_LOCAL op.
-   * This will allow us to keep the type of the variable known for error
-   * handler purposes but not duplicate the free.
-   */
   if (v->type == T_STRING) {
     const char *str = v->u.string;
 

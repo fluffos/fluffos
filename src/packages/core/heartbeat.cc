@@ -108,19 +108,17 @@ void call_heart_beat() {
     g_current_heartbeat = curr_hb;
 
     error_context_t econ;
-    try {
-      save_context(&econ);
 
+    save_context(&econ);
+    try {
       set_eval(max_cost);
       // TODO: provide a safe_call_direct()
       call_direct(ob, ob->prog->heart_beat - 1, ORIGIN_DRIVER, 0);
-
       pop_stack(); /* pop the return value */
-
-      pop_context(&econ);
     } catch (const char *) {
       restore_context(&econ);
     }
+    pop_context(&econ);
 
     restore_command_giver();
     g_current_heartbeat_obj = nullptr;

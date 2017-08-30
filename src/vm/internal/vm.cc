@@ -92,6 +92,8 @@ void vm_start() {
     debug_message("The simul_efun (%s) and master (%s) objects must be loadable.\n",
                   CONFIG_STR(__SIMUL_EFUN_FILE__), CONFIG_STR(__MASTER_FILE__));
     debug_message("Please check log files for exact error. \n");
+    restore_context(&econ);
+    pop_context(&econ);
     exit(-1);
   }
   pop_context(&econ);

@@ -2185,11 +2185,7 @@ void eval_instruction(char *p) {
         }
 
         STACK_INC;
-        *sp = *s;
-
-        /* The optimizer has asserted this won't be used again.  Make
-         * it look like a number to avoid double frees. */
-        s->type = T_NUMBER;
+        assign_svalue_no_free(sp, s);
         break;
       }
       case F_LOCAL: {
@@ -3695,9 +3691,7 @@ static void do_catch(char *pc, unsigned short new_pc_offset) {
    * Save some global variables that must be restored separately after a
    * longjmp. The stack will have to be manually popped all the way.
    */
-  if (!save_context(&econ)) {
-    error("Can't catch too deep recursion error.\n");
-  }
+  save_context(&econ);
   push_control_stack(FRAME_CATCH);
   csp->pc = current_prog->program + new_pc_offset;
   if (CONFIG_INT(__RC_TRACE_CODE__)) {
@@ -3708,8 +3702,8 @@ static void do_catch(char *pc, unsigned short new_pc_offset) {
 #endif
   }
 
+  assign_svalue(&catch_value, &const1);
   try {
-    assign_svalue(&catch_value, &const1);
     /* note, this will work, since csp->extern_call won't be used */
     eval_instruction(pc);
   } catch (const char *) {
@@ -3727,9 +3721,8 @@ static void do_catch(char *pc, unsigned short new_pc_offset) {
       pop_context(&econ);
       error("Can't catch eval cost too big error.\n");
     }
-    if (0 && too_deep_error) {  // can't we??
-      pop_context(&econ);
-      error("Can't catch too deep recursion error.\n");
+    if (too_deep_error) {
+      too_deep_error = 0;
     }
   }
   pop_context(&econ);
@@ -4641,21 +4634,13 @@ void mark_stack() {
 }
 #endif
 
-/* Be careful.  This assumes there will be a frame pushed right after this,
-   as we use econ->save_csp + 1 to restore */
-int save_context(error_context_t *econ) {
-  if (csp == &control_stack[CFG_MAX_CALL_DEPTH - 1]) {
-    /* Attempting to push the frame will give Too deep recursion.
-       fail now. */
-    return 0;
-  }
+void save_context(error_context_t *econ) {
   econ->save_sp = sp;
   econ->save_csp = csp;
   econ->save_cgsp = cgsp;
   econ->save_context = current_error_context;
 
   current_error_context = econ;
-  return 1;
 }
 
 void pop_context(error_context_t *econ) { current_error_context = econ->save_context; }
