@@ -56,11 +56,13 @@ USE_JEMALLOC=1
 ####### END OF USER CONFIGURABLE OPTIONS
 
 echo "Checking autotools..."
+set +e
 bash ./autogen.sh
 if [[ $? -ne 0 ]]; then
-  echo "You must have autotools installed, try apt install autoconf"
+  echo "You must have autotools installed, please install autoconf and automake."
   exit 1
 fi
+set -e
 
 if test $# -ne 0; then
   case $1 in
@@ -72,7 +74,7 @@ if test $# -ne 0; then
       # Hardening mode activated, for more error visibility
       DEBUG="$DEBUG -D_FORTIFY_SOURCE=2 -fstack-protector-all"
       DEBUG="$DEBUG -Wstack-protector --param ssp-buffer-size=1 -fstrict-aliasing"
-      DEBUG="-fsanitize=address,undefined -fno-omit-frame-pointer"
+      DEBUG="$DEBUG -fsanitize=address,undefined -fno-omit-frame-pointer"
       shift
       ;;
     *)
