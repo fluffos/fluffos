@@ -214,6 +214,7 @@ portbind: portbind.o
 clean:
 	@echo [Cleaning ...]
 	@-find . -name "*.o" | xargs rm -rf
+	@-find . -name "*.a" | xargs rm -rf
 	@-find . -name "*.d" | xargs rm -rf
 	@-find . -name "*.gcda" | xargs rm -rf
 	@-find . -name "*.gcno" | xargs rm -rf
