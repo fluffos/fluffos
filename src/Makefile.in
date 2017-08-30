@@ -91,6 +91,7 @@ VM_OBJS= \
 	vm/internal/posix_timers.o \
 	vm/internal/simul_efun.o \
 	vm/internal/simulate.o \
+	vm/internal/trace.o \
 	vm/internal/vm.o
 
 VM_BASE_OBJS= \

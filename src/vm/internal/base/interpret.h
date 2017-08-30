@@ -183,9 +183,7 @@ void mark_apply_low_cache(void);
 void translate_absolute_line(int, unsigned short *, int *, int *);
 char *add_slash(const char *const);
 int strpref(const char *, const char *);
-array_t *get_svalue_trace(void);
 void do_trace(const char *, const char *, const char *);
-const char *dump_trace(int);
 void opcdump(const char *);
 int inter_sscanf(svalue_t *, svalue_t *, svalue_t *, int);
 char *get_line_number_if_any(void);
@@ -241,5 +239,8 @@ inline const char *access_to_name(int mode) {
       return "unknown";
   }
 }
+
+void get_explicit_line_number_info(char *, const program_t *, const char **, int *);
+int last_instructions();
 
 #endif /* _INTERPRET_H */
