@@ -53,16 +53,26 @@ WARN="$(IFS=' '; echo "${WARN[*]}")"
 # Use JEMALLOC in release build.
 USE_JEMALLOC=1
 
+####### END OF USER CONFIGURABLE OPTIONS
+
+echo "Checking autotools..."
+bash ./autogen.sh
+if [[ $? -ne 0 ]]; then
+  echo "You must have autotools installed, try apt install autoconf"
+  exit 1
+fi
+
 if test $# -ne 0; then
   case $1 in
     develop)
       echo Preparing to build developmental version of MudOS driver ...
-      OPTIMIZE="-O0"
+      USE_JEMALLOC=0
+      OPTIMIZE="-O1"
       DEBUG="-g -DDEBUG"
       # Hardening mode activated, for more error visibility
       DEBUG="$DEBUG -D_FORTIFY_SOURCE=2 -fstack-protector-all"
-      DEBUG="$DEBUG -Wstack-protector --param ssp-buffer-size=1 -fstrict-aliasing -fsanitize=address,undefined -fno-omit-frame-pointer"
-      USE_JEMALLOC=0
+      DEBUG="$DEBUG -Wstack-protector --param ssp-buffer-size=1 -fstrict-aliasing"
+      DEBUG="-fsanitize=address,undefined -fno-omit-frame-pointer"
       shift
       ;;
     *)
@@ -71,8 +81,6 @@ if test $# -ne 0; then
 else
   echo Preparing to build standard driver ...
 fi
-
-####### END OF USER CONFIGURABLE OPTIONS
 
 CFLAGS="$CFLAGS $COMPILER_FLAGS $WARN $OPTIMIZE $DEBUG"
 

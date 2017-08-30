@@ -11,6 +11,7 @@
 /config.status
 /config.log
 /configure.h
+/configure
 driver
 driver.old
 portbind
