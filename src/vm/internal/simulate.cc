@@ -42,6 +42,8 @@ void db_cleanup(void);  // FIXME
 
 #include "comm.h"  // FIXME
 
+#include "vm/internal/trace.h" // for dump_trace && get_svalue_trace
+
 /*
  * This one is called from HUP.
  */
@@ -1892,30 +1894,36 @@ void error_handler(char *err) {
     add_errors(&current_object->stats, 1);
   }
 #endif
+  // No mudlib error handling.
   if (!CONFIG_INT(__RC_MUDLIB_ERROR_HANDLER__)) {
     _error_handler(err);
-  } else {
-    if (!too_deep_error) {
-      if (num_mudlib_error) {
-        debug_message("Error in error handler: ");
-        debug_message_with_location(err);
-        (void)dump_trace(0);
-        num_mudlib_error = 0;
-      } else {
-        num_mudlib_error++;
-        num_error--;
-        outoftime = 0;
-        mudlib_error_handler(err, 0);
-        if (max_eval_error) {
-          outoftime = 1;
-        }
-        num_mudlib_error--;
-        num_error++;
-      }
-    } else {
-      _error_handler(err);
-    }
+    goto exit;
   }
+
+  // For 'too deep recurision' we can't call mudlib error handlers, so we must handle this in driver.
+  if (too_deep_error) {
+    _error_handler(err);
+    goto exit;
+  }
+
+  // Error occured while running mudlib error handler.
+  if (num_mudlib_error) {
+    debug_message("Error in mudlib error handler: ");
+    debug_message_with_location(err);
+    (void) dump_trace(0);
+    num_mudlib_error = 0;
+  } else {
+    num_mudlib_error++;
+    num_error--;
+    outoftime = 0;
+    mudlib_error_handler(err, 0);
+    if (max_eval_error) {
+      outoftime = 1;
+    }
+    num_mudlib_error--;
+    num_error++;
+  }
+exit:
   num_error--;
   too_deep_error = max_eval_error = 0;
   if (current_error_context) {
