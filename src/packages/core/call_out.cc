@@ -95,7 +95,7 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, std::chrono::milliseconds dela
       new_call_out_zero_scheduled_on_this_gametick++;
       if (new_call_out_zero_scheduled_on_this_gametick >
           CONFIG_INT(__RC_CALL_OUT_ZERO_NEST_LEVEL__)) {
-        error("Nesting call_out(0) level limit exceeded: %d",
+        error("Nesting call_out(0) level limit exceeded: %d. \n",
               CONFIG_INT(__RC_CALL_OUT_ZERO_NEST_LEVEL__));
       }
     }
