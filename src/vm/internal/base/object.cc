@@ -1750,6 +1750,7 @@ int restore_object(object_t *ob, const char *file, int noclear) {
     restore_object_from_buff(ob, buf.data(), noclear);
   } catch (const char *) {
     restore_context(&econ);
+    pop_context(&econ);
     return 0;
   }
   pop_context(&econ);

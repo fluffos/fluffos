@@ -292,10 +292,7 @@ void f_pcre_replace_callback(void) {
   push_refed_array(arr);
   error_context_t econ;
 
-  if (!save_context(&econ)) {
-    pcre_free_memory(run);
-    error("context stack full!\n");
-  }
+  save_context(&econ);
   try {
     for (i = 0; i < run->rc - 1; i++) {
       svalue_t *v;
