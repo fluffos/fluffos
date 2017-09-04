@@ -234,7 +234,7 @@ void f_compress(void) {
   real_buffer = allocate_buffer(new_size);
   write_buffer(real_buffer, 0, reinterpret_cast<char *>(buffer), new_size);
   FREE(buffer);
-  push_buffer(real_buffer);
+  push_refed_buffer(real_buffer);
 }
 #endif
 
@@ -305,7 +305,7 @@ void f_uncompress(void) {
     buffer = allocate_buffer(len);
     write_buffer(buffer, 0, reinterpret_cast<char *>(output_data), len);
     FREE(output_data);
-    push_buffer(buffer);
+    push_refed_buffer(buffer);
   } else {
     error("inflate: no ZSTREAM_END\n");
   }
