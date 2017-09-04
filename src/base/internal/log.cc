@@ -9,9 +9,9 @@
 #define E(x) \
   { #x, DBG_##x }
 
-debug_t levels[] = {
-    E(call_out), E(d_flag),   E(connections), E(mapping), E(sockets), E(comp_func_tab),
-    E(LPC),      E(LPC_line), E(event),       E(dns),     E(file),    E(add_action),
+const debug_t levels[] = {
+        E(call_out), E(d_flag),   E(connections), E(mapping), E(sockets), E(comp_func_tab),
+        E(LPC),      E(LPC_line), E(event),       E(dns),     E(file),    E(add_action),
 };
 
 const int sizeof_levels = (sizeof(levels) / sizeof(levels[0]));
@@ -20,7 +20,6 @@ void debug_message(const char *fmt, ...) {
   static FILE *debug_message_fp = nullptr;
   static char deb_buf[1024];
   static char *deb = deb_buf;
-  va_list args;
 
   if (!debug_message_fp) {
     /*
@@ -44,18 +43,19 @@ void debug_message(const char *fmt, ...) {
     }
   }
 
-  char message[1024];
-
-  va_start(args, fmt);
-  vsnprintf(message, 1024, fmt, args);
-  va_end(args);
+  va_list args1, args2;
+  va_start(args1, fmt);
+  va_copy(args2, args1);
 
   if (debug_message_fp != stderr) {
-    fprintf(debug_message_fp, "%s", message);
+    vfprintf(debug_message_fp, fmt, args1);
     fflush(debug_message_fp);
   }
-  fprintf(stderr, "%s", message);
+  va_end(args1);
+
+  vfprintf(stderr, fmt, args2);
   fflush(stderr);
+  va_end(args2);
 }
 
 int debug_level = 0;
