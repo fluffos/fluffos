@@ -174,8 +174,12 @@ void f_replace_program(void) {
   name = reinterpret_cast<char *>(DMALLOC(name_len + 3, TAG_TEMPORARY, "replace_program"));
   xname = name;
   strcpy(name, sp->u.string);
-  if (name[name_len - 2] != '.' || name[name_len - 1] != 'c') {
+  if (name_len < 3) {
     strcat(name, ".c");
+  } else {
+    if (name[name_len - 2] != '.' || name[name_len - 1] != 'c') {
+      strcat(name, ".c");
+    }
   }
   if (*name == '/') {
     name++;

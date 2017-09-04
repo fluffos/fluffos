@@ -20,7 +20,7 @@
     string check_memory(int default: 0);
 #endif
 
-#ifdef TRACE
+#ifdef DEBUG
     string traceprefix(string | int);
     int trace(int);
 #endif

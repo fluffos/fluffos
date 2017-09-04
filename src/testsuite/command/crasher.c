@@ -114,7 +114,9 @@ nosave mixed *_efuns = ({
     ({ "has_mxp", (: has_mxp :) }),
     ({ "has_zmp", (: has_zmp :) }),
     ({ "heart_beats", (: heart_beats :) }),
+#ifdef __PACKAGE_MATRIX__
     ({ "id_matrix", (: id_matrix :) }),
+#endif
     ({ "implode", (: implode :) }),
     ({ "in_edit", (: in_edit :) }),
     ({ "in_input", (: in_input :) }),
@@ -218,9 +220,11 @@ nosave mixed *_efuns = ({
     ({ "restore_variable", (: restore_variable :) }),
     ({ "rm", (: rm :) }),
     ({ "rmdir", (: rmdir :) }),
+#ifdef __PACKAGE_MATRIX__
     ({ "rotate_x", (: rotate_x :) }),
     ({ "rotate_y", (: rotate_y :) }),
     ({ "rotate_z", (: rotate_z :) }),
+#endif
     ({ "round", (: round :) }),
     ({ "rusage", (: rusage :) }),
     ({ "save_object", (: save_object :) }),
