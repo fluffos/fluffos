@@ -83,5 +83,6 @@
 #define PACKAGE_COMPRESS
 #define SAVE_GZ_EXTENSION ".o.gz"
 #undef PACKAGE_THREAD
+#define PACKAGE_MATRIX
 
 #endif /* _LOCAL_OPTIONS_H_ */
