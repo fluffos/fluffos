@@ -3,12 +3,9 @@
  *              2-93 : Dwayne Fontenot : original coding.
  */
 
-#include "../base/std.h"
+#include "base/package_api.h"
 
 #include <math.h>
-
-#include "../lpc_incl.h"
-#include "../efun_protos.h"
 
 #include "matrix.h"
 
