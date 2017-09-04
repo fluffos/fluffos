@@ -71,7 +71,7 @@ struct debug_t {
   int bit;
 };
 
-extern debug_t levels[];
+extern const debug_t levels[];
 extern const int sizeof_levels;
 
 #endif /* SRC_BASE_LOG_H_ */
