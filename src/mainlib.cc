@@ -25,6 +25,9 @@
 #include "packages/core/dns.h"  // for init_dns_event_base.
 #include "vm/vm.h"  // for push_constant_string, etc
 
+// from lex.cc
+extern void print_all_predefines();
+
 namespace {
     inline void print_sep() { std::cout << std::string(72, '=') << std::endl; }
 
@@ -211,6 +214,11 @@ struct event_base* init_main(int argc, char **argv) {
 
     // Initialize VM layer
     vm_init();
+
+    // from lex.cc
+    debug_message("==== LPC Predefines ====\n");
+    print_all_predefines();
+    debug_message("========================\n");
 
     return base;
 }

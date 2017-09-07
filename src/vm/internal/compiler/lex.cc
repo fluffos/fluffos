@@ -25,6 +25,8 @@
 #include <cstdlib>   // for exit(), FIXME
 #include <cctype>    // for isspace
 #include <unistd.h>  // for read(), FIXME
+#include <vector>
+#include <algorithm> // for std::sort
 
 // FIXME?
 #include "cc.h"
@@ -3505,6 +3507,29 @@ void mark_all_defines() {
   }
 }
 #endif
+
+void print_all_predefines() {
+  std::vector<defn_t *> results;
+
+  for (int i = 0; i < DEFHASH; i++) {
+    defn_t *tmp = defns[i];
+    while (tmp) {
+      if (tmp->flags == DEF_IS_PREDEF) {
+        results.push_back(tmp);
+      }
+      tmp = tmp->next;
+    }
+  }
+  std::sort(results.begin(), results.end(), [](defn_t* a, defn_t*b) {
+     return strcmp(a->name, b->name) < 0;
+  });
+
+  for(auto &&item: results) {
+    debug_message("#define %s %s\n", item->name, item->exps);
+  }
+
+  results.clear();
+}
 
 static void add_predefine(const char *name, int nargs, const char *exps) {
   defn_t *p;
