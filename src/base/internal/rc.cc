@@ -350,7 +350,7 @@ void read_config(char *filename) {
     }
   }
 
-  std::cout << "==== Runtime Config Table ==== " << std::endl;
+  std::cout << "==== Runtime Config Table ====" << std::endl;
   // process int flags
   for (int i = 0; i < (sizeof(kDefaultFlags) / sizeof(flagEntry)); i++) {
     std::cout << kDefaultFlags[i].key << ": " << kDefaultFlags[i].defaultValue;
@@ -367,7 +367,7 @@ void read_config(char *filename) {
     }
     std::cout << std::endl;
   }
-  std::cout << "==== Runtime Config Table ==== " << std::endl;
+  std::cout << "==============================" << std::endl;
 
   // TODO: get rid of config_lines all together.
   config_lines.clear();
