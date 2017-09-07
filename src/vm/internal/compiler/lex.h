@@ -137,5 +137,6 @@ char *show_error_context(void);
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_all_defines(void);
 #endif
-
+// Print all predefines using debug_message().
+void print_all_predefines();
 #endif
