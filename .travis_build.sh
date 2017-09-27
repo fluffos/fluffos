@@ -85,6 +85,6 @@ fi
 
 if [ -n "$GCOV" ]; then
   cd ..
-  pip install cpp-coveralls
-  coveralls --exclude packages --exclude thirdparty --exclude testsuite --exclude-pattern '.*.tab.+$' --gcov /usr/bin/gcov-4.8 --gcov-options '\-lp' -r $PWD -b $PWD
+  pip install --user cpp-coveralls
+  coveralls --exclude thirdparty --exclude testsuite --exclude-pattern '.*.autogen.+$' --gcov /usr/bin/gcov-4.8 --gcov-options '\-lp' -r $PWD -b $PWD
 fi
