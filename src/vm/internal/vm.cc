@@ -9,10 +9,9 @@
 
 #include <cstdlib>
 
-#include "vm/internal/eval.h"
+#include "vm/internal/eval_limit.h"
 #include "vm/internal/master.h"
 #include "vm/internal/simul_efun.h"
-#include "vm/internal/posix_timers.h"
 #include "vm/internal/otable.h"             // for init_otable
 #include "vm/internal/base/apply_cache.h"   // for apply_cache_init
 #include "vm/internal/base/machine.h"       // for reset_machine
@@ -57,7 +56,7 @@ void preload_objects() {
     }
     push_svalue(&prefiles->item[i]);
     debug_message("%s...\n", prefiles->item[i].u.string);
-    set_eval(max_cost);
+    set_eval(max_eval_cost);
     safe_apply_master_ob(APPLY_PRELOAD, 1);
   }
   free_array(prefiles);
@@ -68,18 +67,18 @@ void preload_objects() {
 void vm_init() {
   boot_time = get_current_time();
 
-  init_posix_timers(); /* in posix_timer.cc */
-
   init_strings();     /* in stralloc.c */
   init_identifiers(); /* in lex.c */
   init_locals();      /* in compiler.c */
   init_otable();      /* in otable.c */
 
-  max_cost = CONFIG_INT(__MAX_EVAL_COST__);
+  max_eval_cost = CONFIG_INT(__MAX_EVAL_COST__);
   set_inc_list(CONFIG_STR(__INCLUDE_DIRS__));
 
   add_predefines();
   reset_machine(1);
+
+  set_eval(max_eval_cost);
 }
 
 void vm_start() {
