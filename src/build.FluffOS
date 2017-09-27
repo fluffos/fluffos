@@ -27,7 +27,6 @@ WARN=(
 "-Wextra"
 "-Wformat"
 "-Werror=format-security"
-"-Werror=array-bounds"
 # Turn off some warnings from GCC.
 "-Wno-char-subscripts"
 "-Wno-sign-compare"
