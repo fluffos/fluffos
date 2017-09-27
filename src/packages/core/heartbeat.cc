@@ -111,7 +111,7 @@ void call_heart_beat() {
 
     save_context(&econ);
     try {
-      set_eval(max_cost);
+      set_eval(max_eval_cost);
       // TODO: provide a safe_call_direct()
       call_direct(ob, ob->prog->heart_beat - 1, ORIGIN_DRIVER, 0);
       pop_stack(); /* pop the return value */

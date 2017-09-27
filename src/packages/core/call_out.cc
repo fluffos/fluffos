@@ -240,7 +240,7 @@ void call_out(pending_call_t *cop) {
   }
 
   // Executing LPC callback
-  set_eval(max_cost);
+  set_eval(max_eval_cost);
 
   save_command_giver(new_command_giver);
   /* current object no longer set */

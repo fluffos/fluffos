@@ -1146,7 +1146,7 @@ void pop_control_stack() {
     ftc.f.fp = stuff->func.u.fp;
     int s = outoftime;
     if (outoftime) {
-      set_eval(max_cost);
+      set_eval(max_eval_cost);
     }
     save_command_giver(stuff->tp.u.ob);
     playerchanged = 0;
@@ -1815,9 +1815,13 @@ void eval_instruction(char *p) {
         }
       }
     }
+    // Note that outoftime could be set through signal handler too.
+    if (get_eval() == 0) {
+      outoftime = 1;
+    }
     if (outoftime) {
-      debug_message("object /%s: eval_cost too big %d\n", current_object->obname, max_cost);
-      set_eval(max_cost);
+      debug_message("Eval interrupted: cost limit reached, limit: %ld microsec\n", max_eval_cost);
+      set_eval(max_eval_cost);
       max_eval_error = 1;
       error("Too long evaluation. Execution aborted.\n");
     }

@@ -27,7 +27,7 @@
 #include "vm/internal/base/machine.h"
 
 // FIXME: merge this?
-#include "vm/internal/eval.h"
+#include "vm/internal/eval_limit.h"
 #include "vm/internal/simulate.h"
 
 // init vm layer.
