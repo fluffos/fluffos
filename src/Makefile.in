@@ -164,7 +164,6 @@ $(GENFILES): local_options tools/build_packages_genfiles.sh tools/build_applies.
 	@./tools/make_grammar.sh $(CXX) $(CXXFLAGS)
 	@$(BISON) -o vm/internal/compiler/grammar.autogen.cc \
 		--defines=vm/internal/compiler/grammar.autogen.h \
-		--warnings=all --report=all --report-file=vm/internal/compiler/grammar.autogen.report \
 		vm/internal/compiler/grammar.autogen.y
 	@echo [Generating options_def...]
 	@$(CXX) $(CXXFLAGS) -E -undef -dM base/internal/options_incl.h | tools/make_options_def.py vm/internal/options.autogen.h
@@ -185,7 +184,12 @@ tools/make_func.autogen.cc: tools/make_func.y
 
 libdriver.a : $(JEMALLOC_OBJS) $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS)
 	@echo [Generating $@]
-	@gcc-ar rcs libdriver.a $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS)
+	@case "@target@" in \
+	*-*-darwin*) \
+	libtool -static -o $@ - $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS) ;; \
+	*) \
+	gcc-ar rcs $@ $(BASE_OBJS) $(VM_OBJS) $(VM_COMPILER_OBJS) $(VM_BASE_OBJS) $(PACKAGES_ALL_OBJS) $(DRIVER_OBJS) ;; \
+	esac
 
 $(DRIVER_BIN): libdriver.a $(DRIVER_EXEC_OBJS) $(JEMALLOC_OBJS)
 	@mv -f $(DRIVER_BIN) $(DRIVER_BIN).old 2>/dev/null || true

@@ -31,19 +31,24 @@ AX_CHECK_LINK_FLAG([-flto], [AX_APPEND_COMPILE_FLAGS([-flto])])
 
 # CYGWIN oddities
 # JEMALLOC doesn't work on CYGWIN
-case "${host}" in
+case "${target}" in
     *-*-cygwin*)
         echo "JEMALLOC doesn't work on CYGWIN, force disabling."
         USE_JEMALLOC=0
         ;;
+    *-*-darwin*)
+        echo "JEMALLOC doesn't work on OSX, force disabling."
+        USE_JEMALLOC=0
+        ;;
     *)
         AX_APPEND_LINK_FLAGS([-rdynamic])
-        AX_APPEND_COMPILE_FLAGS([-fPIE])
-        AX_APPEND_COMPILE_FLAGS([-pie])
-        ;;
+       ;;
 esac
-
-AX_APPEND_COMPILE_FLAGS([-pthread])
+AX_CHECK_COMPILE_FLAG([-fPIE], [
+  AX_APPEND_COMPILE_FLAGS([-fPIE])
+  AX_APPEND_LINK_FLAGS([-fPIE -pie])
+])
+AX_APPEND_LINK_FLAGS([-pthread])
 
 # check for gcov options
 FLUFFOS_CHECK_GCOV

@@ -154,8 +154,8 @@ tick_event *add_walltime_event(std::chrono::milliseconds delay_msecs,
                                tick_event::callback_type callback) {
   auto event = new tick_event(callback);
   struct timeval val {
-    static_cast<time_t>(delay_msecs.count() / 1000),
-        static_cast<time_t>(delay_msecs.count() % 1000 * 1000),
+     (int)(delay_msecs.count() / 1000),
+     (int)(delay_msecs.count() % 1000 * 1000),
   };
   struct timeval *delay_ptr = nullptr;
   if (delay_msecs.count() != 0) {
