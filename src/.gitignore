@@ -17,3 +17,4 @@ driver.old
 portbind
 dtrace_compile
 /autom4te.cache
+aclocal.m4

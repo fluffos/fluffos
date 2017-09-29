@@ -10,5 +10,7 @@ GRAMMAR_Y=vm/internal/compiler/grammar.autogen.y
 "$@" -E -x c++ -undef -P -CC \
   -imacros $OPTIONS_H $GRAMMAR_Y_PRE > $GRAMMAR_Y
 
-# Second step is to run through sed, replacing $include into #include
-sed -e 's/\/\/ #include/#include/g' -i $GRAMMAR_Y
+# Second step is to run through sed, replacing // #include into #include,
+# NOTE that sed -i behave different on linux & BSD, we can't use it.
+sed -e 's/\/\/ #include/#include/g' $GRAMMAR_Y > ${GRAMMAR_Y}.tmp
+mv ${GRAMMAR_Y}.tmp ${GRAMMAR_Y}
