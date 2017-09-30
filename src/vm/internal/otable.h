@@ -2,12 +2,10 @@
 #define OTABLE_H
 
 #include<cassert>
-#include<list>
 #include<memory>
 #include<string>
 #include<unordered_map>
-// #include "base/std.h"
-// #include "vm/internal/base/object.h"
+#include<vector>
 
 #ifdef TESTING
 struct object_t

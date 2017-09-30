@@ -1,7 +1,6 @@
 #ifndef ARRAY_H
 #define ARRAY_H
 
-//#include "base/std.h"
 #include "vm/internal/base/svalue.h"
 
 #ifdef PACKAGE_MUDLIB_STATS
@@ -62,22 +61,6 @@ void dealloc_array(array_t *);
 array_t *union_array(array_t *, array_t *);
 array_t *copy_array(array_t *p);
 array_t *resize_array(array_t *p, unsigned int n);
-
-#include<vector>
-template<typename T> array_t *stlvec2array(std::vector<T> const& v) {
-  auto max_array_size { CONFIG_INT(__MAX_ARRAY_SIZE__ ) };
-  auto vec {allocate_empty_array(max_array_size)};
-  auto i {0};
-
-  for(;i < v.size() && i < max_array_size;++i) {
-    vec->item[i].u.ob = v[i];
-    vec->item[i].type = T_OBJECT;
-    //add_ref(v[i], "children");
-  }
-	vec = resize_array(vec, i);
-  return vec;
-}
-
 
 #define ALLOC_ARRAY(nelem)                                                            \
   (array_t *) DCALLOC(sizeof(array_t) + sizeof(svalue_t) * (nelem - 1), 1, TAG_ARRAY, \

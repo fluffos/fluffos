@@ -351,10 +351,22 @@ void f_capitalize(void) {
 #endif
 
 #ifdef F_CHILDREN
+//TODO:fix this. I basically moved code from the old children into this function but it should probably
+//be some sort of helper in array.h which works for all types. In future this "fix" probably won't be 
+//if I make changes to array_t.
 void f_children(void) {
-  array_t *vec;
+  auto max_array_size { CONFIG_INT(__MAX_ARRAY_SIZE__ ) };
+  auto vec {allocate_empty_array(max_array_size)};
+  auto v { ObjectTable::get()->children(sp->u.string) };
+  auto i {0};
 
-  vec = stlvec2array( ObjectTable::get()->children(sp->u.string) );
+  for(;i < v.size() && i < max_array_size;++i) {
+    vec->item[i].u.ob = v[i];
+    vec->item[i].type = T_OBJECT;
+    add_ref(v[i], "children");
+  }
+	vec = resize_array(vec, i);
+
   free_string_svalue(sp);
   put_array(vec);
 }
