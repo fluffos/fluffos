@@ -11,10 +11,10 @@
 struct object_t
 {
 public:
-    std::string name;
+    std::string obname;
 
     object_t(std::string const & s)
-    :name(s) {}
+    :obname(s) {}
 };
 #endif
 
@@ -33,7 +33,9 @@ public:
     V find(K const & k);
     L children(K const & k);
     bool remove(K const & k);
+#ifndef TESTING
     int showStatus(outbuffer_t *out, int verbose);
+#endif
 
     K basename(K k);
 private:

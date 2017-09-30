@@ -1,6 +1,14 @@
+#ifndef TESTING
 #include "base/std.h"
 #include "vm/internal/base/machine.h"
 #include "vm/internal/otable.h"
+#else
+#include<iostream>
+#include "otable.h"
+#endif
+
+
+#include <algorithm>
 #include <sstream>
 
 
@@ -19,7 +27,14 @@ ObjectTable::S ObjectTable::get() {
 bool ObjectTable::insert(ObjectTable::K k,V v) {
     if( objects_.find(k) == objects_.end() ) {
         objects_.insert( std::make_pair(k,v) );
-        children_.insert( std::pair<K, L>( basename(k), {v} ) );
+        auto n = basename(k);
+        auto i = children_.find(n);
+        if( i == children_.end() ) {
+          children_.insert( std::pair<K, L>( n, {v} ) );
+        }
+        else {
+            i->second.push_back(v);
+        }
         return true;
     } 
     else {
@@ -50,7 +65,17 @@ bool ObjectTable::remove(ObjectTable::K const & k) {
         objects_.erase(i);
         //guaranteed to exist if object exists
      //   std::assert( children_.find( basename(k)) != children_.end() );
-        auto j = children_.erase( basename(k) );
+        auto j = children_.find( basename(k) );
+        auto l = find_if( j->second.begin(), j->second.end(), [&k](V v) -> bool { return v->obname == k; } );
+        if(l != j->second.end() ) {
+            j->second.erase(l);
+        }
+        else {
+            return false;
+        }
+        if( j->second.size() == 0 ) {
+            children_.erase(j);
+        }
         return true;
     }
     else {
@@ -58,6 +83,7 @@ bool ObjectTable::remove(ObjectTable::K const & k) {
     }
 }
 
+#ifndef TESTING
 int ObjectTable::showStatus(outbuffer_t *out, int verbose) {
 
     std::stringstream ss;
@@ -79,10 +105,11 @@ int ObjectTable::showStatus(outbuffer_t *out, int verbose) {
     }
     return objects_.size() * sizeof(V);
 }
+#endif
 
 ObjectTable::K ObjectTable::basename(ObjectTable::K k) {
     auto i = k.begin();
-    for(; *i == '/' ;++i)
+    for(; *i == '/' ;++i);
     k.erase(k.begin(),i);
     
     auto j = k.find('#');
@@ -90,16 +117,38 @@ ObjectTable::K ObjectTable::basename(ObjectTable::K k) {
         k.erase( k.begin() + j, k.end() );
     i = k.end() - 1;
     for(;i-1 != k.begin() && *i == 'c' && *(i-1) == '.';i -= 2);
-    k.erase(i, k.end() );
+    k.erase(i+1, k.end() );
     return k;
 }
 
 #ifdef TESTING
+
+
+
 int main() {
     auto t = ObjectTable::get();
 
+    std::cout << ObjectTable::get()->basename("/realms/silenus.c") << std::endl;
+    std::cout << ObjectTable::get()->basename("//realms/silenus.c") << std::endl;
+    std::cout << ObjectTable::get()->basename("/////realms/silenus.c") << std::endl;
+    std::cout << ObjectTable::get()->basename("/realms/silenus.c.c") << std::endl;
+    std::cout << ObjectTable::get()->basename("///realms/silenus.c.c.c") << std::endl;
+    std::cout << ObjectTable::get()->basename("/realms/silenus#123") << std::endl;
+    std::cout << ObjectTable::get()->basename("/realms/beek#4") << std::endl;
+    
+    
 
-    t->insert("/realms/silenus", new object_t("/realms/silenus"));
-
+    t->insert("/realms/silenus#1", new object_t("/realms/silenus#1"));
+    t->insert("/realms/silenus#13", new object_t("/realms/silenus#13"));
+    t->insert("/realms/silenus#2", new object_t("/realms/silenus#2"));
+    t->insert("/realms/beek#123", new object_t("/realms/beek#123"));
+    std::cout << t->children("realms/silenus").size() << std::endl;
+    std::cout << t->children("realms/beek").size() << std::endl;
+    
+    std::cout << t->find("/realms/silenus#2")->obname << std::endl;
+    std::cout << t->remove("realms/descartes") << std::endl;
+    std::cout << t->remove("/realms/silenus#3") << std::endl;
+    std::cout << t->remove("/realms/silenus#2") << std::endl;
+    std::cout << t->children("realms/silenus").size() << std::endl;
 }
 #endif
