@@ -1,273 +1,273 @@
 0.9.18 to 0.9.19
- 
+
 . COMPAT BUSTER: array = array + scalar is no longer allowed
   (array += scalar was already not allowed)
- 
+
 . COMPAT BUSTER: socket_accept() no longer assumes the newly created socket
   is immediately writable; this may cause slightly different behavior (such
   as the return of EECALLBACK on the first socket_write() whereas it never
   happened before, or write_callbacks being called that never got called
   before)
- 
+
 . COMPAT BUSTER: socket callbacks (including the resolve() callback) can
   now be static and will still be callable by the driver.  this can cause
   different previous_object() behavior, causing some old socket callback
   security checks to behave improperly
- 
+
 . COMPAT BUSTER: fixed explode() so that explode("", "\n") does not return
   ({ 0 })...and removed support for a string as first argument of
   move_object().
- 
+
 . COMPAT BUSTER: removed the following efuns: cat(), log_file(), extract(),
   shadowp(), next_living(), add_worth(), add_verb(), and add_xverb()
- 
-. COMPAT BUSTER: removed the 'cost' and 'worth' fields from 
+
+. COMPAT BUSTER: removed the 'cost' and 'worth' fields from
   domain/author_stats
- 
-. functionp() now returns 2 instead of 1 in the case where 
-  f = (: obj, ({ str, arg0, arg1, arg2, ... }) :).  (ie, the function portion 
+
+. functionp() now returns 2 instead of 1 in the case where
+  f = (: obj, ({ str, arg0, arg1, arg2, ... }) :).  (ie, the function portion
   is an array)
- 
+
 . geteuid() may now be used on type 'function'.  geteuid(f) where f is of
   type function will return the euid of the constructor of 'f'.  if the
   constructor didn't have an euid at the time of f's creation, its uid
   is stored instead
- 
+
 . ed's indentor ('I' command) fixed
- 
+
 . fixed the usage of '!' in get_char() mode
- 
+
 . fixed several Linux crash/hang bugs
- 
+
 . mud_status() improved, total now matches up with the sum of the fields
- 
+
 . revised parse_command() and process_string() efuns, added process_value()
   and break_string() efuns (see docs for information)
- 
+
 . added a new LPC type called 'buffer' that is a cross between the
-  LPC array type and the LPC string type.  'buffer' is intended as a way to 
-  conveniently manipulate binary data.  'buffer' is not zero-terminated 
-  (that is, it has an associated length).  A 'buffer' is an array of bytes 
-  that is implemented using one byte per element.  buf[i] = x and x = buf[i] 
-  are allowed and do work.  sizeof(buf) works.  bufferp(buf) is available.  
-  buf[i..j] should work as well.  buff = read_buffer(file_name, ...) 
-  (same args as read_bytes).  also 'int write_buffer(string file, int start, 
+  LPC array type and the LPC string type.  'buffer' is intended as a way to
+  conveniently manipulate binary data.  'buffer' is not zero-terminated
+  (that is, it has an associated length).  A 'buffer' is an array of bytes
+  that is implemented using one byte per element.  buf[i] = x and x = buf[i]
+  are allowed and do work.  sizeof(buf) works.  bufferp(buf) is available.
+  buf[i..j] should work as well.  buff = read_buffer(file_name, ...)
+  (same args as read_bytes).  also 'int write_buffer(string file, int start,
   mixed source)', buf = buf1 + buf2; buf += buf1, buf = allocate_buffer(size).
-  The socket efuns have been modified to accept and return the 'buffer' type.  
-  Two new socket modes are available:  STREAM_BINARY (3), and 
+  The socket efuns have been modified to accept and return the 'buffer' type.
+  Two new socket modes are available:  STREAM_BINARY (3), and
   DATAGRAM_BINARY (4).  the runtime config file now needs a 'maximum buffer
   size' parameter in it which sets the largest 'buffer' that may be created.
- 
+
 . now possible to use write_bytes() to write past the end of the existing file
- 
-. read_bytes(filename) will now read the entire file (instead of requiring 
+
+. read_bytes(filename) will now read the entire file (instead of requiring
   read_bytes(filename, 0, length_of_file)).
- 
+
 . added an 'int crc32(buffer b|string s) efun which computes a 32-bit
-  cyclic redundancy code for a given buffer or string.  This is the same 
+  cyclic redundancy code for a given buffer or string.  This is the same
   algorithm (and code) that Zmodem uses for doing its CRC calculations.
- 
+
 . overloaded to_int() to accept 'buffer'.  E.g. buffer b; int x;
-  b = read_buffer(file, 0, 4); x = to_int(b);  Note that to_int() expects 
+  b = read_buffer(file, 0, 4); x = to_int(b);  Note that to_int() expects
   the integer embedded in the buffer to be in network-byte-order.
- 
+
 . In addition to 'int write_buffer(string file, int start, mixed source)'
   there is also 'int write_buffer(buffer target, int start, mixed source)'
   Note that write_buffer(string file, int start, int x) will write 'x'
   into the file (or buffer) in network-byte-order.
- 
+
 . In addition to 'buffer read_buffer(string file, int start, int len)'
   there is also 'string read_buffer(buffer b, int start, int len)' which
   provides a way to extract part or all of a buffer into a string.
- 
-. added two malloc debugging efuns that provide an interface to the malloc 
-  debugging system calls provided by the NeXTSTEP OS (malloc_debug() and 
-  malloc_check()).  See NEXT_MALLOC_DEBUG in options.h for more info.  
+
+. added two malloc debugging efuns that provide an interface to the malloc
+  debugging system calls provided by the NeXTSTEP OS (malloc_debug() and
+  malloc_check()).  See NEXT_MALLOC_DEBUG in options.h for more info.
   These efuns aren't available on other OSes.
- 
+
 . (: "string" :) is now equivalent to (: this_object(), "string" :)
- 
-. added replace_program() efun, modified from Amylaar's 3.2.  
- 
-. added optional argument to query_heart_beat(), object to query the 
-  heart_beat of 
- 
-. changed set_eval_limit() so an argument of 0 resets the current eval_cost, 
+
+. added replace_program() efun, modified from Amylaar's 3.2.
+
+. added optional argument to query_heart_beat(), object to query the
+  heart_beat of
+
+. changed set_eval_limit() so an argument of 0 resets the current eval_cost,
   rather than setting the eval limit to 0
- 
+
 . added support to initialize local variables.  Any valid expression
-  allowed (int x = <exp>;), as with global initializations 
- 
+  allowed (int x = <exp>;), as with global initializations
+
 . removed several no-longer-used options from options.h (some of the more
   notable ones include support for driver-level host access restrictions
   and shout logging)
- 
-. changed more efuns so that removing their line in func_spec.c causes most, 
+
+. changed more efuns so that removing their line in func_spec.c causes most,
   if not all, of their code to not be compiled in to the driver
- 
+
 . removed the following items from the driver config file: "access log file",
   "access allow file", "config directory", "allowed ed cmds" (an up-to-date
   Config.example is in the src/ dir)
- 
+
 . the simul_efun object can now be updated and new simul_efuns will go into
   place without having to reboot the driver
- 
+
 . hundreds of minor bug fixes and optimizations; see src/ChangeLog for a full
   list
-  
+
 0.9.17 to 0.9.18
- 
+
 . COMPAT BUSTER: preprocessor: MUDOS_PORT changed to __PORT__, MUDOS_ARCH
   changed to __ARCH__, MUDOS_VERSION to __VERSION__.  Added __COMPILER__,
   __COMPILER_VERSION__, and __OPTIMIZATION__ defines.  Removed the NO_SHADOWS
-  define, and added the following possible defines: HAS_SOCKETS, 
+  define, and added the following possible defines: HAS_SOCKETS,
   HAS_SHADOWS, HAS_DEBUGMALLOC, HAS_MATH, HAS_MATRIX, HAS_ED, HAS_PRINTF,
-  HAS_PRIVS, HAS_EACH, HAS_CACHE_STATS, HAS_RUSAGE, HAS_DEBUG_LEVEL, 
+  HAS_PRIVS, HAS_EACH, HAS_CACHE_STATS, HAS_RUSAGE, HAS_DEBUG_LEVEL,
   HAS_OPCPROF.
- 
+
 . COMPAT BUSTER: rusage() efun: renamed the "usertime" field to "utime"
-  for consistency, and changed it so that the utime and stime fields are 
+  for consistency, and changed it so that the utime and stime fields are
   always returned in units of milliseconds.
- 
+
 . COMPAT BUSTER: removed uid checks from add_worth() efun: if you don't
   want people calling this function, you will need a simul_efun override.
- 
+
 . call_other() on an array of objects now returns an array of the return
   values.
- 
+
 . Changed printf() to be caught by catch_tell() (if defined in options.h)
- 
+
 . Changed notify_fail() to always return 0, allowing for simpler code,
   ie: return notify_fail("Read what?\n");, etc
- 
+
 . (s)printf()/sscanf() improvements/fixes.
- 
+
 . New efuns: match_path(), query_heart_beat(), origin(), function_profile(),
   strsrch(), errorp().
- 
+
 . Added the capability of saving loaded LPC programs to disk (.b files) so
   subsequent loading is faster (added new "save binaries directory" line in
   the runtime configuration file).
- 
+
 . Changed dump_prog() to take an optional third argument: the file to
   dump to.
- 
+
 . Disk swapping improved: line number info is swapped out, and swapfile
   space is reused.
- 
+
 . Added #elif (else if) to the preprocessor.
- 
+
 . LOG_CATCHES option added to options.h; if defined, errors caught by
   catch() will still be logged to debug.log, prefixed by "caught: ".
- 
+
 . Incorporated Wildcard@TMI-2's (John Fehr: umfehr06@ccu.umanitoba.ca)
   port of MudOS to the Amiga (running AmigaDOS).  The port was made using the
-  LATTICE C Compiler.  For those Amiga owners without the LATTICE C compiler 
-  (or the desire to compile the driver from the source), the Amiga MudOS 
-  binaries are available from actlab.rtf.utexas.edu in 
-  /MUD/LPmud/MudOS/amiga.  This port of MudOS does not fully support the 
-  socket efunctions.  Any Amiga guru wanting to make them work please feel 
+  LATTICE C Compiler.  For those Amiga owners without the LATTICE C compiler
+  (or the desire to compile the driver from the source), the Amiga MudOS
+  binaries are available from actlab.rtf.utexas.edu in
+  /MUD/LPmud/MudOS/amiga.  This port of MudOS does not fully support the
+  socket efunctions.  Any Amiga guru wanting to make them work please feel
   free (and send your patches to mudos-bugs@actlab.rtf.utexas.edu!).
- 
+
 . Added @@ENDMARKER processing, which works similarly to @ENDMARKER, but
-  produces an array of strings (1 string per line in the block).  
- 
+  produces an array of strings (1 string per line in the block).
+
 . New second argument to each() efun that resets the current position in the
   mapping kept track of by each().  each(map, 1) will reset the position.
- 
+
 . Changed objects() to take two optional parameters: objects(func, ob)
   will pass each object as an argument to ob->func(), and will only return
   the ones for which that function returns 1.
- 
+
 . Literally hundreds of bug fixes and optimizations--for full details,
   read the ChangeLog in the ./src directory.
- 
+
 0.9.16 to 0.9.17
- 
+
 . MudOS now compiles and runs on the DEC Alpha running OSF/1
- 
+
 . prelang.y and postlang.y combined into compiler.y - the changes in this
   area should allow the .y files to compile with many more yacc's than
   before (Ultrix, Sun?)
- 
+
 . addr_server made more robust and compilable on more machines
- 
+
 . Added an OLD_ULTRIX define in port.h for some VAXes running old versions
   of Ultrix; should allow the driver to compile/run on them
- 
+
 . Anytime an object is compiled now, valid_object(ob) is called in master.
   If valid_object _exists_, and returns 0, then ob is destructed before
   create() is called and the efun that caused the load errors.  (usage
-  of this, along with inherits() and 'nomask', could allow usage of things 
+  of this, along with inherits() and 'nomask', could allow usage of things
   such as destruct() to be safely restricted through simul_efuns and
   valid_override() in master)
- 
+
 . Basic optimization of numeric constants in LPC code is now done (if
   LPC_OPTIMIZE is defined in options.h)
- 
-. call_other() can now take an array as a second argument, where the first 
-  item of the array is the function to call, and all following items will be 
+
+. call_other() can now take an array as a second argument, where the first
+  item of the array is the function to call, and all following items will be
   passed as arguments in the order which they occur
- 
+
 . Added an LPC object disassembler (dump_prog() efun)
- 
+
 . New resolve() efun which can translate ip names to numbers and vice-versa
   (see efun docs)
- 
+
 . Snoops will be sent to receive_snoop(msg) in the receiver object now if
   RECEIVE_SNOOP is defined in options.h
- 
+
 . Extension to set_heart_beat(x), where if x > 1, x is used as the number
   of heart beats inbetween heart_beat() calls (can be disabled in options.h)
- 
+
 . Extension (3rd argument) to member_array(), which, if set to 1 and using
-  a string as 1st arg, checks only the prefix of the strings in the array 
+  a string as 1st arg, checks only the prefix of the strings in the array
   (similar to xverbs vs verbs)
- 
+
 . Added a new efun inherits(string filename, object base) which returns 1
   if base inherits the latest copy of filename, 2 if it inherits an old copy,
   and 0 if it does not inherit filename.  This efun avoids the cost of
   creating an array via deep_inherit()
- 
-. Added OLD_COMMAND to options.h - if defined, the old second argument to 
+
+. Added OLD_COMMAND to options.h - if defined, the old second argument to
   command() will again be available
- 
+
 . Added query_shadowing(), a preferred synonym for the shadowp() efun
- 
-. replace_string() efun expanded to support an optional 4th and 5th 
+
+. replace_string() efun expanded to support an optional 4th and 5th
   argument (see efun docs)
- 
+
 . Added query_snooping() efun (inverse of query_snoop()) - might want to
   add a simul_efun override for this
- 
-. Added query_privs(), set_privs() efuns and privs_file() apply in master 
+
+. Added query_privs(), set_privs() efuns and privs_file() apply in master
   if PRIVS is defined in options.h - read the comments there for information
- 
+
 . Added a new "function" called time_expression() that returns the number
   of microseconds realtime that occurred during execution of the expression
   passed to it
 
 . Added rusage() support for HP-UX 8.x/9.x (if using 7.x, define OLD_HPUX
   in port.h) and SunOS 5
- 
+
 . The writing of text (prefixed with ']') to stderr is no longer done by
   default; can be enabled in options.h (NONINTERACTIVE_STDERR_WRITE)
- 
-. save_object() now inserts a "#filename" at the top of savefiles 
+
+. save_object() now inserts a "#filename" at the top of savefiles
   (restore_object() ignores such lines; this is useful for virtual object
   compilers that want to figure out how to compile .o files)
- 
+
 . functionp(funp) now returns 0 if funp[0] is a destructed object
- 
+
 . Driver now calls crash() in master.c with "Host machine shutting down"
   when SIGUSR1 is received
- 
+
 . Caught errors (via catch()) are now written to debug.log, prefixed with
   "caught:"
- 
-. object::func_name() is now allowed (previously, the existence of the 
+
+. object::func_name() is now allowed (previously, the existence of the
   'object' type caused conflicts when trying to use object::)
- 
+
 . Compat buster: Fixed a bug in multiple inheritance semantics.
    object a: bingme() { bing(); } bing() { write("bingAAA\n"); }
    object b: bingme() { bing(); } bing() { write("bingBBB\n"); }
@@ -276,58 +276,58 @@
              create() { a::bingme(); b::bingme() }
   The old behavior would have been to write bingCCC then bingAAA.
   The new behavior is to write bingCCC then bingCCC.
- 
+
 . Compat buster: removed arch(), version(), and mud_name() functions.  Added
   MUDOS_ARCH, MUDOS_VERSION, and MUD_NAME defines that are exported to all
   LPC objects - also, the DIR define was changed to MUDOS_DIR
- 
+
 . Plenty of bug fixes and optimizations
 
-0.9.15 to 0.9.16                                   
- 
+0.9.15 to 0.9.16
+
 . Brought the documentation up-to-date.
- 
+
 . Added support for a new basic type: 'float'.  32 bit floating point
   (decimal) numbers, and some basic efuns to deal with them: to_float(),
   to_int(), and floatp().
- 
+
 . Added some math efuns for use with floats: cos(), sin(), tan(), asin(),
-  acos(), atan(), sqrt(), log(), pow(), exp(), floor(), ceil().  Can be 
+  acos(), atan(), sqrt(), log(), pow(), exp(), floor(), ceil().  Can be
   removed by undef'ing MATH in options.h.
- 
-. Added some efuns for 3D graphics: id_matrix(), translate(), scale(), 
+
+. Added some efuns for 3D graphics: id_matrix(), translate(), scale(),
   rotate_x(), rotate_y(), rotate_z(), lookat_rotate(), lookat_rotate2().  Can
   be removed by undef'ing MATRIX in options.h.
- 
-. New efuns: shadowp(), set_reset(), reclaim_objects(), objects(), 
+
+. New efuns: shadowp(), set_reset(), reclaim_objects(), objects(),
   memory_info(), reload_object()
- 
+
 . Old efun, back again: virtualp()
- 
+
 . COMPAT BUSTER: query_snoop() can now be called from anywhere, so you might
   want to put in a simul_efun override for it.
- 
+
 . Added a port for HP Motorola (680x0) systems running BSD 4.3.
- 
+
 . Added a port for SPARC Classic running Solaris (SunOS 5.1).
- 
-. Partial ports for Cray (UNICOS 6.1.7) and DEC Alpha (OSF/1 1.2).  Neither 
+
+. Partial ports for Cray (UNICOS 6.1.7) and DEC Alpha (OSF/1 1.2).  Neither
   is complete as of yet.
- 
+
 . Added support for type 'function' in (s)printf()'s %O format spec
- 
+
 . SAVE_EXTENSION define is now imported to all LPC code (ie ".o")
- 
-. Modified save_object() so the original save file is not lost if the save 
+
+. Modified save_object() so the original save file is not lost if the save
   fails due to disk full, quota exceeded, etc.
- 
+
 . Added support for comments in object save files (ie .o files).
- 
+
 . #ifdef'ed all of the efuns so removing an efun def from func_spec.c
   automagically removes some of the associated code for it.
- 
+
 . Continued optimizing many things.
- 
+
 . Many more bug fixes (see src/ChangeLog for full information).
 
 0.9.14 to 0.9.15
@@ -381,7 +381,7 @@
   any variables you may have named 'function'.  This data type is a variant
   on the idea of function pointers.  It may be used to store an
   (object, function) pair in a single variable.  The constructor for function
-  variables is as follows: 
+  variables is as follows:
 
   function f;
 
@@ -390,7 +390,7 @@
   where obj and func may be anything allowed by call_other(obj, func).
   To call the function func in object obj via function variable f, type:
 
-  (*f)(arg0, arg1, ...); 
+  (*f)(arg0, arg1, ...);
 
   You may use the new functionp() efun to detect if a variable is of type
   function.
@@ -681,7 +681,7 @@
 . added AUTO_TRUST_BACKBONE define so that you could disable the automatic
   trusting of backbone uid objects if you want.
 
-. added Pinkfish's modifications to parse command package so that it 
+. added Pinkfish's modifications to parse command package so that it
   actually works now. :-)
 
 . added an optional integer argument to the shutdown() efun.  when an
@@ -734,14 +734,14 @@ up to 0.8.1
 . shadow() can be disabled at compile-time.  Check out NO_SHADOWS in
   config.h.  Note that NO_SHADOWS will appear in LPC's preprocessor's
   run-time table if it is defined in config.h.
-   
+
 . A runtime configuration file replaces much of config.h.  Look at the
   file ./mudlib/config.example.  You must specify a config file as
   an argument to the driver when starting.  It will not run without it.
   The driver will search in CONFIG_FILE_DIR (defined in config.h) for
   the file first and will then search the explicit path.
- 
-. Added Sean Reith's sprintf().  It's huge and therefore a compile-time 
+
+. Added Sean Reith's sprintf().  It's huge and therefore a compile-time
   option defined in config.h.
 
 . Added RCS as a compile-time option.  This allows wizards access to
@@ -793,14 +793,14 @@ up to 0.8.1
   has been removed, check out commands().
 
 
-. Only objects with same user id as master object (root uid) or backbone 
+. Only objects with same user id as master object (root uid) or backbone
   uid, are allowed to add_worth().
 
-. Gamedriver now keeps track of mappings on status line.  Fixed a memory leak 
-  in mapping aggregate initialization.  Mappings now appear in the arrays 
+. Gamedriver now keeps track of mappings on status line.  Fixed a memory leak
+  in mapping aggregate initialization.  Mappings now appear in the arrays
   section of the wizlist.
 
-. Preprocessor now supports token pasting.  To paste two tokens in a #define, 
+. Preprocessor now supports token pasting.  To paste two tokens in a #define,
   use '##'; e.g. #define SET(str, v) set_##str(v)
 
 . inherit statement now understands string expressions.
@@ -851,12 +851,12 @@ up to 0.8.1
   The "n", "s", "e", "w" hardcoded aliases have been removed
      from the GD, you'll have to use global verbs to do the
      same thing.
- 
+
 . Added new modifier to sscanf(): '*'.  It allows you to skip over a
   field without having to use a dummy variable.  e.g.
     sscanf(file_name(ob), "%*s#%d", num);
   It's just an efficiency hack; you don't really need this.
-   
+
 . C++ style comments (//) now work.
 
 . Restricted ed mode.  If this option was compiled in, if the
@@ -892,7 +892,7 @@ up to 0.8.1
 . move_object(ob) is now equivalent to move_object(this_object(), ob).
   This may phase out the latter usage.
 
-. Every object now has the macro DIR defined, which is the directory 
+. Every object now has the macro DIR defined, which is the directory
   that the object's .c file is in.
 
 . process_input() is called on the player object if it exists for
@@ -927,7 +927,7 @@ up to 0.8.1
 . commands() returns an array of arrays detailing the sentences of the
   current object.  Subarray structure: 0=verb, 1=flags,2=defining
   object.
- 
+
 . enable_wizard() makes current object into a wizard.  Wizards don't
   add moves on the wizlist, and get better error reporting than "your
   overly sensitive mind...".
@@ -935,7 +935,7 @@ up to 0.8.1
 . wizardp() returns whether argument is a wizard or not.
 
 . ci, co, rlog (if the parser was compiled with RCS turned on).
-  ci (string filename, string log_messag, int major, int minor); 
+  ci (string filename, string log_messag, int major, int minor);
   co (string filenamem, int major, int minor);
   (major and minor are the major and minor version numbers)
   rlog (string filename);
@@ -946,7 +946,7 @@ up to 0.8.1
 
 . mud_name() Returns the name of the mud as defined in the config file.
 
-. allocate_mapping(int) 
+. allocate_mapping(int)
   This efun isn't strictly
   required in order to use a mapping, it merely serves to give the gamedriver
   a hint regarding how many elements the mapping may be expected to
@@ -988,12 +988,12 @@ up to 0.8.1
    it mostly virtual, with some occasional detailed rooms thrown in.
    The recommended strategy is to have the compile_object() code
    in the master object look like:
-   
+
     object compile_object(string fname) {
        return (object)
           "/secure/virtual_object"->compile_object(fname);
     }
- 
+
    This keeps the complexity of the master object down.  Then
    have the virtual_object server delegate its responsibility.  e.g.
    if an undefined room occurs in a wizard's castle, have it call

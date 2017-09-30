@@ -82,7 +82,7 @@ Example:
         int i;
 
         stack = allocate(STACKSIZE);
-        
+
         for (i = 0; i < STACKSIZE; i++)
             stack[i] = INITCELL(i);
     }
@@ -220,7 +220,7 @@ Notes:
 
     'optimize' takes a second pass over the compiled code to improve it
      slightly
-    
+
     'error_context' adds more text to error messages indicating where on
      the line the error occured
 
@@ -232,7 +232,7 @@ descriptions, etc.
     Syntax 1:   @marker
                   <... text block ...>
                 marker
-    
+
     Syntax 2:   @@marker
                   <... text block ...>
                 marker
