@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.org/fluffos/fluffos.svg)](https://travis-ci.org/fluffos/fluffos)
-[![Coverage Status](https://coveralls.io/repos/fluffos/fluffos/badge.png)](https://coveralls.io/r/fluffos/fluffos)
+[![Coverage Status](https://coveralls.io/repos/github/fluffos/fluffos/badge.svg?branch=master)](https://coveralls.io/github/fluffos/fluffos?branch=master)
 [![Coverity Status](https://scan.coverity.com/projects/483/badge.svg)](https://scan.coverity.com/projects/483)
 
 FluffOS
