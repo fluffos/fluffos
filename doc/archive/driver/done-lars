@@ -17,23 +17,23 @@
     'private' variables and functions: Can not be accessed by a sub class
     inheriting their definitions. Functions can not be called through
     call_other(). 'private' inheritance will make all variables and functions
-    'private'. 
+    'private'.
 
     'nomask' functions and variables can not be redefined by a sub class.
     'nomask' inheritance will make all inherited definitions 'nomask'.
 
     'public' variables and functions can be redefined by a sub class, even if
     they have been inherited 'private'ly. 'public' inheritance will make all
-    inherited definitions 'public'. 
+    inherited definitions 'public'.
 
     The type 'protected' is reserved, but does not mean anything currently.
 
 3.1.0
 
-. From now on, I (lars@cd.chalmers.se) will not develop new major features. 
-  I will only use minimum time to fix bugs. The goal is to make the game 
-  driver as bug free and stable as possible. I will not either incorporate 
-  new big features from others, as that has proven to require much time from 
+. From now on, I (lars@cd.chalmers.se) will not develop new major features.
+  I will only use minimum time to fix bugs. The goal is to make the game
+  driver as bug free and stable as possible. I will not either incorporate
+  new big features from others, as that has proven to require much time from
   me.
 
 . Fixed a bug in the initialization code, which did become a recursive
@@ -43,21 +43,21 @@
 
 3.0.53
 
-. JnA: Fixed some bugs in parse_command(). Empty commands and patterns 
-  will not dump the driver. Multi word id's is now possible. 'word word' 
+. JnA: Fixed some bugs in parse_command(). Empty commands and patterns
+  will not dump the driver. Multi word id's is now possible. 'word word'
   is not.
 
 . RW: Fixed a lot of #else XXX and #endif XXX that ought to have the XXX
   within comments. Apparently a lot of compilers complain mightily.
 
-. RW: Applied fix to apply_low() in interpret.c. References to functions in 
+. RW: Applied fix to apply_low() in interpret.c. References to functions in
   swapped objects were kept and made the game dump.  Fix supplied by Dworkin.
 
-. It is now possible to initialize non-local variables. If such 
-  initialization is used, then a function __INIT() will automatically be 
-  defined, which can be called. __INIT() is automatically called when the 
-  object is created for the first time, as well as when it is cloned. The 
-  __INIT() function will also call __INIT() of all inherited files, if 
+. It is now possible to initialize non-local variables. If such
+  initialization is used, then a function __INIT() will automatically be
+  defined, which can be called. __INIT() is automatically called when the
+  object is created for the first time, as well as when it is cloned. The
+  __INIT() function will also call __INIT() of all inherited files, if
   there are any. Strict types are enforced. Example:
     object created_me = this_player();
   The variables are initalized and __INIT is called in the same order as
@@ -66,7 +66,7 @@
 . Fixed a bug in set_notify(), which would crash the game if the value of
   this_player() was 0.
 
-. previous_object() should now behave the same way, independent of if the 
+. previous_object() should now behave the same way, independent of if the
   called function was found in the cache or not.
 
 . A bug was fixed which cold crash the game driver by the following code:
@@ -102,7 +102,7 @@
 
 . A new function is defined in master.c: query_player_level(string type).
   It is supposed to be a portable function that defines what permissions a
-  player has depending on his level. It is used by the game driver. Be sure 
+  player has depending on his level. It is used by the game driver. Be sure
   to copy this function to your master.c, and update it !
 
 . A new efun has been defined: 'string *regexp(string *list, string pattern)'.
@@ -112,21 +112,21 @@
 . Sorry, some NULL:s had been used again in array.c.
 
 . New efun: object *deep_inventory(object *ob);
-  This function returns the recursive inventory of an object. The returned 
-  array of objects is flat, ie there is no structure reflecting the 
+  This function returns the recursive inventory of an object. The returned
+  array of objects is flat, ie there is no structure reflecting the
   internal containment relations.
- 
+
 . When the user gives a 'e file' command from inside the editor session, then
   the file name has to be transformed to correct path if not given with a
-  leading slash. This is only needed in native mode. A function 'string 
-  make_path_absolute(string file)' is called in master.c to do this job. For 
-  example, when Lars does 'e file.c', then make_path_absolute() could 
+  leading slash. This is only needed in native mode. A function 'string
+  make_path_absolute(string file)' is called in master.c to do this job. For
+  example, when Lars does 'e file.c', then make_path_absolute() could
   transform this into '/w/lars/file.c'.
 
 . Efun rename() only worked for native mode, so it was changed so as to be
   undefined for compatibility mode.
 
-. Allocating much fewer strings when compiling, as pointers to identical 
+. Allocating much fewer strings when compiling, as pointers to identical
   strings can be shared.
 
 . The value of this_player() could be wrong sometimes in 'catch_tell'.
@@ -160,7 +160,7 @@
 
 . Implemented a "range" argument to index operators, which can be used on
   strings and arrays. extract() and slice_array() are no longer needed.
-  The syntax is: 'expr1[expr2 .. expr3]' where 'expr1' is either a string 
+  The syntax is: 'expr1[expr2 .. expr3]' where 'expr1' is either a string
   or an array of any type of elements. 'expr2' and 'expr3' must be numbers.
   extract() will remain for compatibility, but slice_array() has been replaced
   by a simulated efun in mudlib_simul_efun.c.
@@ -267,7 +267,7 @@
 . Enabled default argument to some efuns. For example, all_inventory() will
   use this_object() as argument if none specified.
 
-. There can now be third optional argument to tell_room(), an array of 
+. There can now be third optional argument to tell_room(), an array of
   objects to be excluded.
 
 . There is a new function:
@@ -360,7 +360,7 @@
   arguments which are two of the elements of the array 'arr'. It should return
   true or a positive number if the first argument is greater than the second.
 
-. A parse_old.c was copied from 3.0.45 parse.c, and the new parse.c is not 
+. A parse_old.c was copied from 3.0.45 parse.c, and the new parse.c is not
   used currently.
 
 3.0.46
@@ -371,10 +371,10 @@
 . Fixed a bug in log_file(), which called valid_read instead of valid_write()
   (does not apply to the -o mode).
 
-. The saved commandgiver in call_out() was not properly freed in 
+. The saved commandgiver in call_out() was not properly freed in
   circumstances of errors.
 
-. JnA: Added read_bytes() to read a given number of bytes from a given 
+. JnA: Added read_bytes() to read a given number of bytes from a given
   position in a file. This will be used in CDlib to implement the worldmap.
 
 . JnA: Remade the principal functionality of parse_command(). It is now a lot
@@ -441,12 +441,12 @@
   'return' in it. It is also possible to use numeric intervals like
   'case 1..100:'.
 
-. JnA: Fixed small bug in new_call_out which dumped the GD if 
+. JnA: Fixed small bug in new_call_out which dumped the GD if
   command_giver == 0
 
 . JnA: Fixed a bug with fclose() in restore_object(), dumped the GD
 
-. RW: snoop: Added a backwards compatible patch to set_snoop. There is 
+. RW: snoop: Added a backwards compatible patch to set_snoop. There is
   now a new function in comm1.c (new_set_snoop) that defines the
   mudlib 3.0 version of set_snoop. The difference is that the efun
   in !o_flag mode takes two arguments, snooper and snopee and checks
@@ -465,7 +465,7 @@
 
 . Made a constant array of size 0, for all to share. This saves memory, and
   means that all variables set to ({}) uses as much memory as variables
-  containing numbers. It will also mean that the test "({}) == ({})" will 
+  containing numbers. It will also mean that the test "({}) == ({})" will
   evaluate to true.
 
 . The types of arguments to '+' is now checked (when type testing is enabled).
@@ -558,7 +558,7 @@
 . Added handling of hexadecimal numbers in lex.c and fixed a line number
   counting bug.
 
-. Fixed a bug for not clearing the O_RESET_STATE flag by moving it from 
+. Fixed a bug for not clearing the O_RESET_STATE flag by moving it from
   apply() to apply_low().
 
 . The setup in the editor can now be saved. Use 'hset' for info. The save
@@ -580,7 +580,7 @@
   automatically generate a file efun_defs.c that is included into lex.c.
   The base for compile time type checking is also done this way.
 
-. JnA: get_log_file() added to get the filename of where to log errors for a 
+. JnA: get_log_file() added to get the filename of where to log errors for a
   given file. This is a function in wiz_list.c called from smart_log. It
   calls the corresponding function in /secure/master. It is not used
   in -o mode.
@@ -597,8 +597,8 @@
 
 3.0.38
 
-. Fixed a bug in catch() that could crash the game. This happened when the 
-  code inside catch called a local function, which did something that 
+. Fixed a bug in catch() that could crash the game. This happened when the
+  code inside catch called a local function, which did something that
   triggered an error.
 
 . JnA: trace() and traceprefix() fixed to work with mudlib3 in a correct way
@@ -665,12 +665,12 @@
 
 . JnA: Fixed some bugs in process_string, it actually works now :-)
 
-. Fixed a bug in eval_instruction() where F_INDENT was executed. Added a 
+. Fixed a bug in eval_instruction() where F_INDENT was executed. Added a
   missing 'break;', which would be disastrous when illegal file name was given.
 
 . Added new commands to the editor: help and indenting. There are thus two ways
   to indent LPC code. Probably only one needed. Which one is preferred ?
- 
+
 . Fixed several bugs in the swap/reset/clean_up logic. Recommended values
   are that the swap time is short (less than 30 minutes), and that reset time
   is medium (aprox 60 minutes), and that time to clean_up is long
@@ -803,7 +803,7 @@
 3.0.29
 
 . Fixed a bug in player_parser, which could dereference a dangling pointer
-  (the sentence of a command just executed could be deallocated if the 
+  (the sentence of a command just executed could be deallocated if the
   command moved the player).
 
 . Fixed a bug in transfer(), which would not check prevent_insert correctly.
@@ -943,7 +943,7 @@
 
 . The definition of MUD_LIB has been moved from config.h to Makefile.
 
-. The function 'version()' had a bad return type, which was changed 
+. The function 'version()' had a bad return type, which was changed
   to 'string'.
 
 3.0.22
@@ -962,7 +962,7 @@
 
 3.0.21
 
-. Changed restore_size(), to return -1 for failures instead of the legal 
+. Changed restore_size(), to return -1 for failures instead of the legal
   value 0.
 
 . Implemented "#pragma strict_types", which will ensure strict type checking
@@ -990,7 +990,7 @@
 
 3.0.19
 
-. Fixed load_object() to take an extra parameter for not resetting object 
+. Fixed load_object() to take an extra parameter for not resetting object
   after load. This is used in mudlib 3.0 for inherited objects. Only when the
   ENTIRE object is loaded (all inherited objects loaded) is its reset() called.
 
@@ -1051,7 +1051,7 @@
 
 . Implemented: string read_file(string).
 
-. Added a new complex permission system. Look at LPmud.doc for more 
+. Added a new complex permission system. Look at LPmud.doc for more
   information.
 
 . New function: version(). Will return "03.00.14" for this version.
@@ -1063,7 +1063,7 @@
 
 3.0.a13
 
-. player_parse() did not always restore current_object in time, which means 
+. player_parse() did not always restore current_object in time, which means
   that static declared functions sometimes was not found.
 
 . fixed save_object(), which were broken when used in compatibility mode.
@@ -1093,7 +1093,7 @@
 . Objects must inherit std/object.c if they want to be moved, or moved into.
   The -o flag will as usual remove this requirement.
 
-. Fixed a bug in restore_object and save_object, so that the 'static' 
+. Fixed a bug in restore_object and save_object, so that the 'static'
   information is used.
 
 . Merged from Marion's version:

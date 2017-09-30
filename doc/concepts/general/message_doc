@@ -2,7 +2,7 @@
 the message() client protocol
 -----------------------------
 
-message is a new efun in MudOS designed to make communication efuns more 
+message is a new efun in MudOS designed to make communication efuns more
 generic and to provide a standard way of talking to clients intelligently.
 
 Here is the manual page for message:
@@ -19,7 +19,7 @@ Message is a string containing the message to be sent
 Class is the type of message (used for clients and such). An example
 would be 'combat', 'shout', 'emergency' etc.
 
-target is a list of objects to be sent the message. This can be either a 
+target is a list of objects to be sent the message. This can be either a
 single object string or object pointer, or may be an array of either.
 If a target is non living all objects in it's environment will receive
 the message.
@@ -123,7 +123,7 @@ int has_smart_client;
 void receive_message (string msg, string class)
 {
 	if (member_array(class,muffle) == -1) {
-		if (has_smart_client) 
+		if (has_smart_client)
 			receive (class + " : " + msg);
 		else
 			receive (msg);

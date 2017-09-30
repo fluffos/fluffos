@@ -8,7 +8,7 @@ information).  Even if the program doesn't explicitly call malloc, it will
 fail if it calls system calls that internally use malloc.  Thus the only
 truly safe way to use sbrk and brk is to replace the definition of system
 malloc.  And some machines do not allow system malloc to be replaced.
- 
+
 Note: if you plan to hack on the driver, you should use MALLOC(x, ...),
 FREE(x, ...), REALLOC(x, ...), and CALLOC(x, ...) instead of the lowercase
 counterparts.  Be sure to look at how these macros are used in the driver
