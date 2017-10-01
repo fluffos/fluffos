@@ -29,7 +29,7 @@ public:
     using S = std::shared_ptr<ObjectTable>;
 
     static S get();
-    bool insert(K k, V v);
+    bool insert(K const & k, V v);
     V find(K const & k);
     L children(K const & k);
     bool remove(K const & k);

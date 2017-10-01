@@ -24,7 +24,10 @@ ObjectTable::S ObjectTable::get() {
     return instance_;
 }
 
-bool ObjectTable::insert(ObjectTable::K k,V v) {
+//fix style and efficiency errors in this function
+//should pass in a K const& k. also why is V not prefixed by ObjectTable and
+//it still works? is the ObjectTable needed in the parameter list?  
+bool ObjectTable::insert(K const& k,V v) {
     if( objects_.find(k) == objects_.end() ) {
         objects_.insert( std::make_pair(k,v) );
         auto n = basename(k);
@@ -43,23 +46,27 @@ bool ObjectTable::insert(ObjectTable::K k,V v) {
 
 }
 
-ObjectTable::V ObjectTable::find(ObjectTable::K const & k) {
+ObjectTable::V ObjectTable::find(K const & k) {
     auto i = objects_.find(k);
-    if( i != objects_.end() )
+    if( i != objects_.end() ) {
         return i->second;
-    else
+    } 
+    else {
         return nullptr;
+    }
 }
 
-ObjectTable::L ObjectTable::children(ObjectTable::K const & k) {
+ObjectTable::L ObjectTable::children(K const & k) {
     auto i = children_.find( basename(k) );
-    if( i != children_.end() )
+    if( i != children_.end() ) {
         return i->second;
-    else
+    }
+    else {
         return L({});
+    }
 }
 
-bool ObjectTable::remove(ObjectTable::K const & k) {
+bool ObjectTable::remove(K const & k) {
     auto i = objects_.find(k);
     if( i != objects_.end() ) {
         objects_.erase(i);
@@ -107,7 +114,7 @@ int ObjectTable::showStatus(outbuffer_t *out, int verbose) {
 }
 #endif
 
-ObjectTable::K ObjectTable::basename(ObjectTable::K k) {
+ObjectTable::K ObjectTable::basename(K k) {
     auto i = k.begin();
     for(; *i == '/' ;++i);
     k.erase(k.begin(),i);
