@@ -27,16 +27,16 @@ ObjectTable::Singleton ObjectTable::get() {
 //fix style and efficiency errors in this function
 //should pass in a K const& k. also why is V not prefixed by ObjectTable and
 //it still works? is the ObjectTable needed in the parameter list?  
-bool ObjectTable::insert(Key const& k,Value v) {
-    if( objects_.find(k) == objects_.end() ) {
-        objects_.insert( std::make_pair(k,v) );
-        auto n = basename(k);
+bool ObjectTable::insert(Key const& key,Value value) {
+    if( objects_.find(key) == objects_.end() ) {
+        objects_.insert( std::make_pair(key,value) );
+        auto n = basename(key);
         auto i = children_.find(n);
         if( i == children_.end() ) {
-          children_.insert( std::pair<Key,Vector>(n, {v} ) );
+          children_.insert( std::pair<Key,Vector>(n, {value} ) );
         }
         else {
-            i->second.push_back(v);
+            i->second.push_back(value);
         }
         return true;
     } 
@@ -46,8 +46,8 @@ bool ObjectTable::insert(Key const& k,Value v) {
 
 }
 
-ObjectTable::Value ObjectTable::find(Key const & k) {
-    auto i = objects_.find(k);
+ObjectTable::Value ObjectTable::find(Key const & key) {
+    auto i = objects_.find(key);
     if( i != objects_.end() ) {
         return i->second;
     } 
@@ -56,8 +56,8 @@ ObjectTable::Value ObjectTable::find(Key const & k) {
     }
 }
 
-ObjectTable::Vector ObjectTable::children(Key const & k) {
-    auto i = children_.find( basename(k) );
+ObjectTable::Vector ObjectTable::children(Key const & key) {
+    auto i = children_.find( basename(key) );
     if( i != children_.end() ) {
         return i->second;
     }
@@ -66,14 +66,14 @@ ObjectTable::Vector ObjectTable::children(Key const & k) {
     }
 }
 
-bool ObjectTable::remove(Key const & k) {
-    auto i = objects_.find(k);
+bool ObjectTable::remove(Key const & key) {
+    auto i = objects_.find(key);
     if( i != objects_.end() ) {
         objects_.erase(i);
         //guaranteed to exist if object exists
      //   std::assert( children_.find( basename(k)) != children_.end() );
-        auto j = children_.find( basename(k) );
-        auto l = find_if( j->second.begin(), j->second.end(), [&k](Value v) -> bool { return v->obname == k; } );
+        auto j = children_.find( basename(key) );
+        auto l = find_if( j->second.begin(), j->second.end(), [&key](Value v) -> bool { return v->obname == key; } );
         if(l != j->second.end() ) {
             j->second.erase(l);
         }
@@ -114,16 +114,16 @@ int ObjectTable::showStatus(outbuffer_t *out, int verbose) {
 }
 #endif
 
-ObjectTable::Key ObjectTable::basename(Key k) {
-    auto i = k.begin();
+std::string ObjectTable::basename(std::string s) {
+    auto i = s.begin();
     for(; *i == '/' ;++i);
-    k.erase(k.begin(),i);
+    s.erase(s.begin(),i);
     
-    auto j = k.find('#');
+    auto j = s.find('#');
     if(j != std::string::npos )
-        k.erase( k.begin() + j, k.end() );
-    i = k.end() - 1;
-    for(;i-1 != k.begin() && *i == 'c' && *(i-1) == '.';i -= 2);
-    k.erase(i+1, k.end() );
-    return k;
+        s.erase( s.begin() + j, s.end() );
+    i = s.end() - 1;
+    for(;i-1 != s.begin() && *i == 'c' && *(i-1) == '.';i -= 2);
+    s.erase(i+1, s.end() );
+    return s;
 }

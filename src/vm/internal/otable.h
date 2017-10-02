@@ -29,15 +29,15 @@ public:
     using Singleton = std::shared_ptr<ObjectTable>;
 
     static Singleton get();
-    bool insert(Key const & k, Value v);
-    Value find(Key const & k);
-    Vector children(Key const & k);
-    bool remove(Key const & k);
+    bool insert(Key const & key, Value value);
+    Value find(Key const & key);
+    Vector children(Key const & key);
+    bool remove(Key const & key);
 #ifndef TESTING
     int showStatus(outbuffer_t *out, int verbose);
 #endif
 
-    Key basename(Key k);
+    std::string basename(std::string s);
 private:
     static Singleton instance_;
 
