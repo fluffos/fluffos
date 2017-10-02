@@ -21,25 +21,25 @@ public:
 class ObjectTable /* final */
 {
 public:
-    using K = std::string;
-    using V = object_t*;
-    using L = std::vector<V>;
-    using M1 = std::unordered_map<K,V>;
-    using M2 = std::unordered_map<K,L>;
-    using S = std::shared_ptr<ObjectTable>;
+    using Key = std::string;
+    using Value = object_t*;
+    using Vector = std::vector<Value>;
+    using M1 = std::unordered_map<Key,Value>;
+    using M2 = std::unordered_map<Key,Vector>;
+    using Singleton = std::shared_ptr<ObjectTable>;
 
-    static S get();
-    bool insert(K const & k, V v);
-    V find(K const & k);
-    L children(K const & k);
-    bool remove(K const & k);
+    static Singleton get();
+    bool insert(Key const & k, Value v);
+    Value find(Key const & k);
+    Vector children(Key const & k);
+    bool remove(Key const & k);
 #ifndef TESTING
     int showStatus(outbuffer_t *out, int verbose);
 #endif
 
-    K basename(K k);
+    Key basename(Key k);
 private:
-    static S instance_;
+    static Singleton instance_;
 
     ObjectTable();
     

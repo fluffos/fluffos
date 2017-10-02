@@ -12,28 +12,28 @@
 #include <sstream>
 
 
-ObjectTable::S ObjectTable::instance_ = nullptr;
+ObjectTable::Singleton ObjectTable::instance_ = nullptr;
 
 ObjectTable::ObjectTable()
 :objects_({}),children_({})
 {}
 
-ObjectTable::S ObjectTable::get() {
+ObjectTable::Singleton ObjectTable::get() {
     if( instance_ == nullptr )
-        instance_ = S( new ObjectTable() );
+        instance_ = Singleton( new ObjectTable() );
     return instance_;
 }
 
 //fix style and efficiency errors in this function
 //should pass in a K const& k. also why is V not prefixed by ObjectTable and
 //it still works? is the ObjectTable needed in the parameter list?  
-bool ObjectTable::insert(K const& k,V v) {
+bool ObjectTable::insert(Key const& k,Value v) {
     if( objects_.find(k) == objects_.end() ) {
         objects_.insert( std::make_pair(k,v) );
         auto n = basename(k);
         auto i = children_.find(n);
         if( i == children_.end() ) {
-          children_.insert( std::pair<K, L>( n, {v} ) );
+          children_.insert( std::pair<Key,Vector>(n, {v} ) );
         }
         else {
             i->second.push_back(v);
@@ -46,7 +46,7 @@ bool ObjectTable::insert(K const& k,V v) {
 
 }
 
-ObjectTable::V ObjectTable::find(K const & k) {
+ObjectTable::Value ObjectTable::find(Key const & k) {
     auto i = objects_.find(k);
     if( i != objects_.end() ) {
         return i->second;
@@ -56,24 +56,24 @@ ObjectTable::V ObjectTable::find(K const & k) {
     }
 }
 
-ObjectTable::L ObjectTable::children(K const & k) {
+ObjectTable::Vector ObjectTable::children(Key const & k) {
     auto i = children_.find( basename(k) );
     if( i != children_.end() ) {
         return i->second;
     }
     else {
-        return L({});
+        return Vector({});
     }
 }
 
-bool ObjectTable::remove(K const & k) {
+bool ObjectTable::remove(Key const & k) {
     auto i = objects_.find(k);
     if( i != objects_.end() ) {
         objects_.erase(i);
         //guaranteed to exist if object exists
      //   std::assert( children_.find( basename(k)) != children_.end() );
         auto j = children_.find( basename(k) );
-        auto l = find_if( j->second.begin(), j->second.end(), [&k](V v) -> bool { return v->obname == k; } );
+        auto l = find_if( j->second.begin(), j->second.end(), [&k](Value v) -> bool { return v->obname == k; } );
         if(l != j->second.end() ) {
             j->second.erase(l);
         }
@@ -99,7 +99,7 @@ int ObjectTable::showStatus(outbuffer_t *out, int verbose) {
         ss <<  "Object name hash table status:" << std::endl;
         ss << "------------------------------" << std::endl;
         ss << "Elements:        " << objects_.size() << std::endl;
-        ss << "Memory used:     " << objects_.size() * sizeof(V) << std::endl;
+        ss << "Memory used:     " << objects_.size() * sizeof(Value) << std::endl;
         ss << "Bucket count:    " << objects_.bucket_count() << std::endl;
         ss << "Load factor:     " << objects_.load_factor() << std::endl;
 
@@ -107,14 +107,14 @@ int ObjectTable::showStatus(outbuffer_t *out, int verbose) {
       }
 
     if (!verbose) {
-        ss << "Memory used:     " << objects_.size() * sizeof(V) << std::endl;
+        ss << "Memory used:     " << objects_.size() * sizeof(Value) << std::endl;
         outbuf_add(out, ss.str().c_str());
     }
-    return objects_.size() * sizeof(V);
+    return objects_.size() * sizeof(Value);
 }
 #endif
 
-ObjectTable::K ObjectTable::basename(K k) {
+ObjectTable::Key ObjectTable::basename(Key k) {
     auto i = k.begin();
     for(; *i == '/' ;++i);
     k.erase(k.begin(),i);
