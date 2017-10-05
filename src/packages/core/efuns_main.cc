@@ -356,19 +356,20 @@ void f_capitalize(void) {
 //if I make changes to array_t.
 void f_children(void) {
   auto max_array_size { CONFIG_INT(__MAX_ARRAY_SIZE__ ) };
-  auto vec {allocate_empty_array(max_array_size)};
   auto v { ObjectTable::get()->children(sp->u.string) };
+  auto len { v.size() < max_array_size ? v.size() : max_array_size };
+  auto res {allocate_empty_array(len)};
   auto i {0};
 
   for(;i < v.size() && i < max_array_size;++i) {
-    vec->item[i].u.ob = v[i];
-    vec->item[i].type = T_OBJECT;
+    res->item[i].u.ob = v[i];
+    res->item[i].type = T_OBJECT;
     add_ref(v[i], "children");
   }
-	vec = resize_array(vec, i);
+  res = resize_array(res, i);
 
   free_string_svalue(sp);
-  put_array(vec);
+  put_array(res);
 }
 #endif
 

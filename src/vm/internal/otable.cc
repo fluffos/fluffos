@@ -64,7 +64,7 @@ ObjectTable::Value ObjectTable::find(Key const & key) {
 
 //return the children of key if any as a vector of object pointers(Values).
 ObjectTable::Vector ObjectTable::children(Key const & key) {
-    auto it = children_.find( key );
+    auto it = children_.find( basename(key) );
     if( it != children_.end() ) {
         return it->second;
     }
