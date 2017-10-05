@@ -4,13 +4,13 @@
 
 TEST (BasenameTest, Strings) { 
     auto t = ObjectTable::get();
-    EXPECT_EQ ("realms/silenus", t->basename("/realms/silenus.c"));
-    EXPECT_EQ ("realms/silenus", t->basename("//realms/silenus.c"));
-    EXPECT_EQ ("realms/silenus", t->basename("/////realms/silenus.c"));
-    EXPECT_EQ ("realms/silenus", t->basename("/realms/silenus.c.c"));
-    EXPECT_EQ ("realms/silenus", t->basename("///realms/silenus.c.c.c"));
-    EXPECT_EQ ("realms/silenus", t->basename("/realms/silenus#123"));
-    EXPECT_EQ ("realms/beek", t->basename("/realms/beek#4"));
+    EXPECT_EQ ("realms/silenus", basename("/realms/silenus.c"));
+    EXPECT_EQ ("realms/silenus", basename("//realms/silenus.c"));
+    EXPECT_EQ ("realms/silenus", basename("/////realms/silenus.c"));
+    EXPECT_EQ ("realms/silenus", basename("/realms/silenus.c.c"));
+    EXPECT_EQ ("realms/silenus", basename("///realms/silenus.c.c.c"));
+    EXPECT_EQ ("realms/silenus", basename("/realms/silenus#123"));
+    EXPECT_EQ ("realms/beek", basename("/realms/beek#4"));
 }
 
 TEST(OTableTest, Operations) {

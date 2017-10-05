@@ -18,14 +18,14 @@ public:
 };
 #endif
 
+std::string basename(std::string s);
+
 class ObjectTable /* final */
 {
 public:
     using Key = std::string;
     using Value = object_t*;
     using Vector = std::vector<Value>;
-    using M1 = std::unordered_map<Key,Value>;
-    using M2 = std::unordered_map<Key,Vector>;
     using Singleton = std::shared_ptr<ObjectTable>;
 
     static Singleton get();
@@ -37,15 +37,14 @@ public:
     int showStatus(outbuffer_t *out, int verbose);
 #endif
 
-    std::string basename(std::string s);
+    
 private:
     static Singleton instance_;
 
     ObjectTable();
     
-    M1 objects_;
-    M2 children_;
-
+    std::unordered_map<Key,Value> objects_;
+    std::unordered_map<Key,Vector> children_;
 };
 
 #endif
