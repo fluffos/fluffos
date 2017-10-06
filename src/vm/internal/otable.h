@@ -7,16 +7,7 @@
 #include<unordered_map>
 #include<vector>
 
-#ifdef TESTING
-struct object_t
-{
-public:
-    std::string obname;
-
-    object_t(std::string const & s)
-    :obname(s) {}
-};
-#endif
+struct object_t;
 
 std::string basename(std::string s);
 

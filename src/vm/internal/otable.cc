@@ -1,16 +1,11 @@
 #ifndef TESTING
 #include "base/std.h"
 #include "vm/internal/base/machine.h"
-#include "vm/internal/otable.h"
-#else
-#include<iostream>
-#include "otable.h"
 #endif
-
+#include "vm/internal/otable.h"
 
 #include <algorithm>
 #include <sstream>
-
 
 ObjectTable::Singleton ObjectTable::instance_ = nullptr;
 
@@ -116,14 +111,10 @@ int ObjectTable::showStatus(outbuffer_t *out, int verbose) {
         ss << "Memory(bytes):     " << objects_.size() * sizeof(Value) << std::endl;
         ss << "Bucket count:    " << objects_.bucket_count() << std::endl;
         ss << "Load factor:     " << objects_.load_factor() << std::endl;
-
-        outbuf_add(out, ss.str().c_str());
-      }
-
-    if (!verbose) {
+    } else {
         ss << "Memory used(bytes):     " << objects_.size() * sizeof(Value) << std::endl;
-        outbuf_add(out, ss.str().c_str());
     }
+    outbuf_add(out, ss.str().c_str());
     return objects_.size() * sizeof(Value);
 }
 #endif

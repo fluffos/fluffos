@@ -359,15 +359,12 @@ void f_children(void) {
   auto v { ObjectTable::get()->children(sp->u.string) };
   auto len { v.size() < max_array_size ? v.size() : max_array_size };
   auto res {allocate_empty_array(len)};
-  auto i {0};
 
-  for(;i < v.size() && i < max_array_size;++i) {
+  for(auto i {0};i < v.size() && i < len;++i) {
     res->item[i].u.ob = v[i];
     res->item[i].type = T_OBJECT;
     add_ref(v[i], "children");
   }
-  res = resize_array(res, i);
-
   free_string_svalue(sp);
   put_array(res);
 }

@@ -1,5 +1,17 @@
 #define TESTING
+
+#include<string>
+struct object_t
+{
+public:
+    std::string obname;
+
+    object_t(std::string const & s)
+    :obname(s) {}
+};
+
 #include "otable.cc"
+
 #include <gtest/gtest.h>
 
 TEST (BasenameTest, Strings) { 

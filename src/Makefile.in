@@ -55,7 +55,7 @@ PCRE_CFLAGS=@PCRE_CFLAGS@
 # 1) generate all GENFILES, using several script in tools/
 # 2) main build.
 
-.PHONY: all clean install test help
+.PHONY: all clean install test help googletest
 
 all: $(GENFILES) $(DRIVER_BIN) portbind
 
@@ -257,6 +257,10 @@ install: all
 	@echo [INSTALL] ${INSTALL_DIR}
 	@install -m 0755 $(DRIVER_BIN) $(INSTALL_DIR)
 	@install -m 0755 portbind $(INSTALL_DIR)
+
+googletest: 
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -lgtest vm/internal/otable_test.cc -o otable_test
+	./otable_test
 
 
 help:
