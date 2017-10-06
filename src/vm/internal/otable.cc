@@ -75,26 +75,18 @@ ObjectTable::Vector ObjectTable::children(Key const & key) {
 bool ObjectTable::remove(Key const & key) {
     
     auto it1 = objects_.find(key);
-    if( it1 != objects_.end() ) {
-        objects_.erase(it1);
-        //guaranteed to exist if object exists
-        //std::assert( children_.find( basename(key)) != children_.end() );
-        auto it2 = children_.find( basename(key) );
-        auto it3 = find_if( it2->second.begin(), it2->second.end(), [&key](Value v) -> bool { return v->obname == key; } );
-        if(it3 != it2->second.end() ) {
-            it2->second.erase(it3);
-        }
-        else {
-            return false;
-        }
-        if( it2->second.size() == 0 ) {
-            children_.erase(it2);
-        }
-        return true;
+    if( it1 == objects_.end() ) return false;
+    objects_.erase(it1);
+    //guaranteed to exist if object exists
+    //std::assert( children_.find( basename(key)) != children_.end() );
+    auto it2 = children_.find( basename(key) );
+    auto it3 = find_if( it2->second.begin(), it2->second.end(), [&key](Value v) -> bool { return v->obname == key; } );
+    //std::assert(it3 != it2->second.end())
+    it2->second.erase(it3);
+    if( it2->second.size() == 0 ) {
+      children_.erase(it2);
     }
-    else {
-        return false;
-    }
+    return true;
 }
 
 //write some information about memory usage and other statistics of the object table to out_buffer_t.
