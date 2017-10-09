@@ -1,7 +1,6 @@
 #ifndef OTABLE_H
 #define OTABLE_H
 
-#include<cassert>
 #include<memory>
 #include<string>
 #include<unordered_map>
@@ -17,9 +16,8 @@ public:
     using Key = std::string;
     using Value = object_t*;
     using Vector = std::vector<Value>;
-    using Singleton = std::shared_ptr<ObjectTable>;
 
-    static Singleton get();
+    static std::shared_ptr<ObjectTable> get();
     bool insert(Key const & key, Value value);
     Value find(Key const & key);
     Vector children(Key const & key);
@@ -30,7 +28,7 @@ public:
 
     
 private:
-    static Singleton instance_;
+    static std::shared_ptr<ObjectTable> instance_;
 
     ObjectTable();
     

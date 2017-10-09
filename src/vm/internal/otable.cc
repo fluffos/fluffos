@@ -7,65 +7,49 @@
 #include <algorithm>
 #include <sstream>
 
-ObjectTable::Singleton ObjectTable::instance_ = nullptr;
+std::shared_ptr<ObjectTable> ObjectTable::instance_ = nullptr;
 
 ObjectTable::ObjectTable()
 :objects_({}),children_({})
 {}
 
 //static method to return a pointer to the singleton object table.
-ObjectTable::Singleton ObjectTable::get() {
+std::shared_ptr<ObjectTable> ObjectTable::get() {
     if( instance_ == nullptr )
-        instance_ = Singleton( new ObjectTable() );
+        instance_ = std::shared_ptr<ObjectTable>( new ObjectTable() );
     return instance_;
 }
-
-//fix style and efficiency errors in this function
-//should pass in a K const& k. also why is V not prefixed by ObjectTable and
-//it still works? is the ObjectTable needed in the parameter list? 
 
 //attempt to insert an key(obname), object pointer pair into the object table if the key is not in the table.
 //also will insert the key, object pointer pair in the childrens list.
 //if the key is already in the object table it fails and returns false, otherwise true.
 bool ObjectTable::insert(Key const& key,Value value) {
-    if( objects_.find(key) == objects_.end() ) {
-        objects_.insert( std::make_pair(key,value) );
-        auto base = basename(key);
-        auto it = children_.find(base);
-        if( it == children_.end() ) {
-          children_.insert( std::pair<Key,Vector>(base, {value} ) );
-        }
-        else {
-            it->second.push_back(value);
-        }
-        return true;
-    } 
-    else {
-        return false;
+    if( objects_.find(key) != objects_.end() ) return false;
+    
+    objects_.insert( std::make_pair(key,value) );
+    auto base = basename(key);
+    auto it = children_.find(base);
+    if( it == children_.end() ) {
+      children_.insert( std::pair<Key,Vector>(base, {value} ) );
     }
-
+    else {
+      it->second.push_back(value);
+    }
+    return true; 
 }
 
 //attempt to find the object named key in the object table. Return a pointer to it, or if not found the null pointer.
 ObjectTable::Value ObjectTable::find(Key const & key) {
     auto it = objects_.find(key);
-    if( it != objects_.end() ) {
-        return it->second;
-    } 
-    else {
-        return nullptr;
-    }
+    if( it == objects_.end() ) return nullptr;
+    return it->second;
 }
 
 //return the children of key if any as a vector of object pointers(Values).
 ObjectTable::Vector ObjectTable::children(Key const & key) {
     auto it = children_.find( basename(key) );
-    if( it != children_.end() ) {
-        return it->second;
-    }
-    else {
-        return Vector({});
-    }
+    if( it == children_.end() ) return Vector({});
+    return it->second;
 }
 
 //Attempt to find the object with name key in the object table and remove it
@@ -73,15 +57,13 @@ ObjectTable::Vector ObjectTable::children(Key const & key) {
 //otherwise false.
 //TODO: generalize this code by removing dependency on field obname.
 bool ObjectTable::remove(Key const & key) {
-    
     auto it1 = objects_.find(key);
     if( it1 == objects_.end() ) return false;
     objects_.erase(it1);
     //guaranteed to exist if object exists
-    //std::assert( children_.find( basename(key)) != children_.end() );
     auto it2 = children_.find( basename(key) );
     auto it3 = find_if( it2->second.begin(), it2->second.end(), [&key](Value v) -> bool { return v->obname == key; } );
-    //std::assert(it3 != it2->second.end())
+    //guaranteed to be in list if basename(key) exists in children_
     it2->second.erase(it3);
     if( it2->second.size() == 0 ) {
       children_.erase(it2);
@@ -93,7 +75,6 @@ bool ObjectTable::remove(Key const & key) {
 //TODO: remove dependency on outbuffer_t here
 #ifndef TESTING
 int ObjectTable::showStatus(outbuffer_t *out, int verbose) {
-
     std::stringstream ss;
     if (verbose == 1) {
         ss <<  "Object name hash table status:" << std::endl;
@@ -112,7 +93,6 @@ int ObjectTable::showStatus(outbuffer_t *out, int verbose) {
 #endif
 
 std::string basename(std::string s) {
-    
     //remove all leading forward slashes from string.
     auto it1 = s.begin();
     for(; *it1 == '/' ;++it1);
