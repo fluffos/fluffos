@@ -259,10 +259,10 @@ install: all
 	@install -m 0755 portbind $(INSTALL_DIR)
 
 googletest: 
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -lgtest vm/internal/otable_test.cc -o otable_test
-	./otable_test
-
-
+	@$(CXX) $(CXXFLAGS) $(LDFLAGS) -c vm/internal/otable.cc -o vm/internal/otable.o
+	@$(CXX) $(CXXFLAGS) $(LDFLAGS)  -lgtest vm/internal/otable_test.cc vm/internal/otable.o -o otable_test
+	@./otable_test
+	
 help:
 	@echo "***************** Configuration completed **************"
 	@echo "Compiling @PACKAGE_STRING@ (@SOURCE_REVISION@) as $(DRIVER_BIN) for @target@."

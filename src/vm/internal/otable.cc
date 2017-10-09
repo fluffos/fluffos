@@ -1,7 +1,5 @@
-#ifndef TESTING
 #include "base/std.h"
 #include "vm/internal/base/machine.h"
-#endif
 #include "vm/internal/otable.h"
 
 #include <algorithm>
@@ -73,7 +71,6 @@ bool ObjectTable::remove(Key const & key) {
 
 //write some information about memory usage and other statistics of the object table to out_buffer_t.
 //TODO: remove dependency on outbuffer_t here
-#ifndef TESTING
 int ObjectTable::showStatus(outbuffer_t *out, int verbose) {
     std::stringstream ss;
     if (verbose == 1) {
@@ -90,7 +87,6 @@ int ObjectTable::showStatus(outbuffer_t *out, int verbose) {
     outbuf_add(out, ss.str().c_str());
     return objects_.size() * sizeof(Value);
 }
-#endif
 
 std::string basename(std::string s) {
     //remove all leading forward slashes from string.

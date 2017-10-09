@@ -1,16 +1,6 @@
-#define TESTING
-
-#include<string>
-struct object_t
-{
-public:
-    std::string obname;
-
-    object_t(std::string const & s)
-    :obname(s) {}
-};
-
-#include "otable.cc"
+#include "base/std.h"
+#include "vm/internal/base/machine.h"
+#include "vm/internal/otable.h"
 
 #include <gtest/gtest.h>
 
@@ -27,10 +17,20 @@ TEST (BasenameTest, Strings) {
 
 TEST(OTableTest, Operations) {
     auto t = ObjectTable::get();
-    t->insert("/realms/silenus#1", new object_t("/realms/silenus#1"));
-    t->insert("/realms/silenus#13", new object_t("/realms/silenus#13"));
-    t->insert("/realms/silenus#2", new object_t("/realms/silenus#2"));
-    t->insert("/realms/beek#123", new object_t("/realms/beek#123"));
+    struct object_t ob1;
+    struct object_t ob2;
+    struct object_t ob3;
+    struct object_t ob4;
+    
+    ob1.obname = "/realms/silenus#1";
+    ob2.obname = "/realms/silenus#13";
+    ob3.obname = "/realms/silenus#2";
+    ob4.obname = "/realms/beek#123";
+    
+    t->insert("/realms/silenus#1", &ob1);
+    t->insert("/realms/silenus#13", &ob2);
+    t->insert("/realms/silenus#2", &ob3);
+    t->insert("/realms/beek#123", &ob4);
     EXPECT_EQ(3, t->children("realms/silenus").size() );
     EXPECT_EQ(1, t->children("realms/beek").size() );
     EXPECT_EQ("/realms/silenus#2",t->find("/realms/silenus#2")->obname);

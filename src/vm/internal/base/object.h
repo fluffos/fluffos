@@ -73,7 +73,7 @@ struct object_t {
 #ifdef DEBUGMALLOC_EXTENSIONS
   unsigned int extra_ref; /* Used to check ref count. */
 #endif
-  const char *const obname;
+  const char * obname;
   struct object_t *next_hash;
   struct object_t *next_ch_hash;
   /* the fields above must match lpc_object_t */
