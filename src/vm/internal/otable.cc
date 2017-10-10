@@ -73,18 +73,27 @@ bool ObjectTable::remove(Key const & key) {
 //TODO: remove dependency on outbuffer_t here
 int ObjectTable::showStatus(outbuffer_t *out, int verbose) {
     std::stringstream ss;
-    if (verbose == 1) {
-        ss <<  "Object name hash table status:" << std::endl;
-        ss <<  "Object name hash table status:" << std::endl;
-        ss << "------------------------------" << std::endl;
-        ss << "Elements:        " << objects_.size() << std::endl;
-        ss << "Memory(bytes):     " << objects_.size() * sizeof(Value) << std::endl;
-        ss << "Bucket count:    " << objects_.bucket_count() << std::endl;
-        ss << "Load factor:     " << objects_.load_factor() << std::endl;
-    } else {
-        ss << "Memory used(bytes):     " << objects_.size() * sizeof(Value) << std::endl;
+    
+    switch(verbose) {
+        case 1:    
+            ss <<  "Object name hash table status:" << std::endl;
+            ss <<  "Object name hash table status:" << std::endl;
+            ss << "------------------------------" << std::endl;
+            ss << "Elements:        " << objects_.size() << std::endl;
+            ss << "Memory(bytes):     " << objects_.size() * sizeof(Value) << std::endl;
+            ss << "Bucket count:    " << objects_.bucket_count() << std::endl;
+            ss << "Load factor:     " << objects_.load_factor() << std::endl;
+            outbuf_add(out, ss.str().c_str());
+            break;
+        
+        case 0:
+            ss << "Memory used(bytes):     " << objects_.size() * sizeof(Value) << std::endl;
+            outbuf_add(out, ss.str().c_str());
+            break;
+            
+        default:
+            break;
     }
-    outbuf_add(out, ss.str().c_str());
     return objects_.size() * sizeof(Value);
 }
 
