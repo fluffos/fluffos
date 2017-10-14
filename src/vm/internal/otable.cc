@@ -5,17 +5,17 @@
 #include <algorithm>
 #include <sstream>
 
-std::shared_ptr<ObjectTable> ObjectTable::instance_ = nullptr;
+std::unique_ptr<ObjectTable> ObjectTable::instance_;
 
 ObjectTable::ObjectTable()
 :objects_({}),children_({})
 {}
 
 //static method to return a pointer to the singleton object table.
-std::shared_ptr<ObjectTable> ObjectTable::get() {
-    if( instance_ == nullptr )
-        instance_ = std::shared_ptr<ObjectTable>( new ObjectTable() );
-    return instance_;
+ObjectTable& ObjectTable::instance() {
+    if( !instance_ )
+        instance_.reset( new ObjectTable() );
+    return *(instance_.get());
 }
 
 //attempt to insert an key(obname), object pointer pair into the object table if the key is not in the table.
