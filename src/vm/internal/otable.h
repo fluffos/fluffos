@@ -16,8 +16,10 @@ public:
     using Key = std::string;
     using Value = object_t*;
     using Vector = std::vector<Value>;
-
-    static std::shared_ptr<ObjectTable> get();
+    ObjectTable(ObjectTable const &) = delete;
+    ObjectTable& operator=(ObjectTable const&) = delete;
+    
+    static ObjectTable& instance();
     bool insert(Key const & key, Value value);
     Value find(Key const & key);
     Vector children(Key const & key);
@@ -28,7 +30,7 @@ public:
 
     
 private:
-    static std::shared_ptr<ObjectTable> instance_;
+    static std::unique_ptr<ObjectTable> instance_;
 
     ObjectTable();
     

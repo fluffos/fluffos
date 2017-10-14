@@ -294,7 +294,7 @@ static object_t *load_virtual_object(const char *name, int clone) {
   new_ob = v->u.ob;
 
   if (!clone) {
-    ob = ObjectTable::get()->find(name);
+    ob = ObjectTable::instance().find(name);
     if (ob && ob != new_ob) {
       /*
        * If we rename, we're going to have a duplicate name here.  Don't
@@ -318,12 +318,12 @@ static object_t *load_virtual_object(const char *name, int clone) {
 #endif
 
   /* perform the object rename */
-  ObjectTable::get()->remove(new_ob->obname);
+  ObjectTable::instance().remove(new_ob->obname);
   if (new_ob->obname) {
     FREE((char *)new_ob->obname);
   }
   SETOBNAME(new_ob, new_name);
-  ObjectTable::get()->insert(new_ob->obname,new_ob);
+  ObjectTable::instance().insert(new_ob->obname,new_ob);
 
   /* finish initialization */
   new_ob->flags |= O_VIRTUAL;
@@ -505,7 +505,7 @@ object_t *load_object(const char *lname, int callcreate) {
       error("Illegal to inherit self.\n");
     }
 
-    if ((inh_obj = ObjectTable::get()->find(inhbuf))) {
+    if ((inh_obj = ObjectTable::instance().find(inhbuf))) {
 #ifdef DEBUG
       fatal("Inherited object is already loaded!");
 #endif
@@ -520,7 +520,7 @@ object_t *load_object(const char *lname, int callcreate) {
      * create function. Without this check, that would crash the driver.
      * -Beek
      */
-    if (!(ob = ObjectTable::get()->find(name))) {
+    if (!(ob = ObjectTable::instance().find(name))) {
       ob = load_object(name, 1);
       /* sigh, loading the inherited file removed us */
       if (!ob) {
@@ -544,7 +544,7 @@ object_t *load_object(const char *lname, int callcreate) {
     obj_list->prev_all = ob;
   }
   obj_list = ob;
-  ObjectTable::get()->insert(ob->obname,ob); /* add name to fast object lookup table */
+  ObjectTable::instance().insert(ob->obname,ob); /* add name to fast object lookup table */
   save_command_giver(command_giver);
   push_object(ob);
   mret = apply_master_ob(APPLY_VALID_OBJECT, 1);
@@ -640,7 +640,7 @@ object_t *clone_object(const char *str1, int num_arg) {
   obj_list->prev_all = new_ob;
   new_ob->prev_all = 0;
   obj_list = new_ob;
-  ObjectTable::get()->insert(new_ob->obname, new_ob); /* Add name to fast object lookup table */
+  ObjectTable::instance().insert(new_ob->obname, new_ob); /* Add name to fast object lookup table */
   init_object(new_ob);
 
   call_create(new_ob, num_arg);
@@ -981,13 +981,13 @@ void destruct_object(object_t *ob) {
     SETOBNAME(ob, tmp);
     tmp = new_ob->obname;
     SETOBNAME(new_ob, "");
-    ObjectTable::get()->remove(ob->obname);
+    ObjectTable::instance().remove(ob->obname);
     SETOBNAME(new_ob, tmp);
     tmp_ob = ob;
     free_object(&tmp_ob, "vital object reference");
     // still need ob below!
   } else {
-    ObjectTable::get()->remove(ob->obname);
+    ObjectTable::instance().remove(ob->obname);
   }
 
   /*
@@ -1452,7 +1452,7 @@ object_t *find_object(const char *str) {
     return 0;
   }
 
-  if ((ob = ObjectTable::get()->find(tmpbuf))) {
+  if ((ob = ObjectTable::instance().find(tmpbuf))) {
     return ob;
   }
   ob = load_object(tmpbuf, 1);
@@ -1471,7 +1471,7 @@ object_t *find_object2(const char *str) {
     return 0;
   }
 
-  if ((ob = ObjectTable::get()->find(p))) {
+  if ((ob = ObjectTable::instance().find(p))) {
     return ob;
   }
   return 0;
