@@ -77,7 +77,6 @@ int ObjectTable::showStatus(outbuffer_t *out, int verbose) {
     switch(verbose) {
         case 1:    
             ss <<  "Object name hash table status:" << std::endl;
-            ss <<  "Object name hash table status:" << std::endl;
             ss << "------------------------------" << std::endl;
             ss << "Elements:        " << objects_.size() << std::endl;
             ss << "Memory(bytes):     " << objects_.size() * sizeof(Value) << std::endl;
