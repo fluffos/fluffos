@@ -352,11 +352,18 @@ void f_capitalize(void) {
 
 #ifdef F_CHILDREN
 void f_children(void) {
-  array_t *vec;
+  auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__ );
+  auto v = ObjectTable::instance().children(sp->u.string);
+  auto len = v.size() < max_array_size ? v.size() : max_array_size;
+  auto res = allocate_empty_array(len);
 
-  vec = children(sp->u.string);
+  for(auto i = 0;i < v.size() && i < len;++i) {
+    res->item[i].u.ob = v[i];
+    res->item[i].type = T_OBJECT;
+    add_ref(v[i], "children");
+  }
   free_string_svalue(sp);
-  put_array(vec);
+  put_array(res);
 }
 #endif
 
@@ -1381,7 +1388,7 @@ void f_mud_status(void) {
     print_cache_stats(&ob);
     outbuf_add(&ob, "\n");
 #endif
-    tot = show_otable_status(&ob, verbose);
+    tot = ObjectTable::instance().showStatus(&ob, verbose);
     outbuf_add(&ob, "\n");
     tot += heart_beat_status(&ob, verbose);
     outbuf_add(&ob, "\n");
@@ -1411,7 +1418,7 @@ void f_mud_status(void) {
     outbuf_addv(&ob, "Interactives:\t\t\t%8d %8" PRIu64 "\n", users_num(true),
                 (uint64_t)(users_num(true)) * sizeof(interactive_t));
 
-    tot = show_otable_status(&ob, verbose) + heart_beat_status(&ob, verbose) +
+    tot = ObjectTable::instance().showStatus(&ob, verbose) + heart_beat_status(&ob, verbose) +
           add_string_status(&ob, verbose) + print_call_out_usage(&ob, verbose);
   }
 
@@ -3210,7 +3217,7 @@ void f_memory_info(void) {
 
     tot = total_prog_block_size + total_array_size + total_class_size + total_mapping_size +
           tot_alloc_object_size + tot_alloc_sentence * sizeof(sentence_t) +
-          users_num(1) * sizeof(interactive_t) + show_otable_status(0, -1) +
+          users_num(1) * sizeof(interactive_t) + ObjectTable::instance().showStatus(0, -1) +
           heart_beat_status(0, -1) + add_string_status(0, -1) + print_call_out_usage(0, -1);
     push_number(tot);
     return;

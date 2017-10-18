@@ -1,15 +1,41 @@
 #ifndef OTABLE_H
 #define OTABLE_H
 
-/*
- * otable.c
- */
-void init_otable(void);
-void enter_object_hash(struct object_t *);
-void remove_object_hash(struct object_t *);
-void remove_precompiled_hashes(char *);
-struct object_t *lookup_object_hash(const char *);
-int show_otable_status(struct outbuffer_t *, int);
-struct array_t *find_ch_n(const char *s);
+#include<memory>
+#include<string>
+#include<unordered_map>
+#include<vector>
+
+struct object_t;
+
+std::string basename(std::string s);
+
+class ObjectTable /* final */
+{
+public:
+    using Key = std::string;
+    using Value = object_t*;
+    using Vector = std::vector<Value>;
+    ObjectTable(ObjectTable const &) = delete;
+    ObjectTable& operator=(ObjectTable const&) = delete;
+    
+    static ObjectTable& instance();
+    bool insert(Key const & key, Value value);
+    Value find(Key const & key);
+    Vector children(Key const & key);
+    bool remove(Key const & key);
+#ifndef TESTING
+    int showStatus(outbuffer_t *out, int verbose);
+#endif
+
+    
+private:
+    static std::unique_ptr<ObjectTable> instance_;
+
+    ObjectTable();
+    
+    std::unordered_map<Key,Value> objects_;
+    std::unordered_map<Key,Vector> children_;
+};
 
 #endif

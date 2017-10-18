@@ -1820,7 +1820,7 @@ void dealloc_object(object_t *ob, const char *from) {
   if (ob->obname) {
     debug(d_flag, "Free object /%s\n", ob->obname);
 
-    DEBUG_CHECK1(lookup_object_hash(ob->obname) == ob,
+    DEBUG_CHECK1(ObjectTable::instance().find(ob->obname) == ob,
                  "Freeing object /%s but name still in name table", ob->obname);
     FREE((char *)ob->obname);
     SETOBNAME(ob, 0);
