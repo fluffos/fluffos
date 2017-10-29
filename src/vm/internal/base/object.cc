@@ -1934,6 +1934,8 @@ void call_create(object_t *ob, int num_arg) {
 
   apply(APPLY_CREATE, ob, num_arg, ORIGIN_DRIVER);
 
+  apply(APPLY_POST_CREATE, ob, num_arg, ORIGIN_DRIVER);
+
   ob->flags |= O_RESET_STATE;
 }
 
