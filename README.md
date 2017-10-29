@@ -8,7 +8,7 @@ FluffOS
 FluffOS is the new LPMUD driver base on the last release of MudOS.
 LPC runtime is compatible, if your mud runs on MudOSv22+, it should run on FluffOS.
 
-Offical Website
+Official Website
 ---------------
 <http://fluffos.github.io>
 
