@@ -8,6 +8,8 @@ post_create - object post initialization
 void post_create( void );
 
 .SH DESCRIPTION
+This apply is available only if POST_CREATE is defined.
+
 This apply is called in every object right after the create() apply
 has been finished; it works as the last function call at the end of
 create(). The purpose of this apply is to check, finalize, validate,
