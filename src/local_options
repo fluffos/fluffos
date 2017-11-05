@@ -46,6 +46,7 @@
 #undef USE_ICONV
 #undef IPV6
 #undef DTRACE
+#define POST_CREATE
 
 /****************************************************************************
  *                              PACKAGES                                    *
