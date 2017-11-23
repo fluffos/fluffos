@@ -1,0 +1,34 @@
+.\"object post initialization
+.TH post_create 4 "29 Oct 2017" FluffOS "Driver Applies"
+
+.SH NAME
+post_create - object post initialization
+
+.SH SYNOPSIS
+void post_create( void );
+
+.SH DESCRIPTION
+This apply is available only if POST_CREATE is defined.
+
+This apply is called in every object right after the create() apply
+has been finished; it works as the last function call at the end of
+create(). The purpose of this apply is to check, finalize, validate,
+approve the properties of the object which have been set in create().
+
+Usage examples:
+- Calculate the market price based on settings in create();
+- Check the consistency between properties
+  (high damage for a beginner weapon?);
+- Call balance or approve daemon to validate properties
+
+It's suggested to use nomask on post_create() apply to prevent the
+redeclaration of validator function calls.
+
+If the object has been found as invalid, it can throw an error and
+destruct itself in post_create().
+
+.SH SEE ALSO
+create(4)
+
+.SH AUTHOR
+Raernon@GitHub
