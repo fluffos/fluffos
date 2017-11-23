@@ -1,3 +1,4 @@
+[![Code Sponsor](https://app.codesponsor.io/embed/vwCCXRPND1B8mmAMKp2H5HTe/fluffos/fluffos.svg)](https://app.codesponsor.io/link/vwCCXRPND1B8mmAMKp2H5HTe/fluffos/fluffos)
 [![Build Status](https://travis-ci.org/fluffos/fluffos.svg)](https://travis-ci.org/fluffos/fluffos)
 [![Coverage Status](https://coveralls.io/repos/github/fluffos/fluffos/badge.svg?branch=master)](https://coveralls.io/github/fluffos/fluffos?branch=master)
 [![Coverity Status](https://scan.coverity.com/projects/483/badge.svg)](https://scan.coverity.com/projects/483)
