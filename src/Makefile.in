@@ -239,15 +239,17 @@ clean:
 	@-rm -f testsuite/OBJ_DUMP* testsuite/test_file testsuite/testfile
 	@-rm -f testsuite/tmp_eval_file.c testsuite/sf.o testsuite/ed_test
 	@-rm -f testsuite/log/log testsuite/log/debug.log testsuite/log/compile
-	@-find . -name "*~" -print | xargs rm
-	@-find . -name "*.orig" -print | xargs rm
-	@-find . -name "*.rej" -print | xargs rm
+	@-find . -name "*~" -print | xargs rm -f
+	@-find . -name "*.orig" -print | xargs rm -f
+	@-find . -name "*.rej" -print | xargs rm -f
 	@-rm -f *.ln tags TAGS
 	@-rm -f $(DRIVER_BIN) $(DRIVER_BIN).old portbind *.exe
 	@-rm -f 1.out 2.out
 	@-rm -f testsuite/log/author_stats testsuite/log/domain_stats
 	@-rm -f testsuite/tmp.o
+ifeq ($(USE_JEMALLOC), 1)
 	@-cd thirdparty/jemalloc && make clean && cd -
+endif
 	@echo [Done]
 
 test: all
