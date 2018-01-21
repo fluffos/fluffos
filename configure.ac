@@ -36,7 +36,7 @@ AS_ECHO
 
 AC_PREFIX_DEFAULT([/opt/games])
 
-AC_CONFIG_SRCDIR([main.cc])
+AC_CONFIG_SRCDIR([src/main.cc])
 AC_CONFIG_AUX_DIR([build-aux])
 
 ## if changed: change Makefile.am accordingly
@@ -48,10 +48,16 @@ AC_ARG_PROGRAM
 ## autoheader
 ## ==========
 
-AC_CONFIG_HEADER([configure.h])
+AC_CONFIG_HEADER([src/configure.h])
 AH_TOP([#ifndef _CONFIG_H_
 #define _CONFIG_H_])
 AH_BOTTOM([#endif   /* _CONFIG_H_ */])
+
+## automake
+## ========
+
+AM_INIT_AUTOMAKE([1.15 foreign filename-length-max=9])
+AM_SILENT_RULES([yes])
 
 dnl Make sure config.status is regenerated when the version timestamp changes
 AC_SUBST([CONFIG_STATUS_DEPENDENCIES], ['$(top_srcdir)/.version'])
@@ -167,7 +173,7 @@ AS_BOX([Options pt. 2])
 AS_ECHO
 
 
-source_dir=`dirname $0`
+source_dir=`dirname $0`/src
 AC_CHECK_FILE([${source_dir}/local_options], [],
               [AC_MSG_ERROR([[You must have an local_options file!]])])
 AS_ECHO([["Checking for outdated defines in local_options..."]])
