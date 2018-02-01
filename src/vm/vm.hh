@@ -11,11 +11,11 @@
 // This file is the main API bundle for interacting with vm layer.
 
 // for apply()
-#include "vm/internal/applies_table.autogen.h"
+#include "packages/applies_table.hh"
 #include "vm/internal/apply.h"
 
 // for all EFUN defines
-#include "vm/internal/efuns.autogen.h"
+#include "packages/efuns.hh"
 
 // for calling into master.
 #include "vm/internal/master.h"

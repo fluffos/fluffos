@@ -1,4 +1,4 @@
-/* configure.h.in.  Generated from configure.ac by autoheader.  */
+/* src/configure.h.in.  Generated from configure.ac by autoheader.  */
 
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
@@ -21,21 +21,73 @@
    */
 #undef HAVE_ALLOCA_H
 
+/* Define to 1 if you have the `argz_add' function. */
+#undef HAVE_ARGZ_ADD
+
+/* Define to 1 if you have the `argz_append' function. */
+#undef HAVE_ARGZ_APPEND
+
+/* Define to 1 if you have the `argz_count' function. */
+#undef HAVE_ARGZ_COUNT
+
+/* Define to 1 if you have the `argz_create_sep' function. */
+#undef HAVE_ARGZ_CREATE_SEP
+
+/* Define to 1 if you have the <argz.h> header file. */
+#undef HAVE_ARGZ_H
+
+/* Define to 1 if you have the `argz_insert' function. */
+#undef HAVE_ARGZ_INSERT
+
+/* Define to 1 if you have the `argz_next' function. */
+#undef HAVE_ARGZ_NEXT
+
+/* Define to 1 if you have the `argz_stringify' function. */
+#undef HAVE_ARGZ_STRINGIFY
+
 /* Define to 1 if you have the <arpa/inet.h> header file. */
 #undef HAVE_ARPA_INET_H
+
+/* Define to 1 if you have the `closedir' function. */
+#undef HAVE_CLOSEDIR
 
 /* define if the compiler supports basic C++11 syntax */
 #undef HAVE_CXX11
 
+/* Define to 1 if you have the declaration of `cygwin_conv_path', and to 0 if
+   you don't. */
+#undef HAVE_DECL_CYGWIN_CONV_PATH
+
 /* Define to 1 if you have the <dirent.h> header file, and it defines `DIR'.
    */
 #undef HAVE_DIRENT_H
+
+/* Define if you have the GNU dld library. */
+#undef HAVE_DLD
+
+/* Define to 1 if you have the <dld.h> header file. */
+#undef HAVE_DLD_H
+
+/* Define to 1 if you have the `dlerror' function. */
+#undef HAVE_DLERROR
+
+/* Define to 1 if you have the <dlfcn.h> header file. */
+#undef HAVE_DLFCN_H
+
+/* Define to 1 if you have the <dl.h> header file. */
+#undef HAVE_DL_H
 
 /* Define to 1 if you have the `doprnt' function. */
 #undef HAVE_DOPRNT
 
 /* Define to 1 if you have the `dup2' function. */
 #undef HAVE_DUP2
+
+/* Define if you have the _dyld_func_lookup function. */
+#undef HAVE_DYLD
+
+/* Define to 1 if the system has the type `error_t'. */
+#undef HAVE_ERROR_T
 
 /* Define to 1 if you have the <fcntl.h> header file. */
 #undef HAVE_FCNTL_H
@@ -58,11 +110,20 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
+/* Define if you have the libdl library or equivalent. */
+#undef HAVE_LIBDL
+
+/* Define if libdlloader will be built on this platform */
+#undef HAVE_LIBDLLOADER
+
 /* define if libevent is available */
 #undef HAVE_LIBEVENT
 
 /* Define to 1 if you have the <libintl.h> header file. */
 #undef HAVE_LIBINTL_H
+
+/* Define to 1 if you have the `ltdl' library (-lltdl). */
+#undef HAVE_LIBLTDL
 
 /* Define to 1 if you have the `pcre' library (-lpcre). */
 #undef HAVE_LIBPCRE
@@ -75,6 +136,12 @@
 
 /* Define to 1 if you have the <locale.h> header file. */
 #undef HAVE_LOCALE_H
+
+/* Define this if a modern libltdl is already installed */
+#undef HAVE_LTDL
+
+/* Define to 1 if you have the <mach-o/dyld.h> header file. */
+#undef HAVE_MACH_O_DYLD_H
 
 /* Define to 1 if your system has a GNU libc compatible `malloc' function, and
    to 0 otherwise. */
@@ -110,14 +177,23 @@
 /* Define to 1 if you have the <netinet/in.h> header file. */
 #undef HAVE_NETINET_IN_H
 
+/* Define to 1 if you have the `opendir' function. */
+#undef HAVE_OPENDIR
+
 /* Define to 1 if PostgreSQL libraries are available */
 #undef HAVE_POSTGRESQL
 
 /* Define to 1 if you have the `pow' function. */
 #undef HAVE_POW
 
+/* Define if libtool can extract symbol lists from object files. */
+#undef HAVE_PRELOADED_SYMBOLS
+
 /* Define to 1 if you have the `putenv' function. */
 #undef HAVE_PUTENV
+
+/* Define to 1 if you have the `readdir' function. */
+#undef HAVE_READDIR
 
 /* Define to 1 if your system has a GNU libc compatible `realloc' function,
    and to 0 otherwise. */
@@ -131,6 +207,9 @@
 
 /* Define to 1 if you have the `setlocale' function. */
 #undef HAVE_SETLOCALE
+
+/* Define if you have the shl_load function. */
+#undef HAVE_SHL_LOAD
 
 /* Define to 1 if you have the `socket' function. */
 #undef HAVE_SOCKET
@@ -165,6 +244,12 @@
 /* Define to 1 if you have the <string.h> header file. */
 #undef HAVE_STRING_H
 
+/* Define to 1 if you have the `strlcat' function. */
+#undef HAVE_STRLCAT
+
+/* Define to 1 if you have the `strlcpy' function. */
+#undef HAVE_STRLCPY
+
 /* Define to 1 if you have the `strncasecmp' function. */
 #undef HAVE_STRNCASECMP
 
@@ -189,6 +274,9 @@
 /* Define to 1 if you have the <sys/dir.h> header file, and it defines `DIR'.
    */
 #undef HAVE_SYS_DIR_H
+
+/* Define to 1 if you have the <sys/dl.h> header file. */
+#undef HAVE_SYS_DL_H
 
 /* Define to 1 if you have the <sys/ndir.h> header file, and it defines `DIR'.
    */
@@ -227,6 +315,9 @@
 /* Define to 1 if you have the <vfork.h> header file. */
 #undef HAVE_VFORK_H
 
+/* This value is set to 1 to indicate that the system argz facility works */
+#undef HAVE_WORKING_ARGZ
+
 /* Define to 1 if `fork' works. */
 #undef HAVE_WORKING_FORK
 
@@ -237,6 +328,34 @@
    slash. */
 #undef LSTAT_FOLLOWS_SLASHED_SYMLINK
 
+/* Define if the OS needs help to load dependent libraries for dlopen(). */
+#undef LTDL_DLOPEN_DEPLIBS
+
+/* Define to the system default library search path. */
+#undef LT_DLSEARCH_PATH
+
+/* The archive extension */
+#undef LT_LIBEXT
+
+/* The archive prefix */
+#undef LT_LIBPREFIX
+
+/* Define to the extension used for runtime loadable modules, say, ".so". */
+#undef LT_MODULE_EXT
+
+/* Define to the name of the environment variable that determines the run-time
+   module search path. */
+#undef LT_MODULE_PATH_VAR
+
+/* Define to the sub-directory where libtool stores uninstalled libraries. */
+#undef LT_OBJDIR
+
+/* Define to the shared library suffix, say, ".dylib". */
+#undef LT_SHARED_EXT
+
+/* Define to the shared archive member specification, say "(shr.o)". */
+#undef LT_SHARED_LIB_MEMBER
+
 /* Define to 1 if `major', `minor', and `makedev' are declared in <mkdev.h>.
    */
 #undef MAJOR_IN_MKDEV
@@ -244,6 +363,12 @@
 /* Define to 1 if `major', `minor', and `makedev' are declared in
    <sysmacros.h>. */
 #undef MAJOR_IN_SYSMACROS
+
+/* Define if dlsym() requires a leading underscore in symbol names. */
+#undef NEED_USCORE
+
+/* Name of package */
+#undef PACKAGE
 
 /* Define to the address where bug reports for this package should be sent. */
 #undef PACKAGE_BUGREPORT
@@ -305,6 +430,9 @@
 #endif
 
 
+/* Version number of package */
+#undef VERSION
+
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */
 #if defined AC_APPLE_UNIVERSAL_BUILD
@@ -336,6 +464,12 @@
    <pthread.h>, or <semaphore.h> is not used. If the typedef were allowed, the
    #define below would cause a syntax error. */
 #undef _UINT64_T
+
+/* Define so that glibc/gnulib argp.h does not typedef error_t. */
+#undef __error_t_defined
+
+/* Define to a type to use for 'error_t' if it is not otherwise available. */
+#undef error_t
 
 /* Define to `__inline__' or `__inline' if that's what the C compiler
    calls it, or to nothing if 'inline' is not supported under any name.  */

@@ -13,7 +13,7 @@
 
 #include "vm/internal/compiler/trees.h"
 
-#include "vm/internal/efuns.autogen.h"
+#include "packages/efuns.hh"
 #include "vm/internal/compiler/compiler.h"
 #include "vm/internal/compiler/lex.h"
 

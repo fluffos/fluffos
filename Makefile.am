@@ -7,9 +7,9 @@ AM_CPPFLAGS				=
 AM_LDFLAGS				=
 BUILT_SOURCES			=
 include_HEADERS			=
-noinst_LIBRARIES		=
-lib_LIBRARIES			=
-EXTRA_LIBRARIES			=
+noinst_LTLIBRARIES		=
+lib_LTLIBRARIES			=
+EXTRA_LTLIBRARIES		=
 EXTRA_DIST				=
 CLEANFILES				=
 MOSTLYCLEANFILES		=
@@ -17,19 +17,21 @@ MOSTLYCLEANFILES		=
 DISTCLEANFILES			=
 MAINTAINERCLEANFILES	=
 
-SUBDIRS					= src
-#tests
+SUBDIRS					= $(ltdl_dir) src/tools . src
 DIST_SUBDIRS			= $(SUBDIRS)
 
 BUILT_SOURCES			+= $(top_srcdir)/.version
 
-git_version_gen = '$(SHELL)' '$(aux_dir)/git-version-gen' '--fallback' '$(VERSION)' '.tarball-version'
-rebuild = rebuild=:; revision=`cd $(srcdir) >/dev/zero 2>&1 && $(git_version_gen) | $(SED) 's|-.*$$||'`
+# Using 'cd' in backquotes may print the directory name, use this instead:
+lt__cd		= CDPATH="$${ZSH_VERSION+.}$(PATH_SEPARATOR)" && cd
+
+git_version_gen = '$(SHELL)' '$(aux_dir)/git-version-gen' '--fallback' '$(VERSION)' '--prefix' 'fluffos-' '.tarball-version'
+rebuild = rebuild=:; revision=`$(lt__cd) $(srcdir) && $(git_version_gen) | $(SED) 's|-.*$$||'`
 
 
 EXTRA_DIST += $(top_srcdir)/.version $(top_srcdir)/*.md						\
-	$(top_srcdir)/.*.yml $(top_srcdir)/Makefile.am	$(top_srcdir)/contrib	\
-	$(top_srcdir)/doc $(top_srcdir)/build-aux $(top_srcdir)/build.FluffOS	\
+	$(top_srcdir)/.*.yml $(top_srcdir)/Makefile.am	$(top_srcdir)/doc		\
+	$(top_srcdir)/build-aux $(top_srcdir)/build.FluffOS						\
 	$(top_srcdir)/ChangeLog $(top_srcdir)/Copyright							\
 	$(top_srcdir)/Credits $(top_srcdir)/compat  $(top_srcdir)/.travis*
 # $(top_srcdir)/test

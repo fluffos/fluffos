@@ -36,16 +36,27 @@ setup
 set -eo pipefail
 
 # testing part
-cd src
-./autogen.sh
-cp local_options local_options.default
-cp local_options.$CONFIG local_options
+# cd src            <= configure base dir now top dir
+# ./autogen.sh      <= shouldn't be neccessary any more
 
-if [ -n "$GCOV" ]; then
-  ./build.FluffOS $TYPE --enable-gcov=yes
-else
-  ./build.FluffOS $TYPE
-fi
+############# OLD
+#cp local_options local_options.default
+#cp local_options.$CONFIG local_options
+
+#if [ -n "$GCOV" ]; then
+#  ./build.FluffOS $TYPE --enable-gcov=yes
+#else
+#  ./build.FluffOS $TYPE
+#fi
+#############
+
+############# NEW
+# make build directory and change into it
+mkdir build
+cd build
+# configure with additional warnings enabled
+../configure --enable-devel
+#############
 
 # For coverity, we don't need to actually run tests, just build
 if [ -n "$COVERITY" ]; then
@@ -68,8 +79,8 @@ fi
 make -j 2
 
 # Run standard test first
-cd testsuite
-../driver etc/config.test -ftest -d
+cd ../src/testsuite
+../../build/src/driver etc/config.test -ftest -d
 wait $!
 
 if [ $? -ne 0 ]; then
@@ -77,7 +88,7 @@ if [ $? -ne 0 ]; then
 fi
 # run special interactive tests
 ( sleep 30 ; expect telnet_test.expect localhost 4000 ) &
-( ../driver etc/config.test -d ) &
+( ../../build/src/driver etc/config.test -d ) &
 wait $!
 if [ $? -ne 0 ]; then
   exit $?

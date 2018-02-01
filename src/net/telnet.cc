@@ -11,7 +11,7 @@
 #include "packages/core/mssp.h"
 #include "packages/core/telnet_ext.h"
 #include "thirdparty/libtelnet/libtelnet.h"  // for telnet_t, telnet_event_t*
-#include "vm/vm.h"
+#include "vm/vm.hh"
 
 static const telnet_telopt_t my_telopts[] = {{TELNET_TELOPT_TM, TELNET_WILL, TELNET_DO},
                                              {TELNET_TELOPT_SGA, TELNET_WILL, TELNET_DO},

@@ -8,7 +8,7 @@
 #include <cstdio>  // for printf
 
 #include "include/function.h"
-#include "vm/internal/efuns.autogen.h"
+#include "packages/efuns.hh"
 #include "vm/internal/base/program.h"
 #include "vm/internal/compiler/compiler.h"
 #include "vm/internal/compiler/keyword.h"

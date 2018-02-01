@@ -35,21 +35,14 @@ portbind
 
 # autoconf generated files
 Makefile
-Makefile.in
-aclocal.m4
 autom4te.cache
 config.cache
 config.log
 config.status
-configure
-configure.h
-configure.h.in
 
 *.d
 *.gcda
 *.gcno
 *.gcov
-*.autogen.*
-*.autogen
 /cc.h
 dtrace_compile

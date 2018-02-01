@@ -3,6 +3,7 @@
 
 AC_REVISION([$Revision 0.0$])
 AC_PREREQ([2.69])
+LT_PREREQ([2.4.6])
 
 ## ------------------- ##
 ## Internal m4-macros. ##
@@ -14,6 +15,8 @@ AC_PREREQ([2.69])
 ## sync.
 m4_define([AC_CONFIG_AUX_DIR],
      m4_defn([AC_CONFIG_AUX_DIR])[AC_SUBST([aux_dir], [$1])])
+m4_define([LT_CONFIG_LTDL_DIR],
+     m4_defn([LT_CONFIG_LTDL_DIR])[AC_SUBST([ltdl_dir], [$1])])
 m4_define([AC_CONFIG_MACRO_DIR],
      m4_defn([AC_CONFIG_MACRO_DIR])[AC_SUBST([macro_dir], [$1])])
 
@@ -58,6 +61,13 @@ AH_BOTTOM([#endif   /* _CONFIG_H_ */])
 
 AM_INIT_AUTOMAKE([1.15 foreign filename-length-max=9])
 AM_SILENT_RULES([yes])
+AM_MAINTAINER_MODE
+AM_EXTRA_RECURSIVE_TARGETS([std_header])
+
+## libtool dynamic loader (ltdl)
+## =============================
+
+LT_CONFIG_LTDL_DIR([build-aux/libltdl])
 
 dnl Make sure config.status is regenerated when the version timestamp changes
 AC_SUBST([CONFIG_STATUS_DEPENDENCIES], ['$(top_srcdir)/.version'])
@@ -65,7 +75,40 @@ AC_SUBST([CONFIG_STATUS_DEPENDENCIES], ['$(top_srcdir)/.version'])
 ############################################
 ## add Makefiles for additional subdirs here
 ############################################
-AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([src/cc.h
+                 Makefile
+                 src/Makefile
+                 src/base/internal/Makefile
+                 src/base/Makefile
+                 src/include/Makefile
+                 src/net/Makefile
+                 src/packages/async/Makefile
+                 src/packages/compress/Makefile
+                 src/packages/contrib/Makefile
+                 src/packages/core/Makefile
+                 src/packages/crypto/Makefile
+                 src/packages/db/Makefile
+                 src/packages/develop/Makefile
+                 src/packages/dwlib/Makefile
+                 src/packages/external/Makefile
+                 src/packages/Makefile
+                 src/packages/math/Makefile
+                 src/packages/matrix/Makefile
+                 src/packages/mudlib_stats/Makefile
+                 src/packages/ops/Makefile
+                 src/packages/parser/Makefile
+                 src/packages/pcre/Makefile
+                 src/packages/sha1/Makefile
+                 src/packages/sockets/Makefile
+                 src/packages/trim/Makefile
+                 src/packages/uids/Makefile
+                 src/thirdparty/Makefile
+                 src/tools/Makefile
+                 src/vm/internal/base/Makefile
+                 src/vm/internal/compiler/Makefile
+                 src/vm/internal/Makefile
+                 src/vm/Makefile
+                 ])
 
 ## -------------- ##
 ## Options pt. 1. ##
@@ -76,7 +119,15 @@ AS_BOX([Options pt. 1])
 AS_ECHO
 
 dnl here come all AC_ARG_ENABLE and AC_ARG_WITH
-AS_ECHO([["None yet..."]])
+
+AC_ARG_ENABLE([devel], [AS_HELP_STRING([--enable-devel], [use development settings])])
+if test "$USE_MAINTAINER_MODE" = "yes"
+then
+    AS_ECHO([["Force enabling devel"]])
+    enable_devel=yes
+fi
+
+AC_ARG_WITH([jemalloc], [AS_HELP_STRING([--with-jemalloc], [use jemalloc instead of system malloc])])
 
 ## -------------------- ##
 ## Checks for programs. ##
@@ -96,12 +147,28 @@ AC_USE_SYSTEM_EXTENSIONS
 AC_OPENMP
 
 AX_APPEND_COMPILE_FLAGS([-D_GNU_SOURCE])
-AX_APPEND_COMPILE_FLAGS([-fno-omit-frame-pointer])
 AX_CHECK_COMPILE_FLAG([-fPIE], [
     AX_APPEND_COMPILE_FLAGS([-fPIE])
     AX_APPEND_LINK_FLAGS([-fPIE -pie])
 ])
 AX_APPEND_COMPILE_FLAGS([-pthread])
+
+if test "$enable_devel" = "yes"
+then
+    AX_APPEND_COMPILE_FLAGS([-Wall -Wextra -Wformat -Werror=format-security])
+    AX_APPEND_COMPILE_FLAGS([-Wno-char-subscripts -Wno-sign-compare -Wno-return-type])
+    AX_APPEND_COMPILE_FLAGS([-Wno-unused-parameter -Wno-missing-field-initializers])
+    AX_APPEND_COMPILE_FLAGS([-Wno-overloaded-virtual -Wno-non-virtual-dtor])
+    AX_APPEND_COMPILE_FLAGS([-fdiagnostics-show-option -fmessage-length=0 -funsigned-char -fwrapv])
+dnl    AX_APPEND_COMPILE_FLAGS([-O1 -g -DDEBUG -D_FORTIFY_SOURCE=2 -fstack-protector-all])
+    AX_APPEND_COMPILE_FLAGS([-Og -g -DDEBUG -fstack-protector-all])
+    AX_APPEND_COMPILE_FLAGS([-Wstack-protector "--param ssp-buffer-size=1" -fstrict-aliasing])
+dnl    AX_APPEND_COMPILE_FLAGS([-fsanitize=address,undefined -fno-omit-frame-pointer])
+    AX_APPEND_COMPILE_FLAGS([-fno-omit-frame-pointer])
+else
+    AX_APPEND_COMPILE_FLAGS([-O3 -funroll-loops -DNDEBUG])
+fi
+
 AX_APPEND_LINK_FLAGS([-rdynamic])
 AX_APPEND_LINK_FLAGS([-pthread])
 # lto flag must be checked for LINK.
@@ -124,12 +191,28 @@ AC_PROG_CXX
 AC_OPENMP
 
 AX_APPEND_COMPILE_FLAGS([-D_GNU_SOURCE])
-AX_APPEND_COMPILE_FLAGS([-fno-omit-frame-pointer])
 AX_CHECK_COMPILE_FLAG([-fPIE], [
     AX_APPEND_COMPILE_FLAGS([-fPIE])
     AX_APPEND_LINK_FLAGS([-fPIE -pie])
 ])
 AX_APPEND_COMPILE_FLAGS([-pthread])
+if test "$enable_devel" = "yes"
+then
+    AX_APPEND_COMPILE_FLAGS([-Wall -Wextra -Wformat -Werror=format-security])
+    AX_APPEND_COMPILE_FLAGS([-Wno-char-subscripts -Wno-sign-compare -Wno-return-type])
+    AX_APPEND_COMPILE_FLAGS([-Wno-unused-parameter -Wno-missing-field-initializers])
+    AX_APPEND_COMPILE_FLAGS([-Wno-overloaded-virtual -Wno-non-virtual-dtor])
+    AX_APPEND_COMPILE_FLAGS([-fdiagnostics-show-option -fmessage-length=0 -funsigned-char -fwrapv])
+dnl    AX_APPEND_COMPILE_FLAGS([-O1 -g -DDEBUG -D_FORTIFY_SOURCE=2 -fstack-protector-all])
+    AX_APPEND_COMPILE_FLAGS([-Og -g -DDEBUG -fstack-protector-all])
+dnl -fstack-protector-all])
+    AX_APPEND_COMPILE_FLAGS([-Wstack-protector "--param ssp-buffer-size=1" -fstrict-aliasing])
+dnl    AX_APPEND_COMPILE_FLAGS([-fsanitize=address,undefined -fno-omit-frame-pointer])
+    AX_APPEND_COMPILE_FLAGS([-fno-omit-frame-pointer])
+else
+    AX_APPEND_COMPILE_FLAGS([-O3 -funroll-loops -DNDEBUG])
+fi
+
 AX_APPEND_LINK_FLAGS([-rdynamic])
 AX_APPEND_LINK_FLAGS([-pthread])
 # lto flag must be checked for LINK.
@@ -150,18 +233,66 @@ F_SUPPORT_CXX11([], [AC_MSG_ERROR([
 AS_ECHO(["" "=> other programs."])
 
 ## other progs
-AC_PROG_CPP
-AC_PROG_CXXCPP
-AC_PROG_MKDIR_P
-AC_PROG_INSTALL
-AC_PROG_LN_S
-AC_PROG_MAKE_SET
 AC_CHECK_PROG(BISON, bison, bison, no)
 if test $BISON = no; then
     AC_MSG_ERROR("bison is required")
 fi
+AC_PROG_CPP
+AC_PROG_CXXCPP
 AC_PROG_GREP
+AC_PROG_INSTALL
+AC_PROG_LN_S
+AC_PROG_MAKE_SET
+AC_PROG_MKDIR_P
+AM_PATH_PYTHON
 AC_PROG_SED
+
+
+## -------- ##
+## Libtool. ##
+## -------- ##
+
+AC_CACHE_SAVE
+AS_ECHO([])
+AS_BOX([Libtool])
+AS_ECHO
+
+LT_INIT([dlopen disable-shared])
+LT_CMD_MAX_LEN
+LT_FUNC_DLSYM_USCORE
+LT_LIB_M
+LT_LIB_DLLOAD
+LT_PATH_LD
+LT_PATH_NM
+LT_SYS_DLOPEN_SELF
+LT_SYS_DLOPEN_DEPLIBS
+LT_SYS_DLSEARCH_PATH
+LT_SYS_MODULE_PATH
+LT_SYS_SYMBOL_USCORE
+AC_SUBST(LIBTOOL_DEPS)
+
+## ----------------------- ##
+## Libtool dynamic loader. ##
+## ----------------------- ##
+
+AC_CACHE_SAVE
+AS_ECHO([])
+AS_BOX([Libtool dynamic loader])
+AS_ECHO
+
+LTDL_INIT([subproject convenience])
+# The lt_dladvise_init symbol was added with libtool-2.2
+if test yes != "$with_included_ltdl"; then
+    save_CFLAGS=$CFLAGS
+    save_LDFLAGS=$LDFLAGS
+    CFLAGS="$CFLAGS $LTDLINCL"
+    LDFLAGS="$LDFLAGS $LIBLTDL"
+    AC_CHECK_LIB([ltdl], [lt_dladvise_init],
+                 [],
+         [AC_MSG_ERROR([installed libltdl is too old])])
+    LDFLAGS=$save_LDFLAGS
+    CFLAGS=$save_CFLAGS
+fi
 
 ## -------------- ##
 ## Options pt. 2. ##
@@ -173,14 +304,14 @@ AS_BOX([Options pt. 2])
 AS_ECHO
 
 
-source_dir=`dirname $0`/src
+source_dir=` cd \`dirname $0\`/src ; pwd`
 AC_CHECK_FILE([${source_dir}/local_options], [],
               [AC_MSG_ERROR([[You must have an local_options file!]])])
 AS_ECHO([["Checking for outdated defines in local_options..."]])
-${SED} 's/ \(.*\)/\\b\1\\b/' < outdated_define.txt > outdated_define.wrk
-${GREP} -o -f ./outdated_define.wrk local_options 2>/dev/null
+${SED} 's/ \(.*\)/\\b\1\\b/' < ${source_dir}/outdated_define.txt > ./outdated_define.wrk
+${GREP} -o -f ./outdated_define.wrk ${source_dir}/local_options 2>/dev/null
 ret=$?
-rm -f outdated_define.wrk
+rm -f ./outdated_define.wrk
 if [[ $ret == 0 ]]; then
     AC_MSG_ERROR([[Your local_options contains above listed outdated defines that have been moved to runtime config. See outdated_define.txt ]])
 else
@@ -196,7 +327,7 @@ fi
 case "${target}" in
     *-*-cygwin*|*-*-darwin*)
         echo "JEMALLOC doesn't work on CYGWIN/OSX (darwin), force disabling."
-        USE_JEMALLOC=0
+        with_jemalloc=no
         ;;
     *)
         ;;
@@ -364,6 +495,14 @@ AC_SUBST([ARCH])
 AC_SUBST([DRIVER_BIN])
 AC_SUBST([OPTIMIZE])
 AC_SUBST([SOURCE_REVISION])
+if test "$with_jemalloc" = "yes" -a "$enable_devel" != "yes"
+then
+    USE_JEMALLOC=1
+else
+    USE_JEMALLOC=0
+fi
+dnl temporary disabled!!!
+USE_JEMALLOC=0
 AC_SUBST([USE_JEMALLOC])
 
 AC_OUTPUT

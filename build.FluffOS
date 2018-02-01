@@ -58,6 +58,7 @@ USE_JEMALLOC=1
 
 ####### END OF USER CONFIGURABLE OPTIONS
 
+if false ; then
 echo "Checking autotools..."
 set +e
 (cd ${source_dir} ; ./autogen.sh)
@@ -67,6 +68,7 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 set -e
+fi
 
 if test $# -ne 0; then
     case $1 in
