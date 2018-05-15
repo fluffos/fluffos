@@ -983,6 +983,7 @@ void destruct_object(object_t *ob) {
     SETOBNAME(new_ob, "");
     ObjectTable::instance().remove(ob->obname);
     SETOBNAME(new_ob, tmp);
+    ObjectTable::instance().insert(new_ob->obname, new_ob);
     tmp_ob = ob;
     free_object(&tmp_ob, "vital object reference");
     // still need ob below!
