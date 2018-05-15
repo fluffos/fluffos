@@ -137,6 +137,7 @@ typedef struct telnet_telopt_t telnet_telopt_t;
 #define TELNET_TELOPT_ENCRYPT 38
 #define TELNET_TELOPT_NEW_ENVIRON 39
 #define TELNET_TELOPT_MSSP 70
+#define TELNET_TELOPT_COMPRESS 85
 #define TELNET_TELOPT_COMPRESS2 86
 #define TELNET_TELOPT_ZMP 93
 #define TELNET_TELOPT_EXOPL 255
@@ -432,6 +433,18 @@ extern void telnet_negotiate(telnet_t *telnet, unsigned char cmd,
  */
 extern void telnet_send(telnet_t *telnet,
 		const char *buffer, size_t size);
+
+/*!
+ * Send non-command data (escapes IAC bytes), also.
+ * translate CRLU and CRNUL.
+ *
+ * \param telnet Telnet state tracker object.
+ * \param buffer Buffer of bytes to send.
+ * \param size   Number of bytes to send.
+ */
+extern void telnet_send_text(telnet_t *telnet,
+    const char *buffer, size_t size);
+
 
 /*!
  * \brief Begin a sub-negotiation command.

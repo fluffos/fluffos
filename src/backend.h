@@ -1,21 +1,24 @@
 #ifndef BACKEND_H
 #define BACKEND_H
 
+#include <chrono>
 #include <functional>
-
-typedef struct object_s object_t;
-typedef struct error_context_s error_context_t;
-struct outbuffer_t;
 
 /*
  * backend.c
  */
-extern long g_current_virtual_time;
-extern object_t *g_current_heartbeat_obj;
-extern error_context_t *current_error_context;
-extern int time_for_hb;
 
-// API for register event to be executed on each tick.
+// Global event base
+extern struct event_base *g_event_base;
+
+// Initialization of main game loop.
+struct event_base *init_backend();
+
+// This is the main game loop.
+void backend(struct event_base *);
+
+// API for registering game tick event.
+// Game ticks provides guaranteed spacing intervals between each invocation.
 struct tick_event {
   bool valid;
 
@@ -25,22 +28,22 @@ struct tick_event {
   tick_event(callback_type &callback) : valid(true), callback(callback) {}
 };
 
-// Register a event to run on game ticks. Safe to call from any thread.
-tick_event *add_tick_event(int, tick_event::callback_type);
+// Register a event to run on game ticks.
+tick_event *add_gametick_event(std::chrono::milliseconds delay_msecs,
+                               tick_event::callback_type callback);
+// Realtime event will be executed as close to designated walltime as possible.
+tick_event *add_walltime_event(std::chrono::milliseconds delay_msecs,
+                               tick_event::callback_type callback);
 
 // Used in shutdownMudos()
 void clear_tick_events();
 
-void backend(struct event_base *);
+// Util to help translate gameticks with time.
+int time_to_gametick(std::chrono::milliseconds msec);
+std::chrono::milliseconds gametick_to_time(int ticks);
 
-void clear_state(void);
-int parse_command(char *, object_t *);
-void preload_objects(int);
-void remove_destructed_objects(void);
 void update_load_av(void);
 void update_compile_av(int);
 char *query_load_av(void);
-int query_time_used(void);
-void call_heart_beat(void);
 
 #endif

@@ -64,7 +64,7 @@ int
 valid_domain(string)
 {
 	return 1;
-} 
+}
 
 // valid_socket: controls access to socket efunctions
 // return: 1 if access allowed, 0 if not.
@@ -78,7 +78,7 @@ valid_socket(object, string, mixed *)
 // Write and Read privileges:
 //
 // valid_write: called with the file name, the object initiating the call,
-//  and the function by which they called it. 
+//  and the function by which they called it.
 // return: 1 if access allowed, 0 if access not allowed.
 
 int
@@ -102,9 +102,5 @@ int valid_bind() {
 
 int valid_hide() {
     // same here
-    return 1;
-}
-
-int valid_compile_to_c() {
     return 1;
 }

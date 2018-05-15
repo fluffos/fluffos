@@ -1,8 +1,17 @@
+#include "base/std.h"
+
 #include "fliconv.h"
-#include <errno.h>
-#include "std.h"
-#include "lpc_incl.h"
-#include "comm.h"
+
+#include <errno.h>        // for errno, E2BIG
+#include <iconv.h>        // for iconv_open, iconv_t, iconv
+#include <stddef.h>       // for size_t
+#include <string.h>       // for strlen, strcat, strcmp, etc
+#include "interactive.h"  // for interactive_t
+#include "vm/vm.h"        // for sp, pop_stack, svalue_t, u, etc
+
+#ifndef USE_ICONV
+typedef void *iconv_t;
+#endif
 
 #ifdef USE_ICONV
 
@@ -24,8 +33,10 @@ struct translation *get_translator(const char *encoding) {
   if (ret) {
     return ret;
   }
-  ret = (struct translation *)DMALLOC(sizeof(struct translation), TAG_PERMANENT, "get_translator");
-  char *name = (char *)DMALLOC(strlen(encoding) + 18 + 1, TAG_PERMANENT, "get_translator");
+  ret = reinterpret_cast<struct translation *>(
+      DMALLOC(sizeof(struct translation), TAG_PERMANENT, "get_translator"));
+  char *name =
+      reinterpret_cast<char *>(DMALLOC(strlen(encoding) + 18 + 1, TAG_PERMANENT, "get_translator"));
   strcpy(name, encoding);
 #ifdef __linux__
   strcat(name, "//TRANSLIT//IGNORE");
@@ -62,7 +73,7 @@ char *translate(iconv_t tr, const char *mes, int inlen, int *outlen) {
   char *tmp2;
 
   if (!res) {
-    res = (char *)DMALLOC(1, TAG_PERMANENT, "translate");
+    res = reinterpret_cast<char *>(DMALLOC(1, TAG_PERMANENT, "translate"));
     reslen = 1;
   }
 
@@ -70,7 +81,7 @@ char *translate(iconv_t tr, const char *mes, int inlen, int *outlen) {
   len2 = reslen;
 
   while (len) {
-    iconv(tr, (char **)&tmp, &len, &tmp2, &len2);
+    iconv(tr, reinterpret_cast<char **>(&tmp), &len, &tmp2, &len2);
 #ifdef PACKAGE_DWLIB
     if (len > 1 && tmp[0] == 0xff && tmp[1] == 0xf9) {
       len -= 2;
@@ -85,7 +96,7 @@ char *translate(iconv_t tr, const char *mes, int inlen, int *outlen) {
         len = strlen(mes) + 1;
         FREE(res);
         reslen *= 2;
-        res = (char *)DMALLOC(reslen, TAG_PERMANENT, "translate");
+        res = reinterpret_cast<char *>(DMALLOC(reslen, TAG_PERMANENT, "translate"));
         tmp2 = res;
         len2 = reslen;
         continue;
@@ -115,7 +126,7 @@ char *translate_easy(iconv_t tr, const char *mes) {
 #ifdef F_SET_ENCODING
 void f_set_encoding() {
   if (current_object->interactive) {
-    struct translation *newt = get_translator((char *)sp->u.string);
+    struct translation *newt = get_translator(const_cast<char *>(sp->u.string));
     if (newt) {
       current_object->interactive->trans = newt;
       return;
@@ -128,12 +139,12 @@ void f_set_encoding() {
 
 #ifdef F_TO_UTF8
 void f_to_utf8() {
-  struct translation *newt = get_translator((char *)sp->u.string);
+  struct translation *newt = get_translator(const_cast<char *>(sp->u.string));
   pop_stack();
   if (!newt) {
     error("unknown encoding");
   }
-  char *text = (char *)sp->u.string;
+  char *text = const_cast<char *>(sp->u.string);
   char *translated = translate_easy(newt->incoming, text);
   pop_stack();
   copy_and_push_string(translated);
@@ -142,12 +153,12 @@ void f_to_utf8() {
 
 #ifdef F_UTF8_TO
 void f_utf8_to() {
-  struct translation *newt = get_translator((char *)sp->u.string);
+  struct translation *newt = get_translator(const_cast<char *>(sp->u.string));
   pop_stack();
   if (!newt) {
     error("unknown encoding");
   }
-  char *text = (char *)sp->u.string;
+  char *text = const_cast<char *>(sp->u.string);
   char *translated = translate_easy(newt->outgoing, text);
   pop_stack();
   copy_and_push_string(translated);
@@ -162,7 +173,8 @@ void f_str_to_arr() {
     translate_easy(newt->outgoing, " ");
   }
   int len;
-  int *trans = (int *)translate(newt->outgoing, sp->u.string, SVALUE_STRLEN(sp) + 1, &len);
+  int *trans =
+      reinterpret_cast<int *>(translate(newt->outgoing, sp->u.string, SVALUE_STRLEN(sp) + 1, &len));
   len /= 4;
   array_t *arr = allocate_array(len);
   while (len--) {
@@ -181,14 +193,15 @@ void f_arr_to_str() {
     newt = get_translator("UTF-32");
   }
   int len = sp->u.arr->size;
-  int *in = (int *)DMALLOC(sizeof(int) * (len + 1), TAG_TEMPORARY, "f_arr_to_str");
+  int *in =
+      reinterpret_cast<int *>(DMALLOC(sizeof(int) * (len + 1), TAG_TEMPORARY, "f_arr_to_str"));
   char *trans;
   in[len] = 0;
   while (len--) {
     in[len] = sp->u.arr->item[len].u.number;
   }
 
-  trans = translate(newt->incoming, (char *)in, (sp->u.arr->size + 1) * 4, &len);
+  trans = translate(newt->incoming, reinterpret_cast<char *>(in), (sp->u.arr->size + 1) * 4, &len);
   FREE(in);
   pop_stack();
   copy_and_push_string(trans);

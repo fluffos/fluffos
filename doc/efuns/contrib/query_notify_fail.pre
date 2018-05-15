@@ -1,0 +1,5 @@
+mixed query_notify_fail();
+
+returns current notify_fail setting (funcp or string)
+
+#ifndef NO_ADD_ACTION

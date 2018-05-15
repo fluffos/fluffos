@@ -1,11 +1,8 @@
 #ifndef FLUFFOS_ICONV_H
 #define FLUFFOS_ICONV_H
-#include "std.h"
-#ifdef USE_ICONV
-#include <iconv.h>
-#else
+
 typedef void *iconv_t;
-#endif
+
 struct translation {
   char *name;
   iconv_t incoming;

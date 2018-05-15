@@ -11,7 +11,7 @@
 #define ASSERT2(x, r) if (!(x)) { OUTPUT(WHERE + ", Check failed: " + r + ".\n"); }
 #define ASSERT_EQ(x, y) if (!same((x),(y))) { \
   OUTPUT(WHERE + ", Check Failed: \n" + \
-  "Expected: " + sprintf("%O", (x)) + "\nActual: " + sprintf("%O", (y)) + "\n"); }
+  "Expected: \n" + sprintf("%O", (x)) + "\nActual: \n" + sprintf("%O", (y)) + "\n"); }
 
 #define SAVETP tp = this_player()
 #define RESTORETP { if (tp) evaluate(bind( (: enable_commands :), tp)); else { object youd_never_use_this_as_a_var = new("/single/void"); evaluate(bind( (: enable_commands :), youd_never_use_this_as_a_var)); destruct(youd_never_use_this_as_a_var); } }

@@ -3,42 +3,48 @@
  *            Dwayne Fontenot (Jacques@TMI)
  */
 
-#include "std.h"
+#include "base/std.h"
 
 #include "comm.h"
 
-#include <algorithm>
+#include <errno.h>               // for errno
+#include <event2/buffer.h>       // for evbuffer_freeze, etc
+#include <event2/bufferevent.h>  // for bufferevent_enable, etc
+#include <event2/event.h>        // for EV_TIMEOUT, etc
+#include <event2/listener.h>     // for evconnlistener_free, etc
+#include <event2/util.h>         // for evutil_closesocket, etc
+#include <netdb.h>               // for addrinfo, freeaddrinfo, etc
+#include <netinet/in.h>          // for ntohl, IPPROTO_TCP
+#include <netinet/tcp.h>         // for TCP_NODELAY
+#include <sys/socket.h>          // for SOCK_STREAM
+#include <stdarg.h>              // for va_end, va_list, va_copy, etc
+#include <stdio.h>               // for snprintf, vsnprintf, fwrite, etc
+#include <string.h>              // for NULL, memcpy, strlen, etc
+#include <unistd.h>              // for gethostname
+#include <memory>                // for unique_ptr
 
-#include <event2/buffer.h>
-#include <event2/event.h>
-#include <event2/listener.h>
-#include <netinet/tcp.h>  // for TCP_NODELAY
-
-#include "main.h"
-#include "socket_efuns.h"
 #include "backend.h"
-#include "debug.h"
-#include "ed.h"
-#include "file.h"
+#include "fliconv.h"
 #include "interactive.h"
-#include "master.h"
-#include "add_action.h"
-#include "eval.h"
-#include "console.h"
-#include "port.h"  // get_current_time
-#include "event.h"
-#include "dns.h"
-#include "user.h"
+#include "thirdparty/libtelnet/libtelnet.h"
 #include "net/telnet.h"
+#include "user.h"
+#include "vm/vm.h"
 
+#include "packages/core/add_action.h"  // FIXME?
+#include "packages/core/dns.h"         // FIXME?
+#include "packages/core/ed.h"          // FIXME?
+
+// in backend.cc
+extern void update_load_av();
 /*
  * local function prototypes.
  */
-static char *get_user_command(interactive_t *);
-static char *first_cmd_in_buf(interactive_t *);
-static int cmd_in_buf(interactive_t *);
-static int call_function_interactive(interactive_t *, char *);
-static void print_prompt(interactive_t *);
+static char *get_user_command(interactive_t * /*ip*/);
+static char *first_cmd_in_buf(interactive_t * /*ip*/);
+static int cmd_in_buf(interactive_t * /*ip*/);
+static int call_function_interactive(interactive_t * /*i*/, char * /*str*/);
+static void print_prompt(interactive_t * /*ip*/);
 
 #ifdef NO_SNOOP
 #define handle_snoop(str, len, who)
@@ -46,107 +52,114 @@ static void print_prompt(interactive_t *);
 #define handle_snoop(str, len, who) \
   if ((who)->snooped_by) receive_snoop(str, len, who->snooped_by)
 
-static void receive_snoop(const char *, int, object_t *ob);
+static void receive_snoop(const char * /*buf*/, int /*len*/, object_t *ob);
 
 #endif
 
-/*
- * public local variables.
- */
-int add_message_calls = 0;
-#ifdef F_NETWORK_STATS
-int inet_out_packets = 0;
-int inet_out_volume = 0;
-int inet_in_packets = 0;
-int inet_in_volume = 0;
-#ifdef PACKAGE_SOCKETS
-int inet_socket_in_packets = 0;
-int inet_socket_in_volume = 0;
-int inet_socket_out_packets = 0;
-int inet_socket_out_volume = 0;
-#endif
-#endif
-int inet_packets = 0;
-int inet_volume = 0;
+namespace {
+// User socket event
+struct user_event_data {
+  int idx;
+};
 
-#ifdef HAS_CONSOLE
-int has_console = -1;
-#endif
-
-/*
- * Initialize new user connection socket.
- */
-void init_user_conn() {
-  for (int i = 0; i < 5; i++) {
-#ifdef F_NETWORK_STATS
-    external_port[i].in_packets = 0;
-    external_port[i].in_volume = 0;
-    external_port[i].out_packets = 0;
-    external_port[i].out_volume = 0;
-#endif
-    if (!external_port[i].port) continue;
-    /*
-     * fill in socket address information.
-     */
-    struct addrinfo *res;
-
-    char service[NI_MAXSERV];
-    snprintf(service, sizeof(service), "%u", external_port[i].port);
-
-    struct addrinfo hints;
-    memset(&hints, 0, sizeof(struct addrinfo));
-#ifdef IPV6
-    hints.ai_family = AF_INET6;
-#else
-    hints.ai_family = AF_INET;
-#endif
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE | AI_NUMERICSERV;
-#ifdef IPV6
-    hints.ai_flags |= AI_V4MAPPED;
-#endif
-
-    int ret;
-    if (MUD_IP[0]) {
-      ret = getaddrinfo(MUD_IP, service, &hints, &res);
-    } else {
-      ret = getaddrinfo(NULL, service, &hints, &res);
-    }
-
-    if (ret) {
-      debug_message("init_user_conn: getaddrinfo error: %s \n", gai_strerror(ret));
-      exit(3);
-    }
-
-    // Listen on connection event
-    new_external_port_event_listener(&external_port[i], res->ai_addr, res->ai_addrlen);
-
-    debug_message("Accepting connections on %s.\n",
-                  sockaddr_to_string((sockaddr *)res->ai_addr, res->ai_addrlen));
-
-    freeaddrinfo(res);
+void maybe_schedule_user_command(interactive_t *user) {
+  // If user has a complete command, schedule a command execution.
+  if (user->iflags & CMD_IN_BUF) {
+    struct timeval zero_sec = {0, 0};
+    evtimer_del(user->ev_command);
+    evtimer_add(user->ev_command, &zero_sec);
   }
 }
 
-/*
- * Shut down new user accept file descriptor.
- */
-void shutdown_external_ports() {
-  int i;
+void on_user_command(evutil_socket_t fd, short what, void *arg) {
+  debug(event, "User has an full command ready: %d:%s%s%s%s \n", (int)fd,
+        (what & EV_TIMEOUT) ? " timeout" : "", (what & EV_READ) ? " read" : "",
+        (what & EV_WRITE) ? " write" : "", (what & EV_SIGNAL) ? " signal" : "");
+  auto user = reinterpret_cast<interactive_t *>(arg);
 
-  for (i = 0; i < 5; i++) {
-    if (!external_port[i].port) {
-      continue;
-    }
-    if (external_port[i].ev_conn) evconnlistener_free(external_port[i].ev_conn);
-    if (evutil_closesocket(external_port[i].fd) == -1) {
-      debug_message("shutdown_external_ports: failed: %s",
-                    evutil_socket_error_to_string(
-                        evutil_socket_geterror(external_port[i].fd)));
-    }
+  if (user == NULL) {
+    fatal("on_user_command: user == NULL, Driver BUG.");
+    return;
   }
 
-  debug_message("closed external ports\n");
+  // FIXME: this function currently calls into mudlib and will throw errors
+  // This catch block should be moved one level down.
+  error_context_t econ;
+  if (!save_context(&econ)) {
+    fatal("BUG: on_user_comamnd can not save context!");
+  }
+  set_eval(max_cost);
+  try {
+    process_user_command(user);
+  } catch (const char *) {
+    restore_context(&econ);
+  }
+  pop_context(&econ);
+
+  /* Has to be cleared if we jumped out of process_user_command() */
+  current_interactive = 0;
+
+  // if user still have pending command, continue to schedule it.
+  //
+  // NOTE: It is important to only execute one command here, then schedule next
+  // command at the tail, This ensure users have a fair chance that no one can
+  // keep running commands.
+  //
+  // currently command scehduling is done inside process_user_command().
+  //
+  // maybe_schedule_user_command(user);
+}
+
+void on_user_read(bufferevent *bev, void *arg) {
+  auto user = reinterpret_cast<interactive_t *>(arg);
+
+  if (user == NULL) {
+    fatal("on_user_read: user == NULL, Driver BUG.");
+    return;
+  }
+
+  // Read user input
+  get_user_data(user);
+
+  // TODO: currently get_user_data() will schedule command execution.
+  // should probably move it here.
+}
+
+void on_user_write(bufferevent *bev, void *arg) {
+  auto user = reinterpret_cast<interactive_t *>(arg);
+  if (user == NULL) {
+    fatal("on_user_write: user == NULL, Driver BUG.");
+    return;
+  }
+  // nothing to do.
+}
+
+void on_user_events(bufferevent *bev, short events, void *arg) {
+  auto user = reinterpret_cast<interactive_t *>(arg);
+
+  if (user == NULL) {
+    fatal("on_user_events: user == NULL, Driver BUG.");
+    return;
+  }
+
+  if (events & (BEV_EVENT_ERROR | BEV_EVENT_EOF)) {
+    user->iflags |= NET_DEAD;
+    remove_interactive(user->ob, 0);
+  } else {
+    debug(event, "on_user_events: ignored unknown events: %d\n", events);
+  }
+}
+
+void new_user_event_listener(interactive_t *user) {
+  auto bev = bufferevent_socket_new(g_event_base, user->fd,
+                                    BEV_OPT_CLOSE_ON_FREE | BEV_OPT_DEFER_CALLBACKS);
+  bufferevent_setcb(bev, on_user_read, on_user_write, on_user_events, user);
+  bufferevent_enable(bev, EV_READ | EV_WRITE);
+
+  bufferevent_set_timeouts(bev, NULL, NULL);
+
+  user->ev_buffer = bev;
+  user->ev_command = evtimer_new(g_event_base, on_user_command, user);
 }
 
 /*
@@ -155,13 +168,20 @@ void shutdown_external_ports() {
  * If space is available, an interactive data structure is initialized and
  * the user is connected.
  */
-void new_user_handler(int fd, struct sockaddr *addr, size_t addrlen, port_def_t *port) {
+void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct sockaddr *addr,
+                      int addrlen, void *arg) {
   debug(connections, "New connection from %s.\n", sockaddr_to_string(addr, addrlen));
 
-  int one = 1;
-  if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) == -1) {
-    debug(connections, "async_on_accept: fd %d, set_socket_tcp_nodelay error: %s.\n", fd,
-          evutil_socket_error_to_string(evutil_socket_geterror(fd)));
+  // TODO: we don't really need to pass in port, we can figure out by
+  // evconnlistener_get_fd and compare it
+  auto *port = reinterpret_cast<port_def_t *>(arg);
+
+  {
+    int one = 1;
+    if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) == -1) {
+      debug(connections, "new_user_handler: user fd %d, set_socket_tcp_nodelay error: %s.\n", fd,
+            evutil_socket_error_to_string(evutil_socket_geterror(fd)));
+    }
   }
 
   /*
@@ -192,12 +212,10 @@ void new_user_handler(int fd, struct sockaddr *addr, size_t addrlen, port_def_t 
 
   master_ob->interactive = user;
 
-  // FIXME: this belongs in async_on_accept()
+  // TODO: merge event.cc into here.
   new_user_event_listener(user);
-
-  // FIXME: This current rely on ev_data.
-  // Initialize libtelnet
-  user->telnet = telnet_init(my_telopts, telnet_event_handler, 0, user);
+  // Initialize telnet support
+  user->telnet = net_telnet_init(user);
 
   set_prompt("> ");
 
@@ -219,7 +237,7 @@ void new_user_handler(int fd, struct sockaddr *addr, size_t addrlen, port_def_t 
   set_command_giver(0);
   if (ret == 0 || ret == (svalue_t *)-1 || ret->type != T_OBJECT || !master_ob->interactive) {
     debug_message("Can not accept connection from %s due to error in connect().\n",
-                  sockaddr_to_string((sockaddr *)&user->addr, user->addrlen));
+                  sockaddr_to_string(reinterpret_cast<sockaddr *>(&user->addr), user->addrlen));
     if (master_ob->interactive) {
       remove_interactive(master_ob, 0);
     }
@@ -244,52 +262,169 @@ void new_user_handler(int fd, struct sockaddr *addr, size_t addrlen, port_def_t 
   master_ob->flags &= ~O_ONCE_INTERACTIVE;
   master_ob->interactive = 0;
   add_ref(ob, "new_user");
-  set_command_giver(ob);
+
+  // start reverse DNS probing.
   query_name_by_addr(ob);
 
   if (user->connection_type == PORT_TELNET) {
-    send_initial_telent_negotiantions(user);
+    send_initial_telnet_negotiations(user);
   }
+
+  set_command_giver(ob);
 
   // Call logon() on the object.
-  if (!(ob->flags & O_DESTRUCTED)) {
-    /* current_object no longer set */
-    ret = safe_apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
-    if (ret == NULL) {
-      debug_message(
-          "new_user_handler: logon() on object %s has failed, the user is left "
-          "dangling.\n",
-          ob->obname);
-    }
-    /* function not existing is no longer fatal */
-  } else {
-    debug_message(
-        "new_user_handler: object is gone before logon(), the user is left "
-        "dangling. \n");
+  ret = safe_apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
+  if (ret == NULL) {
+    debug_message("new_user_handler: logon() on object %s has failed, the user is disconnected.\n",
+                  ob->obname);
+    destruct_object(ob);
+    ob = NULL;
+  } else if (ob->flags & O_DESTRUCTED) {
+    // logon() may decide not to allow user connect by destroying objects.
   }
+  set_command_giver(0);
 
   debug(connections, ("new_user_handler: end\n"));
-  set_command_giver(0);
 } /* new_user_handler() */
 
-#ifndef NO_SNOOP
-static void receive_snoop(const char *buf, int len, object_t *snooper) {
-/* command giver no longer set to snooper */
-#ifdef RECEIVE_SNOOP
-  char *str;
+}  // namespace
 
-  str = new_string(len, "receive_snoop");
-  memcpy(str, buf, len);
-  str[len] = 0;
-  push_malloced_string(str);
-  apply(APPLY_RECEIVE_SNOOP, snooper, 1, ORIGIN_DRIVER);
+/*
+ * Initialize new user connection socket.
+ */
+bool init_user_conn() {
+  for (int i = 0; i < 5; i++) {
+#ifdef F_NETWORK_STATS
+    external_port[i].in_packets = 0;
+    external_port[i].in_volume = 0;
+    external_port[i].out_packets = 0;
+    external_port[i].out_volume = 0;
+#endif
+    if (!external_port[i].port) continue;
+#ifdef IPV6
+    auto fd = socket(AF_INET6, SOCK_STREAM, 0);
 #else
-  /* snoop output is now % in all cases */
-  add_message(snooper, "%", 1);
-  add_message(snooper, buf, len);
+    auto fd = socket(AF_INET, SOCK_STREAM, 0);
 #endif
+    if (fd == -1) {
+      debug_message("socket_create: socket error: %s.\n",
+                    evutil_socket_error_to_string(evutil_socket_geterror(fd)));
+      return false;
+    }
+    if (evutil_make_socket_nonblocking(fd) == -1) {
+      debug(sockets, "socket_accept: set_socket_nonblocking error: %s.\n",
+            evutil_socket_error_to_string(evutil_socket_geterror(accept_fd)));
+      evutil_closesocket(fd);
+      return false;
+    }
+    if (evutil_make_socket_closeonexec(fd) == -1) {
+      debug(sockets, "socket_accept: make_socket_closeonexec error: %s.\n",
+            evutil_socket_error_to_string(evutil_socket_geterror(accept_fd)));
+      evutil_closesocket(fd);
+      return false;
+    }
+    {
+      int one = 1;
+      if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (void *)&one, sizeof(one)) < 0) {
+        evutil_closesocket(fd);
+        return false;
+      }
+    }
+    if (evutil_make_listen_socket_reuseable(fd) < 0) {
+      evutil_closesocket(fd);
+      return false;
+    }
+#ifdef __CYGWIN__
+#ifdef IPV6
+    // On windows, IPv6 sockets are IPv6 only by default. We have to change it.
+    {
+      auto zero = 0;
+      if (setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, (void *)&zero, sizeof(zero)) == -1) {
+        debug_message("socket_create: setsockopt error: %s.\n",
+                      evutil_socket_error_to_string(evutil_socket_geterror(fd)));
+        evutil_closesocket(fd);
+        return false;
+      }
+    }
+#endif
+#endif
+    {
+      /*
+       * fill in socket address information.
+       */
+      struct addrinfo *res;
+
+      char service[NI_MAXSERV];
+      snprintf(service, sizeof(service), "%u", external_port[i].port);
+
+      struct addrinfo hints;
+      memset(&hints, 0, sizeof(struct addrinfo));
+#ifdef IPV6
+      hints.ai_family = AF_INET6;
+#else
+      hints.ai_family = AF_INET;
+#endif
+      hints.ai_socktype = SOCK_STREAM;
+      hints.ai_flags = AI_PASSIVE | AI_NUMERICSERV;
+#ifdef IPV6
+      hints.ai_flags |= AI_V4MAPPED;
+#endif
+      int ret;
+
+      auto mudip = CONFIG_STR(__MUD_IP__);
+      if (mudip != nullptr && strlen(mudip) > 0) {
+        ret = getaddrinfo(mudip, service, &hints, &res);
+      } else {
+        ret = getaddrinfo(NULL, service, &hints, &res);
+      }
+      if (ret) {
+        debug_message("init_user_conn: getaddrinfo error: %s \n", gai_strerror(ret));
+        return false;
+      }
+
+      if (bind(fd, res->ai_addr, res->ai_addrlen) == -1) {
+        debug_message("socket_create: bind error: %s.\n",
+                      evutil_socket_error_to_string(evutil_socket_geterror(fd)));
+        evutil_closesocket(fd);
+        freeaddrinfo(res);
+        return false;
+      }
+      debug_message("Accepting connections on %s.\n",
+                    sockaddr_to_string(res->ai_addr, res->ai_addrlen));
+      freeaddrinfo(res);
+    }
+    // Listen on connection event
+    auto conn = evconnlistener_new(
+        g_event_base, new_user_handler, &external_port[i],
+        LEV_OPT_REUSEABLE | LEV_OPT_CLOSE_ON_FREE | LEV_OPT_CLOSE_ON_EXEC, 1024, fd);
+    if (conn == NULL) {
+      debug_message("listening failed: %s !", evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
+      return false;
+    }
+    external_port[i].ev_conn = conn;
+  }
+  return true;
 }
-#endif
+
+/*
+ * Shut down new user accept file descriptor.
+ */
+void shutdown_external_ports() {
+  int i;
+
+  for (i = 0; i < 5; i++) {
+    if (!external_port[i].port) {
+      continue;
+    }
+    if (external_port[i].ev_conn) evconnlistener_free(external_port[i].ev_conn);
+    if (evutil_closesocket(external_port[i].fd) == -1) {
+      debug_message("shutdown_external_ports: failed: %s",
+                    evutil_socket_error_to_string(evutil_socket_geterror(external_port[i].fd)));
+    }
+  }
+
+  debug_message("closed external ports\n");
+}
 
 /*
  * If there is a shadow for this object, then the message should be
@@ -302,12 +437,15 @@ static void receive_snoop(const char *buf, int len, object_t *snooper) {
  * INTERACTIVE_CATCH_TELL, since catch_tell() was already called
  * _instead of_ add_message(), and shadows got their chance then.
  */
-#if !defined(INTERACTIVE_CATCH_TELL) && !defined(NO_SHADOWS)
+#if !defined(NO_SHADOWS)
 #define SHADOW_CATCH_MESSAGE
 #endif
 
 #ifdef SHADOW_CATCH_MESSAGE
 static int shadow_catch_message(object_t *ob, const char *str) {
+  if (CONFIG_INT(__RC_INTERACTIVE_CATCH_TELL__)) {
+    return 0;
+  }
   if (!ob->shadowed) {
     return 0;
   }
@@ -333,62 +471,63 @@ static int shadow_catch_message(object_t *ob, const char *str) {
  * special handling is done.
  */
 void add_message(object_t *who, const char *data, int len) {
-  interactive_t *ip;
-  const char *cp;
-  const char *end;
-  char *trans;
-  int translen;
   /*
    * if who->interactive is not valid, write message on stderr.
    * (maybe)
    */
   if (!who || (who->flags & O_DESTRUCTED) || !who->interactive ||
       (who->interactive->iflags & (NET_DEAD | CLOSING))) {
-#ifdef NONINTERACTIVE_STDERR_WRITE
-    putc(']', stderr);
-    fwrite(data, len, 1, stderr);
-#endif
+    if (CONFIG_INT(__RC_NONINTERACTIVE_STDERR_WRITE__)) {
+      putc(']', stderr);
+      fwrite(data, len, 1, stderr);
+    }
     return;
   }
-  ip = who->interactive;
-  trans = translate(ip->trans->outgoing, data, len, &translen);
+
+  inet_packets++;
+
+  auto ip = who->interactive;
+  if (ip->connection_type == PORT_TELNET) {
+    int translen;
+    char *trans = translate(ip->trans->outgoing, data, len, &translen);
+
+    inet_volume += translen;
+    telnet_send_text(ip->telnet, trans, translen);
+  } else {
+    inet_volume += len;
+    bufferevent_write(ip->ev_buffer, data, len);
+  }
+
 #ifdef SHADOW_CATCH_MESSAGE
   /*
    * shadow handling.
    */
   if (shadow_catch_message(who, data)) {
-#ifdef SNOOP_SHADOWED
-    handle_snoop(data, len, ip);
-#endif
+    if (CONFIG_INT(__RC_SNOOP_SHADOWED__)) {
+      handle_snoop(data, len, ip);
+    }
     return;
   }
 #endif /* NO_SHADOWS */
   handle_snoop(data, len, ip);
 
-  if (ip->connection_type == PORT_TELNET) {
-    telnet_send(ip->telnet, trans, translen);
-  } else {
-    bufferevent_write(ip->ev_buffer, trans, translen);
-  }
-
   add_message_calls++;
 } /* add_message() */
 
 void add_vmessage(object_t *who, const char *format, ...) {
-  auto ip = who->interactive;
-
-  // FIXME: This data is clearly not passed through icovn.
-  va_list args;
+  va_list args, args2;
   va_start(args, format);
-  if (ip->connection_type == PORT_TELNET) {
-    telnet_raw_vprintf(ip->telnet, format, args);
-  } else {
-    auto buffer = bufferevent_get_output(ip->ev_buffer);
-    evbuffer_add_vprintf(buffer, format, args);
-  }
+  va_copy(args2, args);
+  do {
+    int result = vsnprintf(nullptr, 0, format, args);
+    if (result < 0) break;
+    std::unique_ptr<char[]> msg(new char[result + 1]);
+    result = vsnprintf(msg.get(), result + 1, format, args2);
+    if (result < 0) break;
+    add_message(who, msg.get(), result);
+  } while (0);
+  va_end(args2);
   va_end(args);
-
-  add_message_calls++;
 }
 
 /*
@@ -476,6 +615,12 @@ void get_user_data(interactive_t *ip) {
           ip->text_end -= ip->text_start;
           ip->text_start = 0;
         }
+        if (text_space < MAX_TEXT / 16){
+          ip->iflags |= SKIP_COMMAND;
+          ip->text_start = ip->text_end = 0;
+          text_space = MAX_TEXT;
+        }
+        
       }
       break;
 
@@ -483,7 +628,7 @@ void get_user_data(interactive_t *ip) {
       if (ip->text_end < 4) {
         text_space = 4 - ip->text_end;
       } else {
-        text_space = *(volatile int *)ip->text - ip->text_end + 4;
+        text_space = *reinterpret_cast<volatile int *>(ip->text) - ip->text_end + 4;
       }
       break;
 
@@ -520,7 +665,7 @@ void get_user_data(interactive_t *ip) {
         memcpy(ip->ws_text + ip->ws_text_end, buf, num_bytes);
         ip->ws_text_end += num_bytes;
         if (!ip->ws_size) {
-          unsigned char *data = (unsigned char *)&ip->ws_text[ip->ws_text_start];
+          unsigned char *data = reinterpret_cast<unsigned char *>(&ip->ws_text[ip->ws_text_start]);
           if (ip->ws_text_end - ip->ws_text_start < 8) {
             break;
           }
@@ -546,12 +691,13 @@ void get_user_data(interactive_t *ip) {
         }
         int i;
         if (ip->ws_size) {
-          int *wdata = (int *)&ip->ws_text[ip->ws_text_start];
-          int *dest = (int *)&buf[0];
+          int *wdata = reinterpret_cast<int *>(&ip->ws_text[ip->ws_text_start]);
+          int *dest = reinterpret_cast<int *>(&buf[0]);
           if (ip->ws_maskoffs) {
             int newmask;
             for (i = 0; i < 4; i++) {
-              ((char *)&newmask)[i] = ((char *)&ip->ws_mask)[(i + ip->ws_maskoffs) % 4];
+              (reinterpret_cast<char *>(&newmask))[i] =
+                  (reinterpret_cast<char *>(&ip->ws_mask))[(i + ip->ws_maskoffs) % 4];
             }
             ip->ws_mask = newmask;
             ip->ws_maskoffs = 0;
@@ -606,7 +752,7 @@ void get_user_data(interactive_t *ip) {
       int start = ip->text_end;
 
       // this will read data into ip->text
-      telnet_recv(ip->telnet, (const char *)&buf[0], num_bytes);
+      telnet_recv(ip->telnet, reinterpret_cast<const char *>(&buf[0]), num_bytes);
 
       if (ip->text_end > start) {
         /* handle snooping - snooper does not see type-ahead due to
@@ -618,7 +764,9 @@ void get_user_data(interactive_t *ip) {
         // If we read something, search for command.
         if (cmd_in_buf(ip)) {
           ip->iflags |= CMD_IN_BUF;
-          event_active(ip->ev_command, EV_TIMEOUT, 0);
+          struct timeval zero_sec = {0, 0};
+          evtimer_del(ip->ev_command);
+          evtimer_add(ip->ev_command, &zero_sec);
         }
       }
       break;
@@ -629,8 +777,8 @@ void get_user_data(interactive_t *ip) {
 
       if (num_bytes == text_space) {
         if (ip->text_end == 4) {
-          *(volatile int *)ip->text = ntohl(*(int *)ip->text);
-          if (*(volatile int *)ip->text > MAX_TEXT - 5) {
+          *reinterpret_cast<volatile int *>(ip->text) = ntohl(*reinterpret_cast<int *>(ip->text));
+          if (*reinterpret_cast<volatile int *>(ip->text) > MAX_TEXT - 5) {
             remove_interactive(ip->ob, 0);
           }
         } else {
@@ -656,7 +804,7 @@ void get_user_data(interactive_t *ip) {
       ip->text_end += num_bytes;
 
       p = ip->text + ip->text_start;
-      while ((nl = (char *)memchr(p, '\n', ip->text_end - ip->text_start))) {
+      while ((nl = reinterpret_cast<char *>(memchr(p, '\n', ip->text_end - ip->text_start)))) {
         ip->text_start = (nl + 1) - ip->text;
 
         *nl = 0;
@@ -978,7 +1126,9 @@ exit:
     print_prompt(ip);
     // FIXME: this doesn't belong here, should be moved to event.cc
     if (ip->iflags & CMD_IN_BUF) {
-      event_active(ip->ev_command, EV_TIMEOUT, 0);
+      struct timeval zero_sec = {0, 0};
+      evtimer_del(ip->ev_command);
+      evtimer_add(ip->ev_command, &zero_sec);
     }
   }
 
@@ -1047,6 +1197,7 @@ void remove_interactive(object_t *ob, int dested) {
     ip->ev_buffer = NULL;
   }
   if (ip->ev_command != NULL) {
+    evtimer_del(ip->ev_command);
     event_free(ip->ev_command);
     ip->ev_command = NULL;
   }
@@ -1171,6 +1322,17 @@ static int call_function_interactive(interactive_t *i, char *str) {
     }
   }
 
+  // FIXME: this logic can be combined with above.
+  if (was_single && !(i->iflags & SINGLE_CHAR)) {
+    i->text_start = i->text_end = 0;
+    i->text[0] = '\0';
+    i->iflags &= ~CMD_IN_BUF;
+    set_linemode(i, true);
+  }
+  if (was_noecho && !(i->iflags & NOECHO)) {
+    set_localecho(i, true);
+  }
+
   copy_and_push_string(str);
   /*
    * If we have args, we have to push them onto the stack in the order they
@@ -1190,19 +1352,9 @@ static int call_function_interactive(interactive_t *i, char *str) {
   } else {
     safe_call_function_pointer(funp, num_arg + 1);
   }
-
+  // NOTE: we can't use "i" here anymore, it is possible that it
+  // has been freed.
   pop_stack(); /* remove `function' from stack */
-
-  if (was_single && !(i->iflags & SINGLE_CHAR)) {
-    i->text_start = i->text_end = 0;
-    i->text[0] = '\0';
-    i->iflags &= ~CMD_IN_BUF;
-    set_linemode(i, true);
-  }
-  if (was_noecho && !(i->iflags & NOECHO)) {
-    set_localecho(i, true);
-  }
-
   return (1);
 } /* call_function_interactive() */
 
@@ -1268,6 +1420,25 @@ static void print_prompt(interactive_t *ip) {
     telnet_iac(ip->telnet, TELNET_GA);
   }
 } /* print_prompt() */
+
+#ifndef NO_SNOOP
+static void receive_snoop(const char *buf, int len, object_t *snooper) {
+  /* command giver no longer set to snooper */
+  if (CONFIG_INT(__RC_RECEIVE_SNOOP__)) {
+    char *str;
+
+    str = new_string(len, "receive_snoop");
+    memcpy(str, buf, len);
+    str[len] = 0;
+    push_malloced_string(str);
+    apply(APPLY_RECEIVE_SNOOP, snooper, 1, ORIGIN_DRIVER);
+  } else {
+    /* snoop output is now % in all cases */
+    add_message(snooper, "%", 1);
+    add_message(snooper, buf, len);
+  }
+}
+#endif
 
 /*
  * Let object 'me' snoop object 'you'. If 'you' is 0, then turn off
@@ -1410,7 +1581,7 @@ int replace_interactive(object_t *ob, object_t *obfrom) {
 #ifdef F_REQUEST_TERM_TYPE
 void f_request_term_type() {
   auto ip = command_giver->interactive;
-  telnet_begin_sb(ip->telnet, TELNET_TTYPE_SEND);
+  telnet_request_ttype(ip->telnet);
   flush_message(ip);
 }
 #endif
@@ -1418,7 +1589,7 @@ void f_request_term_type() {
 #ifdef F_START_REQUEST_TERM_TYPE
 void f_start_request_term_type() {
   auto ip = command_giver->interactive;
-  telnet_negotiate(ip->telnet, TELNET_DO, TELNET_TELOPT_TTYPE);
+  telnet_start_request_ttype(ip->telnet);
   flush_message(ip);
 }
 #endif
@@ -1428,9 +1599,9 @@ void f_request_term_size() {
   auto ip = command_giver->interactive;
 
   if ((st_num_arg == 1) && (sp->u.number == 0)) {
-    telnet_negotiate(command_giver->interactive->telnet, TELNET_DONT, TELNET_TELOPT_NAWS);
+    telnet_dont_naws(ip->telnet);
   } else {
-    telnet_negotiate(command_giver->interactive->telnet, TELNET_DO, TELNET_TELOPT_NAWS);
+    telnet_do_naws(ip->telnet);
   }
 
   if (st_num_arg == 1) {
@@ -1445,25 +1616,26 @@ void f_websocket_handshake_done() {
   if (!current_interactive) {
     return;
   }
-
-  flush_message(current_interactive->interactive);
-  current_interactive->interactive->iflags |= HANDSHAKE_COMPLETE;
-  object_t *ob = current_interactive;  // command_giver;
-
-  auto user = current_interactive->interactive;
-  /* Ask permission to ask them for their terminal type */
-  telnet_negotiate(user->telnet, TELNET_DO, TELNET_TELOPT_TTYPE);
-  /* Ask them for their window size */
-  telnet_negotiate(user->telnet, TELNET_DO, TELNET_TELOPT_NAMS);
-  // Ask them if they support mxp.
-  telnet_negotiate(user->telnet, TELNET_DO, TELNET_TELOPT_MXP);
-  // And we support mssp
-  telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_MSSP);
-  // May as well ask for zmp while we're there!
-  telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_ZMP);
-  // Also newenv
-  telnet_negotiate(user->telnet, TELNET_DO, TELNET_TELOPT_NEW_ENVIRON);
-  // gmcp *yawn*
-  telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_GMCP);
+  auto ip = current_interactive->interactive;
+  ip->iflags |= HANDSHAKE_COMPLETE;
+  send_initial_telnet_negotiations(ip);
 }
 #endif
+
+const char *sockaddr_to_string(const sockaddr *addr, socklen_t len) {
+  static char result[NI_MAXHOST + NI_MAXSERV];
+
+  char host[NI_MAXHOST], service[NI_MAXSERV];
+  int ret = getnameinfo(addr, len, host, sizeof(host), service, sizeof(service),
+                        NI_NUMERICHOST | NI_NUMERICSERV);
+
+  if (ret) {
+    debug(sockets, "sockaddr_to_string fail: %s.\n", evutil_gai_strerror(ret));
+    strcpy(result, "<invalid address>");
+    return result;
+  }
+
+  snprintf(result, sizeof(result), strchr(host, ':') != NULL ? "[%s]:%s" : "%s:%s", host, service);
+
+  return result;
+}

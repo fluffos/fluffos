@@ -37,9 +37,6 @@
    */
 #undef HAVE_DIRENT_H
 
-/* Define to 1 if you have the `dup2' function. */
-#undef HAVE_DUP2
-
 /* Define to 1 if you have the <execinfo.h> header file. */
 #undef HAVE_EXECINFO_H
 
@@ -49,23 +46,11 @@
 /* Define to 1 if you have the <float.h> header file. */
 #undef HAVE_FLOAT_H
 
-/* Define to 1 if you have the `floor' function. */
-#undef HAVE_FLOOR
-
 /* Define to 1 if you have the `fork' function. */
 #undef HAVE_FORK
 
-/* Define to 1 if you have the `getcwd' function. */
-#undef HAVE_GETCWD
-
-/* Define to 1 if you have the `gethostname' function. */
-#undef HAVE_GETHOSTNAME
-
 /* Define to 1 if you have the `getpagesize' function. */
 #undef HAVE_GETPAGESIZE
-
-/* Define to 1 if you have the `gettimeofday' function. */
-#undef HAVE_GETTIMEOFDAY
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
@@ -92,26 +77,11 @@
 /* Define to 1 if you have the <malloc.h> header file. */
 #undef HAVE_MALLOC_H
 
-/* Define to 1 if you have the `memchr' function. */
-#undef HAVE_MEMCHR
-
-/* Define to 1 if you have the `memmove' function. */
-#undef HAVE_MEMMOVE
-
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
 
-/* Define to 1 if you have the `memset' function. */
-#undef HAVE_MEMSET
-
-/* Define to 1 if you have the `mkdir' function. */
-#undef HAVE_MKDIR
-
 /* Define to 1 if you have a working `mmap' system call. */
 #undef HAVE_MMAP
-
-/* Define to 1 if you have the `munmap' function. */
-#undef HAVE_MUNMAP
 
 /* Define to 1 if MySQL libraries are available */
 #undef HAVE_MYSQL
@@ -128,39 +98,18 @@
 /* Define to 1 if PostgreSQL libraries are available */
 #undef HAVE_POSTGRESQL
 
-/* Define to 1 if you have the `pow' function. */
-#undef HAVE_POW
-
-/* Define to 1 if you have the `putenv' function. */
-#undef HAVE_PUTENV
-
 /* Define to 1 if your system has a GNU libc compatible `realloc' function,
    and to 0 otherwise. */
 #undef HAVE_REALLOC
 
-/* Define to 1 if you have the `regcomp' function. */
-#undef HAVE_REGCOMP
-
 /* Define to 1 if you have the <resolv.h> header file. */
 #undef HAVE_RESOLV_H
-
-/* Define to 1 if you have the `rmdir' function. */
-#undef HAVE_RMDIR
-
-/* Define to 1 if you have the `setlocale' function. */
-#undef HAVE_SETLOCALE
 
 /* Define to 1 if the system has the type `sighandler_t'. */
 #undef HAVE_SIGHANDLER_T
 
-/* Define to 1 if you have the `socket' function. */
-#undef HAVE_SOCKET
-
 /* Have the SQLITE3 library */
 #undef HAVE_SQLITE3
-
-/* Define to 1 if you have the `sqrt' function. */
-#undef HAVE_SQRT
 
 /* Define to 1 if you have the <stddef.h> header file. */
 #undef HAVE_STDDEF_H
@@ -171,44 +120,11 @@
 /* Define to 1 if you have the <stdlib.h> header file. */
 #undef HAVE_STDLIB_H
 
-/* Define to 1 if you have the `strcasecmp' function. */
-#undef HAVE_STRCASECMP
-
-/* Define to 1 if you have the `strchr' function. */
-#undef HAVE_STRCHR
-
-/* Define to 1 if you have the `strcspn' function. */
-#undef HAVE_STRCSPN
-
-/* Define to 1 if you have the `strerror' function. */
-#undef HAVE_STRERROR
-
 /* Define to 1 if you have the <strings.h> header file. */
 #undef HAVE_STRINGS_H
 
 /* Define to 1 if you have the <string.h> header file. */
 #undef HAVE_STRING_H
-
-/* Define to 1 if you have the `strncasecmp' function. */
-#undef HAVE_STRNCASECMP
-
-/* Define to 1 if you have the `strpbrk' function. */
-#undef HAVE_STRPBRK
-
-/* Define to 1 if you have the `strrchr' function. */
-#undef HAVE_STRRCHR
-
-/* Define to 1 if you have the `strspn' function. */
-#undef HAVE_STRSPN
-
-/* Define to 1 if you have the `strstr' function. */
-#undef HAVE_STRSTR
-
-/* Define to 1 if you have the `strtol' function. */
-#undef HAVE_STRTOL
-
-/* Define to 1 if you have the `strtoul' function. */
-#undef HAVE_STRTOUL
 
 /* Define to 1 if `st_rdev' is a member of `struct stat'. */
 #undef HAVE_STRUCT_STAT_ST_RDEV
@@ -254,9 +170,6 @@
 /* Define to 1 if you have the <time.h> header file. */
 #undef HAVE_TIME_H
 
-/* Define to 1 if you have the `tzset' function. */
-#undef HAVE_TZSET
-
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
 
@@ -275,7 +188,7 @@
 /* Define to 1 if `vfork' works. */
 #undef HAVE_WORKING_VFORK
 
-/* Define to 1 if you have `z' library (-lz) */
+/* Define to 1 if you have 'z' library (-lz) */
 #undef HAVE_ZLIB
 
 /* Define to 1 if `lstat' dereferences a symlink specified with a trailing

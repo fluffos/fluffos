@@ -1,4 +1,5 @@
 #!/bin/bash
+set -eo pipefail
 
 # By default driver compile to native environment, you can
 # add "-m64" to force compile under 64bit, "-m32" for 32bit.
@@ -7,8 +8,8 @@
 # should change -march=native to -mtune=generic
 COMPILER_FLAGS=${COMPILER_FLAGS:-"-march=native"}
 
-OPTIMIZE="-O3"
-DEBUG="-g"
+OPTIMIZE="-O3 -funroll-loops"
+DEBUG="-DNDEBUG -g"
 
 # Change this if you want to use another make.
 MAKE=make
@@ -23,11 +24,14 @@ INSTALL_DIR=`dirname $(pwd)`/bin
 #Enable warnings from the compiler (g++), if wanted.
 WARN=(
 "-Wall"
+"-Wextra"
 "-Wformat-security"
 # Turn off some warnings from GCC.
 "-Wno-char-subscripts"
 "-Wno-sign-compare"
 "-Wno-return-type"
+"-Wno-unused-parameter"
+"-Wno-missing-field-initializers"
 # GCC's warning produces too many false positives:
 # https://groups.google.com/a/google.com/forum/#!topic/c-users/jLRfP804wuc
 # https://groups.google.com/a/google.com/d/msg/c-users/jLRfP804wuc/sKe4Ba2PKwAJ
@@ -38,7 +42,9 @@ WARN=(
 # features
 "-fdiagnostics-show-option"
 "-fmessage-length=0"
+# Less undefined behavior
 "-funsigned-char"
+"-fwrapv"
 )
 WARN="$(IFS=' '; echo "${WARN[*]}")"
 
@@ -48,11 +54,10 @@ if test $# -ne 0; then
     develop)
       echo Preparing to build developmental version of MudOS driver ...
       OPTIMIZE="-O0"
-      DEBUG="$DEBUG -DDEBUG -DDEBUG_MACRO"
+      DEBUG="-g -DDEBUG"
       # Hardening mode activated, for more error visibility
       DEBUG="$DEBUG -D_FORTIFY_SOURCE=2 -fstack-protector-all"
-      DEBUG="$DEBUG -fwrapv -fPIE -Wstack-protector"
-      DEBUG="$DEBUG --param ssp-buffer-size=1"
+      DEBUG="$DEBUG -Wstack-protector --param ssp-buffer-size=1 -fstrict-aliasing"
       shift
       ;;
     *)
@@ -65,8 +70,19 @@ fi
 ####### END OF USER CONFIGURABLE OPTIONS
 
 CFLAGS="$CFLAGS $COMPILER_FLAGS $WARN $OPTIMIZE $DEBUG"
-SOURCE_REVISION="$(git describe --dirty --always)"
+
+if [ -d $(pwd)/../.git ]; then
+    if [ "$(git --no-pager show -s --format='%ae')" == "sunyucong@gmail.com" ]; then
+        SOURCE_REVISION="git"
+    else
+        SOURCE_REVISION="git-local"
+    fi
+    SOURCE_REVISION="$SOURCE_REVISION-$(git --no-pager show -s --format='%h-%ct')"
+else
+    SOURCE_REVISION="unknown-nongit"
+fi
 
 # Force an reconfigure.
-rm configure.h
-CFLAGS=$CFLAGS CXXFLAGS=$CFLAGS MAKE=$MAKE ARCH=$ARCH DRIVER_BIN=$DRIVER_BIN OPTIMIZE=$OPTIMIZE SOURCE_REVISION=$SOURCE_REVISION ./configure --bindir=$INSTALL_DIR $@ && $MAKE help
+rm -f configure.h
+CFLAGS=$CFLAGS CXXFLAGS=$CFLAGS MAKE=$MAKE ARCH=$ARCH DRIVER_BIN=$DRIVER_BIN OPTIMIZE=$OPTIMIZE SOURCE_REVISION=$SOURCE_REVISION ./configure --bindir=$INSTALL_DIR $@
+$MAKE help

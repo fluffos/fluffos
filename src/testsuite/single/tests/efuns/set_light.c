@@ -1,6 +1,6 @@
 int light = 0;
 
-#define CHK ASSERT(light = set_light(0));
+#define CHK ASSERT_EQ(light, set_light(0));
 
 #ifndef __NO_ENVIRONMENT__
 void move_or_destruct(object ob) {

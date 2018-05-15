@@ -17,20 +17,16 @@ case $COMPILER in
     $CXX -v
     ;;
   clang)
-    sudo wget -q http://llvm.org/releases/3.5.0/clang+llvm-3.5.0-x86_64-linux-gnu-ubuntu-14.04.tar.xz
-    sudo tar axvf clang+llvm-3.5.0-x86_64-linux-gnu-ubuntu-14.04.tar.xz
-    export CXX="$PWD/clang+llvm-3.5.0-x86_64-linux-gnu/bin/clang++"
+    sudo wget -q http://llvm.org/releases/3.5.2/clang+llvm-3.5.2-x86_64-linux-gnu-ubuntu-14.04.tar.xz
+    sudo tar axvf clang+llvm-3.5.2-x86_64-linux-gnu-ubuntu-14.04.tar.xz
+    export CXX="$PWD/clang+llvm-3.5.2-x86_64-linux-gnu/bin/clang++ -Wno-error=unused-command-line-argument"
     $CXX -v
     ;;
 esac
 
 if [ "$BUILD" = "i386" ]; then
   sudo apt-get remove libevent-dev libevent-* libssl-dev
-  sudo apt-get install g++-multilib g++-4.8-multilib
-  sudo apt-get --no-install-recommends install valgrind:i386
-  sudo apt-get install libevent-2.0-5:i386
-  sudo apt-get install libevent-dev:i386
-  sudo apt-get --no-install-recommends install libz-dev:i386
+  sudo apt-get -f --no-install-recommends install g++-multilib g++-4.8-multilib valgrind:i386 libevent-dev:i386 libz-dev:i386
 else
   sudo apt-get install valgrind
   sudo apt-get install libevent-dev libmysqlclient-dev libsqlite3-dev libpq-dev libz-dev libssl-dev libpcre3-dev
@@ -58,6 +54,7 @@ set -eo pipefail
 # testing part
 cd src
 ./autogen.sh
+cp local_options local_options.default
 cp local_options.$CONFIG local_options
 
 if [ -n "$GCOV" ]; then
@@ -71,7 +68,7 @@ if [ -n "$COVERITY" ]; then
   if [[ "$(git branch | grep coverity_scan)" =~ ^.+coverity_scan$ ]]; then
     wget https://scan.coverity.com/download/linux-64 --post-data "token=DW98q3VnP4QKLy4wwLwReQ&project=fluffos%2Ffluffos" -O coverity_tool.tgz
     tar zxvf coverity_tool.tgz
-    $PWD/cov-analysis-linux64-7.5.0/bin/cov-build --dir cov-int make -j 2
+    $PWD/cov-analysis-linux64-*/bin/cov-build --dir cov-int make -j 2
     tar czvf cov.tgz cov-int
     curl --form token=DW98q3VnP4QKLy4wwLwReQ \
          --form email=sunyucong@gmail.com \
@@ -95,7 +92,7 @@ else
   VALGRIND="valgrind"
 fi
 
-( sleep 15 ; expect telnet_test.expect localhost 4000 ) &
+( sleep 30 ; expect telnet_test.expect localhost 4000 ) &
 ( $VALGRIND --malloc-fill=0x75 --free-fill=0x73 --track-origins=yes --leak-check=full ../driver etc/config.test -d ) &
 wait $!
 if [ $? -ne 0 ]; then

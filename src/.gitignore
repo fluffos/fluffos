@@ -1,4 +1,16 @@
 *.o
+*.d
 *.gcda
 *.gcno
 *.gcov
+*autogen*
+/Makefile
+/cc.h
+/config.status
+/config.log
+/configure.h
+driver
+driver.old
+portbind
+dtrace_compile
+/autom4te.cache
