@@ -92,7 +92,8 @@ host_triplet = @host@
 target_triplet = @target@
 subdir = src/base
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps =  \
+am__aclocal_m4_deps = $(top_srcdir)/build-aux/m4/00gnulib.m4 \
+	$(top_srcdir)/build-aux/m4/absolute-header.m4 \
 	$(top_srcdir)/build-aux/m4/ax_append_compile_flags.m4 \
 	$(top_srcdir)/build-aux/m4/ax_append_flag.m4 \
 	$(top_srcdir)/build-aux/m4/ax_append_link_flags.m4 \
@@ -108,9 +109,13 @@ am__aclocal_m4_deps =  \
 	$(top_srcdir)/build-aux/m4/ax_path_lib_pcre.m4 \
 	$(top_srcdir)/build-aux/m4/ax_require_defined.m4 \
 	$(top_srcdir)/build-aux/m4/ax_show_config_info.m4 \
+	$(top_srcdir)/build-aux/m4/extensions.m4 \
 	$(top_srcdir)/build-aux/m4/fluffos_check_gcov.m4 \
 	$(top_srcdir)/build-aux/m4/fluffos_have_predefine.m4 \
 	$(top_srcdir)/build-aux/m4/fluffos_support_cxx11.m4 \
+	$(top_srcdir)/build-aux/m4/gnulib-common.m4 \
+	$(top_srcdir)/build-aux/m4/gnulib-comp.m4 \
+	$(top_srcdir)/build-aux/m4/include_next.m4 \
 	$(top_srcdir)/build-aux/m4/libtool.m4 \
 	$(top_srcdir)/build-aux/m4/ltargz.m4 \
 	$(top_srcdir)/build-aux/m4/ltdl.m4 \
@@ -118,13 +123,20 @@ am__aclocal_m4_deps =  \
 	$(top_srcdir)/build-aux/m4/ltsugar.m4 \
 	$(top_srcdir)/build-aux/m4/ltversion.m4 \
 	$(top_srcdir)/build-aux/m4/lt~obsolete.m4 \
+	$(top_srcdir)/build-aux/m4/stddef_h.m4 \
+	$(top_srcdir)/build-aux/m4/sys_resource_h.m4 \
+	$(top_srcdir)/build-aux/m4/sys_socket_h.m4 \
+	$(top_srcdir)/build-aux/m4/sys_time_h.m4 \
+	$(top_srcdir)/build-aux/m4/time_h.m4 \
+	$(top_srcdir)/build-aux/m4/warn-on-use.m4 \
+	$(top_srcdir)/build-aux/m4/wchar_t.m4 \
 	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(nobase_base_include_HEADERS) \
-	$(nobase_pkginclude_HEADERS) $(am__DIST_COMMON)
+	$(am__DIST_COMMON)
 mkinstalldirs = $(install_sh) -d
-CONFIG_HEADER = $(top_builddir)/src/configure.h
+CONFIG_HEADER = $(top_builddir)/src/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 LTLIBRARIES = $(noinst_LTLIBRARIES)
@@ -208,9 +220,8 @@ am__uninstall_files_from_dir = { \
     || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
          $(am__cd) "$$dir" && rm -f $$files; }; \
   }
-am__installdirs = "$(DESTDIR)$(base_includedir)" \
-	"$(DESTDIR)$(pkgincludedir)"
-HEADERS = $(nobase_base_include_HEADERS) $(nobase_pkginclude_HEADERS)
+am__installdirs = "$(DESTDIR)$(base_includedir)"
+HEADERS = $(nobase_base_include_HEADERS)
 RECURSIVE_CLEAN_TARGETS = mostlyclean-recursive clean-recursive	\
   distclean-recursive maintainer-clean-recursive
 am__recursive_targets = \
@@ -268,11 +279,11 @@ am__relativize = \
   done; \
   reldir="$$dir2"
 ACLOCAL = @ACLOCAL@
-ALLOCA = @ALLOCA@
 AMTAR = @AMTAR@
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
 AR = @AR@
 ARCH = @ARCH@
+ARFLAGS = @ARFLAGS@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
@@ -305,9 +316,37 @@ FLUFFOS_CONFIGURE = @FLUFFOS_CONFIGURE@
 GCOV = @GCOV@
 GCOV_CFLAGS = @GCOV_CFLAGS@
 GCOV_LIBS = @GCOV_LIBS@
+GNULIB_CTIME = @GNULIB_CTIME@
+GNULIB_GETRUSAGE = @GNULIB_GETRUSAGE@
+GNULIB_GETTIMEOFDAY = @GNULIB_GETTIMEOFDAY@
+GNULIB_LOCALTIME = @GNULIB_LOCALTIME@
+GNULIB_MKTIME = @GNULIB_MKTIME@
+GNULIB_NANOSLEEP = @GNULIB_NANOSLEEP@
+GNULIB_STRFTIME = @GNULIB_STRFTIME@
+GNULIB_STRPTIME = @GNULIB_STRPTIME@
+GNULIB_TIMEGM = @GNULIB_TIMEGM@
+GNULIB_TIME_R = @GNULIB_TIME_R@
+GNULIB_TIME_RZ = @GNULIB_TIME_RZ@
+GNULIB_TZSET = @GNULIB_TZSET@
 GREP = @GREP@
 HAVE_CXX11 = @HAVE_CXX11@
+HAVE_DECL_LOCALTIME_R = @HAVE_DECL_LOCALTIME_R@
+HAVE_GETRUSAGE = @HAVE_GETRUSAGE@
+HAVE_GETTIMEOFDAY = @HAVE_GETTIMEOFDAY@
+HAVE_MAX_ALIGN_T = @HAVE_MAX_ALIGN_T@
+HAVE_NANOSLEEP = @HAVE_NANOSLEEP@
+HAVE_STRPTIME = @HAVE_STRPTIME@
+HAVE_STRUCT_TIMEVAL = @HAVE_STRUCT_TIMEVAL@
+HAVE_SYS_RESOURCE_H = @HAVE_SYS_RESOURCE_H@
+HAVE_SYS_TIME_H = @HAVE_SYS_TIME_H@
+HAVE_TIMEGM = @HAVE_TIMEGM@
+HAVE_TIMEZONE_T = @HAVE_TIMEZONE_T@
+HAVE_TZSET = @HAVE_TZSET@
+HAVE_WCHAR_T = @HAVE_WCHAR_T@
+HAVE_WINSOCK2_H = @HAVE_WINSOCK2_H@
 INCLTDL = @INCLTDL@
+INCLUDE_NEXT = @INCLUDE_NEXT@
+INCLUDE_NEXT_AS_FIRST_DIRECTIVE = @INCLUDE_NEXT_AS_FIRST_DIRECTIVE@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -347,6 +386,14 @@ MYSQL_CFLAGS = @MYSQL_CFLAGS@
 MYSQL_CONFIG = @MYSQL_CONFIG@
 MYSQL_LDFLAGS = @MYSQL_LDFLAGS@
 MYSQL_VERSION = @MYSQL_VERSION@
+NEXT_AS_FIRST_DIRECTIVE_STDDEF_H = @NEXT_AS_FIRST_DIRECTIVE_STDDEF_H@
+NEXT_AS_FIRST_DIRECTIVE_SYS_RESOURCE_H = @NEXT_AS_FIRST_DIRECTIVE_SYS_RESOURCE_H@
+NEXT_AS_FIRST_DIRECTIVE_SYS_TIME_H = @NEXT_AS_FIRST_DIRECTIVE_SYS_TIME_H@
+NEXT_AS_FIRST_DIRECTIVE_TIME_H = @NEXT_AS_FIRST_DIRECTIVE_TIME_H@
+NEXT_STDDEF_H = @NEXT_STDDEF_H@
+NEXT_SYS_RESOURCE_H = @NEXT_SYS_RESOURCE_H@
+NEXT_SYS_TIME_H = @NEXT_SYS_TIME_H@
+NEXT_TIME_H = @NEXT_TIME_H@
 NM = @NM@
 NMEDIT = @NMEDIT@
 OBJDUMP = @OBJDUMP@
@@ -374,13 +421,27 @@ PKG_CONFIG = @PKG_CONFIG@
 POSTGRESQL_CPPFLAGS = @POSTGRESQL_CPPFLAGS@
 POSTGRESQL_LDFLAGS = @POSTGRESQL_LDFLAGS@
 POSTGRESQL_VERSION = @POSTGRESQL_VERSION@
-POW_LIB = @POW_LIB@
+PRAGMA_COLUMNS = @PRAGMA_COLUMNS@
+PRAGMA_SYSTEM_HEADER = @PRAGMA_SYSTEM_HEADER@
+PTHREAD_H_DEFINES_STRUCT_TIMESPEC = @PTHREAD_H_DEFINES_STRUCT_TIMESPEC@
 PYTHON = @PYTHON@
 PYTHON_EXEC_PREFIX = @PYTHON_EXEC_PREFIX@
 PYTHON_PLATFORM = @PYTHON_PLATFORM@
 PYTHON_PREFIX = @PYTHON_PREFIX@
 PYTHON_VERSION = @PYTHON_VERSION@
 RANLIB = @RANLIB@
+REPLACE_CTIME = @REPLACE_CTIME@
+REPLACE_GETTIMEOFDAY = @REPLACE_GETTIMEOFDAY@
+REPLACE_GMTIME = @REPLACE_GMTIME@
+REPLACE_LOCALTIME = @REPLACE_LOCALTIME@
+REPLACE_LOCALTIME_R = @REPLACE_LOCALTIME_R@
+REPLACE_MKTIME = @REPLACE_MKTIME@
+REPLACE_NANOSLEEP = @REPLACE_NANOSLEEP@
+REPLACE_NULL = @REPLACE_NULL@
+REPLACE_STRFTIME = @REPLACE_STRFTIME@
+REPLACE_STRUCT_TIMEVAL = @REPLACE_STRUCT_TIMEVAL@
+REPLACE_TIMEGM = @REPLACE_TIMEGM@
+REPLACE_TZSET = @REPLACE_TZSET@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
@@ -388,7 +449,11 @@ SOURCE_REVISION = @SOURCE_REVISION@
 SQLITE3_CFLAGS = @SQLITE3_CFLAGS@
 SQLITE3_LDFLAGS = @SQLITE3_LDFLAGS@
 SQLITE3_VERSION = @SQLITE3_VERSION@
+STDDEF_H = @STDDEF_H@
 STRIP = @STRIP@
+SYS_TIME_H_DEFINES_STRUCT_TIMESPEC = @SYS_TIME_H_DEFINES_STRUCT_TIMESPEC@
+TIME_H_DEFINES_STRUCT_TIMESPEC = @TIME_H_DEFINES_STRUCT_TIMESPEC@
+UNISTD_H_DEFINES_STRUCT_TIMESPEC = @UNISTD_H_DEFINES_STRUCT_TIMESPEC@
 USE_JEMALLOC = @USE_JEMALLOC@
 VERSION = @VERSION@
 abs_builddir = @abs_builddir@
@@ -417,6 +482,11 @@ datarootdir = @datarootdir@
 docdir = @docdir@
 dvidir = @dvidir@
 exec_prefix = @exec_prefix@
+gl_LIBOBJS = @gl_LIBOBJS@
+gl_LTLIBOBJS = @gl_LTLIBOBJS@
+gltests_LIBOBJS = @gltests_LIBOBJS@
+gltests_LTLIBOBJS = @gltests_LTLIBOBJS@
+gltests_WITNESS = @gltests_WITNESS@
 host = @host@
 host_alias = @host_alias@
 host_cpu = @host_cpu@
@@ -460,17 +530,20 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AM_CFLAGS = $(OPENMP_CFLAGS)
+
+# for gnulib
 AM_CPPFLAGS = -I$(top_srcdir)/src -DMODULE_DIR=\"$(pkglibexecdir)\" \
-	-DCONFIG_DIR=\"$(pkgdatadir)\"
-AM_CXXFLAGS = $(OPENMP_CXXFLAGS) -I$(top_srcdir)/src
+	-DCONFIG_DIR=\"$(pkgdatadir)\" -I$(top_builddir)/src/gnulib \
+	-I$(top_srcdir)/src/gnulib
+AM_CXXFLAGS = $(OPENMP_CXXFLAGS) -I$(top_srcdir)/src \
+	-I$(top_builddir)/src/gnulib -I$(top_srcdir)/src/gnulib
 AM_LDFLAGS = -export-dynamic
 SUBDIRS = internal
 base_includedir = $(pkgincludedir)/base
-nobase_base_include_HEADERS = 
+nobase_base_include_HEADERS = package_api.h std.h
 noinst_LTLIBRARIES = libbase.la
 libbase_la_SOURCES = 
 libbase_la_LIBADD = internal/libbase_internal.la
-nobase_pkginclude_HEADERS = std.h
 all: all-recursive
 
 .SUFFIXES:
@@ -553,30 +626,6 @@ uninstall-nobase_base_includeHEADERS:
 	@list='$(nobase_base_include_HEADERS)'; test -n "$(base_includedir)" || list=; \
 	$(am__nobase_strip_setup); files=`$(am__nobase_strip)`; \
 	dir='$(DESTDIR)$(base_includedir)'; $(am__uninstall_files_from_dir)
-install-nobase_pkgincludeHEADERS: $(nobase_pkginclude_HEADERS)
-	@$(NORMAL_INSTALL)
-	@list='$(nobase_pkginclude_HEADERS)'; test -n "$(pkgincludedir)" || list=; \
-	if test -n "$$list"; then \
-	  echo " $(MKDIR_P) '$(DESTDIR)$(pkgincludedir)'"; \
-	  $(MKDIR_P) "$(DESTDIR)$(pkgincludedir)" || exit 1; \
-	fi; \
-	$(am__nobase_list) | while read dir files; do \
-	  xfiles=; for file in $$files; do \
-	    if test -f "$$file"; then xfiles="$$xfiles $$file"; \
-	    else xfiles="$$xfiles $(srcdir)/$$file"; fi; done; \
-	  test -z "$$xfiles" || { \
-	    test "x$$dir" = x. || { \
-	      echo " $(MKDIR_P) '$(DESTDIR)$(pkgincludedir)/$$dir'"; \
-	      $(MKDIR_P) "$(DESTDIR)$(pkgincludedir)/$$dir"; }; \
-	    echo " $(INSTALL_HEADER) $$xfiles '$(DESTDIR)$(pkgincludedir)/$$dir'"; \
-	    $(INSTALL_HEADER) $$xfiles "$(DESTDIR)$(pkgincludedir)/$$dir" || exit $$?; }; \
-	done
-
-uninstall-nobase_pkgincludeHEADERS:
-	@$(NORMAL_UNINSTALL)
-	@list='$(nobase_pkginclude_HEADERS)'; test -n "$(pkgincludedir)" || list=; \
-	$(am__nobase_strip_setup); files=`$(am__nobase_strip)`; \
-	dir='$(DESTDIR)$(pkgincludedir)'; $(am__uninstall_files_from_dir)
 
 # This directory's subdirectories are mostly independent; you can cd
 # into them and run 'make' without going through this Makefile.
@@ -738,7 +787,7 @@ check: check-recursive
 all-am: Makefile $(LTLIBRARIES) $(HEADERS)
 installdirs: installdirs-recursive
 installdirs-am:
-	for dir in "$(DESTDIR)$(base_includedir)" "$(DESTDIR)$(pkgincludedir)"; do \
+	for dir in "$(DESTDIR)$(base_includedir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-recursive
@@ -793,8 +842,7 @@ info: info-recursive
 
 info-am:
 
-install-data-am: install-nobase_base_includeHEADERS \
-	install-nobase_pkgincludeHEADERS
+install-data-am: install-nobase_base_includeHEADERS
 
 install-dvi: install-dvi-recursive
 
@@ -843,8 +891,7 @@ std_header: std_header-recursive
 
 std_header-am: std_header-local
 
-uninstall-am: uninstall-nobase_base_includeHEADERS \
-	uninstall-nobase_pkgincludeHEADERS
+uninstall-am: uninstall-nobase_base_includeHEADERS
 
 .MAKE: $(am__recursive_targets) install-am install-strip
 
@@ -856,15 +903,13 @@ uninstall-am: uninstall-nobase_base_includeHEADERS \
 	install install-am install-data install-data-am install-dvi \
 	install-dvi-am install-exec install-exec-am install-html \
 	install-html-am install-info install-info-am install-man \
-	install-nobase_base_includeHEADERS \
-	install-nobase_pkgincludeHEADERS install-pdf install-pdf-am \
+	install-nobase_base_includeHEADERS install-pdf install-pdf-am \
 	install-ps install-ps-am install-strip installcheck \
 	installcheck-am installdirs installdirs-am maintainer-clean \
 	maintainer-clean-generic mostlyclean mostlyclean-compile \
 	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
 	std_header-am std_header-local tags tags-am uninstall \
-	uninstall-am uninstall-nobase_base_includeHEADERS \
-	uninstall-nobase_pkgincludeHEADERS
+	uninstall-am uninstall-nobase_base_includeHEADERS
 
 .PRECIOUS: Makefile
 

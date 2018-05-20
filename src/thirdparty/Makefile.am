@@ -14,6 +14,9 @@ AM_CPPFLAGS			+= -DHAVE_ZLIB
 
 AM_LDFLAGS			+= -export-dynamic
 
+EXTRA_DIST		=
+EXTRA_DIST		+= jemalloc
+EXTRA_DIST		+= libtelnet
 SUBDIRS			=
 
 BUILT_SOURCES		+= libtelnet/libtelnet.lo

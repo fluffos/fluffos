@@ -10,6 +10,10 @@ AM_LDFLAGS							=
 AM_CPPFLAGS		+= -DMODULE_DIR=\"$(pkglibexecdir)\"
 AM_CPPFLAGS		+= -DCONFIG_DIR=\"$(pkgdatadir)\"
 
+# for gnulib
+AM_CPPFLAGS		+= -I$(top_builddir)/src/gnulib -I$(top_srcdir)/src/gnulib
+AM_CXXFLAGS		+= -I$(top_builddir)/src/gnulib -I$(top_srcdir)/src/gnulib
+
 SUBDIRS								=
 EXTRA_DIST							=
 
@@ -17,4 +21,6 @@ pkglib_LTLIBRARIES					= libpackage_mudlib_stats.la
 libpackage_mudlib_stats_la_LDFLAGS			= --static $(AM_LDFLAGS)
 
 libpackage_mudlib_stats_la_SOURCES			=
-libpackage_mudlib_stats_la_SOURCES			+= mudlib_stats.cc
+libpackage_mudlib_stats_la_SOURCES			+= mudlib_stats.cc mudlib_stats.h
+
+EXTRA_DIST += mudlib_stats.spec

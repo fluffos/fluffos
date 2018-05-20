@@ -51,7 +51,7 @@ AC_ARG_PROGRAM
 ## autoheader
 ## ==========
 
-AC_CONFIG_HEADER([src/configure.h])
+AC_CONFIG_HEADER([src/config.h])
 AH_TOP([#ifndef _CONFIG_H_
 #define _CONFIG_H_])
 AH_BOTTOM([#endif   /* _CONFIG_H_ */])
@@ -59,7 +59,7 @@ AH_BOTTOM([#endif   /* _CONFIG_H_ */])
 ## automake
 ## ========
 
-AM_INIT_AUTOMAKE([1.15 foreign filename-length-max=9])
+AM_INIT_AUTOMAKE([1.15 foreign filename-length-max=256 tar-ustar])
 AM_SILENT_RULES([yes])
 AM_MAINTAINER_MODE
 AM_EXTRA_RECURSIVE_TARGETS([std_header])
@@ -77,10 +77,10 @@ AC_SUBST([CONFIG_STATUS_DEPENDENCIES], ['$(top_srcdir)/.version'])
 ############################################
 AC_CONFIG_FILES([src/cc.h
                  Makefile
+                 build-aux/gnulib/Makefile
                  src/Makefile
                  src/base/internal/Makefile
                  src/base/Makefile
-                 src/include/Makefile
                  src/net/Makefile
                  src/packages/async/Makefile
                  src/packages/compress/Makefile
@@ -141,10 +141,12 @@ AS_ECHO
 AS_ECHO(["=> C-compiler:"])
 ## for parts we need a 'plain' C-compiler
 AC_LANG(C)
-AC_PROG_CC
+AC_PROG_CC_STDC
 AC_USE_SYSTEM_EXTENSIONS
 ## we might use openmp with C-source
 AC_OPENMP
+## we are using gnulib for portability
+gl_EARLY
 
 AX_APPEND_COMPILE_FLAGS([-D_GNU_SOURCE])
 AX_CHECK_COMPILE_FLAG([-fPIE], [
@@ -158,7 +160,6 @@ then
     AX_APPEND_COMPILE_FLAGS([-Wall -Wextra -Wformat -Werror=format-security])
     AX_APPEND_COMPILE_FLAGS([-Wno-char-subscripts -Wno-sign-compare -Wno-return-type])
     AX_APPEND_COMPILE_FLAGS([-Wno-unused-parameter -Wno-missing-field-initializers])
-    AX_APPEND_COMPILE_FLAGS([-Wno-overloaded-virtual -Wno-non-virtual-dtor])
     AX_APPEND_COMPILE_FLAGS([-fdiagnostics-show-option -fmessage-length=0 -funsigned-char -fwrapv])
 dnl    AX_APPEND_COMPILE_FLAGS([-O1 -g -DDEBUG -D_FORTIFY_SOURCE=2 -fstack-protector-all])
     AX_APPEND_COMPILE_FLAGS([-Og -g -DDEBUG -fstack-protector-all])
@@ -177,7 +178,7 @@ case "${target}" in
     *-*-cygwin*)
         ;;
     *)
-        AX_CHECK_LINK_FLAG([-flto], [AX_APPEND_COMPILE_FLAGS([-flto])])
+dnl        AX_CHECK_LINK_FLAG([-flto], [AX_APPEND_COMPILE_FLAGS([-flto])])
         ;;
 esac
 
@@ -187,6 +188,7 @@ AS_ECHO(["" "=> C++-compiler:"])
 ## (gnu g++/clang)
 AC_LANG(C++)
 AC_PROG_CXX
+AC_PROG_CXX_C_O
 ## we might use openmp with C++-source
 AC_OPENMP
 
@@ -221,7 +223,7 @@ case "${target}" in
     *-*-cygwin*)
        ;;
     *)
-        AX_CHECK_LINK_FLAG([-flto], [AX_APPEND_COMPILE_FLAGS([-flto])])
+dnl        AX_CHECK_LINK_FLAG([-flto], [AX_APPEND_COMPILE_FLAGS([-flto])])
        ;;
 esac
 
@@ -247,6 +249,19 @@ AC_PROG_MKDIR_P
 AM_PATH_PYTHON
 AC_PROG_SED
 
+## --------------------------- ##
+## Checks for system services. ##
+## --------------------------- ##
+
+AC_CACHE_SAVE
+AS_ECHO
+AS_BOX([Checks for system services])
+AS_ECHO
+
+AC_SYS_INTERPRETER
+AC_SYS_LARGEFILE
+AC_SYS_LONG_FILE_NAMES
+AC_SYS_POSIX_TERMIOS
 
 ## -------- ##
 ## Libtool. ##
@@ -303,7 +318,6 @@ AS_ECHO
 AS_BOX([Options pt. 2])
 AS_ECHO
 
-
 source_dir=` cd \`dirname $0\`/src ; pwd`
 AC_CHECK_FILE([${source_dir}/local_options], [],
               [AC_MSG_ERROR([[You must have an local_options file!]])])
@@ -332,6 +346,16 @@ case "${target}" in
     *)
         ;;
 esac
+
+## ---------------------- ##
+## GNULIB for portability ##
+## ---------------------- ##
+
+AS_ECHO([])
+AS_BOX([gnulib (for portability)])
+AS_ECHO
+
+gl_INIT
 
 ## --------------------- ##
 ## Checks for libraries. ##
@@ -378,12 +402,14 @@ AS_BOX([Checks for header files])
 AS_ECHO
 
 AC_HEADER_MAJOR
-AC_FUNC_ALLOCA
+dnl AC_FUNC_ALLOCA
 AC_HEADER_DIRENT
 AC_HEADER_TIME
-AC_CHECK_HEADERS([arpa/inet.h fcntl.h inttypes.h libintl.h limits.h locale.h malloc.h netdb.h netinet/in.h stddef.h stdint.h stdlib.h string.h sys/param.h sys/resource.h sys/rusage.h sys/socket.h sys/time.h unistd.h])
+dnl AC_CHECK_HEADERS([arpa/inet.h fcntl.h inttypes.h libintl.h limits.h locale.h malloc.h netdb.h netinet/in.h stddef.h stdint.h stdlib.h string.h sys/param.h sys/resource.h sys/rusage.h sys/socket.h sys/time.h unistd.h])
+AC_CHECK_HEADERS([fcntl.h libintl.h locale.h malloc.h stddef.h sys/rusage.h])
 # are those needed???
 # AC_CHECK_HEADERS([arpa/telnet.h crypt.h execinfo.h float.h sys/crypt.h sys/ioctl.h sys/stat.h values.h])
+ AC_CHECK_HEADERS([execinfo.h])
 
 ## -------------------------------------------------------------- ##
 ## Checks for typedefs, structures, and compiler characteristics. ##
@@ -400,8 +426,8 @@ AC_TYPE_INT64_T
 AC_TYPE_UINT16_T
 AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
-AC_TYPE_PID_T
-AC_TYPE_SIZE_T
+dnl AC_TYPE_PID_T
+dnl AC_TYPE_SIZE_T
 AC_CHECK_MEMBERS([struct stat.st_rdev])
 
 # FIXME: remove these two, this is currently needed by base/std.h
@@ -417,14 +443,15 @@ AS_ECHO([])
 AS_BOX([Checks for library functions])
 AS_ECHO
 
-AC_FUNC_ALLOCA
-AC_FUNC_MALLOC
-AC_FUNC_REALLOC
-AC_FUNC_ERROR_AT_LINE
-AC_FUNC_FORK
-AC_FUNC_LSTAT_FOLLOWS_SLASHED_SYMLINK
-AC_FUNC_STRTOD
-AC_CHECK_FUNCS([doprnt dup2 floor getcwd gethostname gettimeofday memchr memmove memset mkdir pow putenv regcomp rmdir setlocale socket sqrt strcasecmp strchr strerror strncasecmp strrchr strspn strstr strtol strtoul tzset])
+dnl AC_FUNC_ALLOCA
+dnl AC_FUNC_MALLOC
+dnl AC_FUNC_REALLOC
+dnl AC_FUNC_ERROR_AT_LINE
+dnl AC_FUNC_FORK
+dnl AC_FUNC_LSTAT_FOLLOWS_SLASHED_SYMLINK
+dnl AC_FUNC_STRTOD
+dnl AC_CHECK_FUNCS([doprnt dup2 floor getcwd gethostname gettimeofday memchr memmove memset mkdir pow putenv regcomp rmdir setlocale socket sqrt strcasecmp strchr strerror strncasecmp strrchr strspn strstr strtol strtoul tzset])
+AC_CHECK_FUNCS([doprnt dup2 floor getcwd memchr mkdir pow putenv regcomp rmdir setlocale socket sqrt strcasecmp strchr strerror strncasecmp strrchr strspn strstr strtol strtoul tzset])
 #AC_CHECK_FUNCS([munmap strcspn strpbrk ])
 
 AC_LANG(C)

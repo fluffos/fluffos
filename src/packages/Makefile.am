@@ -10,14 +10,19 @@ AM_LDFLAGS							=
 AM_CPPFLAGS		+= -DMODULE_DIR=\"$(pkglibexecdir)\"
 AM_CPPFLAGS		+= -DCONFIG_DIR=\"$(pkgdatadir)\"
 
+# for gnulib
+AM_CPPFLAGS		+= -I$(top_builddir)/src/gnulib -I$(top_srcdir)/src/gnulib
+AM_CXXFLAGS		+= -I$(top_builddir)/src/gnulib -I$(top_srcdir)/src/gnulib
+
 EXTRA_DIST							=
 
 pkglib_LTLIBRARIES					= libpackages.la
 libpackages_la_LDFLAGS			= --static $(AM_LDFLAGS)
 
 libpackages_la_SOURCES			=
-libpackages_la_SOURCES			+= applies_table.cc
-libpackages_la_SOURCES			+= efuns.cc
+nodist_libpackages_la_SOURCES	=
+nodist_libpackages_la_SOURCES	+= applies_table.cc
+nodist_libpackages_la_SOURCES	+= efuns.cc
 
 BUILT_SOURCES					= std_header
 
@@ -49,7 +54,7 @@ gen_verbose_1 =
 
 CLEANFILES			+= efuns.cc efuns.hh
 efuns.cc efuns.hh: packages.fullspec
-	$(gen_verbose) ASAN_OPTIONS="detect_leaks=0" ../tools/make_func packages.fullspec
+	$(gen_verbose)ASAN_OPTIONS="detect_leaks=0" ../tools/make_func packages.fullspec
 
 .PHONY:		packages.fullspec
 CLEANFILES			+= packages.fullspec
@@ -59,3 +64,5 @@ packages.fullspec:
 CLEANFILES			+= applies_table.cc applies_table.hh
 applies_table.cc applies_table.hh:
 	$(gen_verbose)../tools/build_applies $(top_srcdir)/src
+
+EXTRA_DIST	+= crypto db dwlib parser

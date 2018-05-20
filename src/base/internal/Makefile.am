@@ -13,6 +13,11 @@ AM_CPPFLAGS			+= -DCONFIG_DIR=\"$(pkgdatadir)\"
 
 AM_LDFLAGS			+= -export-dynamic
 
+# for gnulib
+AM_CPPFLAGS		+= -I$(top_builddir)/src/gnulib -I$(top_srcdir)/src/gnulib
+AM_CXXFLAGS		+= -I$(top_builddir)/src/gnulib -I$(top_srcdir)/src/gnulib
+
+EXTRA_DIST					=
 SUBDIRS			=
 
 base_internal_includedir		= $(pkgincludedir)/base/internal
@@ -34,3 +39,15 @@ libbase_internal_la_SOURCES	+= stats.cc stralloc.cc strput.cc
 
 libbase_internal_la_LDFLAGS	= --static $(AM_LDFLAGS)
 libbase_internal_la_LIBADD	=
+
+nobase_base_internal_include_HEADERS	+= arch.h
+nobase_base_internal_include_HEADERS	+= debugmalloc.h
+nobase_base_internal_include_HEADERS	+= external_port.h
+nobase_base_internal_include_HEADERS	+= file.h
+nobase_base_internal_include_HEADERS	+= hash.h
+nobase_base_internal_include_HEADERS	+= log.h
+nobase_base_internal_include_HEADERS	+= md.h
+nobase_base_internal_include_HEADERS	+= options_incl.h options_internal.h outbuf.h
+nobase_base_internal_include_HEADERS	+= port.h
+nobase_base_internal_include_HEADERS	+= rc.h
+nobase_base_internal_include_HEADERS	+= stats.h stralloc.h strput.h strutils.h

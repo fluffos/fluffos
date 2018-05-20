@@ -27,10 +27,20 @@ case $COMPILER in
     ;;
 esac
 
+cd /tmp
+mkdir .build
+cd .build
+cmake -DCMAKE_BUILD_TYPE=RELEASE /usr/src/gtest/
+make
+sudo mv libg* /usr/lib/
+
 }
 
+D=`pwd`
 # do setup
 setup
+
+cd $D
 
 # stop on first error down below
 set -eo pipefail
@@ -76,7 +86,7 @@ if [ -n "$COVERITY" ]; then
 fi
 
 # Otherwise, continue
-make -j 2
+make -j 2 V=1
 
 # Run standard test first
 cd ../src/testsuite

@@ -10,6 +10,10 @@ AM_CPPFLAGS			+= -DCONFIG_DIR=\"$(pkgdatadir)\"
 
 AM_LDFLAGS			+= -export-dynamic
 
+# for gnulib
+AM_CPPFLAGS		+= -I$(top_builddir)/src/gnulib -I$(top_srcdir)/src/gnulib
+AM_CXXFLAGS		+= -I$(top_builddir)/src/gnulib -I$(top_srcdir)/src/gnulib
+
 SUBDIRS			= internal
 
 base_includedir		= $(pkgincludedir)/base
@@ -19,4 +23,5 @@ noinst_LTLIBRARIES	= libbase.la
 libbase_la_SOURCES	=
 libbase_la_LIBADD		= internal/libbase_internal.la
 
-nobase_pkginclude_HEADERS		= std.h
+nobase_base_include_HEADERS		+= package_api.h
+nobase_base_include_HEADERS		+= std.h

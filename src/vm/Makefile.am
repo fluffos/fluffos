@@ -10,6 +10,10 @@ AM_CPPFLAGS			+= -DCONFIG_DIR=\"$(pkgdatadir)\"
 
 AM_LDFLAGS			+= -export-dynamic
 
+# for gnulib
+AM_CPPFLAGS		+= -I$(top_builddir)/src/gnulib -I$(top_srcdir)/src/gnulib
+AM_CXXFLAGS		+= -I$(top_builddir)/src/gnulib -I$(top_srcdir)/src/gnulib
+
 SUBDIRS			= internal
 
 vm_includedir		= $(pkgincludedir)/vm

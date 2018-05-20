@@ -112,7 +112,8 @@ namespace {
     }
 
     static void try_dump_stacktrace() {
-#if !defined(__CYGWIN__) && __GNUC__ > 2
+// #if !defined(__CYGWIN__) && __GNUC__ > 2
+#ifdef HAVE_EXECINFO_H
         static void *bt[100];
         auto bt_size = backtrace(bt, 100);
         backtrace_symbols_fd(bt, bt_size, STDERR_FILENO);

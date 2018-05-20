@@ -17,8 +17,13 @@ MOSTLYCLEANFILES		=
 DISTCLEANFILES			=
 MAINTAINERCLEANFILES	=
 
-SUBDIRS					= $(ltdl_dir) src/tools . src
+SUBDIRS					= $(ltdl_dir) build-aux/gnulib src/tools . src
 DIST_SUBDIRS			= $(SUBDIRS)
+
+gen_verbose = $(gen_verbose_@AM_V@)
+gen_verbose_ = $(gen_verbose_@AM_DEFAULT_V@)
+gen_verbose_0 = @echo "  GEN      $@";
+gen_verbose_1 =
 
 BUILT_SOURCES			+= $(top_srcdir)/.version
 
@@ -28,21 +33,21 @@ lt__cd		= CDPATH="$${ZSH_VERSION+.}$(PATH_SEPARATOR)" && cd
 git_version_gen = '$(SHELL)' '$(aux_dir)/git-version-gen' '--fallback' '$(VERSION)' '--prefix' 'fluffos-' '.tarball-version'
 rebuild = rebuild=:; revision=`$(lt__cd) $(srcdir) && $(git_version_gen) | $(SED) 's|-.*$$||'`
 
-
-EXTRA_DIST += $(top_srcdir)/.version $(top_srcdir)/*.md						\
-	$(top_srcdir)/.*.yml $(top_srcdir)/Makefile.am	$(top_srcdir)/doc		\
-	$(top_srcdir)/build-aux $(top_srcdir)/build.FluffOS						\
-	$(top_srcdir)/ChangeLog $(top_srcdir)/Copyright							\
-	$(top_srcdir)/Credits $(top_srcdir)/compat  $(top_srcdir)/.travis*
+EXTRA_DIST += .version .coveralls.yml .travis_build.sh .travis.yml
+EXTRA_DIST += autogen.sh build.FluffOS ChangeLog Copyright Credits README.md TODO.md
+EXTRA_DIST += doc compat
+EXTRA_DIST += build-aux/compile build-aux/config.guess build-aux/config.rpath
+EXTRA_DIST += build-aux/config.sub build-aux/depcomp build-aux/git-version-gen
+EXTRA_DIST += build-aux/install-sh build-aux/ltmain.sh build-aux/m4 build-aux/missing
 # $(top_srcdir)/test
 
 $(top_srcdir)/.version:
-	echo $(VERSION) > $@-t && mv $@-t $@
+	$(gen_verbose)echo $(VERSION) > $@-t && mv $@-t $@
 dist-hook:
-	echo $(VERSION) > $(distdir)/.tarball-version
+	$(gen_verbose)echo $(VERSION) > $(distdir)/.tarball-version
 
 libtool: @LIBTOOL_DEPS@
-	cd $(srcdir) && $(SHELL) ./config.status lihtool
+	$(gen_verbose)cd $(srcdir) && $(SHELL) ./config.status lihtool
 
 #  Files automatically distributed if found (always):
 #    ABOUT-GNU           INSTALL             config.rpath        ltconfig

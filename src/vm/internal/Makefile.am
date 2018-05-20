@@ -13,6 +13,11 @@ AM_CPPFLAGS			+= -DCONFIG_DIR=\"$(pkgdatadir)\"
 
 AM_LDFLAGS			+= -export-dynamic
 
+# for gnulib
+AM_CPPFLAGS		+= -I$(top_builddir)/src/gnulib -I$(top_srcdir)/src/gnulib
+AM_CXXFLAGS		+= -I$(top_builddir)/src/gnulib -I$(top_srcdir)/src/gnulib
+
+EXTRA_DIST		= applies
 SUBDIRS			= base compiler
 
 vm_internal_includedir		= $(pkgincludedir)/vm/internal
@@ -28,6 +33,13 @@ libvm_internal_la_SOURCES	+= otable.cc otable_test.cc
 libvm_internal_la_SOURCES	+= simul_efun.cc simulate.cc
 libvm_internal_la_SOURCES	+= trace.cc
 libvm_internal_la_SOURCES	+= vm.cc
+
+libvm_internal_la_SOURCES	+= apply.h
+libvm_internal_la_SOURCES	+= eval_limit.h
+libvm_internal_la_SOURCES	+= master.h
+libvm_internal_la_SOURCES	+= otable.h
+libvm_internal_la_SOURCES	+= simul_efun.h simulate.h
+libvm_internal_la_SOURCES	+= trace.h
 
 libvm_internal_la_LDFLAGS	= --static $(AM_LDFLAGS)
 libvm_internal_la_LIBADD	=

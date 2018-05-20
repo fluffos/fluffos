@@ -92,7 +92,8 @@ target_triplet = @target@
 bin_PROGRAMS = driver$(EXEEXT) portbind$(EXEEXT)
 subdir = src
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps =  \
+am__aclocal_m4_deps = $(top_srcdir)/build-aux/m4/00gnulib.m4 \
+	$(top_srcdir)/build-aux/m4/absolute-header.m4 \
 	$(top_srcdir)/build-aux/m4/ax_append_compile_flags.m4 \
 	$(top_srcdir)/build-aux/m4/ax_append_flag.m4 \
 	$(top_srcdir)/build-aux/m4/ax_append_link_flags.m4 \
@@ -108,9 +109,13 @@ am__aclocal_m4_deps =  \
 	$(top_srcdir)/build-aux/m4/ax_path_lib_pcre.m4 \
 	$(top_srcdir)/build-aux/m4/ax_require_defined.m4 \
 	$(top_srcdir)/build-aux/m4/ax_show_config_info.m4 \
+	$(top_srcdir)/build-aux/m4/extensions.m4 \
 	$(top_srcdir)/build-aux/m4/fluffos_check_gcov.m4 \
 	$(top_srcdir)/build-aux/m4/fluffos_have_predefine.m4 \
 	$(top_srcdir)/build-aux/m4/fluffos_support_cxx11.m4 \
+	$(top_srcdir)/build-aux/m4/gnulib-common.m4 \
+	$(top_srcdir)/build-aux/m4/gnulib-comp.m4 \
+	$(top_srcdir)/build-aux/m4/include_next.m4 \
 	$(top_srcdir)/build-aux/m4/libtool.m4 \
 	$(top_srcdir)/build-aux/m4/ltargz.m4 \
 	$(top_srcdir)/build-aux/m4/ltdl.m4 \
@@ -118,12 +123,19 @@ am__aclocal_m4_deps =  \
 	$(top_srcdir)/build-aux/m4/ltsugar.m4 \
 	$(top_srcdir)/build-aux/m4/ltversion.m4 \
 	$(top_srcdir)/build-aux/m4/lt~obsolete.m4 \
+	$(top_srcdir)/build-aux/m4/stddef_h.m4 \
+	$(top_srcdir)/build-aux/m4/sys_resource_h.m4 \
+	$(top_srcdir)/build-aux/m4/sys_socket_h.m4 \
+	$(top_srcdir)/build-aux/m4/sys_time_h.m4 \
+	$(top_srcdir)/build-aux/m4/time_h.m4 \
+	$(top_srcdir)/build-aux/m4/warn-on-use.m4 \
+	$(top_srcdir)/build-aux/m4/wchar_t.m4 \
 	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(am__DIST_COMMON)
 mkinstalldirs = $(install_sh) -d
-CONFIG_HEADER = configure.h
+CONFIG_HEADER = config.h
 CONFIG_CLEAN_FILES = cc.h
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
@@ -132,9 +144,10 @@ am_driver_OBJECTS = backend.$(OBJEXT) comm.$(OBJEXT) fliconv.$(OBJEXT) \
 	main.$(OBJEXT) mainlib.$(OBJEXT) user.$(OBJEXT)
 driver_OBJECTS = $(am_driver_OBJECTS)
 am__DEPENDENCIES_1 =
+am__DEPENDENCIES_2 = $(top_builddir)/build-aux/gnulib/libgnu.la
 driver_DEPENDENCIES = net/libnet.la vm/libvm.la \
 	packages/libpackages.la thirdparty/libtelnet/libtelnet.lo \
-	base/libbase.la $(am__DEPENDENCIES_1)
+	base/libbase.la $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_2)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -145,6 +158,7 @@ driver_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
 am_portbind_OBJECTS = portbind.$(OBJEXT)
 portbind_OBJECTS = $(am_portbind_OBJECTS)
 portbind_LDADD = $(LDADD)
+portbind_DEPENDENCIES = $(am__DEPENDENCIES_2)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -179,6 +193,24 @@ AM_V_CXXLD = $(am__v_CXXLD_@AM_V@)
 am__v_CXXLD_ = $(am__v_CXXLD_@AM_DEFAULT_V@)
 am__v_CXXLD_0 = @echo "  CXXLD   " $@;
 am__v_CXXLD_1 = 
+COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
+	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+LTCOMPILE = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) \
+	$(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) \
+	$(AM_CFLAGS) $(CFLAGS)
+AM_V_CC = $(am__v_CC_@AM_V@)
+am__v_CC_ = $(am__v_CC_@AM_DEFAULT_V@)
+am__v_CC_0 = @echo "  CC      " $@;
+am__v_CC_1 = 
+CCLD = $(CC)
+LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(AM_LDFLAGS) $(LDFLAGS) -o $@
+AM_V_CCLD = $(am__v_CCLD_@AM_V@)
+am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
+am__v_CCLD_0 = @echo "  CCLD    " $@;
+am__v_CCLD_1 = 
 SOURCES = $(driver_SOURCES) $(portbind_SOURCES)
 DIST_SOURCES = $(driver_SOURCES) $(portbind_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive cscopelist-recursive \
@@ -204,7 +236,7 @@ AM_RECURSIVE_TARGETS = $(am__recursive_targets:-recursive=) TAGS CTAGS \
 	distdir
 am__extra_recursive_targets = std_header-recursive
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) \
-	$(LISP)configure.h.in
+	$(LISP)config.h.in
 # Read a list of newline-separated strings from the standard input,
 # and print each of them once, without duplicates.  Input order is
 # *not* preserved.
@@ -225,7 +257,7 @@ ETAGS = etags
 CTAGS = ctags
 DIST_SUBDIRS = $(SUBDIRS)
 am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/cc.h.in \
-	$(srcdir)/configure.h.in $(top_srcdir)/build-aux/depcomp
+	$(srcdir)/config.h.in $(top_srcdir)/build-aux/depcomp
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 am__relativize = \
   dir0=`pwd`; \
@@ -253,11 +285,11 @@ am__relativize = \
   done; \
   reldir="$$dir2"
 ACLOCAL = @ACLOCAL@
-ALLOCA = @ALLOCA@
 AMTAR = @AMTAR@
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
 AR = @AR@
 ARCH = @ARCH@
+ARFLAGS = @ARFLAGS@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
@@ -290,9 +322,37 @@ FLUFFOS_CONFIGURE = @FLUFFOS_CONFIGURE@
 GCOV = @GCOV@
 GCOV_CFLAGS = @GCOV_CFLAGS@
 GCOV_LIBS = @GCOV_LIBS@
+GNULIB_CTIME = @GNULIB_CTIME@
+GNULIB_GETRUSAGE = @GNULIB_GETRUSAGE@
+GNULIB_GETTIMEOFDAY = @GNULIB_GETTIMEOFDAY@
+GNULIB_LOCALTIME = @GNULIB_LOCALTIME@
+GNULIB_MKTIME = @GNULIB_MKTIME@
+GNULIB_NANOSLEEP = @GNULIB_NANOSLEEP@
+GNULIB_STRFTIME = @GNULIB_STRFTIME@
+GNULIB_STRPTIME = @GNULIB_STRPTIME@
+GNULIB_TIMEGM = @GNULIB_TIMEGM@
+GNULIB_TIME_R = @GNULIB_TIME_R@
+GNULIB_TIME_RZ = @GNULIB_TIME_RZ@
+GNULIB_TZSET = @GNULIB_TZSET@
 GREP = @GREP@
 HAVE_CXX11 = @HAVE_CXX11@
+HAVE_DECL_LOCALTIME_R = @HAVE_DECL_LOCALTIME_R@
+HAVE_GETRUSAGE = @HAVE_GETRUSAGE@
+HAVE_GETTIMEOFDAY = @HAVE_GETTIMEOFDAY@
+HAVE_MAX_ALIGN_T = @HAVE_MAX_ALIGN_T@
+HAVE_NANOSLEEP = @HAVE_NANOSLEEP@
+HAVE_STRPTIME = @HAVE_STRPTIME@
+HAVE_STRUCT_TIMEVAL = @HAVE_STRUCT_TIMEVAL@
+HAVE_SYS_RESOURCE_H = @HAVE_SYS_RESOURCE_H@
+HAVE_SYS_TIME_H = @HAVE_SYS_TIME_H@
+HAVE_TIMEGM = @HAVE_TIMEGM@
+HAVE_TIMEZONE_T = @HAVE_TIMEZONE_T@
+HAVE_TZSET = @HAVE_TZSET@
+HAVE_WCHAR_T = @HAVE_WCHAR_T@
+HAVE_WINSOCK2_H = @HAVE_WINSOCK2_H@
 INCLTDL = @INCLTDL@
+INCLUDE_NEXT = @INCLUDE_NEXT@
+INCLUDE_NEXT_AS_FIRST_DIRECTIVE = @INCLUDE_NEXT_AS_FIRST_DIRECTIVE@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -332,6 +392,14 @@ MYSQL_CFLAGS = @MYSQL_CFLAGS@
 MYSQL_CONFIG = @MYSQL_CONFIG@
 MYSQL_LDFLAGS = @MYSQL_LDFLAGS@
 MYSQL_VERSION = @MYSQL_VERSION@
+NEXT_AS_FIRST_DIRECTIVE_STDDEF_H = @NEXT_AS_FIRST_DIRECTIVE_STDDEF_H@
+NEXT_AS_FIRST_DIRECTIVE_SYS_RESOURCE_H = @NEXT_AS_FIRST_DIRECTIVE_SYS_RESOURCE_H@
+NEXT_AS_FIRST_DIRECTIVE_SYS_TIME_H = @NEXT_AS_FIRST_DIRECTIVE_SYS_TIME_H@
+NEXT_AS_FIRST_DIRECTIVE_TIME_H = @NEXT_AS_FIRST_DIRECTIVE_TIME_H@
+NEXT_STDDEF_H = @NEXT_STDDEF_H@
+NEXT_SYS_RESOURCE_H = @NEXT_SYS_RESOURCE_H@
+NEXT_SYS_TIME_H = @NEXT_SYS_TIME_H@
+NEXT_TIME_H = @NEXT_TIME_H@
 NM = @NM@
 NMEDIT = @NMEDIT@
 OBJDUMP = @OBJDUMP@
@@ -359,13 +427,27 @@ PKG_CONFIG = @PKG_CONFIG@
 POSTGRESQL_CPPFLAGS = @POSTGRESQL_CPPFLAGS@
 POSTGRESQL_LDFLAGS = @POSTGRESQL_LDFLAGS@
 POSTGRESQL_VERSION = @POSTGRESQL_VERSION@
-POW_LIB = @POW_LIB@
+PRAGMA_COLUMNS = @PRAGMA_COLUMNS@
+PRAGMA_SYSTEM_HEADER = @PRAGMA_SYSTEM_HEADER@
+PTHREAD_H_DEFINES_STRUCT_TIMESPEC = @PTHREAD_H_DEFINES_STRUCT_TIMESPEC@
 PYTHON = @PYTHON@
 PYTHON_EXEC_PREFIX = @PYTHON_EXEC_PREFIX@
 PYTHON_PLATFORM = @PYTHON_PLATFORM@
 PYTHON_PREFIX = @PYTHON_PREFIX@
 PYTHON_VERSION = @PYTHON_VERSION@
 RANLIB = @RANLIB@
+REPLACE_CTIME = @REPLACE_CTIME@
+REPLACE_GETTIMEOFDAY = @REPLACE_GETTIMEOFDAY@
+REPLACE_GMTIME = @REPLACE_GMTIME@
+REPLACE_LOCALTIME = @REPLACE_LOCALTIME@
+REPLACE_LOCALTIME_R = @REPLACE_LOCALTIME_R@
+REPLACE_MKTIME = @REPLACE_MKTIME@
+REPLACE_NANOSLEEP = @REPLACE_NANOSLEEP@
+REPLACE_NULL = @REPLACE_NULL@
+REPLACE_STRFTIME = @REPLACE_STRFTIME@
+REPLACE_STRUCT_TIMEVAL = @REPLACE_STRUCT_TIMEVAL@
+REPLACE_TIMEGM = @REPLACE_TIMEGM@
+REPLACE_TZSET = @REPLACE_TZSET@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
@@ -373,7 +455,11 @@ SOURCE_REVISION = @SOURCE_REVISION@
 SQLITE3_CFLAGS = @SQLITE3_CFLAGS@
 SQLITE3_LDFLAGS = @SQLITE3_LDFLAGS@
 SQLITE3_VERSION = @SQLITE3_VERSION@
+STDDEF_H = @STDDEF_H@
 STRIP = @STRIP@
+SYS_TIME_H_DEFINES_STRUCT_TIMESPEC = @SYS_TIME_H_DEFINES_STRUCT_TIMESPEC@
+TIME_H_DEFINES_STRUCT_TIMESPEC = @TIME_H_DEFINES_STRUCT_TIMESPEC@
+UNISTD_H_DEFINES_STRUCT_TIMESPEC = @UNISTD_H_DEFINES_STRUCT_TIMESPEC@
 USE_JEMALLOC = @USE_JEMALLOC@
 VERSION = @VERSION@
 abs_builddir = @abs_builddir@
@@ -402,6 +488,11 @@ datarootdir = @datarootdir@
 docdir = @docdir@
 dvidir = @dvidir@
 exec_prefix = @exec_prefix@
+gl_LIBOBJS = @gl_LIBOBJS@
+gl_LTLIBOBJS = @gl_LTLIBOBJS@
+gltests_LIBOBJS = @gltests_LIBOBJS@
+gltests_LTLIBOBJS = @gltests_LTLIBOBJS@
+gltests_WITNESS = @gltests_WITNESS@
 host = @host@
 host_alias = @host_alias@
 host_cpu = @host_cpu@
@@ -445,8 +536,13 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AM_CFLAGS = $(OPENMP_CFLAGS)
-AM_CPPFLAGS = -I$(top_srcdir)/src $(LIBEVENT_CPPFLAGS)
-AM_CXXFLAGS = $(OPENMP_CXXFLAGS) -I$(top_srcdir)/src $(LIBEVENT_CPPFLAGS)
+
+# for gnulib
+AM_CPPFLAGS = -I$(top_srcdir)/src $(LIBEVENT_CPPFLAGS) \
+	-I$(top_builddir)/src/gnulib -I$(top_srcdir)/src/gnulib
+AM_CXXFLAGS = $(OPENMP_CXXFLAGS) -I$(top_srcdir)/src \
+	$(LIBEVENT_CPPFLAGS) -I$(top_builddir)/src/gnulib \
+	-I$(top_srcdir)/src/gnulib
 
 # AM_CFLAGS		+= -DMODULE_DIR=\"$(pkglibexecdir)\"
 # AM_CFLAGS		+= -DCONFIG_DIR=\"$(pkgdatadir)\"
@@ -454,16 +550,31 @@ AM_CXXFLAGS = $(OPENMP_CXXFLAGS) -I$(top_srcdir)/src $(LIBEVENT_CPPFLAGS)
 # AM_CPPFLAGS		+= -DMODULE_DIR=\"$(pkglibexecdir)\"
 # AM_CPPFLAGS		+= -DCONFIG_DIR=\"$(pkgdatadir)\"
 AM_LDFLAGS = $(LIBEVENT_LDFLAGS) -export-dynamic
+GNULIB = $(top_builddir)/build-aux/gnulib/libgnu.la $(ACOS_LIBM) \
+	$(ASIN_LIBM) $(ATAN_LIBM) $(CEIL_LIBM) $(COS_LIBM) $(EXP_LIBM) \
+	$(FLOOR_LIBM) $(FREXP_LIBM) $(GETADDRINFO_LIB) \
+	$(GETHOSTNAME_LIB) $(HOSTENT_LIB) $(INET_NTOP_LIB) \
+	$(ISNAND_LIBM) $(LIBSOCKET) $(LIB_PTHREAD) $(LOG10_LIBM) \
+	$(LOG2_LIBM) $(LOG_LIBM) $(LTLIBICONV) $(LTLIBINTL) \
+	$(LTLIBTHREAD) $(SERVENT_LIB)
+LDADD = $(GNULIB)
+EXTRA_DIST = include format_source.sh local_options \
+	outdated_define.txt Config.example
+gen_verbose = $(gen_verbose_@AM_V@)
+gen_verbose_ = $(gen_verbose_@AM_DEFAULT_V@)
+gen_verbose_0 = @echo "  GEN      $@";
+gen_verbose_1 = 
 BUILT_SOURCES = std_header
 SUBDIRS = thirdparty base net packages vm
 driver_LDADD = net/libnet.la vm/libvm.la packages/libpackages.la \
 	thirdparty/libtelnet/libtelnet.lo base/libbase.la \
-	$(LIBEVENT_LIBS)
-driver_SOURCES = backend.cc comm.cc fliconv.cc main.cc mainlib.cc \
-	user.cc
+	$(LIBEVENT_LIBS) $(GNULIB)
+driver_SOURCES = backend.cc backend.h comm.cc comm.h fliconv.cc \
+	fliconv.h interactive.h main.cc mainlib.cc mainlib.h user.cc \
+	user.h
 driver_LDFLAGS = $(AM_LDFLAGS)
 portbind_SOURCES = portbind.cc
-all: $(BUILT_SOURCES) configure.h
+all: $(BUILT_SOURCES) config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 
 .SUFFIXES:
@@ -498,20 +609,20 @@ $(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(am__aclocal_m4_deps):
 
-configure.h: stamp-h1
+config.h: stamp-h1
 	@test -f $@ || rm -f stamp-h1
 	@test -f $@ || $(MAKE) $(AM_MAKEFLAGS) stamp-h1
 
-stamp-h1: $(srcdir)/configure.h.in $(top_builddir)/config.status
+stamp-h1: $(srcdir)/config.h.in $(top_builddir)/config.status
 	@rm -f stamp-h1
-	cd $(top_builddir) && $(SHELL) ./config.status src/configure.h
-$(srcdir)/configure.h.in: @MAINTAINER_MODE_TRUE@ $(am__configure_deps) 
+	cd $(top_builddir) && $(SHELL) ./config.status src/config.h
+$(srcdir)/config.h.in: @MAINTAINER_MODE_TRUE@ $(am__configure_deps) 
 	($(am__cd) $(top_srcdir) && $(AUTOHEADER))
 	rm -f stamp-h1
 	touch $@
 
 distclean-hdr:
-	-rm -f configure.h stamp-h1
+	-rm -f config.h stamp-h1
 cc.h: $(top_builddir)/config.status $(srcdir)/cc.h.in
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 install-binPROGRAMS: $(bin_PROGRAMS)
@@ -771,7 +882,7 @@ distdir: $(DISTFILES)
 check-am: all-am
 check: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) check-recursive
-all-am: Makefile $(PROGRAMS) configure.h
+all-am: Makefile $(PROGRAMS) config.h
 installdirs: installdirs-recursive
 installdirs-am:
 	for dir in "$(DESTDIR)$(bindir)"; do \

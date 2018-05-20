@@ -1,5 +1,6 @@
 #include <random>
 #include <sys/resource.h>
+#if 0
 #ifdef TIME_WITH_SYS_TIME
 # include <sys/time.h>
 # include <time.h>
@@ -9,6 +10,9 @@
 # else
 #  include <time.h>
 # endif
+#endif
+#else
+# include <sys/time.h>
 #endif
 #include <unistd.h>
 

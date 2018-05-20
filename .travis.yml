@@ -7,7 +7,6 @@ addons:
   apt:
     update: true
     sources:
-      - ubuntu-toolchain-r-test
       - sourceline: "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-5.0 main"
         key_url: "http://apt.llvm.org/llvm-snapshot.gpg.key"
     packages:
@@ -27,6 +26,7 @@ addons:
       - libz-dev
       - llvm-4.0-dev
       - telnet
+      - libgtest-dev
 
 script: bash -x ./.travis_build.sh
 

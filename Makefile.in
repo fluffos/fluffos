@@ -92,7 +92,8 @@ host_triplet = @host@
 target_triplet = @target@
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps =  \
+am__aclocal_m4_deps = $(top_srcdir)/build-aux/m4/00gnulib.m4 \
+	$(top_srcdir)/build-aux/m4/absolute-header.m4 \
 	$(top_srcdir)/build-aux/m4/ax_append_compile_flags.m4 \
 	$(top_srcdir)/build-aux/m4/ax_append_flag.m4 \
 	$(top_srcdir)/build-aux/m4/ax_append_link_flags.m4 \
@@ -108,9 +109,13 @@ am__aclocal_m4_deps =  \
 	$(top_srcdir)/build-aux/m4/ax_path_lib_pcre.m4 \
 	$(top_srcdir)/build-aux/m4/ax_require_defined.m4 \
 	$(top_srcdir)/build-aux/m4/ax_show_config_info.m4 \
+	$(top_srcdir)/build-aux/m4/extensions.m4 \
 	$(top_srcdir)/build-aux/m4/fluffos_check_gcov.m4 \
 	$(top_srcdir)/build-aux/m4/fluffos_have_predefine.m4 \
 	$(top_srcdir)/build-aux/m4/fluffos_support_cxx11.m4 \
+	$(top_srcdir)/build-aux/m4/gnulib-common.m4 \
+	$(top_srcdir)/build-aux/m4/gnulib-comp.m4 \
+	$(top_srcdir)/build-aux/m4/include_next.m4 \
 	$(top_srcdir)/build-aux/m4/libtool.m4 \
 	$(top_srcdir)/build-aux/m4/ltargz.m4 \
 	$(top_srcdir)/build-aux/m4/ltdl.m4 \
@@ -118,6 +123,13 @@ am__aclocal_m4_deps =  \
 	$(top_srcdir)/build-aux/m4/ltsugar.m4 \
 	$(top_srcdir)/build-aux/m4/ltversion.m4 \
 	$(top_srcdir)/build-aux/m4/lt~obsolete.m4 \
+	$(top_srcdir)/build-aux/m4/stddef_h.m4 \
+	$(top_srcdir)/build-aux/m4/sys_resource_h.m4 \
+	$(top_srcdir)/build-aux/m4/sys_socket_h.m4 \
+	$(top_srcdir)/build-aux/m4/sys_time_h.m4 \
+	$(top_srcdir)/build-aux/m4/time_h.m4 \
+	$(top_srcdir)/build-aux/m4/warn-on-use.m4 \
+	$(top_srcdir)/build-aux/m4/wchar_t.m4 \
 	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
@@ -126,7 +138,7 @@ DIST_COMMON = $(srcdir)/Makefile.am $(top_srcdir)/configure \
 am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno config.status.lineno
 mkinstalldirs = $(install_sh) -d
-CONFIG_HEADER = $(top_builddir)/src/configure.h
+CONFIG_HEADER = $(top_builddir)/src/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
@@ -267,11 +279,11 @@ am__distuninstallcheck_listfiles = $(distuninstallcheck_listfiles) \
   | sed 's|^\./|$(prefix)/|' | grep -v '$(infodir)/dir$$'
 distcleancheck_listfiles = find . -type f -print
 ACLOCAL = @ACLOCAL@
-ALLOCA = @ALLOCA@
 AMTAR = @AMTAR@
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
 AR = @AR@
 ARCH = @ARCH@
+ARFLAGS = @ARFLAGS@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
@@ -304,9 +316,37 @@ FLUFFOS_CONFIGURE = @FLUFFOS_CONFIGURE@
 GCOV = @GCOV@
 GCOV_CFLAGS = @GCOV_CFLAGS@
 GCOV_LIBS = @GCOV_LIBS@
+GNULIB_CTIME = @GNULIB_CTIME@
+GNULIB_GETRUSAGE = @GNULIB_GETRUSAGE@
+GNULIB_GETTIMEOFDAY = @GNULIB_GETTIMEOFDAY@
+GNULIB_LOCALTIME = @GNULIB_LOCALTIME@
+GNULIB_MKTIME = @GNULIB_MKTIME@
+GNULIB_NANOSLEEP = @GNULIB_NANOSLEEP@
+GNULIB_STRFTIME = @GNULIB_STRFTIME@
+GNULIB_STRPTIME = @GNULIB_STRPTIME@
+GNULIB_TIMEGM = @GNULIB_TIMEGM@
+GNULIB_TIME_R = @GNULIB_TIME_R@
+GNULIB_TIME_RZ = @GNULIB_TIME_RZ@
+GNULIB_TZSET = @GNULIB_TZSET@
 GREP = @GREP@
 HAVE_CXX11 = @HAVE_CXX11@
+HAVE_DECL_LOCALTIME_R = @HAVE_DECL_LOCALTIME_R@
+HAVE_GETRUSAGE = @HAVE_GETRUSAGE@
+HAVE_GETTIMEOFDAY = @HAVE_GETTIMEOFDAY@
+HAVE_MAX_ALIGN_T = @HAVE_MAX_ALIGN_T@
+HAVE_NANOSLEEP = @HAVE_NANOSLEEP@
+HAVE_STRPTIME = @HAVE_STRPTIME@
+HAVE_STRUCT_TIMEVAL = @HAVE_STRUCT_TIMEVAL@
+HAVE_SYS_RESOURCE_H = @HAVE_SYS_RESOURCE_H@
+HAVE_SYS_TIME_H = @HAVE_SYS_TIME_H@
+HAVE_TIMEGM = @HAVE_TIMEGM@
+HAVE_TIMEZONE_T = @HAVE_TIMEZONE_T@
+HAVE_TZSET = @HAVE_TZSET@
+HAVE_WCHAR_T = @HAVE_WCHAR_T@
+HAVE_WINSOCK2_H = @HAVE_WINSOCK2_H@
 INCLTDL = @INCLTDL@
+INCLUDE_NEXT = @INCLUDE_NEXT@
+INCLUDE_NEXT_AS_FIRST_DIRECTIVE = @INCLUDE_NEXT_AS_FIRST_DIRECTIVE@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -346,6 +386,14 @@ MYSQL_CFLAGS = @MYSQL_CFLAGS@
 MYSQL_CONFIG = @MYSQL_CONFIG@
 MYSQL_LDFLAGS = @MYSQL_LDFLAGS@
 MYSQL_VERSION = @MYSQL_VERSION@
+NEXT_AS_FIRST_DIRECTIVE_STDDEF_H = @NEXT_AS_FIRST_DIRECTIVE_STDDEF_H@
+NEXT_AS_FIRST_DIRECTIVE_SYS_RESOURCE_H = @NEXT_AS_FIRST_DIRECTIVE_SYS_RESOURCE_H@
+NEXT_AS_FIRST_DIRECTIVE_SYS_TIME_H = @NEXT_AS_FIRST_DIRECTIVE_SYS_TIME_H@
+NEXT_AS_FIRST_DIRECTIVE_TIME_H = @NEXT_AS_FIRST_DIRECTIVE_TIME_H@
+NEXT_STDDEF_H = @NEXT_STDDEF_H@
+NEXT_SYS_RESOURCE_H = @NEXT_SYS_RESOURCE_H@
+NEXT_SYS_TIME_H = @NEXT_SYS_TIME_H@
+NEXT_TIME_H = @NEXT_TIME_H@
 NM = @NM@
 NMEDIT = @NMEDIT@
 OBJDUMP = @OBJDUMP@
@@ -373,13 +421,27 @@ PKG_CONFIG = @PKG_CONFIG@
 POSTGRESQL_CPPFLAGS = @POSTGRESQL_CPPFLAGS@
 POSTGRESQL_LDFLAGS = @POSTGRESQL_LDFLAGS@
 POSTGRESQL_VERSION = @POSTGRESQL_VERSION@
-POW_LIB = @POW_LIB@
+PRAGMA_COLUMNS = @PRAGMA_COLUMNS@
+PRAGMA_SYSTEM_HEADER = @PRAGMA_SYSTEM_HEADER@
+PTHREAD_H_DEFINES_STRUCT_TIMESPEC = @PTHREAD_H_DEFINES_STRUCT_TIMESPEC@
 PYTHON = @PYTHON@
 PYTHON_EXEC_PREFIX = @PYTHON_EXEC_PREFIX@
 PYTHON_PLATFORM = @PYTHON_PLATFORM@
 PYTHON_PREFIX = @PYTHON_PREFIX@
 PYTHON_VERSION = @PYTHON_VERSION@
 RANLIB = @RANLIB@
+REPLACE_CTIME = @REPLACE_CTIME@
+REPLACE_GETTIMEOFDAY = @REPLACE_GETTIMEOFDAY@
+REPLACE_GMTIME = @REPLACE_GMTIME@
+REPLACE_LOCALTIME = @REPLACE_LOCALTIME@
+REPLACE_LOCALTIME_R = @REPLACE_LOCALTIME_R@
+REPLACE_MKTIME = @REPLACE_MKTIME@
+REPLACE_NANOSLEEP = @REPLACE_NANOSLEEP@
+REPLACE_NULL = @REPLACE_NULL@
+REPLACE_STRFTIME = @REPLACE_STRFTIME@
+REPLACE_STRUCT_TIMEVAL = @REPLACE_STRUCT_TIMEVAL@
+REPLACE_TIMEGM = @REPLACE_TIMEGM@
+REPLACE_TZSET = @REPLACE_TZSET@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
@@ -387,7 +449,11 @@ SOURCE_REVISION = @SOURCE_REVISION@
 SQLITE3_CFLAGS = @SQLITE3_CFLAGS@
 SQLITE3_LDFLAGS = @SQLITE3_LDFLAGS@
 SQLITE3_VERSION = @SQLITE3_VERSION@
+STDDEF_H = @STDDEF_H@
 STRIP = @STRIP@
+SYS_TIME_H_DEFINES_STRUCT_TIMESPEC = @SYS_TIME_H_DEFINES_STRUCT_TIMESPEC@
+TIME_H_DEFINES_STRUCT_TIMESPEC = @TIME_H_DEFINES_STRUCT_TIMESPEC@
+UNISTD_H_DEFINES_STRUCT_TIMESPEC = @UNISTD_H_DEFINES_STRUCT_TIMESPEC@
 USE_JEMALLOC = @USE_JEMALLOC@
 VERSION = @VERSION@
 abs_builddir = @abs_builddir@
@@ -416,6 +482,11 @@ datarootdir = @datarootdir@
 docdir = @docdir@
 dvidir = @dvidir@
 exec_prefix = @exec_prefix@
+gl_LIBOBJS = @gl_LIBOBJS@
+gl_LTLIBOBJS = @gl_LTLIBOBJS@
+gltests_LIBOBJS = @gltests_LIBOBJS@
+gltests_LTLIBOBJS = @gltests_LTLIBOBJS@
+gltests_WITNESS = @gltests_WITNESS@
 host = @host@
 host_alias = @host_alias@
 host_cpu = @host_cpu@
@@ -468,18 +539,22 @@ include_HEADERS =
 noinst_LTLIBRARIES = 
 lib_LTLIBRARIES = 
 EXTRA_LTLIBRARIES = 
-EXTRA_DIST = $(top_srcdir)/.version $(top_srcdir)/*.md \
-	$(top_srcdir)/.*.yml $(top_srcdir)/Makefile.am \
-	$(top_srcdir)/doc $(top_srcdir)/build-aux \
-	$(top_srcdir)/build.FluffOS $(top_srcdir)/ChangeLog \
-	$(top_srcdir)/Copyright $(top_srcdir)/Credits \
-	$(top_srcdir)/compat $(top_srcdir)/.travis*
+EXTRA_DIST = .version .coveralls.yml .travis_build.sh .travis.yml \
+	autogen.sh build.FluffOS ChangeLog Copyright Credits README.md \
+	TODO.md doc compat build-aux/compile build-aux/config.guess \
+	build-aux/config.rpath build-aux/config.sub build-aux/depcomp \
+	build-aux/git-version-gen build-aux/install-sh \
+	build-aux/ltmain.sh build-aux/m4 build-aux/missing
 CLEANFILES = 
 MOSTLYCLEANFILES = 
 DISTCLEANFILES = 
 MAINTAINERCLEANFILES = 
-SUBDIRS = $(ltdl_dir) src/tools . src
+SUBDIRS = $(ltdl_dir) build-aux/gnulib src/tools . src
 DIST_SUBDIRS = $(SUBDIRS)
+gen_verbose = $(gen_verbose_@AM_V@)
+gen_verbose_ = $(gen_verbose_@AM_DEFAULT_V@)
+gen_verbose_0 = @echo "  GEN      $@";
+gen_verbose_1 = 
 
 # Using 'cd' in backquotes may print the directory name, use this instead:
 lt__cd = CDPATH="$${ZSH_VERSION+.}$(PATH_SEPARATOR)" && cd
@@ -774,7 +849,7 @@ distdir: $(DISTFILES)
 	  ! -type d ! -perm -444 -exec $(install_sh) -c -m a+r {} {} \; \
 	|| chmod -R a+r "$(distdir)"
 	@if test -z "$(am__skip_length_check)" && find "$(distdir)" -type f -print | \
-	  grep '^.........' 1>&2; then \
+	  grep '^................................................................................................................................................................................................................................................................' 1>&2; then \
 	  echo 'error: the above filenames are too long' 1>&2; \
 	  exit 1; \
 	else :; fi
@@ -1049,12 +1124,12 @@ uninstall-am: uninstall-includeHEADERS uninstall-libLTLIBRARIES
 # $(top_srcdir)/test
 
 $(top_srcdir)/.version:
-	echo $(VERSION) > $@-t && mv $@-t $@
+	$(gen_verbose)echo $(VERSION) > $@-t && mv $@-t $@
 dist-hook:
-	echo $(VERSION) > $(distdir)/.tarball-version
+	$(gen_verbose)echo $(VERSION) > $(distdir)/.tarball-version
 
 libtool: @LIBTOOL_DEPS@
-	cd $(srcdir) && $(SHELL) ./config.status lihtool
+	$(gen_verbose)cd $(srcdir) && $(SHELL) ./config.status lihtool
 
 #  Files automatically distributed if found (always):
 #    ABOUT-GNU           INSTALL             config.rpath        ltconfig

@@ -10,6 +10,10 @@ AM_LDFLAGS							=
 AM_CPPFLAGS		+= -DMODULE_DIR=\"$(pkglibexecdir)\"
 AM_CPPFLAGS		+= -DCONFIG_DIR=\"$(pkgdatadir)\"
 
+# for gnulib
+AM_CPPFLAGS		+= -I$(top_builddir)/src/gnulib -I$(top_srcdir)/src/gnulib
+AM_CXXFLAGS		+= -I$(top_builddir)/src/gnulib -I$(top_srcdir)/src/gnulib
+
 SUBDIRS								=
 EXTRA_DIST							=
 
@@ -17,5 +21,7 @@ pkglib_LTLIBRARIES					= libpackage_ops.la
 libpackage_ops_la_LDFLAGS			= --static $(AM_LDFLAGS)
 
 libpackage_ops_la_SOURCES			=
-libpackage_ops_la_SOURCES			+= ops.cc
-libpackage_ops_la_SOURCES			+= parse.cc
+libpackage_ops_la_SOURCES			+= ops.cc ops.h
+libpackage_ops_la_SOURCES			+= parse.cc parse.h
+
+EXTRA_DIST += ops.spec
