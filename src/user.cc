@@ -14,7 +14,7 @@
 #include <vector>      // for vector
 
 #include "interactive.h"  // for interactive_t->ob
-#include "vm/vm.h"
+#include "vm/vm.hh"
 
 // structure that holds all users
 static std::vector<interactive_t *> all_users;

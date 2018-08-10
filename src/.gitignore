@@ -1,20 +1,48 @@
+# Compiled Object files
+*.slo
+*.lo
 *.o
-*.d
+*.obj
+
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.lai
+*.la
 *.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+driver
+driver.old
+driver.exe
+driver.exe.old
+portbind
+
+# Log Files
+*.log
+
+# Backup files
+*.bak
+*~
+
+# autoconf generated files
+Makefile
+autom4te.cache
+config.cache
+config.log
+config.status
+
+*.d
 *.gcda
 *.gcno
 *.gcov
-*.autogen.*
-*.autogen
-/Makefile
 /cc.h
-/config.status
-/config.log
-/configure.h
-/configure
-driver
-driver.old
-portbind
 dtrace_compile
-/autom4te.cache
-aclocal.m4

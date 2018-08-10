@@ -6,8 +6,8 @@
 #include <cstdio>   // for sprintf
 #include <cctype>   // for isspace
 
-#include "vm/internal/efuns.autogen.h"          // FIXME
-#include "vm/internal/applies_table.autogen.h"  // FIXME:
+#include "packages/efuns.hh"          // FIXME
+#include "packages/applies_table.hh"  // FIXME:
 
 #include "vm/internal/base/program.h"
 #include "vm/internal/base/svalue.h"

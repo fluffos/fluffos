@@ -32,13 +32,13 @@
 #include "cc.h"
 
 #include "include/function.h"
-#include "vm/internal/efuns.autogen.h"
-#include "vm/internal/options.autogen.h"
+#include "packages/efuns.hh"
+#include "vm/internal/options.hh"
 #include "vm/internal/base/program.h"
 #include "vm/internal/base/svalue.h"
 #include "vm/internal/compiler/compiler.h"
 #include "vm/internal/compiler/keyword.h"
-#include "vm/internal/compiler/grammar.autogen.h"
+#include "vm/internal/compiler/grammar.hh"
 #include "vm/internal/compiler/scratchpad.h"
 
 // FIXME: in master.h

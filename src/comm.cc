@@ -29,7 +29,7 @@
 #include "thirdparty/libtelnet/libtelnet.h"
 #include "net/telnet.h"
 #include "user.h"
-#include "vm/vm.h"
+#include "vm/vm.hh"
 
 #include "packages/core/add_action.h"  // FIXME?
 #include "packages/core/dns.h"         // FIXME?

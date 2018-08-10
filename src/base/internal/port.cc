@@ -1,6 +1,19 @@
 #include <random>
 #include <sys/resource.h>
-#include <sys/time.h>
+#if 0
+#ifdef TIME_WITH_SYS_TIME
+# include <sys/time.h>
+# include <time.h>
+#else
+# ifdef HAVE_SYS_TIME_H
+#  include <sys/time.h>
+# else
+#  include <time.h>
+# endif
+#endif
+#else
+# include <sys/time.h>
+#endif
 #include <unistd.h>
 
 // Returns a pseudo-random number in the range 0 .. n-1

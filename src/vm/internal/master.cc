@@ -9,7 +9,7 @@
 #include "packages/uids/uids.h"                  // for set_uids etc
 
 #include "vm/internal/base/machine.h"
-#include "vm/internal/applies_table.autogen.h"
+#include "packages/applies_table.hh"
 #include "vm/internal/apply.h"
 #include "vm/internal/simulate.h"
 

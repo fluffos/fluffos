@@ -3,6 +3,8 @@
 - init\_simul\_efun
   possible overflow in strcat(buf, ".c") change to strncat!!!
   search complete source for other occurances
+- portability problems
+    add gnulib modules
 
 # Have Time #
 ## documentation ##

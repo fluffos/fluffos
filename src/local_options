@@ -50,9 +50,6 @@
 /****************************************************************************
  *                              PACKAGES                                    *
  ****************************************************************************/
-#define PACKAGE_OPS
-#define PACKAGE_CORE
-
 #define PACKAGE_CONTRIB
 #define PACKAGE_DEVELOP
 #define PACKAGE_MATH

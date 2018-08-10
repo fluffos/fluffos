@@ -14,7 +14,16 @@
 #ifdef HAVE_SYS_RESOURCE_H
 #include <sys/resource.h>  // for getrlimit
 #endif
-#include <time.h>
+#ifdef TIME_WITH_SYS_TIME
+# include <sys/time.h>
+# include <time.h>
+#else
+# ifdef HAVE_SYS_TIME_H
+#  include <sys/time.h>
+# else
+#  include <time.h>
+# endif
+#endif
 #include <unistd.h>
 
 #include "backend.h"  // for backend, init_backend
@@ -23,7 +32,7 @@
 #include "thirdparty/jemalloc/include/jemalloc/jemalloc.h"  // for mallctl
 #endif
 #include "packages/core/dns.h"  // for init_dns_event_base.
-#include "vm/vm.h"  // for push_constant_string, etc
+#include "vm/vm.hh"  // for push_constant_string, etc
 
 // from lex.cc
 extern void print_all_predefines();
@@ -103,7 +112,8 @@ namespace {
     }
 
     static void try_dump_stacktrace() {
-#if !defined(__CYGWIN__) && __GNUC__ > 2
+// #if !defined(__CYGWIN__) && __GNUC__ > 2
+#ifdef HAVE_EXECINFO_H
         static void *bt[100];
         auto bt_size = backtrace(bt, 100);
         backtrace_symbols_fd(bt, bt_size, STDERR_FILENO);

@@ -6,22 +6,11 @@
 .libs
 INSTALL
 Makefile
-Makefile.in
-aclocal.m4
 autom4te.cache
-config.*
-configure
-depcomp
-install-sh
 libtelnet-*.tar.gz
 libtelnet-uninstalled.pc
 libtelnet.pc
 libtool
-ltmain.sh
-m4/*.m4
-missing
-stamp-h1
-compile
 
 telnet-client
 telnet-proxy
