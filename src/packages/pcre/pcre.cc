@@ -63,7 +63,7 @@
 
 #include "base/package_api.h"
 
-#include "packages/pcre/pcre.h"
+#include "pcre.hh"
 
 // Prototype declarations
 static void pcre_free_memory(pcre_t *p);

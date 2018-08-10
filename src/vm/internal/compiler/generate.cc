@@ -5,7 +5,7 @@
 #include <cstdio>
 
 #include "include/function.h"  // for F_SIMUL etc , FIXME
-#include "vm/internal/efuns.autogen.h"
+#include "packages/efuns.hh"
 #include "vm/internal/base/number.h"  // for formatting lpc int
 
 #include "vm/internal/compiler/compiler.h"  // for CURRENT_PROGRAM_SIZE

@@ -3,7 +3,7 @@
 
 #include <unistd.h>
 
-#include "vm/vm.h"  // for push_constant_string, etc
+#include "vm/vm.hh"  // for push_constant_string, etc
 #include "comm.h"     // for init_user_conn
 #include "backend.h" // for backend();
 

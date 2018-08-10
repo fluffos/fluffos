@@ -8,14 +8,23 @@
 #include <event2/event.h>  // for event_add, etc
 #include <math.h>          // for exp
 #include <stdio.h>         // for NULL, sprintf
-#include <sys/time.h>      // for timeval
+#ifdef TIME_WITH_SYS_TIME
+# include <sys/time.h>
+# include <time.h>
+#else
+# ifdef HAVE_SYS_TIME_H
+#  include <sys/time.h>
+# else
+#  include <time.h>
+# endif
+#endif
 #include <sys/types.h>     // for int64_t
 #include <deque>           // for deque
 #include <functional>      // for _Bind, less, bind, function
 #include <map>             // for multimap, _Rb_tree_iterator
 #include <utility>         // for pair, make_pair
 
-#include "vm/vm.h"
+#include "vm/vm.hh"
 
 #ifdef PACKAGE_ASYNC
 #include "packages/async/async.h"

@@ -15,7 +15,7 @@
 #endif
 
 /* autoconf generated. */
-#include "configure.h"
+#include "config.h"
 
 /* the definition of ARCH */
 #include "base/internal/arch.h"

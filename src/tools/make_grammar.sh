@@ -2,9 +2,14 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-OPTIONS_H=base/internal/options_incl.h
-GRAMMAR_Y_PRE=vm/internal/compiler/grammar.y.pre
-GRAMMAR_Y=vm/internal/compiler/grammar.autogen.y
+TOP_SRCDIR="${1}"
+shift
+SRCDIR="${1}"
+shift
+
+OPTIONS_H="${TOP_SRCDIR}/src/base/internal/options_incl.h"
+GRAMMAR_Y_PRE="${SRCDIR}"/grammar.y.pre
+GRAMMAR_Y=grammar.y
 
 # First step is to run grammar.y.pre through CPP.
 "$@" -E -x c++ -undef -P -CC \
