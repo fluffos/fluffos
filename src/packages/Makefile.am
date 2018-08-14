@@ -10,10 +10,6 @@ AM_LDFLAGS							=
 AM_CPPFLAGS		+= -DMODULE_DIR=\"$(pkglibexecdir)\"
 AM_CPPFLAGS		+= -DCONFIG_DIR=\"$(pkgdatadir)\"
 
-# for gnulib
-AM_CPPFLAGS		+= -I$(top_builddir)/src/gnulib -I$(top_srcdir)/src/gnulib
-AM_CXXFLAGS		+= -I$(top_builddir)/src/gnulib -I$(top_srcdir)/src/gnulib
-
 EXTRA_DIST							=
 
 pkglib_LTLIBRARIES					= libpackages.la

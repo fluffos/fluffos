@@ -10,23 +10,6 @@ AM_CPPFLAGS			+= -DCONFIG_DIR=\"$(pkgdatadir)\"
 
 AM_LDFLAGS			+= -export-dynamic
 
-# for gnulib
-AM_CPPFLAGS		+= -I$(top_builddir)/src/gnulib -I$(top_srcdir)/src/gnulib
-AM_CXXFLAGS		+= -I$(top_builddir)/src/gnulib -I$(top_srcdir)/src/gnulib
-
-GNULIB			= $(top_builddir)/build-aux/gnulib/libgnu.la
-GNULIB			+= $(ACOS_LIBM) $(ASIN_LIBM) $(ATAN_LIBM)
-GNULIB			+= $(CEIL_LIBM) $(COS_LIBM)
-GNULIB			+= $(EXP_LIBM)
-GNULIB			+= $(FLOOR_LIBM) $(FREXP_LIBM)
-GNULIB			+= $(GETADDRINFO_LIB) $(GETHOSTNAME_LIB)
-GNULIB			+= $(HOSTENT_LIB)
-GNULIB			+= $(INET_NTOP_LIB) $(ISNAND_LIBM)
-GNULIB			+= $(LIBSOCKET) $(LIB_PTHREAD) $(LOG10_LIBM) $(LOG2_LIBM) $(LOG_LIBM)
-GNULIB			+= $(LTLIBICONV) $(LTLIBINTL) $(LTLIBTHREAD)
-GNULIB			+= $(SERVENT_LIB)
-LDADD			= $(GNULIB)
-
 EXTRA_DIST		=
 EXTRA_DIST		+= build_packages_genfiles.sh
 EXTRA_DIST		+= make_func.y make_grammar.sh make_options_def.py

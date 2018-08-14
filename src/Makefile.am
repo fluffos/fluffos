@@ -5,24 +5,6 @@ AM_CPPFLAGS		= -I$(top_srcdir)/src $(LIBEVENT_CPPFLAGS)
 AM_CXXFLAGS		= $(OPENMP_CXXFLAGS) -I$(top_srcdir)/src $(LIBEVENT_CPPFLAGS)
 AM_LDFLAGS		= $(LIBEVENT_LDFLAGS)
 
-# for gnulib
-AM_CPPFLAGS		+= -I$(top_builddir)/src/gnulib -I$(top_srcdir)/src/gnulib
-AM_CXXFLAGS		+= -I$(top_builddir)/src/gnulib -I$(top_srcdir)/src/gnulib
-
-GNULIB			= $(top_builddir)/build-aux/gnulib/libgnu.la
-GNULIB			+= $(ACOS_LIBM) $(ASIN_LIBM) $(ATAN_LIBM)
-GNULIB			+= $(CEIL_LIBM) $(COS_LIBM)
-GNULIB			+= $(EXP_LIBM)
-GNULIB			+= $(FLOOR_LIBM) $(FREXP_LIBM)
-GNULIB			+= $(GETADDRINFO_LIB) $(GETHOSTNAME_LIB)
-GNULIB			+= $(HOSTENT_LIB)
-GNULIB			+= $(INET_NTOP_LIB) $(ISNAND_LIBM)
-GNULIB			+= $(LIBSOCKET) $(LIB_PTHREAD) $(LOG10_LIBM) $(LOG2_LIBM) $(LOG_LIBM)
-GNULIB			+= $(LTLIBICONV) $(LTLIBINTL) $(LTLIBTHREAD)
-GNULIB			+= $(SERVENT_LIB)
-
-LDADD			= $(GNULIB)
-
 EXTRA_DIST		=
 EXTRA_DIST		+= include format_source.sh
 EXTRA_DIST		+= local_options outdated_define.txt
