@@ -22,9 +22,6 @@ source_dir=$(dirname $0)
 build_aux_dir=${source_dir}/build-aux
 target=$(${build_aux_dir}/config.guess)
 
-# Set INSTALL_DIR to the directory where you want to install the executables.
-PREFIX=/opt/games
-
 #Enable warnings from the compiler (g++), if wanted.
 WARN=(
 "-Wall"
@@ -117,5 +114,5 @@ fi
 
 # Force an reconfigure.
 rm -f configure.h
-USE_JEMALLOC=$USE_JEMALLOC CFLAGS=$CFLAGS CXXFLAGS=$CFLAGS MAKE=$MAKE ARCH=$ARCH DRIVER_BIN=$DRIVER_BIN OPTIMIZE=$OPTIMIZE SOURCE_REVISION=$SOURCE_REVISION ${source_dir}/configure --prefix=$PREFIX $@
+USE_JEMALLOC=$USE_JEMALLOC CFLAGS=$CFLAGS CXXFLAGS=$CFLAGS MAKE=$MAKE ARCH=$ARCH DRIVER_BIN=$DRIVER_BIN OPTIMIZE=$OPTIMIZE SOURCE_REVISION=$SOURCE_REVISION ${source_dir}/configure $@
 $MAKE help
