@@ -37,7 +37,7 @@ AS_BOX([Configuring AC_PACKAGE_TARNAME AC_PACKAGE_VERSION])
 AS_ECHO(["using autoconf AC_AUTOCONF_VERSION"])
 AS_ECHO
 
-AC_PREFIX_DEFAULT([/opt/games])
+AC_PREFIX_DEFAULT([$(pwd)])
 
 AC_CONFIG_SRCDIR([src/main.cc])
 AC_CONFIG_AUX_DIR([build-aux])
@@ -77,7 +77,6 @@ AC_SUBST([CONFIG_STATUS_DEPENDENCIES], ['$(top_srcdir)/.version'])
 ############################################
 AC_CONFIG_FILES([src/cc.h
                  Makefile
-                 build-aux/gnulib/Makefile
                  src/Makefile
                  src/base/internal/Makefile
                  src/base/Makefile
@@ -145,8 +144,6 @@ AC_PROG_CC_STDC
 AC_USE_SYSTEM_EXTENSIONS
 ## we might use openmp with C-source
 AC_OPENMP
-## we are using gnulib for portability
-gl_EARLY
 
 AX_APPEND_COMPILE_FLAGS([-D_GNU_SOURCE])
 AX_CHECK_COMPILE_FLAG([-fPIE], [
@@ -347,16 +344,6 @@ case "${target}" in
         ;;
 esac
 
-## ---------------------- ##
-## GNULIB for portability ##
-## ---------------------- ##
-
-AS_ECHO([])
-AS_BOX([gnulib (for portability)])
-AS_ECHO
-
-gl_INIT
-
 ## --------------------- ##
 ## Checks for libraries. ##
 ## --------------------- ##
@@ -405,8 +392,8 @@ AC_HEADER_MAJOR
 dnl AC_FUNC_ALLOCA
 AC_HEADER_DIRENT
 AC_HEADER_TIME
-dnl AC_CHECK_HEADERS([arpa/inet.h fcntl.h inttypes.h libintl.h limits.h locale.h malloc.h netdb.h netinet/in.h stddef.h stdint.h stdlib.h string.h sys/param.h sys/resource.h sys/rusage.h sys/socket.h sys/time.h unistd.h])
-AC_CHECK_HEADERS([fcntl.h libintl.h locale.h malloc.h stddef.h sys/rusage.h])
+# AC_CHECK_HEADERS([arpa/inet.h fcntl.h inttypes.h libintl.h limits.h locale.h malloc.h netdb.h netinet/in.h stddef.h stdint.h stdlib.h string.h sys/param.h sys/resource.h sys/rusage.h sys/socket.h sys/time.h unistd.h])
+AC_CHECK_HEADERS([fcntl.h libintl.h locale.h malloc.h stddef.h sys/rusage.h sys/resource.h])
 # are those needed???
 # AC_CHECK_HEADERS([arpa/telnet.h crypt.h execinfo.h float.h sys/crypt.h sys/ioctl.h sys/stat.h values.h])
  AC_CHECK_HEADERS([execinfo.h])

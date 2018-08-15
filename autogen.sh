@@ -1,3 +1,3 @@
 #!/bin/sh
-#autoreconf -I m4 -vf -Wall --install
 autoreconf -vf -Wall --install
+automake -vf -Wall --add-missing --copy

@@ -17,7 +17,7 @@ MOSTLYCLEANFILES		=
 DISTCLEANFILES			=
 MAINTAINERCLEANFILES	=
 
-SUBDIRS					= $(ltdl_dir) build-aux/gnulib src/tools . src
+SUBDIRS					= $(ltdl_dir) src/tools . src
 DIST_SUBDIRS			= $(SUBDIRS)
 
 gen_verbose = $(gen_verbose_@AM_V@)
