@@ -1,4 +1,4 @@
-dist: xenial
+dist: bionic
 sudo: required
 
 language: cpp
@@ -6,16 +6,13 @@ language: cpp
 addons:
   apt:
     update: true
-    sources:
-      - sourceline: "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-5.0 main"
-        key_url: "http://apt.llvm.org/llvm-snapshot.gpg.key"
     packages:
+      - build-essenial
+      - clang-6.0
       - autoconf
       - automake
       - bison
-      - clang-4.0
       - expect
-      - g++-5
       - libevent-dev
       - libmysqlclient-dev
       - libpcre3-dev
@@ -24,7 +21,6 @@ addons:
       - libssl-dev
       - libtool
       - libz-dev
-      - llvm-4.0-dev
       - telnet
       - libgtest-dev
 
