@@ -14,18 +14,8 @@ fi
 
 setup () {
 
-case $COMPILER in
-  gcc)
-    export CC="gcc-5 -fuse-ld=gold"
-    export CXX="g++-5 -fuse-ld=gold"
-    $CXX -v
-    ;;
-  clang)
-    export CC="clang-4.0"
-    export CXX="clang++-4.0"
-    $CXX -v
-    ;;
-esac
+$CC -v
+$CXX -v
 
 cd /tmp
 mkdir .build
