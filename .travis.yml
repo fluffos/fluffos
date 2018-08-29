@@ -1,5 +1,5 @@
 dist: bionic
-sudo: required
+sudo: false
 
 language: cpp
 
