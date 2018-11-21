@@ -47,7 +47,11 @@ dist-hook:
 	$(gen_verbose)echo $(VERSION) > $(distdir)/.tarball-version
 
 libtool: @LIBTOOL_DEPS@
-	$(gen_verbose)cd $(srcdir) && $(SHELL) ./config.status lihtool
+	$(gen_verbose)cd $(srcdir) && $(SHELL) ./config.status libtool
+
+help:
+	$(gen_verbose)cd $(srcdir) && $(SHELL) ./config.status -V
+
 
 #  Files automatically distributed if found (always):
 #    ABOUT-GNU           INSTALL             config.rpath        ltconfig
