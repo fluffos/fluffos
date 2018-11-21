@@ -6,22 +6,22 @@ addons:
   apt:
     update: true
     packages:
-      - build-essenial
-      - clang-6.0
-      - autoconf
-      - automake
-      - bison
-      - expect
-      - libevent-dev
-      - libmysqlclient-dev
-      - libpcre3-dev
-      - libpq-dev
-      - libsqlite3-dev
-      - libssl-dev
-      - libtool
-      - libz-dev
-      - telnet
-      - libgtest-dev
+    - build-essenial
+    - clang-6.0
+    - autoconf
+    - automake
+    - bison
+    - expect
+    - libevent-dev
+    - libmysqlclient-dev
+    - libpcre3-dev
+    - libpq-dev
+    - libsqlite3-dev
+    - libssl-dev
+    - libtool
+    - libz-dev
+    - telnet
+    - libgtest-dev
 
 script: bash -x ./.travis_build.sh
 
