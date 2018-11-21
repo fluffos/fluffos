@@ -5,7 +5,7 @@ language: cpp
 addons:
   apt:
     packages:
-    - build-essenial
+    - build-essential
     - clang-6.0
     - autoconf
     - automake
