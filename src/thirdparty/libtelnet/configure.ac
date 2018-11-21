@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.58])
-AC_INIT([libtelnet], [0.21], [http://github.com/elanthis/libtelnet/tree/master])
+AC_INIT([libtelnet], [0.23], [http://github.com/elanthis/libtelnet/tree/master])
 #AC_CONFIG_AUX_DIR([auxfiles])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])

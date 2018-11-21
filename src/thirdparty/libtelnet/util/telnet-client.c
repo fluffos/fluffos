@@ -9,9 +9,6 @@
  * all present and future rights to this code under copyright law. 
  */
 
-#if !defined(_POSIX_SOURCE)
-#	define _POSIX_SOURCE
-#endif
 #if !defined(_BSD_SOURCE)
 #	define _BSD_SOURCE
 #endif
@@ -100,7 +97,9 @@ static void _event_handler(telnet_t *telnet, telnet_event_t *ev,
 	switch (ev->type) {
 	/* data received */
 	case TELNET_EV_DATA:
-		printf("%.*s", (int)ev->data.size, ev->data.buffer);
+		if (ev->data.size && fwrite(ev->data.buffer, 1, ev->data.size, stdout) != ev->data.size) {
+              		fprintf(stderr, "ERROR: Could not write complete buffer to stdout");
+		}
 		fflush(stdout);
 		break;
 	/* data must be sent */
@@ -153,19 +152,25 @@ int main(int argc, char **argv) {
 	struct addrinfo *ai;
 	struct addrinfo hints;
 	struct termios tios;
+	const char *servname;
+	const char *hostname;
 
 	/* check usage */
-	if (argc != 3) {
-		fprintf(stderr, "Usage:\n ./telnet-client <host> <port>\n");
+	if (argc < 2) {
+		fprintf(stderr, "Usage:\n ./telnet-client <host> [port]\n");
 		return 1;
 	}
+
+	/* process arguments */
+	servname = (argc < 3) ? "23" : argv[2];
+	hostname = argv[1];
 
 	/* look up server host */
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
-	if ((rs = getaddrinfo(argv[1], argv[2], &hints, &ai)) != 0) {
-		fprintf(stderr, "getaddrinfo() failed for %s: %s\n", argv[1],
+	if ((rs = getaddrinfo(hostname, servname, &hints, &ai)) != 0) {
+		fprintf(stderr, "getaddrinfo() failed for %s: %s\n", hostname,
 				gai_strerror(rs));
 		return 1;
 	}

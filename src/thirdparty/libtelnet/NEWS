@@ -1,3 +1,15 @@
+Version 0.23
+============
+
+* Fixed release errors
+
+Version 0.22
+============
+
+* EOL handling fixes
+* allocation fixes to Q option states
+* portability fixes
+
 Version 0.21
 ============
 

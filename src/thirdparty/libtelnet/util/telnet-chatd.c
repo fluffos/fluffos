@@ -10,9 +10,6 @@
  */
 
 #if !defined(_WIN32)
-#	if !defined(_POSIX_SOURCE)
-#		define _POSIX_SOURCE
-#	endif
 #	if !defined(_BSD_SOURCE)
 #		define _BSD_SOURCE
 #	endif
@@ -27,7 +24,10 @@
 #	include <winsock2.h>
 #	include <ws2tcpip.h>
 
+#ifndef _UCRT
 #	define snprintf _snprintf
+#endif
+
 #	define poll WSAPoll
 #	define close closesocket
 #	define strdup _strdup

@@ -10,9 +10,6 @@
  */
 
 #if !defined(_WIN32)
-#	if !defined(_POSIX_SOURCE)
-#		define _POSIX_SOURCE
-#	endif
 #	if !defined(_BSD_SOURCE)
 #		define _BSD_SOURCE
 #	endif
@@ -27,13 +24,15 @@
 #	include <winsock2.h>
 #	include <ws2tcpip.h>
 
+#ifndef _UCRT
 #	define snprintf _snprintf
+#endif
+
 #	define poll WSAPoll
 #	define close closesocket
-
-#if !defined(_MSC_VER) || _MSC_VER < 1600 // VC 9 and prior do not define this macro
+#	undef gai_strerror
+#	define gai_strerror gai_strerrorA
 #	define ECONNRESET WSAECONNRESET
-#endif
 #endif
 
 #include <errno.h>
