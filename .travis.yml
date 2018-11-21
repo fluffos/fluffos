@@ -1,10 +1,9 @@
-dist: bionic
+dist: xenial
 
 language: cpp
 
 addons:
   apt:
-    update: true
     packages:
     - build-essenial
     - clang-6.0
