@@ -403,7 +403,7 @@ void handle_read(struct request *req) {
   if (val < 0) {
     FREE((void *)req->buf);
     push_number(val);
-    set_eval(max_eval_cost);
+    set_eval(max_cost);
     safe_call_efun_callback(req->fun, 1);
     return;
   }
@@ -412,7 +412,7 @@ void handle_read(struct request *req) {
   file[val] = 0;
   push_malloced_string(file);
   FREE((void *)req->buf);
-  set_eval(max_eval_cost);
+  set_eval(max_cost);
   safe_call_efun_callback(req->fun, 1);
 }
 
@@ -452,7 +452,7 @@ void handle_getdir(struct request *req) {
   }
   push_refed_array(ret);
   FREE((void *)req->buf);
-  set_eval(max_eval_cost);
+  set_eval(max_cost);
   safe_call_efun_callback(req->fun, 1);
 }
 #endif
@@ -462,12 +462,12 @@ void handle_write(struct request *req) {
   int val = req->ret;
   if (val < 0) {
     push_number(val);
-    set_eval(max_eval_cost);
+    set_eval(max_cost);
     safe_call_efun_callback(req->fun, 1);
     return;
   }
   push_undefined();
-  set_eval(max_eval_cost);
+  set_eval(max_cost);
   safe_call_efun_callback(req->fun, 1);
 }
 
@@ -479,7 +479,7 @@ void handle_db_exec(struct request *req) {
   } else {
     push_number(val);
   }
-  set_eval(max_eval_cost);
+  set_eval(max_cost);
   safe_call_efun_callback(req->fun, 1);
 }
 

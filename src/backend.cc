@@ -322,7 +322,7 @@ void look_for_objects_to_swap() {
            */
 
           push_number(ob->flags & (O_CLONE) ? 0 : ob->prog->ref);
-          set_eval(max_eval_cost);
+          set_eval(max_cost);
           auto svp = safe_apply(APPLY_CLEAN_UP, ob, 1, ORIGIN_DRIVER);
           if (!svp || (svp->type == T_NUMBER && svp->u.number == 0)) {
             ob->flags &= ~O_WILL_CLEAN_UP;

@@ -2304,22 +2304,19 @@ void f_say(void) {
  object and a set_eval_limit() simul_efun to restrict access.
  */
 void f_set_eval_limit(void) {
-  if (sp->u.number < 0) {
-    sp->u.number = 0;
-  }
   switch (sp->u.number) {
     case 0:
-      sp->u.number = max_eval_cost;
-      set_eval(max_eval_cost);
+      sp->u.number = max_cost;
+      set_eval(max_cost);
       break;
     case -1:
       sp->u.number = get_eval();
       break;
     case 1:
-      sp->u.number = max_eval_cost;
+      sp->u.number = max_cost;
       break;
     default:
-      max_eval_cost = sp->u.number;
+      max_cost = sp->u.number;
       break;
   }
 }

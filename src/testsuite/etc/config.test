@@ -70,8 +70,8 @@ maximum bits in a bitfield : 1200
 maximum local variables : 30
 
 # Maximum amount of "eval cost" per thread - execution is halted when
-# it is exceeded. 32bit value. The unit is microseconds.
-maximum evaluation cost : 300000000
+# it is exceeded. 32bit value.
+maximum evaluation cost : 2147483647
 
 # This is the maximum array size allowed for one single array.
 maximum array size : 15000

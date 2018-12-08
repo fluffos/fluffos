@@ -85,9 +85,10 @@ VM_OBJS= \
 	vm/internal/applies_table.autogen.o \
 	vm/internal/efuns.autogen.o \
 	vm/internal/apply.o \
-	vm/internal/eval_limit.o \
+	vm/internal/eval.o \
 	vm/internal/master.o \
 	vm/internal/otable.o \
+	vm/internal/posix_timers.o \
 	vm/internal/simul_efun.o \
 	vm/internal/simulate.o \
 	vm/internal/trace.o \
