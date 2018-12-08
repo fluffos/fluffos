@@ -91,7 +91,7 @@ maximum string length : 200000
 # Max size of a file allowed to be read by 'read_file()'.
 maximum read file size : 200000
 
-# max number of bytes you allow to be read and written with read_bytes 
+# max number of bytes you allow to be read and written with read_bytes
 # and write_bytes
 maximum byte transfer : 10000
 

@@ -1814,12 +1814,9 @@ void eval_instruction(char *p) {
         }
       }
     }
-    // Note that outoftime could be set through signal handler too.
-    if (get_eval() == 0) {
-      outoftime = 1;
-    }
     if (outoftime) {
-      debug_message("Eval interrupted: cost limit reached, limit: %ld microsec\n", max_eval_cost);
+      debug_message("Eval interrupted: cost limit reached, limit: %ld usec.\n",
+                    current_object->obname, max_eval_cost);
       set_eval(max_eval_cost);
       max_eval_error = 1;
       error("Too long evaluation. Execution aborted.\n");
