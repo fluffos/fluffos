@@ -1,3 +1,9 @@
+---
+layout: default
+title: general / cygwin.md
+---
+
+
 FluffOS 3.0 fully support compiling under CYGWIN 64, thus you can run it on Windows.
 
 Please use https://cygwin.com/install.html to download and install CYGWIN 64.

@@ -1,0 +1,43 @@
+---
+layout: default
+title: mudlib / set_author
+---
+
+
+
+
+
+### NAME
+    set_author - set the author associated with an object.
+
+
+### SYNOPSIS
+    void set_author( string author );
+
+
+### DESCRIPTION
+    Every object has both an author and a domain associated with it for the
+    purposes of tracking statistics for authors and domains.   Domains  may
+    only  be  set  in  the  master  object function domain_file(4), however
+    authors are different.  They can be initialized to some  default  value
+    by  author_file(4)  in the master object, but can also be changed using
+    the set_author efun.
+
+    set_author changes the author of the object that it is  called  within.
+    That  author will get credit for all future actions of that object that
+    affect mudlib statistics.  Note that this may cause some weird  numbers
+    to occur in the categories "objects" and "array_size", since the object
+    may have initialized arrays or been created under the original author's
+    credit,  but  it could be destructed or free the arrays that it's using
+    under another author, thus reducing numbers from a  count  that  didn't
+    have  those  same  numbers added previously.  To rememdy this, only use
+    set_author within create(4), and use it before any arrays are allocated
+    if at all possible.
+
+
+### SEE ALSO
+    author_file(4),    domain_file(4),    author_stats(3),   set_author(3),
+    domain_stats(3)
+
+
+

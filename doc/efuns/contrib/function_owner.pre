@@ -1,3 +1,0 @@
-object function_owner(function);
-
-returns the object defining the given function.

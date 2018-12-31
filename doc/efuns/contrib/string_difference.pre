@@ -1,3 +1,0 @@
-int string_difference(string, string);
-
-returns levenshtein difference
