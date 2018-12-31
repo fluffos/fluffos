@@ -3,22 +3,19 @@ layout: default
 title: sockets / socket_accept
 ---
 
-
-
-
-
 ### NAME
+
     socket_accept() - accept a connection on a socket
 
-
 ### SYNOPSIS
+
     #include <socket_err.h>
 
     int socket_accept( int s, string read_callback,
     string write_callback );
 
-
 ### DESCRIPTION
+
     The argument s is a socket that has been created with socket_create(3),
     bound to an address with socket_bind(3), and is listening  for  connec‐
     tions after a socket_listen(3). socket_accept() extracts the first con‐
@@ -55,15 +52,15 @@ title: sockets / socket_accept
 
     Where fd is the socket which has closed.
 
-
 ### RETURN VALUES
+
     socket_accept()  returns  a  non-negative  descriptor  for the accepted
     socket  on  success.  On  failure,  it  returns   a   negative   value.
     socket_error(3)  can be used on the return value to get a text descrip‐
     tion of the error.
 
-
 ### ERRORS
+
     EEFDRANGE      Descriptor out of range.
 
     EEBADF         Descriptor is invalid.
@@ -82,9 +79,6 @@ title: sockets / socket_accept
 
     EENOSOCKS      No more available efun sockets.
 
-
 ### SEE ALSO
+
     socket_bind(3), socket_connect(3), socket_create(3), socket_listen(3)
-
-
-

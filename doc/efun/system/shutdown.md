@@ -3,19 +3,16 @@ layout: default
 title: system / shutdown
 ---
 
-
-
-
-
 ### NAME
+
     shutdown() - shutdown the driver
 
-
 ### SYNOPSIS
+
     void shutdown( int how );
 
-
 ### DESCRIPTION
+
     This function shuts down the driver in a controlled fashion (as opposed
     to how a crash would shut it down).  The 'how' argument  specifes  what
     integer  value that driver should pass to exit().  The convention is to
@@ -28,9 +25,6 @@ title: system / shutdown
     same name which does the appropriate security checks.  Be sure  to  set
     valid_override(4) up (in master.c) to protect against efun::shutdown().
 
-
 ### SEE ALSO
+
     crash(4)
-
-
-

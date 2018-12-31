@@ -3,15 +3,12 @@ layout: default
 title: strings / replace_string
 ---
 
-
-
-
-
 ### NAME
+
     replace_string() - replace all instances of a string within a string
 
-
 ### SYNOPSIS
+
     string replace_string( str, pattern, replace );
     string replace_string( str, pattern, replace, max );
     string replace_string( str, pattern, replace, first, last );
@@ -20,6 +17,7 @@ title: strings / replace_string
     int max, first, last;
 
 ### DESCRIPTION
+
     replace_string()  returns  str  with  all instances of pattern replaced
     with replace.  If pattern has zero length then str is returned  unmodi‐
     fied.   If  the resultant string would exceed the maximum string length
@@ -46,10 +44,9 @@ title: strings / replace_string
     E.g., replace_string("xyxxy", "x", "z", 2, 3) returns "xyzzy".
 
 ### SEE ALSO
+
     sscanf(3), explode(3), strsrch(3)
 
 ### AUTHOR
+
     Zak@TMI-2 wrote the range constraint additions.
-
-
-

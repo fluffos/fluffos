@@ -3,23 +3,20 @@ layout: default
 title: sockets / socket_acquire
 ---
 
-
-
-
-
 ### NAME
+
     socket_acquire() - assume ownership of a socket
 
-
 ### SYNOPSIS
+
     #include <socket_err.h>
 
     int socket_acquire( int socket, string read_callback,
     string write_callback,
     string close_callback );
 
-
 ### DESCRIPTION
+
     socket_acquire()   is   called  to  complete  the  handshake  begun  by
     socket_release() for transferring ownership (and control) of  a  socket
     to  a new object.  socket_release() calls the release callback function
@@ -40,9 +37,6 @@ title: sockets / socket_acquire
     socket_acquire() may only be called within the context of  thr  release
     callback function and only with the socket specified.
 
-
 ### SEE ALSO
+
     socket_release(3)
-
-
-

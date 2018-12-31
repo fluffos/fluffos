@@ -3,22 +3,19 @@ layout: default
 title: sockets / socket_create
 ---
 
-
-
-
-
 ### NAME
+
     socket_create() - create an efun socket
 
-
 ### SYNOPSIS
+
     #include <socket_err.h>
 
     int socket_create( int mode, string read_callback,
     void | string close_callback );
 
-
 ### DESCRIPTION
+
     socket_create()  creates  an efun socket. mode determines which type of
     socket is created. Currently supported socket modes are:
 
@@ -46,16 +43,16 @@ title: sockets / socket_create
     Where  fd  is the socket which has closed.  NOTE: close_callback is not
     used with DATAGRAM mode sockets.
 
-
 ### RETURN VALUES
+
     socket_create() returns:
 
     a non-negative descriptor on success.
 
     a negative value indicated below on error.
 
-
 ### ERRORS
+
     EEMODENOTSUPP  Socket mode not supported.
 
     EESOCKET       Problem creating socket.
@@ -69,8 +66,6 @@ title: sockets / socket_create
     EESECURITY     Security violation attempted.
 
 ### SEE ALSO
+
     socket_accept(3), socket_bind(3),  socket_close(3),  socket_connect(3),
     socket_listen(3), socket_write(3)
-
-
-

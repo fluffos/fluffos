@@ -3,19 +3,16 @@ layout: default
 title: mappings / each
 ---
 
-
-
-
-
 ### NAME
+
     each() - iterate over the (key, value) pairs in a mapping
 
-
 ### SYNOPSIS
+
     mixed *each( mapping m, int reset );
 
-
 ### DESCRIPTION
+
     The  (key,  value)  pairs  in  a mapping may be iterated over using the
     each() efun.  each() returns the (key, value) pairs in the  same  order
     as  keys()  and values() do.  each() returns a null vector when the end
@@ -37,9 +34,6 @@ title: mappings / each
     write("value = " + pair[1] + "\n");
     }
 
-
 ### SEE ALSO
+
     keys(3), values(3)
-
-
-

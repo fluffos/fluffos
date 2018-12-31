@@ -3,15 +3,12 @@ layout: default
 title: interactive / notify_fail
 ---
 
-
-
-
-
 ### NAME
+
     int notify_fail( string | function str );
 
-
 ### DESCRIPTION
+
     Store  'str' as the error message to be returned instead of the default
     message setup via add_action().  This is the preferred way  to  display
     error messages since it allows other objects a chance to respond to the
@@ -32,9 +29,6 @@ title: interactive / notify_fail
 
     The idea behind this function is to allow better error messages than
 
-
 ### RETURN VALUE
+
     notify_fail() always returns 0.
-
-
-

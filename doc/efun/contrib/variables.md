@@ -3,8 +3,7 @@ layout: default
 title: contrib / variables.pre
 ---
 
-
-mixed *variables(object, int default: 0);
+mixed \*variables(object, int default: 0);
 
 int == 0:
 returns array of global variable names

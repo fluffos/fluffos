@@ -3,7 +3,6 @@ layout: default
 title: contrib / store_variable.pre
 ---
 
-
 void store_variable(string, mixed, object | void);
 
 object defaults to this_object()

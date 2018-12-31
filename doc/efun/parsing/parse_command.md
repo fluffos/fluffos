@@ -3,20 +3,17 @@ layout: default
 title: parsing / parse_command
 ---
 
-
-
-
-
 ### NAME
+
     parse_command() - try to match a string with a given pattern
 
-
 ### SYNOPSIS
+
     int parse_command( string command, object env|object *oblist,
     string pattern, mixed arg, ... );
 
-
 ### DESCRIPTION
+
     parse_command()  is  a piffed up sscanf(3) operating on word basis.  It
     works similar to sscanf(3) in that it takes a pattern  and  a  variable
     set  of  destination  arguments. It is together with sscanf(3) the only
@@ -105,14 +102,14 @@ title: parsing / parse_command
     in
     the returned array of objects.
 
-
 ### CAVEAT
+
     Patterns of type: "%s %w %i" Might not work as one  would  expect.   %w
     will  always  succeed  so  the  arg  corresponding to %s will always be
     empty.
 
-
 ### BUGS
+
     Patterns of the type: 'word' and [word] The 'word' can not contain spa‐
     ces.   It  must  be  a  single word.  This is so because the pattern is
     exploded on " " (space) and a pattern element can therefore not contain
@@ -132,7 +129,7 @@ title: parsing / parse_command
     */
     }
 
-###        MUDLIB SUPPORT
+### MUDLIB SUPPORT
 
     To make the efun useful it must have a certain support from the mudlib,
     there is a set of functions that it  needs  to  call  to  get  relevant
@@ -190,6 +187,3 @@ title: parsing / parse_command
 
     string parse_command_all_word()
     - Would normally return: "all"
-
-
-

@@ -5,8 +5,8 @@ title: Applies
 
 Auto generated on 2018-12-30 16:19:45 STD for [e555ec1](https://github.com/fluffos/fluffos/tree/e555ec1).
 
-
 ### interactive
+
 <table class='table table-condensed'>
 <tr>
 <td>

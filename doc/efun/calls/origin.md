@@ -3,19 +3,16 @@ layout: default
 title: calls / origin
 ---
 
-
-
-
-
 ### NAME
+
     origin() - determine how the current function was called
 
-
 ### SYNOPSIS
+
     int origin( void );
 
-
 ### DESCRIPTION
+
     Returns  an  integer  specifying  how  the current function was called.
     Current values are:
 
@@ -35,9 +32,6 @@ title: calls / origin
 
     128    functional
 
-
 ### SEE ALSO
+
     previous_object(3), /include/origin.h
-
-
-

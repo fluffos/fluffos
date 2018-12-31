@@ -5,7 +5,6 @@ title: concepts / preprocessor
 
 Version: master
 
-
     LPC Preprocessor Manual
     ~~~~~~~~~~~~~~~~~~~~~~~
     (Updated 93.07.17)
@@ -24,12 +23,12 @@ The first three are identical to C usage, so those already familiar with
 C may want to just skim the last few sections of this document.
 
 Note:
-    For those directives that begin with '#' (such as #include), the
-    '#' symbol must start in the first column (of the line).
-
+For those directives that begin with '#' (such as #include), the
+'#' symbol must start in the first column (of the line).
 
 Sharing Definitions and Code
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+```
 This facility is provided through the #include directive.
 
     Syntax 1:   #include <file.h>
@@ -89,7 +88,7 @@ Example:
     int i;
 
     stack = allocate(STACKSIZE);
-###         
+###
     for (i = 0; i < STACKSIZE; i++)
     stack[i] = INITCELL(i);
     }
@@ -227,7 +226,7 @@ Notes:
 
     'optimize' takes a second pass over the compiled code to improve it
     slightly
-###     
+###
     'error_context' adds more text to error messages indicating where on
     the line the error occured
 
@@ -239,7 +238,7 @@ descriptions, etc.
     Syntax 1:   @marker
     <... text block ...>
     marker
-###     
+###
     Syntax 2:   @@marker
     <... text block ...>
     marker
@@ -293,3 +292,4 @@ Example 2:
     "It's hopelessly inadequate." }), 1);
     return 1;
     }
+```

@@ -3,19 +3,16 @@ layout: default
 title: master / get_include_path
 ---
 
-
-
-
-
 ### NAME
+
     get_include_path - decide include path based on object
 
-
 ### SYNOPSIS
+
     mixed get_include_path( string object_path );
 
-
 ### DESCRIPTION
+
     When  the  driver  starts to compile a new object this apply is used to
     determine what directories are to be searched for  include  files.   In
     contrast  to the static run time configuration option 'include directo‐
@@ -27,14 +24,11 @@ title: master / get_include_path
     string ":DEFAULT:" which will be replaced be the include path as set by
     the runtime configuration of the driver.
 
-
 ### EXAMPLE
+
     string *get_include_path(string file) {
     string *t = explode(file, "/");
     if(t[1] == "Domain")    // Domains have their own include directory
     return ({ "/Domain/" + t[2] + "/include", ":DEFAULT:" });
     else                    // use default for others
     return ({ ":DEFAULT:" }); }
-
-
-

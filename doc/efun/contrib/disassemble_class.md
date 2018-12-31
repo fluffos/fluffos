@@ -3,8 +3,7 @@ layout: default
 title: contrib / disassemble_class.pre
 ---
 
-
-mixed *disassemble_class(mixed);
+mixed \*disassemble_class(mixed);
 
 ???
 

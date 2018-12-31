@@ -3,20 +3,17 @@ layout: default
 title: master / valid_socket
 ---
 
-
-
-
-
 ### NAME
+
     valid_socket - protects the socket efunctions.
 
-
 ### SYNOPSIS
+
     int valid_socket( object caller, string function,
     mixed *info );
 
-
 ### DESCRIPTION
+
     Each  of the socket efunctions calls valid_socket() prior to executing.
     If valid_socket  returns  0,  then  the  socket  efunction  fails.   If
     valid_socket  returns 1, then the socket efunction attempts to succeed.
@@ -29,6 +26,3 @@ title: master / valid_socket
     the array is the address (string) of the remote end of the socket.  The
     fourth  element  of  the  array  is the port number associated with the
     socket.
-
-
-

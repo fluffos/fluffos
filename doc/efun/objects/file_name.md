@@ -3,19 +3,16 @@ layout: default
 title: objects / file_name
 ---
 
-
-
-
-
 ### NAME
+
     file_name() - get the file name of an object
 
-
 ### SYNOPSIS
+
     string file_name( object ob );
 
-
 ### DESCRIPTION
+
     file_name()  returns  the  name of the file from which <ob> was loaded.
     If the object is a cloned object,  then  file_name()  will  not  be  an
     actual  file  on  disk, but will be the name of the file from which the
@@ -24,6 +21,3 @@ title: objects / file_name
     game is booted, and increase by one for each object cloned,  hence  the
     number   is   unique   for   each  cloned  object.   <ob>  defaults  to
     this_object() if not specified.
-
-
-

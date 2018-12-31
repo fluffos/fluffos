@@ -6,34 +6,34 @@ title: driver / stackmachine
 Version: master
 
 ### THIS IS A DOCUMENT THAT DESCRIBES HOW A VIRTUAL STACK MACHINE HAS BEEN
+
 DEFINED, TO EXECUTE COMPILED LPC CODE.
 
 There are two stacks:
 
-1.    The stack of values, used for evaluation, local variables and arguments.
-Note that arguments are treated as local variables. Every element on the
-value stack will have the format "struct svalue", as defined in interpret.h.
-The value stack is stored in an array, with limited size. The first push
-operation will store a value into element 0. Access of arguments and local
-variables are supposed to be fast, by simply indexing in the value stack
-using the frame pointer as offset.
+1.  The stack of values, used for evaluation, local variables and arguments.
+    Note that arguments are treated as local variables. Every element on the
+    value stack will have the format "struct svalue", as defined in interpret.h.
+    The value stack is stored in an array, with limited size. The first push
+    operation will store a value into element 0. Access of arguments and local
+    variables are supposed to be fast, by simply indexing in the value stack
+    using the frame pointer as offset.
 
-Start of stack 	-----
-		|
-Frame pointer->	|	Argument number 0
-		|	Argument number 1
-		|	etc.
-		|	Local variable number 0
-		|	Local variable number 1
-		|	etc.
-		|	Temporary stack values
-		|	etc
-		v
+Start of stack -----
+|
+Frame pointer-> | Argument number 0
+| Argument number 1
+| etc.
+| Local variable number 0
+| Local variable number 1
+| etc.
+| Temporary stack values
+| etc
+v
 
-2.    The control stack that contains return addresses, frame pointer etc.
+2.  The control stack that contains return addresses, frame pointer etc.
 
-
-1. CALLING LOCAL FUNCTIONS.
+1) CALLING LOCAL FUNCTIONS.
 
 All arguments are evaluated and pushed to the value stack. The last argument
 is the last pushed. It is important that the called function gets exactly as
@@ -78,7 +78,6 @@ b0
 
 b0 = F_RETURN.
 
-
 2. CALLING PREDEFINED FUNCTIONS.
 
 Arguments are pushed to the stack. A value is always returned (on the stack).
@@ -87,7 +86,7 @@ Instruction format:
 
 b1
 
-b1 = The F_ code of the called function.
+b1 = The F\_ code of the called function.
 
 If a variable number of arguments are allowed, then an extra byte will
 follow the instruction, that states number of actual arguments.

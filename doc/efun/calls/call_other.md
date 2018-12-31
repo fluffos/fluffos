@@ -3,20 +3,17 @@ layout: default
 title: calls / call_other
 ---
 
-
-
-
-
 ### NAME
+
     call_other() - call a function in another object
 
-
 ### SYNOPSIS
+
     unknown call_other( object ob | object *obs,
     string func | mixed *args, ... );
 
-
 ### DESCRIPTION
+
     Calls  a  function in another object, with [optional] argument(s).  The
     return value is returned from the other object, so it cannot  be  known
     at  compile  time  and may need to be cast if using type checking.  The
@@ -47,6 +44,3 @@ title: calls / call_other
     An example of using an array as the first argument:
 
     users()->quit();
-
-
-

@@ -3,19 +3,16 @@ layout: default
 title: object / create
 ---
 
-
-
-
-
 ### NAME
+
     create - object initialization
 
-
 ### SYNOPSIS
+
     void create( void );
 
-
 ### DESCRIPTION
+
     Every  object  should have a create function defined within it.  Within
     that function, all initial object initialization should be done.   cre‐
     ate()  is called on *all* objects.  *NOTE* - This behavior is different
@@ -28,13 +25,10 @@ title: object / create
     create *is* being called twice, but on  two  *different*  objects:  the
     parent, and the child that is calling parent::create() manually.
 
-
 ### SEE ALSO
+
     reset(4), __INIT(4)
 
-
 ### AUTHOR
+
     Wayfarer@Portals
-
-
-

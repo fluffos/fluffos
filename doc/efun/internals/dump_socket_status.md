@@ -3,19 +3,16 @@ layout: default
 title: internals / dump_socket_status
 ---
 
-
-
-
-
 ### NAME
+
     dump_socket_status() - display the status of each LPC socket
 
-
 ### SYNOPSIS
+
     void dump_socket_status( void );
 
-
 ### DESCRIPTION
+
     dump_socket_status()  is  a diagnostic facility which displays the cur‐
     rent status of all LPC sockets configured into the MudOS driver.  It is
     useful  for debugging LPC sockets applications.  Each row in the output
@@ -57,9 +54,6 @@ title: internals / dump_socket_status
     -1    CLOSED      MUD    *.*                *.*
     -1    CLOSED      MUD    *.*                *.*
 
-
 ### SEE ALSO
+
     debug_info(3), dump_file_descriptors(3)
-
-
-

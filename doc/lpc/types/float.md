@@ -3,8 +3,7 @@ layout: default
 title: types / float
 ---
 
-
-MudOS LPC now provides support for the floating point type.  Declare
+MudOS LPC now provides support for the floating point type. Declare
 variables like this:
 
 float pi;
@@ -15,5 +14,5 @@ Floating point constants may contain decimal points e.g.
 pi = 3.14159265;
 
 The LPC float type is based on the single precision floating point type
-provided by C.  On most machines this will give about seven (7) digits
+provided by C. On most machines this will give about seven (7) digits
 of precision (in base 10).

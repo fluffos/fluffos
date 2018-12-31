@@ -3,10 +3,9 @@ layout: default
 title: constructs / if
 ---
 
+- The if else statement:
 
-* The if else statement:
-
-LPC's if statement is identical to that provided by C.  Syntax is as follows:
+LPC's if statement is identical to that provided by C. Syntax is as follows:
 
     if (expression)
     statement;
@@ -35,10 +34,10 @@ Alternately:
 
 The number of else clauses is not explicitly limited.
 
-- - - - -
+---
 
 Another favorite programming construct is the ? : operator, which also
-operates identical to C.  The syntax is:
+operates identical to C. The syntax is:
 
     expression0 ? expression1_if_true : expression2_if_false
 

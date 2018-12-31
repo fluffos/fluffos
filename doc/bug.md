@@ -11,12 +11,12 @@ You can either send to [LPMuds.net Driver board](http://lpmuds.net/smf/index.php
 
 Please be sure to include these in your bug report.
 
-* The version number, if you are using trunk, which change were you pulled to. If that is too hard to answer, send your `git log` output.
+- The version number, if you are using trunk, which change were you pulled to. If that is too hard to answer, send your `git log` output.
 
-* The full output, the driver will at least print out some backtrace or error message. Include those.
+- The full output, the driver will at least print out some backtrace or error message. Include those.
 
-* If you can, try to narrow down to a small LPC program that reproduce the
-problem easily. If you can not, Try using Valgrind method first.
+- If you can, try to narrow down to a small LPC program that reproduce the
+  problem easily. If you can not, Try using Valgrind method first.
 
 ### Valgrind
 
@@ -49,11 +49,11 @@ $ echo 0 > /proc/sys/kernel/yama/ptrace_scope (on ubuntu)
 (it will be slow, that is okay) You may also have to relax your `maximum eval cost`
 setting, if necessary. When Valgrind halts and prints out a backtrace with `Invalid read of size 1`, or `Invalid write of size 1`, save the entire stack trace.
 
-Then press "y" and "enter"  to drop into GDB, do "bt", and then do "info locals"
+Then press "y" and "enter" to drop into GDB, do "bt", and then do "info locals"
 if needed.
 
 #### Known False Positves
 
 Ignore these when you see it happen. Just press `N` or `Enter` to continue.
 
-* With `HAVE_ZLIB`, on `restore_object()` it will complains `Jump base on uninitialized value` with a stacktrace to `zlib`, this is normal.
+- With `HAVE_ZLIB`, on `restore_object()` it will complains `Jump base on uninitialized value` with a stacktrace to `zlib`, this is normal.

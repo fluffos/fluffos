@@ -3,7 +3,6 @@ layout: default
 title: contrib / query_ip_port.pre
 ---
 
-
 int query_ip_port(void | object);
 
 object defaults to this_player()

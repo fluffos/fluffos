@@ -3,19 +3,16 @@ layout: default
 title: internals / dump_file_descriptors
 ---
 
-
-
-
-
 ### NAME
+
     dump_file_descriptors() - dump the MudOS process file descriptor table
 
-
 ### SYNOPSIS
+
     void dump_file_descriptors( void );
 
-
 ### DESCRIPTION
+
     This  function  is provided to assist in debugging the MudOS driver and
     helps overcome deficiencies in some UN*X implementations which  do  not
     provide  equivalent  or  superior  debugging  facilities as part of the
@@ -38,9 +35,6 @@ title: internals / dump_file_descriptors
     6    40    2e2   145996  c    0   2862      1           0
     7    79      7   164601  f  644   2862      1         506
 
-
 ### SEE ALSO
+
     dump_socket_status(3)
-
-
-

@@ -3,20 +3,17 @@ layout: default
 title: arrays / unique_array
 ---
 
-
-
-
-
 ### NAME
+
     unique_array() - partitions an array of objects into groups
 
-
 ### SYNOPSIS
+
     mixed  unique_array( object *obarr, string separator, void | mixed skip
     ); mixed unique_array( mixed *arr, function f, void | mixed skip );
 
-
 ### DESCRIPTION
+
     Groups objects together for which the 'separator' function returns  the
     same  value.  'obarr'  should  be  an array of objects, other types are
     ignored.  The 'separator' function is called only once in  each  object
@@ -26,8 +23,8 @@ title: arrays / unique_array
     ments are partitioned based on the return value of f.   In  particular,
     the array does not need to be composed of objects.
 
-
 ### RETURN VALUE
+
     The return value is an array of arrays of objects on the form:
 
     ({
@@ -38,6 +35,3 @@ title: arrays / unique_array
     ....
     ({SameM:1, SameM:2, SameM:3, .... SameM:N }),
     })
-
-
-

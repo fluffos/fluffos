@@ -3,8 +3,7 @@ layout: default
 title: contrib / assemble_class.pre
 ---
 
-
-mixed assemble_class(mixed *);
+mixed assemble_class(mixed \*);
 
 ???
 

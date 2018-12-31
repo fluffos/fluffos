@@ -3,19 +3,16 @@ layout: default
 title: functions / bind
 ---
 
-
-
-
-
 ### NAME
+
     bind() - change the owner of a function pointer
 
-
 ### SYNOPSIS
+
     function bind(function f, object ob)
 
-
 ### DESCRIPTION
+
     Returns  a  function pointer that is exactly the same as f, but belongs
     to the object 'ob' instead of the object that created f.  Useful if the
     creator  of 'f' has been destructed, or f is an efun pointer to an efun
@@ -35,6 +32,3 @@ title: functions / bind
     this, as bind() allows you to force another object to run  a  piece  of
     code.   To  protect  against this, there is a valid_bind() master apply
     which must return 1 or the call to bind() will fail.
-
-
-

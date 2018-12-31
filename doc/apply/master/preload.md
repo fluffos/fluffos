@@ -3,20 +3,17 @@ layout: default
 title: master / preload
 ---
 
-
-
-
-
 ### NAME
+
     preload - preload an object into memory.
 
-
 ### SYNOPSIS
+
     string *epilog( int load_empty );
     void preload( string filename );
 
-
 ### DESCRIPTION
+
     The  driver  calls  epilog() in master after the master object has been
     loaded.  Mudlibs typically use epilog to initialize data structures  in
     master (such as security tables etc).  epilog() should returns an array
@@ -29,9 +26,6 @@ title: master / preload
     when starting up the driver.  It can be used as a signal to the  mudlib
     to not load castles, etc.
 
-
 ### SEE ALSO
+
     epilog(4)
-
-
-
