@@ -1,3 +1,0 @@
-mixed element_of(mixed *);
-
-returns random elememt of given array

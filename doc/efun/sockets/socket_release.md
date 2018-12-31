@@ -1,0 +1,50 @@
+---
+layout: default
+title: sockets / socket_release
+---
+
+
+
+
+
+### NAME
+    socket_release() - release ownership of a socket to another object
+
+
+### SYNOPSIS
+    #include <socket_err.h>
+
+    int socket_release( int socket, object ob,
+    string release_callback );
+
+
+### DESCRIPTION
+    socket_release()  is used to change ownership (and control) of a socket
+    to another object.  It is useful in daemon objects (like  inetd)  which
+    handle  connection  set-up  and  then  transfer  a  connected socket to
+    another object for further processing.
+
+    Socket ownership transfer involves  a  handshake  between  the  current
+    owner object and the socket to which the current owner wishes to trans‐
+    fer the socket.  The handshake is initiated  when  socket_release()  is
+    called.   socket_release() does appropriate security/integrity checking
+    and then calls the release_callback function in object ob.  This  func‐
+    tion is used to notify ob that socket ownership is being transferred to
+    it.  It is then ob's responsibility to call socket_acquire() within the
+    release  callback  function.   If  socket_acquire()  is called then the
+    handshake is complete and socket ownership has been successfully trans‐
+    ferred  to  ob.  ob may decline to accept responsibility for the socket
+    by not calling socket_acquire(),  in  which  case  ownership  does  not
+    change and the current socket owner must decide how to respond to this.
+
+    If  the  socket  owner is successfully transfered then socket_release()
+    returns EESUCCESS.  If ob does not accept ownership for the socket then
+    EESOCKNOTRLSD is returned.  Other errors can be returned based on secu‐
+    rity violation, bad socket descriptor vbalues, etc.
+
+
+### SEE ALSO
+    socket_acquire(3)
+
+
+

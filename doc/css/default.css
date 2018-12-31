@@ -1,0 +1,37 @@
+body {
+}
+
+#pages {
+  text-align: right;
+  border-right: 1px solid #ccc;
+  padding-right: 2em;
+}
+#pages ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+#pages ol li {
+  padding: 0.3em 0 0.6em 0em;
+  color: #669966;
+  font-weight: bold;
+}
+#pages ol li ol {
+  margin-top: 0.3em;
+  padding: 0.3em 0 0.9em 0.9em;
+}
+#pages ol li ol li {
+  padding: 0.3em 0 0.3em 0em;
+}
+#pages ol li a  {
+  font-weight: normal;
+}
+#pages form {
+  margin-top: 2em;
+  padding: 0.3em 0 0.5em 0.5em;
+}
+#pages ol li p  {
+  font-weight: normal;
+  color: #000;
+  vertical-align: center;
+}

@@ -1,0 +1,36 @@
+---
+layout: default
+title: interactive / exec
+---
+
+
+
+
+
+### NAME
+    exec()  - switches a player (interactive) connection from one object to
+    another
+
+
+### SYNOPSIS
+    int exec( object to, object from );
+
+
+### DESCRIPTION
+    This efunction allows the interactive link to  a  given  object  to  be
+    migrated to another object.  That is, after a successful exec(to, from)
+    call, interactive(to) will return 1 and interactive(from)  will  return
+    0.   The player that was controlling 'from' will begin controlling 'to'
+    following the exec() call.  Note that this is a powerful  function  and
+    its use must be restricted if you wish to attempt to have a secure mud.
+    The proper way to restrict the use of exec() is to make a simul_efun of
+    the  same  name and then use valid_override(4) to restrict the use of a
+    simul_efun override (i.e. efun::exec()).  The exec() function returns 1
+    if the switch is successful (and 0 otherwise).
+
+
+### SEE ALSO
+    interactive(3), valid_override(4)
+
+
+

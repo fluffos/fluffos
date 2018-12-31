@@ -1,5 +1,0 @@
-mixed assemble_class(mixed *);
-
-???
-
-see disassemble_class(3)

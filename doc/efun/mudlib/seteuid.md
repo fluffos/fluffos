@@ -1,0 +1,33 @@
+---
+layout: default
+title: mudlib / seteuid
+---
+
+
+
+
+
+### NAME
+    seteuid() - set the effective user id (euid) of an object
+
+
+### SYNOPSIS
+    int seteuid( string str );
+
+
+### DESCRIPTION
+    Set effective uid to 'str'.  valid_seteuid() in master.c controls which
+    values the euid of an object may be set to.
+
+    When this value is 0, then the current object's uid can be  changed  by
+    export_uid(), and only then.
+
+    But,  when  the  value is 0, no objects can be loaded or cloned by this
+    object.
+
+
+### SEE ALSO
+    export_uid(3), getuid(3), geteuid(3), this_object(3), valid_seteuid(4)
+
+
+
