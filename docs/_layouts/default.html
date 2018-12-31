@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
-    <link rel="stylesheet" href="/css/default.css">
+    <link rel="stylesheet" href={{ "/css/default.css" | relative_url }}>
   </head>
   <body>
     <div class="container">
@@ -63,42 +63,13 @@
         </div>
 
         <div class="col-8 col-sm-8 col-lg-8">
-          <h2>{{ page.title }}</h2>
+		<h2>{{ page.title }} -- <a href="{{ site.github.repository_url }}/tree/master/{{ page.relative_path }}">Edit</a></h2>
           <div id="content">
             {{ content }}
           </div>
-          <div id='discourse-comments'></div>
-          <!--
-            <div>
-            <div id="disqus_thread"></div>
-            <script type="text/javascript">
-/* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
-var disqus_shortname = 'fluffos'; // required: replace example with your forum shortname
-/* * * DON'T EDIT BELOW THIS LINE * * */
-(function() {
-  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-})();
-            </script>
-            <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-            <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-            </div>
-            -->
         </div>
       </div>
     </div>
-
-    <script type="text/javascript">
-DiscourseEmbed = { discourseUrl: 'https://forum.fluffos.info/',
-  discourseEmbedUrl: '{{ page.url | absolute_url }}' };
-
-(function() {
-  var d = document.createElement('script'); d.type = 'text/javascript'; d.async = true;
-  d.src = DiscourseEmbed.discourseUrl + 'javascripts/embed.js';
-  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(d);
-})();
-    </script>
 
     <!-- GCE -->
     <script>
@@ -122,7 +93,7 @@ DiscourseEmbed = { discourseUrl: 'https://forum.fluffos.info/',
 m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
 })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
 
-ga('create', 'UA-2912700-7', 'fluffos.github.io');
+ga('create', 'UA-2912700-7', 'www.fluffos.info');
 ga('send', 'pageview');
     </script>
 
