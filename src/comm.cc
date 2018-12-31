@@ -355,18 +355,17 @@ bool init_user_conn() {
       char service[NI_MAXSERV];
       snprintf(service, sizeof(service), "%u", external_port[i].port);
 
-      struct addrinfo hints;
-      memset(&hints, 0, sizeof(struct addrinfo));
+      // Must be initialized to all zero.
+      struct addrinfo hints = {0};
 #ifdef IPV6
       hints.ai_family = AF_INET6;
+      hints.ai_flags |= AI_V4MAPPED;
 #else
       hints.ai_family = AF_INET;
 #endif
       hints.ai_socktype = SOCK_STREAM;
-      hints.ai_flags = AI_PASSIVE | AI_NUMERICSERV;
-#ifdef IPV6
-      hints.ai_flags |= AI_V4MAPPED;
-#endif
+      hints.ai_flags |= AI_PASSIVE | AI_NUMERICSERV;
+
       int ret;
 
       auto mudip = CONFIG_STR(__MUD_IP__);
