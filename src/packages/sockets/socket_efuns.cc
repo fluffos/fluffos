@@ -114,10 +114,10 @@ static bool lpcaddr_to_sockaddr(const char *name, struct sockaddr *addr, socklen
   memcpy(host, name, cp - name);
   strncpy(service, cp + 1, sizeof(service) - 1);
 
-  struct addrinfo hints, *res;
-
+  struct addrinfo hints = {0}, *res;
 #ifdef IPV6
   hints.ai_family = AF_UNSPEC;
+  hints.ai_flags |= AI_V4MAPPED;
 #else
   hints.ai_family = AF_INET;
 #endif
@@ -125,9 +125,9 @@ static bool lpcaddr_to_sockaddr(const char *name, struct sockaddr *addr, socklen
   hints.ai_protocol = 0;
   // LPC name resolution is done through other efun.
   // this efun only support numeric address and service
-  hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV;
+  hints.ai_flags |= AI_NUMERICHOST | AI_NUMERICSERV;
   // Make sure we only see address that the system supports.
-  hints.ai_flags |= AI_V4MAPPED | AI_ADDRCONFIG;
+  hints.ai_flags |= AI_ADDRCONFIG;
 
   int ret;
   if ((ret = getaddrinfo(host, service, &hints, &res))) {
@@ -434,8 +434,8 @@ int socket_bind(int fd, int port, const char *addr) {
     char service[NI_MAXSERV];
     snprintf(service, sizeof(service), "%u", port);
 
-    struct addrinfo hints;
-    memset(&hints, 0, sizeof(struct addrinfo));
+    // Must be initialized to all zero.
+    struct addrinfo hints = {0};
 #ifdef IPV6
     hints.ai_family = AF_INET6;
 #else
