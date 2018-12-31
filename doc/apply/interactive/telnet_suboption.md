@@ -3,19 +3,16 @@ layout: default
 title: interactive / telnet_suboption
 ---
 
-
-
-
-
 ### NAME
+
     telnet_suboption - process telnet suboptions
 
-
 ### SYNOPSIS
+
     void telnet_suboption( string buffer );
 
-
 ### DESCRIPTION
+
     This apply is called on the interactive object with the parameter given
     by the SE telnet suboption, for mudlib defined processing.   For  exam‐
     ple, this allows for future support of terminal types.
@@ -33,6 +30,3 @@ title: interactive / telnet_suboption
     #define TELQUAL_INFO  2 // ENVIRON: informational version of IS
     #define TELQUAL_REPLY 3 // AUTHENTICATION: client version of IS
     #define TELQUAL_NAME  4 // AUTHENTICATION: client version of IS
-
-
-

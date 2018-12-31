@@ -3,20 +3,17 @@ layout: default
 title: mappings / map_delete
 ---
 
-
-
-
-
 ### NAME
+
     map_delete()  -  remove a (key, value) pair from a mapping based on the
     key
 
-
 ### SYNOPSIS
+
     void map_delete( mapping m, mixed element );
 
-
 ### DESCRIPTION
+
     map_delete removes the (key, value) from the mapping  m  that  has  key
     equal to element.
 
@@ -41,9 +38,6 @@ title: mappings / map_delete
     ilkan") is called [unless ("truilkan", *) is subsequently added back to
     the mapping].
 
-
 ### SEE ALSO
+
     allocate_mapping(3)
-
-
-

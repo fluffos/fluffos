@@ -3,20 +3,17 @@ layout: default
 title: interactive / exec
 ---
 
-
-
-
-
 ### NAME
+
     exec()  - switches a player (interactive) connection from one object to
     another
 
-
 ### SYNOPSIS
+
     int exec( object to, object from );
 
-
 ### DESCRIPTION
+
     This efunction allows the interactive link to  a  given  object  to  be
     migrated to another object.  That is, after a successful exec(to, from)
     call, interactive(to) will return 1 and interactive(from)  will  return
@@ -28,9 +25,6 @@ title: interactive / exec
     simul_efun override (i.e. efun::exec()).  The exec() function returns 1
     if the switch is successful (and 0 otherwise).
 
-
 ### SEE ALSO
+
     interactive(3), valid_override(4)
-
-
-

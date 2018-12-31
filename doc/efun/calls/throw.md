@@ -3,19 +3,16 @@ layout: default
 title: calls / throw
 ---
 
-
-
-
-
 ### NAME
+
     throw() - forces an error to occur in an object.
 
-
 ### SYNOPSIS
+
     void throw(mixed);
 
-
 ### DESCRIPTION
+
     The  throw()  efun may be used to force an error to occur in an object.
     When used in conjunction, throw() and catch() allow the  programmer  to
     choose  what  error  message  is displayed when a runtime error occurs.
@@ -31,9 +28,6 @@ title: calls / throw
     return;
     }
 
-
 ### SEE ALSO
+
     catch(3), error(3), error_handler(4)
-
-
-

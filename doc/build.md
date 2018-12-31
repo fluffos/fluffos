@@ -3,14 +3,14 @@ layout: default
 title: Build
 ---
 
-Requirements
-------------
+## Requirements
+
 Compiler: GCC 4.6+ or LLVM clang 3.0+
 
 Library: libevent 2.0+, addtional libraries depends on the package selection.
 
-General Building Steps
-----------------------
+## General Building Steps
+
 To Build fluffos 3.0
 
     # 1. heckout git repo
@@ -32,8 +32,8 @@ To Build fluffos 3.0
 
     # 4. Find the built binary "driver" and "portbind" in bin/ directory
 
-Ubuntu/Debian x86_64
---------------------
+## Ubuntu/Debian x86_64
+
 This is the best platform to run fluffos currently, support for other platform
 is best effort only.
 
@@ -49,8 +49,8 @@ is best effort only.
     $ sudo apt-get install libmysqlclient-dev libsqlite3-dev \
       libpq-dev libz-dev libssl-dev libpcre3-dev
 
-CentOS X86_64
--------------
+## CentOS X86_64
+
 gcc/libevent on CentOS is too old for FluffOS, you must upgrade them manually.
 
     # Install GCC 4.8
@@ -84,8 +84,8 @@ gcc/libevent on CentOS is too old for FluffOS, you must upgrade them manually.
     $ make
     $ make install
 
-CYGWIN32/CYGWIN64
------------------
+## CYGWIN32/CYGWIN64
+
 FluffOS 3.0alpha8 is fully functional under CYGWIN32 and CYGWIN64 now!
 
 WARNING: FluffOS currently still require your mudlib files have unix line-ending.
@@ -119,10 +119,10 @@ WARNING: FluffOS currently still require your mudlib files have unix line-ending
     $ cd <your mudlib dir>
     $ find . | xargs dos2unix
 
-FreeBSD
--------
+## FreeBSD
+
 Currently not supported.
 
-Customization
--------------
+## Customization
+
 TODO: list important local_options directive here.

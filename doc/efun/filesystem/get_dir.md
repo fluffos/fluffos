@@ -3,19 +3,16 @@ layout: default
 title: filesystem / get_dir
 ---
 
-
-
-
-
 ### NAME
+
     get_dir() - returns information pertaining to a filesystem directory
 
-
 ### SYNOPSIS
+
     mixed *get_dir( string dir, int default: 0 );
 
-
 ### DESCRIPTION
+
     If  'dir' is a filename ('*' and '?' wildcards are supported), an array
     of strings is returned containing all filenames that match the specifi‐
     cation.   If 'dir' is a directory name (ending with a slash--ie: "/u/",
@@ -31,9 +28,6 @@ title: filesystem / get_dir
     The  size_of_file  element  is  the  same  value  that  is  returned by
     file_size(3); the size of the file in bytes, or -2 if it's a directory.
 
-
 ### SEE ALSO
+
     file_size(3), stat(3), time(3)
-
-
-

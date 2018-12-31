@@ -3,19 +3,16 @@ layout: default
 title: ed / ed_start
 ---
 
-
-
-
-
 ### NAME
+
     ed_start() - start an ed session
 
-
 ### SYNOPSIS
+
     string ed_start(string file | void, int restricted | void)
 
-
 ### DESCRIPTION
+
     This efun is available only if __OLD_ED__ is not defined.
 
     The  internal editor is started, optionally loading 'file' for editing.
@@ -26,6 +23,3 @@ title: ed / ed_start
     will be disabled.
 
     Only one ed session can be active per object at a time.
-
-
-

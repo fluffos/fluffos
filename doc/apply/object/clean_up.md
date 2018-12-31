@@ -3,19 +3,16 @@ layout: default
 title: object / clean_up
 ---
 
-
-
-
-
 ### NAME
+
     clean_up - periodically called in inactive objects
 
-
 ### SYNOPSIS
+
     int clean_up( int inherited );
 
-
 ### DESCRIPTION
+
     The  clean_up()  function is called by the driver on a regular basis in
     all objects  that  have  been  inactive  for  the  time  specified  for
     clean_up()  in  the  runtime configuration file.  One flag is passed to
@@ -26,6 +23,3 @@ title: object / clean_up
 
     One  thing that might be commonly done by an object in this function is
     destructing itself to conserve memory.
-
-
-

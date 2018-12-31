@@ -3,22 +3,19 @@ layout: default
 title: sockets / socket_release
 ---
 
-
-
-
-
 ### NAME
+
     socket_release() - release ownership of a socket to another object
 
-
 ### SYNOPSIS
+
     #include <socket_err.h>
 
     int socket_release( int socket, object ob,
     string release_callback );
 
-
 ### DESCRIPTION
+
     socket_release()  is used to change ownership (and control) of a socket
     to another object.  It is useful in daemon objects (like  inetd)  which
     handle  connection  set-up  and  then  transfer  a  connected socket to
@@ -42,9 +39,6 @@ title: sockets / socket_release
     EESOCKNOTRLSD is returned.  Other errors can be returned based on secu‐
     rity violation, bad socket descriptor vbalues, etc.
 
-
 ### SEE ALSO
+
     socket_acquire(3)
-
-
-

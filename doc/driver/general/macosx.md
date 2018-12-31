@@ -3,7 +3,6 @@ layout: default
 title: general / macosx.md
 ---
 
-
 FluffOS 3.0 fully support compiling under MAC OSX.
 
 On 2017-09, following is tested to be working.

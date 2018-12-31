@@ -3,20 +3,17 @@ layout: default
 title: functions / functionp
 ---
 
-
-
-
-
 ### NAME
+
     functionp()  -  determine whether or not a given variable is a function
     pointer, and if so what kind
 
-
 ### SYNOPSIS
+
     int functionp( mixed arg );
 
-
 ### DESCRIPTION
+
     Return nonzero if 'arg' is a function pointer and zero  (0)  otherwise.
     Function  pointers are variables of type 'function' as indicated in the
     documentation for the type 'function', for example:
@@ -49,11 +46,8 @@ title: functions / functionp
 
     if (functionp(f) & FP_HAS_ARGUMENTS) ...
 
-
 ### SEE ALSO
+
     mapp(3),  stringp(3),  pointerp(3),  objectp(3),  intp(3),  bufferp(3),
     floatp(3), nullp(3), undefinedp(3), errorp(3), bind(3), lpc/types/func‐
     tion
-
-
-

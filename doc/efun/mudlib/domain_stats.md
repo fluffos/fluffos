@@ -3,21 +3,18 @@ layout: default
 title: mudlib / domain_stats
 ---
 
-
-
-
-
 ### NAME
+
     domain_stats() - returns statistics gathered on domains
     author_stats() - returns statistics gathered on authors
 
-
 ### SYNOPSIS
+
     mapping domain_stats( string domain | void );
     mapping author_stats( string domain | void );
 
-
 ### DESCRIPTION
+
     Both  domain_stats()  and author_stats() return information stored in a
     mapping.  If no argument is specified, then information is returned  on
     all  domains  (or  on  all  authors)  with  one map entry per domain or
@@ -47,9 +44,6 @@ title: mudlib / domain_stats
     When  called  with an argument, the returned mapping will have the form
     of info0.
 
-
 ### SEE ALSO
+
     domain_file(4), author_file(4), set_author(3)
-
-
-

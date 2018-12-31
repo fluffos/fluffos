@@ -3,19 +3,16 @@ layout: default
 title: internals / rusage
 ---
 
-
-
-
-
 ### NAME
+
     rusage() - reports information gathered by the getrusage() system call
 
-
 ### SYNOPSIS
+
     mapping rusage( void );
 
-
 ### DESCRIPTION
+
     This  efun  collects  information  gathered  via the getrusage() system
     call.  Read the getrusage() man  page  for  more  information  on  what
     information   will   be  collected.   Some  systems  do  not  have  the
@@ -41,9 +38,6 @@ title: internals / rusage
     nswap,   inblock,  oublock,  msgsnd,  msgrcv,  nsignals,  nvcsw,
     nivcsw.
 
-
 ### SEE ALSO
+
     time_expression(3), function_profile(3), time(3), uptime(3)
-
-
-

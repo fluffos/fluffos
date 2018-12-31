@@ -3,19 +3,16 @@ layout: default
 title: objects / present
 ---
 
-
-
-
-
 ### NAME
+
     present() - find an object by id
 
-
 ### SYNOPSIS
+
     object present( mixed str, object ob );
 
-
 ### DESCRIPTION
+
     if first argument is string, second argument is 0/missing, searches for
     a object that id(name) = 1 in this object inventory and  this  object's
     environment's inventory.  Returns the found object.
@@ -37,9 +34,6 @@ title: objects / present
     If  object  is  hidden (via set_hide()), and current object is not hid‐
     able.  returns 0
 
-
 ### SEE ALSO
+
     move_object(3), environment(3)
-
-
-

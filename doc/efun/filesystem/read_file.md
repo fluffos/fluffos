@@ -3,20 +3,17 @@ layout: default
 title: filesystem / read_file
 ---
 
-
-
-
-
 ### NAME
+
     read_file() - read a file into a string
 
-
 ### SYNOPSIS
+
     string read_file( string file, int start_line,
     int number_of_lines );
 
-
 ### DESCRIPTION
+
     Read  a  line  of text from a file into a string.  The second and third
     arguments are optional.  If only the first argument is  specified,  the
     entire file is returned (as a string).
@@ -25,9 +22,6 @@ title: filesystem / read_file
     routine will return 0 if you try to read past the end of the  file,  or
     if you try to read from a nonpositive line.
 
-
 ### SEE ALSO
+
     write_file(3), read_buffer(3)
-
-
-

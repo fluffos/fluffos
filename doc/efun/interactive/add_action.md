@@ -3,20 +3,17 @@ layout: default
 title: interactive / add_action
 ---
 
-
-
-
-
 ### NAME
+
     add_action() - bind a command verb to a local function
 
-
 ### SYNOPSIS
+
     void add_action( string | function fun, string | string * cmd, int flag
     );
 
-
 ### DESCRIPTION
+
     Set up a local function <fun> to be called when user input matches  the
     command  <cmd>. Functions called by a player command will get the argu‐
     ments as a string. It must then return 0 if it was the  wrong  command,
@@ -41,9 +38,6 @@ title: interactive / add_action
     characters must match, but query_verb() will only return the characters
     following <cmd>.
 
-
 ### SEE ALSO
+
     query_verb(3), remove_action(3), init(4)
-
-
-

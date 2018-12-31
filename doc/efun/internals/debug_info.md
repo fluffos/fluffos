@@ -3,21 +3,18 @@ layout: default
 title: internals / debug_info
 ---
 
-
-
-
-
 ### NAME
+
     debug_info() - display debug information
 
-
 ### SYNOPSIS
+
     mixed debug_info( int operation, ... );
     mixed debug_info( 0, object ob );
     mixed debug_info( 1, object ob );
 
-
 ### DESCRIPTION
+
     debug_info()  is  a general-purpose facility which may be used to debug
     the MudOS driver.  The debugging information requested is determined by
     the  first  argument.  Successive arguments are determine by the opera‐
@@ -67,9 +64,6 @@ title: internals / debug_info
     num inherits 0 (0)
     total size 104
 
-
 ### SEE ALSO
+
     dump_file_descriptors(3), dump_socket_status(3)
-
-
-

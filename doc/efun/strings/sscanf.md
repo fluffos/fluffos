@@ -3,20 +3,17 @@ layout: default
 title: strings / sscanf
 ---
 
-
-
-
-
 ### NAME
+
     sscanf() - match substrings in a string.
 
-
 ### SYNOPSIS
+
     int sscanf( string str, string fmt,
     mixed var1, mixed var2 ... );
 
-
 ### DESCRIPTION
+
     Parse  a string 'str' using the format 'fmt'. 'fmt' can contain strings
     separated by "%d" and "%s". Every "%d" and "%s" corresponds to  one  of
     'var1',  'var2'...   "%d"  will  give  a  number,  and "%s" will give a
@@ -32,9 +29,6 @@ title: strings / sscanf
 
     The number of matched "%d" and "%s" is returned.
 
-
 ### SEE ALSO
+
     explode(3), replace_string(3), strsrch(3)
-
-
-

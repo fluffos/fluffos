@@ -3,19 +3,16 @@ layout: default
 title: calls / shadow
 ---
 
-
-
-
-
 ### NAME
+
     shadow() - shadow one or more functions in some object
 
-
 ### SYNOPSIS
+
     object shadow( object ob, int flag );
 
-
 ### DESCRIPTION
+
     If  'flag'  is  1  or missing, then current object will shadow 'ob'. If
     already shadowing 'ob'.
 
@@ -44,9 +41,6 @@ title: calls / shadow
     player object much simpler than it could be if the code for the various
     classes had to be in the player object itself.
 
-
 ### SEE ALSO
+
     destruct(3), shadowp(3), query_shadowing(3), valid_shadow(4)
-
-
-

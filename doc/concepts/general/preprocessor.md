@@ -3,8 +3,6 @@ layout: default
 title: general / preprocessor
 ---
 
-
-
     LPC Preprocessor Manual
     ~~~~~~~~~~~~~~~~~~~~~~~
     (Updated 93.07.17)
@@ -23,12 +21,12 @@ The first three are identical to C usage, so those already familiar with
 C may want to just skim the last few sections of this document.
 
 Note:
-    For those directives that begin with '#' (such as #include), the
-    '#' symbol must start in the first column (of the line).
-
+For those directives that begin with '#' (such as #include), the
+'#' symbol must start in the first column (of the line).
 
 Sharing Definitions and Code
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+```
 This facility is provided through the #include directive.
 
     Syntax 1:   #include <file.h>
@@ -292,3 +290,4 @@ Example 2:
     "It's hopelessly inadequate." }), 1);
     return 1;
     }
+```

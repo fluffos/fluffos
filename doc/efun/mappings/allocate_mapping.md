@@ -3,19 +3,16 @@ layout: default
 title: mappings / allocate_mapping
 ---
 
-
-
-
-
 ### NAME
+
     allocate_mapping() - pre-allocate space for a mapping
 
-
 ### SYNOPSIS
+
     mapping allocate_mapping( int size );
 
-
 ### DESCRIPTION
+
     Returns a mapping with space for 'size' elements preallocated.
 
     For example:
@@ -39,9 +36,6 @@ title: mappings / allocate_mapping
     Note: at this point in time, 'size' is meaningless, x  =  allocate_map‐
     ping(200); is equivalent to x = ([ ]);
 
-
 ### SEE ALSO
+
     map_delete(3)
-
-
-

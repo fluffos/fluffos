@@ -3,19 +3,16 @@ layout: default
 title: general / typeof
 ---
 
-
-
-
-
 ### NAME
+
     typeof() - return the type of an expression
 
-
 ### SYNOPSIS
+
     string typeof( mixed var );
 
-
 ### DESCRIPTION
+
     Return  the  type  of  an  expression.   The return values are given in
     <type.h>.  They are:
 
@@ -28,9 +25,6 @@ title: general / typeof
     "*lvalue_byte*"   T_LVALUE_RANGE    "*lvalue_range*"    T_ERROR_HANDLER
     "*error_handler*" T_FREED         "*freed*" T_UNKNOWN       "*unknown*"
 
-
 ### SEE ALSO
+
     allocate(3), allocate_mapping(3), strlen(3)
-
-
-

@@ -3,21 +3,18 @@ layout: default
 title: system / localtime
 ---
 
-
-
-
-
 ### NAME
+
     localtime() - convert to local time
 
-
 ### SYNOPSIS
+
     #include <localtime.h>
 
     mixed *localtime( int time );
 
-
 ### DESCRIPTION
+
     localtime() converts a time value (as returned by time()) into an array
     of values which represents the time locally.  In the  past  time()  was
     used to get the time in GMT (UTC), and then local definitions were used
@@ -43,9 +40,6 @@ title: system / localtime
     int  LT_GMTOFF Seconds after GMT (UTC)
     string    LT_ZONE        Timezone name
 
-
 ### SEE ALSO
+
     ctime(3), time(3), time_expression(3), uptime(3), /include/localtime.h
-
-
-

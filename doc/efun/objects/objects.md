@@ -3,20 +3,17 @@ layout: default
 title: objects / objects
 ---
 
-
-
-
-
 ### NAME
+
     objects - return an array of all loaded objects
 
-
 ### SYNOPSIS
+
     object  *objects(  string  func, object ob ); object *objects( function
     f);
 
-
 ### DESCRIPTION
+
     An array of every object loaded on the mud is  returned  by  objects().
     Note  that if the system's maximum array size is set too low, objects()
     will truncate its array, in which case it might not be too useful.
@@ -30,9 +27,6 @@ title: objects / objects
     example, objects( (: clonep :) ) returns a list of all  the  clones  in
     existence.
 
-
 ### SEE ALSO
+
     livings(3), users(3)
-
-
-

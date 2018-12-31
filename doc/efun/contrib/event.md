@@ -3,12 +3,11 @@ layout: default
 title: contrib / event.pre
 ---
 
+void event(object | object \*, string, ...);
 
-void event(object | object *, string, ...);
+calls "event\_" + string(...) in:
 
-calls "event_" + string(...) in:
-
-object *:
+object \*:
 each given object
 
 object:

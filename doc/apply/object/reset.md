@@ -3,19 +3,16 @@ layout: default
 title: object / reset
 ---
 
-
-
-
-
 ### NAME
+
     reset - allows an object to do self-maintenance
 
-
 ### SYNOPSIS
+
     void reset( void );
 
-
 ### DESCRIPTION
+
     After  every  reset interval (whose exact length is determined on a mud
     by mud basis, but averages around every 2 hours), reset() is called  in
     every  object  that  currently  exists.   If  LAZY_RESETS is defined in
@@ -25,9 +22,6 @@ title: object / reset
     if  any treasures and/or monsters in the room have been removed so they
     can be replaced.
 
-
 ### SEE ALSO
+
     set_reset(3), create(4)
-
-
-

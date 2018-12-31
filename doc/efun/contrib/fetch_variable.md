@@ -3,7 +3,6 @@ layout: default
 title: contrib / fetch_variable.pre
 ---
 
-
 mixed fetch_variable(string, object | void);
 
 object defaults to this_object()

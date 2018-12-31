@@ -3,20 +3,17 @@ layout: default
 title: interactive / input_to
 ---
 
-
-
-
-
 ### NAME
+
     input_to()  - causes next line of input to be sent to a specified func‐
     tion
 
-
 ### SYNOPSIS
+
     varargs void input_to( string | function fun, int flag, ... );
 
-
 ### DESCRIPTION
+
     Enable next line of user input to be sent to the local  function  'fun'
     as an argument. The input line will not be parsed by the driver.
 
@@ -36,9 +33,6 @@ title: interactive / input_to
     argument (a string). Any additional arguments supplied to input_to will
     be passed on to
 
-
 ### SEE ALSO
+
     call_other(3), call_out(3), get_char(3)
-
-
-

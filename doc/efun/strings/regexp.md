@@ -3,19 +3,16 @@ layout: default
 title: strings / regexp
 ---
 
-
-
-
-
 ### NAME
+
     regexp() - regular expression handler
 
-
 ### SYNOPSIS
+
     string *regexp( string *lines, string pattern, void | int flag );
 
-
 ### DESCRIPTION
+
     Typically  when  presented with an array of lines of text and a regular
     expression, regexp(3) returns an array  containing  those  lines  which
     match  the  pattern  specified  by  the regular expression. If the flag
@@ -24,8 +21,8 @@ title: strings / regexp
     form ({ index1 + 1, match1, ..., indexn + 1, matchn }) where index1  is
     the index of 1st match/non match in the array lines.
 
-
 ### REGULAR EXPRESSION SYNTAX
+
     A  regular  expression  is zero or more branches, separated by '|'.  It
     matches anything that matches one of the branches.
 
@@ -54,8 +51,8 @@ title: strings / regexp
     sequence, make it the first character (following a possible  '^').   To
     include a literal '-', make it the first or last character.
 
-
 ### AMBIGUITY
+
     If  a  regular  expression could match two different parts of the input
     string, it will match the one which begins earliest.  If both begin  in
     the same place but match different lengths, or match the same length in
@@ -84,9 +81,6 @@ title: strings / regexp
     be made, hence subsequent choices must respect it even  if  this  leads
     them to less-preferred alternatives.)
 
-
 ### SEE ALSO
+
     sscanf(3), explode(3), strsrch(3), ed(3)
-
-
-

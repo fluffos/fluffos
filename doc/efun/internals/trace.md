@@ -3,19 +3,16 @@ layout: default
 title: internals / trace
 ---
 
-
-
-
-
 ### NAME
+
     trace() - sets trace flags and returns the old ones.
 
-
 ### SYNOPSIS
+
     int trace( int traceflags );
 
-
 ### DESCRIPTION
+
     Sets  the trace flags and returns the old trace flags.  When tracing is
     on a lot of information is printed during execution.
 
@@ -38,9 +35,6 @@ title: internals / trace
 
     Show object name in tracing.
 
-
 ### SEE ALSO
+
     traceprefix(3)
-
-
-

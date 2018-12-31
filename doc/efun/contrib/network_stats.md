@@ -3,10 +3,10 @@ layout: default
 title: contrib / network_stats.pre
 ---
 
-
 mapping network_stats();
 
 returns mapping:
+
 - incoming packets total : int
 - incoming volume total : int
 - outgoing packets total : int
@@ -18,6 +18,7 @@ returns mapping:
 - outgoing volume port X : int
 
 #ifdef PACKAGE_SOCKETS:
+
 - incoming packets sockets : int
 - incoming volume sockets : int
 - outgoing packets sockets : int

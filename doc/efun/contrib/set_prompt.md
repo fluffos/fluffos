@@ -3,7 +3,6 @@ layout: default
 title: contrib / set_prompt.pre
 ---
 
-
 void set_prompt(string, void | object);
 
 not yet implemented

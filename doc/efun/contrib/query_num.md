@@ -3,7 +3,6 @@ layout: default
 title: contrib / query_num.pre
 ---
 
-
 string query_num(int, int default:0);
 
 english only!!!
