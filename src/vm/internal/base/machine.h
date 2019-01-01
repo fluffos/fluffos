@@ -12,7 +12,7 @@
 #include <sys/types.h>
 
 // FIXME: make this more obvious
-#include "packages/efuns.hh"
+#include "efuns.autogen.h"
 
 // lpc stuff
 #include "vm/internal/base/array.h"

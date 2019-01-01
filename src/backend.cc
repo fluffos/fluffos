@@ -24,7 +24,7 @@
 #include <map>             // for multimap, _Rb_tree_iterator
 #include <utility>         // for pair, make_pair
 
-#include "vm/vm.hh"
+#include "vm/vm.h"
 
 #ifdef PACKAGE_ASYNC
 #include "packages/async/async.h"

@@ -1,6 +1,6 @@
 #include "base/std.h"
 
-#include "vm/vm.hh"
+#include "vm/vm.h"
 #include "vm/internal/base/machine.h"
 #include "vm/internal/compiler/lex.h"  // for instrs, FIXME
 
