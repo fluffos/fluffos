@@ -7,7 +7,7 @@
 #include <stddef.h>       // for size_t
 #include <string.h>       // for strlen, strcat, strcmp, etc
 #include "interactive.h"  // for interactive_t
-#include "vm/vm.hh"       // for sp, pop_stack, svalue_t, u, etc
+#include "vm/vm.h"       // for sp, pop_stack, svalue_t, u, etc
 
 #ifndef USE_ICONV
 typedef void *iconv_t;

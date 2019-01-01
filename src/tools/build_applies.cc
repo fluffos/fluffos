@@ -13,7 +13,7 @@
 #include <string>
 
 static const char *APPLIES = "vm/internal/applies";
-static const char *APPLIES_H = "applies_table.hh";
+static const char *APPLIES_H = "applies_table.autogen.h";
 static const char *APPLIES_TABLE = "applies_table.cc";
 
 int main(int argc, char **argv) {

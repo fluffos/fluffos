@@ -12,7 +12,7 @@
 #include "base/std.h"
 
 // details about machine
-#include "vm/vm.hh"
+#include "vm/vm.h"
 
 // FIXME: apply_cache
 #include "vm/internal/base/apply_cache.h"

@@ -1,5 +1,22 @@
-cmake_minimum_required(VERSION 3.6)   # CMake version check
-project(fluffos)
-set(CMAKE_CXX_STANDARD 11)            # Enable c++11 standard
+cmake_minimum_required(VERSION 3.10)   # CMake version check
+
+# Enable CMAKE Policy
+if(${CMAKE_VERSION} VERSION_LESS 3.12)
+    cmake_policy(VERSION ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION})
+endif()
+
+project(fluffos VERSION 2019.2018123101
+        DESCRIPTION "FluffOS LPC Driver"
+        LANGUAGES CXX)
+
+set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
+
+# Default Build Type
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
+
+message("FluffOS ${PROJECT_VERSION} (${CMAKE_BUILD_TYPE})")
+message("  C++: '${CMAKE_CXX_COMPILER}'")
 
 add_subdirectory(src)

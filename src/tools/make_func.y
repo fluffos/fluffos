@@ -449,8 +449,8 @@ int main(int argc, char **argv) {
   make_efun_tables();
 }
 
-#define EFUN_CC "efuns.cc"
-#define EFUN_H "efuns.hh"
+#define EFUN_CC "efuns.autogen.cc"
+#define EFUN_H "efuns.autogen.h"
 
 static const char HEADER[] =
     "// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"

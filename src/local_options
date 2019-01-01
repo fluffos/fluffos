@@ -44,7 +44,7 @@
 #undef PRIVS
 #undef NO_SHADOWS
 #undef USE_ICONV
-#undef IPV6
+#define IPV6
 #undef DTRACE
 
 /****************************************************************************

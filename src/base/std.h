@@ -106,23 +106,38 @@
 #define LOAD_FLOAT(x, y) LOAD8(x, y)
 #define STORE_FLOAT(x, y) STORE8(x, y)
 
-#if SIZEOF_CHAR_P == 4
-#define COPY_PTR(x, y) COPY4(x, y)
-#define LOAD_PTR(x, y) LOAD4(x, y)
-#define STORE_PTR(x, y) STORE4(x, y)
+#define COPY_PTR(x, y) \
+({ \
+switch(sizeof(char *)) { \
+case 4: COPY4(x, y); break; \
+case 8: COPY8(x, y); break; \
+default: \
+throw "pointers of size other than 4 or 8 not implemented"; \
+} \
+})
+
+#define LOAD_PTR(x, y) \
+({ \
+switch(sizeof(char *)) { \
+case 4: LOAD4(x, y); break; \
+case 8: LOAD8(x, y); break; \
+default: \
+throw "pointers of size other than 4 or 8 not implemented"; \
+} \
+})
+
+#define STORE_PTR(x, y) \
+({ \
+switch(sizeof(char *)) { \
+case 4: STORE4(x, y); break; \
+case 8: STORE8(x, y); break; \
+default: \
+throw "pointers of size other than 4 or 8 not implemented"; \
+} \
+})
 
 #define POINTER_INT intptr_t
 #define INS_POINTER ins_pointer
-#elif SIZEOF_CHAR_P == 8
-#define COPY_PTR(x, y) COPY8(x, y)
-#define LOAD_PTR(x, y) LOAD8(x, y)
-#define STORE_PTR(x, y) STORE8(x, y)
-
-#define POINTER_INT intptr_t
-#define INS_POINTER ins_pointer
-#else
-#error pointers of size other than 4 or 8 not implemented
-#endif
 
 /* The ANSI versions must take an unsigned char, and must work on EOF.  These
  * versions take a (possibly signed) char, and do not work correctly on EOF.

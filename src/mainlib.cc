@@ -32,7 +32,7 @@
 #include "thirdparty/jemalloc/include/jemalloc/jemalloc.h"  // for mallctl
 #endif
 #include "packages/core/dns.h"  // for init_dns_event_base.
-#include "vm/vm.hh"  // for push_constant_string, etc
+#include "vm/vm.h"  // for push_constant_string, etc
 
 // from lex.cc
 extern void print_all_predefines();
