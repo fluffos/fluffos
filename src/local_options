@@ -44,12 +44,16 @@
 #undef PRIVS
 #undef NO_SHADOWS
 #undef USE_ICONV
-#define IPV6
+#undef IPV6
 #undef DTRACE
 
 /****************************************************************************
  *                              PACKAGES                                    *
  ****************************************************************************/
+
+#define PACKAGE_OPS
+#define PACKAGE_CORE
+
 #define PACKAGE_CONTRIB
 #define PACKAGE_DEVELOP
 #define PACKAGE_MATH

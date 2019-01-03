@@ -1,9 +1,9 @@
 %{
 #include "base/std.h"
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <ctype.h>
+#include <cstdlib>
+#include <cstdio>
+#include <cctype>
 
 #define YYDEBUG 1
 #define YYERROR_VERBOSE 1
@@ -447,6 +447,8 @@ int main(int argc, char **argv) {
   yyparse();
 
   make_efun_tables();
+
+  exit(0);
 }
 
 #define EFUN_CC "efuns.autogen.cc"

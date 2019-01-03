@@ -1,10 +1,14 @@
 # Globally enforce CXX11
-set (CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 
 # Configuration phase
 INCLUDE (CheckIncludeFileCXX)
 # usage: CHECK_INCLUDE_FILES (<header> <RESULT_VARIABLE> )
 CHECK_INCLUDE_FILE_CXX (crypt.h HAVE_CRYPT_H)
+CHECK_INCLUDE_FILE_CXX (dirent.h HAVE_DIRENT_H)
 CHECK_INCLUDE_FILE_CXX (execinfo.h HAVE_EXECINFO_H)
 CHECK_INCLUDE_FILE_CXX (time.h HAVE_TIME_H)
 CHECK_INCLUDE_FILE_CXX (sys/resource.h HAVE_SYS_RESOURCE_H)
@@ -42,6 +46,7 @@ set(GENERATRED_SOURCE
         "${CMAKE_CURRENT_BINARY_DIR}/applies_table.autogen.h"
         "${CMAKE_CURRENT_BINARY_DIR}/efuns.autogen.cc"
         "${CMAKE_CURRENT_BINARY_DIR}/efuns.autogen.h"
+        "${CMAKE_CURRENT_BINARY_DIR}/options.autogen.h"
         )
 
 add_custom_command(
@@ -57,10 +62,32 @@ add_custom_command(
 )
 
 add_custom_command(
-        OUTPUT ("efuns.autogen.cc efuns.autogen.h")
+        OUTPUT "efuns.autogen.cc" "efuns.autogen.h"
         COMMAND "make_func" "${CMAKE_CURRENT_BINARY_DIR}/packages.fullspec"
-        DEPENDS "make_func" "vm/internal/applies" "packages.fullspec"
+        DEPENDS "make_func" "packages.fullspec"
 )
+
+add_custom_command(
+        OUTPUT "options.autogen.h"
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/make_options_def.sh" "${CMAKE_CURRENT_SOURCE_DIR}/../" "${CMAKE_CURRENT_SOURCE_DIR}/tools/make_options_def.py" "options.autogen.h" "${CMAKE_CXX_COMPILER}" "-I${CMAKE_CURRENT_SOURCE_DIR}"
+        DEPENDS "tools/make_options_def.sh" "tools/make_options_def.py"
+)
+
+add_custom_command(
+        OUTPUT "grammar.autogen.y"
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/make_grammar.sh" "${CMAKE_CURRENT_SOURCE_DIR}/../" "${CMAKE_CURRENT_SOURCE_DIR}/vm/internal/compiler/grammar.y.pre" "${CMAKE_CXX_COMPILER}" "-I${CMAKE_CURRENT_SOURCE_DIR}"
+        DEPENDS "tools/make_grammar.sh" "vm/internal/compiler/grammar.y.pre"
+)
+
+find_package(BISON REQUIRED)
+BISON_TARGET(Grammar ${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.y ${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.cc
+        DEFINES_FILE ${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.h)
+
+set(GENERATRED_GRAMMAR_FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.y"
+        "${BISON_Grammar_OUTPUT_SOURCE}"
+        "${BISON_Grammar_OUTPUT_HEADER}"
+        )
 
 set(SRC
         "backend.cc"
@@ -138,7 +165,6 @@ set(SRC
         "vm/internal/base/svalue.cc"
         "vm/internal/compiler/compiler.cc"
         "vm/internal/compiler/generate.cc"
-        #"vm/internal/compiler/grammar.cc"
         "vm/internal/compiler/icode.cc"
         "vm/internal/compiler/lex.cc"
         "vm/internal/compiler/scratchpad.cc"
@@ -157,10 +183,10 @@ set(TEST_SRC
         )
 
 file(GLOB_RECURSE SRC_HEADER
-        "*.h" "*.hh"
+        "*.h"
         )
 
-add_executable(driver ${GENERATED_HEADERS} ${GENERATRED_SOURCE} ${SRC} ${SRC_HEADER})
+add_executable(driver ${GENERATED_HEADERS} ${GENERATRED_SOURCE} ${GENERATRED_GRAMMAR_FILES} ${SRC} ${SRC_HEADER})
 target_link_libraries(driver common)
 
 # IPO??

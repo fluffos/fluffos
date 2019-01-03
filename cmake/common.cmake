@@ -1,7 +1,8 @@
 add_library(common INTERFACE)
 
 # include directories
-target_include_directories(common INTERFACE ".")
+target_include_directories(common INTERFACE "${CMAKE_CURRENT_BINARY_DIR}")
+target_include_directories(common INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
 
 # Compiler Features
 target_compile_features(common INTERFACE cxx_std_11)
@@ -32,12 +33,12 @@ else()
             "-fstack-protector-all"
             "-Wstack-protector"
             "--param" "ssp-buffer-size=4"
-            # TODO: This doesn't work with CYGWIN
-            "-fsanitize=address,undefined"
+            # TODO: This doesn't work with CYGWIN and make_func
+#            "-fsanitize=address,undefined"
             )
-    set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS}
-            "-fsanitize=address,undefined"
-            )
+#    set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS}
+#            "-fsanitize=address,undefined"
+#            )
 endif()
 
 # Warnings
