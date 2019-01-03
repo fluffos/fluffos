@@ -43,6 +43,7 @@ set(TOOL_SRC
 
 set(GENERATRED_SOURCE
         "${CMAKE_CURRENT_BINARY_DIR}/packages.fullspec"
+        "${CMAKE_CURRENT_BINARY_DIR}/applies_table.autogen.cc"
         "${CMAKE_CURRENT_BINARY_DIR}/applies_table.autogen.h"
         "${CMAKE_CURRENT_BINARY_DIR}/efuns.autogen.cc"
         "${CMAKE_CURRENT_BINARY_DIR}/efuns.autogen.h"
@@ -50,7 +51,7 @@ set(GENERATRED_SOURCE
         )
 
 add_custom_command(
-        OUTPUT "applies_table.autogen.h"
+        OUTPUT "applies_table.autogen.cc" "applies_table.autogen.h"
         COMMAND "build_applies" "${CMAKE_CURRENT_SOURCE_DIR}"
         DEPENDS "vm/internal/applies"
 )
@@ -187,6 +188,21 @@ file(GLOB_RECURSE SRC_HEADER
         )
 
 add_executable(driver ${GENERATED_HEADERS} ${GENERATRED_SOURCE} ${GENERATRED_GRAMMAR_FILES} ${SRC} ${SRC_HEADER})
+
+# Libraries
+find_package(Libevent 2.1 REQUIRED COMPONENTS libevent)
+target_link_libraries(driver ${LIBEVENT_LIBRARIES})
+target_include_directories(driver PRIVATE ${LIBEVENT_INCLUDE_DIR})
+
+find_package (Threads REQUIRED)
+target_link_libraries(driver ${CMAKE_THREAD_LIBS_INIT})
+
+find_package (ZLIB REQUIRED)
+target_link_libraries(driver ${ZLIB_LIBRARIES})
+
+find_package (PCRE REQUIRED)
+target_link_libraries(driver ${PCRE_LIBRARIES})
+
 target_link_libraries(driver common)
 
 # IPO??
