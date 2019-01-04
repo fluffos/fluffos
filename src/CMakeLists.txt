@@ -96,7 +96,7 @@ set(SRC
         "fliconv.cc"
         "main.cc"
         "mainlib.cc"
-        "portbind.cc"
+        #"portbind.cc"
         "user.cc"
         "net/telnet.cc"
         "base/internal/debugmalloc.cc"
@@ -142,7 +142,7 @@ set(SRC
         #"packages/dwlib/dwlib.cc"
         "packages/external/external.cc"
         "packages/math/math.cc"
-        #"packages/matrix/matrix.cc"
+        "packages/matrix/matrix.cc"
         "packages/mudlib_stats/mudlib_stats.cc"
         "packages/ops/ops.cc"
         "packages/ops/parse.cc"
@@ -187,7 +187,17 @@ file(GLOB_RECURSE SRC_HEADER
         "*.h"
         )
 
-add_executable(driver ${GENERATED_HEADERS} ${GENERATRED_SOURCE} ${GENERATRED_GRAMMAR_FILES} ${SRC} ${SRC_HEADER})
+add_subdirectory(thirdparty/libtelnet)
+
+add_executable(driver
+        ${GENERATED_HEADERS} ${GENERATRED_SOURCE}
+        ${GENERATRED_GRAMMAR_FILES}
+        ${SRC} ${SRC_HEADER})
+
+target_link_libraries(driver libtelnet)
+
+# Compiler definitions
+target_link_libraries(driver common)
 
 # Libraries
 find_package(Libevent 2.1 REQUIRED COMPONENTS libevent)
@@ -203,7 +213,13 @@ target_link_libraries(driver ${ZLIB_LIBRARIES})
 find_package (PCRE REQUIRED)
 target_link_libraries(driver ${PCRE_LIBRARIES})
 
-target_link_libraries(driver common)
+find_package(ZLIB REQUIRED)
+target_link_libraries(driver ${ZLIB_LIBRARIES})
+
+find_package(CRYPT REQUIRED)
+target_link_libraries(driver ${CRYPT_LIBRARIES})
+
+
 
 # IPO??
 include(CheckIPOSupported)
@@ -217,9 +233,9 @@ set_target_properties(driver PROPERTIES POSITION_INDEPENDENT_CODE TURE)
 
 
 # GTEST
-include(GoogleTest)
-enable_testing()
-gtest_discover_tests(driver)
+#include(GoogleTest)
+#enable_testing()
+#gtest_discover_tests(driver)
 
 include(helper)
 message("Final Compile Flags: ")
