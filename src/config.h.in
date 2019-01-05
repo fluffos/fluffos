@@ -2,6 +2,11 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 
+#define PROJECT_VERSION "@PROJECT_VERSION@"
+#define SOURCE_REVISION "CMake/Broken"
+#define COMPILER "@CMAKE_CXX_COMPILER@"
+#define CXXFLAGS "Broken"
+
 // TODO
 #cmakedefine HAVE_CRYPT_H
 #cmakedefine HAVE_DIRENT_H 1

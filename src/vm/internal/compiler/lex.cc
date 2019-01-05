@@ -28,9 +28,6 @@
 #include <vector>
 #include <algorithm> // for std::sort
 
-// FIXME?
-#include "cc.h"
-
 #include "include/function.h"
 #include "efuns.autogen.h"
 #include "options.autogen.h"
@@ -2854,7 +2851,7 @@ void add_predefines() {
 #endif
 
   // Adding version
-  sprintf(save_buf, "%s (%s)", PACKAGE_STRING, SOURCE_REVISION);
+  sprintf(save_buf, "%s (%s)", PROJECT_VERSION, SOURCE_REVISION);
   add_quoted_predefine("__VERSION__", save_buf);
 
   sprintf(save_buf, "%d", external_port[0].port);
@@ -2865,7 +2862,6 @@ void add_predefines() {
   add_quoted_predefine("__ARCH__", ARCH);
   add_quoted_predefine("__COMPILER__", COMPILER);
   add_quoted_predefine("__CXXFLAGS__", CXXFLAGS);
-  add_quoted_predefine("__OPTIMIZATION__", OPTIMIZE);
 
   /* Backwards Compat */
   add_quoted_predefine("MUD_NAME", CONFIG_STR(__MUD_NAME__));
