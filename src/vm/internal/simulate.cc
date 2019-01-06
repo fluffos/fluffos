@@ -1929,8 +1929,8 @@ exit:
   too_deep_error = max_eval_error = 0;
   if (current_error_context) {
     throw("error handler error2");
-    fatal("throw error failed.\n");
   }
+  throw("BUG: Impossible to get here.");
 }
 
 void error_needs_free(char *s) {

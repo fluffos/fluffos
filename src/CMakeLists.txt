@@ -3,6 +3,10 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Setup include directoires
+include_directories("${CMAKE_CURRENT_BINARY_DIR}")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
+
 # Configuration phase
 INCLUDE (CheckIncludeFileCXX)
 # usage: CHECK_INCLUDE_FILES (<header> <RESULT_VARIABLE> )
@@ -22,12 +26,14 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DI
 
 set(GENERATED_HEADERS
         "${CMAKE_CURRENT_BINARY_DIR}/config.h"
+        "${CMAKE_CURRENT_BINARY_DIR}/packages/packages.h"
         )
 
 # include common compiler flags/definiations
 include(common)
 
 target_include_directories(common INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
+
 # Build phase
 
 # Tools
@@ -57,7 +63,7 @@ add_custom_command(
 
 add_custom_command(
         OUTPUT "packages.fullspec"
-        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/build_packages_genfiles.sh" "${CMAKE_CURRENT_SOURCE_DIR}/../" "${CMAKE_CXX_COMPILER}" "-I${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/build_packages_genfiles.sh" "${CMAKE_CURRENT_SOURCE_DIR}/../" "${CMAKE_CXX_COMPILER}"  "-I${CMAKE_CURRENT_BINARY_DIR}" "-I${CMAKE_CURRENT_SOURCE_DIR}"
         DEPENDS "tools/build_packages_genfiles.sh" "base/internal/options_incl.h"
 )
 
@@ -69,13 +75,13 @@ add_custom_command(
 
 add_custom_command(
         OUTPUT "options.autogen.h"
-        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/make_options_def.sh" "${CMAKE_CURRENT_SOURCE_DIR}/../" "${CMAKE_CURRENT_SOURCE_DIR}/tools/make_options_def.py" "options.autogen.h" "${CMAKE_CXX_COMPILER}" "-I${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/make_options_def.sh" "${CMAKE_CURRENT_SOURCE_DIR}/../" "${CMAKE_CURRENT_SOURCE_DIR}/tools/make_options_def.py" "options.autogen.h" "${CMAKE_CXX_COMPILER}" "-I${CMAKE_CURRENT_BINARY_DIR}" "-I${CMAKE_CURRENT_SOURCE_DIR}"
         DEPENDS "tools/make_options_def.sh" "tools/make_options_def.py"
 )
 
 add_custom_command(
         OUTPUT "grammar.autogen.y"
-        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/make_grammar.sh" "${CMAKE_CURRENT_SOURCE_DIR}/../" "${CMAKE_CURRENT_SOURCE_DIR}/vm/internal/compiler/grammar.y.pre" "${CMAKE_CXX_COMPILER}" "-I${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/make_grammar.sh" "${CMAKE_CURRENT_SOURCE_DIR}/../" "${CMAKE_CURRENT_SOURCE_DIR}/vm/internal/compiler/grammar.y.pre" "${CMAKE_CXX_COMPILER}" "-I${CMAKE_CURRENT_BINARY_DIR}" "-I${CMAKE_CURRENT_SOURCE_DIR}"
         DEPENDS "tools/make_grammar.sh" "vm/internal/compiler/grammar.y.pre"
 )
 
@@ -110,48 +116,7 @@ set(SRC
         "base/internal/stats.cc"
         "base/internal/stralloc.cc"
         "base/internal/strput.cc"
-        "packages/async/async.cc"
-        "packages/compress/compress.cc"
-        "packages/contrib/contrib.cc"
-        "packages/core/add_action.cc"
-        "packages/core/call_out.cc"
-        "packages/core/crc32.cc"
-        "packages/core/custom_crypt.cc"
-        "packages/core/debug.cc"
-        "packages/core/dns.cc"
-        "packages/core/dumpstat.cc"
-        "packages/core/ed.cc"
-        "packages/core/efuns_main.cc"
-        "packages/core/file.cc"
-        "packages/core/heartbeat.cc"
-        "packages/core/mssp.cc"
-        "packages/core/outbuf.cc"
-        "packages/core/rc.cc"
-        "packages/core/reclaim.cc"
-        "packages/core/regexp.cc"
-        "packages/core/replace_program.cc"
-        "packages/core/save.cc"
-        "packages/core/sprintf.cc"
-        "packages/core/telnet_ext.cc"
-        #"packages/crypto/crypto.cc"
-        "packages/db/db.cc"
-        "packages/develop/checkmemory.cc"
-        "packages/develop/develop.cc"
-        "packages/develop/disassembler.cc"
-        #"packages/dwlib/dwlib.cc"
-        "packages/external/external.cc"
-        "packages/math/math.cc"
-        "packages/matrix/matrix.cc"
-        "packages/mudlib_stats/mudlib_stats.cc"
-        "packages/ops/ops.cc"
-        "packages/ops/parse.cc"
-        #"packages/parser/parser.cc"
-        "packages/pcre/pcre.cc"
-        "packages/sha1/sha1.cc"
-        "packages/sockets/socket_efuns.cc"
-        "packages/sockets/sockets.cc"
-        "packages/trim/trim.cc"
-        "packages/uids/uids.cc"
+
         "vm/internal/apply.cc"
         "vm/internal/base/apply_cache.cc"
         "vm/internal/base/array.cc"
@@ -186,14 +151,24 @@ file(GLOB_RECURSE SRC_HEADER
         "*.h"
         )
 
-add_subdirectory(thirdparty/libtelnet)
-
-add_executable(driver
-        ${GENERATED_HEADERS} ${GENERATRED_SOURCE}
+add_library(libdriver STATIC ${GENERATED_HEADERS} ${GENERATRED_SOURCE}
         ${GENERATRED_GRAMMAR_FILES}
-        ${SRC} ${SRC_HEADER})
+        ${SRC} ${SRC_HEADER}
+        )
 
-target_link_libraries(driver libtelnet)
+add_executable(driver "main.cc")
+target_link_libraries(driver libdriver)
+
+add_subdirectory(packages) # provides FLUFFOS_PACKAGES
+message(STATUS "ALL PACKAGES: ${FLUFFOS_PACKAGES}")
+foreach(PACKAGE ${FLUFFOS_PACKAGES})
+    # TODO: packages files currently depenends on generated headers, so they must be built after libdriver
+    add_dependencies("${PACKAGE}" libdriver)
+    target_link_libraries(libdriver "${PACKAGE}")
+endforeach()
+
+add_subdirectory(thirdparty/libtelnet)
+target_link_libraries(libdriver libtelnet)
 
 # Compiler definitions
 target_link_libraries(driver common)
@@ -201,24 +176,11 @@ target_link_libraries(driver common)
 # Libraries
 find_package(Libevent 2.1 REQUIRED COMPONENTS libevent)
 target_link_libraries(driver ${LIBEVENT_LIBRARIES})
-target_include_directories(driver PRIVATE ${LIBEVENT_INCLUDE_DIR})
+target_include_directories(driver PUBLIC ${LIBEVENT_INCLUDE_DIR})
 
-find_package (Threads REQUIRED)
-target_link_libraries(driver ${CMAKE_THREAD_LIBS_INIT})
-
-find_package (ZLIB REQUIRED)
-target_link_libraries(driver ${ZLIB_LIBRARIES})
-
-find_package (PCRE REQUIRED)
-target_link_libraries(driver ${PCRE_LIBRARIES})
-
-find_package(ZLIB REQUIRED)
-target_link_libraries(driver ${ZLIB_LIBRARIES})
-
-find_package(CRYPT REQUIRED)
-target_link_libraries(driver ${CRYPT_LIBRARIES})
-
-
+# Async use this?
+#find_package (Threads REQUIRED)
+#target_link_libraries(driver ${CMAKE_THREAD_LIBS_INIT})
 
 # IPO??
 include(CheckIPOSupported)

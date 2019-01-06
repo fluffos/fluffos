@@ -2,17 +2,13 @@ In order to add a package, do the following:
 
 (1) Pick a name for your package (we will use 'foo' here)
 
-(2) Create a directory, put the efun defination in foo/foo.spec.  If your code needs to export
-    addtional symbols for the rest driver code, create a foo/foo.h for automatic inclusion.
+(2) Create a directory, put the efun definition in foo/foo.spec.  If your code needs to export
+    additional symbols for the rest driver code, create a foo/foo.h for automatic inclusion.
 
-(4) add #define PACKAGE_FOO to local_options.
+(3) implement the efuns in "foo.cc", you can have multiple source file if needed.
 
-(3) implement the efuns in "foo.cc", you can have multiple file if needed. During make,
-    tools/build_package_makefile.py will create a package_foo rule with all ".cc" files
+(4) Write CMakeLists.txt for this package, look at examples in other packages. make sure to either provide
+    option(PACKAGE_FOO, "foo package", ON) or set (PACAKGE_FOO ON), make sure you also define an target named
+    "package_foo". adding custom compile flags and link libraries there.
 
-(4) If your files needs custom compile flag, create a Makefile.foo and add
-
-package/foo.o:
-  $(CXX) $(CXXFLAGS) package/foo.cc
-
-(5) do a full recompile (make clean && make)
+(5) Run cmake from top dir and if your package is set to ON it should be automatically built and linked.

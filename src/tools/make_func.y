@@ -356,7 +356,7 @@ const char *etype(int n) {
 int ident(int);
 
 int yylex() {
-  register int c;
+  int c;
 
   for (;;) {
     switch (c = getc(yyin)) {
