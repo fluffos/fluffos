@@ -36,7 +36,7 @@ list(APPEND PACKAGE_H_SOURCE
         )
 
 # Generate packages.h
-set(PACKAGE_H "packages.h")
+set(PACKAGE_H "packages.autogen.h")
 
 file(GENERATE OUTPUT "${PACKAGE_H}"
         CONTENT "$<JOIN:${PACKAGE_H_SOURCE},>"
