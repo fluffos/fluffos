@@ -173,7 +173,7 @@ target_link_libraries(libdriver libtelnet)
 target_link_libraries(driver common)
 
 # Libraries
-find_package(Libevent 2.1 REQUIRED COMPONENTS libevent)
+find_package(Libevent 2.0 REQUIRED COMPONENTS libevent)
 target_link_libraries(driver ${LIBEVENT_LIBRARIES})
 target_include_directories(driver PUBLIC ${LIBEVENT_INCLUDE_DIR})
 
