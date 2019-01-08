@@ -26,7 +26,8 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DI
 
 set(GENERATED_HEADERS
         "${CMAKE_CURRENT_BINARY_DIR}/config.h"
-        "${CMAKE_CURRENT_BINARY_DIR}/packages/packages.autogen.h"
+        # This file is generated in packages/CMakeLists.txt , however set it here will complain.
+        #"${CMAKE_CURRENT_BINARY_DIR}/packages/packages.autogen.h"
         )
 
 # include common compiler flags/definiations
@@ -101,7 +102,6 @@ set(SRC
         "fliconv.cc"
         "main.cc"
         "mainlib.cc"
-        #"portbind.cc"
         "user.cc"
         "net/telnet.cc"
         "base/internal/debugmalloc.cc"
@@ -116,7 +116,6 @@ set(SRC
         "base/internal/stats.cc"
         "base/internal/stralloc.cc"
         "base/internal/strput.cc"
-
         "vm/internal/apply.cc"
         "vm/internal/base/apply_cache.cc"
         "vm/internal/base/array.cc"
@@ -201,3 +200,5 @@ set_target_properties(driver PROPERTIES POSITION_INDEPENDENT_CODE TURE)
 include(helper)
 message("Final Compile Flags: ")
 print_target_properties(driver)
+
+add_executable(portbind "portbind.cc")
