@@ -27,7 +27,6 @@
 #include <unistd.h>
 
 #include "backend.h"  // for backend, init_backend
-#include "cc.h"       // for SOURCE_REVISION
 #if USE_JEMALLOC == 1
 #include "thirdparty/jemalloc/include/jemalloc/jemalloc.h"  // for mallctl
 #endif
@@ -96,7 +95,7 @@ namespace {
         }
 
         /* Print FluffOS version */
-        std::cout << "FluffOS Version: " << PACKAGE_VERSION << "(" << SOURCE_REVISION << ")"
+        std::cout << "FluffOS Version: " << PROJECT_VERSION << "(" << SOURCE_REVISION << ")"
                   << "@ (" << ARCH << ")" << std::endl;
 
 #if USE_JEMALLOC == 1

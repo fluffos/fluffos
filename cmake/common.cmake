@@ -1,11 +1,5 @@
 add_library(common INTERFACE)
 
-# include directories
-target_include_directories(common INTERFACE ".")
-
-# Compiler Features
-target_compile_features(common INTERFACE cxx_std_11)
-
 # Compile options
 target_compile_options(common INTERFACE
         # General debuginfo
@@ -32,12 +26,12 @@ else()
             "-fstack-protector-all"
             "-Wstack-protector"
             "--param" "ssp-buffer-size=4"
-            # TODO: This doesn't work with CYGWIN
-            "-fsanitize=address,undefined"
+            # TODO: This doesn't work with CYGWIN and make_func
+#            "-fsanitize=address,undefined"
             )
-    set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS}
-            "-fsanitize=address,undefined"
-            )
+#    set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS}
+#            "-fsanitize=address,undefined"
+#            )
 endif()
 
 # Warnings
@@ -49,16 +43,10 @@ target_compile_options(common INTERFACE
         # Turn off some warnings from GCC.
         "-Wno-char-subscripts"
         "-Wno-sign-compare"
-        "-Wno-return-type"
+        #"-Wno-return-type"
         "-Wno-unused-parameter"
+        # TODO: Code has a lot of implict zero initilizations
         "-Wno-missing-field-initializers"
-        # GCC's warning produces too many false positives:
-        # https://groups.google.com/a/google.com/forum/#!topic/c-users/jLRfP804wuc
-        # https://groups.google.com/a/google.com/d/msg/c-users/jLRfP804wuc/sKe4Ba2PKwAJ
-        "-Wno-overloaded-virtual"
-        # GCC's warning produces false positives:
-        # https://groups.google.com/a/google.com/d/msg/llvm-team/Mq_7JNPqE2o/lh2XpArujl8J
-        "-Wno-non-virtual-dtor"
         # features
         "-fdiagnostics-show-option"
         "-fmessage-length=0"

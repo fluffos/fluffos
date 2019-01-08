@@ -595,7 +595,7 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
         } else {
           while (pc < aptr + etable) {
             COPY_PTR(&parg, pc);
-            COPY_SHORT(&sarg, pc + SIZEOF_CHAR_P);
+            COPY_SHORT(&sarg, pc + sizeof(char *));
             if (ttype == 1 || !parg) {
               if (sarg == 1) {
                 fprintf(f, "\t%-4ld\t<range start>\n", (LPC_INT)parg);
@@ -605,7 +605,7 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
             } else {
               fprintf(f, "\t\"%s\"\t%04x\n", disassem_string(parg), addr + sarg);
             }
-            pc += 2 + SIZEOF_CHAR_P;
+            pc += 2 + sizeof(char *);
           }
         }
         continue;

@@ -4,12 +4,11 @@ IFS=$'\n\t'
 
 TOP_SRCDIR="${1}"
 shift
-SRCDIR="${1}"
+GRAMMAR_Y_PRE="${1}"
 shift
 
 OPTIONS_H="${TOP_SRCDIR}/src/base/internal/options_incl.h"
-GRAMMAR_Y_PRE="${SRCDIR}"/grammar.y.pre
-GRAMMAR_Y=grammar.y
+GRAMMAR_Y=grammar.autogen.y
 
 # First step is to run grammar.y.pre through CPP.
 "$@" -E -x c++ -undef -P -CC \

@@ -2,12 +2,19 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 
+#define PROJECT_VERSION "@PROJECT_VERSION@"
+#define SOURCE_REVISION "CMake/Broken"
+#define COMPILER "@CMAKE_CXX_COMPILER@"
+#define CXXFLAGS "Broken"
+
 // TODO
 #cmakedefine HAVE_CRYPT_H
+#cmakedefine HAVE_DIRENT_H 1
 #cmakedefine HAVE_EXECINFO_H 1
 #cmakedefine HAVE_TIME_H 1
 #cmakedefine HAVE_SYS_RESOURCE_H 1
 #cmakedefine HAVE_SYS_TIME_H 1
 #cmakedefine TIME_WITH_SYS_TIME 1
+#cmakedefine HAVE_SYS_STAT_H 1
 
 #endif /* _CONFIG_H_ */

@@ -5,4 +5,4 @@ And nothing else in base should be included.
 
 All code in base/internal must include necessary headers itself.
 
-For writing packages, please see packages/package.h
+For writing packages, please just include package_api.h, no need to incldue std.h again.

@@ -22,14 +22,9 @@ addons:
     - telnet
     - libgtest-dev
 
-script: bash -x ./.travis_build.sh
+script: sudo pip install --upgrade cmake && bash -x ./.travis_build.sh
 
 after_failure:
-    - echo src/thirdparty/jemalloc/config.log
-    - cat src/thirdparty/jemalloc/config.log
-    - echo =================================
-    - echo build/config.log
-    - cat build/config.log
     - echo =================================
     - echo -n 50 src/testsuite/log/*
     - tail -n 50 src/testsuite/log/*
@@ -38,11 +33,8 @@ compiler:
   - gcc
 
 env:
-# clang builds
-  - BUILD="x86_64" COMPILER="clang" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev"
-  - BUILD="x86_64" COMPILER="clang" COMPILER_FLAGS="-m64 -mtune=generic" TYPE=""        CONFIG="testrelease"
-# gcc builds
-  - BUILD="x86_64" COMPILER="gcc" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev" GCOV="yes"
-  - BUILD="x86_64" COMPILER="gcc" COMPILER_FLAGS="-m64 -mtune=generic" TYPE=""        CONFIG="testrelease"
+# release builds
+  - CC="clang" CXX="clang++"
+  - CC="cc" CXX="c++"
 # coverity
-  - BUILD="x86_64" COMPILER="gcc" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev" COVERITY="yes"
+  - COVERITY="yes"
