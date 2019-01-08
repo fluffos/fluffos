@@ -28,7 +28,7 @@ TPL_FOOTER = """
 """
 
 if len(sys.argv) != 2:
-  print("Usage: echo "<defines>" | make_options_def.py <output file>")
+  print("Usage: echo '<defines>' | make_options_def.py <output file>")
   sys.exit(1)
 
 result = TPL_HEADER

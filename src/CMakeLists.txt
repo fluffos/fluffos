@@ -1,10 +1,17 @@
 # Globally enforce CXX11
-set (CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Setup include directoires
+include_directories("${CMAKE_CURRENT_BINARY_DIR}")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 
 # Configuration phase
 INCLUDE (CheckIncludeFileCXX)
 # usage: CHECK_INCLUDE_FILES (<header> <RESULT_VARIABLE> )
 CHECK_INCLUDE_FILE_CXX (crypt.h HAVE_CRYPT_H)
+CHECK_INCLUDE_FILE_CXX (dirent.h HAVE_DIRENT_H)
 CHECK_INCLUDE_FILE_CXX (execinfo.h HAVE_EXECINFO_H)
 CHECK_INCLUDE_FILE_CXX (time.h HAVE_TIME_H)
 CHECK_INCLUDE_FILE_CXX (sys/resource.h HAVE_SYS_RESOURCE_H)
@@ -19,12 +26,15 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DI
 
 set(GENERATED_HEADERS
         "${CMAKE_CURRENT_BINARY_DIR}/config.h"
+        # This file is generated in packages/CMakeLists.txt , however set it here will complain.
+        #"${CMAKE_CURRENT_BINARY_DIR}/packages/packages.autogen.h"
         )
 
 # include common compiler flags/definiations
 include(common)
 
 target_include_directories(common INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
+
 # Build phase
 
 # Tools
@@ -39,28 +49,52 @@ set(TOOL_SRC
 
 set(GENERATRED_SOURCE
         "${CMAKE_CURRENT_BINARY_DIR}/packages.fullspec"
+        "${CMAKE_CURRENT_BINARY_DIR}/applies_table.autogen.cc"
         "${CMAKE_CURRENT_BINARY_DIR}/applies_table.autogen.h"
         "${CMAKE_CURRENT_BINARY_DIR}/efuns.autogen.cc"
         "${CMAKE_CURRENT_BINARY_DIR}/efuns.autogen.h"
+        "${CMAKE_CURRENT_BINARY_DIR}/options.autogen.h"
         )
 
 add_custom_command(
-        OUTPUT "applies_table.autogen.h"
+        OUTPUT "applies_table.autogen.cc" "applies_table.autogen.h"
         COMMAND "build_applies" "${CMAKE_CURRENT_SOURCE_DIR}"
         DEPENDS "vm/internal/applies"
 )
 
 add_custom_command(
         OUTPUT "packages.fullspec"
-        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/build_packages_genfiles.sh" "${CMAKE_CURRENT_SOURCE_DIR}/../" "${CMAKE_CXX_COMPILER}" "-I${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/build_packages_genfiles.sh" "${CMAKE_CURRENT_SOURCE_DIR}/../" "${CMAKE_CXX_COMPILER}"  "-I${CMAKE_CURRENT_BINARY_DIR}" "-I${CMAKE_CURRENT_SOURCE_DIR}"
         DEPENDS "tools/build_packages_genfiles.sh" "base/internal/options_incl.h"
 )
 
 add_custom_command(
-        OUTPUT ("efuns.autogen.cc efuns.autogen.h")
+        OUTPUT "efuns.autogen.cc" "efuns.autogen.h"
         COMMAND "make_func" "${CMAKE_CURRENT_BINARY_DIR}/packages.fullspec"
-        DEPENDS "make_func" "vm/internal/applies" "packages.fullspec"
+        DEPENDS "make_func" "packages.fullspec"
 )
+
+add_custom_command(
+        OUTPUT "options.autogen.h"
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/make_options_def.sh" "${CMAKE_CURRENT_SOURCE_DIR}/../" "${CMAKE_CURRENT_SOURCE_DIR}/tools/make_options_def.py" "options.autogen.h" "${CMAKE_CXX_COMPILER}" "-I${CMAKE_CURRENT_BINARY_DIR}" "-I${CMAKE_CURRENT_SOURCE_DIR}"
+        DEPENDS "tools/make_options_def.sh" "tools/make_options_def.py"
+)
+
+add_custom_command(
+        OUTPUT "grammar.autogen.y"
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/make_grammar.sh" "${CMAKE_CURRENT_SOURCE_DIR}/../" "${CMAKE_CURRENT_SOURCE_DIR}/vm/internal/compiler/grammar.y.pre" "${CMAKE_CXX_COMPILER}" "-I${CMAKE_CURRENT_BINARY_DIR}" "-I${CMAKE_CURRENT_SOURCE_DIR}"
+        DEPENDS "tools/make_grammar.sh" "vm/internal/compiler/grammar.y.pre"
+)
+
+find_package(BISON REQUIRED)
+BISON_TARGET(Grammar ${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.y ${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.cc
+        DEFINES_FILE ${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.h)
+
+set(GENERATRED_GRAMMAR_FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.y"
+        "${BISON_Grammar_OUTPUT_SOURCE}"
+        "${BISON_Grammar_OUTPUT_HEADER}"
+        )
 
 set(SRC
         "backend.cc"
@@ -68,7 +102,6 @@ set(SRC
         "fliconv.cc"
         "main.cc"
         "mainlib.cc"
-        "portbind.cc"
         "user.cc"
         "net/telnet.cc"
         "base/internal/debugmalloc.cc"
@@ -83,48 +116,6 @@ set(SRC
         "base/internal/stats.cc"
         "base/internal/stralloc.cc"
         "base/internal/strput.cc"
-        "packages/async/async.cc"
-        "packages/compress/compress.cc"
-        "packages/contrib/contrib.cc"
-        "packages/core/add_action.cc"
-        "packages/core/call_out.cc"
-        "packages/core/crc32.cc"
-        "packages/core/custom_crypt.cc"
-        "packages/core/debug.cc"
-        "packages/core/dns.cc"
-        "packages/core/dumpstat.cc"
-        "packages/core/ed.cc"
-        "packages/core/efuns_main.cc"
-        "packages/core/file.cc"
-        "packages/core/heartbeat.cc"
-        "packages/core/mssp.cc"
-        "packages/core/outbuf.cc"
-        "packages/core/rc.cc"
-        "packages/core/reclaim.cc"
-        "packages/core/regexp.cc"
-        "packages/core/replace_program.cc"
-        "packages/core/save.cc"
-        "packages/core/sprintf.cc"
-        "packages/core/telnet_ext.cc"
-        #"packages/crypto/crypto.cc"
-        "packages/db/db.cc"
-        "packages/develop/checkmemory.cc"
-        "packages/develop/develop.cc"
-        "packages/develop/disassembler.cc"
-        #"packages/dwlib/dwlib.cc"
-        "packages/external/external.cc"
-        "packages/math/math.cc"
-        #"packages/matrix/matrix.cc"
-        "packages/mudlib_stats/mudlib_stats.cc"
-        "packages/ops/ops.cc"
-        "packages/ops/parse.cc"
-        #"packages/parser/parser.cc"
-        "packages/pcre/pcre.cc"
-        "packages/sha1/sha1.cc"
-        "packages/sockets/socket_efuns.cc"
-        "packages/sockets/sockets.cc"
-        "packages/trim/trim.cc"
-        "packages/uids/uids.cc"
         "vm/internal/apply.cc"
         "vm/internal/base/apply_cache.cc"
         "vm/internal/base/array.cc"
@@ -138,7 +129,6 @@ set(SRC
         "vm/internal/base/svalue.cc"
         "vm/internal/compiler/compiler.cc"
         "vm/internal/compiler/generate.cc"
-        #"vm/internal/compiler/grammar.cc"
         "vm/internal/compiler/icode.cc"
         "vm/internal/compiler/lex.cc"
         "vm/internal/compiler/scratchpad.cc"
@@ -157,11 +147,39 @@ set(TEST_SRC
         )
 
 file(GLOB_RECURSE SRC_HEADER
-        "*.h" "*.hh"
+        "*.h"
         )
 
-add_executable(driver ${GENERATED_HEADERS} ${GENERATRED_SOURCE} ${SRC} ${SRC_HEADER})
+add_library(libdriver STATIC ${GENERATED_HEADERS} ${GENERATRED_SOURCE}
+        ${GENERATRED_GRAMMAR_FILES}
+        ${SRC} ${SRC_HEADER}
+        )
+
+add_executable(driver "main.cc")
+target_link_libraries(driver libdriver)
+
+add_subdirectory(packages) # provides FLUFFOS_PACKAGES
+message(STATUS "ALL PACKAGES: ${FLUFFOS_PACKAGES}")
+foreach(PACKAGE ${FLUFFOS_PACKAGES})
+    # TODO: packages files currently depenends on generated headers, so they must be built after libdriver
+    add_dependencies("${PACKAGE}" libdriver)
+    target_link_libraries(libdriver "${PACKAGE}")
+endforeach()
+
+add_subdirectory(thirdparty/libtelnet)
+target_link_libraries(libdriver libtelnet)
+
+# Compiler definitions
 target_link_libraries(driver common)
+
+# Libraries
+find_package(Libevent 2.0 REQUIRED COMPONENTS libevent)
+target_link_libraries(driver ${LIBEVENT_LIBRARIES})
+target_include_directories(driver PUBLIC ${LIBEVENT_INCLUDE_DIR})
+
+# Async use this?
+#find_package (Threads REQUIRED)
+#target_link_libraries(driver ${CMAKE_THREAD_LIBS_INIT})
 
 # IPO??
 include(CheckIPOSupported)
@@ -175,10 +193,12 @@ set_target_properties(driver PROPERTIES POSITION_INDEPENDENT_CODE TURE)
 
 
 # GTEST
-include(GoogleTest)
-enable_testing()
-gtest_discover_tests(driver)
+#include(GoogleTest)
+#enable_testing()
+#gtest_discover_tests(driver)
 
 include(helper)
 message("Final Compile Flags: ")
 print_target_properties(driver)
+
+add_executable(portbind "portbind.cc")

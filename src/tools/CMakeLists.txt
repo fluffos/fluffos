@@ -8,3 +8,7 @@ target_link_libraries(make_func common)
 add_executable(build_applies "build_applies.cc")
 target_link_libraries(build_applies common)
 
+add_executable(preprocessor "preprocessor.cc")
+target_link_libraries(preprocessor common)
+
+

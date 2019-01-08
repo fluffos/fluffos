@@ -44,42 +44,11 @@
 #undef PRIVS
 #undef NO_SHADOWS
 #undef USE_ICONV
-#define IPV6
+#undef IPV6
 #undef DTRACE
 
 /****************************************************************************
  *                              PACKAGES                                    *
  ****************************************************************************/
-#define PACKAGE_CONTRIB
-#define PACKAGE_DEVELOP
-#define PACKAGE_MATH
-#undef PACKAGE_MATRIX
-#define PACKAGE_MUDLIB_STATS
-#define PACKAGE_SOCKETS
-#undef PACKAGE_PARSER
-#define PACKAGE_EXTERNAL
-#undef PACKAGE_DB
-#ifdef PACKAGE_DB
-#define USE_MYSQL 1
-#undef USE_MSQL
-#undef USE_POSTGRES
-#undef USE_SQLITE3
-#define DEFAULT_DB  USE_MYSQL
-#endif
-#define PACKAGE_ASYNC
-#define PACKAGE_SHA1
-#undef PACKAGE_CRYPTO
-#define PACKAGE_TRIM
-#define PACKAGE_PCRE
-#undef PACKAGE_DWLIB
-#define PACKAGE_UIDS
-#ifdef PACKAGE_UIDS
-#define AUTO_SETEUID
-#undef AUTO_TRUST_BACKBONE
-#endif
-#define PACKAGE_COMPRESS
-#define SAVE_GZ_EXTENSION ".o.gz"
-#undef PACKAGE_THREAD
-#define PACKAGE_MATRIX
 
 #endif /* _LOCAL_OPTIONS_H_ */

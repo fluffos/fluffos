@@ -28,17 +28,14 @@
 #include <vector>
 #include <algorithm> // for std::sort
 
-// FIXME?
-#include "cc.h"
-
 #include "include/function.h"
-#include "packages/efuns.hh"
-#include "vm/internal/options.hh"
+#include "efuns.autogen.h"
+#include "options.autogen.h"
 #include "vm/internal/base/program.h"
 #include "vm/internal/base/svalue.h"
 #include "vm/internal/compiler/compiler.h"
 #include "vm/internal/compiler/keyword.h"
-#include "vm/internal/compiler/grammar.hh"
+#include "grammar.autogen.h"
 #include "vm/internal/compiler/scratchpad.h"
 
 // FIXME: in master.h
@@ -2854,7 +2851,7 @@ void add_predefines() {
 #endif
 
   // Adding version
-  sprintf(save_buf, "%s (%s)", PACKAGE_STRING, SOURCE_REVISION);
+  sprintf(save_buf, "%s (%s)", PROJECT_VERSION, SOURCE_REVISION);
   add_quoted_predefine("__VERSION__", save_buf);
 
   sprintf(save_buf, "%d", external_port[0].port);
@@ -2865,7 +2862,6 @@ void add_predefines() {
   add_quoted_predefine("__ARCH__", ARCH);
   add_quoted_predefine("__COMPILER__", COMPILER);
   add_quoted_predefine("__CXXFLAGS__", CXXFLAGS);
-  add_quoted_predefine("__OPTIMIZATION__", OPTIMIZE);
 
   /* Backwards Compat */
   add_quoted_predefine("MUD_NAME", CONFIG_STR(__MUD_NAME__));

@@ -45,7 +45,7 @@ is best effort only.
     # 2. Install libevent 2.0
     $ sudo apt-get install libevent-dev
 
-    # 3. Install other libraries for PACAKGE_*
+    # 3. Install other libraries for PACKAGE_*
     $ sudo apt-get install libmysqlclient-dev libsqlite3-dev \
       libpq-dev libz-dev libssl-dev libpcre3-dev
 

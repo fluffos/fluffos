@@ -14,7 +14,7 @@
 
 static const char *APPLIES = "vm/internal/applies";
 static const char *APPLIES_H = "applies_table.autogen.h";
-static const char *APPLIES_TABLE = "applies_table.cc";
+static const char *APPLIES_TABLE = "applies_table.autogen.cc";
 
 int main(int argc, char **argv) {
   if(argc != 2)
