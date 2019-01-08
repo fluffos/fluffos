@@ -1,2 +1,5 @@
+plugins:
+  - jekyll-sitemap
+
 timezone: America/Los_Angles
-url: http://fluffos.github.io
+url: https://www.fluffos.info
