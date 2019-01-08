@@ -9,7 +9,11 @@ LPC runtime is mostly compatible, if your mud runs on MudOS v22+, it should be r
 
 ## Current Release
 
-[LINK](https://github.com/fluffos/fluffos/releases)
+[ALL RELEASES](https://github.com/fluffos/fluffos/releases)
+
+In 2019, there will be 2 release track maintained:
+v2017: no build system upgrade, no new features, critical bugfix only. 
+v2019: cmake build system, JS interop support and rolling updates.
 
 ## ChangeLog
 
