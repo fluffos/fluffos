@@ -1,5 +1,6 @@
 plugins:
   - jekyll-sitemap
+  - jekyll-seo-tag
 
 timezone: America/Los_Angles
 url: https://www.fluffos.info
