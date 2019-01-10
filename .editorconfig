@@ -3,7 +3,7 @@
 # top-most EditorConfig file
 root = true
 
-[*]
+[**]
 charset = utf-8
 end_of_line = lf
 insert_final_newline = true
@@ -11,9 +11,9 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 2
 
-[*.{cmd,bat,ps1}]
+[**/*.{cmd,bat,ps1}]
 end_of_line = crlf
 
 # files in test-suite
-[*.crlf]
+[**/*.crlf]
 end_of_line = crlf

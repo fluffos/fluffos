@@ -1,33 +1,56 @@
-[![Code Sponsor](https://app.codesponsor.io/embed/vwCCXRPND1B8mmAMKp2H5HTe/fluffos/fluffos.svg)](https://app.codesponsor.io/link/vwCCXRPND1B8mmAMKp2H5HTe/fluffos/fluffos)
 [![Build Status](https://travis-ci.org/fluffos/fluffos.svg)](https://travis-ci.org/fluffos/fluffos)
 [![Coverage Status](https://coveralls.io/repos/github/fluffos/fluffos/badge.svg?branch=master)](https://coveralls.io/github/fluffos/fluffos?branch=master)
 [![Coverity Status](https://scan.coverity.com/projects/483/badge.svg)](https://scan.coverity.com/projects/483)
 
-FluffOS
+Welcome
 =======
+FluffOS is an actively maintained LPMUD driver, based on the last release of MudOS.
+it includes many bug fixes and codebase modernization.
 
-FluffOS is the new LPMUD driver base on the last release of MudOS.
-LPC runtime is compatible, if your mud runs on MudOSv22+, it should run on FluffOS.
+if your LPMUD previously runs on MudOSv22+, it should run on FluffOS with little modification. 
+if not, let us know and we will make it happen.
 
-Official Website
----------------
-<http://fluffos.github.io>
+Release
+-------
+Current release, v2017 is being used by many chinese mud in production and will be continue to
+receive support through out 2019. Supports centOS/ubuntu and under windows using CYGWIN.
 
-Copyright
+Next release, v2019 is being actively developed: cmake support, native build under windows and 
+nodeJS interop underway. 
+
+Official Website & Forum
+----------------
+Website: <https://www.fluffos.info>
+
+Forum: <httpss://forum.fluffos.info>
+
+QQ support Group: 451819151 [![451819151](https://pub.idqqimg.com/wpa/images/group.png)](https://shang.qq.com/wpa/qunwpa?idkey=3fd552adb8ace1a8e3ae3a712e5d314c7caf49af8b87449473c595b7e1f1ddf9)
+
+Build & Usage
+-------------
+Please checkout official website for now.
+
+Donations
 ---------
-This game, LPmud, is copyright by Lars Pensj|, 1990, 1991.
+I would like to personal thank all the sponsors and contributors for showing their support.
+All donations are 100% used towards purchasing tools, equipments and hosting cost for website and forum.
 
-Source code herein refers to the source code, and any executables
-created from the same source code.
+The list is in descending order by time donation received.
 
-All rights reserved.  Permission is granted to extend and modify the
-source code provided subject to the restriction that the source code may
-not be used in any way whatsoever for monetary gain.
+#### Received in 2019 Jan
 
-The name MudOS is copyright 1991-1992 by Erik Kay, Adam Beeman, Stephan Iannce
-and John Garnett.  LPmud copyright restrictions still apply.
+- 逍遥山人, qq1102907881
+- lostsnow
+- 小瓶盖
+- 星星
+- 胜华 gon***@126.com
 
-In addition, the entire package is copyright 1995 by Tim Hollebeek.
+#### Received in 2018 Nov
 
-FluffOS is a range of patches to MudOS distributed as the patched source tree for convenience.
-LPmud and MudOS copyright restrictions still apply.
+- felchoin@sjever
+- 朝亮 wuc***@163.com
+- 羽天邪
+- 风清扬 832***@qq.com
+- Mok say***@139.com
+- 春龙 lon***@gmail.com
+- 碎梦 lih***@163.com
