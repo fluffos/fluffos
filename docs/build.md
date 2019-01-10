@@ -3,61 +3,78 @@ layout: default
 title: Build
 ---
 
-## Requirements
+## Environment
 
-Compiler: GCC 4.6+ or LLVM clang 3.0+
+It is highly recommend to use the latest ubuntu LTS version (current 18.04 LTS), 
 
-Library: libevent 2.0+, addtional libraries depends on the package selection.
+v2017 currently supports ubuntu 14.04+, centos 7+, CYGWIN 64. BSD & OSX has issues.
 
-## General Building Steps
+v2019 will support ubuntu 16.04+, native windows using VS2017, and OSX.
 
-To Build fluffos 3.0
+Compilers: FluffOS uses C++11, which is supported by at least GCC 4.6+ or LLVM clang 3.0+.
 
-    # 1. heckout git repo
+Library: libevent 2.0+, additional libraries depends on the package selection.
+
+## BUILD
+
+Ubuntu 16.04+
+
+This is the best platform to build & run FluffOS, support for other platform
+is best effort only.
+
+    # Install all libs
+    $ sudo apt update
+    $ sudo apt install build-essential bison libevent-dev libmysqlclient-dev \ 
+    libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libz-dev libgtest-dev
+    
+To Build fluffOS v2019 (CMake & out of tree build)
+
+    # 1. checkout git repo
     $ git clone https://github.com/fluffos/fluffos.git
     $ cd fluffos
-    $ git checkout master
+    $ git checkout v2019 (or any specfic release tag)
 
-    # 2. create your own local_options file
+    # 2. Upgrade your cmake
+    $ sudo pip install --upgrade cmake
+    
+    # 3. build
+    $ mkdir build && cd build
+    $ cmake ..
+    $ make
+    $ cd ..
+    
+    # 4. find the built binary in build/src/driver and build/src/portbind
 
+To Build fluffOS v2017 (Autoconf & in tree build)
+
+    # 0. You need to install autoconf & automake!
+    $ sudo apt install autoconf automake
+   
+    # 1. checkout git repo
+    $ git clone https://github.com/fluffos/fluffos.git
+    $ cd fluffos
+    $ git checkout v2017 (or any specfic release tag)
+
+    # 2. modify local_options file as need.
     $ cd src
-    $ cp local_options.testrelease local_options
-
     <edit local_options to you need>
 
     # 3. Build!
     $ ./build.FluffOS
     $ make
-    $ make install
 
-    # 4. Find the built binary "driver" and "portbind" in bin/ directory
+    # 4. find the built binary in src/driver and src/portbind
 
-## Ubuntu/Debian x86_64
+CentOS
 
-This is the best platform to run fluffos currently, support for other platform
-is best effort only.
+gcc/libevent on CentOS is too old for FluffOS, you must upgrade them manually first.
+same to other libraries.
 
-    # recommended version: 12.04 LTS+
-
-    # 1. Install compile environment
-    $ sudo apt-get install build-essential gcc g++
-
-    # 2. Install libevent 2.0
-    $ sudo apt-get install libevent-dev
-
-    # 3. Install other libraries for PACKAGE_*
-    $ sudo apt-get install libmysqlclient-dev libsqlite3-dev \
-      libpq-dev libz-dev libssl-dev libpcre3-dev
-
-## CentOS X86_64
-
-gcc/libevent on CentOS is too old for FluffOS, you must upgrade them manually.
-
-    # Install GCC 4.8
+    # Install GCC 4.8 (or the latest one you like!)
 
     $ wget http://ftp.gnu.org/gnu/gcc/gcc-4.8.0/gcc-4.8.0.tar.bz2
     $ tar -jxvf  gcc-4.8.0.tar.bz2
-    $ cd gcc-4.8.0　
+    $ cd gcc-4.8.0
     $ ./contrib/download_prerequisites
 
     # Build GCC
@@ -83,46 +100,30 @@ gcc/libevent on CentOS is too old for FluffOS, you must upgrade them manually.
     $ ./configure –prefix=/usr
     $ make
     $ make install
+ 
+### CYGWIN32/CYGWIN64 (v2017 only)
 
-## CYGWIN32/CYGWIN64
+FluffOS v2017 is fully functional under CYGWIN32 and CYGWIN64.
 
-FluffOS 3.0alpha8 is fully functional under CYGWIN32 and CYGWIN64 now!
+    # 1. Get CYGWIN setup file on http://www.cygwin.org , preferably x64 one.
 
-WARNING: FluffOS currently still require your mudlib files have unix line-ending.
+    # 2. Make sure to install following packages, using apt-cyg
+         (https://github.com/transcode-open/apt-cyg) is highly recommended. 
 
-    # 1. Get CYGWIN setup file on http://www.cygwin.org
+      - autoconf
+      - automake
+      - binutils (make sure to choose 2.28-3, there are still crashing bugs for latest version)
+      - bison
+      - gcc-core
+      - gcc-g++
+      - git
+      - libcrypt-devel
+      - libevent-devel
+      - libiconv-devel
+      - libpcre-devel
+      - zlib-devel
+      - libmysqlclient-devel
 
-    # 2. Install following packages:
-    #
-    # gcc-core   4.8.2-1
-    # gcc-g++    4.8.2-1
-    # libstdc++6 4.8.2-1
-    # make       4.0-2
-    # m4         1.4.17-1
-    # git
-    # vim (recommended)
-    #
     # CYGWIN setup should take care of other dependencies for you
 
-    # 3. Install libevent2.0 manually
-
-    $ wget https://github.com/downloads/libevent/libevent/libevent-2.0.21-stable.tar.gz
-    $ tar zxvf libevent-2.0.21-stable.tar.gz
-    $ cd libevent-2.0.21-stable
-    $ ./configure
-    $ make
-    $ make install
-
-    # 4. Build FluffOS as under normal linux
-
-    # 5. To convert all your mudlib files into unix line-ending:
-    $ cd <your mudlib dir>
-    $ find . | xargs dos2unix
-
-## FreeBSD
-
-Currently not supported.
-
-## Customization
-
-TODO: list important local_options directive here.
+    # 3. Build FluffOS asif we are under normal linux!
