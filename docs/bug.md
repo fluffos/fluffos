@@ -5,13 +5,13 @@ title: Bug Report
 
 ### Where To File
 
-You can either send to [LPMuds.net Driver board](http://lpmuds.net/smf/index.php?board=2.0), Or creating a [New Issue on GitHub](https://github.com/fluffos/fluffos/issues?direction=desc&milestone=none&sort=popularity&state=open).
+Please creates a [New Issue on GitHub](https://github.com/fluffos/fluffos/issues?direction=desc&milestone=none&sort=popularity&state=open).
 
 ### Bug Report content
 
 Please be sure to include these in your bug report.
 
-- The version number, if you are using trunk, which change were you pulled to. If that is too hard to answer, send your `git log` output.
+- The version number, driver will output this on start.
 
 - The full output, the driver will at least print out some backtrace or error message. Include those.
 
