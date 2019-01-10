@@ -9,3 +9,5 @@ testfile.zerolength
 /log/compile
 /log/author_stats
 /log/domain_stats
+sf.o
+driver
