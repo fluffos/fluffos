@@ -42,7 +42,7 @@ The list is in descending order by time donation received.
 - 逍遥山人, qq1102907881
 - lostsnow
 - 小瓶盖
-- 星星
+- 星星 qq 55833173
 - 胜华 gon***@126.com
 
 #### Received in 2018 Nov
