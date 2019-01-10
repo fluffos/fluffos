@@ -12,12 +12,14 @@ LPC runtime is mostly compatible, if your mud runs on MudOS v22+, it should be r
 [ALL RELEASES](https://github.com/fluffos/fluffos/releases)
 
 In 2019, there will be 2 release track maintained:
-v2017: no build system upgrade, no new features, critical bugfix only. 
+
+v2017: no build system upgrade, no new features, critical bugfix only.
+ 
 v2019: cmake build system, JS interop support and rolling updates.
 
 ## ChangeLog
 
-See [ChangeLog.fluffos-3.x](https://github.com/fluffos/fluffos/blob/next-3.0/ChangeLog.fluffos-3.x) for details.
+[ChangeLog.fluffos-3.x](https://github.com/fluffos/fluffos/blob/next-3.0/ChangeLog.fluffos-3.x) for details.
 
 ## Features
 
@@ -25,27 +27,13 @@ See [ChangeLog.fluffos-3.x](https://github.com/fluffos/fluffos/blob/next-3.0/Cha
 - Lots of bug fixes. (including full CHECK_MEMORY enabled testsuite pass).
 - Compile on modern linux distros, 32bit & 64bit, CYGWIN support.
 - 64 bit LPC runtime, LPC int is always 64bit int, LPC float is C double.
-- MXP, GMCP, ZLIB, Websocket support (experimental). (optional)
+- MXP, GMCP, ZLIB.
 - IPv6 support (optional)
 - ICONV support, code in UTF-8, dynamic translation on output (optional)
 - POSIX timer for better time precision. (optional)
 - More strict type checking (optional)
 - libevent integration, epoll backend.
 
-## License
+## License & Copyright
 
-This game, LPmud, is copyright by Lars Pensj|, 1990, 1991.
-
-Source code herein refers to the source code, and any executables
-created from the same source code.
-
-All rights reserved. Permission is granted to extend and modify the
-source code provided subject to the restriction that the source code may
-not be used in any way whatsoever for monetary gain.
-
-The name MudOS is copyright 1991-1992 by Erik Kay, Adam Beeman, Stephan Iannce
-and John Garnett. LPmud copyright restrictions still apply.
-
-In addition, the entire package is copyright 1995 by Tim Hollebeek.
-
-FluffOS is a range of patches to MudOS distributed as the patched source tree for convenience. LPmud and MudOS copyright restrictions still apply.
+see https://github.com/fluffos/fluffos/blob/master/Copyright
