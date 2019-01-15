@@ -1,3 +1,5 @@
+option(MTUNE_NATIVE "mtune for GCC" ON)
+
 add_library(common INTERFACE)
 
 # Compile options
@@ -12,10 +14,10 @@ target_compile_options(common INTERFACE
         "-fstrict-aliasing"
         )
 
-if (CMAKE_BUILD_TYPE STREQUAL "Release")
+if (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     target_compile_options(common INTERFACE
             "-O3"
-            "-funroll-loops>"
+            "-funroll-loops"
             "-fstack-protector-strong"
             )
 else()
@@ -53,3 +55,18 @@ target_compile_options(common INTERFACE
         # Less undefined behavior
         "-funsigned-char"
         "-fwrapv")
+
+# Optimization flags
+if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+  # MTUNE native
+  if(MTUNE_NATIVE)
+    include(CheckCXXCompilerFlag)
+    check_cxx_compiler_flag("-mtune=native" SUPPORT_MTUNE_NATIVE)
+    if(SUPPORT_MTUNE)
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=${MTUNE}")
+    else()
+      message(STATUS "The compiler dones't support -mtune=${MTUNE} ")
+    endif()
+  endif()
+endif()
+
