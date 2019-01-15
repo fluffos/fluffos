@@ -3,6 +3,7 @@
 */
 
 // FIXME: get rid of malloc stats and merge with md.
+#include <cstdlib>
 
 #include "debugmalloc.h"
 
