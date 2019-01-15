@@ -1,4 +1,4 @@
-option(MTUNE_NATIVE "mtune for GCC" ON)
+option(MARCH_NATIVE "use march=native for GCC" ON)
 
 add_library(common INTERFACE)
 
@@ -20,6 +20,9 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDeb
             "-funroll-loops"
             "-fstack-protector-strong"
             )
+  if(MARCH_NATIVE)
+      add_compile_options("-march=native")
+  endif()
 else()
     target_compile_options(common INTERFACE
             "-Og"
@@ -55,18 +58,3 @@ target_compile_options(common INTERFACE
         # Less undefined behavior
         "-funsigned-char"
         "-fwrapv")
-
-# Optimization flags
-if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
-  # MTUNE native
-  if(MTUNE_NATIVE)
-    include(CheckCXXCompilerFlag)
-    check_cxx_compiler_flag("-mtune=native" SUPPORT_MTUNE_NATIVE)
-    if(SUPPORT_MTUNE)
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=${MTUNE}")
-    else()
-      message(STATUS "The compiler dones't support -mtune=${MTUNE} ")
-    endif()
-  endif()
-endif()
-
