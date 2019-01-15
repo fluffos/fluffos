@@ -1,7 +1,7 @@
-option(STATIC "Build static version of driver" ON)
+option(STATIC "Build static version of driver" OFF)
 
 if(STATIC)
-  message(STATUS "Linking status: ${STATIC}")
+  message(STATUS "Linking driver STATICLY.")
   if(WIN32)
     set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
   else()
