@@ -1,8 +1,6 @@
 #ifndef MALLOC_INCL_H
 #define MALLOC_INCL_H
 
-#include <cstdlib>  // for calloc, free, malloc, etc
-
 #include "base/internal/options_incl.h"
 
 /* malloc wrappers */

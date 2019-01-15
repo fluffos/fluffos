@@ -1,12 +1,13 @@
 /* portbind.c: Tim Hollebeek, Oct 28, 1996 */
 #include "base/std.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <netinet/in.h>
-#include <unistd.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
+#include <arpa/inet.h>   // for inet_addr
+#include <netinet/in.h>  // for sockaddr_in, INADDR_ANY, INADDR_NONE, htons
+#include <stdio.h>       // for perror, fprintf, sscanf, stderr
+#include <stdlib.h>      // for exit
+#include <string.h>      // for strcmp
+#include <sys/socket.h>  // for bind, setsockopt, socket, AF_INET, SOCK_STREAM
+#include <unistd.h>      // for close, dup2, execv, setgid, setuid
 
 #define HANDLE_ERROR(routine, call) \
   if ((call) == -1) {               \

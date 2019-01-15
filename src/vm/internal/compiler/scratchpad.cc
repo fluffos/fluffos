@@ -2,6 +2,8 @@
 
 #include "vm/internal/compiler/scratchpad.h"
 
+#include <cstdlib>
+
 // FIXME: figure out where this is
 extern void yywarn(const char *);
 

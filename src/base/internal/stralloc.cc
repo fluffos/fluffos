@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <cstdlib>
 #include <climits>
 
 #include "base/internal/debugmalloc.h"
