@@ -1,3 +1,15 @@
+option(STATIC "Build static version of driver" ON)
+
+if(STATIC)
+  message(STATUS "Linking status: ${STATIC}")
+  if(WIN32)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
+  else()
+    set(CMAKE_FIND_LIBRARY_SUFFIXES .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
+  endif()
+endif()
+
+
 # Globally enforce CXX11
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -193,6 +205,15 @@ endif ()
 # PIE code
 set_target_properties(driver PROPERTIES POSITION_INDEPENDENT_CODE TURE)
 
+# Link statictly
+if(STATIC)
+  if(WIN32)
+    # TODO
+  else()
+    # target_link_options only avaiable at cmake 3.13.3
+    target_link_libraries(driver "-static-libgcc -static-libstdc++ -static")
+  endif()
+endif()
 
 # GTEST
 #include(GoogleTest)

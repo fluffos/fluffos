@@ -14,9 +14,13 @@ if(${PACKAGE_DB})
         target_compile_definitions(package_db PUBLIC "USE_MYSQL=${PACKAGE_DB_MYSQL}")
         target_compile_definitions(package_db PUBLIC "DEFAULT_DB=${PACKAGE_DB_DEFAULT_DB}")
 
+        if(STATIC)
+          set(MYSQLCLIENT_STATIC_LINKING TRUE)
+        endif()
+
         find_package(MySQL REQUIRED)
         target_include_directories(package_db PUBLIC ${MYSQL_INCLUDE_DIR})
-        # We are using static linkage, and it needs this
+
         target_link_libraries(package_db PUBLIC ${MYSQL_LIBRARIES})
     endif()
     # Adding others
