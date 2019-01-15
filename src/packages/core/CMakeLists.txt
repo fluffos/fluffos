@@ -9,5 +9,6 @@ add_library(package_core STATIC
         ${PACKAGE_CORE_HEADER}
         )
 
-find_package(CRYPT REQUIRED)
+# CRYPT sometimes comes with libcrypt, somteimes comes with libc, so we only link when needed.
+find_package(CRYPT)
 target_link_libraries(package_core ${CRYPT_LIBRARIES})
