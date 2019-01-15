@@ -1,4 +1,4 @@
-option(PACKAGE_CRYPTO "compress package" OFF)
+option(PACKAGE_CRYPTO "crypto package" ON)
 
 if(${PACKAGE_CRYPTO})
     add_library(package_crypto STATIC
