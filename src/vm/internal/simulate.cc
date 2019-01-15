@@ -7,6 +7,9 @@
 #include <sys/stat.h>  // for load_object struct stat
 #include <stdarg.h>    // for va_start
 #include <unistd.h>    // for open()
+#ifdef HAVE_SIGNAL_H
+#include <signal.h>    // for signal*
+#endif
 
 #include "backend.h"  // for clear_tick_events , FIXME
 #include "user.h"     // for users_foreach, FIXME
@@ -1681,16 +1684,13 @@ void fatal(const char *fmt, ...) {
 #ifdef SIGABRT
   signal(SIGABRT, SIG_DFL);
 #endif
-#ifdef SIGILL
-  signal(SIGILL, SIG_DFL);
-#endif
 #ifdef SIGIOT
+#if SIGIOT != SIGABRT
   signal(SIGIOT, SIG_DFL);
 #endif
-
-#if !defined(DEBUG_NON_FATAL)
-  abort();
 #endif
+
+  abort();
 }
 
 static int num_error = 0;
