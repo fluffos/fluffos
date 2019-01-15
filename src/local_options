@@ -9,7 +9,7 @@
  ****************************************************************************/
 
 /* NOTES: Many of the configurable options are now set in the runtime config.
- * 
+ *
  * This file only contain a list of default settings, for quick diffing .
  * See detailed explaination from 'local_options.README'
  */
@@ -50,5 +50,7 @@
 /****************************************************************************
  *                              PACKAGES                                    *
  ****************************************************************************/
+
+// PACKAGES are moved to CMAKE, please don't try to add #define PACKAGE_* here.
 
 #endif /* _LOCAL_OPTIONS_H_ */

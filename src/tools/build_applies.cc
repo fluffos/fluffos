@@ -4,13 +4,11 @@
  * This tool parse "applies" list and generate applies_table.cc/applies_table.h.
  */
 
-#include <cstdlib>
-#include <cstdio>
-#include <cstring>
-#include <cctype>
-
-#include <iostream>
-#include <string>
+#include <cctype>   // for tolower
+#include <cstdio>   // for fprintf, fclose, fgets, fopen, FILE
+#include <cstring>  // for strchr
+#include <string>   // for string
+#include <iostream> // for std::cerr
 
 static const char *APPLIES = "vm/internal/applies";
 static const char *APPLIES_H = "applies_table.autogen.h";

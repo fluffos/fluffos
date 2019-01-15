@@ -7,7 +7,6 @@
 
 #include "comm.h"
 
-#include <errno.h>               // for errno
 #include <event2/buffer.h>       // for evbuffer_freeze, etc
 #include <event2/bufferevent.h>  // for bufferevent_enable, etc
 #include <event2/event.h>        // for EV_TIMEOUT, etc
@@ -617,7 +616,7 @@ void get_user_data(interactive_t *ip) {
           ip->text_start = ip->text_end = 0;
           text_space = MAX_TEXT;
         }
-        
+
       }
       break;
 
