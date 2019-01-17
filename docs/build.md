@@ -7,15 +7,17 @@ title: Build
 
 It is highly recommend to use the latest ubuntu LTS version (current 18.04 LTS), 
 
-v2017 currently supports ubuntu 14.04+, centos 7+, CYGWIN 64. BSD & OSX has issues.
+v2017 currently supports ubuntu 14.04+, centos 7+, CYGWIN 64. BSD & OSX still has issues.
 
-v2019 will support ubuntu 16.04+, native windows using VS2017, and OSX.
+v2019 will support ubuntu 16.04+, CYGWIN, Win10+WSL, native windows using VS2017, and OSX/BSD.
 
-Compilers: FluffOS uses C++11, which is supported by at least GCC 4.6+ or LLVM clang 3.0+.
+Compilers: FluffOS uses C++11, which requires at least GCC 4.6+ or LLVM clang 3.0+.
 
-Library: libevent 2.0+, additional libraries depends on the package selection.
+Library: libevent 2.0+, additional libraries depends on the package selection. 
 
-## BUILD
+jemalloc: use JEMALLOC is highly recommended in production. otherwise you may run into memory issue.
+
+## BUILD (v2019)
 
 Ubuntu 16.04+
 
@@ -24,9 +26,9 @@ is best effort only.
 
     # Install all libs
     $ sudo apt update
-    $ sudo apt install build-essential bison libevent-dev libmysqlclient-dev \ 
-    libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libz-dev libgtest-dev
-    
+    $ sudo apt install build-essential bison libevent-dev libjemalloc-dev \
+    libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libz-dev libgtest-dev
+
 To Build fluffOS v2019 (CMake & out of tree build)
 
     # 1. checkout git repo
@@ -36,14 +38,40 @@ To Build fluffOS v2019 (CMake & out of tree build)
 
     # 2. Upgrade your cmake
     $ sudo pip install --upgrade cmake
-    
+
     # 3. build
     $ mkdir build && cd build
     $ cmake ..
     $ make
     $ cd ..
-    
+
     # 4. find the built binary in build/src/driver and build/src/portbind
+
+Packages
+
+    # By default driver have an default list of builtin packages to build.
+    # Please checkout src/packages/XXX/CMakeLists.txt.
+
+    # To turn off an PAKCAGE in compile time
+
+    $ cmake -DPACKAGE_DB=OFF ..
+
+    # Make sure you clear build directory first.
+
+Advanced Build features (v2019)
+
+    # By default driver will link dynamic libraries and optimize for running on current CPU only.
+    # if you wish to cross compile for other machines, turn off MARCH_NATIVE and turn
+    # on STATIC.
+
+    $ cmake -DMARCH_NATIVE=OFF -DSTATIC=ON ..
+
+    # Check the result file to make sure it is an static file
+
+    $ ldd src/driver
+    not a dynamic executable
+
+## BUILD (v2017)
 
 To Build fluffOS v2017 (Autoconf & in tree build)
 
@@ -65,10 +93,12 @@ To Build fluffOS v2017 (Autoconf & in tree build)
 
     # 4. find the built binary in src/driver and src/portbind
 
-CentOS
+## CentOS
 
-gcc/libevent on CentOS is too old for FluffOS, you must upgrade them manually first.
-same to other libraries.
+The problem with CentOS is that most of the package is too old for FluffOS,
+you must upgrade them manually first.
+
+Move to ubuntu or run an ubuntu based docker images is highly recommended.
 
     # Install GCC 4.8 (or the latest one you like!)
 
@@ -101,7 +131,7 @@ same to other libraries.
     $ make
     $ make install
  
-### CYGWIN32/CYGWIN64 (v2017 only)
+## CYGWIN32/CYGWIN64 (v2017 & V2019)
 
 FluffOS v2017 is fully functional under CYGWIN32 and CYGWIN64.
 
@@ -126,4 +156,4 @@ FluffOS v2017 is fully functional under CYGWIN32 and CYGWIN64.
 
     # CYGWIN setup should take care of other dependencies for you
 
-    # 3. Build FluffOS asif we are under normal linux!
+    # 3. Build FluffOS as if we are under normal linux!
