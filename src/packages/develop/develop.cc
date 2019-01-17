@@ -35,7 +35,7 @@ void f_debug_info(void) {
       outbuf_addv(&out, "O_RESET_STATE     : %s\n", flags & O_RESET_STATE ? "TRUE" : "FALSE");
       outbuf_addv(&out, "O_WILL_CLEAN_UP   : %s\n", flags & O_WILL_CLEAN_UP ? "TRUE" : "FALSE");
       outbuf_addv(&out, "O_WILL_RESET      : %s\n", flags & O_WILL_RESET ? "TRUE" : "FALSE");
-#ifdef HAVE_ZLIB
+
       if (ob->interactive) {
         outbuf_addv(&out, "O_ZMP             : %s\n",
                     ob->interactive->iflags & USING_ZMP ? "TRUE" : "FALSE");
@@ -44,7 +44,6 @@ void f_debug_info(void) {
         outbuf_addv(&out, "O_MXP             : %s\n",
                     ob->interactive->iflags & USING_MXP ? "TRUE" : "FALSE");
       }
-#endif
 
       if (!CONFIG_INT(__RC_NO_RESETS__)) {
         outbuf_addv(&out, "next_reset  : %d\n", ob->next_reset);
