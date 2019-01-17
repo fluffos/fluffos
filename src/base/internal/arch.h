@@ -14,7 +14,11 @@
  * in MudOS is not used.
  */
 #ifdef __CYGWIN__
-#define ARCH "Cygwin-32"
+#ifdef __x86_64__
+#define ARCH "CYGWIN-64"
+#else
+#define ARCH "CYGWIN-32"
+#endif
 #endif
 
 #ifdef WINNT
