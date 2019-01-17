@@ -7,7 +7,10 @@
 #define COMPILER "@CMAKE_CXX_COMPILER@"
 #define CXXFLAGS "Broken"
 
-// TODO
+// Features
+#cmakedefine HAVE_JEMALLOC 1
+
+// System headers
 #cmakedefine HAVE_CRYPT_H
 #cmakedefine HAVE_DIRENT_H 1
 #cmakedefine HAVE_EXECINFO_H 1

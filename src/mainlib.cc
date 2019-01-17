@@ -27,8 +27,8 @@
 #include <unistd.h>
 
 #include "backend.h"  // for backend, init_backend
-#if USE_JEMALLOC == 1
-#include "thirdparty/jemalloc/include/jemalloc/jemalloc.h"  // for mallctl
+#ifdef HAVE_JEMALLOC
+#include <jemalloc/jemalloc.h>  // for mallctl
 #endif
 #include "packages/core/dns.h"  // for init_dns_event_base.
 #include "vm/vm.h"  // for push_constant_string, etc
@@ -98,7 +98,7 @@ namespace {
         std::cout << "FluffOS Version: " << PROJECT_VERSION << "(" << SOURCE_REVISION << ")"
                   << "@ (" << ARCH << ")" << std::endl;
 
-#if USE_JEMALLOC == 1
+#ifdef HAVE_JEMALLOC
         /* Print jemalloc version */
       {
         const char *ver;
