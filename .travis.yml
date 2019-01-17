@@ -21,6 +21,7 @@ addons:
     - libz-dev
     - telnet
     - libgtest-dev
+    - libjemalloc-dev
 
 script: sudo pip install --upgrade cmake && bash -x ./.travis_build.sh
 
