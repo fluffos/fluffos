@@ -1,13 +1,7 @@
+# List of compile options to tweak
 option(STATIC "Build static version of driver" OFF)
-
-if(STATIC)
-  message(STATUS "Linking driver STATICLY.")
-  if(WIN32)
-    set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
-  else()
-    set(CMAKE_FIND_LIBRARY_SUFFIXES .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
-  endif()
-endif()
+option(USE_JEMALLOC "Build driver with jemalloc support" ON)
+# End of list of compile options.
 
 # Globally enforce CXX11
 set(CMAKE_CXX_STANDARD 11)
@@ -17,6 +11,39 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Setup include directoires
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
+
+# include common compiler flags/definiations
+include(common)
+
+target_include_directories(common INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
+
+# STATIC
+if(STATIC)
+  message(STATUS "Linking driver STATICLY.")
+  if(WIN32)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
+  else()
+    set(CMAKE_FIND_LIBRARY_SUFFIXES .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
+  endif()
+endif()
+# end of STATIC
+
+# JEMALLOC
+if (CYGWIN)
+  set(USE_JEMALLOC OFF)
+  message(STATUS "JEMALLOC is not supported on CYGWIN.")
+endif()
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(USE_JEMALLOC OFF)
+  message(STATUS "JEMALLOC is disabled on debug build.")
+endif()
+if (USE_JEMALLOC)
+  find_package(jemalloc REQUIRED)
+  set(HAVE_JEMALLOC TRUE) # used in config.h.in
+  target_include_directories(common INTERFACE ${JEMALLOC_INCLUDE_DIR})
+  target_link_libraries(common INTERFACE ${JEMALLOC_LIBRARIES})
+endif()
+# end of JEMALLOC
 
 # Configuration phase
 INCLUDE (CheckIncludeFileCXX)
@@ -42,11 +69,6 @@ set(GENERATED_HEADERS
         # This file is generated in packages/CMakeLists.txt , however set it here will complain.
         #"${CMAKE_CURRENT_BINARY_DIR}/packages/packages.autogen.h"
         )
-
-# include common compiler flags/definiations
-include(common)
-
-target_include_directories(common INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
 
 # Build phase
 
@@ -168,7 +190,9 @@ add_library(libdriver STATIC ${GENERATED_HEADERS} ${GENERATRED_SOURCE}
         ${SRC} ${SRC_HEADER}
         )
 
+# delcare our target
 add_executable(driver "main.cc")
+
 target_link_libraries(driver libdriver)
 
 add_subdirectory(packages) # provides FLUFFOS_PACKAGES
@@ -221,6 +245,7 @@ endif()
 
 include(helper)
 message("Final Compile Flags: ")
+print_iterface_target_properties(common)
 print_target_properties(driver)
 
 add_executable(portbind "portbind.cc")
