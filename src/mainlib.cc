@@ -77,16 +77,14 @@ namespace {
     }
 
     void print_commandline(int argc, char **argv) {
-        std::cout << "Command: " << argv[0] << " ";
-        for (int i = 1; i < argc; i++) {
+        std::cout << "Full Command Line: ";
+        for (int i = 0; i < argc; i++) {
             std::cout << argv[i] << " ";
         }
         std::cout << std::endl;
-        print_sep();
     }
 
     void print_version_and_time() {
-        print_sep();
         /* Print current time */
         {
             time_t tm;
@@ -107,7 +105,6 @@ namespace {
         std::cout << "Jemalloc Version: " << ver << std::endl;
       }
 #endif
-        print_sep();
     }
 
     static void try_dump_stacktrace() {
@@ -196,10 +193,12 @@ struct event_base* init_main(int argc, char **argv) {
     setlocale(LC_ALL, "C");
     tzset();
 
+    print_sep();
     print_commandline(argc, argv);
     print_version_and_time();
     incrase_fd_rlimit();
     print_rlimit();
+    print_sep();
 
     /* read in the configuration file */
     bool got_config = false;
