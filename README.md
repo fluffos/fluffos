@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.org/fluffos/fluffos.svg)](https://travis-ci.org/fluffos/fluffos)
-[![Coverage Status](https://coveralls.io/repos/github/fluffos/fluffos/badge.svg?branch=master)](https://coveralls.io/github/fluffos/fluffos?branch=master)
+[![Backers on Open Collective](https://opencollective.com/fluffos-579/backers/badge.svg)](#backers) [![Sponsors on Open Collective](https://opencollective.com/fluffos-579/sponsors/badge.svg)](#sponsors) [![Coverage Status](https://coveralls.io/repos/github/fluffos/fluffos/badge.svg?branch=master)](https://coveralls.io/github/fluffos/fluffos?branch=master)
 [![Coverity Status](https://scan.coverity.com/projects/483/badge.svg)](https://scan.coverity.com/projects/483)
 
 Welcome
@@ -54,3 +54,33 @@ The list is in descending order by time donation received.
 - Mok say***@139.com
 - 春龙 lon***@gmail.com
 - 碎梦 lih***@163.com
+
+## Contributors
+
+This project exists thanks to all the people who contribute. 
+<a href="https://github.com/fluffos/fluffos/graphs/contributors"><img src="https://opencollective.com/fluffos-579/contributors.svg?width=890&button=false" /></a>
+
+
+## Backers
+
+Thank you to all our backers! 🙏 [[Become a backer](https://opencollective.com/fluffos-579#backer)]
+
+<a href="https://opencollective.com/fluffos-579#backers" target="_blank"><img src="https://opencollective.com/fluffos-579/backers.svg?width=890"></a>
+
+
+## Sponsors
+
+Support this project by becoming a sponsor. Your logo will show up here with a link to your website. [[Become a sponsor](https://opencollective.com/fluffos-579#sponsor)]
+
+<a href="https://opencollective.com/fluffos-579/sponsor/0/website" target="_blank"><img src="https://opencollective.com/fluffos-579/sponsor/0/avatar.svg"></a>
+<a href="https://opencollective.com/fluffos-579/sponsor/1/website" target="_blank"><img src="https://opencollective.com/fluffos-579/sponsor/1/avatar.svg"></a>
+<a href="https://opencollective.com/fluffos-579/sponsor/2/website" target="_blank"><img src="https://opencollective.com/fluffos-579/sponsor/2/avatar.svg"></a>
+<a href="https://opencollective.com/fluffos-579/sponsor/3/website" target="_blank"><img src="https://opencollective.com/fluffos-579/sponsor/3/avatar.svg"></a>
+<a href="https://opencollective.com/fluffos-579/sponsor/4/website" target="_blank"><img src="https://opencollective.com/fluffos-579/sponsor/4/avatar.svg"></a>
+<a href="https://opencollective.com/fluffos-579/sponsor/5/website" target="_blank"><img src="https://opencollective.com/fluffos-579/sponsor/5/avatar.svg"></a>
+<a href="https://opencollective.com/fluffos-579/sponsor/6/website" target="_blank"><img src="https://opencollective.com/fluffos-579/sponsor/6/avatar.svg"></a>
+<a href="https://opencollective.com/fluffos-579/sponsor/7/website" target="_blank"><img src="https://opencollective.com/fluffos-579/sponsor/7/avatar.svg"></a>
+<a href="https://opencollective.com/fluffos-579/sponsor/8/website" target="_blank"><img src="https://opencollective.com/fluffos-579/sponsor/8/avatar.svg"></a>
+<a href="https://opencollective.com/fluffos-579/sponsor/9/website" target="_blank"><img src="https://opencollective.com/fluffos-579/sponsor/9/avatar.svg"></a>
+
+
