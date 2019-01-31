@@ -215,8 +215,12 @@ target_link_libraries(driver ${LIBEVENT_LIBRARIES})
 target_include_directories(driver PUBLIC ${LIBEVENT_INCLUDE_DIR})
 
 # Async use this?
-#find_package (Threads REQUIRED)
-#target_link_libraries(driver ${CMAKE_THREAD_LIBS_INIT})
+find_package (Threads REQUIRED)
+target_link_libraries(driver ${CMAKE_THREAD_LIBS_INIT})
+
+# ICU
+find_package(ICU REQUIRED COMPONENTS uc io)
+target_link_libraries(driver ${ICU_LIBRARIES})
 
 # IPO??
 include(CheckIPOSupported)

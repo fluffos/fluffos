@@ -30,6 +30,10 @@
 #ifdef HAVE_JEMALLOC
 #include <jemalloc/jemalloc.h>  // for mallctl
 #endif
+
+#include <unicode/uversion.h>
+#include <unicode/uloc.h>
+
 #include "packages/core/dns.h"  // for init_dns_event_base.
 #include "vm/vm.h"  // for push_constant_string, etc
 
@@ -95,6 +99,11 @@ namespace {
         /* Print FluffOS version */
         std::cout << "FluffOS Version: " << PROJECT_VERSION << "(" << SOURCE_REVISION << ")"
                   << "@ (" << ARCH << ")" << std::endl;
+
+        std::cout << "ICU Version: " << U_ICU_VERSION << ", "
+                  << "Default locale: env: " << setlocale(LC_ALL, nullptr) << ", "
+                  << "ICU: " << uloc_getDefault()
+                  << std::endl;
 
 #ifdef HAVE_JEMALLOC
         /* Print jemalloc version */
@@ -190,7 +199,7 @@ namespace {
 }
 
 struct event_base* init_main(int argc, char **argv) {
-    setlocale(LC_ALL, "C");
+    setlocale(LC_ALL, "");
     tzset();
 
     print_sep();
