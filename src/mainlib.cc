@@ -106,13 +106,15 @@ namespace {
                   << std::endl;
 
 #ifdef HAVE_JEMALLOC
-        /* Print jemalloc version */
-      {
-        const char *ver;
-        size_t resultlen = sizeof(ver);
-        mallctl("version", &ver, &resultlen, NULL, 0);
-        std::cout << "Jemalloc Version: " << ver << std::endl;
-      }
+          /* Print jemalloc version */
+        {
+          const char *ver;
+          size_t resultlen = sizeof(ver);
+          mallctl("version", &ver, &resultlen, NULL, 0);
+          std::cout << "Jemalloc Version: " << ver << std::endl;
+        }
+#else
+        std::cout << "Jemalloc is disabled, this is not suitable for production." << std::endl;
 #endif
     }
 
