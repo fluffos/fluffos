@@ -197,7 +197,7 @@ INCLUDE(CheckIncludeFileCXX)
 # boost improves several stl classes as well as has an improved assert
 # handling
 
-find_package(Boost 1.65.0 REQUIRED)
+find_package(Boost 1.55.0 REQUIRED)
 target_include_directories(common INTERFACE ${Boost_INCLUDE_DIRS})
 target_link_libraries(common INTERFACE ${Boost_LIBRARIES})
 
