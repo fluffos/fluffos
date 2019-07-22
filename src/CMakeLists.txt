@@ -192,6 +192,20 @@ include_directories("thirdparty/libwebsockets/include" SYSTEM)
 include_directories("${CMAKE_CURRENT_BINARY_DIR}/thirdparty/libwebsockets")
 
 INCLUDE(CheckIncludeFileCXX)
+
+# Boost libraries
+# boost improves several stl classes as well as has an improved assert
+# handling
+
+find_package(Boost 1.65.0 REQUIRED)
+target_include_directories(common INTERFACE ${Boost_INCLUDE_DIRS})
+target_link_libraries(common INTERFACE ${Boost_LIBRARIES})
+
+# end of boost libraries
+
+# Configuration phase
+
+INCLUDE (CheckIncludeFileCXX)
 # usage: CHECK_INCLUDE_FILES (<header> <RESULT_VARIABLE> )
 CHECK_INCLUDE_FILE_CXX(dirent.h HAVE_DIRENT_H)
 CHECK_INCLUDE_FILE_CXX(time.h HAVE_TIME_H)

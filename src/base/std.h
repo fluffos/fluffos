@@ -164,5 +164,7 @@
 
 #include "base/internal/strutils.h"
 
+#include "base/internal/shared_string.hh"
+
 // IWYU pragma: end_exports
 #endif  // STD_H
