@@ -406,9 +406,9 @@ void update_compile_av(int lines) {
   acc = 0;
 } /* update_compile_av() */
 
-char *query_load_av() {
-  static char buff[100];
+std::string query_load_av() {
+    static boost::format fmt("%.2f cmds/s, %.2f comp lines/s");
 
-  sprintf(buff, "%.2f cmds/s, %.2f comp lines/s", load_av, compile_av);
-  return (buff);
+    fmt % load_av % compile_av;
+    return (fmt.str());
 } /* query_load_av() */

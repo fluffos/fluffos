@@ -1647,7 +1647,7 @@ void f_query_ip_number(void) {
 #endif
 
 #ifdef F_QUERY_LOAD_AVERAGE
-void f_query_load_average(void) { copy_and_push_string(query_load_av()); }
+void f_query_load_average(void) { copy_and_push_string(query_load_av().c_str()); }
 #endif
 
 #ifdef F_QUERY_PRIVS
