@@ -2930,7 +2930,7 @@ void f_send_nullbyte(void) {
   } else {
     tmp = 1;
     //""is only the end-of-string zero byte.
-    add_message(who, "\0", 1);
+    add_message(who, "\0");
     flush_message(who->interactive);
   }
   free_object(&sp->u.ob, "f_send_nullbyte");

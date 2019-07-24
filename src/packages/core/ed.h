@@ -136,7 +136,7 @@ void ed_cmd(char *);
 void save_ed_buffer(struct object_t *);
 
 #ifdef OLD_ED
-#define ED_OUTPUT(x, y) add_message(x, y, strlen(y))
+#define ED_OUTPUT(x, y) add_message(x, y)
 #define ED_OUTPUTV add_vmessage
 #define ED_DEST command_giver
 #else

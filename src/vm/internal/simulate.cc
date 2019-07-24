@@ -1719,13 +1719,16 @@ static void debug_message_with_location(char *err) {
 
 static void add_message_with_location(char *err) {
   if (current_object && current_prog) {
-    add_vmessage(command_giver, "%sprogram: /%s, object: /%s, file: %s\n", err,
+      static boost::format fmt("%sprogram: /%s, object: /%s, file: %s\n");
+    add_vmessage(command_giver, fmt, err,
                  current_prog->filename, current_object->obname, get_line_number(pc, current_prog));
   } else if (current_object) {
-    add_vmessage(command_giver, "%sprogram: (none), object: /%s, file: (none)\n", err,
+      static boost::format fmt("%sprogram: (none), object: /%s, file: (none)\n");
+    add_vmessage(command_giver, fmt, err,
                  current_object->obname);
   } else {
-    add_vmessage(command_giver, "%sprogram: (none), object: (none), file: (none)\n", err);
+      static boost::format fmt("%sprogram: (none), object: (none), file: (none)\n");
+    add_vmessage(command_giver, fmt, err);
   }
 }
 
@@ -1787,7 +1790,8 @@ void _error_handler(char *err) {
     ob = find_object2(object_name);
     if (!ob) {
       if (command_giver) {
-        add_vmessage(command_giver, "error when executing program in destroyed object /%s\n",
+          static boost::format fmt("error when executing program in destroyed object /%s\n");
+        add_vmessage(command_giver, fmt,
                      object_name);
       }
       debug_message("error when executing program in destroyed object /%s\n", object_name);
@@ -1801,7 +1805,8 @@ void _error_handler(char *err) {
       add_message_with_location(err + 1);
 #ifndef NO_WIZARDS
     } else {
-      add_vmessage(command_giver, "%s\n", default_error_message);
+        static boost::format fmt("%s\n");
+      add_vmessage(command_giver, fmt, default_error_message);
     }
 #endif
   }
@@ -1810,7 +1815,7 @@ void _error_handler(char *err) {
     set_heart_beat(g_current_heartbeat_obj, 0);
     debug_message("Heart beat in /%s turned off.\n", g_current_heartbeat_obj->obname);
     if (g_current_heartbeat_obj->interactive) {
-      add_message(g_current_heartbeat_obj, hb_message, sizeof(hb_message) - 1);
+      add_message(g_current_heartbeat_obj, hb_message);
     }
 
     g_current_heartbeat_obj = nullptr;
@@ -2050,7 +2055,7 @@ void tell_npc(object_t *ob, const char *str) {
  */
 void tell_object(object_t *ob, const char *str, int len) {
   if (!ob || (ob->flags & O_DESTRUCTED)) {
-    add_message(nullptr, str, len);
+    add_message(nullptr, str);
     return;
   }
   if (CONFIG_INT(__RC_INTERACTIVE_CATCH_TELL__)) {
@@ -2058,7 +2063,7 @@ void tell_object(object_t *ob, const char *str, int len) {
   } else {
     /* if this is on, EVERYTHING goes through catch_tell() */
     if (ob->interactive) {
-      add_message(ob, str, len);
+      add_message(ob, str);
     } else {
       tell_npc(ob, str);
     }

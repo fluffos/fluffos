@@ -41,8 +41,21 @@
  * comm.c
  */
 
-void add_vmessage(struct object_t *, const char *, ...);
-void add_message(struct object_t *, const char *, int);
+void add_message(struct object_t *, const std::string);
+void add_vmessage(struct object_t *, boost::format);
+template <typename T>
+void add_vmessage(struct object_t *who , boost::format fmt, T arg) {
+    fmt % arg;
+    add_message(who, fmt.str());
+}
+template <typename T, typename... Args>
+void add_vmessage(struct object_t *who, boost::format fmt, T arg, Args... args) {
+    fmt % arg;
+    add_vmessage(who, fmt, args...);
+}
+
+void update_ref_counts_for_users(void);
+void make_selectmasks(void);
 bool init_user_conn(void);
 void shutdown_external_ports(void);
 void set_prompt(const char *);

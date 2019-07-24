@@ -1341,6 +1341,8 @@ void push_constant_string(const char *p) {
 }
 
 void do_trace_call(int offset) {
+    static boost::format fmt(" with %d arguments: ");
+
   do_trace("Call direct ", current_prog->function_table[offset].funcname, " ");
   if (TRACEHB) {
     if (TRACETST(TRACE_ARGS)) {
@@ -1348,13 +1350,13 @@ void do_trace_call(int offset) {
 
       n = current_prog->function_table[offset].num_arg;
 
-      add_vmessage(command_giver, " with %d arguments: ", n);
+      add_vmessage(command_giver, fmt, n);
       for (i = n - 1; i >= 0; i--) {
         print_svalue(&sp[-i]);
-        add_message(command_giver, " ", 1);
+        add_message(command_giver, " ");
       }
     }
-    add_message(command_giver, "\n", 1);
+    add_message(command_giver, "\n");
   }
 }
 
@@ -3501,9 +3503,9 @@ void eval_instruction(char *p) {
               if (TRACETST(TRACE_ARGS)) {
                 static char msg[] = "with value: 0";
 
-                add_message(command_giver, msg, sizeof(msg) - 1);
+                add_message(command_giver, msg);
               }
-              add_message(command_giver, "\n", 1);
+              add_message(command_giver, "\n");
             }
           }
         }
@@ -3544,10 +3546,10 @@ void eval_instruction(char *p) {
               if (TRACETST(TRACE_ARGS)) {
                 char msg[] = " with value: ";
 
-                add_message(command_giver, msg, sizeof(msg) - 1);
+                add_message(command_giver, msg);
                 print_svalue(sp);
               }
-              add_message(command_giver, "\n", 1);
+              add_message(command_giver, "\n");
             }
           }
         }
@@ -4688,6 +4690,7 @@ int last_instructions() {
 /* Generate a debug message to the user */
 void do_trace(const char *msg, const char *fname, const char *post) {
   const char *objname;
+  static boost::format fmt("*** %d %*s %s %s %s%s");
 
   if (!TRACEHB) {
     return;
@@ -4695,7 +4698,7 @@ void do_trace(const char *msg, const char *fname, const char *post) {
   objname = TRACETST(TRACE_OBJNAME)
                 ? (current_object && current_object->obname ? current_object->obname : "??")
                 : "";
-  add_vmessage(command_giver, "*** %d %*s %s %s %s%s", tracedepth, tracedepth, "", msg, objname,
+  add_vmessage(command_giver, fmt, tracedepth, tracedepth, "", msg, objname,
                fname, post);
 }
 

@@ -1292,7 +1292,7 @@ void f_message(void) {
         error("Printable strings limited to length of %d.\n", LARGEST_PRINTABLE_STRING);
       }
 
-      add_message(command_giver, args[1].u.string, len);
+      add_message(command_giver, args[1].u.string);
       pop_n_elems(num_arg);
       return;
     }
@@ -1806,12 +1806,12 @@ void f_receive(void) {
         error("Printable strings limited to length of %d.\n", LARGEST_PRINTABLE_STRING);
       }
 
-      add_message(current_object, sp->u.string, len);
+      add_message(current_object, sp->u.string);
     }
     free_string_svalue(sp--);
   } else {
     if (current_object->interactive) {
-      add_message(current_object, reinterpret_cast<char *>(sp->u.buf->item), sp->u.buf->size);
+      add_message(current_object, reinterpret_cast<char *>(sp->u.buf->item));
     }
 
     free_buffer((sp--)->u.buf);

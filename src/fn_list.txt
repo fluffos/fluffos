@@ -1,0 +1,8 @@
+old signature                                           |   new signature
+
+backend.cc:
+char *query_load_av()                                   |   std::string query_load_av()
+
+comm.cc:
+void add_message(struct object_t *, const char *, int)  |   void add_message(struct object_t *, const std::string)
+void add_vmessage(struct object_t *, const char *, ...) |   void add_vmessage(struct object_t *, boost::format, ...)

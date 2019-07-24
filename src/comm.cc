@@ -504,7 +504,7 @@ static int shadow_catch_message(object_t *ob, const char *str) {
  * Send a message to an interactive object. If that object is shadowed,
  * special handling is done.
  */
-void add_message(object_t *who, const char *data, int len) {
+void add_message(object_t *who, const std::string data) {
   /*
    * if who->interactive is not valid, write message on stderr.
    * (maybe)
@@ -513,7 +513,7 @@ void add_message(object_t *who, const char *data, int len) {
       (who->interactive->iflags & (NET_DEAD | CLOSING))) {
     if (CONFIG_INT(__RC_NONINTERACTIVE_STDERR_WRITE__)) {
       putc(']', stderr);
-      fwrite(data, len, 1, stderr);
+      fwrite(data.c_str(), data.size(), 1, stderr);
     }
     return;
   }
@@ -579,40 +579,20 @@ void add_message(object_t *who, const char *data, int len) {
   /*
    * shadow handling.
    */
-  if (shadow_catch_message(who, data)) {
+  if (shadow_catch_message(who, data.c_str())) {
     if (CONFIG_INT(__RC_SNOOP_SHADOWED__)) {
-      handle_snoop(data, len, ip);
+      handle_snoop(data.c_str(), data.size(), ip);
     }
     return;
   }
 #endif /* NO_SHADOWS */
-  handle_snoop(data, len, ip);
+  handle_snoop(data.c_str(), data.size(), ip);
 
   add_message_calls++;
 } /* add_message() */
 
-void add_vmessage(object_t *who, const char *format, ...) {
-  va_list args, args2;
-  va_start(args, format);
-  va_copy(args2, args);
-  static char buf[LARGEST_PRINTABLE_STRING + 1];
-  do {
-    auto result = vsnprintf(buf, sizeof(buf), format, args);
-    if (result < 0) {
-      DEBUG_CHECK(result < 0, "Invalid format string: add_vmessage");
-      break;
-    }
-    if (result <= sizeof(buf)) {
-      add_message(who, buf, result);
-    } else {
-      std::unique_ptr<char[]> msg(new char[result + 1]);
-      result = vsnprintf(msg.get(), result + 1, format, args2);
-      if (result < 0) break;
-      add_message(who, msg.get(), result);
-    }
-  } while (false);
-  va_end(args2);
-  va_end(args);
+void add_vmessage(struct object_t *who, boost::format fmt) {
+    add_message(who, fmt.str());
 }
 
 /*
@@ -1488,8 +1468,8 @@ static void receive_snoop(const char *buf, int len, object_t *snooper) {
     apply(APPLY_RECEIVE_SNOOP, snooper, 1, ORIGIN_DRIVER);
   } else {
     /* snoop output is now % in all cases */
-    add_message(snooper, "%", 1);
-    add_message(snooper, buf, len);
+    add_message(snooper, "%");
+    add_message(snooper, buf);
   }
 }
 #endif
