@@ -1,4 +1,5 @@
 old signature                                           |   new signature
+================================================================================================================================
 
 backend.cc:
 char *query_load_av()                                   |   std::string query_load_av()
@@ -6,3 +7,8 @@ char *query_load_av()                                   |   std::string query_lo
 comm.cc:
 void add_message(struct object_t *, const char *, int)  |   void add_message(struct object_t *, const std::string)
 void add_vmessage(struct object_t *, const char *, ...) |   void add_vmessage(struct object_t *, boost::format, ...)
+
+fliconv.cc:
+struct translation *get_translator(const char *)        |   const translation get_translator(const std::string)
+char *translate(iconv_t, const char *, int, int *)      |   std::string translate(iconv_t, const std::string)
+char *translate_easy(iconv_t, const char *)             |   --- (obsolete)

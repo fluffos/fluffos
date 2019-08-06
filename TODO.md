@@ -1,8 +1,9 @@
 # URGENT #
 ## vm/internal/simul\_efun.cc ##
 - init\_simul\_efun
-  possible overflow in strcat(buf, ".c") change to strncat!!!
-  search complete source for other occurances
+  ~~possible overflow in strcat(buf, ".c") change to strncat!!!~~
+  ~~search complete source for other occurances~~
+  Doesn't apply anymore after changing to std::string
 - portability problems
     add gnulib modules
 
@@ -12,6 +13,7 @@
 - check efun::shadowp/efun::query_shadowing
 - expand docs for efun:implode (missing three arg form)
 - missing docs for efun::defer
+- missing docs for iconv-efuns
 
 ## packages/contrib/contrib.cc ##
 network\_stats
@@ -53,3 +55,6 @@ string\_difference
 ## vm/internal/simulate.cc ##
 - give_uid_to_object
   after calling master::creator_file doubled check for ```!ret```.
+
+## iconv ##
+- provide (MT safe) c++ wrapper

@@ -42,8 +42,8 @@
 #define SAVE_EXTENSION ".o"
 #define PRIVS
 #undef NO_SHADOWS
-#undef USE_ICONV
-#undef IPV6
+#define USE_ICONV
+#define IPV6
 
 /****************************************************************************
  *                              PACKAGES                                    *
