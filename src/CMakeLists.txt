@@ -30,6 +30,7 @@ option(PACKAGE_TRIM "trim package" ON)
 option(PACKAGE_UIDS "uids package" ON)
 option(DEBUG OFF)
 option(DEBUGMALLOC ${DEBUG})
+option(USE_THIRDPARTY_FMT "use provided libfmt instead of installed one" OFF)
 # End of list of compile options.
 
 # Globally enforce CXX17 and C11
@@ -403,6 +404,36 @@ target_link_libraries(driver PUBLIC ${ICU_LIBRARIES})
 add_subdirectory(thirdparty/backward-cpp EXCLUDE_FROM_ALL)
 add_backward(driver)
 
+<<<<<<< HEAD
+=======
+find_package(fmt 6.0.0 QUIET)
+if (USE_THIRDPARTY_FMT OR NOT fmt_FOUND)
+    message(STATUS "Using supplied libfmt...")
+    add_subdirectory(thirdparty/fmt)
+else()
+    message(STATUS "Using installed libfmt (${fmt_VERSION})...")
+endif()
+target_link_libraries(driver PUBLIC fmt)
+
+# Compiler definitions
+target_link_libraries(driver PUBLIC common)
+
+# Link statictly
+if(STATIC)
+    if(WIN32)
+        # TODO
+        message(FATAL_ERROR "Build staticly on Windows is not currently supported")
+    else()
+        if(APPLE)
+            message(FATAL_ERROR "Build staticly on OSX is not supported")
+        else()
+            # target_link_options only avaiable at cmake 3.13.3
+            target_link_libraries(driver PUBLIC "-static-libgcc -static-libstdc++ -Wl,-Bstatic")
+        endif()
+    endif()
+endif()
+
+>>>>>>> <feat>(char_p2string): added fmtlib/fmt
 # JEMALLOC
 if (CYGWIN)
   set(USE_JEMALLOC OFF)

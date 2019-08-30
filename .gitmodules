@@ -1,0 +1,4 @@
+[submodule "src/thirdparty/fmt"]
+	path = src/thirdparty/fmt
+	url = git@github.com:fmtlib/fmt.git
+	branch = tags/6.0.0
