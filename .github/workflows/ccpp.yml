@@ -1,6 +1,6 @@
 name: C/C++ CI
 
-on: [push]
+on: [push, pull-request]
 
 jobs:
   build:
@@ -9,6 +9,8 @@ jobs:
     
     steps:
     - uses: actions/checkout@v1
+    - name: packegs
+      run:  apt install -y build-essential clang-6.0 autoconf automake bison expect libevent-dev libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
     - name: cmake
       run: mkdir build && cd build && cmake ..
     - name: make
