@@ -6,8 +6,12 @@ jobs:
   build:
     strategy:
       matrix:
-        compiler: ["g++", "clang++"]
-        os: ["ubuntu-16.04", "ubuntu-18.04"]
+        compiler:
+          - CC: "gcc"
+            CXX: "g++"
+          - CC: "clang"
+            CXX: "clang++"
+        os: ["ubuntu-18.04"]
       
     runs-on: ${{ matrix.os }}
 
@@ -16,8 +20,7 @@ jobs:
     - name: packegs
       run:  sudo apt install -y build-essential clang-6.0 autoconf automake bison expect libevent-dev libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
     - name: cmake
-      env:
-        CXX: ${{ matrix.compiler }}
+      env: ${{ matrix.compiler }}
       run: mkdir build && cd build && cmake ..
     - name: make
       run: cd build && make
