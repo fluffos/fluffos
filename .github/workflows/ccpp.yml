@@ -4,15 +4,19 @@ on: [push, pull_request]
 
 jobs:
   build:
-
-    runs-on: ubuntu-latest
+  strategy:
+    matrix:
+      compiler: ["g++", "clang"]
+      os: ["ubuntu-16.04", "ubuntu-18.04"]
+      
+    runs-on: runs-on: ${{ matrix.os }}
     
     steps:
     - uses: actions/checkout@v1
     - name: packegs
       run:  sudo apt install -y build-essential clang-6.0 autoconf automake bison expect libevent-dev libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
     - name: cmake
-      run: mkdir build && cd build && cmake ..
+      run: mkdir build && cd build && CXX="${{matrix.compiler}}" cmake ..
     - name: make
       run: cd build && make
     - name: make test
