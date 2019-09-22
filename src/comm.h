@@ -42,16 +42,11 @@
  */
 
 void add_message(struct object_t *, const std::string);
-void add_vmessage(struct object_t *, boost::format);
-template <typename T>
-void add_vmessage(struct object_t *who , boost::format fmt, T arg) {
-    fmt % arg;
-    add_message(who, fmt.str());
-}
-template <typename T, typename... Args>
-void add_vmessage(struct object_t *who, boost::format fmt, T arg, Args... args) {
-    fmt % arg;
-    add_vmessage(who, fmt, args...);
+void add_vmessage_internal(object_t *, const std::string, fmt::format_args);
+template <typename... Args> void add_vmessage(object_t *who, const std::string format, Args ...args)
+{
+    std::cerr << "DEBUG_OUTPUT!!! fmt::vformat(\"" << format << "\", ...)\n";
+    add_vmessage_internal(who, format, fmt::make_format_args(args...));
 }
 
 void update_ref_counts_for_users(void);

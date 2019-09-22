@@ -237,14 +237,11 @@ static void regoptail(char * /*p*/, char * /*val*/);
 static void regerror(const char *s) {
   switch (regexp_user) {
     case ED_REGEXP:
-        {
-            static boost::format fmt("ed: regular expression error: %s");
-            ED_OUTPUTV(ED_DEST, fmt, s);
-        }
+        ED_OUTPUTV(ED_DEST, "ed: regular expression error: {}", s);
         break;
     case EFUN_REGEXP:
-      regexp_error = s;
-      break;
+        regexp_error = s;
+        break;
   }
 }
 

@@ -273,12 +273,10 @@ static int append(int line, int glob) {
   setCurLn(line);
   P_APPENDING = 1;
   if (P_NFLG) {
-    static boost::format fmt("%6d. ");
-    ED_OUTPUTV(ED_DEST, fmt, P_CURLN + 1);
+    ED_OUTPUTV(ED_DEST, "{6}. ", P_CURLN + 1);
   }
   if (P_CUR_AUTOIND) {
-    static boost::format fmt("%*s");
-    ED_OUTPUTV(ED_DEST, fmt, P_LEADBLANKS, "");
+    ED_OUTPUTV(ED_DEST, "{*}", P_LEADBLANKS, "");
   }
 #ifdef OLD_ED
   set_prompt("*\b");
@@ -295,11 +293,9 @@ static int more_append(const char *str) {
     return (0);
   }
   if (P_NFLG) {
-      static boost::format fmt("%6d. ");
-    ED_OUTPUTV(ED_DEST, fmt, P_CURLN + 2);
+    ED_OUTPUTV(ED_DEST, "{6}. ", P_CURLN + 2);
   }
   if (P_CUR_AUTOIND) {
-    static boost::format fmt("%*s");
     int i;
     int less_indent_flag = 0;
 
@@ -317,7 +313,7 @@ static int more_append(const char *str) {
     strncpy(inlin + P_LEADBLANKS, str, ED_MAXLINE - P_LEADBLANKS);
     inlin[ED_MAXLINE - 1] = '\0';
     _count_blanks(inlin, 0);
-    ED_OUTPUTV(ED_DEST, fmt, P_LEADBLANKS, "");
+    ED_OUTPUTV(ED_DEST, "{*}", P_LEADBLANKS, "");
     if (!*str && less_indent_flag) {
       return 0;
     }
@@ -551,8 +547,6 @@ static int doprnt(int from, int to) {
 }
 
 static void do_output(char *str) {
-    static boost::format fmt("%s\n");
-
 #ifdef RECEIVE_ED
   svalue_t *ret;
 
@@ -563,17 +557,17 @@ static void do_output(char *str) {
   // Con: "I wrote a receive_ed()!  Why does the driver ignore it??"
   ret = apply(APPLY_RECEIVE_ED, ED_DEST, 2, ORIGIN_DRIVER);
   if (!ret) {
-    ED_OUTPUTV(ED_DEST, fmt, str);
+    ED_OUTPUTV(ED_DEST, "{}\n", str);
   } else if (ret->type == T_NUMBER) {
     // if 0, output ourselves, else they handled it, do nothing.
     if (ret->u.number == 0) {  // "pass"
-      ED_OUTPUTV(ED_DEST, fmt, str);
+      ED_OUTPUTV(ED_DEST, "{}\n", str);
     }
   } else if (ret->type == T_STRING) {
-    ED_OUTPUTV(ED_DEST, fmt, ret->u.string);
+    ED_OUTPUTV(ED_DEST, "{}\n", ret->u.string);
   }
 #else
-  ED_OUTPUTV(ED_DEST, fmt, str);
+  ED_OUTPUTV(ED_DEST, "{}\n", str);
 #endif
 }
 
@@ -723,8 +717,7 @@ static int doread(int lin, const char *fname) {
   P_NONASCII = P_NULLCHAR = P_TRUNCATED = 0;
 
   if (P_VERBOSE) {
-      static boost::format fmt("\"%s\" ");
-    ED_OUTPUTV(ED_DEST, fmt, fname);
+    ED_OUTPUTV(ED_DEST, "\"{}\" ", fname);
   }
   if ((fp = fopen(fname, "r")) == nullptr) {
     ED_OUTPUT(ED_DEST, " isn't readable.\n");
@@ -744,19 +737,15 @@ static int doread(int lin, const char *fname) {
     return (err);
   }
   if (P_VERBOSE) {
-      static boost::format fmt("%u lines %u bytes");
-    ED_OUTPUTV(ED_DEST, fmt, lines, bytes);
+    ED_OUTPUTV(ED_DEST, "{} lines {} bytes", lines, bytes);
     if (P_NONASCII) {
-        static boost::format fmt(" [%d non-ascii]");
-      ED_OUTPUTV(ED_DEST, fmt, P_NONASCII);
+      ED_OUTPUTV(ED_DEST, " [{} non-ascii]", P_NONASCII);
     }
     if (P_NULLCHAR) {
-        static boost::format fmt(" [%d nul]");
-      ED_OUTPUTV(ED_DEST, fmt, P_NULLCHAR);
+      ED_OUTPUTV(ED_DEST, " [{} nul]", P_NULLCHAR);
     }
     if (P_TRUNCATED) {
-        static boost::format fmt(" [%d lines truncated]");
-      ED_OUTPUTV(ED_DEST, fmt, P_TRUNCATED);
+      ED_OUTPUTV(ED_DEST, " [{} lines truncated]", P_TRUNCATED);
     }
     ED_OUTPUT(ED_DEST, "\n");
   }
@@ -788,8 +777,7 @@ static int dowrite(int from, int to, const char *fname, int apflg) {
 #endif
 
   if (!P_RESTRICT) {
-      static boost::format fmt("\"/%s\" ");
-    ED_OUTPUTV(ED_DEST, fmt, fname);
+    ED_OUTPUTV(ED_DEST, "\"/{}\" ", fname);
   }
   if ((fp = fopen(fname, (apflg ? "a" : "w"))) == nullptr) {
     if (!P_RESTRICT) {
@@ -814,8 +802,7 @@ static int dowrite(int from, int to, const char *fname, int apflg) {
   }
 
   if (!P_RESTRICT) {
-      static boost::format fmt("%u lines %lu bytes\n");
-    ED_OUTPUTV(ED_DEST, fmt, lines, bytes);
+    ED_OUTPUTV(ED_DEST, "{} lines {} bytes\n", lines, bytes);
   }
   fclose(fp);
 
@@ -1439,7 +1426,7 @@ static int subst(regexp *pat, char *sub, int gflg, int pflag) {
  */
 #define error(s)                    \
   {                                 \
-    ED_OUTPUTV(ED_DEST, boost::format(s), lineno); \
+    ED_OUTPUTV(ED_DEST, s, lineno); \
     errs++;                         \
     return;                         \
   }
@@ -1493,7 +1480,7 @@ static void shift(char *text) {
         return;
       }
     }
-    error("Result of shift would be too long, line %d\n");
+    error("Result of shift would be too long, line {d}\n");
   }
 }
 
@@ -1632,7 +1619,7 @@ static void indent(char *buf) {
           p++;
           break;
         } else if (*p == '\0') {
-          error("Unterminated string in line %d\n");
+          error("Unterminated string in line {d}\n");
         } else if (*p == '\\' && *++p == '\0') {
           break;
         }
@@ -1813,7 +1800,7 @@ static void indent(char *buf) {
 
         if (sp == stackbot) {
           /* out of stack */
-          error("Nesting too deep in line %d\n");
+          error("Nesting too deep in line {d}\n");
         }
         /* handle indentation */
         i = *ip;
@@ -1953,10 +1940,7 @@ static int docmd(int glob) {
       return (1);
 
     case '=':
-      {
-          static boost::format fmt("%d\n");
-          ED_OUTPUTV(ED_DEST, fmt, P_LINE2);
-      }
+      ED_OUTPUTV(ED_DEST, "{}\n", P_LINE2);
       break;
 
     case 'o':
@@ -2071,8 +2055,7 @@ static int docmd(int glob) {
       fptr = getfn(0);
 
       if (P_NOFNAME) {
-          static boost::format fmt("/%s\n");
-        ED_OUTPUTV(ED_DEST, fmt, P_FNAME);
+        ED_OUTPUTV(ED_DEST, "/{}\n", P_FNAME);
       } else {
         if (fptr == nullptr) {
           return FILE_NAME_ERROR;
@@ -2151,18 +2134,15 @@ static int docmd(int glob) {
       break;
 
     case 'n':
-      {
-          static boost::format fmt("number %s, list %s\n");
-          if (*inptr != NL) {
-            return SYNTAX_ERROR;
-          }
-          if (P_NFLG) {
-            P_FLAGS &= ~NFLG_MASK;
-          } else {
-            P_FLAGS |= NFLG_MASK;
-          }
-          ED_OUTPUTV(ED_DEST, fmt, P_NFLG ? "on" : "off", P_LFLG ? "on" : "off");
+      if (*inptr != NL) {
+        return SYNTAX_ERROR;
       }
+      if (P_NFLG) {
+        P_FLAGS &= ~NFLG_MASK;
+      } else {
+        P_FLAGS |= NFLG_MASK;
+      }
+      ED_OUTPUTV<char*,char*>(ED_DEST, "number {}, list {}\n", const_cast<char*>(P_NFLG ? "on" : "off"), const_cast<char*>(P_LFLG ? "on" : "off"));
       break;
 
     case 'I':
@@ -2871,30 +2851,28 @@ every match. Other commands than 'p' can also be given\n\
 Compare with command 'g'.\n");
       break;
     case 'z':
-      {
-          static boost::format fmt("\
+      n = ED_BUFFER->scroll_lines - 1;
+      ED_OUTPUTV(ED_DEST,
+                 "\
 Command: z   Usage: z  or  z-  or  z--  or  z.\n\
-Displays %d lines starting at the current line.\n\
-If the command is 'z.' then %d lines are displayed being\n\
+Displays {} lines starting at the current line.\n\
+If the command is 'z.' then {} lines are displayed being\n\
 centered on the current line. The command 'z-' displays\n\
-the %d lines before the current line. The command 'z--' displays\n\
-the %d lines prior to what 'z-' shows.\n");
-          n = ED_BUFFER->scroll_lines - 1;
-          ED_OUTPUTV(ED_DEST, fmt, n, n, n, n);
-      }
+the {} lines before the current line. The command 'z--' displays\n\
+the {} lines prior to what 'z-' shows.\n",
+                 n, n, n, n);
       break;
     case 'Z':
-      {
-          static boost::format fmt("\
+      n = ED_BUFFER->scroll_lines + 4;
+      ED_OUTPUTV(ED_DEST,
+                 "\
 Command: Z   Usage: Z  or  Z-  or Z.\n\
-Displays %d lines starting at the current line.\n\
-If the command is 'Z.' then %d lines are displayed being\n\
+Displays {} lines starting at the current line.\n\
+If the command is 'Z.' then {} lines are displayed being\n\
 centered on the current line. The command 'Z-' displays\n\
-the %d lines before the current line. The command 'Z--' displays\n\
-the %d lines prior to what 'Z-' shows.\n");
-          n = ED_BUFFER->scroll_lines + 4;
-          ED_OUTPUTV(ED_DEST, fmt, n, n, n, n);
-      }
+the {} lines before the current line. The command 'Z--' displays\n\
+the {} lines prior to what 'Z-' shows.\n",
+                 n, n, n, n);
       break;
     case 'x':
       ED_OUTPUT(ED_DEST,

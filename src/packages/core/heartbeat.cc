@@ -115,7 +115,7 @@ void call_heart_beat() {
       // TODO: provide a safe_call_direct()
       call_direct(ob, ob->prog->heart_beat - 1, ORIGIN_DRIVER, 0);
       pop_stack(); /* pop the return value */
-    } catch (const char *) {
+    } catch (const char *e) {
       restore_context(&econ);
     }
     pop_context(&econ);

@@ -1719,16 +1719,12 @@ static void debug_message_with_location(char *err) {
 
 static void add_message_with_location(char *err) {
   if (current_object && current_prog) {
-      static boost::format fmt("%sprogram: /%s, object: /%s, file: %s\n");
-    add_vmessage(command_giver, fmt, err,
+    add_vmessage(command_giver, "{}program: /{}, object: /{}, file: {}\n", err,
                  current_prog->filename, current_object->obname, get_line_number(pc, current_prog));
   } else if (current_object) {
-      static boost::format fmt("%sprogram: (none), object: /%s, file: (none)\n");
-    add_vmessage(command_giver, fmt, err,
-                 current_object->obname);
+    add_vmessage(command_giver, "{}program: (none), object: /{}, file: (none)\n", err, current_object->obname);
   } else {
-      static boost::format fmt("%sprogram: (none), object: (none), file: (none)\n");
-    add_vmessage(command_giver, fmt, err);
+    add_vmessage(command_giver, "{}program: (none), object: (none), file: (none)\n", err);
   }
 }
 
@@ -1790,9 +1786,7 @@ void _error_handler(char *err) {
     ob = find_object2(object_name);
     if (!ob) {
       if (command_giver) {
-          static boost::format fmt("error when executing program in destroyed object /%s\n");
-        add_vmessage(command_giver, fmt,
-                     object_name);
+        add_vmessage(command_giver, "error when executing program in destroyed object /{}\n", object_name);
       }
       debug_message("error when executing program in destroyed object /%s\n", object_name);
     }
@@ -1805,8 +1799,7 @@ void _error_handler(char *err) {
       add_message_with_location(err + 1);
 #ifndef NO_WIZARDS
     } else {
-        static boost::format fmt("%s\n");
-      add_vmessage(command_giver, fmt, default_error_message);
+      add_vmessage(command_giver, "{}\n", default_error_message);
     }
 #endif
   }

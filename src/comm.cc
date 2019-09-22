@@ -12,7 +12,10 @@
 #include <event2/event.h>        // for EV_TIMEOUT, etc
 #include <event2/listener.h>     // for evconnlistener_free, etc
 #include <event2/util.h>         // for evutil_closesocket, etc
-#include <stdarg.h>              // for va_end, va_list, va_copy, etc
+#include <netdb.h>               // for addrinfo, freeaddrinfo, etc
+#include <netinet/in.h>          // for ntohl, IPPROTO_TCP
+#include <netinet/tcp.h>         // for TCP_NODELAY
+#include <sys/socket.h>          // for SOCK_STREAM
 #include <stdio.h>               // for snprintf, vsnprintf, fwrite, etc
 #include <string.h>              // for NULL, memcpy, strlen, etc
 #include <unistd.h>              // for gethostname
@@ -94,7 +97,7 @@ void on_user_command(evutil_socket_t fd, short what, void *arg) {
   set_eval(max_eval_cost);
   try {
     process_user_command(user);
-  } catch (const char *) {
+  } catch (const char *e) {
     restore_context(&econ);
   }
   pop_context(&econ);
@@ -509,11 +512,14 @@ void add_message(object_t *who, const std::string data) {
    * if who->interactive is not valid, write message on stderr.
    * (maybe)
    */
+
+    auto len = data.size();
+
   if (!who || (who->flags & O_DESTRUCTED) || !who->interactive ||
       (who->interactive->iflags & (NET_DEAD | CLOSING))) {
     if (CONFIG_INT(__RC_NONINTERACTIVE_STDERR_WRITE__)) {
       putc(']', stderr);
-      fwrite(data.c_str(), data.size(), 1, stderr);
+      fwrite(data.c_str(), len, 1, stderr);
     }
     return;
   }
@@ -581,18 +587,26 @@ void add_message(object_t *who, const std::string data) {
    */
   if (shadow_catch_message(who, data.c_str())) {
     if (CONFIG_INT(__RC_SNOOP_SHADOWED__)) {
-      handle_snoop(data.c_str(), data.size(), ip);
+      handle_snoop(data.c_str(), len, ip);
     }
     return;
   }
 #endif /* NO_SHADOWS */
-  handle_snoop(data.c_str(), data.size(), ip);
+  handle_snoop(data.c_str(), len, ip);
 
   add_message_calls++;
 } /* add_message() */
 
-void add_vmessage(struct object_t *who, boost::format fmt) {
-    add_message(who, fmt.str());
+void add_vmessage_internal(object_t *who, const std::string format, fmt::format_args args) {;
+    std::string msg;
+    try {
+        msg = fmt::vformat(format, args);
+    }
+    catch(const std::exception &e) {
+        msg = std::string("BUG! driver[add_vmessage]: ") + e.what() + "\nFormatstring: \"" + format + "\"\n";
+        debug_message(msg.c_str());
+    }
+    add_message(who, msg);
 }
 
 /*

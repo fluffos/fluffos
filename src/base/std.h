@@ -166,5 +166,7 @@
 
 #include "base/internal/shared_string.hh"
 
+#include <iostream>                         // for cin, cout, cerr
+
 // IWYU pragma: end_exports
 #endif  // STD_H

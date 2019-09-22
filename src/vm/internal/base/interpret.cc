@@ -1341,8 +1341,6 @@ void push_constant_string(const char *p) {
 }
 
 void do_trace_call(int offset) {
-    static boost::format fmt(" with %d arguments: ");
-
   do_trace("Call direct ", current_prog->function_table[offset].funcname, " ");
   if (TRACEHB) {
     if (TRACETST(TRACE_ARGS)) {
@@ -1350,7 +1348,7 @@ void do_trace_call(int offset) {
 
       n = current_prog->function_table[offset].num_arg;
 
-      add_vmessage(command_giver, fmt, n);
+      add_vmessage(command_giver, " with {} arguments: ", n);
       for (i = n - 1; i >= 0; i--) {
         print_svalue(&sp[-i]);
         add_message(command_giver, " ");
@@ -3808,7 +3806,7 @@ static void do_catch(char *pc, unsigned short new_pc_offset) {
   try {
     /* note, this will work, since csp->extern_call won't be used */
     eval_instruction(pc);
-  } catch (const char *) {
+  } catch (const char *e) {
     /*
      * They did a throw() or error. That means that the control stack
      * must be restored manually here.
@@ -4690,7 +4688,6 @@ int last_instructions() {
 /* Generate a debug message to the user */
 void do_trace(const char *msg, const char *fname, const char *post) {
   const char *objname;
-  static boost::format fmt("*** %d %*s %s %s %s%s");
 
   if (!TRACEHB) {
     return;
@@ -4698,8 +4695,8 @@ void do_trace(const char *msg, const char *fname, const char *post) {
   objname = TRACETST(TRACE_OBJNAME)
                 ? (current_object && current_object->obname ? current_object->obname : "??")
                 : "";
-  add_vmessage(command_giver, fmt, tracedepth, tracedepth, "", msg, objname,
-               fname, post);
+  //add_vmessage(command_giver, "*** {d} {*s} {s} {s} {s}{s}", tracedepth, tracedepth, "", msg, objname, fname, post);
+  add_vmessage(command_giver, "*** {} {*} {} {} {}{}", tracedepth, tracedepth, "", msg, objname, fname, post);
 }
 
 /*

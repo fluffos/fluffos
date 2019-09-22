@@ -10,7 +10,8 @@
 #include <string>
 #include "templates/shared_storage.hh"
 
-#include <boost/format.hpp>             // for XXprintf like string formating
+#include <fmt/format.h>             // for XXprintf like string formating
+#include <fmt/compile.h>            // to precompile format strings
 
 using shared_string = shared_storage<std::string>;
 

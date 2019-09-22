@@ -309,7 +309,7 @@ void f_pcre_replace_callback(void) {
         assign_svalue_no_free(&r->item[i], &arr->item[i]);
       }
     }
-  } catch (const char *) {
+  } catch (const char *e) {
     restore_context(&econ);
     /* condition was restored to where it was when we came in */
     pcre_free_memory(run);

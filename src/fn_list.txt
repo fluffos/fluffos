@@ -6,7 +6,7 @@ char *query_load_av()                                   |   std::string query_lo
 
 comm.cc:
 void add_message(struct object_t *, const char *, int)  |   void add_message(struct object_t *, const std::string)
-void add_vmessage(struct object_t *, const char *, ...) |   void add_vmessage(struct object_t *, boost::format, ...)
+void add_vmessage(struct object_t *, const char *, ...) |   template <typename... Args> void add_vmessage(struct object_t *, const std::string, Args ...)
 
 fliconv.cc:
 struct translation *get_translator(const char *)        |   const translation get_translator(const std::string)

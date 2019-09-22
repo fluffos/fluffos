@@ -86,7 +86,7 @@ void vm_start() {
   try {
     init_simul_efun(CONFIG_STR(__SIMUL_EFUN_FILE__));
     init_master(CONFIG_STR(__MASTER_FILE__));
-  } catch (const char *) {
+  } catch (const char *e) {
     debug_message("The simul_efun (%s) and master (%s) objects must be loadable.\n",
                   CONFIG_STR(__SIMUL_EFUN_FILE__), CONFIG_STR(__MASTER_FILE__));
     debug_message("Please check log files for exact error. \n");

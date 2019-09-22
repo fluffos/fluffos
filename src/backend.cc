@@ -230,8 +230,15 @@ void backend(struct event_base *base) {
 
   try {
     event_base_loop(base, 0);
-  } catch (...) {  // catch everything
-    fatal("BUG: jumped out of event loop!");
+  }
+  catch (const char *e) {
+    fatal("BUG(\"%s\"): jumped out of event loop!", e);
+  }
+  catch (const std::exception &e) {
+    fatal("BUG([%s]): jumped out of event loop!", e.what());
+  }
+  catch (...) {  // catch everything
+    fatal("BUG(unknown exception): jumped out of event loop!");
   }
   // We've reached here meaning we are in shutdown sequence.
   shutdownMudOS(-1);
@@ -407,8 +414,7 @@ void update_compile_av(int lines) {
 } /* update_compile_av() */
 
 std::string query_load_av() {
-    static boost::format fmt("%.2f cmds/s, %.2f comp lines/s");
+    static auto fmt = fmt::compile<double, double>("{:.2} cmds/s, {:.2} comp lines/s");
 
-    fmt % load_av % compile_av;
-    return (fmt.str());
+    return fmt::format(fmt, load_av, compile_av);
 } /* query_load_av() */

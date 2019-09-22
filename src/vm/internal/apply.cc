@@ -345,7 +345,7 @@ svalue_t *safe_apply(const char *fun, object_t *ob, int num_arg, int where) {
   svalue_t *ret = nullptr;
   try {
     ret = apply(fun, ob, num_arg, where);
-  } catch (const char *) {
+  } catch (const char *e) {
     restore_context(&econ);
     pop_n_elems(num_arg);
     ret = nullptr;
