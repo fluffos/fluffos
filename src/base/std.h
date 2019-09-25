@@ -167,6 +167,9 @@
 #include "base/internal/shared_string.hh"
 
 #include <iostream>                         // for cin, cout, cerr
+#include <fmt/compile.h>                    // to precompile format strings
+#include <fmt/format.h>                     // for sprintf like string formating
+#include <fmt/ostream.h>                     // for fprintf like string formating
 
 // IWYU pragma: end_exports
 #endif  // STD_H

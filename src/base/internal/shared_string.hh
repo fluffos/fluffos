@@ -10,9 +10,6 @@
 #include <string>
 #include "templates/shared_storage.hh"
 
-#include <fmt/format.h>             // for XXprintf like string formating
-#include <fmt/compile.h>            // to precompile format strings
-
 using shared_string = shared_storage<std::string>;
 
 #endif // SHARED_STRING_HH
