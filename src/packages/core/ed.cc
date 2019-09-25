@@ -2142,7 +2142,7 @@ static int docmd(int glob) {
       } else {
         P_FLAGS |= NFLG_MASK;
       }
-      ED_OUTPUTV<char*,char*>(ED_DEST, "number {}, list {}\n", const_cast<char*>(P_NFLG ? "on" : "off"), const_cast<char*>(P_LFLG ? "on" : "off"));
+      ED_OUTPUTV(ED_DEST, "number {}, list {}\n", P_NFLG ? "on" : "off", P_LFLG ? "on" : "off");
       break;
 
     case 'I':

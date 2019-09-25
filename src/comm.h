@@ -43,10 +43,10 @@
 
 void add_message(struct object_t *, const std::string);
 void add_vmessage_internal(object_t *, const std::string, fmt::format_args);
-template <typename... Args> void add_vmessage(object_t *who, const std::string format, Args ...args)
+template <typename... Args> void add_vmessage(object_t *who, const std::string format, Args&& ...args)
 {
     std::cerr << "DEBUG_OUTPUT!!! fmt::vformat(\"" << format << "\", ...)\n";
-    add_vmessage_internal(who, format, fmt::make_format_args(args...));
+    add_vmessage_internal(who, format, fmt::make_format_args(std::forward<Args>(args)...));
 }
 
 void update_ref_counts_for_users(void);
