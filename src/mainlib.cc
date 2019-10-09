@@ -28,6 +28,7 @@
 
 #include "backend.h"  // for backend, init_backend
 #ifdef HAVE_JEMALLOC
+#define JEMALLOC_MANGLE
 #include <jemalloc/jemalloc.h>  // for mallctl
 #endif
 
