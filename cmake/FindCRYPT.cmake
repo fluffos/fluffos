@@ -6,12 +6,12 @@
 # LIBCRYPT_FOUND, whether libcrypt was found
 
 
-find_path( CRYPT_INCLUDE_DIR NAMES crypt.h
+find_path( CRYPT_INCLUDE_DIR NAMES crypt.h gcrypt.h
   HINTS
   ${CMAKE_INSTALL_INCLUDEDIR}
   )
 
-find_library( CRYPT_LIBRARIES NAMES crypt
+find_library( CRYPT_LIBRARIES NAMES crypt gcrypt
   HINTS
   ${CMAKE_INSTALL_LIBDIR}
   )
