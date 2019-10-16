@@ -195,11 +195,11 @@ target_link_libraries(driver PRIVATE autogen)
 
 add_subdirectory(packages) # provides FLUFFOS_PACKAGES
 message(STATUS "ALL PACKAGES: ${FLUFFOS_PACKAGES}")
-add_library(package_all STATIC)
+add_library(package_all INTERFACE)
 foreach(PACKAGE ${FLUFFOS_PACKAGES})
     # TODO: packages files currently depenends on generated headers, so they must be built after driver
     add_dependencies("${PACKAGE}" autogen)
-    target_link_libraries(package_all PUBLIC "${PACKAGE}")
+    target_link_libraries(package_all INTERFACE "${PACKAGE}")
 endforeach()
 
 target_link_libraries(driver PRIVATE package_all)
