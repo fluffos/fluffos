@@ -1,6 +1,10 @@
-name: Cmake CI
+name: Rust/Cmake CI
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - master
+  pull_request:
 
 jobs:
   build:
@@ -12,17 +16,17 @@ jobs:
           - CC: "clang"
             CXX: "clang++"
         os: ["ubuntu-18.04"]
-      
+
     runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v1
     - name: Install packages
       run:  sudo apt install -y build-essential clang-6.0 autoconf automake bison expect libevent-dev libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
-    - name: cmake
+    - name: compile
       env: ${{ matrix.compiler }}
-      run: mkdir build && cd build && cmake ..
-    - name: make
-      run: cd build && make
+      run: cargo build -vv
+    - name: test
+      run: cargo test -vv
 #    - name: make test
 #      run: cd build && make test

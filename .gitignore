@@ -3,3 +3,11 @@
 /build
 # default idea build directory
 /cmake-build-*
+
+
+/target
+**/*.rs.bk
+/docs/.bundle
+/docs/Gemfile
+/docs/Gemfile.lock
+/docs/vendor
