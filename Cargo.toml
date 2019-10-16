@@ -1,0 +1,22 @@
+[workspace]
+members = [
+    "common",
+]
+
+[package]
+name = "fluffos"
+version = "0.1.0"
+authors = ["Yucong Sun <sunyucong@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+common = { path= "./common" }
+libc = "0.2"
+
+[build-dependencies]
+cmake = "0.1"
+built = "0.3"
+
+

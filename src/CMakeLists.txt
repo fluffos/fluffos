@@ -135,7 +135,6 @@ set(SRC
         "backend.cc"
         "comm.cc"
         "fliconv.cc"
-        "main.cc"
         "mainlib.cc"
         "user.cc"
         "net/telnet.cc"
@@ -185,42 +184,40 @@ file(GLOB_RECURSE SRC_HEADER
         "*.h"
         )
 
-add_library(libdriver STATIC ${GENERATED_HEADERS} ${GENERATRED_SOURCE}
-        ${GENERATRED_GRAMMAR_FILES}
+add_library(autogen  ${GENERATED_HEADERS} ${GENERATRED_SOURCE}
+  ${GENERATRED_GRAMMAR_FILES})
+
+add_library(driver SHARED
         ${SRC} ${SRC_HEADER}
         )
 
-# delcare our target
-add_executable(driver "main.cc")
-
-target_link_libraries(driver libdriver)
+target_link_libraries(driver PRIVATE autogen)
 
 add_subdirectory(packages) # provides FLUFFOS_PACKAGES
 message(STATUS "ALL PACKAGES: ${FLUFFOS_PACKAGES}")
+add_library(package_all INTERFACE)
 foreach(PACKAGE ${FLUFFOS_PACKAGES})
-    # TODO: packages files currently depenends on generated headers, so they must be built after libdriver
-    add_dependencies("${PACKAGE}" libdriver)
-    target_link_libraries(libdriver "${PACKAGE}")
+    # TODO: packages files currently depenends on generated headers, so they must be built after driver
+    add_dependencies("${PACKAGE}" autogen)
+    target_link_libraries(package_all INTERFACE "${PACKAGE}")
 endforeach()
 
+target_link_libraries(driver PRIVATE package_all)
+
 add_subdirectory(thirdparty/libtelnet)
-target_link_libraries(libdriver libtelnet)
+target_link_libraries(driver PRIVATE libtelnet)
 
 # Compiler definitions
-target_link_libraries(driver common)
+target_link_libraries(driver PRIVATE common)
 
 # Libraries
 find_package(Libevent 2.0 REQUIRED COMPONENTS libevent)
-target_link_libraries(driver ${LIBEVENT_LIBRARIES})
-target_include_directories(driver PUBLIC ${LIBEVENT_INCLUDE_DIR})
+target_link_libraries(driver PRIVATE ${LIBEVENT_LIBRARIES})
+target_include_directories(driver PRIVATE ${LIBEVENT_INCLUDE_DIR})
 
 # Async use this?
 find_package (Threads REQUIRED)
-target_link_libraries(driver ${CMAKE_THREAD_LIBS_INIT})
-
-# ICU
-find_package(ICU REQUIRED COMPONENTS uc io)
-target_link_libraries(driver ${ICU_LIBRARIES})
+target_link_libraries(driver PRIVATE ${CMAKE_THREAD_LIBS_INIT})
 
 # IPO??
 include(CheckIPOSupported)
@@ -248,8 +245,12 @@ endif()
 #gtest_discover_tests(driver)
 
 include(helper)
+
 message("Final Compile Flags: ")
 print_iterface_target_properties(common)
 print_target_properties(driver)
 
 add_executable(portbind "portbind.cc")
+
+install (TARGETS driver
+  LIBRARY DESTINATION lib)
