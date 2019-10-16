@@ -28,5 +28,5 @@ jobs:
       run: cargo build -vv
     - name: test
       run: cargo test -vv
-#    - name: make test
-#      run: cd build && make test
+    - name: testsuite
+      run: cd testsuite && ../target/debug/fluffos etc/config.test -ftest
