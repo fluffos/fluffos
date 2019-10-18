@@ -5,7 +5,7 @@ title: Build
 
 ## Environment
 
-It is highly recommend to use the latest ubuntu LTS version (current 18.04 LTS), 
+It is highly recommend to use the latest ubuntu LTS version (current 18.04 LTS), to build either version of the driver.
 
 v2017 currently supports ubuntu 14.04+, centos 7+, CYGWIN 64. BSD & OSX still has issues.
 
@@ -29,7 +29,7 @@ is best effort only.
     $ sudo apt install build-essential bison libevent-dev libjemalloc-dev \
     libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libz-dev libgtest-dev
 
-To Build fluffOS v2019 (CMake & out of tree build)
+To Build fluffOS v2019 (Cargo + CMake)
 
     # 1. checkout git repo
     $ git clone https://github.com/fluffos/fluffos.git
@@ -40,25 +40,16 @@ To Build fluffOS v2019 (CMake & out of tree build)
     $ sudo pip install --upgrade cmake
 
     # 3. build
-    $ mkdir build && cd build
-    $ cmake ..
-    $ make
-    $ cd ..
+    $ cargo build -vvv
 
-    # 4. find the built binary in build/src/driver and build/src/portbind
+    # 4. find the built binary in target/debug/, with fluffos & libdriver.so two files.
 
 Packages
 
     # By default driver have an default list of builtin packages to build.
-    # Please checkout src/packages/XXX/CMakeLists.txt.
+    # If you want to turn off an package, modify src/packages/XXX/CMakeLists.txt. and change ON to OFF
 
-    # To turn off an PAKCAGE in compile time
-
-    $ cmake -DPACKAGE_DB=OFF ..
-
-    # Make sure you clear build directory first.
-
-Advanced Build features (v2019)
+Advanced Build features (v2019) (broken)
 
     # By default driver will link dynamic libraries and optimize for running on current CPU only.
     # if you wish to cross compile for other machines, turn off MARCH_NATIVE and turn
