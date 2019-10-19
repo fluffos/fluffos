@@ -7,11 +7,9 @@ title: functions / bind
 
     bind() - change the owner of a function pointer
 
-
 ### SYNOPSIS
 
     function bind(function f, object ob)
-
 
 ### DESCRIPTION
 
@@ -34,3 +32,4 @@ title: functions / bind
     this, as bind() allows you to force another object to run  a  piece  of
     code.   To  protect  against this, there is a valid_bind() master apply
     which must return 1 or the call to bind() will fail.
+

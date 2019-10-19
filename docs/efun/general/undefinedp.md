@@ -7,11 +7,9 @@ title: general / undefinedp
 
     undefinedp() - determine whether or not a given variable is undefined.
 
-
 ### SYNOPSIS
 
     int undefinedp( mixed arg );
-
 
 ### DESCRIPTION
 
@@ -25,8 +23,8 @@ title: general / undefinedp
         element  in  a   mapping   that   doesn't   exist   (e.g.   arg   =
         map[not_there]).
 
-
 ### SEE ALSO
 
     mapp(3),  stringp(3),  pointerp(3),  objectp(3),  intp(3),  bufferp(3),
     floatp(3), functionp(3), nullp(3), errorp(3)
+

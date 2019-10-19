@@ -8,11 +8,9 @@ title: filesystem / read_bytes
     read_bytes()  -  reads  a contiguous series of bytes from a file into a
     string
 
-
 ### SYNOPSIS
 
     string read_bytes( string path, int start, int length );
-
 
 ### DESCRIPTION
 
@@ -22,7 +20,7 @@ title: filesystem / read_bytes
     read_bytes  will  fail.  If the second and third arguments are omitted,
     the entire file is returned.
 
-
 ### SEE ALSO
 
     read_file(3), write_bytes(3)
+

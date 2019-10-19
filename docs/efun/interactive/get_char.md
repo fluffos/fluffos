@@ -8,11 +8,9 @@ title: interactive / get_char
     get_char  -  causes  next  character of input to be sent to a specified
     function
 
-
 ### SYNOPSIS
 
     varargs void get_char( string | function fun, int flag, ... );
-
 
 ### DESCRIPTION
 
@@ -36,7 +34,6 @@ title: interactive / get_char
     argument (a string). Any additional arguments supplied to get_char will
     be passed on to 'fun' as arguments following the user input.
 
-
 ### BUGS
 
     Please note that get_char has a significant bug in MudOS 0.9  and  ear‐
@@ -46,7 +43,7 @@ title: interactive / get_char
     mudlib until that bug is fixed.  (It is currently only  known  to  work
     well for users connecting from NeXT computers.)
 
-
 ### SEE ALSO
 
     call_other(3), call_out(3), input_to(3)
+

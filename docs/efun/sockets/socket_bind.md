@@ -7,13 +7,11 @@ title: sockets / socket_bind
 
     socket_bind() - bind a name to a socket
 
-
 ### SYNOPSIS
 
     #include <socket_err.h>
 
     int socket_bind( int s, int port );
-
 
 ### DESCRIPTION
 
@@ -22,7 +20,6 @@ title: sockets / socket_bind
     ily)  but has no name assigned. socket_bind() requests that the port be
     assigned to the socket s.
 
-
 ### RETURN VALUES
 
     socket_bind() returns:
@@ -30,7 +27,6 @@ title: sockets / socket_bind
         EESUCCESS on success.
 
         a negative value indicated below on error.
-
 
 ### ERRORS
 
@@ -48,7 +44,7 @@ title: sockets / socket_bind
 
     EEGETSOCKNAME  Problem with getsockname.
 
-
 ### SEE ALSO
 
     socket_connect(3), socket_create(3), socket_listen(3)
+

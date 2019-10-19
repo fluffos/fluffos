@@ -7,11 +7,9 @@ title: filesystem / get_dir
 
     get_dir() - returns information pertaining to a filesystem directory
 
-
 ### SYNOPSIS
 
     mixed *get_dir( string dir, int default: 0 );
-
 
 ### DESCRIPTION
 
@@ -30,7 +28,7 @@ title: filesystem / get_dir
     The  size_of_file  element  is  the  same  value  that  is  returned by
     file_size(3); the size of the file in bytes, or -2 if it's a directory.
 
-
 ### SEE ALSO
 
     file_size(3), stat(3), time(3)
+

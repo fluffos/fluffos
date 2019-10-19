@@ -7,11 +7,9 @@ title: master / valid_object
 
     valid_object - allows control over which objects can be loaded
 
-
 ### SYNOPSIS
 
     int valid_object( object obj );
-
 
 ### DESCRIPTION
 
@@ -23,7 +21,7 @@ title: master / valid_object
     'nomask' and the inherits() efun, this could allow  safely  restricting
     destruct() via a simul_efun.
 
-
 ### SEE ALSO
 
     valid_override(4)
+

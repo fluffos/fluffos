@@ -7,11 +7,9 @@ title: calls / throw
 
     throw() - forces an error to occur in an object.
 
-
 ### SYNOPSIS
 
     void throw(mixed);
-
 
 ### DESCRIPTION
 
@@ -30,7 +28,7 @@ title: calls / throw
             return;
        }
 
-
 ### SEE ALSO
 
     catch(3), error(3), error_handler(4)
+

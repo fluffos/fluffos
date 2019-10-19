@@ -7,11 +7,9 @@ title: internals / refs
 
     refs - return the number of references to a data structure
 
-
 ### SYNOPSIS
 
     int refs( mixed data );
-
 
 ### DESCRIPTION
 
@@ -19,7 +17,7 @@ title: internals / refs
     useful for deciding whether or not to make a copy of a  data  structure
     before returning it.
 
-
 ### SEE ALSO
 
     children(3), inherit_list(3), deep_inherit_list(3), objects(3)
+

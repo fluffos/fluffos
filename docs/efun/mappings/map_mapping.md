@@ -8,13 +8,11 @@ title: mappings / map_mapping
     map_mapping()  -  modify  an  mapping  of elements via application of a
     function
 
-
 ### SYNOPSIS
 
     mapping map_mapping( mapping map, string fun, object ob,
                          mixed extra, ... );
     mapping map_mapping( mapping map, function f, mixed extra, ... );
-
 
 ### DESCRIPTION
 
@@ -24,7 +22,7 @@ title: mappings / map_mapping
     'map'.   'extra' and following are passed as parameters to the function
     after the item.
 
-
 ### SEE ALSO
 
     filter_array(3), sort_array(3), map(3)
+

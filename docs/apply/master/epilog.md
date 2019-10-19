@@ -8,12 +8,10 @@ title: master / epilog
     epilog  -  returns  an array of the filenames of the objects to be pre‐
     loaded.
 
-
 ### SYNOPSIS
 
     string *epilog( int load_empty );
     void preload( string filename );
-
 
 ### DESCRIPTION
 
@@ -29,7 +27,7 @@ title: master / epilog
     when  starting up the driver.  It can be used as a signal to the mudlib
     to not load castles, etc.
 
-
 ### SEE ALSO
 
     preload(4)
+

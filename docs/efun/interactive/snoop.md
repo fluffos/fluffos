@@ -7,11 +7,9 @@ title: interactive / snoop
 
     snoop() - snoop an interactive user
 
-
 ### SYNOPSIS
 
     varargs object snoop( object snooper, object snoopee );
-
 
 ### DESCRIPTION
 
@@ -22,7 +20,7 @@ title: interactive / snoop
     ment  case,  and  'snooper' if it was successful in the single-argument
     case.  A return of 0 indicates failure.
 
-
 ### SEE ALSO
 
     query_snoop(3), query_snooping(3)
+

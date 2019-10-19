@@ -7,11 +7,9 @@ title: internals / dump_prog
 
     dump_prog() - dump/disassemble an LPC object
 
-
 ### SYNOPSIS
 
     void dump_prog( object ob, int flags default: 0, string file );
-
 
 ### DESCRIPTION
 
@@ -22,7 +20,7 @@ title: internals / dump_prog
     Flags  can be a combination of the following values: 1 - include a dis‐
     assembly of the i-code 2 - include line number information
 
-
 ### SEE ALSO
 
     debug_info(3), dumpallobj(3)
+

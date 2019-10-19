@@ -7,11 +7,9 @@ title: calls / catch
 
     catch() - catch an evaluation error
 
-
 ### SYNOPSIS
 
     mixed catch( mixed expr );
-
 
 ### DESCRIPTION
 
@@ -25,7 +23,7 @@ title: calls / catch
     The catch() is somewhat costly, and should not be used  just  anywhere.
     Rather, use it at places where an error would destroy consistency.
 
-
 ### SEE ALSO
 
     error(3), throw(3), error_handler(4)
+

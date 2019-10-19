@@ -7,11 +7,9 @@ title: filesystem / write_file
 
     write_file() - appends a string to a file
 
-
 ### SYNOPSIS
 
     int write_file( string file, string str, int flag );
-
 
 ### DESCRIPTION
 
@@ -19,7 +17,7 @@ title: filesystem / write_file
     ure or success.  If flag is 1, write_file overwrites instead of append‐
     ing.
 
-
 ### SEE ALSO
 
     read_file(3), write_buffer(3), file_size(3)
+

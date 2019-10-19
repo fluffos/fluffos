@@ -7,11 +7,9 @@ title: system / set_reset
 
     set_reset - modify the time until reset on an object
 
-
 ### SYNOPSIS
 
     varargs void set_reset( object ob, int time );
-
 
 ### DESCRIPTION
 
@@ -21,7 +19,7 @@ title: system / set_reset
 
     reset time = current_time + reset_time / 2 + random(reset_time / 2)
 
-
 ### SEE ALSO
 
     reset(4)
+

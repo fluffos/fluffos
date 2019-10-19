@@ -7,11 +7,9 @@ title: system / errorp
 
     errorp() - determine whether or not a given variable is an error code
 
-
 ### SYNOPSIS
 
     int errorp( mixed arg );
-
 
 ### DESCRIPTION
 
@@ -26,7 +24,7 @@ title: system / errorp
     In future, there will also be a perror(result)  efun  to  return  error
     string that goes with a particular error integer.
 
-
 ### SEE ALSO
 
     nullp(3), undefinedp(3)
+

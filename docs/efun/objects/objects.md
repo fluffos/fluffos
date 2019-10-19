@@ -7,12 +7,10 @@ title: objects / objects
 
     objects - return an array of all loaded objects
 
-
 ### SYNOPSIS
 
     object  *objects(  string  func, object ob ); object *objects( function
     f);
-
 
 ### DESCRIPTION
 
@@ -29,7 +27,7 @@ title: objects / objects
     example, objects( (: clonep :) ) returns a list of all  the  clones  in
     existence.
 
-
 ### SEE ALSO
 
     livings(3), users(3)
+

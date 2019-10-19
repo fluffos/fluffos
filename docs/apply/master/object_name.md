@@ -7,11 +7,9 @@ title: master / object_name
 
     object_name - called by the driver to find out an object's name
 
-
 ### SYNOPSIS
 
     string object_name( object );
-
 
 ### DESCRIPTION
 
@@ -19,7 +17,7 @@ title: master / object_name
     "value" of an object.  This function should return a string correspond‐
     ing to the name of the object (eg a user's name).
 
-
 ### SEE ALSO
 
     file_name(3)
+

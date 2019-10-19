@@ -7,11 +7,9 @@ title: interactive / command
 
     command() - execute a command as if given by the object
 
-
 ### SYNOPSIS
 
     int command( string str, object ob );
-
 
 ### DESCRIPTION
 
@@ -23,7 +21,7 @@ title: interactive / command
     command.  Bigger numbers mean higher cost, but the whole scale is  sub‐
     jective and unreliable.
 
-
 ### SEE ALSO
 
     add_action(3), enable_commands(3)
+

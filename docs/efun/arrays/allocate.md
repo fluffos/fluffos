@@ -7,11 +7,9 @@ title: arrays / allocate
 
     allocate() - allocate an array
 
-
 ### SYNOPSIS
 
     varargs mixed *allocate( int size, void | mixed value );
-
 
 ### DESCRIPTION
 
@@ -27,7 +25,7 @@ title: arrays / allocate
 
     Example: allocate( 5, (: $1 + 3 :) ) => ({ 3, 4, 5, 6, 7 })
 
-
 ### SEE ALSO
 
     sizeof(3), allocate_mapping(3)
+

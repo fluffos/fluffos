@@ -7,11 +7,9 @@ title: master / get_root_uid
 
     get_root_uid - get the root uid
 
-
 ### SYNOPSIS
 
     string get_root_uid( void );
-
 
 ### DESCRIPTION
 
@@ -20,7 +18,7 @@ title: master / get_root_uid
     root  uid  defined by the mud.  The function should return a string, eg
     "ROOT"
 
-
 ### SEE ALSO
 
     get_bb_uid(4)
+

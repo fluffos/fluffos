@@ -7,14 +7,12 @@ title: sockets / socket_write
 
     socket_write() - send a message from a socket
 
-
 ### SYNOPSIS
 
     #include <socket_err.h>
 
     int socket_write( int s, mixed message,
                       void | string address );
-
 
 ### DESCRIPTION
 
@@ -23,7 +21,6 @@ title: sockets / socket_write
     address  is  not  specified.  If  the  socket  is of type DATAGRAM, the
     address must be specified.  The address is of the form: "127.0.0.1 23".
 
-
 ### RETURN VALUES
 
     socket_write() returns:
@@ -31,7 +28,6 @@ title: sockets / socket_write
         EESUCCESS on success.
 
         a negative value indicated below on error.
-
 
 ### ERRORS
 
@@ -63,7 +59,7 @@ title: sockets / socket_write
 
     EECALLBACK     Wait for callback.
 
-
 ### SEE ALSO
 
     socket_connect(3), socket_create(3)
+

@@ -8,11 +8,9 @@ title: mappings / keys
     keys()  -  return an array of the keys from the (key, value) pairs in a
     mapping
 
-
 ### SYNOPSYS
 
     mixed *keys( mapping m );
-
 
 ### DESCRIPTION
 
@@ -32,7 +30,7 @@ title: mappings / keys
     they will be returned in the same order  as  the  corresponding  values
     (returned by the values() efun).
 
-
 ### SEE ALSO
 
     values(3), each(3)
+

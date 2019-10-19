@@ -7,11 +7,9 @@ title: objects / new
 
     new() - load a copy of an object
 
-
 ### SYNOPSIS
 
     object new( string name );
-
 
 ### DESCRIPTION
 
@@ -19,7 +17,7 @@ title: objects / new
     name.  Returns the new object.  An object with a nonzero  environment()
     cannot be cloned.
 
-
 ### SEE ALSO
 
     clone_object(3), destruct(3), move_object(3)
+

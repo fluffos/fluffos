@@ -7,14 +7,12 @@ title: sockets / socket_create
 
     socket_create() - create an efun socket
 
-
 ### SYNOPSIS
 
     #include <socket_err.h>
 
     int socket_create( int mode, string read_callback,
                        void | string close_callback );
-
 
 ### DESCRIPTION
 
@@ -45,7 +43,6 @@ title: sockets / socket_create
     Where  fd  is the socket which has closed.  NOTE: close_callback is not
     used with DATAGRAM mode sockets.
 
-
 ### RETURN VALUES
 
     socket_create() returns:
@@ -53,7 +50,6 @@ title: sockets / socket_create
         a non-negative descriptor on success.
 
         a negative value indicated below on error.
-
 
 ### ERRORS
 
@@ -73,3 +69,4 @@ title: sockets / socket_create
 
     socket_accept(3), socket_bind(3),  socket_close(3),  socket_connect(3),
     socket_listen(3), socket_write(3)
+

@@ -7,12 +7,10 @@ title: interactive / message
 
     message() - deliver messages to "living" objects
 
-
 ### SYNOPSIS
 
     void message( mixed class, string message, mixed target,
                   mixed exclude );
-
 
 ### DESCRIPTION
 
@@ -33,7 +31,7 @@ title: interactive / message
     Exclude  is a list of objects that should not receive the message. This
     can either be one object or an array of objects.
 
-
 ### SEE ALSO
 
     say(3), write(3), shout(3), tell_object(3), tell_room(3)
+

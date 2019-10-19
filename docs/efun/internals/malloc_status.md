@@ -7,11 +7,9 @@ title: internals / malloc_status
 
     malloc_status() - report various statistics related to memory usage.
 
-
 ### SYNOPSIS
 
     void malloc_status( void );
-
 
 ### DESCRIPTION
 
@@ -21,7 +19,7 @@ title: internals / malloc_status
     memory management package is chosen  in  options.h  when  building  the
     driver.
 
-
 ### SEE ALSO
 
     mud_status(3), dumpallobj(3), memory_info(3)
+

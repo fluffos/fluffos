@@ -7,11 +7,9 @@ title: master / connect
 
     connect - get an object for a new user
 
-
 ### SYNOPSIS
 
     object connect( void );
-
 
 ### DESCRIPTION
 
@@ -20,7 +18,7 @@ title: master / connect
     initial user object.  Note that it is possible to use exec(3) to switch
     the user connection from the initial user object to some other object.
 
-
 ### SEE ALSO
 
     exec(3), logon(4)
+

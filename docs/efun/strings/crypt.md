@@ -7,11 +7,9 @@ title: strings / crypt
 
     crypt() - encrypt a string
 
-
 ### SYNOPSIS
 
     string crypt( string str, string seed );
-
 
 ### DESCRIPTION
 
@@ -19,3 +17,4 @@ title: strings / crypt
     seed. If <seed> is 0, then random seed is used.
 
     The result has the first two characters as the seed.
+

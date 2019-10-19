@@ -7,11 +7,9 @@ title: master / valid_hide
 
     valid_hide - allows or disallows objects to hide and see hidden objects
 
-
 ### SYNOPSIS
 
     int valid_hide( object ob );
-
 
 ### DESCRIPTION
 
@@ -23,7 +21,7 @@ title: master / valid_hide
     call takes place when it needs to be determined  if  a  certain  object
     should be able to see hidden objects.
 
-
 ### SEE ALSO
 
     set_hide(3)
+

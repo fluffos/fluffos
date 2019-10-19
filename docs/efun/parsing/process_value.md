@@ -7,11 +7,9 @@ title: parsing / process_value
 
     process_value() - give a value from a described function call
 
-
 ### SYNOPSIS
 
     mixed process_value( string calldescription );
-
 
 ### DESCRIPTION
 
@@ -25,11 +23,9 @@ title: parsing / process_value
     Note that both object and arguments are marked optional with the brack‐
     ets and that the brackets are not included in the actual pattern.
 
-
 ### SEE ALSO
 
     process_string(3)
-
 
 ### CAVEAT
 
@@ -37,3 +33,4 @@ title: parsing / process_value
     It is wise to set the  effuserid  of  the  object  to  0  before  using
     process_value  as  any function in any object can be called with almost
     any arguments.
+

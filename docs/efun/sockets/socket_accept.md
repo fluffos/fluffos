@@ -7,14 +7,12 @@ title: sockets / socket_accept
 
     socket_accept() - accept a connection on a socket
 
-
 ### SYNOPSIS
 
     #include <socket_err.h>
 
     int socket_accept( int s, string read_callback,
                        string write_callback );
-
 
 ### DESCRIPTION
 
@@ -54,14 +52,12 @@ title: sockets / socket_accept
 
     Where fd is the socket which has closed.
 
-
 ### RETURN VALUES
 
     socket_accept()  returns  a  non-negative  descriptor  for the accepted
     socket  on  success.  On  failure,  it  returns   a   negative   value.
     socket_error(3)  can be used on the return value to get a text descrip‐
     tion of the error.
-
 
 ### ERRORS
 
@@ -83,7 +79,7 @@ title: sockets / socket_accept
 
     EENOSOCKS      No more available efun sockets.
 
-
 ### SEE ALSO
 
     socket_bind(3), socket_connect(3), socket_create(3), socket_listen(3)
+

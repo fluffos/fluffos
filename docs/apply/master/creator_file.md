@@ -7,11 +7,9 @@ title: master / creator_file
 
     creator_file - specifies the uid to give to a newly created object
 
-
 ### SYNOPSIS
 
     string creator_file(string filename);
-
 
 ### DESCRIPTION
 
@@ -26,7 +24,7 @@ title: master / creator_file
     specified  by  get_bb_uid()  in the master object), the object is given
     the uid and euid of the object that loaded it.
 
-
 ### SEE ALSO
 
     seteuid(3), new(3), clone_object(3), call_other(3)
+

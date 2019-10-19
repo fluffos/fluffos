@@ -8,11 +8,9 @@ title: mappings / map_delete
     map_delete()  -  remove a (key, value) pair from a mapping based on the
     key
 
-
 ### SYNOPSIS
 
     void map_delete( mapping m, mixed element );
-
 
 ### DESCRIPTION
 
@@ -40,7 +38,7 @@ title: mappings / map_delete
     ilkan") is called [unless ("truilkan", *) is subsequently added back to
     the mapping].
 
-
 ### SEE ALSO
 
     allocate_mapping(3)
+

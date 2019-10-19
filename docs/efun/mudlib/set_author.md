@@ -7,11 +7,9 @@ title: mudlib / set_author
 
     set_author - set the author associated with an object.
 
-
 ### SYNOPSIS
 
     void set_author( string author );
-
 
 ### DESCRIPTION
 
@@ -33,8 +31,8 @@ title: mudlib / set_author
     set_author within create(4), and use it before any arrays are allocated
     if at all possible.
 
-
 ### SEE ALSO
 
     author_file(4),    domain_file(4),    author_stats(3),   set_author(3),
     domain_stats(3)
+

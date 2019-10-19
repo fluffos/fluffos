@@ -7,12 +7,10 @@ title: strings / sprintf
 
     printf, sprintf - formatted output conversion
 
-
 ### SYNOPSIS
 
     void printf( string format, ... );
     string sprintf( string format, ... );
-
 
 ### DESCRIPTION
 
@@ -84,17 +82,15 @@ title: strings / sprintf
 
     f       floating point number
 
-
 ### RETURN VALUES
 
     sprintf() returns the formatted string.
-
 
 ### AUTHOR
 
     Sean A. Reith (Lynscar)
 
-
 ### SEE ALSO
 
     sscanf(3)
+

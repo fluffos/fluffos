@@ -7,12 +7,10 @@ title: strings / reg_assoc
 
     reg_assoc() - A regular pattern substring extractor
 
-
 ### SYNOPSIS
 
     mixed  *reg_assoc(string  str,  string *pat_arr, mixed *tok_arr, void |
     mixed def);
-
 
 ### DESCRIPTION
 
@@ -36,7 +34,6 @@ title: strings / reg_assoc
 
     If pat_arr (and hence tok_arr) has size 0 then the return value is sim‐
     ply ({ ({ str }), ({ def }) }).
-
 
 ### EXAMPLE
 

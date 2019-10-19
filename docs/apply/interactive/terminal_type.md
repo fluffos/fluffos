@@ -7,11 +7,9 @@ title: interactive / terminal_type
 
     terminal_type - inform the mudlib of the user's terminal type
 
-
 ### SYNOPSIS
 
     void terminal_type( string term );
-
 
 ### DESCRIPTION
 

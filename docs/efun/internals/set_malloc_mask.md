@@ -8,11 +8,9 @@ title: internals / set_malloc_mask
     set_malloc_mask()  -  sets the mask controlling display of malloc debug
     info
 
-
 ### SYNOPSIS
 
     void set_malloc_mask( int mask );
-
 
 ### DESCRIPTION
 
@@ -22,7 +20,7 @@ title: internals / set_malloc_mask
     allocates  and  deallocates memory.  Read md.c in the driver source for
     more information.
 
-
 ### SEE ALSO
 
     debugmalloc(3)
+

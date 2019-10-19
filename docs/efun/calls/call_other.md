@@ -7,12 +7,10 @@ title: calls / call_other
 
     call_other() - call a function in another object
 
-
 ### SYNOPSIS
 
     unknown call_other( object ob | object *obs,
                         string func | mixed *args, ... );
-
 
 ### DESCRIPTION
 
@@ -48,3 +46,4 @@ title: calls / call_other
     An example of using an array as the first argument:
 
         users()->quit();
+

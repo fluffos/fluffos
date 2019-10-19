@@ -7,11 +7,9 @@ title: internals / mud_status
 
     mud_status() - report various driver and mudlib statistics
 
-
 ### SYNOPSIS
 
     void mud_status( int extra );
-
 
 ### DESCRIPTION
 
@@ -20,7 +18,7 @@ title: internals / mud_status
     written.   This  function  replaces  the hardcoded 'status' and 'status
     tables' commands in vanilla 3.1.2.
 
-
 ### SEE ALSO
 
     debug_info(3), dumpallobj(3), memory_info(3), uptime(3)
+

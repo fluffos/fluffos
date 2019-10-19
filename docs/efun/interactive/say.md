@@ -7,11 +7,9 @@ title: interactive / say
 
     say() - send a message to all users in the same environment
 
-
 ### SYNOPSIS
 
     varargs void say( string str, object obj );
-
 
 ### DESCRIPTION
 
@@ -25,7 +23,7 @@ title: interactive / say
     object, but an array of objects, all those objects  are  excluded  from
     receiving the message.
 
-
 ### SEE ALSO
 
     message(3), write(3), shout(3), tell_object(3), tell_room(3)
+

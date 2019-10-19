@@ -7,7 +7,6 @@ title: interactive / notify_fail
 
     int notify_fail( string | function str );
 
-
 ### DESCRIPTION
 
     Store  'str' as the error message to be returned instead of the default
@@ -25,14 +24,13 @@ title: interactive / notify_fail
     string is used as the failure message.  Also, this_player() is set cor‐
     rectly, so write() can be used.
 
-
     If "notify_fail()" is called more than once, only the  last  call  will
     have an effect.
 
     The  idea  behind  this function is to allow better error messages than
     'What?'.
 
-
 ### RETURN VALUE
 
     notify_fail() always returns 0.
+

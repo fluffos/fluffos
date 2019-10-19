@@ -7,11 +7,9 @@ title: system / set_eval_limit
 
     set_eval_limit() - set the maximum evaluation cost
 
-
 ### SYNOPSIS
 
     void set_eval_limit( int );
-
 
 ### DESCRIPTION
 
@@ -21,7 +19,7 @@ title: system / set_eval_limit
     and the maximum  cost  is  returned.   set_eval_limit(-1)  returns  the
     remaining evaluation cost.
 
-
 ### SEE ALSO
 
     catch(3), error(3), throw(3), error_handler(4), eval_cost(3)
+

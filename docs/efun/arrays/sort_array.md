@@ -7,13 +7,11 @@ title: arrays / sort_array
 
     sort_array() - sort an array
 
-
 ### SYNOPSIS
 
     mixed *sort_array( mixed *arr, string fun, object ob );
     mixed *sort_array( mixed *arr, function f );
     mixed *sort_array( mixed *arr, int direction );
-
 
 ### DESCRIPTION
 
@@ -34,7 +32,7 @@ title: arrays / sort_array
     where  that type is string, int, or float.  Arrays of arrays are sorted
     by sorting based on the first element, making database sorts possible.
 
-
 ### SEE ALSO
 
     filter_array(3), map_array(3), strcmp(3)
+

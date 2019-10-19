@@ -7,11 +7,9 @@ title: internals / trace
 
     trace() - sets trace flags and returns the old ones.
 
-
 ### SYNOPSIS
 
     int trace( int traceflags );
-
 
 ### DESCRIPTION
 
@@ -37,7 +35,7 @@ title: internals / trace
 
     128 Show object name in tracing.
 
-
 ### SEE ALSO
 
     traceprefix(3)
+

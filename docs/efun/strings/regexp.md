@@ -7,11 +7,9 @@ title: strings / regexp
 
     regexp() - regular expression handler
 
-
 ### SYNOPSIS
 
     string *regexp( string *lines, string pattern, void | int flag );
-
 
 ### DESCRIPTION
 
@@ -22,7 +20,6 @@ title: strings / regexp
     matches.  If the flag  has bit 1 set, the array returned will be of the
     form ({ index1 + 1, match1, ..., indexn + 1, matchn }) where index1  is
     the index of 1st match/non match in the array lines.
-
 
 ### REGULAR EXPRESSION SYNTAX
 
@@ -53,7 +50,6 @@ title: strings / regexp
     '[0-9]'  matches  any  decimal digit).  To include a literal ']' in the
     sequence, make it the first character (following a possible  '^').   To
     include a literal '-', make it the first or last character.
-
 
 ### AMBIGUITY
 
@@ -86,7 +82,7 @@ title: strings / regexp
     be  made,  hence  subsequent choices must respect it even if this leads
     them to less-preferred alternatives.)
 
-
 ### SEE ALSO
 
     sscanf(3), explode(3), strsrch(3), ed(3)
+

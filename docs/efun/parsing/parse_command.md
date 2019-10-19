@@ -7,12 +7,10 @@ title: parsing / parse_command
 
     parse_command() - try to match a string with a given pattern
 
-
 ### SYNOPSIS
 
     int parse_command( string command, object env|object *oblist,
                        string pattern, mixed arg, ... );
-
 
 ### DESCRIPTION
 
@@ -89,42 +87,36 @@ title: parsing / parse_command
        if numeral==0 then 'all' or a generic plural form such as
                       'apples' were matched.
 
-    NOTE!
+### NOTE
 
-          The  efun  makes no semantic implication on the given numeral. It
-        does
-          not matter if 'all apples' or 'second apple' is given. A %i will
-          return ALL possible objects matching in the array. It  is  up  to
-        the
-          caller to decide what 'second' means in a given context.
-          Also  when  given  an object and not an explicit array of objects
-        the
-          entire recursive inventory of the given object is searched. It is
-        up
-          to the caller to decide which of the objects are actually visible
-          meaning that 'second' might not at all mean the second object in
-          the returned array of objects.
-
+    The  efun  makes  no semantic implication on the given numeral. It does
+    not matter if 'all apples' or 'second apple' is given. A %i will return
+    ALL  possible  objects matching in the array. It is up to the caller to
+    decide what 'second' means in a given  context.   Also  when  given  an
+    object and not an explicit array of objects the entire recursive inven‐
+    tory of the given object is searched. It is up to the caller to  decide
+    which  of  the objects are actually visible meaning that 'second' might
+    not at all mean the second object in the returned array of objects.
 
 ### CAVEAT
 
-    Patterns  of  type:  "%s %w %i" Might not work as one would expect.  %w
-    will always succeed so the arg  corresponding  to  %s  will  always  be
+    Patterns of type: "%s %w %i" Might not work as one  would  expect.   %w
+    will  always  succeed  so  the  arg  corresponding to %s will always be
     empty.
-
 
 ### BUGS
 
     Patterns of the type: 'word' and [word] The 'word' can not contain spa‐
-    ces.  It must be a single word.  This is  so  because  the  pattern  is
+    ces.   It  must  be  a  single word.  This is so because the pattern is
     exploded on " " (space) and a pattern element can therefore not contain
     spaces.
 
-    As another effect of the exploding on space, separate pieces of a  pat‐
-    tern  MUST be separated with space, ie not " 'word'/%i " but " 'word' /
+    As  another effect of the exploding on space, separate pieces of a pat‐
+    tern MUST be separated with space, ie not " 'word'/%i " but " 'word'  /
     %i"
 
-    EXAMPLE:
+### EXAMPLE
+
          if (parse_command("spray car",environment(this_player()),
                            " 'spray' / 'paint' [paint] %i ",items))
              {
@@ -134,18 +126,18 @@ title: parsing / parse_command
                 */
              }
 
-    MUDLIB SUPPORT
+### MUDLIB SUPPORT
 
     To make the efun useful it must have a certain support from the mudlib,
-    there  is  a  set  of  functions  that it needs to call to get relevant
+    there is a set of functions that it  needs  to  call  to  get  relevant
     information before it can parse in a sensible manner.
 
-    In earlier versions it used the normal id() lfun in the LPC objects  to
+    In  earlier versions it used the normal id() lfun in the LPC objects to
     find out if a given object was identified by a certain string. This was
     highly inefficient as it could result in hundreds or maybe thousands of
     calls when very long commands were parsed.
 
-    The  new  version  relies  on the LPC objects to give it three lists of
+    The new version relies on the LPC objects to give  it  three  lists  of
     'names'.
 
        1 - The normal singular names.
@@ -158,23 +150,23 @@ title: parsing / parse_command
        2 - string *parse_command_plural_id_list();
        3 - string *parse_command_adjectiv_id_list();
 
-    The only really needed list is the first. If the second does not  exist
+    The  only really needed list is the first. If the second does not exist
     than the efun will try to create one from the singluar list.  For gram‐
-    matical reasons it does not always succeed in a perfect way.   This  is
+    matical  reasons  it does not always succeed in a perfect way.  This is
     especially true when the 'names' are not single words but phrases.
 
-    The  third  is  very nice to have because it makes constructs like 'get
+    The third is very nice to have because it makes  constructs  like  'get
     all the little blue ones' possible.
 
-    Apart from these functions that should exist in all objects, and  which
+    Apart  from these functions that should exist in all objects, and which
     are therefore best put in the base mudlib object there is also a set of
     functions needed in the master object.  These are not absolutely neces‐
     sary but they give extra power to the efun.
 
-    Basically  these  master  object lfuns are there to give default values
+    Basically these master object lfuns are there to  give  default  values
     for the lists of names fetched from each object.
 
-    The names in these lists are applicable to any  and  all  objects,  the
+    The  names  in  these  lists are applicable to any and all objects, the
     first three are identical to the lfuns in the objects:
 
        string *parse_command_id_list()
@@ -186,10 +178,11 @@ title: parsing / parse_command
        string *parse_command_adjectiv_id_list()
           - Would normally return ({ "iffish" })
 
-    The  last  two are the default list of the prepositions and a single so
+    The last two are the default list of the prepositions and a  single  so
     called 'all' word.
        string *parse_command_prepos_list()
           - Would normally return: ({ "in", "on", "under" })
 
        string parse_command_all_word()
           - Would normally return: "all"
+

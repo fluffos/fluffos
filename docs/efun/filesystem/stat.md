@@ -7,11 +7,9 @@ title: filesystem / stat
 
     stat() - returns information pertaining to a file or a directory
 
-
 ### SYNOPSIS
 
     mixed stat( string str, int default: 0 );
-
 
 ### DESCRIPTION
 
@@ -24,7 +22,7 @@ title: filesystem / stat
     If stat is called on a directory (not a regular file), or with a second
     argument of -1, then stat() behaves identically to get_dir(3).
 
-
 ### SEE ALSO
 
     get_dir(3), file_size(3)
+

@@ -7,11 +7,9 @@ title: parsing / process_string
 
     process_string() - give a string with replaced calldescriptions
 
-
 ### SYNOPSIS
 
     string process_string( string combinestring );
-
 
 ### DESCRIPTION
 
@@ -38,11 +36,9 @@ title: parsing / process_string
     Note that both object and arguments are marked optional with the brack‐
     ets and that the brackets are not included in the actual pattern.
 
-
 ### SEE ALSO
 
     process_value(3)
-
 
 ### CAVEAT
 
@@ -50,7 +46,6 @@ title: parsing / process_string
     It  is  wise  to  set  the  effuserid  of  the object to 0 before using
     process_value as any function in any object can be called  with  almost
     any arguments.
-
 
 ### EXAMPLE
 
@@ -61,3 +56,4 @@ title: parsing / process_string
         "You are chased by the orc eastward."
 
     Assuming that query_the_name in monster#123 returns "the orc".
+

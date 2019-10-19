@@ -7,11 +7,9 @@ title: interactive / telnet_suboption
 
     telnet_suboption - process telnet suboptions
 
-
 ### SYNOPSIS
 
     void telnet_suboption( string buffer );
-
 
 ### DESCRIPTION
 
@@ -32,3 +30,4 @@ title: interactive / telnet_suboption
         #define TELQUAL_INFO  2 // ENVIRON: informational version of IS
         #define TELQUAL_REPLY 3 // AUTHENTICATION: client version of IS
         #define TELQUAL_NAME  4 // AUTHENTICATION: client version of IS
+

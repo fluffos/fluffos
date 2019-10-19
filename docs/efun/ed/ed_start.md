@@ -7,11 +7,9 @@ title: ed / ed_start
 
     ed_start() - start an ed session
 
-
 ### SYNOPSIS
 
     string ed_start(string file | void, int restricted | void)
-
 
 ### DESCRIPTION
 
@@ -25,3 +23,4 @@ title: ed / ed_start
     will be disabled.
 
     Only one ed session can be active per object at a time.
+

@@ -7,11 +7,9 @@ title: objects / tell_object
 
     tell_object() - send a message to an object
 
-
 ### SYNOPSIS
 
     void tell_object( object ob, string str );
-
 
 ### DESCRIPTION
 
@@ -19,7 +17,7 @@ title: objects / tell_object
     player), then the message will go to him, otherwise it will go  to  the
     local function "catch_tell()".
 
-
 ### SEE ALSO
 
     message(3), write(3), shout(3), say(3), tell_room(3)
+

@@ -7,11 +7,9 @@ title: system / shutdown
 
     shutdown() - shutdown the driver
 
-
 ### SYNOPSIS
 
     void shutdown( int how );
-
 
 ### DESCRIPTION
 
@@ -27,7 +25,7 @@ title: system / shutdown
     same name which does the appropriate security checks.  Be sure  to  set
     valid_override(4) up (in master.c) to protect against efun::shutdown().
 
-
 ### SEE ALSO
 
     crash(4)
+

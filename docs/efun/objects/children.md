@@ -7,11 +7,9 @@ title: objects / children
 
     children() - returns an array of objects cloned from a given object.
 
-
 ### SYNOPSIS
 
     object *children( string name );
-
 
 ### DESCRIPTION
 
@@ -27,7 +25,7 @@ title: objects / children
     This lets you find all users  (both  netdead  and  interactive  whereas
     users() only reports interactive users).
 
-
 ### SEE ALSO
 
     deep_inherit_list(3), inherit_list(3), objects(3)
+

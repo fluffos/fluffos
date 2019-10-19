@@ -7,12 +7,10 @@ title: interactive / add_action
 
     add_action() - bind a command verb to a local function
 
-
 ### SYNOPSIS
 
     void add_action( string | function fun, string | string * cmd, int flag
     );
-
 
 ### DESCRIPTION
 
@@ -40,7 +38,7 @@ title: interactive / add_action
     characters must match, but query_verb() will only return the characters
     following <cmd>.
 
-
 ### SEE ALSO
 
     query_verb(3), remove_action(3), init(4)
+

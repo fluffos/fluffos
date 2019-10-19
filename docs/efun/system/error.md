@@ -7,11 +7,9 @@ title: system / error
 
     error - generate a run-time error
 
-
 ### SYNOPSIS
 
     void error( string err );
-
 
 ### DESCRIPTION
 
@@ -22,7 +20,7 @@ title: system / error
     Before processing if the error the optional '\n' will be removed, a '*'
     will be prepended unconditional an '\n' gets appended.
 
-
 ### SEE ALSO
 
     catch(3), throw(3), error_handler(4)
+

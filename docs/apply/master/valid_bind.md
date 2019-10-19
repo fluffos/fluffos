@@ -7,11 +7,9 @@ title: master / valid_bind
 
     valid_bind - controls the use of the bind() efun
 
-
 ### SYNOPSIS
 
     int valid_bind(object binder, object old_owner, object new_owner)
-
 
 ### DESCRIPTION
 
@@ -19,3 +17,4 @@ title: master / valid_bind
     make  a  function  pointer  which  belongs  to  'old_owner'  belong  to
     'new_owner'.  If this routine returns 1, the call is allowed, otherwise
     an error is generated.
+

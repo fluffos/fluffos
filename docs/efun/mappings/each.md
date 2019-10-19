@@ -7,11 +7,9 @@ title: mappings / each
 
     each() - iterate over the (key, value) pairs in a mapping
 
-
 ### SYNOPSIS
 
     mixed *each( mapping m, int reset );
-
 
 ### DESCRIPTION
 
@@ -36,7 +34,7 @@ title: mappings / each
           write("value = " + pair[1] + "\n");
         }
 
-
 ### SEE ALSO
 
     keys(3), values(3)
+

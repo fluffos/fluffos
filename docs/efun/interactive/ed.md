@@ -7,12 +7,10 @@ title: interactive / ed
 
     ed() - edit a file
 
-
 ### SYNOPSIS
 
     void ed( string file, string exit_fn, int restricted );
     void ed( string file, string write_fn, string exit_fn, int restricted );
-
 
 ### DESCRIPTION
 
@@ -42,7 +40,7 @@ title: interactive / ed
     The optional <restricted> flag limits the editor's  capabilities,  such
     as inserting a file, and saving using an alternate file name.
 
-
 ### SEE ALSO
 
     regexp(3), valid_read(4), valid_write(4), get_save_file_name(4)
+

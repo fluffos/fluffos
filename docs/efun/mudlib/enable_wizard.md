@@ -7,11 +7,9 @@ title: mudlib / enable_wizard
 
     enable_wizard() - give wizard priveleges to an object
 
-
 ### SYNOPSIS
 
     void enable_wizard( void );
-
 
 ### DESRIPTION
 
@@ -26,7 +24,7 @@ title: mudlib / enable_wizard
 
     3.  privilege of using the trace(3) and traceprefix(3) efuns.
 
-
 ### SEE ALSO
 
     disable_wizard(3), wizardp(3)
+

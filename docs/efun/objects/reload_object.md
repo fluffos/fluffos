@@ -7,11 +7,9 @@ title: objects / reload_object
 
     reload_object - return an object to its just-loaded state
 
-
 ### SYNOPSIS
 
     void reload_object( object ob );
-
 
 ### DESCRIPTION
 
@@ -21,7 +19,7 @@ title: objects / reload_object
     similar effect to destructing/reloading the object,  however,  no  disk
     access or parsing is performed.
 
-
 ### SEE ALSO
 
     export_uid(3), new(3), clone_object(3), destruct(3)
+

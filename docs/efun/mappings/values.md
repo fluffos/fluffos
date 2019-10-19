@@ -8,11 +8,9 @@ title: mappings / values
     values() - return an array of the values from the (key, value) pairs
                in a mapping
 
-
 ### SYNOPSIS
 
     mixed *values( mapping m );
-
 
 ### DESCRIPTION
 
@@ -32,7 +30,7 @@ title: mappings / values
     Note: the values will be returned in the same order as the  correspond‐
     ing keys.
 
-
 ### SEE ALSO
 
     keys(3), each(3)
+

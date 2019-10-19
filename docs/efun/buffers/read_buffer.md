@@ -8,12 +8,10 @@ title: buffers / read_buffer
     read_buffer() - read from a file and return a buffer, or return part of
     a buffer as a string
 
-
 ### SYNOPSIS
 
     string | buffer read_buffer( string | buffer src,
                                  int start,  int len );
-
 
 ### DESCRIPTION
 
@@ -29,13 +27,12 @@ title: buffers / read_buffer
     a buffer is controlled via the 'maximum byte transfer' parameter in the
     runtime config file.
 
-
 ### SEE ALSO
 
     write_buffer(3),   allocate_buffer(3),    bufferp(3),    read_bytes(3),
     write_bytes(3)
 
-
 ### AUTHOR
 
     Truilkan
+

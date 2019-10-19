@@ -7,11 +7,9 @@ title: contrib / min
 
     min() - searches for the minimum value inside an array
 
-
 ### SYNOPSIS
 
     mixed min(mixed * arr) mixed min(mixed * arr, int flag);
-
 
 ### DESCRIPTION
 
@@ -19,7 +17,7 @@ title: contrib / min
     omitted the minimum value will be returned, otherwise the  first  index
     of its occurrence.
 
-
 ### SEE ALSO
 
     max(3)
+

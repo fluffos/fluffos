@@ -8,13 +8,11 @@ title: general / map
     map()  - modify an mapping, array, or string via application of a func‐
     tion
 
-
 ### SYNOPSIS
 
     mapping map( mapping | mixed* | string x, string fun, object ob,
                  mixed extra, ... );
     mapping map( mapping | mixed* | string x, function f, mixed extra, ... );
-
 
 ### DESCRIPTION
 
@@ -24,7 +22,7 @@ title: general / map
     the  function,  and replaces the character with the return value if the
     return value is a non-zero integer.
 
-
 ### SEE ALSO
 
     filter_array(3), sort_array(3), map_array(3), map_mapping(3)
+

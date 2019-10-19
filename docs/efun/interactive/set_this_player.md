@@ -7,7 +7,6 @@ title: interactive / set_this_player
 
     void set_this_player( object who );
 
-
 ### DESCRIPTION
 
     set_this_player()   causes   'who'   to   become   the   new  value  of
@@ -17,7 +16,7 @@ title: interactive / set_this_player
 
     who can also be zero, in which this_player() is set to zero.
 
-
 ### SEE ALSO
 
     this_player(3)
+

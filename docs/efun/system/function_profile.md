@@ -7,18 +7,15 @@ title: system / function_profile
 
     function_profile() - get function profiling information for an object
 
-
 ### SYNOPSIS
 
     mixed *function_profile( object ob );
-
 
 ### DESCRIPTION
 
     Returns  function  profiling  information for 'ob', or this_object() if
     'ob' is not specified.  This is only available if the driver  was  com‐
     piled with PROFILE_FUNCTIONS defined.
-
 
 ### RETURN VALUE
 
@@ -35,7 +32,7 @@ title: system / function_profile
     though  the  units  are microseconds, the CPU timer resolution is often
     much less
 
-
 ### SEE ALSO
 
     rusage(3), time_expression(3), opcprof(3)
+

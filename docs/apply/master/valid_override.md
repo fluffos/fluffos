@@ -7,11 +7,9 @@ title: master / valid_override
 
     valid_override - controls the use of efun::
 
-
 ### SYNOPSIS
 
     int valid_override( string file, string efun_name , string main_file );
-
 
 ### DESCRIPTION
 
@@ -51,12 +49,11 @@ title: master / valid_override
           return 1;
        }
 
-
 ### AUTHOR
 
     Truilkan@Basis
 
-
 ### SEE ALSO
 
     valid_object(4), function_exists(3)
+

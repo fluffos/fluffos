@@ -7,11 +7,9 @@ title: object / reset
 
     reset - allows an object to do self-maintenance
 
-
 ### SYNOPSIS
 
     void reset( void );
-
 
 ### DESCRIPTION
 
@@ -24,7 +22,7 @@ title: object / reset
     if  any treasures and/or monsters in the room have been removed so they
     can be replaced.
 
-
 ### SEE ALSO
 
     set_reset(3), create(4)
+

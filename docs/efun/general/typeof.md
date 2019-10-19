@@ -7,11 +7,9 @@ title: general / typeof
 
     typeof() - return the type of an expression
 
-
 ### SYNOPSIS
 
     string typeof( mixed var );
-
 
 ### DESCRIPTION
 
@@ -27,7 +25,7 @@ title: general / typeof
     "*lvalue_byte*"   T_LVALUE_RANGE    "*lvalue_range*"    T_ERROR_HANDLER
     "*error_handler*" T_FREED         "*freed*" T_UNKNOWN       "*unknown*"
 
-
 ### SEE ALSO
 
     allocate(3), allocate_mapping(3), strlen(3)
+

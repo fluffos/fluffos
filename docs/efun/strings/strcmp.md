@@ -7,11 +7,9 @@ title: strings / strcmp
 
     strcmp() - determines the lexical relationship between two strings.
 
-
 ### SYNOPSIS
 
     int strcmp( string one, string two );
-
 
 ### DESCRIPTION
 
@@ -22,7 +20,7 @@ title: strings / strcmp
     strcmp()  returns  a number greater than 0.  This efunction is particu‐
     larly useful in the compare functions needed by sort_array(3).
 
-
 ### SEE ALSO
 
     sort_array(3)
+

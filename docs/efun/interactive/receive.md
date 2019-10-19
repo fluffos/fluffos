@@ -7,11 +7,9 @@ title: interactive / receive
 
     receive() - displays a message to the current object
 
-
 ### SYNOPSIS
 
     int receive( string message );
-
 
 ### DESCRIPTION
 
@@ -20,7 +18,7 @@ title: interactive / receive
     1  if the current object is interactive, 0 otherwise.  Often, receive()
     is called from within catch_tell(4) or receive_message(4).
 
-
 ### SEE ALSO
 
     catch_tell(4), receive_message(4), message(3)
+

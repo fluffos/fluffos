@@ -7,11 +7,9 @@ title: object / clean_up
 
     clean_up - periodically called in inactive objects
 
-
 ### SYNOPSIS
 
     int clean_up( int inherited );
-
 
 ### DESCRIPTION
 
@@ -25,3 +23,4 @@ title: object / clean_up
 
     One  thing that might be commonly done by an object in this function is
     destructing itself to conserve memory.
+

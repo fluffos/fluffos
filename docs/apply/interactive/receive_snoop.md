@@ -7,11 +7,9 @@ title: interactive / receive_snoop
 
     receive_snoop - catch incoming snoop text
 
-
 ### SYNOPSIS
 
     void receive_snoop( string message) ;
-
 
 ### DESCRIPTION
 
@@ -20,7 +18,7 @@ title: interactive / receive_snoop
     object.  Inside of this function, you can do as you wish with the text.
     A common activity would be to receive() it.
 
-
 ### SEE ALSO
 
     catch_tell(4), receive(3), receive_message(4)
+

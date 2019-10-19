@@ -7,13 +7,12 @@ title: contrib / debug_message
 
     debug_message() - logs a debug mssage
 
-
 ### SYNOPSIS
 
     void debug_message(string msg);
-
 
 ### DESCRIPTION
 
     Prints  the  given message on the <stderr> file desciptor of the driver
     and appends it to the debug log.
+

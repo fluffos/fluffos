@@ -7,11 +7,9 @@ title: internals / get_config
 
     get_config() - query various driver config settings
 
-
 ### SYNOPSIS
 
     string | int get_config( int );
-
 
 ### DESCRIPTION
 
@@ -19,7 +17,7 @@ title: internals / get_config
     Please refer to the "runtime_config.h" include file for a list of  cur‐
     rently recognized options.
 
-
 ### SEE ALSO
 
     /include/runtime_config.h
+

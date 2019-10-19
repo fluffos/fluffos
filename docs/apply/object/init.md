@@ -8,11 +8,9 @@ title: object / init
     init  -  function  in  an  object called by move_object() to initialize
     verb/actions
 
-
 ### SYNOPSIS
 
     void init( void );
-
 
 ### DESCRIPTION
 
@@ -33,7 +31,7 @@ title: object / init
     Typically,  the  init(4)  function  in  an  object  is  used  to   call
     add_action(3) for each command that the object offers.
 
-
 ### SEE ALSO
 
     reset(4), move_object(3), enable_commands(3), living(3), add_action(3)
+

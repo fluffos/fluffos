@@ -7,11 +7,9 @@ title: floats / to_int
 
     to_int - convert a float or buffer to an int
 
-
 ### SYNOPSIS
 
     int to_int( float | buffer x );
-
 
 ### DESCRIPTION
 
@@ -20,7 +18,7 @@ title: floats / to_int
     buffer,  the  call  returns the integer (in network-byte-order) that is
     embedded in the buffer.
 
-
 ### SEE ALSO
 
     to_float(3), read_buffer(3), sprintf(3), sscanf(3)
+

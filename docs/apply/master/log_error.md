@@ -7,11 +7,9 @@ title: master / log_error
 
     log_error - log errors intelligently
 
-
 ### SYNOPSIS
 
     void log_error( string file, string message );
-
 
 ### DESCRIPTION
 
@@ -22,12 +20,11 @@ title: master / log_error
     deciding  based  on  the  filename  where  the  error message should be
     logged, and then writing it to that file.
 
-
 ### SEE ALSO
 
     error_handler(4)
 
-
 ### AUTHOR
 
     Wayfarer@Portals
+

@@ -7,11 +7,9 @@ title: calls / shadow
 
     shadow() - shadow one or more functions in some object
 
-
 ### SYNOPSIS
 
     object shadow( object ob, int flag );
-
 
 ### DESCRIPTION
 
@@ -44,7 +42,7 @@ title: calls / shadow
     player object much simpler than it could be if the code for the various
     classes had to be in the player object itself.
 
-
 ### SEE ALSO
 
     destruct(3), shadowp(3), query_shadowing(3), valid_shadow(4)
+

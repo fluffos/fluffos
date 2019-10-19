@@ -7,11 +7,9 @@ title: contrib / max
 
     max() - searches for the maximum value inside an array
 
-
 ### SYNOPSIS
 
     mixed max(mixed * arr) mixed max(mixed * arr, int flag);
-
 
 ### DESCRIPTION
 
@@ -19,7 +17,7 @@ title: contrib / max
     omitted the maximum value will be returned, otherwise the  first  index
     of its occurrence.
 
-
 ### SEE ALSO
 
     min(3)
+

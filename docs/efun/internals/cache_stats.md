@@ -7,11 +7,9 @@ title: internals / cache_stats
 
     cache_stats() - report various driver and mudlib statistics
 
-
 ### SYNOPSIS
 
     void cache_stats( void );
-
 
 ### DESCRIPTION
 
@@ -19,7 +17,7 @@ title: internals / cache_stats
     driver build time.  This efun  dumps  statistics  on  the  call_other()
     cache hit rate to the caller's screen.
 
-
 ### SEE ALSO
 
     opcprof(3), mud_status(3)
+

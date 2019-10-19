@@ -7,11 +7,9 @@ title: internals / moncontrol
 
     moncontrol() - turns on/off profiling during execution
 
-
 ### SYNOPSIS
 
     void moncontrol( int on );
-
 
 ### DESCRIPTION
 
@@ -21,7 +19,7 @@ title: internals / moncontrol
     trol() has no effect if profiling is  not  enabled  at  driver  compile
     time.
 
-
 ### SEE ALSO
 
     opcprof(3), function_profile(3)
+

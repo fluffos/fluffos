@@ -7,7 +7,6 @@ title: sockets / socket_connect
 
     socket_connect() - initiate a connection on a socket
 
-
 ### SYNOPSIS
 
     #include <socket_err.h>
@@ -15,7 +14,6 @@ title: sockets / socket_connect
     int socket_connect( int s, string address,
                         string read_callback,
                         string write_callback );
-
 
 ### DESCRIPTION
 
@@ -40,7 +38,6 @@ title: sockets / socket_connect
 
     Where fd is the socket which is ready to be written to.
 
-
 ### RETURN VALUES
 
     socket_connect() returns:
@@ -48,7 +45,6 @@ title: sockets / socket_connect
         EESUCCESS on success.
 
         a negative value indicated below on error.
-
 
 ### ERRORS
 
@@ -76,7 +72,7 @@ title: sockets / socket_connect
 
     EECONNECT      Problem with connect.
 
-
 ### SEE ALSO
 
     socket_accept(3), socket_close(3), socket_create(3)
+

@@ -7,13 +7,11 @@ title: sockets / socket_address
 
     socket_address() - return the remote address for an efun socket
 
-
 ### SYNOPSIS
 
     #include <socket_err.h>
 
     string socket_address( int s );
-
 
 ### DESCRIPTION
 
@@ -21,7 +19,6 @@ title: sockets / socket_address
     returned address is of the form:
 
         "127.0.0.1 23".
-
 
 ### RETURN VALUES
 
@@ -31,8 +28,8 @@ title: sockets / socket_address
 
         an empty string on failure.
 
-
 ### SEE ALSO
 
     socket_connect(3),  socket_create(3),  resolve(3),  query_host_name(3),
     query_ip_name(3), query_ip_number(3)
+

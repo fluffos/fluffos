@@ -7,11 +7,9 @@ title: ed / ed_cmd
 
     ed_cmd() - send a command to an ed session
 
-
 ### SYNOPSIS
 
     string ed_cmd(string cmd)
-
 
 ### DESCRIPTION
 
@@ -19,3 +17,4 @@ title: ed / ed_cmd
 
     The  command  'cmd' is sent to the active ed session, and the resulting
     output is returned.
+

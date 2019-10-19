@@ -7,11 +7,9 @@ title: master / error_handler
 
     error_handler - function in master object to handle errors
 
-
 ### SYNOPSIS
 
     void error_handler( mapping error, int caught );
-
 
 ### DESCRIPTION
 
@@ -37,12 +35,11 @@ title: master / error_handler
         ])
     The 'caught' flag is 1 if the error was trapped by catch().
 
-
 ### SEE ALSO
 
     catch(3), error(3), throw(3), log_error(4)
 
-
 ### AUTHOR
 
     Beek
+

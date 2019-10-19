@@ -8,11 +8,9 @@ title: interactive / process_input
     process_input  -  provide a hook for the MudOS driver to send a copy of
     what the player is typing to the player object.
 
-
 ### SYNOPSIS
 
     string process_input( string );
-
 
 ### DESCRIPTION
 
@@ -24,7 +22,7 @@ title: interactive / process_input
     string,  that  string  is used by the driver instead of what the player
     typed.
 
-
 ### AUTHOR
 
     Truilkan@TMI
+

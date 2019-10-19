@@ -7,11 +7,9 @@ title: objects / set_hide
 
     set_hide() - set the hide flag on a hidable object
 
-
 ### SYNOPSIS
 
     void set_hide( int flag );
-
 
 ### DESCRIPTION
 
@@ -22,7 +20,7 @@ title: objects / set_hide
     find  the object with find_object(), or multiple-object returning efuns
     such as users(), children(), all_inventory(), etc.
 
-
 ### SEE ALSO
 
     valid_hide(4)
+

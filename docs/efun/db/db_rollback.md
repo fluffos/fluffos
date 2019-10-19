@@ -7,11 +7,9 @@ title: db / db_rollback
 
     db_rollback() - rollback the last transaction
 
-
 ### SYNOPSIS
 
     int db_rollback( int );
-
 
 ### DESCRIPTION
 
@@ -19,12 +17,11 @@ title: db / db_rollback
 
     Returns 1 on success, 0 otherwise
 
-
 ### NOTES
 
     Not yet implemented!
 
-
 ### SEE ALSO
 
     db_commit(3), db_exec(3), valid_database(4)
+

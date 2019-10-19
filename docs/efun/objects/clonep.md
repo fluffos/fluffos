@@ -8,11 +8,9 @@ title: objects / clonep
     clonep() - determine whether or not a given variable points to a cloned
     object
 
-
 ### SYNOPSIS
 
     int clonep( void | mixed arg );
-
 
 ### DESCRIPTION
 
@@ -24,8 +22,8 @@ title: objects / clonep
     will   return   a  string  containing  a  '#'.   clonep()  defaults  to
     this_object().
 
-
 ### SEE ALSO
 
     virtualp(3), userp(3), wizardp(3), objectp(3), new(3), clone_object(3),
     call_other(3), file_name(3)
+

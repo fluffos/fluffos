@@ -7,11 +7,9 @@ title: db / db_close
 
     db_close() - close the database connection
 
-
 ### SYNOPSIS
 
     int db_close( int handle );
-
 
 ### DESCRIPTION
 
@@ -19,7 +17,7 @@ title: db / db_close
 
     Returns 1 on success, 0 otherwise
 
-
 ### SEE ALSO
 
     db_connect(3), db_status(3), valid_database(4)
+

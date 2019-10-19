@@ -7,11 +7,9 @@ title: functions / apply
 
     apply() - evaluate a function pointer
 
-
 ### SYNOPSIS
 
     mixed apply(mixed f, mixed *args)
-
 
 ### DESCRIPTION
 
@@ -19,3 +17,4 @@ title: functions / apply
     arguments.  For example,
 
     apply(f, ({ 1, 2, 3 }) ) is the same as evaluate(f, 1, 2, 3);
+

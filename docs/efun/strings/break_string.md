@@ -7,12 +7,10 @@ title: strings / break_string
 
     break_string() - break a string at regular intervals
 
-
 ### SYNOPSIS
 
     string break_string( string str | int foobar, int len,
                          void | int indent | string indent );
-
 
 ### DESCRIPTION
 
@@ -25,7 +23,6 @@ title: strings / break_string
 
     If the first argument is an integer, the function simply returns 0.
 
-
 ### BUGS
 
     break_string() is *not* context sensitive.  It does not take account of
@@ -37,7 +34,7 @@ title: strings / break_string
     future revision of break_string()  may  allow  different  line-breaking
     semantics.  (Cygnus)
 
-
 ### SEE ALSO
 
     implode(3), explode(3), sprintf(3)
+

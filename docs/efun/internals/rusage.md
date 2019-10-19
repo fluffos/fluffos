@@ -7,11 +7,9 @@ title: internals / rusage
 
     rusage() - reports information gathered by the getrusage() system call
 
-
 ### SYNOPSIS
 
     mapping rusage( void );
-
 
 ### DESCRIPTION
 
@@ -39,7 +37,7 @@ title: internals / rusage
         utime, stime, maxrss, ixrss, idrss, isrss, minflt,  majflt,  nswap,
         inblock, oublock, msgsnd, msgrcv, nsignals, nvcsw, nivcsw.
 
-
 ### SEE ALSO
 
     time_expression(3), function_profile(3), time(3), uptime(3)
+

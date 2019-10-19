@@ -7,7 +7,6 @@ title: strings / replace_string
 
     replace_string() - replace all instances of a string within a string
 
-
 ### SYNOPSIS
 
     string replace_string( str, pattern, replace );
@@ -53,3 +52,4 @@ title: strings / replace_string
 ### AUTHOR
 
     Zak@TMI-2 wrote the range constraint additions.
+

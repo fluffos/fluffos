@@ -7,13 +7,11 @@ title: internals / debug_info
 
     debug_info() - display debug information
 
-
 ### SYNOPSIS
 
     mixed debug_info( int operation, ... );
     mixed debug_info( 0, object ob );
     mixed debug_info( 1, object ob );
-
 
 ### DESCRIPTION
 
@@ -66,7 +64,7 @@ title: internals / debug_info
         num inherits 0 (0)
         total size 104
 
-
 ### SEE ALSO
 
     dump_file_descriptors(3), dump_socket_status(3)
+

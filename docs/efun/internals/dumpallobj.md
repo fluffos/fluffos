@@ -8,11 +8,9 @@ title: internals / dumpallobj
     dumpallobj()  - report various statistics on all objects that have been
     loaded
 
-
 ### SYNOPSIS
 
     void dumpallobj( string | void );
-
 
 ### DESCRIPTION
 
@@ -21,7 +19,7 @@ title: internals / dumpallobj
     dumped to a file named /OBJ_DUMP.  If an argument  is  specified,  then
     that name is used as the filename for the dump.
 
-
 ### SEE ALSO
 
     mud_status(3), debug_info(3)
+

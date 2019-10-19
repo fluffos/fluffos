@@ -7,11 +7,9 @@ title: calls / origin
 
     origin() - determine how the current function was called
 
-
 ### SYNOPSIS
 
     int origin( void );
-
 
 ### DESCRIPTION
 
@@ -34,7 +32,7 @@ title: calls / origin
 
     128    functional
 
-
 ### SEE ALSO
 
     previous_object(3), /include/origin.h
+

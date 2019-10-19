@@ -7,13 +7,11 @@ title: db / db_connect
 
     db_connect() - close the database connection
 
-
 ### SYNOPSIS
 
     int  db_connect( string host, string db ); int db_connect( string host,
     string db, string user );  int  db_connect(  string  host,  string  db,
     string user, int type );
-
 
 ### DESCRIPTION
 
@@ -25,7 +23,7 @@ title: db / db_connect
 
     Returns a handle to the new connection on success, 0 otherwise
 
-
 ### SEE ALSO
 
     db_close(3), db_status(3), valid_database(4)
+

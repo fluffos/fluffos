@@ -8,11 +8,9 @@ title: system / function_exists
     function_exists()  -  find  the  file containing a given function in an
     object
 
-
 ### SYNOPSYS
 
     string function_exists( string str, object ob );
-
 
 ### DESCRIPTION
 
@@ -24,7 +22,7 @@ title: system / function_exists
 
     Note that function_exists() does not check shadows.
 
-
 ### SEE ALSO
 
     call_other(3), call_out(3), functionp(3), valid_shadow(4)
+

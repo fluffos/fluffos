@@ -7,11 +7,9 @@ title: objects / file_name
 
     file_name() - get the file name of an object
 
-
 ### SYNOPSIS
 
     string file_name( object ob );
-
 
 ### DESCRIPTION
 
@@ -23,3 +21,4 @@ title: objects / file_name
     game is booted, and increase by one for each object cloned,  hence  the
     number   is   unique   for   each  cloned  object.   <ob>  defaults  to
     this_object() if not specified.
+

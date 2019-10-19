@@ -7,11 +7,9 @@ title: objects / destruct
 
     destruct() - remove an object from the games
 
-
 ### SYNOPSIS
 
     void destruct( object ob );
-
 
 ### DESCRIPTION
 
@@ -20,7 +18,7 @@ title: objects / destruct
     arguments.   If  'ob' is this_object(), execution will continue, but it
     is best to return a value immediately.
 
-
 ### SEE ALSO
 
     clone_object(3), new(3), destruct_env_of(4), move(4)
+

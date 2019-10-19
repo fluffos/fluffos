@@ -7,11 +7,9 @@ title: object / move_or_destruct
 
     move_or_destruct - ask an object to move to the specified destination
 
-
 ### SYNOPSIS
 
     int move_or_destruct( object dest );
-
 
 ### DESCRIPTION
 
@@ -20,7 +18,7 @@ title: object / move_or_destruct
     If  the  target  object  of  this apply does not move itself out of the
     object being destructed, it will be destructed as well.
 
-
 ### SEE ALSO
 
     destruct(3), move_object(3), init(4)
+

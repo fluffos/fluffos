@@ -7,11 +7,9 @@ title: master / valid_database
 
     valid_database - protects the database efunctions.
 
-
 ### SYNOPSIS
 
     mixed valid_database( object caller, string function, mixed *info );
-
 
 ### DESCRIPTION
 
@@ -30,7 +28,7 @@ title: master / valid_database
     nect  it  should  return  the password to be used for the connect and 1
     otherwise
 
-
 ### SEE ALSO
 
     db_connect(3), db_exec(3)
+

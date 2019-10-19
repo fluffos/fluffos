@@ -7,11 +7,9 @@ title: interactive / disable_commands
 
     disable_commands() - makes a living object non-living
 
-
 ### SYNOPSIS
 
     int disable_commands( void );
-
 
 ### DESCRIPTION
 
@@ -24,7 +22,7 @@ title: interactive / disable_commands
     previously  added  by  other  object,  it also removes actions that was
     defined by this object.
 
-
 ### SEE ALSO
 
     enable_commands(3)
+

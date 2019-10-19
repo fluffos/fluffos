@@ -8,11 +8,9 @@ title: master / retrieve_ed_setup
     retrieve_ed_setup  -  retrieve  a  user's editor setup or configuration
     settings
 
-
 ### SYNOPSIS
 
     int retrieve_ed_setup( object user );
-
 
 ### DESCRIPTION
 
@@ -20,7 +18,7 @@ title: master / retrieve_ed_setup
     setup/configuration  settings.   This  function should return the setup
     (contained in an int).
 
-
 ### SEE ALSO
 
     save_ed_setup(4)
+

@@ -7,11 +7,9 @@ title: mudlib / find_living
 
     find_living() - find a living object matching a given id
 
-
 ### SYNOPSIS
 
     object find_living( string str );
-
 
 ### DESCRIPTION
 
@@ -21,8 +19,8 @@ title: mudlib / find_living
     will be entered into the hash table used to speed  up  the  search  for
     living objects.
 
-
 ### SEE ALSO
 
     living(3),  livings(3),  find_player(3),  users(3), enable_commands(3),
     set_living_name(3)
+

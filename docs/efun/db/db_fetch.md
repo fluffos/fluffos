@@ -7,11 +7,9 @@ title: db / db_fetch
 
     db_fetch() - fetches a ruslt set
 
-
 ### SYNOPSIS
 
     mixed *db_fetch( int handle, int row );
-
 
 ### DESCRIPTION
 
@@ -20,7 +18,6 @@ title: db / db_fetch
 
     Returns an array of columns of the named  row  upon  success  an  error
     string otherwise.
-
 
 ### EXAMPLE
 
@@ -38,7 +35,7 @@ title: db / db_fetch
             write(res[1]);
         } db_close(dbconn);
 
-
 ### SEE ALSO
 
     db_exec(3), valid_database(4)
+

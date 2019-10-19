@@ -7,11 +7,9 @@ title: master / author_file
 
     author_file - determine the author for a given object
 
-
 ### SYNOPSIS
 
     string author_file (string file);
-
 
 ### DESCRIPTION
 
@@ -25,7 +23,7 @@ title: master / author_file
     At startup the driver  will  ask  for  the  master  author  by  calling
     author_file(__MASTER_FILE__).
 
-
 ### SEE ALSO
 
     author_stats(3), domain_stats(3), domain_file(4)
+

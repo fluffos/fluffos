@@ -7,11 +7,9 @@ title: master / get_save_file_name
 
     get_save_file_name - back up editor file on abnormal exit
 
-
 ### SYNOPSIS
 
     string get_save_file_name( string );
-
 
 ### DESCRIPTION
 
@@ -20,12 +18,11 @@ title: master / get_save_file_name
     nate file name for the file to be saved, to avoid overwriting the orig‐
     inal.
 
-
 ### NOTE
 
     This apply used to be named get_ed_buffer_save_file_name().
 
-
 ### SEE ALSO
 
     ed(3)
+

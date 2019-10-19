@@ -8,12 +8,10 @@ title: buffers / write_buffer
     write_buffer() - write a buffer to a file, or read into a buffer from a
     source
 
-
 ### SYNOPSIS
 
     int write_buffer( string | buffer dest, int start,
                       mixed source );
-
 
 ### DESCRIPTION
 
@@ -25,12 +23,11 @@ title: buffers / write_buffer
     starting  at  byte  # 'start' in the buffer.  If 'source' is an int, it
     will be written in network-byte-order.
 
-
 ### SEE ALSO
 
     read_buffer(3), allocate_buffer(3)
 
-
 ### AUTHOR
 
     Truilkan
+
