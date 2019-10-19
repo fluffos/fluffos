@@ -29,13 +29,13 @@ title: interactive / ed
     called  after the write has completed -- <flag> will be non-zero.  This
     callback function should have the form:
 
-    int write_fn(string fname, int flag)
+        int write_fn(string fname, int flag)
 
     When the editor is exited, the driver will callback the <exit_fn> func‐
     tion.   This  function  allows  the  mudlib to clean up.  This callback
     function has the form:
 
-    void exit_fn()
+        void exit_fn()
 
     The optional <restricted> flag limits the editor's  capabilities,  such
     as inserting a file, and saving using an alternate file name.
@@ -43,3 +43,4 @@ title: interactive / ed
 ### SEE ALSO
 
     regexp(3), valid_read(4), valid_write(4), get_save_file_name(4)
+

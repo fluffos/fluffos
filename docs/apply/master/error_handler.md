@@ -16,23 +16,23 @@ title: master / error_handler
     This function allows the mudlib to handle errors instead of the driver.
     The contents of the 'error' mapping are:
 
-    ([
-    "error"   : string,     // the error
-    "program" : string,     // the program
-    "object"  : object,     // the current object
-    "line"    : int,        // the line number
-    "trace"   : mapping*    // a trace back
-    ])
+        ([
+            "error"   : string,     // the error
+            "program" : string,     // the program
+            "object"  : object,     // the current object
+            "line"    : int,        // the line number
+            "trace"   : mapping*    // a trace back
+        ])
 
     Each line of traceback is a mapping containing the following:
 
-    ([
-    "function"  : string,   // the function name
-    "program"   : string,   // the program
-    "object"    : object,   // the object
-    "file"      : string,   // the file to which the line number refers
-    "line"      : int       // the line number
-    ])
+        ([
+            "function"  : string,   // the function name
+            "program"   : string,   // the program
+            "object"    : object,   // the object
+         "file"      : string,   // the file to which the line number refers
+            "line"      : int       // the line number
+        ])
     The 'caught' flag is 1 if the error was trapped by catch().
 
 ### SEE ALSO
@@ -42,3 +42,4 @@ title: master / error_handler
 ### AUTHOR
 
     Beek
+

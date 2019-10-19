@@ -25,3 +25,4 @@ title: internals / set_debug_level
 ### SEE ALSO
 
     set_malloc_mask(3)
+

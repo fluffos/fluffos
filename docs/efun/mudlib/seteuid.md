@@ -25,3 +25,4 @@ title: mudlib / seteuid
 ### SEE ALSO
 
     export_uid(3), getuid(3), geteuid(3), this_object(3), valid_seteuid(4)
+

@@ -12,8 +12,8 @@ title: sockets / socket_acquire
     #include <socket_err.h>
 
     int socket_acquire( int socket, string read_callback,
-    string write_callback,
-    string close_callback );
+                        string write_callback,
+                        string close_callback );
 
 ### DESCRIPTION
 
@@ -40,3 +40,4 @@ title: sockets / socket_acquire
 ### SEE ALSO
 
     socket_release(3)
+

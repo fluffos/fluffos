@@ -16,3 +16,4 @@ title: mudlib / set_light
     Passing  <light_level_adjustment>  as  0  queries  the object's current
     light level.  A positive number will increase the light level, while  a
     negative number will decrease the light level.
+

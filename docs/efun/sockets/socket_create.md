@@ -12,7 +12,7 @@ title: sockets / socket_create
     #include <socket_err.h>
 
     int socket_create( int mode, string read_callback,
-    void | string close_callback );
+                       void | string close_callback );
 
 ### DESCRIPTION
 
@@ -29,7 +29,7 @@ title: sockets / socket_create
     call  when the socket gets data from its peer. The read callback should
     follow this format:
 
-    void read_callback(int fd, mixed message)
+        void read_callback(int fd, mixed message)
 
     Where fd is the socket which received the data, and message is the data
     which was received.
@@ -38,7 +38,7 @@ title: sockets / socket_create
     call if the socket closes unexpectedly, i.e. not as  the  result  of  a
     socket_close(3) call. The close callback should follow this format:
 
-    void close_callback(int fd)
+        void close_callback(int fd)
 
     Where  fd  is the socket which has closed.  NOTE: close_callback is not
     used with DATAGRAM mode sockets.
@@ -47,9 +47,9 @@ title: sockets / socket_create
 
     socket_create() returns:
 
-    a non-negative descriptor on success.
+        a non-negative descriptor on success.
 
-    a negative value indicated below on error.
+        a negative value indicated below on error.
 
 ### ERRORS
 
@@ -69,3 +69,4 @@ title: sockets / socket_create
 
     socket_accept(3), socket_bind(3),  socket_close(3),  socket_connect(3),
     socket_listen(3), socket_write(3)
+

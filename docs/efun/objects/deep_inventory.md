@@ -20,3 +20,4 @@ title: objects / deep_inventory
 ### SEE ALSO
 
     first_inventory(3), next_inventory(3), all_inventory(3)
+

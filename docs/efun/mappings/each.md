@@ -27,13 +27,14 @@ title: mappings / each
 
     For example:
 
-    mixed *pair;
+        mixed *pair;
 
-    while ((pair = each(x)) != ({})) {
-    write("key   = " + pair[0] + "\n");
-    write("value = " + pair[1] + "\n");
-    }
+        while ((pair = each(x)) != ({})) {
+          write("key   = " + pair[0] + "\n");
+          write("value = " + pair[1] + "\n");
+        }
 
 ### SEE ALSO
 
     keys(3), values(3)
+

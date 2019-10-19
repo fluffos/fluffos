@@ -21,14 +21,15 @@ title: functions / bind
     For example:
 
     void make_living(object ob) {
-    function f;
+       function f;
 
-    f = bind( (: enable_commands :), ob );
+       f = bind( (: enable_commands :), ob );
 
-    evaluate(f); }
+       evaluate(f); }
 
     The effect of the above is the same as if 'ob' itself had evaluated the
     enable_commands() efun.  Note that there are security risks involved in
     this, as bind() allows you to force another object to run  a  piece  of
     code.   To  protect  against this, there is a valid_bind() master apply
     which must return 1 or the call to bind() will fail.
+

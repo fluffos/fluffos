@@ -26,3 +26,4 @@ title: master / compile_object
     ciated.  After an association is made between an object and a filename,
     then it will be as if the file, file.r.c, did exist (to the driver) and
     when loaded produced the object that compile_object() returned.
+

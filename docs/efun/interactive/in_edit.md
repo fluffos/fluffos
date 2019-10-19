@@ -19,3 +19,4 @@ title: interactive / in_edit
 ### SEE ALSO
 
     ed(3), in_input(3)
+

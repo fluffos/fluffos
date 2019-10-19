@@ -19,3 +19,4 @@ title: strings / clear_bit
 ### SEE ALSO
 
     set_bit(3), test_bit(3)
+

@@ -11,7 +11,7 @@ title: master / crash
 ### SYNOPSIS
 
     void crash( string crash_message, object command_giver,
-    object current_object );
+                object current_object );
 
 ### DESCRIPTION
 
@@ -25,3 +25,4 @@ title: master / crash
 ### SEE ALSO
 
     shutdown(3)
+

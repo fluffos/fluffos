@@ -19,12 +19,12 @@ title: mappings / keys
 
     For example, if:
 
-    mapping m;
-    m = (["hp" : 35, "sp" : 42, "mass" : 100]);
+        mapping m;
+        m = (["hp" : 35, "sp" : 42, "mass" : 100]);
 
     then
 
-    keys(m) == ({"hp", "sp", "mass"})
+        keys(m) == ({"hp", "sp", "mass"})
 
     Note:  the  keys  will not be returned in any apparent order.  However,
     they will be returned in the same order  as  the  corresponding  values
@@ -33,3 +33,4 @@ title: mappings / keys
 ### SEE ALSO
 
     values(3), each(3)
+

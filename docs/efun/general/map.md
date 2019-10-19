@@ -11,7 +11,7 @@ title: general / map
 ### SYNOPSIS
 
     mapping map( mapping | mixed* | string x, string fun, object ob,
-    mixed extra, ... );
+                 mixed extra, ... );
     mapping map( mapping | mixed* | string x, function f, mixed extra, ... );
 
 ### DESCRIPTION
@@ -25,3 +25,4 @@ title: general / map
 ### SEE ALSO
 
     filter_array(3), sort_array(3), map_array(3), map_mapping(3)
+

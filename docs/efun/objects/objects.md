@@ -30,3 +30,4 @@ title: objects / objects
 ### SEE ALSO
 
     livings(3), users(3)
+

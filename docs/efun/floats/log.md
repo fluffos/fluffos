@@ -19,3 +19,4 @@ title: floats / log
 ### SEE ALSO
 
     exp(3), pow(3), sqrt(3)
+

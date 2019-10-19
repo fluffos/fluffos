@@ -20,3 +20,4 @@ title: objects / find_object
 ### SEE ALSO
 
     file_name(3), stat(3)
+

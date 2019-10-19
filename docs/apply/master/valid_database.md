@@ -31,3 +31,4 @@ title: master / valid_database
 ### SEE ALSO
 
     db_connect(3), db_exec(3)
+

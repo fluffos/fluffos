@@ -24,3 +24,4 @@ title: calls / remove_call_out
 ### SEE ALSO
 
     call_out(3), call_out_info(3).
+

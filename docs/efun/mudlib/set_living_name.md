@@ -19,3 +19,4 @@ title: mudlib / set_living_name
 ### SEE ALSO
 
     enable_commands(3), find_living(3), find_player(3)
+

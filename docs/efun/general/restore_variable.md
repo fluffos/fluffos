@@ -19,3 +19,4 @@ title: general / restore_variable
 ### SEE ALSO
 
     restore_object(3)
+

@@ -20,3 +20,4 @@ title: contrib / min
 ### SEE ALSO
 
     max(3)
+

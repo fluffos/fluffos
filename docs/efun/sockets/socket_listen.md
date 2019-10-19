@@ -24,7 +24,7 @@ title: sockets / socket_listen
     to  call  when  a  connection is requested on the listening socket. The
     listen callback should follow this format:
 
-    void listen_callback(int fd)
+        void listen_callback(int fd)
 
     Where fd is the listening socket.
 
@@ -32,9 +32,9 @@ title: sockets / socket_listen
 
     socket_listen() returns:
 
-    EESUCCESS on success.
+        EESUCCESS on success.
 
-    a negative value indicated below on error.
+        a negative value indicated below on error.
 
 ### ERRORS
 
@@ -55,3 +55,4 @@ title: sockets / socket_listen
 ### SEE ALSO
 
     socket_accept(3), socket_connect(3), socket_create(3)
+

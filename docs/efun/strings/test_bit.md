@@ -18,3 +18,4 @@ title: strings / test_bit
 ### SEE ALSO
 
     set_bit(3), clear_bit(3)
+

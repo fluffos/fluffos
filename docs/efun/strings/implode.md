@@ -20,3 +20,4 @@ title: strings / implode
 ### SEE ALSO
 
     explode(3), sprintf(3)
+

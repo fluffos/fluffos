@@ -17,3 +17,4 @@ title: functions / apply
     arguments.  For example,
 
     apply(f, ({ 1, 2, 3 }) ) is the same as evaluate(f, 1, 2, 3);
+

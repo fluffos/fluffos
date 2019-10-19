@@ -19,3 +19,4 @@ title: interactive / query_idle
 ### SEE ALSO
 
     in_edit(3), in_input(3)
+

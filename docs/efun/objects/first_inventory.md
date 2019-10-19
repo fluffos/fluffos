@@ -19,3 +19,4 @@ title: objects / first_inventory
 ### SEE ALSO
 
     file_name(3), next_inventory(3), all_inventory(3), deep_inventory(3)
+

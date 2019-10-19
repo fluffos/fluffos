@@ -22,3 +22,4 @@ title: internals / time_expression
 ### SEE ALSO
 
     rusage(3), function_profile(3), time(3)
+

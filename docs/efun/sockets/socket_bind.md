@@ -24,9 +24,9 @@ title: sockets / socket_bind
 
     socket_bind() returns:
 
-    EESUCCESS on success.
+        EESUCCESS on success.
 
-    a negative value indicated below on error.
+        a negative value indicated below on error.
 
 ### ERRORS
 
@@ -47,3 +47,4 @@ title: sockets / socket_bind
 ### SEE ALSO
 
     socket_connect(3), socket_create(3), socket_listen(3)
+

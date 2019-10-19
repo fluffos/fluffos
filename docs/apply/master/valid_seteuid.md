@@ -21,3 +21,4 @@ title: master / valid_seteuid
 ### SEE ALSO
 
     seteuid(3), geteuid(3), getuid(3), export_uid(3)
+

@@ -19,3 +19,4 @@ title: interactive / write
 ### SEE ALSO
 
     message(3), tell_object(3), tell_room(3), shout(3), say(3)
+

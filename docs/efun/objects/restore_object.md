@@ -24,3 +24,4 @@ title: objects / restore_object
 ### SEE ALSO
 
     save_object(3)
+

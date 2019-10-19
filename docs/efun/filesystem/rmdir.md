@@ -22,3 +22,4 @@ title: filesystem / rmdir
 ### SEE ALSO
 
     rm(3), mkdir(3), link(3)
+

@@ -23,3 +23,4 @@ title: object / clean_up
 
     One  thing that might be commonly done by an object in this function is
     destructing itself to conserve memory.
+

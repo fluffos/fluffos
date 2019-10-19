@@ -18,8 +18,8 @@ title: system / errorp
     Eventually  efuns  will  be  modified to return standard error codes so
     that code like this will be possible:
 
-    if (errorp(result = efun_call()))
-    printf("error = %d\n", result);
+        if (errorp(result = efun_call()))
+            printf("error = %d\n", result);
 
     In future, there will also be a perror(result)  efun  to  return  error
     string that goes with a particular error integer.
@@ -27,3 +27,4 @@ title: system / errorp
 ### SEE ALSO
 
     nullp(3), undefinedp(3)
+

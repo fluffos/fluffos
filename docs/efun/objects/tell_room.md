@@ -16,3 +16,4 @@ title: objects / tell_room
 ### SEE ALSO
 
     message(3), write(3), shout(3), say(3), tell_object(3)
+

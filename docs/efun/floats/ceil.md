@@ -19,3 +19,4 @@ title: floats / ceil
 ### SEE ALSO
 
     floor(3), to_int(3), to_float(3)
+

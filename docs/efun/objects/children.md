@@ -18,9 +18,9 @@ title: objects / children
     loaded.   An example use of children() is to find all objects that have
     been cloned from the user object:
 
-    object *list;
+        object *list;
 
-    list = children("/obj/user");
+        list = children("/obj/user");
 
     This lets you find all users  (both  netdead  and  interactive  whereas
     users() only reports interactive users).
@@ -28,3 +28,4 @@ title: objects / children
 ### SEE ALSO
 
     deep_inherit_list(3), inherit_list(3), objects(3)
+

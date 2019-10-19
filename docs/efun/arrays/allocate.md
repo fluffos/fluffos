@@ -28,3 +28,4 @@ title: arrays / allocate
 ### SEE ALSO
 
     sizeof(3), allocate_mapping(3)
+

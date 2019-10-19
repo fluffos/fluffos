@@ -19,3 +19,4 @@ title: interactive / disable_wizard
 ### SEE ALSO
 
     enable_wizard(3), wizardp(3)
+

@@ -22,10 +22,11 @@ title: sockets / socket_error
 
     socket_error() returns:
 
-    a string describing the error on success.
+        a string describing the error on success.
 
-    "socket_error: invalid error number" on bad input.
+        "socket_error: invalid error number" on bad input.
 
 ### SEE ALSO
 
     socket_create(3), socket_connect(3)
+

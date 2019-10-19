@@ -21,9 +21,9 @@ title: sockets / socket_close
 
     socket_close() returns:
 
-    EESUCCESS on success.
+        EESUCCESS on success.
 
-    a negative value indicated below on error.
+        a negative value indicated below on error.
 
 ### ERRORS
 
@@ -36,3 +36,4 @@ title: sockets / socket_close
 ### SEE ALSO
 
     socket_accept(3), socket_create(3)
+

@@ -18,3 +18,4 @@ title: objects / master
 ### SEE ALSO
 
     find_object(3)
+

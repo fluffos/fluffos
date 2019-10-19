@@ -20,3 +20,4 @@ title: objects / clone_object
 ### SEE ALSO
 
     destruct(3), move_object(3), new(3)
+

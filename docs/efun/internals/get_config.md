@@ -20,3 +20,4 @@ title: internals / get_config
 ### SEE ALSO
 
     /include/runtime_config.h
+

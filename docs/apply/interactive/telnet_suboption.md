@@ -25,8 +25,9 @@ title: interactive / telnet_suboption
 
     Possible suboptions:
 
-    #define TELQUAL_IS    0 // option is...
-    #define TELQUAL_SEND  1 // send options
-    #define TELQUAL_INFO  2 // ENVIRON: informational version of IS
-    #define TELQUAL_REPLY 3 // AUTHENTICATION: client version of IS
-    #define TELQUAL_NAME  4 // AUTHENTICATION: client version of IS
+        #define TELQUAL_IS    0 // option is...
+        #define TELQUAL_SEND  1 // send options
+        #define TELQUAL_INFO  2 // ENVIRON: informational version of IS
+        #define TELQUAL_REPLY 3 // AUTHENTICATION: client version of IS
+        #define TELQUAL_NAME  4 // AUTHENTICATION: client version of IS
+

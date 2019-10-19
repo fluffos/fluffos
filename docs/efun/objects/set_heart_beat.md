@@ -24,3 +24,4 @@ title: objects / set_heart_beat
 ### SEE ALSO
 
     heart_beat(4), query_heart_beat(3)
+

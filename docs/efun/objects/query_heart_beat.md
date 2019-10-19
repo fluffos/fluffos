@@ -14,8 +14,10 @@ title: objects / query_heart_beat
 ### DESCRIPTION
 
     Returns  the  value with which set_heart_beat() has been called with on
-    the object has no heart beat, 0 will be returned.
+    'object'.  If object is not given, it defaults to the  current  object.
+    If the object has no heart beat, 0 will be returned.
 
 ### SEE ALSO
 
     heart_beat(4), set_heart_beat(3)
+

@@ -19,3 +19,4 @@ title: interactive / in_input
 ### SEE ALSO
 
     get_char(3), input_to(3)
+

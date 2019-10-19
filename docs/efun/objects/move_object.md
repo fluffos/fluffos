@@ -21,3 +21,4 @@ title: objects / move_object
 ### SEE ALSO
 
     this_object(3), move_or_destruct(4)
+

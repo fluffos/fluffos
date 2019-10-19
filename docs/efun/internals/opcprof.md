@@ -21,3 +21,4 @@ title: internals / opcprof
 ### SEE ALSO
 
     function_profile(3)
+
