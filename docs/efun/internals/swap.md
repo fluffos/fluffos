@@ -19,3 +19,4 @@ title: internals / swap
 
     Note:  objects which have been destructed, already swapped out, contain
     a heart beat, cloned, inherited, or interactive, cannot be swapped out.
+

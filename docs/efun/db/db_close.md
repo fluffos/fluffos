@@ -20,3 +20,4 @@ title: db / db_close
 ### SEE ALSO
 
     db_connect(3), db_status(3), valid_database(4)
+

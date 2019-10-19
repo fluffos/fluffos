@@ -20,3 +20,4 @@ title: objects / load_object
 ### SEE ALSO
 
     file_name(3), stat(3), find_object(3)
+

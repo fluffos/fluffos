@@ -21,3 +21,4 @@ title: floats / to_int
 ### SEE ALSO
 
     to_float(3), read_buffer(3), sprintf(3), sscanf(3)
+

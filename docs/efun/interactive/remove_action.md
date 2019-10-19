@@ -22,10 +22,11 @@ title: interactive / remove_action
 
     remove_action() returns:
 
-    1 on success.
+        1 on success.
 
-    0 on failure.
+        0 on failure.
 
 ### SEE ALSO
 
     add_action(3), query_verb(3), init(4)
+

@@ -17,20 +17,22 @@ title: arrays / sort_array
 
     The  first  form  returns an array with the same elements as 'arr', but
     quicksorted in ascending order according to the rules  in  'ob->fun()'.
-    return  -1, 0, or 1, depending on the relationship of the two arguments
+    'ob->fun()'  will  be  passed  two  arguments for each call.  It should
+    return -1, 0, or 1, depending on the relationship of the two  arguments
     (lesser, equal to, greater than).
 
     The second form does the same thing but allows a function pointer to be
     used instead.
 
-    The  third  form  returns an array with the same elements as 'arr', but
+    The third form returns an array with the same elements  as  'arr',  but
     quicksorted using built-in sort routines.  A 'direction' of 1 or 0 will
-    quicksort  in ascending order, while a 'direction' of -1 will quicksort
-    in descending order.  A limitation of the  built-in  sort  routines  is
+    quicksort in ascending order, while a 'direction' of -1 will  quicksort
+    in  descending  order.   A  limitation of the built-in sort routines is
     that the array must be homogeneous, composed entirely of a single type,
-    where that type is string, int, or float.  Arrays of arrays are  sorted
+    where  that type is string, int, or float.  Arrays of arrays are sorted
     by sorting based on the first element, making database sorts possible.
 
 ### SEE ALSO
 
     filter_array(3), map_array(3), strcmp(3)
+

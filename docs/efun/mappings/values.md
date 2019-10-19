@@ -6,7 +6,7 @@ title: mappings / values
 ### NAME
 
     values() - return an array of the values from the (key, value) pairs
-    in a mapping
+               in a mapping
 
 ### SYNOPSIS
 
@@ -19,13 +19,13 @@ title: mappings / values
 
     For example, if:
 
-    mapping m;
+        mapping m;
 
-    m = (["hp" : 35, "sp" : 42, "mass" : 100]);
+        m = (["hp" : 35, "sp" : 42, "mass" : 100]);
 
     then
 
-    values(m) == ({35, 42, 100})
+        values(m) == ({35, 42, 100})
 
     Note: the values will be returned in the same order as the  correspond‐
     ing keys.
@@ -33,3 +33,4 @@ title: mappings / values
 ### SEE ALSO
 
     keys(3), each(3)
+

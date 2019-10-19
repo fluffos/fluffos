@@ -20,3 +20,4 @@ title: mudlib / getuid
 
     seteuid(3),   geteuid(3),   export_uid(3),    this_object(3),    previ‐
     ous_object(3), creator_file(4), valid_seteuid(4)
+

@@ -30,3 +30,4 @@ title: interactive / query_ip_name
 ### SEE ALSO
 
     query_ip_number(3), query_host_name(3), resolve(3), socket_address(3)
+

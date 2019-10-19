@@ -19,3 +19,4 @@ title: mudlib / wizardp
 ### SEE ALSO
 
     disable_wizard(3), enable_wizard(3)
+

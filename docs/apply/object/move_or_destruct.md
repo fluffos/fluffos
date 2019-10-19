@@ -21,3 +21,4 @@ title: object / move_or_destruct
 ### SEE ALSO
 
     destruct(3), move_object(3), init(4)
+

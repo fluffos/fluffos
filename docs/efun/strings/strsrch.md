@@ -10,7 +10,7 @@ title: strings / strsrch
 ### SYNOPSIS
 
     int strsrch( string str, string substr | int char,
-    int flag );
+                 int flag );
 
 ### DESCRIPTION
 
@@ -28,3 +28,4 @@ title: strings / strsrch
 ### SEE ALSO
 
     explode(3), sscanf(3), replace_string(3), regexp(3)
+

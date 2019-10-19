@@ -20,3 +20,4 @@ title: filesystem / file_size
 ### SEE ALSO
 
     stat(3), get_dir(3)
+

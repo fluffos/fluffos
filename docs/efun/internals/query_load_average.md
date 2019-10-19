@@ -19,3 +19,4 @@ title: internals / query_load_average
 ### SEE ALSO
 
     rusage(3)
+

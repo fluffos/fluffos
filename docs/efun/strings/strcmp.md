@@ -23,3 +23,4 @@ title: strings / strcmp
 ### SEE ALSO
 
     sort_array(3)
+

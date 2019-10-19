@@ -12,7 +12,7 @@ title: sockets / socket_release
     #include <socket_err.h>
 
     int socket_release( int socket, object ob,
-    string release_callback );
+                        string release_callback );
 
 ### DESCRIPTION
 
@@ -42,3 +42,4 @@ title: sockets / socket_release
 ### SEE ALSO
 
     socket_acquire(3)
+

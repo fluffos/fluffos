@@ -19,3 +19,4 @@ title: system / deep_inherit_list
 ### SEE ALSO
 
     inherit_list(3), inherits(3)
+

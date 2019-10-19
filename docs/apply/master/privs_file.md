@@ -25,3 +25,4 @@ title: master / privs_file
 ### SEE ALSO
 
     query_privs(3), set_privs(3)
+

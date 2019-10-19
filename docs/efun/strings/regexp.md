@@ -74,13 +74,15 @@ title: strings / regexp
     string—since it must respect the earlier choice.
 
     In  the particular case where no '|'s are present and there is only one
-    match will be chosen.  So 'ab*', presented with 'xabbbby',  will  match
-    'abbbb'.   Note  that  if  'ab*'  is tried against 'xabyabbbz', it will
-    match 'ab' just after  'x',  due  to  the  begins-earliest  rule.   (In
+    '*', '+', or '?', the net effect is that  the  longest  possible  match
+    will  be  chosen.   So  'ab*',  presented  with  'xabbbby',  will match
+    'abbbb'.  Note that if 'ab*' is  tried  against  'xabyabbbz',  it  will
+    match  'ab'  just  after  'x',  due  to  the begins-earliest rule.  (In
     effect, the decision on where to start the match is the first choice to
-    be made, hence subsequent choices must respect it even  if  this  leads
+    be  made,  hence  subsequent choices must respect it even if this leads
     them to less-preferred alternatives.)
 
 ### SEE ALSO
 
     sscanf(3), explode(3), strsrch(3), ed(3)
+

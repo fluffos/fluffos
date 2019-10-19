@@ -19,11 +19,11 @@ title: parsing / process_string
 
     The syntactic patterns are on the form:
 
-    "@@function[:filename][|arg1|arg2....|argN]@@"
+          "@@function[:filename][|arg1|arg2....|argN]@@"
 
     This is interpreted as a call:
 
-    filename->function(arg1, arg2, ....., argN)
+           filename->function(arg1, arg2, ....., argN)
 
     Note  that  process_string  does  not recurse over returned replacement
     values. If a function returns another syntactic pattern, that  descrip‐
@@ -50,9 +50,10 @@ title: parsing / process_string
 ### EXAMPLE
 
     A string:
-    "You are chased by @@query_the_name:/obj/monster#123@@ eastward."
+        "You are chased by @@query_the_name:/obj/monster#123@@ eastward."
 
     is replaced by:
-    "You are chased by the orc eastward."
+        "You are chased by the orc eastward."
 
     Assuming that query_the_name in monster#123 returns "the orc".
+

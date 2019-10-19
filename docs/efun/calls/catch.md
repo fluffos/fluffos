@@ -26,3 +26,4 @@ title: calls / catch
 ### SEE ALSO
 
     error(3), throw(3), error_handler(4)
+

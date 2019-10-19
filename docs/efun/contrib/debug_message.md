@@ -15,3 +15,4 @@ title: contrib / debug_message
 
     Prints  the  given message on the <stderr> file desciptor of the driver
     and appends it to the debug log.
+

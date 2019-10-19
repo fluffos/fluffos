@@ -17,3 +17,4 @@ title: interactive / terminal_type
     terminal type for the user, as reported by telnet negotiation.  If  the
     user's  client  never responds (it's not telnet, for example) this will
     never be called.
+

@@ -1,15 +1,18 @@
 ---
 layout: default
-title: general / call_into_vm.md
+title: general / call_into_vm
 ---
 
-Author: sunyucong@gmail.com
-Date: 2017-08-29
+### Author
+sunyucong@gmail.com
+
+### Date
+2017-08-29
 
 Driver code are consisted of roughly 2 parts.
 
-1. VM related code. This is the LPC vm and assoicated stack machine. All EFUN functions also belongs to this part.
-2. Non VM code, this mostly incldue communication related stuff.
+1. VM related code. This is the LPC vm and associated stack machine. All EFUN functions also belongs to this part.
+2. Non VM code, this mostly includes communication related stuff.
 
 To execute LPC, Non VM code needs to do some preparations:
 
@@ -33,7 +36,7 @@ However, several parts of driver can't use these functions, instead they are usi
 3. call_program()
 
 For these code, the only correct way of doing this is documented here.
-'''
+```
 // use push_number() , push_malloc_string() etc to push arguments into stack
 num_arg = X; // MUST remember how many arguments were pushed.
 
@@ -51,10 +54,10 @@ num_arg = X; // MUST remember how many arguments were pushed.
     }
     pop_context(&econ);
 
-'''
+```
 
 (unfinished)
 LPC VM use C++ Exception to handle _any_ error encountered during LPC execution. This could come from following non-exausted list
 
-1. error generated from 'throw()'' in LPC code.
+1. error generated from 'throw()' in LPC code.
 2. 'error()' function from EFUN implementations.

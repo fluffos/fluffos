@@ -21,13 +21,13 @@ title: system / function_profile
 
     An  array  of  mappings is returned, one for each function in 'ob', the
     format of the mapping is:
-    ([ "name"     : name_of_the_function,
-    "calls"    : number_of_calls,
+           ([ "name"     : name_of_the_function,
+              "calls"    : number_of_calls,
 
-    /* cpu time expressed in microseconds */
-    "self"     : cpu_time_spent_in self,
-    "children" : cpu_time_spent_in_children
-    ])
+              /* cpu time expressed in microseconds */
+              "self"     : cpu_time_spent_in self,
+              "children" : cpu_time_spent_in_children
+           ])
     The usefulness of this is tied to the resolution of the CPU clock--even
     though  the  units  are microseconds, the CPU timer resolution is often
     much less
@@ -35,3 +35,4 @@ title: system / function_profile
 ### SEE ALSO
 
     rusage(3), time_expression(3), opcprof(3)
+

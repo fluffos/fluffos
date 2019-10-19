@@ -17,3 +17,4 @@ title: ed / ed_cmd
 
     The  command  'cmd' is sent to the active ed session, and the resulting
     output is returned.
+

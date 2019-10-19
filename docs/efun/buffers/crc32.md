@@ -15,3 +15,4 @@ title: buffers / crc32
 
     Computes  and  returns  the CRC-32 code for the given buffer or string,
     'x'.
+

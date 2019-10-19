@@ -28,3 +28,4 @@ title: general / typeof
 ### SEE ALSO
 
     allocate(3), allocate_mapping(3), strlen(3)
+

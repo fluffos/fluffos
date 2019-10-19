@@ -41,3 +41,4 @@ title: interactive / add_action
 ### SEE ALSO
 
     query_verb(3), remove_action(3), init(4)
+

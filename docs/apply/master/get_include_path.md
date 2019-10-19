@@ -27,8 +27,9 @@ title: master / get_include_path
 ### EXAMPLE
 
     string *get_include_path(string file) {
-    string *t = explode(file, "/");
-    if(t[1] == "Domain")    // Domains have their own include directory
-    return ({ "/Domain/" + t[2] + "/include", ":DEFAULT:" });
-    else                    // use default for others
-    return ({ ":DEFAULT:" }); }
+        string *t = explode(file, "/");
+        if(t[1] == "Domain")    // Domains have their own include directory
+            return ({ "/Domain/" + t[2] + "/include", ":DEFAULT:" });
+        else                    // use default for others
+            return ({ ":DEFAULT:" }); }
+

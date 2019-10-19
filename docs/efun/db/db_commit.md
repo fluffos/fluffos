@@ -24,3 +24,4 @@ title: db / db_commit
 ### SEE ALSO
 
     db_exec(3), db_rollback(3), valid_database(4)
+

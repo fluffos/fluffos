@@ -17,10 +17,10 @@ title: mappings / allocate_mapping
 
     For example:
 
-    mapping x;
-    int y = 200;
+        mapping x;
+        int y = 200;
 
-    x = allocate_mapping(y);
+        x = allocate_mapping(y);
 
     where  y is the initial size of the mapping.  Using allocate_mapping is
     the preferred way to initalize the mapping if you have some idea of how
@@ -39,3 +39,4 @@ title: mappings / allocate_mapping
 ### SEE ALSO
 
     map_delete(3)
+

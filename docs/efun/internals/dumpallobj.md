@@ -22,3 +22,4 @@ title: internals / dumpallobj
 ### SEE ALSO
 
     mud_status(3), debug_info(3)
+

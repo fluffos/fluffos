@@ -24,3 +24,4 @@ title: master / valid_hide
 ### SEE ALSO
 
     set_hide(3)
+

@@ -18,3 +18,4 @@ title: floats / cos
 ### SEE ALSO
 
     acos(3), asin(3), atan(3), sin(3), tan(3)
+

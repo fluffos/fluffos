@@ -31,17 +31,19 @@ title: strings / replace_string
     The  4th and 5th arguments are optional (to retain backward compatibil‐
     ity.)  The extra arguments have the following effect:
 
-    4 args The 4th argument specifies the maximum number of replacements to
-    make  (the  count  starts  at  1). A value of 0 implies 'replace
-    all', and thus, acts as replace_string() with 3 arguments would.
-    E.g., replace_string("xyxx", "x", "z", 2) would return "zyzx".
+    4 args
+        The 4th argument specifies the maximum number  of  replacements  to
+        make  (the  count starts at 1). A value of 0 implies 'replace all',
+        and thus, acts as replace_string() with 3  arguments  would.  E.g.,
+        replace_string("xyxx", "x", "z", 2) would return "zyzx".
 
-    5 args The  4th  and  5th  arguments  specify  the  range of matches to
-    replace between, with the following constraints:
-    - first < 1 : change all from the start.
-    - last == 0, or last > max_matches : change all to end
-    - first > last : return the unmodified array.
-    E.g., replace_string("xyxxy", "x", "z", 2, 3) returns "xyzzy".
+    5 args
+        The  4th  and 5th arguments specify the range of matches to replace
+        between, with the following constraints:
+        - first < 1 : change all from the start.
+        - last == 0, or last > max_matches : change all to end
+        - first > last : return the unmodified array.
+        E.g., replace_string("xyxxy", "x", "z", 2, 3) returns "xyzzy".
 
 ### SEE ALSO
 
@@ -50,3 +52,4 @@ title: strings / replace_string
 ### AUTHOR
 
     Zak@TMI-2 wrote the range constraint additions.
+

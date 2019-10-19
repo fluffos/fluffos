@@ -19,3 +19,4 @@ title: interactive / find_player
 ### SEE ALSO
 
     lower_case(3), find_living(3), livings(3), users(3), set_living_name(3)
+

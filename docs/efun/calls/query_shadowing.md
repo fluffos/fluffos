@@ -20,3 +20,4 @@ title: calls / query_shadowing
 ### SEE ALSO
 
     shadow(3), objectp(3), query_shadowing(3), valid_shadow(4)
+

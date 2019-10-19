@@ -19,3 +19,4 @@ title: strings / lower_case
 ### SEE ALSO
 
     capitalize(3)
+

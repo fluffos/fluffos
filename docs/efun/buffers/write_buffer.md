@@ -11,7 +11,7 @@ title: buffers / write_buffer
 ### SYNOPSIS
 
     int write_buffer( string | buffer dest, int start,
-    mixed source );
+                      mixed source );
 
 ### DESCRIPTION
 
@@ -30,3 +30,4 @@ title: buffers / write_buffer
 ### AUTHOR
 
     Truilkan
+

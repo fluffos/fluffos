@@ -22,3 +22,4 @@ title: objects / reload_object
 ### SEE ALSO
 
     export_uid(3), new(3), clone_object(3), destruct(3)
+

@@ -10,7 +10,7 @@ title: strings / break_string
 ### SYNOPSIS
 
     string break_string( string str | int foobar, int len,
-    void | int indent | string indent );
+                         void | int indent | string indent );
 
 ### DESCRIPTION
 
@@ -37,3 +37,4 @@ title: strings / break_string
 ### SEE ALSO
 
     implode(3), explode(3), sprintf(3)
+

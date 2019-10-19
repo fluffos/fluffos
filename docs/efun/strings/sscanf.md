@@ -10,7 +10,7 @@ title: strings / sscanf
 ### SYNOPSIS
 
     int sscanf( string str, string fmt,
-    mixed var1, mixed var2 ... );
+                mixed var1, mixed var2 ... );
 
 ### DESCRIPTION
 
@@ -32,3 +32,4 @@ title: strings / sscanf
 ### SEE ALSO
 
     explode(3), replace_string(3), strsrch(3)
+

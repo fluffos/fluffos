@@ -22,22 +22,22 @@ title: internals / rusage
 
     Here is an example usage of rusage():
 
-    void
-    create()
-    {
-    mapping info;
+      void
+      create()
+      {
+          mapping info;
 
-    info = rusage();
-    write("user time = " + info["utime"] + "ms\n");
-    write("system time = " + info["stime"] + "ms\n");
-    }
+          info = rusage();
+          write("user time = " + info["utime"] + "ms\n");
+          write("system time = " + info["stime"] + "ms\n");
+      }
 
     The available fields are:
 
-    utime, stime,  maxrss,  ixrss,  idrss,  isrss,  minflt,  majflt,
-    nswap,   inblock,  oublock,  msgsnd,  msgrcv,  nsignals,  nvcsw,
-    nivcsw.
+        utime, stime, maxrss, ixrss, idrss, isrss, minflt,  majflt,  nswap,
+        inblock, oublock, msgsnd, msgrcv, nsignals, nvcsw, nivcsw.
 
 ### SEE ALSO
 
     time_expression(3), function_profile(3), time(3), uptime(3)
+

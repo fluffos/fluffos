@@ -10,7 +10,7 @@ title: master / valid_socket
 ### SYNOPSIS
 
     int valid_socket( object caller, string function,
-    mixed *info );
+                      mixed *info );
 
 ### DESCRIPTION
 
@@ -26,3 +26,4 @@ title: master / valid_socket
     the array is the address (string) of the remote end of the socket.  The
     fourth  element  of  the  array  is the port number associated with the
     socket.
+

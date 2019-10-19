@@ -20,3 +20,4 @@ title: mudlib / set_privs
 ### SEE ALSO
 
     privs_file(4), query_privs(3)
+

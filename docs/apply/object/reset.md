@@ -25,3 +25,4 @@ title: object / reset
 ### SEE ALSO
 
     set_reset(3), create(4)
+

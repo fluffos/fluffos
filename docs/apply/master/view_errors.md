@@ -20,3 +20,4 @@ title: master / view_errors
 ### SEE ALSO
 
     MUDLIB_ERROR_HANDER(3)
+

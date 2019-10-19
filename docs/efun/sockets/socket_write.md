@@ -12,7 +12,7 @@ title: sockets / socket_write
     #include <socket_err.h>
 
     int socket_write( int s, mixed message,
-    void | string address );
+                      void | string address );
 
 ### DESCRIPTION
 
@@ -25,9 +25,9 @@ title: sockets / socket_write
 
     socket_write() returns:
 
-    EESUCCESS on success.
+        EESUCCESS on success.
 
-    a negative value indicated below on error.
+        a negative value indicated below on error.
 
 ### ERRORS
 
@@ -62,3 +62,4 @@ title: sockets / socket_write
 ### SEE ALSO
 
     socket_connect(3), socket_create(3)
+

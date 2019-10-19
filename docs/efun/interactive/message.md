@@ -10,7 +10,7 @@ title: interactive / message
 ### SYNOPSIS
 
     void message( mixed class, string message, mixed target,
-    mixed exclude );
+                  mixed exclude );
 
 ### DESCRIPTION
 
@@ -34,3 +34,4 @@ title: interactive / message
 ### SEE ALSO
 
     say(3), write(3), shout(3), tell_object(3), tell_room(3)
+

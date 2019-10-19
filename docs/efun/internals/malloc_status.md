@@ -22,3 +22,4 @@ title: internals / malloc_status
 ### SEE ALSO
 
     mud_status(3), dumpallobj(3), memory_info(3)
+

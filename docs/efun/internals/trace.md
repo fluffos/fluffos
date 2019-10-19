@@ -18,23 +18,24 @@ title: internals / trace
 
     The trace bits are:
 
-    Trace all function calls to lfuns.
+    1   Trace all function calls to lfuns.
 
-    Trace all calls to "call_other".
+    2   Trace all calls to "call_other".
 
-    Trace all function returns.
+    4   Trace all function returns.
 
-    Print arguments at function calls and return values.
+    8   Print arguments at function calls and return values.
 
-    Print all executed stack machine instructions (produces a lot  of  out‐
-    put!).
+    16  Print all executed stack machine instructions (produces  a  lot  of
+        output!).
 
-    Enable trace in heart beat functions.
+    32  Enable trace in heart beat functions.
 
-    Trace calls to apply.
+    64  Trace calls to apply.
 
-    Show object name in tracing.
+    128 Show object name in tracing.
 
 ### SEE ALSO
 
     traceprefix(3)
+

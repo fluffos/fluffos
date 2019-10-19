@@ -19,3 +19,4 @@ title: master / make_path_absolute
 ### SEE ALSO
 
     ed(3)
+
