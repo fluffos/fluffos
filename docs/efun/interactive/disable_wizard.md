@@ -7,14 +7,17 @@ title: interactive / disable_wizard
 
     disable_wizard() - remove wizard priveleges from an object
 
+
 ### SYNOPSIS
 
     void disable_wizard( void );
+
 
 ### DESCRIPTION
 
     The  opposite  of enable_wizard().  Disables wizard privileges from the
     current object.
+
 
 ### SEE ALSO
 

@@ -8,9 +8,11 @@ title: internals / time_expression
     time_expression()  -  return the amount of real time that an expression
     took
 
+
 ### SYNOPSIS
 
     int time_expression( mixed expr );
+
 
 ### DESCRIPTION
 
@@ -18,6 +20,7 @@ title: internals / time_expression
     ation  of  <expr>,  in microseconds, is returned.  The precision of the
     value is not necessarily 1 microsecond; in fact, it  probably  is  much
     less precise.
+
 
 ### SEE ALSO
 

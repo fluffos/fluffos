@@ -7,9 +7,11 @@ title: interactive / resolve
 
     resolve() - resolve an internet address to domain name, or vice versa
 
+
 ### SYNOPSIS
 
     int resolve( string address, string callback_func );
+
 
 ### DESCRIPTION
 
@@ -20,9 +22,13 @@ title: interactive / resolve
 
     void callback(string address, string resolved, int key);
 
-    decimal ip address.  The unknown value will be 0 if the lookup failed.
+    'key' will match  up  with  the  number  that  the  call  to  resolve()
+    returned.   'address'  will  be  the  domain  name  of  the  host,  and
+    'resolved' the dotted decimal ip address.  The unknown value will be  0
+    if the lookup failed.
+
 
 ### SEE ALSO
 
-    query_host_name(3), socket_address(3), query_ip_name(3),  query_ip_num‐
+    query_host_name(3),  socket_address(3), query_ip_name(3), query_ip_num‐
     ber(3)

@@ -7,9 +7,11 @@ title: internals / swap
 
     swap - swap out a file explicitly
 
+
 ### SYNOPSIS
 
     void swap( object );
+
 
 ### DESCRIPTION
 

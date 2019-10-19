@@ -7,9 +7,11 @@ title: functions / bind
 
     bind() - change the owner of a function pointer
 
+
 ### SYNOPSIS
 
     function bind(function f, object ob)
+
 
 ### DESCRIPTION
 
@@ -21,11 +23,11 @@ title: functions / bind
     For example:
 
     void make_living(object ob) {
-    function f;
+       function f;
 
-    f = bind( (: enable_commands :), ob );
+       f = bind( (: enable_commands :), ob );
 
-    evaluate(f); }
+       evaluate(f); }
 
     The effect of the above is the same as if 'ob' itself had evaluated the
     enable_commands() efun.  Note that there are security risks involved in

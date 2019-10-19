@@ -7,9 +7,11 @@ title: internals / rusage
 
     rusage() - reports information gathered by the getrusage() system call
 
+
 ### SYNOPSIS
 
     mapping rusage( void );
+
 
 ### DESCRIPTION
 
@@ -22,21 +24,21 @@ title: internals / rusage
 
     Here is an example usage of rusage():
 
-    void
-    create()
-    {
-    mapping info;
+      void
+      create()
+      {
+          mapping info;
 
-    info = rusage();
-    write("user time = " + info["utime"] + "ms\n");
-    write("system time = " + info["stime"] + "ms\n");
-    }
+          info = rusage();
+          write("user time = " + info["utime"] + "ms\n");
+          write("system time = " + info["stime"] + "ms\n");
+      }
 
     The available fields are:
 
-    utime, stime,  maxrss,  ixrss,  idrss,  isrss,  minflt,  majflt,
-    nswap,   inblock,  oublock,  msgsnd,  msgrcv,  nsignals,  nvcsw,
-    nivcsw.
+        utime, stime, maxrss, ixrss, idrss, isrss, minflt,  majflt,  nswap,
+        inblock, oublock, msgsnd, msgrcv, nsignals, nvcsw, nivcsw.
+
 
 ### SEE ALSO
 

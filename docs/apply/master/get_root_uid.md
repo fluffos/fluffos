@@ -7,9 +7,11 @@ title: master / get_root_uid
 
     get_root_uid - get the root uid
 
+
 ### SYNOPSIS
 
     string get_root_uid( void );
+
 
 ### DESCRIPTION
 
@@ -17,6 +19,7 @@ title: master / get_root_uid
     object, to verify that the master object has loaded,  and  to  get  the
     root  uid  defined by the mud.  The function should return a string, eg
     "ROOT"
+
 
 ### SEE ALSO
 

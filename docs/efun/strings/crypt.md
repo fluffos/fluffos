@@ -7,9 +7,11 @@ title: strings / crypt
 
     crypt() - encrypt a string
 
+
 ### SYNOPSIS
 
     string crypt( string str, string seed );
+
 
 ### DESCRIPTION
 

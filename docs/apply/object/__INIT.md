@@ -7,9 +7,11 @@ title: object / __INIT
 
     __INIT - obsolete apply
 
+
 ### SYNOPSIS
 
     __INIT( void );
+
 
 ### DESCRIPTION
 

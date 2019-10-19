@@ -7,13 +7,15 @@ title: sockets / socket_acquire
 
     socket_acquire() - assume ownership of a socket
 
+
 ### SYNOPSIS
 
     #include <socket_err.h>
 
     int socket_acquire( int socket, string read_callback,
-    string write_callback,
-    string close_callback );
+                        string write_callback,
+                        string close_callback );
+
 
 ### DESCRIPTION
 
@@ -36,6 +38,7 @@ title: sockets / socket_acquire
 
     socket_acquire() may only be called within the context of  thr  release
     callback function and only with the socket specified.
+
 
 ### SEE ALSO
 

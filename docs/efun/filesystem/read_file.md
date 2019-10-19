@@ -7,10 +7,12 @@ title: filesystem / read_file
 
     read_file() - read a file into a string
 
+
 ### SYNOPSIS
 
     string read_file( string file, int start_line,
-    int number_of_lines );
+                      int number_of_lines );
+
 
 ### DESCRIPTION
 
@@ -21,6 +23,7 @@ title: filesystem / read_file
     The  start_line  is the line number of the line you wish to read.  This
     routine will return 0 if you try to read past the end of the  file,  or
     if you try to read from a nonpositive line.
+
 
 ### SEE ALSO
 

@@ -7,9 +7,11 @@ title: system / reclaim_objects
 
     reclaim_objects - reclaim any lingering objets
 
+
 ### SYNOPSIS
 
     int reclaim_objects( void );
+
 
 ### DESCRIPTION
 
@@ -19,6 +21,7 @@ title: system / reclaim_objects
     cally left lingering when a global variable in  more  than  one  object
     contains  a  pointer  to it, and the object gets destructed.  This efun
     returns the number of destructed objects encountered in variables.
+
 
 ### SEE ALSO
 

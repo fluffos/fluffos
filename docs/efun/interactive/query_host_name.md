@@ -7,21 +7,25 @@ title: interactive / query_host_name
 
     query_host_name() - return the host name
 
+
 ### SYNOPSIS
 
     string query_host_name( void );
+
 
 ### DESCRIPTION
 
     query_host_name() returns the name of the host.
 
+
 ### RETURN VALUES
 
     query_host_name() returns:
 
-    a string hostname on success.
+        a string hostname on success.
 
-    an empty string on failure.
+        an empty string on failure.
+
 
 ### SEE ALSO
 

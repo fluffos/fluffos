@@ -7,9 +7,11 @@ title: ed / ed_start
 
     ed_start() - start an ed session
 
+
 ### SYNOPSIS
 
     string ed_start(string file | void, int restricted | void)
+
 
 ### DESCRIPTION
 

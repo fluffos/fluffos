@@ -7,14 +7,17 @@ title: floats / log
 
     log() - returns the natural logarithm of a float
 
+
 ### SYNOPSIS
 
     float log( float f );
+
 
 ### DESCRIPTION
 
     Returns  the natural logarithm of its argument, 'f'.  'f' must be posi‐
     tive.
+
 
 ### SEE ALSO
 

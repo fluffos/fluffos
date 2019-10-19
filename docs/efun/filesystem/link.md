@@ -7,9 +7,11 @@ title: filesystem / link
 
     link() - link a file to another
 
+
 ### SYNOPSIS
 
     void link( string original, string reference );
+
 
 ### DESCRIPTION
 
@@ -20,6 +22,7 @@ title: filesystem / link
     same arguments.
 
     Note: This efun creates a hard link, not a symbolic one.
+
 
 ### SEE ALSO
 

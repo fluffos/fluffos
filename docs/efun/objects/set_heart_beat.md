@@ -7,9 +7,11 @@ title: objects / set_heart_beat
 
     set_heart_beat() - enable or disable an object's heartbeat
 
+
 ### SYNOPSIS
 
     int set_heart_beat( int flag );
+
 
 ### DESCRIPTION
 
@@ -20,6 +22,7 @@ title: objects / set_heart_beat
     ber  of heart beats inbetween calls to heart_beat(), however your local
     administrator may have the system configured to treat any 'flag'  above
     1 as 1.
+
 
 ### SEE ALSO
 

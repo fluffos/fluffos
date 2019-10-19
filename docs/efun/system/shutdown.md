@@ -7,9 +7,11 @@ title: system / shutdown
 
     shutdown() - shutdown the driver
 
+
 ### SYNOPSIS
 
     void shutdown( int how );
+
 
 ### DESCRIPTION
 
@@ -24,6 +26,7 @@ title: system / shutdown
     with  exec(),  the  way to make it secure is to add a simul_efun of the
     same name which does the appropriate security checks.  Be sure  to  set
     valid_override(4) up (in master.c) to protect against efun::shutdown().
+
 
 ### SEE ALSO
 

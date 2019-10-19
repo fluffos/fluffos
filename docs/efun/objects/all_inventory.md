@@ -7,13 +7,16 @@ title: objects / all_inventory
 
     all_inventory() - return the inventory of an object
 
+
 ### SYNOPSIS
 
     object *all_inventory( object ob );
 
+
 ### DESCRIPTION
 
     Returns an array of the objects contained in the inventory of <ob>.
+
 
 ### SEE ALSO
 

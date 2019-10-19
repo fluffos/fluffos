@@ -7,9 +7,11 @@ title: master / get_include_path
 
     get_include_path - decide include path based on object
 
+
 ### SYNOPSIS
 
     mixed get_include_path( string object_path );
+
 
 ### DESCRIPTION
 
@@ -24,11 +26,12 @@ title: master / get_include_path
     string ":DEFAULT:" which will be replaced be the include path as set by
     the runtime configuration of the driver.
 
+
 ### EXAMPLE
 
     string *get_include_path(string file) {
-    string *t = explode(file, "/");
-    if(t[1] == "Domain")    // Domains have their own include directory
-    return ({ "/Domain/" + t[2] + "/include", ":DEFAULT:" });
-    else                    // use default for others
-    return ({ ":DEFAULT:" }); }
+        string *t = explode(file, "/");
+        if(t[1] == "Domain")    // Domains have their own include directory
+            return ({ "/Domain/" + t[2] + "/include", ":DEFAULT:" });
+        else                    // use default for others
+            return ({ ":DEFAULT:" }); }

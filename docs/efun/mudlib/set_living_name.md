@@ -7,14 +7,17 @@ title: mudlib / set_living_name
 
     set_living_name() - set a living name for a living object
 
+
 ### SYNOPSIS
 
     void set_living_name( string name );
+
 
 ### DESCRIPTION
 
     Set  a  living  name  on  an object that is living. After this has been
     done, the object can be found with "find_living()".
+
 
 ### SEE ALSO
 

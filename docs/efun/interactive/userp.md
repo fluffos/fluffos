@@ -7,13 +7,16 @@ title: interactive / userp
 
     userp() - determine if a given object was once interactive
 
+
 ### SYNOPSIS
 
     int userp( object );
 
+
 ### DESCRIPTION
 
     Returns 1 if the arg was once interactive.
+
 
 ### SEE ALSO
 

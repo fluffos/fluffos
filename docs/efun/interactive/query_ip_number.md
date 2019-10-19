@@ -7,14 +7,17 @@ title: interactive / query_ip_number
 
     query_ip_number() - return the ip number for a player object
 
+
 ### SYNOPSIS
 
     string query_ip_number( object ob );
+
 
 ### DESCRIPTION
 
     Return  the  ip-number  (dotted  decimal  form or IPv6 form) for player
     'ob'.
+
 
 ### SEE ALSO
 

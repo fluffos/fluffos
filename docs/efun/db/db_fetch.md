@@ -7,9 +7,11 @@ title: db / db_fetch
 
     db_fetch() - fetches a ruslt set
 
+
 ### SYNOPSIS
 
     mixed *db_fetch( int handle, int row );
+
 
 ### DESCRIPTION
 
@@ -19,21 +21,23 @@ title: db / db_fetch
     Returns an array of columns of the named  row  upon  success  an  error
     string otherwise.
 
+
 ### EXAMPLE
 
     string *res; mixed rows; int dbconn, i;
 
     dbconn = db_connect("db.server", "db_mud"); if(dbconn < 1)
-    return  0;  rows  =  db_exec(dbconn,  "SELECT player_name, exp FROM
+        return  0;  rows  =  db_exec(dbconn,  "SELECT player_name, exp FROM
     t_player"); if(!rows)
-    write("No rows return3d."); else if(stringp(rows))  /* error */
-    write(rows); else
-    for(i = 1; i <= rows; i++)
-    {
-    res = db_fetch(dbconn, i);
-    write(res[0]);
-    write(res[1]);
-    } db_close(dbconn);
+        write("No rows return3d."); else if(stringp(rows))  /* error */
+        write(rows); else
+        for(i = 1; i <= rows; i++)
+        {
+            res = db_fetch(dbconn, i);
+            write(res[0]);
+            write(res[1]);
+        } db_close(dbconn);
+
 
 ### SEE ALSO
 

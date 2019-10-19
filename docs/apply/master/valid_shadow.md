@@ -7,9 +7,11 @@ title: master / valid_shadow
 
     valid_shadow - controls which objects can be shadowed
 
+
 ### SYNOPSIS
 
     int valid_shadow( object ob );
+
 
 ### DESCRIPTION
 
@@ -19,6 +21,7 @@ title: master / valid_shadow
     shadow.  valid_shadow() should return 0 if the  shadow  should  not  be
     permitted,  in which case the shadow() call will return 0 and fail.  If
     valid_shadow() returns 1, the shadow is allowed.
+
 
 ### SEE ALSO
 

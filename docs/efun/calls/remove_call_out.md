@@ -7,9 +7,11 @@ title: calls / remove_call_out
 
     remove_call_out() - remove a pending call_out
 
+
 ### SYNOPSIS
 
     int remove_call_out( string fun ); int remove_call_out();
+
 
 ### DESCRIPTION
 
@@ -20,6 +22,7 @@ title: calls / remove_call_out
 
     In the second form all pending call outs for the current object will be
     removed.  In this case the return value is always 0.
+
 
 ### SEE ALSO
 

@@ -7,13 +7,16 @@ title: strings / strlen
 
     strlen() - returns the length of a string
 
+
 ### SYNOPSIS
 
     int strlen( string str );
 
+
 ### DESCRIPTION
 
     strlen() returns the number of characters in the string 'str'.
+
 
 ### SEE ALSO
 

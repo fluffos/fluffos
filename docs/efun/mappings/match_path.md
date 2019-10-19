@@ -7,9 +7,11 @@ title: mappings / match_path
 
     match_path() - search a mapping for a path
 
+
 ### SYNOPSIS
 
     mixed match_path( mapping m, string str );
+
 
 ### DESCRIPTION
 
@@ -18,6 +20,7 @@ title: mappings / match_path
     largest matching path in the mapping.  Keys ended in '/' are assumed to
     match paths with character that follow the '/', i.e. /  is  a  wildcard
     for anything below this directory.
+
 
 ### AUTHOR
 

@@ -7,14 +7,17 @@ title: mudlib / export_uid
 
     export_uid() - set the uid of another object
 
+
 ### SYNOPSIS
 
     int export_uid( object ob );
+
 
 ### DESCRIPTION
 
     Set  the  uid of <ob> to the effective uid of this_object(). It is only
     possible when <ob> has an effective uid of 0.
+
 
 ### SEE ALSO
 

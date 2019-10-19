@@ -7,14 +7,17 @@ title: system / max_eval_cost
 
     max_eval_cost() - returns the maximum evaluation cost
 
+
 ### SYNOPSIS
 
     void max_eval_cost()
+
 
 ### DESCRIPTION
 
     max_eval_cost() returns the number of instructions that can be executed
     before the driver decides it is in an infinite loop.
+
 
 ### SEE ALSO
 

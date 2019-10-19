@@ -7,9 +7,11 @@ title: buffers / crc32
 
     crc32() - compute the cycle redundancy code for a buffer or string
 
+
 ### SYNOPSIS
 
     int crc32( buffer | string x );
+
 
 ### DESCRIPTION
 

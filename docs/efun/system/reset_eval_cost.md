@@ -7,14 +7,17 @@ title: system / reset_eval_cost
 
     reset_eval_cost() - resets the evaluation cost remaining
 
+
 ### SYNOPSIS
 
     void reset_eval_cost();
+
 
 ### DESCRIPTION
 
     reset_eval_cost(),  resets the evaluation cost remaining to the maximum
     evaluation cost.
+
 
 ### SEE ALSO
 

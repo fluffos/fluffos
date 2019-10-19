@@ -7,12 +7,14 @@ title: sockets / socket_accept
 
     socket_accept() - accept a connection on a socket
 
+
 ### SYNOPSIS
 
     #include <socket_err.h>
 
     int socket_accept( int s, string read_callback,
-    string write_callback );
+                       string write_callback );
+
 
 ### DESCRIPTION
 
@@ -31,7 +33,7 @@ title: sockets / socket_accept
     call when the new socket (not the accepting socket) receives data.  The
     write callback should follow this format:
 
-    void read_callback(int fd)
+        void read_callback(int fd)
 
     Where fd is the socket which is ready to accept data.
 
@@ -39,7 +41,7 @@ title: sockets / socket_accept
     call  when  the  new  socket  (not the accepting socket) is ready to be
     written to. The write callback should follow this format:
 
-    void write_callback(int fd)
+        void write_callback(int fd)
 
     Where fd is the socket which is ready to be written to.
 
@@ -48,9 +50,10 @@ title: sockets / socket_accept
     of a socket_close(3) call. The close callback should follow  this  for‐
     mat:
 
-    void close_callback(int fd)
+        void close_callback(int fd)
 
     Where fd is the socket which has closed.
+
 
 ### RETURN VALUES
 
@@ -58,6 +61,7 @@ title: sockets / socket_accept
     socket  on  success.  On  failure,  it  returns   a   negative   value.
     socket_error(3)  can be used on the return value to get a text descrip‐
     tion of the error.
+
 
 ### ERRORS
 
@@ -78,6 +82,7 @@ title: sockets / socket_accept
     EEACCEPT       Problem with accept.
 
     EENOSOCKS      No more available efun sockets.
+
 
 ### SEE ALSO
 

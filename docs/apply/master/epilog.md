@@ -8,10 +8,12 @@ title: master / epilog
     epilog  -  returns  an array of the filenames of the objects to be pre‐
     loaded.
 
+
 ### SYNOPSIS
 
     string *epilog( int load_empty );
     void preload( string filename );
+
 
 ### DESCRIPTION
 
@@ -26,6 +28,7 @@ title: master / epilog
     The variable 'load_empty' is non-zero if the -e  option  was  specified
     when  starting up the driver.  It can be used as a signal to the mudlib
     to not load castles, etc.
+
 
 ### SEE ALSO
 

@@ -7,13 +7,16 @@ title: arrays / arrayp
 
     arrayp() - determine whether or not a given variable is an array
 
+
 ### SYNOPSIS
 
     int arrayp( mixed arg );
 
+
 ### DESCRIPTION
 
     Return 1 if 'arg' is an array.
+
 
 ### SEE ALSO
 

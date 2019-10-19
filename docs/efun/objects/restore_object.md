@@ -8,9 +8,11 @@ title: objects / restore_object
     restore_object()  -  restore  values  of  variables from a file into an
     object
 
+
 ### SYNOPSIS
 
     int restore_object( string name, int flag );
+
 
 ### DESCRIPTION
 
@@ -20,6 +22,7 @@ title: objects / restore_object
 
     In the case of an error, the affected variable will be  left  untouched
     and an error given.
+
 
 ### SEE ALSO
 

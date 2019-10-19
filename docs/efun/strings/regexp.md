@@ -7,9 +7,11 @@ title: strings / regexp
 
     regexp() - regular expression handler
 
+
 ### SYNOPSIS
 
     string *regexp( string *lines, string pattern, void | int flag );
+
 
 ### DESCRIPTION
 
@@ -20,6 +22,7 @@ title: strings / regexp
     matches.  If the flag  has bit 1 set, the array returned will be of the
     form ({ index1 + 1, match1, ..., indexn + 1, matchn }) where index1  is
     the index of 1st match/non match in the array lines.
+
 
 ### REGULAR EXPRESSION SYNTAX
 
@@ -51,6 +54,7 @@ title: strings / regexp
     sequence, make it the first character (following a possible  '^').   To
     include a literal '-', make it the first or last character.
 
+
 ### AMBIGUITY
 
     If  a  regular  expression could match two different parts of the input
@@ -74,12 +78,14 @@ title: strings / regexp
     string—since it must respect the earlier choice.
 
     In  the particular case where no '|'s are present and there is only one
-    match will be chosen.  So 'ab*', presented with 'xabbbby',  will  match
-    'abbbb'.   Note  that  if  'ab*'  is tried against 'xabyabbbz', it will
-    match 'ab' just after  'x',  due  to  the  begins-earliest  rule.   (In
+    '*', '+', or '?', the net effect is that  the  longest  possible  match
+    will  be  chosen.   So  'ab*',  presented  with  'xabbbby',  will match
+    'abbbb'.  Note that if 'ab*' is  tried  against  'xabyabbbz',  it  will
+    match  'ab'  just  after  'x',  due  to  the begins-earliest rule.  (In
     effect, the decision on where to start the match is the first choice to
-    be made, hence subsequent choices must respect it even  if  this  leads
+    be  made,  hence  subsequent choices must respect it even if this leads
     them to less-preferred alternatives.)
+
 
 ### SEE ALSO
 

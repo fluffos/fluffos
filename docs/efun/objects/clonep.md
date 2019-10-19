@@ -8,9 +8,11 @@ title: objects / clonep
     clonep() - determine whether or not a given variable points to a cloned
     object
 
+
 ### SYNOPSIS
 
     int clonep( void | mixed arg );
+
 
 ### DESCRIPTION
 
@@ -21,6 +23,7 @@ title: objects / clonep
     call_other(3)).  Note that if clonep() returns true,  then  file_name()
     will   return   a  string  containing  a  '#'.   clonep()  defaults  to
     this_object().
+
 
 ### SEE ALSO
 

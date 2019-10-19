@@ -8,9 +8,11 @@ title: internals / set_debug_level
     set_debug_level()  -  sets the debug level used by the driver's debug()
     macro
 
+
 ### SYNOPSIS
 
     void set_debug_level( int level );
+
 
 ### DESCRIPTION
 
@@ -21,6 +23,7 @@ title: internals / set_debug_level
 
     For  more information, read the file debug.h which is included with the
     driver source.
+
 
 ### SEE ALSO
 

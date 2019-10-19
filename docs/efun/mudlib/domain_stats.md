@@ -8,10 +8,12 @@ title: mudlib / domain_stats
     domain_stats() - returns statistics gathered on domains
     author_stats() - returns statistics gathered on authors
 
+
 ### SYNOPSIS
 
     mapping domain_stats( string domain | void );
     mapping author_stats( string domain | void );
+
 
 ### DESCRIPTION
 
@@ -33,16 +35,17 @@ title: mudlib / domain_stats
     number of objects created by the given domain.   When  called  with  no
     arguments, the returned mapping has a form like this:
 
-    ([ domain0 : info0, domain1 : info1, ... ])
+        ([ domain0 : info0, domain1 : info1, ... ])
 
     while info0 has the form:
 
-    ([ "moves" : moves, "cost" : cost, "errors" : errors,
-    "heart_beats" : heart_beats, "worth" : worth,
-    "array_size" : array_size, "objects" : objects ])
+        ([ "moves" : moves, "cost" : cost, "errors" : errors,
+           "heart_beats" : heart_beats, "worth" : worth,
+           "array_size" : array_size, "objects" : objects ])
 
     When  called  with an argument, the returned mapping will have the form
     of info0.
+
 
 ### SEE ALSO
 

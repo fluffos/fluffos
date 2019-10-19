@@ -8,9 +8,11 @@ title: calls / previous_object
     previous_object() - returns the object(s) that called the current func‐
     tion
 
+
 ### SYNOPSIS
 
     mixed previous_object( int | void );
+
 
 ### DESCRIPTION
 
@@ -21,6 +23,7 @@ title: calls / previous_object
     ing chain.  previous_object(0) is the same as previous_object(), previ‐
     ous_object(1)  is the previous object's previous_object(), etc.  previ‐
     ous_object(-1) returns an array containing all of the previous objects.
+
 
 ### SEE ALSO
 

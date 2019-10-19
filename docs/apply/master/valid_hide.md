@@ -7,9 +7,11 @@ title: master / valid_hide
 
     valid_hide - allows or disallows objects to hide and see hidden objects
 
+
 ### SYNOPSIS
 
     int valid_hide( object ob );
+
 
 ### DESCRIPTION
 
@@ -20,6 +22,7 @@ title: master / valid_hide
     ter.   It  should return 1 to allow it, or 0 to not allow it.  The same
     call takes place when it needs to be determined  if  a  certain  object
     should be able to see hidden objects.
+
 
 ### SEE ALSO
 

@@ -7,9 +7,11 @@ title: objects / move_object
 
     move_object() - move current object to another environment
 
+
 ### SYNOPSIS
 
     void move_object( object item, mixed dest );
+
 
 ### DESCRIPTION
 
@@ -17,6 +19,7 @@ title: objects / move_object
     this_object().  move_object may be optionally called with one  argument
     in  which  case 'item' is implicitly this_object() and the passed argu‐
     ment is 'dest'.
+
 
 ### SEE ALSO
 

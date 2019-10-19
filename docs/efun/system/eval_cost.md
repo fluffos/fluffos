@@ -7,14 +7,17 @@ title: system / eval_cost
 
     eval_cost() - returns the evaluation cost remaining
 
+
 ### SYNOPSIS
 
     void eval_cost()
+
 
 ### DESCRIPTION
 
     eval_cost()  returns  the  number  of instructions that can be executed
     before the driver decides it is in an infinite loop.
+
 
 ### SEE ALSO
 

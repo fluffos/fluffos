@@ -7,9 +7,11 @@ title: interactive / catch_tell
 
     catch_tell - provides an interface to interact with users
 
+
 ### SYNOPSIS
 
     void catch_tell( string message );
+
 
 ### DESCRIPTION
 
@@ -19,6 +21,7 @@ title: interactive / catch_tell
     to be printed.  The message can be displayed, discarded, or modified in
     any way desired.  This is a useful way to have flexible earmuffs, or to
     support intelligent clients.
+
 
 ### SEE ALSO
 

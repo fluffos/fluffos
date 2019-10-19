@@ -7,9 +7,11 @@ title: objects / save_object
 
     save_object() - save the values of variables in an object into a file
 
+
 ### SYNOPSIS
 
     int save_object( string name, int flag );
+
 
 ### DESCRIPTION
 
@@ -20,9 +22,11 @@ title: objects / save_object
     aren't).   Object  variables always save as 0.  If bit 1 is 1, then the
     save file will be compressed.
 
+
 ### RETURN VALUE
 
     save_object() returns 1 for success, 0 for failure.
+
 
 ### SEE ALSO
 

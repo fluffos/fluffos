@@ -7,9 +7,11 @@ title: internals / dump_socket_status
 
     dump_socket_status() - display the status of each LPC socket
 
+
 ### SYNOPSIS
 
     void dump_socket_status( void );
+
 
 ### DESCRIPTION
 
@@ -53,6 +55,7 @@ title: internals / dump_socket_status
     -1    CLOSED      MUD    *.*                *.*
     -1    CLOSED      MUD    *.*                *.*
     -1    CLOSED      MUD    *.*                *.*
+
 
 ### SEE ALSO
 

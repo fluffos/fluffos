@@ -7,9 +7,11 @@ title: master / domain_file
 
     domain_file - determine the domain for a given object
 
+
 ### SYNOPSIS
 
     string domain_file( string file );
+
 
 ### DESCRIPTION
 
@@ -23,9 +25,11 @@ title: master / domain_file
     At startup the driver will ask  for  the  backbone  domain  by  calling
     domain_file("/").
 
+
 ### SEE ALSO
 
     author_stats(3), domain_stats(3), author_file(4)
+
 
 ### AUTHOR
 

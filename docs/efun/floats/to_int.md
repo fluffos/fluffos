@@ -7,9 +7,11 @@ title: floats / to_int
 
     to_int - convert a float or buffer to an int
 
+
 ### SYNOPSIS
 
     int to_int( float | buffer x );
+
 
 ### DESCRIPTION
 
@@ -17,6 +19,7 @@ title: floats / to_int
     that is equivalent to 'x' (with any decimal stripped off).  If 'x' is a
     buffer,  the  call  returns the integer (in network-byte-order) that is
     embedded in the buffer.
+
 
 ### SEE ALSO
 

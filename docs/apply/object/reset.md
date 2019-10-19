@@ -7,9 +7,11 @@ title: object / reset
 
     reset - allows an object to do self-maintenance
 
+
 ### SYNOPSIS
 
     void reset( void );
+
 
 ### DESCRIPTION
 
@@ -21,6 +23,7 @@ title: object / reset
     from the swap file to reset.  The reset() call is usually used to check
     if  any treasures and/or monsters in the room have been removed so they
     can be replaced.
+
 
 ### SEE ALSO
 

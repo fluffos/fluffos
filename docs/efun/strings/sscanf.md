@@ -7,10 +7,12 @@ title: strings / sscanf
 
     sscanf() - match substrings in a string.
 
+
 ### SYNOPSIS
 
     int sscanf( string str, string fmt,
-    mixed var1, mixed var2 ... );
+                mixed var1, mixed var2 ... );
+
 
 ### DESCRIPTION
 
@@ -28,6 +30,7 @@ title: strings / sscanf
     into str2.
 
     The number of matched "%d" and "%s" is returned.
+
 
 ### SEE ALSO
 

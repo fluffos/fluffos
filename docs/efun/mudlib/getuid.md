@@ -7,14 +7,17 @@ title: mudlib / getuid
 
     getuid() - return the user id (uid) of an object
 
+
 ### SYNOPSIS
 
     string getuid( object ob );
+
 
 ### DESCRIPTION
 
     Returns  the  user id of an object.  The uid of an object is determined
     at object creation by the creator_file() function.
+
 
 ### SEE ALSO
 

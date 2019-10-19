@@ -7,21 +7,24 @@ title: general / undefinedp
 
     undefinedp() - determine whether or not a given variable is undefined.
 
+
 ### SYNOPSIS
 
     int undefinedp( mixed arg );
+
 
 ### DESCRIPTION
 
     Return 1 if 'arg' is undefined.  'arg' will be undefined in the follow‐
     ing cases:
 
-    1.     it is a variable set equal to the return value of  a  call_other
-    to a non-existent method (e.g. arg = call_other(obj, "???")).
+    1.  it is a variable set equal to the return value of a call_other to a
+        non-existent method (e.g. arg = call_other(obj, "???")).
 
-    2.     it  is  a variable set equal to the return value of an access of
-    an  element  in  a  mapping  that  doesn't  exist  (e.g.  arg  =
-    map[not_there]).
+    2.  it  is  a variable set equal to the return value of an access of an
+        element  in  a   mapping   that   doesn't   exist   (e.g.   arg   =
+        map[not_there]).
+
 
 ### SEE ALSO
 

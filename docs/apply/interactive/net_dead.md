@@ -8,9 +8,11 @@ title: interactive / net_dead
     net_dead  - called by the MudOS driver when an interactive object drops
     its connection
 
+
 ### SYNOPSIS
 
     void net_dead( void );
+
 
 ### DESCRIPTION
 
@@ -19,6 +21,7 @@ title: interactive / net_dead
     tion on that object giving it a chance to clean up, notify its environ‐
     ment  etc.   Be  aware  that  functions that depend on the object being
     interactive will not work as expected.
+
 
 ### AUTHOR
 

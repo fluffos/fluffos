@@ -7,13 +7,16 @@ title: floats / acos
 
     acos() - return the arccosine of a float
 
+
 ### SYNOPSIS
 
     float acos( float f );
 
+
 ### DESCRIPTION
 
     Returns the arccosine of its argument, 'f', measured in radians.
+
 
 ### SEE ALSO
 

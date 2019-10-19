@@ -7,10 +7,12 @@ title: strings / reg_assoc
 
     reg_assoc() - A regular pattern substring extractor
 
+
 ### SYNOPSIS
 
     mixed  *reg_assoc(string  str,  string *pat_arr, mixed *tok_arr, void |
     mixed def);
+
 
 ### DESCRIPTION
 
@@ -20,12 +22,12 @@ title: strings / reg_assoc
     ciated  with  a  non-match. The return value is an array of two arrays,
     the 1st being an array of the form
 
-    ({ non-match1, match1, non-match2, match2, ...,
-    non-match n, match n, non-match n+1 })
+         ({ non-match1, match1, non-match2, match2, ...,
+            non-match n, match n, non-match n+1 })
 
     and the 2nd holds the tokens corresponding to the matches in order
 
-    ({ def, token corresponding to match1, ....,  def,           token
+         ({ def, token corresponding to match1, ....,  def,           token
     corresponding to match n, def }).
 
     pat_arr  and  tok_arr  must  be  of  the same sizes, the ith element in
@@ -34,6 +36,7 @@ title: strings / reg_assoc
 
     If pat_arr (and hence tok_arr) has size 0 then the return value is sim‐
     ply ({ ({ str }), ({ def }) }).
+
 
 ### EXAMPLE
 
@@ -44,10 +47,11 @@ title: strings / reg_assoc
     #define F_NUM 2
 
     reg_assoc("Blah \"blah\" test 203 hhh j 308 \"bacdcd\b\"acb",
-    ({ STRING_PAT, NUM_PAT }), ({ F_STRING, F_NUM }), "no-match")
+      ({ STRING_PAT, NUM_PAT }), ({ F_STRING, F_NUM }), "no-match")
 
     will return
     ({ ({ "Blah ", "\"blah\"", " test ", "203", " hhh j ", "308", " ",
-    "\"bacdcd\b\"", "acb" }),
-    ({ "no-match", F_STRING, "no-match", F_NUM, "no-match", F_NUM,
-    "no-match", F_STRING, "no-match" }) })
+          "\"bacdcd\b\"", "acb" }),
+       ({ "no-match", F_STRING, "no-match", F_NUM, "no-match", F_NUM,
+          "no-match", F_STRING, "no-match" }) })
+

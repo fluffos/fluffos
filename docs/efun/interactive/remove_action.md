@@ -7,9 +7,11 @@ title: interactive / remove_action
 
     remove_action - unbind a command verb from a local function
 
+
 ### SYNOPSIS
 
     int remove_action( string fun, string cmd );
+
 
 ### DESCRIPTION
 
@@ -18,13 +20,15 @@ title: interactive / remove_action
     add_verb(3).  When a verb is no longer required, it can be unbound with
     remove_action().
 
+
 ### RETURN VALUES
 
     remove_action() returns:
 
-    1 on success.
+        1 on success.
 
-    0 on failure.
+        0 on failure.
+
 
 ### SEE ALSO
 

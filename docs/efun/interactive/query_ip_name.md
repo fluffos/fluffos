@@ -7,9 +7,11 @@ title: interactive / query_ip_name
 
     query_ip_name() - return the ip name of a given player object.
 
+
 ### SYNOPSIS
 
     string query_ip_name( object ob );
+
 
 ### DESCRIPTION
 
@@ -26,6 +28,7 @@ title: interactive / query_ip_name
     ber(3)'.
 
     The result is cached, there is no overhead for this function.
+
 
 ### SEE ALSO
 

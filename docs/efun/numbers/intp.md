@@ -7,13 +7,16 @@ title: numbers / intp
 
     intp() - determine whether or not a given variable is an integer
 
+
 ### SYNOPSIS
 
     int intp( mixed arg );
 
+
 ### DESCRIPTION
 
     Return 1 if 'arg' is an integer number and zero (0) otherwise.
+
 
 ### SEE ALSO
 

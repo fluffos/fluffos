@@ -7,11 +7,13 @@ title: sockets / socket_listen
 
     socket_listen() - listen for connections on a socket
 
+
 ### SYNOPSIS
 
     #include <socket_err.h>
 
     int socket_listen( int s, string listen_callback );
+
 
 ### DESCRIPTION
 
@@ -24,17 +26,19 @@ title: sockets / socket_listen
     to  call  when  a  connection is requested on the listening socket. The
     listen callback should follow this format:
 
-    void listen_callback(int fd)
+        void listen_callback(int fd)
 
     Where fd is the listening socket.
+
 
 ### RETURN VALUES
 
     socket_listen() returns:
 
-    EESUCCESS on success.
+        EESUCCESS on success.
 
-    a negative value indicated below on error.
+        a negative value indicated below on error.
+
 
 ### ERRORS
 
@@ -51,6 +55,7 @@ title: sockets / socket_listen
     EEISCONN       Socket is already connected.
 
     EELISTEN       Problem with listen.
+
 
 ### SEE ALSO
 

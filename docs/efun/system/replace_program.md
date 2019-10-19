@@ -7,9 +7,11 @@ title: system / replace_program
 
     replace_program() - replaces the program in this_object()
 
+
 ### SYNOPSIS
 
     void replace_program( string str );
+
 
 ### DESCRIPTION
 
@@ -19,6 +21,7 @@ title: system / replace_program
     current object effectively becomes a clone of that  other  object,  but
     with  its  current  filename and global variable values. The program is
     not actually replaced until the current execution is completed.
+
 
 ### SEE ALSO
 

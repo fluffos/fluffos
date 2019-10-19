@@ -7,9 +7,11 @@ title: internals / opcprof
 
     opcprof() - reports statistics on calling frequencies of various efuns
 
+
 ### SYNOPSIS
 
     void opcprof( string | void );
+
 
 ### DESCRIPTION
 
@@ -17,6 +19,7 @@ title: internals / opcprof
     tor.  If no argument is specified, then the information will be  dumped
     to  files  named  /OPCPROF.efun  and /OPCPROF.eoper.  If an argument is
     specified, then that name is used as the filename for the dump.
+
 
 ### SEE ALSO
 

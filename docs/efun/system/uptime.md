@@ -8,14 +8,17 @@ title: system / uptime
     uptime()  -  return the number of seconds elapsed since the last driver
     reboot
 
+
 ### SYNOPSIS
 
     int uptime( void );
+
 
 ### DESCRIPTION
 
     This function returns the number  of  seconds  since  the  last  driver
     reboot.
+
 
 ### SEE ALSO
 

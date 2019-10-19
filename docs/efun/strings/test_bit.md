@@ -7,13 +7,16 @@ title: strings / test_bit
 
     set_bit() - set a bit in a bitstring
 
+
 ### SYNOPSIS
 
     int test_bit( string str, int n );
 
+
 ### DESCRIPTION
 
     Return 0 or 1 of bit 'n' was set in string 'str'.
+
 
 ### SEE ALSO
 

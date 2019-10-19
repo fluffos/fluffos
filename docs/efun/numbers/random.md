@@ -7,9 +7,11 @@ title: numbers / random
 
     random() - return a pseudo-random number
 
+
 ### SYNOPSIS
 
     int random( int n );
+
 
 ### DESCRIPTION
 

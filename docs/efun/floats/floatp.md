@@ -7,13 +7,16 @@ title: floats / floatp
 
     floatp() - determine whether or not a given variable is a float
 
+
 ### SYNOPSIS
 
     int floatp( mixed arg );
 
+
 ### DESCRIPTION
 
     Return 1 if 'arg' is a float number and zero (0) otherwise.
+
 
 ### SEE ALSO
 

@@ -7,9 +7,11 @@ title: interactive / receive_message
 
     receive_message - provides the interface used by the message efun.
 
+
 ### SYNOPSIS
 
     void receive_message( string class, string message );
+
 
 ### DESCRIPTION
 
@@ -18,6 +20,7 @@ title: interactive / receive_message
     combat,  room  description, etc) of the message.  The receive_message()
     apply together with the message() efun can provide a good mechanism for
     interfacing with a "smart" client.
+
 
 ### SEE ALSO
 

@@ -7,9 +7,11 @@ title: objects / file_name
 
     file_name() - get the file name of an object
 
+
 ### SYNOPSIS
 
     string file_name( object ob );
+
 
 ### DESCRIPTION
 

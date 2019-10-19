@@ -8,9 +8,11 @@ title: interactive / exec
     exec()  - switches a player (interactive) connection from one object to
     another
 
+
 ### SYNOPSIS
 
     int exec( object to, object from );
+
 
 ### DESCRIPTION
 
@@ -24,6 +26,7 @@ title: interactive / exec
     the  same  name and then use valid_override(4) to restrict the use of a
     simul_efun override (i.e. efun::exec()).  The exec() function returns 1
     if the switch is successful (and 0 otherwise).
+
 
 ### SEE ALSO
 

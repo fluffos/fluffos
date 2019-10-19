@@ -7,9 +7,11 @@ title: functions / apply
 
     apply() - evaluate a function pointer
 
+
 ### SYNOPSIS
 
     mixed apply(mixed f, mixed *args)
+
 
 ### DESCRIPTION
 

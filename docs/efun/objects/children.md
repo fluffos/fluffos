@@ -7,9 +7,11 @@ title: objects / children
 
     children() - returns an array of objects cloned from a given object.
 
+
 ### SYNOPSIS
 
     object *children( string name );
+
 
 ### DESCRIPTION
 
@@ -18,12 +20,13 @@ title: objects / children
     loaded.   An example use of children() is to find all objects that have
     been cloned from the user object:
 
-    object *list;
+        object *list;
 
-    list = children("/obj/user");
+        list = children("/obj/user");
 
     This lets you find all users  (both  netdead  and  interactive  whereas
     users() only reports interactive users).
+
 
 ### SEE ALSO
 

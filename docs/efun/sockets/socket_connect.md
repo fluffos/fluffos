@@ -7,13 +7,15 @@ title: sockets / socket_connect
 
     socket_connect() - initiate a connection on a socket
 
+
 ### SYNOPSIS
 
     #include <socket_err.h>
 
     int socket_connect( int s, string address,
-    string read_callback,
-    string write_callback );
+                        string read_callback,
+                        string write_callback );
+
 
 ### DESCRIPTION
 
@@ -25,7 +27,7 @@ title: sockets / socket_connect
     call when the socket gets data from its peer. The read callback  should
     follow this format:
 
-    void read_callback(int fd, mixed message)
+        void read_callback(int fd, mixed message)
 
     Where fd is the socket which received the data, and message is the data
     which was received.
@@ -34,17 +36,19 @@ title: sockets / socket_connect
     call  when  the  socket  is  ready to be written to. The write callback
     should follow this format:
 
-    void write_callback(int fd)
+        void write_callback(int fd)
 
     Where fd is the socket which is ready to be written to.
+
 
 ### RETURN VALUES
 
     socket_connect() returns:
 
-    EESUCCESS on success.
+        EESUCCESS on success.
 
-    a negative value indicated below on error.
+        a negative value indicated below on error.
+
 
 ### ERRORS
 
@@ -71,6 +75,7 @@ title: sockets / socket_connect
     EECONNREFUSED  Connection refused.
 
     EECONNECT      Problem with connect.
+
 
 ### SEE ALSO
 

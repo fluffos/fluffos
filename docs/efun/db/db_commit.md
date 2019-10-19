@@ -7,9 +7,11 @@ title: db / db_commit
 
     db_commit() - commits the last transaction
 
+
 ### SYNOPSIS
 
     int db_commit(int handle );
+
 
 ### DESCRIPTION
 
@@ -17,9 +19,11 @@ title: db / db_commit
 
     Returns 1 on success, 0 otherwise
 
+
 ### NOTES
 
     Not yet implemented!
+
 
 ### SEE ALSO
 

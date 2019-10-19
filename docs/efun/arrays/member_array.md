@@ -8,9 +8,11 @@ title: arrays / member_array
     member_array()  -  returns  index of an occurence of a given item in an
     array or string
 
+
 ### SYNOPSIS
 
     int member_array( mixed item, mixed * | string arr, void | int start );
+
 
 ### DESCRIPTION
 

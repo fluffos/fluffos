@@ -7,23 +7,27 @@ title: sockets / socket_close
 
     socket_close() - close a socket
 
+
 ### SYNOPSIS
 
     #include <socket_err.h>
 
     int socket_close( int s );
 
+
 ### DESCRIPTION
 
     socket_close() closes socket s. This frees a socket efun slot for use.
+
 
 ### RETURN VALUES
 
     socket_close() returns:
 
-    EESUCCESS on success.
+        EESUCCESS on success.
 
-    a negative value indicated below on error.
+        a negative value indicated below on error.
+
 
 ### ERRORS
 
@@ -32,6 +36,7 @@ title: sockets / socket_close
     EEBADF         Descriptor is invalid.
 
     EESECURITY     Security violation attempted.
+
 
 ### SEE ALSO
 

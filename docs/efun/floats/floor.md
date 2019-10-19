@@ -7,14 +7,17 @@ title: floats / floor
 
     floor() - round a float down to the nearest integer
 
+
 ### SYNOPSIS
 
     float floor( float f );
+
 
 ### DESCRIPTION
 
     Returns  (as  a  float)  the nearest integer number equal to or smaller
     than f.
+
 
 ### SEE ALSO
 

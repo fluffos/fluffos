@@ -7,13 +7,16 @@ title: mappings / mapp
 
     mapp() - determine whether or not a given variable is a mapping
 
+
 ### SYNOPSIS
 
     int mapp( mixed arg );
 
+
 ### DESCRIPTION
 
     Return 1 if 'arg' is a mapping.
+
 
 ### SEE ALSO
 

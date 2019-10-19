@@ -8,9 +8,11 @@ title: master / compile_object
     compile_object  - serves as the mudlib interface for the virtual object
     facility
 
+
 ### SYNOPSIS
 
     object compile_object( string pathname );
+
 
 ### DESCRIPTION
 

@@ -7,9 +7,11 @@ title: calls / call_out
 
     call_out() - delayed function call in same object
 
+
 ### SYNOPSIS
 
     void call_out( string | function fun, int delay, mixed arg );
+
 
 ### DESCRIPTION
 
@@ -23,6 +25,7 @@ title: calls / call_out
 
 
     The define THIS_PLAYER_IN_CALL_OUT exists to remedy the above problem.
+
 
 ### SEE ALSO
 

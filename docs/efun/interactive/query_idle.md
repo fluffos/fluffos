@@ -8,13 +8,16 @@ title: interactive / query_idle
     query_idle()  -  determine  how  many seconds an interactive player has
     been idle
 
+
 ### SYNOPSIS
 
     int query_idle( object ob );
 
+
 ### DESCRIPTION
 
     Query how many seconds a player object (ob) has been idling.
+
 
 ### SEE ALSO
 

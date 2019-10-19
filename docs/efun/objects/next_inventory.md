@@ -7,9 +7,11 @@ title: objects / next_inventory
 
     next_inventory() - return the next object in the same inventory
 
+
 ### SYNOPSIS
 
     object next_inventory( object ob );
+
 
 ### DESCRIPTION
 
@@ -17,6 +19,7 @@ title: objects / next_inventory
 
     Warning:   If  the  object  'ob'  is  moved  by  "move_object()",  then
     "next_inventory()" will return an object from the new inventory.
+
 
 ### SEE ALSO
 

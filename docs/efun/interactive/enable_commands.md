@@ -7,13 +7,15 @@ title: interactive / enable_commands
 
     enable_commands() - allow object to use 'player' commands
 
+
 ### SYNOPSIS
 
     Deprecated:
-    void enable_commands( void );
+      void enable_commands( void );
 
     Since FluffOS 3.0-alpha7.1:
-    void enable_commands( int setup_actions = 0 );
+      void enable_commands( int setup_actions = 0 );
+
 
 ### DESCRIPTION
 
@@ -32,10 +34,12 @@ title: interactive / enable_commands
     init()  on  its  environment,  sibling  and inventory objects. (in that
     order).
 
+
 ### BUGS
 
     Do not call this function in any other place than create()  or  strange
     things will likely occur.
+
 
 ### SEE ALSO
 

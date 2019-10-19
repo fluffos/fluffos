@@ -7,9 +7,11 @@ title: functions / evaluate
 
     evaluate() - evaluate a function pointer
 
+
 ### SYNOPSIS
 
     mixed evaluate(mixed f, ...)
+
 
 ### DESCRIPTION
 

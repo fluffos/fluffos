@@ -7,14 +7,17 @@ title: system / find_call_out
 
     find_call_out() - find a call out scheduled to be called next
 
+
 ### SYNOPSIS
 
     int find_call_out( string func ):
+
 
 ### DESCRIPTION
 
     Find  the  first  call  out due to be executed for function 'func', and
     return the time left. If it is not found, then return -1.
+
 
 ### SEE ALSO
 

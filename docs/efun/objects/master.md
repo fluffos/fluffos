@@ -7,13 +7,16 @@ title: objects / master
 
     master() - returns the master object
 
+
 ### SYNOPSIS
 
     object master( void );
 
+
 ### DESCRIPTION
 
     Returns a pointer to the master object.
+
 
 ### SEE ALSO
 

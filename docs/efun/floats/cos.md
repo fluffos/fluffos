@@ -7,13 +7,16 @@ title: floats / cos
 
     cos() - return the cosine of a float
 
+
 ### SYNOPSIS
 
     float cos( float f );
 
+
 ### DESCRIPTION
 
     Returns the cosine of its argument, 'f', measured in radians.
+
 
 ### SEE ALSO
 

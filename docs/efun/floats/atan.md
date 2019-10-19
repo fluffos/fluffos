@@ -7,13 +7,16 @@ title: floats / atan
 
     atan() - return the tangent of a float
 
+
 ### SYNOPSIS
 
     float atan( float f );
 
+
 ### DESCRIPTION
 
     Returns the arctangent of its argument, 'f', measured in radians.
+
 
 ### SEE ALSO
 

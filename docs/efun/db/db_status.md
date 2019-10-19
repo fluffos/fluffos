@@ -7,13 +7,16 @@ title: db / db_status
 
     db_status() - return package status
 
+
 ### SYNOPSIS
 
     string db_status( void );
 
+
 ### DESCRIPTION
 
     Returns a string describing the current status of the database package.
+
 
 ### SEE ALSO
 

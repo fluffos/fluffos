@@ -7,14 +7,17 @@ title: interactive / write
 
     write() - send a message to current player
 
+
 ### SYNOPSIS
 
     void write( mixed str );
+
 
 ### DESCRIPTION
 
     Write  a  message  'str' to current player. 'str' can also be a number,
     which will be translated to a string.
+
 
 ### SEE ALSO
 

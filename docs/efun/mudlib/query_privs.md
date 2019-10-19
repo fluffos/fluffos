@@ -7,9 +7,11 @@ title: mudlib / query_privs
 
     query_privs() - return the privs string for an object
 
+
 ### SYNOPSIS
 
     string query_privs( object ob );
+
 
 ### DESCRIPTION
 
@@ -18,6 +20,7 @@ title: mudlib / query_privs
     changeable via the set_privs() efun.
 
     This efun is only available if PRIVS is defined at driver compile time.
+
 
 ### SEE ALSO
 

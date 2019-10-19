@@ -7,11 +7,13 @@ title: db / db_connect
 
     db_connect() - close the database connection
 
+
 ### SYNOPSIS
 
     int  db_connect( string host, string db ); int db_connect( string host,
     string db, string user );  int  db_connect(  string  host,  string  db,
     string user, int type );
+
 
 ### DESCRIPTION
 
@@ -22,6 +24,7 @@ title: db / db_connect
     corresponding header file within the mudlib.
 
     Returns a handle to the new connection on success, 0 otherwise
+
 
 ### SEE ALSO
 

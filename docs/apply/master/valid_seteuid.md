@@ -7,9 +7,11 @@ title: master / valid_seteuid
 
     valid_seteuid - secures the use of seteuid(3)
 
+
 ### SYNOPSIS
 
     int valid_seteuid( object obj, string euid );
+
 
 ### DESCRIPTION
 
@@ -17,6 +19,7 @@ title: master / valid_seteuid
     inside the seteuid(euid) efunction.  If valid_seteuid() returns 0, then
     the  seteuid()  call will fail.  If valid_seteuid() returns 1, then the
     seteuid(3) will succeed.
+
 
 ### SEE ALSO
 

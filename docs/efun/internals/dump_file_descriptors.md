@@ -7,9 +7,11 @@ title: internals / dump_file_descriptors
 
     dump_file_descriptors() - dump the MudOS process file descriptor table
 
+
 ### SYNOPSIS
 
     void dump_file_descriptors( void );
+
 
 ### DESCRIPTION
 
@@ -26,14 +28,15 @@ title: internals / dump_file_descriptors
 
     Fd  Device Number  Inode   Mode    Uid    Gid      Size
     --  -------------  -----  ------  -----  -----  ----------
-    0     3      2    10319  c  666      0      3           0
-    1    79      7   164598  f  644   2862      1      789522
-    2    79      7   164598  f  644   2862      1      789522
-    3    40    33b     6925  c    0   2862      1           0
-    4    40    2a4     6943  c    0   2862      1           0
-    5    79      7   164599  f  600   2862      1       44784
-    6    40    2e2   145996  c    0   2862      1           0
-    7    79      7   164601  f  644   2862      1         506
+     0     3      2    10319  c  666      0      3           0
+     1    79      7   164598  f  644   2862      1      789522
+     2    79      7   164598  f  644   2862      1      789522
+     3    40    33b     6925  c    0   2862      1           0
+     4    40    2a4     6943  c    0   2862      1           0
+     5    79      7   164599  f  600   2862      1       44784
+     6    40    2e2   145996  c    0   2862      1           0
+     7    79      7   164601  f  644   2862      1         506
+
 
 ### SEE ALSO
 

@@ -7,9 +7,11 @@ title: objects / present
 
     present() - find an object by id
 
+
 ### SYNOPSIS
 
     object present( mixed str, object ob );
+
 
 ### DESCRIPTION
 
@@ -33,6 +35,7 @@ title: objects / present
 
     If  object  is  hidden (via set_hide()), and current object is not hid‐
     able.  returns 0
+
 
 ### SEE ALSO
 

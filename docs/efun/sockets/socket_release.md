@@ -7,12 +7,14 @@ title: sockets / socket_release
 
     socket_release() - release ownership of a socket to another object
 
+
 ### SYNOPSIS
 
     #include <socket_err.h>
 
     int socket_release( int socket, object ob,
-    string release_callback );
+                        string release_callback );
+
 
 ### DESCRIPTION
 
@@ -38,6 +40,7 @@ title: sockets / socket_release
     returns EESUCCESS.  If ob does not accept ownership for the socket then
     EESOCKNOTRLSD is returned.  Other errors can be returned based on secu‐
     rity violation, bad socket descriptor vbalues, etc.
+
 
 ### SEE ALSO
 

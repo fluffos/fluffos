@@ -7,9 +7,11 @@ title: object / clean_up
 
     clean_up - periodically called in inactive objects
 
+
 ### SYNOPSIS
 
     int clean_up( int inherited );
+
 
 ### DESCRIPTION
 

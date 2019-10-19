@@ -7,9 +7,11 @@ title: object / create
 
     create - object initialization
 
+
 ### SYNOPSIS
 
     void create( void );
+
 
 ### DESCRIPTION
 
@@ -25,9 +27,11 @@ title: object / create
     create *is* being called twice, but on  two  *different*  objects:  the
     parent, and the child that is calling parent::create() manually.
 
+
 ### SEE ALSO
 
     reset(4), __INIT(4)
+
 
 ### AUTHOR
 

@@ -7,10 +7,12 @@ title: interactive / ed
 
     ed() - edit a file
 
+
 ### SYNOPSIS
 
     void ed( string file, string exit_fn, int restricted );
     void ed( string file, string write_fn, string exit_fn, int restricted );
+
 
 ### DESCRIPTION
 
@@ -29,16 +31,17 @@ title: interactive / ed
     called  after the write has completed -- <flag> will be non-zero.  This
     callback function should have the form:
 
-    int write_fn(string fname, int flag)
+        int write_fn(string fname, int flag)
 
     When the editor is exited, the driver will callback the <exit_fn> func‐
     tion.   This  function  allows  the  mudlib to clean up.  This callback
     function has the form:
 
-    void exit_fn()
+        void exit_fn()
 
     The optional <restricted> flag limits the editor's  capabilities,  such
     as inserting a file, and saving using an alternate file name.
+
 
 ### SEE ALSO
 

@@ -7,9 +7,11 @@ title: mudlib / geteuid
 
     geteuid() - return the effective user id of an object or function
 
+
 ### SYNOPSIS
 
     string geteuid( object|function );
+
 
 ### DESCRIPTION
 
@@ -18,6 +20,7 @@ title: mudlib / geteuid
     returns  the  euid of the object that created that 'function' variable.
     If the object, at the time of the function variable's construction, had
     no euid, the object's uid is stored instead.
+
 
 ### SEE ALSO
 

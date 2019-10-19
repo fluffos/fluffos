@@ -7,20 +7,23 @@ title: general / nullp
 
     nullp() - determine whether or not a given variable is null.
 
+
 ### SYNOPSIS
 
     int nullp( mixed arg );
+
 
 ### DESCRIPTION
 
     Return 1 if 'arg' is null.  'arg' will be null in the following cases:
 
-    1.     it has not yet been initialized.
+    1.  it has not yet been initialized.
 
-    2.     it points to a destructed object.
+    2.  it points to a destructed object.
 
-    3.     it  is a function (formal) parameter that corresponds to a miss‐
-    ing actual argument.
+    3.  it  is  a function (formal) parameter that corresponds to a missing
+        actual argument.
+
 
 ### SEE ALSO
 

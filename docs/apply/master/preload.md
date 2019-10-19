@@ -7,10 +7,12 @@ title: master / preload
 
     preload - preload an object into memory.
 
+
 ### SYNOPSIS
 
     string *epilog( int load_empty );
     void preload( string filename );
+
 
 ### DESCRIPTION
 
@@ -25,6 +27,7 @@ title: master / preload
     The  variable  'load_empty'  is non-zero if the -e option was specified
     when starting up the driver.  It can be used as a signal to the  mudlib
     to not load castles, etc.
+
 
 ### SEE ALSO
 

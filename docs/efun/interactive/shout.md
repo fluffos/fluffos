@@ -7,13 +7,16 @@ title: interactive / shout
 
     shout() - sends a message to all living objects
 
+
 ### SYNOPSIS
 
     void shout( string str );
 
+
 ### DESCRIPTION
 
     Sends the string 'str' to all living objects except this_player().
+
 
 ### SEE ALSO
 

@@ -7,9 +7,11 @@ title: internals / moncontrol
 
     moncontrol() - turns on/off profiling during execution
 
+
 ### SYNOPSIS
 
     void moncontrol( int on );
+
 
 ### DESCRIPTION
 
@@ -18,6 +20,7 @@ title: internals / moncontrol
     ical use is to profile only certain parts of driver execution.  moncon‐
     trol() has no effect if profiling is  not  enabled  at  driver  compile
     time.
+
 
 ### SEE ALSO
 

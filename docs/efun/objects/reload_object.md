@@ -7,9 +7,11 @@ title: objects / reload_object
 
     reload_object - return an object to its just-loaded state
 
+
 ### SYNOPSIS
 
     void reload_object( object ob );
+
 
 ### DESCRIPTION
 
@@ -18,6 +20,7 @@ title: objects / reload_object
     all  variables  are  re-initialized,  and create() is called.  It has a
     similar effect to destructing/reloading the object,  however,  no  disk
     access or parsing is performed.
+
 
 ### SEE ALSO
 

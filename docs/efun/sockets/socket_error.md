@@ -13,18 +13,21 @@ title: sockets / socket_error
 
     string socket_error( int error );
 
+
 ### DESCRIPTION
 
     socket_error()  returns  a  string  describing  the  error signified by
     error.
 
+
 ### RETURN VALUES
 
     socket_error() returns:
 
-    a string describing the error on success.
+        a string describing the error on success.
 
-    "socket_error: invalid error number" on bad input.
+        "socket_error: invalid error number" on bad input.
+
 
 ### SEE ALSO
 

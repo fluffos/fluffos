@@ -7,14 +7,17 @@ title: interactive / find_player
 
     find_player() - find a player by name
 
+
 ### SYNOPSIS
 
     object find_player( string str );
+
 
 ### DESCRIPTION
 
     Similar  to  find_living(),  but only searches through objects that are
     interactive, or were once interactive.
+
 
 ### SEE ALSO
 

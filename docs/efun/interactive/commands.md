@@ -7,9 +7,11 @@ title: interactive / commands
 
     commands() - returns some information about actions the user can take
 
+
 ### SYNOPSIS
 
     mixed *commands( void );
+
 
 ### DESCRIPTION
 
@@ -19,6 +21,7 @@ title: interactive / commands
     add_action as the third argument, often defaulted to 0).  The third  is
     the  object  that defined the action.  The fourth is the function to be
     called ("<function>" if it is a function pointer).
+
 
 ### SEE ALSO
 

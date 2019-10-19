@@ -7,9 +7,11 @@ title: mudlib / set_light
 
     set_light() - update or query an object's light level
 
+
 ### SYNOPSIS
 
     int set_light( int light_level_adjustment );
+
 
 ### DESCRIPTION
 

@@ -7,11 +7,13 @@ title: arrays / filter_array
 
     filter_array() - return a selective sub-array
 
+
 ### SYNOPSIS
 
     mixed *filter_array( mixed *arr, string fun, object ob,
-    mixed extra, ... );
+                         mixed extra, ... );
     mixed *filter_array( mixed *arr, function f, mixed extra, ...);
+
 
 ### DESCRIPTION
 
@@ -23,6 +25,7 @@ title: arrays / filter_array
     sucessfully through <fun> (and hence is included in the  return  array)
     if  <fun>  returns  1.  If f is passed it is used instead of ob->fun().
     If <arr> is not an array, then 0 will be returned.
+
 
 ### SEE ALSO
 

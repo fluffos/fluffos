@@ -7,9 +7,11 @@ title: system / set_eval_limit
 
     set_eval_limit() - set the maximum evaluation cost
 
+
 ### SYNOPSIS
 
     void set_eval_limit( int );
+
 
 ### DESCRIPTION
 
@@ -18,6 +20,7 @@ title: system / set_eval_limit
     With  a  zero argument, it sets the current evaluation counter to zero,
     and the maximum  cost  is  returned.   set_eval_limit(-1)  returns  the
     remaining evaluation cost.
+
 
 ### SEE ALSO
 

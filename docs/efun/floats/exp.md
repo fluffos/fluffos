@@ -7,13 +7,16 @@ title: floats / exp
 
     exp() - find e to the power of a float
 
+
 ### SYNOPSIS
 
     float exp( float f );
 
+
 ### DESCRIPTION
 
     exp() returns e^f.
+
 
 ### SEE ALSO
 

@@ -8,9 +8,11 @@ title: master / privs_file
     privs_file  -  specifies  the  privs  string to give to a newly created
     object
 
+
 ### SYNOPSIS
 
     string privs_file( string filename );
+
 
 ### DESCRIPTION
 
@@ -21,6 +23,7 @@ title: master / privs_file
 
     The  privs_file() functionality is only available if the driver is com‐
     piled with the PRIVS option defined.
+
 
 ### SEE ALSO
 

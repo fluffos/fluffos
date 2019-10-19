@@ -7,9 +7,11 @@ title: mudlib / find_living
 
     find_living() - find a living object matching a given id
 
+
 ### SYNOPSIS
 
     object find_living( string str );
+
 
 ### DESCRIPTION
 
@@ -18,6 +20,7 @@ title: mudlib / find_living
     The  object  must  have  set a name with set_living_name(), so its name
     will be entered into the hash table used to speed  up  the  search  for
     living objects.
+
 
 ### SEE ALSO
 

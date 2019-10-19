@@ -7,9 +7,11 @@ title: ed / ed_cmd
 
     ed_cmd() - send a command to an ed session
 
+
 ### SYNOPSIS
 
     string ed_cmd(string cmd)
+
 
 ### DESCRIPTION
 

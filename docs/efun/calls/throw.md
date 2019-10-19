@@ -7,9 +7,11 @@ title: calls / throw
 
     throw() - forces an error to occur in an object.
 
+
 ### SYNOPSIS
 
     void throw(mixed);
+
 
 ### DESCRIPTION
 
@@ -19,14 +21,15 @@ title: calls / throw
     When throw() is used,  it  should  be  used  in  conjunction  with  the
     catch(3) efun.  Here is a typical usage:
 
-    string err;
-    int rc;
+       string err;
+       int rc;
 
-    err = catch(rc = ob->move(dest));
-    if (err) {
-    throw("move.c: ob->move(dest): " + err + "\n");
-    return;
-    }
+       err = catch(rc = ob->move(dest));
+       if (err) {
+            throw("move.c: ob->move(dest): " + err + "\n");
+            return;
+       }
+
 
 ### SEE ALSO
 

@@ -7,17 +7,21 @@ title: interactive / snoop
 
     snoop() - snoop an interactive user
 
+
 ### SYNOPSIS
 
     varargs object snoop( object snooper, object snoopee );
+
 
 ### DESCRIPTION
 
     When   both  arguments  are  used,  begins  snooping  of  'snoopee'  by
     'snooper'.  If the second argument is omitted, turns off  all  snooping
     by  'snoopee'.   Security  for  snoop()  is  normally  controlled  by a
-    simul_efun.  snoop() returns successful in the single-argument case.  A
-    return of 0 indicates failure.
+    simul_efun.  snoop() returns 'snoopee' if successful in  the  two-argu‐
+    ment  case,  and  'snooper' if it was successful in the single-argument
+    case.  A return of 0 indicates failure.
+
 
 ### SEE ALSO
 

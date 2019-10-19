@@ -7,9 +7,11 @@ title: internals / memory_info
 
     memory_info - obtain info on object/overall memory usage
 
+
 ### SYNOPSIS
 
     varargs int memory_info( object ob );
+
 
 ### DESCRIPTION
 
@@ -19,6 +21,7 @@ title: internals / memory_info
     mud is using.  Note that the amount of memory the mud is using does not
     necessarily  correspond  to  the amount of memory actually allocated by
     the mud from the system.
+
 
 ### SEE ALSO
 

@@ -7,10 +7,12 @@ title: master / valid_socket
 
     valid_socket - protects the socket efunctions.
 
+
 ### SYNOPSIS
 
     int valid_socket( object caller, string function,
-    mixed *info );
+                      mixed *info );
+
 
 ### DESCRIPTION
 

@@ -7,9 +7,11 @@ title: mudlib / seteuid
 
     seteuid() - set the effective user id (euid) of an object
 
+
 ### SYNOPSIS
 
     int seteuid( string str );
+
 
 ### DESCRIPTION
 
@@ -21,6 +23,7 @@ title: mudlib / seteuid
 
     But,  when  the  value is 0, no objects can be loaded or cloned by this
     object.
+
 
 ### SEE ALSO
 

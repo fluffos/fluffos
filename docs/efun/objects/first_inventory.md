@@ -7,14 +7,17 @@ title: objects / first_inventory
 
     first_inventory() - return the first item in an object's inventory
 
+
 ### SYNOPSIS
 
     object first_inventory( mixed ob );
+
 
 ### DESCRIPTION
 
     Return  the first object in the inventory of <ob>, where <ob> is either
     an object or the file name of an object.
+
 
 ### SEE ALSO
 

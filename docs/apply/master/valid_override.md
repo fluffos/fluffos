@@ -7,9 +7,11 @@ title: master / valid_override
 
     valid_override - controls the use of efun::
 
+
 ### SYNOPSIS
 
     int valid_override( string file, string efun_name , string main_file );
+
 
 ### DESCRIPTION
 
@@ -27,31 +29,33 @@ title: master / valid_override
     If you wish to have the original 3.1.2 efun:: behavior,  simply  add  a
     line to master.c that looks like this:
 
-    int  valid_override(string  file,  string  efun, string main_file) {
+       int  valid_override(string  file,  string  efun, string main_file) {
     return 1; }
 
     Here is an example valid_override that is more restrictive:
 
-    int
-    valid_override(string file, string name, string main_file)
-    {
-    if (file == "/adm/obj/simul_efun") {
-    return 1;
-    }
-    if (name == "destruct")
-    return 0;
-    if (name == "shutdown")
-    return 0;
-    if (name == "snoop")
-    return 0;
-    if (name == "exec")
-    return 0;
-    return 1;
-    }
+      int
+      valid_override(string file, string name, string main_file)
+      {
+          if (file == "/adm/obj/simul_efun") {
+              return 1;
+          }
+          if (name == "destruct")
+              return 0;
+          if (name == "shutdown")
+              return 0;
+          if (name == "snoop")
+              return 0;
+          if (name == "exec")
+              return 0;
+          return 1;
+       }
+
 
 ### AUTHOR
 
     Truilkan@Basis
+
 
 ### SEE ALSO
 

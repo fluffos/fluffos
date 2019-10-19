@@ -7,10 +7,12 @@ title: strings / strsrch
 
     strsrch() - search for substrings in a string
 
+
 ### SYNOPSIS
 
     int strsrch( string str, string substr | int char,
-    int flag );
+                 int flag );
+
 
 ### DESCRIPTION
 
@@ -20,10 +22,12 @@ title: strings / strsrch
     ment is an integer, that character is found  (a  la  C's  strchr()/str‐
     rchr().)  The empty string or null value cannot be searched for.
 
+
 ### RETURN VALUE
 
     The  integer  offset  of  the  first  (last)  match is returned.  -1 is
     returned if there was no match, or an error occurred (bad args, etc).
+
 
 ### SEE ALSO
 

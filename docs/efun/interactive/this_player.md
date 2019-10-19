@@ -7,6 +7,7 @@ title: interactive / this_player
 
     object this_player( int flag );
 
+
 ### DESCRIPTION
 
     Return the object representing the player that caused the calling func‐
@@ -17,6 +18,7 @@ title: interactive / this_player
     this_player(1) may return a different value than this_player() in  cer‐
     tain  cases  (such  as  when  command()  is used by an admin to force a
     player to perform some command).
+
 
 ### SEE ALSO
 

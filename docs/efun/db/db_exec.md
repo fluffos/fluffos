@@ -7,9 +7,11 @@ title: db / db_exec
 
     db_exec() - executes an sql statement
 
+
 ### SYNOPSIS
 
     mixed db_exec( int handle, string sql_query );
+
 
 ### DESCRIPTION
 
@@ -18,6 +20,7 @@ title: db / db_exec
 
     Returns the number of rows in result set on success,  an  error  string
     otherwise.
+
 
 ### SEE ALSO
 

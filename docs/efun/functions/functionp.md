@@ -8,9 +8,11 @@ title: functions / functionp
     functionp()  -  determine whether or not a given variable is a function
     pointer, and if so what kind
 
+
 ### SYNOPSIS
 
     int functionp( mixed arg );
+
 
 ### DESCRIPTION
 
@@ -45,6 +47,7 @@ title: functions / functionp
     to test if it has args:
 
     if (functionp(f) & FP_HAS_ARGUMENTS) ...
+
 
 ### SEE ALSO
 
