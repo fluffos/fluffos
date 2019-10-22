@@ -2851,7 +2851,7 @@ void add_predefines() {
 #endif
 
   // Adding version
-  sprintf(save_buf, "%s (%s)", PROJECT_VERSION, SOURCE_REVISION);
+  sprintf(save_buf, "%s", PROJECT_VERSION);
   add_quoted_predefine("__VERSION__", save_buf);
 
   sprintf(save_buf, "%d", external_port[0].port);

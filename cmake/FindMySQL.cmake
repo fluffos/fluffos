@@ -115,65 +115,65 @@
 # and not empty strings, they better be the same. Else stop and complain
 
 set(ENV_OR_OPT_VARS
-        MYSQL_DIR
-        MYSQL_INCLUDE_DIR
-        MYSQL_LIB_DIR
-        MYSQL_LIB_DIR_LIST
-        MYSQL_CFLAGS
-        MYSQL_CXXFLAGS
-        MYSQL_CONFIG_EXECUTABLE
-        MYSQLCLIENT_STATIC_LINKING
-        MYSQLCLIENT_NO_THREADS
-        MYSQL_CXX_LINKAGE
-        MYSQL_EXTRA_LIBRARIES
-        MYSQL_LINK_FLAGS
-        )
+  MYSQL_DIR
+  MYSQL_INCLUDE_DIR
+  MYSQL_LIB_DIR
+  MYSQL_LIB_DIR_LIST
+  MYSQL_CFLAGS
+  MYSQL_CXXFLAGS
+  MYSQL_CONFIG_EXECUTABLE
+  MYSQLCLIENT_STATIC_LINKING
+  MYSQLCLIENT_NO_THREADS
+  MYSQL_CXX_LINKAGE
+  MYSQL_EXTRA_LIBRARIES
+  MYSQL_LINK_FLAGS
+  )
 
 # Mark the variable names that have values that are paths
 set(ENV_OR_OPT_PATH_VARS
-        MYSQL_DIR
-        MYSQL_INCLUDE_DIR
-        MYSQL_LIB_DIR
-        )
+  MYSQL_DIR
+  MYSQL_INCLUDE_DIR
+  MYSQL_LIB_DIR
+  )
 
-foreach(_xvar ${ENV_OR_OPT_VARS})
+foreach (_xvar ${ENV_OR_OPT_VARS})
 
-    if((DEFINED ${_xvar}) AND
-    (DEFINED ENV{${_xvar}}) AND
-    (NOT "${${_xvar}}" STREQUAL "") AND
-    (NOT "$ENV{${_xvar}}" STREQUAL "") AND
-    (NOT "$ENV{${_xvar}}" STREQUAL "${${_xvar}}"))
-        message(FATAL_ERROR "Please pass -D${_xvar}=... as an argument or "
-                "set ${_xvar} in the environment, but not both")
-    endif()
+  if ((DEFINED ${_xvar}) AND
+  (DEFINED ENV{${_xvar}}) AND
+  (NOT "${${_xvar}}" STREQUAL "") AND
+  (NOT "$ENV{${_xvar}}" STREQUAL "") AND
+  (NOT "$ENV{${_xvar}}" STREQUAL "${${_xvar}}"))
+    message(FATAL_ERROR "Please pass -D${_xvar}=... as an argument or "
+      "set ${_xvar} in the environment, but not both")
+  endif ()
 
-    # Now we know both are not set, set the CMake variable if needed
-    if((DEFINED ENV{${_xvar}}) AND (NOT "$ENV{${_xvar}}" STREQUAL ""))
-        set(${_xvar} $ENV{${_xvar}})
-    endif()
+  # Now we know both are not set, set the CMake variable if needed
+  if ((DEFINED ENV{${_xvar}}) AND (NOT "$ENV{${_xvar}}" STREQUAL ""))
+    set(${_xvar} $ENV{${_xvar}})
+  endif ()
 
-    # Notmalize the path if the variable is set and is a path
-    if(${_xvar})
-        list(FIND ENV_OR_OPT_PATH_VARS ${_xvar} _index)
-        if (${_index} GREATER -1)
-            file(TO_CMAKE_PATH "${${_xvar}}" ${_xvar})
-        endif()
-    endif()
+  # Notmalize the path if the variable is set and is a path
+  if (${_xvar})
+    list(FIND ENV_OR_OPT_PATH_VARS ${_xvar} _index)
+    if (${_index} GREATER -1)
+      file(TO_CMAKE_PATH "${${_xvar}}" ${_xvar})
+    endif ()
+  endif ()
 
-endforeach()
+endforeach ()
 
 
-if(MYSQL_CONFIG_EXECUTABLE)
-    set(_mysql_config_set_by_user 1)
-else()
-    # If MYSQL_DIR is set, set MYSQL_CONFIG_EXECUTABLE
-    if((NOT WIN32) AND
-    (DEFINED MYSQL_DIR) AND
-    (EXISTS "${MYSQL_DIR}/bin/mysql_config"))
-        set(MYSQL_CONFIG_EXECUTABLE "${MYSQL_DIR}/bin/mysql_config")
-        set(_mysql_config_in_mysql_dir 1)
-    endif()
-endif()
+if (MYSQL_CONFIG_EXECUTABLE)
+  set(_mysql_config_set_by_user 1)
+else ()
+  # If MYSQL_DIR is set, set MYSQL_CONFIG_EXECUTABLE
+  if ((NOT WIN32) AND
+  (DEFINED MYSQL_DIR) AND
+  (EXISTS "${MYSQL_DIR}/bin/mysql_config"))
+    set(MYSQL_CONFIG_EXECUTABLE "${MYSQL_DIR}/bin/mysql_config")
+    set(_mysql_config_in_mysql_dir 1)
+  endif ()
+endif ()
 
 ##########################################################################
 #
@@ -185,127 +185,127 @@ endif()
 # dist = for mysql binary distributions
 # build = for custom built tree
 
-if(CMAKE_BUILD_TYPE STREQUAL Debug)
-    set(_lib_suffix_dist debug)
-    set(_lib_suffix_build Debug)
-else()
-    set(_lib_suffix_dist opt)
-    set(_lib_suffix_build Release)
-    add_definitions(-DDBUG_OFF)   # FIXME what?!
-endif()
+if (CMAKE_BUILD_TYPE STREQUAL Debug)
+  set(_lib_suffix_dist debug)
+  set(_lib_suffix_build Debug)
+else ()
+  set(_lib_suffix_dist opt)
+  set(_lib_suffix_build Release)
+  add_definitions(-DDBUG_OFF)   # FIXME what?!
+endif ()
 
 set(_exe_fallback_path
-        /usr/bin
-        /usr/local/bin
-        /opt/mysql/mysql/bin
-        /usr/local/mysql/bin
-        )
+  /usr/bin
+  /usr/local/bin
+  /opt/mysql/mysql/bin
+  /usr/local/mysql/bin
+  )
 
 set(_include_fallback_path
-        /usr/include/mysql
-        /usr/local/include/mysql
-        /opt/mysql/mysql/include
-        /opt/mysql/mysql/include/mysql
-        /usr/local/mysql/include
-        /usr/local/mysql/include/mysql
-        $ENV{ProgramFiles}/MySQL/*/include
-        $ENV{SystemDrive}/MySQL/*/include
-        )
+  /usr/include/mysql
+  /usr/local/include/mysql
+  /opt/mysql/mysql/include
+  /opt/mysql/mysql/include/mysql
+  /usr/local/mysql/include
+  /usr/local/mysql/include/mysql
+  $ENV{ProgramFiles}/MySQL/*/include
+  $ENV{SystemDrive}/MySQL/*/include
+  )
 
 set(_lib_fallback_path
-        /usr/lib/mysql
-        /usr/local/lib/mysql
-        /usr/local/mysql/lib
-        /usr/local/mysql/lib/mysql
-        /opt/mysql/mysql/lib
-        /opt/mysql/mysql/lib/mysql
-        $ENV{ProgramFiles}/MySQL/*/lib/${_lib_suffix_dist}
-        $ENV{ProgramFiles}/MySQL/*/lib
-        $ENV{SystemDrive}/MySQL/*/lib/${_lib_suffix_dist}
-        $ENV{SystemDrive}/MySQL/*/lib
-        )
+  /usr/lib/mysql
+  /usr/local/lib/mysql
+  /usr/local/mysql/lib
+  /usr/local/mysql/lib/mysql
+  /opt/mysql/mysql/lib
+  /opt/mysql/mysql/lib/mysql
+  $ENV{ProgramFiles}/MySQL/*/lib/${_lib_suffix_dist}
+  $ENV{ProgramFiles}/MySQL/*/lib
+  $ENV{SystemDrive}/MySQL/*/lib/${_lib_suffix_dist}
+  $ENV{SystemDrive}/MySQL/*/lib
+  )
 
 set(_lib_subdirs
-        # Paths in build tree, really being too nice
-        libmysql/${_lib_suffix_build}
-        client/${_lib_suffix_build}
-        libmysql_r/.libs
-        libmysql/.libs
-        libmysql
-        # Install sub directories
-        lib/mysql
-        lib/${_lib_suffix_dist}   # Need to be before "lib"
-        lib
-        )
+  # Paths in build tree, really being too nice
+  libmysql/${_lib_suffix_build}
+  client/${_lib_suffix_build}
+  libmysql_r/.libs
+  libmysql/.libs
+  libmysql
+  # Install sub directories
+  lib/mysql
+  lib/${_lib_suffix_dist}   # Need to be before "lib"
+  lib
+  )
 
 set(_static_subdirs
-        mysql
-        ${_lib_suffix_dist}
-        )
+  mysql
+  ${_lib_suffix_dist}
+  )
 
-if(MSVC90)
-    set(_vs_subdir vs9)
-elseif(MSVC10)
-    set(_vs_subdir vs10)
-elseif(MSVC11)
-    set(_vs_subdir vs11)
-elseif(MSVC12)
-    set(_vs_subdir vs12)
-elseif(MSVC13)
-    set(_vs_subdir vs13)
-elseif(MSVC14)
-    set(_vs_subdir vs14)
-elseif(MSVC15)
-    set(_vs_subdir vs15)
-endif()
+if (MSVC90)
+  set(_vs_subdir vs9)
+elseif (MSVC10)
+  set(_vs_subdir vs10)
+elseif (MSVC11)
+  set(_vs_subdir vs11)
+elseif (MSVC12)
+  set(_vs_subdir vs12)
+elseif (MSVC13)
+  set(_vs_subdir vs13)
+elseif (MSVC14)
+  set(_vs_subdir vs14)
+elseif (MSVC15)
+  set(_vs_subdir vs15)
+endif ()
 
-if(_vs_subdir)
-    if("${_lib_suffix_dist}" STREQUAL "debug")
-        set(_vs_subdir "${_vs_subdir}/debug")
-    endif()
-    list(INSERT _lib_subdirs 0 "lib/${_vs_subdir}")
-endif()
+if (_vs_subdir)
+  if ("${_lib_suffix_dist}" STREQUAL "debug")
+    set(_vs_subdir "${_vs_subdir}/debug")
+  endif ()
+  list(INSERT _lib_subdirs 0 "lib/${_vs_subdir}")
+endif ()
 
 # For Windows, the client library name differs, so easy to
 # make sure find_library() picks the right one. For Unix, it
 # is the file extension that differs. In the static library
 # case we know it is ".a", so we add it to the library name
 # we search for to make sure it is picked in the static case.
-if(WIN32)
-    set(_dynamic_libs   "libmysql")
-    set(_static_libs    "mysqlclient")
-    set(_static_lib_ext ".lib")   # Careful, can be import library for DLL
-elseif(MYSQLCLIENT_NO_THREADS)
-    # In 5.1 and below there is a single threaded library
-    set(_dynamic_libs   "mysqlclient")
-    set(_static_libs    "libmysqlclient.a")
-    set(_static_lib_ext ".a")
-else()
-    # We try the multithreaded "libmysqlclient_r" first and if not
-    # there, pick "libmysqlclient" that in 5.5 and up is multithreaded
-    # anyway (soft link "libmysqlclient_r" is not installed MySQL Server
-    # 5.6 and Debian/Ubuntu and might go in 5.7 for all installs)
-    set(_dynamic_libs   "mysqlclient_r"      "mysqlclient")
-    set(_static_libs    "libmysqlclient_r.a" "libmysqlclient.a")
-    set(_static_lib_ext ".a")
-endif()
+if (WIN32)
+  set(_dynamic_libs "libmysql")
+  set(_static_libs "mysqlclient")
+  set(_static_lib_ext ".lib")   # Careful, can be import library for DLL
+elseif (MYSQLCLIENT_NO_THREADS)
+  # In 5.1 and below there is a single threaded library
+  set(_dynamic_libs "mysqlclient")
+  set(_static_libs "libmysqlclient.a")
+  set(_static_lib_ext ".a")
+else ()
+  # We try the multithreaded "libmysqlclient_r" first and if not
+  # there, pick "libmysqlclient" that in 5.5 and up is multithreaded
+  # anyway (soft link "libmysqlclient_r" is not installed MySQL Server
+  # 5.6 and Debian/Ubuntu and might go in 5.7 for all installs)
+  set(_dynamic_libs "mysqlclient_r" "mysqlclient")
+  set(_static_libs "libmysqlclient_r.a" "libmysqlclient.a")
+  set(_static_lib_ext ".a")
+endif ()
 
-if(MYSQLCLIENT_STATIC_LINKING)
-    set(_link_type   "static")
-    set(_search_libs ${_static_libs})
-else()
-    set(_link_type   "dynamic")
-    set(_search_libs ${_dynamic_libs})
-endif()
+if (MYSQLCLIENT_STATIC_LINKING)
+  set(_link_type "static")
+  set(_search_libs ${_static_libs})
+else ()
+  set(_link_type "dynamic")
+  set(_search_libs ${_dynamic_libs})
+endif ()
 
 # Just to pretty print in error messages
-string(REPLACE ";" " " _pp_search_libs           "${_search_libs}")
-string(REPLACE ";" " " _pp_lib_subdirs           "${_lib_subdirs}")
-string(REPLACE ";" " " _pp_lib_fallback_path     "${_lib_fallback_path}")
+string(REPLACE ";" " " _pp_search_libs "${_search_libs}")
+string(REPLACE ";" " " _pp_lib_subdirs "${_lib_subdirs}")
+string(REPLACE ";" " " _pp_lib_fallback_path "${_lib_fallback_path}")
 string(REPLACE ";" " " _pp_include_fallback_path "${_include_fallback_path}")
 
 message(STATUS "You will link ${_link_type}ally to the MySQL client"
-        " library (set with -DMYSQLCLIENT_STATIC_LINKING=<bool>)")
+  " library (set with -DMYSQLCLIENT_STATIC_LINKING=<bool>)")
 message(STATUS "Searching for ${_link_type} libraries with the base name(s) \"${_pp_search_libs}\"")
 
 ##########################################################################
@@ -326,11 +326,11 @@ message(STATUS "Searching for ${_link_type} libraries with the base name(s) \"${
 # ----------------------------------------------------------------------
 
 macro(_mysql_conf _var _opt)
-    execute_process(
-            COMMAND ${MYSQL_CONFIG_EXECUTABLE} ${_opt}
-            OUTPUT_VARIABLE ${_var}
-            OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
+  execute_process(
+    COMMAND ${MYSQL_CONFIG_EXECUTABLE} ${_opt}
+    OUTPUT_VARIABLE ${_var}
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
 endmacro()
 
 # ----------------------------------------------------------------------
@@ -347,15 +347,15 @@ endmacro()
 # ----------------------------------------------------------------------
 
 macro(_mysql_config _var _regex _opt)
-    _mysql_conf(_mysql_config_output ${_opt})
-    string(REGEX MATCHALL "${_regex}([^ ]+)" _mysql_config_output "${_mysql_config_output}")
-    string(REGEX REPLACE "^[ \t]+" "" _mysql_config_output "${_mysql_config_output}")
-    IF(CMAKE_SYSTEM_NAME MATCHES "SunOS")
-        string(REGEX REPLACE " -latomic" "" _mysql_config_output "${_mysql_config_output}")
-    ENDIF()
-    string(REGEX REPLACE "${_regex}" "" _mysql_config_output "${_mysql_config_output}")
-    separate_arguments(_mysql_config_output)
-    set(${_var} ${_mysql_config_output})
+  _mysql_conf(_mysql_config_output ${_opt})
+  string(REGEX MATCHALL "${_regex}([^ ]+)" _mysql_config_output "${_mysql_config_output}")
+  string(REGEX REPLACE "^[ \t]+" "" _mysql_config_output "${_mysql_config_output}")
+  IF (CMAKE_SYSTEM_NAME MATCHES "SunOS")
+    string(REGEX REPLACE " -latomic" "" _mysql_config_output "${_mysql_config_output}")
+  ENDIF ()
+  string(REGEX REPLACE "${_regex}" "" _mysql_config_output "${_mysql_config_output}")
+  separate_arguments(_mysql_config_output)
+  set(${_var} ${_mysql_config_output})
 endmacro()
 
 # ----------------------------------------------------------------------
@@ -375,16 +375,16 @@ endmacro()
 # ----------------------------------------------------------------------
 
 macro(_mysql_config_replace _var _regex1 _replace _regex2 _opt)
-    _mysql_conf(_mysql_config_output ${_opt})
-    string(REGEX MATCHALL "${_regex2}([^ ]+)" _mysql_config_output "${_mysql_config_output}")
-    string(REGEX REPLACE "^[ \t]+" "" _mysql_config_output "${_mysql_config_output}")
-    IF(CMAKE_SYSTEM_NAME MATCHES "SunOS")
-        string(REGEX REPLACE " -latomic" "" _mysql_config_output "${_mysql_config_output}")
-    ENDIF()
-    string(REGEX REPLACE "${_regex2}" "" _mysql_config_output "${_mysql_config_output}")
-    string(REGEX REPLACE "${_regex1}" "${_replace}" _mysql_config_output "${_mysql_config_output}")
-    separate_arguments(_mysql_config_output)
-    set(${_var} ${_mysql_config_output})
+  _mysql_conf(_mysql_config_output ${_opt})
+  string(REGEX MATCHALL "${_regex2}([^ ]+)" _mysql_config_output "${_mysql_config_output}")
+  string(REGEX REPLACE "^[ \t]+" "" _mysql_config_output "${_mysql_config_output}")
+  IF (CMAKE_SYSTEM_NAME MATCHES "SunOS")
+    string(REGEX REPLACE " -latomic" "" _mysql_config_output "${_mysql_config_output}")
+  ENDIF ()
+  string(REGEX REPLACE "${_regex2}" "" _mysql_config_output "${_mysql_config_output}")
+  string(REGEX REPLACE "${_regex1}" "${_replace}" _mysql_config_output "${_mysql_config_output}")
+  separate_arguments(_mysql_config_output)
+  set(${_var} ${_mysql_config_output})
 endmacro()
 
 # ----------------------------------------------------------------------
@@ -395,36 +395,36 @@ endmacro()
 
 macro(_check_lib_search_error _lib_dir_var _lib_var _exta_err_string)
 
-    set(_lib     "${${_lib_var}}")
-    set(_lib_dir "${${_lib_dir_var}}")
+  set(_lib "${${_lib_var}}")
+  set(_lib_dir "${${_lib_dir_var}}")
 
-    if(FINDMYSQL_DEBUG)
-        message("_lib         \"${_lib}\"")
-        message("_lib_dir     \"${_lib_dir}\"")
-        message("_lib_var     \"${_lib_var}\"")
-        message("_lib_dir_var \"${_lib_dir_var}\"")
-    endif()
+  if (FINDMYSQL_DEBUG)
+    message("_lib         \"${_lib}\"")
+    message("_lib_dir     \"${_lib_dir}\"")
+    message("_lib_var     \"${_lib_var}\"")
+    message("_lib_dir_var \"${_lib_dir_var}\"")
+  endif ()
 
-    set(_err_string "Could not find ${_link_type} "
-            "\"${_pp_search_libs}\" in ${_lib_dir_var} "
-            "\"${_lib_dir}\" ${_exta_err_string}")
+  set(_err_string "Could not find ${_link_type} "
+    "\"${_pp_search_libs}\" in ${_lib_dir_var} "
+    "\"${_lib_dir}\" ${_exta_err_string}")
 
-    if(NOT ${_lib_var})
+  if (NOT ${_lib_var})
+    message(FATAL_ERROR ${_err_string})
+  endif ()
+
+  # find_library() try find a shared library first, then a static
+  # one. For Windows the library has a different name, but for
+  # Unix only the extension differs. So we check here that we
+  # got the library kind we expected.
+  if (NOT WIN32)
+    if (NOT MYSQLCLIENT_STATIC_LINKING)
+      get_filename_component(_ext ${_lib} EXT)
+      if (${_ext} STREQUAL ${_static_lib_ext})
         message(FATAL_ERROR ${_err_string})
-    endif()
-
-    # find_library() try find a shared library first, then a static
-    # one. For Windows the library has a different name, but for
-    # Unix only the extension differs. So we check here that we
-    # got the library kind we expected.
-    if(NOT WIN32)
-        if(NOT MYSQLCLIENT_STATIC_LINKING)
-            get_filename_component(_ext ${_lib} EXT)
-            if(${_ext} STREQUAL ${_static_lib_ext})
-                message(FATAL_ERROR ${_err_string})
-            endif()
-        endif()
-    endif()
+      endif ()
+    endif ()
+  endif ()
 endmacro()
 
 
@@ -434,26 +434,26 @@ endmacro()
 #
 ##########################################################################
 
-if(NOT WIN32)
+if (NOT WIN32)
 
-    if(NOT MYSQL_CONFIG_EXECUTABLE)
-        find_program(MYSQL_CONFIG_EXECUTABLE
-                NAMES
-                mysql_config
-                DOC
-                "full path of mysql_config"
-                PATHS
-                ${_exe_fallback_path}
-                )
-    endif()
+  if (NOT MYSQL_CONFIG_EXECUTABLE)
+    find_program(MYSQL_CONFIG_EXECUTABLE
+      NAMES
+      mysql_config
+      DOC
+      "full path of mysql_config"
+      PATHS
+      ${_exe_fallback_path}
+      )
+  endif ()
 
-    if(MYSQL_CONFIG_EXECUTABLE)
-        message(STATUS "mysql_config was found ${MYSQL_CONFIG_EXECUTABLE}")
+  if (MYSQL_CONFIG_EXECUTABLE)
+    message(STATUS "mysql_config was found ${MYSQL_CONFIG_EXECUTABLE}")
 
-        _mysql_conf(MYSQL_VERSION "--version")
-    endif()
+    _mysql_conf(MYSQL_VERSION "--version")
+  endif ()
 
-endif()
+endif ()
 
 ##########################################################################
 #
@@ -461,78 +461,78 @@ endif()
 #
 ##########################################################################
 
-if(FINDMYSQL_DEBUG AND MYSQL_INCLUDE_DIR)
-    message("DBG: User gave MYSQL_INCLUDE_DIR = \"${MYSQL_INCLUDE_DIR}\"")
-endif()
+if (FINDMYSQL_DEBUG AND MYSQL_INCLUDE_DIR)
+  message("DBG: User gave MYSQL_INCLUDE_DIR = \"${MYSQL_INCLUDE_DIR}\"")
+endif ()
 
-if(FINDMYSQL_DEBUG AND MYSQL_DIR)
-    message("DBG: User gave MYSQL_DIR = \"${MYSQL_DIR}\"")
-endif()
+if (FINDMYSQL_DEBUG AND MYSQL_DIR)
+  message("DBG: User gave MYSQL_DIR = \"${MYSQL_DIR}\"")
+endif ()
 
-if(MYSQL_INCLUDE_DIR)
+if (MYSQL_INCLUDE_DIR)
 
-    if(FINDMYSQL_DEBUG)
-        message("DBG: Using MYSQL_INCLUDE_DIR to find \"mysql.h\"")
-    endif()
+  if (FINDMYSQL_DEBUG)
+    message("DBG: Using MYSQL_INCLUDE_DIR to find \"mysql.h\"")
+  endif ()
 
-    if(NOT EXISTS "${MYSQL_INCLUDE_DIR}/mysql.h")
-        message(FATAL_ERROR "MYSQL_INCLUDE_DIR given, but no \"mysql.h\" "
-                "in \"${MYSQL_INCLUDE_DIR}\"")
-    endif()
+  if (NOT EXISTS "${MYSQL_INCLUDE_DIR}/mysql.h")
+    message(FATAL_ERROR "MYSQL_INCLUDE_DIR given, but no \"mysql.h\" "
+      "in \"${MYSQL_INCLUDE_DIR}\"")
+  endif ()
 
-elseif(MYSQL_DIR AND
+elseif (MYSQL_DIR AND
 (NOT _mysql_config_in_mysql_dir) AND
 (NOT _mysql_config_set_by_user))
 
-    if(FINDMYSQL_DEBUG)
-        message("DBG: Using MYSQL_DIR without \"mysql_config\" to find \"mysql.h\"")
-    endif()
+  if (FINDMYSQL_DEBUG)
+    message("DBG: Using MYSQL_DIR without \"mysql_config\" to find \"mysql.h\"")
+  endif ()
 
-    set(MYSQL_INCLUDE_DIR "${MYSQL_DIR}/include")
-    if(NOT EXISTS "${MYSQL_INCLUDE_DIR}/mysql.h")
-        message(FATAL_ERROR "MYSQL_DIR given, but no \"mysql.h\" "
-                "in \"${MYSQL_INCLUDE_DIR}\"")
-    endif()
+  set(MYSQL_INCLUDE_DIR "${MYSQL_DIR}/include")
+  if (NOT EXISTS "${MYSQL_INCLUDE_DIR}/mysql.h")
+    message(FATAL_ERROR "MYSQL_DIR given, but no \"mysql.h\" "
+      "in \"${MYSQL_INCLUDE_DIR}\"")
+  endif ()
 
-elseif(MYSQL_CONFIG_EXECUTABLE)
+elseif (MYSQL_CONFIG_EXECUTABLE)
 
-    if(FINDMYSQL_DEBUG)
-        message("DBG: Using \"mysql_config\" to find \"mysql.h\"")
-    endif()
+  if (FINDMYSQL_DEBUG)
+    message("DBG: Using \"mysql_config\" to find \"mysql.h\"")
+  endif ()
 
-    # This code assumes there is just one "-I...." and that
-    # no space between "-I" and the path
-    _mysql_config(MYSQL_INCLUDE_DIR "(^| )-I" "--include")
-    if(NOT MYSQL_INCLUDE_DIR)
-        message(FATAL_ERROR "Could not find the include dir from running "
-                "\"${MYSQL_CONFIG_EXECUTABLE}\"")
-    endif()
+  # This code assumes there is just one "-I...." and that
+  # no space between "-I" and the path
+  _mysql_config(MYSQL_INCLUDE_DIR "(^| )-I" "--include")
+  if (NOT MYSQL_INCLUDE_DIR)
+    message(FATAL_ERROR "Could not find the include dir from running "
+      "\"${MYSQL_CONFIG_EXECUTABLE}\"")
+  endif ()
 
-    if(NOT EXISTS "${MYSQL_INCLUDE_DIR}/mysql.h")
-        message(FATAL_ERROR "Could not find \"mysql.h\" in \"${MYSQL_INCLUDE_DIR}\" "
-                "found from running \"${MYSQL_CONFIG_EXECUTABLE}\"")
-    endif()
+  if (NOT EXISTS "${MYSQL_INCLUDE_DIR}/mysql.h")
+    message(FATAL_ERROR "Could not find \"mysql.h\" in \"${MYSQL_INCLUDE_DIR}\" "
+      "found from running \"${MYSQL_CONFIG_EXECUTABLE}\"")
+  endif ()
 
-else()
+else ()
 
-    if(FINDMYSQL_DEBUG)
-        message("DBG: Using find_path() searching "
-                "\"${_pp_include_fallback_path}\" to find \"mysql.h\"")
-    endif()
+  if (FINDMYSQL_DEBUG)
+    message("DBG: Using find_path() searching "
+      "\"${_pp_include_fallback_path}\" to find \"mysql.h\"")
+  endif ()
 
-    # No specific paths, try some common install paths
-    find_path(MYSQL_INCLUDE_DIR mysql.h ${_include_fallback_path})
+  # No specific paths, try some common install paths
+  find_path(MYSQL_INCLUDE_DIR mysql.h ${_include_fallback_path})
 
-    if(NOT MYSQL_INCLUDE_DIR)
-        message(FATAL_ERROR "Could not find \"mysql.h\" from searching "
-                "\"${_pp_include_fallback_path}\"")
-    endif()
+  if (NOT MYSQL_INCLUDE_DIR)
+    message(FATAL_ERROR "Could not find \"mysql.h\" from searching "
+      "\"${_pp_include_fallback_path}\"")
+  endif ()
 
-endif()
+endif ()
 
-if(FINDMYSQL_DEBUG)
-    message("DBG: MYSQL_INCLUDE_DIR = \"${MYSQL_INCLUDE_DIR}\"")
-endif()
+if (FINDMYSQL_DEBUG)
+  message("DBG: MYSQL_INCLUDE_DIR = \"${MYSQL_INCLUDE_DIR}\"")
+endif ()
 
 ##########################################################################
 #
@@ -540,153 +540,164 @@ endif()
 #
 ##########################################################################
 
-if(FINDMYSQL_DEBUG AND MYSQL_LIB_DIR)
-    message("DBG: User gave MYSQL_LIB_DIR = \"${MYSQL_LIB_DIR}\"")
-endif()
+if (FINDMYSQL_DEBUG AND MYSQL_LIB_DIR)
+  message("DBG: User gave MYSQL_LIB_DIR = \"${MYSQL_LIB_DIR}\"")
+endif ()
 
-if(MYSQL_LIB_DIR)
+if (MYSQL_LIB_DIR)
 
-    if(FINDMYSQL_DEBUG)
-        message("DBG: Using find_library() searching MYSQL_LIB_DIR")
-    endif()
+  if (FINDMYSQL_DEBUG)
+    message("DBG: Using find_library() searching MYSQL_LIB_DIR")
+  endif ()
 
-    find_library(MYSQL_LIB
-            NAMES
-            ${_search_libs}
-            PATHS
-            "${MYSQL_LIB_DIR}"
-            NO_DEFAULT_PATH
-            )
-    _check_lib_search_error(MYSQL_LIB_DIR MYSQL_LIB "")
-    set(MYSQL_LIBRARIES ${MYSQL_LIB})
+  find_library(MYSQL_LIB
+    NAMES
+    ${_search_libs}
+    PATHS
+    "${MYSQL_LIB_DIR}"
+    NO_DEFAULT_PATH
+    )
+  _check_lib_search_error(MYSQL_LIB_DIR MYSQL_LIB "")
+  set(MYSQL_LIBRARIES ${MYSQL_LIB})
 
-elseif(MYSQL_DIR AND
+elseif (MYSQL_DIR AND
 (NOT _mysql_config_in_mysql_dir) AND
 (NOT _mysql_config_set_by_user))
 
-    if(FINDMYSQL_DEBUG)
-        message("DBG: Using find_library() searching "
-                "MYSQL_DIR and \"${_pp_lib_subdirs}\"")
-    endif()
+  if (FINDMYSQL_DEBUG)
+    message("DBG: Using find_library() searching "
+      "MYSQL_DIR and \"${_pp_lib_subdirs}\"")
+  endif ()
 
+  find_library(MYSQL_LIB
+    NAMES
+    ${_search_libs}
+    PATHS
+    "${MYSQL_DIR}"
+    PATH_SUFFIXES
+    ${_lib_subdirs}
+    NO_DEFAULT_PATH
+    )
+  _check_lib_search_error(MYSQL_DIR MYSQL_LIB "in \"${_pp_lib_subdirs}\"")
+  get_filename_component(MYSQL_LIB_DIR "${MYSQL_LIB}" PATH)
+  set(MYSQL_LIBRARIES "${MYSQL_LIB}")
+
+elseif (MYSQL_CONFIG_EXECUTABLE)
+
+  if (FINDMYSQL_DEBUG)
+    message("DBG: Using \"mysql_config\" to find the libraries")
+  endif ()
+
+  # This code assumes there is just one "-L...." and that
+  # no space between "-L" and the path
+  _mysql_config(MYSQL_LIB_DIR "(^| )-L" "--libs")
+
+  IF (CMAKE_SYSTEM_NAME MATCHES "SunOS")
+    # This is needed to make Solaris binaries using the default runtime lib path
+    _mysql_config(DEV_STUDIO_RUNTIME_DIR "(^| )-R" "--libs")
+  ENDIF ()
+
+
+  LIST(LENGTH MYSQL_LIB_DIR dir_cnt)
+  MESSAGE(STATUS "Libraries paths found: ${n}")
+  IF (${dir_cnt} GREATER 1)
+    SET(MYSQL_LIB_DIR_LIST ${MYSQL_LIB_DIR})
+    MESSAGE(STATUS "MYSQL_LIB_DIR_LIST = ${MYSQL_LIB_DIR_LIST}")
+
+    FOREACH (_path_to_check IN LISTS MYSQL_LIB_DIR)
+      FIND_LIBRARY(_mysql_client_lib_var
+        NAMES ${_search_libs}
+        PATHS ${_path_to_check}
+        NO_DEFAULT_PATH
+        )
+      IF (_mysql_client_lib_var)
+        MESSAGE(STATUS "CLIENT LIB VAR: ${_mysql_client_lib_var}")
+        unset(_mysql_client_lib_var CACHE)
+        set(MYSQL_LIB_DIR ${_path_to_check})
+      ENDIF ()
+    ENDFOREACH (_path_to_check)
+  ENDIF ()
+
+  if (NOT MYSQL_LIB_DIR)
+    message(FATAL_ERROR "Could not find the library dir from running "
+      "\"${MYSQL_CONFIG_EXECUTABLE}\"")
+  endif ()
+
+  if (NOT EXISTS "${MYSQL_LIB_DIR}")
+    message(FATAL_ERROR "Could not find the directory \"${MYSQL_LIB_DIR}\" "
+      "found from running \"${MYSQL_CONFIG_EXECUTABLE}\"")
+  endif ()
+
+  # We have the assumed MYSQL_LIB_DIR. The output from "mysql_config"
+  # might not be correct for static libraries, so we might need to
+  # adjust MYSQL_LIB_DIR later on.
+
+  if (MYSQLCLIENT_STATIC_LINKING)
+
+    # Find the static library, might be one level down
     find_library(MYSQL_LIB
-            NAMES
-            ${_search_libs}
-            PATHS
-            "${MYSQL_DIR}"
-            PATH_SUFFIXES
-            ${_lib_subdirs}
-            NO_DEFAULT_PATH
-            )
-    _check_lib_search_error(MYSQL_DIR MYSQL_LIB "in \"${_pp_lib_subdirs}\"")
-    get_filename_component(MYSQL_LIB_DIR "${MYSQL_LIB}" PATH)
-    set(MYSQL_LIBRARIES "${MYSQL_LIB}")
+      NAMES
+      ${_search_libs}
+      PATHS
+      ${MYSQL_LIB_DIR}
+      PATH_SUFFIXES
+      ${_static_subdirs}
+      NO_DEFAULT_PATH
+      )
+    _check_lib_search_error(MYSQL_LIB_DIR MYSQL_LIB "in \"${_static_subdirs}\"")
 
-elseif(MYSQL_CONFIG_EXECUTABLE)
-
-    if(FINDMYSQL_DEBUG)
-        message("DBG: Using \"mysql_config\" to find the libraries")
-    endif()
-
-    # This code assumes there is just one "-L...." and that
-    # no space between "-L" and the path
-    _mysql_config(MYSQL_LIB_DIR "(^| )-L" "--libs")
-
-    IF(CMAKE_SYSTEM_NAME MATCHES "SunOS")
-        # This is needed to make Solaris binaries using the default runtime lib path
-        _mysql_config(DEV_STUDIO_RUNTIME_DIR "(^| )-R" "--libs")
-    ENDIF()
-
-
-    # In case mysql_config returns several paths: libmysqlclient is last
-    LIST(LENGTH MYSQL_LIB_DIR n)
-    IF( ${n} GREATER 1)
-        #copy list of directories
-        SET(MYSQL_LIB_DIR_LIST ${MYSQL_LIB_DIR})
-
-        MATH(EXPR ind "${n}-1")
-        LIST(GET MYSQL_LIB_DIR ${ind} MYSQL_LIB_DIR)
-    ENDIF()
-    if(NOT MYSQL_LIB_DIR)
-        message(FATAL_ERROR "Could not find the library dir from running "
-                "\"${MYSQL_CONFIG_EXECUTABLE}\"")
-    endif()
-
-    if(NOT EXISTS "${MYSQL_LIB_DIR}")
-        message(FATAL_ERROR "Could not find the directory \"${MYSQL_LIB_DIR}\" "
-                "found from running \"${MYSQL_CONFIG_EXECUTABLE}\"")
-    endif()
-
-    # We have the assumed MYSQL_LIB_DIR. The output from "mysql_config"
-    # might not be correct for static libraries, so we might need to
-    # adjust MYSQL_LIB_DIR later on.
-
-    if(MYSQLCLIENT_STATIC_LINKING)
-
-        # Find the static library, might be one level down
-        find_library(MYSQL_LIB
-                NAMES
-                ${_search_libs}
-                PATHS
-                ${MYSQL_LIB_DIR}
-                PATH_SUFFIXES
-                ${_static_subdirs}
-                NO_DEFAULT_PATH
-                )
-        _check_lib_search_error(MYSQL_LIB_DIR MYSQL_LIB "in \"${_static_subdirs}\"")
-
-        # Adjust MYSQL_LIB_DIR in case it changes
-        get_filename_component(MYSQL_LIB_DIR "${MYSQL_LIB}" PATH)
-
-        # Replace the current library references with the full path
-        # to the library, i.e. the -L will be ignored
-        _mysql_config_replace(MYSQL_LIBRARIES
-                "(mysqlclient|mysqlclient_r)" "${MYSQL_LIB}" "(^| )-l" "--libs")
-
-    else()
-
-        _mysql_config(MYSQL_LIBRARIES "(^| )-l" "--libs")
-        FOREACH(__lib IN LISTS MYSQL_LIBRARIES)
-            string(REGEX MATCH "mysqlclient([^ ]*)" _matched_lib __lib)
-            IF(_matched_lib)
-                set(_search_libs ${matched_lib})
-            ENDIF()
-        ENDFOREACH()
-        # First library is assumed to be the client library
-        # list(GET MYSQL_LIBRARIES 0 _search_libs)
-        find_library(MYSQL_LIB
-                NAMES
-                ${_search_libs}
-                PATHS
-                ${MYSQL_LIB_DIR}
-                NO_DEFAULT_PATH
-                )
-        _check_lib_search_error(MYSQL_LIB_DIR MYSQL_LIB "")
-
-    endif()
-
-else()
-
-    if(FINDMYSQL_DEBUG)
-        message("DBG: Using find_library() searching "
-                "\"${_pp_lib_fallback_path}\" to find the client library")
-    endif()
-
-    # Search standard places
-    find_library(MYSQL_LIB
-            NAMES
-            ${_search_libs}
-            PATHS
-            ${_lib_fallback_path}
-            )
-    if(NOT MYSQL_LIB)
-        message(FATAL_ERROR "Could not find \"${_pp_search_libs}\" from searching "
-                "\"${_pp_lib_fallback_path}\"")
-    endif()
-
+    # Adjust MYSQL_LIB_DIR in case it changes
     get_filename_component(MYSQL_LIB_DIR "${MYSQL_LIB}" PATH)
 
-endif()
+    # Replace the current library references with the full path
+    # to the library, i.e. the -L will be ignored
+    _mysql_config_replace(MYSQL_LIBRARIES
+      "(mysqlclient|mysqlclient_r)" "${MYSQL_LIB}" "(^| )-l" "--libs")
+
+  else ()
+
+    _mysql_config(MYSQL_LIBRARIES "(^| )-l" "--libs")
+    FOREACH (__lib IN LISTS MYSQL_LIBRARIES)
+      string(REGEX MATCH "mysqlclient([^ ]*)" _matched_lib __lib)
+      IF (_matched_lib)
+        set(_search_libs ${matched_lib})
+      ENDIF ()
+    ENDFOREACH ()
+    # First library is assumed to be the client library
+    # list(GET MYSQL_LIBRARIES 0 _search_libs)
+    find_library(MYSQL_LIB
+      NAMES
+      ${_search_libs}
+      PATHS
+      ${MYSQL_LIB_DIR}
+      NO_DEFAULT_PATH
+      )
+    _check_lib_search_error(MYSQL_LIB_DIR MYSQL_LIB "")
+
+  endif ()
+
+else ()
+
+  if (FINDMYSQL_DEBUG)
+    message("DBG: Using find_library() searching "
+      "\"${_pp_lib_fallback_path}\" to find the client library")
+  endif ()
+
+  # Search standard places
+  find_library(MYSQL_LIB
+    NAMES
+    ${_search_libs}
+    PATHS
+    ${_lib_fallback_path}
+    )
+  if (NOT MYSQL_LIB)
+    message(FATAL_ERROR "Could not find \"${_pp_search_libs}\" from searching "
+      "\"${_pp_lib_fallback_path}\"")
+  endif ()
+
+  get_filename_component(MYSQL_LIB_DIR "${MYSQL_LIB}" PATH)
+
+endif ()
 
 ##########################################################################
 #
@@ -695,29 +706,29 @@ endif()
 ##########################################################################
 
 # FIXME needed?!
-if(MYSQLCLIENT_STATIC_LINKING AND
-        NOT WIN32 AND
-        NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    list(APPEND MYSQL_LIBRARIES "rt")
-endif()
+if (MYSQLCLIENT_STATIC_LINKING AND
+  NOT WIN32 AND
+  NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  list(APPEND MYSQL_LIBRARIES "rt")
+endif ()
 
 # For dynamic linking use the built-in sys and strings
-if(NOT MYSQLCLIENT_STATIC_LINKING)
-    #list(APPEND SYS_LIBRARIES "mysql_sys")
-    #list(APPEND SYS_LIBRARIES "mysql_strings")
-    #list(APPEND SYS_LIBRARIES ${MYSQL_LIBRARIES})
-    #SET(MYSQL_LIBRARIES ${SYS_LIBRARIES})
+if (NOT MYSQLCLIENT_STATIC_LINKING)
+  #list(APPEND SYS_LIBRARIES "mysql_sys")
+  #list(APPEND SYS_LIBRARIES "mysql_strings")
+  #list(APPEND SYS_LIBRARIES ${MYSQL_LIBRARIES})
+  #SET(MYSQL_LIBRARIES ${SYS_LIBRARIES})
 
-    #if(NOT MYSQLCLIENT_STATIC_LINKING AND ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    #  list(REVERSE MYSQL_LIBRARIES)
-    #endif()
+  #if(NOT MYSQLCLIENT_STATIC_LINKING AND ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  #  list(REVERSE MYSQL_LIBRARIES)
+  #endif()
 
-endif()
+endif ()
 
-if(MYSQL_EXTRA_LIBRARIES)
-    separate_arguments(MYSQL_EXTRA_LIBRARIES)
-    list(APPEND MYSQL_LIBRARIES ${MYSQL_EXTRA_LIBRARIES})
-endif()
+if (MYSQL_EXTRA_LIBRARIES)
+  separate_arguments(MYSQL_EXTRA_LIBRARIES)
+  list(APPEND MYSQL_LIBRARIES ${MYSQL_EXTRA_LIBRARIES})
+endif ()
 
 # For compatibility
 SET(MYSQL_CLIENT_LIBS ${MYSQL_LIBRARIES})
@@ -729,36 +740,36 @@ SET(MYSQL_CLIENT_LIBS ${MYSQL_LIBRARIES})
 #
 ##########################################################################
 
-if(MYSQL_INCLUDE_DIR AND NOT MYSQL_VERSION)
+if (MYSQL_INCLUDE_DIR AND NOT MYSQL_VERSION)
 
-    # Write the C source file that will include the MySQL headers
-    set(GETMYSQLVERSION_SOURCEFILE "${CMAKE_CURRENT_BINARY_DIR}/getmysqlversion.c")
-    file(WRITE "${GETMYSQLVERSION_SOURCEFILE}"
-            "#include <mysql.h>\n"
-            "#include <stdio.h>\n"
-            "int main() {\n"
-            "  printf(\"%s\", MYSQL_SERVER_VERSION);\n"
-            "}\n"
-            )
+  # Write the C source file that will include the MySQL headers
+  set(GETMYSQLVERSION_SOURCEFILE "${CMAKE_CURRENT_BINARY_DIR}/getmysqlversion.c")
+  file(WRITE "${GETMYSQLVERSION_SOURCEFILE}"
+    "#include <mysql.h>\n"
+    "#include <stdio.h>\n"
+    "int main() {\n"
+    "  printf(\"%s\", MYSQL_SERVER_VERSION);\n"
+    "}\n"
+    )
 
-    # Compile and run the created executable, store output in MYSQL_VERSION
-    try_run(_run_result _compile_result
-            "${CMAKE_BINARY_DIR}"
-            "${GETMYSQLVERSION_SOURCEFILE}"
-            CMAKE_FLAGS "-DINCLUDE_DIRECTORIES:STRING=${MYSQL_INCLUDE_DIR}"
-            RUN_OUTPUT_VARIABLE MYSQL_VERSION
-            )
+  # Compile and run the created executable, store output in MYSQL_VERSION
+  try_run(_run_result _compile_result
+    "${CMAKE_BINARY_DIR}"
+    "${GETMYSQLVERSION_SOURCEFILE}"
+    CMAKE_FLAGS "-DINCLUDE_DIRECTORIES:STRING=${MYSQL_INCLUDE_DIR}"
+    RUN_OUTPUT_VARIABLE MYSQL_VERSION
+    )
 
-    if(FINDMYSQL_DEBUG)
-        if(NOT _compile_result)
-            message("DBG: Could not compile \"getmysqlversion.c\"")
-        endif()
-        if(_run_result)
-            message("DBG: Running \"getmysqlversion\" returned ${_run_result}")
-        endif()
-    endif()
+  if (FINDMYSQL_DEBUG)
+    if (NOT _compile_result)
+      message("DBG: Could not compile \"getmysqlversion.c\"")
+    endif ()
+    if (_run_result)
+      message("DBG: Running \"getmysqlversion\" returned ${_run_result}")
+    endif ()
+  endif ()
 
-endif()
+endif ()
 
 ##########################################################################
 #
@@ -766,15 +777,15 @@ endif()
 #
 ##########################################################################
 
-if(NOT MYSQL_VERSION)
-    message(FATAL_ERROR "Could not determine the MySQL Server version")
-endif()
+if (NOT MYSQL_VERSION)
+  message(FATAL_ERROR "Could not determine the MySQL Server version")
+endif ()
 
 # Clean up so only numeric, in case of "-alpha" or similar
 string(REGEX MATCHALL "([0-9]+.[0-9]+.[0-9]+)" MYSQL_VERSION "${MYSQL_VERSION}")
 # To create a fully numeric version, first normalize so N.NN.NN
 string(REGEX REPLACE "[.]([0-9])[.]" ".0\\1." MYSQL_VERSION_ID "${MYSQL_VERSION}")
-string(REGEX REPLACE "[.]([0-9])$"   ".0\\1"  MYSQL_VERSION_ID "${MYSQL_VERSION_ID}")
+string(REGEX REPLACE "[.]([0-9])$" ".0\\1" MYSQL_VERSION_ID "${MYSQL_VERSION_ID}")
 # Finally remove the dot
 string(REGEX REPLACE "[.]" "" MYSQL_VERSION_ID "${MYSQL_VERSION_ID}")
 set(MYSQL_NUM_VERSION ${MYSQL_VERSION_ID})
@@ -785,36 +796,36 @@ set(MYSQL_NUM_VERSION ${MYSQL_VERSION_ID})
 #
 ##########################################################################
 
-if(NOT WIN32)
+if (NOT WIN32)
 
-    if(MYSQL_CONFIG_EXECUTABLE)
+  if (MYSQL_CONFIG_EXECUTABLE)
 
-        if(NOT MYSQL_CFLAGS)
-            _mysql_conf(MYSQL_CFLAGS "--cflags")
-        endif()
+    if (NOT MYSQL_CFLAGS)
+      _mysql_conf(MYSQL_CFLAGS "--cflags")
+    endif ()
 
-        if(NOT MYSQL_CXXFLAGS)
-            if(MYSQL_CXX_LINKAGE OR MYSQL_VERSION_ID GREATER 50603)
-                _mysql_conf(MYSQL_CXXFLAGS "--cxxflags")
-                set(MYSQL_CXX_LINKAGE 1)
-            else()
-                set(MYSQL_CXXFLAGS "${MYSQL_CFLAGS}")
-            endif()
-        endif()
+    if (NOT MYSQL_CXXFLAGS)
+      if (MYSQL_CXX_LINKAGE OR MYSQL_VERSION_ID GREATER 50603)
+        _mysql_conf(MYSQL_CXXFLAGS "--cxxflags")
+        set(MYSQL_CXX_LINKAGE 1)
+      else ()
+        set(MYSQL_CXXFLAGS "${MYSQL_CFLAGS}")
+      endif ()
+    endif ()
 
-        # FIXME this should not be needed, caller of this module should set
-        #       it's own flags and just use the library on it's on terms
-        #       (change the infe message if enabling this code)
-        #   if(NOT MYSQL_LINK_FLAGS)
-        #     # Find -mcpu -march -mt -m32 -m64 and other flags starting with "-m"
-        #     string(REGEX MATCHALL "(^| )-m([^\r\n ]+)" MYSQL_LINK_FLAGS "${MYSQL_CXXFLAGS}")
-        #     string(REGEX REPLACE "^ " ""  MYSQL_LINK_FLAGS "${MYSQL_LINK_FLAGS}")
-        #     string(REGEX REPLACE "; " ";" MYSQL_LINK_FLAGS "${MYSQL_LINK_FLAGS}")
-        #   endif()
+    # FIXME this should not be needed, caller of this module should set
+    #       it's own flags and just use the library on it's on terms
+    #       (change the infe message if enabling this code)
+    #   if(NOT MYSQL_LINK_FLAGS)
+    #     # Find -mcpu -march -mt -m32 -m64 and other flags starting with "-m"
+    #     string(REGEX MATCHALL "(^| )-m([^\r\n ]+)" MYSQL_LINK_FLAGS "${MYSQL_CXXFLAGS}")
+    #     string(REGEX REPLACE "^ " ""  MYSQL_LINK_FLAGS "${MYSQL_LINK_FLAGS}")
+    #     string(REGEX REPLACE "; " ";" MYSQL_LINK_FLAGS "${MYSQL_LINK_FLAGS}")
+    #   endif()
 
-    endif()
+  endif ()
 
-endif()
+endif ()
 
 ##########################################################################
 #
@@ -827,15 +838,15 @@ endif()
 # set(CMAKE_CXX_FLAGS_${CMAKEBT}     "${CMAKE_CXX_FLAGS_${CMAKEBT}} ${MYSQL_CXXFLAGS}")
 
 include_directories("${MYSQL_INCLUDE_DIR}")
+
 link_directories("${MYSQL_LIB_DIR}")
 
 MESSAGE(STATUS "MYSQL_LIB_DIR_LIST = ${MYSQL_LIB_DIR_LIST}")
-IF(MYSQL_LIB_DIR_LIST)
-    FOREACH(__libpath IN LISTS MYSQL_LIB_DIR_LIST)
-        link_directories("${__libpath}")
-    ENDFOREACH()
-ENDIF()
-
+IF (MYSQL_LIB_DIR_LIST)
+  FOREACH (__libpath IN LISTS MYSQL_LIB_DIR_LIST)
+    link_directories("${__libpath}")
+  ENDFOREACH ()
+ENDIF ()
 
 
 ##########################################################################

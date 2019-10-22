@@ -97,8 +97,7 @@ namespace {
         }
 
         /* Print FluffOS version */
-        std::cout << "FluffOS Version: " << PROJECT_VERSION << "(" << SOURCE_REVISION << ")"
-                  << "@ (" << ARCH << ")" << std::endl;
+        std::cout << "Version: " << PROJECT_VERSION << " (" << ARCH << ")" << std::endl;
 
 #ifdef HAVE_JEMALLOC
           /* Print jemalloc version */

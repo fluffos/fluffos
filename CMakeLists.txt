@@ -5,7 +5,7 @@ if(${CMAKE_VERSION} VERSION_LESS 3.12)
     cmake_policy(VERSION ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION})
 endif()
 
-project(fluffos VERSION 2019.2019011401
+project(fluffos VERSION 2019
         DESCRIPTION "FluffOS LPC Driver"
         LANGUAGES C CXX)
 
