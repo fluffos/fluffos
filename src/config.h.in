@@ -3,7 +3,6 @@
 #define _CONFIG_H_
 
 #define PROJECT_VERSION "@PROJECT_NAME@ v@PROJECT_VERSION@"
-#define SOURCE_REVISION "CMake/Broken"
 #define COMPILER "@CMAKE_CXX_COMPILER@"
 #define CXXFLAGS "Broken"
 
