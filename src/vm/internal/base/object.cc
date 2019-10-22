@@ -48,7 +48,7 @@ int valid_hide(object_t *obj) {
   }
   push_object(obj);
   ret = safe_apply_master_ob(APPLY_VALID_HIDE, 1);
-  return (!IS_ZERO(ret));
+  return MASTER_APPROVED(ret);
 }
 #endif
 
