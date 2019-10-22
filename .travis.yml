@@ -38,7 +38,5 @@ env:
   - BUILD="x86_64" COMPILER="clang" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev"
   - BUILD="x86_64" COMPILER="clang" COMPILER_FLAGS="-m64 -mtune=generic" TYPE=""        CONFIG="testrelease"
 # gcc builds
-  - BUILD="x86_64" COMPILER="gcc" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev" GCOV="yes"
+  - BUILD="x86_64" COMPILER="gcc" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev"
   - BUILD="x86_64" COMPILER="gcc" COMPILER_FLAGS="-m64 -mtune=generic" TYPE=""        CONFIG="testrelease"
-# coverity
-  - BUILD="x86_64" COMPILER="gcc" COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev" COVERITY="yes"
