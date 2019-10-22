@@ -11,6 +11,7 @@ if(${PACKAGE_DB})
             "db.h")
     if(${PACKAGE_DB_MYSQL})
         message(STATUS "PACKAGE_DB USE_MYSQL: ${PACKAGE_DB_MYSQL}")
+        target_compile_options(package_db PUBLIC "${MYSQL_CXXFLAGS}")
         target_compile_definitions(package_db PUBLIC "USE_MYSQL=${PACKAGE_DB_MYSQL}")
         target_compile_definitions(package_db PUBLIC "DEFAULT_DB=${PACKAGE_DB_DEFAULT_DB}")
 
@@ -19,9 +20,12 @@ if(${PACKAGE_DB})
         endif()
 
         find_package(MySQL REQUIRED)
+        target_link_libraries(package_db PUBLIC ${MYSQL_LINK_FLAGS})
         target_include_directories(package_db PUBLIC ${MYSQL_INCLUDE_DIR})
 
-        target_link_libraries(package_db PUBLIC ${MYSQL_LIBRARIES})
+        target_link_libraries(package_db PRIVATE ${MYSQL_LIBRARIES})
+    else()
+      message(FATAL_ERROR "Only Mysql is currently supported in CMake.")
     endif()
     # Adding others
 endif()
