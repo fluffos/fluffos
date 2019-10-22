@@ -6,5 +6,8 @@ if(${PACKAGE_PCRE})
             "pcre.h"
             )
     find_package (PCRE REQUIRED)
+    if(STATIC)
+      target_compile_definitions(package_pcre PUBLIC "PCRE_STATIC")
+    endif()
     target_link_libraries(package_pcre ${PCRE_LIBRARIES})
 endif()
