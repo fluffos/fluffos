@@ -237,7 +237,7 @@ add_library(driver SHARED
         ${SRC} ${SRC_HEADER}
         )
 
-target_link_libraries(driver PRIVATE autogen)
+target_link_libraries(driver PUBLIC autogen)
 
 add_subdirectory(packages) # provides FLUFFOS_PACKAGES
 message(STATUS "ALL PACKAGES: ${FLUFFOS_PACKAGES}")
@@ -248,7 +248,7 @@ foreach(PACKAGE ${FLUFFOS_PACKAGES})
     target_link_libraries(package_all INTERFACE "${PACKAGE}")
 endforeach()
 
-target_link_libraries(driver PRIVATE package_all)
+target_link_libraries(driver PUBLIC package_all)
 
 # JEMALLOC
 if (CYGWIN)
