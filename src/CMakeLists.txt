@@ -250,6 +250,16 @@ endforeach()
 
 target_link_libraries(driver PUBLIC package_all)
 
+# Link statictly
+if(STATIC)
+  if(WIN32)
+    # TODO
+  else()
+    # target_link_options only avaiable at cmake 3.13.3
+    target_link_libraries(driver PUBLIC "-static-libgcc -static-libstdc++ -Wl,-Bstatic")
+  endif()
+endif()
+
 # JEMALLOC
 if (CYGWIN)
   set(USE_JEMALLOC OFF)
@@ -276,19 +286,8 @@ find_package(Libevent 2.0 REQUIRED COMPONENTS libevent)
 target_link_libraries(driver PRIVATE ${LIBEVENT_LIBRARIES})
 target_include_directories(driver PRIVATE ${LIBEVENT_INCLUDE_DIR})
 
-# Async use this?
 find_package (Threads REQUIRED)
-target_link_libraries(driver PRIVATE ${CMAKE_THREAD_LIBS_INIT})
-
-# Link statictly
-if(STATIC)
-  if(WIN32)
-    # TODO
-  else()
-    # target_link_options only avaiable at cmake 3.13.3
-    target_link_libraries(driver PUBLIC "-static-libgcc -static-libstdc++ -static")
-  endif()
-endif()
+target_link_libraries(driver PRIVATE Threads::Threads)
 
 # GTEST
 #include(GoogleTest)
