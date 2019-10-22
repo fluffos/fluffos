@@ -286,7 +286,7 @@ if(STATIC)
     # TODO
   else()
     # target_link_options only avaiable at cmake 3.13.3
-    target_link_libraries(driver "-static-libgcc -static-libstdc++ -static")
+    target_link_libraries(driver PUBLIC "-static-libgcc -static-libstdc++ -static")
   endif()
 endif()
 
