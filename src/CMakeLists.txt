@@ -1,4 +1,5 @@
 # List of compile options to tweak
+option(MARCH_NATIVE "use march=native for GCC" ON)
 option(STATIC "Build static version of driver" OFF)
 option(USE_JEMALLOC "Build driver with jemalloc support" ON)
 # End of list of compile options.
@@ -12,10 +13,72 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 
-# include common compiler flags/definiations
-include(common)
+# Compile options
+add_compile_options(
+  # General debuginfo
+  "-g"
+  "-DNDEBUG"
+  "-fno-omit-frame-pointer"
+  # We use GNU extensions
+  "-D_GNU_SOURCE"
+  # Enforce strict aliasing
+  "-fstrict-aliasing"
+  )
 
-target_include_directories(common INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
+if (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+  add_compile_options(
+    "-O3"
+    "-funroll-loops"
+    "-fstack-protector-strong"
+    )
+  if(MARCH_NATIVE)
+    add_compile_options("-march=native")
+  endif()
+else()
+  add_compile_options(
+    "-Og"
+    #"-DDEBUG"
+    "-D_FORTIFY_SOURCE=2"
+    "-fstack-protector-all"
+    "-Wstack-protector"
+    "--param" "ssp-buffer-size=4"
+    # TODO: This doesn't work with CYGWIN and make_func
+    #            "-fsanitize=address,undefined"
+    )
+  #    set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS}
+  #            "-fsanitize=address,undefined"
+  #            )
+endif()
+
+# Warnings
+add_compile_options(
+  "-Wall"
+  "-Wextra"
+  "-Wformat"
+  "-Werror=format-security"
+  # Turn off some warnings from GCC.
+  "-Wno-char-subscripts"
+  "-Wno-sign-compare"
+  #"-Wno-return-type"
+  "-Wno-unused-parameter"
+  # TODO: Code has a lot of implict zero initilizations
+  "-Wno-missing-field-initializers"
+  # features
+  "-fdiagnostics-show-option"
+  "-fmessage-length=0"
+  # Less undefined behavior
+  "-funsigned-char"
+  "-fwrapv")
+
+# IPO??
+include(CheckIPOSupported)
+check_ipo_supported(RESULT result)
+if (result)
+  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif ()
+
+# build PIE code by default
+set(CMAKE_POSITION_INDEPENDENT_CODE TURE)
 
 # STATIC
 if(STATIC)
@@ -27,23 +90,6 @@ if(STATIC)
   endif()
 endif()
 # end of STATIC
-
-# JEMALLOC
-if (CYGWIN)
-  set(USE_JEMALLOC OFF)
-  message(STATUS "JEMALLOC is not supported on CYGWIN.")
-endif()
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-  set(USE_JEMALLOC OFF)
-  message(STATUS "JEMALLOC is disabled on debug build.")
-endif()
-if (USE_JEMALLOC)
-  find_package(jemalloc REQUIRED)
-  set(HAVE_JEMALLOC TRUE) # used in config.h.in
-  target_include_directories(common INTERFACE ${JEMALLOC_INCLUDE_DIR})
-  target_link_libraries(common INTERFACE ${JEMALLOC_LIBRARIES})
-endif()
-# end of JEMALLOC
 
 # Configuration phase
 INCLUDE (CheckIncludeFileCXX)
@@ -204,11 +250,26 @@ endforeach()
 
 target_link_libraries(driver PRIVATE package_all)
 
+# JEMALLOC
+if (CYGWIN)
+  set(USE_JEMALLOC OFF)
+  message(STATUS "JEMALLOC is not supported on CYGWIN.")
+endif()
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(USE_JEMALLOC OFF)
+  message(STATUS "JEMALLOC is disabled on debug build.")
+endif()
+if (USE_JEMALLOC)
+  find_package(jemalloc REQUIRED)
+  set(HAVE_JEMALLOC TRUE) # used in config.h.in
+  include_directories(${JEMALLOC_INCLUDE_DIR})
+  target_link_libraries(driver PRIVATE ${JEMALLOC_LIBRARIES})
+endif()
+# end of JEMALLOC
+
+# Third party libraries
 add_subdirectory(thirdparty/libtelnet)
 target_link_libraries(driver PRIVATE libtelnet)
-
-# Compiler definitions
-target_link_libraries(driver PRIVATE common)
 
 # Libraries
 find_package(Libevent 2.0 REQUIRED COMPONENTS libevent)
@@ -218,16 +279,6 @@ target_include_directories(driver PRIVATE ${LIBEVENT_INCLUDE_DIR})
 # Async use this?
 find_package (Threads REQUIRED)
 target_link_libraries(driver PRIVATE ${CMAKE_THREAD_LIBS_INIT})
-
-# IPO??
-include(CheckIPOSupported)
-check_ipo_supported(RESULT result)
-if (result)
-    set_target_properties(driver PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
-endif ()
-
-# PIE code
-set_target_properties(driver PROPERTIES POSITION_INDEPENDENT_CODE TURE)
 
 # Link statictly
 if(STATIC)
@@ -247,7 +298,6 @@ endif()
 include(helper)
 
 message("Final Compile Flags: ")
-print_iterface_target_properties(common)
 print_target_properties(driver)
 
 add_executable(portbind "portbind.cc")
