@@ -1,4 +1,5 @@
-[![Actions Status](https://github.com/fluffos/fluffos/workflows/Rust/Cmake%20CI/badge.svg)](https://github.com/fluffos/fluffos/actions)
+[![CI Status](https://github.com/fluffos/fluffos/workflows/Rust/Cmake%20CI/badge.svg)](https://github.com/fluffos/fluffos/actions)
+[![CI-OSX Status](https://github.com/fluffos/fluffos/workflows/Rust/Cmake%20CI%20on%20OSX/badge.svg)](https://github.com/fluffos/fluffos/actions)
 [![Backers on Open Collective](https://opencollective.com/fluffos-579/backers/badge.svg)](#backers)
 [![Sponsors on Open Collective](https://opencollective.com/fluffos-579/sponsors/badge.svg)](#sponsors)
 
