@@ -2,6 +2,32 @@
 option(MARCH_NATIVE "use march=native for GCC" ON)
 option(STATIC "Build static version of driver" OFF)
 option(USE_JEMALLOC "Build driver with jemalloc support" ON)
+option(PACKAGE_ASYNC "async package" ON)
+option(PACKAGE_COMPRESS "compress package" ON)
+set("SAVE_GZ_EXTENSION" ".o.gz")
+option(PACKAGE_CONTRIB "compress package" ON)
+# PACKAGE CORE should always be on
+set(PACKAGE_CORE ON)
+option(PACKAGE_CRYPTO "crypto package" ON)
+option(PACKAGE_DB "db package" ON)
+set(PACKAGE_DB_MYSQL "1")
+set(PACKAGE_DB_POSTGRESQL OFF)
+set(PACKAGE_DB_SQLITE OFF)
+set(PACKAGE_DB_DEFAULT_DB ${PACKAGE_DB_MYSQL})
+option(PACKAGE_DEVELOP "compress package" ON)
+option(PACKAGE_MATH "math package" ON)
+option(PACKAGE_MATRIX "matrix package" ON)
+option(PACKAGE_MUDLIB_STATS "mudlib_stats package" ON)
+# Package OPS is always on
+set(PACKAGE_OPS ON)
+option(PACKAGE_PARSER "parser package" ON)
+option(PACKAGE_PCRE "pcre package" ON)
+option(PACKAGE_SHA1 "sha1 package" ON)
+option(PACKAGE_SOCKETS "sockets package" ON)
+option(PACKAGE_TRIM "trim package" ON)
+option(PACKAGE_UIDS "uids package" ON)
+set(AUTO_SETEUID ON)
+set(AUTO_TRUST_BACKBONE OFF)
 # End of list of compile options.
 
 # Globally enforce CXX11
@@ -112,8 +138,7 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DI
 
 set(GENERATED_HEADERS
         "${CMAKE_CURRENT_BINARY_DIR}/config.h"
-        # This file is generated in packages/CMakeLists.txt , however set it here will complain.
-        #"${CMAKE_CURRENT_BINARY_DIR}/packages/packages.autogen.h"
+        "${CMAKE_CURRENT_BINARY_DIR}/packages/packages.autogen.h"
         )
 
 # Libraries
@@ -234,6 +259,9 @@ set(TEST_SRC
 file(GLOB_RECURSE SRC_HEADER
         "*.h"
         )
+
+set_source_files_properties(${GENERATED_HEADERS} ${GENERATRED_SOURCE}
+        ${GENERATRED_GRAMMAR_FILES} PROPERTIES GENERATED TRUE)
 
 add_library(autogen  ${GENERATED_HEADERS} ${GENERATRED_SOURCE}
   ${GENERATRED_GRAMMAR_FILES})

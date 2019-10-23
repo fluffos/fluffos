@@ -1,6 +1,3 @@
-# PACKAGE CORE is always on
-set(PACKAGE_CORE ON)
-
 file(GLOB PACKAGE_CORE_SOURCE "*.cc")
 file(GLOB PACKAGE_CORE_HEADER "*.h")
 

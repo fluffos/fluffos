@@ -1,5 +1,3 @@
-option(PACKAGE_PCRE "pcre package" ON)
-
 if(${PACKAGE_PCRE})
     add_library(package_pcre STATIC
             "pcre.cc"
