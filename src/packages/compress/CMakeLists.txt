@@ -1,7 +1,3 @@
-option(PACKAGE_COMPRESS "compress package" ON)
-
-set("SAVE_GZ_EXTENSION" ".o.gz")
-
 if(${PACKAGE_COMPRESS})
     add_library(package_compress STATIC
             "compress.cc"

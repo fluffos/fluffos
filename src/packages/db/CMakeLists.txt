@@ -1,10 +1,3 @@
-option(PACKAGE_DB "db package" ON)
-
-set(PACKAGE_DB_MYSQL "1")
-set(PACKAGE_DB_POSTGRESQL OFF)
-set(PACKAGE_DB_SQLITE OFF)
-set(PACKAGE_DB_DEFAULT_DB ${PACKAGE_DB_MYSQL})
-
 if(${PACKAGE_DB})
     add_library(package_db STATIC
             "db.cc"
