@@ -37,7 +37,6 @@
 
 // FIXME: backend queue
 #include "backend.h"
-#include "event.h"
 #include "comm.h"  // reverse API, FIXME
 #include "user.h"  // reverse API
 
