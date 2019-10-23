@@ -10,6 +10,7 @@
 #include "packages/sockets/socket_efuns.h"
 
 #include <errno.h>
+#include <event2/event.h>
 #include <event2/util.h>
 #include <deque>
 #include <string>

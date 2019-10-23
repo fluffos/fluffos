@@ -20,10 +20,10 @@ if(${PACKAGE_DB})
         endif()
 
         find_package(MySQL REQUIRED)
-        target_link_libraries(package_db PUBLIC ${MYSQL_LINK_FLAGS})
-        target_include_directories(package_db PUBLIC ${MYSQL_INCLUDE_DIR})
+        target_include_directories(package_db SYSTEM PUBLIC ${MYSQL_INCLUDE_DIR})
 
-        target_link_libraries(package_db PRIVATE ${MYSQL_LIBRARIES})
+        target_link_libraries(package_db PRIVATE ${MYSQL_LINK_FLAGS})
+        target_link_libraries(package_db PRIVATE ${MYSQL_LIB})
     else()
       message(FATAL_ERROR "Only Mysql is currently supported in CMake.")
     endif()

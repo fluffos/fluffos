@@ -10,6 +10,7 @@
 #include "base/package_api.h"
 
 #include <algorithm>
+#include <arpa/inet.h>   // for htons etc
 #ifdef HAVE_CRYPT_H
 #include <crypt.h>
 #endif
