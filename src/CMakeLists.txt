@@ -116,6 +116,11 @@ set(GENERATED_HEADERS
         #"${CMAKE_CURRENT_BINARY_DIR}/packages/packages.autogen.h"
         )
 
+# Libraries
+find_package(Libevent 2.0 REQUIRED COMPONENTS libevent)
+# multiple packages uses this, so we simply do a global inclusion
+include_directories(SYSTEM ${LIBEVENT_INCLUDE_DIR})
+
 # Build phase
 
 # Tools
@@ -250,44 +255,41 @@ endforeach()
 
 target_link_libraries(driver PUBLIC package_all)
 
-# Link statictly
-if(STATIC)
-  if(WIN32)
-    # TODO
-  else()
-    # target_link_options only avaiable at cmake 3.13.3
-    target_link_libraries(driver PUBLIC "-static-libgcc -static-libstdc++ -Wl,-Bstatic")
-  endif()
-endif()
-
-# JEMALLOC
-if (CYGWIN)
-  set(USE_JEMALLOC OFF)
-  message(STATUS "JEMALLOC is not supported on CYGWIN.")
-endif()
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-  set(USE_JEMALLOC OFF)
-  message(STATUS "JEMALLOC is disabled on debug build.")
-endif()
-if (USE_JEMALLOC)
-  find_package(jemalloc REQUIRED)
-  set(HAVE_JEMALLOC TRUE) # used in config.h.in
-  include_directories(${JEMALLOC_INCLUDE_DIR})
-  target_link_libraries(driver PRIVATE ${JEMALLOC_LIBRARIES})
-endif()
-# end of JEMALLOC
-
 # Third party libraries
 add_subdirectory(thirdparty/libtelnet)
 target_link_libraries(driver PRIVATE libtelnet)
 
-# Libraries
-find_package(Libevent 2.0 REQUIRED COMPONENTS libevent)
-target_link_libraries(driver PRIVATE ${LIBEVENT_LIBRARIES})
-target_include_directories(driver PRIVATE ${LIBEVENT_INCLUDE_DIR})
+# Link statictly
+if(STATIC)
+    if(WIN32)
+        # TODO
+    else()
+        # target_link_options only avaiable at cmake 3.13.3
+        target_link_libraries(driver PUBLIC "-static-libgcc -static-libstdc++ -Wl,-Bstatic")
+    endif()
+endif()
+
+# JEMALLOC
+if (CYGWIN)
+    set(USE_JEMALLOC OFF)
+    message(STATUS "JEMALLOC is not supported on CYGWIN.")
+endif()
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(USE_JEMALLOC OFF)
+    message(STATUS "JEMALLOC is disabled on debug build.")
+endif()
+if (USE_JEMALLOC)
+    find_package(jemalloc REQUIRED)
+    set(HAVE_JEMALLOC TRUE) # used in config.h.in
+    include_directories(${JEMALLOC_INCLUDE_DIR})
+    target_link_libraries(driver PRIVATE ${JEMALLOC_LIBRARIES})
+endif()
+# end of JEMALLOC
 
 find_package (Threads REQUIRED)
 target_link_libraries(driver PRIVATE Threads::Threads)
+
+target_link_libraries(driver PUBLIC ${LIBEVENT_LIBRARIES})
 
 # GTEST
 #include(GoogleTest)

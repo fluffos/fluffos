@@ -647,7 +647,7 @@ elseif (MYSQL_CONFIG_EXECUTABLE)
     _check_lib_search_error(MYSQL_LIB_DIR MYSQL_LIB "in \"${_static_subdirs}\"")
 
     # Adjust MYSQL_LIB_DIR in case it changes
-    get_filename_component(MYSQL_LIB_DIR "${MYSQL_LIB}" PATH)
+    get_filename_component(MYSQL_LIB_DIR "${MYSQL_LIB}" DIRECTORY)
 
     # Replace the current library references with the full path
     # to the library, i.e. the -L will be ignored
