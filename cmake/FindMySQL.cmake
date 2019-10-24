@@ -508,6 +508,12 @@ elseif (MYSQL_CONFIG_EXECUTABLE)
       "\"${MYSQL_CONFIG_EXECUTABLE}\"")
   endif ()
 
+  # In case mysql_config returns several paths: mysql.h in first
+  LIST(LENGTH MYSQL_INCLUDE_DIR n)
+  IF( ${n} GREATER 1)
+      LIST(GET MYSQL_INCLUDE_DIR 0 MYSQL_INCLUDE_DIR)
+  ENDIF()
+
   if (NOT EXISTS "${MYSQL_INCLUDE_DIR}/mysql.h")
     message(FATAL_ERROR "Could not find \"mysql.h\" in \"${MYSQL_INCLUDE_DIR}\" "
       "found from running \"${MYSQL_CONFIG_EXECUTABLE}\"")
