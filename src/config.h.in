@@ -7,7 +7,15 @@
 #define CXXFLAGS "Broken"
 
 // Features
+#cmakedefine DEBUG
+#cmakedefine DEBUGMALLOC
+#ifdef DEBUGMALLOC
+#define DEBUGMALLOC_EXTENSIONS
+#define CHECK_MEMORY
+#endif
+
 #cmakedefine HAVE_JEMALLOC 1
+
 
 // System headers
 #cmakedefine HAVE_CRYPT_H

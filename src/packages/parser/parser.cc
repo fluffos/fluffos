@@ -22,8 +22,9 @@
 
 #include "base/package_api.h"
 
-#include "packages/parser/parser.h"
+#include <cstdarg>
 
+#include "packages/parser/parser.h"
 #include "packages/core/outbuf.h"
 
 /*

@@ -7,6 +7,8 @@
 // IWYU pragma: begin_exports
 #include "base/internal/options_internal.h"
 #include "local_options"
+// Must be under local_options to be effective
+#include "config.h"
 #include "packages/packages.autogen.h"
 // IWYU pragma: end_exports
 
