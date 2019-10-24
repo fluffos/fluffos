@@ -14,9 +14,6 @@
 #define __STDC_FORMAT_MACROS
 #endif
 
-/* autoconf generated. */
-#include "config.h"
-
 /* the definition of ARCH */
 #include "base/internal/arch.h"
 

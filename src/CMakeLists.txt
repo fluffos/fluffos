@@ -28,6 +28,8 @@ option(PACKAGE_TRIM "trim package" ON)
 option(PACKAGE_UIDS "uids package" ON)
 set(AUTO_SETEUID ON)
 set(AUTO_TRUST_BACKBONE OFF)
+option(DEBUG OFF)
+option(DEBUGMALLOC ${DEBUG})
 # End of list of compile options.
 
 # Globally enforce CXX11
@@ -43,7 +45,6 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 add_compile_options(
   # General debuginfo
   "-g"
-  "-DNDEBUG"
   "-fno-omit-frame-pointer"
   # We use GNU extensions
   "-D_GNU_SOURCE"
@@ -56,6 +57,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDeb
     "-O3"
     "-funroll-loops"
     "-fstack-protector-strong"
+    "-DNDEBUG"
     )
   if(MARCH_NATIVE)
     add_compile_options("-march=native")
@@ -63,7 +65,6 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDeb
 else()
   add_compile_options(
     "-Og"
-    #"-DDEBUG"
     "-D_FORTIFY_SOURCE=2"
     "-fstack-protector-all"
     "-Wstack-protector"
@@ -118,6 +119,14 @@ endif()
 # end of STATIC
 
 # Configuration phase
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+  # Force enable DEBUG related flags
+  set(DEBUG ON)
+  set(DEBUGMALLOC ON)
+else()
+  set(DEBUG OFF)
+endif()
+
 INCLUDE (CheckIncludeFileCXX)
 # usage: CHECK_INCLUDE_FILES (<header> <RESULT_VARIABLE> )
 CHECK_INCLUDE_FILE_CXX (crypt.h HAVE_CRYPT_H)
@@ -134,6 +143,8 @@ if( HAVE_TIME_H AND HAVE_SYS_TIME_H )
 endif()
 #CHECK_INCLUDE_FILES ("sys/param.h;sys/mount.h" HAVE_SYS_MOUNT_H)
 # AC_CHECK_HEADERS([arpa/inet.h fcntl.h inttypes.h limits.h locale.h netdb.h netinet/in.h stddef.h stdint.h stdlib.h string.h sys/param.h sys/socket.h sys/time.h unistd.h])
+
+
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
 set(GENERATED_HEADERS
@@ -274,14 +285,11 @@ target_link_libraries(driver PUBLIC autogen)
 
 add_subdirectory(packages) # provides FLUFFOS_PACKAGES
 message(STATUS "ALL PACKAGES: ${FLUFFOS_PACKAGES}")
-add_library(package_all INTERFACE)
 foreach(PACKAGE ${FLUFFOS_PACKAGES})
     # TODO: packages files currently depenends on generated headers, so they must be built after driver
     add_dependencies("${PACKAGE}" autogen)
-    target_link_libraries(package_all INTERFACE "${PACKAGE}")
+    target_link_libraries(driver PUBLIC "${PACKAGE}")
 endforeach()
-
-target_link_libraries(driver PUBLIC package_all)
 
 # Third party libraries
 add_subdirectory(thirdparty/libtelnet)

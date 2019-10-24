@@ -3,6 +3,7 @@ if(${PACKAGE_ASYNC})
             "async.cc"
             "async.h")
     if(${PACKAGE_DB})
-        add_dependencies(package_async package_db)
+        # to get the compile flags
+        target_link_libraries(package_async PUBLIC package_db)
     endif()
 endif()
