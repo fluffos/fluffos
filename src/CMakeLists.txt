@@ -198,8 +198,8 @@ add_custom_command(
 
 add_custom_command(
         OUTPUT "options.autogen.h"
-        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/make_options_def.sh" "${CMAKE_CURRENT_SOURCE_DIR}/../" "${CMAKE_CURRENT_SOURCE_DIR}/tools/make_options_def.py" "options.autogen.h" "${CMAKE_CXX_COMPILER}" "-I${CMAKE_CURRENT_BINARY_DIR}" "-I${CMAKE_CURRENT_SOURCE_DIR}"
-        DEPENDS "tools/make_options_def.sh" "tools/make_options_def.py"
+        COMMAND "${CMAKE_CURRENT_BINARY_DIR}/tools/make_options_defs" "-I${CMAKE_CURRENT_BINARY_DIR}" "-I${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/base/internal/options_incl.h"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/base/internal/options_incl.h"
 )
 
 add_custom_command(
@@ -276,6 +276,7 @@ set_source_files_properties(${GENERATED_HEADERS} ${GENERATRED_SOURCE}
 
 add_library(autogen  ${GENERATED_HEADERS} ${GENERATRED_SOURCE}
   ${GENERATRED_GRAMMAR_FILES})
+add_dependencies(autogen make_options_defs)
 
 add_library(driver SHARED
         ${SRC} ${SRC_HEADER}

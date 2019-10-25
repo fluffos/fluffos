@@ -7,11 +7,24 @@
 // self-contained and runs cross-platform, so we don't have to depends on other
 // tooling in the build process.
 //
-// This file is largely based on the original edit_source.c from MudOS.
+// This file is largely based on the original edit_source.c and preprocess.c from MudOS.
 
 #include <string.h>
 #include <cstdio>
 #include <cstdlib>
+#include <vector>
+
+#if defined(__cplusplus) && __cplusplus >= 201703L && defined(__has_include)
+#if __has_include(<filesystem>)
+#define GHC_USE_STD_FS
+#include <filesystem>
+namespace fs = std::filesystem;
+#endif
+#endif
+#ifndef GHC_USE_STD_FS
+#include "thirdparty/filesystem/filesystem.hpp"
+namespace fs = ghc::filesystem;
+#endif
 
 unsigned int whashstr(const char *s) {
   int i = 0;
@@ -83,9 +96,10 @@ FILE *yyin = nullptr, *yyout = nullptr;
 
 #define PRAGMA_NOTE_CASE_START 1
 
-char *packages[100];
-char ppchar;
+char ppchar = '#';
 
+// Global directory to search for includes
+std::vector<fs::path> base_dirs;
 char *current_file = 0;
 int current_line;
 
@@ -512,9 +526,6 @@ static int skip_to(const char *token, const char *atoken) {
   }
 }
 
-/* WARNING: This file is #included into two places, since the definition
-   of malloc() differs.  Be careful. */
-
 static int cond_get_exp(int);
 
 static void handle_cond(int);
@@ -743,9 +754,9 @@ static int cond_get_exp(int priority) {
       return 0;
     }
     value = 0;
-    if (c != '0')
+    if (c != '0') {
       base = 10;
-    else {
+    } else {
       c = *outp++;
       if (c == 'x' || c == 'X') {
         base = 16;
@@ -753,6 +764,7 @@ static int cond_get_exp(int priority) {
       } else
         base = 8;
     }
+    outp++;
     for (;;) {
       if (isdigit(c))
         x = -'0';
@@ -772,7 +784,8 @@ static int cond_get_exp(int priority) {
   for (;;) {
     if (!ispunct(c = exgetc())) break;
     if (!(x = optab1[c])) break;
-    value2 = *outp++;
+    outp++;
+    value2 = exgetc();
     for (;; x += 3) {
       if (!optab2[x]) {
         outp--;
@@ -860,7 +873,7 @@ static int cond_get_exp(int priority) {
         break;
     }
   }
-  outp--;
+  //outp--;
   return value;
 }
 
@@ -951,7 +964,24 @@ static void handle_include(char *name) {
   if (!*p) yyerrorp("Missing trailing \" in %cinclude");
 
   *p = 0;
-  if ((f = fopen(name, "r")) != nullptr) {
+
+  bool found = false;
+  fs::path include_file;
+  for(auto base_dir: base_dirs) {
+    include_file = base_dir / name;
+    if (fs::exists(include_file)) {
+      found = true;
+      break;
+    }
+  }
+  if (!found) {
+    sprintf(buf, "Cannot %cinclude %s", ppchar, name);
+    yyerror(buf);
+    return;
+  }
+
+  fprintf(stderr, "Opening file: %s\n", include_file.c_str());
+  if ((f = fopen(include_file.c_str(), "r")) != nullptr) {
     is = (incstate *)malloc(sizeof(incstate) /*, 61, "handle_include: 1" */);
     is->yyin = yyin;
     is->line = current_line;
@@ -1031,7 +1061,7 @@ static void preprocess() {
         handle_define();
       } else if (!strcmp("if", yyp)) {
         cond = cond_get_exp(0);
-        if (*outp != '\n')
+        if (*outp)
           yyerrorp("Condition too complex in %cif");
         else
           handle_cond(cond);
@@ -1186,34 +1216,41 @@ static void preprocess() {
     yyin = 0;
 }
 
-int main(int argc, char **argv) {
-  if (argc < 2) {
-     fprintf(stderr, "preprocessor <basedir> <file>.");
+void do_preprocess(int argc, char **argv) {
+  if (argc < 3) {
+     fprintf(stderr, "Usage: preprocessor -I<base_dir> -I<base_dir> <global.h>\n");
      exit(-1);
   }
 
-  char *file = argv[1];
-  char buf[1024];
-  size_t l;
+  auto i = 1;
+  for(; i < argc; i++) {
+    char* arg = argv[i];
+    if (arg[0] == '-') {
+      switch(arg[1]) {
+        case 'i':
+        case 'I':
+        {
+          auto base_dir = fs::path(&arg[2]);
+          base_dirs.push_back(base_dir);
+          fprintf(stderr, "Adding search directory: %s\n", base_dir.c_str());
+        }
+          break;
+        default:
+          fprintf(stderr, "Unknown flag: %s.\n", arg);
+          exit(-1);
+          break;
+      }
+    } else {
+      break;
+    }
+  }
 
-  strcpy(buf, file);
-  l = strlen(buf);
-  if (strcmp(buf + l - 4, ".pre") != 0) {
-    fprintf(stderr, "Filename for -process must end in .pre\n");
+  if (argc <= i) {
+    fprintf(stderr, "Not enough arguments!\n");
     exit(-1);
   }
-  *(buf + l - 4) = 0;
 
-  fprintf(stderr, "Creating '%s' from '%s' ...\n", buf, file);
-
-#ifdef DEBUG
-  /* pass down the DEBUG define from CFLAGS */
-  add_define("DEBUG", -1, " ");
-#endif
-
-  open_input_file(file);
-  open_output_file(buf);
-  ppchar = '%';
+  char *global = argv[i];
+  open_input_file(global);
   preprocess();
-  close_output_file();
 }
