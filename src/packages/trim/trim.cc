@@ -14,11 +14,13 @@
 #include <locale>
 #include <string>
 
+namespace {
+
 // trim from start
-static inline std::string &ltrim(std::string &s, const std::string &charset) {
+inline std::string &ltrim(std::string &s, const std::string &charset) {
   if (charset.empty()) {
     s.erase(s.begin(),
-            std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
+            std::find_if(s.begin(), s.end(), ::fn_not_isspace));
   } else {
     int pos = s.find_first_not_of(charset);
     if (pos == -1) {
@@ -31,10 +33,10 @@ static inline std::string &ltrim(std::string &s, const std::string &charset) {
 }
 
 // trim from end
-static inline std::string &rtrim(std::string &s, const std::string &charset) {
+inline std::string &rtrim(std::string &s, const std::string &charset) {
   if (charset.empty()) {
     s.erase(
-        std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(),
+        std::find_if(s.rbegin(), s.rend(), ::fn_not_isspace).base(),
         s.end());
   } else {
     s.erase(s.find_last_not_of(charset) + 1);
@@ -43,13 +45,13 @@ static inline std::string &rtrim(std::string &s, const std::string &charset) {
 }
 
 // trim from both ends
-static inline std::string &trim(std::string &s, const std::string &charset) {
+inline std::string &trim(std::string &s, const std::string &charset) {
   return ltrim(rtrim(s, charset), charset);
 }
 
 typedef std::string &(trim_func)(std::string &, const std::string &);
 
-static inline void _trim_impl(trim_func *func) {
+inline void _trim_impl(trim_func *func) {
   std::string charset;
 
   // If use 2 arguments, we get characters to remove and positioning in previous
@@ -69,6 +71,8 @@ static inline void _trim_impl(trim_func *func) {
     copy_and_push_string(target.c_str());
   }
 }
+
+} // namespace
 
 #ifdef F_TRIM
 void f_trim(void) { _trim_impl(&trim); }

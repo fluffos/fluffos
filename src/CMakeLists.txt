@@ -32,8 +32,8 @@ option(DEBUG OFF)
 option(DEBUGMALLOC ${DEBUG})
 # End of list of compile options.
 
-# Globally enforce CXX11
-set(CMAKE_CXX_STANDARD 11)
+# Globally enforce CXX17
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
