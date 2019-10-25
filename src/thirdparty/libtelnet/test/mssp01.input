@@ -1,0 +1,32 @@
+# test MSSP
+
+# send no vars
+%FF%FA%46
+%FF%F0
+
+# send me one var, one value
+%FF%FA%46
+%01FOO
+%02BAR
+%FF%F0
+
+# send me one var, two values
+%FF%FA%46
+%01FOO
+%02BAR
+%02BAZ
+%FF%F0
+
+# send me three vars, no values
+%FF%FA%46
+%01FOO
+%01BAR
+%01BAZ
+%FF%F0
+
+# send me one var w/ one value, one var w/ no value
+%FF%FA%46
+%01FOO
+%02BAR
+%01BAZ
+%FF%F0

@@ -1,0 +1,9 @@
+# basic TERMINAL-TYPE test
+
+# proper usages
+%FF%FA%18%01%FF%F0
+%FF%FA%18%00xterm%FF%F0
+
+# improper usages
+%FF%FA%18%00%FF%F0
+%FF%FA%18%01xterm%FF%F0

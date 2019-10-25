@@ -16,7 +16,6 @@
 
 #cmakedefine HAVE_JEMALLOC 1
 
-
 // System headers
 #cmakedefine HAVE_CRYPT_H
 #cmakedefine HAVE_DIRENT_H 1

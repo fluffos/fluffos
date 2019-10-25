@@ -1,0 +1,7 @@
+# basic ENVIRON test
+
+# send me info on all USERVARs
+%FF%FA%24
+%01
+%03
+%FF%F0

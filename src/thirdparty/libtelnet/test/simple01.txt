@@ -1,0 +1,1 @@
+DATA [30] ==> This is a single line of input

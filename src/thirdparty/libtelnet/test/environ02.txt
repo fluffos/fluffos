@@ -1,0 +1,1 @@
+ENVIRON [2 parts] ==> SEND VAR "FO%02O" USERVAR "B%01AR"

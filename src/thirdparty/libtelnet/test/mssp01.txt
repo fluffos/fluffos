@@ -1,0 +1,4 @@
+MSSP [1] ==> "FOO"="BAR"
+MSSP [2] ==> "FOO"="BAR" "FOO"="BAZ"
+MSSP [0] ==>
+MSSP [1] ==> "FOO"="BAR"

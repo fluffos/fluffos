@@ -1,0 +1,3 @@
+# Test a simple ZMP command
+
+%FF%FA%5Dzmp.ping%00%FF%F0
