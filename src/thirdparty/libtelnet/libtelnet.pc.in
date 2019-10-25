@@ -1,10 +1,9 @@
-prefix=@prefix@
-exec_prefix=@exec_prefix@
-libdir=@libdir@
-includedir=${prefix}/include
+libdir=@CMAKE_INSTALL_FULL_LIBDIR@
+includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
 
 Name: libtelnet
-Description: TELNET protocol handling library
-Version: @VERSION@
-Libs: -L${libdir} -ltelnet @LIBS@
+Description: @PROJECT_DESCRIPTION@
+URL: @PROJECT_HOMEPAGE_URL@
+Version: @PROJECT_VERSION@
+Libs: -L${libdir} -ltelnet
 Cflags: -I${includedir}

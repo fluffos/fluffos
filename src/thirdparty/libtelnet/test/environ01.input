@@ -1,0 +1,13 @@
+# basic ENVIRON test
+
+# send me info on VAR FOO USERVAR BAR
+%FF%FA%24
+%01
+%00FOO
+%03BAR
+%FF%F0
+
+# send me info on everything
+%FF%FA%24
+%01
+%FF%F0

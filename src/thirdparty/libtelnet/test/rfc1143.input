@@ -1,0 +1,16 @@
+# test RFC1143 option negotiation
+
+# enable ZMP (expect DO to be output)
+%FF%FD%5D
+
+# enable ZMP again (expect nothing)
+%FF%FD%5D
+
+# enable NAWS (expect nothing)
+%FF%FD%1F
+
+# disable ZMP (expect DONT to be in output)
+%FF%FE%5D
+
+# disable ZMP again (expect nothing)
+%FF%FE%5D

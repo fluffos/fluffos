@@ -48,9 +48,12 @@ add_compile_options(
   "-fno-omit-frame-pointer"
   # We use GNU extensions
   "-D_GNU_SOURCE"
-  # Enforce strict aliasing
-  "-fstrict-aliasing"
-  )
+  # strict aliasing is bad!
+  "-fno-strict-aliasing"
+  # safety features
+  "-D_FORTIFY_SOURCE=2"
+  "-D_GLIBCXX_ASSERTIONS"
+)
 
 if (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
   add_compile_options(
@@ -60,12 +63,11 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDeb
     "-DNDEBUG"
     )
   if(MARCH_NATIVE)
-    add_compile_options("-march=native")
+    add_compile_options("-march=native -mtune=native")
   endif()
 else()
   add_compile_options(
     "-Og"
-    "-D_FORTIFY_SOURCE=2"
     "-fstack-protector-all"
     "-Wstack-protector"
     "--param" "ssp-buffer-size=4"
@@ -83,6 +85,7 @@ add_compile_options(
   "-Wextra"
   "-Wformat"
   "-Werror=format-security"
+  "-Werror=implicit-function-declaration"
   # Turn off some warnings from GCC.
   "-Wno-char-subscripts"
   "-Wno-sign-compare"
@@ -294,7 +297,7 @@ endforeach()
 
 # Third party libraries
 add_subdirectory(thirdparty/libtelnet)
-target_link_libraries(driver PRIVATE libtelnet)
+target_link_libraries(driver PUBLIC libtelnet)
 
 # Link statictly
 if(STATIC)
@@ -323,10 +326,13 @@ if (USE_JEMALLOC)
 endif()
 # end of JEMALLOC
 
+target_link_libraries(driver PUBLIC ${LIBEVENT_LIBRARIES})
+
+# libevent
+target_link_libraries(driver PUBLIC ${LIBEVENT_LIBRARIES})
+
 find_package (Threads REQUIRED)
 target_link_libraries(driver PRIVATE Threads::Threads)
-
-target_link_libraries(driver PUBLIC ${LIBEVENT_LIBRARIES})
 
 # GTEST
 #include(GoogleTest)

@@ -186,12 +186,14 @@ int main(int argc, char **argv) {
 	addr.sin_family = AF_INET;
 	if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
 		fprintf(stderr, "bind() failed: %s\n", strerror(errno));
+		close(sock);
 		return 1;
 	}
 
 	/* connect */
 	if (connect(sock, ai->ai_addr, ai->ai_addrlen) == -1) {
 		fprintf(stderr, "connect() failed: %s\n", strerror(errno));
+		close(sock);
 		return 1;
 	}
 

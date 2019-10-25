@@ -20,6 +20,8 @@
 #	include <netdb.h>
 #	include <poll.h>
 #	include <unistd.h>
+
+#	define SOCKET int
 #else
 #	include <winsock2.h>
 #	include <ws2tcpip.h>
@@ -32,7 +34,9 @@
 #	define close closesocket
 #	undef gai_strerror
 #	define gai_strerror gai_strerrorA
-#	define ECONNRESET WSAECONNRESET
+#	if !defined(ECONNRESET)
+#		define ECONNRESET WSAECONNRESET
+#	endif
 #endif
 
 #include <errno.h>
@@ -64,7 +68,7 @@
 
 struct conn_t {
 	const char *name;
-	int sock;
+	SOCKET sock;
 	telnet_t *telnet;
 	struct conn_t *remote;
 };
@@ -151,10 +155,9 @@ static const char *get_opt(unsigned char opt) {
 }
 
 static void print_buffer(const char *buffer, size_t size) {
-	printf("%.*s", (int)size, buffer);
-
 	size_t i;
-	printf(" [");
+
+	printf("%.*s [", (int)size, buffer);
 	for (i = 0; i != size; ++i) {
 		printf("<" COLOR_BOLD "0x%02X" COLOR_UNBOLD ">", (unsigned char)buffer[i]);
 		if(buffer[i] == '\n') printf("%c", '\n');
@@ -162,12 +165,12 @@ static void print_buffer(const char *buffer, size_t size) {
 	printf("]");
 }
 
-static void _send(int sock, const char *buffer, size_t size) {
+static void _send(SOCKET sock, const char *buffer, size_t size) {
 	int rs;
 
 	/* send data */
 	while (size > 0) {
-		if ((rs = send(sock, buffer, size, 0)) == -1) {
+		if ((rs = send(sock, buffer, (int)size, 0)) == -1) {
 			if (errno != EINTR && errno != ECONNRESET) {
 				fprintf(stderr, "send() failed: %s\n", strerror(errno));
 				exit(1);
@@ -188,6 +191,8 @@ static void _send(int sock, const char *buffer, size_t size) {
 static void _event_handler(telnet_t *telnet, telnet_event_t *ev,
 		void *user_data) {
 	struct conn_t *conn = (struct conn_t*)user_data;
+
+	(void)telnet;
 
 	switch (ev->type) {
 	/* data received */
@@ -247,7 +252,7 @@ static void _event_handler(telnet_t *telnet, telnet_event_t *ev,
 		printf("%s SUB %d (%s)", conn->name, (int)ev->sub.telopt,
 				get_opt(ev->sub.telopt));
 		if (ev->sub.size > 0) {
-			printf(" [%zi bytes]: ", ev->sub.size);
+			printf(" [%ld bytes]: ", (long)ev->sub.size);
 			print_buffer(ev->sub.buffer, ev->sub.size);
 		}
 		printf(COLOR_NORMAL "\n");
@@ -260,7 +265,7 @@ static void _event_handler(telnet_t *telnet, telnet_event_t *ev,
 	case TELNET_EV_ZMP:
 		if (ev->zmp.argc != 0) {
 			size_t i;
-			printf("%s ZMP [%zi params]", conn->name, ev->zmp.argc);
+			printf("%s ZMP [%ld params]", conn->name, (long)ev->zmp.argc);
 			for (i = 0; i != ev->zmp.argc; ++i) {
 				printf(" \"");
 				print_buffer(ev->zmp.argv[i], strlen(ev->zmp.argv[i]));
@@ -277,7 +282,7 @@ static void _event_handler(telnet_t *telnet, telnet_event_t *ev,
 	/* ENVIRON/NEW-ENVIRON commands */
 	case TELNET_EV_ENVIRON: {
 		size_t i;
-		printf("%s ENVIRON (%s) [%zi parts]", conn->name, ev->environ.cmd == TELNET_ENVIRON_IS ? "IS" : ev->environ.cmd == TELNET_ENVIRON_SEND ? "SEND" : "INFO", ev->environ.size);
+		printf("%s ENVIRON (%s) [%ld parts]", conn->name, ev->environ.cmd == TELNET_ENVIRON_IS ? "IS" : ev->environ.cmd == TELNET_ENVIRON_SEND ? "SEND" : "INFO", (long)ev->environ.size);
 		for (i = 0; i != ev->environ.size; ++i) {
 			printf(" %s \"", ev->environ.values[i].type == TELNET_ENVIRON_VAR ? "VAR" : "USERVAR");
 			if (ev->environ.values[i].var != 0) {
@@ -296,7 +301,7 @@ static void _event_handler(telnet_t *telnet, telnet_event_t *ev,
 	}
 	case TELNET_EV_MSSP: {
 		size_t i;
-		printf("%s MSSP [%zi parts]", conn->name, ev->mssp.size);
+		printf("%s MSSP [%ld parts]", conn->name, (long)ev->mssp.size);
 		for (i = 0; i != ev->mssp.size; ++i) {
 			printf(" \"");
 			print_buffer(ev->mssp.values[i].var, strlen(ev->mssp.values[i].var));
@@ -328,7 +333,7 @@ static void _event_handler(telnet_t *telnet, telnet_event_t *ev,
 int main(int argc, char **argv) {
 	char buffer[512];
 	short listen_port;
-	int listen_sock;
+	SOCKET listen_sock;
 	int rs;
 	struct sockaddr_in addr;
 	socklen_t addrlen;
@@ -364,7 +369,7 @@ int main(int argc, char **argv) {
 
 		/* reuse address option */
 		rs = 1;
-		setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, (void*)&rs, sizeof(rs));
+		setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, (char*)&rs, sizeof(rs));
 
 		/* bind to listening addr/port */
 		memset(&addr, 0, sizeof(addr));
@@ -373,6 +378,7 @@ int main(int argc, char **argv) {
 		addr.sin_port = htons(listen_port);
 		if (bind(listen_sock, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
 			fprintf(stderr, "bind() failed: %s\n", strerror(errno));
+			close(listen_sock);
 			return 1;
 		}
 
@@ -381,12 +387,14 @@ int main(int argc, char **argv) {
 		/* wait for client */
 		if (listen(listen_sock, 1) == -1) {
 			fprintf(stderr, "listen() failed: %s\n", strerror(errno));
+			close(listen_sock);
 			return 1;
 		}
 		addrlen = sizeof(addr);
 		if ((client.sock = accept(listen_sock, (struct sockaddr *)&addr,
 				&addrlen)) == -1) {
 			fprintf(stderr, "accept() failed: %s\n", strerror(errno));
+			close(listen_sock);
 			return 1;
 		}
 
@@ -402,12 +410,14 @@ int main(int argc, char **argv) {
 		if ((rs = getaddrinfo(argv[1], argv[2], &hints, &ai)) != 0) {
 			fprintf(stderr, "getaddrinfo() failed for %s: %s\n", argv[1],
 					gai_strerror(rs));
+			close(client.sock);
 			return 1;
 		}
 		
 		/* create server socket */
 		if ((server.sock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
 			fprintf(stderr, "socket() failed: %s\n", strerror(errno));
+			close(server.sock);
 			return 1;
 		}
 
@@ -416,12 +426,14 @@ int main(int argc, char **argv) {
 		addr.sin_family = AF_INET;
 		if (bind(server.sock, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
 			fprintf(stderr, "bind() failed: %s\n", strerror(errno));
+			close(server.sock);
 			return 1;
 		}
 
 		/* connect */
-		if (connect(server.sock, ai->ai_addr, ai->ai_addrlen) == -1) {
+		if (connect(server.sock, ai->ai_addr, (int)ai->ai_addrlen) == -1) {
 			fprintf(stderr, "server() failed: %s\n", strerror(errno));
+			close(server.sock);
 			return 1;
 		}
 
