@@ -10,11 +10,17 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <ctype.h>
 
 #include "libtelnet.h"
+
+typedef struct state {
+	char *expected;
+	char *actual;
+} state_t;
 
 static const telnet_telopt_t telopts[] = {
  { TELNET_TELOPT_COMPRESS2,	TELNET_WILL, TELNET_DONT },
@@ -106,6 +112,36 @@ static const char *get_opt(unsigned char opt) {
 	}
 }
 
+static char *append(char *original, const char *append) {
+	size_t olen, alen;
+	char *dest;
+	
+	olen = original != NULL ? strlen(original) : 0;
+	alen = strlen(append);
+
+	dest = (char *)malloc(olen + alen + 1);
+	dest[0] = '\0';
+
+	if (original != NULL) {
+		strcpy(dest, original);
+
+		free(original);
+	}
+
+	strcat(dest, append);
+	return dest;
+}
+
+static void stprintf(state_t *state, char *format, ...) {
+	char buffer[4096];
+	va_list va;
+
+	va_start(va, format);
+	vsnprintf(buffer, sizeof(buffer), format, va);
+	state->actual = append(state->actual, buffer);
+	va_end(va);
+}
+
 static void decode(char *buffer, size_t *size) {
 	const char *in = buffer, *end = buffer + *size;
 	char *out = buffer;
@@ -135,7 +171,7 @@ static void decode(char *buffer, size_t *size) {
 				} else {
 					c += *in - 'A' + 10;
 				}
-				*out = c;
+				*out = (char)c;
 			}
 			++out;
 		} else if (isprint(*in)) {
@@ -150,16 +186,16 @@ static void decode(char *buffer, size_t *size) {
 	*size = out - buffer;
 }
 
-static void print_encode(const char *buffer, size_t size) {
+static void print_encode(state_t *state, const char *buffer, size_t size) {
 	const char *in = buffer, *end = buffer + size;
 
 	while (in != end) {
 		if (*in == '%') {
-			printf("%%%%");
+			stprintf(state, "%%%%");
 		} else if (isprint(*in)) {
-			printf("%c", *in);
+			stprintf(state, "%c", *in);
 		} else {
-			printf("%%%02X", *in);
+			stprintf(state, "%%%02X", *in);
 		}
 		++in;
 	}
@@ -167,29 +203,34 @@ static void print_encode(const char *buffer, size_t size) {
 
 static void event_print(telnet_t *telnet, telnet_event_t *ev, void *ud) {
 	size_t i;
+	state_t *state;
+
+	(void)telnet;
+
+	state = (state_t *)ud;
 
 	switch (ev->type) {
 	case TELNET_EV_DATA:
-		printf("DATA [%zi] ==> ", ev->data.size);
-		print_encode(ev->data.buffer, ev->data.size);
-		printf("\n");
+		stprintf(state, "DATA [%zi] ==> ", ev->data.size);
+		print_encode(state, ev->data.buffer, ev->data.size);
+		stprintf(state, "\n");
 		break;
 	case TELNET_EV_SEND:
 		break;
 	case TELNET_EV_IAC:
-		printf("IAC %d (%s)\n", (int)ev->iac.cmd, get_cmd(ev->iac.cmd));
+		stprintf(state, "IAC %d (%s)\n", (int)ev->iac.cmd, get_cmd(ev->iac.cmd));
 		break;
 	case TELNET_EV_WILL:
-		printf("WILL %d (%s)\n", (int)ev->neg.telopt, get_opt(ev->neg.telopt));
+		stprintf(state, "WILL %d (%s)\n", (int)ev->neg.telopt, get_opt(ev->neg.telopt));
 		break;
 	case TELNET_EV_WONT:
-		printf("WONT %d (%s)\n", (int)ev->neg.telopt, get_opt(ev->neg.telopt));
+		stprintf(state, "WONT %d (%s)\n", (int)ev->neg.telopt, get_opt(ev->neg.telopt));
 		break;
 	case TELNET_EV_DO:
-		printf("DO %d (%s)\n", (int)ev->neg.telopt, get_opt(ev->neg.telopt));
+		stprintf(state, "DO %d (%s)\n", (int)ev->neg.telopt, get_opt(ev->neg.telopt));
 		break;
 	case TELNET_EV_DONT:
-		printf("DONT %d (%s)\n", (int)ev->neg.telopt, get_opt(ev->neg.telopt));
+		stprintf(state, "DONT %d (%s)\n", (int)ev->neg.telopt, get_opt(ev->neg.telopt));
 		break;
 	case TELNET_EV_SUBNEGOTIATION:
 		switch (ev->sub.telopt) {
@@ -201,55 +242,55 @@ static void event_print(telnet_t *telnet, telnet_event_t *ev, void *ud) {
 			/* print nothing */
 			break;
 		default:
-			printf("SUB %d (%s) [%zi]\n", (int)ev->sub.telopt, get_opt(ev->sub.telopt), ev->sub.size);
+			stprintf(state, "SUB %d (%s) [%zi]\n", (int)ev->sub.telopt, get_opt(ev->sub.telopt), ev->sub.size);
 			break;
 		}
 		break;
 	case TELNET_EV_ZMP:
-		printf("ZMP (%s) [%zi]\n", ev->zmp.argv[0], ev->zmp.argc);
+		stprintf(state, "ZMP (%s) [%zi]\n", ev->zmp.argv[0], ev->zmp.argc);
 		break;
 	case TELNET_EV_TTYPE:
-		printf("TTYPE %s %s\n", ev->ttype.cmd ? "SEND" : "IS",
+		stprintf(state, "TTYPE %s %s\n", ev->ttype.cmd ? "SEND" : "IS",
 				ev->ttype.name ? ev->ttype.name : "");
 		break;
 	/* ENVIRON/NEW-ENVIRON commands */
 	case TELNET_EV_ENVIRON:
-		printf("ENVIRON [%zi parts] ==> %s", ev->environ.size, ev->environ.cmd == TELNET_ENVIRON_IS ? "IS" : (ev->environ.cmd == TELNET_ENVIRON_SEND ? "SEND" : "INFO"));
+		stprintf(state, "ENVIRON [%zi parts] ==> %s", ev->environ.size, ev->environ.cmd == TELNET_ENVIRON_IS ? "IS" : (ev->environ.cmd == TELNET_ENVIRON_SEND ? "SEND" : "INFO"));
 		for (i = 0; i != ev->environ.size; ++i) {
-			printf(" %s \"", ev->environ.values[i].type == TELNET_ENVIRON_VAR ? "VAR" : "USERVAR");
+			stprintf(state, " %s \"", ev->environ.values[i].type == TELNET_ENVIRON_VAR ? "VAR" : "USERVAR");
 			if (ev->environ.values[i].var != 0) {
-				print_encode(ev->environ.values[i].var, strlen(ev->environ.values[i].var));
+				print_encode(state, ev->environ.values[i].var, strlen(ev->environ.values[i].var));
 			}
-			printf("\"");
+			stprintf(state, "\"");
 			if (ev->environ.cmd != TELNET_ENVIRON_SEND) {
-				printf("=\"");
+				stprintf(state, "=\"");
 				if (ev->environ.values[i].value != 0) {
-					print_encode(ev->environ.values[i].value, strlen(ev->environ.values[i].value));
+					print_encode(state, ev->environ.values[i].value, strlen(ev->environ.values[i].value));
 				}
-				printf("\"");
+				stprintf(state, "\"");
 			}
 		}
-		printf("\n");
+		stprintf(state, "\n");
 		break;
 	case TELNET_EV_MSSP:
-		printf("MSSP [%zi] ==>", ev->mssp.size);
+		stprintf(state, "MSSP [%zi] ==>", ev->mssp.size);
 		for (i = 0; i != ev->mssp.size; ++i) {
-			printf(" \"");
-			print_encode(ev->mssp.values[i].var, strlen(ev->mssp.values[i].var));
-			printf("\"=\"");
-			print_encode(ev->mssp.values[i].value, strlen(ev->mssp.values[i].value));
-			printf("\"");
+			stprintf(state, " \"");
+			print_encode(state, ev->mssp.values[i].var, strlen(ev->mssp.values[i].var));
+			stprintf(state, "\"=\"");
+			print_encode(state, ev->mssp.values[i].value, strlen(ev->mssp.values[i].value));
+			stprintf(state, "\"");
 		}
-		printf("\n");
+		stprintf(state, "\n");
 		break;
 	case TELNET_EV_COMPRESS:
-		printf("COMPRESSION %s\n", ev->compress.state ? "ON" : "OFF");
+		stprintf(state, "COMPRESSION %s\n", ev->compress.state ? "ON" : "OFF");
 		break;
 	case TELNET_EV_WARNING:
-		printf("WARNING: %s\n", ev->error.msg);
+		stprintf(state, "WARNING: %s\n", ev->error.msg);
 		break;
 	case TELNET_EV_ERROR:
-		printf("ERROR: %s\n", ev->error.msg);
+		stprintf(state, "ERROR: %s\n", ev->error.msg);
 		break;
 	}
 }
@@ -259,26 +300,44 @@ int main(int argc, char** argv) {
 	telnet_t *telnet;
 	char buffer[4096];
 	size_t len;
+	state_t state;
+
+	state.expected = NULL;
+	state.actual = NULL;
 
 	/* check for a requested input file */
-	if (argc != 2) {
-		fprintf(stderr, "Usage: telnet-test [test file]\n");
+	if (argc != 3) {
+		fprintf(stderr, "Usage: telnet-test [test file] [expected outline]\n");
 		return 1;
 	}
 
-	/* open requested file */
+	/* load expected input file */
+	if ((fh = fopen(argv[2], "rt")) == NULL) {
+		fprintf(stderr, "Failed to open %s: %s\n",
+				argv[2], strerror(errno));
+		return 2;
+	}
+
+	while (fgets(buffer, sizeof(buffer), fh) != NULL) {
+		state.expected = append(state.expected, buffer);
+	}
+
+	fclose(fh);
+
+	/* open input file file */
 	if ((fh = fopen(argv[1], "rt")) == NULL) {
 		fprintf(stderr, "Failed to open %s: %s\n",
 				argv[1], strerror(errno));
-		return 2;
+		return 3;
 	}
 
 	/* create telnet parser instance */
 	if ((telnet = telnet_init(telopts, event_print, 0,
-			NULL)) == 0) {
+			&state)) == 0) {
 		fprintf(stderr, "Failed to initialize libtelnet: %s\n",
 				strerror(errno));
-		return 3;
+		fclose(fh);
+		return 4;
 	}
 
 	/* read input until we hit EOF or marker */
@@ -290,9 +349,18 @@ int main(int argc, char** argv) {
 		}
 	}
 
+	fclose(fh);
+
+	/* compare expected and actual output */
+	if (strcmp(state.actual, state.expected) != 0) {
+		fprintf(stderr, "Expected:\n%s\n\nActual:\n%s\n", state.expected, state.actual);
+		return 5;
+	}
+
 	/* clean up */
 	telnet_free(telnet);
-	fclose(fh);
+	free(state.expected);
+	free(state.actual);
 
 	return 0;
 }

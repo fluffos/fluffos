@@ -1,5 +1,0 @@
-# Test error handling for an invalid ZMP request
-
-%FF%FA%5Dbad%FF%F0
-%%
-WARNING: incomplete ZMP frame

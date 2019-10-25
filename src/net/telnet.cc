@@ -429,7 +429,7 @@ void send_initial_telnet_negotiations(struct interactive_t *user) {
   telnet_negotiate(user->telnet, TELNET_DO, TELNET_TELOPT_NEW_ENVIRON);
 
 /* We support COMPRESS2 */
-#ifdef HAVE_ZLIB
+#ifdef HAVE_ZLIB // come from libtelnet
   telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_COMPRESS2);
 #endif
 

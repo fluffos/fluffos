@@ -1,12 +1,11 @@
-[![Build Status](https://travis-ci.org/seanmiddleditch/libtelnet.svg?branch=master)](https://travis-ci.org/seanmiddleditch/libtelnet)
+[![Actions Status](https://github.com/seanmiddleditch/libtelnet/workflows/CI/badge.svg)](https://github.com/seanmiddleditch/libtelnet/actions)
 
 libtelnet - TELNET protocol handling library
 ============================================
 
  http://github.com/seanmiddleditch/libtelnet
 
- Sean Middleditch
- sean@sourcemud.org
+ Sean Middleditch and contributors
 
 
 The author or authors of this code dedicate any and all copyright

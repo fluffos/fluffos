@@ -1,0 +1,7 @@
+# test ENVIRON ESC handling
+
+%FF%FA%24
+%01
+%00FO%02%02O
+%03B%02%01AR
+%FF%F0

@@ -3,6 +3,6 @@ if(${PACKAGE_COMPRESS})
             "compress.cc"
             )
     find_package (ZLIB REQUIRED)
-    target_link_libraries(package_compress ${ZLIB_LIBRARIES})
     target_compile_definitions(package_compress PUBLIC SAVE_GZ_EXTENSION="${SAVE_GZ_EXTENSION}")
+    target_link_libraries(package_compress ${ZLIB_LIBRARIES})
 endif()

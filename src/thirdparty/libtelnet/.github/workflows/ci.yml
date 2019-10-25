@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches:
+    - master
+    - develop
+  pull_request:
+
+jobs:
+  Build:
+    strategy:
+      matrix:
+        os: [ubuntu, windows, macOS]
+        config: [Debug, Release]
+  
+    runs-on: ${{ matrix.os }}-latest
+    
+    steps:
+    - uses: actions/checkout@v1
+    
+    - name: install dependencies
+      shell: bash
+      run: sudo apt-get install -y doxygen
+      if: runner.os == 'Linux'
+      
+    - name: configure
+      shell: bash
+      run: mkdir build && cd build && cmake .. -DCMAKE_INSTALL_PREFIX:PATH=~/.local -DCMAKE_BUILD_TYPE:STRING=${CONFIG} -DLIBTELNET_STRICT:BOOL=${STRICT}
+      env:
+        CONFIG: ${{ matrix.config }}
+        STRICT: NO
+        
+    - name: make
+      shell: bash
+      run: cd build && cmake --build . --config ${CONFIG}
+      env:
+        CONFIG: ${{ matrix.config }}
+        
+    - name: test
+      shell: bash
+      run: cd build/test && ctest . -C ${CONFIG}
+      env:
+        CONFIG: ${{ matrix.config }}
+        
+    - name: dist
+      shell: bash
+      run: cd build && cpack -G TGZ
+      if: runner.os == 'Linux'
