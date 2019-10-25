@@ -33,10 +33,12 @@ target_include_directories(libtelnet
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-find_package(ZLIB REQUIRED)
-target_compile_definitions(libtelnet PUBLIC HAVE_ZLIB)
-target_include_directories(libtelnet PRIVATE ${ZLIB_INCLUDE_DIRS})
-target_link_libraries(libtelnet PRIVATE ${ZLIB_LIBRARIES})
+find_package(ZLIB)
+if(${ZLIB_FOUND})
+      target_compile_definitions(libtelnet PUBLIC HAVE_ZLIB)
+      target_include_directories(libtelnet PRIVATE ${ZLIB_INCLUDE_DIRS})
+      target_link_libraries(libtelnet PRIVATE ${ZLIB_LIBRARIES})
+endif()
 
 add_subdirectory(util)
 add_subdirectory(doc)

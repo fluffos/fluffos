@@ -63,7 +63,8 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDeb
     "-DNDEBUG"
     )
   if(MARCH_NATIVE)
-    add_compile_options("-march=native -mtune=native")
+    add_compile_options("-march=native")
+    add_compile_options("-mtune=native")
   endif()
 else()
   add_compile_options(
