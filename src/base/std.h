@@ -179,5 +179,7 @@ throw "pointers of size other than 4 or 8 not implemented"; \
 
 #include "base/internal/strput.h"
 
+#include "base/internal/strutils.h"
+
 #endif  // STD_H
 // IWYU pragma: end_exports
