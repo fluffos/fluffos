@@ -193,5 +193,5 @@
 
 #include "base/internal/strutils.h"
 
-#endif  // STD_H
 // IWYU pragma: end_exports
+#endif  // STD_H

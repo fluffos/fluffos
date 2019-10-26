@@ -7,6 +7,7 @@
 
 #ifndef SRC_BASE_PACKAGE_API_H_
 #define SRC_BASE_PACKAGE_API_H_
+// IWYU pragma: begin_exports
 
 // FIXME: avoid this?
 #include "base/std.h"
@@ -40,4 +41,5 @@
 #include "comm.h"  // reverse API, FIXME
 #include "user.h"  // reverse API
 
+// IWYU pragma: end_exports
 #endif /* SRC_BASE_PACKAGE_API_H_ */
