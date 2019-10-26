@@ -105,11 +105,11 @@ add_compile_options(
 include(CheckIPOSupported)
 check_ipo_supported(RESULT result)
 if (result)
-  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
 endif ()
 
 # build PIE code by default
-set(CMAKE_POSITION_INDEPENDENT_CODE TURE)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # STATIC
 if(STATIC)
@@ -202,7 +202,7 @@ add_custom_command(
 
 add_custom_command(
         OUTPUT "options.autogen.h"
-        COMMAND "${CMAKE_CURRENT_BINARY_DIR}/tools/make_options_defs" "-I${CMAKE_CURRENT_BINARY_DIR}" "-I${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/base/internal/options_incl.h"
+        COMMAND "make_options_defs" "-I${CMAKE_CURRENT_BINARY_DIR}" "-I${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/base/internal/options_incl.h"
         DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/base/internal/options_incl.h"
 )
 
