@@ -27,7 +27,9 @@ void fatal(const char *, ...);
 #define NOISY3(w, x, y, z)
 #endif
 
-typedef struct stats_s { unsigned int free_calls, alloc_calls, realloc_calls; } stats_t;
+typedef struct stats_s {
+  unsigned int free_calls, alloc_calls, realloc_calls;
+} stats_t;
 
 static stats_t stats = {0, 0, 0};
 

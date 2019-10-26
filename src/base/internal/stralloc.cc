@@ -163,7 +163,7 @@ static block_t *alloc_new_string(const char *string, int h) {
   strncpy(STRING(b), string, len);
   STRING(b)
   [len] = '\0'; /* strncpy doesn't put on \0 if 'from' too
-                   * long */
+                 * long */
   if (cut) {
     h = whashstr(STRING(b)) & htable_size_minus_one;
   }

@@ -427,7 +427,7 @@ struct linux_dirent {
            offsetof(struct linux_dirent, d_name) */
 };
 
-void handle_getdir(struct request *req) {  
+void handle_getdir(struct request *req) {
   int tmp_buf_size = 0;
   int ret_size = 0;
   while (tmp_buf_size < req->ret) {

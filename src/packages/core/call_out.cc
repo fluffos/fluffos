@@ -42,7 +42,7 @@ namespace {
 int new_call_out_zero_last_gametick = 0;
 // Total number of call_out(0) that was scheduled on this gametick.
 int new_call_out_zero_scheduled_on_this_gametick = 0;
-}
+}  // namespace
 
 /*
  * Free a call out structure.
@@ -178,11 +178,10 @@ void call_out(pending_call_t *cop) {
   DBG_CALLOUT("  is_walltime: %i\n", cop->is_walltime ? 1 : 0);
 
   DBG_CALLOUT("  target_time: %lu vs current: %lu\n", cop->target_time,
-              cop->is_walltime
-                  ? std::chrono::duration_cast<std::chrono::milliseconds>(
-                        std::chrono::high_resolution_clock::now().time_since_epoch())
-                        .count()
-                  : g_current_gametick);
+              cop->is_walltime ? std::chrono::duration_cast<std::chrono::milliseconds>(
+                                     std::chrono::high_resolution_clock::now().time_since_epoch())
+                                     .count()
+                               : g_current_gametick);
 
   // Remove self from callout map
   {
@@ -258,10 +257,9 @@ void call_out(pending_call_t *cop) {
 
 static int time_left(pending_call_t *cop) {
   if (cop->is_walltime) {
-    return (cop->target_time -
-            std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::high_resolution_clock::now().time_since_epoch())
-                .count()) /
+    return (cop->target_time - std::chrono::duration_cast<std::chrono::milliseconds>(
+                                   std::chrono::high_resolution_clock::now().time_since_epoch())
+                                   .count()) /
            1000;
   } else {
     return std::chrono::duration_cast<std::chrono::seconds>(
@@ -617,7 +615,7 @@ inline void int_call_out(bool walltime) {
   free_svalue(sp, "call_out");
   put_number(ret);
 }
-}
+}  // namespace
 
 #ifdef F_CALL_OUT
 void f_call_out(void) { int_call_out(false); }

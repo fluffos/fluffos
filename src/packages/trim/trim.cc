@@ -19,8 +19,7 @@ namespace {
 // trim from start
 inline std::string &ltrim(std::string &s, const std::string &charset) {
   if (charset.empty()) {
-    s.erase(s.begin(),
-            std::find_if(s.begin(), s.end(), ::fn_not_isspace));
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), ::fn_not_isspace));
   } else {
     int pos = s.find_first_not_of(charset);
     if (pos == -1) {
@@ -35,9 +34,7 @@ inline std::string &ltrim(std::string &s, const std::string &charset) {
 // trim from end
 inline std::string &rtrim(std::string &s, const std::string &charset) {
   if (charset.empty()) {
-    s.erase(
-        std::find_if(s.rbegin(), s.rend(), ::fn_not_isspace).base(),
-        s.end());
+    s.erase(std::find_if(s.rbegin(), s.rend(), ::fn_not_isspace).base(), s.end());
   } else {
     s.erase(s.find_last_not_of(charset) + 1);
   }
@@ -72,7 +69,7 @@ inline void _trim_impl(trim_func *func) {
   }
 }
 
-} // namespace
+}  // namespace
 
 #ifdef F_TRIM
 void f_trim(void) { _trim_impl(&trim); }

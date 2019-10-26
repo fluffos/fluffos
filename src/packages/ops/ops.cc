@@ -1232,10 +1232,10 @@ void f_sscanf() {
   sp += num_arg + 1;
   *sp = *(fp--);       /* move format description to top of stack */
   *(sp - 1) = *(fp);   /* move source string just below the format
-                          * desc. */
+                        * desc. */
   fp->type = T_NUMBER; /* this svalue isn't invalidated below, and
-                          * if we don't change it to something safe,
-                          * it will get freed twice if an error occurs */
+                        * if we don't change it to something safe,
+                        * it will get freed twice if an error occurs */
   /*
    * prep area for rvalues
    */

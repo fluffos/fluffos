@@ -103,35 +103,47 @@
 #define LOAD_FLOAT(x, y) LOAD8(x, y)
 #define STORE_FLOAT(x, y) STORE8(x, y)
 
-#define COPY_PTR(x, y) \
-({ \
-switch(sizeof(char *)) { \
-case 4: COPY4(x, y); break; \
-case 8: COPY8(x, y); break; \
-default: \
-throw "pointers of size other than 4 or 8 not implemented"; \
-} \
-})
+#define COPY_PTR(x, y)                                              \
+  ({                                                                \
+    switch (sizeof(char *)) {                                       \
+      case 4:                                                       \
+        COPY4(x, y);                                                \
+        break;                                                      \
+      case 8:                                                       \
+        COPY8(x, y);                                                \
+        break;                                                      \
+      default:                                                      \
+        throw "pointers of size other than 4 or 8 not implemented"; \
+    }                                                               \
+  })
 
-#define LOAD_PTR(x, y) \
-({ \
-switch(sizeof(char *)) { \
-case 4: LOAD4(x, y); break; \
-case 8: LOAD8(x, y); break; \
-default: \
-throw "pointers of size other than 4 or 8 not implemented"; \
-} \
-})
+#define LOAD_PTR(x, y)                                              \
+  ({                                                                \
+    switch (sizeof(char *)) {                                       \
+      case 4:                                                       \
+        LOAD4(x, y);                                                \
+        break;                                                      \
+      case 8:                                                       \
+        LOAD8(x, y);                                                \
+        break;                                                      \
+      default:                                                      \
+        throw "pointers of size other than 4 or 8 not implemented"; \
+    }                                                               \
+  })
 
-#define STORE_PTR(x, y) \
-({ \
-switch(sizeof(char *)) { \
-case 4: STORE4(x, y); break; \
-case 8: STORE8(x, y); break; \
-default: \
-throw "pointers of size other than 4 or 8 not implemented"; \
-} \
-})
+#define STORE_PTR(x, y)                                             \
+  ({                                                                \
+    switch (sizeof(char *)) {                                       \
+      case 4:                                                       \
+        STORE4(x, y);                                               \
+        break;                                                      \
+      case 8:                                                       \
+        STORE8(x, y);                                               \
+        break;                                                      \
+      default:                                                      \
+        throw "pointers of size other than 4 or 8 not implemented"; \
+    }                                                               \
+  })
 
 #define POINTER_INT intptr_t
 #define INS_POINTER ins_pointer

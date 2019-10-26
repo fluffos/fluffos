@@ -12,7 +12,7 @@
 void f_act_mxp() {
   // start MXP
   auto ip = current_object->interactive;
-  if (ip == nullptr) return ;
+  if (ip == nullptr) return;
 
   telnet_begin_sb(ip->telnet, TELNET_TELOPT_MXP);
 }

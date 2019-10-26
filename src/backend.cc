@@ -9,20 +9,20 @@
 #include <math.h>          // for exp
 #include <stdio.h>         // for NULL, sprintf
 #ifdef TIME_WITH_SYS_TIME
-# include <sys/time.h>
-# include <time.h>
+#include <sys/time.h>
+#include <time.h>
 #else
-# ifdef HAVE_SYS_TIME_H
-#  include <sys/time.h>
-# else
-#  include <time.h>
-# endif
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#else
+#include <time.h>
 #endif
-#include <sys/types.h>     // for int64_t
-#include <deque>           // for deque
-#include <functional>      // for _Bind, less, bind, function
-#include <map>             // for multimap, _Rb_tree_iterator
-#include <utility>         // for pair, make_pair
+#endif
+#include <sys/types.h>  // for int64_t
+#include <deque>        // for deque
+#include <functional>   // for _Bind, less, bind, function
+#include <map>          // for multimap, _Rb_tree_iterator
+#include <utility>      // for pair, make_pair
 
 #include "vm/vm.h"
 
@@ -44,7 +44,7 @@ struct event_base *g_event_base = nullptr;
 namespace {
 void libevent_log(int severity, const char *msg) { debug(event, "%d:%s\n", severity, msg); }
 void libevent_dns_log(int severity, const char *msg) { debug(dns, "%d:%s\n", severity, msg); }
-}
+}  // namespace
 // Initialize backend
 event_base *init_backend() {
   event_set_log_callback(libevent_log);
@@ -83,8 +83,7 @@ inline struct timeval gametick_timeval() {
 }
 
 // Global structure to holding all events to be executed on gameticks.
-typedef std::multimap<decltype(g_current_gametick), tick_event *,
-                      std::less<(g_current_gametick)>> TickQueue;
+typedef std::multimap<decltype(g_current_gametick), tick_event *, std::less<>> TickQueue;
 TickQueue g_tick_queue;
 
 // Call all events for current tick
@@ -163,8 +162,7 @@ tick_event *add_walltime_event(std::chrono::milliseconds delay_msecs,
                                tick_event::callback_type callback) {
   auto event = new tick_event(callback);
   struct timeval val {
-     (int)(delay_msecs.count() / 1000),
-     (int)(delay_msecs.count() % 1000 * 1000),
+    (int)(delay_msecs.count() / 1000), (int)(delay_msecs.count() % 1000 * 1000),
   };
   struct timeval *delay_ptr = nullptr;
   if (delay_msecs.count() != 0) {
@@ -354,7 +352,7 @@ const double consts[kNumConst]{
     exp(0 / 900.0), exp(-1 / 900.0), exp(-2 / 900.0), exp(-3 / 900.0), exp(-4 / 900.0),
 };
 double load_av = 0.0;
-}
+}  // namespace
 
 void update_load_av() {
   static long last_time;

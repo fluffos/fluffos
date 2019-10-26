@@ -62,7 +62,9 @@ typedef struct {
  *   noun: (ob2 and ob3)
  *   adj:  (ob1)
  */
-typedef struct { bitvec_t noun, plural, adj; } parse_val_t;
+typedef struct {
+  bitvec_t noun, plural, adj;
+} parse_val_t;
 
 #define WORD_ALLOCATED 1
 

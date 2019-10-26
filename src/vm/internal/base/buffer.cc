@@ -8,7 +8,7 @@
 
 buffer_t null_buf = {
     1, /* Ref count, which will ensure that it will
-          * never be deallocated */
+        * never be deallocated */
     0  /* size */
 };
 

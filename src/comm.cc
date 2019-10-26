@@ -290,7 +290,7 @@ void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
  * Initialize new user connection socket.
  */
 bool init_user_conn() {
-  for (auto & i : external_port) {
+  for (auto &i : external_port) {
 #ifdef F_NETWORK_STATS
     i.in_packets = 0;
     i.in_volume = 0;
@@ -611,12 +611,11 @@ void get_user_data(interactive_t *ip) {
           ip->text_end -= ip->text_start;
           ip->text_start = 0;
         }
-        if (text_space < MAX_TEXT / 16){
+        if (text_space < MAX_TEXT / 16) {
           ip->iflags |= SKIP_COMMAND;
           ip->text_start = ip->text_end = 0;
           text_space = MAX_TEXT;
         }
-
       }
       break;
 
@@ -1631,7 +1630,8 @@ const char *sockaddr_to_string(const sockaddr *addr, socklen_t len) {
     return result;
   }
 
-  snprintf(result, sizeof(result), strchr(host, ':') != nullptr ? "[%s]:%s" : "%s:%s", host, service);
+  snprintf(result, sizeof(result), strchr(host, ':') != nullptr ? "[%s]:%s" : "%s:%s", host,
+           service);
 
   return result;
 }

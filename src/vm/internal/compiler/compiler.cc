@@ -1543,7 +1543,7 @@ short store_prog_string(const char *str) {
     for (i = *idxp; i >= 0; i = next_tab[i]) {
       if (p[i] == str) {
         free_string(str); /* needed as string is only free'ed
-                                   * once. */
+                           * once. */
         (reinterpret_cast<short *>(mem_block[A_STRING_REFS].block))[i]++;
         return i;
       }

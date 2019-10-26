@@ -10,7 +10,7 @@
 #include "base/package_api.h"
 
 #include <algorithm>
-#include <arpa/inet.h>   // for htons etc
+#include <arpa/inet.h>  // for htons etc
 #ifdef HAVE_CRYPT_H
 #include <crypt.h>
 #endif
@@ -353,12 +353,12 @@ void f_capitalize(void) {
 
 #ifdef F_CHILDREN
 void f_children(void) {
-  auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__ );
+  auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
   auto v = ObjectTable::instance().children(sp->u.string);
   auto len = v.size() < max_array_size ? v.size() : max_array_size;
   auto res = allocate_empty_array(len);
 
-  for(auto i = 0;i < v.size() && i < len;++i) {
+  for (auto i = 0; i < v.size() && i < len; ++i) {
     res->item[i].u.ob = v[i];
     res->item[i].type = T_OBJECT;
     add_ref(v[i], "children");
@@ -1379,8 +1379,9 @@ void f_mud_status(void) {
     outbuf_addv(&ob, "current working directory: %s\n\n", get_current_dir(dir_buf, 1024));
     outbuf_add(&ob, "add_message statistics\n");
     outbuf_add(&ob, "------------------------------\n");
-    outbuf_addv(&ob, "Calls to add_message: %8" PRIu64 "   Packets: %8" PRIu64
-                     "   Average packet size: %.2lf\n\n",
+    outbuf_addv(&ob,
+                "Calls to add_message: %8" PRIu64 "   Packets: %8" PRIu64
+                "   Average packet size: %.2lf\n\n",
                 add_message_calls, inet_packets, static_cast<double>(inet_volume) / inet_packets);
 
     stat_living_objects(&ob);
@@ -3174,7 +3175,9 @@ void f_write_buffer(void) {
       break;
     }
 
-    default: { bad_argument(sp, T_BUFFER | T_STRING | T_NUMBER, 3, F_WRITE_BUFFER); }
+    default: {
+      bad_argument(sp, T_BUFFER | T_STRING | T_NUMBER, 3, F_WRITE_BUFFER);
+    }
   }
   free_svalue(sp--, "f_write_buffer");
   free_svalue(--sp, "f_write_buffer");
@@ -3218,8 +3221,9 @@ void f_memory_info(void) {
 
     tot = total_prog_block_size + total_array_size + total_class_size + total_mapping_size +
           tot_alloc_object_size + tot_alloc_sentence * sizeof(sentence_t) +
-          users_num(true) * sizeof(interactive_t) + ObjectTable::instance().showStatus(nullptr, -1) +
-          heart_beat_status(nullptr, -1) + add_string_status(nullptr, -1) + print_call_out_usage(nullptr, -1);
+          users_num(true) * sizeof(interactive_t) +
+          ObjectTable::instance().showStatus(nullptr, -1) + heart_beat_status(nullptr, -1) +
+          add_string_status(nullptr, -1) + print_call_out_usage(nullptr, -1);
     push_number(tot);
     return;
   }

@@ -4,23 +4,22 @@
  * This tool parse "applies" list and generate applies_table.cc/applies_table.h.
  */
 
-#include <cctype>   // for tolower
-#include <cstdio>   // for fprintf, fclose, fgets, fopen, FILE
-#include <cstring>  // for strchr
-#include <string>   // for string
-#include <iostream> // for std::cerr
+#include <cctype>    // for tolower
+#include <cstdio>    // for fprintf, fclose, fgets, fopen, FILE
+#include <cstring>   // for strchr
+#include <string>    // for string
+#include <iostream>  // for std::cerr
 
 static const char *APPLIES = "vm/internal/applies";
 static const char *APPLIES_H = "applies_table.autogen.h";
 static const char *APPLIES_TABLE = "applies_table.autogen.cc";
 
 int main(int argc, char **argv) {
-  if(argc != 2)
-  {
-      std::cerr << "error:\n" << argv[0] << " <src_dir>\n\n";
-      return 1;
+  if (argc != 2) {
+    std::cerr << "error:\n" << argv[0] << " <src_dir>\n\n";
+    return 1;
   }
-  std::string applies_path {argv[1]};
+  std::string applies_path{argv[1]};
   applies_path += '/';
   applies_path += APPLIES;
   FILE *f = fopen(applies_path.c_str(), "r");
