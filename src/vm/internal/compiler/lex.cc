@@ -79,7 +79,7 @@ int pragmas;
 
 int num_parse_error; /* Number of errors in the parser. */
 
-lpc_predef_t *lpc_predefs = NULL;
+lpc_predef_t *lpc_predefs = nullptr;
 
 static int yyin_desc;
 int lex_fatal;
@@ -108,7 +108,7 @@ typedef struct incstate_s {
   char *outp;
 } incstate_t;
 
-static incstate_t *inctop = 0;
+static incstate_t *inctop = nullptr;
 
 /* prevent unbridled recursion */
 #define MAX_INCLUDE_DEPTH 32
@@ -119,7 +119,7 @@ static int incnum;
 
 static function_context_t function_context_stack[MAX_FUNCTION_DEPTH];
 static int last_function_context;
-function_context_t *current_function_context = 0;
+function_context_t *current_function_context = nullptr;
 
 int arrow_efun, evaluate_efun, this_efun, to_float_efun, to_int_efun, new_efun;
 
@@ -212,7 +212,7 @@ static ident_hash_elem_t **ident_hash_table;
 static ident_hash_elem_t **ident_hash_head;
 static ident_hash_elem_t **ident_hash_tail;
 
-static ident_hash_elem_t *ident_dirty_list = 0;
+static ident_hash_elem_t *ident_dirty_list = nullptr;
 
 instr_t instrs[MAX_INSTRS];
 
@@ -229,7 +229,7 @@ typedef struct linked_buf_s {
   char *last_nl;
 } linked_buf_t;
 
-static linked_buf_t head_lbuf = {NULL, TERM_START};
+static linked_buf_t head_lbuf = {nullptr, TERM_START};
 static linked_buf_t *cur_lbuf;
 
 static void handle_define(char * /*yyt*/);
@@ -265,7 +265,7 @@ static LPC_INT cond_get_exp(int /*priority*/);
 static void handle_cond(LPC_INT /*c*/);
 
 static defn_t *defns[DEFHASH];
-static ifstate_t *iftop = 0;
+static ifstate_t *iftop = nullptr;
 
 static defn_t *lookup_definition(const char *s) {
   defn_t *p;
@@ -277,14 +277,14 @@ static defn_t *lookup_definition(const char *s) {
       return p;
     }
   }
-  return 0;
+  return nullptr;
 }
 
 defn_t *lookup_define(const char *s) {
   defn_t *p = lookup_definition(s);
 
   if (p && (p->flags & DEF_IS_UNDEFINED)) {
-    return 0;
+    return nullptr;
   } else {
     return p;
   }
@@ -394,7 +394,7 @@ static void handle_elif()
   * last cond was true...skip to end of
   * conditional
   */
-      skip_to("endif", (char *)0);
+      skip_to("endif", (char *)nullptr);
     }
   } else {
     lexerror("Unexpected #elif");
@@ -406,7 +406,7 @@ static void handle_else(void) {
     if (iftop->state == EXPECT_ELSE) {
       iftop->state = EXPECT_ENDIF;
     } else {
-      skip_to("endif", (char *)0);
+      skip_to("endif", (char *)nullptr);
     }
   } else {
     lexerror("Unexpected #endif");
@@ -738,7 +738,7 @@ static void merge(char *name, char *dest) {
         break;
       }
       tmp = strrchr(dest, '/');
-      if (tmp == NULL) { /* 1 component in dest */
+      if (tmp == nullptr) { /* 1 component in dest */
         *dest = 0;
       } else {
         *tmp = 0;
@@ -815,7 +815,7 @@ static int skip_to(const char *token, const char *atoken) {
         } else if (!strcmp(b, "elif")) {
           outp = startp;
           *--outp = '#';
-          return (atoken == 0);
+          return (atoken == nullptr);
         }
       }
     }
@@ -1165,7 +1165,7 @@ static int get_array_block(char *term) {
       /*
        * only report end of file in array block, if not an include file
        */
-      if (c == LEX_EOF && inctop == 0) {
+      if (c == LEX_EOF && inctop == nullptr) {
         res = -1;
         outp = yyp;
         break;
@@ -1335,7 +1335,7 @@ static int get_text_block(char *term) {
       /*
        * only report end of file in text block, if not an include file
        */
-      if (c == LEX_EOF && inctop == 0) {
+      if (c == LEX_EOF && inctop == nullptr) {
         res = -1;
         outp = yyp;
         break;
@@ -1470,7 +1470,7 @@ static pragma_t our_pragmas[] = {{"strict_types", PRAGMA_STRICT_TYPES},
                                  {"warnings", PRAGMA_WARNINGS},
                                  {"optimize", PRAGMA_OPTIMIZE},
                                  {"show_error_context", PRAGMA_ERROR_CONTEXT},
-                                 {0, 0}};
+                                 {nullptr, 0}};
 
 static void handle_pragma(char *str) {
   int i;
@@ -1685,7 +1685,7 @@ void push_function_context() {
   fc->num_locals = 0;
   node = new_node_no_line();
   node->l.expr = node;
-  node->r.expr = 0;
+  node->r.expr = nullptr;
   node->kind = 0;
   fc->values_list = node;
   fc->bindable = 0;
@@ -2099,7 +2099,7 @@ int yylex() {
         goto badlex;
       case '#':
         if (*(outp - 2) == '\n') {
-          char *sp = 0;
+          char *sp = nullptr;
           int quote;
 
           while (is_wspace(c = *outp++)) {
@@ -2171,10 +2171,10 @@ int yylex() {
               }
             } else if (strcmp("ifdef", yytext) == 0) {
               deltrail(sp);
-              handle_cond(lookup_define(sp) != 0);
+              handle_cond(lookup_define(sp) != nullptr);
             } else if (strcmp("ifndef", yytext) == 0) {
               deltrail(sp);
-              handle_cond(lookup_define(sp) == 0);
+              handle_cond(lookup_define(sp) == nullptr);
             } else if (strcmp("elif", yytext) == 0) {
               handle_elif(sp);
             } else if (strcmp("else", yytext) == 0) {
@@ -2617,7 +2617,7 @@ int yylex() {
             }
           }
           outp--;
-          yylval.number = strtoll(yytext, NULL, 16);
+          yylval.number = strtoll(yytext, nullptr, 16);
           return L_NUMBER;
         }
         outp--;
@@ -2653,10 +2653,10 @@ int yylex() {
         outp--;
         *yyp = 0;
         if (is_float) {
-          yylval.real = strtod(yytext, NULL);
+          yylval.real = strtod(yytext, nullptr);
           return L_REAL;
         } else {
-          yylval.number = strtoll(yytext, NULL, 10);
+          yylval.number = strtoll(yytext, nullptr, 10);
           return L_NUMBER;
         }
       default:
@@ -2800,7 +2800,7 @@ void end_new_file() {
     inctop = p->next;
     FREE((char *)p);
   }
-  inctop = 0;
+  inctop = nullptr;
   while (iftop) {
     ifstate_t *p;
 
@@ -3019,7 +3019,7 @@ void start_new_file(int f) {
   yyin_desc = f;
   lex_fatal = 0;
   last_function_context = -1;
-  current_function_context = 0;
+  current_function_context = nullptr;
   cur_lbuf = &head_lbuf;
   cur_lbuf->outp = cur_lbuf->buf_end = outp = cur_lbuf->buf + (DEFMAX >> 1);
   *(last_nl = outp - 1) = '\n';
@@ -3326,7 +3326,7 @@ static void handle_define(char *yyt) {
     int squote, dquote;
     int arg;
     int inid;
-    char *ids = (char *)NULL;
+    char *ids = (char *)nullptr;
 
     p++; /* skip '(' */
     SKIPWHITE;
@@ -3693,7 +3693,7 @@ static int extract_args(char **argv, char *argb) {
 static char *expand_define2(char *text) {
   int argc = 0, i, paste = 0, pasting = 0;
   defn_t *macro;
-  char expbuf[DEFMAX], *argv[NARGS], *expand_buffer, *in, *out, *freeme = 0;
+  char expbuf[DEFMAX], *argv[NARGS], *expand_buffer, *in, *out, *freeme = nullptr;
 
   /* special handling for __LINE__ macro */
   if (!strcmp(text, "__LINE__")) {
@@ -3705,7 +3705,7 @@ static char *expand_define2(char *text) {
   /* have we already expanded this macro? */
   for (i = 0; i < expand_depth; i++) {
     if (!strcmp(expands[i], text)) {
-      return 0;
+      return nullptr;
     }
   }
   expands[expand_depth++] = text;
@@ -3713,24 +3713,24 @@ static char *expand_define2(char *text) {
   if (nexpands++ > EXPANDMAX) {
     expand_depth--;
     lexerror("Too many macro expansions");
-    return 0;
+    return nullptr;
   }
 
   macro = lookup_define(text);
   if (!macro) {
     expand_depth--;
-    return 0;
+    return nullptr;
   }
 
   if (macro->nargs >= 0) {
     if ((argc = extract_args(argv, expbuf)) == -1) {
       expand_depth--;
-      return 0;
+      return nullptr;
     }
     if (argc != macro->nargs) {
       expand_depth--;
       yyerror("Wrong number of macro arguments");
-      return 0;
+      return nullptr;
     }
   }
 
@@ -3799,7 +3799,7 @@ static char *expand_define2(char *text) {
         int len;
 
         /* don't expand if token pasting with ## */
-        if (!pasting && (freeme = expand_define2(exp)) != 0) {
+        if (!pasting && (freeme = expand_define2(exp)) != nullptr) {
           exp = freeme;
         }
         len = strlen(exp);
@@ -3845,7 +3845,7 @@ static char *expand_define2(char *text) {
 int expand_define(void) {
   char *expand_buffer;
 
-  if ((expand_buffer = expand_define2(yytext)) != 0) {
+  if ((expand_buffer = expand_define2(yytext)) != nullptr) {
     add_input(expand_buffer);
     FREE(expand_buffer);
     return 1;
@@ -3909,7 +3909,7 @@ static int exgetc() {
         ident_hash_elem_t *ihe = lookup_ident(yytext);
         flag = (ihe && ihe->dn.efun_num != -1);
       } else {
-        flag = (lookup_define(yytext) != 0);
+        flag = (lookup_define(yytext) != nullptr);
       }
       if (flag) {
         add_input(" 1 ");
@@ -3930,7 +3930,7 @@ void set_inc_list(char *list) {
   int i, size;
   char *p;
 
-  if (list == 0) {
+  if (list == nullptr) {
     fprintf(stderr, "The config string 'include dirs' must bet set.\n");
     fprintf(stderr, "It should contain a list of all directories to be searched\n");
     fprintf(stderr, "for include files, separated by a ':'.\n");
@@ -3980,7 +3980,7 @@ void set_inc_list(char *list) {
 char *main_file_name() {
   incstate_t *is;
 
-  if (inctop == 0) {
+  if (inctop == nullptr) {
     return current_file;
   }
   is = inctop;
@@ -4034,7 +4034,7 @@ ident_hash_elem_t *lookup_ident(const char *name) {
       hptr2 = hptr2->next;
     }
   }
-  return 0;
+  return nullptr;
 }
 
 ident_hash_elem_t *find_or_add_perm_ident(const char *name) {
@@ -4083,7 +4083,7 @@ typedef struct lname_linked_buf_s {
   char block[4096];
 } lname_linked_buf_t;
 
-lname_linked_buf_t *lnamebuf = 0;
+lname_linked_buf_t *lnamebuf = nullptr;
 
 int lb_index = 4096;
 
@@ -4112,7 +4112,7 @@ typedef struct ident_hash_elem_list_s {
   ident_hash_elem_t items[128];
 } ident_hash_elem_list_t;
 
-ident_hash_elem_list_t *ihe_list = 0;
+ident_hash_elem_list_t *ihe_list = nullptr;
 
 #if 0
 void dump_ihe(ident_hash_elem_t *ihe, int noisy)
@@ -4212,7 +4212,7 @@ void free_unused_identifiers() {
     FREE(ihel);
     ihel = next;
   }
-  ihe_list = 0;
+  ihe_list = nullptr;
   num_free = 0;
 
   lnb = lnamebuf;
@@ -4221,7 +4221,7 @@ void free_unused_identifiers() {
     FREE(lnb);
     lnb = lnbn;
   }
-  lnamebuf = 0;
+  lnamebuf = nullptr;
   lb_index = 4096;
 #if 0
   debug_dump_ident_hash_table(0);
@@ -4329,7 +4329,7 @@ void init_identifiers() {
 
   /* clean all three tables */
   for (i = 0; i < IDENT_HASH_SIZE * 3; i++) {
-    ident_hash_table[i] = 0;
+    ident_hash_table[i] = nullptr;
   }
   /* add the reserved words */
   for (i = 0; i < NELEM(reswords); i++) {

@@ -7,7 +7,7 @@
 
 #include "vm/internal/base/machine.h"
 
-mapping_node_t *locked_map_nodes = 0;
+mapping_node_t *locked_map_nodes = nullptr;
 
 /*
  * LPC mapping (associative arrays) module.  Contains routines for
@@ -163,8 +163,8 @@ void free_mapping(mapping_t *m) {
   dealloc_mapping(m);
 }
 
-static mapping_node_t *free_nodes = 0;
-mapping_node_block_t *mapping_node_blocks = 0;
+static mapping_node_t *free_nodes = nullptr;
+mapping_node_block_t *mapping_node_blocks = nullptr;
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_mapping_node_blocks() {
@@ -189,7 +189,7 @@ mapping_node_t *new_map_node() {
         DMALLOC(sizeof(mapping_node_block_t), TAG_MAP_NODE_BLOCK, "new_map_node"));
     mnb->next = mapping_node_blocks;
     mapping_node_blocks = mnb;
-    mnb->nodes[MNB_SIZE - 1].next = 0;
+    mnb->nodes[MNB_SIZE - 1].next = nullptr;
     for (i = MNB_SIZE - 1; i--;) {
       mnb->nodes[i].next = &mnb->nodes[i + 1];
     }
@@ -248,7 +248,7 @@ mapping_t *allocate_mapping(int n) {
   newmap =
       reinterpret_cast<mapping_t *>(DMALLOC(sizeof(mapping_t), TAG_MAPPING, "allocate_mapping: 1"));
   debug(mapping, "mapping.c: allocate_mapping begin, newmap = %p\n", (void *)newmap);
-  if (newmap == NULL) {
+  if (newmap == nullptr) {
     error("Allocate_mapping - out of memory.\n");
   }
 
@@ -339,7 +339,7 @@ static mapping_t *copyMapping(mapping_t *m) {
 
   newmap =
       reinterpret_cast<mapping_t *>(DMALLOC(sizeof(mapping_t), TAG_MAPPING, "copy_mapping: 1"));
-  if (newmap == NULL) {
+  if (newmap == nullptr) {
     error("copyMapping - out of memory.\n");
   }
   newmap->table_size = k++;

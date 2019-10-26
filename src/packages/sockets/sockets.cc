@@ -20,7 +20,7 @@ void f_socket_create(void) {
   }
   if (check_valid_socket("create", -1, current_object, "N/A", -1)) {
     if (num_arg == 2) {
-      fd = socket_create(static_cast<enum socket_mode>(arg[0].u.number), &arg[1], NULL);
+      fd = socket_create(static_cast<enum socket_mode>(arg[0].u.number), &arg[1], nullptr);
     } else {
       fd = socket_create(static_cast<enum socket_mode>(arg[0].u.number), &arg[1], &arg[2]);
     }
@@ -48,7 +48,7 @@ void f_socket_bind(void) {
   get_socket_address(fd, addr, &port, 0);
 
   if (VALID_SOCKET("bind")) {
-    i = socket_bind(fd, arg[1].u.number, (num_arg == 3 ? arg[2].u.string : NULL));
+    i = socket_bind(fd, arg[1].u.number, (num_arg == 3 ? arg[2].u.string : nullptr));
     pop_n_elems(num_arg - 1);
     sp->u.number = i;
   } else {
@@ -158,7 +158,7 @@ void f_socket_write(void) {
   get_socket_address(fd, addr, &port, 0);
 
   if (VALID_SOCKET("write")) {
-    i = socket_write(fd, &arg[1], (num_arg == 3) ? arg[2].u.string : (char *)NULL);
+    i = socket_write(fd, &arg[1], (num_arg == 3) ? arg[2].u.string : (char *)nullptr);
     pop_n_elems(num_arg - 1);
     sp->u.number = i;
   } else {

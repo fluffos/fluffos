@@ -91,7 +91,7 @@ char ppchar = '#';
 
 // Global directory to search for includes
 std::vector<fs::path> base_dirs;
-char *current_file = 0;
+char *current_file = nullptr;
 int current_line;
 
 int grammar_mode = 0; /* which section we're in for .y files */
@@ -536,7 +536,7 @@ static void handle_cond(int);
 #define DEF_IS_NOT_LOCAL 4
 
 static defn_t *defns[DEFHASH];
-static ifstate_t *iftop = 0;
+static ifstate_t *iftop = nullptr;
 
 static defn_t *lookup_definition(const char *s) {
   defn_t *p;
@@ -545,14 +545,14 @@ static defn_t *lookup_definition(const char *s) {
   h = defhash(s);
   for (p = defns[h]; p; p = p->next)
     if (strcmp(s, p->name) == 0) return p;
-  return 0;
+  return nullptr;
 }
 
 defn_t *lookup_define(const char *s) {
   defn_t *p = lookup_definition(s);
 
   if (p && (p->flags & DEF_IS_UNDEFINED))
-    return 0;
+    return nullptr;
   else
     return p;
 }
@@ -636,7 +636,7 @@ static void handle_elif()
        * last cond was true...skip to end of
        * conditional
        */
-      skip_to("endif", (char *)0);
+      skip_to("endif", (char *)nullptr);
     }
   } else {
     yyerrorp("Unexpected %celif");
@@ -648,7 +648,7 @@ static void handle_else(void) {
     if (iftop->state == EXPECT_ELSE) {
       iftop->state = EXPECT_ENDIF;
     } else {
-      skip_to("endif", (char *)0);
+      skip_to("endif", (char *)nullptr);
     }
   } else {
     yyerrorp("Unexpected %cendif");
@@ -905,7 +905,7 @@ static void open_output_file(char *fn) {
 
 static void close_output_file() {
   fclose(yyout);
-  yyout = 0;
+  yyout = nullptr;
 }
 
 static char *protect(char *p) {
@@ -1017,7 +1017,7 @@ static void preprocess() {
       char sp_buf = 0, *oldoutp;
 
       if (c == '%' && yyp2[1] == '%') grammar_mode++;
-      outp = 0;
+      outp = nullptr;
       if (yyp != yyp2) yyerrorp("Misplaced '%c'.\n");
       while (isspace(*++yyp2))
         ;
@@ -1058,7 +1058,7 @@ static void preprocess() {
           handle_cond(cond);
       } else if (!strcmp("ifdef", yyp)) {
         deltrail();
-        handle_cond(lookup_define(outp) != 0);
+        handle_cond(lookup_define(outp) != nullptr);
       } else if (!strcmp("ifndef", yyp)) {
         deltrail();
         handle_cond(!lookup_define(outp));
@@ -1192,7 +1192,7 @@ static void preprocess() {
   }
   fclose(yyin);
   free(current_file);
-  current_file = 0;
+  current_file = nullptr;
   nexpands = 0;
   if (inctop) {
     incstate *p = inctop;
@@ -1204,7 +1204,7 @@ static void preprocess() {
     free((char *)p);
     preprocess();
   } else
-    yyin = 0;
+    yyin = nullptr;
 }
 
 void do_preprocess(int argc, char **argv) {

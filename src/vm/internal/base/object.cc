@@ -53,7 +53,7 @@ int valid_hide(object_t *obj) {
 #endif
 
 int save_svalue_depth = 0, max_depth;
-int *sizes = 0;
+int *sizes = nullptr;
 
 int svalue_save_size(svalue_t *v) {
   switch (v->type) {
@@ -1121,7 +1121,7 @@ int restore_svalue(char *cp, svalue_t *v) {
         if (sizes) {
           FREE((char *)sizes);
         }
-        sizes = (int *)0;
+        sizes = (int *)nullptr;
       }
       return ret;
 
@@ -1181,7 +1181,7 @@ static int safe_restore_svalue(char *cp, svalue_t *v) {
         if (sizes) {
           FREE((char *)sizes);
         }
-        sizes = (int *)0;
+        sizes = (int *)nullptr;
       }
       if (ret) {
         return ret;
@@ -1326,7 +1326,7 @@ static int save_object_recurse(program_t *prog, svalue_t **svp, int type, int sa
     return 1;
   }
   oldSize = -1;
-  new_str = NULL;
+  new_str = nullptr;
   for (i = 0; i < prog->num_variables_defined; i++) {
     if (prog->variable_types[i] & DECL_NOSAVE) {
       (*svp)++;
@@ -1360,7 +1360,7 @@ static int save_object_recurse(program_t *prog, svalue_t **svp, int type, int sa
         result = fprintf(f, "%s %s\n", prog->variable_table[i], new_str);
       }
       if (result < 0) {
-        debug_perror("save_object: printf", 0);
+        debug_perror("save_object: printf", nullptr);
         FREE(new_str);
         return 0;
       }
@@ -1401,7 +1401,7 @@ static int save_object_recurse_str(program_t *prog, svalue_t **svp, int type, in
     return 1;
   }
   oldSize = -1;
-  new_str = NULL;
+  new_str = nullptr;
   for (i = 0; i < prog->num_variables_defined; i++) {
     if (prog->variable_types[i] & DECL_NOSAVE) {
       (*svp)++;
@@ -1428,7 +1428,7 @@ static int save_object_recurse_str(program_t *prog, svalue_t **svp, int type, in
     DEBUG_CHECK(p - new_str != theSize - 1, "Length miscalculated in save_object!");
     if (save_zeros || new_str[0] != '0' || new_str[1] != 0) { /* Armidale */
       if (sprintf(buf + textsize - 1, "%s %s\n", prog->variable_table[i], new_str) < 0) {
-        debug_perror("save_object: fprintf", 0);
+        debug_perror("save_object: fprintf", nullptr);
         FREE(new_str);
         return 0;
       }
@@ -1500,7 +1500,7 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
   }
 
   strcpy(save_name, ob->obname);
-  if ((p = strrchr(save_name, '#')) != 0) {
+  if ((p = strrchr(save_name, '#')) != nullptr) {
     *p = '\0';
   }
   p = save_name + strlen(save_name) - 1;
@@ -1514,8 +1514,8 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
    */
   sprintf(tmp_name, "%.250s.tmp", file);
 
-  gzf = NULL;
-  f = NULL;
+  gzf = nullptr;
+  f = nullptr;
   if (save_compressed) {
     gzf = gzopen(tmp_name, "wb");
     if (!gzf) {
@@ -1577,7 +1577,7 @@ int save_object_str(object_t *ob, int save_zeros, char *saved, int size) {
   strcpy(now, "#/");
   now += 2;
   strcpy(now, ob->obname);
-  if ((p = strrchr(now, '#')) != 0) {
+  if ((p = strrchr(now, '#')) != nullptr) {
     *p = '\0';
   }
   p = now + strlen(now) - 1;
@@ -1806,11 +1806,11 @@ void dealloc_object(object_t *ob, const char *from) {
     tot_alloc_object_size -=
         (ob->prog->num_variables_total - 1) * sizeof(svalue_t) + sizeof(object_t);
     free_prog(&ob->prog);
-    ob->prog = 0;
+    ob->prog = nullptr;
   }
   if (ob->replaced_program) {
     FREE_MSTR(ob->replaced_program);
-    ob->replaced_program = 0;
+    ob->replaced_program = nullptr;
   }
 #ifdef PRIVS
   if (ob->privs) {
@@ -1823,7 +1823,7 @@ void dealloc_object(object_t *ob, const char *from) {
     DEBUG_CHECK1(ObjectTable::instance().find(ob->obname) == ob,
                  "Freeing object /%s but name still in name table", ob->obname);
     FREE((char *)ob->obname);
-    SETOBNAME(ob, 0);
+    SETOBNAME(ob, nullptr);
   }
 #ifdef DEBUG
   prev_all = ob->prev_all;
@@ -1911,7 +1911,7 @@ void set_nextreset(object_t *ob) {
 
 void reset_object(object_t *ob) {
   set_nextreset(ob);
-  save_command_giver(0);
+  save_command_giver(nullptr);
   set_eval(max_eval_cost);
   if (!safe_apply(APPLY_RESET, ob, 0, ORIGIN_DRIVER)) {
     /* no reset() in the object */
@@ -1979,8 +1979,8 @@ void reload_object(object_t *obj) {
     for (ob2 = obj->shadowed; ob2;) {
       otmp = ob2;
       ob2 = ob2->shadowed;
-      otmp->shadowed = 0;
-      otmp->shadowing = 0;
+      otmp->shadowed = nullptr;
+      otmp->shadowing = nullptr;
       destruct_object(otmp);
     }
   }
@@ -1994,8 +1994,8 @@ void reload_object(object_t *obj) {
   if (obj->shadowed) {
     obj->shadowed->shadowing = obj->shadowing;
   }
-  obj->shadowing = 0;
-  obj->shadowed = 0;
+  obj->shadowing = nullptr;
+  obj->shadowed = nullptr;
 #endif
   remove_living_name(obj);
   set_heart_beat(obj, 0);
@@ -2094,7 +2094,7 @@ void set_command_giver(object_t *ob) {
   }
 
   command_giver = ob;
-  if (command_giver != 0) {
+  if (command_giver != nullptr) {
     add_ref(command_giver, "set_command_giver");
   }
 }

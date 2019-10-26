@@ -9,7 +9,7 @@
  * Ported from Amylaars LP 3.2 driver
  */
 
-replace_ob_t *obj_list_replace = 0;
+replace_ob_t *obj_list_replace = nullptr;
 
 static program_t *search_inherited(char * /*str*/, program_t * /*prg*/, int * /*offpnt*/);
 static replace_ob_t *retrieve_replace_program_entry(void);
@@ -66,7 +66,7 @@ void replace_programs(void) {
 
     if (r_ob->ob->replaced_program) {
       FREE_MSTR(r_ob->ob->replaced_program);
-      r_ob->ob->replaced_program = 0;
+      r_ob->ob->replaced_program = nullptr;
     }
     r_ob->ob->replaced_program = string_copy(r_ob->new_prog->filename, "replace_programs");
 
@@ -94,14 +94,14 @@ void replace_programs(void) {
       r_ob->ob->shadowing->shadowed = r_ob->ob->shadowed;
       if (r_ob->ob->shadowed) {
         r_ob->ob->shadowed->shadowing = r_ob->ob->shadowing;
-        r_ob->ob->shadowed = 0;
+        r_ob->ob->shadowed = nullptr;
       }
-      r_ob->ob->shadowing = 0;
+      r_ob->ob->shadowing = nullptr;
     }
 #endif
     FREE((char *)r_ob);
   }
-  obj_list_replace = (replace_ob_t *)0;
+  obj_list_replace = (replace_ob_t *)nullptr;
   debug(d_flag, ("end of replace_programs"));
 }
 
@@ -132,7 +132,7 @@ static program_t *search_inherited(char *str, program_t *prg, int *offpnt) {
   }
   debug(d_flag, "search_inherited failed");
 
-  return (program_t *)0;
+  return (program_t *)nullptr;
 }
 
 static replace_ob_t *retrieve_replace_program_entry(void) {
@@ -143,7 +143,7 @@ static replace_ob_t *retrieve_replace_program_entry(void) {
       return r_ob;
     }
   }
-  return 0;
+  return nullptr;
 }
 
 void f_replace_program(void) {

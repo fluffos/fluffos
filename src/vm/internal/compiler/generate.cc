@@ -13,7 +13,7 @@
 #include "vm/internal/compiler/icode.h"     // for IS_NODE.
 
 static parse_node_t *optimize(parse_node_t * /*expr*/);
-static parse_node_t **last_local_refs = 0;
+static parse_node_t **last_local_refs = nullptr;
 static int optimizer_num_locals;
 
 /* Document optimizations here so we can make sure they don't interfere.
@@ -52,7 +52,7 @@ static int optimizer_state = 0;
 
 static parse_node_t *optimize(parse_node_t *expr) {
   if (!expr) {
-    return 0;
+    return nullptr;
   }
 
   switch (expr->kind) {
@@ -70,7 +70,7 @@ static parse_node_t *optimize(parse_node_t *expr) {
 
             if (last_local_refs[x]) {
               last_local_refs[x]->v.number = F_TRANSFER_LOCAL;
-              last_local_refs[x] = 0;
+              last_local_refs[x] = nullptr;
             }
           }
         }
@@ -96,7 +96,7 @@ static parse_node_t *optimize(parse_node_t *expr) {
       if (expr->v.number == F_VOID_ASSIGN_LOCAL) {
         if (last_local_refs[expr->l.number] && !optimizer_state) {
           last_local_refs[expr->l.number]->v.number = F_TRANSFER_LOCAL;
-          last_local_refs[expr->l.number] = 0;
+          last_local_refs[expr->l.number] = nullptr;
         }
       }
       break;
@@ -108,7 +108,7 @@ static parse_node_t *optimize(parse_node_t *expr) {
             break;
           }
         }
-        last_local_refs[expr->l.number] = 0;
+        last_local_refs[expr->l.number] = nullptr;
       }
       break;
     case NODE_OPCODE_2:
@@ -246,10 +246,10 @@ static void optimizer_start_function(int n) {
         DCALLOC(n, sizeof(parse_node_t *), TAG_COMPILER, "c_start_function"));
     optimizer_num_locals = n;
     while (n--) {
-      last_local_refs[n] = 0;
+      last_local_refs[n] = nullptr;
     }
   } else {
-    last_local_refs = 0;
+    last_local_refs = nullptr;
   }
 }
 
@@ -262,7 +262,7 @@ static void optimizer_end_function(void) {
       }
     }
     FREE(last_local_refs);
-    last_local_refs = 0;
+    last_local_refs = nullptr;
   }
 }
 
@@ -316,7 +316,7 @@ int generate_conditional_branch(parse_node_t *node) {
       } else {
         branch = F_BBRANCH;
       }
-      node = 0;
+      node = nullptr;
     }
     if (node) {
       if (IS_NODE(node, NODE_BINARY_OP, F_LT)) {

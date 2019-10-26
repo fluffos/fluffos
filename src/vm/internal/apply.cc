@@ -311,7 +311,7 @@ svalue_t *apply(const char *fun, object_t *ob, int num_arg, int where) {
   expected_sp = sp - num_arg;
 #endif
   if (apply_low(fun, ob, num_arg) == 0) {
-    return 0;
+    return nullptr;
   }
   free_svalue(&apply_ret_value, "sapply");
   apply_ret_value = *sp--;
@@ -331,19 +331,19 @@ svalue_t *safe_apply(const char *fun, object_t *ob, int num_arg, int where) {
 
   if (ob->flags & O_DESTRUCTED) {
     pop_n_elems(num_arg);
-    return 0;
+    return nullptr;
   }
 
   error_context_t econ;
   save_context(&econ);
 
-  svalue_t *ret = 0;
+  svalue_t *ret = nullptr;
   try {
     ret = apply(fun, ob, num_arg, where);
   } catch (const char *) {
     restore_context(&econ);
     pop_n_elems(num_arg);
-    ret = 0;
+    ret = nullptr;
   }
   pop_context(&econ);
   return ret;

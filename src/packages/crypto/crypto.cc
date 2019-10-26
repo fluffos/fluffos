@@ -51,7 +51,7 @@ static char *hexdump(const unsigned char *data, int len) {
 
 void f_hash(void) {
   const char *algo, *data;
-  char *result = NULL;
+  char *result = nullptr;
   int data_len;
 
   algo = (sp - 1)->u.string;

@@ -34,7 +34,7 @@ void preload_objects() {
   push_number(0);
   auto ret = safe_apply_master_ob(APPLY_EPILOG, 1);
 
-  if ((ret == 0) || (ret == (svalue_t *)-1) || (ret->type != T_ARRAY)) {
+  if ((ret == nullptr) || (ret == (svalue_t *)-1) || (ret->type != T_ARRAY)) {
     return;
   }
 
@@ -110,11 +110,11 @@ void vm_start() {
  * stack machine execution (as stack will be cleared).
  */
 void clear_state() {
-  current_object = 0;
-  set_command_giver(0);
-  current_interactive = 0;
-  previous_ob = 0;
-  current_prog = 0;
+  current_object = nullptr;
+  set_command_giver(nullptr);
+  current_interactive = nullptr;
+  previous_ob = nullptr;
+  current_prog = nullptr;
   caller_type = 0;
   reset_machine(0); /* Pop down the stack. */
 } /* clear_state() */

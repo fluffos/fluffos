@@ -231,7 +231,7 @@ void f__call_other(void) {
       do_trace("Call other ", funcname, "\n");
     }
   }
-  if (apply(funcname, ob, num_arg - 2, ORIGIN_CALL_OTHER) == 0) { /* Function not found */
+  if (apply(funcname, ob, num_arg - 2, ORIGIN_CALL_OTHER) == nullptr) { /* Function not found */
     pop_2_elems();
     push_undefined();
     return;
@@ -511,9 +511,9 @@ void f_deep_inventory(void) {
     if (sp->type == T_FUNCTION) {
       vec = deep_inventory(current_object, 0, sp->u.fp);
     } else if (sp->type == T_ARRAY) {
-      vec = deep_inventory_array(sp->u.arr, 1, 0);
+      vec = deep_inventory_array(sp->u.arr, 1, nullptr);
     } else { /*sp->type==T_OBJECT*/
-      vec = deep_inventory(sp->u.ob, 0, 0);
+      vec = deep_inventory(sp->u.ob, 0, nullptr);
     }
   } else {
     vec = &the_null_array;
@@ -893,7 +893,7 @@ void f_input_to(void) {
 void f_interactive(void) {
   int i;
 
-  i = (sp->u.ob->interactive != 0);
+  i = (sp->u.ob->interactive != nullptr);
   free_object(&sp->u.ob, "f_interactive");
   put_number(i);
 }
@@ -1474,7 +1474,7 @@ void f_present(void) {
       try_reset(arg[1].u.ob);
     }
   }
-  ob = object_present(arg, num_arg == 1 ? 0 : arg[1].u.ob);
+  ob = object_present(arg, num_arg == 1 ? nullptr : arg[1].u.ob);
   pop_n_elems(num_arg);
   if (ob && object_visible(ob)) {
     push_object(ob);
@@ -1495,7 +1495,7 @@ void f_previous_object(void) {
       sp->u.number = 0;
       return;
     }
-    ob = 0;
+    ob = nullptr;
     p = csp;
     do {
       if ((p->framekind & FRAME_OB_CHANGE) && !(--i)) {
@@ -1635,7 +1635,7 @@ void f_query_idle(void) {
 void f_query_ip_name(void) {
   const char *tmp;
 
-  tmp = query_ip_name(st_num_arg ? sp->u.ob : 0);
+  tmp = query_ip_name(st_num_arg ? sp->u.ob : nullptr);
   if (st_num_arg) {
     free_object(&(sp--)->u.ob, "f_query_ip_name");
   }
@@ -1652,7 +1652,7 @@ void f_query_ip_name(void) {
 void f_query_ip_number(void) {
   const char *tmp;
 
-  tmp = query_ip_number(st_num_arg ? sp->u.ob : 0);
+  tmp = query_ip_number(st_num_arg ? sp->u.ob : nullptr);
   if (st_num_arg) {
     free_object(&(sp--)->u.ob, "f_query_ip_number");
   }
@@ -1740,7 +1740,7 @@ void f_read_bytes(void) {
   }
   str = read_bytes(arg[0].u.string, start, len, &rlen);
   pop_n_elems(num_arg);
-  if (str == 0) {
+  if (str == nullptr) {
     push_number(0);
   } else {
     push_malloced_string(str);
@@ -1768,7 +1768,7 @@ void f_read_buffer(void) {
     str = read_buffer(arg[0].u.buf, start, len, &rlen);
   }
   pop_n_elems(num_arg);
-  if (str == 0) {
+  if (str == nullptr) {
     push_number(0);
   } else if (from_file) { /* changed */
     buffer_t *buf;
@@ -2278,7 +2278,7 @@ void f_say(void) {
 #endif
                          1,
 #ifdef PACKAGE_MUDLIB_STATS
-                         {(mudlib_stats_t *)NULL, (mudlib_stats_t *)NULL}
+                         {(mudlib_stats_t *)nullptr, (mudlib_stats_t *)nullptr}
 #endif
   };
 
@@ -2535,7 +2535,7 @@ void f_snoop(void) {
    * object.
    */
   if (st_num_arg == 1) {
-    if (!new_set_snoop(sp->u.ob, 0) || (sp->u.ob->flags & O_DESTRUCTED)) {
+    if (!new_set_snoop(sp->u.ob, nullptr) || (sp->u.ob->flags & O_DESTRUCTED)) {
       free_object(&sp->u.ob, "f_snoop:1");
       *sp = const0;
     }
@@ -2598,7 +2598,7 @@ void f_stat(void) {
       v->item[2].subtype = 0;
       ob = find_object2(path);
       if (ob && !object_visible(ob)) {
-        ob = 0;
+        ob = nullptr;
       }
       if (ob) {
         v->item[2].u.number = ob->load_time;
@@ -2650,7 +2650,7 @@ void f_strsrch(void) {
   }
 
   if (!llen || blen < llen) {
-    pos = NULL;
+    pos = nullptr;
 
     /* start at left */
   } else if (!((sp + 1)->u.number)) {
@@ -2675,7 +2675,7 @@ void f_strsrch(void) {
           }
         } while (--pos >= big);
         if (pos < big) {
-          pos = NULL;
+          pos = nullptr;
           break;
         }
         for (i = 1; little[i] && (pos[i] == little[i]); i++) {
@@ -2753,7 +2753,7 @@ void f_tell_room(void) {
 #endif
                          1,
 #ifdef PACKAGE_MUDLIB_STATS
-                         {(mudlib_stats_t *)NULL, (mudlib_stats_t *)NULL}
+                         {(mudlib_stats_t *)nullptr, (mudlib_stats_t *)nullptr}
 #endif
   };
 
@@ -2933,7 +2933,7 @@ void f__to_float(void) {
       sp->u.real = static_cast<LPC_FLOAT>(sp->u.number);
       break;
     case T_STRING:
-      temp = strtod(sp->u.string, NULL);
+      temp = strtod(sp->u.string, nullptr);
       free_string_svalue(sp);
       sp->type = T_REAL;
       sp->u.real = temp;
@@ -3218,8 +3218,8 @@ void f_memory_info(void) {
 
     tot = total_prog_block_size + total_array_size + total_class_size + total_mapping_size +
           tot_alloc_object_size + tot_alloc_sentence * sizeof(sentence_t) +
-          users_num(1) * sizeof(interactive_t) + ObjectTable::instance().showStatus(0, -1) +
-          heart_beat_status(0, -1) + add_string_status(0, -1) + print_call_out_usage(0, -1);
+          users_num(1) * sizeof(interactive_t) + ObjectTable::instance().showStatus(nullptr, -1) +
+          heart_beat_status(nullptr, -1) + add_string_status(nullptr, -1) + print_call_out_usage(nullptr, -1);
     push_number(tot);
     return;
   }
@@ -3347,7 +3347,7 @@ void f_defer() {
 
   if (CONFIG_INT(__RC_REVERSE_DEFER__)) {
     // In reverse mode, newlist always will be the last data.
-    newlist->next = NULL;
+    newlist->next = nullptr;
   } else {
     // In normal mode, newlist always will be the first data.
     newlist->next = csp->defers;
@@ -3364,7 +3364,7 @@ void f_defer() {
   // In reverse mode, if list is not null, then add new item to the end.
   if (CONFIG_INT(__RC_REVERSE_DEFER__)) {
     // If list is null, then init it with new item.
-    if (csp->defers == NULL) {
+    if (csp->defers == nullptr) {
       csp->defers = newlist;
     } else {
       // Search last defer.

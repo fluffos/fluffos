@@ -414,7 +414,7 @@ char *custom_crypt(const char *key, const char *salt, unsigned char *rawout) {
   len = strlen(key);
   for (i = 3000 + (11 * len); i > 0; i--) {
     if (!MD5Digest(abuffer, sizeof(abuffer), Digest)) {
-      return NULL;
+      return nullptr;
     }
     memcpy(&(abuffer[(i + len) % (MD5_MAXLEN - sizeof(Digest))]), Digest, sizeof(Digest));
   }
@@ -423,7 +423,7 @@ char *custom_crypt(const char *key, const char *salt, unsigned char *rawout) {
 
   /* Use this generated buffer to do the actual digesting. */
   if (!MD5Digest(buffer, sizeof(buffer), Digest)) {
-    return NULL;
+    return nullptr;
   }
 
   /* Pyre! */

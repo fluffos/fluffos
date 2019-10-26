@@ -33,7 +33,7 @@ array_t the_null_array = {
 #endif
     0, /* size */
 #ifdef PACKAGE_MUDLIB_STATS
-    {0}, /* statgroup_t stats */
+    {nullptr}, /* statgroup_t stats */
 #endif
     {{0, 0, {0}}}, /* svalue_t item[1] */
 };
@@ -222,7 +222,7 @@ array_t *resize_array(array_t *p, unsigned int n) {
 array_t *explode_string(const char *str, int slen, const char *del, int len) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
-  const char *p, *beg, *lastdel = 0;
+  const char *p, *beg, *lastdel = nullptr;
   int num, j, limit;
   array_t *ret;
   char *buff, *tmp;
@@ -755,7 +755,7 @@ typedef struct unique_list_s {
   struct unique_list_s *next;
 } unique_list_t;
 
-static unique_list_t *g_u_list = 0;
+static unique_list_t *g_u_list = nullptr;
 
 static void unique_array_error_handler(void) {
   unique_list_t *unlist = g_u_list;
@@ -779,7 +779,7 @@ void f_unique_array(void) {
   svalue_t *skipval, *sv, *svp;
   unique_list_t *unlist;
   unique_t **head, *uptr, *nptr;
-  funptr_t *fptr = 0;
+  funptr_t *fptr = nullptr;
   const char *func;
 
   size = (v = (sp - num_arg + 1)->u.arr)->size;
@@ -810,7 +810,7 @@ void f_unique_array(void) {
   unlist = reinterpret_cast<unique_list_t *>(
       DMALLOC(sizeof(unique_list_t), TAG_TEMPORARY, "f_unique_array:1"));
   unlist->next = g_u_list;
-  unlist->head = 0;
+  unlist->head = nullptr;
   head = &unlist->head;
   g_u_list = unlist;
 
@@ -825,7 +825,7 @@ void f_unique_array(void) {
     } else if (v->item[i].type == T_OBJECT) {
       sv = apply(func, v->item[i].u.ob, 0, ORIGIN_EFUN);
     } else {
-      sv = 0;
+      sv = nullptr;
     }
 
     if (sv && !sameval(sv, skipval)) {
@@ -1057,9 +1057,9 @@ void map_array(svalue_t *arg, int num_arg) {
 void map_string(svalue_t *arg, int num_arg) {
   char *arr;
   char *p;
-  funptr_t *fptr = 0;
+  funptr_t *fptr = nullptr;
   int numex = 0;
-  object_t *ob = 0;
+  object_t *ob = nullptr;
   svalue_t *extra, *v;
   const char *func;
 
@@ -1086,7 +1086,7 @@ void map_string(svalue_t *arg, int num_arg) {
         ob = arg[2].u.ob;
       } else if (arg[2].type == T_STRING) {
         if ((ob = find_object(arg[2].u.string)) && !object_visible(ob)) {
-          ob = 0;
+          ob = nullptr;
         }
       }
       if (num_arg > 3) {
@@ -1518,7 +1518,7 @@ static svalue_t *alist_sort(array_t *inlist) {
   char *str;
 
   if (!(size = inlist->size)) {
-    return (svalue_t *)NULL;
+    return (svalue_t *)nullptr;
   }
   if ((flag = (inlist->ref > 1))) {
     sv_tab = reinterpret_cast<svalue_t *>(
@@ -2036,7 +2036,7 @@ array_t *livings() {
   object_t **list;
   array_t *ret;
 
-  get_objects(&list, &count, livings_filter, 0);
+  get_objects(&list, &count, livings_filter, nullptr);
 
   if (count > max_array_size) {
     count = max_array_size;
@@ -2058,22 +2058,22 @@ void f_objects(void) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   int count, i;
-  const char *func = 0;
+  const char *func = nullptr;
   object_t **list;
   array_t *ret;
-  funptr_t *f = 0;
+  funptr_t *f = nullptr;
 
   int num_arg = st_num_arg;
 
   if (!num_arg) {
-    func = 0;
+    func = nullptr;
   } else if (sp->type == T_FUNCTION) {
     f = sp->u.fp;
   } else {
     func = sp->u.string;
   }
 
-  get_objects(&list, &count, 0, 0);
+  get_objects(&list, &count, nullptr, nullptr);
   if (f || func) {
     /* NOTE: If an object's hidden status changes during a callback, that
      * change will NOT be reflected in the returned array.  If the caller
@@ -2095,7 +2095,7 @@ void f_objects(void) {
         return;
       }
       if (v->type == T_NUMBER && !v->u.number) {
-        list[i] = 0;
+        list[i] = nullptr;
       }
     }
     for (i = 0; i < count; i++) {

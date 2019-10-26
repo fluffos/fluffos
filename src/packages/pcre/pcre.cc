@@ -82,7 +82,7 @@ static pcre *pcre_get_cached_pattern(struct pcre_cache_t *table, svalue_t *patte
 static mapping_t *pcre_get_cache();
 int pcrecachesize = 0;
 // Globals
-struct pcre_cache_t pcre_cache = {{0}};
+struct pcre_cache_t pcre_cache = {{nullptr}};
 
 // efuns
 void f_pcre_version(void) {
@@ -153,7 +153,7 @@ void f_pcre_extract(void) {
   assign_svalue_no_free(&run->pattern, sp);
   run->subject = (sp - 1)->u.string;
   run->s_length = SVALUE_STRLEN(sp - 1);
-  run->ovector = NULL;
+  run->ovector = nullptr;
   run->ovecsize = 0;
 
   if (pcre_magic(run) < 0) {
@@ -194,7 +194,7 @@ void f_pcre_replace(void) {
 
   run = (pcre_t *)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "f_pcre_replace: run");
 
-  run->ovector = NULL;
+  run->ovector = nullptr;
   run->ovecsize = 0;
   assign_svalue_no_free(&run->pattern, (sp - 1));
   run->subject = (sp - 2)->u.string;
@@ -254,7 +254,7 @@ void f_pcre_replace_callback(void) {
   arg = sp - num_arg + 1;
 
   run = (pcre_t *)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "f_pcre_replace: run");
-  run->ovector = NULL;
+  run->ovector = nullptr;
   run->ovecsize = 0;
   run->subject = arg->u.string;
   assign_svalue_no_free(&run->pattern, (arg + 1));
@@ -303,7 +303,7 @@ void f_pcre_replace_callback(void) {
       /* Mimic behaviour of map(string, function) when function pointer returns
        null,
        ie return the input.  */
-      if (v && v->type == T_STRING && v->u.string != NULL) {
+      if (v && v->type == T_STRING && v->u.string != nullptr) {
         assign_svalue_no_free(&r->item[i], v);
       } else {
         assign_svalue_no_free(&r->item[i], &arr->item[i]);
@@ -326,7 +326,7 @@ void f_pcre_replace_callback(void) {
 }
 
 void f_pcre_cache(void) {
-  mapping_t *m = NULL;
+  mapping_t *m = nullptr;
   m = pcre_get_cache();
   if (!m) {
     push_number(0);
@@ -337,14 +337,14 @@ void f_pcre_cache(void) {
 
 // Internal functions utilized by the efuns
 static pcre *pcre_local_compile(pcre_t *p) {
-  p->re = pcre_compile(p->pattern.u.string, 0, &p->error, &p->erroffset, NULL);
+  p->re = pcre_compile(p->pattern.u.string, 0, &p->error, &p->erroffset, nullptr);
 
   return p->re;
 }
 
 static int pcre_local_exec(pcre_t *p) {
   int size;
-  pcre_fullinfo(p->re, NULL, PCRE_INFO_CAPTURECOUNT, &size);
+  pcre_fullinfo(p->re, nullptr, PCRE_INFO_CAPTURECOUNT, &size);
   size += 2;
   size *= 3;
   if (p->ovector) {
@@ -353,7 +353,7 @@ static int pcre_local_exec(pcre_t *p) {
   p->ovector = (int *)DCALLOC(size + 1, sizeof(int), TAG_TEMPORARY,
                               "pcre_local_exec");  // too much, but who cares
   p->ovecsize = size;
-  p->rc = pcre_exec(p->re, NULL, p->subject, p->s_length, 0,
+  p->rc = pcre_exec(p->re, nullptr, p->subject, p->s_length, 0,
 #ifndef USE_ICONV
                     PCRE_NO_UTF8_CHECK,
 #else
@@ -367,12 +367,12 @@ static int pcre_local_exec(pcre_t *p) {
 static int pcre_magic(pcre_t *p) {
   p->re = pcre_get_cached_pattern(&pcre_cache, &p->pattern);
 
-  if (p->re == NULL) {
+  if (p->re == nullptr) {
     pcre_local_compile(p);
     pcre_cache_pattern(&pcre_cache, p->re, &p->pattern);
   }
 
-  if (p->re == NULL) {
+  if (p->re == nullptr) {
     return -1;
   }
 
@@ -393,7 +393,7 @@ static int pcre_match_single(svalue_t *str, svalue_t *pattern) {
   int ret;
 
   run = (pcre_t *)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "pcre_match_single : run");
-  run->ovector = NULL;
+  run->ovector = nullptr;
   run->ovecsize = 0;
   assign_svalue_no_free(&run->pattern, pattern);
   run->subject = str->u.string;
@@ -424,14 +424,14 @@ static array_t *pcre_match(array_t *v, svalue_t *pattern, int flag) {
   }
 
   run = (pcre_t *)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "pcre_match : run");
-  run->ovector = NULL;
+  run->ovector = nullptr;
   run->ovecsize = 0;
   assign_svalue_no_free(&run->pattern, pattern);
 
   run->re = pcre_get_cached_pattern(&pcre_cache, &run->pattern);
 
-  if (run->re == NULL) {
-    if (pcre_local_compile(run) == NULL) {
+  if (run->re == nullptr) {
+    if (pcre_local_compile(run) == nullptr) {
       const char *rerror = run->error;
       int offset = run->erroffset;
 
@@ -524,7 +524,7 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
       int tok_i;
       const char *begin, *end;
       struct reg_match *next;
-    } *rmp = (struct reg_match *)0, *rmph = (struct reg_match *)0;
+    } *rmp = (struct reg_match *)nullptr, *rmph = (struct reg_match *)nullptr;
     int num_match = 0, length;
     svalue_t *sv1, *sv2, *sv;
     int regindex;
@@ -535,13 +535,13 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
 
     for (i = 0; i < size; i++) {
       rgpp[i] = (pcre_t *)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "pcre_assoc : rgpp[i]");
-      rgpp[i]->ovector = NULL;
+      rgpp[i]->ovector = nullptr;
       rgpp[i]->ovecsize = 0;
       assign_svalue_no_free(&rgpp[i]->pattern, &pat->item[i]);
       rgpp[i]->re = pcre_get_cached_pattern(&pcre_cache, &rgpp[i]->pattern);
 
-      if (rgpp[i]->re == NULL) {
-        if (pcre_local_compile(rgpp[i]) == NULL) {
+      if (rgpp[i]->re == nullptr) {
+        if (pcre_local_compile(rgpp[i]) == nullptr) {
           const char *rerror = rgpp[i]->error;
           int offset = rgpp[i]->erroffset;
 
@@ -607,7 +607,7 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
         rmp->end = tmp = rmpe_tmp;
         used += tmpreg->ovector[1];
         rmp->tok_i = regindex;
-        rmp->next = (struct reg_match *)0;
+        rmp->next = (struct reg_match *)nullptr;
       } else {
         break;
       }
@@ -804,7 +804,7 @@ static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
   tmp = table->buckets[bucket];
 
   // Calculate size of compiled pattern
-  pcre_fullinfo(cpat, NULL, PCRE_INFO_SIZE, &sz);
+  pcre_fullinfo(cpat, nullptr, PCRE_INFO_SIZE, &sz);
 
   full = (pcrecachesize > 2 * PCRE_CACHE_SIZE);
   while (tmp) {
@@ -823,7 +823,7 @@ static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
     node = (struct pcre_cache_bucket_t *)DCALLOC(1, sizeof(struct pcre_cache_bucket_t),
                                                  TAG_TEMPORARY, "pcre_cache_pattern : node");
     node->pattern.type = T_NUMBER;  // so we don't free invalids
-    if (node == NULL) {
+    if (node == nullptr) {
       return -1;
     }
     if (!full) {
@@ -837,7 +837,7 @@ static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
                                               // of the time
           pcre_free(tmp->compiled_pattern);
           FREE(tmp);
-          table->buckets[bucket] = NULL;
+          table->buckets[bucket] = nullptr;
         } else {
           struct pcre_cache_bucket_t *tmp2;
           tmp2 = table->buckets[bucket];
@@ -846,7 +846,7 @@ static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
           }
           pcre_free(tmp->compiled_pattern);
           FREE(tmp);
-          tmp2->next = NULL;
+          tmp2->next = nullptr;
         }
       }
     }
@@ -864,7 +864,7 @@ static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
 static pcre *pcre_get_cached_pattern(struct pcre_cache_t *table, svalue_t *pattern) {
   unsigned int bucket = svalue_to_int(pattern) % PCRE_CACHE_SIZE;
   struct pcre_cache_bucket_t *node;
-  struct pcre_cache_bucket_t *lnode = NULL;
+  struct pcre_cache_bucket_t *lnode = nullptr;
   node = table->buckets[bucket];
 
   while (node) {
@@ -880,7 +880,7 @@ static pcre *pcre_get_cached_pattern(struct pcre_cache_t *table, svalue_t *patte
     lnode = node;
     node = node->next;
   }
-  return NULL;
+  return nullptr;
 }
 
 static mapping_t *pcre_get_cache() {
@@ -890,7 +890,7 @@ static mapping_t *pcre_get_cache() {
 
   // Calculate size for mapping
   for (i = 0; i < PCRE_CACHE_SIZE; i++) {
-    if (pcre_cache.buckets[i] != NULL) {
+    if (pcre_cache.buckets[i] != nullptr) {
       node = pcre_cache.buckets[i];
 
       while (node) {
@@ -903,7 +903,7 @@ static mapping_t *pcre_get_cache() {
   ret = allocate_mapping(size);
 
   for (i = 0; i < PCRE_CACHE_SIZE; i++) {
-    if (pcre_cache.buckets[i] != NULL) {
+    if (pcre_cache.buckets[i] != nullptr) {
       node = pcre_cache.buckets[i];
 
       while (node) {

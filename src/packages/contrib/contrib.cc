@@ -10,7 +10,7 @@
 /* should be done in configure */
 
 #ifdef F_REAL_TIME
-void f_real_time(void) { push_number(time(NULL)); }
+void f_real_time(void) { push_number(time(nullptr)); }
 #endif
 
 #ifdef F_COMPRESSEDP
@@ -95,7 +95,7 @@ void f_remove_shadow(void) {
     ob = sp->u.ob;
     pop_stack();
   }
-  if (ob == 0 || (ob->shadowing == 0 && ob->shadowed == 0)) {
+  if (ob == nullptr || (ob->shadowing == nullptr && ob->shadowed == nullptr)) {
     push_number(0);
   } else {
     if (ob->shadowed) {
@@ -104,7 +104,7 @@ void f_remove_shadow(void) {
     if (ob->shadowing) {
       ob->shadowing->shadowed = ob->shadowed;
     }
-    ob->shadowing = ob->shadowed = 0;
+    ob->shadowing = ob->shadowed = nullptr;
     push_number(1);
   }
 }
@@ -140,7 +140,7 @@ void f_store_variable(void) {
   svalue_t *sv;
   unsigned short type;
 
-  const char *name = NULL;
+  const char *name = nullptr;
   object_t *ob;
 
   if (st_num_arg == 3) {
@@ -168,7 +168,7 @@ void f_fetch_variable(void) {
   int idx;
   unsigned short type;
 
-  const char *name = NULL;
+  const char *name = nullptr;
   object_t *ob;
 
   if (st_num_arg == 2) {
@@ -383,7 +383,7 @@ void f_functions(void) {
       if (prog->type_start && prog->type_start[ind] != INDEX_START_NONE) {
         types = &prog->argument_types[prog->type_start[ind]];
       } else {
-        types = 0;
+        types = nullptr;
       }
 
       vec->item[i].type = T_ARRAY;
@@ -535,7 +535,7 @@ void f_terminal_colour(void) {
   char colouratstartword[MAX_COLOUR_STRING];
   int curcolourlen;
   int colourstartlen = 0;
-  const char *resetstr = 0;
+  const char *resetstr = nullptr;
   char *resetstrname;
   int resetstrlen = 0;
   int num, i, j, k, col, start, space, *lens, maybe_at_end;
@@ -578,13 +578,13 @@ void f_terminal_colour(void) {
       cp++;
     }
   } while (cp);
-  if (cp == NULL) {
+  if (cp == nullptr) {
     if (wrap) {
       num = 1;
       parts = reinterpret_cast<const char **>(
           DCALLOC(1, sizeof(char *), TAG_TEMPORARY, "f_terminal_colour: parts"));
       parts[0] = instr;
-      savestr = 0;
+      savestr = nullptr;
     } else {
       pop_stack(); /* no delimiter in string, so return the original */
       return;
@@ -1049,7 +1049,7 @@ static char *pluralize(const char *str) {
 
   sz = strlen(str);
   if (!sz) {
-    return 0;
+    return nullptr;
   }
 
   /* if it is of the form 'X of Y', pluralize the 'X' part */
@@ -1625,7 +1625,7 @@ void f_replaceable(void) {
         ignore = reinterpret_cast<char **>(
             DCALLOC(numignore + 2, sizeof(char *), TAG_TEMPORARY, "replaceable"));
       } else {
-        ignore = 0;
+        ignore = nullptr;
       }
       ignore[0] = findstring(APPLY_CREATE);
       ignore[1] = findstring(APPLY___INIT);
@@ -1633,7 +1633,7 @@ void f_replaceable(void) {
         if (sp->u.arr->item[i].type == T_STRING) {
           ignore[i + 2] = findstring(sp->u.arr->item[i].u.string);
         } else {
-          ignore[i + 2] = 0;
+          ignore[i + 2] = nullptr;
         }
       }
       numignore += 2;
@@ -1790,7 +1790,7 @@ void f_remove_interactive(void) {
  */
 #ifdef F_QUERY_IP_PORT
 static int query_ip_port(object_t *ob) {
-  if (!ob || ob->interactive == 0) {
+  if (!ob || ob->interactive == nullptr) {
     return 0;
   }
   return ob->interactive->local_port;
@@ -2107,7 +2107,7 @@ void f_memory_summary(void) {
 /* Marius */
 #ifdef F_QUERY_REPLACED_PROGRAM
 void f_query_replaced_program(void) {
-  char *res = 0;
+  char *res = nullptr;
 
   if (st_num_arg) {
     if (sp->u.ob->replaced_program) {
@@ -2394,7 +2394,7 @@ void f_base_name(void) {
 
   pop_stack();
 
-  if ((tmp = strchr(name, '#')) != NULL) {
+  if ((tmp = strchr(name, '#')) != nullptr) {
     char *ret;
     i = tmp - name;
     ret = new_string(i, "f_base_name: ret");
@@ -2429,7 +2429,7 @@ void f_get_garbage(void) {
   int count, i;
   object_t **obs;
   array_t *ret;
-  get_objects(&obs, &count, garbage_check, 0);
+  get_objects(&obs, &count, garbage_check, nullptr);
 
   if (count > max_array_size) {
     count = max_array_size;
@@ -2845,7 +2845,7 @@ void f_string_difference() {
 #ifdef F_QUERY_CHARMODE
 static int query_charmode(object_t *ob) {
   int ret;
-  if (!ob || ob->interactive == 0) {
+  if (!ob || ob->interactive == nullptr) {
     ret = -2;
   } else {
     ret = (ob->interactive->iflags & I_SINGLE_CHAR);
@@ -2868,7 +2868,7 @@ void f_query_charmode(void) {
 #ifdef F_REMOVE_CHARMODE
 static int remove_charmode(object_t *ob) {
   int ret;
-  if (!ob || ob->interactive == 0) {
+  if (!ob || ob->interactive == nullptr) {
     ret = -2;
   } else {
     ret = (ob->interactive->iflags &= ~I_SINGLE_CHAR);
@@ -2893,7 +2893,7 @@ void f_remove_charmode(void) {
 #endif
 #ifdef F_REMOVE_GET_CHAR
 static int remove_get_char(object_t *ob) {
-  if (!ob || ob->interactive == 0) {
+  if (!ob || ob->interactive == nullptr) {
     return -2;
   }
 
@@ -2902,9 +2902,9 @@ static int remove_get_char(object_t *ob) {
     if (ob->interactive->num_carry > 0) {
       free_some_svalues(ob->interactive->carryover, ob->interactive->num_carry);
     }
-    ob->interactive->carryover = NULL;
+    ob->interactive->carryover = nullptr;
     ob->interactive->num_carry = 0;
-    ob->interactive->input_to = 0;
+    ob->interactive->input_to = nullptr;
     return 1;
   }
   return -1;

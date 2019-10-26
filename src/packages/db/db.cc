@@ -101,7 +101,7 @@ static void MySQL_cleanup(dbconn_t *);
 static char *MySQL_errormsg(dbconn_t *);
 
 static db_defn_t mysql = {"MySQL", MySQL_connect, MySQL_close,   MySQL_execute, MySQL_fetch,
-                          NULL,    NULL,          MySQL_cleanup, NULL,          MySQL_errormsg};
+                          nullptr,    nullptr,          MySQL_cleanup, nullptr,          MySQL_errormsg};
 #endif
 
 #ifdef USE_POSTGRES
@@ -143,7 +143,7 @@ static db_defn_t SQLite3 = {
     NULL,      SQLite3_cleanup, NULL,          SQLite3_errormsg};
 #endif
 
-static db_defn_t no_db = {"None", NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
+static db_defn_t no_db = {"None", nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
 
 /* valid_database
  *
@@ -250,7 +250,7 @@ void f_db_commit(void) {
  */
 #ifdef F_DB_CONNECT
 void f_db_connect(void) {
-  char *errormsg = 0;
+  char *errormsg = nullptr;
   const char *user = "", *database, *host;
   db_t *db;
   array_t *info;
@@ -338,7 +338,7 @@ void f_db_connect(void) {
   if (db->type->connect) {
     ret =
         db->type->connect(&(db->c), host, database, user,
-                          (mret != (svalue_t *)-1 && mret->type == T_STRING ? mret->u.string : 0));
+                          (mret != (svalue_t *)-1 && mret->type == T_STRING ? mret->u.string : nullptr));
   }
 
   pop_n_elems(args);
@@ -389,7 +389,7 @@ void f_db_exec(void) {
 #ifdef PACKAGE_ASYNC
   if (!db_mut) {
     db_mut = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
-    pthread_mutex_init(db_mut, NULL);
+    pthread_mutex_init(db_mut, nullptr);
   }
   pthread_mutex_lock(db_mut);
 #endif
@@ -529,7 +529,7 @@ void f_db_status(void) {
     }
 
     outbuf_addv(&out, "Handle: %d (%s)\n", i + 1, dbConnList[i].type->name);
-    if (dbConnList[i].type->status != NULL) {
+    if (dbConnList[i].type->status != nullptr) {
       dbConnList[i].type->status(&(dbConnList[i].c), &out);
     }
   }
@@ -594,7 +594,7 @@ int create_db_conn(void) {
 
 db_t *find_db_conn(int handle) {
   if (handle < 1 || handle > dbConnAlloc || dbConnList[handle - 1].flags & DB_FLAG_EMPTY) {
-    return 0;
+    return nullptr;
   }
   return &(dbConnList[handle - 1]);
 }
@@ -614,7 +614,7 @@ static void MySQL_cleanup(dbconn_t *c) {
   *(c->mysql.errormsg) = 0;
   if (c->mysql.results) {
     mysql_free_result(c->mysql.results);
-    c->mysql.results = 0;
+    c->mysql.results = nullptr;
   }
 }
 
@@ -629,7 +629,7 @@ static char *MySQL_errormsg(dbconn_t *c) {
 static int MySQL_close(dbconn_t *c) {
   mysql_close(c->mysql.handle);
   FREE(c->mysql.handle);
-  c->mysql.handle = 0;
+  c->mysql.handle = nullptr;
 
   return 1;
 }
@@ -682,7 +682,7 @@ static array_t *MySQL_fetch(dbconn_t *c, int row) {
     field = mysql_fetch_field(c->mysql.results);
 
     if (row == 0) {
-      if (field == (MYSQL_FIELD *)NULL) {
+      if (field == (MYSQL_FIELD *)nullptr) {
         v->item[i] = const0u;
       } else {
         v->item[i].type = T_STRING;
@@ -778,12 +778,12 @@ static int MySQL_connect(dbconn_t *c, const char *host, const char *database, co
     strncpy(c->mysql.errormsg, mysql_error(c->mysql.handle), sizeof(c->mysql.errormsg));
     c->mysql.errormsg[sizeof(c->mysql.errormsg) - 1] = 0;
     mysql_close(c->mysql.handle);
-    c->mysql.handle = 0;
+    c->mysql.handle = nullptr;
     FREE(tmp);
     return 0;
   }
 
-  c->mysql.results = 0;
+  c->mysql.results = nullptr;
   return 1;
 }
 #endif

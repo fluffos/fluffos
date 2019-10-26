@@ -35,7 +35,7 @@ static int send_mssp_val(mapping_t *map, mapping_node_t *el, void *data) {
 void on_telnet_do_mssp(interactive_t *ip) {
   svalue_t *res = safe_apply_master_ob(APPLY_GET_MUD_STATS, 0);
   mapping_t *map;
-  if (res <= (svalue_t *)0 || res->type != T_MAPPING) {
+  if (res <= (svalue_t *)nullptr || res->type != T_MAPPING) {
     map = allocate_mapping(0);
     free_svalue(&apply_ret_value, "telnet neg");
     apply_ret_value.type = T_MAPPING;
@@ -52,7 +52,7 @@ void on_telnet_do_mssp(interactive_t *ip) {
   if (tmp) {
     svalue_t *name = find_string_in_mapping(map, tmp);
     if (!name || name->type != T_STRING) {
-      tmp = 0;
+      tmp = nullptr;
     }
   }
   if (!tmp) {
@@ -63,7 +63,7 @@ void on_telnet_do_mssp(interactive_t *ip) {
   if (tmp) {
     svalue_t *players = find_string_in_mapping(map, tmp);
     if (!players || players->type != T_STRING) {
-      tmp = 0;
+      tmp = nullptr;
     }
   }
   if (!tmp) {
@@ -75,7 +75,7 @@ void on_telnet_do_mssp(interactive_t *ip) {
   if (tmp) {
     svalue_t *upt = find_string_in_mapping(map, tmp);
     if (!upt || upt->type != T_STRING) {
-      tmp = 0;
+      tmp = nullptr;
     }
   }
   if (!tmp) {
