@@ -1,0 +1,9 @@
+---
+# We'll use defaults from the LLVM style, but with 4 columns indentation.
+BasedOnStyle: Google
+IndentWidth: 2
+SortIncludes: false
+---
+Language: Cpp
+ColumnLimit: 100
+---

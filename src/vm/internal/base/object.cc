@@ -128,7 +128,9 @@ int svalue_save_size(svalue_t *v) {
       sprintf(buf, "%" LPC_FLOAT_FMTSTR_P, v->u.real);
       return (strlen(buf) + 1);
     }
-    default: { return 1; }
+    default: {
+      return 1;
+    }
   }
 }
 

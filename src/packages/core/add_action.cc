@@ -430,7 +430,7 @@ static int user_parser(char *buff) {
 #ifndef NO_WIZARDS
           && !(command_giver->flags & O_IS_WIZARD)
 #endif
-              ) {
+      ) {
         add_moves(&s->ob->stats, 1);
       }
 #endif
@@ -525,10 +525,10 @@ static void add_action(svalue_t *str, const char *cmd, int flag) {
       && ob->super != command_giver && ob->super != command_giver->super &&
       ob != command_giver->super
 #endif
-      ) {
+  ) {
     return;
   } /* No need for an error, they know what they
-         * did wrong. */
+     * did wrong. */
   p = alloc_sentence();
   if (str->type == T_STRING) {
     debug(add_action, "--Add action '%s' (ob: %s func: '%s')\n", cmd, ob->obname, str->u.string);

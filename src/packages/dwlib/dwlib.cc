@@ -677,7 +677,6 @@ void replace_mxp_html(int html, int mxp) {
 
 void f_replace_html() { replace_mxp_html(1, 0); }
 
-
 void f_replace_mxp() { replace_mxp_html(0, 1); }
 
 void f_roulette_wheel() {

@@ -624,9 +624,9 @@ void filter_array(svalue_t *arg, int num_arg) {
     process_efun_callback(1, &ftc, F_FILTER);
 
     /* allocate a full size array and push it onto the stack so that if an
-         * error occurs, it'll get cleaned up.  can't use empty array because
-         * if an error occurs, it'll contain garbage and crash the driver
-         */
+     * error occurs, it'll get cleaned up.  can't use empty array because
+     * if an error occurs, it'll contain garbage and crash the driver
+     */
     r = allocate_array(size);
     push_refed_array(r);
 
@@ -1381,8 +1381,8 @@ array_t *deep_inventory(object_t *ob, int take_top, funptr_t *fp) {
   dinv = int_allocate_array(o = i);
   push_refed_array(dinv);
   /*
-  * collect visible inventory objects recursively
-  */
+   * collect visible inventory objects recursively
+   */
   if (take_top) {
     if (fp) {
       push_object(ob);
@@ -1455,8 +1455,8 @@ array_t *deep_inventory_array(array_t *arr, int take_top, funptr_t *fp) {
   dinv = int_allocate_array(o = i);
   push_refed_array(dinv);
   /*
-  * collect visible inventory objects recursively
-  */
+   * collect visible inventory objects recursively
+   */
   i = 0;
   for (c = 0; i < o && c < arr->size; c++) {
     if (arr->item[c].type == T_OBJECT) {

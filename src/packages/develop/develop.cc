@@ -144,7 +144,7 @@ void f_refs(void) {
   }
   free_svalue(sp, "f_refs");
   put_number(r - 1); /* minus 1 to compensate for being arg of
-                        * refs() */
+                      * refs() */
 }
 #endif
 
@@ -193,7 +193,7 @@ void f_set_malloc_mask(void) { set_malloc_mask((sp--)->u.number); }
 void f_check_memory(void) { check_all_blocks((sp--)->u.number); }
 #endif
 #endif /* (defined(DEBUGMALLOC) && \
-* defined(DEBUGMALLOC_EXTENSIONS)) */
+        * defined(DEBUGMALLOC_EXTENSIONS)) */
 
 #ifdef F_TRACE
 void f_trace(void) {

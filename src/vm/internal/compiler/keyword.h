@@ -23,7 +23,7 @@ struct keyword_t {
   unsigned short arg_type4; /* Type of argument 4 */
   short arg_index;          /* Index pointing to where to find arg type */
   short Default;            /* an efun to use as default for last
-         * argument */
+                             * argument */
 };
 
 #endif /* SRC_VM_INTERNAL_COMPILER_KEYWORD_H_ */

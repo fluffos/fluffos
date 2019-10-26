@@ -89,8 +89,8 @@ void on_query_addr_by_name_finish(addr_number_query *query) {
 
     // push IP address
     char host[NI_MAXHOST];
-    int ret = getnameinfo(query->res->ai_addr, query->res->ai_addrlen, host, sizeof(host), nullptr, 0,
-                          NI_NUMERICHOST);
+    int ret = getnameinfo(query->res->ai_addr, query->res->ai_addrlen, host, sizeof(host), nullptr,
+                          0, NI_NUMERICHOST);
     if (!ret) {
       copy_and_push_string(host);
     } else {
@@ -125,7 +125,8 @@ void on_getaddr_result(int err, evutil_addrinfo *res, void *arg) {
   query->res = res;
 
   // Schedule an immediate event to call LPC callback.
-  add_gametick_event(std::chrono::milliseconds(0), [=] { return on_query_addr_by_name_finish(query); });
+  add_gametick_event(std::chrono::milliseconds(0),
+                     [=] { return on_query_addr_by_name_finish(query); });
 }
 
 /*

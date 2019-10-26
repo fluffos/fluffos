@@ -101,7 +101,7 @@ static void MySQL_cleanup(dbconn_t *);
 static char *MySQL_errormsg(dbconn_t *);
 
 static db_defn_t mysql = {"MySQL", MySQL_connect, MySQL_close,   MySQL_execute, MySQL_fetch,
-                          nullptr,    nullptr,          MySQL_cleanup, nullptr,          MySQL_errormsg};
+                          nullptr, nullptr,       MySQL_cleanup, nullptr,       MySQL_errormsg};
 #endif
 
 #ifdef USE_POSTGRES
@@ -143,7 +143,8 @@ static db_defn_t SQLite3 = {
     NULL,      SQLite3_cleanup, NULL,          SQLite3_errormsg};
 #endif
 
-static db_defn_t no_db = {"None", nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
+static db_defn_t no_db = {"None",  nullptr, nullptr, nullptr, nullptr,
+                          nullptr, nullptr, nullptr, nullptr, nullptr};
 
 /* valid_database
  *
@@ -336,9 +337,9 @@ void f_db_connect(void) {
   }
 
   if (db->type->connect) {
-    ret =
-        db->type->connect(&(db->c), host, database, user,
-                          (mret != (svalue_t *)-1 && mret->type == T_STRING ? mret->u.string : nullptr));
+    ret = db->type->connect(
+        &(db->c), host, database, user,
+        (mret != (svalue_t *)-1 && mret->type == T_STRING ? mret->u.string : nullptr));
   }
 
   pop_n_elems(args);

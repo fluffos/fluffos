@@ -95,9 +95,9 @@ uint32_t T[64] = {
 /* This function returns success, i.e. 0 on error. */
 int MD5Digest(BytE *buf,            /* Buffer to be digested.               */
               unsigned long buflen, /* Length of the buffer in bytes.
-*/
+                                     */
               BytE *Digest          /* Output area: 16 raw bytes.           */
-              ) {
+) {
 #define OA 0x67452301 /* Per RFC, section 3.3. */
 #define OB 0xefcdab89
 #define OC 0x98badcfe
@@ -321,7 +321,7 @@ void crunchbuffer(BytE *buf,      /* Buffer to be crunched.       */
                   char *addition, /* What to add to buf.          */
                   int addlen,     /* Length of addition.          */
                   int maxlen      /* How many bytes in buf.       */
-                  ) {
+) {
   int used;
 
   used = *len;
@@ -371,8 +371,8 @@ char *custom_crypt(const char *key, const char *salt, unsigned char *rawout) {
   static BytE buffer[MD5_MAXLEN], abuffer[MD5_MAXLEN], thesalt[MD5_SALTLEN];
   int used = 0, len, i;
   static BytE /* encode()d salt, encode()d digest, salt seperator
-                     * and null terminating byte:
-                     */
+               * and null terminating byte:
+               */
       ret[(MD5_SALTLEN * 2) + 1 + (sizeof(Digest) * 2) + 1];
 
   /* Obtain the salt we have to use (either given in salt

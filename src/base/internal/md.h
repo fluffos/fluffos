@@ -42,7 +42,7 @@ void check_all_blocks(int);
     fprintf(stderr, "Expected node of type %04x: got %s %04x\n", kind, PTR_TO_NODET(ptr)->desc, \
             PTR_TO_NODET(ptr)->tag);                                                            \
   else                                                                                          \
-  PTR_TO_NODET(ptr)->tag |= TAG_MARKED
+    PTR_TO_NODET(ptr)->tag |= TAG_MARKED
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 #define SET_TAG(x, y) set_tag(x, y)

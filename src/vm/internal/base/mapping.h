@@ -37,7 +37,7 @@ typedef struct mapping_node_block_s {
 
 struct mapping_t {
   unsigned short ref; /* how many times this map has been
-                         * referenced */
+                       * referenced */
 #ifdef DEBUGMALLOC_EXTENSIONS
   int extra_ref;
 #endif
@@ -64,7 +64,9 @@ typedef struct vinfo_s {
   int pos, size, w;
 } vinfo_t;
 
-typedef struct minfo_s { mapping_t *map, *newmap; } minfo_t;
+typedef struct minfo_s {
+  mapping_t *map, *newmap;
+} minfo_t;
 
 #define mapping_too_large() \
   error("Mapping exceeded maximum allowed size of %d.\n", MAX_MAPPING_SIZE);

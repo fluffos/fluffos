@@ -6,7 +6,7 @@ volatile int outoftime = 0;
 uint64_t max_eval_cost;
 
 namespace {
-    std::chrono::steady_clock::time_point deadline;
+std::chrono::steady_clock::time_point deadline;
 }
 
 void set_eval(uint64_t etime) {

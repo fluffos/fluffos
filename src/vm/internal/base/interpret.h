@@ -65,7 +65,7 @@ struct control_stack_t {
   struct defer_list *defers;
   int num_local_variables;   /* Local + arguments */
   int function_index_offset; /* Used when executing functions in inherited
-                                * programs */
+                              * programs */
   int variable_index_offset; /* Same */
   short caller_type;         /* was this a locally called function? */
   short framekind;

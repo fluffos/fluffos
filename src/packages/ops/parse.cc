@@ -246,7 +246,7 @@ Example:
 */
 
 /* Some useful string macros
-*/
+ */
 #define EQ(x, y) (strcmp(x, y) == 0)
 #define EQN(x, y) (strncmp(x, y, strlen(x)) == 0)
 #define EMPTY(x) (strcmp(x, "") == 0)
@@ -383,7 +383,7 @@ static void load_lpc_info(int ix, object_t *ob) {
 }
 
 /* Main function, called from interpret.c (or eoperators.c)
-*/
+ */
 
 /* Some leak prevention: */
 static void parse_clean_up() {
@@ -482,7 +482,7 @@ int parse(const char *cmd,       /* Command to parse */
           svalue_t *ob_or_array, /* Object or array of objects */
           const char *pattern,   /* Special parsing pattern */
           svalue_t *stack_args,  /* Pointer to lvalue args on
-                                    * stack */
+                                  * stack */
           int num_arg) {
   int pix, cix, six, fail, fword, ocix, fpix;
   svalue_t *pval;
@@ -567,7 +567,7 @@ int parse(const char *cmd,       /* Command to parse */
    */
   for (six = 0, cix = 0, pix = 0; pix < parse_patarr->size; pix++) {
     pval = nullptr; /* The 'fill-in' value */
-    fail = 0; /* 1 if match failed */
+    fail = 0;       /* 1 if match failed */
 
     if (EQ(parse_patarr->item[pix].u.string, "%s")) {
       /*
@@ -1407,12 +1407,12 @@ static int check_adjectiv(int obix, array_t *warr, int from, int to) {
   for (il = from; il <= to;) {            /* adj1 .. adjN */
     for (back = to; back >= il; back--) { /* back from adjN to adj[il] */
                                           /*
- * Create teststring with "adj[il] .. adj[back]"
- */
+                                           * Create teststring with "adj[il] .. adj[back]"
+                                           */
       adstr[0] = 0;
       for (sum = il; sum <= back; sum++) {
         /* test "adj[il] ..
-                                                     * adj[back] */
+         * adj[back] */
         if (sum > il) {
           strcat(adstr, " ");
         }
