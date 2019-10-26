@@ -207,7 +207,7 @@ void backend(struct event_base *base) {
   add_gametick_event(std::chrono::seconds(0), tick_event::callback_type(call_heart_beat));
   add_gametick_event(std::chrono::minutes(5), tick_event::callback_type(look_for_objects_to_swap));
   add_gametick_event(std::chrono::minutes(30),
-                     tick_event::callback_type(std::bind(reclaim_objects, true)));
+                     tick_event::callback_type([] { return reclaim_objects(true); }));
 #ifdef PACKAGE_MUDLIB_STATS
   add_gametick_event(std::chrono::minutes(60), tick_event::callback_type(mudlib_stats_decay));
 #endif
