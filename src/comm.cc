@@ -290,14 +290,14 @@ void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
  * Initialize new user connection socket.
  */
 bool init_user_conn() {
-  for (int i = 0; i < 5; i++) {
+  for (auto & i : external_port) {
 #ifdef F_NETWORK_STATS
-    external_port[i].in_packets = 0;
-    external_port[i].in_volume = 0;
-    external_port[i].out_packets = 0;
-    external_port[i].out_volume = 0;
+    i.in_packets = 0;
+    i.in_volume = 0;
+    i.out_packets = 0;
+    i.out_volume = 0;
 #endif
-    if (!external_port[i].port) continue;
+    if (!i.port) continue;
 #ifdef IPV6
     auto fd = socket(AF_INET6, SOCK_STREAM, 0);
 #else
@@ -352,7 +352,7 @@ bool init_user_conn() {
       struct addrinfo *res;
 
       char service[NI_MAXSERV];
-      snprintf(service, sizeof(service), "%u", external_port[i].port);
+      snprintf(service, sizeof(service), "%u", i.port);
 
       // Must be initialized to all zero.
       struct addrinfo hints = {0};
@@ -391,13 +391,13 @@ bool init_user_conn() {
     }
     // Listen on connection event
     auto conn = evconnlistener_new(
-        g_event_base, new_user_handler, &external_port[i],
+        g_event_base, new_user_handler, &i,
         LEV_OPT_REUSEABLE | LEV_OPT_CLOSE_ON_FREE | LEV_OPT_CLOSE_ON_EXEC, 1024, fd);
     if (conn == nullptr) {
       debug_message("listening failed: %s !", evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
       return false;
     }
-    external_port[i].ev_conn = conn;
+    i.ev_conn = conn;
   }
   return true;
 }

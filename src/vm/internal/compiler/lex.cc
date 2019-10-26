@@ -3507,8 +3507,7 @@ void mark_all_defines() {
 void print_all_predefines() {
   std::vector<defn_t *> results;
 
-  for (int i = 0; i < DEFHASH; i++) {
-    defn_t *tmp = defns[i];
+  for (auto tmp : defns) {
     while (tmp) {
       if (tmp->flags == DEF_IS_PREDEF) {
         results.push_back(tmp);

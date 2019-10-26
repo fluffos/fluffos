@@ -107,8 +107,8 @@ void config_init() {
   }
 
   // populate default value for int flags.
-  for (int i = 0; i < (sizeof(kDefaultFlags) / sizeof(flagEntry)); i++) {
-    CONFIG_INT(kDefaultFlags[i].pos) = kDefaultFlags[i].defaultValue;
+  for (const auto & kDefaultFlag : kDefaultFlags) {
+    CONFIG_INT(kDefaultFlag.pos) = kDefaultFlag.defaultValue;
   }
 }
 
@@ -344,24 +344,24 @@ void read_config(char *filename) {
   scan_config_line("fd6 port : %d\n", tmp, -2);
 
   // Give all obsolete (thus untouched) config strings a value.
-  for (int i = 0; i < NUM_CONFIG_STRS; i++) {
-    if (config_str[i] == nullptr) {
-      config_str[i] = alloc_cstring("", "rc_obsolete");
+  for (auto & i : config_str) {
+    if (i == nullptr) {
+      i = alloc_cstring("", "rc_obsolete");
     }
   }
 
   std::cout << "==== Runtime Config Table ====" << std::endl;
   // process int flags
-  for (int i = 0; i < (sizeof(kDefaultFlags) / sizeof(flagEntry)); i++) {
-    std::cout << kDefaultFlags[i].key << ": " << kDefaultFlags[i].defaultValue;
+  for (const auto & kDefaultFlag : kDefaultFlags) {
+    std::cout << kDefaultFlag.key << ": " << kDefaultFlag.defaultValue;
 
     int value = 0;
     char buf[256];
-    sprintf(buf, "%s : %%d\n", kDefaultFlags[i].key.c_str());
+    sprintf(buf, "%s : %%d\n", kDefaultFlag.key.c_str());
 
     if (scan_config_line(buf, &value, kOptional)) {
-      if (value != kDefaultFlags[i].defaultValue) {
-        CONFIG_INT(kDefaultFlags[i].pos) = value;
+      if (value != kDefaultFlag.defaultValue) {
+        CONFIG_INT(kDefaultFlag.pos) = value;
         std::cout << " (new: " << value << ")";
       }
     }
