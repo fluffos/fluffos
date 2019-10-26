@@ -273,7 +273,7 @@ typedef struct parse_global_s {
   array_t *obarr;
 } parse_global_t;
 
-static parse_global_t *globals = 0;
+static parse_global_t *globals = nullptr;
 
 #define gId_list (globals->Id_list)
 #define gPluid_list (globals->Pluid_list)
@@ -440,17 +440,17 @@ static void push_parse_globals() {
   pg->next = globals;
   globals = pg;
 
-  pg->Id_list = 0;
-  pg->Pluid_list = 0;
-  pg->Adjid_list = 0;
-  pg->Id_list_d = 0;
-  pg->Pluid_list_d = 0;
-  pg->Adjid_list_d = 0;
-  pg->Prepos_list = 0;
-  pg->Allword = 0;
-  pg->warr = 0;
-  pg->patarr = 0;
-  pg->obarr = 0;
+  pg->Id_list = nullptr;
+  pg->Pluid_list = nullptr;
+  pg->Adjid_list = nullptr;
+  pg->Id_list_d = nullptr;
+  pg->Pluid_list_d = nullptr;
+  pg->Adjid_list_d = nullptr;
+  pg->Prepos_list = nullptr;
+  pg->Allword = nullptr;
+  pg->warr = nullptr;
+  pg->patarr = nullptr;
+  pg->obarr = nullptr;
 }
 
 static void pop_parse_globals() {
@@ -520,7 +520,7 @@ int parse(const char *cmd,       /* Command to parse */
 #ifndef NO_ENVIRONMENT
   else if (ob_or_array->type == T_OBJECT) {
     /* 1 == ob + deepinv */
-    parse_obarr = obarr = deep_inventory(ob_or_array->u.ob, 1, NULL);
+    parse_obarr = obarr = deep_inventory(ob_or_array->u.ob, 1, nullptr);
   }
 #endif
 
@@ -566,7 +566,7 @@ int parse(const char *cmd,       /* Command to parse */
    * Loop through the pattern. Handle %s but not '/'
    */
   for (six = 0, cix = 0, pix = 0; pix < parse_patarr->size; pix++) {
-    pval = 0; /* The 'fill-in' value */
+    pval = nullptr; /* The 'fill-in' value */
     fail = 0; /* 1 if match failed */
 
     if (EQ(parse_patarr->item[pix].u.string, "%s")) {
@@ -595,7 +595,7 @@ int parse(const char *cmd,       /* Command to parse */
            * pattern
            */
           pval = sub_parse(obarr, parse_patarr, &pix, parse_warr, &cix, &fail,
-                           ((six + 1) < num_arg) ? &stack_args[six + 1] : 0);
+                           ((six + 1) < num_arg) ? &stack_args[six + 1] : nullptr);
           if (fail) {
             cix = ++ocix;
             pix = fpix;
@@ -615,7 +615,7 @@ int parse(const char *cmd,       /* Command to parse */
           } else { /* A match with a non value ie 'word' */
             store_words_slice(stack_args, six++, num_arg, parse_warr, fword, ocix - 1);
           }
-          pval = 0;
+          pval = nullptr;
         }
       }
     }
@@ -625,7 +625,7 @@ int parse(const char *cmd,       /* Command to parse */
      */
     else if (!EQ(parse_patarr->item[pix].u.string, "/")) {
       pval = sub_parse(obarr, parse_patarr, &pix, parse_warr, &cix, &fail,
-                       (six < num_arg) ? &stack_args[six] : 0);
+                       (six < num_arg) ? &stack_args[six] : nullptr);
       if (!fail && pval) {
         store_value(stack_args, six++, num_arg, pval);
       }
@@ -715,7 +715,7 @@ static svalue_t *sub_parse(array_t *obarr, array_t *patarr, int *pix_in, array_t
    */
   if (*cix_in == warr->size) {
     *fail = 1;
-    return 0;
+    return nullptr;
   }
   cix = *cix_in;
   pix = *pix_in;
@@ -740,7 +740,7 @@ static svalue_t *sub_parse(array_t *obarr, array_t *patarr, int *pix_in, array_t
     } else {
       *fail = 1;
       *pix_in = pix - 1;
-      return 0;
+      return nullptr;
     }
   }
 
@@ -784,13 +784,13 @@ static svalue_t *one_parse(array_t *obarr, const char *pat, array_t *warr, int *
    */
   if (*cix_in >= warr->size) {
     *fail = 1;
-    return 0;
+    return nullptr;
   }
   ch = pat[0];
   if (ch == '%') {
     ch = ((uisupper(pat[1])) ? tolower(pat[1]) : pat[1]);
   }
-  pval = 0;
+  pval = nullptr;
 
   switch (ch) {
     case 'i':
@@ -909,7 +909,7 @@ static svalue_t *number_parse(array_t *obarr, array_t *warr, int *cix_in, int *f
       return &parse_ret;
     }
     *fail = 1;
-    return 0; /* Only nonnegative numbers */
+    return nullptr; /* Only nonnegative numbers */
   }
   if (gAllword && (strcmp(warr->item[cix].u.string, gAllword) == 0)) {
     (*cix_in)++;
@@ -945,7 +945,7 @@ static svalue_t *number_parse(array_t *obarr, array_t *warr, int *cix_in, int *f
   }
 
   *fail = 1;
-  return 0;
+  return nullptr;
 }
 
 /*
@@ -1011,7 +1011,7 @@ static svalue_t *item_parse(array_t *obarr, array_t *warr, int *cix_in, int *fai
     if (pval) {
       (*cix_in)--;
     }
-    return 0;
+    return nullptr;
   } else {
     if (*cix_in < warr->size) {
       *cix_in = max_cix + 1;
@@ -1099,7 +1099,7 @@ static svalue_t *living_parse(array_t *obarr, array_t *warr, int *cix_in, int *f
     return &parse_ret;
   }
   *fail = 1;
-  return 0;
+  return nullptr;
 }
 #endif
 
@@ -1130,7 +1130,7 @@ static svalue_t *single_parse(array_t *obarr, array_t *warr, int *cix_in, int *f
     }
   }
   *fail = 1;
-  return 0;
+  return nullptr;
 }
 
 /*
@@ -1254,7 +1254,7 @@ static int match_object(int obix, array_t *warr, int *cix_in, int *plur) {
         break;
 
       default:
-        ids = 0;
+        ids = nullptr;
     }
 
     for (il = 0; il < ids->size; il++) {
@@ -1368,7 +1368,7 @@ static int check_adjectiv(int obix, array_t *warr, int from, int to) {
   if (gAdjid_list->item[obix].type == T_ARRAY) {
     ids = gAdjid_list->item[obix].u.arr;
   } else {
-    ids = 0;
+    ids = nullptr;
   }
 
   for (sum = 0, fail = 0, il = from; il <= to; il++) {

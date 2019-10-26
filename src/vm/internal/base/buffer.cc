@@ -75,21 +75,21 @@ char *read_buffer(buffer_t *b, int start, int len, int *rlen) {
   unsigned int size;
 
   if (len < 0) {
-    return 0;
+    return nullptr;
   }
 
   size = b->size;
   if (start < 0) {
     start = size + start;
     if (start < 0) {
-      return 0;
+      return nullptr;
     }
   }
   if (len == 0) {
     len = size;
   }
   if (start >= size) {
-    return 0;
+    return nullptr;
   }
   if ((start + len) > size) {
     len = (size - start);

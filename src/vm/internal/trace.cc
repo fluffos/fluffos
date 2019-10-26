@@ -48,16 +48,16 @@ void dump_trace_line(const char *fname, const char *pname, const char *const obn
 
 const char *dump_trace(int how) {
     control_stack_t *p;
-    const char *ret = 0;
+    const char *ret = nullptr;
     int num_arg = -1, num_local = -1;
 
     int i;
 
-    if (current_prog == 0) {
-        return 0;
+    if (current_prog == nullptr) {
+        return nullptr;
     }
     if (csp < &control_stack[0]) {
-        return 0;
+        return nullptr;
     }
 
     if (CONFIG_INT(__RC_TRACE_CODE__)) {
@@ -90,7 +90,7 @@ const char *dump_trace(int how) {
                 get_trace_details(trace_prog, p[0].fr.table_index, &fname, &num_arg, &num_local);
                 dump_trace_line(fname, trace_prog->filename, trace_obj->obname, get_line_number(trace_pc, trace_prog));
                 if (strcmp(fname, "heart_beat") == 0) {
-                    ret = p->ob ? p->ob->obname : 0;
+                    ret = p->ob ? p->ob->obname : nullptr;
                 }
                 break;
             }
@@ -99,7 +99,7 @@ const char *dump_trace(int how) {
                 svalue_t tmpval;
 
                 tmpbuf.real_size = 0;
-                tmpbuf.buffer = 0;
+                tmpbuf.buffer = nullptr;
 
                 tmpval.type = T_FUNCTION;
                 tmpval.u.fp = p[0].fr.funp;
@@ -178,7 +178,7 @@ array_t *get_svalue_trace() {
     svalue_t *ptr;
     int i;
 
-    if (current_prog == 0) {
+    if (current_prog == nullptr) {
         return &the_null_array;
     }
     if (csp < &control_stack[0]) {
@@ -205,7 +205,7 @@ array_t *get_svalue_trace() {
                 svalue_t tmpval;
 
                 tmpbuf.real_size = 0;
-                tmpbuf.buffer = 0;
+                tmpbuf.buffer = nullptr;
 
                 tmpval.type = T_FUNCTION;
                 tmpval.u.fp = p[0].fr.funp;
@@ -271,7 +271,7 @@ array_t *get_svalue_trace() {
             svalue_t tmpval;
 
             tmpbuf.real_size = 0;
-            tmpbuf.buffer = 0;
+            tmpbuf.buffer = nullptr;
 
             tmpval.type = T_FUNCTION;
             tmpval.u.fp = p[0].fr.funp;

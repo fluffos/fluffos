@@ -47,7 +47,7 @@ void add_req(struct request *req);
 struct cb_mem {
   function_to_call_t cb;
   struct cb_mem *next;
-} *cbs = 0;
+} *cbs = nullptr;
 
 struct req_mem {
   struct request req;
@@ -73,12 +73,12 @@ struct stuff *get_stuff() {
     pthread_mutex_lock(&mem_mut);
     ret = &stuffs->stuff;
     stuffs = stuffs->next;
-    (reinterpret_cast<struct stuff_mem *>(ret))->next = 0;
+    (reinterpret_cast<struct stuff_mem *>(ret))->next = nullptr;
     pthread_mutex_unlock(&mem_mut);
   } else {
     ret = reinterpret_cast<struct stuff *>(
         DMALLOC(sizeof(struct stuff_mem), TAG_PERMANENT, "get_stuff"));
-    (reinterpret_cast<struct stuff_mem *>(ret))->next = 0;
+    (reinterpret_cast<struct stuff_mem *>(ret))->next = nullptr;
   }
   return ret;
 }
@@ -103,7 +103,7 @@ void *thread_func(void *mydata) {
       struct stuff *work = todo;
       todo = todo->next;
       if (!todo) {
-        lasttodo = NULL;
+        lasttodo = nullptr;
       }
       pthread_mutex_unlock(&work_mut);
       work->func(work->data);
@@ -114,18 +114,18 @@ void *thread_func(void *mydata) {
 
 void do_stuff(void *(*func)(struct request *), struct request *data) {
   if (!thread_started) {
-    pthread_mutex_init(&mut, NULL);
-    pthread_mutex_init(&mem_mut, NULL);
-    pthread_mutex_init(&work_mut, NULL);
+    pthread_mutex_init(&mut, nullptr);
+    pthread_mutex_init(&mem_mut, nullptr);
+    pthread_mutex_init(&work_mut, nullptr);
     pthread_mutex_lock(&mut);
     pthread_t t;
-    pthread_create(&t, NULL, &thread_func, NULL);
+    pthread_create(&t, nullptr, &thread_func, nullptr);
     thread_started = 1;
   }
   struct stuff *work = get_stuff();
   work->func = func;
   work->data = data;
-  work->next = NULL;
+  work->next = nullptr;
   pthread_mutex_lock(&work_mut);
   add_req(data);
   if (lasttodo) {
@@ -143,11 +143,11 @@ function_to_call_t *get_cb() {
   if (cbs) {
     ret = &cbs->cb;
     cbs = cbs->next;
-    (reinterpret_cast<struct cb_mem *>(ret))->next = 0;
+    (reinterpret_cast<struct cb_mem *>(ret))->next = nullptr;
   } else {
     ret = reinterpret_cast<function_to_call_t *>(
         DMALLOC(sizeof(struct cb_mem), TAG_PERMANENT, "get_cb"));
-    (reinterpret_cast<struct cb_mem *>(ret))->next = 0;
+    (reinterpret_cast<struct cb_mem *>(ret))->next = nullptr;
   }
   memset(ret, 0, sizeof(function_to_call_t));
   return ret;
@@ -164,11 +164,11 @@ struct request *get_req() {
   if (reqms) {
     ret = &reqms->req;
     reqms = reqms->next;
-    (reinterpret_cast<struct req_mem *>(ret))->next = 0;
+    (reinterpret_cast<struct req_mem *>(ret))->next = nullptr;
   } else {
     ret = reinterpret_cast<struct request *>(
         DMALLOC(sizeof(struct req_mem), TAG_PERMANENT, "get_cb"));
-    (reinterpret_cast<struct req_mem *>(ret))->next = 0;
+    (reinterpret_cast<struct req_mem *>(ret))->next = nullptr;
   }
   return ret;
 }
@@ -179,15 +179,15 @@ void free_req(struct request *req) {
   reqms = reqt;
 }
 
-static struct request *reqs = NULL;
-static struct request *lastreq = NULL;
+static struct request *reqs = nullptr;
+static struct request *lastreq = nullptr;
 void add_req(struct request *req) {
   if (lastreq) {
     lastreq->next = req;
   } else {
     reqs = req;
   }
-  req->next = NULL;
+  req->next = nullptr;
   lastreq = req;
 }
 
@@ -196,7 +196,7 @@ void *gzreadthread(struct request *req) {
   req->ret = gzread(file, (void *)(req->buf), req->size);
   req->status = DONE;
   gzclose(file);
-  return NULL;
+  return nullptr;
 }
 
 int aio_gzread(struct request *req) {
@@ -213,7 +213,7 @@ void *gzwritethread(struct request *req) {
   req->ret = gzwrite(file, (void *)(req->buf), req->size);
   req->status = DONE;
   gzclose(file);
-  return NULL;
+  return nullptr;
 }
 
 int aio_gzwrite(struct request *req) {
@@ -232,7 +232,7 @@ void *writethread(struct request *req) {
 
   req->status = DONE;
   close(fd);
-  return NULL;
+  return nullptr;
 }
 
 int aio_write(struct request *req) {
@@ -246,7 +246,7 @@ void *readthread(struct request *req) {
   req->ret = read(fd, (void *)(req->buf), req->size);
   req->status = DONE;
   close(fd);
-  return NULL;
+  return nullptr;
 }
 
 int aio_read(struct request *req) {
@@ -256,7 +256,7 @@ int aio_read(struct request *req) {
 }
 
 #ifdef F_ASYNC_DB_EXEC
-pthread_mutex_t *db_mut = NULL;
+pthread_mutex_t *db_mut = nullptr;
 
 void *dbexecthread(struct request *req) {
   pthread_mutex_lock(db_mut);
@@ -284,7 +284,7 @@ void *dbexecthread(struct request *req) {
 
   req->ret = ret;
   req->status = DONE;
-  return NULL;
+  return nullptr;
 }
 
 int aio_db_exec(struct request *req) {
@@ -302,20 +302,20 @@ void *getdirthread(struct request *req) {
     close(fd);
     req->ret = 0;
     req->status = DONE;
-    return NULL;
+    return nullptr;
   }
   req->ret = size;
   while ((size = syscall(SYS_getdents, fd, req->buf + req->ret, req->size - req->ret))) {
     if (size == -1) {
       close(fd);
       req->status = DONE;
-      return NULL;
+      return nullptr;
     }
     req->ret += size;
   }
   req->status = DONE;
   close(fd);
-  return NULL;
+  return nullptr;
 }
 
 int aio_getdir(struct request *req) {
@@ -580,7 +580,7 @@ void f_async_db_exec() {
   }
   if (!db_mut) {
     db_mut = (pthread_mutex_t *)DMALLOC(sizeof(pthread_mutex_t), TAG_PERMANENT, "async_db_exec");
-    pthread_mutex_init(db_mut, NULL);
+    pthread_mutex_init(db_mut, nullptr);
   }
   st_num_arg = num_arg;
   function_to_call_t *cb = get_cb();

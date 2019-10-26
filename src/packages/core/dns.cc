@@ -5,7 +5,7 @@
 #include <event2/event.h>
 #include <event2/dns.h>
 
-static struct evdns_base *g_dns_base = NULL;
+static struct evdns_base *g_dns_base = nullptr;
 
 void init_dns_event_base(struct event_base *base) {
   // Configure a DNS resolver with default nameserver
@@ -89,7 +89,7 @@ void on_query_addr_by_name_finish(addr_number_query *query) {
 
     // push IP address
     char host[NI_MAXHOST];
-    int ret = getnameinfo(query->res->ai_addr, query->res->ai_addrlen, host, sizeof(host), NULL, 0,
+    int ret = getnameinfo(query->res->ai_addr, query->res->ai_addrlen, host, sizeof(host), nullptr, 0,
                           NI_NUMERICHOST);
     if (!ret) {
       copy_and_push_string(host);
@@ -110,7 +110,7 @@ void on_query_addr_by_name_finish(addr_number_query *query) {
     safe_call_function_pointer(query->call_back.u.fp, 3);
   }
 
-  if (query->res != NULL) evutil_freeaddrinfo(query->res);
+  if (query->res != nullptr) evutil_freeaddrinfo(query->res);
 
   free_string(query->name);
   free_svalue(&query->call_back, "on_addr_result");
@@ -151,7 +151,7 @@ int query_addr_by_name(const char *name, svalue_t *call_back) {
 
   add_ref(current_object, "query_addr_number: ");
 
-  query->req = evdns_getaddrinfo(g_dns_base, name, NULL, &hints, on_getaddr_result, query);
+  query->req = evdns_getaddrinfo(g_dns_base, name, nullptr, &hints, on_getaddr_result, query);
 
   debug(dns, "DNS lookup scheduled: %" LPC_INT_FMTSTR_P ", %s\n", query->key, name);
 
@@ -182,11 +182,11 @@ void mark_iptable() {
 const char *query_ip_name(object_t *ob) {
   int i;
 
-  if (ob == 0) {
+  if (ob == nullptr) {
     ob = command_giver;
   }
-  if (!ob || ob->interactive == 0) {
-    return NULL;
+  if (!ob || ob->interactive == nullptr) {
+    return nullptr;
   }
   for (i = 0; i < IPSIZE; i++) {
     if (iptable[i].addrlen == ob->interactive->addrlen &&
@@ -217,14 +217,14 @@ static void add_ip_entry(struct sockaddr *addr, socklen_t size, char *name) {
 }
 
 const char *query_ip_number(object_t *ob) {
-  if (ob == 0) {
+  if (ob == nullptr) {
     ob = command_giver;
   }
-  if (!ob || ob->interactive == 0) {
-    return 0;
+  if (!ob || ob->interactive == nullptr) {
+    return nullptr;
   }
   char host[NI_MAXHOST];
   getnameinfo(reinterpret_cast<sockaddr *>(&ob->interactive->addr), sizeof(ob->interactive->addr),
-              host, sizeof(host), NULL, 0, NI_NUMERICHOST);
+              host, sizeof(host), nullptr, 0, NI_NUMERICHOST);
   return make_shared_string(host);
 }

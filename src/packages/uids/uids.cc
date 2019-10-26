@@ -20,7 +20,7 @@ static object_t *ob;
 #ifdef F_EXPORT_UID
 
 void f_export_uid(void) {
-  if (current_object->euid == NULL) {
+  if (current_object->euid == nullptr) {
     error("Illegal to export uid 0\n");
   }
   ob = sp->u.ob;
@@ -89,7 +89,7 @@ void f_seteuid(void) {
     if (sp->u.number) {
       bad_arg(1, F_SETEUID);
     }
-    current_object->euid = NULL;
+    current_object->euid = nullptr;
     sp->u.number = 1;
     return;
   }

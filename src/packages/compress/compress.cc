@@ -248,7 +248,7 @@ static void zlib_free(void *opaque, void *address) { FREE(address); }
 void f_uncompress(void) {
   z_stream *compressed;
   unsigned char compress_buf[COMPRESS_BUF_SIZE];
-  unsigned char *output_data = NULL;
+  unsigned char *output_data = nullptr;
   int len;
   int pos;
   buffer_t *buffer;
@@ -270,7 +270,7 @@ void f_uncompress(void) {
   compressed->avail_out = COMPRESS_BUF_SIZE;
   compressed->zalloc = zlib_alloc;
   compressed->zfree = zlib_free;
-  compressed->opaque = NULL;
+  compressed->opaque = nullptr;
 
   if (inflateInit(compressed) != Z_OK) {
     FREE(compressed);
@@ -279,7 +279,7 @@ void f_uncompress(void) {
   }
 
   len = 0;
-  output_data = NULL;
+  output_data = nullptr;
   do {
     ret = inflate(compressed, 0);
     if (ret == Z_OK || ret == Z_STREAM_END) {

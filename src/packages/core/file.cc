@@ -151,13 +151,13 @@ array_t *get_dir(const char *path, int flags) {
   char *p;
 
   if (!path) {
-    return 0;
+    return nullptr;
   }
 
   path = check_valid_path(path, current_object, "stat", 0);
 
-  if (path == 0) {
-    return 0;
+  if (path == nullptr) {
+    return nullptr;
   }
 
   if (strlen(path) < 2) {
@@ -171,7 +171,7 @@ array_t *get_dir(const char *path, int flags) {
     /*
      * If path ends with '/' or "/." remove it
      */
-    if ((p = strrchr(temppath, '/')) == 0) {
+    if ((p = strrchr(temppath, '/')) == nullptr) {
       p = temppath;
     }
     if (p[0] == '/' && ((p[1] == '.' && p[2] == '\0') || p[1] == '\0')) {
@@ -181,7 +181,7 @@ array_t *get_dir(const char *path, int flags) {
 
   if (stat(temppath, &st) < 0) {
     if (*p == '\0') {
-      return 0;
+      return nullptr;
     }
     if (p != temppath) {
       strcpy(regexppath, p + 1);
@@ -199,8 +199,8 @@ array_t *get_dir(const char *path, int flags) {
     encode_stat(&v->item[0], flags, p, &st);
     return v;
   }
-  if ((dirp = opendir(temppath)) == 0) {
-    return 0;
+  if ((dirp = opendir(temppath)) == nullptr) {
+    return nullptr;
   }
   /*
    * Count files
@@ -262,7 +262,7 @@ array_t *get_dir(const char *path, int flags) {
 int remove_file(const char *path) {
   path = check_valid_path(path, current_object, "remove_file", 1);
 
-  if (path == 0) {
+  if (path == nullptr) {
     return 0;
   }
   if (unlink(path) == -1) {
@@ -290,7 +290,7 @@ int write_file(const char *file, const char *str, int flags) {
     }
   } else {
     f = fopen(file, (flags & 1) ? "w" : "a");
-    if (f == 0) {
+    if (f == nullptr) {
       error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n", file,
             (flags & 1) ? "overwrite" : "append", strerror(errno));
     }
@@ -317,14 +317,14 @@ char *read_file(const char *file, int start, int lines) {
 
   if (lines < 0) {
     debug(file, "read_file: trying to read negative lines: %d", lines);
-    return 0;
+    return nullptr;
   }
 
   const char *real_file;
 
   real_file = check_valid_path(file, current_object, "read_file", 0);
   if (!real_file) {
-    return 0;
+    return nullptr;
   }
 
   struct stat st;
@@ -332,7 +332,7 @@ char *read_file(const char *file, int start, int lines) {
    * file doesn't exist, or is really a directory
    */
   if (stat(real_file, &st) == -1 || (st.st_mode & S_IFDIR)) {
-    return 0;
+    return nullptr;
   }
 
   if (st.st_size == 0) {
@@ -346,7 +346,7 @@ char *read_file(const char *file, int start, int lines) {
 
   if (f == nullptr) {
     debug(file, "read_file: fail to open: %s.\n", file);
-    return 0;
+    return nullptr;
   }
 
   static char *theBuff = nullptr;
@@ -360,7 +360,7 @@ char *read_file(const char *file, int start, int lines) {
 
   if (total_bytes_read <= 0) {
     debug(file, "read_file: read error: %s.\n", file);
-    return 0;
+    return nullptr;
   }
   theBuff[total_bytes_read] = '\0';
 
@@ -369,7 +369,7 @@ char *read_file(const char *file, int start, int lines) {
   while (start > 1 && ptr_start < theBuff + total_bytes_read) {
     if (*ptr_start == '\0') {
       debug(file, "read_file: file contains '\\0': %s.\n", file);
-      return 0;
+      return nullptr;
     }
     if (*ptr_start == '\n') {
       start--;
@@ -380,7 +380,7 @@ char *read_file(const char *file, int start, int lines) {
   // not found
   if (start > 1) {
     debug(file, "read_file: reached EOF searching for start: %s.\n", file);
-    return 0;
+    return nullptr;
   }
 
   char *ptr_end = nullptr;
@@ -407,7 +407,7 @@ char *read_file(const char *file, int start, int lines) {
   // result is too big.
   if (strlen(ptr_start) > read_file_max_size) {
     debug(file, "read_file: result too big: %s.\n", file);
-    return 0;
+    return nullptr;
   }
 
   bool found_crlf = strchr(ptr_start, '\r') != nullptr;
@@ -435,15 +435,15 @@ char *read_bytes(const char *file, int start, int len, int *rlen) {
   int size;
 
   if (len < 0) {
-    return 0;
+    return nullptr;
   }
   file = check_valid_path(file, current_object, "read_bytes", 0);
   if (!file) {
-    return 0;
+    return nullptr;
   }
   fptr = fopen(file, "rb");
-  if (fptr == NULL) {
-    return 0;
+  if (fptr == nullptr) {
+    return nullptr;
   }
   if (fstat(fileno(fptr), &st) == -1) {
     fatal("Could not stat an open file.\n");
@@ -459,11 +459,11 @@ char *read_bytes(const char *file, int start, int len, int *rlen) {
   if (len > max_byte_transfer) {
     fclose(fptr);
     error("Transfer exceeded maximum allowed number of bytes.\n");
-    return 0;
+    return nullptr;
   }
   if (start >= size) {
     fclose(fptr);
-    return 0;
+    return nullptr;
   }
   if ((start + len) > size) {
     len = (size - start);
@@ -471,7 +471,7 @@ char *read_bytes(const char *file, int start, int len, int *rlen) {
 
   if ((size = fseek(fptr, start, 0)) < 0) {
     fclose(fptr);
-    return 0;
+    return nullptr;
   }
 
   str = new_string(len, "read_bytes: str");
@@ -482,7 +482,7 @@ char *read_bytes(const char *file, int start, int len, int *rlen) {
 
   if (size <= 0) {
     FREE_MSTR(str);
-    return 0;
+    return nullptr;
   }
   /*
    * The string has to end to '\0'!!!
@@ -519,7 +519,7 @@ int write_bytes(const char *file, int start, const char *str, int theLength) {
   } else {
     fptr = fopen(file, "r+b");
   }
-  if (fptr == NULL) {
+  if (fptr == nullptr) {
     return 0;
   }
   if (fstat(fileno(fptr), &st) == -1) {
@@ -589,8 +589,8 @@ const char *check_valid_path(const char *path, object_t *call_object, const char
     return path;
   }
 
-  if (call_object == 0 || call_object->flags & O_DESTRUCTED) {
-    return 0;
+  if (call_object == nullptr || call_object->flags & O_DESTRUCTED) {
+    return nullptr;
   }
 
   copy_and_push_string(path);
@@ -603,11 +603,11 @@ const char *check_valid_path(const char *path, object_t *call_object, const char
   }
 
   if (v == (svalue_t *)-1) {
-    v = 0;
+    v = nullptr;
   }
 
   if (v && v->type == T_NUMBER && v->u.number == 0) {
-    return 0;
+    return nullptr;
   }
   if (v && v->type == T_STRING) {
     path = v->u.string;
@@ -630,7 +630,7 @@ const char *check_valid_path(const char *path, object_t *call_object, const char
     return path;
   }
 
-  return 0;
+  return nullptr;
 }
 
 static int match_string(char *match, char *str) {
@@ -912,10 +912,10 @@ int copy_file(const char *from, const char *to) {
   to = check_valid_path(to, current_object, "move_file", 1);
   assign_svalue(&to_sv, &apply_ret_value);
 
-  if (from == 0) {
+  if (from == nullptr) {
     return -1;
   }
-  if (to == 0) {
+  if (to == nullptr) {
     return -2;
   }
 

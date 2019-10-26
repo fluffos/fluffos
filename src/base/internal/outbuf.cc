@@ -10,7 +10,7 @@
 
 void outbuf_zero(outbuffer_t *outbuf) {
   outbuf->real_size = 0;
-  outbuf->buffer = 0;
+  outbuf->buffer = nullptr;
 }
 
 int outbuf_extend(outbuffer_t *outbuf, int l) {

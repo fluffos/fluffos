@@ -76,7 +76,7 @@ void on_user_command(evutil_socket_t fd, short what, void *arg) {
         (what & EV_WRITE) ? " write" : "", (what & EV_SIGNAL) ? " signal" : "");
   auto user = reinterpret_cast<interactive_t *>(arg);
 
-  if (user == NULL) {
+  if (user == nullptr) {
     fatal("on_user_command: user == NULL, Driver BUG.");
     return;
   }
@@ -94,7 +94,7 @@ void on_user_command(evutil_socket_t fd, short what, void *arg) {
   pop_context(&econ);
 
   /* Has to be cleared if we jumped out of process_user_command() */
-  current_interactive = 0;
+  current_interactive = nullptr;
 
   // if user still have pending command, continue to schedule it.
   //
@@ -110,7 +110,7 @@ void on_user_command(evutil_socket_t fd, short what, void *arg) {
 void on_user_read(bufferevent *bev, void *arg) {
   auto user = reinterpret_cast<interactive_t *>(arg);
 
-  if (user == NULL) {
+  if (user == nullptr) {
     fatal("on_user_read: user == NULL, Driver BUG.");
     return;
   }
@@ -124,7 +124,7 @@ void on_user_read(bufferevent *bev, void *arg) {
 
 void on_user_write(bufferevent *bev, void *arg) {
   auto user = reinterpret_cast<interactive_t *>(arg);
-  if (user == NULL) {
+  if (user == nullptr) {
     fatal("on_user_write: user == NULL, Driver BUG.");
     return;
   }
@@ -134,7 +134,7 @@ void on_user_write(bufferevent *bev, void *arg) {
 void on_user_events(bufferevent *bev, short events, void *arg) {
   auto user = reinterpret_cast<interactive_t *>(arg);
 
-  if (user == NULL) {
+  if (user == nullptr) {
     fatal("on_user_events: user == NULL, Driver BUG.");
     return;
   }
@@ -153,7 +153,7 @@ void new_user_event_listener(interactive_t *user) {
   bufferevent_setcb(bev, on_user_read, on_user_write, on_user_events, user);
   bufferevent_enable(bev, EV_READ | EV_WRITE);
 
-  bufferevent_set_timeouts(bev, NULL, NULL);
+  bufferevent_set_timeouts(bev, nullptr, nullptr);
 
   user->ev_buffer = bev;
   user->ev_command = evtimer_new(g_event_base, on_user_command, user);
@@ -231,8 +231,8 @@ void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
   ret = safe_apply_master_ob(APPLY_CONNECT, 1);
   /* master_ob->interactive can be zero if the master object self
    destructed in the above (don't ask) */
-  set_command_giver(0);
-  if (ret == 0 || ret == (svalue_t *)-1 || ret->type != T_OBJECT || !master_ob->interactive) {
+  set_command_giver(nullptr);
+  if (ret == nullptr || ret == (svalue_t *)-1 || ret->type != T_OBJECT || !master_ob->interactive) {
     debug_message("Can not accept connection from %s due to error in connect().\n",
                   sockaddr_to_string(reinterpret_cast<sockaddr *>(&user->addr), user->addrlen));
     if (master_ob->interactive) {
@@ -257,7 +257,7 @@ void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
   free_object(&master, "new_user");
 
   master_ob->flags &= ~O_ONCE_INTERACTIVE;
-  master_ob->interactive = 0;
+  master_ob->interactive = nullptr;
   add_ref(ob, "new_user");
 
   // start reverse DNS probing.
@@ -271,15 +271,15 @@ void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
 
   // Call logon() on the object.
   ret = safe_apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
-  if (ret == NULL) {
+  if (ret == nullptr) {
     debug_message("new_user_handler: logon() on object %s has failed, the user is disconnected.\n",
                   ob->obname);
     destruct_object(ob);
-    ob = NULL;
+    ob = nullptr;
   } else if (ob->flags & O_DESTRUCTED) {
     // logon() may decide not to allow user connect by destroying objects.
   }
-  set_command_giver(0);
+  set_command_giver(nullptr);
 
   debug(connections, ("new_user_handler: end\n"));
 } /* new_user_handler() */
@@ -371,7 +371,7 @@ bool init_user_conn() {
       if (mudip != nullptr && strlen(mudip) > 0) {
         ret = getaddrinfo(mudip, service, &hints, &res);
       } else {
-        ret = getaddrinfo(NULL, service, &hints, &res);
+        ret = getaddrinfo(nullptr, service, &hints, &res);
       }
       if (ret) {
         debug_message("init_user_conn: getaddrinfo error: %s \n", gai_strerror(ret));
@@ -393,7 +393,7 @@ bool init_user_conn() {
     auto conn = evconnlistener_new(
         g_event_base, new_user_handler, &external_port[i],
         LEV_OPT_REUSEABLE | LEV_OPT_CLOSE_ON_FREE | LEV_OPT_CLOSE_ON_EXEC, 1024, fd);
-    if (conn == NULL) {
+    if (conn == nullptr) {
       debug_message("listening failed: %s !", evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
       return false;
     }
@@ -445,7 +445,7 @@ static int shadow_catch_message(object_t *ob, const char *str) {
   if (!ob->shadowed) {
     return 0;
   }
-  while (ob->shadowed != 0 && ob->shadowed != current_object) {
+  while (ob->shadowed != nullptr && ob->shadowed != current_object) {
     ob = ob->shadowed;
   }
   while (ob->shadowing) {
@@ -737,8 +737,8 @@ void get_user_data(interactive_t *ip) {
         set_command_giver(ob);
         current_interactive = ob;
         safe_apply(APPLY_PROCESS_INPUT, ob, 1, ORIGIN_DRIVER);
-        set_command_giver(0);
-        current_interactive = 0;
+        set_command_giver(nullptr);
+        current_interactive = nullptr;
 
         break;  // they're not allowed to send the other stuff until we replied,
                 // so all data should be handshake stuff
@@ -898,7 +898,7 @@ static char *first_cmd_in_buf(interactive_t *ip) {
 
   /* do standard input buffer cleanup */
   if (!clean_buf(ip)) {
-    return 0;
+    return nullptr;
   }
 
   p = ip->text + ip->text_start;
@@ -942,10 +942,10 @@ static char *first_cmd_in_buf(interactive_t *ip) {
  * when SINGLE_CHAR is set, or a newline terminated string otherwise.
  */
 static char *get_user_command(interactive_t *ip) {
-  char *user_command = NULL;
+  char *user_command = nullptr;
 
   if (!ip || !ip->ob || (ip->ob->flags & O_DESTRUCTED)) {
-    return NULL;
+    return nullptr;
   }
 
   /* if there's a command in the buffer, pull it out! */
@@ -955,7 +955,7 @@ static char *get_user_command(interactive_t *ip) {
 
   /* no command found - return NULL */
   if (!user_command) {
-    return NULL;
+    return nullptr;
   }
 
   /* got a command - return it and set command_giver */
@@ -1128,7 +1128,7 @@ exit:
     }
   }
 
-  current_interactive = 0;
+  current_interactive = nullptr;
   restore_command_giver();
   return 1;
 }
@@ -1183,25 +1183,25 @@ void remove_interactive(object_t *ob, int dested) {
 #ifndef NO_SNOOP
   if (ip->snooped_by) {
     ip->snooped_by->flags &= ~O_SNOOP;
-    ip->snooped_by = 0;
+    ip->snooped_by = nullptr;
   }
 #endif
 
   // Cleanup events
-  if (ip->ev_buffer != NULL) {
+  if (ip->ev_buffer != nullptr) {
     bufferevent_free(ip->ev_buffer);
-    ip->ev_buffer = NULL;
+    ip->ev_buffer = nullptr;
   }
-  if (ip->ev_command != NULL) {
+  if (ip->ev_command != nullptr) {
     evtimer_del(ip->ev_command);
     event_free(ip->ev_command);
-    ip->ev_command = NULL;
+    ip->ev_command = nullptr;
   }
 
   // Free telnet handle
-  if (ip->telnet != NULL) {
+  if (ip->telnet != nullptr) {
     telnet_free(ip->telnet);
-    ip->telnet = NULL;
+    ip->telnet = nullptr;
   }
 
   clear_notify(ip->ob);
@@ -1212,14 +1212,14 @@ void remove_interactive(object_t *ob, int dested) {
     if (ip->num_carry > 0) {
       free_some_svalues(ip->carryover, ip->num_carry);
     }
-    ip->carryover = NULL;
+    ip->carryover = nullptr;
     ip->num_carry = 0;
-    ip->input_to = 0;
+    ip->input_to = nullptr;
   }
 #endif
   user_del(ip);
   FREE(ip);
-  ob->interactive = 0;
+  ob->interactive = nullptr;
   free_object(&ob, "remove_interactive");
   return;
 } /* remove_interactive() */
@@ -1248,13 +1248,13 @@ static int call_function_interactive(interactive_t *i, char *str) {
     /* Sorry, the object has selfdestructed ! */
     free_object(&sent->ob, "call_function_interactive");
     free_sentence(sent);
-    i->input_to = 0;
+    i->input_to = nullptr;
     if (i->num_carry) {
       free_some_svalues(i->carryover, i->num_carry);
     }
-    i->carryover = NULL;
+    i->carryover = nullptr;
     i->num_carry = 0;
-    i->input_to = 0;
+    i->input_to = nullptr;
     if (i->iflags & SINGLE_CHAR) {
       /*
        * clear single character mode
@@ -1277,7 +1277,7 @@ static int call_function_interactive(interactive_t *i, char *str) {
   /* we put the function on the stack in case of an error */
   STACK_INC;
   if (sent->flags & V_FUNCTION) {
-    function = 0;
+    function = nullptr;
     sp->type = T_FUNCTION;
     sp->u.fp = funp = sent->function.f;
     funp->hdr.ref++;
@@ -1300,12 +1300,12 @@ static int call_function_interactive(interactive_t *i, char *str) {
   if (num_arg) {
     args = i->carryover;
     i->num_carry = 0;
-    i->carryover = NULL;
+    i->carryover = nullptr;
   } else {
-    args = NULL;
+    args = nullptr;
   }
 
-  i->input_to = 0;
+  i->input_to = nullptr;
   if (i->iflags & SINGLE_CHAR) {
     /*
      * clear single character mode
@@ -1355,10 +1355,10 @@ static int call_function_interactive(interactive_t *i, char *str) {
 } /* call_function_interactive() */
 
 int set_call(object_t *ob, sentence_t *sent, int flags) {
-  if (ob == 0 || sent == 0) {
+  if (ob == nullptr || sent == nullptr) {
     return (0);
   }
-  if (ob->interactive == 0 || ob->interactive->input_to) {
+  if (ob->interactive == nullptr || ob->interactive->input_to) {
     return (0);
   }
   ob->interactive->input_to = sent;
@@ -1386,7 +1386,7 @@ static void print_prompt(interactive_t *ip) {
   object_t *ob = ip->ob;
 
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
-  if (ip->input_to == 0) {
+  if (ip->input_to == nullptr) {
 #endif
     /* give user object a chance to write its own prompt */
     if (!(ip->iflags & HAS_WRITE_PROMPT)) {
@@ -1471,7 +1471,7 @@ int new_set_snoop(object_t *by, object_t *victim) {
     if (by->flags & O_SNOOP) {
       users_foreach([by](interactive_t *user) {
         if (user->snooped_by == by) {
-          user->snooped_by = 0;
+          user->snooped_by = nullptr;
         }
       });
       by->flags &= ~O_SNOOP;
@@ -1489,13 +1489,13 @@ int new_set_snoop(object_t *by, object_t *victim) {
     }
 
     /* the person snooping us, if any */
-    tmp = (tmp->interactive ? tmp->interactive->snooped_by : 0);
+    tmp = (tmp->interactive ? tmp->interactive->snooped_by : nullptr);
   }
 
   /*
    * Terminate previous snoop, if any.
    */
-  new_set_snoop(by, NULL);
+  new_set_snoop(by, nullptr);
 
   // setup new snoop
   if (ip->snooped_by) {
@@ -1519,14 +1519,14 @@ char *query_host_name() {
 #ifndef NO_SNOOP
 object_t *query_snoop(object_t *ob) {
   if (!ob->interactive) {
-    return 0;
+    return nullptr;
   }
   return ob->interactive->snooped_by;
 } /* query_snoop() */
 
 object_t *query_snooping(object_t *ob) {
   if (!(ob->flags & O_SNOOP)) {
-    return 0;
+    return nullptr;
   }
   for (auto &user : users()) {
     if (user->snooped_by == ob) {
@@ -1535,7 +1535,7 @@ object_t *query_snooping(object_t *ob) {
   }
   // TODO: change this to dfatal
   // fatal("couldn't find snoop target.\n");
-  return 0;
+  return nullptr;
 } /* query_snooping() */
 #endif
 
@@ -1560,7 +1560,7 @@ int replace_interactive(object_t *ob, object_t *obfrom) {
    * proven wrong (after trying to call them).
    */
   ob->interactive->iflags |= (HAS_WRITE_PROMPT | HAS_PROCESS_INPUT);
-  obfrom->interactive = 0;
+  obfrom->interactive = nullptr;
   ob->interactive->ob = ob;
   ob->flags |= O_ONCE_INTERACTIVE;
   obfrom->flags &= ~O_ONCE_INTERACTIVE;
@@ -1631,7 +1631,7 @@ const char *sockaddr_to_string(const sockaddr *addr, socklen_t len) {
     return result;
   }
 
-  snprintf(result, sizeof(result), strchr(host, ':') != NULL ? "[%s]:%s" : "%s:%s", host, service);
+  snprintf(result, sizeof(result), strchr(host, ':') != nullptr ? "[%s]:%s" : "%s:%s", host, service);
 
   return result;
 }

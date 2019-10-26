@@ -46,7 +46,7 @@ void *debugrealloc(void *ptr, int size, int tag, const char *desc) {
     MDmalloc(reinterpret_cast<md_node_t *>(tmp), size, tag, desc);
     return reinterpret_cast<md_node_t *>(tmp) + 1;
   }
-  return (void *)0;
+  return (void *)nullptr;
 }
 
 void *debugmalloc(int size, int tag, const char *desc) {

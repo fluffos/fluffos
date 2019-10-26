@@ -14,7 +14,7 @@
 #include "packages/ops/ops.h"       // FIXME
 
 int call_origin = 0;
-error_context_t *current_error_context = 0;
+error_context_t *current_error_context = nullptr;
 
 #ifdef DTRACE
 #include <sys/sdt.h>
@@ -95,7 +95,7 @@ control_stack_t *csp; /* Points to last element pushed */
 
 int too_deep_error = 0, max_eval_error = 0;
 
-ref_t *global_ref_list = 0;
+ref_t *global_ref_list = nullptr;
 
 void kill_ref(ref_t *ref) {
   if (ref->sv.type == T_MAPPING && (ref->sv.u.map->count & MAP_LOCKED)) {
@@ -124,12 +124,12 @@ void kill_ref(ref_t *ref) {
   } else {
     global_ref_list = ref->next;
     if (global_ref_list) {
-      global_ref_list->prev = 0;
+      global_ref_list->prev = nullptr;
     }
   }
   if (ref->ref > 0) {
     /* still referenced */
-    ref->lvalue = 0;
+    ref->lvalue = nullptr;
     ref->prev = ref;  // so it doesn't get set to the global list above
     ref->next = ref;
   } else {
@@ -140,7 +140,7 @@ void kill_ref(ref_t *ref) {
 ref_t *make_ref(void) {
   ref_t *ref = reinterpret_cast<ref_t *>(DMALLOC(sizeof(ref_t), TAG_TEMPORARY, "make_ref"));
   ref->next = global_ref_list;
-  ref->prev = NULL;
+  ref->prev = nullptr;
   if (ref->next) {
     ref->next->prev = ref;
   }
@@ -249,7 +249,7 @@ static char *check_shadow_functions(program_t *shadow, program_t *victim) {
       return fun;
     }
   }
-  return 0;
+  return nullptr;
 }
 
 int validate_shadowing(object_t *ob) {
@@ -403,7 +403,7 @@ void process_efun_callback(int narg, function_to_call_t *ftc, int f) {
 
   if (arg->type == T_FUNCTION) {
     ftc->f.fp = arg->u.fp;
-    ftc->ob = 0;
+    ftc->ob = nullptr;
     ftc->narg = argc - narg - 1;
     ftc->args = arg + 1;
   } else {
@@ -1096,7 +1096,7 @@ void push_control_stack(int frkind) {
   csp->pc = pc;
   csp->function_index_offset = function_index_offset;
   csp->variable_index_offset = variable_index_offset;
-  csp->defers = NULL;
+  csp->defers = nullptr;
 }
 
 /*
@@ -1139,7 +1139,7 @@ void pop_control_stack() {
   }
 #endif
   struct defer_list *stuff = csp->defers;
-  csp->defers = 0;
+  csp->defers = nullptr;
   while (stuff) {
     function_to_call_t ftc;
     memset(&ftc, 0, sizeof ftc);
@@ -1634,8 +1634,8 @@ static void do_loop_cond_number() {
 }
 
 static void show_lpc_line(char *f, int l) {
-  static FILE *fp = 0;
-  static char *fn = 0;
+  static FILE *fp = nullptr;
+  static char *fn = nullptr;
   static int lastline, offset;
   static char buf[32768], *p;
   static int n;
@@ -1748,7 +1748,7 @@ static void show_lpc_line(char *f, int l) {
   return;
 
 bail_hard:
-  fn = 0;
+  fn = nullptr;
   return;
 }
 
@@ -2527,7 +2527,7 @@ void eval_instruction(char *p) {
           svalue_t *loc = fp + EXTRACT_UCHAR(pc++);
 
           /* foreach guarantees our target remains valid */
-          ref->lvalue = 0;
+          ref->lvalue = nullptr;
           ref->sv.type = T_NUMBER;
           STACK_INC;
           sp->type = T_REF;
@@ -2555,7 +2555,7 @@ void eval_instruction(char *p) {
             assign_svalue((sp - 1)->u.lvalue, key);
             if (sp->type == T_REF) {
               if (value == &const0u) {
-                sp->u.ref->lvalue = 0;
+                sp->u.ref->lvalue = nullptr;
               } else {
                 sp->u.ref->lvalue = value;
               }
@@ -2598,7 +2598,7 @@ void eval_instruction(char *p) {
         stack_in_use_as_temporary--;
 #endif
         if (sp->type == T_REF) {
-          if (!(--sp->u.ref->ref) && sp->u.ref->lvalue == 0) {
+          if (!(--sp->u.ref->ref) && sp->u.ref->lvalue == nullptr) {
             FREE(sp->u.ref);
           }
         }
@@ -3750,7 +3750,7 @@ static program_t *ffbn_recurse(program_t *prog, char *name, int *indexp, int *ru
       ri = mid + prog->last_inherited;
 
       if (prog->function_flags[ri] & (FUNC_UNDEFINED | FUNC_PROTOTYPE)) {
-        return 0;
+        return nullptr;
       }
 
       *indexp = mid;
@@ -3768,14 +3768,14 @@ static program_t *ffbn_recurse(program_t *prog, char *name, int *indexp, int *ru
       return ret;
     }
   }
-  return 0;
+  return nullptr;
 }
 
 program_t *find_function_by_name(object_t *ob, const char *name, int *indexp, int *runtime_index) {
   char *funname = findstring(name);
 
   if (!funname) {
-    return 0;
+    return nullptr;
   }
   return ffbn_recurse(ob->prog, funname, indexp, runtime_index);
 }
@@ -3931,19 +3931,19 @@ const char *function_exists(const char *fun, object_t *ob, int flag) {
   DEBUG_CHECK(ob->flags & O_DESTRUCTED, "function_exists() on destructed object\n");
 
   if (fun[0] == APPLY___INIT_SPECIAL_CHAR) {
-    return 0;
+    return nullptr;
   }
 
   prog = find_function_by_name(ob, fun, &findex, &runtime_index);
   if (!prog) {
-    return 0;
+    return nullptr;
   }
 
   flags = ob->prog->function_flags[runtime_index];
 
   if ((flags & FUNC_UNDEFINED) ||
       (!flag && (flags & (DECL_PROTECTED | DECL_PRIVATE | DECL_HIDDEN)))) {
-    return 0;
+    return nullptr;
   }
 
   return prog->filename;
@@ -4032,7 +4032,7 @@ static int find_line(char *p, const program_t *progp, const char **ret_file, int
   ADDRESS_TYPE abs_line;
   int file_idx;
 
-  *ret_file = 0;
+  *ret_file = nullptr;
   *ret_line = 0;
 
   if (!progp) {
@@ -4115,7 +4115,7 @@ char *get_line_number_if_any() {
   if (current_prog) {
     return get_line_number(pc, current_prog);
   }
-  return 0;
+  return nullptr;
 }
 
 #define SSCANF_ASSIGN_SVALUE_STRING(S) \
@@ -4480,7 +4480,7 @@ int inter_sscanf(svalue_t *arg, svalue_t *s0, svalue_t *s1, int num_arg) {
           continue; /* on the big for loop */
       }
     }
-    if ((tmp = strchr(fmt, '%')) != NULL) {
+    if ((tmp = strchr(fmt, '%')) != nullptr) {
       num = tmp - fmt + 1;
     } else {
       tmp = fmt + (num = strlen(fmt));

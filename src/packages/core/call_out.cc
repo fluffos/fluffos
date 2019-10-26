@@ -54,17 +54,17 @@ static void free_called_call(pending_call_t *cop) {
   } else {
     free_funp(cop->function.f);
   }
-  cop->ob = NULL;
-  cop->function.s = NULL;
+  cop->ob = nullptr;
+  cop->function.s = nullptr;
   if (CONFIG_INT(__RC_THIS_PLAYER_IN_CALL_OUT__)) {
     if (cop->command_giver) {
       free_object(&cop->command_giver, "free_call");
-      cop->command_giver = 0;
+      cop->command_giver = nullptr;
     }
   }
-  if (cop->tick_event != NULL) {
+  if (cop->tick_event != nullptr) {
     cop->tick_event->valid = false;  // Will be freed by tick loop itself.
-    cop->tick_event = NULL;
+    cop->tick_event = nullptr;
   }
   FREE(cop);
 }
@@ -126,7 +126,7 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, std::chrono::milliseconds dela
     DBG_CALLOUT("  function: <function>\n");
     cop->function.f = fun->u.fp;
     fun->u.fp->hdr.ref++;
-    cop->ob = 0;
+    cop->ob = nullptr;
   }
 
   cop->handle = g_current_gametick + (++unique);
@@ -149,7 +149,7 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, std::chrono::milliseconds dela
     cop->vs = allocate_empty_array(num_args);
     memcpy(cop->vs->item, arg, sizeof(svalue_t) * num_args);
   } else {
-    cop->vs = 0;
+    cop->vs = nullptr;
   }
 
   auto callback = std::bind(call_out, cop);
@@ -167,7 +167,7 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, std::chrono::milliseconds dela
  * be living objects.
  */
 void call_out(pending_call_t *cop) {
-  current_interactive = 0;
+  current_interactive = nullptr;
 
   object_t *ob, *new_command_giver;
   ob = (cop->ob ? cop->ob : cop->function.f->hdr.owner);
@@ -210,7 +210,7 @@ void call_out(pending_call_t *cop) {
     }
   }
 #endif
-  new_command_giver = 0;
+  new_command_giver = nullptr;
   if (CONFIG_INT(__RC_THIS_PLAYER_IN_CALL_OUT__)) {
     if (cop->command_giver && !(cop->command_giver->flags & O_DESTRUCTED)) {
       new_command_giver = cop->command_giver;
@@ -469,7 +469,7 @@ array_t *get_all_call_outs() {
       svalue_t tmpval;
 
       tmpbuf.real_size = 0;
-      tmpbuf.buffer = 0;
+      tmpbuf.buffer = nullptr;
 
       tmpval.type = T_FUNCTION;
       tmpval.u.fp = cop->function.f;
@@ -575,7 +575,7 @@ void reclaim_call_outs() {
       auto cop = iter->second;
       if (cop->command_giver && (cop->command_giver->flags & O_DESTRUCTED)) {
         free_object(&cop->command_giver, "reclaim_call_outs");
-        cop->command_giver = 0;
+        cop->command_giver = nullptr;
         i++;
       }
     }

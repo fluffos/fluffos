@@ -28,7 +28,7 @@ void f_dump_prog(void) {
 
     ob = sp[-1].u.ob;
     d = sp->u.number;
-    where = 0;
+    where = nullptr;
   } else if (st_num_arg == 3) {
     if ((sp - 2)->type != T_OBJECT) {
       bad_argument(sp - 2, T_OBJECT, 1, F_DUMP_PROG);
@@ -36,7 +36,7 @@ void f_dump_prog(void) {
 
     ob = sp[-2].u.ob;
     d = sp[-1].u.number;
-    where = (sp->type == T_STRING) ? sp->u.string : 0;
+    where = (sp->type == T_STRING) ? sp->u.string : nullptr;
   } else {
     if (sp->type != T_OBJECT) {
       bad_argument(sp, T_OBJECT, 1, F_DUMP_PROG);
@@ -44,7 +44,7 @@ void f_dump_prog(void) {
 
     ob = sp->u.ob;
     d = 0;
-    where = 0;
+    where = nullptr;
   }
 
   if (!(prog = ob->prog)) {
@@ -247,7 +247,7 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
     qsort(reinterpret_cast<char *>(&offsets[0]), NUM_FUNS_D, sizeof(short) * 2, short_compare);
     next_func = 0;
   } else {
-    offsets = 0;
+    offsets = nullptr;
     next_func = -1;
   }
 

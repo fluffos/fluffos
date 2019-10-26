@@ -50,7 +50,7 @@ char *pluralize(char *);
 #define MS_HAS_USERS 4
 static int master_state = 0;
 
-static parse_info_t *pi = 0;
+static parse_info_t *pi = nullptr;
 static hash_entry_t *hash_table[HASH_SIZE];
 static special_word_t *special_table[SPECIAL_HASH_SIZE];
 static verb_t *verbs[VERB_HASH_SIZE];
@@ -59,7 +59,7 @@ static int num_objects, num_people, me_object;
 static struct object_t *loaded_objects[MAX_NUM_OBJECTS];
 static int object_flags[MAX_NUM_OBJECTS];
 static bitvec_t my_objects;
-static char *my_string = 0;
+static char *my_string = nullptr;
 static int num_literals = 0;
 static char **literals;
 static word_t words[MAX_WORDS_PER_LINE];
@@ -68,17 +68,17 @@ static verb_node_t *parse_vn;
 static verb_t *parse_verb_entry;
 static object_t *parse_restricted;
 static object_t *parse_user;
-static array_t *master_user_list = 0;
+static array_t *master_user_list = nullptr;
 static bitvec_t cur_livings;
 static bitvec_t cur_accessible;
 static int best_match;
 static int best_error_match;
 static int best_num_errors;
-static parse_result_t *best_result = 0;
+static parse_result_t *best_result = nullptr;
 static match_t matches[MAX_MATCHES];
 static int found_level = 0;
-static mapping_t *parse_nicks = 0;
-static array_t *parse_env = 0;
+static mapping_t *parse_nicks = nullptr;
+static array_t *parse_env = nullptr;
 
 static int direct_object, indirect_object;
 
@@ -87,7 +87,7 @@ static parser_error_t best_error_info;
 static parser_error_t parallel_error_info;
 static parser_error_t second_parallel_error_info;
 
-static saved_error_t *parallel_errors = 0;
+static saved_error_t *parallel_errors = nullptr;
 
 #if defined(DEBUG) || defined(PARSE_DEBUG)
 static int debug_parse_depth = 0;
@@ -349,7 +349,7 @@ static int parse_copy_array(array_t *arr, char ***sarrp) {
   int n = 0;
 
   if (!arr->size) {
-    *sarrp = 0;
+    *sarrp = nullptr;
     return 0;
   }
 
@@ -433,7 +433,7 @@ static void interrogate_master(void) {
     DEBUG_PP(("[master::parse_command_users]"));
     if (master_user_list) {
       free_array(master_user_list);
-      master_user_list = 0;
+      master_user_list = nullptr;
     }
 
     DEBUG_PP(("[%s]", applies_table[APPLY_USERS]));
@@ -455,7 +455,7 @@ static void interrogate_master(void) {
       }
       FREE(literals);
       num_literals = 0;
-      literals = 0;
+      literals = nullptr;
     }
 
     DEBUG_PP(("[%s]", applies_table[APPLY_LITERALS]));
@@ -534,7 +534,7 @@ static void remove_ids(parse_info_t *pinfo) {
       FREE(pinfo->adjs);
     }
     pinfo->num_ids = pinfo->num_plurals = pinfo->num_adjs = 0;
-    pinfo->ids = pinfo->plurals = pinfo->adjs = 0;
+    pinfo->ids = pinfo->plurals = pinfo->adjs = nullptr;
   }
 }
 
@@ -651,12 +651,12 @@ static void free_parse_result(parse_result_t *pr) {
 static void clear_result(parse_result_t *pr) {
   int i;
 
-  pr->ob = 0;
-  pr->parallel = 0;
+  pr->ob = nullptr;
+  pr->parallel = nullptr;
 
   for (i = 0; i < 4; i++) {
-    pr->res[i].func = 0;
-    pr->res[i].args = 0;
+    pr->res[i].func = nullptr;
+    pr->res[i].args = nullptr;
   }
 }
 
@@ -670,10 +670,10 @@ static void free_parse_globals(void) {
     free_array(parse_env);
   }
 
-  parse_nicks = 0;
-  parse_env = 0;
+  parse_nicks = nullptr;
+  parse_env = nullptr;
 
-  pi = 0;
+  pi = nullptr;
   hash_clean();
   if (objects_loaded) {
     for (i = 0; i < num_objects; i++) {
@@ -689,7 +689,7 @@ token_def_t tokens[] = {{"OBJ", OBJ_A_TOKEN, 1},
                         {"LIV", LIV_A_TOKEN, 1},
                         {"OBS", OBS_TOKEN, 1},
                         {"LVS", LVS_TOKEN, 1},
-                        {0, 0}};
+                        {nullptr, 0}};
 
 #define STR3CMP(x, y) (x[0] == y[0] && x[1] == y[1] && x[2] == y[2])
 
@@ -1289,7 +1289,7 @@ static void load_objects(void) {
       }
       env = super(env);
       if (env && env->pinfo && !(env->pinfo->flags & PI_INV_VISIBLE)) {
-        env = 0;
+        env = nullptr;
       }
     }
     if (env) {
@@ -1373,7 +1373,7 @@ static int get_single(bitvec_t *bv) {
 static char *query_the_short(char *start, char *end, object_t *ob) {
   svalue_t *ret;
 
-  if (ob == NULL || (intptr_t)ob == 0x9 || ob == 0x0) {
+  if (ob == nullptr || (intptr_t)ob == 0x9 || ob == nullptr) {
     return strput(start, end, "the thing");
   }
   if ((ob->flags & O_DESTRUCTED) || (!(ret = apply("the_short", ob, 0, ORIGIN_DRIVER))) ||
@@ -1448,7 +1448,7 @@ static void expand_node(hash_entry_t *he) {
   if (ob->flags & O_DESTRUCTED) {
     return;
   }
-  if (ob->pinfo == 0) {
+  if (ob->pinfo == nullptr) {
     return;
   }
 
@@ -1467,11 +1467,11 @@ static void parse_obj(int tok, parse_state_t *state, int ordinal) {
   bitvec_t objects, save_obs, err_obs;
   int start = state->word_index;
   char *str;
-  hash_entry_t *hnode, *last_adj = 0;
+  hash_entry_t *hnode, *last_adj = nullptr;
   int multiple_adj = 0;
   int ord_legal, singular_legal = 1, ord_seen = 0;
   long tmp, tmp2;
-  match_t *mp = NULL;
+  match_t *mp = nullptr;
 
   // if(!ordinal) ordinal = 1;
   ord_legal = (ordinal == 0);
@@ -1686,7 +1686,7 @@ static void parse_obj(int tok, parse_state_t *state, int ordinal) {
 
         p_skip_it:
           bitvec_copy(&objects, &save_obs);
-        } else if (!ordinal && mp != NULL) {
+        } else if (!ordinal && mp != nullptr) {
           check_special_word("first", &tmp2);
           ordinal = 1;
           mp->ordinal = tmp2;
@@ -2070,8 +2070,8 @@ static int make_function(char *buf, char *end, int which, parse_state_t *state, 
           push_bitvec_as_array(&matches[match].val.obs, which == 3);
         } else if (matches[match].val.number < 0) {
           push_number(0);
-        } else if (loaded_objects[matches[match].val.number] == NULL ||
-                   loaded_objects[matches[match].val.number] == 0x0 ||
+        } else if (loaded_objects[matches[match].val.number] == nullptr ||
+                   loaded_objects[matches[match].val.number] == nullptr ||
                    (intptr_t)loaded_objects[matches[match].val.number] == 0x9 ||
                    loaded_objects[matches[match].val.number]->flags & O_DESTRUCTED) {
           push_number(0);
@@ -2155,7 +2155,7 @@ static void clear_parallel_errors(saved_error_t **par) {
     free_parser_error(&se->err);
     FREE(se);
   }
-  *par = 0;
+  *par = nullptr;
 }
 
 static int use_last_parallel_error(parse_state_t *state) {
@@ -2825,10 +2825,10 @@ static void we_are_finished(parse_state_t *state) {
     }
     best_result->ob = parse_vn->handler;
     best_result->parallel = parallel_errors;
-    parallel_errors = 0;
+    parallel_errors = nullptr;
     add_ref(parse_vn->handler, "best_result");
     for (tryy = 0; tryy < 4; tryy++) {
-      args = make_function(func, EndOf(func), 3, state, tryy, 0);
+      args = make_function(func, EndOf(func), 3, state, tryy, nullptr);
       args += push_real_names(tryy, 3);
       best_result->res[tryy].func = string_copy(func, "best_result");
       best_result->res[tryy].num = args;
@@ -2874,7 +2874,7 @@ static void do_the_call(void) {
       }
       FREE(best_result->res[i].args);
     }
-    best_result->res[i].args = 0;
+    best_result->res[i].args = nullptr;
     DEBUG_P(("Calling %s ...", best_result->res[i].func));
     if (apply(best_result->res[i].func, ob, best_result->res[i].num, ORIGIN_DRIVER)) {
       return;
@@ -3302,7 +3302,7 @@ void f_parse_sentence(void) {
    */
   if (best_result) {
     free_parse_result(best_result);
-    best_result = 0;
+    best_result = nullptr;
   }
 
   if (st_num_arg == 4) {
@@ -3336,7 +3336,7 @@ void f_parse_sentence(void) {
 
   parse_user = current_object;
   pi = current_object->pinfo;
-  parse_restricted = 0;
+  parse_restricted = nullptr;
   found_level = 0;
   parse_sentence((sp - 1)->u.string);
 
@@ -3364,7 +3364,7 @@ void f_parse_sentence(void) {
 
   if (best_result) {
     free_parse_result(best_result);
-    best_result = 0;
+    best_result = nullptr;
   }
 }
 
@@ -3412,7 +3412,7 @@ void f_parse_my_rules(void) {
         }
         FREE(best_result->res[3].args);
       }
-      best_result->res[3].args = 0;
+      best_result->res[3].args = nullptr;
       sp--; /* pop the error handler */
       free_string_svalue(sp--);
       free_svalue(sp, "parse_my_rules"); /* may have been destructed */
@@ -3471,7 +3471,7 @@ void f_parse_add_rule() {
 
   rule = sp->u.string;
   verb = SHARED_STRING(sp - 1);
-  verb_entry = 0;
+  verb_entry = nullptr;
   handler = current_object;
   if (!(handler->pinfo))
     error("/%s is not known by the parser.  Call parse_init() first.\n", handler->obname);
@@ -3506,7 +3506,7 @@ void f_parse_add_rule() {
     verb_entry->real_name = verb;
     ref_string(verb);
     verb_entry->match_name = verb;
-    verb_entry->node = 0;
+    verb_entry->node = nullptr;
     verb_entry->flags = 0;
     verb_entry->next = verbs[h];
     verbs[h] = verb_entry;
@@ -3568,14 +3568,14 @@ void f_parse_add_synonym() {
     orig_new_verb = (sp - 1)->u.string;
     new_verb = SHARED_STRING(sp - 1);
     old_verb = SHARED_STRING(sp);
-    rule = 0;
+    rule = nullptr;
   }
 
   if (old_verb == new_verb) {
     error("Verb cannot be a synonym for itself.\n");
   }
 
-  verb_entry = 0;
+  verb_entry = nullptr;
 
   if (!old_verb) {
     error("%s is not a verb!\n", old_verb);
@@ -3593,7 +3593,7 @@ void f_parse_add_synonym() {
     error("%s is not a verb!\n", old_verb);
   }
 
-  verb_entry = 0;
+  verb_entry = nullptr;
 
   /* Now find a verb entry to put it in */
   if (new_verb) {
@@ -3626,7 +3626,7 @@ void f_parse_add_synonym() {
     verb_entry = (verb_t *)DMALLOC(sizeof(verb_t), TAG_PARSER, "parse_add_rule");
     verb_entry->real_name = new_verb;
     verb_entry->match_name = old_verb;
-    verb_entry->node = 0;
+    verb_entry->node = nullptr;
     verb_entry->flags = 0;
     verb_entry->next = verbs[h];
     verbs[h] = verb_entry;

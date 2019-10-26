@@ -62,7 +62,7 @@ extern void yywarn(const char *);
 #define SIZE_WITH_HDR(x) (x + HDR_SIZE)
 
 static unsigned char scratchblock[SCRATCHPAD_SIZE];
-static sp_block_t scratch_head = {0, 0};
+static sp_block_t scratch_head = {nullptr, nullptr};
 unsigned char *scr_last = &scratchblock[2], *scr_tail = &scratchblock[2];
 unsigned char *scratch_end = scratchblock + SCRATCHPAD_SIZE;
 
@@ -100,7 +100,7 @@ void scratch_destroy() {
     FREE(thisb);
     thisb = next;
   }
-  scratch_head.next = 0;
+  scratch_head.next = nullptr;
   scr_last = &scratchblock[2];
   scr_tail = &scratchblock[2];
 }

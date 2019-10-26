@@ -13,8 +13,8 @@
 #include "vm/internal/apply.h"
 #include "vm/internal/simulate.h"
 
-struct object_t *master_ob = 0;
-struct function_lookup_info_t *master_applies = 0;
+struct object_t *master_ob = nullptr;
+struct function_lookup_info_t *master_applies = nullptr;
 
 /* Note that now, once the master object loads once, there is ALWAYS a
  * master object, so the only way this can fail is if the master object
@@ -40,7 +40,7 @@ svalue_t *apply_master_ob(int fun, int num_arg) {
     return &apply_ret_value;
   } else {
     pop_n_elems(num_arg);
-    return 0;
+    return nullptr;
   }
 }
 
@@ -62,7 +62,7 @@ void init_master(const char *master_file) {
   }
 
   new_ob = load_object(buf, 1);
-  if (new_ob == 0) {
+  if (new_ob == nullptr) {
     fprintf(stderr, "The master file %s was not loaded.\n", master_file);
     exit(-1);
   }
@@ -87,7 +87,7 @@ static void get_master_applies(object_t *ob) {
       master_applies[i].func = find_func_entry(ob->prog, ri);
       master_applies[i].index = ri;
     } else {
-      master_applies[i].func = 0;
+      master_applies[i].func = nullptr;
     }
   }
 }
@@ -160,7 +160,7 @@ void set_master(object_t *ob) {
       // asking for 'master::author_file(__MASTER_FILE__)'
     push_malloced_string(add_slash(CONFIG_STR(__MASTER_FILE__)));
     ret = apply_master_ob(APPLY_AUTHOR_FILE, 1);
-    if (ret == 0 || ret->type != T_STRING) {
+    if (ret == nullptr || ret->type != T_STRING) {
         // we didn't got the expected value?
         // emit warning and fall back to old behavior
       debug_message("%s() in the master file does not work, using root_uid as fallback (see %s.4)\n",
@@ -172,7 +172,7 @@ void set_master(object_t *ob) {
     }
 #endif
     ret = apply_master_ob(APPLY_GET_BACKBONE_UID, 0);
-    if (ret == 0 || ret->type != T_STRING) {
+    if (ret == nullptr || ret->type != T_STRING) {
       debug_message("%s() in the master file does not work\n",
                     applies_table[APPLY_GET_BACKBONE_UID]);
       exit(-1);
@@ -184,7 +184,7 @@ void set_master(object_t *ob) {
       // asking for 'master::domain_file("/")'
     push_constant_string("/");
     ret = apply_master_ob(APPLY_DOMAIN_FILE, 1);
-    if (ret == 0 || ret->type != T_STRING) {
+    if (ret == nullptr || ret->type != T_STRING) {
         // we didn't got the expected value?
         // emit warning and fall back to old behavior
       debug_message("%s() in the master file does not work, using bb_ui as fallback (see %s.4)d\n",

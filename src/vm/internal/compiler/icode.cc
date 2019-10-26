@@ -48,7 +48,7 @@ static int push_start;
 
 static parse_node_t *branch_list[3];
 static int nforward_branches, nforward_branches_max;
-static int *forward_branches = 0;
+static int *forward_branches = nullptr;
 
 static void ins_real(LPC_FLOAT l) {
   LPC_FLOAT f = l;
@@ -633,7 +633,7 @@ void i_generate_node(parse_node_t *expr) {
       parse_node_t *save_switch_breaks = branch_list[CJ_BREAK_SWITCH];
 
       i_generate_node(sub);
-      branch_list[CJ_BREAK_SWITCH] = 0;
+      branch_list[CJ_BREAK_SWITCH] = nullptr;
       end_pushes();
       ins_byte(F_SWITCH);
       addr = CURRENT_PROGRAM_SIZE;
@@ -830,7 +830,7 @@ static void i_generate_loop(int test_first, parse_node_t *block, parse_node_t *i
   if (test_first == 2) {
     foreach_depth++;
   }
-  branch_list[CJ_BREAK] = branch_list[CJ_CONTINUE] = 0;
+  branch_list[CJ_BREAK] = branch_list[CJ_CONTINUE] = nullptr;
   end_pushes();
   if (!forever && test_first) {
     i_generate_forward_branch(F_BRANCH);
@@ -1006,9 +1006,9 @@ void i_initialize_parser() {
   }
   nforward_branches = 0;
 
-  branch_list[CJ_BREAK] = 0;
-  branch_list[CJ_BREAK_SWITCH] = 0;
-  branch_list[CJ_CONTINUE] = 0;
+  branch_list[CJ_BREAK] = nullptr;
+  branch_list[CJ_BREAK_SWITCH] = nullptr;
+  branch_list[CJ_CONTINUE] = nullptr;
 
   prog_code = mem_block[A_PROGRAM].block;
   prog_code_max = mem_block[A_PROGRAM].block + mem_block[A_PROGRAM].max_size;
@@ -1051,7 +1051,7 @@ void i_generate_final_program(int x) {
  */
 void optimize_icode(char *start, char *pc, char *end) {
   int instr = 0, prev;
-  if (start == 0) {
+  if (start == nullptr) {
     /* we don't optimize the initializer block right now b/c all the
      * stuff we do (jump threading, etc) can't occur there.
      */

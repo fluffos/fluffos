@@ -102,7 +102,7 @@ const char *error_strings[ERROR_STRINGS] = {"Problem creating socket",
  */
 static bool lpcaddr_to_sockaddr(const char *name, struct sockaddr *addr, socklen_t *len) {
   const char *cp = strchr(name, ' ');
-  if (cp == NULL) {
+  if (cp == nullptr) {
     debug(sockets, "lpcaddr_to_sockaddr: malformed address: %s", name);
     return false;
   }
@@ -138,7 +138,7 @@ static bool lpcaddr_to_sockaddr(const char *name, struct sockaddr *addr, socklen
 
   // Just take first result, ignore rest.
   memcpy(addr, res->ai_addr, res->ai_addrlen);
-  if (len != NULL) *len = res->ai_addrlen;
+  if (len != nullptr) *len = res->ai_addrlen;
 
   freeaddrinfo(res);
 
@@ -173,9 +173,9 @@ int check_valid_socket(const char *const what, int fd, object_t *owner, const ch
 
 static void clear_socket(int which, int dofree) {
   if (dofree) {
-    set_read_callback(which, 0);
-    set_write_callback(which, 0);
-    set_close_callback(which, 0);
+    set_read_callback(which, nullptr);
+    set_write_callback(which, nullptr);
+    set_close_callback(which, nullptr);
   }
 
   lpc_socks[which].fd = -1;
@@ -186,19 +186,19 @@ static void clear_socket(int which, int dofree) {
   memset(reinterpret_cast<char *>(&lpc_socks[which].r_addr), 0, sizeof(lpc_socks[which].r_addr));
   lpc_socks[which].l_addrlen = 0;
   lpc_socks[which].r_addrlen = 0;
-  lpc_socks[which].owner_ob = NULL;
-  lpc_socks[which].release_ob = NULL;
-  lpc_socks[which].read_callback.s = 0;
-  lpc_socks[which].write_callback.s = 0;
-  lpc_socks[which].close_callback.s = 0;
-  lpc_socks[which].r_buf = NULL;
+  lpc_socks[which].owner_ob = nullptr;
+  lpc_socks[which].release_ob = nullptr;
+  lpc_socks[which].read_callback.s = nullptr;
+  lpc_socks[which].write_callback.s = nullptr;
+  lpc_socks[which].close_callback.s = nullptr;
+  lpc_socks[which].r_buf = nullptr;
   lpc_socks[which].r_off = 0;
   lpc_socks[which].r_len = 0;
-  lpc_socks[which].w_buf = NULL;
+  lpc_socks[which].w_buf = nullptr;
   lpc_socks[which].w_off = 0;
   lpc_socks[which].w_len = 0;
-  lpc_socks[which].ev_read = NULL;
-  lpc_socks[which].ev_write = NULL;
+  lpc_socks[which].ev_read = nullptr;
+  lpc_socks[which].ev_write = nullptr;
 }
 
 /*
@@ -223,7 +223,7 @@ void set_read_callback(int which, svalue_t *cb) {
       lpc_socks[which].read_callback.s = make_shared_string(cb->u.string);
     }
   } else {
-    lpc_socks[which].read_callback.s = 0;
+    lpc_socks[which].read_callback.s = nullptr;
   }
 }
 
@@ -246,7 +246,7 @@ void set_write_callback(int which, svalue_t *cb) {
       lpc_socks[which].write_callback.s = make_shared_string(cb->u.string);
     }
   } else {
-    lpc_socks[which].write_callback.s = 0;
+    lpc_socks[which].write_callback.s = nullptr;
   }
 }
 
@@ -269,7 +269,7 @@ void set_close_callback(int which, svalue_t *cb) {
       lpc_socks[which].close_callback.s = make_shared_string(cb->u.string);
     }
   } else {
-    lpc_socks[which].close_callback.s = 0;
+    lpc_socks[which].close_callback.s = nullptr;
   }
 }
 
@@ -384,10 +384,10 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
     lpc_socks[i].flags = S_HEADER;
 
     if (type == SOCK_DGRAM) {
-      close_callback = 0;
+      close_callback = nullptr;
     }
     set_read_callback(i, read_callback);
-    set_write_callback(i, 0);
+    set_write_callback(i, nullptr);
     set_close_callback(i, close_callback);
 
 #ifndef NO_BUFFER_TYPE
@@ -447,7 +447,7 @@ int socket_bind(int fd, int port, const char *addr) {
     hints.ai_protocol = 0; /* Any protocol */
 
     int ret;
-    struct addrinfo *result = NULL;
+    struct addrinfo *result = nullptr;
 
     auto mudip = CONFIG_STR(__MUD_IP__);
     if (mudip != nullptr && strlen(mudip) > 0) {
@@ -455,7 +455,7 @@ int socket_bind(int fd, int port, const char *addr) {
       ret = getaddrinfo(mudip, service, &hints, &result);
     } else {
       debug(sockets, "socket_bind: binding to any address.\n");
-      ret = getaddrinfo(NULL, service, &hints, &result);
+      ret = getaddrinfo(nullptr, service, &hints, &result);
     }
     if (ret) {
       debug(sockets, "socket_bind: error %s \n", gai_strerror(ret));
@@ -495,7 +495,7 @@ int socket_bind(int fd, int port, const char *addr) {
 
   // register read event.
   if (lpc_socks[fd].mode == DATAGRAM || lpc_socks[fd].mode == DATAGRAM_BINARY) {
-    event_add(lpc_socks[fd].ev_read, NULL);
+    event_add(lpc_socks[fd].ev_read, nullptr);
   }
 
   return EESUCCESS;
@@ -534,7 +534,7 @@ int socket_listen(int fd, svalue_t *callback) {
 
   current_object->flags |= O_EFUN_SOCKET;
 
-  event_add(lpc_socks[fd].ev_read, NULL);
+  event_add(lpc_socks[fd].ev_read, nullptr);
 
   debug(sockets, "socket_listen: listen on socket %d\n", fd);
 
@@ -620,8 +620,8 @@ int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback) {
 
     current_object->flags |= O_EFUN_SOCKET;
 
-    event_add(lpc_socks[i].ev_read, NULL);
-    event_add(lpc_socks[i].ev_write, NULL);
+    event_add(lpc_socks[i].ev_read, nullptr);
+    event_add(lpc_socks[i].ev_write, nullptr);
 
     debug(sockets, "socket_accept: accept on socket %d\n", fd);
     debug(sockets, "socket_accept: new socket %d on fd %d\n", i, accept_fd);
@@ -697,8 +697,8 @@ int socket_connect(int fd, const char *name, svalue_t *read_callback, svalue_t *
 
   debug(sockets, "socket_connect: lpc socket %d (real fd %d) connected.\n", fd, lpc_socks[fd].fd);
 
-  event_add(lpc_socks[fd].ev_read, NULL);
-  event_add(lpc_socks[fd].ev_write, NULL);
+  event_add(lpc_socks[fd].ev_read, nullptr);
+  event_add(lpc_socks[fd].ev_write, nullptr);
 
   return EESUCCESS;
 }
@@ -725,7 +725,7 @@ int socket_write(int fd, svalue_t *message, const char *name) {
     return EESECURITY;
   }
   if (lpc_socks[fd].mode == DATAGRAM) {
-    if (name == NULL) {
+    if (name == nullptr) {
       return EENOADDR;
     }
     if (!lpcaddr_to_sockaddr(name, reinterpret_cast<sockaddr *>(&addr), &addrlen)) {
@@ -735,7 +735,7 @@ int socket_write(int fd, svalue_t *message, const char *name) {
     if (lpc_socks[fd].state != STATE_DATA_XFER) {
       return EENOTCONN;
     }
-    if (name != NULL) {
+    if (name != nullptr) {
       return EEBADADDR;
     }
     if (lpc_socks[fd].flags & S_BLOCKED) {
@@ -758,7 +758,7 @@ int socket_write(int fd, svalue_t *message, const char *name) {
             return EEBADDATA;
           }
           buf = reinterpret_cast<char *>(DMALLOC(len + 5, TAG_TEMPORARY, "socket_write: default"));
-          if (buf == NULL) {
+          if (buf == nullptr) {
             fatal("Out of memory");
           }
           *reinterpret_cast<uint32_t *>(buf) = htonl(static_cast<uint32_t>(len));
@@ -782,7 +782,7 @@ int socket_write(int fd, svalue_t *message, const char *name) {
             return EESUCCESS;
           }
           buf = reinterpret_cast<char *>(DMALLOC(len, TAG_TEMPORARY, "socket_write: T_BUFFER"));
-          if (buf == NULL) {
+          if (buf == nullptr) {
             fatal("Out of memory");
           }
           memcpy(buf, message->u.buf->item, len);
@@ -795,7 +795,7 @@ int socket_write(int fd, svalue_t *message, const char *name) {
             return EESUCCESS;
           }
           buf = reinterpret_cast<char *>(DMALLOC(len + 1, TAG_TEMPORARY, "socket_write: T_STRING"));
-          if (buf == NULL) {
+          if (buf == nullptr) {
             fatal("Out of memory");
           }
           strcpy(buf, message->u.string);
@@ -810,7 +810,7 @@ int socket_write(int fd, svalue_t *message, const char *name) {
             return EESUCCESS;
           }
           buf = reinterpret_cast<char *>(DMALLOC(len + 1, TAG_TEMPORARY, "socket_write: T_ARRAY"));
-          if (buf == NULL) {
+          if (buf == nullptr) {
             fatal("Out of memory");
           }
           el = message->u.arr->item;
@@ -919,7 +919,7 @@ int socket_write(int fd, svalue_t *message, const char *name) {
     lpc_socks[fd].w_off = off;
     lpc_socks[fd].w_len = len - off;
     debug(sockets, "socket_write: wrote %d out of %d bytes, will call back.\n", off, len);
-    event_add(lpc_socks[fd].ev_write, NULL);
+    event_add(lpc_socks[fd].ev_write, nullptr);
     return EECALLBACK;
   }
   FREE(buf);
@@ -1087,7 +1087,7 @@ void socket_read_select_handler(int fd) {
             }
             lpc_socks[fd].r_buf = reinterpret_cast<char *>(
                 DMALLOC(lpc_socks[fd].r_len + 1, TAG_TEMPORARY, "socket_read_select_handler"));
-            if (lpc_socks[fd].r_buf == NULL) {
+            if (lpc_socks[fd].r_buf == nullptr) {
               fatal("Out of memory");
             }
             debug(sockets, "read_socket_handler: svalue len is %d.\n", lpc_socks[fd].r_len);
@@ -1124,7 +1124,7 @@ void socket_read_select_handler(int fd) {
           }
           FREE(lpc_socks[fd].r_buf);
           lpc_socks[fd].flags |= S_HEADER;
-          lpc_socks[fd].r_buf = NULL;
+          lpc_socks[fd].r_buf = nullptr;
           lpc_socks[fd].r_off = 0;
           lpc_socks[fd].r_len = 0;
           debug(sockets, ("read_socket_handler: apply read callback\n"));
@@ -1215,11 +1215,11 @@ void socket_write_select_handler(int fd) {
     return;
   }
 
-  if (lpc_socks[fd].w_buf != NULL) {
+  if (lpc_socks[fd].w_buf != nullptr) {
     cc = send(lpc_socks[fd].fd, lpc_socks[fd].w_buf + lpc_socks[fd].w_off, lpc_socks[fd].w_len, 0);
     if (cc < 0) {
       if (cc == -1 && (errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR)) {
-        event_add(lpc_socks[fd].ev_write, NULL);
+        event_add(lpc_socks[fd].ev_write, nullptr);
         return;
       }
       debug(sockets,
@@ -1250,7 +1250,7 @@ void socket_write_select_handler(int fd) {
       return;
     }
     FREE(lpc_socks[fd].w_buf);
-    lpc_socks[fd].w_buf = NULL;
+    lpc_socks[fd].w_buf = nullptr;
     lpc_socks[fd].w_off = 0;
   }
   lpc_socks[fd].flags &= ~S_BLOCKED;
@@ -1288,9 +1288,9 @@ int socket_close(int fd, int flags) {
     call_callback(fd, S_CLOSE_FP, 1);
   }
 
-  set_read_callback(fd, 0);
-  set_write_callback(fd, 0);
-  set_close_callback(fd, 0);
+  set_read_callback(fd, nullptr);
+  set_write_callback(fd, nullptr);
+  set_close_callback(fd, nullptr);
 
   /* if we're linkdead, we'll never flush, so don't even try :-) */
   if ((lpc_socks[fd].flags & S_BLOCKED) && !(lpc_socks[fd].flags & S_LINKDEAD)) {
@@ -1302,26 +1302,26 @@ int socket_close(int fd, int flags) {
   }
 
   // cleanup event listeners
-  if (lpc_socks[fd].ev_read != NULL) {
+  if (lpc_socks[fd].ev_read != nullptr) {
     event_free(lpc_socks[fd].ev_read);
-    lpc_socks[fd].ev_read = NULL;
+    lpc_socks[fd].ev_read = nullptr;
   }
-  if (lpc_socks[fd].ev_write != NULL) {
+  if (lpc_socks[fd].ev_write != nullptr) {
     event_free(lpc_socks[fd].ev_write);
-    lpc_socks[fd].ev_write = NULL;
+    lpc_socks[fd].ev_write = nullptr;
   }
-  if (lpc_socks[fd].ev_data != NULL) {
+  if (lpc_socks[fd].ev_data != nullptr) {
     delete lpc_socks[fd].ev_data;
-    lpc_socks[fd].ev_data = NULL;
+    lpc_socks[fd].ev_data = nullptr;
   }
 
   while (close(lpc_socks[fd].fd) == -1 && errno == EINTR) {
     ; /* empty while */
   }
-  if (lpc_socks[fd].r_buf != NULL) {
+  if (lpc_socks[fd].r_buf != nullptr) {
     FREE(lpc_socks[fd].r_buf);
   }
-  if (lpc_socks[fd].w_buf != NULL) {
+  if (lpc_socks[fd].w_buf != nullptr) {
     FREE(lpc_socks[fd].w_buf);
   }
   clear_socket(fd, 1);
@@ -1366,7 +1366,7 @@ int socket_release(int fd, object_t *ob, svalue_t *callback) {
   }
 
   lpc_socks[fd].flags &= ~S_RELEASE;
-  lpc_socks[fd].release_ob = NULL;
+  lpc_socks[fd].release_ob = nullptr;
 
   return EESOCKNOTRLSD;
 }
@@ -1391,7 +1391,7 @@ int socket_acquire(int fd, svalue_t *read_callback, svalue_t *write_callback,
 
   lpc_socks[fd].flags &= ~S_RELEASE;
   lpc_socks[fd].owner_ob = current_object;
-  lpc_socks[fd].release_ob = NULL;
+  lpc_socks[fd].release_ob = nullptr;
 
   set_read_callback(fd, read_callback);
   set_write_callback(fd, write_callback);
@@ -1452,10 +1452,10 @@ int get_socket_address(int fd, char *addr, int *port, int local) {
  */
 object_t *get_socket_owner(int fd) {
   if (fd < 0 || fd >= lpc_socks.size()) {
-    return (object_t *)NULL;
+    return (object_t *)nullptr;
   }
   if (lpc_socks[fd].state == STATE_CLOSED || lpc_socks[fd].state == STATE_FLUSHING) {
-    return (object_t *)NULL;
+    return (object_t *)nullptr;
   }
   return lpc_socks[fd].owner_ob;
 }
@@ -1466,7 +1466,7 @@ object_t *get_socket_owner(int fd) {
  * Initialize a T_OBJECT svalue
  */
 void assign_socket_owner(svalue_t *sv, object_t *ob) {
-  if (ob != NULL) {
+  if (ob != nullptr) {
     sv->type = T_OBJECT;
     sv->u.ob = ob;
     add_ref(ob, "assign_socket_owner");
@@ -1526,7 +1526,7 @@ array_t *socket_status(int which) {
   array_t *ret;
 
   if (which < 0 || which >= lpc_socks.size()) {
-    return 0;
+    return nullptr;
   }
 
   ret = allocate_empty_array(6);

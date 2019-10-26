@@ -6,7 +6,7 @@
 
 #define MAX_VERB_BUFF 100
 
-object_t *hashed_living[CFG_LIVING_HASH_SIZE] = {0};
+object_t *hashed_living[CFG_LIVING_HASH_SIZE] = {nullptr};
 
 static int num_living_names;
 static int num_searches = 1;
@@ -33,13 +33,13 @@ static void notify_no_command(void) {
         tell_object(command_giver, v->u.string, SVALUE_STRLEN(v));
       }
       command_giver->interactive->iflags &= ~NOTIFY_FAIL_FUNC;
-      command_giver->interactive->default_err_message.s = 0;
+      command_giver->interactive->default_err_message.s = nullptr;
     }
   } else {
     if (p.s) {
       tell_object(command_giver, p.s, strlen(p.s));
       free_string(p.s);
-      command_giver->interactive->default_err_message.s = 0;
+      command_giver->interactive->default_err_message.s = nullptr;
     } else {
       auto dfm = CONFIG_STR(__DEFAULT_FAIL_MESSAGE__);
       tell_object(command_giver, dfm, strlen(dfm));
@@ -58,7 +58,7 @@ void clear_notify(object_t *ob) {
   } else if (dem.s) {
     free_string(dem.s);
   }
-  ip->default_err_message.s = 0;
+  ip->default_err_message.s = nullptr;
 }
 
 static int hash_living_name(const char *str) { return whashstr(str) & (CFG_LIVING_HASH_SIZE - 1); }
@@ -68,7 +68,7 @@ object_t *find_living_object(const char *str, int user) {
   object_t **hl;
 
   if (!str) {
-    return 0;
+    return nullptr;
   }
   num_searches++;
   hl = &hashed_living[hash_living_name(str)];
@@ -91,8 +91,8 @@ object_t *find_living_object(const char *str, int user) {
       break;
     }
   }
-  if (*obp == 0) {
-    return 0;
+  if (*obp == nullptr) {
+    return nullptr;
   }
   /* Move the found ob first. */
   if (obp == hl) {
@@ -125,8 +125,8 @@ void remove_living_name(object_t *ob) {
   DEBUG_CHECK1(*hl == 0, "remove_living_name: Object named %s no in hash list.\n", ob->living_name);
   *hl = ob->next_hashed_living;
   free_string(ob->living_name);
-  ob->next_hashed_living = 0;
-  ob->living_name = 0;
+  ob->next_hashed_living = nullptr;
+  ob->living_name = nullptr;
 }
 
 static void set_living_name(object_t *ob, const char *str) {
@@ -279,7 +279,7 @@ static void enable_commands(int enable, int toggle_action) {
 #endif
     current_object->flags &= ~O_ENABLE_COMMANDS;
     if (current_object == command_giver) {
-      set_command_giver(0);
+      set_command_giver(nullptr);
     }
   }
 }
@@ -294,7 +294,7 @@ static int user_parser(char *buff) {
   sentence_t *s;
   char *p;
   int length;
-  char *user_verb = 0;
+  char *user_verb = nullptr;
   int where;
   int save_illegal_sentence_action;
 
@@ -312,7 +312,7 @@ static int user_parser(char *buff) {
   }
   length = p - buff + 1;
   p = strchr(buff, ' ');
-  if (p == 0) {
+  if (p == nullptr) {
     user_verb = findstring(buff);
   } else {
     *p = '\0';
@@ -406,10 +406,10 @@ static int user_parser(char *buff) {
 
     restore_command_giver();
 
-    last_verb = 0;
+    last_verb = nullptr;
 
     /* was this the right verb? */
-    if (ret == 0) {
+    if (ret == nullptr) {
       /* is it still around?  Otherwise, ignore this ...
          it moved somewhere or dested itself */
       if (s == command_giver->sent) {
@@ -517,7 +517,7 @@ static void add_action(svalue_t *str, const char *cmd, int flag) {
     return;
   }
 #endif
-  if (command_giver == 0 || (command_giver->flags & O_DESTRUCTED)) {
+  if (command_giver == nullptr || (command_giver->flags & O_DESTRUCTED)) {
     return;
   }
   if (ob != command_giver

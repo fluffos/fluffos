@@ -80,7 +80,7 @@ static block_t *sfindblock(const char * /*s*/, int /*h*/);
  * 1000 and 5000.
  */
 
-static block_t **base_table = (block_t **)0;
+static block_t **base_table = (block_t **)nullptr;
 static int htable_size;
 static int htable_size_minus_one;
 
@@ -100,7 +100,7 @@ void init_strings() {
   overhead_bytes += (sizeof(block_t *) * htable_size);
 
   for (x = 0; x < htable_size; x++) {
-    base_table[x] = 0;
+    base_table[x] = nullptr;
   }
 }
 
@@ -115,7 +115,7 @@ static block_t *sfindblock(const char *s, int h) {
   block_t *curr, *prev;
 
   curr = base_table[h];
-  prev = NULL;
+  prev = nullptr;
   num_str_searches++;
 
   while (curr) {
@@ -132,7 +132,7 @@ static block_t *sfindblock(const char *s, int h) {
     prev = curr;
     curr = NEXT(curr);
   }
-  return ((block_t *)0); /* not found */
+  return ((block_t *)nullptr); /* not found */
 }
 
 char *findstring(const char *s) {
@@ -141,7 +141,7 @@ char *findstring(const char *s) {
   if ((b = findblock(s))) {
     return STRING(b);
   } else {
-    return (NULL);
+    return (nullptr);
   }
 }
 

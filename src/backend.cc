@@ -39,7 +39,7 @@
 #endif
 
 // FIXME: rewrite other part so this could become static.
-struct event_base *g_event_base = NULL;
+struct event_base *g_event_base = nullptr;
 
 namespace {
 void libevent_log(int severity, const char *msg) { debug(event, "%d:%s\n", severity, msg); }
@@ -72,7 +72,7 @@ std::chrono::milliseconds gametick_to_time(int ticks) {
 namespace {
 // TODO: remove the need for this
 // Global variable for game ticket event handle.
-struct event *g_ev_tick = NULL;
+struct event *g_ev_tick = nullptr;
 
 inline struct timeval gametick_timeval() {
   static struct timeval val {
