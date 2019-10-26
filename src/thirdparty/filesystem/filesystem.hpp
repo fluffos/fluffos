@@ -1682,7 +1682,7 @@ GHC_INLINE file_status file_status_from_st_mode(T mode)
     else if (S_ISSOCK(mode)) {
         ft = file_type::socket;
     }
-    perms prms = static_cast<perms>(mode & 0xfff);
+    auto prms = static_cast<perms>(mode & 0xfff);
     return file_status(ft, prms);
 #endif
 }
@@ -3450,7 +3450,7 @@ GHC_INLINE bool create_directory(const path& p, const path& attributes, std::err
         return false;
     }
 #else
-    ::mode_t attribs = static_cast<mode_t>(perms::all);
+    auto attribs = static_cast<mode_t>(perms::all);
     if (!attributes.empty()) {
         struct ::stat fileStat;
         if (::stat(attributes.c_str(), &fileStat) != 0) {

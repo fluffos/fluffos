@@ -661,7 +661,7 @@ void get_user_data(interactive_t *ip) {
         memcpy(ip->ws_text + ip->ws_text_end, buf, num_bytes);
         ip->ws_text_end += num_bytes;
         if (!ip->ws_size) {
-          unsigned char *data = reinterpret_cast<unsigned char *>(&ip->ws_text[ip->ws_text_start]);
+          auto *data = reinterpret_cast<unsigned char *>(&ip->ws_text[ip->ws_text_start]);
           if (ip->ws_text_end - ip->ws_text_start < 8) {
             break;
           }

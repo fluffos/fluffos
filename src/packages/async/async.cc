@@ -84,7 +84,7 @@ struct stuff *get_stuff() {
 }
 
 void free_stuff(struct stuff *stuff) {
-  struct stuff_mem *stufft = reinterpret_cast<struct stuff_mem *>(stuff);
+  auto *stufft = reinterpret_cast<struct stuff_mem *>(stuff);
   pthread_mutex_lock(&mem_mut);
   stufft->next = stuffs;
   stuffs = stufft;
@@ -154,7 +154,7 @@ function_to_call_t *get_cb() {
 }
 
 void free_cb(function_to_call_t *cb) {
-  struct cb_mem *cbt = reinterpret_cast<struct cb_mem *>(cb);
+  auto *cbt = reinterpret_cast<struct cb_mem *>(cb);
   cbt->next = cbs;
   cbs = cbt;
 }
@@ -174,7 +174,7 @@ struct request *get_req() {
 }
 
 void free_req(struct request *req) {
-  struct req_mem *reqt = reinterpret_cast<struct req_mem *>(req);
+  auto *reqt = reinterpret_cast<struct req_mem *>(req);
   reqt->next = reqms;
   reqms = reqt;
 }
@@ -431,7 +431,7 @@ void handle_getdir(struct request *req) {
   int tmp_buf_size = 0;
   int ret_size = 0;
   while (tmp_buf_size < req->ret) {
-    struct linux_dirent *de = (struct linux_dirent *)(req->buf + tmp_buf_size);
+    auto *de = (struct linux_dirent *)(req->buf + tmp_buf_size);
     ++ret_size;
     tmp_buf_size += de->d_reclen;
   }
@@ -441,7 +441,7 @@ void handle_getdir(struct request *req) {
   }
   array_t *ret = allocate_empty_array(ret_size);
   if (ret_size > 0) {
-    struct linux_dirent *de = (struct linux_dirent *)req->buf;
+    auto *de = (struct linux_dirent *)req->buf;
     for (int i = 0; i < ret_size; i++) {
       svalue_t *vp = &(ret->item[i]);
       vp->type = T_STRING;
