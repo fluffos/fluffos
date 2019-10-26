@@ -84,7 +84,7 @@ inline struct timeval gametick_timeval() {
 
 // Global structure to holding all events to be executed on gameticks.
 typedef std::multimap<decltype(g_current_gametick), tick_event *,
-                      std::less<decltype(g_current_gametick)>> TickQueue;
+                      std::less<(g_current_gametick)>> TickQueue;
 TickQueue g_tick_queue;
 
 // Call all events for current tick
