@@ -41,8 +41,8 @@ int main(int argc, char** argv) {
   file.open(FILENAME, std::ios::out);
 
   file << TPL_HEADER;
-  for(auto i=0; i<sizeof(defns) / sizeof(defns[0]); i++) {
-    for(auto p = defns[i]; p; p=p->next) {
+  for(auto p : defns) {
+    for(; p; p=p->next) {
       // Ignore define name starts with _ , those are system defines.
       if (p->name[0] == '_') continue;
       if (p->flags & DEF_IS_UNDEFINED) continue;
