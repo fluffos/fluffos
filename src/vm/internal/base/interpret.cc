@@ -138,7 +138,7 @@ void kill_ref(ref_t *ref) {
 }
 
 ref_t *make_ref(void) {
-  ref_t *ref = reinterpret_cast<ref_t *>(DMALLOC(sizeof(ref_t), TAG_TEMPORARY, "make_ref"));
+  auto *ref = reinterpret_cast<ref_t *>(DMALLOC(sizeof(ref_t), TAG_TEMPORARY, "make_ref"));
   ref->next = global_ref_list;
   ref->prev = nullptr;
   if (ref->next) {

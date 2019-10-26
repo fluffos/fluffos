@@ -101,7 +101,7 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, std::chrono::milliseconds dela
     }
   }
 
-  pending_call_t *cop = reinterpret_cast<pending_call_t *>(
+  auto *cop = reinterpret_cast<pending_call_t *>(
       DCALLOC(1, sizeof(pending_call_t), TAG_CALL_OUT, "new_call_out"));
 
   cop->is_walltime = walltime;

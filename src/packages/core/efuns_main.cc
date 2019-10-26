@@ -3342,7 +3342,7 @@ void f_next_inventory(void) {
 
 #ifdef F_DEFER
 void f_defer() {
-  struct defer_list *newlist = reinterpret_cast<struct defer_list *>(
+  auto *newlist = reinterpret_cast<struct defer_list *>(
       DMALLOC(sizeof(struct defer_list), TAG_TEMPORARY, "defer: new item"));
 
   if (CONFIG_INT(__RC_REVERSE_DEFER__)) {

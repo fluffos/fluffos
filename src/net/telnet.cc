@@ -39,7 +39,7 @@ static const int ANSI_SUBSTITUTE = 0x20;
 
 static inline void on_telnet_data(const char *buffer, unsigned long size, interactive_t *ip) {
   for (int i = 0; i < size; i++) {
-    unsigned char c = static_cast<unsigned char>(buffer[i]);
+    auto c = static_cast<unsigned char>(buffer[i]);
     switch (c) {
       case 0x08:
       case 0x7f:
@@ -239,7 +239,7 @@ static inline void on_telnet_subnegotiation(unsigned char cmd, const char *buf, 
       // how this works.
       // Basically, we force client to use MODE_EDIT | MODE_TRAPSIG
       // and we ignore SLC settings.
-      unsigned char action = static_cast<unsigned char>(buf[0]);
+      auto action = static_cast<unsigned char>(buf[0]);
       switch (action) {
         case LM_MODE:
           /* Don't do anything with an ACK */

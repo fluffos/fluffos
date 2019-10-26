@@ -77,15 +77,15 @@ static void encode_stat(svalue_t * /*vp*/, int /*flags*/, char * /*str*/, struct
  * These are used by qsort in get_dir().
  */
 static int pstrcmp(const void *p1, const void *p2) {
-  svalue_t *x = (svalue_t *)p1;
-  svalue_t *y = (svalue_t *)p2;
+  auto *x = (svalue_t *)p1;
+  auto *y = (svalue_t *)p2;
 
   return strcmp(x->u.string, y->u.string);
 }
 
 static int parrcmp(const void *p1, const void *p2) {
-  svalue_t *x = (svalue_t *)p1;
-  svalue_t *y = (svalue_t *)p2;
+  auto *x = (svalue_t *)p1;
+  auto *y = (svalue_t *)p2;
 
   return strcmp(x->u.arr->item[0].u.string, y->u.arr->item[0].u.string);
 }

@@ -374,7 +374,7 @@ static int parse_copy_array(array_t *arr, char ***sarrp) {
 static void add_special_word(const char *wrd, int kind, int arg) {
   char *p = make_shared_string(wrd);
   int h = DO_HASH(p, SPECIAL_HASH_SIZE);
-  special_word_t *swp =
+  auto *swp =
       (special_word_t *)DMALLOC(sizeof(special_word_t), TAG_PARSER, "add_special_word");
 
   swp->wrd = p;
@@ -3213,7 +3213,7 @@ static void parse_sentence(const char *input) {
 
   /* find an interpretation, first word must be shared (verb) */
   for (i = 1; i <= n; i++) {
-    unsigned char *vb = (unsigned char *)findstring((char *)buf);
+    auto *vb = (unsigned char *)findstring((char *)buf);
     verb_t *ve;
 
     if (vb) {
@@ -3668,7 +3668,7 @@ void f_parse_add_synonym() {
     verb_node->next = verb_entry->node;
     verb_entry->node = verb_node;
   } else {
-    verb_syn_t *syn = (verb_syn_t *)verb_entry;
+    auto *syn = (verb_syn_t *)verb_entry;
     syn->flags = VB_IS_SYN | (vb->flags & VB_HAS_OBJ);
     syn->real = vb;
   }
