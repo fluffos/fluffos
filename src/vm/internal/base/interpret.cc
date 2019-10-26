@@ -1727,7 +1727,7 @@ static void show_lpc_line(char *f, int l) {
     }
   }
   q = p;
-  while (1) {
+  while (true) {
     while (*q) {
       putchar(*q);
       if (*q++ == '\n') {
@@ -1785,7 +1785,7 @@ void eval_instruction(char *p) {
   /* Next F_RETURN at this level will return out of eval_instruction() */
   csp->framekind |= FRAME_EXTERNAL;
   pc = p;
-  while (1) {
+  while (true) {
     if (debug_level & DBG_LPC) {
       char *f;
       int l;
@@ -4245,7 +4245,7 @@ int inter_sscanf(svalue_t *arg, svalue_t *s0, svalue_t *s1, int num_arg) {
 
         tmp = fmt; /* 1 after the ( */
         num = 1;
-        while (1) {
+        while (true) {
           switch (*tmp) {
             case '\\':
               if (*++tmp) {
@@ -4374,7 +4374,7 @@ int inter_sscanf(svalue_t *arg, svalue_t *s0, svalue_t *s1, int num_arg) {
 
           tmp = fmt;
           num = 1;
-          while (1) {
+          while (true) {
             switch (*tmp) {
               case '\\':
                 if (*++tmp) {

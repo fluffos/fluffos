@@ -319,7 +319,7 @@ void f_call_stack(void) {
     case 4:
       for (i = 0; i < n; i++) {
         ret->item[i].type = T_STRING;
-        if (1 || ((csp - i)->framekind & FRAME_MASK) == FRAME_FUNCTION ||
+        if (true || ((csp - i)->framekind & FRAME_MASK) == FRAME_FUNCTION ||
             ((csp - i)->framekind & FRAME_MASK) == FRAME_FUNP) {
           const program_t *prog = (i ? (csp - i + 1)->prog : current_prog);
           int index = (csp - i)->fr.table_index;
@@ -2841,7 +2841,7 @@ void f_next_bit(void) {
     value = *sp->u.string - ' ';
   }
 
-  while (1) {
+  while (true) {
     if (value) {
       if (value & 0x07) {
         if (value & 0x01) {
@@ -3218,7 +3218,7 @@ void f_memory_info(void) {
 
     tot = total_prog_block_size + total_array_size + total_class_size + total_mapping_size +
           tot_alloc_object_size + tot_alloc_sentence * sizeof(sentence_t) +
-          users_num(1) * sizeof(interactive_t) + ObjectTable::instance().showStatus(nullptr, -1) +
+          users_num(true) * sizeof(interactive_t) + ObjectTable::instance().showStatus(nullptr, -1) +
           heart_beat_status(nullptr, -1) + add_string_status(nullptr, -1) + print_call_out_usage(nullptr, -1);
     push_number(tot);
     return;

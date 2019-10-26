@@ -830,7 +830,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
   sp->u.error_handler = pop_sprintf_state;
 
   last = 0;
-  for (fpos = 0; 1; fpos++) {
+  for (fpos = 0; true; fpos++) {
     char c = format_str[fpos];
 
     if (c == '\n' || !c) {
@@ -1021,7 +1021,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
           case '\'':
             fpos++;
             pad.what = format_str + fpos;
-            while (1) {
+            while (true) {
               if (!format_str[fpos]) {
                 ERROR(ERR_UNEXPECTED_EOS);
               }
@@ -1061,7 +1061,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
         carg = (argv + sprintf_state->cur_arg)->u.arr->item;
         nelemno = 1; /* next element number */
       }
-      while (1) {
+      while (true) {
         if ((finfo & INFO_T) == INFO_T_LPC) {
           outbuffer_t outbuf;
 

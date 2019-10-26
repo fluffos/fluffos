@@ -1481,7 +1481,7 @@ static void parse_obj(int tok, parse_state_t *state, int ordinal) {
 
   all_objects(&objects, parse_vn->handler->pinfo->flags & PI_REMOTE_LIVINGS);
 
-  while (1) {
+  while (true) {
     if (state->word_index == num_words) {
       return;
     }
@@ -1874,7 +1874,7 @@ static char *rule_string(verb_node_t *vn) {
 
   p = buf;
 
-  while (1) {
+  while (true) {
     switch ((tok = vn->token[index++]) & ~CHOOSE_MODIFIER) {
       case OBJ_A_TOKEN:
       case OBJ_TOKEN:

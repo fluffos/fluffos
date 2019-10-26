@@ -521,7 +521,7 @@ void add_vmessage(object_t *who, const char *format, ...) {
     result = vsnprintf(msg.get(), result + 1, format, args2);
     if (result < 0) break;
     add_message(who, msg.get(), result);
-  } while (0);
+  } while (false);
   va_end(args2);
   va_end(args);
 }
