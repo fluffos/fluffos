@@ -437,8 +437,8 @@ void mark_call_outs() {
  */
 array_t *get_all_call_outs() {
   int i = 0;
-  for (auto iter = g_callout_handle_map.cbegin(); iter != g_callout_handle_map.cend(); iter++) {
-    auto cop = iter->second;
+  for (auto iter : g_callout_handle_map) {
+    auto cop = iter.second;
     object_t *ob = (cop->ob ? cop->ob : cop->function.f->hdr.owner);
     if (ob && !(ob->flags & O_DESTRUCTED)) {
       i++;
@@ -448,8 +448,8 @@ array_t *get_all_call_outs() {
   array_t *v = allocate_empty_array(i);
 
   i = 0;
-  for (auto iter = g_callout_handle_map.cbegin(); iter != g_callout_handle_map.cend(); iter++) {
-    auto cop = iter->second;
+  for (auto iter : g_callout_handle_map) {
+    auto cop = iter.second;
     array_t *vv;
     object_t *ob;
     ob = (cop->ob ? cop->ob : cop->function.f->hdr.owner);
@@ -571,8 +571,8 @@ void reclaim_call_outs() {
 
   if (CONFIG_INT(__RC_THIS_PLAYER_IN_CALL_OUT__)) {
     i = 0;
-    for (auto iter = g_callout_handle_map.cbegin(); iter != g_callout_handle_map.cend(); iter++) {
-      auto cop = iter->second;
+    for (auto iter : g_callout_handle_map) {
+      auto cop = iter.second;
       if (cop->command_giver && (cop->command_giver->flags & O_DESTRUCTED)) {
         free_object(&cop->command_giver, "reclaim_call_outs");
         cop->command_giver = nullptr;
