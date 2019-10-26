@@ -1978,9 +1978,8 @@ static int memory_share(svalue_t *sv) {
     case T_STRING:
       switch (sv->subtype) {
         case STRING_MALLOC:
-          return total +
-                 (1 + COUNTED_STRLEN(sv->u.string) + sizeof(malloc_block_t)) /
-                     (COUNTED_REF(sv->u.string));
+          return total + (1 + COUNTED_STRLEN(sv->u.string) + sizeof(malloc_block_t)) /
+                             (COUNTED_REF(sv->u.string));
         case STRING_SHARED:
           return total +
                  (1 + COUNTED_STRLEN(sv->u.string) + sizeof(block_t)) / (COUNTED_REF(sv->u.string));

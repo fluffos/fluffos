@@ -374,8 +374,7 @@ static int parse_copy_array(array_t *arr, char ***sarrp) {
 static void add_special_word(const char *wrd, int kind, int arg) {
   char *p = make_shared_string(wrd);
   int h = DO_HASH(p, SPECIAL_HASH_SIZE);
-  auto *swp =
-      (special_word_t *)DMALLOC(sizeof(special_word_t), TAG_PARSER, "add_special_word");
+  auto *swp = (special_word_t *)DMALLOC(sizeof(special_word_t), TAG_PARSER, "add_special_word");
 
   swp->wrd = p;
   swp->kind = kind;
@@ -683,13 +682,9 @@ static void free_parse_globals(void) {
   }
 }
 
-token_def_t tokens[] = {{"OBJ", OBJ_A_TOKEN, 1},
-                        {"STR", STR_TOKEN, 0},
-                        {"WRD", WRD_TOKEN, 0},
-                        {"LIV", LIV_A_TOKEN, 1},
-                        {"OBS", OBS_TOKEN, 1},
-                        {"LVS", LVS_TOKEN, 1},
-                        {nullptr, 0}};
+token_def_t tokens[] = {
+    {"OBJ", OBJ_A_TOKEN, 1}, {"STR", STR_TOKEN, 0}, {"WRD", WRD_TOKEN, 0}, {"LIV", LIV_A_TOKEN, 1},
+    {"OBS", OBS_TOKEN, 1},   {"LVS", LVS_TOKEN, 1}, {nullptr, 0}};
 
 #define STR3CMP(x, y) (x[0] == y[0] && x[1] == y[1] && x[2] == y[2])
 

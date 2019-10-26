@@ -48,7 +48,6 @@ extern inline const char *origin_to_name(int /*origin*/);
 int stack_in_use_as_temporary = 0;
 #endif
 
-
 int inter_sscanf(svalue_t * /*arg*/, svalue_t * /*s0*/, svalue_t * /*s1*/, int /*num_arg*/);
 program_t *current_prog;
 short int caller_type;
@@ -2018,7 +2017,7 @@ void eval_instruction(char *p) {
         }
         if (i) {
           sp--; /* when sp is an integer svalue, its cheaper
-               * to do this */
+                 * to do this */
         } else {
           pop_stack();
         }
@@ -2152,7 +2151,7 @@ void eval_instruction(char *p) {
         pc += 2;
         break;
       case F_LOOP_INCR: /* this case must be just prior to
-                       * F_LOOP_COND */
+                         * F_LOOP_COND */
       {
         svalue_t *s;
 
@@ -3186,7 +3185,7 @@ void eval_instruction(char *p) {
         }
         if (i) {
           sp--; /* cheaper to do this when sp is an integer
-               * svalue */
+                 * svalue */
         } else {
           pop_stack();
         }
@@ -3452,7 +3451,7 @@ void eval_instruction(char *p) {
           STACK_INC;
           DEBUG_CHECK(sp != fp, "Bad stack at F_RETURN\n");
           *sp = sv; /* This way, the same ref counts are
- * maintained */
+                     * maintained */
         }
         pop_control_stack();
         if (CONFIG_INT(__RC_TRACE__)) {
@@ -4072,7 +4071,8 @@ static int find_line(char *p, const program_t *progp, const char **ret_file, int
   return 0;
 }
 
-void get_explicit_line_number_info(char *p, const program_t *progp, const char **ret_file, int *ret_line) {
+void get_explicit_line_number_info(char *p, const program_t *progp, const char **ret_file,
+                                   int *ret_line) {
   int i = find_line(p, progp, ret_file, ret_line);
 
   switch (i) {
@@ -4571,18 +4571,18 @@ static char *get_arg(int a, int b) {
 }
 
 int last_instructions() {
-    int i;
+  int i;
 
-    debug_message("Recent instruction trace:\n");
-    i = last;
-    do {
-        if (previous_instruction[i] != 0)
-            debug_message("%p: %3d %8s %-25s (%d)\n", previous_pc[i], previous_instruction[i],
-                          get_arg(i, (i + 1) % (sizeof previous_instruction / sizeof(int))),
-                          query_instr_name(previous_instruction[i]), stack_size[i] + 1);
-        i = (i + 1) % (sizeof previous_instruction / sizeof(int));
-    } while (i != last);
-    return last;
+  debug_message("Recent instruction trace:\n");
+  i = last;
+  do {
+    if (previous_instruction[i] != 0)
+      debug_message("%p: %3d %8s %-25s (%d)\n", previous_pc[i], previous_instruction[i],
+                    get_arg(i, (i + 1) % (sizeof previous_instruction / sizeof(int))),
+                    query_instr_name(previous_instruction[i]), stack_size[i] + 1);
+    i = (i + 1) % (sizeof previous_instruction / sizeof(int));
+  } while (i != last);
+  return last;
 }
 
 /* Generate a debug message to the user */

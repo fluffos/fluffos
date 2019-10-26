@@ -357,7 +357,7 @@ static void init_domain_for_ob(object_t *ob) {
 #ifdef PACKAGE_UIDS
       || !current_object->uid
 #endif
-      ) {
+  ) {
     /*
      * Only for the master and void object. Note that you can't ask for
      * the backbone or root domain here since we're in the process of

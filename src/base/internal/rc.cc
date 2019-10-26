@@ -107,7 +107,7 @@ void config_init() {
   }
 
   // populate default value for int flags.
-  for (const auto & kDefaultFlag : kDefaultFlags) {
+  for (const auto &kDefaultFlag : kDefaultFlags) {
     CONFIG_INT(kDefaultFlag.pos) = kDefaultFlag.defaultValue;
   }
 }
@@ -344,7 +344,7 @@ void read_config(char *filename) {
   scan_config_line("fd6 port : %d\n", tmp, -2);
 
   // Give all obsolete (thus untouched) config strings a value.
-  for (auto & i : config_str) {
+  for (auto &i : config_str) {
     if (i == nullptr) {
       i = alloc_cstring("", "rc_obsolete");
     }
@@ -352,7 +352,7 @@ void read_config(char *filename) {
 
   std::cout << "==== Runtime Config Table ====" << std::endl;
   // process int flags
-  for (const auto & kDefaultFlag : kDefaultFlags) {
+  for (const auto &kDefaultFlag : kDefaultFlags) {
     std::cout << kDefaultFlag.key << ": " << kDefaultFlag.defaultValue;
 
     int value = 0;

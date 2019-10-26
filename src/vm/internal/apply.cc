@@ -168,9 +168,9 @@ int apply_low(const char *fun, object_t *ob, int num_arg) {
   call_origin = 0;
   ob->time_of_ref = g_current_gametick; /* Used by the swapper */
                                         /*
-* This object will now be used, and is thus a target for reset later on
-* (when time due).
-*/
+                                         * This object will now be used, and is thus a target for reset later on
+                                         * (when time due).
+                                         */
   if (!CONFIG_INT(__RC_NO_RESETS__) && CONFIG_INT(__RC_LAZY_RESETS__)) {
     try_reset(ob);
   }

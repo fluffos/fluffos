@@ -125,7 +125,7 @@ typedef unsigned int format_info;
 #define ERR_ARRAY_EXPECTED 0xD     /* Yep!  You guessed it. */
 #define ERR_RECOVERY_ONLY            \
   0xE /* err msg already done...just \
-* recover */
+       * recover */
 
 #define ADD_CHAR(x)                                                                    \
   {                                                                                    \
@@ -1169,7 +1169,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
                   max_len = p1 - p2;
                 }
                 pres = fs / (max_len + 2); /* at least two
-                                                            * separating spaces */
+                                            * separating spaces */
                 if (!pres) {
                   pres = 1;
                 }
@@ -1211,7 +1211,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
               } else {
                 i = 1; /* the next column number */
                 n = 0; /* the current "word" number in this
-                                        * column */
+                        * column */
 
                 p1 = TABLE;
                 while (*p1) {
@@ -1262,7 +1262,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
           }
         } else if (finfo & INFO_T_INT) {
           /* one of the integer
-                                                   * types */
+           * types */
           char cheat[40];
           char temp[400];
 

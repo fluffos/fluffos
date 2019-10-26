@@ -109,22 +109,22 @@
 #define ANYOF 4 /* str  Match any character in this string. */
 #define ANYBUT                                            \
   5               /* str  Match any character not in this \
-              * string. */
+                   * string. */
 #define BRANCH 6  /* node Match this alternative, or the nxt... */
 #define BACK 7    /* no   Match "", "nxt" ptr points backward. */
 #define EXACTLY 8 /* str  Match this string. */
 #define NOTHING 9 /* no   Match empty string. */
 #define STAR                                     \
   10 /* node Match this (simple) thing 0 or more \
-* times. */
+      * times. */
 #define PLUS                                                     \
   11                 /* node Match this (simple) thing 1 or more \
-                * times. */
+                      * times. */
 #define WORDSTART 12 /* node matching a start of a word          */
 #define WORDEND 13   /* node matching an end of a word           */
 #define OPEN                                      \
   20 /* no   Mark this point in input as start of \
-* #n. */
+      * #n. */
 /* OPEN+1 is number 1, etc. */
 #define CLOSE 30 /* no   Analogous to OPEN. */
 

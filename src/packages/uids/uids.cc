@@ -13,7 +13,7 @@
 
 #include "packages/uids/uids.h"
 
-#include<set>
+#include <set>
 
 static object_t *ob;
 
@@ -113,17 +113,14 @@ void f_seteuid(void) {
 static auto comp = [](userid_t *uid1, userid_t *uid2) { return uid1->name < uid2->name; };
 static auto uids = std::set<userid_t *, decltype(comp)>(comp);
 
-
 // static tree *uids = NULL;
 userid_t *backbone_uid = nullptr;
 userid_t *root_uid = nullptr;
 
 #ifdef DEBUGMALLOC_EXTENSIONS
-void mark_all_uid_nodes()
-{
-  for(auto i : uids)
-  {
-      ++EXTRA_REF(BLOCK(i->name));
+void mark_all_uid_nodes() {
+  for (auto i : uids) {
+    ++EXTRA_REF(BLOCK(i->name));
   }
 }
 #endif

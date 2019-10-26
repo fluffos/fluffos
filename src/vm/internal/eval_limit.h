@@ -3,11 +3,13 @@
 
 #include <cstdint>
 
-// Use to indicate VM execution limits are met. this variable is accessed through signal handler, so it must be volatile.
+// Use to indicate VM execution limits are met. this variable is accessed through signal handler, so
+// it must be volatile.
 extern volatile int outoftime;
 
 // TODO: we should simply remove this variable and directly read from RC.
-// Stores the current maximum eval cost, this is only changed through set_eval_limit efun and through runtime config.
+// Stores the current maximum eval cost, this is only changed through set_eval_limit efun and
+// through runtime config.
 extern uint64_t max_eval_cost;
 
 // Set evaluation deadline to given microseconds.

@@ -5,7 +5,9 @@
    directly */
 
 /* FP_LOCAL */
-typedef struct { short index; } local_ptr_t;
+typedef struct {
+  short index;
+} local_ptr_t;
 
 /* FP_SIMUL */
 typedef local_ptr_t simul_ptr_t;

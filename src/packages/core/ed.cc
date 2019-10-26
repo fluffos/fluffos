@@ -1385,7 +1385,7 @@ static int subst(regexp *pat, char *sub, int gflg, int pflag) {
         }
         if (txtptr == pat->endp[0]) {
           /* amylaar : prevent infinite
-                                           * loop */
+           * loop */
           if (!*txtptr) {
             break;
           }

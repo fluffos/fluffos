@@ -8,7 +8,7 @@
 #include <stdarg.h>    // for va_start
 #include <unistd.h>    // for open()
 #ifdef HAVE_SIGNAL_H
-#include <signal.h>    // for signal*
+#include <signal.h>  // for signal*
 #endif
 
 #include "backend.h"  // for clear_tick_events , FIXME
@@ -45,7 +45,7 @@ void db_cleanup(void);  // FIXME
 
 #include "comm.h"  // FIXME
 
-#include "vm/internal/trace.h" // for dump_trace && get_svalue_trace
+#include "vm/internal/trace.h"  // for dump_trace && get_svalue_trace
 
 /*
  * This one is called from HUP.
@@ -135,7 +135,7 @@ static void init_privs_for_object(object_t *ob) {
 #ifdef PACKAGE_UIDS
       || !current_object->uid
 #endif
-      ) {
+  ) {
     ob->privs = NULL;
     return;
   }
@@ -326,7 +326,7 @@ static object_t *load_virtual_object(const char *name, int clone) {
     FREE((char *)new_ob->obname);
   }
   SETOBNAME(new_ob, new_name);
-  ObjectTable::instance().insert(new_ob->obname,new_ob);
+  ObjectTable::instance().insert(new_ob->obname, new_ob);
 
   /* finish initialization */
   new_ob->flags |= O_VIRTUAL;
@@ -547,7 +547,7 @@ object_t *load_object(const char *lname, int callcreate) {
     obj_list->prev_all = ob;
   }
   obj_list = ob;
-  ObjectTable::instance().insert(ob->obname,ob); /* add name to fast object lookup table */
+  ObjectTable::instance().insert(ob->obname, ob); /* add name to fast object lookup table */
   save_command_giver(command_giver);
   push_object(ob);
   mret = apply_master_ob(APPLY_VALID_OBJECT, 1);
@@ -1267,7 +1267,7 @@ void shout_string(const char *str) {
 #ifndef NO_ENVIRONMENT
         || !ob->super
 #endif
-        ) {
+    ) {
       continue;
     }
     tell_object(ob, str, strlen(str));
@@ -1829,8 +1829,7 @@ void _error_handler(char *err) {
   }
 }
 
-} // namespace
-
+}  // namespace
 
 void error_handler(char *err) {
 /* in case we're going to jump out of load_object */
@@ -1901,7 +1900,8 @@ void error_handler(char *err) {
     goto exit;
   }
 
-  // For 'too deep recurision' we can't call mudlib error handlers, so we must handle this in driver.
+  // For 'too deep recurision' we can't call mudlib error handlers, so we must handle this in
+  // driver.
   if (too_deep_error) {
     _error_handler(err);
     goto exit;
@@ -1911,7 +1911,7 @@ void error_handler(char *err) {
   if (num_mudlib_error) {
     debug_message("Error in mudlib error handler: ");
     debug_message_with_location(err);
-    (void) dump_trace(0);
+    (void)dump_trace(0);
     num_mudlib_error = 0;
   } else {
     num_mudlib_error++;

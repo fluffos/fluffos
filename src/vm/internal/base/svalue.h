@@ -5,7 +5,9 @@
  directly */
 #include "vm/internal/base/number.h"
 
-typedef struct { unsigned short ref; } refed_t;
+typedef struct {
+  unsigned short ref;
+} refed_t;
 
 union u {
   LPC_INT number;
@@ -168,7 +170,7 @@ extern svalue_t const0, const1, const0u;
     if ((x)->subtype == STRING_MALLOC && MSTR_REF((x)->u.string) == 1) {                          \
       ssj_res = (char *)extend_string((x)->u.string, ssj_len);                                    \
       if (!ssj_res) fatal("Out of memory!\n");                                                    \
-      (void) strcpy(ssj_res + ssj_r, (y)->u.string);                                              \
+      (void)strcpy(ssj_res + ssj_r, (y)->u.string);                                               \
       free_string_svalue(y);                                                                      \
     } else {                                                                                      \
       ssj_res = (char *)new_string(ssj_len, z);                                                   \

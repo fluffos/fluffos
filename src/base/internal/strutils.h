@@ -8,20 +8,17 @@
 
 namespace {
 
-const auto fn_not_isspace = [](int c) {return !std::isspace(c);};
+const auto fn_not_isspace = [](int c) { return !std::isspace(c); };
 
 // trim from start
 inline std::string &ltrim(std::string &s) {
-  s.erase(s.begin(),
-          std::find_if(s.begin(), s.end(), fn_not_isspace));
+  s.erase(s.begin(), std::find_if(s.begin(), s.end(), fn_not_isspace));
   return s;
 }
 
 // trim from end
 inline std::string &rtrim(std::string &s) {
-  s.erase(
-      std::find_if(s.rbegin(), s.rend(), fn_not_isspace).base(),
-      s.end());
+  s.erase(std::find_if(s.rbegin(), s.rend(), fn_not_isspace).base(), s.end());
   return s;
 }
 
@@ -37,5 +34,5 @@ inline bool ends_with(const std::string &str, const std::string &ending) {
   return str.compare(str.length() - ending.length(), ending.length(), ending) == 0;
 }
 
-}
-#endif // STRUTILS_H
+}  // namespace
+#endif  // STRUTILS_H

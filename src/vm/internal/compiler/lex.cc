@@ -26,7 +26,7 @@
 #include <cctype>    // for isspace
 #include <unistd.h>  // for read(), FIXME
 #include <vector>
-#include <algorithm> // for std::sort
+#include <algorithm>  // for std::sort
 
 #include "include/function.h"
 #include "efuns.autogen.h"
@@ -83,9 +83,9 @@ lpc_predef_t *lpc_predefs = nullptr;
 
 static int yyin_desc;
 int lex_fatal;
-static char **inc_list;         // global include path from runtime config
+static char **inc_list;  // global include path from runtime config
 static int inc_list_size;
-static char **inc_path;         // include path used for current compile
+static char **inc_path;  // include path used for current compile
 static int inc_path_size;
 static int defines_need_freed = 0;
 static char *last_nl;
@@ -391,9 +391,9 @@ static void handle_elif()
       }
     } else { /* EXPECT_ENDIF */
              /*
-  * last cond was true...skip to end of
-  * conditional
-  */
+              * last cond was true...skip to end of
+              * conditional
+              */
       skip_to("endif", (char *)nullptr);
     }
   } else {
@@ -838,40 +838,42 @@ static int skip_to(const char *token, const char *atoken) {
 }
 
 void init_include_path() {
-  push_malloced_string(add_slash(current_file));        // does master has an include path?
+  push_malloced_string(add_slash(current_file));  // does master has an include path?
   svalue_t *ret = apply_master_ob(APPLY_GET_INCLUDE_PATH, 1);
 
-  if (!ret || ret == (svalue_t *)-1) {                  // either no or no master yet
-      return;                                           // just use the runtime configuration
+  if (!ret || ret == (svalue_t *)-1) {  // either no or no master yet
+    return;                             // just use the runtime configuration
   }
-  if (ret->type != T_ARRAY) {                           // illegal return value
-      debug_message("'master::get_include_path' must return 'string *'\n");
-      return;                                           // we still have the runtime configuration
+  if (ret->type != T_ARRAY) {  // illegal return value
+    debug_message("'master::get_include_path' must return 'string *'\n");
+    return;  // we still have the runtime configuration
   }
-  array_t *arr  = ret->u.arr;
+  array_t *arr = ret->u.arr;
   int size = arr->size;
 
-  if(!size) {                                           // empty path?
-      debug_message("got empty include path for 'master::get_include_path(%s)'\n", current_file);
-      return;                                           // we still have the runtime configuration
+  if (!size) {  // empty path?
+    debug_message("got empty include path for 'master::get_include_path(%s)'\n", current_file);
+    return;  // we still have the runtime configuration
   }
-  char **path = static_cast<char **>(DMALLOC(sizeof(char*) * size, TAG_COMPILER, "compiler:init_include_path"));
+  char **path = static_cast<char **>(
+      DMALLOC(sizeof(char *) * size, TAG_COMPILER, "compiler:init_include_path"));
 
   // check elements and build working copy
-  int i,                    // index into returned array
-      j,                    // index into dynamic path array
-      k;                    // index into static path array
-  for (i = j = 0; i < arr->size; i++) {                 // can't use size since it might change
-    if (arr->item[i].type != T_STRING) {                // wrong type of element
+  int i,                                  // index into returned array
+      j,                                  // index into dynamic path array
+      k;                                  // index into static path array
+  for (i = j = 0; i < arr->size; i++) {   // can't use size since it might change
+    if (arr->item[i].type != T_STRING) {  // wrong type of element
       debug_message("'master::get_include_path(%s)' must return 'string *'\n", current_file);
-      goto init_include_path_cleanup;                   // clean exit
+      goto init_include_path_cleanup;  // clean exit
     }
 
     const char *elem;
-    if(!strcmp(elem = arr->item[i].u.string, ":DEFAULT:")) { // replace with runtime configuration
-      size += inc_list_size - 1;                        // get additional space
-      path = static_cast<char **>(DREALLOC(path, sizeof(char *) * size, TAG_COMPILER, "compiler:init_include_path"));
-      for (k = 0; k < inc_list_size;) {                 // and copy runtime configuration
+    if (!strcmp(elem = arr->item[i].u.string, ":DEFAULT:")) {  // replace with runtime configuration
+      size += inc_list_size - 1;                               // get additional space
+      path = static_cast<char **>(
+          DREALLOC(path, sizeof(char *) * size, TAG_COMPILER, "compiler:init_include_path"));
+      for (k = 0; k < inc_list_size;) {  // and copy runtime configuration
         path[j++] = make_shared_string(inc_list[k++]);
       }
     } else {
@@ -879,31 +881,34 @@ void init_include_path() {
       if (elem[0] == '/') {
         check = &elem[1];
       }
-      if (!legal_path(check)) {                     // illegal value
-        debug_message("'master::get_include_path(%s)' returns invalid value '%s', must give paths without any '..'\n", current_file, elem);
-        goto init_include_path_cleanup;                   // clean exit
+      if (!legal_path(check)) {  // illegal value
+        debug_message(
+            "'master::get_include_path(%s)' returns invalid value '%s', must give paths without "
+            "any '..'\n",
+            current_file, elem);
+        goto init_include_path_cleanup;  // clean exit
       } else {
-        path[j++] = make_shared_string(elem);             // valid directory
+        path[j++] = make_shared_string(elem);  // valid directory
       }
     }
   }
-  inc_path = path;                                      // with this we may continue
+  inc_path = path;  // with this we may continue
   inc_path_size = size;
   return;
 
-init_include_path_cleanup:                              // oops, here something went wrong...
-  if (j) {                                              // we have seen at least one valid string
+init_include_path_cleanup:  // oops, here something went wrong...
+  if (j) {                  // we have seen at least one valid string
     for (i = 0; i < j; i++) {
-      free_string(path[i]);                             // free all of them
+      free_string(path[i]);  // free all of them
     }
   }
-  FREE(path);                                           // free array
+  FREE(path);  // free array
 }
 
 void deinit_include_path() {
-  if (inc_path != inc_list) {                           // we got an include path from master
+  if (inc_path != inc_list) {  // we got an include path from master
     for (int i = 0; i < inc_path_size; i++) {
-      free_string(inc_path[i]);                         // free it
+      free_string(inc_path[i]);  // free it
     }
     FREE(inc_path);
     inc_path = inc_list;
@@ -3515,11 +3520,10 @@ void print_all_predefines() {
       tmp = tmp->next;
     }
   }
-  std::sort(results.begin(), results.end(), [](defn_t* a, defn_t*b) {
-     return strcmp(a->name, b->name) < 0;
-  });
+  std::sort(results.begin(), results.end(),
+            [](defn_t *a, defn_t *b) { return strcmp(a->name, b->name) < 0; });
 
-  for(auto &&item: results) {
+  for (auto &&item : results) {
     debug_message("#define %s %s\n", item->name, item->exps);
   }
 
@@ -3745,29 +3749,31 @@ static char *expand_define2(char *text) {
   in = macro->exps;
   out = expand_buffer = reinterpret_cast<char *>(DMALLOC(DEFMAX, TAG_COMPILER, "expand_define2"));
 
-#define SAVECHAR(x)                                                   \
-  SAFE(if (out + 1 < expand_buffer + DEFMAX) { *out++ = (x); } else { \
-    if (freeme) FREE(freeme);                                         \
-    FREE(expand_buffer);                                              \
-    lexerror("Macro expansion overflow");                             \
-    expand_depth--;                                                   \
-    return 0;                                                         \
-  })
+#define SAVECHAR(x)                                                  \
+  SAFE(                                                              \
+      if (out + 1 < expand_buffer + DEFMAX) { *out++ = (x); } else { \
+        if (freeme) FREE(freeme);                                    \
+        FREE(expand_buffer);                                         \
+        lexerror("Macro expansion overflow");                        \
+        expand_depth--;                                              \
+        return 0;                                                    \
+      })
 
-#define SAVESTR(x, y)                            \
-  SAFE(if (out + (y) < expand_buffer + DEFMAX) { \
-    memcpy(out, (x), (y));                       \
-    out += (y);                                  \
-  } else {                                       \
-    if (freeme) FREE(freeme);                    \
-    FREE(expand_buffer);                         \
-    lexerror("Macro expansion overflow");        \
-    expand_depth--;                              \
-    return 0;                                    \
-  } if (freeme) {                                \
-    FREE(freeme);                                \
-    freeme = 0;                                  \
-  })
+#define SAVESTR(x, y)                           \
+  SAFE(                                         \
+      if (out + (y) < expand_buffer + DEFMAX) { \
+        memcpy(out, (x), (y));                  \
+        out += (y);                             \
+      } else {                                  \
+        if (freeme) FREE(freeme);               \
+        FREE(expand_buffer);                    \
+        lexerror("Macro expansion overflow");   \
+        expand_depth--;                         \
+        return 0;                               \
+      } if (freeme) {                           \
+        FREE(freeme);                           \
+        freeme = 0;                             \
+      })
 
   while (*in) {
     char *skip = in + 1;
@@ -3945,7 +3951,8 @@ void set_inc_list(char *list) {
     size++;
     p++;
   }
-  inc_path = inc_list = reinterpret_cast<char **>(DCALLOC(size, sizeof(char *), TAG_INC_LIST, "set_inc_list"));
+  inc_path = inc_list =
+      reinterpret_cast<char **>(DCALLOC(size, sizeof(char *), TAG_INC_LIST, "set_inc_list"));
   inc_path_size = inc_list_size = size;
   for (i = size - 1; i >= 0; i--) {
     p = strrchr(list, ':');
