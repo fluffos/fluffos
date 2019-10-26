@@ -152,7 +152,7 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, std::chrono::milliseconds dela
     cop->vs = nullptr;
   }
 
-  auto callback = std::bind(call_out, cop);
+  auto callback = [=] { return call_out(cop); };
   if (walltime) {
     cop->tick_event = add_walltime_event(delay_msecs, tick_event::callback_type(callback));
   } else {
