@@ -12,7 +12,7 @@ lookup_entry_s apply_cache_lookup(const char *funcname, program_t *prog) {
   // All function names are shared string.
   auto key = (intptr_t)(findstring(funcname));
   if (key == 0) {
-    return lookup_entry_s{0};
+    return lookup_entry_s{nullptr};
   }
 
   auto table = prog->apply_lookup_table;
@@ -28,7 +28,7 @@ lookup_entry_s apply_cache_lookup(const char *funcname, program_t *prog) {
     apply_cache_hits++;
     return pos->second;
   } else {
-    return lookup_entry_s{0};
+    return lookup_entry_s{nullptr};
   }
 }
 
@@ -43,7 +43,7 @@ static inline void fill_lookup_table_recurse(void *table, program_t *prog, uint1
 
     auto real_table = decltype(prog->apply_lookup_table)(table);
     auto key = (intptr_t)(prog->function_table[i].funcname);
-    lookup_entry_s entry = {0};
+    lookup_entry_s entry = {nullptr};
     entry.progp = prog;
     entry.funp = &(prog->function_table[i]);
     entry.function_index_offset = fio;

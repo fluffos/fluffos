@@ -21,7 +21,7 @@ void f_domain_stats(void) {
     m = get_domain_stats(sp->u.string);
     free_string_svalue(sp--);
   } else {
-    m = get_domain_stats(0);
+    m = get_domain_stats(nullptr);
   }
   if (!m) {
     push_number(0);
@@ -47,7 +47,7 @@ void f_author_stats(void) {
     m = get_author_stats(sp->u.string);
     free_string_svalue(sp--);
   } else {
-    m = get_author_stats(0);
+    m = get_author_stats(nullptr);
   }
   if (!m) {
     push_number(0);
@@ -59,10 +59,10 @@ void f_author_stats(void) {
 #endif
 
 /* Support functions */
-static mudlib_stats_t *domains = 0;
-static mudlib_stats_t *backbone_domain = 0;
-static mudlib_stats_t *authors = 0;
-static mudlib_stats_t *master_author = 0;
+static mudlib_stats_t *domains = nullptr;
+static mudlib_stats_t *backbone_domain = nullptr;
+static mudlib_stats_t *authors = nullptr;
+static mudlib_stats_t *master_author = nullptr;
 
 static mudlib_stats_t *find_stat_entry(const char * /*name*/, mudlib_stats_t * /*list*/);
 static mudlib_stats_t *add_stat_entry(const char * /*str*/, mudlib_stats_t ** /*list*/);
@@ -123,7 +123,7 @@ static mudlib_stats_t *find_stat_entry(const char *name, mudlib_stats_t *list) {
       return list;
     }
   }
-  return 0;
+  return nullptr;
 }
 
 /*
@@ -143,7 +143,7 @@ static mudlib_stats_t *add_stat_entry(const char *str, mudlib_stats_t **list) {
   entry->heart_beats = 0;
   entry->errors = 0;
   entry->objects = 0;
-  entry->next = NULL;
+  entry->next = nullptr;
   entry->size_array = 0;
   insert_stat_entry(entry, list);
   return entry;
@@ -160,8 +160,8 @@ void assign_stats(statgroup_t *st, object_t *ob) {
 
 void null_stats(statgroup_t *st) {
   if (st) {
-    st->domain = NULL;
-    st->author = NULL;
+    st->domain = nullptr;
+    st->author = nullptr;
   }
 }
 
@@ -296,7 +296,7 @@ static void init_author_for_ob(object_t *ob) {
   if (ret == (svalue_t *)-1) {
     ob->stats.author = master_author;
   } else if (!ret || ret->type != T_STRING) {
-    ob->stats.author = NULL;
+    ob->stats.author = nullptr;
   } else {
     ob->stats.author = add_stat_entry(ret->u.string, &authors);
   }
@@ -310,7 +310,7 @@ void set_author(const char *name) {
   }
   ob = current_object;
   if (master_ob == (object_t *)-1) {
-    ob->stats.author = NULL;
+    ob->stats.author = nullptr;
     return;
   }
   if (ob->stats.author) {
@@ -338,8 +338,8 @@ static const char *author_for_file(const char *file) {
 
   copy_and_push_string(file);
   ret = apply_master_ob(APPLY_AUTHOR_FILE, 1);
-  if (ret == 0 || ret == (svalue_t *)-1 || ret->type != T_STRING) {
-    return 0;
+  if (ret == nullptr || ret == (svalue_t *)-1 || ret->type != T_STRING) {
+    return nullptr;
   }
   strcpy(buff, ret->u.string);
   return buff;
@@ -426,8 +426,8 @@ static const char *domain_for_file(const char *file) {
 
   share_and_push_string(file);
   ret = apply_master_ob(APPLY_DOMAIN_FILE, 1);
-  if (ret == 0 || ret == (svalue_t *)-1 || ret->type != T_STRING) {
-    return 0;
+  if (ret == nullptr || ret == (svalue_t *)-1 || ret->type != T_STRING) {
+    return nullptr;
   }
   strcpy(buff, ret->u.string);
   return buff;
@@ -549,7 +549,7 @@ static mapping_t *get_stats(const char *str, mudlib_stats_t *list) {
       tmp->ref--;
       return tmp;
     } else {
-      return 0;
+      return nullptr;
     }
   }
   m = allocate_mapping(8);

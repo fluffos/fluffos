@@ -18,11 +18,11 @@
 #include "vm/internal/compiler/lex.h"
 
 /* our globals */
-static parse_node_block_t *parse_block_list = 0;
-static parse_node_block_t *free_block_list = 0;
+static parse_node_block_t *parse_block_list = nullptr;
+static parse_node_block_t *free_block_list = nullptr;
 
-static parse_node_t *next_node = 0;
-static parse_node_t *last_node = 0;
+static parse_node_t *next_node = nullptr;
+static parse_node_t *last_node = nullptr;
 
 static int last_prog_size = 1;
 
@@ -41,9 +41,9 @@ void free_tree() {
   /* put all the blocks in the free list */
   cur_block->next = free_block_list;
   free_block_list = parse_block_list;
-  parse_block_list = 0;
-  next_node = 0;
-  last_node = 0;
+  parse_block_list = nullptr;
+  next_node = nullptr;
+  last_node = nullptr;
 }
 
 /* called when the parser cleans up */
@@ -57,7 +57,7 @@ void release_tree() {
     next_block = cur_block->next;
     FREE(cur_block);
   }
-  free_block_list = 0;
+  free_block_list = nullptr;
   last_prog_size = 1;
 }
 
@@ -245,7 +245,7 @@ parse_node_t *insert_pop_value(parse_node_t *expr) {
   parse_node_t *replacement;
 
   if (!expr) {
-    return 0;
+    return nullptr;
   }
   if (expr->type == TYPE_NOVALUE) {
     expr->type = TYPE_VOID;
@@ -357,7 +357,7 @@ parse_node_t *insert_pop_value(parse_node_t *expr) {
         case F_LOCAL:
         case F_GLOBAL:
         case F_REF:
-          return 0;
+          return nullptr;
         case F_EQ:
         case F_NE:
         case F_GT:
@@ -408,11 +408,11 @@ parse_node_t *insert_pop_value(parse_node_t *expr) {
     case NODE_PARAMETER:
     case NODE_ANON_FUNC: /* some dweeb threw away one? */
     case NODE_FUNCTION_CONSTRUCTOR:
-      return 0;
+      return nullptr;
     case NODE_NUMBER:
     case NODE_STRING:
     case NODE_REAL:
-      return 0;
+      return nullptr;
   }
   CREATE_UNARY_OP(replacement, F_POP_VALUE, 0, expr);
   return replacement;
@@ -432,7 +432,7 @@ parse_node_t *pop_value(parse_node_t *pn) {
     return ret;
   }
 
-  return 0;
+  return nullptr;
 }
 
 int is_boolean(parse_node_t *pn) {
@@ -458,7 +458,7 @@ parse_node_t *optimize_loop_test(parse_node_t *pn) {
   parse_node_t *ret;
 
   if (!pn) {
-    return 0;
+    return nullptr;
   }
 
   if (IS_NODE(pn, NODE_BINARY_OP, F_LT) && IS_NODE(pn->l.expr, NODE_OPCODE_1, F_LOCAL)) {

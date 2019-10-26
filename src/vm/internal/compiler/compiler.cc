@@ -97,7 +97,7 @@ unsigned short *prog_flags, *comp_sorted_funcs;
 char *prog_code;
 char *prog_code_max;
 
-program_t NULL_program = {0};
+program_t NULL_program = {nullptr};
 
 program_t *prog;
 
@@ -352,7 +352,7 @@ static void copy_new_function(program_t *prog, int index, program_t *defprog, in
   FUNCTION_TEMP(where)->u.func = defprog->function_table + defindex;
   FUNCTION_TEMP(where)->offset = NUM_INHERITS - 1;
   FUNCTION_TEMP(where)->function_index_offset = index;
-  FUNCTION_NEXT(where) = 0;
+  FUNCTION_NEXT(where) = nullptr;
 
   /* add the identifier */
   ihe = find_or_add_ident(defprog->function_table[defindex].funcname, FOA_GLOBAL_SCOPE);
@@ -463,11 +463,11 @@ parse_node_t *reorder_class_values(int which, parse_node_t *node) {
       DCALLOC(cd->size, sizeof(parse_node_t *), TAG_COMPILER, "reorder_class_values"));
 
   for (i = 0; i < cd->size; i++) {
-    tmp[i] = 0;
+    tmp[i] = nullptr;
   }
 
   while (node) {
-    i = lookup_class_member(which, reinterpret_cast<char *>(node->l.expr), 0);
+    i = lookup_class_member(which, reinterpret_cast<char *>(node->l.expr), nullptr);
     if (i != -1) {
       if (tmp[i]) {
         char buf[256];
@@ -489,13 +489,13 @@ parse_node_t *reorder_class_values(int which, parse_node_t *node) {
     node = node->r.expr;
   }
   i = cd->size;
-  node = 0;
+  node = nullptr;
   while (i--) {
     parse_node_t *newnode;
     if (tmp[i]) {
       CREATE_STATEMENTS(newnode, tmp[i], node);
     } else {
-      CREATE_STATEMENTS(newnode, 0, node);
+      CREATE_STATEMENTS(newnode, nullptr, node);
       CREATE_NUMBER(newnode->l.expr, 0);
     }
     node = newnode;
@@ -607,7 +607,7 @@ typedef struct ovlwarn_s {
   char *warn;
 } ovlwarn_t;
 
-ovlwarn_t *overload_warnings = 0;
+ovlwarn_t *overload_warnings = nullptr;
 
 static void remove_overload_warnings(char *func) {
   ovlwarn_t **p;
@@ -636,7 +636,7 @@ static void show_overload_warnings() {
     FREE(p);
     p = next;
   }
-  overload_warnings = 0;
+  overload_warnings = nullptr;
 }
 
 /* Overload the function index with the new definition
@@ -1027,7 +1027,7 @@ int arrange_call_inherited(char *name, parse_node_t *node) {
   int ret;
 
   if (real_name[0] == ':') {
-    super_name = 0;
+    super_name = nullptr;
     real_name += 2; /* There will be exactly two ':' */
     super_length = 0;
   } else if ((p = strchr(real_name, ':'))) {
@@ -1102,7 +1102,7 @@ int define_new_function(const char *name, int num_arg, int num_local, int flags,
   int oldindex, num, newindex;
   unsigned short argument_start_index;
   ident_hash_elem_t *ihe;
-  function_t *funp = 0;
+  function_t *funp = nullptr;
   compiler_temp_t *newfunc;
 
   oldindex = (ihe = lookup_ident(name)) ? ihe->dn.function_num : -1;
@@ -1228,11 +1228,11 @@ int define_new_function(const char *name, int num_arg, int num_local, int flags,
      * the name is the same, and the ident hash table might be counting
      * on it to stay allocated.
      */
-    if (FUNCTION_PROG(oldindex) == 0) {
+    if (FUNCTION_PROG(oldindex) == nullptr) {
       num = FUNCTION_TEMP(oldindex)->u.index;
       funp = FUNC(num);
     } else {
-      funp = 0;
+      funp = nullptr;
     }
   }
   if (!funp) {
@@ -1249,7 +1249,7 @@ int define_new_function(const char *name, int num_arg, int num_local, int flags,
     ihe->sem_value++;
     ihe->dn.function_num = newindex;
     newfunc = FUNCTION_TEMP(newindex);
-    newfunc->next = (compiler_temp_t *)NULL;
+    newfunc->next = (compiler_temp_t *)nullptr;
   } else {
     newfunc = reinterpret_cast<compiler_temp_t *>(
         DMALLOC(sizeof(compiler_temp_t), TAG_TEMPORARY, "define_new_function"));
@@ -1262,7 +1262,7 @@ int define_new_function(const char *name, int num_arg, int num_local, int flags,
     newindex = oldindex;
   }
 
-  newfunc->prog = 0;
+  newfunc->prog = nullptr;
   newfunc->u.index = num;
 
   if (exact_types) {
@@ -1566,7 +1566,7 @@ short store_prog_string(const char *str) {
 
     top = mem_block[A_STRINGS].current_size / sizeof str;
     for (freed_string++; freed_string < top; freed_string++) {
-      if (p[freed_string] == 0) {
+      if (p[freed_string] == nullptr) {
         break;
       }
     }
@@ -1628,7 +1628,7 @@ void free_prog_string(short num) {
   }
 
   free_string(str); /* important */
-  p[i] = 0;
+  p[i] = nullptr;
   if (i != top) {
     if (i < freed_string || freed_string == -1) {
       freed_string = i;
@@ -1647,7 +1647,7 @@ int validate_function_call(int f, parse_node_t *args) {
   int num_arg = (args ? args->kind : 0);
   int num_var = 0;
   parse_node_t *pn = args;
-  unsigned short *arg_types = 0;
+  unsigned short *arg_types = nullptr;
   program_t *prog;
 
   while (pn) {
@@ -1784,7 +1784,7 @@ parse_node_t *promote_to_float(parse_node_t *node) {
   expr->r.expr->l.expr = expr->r.expr;
   expr->r.expr->type = 0;
   expr->r.expr->v.expr = node;
-  expr->r.expr->r.expr = 0;
+  expr->r.expr->r.expr = nullptr;
   return expr;
 }
 
@@ -1805,7 +1805,7 @@ parse_node_t *promote_to_int(parse_node_t *node) {
   expr->r.expr->l.expr = expr->r.expr;
   expr->r.expr->type = 0;
   expr->r.expr->v.expr = node;
-  expr->r.expr->r.expr = 0;
+  expr->r.expr->r.expr = nullptr;
   return expr;
 }
 
@@ -1876,7 +1876,7 @@ parse_node_t *do_promotions(parse_node_t *node, int type) {
    side effects */
 parse_node_t *throw_away_call(parse_node_t *pn) {
   parse_node_t *enode;
-  parse_node_t *ret = 0;
+  parse_node_t *ret = nullptr;
   parse_node_t *arg;
 
   enode = pn->r.expr;
@@ -1899,7 +1899,7 @@ parse_node_t *throw_away_call(parse_node_t *pn) {
 
 parse_node_t *throw_away_mapping(parse_node_t *pn) {
   parse_node_t *enode;
-  parse_node_t *ret = 0;
+  parse_node_t *ret = nullptr;
   parse_node_t *arg;
 
   enode = pn->r.expr;
@@ -1974,7 +1974,7 @@ parse_node_t *validate_efun_call(int f, parse_node_t *args) {
     if (!num_var && def != DEFAULT_NONE && num == min_arg - 1) {
       parse_node_t *tmp;
       tmp = new_node_no_line();
-      tmp->r.expr = 0;
+      tmp->r.expr = nullptr;
       tmp->type = 0;
       args->l.expr->r.expr = tmp;
       if (def == DEFAULT_THIS_OBJECT) {
@@ -1983,7 +1983,7 @@ parse_node_t *validate_efun_call(int f, parse_node_t *args) {
         tmp->v.expr->v.number = predefs[this_efun].token;
         tmp->v.expr->l.number = 0;
         tmp->v.expr->type = TYPE_ANY;
-        tmp->v.expr->r.expr = 0;
+        tmp->v.expr->r.expr = nullptr;
       } else {
         CREATE_NUMBER(tmp->v.expr, def);
       }
@@ -2322,13 +2322,13 @@ static program_t *epilog(void) {
     /* don't print these; they can be wrong, since we didn't parse the
        entire file */
     if (pragmas & PRAGMA_WARNINGS) {
-      remove_overload_warnings(0);
+      remove_overload_warnings(nullptr);
     }
     clean_parser();
     end_new_file();
     free_string(current_file);
-    current_file = 0;
-    return 0;
+    current_file = nullptr;
+    return nullptr;
   }
 
   if (pragmas & PRAGMA_WARNINGS) {
@@ -2345,7 +2345,7 @@ static program_t *epilog(void) {
     parse_node_t *pn, *newnode;
     int fun;
     /* end the __INIT function */
-    CREATE_RETURN(pn, 0);
+    CREATE_RETURN(pn, nullptr);
     newnode = comp_trees[TREE_INIT];
     CREATE_TWO_VALUES(comp_trees[TREE_INIT], 0, newnode, pn);
     fun = define_new_function(APPLY___INIT, 0, 0, DECL_HIDDEN | FUNC_STRICT_TYPES, TYPE_VOID);
@@ -2379,8 +2379,8 @@ static program_t *epilog(void) {
     clean_parser();
     end_new_file();
     free_string(current_file);
-    current_file = 0;
-    return 0;
+    current_file = nullptr;
+    return nullptr;
   }
 
   generate_final_program(1);
@@ -2437,7 +2437,7 @@ static program_t *epilog(void) {
   }
   prog->filename = current_file;
 
-  current_file = 0;
+  current_file = nullptr;
 
   total_num_prog_blocks++;
   total_prog_block_size += size;
@@ -2497,8 +2497,8 @@ static program_t *epilog(void) {
     }
     p += align(num_func * sizeof(unsigned short));
   } else {
-    prog->argument_types = 0;
-    prog->type_start = 0;
+    prog->argument_types = nullptr;
+    prog->type_start = nullptr;
   }
 
   prog->classes = reinterpret_cast<class_def_t *>(p);
@@ -2525,7 +2525,7 @@ static program_t *epilog(void) {
     prog->inherit = reinterpret_cast<inherit_t *>(p);
     copy_in(A_INHERITS, &p);
   } else {
-    prog->inherit = 0;
+    prog->inherit = nullptr;
   }
 
   prog->apply_lookup_table = nullptr;
@@ -2596,11 +2596,11 @@ static void prolog(int f, char *name) {
     mem_block[i].max_size = START_BLOCK_SIZE;
   }
   for (i = 0; i < NUMTREES; i++) {
-    comp_trees[i] = 0;
+    comp_trees[i] = nullptr;
   }
-  prog_flags = 0;
-  func_index_map = 0;
-  comp_def_index_map = 0;
+  prog_flags = nullptr;
+  func_index_map = nullptr;
+  comp_def_index_map = nullptr;
 
   memset(string_tags, 0, sizeof(string_tags));
   freed_string = -1;
@@ -2658,7 +2658,7 @@ static void clean_parser() {
     free_string(*(reinterpret_cast<char **>(mem_block[A_VAR_NAME].block) + i));
   }
 
-  prog = 0;
+  prog = nullptr;
   for (i = 0; i < NUMAREAS; i++) {
     FREE(mem_block[i].block);
   }
@@ -2738,7 +2738,7 @@ void prepare_cases(parse_node_t *pn, int start) {
 
   if (ce_start == ce_end) {
     /* no cases */
-    pn->v.expr = 0;
+    pn->v.expr = nullptr;
     mem_block[A_CASES].current_size = start;
     return;
   }
@@ -2754,7 +2754,7 @@ void prepare_cases(parse_node_t *pn, int start) {
     if (ce + 1 == ce_end) {
       /* only a default */
       pn->v.expr = *ce;
-      (*ce)->l.expr = 0;
+      (*ce)->l.expr = nullptr;
       mem_block[A_CASES].current_size = start;
       return;
     }
@@ -2821,7 +2821,7 @@ void prepare_cases(parse_node_t *pn, int start) {
     }
     ce++;
   }
-  (*(ce_end - 1))->l.expr = 0;
+  (*(ce_end - 1))->l.expr = nullptr;
   if (direct && pn->kind == NODE_SWITCH_NUMBERS) {
     pn->kind = NODE_SWITCH_DIRECT;
   }

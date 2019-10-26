@@ -7,7 +7,7 @@
 #include "packages/core/replace_program.h"
 
 void dealloc_funp(funptr_t *fp) {
-  program_t *prog = 0;
+  program_t *prog = nullptr;
 
   switch (fp->hdr.type) {
     case FP_LOCAL | FP_NOT_BINDABLE:
@@ -106,7 +106,7 @@ funptr_t *make_efun_funp(int opcode, svalue_t *args) {
     fp->hdr.args = args->u.arr;
     args->u.arr->ref++;
   } else {
-    fp->hdr.args = 0;
+    fp->hdr.args = nullptr;
   }
 
   fp->hdr.ref = 1;
@@ -143,7 +143,7 @@ funptr_t *make_lfun_funp(int index, svalue_t *args) {
     fp->hdr.args = args->u.arr;
     args->u.arr->ref++;
   } else {
-    fp->hdr.args = 0;
+    fp->hdr.args = nullptr;
   }
 
   fp->hdr.ref = 1;
@@ -165,7 +165,7 @@ funptr_t *make_simul_funp(int index, svalue_t *args) {
     fp->hdr.args = args->u.arr;
     args->u.arr->ref++;
   } else {
-    fp->hdr.args = 0;
+    fp->hdr.args = nullptr;
   }
 
   fp->hdr.ref = 1;
@@ -204,7 +204,7 @@ funptr_t *make_functional_funp(short num_arg, short num_local, short len, svalue
     args->u.arr->ref++;
     fp->f.functional.num_arg += args->u.arr->size;
   } else {
-    fp->hdr.args = 0;
+    fp->hdr.args = nullptr;
   }
 
   fp->hdr.ref = 1;

@@ -259,7 +259,7 @@ void setup_signal_handlers() {
      * we use nonblocking socket, must ignore SIGPIPE.
      */
     if (signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
-        debug_perror("can't ignore signal SIGPIPE", 0);
+        debug_perror("can't ignore signal SIGPIPE", nullptr);
         exit(5);
     }
 }

@@ -17,7 +17,7 @@
 
 int main(int argc, char **argv) {
   int port = -1;
-  char *ipaddress = 0;
+  char *ipaddress = nullptr;
   const char *driver_name = "./driver";
   int uid = -1;
   int gid = -1;

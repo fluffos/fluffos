@@ -30,8 +30,8 @@ struct simul_entry {
   short index;
 };
 
-simul_entry *simul_names = 0;
-function_lookup_info_t *simuls = 0;
+simul_entry *simul_names = nullptr;
+function_lookup_info_t *simuls = nullptr;
 int num_simul_efun = 0;
 object_t *simul_efun_ob;
 
@@ -69,7 +69,7 @@ void init_simul_efun(const char *file) {
   }
 
   new_ob = load_object(buf, 1);
-  if (new_ob == 0) {
+  if (new_ob == nullptr) {
     fprintf(stderr, "The simul_efun file %s was not loaded.\n", buf);
     exit(-1);
   }
@@ -82,7 +82,7 @@ static void remove_simuls() {
   /* inactivate all old simul_efuns */
   for (i = 0; i < num_simul_efun; i++) {
     simuls[i].index = 0;
-    simuls[i].func = 0;
+    simuls[i].func = nullptr;
   }
   for (i = 0; i < num_simul_efun; i++) {
     if ((ihe = lookup_ident(simul_names[i].name))) {

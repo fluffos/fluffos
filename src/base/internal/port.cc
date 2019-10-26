@@ -40,7 +40,7 @@ int64_t random_number(int64_t n) {
  * of seconds since 1970.
  */
 
-long get_current_time() { return time(0l); /* Just use the old time() for now */ }
+long get_current_time() { return time(nullptr); /* Just use the old time() for now */ }
 
 const char *time_string(time_t t) {
   const char *res = ctime(&t);
@@ -56,7 +56,7 @@ const char *time_string(time_t t) {
 void get_usec_clock(long *sec, long *usec) {
   struct timeval tv;
 
-  gettimeofday(&tv, NULL);
+  gettimeofday(&tv, nullptr);
   *sec = tv.tv_sec;
   *usec = tv.tv_usec;
 }

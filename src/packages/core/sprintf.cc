@@ -174,7 +174,7 @@ typedef struct _sprintf_state {
   struct _sprintf_state *next;
 } sprintf_state_t;
 
-static sprintf_state_t *sprintf_state = NULL;
+static sprintf_state_t *sprintf_state = nullptr;
 
 static void add_space(outbuffer_t * /*outbuf*/, int indent);
 static void add_justified(const char *str, int slen, pad_info_t *pad, int fs, format_info finfo,
@@ -214,7 +214,7 @@ static void push_sprintf_state(void) {
   state = reinterpret_cast<sprintf_state_t *>(
       DMALLOC(sizeof(sprintf_state_t), TAG_TEMPORARY, "push_sprintf_state"));
   outbuf_zero(&(state->obuff));
-  state->csts = NULL;
+  state->csts = nullptr;
   state->cur_arg = -1;
   state->clean.type = T_NUMBER;
   state->clean.u.number = 0;
@@ -719,7 +719,7 @@ static int add_table(cst **table) {
                   tab->pad || (i < tab->nocols - 1) || tab->next);
 #endif
     if (done >= end - 1) {
-      tab_di = 0;
+      tab_di = nullptr;
     } else {
       tab_di += done + 1; /* inc'ed next line ... */
     }
@@ -797,7 +797,7 @@ static int get_curpos() {
 static pad_info_t *make_pad(pad_info_t *p) {
   pad_info_t *x;
   if (p->len == 0) {
-    return 0;
+    return nullptr;
   }
   x = reinterpret_cast<pad_info_t *>(DMALLOC(sizeof(pad_info_t), TAG_TEMPORARY, "make_pad"));
   x->what = p->what;
@@ -862,13 +862,13 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
                 (*temp)->d.col++;
               }
             }
-            add_pad(0, (*temp)->start - get_curpos());
+            add_pad(nullptr, (*temp)->start - get_curpos());
             column_stat = add_column(temp, 0);
             if (!column_stat) {
               temp = &((*temp)->next);
             }
           } else {
-            add_pad(0, (*temp)->start - get_curpos());
+            add_pad(nullptr, (*temp)->start - get_curpos());
             if (!add_table(temp)) {
               temp = &((*temp)->next);
             }
@@ -1117,7 +1117,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
               }
               *temp =
                   reinterpret_cast<cst *>(DMALLOC(sizeof(cst), TAG_TEMPORARY, "string_print: 3"));
-              (*temp)->next = 0;
+              (*temp)->next = nullptr;
               (*temp)->d.col = carg->u.string;
               (*temp)->pad = make_pad(&pad);
               (*temp)->size = fs;
@@ -1141,11 +1141,11 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
 #define TABLE carg->u.string
               (*temp) =
                   reinterpret_cast<cst *>(DMALLOC(sizeof(cst), TAG_TEMPORARY, "string_print: 4"));
-              (*temp)->d.tab = 0;
+              (*temp)->d.tab = nullptr;
               (*temp)->pad = make_pad(&pad);
               (*temp)->info = finfo;
               (*temp)->start = get_curpos();
-              (*temp)->next = 0;
+              (*temp)->next = nullptr;
               max_len = 0;
               n = 1;
 
@@ -1378,7 +1378,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
 
   outbuf_fix(&sprintf_state->obuff);
   retvalue = sprintf_state->obuff.buffer;
-  sprintf_state->obuff.buffer = 0;
+  sprintf_state->obuff.buffer = nullptr;
   pop_stack(); /* pop off our error handler, will call pop_sprintf_state */
   return retvalue;
 } /* end of string_print_formatted() */

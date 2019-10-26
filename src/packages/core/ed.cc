@@ -587,7 +587,7 @@ static void free_ed_buffer(object_t *who) {
       FREE((char *)P_OLDPAT);
     }
     FREE((char *)ED_BUFFER);
-    who->interactive->ed_buffer = 0;
+    who->interactive->ed_buffer = nullptr;
     set_prompt("> ");
 
     /* make this "safe" */
@@ -603,7 +603,7 @@ static void free_ed_buffer(object_t *who) {
   }
 #ifdef OLD_ED
   FREE((char *)ED_BUFFER);
-  who->interactive->ed_buffer = 0;
+  who->interactive->ed_buffer = nullptr;
   set_prompt("> ");
 #else
   object_free_ed_buffer();
@@ -719,7 +719,7 @@ static int doread(int lin, const char *fname) {
   if (P_VERBOSE) {
     ED_OUTPUTV(ED_DEST, "\"%s\" ", fname);
   }
-  if ((fp = fopen(fname, "r")) == NULL) {
+  if ((fp = fopen(fname, "r")) == nullptr) {
     ED_OUTPUT(ED_DEST, " isn't readable.\n");
     return EDERR;
   }
@@ -779,7 +779,7 @@ static int dowrite(int from, int to, const char *fname, int apflg) {
   if (!P_RESTRICT) {
     ED_OUTPUTV(ED_DEST, "\"/%s\" ", fname);
   }
-  if ((fp = fopen(fname, (apflg ? "a" : "w"))) == NULL) {
+  if ((fp = fopen(fname, (apflg ? "a" : "w"))) == nullptr) {
     if (!P_RESTRICT) {
       ED_OUTPUT(ED_DEST, " can't be opened for writing!\n");
     } else {
@@ -872,14 +872,14 @@ static char *getfn(int writeflg) {
   }
   if (strlen(file) == 0) {
     ED_OUTPUT(ED_DEST, "Bad file name.\n");
-    return (0);
+    return (nullptr);
   }
 
   if (file[0] != '/') {
     copy_and_push_string(file);
     ret = apply_master_ob(APPLY_MAKE_PATH_ABSOLUTE, 1);
-    if ((ret == 0) || (ret == (svalue_t *)-1) || ret->type != T_STRING) {
-      return NULL;
+    if ((ret == nullptr) || (ret == (svalue_t *)-1) || ret->type != T_STRING) {
+      return nullptr;
     }
     strncpy(file, ret->u.string, sizeof file - 1);
     file[MAXFNAME - 1] = '\0';
@@ -888,14 +888,14 @@ static char *getfn(int writeflg) {
   /* valid_read/valid_write done here */
   file2 = check_valid_path(file, current_editor, "ed_start", writeflg);
   if (!file2) {
-    return (NULL);
+    return (nullptr);
   }
   strncpy(file, file2, MAXFNAME - 1);
   file[MAXFNAME - 1] = 0;
 
   if (*file == 0) {
     ED_OUTPUT(ED_DEST, "no file name\n");
-    return (NULL);
+    return (nullptr);
   }
   return (file);
 } /* getfn */
@@ -1122,7 +1122,7 @@ static int ins(const char *str) {
     /* cp now points to end of first or only line */
 
     if ((newl = reinterpret_cast<ed_line_t *>(
-             DMALLOC(sizeof(ed_line_t) + len, TAG_ED, "ins: new"))) == NULL) {
+             DMALLOC(sizeof(ed_line_t) + len, TAG_ED, "ins: new"))) == nullptr) {
       return (MEM_FAIL); /* no memory */
     }
 
@@ -2027,7 +2027,7 @@ static int docmd(int glob) {
         return SYNTAX_ERROR;
       }
 
-      if ((fptr = getfn(0)) == NULL) {
+      if ((fptr = getfn(0)) == nullptr) {
         return FILE_NAME_ERROR;
       }
 
@@ -2055,7 +2055,7 @@ static int docmd(int glob) {
       if (P_NOFNAME) {
         ED_OUTPUTV(ED_DEST, "/%s\n", P_FNAME);
       } else {
-        if (fptr == NULL) {
+        if (fptr == nullptr) {
           return FILE_NAME_ERROR;
         }
         strcpy(P_FNAME, fptr);
@@ -2211,7 +2211,7 @@ static int docmd(int glob) {
         return SYNTAX_ERROR;
       }
 
-      if ((fptr = getfn(0)) == NULL) {
+      if ((fptr = getfn(0)) == nullptr) {
         return FILE_NAME_ERROR;
       }
 
@@ -2226,7 +2226,7 @@ static int docmd(int glob) {
         return (set());
       }
       Skip_White_Space;
-      if ((subpat = optpat()) == NULL) {
+      if ((subpat = optpat()) == nullptr) {
         return SUB_BAD_PATTERN;
       }
       if ((gflag = getrhs(rhs)) < 0) {
@@ -2275,7 +2275,7 @@ static int docmd(int glob) {
         return SYNTAX_ERROR;
       }
 
-      if ((fptr = getfn(1)) == NULL) {
+      if ((fptr = getfn(1)) == nullptr) {
         return FILE_NAME_ERROR;
       }
 
@@ -2290,7 +2290,7 @@ static int docmd(int glob) {
 
     case 'x':
       if (*inptr == NL && P_NLINES == 0 && !glob) {
-        if ((fptr = getfn(1)) == NULL) {
+        if ((fptr = getfn(1)) == nullptr) {
           return FILE_NAME_ERROR;
         }
         if (dowrite(1, P_LASTLN, fptr, 0) >= 0) {
@@ -2488,13 +2488,13 @@ void ed_start(const char *file_arg, const char *write_fn, const char *exit_fn, i
     ED_BUFFER->write_fn = alloc_cstring(write_fn, "ed_start");
     exit_ob->ref++;
   } else {
-    ED_BUFFER->write_fn = 0;
+    ED_BUFFER->write_fn = nullptr;
   }
   if (exit_fn) {
     ED_BUFFER->exit_fn = alloc_cstring(exit_fn, "ed_start");
     exit_ob->ref++;
   } else {
-    ED_BUFFER->exit_fn = 0;
+    ED_BUFFER->exit_fn = nullptr;
   }
   ED_BUFFER->exit_ob = exit_ob;
   if (scroll_lines) {
@@ -3053,7 +3053,7 @@ that help is desired for. \n",
 
         curp = P_HELPOUT = reinterpret_cast<struct strlst *>(
             DMALLOC(sizeof(struct strlst), TAG_TEMPORARY, "ed: help"));
-        curp->next = 0;
+        curp->next = nullptr;
 
         brkpt = outstr;
 
@@ -3079,7 +3079,7 @@ that help is desired for. \n",
                   DMALLOC(sizeof(char) * (strlen(outstr) + 1), TAG_TEMPORARY, "ed: help"));
               strcpy(curp->screen, outstr);
 
-              curp->next = 0;
+              curp->next = nullptr;
 
               if (tmpc != '\0') {
                 *(brkpt + 1) = tmpc;
@@ -3320,13 +3320,13 @@ void f_ed(void) {
 
   if (!st_num_arg) {
     /* ed() */
-    ed_start(0, 0, 0, 0, 0, 0);
+    ed_start(nullptr, nullptr, nullptr, 0, nullptr, 0);
   } else if (st_num_arg == 1) {
     /* ed(fname) */
     if (!(sp->type == T_STRING)) {
       bad_argument(sp, T_STRING, 1, F_ED);
     }
-    ed_start(sp->u.string, 0, 0, 0, 0, 0);
+    ed_start(sp->u.string, nullptr, nullptr, 0, nullptr, 0);
     pop_stack();
   } else if (st_num_arg == 2) {
     /* ed(fname,exitfn) / ed(fname, scroll_lines) */
@@ -3335,9 +3335,9 @@ void f_ed(void) {
     }
 
     if (sp->type == T_STRING) {
-      ed_start((sp - 1)->u.string, 0, sp->u.string, 0, current_object, 0);
+      ed_start((sp - 1)->u.string, nullptr, sp->u.string, 0, current_object, 0);
     } else if (sp->type == T_NUMBER) {
-      ed_start((sp - 1)->u.string, 0, 0, 0, 0, sp->u.number);
+      ed_start((sp - 1)->u.string, nullptr, nullptr, 0, nullptr, sp->u.number);
     } else {
       bad_argument(sp, T_NUMBER | T_STRING, 2, F_ED);
     }
@@ -3354,9 +3354,9 @@ void f_ed(void) {
 
     if (sp->type == T_NUMBER) {
       if (sp->u.number == 1) {
-        ed_start((sp - 2)->u.string, 0, (sp - 1)->u.string, sp->u.number, current_object, 0);
+        ed_start((sp - 2)->u.string, nullptr, (sp - 1)->u.string, sp->u.number, current_object, 0);
       } else {
-        ed_start((sp - 2)->u.string, 0, (sp - 1)->u.string, 0, current_object, sp->u.number);
+        ed_start((sp - 2)->u.string, nullptr, (sp - 1)->u.string, 0, current_object, sp->u.number);
       }
     } else if (sp->type == T_STRING) {
       ed_start((sp - 2)->u.string, (sp - 1)->u.string, sp->u.string, 0, current_object, 0);
@@ -3495,7 +3495,7 @@ void f_ed_start(void) {
 #ifdef F_IN_EDIT
 void f_in_edit(void) {
   char *fn;
-  ed_buffer_t *eb = 0;
+  ed_buffer_t *eb = nullptr;
 
 #ifdef OLD_ED
   if (sp->u.ob->interactive) {
