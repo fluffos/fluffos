@@ -264,7 +264,7 @@ void look_for_objects_to_swap() {
    */
   next_ob = obj_list;
   last_good_ob = obj_list;
-  while (1) {
+  while (true) {
     while ((ob = (object_t *)next_ob)) {
       int ready_for_clean_up = 0;
 

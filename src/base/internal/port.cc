@@ -18,13 +18,13 @@
 
 // Returns a pseudo-random number in the range 0 .. n-1
 int64_t random_number(int64_t n) {
-  static bool called = 0;
+  static bool called = false;
   static std::mt19937_64 engine;
 
   if (!called) {
     std::random_device rd;
     engine.seed(rd());
-    called = 1;
+    called = true;
   }
 
   std::uniform_int_distribution<int64_t> dist(0, n - 1);

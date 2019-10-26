@@ -1095,7 +1095,7 @@ static int get_array_block(char *term) {
   curchunk = 0;
   res = 0;
 
-  while (1) {
+  while (true) {
     while (((c = *yyp++) != '\n') && (c != LEX_EOF)) {
       NEWCHUNK(array_line);
       if (c == '"' || c == '\\') {
@@ -1236,7 +1236,7 @@ static int get_text_block(char *term) {
   curchunk = 0;
   res = 0;
 
-  while (1) {
+  while (true) {
     while (((c = *yyp++) != '\n') && (c != LEX_EOF)) {
       NEWCHUNK(text_line);
       if (c == '"' || c == '\\') {
@@ -3937,7 +3937,7 @@ void set_inc_list(char *list) {
   }
   size = 1;
   p = list;
-  while (1) {
+  while (true) {
     p = strchr(p, ':');
     if (!p) {
       break;

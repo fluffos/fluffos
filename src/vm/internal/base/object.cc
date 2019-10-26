@@ -629,7 +629,7 @@ static int restore_mapping(char **str, svalue_t *sv) {
   a = m->table;                    /* we'll leak */
   mask = m->table_size;
 
-  while (1) {
+  while (true) {
     switch (c = *cp++) {
       case '"': {
         *str = cp;

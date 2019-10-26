@@ -96,7 +96,7 @@ pthread_mutex_t work_mut;
 int thread_started = 0;
 
 void *thread_func(void *mydata) {
-  while (1) {
+  while (true) {
     pthread_mutex_lock(&mut);
     while (todo) {
       pthread_mutex_lock(&work_mut);
