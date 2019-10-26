@@ -1136,8 +1136,8 @@ array_t *builtin_sort_array(array_t *inlist, int dir) {
 }
 
 static int builtin_sort_array_cmp_fwd(const void *vp1, const void *vp2) {
-  svalue_t *p1 = (svalue_t *)vp1;
-  svalue_t *p2 = (svalue_t *)vp2;
+  auto *p1 = (svalue_t *)vp1;
+  auto *p2 = (svalue_t *)vp2;
   switch (p1->type | p2->type) {
     case T_STRING: {
       return strcmp(p1->u.string, p2->u.string);
@@ -1189,8 +1189,8 @@ static int builtin_sort_array_cmp_rev(const void *vp1, const void *vp2) {
 }
 
 static int sort_array_cmp(const void *vp1, const void *vp2) {
-  svalue_t *p1 = (svalue_t *)vp1;
-  svalue_t *p2 = (svalue_t *)vp2;
+  auto *p1 = (svalue_t *)vp1;
+  auto *p2 = (svalue_t *)vp2;
   svalue_t *d;
 
   push_svalue(p1);
