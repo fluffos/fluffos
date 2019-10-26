@@ -1098,7 +1098,7 @@ void optimize_icode(char *start, char *pc, char *end) {
           tmp = pc + sarg;
         }
         sarg = 0;
-        while (1) {
+        while (true) {
           if (EXTRACT_UCHAR(tmp) == F_BRANCH) {
             COPY_SHORT(&sarg, tmp + 1);
             tmp += sarg + 1;
@@ -1139,7 +1139,7 @@ void optimize_icode(char *start, char *pc, char *end) {
         COPY_SHORT(&sarg, pc);
         tmp = pc + sarg;
         sarg = 0;
-        while (1) {
+        while (true) {
           if (EXTRACT_UCHAR(tmp) == F_BRANCH) {
             COPY_SHORT(&sarg, tmp + 1);
             tmp += sarg + 1;

@@ -466,7 +466,7 @@ void implode_array(funptr_t *fptr, array_t *arr, svalue_t *dest, int first_on_st
     push_svalue(&arr->item[i++]);
   }
 
-  while (1) {
+  while (true) {
     push_svalue(&arr->item[i++]);
     v = call_function_pointer(fptr, 2);
     if (!v) {
