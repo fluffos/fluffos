@@ -229,6 +229,7 @@ void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
   master = master_ob;
   add_ref(master_ob, "new_user");
   push_number(user->local_port);
+  set_eval(max_cost);
   ret = safe_apply_master_ob(APPLY_CONNECT, 1);
   /* master_ob->interactive can be zero if the master object self
    destructed in the above (don't ask) */
