@@ -138,22 +138,38 @@ const char *dump_trace(int how) {
         if (i) {
           debug_message(", ");
         }
-        outbuf_zero(&outbuf);
-        svalue_to_string(&trace_fp[i], &outbuf, 0, 0, 0);
-        /* don't need to fix length here */
-        debug_message("{}", outbuf.buffer);
-        FREE_MSTR(outbuf.buffer);
-      }
-      debug_message("]\n");
-    }
-    if (num_local > 0 && num_arg != -1) {
-      struct svalue_t *ptr = trace_fp + num_arg;
-      debug_message("locals: [");
-      for (i = 0; i < num_local; i++) {
-        outbuffer_t outbuf;
+        if (num_arg > 0) {
+            debug_message("arguments: [");
+            for (i = 0; i < num_arg; i++) {
+                outbuffer_t outbuf;
 
-        if (i) {
-          debug_message(", ");
+                if (i) {
+                    debug_message(", ");
+                }
+                outbuf_zero(&outbuf);
+                svalue_to_string(&trace_fp[i], &outbuf, 0, 0, 0);
+                /* don't need to fix length here */
+                debug_message("{}", outbuf.buffer);
+                FREE_MSTR(outbuf.buffer);
+            }
+            debug_message("]\n");
+        }
+        if (num_local > 0 && num_arg != -1) {
+            struct svalue_t * ptr = trace_fp + num_arg;
+            debug_message("locals: [");
+            for (i = 0; i < num_local; i++) {
+                outbuffer_t outbuf;
+
+                if (i) {
+                    debug_message(", ");
+                }
+                outbuf_zero(&outbuf);
+                svalue_to_string(&ptr[i], &outbuf, 0, 0, 0);
+                /* no need to fix length */
+                debug_message("{}", outbuf.buffer);
+                FREE_MSTR(outbuf.buffer);
+            }
+            debug_message("]\n");
         }
         outbuf_zero(&outbuf);
         svalue_to_string(&ptr[i], &outbuf, 0, 0, 0);
