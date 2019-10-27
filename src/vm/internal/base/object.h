@@ -125,7 +125,7 @@ typedef int (*get_objectsfn_t)(object_t *, void *);
 
 #define add_ref(ob, str)                                                                        \
   SAFE(if (ob->ref++ > 0xfffffff0) {                                                            \
-    debug_message("Ref count dangerously high: %s (%d) calling from %s\n", ob->obname, ob->ref, \
+    debug_message("Ref count dangerously high: {} ({}) calling from {}\n", ob->obname, ob->ref, \
                   str);                                                                         \
   })
 

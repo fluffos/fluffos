@@ -404,8 +404,6 @@ target_link_libraries(driver PUBLIC ${ICU_LIBRARIES})
 add_subdirectory(thirdparty/backward-cpp EXCLUDE_FROM_ALL)
 add_backward(driver)
 
-<<<<<<< HEAD
-=======
 find_package(fmt 6.0.0 QUIET)
 if (USE_THIRDPARTY_FMT OR NOT fmt_FOUND)
     message(STATUS "Using supplied libfmt...")
@@ -433,7 +431,6 @@ if(STATIC)
     endif()
 endif()
 
->>>>>>> <feat>(char_p2string): added fmtlib/fmt
 # JEMALLOC
 if (CYGWIN)
   set(USE_JEMALLOC OFF)

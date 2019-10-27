@@ -15,7 +15,7 @@ mapping_t *debug_levels() {
   unsigned int i;
 
   for (i = 0; i < sizeof_levels; i++) {
-    add_mapping_pair(ret, levels[i].name, dl & levels[i].bit);
+    add_mapping_pair(ret, levels[i].name.c_str(), dl & levels[i].bit);
     dl &= ~levels[i].bit;
   }
 

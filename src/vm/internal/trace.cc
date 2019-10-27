@@ -141,7 +141,7 @@ const char *dump_trace(int how) {
         outbuf_zero(&outbuf);
         svalue_to_string(&trace_fp[i], &outbuf, 0, 0, 0);
         /* don't need to fix length here */
-        debug_message("%s", outbuf.buffer);
+        debug_message("{}", outbuf.buffer);
         FREE_MSTR(outbuf.buffer);
       }
       debug_message("]\n");

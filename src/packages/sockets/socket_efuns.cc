@@ -973,7 +973,7 @@ void socket_read_select_handler(int fd) {
       return;
 
     case STATE_UNBOUND:
-      debug_message("socket_read_select_handler: read on unbound socket %i\n", fd);
+      debug_message("socket_read_select_handler: read on unbound socket {}\n", fd);
       break;
 
     case STATE_BOUND:

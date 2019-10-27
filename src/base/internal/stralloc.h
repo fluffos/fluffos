@@ -41,9 +41,9 @@ struct outbuffer_t;
 void bp(void);
 #ifdef NOISY_STRING
 #define NDBG(x) \
-  if (strcmp(STRING(x), NOISY_STRING) == 0) debug_message("%s - %d\n", STRING(x), REFS(x)), bp()
+  if (strcmp(STRING(x), NOISY_STRING) == 0) debug_message("{} - {}\n", STRING(x), REFS(x)), bp()
 #else
-#define NDBG(x) debug_message("%s - %d\n", STRING(x), REFS(x)), bp()
+#define NDBG(x) debug_message("{} - {}\n", STRING(x), REFS(x)), bp()
 #endif
 #else
 #define NDBG(x)

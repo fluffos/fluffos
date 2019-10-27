@@ -136,8 +136,9 @@ void f_socket_connect(void) {
     }
 #ifdef DEBUG
   } else {
-    debug_message("socket_connect: socket already bound to address/port: %s/%d\n", addr, port);
-    debug_message("socket_connect: but requested to connect to: %s\n", (sp - 2)->u.string);
+    debug_message("socket_connect: socket already bound to address/port: {}/{}\n"
+            "                but requested to connect to: {}\n",
+            addr, port, (sp - 2)->u.string);
 #endif
   }
 

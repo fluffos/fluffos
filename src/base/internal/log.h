@@ -21,10 +21,17 @@
 #include <stdio.h>  // for snprintf
 #include "base/internal/options_incl.h"
 
+#include <string>
+#include <fmt/ostream.h>
+
 // Defined by simulate.cc, this belongs to driver layer.
 [[noreturn]] extern void fatal(const char *, ...);
 
-void debug_message(const char *, ...);
+void debug_message_internal(const std::string, fmt::format_args);
+template <typename... Args> void debug_message(const std::string format, Args&& ...args)
+{
+    debug_message_internal(format, fmt::make_format_args(std::forward<Args>(args)...));
+}
 
 #define SAFE(x) \
   do {          \
@@ -43,9 +50,8 @@ void debug_message(const char *, ...);
 
 extern int debug_level;
 
-void handle_debug_level(char *);
-void debug_level_set(const char *);
-void debug_level_clear(const char *);
+void debug_level_set(const std::string);
+void debug_level_clear(const std::string);
 
 #define debug(x, ...)                                                          \
   if (debug_level & DBG_##x) {                                                 \
@@ -54,33 +60,35 @@ void debug_level_clear(const char *);
     time(&_rawtime);                                                           \
     strftime(_tbuf, sizeof(_tbuf), "%Y-%m-%d %H:%M:%S", localtime(&_rawtime)); \
     snprintf(_buf, sizeof(_buf), __VA_ARGS__);                                 \
-    debug_message("[%s] %s:%d %s", _tbuf, __FILE__, __LINE__, _buf);           \
+    debug_message("[{}] {}:{} {}", _tbuf, __FILE__, __LINE__, _buf);           \
   }
 
 /* bit sets here */
-#define DBG_call_out 1
-#define DBG_addr_server 2
-#define DBG_d_flag 4
-#define DBG_connections 8
-#define DBG_mapping 16
-#define DBG_sockets 32
-#define DBG_comp_func_tab 64
-#define DBG_LPC 128
-#define DBG_LPC_line 256
-#define DBG_event 512
-#define DBG_dns 1024
-#define DBG_file 2048
-#define DBG_add_action 4096
-#define DBG_telnet 8192
+// !!! Keep in sync with levels[] in code file !!!
+#define DBG_call_out           1
+#define DBG_addr_server        2
+#define DBG_d_flag             4
+#define DBG_connections        8
+#define DBG_mapping           16
+#define DBG_sockets           32
+#define DBG_comp_func_tab     64
+#define DBG_LPC              128
+#define DBG_LPC_line         256
+#define DBG_event            512
+#define DBG_dns             1024
+#define DBG_file            2048
+#define DBG_add_action      4096
+#define DBG_telnet          8192
 
-#define DBG_DEFAULT (DBG_connections | DBG_telnet)
+// #define DBG_DEFAULT (DBG_connections | DBG_telnet)
+#define DBG_DEFAULT 65535
 
 struct debug_t {
-  const char *name;
-  int bit;
+    const std::string name;
+    unsigned bit;
 };
 
 extern const debug_t levels[];
-extern const int sizeof_levels;
+extern const size_t sizeof_levels;
 
 #endif /* SRC_BASE_LOG_H_ */

@@ -528,7 +528,7 @@ void clear_call_outs() {
     iter = g_callout_handle_map.erase(iter);
     i++;
   }
-  debug_message("clear_call_outs: %d leftover callouts cleared.\n", i);
+  debug_message("clear_call_outs: {} leftover callouts cleared.\n", i);
 }
 
 void reclaim_call_outs() {

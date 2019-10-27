@@ -2532,8 +2532,8 @@ static program_t *epilog(void) {
 
 #ifdef DEBUG
   if (p - reinterpret_cast<char *>(prog) != size) {
-    debug_message("Program size miscalculated for /%s.\n", prog->filename);
-    debug_message("is: %ld, expected: %d\n", p - reinterpret_cast<char *>(prog), size);
+    debug_message("Program size miscalculated for /{}.\n", prog->filename);
+    debug_message("is: {}, expected: {}\n", p - reinterpret_cast<char *>(prog), size);
   }
 #endif
 
@@ -2901,7 +2901,7 @@ void smart_log(const char *error_file, int line, const char *what, int flag) {
   copy_and_push_string(buff);
   mret = safe_apply_master_ob(APPLY_LOG_ERROR, 2);
   if (!mret || mret == (svalue_t *)-1) {
-    debug_message("%s", buff);
+    debug_message("{}", buff);
   }
   FREE(buff);
 } /* smart_log() */

@@ -222,7 +222,7 @@ static parse_node_t *optimize(parse_node_t *expr) {
     default:
       // This should not happen!
       // see src/testsuite/single/tests/compiler/optimize.c
-      debug_message("optimizer: unknown node kind: %d.", expr->kind);
+      debug_message("optimizer: unknown node kind: {}.", expr->kind);
       break;
   }
   return expr;

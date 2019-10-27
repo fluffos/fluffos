@@ -460,7 +460,7 @@ static void save_stat_list(const char *file, mudlib_stats_t *list) {
     return;
   }
   if (!f) {
-    debug_message("*Error: unable to open stat file %s for writing.\n", file);
+    debug_message("*Error: unable to open stat file {} for writing.\n", file);
     return;
   }
   while (list) {
@@ -494,7 +494,7 @@ static void restore_stat_list(const char *file, mudlib_stats_t **list) {
     return;
   }
   if (!f) {
-    debug_message("*Warning: unable to open stat file %s for reading.\n", file);
+    debug_message("*Warning: unable to open stat file {} for reading.\n", file);
     return;
   }
   while (fscanf(f, "%s", fname) != EOF) {

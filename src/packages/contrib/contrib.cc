@@ -1901,7 +1901,7 @@ void f_is_daylight_savings_time(void) {
 
 #ifdef F_DEBUG_MESSAGE
 void f_debug_message(void) {
-  debug_message("%s\n", sp->u.string);
+  debug_message("{}\n", sp->u.string);
   free_string_svalue(sp--);
 }
 #endif

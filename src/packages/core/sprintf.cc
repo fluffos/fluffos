@@ -1254,9 +1254,9 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
                     cheat[i - 1], sprintf_state->cur_arg);
             fprintf(stderr, "Program /%s File: %s: %s", current_prog->name,
                     get_line_number_if_any(), buff);
-            debug_message("%s", buff);
+            debug_message("{}", buff);
             if (current_object) {
-              debug_message("program: /%s, object: %s, file: %s\n",
+              debug_message("program: /{}, object: {}, file: {}\n",
                             current_prog ? current_prog->name : "", current_object->name,
                             get_line_number_if_any());
             }

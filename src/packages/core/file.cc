@@ -748,9 +748,9 @@ static int do_move(const char *from, const char *to, int flag) {
 
 void debug_perror(const char *what, const char *file) {
   if (file) {
-    debug_message("System Error: %s:%s:%s\n", what, file, strerror(errno));
+    debug_message("System Error: {}:{}:{}\n", what, file, strerror(errno));
   } else {
-    debug_message("System Error: %s:%s\n", what, strerror(errno));
+    debug_message("System Error: {}:{}\n", what, strerror(errno));
   }
 }
 

@@ -139,6 +139,11 @@
 /* Compare two number */
 #define COMPARE_NUMS(x, y) (((x) > (y) ? 1 : ((x) < (y) ? -1 : 0)))
 
+#include <iostream>                         // for cin, cout, cerr
+#include <fmt/compile.h>                    // to precompile format strings
+#include <fmt/format.h>                     // for sprintf like string formating
+#include <fmt/ostream.h>                    // for fprintf like string formating
+
 #include "base/internal/debugmalloc.h"
 #include "base/internal/md.h"
 
@@ -165,11 +170,6 @@
 #include "base/internal/strutils.h"
 
 #include "base/internal/shared_string.hh"
-
-#include <iostream>                         // for cin, cout, cerr
-#include <fmt/compile.h>                    // to precompile format strings
-#include <fmt/format.h>                     // for sprintf like string formating
-#include <fmt/ostream.h>                     // for fprintf like string formating
 
 // IWYU pragma: end_exports
 #endif  // STD_H

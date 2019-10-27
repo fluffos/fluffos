@@ -166,7 +166,7 @@ void f_replace_program(void) {
   }
 
   if (current_object->prog->func_ref) {
-    debug_message("%s: cannot replace a program with function references, ignored.\n",
+    debug_message("{}: cannot replace a program with function references, ignored.\n",
                   current_object->prog->filename);
   }
 

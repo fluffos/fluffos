@@ -274,7 +274,7 @@ void on_user_logon(interactive_t *user) {
    destructed in the above (don't ask) */
   set_command_giver(nullptr);
   if (ret == nullptr || ret == (svalue_t *)-1 || ret->type != T_OBJECT || !master_ob->interactive) {
-    debug_message("Can not accept connection from %s due to error in connect().\n",
+    debug_message("Can not accept connection from {} due to error in connect().\n",
                   sockaddr_to_string(reinterpret_cast<sockaddr *>(&user->addr), user->addrlen));
     if (master_ob->interactive) {
       remove_interactive(master_ob, 0);
@@ -311,7 +311,7 @@ void on_user_logon(interactive_t *user) {
   // Call logon() on the object.
   ret = safe_apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
   if (ret == nullptr) {
-    debug_message("new_user_handler: logon() on object %s has failed, the user is disconnected.\n",
+    debug_message("new_user_handler: logon() on object {} has failed, the user is disconnected.\n",
                   ob->obname);
     remove_interactive(ob, false);
   } else if (ob->flags & O_DESTRUCTED) {
@@ -339,7 +339,7 @@ bool init_user_conn() {
     auto fd = socket(AF_INET, SOCK_STREAM, 0);
 #endif
     if (fd == -1) {
-      debug_message("socket_create: socket error: %s.\n",
+      debug_message("socket_create: socket error: {}.\n",
                     evutil_socket_error_to_string(evutil_socket_geterror(fd)));
       return false;
     }
@@ -378,7 +378,7 @@ bool init_user_conn() {
     {
       auto zero = 0;
       if (setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, (void *)&zero, sizeof(zero)) == -1) {
-        debug_message("socket_create: setsockopt error: %s.\n",
+        debug_message("socket_create: setsockopt error: {}.\n",
                       evutil_socket_error_to_string(evutil_socket_geterror(fd)));
         evutil_closesocket(fd);
         return false;
@@ -415,18 +415,18 @@ bool init_user_conn() {
         ret = evutil_getaddrinfo(nullptr, service, &hints, &res);
       }
       if (ret) {
-        debug_message("init_user_conn: getaddrinfo error: %s \n", evutil_gai_strerror(ret));
+        debug_message("init_user_conn: getaddrinfo error: {} \n", evutil_gai_strerror(ret));
         return false;
       }
 
       if (bind(fd, res->ai_addr, res->ai_addrlen) == -1) {
-        debug_message("socket_create: bind error: %s.\n",
+        debug_message("socket_create: bind error: {}.\n",
                       evutil_socket_error_to_string(evutil_socket_geterror(fd)));
         evutil_closesocket(fd);
         evutil_freeaddrinfo(res);
         return false;
       }
-      debug_message("Accepting %s connections on %s.\n", port_kind_name(i.kind),
+      debug_message("Accepting {} connections on {}.\n", port_kind_name(i.kind),
                     sockaddr_to_string(res->ai_addr, res->ai_addrlen));
       evutil_freeaddrinfo(res);
     }
@@ -435,7 +435,7 @@ bool init_user_conn() {
         g_event_base, new_user_handler, &i,
         LEV_OPT_REUSEABLE | LEV_OPT_CLOSE_ON_FREE | LEV_OPT_CLOSE_ON_EXEC, 1024, fd);
     if (conn == nullptr) {
-      debug_message("listening failed: %s !", evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
+      debug_message("listening failed: {} !", evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
       return false;
     }
     i.ev_conn = conn;

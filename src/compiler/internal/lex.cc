@@ -854,21 +854,21 @@ void init_include_path() {
   array_t *arr = ret->u.arr;
   int size = arr->size;
 
-  if (!size) {  // empty path?
-    debug_message("got empty include path for 'master::get_include_path(%s)'\n", current_file);
-    return;  // we still have the runtime configuration
+  if(!size) {                                           // empty path?
+      debug_message("got empty include path for 'master::get_include_path({})'\n", current_file);
+      return;                                           // we still have the runtime configuration
   }
   char **path = static_cast<char **>(
       DMALLOC(sizeof(char *) * size, TAG_COMPILER, "compiler:init_include_path"));
 
   // check elements and build working copy
-  int i,                                  // index into returned array
-      j,                                  // index into dynamic path array
-      k;                                  // index into static path array
-  for (i = j = 0; i < arr->size; i++) {   // can't use size since it might change
-    if (arr->item[i].type != T_STRING) {  // wrong type of element
-      debug_message("'master::get_include_path(%s)' must return 'string *'\n", current_file);
-      goto init_include_path_cleanup;  // clean exit
+  int i,                    // index into returned array
+      j,                    // index into dynamic path array
+      k;                    // index into static path array
+  for (i = j = 0; i < arr->size; i++) {                 // can't use size since it might change
+    if (arr->item[i].type != T_STRING) {                // wrong type of element
+      debug_message("'master::get_include_path({})' must return 'string *'\n", current_file);
+      goto init_include_path_cleanup;                   // clean exit
     }
 
     const char *elem;
@@ -884,12 +884,9 @@ void init_include_path() {
       if (elem[0] == '/') {
         check = &elem[1];
       }
-      if (!legal_path(check)) {  // illegal value
-        debug_message(
-            "'master::get_include_path(%s)' returns invalid value '%s', must give paths without "
-            "any '..'\n",
-            current_file, elem);
-        goto init_include_path_cleanup;  // clean exit
+      if (!legal_path(check)) {                     // illegal value
+        debug_message("'master::get_include_path({})' returns invalid value '{}', must give paths without any '..'\n", current_file, elem);
+        goto init_include_path_cleanup;                   // clean exit
       } else {
         path[j++] = make_shared_string(elem);  // valid directory
       }
@@ -2227,7 +2224,7 @@ int yylex() {
                 }
               }
             } else if (strcmp("echo", yytext) == 0) {
-              debug_message("%s\n", sp);
+              debug_message("{}\n", sp);
             } else if (strcmp("error", yytext) == 0) {
               char buf[MAXLINE + 1];
               strcpy(buf, yytext);
@@ -3671,7 +3668,7 @@ void print_all_predefines() {
             [](defn_t *a, defn_t *b) { return strcmp(a->name, b->name) < 0; });
 
   for (auto &&item : results) {
-    debug_message("#define %s %s\n", item->name, item->exps);
+    debug_message("#define {} {}\n", item->name, item->exps);
   }
 
   results.clear();

@@ -330,8 +330,8 @@ int driver_main(int argc, char **argv) {
        * Look at flags. ignore those already been tested.
        */
       switch (argv[i][1]) {
-        case 'f': {
-          debug_message("Calling master::flag(\"%s\")...\n", argv[i] + 2);
+        case 'f':
+          debug_message("Calling master::flag(\"{}\")...\n", argv[i] + 2);
           push_constant_string(argv[i] + 2);
           auto ret = safe_apply_master_ob(APPLY_FLAG, 1);
           if (ret == (svalue_t *)-1 || ret == nullptr || MudOS_is_being_shut_down) {
@@ -346,10 +346,10 @@ int driver_main(int argc, char **argv) {
           } else {
             debug_level |= DBG_DEFAULT;
           }
-          debug_message("Debug Level: %d\n", debug_level);
+          debug_message("Debug Level: {}\n", debug_level);
           continue;
         default:
-          debug_message("Unknown flag: %s\n", argv[i]);
+          debug_message("Unknown flag: {}\n", argv[i]);
           exit(-1);
       }
     }

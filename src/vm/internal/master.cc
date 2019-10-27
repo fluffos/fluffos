@@ -114,9 +114,8 @@ void set_master(object_t *ob) {
     if (ret == 0 || ret->type != T_STRING) {
       // we didn't got the expected value?
       // emit warning and fall back to old behavior
-      debug_message(
-          "%s() in the master file does not work, using 'BACKBONE' as fallback (see %s.4)\n",
-          applies_table[APPLY_DOMAIN_FILE], applies_table[APPLY_DOMAIN_FILE]);
+      debug_message("{0}() in the master file does not work, using 'BACKBONE' as fallback (see {0}.4)\n",
+                    applies_table[APPLY_DOMAIN_FILE]);
       set_backbone_domain("BACKBONE");
     } else {
       set_backbone_domain(ret->u.string);
@@ -129,9 +128,8 @@ void set_master(object_t *ob) {
     if (ret == 0 || ret->type != T_STRING) {
       // we didn't got the expected value?
       // emit warning and fall back to old behavior
-      debug_message(
-          "%s() in the master file does not work, using 'NONAME' as fallback (see %s.4)\n",
-          applies_table[APPLY_AUTHOR_FILE], applies_table[APPLY_AUTHOR_FILE]);
+      debug_message("{0}() in the master file does not work, using 'NONAME' as fallback (see {0}.4)\n",
+                    applies_table[APPLY_AUTHOR_FILE]);
       set_master_author("NONAME");
     } else {
       set_master_author(ret->u.string);
@@ -142,13 +140,13 @@ void set_master(object_t *ob) {
   ret = apply_master_ob(APPLY_GET_ROOT_UID, 0);
   if (!ret) {
     debug_message(
-        "No function %s() in master object; possibly the mudlib doesn't want "
+        "No function {}() in master object; possibly the mudlib doesn't want "
         "PACKAGE_UIDS to be defined.\n",
         applies_table[APPLY_GET_ROOT_UID]);
     exit(-1);
   }
   if (ret->type != T_STRING) {
-    debug_message("%s() in master object does not work.\n", applies_table[APPLY_GET_ROOT_UID]);
+    debug_message("{}() in master object does not work.\n", applies_table[APPLY_GET_ROOT_UID]);
     exit(-1);
   }
   if (first_load) {
@@ -163,9 +161,8 @@ void set_master(object_t *ob) {
     if (ret == nullptr || ret->type != T_STRING) {
       // we didn't got the expected value?
       // emit warning and fall back to old behavior
-      debug_message(
-          "%s() in the master file does not work, using root_uid as fallback (see %s.4)\n",
-          applies_table[APPLY_AUTHOR_FILE], applies_table[APPLY_AUTHOR_FILE]);
+      debug_message("{0}() in the master file does not work, using root_uid as fallback (see {0}.4)\n",
+                    applies_table[APPLY_AUTHOR_FILE]);
       set_master_author(master_ob->uid->name);
     } else {
       set_master_author(ret->u.string);
@@ -173,7 +170,7 @@ void set_master(object_t *ob) {
 #endif
     ret = apply_master_ob(APPLY_GET_BACKBONE_UID, 0);
     if (ret == nullptr || ret->type != T_STRING) {
-      debug_message("%s() in the master file does not work\n",
+      debug_message("{}() in the master file does not work\n",
                     applies_table[APPLY_GET_BACKBONE_UID]);
       exit(-1);
     }
@@ -187,8 +184,8 @@ void set_master(object_t *ob) {
     if (ret == nullptr || ret->type != T_STRING) {
       // we didn't got the expected value?
       // emit warning and fall back to old behavior
-      debug_message("%s() in the master file does not work, using bb_ui as fallback (see %s.4)d\n",
-                    applies_table[APPLY_DOMAIN_FILE], applies_table[APPLY_DOMAIN_FILE]);
+      debug_message("{0}() in the master file does not work, using bb_ui as fallback (see {0}.4)d\n",
+                    applies_table[APPLY_DOMAIN_FILE]);
       set_backbone_domain(backbone_uid->name);
     } else {
       set_backbone_domain(ret->u.string);

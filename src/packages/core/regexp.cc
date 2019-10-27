@@ -942,13 +942,13 @@ static int regmatch(char *prog) {
   scan = prog;
 #ifdef DEBUG
   if (scan != (char *)NULL && regnarrate) {
-    debug_message("%s(\n", regprop(scan));
+    debug_message("{}(\n", regprop(scan));
   }
 #endif
   while (scan != (char *)nullptr) {
 #ifdef DEBUG
     if (regnarrate) {
-      debug_message("%s...\n", regprop(scan));
+      debug_message("{}...\n", regprop(scan));
     }
 #endif
     nxt = regnext(scan);

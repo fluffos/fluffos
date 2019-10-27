@@ -6,9 +6,14 @@ char *query_load_av()                                   |   std::string query_lo
 
 comm.cc:
 void add_message(struct object_t *, const char *, int)  |   void add_message(struct object_t *, const std::string)
-void add_vmessage(struct object_t *, const char *, ...) |   template <typename... Args> void add_vmessage(struct object_t *, const std::string, Args &&...)
+void add_vmessage(struct object_t *, const char *, ...) |   template <typename... Args> void add_vmessage(struct object_t *, const std::string, Args&& ...)
 
 fliconv.cc:
 struct translation *get_translator(const char *)        |   const translation get_translator(const std::string)
 char *translate(iconv_t, const char *, int, int *)      |   std::string translate(iconv_t, const std::string)
 char *translate_easy(iconv_t, const char *)             |   --- (obsolete)
+
+base/internal/log.cc:
+void debug_message(const char *, ...)                   |   template <typename... Args> void debug_message(const std::string, Args&& ...)
+void debug_level_set(const char *)                      |   void debug_level_set(const std::string)
+void debug_level_clear(const char *)                    |   void debug_level_clear(const std::string)

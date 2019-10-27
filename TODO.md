@@ -15,6 +15,12 @@
 - missing docs for efun::defer
 - missing docs for iconv-efuns
 
+## base/internal/log.cc
+- use STL container for 'debug_levels'
+
+## base/internal/log.h
+- #define debug(...) still uses char\*
+
 ## packages/contrib/contrib.cc ##
 network\_stats
 - make maximum number of ports configurable?

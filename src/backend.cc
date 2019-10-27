@@ -59,7 +59,7 @@ event_base *init_backend() {
   evthread_use_pthreads();
 #endif
   g_event_base = event_base_new();
-  debug_message("Event backend in use: %s\n", event_base_get_method(g_event_base));
+  debug_message("Event backend in use: {}\n", event_base_get_method(g_event_base));
   return g_event_base;
 }
 
@@ -187,7 +187,7 @@ void clear_tick_events() {
     }
     g_tick_queue.clear();
   }
-  debug_message("clear_tick_events: %d leftover events cleared.\n", i);
+  debug_message("clear_tick_events: {} leftover events cleared.\n", i);
 }
 
 namespace {

@@ -453,8 +453,8 @@ object_t *load_object(const char *lname, int callcreate) {
    * Check if it's a legal name.
    */
   if (!legal_path(real_name)) {
-    debug_message("Illegal pathname: /%s\n", real_name);
-    error("Illegal path name '/%s'.\n", real_name);
+    debug_message("Illegal pathname: /{}\n", real_name);
+    error("Illegal path name '/{}'.\n", real_name);
   }
 
   f = open(real_name, O_RDONLY);
@@ -464,7 +464,7 @@ object_t *load_object(const char *lname, int callcreate) {
 #endif
   if (f == -1) {
     debug_perror("compile_file", real_name);
-    error("Could not read the file '/%s'.\n", real_name);
+    error("Could not read the file '/{}'.\n", real_name);
   }
   save_command_giver(command_giver);
   prog = compile_file(f, obname);
@@ -1644,7 +1644,7 @@ void free_sentence(sentence_t *p) {
       va_start(args, fmt);
       vsnprintf(msg_buf, 2048, fmt, args);
       va_end(args);
-      debug_message("******** FATAL ERROR: %s\n", msg_buf);
+      debug_message("******** FATAL ERROR: {}\n", msg_buf);
 #ifdef DEBUG
       // make DEBUG driver directly crash, if there is debugger
       // it will catch the problem and allow debugging.
@@ -1652,11 +1652,11 @@ void free_sentence(sentence_t *p) {
 #endif
       debug_message("FluffOS driver attempting to exit gracefully.\n", msg_buf);
       if (current_file) {
-        debug_message("(occured during compilation of %s at line %d)\n", current_file,
+        debug_message("(occured during compilation of {} at line {})\n", current_file,
                       current_line);
       }
       if (current_object) {
-        debug_message("(current object was /%s)\n", current_object->obname);
+        debug_message("(current object was /{})\n", current_object->obname);
       }
 
       dump_trace(1);
@@ -1708,12 +1708,12 @@ static int num_mudlib_error = 0;
 
 static void debug_message_with_location(char *err) {
   if (current_object && current_prog) {
-    debug_message("%sprogram: /%s, object: /%s, file: %s\n", err, current_prog->filename,
+    debug_message("{}program: /{}, object: /{}, file: {}\n", err, current_prog->filename,
                   current_object->obname, get_line_number(pc, current_prog));
   } else if (current_object) {
-    debug_message("%sprogram: (none), object: /%s, file: (none)\n", err, current_object->obname);
+    debug_message("{}program: (none), object: /{}, file: (none)\n", err, current_object->obname);
   } else {
-    debug_message("%sprogram: (none), object: (none), file: (none)\n", err);
+    debug_message("{}program: (none), object: (none), file: (none)\n", err);
   }
 }
 
@@ -1766,7 +1766,7 @@ static void mudlib_error_handler(char *err, int katch) {
     debug_message_with_location(err);
     dump_trace(0);
   } else if (mret->type == T_STRING) {
-    debug_message("%s", mret->u.string);
+    debug_message("{}", mret->u.string);
   }
 }
 
@@ -1788,7 +1788,7 @@ void _error_handler(char *err) {
       if (command_giver) {
         add_vmessage(command_giver, "error when executing program in destroyed object /{}\n", object_name);
       }
-      debug_message("error when executing program in destroyed object /%s\n", object_name);
+      debug_message("error when executing program in destroyed object /{}\n", object_name);
     }
   }
   auto default_error_message = CONFIG_STR(__DEFAULT_ERROR_MESSAGE__);
@@ -1806,7 +1806,7 @@ void _error_handler(char *err) {
   if (g_current_heartbeat_obj) {
     static char hb_message[] = "FluffOS driver tells you: You have no heart beat!\n";
     set_heart_beat(g_current_heartbeat_obj, 0);
-    debug_message("Heart beat in /%s turned off.\n", g_current_heartbeat_obj->obname);
+    debug_message("Heart beat in /{} turned off.\n", g_current_heartbeat_obj->obname);
     if (g_current_heartbeat_obj->interactive) {
       add_message(g_current_heartbeat_obj, hb_message);
     }
@@ -1867,7 +1867,7 @@ void _error_handler(char *err) {
 
   if (num_error > 0) {
     /* This can happen via errors in the object_name() apply. */
-    debug_message("Error '%s' while trying to print error trace -- trace suppressed.\n", err);
+    debug_message("Error '{}' while trying to print error trace -- trace suppressed.\n", err);
     too_deep_error = max_eval_error = 0;
     if (current_error_context) {
       throw("error handler error");

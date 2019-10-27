@@ -1889,8 +1889,7 @@ void eval_instruction(char *p) {
       }
     }
     if (outoftime) {
-      debug_message("Eval interrupted: cost limit reached, limit: %ld usec.\n",
-                    current_object->obname, max_eval_cost);
+      debug_message("Eval interrupted: cost limit reached, limit: {} microsec\n", max_eval_cost);
       set_eval(max_eval_cost);
       max_eval_error = 1;
       error("Too long evaluation. Execution aborted.\n");
@@ -4671,18 +4670,18 @@ static const char *get_arg(int a, int b) {
 }
 
 int last_instructions() {
-  int i;
+    int i;
 
-  debug_message("Recent instruction trace:\n");
-  i = last;
-  do {
-    if (previous_instruction[i] != 0)
-      debug_message("%p: %3d %8s %-25s (%d)\n", previous_pc[i], previous_instruction[i],
-                    get_arg(i, (i + 1) % (sizeof previous_instruction / sizeof(int))),
-                    query_instr_name(previous_instruction[i]), stack_size[i] + 1);
-    i = (i + 1) % (sizeof previous_instruction / sizeof(int));
-  } while (i != last);
-  return last;
+    debug_message("Recent instruction trace:\n");
+    i = last;
+    do {
+        if (previous_instruction[i] != 0)
+            debug_message("{}: {:3} {:8} {:<25} ({})\n", previous_pc[i], previous_instruction[i],
+                          get_arg(i, (i + 1) % (sizeof previous_instruction / sizeof(int))),
+                          query_instr_name(previous_instruction[i]), stack_size[i] + 1);
+        i = (i + 1) % (sizeof previous_instruction / sizeof(int));
+    } while (i != last);
+    return last;
 }
 
 /* Generate a debug message to the user */
@@ -4696,7 +4695,7 @@ void do_trace(const char *msg, const char *fname, const char *post) {
                 ? (current_object && current_object->obname ? current_object->obname : "??")
                 : "";
   //add_vmessage(command_giver, "*** {d} {*s} {s} {s} {s}{s}", tracedepth, tracedepth, "", msg, objname, fname, post);
-  add_vmessage(command_giver, "*** {} {*} {} {} {}{}", tracedepth, tracedepth, "", msg, objname, fname, post);
+  add_vmessage(command_giver, "*** {} {:{}} {} {} {}{}", tracedepth, "", tracedepth, msg, objname, fname, post);
 }
 
 /*

@@ -53,7 +53,7 @@ void preload_objects() {
       continue;
     }
     push_svalue(&prefiles->item[i]);
-    debug_message("%s...\n", prefiles->item[i].u.string);
+    debug_message("{}...\n", prefiles->item[i].u.string);
     set_eval(max_eval_cost);
     safe_apply_master_ob(APPLY_PRELOAD, 1);
   }
@@ -87,7 +87,7 @@ void vm_start() {
     init_simul_efun(CONFIG_STR(__SIMUL_EFUN_FILE__));
     init_master(CONFIG_STR(__MASTER_FILE__));
   } catch (const char *e) {
-    debug_message("The simul_efun (%s) and master (%s) objects must be loadable.\n",
+    debug_message("The simul_efun ({}) and master ({}) objects must be loadable.\n",
                   CONFIG_STR(__SIMUL_EFUN_FILE__), CONFIG_STR(__MASTER_FILE__));
     debug_message("Please check log files for exact error. \n");
     restore_context(&econ);
