@@ -194,16 +194,6 @@ include_directories("${CMAKE_CURRENT_BINARY_DIR}/thirdparty/libwebsockets")
 
 INCLUDE(CheckIncludeFileCXX)
 
-# Boost libraries
-# boost improves several stl classes as well as has an improved assert
-# handling
-
-find_package(Boost 1.55.0 REQUIRED)
-target_include_directories(common INTERFACE ${Boost_INCLUDE_DIRS})
-target_link_libraries(common INTERFACE ${Boost_LIBRARIES})
-
-# end of boost libraries
-
 # Configuration phase
 
 INCLUDE (CheckIncludeFileCXX)
@@ -396,6 +386,10 @@ endif ()
 
 target_link_libraries(driver PRIVATE ${LIBWEBSOCKETS_LIBRARIES_STATIC})
 # Third party libraries
+
+add_subdirectory(thirdparty/filesystem EXCLUDE_FROM_ALL)
+include_directories(thirdparty/filesystem/include)
+
 add_subdirectory(thirdparty/libtelnet EXCLUDE_FROM_ALL)
 target_link_libraries(driver PUBLIC libtelnet)
 
@@ -403,6 +397,17 @@ target_link_libraries(driver PUBLIC ${ICU_LIBRARIES})
 
 add_subdirectory(thirdparty/backward-cpp EXCLUDE_FROM_ALL)
 add_backward(driver)
+
+# Boost libraries
+# boost improves several stl classes as well as has an improved assert
+# handling
+
+find_package(Boost 1.55.0 REQUIRED)
+include_directories(driver INTERFACE ${Boost_INCLUDE_DIRS})
+
+# end of boost libraries
+
+# Third party libraries
 
 find_package(fmt 6.0.0 QUIET)
 if (USE_THIRDPARTY_FMT OR NOT fmt_FOUND)
@@ -412,9 +417,6 @@ else()
     message(STATUS "Using installed libfmt (${fmt_VERSION})...")
 endif()
 target_link_libraries(driver PUBLIC fmt)
-
-# Compiler definitions
-target_link_libraries(driver PUBLIC common)
 
 # Link statictly
 if(STATIC)
