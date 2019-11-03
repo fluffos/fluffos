@@ -1,0 +1,10 @@
+The testsuite is intended to be usedwith following locale settings:
+
+LANG=C
+LC_ALL=C
+
+e.g. for bourne shell and compatible:
+
+LANG=C LC_ALL=C ../target/debug/fluffos etc/config.test
+
+usage of other settings might fail one or more of the supplied tests.
