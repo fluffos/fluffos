@@ -10,12 +10,14 @@
 
 #include <event2/util.h>
 
-#define PORT_UNDEFINED 0
-#define PORT_TELNET 1
-#define PORT_BINARY 2
-#define PORT_ASCII 3
-#define PORT_MUD 4
-#define PORT_WEBSOCKET 5
+#define EXTERNAL_PORT_SIZE  5
+
+#define PORT_UNDEFINED      0
+#define PORT_TELNET         1
+#define PORT_BINARY         2
+#define PORT_ASCII          3
+#define PORT_MUD            4
+#define PORT_WEBSOCKET      5
 
 struct port_def_t {
   int kind;
@@ -49,6 +51,6 @@ static inline const char* port_kind_name(int kind) {
   }
 }
 
-extern port_def_t external_port[5];
+extern port_def_t external_port[EXTERNAL_PORT_SIZE];
 
 #endif /* BASE_INTERNAL_EXTERNAL_PORT_H_ */

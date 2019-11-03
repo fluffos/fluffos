@@ -7,4 +7,4 @@
 
 #include "base/internal/external_port.h"
 
-port_def_t external_port[5];
+port_def_t external_port[EXTERNAL_PORT_SIZE];
