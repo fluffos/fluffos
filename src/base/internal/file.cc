@@ -5,16 +5,26 @@
  *      Author: sunyc
  */
 
+#include "base/internal/file.h"
+
 #include <cstring>
 #include <cstdlib>
 
 /*
  * Check that it is an legal path. No '..' are allowed.
  */
-int legal_path(const char *path) {
-  const char *p;
+/**
+ * @brief Check that it is an legal path. No '..' are allowed.
+ *
+ * @param path
+ *
+ * @return 1 if true, 0 otherwise
+ */
+int legal_path(const std::string path) {
+    size_t i = 0;
+    size_t s = path.size();
 
-  if (path == nullptr) {
+  if (s == 0) {
     return 0;
   }
   if (path[0] == '/') {
@@ -24,25 +34,24 @@ int legal_path(const char *path) {
    * disallowing # seems the easiest way to solve a bug involving loading
    * files containing that character
    */
-  if (strchr(path, '#')) {
+  if (path.find('#') != std::string::npos) {
     return 0;
   }
-  p = path;
-  while (p) { /* Zak, 930530 - do better checking */
-    if (p[0] == '.') {
-      if (p[1] == '\0') { /* trailing `.' ok */
+  while (i < s) {
+    if (path[i] == '.') {
+      if ((i + 1) == s) { /* trailing `.' ok */
         break;
       }
-      if (p[1] == '.') { /* check for `..' or `../' */
-        p++;
+      if (path[i+1] == '.') { /* check for `..' or `../' */
+        i++;
       }
-      if (p[1] == '/' || p[1] == '\0') {
+      if (((i + 1) == s) || (path[i + 1] == '/')) {
         return 0; /* check for `./', `..', or `../' */
       }
     }
-    p = const_cast<char *>(strstr(p, "/.")); /* search next component */
-    if (p) {
-      p++; /* step over `/' */
+    i = path.find("/.", i); /* search next component */
+    if (i != std::string::npos) {
+      i++; /* step over `/' */
     }
   }
   return 1;
