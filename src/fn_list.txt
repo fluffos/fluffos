@@ -16,6 +16,9 @@ char *translate_easy(iconv_t, const char *)             |   --- (obsolete)
 base/internal/file.cc:
 int legal_path(const char*)                             |   int legal_path(const std::string)
 
+base/internal/file.cc:
+unsigned int whashstr(const char *)                     |   unsigned long whashstr(const std::string)
+
 base/internal/log.cc:
 void debug_message(const char *, ...)                   |   template <typename... Args> void debug_message(const std::string, Args&& ...)
 void debug_level_set(const char *)                      |   void debug_level_set(const std::string)
