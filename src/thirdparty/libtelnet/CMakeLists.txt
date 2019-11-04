@@ -7,11 +7,6 @@ project(libtelnet
 set(PROJECT_DESCRIPTION "TELNET protocol handling library")
 set(PROJECT_HOMEPAGE_URL https://github.com/seanmiddleditch/libtelne)
 
-# Enable CMAKE Policy
-if(${CMAKE_VERSION} VERSION_LESS 3.10)
-    cmake_policy(VERSION ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION})
-endif()
-
 if (MSVC)
     add_definitions(-D_SCL_SECURE_NO_WARNINGS -D_CRT_SECURE_NO_WARNINGS)
     if (LIBTELNET_STRICT)

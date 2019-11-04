@@ -1,12 +1,12 @@
 # only process documented members in our main header
 EXTRACT_ALL=no
-INPUT=@CMAKE_SOURCE_DIR@/libtelnet.h
+INPUT=@CMAKE_CURRENT_SOURCE_DIR@/../libtelnet.h
 
 # libtelnet is all C
 OPTIMIZE_OUTPUT_FOR_C=yes
 
 # put all output into the doc directory
-OUTPUT_DIRECTORY=@CMAKE_BINARY_DIR@/doc
+OUTPUT_DIRECTORY=@CMAKE_CURRENT_BINARY_DIR@
 
 # generate HTML and man pages only
 GENERATE_LATEX=no
