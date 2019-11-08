@@ -263,6 +263,7 @@ void setup_signal_handlers() {
     exit(5);
   }
 }
+
 extern "C" {
 int driver_main(int argc, char **argv);
 }
