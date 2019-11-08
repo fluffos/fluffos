@@ -10,7 +10,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: ["macOS-10.14"]
+        os: ["macOS-latest"]
 
     runs-on: ${{ matrix.os }}
 
