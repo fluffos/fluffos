@@ -17,12 +17,8 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Install packages
-      run: brew install rustup cmake pkg-config mysql pcre libgcrypt libevent openssl
-    - name: Install rust
-      run: rustup-init -y
+      run: brew install cmake pkg-config mysql pcre libgcrypt libevent openssl jemalloc
     - name: compile
-      run: source $HOME/.cargo/env && OPENSSL_ROOT_DIR="/usr/local/opt/openssl" cargo build -vv
-    - name: test
-      run: source $HOME/.cargo/env && cargo test -vv
+      run: mkdir build && cd build && OPENSSL_ROOT_DIR="/usr/local/opt/openssl" cmake .. && make install && cd ..
     - name: testsuite
-      run: cd testsuite && ../target/debug/fluffos etc/config.test -ftest
+      run: cd testsuite && ../build/bin/driver etc/config.test -ftest

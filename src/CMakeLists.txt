@@ -226,6 +226,7 @@ set(SRC
         "backend.cc"
         "comm.cc"
         "fliconv.cc"
+        "main.cc"
         "mainlib.cc"
         "user.cc"
         "net/telnet.cc"
@@ -282,7 +283,7 @@ add_library(autogen  ${GENERATED_HEADERS} ${GENERATRED_SOURCE}
   ${GENERATRED_GRAMMAR_FILES})
 add_dependencies(autogen make_options_defs)
 
-add_library(driver SHARED
+add_executable(driver
         ${SRC} ${SRC_HEADER}
         )
 
@@ -297,16 +298,21 @@ foreach(PACKAGE ${FLUFFOS_PACKAGES})
 endforeach()
 
 # Third party libraries
-add_subdirectory(thirdparty/libtelnet)
+add_subdirectory(thirdparty/libtelnet EXCLUDE_FROM_ALL)
 target_link_libraries(driver PUBLIC libtelnet)
 
 # Link statictly
 if(STATIC)
     if(WIN32)
         # TODO
+        message(FATAL_ERROR "Build staticly on Windows is not currently supported")
     else()
-        # target_link_options only avaiable at cmake 3.13.3
-        target_link_libraries(driver PUBLIC "-static-libgcc -static-libstdc++ -Wl,-Bstatic")
+        if(APPLE)
+            message(FATAL_ERROR "Build staticly on OSX is not supported")
+        else()
+            # target_link_options only avaiable at cmake 3.13.3
+            target_link_libraries(driver PUBLIC "-static-libgcc -static-libstdc++ -Wl,-Bstatic")
+        endif()
     endif()
 endif()
 
@@ -347,5 +353,5 @@ print_target_properties(driver)
 
 add_executable(portbind "portbind.cc")
 
-install (TARGETS driver
-  LIBRARY DESTINATION lib)
+install (TARGETS driver portbind
+  RUNTIME DESTINATION bin)
