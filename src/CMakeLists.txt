@@ -2,6 +2,7 @@
 option(MARCH_NATIVE "use march=native for GCC" ON)
 option(STATIC "Build static version of driver" OFF)
 option(USE_JEMALLOC "Build driver with jemalloc support" ON)
+option(ENABLE_SANITIZER "Build driver with sanitizer support" OFF)
 option(PACKAGE_ASYNC "async package" ON)
 option(PACKAGE_COMPRESS "compress package" ON)
 set("SAVE_GZ_EXTENSION" ".o.gz")
@@ -100,6 +101,14 @@ add_compile_options(
   # Less undefined behavior
   "-funsigned-char"
   "-fwrapv")
+
+# Sanitizer support
+if (ENABLE_SANITIZER)
+    add_compile_options(
+            "-fsanitize=address,undefined"
+            "-U_FORTIFY_SOURCE")
+    add_link_options("-fsanitize=address,undefined")
+endif()
 
 # IPO??
 include(CheckIPOSupported)
