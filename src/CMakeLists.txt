@@ -51,34 +51,47 @@ add_compile_options(
   "-D_GNU_SOURCE"
   # strict aliasing is bad!
   "-fno-strict-aliasing"
-  # safety features
-  "-D_FORTIFY_SOURCE=2"
   "-D_GLIBCXX_ASSERTIONS"
 )
+
+# Sanitizer support
+if (ENABLE_SANITIZER)
+    add_compile_options("-fsanitize=address,undefined")
+    # add_linker_options is only avaiable cmake 3.13
+    set(CMAKE_EXE_LINKER_FLAGS "-fsanitize=address,undefined")
+else()
+    add_compile_options(
+            "-D_FORTIFY_SOURCE=2"
+    )
+endif()
+
+if(MARCH_NATIVE)
+    add_compile_options("-march=native")
+    add_compile_options("-mtune=native")
+endif()
 
 if (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
   add_compile_options(
     "-O3"
     "-funroll-loops"
-    "-fstack-protector-strong"
     "-DNDEBUG"
     )
-  if(MARCH_NATIVE)
-    add_compile_options("-march=native")
-    add_compile_options("-mtune=native")
+  if (NOT ENABLE_SANITIZER)
+      add_compile_options(
+        "-fstack-protector-strong"
+      )
   endif()
 else()
   add_compile_options(
     "-Og"
-    "-fstack-protector-all"
-    "-Wstack-protector"
-    "--param" "ssp-buffer-size=4"
-    # TODO: This doesn't work with CYGWIN and make_func
-    #            "-fsanitize=address,undefined"
-    )
-  #    set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS}
-  #            "-fsanitize=address,undefined"
-  #            )
+  )
+  if (NOT ENABLE_SANITIZER)
+      add_compile_options(
+        "-fstack-protector-all"
+        "-Wstack-protector"
+        "--param" "ssp-buffer-size=4"
+      )
+  endif()
 endif()
 
 # Warnings
@@ -101,14 +114,6 @@ add_compile_options(
   # Less undefined behavior
   "-funsigned-char"
   "-fwrapv")
-
-# Sanitizer support
-if (ENABLE_SANITIZER)
-    add_compile_options(
-            "-fsanitize=address,undefined"
-            "-U_FORTIFY_SOURCE")
-    add_link_options("-fsanitize=address,undefined")
-endif()
 
 # IPO??
 include(CheckIPOSupported)
