@@ -1,27 +1,29 @@
 #include "base/std.h"
 
-#include <chrono>
+#include "eval_limit.h"
+#include "posix_timers.h"
 
 volatile int outoftime = 0;
 uint64_t max_eval_cost;
 
-namespace {
-std::chrono::steady_clock::time_point deadline;
+void init_eval() {
+#ifdef __linux__
+  init_posix_timers();
+  debug_message("WARNING: Platform doesn't support eval limit!\n");
+#endif
 }
 
 void set_eval(uint64_t etime) {
-  if (etime > std::chrono::microseconds::max().count()) {
-    etime = std::chrono::microseconds::max().count();
-  }
-  deadline = std::chrono::steady_clock::now() + std::chrono::microseconds(etime);
+#ifdef __linux__
+  posix_eval_timer_set(etime);
+#endif
   outoftime = 0;
 }
 
 int64_t get_eval() {
-  auto now = std::chrono::steady_clock::now();
-  if (now >= deadline) {
-    return 0;
-  } else {
-    return (deadline - now).count();
-  }
+#ifdef __linux__
+  return posix_eval_timer_get();
+#else
+  return max_eval_cost;
+#endif
 }

@@ -2306,9 +2306,6 @@ void f_say(void) {
  object and a set_eval_limit() simul_efun to restrict access.
  */
 void f_set_eval_limit(void) {
-  if (sp->u.number < 0) {
-    sp->u.number = 0;
-  }
   switch (sp->u.number) {
     case 0:
       sp->u.number = max_eval_cost;
@@ -2321,6 +2318,9 @@ void f_set_eval_limit(void) {
       sp->u.number = max_eval_cost;
       break;
     default:
+      if (sp->u.number < -1) {
+        error("Invalid number.");
+      }
       max_eval_cost = sp->u.number;
       break;
   }

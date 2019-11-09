@@ -12,7 +12,6 @@
 #include "vm/internal/eval_limit.h"
 #include "vm/internal/master.h"
 #include "vm/internal/simul_efun.h"
-#include "vm/internal/base/apply_cache.h"   // for apply_cache_init
 #include "vm/internal/base/machine.h"       // for reset_machine
 #include "vm/internal/compiler/lex.h"       // for add_predefines, fixme!
 #include "vm/internal/compiler/compiler.h"  // for init_locals, fixme!
@@ -65,6 +64,8 @@ void preload_objects() {
 
 void vm_init() {
   boot_time = get_current_time();
+
+  init_eval(); /* in eval.cc */
 
   init_strings();     /* in stralloc.c */
   init_identifiers(); /* in lex.c */
