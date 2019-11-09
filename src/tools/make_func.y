@@ -1,3 +1,4 @@
+/* This is to make emacs edit this in C mode: -*-C-*- */
 %{
 #include "base/std.h"
 
@@ -43,7 +44,7 @@ extern const char *key[MAX_FUNC], *buf[MAX_FUNC];
 extern int arg_types[1000], last_current_type;
 
 const char *ctype(int);
-const char *etype(int);
+std::string etype(int);
 
 int num_buff = 0;
 int op_code, efun_code;
@@ -136,6 +137,7 @@ optional_default : /* empty */ { $$ = "DEFAULT_NONE"; }
 | DEFAULT ':' ID {
   if (strcmp($3, "F__THIS_OBJECT")) yyerror("Illegal default");
   $$ = "DEFAULT_THIS_OBJECT";
+  free((void *)$3);
 };
 
 func: type ID optional_ID '(' arg_list optional_default ')' ';' {
@@ -185,8 +187,9 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';' {
   }
 #endif
   sprintf(buff, "{\"%s\",%s,0,0,%d,%d,%s,%s,%s,%s,%s,%d,%s},\n", $2, f_name, min_arg,
-          limit_max ? -1 : $5, $1 != T_VOID ? ctype($1) : "TYPE_NOVALUE", etype(0), etype(1),
-          etype(2), etype(3), i, $6);
+          limit_max ? -1 : $5, $1 != T_VOID ? ctype($1) : "TYPE_NOVALUE",
+          etype(0).c_str(), etype(1).c_str(), etype(2).c_str(), etype(3).c_str(), i, $6);
+
   if (strlen(buff) > sizeof buff) yyerror("Local buffer overwritten !\n");
 
   key[num_buff] = $2;
@@ -323,10 +326,10 @@ const char *etype1(int n) {
   return "What?";
 }
 
-const char *etype(int n) {
+std::string etype(int n) {
   int i;
   int local_size = 100;
-  char *buff = (char *)malloc(local_size);
+  std::string buff = "";
 
   for (i = 0; i < curr_arg_type_size; i++) {
     if (n == 0) break;
@@ -337,19 +340,19 @@ const char *etype(int n) {
   for (; curr_arg_types[i] != 0; i++) {
     const char *p;
     if (curr_arg_types[i] == T_VOID) continue;
-    if (buff[0] != '\0') strcat(buff, "|");
+    if (buff[0] != '\0') buff = buff + "|";
     p = etype1(curr_arg_types[i]);
     /*
      * The number 2 below is to include the zero-byte and the next
      * '|' (which may not come).
      */
-    if (strlen(p) + strlen(buff) + 2 > local_size) {
+    if (strlen(p) + buff.size() + 2 > local_size) {
       fprintf(stderr, "Buffer overflow!\n");
       exit(1);
     }
-    strcat(buff, etype1(curr_arg_types[i]));
+    buff += etype1(curr_arg_types[i]);
   }
-  if (!strcmp(buff, "")) strcpy(buff, "T_ANY");
+  if (buff == "") buff = "T_ANY";
   return buff;
 }
 
