@@ -1,4 +1,4 @@
-name: Rust/Cmake CI on OSX
+name: CI on OSX
 
 on:
   push:
