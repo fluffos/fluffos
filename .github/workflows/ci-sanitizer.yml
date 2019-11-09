@@ -11,8 +11,8 @@ jobs:
     strategy:
       matrix:
         compiler:
-          - CC: "clang"
-            CXX: "clang++"
+          - CC: "gcc"
+            CXX: "g++"
         build: ["Debug", "RelWithDebInfo"]
 
     runs-on: "ubuntu-18.04"
