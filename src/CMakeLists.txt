@@ -274,6 +274,7 @@ set(SRC
         "vm/internal/compiler/scratchpad.cc"
         "vm/internal/compiler/trees.cc"
         "vm/internal/eval_limit.cc"
+        "vm/internal/posix_timers.cc"
         "vm/internal/master.cc"
         "vm/internal/otable.cc"
         "vm/internal/simul_efun.cc"
@@ -347,13 +348,17 @@ if (USE_JEMALLOC)
 endif()
 # end of JEMALLOC
 
-target_link_libraries(driver PUBLIC ${LIBEVENT_LIBRARIES})
-
 # libevent
 target_link_libraries(driver PUBLIC ${LIBEVENT_LIBRARIES})
 
 find_package (Threads REQUIRED)
 target_link_libraries(driver PRIVATE Threads::Threads)
+
+include(CheckLibraryExists)
+CHECK_LIBRARY_EXISTS(rt clock_gettime "time.h" HAVE_CLOCK_GETTIME_IN_RT)
+if (HAVE_CLOCK_GETTIME_IN_RT)
+  target_link_libraries(driver PRIVATE rt)
+endif()
 
 # GTEST
 #include(GoogleTest)

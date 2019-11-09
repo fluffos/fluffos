@@ -12,6 +12,9 @@ extern volatile int outoftime;
 // through runtime config.
 extern uint64_t max_eval_cost;
 
+// Initialization for eval limit
+void init_eval();
+
 // Set evaluation deadline to given microseconds.
 void set_eval(uint64_t time);
 
