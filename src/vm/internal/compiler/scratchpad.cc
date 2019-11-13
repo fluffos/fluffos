@@ -290,7 +290,7 @@ char *scratch_join(char *s1, char *s2) {
   }
 }
 
-char *scratch_copy_string(char *s) {
+char *scratch_copy_string(const char *s) {
   int l;
   unsigned char *to = scr_tail + 1;
   char *res;

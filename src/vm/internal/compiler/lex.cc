@@ -1192,6 +1192,11 @@ static int get_array_block(char *term) {
             reinterpret_cast<char *>(DMALLOC(MAXCHUNK, TAG_COMPILER, "array_block"));
         len = 0;
       }
+      // Remove trailing CR
+      if (array_line[curchunk][len - 1] == '\r') {
+        array_line[curchunk][len - 1] = '\0';
+        len = len - 1;
+      }
       /*
        * header
        */
@@ -1361,6 +1366,11 @@ static int get_text_block(char *term) {
         text_line[++curchunk] =
             reinterpret_cast<char *>(DMALLOC(MAXCHUNK, TAG_COMPILER, "text_block"));
         len = 0;
+      }
+      // Remove trailing CR
+      if (text_line[curchunk][len-1] == '\r') {
+        text_line[curchunk][len-1] = '\0';
+        len = len - 1;
       }
       /*
        * header
