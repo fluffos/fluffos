@@ -47,7 +47,7 @@ void scratch_free(char *);
 char *scratch_join(char *, char *);
 char *scratch_join2(char *, char *);
 char *scratch_realloc(char *, int);
-char *scratch_copy_string(char *);
+char *scratch_copy_string(const char *);
 char *scratch_large_alloc(int);
 
 #endif
