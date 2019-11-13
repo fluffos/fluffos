@@ -45,7 +45,7 @@ inline size_t & shared_storage<T, hash>::unref(void)
     return c;
 }
 
-// amount of unreferenced shared objects in storage
+// amount of protected shared objects in storage
 template <typename T, class hash>
 inline size_t & shared_storage<T, hash>::prot(void)
 {
@@ -85,13 +85,13 @@ shared_storage<T, hash>::shared_storage(shared_storage_vt * const arg) :
 {
     if(arg != nullptr)
     {
-        if(!arg->flag && (arg->ref_count == 0))           // was unreferenced
+        if(!arg->flag && (arg->ref_count == 0))         // was unreferenced
         {
             (unref())--;
         }
-        arg->ref_count++;                              // increase reference count
-        if(!arg->flag &&                               // we had an "overflow" => we can't clean this value anymore
-                (arg->ref_count == max_ref()))
+        arg->ref_count++;                               // increase reference count
+        if(!arg->flag &&                                // we had an "overflow" => we can't clean this value anymore
+                (arg->ref_count >= max_ref()))
         {
             arg->flag = true;
             (prot())++;
@@ -125,7 +125,7 @@ shared_storage<T, hash>::shared_storage(const T &arg) :
                     }
                     s.ref_count++;                              // increase reference count
                     if(!s.flag &&                               // we had an "overflow" => we can't clean this value anymore
-                            (s.ref_count == max_ref()))
+                            (s.ref_count >= max_ref()))
                     {
                         s.flag = true;
                         (prot())++;
@@ -156,7 +156,7 @@ shared_storage<T, hash>::shared_storage(const shared_storage &arg) :
 #endif
         val->ref_count++;
         if(!val->flag &&                               // we had an "overflow" => we can't clean this value anymore
-                (val->ref_count == max_ref()))
+                (val->ref_count >= max_ref()))
         {
             val->flag = true;
             (prot())++;
@@ -215,8 +215,8 @@ shared_storage<T, hash> & shared_storage<T, hash>::operator=(const shared_storag
         if(val != nullptr)                              // new value gains one reference
         {
             val->ref_count++;
-            if(!val->flag &&                               // we had an "overflow" => we can't clean this value anymore
-                    (val->ref_count == max_ref()))
+            if(!val->flag &&                            // we had an "overflow" => we can't clean this value anymore
+                    (val->ref_count >= max_ref()))
             {
                 val->flag = true;
                 (prot())++;
@@ -266,10 +266,10 @@ const T & shared_storage<T, hash>::operator*(void) const
 template <typename T, class hash>
 const T * shared_storage<T, hash>::operator->(void) const
 {
-    if(val == nullptr)
-        return &(empty());
-    else
+    if(val != nullptr)
         return &(val->val);
+    else
+        return &(empty());
 }
 
 template <typename T, class hash>

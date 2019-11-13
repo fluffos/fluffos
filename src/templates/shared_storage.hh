@@ -44,11 +44,11 @@
 /// - size_t cleanup(void)
 ///     removes shared objects with reference count 0 from storage
 ///     returns amount of removed shared objects
-///     (unreferenced shared objects for which an referenced count
+///     (unreferenced shared objects for which an reference count
 ///     "overflow" has happened are not removed!)
 /// - size_t unref_size(void)
 ///     returns amount of unreferenced shared objects in storage
-///     (unreferenced shared objects for which an referenced count
+///     (unreferenced shared objects for which an reference count
 ///     "overflow" has happened are not counted!)
 /// - size_t prot_size(void)
 ///     returns amount of protected shared objects in storage
@@ -94,9 +94,13 @@ class shared_storage {
         };
 
         // the storage type for the shared objects
-        // we use an avl-tree, since most likely most of our accesses will be
-        // retrievals and it doesn't have problems with possible multi
-        // threaded environments
+        // !!! ATTENTION !!!
+        // pointers to stored values MUST NOT be invalidated by resizing the container !!!
+        //
+        // we use an avl-tree based multimap.
+        // avl-tree based since most likely most of our accesses will be
+        // retrievals and it doesn't have problems with possible multi threaded
+        // environments
         using avl_tree_t    = boost::container::tree_assoc_options<boost::container::tree_type<boost::container::avl_tree>>::type;
         using value_t       = std::pair<const size_t, shared_storage_vt>;
         typedef boost::container::multimap<size_t, shared_storage_vt,
