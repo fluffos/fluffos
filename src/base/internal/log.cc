@@ -3,6 +3,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
+#include <cerrno>
 
 #include "rc.h"  // for CONFIG_*
 
@@ -37,7 +38,7 @@ void debug_message(const char *fmt, ...) {
     }
     debug_message_fp = fopen(deb, "w");
     if (!debug_message_fp) {
-      perror(deb);
+      fprintf(stderr, "Unable to open log file: \"%s\", error: \"%s\". Use stderr only.\n", deb, strerror(errno));
       /* use stderr by default. */
       debug_message_fp = stderr;
     }
