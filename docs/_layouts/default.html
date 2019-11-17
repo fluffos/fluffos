@@ -76,7 +76,7 @@
 
         <div class="col-8 col-sm-8 col-lg-8">
 		<h2>{{ page.title }}</h2>
-		<h3><a href="{{ site.github.repository_url }}/tree/master/docs/{{ page.path }}">Edit on Github</a></h3>
+		<p><small><span class="glyphicon glyphicon-pencil"></span>{% github_edit_link "Edit this article on Github" %}.</small></p>
           <div id="content">
             {{ content }}
           </div>
@@ -95,7 +95,6 @@
     s.parentNode.insertBefore(gcse, s);
   })();
 </script>
-    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
 
