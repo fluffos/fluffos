@@ -42,6 +42,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 
+if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_C_COMPILER_ID} STREQUAL "Clang")
 # Compile options
 add_compile_options(
   # General debuginfo
@@ -114,6 +115,7 @@ add_compile_options(
   # Less undefined behavior
   "-funsigned-char"
   "-fwrapv")
+endif()
 
 # IPO??
 include(CheckIPOSupported)
@@ -171,7 +173,10 @@ set(GENERATED_HEADERS
         )
 
 # Libraries
-find_package(Libevent 2.0 REQUIRED COMPONENTS libevent)
+if(WIN32)
+else()
+  find_package(Libevent 2.0 REQUIRED COMPONENTS libevent)
+endif()
 # multiple packages uses this, so we simply do a global inclusion
 include_directories(SYSTEM ${LIBEVENT_INCLUDE_DIR})
 
@@ -336,6 +341,10 @@ if (CYGWIN)
     set(USE_JEMALLOC OFF)
     message(STATUS "JEMALLOC is not supported on CYGWIN.")
 endif()
+if (WIN32)
+  set(USE_JEMALLOC OFF)
+  message(STATUS "JEMALLOC is not supported on CYGWIN.")
+endif()
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(USE_JEMALLOC OFF)
     message(STATUS "JEMALLOC is disabled on debug build.")
@@ -370,7 +379,12 @@ include(helper)
 message("Final Compile Flags: ")
 print_target_properties(driver)
 
-add_executable(portbind "portbind.cc")
-
-install (TARGETS driver portbind
+install (TARGETS driver
   RUNTIME DESTINATION bin)
+
+if(NOT WIN32)
+  add_executable(portbind "portbind.cc")
+  install (TARGETS portbind
+    RUNTIME DESTINATION bin)
+endif()
+
