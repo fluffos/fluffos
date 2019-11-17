@@ -15,5 +15,11 @@ indent_size = 2
 end_of_line = crlf
 
 # files in test-suite
-[**/*.crlf]
+[testsuite/**/*_crlf.c]
 end_of_line = crlf
+
+[testsuite/**/*.crlf]
+end_of_line = crlf
+
+[Makefile]
+indent_style = tab
