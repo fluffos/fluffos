@@ -43,10 +43,15 @@ include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 
 if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_C_COMPILER_ID} STREQUAL "Clang")
+foreach(lang C CXX)
+  set(CMAKE_${lang}_FLAGS_DEBUG "-Og -g")
+  # include debug information even for RELEASE build.
+  set(CMAKE_${lang}_FLAGS_RELEASE "-O3 -funroll-loops -DNDEBUG -g")
+  set(CMAKE_${lang}_FLAGS_RELWITHDEBINFO "${CMAKE_${lang}_FLAGS_RELEASE}")
+endforeach()
+
 # Compile options
 add_compile_options(
-  # General debuginfo
-  "-g"
   "-fno-omit-frame-pointer"
   # We use GNU extensions
   "-D_GNU_SOURCE"
@@ -72,20 +77,12 @@ if(MARCH_NATIVE)
 endif()
 
 if (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-  add_compile_options(
-    "-O3"
-    "-funroll-loops"
-    "-DNDEBUG"
-    )
   if (NOT ENABLE_SANITIZER)
       add_compile_options(
         "-fstack-protector-strong"
       )
   endif()
 else()
-  add_compile_options(
-    "-Og"
-  )
   if (NOT ENABLE_SANITIZER)
       add_compile_options(
         "-fstack-protector-all"
@@ -151,7 +148,6 @@ INCLUDE (CheckIncludeFileCXX)
 # usage: CHECK_INCLUDE_FILES (<header> <RESULT_VARIABLE> )
 CHECK_INCLUDE_FILE_CXX (crypt.h HAVE_CRYPT_H)
 CHECK_INCLUDE_FILE_CXX (dirent.h HAVE_DIRENT_H)
-CHECK_INCLUDE_FILE_CXX (execinfo.h HAVE_EXECINFO_H)
 CHECK_INCLUDE_FILE_CXX (time.h HAVE_TIME_H)
 CHECK_INCLUDE_FILE_CXX (signal.h HAVE_SIGNAL_H)
 CHECK_INCLUDE_FILE_CXX (sys/resource.h HAVE_SYS_RESOURCE_H)
@@ -164,8 +160,6 @@ endif()
 #CHECK_INCLUDE_FILES ("sys/param.h;sys/mount.h" HAVE_SYS_MOUNT_H)
 # AC_CHECK_HEADERS([arpa/inet.h fcntl.h inttypes.h limits.h locale.h netdb.h netinet/in.h stddef.h stdint.h stdlib.h string.h sys/param.h sys/socket.h sys/time.h unistd.h])
 
-
-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
 set(GENERATED_HEADERS
         "${CMAKE_CURRENT_BINARY_DIR}/config.h"
@@ -306,6 +300,8 @@ add_dependencies(autogen make_options_defs)
 add_executable(driver
         ${SRC} ${SRC_HEADER}
         )
+# Enbale -rdynamic so we get an meanful backtrace
+set_target_properties(driver PROPERTIES ENABLE_EXPORTS ON)
 
 target_link_libraries(driver PUBLIC autogen)
 
@@ -320,6 +316,9 @@ endforeach()
 # Third party libraries
 add_subdirectory(thirdparty/libtelnet EXCLUDE_FROM_ALL)
 target_link_libraries(driver PUBLIC libtelnet)
+
+add_subdirectory(thirdparty/backward-cpp EXCLUDE_FROM_ALL)
+add_backward(driver)
 
 # Link statictly
 if(STATIC)
@@ -388,3 +387,5 @@ if(NOT WIN32)
     RUNTIME DESTINATION bin)
 endif()
 
+# Must keep this line at the end, so we get all the variables.
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
