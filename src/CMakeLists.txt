@@ -80,6 +80,8 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDeb
   if (NOT ENABLE_SANITIZER)
       add_compile_options(
         "-fstack-protector-strong"
+        "-Wstack-protector"
+        "--param" "ssp-buffer-size=4"
       )
   endif()
 else()
