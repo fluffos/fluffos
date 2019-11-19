@@ -503,7 +503,8 @@ static array_t *pcre_match(array_t *v, svalue_t *pattern, int flag) {
  * TODO: rewrite with new logic
  */
 static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *def) {
-  int i, size;
+  int i;
+  size_t size;
   const char *tmp;
   array_t *ret;
 
@@ -545,6 +546,7 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
           const char *rerror = rgpp[i]->error;
           int offset = rgpp[i]->erroffset;
 
+          pcre_free_memory(rgpp[i]);
           while (i--) {
             pcre_free_memory(rgpp[i]);
           }
@@ -796,14 +798,14 @@ static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
                                                   // elsewhere!
 {
   unsigned int bucket = svalue_to_int(pattern) % PCRE_CACHE_SIZE;
-  int sz;
+  size_t sz;
   struct pcre_cache_bucket_t *tmp;
   struct pcre_cache_bucket_t *node;
   int full;
 
   tmp = table->buckets[bucket];
 
-  // Calculate size of compiled pattern
+  // Calculate size of compiled pattern, require size_t!
   pcre_fullinfo(cpat, NULL, PCRE_INFO_SIZE, &sz);
 
   full = (pcrecachesize > 2 * PCRE_CACHE_SIZE);
@@ -822,10 +824,10 @@ static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
   } else {
     node = (struct pcre_cache_bucket_t *)DCALLOC(1, sizeof(struct pcre_cache_bucket_t),
                                                  TAG_TEMPORARY, "pcre_cache_pattern : node");
-    node->pattern.type = T_NUMBER;  // so we don't free invalids
     if (node == NULL) {
       return -1;
     }
+    node->pattern.type = T_NUMBER;  // so we don't free invalids
     if (!full) {
       pcrecachesize++;
     } else {
