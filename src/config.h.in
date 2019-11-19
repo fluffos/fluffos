@@ -19,7 +19,6 @@
 // System headers
 #cmakedefine HAVE_CRYPT_H
 #cmakedefine HAVE_DIRENT_H 1
-#cmakedefine HAVE_EXECINFO_H 1
 #cmakedefine HAVE_TIME_H 1
 #cmakedefine HAVE_SIGNAL_H 1
 #cmakedefine HAVE_SYS_RESOURCE_H 1

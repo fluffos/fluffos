@@ -2,9 +2,6 @@
 
 #include "mainlib.h"
 
-#ifdef HAVE_EXECINFO_H
-#include <execinfo.h>
-#endif
 #include <iostream>  // for cout
 #include <locale.h>  // for setlocale, LC_ALL
 #include <signal.h>  // for signal, SIG_DFL, SIGABRT, etc
@@ -26,7 +23,6 @@
 #endif
 #include <unistd.h>
 
-#include "backend.h"  // for backend, init_backend
 #ifdef HAVE_JEMALLOC
 #define JEMALLOC_MANGLE
 #include <jemalloc/jemalloc.h>  // for mallctl
@@ -36,6 +32,7 @@
 #include "vm/vm.h"              // for push_constant_string, etc
 #include "comm.h"               // for init_user_conn
 #include "backend.h"            // for backend();
+#include "thirdparty/backward-cpp/backward.hpp" // for backtracing
 
 // from lex.cc
 extern void print_all_predefines();
@@ -110,20 +107,16 @@ void print_version_and_time() {
 #else
   std::cout << "Jemalloc is disabled, this is not suitable for production." << std::endl;
 #endif
-}
-
-static void try_dump_stacktrace() {
-// #if !defined(__CYGWIN__) && __GNUC__ > 2
-#ifdef HAVE_EXECINFO_H
-  static void *bt[100];
-  auto bt_size = backtrace(bt, 100);
-  backtrace_symbols_fd(bt, bt_size, STDERR_FILENO);
+#if BACKWARD_HAS_DW == 1
+  std::cout << "Backtrace support: libdw." << std::endl;
+#elif BACKWARD_HAS_BFD == 1
+  std::cout << "Backtrace support: libbfd." << std::endl;
 #else
-  debug_message("Not able to generate backtrace, please use core.\n");
+  std::cout << "libdw or libbfd is not found, you will only get very limited crash stacktrace." << std::endl;
 #endif
 }
 
-static void sig_cld(int sig) {
+void sig_cld(int sig) {
   /*FIXME: restore this
    int status;
    while (wait3(&status, WNOHANG, NULL) > 0) {
@@ -135,7 +128,7 @@ static void sig_cld(int sig) {
  which restarts the MUD should take an exit code of 1 to mean don't
  restart
  */
-static void sig_usr1(int sig) {
+void sig_usr1(int sig) {
   push_constant_string("Host machine shutting down");
   push_undefined();
   push_undefined();
@@ -145,7 +138,7 @@ static void sig_usr1(int sig) {
 }
 
 /* Abort evaluation */
-static void sig_usr2(int sig) {
+void sig_usr2(int sig) {
   debug_message("Received SIGUSR2, current eval aborted.\n");
   outoftime = 1;
 }
@@ -154,7 +147,7 @@ static void sig_usr2(int sig) {
  * Actually, doing all this stuff from a signal is probably illegal
  * -Beek
  */
-static void attempt_shutdown(int sig) {
+void attempt_shutdown(int sig) {
   const char *msg = "Unkonwn signal!";
   switch (sig) {
     case SIGABRT:
@@ -181,15 +174,19 @@ static void attempt_shutdown(int sig) {
   }
 
   // Reverse all traps
-  signal(SIGFPE, SIG_DFL);
   signal(SIGTERM, SIG_DFL);
   signal(SIGINT, SIG_DFL);
-  signal(SIGABRT, SIG_DFL);
-  signal(SIGBUS, SIG_DFL);
-  signal(SIGSEGV, SIG_DFL);
-  signal(SIGILL, SIG_DFL);
 
-  try_dump_stacktrace();
+  // Print backtrace
+  {
+    using namespace backward;
+    StackTrace st; st.load_here(64);
+    Printer p;
+    p.object = true;
+    p.color_mode = ColorMode::always;
+    p.address = true;
+    p.print(st, stderr);
+  }
   fatal(msg);
 }
 }  // namespace
@@ -237,13 +234,8 @@ struct event_base *init_main(int argc, char **argv) {
 }
 
 void setup_signal_handlers() {
-  signal(SIGFPE, attempt_shutdown);
   signal(SIGTERM, attempt_shutdown);
   signal(SIGINT, attempt_shutdown);
-  signal(SIGABRT, attempt_shutdown);
-  signal(SIGBUS, attempt_shutdown);
-  signal(SIGSEGV, attempt_shutdown);
-  signal(SIGILL, attempt_shutdown);
 
   // User signal
   signal(SIGUSR1, sig_usr1);
@@ -269,6 +261,12 @@ int driver_main(int argc, char **argv);
 }
 
 int driver_main(int argc, char **argv) {
+  // register crash handlers
+  backward::SignalHandling sh;
+  if(!sh.loaded()) {
+    std::cout << "Signal handler installation failed, not backtrace on crash!";
+  }
+
   auto base = init_main(argc, argv);
 
   // Make sure mudlib dir is correct.
