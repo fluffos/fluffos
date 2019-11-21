@@ -3,6 +3,8 @@ option(MARCH_NATIVE "use march=native for GCC" ON)
 option(STATIC "Build static version of driver" OFF)
 option(USE_JEMALLOC "Build driver with jemalloc support" ON)
 option(ENABLE_SANITIZER "Build driver with sanitizer support" OFF)
+option(ENABLE_DTRACE "Build driver with dtrace (system-tap) support" OFF)
+# Packages
 option(PACKAGE_ASYNC "async package" ON)
 option(PACKAGE_COMPRESS "compress package" ON)
 set("SAVE_GZ_EXTENSION" ".o.gz")
@@ -315,6 +317,12 @@ foreach(PACKAGE ${FLUFFOS_PACKAGES})
     target_link_libraries(driver PUBLIC "${PACKAGE}")
 endforeach()
 
+# DTRACE support
+if(ENABLE_DTRACE)
+  message(STATUS "DTRACE Support: ON")
+  add_subdirectory(tracing)
+  target_link_libraries(driver PRIVATE tracing)
+endif()
 # Third party libraries
 add_subdirectory(thirdparty/libtelnet EXCLUDE_FROM_ALL)
 target_link_libraries(driver PUBLIC libtelnet)

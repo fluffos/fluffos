@@ -5,6 +5,9 @@
 #include <algorithm>  // for std::min
 #include <cstdio>     // for sprintf
 
+#ifdef ENABLE_DTRACE
+#include "tracing/tracing.autogen.h"
+#endif
 #include "vm/internal/base/apply_cache.h"
 #include "vm/internal/base/machine.h"
 #include "vm/internal/compiler/compiler.h"
@@ -264,8 +267,10 @@ retry_for_shadow:
         do_trace_call(findex);
       }
     }
-#ifdef DTRACE
-    DTRACE_PROBE3(fluffos, lpc__entry, ob->obname, fun, current_prog->filename);
+#ifdef ENABLE_DTRACE
+    if(FLUFFOS_LPC_ENTRY_ENABLED()) {
+      FLUFFOS_LPC_ENTRY(ob->obname, fun, current_prog->filename);
+    }
 #endif
     /* Call the program */
     previous_ob = current_object;

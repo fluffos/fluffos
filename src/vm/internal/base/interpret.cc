@@ -5,6 +5,9 @@
 
 #include "comm.h"  // add_vmessage FIXME: reverse API
 
+#ifdef ENABLE_DTRACE
+#include "tracing/tracing.autogen.h"
+#endif
 #include "vm/internal/base/machine.h"
 #include "vm/internal/compiler/icode.h"  // for PUSH_WHAT
 #include "vm/internal/compiler/lex.h"    // for insstr, FIXME
@@ -15,12 +18,6 @@
 
 int call_origin = 0;
 error_context_t *current_error_context = nullptr;
-
-#ifdef DTRACE
-#include <sys/sdt.h>
-#else
-#define DTRACE_PROBE3(x, y, z, zz, zzz)
-#endif
 
 static const char *type_names[] = {"int",      "string", "array",  "object", "mapping",
                                    "function", "float",  "buffer", "class"};
@@ -1107,11 +1104,13 @@ extern int playerchanged;
 
 void pop_control_stack() {
   DEBUG_CHECK(csp == (control_stack - 1), "Popped out of the control stack\n");
-#ifdef DTRACE
+#ifdef ENABLE_DTRACE
   if ((csp->framekind & FRAME_MASK) == FRAME_FUNCTION) {
-    DTRACE_PROBE3(fluffos, lpc__return, current_object->obname,
-                  current_prog->function_table[csp->fr.table_index].funcname,
-                  current_prog->filename);
+    if(FLUFFOS_LPC_RETURN_ENABLED()) {
+      FLUFFOS_LPC_RETURN(current_object->obname,
+        current_prog->function_table[csp->fr.table_index].funcname,
+        current_prog->filename);
+    }
   }
 #endif
 #ifdef PROFILE_FUNCTIONS
@@ -1382,9 +1381,12 @@ function_t *setup_new_frame(int findex) {
       do_trace_call(findex);
     }
   }
-  DTRACE_PROBE3(fluffos, lpc__entry, current_object->obname,
-                current_prog->function_table[findex].funcname, current_prog->filename);
-
+#ifdef ENABLE_DTRACE
+  if(FLUFFOS_LPC_ENTRY_ENABLED()) {
+    FLUFFOS_LPC_ENTRY(current_object->obname,
+      current_prog->function_table[findex].funcname, current_prog->filename);
+  }
+#endif
   return &current_prog->function_table[findex];
 }
 
@@ -1438,9 +1440,13 @@ function_t *setup_inherited_frame(int findex) {
       do_trace_call(findex);
     }
   }
-  DTRACE_PROBE3(fluffos, lpc__entry, csp->ob->obname, current_prog->function_table[findex].funcname,
-                current_prog->filename);
-
+#ifdef ENABLE_DTRACE
+  if(FLUFFOS_LPC_ENTRY_ENABLED()){
+    FLUFFOS_LPC_ENTRY(csp->ob->obname,
+      current_prog->function_table[findex].funcname,
+      current_prog->filename);
+  }
+#endif
   return &current_prog->function_table[findex];
 }
 

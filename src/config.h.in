@@ -15,6 +15,7 @@
 #endif
 
 #cmakedefine HAVE_JEMALLOC 1
+#cmakedefine ENABLE_DTRACE
 
 // System headers
 #cmakedefine HAVE_CRYPT_H
