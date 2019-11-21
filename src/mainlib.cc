@@ -183,7 +183,7 @@ void attempt_shutdown(int sig) {
     StackTrace st; st.load_here(64);
     Printer p;
     p.object = true;
-    p.color_mode = ColorMode::always;
+    p.color_mode = ColorMode::automatic;
     p.address = true;
     p.print(st, stderr);
   }
