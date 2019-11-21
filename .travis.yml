@@ -1,3 +1,7 @@
+branches:
+  only:
+    - v2017
+
 dist: trusty
 sudo: false
 
