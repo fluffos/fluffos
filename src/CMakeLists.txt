@@ -44,13 +44,26 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 
-if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_C_COMPILER_ID} STREQUAL "Clang")
 foreach(lang C CXX)
-  set(CMAKE_${lang}_FLAGS_DEBUG "-Og -g")
-  # include debug information even for RELEASE build.
-  set(CMAKE_${lang}_FLAGS_RELEASE "-O3 -funroll-loops -DNDEBUG -g")
-  set(CMAKE_${lang}_FLAGS_RELWITHDEBINFO "${CMAKE_${lang}_FLAGS_RELEASE}")
+  set(CMAKE_${lang}_VISIBILITY_PRESET hidden)
 endforeach()
+
+set(CMAKE_ENABLE_EXPORTS ON)
+
+if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_C_COMPILER_ID} STREQUAL "Clang")
+  foreach(lang C CXX)
+    if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
+        set(CMAKE_${lang}_FLAGS_DEBUG "-Og -g3")
+        # include (minimal) debug information even for RELEASE build.
+        set(CMAKE_${lang}_FLAGS_RELEASE "-O3 -DNDEBUG -g1")
+        set(CMAKE_${lang}_FLAGS_RELWITHDEBINFO "${CMAKE_${lang}_FLAGS_RELEASE}")
+    else()
+      set(CMAKE_${lang}_FLAGS_DEBUG "-O1 -g3")
+      # include (minimal) debug information even for RELEASE build.
+      set(CMAKE_${lang}_FLAGS_RELEASE "-O3 -DNDEBUG -g1")
+      set(CMAKE_${lang}_FLAGS_RELWITHDEBINFO "${CMAKE_${lang}_FLAGS_RELEASE}")
+    endif()
+  endforeach()
 
 # Compile options
 add_compile_options(
@@ -304,8 +317,6 @@ add_dependencies(autogen make_options_defs)
 add_executable(driver
         ${SRC} ${SRC_HEADER}
         )
-# Enbale -rdynamic so we get an meanful backtrace
-set_target_properties(driver PROPERTIES ENABLE_EXPORTS ON)
 
 target_link_libraries(driver PUBLIC autogen)
 
