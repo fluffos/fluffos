@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.68])
-AC_INIT([FluffOS],[v2017.2019112001])
+AC_INIT([FluffOS],[v2017.2019112002])
 AC_CONFIG_MACRO_DIR([m4])
 
 AC_CANONICAL_TARGET
@@ -26,8 +26,16 @@ F_SUPPORT_CXX11([], [AC_MSG_ERROR([
 AX_APPEND_COMPILE_FLAGS([-D_GNU_SOURCE])
 AX_APPEND_COMPILE_FLAGS([-fno-omit-frame-pointer])
 AX_APPEND_COMPILE_FLAGS([-iquote.])
-# This flag must be check for LINK.
-AX_CHECK_LINK_FLAG([-flto], [AX_APPEND_COMPILE_FLAGS([-flto])])
+
+# Only do LTO on linux
+case "${target}" in
+    *-*-linux-gnu)
+	# This flag must be check for LINK.
+	AX_CHECK_LINK_FLAG([-flto], [AX_APPEND_COMPILE_FLAGS([-flto])])
+	;;
+    *)
+       ;;
+esac
 
 # CYGWIN oddities
 # JEMALLOC doesn't work on CYGWIN
