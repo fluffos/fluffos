@@ -1434,7 +1434,8 @@ int match_single_regexp(const char *str, const char *pattern) {
  *
  */
 array_t *reg_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *def) {
-  int i, size;
+  int i;
+  size_t size;
   const char *tmp;
   array_t *ret;
 

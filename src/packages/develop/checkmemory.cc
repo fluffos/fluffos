@@ -13,6 +13,9 @@
 #ifdef PACKAGE_PARSER
 #include "packages/parser/parser.h"
 #endif
+#ifdef PACKAGE_PCRE
+#include "packages/pcre/pcre.h"
+#endif
 #ifdef PACKAGE_UIDS
 #include "packages/uids/uids.h"
 #endif
@@ -361,8 +364,8 @@ static void dump_stralloc() {
   for (int hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
     for (entry = table[hsh]; entry; entry = entry->next) {
       if (entry->tag == TAG_MALLOC_STRING || entry->tag == TAG_SHARED_STRING) {
-        fprintf(stderr, "%-30s: sz %7d: id %6d: tag %08x, a %8llx\n", entry->desc, entry->size,
-                entry->id, entry->tag, (uintptr_t)PTR(entry));
+        fprintf(stderr, "%-20s: sz %7d: id %6d: tag %08x, a %8p, \"%.20s\"\n", entry->desc, entry->size,
+                entry->id, entry->tag, PTR(entry), STRING(NODET_TO_PTR(entry, block_t *)));
       }
     }
   }
@@ -394,6 +397,7 @@ void check_string_stats(outbuffer_t *out) {
                   num);
     } else {
       printf("WARNING: num_distinct_strings is: %i should be: %i\n", num_distinct_strings, num);
+      dump_stralloc();
       abort();
     }
   }
@@ -403,6 +407,7 @@ void check_string_stats(outbuffer_t *out) {
       outbuf_addv(out, "WARNING: overhead_bytes is: %i should be: %i\n", overhead_bytes, overhead);
     } else {
       printf("WARNING: overhead_bytes is: %i should be: %i\n", overhead_bytes, overhead);
+      dump_stralloc();
       abort();
     }
   }
@@ -414,6 +419,7 @@ void check_string_stats(outbuffer_t *out) {
     } else {
       printf("WARNING: bytes_distinct_strings is: %i should be: %i\n", bytes_distinct_strings,
              bytes - (overhead - base_overhead));
+      dump_stralloc();
       abort();
     }
   }
@@ -423,6 +429,7 @@ void check_string_stats(outbuffer_t *out) {
       outbuf_addv(out, "WARNING: allocd_strings is: %i should be: %i\n", allocd_strings, as);
     } else {
       printf("WARNING: allocd_strings is: %i should be: %i\n", allocd_strings, as);
+      dump_stralloc();
       abort();
     }
   }
@@ -432,6 +439,7 @@ void check_string_stats(outbuffer_t *out) {
       outbuf_addv(out, "WARNING: allocd_bytes is: %i should be: %i\n", allocd_bytes, ab);
     } else {
       printf("WARNING: allocd_bytes is: %i should be: %i\n", allocd_bytes, ab);
+      dump_stralloc();
       abort();
     }
   }
@@ -696,6 +704,9 @@ void check_all_blocks(int flag) {
     mark_simuls();
     mark_mapping_node_blocks();
     mark_config();
+#ifdef PACKAGE_PCRE
+    mark_pcre_cache();
+#endif
 
     mark_svalue(&apply_ret_value);
 
@@ -976,8 +987,9 @@ void check_all_blocks(int flag) {
             outbuf_addv(&out, "WARNING: Found orphan mapping node block: %s %04x\n", entry->desc,
                         entry->tag);
             break;
-          /* FIXME: need to account these. */
           case TAG_PERMANENT: /* only save_object|resotre_object uses this */
+          break;
+            /* FIXME: need to account these. */
           case TAG_INC_LIST:
           case TAG_IDENT_TABLE:
           case TAG_OBJ_TBL:

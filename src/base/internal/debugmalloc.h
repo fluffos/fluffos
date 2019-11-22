@@ -32,6 +32,7 @@ void set_malloc_mask(int);
 char *dump_debugmalloc(const char *, int);
 
 /* tags */
+// NOTE: the digit after + must be unique, range is 0-255.
 static const int TAG_TEMPORARY = (1 << 8);
 static const int TAG_PERMANENT = (2 << 8);
 static const int TAG_COMPILER = (3 << 8);
@@ -70,11 +71,6 @@ static const int TAG_PARSER = (TAG_PERMANENT + 37);
 #endif
 static const int TAG_INPUT_TO = (TAG_PERMANENT + 38);
 static const int TAG_SOCKETS = (TAG_PERMANENT + 39);
-#ifdef PACKAGE_DB
-static const int TAG_DB = (TAG_PERMANENT + 40);
-#endif
-static const int TAG_INTERPRETER = (TAG_PERMANENT + 41);
-
 static const int TAG_STRING = (TAG_DATA + 40);
 static const int TAG_MALLOC_STRING = (TAG_DATA + 41);
 static const int TAG_SHARED_STRING = (TAG_DATA + 42);
@@ -85,5 +81,12 @@ static const int TAG_MAP_NODE_BLOCK = (TAG_DATA + 46);
 static const int TAG_MAP_TBL = (TAG_DATA + 47);
 static const int TAG_BUFFER = (TAG_DATA + 48);
 static const int TAG_CLASS = (TAG_DATA + 49);
+#ifdef PACKAGE_DB
+static const int TAG_DB = (TAG_PERMANENT + 50);
+#endif
+static const int TAG_INTERPRETER = (TAG_PERMANENT + 51);
+#ifdef PACKAGE_PCRE
+static const int TAG_PCRE_CACHE = (TAG_PERMANENT + 52);
+#endif
 
 #endif

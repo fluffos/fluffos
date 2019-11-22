@@ -19,7 +19,7 @@ The maximum number of capturing groups is:
 typedef struct {
   pcre *re;
   const char *error;
-  svalue_t pattern;
+  const char *pattern;
   const char *subject;
   unsigned char *name_table;
   size_t s_length;
@@ -35,7 +35,7 @@ typedef struct {
 
 struct pcre_cache_bucket_t {
   pcre *compiled_pattern;  // value1
-  svalue_t pattern;        // key
+  const char* pattern;        // key
   int size;                // size in bytes
   struct pcre_cache_bucket_t *next;
 };
@@ -43,5 +43,9 @@ struct pcre_cache_bucket_t {
 struct pcre_cache_t {
   struct pcre_cache_bucket_t *buckets[PCRE_CACHE_SIZE];
 };
+
+#ifdef DEBUGMALLOC_EXTENSIONS
+void mark_pcre_cache();
+#endif
 
 #endif
