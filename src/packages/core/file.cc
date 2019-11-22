@@ -784,8 +784,12 @@ static int do_move(const char *from, const char *to, int flag) {
     error("/%s: unknown error\n", to);
     return 1;
   }
-  if ((flag == F_RENAME) && (rename(from, to) == 0)) {
-    return 0;
+  if (flag == F_RENAME) {
+    std::error_code errorCode;
+    fs::rename(from, to, errorCode);
+    if (!errorCode) {
+      return 0;
+    }
   }
 #ifdef F_LINK
   else if (flag == F_LINK) {
