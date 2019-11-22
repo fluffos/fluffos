@@ -41,6 +41,7 @@ namespace {
 inline void print_sep() { std::cout << std::string(72, '=') << std::endl; }
 
 void incrase_fd_rlimit() {
+#ifndef _WIN32
   // try to bump FD limits.
   struct rlimit rlim;
   rlim.rlim_cur = 65535;
@@ -48,9 +49,11 @@ void incrase_fd_rlimit() {
   if (setrlimit(RLIMIT_NOFILE, &rlim)) {
     // ignore this error.
   }
+#endif
 }
 
 void print_rlimit() {
+#ifndef _WIN32
   // try to bump FD limits.
   {
     struct rlimit rlim;
@@ -75,6 +78,7 @@ void print_rlimit() {
   } else {
     std::cout << "Max FD: " << rlim.rlim_cur << std::endl;
   }
+#endif
 }
 
 void print_commandline(int argc, char **argv) {
@@ -150,26 +154,11 @@ void sig_usr2(int sig) {
 void attempt_shutdown(int sig) {
   const char *msg = "Unkonwn signal!";
   switch (sig) {
-    case SIGABRT:
-      msg = "SIGABRT: Aborted";
-      break;
     case SIGTERM:
       msg = "SIGTERM: Process terminated";
       break;
     case SIGINT:
       msg = "SIGINT: Process interrupted";
-      break;
-    case SIGSEGV:
-      msg = "SIGSEGV: Segmentation fault";
-      break;
-    case SIGFPE:
-      msg = "SIGFPE: Floating point exception";
-      break;
-    case SIGBUS:
-      msg = "SIGBUS: Bus error";
-      break;
-    case SIGILL:
-      msg = "SIGILL: Illegal instruction";
       break;
   }
 
@@ -237,6 +226,7 @@ void setup_signal_handlers() {
   signal(SIGTERM, attempt_shutdown);
   signal(SIGINT, attempt_shutdown);
 
+#ifndef _WIN32
   // User signal
   signal(SIGUSR1, sig_usr1);
   signal(SIGUSR2, sig_usr2);
@@ -254,18 +244,29 @@ void setup_signal_handlers() {
     debug_perror("can't ignore signal SIGPIPE", nullptr);
     exit(5);
   }
+#endif
 }
 
 extern "C" {
 int driver_main(int argc, char **argv);
 }
 
+void init_win32() {
+#ifdef _WIN32
+  WSADATA wsa_data;
+  WSAStartup(0x0201, &wsa_data);
+#endif
+}
+
 int driver_main(int argc, char **argv) {
+#ifndef __WIN32
   // register crash handlers
   backward::SignalHandling sh;
   if(!sh.loaded()) {
-    std::cout << "Signal handler installation failed, not backtrace on crash!";
+    std::cout << "Warning: Signal handler installation failed, not backtrace on crash!" << std::endl;
   }
+#endif
+  init_win32();
 
   auto base = init_main(argc, argv);
 

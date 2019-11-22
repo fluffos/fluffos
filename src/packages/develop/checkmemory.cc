@@ -98,8 +98,8 @@ char *dump_debugmalloc(const char *tfn, int mask) {
   for (j = 0; j < MD_TABLE_SIZE; j++) {
     for (entry = table[j]; entry; entry = entry->next) {
       if (!mask || (entry->tag == mask)) {
-        fprintf(fp, "%-30s: sz %7d: id %6d: tag %08x, a %8lx\n", entry->desc, entry->size,
-                entry->id, entry->tag, (unsigned long)PTR(entry));
+        fprintf(fp, "%-30s: sz %7d: id %6d: tag %08x, a %8llx\n", entry->desc, entry->size,
+                entry->id, entry->tag, (uintptr_t)PTR(entry));
         total += entry->size;
         chunks++;
       }
@@ -361,8 +361,8 @@ static void dump_stralloc() {
   for (int hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
     for (entry = table[hsh]; entry; entry = entry->next) {
       if (entry->tag == TAG_MALLOC_STRING || entry->tag == TAG_SHARED_STRING) {
-        fprintf(stderr, "%-30s: sz %7d: id %6d: tag %08x, a %8lx\n", entry->desc, entry->size,
-                entry->id, entry->tag, (unsigned long)PTR(entry));
+        fprintf(stderr, "%-30s: sz %7d: id %6d: tag %08x, a %8llx\n", entry->desc, entry->size,
+                entry->id, entry->tag, (uintptr_t)PTR(entry));
       }
     }
   }

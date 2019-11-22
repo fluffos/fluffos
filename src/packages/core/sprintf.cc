@@ -130,13 +130,13 @@ typedef unsigned int format_info;
 #define ADD_CHAR(x)                                                                    \
   {                                                                                    \
     const auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);                  \
-    if (sprintf_state->obuff.real_size == max_string_length) ERROR(ERR_BUFF_OVERFLOW); \
+    if (sprintf_state->obuff.real_size == max_string_length) SPRINTF_ERROR(ERR_BUFF_OVERFLOW); \
     outbuf_addchar(&(sprintf_state->obuff), x);                                        \
   }
 
 #define GET_NEXT_ARG                                               \
   {                                                                \
-    if (++sprintf_state->cur_arg >= argc) ERROR(ERR_TOO_FEW_ARGS); \
+    if (++sprintf_state->cur_arg >= argc) SPRINTF_ERROR(ERR_TOO_FEW_ARGS); \
     carg = (argv + sprintf_state->cur_arg);                        \
   }
 
@@ -182,7 +182,7 @@ static void add_justified(const char *str, int slen, pad_info_t *pad, int fs, fo
 static int add_column(cst **column, int trailing);
 static int add_table(cst **table);
 
-#define ERROR(x) sprintf_error(x, 0)
+#define SPRINTF_ERROR(x) sprintf_error(x, 0)
 
 static void pop_sprintf_state(void) {
   sprintf_state_t *state;
@@ -473,7 +473,7 @@ static void add_pad(pad_info_t *pad, int len) {
   int padlen;
 
   if (outbuf_extend(&(sprintf_state->obuff), len) < len) {
-    ERROR(ERR_BUFF_OVERFLOW);
+    SPRINTF_ERROR(ERR_BUFF_OVERFLOW);
   }
   p = sprintf_state->obuff.buffer + sprintf_state->obuff.real_size;
   sprintf_state->obuff.real_size += len;
@@ -504,7 +504,7 @@ static void add_pad(pad_info_t *pad, int len) {
 
 static void add_nstr(const char *str, int len) {
   if (outbuf_extend(&(sprintf_state->obuff), len) < len) {
-    ERROR(ERR_BUFF_OVERFLOW);
+    SPRINTF_ERROR(ERR_BUFF_OVERFLOW);
   }
   memcpy(sprintf_state->obuff.buffer + sprintf_state->obuff.real_size, str, len);
   sprintf_state->obuff.real_size += len;
@@ -911,7 +911,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
           if (pres == -1) { /* then looking for pres */
             if (format_str[fpos] == '*') {
               if (carg->type != T_NUMBER) {
-                ERROR(ERR_INVALID_STAR);
+                SPRINTF_ERROR(ERR_INVALID_STAR);
               }
               pres = carg->u.number;
               GET_NEXT_ARG;
@@ -933,7 +933,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
             } else {
               if (format_str[fpos] == '*') {
                 if (carg->type != T_NUMBER) {
-                  ERROR(ERR_INVALID_STAR);
+                  SPRINTF_ERROR(ERR_INVALID_STAR);
                 }
                 fs = carg->u.number;
                 if (fs < 0) {
@@ -1023,16 +1023,16 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
             pad.what = format_str + fpos;
             while (true) {
               if (!format_str[fpos]) {
-                ERROR(ERR_UNEXPECTED_EOS);
+                SPRINTF_ERROR(ERR_UNEXPECTED_EOS);
               }
               if (format_str[fpos] == '\\') {
                 if (!format_str[++fpos]) {
-                  ERROR(ERR_UNEXPECTED_EOS);
+                  SPRINTF_ERROR(ERR_UNEXPECTED_EOS);
                 }
               } else if (format_str[fpos] == '\'') {
                 pad.len = format_str + fpos - pad.what;
                 if (!pad.len) {
-                  ERROR(ERR_NULL_PS);
+                  SPRINTF_ERROR(ERR_NULL_PS);
                 }
                 break;
               }
@@ -1044,14 +1044,14 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
         }
       } /* end of for () */
       if (pres < 0) {
-        ERROR(ERR_PRES_EXPECTED);
+        SPRINTF_ERROR(ERR_PRES_EXPECTED);
       }
       /*
        * now handle the different arg types...
        */
       if (finfo & INFO_ARRAY) {
         if (carg->type != T_ARRAY) {
-          ERROR(ERR_ARRAY_EXPECTED);
+          SPRINTF_ERROR(ERR_ARRAY_EXPECTED);
         }
         if (carg->u.arr->size == 0) {
           last = fpos;
@@ -1077,7 +1077,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
           finfo |= INFO_T_STRING;
         }
         if ((finfo & INFO_T) == INFO_T_ERROR) {
-          ERROR(ERR_INVALID_FORMAT_STR);
+          SPRINTF_ERROR(ERR_INVALID_FORMAT_STR);
 #ifdef DEBUG
         } else if ((finfo & INFO_T) == INFO_T_NULL) {
           /* never reached... */
@@ -1096,14 +1096,14 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
             sprintf_state->clean.u.string = string_copy("0", "sprintf NULL");
             carg = &(sprintf_state->clean);
           } else if (carg->type != T_STRING) {
-            ERROR(ERR_INCORRECT_ARG_S);
+            SPRINTF_ERROR(ERR_INCORRECT_ARG_S);
           }
           slen = SVALUE_STRLEN(carg);
           if ((finfo & INFO_COLS) || (finfo & INFO_TABLE)) {
             cst **temp;
 
             if (!fs) {
-              ERROR(ERR_CST_REQUIRES_FS);
+              SPRINTF_ERROR(ERR_CST_REQUIRES_FS);
             }
 
             temp = &(sprintf_state->csts);
@@ -1279,7 +1279,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
           if (pres) {
             cheat[i++] = '.';
             if (pres >= sizeof(temp)) {
-              sprintf(cheat + i, "%lu", sizeof(temp) - 1);
+              sprintf(cheat + i, "%llu", sizeof(temp) - 1);
             } else {
               sprintf(cheat + i, "%d", pres);
             }
@@ -1318,7 +1318,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
               cheat[i++] = 'X';
               break;
             default:
-              ERROR(ERR_BAD_INT_TYPE);
+              SPRINTF_ERROR(ERR_BAD_INT_TYPE);
           }
           if ((cheat[i - 1] == 'f' && carg->type != T_REAL) ||
               (cheat[i - 1] != 'f' && carg->type != T_NUMBER)) {
@@ -1356,7 +1356,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
                             (nelemno < (argv + sprintf_state->cur_arg)->u.arr->size))));
           }
         } else { /* type not found */
-          ERROR(ERR_UNDEFINED_TYPE);
+          SPRINTF_ERROR(ERR_UNDEFINED_TYPE);
         }
         if (sprintf_state->clean.type != T_NUMBER) {
           free_svalue(&(sprintf_state->clean), "string_print_formatted");

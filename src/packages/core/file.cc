@@ -42,6 +42,8 @@
 #include <zlib.h>
 
 #include "base/internal/strutils.h"
+#include "ghc/filesystem.hpp"
+namespace fs = ghc::filesystem;
 
 /*
  * Credits for some of the code below goes to Free Software Foundation
@@ -62,6 +64,14 @@
 
 #ifndef S_ISBLK
 #define S_ISBLK(m) (((m)&S_IFMT) == S_IFBLK)
+#endif
+
+#ifdef _WIN32
+#define lstat(x, y) stat(x, y)
+#define link(x, y) ((-1))
+#define OS_mkdir(x, y) mkdir(x)
+#else
+#define OS_mkdir(x, y) mkdir(x, y)
 #endif
 
 static int match_string(char * /*match*/, char * /*str*/);
@@ -327,15 +337,16 @@ char *read_file(const char *file, int start, int lines) {
     return nullptr;
   }
 
-  struct stat st;
+  auto fs_real_file = fs::path(real_file);
+
   /*
    * file doesn't exist, or is really a directory
    */
-  if (stat(real_file, &st) == -1 || (st.st_mode & S_IFDIR)) {
+  if (!fs::exists(fs_real_file) || fs::is_directory(fs_real_file)) {
     return nullptr;
   }
 
-  if (st.st_size == 0) {
+  if (fs::is_empty(fs_real_file)) {
     /* zero length file */
     char *result = new_string(0, "read_file: empty");
     result[0] = '\0';
@@ -700,12 +711,14 @@ static int copy(const char *from, const char *to) {
     close(ifd);
     return 1;
   }
+#ifndef __WIN32
   if (fchmod(ofd, from_stats.st_mode & 0777)) {
     close(ifd);
     close(ofd);
     unlink(to);
     return 1;
   }
+#endif
   while ((len = read(ifd, buf, sizeof(buf))) > 0) {
     int wrote = 0;
     char *bp = buf;
@@ -755,7 +768,11 @@ static int do_move(const char *from, const char *to, int flag) {
     return 1;
   }
   if (lstat(to, &to_stats) == 0) {
+#ifdef __WIN32
+    if (strcmp(from, to) == 0) {
+#else
     if (from_stats.st_dev == to_stats.st_dev && from_stats.st_ino == to_stats.st_ino) {
+#endif
       error("`/%s' and `/%s' are the same file", from, to);
       return 1;
     }
@@ -900,10 +917,6 @@ int do_rename(const char *fr, const char *t, int flag) {
 #endif /* F_RENAME */
 
 int copy_file(const char *from, const char *to) {
-  char buf[128];
-  int from_fd, to_fd;
-  int num_read, num_written;
-  char *write_ptr;
   extern svalue_t apply_ret_value;
 
   from = check_valid_path(from, current_object, "move_file", 0);
@@ -924,18 +937,17 @@ int copy_file(const char *from, const char *to) {
     return 1;
   }
   if (lstat(to, &to_stats) == 0) {
+#ifdef __WIN32
+    if (!strcmp(from, to)) {
+#else
     if (from_stats.st_dev == to_stats.st_dev && from_stats.st_ino == to_stats.st_ino) {
+#endif
       error("`/%s' and `/%s' are the same file", from, to);
       return 1;
     }
   } else if (errno != ENOENT) {
     error("/%s: unknown error\n", to);
     return 1;
-  }
-
-  from_fd = open(from, O_RDONLY);
-  if (from_fd < 0) {
-    return -1;
   }
 
   if (file_size(to) == -2) {
@@ -949,37 +961,19 @@ int copy_file(const char *from, const char *to) {
     } else {
       cp = from;
     }
-
     sprintf(newto, "%s/%s", to, cp);
-    close(from_fd);
     return copy_file(from, newto);
   }
-  to_fd = open(to, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-  if (to_fd < 0) {
-    close(from_fd);
-    return -2;
+
+  std::error_code error_code;
+  auto base = fs::current_path();
+  fs::copy_file(base / from, base / to, fs::copy_options::overwrite_existing, error_code);
+
+  if(error_code) {
+    debug_message("Error copying file from /%s to /%s, Error: %s", from, to, error_code.message().c_str());
+    return -1;
   }
-  while ((num_read = read(from_fd, buf, 128)) != 0) {
-    if (num_read < 0) {
-      debug_perror("copy_file: read", from);
-      close(from_fd);
-      close(to_fd);
-      return -3;
-    }
-    write_ptr = buf;
-    while (write_ptr != (buf + num_read)) {
-      num_written = write(to_fd, write_ptr, num_read);
-      if (num_written < 0) {
-        debug_perror("copy_file: write", to);
-        close(from_fd);
-        close(to_fd);
-        return -3;
-      }
-      write_ptr += num_written;
-    }
-  }
-  close(from_fd);
-  close(to_fd);
+
   return 1;
 }
 
@@ -1041,7 +1035,7 @@ void f_mkdir(void) {
   const char *path;
 
   path = check_valid_path(sp->u.string, current_object, "mkdir", 1);
-  if (!path || mkdir(path, 0770) == -1) {
+  if (!path || OS_mkdir(path, 0770) == -1) {
     free_string_svalue(sp);
     *sp = const0;
   } else {

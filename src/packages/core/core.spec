@@ -196,8 +196,9 @@ int file_size(string);
 string read_bytes(string, void | int, void | int);
 string read_file(string, void | int, void | int);
 int cp(string, string);
-
+#ifndef _WIN32
 int link(string, string);
+#endif
 int mkdir(string);
 int rm(string);
 int rmdir(string);

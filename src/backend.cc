@@ -128,7 +128,7 @@ inline void call_tick_events() {
 #endif
 }
 
-void on_game_tick(int fd, short what, void *arg) {
+void on_game_tick(evutil_socket_t fd, short what, void *arg) {
   call_tick_events();
   g_current_gametick++;
 
@@ -148,7 +148,7 @@ tick_event *add_gametick_event(std::chrono::milliseconds delay_msecs,
 }
 
 namespace {
-void on_walltime_event(int fd, short what, void *arg) {
+void on_walltime_event(evutil_socket_t fd, short what, void *arg) {
   auto event = reinterpret_cast<tick_event *>(arg);
   if (event->valid) {
     event->callback();

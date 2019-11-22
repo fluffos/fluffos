@@ -14,7 +14,7 @@
 #include <cstdlib>
 #include <vector>
 
-#include "thirdparty/filesystem/filesystem.hpp"
+#include "ghc/filesystem.hpp"
 namespace fs = ghc::filesystem;
 
 unsigned int whashstr(const char *s) {

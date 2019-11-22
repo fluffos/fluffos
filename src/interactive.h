@@ -1,7 +1,8 @@
 #ifndef INTERACITVE_H
 #define INTERACITVE_H
 
-#include <sys/socket.h>  // for sockaddr_storage
+#include <event2/util.h>
+
 #include "vm/vm.h"       // FIXME: for union string_or_func
 
 #define MAX_TEXT 2048
@@ -44,7 +45,7 @@ struct interactive_t {
   int connection_type;          /* the type of connection this is          */
   int fd;                       /* file descriptor for interactive object  */
   struct sockaddr_storage addr; /* socket address of interactive object    */
-  socklen_t addrlen;
+  ev_socklen_t addrlen;
   int local_port;      /* which of our ports they connected to    */
   int external_port;   /* external port index for connection      */
   const char *prompt;  /* prompt string for interactive object    */

@@ -7,6 +7,10 @@
 
 #include "packages/sockets/socket_efuns.h"
 
+#ifdef _WIN32
+#include <ws2tcpip.h>
+#endif
+
 #define VALID_SOCKET(x) check_valid_socket((x), fd, get_socket_owner(fd), addr, port)
 
 #ifdef F_SOCKET_CREATE
