@@ -1519,7 +1519,7 @@ char *get_type_name(char *where, char *end, int type) {
 }
 
 #define STRING_HASH(var, str)        \
-  var = (long)str ^ (long)str >> 16; \
+  var = (intptr_t)str ^ (intptr_t)str >> 16; \
   var = (var ^ var >> 8) & 0xff;
 
 short store_prog_string(const char *str) {

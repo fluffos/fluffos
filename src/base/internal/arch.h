@@ -21,12 +21,8 @@
 #endif
 #endif
 
-#ifdef WINNT
-#define ARCH "Microsoft Windows NT"
-#endif
-
-#ifdef WIN95
-#define ARCH "Microsoft Windows 95"
+#ifdef __WIN32
+#define ARCH "Microsoft Windows"
 #endif
 
 #ifdef _SEQUENT_

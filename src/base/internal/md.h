@@ -31,7 +31,7 @@ void check_all_blocks(int);
 
 #define MD_TABLE_BITS 14
 #define MD_TABLE_SIZE (1 << MD_TABLE_BITS)
-#define MD_HASH(x) (((unsigned long)x >> 3) & (MD_TABLE_SIZE - 1))
+#define MD_HASH(x) (((uintptr_t)x >> 3) & (MD_TABLE_SIZE - 1))
 
 #define PTR(x) ((void *)(x + 1))
 #define NODET_TO_PTR(x, y) ((y)(x + 1))

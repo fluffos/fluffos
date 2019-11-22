@@ -15,6 +15,10 @@
 #include <deque>
 #include <string>
 #include <unistd.h>  // for close
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#endif
 
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
 
@@ -60,7 +64,7 @@ void new_lpc_socket_event_listener(int idx, lpc_socket_t *sock, evutil_socket_t 
 #define SC_FINAL_CLOSE 4
 
 #ifdef PACKAGE_SOCKETS
-static char *old_sockaddr_to_string(struct sockaddr * /*addr*/, socklen_t /*len*/);
+static char *old_sockaddr_to_string(struct sockaddr * /*addr*/, ev_socklen_t /*len*/);
 #endif
 
 const char *error_strings[ERROR_STRINGS] = {"Problem creating socket",
@@ -100,7 +104,7 @@ const char *error_strings[ERROR_STRINGS] = {"Problem creating socket",
  * Convert a string representation of an address to a sockaddr_in
  * The format of the string is "ip port", the delimiter is a whitespace.
  */
-static bool lpcaddr_to_sockaddr(const char *name, struct sockaddr *addr, socklen_t *len) {
+static bool lpcaddr_to_sockaddr(const char *name, struct sockaddr *addr, ev_socklen_t *len) {
   const char *cp = strchr(name, ' ');
   if (cp == nullptr) {
     debug(sockets, "lpcaddr_to_sockaddr: malformed address: %s", name);
@@ -126,13 +130,13 @@ static bool lpcaddr_to_sockaddr(const char *name, struct sockaddr *addr, socklen
   hints.ai_protocol = 0;
   // LPC name resolution is done through other efun.
   // this efun only support numeric address and service
-  hints.ai_flags |= AI_NUMERICHOST | AI_NUMERICSERV;
+  hints.ai_flags |= EVUTIL_AI_NUMERICHOST | EVUTIL_AI_NUMERICSERV;
   // Make sure we only see address that the system supports.
-  hints.ai_flags |= AI_ADDRCONFIG;
+  hints.ai_flags |= EVUTIL_AI_ADDRCONFIG;
 
   int ret;
-  if ((ret = getaddrinfo(host, service, &hints, &res))) {
-    debug(sockets, "lpcaddr_to_sockaddr: getaddrinfo error: %s", gai_strerror(ret));
+  if ((ret = evutil_getaddrinfo(host, service, &hints, &res))) {
+    debug(sockets, "lpcaddr_to_sockaddr: getaddrinfo error: %s", evutil_gai_strerror(ret));
     return false;
   }
 
@@ -140,7 +144,7 @@ static bool lpcaddr_to_sockaddr(const char *name, struct sockaddr *addr, socklen
   memcpy(addr, res->ai_addr, res->ai_addrlen);
   if (len != nullptr) *len = res->ai_addrlen;
 
-  freeaddrinfo(res);
+  evutil_freeaddrinfo(res);
 
   return true;
 }
@@ -369,6 +373,7 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
       return EESETSOCKOPT;
     }
 
+#ifndef _WIN32
     // Set send buffer to 256K
     {
       int sendbuf = 256 * 1024;
@@ -377,6 +382,7 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
               evutil_socket_error_to_string(evutil_socket_geterror(fd)));
       }
     }
+#endif
 
     new_lpc_socket_event_listener(i, &lpc_socks[i], fd);
 

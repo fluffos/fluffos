@@ -1837,12 +1837,12 @@ void reset_timezone(const char *old_tz) {
     sprintf(put_tz, "TZ=%s", old_tz);
     putenv(put_tz);
   } else {
-#ifndef MINGW
+#ifndef __MINGW32__
     unsetenv("TZ");
-  }
 #else
     putenv("TZ=");
 #endif
+  }
 
   tzset();
 }

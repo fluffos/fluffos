@@ -1,8 +1,8 @@
 #include "base/std.h"
 
 #include "net/telnet.h"
+#include "net/sys_telnet.h" // our own version of telnet header.
 
-#include <arpa/telnet.h>  // for LM, MODE_EDIT, TRAPSIG etc
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
 #include <string>

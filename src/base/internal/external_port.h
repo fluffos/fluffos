@@ -8,6 +8,8 @@
 #ifndef BASE_INTERNAL_EXTERNAL_PORT_H_
 #define BASE_INTERNAL_EXTERNAL_PORT_H_
 
+#include <event2/util.h>
+
 #define PORT_UNDEFINED 0
 #define PORT_TELNET 1
 #define PORT_BINARY 2
@@ -18,7 +20,7 @@
 struct port_def_t {
   int kind;
   int port;
-  int fd;
+  evutil_socket_t fd;
   // used by F_NETWORK_STATS
   int in_packets;
   int in_volume;

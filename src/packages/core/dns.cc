@@ -4,7 +4,11 @@
 
 #include <event2/event.h>
 #include <event2/dns.h>
-
+#include <event2/util.h>
+#ifdef _WIN32
+#include <ws2ipdef.h>
+#include <ws2tcpip.h>
+#endif
 static struct evdns_base *g_dns_base = nullptr;
 
 void init_dns_event_base(struct event_base *base) {
@@ -12,11 +16,11 @@ void init_dns_event_base(struct event_base *base) {
   g_dns_base = evdns_base_new(base, 1);
 }
 
-static void add_ip_entry(struct sockaddr * /*addr*/, socklen_t size, char * /*name*/);
+static void add_ip_entry(struct sockaddr * /*addr*/, ev_socklen_t size, char * /*name*/);
 
 typedef struct addr_name_query_s {
   sockaddr_storage addr;
-  socklen_t addrlen;
+  ev_socklen_t addrlen;
   struct evdns_request *req;
 } addr_name_query_t;
 

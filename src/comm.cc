@@ -12,15 +12,20 @@
 #include <event2/event.h>        // for EV_TIMEOUT, etc
 #include <event2/listener.h>     // for evconnlistener_free, etc
 #include <event2/util.h>         // for evutil_closesocket, etc
-#include <netdb.h>               // for addrinfo, freeaddrinfo, etc
-#include <netinet/in.h>          // for ntohl, IPPROTO_TCP
-#include <netinet/tcp.h>         // for TCP_NODELAY
-#include <sys/socket.h>          // for SOCK_STREAM
 #include <stdarg.h>              // for va_end, va_list, va_copy, etc
 #include <stdio.h>               // for snprintf, vsnprintf, fwrite, etc
 #include <string.h>              // for NULL, memcpy, strlen, etc
 #include <unistd.h>              // for gethostname
 #include <memory>                // for unique_ptr
+// Network stuff
+#ifndef _WIN32
+#include <netdb.h>               // for addrinfo, freeaddrinfo, etc
+#include <netinet/in.h>          // for ntohl, IPPROTO_TCP
+#include <netinet/tcp.h>         // for TCP_NODELAY
+#include <sys/socket.h>          // for SOCK_STREAM
+#else
+#include <ws2tcpip.h>
+#endif
 
 #include "backend.h"
 #include "fliconv.h"
@@ -175,7 +180,13 @@ void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
 
   {
     int one = 1;
-    if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) == -1) {
+    if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY,
+#ifndef _WIN32
+      &one,
+#else
+      (const char*)&one,
+#endif
+      sizeof(one)) == -1) {
       debug(connections, "new_user_handler: user fd %d, set_socket_tcp_nodelay error: %s.\n", fd,
             evutil_socket_error_to_string(evutil_socket_geterror(fd)));
     }
@@ -311,19 +322,25 @@ bool init_user_conn() {
     }
     if (evutil_make_socket_nonblocking(fd) == -1) {
       debug(sockets, "socket_accept: set_socket_nonblocking error: %s.\n",
-            evutil_socket_error_to_string(evutil_socket_geterror(accept_fd)));
+            evutil_socket_error_to_string(evutil_socket_geterror(fd)));
       evutil_closesocket(fd);
       return false;
     }
     if (evutil_make_socket_closeonexec(fd) == -1) {
       debug(sockets, "socket_accept: make_socket_closeonexec error: %s.\n",
-            evutil_socket_error_to_string(evutil_socket_geterror(accept_fd)));
+            evutil_socket_error_to_string(evutil_socket_geterror(fd)));
       evutil_closesocket(fd);
       return false;
     }
     {
       int one = 1;
-      if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (void *)&one, sizeof(one)) < 0) {
+      if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE,
+#ifndef _WIN32
+        (void *)&one,
+#else
+        (const char*)&one,
+#endif
+        sizeof(one)) < 0) {
         evutil_closesocket(fd);
         return false;
       }
@@ -414,7 +431,7 @@ void shutdown_external_ports() {
       continue;
     }
     if (external_port[i].ev_conn) evconnlistener_free(external_port[i].ev_conn);
-    if (evutil_closesocket(external_port[i].fd) == -1) {
+    if (external_port[i].fd && evutil_closesocket(external_port[i].fd) == -1) {
       debug_message("shutdown_external_ports: failed: %s",
                     evutil_socket_error_to_string(evutil_socket_geterror(external_port[i].fd)));
     }

@@ -6,7 +6,7 @@
 #ifndef COMM_H
 #define COMM_H
 
-#include <sys/socket.h>  // for sockaddr, socklen_t
+#include <event2/util.h>
 
 /*
  * This macro is for testing whether ip is still valid, since many
@@ -72,6 +72,6 @@ struct object_t *query_snooping(struct object_t *);
 void mark_iptable(void);
 #endif
 
-const char *sockaddr_to_string(const sockaddr *addr, socklen_t len);
+const char *sockaddr_to_string(const sockaddr *addr, ev_socklen_t len);
 
 #endif /* COMM_H */

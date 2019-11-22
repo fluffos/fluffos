@@ -7,7 +7,6 @@
 #ifndef _SOCKET_EFUNS_H_
 #define _SOCKET_EFUNS_H_
 
-#include <sys/socket.h>
 #include <deque>
 #include <event2/util.h>
 
@@ -35,8 +34,8 @@ struct lpc_socket_t {
   enum socket_state state;
   struct sockaddr_storage l_addr;
   struct sockaddr_storage r_addr;
-  socklen_t l_addrlen;
-  socklen_t r_addrlen;
+  ev_socklen_t l_addrlen;
+  ev_socklen_t r_addrlen;
   object_t *owner_ob;
   object_t *release_ob;
   union string_or_func read_callback;
