@@ -171,13 +171,13 @@
 // as ghc::filesystem::string_type.
 // #define GHC_WIN_WSTRING_STRING_TYPE
 //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-// Rais errors/exceptions when invalid unicode codepoints or UTF-8 sequences are found,
+// Raise errors/exceptions when invalid unicode codepoints or UTF-8 sequences are found,
 // instead of replacing them with the unicode replacement character (U+FFFD).
 // #define GHC_RAISE_UNICODE_ERRORS
 //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 // ghc::filesystem version in decimal (major * 10000 + minor * 100 + patch)
-#define GHC_FILESYSTEM_VERSION 10206L
+#define GHC_FILESYSTEM_VERSION 10208L
 
 namespace ghc {
 namespace filesystem {
@@ -204,9 +204,11 @@ public:
 #endif
 };
 
+#if  __cplusplus < 201703L
 template <typename char_type>
 constexpr char_type path_helper_base<char_type>::preferred_separator;
-    
+#endif
+
 // 30.10.8 class path
 class GHC_FS_API_CLASS path
 #if defined(GHC_OS_WINDOWS) && defined(GHC_WIN_WSTRING_STRING_TYPE)
@@ -223,7 +225,7 @@ public:
 #endif
     using string_type = std::basic_string<value_type>;
     using path_helper_base<value_type>::preferred_separator;
-    
+
     // 30.10.10.1 enumeration format
     /// The path format in wich the constructor argument is given.
     enum format {
@@ -1149,7 +1151,7 @@ GHC_INLINE std::error_code make_system_error(int err)
     return std::error_code(err ? err : errno, std::system_category());
 }
 #endif
-    
+
 #endif  // GHC_EXPAND_IMPL
 
 template <typename Enum>
@@ -1211,7 +1213,7 @@ namespace detail {
 
 GHC_INLINE bool in_range(uint32_t c, uint32_t lo, uint32_t hi)
 {
-    return ((uint32_t)(c - lo) < (hi - lo + 1));
+    return (static_cast<uint32_t>(c - lo) < (hi - lo + 1));
 }
 
 GHC_INLINE bool is_surrogate(uint32_t c)
@@ -1272,14 +1274,14 @@ GHC_INLINE unsigned consumeUtf8Fragment(const unsigned state, const uint8_t frag
     codepoint = (state ? (codepoint << 6) | (fragment & 0x3fu) : (0xffu >> category) & fragment);
     return state == S_RJCT ? static_cast<unsigned>(S_RJCT) : static_cast<unsigned>((utf8_state_info[category + 16] >> (state << 2)) & 0xf);
 }
-    
+
 GHC_INLINE bool validUtf8(const std::string& utf8String)
 {
     std::string::const_iterator iter = utf8String.begin();
     unsigned utf8_state = S_STRT;
     std::uint32_t codepoint = 0;
     while (iter < utf8String.end()) {
-        if ((utf8_state = consumeUtf8Fragment(utf8_state, (uint8_t)*iter++, codepoint)) == S_RJCT) {
+        if ((utf8_state = consumeUtf8Fragment(utf8_state, static_cast<uint8_t>(*iter++), codepoint)) == S_RJCT) {
             return false;
         }
     }
@@ -1290,9 +1292,9 @@ GHC_INLINE bool validUtf8(const std::string& utf8String)
 }
 
 }  // namespace detail
-    
+
 #endif
-    
+
 namespace detail {
 
 template <class StringType, typename std::enable_if<(sizeof(typename StringType::value_type) == 1)>::type* = nullptr>
@@ -1310,14 +1312,14 @@ inline StringType fromUtf8(const std::string& utf8String, const typename StringT
     unsigned utf8_state = S_STRT;
     std::uint32_t codepoint = 0;
     while (iter < utf8String.end()) {
-        if ((utf8_state = consumeUtf8Fragment(utf8_state, (uint8_t)*iter++, codepoint)) == S_STRT) {
+        if ((utf8_state = consumeUtf8Fragment(utf8_state, static_cast<uint8_t>(*iter++), codepoint)) == S_STRT) {
             if (codepoint <= 0xffff) {
-                result += (typename StringType::value_type)codepoint;
+                result += static_cast<typename StringType::value_type>(codepoint);
             }
             else {
                 codepoint -= 0x10000;
-                result += (typename StringType::value_type)((codepoint >> 10) + 0xd800);
-                result += (typename StringType::value_type)((codepoint & 0x3ff) + 0xdc00);
+                result += static_cast<typename StringType::value_type>((codepoint >> 10) + 0xd800);
+                result += static_cast<typename StringType::value_type>((codepoint & 0x3ff) + 0xdc00);
             }
             codepoint = 0;
         }
@@ -1325,7 +1327,7 @@ inline StringType fromUtf8(const std::string& utf8String, const typename StringT
 #ifdef GHC_RAISE_UNICODE_ERRORS
             throw filesystem_error("Illegal byte sequence for unicode character.", utf8String, std::make_error_code(std::errc::illegal_byte_sequence));
 #else
-            result += (typename StringType::value_type)0xfffd;
+            result += static_cast<typename StringType::value_type>(0xfffd);
             utf8_state = S_STRT;
             codepoint = 0;
 #endif
@@ -1335,7 +1337,7 @@ inline StringType fromUtf8(const std::string& utf8String, const typename StringT
 #ifdef GHC_RAISE_UNICODE_ERRORS
         throw filesystem_error("Illegal byte sequence for unicode character.", utf8String, std::make_error_code(std::errc::illegal_byte_sequence));
 #else
-        result += (typename StringType::value_type)0xfffd;
+        result += static_cast<typename StringType::value_type>(0xfffd);
 #endif
     }
     return result;
@@ -1350,7 +1352,7 @@ inline StringType fromUtf8(const std::string& utf8String, const typename StringT
     unsigned utf8_state = S_STRT;
     std::uint32_t codepoint = 0;
     while (iter < utf8String.end()) {
-        if ((utf8_state = consumeUtf8Fragment(utf8_state, (uint8_t)*iter++, codepoint)) == S_STRT) {
+        if ((utf8_state = consumeUtf8Fragment(utf8_state, static_cast<uint8_t>(*iter++), codepoint)) == S_STRT) {
             result += static_cast<typename StringType::value_type>(codepoint);
             codepoint = 0;
         }
@@ -1358,7 +1360,7 @@ inline StringType fromUtf8(const std::string& utf8String, const typename StringT
 #ifdef GHC_RAISE_UNICODE_ERRORS
             throw filesystem_error("Illegal byte sequence for unicode character.", utf8String, std::make_error_code(std::errc::illegal_byte_sequence));
 #else
-            result += (typename StringType::value_type)0xfffd;
+            result += static_cast<typename StringType::value_type>(0xfffd);
             utf8_state = S_STRT;
             codepoint = 0;
 #endif
@@ -1368,7 +1370,7 @@ inline StringType fromUtf8(const std::string& utf8String, const typename StringT
 #ifdef GHC_RAISE_UNICODE_ERRORS
         throw filesystem_error("Illegal byte sequence for unicode character.", utf8String, std::make_error_code(std::errc::illegal_byte_sequence));
 #else
-        result += (typename StringType::value_type)0xfffd;
+        result += static_cast<typename StringType::value_type>(0xfffd);
 #endif
     }
     return result;
@@ -1682,7 +1684,7 @@ GHC_INLINE file_status file_status_from_st_mode(T mode)
     else if (S_ISSOCK(mode)) {
         ft = file_type::socket;
     }
-    auto prms = static_cast<perms>(mode & 0xfff);
+    perms prms = static_cast<perms>(mode & 0xfff);
     return file_status(ft, prms);
 #endif
 }
@@ -1756,7 +1758,7 @@ GHC_INLINE path resolveSymlink(const path& p, std::error_code& ec)
 #else
     size_t bufferSize = 256;
     while (true) {
-        std::vector<char> buffer(bufferSize, (char)0);
+        std::vector<char> buffer(bufferSize, static_cast<char>(0));
         auto rc = ::readlink(p.c_str(), buffer.data(), buffer.size());
         if (rc < 0) {
             ec = detail::make_system_error();
@@ -2509,7 +2511,7 @@ GHC_INLINE path path::parent_path() const
         }
         else {
             path pp;
-            for (const string_type& s : input_iterator_range<iterator>(begin(), --end())) {
+            for (string_type s : input_iterator_range<iterator>(begin(), --end())) {
                 if (s == "/") {
                     // don't use append to join a path-
                     pp += s;
@@ -2619,7 +2621,8 @@ GHC_INLINE bool path::is_relative() const
 GHC_INLINE path path::lexically_normal() const
 {
     path dest;
-    for (const string_type& s : *this) {
+    bool lastDotDot = false;
+    for (string_type s : *this) {
         if (s == ".") {
             dest /= "";
             continue;
@@ -2637,7 +2640,10 @@ GHC_INLINE path path::lexically_normal() const
                 continue;
             }
         }
-        dest /= s;
+        if (!(s.empty() && lastDotDot)) {
+            dest /= s;
+        }
+        lastDotDot = s == "..";
     }
     if (dest.empty()) {
         dest = ".";
@@ -3373,7 +3379,7 @@ GHC_INLINE bool create_directories(const path& p, std::error_code& ec) noexcept
 {
     path current;
     ec.clear();
-    for (const path::string_type& part : p) {
+    for (path::string_type part : p) {
         current /= part;
         if (current != p.root_name() && current != p.root_path()) {
             std::error_code tec;
@@ -3385,7 +3391,12 @@ GHC_INLINE bool create_directories(const path& p, std::error_code& ec) noexcept
             if (!exists(fs)) {
                 create_directory(current, ec);
                 if (ec) {
-                    return false;
+                    std::error_code tmp_ec;
+                    if (is_directory(current, tmp_ec)) {
+                        ec.clear();
+                    } else {
+                        return false;
+                    }
                 }
             }
 #ifndef LWG_2935_BEHAVIOUR
@@ -3450,7 +3461,7 @@ GHC_INLINE bool create_directory(const path& p, const path& attributes, std::err
         return false;
     }
 #else
-    auto attribs = static_cast<mode_t>(perms::all);
+    ::mode_t attribs = static_cast<mode_t>(perms::all);
     if (!attributes.empty()) {
         struct ::stat fileStat;
         if (::stat(attributes.c_str(), &fileStat) != 0) {
@@ -4165,7 +4176,7 @@ GHC_INLINE void rename(const path& from, const path& to, std::error_code& ec) no
     ec.clear();
 #ifdef GHC_OS_WINDOWS
     if (from != to) {
-        if (!MoveFileW(detail::fromUtf8<std::wstring>(from.u8string()).c_str(), detail::fromUtf8<std::wstring>(to.u8string()).c_str())) {
+        if (!MoveFileExW(detail::fromUtf8<std::wstring>(from.u8string()).c_str(), detail::fromUtf8<std::wstring>(to.u8string()).c_str(), (DWORD) MOVEFILE_REPLACE_EXISTING)) {
             ec = detail::make_system_error();
         }
     }

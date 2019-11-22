@@ -7,7 +7,7 @@ nosave int z = 5;
 int y = 0x7fffffffffffffff;
 
 void do_tests() {
-    save_object("/sf");
+    ASSERT_EQ(24, save_object("/sf"));
     ASSERT_EQ(read_file("/sf.o") , "#" + __FILE__ + "\ny " + MAX_INT + "\n");
     save_object("/sf", 1);
     ASSERT_EQ(read_file("/sf.o"),  "#" + __FILE__ + "\nx 0\ny " + MAX_INT + "\n");

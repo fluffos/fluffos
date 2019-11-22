@@ -18,6 +18,8 @@
 #include "comm.h"                    // add_message FIXME: reverse API
 #include "vm/internal/base/machine.h"
 #include "vm/internal/otable.h"  // FIXME:
+#include "ghc/filesystem.hpp"
+namespace fs = ghc::filesystem;
 
 #include "packages/core/add_action.h"  // for remove_living_name
 #include "packages/core/call_out.h"    // for remove_all_call_out
@@ -1527,7 +1529,7 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
       error("Could not open /%s for a save.\n", tmp_name);
     }
   } else {
-    if (!(f = fopen(tmp_name, "w")) || fprintf(f, "#/%s\n", save_name) < 0) {
+    if (!(f = fopen(tmp_name, "wb")) || fprintf(f, "#/%s\n", save_name) < 0) {
       error("Could not open /%s for a save.\n", tmp_name);
     }
   }
@@ -1549,11 +1551,13 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
     debug_message("Failed to completely save file. Disk could be full.\n");
     std::remove(tmp_name);
   } else {
-    if (rename(tmp_name, file) < 0) {
-      debug_perror("save_object", file);
-      debug_message("Failed to rename /%s to /%s\n", tmp_name, file);
-      debug_message("Failed to save object!\n");
+    std::error_code error_code;
+    auto base = fs::current_path(error_code);
+    fs::rename(base / fs::path(tmp_name), base / fs::path(file), error_code);
+    if (error_code) {
+      debug_message("Failed to rename /%s to /%s: Error: %d (%s)\n", tmp_name, file, error_code.value(), error_code.message().c_str());
       std::remove(tmp_name);
+      debug_message("Failed to save object!\n");
     } else if (save_compressed) {
       char buf[1024];
       // When compressed, unlink the uncompressed name too.

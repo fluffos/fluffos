@@ -98,6 +98,9 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDeb
         "-Wstack-protector"
         "--param" "ssp-buffer-size=4"
       )
+  if(WIN32)
+    link_libraries(ssp)
+  endif() # WIN32
   endif()
 else()
   if (NOT ENABLE_SANITIZER)
@@ -106,9 +109,11 @@ else()
         "-Wstack-protector"
         "--param" "ssp-buffer-size=4"
       )
+  if(WIN32)
+    link_libraries(ssp)
+  endif() # WIN32
   endif()
 endif()
-
 # Warnings
 add_compile_options(
   "-Wall"
@@ -161,6 +166,9 @@ else()
   set(DEBUG OFF)
 endif()
 
+add_subdirectory(thirdparty/filesystem EXCLUDE_FROM_ALL)
+include_directories(thirdparty/filesystem/include)
+
 INCLUDE (CheckIncludeFileCXX)
 # usage: CHECK_INCLUDE_FILES (<header> <RESULT_VARIABLE> )
 CHECK_INCLUDE_FILE_CXX (crypt.h HAVE_CRYPT_H)
@@ -184,10 +192,7 @@ set(GENERATED_HEADERS
         )
 
 # Libraries
-if(WIN32)
-else()
-  find_package(Libevent 2.0 REQUIRED COMPONENTS libevent)
-endif()
+find_package(Libevent 2.0 REQUIRED COMPONENTS libevent)
 # multiple packages uses this, so we simply do a global inclusion
 include_directories(SYSTEM ${LIBEVENT_INCLUDE_DIR})
 
@@ -317,6 +322,11 @@ add_dependencies(autogen make_options_defs)
 add_executable(driver
         ${SRC} ${SRC_HEADER}
         )
+IF(WIN32)
+  target_link_libraries(driver PRIVATE wsock32 ws2_32)
+ENDIF()
+
+target_link_libraries(driver PRIVATE ghc_filesystem)
 
 target_link_libraries(driver PUBLIC autogen)
 
@@ -372,7 +382,7 @@ endif()
 if (USE_JEMALLOC)
     find_package(jemalloc REQUIRED)
     set(HAVE_JEMALLOC TRUE) # used in config.h.in
-    include_directories(${JEMALLOC_INCLUDE_DIR})
+    include_directories(SYSTEM ${JEMALLOC_INCLUDE_DIR})
     target_link_libraries(driver PRIVATE ${JEMALLOC_LIBRARIES})
 endif()
 # end of JEMALLOC

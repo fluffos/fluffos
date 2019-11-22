@@ -110,12 +110,12 @@ int MDfree(void *ptr) {
     }
     if (malloc_mask == entry->tag) {
       debug_message("MDfree: %5d, [%-25s], %8lx:(%d)\n", entry->tag, entry->desc,
-                    (unsigned long)PTR(entry), entry->size);
+                    (uintptr_t)PTR(entry), entry->size);
     }
 #endif
   } else {
     debug_message("md: debugmalloc: attempted to free non-malloc'd pointer %08lx\n",
-                  (unsigned long)ptr);
+                  (uintptr_t)ptr);
 #ifdef DEBUG
     abort();
 #endif

@@ -10,7 +10,6 @@
 #include "base/package_api.h"
 
 #include <algorithm>
-#include <arpa/inet.h>  // for htons etc
 #ifdef HAVE_CRYPT_H
 #include <crypt.h>
 #endif
@@ -3395,6 +3394,10 @@ void f_defer() {
 #define OLDCRYPT(x, y) crypt(x, y)
 #endif
 
+#ifdef _WIN32
+#define crypt(x, y) custom_crypt(x, y, 0)
+#endif
+
 void f_crypt(void) {
   const char *res, *p;
   char salt[SALT_LEN + 1];
@@ -3500,6 +3503,7 @@ void f_localtime(void) {
 
 #ifdef F_RUSAGE
 void f_rusage(void) {
+#ifdef HAVE_SYS_RUSAGE_H
   struct rusage rus;
   mapping_t *m;
   long usertime, stime, maxrss;
@@ -3529,5 +3533,10 @@ void f_rusage(void) {
     add_mapping_pair(m, "nivcsw", rus.ru_nivcsw);
   }
   push_refed_mapping(m);
+#else
+  mapping_t *m;
+  m = allocate_mapping(16);
+  push_refed_mapping(m);
+#endif
 }
 #endif
