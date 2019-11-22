@@ -71,14 +71,14 @@ static pcre *pcre_local_compile(pcre_t *p);
 static int pcre_local_exec(pcre_t *p);
 static int pcre_magic(pcre_t *p);
 static int pcre_query_match(pcre_t *p);
-static int pcre_match_single(svalue_t *str, svalue_t *pattern);
-static array_t *pcre_match(array_t *v, svalue_t *pattern, int flag);
+static int pcre_match_single(svalue_t *str, const char* pattern);
+static array_t *pcre_match(array_t *v, const char* pattern, int flag);
 static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *def);
 static char *pcre_get_replace(pcre_t *run, array_t *replacements);
 static array_t *pcre_get_substrings(pcre_t *run);
 // Caching functions
-static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat, svalue_t *pattern);
-static pcre *pcre_get_cached_pattern(struct pcre_cache_t *table, svalue_t *pattern);
+static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat, const char *pattern);
+static pcre *pcre_get_cached_pattern(struct pcre_cache_t *table, const char *pattern);
 static mapping_t *pcre_get_cache();
 int pcrecachesize = 0;
 // Globals
@@ -107,13 +107,13 @@ void f_pcre_match(void) {
   }
 
   if ((sp - 1)->type == T_STRING) {
-    flag = pcre_match_single((sp - 1), sp);
+    flag = pcre_match_single((sp - 1), sp->u.string);
 
     free_string_svalue(sp--);
     free_string_svalue(sp);
     put_number(flag);
   } else {
-    v = pcre_match((sp - 1)->u.arr, sp, flag);
+    v = pcre_match((sp - 1)->u.arr, sp->u.string, flag);
 
     free_string_svalue(sp--);
     free_array(sp->u.arr);
@@ -150,7 +150,7 @@ void f_pcre_extract(void) {
   array_t *ret;
 
   run = (pcre_t *)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "f_pcre_extract : run");
-  assign_svalue_no_free(&run->pattern, sp);
+  run->pattern = sp->u.string;
   run->subject = (sp - 1)->u.string;
   run->s_length = SVALUE_STRLEN(sp - 1);
   run->ovector = nullptr;
@@ -196,7 +196,7 @@ void f_pcre_replace(void) {
 
   run->ovector = nullptr;
   run->ovecsize = 0;
-  assign_svalue_no_free(&run->pattern, (sp - 1));
+  run->pattern = (sp - 1)->u.string;
   run->subject = (sp - 2)->u.string;
   replacements = sp->u.arr;
 
@@ -257,7 +257,7 @@ void f_pcre_replace_callback(void) {
   run->ovector = nullptr;
   run->ovecsize = 0;
   run->subject = arg->u.string;
-  assign_svalue_no_free(&run->pattern, (arg + 1));
+  run->pattern = (arg + 1)->u.string;
 
   run->s_length = SVALUE_STRLEN(arg);
 
@@ -337,7 +337,7 @@ void f_pcre_cache(void) {
 
 // Internal functions utilized by the efuns
 static pcre *pcre_local_compile(pcre_t *p) {
-  p->re = pcre_compile(p->pattern.u.string, 0, &p->error, &p->erroffset, nullptr);
+  p->re = pcre_compile(p->pattern, 0, &p->error, &p->erroffset, nullptr);
 
   return p->re;
 }
@@ -365,11 +365,11 @@ static int pcre_local_exec(pcre_t *p) {
 }
 
 static int pcre_magic(pcre_t *p) {
-  p->re = pcre_get_cached_pattern(&pcre_cache, &p->pattern);
+  p->re = pcre_get_cached_pattern(&pcre_cache, p->pattern);
 
   if (p->re == nullptr) {
     pcre_local_compile(p);
-    pcre_cache_pattern(&pcre_cache, p->re, &p->pattern);
+    pcre_cache_pattern(&pcre_cache, p->re, p->pattern);
   }
 
   if (p->re == nullptr) {
@@ -388,14 +388,14 @@ static int pcre_magic(pcre_t *p) {
 
 static int pcre_query_match(pcre_t *p) { return p->rc < 0 ? 0 : 1; }
 
-static int pcre_match_single(svalue_t *str, svalue_t *pattern) {
+static int pcre_match_single(svalue_t *str, const char *pattern) {
   pcre_t *run;
   int ret;
 
   run = (pcre_t *)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "pcre_match_single : run");
   run->ovector = nullptr;
   run->ovecsize = 0;
-  assign_svalue_no_free(&run->pattern, pattern);
+  run->pattern = pattern;
   run->subject = str->u.string;
   run->s_length = SVALUE_STRLEN(str);
 
@@ -412,7 +412,7 @@ static int pcre_match_single(svalue_t *str, svalue_t *pattern) {
   return ret;
 }
 
-static array_t *pcre_match(array_t *v, svalue_t *pattern, int flag) {
+static array_t *pcre_match(array_t *v, const char* pattern, int flag) {
   pcre_t *run;
   array_t *ret;
   svalue_t *sv1, *sv2;
@@ -426,9 +426,9 @@ static array_t *pcre_match(array_t *v, svalue_t *pattern, int flag) {
   run = (pcre_t *)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "pcre_match : run");
   run->ovector = nullptr;
   run->ovecsize = 0;
-  assign_svalue_no_free(&run->pattern, pattern);
+  run->pattern= pattern;
 
-  run->re = pcre_get_cached_pattern(&pcre_cache, &run->pattern);
+  run->re = pcre_get_cached_pattern(&pcre_cache, run->pattern);
 
   if (run->re == nullptr) {
     if (pcre_local_compile(run) == nullptr) {
@@ -438,7 +438,7 @@ static array_t *pcre_match(array_t *v, svalue_t *pattern, int flag) {
       pcre_free_memory(run);
       error("PCRE compilation failed at offset %d: %s\n", offset, rerror);
     } else {
-      pcre_cache_pattern(&pcre_cache, run->re, &run->pattern);
+      pcre_cache_pattern(&pcre_cache, run->re, run->pattern);
     }
   }
 
@@ -538,8 +538,8 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
       rgpp[i] = (pcre_t *)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "pcre_assoc : rgpp[i]");
       rgpp[i]->ovector = nullptr;
       rgpp[i]->ovecsize = 0;
-      assign_svalue_no_free(&rgpp[i]->pattern, &pat->item[i]);
-      rgpp[i]->re = pcre_get_cached_pattern(&pcre_cache, &rgpp[i]->pattern);
+      rgpp[i]->pattern = pat->item[i].u.string;
+      rgpp[i]->re = pcre_get_cached_pattern(&pcre_cache, rgpp[i]->pattern);
 
       if (rgpp[i]->re == nullptr) {
         if (pcre_local_compile(rgpp[i]) == nullptr) {
@@ -555,7 +555,7 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
           free_empty_array(ret);
           error("PCRE compilation failed at offset %d: %s\n", offset, rerror);
         } else {
-          pcre_cache_pattern(&pcre_cache, rgpp[i]->re, &rgpp[i]->pattern);
+          pcre_cache_pattern(&pcre_cache, rgpp[i]->re, rgpp[i]->pattern);
         }
       }
     }
@@ -783,7 +783,6 @@ static char *pcre_get_replace(pcre_t *run, array_t *replacements) {
 }
 
 static void pcre_free_memory(pcre_t *p) {
-  free_svalue(&p->pattern, "pcre_free_memory");
   if (p->ovector) {
     FREE(p->ovector);
   }
@@ -793,11 +792,10 @@ static void pcre_free_memory(pcre_t *p) {
 // Caching functions, add new ones at the front of the bucket so we find them
 // faster
 static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
-                              svalue_t *pattern)  // don't keep pointers to
-                                                  // strings that will get freed
-                                                  // elsewhere!
+                              const char* pattern)  // must be shared string
 {
-  unsigned int bucket = svalue_to_int(pattern) % PCRE_CACHE_SIZE;
+  auto shared_pattern = make_shared_string(pattern);
+  unsigned int bucket = HASH(BLOCK(shared_pattern)) % PCRE_CACHE_SIZE;
   size_t sz;
   struct pcre_cache_bucket_t *tmp;
   struct pcre_cache_bucket_t *node;
@@ -810,7 +808,7 @@ static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
 
   full = (pcrecachesize > 2 * PCRE_CACHE_SIZE);
   while (tmp) {
-    if (pattern->u.string == tmp->pattern.u.string) {
+    if (shared_pattern == tmp->pattern) {
       break;
     }
 
@@ -823,11 +821,10 @@ static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
     node = tmp;
   } else {
     node = (struct pcre_cache_bucket_t *)DCALLOC(1, sizeof(struct pcre_cache_bucket_t),
-                                                 TAG_TEMPORARY, "pcre_cache_pattern : node");
+                                                 TAG_PCRE_CACHE, "pcre_cache_pattern : node");
     if (node == nullptr) {
       return -1;
     }
-    node->pattern.type = T_NUMBER;  // so we don't free invalids
     if (!full) {
       pcrecachesize++;
     } else {
@@ -838,6 +835,7 @@ static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
         if (tmp == table->buckets[bucket]) {  // if the hash version works, most
                                               // of the time
           pcre_free(tmp->compiled_pattern);
+          free_string(tmp->pattern);
           FREE(tmp);
           table->buckets[bucket] = nullptr;
         } else {
@@ -847,6 +845,7 @@ static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
             tmp2 = tmp2->next;  // shouldn't get here often
           }
           pcre_free(tmp->compiled_pattern);
+          free_string(tmp->pattern);
           FREE(tmp);
           tmp2->next = nullptr;
         }
@@ -856,32 +855,35 @@ static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
     table->buckets[bucket] = node;
   }
 
-  assign_svalue(&node->pattern, pattern);
+  node->pattern = shared_pattern;
   node->compiled_pattern = cpat;
   node->size = sz;
 
   return 0;
 }
 
-static pcre *pcre_get_cached_pattern(struct pcre_cache_t *table, svalue_t *pattern) {
-  unsigned int bucket = svalue_to_int(pattern) % PCRE_CACHE_SIZE;
+static pcre *pcre_get_cached_pattern(struct pcre_cache_t *table, const char* pattern) {
+  auto shared_pattern = make_shared_string(pattern);
+  unsigned int bucket = HASH(BLOCK(shared_pattern)) % PCRE_CACHE_SIZE;
   struct pcre_cache_bucket_t *node;
   struct pcre_cache_bucket_t *lnode = nullptr;
   node = table->buckets[bucket];
 
   while (node) {
-    if (pattern->u.string == node->pattern.u.string) {
+    if (shared_pattern == node->pattern) {
       if (node != table->buckets[bucket]) {
         // not at the front, move it there, so the most used pattern is fastest
         lnode->next = node->next;
         node->next = table->buckets[bucket];
         table->buckets[bucket] = node;
       }
+      free_string(shared_pattern);
       return node->compiled_pattern;
     }
     lnode = node;
     node = node->next;
   }
+  free_string(shared_pattern);
   return nullptr;
 }
 
@@ -909,10 +911,25 @@ static mapping_t *pcre_get_cache() {
       node = pcre_cache.buckets[i];
 
       while (node) {
-        add_mapping_pair(ret, node->pattern.u.string, node->size);
+        add_mapping_pair(ret, node->pattern, node->size);
         node = node->next;
       }
     }
   }
   return ret;
 }
+
+#ifdef DEBUGMALLOC_EXTENSIONS
+void mark_pcre_cache() {
+  for (auto i = 0; i < PCRE_CACHE_SIZE; i++) {
+    if (pcre_cache.buckets[i] != nullptr) {
+      auto node = pcre_cache.buckets[i];
+      while(node != nullptr) {
+        DO_MARK(node, TAG_PCRE_CACHE);
+        EXTRA_REF(BLOCK(node->pattern))++;
+        node = node->next;
+      }
+    }
+  }
+}
+#endif
