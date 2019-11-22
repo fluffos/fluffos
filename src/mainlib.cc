@@ -205,7 +205,7 @@ struct event_base *init_main(int argc, char **argv) {
     exit(-1);
   }
 
-  printf("Initializing internal stuff ....\n");
+  debug_message("Initializing internal stuff ....\n");
 
   // Initialize libevent, This should be done before executing LPC.
   auto base = init_backend();
@@ -287,15 +287,16 @@ int driver_main(int argc, char **argv) {
        * Look at flags. ignore those already been tested.
        */
       switch (argv[i][1]) {
-        case 'f':
+        case 'f': {
           debug_message("Calling master::flag(\"%s\")...\n", argv[i] + 2);
           push_constant_string(argv[i] + 2);
-          safe_apply_master_ob(APPLY_FLAG, 1);
-          if (MudOS_is_being_shut_down) {
+          auto ret = safe_apply_master_ob(APPLY_FLAG, 1);
+          if (ret == (svalue_t*)-1 || ret == nullptr || MudOS_is_being_shut_down) {
             debug_message("Shutdown by master object.\n");
-            exit(0);
+            return -1;
           }
-          continue;
+        }
+        continue;
         case 'd':
           if (argv[i][2]) {
             debug_level_set(&argv[i][2]);
