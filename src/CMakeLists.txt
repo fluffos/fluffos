@@ -384,9 +384,6 @@ endif ()
 target_link_libraries(driver PRIVATE ${LIBWEBSOCKETS_LIBRARIES_STATIC})
 # Third party libraries
 
-add_subdirectory(thirdparty/filesystem EXCLUDE_FROM_ALL)
-include_directories(thirdparty/filesystem/include)
-
 add_subdirectory(thirdparty/libtelnet EXCLUDE_FROM_ALL)
 target_link_libraries(driver PUBLIC libtelnet)
 
