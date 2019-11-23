@@ -171,7 +171,6 @@ include_directories(thirdparty/filesystem/include)
 
 INCLUDE (CheckIncludeFileCXX)
 # usage: CHECK_INCLUDE_FILES (<header> <RESULT_VARIABLE> )
-CHECK_INCLUDE_FILE_CXX (crypt.h HAVE_CRYPT_H)
 CHECK_INCLUDE_FILE_CXX (dirent.h HAVE_DIRENT_H)
 CHECK_INCLUDE_FILE_CXX (time.h HAVE_TIME_H)
 CHECK_INCLUDE_FILE_CXX (signal.h HAVE_SIGNAL_H)
@@ -337,6 +336,9 @@ foreach(PACKAGE ${FLUFFOS_PACKAGES})
     add_dependencies("${PACKAGE}" autogen)
     target_link_libraries(driver PUBLIC "${PACKAGE}")
 endforeach()
+
+add_subdirectory(thirdparty/crypt)
+target_link_libraries(driver PRIVATE crypt)
 
 # DTRACE support
 if(ENABLE_DTRACE)
