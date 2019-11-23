@@ -187,9 +187,9 @@ extern short compatible[11];
 extern short is_type[11];
 extern int comp_last_inherited;
 
-char *get_type_modifiers(char *, char *, int);
-char *get_two_types(char *, char *, int, int);
-char *get_type_name(char *, char *, int);
+std::string get_type_modifiers(int);
+std::string get_two_types(int, int);
+std::string get_type_name(int);
 void init_locals(void);
 
 void save_file_info(int, int);
@@ -271,6 +271,6 @@ char *allocate_in_mem_block(int, int);
 void smart_log(const char *, int, const char *, int);
 
 // FIXME: 'inherit_file' is used as a flag.
-extern char *inherit_file;
+extern std::string inherit_file;
 
 #endif

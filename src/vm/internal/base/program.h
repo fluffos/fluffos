@@ -161,7 +161,7 @@ typedef struct {
 #endif
 
 struct function_t {
-  char *funcname;
+  shared_string funcname;
   unsigned short type;
   unsigned char num_arg;
   unsigned char num_local;

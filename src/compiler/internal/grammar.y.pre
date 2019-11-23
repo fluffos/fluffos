@@ -262,14 +262,10 @@ inheritance:
 #ifdef SENSIBLE_MODIFIERS
       acc_mod = ($1 & DECL_ACCESS) & ~global_modifiers;
       if (acc_mod & (acc_mod - 1)) {
-        char buf[256];
-        char *end = EndOf(buf);
-        char *p;
-
-        p = strput(buf, end, "Multiple access modifiers (");
-        p = get_type_modifiers(p, end, $1);
-        p = strput(p, end, ") for inheritance");
-        yyerror(buf);
+        std::string buf {"Multiple access modifiers ("};
+        buf += get_type_modifiers($1);
+        buf += ") for inheritance";
+        yyerror(buf.c_str());
       }
 #endif
 
@@ -277,12 +273,12 @@ inheritance:
       if (var_defined)
         yyerror("Illegal to inherit after defining global variables.");
       if (var_defined){
-        inherit_file = 0;
+        inherit_file = "";
         YYACCEPT;
       }
       ob = find_object2($3);
       if (ob == 0) {
-        inherit_file = alloc_cstring($3, "inherit");
+        inherit_file = std::string{$3};
         /* Return back to load_object() */
         YYACCEPT;
       }
@@ -297,7 +293,7 @@ inheritance:
           + prev_inherit->prog->num_functions_defined
           + prev_inherit->prog->last_inherited;
         if (prev_inherit->prog->num_functions_defined &&
-            prev_inherit->prog->function_table[prev_inherit->prog->num_functions_defined - 1].funcname[0] == APPLY___INIT_SPECIAL_CHAR)
+            (*(prev_inherit->prog->function_table[prev_inherit->prog->num_functions_defined - 1].funcname))[0] == APPLY___INIT_SPECIAL_CHAR)
           inherit.function_index_offset--;
       } else inherit.function_index_offset = 0;
 
@@ -401,14 +397,10 @@ def:
 #ifdef SENSIBLE_MODIFIERS
       acc_mod = (flags & DECL_ACCESS) & ~global_modifiers;
       if (acc_mod & (acc_mod - 1)) {
-        char buf[256];
-        char *end = EndOf(buf);
-        char *p;
-
-        p = strput(buf, end, "Multiple access modifiers (");
-        p = get_type_modifiers(p, end, flags);
-        p = strput(p, end, ") for function");
-        yyerror(buf);
+        std::string buf {"Multiple access modifiers ("};
+        buf += get_type_modifiers($1);
+        buf += ") for function";
+        yyerror(buf.c_str());
       }
 #endif
 
@@ -440,10 +432,6 @@ def:
     }
   '(' argument ')'
     {
-      char *p = $3;
-      $3 = make_shared_string($3);
-      scratch_free(p);
-
       /* If we had nested functions, we would need to check */
       /* here if we have enough space for locals */
 
@@ -461,7 +449,6 @@ def:
       define_new_function($3, $6.num_arg, 0, $<number>$, ($1 & 0xffff)| $2);
       /* This is safe since it is guaranteed to be in the
          function table, so it can't be dangling */
-      free_string($3);
       context = 0;
     }
   block_or_semi
@@ -562,12 +549,7 @@ type_decl:
         ihe->sem_value++;
         ihe->dn.class_num = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
         if (ihe->dn.class_num > CLASS_NUM_MASK){
-          char buf[256];
-          char *p;
-
-          p = buf;
-          sprintf(p, "Too many classes, max is %d.\n", CLASS_NUM_MASK + 1);
-          yyerror(buf);
+          yyerror(fmt::format("Too many classes, max is {}.\n", CLASS_NUM_MASK + 1).c_str());
         }
 
         scratch_free($3);
@@ -603,13 +585,9 @@ type_decl:
       }
 
       if (raise_error) {
-        char buf[512];
-        char *end = EndOf(buf);
-        char *p;
-
-        p = strput(buf, end, "Illegal to redefine class ");
-        p = strput(p, end, PROG_STRING($<number>$));
-        yyerror(buf);
+        std::string  buf {"Illegal to redefine class "};
+        buf += PROG_STRING($<number>$);
+        yyerror(buf.c_str());
       } else {
         sd = (class_def_t *)allocate_in_mem_block(A_CLASS_DEF, sizeof(class_def_t));
         i = sd->size = current_number_of_locals;
@@ -634,14 +612,10 @@ new_local_name:
   | L_DEFINED_NAME
     {
       if ($1->dn.local_num != -1) {
-        char buff[256];
-        char *end = EndOf(buff);
-        char *p;
-
-        p = strput(buff, end, "Illegal to redeclare local name '");
-        p = strput(p, end, $1->name);
-        p = strput(p, end, "'");
-        yyerror(buff);
+        std::string buf {"Illegal to redeclare local name '"};
+        buf += $1->name;
+        buf += "'";
+        yyerror(buf.c_str());
       }
       $$ = scratch_copy($1->name);
     }
@@ -652,14 +626,10 @@ atomic_type:
   | L_CLASS L_DEFINED_NAME
     {
       if ($2->dn.class_num == -1) {
-        char buf[256];
-        char *end = EndOf(buf);
-        char *p;
-
-        p = strput(buf, end, "Undefined class '");
-        p = strput(p, end, $2->name);
-        p = strput(p, end, "'");
-        yyerror(buf);
+        std::string buf {"Undefined class '"};
+        buf += $2->name;
+        buf += "'";
+        yyerror(buf.c_str());
         $$ = TYPE_ANY;
       } else {
         $$ = $2->dn.class_num | TYPE_MOD_CLASS;
@@ -667,14 +637,10 @@ atomic_type:
     }
   | L_CLASS L_IDENTIFIER
     {
-      char buf[256];
-      char *end = EndOf(buf);
-      char *p;
-
-      p = strput(buf, end, "Undefined class '");
-      p = strput(p, end, $2);
-      p = strput(p, end, "'");
-      yyerror(buf);
+      std::string buf {"Undefined class '"};
+      buf += $2;
+      buf += "'";
+      yyerror(buf.c_str());
       $$ = TYPE_ANY;
     }
 ;
@@ -799,14 +765,10 @@ type_modifier_list:
 #ifdef SENSIBLE_MODIFIERS
       acc_mod = ($$ & DECL_ACCESS) & ~global_modifiers;
       if (acc_mod & (acc_mod - 1)) {
-        char buf[256];
-        char *end = EndOf(buf);
-        char *p;
-
-        p = strput(buf, end, "Multiple access modifiers (");
-        p = get_type_modifiers(p, end, $$);
-        p = strput(p, end, ") ");
-        yyerror(buf);
+        std::string buf {"Multiple access modifiers ("};
+        buf += get_type_modifiers($$);
+        buf += ") ";
+        yyerror(buf.c_str());
         $$ = DECL_PUBLIC;
       }
 #endif
@@ -898,15 +860,11 @@ new_name:
         if ((current_type & ~DECL_MODS) == TYPE_VOID)
           yyerror("Illegal to declare global variable of type void.");
         if (!compatible_types(type, $4->type)) {
-          char buff[256];
-          char *end = EndOf(buff);
-          char *p;
-
-          p = strput(buff, end, "Type mismatch ");
-          p = get_two_types(p, end, type, $4->type);
-          p = strput(p, end, " when initializing ");
-          p = strput(p, end, $2);
-          yyerror(buff);
+          std::string buf {"Type mismatch "};
+          buf += get_two_types(type, $4->type);
+          buf += " when initializing ";
+          buf += $2;
+          yyerror(buf.c_str());
         }
       } else type = 0;
       $4 = do_promotions($4, type);
@@ -982,16 +940,12 @@ new_local_def:
       if ($3 != F_ASSIGN)
         yyerror("Only '=' is allowed in initializers.");
       if (!compatible_types($4->type, type)) {
-        char buff[256];
-        char *end = EndOf(buff);
-        char *p;
+        std::string buf {"Type mismatch "};
+        buf += get_two_types(type, $4->type);
+        buf += " when initializing ";
+        buf += $2;
 
-        p = strput(buff, end, "Type mismatch ");
-        p = get_two_types(p, end, type, $4->type);
-        p = strput(p, end, " when initializing ");
-        p = strput(p, end, $2);
-
-        yyerror(buff);
+        yyerror(buf.c_str());
       }
 
       $4 = do_promotions($4, type);
@@ -1027,14 +981,10 @@ single_new_local_def_with_init:
       if ($2 != F_ASSIGN)
         yyerror("Only '=' is allowed in initializers.");
       if (!compatible_types($3->type, type)) {
-        char buff[256];
-        char *end = EndOf(buff);
-        char *p;
-
-        p = strput(buff, end, "Type mismatch ");
-        p = get_two_types(p, end, type, $3->type);
-        p = strput(p, end, " when initializing.");
-        yyerror(buff);
+        std::string buf {"Type mismatch "};
+        buf += get_two_types(type, $3->type);
+        buf += " when initializing.";
+        yyerror(buf.c_str());
       }
 
       $3 = do_promotions($3, type);
@@ -1198,14 +1148,10 @@ foreach_var:
         if ($1->dn.global_num != -1) {
           CREATE_OPCODE_1($$.node, F_GLOBAL_LVALUE, 0, $1->dn.global_num);
         } else {
-          char buf[256];
-          char *end = EndOf(buf);
-          char *p;
-
-          p = strput(buf, end, "'");
-          p = strput(p, end, $1->name);
-          p = strput(p, end, "' is not a local or a global variable.");
-          yyerror(buf);
+          std::string buf {"'"};
+          buf += $1->name;
+          buf += "' is not a local or a global variable.";
+          yyerror(buf.c_str());
           CREATE_OPCODE_1($$.node, F_GLOBAL_LVALUE, 0, 0);
         }
       $$.num = 0;
@@ -1222,14 +1168,10 @@ foreach_var:
     }
   | L_IDENTIFIER
     {
-      char buf[256];
-      char *end = EndOf(buf);
-      char *p;
-
-      p = strput(buf, end, "'");
-      p = strput(p, end, $1);
-      p = strput(p, end, "' is not a local or a global variable.");
-      yyerror(buf);
+      std::string buf {"'"};
+      buf += $1;
+      buf += "' is not a local or a global variable.";
+      yyerror(buf.c_str());
       CREATE_OPCODE_1($$.node, F_GLOBAL_LVALUE, 0, 0);
       scratch_free($1);
       $$.num = 0;
@@ -1589,13 +1531,10 @@ expr0:
       if (exact_types && !compatible_types(r->type, l->type) &&
           !($2 == F_ADD_EQ && l->type == TYPE_STRING &&
             ((COMP_TYPE(r->type, TYPE_NUMBER)) || r->type == TYPE_OBJECT))) {
-        char buf[256];
-        char *end = EndOf(buf);
-        char *p;
-        p = strput(buf, end, "Bad assignment ");
-        p = get_two_types(p, end, l->type, r->type);
-        p = strput(p, end, ".");
-        yyerror(buf);
+        std::string buf {"Bad assignment "};
+        buf += get_two_types(l->type, r->type);
+        buf += ".";
+        yyerror(buf.c_str());
       }
 
       if ($2 == F_ASSIGN)
@@ -1611,14 +1550,10 @@ expr0:
       parse_node_t *p1 = $3, *p2 = $5;
 
       if (exact_types && !compatible_types2(p1->type, p2->type)) {
-        char buf[256];
-        char *end = EndOf(buf);
-        char *p;
-
-        p = strput(buf, end, "Types in ?: do not match ");
-        p = get_two_types(p, end, p1->type, p2->type);
-        p = strput(p, end, ".");
-        yywarn(buf);
+        std::string buf {"Types in ?: do not match "};
+        buf += get_two_types(p1->type, p2->type);
+        buf += ".";
+        yywarn(buf.c_str());
       }
 
       /* optimize if last expression did F_NOT */
@@ -1652,14 +1587,10 @@ expr0:
         if (t1 != t3) {
           if ((t1 != TYPE_ANY) && (t3 != TYPE_ANY) &&
               !(t1 & t3 & TYPE_MOD_ARRAY)) {
-            char buf[256];
-            char *end = EndOf(buf);
-            char *p;
-
-            p = strput(buf, end, "Incompatible types for | ");
-            p = get_two_types(p, end, t1, t3);
-            p = strput(p, end, ".");
-            yyerror(buf);
+            std::string buf {"Incompatible types for | "};
+            buf += get_two_types(t1, t3);
+            buf += ".";
+            yyerror(buf.c_str());
           }
           t1 = TYPE_ANY | TYPE_MOD_ARRAY;
         }
@@ -1680,14 +1611,10 @@ expr0:
         if (t1 != t3) {
           if ((t1 != TYPE_ANY) && (t3 != TYPE_ANY) &&
               !(t1 & t3 & TYPE_MOD_ARRAY)) {
-            char buf[256];
-            char *end = EndOf(buf);
-            char *p;
-
-            p = strput(buf, end, "Incompatible types for & ");
-            p = get_two_types(p, end, t1, t3);
-            p = strput(p, end, ".");
-            yyerror(buf);
+            std::string buf {"Incompatible types for & "};
+            buf += get_two_types(t1, t3);
+            buf += ".";
+            yyerror(buf.c_str());
           }
           t1 = TYPE_ANY | TYPE_MOD_ARRAY;
         }
@@ -1697,14 +1624,10 @@ expr0:
   | expr0 L_EQ expr0
     {
       if (exact_types && !compatible_types2($1->type, $3->type)){
-        char buf[256];
-        char *end = EndOf(buf);
-        char *p;
-
-        p = strput(buf, end, "== always false because of incompatible types ");
-        p = get_two_types(p, end, $1->type, $3->type);
-        p = strput(p, end, ".");
-        yyerror(buf);
+        std::string buf {"== always false because of incompatible types "};
+        buf += get_two_types($1->type, $3->type);
+        buf += ".";
+        yyerror(buf.c_str());
       }
       /* x == 0 -> !x */
       if (IS_NODE($1, NODE_NUMBER, 0)) {
@@ -1719,14 +1642,10 @@ expr0:
   | expr0 L_NE expr0
     {
       if (exact_types && !compatible_types2($1->type, $3->type)){
-        char buf[256];
-        char *end = EndOf(buf);
-        char *p;
-
-        p = strput(buf, end, "!= always true because of incompatible types ");
-        p = get_two_types(p, end, $1->type, $3->type);
-        p = strput(p, end, ".");
-        yyerror(buf);
+        std::string buf {"!= always true because of incompatible types "};
+        buf += get_two_types($1->type, $3->type);
+        buf += ".";
+        yyerror(buf.c_str());
       }
       CREATE_BINARY_OP($$, F_NE, TYPE_NUMBER, $1, $3);
     }
@@ -1738,38 +1657,26 @@ expr0:
 
         if (!COMP_TYPE(t1, TYPE_NUMBER)
             && !COMP_TYPE(t1, TYPE_STRING)) {
-          char buf[256];
-          char *end = EndOf(buf);
-          char *p;
-
-          p = strput(buf, end, "Bad left argument to '");
-          p = strput(p, end, query_instr_name($2));
-          p = strput(p, end, "' : \"");
-          p = get_type_name(p, end, t1);
-          p = strput(p, end, "\"");
-          yyerror(buf);
+          std::string buf {"Bad left argument to '"};
+          buf += query_instr_name($2);
+          buf += "' : \"";
+          buf += get_type_name(t1);
+          buf += "\"";
+          yyerror(buf.c_str());
         } else if (!COMP_TYPE(t3, TYPE_NUMBER)
             && !COMP_TYPE(t3, TYPE_STRING)) {
-          char buf[256];
-          char *end = EndOf(buf);
-          char *p;
-
-          p = strput(buf, end, "Bad right argument to '");
-          p = strput(p, end, query_instr_name($2));
-          p = strput(p, end, "' : \"");
-          p = get_type_name(p, end, t3);
-          p = strput(p, end, "\"");
-          yyerror(buf);
+          std::string buf {"Bad right argument to '"};
+          buf += query_instr_name($2);
+          buf += "' : \"";
+          buf += get_type_name(t3);
+          buf += "\"";
+          yyerror(buf.c_str());
         } else if (!compatible_types2(t1,t3)) {
-          char buf[256];
-          char *end = EndOf(buf);
-          char *p;
-
-          p = strput(buf, end, "Arguments to ");
-          p = strput(p, end, query_instr_name($2));
-          p = strput(p, end, " do not have compatible types : ");
-          p = get_two_types(p, end, t1, t3);
-          yyerror(buf);
+          std::string buf {"Arguments to "};
+          buf += query_instr_name($2);
+          buf += " do not have compatible types : ";
+          buf += get_two_types(t1, t3);
+          yyerror(buf.c_str());
         }
       }
       CREATE_BINARY_OP($$, $2, TYPE_NUMBER, $1, $3);
@@ -1781,32 +1688,20 @@ expr0:
 
         if (!COMP_TYPE(t1, TYPE_NUMBER)
             && !COMP_TYPE(t1, TYPE_STRING)) {
-          char buf[256];
-          char *end = EndOf(buf);
-          char *p;
-
-          p = strput(buf, end, "Bad left argument to '<' : \"");
-          p = get_type_name(p, end, t1);
-          p = strput(p, end, "\"");
-          yyerror(buf);
+          std::string buf {"Bad left argument to '<' : \""};
+          buf += get_type_name(t1);
+          buf += '"';
+          yyerror(buf.c_str());
         } else if (!COMP_TYPE(t3, TYPE_NUMBER)
             && !COMP_TYPE(t3, TYPE_STRING)) {
-          char buf[200];
-          char *end = EndOf(buf);
-          char *p;
-
-          p = strput(buf, end, "Bad right argument to '<' : \"");
-          p = get_type_name(p, end, t3);
-          p = strput(p, end, "\"");
-          yyerror(buf);
+          std::string buf {"Bad right argument to '<' : \""};
+          buf += get_type_name(t3);
+          buf += '"';
+          yyerror(buf.c_str());
         } else if (!compatible_types2(t1,t3)) {
-          char buf[256];
-          char *end = EndOf(buf);
-          char *p;
-
-          p = strput(buf, end, "Arguments to < do not have compatible types : ");
-          p = get_two_types(p, end, t1, t3);
-          yyerror(buf);
+          std::string buf {"Arguments to < do not have compatible types : "};
+          buf += get_two_types(t1, t3);
+          yyerror(buf.c_str());
         }
       }
       CREATE_BINARY_OP($$, F_LT, TYPE_NUMBER, $1, $3);
@@ -1881,13 +1776,9 @@ expr0:
                 }
             add_error:
                 {
-                  char buf[256];
-                  char *end = EndOf(buf);
-                  char *p;
-
-                  p = strput(buf, end, "Invalid argument types to '+' ");
-                  p = get_two_types(p, end, t1, t3);
-                  yyerror(buf);
+                  std::string buf {"Invalid argument types to '+' "};
+                  buf += get_two_types(t1, t3);
+                  yyerror(buf.c_str());
                   result_type = TYPE_ANY;
                 }
               }
@@ -2039,13 +1930,9 @@ expr0:
         } else if (t1 & t3 & TYPE_MOD_ARRAY){
           result_type = TYPE_MOD_ARRAY|TYPE_ANY;
         } else {
-          char buf[256];
-          char *end = EndOf(buf);
-          char *p;
-
-          p = strput(buf, end, "Invalid types to '-' ");
-          p = get_two_types(p, end, t1, t3);
-          yyerror(buf);
+          std::string buf {"Invalid types to '-' "};
+          buf += get_two_types(t1, t3);
+          yyerror(buf.c_str());
           result_type = TYPE_ANY;
         }
       } else result_type = TYPE_ANY;
@@ -2121,13 +2008,9 @@ expr0:
             (t1 == TYPE_REAL && t3 == TYPE_NUMBER)){
           result_type = TYPE_REAL;
         } else {
-          char buf[256];
-          char *end = EndOf(buf);
-          char *p;
-
-          p = strput(buf, end, "Invalid types to '*' ");
-          p = get_two_types(p, end, t1, t3);
-          yyerror(buf);
+          std::string buf {"Invalid types to '*' "};
+          buf += get_two_types(t1, t3);
+          yyerror(buf.c_str());
           result_type = TYPE_ANY;
         }
       } else result_type = TYPE_ANY;
@@ -2199,13 +2082,9 @@ expr0:
             (t1 == TYPE_REAL && t3 == TYPE_NUMBER)) {
           result_type = TYPE_REAL;
         } else {
-          char buf[256];
-          char *end = EndOf(buf);
-          char *p;
-
-          p = strput(buf, end, "Invalid types to '/' ");
-          p = get_two_types(p, end, t1, t3);
-          yyerror(buf);
+          std::string buf {"Invalid types to '/' "};
+          buf += get_two_types(t1, t3);
+          yyerror(buf.c_str());
           result_type = TYPE_ANY;
         }
       } else result_type = TYPE_ANY;
@@ -2272,15 +2151,11 @@ expr0:
           $2->type != TYPE_ANY &&
           $2->type != TYPE_UNKNOWN &&
           $1 != TYPE_VOID) {
-        char buf[256];
-        char *end = EndOf(buf);
-        char *p;
-
-        p = strput(buf, end, "Cannot cast ");
-        p = get_type_name(p, end, $2->type);
-        p = strput(p, end, "to ");
-        p = get_type_name(p, end, $1);
-        yyerror(buf);
+        std::string buf {"Cannot cast "};
+        buf += get_type_name($2->type);
+        buf += "to ";
+        buf += get_type_name($1);
+        yyerror(buf.c_str());
       }
     }
   | L_INC lvalue  %prec L_NOT  /* note lower precedence here */
@@ -2431,13 +2306,9 @@ return:
   | L_RETURN comma_expr ';'
     {
       if (exact_types && !compatible_types($2->type, exact_types)) {
-        char buf[256];
-        char *end = EndOf(buf);
-        char *p;
-
-        p = strput(buf, end, "Type of returned value doesn't match function return type ");
-        p = get_two_types(p, end, $2->type, exact_types);
-        yyerror(buf);
+        std::string buf {"Type of returned value doesn't match function return type "};
+        buf += get_two_types($2->type, exact_types);
+        yyerror(buf.c_str());
       }
       if (IS_NODE($2, NODE_NUMBER, 0)) {
         CREATE_RETURN($$, 0);
@@ -2710,44 +2581,32 @@ expr4:
           CREATE_OPCODE_1($$, F_GLOBAL,
               VAR_TEMP(i)->type & ~DECL_MODS, i);
           if (VAR_TEMP(i)->type & DECL_HIDDEN) {
-            char buf[256];
-            char *end = EndOf(buf);
-            char *p;
-
-            p = strput(buf, end, "Illegal to use private variable '");
-            p = strput(p, end, $1->name);
-            p = strput(p, end, "'");
-            yyerror(buf);
+            std::string buf {"Illegal to use private variable '"};
+            buf += $1->name;
+            buf += '\'';
+            yyerror(buf.c_str());
           }
         } else {
-          char buf[256];
-          char *end = EndOf(buf);
-          char *p;
-
-          p = strput(buf, end, "Undefined variable '");
-          p = strput(p, end, $1->name);
-          p = strput(p, end, "'");
+          std::string buf {"Undefined variable '"};
+          buf += $1->name;
+          buf += '\'';
           if (current_number_of_locals < CFG_MAX_LOCAL_VARIABLES) {
             add_local_name($1->name, TYPE_ANY);
           }
           CREATE_ERROR($$);
-          yyerror(buf);
+          yyerror(buf.c_str());
         }
     }
   | L_IDENTIFIER
     {
-      char buf[256];
-      char *end = EndOf(buf);
-      char *p;
-
-      p = strput(buf, end, "Undefined variable '");
-      p = strput(p, end, $1);
-      p = strput(p, end, "'");
+      std::string  buf {"Undefined variable '"};
+      buf += $1;
+      buf += "'";
       if (current_number_of_locals < CFG_MAX_LOCAL_VARIABLES) {
         add_local_name($1, TYPE_ANY);
       }
       CREATE_ERROR($$);
-      yyerror(buf);
+      yyerror(buf.c_str());
       scratch_free($1);
     }
   | L_PARAMETER
@@ -3037,14 +2896,10 @@ expr4:
           CREATE_OPCODE_1($$->l.expr, F_GLOBAL, 0, $1 >> 8);
           $$->v.number = FP_FUNCTIONAL | FP_NOT_BINDABLE;
           if (VAR_TEMP($$->l.expr->l.number)->type & DECL_HIDDEN) {
-            char buf[256];
-            char *end = EndOf(buf);
-            char *p;
-
-            p = strput(buf, end, "Illegal to use private variable '");
-            p = strput(p, end, VAR_TEMP($$->l.expr->l.number)->name);
-            p = strput(p, end, "'");
-            yyerror(buf);
+            std::string buf {"Illegal to use private variable '"};
+            buf += VAR_TEMP($$->l.expr->l.number)->name;
+            buf += "'";
+            yyerror(buf.c_str());
           }
           break;
         default:
@@ -3081,13 +2936,9 @@ expr4:
                             }
 
                             if (!pn) {
-                              char bff[256];
-                              char *end = EndOf(bff);
-                              char *p;
-
-                              p = strput(bff, end, "Too many arguments to ");
-                              p = strput(p, end, predefs[f].word);
-                              yyerror(bff);
+                              std::string buf {"Too many arguments to "};
+                              buf += predefs[f].word;
+                              yyerror(buf.c_str());
                             }
                           } else if (max_arg != -1 && exact_types) {
                             /*
@@ -3105,16 +2956,12 @@ expr4:
                                   && argp[i] != 0; i++)
                                 ;
                               if (argp[i] == 0) {
-                                char buf[256];
-                                char *end = EndOf(buf);
-                                char *p;
-
-                                p = strput(buf, end, "Bad argument ");
-                                p = strput_int(p, end, argn+1);
-                                p = strput(p, end, " to efun ");
-                                p = strput(p, end, predefs[f].word);
-                                p = strput(p, end, "()");
-                                yyerror(buf);
+                                std::string buf {"Bad argument "};
+                                buf += (argn+1);
+                                buf += " to efun ";
+                                buf += predefs[f].word;
+                                buf += "()";
+                                yyerror(buf.c_str());
                               } else {
                                 /* this little section necessary b/c in the
                                    case float | int we dont want to do
@@ -3381,14 +3228,10 @@ function_call:
       parse_node_t *node;
 
       if ($4->dn.class_num == -1) {
-        char buf[256];
-        char *end = EndOf(buf);
-        char *p;
-
-        p = strput(buf, end, "Undefined class '");
-        p = strput(p, end, $4->name);
-        p = strput(p, end, "'");
-        yyerror(buf);
+        std::string buf {"Undefined class '"};
+        buf += $4->name;
+        buf += "'";
+        yyerror(buf.c_str());
         CREATE_ERROR($$);
         node = $5;
         while (node) {
@@ -3414,14 +3257,10 @@ function_call:
   | L_NEW '(' L_CLASS L_IDENTIFIER opt_class_init ')'
     {
       parse_node_t *node;
-      char buf[256];
-      char *end = EndOf(buf);
-      char *p;
-
-      p = strput(buf, end, "Undefined class '");
-      p = strput(p, end, $4);
-      p = strput(p, end, "'");
-      yyerror(buf);
+      std::string buf {"Undefined class '"};
+      buf += $4;
+      buf += "'";
+      yyerror(buf.c_str());
       CREATE_ERROR($$);
       node = $5;
       while (node) {
@@ -3464,14 +3303,14 @@ function_call:
          * f() { }                // need this case
          */
         if (exact_types) {
-          char buf[256];
-          char *end = EndOf(buf);
-          char *p;
+          std::string buf {"Undefined function "};
           const char *n = $1->name;
-          if (*n == ':') n++;
-          p = strput(buf, end, "Undefined function ");
-          p = strput(p, end, n);
-          yyerror(buf);
+
+          if (*n == ':') {
+            n++;
+          }
+          buf += n;
+          yyerror(buf.c_str());
         } else {
           /*
            * Don't complain, just grok it.
@@ -3508,13 +3347,13 @@ function_call:
       if (*name == ':') {
         int f;
 
-        if ((f = arrange_call_inherited(name + 1, $$)) != -1)
+        if ((f = arrange_call_inherited(name + 1, $$)) != -1) {
           /* Can't do this; f may not be the correct function
              entry.  It might be overloaded.
 
              validate_function_call(f, $$->r.expr)
              */
-          ;
+          }
       } else {
         /* The only way this can happen is if function_name
          * below made the function name. (directly or inherited.)
@@ -3529,14 +3368,14 @@ function_call:
         // otherwise attempt to create a function, hoping later it will be defined by inherit.
         if (f == -1) {
           if (exact_types) {
-            char buf[256];
-            char *end = EndOf(buf);
-            char *p;
+            std::string buf {"Undefined function "};
             char *n = $1;
-            if (*n == ':') n++;
-            p = strput(buf, end, "Undefined function ");
-            p = strput(p, end, n);
-            yyerror(buf);
+
+            if (*n == ':') {
+              n++;
+            }
+            buf += n;
+            yyerror(buf.c_str());
           } else {
             f = define_new_function(name, 0, 0, DECL_PUBLIC|FUNC_UNDEFINED, TYPE_ANY);
           }
@@ -3646,13 +3485,9 @@ efun_override:
 
       $$ = (ihe = lookup_ident($3)) ? ihe->dn.efun_num : -1;
       if ($$ == -1) {
-        char buf[256];
-        char *end = EndOf(buf);
-        char *p;
-
-        p = strput(buf, end, "Unknown efun: ");
-        p = strput(p, end, $3);
-        yyerror(buf);
+        std::string buf {"Unknown efun: "};
+        buf += $3;
+        yyerror(buf.c_str());
       } else {
         push_malloced_string(the_file_name(current_file));
         share_and_push_string($3);

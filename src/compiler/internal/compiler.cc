@@ -32,7 +32,7 @@
  * after yyparse(), this string should be loaded as an object,
  * and the original object must be loaded again.
  */
-char *inherit_file;
+std::string inherit_file {};
 
 // FIXME: this is defined in vm/internal/simul_efun.cc
 extern object_t *simul_efun_ob;
@@ -115,14 +115,15 @@ int current_number_of_locals = 0;
 int max_num_locals = 0;
 
 /* This function has strput() semantics; see comments in simulate.c */
-char *get_two_types(char *where, char *end, int type1, int type2) {
-  where = strput(where, end, "( ");
-  where = get_type_name(where, end, type1);
-  where = strput(where, end, "vs ");
-  where = get_type_name(where, end, type2);
-  where = strput(where, end, ")");
+std::string get_two_types(int type1, int type2) {
+    std::string ret {"( "};
 
-  return where;
+  ret += get_type_name(type1);
+  ret += "vs ";
+  ret += get_type_name(type2);
+  ret += ")";
+
+  return ret;
 }
 
 void init_locals() {
@@ -1127,14 +1128,10 @@ int define_new_function(const char *name, int num_arg, int num_local, int flags,
 
     if (!(funflags & (FUNC_INHERITED | FUNC_PROTOTYPE | FUNC_UNDEFINED)) &&
         !(flags & FUNC_PROTOTYPE)) {
-      char buff[256];
-      char *end = EndOf(buff);
-      char *p;
-
-      p = strput(buff, end, "Redeclaration of function ");
-      p = strput(p, end, name);
-      p = strput(p, end, ".");
-      yyerror(buff);
+      std::string buff {"Redeclaration of function "};
+      buff += name;
+      buff += ".";
+      yyerror(buff.c_str());
       return -1;
     }
     /*
@@ -1149,14 +1146,10 @@ int define_new_function(const char *name, int num_arg, int num_local, int flags,
      * 'nomask' functions may not be redefined.
      */
     if ((funflags & DECL_NOMASK) && !((flags | funflags) & (FUNC_UNDEFINED | FUNC_PROTOTYPE))) {
-      char buf[256];
-      char *end = EndOf(buf);
-      char *p;
-
-      p = strput(buf, end, "Illegal to redefine 'nomask' function \"");
-      p = strput(p, end, name);
-      p = strput(p, end, "\"");
-      yyerror(buf);
+      std::string buf {"Illegal to redefine 'nomask' function \""};
+      buff += name;
+      buff += "\"";
+      yyerror(buf.c_str());
     }
 
     /* only check prototypes for matching.  It shouldn't be required that
@@ -1179,28 +1172,26 @@ int define_new_function(const char *name, int num_arg, int num_local, int flags,
 
         /* Now check that argument types wasn't changed. */
         if (!compatible_types(type, funtype)) {
-          char buff[512];
-          char *end = EndOf(buff);
-          char *p;
+          std::string buff;
 
           if (FUNCTION_TEMP(oldindex)->prog) {
-            p = strput(buff, end, "Function ");
-            p = strput(p, end, name);
-            p = strput(p, end, " inherited from '/");
-            p = strput(p, end, FUNCTION_TEMP(oldindex)->prog->filename);
-            p = strput(p, end, "' does not match ");
+            buff = "Function ";
+            buff += name;
+            buff += " inherited from '/";
+            buff += FUNCTION_TEMP(oldindex)->prog->filename;
+            buff += "' does not match ";
           } else {
             if (funflags & FUNC_PROTOTYPE) {
-              p = strput(buff, end, "Previous function prototype ");
+              buff = "Previous function prototype ";
             } else {
-              p = strput(buff, end, "Previous function declaration ");
+              buff = "Previous function declaration ";
             }
-            p = strput(p, end, "for ");
-            p = strput(p, end, name);
-            p = strput(p, end, " does not match ");
+            buff += "for ";
+            buff += name;
+            buff += " does not match ";
           }
-          p = strput(p, end, "current function in return type ");
-          p = get_two_types(p, end, funtype, type);
+          buff += "current function in return type ";
+          buff += get_two_types(funtype, type);
 
           yywarn(buff);
         }
@@ -1238,7 +1229,7 @@ int define_new_function(const char *name, int num_arg, int num_local, int flags,
   if (!funp) {
     num = mem_block[A_FUNCTIONS].current_size / sizeof(function_t);
     funp = reinterpret_cast<function_t *>(allocate_in_mem_block(A_FUNCTIONS, sizeof(function_t)));
-    funp->funcname = make_shared_string(name);
+    funp->funcname = name;
     argument_start_index = INDEX_START_NONE;
     add_to_mem_block(A_ARGUMENT_INDEX, (char *)&argument_start_index, sizeof argument_start_index);
   }
@@ -1442,56 +1433,57 @@ const char *compiler_type_names[] = {"unknown", "mixed",   "void",     "void",  
 
 /* This routine has the semantics of strput(); see comments in simulate.c */
 
-char *get_type_modifiers(char *where, char *end, int type) {
+std::string get_type_modifiers(int type) {
+    std::string ret {};
 #ifdef SENSIBLE_MODIFIERS
   if (type & DECL_HIDDEN) {
-    where = strput(where, end, "hidden ");
+    ret += "hidden ";
   }
   if (type & DECL_PRIVATE) {
-    where = strput(where, end, "private ");
+    ret += "private ";
   }
   if (type & DECL_PROTECTED) {
-    where = strput(where, end, "protected ");
+    ret += "protected ";
   }
   if (type & DECL_NOSAVE) {
-    where = strput(where, end, "nosave ");
+    ret += "nosave ";
   }
 #else
   if (type & DECL_HIDDEN) {
-    where = strput(where, end, "hidden ");
+    ret += "hidden ";
   }
   if (type & DECL_VISIBLE) {
-    where = strput(where, end, "public ");
+    ret += "public ";
   }
   if (type & DECL_PRIVATE) {
-    where = strput(where, end, "private ");
+    ret += "private ";
   }
   if (type & DECL_PROTECTED) {
-    where = strput(where, end, "static ");
+    ret += "static ";
   }
 #endif
   /* no output for public */
   if (type & DECL_NOMASK) {
-    where = strput(where, end, "nomask ");
+    ret += "nomask ";
   }
   if (type & FUNC_VARARGS) {
-    where = strput(where, end, "varargs ");
+    ret += "varargs ";
   }
 
-  return where;
+  return ret;
 }
 
-char *get_type_name(char *where, char *end, int type) {
+std::string get_type_name(int type) {
   int pointer = 0;
+  std::string ret {get_type_modifiers(type)};
 
-  where = get_type_modifiers(where, end, type);
   type &= ~DECL_MODS;
   if (type & TYPE_MOD_ARRAY) {
     pointer = 1;
     type &= ~TYPE_MOD_ARRAY;
   }
   if (type & TYPE_MOD_CLASS) {
-    where = strput(where, end, "class ");
+    ret += "class ";
     /* we're sometimes called from outside the compiler * /
     if (current_file)
         where = strput(where, end, PROG_STRING(CLASS(type &
@@ -1499,23 +1491,24 @@ char *get_type_name(char *where, char *end, int type) {
         and that just doesn't work */
   } else {
     DEBUG_CHECK(type >= sizeof compiler_type_names / sizeof compiler_type_names[0], "Bad type\n");
-    where = strput(where, end, compiler_type_names[type]);
+    ret += compiler_type_names[type];
   }
-  where = strput(where, end, " ");
+  ret += " ";
 #ifdef ARRAY_RESERVED_WORD
   if (pointer) {
     /* use just "array" instead of "mixed array" */
     if (type == TYPE_ANY) {
-      where -= strlen(compiler_type_names[type]) + 1;
+      size_t i = strlen(compiler_type_names[type]) + 1;
+      ret.erase(ret.size() - i, i);
     }
-    where = strput(where, end, "array ");
+    ret += "array ";
   }
 #else
   if (pointer) {
-    where = strput(where, end, "* ");
+    ret += "* ";
   }
 #endif
-  return where;
+  return ret;
 }
 
 #define STRING_HASH(var, str)                \
