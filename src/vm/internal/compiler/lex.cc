@@ -2907,7 +2907,7 @@ void add_predefines() {
     }
     add_predefine(namebuf, -1, mtext);
   }
-  sprintf(save_buf, "%lu", sizeof(LPC_INT));
+  sprintf(save_buf, "%zu", sizeof(LPC_INT));
   add_predefine("SIZEOFINT", -1, save_buf);
 
   sprintf(save_buf, "%" LPC_INT_FMTSTR_P, LPC_INT_MAX);

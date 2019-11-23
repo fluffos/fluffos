@@ -132,7 +132,7 @@ add_compile_options(
   "-fdiagnostics-show-option"
   "-fmessage-length=0"
   # Less undefined behavior
-  "-funsigned-char"
+  "-fsigned-char"
   "-fwrapv")
 endif()
 
