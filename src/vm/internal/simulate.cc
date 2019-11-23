@@ -1678,16 +1678,6 @@ void fatal(const char *fmt, ...) {
 
   in_fatal = 0;
 
-/* Make sure we don't trap our abort() */
-#ifdef SIGABRT
-  signal(SIGABRT, SIG_DFL);
-#endif
-#ifdef SIGIOT
-#if SIGIOT != SIGABRT
-  signal(SIGIOT, SIG_DFL);
-#endif
-#endif
-
   abort();
 }
 
