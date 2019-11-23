@@ -10,9 +10,6 @@
 #include "base/package_api.h"
 
 #include <algorithm>
-#ifdef HAVE_CRYPT_H
-#include <crypt.h>
-#endif
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif
@@ -34,6 +31,7 @@
 #include "packages/core/reclaim.h"
 #include "packages/core/custom_crypt.h"
 #include "packages/core/ed.h"
+#include "thirdparty/crypt/include/crypt.h"
 
 int data_size(object_t *ob);
 void reload_object(object_t *obj);
@@ -3392,10 +3390,6 @@ void f_defer() {
 #else
 #define CRYPT(x, y) crypt(x, y)
 #define OLDCRYPT(x, y) crypt(x, y)
-#endif
-
-#ifdef _WIN32
-#define crypt(x, y) custom_crypt(x, y, 0)
 #endif
 
 void f_crypt(void) {
