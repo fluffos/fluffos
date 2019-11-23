@@ -16,9 +16,16 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}" CACHE PATH "..." FORCE)
 endif()
 
+if(WIN32)
+  # minimal support version is Windows 7
+  add_compile_definitions("WINVER=0x0601")
+  add_compile_definitions("_WIN32_WINNT=0x0601")
+endif()
+
 message("FluffOS ${PROJECT_VERSION} (${CMAKE_BUILD_TYPE})")
 message("  C: '${CMAKE_C_COMPILER}'")
 message("  C++: '${CMAKE_CXX_COMPILER}'")
+message("Building on: '${CMAKE_HOST_SYSTEM}' for '${CMAKE_SYSTEM_NAME}'")
 message("Installing to ${CMAKE_INSTALL_PREFIX}")
 
 add_subdirectory(src)
