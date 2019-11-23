@@ -45,8 +45,6 @@
 
 #include "packages/core/custom_crypt.h"
 
-#ifdef CUSTOM_CRYPT
-
 #ifndef min
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #endif
@@ -442,4 +440,3 @@ char *custom_crypt(const char *key, const char *salt, unsigned char *rawout) {
 
   return reinterpret_cast<char *>(ret);
 }
-#endif
