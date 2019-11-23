@@ -3681,7 +3681,9 @@ void eval_instruction(char *p) {
         (*efun_table[instruction - EFUN_BASE])();
 
         if (expected_stack != sp) {
-          fatal("Bad stack after efun. Instruction %d, num arg %d\n", instruction, num_arg);
+          fatal("Bad sp %p (should be %p) after calling efun '%s', num arg %d.\n",
+            sp, expected_stack,
+            instrs[instruction].name, num_arg);
         }
 #endif
     } /* switch (instruction) */
