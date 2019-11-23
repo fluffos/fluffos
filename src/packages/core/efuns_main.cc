@@ -3382,17 +3382,60 @@ void f_defer() {
 #endif
 
 #ifdef F_CRYPT
-#define SALT_LEN 8
+void f_crypt(void) {
+  char salt[3];
+  const char *saltp = nullptr;
+  const char *choice = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ./";
 
-#ifdef CUSTOM_CRYPT
-#define CRYPT(x, y) custom_crypt(x, y, 0)
-#define OLDCRYPT(x, y) crypt(x, y)
-#else
-#define CRYPT(x, y) crypt(x, y)
-#define OLDCRYPT(x, y) crypt(x, y)
+  if (sp->type == T_STRING) {
+    // Support $1$, $2a$ (a,x,y), $5$, $6$
+    if(sp->u.string[0] == '$') {
+      // $2?$
+      if (SVALUE_STRLEN(sp) >= 4 &&
+          sp->u.string[1] == '2' &&
+          (sp->u.string[2] == 'a' || sp->u.string[2] == 'x' || sp->u.string[2] == 'y') &&
+          sp->u.string[3] == '$') {
+        saltp = sp->u.string;
+      } else {
+        if (SVALUE_STRLEN(sp) >= 3 &&
+            (sp->u.string[1] == '1' ||
+             sp->u.string[1] == '5' ||
+             sp->u.string[1] == '6') && sp->u.string[2] == '$') {
+          saltp = sp->u.string;
+        }
+      }
+    } else if (SVALUE_STRLEN(sp) >= 2) {
+      // Old f_crypt only use first two key.
+      salt[0] = sp->u.string[0];
+      salt[1] = sp->u.string[1];
+      salt[2] = '\0';
+      saltp = salt;
+    }
+  }
+
+  if (saltp == nullptr) {
+    salt[0] = choice[random_number(strlen(choice))];
+    salt[1] = choice[random_number(strlen(choice))];
+    salt[2] = '\0';
+    saltp = salt;
+  }
+
+  auto result = crypt((sp-1)->u.string, saltp);
+  if(result == nullptr ||
+     (result && result[0] == '*')) {
+    error("Error in crypt(), check your salt");
+    return;
+  }
+  result = string_copy(result, "f_crypt");
+  pop_2_elems();
+  push_malloced_string(result);
+}
 #endif
 
-void f_crypt(void) {
+#ifdef F_OLDCRYPT
+void f_oldcrypt(void) {
+  const int SALT_LEN = 8;
+
   const char *res, *p;
   char salt[SALT_LEN + 1];
   const char *choice = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ./";
@@ -3410,33 +3453,9 @@ void f_crypt(void) {
     p = salt;
   }
 
-  res = string_copy(CRYPT((sp - 1)->u.string, p), "f_crypt");
-  pop_stack();
-  free_string_svalue(sp);
-  sp->subtype = STRING_MALLOC;
-  sp->u.string = res;
-}
-#endif
-
-#ifdef F_OLDCRYPT
-void f_oldcrypt(void) {
-  char *res, salt[3];
-  const char *choice = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ./";
-
-  if (sp->type == T_STRING && SVALUE_STRLEN(sp) >= 2) {
-    salt[0] = sp->u.string[0];
-    salt[1] = sp->u.string[1];
-    free_string_svalue(sp--);
-  } else {
-    salt[0] = choice[random_number(strlen(choice))];
-    salt[1] = choice[random_number(strlen(choice))];
-    pop_stack();
-  }
-  salt[2] = 0;
-  res = string_copy(OLDCRYPT(sp->u.string, salt), "f_crypt");
-  free_string_svalue(sp);
-  sp->subtype = STRING_MALLOC;
-  sp->u.string = res;
+  res = string_copy(custom_crypt((sp - 1)->u.string, p, nullptr), "f_oldcrypt");
+  pop_2_elems();
+  push_malloced_string(res);
 }
 #endif
 

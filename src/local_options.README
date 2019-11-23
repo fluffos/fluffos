@@ -6,8 +6,8 @@
  * cause the driver to behave oddly.                                        *
  ****************************************************************************/
 
-#ifndef _LOCAL_OPTIONS_H_ 
-#define _LOCAL_OPTIONS_H_ 
+#ifndef _LOCAL_OPTIONS_H_
+#define _LOCAL_OPTIONS_H_
 
 /* NOTES:
  * Many of the configurable options are now set via the configuration file
@@ -143,15 +143,6 @@
  *          it may assume certain settings of these options.  Check the     *
  *          instructions for details.                                       *
  ****************************************************************************/
-
-/*
- * Define this in order to use Fermat@Equilibria's MD5 based crypt() instead
- * of the operating system's.  It has the advantage of giving the same value
- * on all architectures, and being stronger than the standard UNIX crypt().
- *
- * Consider use PACKAGE_CRYPTO instead.
- */
-#define CUSTOM_CRYPT
 
 /*
  * Some minor tweaks that make it a bit easier to run code designed to run
