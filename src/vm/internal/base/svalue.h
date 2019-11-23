@@ -9,11 +9,10 @@ typedef struct {
   unsigned short ref;
 } refed_t;
 
-typedef const char *LPC_STRING;
 union u {
   LPC_INT number;
   LPC_FLOAT real;
-  LPC_STRING string;
+  shared_string string;
 
   refed_t *refed; /* any of the block below */
 
@@ -27,6 +26,8 @@ union u {
   struct ref_t *ref;
   unsigned char *lvalue_byte;
   void (*error_handler)(void);
+
+  ~u() {}
 };
 
 /*
@@ -115,9 +116,9 @@ extern svalue_t const0, const1, const0u;
   SAFE({                                                                                          \
     const auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);                             \
     char *ess_res;                                                                                \
-    int ess_len;                                                                                  \
+    size_t ess_len;                                                                               \
     int ess_r;                                                                                    \
-    ess_len = (ess_r = SVALUE_STRLEN(x)) + strlen(y);                                             \
+    ess_len = (ess_r = SVALUE_STRLEN(x)) + (y).size();                                             \
     if (ess_len > max_string_length) error("Maximum string length exceeded in concatenation.\n"); \
     if ((x)->subtype == STRING_MALLOC && MSTR_REF((x)->u.string) == 1) {                          \
       ess_res = (char *)extend_string((x)->u.string, ess_len);                                    \

@@ -163,10 +163,6 @@
 
 #include "base/internal/stats.h"
 
-#include "base/internal/stralloc.h"
-
-#include "base/internal/strput.h"
-
 #include "base/internal/strutils.h"
 
 #include "base/internal/shared_string.hh"
