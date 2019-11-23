@@ -5,7 +5,7 @@
 
 #include "thirdparty/libtelnet/libtelnet.h"  // FIXME?
 
-static const unsigned char telnet_mssp_value[] = {
+static const char telnet_mssp_value[] = {
     TELNET_MSSP_VAR, '%', 's', TELNET_MSSP_VAL, '%', 's', 0};
 
 static int send_mssp_val(mapping_t *map, mapping_node_t *el, void *data) {
@@ -80,7 +80,7 @@ void on_telnet_do_mssp(interactive_t *ip) {
   }
   if (!tmp) {
     char num[20] = {};
-    snprintf(num, sizeof(num), "%ld", boot_time);
+    snprintf(num, sizeof(num), "%zd", boot_time);
     telnet_printf(ip->telnet, reinterpret_cast<const char *>(telnet_mssp_value), "UPTIME", num);
   }
   // now send the rest

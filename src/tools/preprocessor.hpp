@@ -112,7 +112,7 @@ static incstate *inctop = nullptr;
 #define CHAR_QUOTE 1
 #define STRING_QUOTE 2
 
-static void add_define(const char *, int, char *);
+static void add_define(const char *, int, const char *);
 
 defn_t *lookup_define(const char *);
 
@@ -557,7 +557,7 @@ defn_t *lookup_define(const char *s) {
     return p;
 }
 
-static void add_define(const char *name, int nargs, char *exps) {
+static void add_define(const char *name, int nargs, const char *exps) {
   defn_t *p = lookup_definition(name);
   int h, len;
 

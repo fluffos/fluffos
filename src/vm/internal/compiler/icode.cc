@@ -384,6 +384,7 @@ void i_generate_node(parse_node_t *expr) {
     case NODE_TERNARY_OP:
       i_generate_node(expr->l.expr);
       expr = expr->r.expr;
+    /* fall through */
     case NODE_BINARY_OP:
       i_generate_node(expr->l.expr);
     /* fall through */

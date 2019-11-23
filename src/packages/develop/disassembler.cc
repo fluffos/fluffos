@@ -515,7 +515,7 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
             COPY_SHORT(&sarg, &pc[2]);
             sprintf(buff,
                     "<anonymous function, %d args, %d locals, ends at "
-                    "%04ld>\nCode:",
+                    "%04tu>\nCode:",
                     pc[0], pc[1], (pc + 3 + sarg - code));
             pc += 4;
             break;
@@ -598,9 +598,9 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
             COPY_SHORT(&sarg, pc + sizeof(char *));
             if (ttype == 1 || !parg) {
               if (sarg == 1) {
-                fprintf(f, "\t%-4ld\t<range start>\n", (LPC_INT)parg);
+                fprintf(f, "\t%-4p\t<range start>\n", parg);
               } else {
-                fprintf(f, "\t%-4ld\t%04x\n", (LPC_INT)parg, addr + sarg);
+                fprintf(f, "\t%-4p\t%04x\n", parg, addr + sarg);
               }
             } else {
               fprintf(f, "\t\"%s\"\t%04x\n", disassem_string(parg), addr + sarg);
