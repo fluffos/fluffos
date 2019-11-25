@@ -136,12 +136,14 @@ if (${CMAKE_C_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_C_COMPILER_ID} STREQUAL "Cl
     "-fwrapv")
 endif ()
 
-# IPO??
-include(CheckIPOSupported)
-check_ipo_supported(RESULT result)
-if (result)
-  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
-endif ()
+# LTO on release builds
+if(NOT ${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+  include(CheckIPOSupported)
+  check_ipo_supported(RESULT result)
+  if (result)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+  endif ()
+endif()
 
 # build PIE code by default
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -248,7 +250,7 @@ add_custom_command(
 
 find_package(BISON REQUIRED)
 BISON_TARGET(Grammar ${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.y ${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.cc
-  DEFINES_FILE ${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.h)
+  DEFINES_FILE "${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.h")
 
 set(GENERATRED_GRAMMAR_FILES
   "${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.y"
@@ -321,9 +323,6 @@ add_dependencies(autogen make_options_defs)
 add_executable(driver
   ${SRC} ${SRC_HEADER}
   )
-IF (WIN32)
-  target_link_libraries(driver PRIVATE wsock32 ws2_32)
-ENDIF ()
 
 target_link_libraries(driver PRIVATE ghc_filesystem)
 
@@ -346,6 +345,12 @@ if (ENABLE_DTRACE)
   add_subdirectory(tracing)
   target_link_libraries(driver PRIVATE tracing)
 endif ()
+
+# Winsocks
+IF (WIN32)
+  target_link_libraries(driver PRIVATE wsock32 ws2_32)
+ENDIF ()
+
 # Third party libraries
 add_subdirectory(thirdparty/libtelnet EXCLUDE_FROM_ALL)
 target_link_libraries(driver PUBLIC libtelnet)
