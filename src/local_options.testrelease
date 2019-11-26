@@ -1,5 +1,0 @@
-#include "local_options.testdev"
-
-#undef DEBUGMALLOC
-#undef DEBUGMALLOC_EXTENSIONS
-#undef CHECK_MEMORY
