@@ -57,8 +57,9 @@
 ///     set's the reference count from which on a shared object is seen as
 ///     protected, returns the old setting
 /// - find(T)
-///     returns shared object representing argument if found, nullptr
-///     otherwise
+///     returns unique pointer
+///         - to shared object representing argument if found
+///         - nullptr otherwise
 ///
 /// @tparam T       type of shared objects
 ///                 needs to be:
