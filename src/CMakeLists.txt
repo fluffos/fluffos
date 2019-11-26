@@ -7,7 +7,6 @@ option(ENABLE_DTRACE "Build driver with dtrace (system-tap) support" OFF)
 # Packages
 option(PACKAGE_ASYNC "async package" ON)
 option(PACKAGE_COMPRESS "compress package" ON)
-set("SAVE_GZ_EXTENSION" ".o.gz")
 option(PACKAGE_CONTRIB "compress package" ON)
 # PACKAGE CORE should always be on
 set(PACKAGE_CORE ON)
@@ -29,8 +28,6 @@ option(PACKAGE_SHA1 "sha1 package" ON)
 option(PACKAGE_SOCKETS "sockets package" ON)
 option(PACKAGE_TRIM "trim package" ON)
 option(PACKAGE_UIDS "uids package" ON)
-set(AUTO_SETEUID ON)
-set(AUTO_TRUST_BACKBONE OFF)
 option(DEBUG OFF)
 option(DEBUGMALLOC ${DEBUG})
 # End of list of compile options.

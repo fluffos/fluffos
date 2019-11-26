@@ -46,10 +46,22 @@
 #undef IPV6
 #undef DTRACE
 
+
 /****************************************************************************
  *                              PACKAGES                                    *
  ****************************************************************************/
 
-// PACKAGES are moved to CMAKE, please don't try to add #define PACKAGE_* here.
+// PACKAGES are moved to CMAKE options, please don't try to add #define PACKAGE_* here.
+
+/****************************************************************************
+ *                              PACKAGES CONFIGS                            *
+ ****************************************************************************/
+
+// configs for PACKAGE_COMPRESS
+#define SAVE_GZ_EXTENSION ".o.gz"
+
+// configs for PACKAGE_UIDS
+#define AUTO_SETEUID
+#undef AUTO_TRUST_BACKBONE
 
 #endif /* _LOCAL_OPTIONS_H_ */
