@@ -37,20 +37,13 @@
 #include <iomanip>
 #include <iostream>
 #include <map>
-#include <set>
 #include <random>
+#include <set>
 #include <sstream>
 #include <thread>
-#if defined(WIN32) || defined(_WIN32)
-#ifndef __GNUC__
+
+#if (defined(WIN32) || defined(_WIN32)) && !defined(__GNUC__)
 #define NOMINMAX 1
-#endif
-#include <windows.h>
-#else
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/un.h>
 #endif
 
 #ifdef USE_STD_FS
@@ -82,6 +75,15 @@ using ifstream = ghc::filesystem::ifstream;
 using ofstream = ghc::filesystem::ofstream;
 using fstream = ghc::filesystem::fstream;
 }  // namespace fs
+#endif
+
+#if defined(WIN32) || defined(_WIN32)
+#include <windows.h>
+#else
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/un.h>
 #endif
 
 #ifndef GHC_FILESYSTEM_FWD_TEST
@@ -2442,12 +2444,20 @@ TEST_CASE("30.10.15.32 rename", "[filesystem][operations][fs.op.rename]")
 {
     TemporaryDirectory t(TempOpt::change_path);
     std::error_code ec;
-    generateFile("foo");
+    generateFile("foo", 123);
     fs::create_directory("dir1");
     CHECK_NOTHROW(fs::rename("foo", "bar"));
+    CHECK(!fs::exists("foo"));
     CHECK(fs::exists("bar"));
     CHECK_NOTHROW(fs::rename("dir1", "dir2"));
     CHECK(fs::exists("dir2"));
+    generateFile("foo2", 42);
+    CHECK_NOTHROW(fs::rename("bar", "foo2"));
+    CHECK(fs::exists("foo2"));
+    CHECK(fs::file_size("foo2") == 123u);
+    CHECK(!fs::exists("bar"));
+    CHECK_NOTHROW(fs::rename("foo2", "foo", ec));
+    CHECK(!ec);
     CHECK_THROWS_AS(fs::rename("foobar", "barfoo"), fs::filesystem_error);
     CHECK_NOTHROW(fs::rename("foobar", "barfoo", ec));
     CHECK(ec);
