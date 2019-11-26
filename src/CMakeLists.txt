@@ -49,17 +49,10 @@ set(CMAKE_ENABLE_EXPORTS ON)
 
 if (${CMAKE_C_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_C_COMPILER_ID} STREQUAL "Clang")
   foreach (lang C CXX)
-    if (${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
-      set(CMAKE_${lang}_FLAGS_DEBUG "-Og -g3")
-      # include (minimal) debug information even for RELEASE build.
-      set(CMAKE_${lang}_FLAGS_RELEASE "-O3 -DNDEBUG -g1")
-      set(CMAKE_${lang}_FLAGS_RELWITHDEBINFO "${CMAKE_${lang}_FLAGS_RELEASE}")
-    else ()
-      set(CMAKE_${lang}_FLAGS_DEBUG "-O1 -g3")
-      # include (minimal) debug information even for RELEASE build.
-      set(CMAKE_${lang}_FLAGS_RELEASE "-O3 -DNDEBUG -g1")
-      set(CMAKE_${lang}_FLAGS_RELWITHDEBINFO "${CMAKE_${lang}_FLAGS_RELEASE}")
-    endif ()
+    set(CMAKE_${lang}_FLAGS_DEBUG "-O0 -g3")
+    # include (minimal) debug information even for RELEASE build.
+    set(CMAKE_${lang}_FLAGS_RELEASE "-O3 -DNDEBUG -g1")
+    set(CMAKE_${lang}_FLAGS_RELWITHDEBINFO "${CMAKE_${lang}_FLAGS_RELEASE}")
   endforeach ()
 
   # Compile options
