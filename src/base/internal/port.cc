@@ -40,7 +40,7 @@ int64_t random_number(int64_t n) {
  * of seconds since 1970.
  */
 
-long get_current_time() { return time(nullptr); /* Just use the old time() for now */ }
+time_t get_current_time() { return time(nullptr); /* Just use the old time() for now */ }
 
 const char *time_string(time_t t) {
   const char *res = ctime(&t);

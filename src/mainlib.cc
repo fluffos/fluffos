@@ -178,11 +178,33 @@ void attempt_shutdown(int sig) {
   }
   fatal(msg);
 }
+
+void init_locale() {
+  setlocale(LC_ALL, "");
+  // Verify locale is UTF8, complain otherwise
+  std::string current_locale = setlocale(LC_ALL, nullptr);
+  std::transform(current_locale.begin(), current_locale.end(), current_locale.begin(),
+                 [](unsigned char c){ return std::tolower(c); });
+#ifndef _WIN32
+  if (current_locale.find(".utf-8") == std::string::npos) {
+    std::cerr << "Your locale '" << current_locale << "' is not UTF8 compliant, you will likely run into issues." << std::endl;
+  }
+#endif
+}
+
+void init_tz() {
+#ifndef _WIN32
+  tzset();
+#else
+  _tzset();
+#endif
+}
 }  // namespace
 
+
 struct event_base *init_main(int argc, char **argv) {
-  setlocale(LC_ALL, "");
-  tzset();
+  init_locale();
+  init_tz();
 
   print_sep();
   print_commandline(argc, argv);
