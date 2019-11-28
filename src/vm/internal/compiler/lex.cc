@@ -1370,8 +1370,8 @@ static int get_text_block(char *term) {
         len = 0;
       }
       // Remove trailing CR
-      if (text_line[curchunk][len-1] == '\r') {
-        text_line[curchunk][len-1] = '\0';
+      if (text_line[curchunk][len - 1] == '\r') {
+        text_line[curchunk][len - 1] = '\0';
         len = len - 1;
       }
       /*
@@ -1490,6 +1490,12 @@ static pragma_t our_pragmas[] = {{"strict_types", PRAGMA_STRICT_TYPES},
 static void handle_pragma(char *str) {
   int i;
   int no_flag;
+
+  // Ignore trailing whitespaces
+  char *p = &str[strlen(str) - 1];
+  while (iswspace(*p)) {
+    *p-- = '\0';
+  }
 
   if (strncmp(str, "no_", 3) == 0) {
     str += 3;
