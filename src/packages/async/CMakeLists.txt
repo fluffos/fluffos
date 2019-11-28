@@ -1,4 +1,5 @@
 if(${PACKAGE_ASYNC})
+    add_compile_options(-fpermissive)
     add_library(package_async STATIC
             "async.cc"
             "async.h")
