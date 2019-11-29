@@ -4,7 +4,9 @@
 
 #include <iostream>  // for cout
 #include <locale.h>  // for setlocale, LC_ALL
-#include <signal.h>  // for signal, SIG_DFL, SIGABRT, etc
+#ifdef HAVE_SIGNAL_H
+#include <signal.h>  //  for signal, SIG_DFL, SIGABRT, etc
+#endif
 #include <stddef.h>  // for size_t
 #include <stdio.h>   // for fprintf, stderr, printf, etc
 #include <stdlib.h>  // for exit
@@ -176,6 +178,8 @@ void attempt_shutdown(int sig) {
     p.address = true;
     p.print(st, stderr);
   }
+
+  // Attempt to call crash()
   fatal(msg);
 }
 

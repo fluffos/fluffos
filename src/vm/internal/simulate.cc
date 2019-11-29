@@ -1678,6 +1678,7 @@ void fatal(const char *fmt, ...) {
 
   in_fatal = 0;
 
+  signal(SIGABRT, SIG_DFL);
   abort();
 }
 
