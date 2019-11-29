@@ -10,9 +10,6 @@
 #define NARGS 25
 #define MARKS '@'
 
-#define SKIPWHITE \
-  while (isspace((unsigned char)*p) && (*p != '\n')) p++
-
 #define PRAGMA_STRICT_TYPES 1
 #define PRAGMA_WARNINGS 2
 #define PRAGMA_SAVE_TYPES 4
