@@ -1279,7 +1279,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
           if (pres) {
             cheat[i++] = '.';
             if (pres >= sizeof(temp)) {
-              sprintf(cheat + i, "%llu", sizeof(temp) - 1);
+              sprintf(cheat + i, "%zu", sizeof(temp) - 1);
             } else {
               sprintf(cheat + i, "%d", pres);
             }
