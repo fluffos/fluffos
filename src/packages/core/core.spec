@@ -380,3 +380,5 @@ void start_request_term_type();
 void request_term_size(void | int);
 /* shutdown is at the end because it is only called once per boot cycle :) */
 void shutdown(void | int);
+// Get current LPC stacktrace
+mixed* dump_trace();
