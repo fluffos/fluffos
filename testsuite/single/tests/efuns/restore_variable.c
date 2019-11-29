@@ -1,17 +1,18 @@
-#define ERR(x) ASSERT2(catch(restore_variable(x)),  sprintf("unexpected successful restore: %O ", x))
-#define IS(x, y) ASSERT2(same(restore_variable(x),y), sprintf("expected: %O, actual: %O", y, restore_variable(x)))
+#define ERR(i, x) ASSERT2(catch(restore_variable(x)), sprintf("Unexpected successful restore idx %d,\n %O\n", i, x))
+#define IS(x, y) ASSERT_EQ(y, restore_variable(x))
 
-string *value_errs = ({ "\"\"x", "\"\\", "\"\\x\\", "\"\\x\"x",
-		        "-x" });
+string *value_errs = ({ "\"\"x", "\"\\", "\"\\x\\", "\"\\x\"x", "-x", "\"", "\"\\", "\"\r\"\r" });
 mapping values = ([
     "\"\r\"" : "\n",
     "\"\\\"\"" : "\"",
     "\"\\\"\\x\r\"" : "\"x\n",
+    // Special cases for encoding '\r'
+    "\"a\\\rb\\\rc\\\rd\\\r\r\\\radsfasdsdf\\\r\"": "a\rb\rc\rd\r\n\radsfasdsdf\r",
     "-1" : -1,
     "0" : 0,
     "1" : 1,
     "22" : 22,
-    "1.2" : 1.2, 
+    "1.2" : 1.2,
     "333" : 333,
     "({})" : ({}),
     "({,})" : ({0})
@@ -19,8 +20,9 @@ mapping values = ([
 
 void do_tests() {
     mixed x, y;
-    foreach (x in value_errs) {
-	ERR(x);
+    int i = 0 ;
+    for (i = 0; i < sizeof(value_errs); i++) {
+	  ERR(i, value_errs[i]);
     }
 
     foreach (x, y in values) {
@@ -32,7 +34,7 @@ void do_tests() {
 	IS("({" + x + ",})", ({ y }));
 	IS("({" + x + "," + x + ",})", ({ y, y }));
     }
-    
+
     // mappings
     foreach (x, y in values) {
 	IS("([1:" + x + ",])", ([1:y ]));
