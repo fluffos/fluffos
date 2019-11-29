@@ -66,6 +66,9 @@ char lex_ctype[256] = {
 
 #define is_wspace(c) lex_ctype[(unsigned char)(c)]
 
+#define SKIPWHITE \
+  while (is_wspace((unsigned char)*p) && (*p != '\n')) p++
+
 int current_line;       /* line number in this file */
 int current_line_base;  /* number of lines from other files */
 int current_line_saved; /* last line in this file where line num
@@ -925,6 +928,10 @@ static int inc_open(char *buf, char *name, int check_local) {
     merge(name, buf);
     tmp = check_valid_path(buf, master_ob, "include", 0);
     if (tmp && (f = open(tmp, O_RDONLY)) != -1) {
+#ifdef _WIN32
+      // TODO: change everything to use fopen instead.
+      _setmode(f, _O_BINARY);
+#endif
       return f;
     }
   }
@@ -940,6 +947,10 @@ static int inc_open(char *buf, char *name, int check_local) {
     sprintf(buf, "%s/%s", inc_path[i], name);
     tmp = check_valid_path(buf, master_ob, "include", 0);
     if (tmp && (f = open(tmp, O_RDONLY)) != -1) {
+#ifdef _WIN32
+      // TODO: change everything to use fopen instead.
+      _setmode(f, _O_BINARY);
+#endif
       return f;
     }
   }
@@ -2154,7 +2165,7 @@ int yylex() {
           }
           if (sp) {
             *sp++ = 0;
-            while (uisspace(*sp)) {
+            while (is_wspace(*sp)) {
               sp++;
             }
           } else {
