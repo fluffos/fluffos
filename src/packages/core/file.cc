@@ -430,7 +430,7 @@ char *read_file(const char *file, int start, int lines) {
       if (ends_with(line, "\r")) {
         line = line.substr(0, line.length() - 1);
       }
-      output << line << std::endl;
+      output << line << "\n";
     }
     return string_copy(output.str().c_str(), "read file: CRLF result");
   }

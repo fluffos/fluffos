@@ -65,7 +65,7 @@ int svalue_save_size(svalue_t *v) {
       int size = 0;
 
       while ((c = *cp++)) {
-        if (c == '\\' || c == '"') {
+        if (c == '\\' || c == '"' || c == '\r') {
           size++;
         }
         size++;
@@ -145,7 +145,7 @@ void save_svalue(svalue_t *v, char **buf) {
 
       *cp++ = '"';
       while ((c = *str++)) {
-        if (c == '"' || c == '\\') {
+        if (c == '"' || c == '\\' || c == '\r') {
           *cp++ = '\\';
           *cp++ = c;
         } else {
@@ -1643,9 +1643,7 @@ void clear_non_statics(object_t *ob) {
 void restore_object_from_buff(object_t *ob, const char *buf, int noclear) {
   std::istringstream input(buf);
   for (std::string line; std::getline(input, line);) {
-    if (ends_with(line, "\r")) {
-      line = line.substr(0, line.length() - 1);
-    }
+    DEBUG_CHECK(ends_with(line, "\r"), "restore_object_from_buff: have trailing \\r!");
     // FIXME: some restore function needs to modify string inplace.
     std::vector<char> tmp(line.length() + 1);
     std::copy(line.begin(), line.end(), tmp.begin());
@@ -1693,7 +1691,7 @@ int restore_object(object_t *ob, const char *file, int noclear) {
     error("restore_object: read permission denied: %s.\n", filename.c_str());
   }
 
-  // We always use zlib functions here and below, as it handls non-gzip file as wel.
+  // We always use zlib functions here and below, as it handles non-gzip file as well.
   gzFile gzf = gzopen(file, "rb");
   if (gzf == nullptr) {
     // Compat: do not return error, if there are no save files.

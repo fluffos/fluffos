@@ -1,4 +1,4 @@
-#define IS(x, y) ASSERT2(save_variable(x)==y, sprintf("%O %O", x, save_variable(x)))
+#define IS(x, y) ASSERT_EQ(y, save_variable(x))
 
 mapping values = 
 ([
@@ -12,7 +12,9 @@ mapping values =
   1.2 : "1.200000",
   333 : "333",
   ({}) : "({})",
-  ({ 0 }) : "({0,})"
+  ({ 0 }) : "({0,})",
+  // Special cases for encoding '\r'
+  "a\rb\rc\rd\r\n\radsfasdsdf\r" : "\"a\\\rb\\\rc\\\rd\\\r\r\\\radsfasdsdf\\\r\"",
 ]);
 
 void do_tests() {
