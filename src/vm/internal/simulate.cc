@@ -460,6 +460,10 @@ object_t *load_object(const char *lname, int callcreate) {
   }
 
   f = open(real_name, O_RDONLY);
+#ifdef _WIN32
+  // TODO: change everything to use fopen instead.
+  _setmode(f, _O_BINARY);
+#endif
   if (f == -1) {
     debug_perror("compile_file", real_name);
     error("Could not read the file '/%s'.\n", real_name);
