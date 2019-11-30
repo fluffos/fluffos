@@ -1378,8 +1378,9 @@ void f_mud_status(void) {
     outbuf_add(&ob, "------------------------------\n");
     outbuf_addv(&ob,
                 "Calls to add_message: %8" PRIu64 "   Packets: %8" PRIu64
-                "   Average packet size: %.2lf\n\n",
-                add_message_calls, inet_packets, static_cast<double>(inet_volume) / inet_packets);
+                "   Average packet size: %.2lf bytes\n\n",
+                add_message_calls, inet_packets,
+                inet_volume && inet_packets ? static_cast<double>(inet_volume) / inet_packets: 0);
 
     stat_living_objects(&ob);
 
