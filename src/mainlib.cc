@@ -24,11 +24,11 @@
 #endif
 #endif
 #include <unistd.h>
-
 #ifdef HAVE_JEMALLOC
 #define JEMALLOC_MANGLE
 #include <jemalloc/jemalloc.h>  // for mallctl
 #endif
+#include <unicode/uversion.h>
 
 #include "packages/core/dns.h"                   // for init_dns_event_base.
 #include "vm/vm.h"                               // for push_constant_string, etc
@@ -113,6 +113,7 @@ void print_version_and_time() {
 #else
   std::cout << "Jemalloc is disabled, this is not suitable for production." << std::endl;
 #endif
+  std::cout << "ICU Version: " << U_ICU_VERSION << std::endl;
 #if BACKWARD_HAS_DW == 1
   std::cout << "Backtrace support: libdw." << std::endl;
 #elif BACKWARD_HAS_BFD == 1
