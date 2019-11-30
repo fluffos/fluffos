@@ -84,11 +84,12 @@ void check_string_stats(outbuffer_t *);
   allocd_bytes -= len + 1; \
   CHECK_STRING_STATS
 
+// The layout of malloc_block_s must be same as block_s
 typedef struct malloc_block_s {
-  void *dummy;
-  int bing;
+  void *_padding1;
+  unsigned int _padding2;
 #ifdef DEBUGMALLOC_EXTENSIONS
-  long extra_ref;
+  unsigned int extra_ref;
 #endif
   unsigned int size;
   unsigned short ref;
@@ -131,12 +132,14 @@ typedef struct block_s {
   struct block_s *next; /* next block in the hash chain */
   unsigned int hash;
 #if defined(DEBUGMALLOC_EXTENSIONS)  //|| (SIZEOF_CHAR_P == 8)
-  long extra_ref;
+  unsigned int extra_ref;
 #endif
   /* these two must be last */
   unsigned int size;   /* length of the string */
   unsigned short refs; /* reference count    */
 } block_t;
+
+static_assert(sizeof(malloc_block_t) == sizeof(block_t), "Block size mismatch, this will cause memory corruption!");
 
 #define NEXT(x) (x)->next
 #define REFS(x) (x)->refs
