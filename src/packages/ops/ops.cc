@@ -614,8 +614,6 @@ void f_parse_command() {
 }
 
 void f_range(int code) {
-  int from, to, len;
-
   if ((sp - 2)->type != T_NUMBER) {
     error("Start of range [ .. ] interval must be a number.\n");
   }
@@ -625,9 +623,14 @@ void f_range(int code) {
 
   switch (sp->type) {
     case T_STRING: {
+      size_t from, to, len;
       const char *res = sp->u.string;
 
-      len = SVALUE_STRLEN(sp);
+      auto success = u8_codepoints(reinterpret_cast<const uint8_t *>(res), &len);
+      if (!success) {
+        error("Invalid UTF-8 string: f_range");
+      }
+
       to = (--sp)->u.number;
 
       if (!CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
@@ -665,12 +668,15 @@ void f_range(int code) {
       }
 
       if (to >= len - 1) {
-        put_malloced_string(string_copy(res + from, "f_range"));
+        auto offset = u8_codepoint_index_to_offset(reinterpret_cast<const uint8_t *>(res), from);
+        put_malloced_string(string_copy(res + offset, "f_range"));
       } else {
-        char *tmp;
-        tmp = new_string(to - from + 1, "f_range");
-        strncpy(tmp, res + from, to - from + 1);
-        tmp[to - from + 1] = '\0';
+        auto start = u8_codepoint_index_to_offset(reinterpret_cast<const uint8_t *>(res), from);
+        auto end = u8_codepoint_index_to_offset(reinterpret_cast<const uint8_t *>(res),
+                                                from + (to - from + 1));
+        char *tmp = new_string(end - start, "f_range");
+        strncpy(tmp, res + start, end - start);
+        tmp[end - start] = '\0';
         put_malloced_string(tmp);
       }
       free_string_svalue(sp + 2);
@@ -678,6 +684,8 @@ void f_range(int code) {
     }
 #ifndef NO_BUFFER_TYPE
     case T_BUFFER: {
+      int from, to, len;
+
       buffer_t *rbuf = sp->u.buf;
 
       len = rbuf->size;
@@ -724,6 +732,8 @@ void f_range(int code) {
 #endif
 
     case T_ARRAY: {
+      int from, to, len;
+
       array_t *v = sp->u.arr;
       to = (--sp)->u.number;
       if (code & 0x01) {
@@ -743,17 +753,19 @@ void f_range(int code) {
 }
 
 void f_extract_range(int code) {
-  int from, len;
-
   if ((sp - 1)->type != T_NUMBER) {
     error("Start of range [ .. ] interval must be a number.\n");
   }
 
   switch (sp->type) {
     case T_STRING: {
-      const char *res = sp->u.string;
+      size_t from, len;
 
-      len = SVALUE_STRLEN(sp);
+      const char *res = sp->u.string;
+      auto success = u8_codepoints(reinterpret_cast<const uint8_t *>(res), &len);
+      if (!success) {
+        error("Invalid UTF-8 String: f_extract_range.");
+      }
       from = (--sp)->u.number;
       if (code) {
         from = len - from;
@@ -774,13 +786,16 @@ void f_extract_range(int code) {
         sp->subtype = STRING_CONSTANT;
         sp->u.string = "";
       } else {
-        put_malloced_string(string_copy(res + from, "f_extract_range"));
+        auto offset = u8_codepoint_index_to_offset(reinterpret_cast<const uint8_t *>(res), from);
+        put_malloced_string(string_copy(res + offset, "f_extract_range"));
       }
       free_string_svalue(sp + 1);
       break;
     }
 #ifndef NO_BUFFER_TYPE
     case T_BUFFER: {
+      size_t from, len;
+
       buffer_t *rbuf = sp->u.buf;
       buffer_t *nbuf;
 
@@ -812,6 +827,8 @@ void f_extract_range(int code) {
 #endif
 
     case T_ARRAY: {
+      size_t from, len;
+
       array_t *v = sp->u.arr;
       from = (--sp)->u.number;
       if (code) {

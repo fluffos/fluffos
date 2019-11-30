@@ -17,6 +17,7 @@
 #define T_LVALUE "*lvalue*"
 #define T_LVALUE_BYTE "*lvalue_byte*"
 #define T_LVALUE_RANGE "*lvalue_range*"
+#define T_LVALUE_CODEPOINT "*lvalue_codepoint*"
 #define T_ERROR_HANDLER "*error_handler*"
 #define T_FREED "*freed*"
 #define T_UNKNOWN "*unknown*"

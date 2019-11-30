@@ -18,8 +18,11 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Install packages
-      run: brew install cmake pkg-config mysql pcre libgcrypt libevent openssl jemalloc
+      run: brew install cmake pkg-config mysql pcre libgcrypt libevent openssl jemalloc icu4c
     - name: compile
-      run: mkdir build && cd build && OPENSSL_ROOT_DIR="/usr/local/opt/openssl" cmake -DCMAKE_BUILD_TYPE=${{ matrix.build }} .. && make install && cd ..
+      run: mkdir build && cd build &&  cmake -DCMAKE_BUILD_TYPE=${{ matrix.build }} .. && make install && cd ..
+      env:
+        OPENSSL_ROOT_DIR: "/usr/local/opt/openssl"
+        ICU_ROOT: "/usr/local/opt/icu4c"
     - name: testsuite
       run: cd testsuite && ../build/bin/driver etc/config.test -ftest
