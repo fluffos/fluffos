@@ -47,7 +47,7 @@ endforeach ()
 
 set(CMAKE_ENABLE_EXPORTS ON)
 
-if (${CMAKE_C_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_C_COMPILER_ID} STREQUAL "Clang")
+if (${CMAKE_C_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_C_COMPILER_ID} STREQUAL "Clang" OR ${CMAKE_C_COMPILER_ID} STREQUAL "AppleClang")
   foreach (lang C CXX)
     set(CMAKE_${lang}_FLAGS_DEBUG "-O0 -g3")
     # include (minimal) debug information even for RELEASE build.
