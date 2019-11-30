@@ -18,8 +18,8 @@ endif()
 
 if(WIN32)
   # minimal support version is Windows 7
-  add_compile_definitions("WINVER=0x0601")
-  add_compile_definitions("_WIN32_WINNT=0x0601")
+  add_compile_options("-DWINVER=0x0601")
+  add_compile_options("-D_WIN32_WINNT=0x0601")
 endif()
 
 message("FluffOS ${PROJECT_VERSION} (${CMAKE_BUILD_TYPE})")

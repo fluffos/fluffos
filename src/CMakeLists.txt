@@ -187,6 +187,13 @@ find_package(Libevent 2.0 REQUIRED COMPONENTS libevent)
 # multiple packages uses this, so we simply do a global inclusion
 include_directories(SYSTEM ${LIBEVENT_INCLUDE_DIR})
 
+# Libraries
+find_package(ICU REQUIRED COMPONENTS uc)
+# Make ICU use utf-8 internally
+add_compile_options("-DU_CHARSET_IS_UTF8=1")
+# multiple packages uses this, so we simply do a global inclusion too.
+include_directories(SYSTEM ${ICU_INCLUDE_DIRS})
+
 # Build phase
 
 # Tools
@@ -344,6 +351,8 @@ ENDIF ()
 # Third party libraries
 add_subdirectory(thirdparty/libtelnet EXCLUDE_FROM_ALL)
 target_link_libraries(driver PUBLIC libtelnet)
+
+target_link_libraries(driver PUBLIC ${ICU_LIBRARIES})
 
 add_subdirectory(thirdparty/backward-cpp EXCLUDE_FROM_ALL)
 add_backward(driver)

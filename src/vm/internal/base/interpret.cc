@@ -11,10 +11,9 @@
 #include "vm/internal/base/machine.h"
 #include "vm/internal/compiler/icode.h"  // for PUSH_WHAT
 #include "vm/internal/compiler/lex.h"    // for insstr, FIXME
-
-#include "packages/core/sprintf.h"  // FIXME
-#include "packages/core/regexp.h"   // FIXME
-#include "packages/ops/ops.h"       // FIXME
+#include "packages/core/sprintf.h"       // FIXME
+#include "packages/core/regexp.h"        // FIXME
+#include "packages/ops/ops.h"            // FIXME
 
 int call_origin = 0;
 error_context_t *current_error_context = nullptr;
@@ -209,6 +208,8 @@ const char *type_name(int c) {
       return "*lvalue_byte*";
     case T_LVALUE_RANGE:
       return "*lvalue_range*";
+    case T_LVALUE_CODEPOINT:
+      return "*lvalue_codepoint*";
     case T_ERROR_HANDLER:
       return "*error_handler*";
 #ifdef DEBUG
@@ -519,16 +520,23 @@ svalue_t global_lvalue_byte = {T_LVALUE_BYTE};
 int lv_owner_type;
 refed_t *lv_owner;
 
+// LVALUE points to an character(codepoint) in string
+static struct {
+  int32_t offset;
+  svalue_t *owner;
+} global_lvalue_codepoint;
+static svalue_t global_lvalue_codepoint_sv = {T_LVALUE_CODEPOINT};
+
 /*
  * Compute the address of an array element.
  */
-void push_indexed_lvalue(int code) {
+void push_indexed_lvalue(int reverse) {
   int ind;
   svalue_t *lv;
 
   if (sp->type == T_LVALUE) {
     lv = sp->u.lvalue;
-    if (!code && lv->type == T_MAPPING) {
+    if (!reverse && lv->type == T_MAPPING) {
       sp--;
       if (!(lv = find_for_insert(lv->u.map, sp, 0))) {
         mapping_too_large();
@@ -551,19 +559,21 @@ void push_indexed_lvalue(int code) {
 
     switch (lv->type) {
       case T_STRING: {
-        int len = SVALUE_STRLEN(lv);
+        size_t count;
+        auto success = u8_codepoints((const uint8_t *)lv->u.string, &count);
+        DEBUG_CHECK(!success, "Bad UTF-8 String: push_indexed_lvalue");
 
-        if (code) {
-          ind = len - ind;
+        if (reverse) {
+          ind = count - ind;
         }
-        if (ind >= len || ind < 0) {
+        if (ind >= count || ind < 0) {
           error("Index out of bounds in string index lvalue.\n");
         }
         unlink_string_svalue(lv);
         sp->type = T_LVALUE;
-        sp->u.lvalue = &global_lvalue_byte;
-        global_lvalue_byte.subtype = 0;
-        global_lvalue_byte.u.lvalue_byte = (unsigned char *)&lv->u.string[ind];
+        sp->u.lvalue = &global_lvalue_codepoint_sv;
+        global_lvalue_codepoint.offset = ind;
+        global_lvalue_codepoint.owner = lv;
 #ifdef REF_RESERVED_WORD
         lv_owner_type = T_STRING;
         lv_owner = (refed_t *)lv->u.string;
@@ -573,7 +583,7 @@ void push_indexed_lvalue(int code) {
 
 #ifndef NO_BUFFER_TYPE
       case T_BUFFER: {
-        if (code) {
+        if (reverse) {
           ind = lv->u.buf->size - ind;
         }
         if (ind >= lv->u.buf->size || ind < 0) {
@@ -592,7 +602,7 @@ void push_indexed_lvalue(int code) {
 #endif
 
       case T_ARRAY: {
-        if (code) {
+        if (reverse) {
           ind = lv->u.arr->size - ind;
         }
         if (ind >= lv->u.arr->size || ind < 0) {
@@ -618,7 +628,7 @@ void push_indexed_lvalue(int code) {
     /* Where x is a _valid_ lvalue */
     /* Hence the reference to sp is at least 2 :) */
 
-    if (!code && (sp->type == T_MAPPING)) {
+    if (!reverse && (sp->type == T_MAPPING)) {
       if (!(lv = find_for_insert(sp->u.map, sp - 1, 0))) {
         mapping_too_large();
       }
@@ -647,7 +657,7 @@ void push_indexed_lvalue(int code) {
 
 #ifndef NO_BUFFER_TYPE
       case T_BUFFER: {
-        if (code) {
+        if (reverse) {
           ind = sp->u.buf->size - ind;
         }
         if (ind >= sp->u.buf->size || ind < 0) {
@@ -667,7 +677,7 @@ void push_indexed_lvalue(int code) {
 #endif
 
       case T_ARRAY: {
-        if (code) {
+        if (reverse) {
           ind = sp->u.arr->size - ind;
         }
         if (ind >= sp->u.arr->size || ind < 0) {
@@ -693,14 +703,14 @@ void push_indexed_lvalue(int code) {
 }
 
 static struct lvalue_range {
-  int ind1, ind2, size;
+  size_t ind1, ind2, size;
   svalue_t *owner;
 } global_lvalue_range;
 
 static svalue_t global_lvalue_range_sv = {T_LVALUE_RANGE};
 
 static void push_lvalue_range(int code) {
-  int ind1, ind2, size = 0;
+  size_t ind1, ind2, size, u8len = 0;
   svalue_t *lv;
 
   {
@@ -710,6 +720,10 @@ static void push_lvalue_range(int code) {
         break;
       case T_STRING: {
         size = SVALUE_STRLEN(lv);
+        auto success = u8_codepoints(reinterpret_cast<const uint8_t *>(lv->u.string), &u8len);
+        if (!success) {
+          error("Invalid UTF-8 String: push_lvalue_range");
+        }
         unlink_string_svalue(lv);
         break;
       }
@@ -720,9 +734,6 @@ static void push_lvalue_range(int code) {
 #endif
       default:
         error("Range lvalue on illegal type\n");
-#ifdef DEBUG
-        size = 0;
-#endif
     }
   }
 
@@ -730,22 +741,44 @@ static void push_lvalue_range(int code) {
     error("Illegal 2nd index type to range lvalue\n");
   }
 
-  ind2 = (code & 0x01) ? (size - sp->u.number) : sp->u.number;
-  if (++ind2 < 0 || (ind2 > size)) {
-    error(
-        "The 2nd index to range lvalue must be >= -1 and < sizeof(indexed "
-        "value)\n");
+  if (lv->type == T_STRING) {
+    ind2 = sp->u.number;
+    ind2 = (code & 0x01) ? (u8len - ind2) : ind2;
+    if (++ind2 < 0 || (ind2 > u8len)) {
+      error(
+          "The 2nd index to range lvalue must be >= -1 and < sizeof(indexed "
+          "value)\n");
+    }
+    ind2 = u8_codepoint_index_to_offset(reinterpret_cast<const uint8_t *>(lv->u.string), ind2);
+  } else {
+    ind2 = (code & 0x01) ? (size - sp->u.number) : sp->u.number;
+    if (++ind2 < 0 || (ind2 > size)) {
+      error(
+          "The 2nd index to range lvalue must be >= -1 and < sizeof(indexed "
+          "value)\n");
+    }
   }
 
   if (!((--sp)->type == T_NUMBER)) {
     error("Illegal 1st index type to range lvalue\n");
   }
-  ind1 = (code & 0x10) ? (size - sp->u.number) : sp->u.number;
 
-  if (ind1 < 0 || ind1 > size) {
-    error(
-        "The 1st index to range lvalue must be >= 0 and <= sizeof(indexed "
-        "value)\n");
+  if (lv->type == T_STRING) {
+    ind1 = sp->u.number;
+    ind1 = (code & 0x10) ? (u8len - ind1) : ind1;
+    if (ind1 < 0 || ind1 > u8len) {
+      error(
+          "The 1st index to range lvalue must be >= 0 and <= sizeof(indexed "
+          "value)\n");
+    }
+    ind1 = u8_codepoint_index_to_offset(reinterpret_cast<const uint8_t *>(lv->u.string), ind1);
+  } else {
+    ind1 = (code & 0x10) ? (size - sp->u.number) : sp->u.number;
+    if (ind1 < 0 || ind1 > size) {
+      error(
+          "The 1st index to range lvalue must be >= 0 and <= sizeof(indexed "
+          "value)\n");
+    }
   }
 
   global_lvalue_range.ind1 = ind1;
@@ -894,6 +927,36 @@ void copy_lvalue_range(svalue_t *from) {
       break;
     }
 #endif
+  }
+}
+
+template <typename F>
+void assign_lvalue_codepoint(F &&func) {
+  {
+    UChar32 c = u8_codepoint_at((const uint8_t *)global_lvalue_codepoint.owner->u.string,
+                                global_lvalue_codepoint.offset);
+    if (c < 0) {
+      error("Invalid string index.\n");
+    }
+    auto old_len = U8_LENGTH(c);
+    DEBUG_CHECK(old_len == 0, "Invalid UTF-8 Codepoint: assign_lvalue_codepoint");
+
+    auto newc = func(c);
+    if (newc == 0) {
+      error("Strings cannot contain 0 byte.\n");
+    }
+    c = newc;
+    auto new_len = U8_LENGTH(c);
+    if (!new_len) {
+      error("Strings cannot contain invalid utf8 codepoint.\n");
+    }
+    auto res = new_string(SVALUE_STRLEN(global_lvalue_codepoint.owner) - old_len + new_len,
+                          "assign_lvalue_codepoint");
+    u8_copy_and_replace_codepoint_at((const uint8_t *)global_lvalue_codepoint.owner->u.string,
+                                     (uint8_t *)res, global_lvalue_codepoint.offset, c);
+
+    free_string_svalue(global_lvalue_codepoint.owner);
+    global_lvalue_codepoint.owner->u.string = res;
   }
 }
 
@@ -1880,12 +1943,12 @@ void eval_instruction(char *p) {
             lval->u.real++;
             break;
           case T_LVALUE_BYTE:
-            if (global_lvalue_byte.subtype == 0 &&
-                *global_lvalue_byte.u.lvalue_byte == static_cast<unsigned char>(255)) {
-              error("Strings cannot contain 0 bytes.\n");
-            }
             ++*global_lvalue_byte.u.lvalue_byte;
             break;
+          case T_LVALUE_CODEPOINT: {
+            assign_lvalue_codepoint([](UChar32 c) { return c + 1; });
+            break;
+          }
           default:
             error("++ of non-numeric argument\n");
         }
@@ -2440,7 +2503,7 @@ void eval_instruction(char *p) {
             } else {
               absorb_mapping(lval->u.map, sp->u.map);
               free_mapping(sp->u.map); /* free RHS */
-                                       /* LHS not freed because its being reused */
+              /* LHS not freed because its being reused */
             }
             break;
           case T_LVALUE_BYTE: {
@@ -2597,7 +2660,7 @@ void eval_instruction(char *p) {
           }
         }
         pc += 2;
-      /* fallthrough */
+        /* fallthrough */
       case F_EXIT_FOREACH:
 #ifdef DEBUG
         stack_in_use_as_temporary--;
@@ -2716,24 +2779,24 @@ void eval_instruction(char *p) {
 #endif
         switch (sp->u.lvalue->type) {
           case T_LVALUE_BYTE: {
-            unsigned char c;
-
+            if ((sp - 1)->type != T_NUMBER) {
+              error("Illegal rhs to byte lvalue\n");
+            }
+            *global_lvalue_byte.u.lvalue_byte = (sp - 1)->u.number;
+          } break;
+          case T_LVALUE_RANGE:
+            assign_lvalue_range(sp - 1);
+            break;
+          case T_LVALUE_CODEPOINT: {
             if ((sp - 1)->type != T_NUMBER) {
               error("Illegal rhs to char lvalue\n");
-            } else {
-              c = ((sp - 1)->u.number & 0xff);
-              if (global_lvalue_byte.subtype == 0 && c == '\0') {
-                error("Strings cannot contain 0 bytes.\n");
-              }
-              *global_lvalue_byte.u.lvalue_byte = c;
             }
+            UChar32 newc = (sp - 1)->u.number;
+            assign_lvalue_codepoint([=](UChar32 c) { return newc; });
             break;
           }
           default:
             assign_svalue(sp->u.lvalue, sp - 1);
-            break;
-          case T_LVALUE_RANGE:
-            assign_lvalue_range(sp - 1);
             break;
         }
         sp--; /* ignore lvalue */
@@ -2760,22 +2823,26 @@ void eval_instruction(char *p) {
           switch (lval->type) {
             case T_LVALUE_BYTE: {
               if (sp->type != T_NUMBER) {
-                error("Illegal rhs to char lvalue\n");
+                error("Illegal rhs to byte lvalue\n");
               } else {
                 char c = (sp--)->u.number & 0xff;
-                if (global_lvalue_byte.subtype == 0 && c == '\0') {
-                  error("Strings cannot contain 0 bytes.\n");
-                }
                 *global_lvalue_byte.u.lvalue_byte = c;
               }
               break;
             }
-
             case T_LVALUE_RANGE: {
               copy_lvalue_range(sp--);
               break;
             }
-
+            case T_LVALUE_CODEPOINT: {
+              if (sp->type != T_NUMBER) {
+                error("Illegal rhs to byte lvalue\n");
+              }
+              UChar32 newc = sp->u.number;
+              assign_lvalue_codepoint([=](UChar32 c) { return newc; });
+              pop_stack();
+              break;
+            }
             default: {
               free_svalue(lval, "F_VOID_ASSIGN : 3");
               *lval = *sp--;
@@ -2904,10 +2971,10 @@ void eval_instruction(char *p) {
             lval->u.real--;
             break;
           case T_LVALUE_BYTE:
-            if (global_lvalue_byte.subtype == 0 && *global_lvalue_byte.u.lvalue_byte == '\x1') {
-              error("Strings cannot contain 0 bytes.\n");
-            }
             --(*global_lvalue_byte.u.lvalue_byte);
+            break;
+          case T_LVALUE_CODEPOINT:
+            assign_lvalue_codepoint([](UChar32 c) { return c - 1; });
             break;
           default:
             error("-- of non-numeric argument\n");
@@ -3000,13 +3067,12 @@ void eval_instruction(char *p) {
             sp->u.real = ++lval->u.real;
             break;
           case T_LVALUE_BYTE:
-            if (global_lvalue_byte.subtype == 0 &&
-                *global_lvalue_byte.u.lvalue_byte == static_cast<unsigned char>(255)) {
-              error("Strings cannot contain 0 bytes.\n");
-            }
             sp->type = T_NUMBER;
             sp->subtype = 0;
             sp->u.number = ++*global_lvalue_byte.u.lvalue_byte;
+            break;
+          case T_LVALUE_CODEPOINT:
+            assign_lvalue_codepoint([](UChar32 c) { return ++c; });
             break;
           default:
             error("++ of non-numeric argument\n");
@@ -3087,12 +3153,18 @@ void eval_instruction(char *p) {
               error("String indexes must be integers.\n");
             }
             i = (sp - 1)->u.number;
-            if ((i > SVALUE_STRLEN(sp)) || (i < 0)) {
+            size_t codepoints;
+            auto success = u8_codepoints((const uint8_t *)sp->u.string, &codepoints);
+            if (!success) {
+              error("Bad UTF-8 String: f_index.");
+            }
+            if (i > codepoints || i < 0) {
               error("String index out of bounds.\n");
             }
-            i = static_cast<unsigned char>(sp->u.string[i]);
+            UChar32 res = u8_codepoint_at((const uint8_t *)sp->u.string, i);
+            DEBUG_CHECK(res < 0, "f_idnex: u8_codepoint_at failed!");
             free_string_svalue(sp);
-            (--sp)->u.number = i;
+            (--sp)->u.number = res;
             break;
           }
           case T_ARRAY: {
@@ -3144,17 +3216,19 @@ void eval_instruction(char *p) {
           }
 #endif
           case T_STRING: {
-            int len = SVALUE_STRLEN(sp);
             if ((sp - 1)->type != T_NUMBER) {
               error("Indexing a string with an illegal type.\n");
             }
-            i = len - (sp - 1)->u.number;
-            if ((i > len) || (i < 0)) {
+            size_t count;
+            auto success = u8_codepoints((const uint8_t *)sp->u.string, &count);
+            DEBUG_CHECK(!success, "Invalid UTF8 string: f_rindex");
+            i = count - (sp - 1)->u.number;
+            if ((i > count) || (i < 0)) {
               error("String index out of bounds.\n");
             }
-            i = static_cast<unsigned char>(sp->u.string[i]);
+            UChar32 c = u8_codepoint_at((const uint8_t *)sp->u.string, i);
             free_string_svalue(sp);
-            (--sp)->u.number = i;
+            (--sp)->u.number = c;
             break;
           }
           case T_ARRAY: {
@@ -3318,11 +3392,11 @@ void eval_instruction(char *p) {
             break;
           case T_LVALUE_BYTE:
             sp->type = T_NUMBER;
-            if (global_lvalue_byte.subtype == 0 && *global_lvalue_byte.u.lvalue_byte == '\x1') {
-              error("Strings cannot contain 0 bytes.\n");
-            }
-            sp->u.number = (*global_lvalue_byte.u.lvalue_byte)--;
             sp->subtype = 0;
+            sp->u.number = (*global_lvalue_byte.u.lvalue_byte)--;
+            break;
+          case T_LVALUE_CODEPOINT:
+            assign_lvalue_codepoint([](UChar32 c) { return --c; });
             break;
           default:
             error("-- of non-numeric argument\n");
@@ -3342,13 +3416,12 @@ void eval_instruction(char *p) {
             sp->u.real = lval->u.real++;
             break;
           case T_LVALUE_BYTE:
-            if (global_lvalue_byte.subtype == 0 &&
-                *global_lvalue_byte.u.lvalue_byte == static_cast<unsigned char>(255)) {
-              error("Strings cannot contain 0 bytes.\n");
-            }
             sp->type = T_NUMBER;
             sp->u.number = (*global_lvalue_byte.u.lvalue_byte)++;
             sp->subtype = 0;
+            break;
+          case T_LVALUE_CODEPOINT:
+            assign_lvalue_codepoint([](UChar32 c) { return c++; });
             break;
           default:
             error("++ of non-numeric argument\n");
@@ -3689,8 +3762,22 @@ void eval_instruction(char *p) {
         }
 #endif
     } /* switch (instruction) */
-    DEBUG_CHECK1(sp < fp + csp->num_local_variables - 1,
-                 "Bad stack after evaluation. Instruction %d\n", instruction);
+    DEBUG_CHECK2(sp < fp + csp->num_local_variables - 1,
+                 "Bad stack after evaluation. Instruction '%s' (%d) \n", instrs[instruction].name,
+                 instruction);
+#if defined(DEBUG) && 0 // super slow
+    {
+      svalue_t *current_stack = sp;
+      while (current_stack >= fp) {
+        auto v = *current_stack--;
+        if (v.type == T_STRING) {
+          DEBUG_CHECK2(!u8_validate((const uint8_t *)v.u.string),
+                       "Corrupted UTF8 string after evaluation. Instruction '%s' (%d)\n",
+                       instrs[instruction].name, instruction);
+        }
+      }
+    }
+#endif
   } /* while (1) */
 }
 

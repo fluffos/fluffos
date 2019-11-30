@@ -25,6 +25,7 @@ void recurse(string dir) {
         }
 #endif
       }
+      cp("/log/compile", "/log/compile_fail");
       rm("/log/compile");
     }
     // only make sure crasher don't crash, errors are ignored.

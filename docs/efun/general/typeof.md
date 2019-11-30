@@ -16,14 +16,24 @@ title: general / typeof
     Return  the  type  of  an  expression.   The return values are given in
     <type.h>.  They are:
 
-    T_INT           "int" T_STRING        "string" T_ARRAY          "array"
-    T_OBJECT           "object"    T_MAPPING         "mapping"   T_FUNCTION
-    "function" T_FLOAT          "float"  T_BUFFER         "buffer"  T_CLASS
-    "class"
+    T_INT           "int"
+    T_STRING        "string"
+    T_ARRAY         "array"
+    T_OBJECT        "object"
+    T_MAPPING       "mapping"
+    T_FUNCTION      "function"
+    T_FLOAT         "float"
+    T_BUFFER        "buffer"
+    T_CLASS         "class"
 
-    T_INVALID        "*invalid*"  T_LVALUE         "*lvalue*" T_LVALUE_BYTE
-    "*lvalue_byte*"   T_LVALUE_RANGE    "*lvalue_range*"    T_ERROR_HANDLER
-    "*error_handler*" T_FREED         "*freed*" T_UNKNOWN       "*unknown*"
+    T_INVALID          "*invalid*"
+    T_LVALUE           "*lvalue*"
+    T_LVALUE_BYTE      "*lvalue_byte*"
+    T_LVALUE_RANGE     "*lvalue_range*"
+    T_LVALUE_CODEPOINT "*lvalue_codepoint*"
+    T_ERROR_HANDLER    "*error_handler*"
+    T_FREED            "*freed*"
+    T_UNKNOWN          "*unknown*"
 
 ### SEE ALSO
 

@@ -539,17 +539,18 @@ void f_enable_wizard(void) {
 #ifdef F_ERROR
 void f_error(void) {
   int l = SVALUE_STRLEN(sp);
-  char err_buf[2048];
-
   if (l && sp->u.string[l - 1] == '\n') {
     l--;
   }
-  if (l > 2045) {
-    l = 2045;
-  }
+  const auto max_string_length = LARGEST_PRINTABLE_STRING;
+  l = std::min(l, max_string_length - 3);
+
+  // VLA
+  char err_buf[l + 3];
 
   err_buf[0] = '*';
-  strncpy(err_buf + 1, sp->u.string, l);
+  u8_strncpy(reinterpret_cast<uint8_t *>(err_buf + 1),
+             reinterpret_cast<const uint8_t *>(sp->u.string), l);
   err_buf[l + 1] = '\n';
   err_buf[l + 2] = 0;
 
@@ -2494,7 +2495,7 @@ void f_shutdown(void) {
 
 #ifdef F_SIZEOF
 void f_sizeof(void) {
-  int i;
+  size_t i;
 
   switch (sp->type) {
     case T_CLASS:
@@ -2515,10 +2516,12 @@ void f_sizeof(void) {
       free_buffer(sp->u.buf);
       break;
 #endif
-    case T_STRING:
-      i = SVALUE_STRLEN(sp);
+    case T_STRING: {
+      auto success = u8_codepoints((const uint8_t *)sp->u.string, &i);
+      DEBUG_CHECK(!success, "Invalid UTF8 string!");
       free_string_svalue(sp);
       break;
+    }
     default:
       i = 0;
       free_svalue(sp, "f_sizeof");

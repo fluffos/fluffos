@@ -52,6 +52,9 @@ extern int NUM_OPTION_DEFS;
 
 #define NELEM(a) (sizeof(a) / sizeof((a)[0]))
 
+// FIXME: This means current source code can not contain "NUL" byte,
+//  for now it seems suffice, but this should be fixed to check pointer address
+//  for EOF, not for value.
 #define LEX_EOF ((unsigned char)0)
 
 char lex_ctype[256] = {
@@ -2371,6 +2374,10 @@ int yylex() {
           if (rc > 0) {
             int n;
 
+            if (!u8_validate((const uint8_t *)outp)) {
+              lexerror("Bad UTF-8 string in string block");
+              return LEX_EOF;
+            }
             /*
              * make string token and clean up
              */
@@ -2403,6 +2410,10 @@ int yylex() {
 
             case '"':
               *to++ = 0;
+              if (!u8_validate(scr_tail + 1)) {
+                lexerror("Invalid UTF8 string");
+                return LEX_EOF;
+              }
               if (!l && (to == scratch_end)) {
                 char *res = scratch_large_alloc(to - scr_tail - 1);
                 strcpy(res, reinterpret_cast<char *>(scr_tail + 1));
@@ -2500,6 +2511,102 @@ int yylex() {
                   }
                   break;
                 }
+                  // \uhhhh, 2 byte
+                case 'u': {
+                  UChar res[2];  // possible surrogate pairs
+                  char buf[4 + 1];
+                  for (auto i = 0; i < 4; i++) {
+                    buf[i] = *outp++;
+                    if (!isxdigit(buf[i]) || buf[i] == LEX_EOF) {
+                      lexerror("Illegal unicode sequence.");
+                      return LEX_EOF;
+                    }
+                  }
+                  buf[4] = 0;
+                  res[0] = strtoll(buf, nullptr, 16);
+                  if (res[0] == 0) {
+                    lexerror("Illegal unicode sequence.");
+                    return LEX_EOF;
+                  }
+                  // If this is an single character
+                  if (U16_IS_SINGLE(res[0])) {
+                    UErrorCode err = U_ZERO_ERROR;
+                    int32_t written = 0;
+                    u_strToUTF8(reinterpret_cast<char *>(to), 4, &written, res, 2, &err);
+                    if (U_FAILURE(err)) {
+                      lexerror("Illegal unicode sequence.");
+                      return LEX_EOF;
+                    }
+                    to += written;
+                  } else if (!U16_IS_SURROGATE_LEAD(res[0])) {
+                    lexerror("Illegal unicode sequence, expecting surrogate lead, got trail.");
+                    return LEX_EOF;
+                  } else {
+                    // Now we need to continue look for next surrogate
+                    if (outp[0] == '\\' && outp[1] == 'u') {
+                      outp += 2;
+                      for (auto i = 0; i < 4; i++) {
+                        buf[i] = *outp++;
+                        if (!isxdigit(buf[i]) || buf[i] == LEX_EOF) {
+                          lexerror("Illegal unicode sequence.");
+                          return LEX_EOF;
+                        }
+                      }
+                      buf[4] = 0;
+                      res[1] = strtoll(buf, nullptr, 16);
+                      if (res[1] == 0) {
+                        lexerror("Illegal unicode sequence.");
+                        return LEX_EOF;
+                      }
+                      if (!U16_IS_SURROGATE_TRAIL(res[1])) {
+                        lexerror(
+                            "Illegal unicode sequence, expecting surrogate trail, got single.");
+                        return LEX_EOF;
+                      }
+                      UErrorCode err = U_ZERO_ERROR;
+                      int32_t written = 0;
+                      u_strToUTF8(reinterpret_cast<char *>(to), 4, &written, res, 2, &err);
+                      if (U_FAILURE(err)) {
+                        lexerror("Illegal unicode sequence.");
+                        return LEX_EOF;
+                      }
+                      to += written;
+                    } else {
+                      lexerror("Illegal unicode sequence. Missing surrogate trail. ");
+                      return LEX_EOF;
+                    }
+                  }
+                  break;
+                }
+                // \Uhhhhhhhh, 4 byte
+                case 'U': {
+                  UChar res[2];
+                  char buf[2 + 8 + 1];
+                  buf[0] = '\\';
+                  buf[1] = 'U';
+                  for (int i = 2; i < 10; i++) {
+                    buf[i] = *outp++;
+                    if (!isxdigit(buf[i]) || buf[i] == LEX_EOF) {
+                      lexerror("Illegal unicode sequence.");
+                      return LEX_EOF;
+                    }
+                  }
+                  buf[10] = 0;
+                  auto size = u_unescape(buf, res, 2);
+                  if (size == 0) {
+                    lexerror("Illegal unicode sequence.");
+                    return LEX_EOF;
+                  }
+                  UErrorCode err = U_ZERO_ERROR;
+                  int32_t written = 0;
+                  u_strToUTF8(reinterpret_cast<char *>(to), 4, &written, res, 2, &err);
+                  if (U_FAILURE(err)) {
+                    lexerror("Illegal unicode sequence.");
+                    return LEX_EOF;
+                  }
+                  to += written;
+                  break;
+                }
                 default:
                   *to++ = *(outp - 1);
                   yywarn("Unknown \\ escape.");
@@ -2526,6 +2633,11 @@ int yylex() {
               res = scratch_large_alloc((yyp - yytext) + (to - scr_tail) - 1);
               strncpy(res, reinterpret_cast<char *>(scr_tail + 1), (to - scr_tail) - 1);
               strcpy(res + (to - scr_tail) - 1, yytext);
+              if (!u8_validate((const uint8_t *)res)) {
+                lexerror("Invalid UTF8 string");
+                scratch_free(res);
+                return LEX_EOF;
+              }
               yylval.string = res;
               return L_STRING;
             }
@@ -2633,6 +2745,12 @@ int yylex() {
           res = scratch_large_alloc((yyp - yytext) + (to - scr_tail) - 1);
           strncpy(res, reinterpret_cast<char *>(scr_tail + 1), (to - scr_tail) - 1);
           strcpy(res + (to - scr_tail) - 1, yytext);
+          // Validate UTF8
+          if (!u8_validate((const uint8_t *)res)) {
+            lexerror("Invalid UTF8 string");
+            scratch_free(res);
+            return LEX_EOF;
+          }
           yylval.string = res;
           return L_STRING;
         }

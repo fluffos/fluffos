@@ -1,4 +1,4 @@
 void do_tests() {
-    ASSERT(catch(error("hi")) == "*hi\n");
-    ASSERT(catch(error("hi\n")) == "*hi\n");
+    ASSERT_EQ("*hi\n", catch(error("hi")));
+    ASSERT_EQ("*hi\n", catch(error("hi\n")));
 }

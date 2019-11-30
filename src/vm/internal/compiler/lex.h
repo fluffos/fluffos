@@ -1,7 +1,7 @@
 #ifndef _LEX_H_
 #define _LEX_H_
 
-#define DEFMAX 20000  // at least 4 times MAXLINE
+#define DEFMAX 65536  // at least 4 times MAXLINE
 #define MAXLINE 4096
 #define MLEN 4096
 #define NSIZE 256
