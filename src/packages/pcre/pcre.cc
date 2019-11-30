@@ -71,8 +71,8 @@ static pcre *pcre_local_compile(pcre_t *p);
 static int pcre_local_exec(pcre_t *p);
 static int pcre_magic(pcre_t *p);
 static int pcre_query_match(pcre_t *p);
-static int pcre_match_single(svalue_t *str, const char* pattern);
-static array_t *pcre_match(array_t *v, const char* pattern, int flag);
+static int pcre_match_single(svalue_t *str, const char *pattern);
+static array_t *pcre_match(array_t *v, const char *pattern, int flag);
 static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *def);
 static char *pcre_get_replace(pcre_t *run, array_t *replacements);
 static array_t *pcre_get_substrings(pcre_t *run);
@@ -412,7 +412,7 @@ static int pcre_match_single(svalue_t *str, const char *pattern) {
   return ret;
 }
 
-static array_t *pcre_match(array_t *v, const char* pattern, int flag) {
+static array_t *pcre_match(array_t *v, const char *pattern, int flag) {
   pcre_t *run;
   array_t *ret;
   svalue_t *sv1, *sv2;
@@ -426,7 +426,7 @@ static array_t *pcre_match(array_t *v, const char* pattern, int flag) {
   run = (pcre_t *)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "pcre_match : run");
   run->ovector = nullptr;
   run->ovecsize = 0;
-  run->pattern= pattern;
+  run->pattern = pattern;
 
   run->re = pcre_get_cached_pattern(&pcre_cache, run->pattern);
 
@@ -792,7 +792,7 @@ static void pcre_free_memory(pcre_t *p) {
 // Caching functions, add new ones at the front of the bucket so we find them
 // faster
 static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
-                              const char* pattern)  // must be shared string
+                              const char *pattern)  // must be shared string
 {
   auto shared_pattern = make_shared_string(pattern);
   unsigned int bucket = HASH(BLOCK(shared_pattern)) % PCRE_CACHE_SIZE;
@@ -862,7 +862,7 @@ static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
   return 0;
 }
 
-static pcre *pcre_get_cached_pattern(struct pcre_cache_t *table, const char* pattern) {
+static pcre *pcre_get_cached_pattern(struct pcre_cache_t *table, const char *pattern) {
   auto shared_pattern = make_shared_string(pattern);
   unsigned int bucket = HASH(BLOCK(shared_pattern)) % PCRE_CACHE_SIZE;
   struct pcre_cache_bucket_t *node;
@@ -924,7 +924,7 @@ void mark_pcre_cache() {
   for (auto i = 0; i < PCRE_CACHE_SIZE; i++) {
     if (pcre_cache.buckets[i] != nullptr) {
       auto node = pcre_cache.buckets[i];
-      while(node != nullptr) {
+      while (node != nullptr) {
         DO_MARK(node, TAG_PCRE_CACHE);
         EXTRA_REF(BLOCK(node->pattern))++;
         node = node->next;

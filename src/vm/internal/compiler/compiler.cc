@@ -1518,7 +1518,7 @@ char *get_type_name(char *where, char *end, int type) {
   return where;
 }
 
-#define STRING_HASH(var, str)        \
+#define STRING_HASH(var, str)                \
   var = (intptr_t)str ^ (intptr_t)str >> 16; \
   var = (var ^ var >> 8) & 0xff;
 

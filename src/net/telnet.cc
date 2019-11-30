@@ -1,7 +1,7 @@
 #include "base/std.h"
 
 #include "net/telnet.h"
-#include "net/sys_telnet.h" // our own version of telnet header.
+#include "net/sys_telnet.h"  // our own version of telnet header.
 
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>

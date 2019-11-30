@@ -364,8 +364,9 @@ static void dump_stralloc() {
   for (int hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
     for (entry = table[hsh]; entry; entry = entry->next) {
       if (entry->tag == TAG_MALLOC_STRING || entry->tag == TAG_SHARED_STRING) {
-        fprintf(stderr, "%-20s: sz %7d: id %6d: tag %08x, a %8p, \"%.20s\"\n", entry->desc, entry->size,
-                entry->id, entry->tag, PTR(entry), STRING(NODET_TO_PTR(entry, block_t *)));
+        fprintf(stderr, "%-20s: sz %7d: id %6d: tag %08x, a %8p, \"%.20s\"\n", entry->desc,
+                entry->size, entry->id, entry->tag, PTR(entry),
+                STRING(NODET_TO_PTR(entry, block_t *)));
       }
     }
   }
@@ -988,7 +989,7 @@ void check_all_blocks(int flag) {
                         entry->tag);
             break;
           case TAG_PERMANENT: /* only save_object|resotre_object uses this */
-          break;
+            break;
             /* FIXME: need to account these. */
           case TAG_INC_LIST:
           case TAG_IDENT_TABLE:

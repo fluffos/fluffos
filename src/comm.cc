@@ -19,10 +19,10 @@
 #include <memory>                // for unique_ptr
 // Network stuff
 #ifndef _WIN32
-#include <netdb.h>               // for addrinfo, freeaddrinfo, etc
-#include <netinet/in.h>          // for ntohl, IPPROTO_TCP
-#include <netinet/tcp.h>         // for TCP_NODELAY
-#include <sys/socket.h>          // for SOCK_STREAM
+#include <netdb.h>        // for addrinfo, freeaddrinfo, etc
+#include <netinet/in.h>   // for ntohl, IPPROTO_TCP
+#include <netinet/tcp.h>  // for TCP_NODELAY
+#include <sys/socket.h>   // for SOCK_STREAM
 #else
 #include <ws2tcpip.h>
 #endif
@@ -182,11 +182,11 @@ void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
     int one = 1;
     if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY,
 #ifndef _WIN32
-      &one,
+                   &one,
 #else
-      (const char*)&one,
+                   (const char *)&one,
 #endif
-      sizeof(one)) == -1) {
+                   sizeof(one)) == -1) {
       debug(connections, "new_user_handler: user fd %td, set_socket_tcp_nodelay error: %s.\n", fd,
             evutil_socket_error_to_string(evutil_socket_geterror(fd)));
     }
@@ -336,11 +336,11 @@ bool init_user_conn() {
       int one = 1;
       if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE,
 #ifndef _WIN32
-        (void *)&one,
+                     (void *)&one,
 #else
-        (const char*)&one,
+                     (const char *)&one,
 #endif
-        sizeof(one)) < 0) {
+                     sizeof(one)) < 0) {
         evutil_closesocket(fd);
         return false;
       }
