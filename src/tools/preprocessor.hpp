@@ -155,17 +155,17 @@ static char *skip_comment(char *tmp, int flag) {
         current_line++;
         if (!fgets(yytext, MAXLINE - 1, yyin)) yyerror("End of file in a comment");
         if (flag && yyout) fputs(yytext, yyout);
-        tmp = yytext - 1;
+        tmp = yytext;
       }
     }
     do {
-      if ((c = *++tmp) == '/') return tmp + 1;
+      if ((c = *tmp++) == '/') return tmp + 1;
       if (c == '\n') {
         nexpands = 0;
         current_line++;
         if (!fgets(yytext, MAXLINE - 1, yyin)) yyerror("End of file in a comment");
         if (flag && yyout) fputs(yytext, yyout);
-        tmp = yytext - 1;
+        tmp = yytext;
       }
     } while (c == '*');
   }
@@ -432,7 +432,7 @@ static int expand_define() {
   return 1;
 }
 
-static int exgetc() {
+static char exgetc() {
   char c, *yyp;
 
   SKPW;
@@ -691,7 +691,7 @@ static void handle_endif(void) {
 #define LOR 18
 #define QMARK 19
 
-static char _optab[] = {0, 4, 0, 0, 0, 26, 56, 0, 0, 0,  18, 14, 0,  10, 0, 22, 0,  0, 0,
+static char optab[] = {0, 4, 0, 0, 0, 26, 56, 0, 0, 0,  18, 14, 0,  10, 0, 22, 0,  0, 0,
                         0, 0, 0, 0, 0, 0,  0,  0, 0, 30, 50, 40, 74, 0,  0, 0,  0,  0, 0,
                         0, 0, 0, 0, 0, 0,  0,  0, 0, 0,  0,  0,  0,  0,  0, 0,  0,  0, 0,
                         0, 0, 0, 0, 0, 70, 0,  0, 0, 0,  0,  0,  0,  0,  0, 0,  0,  0, 0,
@@ -703,17 +703,15 @@ static char optab2[] = {
     8,    0,   '=', EQ,   7,   0,    0, 0,   '&', LAND,   3, 0,      BAND, 6,     0,   '|',
     LOR,  2,   0,   BOR,  4,   0,    0, XOR, 5,   0,      0, QMARK,  1};
 
-#define optab1 (_optab - ' ')
-
 static int cond_get_exp(int priority) {
-  int c;
+  char c;
   int value, value2, x;
 
   if ((c = exgetc()) == '(') {
     value = cond_get_exp(0);
     if ((c = exgetc()) != ')') yyerrorp("bracket not paired in %cif");
   } else if (ispunct(c)) {
-    if (!(x = optab1[c])) {
+    if (!(x = optab[c - ' '])) {
       yyerrorp("illegal character in %cif");
       return 0;
     }
@@ -774,7 +772,7 @@ static int cond_get_exp(int priority) {
   }
   for (;;) {
     if (!ispunct(c = exgetc())) break;
-    if (!(x = optab1[c])) break;
+    if (!(x = optab[c - ' '])) break;
     outp++;
     value2 = exgetc();
     for (;; x += 3) {
