@@ -1946,7 +1946,7 @@ void error(const char *const fmt, ...) {
   va_end(args);
   err_buf[0] = '*'; /* all system errors get a * at the start */
 #ifdef ENABLE_DTRACE
-  if(FLUFFOS_ERROR_ENABLED()) {
+  if (FLUFFOS_ERROR_ENABLED()) {
     FLUFFOS_ERROR((char *)err_buf);
   }
 #endif

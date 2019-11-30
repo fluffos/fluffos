@@ -84,7 +84,7 @@ static block_t **base_table = (block_t **)nullptr;
 static int htable_size;
 static int htable_size_minus_one;
 
-static block_t *alloc_new_string(const char * /*string*/, int /*h*/, const char* /*why*/);
+static block_t *alloc_new_string(const char * /*string*/, int /*h*/, const char * /*why*/);
 
 void init_strings() {
   int x, y;
@@ -147,7 +147,7 @@ char *findstring(const char *s) {
 
 /* alloc_new_string: Make a space for a string.  */
 
-static block_t *alloc_new_string(const char *string, int h, const char* why) {
+static block_t *alloc_new_string(const char *string, int h, const char *why) {
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   block_t *b;
@@ -161,7 +161,8 @@ static block_t *alloc_new_string(const char *string, int h, const char* why) {
   size = sizeof(block_t) + len + 1;
   b = reinterpret_cast<block_t *>(DMALLOC(size, TAG_SHARED_STRING, why));
   strncpy(STRING(b), string, len);
-  STRING(b)[len] = '\0'; /* strncpy doesn't put on \0 if 'from' too
+  STRING(b)
+  [len] = '\0'; /* strncpy doesn't put on \0 if 'from' too
                  * long */
   if (cut) {
     h = whashstr(STRING(b)) & htable_size_minus_one;

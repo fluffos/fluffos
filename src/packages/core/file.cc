@@ -905,8 +905,9 @@ int copy_file(const char *from, const char *to) {
   auto base = fs::current_path();
   fs::copy_file(base / from, base / to, fs::copy_options::overwrite_existing, error_code);
 
-  if(error_code) {
-    debug_message("Error copying file from /%s to /%s, Error: %s", from, to, error_code.message().c_str());
+  if (error_code) {
+    debug_message("Error copying file from /%s to /%s, Error: %s", from, to,
+                  error_code.message().c_str());
     return -1;
   }
 

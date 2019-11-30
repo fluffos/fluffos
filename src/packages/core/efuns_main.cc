@@ -1380,7 +1380,7 @@ void f_mud_status(void) {
                 "Calls to add_message: %8" PRIu64 "   Packets: %8" PRIu64
                 "   Average packet size: %.2lf bytes\n\n",
                 add_message_calls, inet_packets,
-                inet_volume && inet_packets ? static_cast<double>(inet_volume) / inet_packets: 0);
+                inet_volume && inet_packets ? static_cast<double>(inet_volume) / inet_packets : 0);
 
     stat_living_objects(&ob);
 
@@ -3390,18 +3390,16 @@ void f_crypt(void) {
 
   if (sp->type == T_STRING) {
     // Support $1$, $2a$ (a,x,y), $5$, $6$
-    if(sp->u.string[0] == '$') {
+    if (sp->u.string[0] == '$') {
       // $2?$
-      if (SVALUE_STRLEN(sp) >= 4 &&
-          sp->u.string[1] == '2' &&
+      if (SVALUE_STRLEN(sp) >= 4 && sp->u.string[1] == '2' &&
           (sp->u.string[2] == 'a' || sp->u.string[2] == 'x' || sp->u.string[2] == 'y') &&
           sp->u.string[3] == '$') {
         saltp = sp->u.string;
       } else {
         if (SVALUE_STRLEN(sp) >= 3 &&
-            (sp->u.string[1] == '1' ||
-             sp->u.string[1] == '5' ||
-             sp->u.string[1] == '6') && sp->u.string[2] == '$') {
+            (sp->u.string[1] == '1' || sp->u.string[1] == '5' || sp->u.string[1] == '6') &&
+            sp->u.string[2] == '$') {
           saltp = sp->u.string;
         }
       }
@@ -3421,9 +3419,8 @@ void f_crypt(void) {
     saltp = salt;
   }
 
-  auto result = crypt((sp-1)->u.string, saltp);
-  if(result == nullptr ||
-     (result && result[0] == '*')) {
+  auto result = crypt((sp - 1)->u.string, saltp);
+  if (result == nullptr || (result && result[0] == '*')) {
     error("Error in crypt(), check your salt");
     return;
   }

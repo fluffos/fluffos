@@ -1555,7 +1555,8 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
     auto base = fs::current_path(error_code);
     fs::rename(base / fs::path(tmp_name), base / fs::path(file), error_code);
     if (error_code) {
-      debug_message("Failed to rename /%s to /%s: Error: %d (%s)\n", tmp_name, file, error_code.value(), error_code.message().c_str());
+      debug_message("Failed to rename /%s to /%s: Error: %d (%s)\n", tmp_name, file,
+                    error_code.value(), error_code.message().c_str());
       std::remove(tmp_name);
       debug_message("Failed to save object!\n");
     } else if (save_compressed) {

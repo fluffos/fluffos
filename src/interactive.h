@@ -3,7 +3,7 @@
 
 #include <event2/util.h>
 
-#include "vm/vm.h"       // FIXME: for union string_or_func
+#include "vm/vm.h"  // FIXME: for union string_or_func
 
 #define MAX_TEXT 2048
 

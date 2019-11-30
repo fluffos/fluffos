@@ -268,7 +268,7 @@ retry_for_shadow:
       }
     }
 #ifdef ENABLE_DTRACE
-    if(FLUFFOS_LPC_ENTRY_ENABLED()) {
+    if (FLUFFOS_LPC_ENTRY_ENABLED()) {
       FLUFFOS_LPC_ENTRY(ob->obname, fun, current_prog->filename);
     }
 #endif
