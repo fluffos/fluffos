@@ -52,7 +52,7 @@ extern int NUM_OPTION_DEFS;
 
 #define NELEM(a) (sizeof(a) / sizeof((a)[0]))
 
-#define LEX_EOF ((unsigned char)EOF)
+#define LEX_EOF ((unsigned char)0)
 
 char lex_ctype[256] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -256,9 +256,9 @@ static void skip_comment(void);
 static void deltrail(char * /*sp*/);
 static void handle_pragma(char * /*str*/);
 static int cmygetc(void);
-static void refill(void);
+static void refill_on_continuation(void);
 static void refill_buffer(void);
-static int exgetc(void);
+static char exgetc(void);
 static int old_func(void);
 static ident_hash_elem_t *quick_alloc_ident_entry(void);
 
@@ -2171,7 +2171,9 @@ int yylex() {
           } else {
             sp = yyp;
           }
-          *yyp = 0;
+          *yyp = '\0';
+          // Deal with trailing \r
+          if(*(yyp -1) == '\r') *(yyp-1) = '\0';
           if (!strcmp("include", yytext)) {
             current_line++;
             if (c == LEX_EOF) {
@@ -3321,7 +3323,8 @@ static int cmygetc() {
   }
 }
 
-static void refill() {
+// Refill buffer for next line, used for dealing with macro continuation '\ '
+static void refill_on_continuation() {
   char *p;
   unsigned char c;
 
@@ -3338,8 +3341,15 @@ static void refill() {
   if ((c == '\n') && (outp == last_nl + 1)) {
     refill_buffer();
   }
-  p[-1] = ' ';
   *p = 0;
+  // Deal with possible trailing '\r'
+  if (p >= yytext + 2 && p[-2] == '\r' && p[-1] == '\n') {
+    p[-2] = ' ';
+    p[-1] = '\0';
+  } else {
+    // replace \n
+    p[-1] = ' ';
+ }
   nexpands = 0;
   current_line++;
 }
@@ -3438,7 +3448,7 @@ static void handle_define(char *yyt) {
       }
       if (!*p && p[-2] == '\\') {
         q -= 2;
-        refill();
+        refill_on_continuation();
         p = yytext;
       }
     }
@@ -3453,9 +3463,9 @@ static void handle_define(char *yyt) {
         lexerror("Macro text too long");
         return;
       }
-      if (!*p && p[-2] == '\\') {
+      if (!*p && p >= yytext + 2 && p[-2] == '\\') { // we copied something
         q -= 2;
-        refill();
+        refill_on_continuation();
         p = yytext;
       }
     }
@@ -3895,7 +3905,7 @@ int expand_define(void) {
   while (is_wspace(c)); \
   outp--
 
-static int exgetc() {
+static char exgetc() {
   unsigned char c;
   char *yyp;
 
