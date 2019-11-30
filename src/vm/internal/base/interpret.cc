@@ -80,13 +80,17 @@ int function_index_offset; /* Needed for inheritance */
 int variable_index_offset; /* Needed for inheritance */
 int st_num_arg;
 
-static svalue_t start_of_stack[CFG_EVALUATOR_STACK_SIZE + 10];
-svalue_t *end_of_stack = start_of_stack + CFG_EVALUATOR_STACK_SIZE;
+// For safety, we leave some buffer in before and after the space.
+static svalue_t _stack [10 + CFG_EVALUATOR_STACK_SIZE + 10];
+static svalue_t* const start_of_stack = &_stack[10];
+svalue_t* const end_of_stack = start_of_stack + CFG_EVALUATOR_STACK_SIZE;
 
 /* Used to throw an error to a catch */
 svalue_t catch_value = {T_NUMBER};
 
-control_stack_t control_stack[CFG_MAX_CALL_DEPTH + 5];
+// For safety, we leave some buffer in before and after the space.
+control_stack_t _control_stack[5 + CFG_MAX_CALL_DEPTH + 5];
+control_stack_t* const control_stack =  &_control_stack[5];
 control_stack_t *csp; /* Points to last element pushed */
 
 int too_deep_error = 0, max_eval_error = 0;

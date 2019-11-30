@@ -452,7 +452,7 @@ static void handle_endif(void) {
 #define LOR 18
 #define QMARK 19
 
-static char _optab[] = {0, 4, 0, 0, 0, 26, 56, 0, 0, 0,  18, 14, 0,  10, 0, 22, 0,  0, 0,
+static char optab[] = {0, 4, 0, 0, 0, 26, 56, 0, 0, 0,  18, 14, 0,  10, 0, 22, 0,  0, 0,
                         0, 0, 0, 0, 0, 0,  0,  0, 0, 30, 50, 40, 74, 0,  0, 0,  0,  0, 0,
                         0, 0, 0, 0, 0, 0,  0,  0, 0, 0,  0,  0,  0,  0,  0, 0,  0,  0, 0,
                         0, 0, 0, 0, 0, 70, 0,  0, 0, 0,  0,  0,  0,  0,  0, 0,  0,  0, 0,
@@ -463,8 +463,6 @@ static char optab2[] = {
     9,    '=', LEQ, 8,    0,   LESS, 8, 0,   '>', RSHIFT, 9, '=',    GEQ,  8,     0,   GREAT,
     8,    0,   '=', EQ,   7,   0,    0, 0,   '&', LAND,   3, 0,      BAND, 6,     0,   '|',
     LOR,  2,   0,   BOR,  4,   0,    0, XOR, 5,   0,      0, QMARK,  1};
-
-#define optab1 (_optab - ' ')
 
 static LPC_INT cond_get_exp(int priority) {
   int c;
@@ -495,7 +493,7 @@ static LPC_INT cond_get_exp(int priority) {
     }
 #endif
   } else if (ispunct(c)) {
-    if (!(x = optab1[c])) {
+    if (!(x = optab[c - ' '])) {
       lexerror("illegal character in #if");
       return 0;
     }
@@ -575,7 +573,7 @@ static LPC_INT cond_get_exp(int priority) {
       break;
     }
 #endif
-    if (!(x = optab1[c])) {
+    if (!(x = optab[c - ' '])) {
       break;
     }
     value2 = *outp++;
