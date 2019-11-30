@@ -35,7 +35,7 @@ typedef struct {
 
 struct pcre_cache_bucket_t {
   pcre *compiled_pattern;  // value1
-  const char* pattern;        // key
+  const char *pattern;     // key
   int size;                // size in bytes
   struct pcre_cache_bucket_t *next;
 };

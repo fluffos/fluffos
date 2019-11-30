@@ -38,7 +38,8 @@ void debug_message(const char *fmt, ...) {
     }
     debug_message_fp = fopen(deb, "w");
     if (!debug_message_fp) {
-      fprintf(stderr, "Unable to open log file: \"%s\", error: \"%s\". Use stderr only.\n", deb, strerror(errno));
+      fprintf(stderr, "Unable to open log file: \"%s\", error: \"%s\". Use stderr only.\n", deb,
+              strerror(errno));
       /* use stderr by default. */
       debug_message_fp = stderr;
     }

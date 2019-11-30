@@ -453,10 +453,10 @@ static void handle_endif(void) {
 #define QMARK 19
 
 static char optab[] = {0, 4, 0, 0, 0, 26, 56, 0, 0, 0,  18, 14, 0,  10, 0, 22, 0,  0, 0,
-                        0, 0, 0, 0, 0, 0,  0,  0, 0, 30, 50, 40, 74, 0,  0, 0,  0,  0, 0,
-                        0, 0, 0, 0, 0, 0,  0,  0, 0, 0,  0,  0,  0,  0,  0, 0,  0,  0, 0,
-                        0, 0, 0, 0, 0, 70, 0,  0, 0, 0,  0,  0,  0,  0,  0, 0,  0,  0, 0,
-                        0, 0, 0, 0, 0, 0,  0,  0, 0, 0,  0,  0,  0,  0,  0, 0,  63, 0, 1};
+                       0, 0, 0, 0, 0, 0,  0,  0, 0, 30, 50, 40, 74, 0,  0, 0,  0,  0, 0,
+                       0, 0, 0, 0, 0, 0,  0,  0, 0, 0,  0,  0,  0,  0,  0, 0,  0,  0, 0,
+                       0, 0, 0, 0, 0, 70, 0,  0, 0, 0,  0,  0,  0,  0,  0, 0,  0,  0, 0,
+                       0, 0, 0, 0, 0, 0,  0,  0, 0, 0,  0,  0,  0,  0,  0, 0,  63, 0, 1};
 static char optab2[] = {
     BNOT, 0,   0,   LNOT, '=', NEQ,  7, 0,   0,   UMINUS, 0, BMINUS, 10,   UPLUS, 0,   BPLUS,
     10,   0,   0,   MULT, 11,  0,    0, DIV, 11,  0,      0, MOD,    11,   0,     '<', LSHIFT,
@@ -2171,7 +2171,7 @@ int yylex() {
           }
           *yyp = '\0';
           // Deal with trailing \r
-          if(*(yyp -1) == '\r') *(yyp-1) = '\0';
+          if (*(yyp - 1) == '\r') *(yyp - 1) = '\0';
           if (!strcmp("include", yytext)) {
             current_line++;
             if (c == LEX_EOF) {
@@ -3347,7 +3347,7 @@ static void refill_on_continuation() {
   } else {
     // replace \n
     p[-1] = ' ';
- }
+  }
   nexpands = 0;
   current_line++;
 }
@@ -3461,7 +3461,7 @@ static void handle_define(char *yyt) {
         lexerror("Macro text too long");
         return;
       }
-      if (!*p && p >= yytext + 2 && p[-2] == '\\') { // we copied something
+      if (!*p && p >= yytext + 2 && p[-2] == '\\') {  // we copied something
         q -= 2;
         refill_on_continuation();
         p = yytext;

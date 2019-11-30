@@ -2143,7 +2143,7 @@ void f_network_stats(void) {
 #ifndef PACKAGE_SOCKETS
   m = allocate_mapping(ports + 4);
 #else
-    m = allocate_mapping(ports + 8);
+  m = allocate_mapping(ports + 8);
 #endif
 
   add_mapping_pair(m, "incoming packets total", inet_in_packets);
@@ -2415,9 +2415,9 @@ int garbage_check(object_t *ob, void *data) {
 #if defined NO_ENVIRONMENT && !defined NO_SHADOWS
          && !ob->shadowing
 #elif !defined NO_ENVIRONMENT && defined NO_SHADOWS
-           && !ob->super
+         && !ob->super
 #elif !defined NO_ENVIRONMENT && !defined NO_SHADOWS
-           && !(ob->super || ob->shadowing)
+         && !(ob->super || ob->shadowing)
 #endif
       ;
 }

@@ -127,17 +127,17 @@ typedef unsigned int format_info;
   0xE /* err msg already done...just \
        * recover */
 
-#define ADD_CHAR(x)                                                                    \
-  {                                                                                    \
-    const auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);                  \
+#define ADD_CHAR(x)                                                                            \
+  {                                                                                            \
+    const auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);                          \
     if (sprintf_state->obuff.real_size == max_string_length) SPRINTF_ERROR(ERR_BUFF_OVERFLOW); \
-    outbuf_addchar(&(sprintf_state->obuff), x);                                        \
+    outbuf_addchar(&(sprintf_state->obuff), x);                                                \
   }
 
-#define GET_NEXT_ARG                                               \
-  {                                                                \
+#define GET_NEXT_ARG                                                       \
+  {                                                                        \
     if (++sprintf_state->cur_arg >= argc) SPRINTF_ERROR(ERR_TOO_FEW_ARGS); \
-    carg = (argv + sprintf_state->cur_arg);                        \
+    carg = (argv + sprintf_state->cur_arg);                                \
   }
 
 typedef struct {

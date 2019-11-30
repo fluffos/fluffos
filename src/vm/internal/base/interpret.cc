@@ -81,16 +81,16 @@ int variable_index_offset; /* Needed for inheritance */
 int st_num_arg;
 
 // For safety, we leave some buffer in before and after the space.
-static svalue_t _stack [10 + CFG_EVALUATOR_STACK_SIZE + 10];
-static svalue_t* const start_of_stack = &_stack[10];
-svalue_t* const end_of_stack = start_of_stack + CFG_EVALUATOR_STACK_SIZE;
+static svalue_t _stack[10 + CFG_EVALUATOR_STACK_SIZE + 10];
+static svalue_t *const start_of_stack = &_stack[10];
+svalue_t *const end_of_stack = start_of_stack + CFG_EVALUATOR_STACK_SIZE;
 
 /* Used to throw an error to a catch */
 svalue_t catch_value = {T_NUMBER};
 
 // For safety, we leave some buffer in before and after the space.
 control_stack_t _control_stack[5 + CFG_MAX_CALL_DEPTH + 5];
-control_stack_t* const control_stack =  &_control_stack[5];
+control_stack_t *const control_stack = &_control_stack[5];
 control_stack_t *csp; /* Points to last element pushed */
 
 int too_deep_error = 0, max_eval_error = 0;
@@ -1110,10 +1110,10 @@ void pop_control_stack() {
   DEBUG_CHECK(csp == (control_stack - 1), "Popped out of the control stack\n");
 #ifdef ENABLE_DTRACE
   if ((csp->framekind & FRAME_MASK) == FRAME_FUNCTION) {
-    if(FLUFFOS_LPC_RETURN_ENABLED()) {
+    if (FLUFFOS_LPC_RETURN_ENABLED()) {
       FLUFFOS_LPC_RETURN(current_object->obname,
-        current_prog->function_table[csp->fr.table_index].funcname,
-        current_prog->filename);
+                         current_prog->function_table[csp->fr.table_index].funcname,
+                         current_prog->filename);
     }
   }
 #endif
@@ -1386,9 +1386,9 @@ function_t *setup_new_frame(int findex) {
     }
   }
 #ifdef ENABLE_DTRACE
-  if(FLUFFOS_LPC_ENTRY_ENABLED()) {
-    FLUFFOS_LPC_ENTRY(current_object->obname,
-      current_prog->function_table[findex].funcname, current_prog->filename);
+  if (FLUFFOS_LPC_ENTRY_ENABLED()) {
+    FLUFFOS_LPC_ENTRY(current_object->obname, current_prog->function_table[findex].funcname,
+                      current_prog->filename);
   }
 #endif
   return &current_prog->function_table[findex];
@@ -1445,10 +1445,9 @@ function_t *setup_inherited_frame(int findex) {
     }
   }
 #ifdef ENABLE_DTRACE
-  if(FLUFFOS_LPC_ENTRY_ENABLED()){
-    FLUFFOS_LPC_ENTRY(csp->ob->obname,
-      current_prog->function_table[findex].funcname,
-      current_prog->filename);
+  if (FLUFFOS_LPC_ENTRY_ENABLED()) {
+    FLUFFOS_LPC_ENTRY(csp->ob->obname, current_prog->function_table[findex].funcname,
+                      current_prog->filename);
   }
 #endif
   return &current_prog->function_table[findex];
@@ -3685,9 +3684,8 @@ void eval_instruction(char *p) {
         (*efun_table[instruction - EFUN_BASE])();
 
         if (expected_stack != sp) {
-          fatal("Bad sp %p (should be %p) after calling efun '%s', num arg %d.\n",
-            sp, expected_stack,
-            instrs[instruction].name, num_arg);
+          fatal("Bad sp %p (should be %p) after calling efun '%s', num arg %d.\n", sp,
+                expected_stack, instrs[instruction].name, num_arg);
         }
 #endif
     } /* switch (instruction) */

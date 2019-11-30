@@ -139,7 +139,8 @@ typedef struct block_s {
   unsigned short refs; /* reference count    */
 } block_t;
 
-static_assert(sizeof(malloc_block_t) == sizeof(block_t), "Block size mismatch, this will cause memory corruption!");
+static_assert(sizeof(malloc_block_t) == sizeof(block_t),
+              "Block size mismatch, this will cause memory corruption!");
 
 #define NEXT(x) (x)->next
 #define REFS(x) (x)->refs
