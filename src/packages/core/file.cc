@@ -426,7 +426,7 @@ char *read_file(const char *file, int start, int lines) {
     // Deal with CRLF.
     std::istringstream input(ptr_start);
     std::ostringstream output;
-    for (std::string line; std::getline(input, line);) {
+    for (std::string line; std::getline(input, line, '\n');) {
       if (ends_with(line, "\r")) {
         line = line.substr(0, line.length() - 1);
       }
