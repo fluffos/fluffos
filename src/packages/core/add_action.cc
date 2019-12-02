@@ -12,8 +12,13 @@ static int num_living_names;
 static int num_searches = 1;
 static int search_length = 1;
 static int illegal_sentence_action;
-static const char *last_verb;
+static std::string last_verb;
 static object_t *illegal_sentence_ob;
+
+static inline void free_string(shared_string *arg)
+{
+    arg->~shared_string();
+}
 
 static void notify_no_command(void) {
   union string_or_func p;
@@ -30,19 +35,19 @@ static void notify_no_command(void) {
     free_funp(p.f);
     if (command_giver && command_giver->interactive) {
       if (v && v->type == T_STRING) {
-        tell_object(command_giver, v->u.string, SVALUE_STRLEN(v));
+        tell_object(command_giver, v->u.string);
       }
       command_giver->interactive->iflags &= ~NOTIFY_FAIL_FUNC;
       command_giver->interactive->default_err_message.s = nullptr;
     }
   } else {
     if (p.s) {
-      tell_object(command_giver, p.s, strlen(p.s));
+      tell_object(command_giver, *(p.s));
       free_string(p.s);
       command_giver->interactive->default_err_message.s = nullptr;
     } else {
       auto dfm = CONFIG_STR(__DEFAULT_FAIL_MESSAGE__);
-      tell_object(command_giver, dfm, strlen(dfm));
+      tell_object(command_giver, dfm);
     }
   }
 }
@@ -61,13 +66,13 @@ void clear_notify(object_t *ob) {
   ip->default_err_message.s = nullptr;
 }
 
-static int hash_living_name(const char *str) { return whashstr(str) & (CFG_LIVING_HASH_SIZE - 1); }
+static int hash_living_name(const std::string str) { return whashstr(str) & (CFG_LIVING_HASH_SIZE - 1); }
 
-object_t *find_living_object(const char *str, int user) {
+object_t *find_living_object(const std::string str, int user) {
   object_t **obp, *tmp;
   object_t **hl;
 
-  if (!str) {
+  if (str == "") {
     return nullptr;
   }
   num_searches++;
@@ -87,7 +92,7 @@ object_t *find_living_object(const char *str, int user) {
     if (!((*obp)->flags & O_ENABLE_COMMANDS)) {
       continue;
     }
-    if (strcmp((*obp)->living_name, str) == 0) {
+    if ((*obp)->living_name == str) {
       break;
     }
   }
@@ -109,12 +114,12 @@ void remove_living_name(object_t *ob) {
   object_t **hl;
 
   ob->flags &= ~O_ENABLE_COMMANDS;
-  if (!ob->living_name) {
+  if (ob->living_name->empty()) {
     return;
   }
 
   num_living_names--;
-  DEBUG_CHECK(!ob->living_name, "remove_living_name: no living name set.\n");
+  DEBUG_CHECK(ob->living_name->empty(), "remove_living_name: no living name set.\n");
   hl = &hashed_living[hash_living_name(ob->living_name)];
   while (*hl) {
     if (*hl == ob) {
@@ -122,14 +127,13 @@ void remove_living_name(object_t *ob) {
     }
     hl = &(*hl)->next_hashed_living;
   }
-  DEBUG_CHECK1(*hl == 0, "remove_living_name: Object named %s no in hash list.\n", ob->living_name);
+  DEBUG_CHECK1(*hl == 0, "remove_living_name: Object named {} no in hash list.\n", ob->living_name);
   *hl = ob->next_hashed_living;
-  free_string(ob->living_name);
+  ob->living_name = std::string("");
   ob->next_hashed_living = nullptr;
-  ob->living_name = nullptr;
 }
 
-static void set_living_name(object_t *ob, const char *str) {
+static void set_living_name(object_t *ob, const std::string str) {
   int flags = ob->flags & O_ENABLE_COMMANDS;
   object_t **hl;
 
@@ -141,7 +145,7 @@ static void set_living_name(object_t *ob, const char *str) {
   hl = &hashed_living[hash_living_name(str)];
   ob->next_hashed_living = *hl;
   *hl = ob;
-  ob->living_name = make_shared_string(str);
+  ob->living_name = str;
   ob->flags |= flags;
 }
 
@@ -241,7 +245,7 @@ static void enable_commands(int enable, int toggle_action) {
   }
 
   if (enable) {
-    debug(add_action, "Enable commands: %s (ref %d)\n", current_object->obname,
+    debug(add_action, "Enable commands: {} (ref {})\n", "current_object->obname",
           current_object->ref);
 
     current_object->flags |= O_ENABLE_COMMANDS;
@@ -262,10 +266,10 @@ static void enable_commands(int enable, int toggle_action) {
       }
     }
   } else {
-    debug(add_action, "Disable commands: %s (ref %d)\n", current_object->obname,
+    debug(add_action, "Disable commands: {} (ref {})\n", current_object->obname,
           current_object->ref);
 #ifndef NO_ENVIRONMENT
-    debug(add_action, "Clearing all actions: %s\n", current_object->obname);
+    debug(add_action, "Clearing all actions: {}\n", current_object->obname);
     /* Remove all sentences defined for the object */
     if (current_object->super) {
       remove_sent(current_object->super, current_object);
@@ -289,53 +293,41 @@ static void enable_commands(int enable, int toggle_action) {
  * Return success status.
  */
 
-static int user_parser(char *buff) {
-  char verb_buff[MAX_VERB_BUFF];
+static int user_parser(const std::string buff) {
+  std::string p {rtrim(buff)}; /* strip trailing spaces. */
+  std::string verb_buff {""};
+  std::string user_verb {""};
   sentence_t *s;
-  char *p;
-  int length;
-  char *user_verb = nullptr;
+  size_t length {p.size()};
+  size_t pos {};
   int where;
   int save_illegal_sentence_action;
 
-  debug(add_action, "cmd [/%s]: '%s'\n", command_giver->obname, buff);
+  debug(add_action, "cmd [/{}]: '{}'\n", command_giver->obname, buff);
 
-  /* strip trailing spaces. */
-  for (p = buff + strlen(buff) - 1; p >= buff; p--) {
-    if (*p != ' ') {
-      break;
-    }
-    *p = '\0';
-  }
-  if (buff[0] == '\0') {
+  if (p.empty()) {
     return 0;
   }
-  length = p - buff + 1;
-  p = strchr(buff, ' ');
-  if (p == nullptr) {
-    user_verb = findstring(buff);
+  pos = p.find_first_of(' ');
+  if (pos == std::string::npos) {
+    auto tmp = shared_string::find(p);
+    user_verb = (tmp == nullptr) ? std::string{""} : **tmp;
   } else {
-    *p = '\0';
-    user_verb = findstring(buff);
-    *p = ' ';
-    length = p - buff;
+    auto tmp = shared_string::find(p.substr(0, pos));
+    user_verb = (tmp == nullptr) ? std::string{""} : **tmp;
+    length -= pos;
   }
-  if (!user_verb) {
+  if (user_verb.empty()) {
     /* either an xverb or a verb without a specific add_action */
-    user_verb = buff;
+    user_verb = p;
   }
   /*
    * copy user_verb into a static character buffer to be pointed to by
    * last_verb.
    */
-  strncpy(verb_buff, user_verb, MAX_VERB_BUFF - 1);
-  if (p) {
-    int pos;
-
-    pos = p - buff;
-    if (pos < MAX_VERB_BUFF) {
-      verb_buff[pos] = '\0';
-    }
+  verb_buff = user_verb;
+  if (pos != std::string::npos) {
+      verb_buff = verb_buff.substr(0,pos);
   }
 
   save_illegal_sentence_action = illegal_sentence_action;
@@ -344,7 +336,7 @@ static int user_parser(char *buff) {
     svalue_t *ret;
 
     if (s->flags & (V_NOSPACE | V_SHORT)) {
-      if (strncmp(buff, s->verb, strlen(s->verb)) != 0) {
+      if (buff != s->verb) {
         continue;
       }
     } else {
@@ -358,14 +350,14 @@ static int user_parser(char *buff) {
      */
 
     if (!(s->flags & V_FUNCTION))
-      debug(add_action, "Local command %s on /%s\n", s->function.s, s->ob->obname);
+      debug(add_action, "Local command {} on /{}\n", *(s->function.s), s->ob->obname);
 
     if (s->flags & V_NOSPACE) {
-      int l1 = strlen(s->verb);
-      int l2 = strlen(verb_buff);
+      size_t l1 = s->verb.size();
+      size_t l2 = verb_buff.size();
 
       if (l1 < l2) {
-        last_verb = verb_buff + l1;
+        last_verb = verb_buff.substr(l1);
       } else {
         last_verb = "";
       }
@@ -388,19 +380,19 @@ static int user_parser(char *buff) {
      */
     save_command_giver(command_giver);
     if (s->flags & V_NOSPACE) {
-      copy_and_push_string(&buff[strlen(s->verb)]);
+      push_string(buff.substr(s->verb.size()));
     } else if (buff[length] == ' ') {
-      copy_and_push_string(&buff[length + 1]);
+      push_string(buff.substr(length + 1));
     } else {
       push_undefined();
     }
     if (s->flags & V_FUNCTION) {
       ret = call_function_pointer(s->function.f, 1);
     } else {
-      if (s->function.s[0] == APPLY___INIT_SPECIAL_CHAR) {
+      if ((**(s->function.s))[0] == APPLY___INIT_SPECIAL_CHAR) {
         error("Illegal function name.\n");
       }
-      ret = apply(s->function.s, s->ob, 1, where);
+      ret = apply(*(s->function.s), s->ob, 1, where);
     }
     /* s may be dangling at this point */
 
@@ -413,13 +405,13 @@ static int user_parser(char *buff) {
       /* is it still around?  Otherwise, ignore this ...
          it moved somewhere or dested itself */
       if (s == command_giver->sent) {
-        char buf[256];
+          std::string buf;
         if (s->flags & V_FUNCTION) {
-          sprintf(buf, "Verb '%s' bound to uncallable function pointer.\n", s->verb);
-          error(buf);
+          buf = fmt::format("Verb '{}' bound to uncallable function pointer.\n", s->verb);
+          error(buf.c_str());
         } else {
-          sprintf(buf, "Function for verb '%s' not found.\n", s->verb);
-          error(buf);
+          buf = fmt::format("Function for verb '{}' not found.\n", s->verb);
+          error(buf.c_str());
         }
       }
     }
@@ -500,7 +492,7 @@ int parse_command(char *str, object_t *ob) {
  * If the call is from a shadow, make it look like it is really from
  * the shadowed object.
  */
-static void add_action(svalue_t *str, const char *cmd, int flag) {
+static void add_action(svalue_t *str, const std::string cmd, int flag) {
   sentence_t *p;
   object_t *ob;
 
@@ -531,18 +523,18 @@ static void add_action(svalue_t *str, const char *cmd, int flag) {
      * did wrong. */
   p = alloc_sentence();
   if (str->type == T_STRING) {
-    debug(add_action, "--Add action '%s' (ob: %s func: '%s')\n", cmd, ob->obname, str->u.string);
-    p->function.s = make_shared_string(str->u.string);
+    debug(add_action, "--Add action '{}' (ob: {} func: '{}')\n", cmd, ob->obname, str->u.string);
+    p->function.s = new shared_string {str->u.string};
     p->flags = flag;
   } else {
-    debug(add_action, "--Add action '%s' (ob: %s func: <function>)\n", cmd, ob->obname);
+    debug(add_action, "--Add action '{}' (ob: {} func: <function>)\n", cmd, ob->obname);
 
     p->function.f = str->u.fp;
     str->u.fp->hdr.ref++;
     p->flags = flag | V_FUNCTION;
   }
   p->ob = ob;
-  p->verb = make_shared_string(cmd);
+  p->verb = cmd;
   /* This is ok; adding to the top of the list doesn't harm anything */
   p->next = command_giver->sent;
   command_giver->sent = p;
@@ -553,7 +545,7 @@ static void add_action(svalue_t *str, const char *cmd, int flag) {
  * if success.  If command_giver, remove his action, otherwise
  * remove current_object's action.
  */
-static int remove_action(const char *act, const char *verb) {
+static int remove_action(const std::string act, const std::string verb) {
   object_t *ob;
   sentence_t **s;
 
@@ -568,7 +560,7 @@ static int remove_action(const char *act, const char *verb) {
       sentence_t *tmp;
 
       if (((*s)->ob == current_object) && (!((*s)->flags & V_FUNCTION)) &&
-          !strcmp((*s)->function.s, act) && !strcmp((*s)->verb, verb)) {
+          (*((*s)->function.s) == act) && (((*s)->verb) == verb)) {
         tmp = *s;
         *s = tmp->next;
         free_sentence(tmp);
@@ -599,7 +591,7 @@ void remove_sent(object_t *ob, object_t *user) {
     if ((*s)->ob == ob) {
 #ifdef DEBUG
       if (!((*s)->flags & V_FUNCTION)) {
-        debug(add_action, "--Unlinking sentence %s (user: %s ob: %s)\n", (*s)->function.s,
+        debug(add_action, "--Unlinking sentence {} (user: {} ob: {})\n", (*s)->function.s,
               user->obname, ob->obname);
       }
 #endif
@@ -658,15 +650,8 @@ void f_command(void) {
   LPC_INT rc = 0;
 
   if (current_object && !(current_object->flags & O_DESTRUCTED)) {
-    char buff[1000];
     LPC_INT save_eval_cost = get_eval();
-
-    if (SVALUE_STRLEN(sp) > sizeof(buff) - 1) {
-      error("Too long command.\n");
-    }
-
-    strncpy(buff, sp->u.string, sizeof(buff));
-    buff[sizeof(buff) - 1] = 0;
+    std::string  buff {sp->u.string};
 
     if (parse_command(buff, current_object)) {
       rc = save_eval_cost - get_eval();
@@ -707,7 +692,7 @@ void f_find_living(void) {
   if (ob) {
     put_unrefed_undested_object(ob, "find_living");
   } else {
-    *sp = const0;
+    *sp = 0;
   }
 }
 #endif
@@ -722,7 +707,7 @@ void f_find_player(void) {
   if (ob) {
     put_unrefed_undested_object(ob, "find_living");
   } else {
-    *sp = const0;
+    *sp = 0;
   }
 }
 #endif
@@ -731,10 +716,10 @@ void f_find_player(void) {
 void f_living(void) {
   if (sp->u.ob->flags & O_ENABLE_COMMANDS) {
     free_object(&sp->u.ob, "f_living:1");
-    *sp = const1;
+    *sp = 1;
   } else {
     free_object(&sp->u.ob, "f_living:2");
-    *sp = const0;
+    *sp = 0;
   }
 }
 #endif
@@ -748,7 +733,7 @@ void f_notify_fail(void) {
   if (command_giver && command_giver->interactive) {
     clear_notify(command_giver);
     if (sp->type == T_STRING) {
-      command_giver->interactive->default_err_message.s = make_shared_string(sp->u.string);
+      command_giver->interactive->default_err_message.s = new shared_string {sp->u.string};
     } else {
       command_giver->interactive->iflags |= NOTIFY_FAIL_FUNC;
       command_giver->interactive->default_err_message.f = sp->u.fp;
@@ -761,11 +746,11 @@ void f_notify_fail(void) {
 
 #ifdef F_QUERY_VERB
 void f_query_verb(void) {
-  if (!last_verb) {
+  if (last_verb.empty()) {
     push_number(0);
     return;
   }
-  share_and_push_string(last_verb);
+  push_string(last_verb);
 }
 #endif
 

@@ -321,18 +321,10 @@ static void push_undefineds(int num) {
   }
 }
 
-void copy_and_push_string(const char *p) {
+void push_string(const std::string p) {
   STACK_INC;
   sp->type = T_STRING;
-  sp->subtype = STRING_MALLOC;
-  sp->u.string = string_copy(p, "copy_and_push_string");
-}
-
-void share_and_push_string(const char *p) {
-  STACK_INC;
-  sp->type = T_STRING;
-  sp->subtype = STRING_SHARED;
-  sp->u.string = make_shared_string(p);
+  sp->u.string = p;
 }
 
 /*

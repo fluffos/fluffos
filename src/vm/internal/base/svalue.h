@@ -22,7 +22,7 @@ union u {
   struct mapping_t *map;
   struct funptr_t *fp;
 
-  struct svalue_t *lvalue;
+  class svalue_t *lvalue;
   struct ref_t *ref;
   unsigned char *lvalue_byte;
   void (*error_handler)(void);
@@ -35,10 +35,13 @@ union u {
  * If it is a string, then the way that the string has been allocated
  * differently, which will affect how it should be freed.
  */
-struct svalue_t {
-  unsigned short type;
-  unsigned short subtype;
-  union u u;
+class svalue_t {
+    public:
+        unsigned short type;
+        unsigned short subtype;
+        union u u;
+
+        svalue_t &  operator= (const LPC_INT&);
 };
 
 struct ref_t {

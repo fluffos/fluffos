@@ -24,8 +24,12 @@
 #include <string>
 #include <fmt/ostream.h>
 
-// Defined by simulate.cc, this belongs to driver layer.
-[[noreturn]] extern void fatal(const char *, ...);
+[[noreturn]] void fatal_internal(const std::string, fmt::format_args);
+template <typename... Args>
+[[noreturn]] void fatal(const std::string format, Args&& ...args)
+{
+    fatal_internal(format, fmt::make_format_args(std::forward<Args>(args)...));
+}
 
 void debug_message_internal(const std::string, fmt::format_args);
 template <typename... Args> void debug_message(const std::string format, Args&& ...args)
@@ -53,14 +57,13 @@ extern int debug_level;
 void debug_level_set(const std::string);
 void debug_level_clear(const std::string);
 
-#define debug(x, ...)                                                          \
-  if (debug_level & DBG_##x) {                                                 \
-    char _buf[1024], _tbuf[64];                                                \
-    time_t _rawtime;                                                           \
-    time(&_rawtime);                                                           \
-    strftime(_tbuf, sizeof(_tbuf), "%Y-%m-%d %H:%M:%S", localtime(&_rawtime)); \
-    snprintf(_buf, sizeof(_buf), __VA_ARGS__);                                 \
-    debug_message("[{}] {}:{} {}", _tbuf, __FILE__, __LINE__, _buf);           \
+#define debug(x, ...)                                                   \
+  if (debug_level & DBG_##x) {                                          \
+    std::time_t _rawtime {std::time(nullptr)};                          \
+    std::string _tbuf {fmt::format("{:%F %T}",                          \
+                       *std::localtime(&_rawtime))};                    \
+    std::string  _buf {fmt::format(__VA_ARGS__)};                       \
+    debug_message("[{}] {}:{} {}", _tbuf, __FILE__, __LINE__, _buf);    \
   }
 
 /* bit sets here */

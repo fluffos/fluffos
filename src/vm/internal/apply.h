@@ -14,7 +14,7 @@ enum origin {
   ORIGIN_FUNCTIONAL = 0x80
 };
 
-inline const char *origin_to_name(const int origin) {
+inline const std::string origin_to_name(const int origin) {
   switch (origin) {
     case ORIGIN_DRIVER:
       return "driver";
@@ -43,13 +43,13 @@ extern struct svalue_t apply_ret_value;
 
 // Call a specific function on a specific object
 // Result are stored in a global value, no need to free.
-svalue_t *safe_apply(const char *, struct object_t *, int, int);
+svalue_t *safe_apply(const std::string, struct object_t *, int, int);
 
 // Unsafe version, should only be used in efuns.
-svalue_t *apply(const char *, struct object_t *, int, int);
+svalue_t *apply(const std::string, struct object_t *, int, int);
 
 // TODO: Some place still use this function.
 // because apply() would reset the value on next call
-int apply_low(const char *, struct object_t *, int);
+int apply_low(const std::string, struct object_t *, int);
 
 #endif /* LPC_APPLY_H_ */

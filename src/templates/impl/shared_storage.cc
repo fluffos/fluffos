@@ -271,7 +271,6 @@ const T * shared_storage<T, hash>::operator->(void) const
     else
         return &(empty());
 }
-
 template <typename T, class hash>
 bool shared_storage<T, hash>::operator==(const shared_storage<T, hash> &arg) const
 {
@@ -279,9 +278,21 @@ bool shared_storage<T, hash>::operator==(const shared_storage<T, hash> &arg) con
 }
 
 template <typename T, class hash>
+bool shared_storage<T, hash>::operator==(const T &arg) const
+{
+    return val->val == arg;
+}
+
+template <typename T, class hash>
 bool shared_storage<T, hash>::operator!=(const shared_storage<T, hash> &arg) const
 {
     return val != arg.val;
+}
+
+template <typename T, class hash>
+bool shared_storage<T, hash>::operator!=(const T &arg) const
+{
+    return val->val != arg;
 }
 
 template <typename T, class hash>
@@ -372,7 +383,7 @@ size_t shared_storage<T, hash>::set_max_ref(size_t arg)
 template <typename T, class hash>
 std::unique_ptr<shared_storage<T, hash>> shared_storage<T, hash>::find(T arg)
 {
-    std::unique_ptr<shared_storage<T, hash>> ret {};        // return value, nullptr => not found
+    std::unique_ptr<shared_storage<T, hash>> ret {nullptr}; // return value, nullptr => not found
     size_t  key { std::hash<T>()(arg) };                    // hash for given object as key for storage
 #ifdef USE_THREADS
     LOCK(mtx());                                            // we might use multi threading

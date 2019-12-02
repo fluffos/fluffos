@@ -8,10 +8,10 @@
 
 static inline void fill_lookup_table(program_t *prog);
 
-lookup_entry_s apply_cache_lookup(const char *funcname, program_t *prog) {
+lookup_entry_s apply_cache_lookup(const std::string funcname, program_t *prog) {
   // All function names are shared string.
-  auto key = (intptr_t)(findstring(funcname));
-  if (key == 0) {
+  auto key = shared_string::find(funcname);
+  if (key == nullptr) {
     return lookup_entry_s{nullptr};
   }
 

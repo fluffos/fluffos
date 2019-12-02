@@ -7,6 +7,13 @@ svalue_t const0{T_NUMBER, 0, {0}};
 svalue_t const1{T_NUMBER, 0, {1}};
 svalue_t const0u{T_NUMBER, T_UNDEFINED, {0}};
 
+svalue_t &  operator= (const LPC_INT &arg) {
+    this->type = T_NUMBER;
+    this->u.number = arg;
+
+    return this;
+}
+
 /*
  * Assign to a svalue.
  * This is done either when element in array, or when to an identifier

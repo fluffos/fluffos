@@ -23,3 +23,31 @@ base/internal/log.cc:
 void debug_message(const char *, ...)                   |   template <typename... Args> void debug_message(const std::string, Args&& ...)
 void debug_level_set(const char *)                      |   void debug_level_set(const std::string)
 void debug_level_clear(const char *)                    |   void debug_level_clear(const std::string)
+
+vm/internal/apply.cc:
+inline const char *origin_to_name(const int origin)     |   inline const std::string origin_to_name(const int origin)
+svalue_t *safe_apply(const char *, struct object_t *,   |   svalue_t *safe_apply(const std::string, struct object_t *,
+        int, int)                                       |            int, int)
+svalue_t *apply(const char *, struct object_t *,        |   svalue_t *apply(const std::string, struct object_t *,
+        int, int)                                       |            int, int)
+int apply_low(const char *, struct object_t *, int)     |   int apply_low(const std::string, struct object_t *, int)
+
+vm/internal/simulate.cc:
+void fatal(const char *, ...)                           |   template <typename... Args> void fatal(const std::string, Args&& ...)
+void tell_object(object_t *, const char *, int)         |   void tell_object(object_t *, const std::string)
+
+vm/internal/base/apply_cache.cc:
+lookup_entry_s apply_cache_lookup(const char *funcname, |   lookup_entry_s apply_cache_lookup(const std::string funcname,
+        program_t *prog)                                |           program_t *prog)
+
+vm/internal/base/interpret.cc:
+void copy_and_push_string(const char *)                 |   void push_string(const std::string)
+int is_static(const char *, object_t *)                 |   int is_static(const std::string, object_t *)
+void share_and_push_string(const char *)                |   void push_string(const std::string)
+
+packages/core/add_action.cc:
+int parse_command(char *, object_t *)                   |   int parse_command(std::string, object_t *)
+object_t *find_living_object(const char *, int)         |   object_t *find_living_object(const std::string, int)
+static int hash_living_name(const char *)               |   static int hash_living_name(const std::string)
+static int user_parser(char *)                          |   static int user_parser(std::string)
+static void set_living_name(object_t *, const char *)   |   static void set_living_name(object_t *, const std::string)

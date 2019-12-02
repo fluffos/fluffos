@@ -140,9 +140,10 @@
 #define COMPARE_NUMS(x, y) (((x) > (y) ? 1 : ((x) < (y) ? -1 : 0)))
 
 #include <iostream>                         // for cin, cout, cerr
-#include <fmt/compile.h>                    // to precompile format strings
 #include <fmt/format.h>                     // for sprintf like string formating
+#include <fmt/chrono.h>                     // for formating of time values
 #include <fmt/ostream.h>                    // for fprintf like string formating
+#include <fmt/compile.h>                    // to precompile format strings
 
 #include "base/internal/debugmalloc.h"
 #include "base/internal/md.h"

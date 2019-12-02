@@ -59,12 +59,12 @@
 
 struct sentence_t {
 #ifndef NO_ADD_ACTION
-  char *verb;
+    std::string verb;
 #endif
-  struct sentence_t *next;
-  struct object_t *ob;
-  union string_or_func function;
-  int flags;
+    struct sentence_t *next;
+    struct object_t *ob;
+    union string_or_func function;
+    int flags;
 };
 
 struct object_t {
@@ -102,7 +102,7 @@ struct object_t {
 #ifndef NO_ADD_ACTION
   sentence_t *sent;
   struct object_t *next_hashed_living;
-  char *living_name; /* Name of living object if in hash */
+  shared_string living_name; /* Name of living object if in hash */
 #endif
 #ifdef PACKAGE_UIDS
   struct userid_t *uid;  /* the "owner" of this object */

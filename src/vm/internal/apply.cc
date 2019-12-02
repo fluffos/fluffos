@@ -16,8 +16,6 @@
 // global static result
 svalue_t apply_ret_value;
 
-int convert_type(int /*type*/);
-
 int convert_type(int type) {
   switch (type & (~DECL_MODS)) {
     case TYPE_UNKNOWN:
@@ -158,7 +156,7 @@ void check_co_args(int num_arg, const program_t *prog, function_t *fun, int find
  * manually !  (Look towards end of this function.)
  */
 
-int apply_low(const char *fun, object_t *ob, int num_arg) {
+int apply_low(const std::string fun, object_t *ob, int num_arg) {
   int local_call_origin = call_origin;
 
 #ifdef DEBUG
@@ -294,7 +292,7 @@ retry_for_shadow:
  * are deallocated.
  */
 
-svalue_t *apply(const char *fun, object_t *ob, int num_arg, int where) {
+svalue_t *apply(const std::string fun, object_t *ob, int num_arg, int where) {
 #ifdef DEBUG
   svalue_t *expected_sp;
 #endif
@@ -331,7 +329,7 @@ svalue_t *apply(const char *fun, object_t *ob, int num_arg, int where) {
  * applied function and the driver depends on being able to do something
  * after the apply. (such as the ed exit function, and the net_dead function).
  */
-svalue_t *safe_apply(const char *fun, object_t *ob, int num_arg, int where) {
+svalue_t *safe_apply(const std::string fun, object_t *ob, int num_arg, int where) {
   /* Arguments are already pushed on stack */
 
   if (ob->flags & O_DESTRUCTED) {

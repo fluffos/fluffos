@@ -7,7 +7,13 @@
 - portability problems
     add gnulib modules
 
-# Have Time #
+# Major #
+## complete source ##
+- check for package dependencies
+  e.g. vm/internal/base/object.cc depends on package/compress enabled!
+- subsitute struct svalue_t by class and split member u into subclasses
+
+# Minor #
 ## documentation ##
 - complete docs/efun/contrib [packages/contrib]
 - check efun::shadowp/efun::query_shadowing

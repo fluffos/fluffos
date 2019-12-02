@@ -1630,10 +1630,9 @@ void free_sentence(sentence_t *p) {
   sent_free = p;
 }
 
-[[noreturn]] void fatal(const char *fmt, ...) {
+[[noreturn]] void fatal_internal(const std::string fmt, fmt::format_args arg) {
   static int in_fatal = 0;
-  char msg_buf[2049];
-  va_list args;
+  std::string msg_buf;
 
   switch (in_fatal) {
     default:
@@ -1641,9 +1640,13 @@ void free_sentence(sentence_t *p) {
       break;
     case 0:
       in_fatal = 1;
-      va_start(args, fmt);
-      vsnprintf(msg_buf, 2048, fmt, args);
-      va_end(args);
+      try {
+          msg_buf = fmt::vformat(fmt, args);
+      }
+      catch(const std::exception &e) {
+          msg_buf = std::string("BUG! driver[fatal_internal]: ") + e.what() + "\nFormatstring: \"" + fmt + "\"\n";
+          std::cerr << msg_buf;
+      }
       debug_message("******** FATAL ERROR: {}\n", msg_buf);
 #ifdef DEBUG
       // make DEBUG driver directly crash, if there is debugger

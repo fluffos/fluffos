@@ -3490,7 +3490,7 @@ efun_override:
         yyerror(buf.c_str());
       } else {
         push_malloced_string(the_file_name(current_file));
-        share_and_push_string($3);
+        push_string($3);
         push_malloced_string(add_slash(main_file_name()));
         res = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 3);
         if (!MASTER_APPROVED(res)) {

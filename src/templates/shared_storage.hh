@@ -31,6 +31,11 @@
 /// - operator-> (dereferencing, analogue to operator*)
 /// - operator T (implicit type conversion to type T)
 ///
+/// - operator== (both compare with other shared_storage as well as
+///                 objects of type T)
+/// - operator!= (both compare with other shared_storage as well as
+///                 objects of type T)
+///
 /// member functions:
 /// - size_t ref_count(void)
 ///     returns the reference count for a given shared object
@@ -148,7 +153,9 @@ class shared_storage {
         const   T               *   operator->      (void) const;
 
                 bool                operator==      (const shared_storage &) const;
+                bool                operator==      (const T &) const;
                 bool                operator!=      (const shared_storage &) const;
+                bool                operator!=      (const T &) const;
 
                                     operator T      (void) const;
 

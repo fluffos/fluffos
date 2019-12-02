@@ -21,7 +21,6 @@ extern object_t *obj_list_dangling;
 #endif
 
 void debug_fatal(char *, ...);
-[[noreturn]] void fatal(const char *, ...);
 void check_legal_string(const char *);
 #ifndef NO_LIGHT
 void add_light(object_t *, int);
@@ -65,6 +64,6 @@ void mark_free_sentences(void);
 #endif
 
 void tell_npc(object_t *, const char *);
-void tell_object(object_t *, const char *, int);
+void tell_object(object_t *, const std::string);
 
 #endif

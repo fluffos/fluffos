@@ -172,7 +172,7 @@ const char *type_name(int c);
 [[noreturn]] void bad_arg(int, int);
 [[noreturn]] void bad_argument(svalue_t *, int, int, int);
 void check_for_destr(array_t *);
-int is_static(const char *, object_t *);
+int is_static(const std::string, object_t *);
 svalue_t *call_function_pointer(funptr_t *, int);
 svalue_t *safe_call_function_pointer(funptr_t *, int);
 void call___INIT(object_t *);
