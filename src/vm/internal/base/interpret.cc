@@ -36,7 +36,7 @@ static void do_loop_cond_number(void);
 static void do_loop_cond_local(void);
 static void do_catch(char * /*pc*/, unsigned short /*new_pc_offset*/);
 int last_instructions(void);
-static char *get_arg(int, int);
+static const char *get_arg(int, int);
 extern inline const char *access_to_name(int /*mode*/);
 extern inline const char *origin_to_name(int /*origin*/);
 
@@ -710,7 +710,8 @@ static struct lvalue_range {
 static svalue_t global_lvalue_range_sv = {T_LVALUE_RANGE};
 
 static void push_lvalue_range(int code) {
-  size_t ind1, ind2, size, u8len = 0;
+  int32_t ind1, ind2;
+  size_t size = 0, u8len = 0;
   svalue_t *lv;
 
   {
@@ -734,6 +735,7 @@ static void push_lvalue_range(int code) {
 #endif
       default:
         error("Range lvalue on illegal type\n");
+        return ;
     }
   }
 
@@ -4634,7 +4636,7 @@ void reset_machine(int first) {
   }
 }
 
-static char *get_arg(int a, int b) {
+static const char *get_arg(int a, int b) {
   static char buff[50];
   char *from, *to;
 

@@ -623,7 +623,8 @@ void f_range(int code) {
 
   switch (sp->type) {
     case T_STRING: {
-      size_t from, to, len;
+      int32_t from, to;
+      size_t len;
       const char *res = sp->u.string;
 
       auto success = u8_codepoints(reinterpret_cast<const uint8_t *>(res), &len);
@@ -759,7 +760,8 @@ void f_extract_range(int code) {
 
   switch (sp->type) {
     case T_STRING: {
-      size_t from, len;
+      int32_t from;
+      size_t len;
 
       const char *res = sp->u.string;
       auto success = u8_codepoints(reinterpret_cast<const uint8_t *>(res), &len);
@@ -794,7 +796,8 @@ void f_extract_range(int code) {
     }
 #ifndef NO_BUFFER_TYPE
     case T_BUFFER: {
-      size_t from, len;
+      int32_t from;
+      size_t len;
 
       buffer_t *rbuf = sp->u.buf;
       buffer_t *nbuf;
