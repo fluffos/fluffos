@@ -49,7 +49,7 @@ void bp(void);
 #define NDBG(x)
 #endif
 
-#if defined(DEBUGMALLOC_EXTENSIONS)
+#if defined(DEBUG) && defined(DEBUGMALLOC_EXTENSIONS)
 /* Uncomment for very complete string ref checking, but be warned it runs
    _very_ slowly.  A conditional definition like:
 
@@ -59,7 +59,7 @@ void bp(void);
    is usually best.
  */
 void check_string_stats(outbuffer_t *);
-#define CHECK_STRING_STATS check_string_stats(nullptr)
+#define CHECK_STRING_STATS // enable when need to debug: check_string_stats(nullptr)
 #else
 #define CHECK_STRING_STATS
 #endif
