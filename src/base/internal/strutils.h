@@ -6,8 +6,11 @@
 #include <cctype>
 #include <locale>
 #include <unicode/utf8.h>
+#include <unicode/utext.h>
 #include <unicode/utypes.h>
 #include <unicode/ustring.h>
+#include <unicode/brkiter.h>
+
 #include "thirdparty/utf8_decoder_dfa/decoder.h"
 
 namespace {
@@ -101,6 +104,7 @@ inline size_t u8_codepoint_index_to_offset(const uint8_t *src, int32_t index) {
   return offset;
 }
 
+// same as strncpy, copy up to maxlen bytes but will not copy broken characters.
 inline int32_t u8_strncpy(uint8_t *dest, const uint8_t *src, size_t maxlen) {
   int32_t src_offset = 0;
   int32_t written = 0;
@@ -113,6 +117,79 @@ inline int32_t u8_strncpy(uint8_t *dest, const uint8_t *src, size_t maxlen) {
     if (isError == TRUE) break;
   }
   return written;
+}
+
+// Return
+inline size_t u8_charwidth(UChar32 codepoint, bool ambiguous_as_full_width = true) {
+  if (!u_isdefined(codepoint) ||
+      u_iscntrl(codepoint) ||
+      u_getCombiningClass(codepoint) > 0 ||
+      u_hasBinaryProperty(codepoint, UCHAR_EMOJI_MODIFIER)) {
+    return 0;
+  }
+  // UCHAR_EAST_ASIAN_WIDTH is the Unicode property that identifies a
+  // codepoint as being full width, wide, ambiguous, neutral, narrow,
+  // or halfwidth.
+  const int eaw = u_getIntPropertyValue(codepoint, UCHAR_EAST_ASIAN_WIDTH);
+  switch (eaw) {
+    case U_EA_FULLWIDTH:
+    case U_EA_WIDE:
+      return 2;
+    case U_EA_AMBIGUOUS:
+      // See: http://www.unicode.org/reports/tr11/#Ambiguous for details
+      if (ambiguous_as_full_width) {
+        return 2;
+      }
+      // Fall through if ambiguous_as_full_width if false.
+    case U_EA_NEUTRAL:
+      if (u_hasBinaryProperty(codepoint, UCHAR_EMOJI_PRESENTATION)) {
+        return 2;
+      }
+      // Fall through
+    case U_EA_HALFWIDTH:
+    case U_EA_NARROW:
+    default:
+      return 1;
+  }
+}
+// Total width of characters(grapheme cluster). Also adjust for east asain full width characters
+inline size_t u8_width(const char* src, bool expand_emoji_sequence = false) {
+  UErrorCode status = U_ZERO_ERROR;
+  size_t total = 0;
+
+  auto text = utext_openUTF8(nullptr, src, -1, &status);
+  /* create an iterator for graphemes */
+  auto *brk = icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status);
+  if(!U_SUCCESS(status)) {
+    return 0;
+  }
+  brk->setText(text, status);
+  if(!U_SUCCESS(status)) {
+    return 0;
+  }
+  int32_t pos = brk->first();
+  UChar32 c = U_SENTINEL, prev;
+  while(pos != icu::BreakIterator::DONE) {
+    prev = c;
+    // Treat asain chars as 2 width
+    c = utext_char32At(text, pos);
+    if (c != U_SENTINEL) {
+      if (!expand_emoji_sequence &&
+          prev == 0x200d &&  // 0x200d == ZWJ (zero width joiner)
+          (u_hasBinaryProperty(c, UCHAR_EMOJI_PRESENTATION) ||
+              u_hasBinaryProperty(c, UCHAR_EMOJI_MODIFIER))) {
+        // skip
+      } else {
+        total += u8_charwidth(c);
+      }
+    }
+    pos = brk->next();
+  }
+
+  delete brk;
+  utext_close(text);
+
+  return total;
 }
 
 }  // namespace
