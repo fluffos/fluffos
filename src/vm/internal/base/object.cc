@@ -1643,8 +1643,11 @@ void clear_non_statics(object_t *ob) {
 
 void restore_object_from_buff(object_t *ob, const char *buf, int noclear) {
   std::istringstream input(buf);
-  for (std::string line; std::getline(input, line, '\n');) {
-    DEBUG_CHECK(ends_with(line, "\r"), "restore_object_from_buff: have trailing \\r!");
+  std::string line;
+  while (std::getline(input, line, '\n')) {
+    if (ends_with(line, "\r")) {
+      line = line.substr(0, line.length() - 1);
+    }
     // FIXME: some restore function needs to modify string inplace.
     std::vector<char> tmp(line.length() + 1);
     std::copy(line.begin(), line.end(), tmp.begin());

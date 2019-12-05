@@ -293,13 +293,13 @@ int write_file(const char *file, const char *str, int flags) {
     return 0;
   }
   if (flags & 2) {
-    gf = gzopen(file, (flags & 1) ? "w" : "a");
+    gf = gzopen(file, (flags & 1) ? "wb" : "ab");
     if (!gf) {
       error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n", file,
             (flags & 1) ? "overwrite" : "append", strerror(errno));
     }
   } else {
-    f = fopen(file, (flags & 1) ? "w" : "a");
+    f = fopen(file, (flags & 1) ? "wb" : "ab");
     if (f == nullptr) {
       error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n", file,
             (flags & 1) ? "overwrite" : "append", strerror(errno));
@@ -424,15 +424,9 @@ char *read_file(const char *file, int start, int lines) {
   bool found_crlf = strchr(ptr_start, '\r') != nullptr;
   if (found_crlf) {
     // Deal with CRLF.
-    std::istringstream input(ptr_start);
-    std::ostringstream output;
-    for (std::string line; std::getline(input, line, '\n');) {
-      if (ends_with(line, "\r")) {
-        line = line.substr(0, line.length() - 1);
-      }
-      output << line << "\n";
-    }
-    return string_copy(output.str().c_str(), "read file: CRLF result");
+    std::string content(ptr_start);
+    ReplaceStringInPlace(content, "\r\n", "\n");
+    return string_copy(content.c_str(), "read file: CRLF result");
   }
   return string_copy(ptr_start, "read_file: result");
 }

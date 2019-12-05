@@ -98,7 +98,7 @@ void on_query_addr_by_name_finish(addr_number_query *query) {
     if (!ret) {
       copy_and_push_string(host);
     } else {
-      debug(dns, "on_query_addr_by_name_finish: getnameinfo: %s \n", gai_strerror(ret));
+      debug(dns, "on_query_addr_by_name_finish: getnameinfo: %s \n", evutil_gai_strerror(ret));
       push_undefined();
     }
     debug(dns, "DNS lookup success: id %" LPC_INT_FMTSTR_P ": %s -> %s \n", query->key, query->name,

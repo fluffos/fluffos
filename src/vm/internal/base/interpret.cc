@@ -735,7 +735,7 @@ static void push_lvalue_range(int code) {
 #endif
       default:
         error("Range lvalue on illegal type\n");
-        return ;
+        return;
     }
   }
 
@@ -3767,7 +3767,7 @@ void eval_instruction(char *p) {
     DEBUG_CHECK2(sp < fp + csp->num_local_variables - 1,
                  "Bad stack after evaluation. Instruction '%s' (%d) \n", instrs[instruction].name,
                  instruction);
-#if defined(DEBUG) && 0 // super slow
+#if defined(DEBUG) && 0  // super slow
     {
       svalue_t *current_stack = sp;
       while (current_stack >= fp) {

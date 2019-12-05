@@ -4,10 +4,11 @@
 #include "backend.h"
 
 #include <chrono>
-#include <event2/dns.h>    // for evdns_set_log_fn
-#include <event2/event.h>  // for event_add, etc
-#include <math.h>          // for exp
-#include <stdio.h>         // for NULL, sprintf
+#include <event2/dns.h>     // for evdns_set_log_fn
+#include <event2/event.h>   // for event_add, etc
+#include <event2/thread.h>  // for thread support
+#include <math.h>           // for exp
+#include <stdio.h>          // for NULL, sprintf
 #ifdef TIME_WITH_SYS_TIME
 #include <sys/time.h>
 #include <time.h>
@@ -51,6 +52,11 @@ event_base *init_backend() {
   evdns_set_log_fn(libevent_dns_log);
 #ifdef DEBUG
   event_enable_debug_mode();
+#endif
+#ifdef _WIN32
+  evthread_use_windows_threads();
+#else
+  evthread_use_pthreads();
 #endif
   g_event_base = event_base_new();
   debug_message("Event backend in use: %s\n", event_base_get_method(g_event_base));
