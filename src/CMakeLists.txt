@@ -377,6 +377,11 @@ if (CYGWIN)
   set(USE_JEMALLOC OFF)
   message(STATUS "JEMALLOC is not supported on CYGWIN.")
 endif ()
+if(ENABLE_SANITIZER)
+  set(USE_JEMALLOC OFF)
+  message(STATUS "AddressSanitizer doesn't work with JEMALLOC, force disabling!")
+endif()
+
 if (USE_JEMALLOC)
   find_package(jemalloc REQUIRED)
   set(HAVE_JEMALLOC TRUE) # used in config.h.in
