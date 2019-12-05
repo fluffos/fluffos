@@ -387,12 +387,12 @@ bool init_user_conn() {
 
       auto mudip = CONFIG_STR(__MUD_IP__);
       if (mudip != nullptr && strlen(mudip) > 0) {
-        ret = getaddrinfo(mudip, service, &hints, &res);
+        ret = evutil_getaddrinfo(mudip, service, &hints, &res);
       } else {
-        ret = getaddrinfo(nullptr, service, &hints, &res);
+        ret = evutil_getaddrinfo(nullptr, service, &hints, &res);
       }
       if (ret) {
-        debug_message("init_user_conn: getaddrinfo error: %s \n", gai_strerror(ret));
+        debug_message("init_user_conn: getaddrinfo error: %s \n", evutil_gai_strerror(ret));
         return false;
       }
 
@@ -400,12 +400,12 @@ bool init_user_conn() {
         debug_message("socket_create: bind error: %s.\n",
                       evutil_socket_error_to_string(evutil_socket_geterror(fd)));
         evutil_closesocket(fd);
-        freeaddrinfo(res);
+        evutil_freeaddrinfo(res);
         return false;
       }
       debug_message("Accepting connections on %s.\n",
                     sockaddr_to_string(res->ai_addr, res->ai_addrlen));
-      freeaddrinfo(res);
+      evutil_freeaddrinfo(res);
     }
     // Listen on connection event
     auto conn = evconnlistener_new(

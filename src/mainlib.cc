@@ -283,19 +283,24 @@ int driver_main(int argc, char **argv);
 void init_win32() {
 #ifdef _WIN32
   WSADATA wsa_data;
-  WSAStartup(0x0201, &wsa_data);
+  int err = WSAStartup(0x0202, &wsa_data);
+  if (err != 0) {
+    /* Tell the user that we could not find a usable */
+    /* Winsock DLL.                                  */
+    printf("WSAStartup failed with error: %d\n", err);
+    exit(-1);
+  }
 #endif
 }
 
 int driver_main(int argc, char **argv) {
-#ifndef __WIN32
   // register crash handlers
   backward::SignalHandling sh;
   if (!sh.loaded()) {
     std::cout << "Warning: Signal handler installation failed, not backtrace on crash!"
               << std::endl;
   }
-#endif
+
   init_win32();
 
   auto base = init_main(argc, argv);
