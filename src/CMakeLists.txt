@@ -51,7 +51,7 @@ if (${CMAKE_C_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_C_COMPILER_ID} STREQUAL "Cl
   foreach (lang C CXX)
     set(CMAKE_${lang}_FLAGS_DEBUG "-O0 -g3")
     # include (minimal) debug information even for RELEASE build.
-    set(CMAKE_${lang}_FLAGS_RELEASE "-O3 -DNDEBUG -g1")
+    set(CMAKE_${lang}_FLAGS_RELEASE "-O3 -DNDEBUG -g")
     set(CMAKE_${lang}_FLAGS_RELWITHDEBINFO "${CMAKE_${lang}_FLAGS_RELEASE}")
   endforeach ()
 
@@ -69,7 +69,7 @@ if (${CMAKE_C_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_C_COMPILER_ID} STREQUAL "Cl
   if (ENABLE_SANITIZER)
     add_compile_options("-fsanitize=address,undefined")
     # add_linker_options is only avaiable cmake 3.13
-    set(CMAKE_EXE_LINKER_FLAGS "-fsanitize=address,undefined")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address,undefined")
   else ()
     add_compile_options(
       "-D_FORTIFY_SOURCE=2"
@@ -139,13 +139,24 @@ endif()
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # STATIC
+IF(WIN32)
+  set(STATIC ON)
+  message(STATUS "Default to build static on windows!")
+ENDIF()
+
 if (STATIC)
-  message(STATUS "Linking driver STATICLY.")
+  message(STATUS "Linking static driver.")
   if (WIN32)
     set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
+  elseif (APPLE)
+    message(FATAL_ERROR "Build staticly on OSX is not supported")
   else ()
     set(CMAKE_FIND_LIBRARY_SUFFIXES .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
   endif ()
+  # target_link_options only avaiable at cmake 3.13.3
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static -static-libgcc -static-libstdc++ -Wl,-Bstatic")
+else()
+  message(STATUS "Linking dynamic driver.")
 endif ()
 # end of STATIC
 
@@ -183,7 +194,11 @@ set(GENERATED_HEADERS
   )
 
 # Libraries
-find_package(Libevent 2.0 REQUIRED COMPONENTS libevent)
+if(WIN32)
+  find_package(Libevent 2.0 REQUIRED COMPONENTS libevent)
+else()
+  find_package(Libevent 2.0 REQUIRED COMPONENTS libevent pthreads)
+endif()
 # multiple packages uses this, so we simply do a global inclusion
 include_directories(SYSTEM ${LIBEVENT_INCLUDE_DIR})
 
@@ -345,7 +360,7 @@ endif ()
 
 # Winsocks
 IF (WIN32)
-  target_link_libraries(driver PRIVATE wsock32 ws2_32)
+  target_link_libraries(driver PRIVATE ws2_32)
 ENDIF ()
 
 # Third party libraries
@@ -357,29 +372,10 @@ target_link_libraries(driver PUBLIC ${ICU_LIBRARIES})
 add_subdirectory(thirdparty/backward-cpp EXCLUDE_FROM_ALL)
 add_backward(driver)
 
-# Link statictly
-if (STATIC)
-  if (WIN32)
-    # TODO
-    message(FATAL_ERROR "Build staticly on Windows is not currently supported")
-  else ()
-    if (APPLE)
-      message(FATAL_ERROR "Build staticly on OSX is not supported")
-    else ()
-      # target_link_options only avaiable at cmake 3.13.3
-      target_link_libraries(driver PUBLIC "-static-libgcc -static-libstdc++ -Wl,-Bstatic")
-    endif ()
-  endif ()
-endif ()
-
 # JEMALLOC
 if (CYGWIN)
   set(USE_JEMALLOC OFF)
   message(STATUS "JEMALLOC is not supported on CYGWIN.")
-endif ()
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-  set(USE_JEMALLOC OFF)
-  message(STATUS "JEMALLOC is disabled on debug build.")
 endif ()
 if (USE_JEMALLOC)
   find_package(jemalloc REQUIRED)
@@ -392,8 +388,10 @@ endif ()
 # libevent
 target_link_libraries(driver PUBLIC ${LIBEVENT_LIBRARIES})
 
-find_package(Threads REQUIRED)
-target_link_libraries(driver PRIVATE Threads::Threads)
+if(NOT WIN32)
+  find_package(Threads REQUIRED)
+  target_link_libraries(driver PRIVATE Threads::Threads)
+endif()
 
 include(CheckLibraryExists)
 CHECK_LIBRARY_EXISTS(rt clock_gettime "time.h" HAVE_CLOCK_GETTIME_IN_RT)

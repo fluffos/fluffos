@@ -59,7 +59,7 @@ void bp(void);
    is usually best.
  */
 void check_string_stats(outbuffer_t *);
-#define CHECK_STRING_STATS // enable when need to debug: check_string_stats(nullptr)
+#define CHECK_STRING_STATS  // enable when need to debug: check_string_stats(nullptr)
 #else
 #define CHECK_STRING_STATS
 #endif

@@ -38,6 +38,15 @@ inline bool ends_with(const std::string &str, const std::string &ending) {
   return str.compare(str.length() - ending.length(), ending.length(), ending) == 0;
 }
 
+inline void ReplaceStringInPlace(std::string &subject, const std::string &search,
+                                 const std::string &replace) {
+  size_t pos = 0;
+  while ((pos = subject.find(search, pos)) != std::string::npos) {
+    subject.replace(pos, search.length(), replace);
+    pos += replace.length();
+  }
+}
+
 // Addition by Yucong Sun
 
 // check string s is valid utf8
