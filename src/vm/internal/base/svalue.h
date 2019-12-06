@@ -41,7 +41,8 @@ class svalue_t {
         unsigned short subtype;
         union u u;
 
-        svalue_t &  operator= (const LPC_INT&);
+                    svalue_t    (void);
+        svalue_t &  operator=   (const LPC_INT&);
 };
 
 struct ref_t {

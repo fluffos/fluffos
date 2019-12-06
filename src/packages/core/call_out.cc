@@ -2,7 +2,6 @@
 
 #include "packages/core/call_out.h"
 
-#include <chrono>
 #include <functional>
 #include <math.h>
 #include <unordered_map>
@@ -49,7 +48,7 @@ int new_call_out_zero_scheduled_on_this_gametick = 0;
  */
 static void free_called_call(pending_call_t *cop) {
   if (cop->ob) {
-    free_string(cop->function.s);
+    delete cop->function.s;
     free_object(&cop->ob, "free_call");
   } else {
     free_funp(cop->function.f);
@@ -81,7 +80,7 @@ static void free_call(pending_call_t *cop) {
  */
 LPC_INT new_call_out(object_t *ob, svalue_t *fun, std::chrono::milliseconds delay_msecs,
                      int num_args, svalue_t *arg, bool walltime) {
-  DBG_CALLOUT("new_call_out: /%s delay msecs %" PRId64 "\n", ob->obname, delay_msecs.count());
+  DBG_CALLOUT("new_call_out: /{} delay msecs {}\n", ob->obname, delay_msecs.count());
 
   // call_out(0) loop prevention. This is based on the fact that new call_out(0)
   // will be executed on the same gametick, and when the total exceed the limit
@@ -114,12 +113,12 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, std::chrono::milliseconds dela
   } else {
     cop->target_time = g_current_gametick + time_to_gametick(delay_msecs);
   }
-  DBG_CALLOUT("  is_walltime: %d\n", cop->is_walltime ? 1 : 0);
-  DBG_CALLOUT("  target_time: %" PRIu64 "\n", cop->target_time);
+  DBG_CALLOUT("  is_walltime: {}\n", cop->is_walltime ? 1 : 0);
+  DBG_CALLOUT("  target_time: {}\n", cop->target_time);
 
   if (fun->type == T_STRING) {
-    DBG_CALLOUT("  function: %s\n", fun->u.string);
-    cop->function.s = make_shared_string(fun->u.string);
+    DBG_CALLOUT("  function: {}\n", fun->u.string);
+    cop->function.s = new shared_string {fun->u.string};
     cop->ob = ob;
     add_ref(ob, "call_out");
   } else {
@@ -133,7 +132,7 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, std::chrono::milliseconds dela
   if (unique > 0xffffffff) {
     unique = 1;  // force wrapping around.
   }
-  DBG_CALLOUT("  handle: %" LPC_INT_FMTSTR_P "\n", cop->handle);
+  DBG_CALLOUT("  handle: {}\n", cop->handle);
 
   g_callout_handle_map.insert(std::make_pair(cop->handle, cop));
   g_callout_object_handle_map.insert(
@@ -172,12 +171,12 @@ void call_out(pending_call_t *cop) {
   object_t *ob, *new_command_giver;
   ob = (cop->ob ? cop->ob : cop->function.f->hdr.owner);
 
-  DBG_CALLOUT("Executing callout: %s\n", ob ? ob->obname : "(null)");
+  DBG_CALLOUT("Executing callout: {}\n", ob ? ob->obname : "(null)");
 
-  DBG_CALLOUT("  handle: %" LPC_INT_FMTSTR_P "\n", cop->handle);
-  DBG_CALLOUT("  is_walltime: %i\n", cop->is_walltime ? 1 : 0);
+  DBG_CALLOUT("  handle: {}\n", cop->handle);
+  DBG_CALLOUT("  is_walltime: {}\n", cop->is_walltime ? 1 : 0);
 
-  DBG_CALLOUT("  target_time: %" PRIu64 " vs current: %" PRIu64 "\n", cop->target_time,
+  DBG_CALLOUT("  target_time: {} vs current: {}\n", cop->target_time,
               cop->is_walltime ? std::chrono::duration_cast<std::chrono::milliseconds>(
                                      std::chrono::high_resolution_clock::now().time_since_epoch())
                                      .count()
@@ -196,7 +195,7 @@ void call_out(pending_call_t *cop) {
   }
 
   // FIXME: Figure out why this is useful. Maybe a security thing.
-  if (cop->ob && cop->function.s[0] == APPLY___INIT_SPECIAL_CHAR) {
+  if (cop->ob && (**cop->function.s)[0] == APPLY___INIT_SPECIAL_CHAR) {
     DBG_CALLOUT("  Trying to call illegal function, ignored.\n");
     free_call(cop);
     return;
@@ -217,7 +216,7 @@ void call_out(pending_call_t *cop) {
       new_command_giver = ob;
     }
     if (new_command_giver) {
-      DBG_CALLOUT("  command_giver: /%s\n", new_command_giver->obname);
+      DBG_CALLOUT("  command_giver: /{}\n", new_command_giver->obname);
     }
   }
   int num_callout_args = 0;
@@ -230,7 +229,7 @@ void call_out(pending_call_t *cop) {
     while (svp-- > vec->item) {
       if (svp->type == T_OBJECT && (svp->u.ob->flags & O_DESTRUCTED)) {
         free_object(&svp->u.ob, "call_out");
-        *svp = const0u;
+        *svp = 0;
       }
     }
     /* cop->vs is ref one */
@@ -244,8 +243,8 @@ void call_out(pending_call_t *cop) {
   save_command_giver(new_command_giver);
   /* current object no longer set */
   if (cop->ob) {
-    DBG_CALLOUT("  func: %s\n", cop->function.s);
-    (void)safe_apply(cop->function.s, cop->ob, num_callout_args, ORIGIN_INTERNAL);
+    DBG_CALLOUT("  func: {}\n", *cop->function.s);
+    (void)safe_apply(*cop->function.s, cop->ob, num_callout_args, ORIGIN_INTERNAL);
   } else {
     DBG_CALLOUT("  func: <function>\n");
     (void)safe_call_function_pointer(cop->function.f, num_callout_args);
@@ -273,12 +272,12 @@ static int time_left(pending_call_t *cop) {
  * The time left until execution is returned.
  * -1 is returned if no callout with this function is pending.
  */
-int remove_call_out(object_t *ob, const char *fun) {
+int remove_call_out(object_t *ob, const std::string fun) {
   if (!ob) {
     return -1;
   }
 
-  DBG_CALLOUT("remove_call_out: /%s \"%s\"\n", ob->obname, fun);
+  DBG_CALLOUT("remove_call_out: /{} \"{}\"\n", ob->obname, fun);
 
   auto range = g_callout_object_handle_map.equal_range(ob);
   auto iter = range.first;
@@ -290,13 +289,13 @@ int remove_call_out(object_t *ob, const char *fun) {
     }
     auto cop = iter_handle->second;
 
-    if (cop->ob == ob && strcmp(cop->function.s, fun) == 0) {
+    if (cop->ob == ob && *cop->function.s == fun) {
       auto remaining_time = time_left(cop);
       free_call(cop);
       g_callout_handle_map.erase(iter_handle);
       g_callout_object_handle_map.erase(iter);
 
-      DBG_CALLOUT("  found: remaining time %d.\n", remaining_time);
+      DBG_CALLOUT("  found: remaining time {}.\n", remaining_time);
       return remaining_time;
     }
     iter++;
@@ -310,8 +309,7 @@ int remove_call_out_by_handle(object_t *ob, LPC_INT handle) {
     return -1;
   }
 
-  DBG_CALLOUT("remove_call_out_by_handle: ob: %s, handle: %" LPC_INT_FMTSTR_P ".\n", ob->obname,
-              handle);
+  DBG_CALLOUT("remove_call_out_by_handle: ob: {}, handle: {}.\n", ob->obname, handle);
 
   if (handle == 0 || handle < unique) {
     DBG_CALLOUT("  invalid handle, ignored.\n");
@@ -326,7 +324,7 @@ int remove_call_out_by_handle(object_t *ob, LPC_INT handle) {
 
     g_callout_handle_map.erase(iter);
 
-    DBG_CALLOUT("  found: remaining time %d.\n", remaining_time);
+    DBG_CALLOUT("  found: remaining time {}.\n", remaining_time);
     return remaining_time;
   }
   DBG_CALLOUT("  not found.\n");
@@ -334,8 +332,7 @@ int remove_call_out_by_handle(object_t *ob, LPC_INT handle) {
 }
 
 int find_call_out_by_handle(object_t *ob, LPC_INT handle) {
-  DBG_CALLOUT("find_call_out_by_handle: ob: %s, handle: %" LPC_INT_FMTSTR_P "\n", ob->obname,
-              handle);
+  DBG_CALLOUT("find_call_out_by_handle: ob: {}, handle: {}\n", ob->obname, handle);
 
   if (handle == 0 || handle < unique) {
     DBG_CALLOUT("  invalid handle, ignored.\n");
@@ -347,7 +344,7 @@ int find_call_out_by_handle(object_t *ob, LPC_INT handle) {
     auto cop = iter->second;
     if (cop->handle == handle && (cop->ob == ob || cop->function.f->hdr.owner == ob)) {
       auto remaining_time = time_left(cop);
-      DBG_CALLOUT("  found: remaining time %d.\n", remaining_time);
+      DBG_CALLOUT("  found: remaining time {}.\n", remaining_time);
       return remaining_time;
     }
   }
@@ -360,7 +357,7 @@ int find_call_out(object_t *ob, const char *fun) {
     return -1;
   }
 
-  DBG_CALLOUT("find_call_out: ob:%s \"%s\"\n", ob->obname, fun);
+  DBG_CALLOUT("find_call_out: ob:{} \"{}\"\n", ob->obname, fun);
 
   auto range = g_callout_object_handle_map.equal_range(ob);
   auto iter = range.first;
@@ -371,9 +368,9 @@ int find_call_out(object_t *ob, const char *fun) {
       continue;
     }
     auto cop = iter_handle->second;
-    if (cop->ob == ob && strcmp(cop->function.s, fun) == 0) {
+    if (cop->ob == ob && *cop->function.s == fun) {
       auto remaining_time = time_left(cop);
-      DBG_CALLOUT("  found: remaining time %d.\n", remaining_time);
+      DBG_CALLOUT("  found: remaining time {}.\n", remaining_time);
       return remaining_time;
     }
     iter++;
@@ -386,18 +383,18 @@ int print_call_out_usage(outbuffer_t *ob, int verbose) {
   if (verbose == 1) {
     outbuf_add(ob, "Call out information:\n");
     outbuf_add(ob, "---------------------\n");
-    outbuf_addv(ob, "Number of allocated call outs: %8d, %8d bytes.\n", g_callout_handle_map.size(),
+    outbuf_addv(ob, "Number of allocated call outs: {:8}, {:8} bytes.\n", g_callout_handle_map.size(),
                 g_callout_handle_map.size() * sizeof(pending_call_t));
-    outbuf_addv(ob, "Current handle map bucket: %d\n", g_callout_handle_map.bucket_count());
-    outbuf_addv(ob, "Current handle map load_factor: %f\n", g_callout_handle_map.load_factor());
-    outbuf_addv(ob, "Current object map bucket: %d\n", g_callout_object_handle_map.bucket_count());
-    outbuf_addv(ob, "Current object map load_factor: %f\n",
+    outbuf_addv(ob, "Current handle map bucket: {}\n", g_callout_handle_map.bucket_count());
+    outbuf_addv(ob, "Current handle map load_factor: {}\n", g_callout_handle_map.load_factor());
+    outbuf_addv(ob, "Current object map bucket: {}\n", g_callout_object_handle_map.bucket_count());
+    outbuf_addv(ob, "Current object map load_factor: {}\n",
                 g_callout_object_handle_map.load_factor());
-    outbuf_addv(ob, "Number of garbage entry in object map: %d\n",
+    outbuf_addv(ob, "Number of garbage entry in object map: {}\n",
                 g_callout_object_handle_map.size() - g_callout_handle_map.size());
   } else {
     if (verbose != -1) {
-      outbuf_addv(ob, "call out:\t\t\t%8d %8d (load_factor %f)\n", g_callout_handle_map.size(),
+      outbuf_addv(ob, "call out:\t\t\t{:8} {:8} (load_factor {})\n", g_callout_handle_map.size(),
                   g_callout_handle_map.size() * sizeof(pending_call_t),
                   g_callout_handle_map.load_factor());
     }
@@ -461,10 +458,10 @@ array_t *get_all_call_outs() {
       add_ref(cop->ob, "get_all_call_outs");
       vv->item[1].type = T_STRING;
       vv->item[1].subtype = STRING_SHARED;
-      vv->item[1].u.string = make_shared_string(cop->function.s);
+      vv->item[1].u.string = *cop->function.s;
     } else {
       outbuffer_t tmpbuf;
-      svalue_t tmpval;
+      svalue_t tmpval {};
 
       tmpbuf.real_size = 0;
       tmpbuf.buffer = nullptr;
@@ -479,8 +476,8 @@ array_t *get_all_call_outs() {
       add_ref(cop->function.f->hdr.owner, "get_all_call_outs");
       vv->item[1].type = T_STRING;
       vv->item[1].subtype = STRING_SHARED;
-      vv->item[1].u.string = make_shared_string(tmpbuf.buffer);
-      FREE_MSTR(tmpbuf.buffer);
+      vv->item[1].u.string = std::string {tmpbuf.buffer};
+      delete tmpbuf.buffer;
     }
     vv->item[2].type = T_NUMBER;
     vv->item[2].u.number = time_left(cop);
@@ -516,7 +513,7 @@ void remove_all_call_out(object_t *obj) {
       iter++;
     }
   }
-  DBG_CALLOUT("remove_all_call_out: removed %d callouts.\n", i);
+  DBG_CALLOUT("remove_all_call_out: removed {} callouts.\n", i);
 }
 
 void clear_call_outs() {
@@ -550,7 +547,7 @@ void reclaim_call_outs() {
       }
     }
   }
-  DBG_CALLOUT("reclaim_call_outs: %d callouts with destructed object.\n", i);
+  DBG_CALLOUT("reclaim_call_outs: {} callouts with destructed object.\n", i);
 
   // GC all invalid object->handle entries
   i = 0;
@@ -565,7 +562,7 @@ void reclaim_call_outs() {
       }
     }
   }
-  DBG_CALLOUT("reclaim_call_outs: %d garbage in object handle map.\n", i);
+  DBG_CALLOUT("reclaim_call_outs: {} garbage in object handle map.\n", i);
 
   if (CONFIG_INT(__RC_THIS_PLAYER_IN_CALL_OUT__)) {
     i = 0;
@@ -577,7 +574,7 @@ void reclaim_call_outs() {
         i++;
       }
     }
-    DBG_CALLOUT("reclaim_call_outs: %d callouts with command_giver gone.\n", i);
+    DBG_CALLOUT("reclaim_call_outs: {} callouts with command_giver gone.\n", i);
   }
 }
 

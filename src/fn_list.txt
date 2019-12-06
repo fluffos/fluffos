@@ -51,3 +51,7 @@ object_t *find_living_object(const char *, int)         |   object_t *find_livin
 static int hash_living_name(const char *)               |   static int hash_living_name(const std::string)
 static int user_parser(char *)                          |   static int user_parser(std::string)
 static void set_living_name(object_t *, const char *)   |   static void set_living_name(object_t *, const std::string)
+
+packages/core/call_out.cc:
+int find_call_out(object_t *, const char *)             |   int find_call_out(object_t *, const std::string)
+int remove_call_out(object_t *, const char *)           |   int remove_call_out(object_t *, const std::string)

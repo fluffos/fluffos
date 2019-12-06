@@ -6,6 +6,7 @@
  */
 
 #include <chrono>
+#if 0
 #ifdef TIME_WITH_SYS_TIME
 #include <sys/time.h>
 #include <time.h>
@@ -14,6 +15,7 @@
 #include <sys/time.h>
 #else
 #include <time.h>
+#endif
 #endif
 #endif
 
@@ -37,9 +39,9 @@ void reclaim_call_outs(void);
 int find_call_out_by_handle(object_t *, LPC_INT);
 int remove_call_out_by_handle(object_t *, LPC_INT);
 LPC_INT new_call_out(object_t *, svalue_t *, std::chrono::milliseconds delay_msec, int, svalue_t *);
-int remove_call_out(object_t *, const char *);
+int remove_call_out(object_t *, const std::string);
 void remove_all_call_out(object_t *);
-int find_call_out(object_t *, const char *);
+int find_call_out(object_t *, const std::string);
 array_t *get_all_call_outs(void);
 int print_call_out_usage(outbuffer_t *, int);
 void mark_call_outs(void);
