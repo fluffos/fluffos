@@ -121,9 +121,7 @@ inline int32_t u8_strncpy(uint8_t *dest, const uint8_t *src, size_t maxlen) {
 
 // Return
 inline size_t u8_charwidth(UChar32 codepoint, bool ambiguous_as_full_width = true) {
-  if (!u_isdefined(codepoint) ||
-      u_iscntrl(codepoint) ||
-      u_getCombiningClass(codepoint) > 0 ||
+  if (!u_isdefined(codepoint) || u_iscntrl(codepoint) || u_getCombiningClass(codepoint) > 0 ||
       u_hasBinaryProperty(codepoint, UCHAR_EMOJI_MODIFIER)) {
     return 0;
   }
@@ -145,7 +143,7 @@ inline size_t u8_charwidth(UChar32 codepoint, bool ambiguous_as_full_width = tru
       if (u_hasBinaryProperty(codepoint, UCHAR_EMOJI_PRESENTATION)) {
         return 2;
       }
-      // Fall through
+      /* fallthrough */
     case U_EA_HALFWIDTH:
     case U_EA_NARROW:
     default:
@@ -153,31 +151,30 @@ inline size_t u8_charwidth(UChar32 codepoint, bool ambiguous_as_full_width = tru
   }
 }
 // Total width of characters(grapheme cluster). Also adjust for east asain full width characters
-inline size_t u8_width(const char* src, bool expand_emoji_sequence = false) {
+inline size_t u8_width(const char *src, bool expand_emoji_sequence = false) {
   UErrorCode status = U_ZERO_ERROR;
   size_t total = 0;
 
   auto text = utext_openUTF8(nullptr, src, -1, &status);
   /* create an iterator for graphemes */
   auto *brk = icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status);
-  if(!U_SUCCESS(status)) {
+  if (!U_SUCCESS(status)) {
     return 0;
   }
   brk->setText(text, status);
-  if(!U_SUCCESS(status)) {
+  if (!U_SUCCESS(status)) {
     return 0;
   }
   int32_t pos = brk->first();
   UChar32 c = U_SENTINEL, prev;
-  while(pos != icu::BreakIterator::DONE) {
+  while (pos != icu::BreakIterator::DONE) {
     prev = c;
     // Treat asain chars as 2 width
     c = utext_char32At(text, pos);
     if (c != U_SENTINEL) {
-      if (!expand_emoji_sequence &&
-          prev == 0x200d &&  // 0x200d == ZWJ (zero width joiner)
+      if (!expand_emoji_sequence && prev == 0x200d &&  // 0x200d == ZWJ (zero width joiner)
           (u_hasBinaryProperty(c, UCHAR_EMOJI_PRESENTATION) ||
-              u_hasBinaryProperty(c, UCHAR_EMOJI_MODIFIER))) {
+           u_hasBinaryProperty(c, UCHAR_EMOJI_MODIFIER))) {
         // skip
       } else {
         total += u8_charwidth(c);

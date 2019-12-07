@@ -178,8 +178,8 @@ typedef struct _sprintf_state {
 static sprintf_state_t *sprintf_state = nullptr;
 
 static void add_space(outbuffer_t * /*outbuf*/, int indent);
-static void add_justified(const char *str, int swidth, int slen, pad_info_t *pad, int fs, format_info finfo,
-                          short int trailing);
+static void add_justified(const char *str, int swidth, int slen, pad_info_t *pad, int fs,
+                          format_info finfo, short int trailing);
 static int add_column(cst **column, int trailing);
 static int add_table(cst **table);
 
@@ -521,8 +521,8 @@ static void add_nstr(const char *str, int len) {
  * "str" is unmodified.  trailing is, of course, ignored in the case
  * of right justification.
  */
-static void add_justified(const char *str, int swidth, int slen, pad_info_t *pad, int fs, format_info finfo,
-                          short int trailing) {
+static void add_justified(const char *str, int swidth, int slen, pad_info_t *pad, int fs,
+                          format_info finfo, short int trailing) {
   // Strip ANSI codes from input string.
   // https://en.wikipedia.org/wiki/ANSI_escape_code#Colors
   // format is "\x1b[X;Ym"
@@ -658,8 +658,8 @@ static int add_table(cst **table) {
     for (done = 0; done != end && tab_di[done] != '\n'; done++)
       ;
     auto swidth = u8_width(tab_di);
-    add_justified(tab_di, swidth, (done > tab->size ? tab->size : done), tab->pad, tab->size, tab->info,
-                  tab->pad || (i < tab->nocols - 1) || tab->next);
+    add_justified(tab_di, swidth, (done > tab->size ? tab->size : done), tab->pad, tab->size,
+                  tab->info, tab->pad || (i < tab->nocols - 1) || tab->next);
     if (done >= end - 1) {
       tab_di = nullptr;
     } else {
@@ -1147,7 +1147,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
 
               add_table(temp);
             }
-          } else {                             /* not column or table */
+          } else { /* not column or table */
             if (pres && pres < swidth) {
               swidth = pres;
             }
@@ -1162,7 +1162,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
             SPRINTF_ERROR(ERR_INVALID_ARG_C);
           }
           /* write UTF8 codepoint */
-          char temp[4+1];
+          char temp[4 + 1];
           UChar32 c = carg->u.number;
 
           if (c == 0 || !u_isdefined(c)) {
@@ -1175,10 +1175,10 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
           int tmpl = strlen(temp);
           int swidth = u8_width(temp);
 
-          add_justified(temp, swidth, tmpl, &pad, fs, finfo,
-                        (((format_str[fpos] != '\n') && (format_str[fpos] != '\0')) ||
-                            ((finfo & INFO_ARRAY) &&
-                                (nelemno < (argv + sprintf_state->cur_arg)->u.arr->size))));
+          add_justified(
+              temp, swidth, tmpl, &pad, fs, finfo,
+              (((format_str[fpos] != '\n') && (format_str[fpos] != '\0')) ||
+               ((finfo & INFO_ARRAY) && (nelemno < (argv + sprintf_state->cur_arg)->u.arr->size))));
         } else if (finfo & INFO_T_INT) {
           /* one of the integer
            * types */

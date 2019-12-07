@@ -153,7 +153,7 @@ if (STATIC)
   else ()
     set(CMAKE_FIND_LIBRARY_SUFFIXES .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
   endif ()
-  # target_link_options only avaiable at cmake 3.13.3
+  # target_link_options only available at cmake 3.13.3
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static -static-libgcc -static-libstdc++ -Wl,-Bstatic")
 else()
   message(STATUS "Linking dynamic driver.")
@@ -203,7 +203,7 @@ endif()
 include_directories(SYSTEM ${LIBEVENT_INCLUDE_DIR})
 
 # Libraries
-find_package(ICU REQUIRED COMPONENTS uc)
+find_package(ICU REQUIRED COMPONENTS uc dt)
 # Make ICU use utf-8 internally
 add_compile_options("-DU_CHARSET_IS_UTF8=1")
 # multiple packages uses this, so we simply do a global inclusion too.
@@ -358,11 +358,6 @@ if (ENABLE_DTRACE)
   target_link_libraries(driver PRIVATE tracing)
 endif ()
 
-# Winsocks
-IF (WIN32)
-  target_link_libraries(driver PRIVATE ws2_32)
-ENDIF ()
-
 # Third party libraries
 add_subdirectory(thirdparty/libtelnet EXCLUDE_FROM_ALL)
 target_link_libraries(driver PUBLIC libtelnet)
@@ -392,6 +387,13 @@ endif ()
 
 # libevent
 target_link_libraries(driver PUBLIC ${LIBEVENT_LIBRARIES})
+
+# Platform Libraries
+
+# Winsocks
+IF (WIN32)
+  target_link_libraries(driver PRIVATE ws2_32)
+ENDIF ()
 
 if(NOT WIN32)
   find_package(Threads REQUIRED)
