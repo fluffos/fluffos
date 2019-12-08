@@ -195,8 +195,28 @@ Box drawing alignment tests:                                          █
   ╚══╩══╝  └──┴──┘  ╰──┴──╯  ╰──┴──╯  ┗━━┻━━┛           └╌╌┘ ╎ ┗╍╍┛ ┋  ▁▂▃▄▅▆▇█
 UTF8;
 
+string text8_cp1 = @UNICODE
+\U0001f600
+UNICODE;
+
+string* text8_cp2 = @@UNICODE
+\uD83D
+UNICODE;
+
+string text8_str = @UNICODE
+😀​😁​😂​😃​😄​😅​😆​😇​😈​😉​😊​😋​😌​😍​😎​😏​😐​😑​😒​😓​😔​😕​😖​😗​😘​😙​😚​😛​😜​😝​😞​😟​😠​😡
+​😢​😣​😤​😥​😦​😧​😨​😩​😪​😫​😬​😭​😮​😯​😰​😱​😲​😳​😴​😵​😶​😷​😸​😹​😺​😻​😼​😽​😾​😿​🙀​🙁​🙂​🙃
+​🙄​🙅​🙆​🙇​🙈​🙉​🙊​🙋​🙌​🙍​🙎​🙏
+UNICODE;
+
 void do_tests() {
   string tmp;
+
+  // string block don't process \U and \u
+  ASSERT_EQ("\\U", text8_cp1[0..1]);
+  // string block don't process \U and \u
+  ASSERT_EQ("\\u", text8_cp2[0][0..1]);
+
   // strlen
   ASSERT_EQ(74, strlen(text1));
   ASSERT_EQ(92, strlen(text2));
