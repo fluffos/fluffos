@@ -591,7 +591,7 @@ void remove_sent(object_t *ob, object_t *user) {
     if ((*s)->ob == ob) {
 #ifdef DEBUG
       if (!((*s)->flags & V_FUNCTION)) {
-        debug(add_action, "--Unlinking sentence {} (user: {} ob: {})\n", (*s)->function.s,
+        debug(add_action, "--Unlinking sentence {} (user: {} ob: {})\n", *((*s)->function.s),
               user->obname, ob->obname);
       }
 #endif
