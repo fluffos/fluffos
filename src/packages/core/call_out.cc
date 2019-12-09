@@ -184,7 +184,7 @@ void call_out(pending_call_t *cop) {
 
   // Remove self from callout map
   {
-    int found = g_callout_handle_map.erase(cop->handle);
+    int found [[gnu::unused]] = g_callout_handle_map.erase(cop->handle);
     DEBUG_CHECK(!found, "BUG: Rogue callout, not found in map.\n");
   }
 
