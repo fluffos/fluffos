@@ -6,6 +6,6 @@
 /*
  * crc32.c
  */
-uint32_t compute_crc32(unsigned char *, int);
+uint32_t compute_crc32(const unsigned char *, const size_t);
 
 #endif

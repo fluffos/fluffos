@@ -12,9 +12,9 @@
    by others.  See the comments in the file (crctab.h) for the credits.
 */
 
-uint32_t compute_crc32(unsigned char *buf, int len) {
+uint32_t compute_crc32(const unsigned char *buf, const size_t len) {
   uint32_t crc = 0xFFFFFFFFL;
-  int j;
+  size_t j;
 
   j = len;
   while (j--) {
@@ -26,18 +26,24 @@ uint32_t compute_crc32(unsigned char *buf, int len) {
 
 #ifdef F_CRC32
 void f_crc32(void) {
-  int len;
-  unsigned char *buf;
+  size_t len;
+  const unsigned char *buf;
   uint32_t crc;
 
   if (sp->type == T_STRING) {
-    len = SVALUE_STRLEN(sp);
-    buf = (unsigned char *)sp->u.string;
+    len = sp->u.string->size();
+    buf = reinterpret_cast<const unsigned char*>(sp->u.string->c_str());
+#ifndef NO_BUFFER_TYPE
   } else if (sp->type == T_BUFFER) {
     len = sp->u.buf->size;
     buf = sp->u.buf->item;
+#endif
   } else {
+#ifndef NO_BUFFER_TYPE
     bad_argument(sp, T_STRING | T_BUFFER, 1, F_CRC32);
+#else
+    bad_argument(sp, T_STRING, 1, F_CRC32);
+#endif
   }
   crc = compute_crc32(buf, len);
   free_svalue(sp, "f_crc32");

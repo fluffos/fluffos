@@ -55,3 +55,6 @@ static void set_living_name(object_t *, const char *)   |   static void set_livi
 packages/core/call_out.cc:
 int find_call_out(object_t *, const char *)             |   int find_call_out(object_t *, const std::string)
 int remove_call_out(object_t *, const char *)           |   int remove_call_out(object_t *, const std::string)
+
+packages/core/crc32.cc:
+uint32_t compute_crc32(unsigned char *, int)            |   uint32_t compute_crc32(const unsigned char *, const size_t)
