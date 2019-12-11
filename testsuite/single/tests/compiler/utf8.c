@@ -223,13 +223,17 @@ void do_tests() {
   ASSERT_EQ(76, strlen(text3));
   ASSERT_EQ(31, strlen(text4));
   ASSERT_EQ(17, sizeof(text5));
-  ASSERT_EQ(4901, sizeof(text6));
+  ASSERT_EQ(4801, sizeof(text6));
   ASSERT_EQ(strlen(text6), sizeof(text6));
   ASSERT_EQ(688, sizeof(text7));
+  ASSERT_EQ(162, sizeof(text8_str));
 
   // Multi codepoint emoji
   tmp = "👩‍👩‍👧‍👧";
-  ASSERT_EQ(7, strlen(tmp));
+  ASSERT_EQ(1, strlen(tmp));
+
+  // INDEX doesn't work with multi-codepoint character.
+  ASSERT(catch(tmp[0] = 'a'));
 
   // INDEX
   ASSERT_EQ(22909, "好"[0]);

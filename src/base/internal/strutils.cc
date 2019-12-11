@@ -1,5 +1,6 @@
 #include <cctype>
 #include <string.h>
+#include <unicode/brkiter.h>
 
 #include "thirdparty/utf8_decoder_dfa/decoder.h"
 #include "thirdparty/widecharwidth/widechar_width.h"
@@ -8,7 +9,6 @@
 
 // Addition by Yucong Sun
 
-// check string s is valid utf8
 bool u8_validate(const uint8_t *s) {
   uint32_t codepoint, state = 0;
 
@@ -17,33 +17,50 @@ bool u8_validate(const uint8_t *s) {
   return state == UTF8_ACCEPT;
 }
 
-// saves number of codepoints in string s, to count.
-// Returns false if string is not valid utf8
-bool u8_codepoints(const uint8_t *s, size_t *count) {
-  uint32_t codepoint, state = 0;
+bool u8_egc_count(const char *src, size_t *count) {
+  UErrorCode status = U_ZERO_ERROR;
+  size_t total = 0;
+  UText text = UTEXT_INITIALIZER;
 
-  for (*count = 0; *s; ++s)
-    if (!decode(&state, &codepoint, *s)) *count += 1;
+  utext_openUTF8(&text, src, -1, &status);
+  if (!U_SUCCESS(status)) {
+    return false;
+  }
 
-  return state == UTF8_ACCEPT;
+  /* create an iterator for graphemes */
+  std::unique_ptr<icu::BreakIterator> brk(
+      icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status));
+  if (!U_SUCCESS(status)) {
+    return false;
+  }
+  brk->setText(&text, status);
+  if (!U_SUCCESS(status)) {
+    return false;
+  }
+  brk->first();
+  while (brk->next() != icu::BreakIterator::DONE) ++total;
+
+  *count = total;
+
+  return true;
 }
 
-// Return the character at given index of str
-UChar32 u8_codepoint_at(const uint8_t *str, int32_t index) {
-  int32_t offset = 0;
-  U8_FWD_N(str, offset, -1, index);
+// Return the egc at given index of src, if it is an single code point
+UChar32 u8_egc_index_as_single_codepoint(const char *src, int32_t index) {
+  UChar32 c = U_SENTINEL;
+  auto start = u8_egc_index_to_offset(src, index);
+  auto end = u8_egc_index_to_offset(src, index + 1);
 
-  UChar32 c = 0;
-  U8_NEXT(str, offset, -1, c);
+  if (start >= 0 && end >= start && end - start < U8_MAX_LENGTH) U8_NEXT_UNSAFE(src, start, c);
+
   return c;
 }
 
 // Copy string src to dest, replacing character at index to c. Assuming dst is already allocated.
-void u8_copy_and_replace_codepoint_at(const uint8_t *src, uint8_t *dst, int32_t index, UChar32 c) {
-  int32_t src_offset = 0;
+void u8_copy_and_replace_codepoint_at(const char *src, char *dst, int32_t index, UChar32 c) {
+  int32_t src_offset = u8_egc_index_to_offset(src, index);
   int32_t dst_offset = 0;
 
-  U8_FWD_N(src, src_offset, -1, index);
   memcpy(dst, src, src_offset);
   dst_offset = src_offset;
   U8_APPEND_UNSAFE(dst, dst_offset, c);
@@ -52,11 +69,34 @@ void u8_copy_and_replace_codepoint_at(const uint8_t *src, uint8_t *dst, int32_t 
   strcpy((char *)dst + dst_offset, (const char *)src + src_offset);
 }
 
-// Get the byte offset to the codepoint index, doesn't check validity or bounds.
-size_t u8_codepoint_index_to_offset(const uint8_t *src, int32_t index) {
-  size_t offset = 0;
-  U8_FWD_N_UNSAFE(src, offset, index);
-  return offset;
+// Get the byte offset to the egc index, doesn't check validity or bounds.
+int32_t u8_egc_index_to_offset(const char *src, int32_t index) {
+  UErrorCode status = U_ZERO_ERROR;
+  int32_t pos = -1;
+  UText text = UTEXT_INITIALIZER;
+
+  utext_openUTF8(&text, src, -1, &status);
+  if (!U_SUCCESS(status)) {
+    return -1;
+  }
+
+  std::unique_ptr<icu::BreakIterator> brk(
+      icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status));
+  if (!U_SUCCESS(status)) {
+    return -1;
+  }
+
+  brk->setText(&text, status);
+  if (!U_SUCCESS(status)) {
+    return -1;
+  }
+
+  pos = brk->first();
+  while (index-- > 0 && pos >= 0) {
+    pos = brk->next();
+  }
+
+  return pos;
 }
 
 // same as strncpy, copy up to maxlen bytes but will not copy broken characters.
