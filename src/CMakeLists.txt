@@ -290,6 +290,7 @@ set(SRC
   "base/internal/stats.cc"
   "base/internal/stralloc.cc"
   "base/internal/strput.cc"
+  "base/internal/strutils.cc"
   "vm/internal/apply.cc"
   "vm/internal/base/apply_cache.cc"
   "vm/internal/base/array.cc"

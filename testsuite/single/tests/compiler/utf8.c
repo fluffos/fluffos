@@ -308,8 +308,7 @@ void do_tests() {
   // truncation
   ASSERT_EQ(tmp, sprintf("%.10s", tmp));
 
-  // left, center, and right adjustment, and
-  // no east asain adjustment 40 - 16 = 24
+  // left, center, and right adjustment,
   // and count CJK chars and emojis as 2 width,  40 - 16 * 2 = 8
   ASSERT_EQ(repeat_string(" ", 4) + tmp + repeat_string(" ", 4), sprintf("%40|s", tmp));
   ASSERT_EQ(repeat_string(" ", 8) + tmp, sprintf("%40s", tmp));

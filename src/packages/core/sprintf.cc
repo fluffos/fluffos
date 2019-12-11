@@ -1162,7 +1162,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
             SPRINTF_ERROR(ERR_INVALID_ARG_C);
           }
           /* write UTF8 codepoint */
-          char temp[4 + 1];
+          char temp[4 + 1] = {0};
           UChar32 c = carg->u.number;
 
           if (c == 0 || !u_isdefined(c)) {
@@ -1217,10 +1217,6 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
               /* make sure to print out at least 64bits. */
               cheat[i++] = 'l';
               cheat[i++] = 'f';
-              break;
-            case INFO_T_CHAR:
-              cheat[i++] = 'z';
-              cheat[i++] = 'c';
               break;
             case INFO_T_OCT:
               cheat[i++] = 'l';
