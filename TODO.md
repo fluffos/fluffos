@@ -27,6 +27,15 @@
 ## base/internal/log.h
 - #define debug(...) still uses char\*
 
+## packages/core/crc32.cc ##
+- switch to CRCpp (see: [github repo](https://github.com/Shea690901/CRCpp "forked from d-bahr/CRCpp"))
+- also add additional hashes (sha, blowfish, ...) (rename file or expand using own package?)
+
+## packages/core/dns.cc ##
+- complete rewrite
+  - change storage class
+  - change storage handling
+
 ## packages/contrib/contrib.cc ##
 network\_stats
 - make maximum number of ports configurable?

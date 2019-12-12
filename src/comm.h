@@ -68,9 +68,7 @@ struct object_t *query_snoop(struct object_t *);
 struct object_t *query_snooping(struct object_t *);
 #endif
 
-#ifdef DEBUGMALLOC_EXTENSIONS
-void mark_iptable(void);
-#endif
+[[gnu::deprecated]] inline static void mark_iptable(void) {};
 
 const char *sockaddr_to_string(const sockaddr *addr, ev_socklen_t len);
 

@@ -271,6 +271,7 @@ const T * shared_storage<T, hash>::operator->(void) const
     else
         return &(empty());
 }
+
 template <typename T, class hash>
 bool shared_storage<T, hash>::operator==(const shared_storage<T, hash> &arg) const
 {

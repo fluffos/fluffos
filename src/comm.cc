@@ -18,7 +18,6 @@
 #include <sys/socket.h>          // for SOCK_STREAM
 #include <stdio.h>               // for snprintf, vsnprintf, fwrite, etc
 #include <string.h>              // for NULL, memcpy, strlen, etc
-#include <unistd.h>              // for gethostname
 #include <memory>                // for unique_ptr
 // Network stuff
 #ifndef _WIN32
@@ -1559,14 +1558,6 @@ int new_set_snoop(object_t *by, object_t *victim) {
   return 1;
 } /* set_new_snoop() */
 #endif
-
-char *query_host_name() {
-  static char name[400];
-
-  gethostname(name, sizeof(name));
-  name[sizeof(name) - 1] = '\0'; /* Just to make sure */
-  return (name);
-} /* query_host_name() */
 
 #ifndef NO_SNOOP
 object_t *query_snoop(object_t *ob) {

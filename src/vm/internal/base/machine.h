@@ -61,6 +61,7 @@ void push_number(LPC_INT);
 void push_real(LPC_FLOAT);
 void push_undefined(void);
 void push_string(const std::string);
+inline void push_string(const char *arg) { push_string(std::string(arg));}
 void push_array(array_t *);
 void push_refed_array(array_t *);
 void push_buffer(buffer_t *);
