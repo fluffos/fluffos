@@ -64,3 +64,6 @@ int query_addr_by_name(const char *, struct svalue_t *) |   int query_addr_by_na
 const char *query_ip_name(struct object_t *)            |   const std::string query_ip_name(struct object_t *)
 const char *query_ip_number(struct object_t *)          |   const std::string query_ip_number(struct object_t *)
 char *query_host_name(void)                             |   std::string query_host_name(void)
+
+packages/core/dumpstat.cc:
+void dumpstat(const char *)                             |   void dumpstat(const std::string)

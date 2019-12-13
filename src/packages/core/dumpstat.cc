@@ -28,7 +28,7 @@ static int svalue_size(svalue_t *v) {
     case T_NUMBER:
       return 0;
     case T_STRING:
-      return (strlen(v->u.string) + 1);
+      return (v->u.string->size() + 1);
     case T_ARRAY:
     case T_CLASS:
       if (++depth > 100) {
@@ -108,7 +108,7 @@ int data_size(object_t *ob) {
   return total;
 }
 
-void dumpstat(const char *tfn) {
+void dumpstat(const std::string tfn) {
   FILE *f;
   object_t *ob;
   const char *fn;
@@ -116,14 +116,14 @@ void dumpstat(const char *tfn) {
   int display_hidden;
 #endif
 
-  fn = check_valid_path(tfn, current_object, "dumpallobj", 1);
+  fn = check_valid_path(tfn, current_object, "dumpallobj", 1).c_str();
   if (!fn) {
-    error("Invalid path '/%s' for writing.\n", tfn);
+    error("Invalid path '/{}' for writing.\n", tfn);
     return;
   }
   f = fopen(fn, "w");
   if (!f) {
-    error("Unable to open '/%s' for writing.\n", fn);
+    error("Unable to open '/{}' for writing.\n", fn);
     return;
   }
 
@@ -149,7 +149,7 @@ void dumpstat(const char *tfn) {
     } else {
       tmp = 0;
     }
-    fprintf(f, "%-20s %zu ref %2d %s %s (%d)\n", ob->obname, tmp + data_size(ob) + sizeof(object_t),
+    fmt::print(f, "{:<20} {:} ref {:2} {} {} ({})\n", ob->obname, tmp + data_size(ob) + sizeof(object_t),
             ob->ref, ob->flags & O_HEART_BEAT ? "HB" : "  ",
 #ifndef NO_ENVIRONMENT
             ob->super ? ob->super->obname : "--",

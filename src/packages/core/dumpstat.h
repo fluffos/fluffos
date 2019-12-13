@@ -5,6 +5,6 @@
  * dumpstat.c
  */
 int data_size(struct object_t *);
-void dumpstat(const char *);
+void dumpstat(const std::string);
 
 #endif
