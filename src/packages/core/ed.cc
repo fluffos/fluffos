@@ -550,8 +550,8 @@ static void do_output(char *str) {
 #ifdef RECEIVE_ED
   svalue_t *ret;
 
-  copy_and_push_string(str);
-  copy_and_push_string(P_FNAME);
+  push_string(str);
+  push_string(P_FNAME);
   // One could argue that this should be safe_apply()
   // Pro: ed continues to work with a runtiming receive_ed()
   // Con: "I wrote a receive_ed()!  Why does the driver ignore it??"
@@ -576,7 +576,7 @@ static void free_ed_buffer(object_t *who) {
 #ifdef OLD_ED
   if (ED_BUFFER->write_fn) {
     object_t *exit_ob = ED_BUFFER->exit_ob;
-    FREE(ED_BUFFER->write_fn);
+    delete[] (ED_BUFFER->write_fn);
     free_object(&exit_ob, "ed EOF");
   }
   if (ED_BUFFER->exit_fn) {
@@ -592,7 +592,7 @@ static void free_ed_buffer(object_t *who) {
 
     /* make this "safe" */
     safe_apply(exit_fn, exit_ob, 0, ORIGIN_INTERNAL);
-    FREE(exit_fn);
+    delete[] (exit_fn);
     free_object(&exit_ob, "ed EOF");
     return;
   }
@@ -767,7 +767,7 @@ static int dowrite(int from, int to, const char *fname, int apflg) {
   if (ED_BUFFER->write_fn) {
     svalue_t *res;
 
-    push_malloced_string(add_slash(fname));
+    push_string(add_slash(fname));
     push_number(0);
     res = safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, 2, ORIGIN_INTERNAL);
     if (IS_ZERO(res)) {
@@ -808,7 +808,7 @@ static int dowrite(int from, int to, const char *fname, int apflg) {
 
 #ifdef OLD_ED
   if (ED_BUFFER->write_fn) {
-    push_malloced_string(add_slash(fname));
+    push_string(add_slash(fname));
     push_number(1);
     safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, 2, ORIGIN_INTERNAL);
   }
@@ -876,17 +876,17 @@ static char *getfn(int writeflg) {
   }
 
   if (file[0] != '/') {
-    copy_and_push_string(file);
+    push_string(file);
     ret = apply_master_ob(APPLY_MAKE_PATH_ABSOLUTE, 1);
     if ((ret == nullptr) || (ret == (svalue_t *)-1) || ret->type != T_STRING) {
       return nullptr;
     }
-    strncpy(file, ret->u.string, sizeof file - 1);
+    strncpy(file, ret->u.string->c_str(), sizeof file - 1);
     file[MAXFNAME - 1] = '\0';
   }
 
   /* valid_read/valid_write done here */
-  file2 = check_valid_path(file, current_editor, "ed_start", writeflg);
+  file2 = check_valid_path(file, current_editor, "ed_start", writeflg).c_str();
   if (!file2) {
     return (nullptr);
   }
@@ -2487,13 +2487,19 @@ void ed_start(const char *file_arg, const char *write_fn, const char *exit_fn, i
     P_RESTRICT = 1;
   }
   if (write_fn) {
-    ED_BUFFER->write_fn = alloc_cstring(write_fn, "ed_start");
+    size_t len {strlen(write_fn)+1};
+
+    ED_BUFFER->write_fn = new char[len];
+    strncpy(ED_BUFFER->write_fn, write_fn, len);
     exit_ob->ref++;
   } else {
     ED_BUFFER->write_fn = nullptr;
   }
   if (exit_fn) {
-    ED_BUFFER->exit_fn = alloc_cstring(exit_fn, "ed_start");
+    size_t len {strlen(exit_fn)+1};
+
+    ED_BUFFER->exit_fn = new char[len];
+    strncpy(ED_BUFFER->exit_fn, exit_fn, len);
     exit_ob->ref++;
   } else {
     ED_BUFFER->exit_fn = nullptr;
@@ -2511,7 +2517,7 @@ void ed_start(const char *file_arg, const char *write_fn, const char *exit_fn, i
    * Check for read on startup, since the buffer is read in. But don't
    * check for write, since we may want to change the file name.
    */
-  if (file_arg && (file_arg = check_valid_path(file_arg, current_editor, "ed_start", 0)) &&
+  if (file_arg && (file_arg = check_valid_path(file_arg, current_editor, "ed_start", 0).c_str()) &&
       !doread(0, file_arg)) {
     setCurLn(1);
   }
@@ -2641,13 +2647,13 @@ void save_ed_buffer(object_t *who) {
   current_ed_buffer = who->interactive->ed_buffer;
   current_editor = who;
 
-  push_malloced_string(add_slash(P_FNAME));
+  push_string(add_slash(P_FNAME));
   push_object(who);
   /* must be safe; we get called by remove_interactive() */
   stmp = safe_apply_master_ob(APPLY_GET_ED_BUFFER_SAVE_FILE_NAME, 2);
   if (stmp && stmp != (svalue_t *)-1) {
     if (stmp->type == T_STRING) {
-      fname = stmp->u.string;
+      fname = stmp->u.string->c_str();
       if (*fname == '/') {
         fname++;
       }
@@ -2665,6 +2671,10 @@ static void print_help(int arg) {
   char *outstr;
   int n;
   struct strlst *curp;
+#ifdef RECEIVE_ED
+  svalue_t *ret {nullptr};
+  char *dummy {nullptr};
+#endif
 
   switch (arg) {
     case 'I':
@@ -3002,7 +3012,7 @@ that help is desired for. \n",
               ED_BUFFER->scroll_lines - 1, ED_BUFFER->scroll_lines + 4);
 
 #ifdef RECEIVE_ED
-      copy_and_push_string(edout);
+      push_string(edout);
       push_undefined();
 
       ret = apply(APPLY_RECEIVE_ED, ED_DEST, 2, ORIGIN_DRIVER);
@@ -3013,30 +3023,34 @@ that help is desired for. \n",
         if (ret->u.number == 0) {  // "pass"
           outstr = edout;
         } else {
-          outstr = (char *)0;
+          outstr = nullptr;
         }
       } else if (ret->type == T_STRING) {
-        outstr = (char *)ret->u.string;
+        size_t len {ret->u.string->size() + 1};
+
+        dummy = new char[len];
+        strncpy(dummy, ret->u.string->c_str(), len);
+        outstr = dummy;
       } else if (ret->type == T_ARRAY) {
-        outstr = (char *)0;
+        outstr = nullptr;
 
         curp = P_HELPOUT =
             (struct strlst *)DMALLOC(sizeof(struct strlst), TAG_TEMPORARY, "ed: help");
         curp->screen = 0;
         curp->next = 0;
 
-        for (i = 0; i < ret->u.arr->size; i++) {
+        for (size_t i {0}; i < ret->u.arr->size; i++) {
           if (ret->u.arr->item[i].type != T_STRING) {
             continue;  // dumb.  just skip.
           }
+          size_t len {ret->u.arr->item[i].u.string->size() + 1};
 
           curp->next = (struct strlst *)DMALLOC(sizeof(struct strlst), TAG_TEMPORARY, "ed: help");
           curp = curp->next;
 
           curp->next = 0;
-          curp->screen = DMALLOC(sizeof(char) * (strlen(ret->u.arr->item[i].u.string) + 1),
-                                 TAG_TEMPORARY, "ed: help");
-          strcpy(curp->screen, ret->u.arr->item[i].u.string);
+          curp->screen = static_cast<char*>(DMALLOC(len, TAG_TEMPORARY, "ed: help"));
+          strncpy(curp->screen, ret->u.arr->item[i].u.string->c_str(), len);
         }
 
         curp = P_HELPOUT;
@@ -3104,6 +3118,11 @@ that help is desired for. \n",
         print_help2();
       }
   }
+#ifdef RECEIVE_ED
+  if(dummy != nullptr) {
+      delete[] dummy;
+  }
+#endif
 }
 
 static void print_help2() {
@@ -3217,7 +3236,7 @@ char *object_ed_start(object_t *ob, const char *fname, int restricted, int scrol
    * Check for read on startup, since the buffer is read in. But don't
    * check for write, since we may want to change the file name.
    */
-  if (fname && (fname = check_valid_path(fname, current_editor, "ed_start", 0)) &&
+  if (fname && (fname = check_valid_path(fname, current_editor, "ed_start", 0).c_str()) &&
       !doread(0, fname)) {
     setCurLn(1);
   }
@@ -3238,11 +3257,11 @@ void object_save_ed_buffer(object_t *ob) {
   current_ed_buffer = find_ed_buffer(ob);
   current_editor = ob;
 
-  copy_and_push_string(P_FNAME);
+  push_string(P_FNAME);
   stmp = apply_master_ob(APPLY_GET_ED_BUFFER_SAVE_FILE_NAME, 1);
   if (stmp && stmp != (svalue_t *)-1) {
     if (stmp->type == T_STRING) {
-      fname = stmp->u.string;
+      fname = stmp->u.string->c_str();
       if (*fname == '/') {
         fname++;
       }
@@ -3252,7 +3271,7 @@ void object_save_ed_buffer(object_t *ob) {
   free_ed_buffer(current_editor);
   outbuf_fix(&current_ed_results);
   if (current_ed_results.buffer) {
-    FREE_MSTR(current_ed_results.buffer);
+    free(current_ed_results.buffer);
   }
   outbuf_zero(&current_ed_results);
 }
@@ -3328,7 +3347,7 @@ void f_ed(void) {
     if (!(sp->type == T_STRING)) {
       bad_argument(sp, T_STRING, 1, F_ED);
     }
-    ed_start(sp->u.string, nullptr, nullptr, 0, nullptr, 0);
+    ed_start(sp->u.string->c_str(), nullptr, nullptr, 0, nullptr, 0);
     pop_stack();
   } else if (st_num_arg == 2) {
     /* ed(fname,exitfn) / ed(fname, scroll_lines) */
@@ -3337,9 +3356,9 @@ void f_ed(void) {
     }
 
     if (sp->type == T_STRING) {
-      ed_start((sp - 1)->u.string, nullptr, sp->u.string, 0, current_object, 0);
+      ed_start((sp - 1)->u.string->c_str(), nullptr, sp->u.string->c_str(), 0, current_object, 0);
     } else if (sp->type == T_NUMBER) {
-      ed_start((sp - 1)->u.string, nullptr, nullptr, 0, nullptr, sp->u.number);
+      ed_start((sp - 1)->u.string->c_str(), nullptr, nullptr, 0, nullptr, sp->u.number);
     } else {
       bad_argument(sp, T_NUMBER | T_STRING, 2, F_ED);
     }
@@ -3356,12 +3375,12 @@ void f_ed(void) {
 
     if (sp->type == T_NUMBER) {
       if (sp->u.number == 1) {
-        ed_start((sp - 2)->u.string, nullptr, (sp - 1)->u.string, sp->u.number, current_object, 0);
+        ed_start((sp - 2)->u.string->c_str(), nullptr, (sp - 1)->u.string->c_str(), sp->u.number, current_object, 0);
       } else {
-        ed_start((sp - 2)->u.string, nullptr, (sp - 1)->u.string, 0, current_object, sp->u.number);
+        ed_start((sp - 2)->u.string->c_str(), nullptr, (sp - 1)->u.string->c_str(), 0, current_object, sp->u.number);
       }
     } else if (sp->type == T_STRING) {
-      ed_start((sp - 2)->u.string, (sp - 1)->u.string, sp->u.string, 0, current_object, 0);
+      ed_start((sp - 2)->u.string->c_str(), (sp - 1)->u.string->c_str(), sp->u.string->c_str(), 0, current_object, 0);
     } else {
       bad_argument(sp, T_NUMBER | T_STRING, 3, F_ED);
     }
@@ -3383,10 +3402,10 @@ void f_ed(void) {
     }
 
     if (sp->u.number == 1) {
-      ed_start((sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.string, sp->u.number,
+      ed_start((sp - 3)->u.string->c_str(), (sp - 2)->u.string->c_str(), (sp - 1)->u.string->c_str(), sp->u.number,
                current_object, 0);
     } else {
-      ed_start((sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.string, 0, current_object,
+      ed_start((sp - 3)->u.string->c_str(), (sp - 2)->u.string->c_str(), (sp - 1)->u.string->c_str(), 0, current_object,
                sp->u.number);
     }
     pop_n_elems(4);
@@ -3408,7 +3427,7 @@ void f_ed(void) {
       bad_argument(sp - 4, T_STRING, 1, F_ED);
     }
 
-    ed_start((sp - 4)->u.string, (sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.number,
+    ed_start((sp - 4)->u.string->c_str(), (sp - 3)->u.string->c_str(), (sp - 2)->u.string->c_str(), (sp - 1)->u.number,
              current_object, sp->u.number);
 
     pop_n_elems(5);
@@ -3510,11 +3529,11 @@ void f_in_edit(void) {
 #endif
   if (eb && (fn = eb->fname)) {
     free_object(&sp->u.ob, "f_in_edit:1");
-    put_malloced_string(add_slash(fn));
+    put_string(add_slash(fn));
     return;
   }
   free_object(&sp->u.ob, "f_in_edit:1");
-  *sp = const0;
+  *sp = 0;
   return;
 }
 #endif

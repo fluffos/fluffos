@@ -27,7 +27,8 @@ union u {
   unsigned char *lvalue_byte;
   void (*error_handler)(void);
 
-  ~u() {}
+  u(void) {}
+  ~u(void) {}
 };
 
 /*

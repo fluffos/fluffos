@@ -1299,39 +1299,6 @@ void push_refed_class(array_t *v) {
   sp->u.arr = v;
 }
 
-/*
- * Push a string on the stack that is already malloced.
- */
-void push_malloced_string(const char *p) {
-  STACK_INC;
-  sp->type = T_STRING;
-  sp->u.string = p;
-  sp->subtype = STRING_MALLOC;
-}
-
-/*
- * Pushes a known shared string.  Note that this references, while
- * push_malloced_string doesn't.
- */
-void push_shared_string(const char *p) {
-  STACK_INC;
-  sp->type = T_STRING;
-  sp->u.string = p;
-  sp->subtype = STRING_SHARED;
-  ref_string(p);
-}
-
-/*
- * Push a string on the stack that is already constant.
- */
-
-void push_constant_string(const char *p) {
-  STACK_INC;
-  sp->type = T_STRING;
-  sp->subtype = STRING_CONSTANT;
-  sp->u.string = p;
-}
-
 void do_trace_call(int offset) {
   do_trace("Call direct ", current_prog->function_table[offset].funcname, " ");
   if (TRACEHB) {

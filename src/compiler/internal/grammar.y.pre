@@ -3489,9 +3489,9 @@ efun_override:
         buf += $3;
         yyerror(buf.c_str());
       } else {
-        push_malloced_string(the_file_name(current_file));
+        push_string(the_file_name(current_file));
         push_string($3);
-        push_malloced_string(add_slash(main_file_name()));
+        push_string(add_slash(main_file_name()));
         res = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 3);
         if (!MASTER_APPROVED(res)) {
           yyerror("Invalid simulated efunction override");
@@ -3504,9 +3504,9 @@ efun_override:
     {
       svalue_t *res;
 
-      push_malloced_string(the_file_name(current_file));
-      push_constant_string("new");
-      push_malloced_string(add_slash(main_file_name()));
+      push_string(the_file_name(current_file));
+      push_string("new");
+      push_string(add_slash(main_file_name()));
       res = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 3);
       if (!MASTER_APPROVED(res)) {
         yyerror("Invalid simulated efunction override");

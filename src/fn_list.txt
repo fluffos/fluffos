@@ -44,6 +44,10 @@ vm/internal/base/interpret.cc:
 void copy_and_push_string(const char *)                 |   void push_string(const std::string)
 int is_static(const char *, object_t *)                 |   int is_static(const std::string, object_t *)
 void share_and_push_string(const char *)                |   void push_string(const std::string)
+void push_malloced_string(const char *)                 |   void push_string(const std::string)
+void push_shared_string(const char *)                   |   void push_string(const std::string)
+void push_constant_string(const char *)                 |   void push_string(const std::string)
+char *add_slash(const char *const)                      |   std::string add_slash(const std::string)
 
 packages/core/add_action.cc:
 int parse_command(char *, object_t *)                   |   int parse_command(std::string, object_t *)

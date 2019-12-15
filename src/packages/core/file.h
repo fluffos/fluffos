@@ -4,7 +4,8 @@
  * file.c
  */
 
-const char *check_valid_path(const char *, object_t *, const char *const, int);
+// const char *check_valid_path(const char *, object_t *, const char *const, int);
+const std::string check_valid_path(const std::string, object_t *, const std::string, int);
 void dump_file_descriptors(outbuffer_t *);
 
 char *read_file(const char *, int, int);

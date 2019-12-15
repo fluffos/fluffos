@@ -7,15 +7,18 @@ svalue_t const0{T_NUMBER, 0, {0}};
 svalue_t const1{T_NUMBER, 0, {1}};
 svalue_t const0u{T_NUMBER, T_UNDEFINED, {0}};
 
-svalue_t(void) {
+svalue_t::svalue_t(void) {
     this->type      = T_INVALID;
 }
 
-svalue_t &  operator= (const LPC_INT &arg) {
+svalue_t &  svalue_t::operator= (const LPC_INT &arg) {
+    if(this->type == T_STRING) {
+        this->u.string.~shared_string();
+    }
     this->type = T_NUMBER;
     this->u.number = arg;
 
-    return this;
+    return *this;
 }
 
 /*
@@ -83,31 +86,11 @@ void int_free_svalue(svalue_t *v)
 #endif
 {
   if (v->type == T_STRING) {
-    const char *str = v->u.string;
-
-    if (v->subtype & STRING_COUNTED) {
-      int size = MSTR_SIZE(str);
-      if (DEC_COUNTED_REF(str)) {
-        SUB_STRING(size);
-        NDBG(BLOCK(str));
-        if (v->subtype & STRING_HASHED) {
-          SUB_NEW_STRING(size, sizeof(block_t));
-          deallocate_string(const_cast<char *>(str));
-          CHECK_STRING_STATS;
-        } else {
-          SUB_NEW_STRING(size, sizeof(malloc_block_t));
-          FREE(MSTR_BLOCK(str));
-          CHECK_STRING_STATS;
-        }
-      } else {
-        SUB_STRING(size);
-        NDBG(BLOCK(str));
-      }
-    }
+    v->u.string.~shared_string();
   } else if ((v->type & T_REFED) && !(v->type & T_FREED)) {
 #ifdef DEBUG
     if (v->type == T_OBJECT) {
-      debug(d_flag, "Free_svalue %s (%d) from %s\n", v->u.ob->obname, v->u.ob->ref - 1, tag);
+      debug(d_flag, "Free_svalue {} ({}) from {}\n", v->u.ob->obname, v->u.ob->ref - 1, tag);
     }
 #endif
     /* TODO: Set to 0 on condition that REF overflow to negative. */

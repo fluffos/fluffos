@@ -108,24 +108,19 @@ struct function_lookup_info_t {
 #define STACK_INC SAFE(CHECK_STACK_OVERFLOW(1); sp++;)
 
 #define push_svalue(x) SAFE(STACK_INC; assign_svalue_no_free(sp, x);)
-#define put_number(x) SAFE(sp->type = T_NUMBER; sp->subtype = 0; sp->u.number = (x);)
-#define put_buffer(x) SAFE(sp->type = T_BUFFER; sp->u.buf = (x);)
-#define put_undested_object(x) SAFE(sp->type = T_OBJECT; sp->u.ob = (x);)
+#define put_number(x) SAFE(if(sp->type == T_STRING) sp->u.string.~shared_string(); sp->type = T_NUMBER; sp->subtype = 0; sp->u.number = (x);)
+#define put_buffer(x) SAFE(if(sp->type == T_STRING) sp->u.string.~shared_string(); sp->type = T_BUFFER; sp->u.buf = (x);)
+#define put_undested_object(x) SAFE(if(sp->type == T_STRING) sp->u.string.~shared_string(); sp->type = T_OBJECT; sp->u.ob = (x);)
 #define put_object(x) \
-  SAFE(if (!(x) || (x)->flags & O_DESTRUCTED) *sp = const0u; else put_undested_object(x);)
+  SAFE(if(sp->type == T_STRING) sp->u.string.~shared_string(); if (!(x) || (x)->flags & O_DESTRUCTED) *sp = const0u; else put_undested_object(x);)
 #define put_unrefed_undested_object(x, y) \
-  SAFE(sp->type = T_OBJECT; sp->u.ob = (x); add_ref((x), y);)
+  SAFE(if(sp->type == T_STRING) sp->u.string.~shared_string(); sp->type = T_OBJECT; sp->u.ob = (x); add_ref((x), y);)
 #define put_unrefed_object(x, y)                             \
-  SAFE(if (!(x) || (x)->flags & O_DESTRUCTED) *sp = const0u; \
+  SAFE(if(sp->type == T_STRING) sp->u.string.~shared_string(); if (!(x) || (x)->flags & O_DESTRUCTED) *sp = const0u; \
        else put_unrefed_undested_object(x, y);)
 /* see comments on push_constant_string */
-#define put_constant_string(x) \
-  SAFE(sp->type = T_STRING; sp->subtype = STRING_SHARED; sp->u.string = make_shared_string(x);)
-#define put_malloced_string(x) \
-  SAFE(sp->type = T_STRING; sp->subtype = STRING_MALLOC; sp->u.string = (x);)
-#define put_array(x) SAFE(sp->type = T_ARRAY; sp->u.arr = (x);)
-#define put_shared_string(x) \
-  SAFE(sp->type = T_STRING; sp->subtype = STRING_SHARED; sp->u.string = (x);)
+#define put_string(x)   \
+    SAFE(if(sp->type == T_STRING) sp->u.string.~shared_string(); sp->type = T_STRING; sp->u.string = shared_string {x};)
 
 extern program_t *current_prog;
 extern short caller_type;
@@ -181,7 +176,7 @@ const char *function_exists(const char *, object_t *, int);
 void call_function(program_t *, int);
 void mark_apply_low_cache(void);
 void translate_absolute_line(int, unsigned short *, int *, int *);
-char *add_slash(const char *const);
+std::string add_slash(const std::string);
 int strpref(const char *, const char *);
 void do_trace(const char *, const char *, const char *);
 void opcdump(const char *);
