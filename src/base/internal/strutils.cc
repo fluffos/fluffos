@@ -24,6 +24,7 @@ bool u8_egc_count(const char *src, size_t *count) {
 
   utext_openUTF8(&text, src, -1, &status);
   if (!U_SUCCESS(status)) {
+    utext_close(&text);
     return false;
   }
 
@@ -31,10 +32,12 @@ bool u8_egc_count(const char *src, size_t *count) {
   std::unique_ptr<icu::BreakIterator> brk(
       icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status));
   if (!U_SUCCESS(status)) {
+    utext_close(&text);
     return false;
   }
   brk->setText(&text, status);
   if (!U_SUCCESS(status)) {
+    utext_close(&text);
     return false;
   }
   brk->first();
@@ -42,6 +45,7 @@ bool u8_egc_count(const char *src, size_t *count) {
 
   *count = total;
 
+  utext_close(&text);
   return true;
 }
 
@@ -77,17 +81,20 @@ int32_t u8_egc_index_to_offset(const char *src, int32_t index) {
 
   utext_openUTF8(&text, src, -1, &status);
   if (!U_SUCCESS(status)) {
+    utext_close(&text);
     return -1;
   }
 
   std::unique_ptr<icu::BreakIterator> brk(
       icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status));
   if (!U_SUCCESS(status)) {
+    utext_close(&text);
     return -1;
   }
 
   brk->setText(&text, status);
   if (!U_SUCCESS(status)) {
+    utext_close(&text);
     return -1;
   }
 
@@ -96,6 +103,7 @@ int32_t u8_egc_index_to_offset(const char *src, int32_t index) {
     pos = brk->next();
   }
 
+  utext_close(&text);
   return pos;
 }
 
