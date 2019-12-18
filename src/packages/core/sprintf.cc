@@ -614,7 +614,8 @@ static int add_column(cst **column, int trailing) {
       break;
     }
   }
-  int swidth = u8_width(col_d);
+  // TODO: Support UTF-8
+  int swidth = done;
   add_justified(col_d, swidth, done, col->pad, col->size, col->info, trailing || col->next);
   col_d += done;
   ret = 1;
@@ -657,7 +658,8 @@ static int add_table(cst **table) {
     end = tab_d[i + 1].start - tab_di - 1;
     for (done = 0; done != end && tab_di[done] != '\n'; done++)
       ;
-    auto swidth = u8_width(tab_di);
+    // TODO: support UTF8
+    auto swidth = (done > tab->size ? tab->size : done);
     add_justified(tab_di, swidth, (done > tab->size ? tab->size : done), tab->pad, tab->size,
                   tab->info, tab->pad || (i < tab->nocols - 1) || tab->next);
     if (done >= end - 1) {
@@ -1041,9 +1043,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
               (*temp)->pres = (pres) ? pres : fs;
               (*temp)->info = finfo;
               (*temp)->start = get_curpos();
-#ifdef TCC
-              puts("tcc has some bugs");
-#endif
+
               tmp = ((format_str[fpos] != '\n') && (format_str[fpos] != '\0')) ||
                     ((finfo & INFO_ARRAY) &&
                      (nelemno < (argv + sprintf_state->cur_arg)->u.arr->size));
