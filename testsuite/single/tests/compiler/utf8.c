@@ -195,17 +195,46 @@ Box drawing alignment tests:                                          █
   ╚══╩══╝  └──┴──┘  ╰──┴──╯  ╰──┴──╯  ┗━━┻━━┛           └╌╌┘ ╎ ┗╍╍┛ ┋  ▁▂▃▄▅▆▇█
 UTF8;
 
+string text8_cp1 = @UNICODE
+\U0001f600
+UNICODE;
+
+string* text8_cp2 = @@UNICODE
+\uD83D
+UNICODE;
+
+string text8_str = @UNICODE
+😀​😁​😂​😃​😄​😅​😆​😇​😈​😉​😊​😋​😌​😍​😎​😏​😐​😑​😒​😓​😔​😕​😖​😗​😘​😙​😚​😛​😜​😝​😞​😟​😠​😡
+​😢​😣​😤​😥​😦​😧​😨​😩​😪​😫​😬​😭​😮​😯​😰​😱​😲​😳​😴​😵​😶​😷​😸​😹​😺​😻​😼​😽​😾​😿​🙀​🙁​🙂​🙃
+​🙄​🙅​🙆​🙇​🙈​🙉​🙊​🙋​🙌​🙍​🙎​🙏
+UNICODE;
+
 void do_tests() {
   string tmp;
+
+  // string block don't process \U and \u
+  ASSERT_EQ("\\U", text8_cp1[0..1]);
+  // string block don't process \U and \u
+  ASSERT_EQ("\\u", text8_cp2[0][0..1]);
+
   // strlen
   ASSERT_EQ(74, strlen(text1));
   ASSERT_EQ(92, strlen(text2));
   ASSERT_EQ(76, strlen(text3));
   ASSERT_EQ(31, strlen(text4));
   ASSERT_EQ(17, sizeof(text5));
-  ASSERT_EQ(4901, sizeof(text6));
+  ASSERT_EQ(4801, sizeof(text6));
   ASSERT_EQ(strlen(text6), sizeof(text6));
   ASSERT_EQ(688, sizeof(text7));
+  ASSERT_EQ(162, sizeof(text8_str));
+
+  // Multi codepoint emoji
+  tmp = "👩‍👩‍👧‍👧";
+  ASSERT_EQ(1, strlen(tmp));
+
+  // INDEX doesn't work with multi-codepoint character.
+  ASSERT(catch(tmp[0] = 'a'));
+
   // INDEX
   ASSERT_EQ(22909, "好"[0]);
   ASSERT_EQ("⋅"[0], text1[3]);
@@ -275,6 +304,31 @@ void do_tests() {
   // upper_case
 
   // lower_case
+
+  // printf/sprintf
+  tmp = "欲穷千里目🍆🍠🧮😊👌💩更上一层楼";
+  ASSERT_EQ(tmp, sprintf("%s", tmp));
+  ASSERT_EQ("\"" + tmp + "\"", sprintf("%O", tmp));
+  // truncation
+  ASSERT_EQ(tmp, sprintf("%.10s", tmp));
+
+  // left, center, and right adjustment,
+  // and count CJK chars and emojis as 2 width,  40 - 16 * 2 = 8
+  ASSERT_EQ(repeat_string(" ", 4) + tmp + repeat_string(" ", 4), sprintf("%40|s", tmp));
+  ASSERT_EQ(repeat_string(" ", 8) + tmp, sprintf("%40s", tmp));
+  ASSERT_EQ(tmp + repeat_string(" ", 8), sprintf("%-40s", tmp));
+
+  // adjustment works with grapheme cluster, not codepoints
+  tmp = "欲穷a千里v目👩‍👩‍👧‍👧更上一层楼c";
+  // correct with is 10 * 2 (cjk) + 2 (emoji) + 3 (ascii) = 25, field size = 40, 40 - 25 = 15
+  ASSERT_EQ(repeat_string(" ", 8) + tmp + repeat_string(" ", 7), sprintf("%40|s", tmp));
+  ASSERT_EQ(repeat_string(" ", 15) + tmp, sprintf("%40s", tmp));
+  ASSERT_EQ(tmp + repeat_string(" ", 15), sprintf("%-40s", tmp));
+
+  // TODO: padding with utf8 chars!
+
+  // char
+  ASSERT_EQ(tmp[0..0], sprintf("%c", tmp[0]));
 
   // repeat_string
   ASSERT_EQ(text4 + repeat_string(text4, 2), repeat_string(text4, 3));

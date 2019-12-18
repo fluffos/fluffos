@@ -522,7 +522,7 @@ refed_t *lv_owner;
 
 // LVALUE points to an character(codepoint) in string
 static struct {
-  int32_t offset;
+  int32_t index;
   svalue_t *owner;
 } global_lvalue_codepoint;
 static svalue_t global_lvalue_codepoint_sv = {T_LVALUE_CODEPOINT};
@@ -560,7 +560,7 @@ void push_indexed_lvalue(int reverse) {
     switch (lv->type) {
       case T_STRING: {
         size_t count;
-        auto success = u8_codepoints((const uint8_t *)lv->u.string, &count);
+        auto success = u8_egc_count(lv->u.string, &count);
         DEBUG_CHECK(!success, "Bad UTF-8 String: push_indexed_lvalue");
 
         if (reverse) {
@@ -569,10 +569,14 @@ void push_indexed_lvalue(int reverse) {
         if (ind >= count || ind < 0) {
           error("Index out of bounds in string index lvalue.\n");
         }
+        UChar32 c = u8_egc_index_as_single_codepoint(lv->u.string, ind);
+        if (c < 0) {
+          error("Indexed character is multi-codepoint.\n");
+        }
         unlink_string_svalue(lv);
         sp->type = T_LVALUE;
         sp->u.lvalue = &global_lvalue_codepoint_sv;
-        global_lvalue_codepoint.offset = ind;
+        global_lvalue_codepoint.index = ind;
         global_lvalue_codepoint.owner = lv;
 #ifdef REF_RESERVED_WORD
         lv_owner_type = T_STRING;
@@ -721,7 +725,7 @@ static void push_lvalue_range(int code) {
         break;
       case T_STRING: {
         size = SVALUE_STRLEN(lv);
-        auto success = u8_codepoints(reinterpret_cast<const uint8_t *>(lv->u.string), &u8len);
+        auto success = u8_egc_count(lv->u.string, &u8len);
         if (!success) {
           error("Invalid UTF-8 String: push_lvalue_range");
         }
@@ -751,7 +755,10 @@ static void push_lvalue_range(int code) {
           "The 2nd index to range lvalue must be >= -1 and < sizeof(indexed "
           "value)\n");
     }
-    ind2 = u8_codepoint_index_to_offset(reinterpret_cast<const uint8_t *>(lv->u.string), ind2);
+    ind2 = u8_egc_index_to_offset(lv->u.string, ind2);
+    if (ind2 < 0) {
+      error("push_lvalue_range: invalid ind2");
+    }
   } else {
     ind2 = (code & 0x01) ? (size - sp->u.number) : sp->u.number;
     if (++ind2 < 0 || (ind2 > size)) {
@@ -773,7 +780,10 @@ static void push_lvalue_range(int code) {
           "The 1st index to range lvalue must be >= 0 and <= sizeof(indexed "
           "value)\n");
     }
-    ind1 = u8_codepoint_index_to_offset(reinterpret_cast<const uint8_t *>(lv->u.string), ind1);
+    ind1 = u8_egc_index_to_offset(lv->u.string, ind1);
+    if (ind1 < 0) {
+      error("push_lvalue_range: invalid ind1");
+    }
   } else {
     ind1 = (code & 0x10) ? (size - sp->u.number) : sp->u.number;
     if (ind1 < 0 || ind1 > size) {
@@ -935,10 +945,10 @@ void copy_lvalue_range(svalue_t *from) {
 template <typename F>
 void assign_lvalue_codepoint(F &&func) {
   {
-    UChar32 c = u8_codepoint_at((const uint8_t *)global_lvalue_codepoint.owner->u.string,
-                                global_lvalue_codepoint.offset);
+    UChar32 c = u8_egc_index_as_single_codepoint(global_lvalue_codepoint.owner->u.string,
+                                                 global_lvalue_codepoint.index);
     if (c < 0) {
-      error("Invalid string index.\n");
+      error("Invalid string index, multi-codepoint character.\n");
     }
     auto old_len = U8_LENGTH(c);
     DEBUG_CHECK(old_len == 0, "Invalid UTF-8 Codepoint: assign_lvalue_codepoint");
@@ -954,8 +964,8 @@ void assign_lvalue_codepoint(F &&func) {
     }
     auto res = new_string(SVALUE_STRLEN(global_lvalue_codepoint.owner) - old_len + new_len,
                           "assign_lvalue_codepoint");
-    u8_copy_and_replace_codepoint_at((const uint8_t *)global_lvalue_codepoint.owner->u.string,
-                                     (uint8_t *)res, global_lvalue_codepoint.offset, c);
+    u8_copy_and_replace_codepoint_at(global_lvalue_codepoint.owner->u.string, res,
+                                     global_lvalue_codepoint.index, c);
 
     free_string_svalue(global_lvalue_codepoint.owner);
     global_lvalue_codepoint.owner->u.string = res;
@@ -3156,15 +3166,17 @@ void eval_instruction(char *p) {
             }
             i = (sp - 1)->u.number;
             size_t codepoints;
-            auto success = u8_codepoints((const uint8_t *)sp->u.string, &codepoints);
+            auto success = u8_egc_count(sp->u.string, &codepoints);
             if (!success) {
               error("Bad UTF-8 String: f_index.");
             }
             if (i > codepoints || i < 0) {
               error("String index out of bounds.\n");
             }
-            UChar32 res = u8_codepoint_at((const uint8_t *)sp->u.string, i);
-            DEBUG_CHECK(res < 0, "f_idnex: u8_codepoint_at failed!");
+            UChar32 res = u8_egc_index_as_single_codepoint(sp->u.string, i);
+            if (res < 0) {
+              error("String index only work for single codepoint character");
+            }
             free_string_svalue(sp);
             (--sp)->u.number = res;
             break;
@@ -3222,13 +3234,18 @@ void eval_instruction(char *p) {
               error("Indexing a string with an illegal type.\n");
             }
             size_t count;
-            auto success = u8_codepoints((const uint8_t *)sp->u.string, &count);
-            DEBUG_CHECK(!success, "Invalid UTF8 string: f_rindex");
+            auto success = u8_egc_count(sp->u.string, &count);
+            if (!success) {
+              error("Invalid UTF8 string: f_rindex");
+            }
             i = count - (sp - 1)->u.number;
             if ((i > count) || (i < 0)) {
               error("String index out of bounds.\n");
             }
-            UChar32 c = u8_codepoint_at((const uint8_t *)sp->u.string, i);
+            UChar32 c = u8_egc_index_as_single_codepoint(sp->u.string, i);
+            if (c < 0) {
+              error("String index only work for single codepoint character.");
+            }
             free_string_svalue(sp);
             (--sp)->u.number = c;
             break;

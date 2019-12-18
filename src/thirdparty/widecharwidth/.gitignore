@@ -1,0 +1,8 @@
+UnicodeData.txt
+EastAsianWidth.txt
+emoji-data.txt
+gen_unicode_tables.lua
+luas/
+tester
+wcwidth9.h
+

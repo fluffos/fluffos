@@ -27,6 +27,7 @@
 #include <unistd.h>  // for read(), FIXME
 #include <vector>
 #include <algorithm>  // for std::sort
+#include <unicode/ustring.h>
 
 #include "include/function.h"
 #include "efuns.autogen.h"
