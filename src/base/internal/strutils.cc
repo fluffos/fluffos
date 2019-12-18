@@ -136,7 +136,7 @@ size_t u8_width(const char *src) {
     if (c == 0x200d || prev == 0x200d) {  // zwj, skip the next character
       continue;
     }
-    size_t width = widechar_wcwidth(c);
+    auto width = widechar_wcwidth(c);
     if (width > 0) {
       total += width;
     } else if (width == widechar_ambiguous) {
