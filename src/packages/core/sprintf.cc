@@ -67,8 +67,8 @@ typedef unsigned int format_info;
  *                              0010 : percent sign, null argument;
  *                              0011 : LPC datatype;
  *                              0100 : string;
+ *                              0101 : char;
  *                              1000 : integer;
- *                              1001 : char;
  *                              1010 : octal;
  *                              1011 : hex;
  *                              1100 : HEX;
@@ -91,8 +91,8 @@ typedef unsigned int format_info;
 #define INFO_T_NULL 0x2
 #define INFO_T_LPC 0x3
 #define INFO_T_STRING 0x4
+#define INFO_T_CHAR 0x5
 #define INFO_T_INT 0x8
-#define INFO_T_CHAR 0x9
 #define INFO_T_OCT 0xA
 #define INFO_T_HEX 0xB
 #define INFO_T_C_HEX 0xC
@@ -123,8 +123,9 @@ typedef unsigned int format_info;
 #define ERR_UNEXPECTED_EOS 0xB     /* fs terminated unexpectedly */
 #define ERR_NULL_PS 0xC            /* pad string is null */
 #define ERR_ARRAY_EXPECTED 0xD     /* Yep!  You guessed it. */
+#define ERR_INVALID_ARG_C 0xE      /* Invalid arg to %c */
 #define ERR_RECOVERY_ONLY            \
-  0xE /* err msg already done...just \
+  0xF /* err msg already done...just \
        * recover */
 
 #define ADD_CHAR(x)                                                                            \
@@ -177,8 +178,8 @@ typedef struct _sprintf_state {
 static sprintf_state_t *sprintf_state = nullptr;
 
 static void add_space(outbuffer_t * /*outbuf*/, int indent);
-static void add_justified(const char *str, int slen, pad_info_t *pad, int fs, format_info finfo,
-                          short int trailing);
+static void add_justified(const char *str, int swidth, int slen, pad_info_t *pad, int fs,
+                          format_info finfo, short int trailing);
 static int add_column(cst **column, int trailing);
 static int add_table(cst **table);
 
@@ -269,6 +270,9 @@ static void sprintf_error(int which, char *premade) {
       break;
     case ERR_ARRAY_EXPECTED:
       err = "Array expected.";
+      break;
+    case ERR_INVALID_ARG_C:
+      err = "Incorrect argument to type %%c, must be valid UTF8 char.";
       break;
     case ERR_RECOVERY_ONLY:
       err = premade;
@@ -517,14 +521,8 @@ static void add_nstr(const char *str, int len) {
  * "str" is unmodified.  trailing is, of course, ignored in the case
  * of right justification.
  */
-static void add_justified(const char *str, int slen, pad_info_t *pad, int fs, format_info finfo,
-                          short int trailing) {
-#ifdef USE_ICONV
-  int skip = 0;
-  int wide = 0;
-  const char *p2 = str + slen;
-#endif
-
+static void add_justified(const char *str, int swidth, int slen, pad_info_t *pad, int fs,
+                          format_info finfo, short int trailing) {
   // Strip ANSI codes from input string.
   // https://en.wikipedia.org/wiki/ANSI_escape_code#Colors
   // format is "\x1b[X;Ym"
@@ -549,27 +547,7 @@ static void add_justified(const char *str, int slen, pad_info_t *pad, int fs, fo
       str_a++;
     }
   }
-
-#ifdef USE_ICONV
-  while (p2 > str) {
-    if ((*p2) & 0x80) {
-      wide = 1;
-      skip++;
-    } else {
-      if (wide) {
-        wide = 0;
-        skip--;
-      }
-    }
-    p2--;
-  }
-  if (wide) {
-    skip--;
-  }
-  fs -= (slen - skip);
-#else
-  fs -= slen;
-#endif
+  fs -= swidth;
   if (fs <= 0) {
     add_nstr(str, slen);
   } else {
@@ -621,27 +599,12 @@ static int add_column(cst **column, int trailing) {
   const char *col_d = col->d.col; /* always holds (col->d.col) */
 
   done = 0;
-#ifdef USE_ICONV
-  int width = 0;
-#endif
   /* find a good spot to break the line */
   while ((c = col_d[done]) && c != '\n') {
     if (c == ' ') {
       space = done;
     }
-#ifdef USE_ICONV
-    if (c & 0x80) {
-      if (!(col_d[done + 1] & 0x80)) {
-        width++;
-      }
-    } else {
-      width++;
-    }
-    done++;
-    if (width == col->pres) {
-#else
     if (++done == col->pres) {
-#endif
       if (space != -1) {
         c = col_d[done];
         if (c != '\n' && c != ' ' && c) {
@@ -651,7 +614,9 @@ static int add_column(cst **column, int trailing) {
       break;
     }
   }
-  add_justified(col_d, done, col->pad, col->size, col->info, trailing || col->next);
+  // TODO: Support UTF-8
+  int swidth = done;
+  add_justified(col_d, swidth, done, col->pad, col->size, col->info, trailing || col->next);
   col_d += done;
   ret = 1;
   if (*col_d == '\n') {
@@ -688,36 +653,15 @@ static int add_table(cst **table) {
   tab_data_t *tab_d = tab->d.tab; /* always tab->d.tab */
   const char *tab_di;             /* always tab->d.tab[i].cur */
   int end;
-#ifdef USE_ICONV
-  int width, tabwidth;
-#endif
 
   for (i = 0; i < tab->nocols && (tab_di = tab_d[i].cur); i++) {
     end = tab_d[i + 1].start - tab_di - 1;
-#ifdef USE_ICONV
-    width = 0;
-#endif
     for (done = 0; done != end && tab_di[done] != '\n'; done++)
-#ifdef USE_ICONV
-    {
-      if (tab_di[done] & 0x80) {
-        if (!(tab_di[done + 1] & 0x80)) {
-          width++;
-        }
-      } else {
-        width++;
-      }
-      if (width == tab->size) {
-        tabwidth = done + 1;
-      }
-    }
-    add_justified(tab_di, (width > tab->size ? tabwidth : done), tab->pad, tab->size, tab->info,
-                  tab->pad || (i < tab->nocols - 1) || tab->next);
-#else
       ;
-    add_justified(tab_di, (done > tab->size ? tab->size : done), tab->pad, tab->size, tab->info,
-                  tab->pad || (i < tab->nocols - 1) || tab->next);
-#endif
+    // TODO: support UTF8
+    auto swidth = (done > tab->size ? tab->size : done);
+    add_justified(tab_di, swidth, (done > tab->size ? tab->size : done), tab->pad, tab->size,
+                  tab->info, tab->pad || (i < tab->nocols - 1) || tab->next);
     if (done >= end - 1) {
       tab_di = nullptr;
     } else {
@@ -755,30 +699,6 @@ static int get_curpos() {
   }
   p1 = sprintf_state->obuff.buffer + sprintf_state->obuff.real_size - 1;
   p2 = p1;
-#ifdef USE_ICONV
-  int skip = 0;
-  int wide = 0;
-  while (p2 > sprintf_state->obuff.buffer && *p2 != '\n') {
-    if ((*p2) & 0x80) {
-      wide = 1;
-      skip++;
-    } else {
-      if (wide) {
-        wide = 0;
-        skip--;
-      }
-    }
-    p2--;
-  }
-  if (wide) {
-    skip--;
-  }
-  if (*p2 != '\n') {
-    return p1 - p2 + 1 - skip;
-  } else {
-    return p1 - p2 - skip;
-  }
-#else
   while (p2 > sprintf_state->obuff.buffer && *p2 != '\n') {
     p2--;
   }
@@ -788,7 +708,6 @@ static int get_curpos() {
   } else {
     return p1 - p2;
   }
-#endif
 }
 
 /* We can't use a pointer to a local in a table or column, since it
@@ -1085,7 +1004,6 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
           ADD_CHAR('%');
 #endif
         } else if ((finfo & INFO_T) == INFO_T_STRING) {
-          int slen;
           /*
            * %s null handling added 930709 by Luke Mewburn
            * <zak@rmit.oz.au>
@@ -1098,7 +1016,8 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
           } else if (carg->type != T_STRING) {
             SPRINTF_ERROR(ERR_INCORRECT_ARG_S);
           }
-          slen = SVALUE_STRLEN(carg);
+          int swidth = u8_width(carg->u.string);
+          int slen = SVALUE_STRLEN(carg);
           if ((finfo & INFO_COLS) || (finfo & INFO_TABLE)) {
             cst **temp;
 
@@ -1124,9 +1043,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
               (*temp)->pres = (pres) ? pres : fs;
               (*temp)->info = finfo;
               (*temp)->start = get_curpos();
-#ifdef TCC
-              puts("tcc has some bugs");
-#endif
+
               tmp = ((format_str[fpos] != '\n') && (format_str[fpos] != '\0')) ||
                     ((finfo & INFO_ARRAY) &&
                      (nelemno < (argv + sprintf_state->cur_arg)->u.arr->size));
@@ -1230,36 +1147,38 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
 
               add_table(temp);
             }
-          } else {                             /* not column or table */
-            const char *tmp = carg->u.string;  // work around tcc bug;
-#ifdef USE_ICONV
-            int width = 0;
-            int i;
-            if (pres) {
-              for (i = 0; i < slen && width != pres; i++) {
-                if (tmp[i] & 0x80) {
-                  if (!(tmp[i + 1] & 0x80)) {
-                    width++;
-                  }
-                } else {
-                  width++;
-                }
-              }
-              if (width == pres) {
-                slen = i;
-              }
+          } else { /* not column or table */
+            if (pres && pres < swidth) {
+              swidth = pres;
             }
-#else
-            if (pres && pres < slen) {
-              slen = pres;
-            }
-#endif
-            add_justified(tmp, slen, &pad, fs, finfo,
+            add_justified(carg->u.string, swidth, slen, &pad, fs, finfo,
                           (((format_str[fpos] != '\n') && (format_str[fpos] != '\0')) ||
                            ((finfo & INFO_ARRAY) &&
                             (nelemno < (argv + sprintf_state->cur_arg)->u.arr->size))) ||
                               (slen && (carg->u.string[slen - 1] != '\n')));
           }
+        } else if ((finfo & INFO_T) == INFO_T_CHAR) {
+          if (carg->type != T_NUMBER) {
+            SPRINTF_ERROR(ERR_INVALID_ARG_C);
+          }
+          /* write UTF8 codepoint */
+          char temp[4 + 1] = {0};
+          UChar32 c = carg->u.number;
+
+          if (c == 0 || !u_isdefined(c)) {
+            SPRINTF_ERROR(ERR_INVALID_ARG_C);
+          }
+          size_t offset = 0;
+          U8_APPEND_UNSAFE(temp, offset, c);
+          temp[4] = 0;
+
+          int tmpl = strlen(temp);
+          int swidth = u8_width(temp);
+
+          add_justified(
+              temp, swidth, tmpl, &pad, fs, finfo,
+              (((format_str[fpos] != '\n') && (format_str[fpos] != '\0')) ||
+               ((finfo & INFO_ARRAY) && (nelemno < (argv + sprintf_state->cur_arg)->u.arr->size))));
         } else if (finfo & INFO_T_INT) {
           /* one of the integer
            * types */
@@ -1298,9 +1217,6 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
               /* make sure to print out at least 64bits. */
               cheat[i++] = 'l';
               cheat[i++] = 'f';
-              break;
-            case INFO_T_CHAR:
-              cheat[i++] = 'c';
               break;
             case INFO_T_OCT:
               cheat[i++] = 'l';
@@ -1349,8 +1265,9 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
           }
           {
             int tmpl = strlen(temp);
+            int swidth = u8_width(temp);
 
-            add_justified(temp, tmpl, &pad, fs, finfo,
+            add_justified(temp, swidth, tmpl, &pad, fs, finfo,
                           (((format_str[fpos] != '\n') && (format_str[fpos] != '\0')) ||
                            ((finfo & INFO_ARRAY) &&
                             (nelemno < (argv + sprintf_state->cur_arg)->u.arr->size))));

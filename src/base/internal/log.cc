@@ -55,8 +55,14 @@ void debug_message(const char *fmt, ...) {
   }
   va_end(args1);
 
+#ifndef _WIN32
   vfprintf(stderr, fmt, args2);
   fflush(stderr);
+#else
+  // TODO: figure out how to output utf8 properly
+  vfprintf(stderr, fmt, args2);
+  fflush(stderr);
+#endif
   va_end(args2);
 }
 

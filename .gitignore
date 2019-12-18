@@ -1,6 +1,7 @@
 /.idea
 # default build directory
 /build
+/build*
 # default idea build directory
 /cmake-build-*
 

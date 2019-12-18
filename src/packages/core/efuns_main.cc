@@ -2517,7 +2517,7 @@ void f_sizeof(void) {
       break;
 #endif
     case T_STRING: {
-      auto success = u8_codepoints((const uint8_t *)sp->u.string, &i);
+      auto success = u8_egc_count(sp->u.string, &i);
       DEBUG_CHECK(!success, "Invalid UTF8 string!");
       free_string_svalue(sp);
       break;

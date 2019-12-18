@@ -627,7 +627,7 @@ void f_range(int code) {
       size_t len;
       const char *res = sp->u.string;
 
-      auto success = u8_codepoints(reinterpret_cast<const uint8_t *>(res), &len);
+      auto success = u8_egc_count(res, &len);
       if (!success) {
         error("Invalid UTF-8 string: f_range");
       }
@@ -669,12 +669,17 @@ void f_range(int code) {
       }
 
       if (to >= len - 1) {
-        auto offset = u8_codepoint_index_to_offset(reinterpret_cast<const uint8_t *>(res), from);
+        auto offset = u8_egc_index_to_offset(res, from);
+        if (offset < 0) {
+          error("f_range: invalid offset");
+        }
         put_malloced_string(string_copy(res + offset, "f_range"));
       } else {
-        auto start = u8_codepoint_index_to_offset(reinterpret_cast<const uint8_t *>(res), from);
-        auto end = u8_codepoint_index_to_offset(reinterpret_cast<const uint8_t *>(res),
-                                                from + (to - from + 1));
+        auto start = u8_egc_index_to_offset(res, from);
+        auto end = u8_egc_index_to_offset(res, from + (to - from + 1));
+        if (start < 0 || end < 0) {
+          error("f_range: invalid offset");
+        }
         char *tmp = new_string(end - start, "f_range");
         strncpy(tmp, res + start, end - start);
         tmp[end - start] = '\0';
@@ -764,7 +769,7 @@ void f_extract_range(int code) {
       size_t len;
 
       const char *res = sp->u.string;
-      auto success = u8_codepoints(reinterpret_cast<const uint8_t *>(res), &len);
+      auto success = u8_egc_count(res, &len);
       if (!success) {
         error("Invalid UTF-8 String: f_extract_range.");
       }
@@ -788,7 +793,10 @@ void f_extract_range(int code) {
         sp->subtype = STRING_CONSTANT;
         sp->u.string = "";
       } else {
-        auto offset = u8_codepoint_index_to_offset(reinterpret_cast<const uint8_t *>(res), from);
+        auto offset = u8_egc_index_to_offset(res, from);
+        if (offset < 0) {
+          error("f_range: invalid offset");
+        }
         put_malloced_string(string_copy(res + offset, "f_extract_range"));
       }
       free_string_svalue(sp + 1);
