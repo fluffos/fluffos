@@ -337,7 +337,7 @@ void f_pcre_cache(void) {
 
 // Internal functions utilized by the efuns
 static pcre *pcre_local_compile(pcre_t *p) {
-  p->re = pcre_compile(p->pattern, 0, &p->error, &p->erroffset, nullptr);
+  p->re = pcre_compile(p->pattern, PCRE_UTF8, &p->error, &p->erroffset, nullptr);
 
   return p->re;
 }
@@ -353,13 +353,7 @@ static int pcre_local_exec(pcre_t *p) {
   p->ovector = (int *)DCALLOC(size + 1, sizeof(int), TAG_TEMPORARY,
                               "pcre_local_exec");  // too much, but who cares
   p->ovecsize = size;
-  p->rc = pcre_exec(p->re, nullptr, p->subject, p->s_length, 0,
-#ifndef USE_ICONV
-                    PCRE_NO_UTF8_CHECK,
-#else
-                    0,
-#endif
-                    p->ovector, size);
+  p->rc = pcre_exec(p->re, nullptr, p->subject, p->s_length, 0, 0, p->ovector, size);
 
   return p->rc;
 }
