@@ -6,6 +6,7 @@
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
 #include <string>
+#include <unicode/ucnv.h>
 
 #include "comm.h"
 #include "packages/core/mssp.h"
@@ -38,11 +39,33 @@ struct telnet_t *net_telnet_init(interactive_t *user) {
 static const int ANSI_SUBSTITUTE = 0x20;
 
 static inline void on_telnet_data(const char *buffer, unsigned long size, interactive_t *ip) {
-  for (int i = 0; i < size; i++) {
-    auto c = static_cast<unsigned char>(buffer[i]);
+  char *transdata = const_cast<char *>(buffer);
+  auto translen = size;
+
+  // Handle charset transcoding
+  if (ip->trans) {
+    UErrorCode error_code = U_ZERO_ERROR;
+    translen = ucnv_toAlgorithmic(UConverterType::UCNV_UTF8, ip->trans, nullptr, 0, buffer, size,
+                                  &error_code);
+    if (error_code == U_BUFFER_OVERFLOW_ERROR) {
+      error_code = U_ZERO_ERROR;
+      transdata = (char *)DMALLOC(translen, TAG_TEMPORARY, "on_telnet_data: transcoding");
+      auto written = ucnv_toAlgorithmic(UConverterType::UCNV_UTF8, ip->trans, transdata, translen,
+                                        buffer, size, &error_code);
+      DEBUG_CHECK(written != translen, "Bug: translation buffer size calculation error");
+      if (U_FAILURE(error_code)) {
+        debug_message("add_message: Translation failed!");
+        transdata = const_cast<char *>(buffer);
+        translen = size;
+      };
+    }
+  }
+
+  for (int i = 0; i < translen; i++) {
+    auto c = static_cast<unsigned char>(transdata[i]);
     switch (c) {
-      case 0x08:
-      case 0x7f:
+      case 0x08:  // BACKSPACE
+      case 0x7f:  // DEL
         if (ip->iflags & SINGLE_CHAR) {
           ip->text[ip->text_end++] = c;
         } else {
@@ -61,6 +84,9 @@ static inline void on_telnet_data(const char *buffer, unsigned long size, intera
         ip->text[ip->text_end++] = c;
         break;
     }
+  }
+  if (transdata != buffer) {
+    FREE(transdata);
   }
 }
 
