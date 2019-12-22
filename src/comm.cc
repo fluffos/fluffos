@@ -33,6 +33,7 @@
 #include "interactive.h"
 #include "thirdparty/libtelnet/libtelnet.h"
 #include "net/telnet.h"
+#include "net/websocket.h"
 #include "user.h"
 #include "vm/vm.h"
 
@@ -47,7 +48,6 @@ extern void update_load_av();
  */
 static char *get_user_command(interactive_t * /*ip*/);
 static char *first_cmd_in_buf(interactive_t * /*ip*/);
-static int cmd_in_buf(interactive_t * /*ip*/);
 static int call_function_interactive(interactive_t * /*i*/, char * /*str*/);
 static void print_prompt(interactive_t * /*ip*/);
 
@@ -153,16 +153,15 @@ void on_user_events(bufferevent *bev, short events, void *arg) {
   }
 }
 
-void new_user_event_listener(interactive_t *user) {
-  auto bev = bufferevent_socket_new(g_event_base, user->fd,
-                                    BEV_OPT_CLOSE_ON_FREE | BEV_OPT_DEFER_CALLBACKS);
+void new_user_event_listener(event_base *base, interactive_t *user) {
+  auto bev =
+      bufferevent_socket_new(base, user->fd, BEV_OPT_CLOSE_ON_FREE | BEV_OPT_DEFER_CALLBACKS);
   bufferevent_setcb(bev, on_user_read, on_user_write, on_user_events, user);
   bufferevent_enable(bev, EV_READ | EV_WRITE);
 
   bufferevent_set_timeouts(bev, nullptr, nullptr);
 
   user->ev_buffer = bev;
-  user->ev_command = evtimer_new(g_event_base, on_user_command, user);
 }
 
 /*
@@ -193,6 +192,38 @@ void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
     }
   }
 
+  if (port->kind == PORT_WEBSOCKET) {
+    // For websocket connections, wait until they are handshake finished.
+    init_user_websocket(port->lws_context, fd);
+    return;
+  } else {
+    // For other connections go straight to no handshake necessary, schedule to logon.
+    auto base = evconnlistener_get_base(listener);
+
+    auto user = new_user(port, fd, addr, addrlen);
+    new_user_event_listener(base, user);
+
+    if (user->connection_type == PORT_TELNET) {
+      user->telnet = net_telnet_init(user);
+      send_initial_telnet_negotiations(user);
+    }
+
+    event_base_once(
+        base, -1, EV_TIMEOUT,
+        [](evutil_socket_t fd, short what, void *arg) {
+          auto user = reinterpret_cast<interactive_t *>(arg);
+          on_user_logon(user);
+        },
+        (void *)user, nullptr);
+  }
+  debug(connections, ("new_user_handler: end\n"));
+} /* new_user_handler() */
+
+}  // namespace
+
+// Initialize an new user
+interactive_t *new_user(port_def_t *port, evutil_socket_t fd, sockaddr *addr,
+                        ev_socklen_t addrlen) {
   /*
    * initialize new user interactive data structure.
    */
@@ -209,17 +240,18 @@ void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
   memcpy(&user->addr, addr, addrlen);
   user->addrlen = addrlen;
 
+  // Command handler
+  auto base = evconnlistener_get_base(port->ev_conn);
+  user->ev_command = evtimer_new(base, on_user_command, user);
+
+  return user;
+}
+
+// Called upon user, when he's finished negotiations , and ready to logon
+void on_user_logon(interactive_t *user) {
   set_command_giver(master_ob);
   master_ob->flags |= O_ONCE_INTERACTIVE;
-
   master_ob->interactive = user;
-
-  // TODO: merge event.cc into here.
-  new_user_event_listener(user);
-  // Initialize telnet support
-  user->telnet = net_telnet_init(user);
-
-  set_prompt("> ");
 
   /*
    * The user object has one extra reference. It is asserted that the
@@ -269,28 +301,22 @@ void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
   // start reverse DNS probing.
   query_name_by_addr(ob);
 
-  if (user->connection_type == PORT_TELNET) {
-    send_initial_telnet_negotiations(user);
-  }
-
   set_command_giver(ob);
+
+  set_prompt("> ");
 
   // Call logon() on the object.
   ret = safe_apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
   if (ret == nullptr) {
     debug_message("new_user_handler: logon() on object %s has failed, the user is disconnected.\n",
                   ob->obname);
-    destruct_object(ob);
-    ob = nullptr;
+    remove_interactive(ob, false);
   } else if (ob->flags & O_DESTRUCTED) {
     // logon() may decide not to allow user connect by destroying objects.
+    remove_interactive(ob, true);
   }
   set_command_giver(nullptr);
-
-  debug(connections, ("new_user_handler: end\n"));
-} /* new_user_handler() */
-
-}  // namespace
+}
 
 /*
  * Initialize new user connection socket.
@@ -397,7 +423,7 @@ bool init_user_conn() {
         evutil_freeaddrinfo(res);
         return false;
       }
-      debug_message("Accepting connections on %s.\n",
+      debug_message("Accepting %s connections on %s.\n", port_kind_name(i.kind),
                     sockaddr_to_string(res->ai_addr, res->ai_addrlen));
       evutil_freeaddrinfo(res);
     }
@@ -410,6 +436,10 @@ bool init_user_conn() {
       return false;
     }
     i.ev_conn = conn;
+    i.fd = fd;
+    if (i.kind == PORT_WEBSOCKET) {
+      i.lws_context = init_websocket_context(g_event_base, &i);
+    }
   }
   return true;
 }
@@ -418,17 +448,13 @@ bool init_user_conn() {
  * Shut down new user accept file descriptor.
  */
 void shutdown_external_ports() {
-  int i;
-
-  for (i = 0; i < 5; i++) {
-    if (!external_port[i].port) {
+  for (auto &port : external_port) {
+    if (!port.port) {
       continue;
     }
-    if (external_port[i].ev_conn) evconnlistener_free(external_port[i].ev_conn);
-    if (external_port[i].fd && evutil_closesocket(external_port[i].fd) == -1) {
-      debug_message("shutdown_external_ports: failed: %s",
-                    evutil_socket_error_to_string(evutil_socket_geterror(external_port[i].fd)));
-    }
+    // will also close the FD.
+    if (port.ev_conn) evconnlistener_free(port.ev_conn);
+    if (port.lws_context) close_websocket_context(port.lws_context);
   }
 
   debug_message("closed external ports\n");
@@ -495,46 +521,58 @@ void add_message(object_t *who, const char *data, int len) {
   inet_packets++;
 
   auto ip = who->interactive;
+  switch (ip->connection_type) {
+    case PORT_ASCII:
+    case PORT_TELNET: {
+      // Handle charset transcoding
+      auto transdata = const_cast<char *>(data);
+      auto translen = len;
 
-  if (ip->connection_type == PORT_TELNET || ip->connection_type == PORT_ASCII) {
-    // Handle charset transcoding
-    auto transdata = const_cast<char *>(data);
-    auto translen = len;
+      if (ip->trans) {
+        UErrorCode error_code = U_ZERO_ERROR;
 
-    if (ip->trans) {
-      UErrorCode error_code = U_ZERO_ERROR;
+        auto required = ucnv_fromAlgorithmic(ip->trans, UConverterType::UCNV_UTF8, nullptr, 0, data,
+                                             len, &error_code);
+        if (error_code == U_BUFFER_OVERFLOW_ERROR) {
+          translen = required;
+          transdata = (char *)DMALLOC(translen, TAG_TEMPORARY, "add_message (translate)");
 
-      auto required = ucnv_fromAlgorithmic(ip->trans, UConverterType::UCNV_UTF8, nullptr, 0, data,
-                                           len, &error_code);
-      if (error_code == U_BUFFER_OVERFLOW_ERROR) {
-        translen = required;
-        transdata = (char *)DMALLOC(translen, TAG_TEMPORARY, "add_message (translate)");
-
-        error_code = U_ZERO_ERROR;
-        auto written = ucnv_fromAlgorithmic(ip->trans, UConverterType::UCNV_UTF8, transdata,
-                                            translen, data, len, &error_code);
-        DEBUG_CHECK(written != translen, "Bug: translation buffer size calculation error");
-        if (U_FAILURE(error_code)) {
-          debug_message("add_message: Translation failed!");
-          transdata = const_cast<char *>(data);
-          translen = len;
-        };
+          error_code = U_ZERO_ERROR;
+          auto written = ucnv_fromAlgorithmic(ip->trans, UConverterType::UCNV_UTF8, transdata,
+                                              translen, data, len, &error_code);
+          DEBUG_CHECK(written != translen, "Bug: translation buffer size calculation error");
+          if (U_FAILURE(error_code)) {
+            debug_message("add_message: Translation failed!");
+            transdata = const_cast<char *>(data);
+            translen = len;
+          };
+        }
       }
-    }
 
-    inet_volume += translen;
-    if (ip->connection_type == PORT_TELNET) {
-      telnet_send_text(ip->telnet, transdata, translen);
-    } else {
+      inet_volume += translen;
+      if (ip->connection_type == PORT_TELNET) {
+        telnet_send_text(ip->telnet, transdata, translen);
+      } else {
+        bufferevent_write(ip->ev_buffer, data, len);
+      }
+
+      if (transdata != data) {
+        FREE(transdata);
+      }
+    } break;
+    case PORT_WEBSOCKET: {
+      if (ip->iflags & HANDSHAKE_COMPLETE) {
+        websocket_send_text(ip->lws, data, len);
+      } else {
+        debug_message("User hasn't completed websocket upgrade! can't send message.\n");
+      }
+      break;
+    }
+    default: {
+      inet_volume += len;
       bufferevent_write(ip->ev_buffer, data, len);
+      break;
     }
-
-    if (transdata != data) {
-      FREE(transdata);
-    }
-  } else {
-    inet_volume += len;
-    bufferevent_write(ip->ev_buffer, data, len);
   }
 
 #ifdef SHADOW_CATCH_MESSAGE
@@ -589,25 +627,26 @@ int flush_message(interactive_t *ip) {
     return 0;
   }
 
-  // Flush things normally.
-  if (bufferevent_flush(ip->ev_buffer, EV_WRITE, BEV_FLUSH) == -1) {
-    return 0;
-  }
+  // Flush things normally
+  if (ip->ev_buffer) {
+    if (bufferevent_flush(ip->ev_buffer, EV_WRITE, BEV_FLUSH) == -1) {
+      return 0;
+    }
+    // For socket bufferevent, bufferevent_flush is actually a no-op, thus we have to
+    // implement our own.
+    auto fd = bufferevent_getfd(ip->ev_buffer);
+    if (fd == -1) {
+      return 0;
+    }
 
-  // For socket bufferevent, bufferevent_flush is actually a no-op, thus we have to
-  // implement our own.
-  auto fd = bufferevent_getfd(ip->ev_buffer);
-  if (fd == -1) {
-    return 0;
-  }
-
-  auto output = bufferevent_get_output(ip->ev_buffer);
-  auto total = evbuffer_get_length(output);
-  if (total > 0) {
-    evbuffer_unfreeze(output, 1);
-    auto wrote = evbuffer_write(output, fd);
-    evbuffer_freeze(output, 1);
-    return wrote != -1;
+    auto output = bufferevent_get_output(ip->ev_buffer);
+    auto total = evbuffer_get_length(output);
+    if (total > 0) {
+      evbuffer_unfreeze(output, 1);
+      auto wrote = evbuffer_write(output, fd);
+      evbuffer_freeze(output, 1);
+      return wrote != -1;
+    }
   }
   return 0;
 }
@@ -631,24 +670,7 @@ void get_user_data(interactive_t *ip) {
   /* compute how much data we can read right now */
   switch (ip->connection_type) {
     case PORT_WEBSOCKET:
-      ws_space = MAX_TEXT - ip->ws_text_end;
-      /* check if we need more space */
-      if (ws_space < MAX_TEXT / 16) {
-        if (ip->ws_text_start > 0) {
-          memmove(ip->ws_text, ip->ws_text + ip->ws_text_start,
-                  ip->ws_text_end - ip->ws_text_start);
-          ws_space += ip->ws_text_start;
-          ip->ws_text_end -= ip->ws_text_start;
-          ip->ws_text_start = 0;
-        }
-      }
-      if ((ip->iflags & HANDSHAKE_COMPLETE) && (!ip->ws_size) && ws_space > 8) {
-        ws_space = 8;  // only read the header or we'll end up queueing several
-                       // websocket packets with no triggers to read them
-      }
-      if (ip->ws_size && ws_space > ip->ws_size) {
-        ws_space = ip->ws_size;  // keep the next packet in the socket
-      }
+      // Impossible, we don't handle it here.
       break;
     case PORT_TELNET:
       text_space = MAX_TEXT - ip->text_end;
@@ -706,92 +728,7 @@ void get_user_data(interactive_t *ip) {
 
   switch (ip->connection_type) {
     case PORT_WEBSOCKET:
-      if (ip->iflags & HANDSHAKE_COMPLETE) {
-        memcpy(ip->ws_text + ip->ws_text_end, buf, num_bytes);
-        ip->ws_text_end += num_bytes;
-        if (!ip->ws_size) {
-          auto *data = reinterpret_cast<unsigned char *>(&ip->ws_text[ip->ws_text_start]);
-          if (ip->ws_text_end - ip->ws_text_start < 8) {
-            break;
-          }
-          unsigned char msize = data[1];
-          int size = msize & 0x7f;
-          ip->ws_text_start += 2;
-          if (size == 126) {
-            size = (data[2] << 8) | data[3];
-            ip->ws_text_start += 2;
-          } else if (size == 127) {  // insane real size
-            ip->iflags |= NET_DEAD;
-            remove_interactive(ip->ob, 0);
-            return;
-          }
-          ip->ws_size = size;
-          if (msize & 0x80) {
-            memcpy(&ip->ws_mask, &ip->ws_text[ip->ws_text_start], 4);
-            ip->ws_text_start += 4;
-          } else {
-            ip->ws_mask = 0;
-          }
-          ip->ws_maskoffs = 0;
-        }
-        int i;
-        if (ip->ws_size) {
-          int *wdata = reinterpret_cast<int *>(&ip->ws_text[ip->ws_text_start]);
-          int *dest = reinterpret_cast<int *>(&buf[0]);
-          if (ip->ws_maskoffs) {
-            int newmask;
-            for (i = 0; i < 4; i++) {
-              (reinterpret_cast<char *>(&newmask))[i] =
-                  (reinterpret_cast<char *>(&ip->ws_mask))[(i + ip->ws_maskoffs) % 4];
-            }
-            ip->ws_mask = newmask;
-            ip->ws_maskoffs = 0;
-          }
-          i = 0;
-          while (ip->ws_size > 3 && ip->ws_text_end - ip->ws_text_start > 3) {
-            dest[i] = wdata[i] ^ ip->ws_mask;
-            i++;
-            ip->ws_text_start += 4;
-            ip->ws_size -= 4;
-          }
-          num_bytes = i * 4;
-          int left = ip->ws_size;
-          if (left > ip->ws_text_end - ip->ws_text_start) {
-            left = ip->ws_text_end - ip->ws_text_start;
-          }
-          if (left) {
-            ip->ws_maskoffs = left;
-            dest[i] = wdata[i] ^ ip->ws_mask;
-            num_bytes += left;
-            ip->ws_text_start += left;
-            ip->ws_size -= left;
-          }
-        }
-        //          for(i=0;i<num_bytes;i++)
-        //              printf("%x ", buf[i]);
-        //          puts("");
-        // and on with the telnet case
-      } else {
-        char *str = new_string(num_bytes, "PORT_WEBSOCKET");
-        memcpy(str, buf, num_bytes);
-        ip->ws_size = 0;
-        ip->ws_text_end = 0;
-        str[num_bytes] = 0;
-        push_malloced_string(str);
-        if (current_interactive) {
-          fatal("eek! someone already here\n");
-          return;
-        }
-        object_t *ob = ip->ob;
-        set_command_giver(ob);
-        current_interactive = ob;
-        safe_apply(APPLY_PROCESS_INPUT, ob, 1, ORIGIN_DRIVER);
-        set_command_giver(nullptr);
-        current_interactive = nullptr;
-
-        break;  // they're not allowed to send the other stuff until we replied,
-                // so all data should be handshake stuff
-      }
+      // Impossible, we don't handle it here
       break;
     case PORT_TELNET: {
       int start = ip->text_end;
@@ -918,7 +855,72 @@ static int clean_buf(interactive_t *ip) {
   return (ip->text_end > ip->text_start);
 }
 
-static int cmd_in_buf(interactive_t *ip) {
+void on_user_websocket_received(interactive_t *ip, const char *data, size_t len) {
+  if (!len) {
+    return;
+  }
+
+  auto text_space = MAX_TEXT - ip->text_end;
+
+  /* check if we need more space */
+  if (text_space < len) {
+    if (ip->text_start > 0) {
+      memmove(ip->text, ip->text + ip->text_start, ip->text_end - ip->text_start);
+      text_space += ip->text_start;
+      ip->text_end -= ip->text_start;
+      ip->text_start = 0;
+    }
+    if (text_space < len) {
+      ip->iflags |= SKIP_COMMAND;
+      ip->text_start = ip->text_end = 0;
+      text_space = MAX_TEXT;
+    }
+  }
+
+  on_user_input(ip, data, len);
+
+  if (cmd_in_buf(ip)) {
+    ip->iflags |= CMD_IN_BUF;
+
+    maybe_schedule_user_command(ip);
+  }
+}
+
+// ANSI
+static const int ANSI_SUBSTITUTE = 0x20;
+
+// Used by both telnet and ws_ascii, in case of telnet, default is linemode, which means
+// client will actually send entire line. In ascii mode, we will get an single char input
+// each time.
+void on_user_input(interactive_t *ip, const char *data, size_t len) {
+  for (int i = 0; i < len; i++) {
+    auto c = static_cast<unsigned char>(data[i]);
+    switch (c) {
+      case 0x08:  // BACKSPACE
+      case 0x7f:  // DEL
+        if (ip->iflags & SINGLE_CHAR) {
+          ip->text[ip->text_end++] = c;
+        } else {
+          if (ip->text_end > 0) {
+            ip->text_end--;
+          }
+        }
+        break;
+      case 0x1b:
+        if (CONFIG_INT(__RC_NO_ANSI__) && CONFIG_INT(__RC_STRIP_BEFORE_PROCESS_INPUT__)) {
+          ip->text[ip->text_end++] = ANSI_SUBSTITUTE;
+          break;
+        }
+        // fallthrough
+      default:
+        ip->text[ip->text_end++] = c;
+        break;
+    }
+  }
+}
+
+// Also used by ws_ascii.
+int cmd_in_buf(interactive_t *ip) {
   char *p;
 
   /* do standard input buffer cleanup */
@@ -1169,11 +1171,7 @@ exit:
   if (IP_VALID(ip, command_giver)) {
     print_prompt(ip);
     // FIXME: this doesn't belong here, should be moved to event.cc
-    if (ip->iflags & CMD_IN_BUF) {
-      struct timeval zero_sec = {0, 0};
-      evtimer_del(ip->ev_command);
-      evtimer_add(ip->ev_command, &zero_sec);
-    }
+    maybe_schedule_user_command(ip);
   }
 
   current_interactive = nullptr;
@@ -1250,6 +1248,12 @@ void remove_interactive(object_t *ob, int dested) {
   if (ip->telnet != nullptr) {
     telnet_free(ip->telnet);
     ip->telnet = nullptr;
+  }
+
+  // Free LWS handle
+  if (ip->lws != nullptr) {
+    close_user_websocket(ip->lws);
+    ip->lws = nullptr;
   }
 
   // Free translator

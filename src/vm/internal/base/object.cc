@@ -477,7 +477,7 @@ static int restore_interior_string(char **val, svalue_t *sv) {
           *val = cp;
           newstr = new_string(len = (news - start), "restore_string");
           strcpy(newstr, start);
-          if (!u8_validate(reinterpret_cast<const uint8_t *>(newstr))) {
+          if (!u8_validate(newstr)) {
             return ROB_STRING_UTF8_ERROR;
           }
           sv->u.string = newstr;
@@ -500,7 +500,7 @@ static int restore_interior_string(char **val, svalue_t *sv) {
   len = cp - start;
   newstr = new_string(len, "restore_string");
   strcpy(newstr, start);
-  if (!u8_validate(reinterpret_cast<const uint8_t *>(newstr))) {
+  if (!u8_validate(newstr)) {
     return ROB_STRING_UTF8_ERROR;
   }
   sv->u.string = newstr;
@@ -1078,7 +1078,7 @@ static int restore_string(char *val, svalue_t *sv) {
           *news = '\0';
           newstr = new_string(news - start, "restore_string");
           strcpy(newstr, start);
-          if (!u8_validate(reinterpret_cast<const uint8_t *>(newstr))) {
+          if (!u8_validate(newstr)) {
             return ROB_STRING_UTF8_ERROR;
           }
           sv->u.string = newstr;
@@ -1101,7 +1101,7 @@ static int restore_string(char *val, svalue_t *sv) {
   len = cp - start;
   newstr = new_string(len, "restore_string");
   strcpy(newstr, start);
-  if (!u8_validate(reinterpret_cast<const uint8_t *>(newstr))) {
+  if (!u8_validate(newstr)) {
     return ROB_STRING_UTF8_ERROR;
   }
   sv->u.string = newstr;

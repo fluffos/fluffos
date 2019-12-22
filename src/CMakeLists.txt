@@ -32,10 +32,13 @@ option(DEBUG OFF)
 option(DEBUGMALLOC ${DEBUG})
 # End of list of compile options.
 
-# Globally enforce CXX17
+# Globally enforce CXX17 and C11
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS OFF)
 
 # Setup include directoires
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
@@ -58,7 +61,6 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL
   # Compile options
   add_compile_options(
     "-fno-omit-frame-pointer"
-    # We use GNU extensions
     "-D_GNU_SOURCE"
     # strict aliasing is bad!
     "-fno-strict-aliasing"
@@ -171,6 +173,24 @@ endif ()
 add_subdirectory(thirdparty/filesystem EXCLUDE_FROM_ALL)
 include_directories(thirdparty/filesystem/include)
 
+set(LWS_WITH_SHARED OFF CACHE BOOL "" FORCE)
+set(LWS_WITHOUT_TESTAPPS ON CACHE BOOL "" FORCE)
+set(LWS_IPV6 ON CACHE BOOL "" FORCE)
+set(LWS_WITH_LIBEVENT ON CACHE BOOL "" FORCE)
+set(LWS_STATIC_PIC ON CACHE BOOL "" FORCE)
+set(LWS_WITH_DIR OFF CACHE BOOL "" FORCE)
+set(LWS_WITH_SSL OFF CACHE BOOL "" FORCE)
+set(LWS_WITHOUT_TESTAPPS ON CACHE BOOL "" FORCE)
+set(LWS_WITHOUT_TEST_SERVER ON CACHE BOOL "" FORCE)
+set(LWS_WITHOUT_TEST_SERVER_EXTPOLL ON CACHE BOOL "" FORCE)
+set(LWS_WITHOUT_TEST_PING ON CACHE BOOL "" FORCE)
+set(LWS_WITHOUT_TEST_CLIENT ON CACHE BOOL "" FORCE)
+set(LWS_WITH_LEJP OFF CACHE BOOL "" FORCE)
+set(LWS_WITH_LEJP_CONF OFF CACHE BOOL "" FORCE)
+add_subdirectory(thirdparty/libwebsockets EXCLUDE_FROM_ALL)
+include_directories("thirdparty/libwebsockets/include" SYSTEM)
+include_directories("${CMAKE_CURRENT_BINARY_DIR}/thirdparty/libwebsockets")
+
 INCLUDE(CheckIncludeFileCXX)
 # usage: CHECK_INCLUDE_FILES (<header> <RESULT_VARIABLE> )
 CHECK_INCLUDE_FILE_CXX(dirent.h HAVE_DIRENT_H)
@@ -276,6 +296,8 @@ set(SRC
   "mainlib.cc"
   "user.cc"
   "net/telnet.cc"
+  "net/websocket.cc"
+  "net/ws_ascii.cc"
   "base/internal/debugmalloc.cc"
   "base/internal/external_port.cc"
   "base/internal/file.cc"
@@ -357,6 +379,7 @@ if (ENABLE_DTRACE)
   target_link_libraries(driver PRIVATE tracing)
 endif ()
 
+target_link_libraries(driver PRIVATE ${LIBWEBSOCKETS_LIBRARIES_STATIC})
 # Third party libraries
 add_subdirectory(thirdparty/libtelnet EXCLUDE_FROM_ALL)
 target_link_libraries(driver PUBLIC libtelnet)

@@ -414,7 +414,7 @@ int restore_hash_string(char **val, svalue_t *sv) {
           }
           *news = '\0';
           *val = cp;
-          if (!u8_validate(reinterpret_cast<const uint8_t *>(start))) {
+          if (!u8_validate(start)) {
             return ROB_STRING_UTF8_ERROR;
           }
           sv->u.string = make_shared_string(start);
@@ -432,7 +432,7 @@ int restore_hash_string(char **val, svalue_t *sv) {
   }
   *val = cp;
   *--cp = '\0';
-  if (!u8_validate(reinterpret_cast<const uint8_t *>(start))) {
+  if (!u8_validate(start)) {
     return ROB_STRING_UTF8_ERROR;
   }
   sv->u.string = make_shared_string(start);
