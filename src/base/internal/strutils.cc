@@ -9,10 +9,20 @@
 
 // Addition by Yucong Sun
 
-bool u8_validate(const uint8_t *s) {
+bool u8_validate(const char *s) {
+  auto p = (const uint8_t *)s;
   uint32_t codepoint, state = 0;
 
-  while (*s) decode(&state, &codepoint, *s++);
+  while (*p) decode(&state, &codepoint, *p++);
+
+  return state == UTF8_ACCEPT;
+}
+
+bool u8_validate(const uint8_t *s, size_t len) {
+  auto end = s + len;
+  uint32_t codepoint, state = 0;
+
+  while (s < end && *s) decode(&state, &codepoint, *s++);
 
   return state == UTF8_ACCEPT;
 }
@@ -122,6 +132,67 @@ int32_t u8_strncpy(uint8_t *dest, const uint8_t *src, const int32_t maxlen) {
   return written;
 }
 
+// From ICU 61
+#ifndef U8_TRUNCATE_IF_INCOMPLETE
+/**
+ * If the string ends with a UTF-8 byte sequence that is valid so far
+ * but incomplete, then reduce the length of the string to end before
+ * the lead byte of that incomplete sequence.
+ * For example, if the string ends with E1 80, the length is reduced by 2.
+ *
+ * In all other cases (the string ends with a complete sequence, or it is not
+ * possible for any further trail byte to extend the trailing sequence)
+ * the length remains unchanged.
+ *
+ * Useful for processing text split across multiple buffers
+ * (save the incomplete sequence for later)
+ * and for optimizing iteration
+ * (check for string length only once per character).
+ *
+ * "Safe" macro, checks for illegal sequences and for string boundaries.
+ * Unlike U8_SET_CP_START(), this macro never reads s[length].
+ *
+ * (In UTF-16, simply check for U16_IS_LEAD(last code unit).)
+ *
+ * @param s const uint8_t * string
+ * @param start int32_t starting string offset (usually 0)
+ * @param length int32_t string length (usually start<=length)
+ * @see U8_SET_CP_START
+ * @stable ICU 61
+ */
+#define U8_TRUNCATE_IF_INCOMPLETE(s, start, length)                                   \
+  do {                                                                                \
+    if ((length) > (start)) {                                                         \
+      uint8_t __b1 = s[(length)-1];                                                   \
+      if (U8_IS_SINGLE(__b1)) {                                                       \
+        /* common ASCII character */                                                  \
+      } else if (U8_IS_LEAD(__b1)) {                                                  \
+        --(length);                                                                   \
+      } else if (U8_IS_TRAIL(__b1) && ((length)-2) >= (start)) {                      \
+        uint8_t __b2 = s[(length)-2];                                                 \
+        if (0xe0 <= __b2 && __b2 <= 0xf4) {                                           \
+          if (__b2 < 0xf0 ? U8_IS_VALID_LEAD3_AND_T1(__b2, __b1)                      \
+                          : U8_IS_VALID_LEAD4_AND_T1(__b2, __b1)) {                   \
+            (length) -= 2;                                                            \
+          }                                                                           \
+        } else if (U8_IS_TRAIL(__b2) && ((length)-3) >= (start)) {                    \
+          uint8_t __b3 = s[(length)-3];                                               \
+          if (0xf0 <= __b3 && __b3 <= 0xf4 && U8_IS_VALID_LEAD4_AND_T1(__b3, __b2)) { \
+            (length) -= 3;                                                            \
+          }                                                                           \
+        }                                                                             \
+      }                                                                               \
+    }                                                                                 \
+  } while (false)
+#endif
+
+// truncate strlen() to last valid codepoint
+size_t u8_truncate(const uint8_t *src, size_t len) {
+  int32_t res = len;
+  U8_TRUNCATE_IF_INCOMPLETE(src, 0, res);
+  return res;
+}
+
 // Total width of characters(grapheme cluster). Also adjust for east asain full width characters
 size_t u8_width(const char *src) {
   size_t total = 0;
@@ -131,8 +202,9 @@ size_t u8_width(const char *src) {
   UChar32 prev = 0;
   for (;;) {
     prev = c;
-    U8_NEXT_OR_FFFD(src, src_offset, -1, c);
-    if (c <= 0) break;
+    U8_NEXT(src, src_offset, -1, c);
+    if (c < 0) c = 0xfffd;
+    if (c == 0) break;
     if (c == 0x200d || prev == 0x200d) {  // zwj, skip the next character
       continue;
     }

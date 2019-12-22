@@ -35,9 +35,6 @@ struct telnet_t *net_telnet_init(interactive_t *user) {
   return telnet_init(my_telopts, telnet_event_handler, 0, user);
 }
 
-// ANSI
-static const int ANSI_SUBSTITUTE = 0x20;
-
 static inline void on_telnet_data(const char *buffer, unsigned long size, interactive_t *ip) {
   char *transdata = const_cast<char *>(buffer);
   auto translen = size;
@@ -61,30 +58,8 @@ static inline void on_telnet_data(const char *buffer, unsigned long size, intera
     }
   }
 
-  for (int i = 0; i < translen; i++) {
-    auto c = static_cast<unsigned char>(transdata[i]);
-    switch (c) {
-      case 0x08:  // BACKSPACE
-      case 0x7f:  // DEL
-        if (ip->iflags & SINGLE_CHAR) {
-          ip->text[ip->text_end++] = c;
-        } else {
-          if (ip->text_end > 0) {
-            ip->text_end--;
-          }
-        }
-        break;
-      case 0x1b:
-        if (CONFIG_INT(__RC_NO_ANSI__) && CONFIG_INT(__RC_STRIP_BEFORE_PROCESS_INPUT__)) {
-          ip->text[ip->text_end++] = ANSI_SUBSTITUTE;
-          break;
-        }
-      // fallthrough
-      default:
-        ip->text[ip->text_end++] = c;
-        break;
-    }
-  }
+  on_user_input(ip, transdata, translen);
+
   if (transdata != buffer) {
     FREE(transdata);
   }
@@ -474,30 +449,36 @@ void send_initial_telnet_negotiations(struct interactive_t *user) {
 }
 
 void set_linemode(interactive_t *ip, bool flush) {
-  telnet_negotiate(ip->telnet, TELNET_DO, TELNET_TELOPT_LINEMODE);
+  if (ip->telnet) {
+    telnet_negotiate(ip->telnet, TELNET_DO, TELNET_TELOPT_LINEMODE);
 
-  const unsigned char sb_mode[] = {LM_MODE, MODE_EDIT | MODE_TRAPSIG};
-  telnet_subnegotiation(ip->telnet, TELNET_TELOPT_LINEMODE, reinterpret_cast<const char *>(sb_mode),
-                        sizeof(sb_mode));
+    const unsigned char sb_mode[] = {LM_MODE, MODE_EDIT | MODE_TRAPSIG};
+    telnet_subnegotiation(ip->telnet, TELNET_TELOPT_LINEMODE,
+                          reinterpret_cast<const char *>(sb_mode), sizeof(sb_mode));
 
-  if (flush) {
-    flush_message(ip);
+    if (flush) {
+      flush_message(ip);
+    }
   }
 }
 
 void set_charmode(interactive_t *ip, bool flush) {
-  if (ip->iflags & USING_LINEMODE) {
-    telnet_negotiate(ip->telnet, TELNET_DONT, TELNET_TELOPT_LINEMODE);
-  }
-  if (flush) {
-    flush_message(ip);
+  if (ip->telnet) {
+    if (ip->iflags & USING_LINEMODE) {
+      telnet_negotiate(ip->telnet, TELNET_DONT, TELNET_TELOPT_LINEMODE);
+    }
+    if (flush) {
+      flush_message(ip);
+    }
   }
 }
 
 void set_localecho(interactive_t *ip, bool enable, bool flush) {
-  telnet_negotiate(ip->telnet, enable ? TELNET_WONT : TELNET_WILL, TELNET_TELOPT_ECHO);
-  if (flush) {
-    flush_message(ip);
+  if (ip->telnet) {
+    telnet_negotiate(ip->telnet, enable ? TELNET_WONT : TELNET_WILL, TELNET_TELOPT_ECHO);
+    if (flush) {
+      flush_message(ip);
+    }
   }
 }
 

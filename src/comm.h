@@ -67,4 +67,11 @@ void mark_iptable(void);
 
 const char *sockaddr_to_string(const sockaddr *addr, ev_socklen_t len);
 
+interactive_t *new_user(port_def_t *, evutil_socket_t, sockaddr *, ev_socklen_t);
+void on_user_logon(interactive_t *);
+
+int cmd_in_buf(interactive_t *ip);
+void on_user_input(interactive_t *ip, const char *data, size_t len);
+void on_user_websocket_received(interactive_t *ip, const char *data, size_t len);
+
 #endif /* COMM_H */

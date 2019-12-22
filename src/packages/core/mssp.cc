@@ -9,6 +9,9 @@ static const char telnet_mssp_value[] = {TELNET_MSSP_VAR, '%', 's', TELNET_MSSP_
 
 static int send_mssp_val(mapping_t *map, mapping_node_t *el, void *data) {
   auto ip = reinterpret_cast<interactive_t *>(data);
+  if (!ip->telnet) {
+    return -1;
+  }
 
   if (el->values[0].type == T_STRING && el->values[1].type == T_STRING) {
     telnet_printf(ip->telnet, reinterpret_cast<const char *>(telnet_mssp_value),

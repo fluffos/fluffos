@@ -12,9 +12,9 @@
 void f_act_mxp() {
   // start MXP
   auto ip = current_object->interactive;
-  if (ip == nullptr) return;
-
-  telnet_begin_sb(ip->telnet, TELNET_TELOPT_MXP);
+  if (ip && ip->telnet) {
+    telnet_begin_sb(ip->telnet, TELNET_TELOPT_MXP);
+  }
 }
 #endif
 
@@ -28,7 +28,7 @@ void on_telnet_do_gmcp(interactive_t* ip) {
 #ifdef F_SEND_GMCP
 void f_send_gmcp() {
   auto ip = current_object->interactive;
-  if (ip) {
+  if (ip && ip->telnet) {
     telnet_subnegotiation(ip->telnet, TELNET_TELOPT_GMCP, sp->u.string, SVALUE_STRLEN(sp));
     flush_message(ip);
   }
@@ -60,17 +60,19 @@ void on_telnet_do_zmp(const char** argv, unsigned long argc, interactive_t* ip) 
 void f_send_zmp() {
   auto ip = current_object->interactive;
 
-  telnet_begin_zmp(ip->telnet, (sp - 1)->u.string);
+  if (ip && ip->telnet) {
+    telnet_begin_zmp(ip->telnet, (sp - 1)->u.string);
 
-  for (int i = 0; i < sp->u.arr->size; i++) {
-    if (sp->u.arr->item[i].type == T_STRING) {
-      telnet_zmp_arg(ip->telnet, sp->u.arr->item[i].u.string);
+    for (int i = 0; i < sp->u.arr->size; i++) {
+      if (sp->u.arr->item[i].type == T_STRING) {
+        telnet_zmp_arg(ip->telnet, sp->u.arr->item[i].u.string);
+      }
     }
+
+    telnet_finish_zmp(ip->telnet);
+
+    flush_message(ip);
+    pop_2_elems();
   }
-
-  telnet_finish_zmp(ip->telnet);
-
-  flush_message(ip);
-  pop_2_elems();
 }
 #endif

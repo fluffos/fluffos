@@ -26,8 +26,28 @@ struct port_def_t {
   int in_volume;
   int out_packets;
   int out_volume;
-  struct evconnlistener *ev_conn;
+  struct evconnlistener* ev_conn;
+  // websocket context
+  struct lws_context* lws_context;
 };
+
+static inline const char* port_kind_name(int kind) {
+  switch (kind) {
+    case PORT_TELNET:
+      return "telnet";
+    case PORT_BINARY:
+      return "binary";
+    case PORT_ASCII:
+      return "ascii";
+    case PORT_MUD:
+      return "mud";
+    case PORT_WEBSOCKET:
+      return "websocket";
+
+    default:
+      return "unknown";
+  }
+}
 
 extern port_def_t external_port[5];
 
