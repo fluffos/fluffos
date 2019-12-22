@@ -26,9 +26,10 @@
 #else
 #include <ws2tcpip.h>
 #endif
+// ICU
+#include <unicode/ucnv.h>
 
 #include "backend.h"
-#include "fliconv.h"
 #include "interactive.h"
 #include "thirdparty/libtelnet/libtelnet.h"
 #include "net/telnet.h"
@@ -200,14 +201,7 @@ void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
   user->connection_type = port->kind;
   user->ob = master_ob;
   user->last_time = get_current_time();
-
-#ifdef USE_ICONV
-  user->trans = get_translator("UTF-8");
-#else
-  user->trans = (struct translation *)master_ob;
-// never actually used, but avoids multiple ifdefs later on!
-#endif
-
+  user->trans = nullptr;
   user->fd = fd;
   user->local_port = port->port;
   user->external_port = (port - external_port);  // FIXME: pointer arith
@@ -501,12 +495,43 @@ void add_message(object_t *who, const char *data, int len) {
   inet_packets++;
 
   auto ip = who->interactive;
-  if (ip->connection_type == PORT_TELNET) {
-    int translen;
-    char *trans = translate(ip->trans->outgoing, data, len, &translen);
+
+  if (ip->connection_type == PORT_TELNET || ip->connection_type == PORT_ASCII) {
+    // Handle charset transcoding
+    auto transdata = const_cast<char *>(data);
+    auto translen = len;
+
+    if (ip->trans) {
+      UErrorCode error_code = U_ZERO_ERROR;
+
+      auto required = ucnv_fromAlgorithmic(ip->trans, UConverterType::UCNV_UTF8, nullptr, 0, data,
+                                           len, &error_code);
+      if (error_code == U_BUFFER_OVERFLOW_ERROR) {
+        translen = required;
+        transdata = (char *)DMALLOC(translen, TAG_TEMPORARY, "add_message (translate)");
+
+        error_code = U_ZERO_ERROR;
+        auto written = ucnv_fromAlgorithmic(ip->trans, UConverterType::UCNV_UTF8, transdata,
+                                            translen, data, len, &error_code);
+        DEBUG_CHECK(written != translen, "Bug: translation buffer size calculation error");
+        if (U_FAILURE(error_code)) {
+          debug_message("add_message: Translation failed!");
+          transdata = const_cast<char *>(data);
+          translen = len;
+        };
+      }
+    }
 
     inet_volume += translen;
-    telnet_send_text(ip->telnet, trans, translen);
+    if (ip->connection_type == PORT_TELNET) {
+      telnet_send_text(ip->telnet, transdata, translen);
+    } else {
+      bufferevent_write(ip->ev_buffer, data, len);
+    }
+
+    if (transdata != data) {
+      FREE(transdata);
+    }
   } else {
     inet_volume += len;
     bufferevent_write(ip->ev_buffer, data, len);
@@ -775,6 +800,7 @@ void get_user_data(interactive_t *ip) {
       // this will read data into ip->text
       telnet_recv(ip->telnet, reinterpret_cast<const char *>(&buf[0]), num_bytes);
 
+      // If we read something
       if (ip->text_end > start) {
         /* handle snooping - snooper does not see type-ahead due to
          telnet being in linemode */
@@ -782,7 +808,7 @@ void get_user_data(interactive_t *ip) {
           handle_snoop(ip->text + start, ip->text_end - start, ip);
         }
 
-        // If we read something, search for command.
+        // search for command.
         if (cmd_in_buf(ip)) {
           ip->iflags |= CMD_IN_BUF;
           struct timeval zero_sec = {0, 0};
@@ -1087,8 +1113,6 @@ int process_user_command(interactive_t *ip) {
     goto exit;
   }
 
-  user_command = translate_easy(ip->trans->incoming, user_command);
-
   if ((ip->iflags & USING_MXP) && user_command[0] == ' ' && user_command[1] == '[' &&
       user_command[3] == 'z') {
     svalue_t *ret;
@@ -1229,7 +1253,14 @@ void remove_interactive(object_t *ob, int dested) {
     ip->telnet = nullptr;
   }
 
+  // Free translator
+  if (ip->trans != nullptr) {
+    ucnv_close(ip->trans);
+    ip->trans = nullptr;
+  }
+
   clear_notify(ip->ob);
+
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
   if (ip->input_to) {
     free_object(&ip->input_to->ob, "remove_interactive");
@@ -1242,6 +1273,7 @@ void remove_interactive(object_t *ob, int dested) {
     ip->input_to = nullptr;
   }
 #endif
+
   user_del(ip);
   FREE(ip);
   ob->interactive = nullptr;
