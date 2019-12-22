@@ -51,11 +51,6 @@ object *all_previous_objects previous_object(int default: -1);
 mixed *call_stack(int default: 0);
 int sizeof(mixed);
 int strlen sizeof(string);
-#ifdef USE_ICONV
-int strwidth(string);
-#else
-int strwidth sizeof(string);
-#endif
 void destruct(object default: F__THIS_OBJECT);
 string file_name(object default: F__THIS_OBJECT);
 string capitalize(string);
@@ -366,13 +361,8 @@ mapping *function_profile(object default:F__THIS_OBJECT);
 #endif
 
 int resolve(string, string | function);
-#ifdef USE_ICONV
-int set_encoding(string);
-string to_utf8(string, string);
-string utf8_to(string, string);
-int *str_to_arr(string);
-string arr_to_str(int *);
-#endif
+string set_encoding(string | void);
+string query_encoding();
 void act_mxp();
 void websocket_handshake_done();
 void request_term_type();

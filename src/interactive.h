@@ -35,6 +35,9 @@
 #define HANDSHAKE_COMPLETE 0x20000 /* websocket connected */
 #define USING_COMPRESS 0x40000     /* we've negotiated compress */
 
+// from ICU
+struct UConverter;
+
 struct interactive_t {
   struct object_t *ob; /* points to the associated object         */
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
@@ -68,7 +71,7 @@ struct interactive_t {
   int iflags; /* interactive flags */
 
   // iconv handle
-  struct translation *trans;
+  UConverter *trans;
 
   char ws_text[MAX_TEXT]; /* input buffer for interactive object     */
   int ws_text_end;        /* first free char in buffer               */
