@@ -22,7 +22,7 @@
 #include "base/internal/options_incl.h"
 
 // Defined by simulate.cc, this belongs to driver layer.
-extern void fatal(const char *, ...);
+[[noreturn]] extern void fatal(const char *, ...);
 
 void debug_message(const char *, ...);
 

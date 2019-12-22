@@ -2375,7 +2375,7 @@ int yylex() {
           if (rc > 0) {
             int n;
 
-            if (!u8_validate((const uint8_t *)outp)) {
+            if (!u8_validate(outp)) {
               lexerror("Bad UTF-8 string in string block");
               return LEX_EOF;
             }
@@ -2411,7 +2411,7 @@ int yylex() {
 
             case '"':
               *to++ = 0;
-              if (!u8_validate(scr_tail + 1)) {
+              if (!u8_validate(reinterpret_cast<const char *>(scr_tail + 1))) {
                 lexerror("Invalid UTF8 string");
                 return LEX_EOF;
               }
@@ -2634,7 +2634,7 @@ int yylex() {
               res = scratch_large_alloc((yyp - yytext) + (to - scr_tail) - 1);
               strncpy(res, reinterpret_cast<char *>(scr_tail + 1), (to - scr_tail) - 1);
               strcpy(res + (to - scr_tail) - 1, yytext);
-              if (!u8_validate((const uint8_t *)res)) {
+              if (!u8_validate(res)) {
                 lexerror("Invalid UTF8 string");
                 scratch_free(res);
                 return LEX_EOF;
@@ -2747,7 +2747,7 @@ int yylex() {
           strncpy(res, reinterpret_cast<char *>(scr_tail + 1), (to - scr_tail) - 1);
           strcpy(res + (to - scr_tail) - 1, yytext);
           // Validate UTF8
-          if (!u8_validate((const uint8_t *)res)) {
+          if (!u8_validate(res)) {
             lexerror("Invalid UTF8 string");
             scratch_free(res);
             return LEX_EOF;
