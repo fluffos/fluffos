@@ -9,12 +9,14 @@ title: system / ctime
 
 ### SYNOPSIS
 
-    string ctime( int clock );
+    string ctime( int clock | void );
 
 ### DESCRIPTION
 
     Gives  a  nice  string  with  current  date and time, with the argument
     'clock' that is the number of seconds since 1970.
+    
+    If no arguments are provided, it will use the current time.
 
 ### SEE ALSO
 
