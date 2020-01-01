@@ -75,7 +75,6 @@ namespace fs = ghc::filesystem;
 #endif
 
 static int match_string(char * /*match*/, char * /*str*/);
-static int copy(const char *from, const char *to);
 static int do_move(const char *from, const char *to, int flag);
 static int pstrcmp(const void * /*p1*/, const void * /*p2*/);
 static int parrcmp(const void * /*p1*/, const void * /*p2*/);

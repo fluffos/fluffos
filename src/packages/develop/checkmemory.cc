@@ -453,7 +453,6 @@ void check_string_stats(outbuffer_t *out) {
 /* currently: 1 - debug, 2 - suppress leak checks */
 void check_all_blocks(int flag) {
   int i, j, hsh;
-  int tmp;
   md_node_t *entry;
   object_t *ob;
   array_t *vec;

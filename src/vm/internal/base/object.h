@@ -135,7 +135,8 @@ typedef int (*get_objectsfn_t)(object_t *, void *);
 #define ROB_NUMERAL_ERROR 8
 #define ROB_GENERAL_ERROR 16
 #define ROB_CLASS_ERROR 32
-#define ROB_ERROR 63
+#define ROB_STRING_UTF8_ERROR 64
+#define ROB_ERROR 127
 
 #define SETOBNAME(ob, name) (*(const char **)&(ob->obname) = (char *)name)
 

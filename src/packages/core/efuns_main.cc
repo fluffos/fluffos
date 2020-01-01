@@ -182,7 +182,6 @@ void f_cache_stats(void) {
 void f__call_other(void) {
   svalue_t *arg;
   const char *funcname;
-  int i;
   int num_arg = st_num_arg;
   object_t *ob;
 
