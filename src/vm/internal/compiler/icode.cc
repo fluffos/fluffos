@@ -1244,6 +1244,7 @@ void optimize_icode(char *start, char *pc, char *end) {
       }
       case F_EFUNV:
         pc++;
+        // fall through
       case F_EFUN0:
       case F_EFUN1:
       case F_EFUN2:

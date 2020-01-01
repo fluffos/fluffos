@@ -33,7 +33,7 @@
 // TODO: in interpret.cc
 extern int call_origin;
 // TODO: defined in simulate.cc
-void error(const char *const, ...);
+[[noreturn]] void error(const char *const, ...);
 extern object_t *current_object;
 extern object_t *command_giver;
 extern object_t *current_interactive;

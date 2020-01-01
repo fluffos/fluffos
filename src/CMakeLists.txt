@@ -47,7 +47,7 @@ endforeach ()
 
 set(CMAKE_ENABLE_EXPORTS ON)
 
-if (${CMAKE_C_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_C_COMPILER_ID} STREQUAL "Clang" OR ${CMAKE_C_COMPILER_ID} STREQUAL "AppleClang")
+if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "AppleClang")
   foreach (lang C CXX)
     set(CMAKE_${lang}_FLAGS_DEBUG "-O0 -g3")
     # include (minimal) debug information even for RELEASE build.
@@ -114,9 +114,8 @@ if (${CMAKE_C_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_C_COMPILER_ID} STREQUAL "Cl
     # Turn off some warnings from GCC.
     "-Wno-char-subscripts"
     "-Wno-sign-compare"
-    #"-Wno-return-type"
     "-Wno-unused-parameter"
-    # TODO: Code has a lot of implict zero initilizations
+    # TODO: Code has a lot of implicit zero initializations
     "-Wno-missing-field-initializers"
     # features
     "-fdiagnostics-show-option"

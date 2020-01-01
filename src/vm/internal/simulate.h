@@ -21,7 +21,7 @@ extern object_t *obj_list_dangling;
 #endif
 
 void debug_fatal(char *, ...);
-void fatal(const char *, ...);
+[[noreturn]] void fatal(const char *, ...);
 void check_legal_string(const char *);
 #ifndef NO_LIGHT
 void add_light(object_t *, int);
@@ -52,9 +52,9 @@ void say(svalue_t *, array_t *);
 void tell_room(object_t *, svalue_t *, array_t *);
 void shout_string(const char *);
 
-void error_needs_free(char *);
-void throw_error(void);
-void error_handler(char *);
+[[noreturn]] void error_needs_free(char *);
+[[noreturn]] void throw_error(void);
+[[noreturn]] void error_handler(char *);
 
 void startshutdownMudOS(int);
 void shutdownMudOS(int);
