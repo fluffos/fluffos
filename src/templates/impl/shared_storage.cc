@@ -2,11 +2,16 @@
 /// @brief - implementation for shared_storage<T, hash>
 /// @attention internal header, don't include or otherwise compile by itself
 /// @author René Müller
-/// @version 0.0.0
-/// @date 2016-10-12
+/// @version 0.0.1
+/// @date 2019-12-30
 
 #ifndef _SHARED_STORAGE_IMPL_
 #define _SHARED_STORAGE_IMPL_
+
+#ifdef USE_THREADS
+#   define LOCK(arg)   \
+        std::lock_guard<std::mutex> lock(arg)
+#endif
 
 // every shared storage object either holds
 //  - a null pointer
@@ -28,40 +33,13 @@ inline typename shared_storage<T, hash>::storage_t &shared_storage<T, hash>::sto
 #ifdef USE_THREADS                      // be prepared
 // we want to he multi thread save => we need locking
 template <typename T, class hash>
-inline boost::mutex & shared_storage<T, hash>::mtx(void)
+inline std::mutex & shared_storage<T, hash>::mtx(void)
 {
-    static boost::mutex m {};
+    static std::mutex m {};
 
     return m;
 }
 #endif
-
-// amount of unreferenced shared objects in storage
-template <typename T, class hash>
-inline size_t & shared_storage<T, hash>::unref(void)
-{
-    static size_t c {};
-
-    return c;
-}
-
-// amount of protected shared objects in storage
-template <typename T, class hash>
-inline size_t & shared_storage<T, hash>::prot(void)
-{
-    static size_t c {};
-
-    return c;
-}
-
-// maximum references before the shared object becomes protected
-template <typename T, class hash>
-inline size_t & shared_storage<T, hash>::max_ref(void)
-{
-    static size_t m {};
-
-    return m;
-}
 
 // a "null object"
 template <typename T, class hash>
@@ -87,14 +65,14 @@ shared_storage<T, hash>::shared_storage(shared_storage_vt * const arg) :
     {
         if(!arg->flag && (arg->ref_count == 0))         // was unreferenced
         {
-            (unref())--;
+            status.unref--;
         }
         arg->ref_count++;                               // increase reference count
         if(!arg->flag &&                                // we had an "overflow" => we can't clean this value anymore
-                (arg->ref_count >= max_ref()))
+                (arg->ref_count >= status.max_ref))
         {
             arg->flag = true;
-            (prot())++;
+            status.prot++;
         }
     }
     BOOST_ASSERT(INVARIANT);
@@ -106,7 +84,7 @@ shared_storage<T, hash>::shared_storage(const T &arg) :
 {
     if(!(arg == empty()))                                       // otherwise we're finished
     {
-        size_t  key { std::hash<T>()(arg) };                    // hash for given object as key for storage
+        size_t  key { hash()(arg) };                            // hash for given object as key for storage
 #ifdef USE_THREADS
         LOCK(mtx());                                            // we might use multi threading
 #endif
@@ -121,14 +99,14 @@ shared_storage<T, hash>::shared_storage(const T &arg) :
                 {
                     if(!s.flag && (s.ref_count == 0))           // was unreferenced
                     {
-                        (unref())--;
+                        status.unref--;
                     }
                     s.ref_count++;                              // increase reference count
                     if(!s.flag &&                               // we had an "overflow" => we can't clean this value anymore
-                            (s.ref_count >= max_ref()))
+                            (s.ref_count >= status.max_ref))
                     {
                         s.flag = true;
-                        (prot())++;
+                        status.prot++;
                     }
                     val = &(i->second);                         // and remember value
                     BOOST_ASSERT(INVARIANT);
@@ -156,10 +134,10 @@ shared_storage<T, hash>::shared_storage(const shared_storage &arg) :
 #endif
         val->ref_count++;
         if(!val->flag &&                               // we had an "overflow" => we can't clean this value anymore
-                (val->ref_count >= max_ref()))
+                (val->ref_count >= status.max_ref))
         {
             val->flag = true;
-            (prot())++;
+            status.prot++;
         }
     }
     BOOST_ASSERT(INVARIANT);
@@ -185,7 +163,7 @@ shared_storage<T, hash>::~shared_storage(void)
         val->ref_count--;
         if((val->ref_count == 0) && !val->flag)             // now unreferenced
         {
-            (unref())++;
+            status.unref++;
         }
     }
 }
@@ -208,7 +186,7 @@ shared_storage<T, hash> & shared_storage<T, hash>::operator=(const shared_storag
             val->ref_count--;
             if((val->ref_count == 0) && !val->flag)     // now unreferenced
             {
-                (unref())++;
+                status.unref++;
             }
         }
         val = arg.val;
@@ -216,10 +194,10 @@ shared_storage<T, hash> & shared_storage<T, hash>::operator=(const shared_storag
         {
             val->ref_count++;
             if(!val->flag &&                            // we had an "overflow" => we can't clean this value anymore
-                    (val->ref_count >= max_ref()))
+                    (val->ref_count >= status.max_ref))
             {
                 val->flag = true;
-                (prot())++;
+                status.prot++;
             }
         }
         BOOST_ASSERT(INVARIANT);
@@ -243,7 +221,7 @@ shared_storage<T, hash> & shared_storage<T, hash>::operator=(shared_storage<T, h
             val->ref_count--;
             if((val->ref_count == 0) && !val->flag)     // now unreferenced
             {
-                (unref())++;
+                status.unref++;
             }
         }
         val     = arg.val;
@@ -325,16 +303,87 @@ bool shared_storage<T, hash>::is_protected(void) const
 template <typename T, class hash>
 size_t shared_storage<T, hash>::size(void)
 {
-    return storage().size();
+    return storage().size();            // we don't need to update status.size here since it only got read by get_status, which updates it itself
+}
+
+template <typename T, class hash>
+size_t shared_storage<T, hash>::unref_size(void)
+{
+    return status.unref;
+}
+
+template <typename T, class hash>
+size_t shared_storage<T, hash>::prot_size(void)
+{
+    return status.prot;
+}
+
+template <typename T, class hash> template<class Q>
+auto shared_storage<T, hash>::get_status(bool verbose) -> typename std::enable_if<has_size<Q>::value, v_status_t const &>::type
+{
+#ifdef USE_THREADS
+    LOCK(mtx());                                            // we might use multi threading
+#endif
+
+    status.size = storage().size();
+
+    if(verbose)
+    {
+        status.data_size    =
+        status.unref_size   =
+        status.prot_size    = 0;
+
+        for(auto i = storage().begin(); i != storage().end();)
+        {
+            auto   &s  = i->second;
+            size_t len = s.val.size();
+
+            status.data_size += len;
+
+            if(s.flag)
+            {
+                status.prot_size += len;
+            }
+            else if(!s.ref_count)
+            {
+                status.unref_size += len;
+            }
+        }
+    }
+
+    return status;
+}
+
+template <typename T, class hash> template<class Q>
+auto shared_storage<T, hash>::get_status(void) -> typename std::enable_if<!has_size<Q>::value, b_status_t const &>::type
+{
+#ifdef USE_THREADS
+    LOCK(mtx());                                            // we might use multi threading
+#endif
+
+    status.size = storage().size();
+
+    return status;
+}
+
+template <typename T, class hash>
+size_t shared_storage<T, hash>::set_max_ref(size_t arg)
+{
+#ifdef USE_THREADS
+    LOCK(mtx());
+#endif
+    size_t t {status.max_ref};
+
+    status.max_ref = arg;
+    return t;
 }
 
 template <typename T, class hash>
 size_t shared_storage<T, hash>::cleanup(void)
 {
     size_t count {0};
-    size_t size  {storage().size()};
 
-    if(!size)
+    if(!storage().size())
     {
         return 0;
     }
@@ -350,7 +399,7 @@ size_t shared_storage<T, hash>::cleanup(void)
         {
             i = storage().erase(i);
             count++;
-            (unref())--;
+            status.unref--;
         }
         else
         {
@@ -361,31 +410,10 @@ size_t shared_storage<T, hash>::cleanup(void)
 }
 
 template <typename T, class hash>
-size_t shared_storage<T, hash>::unref_size(void)
-{
-    return unref();
-}
-
-template <typename T, class hash>
-size_t shared_storage<T, hash>::prot_size(void)
-{
-    return prot();
-}
-
-template <typename T, class hash>
-size_t shared_storage<T, hash>::set_max_ref(size_t arg)
-{
-    size_t t {max_ref()};
-
-    max_ref() = arg;
-    return t;
-}
-
-template <typename T, class hash>
 std::unique_ptr<shared_storage<T, hash>> shared_storage<T, hash>::find(T arg)
 {
     std::unique_ptr<shared_storage<T, hash>> ret {nullptr}; // return value, nullptr => not found
-    size_t  key { std::hash<T>()(arg) };                    // hash for given object as key for storage
+    size_t  key { hash()(arg) };                            // hash for given object as key for storage
 #ifdef USE_THREADS
     LOCK(mtx());                                            // we might use multi threading
 #endif
@@ -408,5 +436,8 @@ std::unique_ptr<shared_storage<T, hash>> shared_storage<T, hash>::find(T arg)
 }
 
 #undef INVARIANT
+#ifdef USE_THREADS
+#   undef LOCK
+#endif // _SHARED_STORAGE_IMPL_
 
 #endif // _SHARED_STORAGE_IMPL_
