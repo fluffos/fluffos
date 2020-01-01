@@ -623,7 +623,6 @@ void flush_message_all() {
 void get_user_data(interactive_t *ip) {
   int num_bytes, text_space;
   unsigned char buf[MAX_TEXT];
-  int ws_space;
 
   text_space = sizeof(buf);
 

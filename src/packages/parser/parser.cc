@@ -1463,7 +1463,6 @@ static void parse_obj(int tok, parse_state_t *state, int ordinal) {
   int start = state->word_index;
   char *str;
   hash_entry_t *hnode, *last_adj = nullptr;
-  int multiple_adj = 0;
   int ord_legal, singular_legal = 1, ord_seen = 0;
   long tmp, tmp2;
   match_t *mp = nullptr;
@@ -1690,7 +1689,6 @@ static void parse_obj(int tok, parse_state_t *state, int ordinal) {
           DEBUG_P(("Found adj: %s", str));
           intersect(&objects, &hnode->pv.adj);
           if (last_adj) {
-            multiple_adj = 1;
           }
           last_adj = hnode;
         } else {
@@ -2518,7 +2516,6 @@ static void check_object_relations(parse_state_t *state) {
   int j, k, l, m, n, ret;
   int found_direct = -1, found_indirect = -1;
   int direct_unique, indirect_unique;
-  int found_something;
   int direct_ordinal, finished = 0;
   bitvec_t indirects, directs;
   parser_error_t err;
@@ -2611,7 +2608,6 @@ static void check_object_relations(parse_state_t *state) {
            * all indirect objects I have.
            */
           direct_object = BPI * i + k;
-          found_something = 0;
           for (l = 0; l < indir_objs->last; l++)
             if (indir_objs->b[l]) {
               for (m = 1, n = 0; m; m <<= 1, n++)

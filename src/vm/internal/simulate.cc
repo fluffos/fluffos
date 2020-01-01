@@ -58,8 +58,6 @@ void startshutdownMudOS(int sig) { MudOS_is_being_shut_down = 1; }
  * in an interrupt.
  */
 void shutdownMudOS(int exit_code) {
-  int i;
-
   shout_string("FluffOS driver shouts: shutting down immediately.\n");
 
 #ifdef PACKAGE_MUDLIB_STATS
@@ -914,7 +912,6 @@ void destruct_object(object_t *ob) {
 #endif
 #ifndef NO_SNOOP
   if (ob->flags & O_SNOOP) {
-    int i;
     users_foreach([ob](interactive_t *user) {
       if (user->snooped_by == ob) {
         user->snooped_by = nullptr;
@@ -1635,7 +1632,7 @@ void free_sentence(sentence_t *p) {
   sent_free = p;
 }
 
-void fatal(const char *fmt, ...) {
+[[noreturn]] void fatal(const char *fmt, ...) {
   static int in_fatal = 0;
   char msg_buf[2049];
   va_list args;
@@ -1683,7 +1680,7 @@ void fatal(const char *fmt, ...) {
   in_fatal = 0;
 
   signal(SIGABRT, SIG_DFL);
-  abort();
+  std::abort();
 }
 
 static int num_error = 0;
@@ -1703,7 +1700,7 @@ static int num_mudlib_error = 0;
  * want to replace it with the system's error string.
  */
 
-void throw_error() {
+[[noreturn]] void throw_error() {
   if (((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) {
     throw("throw error");
     fatal("Throw_error failed!");
@@ -1824,7 +1821,7 @@ void _error_handler(char *err) {
 
 }  // namespace
 
-void error_handler(char *err) {
+[[noreturn]] void error_handler(char *err) {
 /* in case we're going to jump out of load_object */
 #ifndef NO_ENVIRONMENT
   restrict_destruct = nullptr;
@@ -1927,7 +1924,7 @@ exit:
   throw("BUG: Impossible to get here.");
 }
 
-void error_needs_free(char *s) {
+[[noreturn]] void error_needs_free(char *s) {
   char err_buf[2048];
   strncpy(err_buf + 1, s, 2047);
   err_buf[0] = '*'; /* all system errors get a * at the start */
@@ -1937,7 +1934,7 @@ void error_needs_free(char *s) {
   error_handler(err_buf);
 }
 
-void error(const char *const fmt, ...) {
+[[noreturn]] void error(const char *const fmt, ...) {
   char err_buf[2048];
   va_list args;
 

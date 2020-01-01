@@ -1714,6 +1714,7 @@ static void indent(char *buf) {
             token = LHOOK2;
             break;
           }
+          // fall through
         case '[':
           token = LHOOK;
           break;
@@ -1741,6 +1742,7 @@ static void indent(char *buf) {
                                                 (stack[1] == ROPERATOR && stack[2] == LHOOK2))))) {
             p++;
           }
+          // fall through
         case ')':
           token = RHOOK;
           break;

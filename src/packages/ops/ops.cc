@@ -738,7 +738,7 @@ void f_range(int code) {
 #endif
 
     case T_ARRAY: {
-      int from, to, len;
+      int from, to;
 
       array_t *v = sp->u.arr;
       to = (--sp)->u.number;
@@ -838,7 +838,7 @@ void f_extract_range(int code) {
 #endif
 
     case T_ARRAY: {
-      size_t from, len;
+      size_t from;
 
       array_t *v = sp->u.arr;
       from = (--sp)->u.number;
