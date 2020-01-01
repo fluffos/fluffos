@@ -477,6 +477,9 @@ static int restore_interior_string(char **val, svalue_t *sv) {
           *val = cp;
           newstr = new_string(len = (news - start), "restore_string");
           strcpy(newstr, start);
+          if(!u8_validate(reinterpret_cast<const uint8_t *>(newstr))) {
+            return ROB_STRING_UTF8_ERROR;
+          }
           sv->u.string = newstr;
           sv->type = T_STRING;
           sv->subtype = STRING_MALLOC;
@@ -497,6 +500,9 @@ static int restore_interior_string(char **val, svalue_t *sv) {
   len = cp - start;
   newstr = new_string(len, "restore_string");
   strcpy(newstr, start);
+  if(!u8_validate(reinterpret_cast<const uint8_t *>(newstr))) {
+    return ROB_STRING_UTF8_ERROR;
+  }
   sv->u.string = newstr;
   sv->type = T_STRING;
   sv->subtype = STRING_MALLOC;
@@ -1072,13 +1078,16 @@ static int restore_string(char *val, svalue_t *sv) {
           *news = '\0';
           newstr = new_string(news - start, "restore_string");
           strcpy(newstr, start);
+          if(!u8_validate(reinterpret_cast<const uint8_t *>(newstr))) {
+            return ROB_STRING_UTF8_ERROR;
+          }
           sv->u.string = newstr;
           sv->type = T_STRING;
           sv->subtype = STRING_MALLOC;
           return 0;
         }
       }
-
+      // fall through
       case '\0': {
         return ROB_STRING_ERROR;
       }
@@ -1092,6 +1101,9 @@ static int restore_string(char *val, svalue_t *sv) {
   len = cp - start;
   newstr = new_string(len, "restore_string");
   strcpy(newstr, start);
+  if(!u8_validate(reinterpret_cast<const uint8_t *>(newstr))) {
+    return ROB_STRING_UTF8_ERROR;
+  }
   sv->u.string = newstr;
   sv->type = T_STRING;
   sv->subtype = STRING_MALLOC;
@@ -1293,6 +1305,8 @@ void restore_object_from_line(object_t *ob, char *line, int noclear) {
       error("restore_object(): Illegal mapping format while restoring %s.\n", var);
     } else if (rc & ROB_STRING_ERROR) {
       error("restore_object(): Illegal string format while restoring %s.\n", var);
+    } else if (rc & ROB_STRING_UTF8_ERROR) {
+      error("restore_object(): Invalid utf8 string while restoring %s.\n", var);
     } else if (rc & ROB_CLASS_ERROR) {
       error("restore_object(): Illegal class format while restoring %s.\n", var);
     }
@@ -1785,6 +1799,8 @@ void restore_variable(svalue_t *var, char *str) {
       error("restore_object(): Illegal mapping format.\n");
     } else if (rc & ROB_STRING_ERROR) {
       error("restore_object(): Illegal string format.\n");
+    } else if (rc & ROB_STRING_UTF8_ERROR) {
+      error("restore_object(): string is not valid utf8.\n");
     }
   }
 }
