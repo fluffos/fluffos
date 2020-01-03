@@ -8,9 +8,14 @@ inherit "/inherit/master/valid";
 nosave int has_error = 0;
 
 void flag(string str) {
+  mixed error;
   switch (str) {
     case "test":
-      "/command/tests"->main();
+      error = catch("/command/tests"->main());
+      if(error) {
+        has_error = 1;
+        write(error);
+      }
       break;
     default:
       write("The only supproted flag is 'test', got '" + str + "'.\n");
