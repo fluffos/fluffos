@@ -114,6 +114,8 @@ void print_version_and_time() {
   std::cout << "Jemalloc is disabled, this is not suitable for production." << std::endl;
 #endif
   std::cout << "ICU Version: " << U_ICU_VERSION << std::endl;
+
+#ifndef _WIN32
 #if BACKWARD_HAS_DW == 1
   std::cout << "Backtrace support: libdw." << std::endl;
 #elif BACKWARD_HAS_BFD == 1
@@ -122,6 +124,7 @@ void print_version_and_time() {
   std::cout << "libdw or libbfd is not found, you will only get very limited crash stacktrace."
             << std::endl;
 #endif
+#endif /* _WIN32 */
 }
 
 void sig_cld(int sig) {
@@ -294,14 +297,19 @@ void init_win32() {
 }
 
 int driver_main(int argc, char **argv) {
+  // backward-cpp doesn't yet work on win32
+#ifndef _WIN32
   // register crash handlers
   backward::SignalHandling sh;
   if (!sh.loaded()) {
     std::cout << "Warning: Signal handler installation failed, not backtrace on crash!"
               << std::endl;
   }
+#endif
 
+#ifdef _WIN32
   init_win32();
+#endif
 
   auto base = init_main(argc, argv);
 
