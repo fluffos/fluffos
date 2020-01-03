@@ -36,7 +36,7 @@
  */
 
 .xterm {
-    font-feature-settings: "liga" 0;
+    font-feature-settings: "liga" on;
     position: relative;
     user-select: none;
     -ms-user-select: none;
