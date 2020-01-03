@@ -1,5 +1,5 @@
-# v2019 is targeted
-cmake_minimum_required(VERSION 3.10)   # CMake version check
+# v2019 is targeted to ubuntu 18.04 LTS, it ships with cmake 3.10
+cmake_minimum_required(VERSION 3.10)
 
 project(fluffos VERSION 2019
         DESCRIPTION "FluffOS LPC Driver"
