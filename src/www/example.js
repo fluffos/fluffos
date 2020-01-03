@@ -12,8 +12,8 @@ let history_index = -1;
 let current_command = "";
 
 function get_appropriate_ws_url(extra_url) {
-  var pcol;
-  var u = document.URL;
+  let pcol;
+  let u = document.URL;
 
   /*
    * We open the websocket encrypted if this page came on an
@@ -50,7 +50,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   term.open(el_terminal);
 
-  ws = new_ws(get_appropriate_ws_url(""), "ascii");
+  let ws = new_ws(get_appropriate_ws_url(""), "ascii");
   const attachAddon = new AttachAddon.AttachAddon(ws);
   term.loadAddon(attachAddon);
 
