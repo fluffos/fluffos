@@ -588,23 +588,6 @@ void f_environment(void) {
 }
 #endif
 
-#ifdef F_EXEC
-void f_exec(void) {
-  int i;
-
-  i = replace_interactive((sp - 1)->u.ob, sp->u.ob);
-
-  /* They might have been destructed */
-  if (sp->type == T_OBJECT) {
-    free_object(&sp->u.ob, "f_exec:1");
-  }
-  if ((--sp)->type == T_OBJECT) {
-    free_object(&sp->u.ob, "f_exec:2");
-  }
-  put_number(i);
-}
-#endif
-
 #ifdef F_EXPLODE
 void f_explode(void) {
   array_t *vec;
