@@ -108,12 +108,12 @@ int32_t u8_egc_index_to_offset(const char *src, int32_t index) {
 }
 
 // same as strncpy, copy up to maxlen bytes but will not copy broken characters.
-int32_t u8_strncpy(uint8_t *dest, const uint8_t *src, size_t maxlen) {
+int32_t u8_strncpy(uint8_t *dest, const uint8_t *src, const int32_t maxlen) {
   int32_t src_offset = 0;
   int32_t written = 0;
-  for (;;) {
+  while (written <= maxlen) {
     UChar32 c = 0;
-    U8_NEXT(src, src_offset, -1, c);
+    U8_NEXT(src, src_offset, maxlen, c);
     if (c <= 0) break;
     UBool isError = FALSE;
     U8_APPEND(dest, written, maxlen, c, isError);
