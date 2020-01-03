@@ -10,36 +10,42 @@ void test_oldcrypt(string key) {
 void test_crypt(string key) {
   string result;
 
-  // Default algo/salt is DES
+  // Old algo/salt is DES with 2 character key and maximum pasword length is 8
   ASSERT_EQ("12IbR.gJ8wcpc", crypt("123", "123"));
   ASSERT_EQ("12IbR.gJ8wcpc", crypt("123", "12IbR.gJ8wcpc"));
 
+  // yes, it is very broken
+  ASSERT_EQ("11abPRGlgbz9A", crypt("deadbeef", "11"));
+  ASSERT_EQ("11abPRGlgbz9A", crypt("deadbeef-wtf", "11-wtf"));
+
+  // Make sure we use SHA512 as default
   result = crypt(key, "");
+  ASSERT_EQ("$6$", result[0..2]);
   ASSERT_EQ(result, crypt(key, result));
 
   // Make sure we support $1$, $2a$, $2x$, $2y$, $5$, $6$ etc
-  result = crypt(key, "$1$12IbRgJ8$Y.vPnUxb7UxG.2bnEVAny.");
-  ASSERT_EQ("$1$12IbRgJ8$Y.vPnUxb7UxG.2bnEVAny.", result);
+  result = crypt(key, "$1$12IbRgJ8$92eJ54pYS5ISsRs./Jac21");
+  ASSERT_EQ("$1$12IbRgJ8$92eJ54pYS5ISsRs./Jac21", result);
   ASSERT_EQ(result, crypt(key, result));
 
   result = crypt(key, "$2a$05$abcdefghijklmnopqrstuu");
-  ASSERT_EQ("$2a$05$abcdefghijklmnopqrstuuUUDe2kD62zFEBivC.bhb00frGEXsinq", result);
+  ASSERT_EQ("$2a$05$abcdefghijklmnopqrstuunlwTxQ4sl7dLGS2xJ.iMMzU7tVomKuy", result);
   ASSERT_EQ(result, crypt(key, result));
 
   result = crypt(key, "$2x$08$abcdefghijklmnopqrstuu");
-  ASSERT_EQ("$2x$08$abcdefghijklmnopqrstuuQa7IQF7.7DwNJ1gNo9ChNEpDaymSfYq", result);
+  ASSERT_EQ("$2x$08$abcdefghijklmnopqrstuuwGS8NeHQOi8O1YXuHuWBzYTYdR1l8GS", result);
   ASSERT_EQ(result, crypt(key, result));
 
   result = crypt(key, "$2y$09$abcdefghijklmnopqrstuu");
-  ASSERT_EQ("$2y$09$abcdefghijklmnopqrstuuMwuBdFTxWJl8CdA0t6CpIt/rSERMOb.", result);
+  ASSERT_EQ("$2y$09$abcdefghijklmnopqrstuux4Xxxa5jKMzA60uXAXbkP/vAphqHo.q", result);
   ASSERT_EQ(result, crypt(key, result));
 
   result = crypt(key, "$5$xxpyPxiuc0IJY");
-  ASSERT_EQ("$5$xxpyPxiuc0IJY$OYOh92l2UEyk/Rb.cYlcgbbZ5zsP3TVErs4Jyvovmg5", result);
+  ASSERT_EQ("$5$xxpyPxiuc0IJY$BAJWByjsbjtPgIWKrBdSZes5VdZWyvYr2CZ3pmOzRr4", result);
   ASSERT_EQ(result, crypt(key, result));
 
   result = crypt(key, "$6$DSVWtVeRU/71A");
-  ASSERT_EQ("$6$DSVWtVeRU/71A$Z8TYP8XyUv.Qehba.tcxgcBT7XzON2rPBVYbGC3sCxvO8nu7KNRbq3GUoHH.yyJGSMmvWmTsNwHBCA1fHVGKI1", result);
+  ASSERT_EQ("$6$DSVWtVeRU/71A$GvRozPOkmWEd3wTR7wMMQhug5wM5rrEM/cle4VEZD1yDEGf1iq6JST0PDN1Ua6QaQslVK2jAzIBKOamxi5dt1.", result);
   ASSERT_EQ(result, crypt(key, result));
 
   // $2$ on the other hand, is wrong format
@@ -51,7 +57,7 @@ void test_crypt(string key) {
 void do_tests() {
   string key, result;
   // Chosen by fair dice roll. guaranteed to be random.
-  key = "U?5mG$'xe`%!pf6p\"";
+  key = "U?5测mG$'xe`%!pf6试p\"#";
 
   test_crypt(key);
   test_oldcrypt(key);
@@ -61,4 +67,9 @@ void do_tests() {
   ASSERT(result != oldcrypt(key, result));
   result = oldcrypt(key, "");
   ASSERT(result != crypt(key, result));
+
+  // Make sure invalid second parameter doesn't crash
+  ASSERT(crypt(key, key));
+  ASSERT(oldcrypt(key, key));
+
 }
