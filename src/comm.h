@@ -43,18 +43,11 @@
 
 void add_vmessage(struct object_t *, const char *, ...);
 void add_message(struct object_t *, const char *, int);
-void add_binary_message_noflush(struct object_t *, const unsigned char *, int);
-void add_binary_message(struct object_t *, const unsigned char *, int);
-
-void update_ref_counts_for_users(void);
-void make_selectmasks(void);
 bool init_user_conn(void);
 void shutdown_external_ports(void);
 void set_prompt(const char *);
-void process_io(void);
 void get_user_data(struct interactive_t *);
 int process_user_command(struct interactive_t *);
-int replace_interactive(struct object_t *, struct object_t *);
 int set_call(struct object_t *, struct sentence_t *, int);
 void remove_interactive(struct object_t *, int);
 
