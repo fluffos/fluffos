@@ -5,12 +5,12 @@ int get_config_item(svalue_t *res, svalue_t *arg) {
 
   num = arg->u.number;
 
-  if (num < 0 || num >= RUNTIME_CONFIG_NEXT) {
+  if (num < 0 || num >= RC_LAST_CONFIG_INT) {
     return 0;
   }
-  if (num >= BASE_CONFIG_INT) {
+  if (num >= RC_BASE_CONFIG_INT) {
     res->type = T_NUMBER;
-    res->u.number = config_int[num - BASE_CONFIG_INT];
+    res->u.number = config_int[num - RC_BASE_CONFIG_INT];
   } else {
     if (!config_str[num]) {  // obsolete value, less muds break if we don't
                              // renumber!
@@ -36,11 +36,11 @@ void f_set_config() {
   auto num = (sp - 1)->u.number;
   auto value = sp;
 
-  if (num < 0 || num >= RUNTIME_CONFIG_NEXT) {
+  if (num < 0 || num >= RC_LAST_CONFIG_INT) {
     pop_2_elems();
     error("Bad 1st argument to set_config()\n");
   }
-  if (num < BASE_CONFIG_INT) {
+  if (num < RC_BASE_CONFIG_INT) {
     pop_2_elems();
     error("Can not set string config through set_config() yet.\n");
   }

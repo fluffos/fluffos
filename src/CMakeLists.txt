@@ -441,6 +441,9 @@ print_target_properties(driver)
 install(TARGETS driver
   RUNTIME DESTINATION bin)
 
+install(DIRECTORY www
+        DESTINATION bin)
+
 if (NOT WIN32)
   add_executable(portbind "portbind.cc")
   install(TARGETS portbind
