@@ -325,6 +325,10 @@ void do_tests() {
   ASSERT_EQ(repeat_string(" ", 15) + tmp, sprintf("%40s", tmp));
   ASSERT_EQ(tmp + repeat_string(" ", 15), sprintf("%-40s", tmp));
 
+  // TODO: column mode doesn't work yet.
+  // tmp = "欲穷千里目🍆🍠🧮😊👌💩更上一层楼";
+  //ASSERT_EQ("欲穷千里目🍆🍠🧮😊👌💩更上一层楼", sprintf("%-=39s", tmp + tmp));
+
   // TODO: padding with utf8 chars!
 
   // char
