@@ -3,17 +3,17 @@
  */
 #include "base/std.h"
 
-#include "vm/internal/compiler/icode.h"
+#include "icode.h"
 
 #include <cstdio>  // for printf
 
 #include "include/function.h"
 #include "efuns.autogen.h"
 #include "vm/internal/base/program.h"
-#include "vm/internal/compiler/compiler.h"
-#include "vm/internal/compiler/keyword.h"
-#include "vm/internal/compiler/lex.h"
-#include "vm/internal/compiler/generate.h"
+#include "compiler.h"
+#include "keyword.h"
+#include "lex.h"
+#include "generate.h"
 
 /*
  * Macro for inserting global variable indices.

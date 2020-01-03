@@ -9,8 +9,8 @@
 #include "tracing/tracing.autogen.h"
 #endif
 #include "vm/internal/base/machine.h"
-#include "vm/internal/compiler/icode.h"  // for PUSH_WHAT
-#include "vm/internal/compiler/lex.h"    // for insstr, FIXME
+#include "compiler/internal/icode.h"  // for PUSH_WHAT
+#include "compiler/internal/lex.h"    // for insstr, FIXME
 #include "packages/core/sprintf.h"       // FIXME
 #include "packages/core/regexp.h"        // FIXME
 #include "packages/ops/ops.h"            // FIXME

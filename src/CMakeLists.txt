@@ -255,8 +255,8 @@ add_custom_command(
 
 add_custom_command(
   OUTPUT "grammar.autogen.y"
-  COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/make_grammar.sh" "${CMAKE_CURRENT_SOURCE_DIR}/../" "${CMAKE_CURRENT_SOURCE_DIR}/vm/internal/compiler/grammar.y.pre" "${CMAKE_CXX_COMPILER}" "-I${CMAKE_CURRENT_BINARY_DIR}" "-I${CMAKE_CURRENT_SOURCE_DIR}"
-  DEPENDS "tools/make_grammar.sh" "vm/internal/compiler/grammar.y.pre"
+  COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/make_grammar.sh" "${CMAKE_CURRENT_SOURCE_DIR}/../" "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.y.pre" "${CMAKE_CXX_COMPILER}" "-I${CMAKE_CURRENT_BINARY_DIR}" "-I${CMAKE_CURRENT_SOURCE_DIR}"
+  DEPENDS "tools/make_grammar.sh" "compiler/internal/grammar.y.pre"
 )
 
 find_package(BISON REQUIRED)
@@ -289,7 +289,12 @@ set(SRC
   "base/internal/stralloc.cc"
   "base/internal/strput.cc"
   "base/internal/strutils.cc"
-  "vm/internal/apply.cc"
+  "compiler/internal/compiler.cc"
+  "compiler/internal/generate.cc"
+  "compiler/internal/icode.cc"
+  "compiler/internal/lex.cc"
+  "compiler/internal/scratchpad.cc"
+  "compiler/internal/trees.cc"
   "vm/internal/base/apply_cache.cc"
   "vm/internal/base/array.cc"
   "vm/internal/base/buffer.cc"
@@ -300,12 +305,7 @@ set(SRC
   "vm/internal/base/object.cc"
   "vm/internal/base/program.cc"
   "vm/internal/base/svalue.cc"
-  "vm/internal/compiler/compiler.cc"
-  "vm/internal/compiler/generate.cc"
-  "vm/internal/compiler/icode.cc"
-  "vm/internal/compiler/lex.cc"
-  "vm/internal/compiler/scratchpad.cc"
-  "vm/internal/compiler/trees.cc"
+  "vm/internal/apply.cc"
   "vm/internal/eval_limit.cc"
   "vm/internal/posix_timers.cc"
   "vm/internal/master.cc"

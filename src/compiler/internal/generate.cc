@@ -1,6 +1,6 @@
 #include "base/std.h"
 
-#include "vm/internal/compiler/generate.h"
+#include "generate.h"
 
 #include <cstdio>
 
@@ -8,9 +8,9 @@
 #include "efuns.autogen.h"
 #include "vm/internal/base/number.h"  // for formatting lpc int
 
-#include "vm/internal/compiler/compiler.h"  // for CURRENT_PROGRAM_SIZE
-#include "vm/internal/compiler/lex.h"       // for pragmas
-#include "vm/internal/compiler/icode.h"     // for IS_NODE.
+#include "compiler.h"  // for CURRENT_PROGRAM_SIZE
+#include "lex.h"       // for pragmas
+#include "icode.h"     // for IS_NODE.
 
 static parse_node_t *optimize(parse_node_t * /*expr*/);
 static parse_node_t **last_local_refs = nullptr;
