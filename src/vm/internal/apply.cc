@@ -10,8 +10,8 @@
 #endif
 #include "vm/internal/base/apply_cache.h"
 #include "vm/internal/base/machine.h"
-#include "vm/internal/compiler/compiler.h"
-#include "vm/internal/compiler/lex.h"
+#include "compiler/internal/compiler.h"
+#include "compiler/internal/lex.h"
 
 // global static result
 svalue_t apply_ret_value;

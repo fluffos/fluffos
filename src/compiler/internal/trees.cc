@@ -11,11 +11,11 @@
 
 #include "base/std.h"
 
-#include "vm/internal/compiler/trees.h"
+#include "trees.h"
 
 #include "efuns.autogen.h"
-#include "vm/internal/compiler/compiler.h"
-#include "vm/internal/compiler/lex.h"
+#include "compiler.h"
+#include "lex.h"
 
 /* our globals */
 static parse_node_block_t *parse_block_list = nullptr;

@@ -15,7 +15,7 @@
 
 #include "base/std.h"
 
-#include "vm/internal/compiler/lex.h"
+#include "lex.h"
 #include "vm/internal/base/array.h"
 #include "vm/internal/base/interpret.h"
 #include "vm/internal/master.h"
@@ -34,10 +34,10 @@
 #include "options.autogen.h"
 #include "vm/internal/base/program.h"
 #include "vm/internal/base/svalue.h"
-#include "vm/internal/compiler/compiler.h"
-#include "vm/internal/compiler/keyword.h"
+#include "compiler.h"
+#include "keyword.h"
 #include "grammar.autogen.h"
-#include "vm/internal/compiler/scratchpad.h"
+#include "scratchpad.h"
 
 // FIXME: in master.h
 extern struct object_t *master_ob;

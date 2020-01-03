@@ -2,7 +2,7 @@
 
 #include "vm/vm.h"
 #include "vm/internal/base/machine.h"
-#include "vm/internal/compiler/lex.h"  // for instrs, FIXME
+#include "compiler/internal/lex.h"  // for instrs, FIXME
 
 #include "packages/core/replace_program.h"
 

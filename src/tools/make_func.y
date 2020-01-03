@@ -559,8 +559,8 @@ void make_efun_tables() {
 
   fprintf(f, "\n // EFUN arguments list (used by compiler.cc) \n\n");
 
-  fprintf(f, "#include \"vm/internal/compiler/keyword.h\"\n");
-  fprintf(f, "#include \"vm/internal/compiler/compiler.h\"\n");
+  fprintf(f, "#include \"compiler/internal/keyword.h\"\n");
+  fprintf(f, "#include \"compiler/internal/compiler.h\"\n");
   fprintf(f, "#include \"vm/internal/base/svalue.h\"\n");
   fprintf(f, "\n\n");
   fprintf(f, "#define DEFAULT_NONE 0xff\n");

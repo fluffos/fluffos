@@ -1,6 +1,6 @@
 #include "base/std.h"
 
-#include "vm/internal/compiler/scratchpad.h"
+#include "scratchpad.h"
 
 #include <cstdlib>
 
