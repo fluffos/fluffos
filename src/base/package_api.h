@@ -41,7 +41,7 @@
 #include "comm.h"  // reverse API, FIXME
 #include "user.h"  // reverse API
 
-#include "net/telnet.h" // Telnet related stuff
+#include "net/telnet.h"  // Telnet related stuff
 
 // trace.cc
 extern struct array_t *get_svalue_trace();

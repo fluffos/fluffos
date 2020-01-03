@@ -3392,7 +3392,10 @@ void f_crypt(void) {
       }
     } else if (SVALUE_STRLEN(sp) >= 2) {
       // Compat: Old f_crypt only use first two character as key.
-      debug_message("old crypt() password detected, It is only using first 2 character as key and ignore password beyond 8 characters, please upgrade to SHA512 using crypt(password) immediately.\n");
+      debug_message(
+          "old crypt() password detected, It is only using first 2 character as key and ignore "
+          "password beyond 8 characters, please upgrade to SHA512 using crypt(password) "
+          "immediately.\n");
       salt[0] = sp->u.string[0];
       salt[1] = sp->u.string[1];
       salt[2] = '\0';
@@ -3404,7 +3407,7 @@ void f_crypt(void) {
     salt[0] = '$';
     salt[1] = '6';
     salt[2] = '$';
-    for(auto i=0; i < SHA512_SALT_LEN; i++) {
+    for (auto i = 0; i < SHA512_SALT_LEN; i++) {
       salt[3 + i] = choice[random_number(strlen(choice))];
     }
     salt[sizeof(salt) - 1] = '\0';
@@ -3442,7 +3445,9 @@ void f_oldcrypt(void) {
     salt[SALT_LEN] = 0;
     p = salt;
   }
-  debug_message("oldcrypt() is deprecated! it is using MD5 and unsafe, please upgrade your code to use crypt(password).\n");
+  debug_message(
+      "oldcrypt() is deprecated! it is using MD5 and unsafe, please upgrade your code to use "
+      "crypt(password).\n");
   res = string_copy(custom_crypt((sp - 1)->u.string, p, nullptr), "f_oldcrypt");
   pop_2_elems();
   push_malloced_string(res);
