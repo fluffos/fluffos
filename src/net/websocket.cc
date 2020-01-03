@@ -26,24 +26,25 @@ static const struct lws_extension extensions[] = {
      "; client_max_window_bits"},
     {NULL, NULL, NULL /* terminator */}};
 
-static const struct lws_http_mount mount = {
-    /* .mount_next */ NULL,         /* linked-list "next" */
-    /* .mountpoint */ "/",          /* mountpoint URL */
-    /* .origin */ "./mount-origin", /* serve from dir */
-    /* .def */ "index.html",        /* default filename */
-    /* .protocol */ NULL,
-    /* .cgienv */ NULL,
-    /* .extra_mimetypes */ NULL,
-    /* .interpret */ NULL,
-    /* .cgi_timeout */ 0,
-    /* .cache_max_age */ 0,
-    /* .auth_mask */ 0,
-    /* .cache_reusable */ 0,
-    /* .cache_revalidate */ 0,
-    /* .cache_intermediaries */ 0,
-    /* .origin_protocol */ LWSMPRO_FILE, /* files in a dir */
-    /* .mountpoint_len */ 1,             /* char count */
-    /* .basic_auth_login_file */ NULL,
+// modified on create.
+static struct lws_http_mount mount = {
+  /* .mount_next */ NULL,         /* linked-list "next" */
+  /* .mountpoint */ "/",          /* mountpoint URL */
+  /* .origin */ nullptr, /* serve from dir */
+  /* .def */ "index.html",        /* default filename */
+  /* .protocol */ NULL,
+  /* .cgienv */ NULL,
+  /* .extra_mimetypes */ NULL,
+  /* .interpret */ NULL,
+  /* .cgi_timeout */ 0,
+  /* .cache_max_age */ 0,
+  /* .auth_mask */ 0,
+  /* .cache_reusable */ 0,
+  /* .cache_revalidate */ 0,
+  /* .cache_intermediaries */ 0,
+  /* .origin_protocol */ LWSMPRO_FILE, /* files in a dir */
+  /* .mountpoint_len */ 1,             /* char count */
+  /* .basic_auth_login_file */ NULL,
 };
 
 struct lws_context *init_websocket_context(event_base *base, port_def_t *port) {
@@ -63,6 +64,10 @@ struct lws_context *init_websocket_context(event_base *base, port_def_t *port) {
   void *foreign_loops[1] = {base};
 
   info.foreign_loops = foreign_loops;
+
+  DEBUG_CHECK(CONFIG_STR(__RC_WEBSOCKET_HTTP_DIR__) == nullptr, "Bug, no websocket http lib dir!");
+  mount.origin = CONFIG_STR(__RC_WEBSOCKET_HTTP_DIR__);
+
   info.mounts = &mount;
   info.port = CONTEXT_PORT_NO_LISTEN_SERVER;
   info.protocols = protocols;
@@ -107,7 +112,9 @@ void websocket_send_text(struct lws *wsi, const char *data, size_t len) {
   }
 }
 
-void close_websocket_context(struct lws_context *context) { lws_context_destroy(context); }
+void close_websocket_context(struct lws_context *context) {
+  lws_context_destroy(context);
+}
 
 void close_user_websocket(struct lws *wsi) {
   lws_set_timeout(wsi, pending_timeout::PENDING_FLUSH_STORED_SEND_BEFORE_CLOSE, LWS_TO_KILL_ASYNC);

@@ -13,14 +13,13 @@ name : Testsuite
 port number : 4000
 external_port_2: websocket 4001
 
+websocket http dir: ../src/www
+
 # Restrict IP binding, if omitted, bind to all addresses.
 mud ip : 127.0.0.1
 
 # absolute pathname of mudlib
 mudlib directory : ./
-
-# absolute pathname of driver/config dir
-binary directory : ./
 
 # debug.log and author/domain stats are stored here
 log directory : /log
@@ -29,17 +28,11 @@ log directory : /log
 # for multiple dirs, separate each path with a ':'
 include directories : /include
 
-# Directory to save binaries in.  (if BINARIES is defined)
-save binaries directory : /binaries
-
 # the file which defines the master object
 master file : /single/master
 
 # the file where all global simulated efuns are defined.
 simulated efun file : /single/simul_efun
-
-# file to swap out objects; not used if time to swap is 0
-swap file : /etc/swapfile
 
 # alternate debug.log file name (assumed to be in specified 'log directory')
 debug log file : debug.log

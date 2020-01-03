@@ -4,6 +4,7 @@ const term = new Terminal({
   convertEol: true,
   disableStdin: true,
   scrollback: 1024,
+  fontFamily: 'Consolas, Monaco, monospace, "Microsoft Yahei","微软雅黑", STXihei, "华文细黑", sans-serif'
 });
 
 let history = [];
