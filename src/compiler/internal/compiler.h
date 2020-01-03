@@ -3,7 +3,7 @@
 
 #include "vm/internal/base/function.h"  // for function_t
 #include "vm/internal/base/program.h"   // for DECL_MODS etc
-#include "vm/internal/compiler/trees.h"
+#include "trees.h"
 
 /* The end of a static buffer */
 #define EndOf(x) (x + sizeof(x) / sizeof(x[0]))

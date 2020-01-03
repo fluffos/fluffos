@@ -15,7 +15,7 @@
 #include "user.h"     // for users_foreach, FIXME
 #include "vm/internal/otable.h"
 #include "vm/internal/base/machine.h"
-#include "vm/internal/compiler/lex.h"  // for total_lines, FIXME
+#include "compiler/internal/lex.h"  // for total_lines, FIXME
 
 #include "packages/core/add_action.h"
 #include "packages/core/call_out.h"

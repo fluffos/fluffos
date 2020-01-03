@@ -1,6 +1,6 @@
 #include "base/std.h"
 
-#include "vm/internal/compiler/compiler.h"
+#include "compiler.h"
 
 #include <cstdlib>  // for qsort
 #include <cstdio>   // for sprintf
@@ -11,11 +11,11 @@
 
 #include "vm/internal/base/program.h"
 #include "vm/internal/base/svalue.h"
-#include "vm/internal/compiler/generate.h"
-#include "vm/internal/compiler/icode.h"
-#include "vm/internal/compiler/lex.h"
-#include "vm/internal/compiler/scratchpad.h"
-#include "vm/internal/compiler/keyword.h"
+#include "generate.h"
+#include "icode.h"
+#include "lex.h"
+#include "scratchpad.h"
+#include "keyword.h"
 
 #include "vm/internal/base/machine.h"  // for error(), FIXME
 
