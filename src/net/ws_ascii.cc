@@ -110,14 +110,14 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
       if (numbytes > 0) {
         numbytes = u8_truncate(&buf[LWS_PRE], numbytes);
 #ifdef DEBUG
-        if(!u8_validate(&buf[LWS_PRE], numbytes)) {
+        if (!u8_validate(&buf[LWS_PRE], numbytes)) {
           char buf1[MAX_TEXT + 1];
           strncpy(buf1, reinterpret_cast<const char *>(&buf[LWS_PRE]), numbytes);
           debug_message("Illegal UTF8 Websocket output string: %s.", buf1);
         }
 #endif
-        // TODO: we could use LWS_WRITE_TEXT , however it is much safer to use binary mode, its better to let client
-        // deal with incorrect encoding.
+        // TODO: we could use LWS_WRITE_TEXT , however it is much safer to use binary mode, its
+        // better to let client deal with incorrect encoding.
         auto m = lws_write(wsi, buf + LWS_PRE, numbytes, LWS_WRITE_BINARY);
         if (m < 0) {
           lwsl_err("ERROR %d writing to ws socket\n", m);

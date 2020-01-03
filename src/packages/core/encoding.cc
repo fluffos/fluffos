@@ -9,11 +9,11 @@ const char* DEFAULT_ENCODING = "utf-8";
 #ifdef F_SET_ENCODING
 void f_set_encoding() {
   if (!command_giver || !command_giver->interactive) {
-    if(st_num_arg) {
+    if (st_num_arg) {
       pop_stack();
     }
     push_malloced_string(string_copy(DEFAULT_ENCODING, "f_set_encoding: 1"));
-    return ;
+    return;
   }
 
   auto ip = command_giver->interactive;
@@ -66,11 +66,11 @@ void f_set_encoding() {
 #ifdef F_QUERY_ENCODING
 void f_query_encoding() {
   if (!command_giver || !command_giver->interactive) {
-    if(st_num_arg) {
+    if (st_num_arg) {
       pop_stack();
     }
     push_malloced_string(string_copy(DEFAULT_ENCODING, "f_set_encoding: 1"));
-    return ;
+    return;
   }
 
   auto res = DEFAULT_ENCODING;

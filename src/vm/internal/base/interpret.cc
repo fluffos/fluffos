@@ -11,9 +11,9 @@
 #include "vm/internal/base/machine.h"
 #include "compiler/internal/icode.h"  // for PUSH_WHAT
 #include "compiler/internal/lex.h"    // for insstr, FIXME
-#include "packages/core/sprintf.h"       // FIXME
-#include "packages/core/regexp.h"        // FIXME
-#include "packages/ops/ops.h"            // FIXME
+#include "packages/core/sprintf.h"    // FIXME
+#include "packages/core/regexp.h"     // FIXME
+#include "packages/ops/ops.h"         // FIXME
 
 int call_origin = 0;
 error_context_t *current_error_context = nullptr;
