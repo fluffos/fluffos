@@ -9,7 +9,7 @@ title: master / connect
 
 ### SYNOPSIS
 
-    object connect( void );
+    object connect( int );
 
 ### DESCRIPTION
 
@@ -17,6 +17,9 @@ title: master / connect
     logs into the driver.  The object returned by connect() is used as  the
     initial user object.  Note that it is possible to use exec(3) to switch
     the user connection from the initial user object to some other object.
+    
+    The argument, an int value, is the port number that this connection has
+    connected to.
 
 ### SEE ALSO
 
