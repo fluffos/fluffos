@@ -48,10 +48,10 @@ static struct lws_http_mount mount = {
 };
 
 struct lws_context *init_websocket_context(event_base *base, port_def_t *port) {
-  int logs = LLL_USER | LLL_ERR;
-
 #ifdef DEBUG
-  logs |= LLL_WARN | LLL_NOTICE;
+  int logs = LLL_USER | LLL_ERR;
+  logs |= LLL_WARN | LLL_NOTICE | LLL_INFO;
+
   // More debug levels
 
   /* | LLL_INFO */ /* | LLL_PARSER */ /* | LLL_HEADER */
