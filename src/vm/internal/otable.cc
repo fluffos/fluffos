@@ -92,9 +92,10 @@ int ObjectTable::showStatus(outbuffer_t* out, int verbose) {
     default:
       break;
   }
-  std::string content;
-  ss >> content;
-  outbuf_add(out, content.c_str());
+  {
+      std::string tmp = ss.str();
+      outbuf_add(out, tmp.c_str());
+  }
 
   return objects_.size() * sizeof(Value);
 }
