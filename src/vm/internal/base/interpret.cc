@@ -3170,12 +3170,12 @@ void eval_instruction(char *p) {
             if (!success) {
               error("Bad UTF-8 String: f_index.");
             }
-            if (i > codepoints || i < 0) {
+            if (i >= codepoints || i < 0) {
               error("String index out of bounds.\n");
             }
             UChar32 res = u8_egc_index_as_single_codepoint(sp->u.string, i);
             if (res < 0) {
-              error("String index only work for single codepoint character");
+              error("String index only work for single codepoint character.\n");
             }
             free_string_svalue(sp);
             (--sp)->u.number = res;
@@ -3236,15 +3236,15 @@ void eval_instruction(char *p) {
             size_t count;
             auto success = u8_egc_count(sp->u.string, &count);
             if (!success) {
-              error("Invalid UTF8 string: f_rindex");
+              error("Invalid UTF8 string: f_rindex.\n");
             }
             i = count - (sp - 1)->u.number;
-            if ((i > count) || (i < 0)) {
+            if ((i >= count) || (i < 0)) {
               error("String index out of bounds.\n");
             }
             UChar32 c = u8_egc_index_as_single_codepoint(sp->u.string, i);
             if (c < 0) {
-              error("String index only work for single codepoint character.");
+              error("String index only work for single codepoint character.\n");
             }
             free_string_svalue(sp);
             (--sp)->u.number = c;
@@ -3254,7 +3254,7 @@ void eval_instruction(char *p) {
             array_t *arr = sp->u.arr;
 
             if ((sp - 1)->type != T_NUMBER) {
-              error("Indexing an array with an illegal type\n");
+              error("Indexing an array with an illegal type.\n");
             }
             i = arr->size - (sp - 1)->u.number;
             if (i < 0 || i >= arr->size) {
