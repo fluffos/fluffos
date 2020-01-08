@@ -4,7 +4,9 @@ const term = new Terminal({
   convertEol: true,
   disableStdin: true,
   scrollback: 1024,
-  fontFamily: 'Consolas, Monaco, monospace, "Microsoft Yahei","微软雅黑", STXihei, "华文细黑", sans-serif'
+  tabStopWidth: 4,
+  fontFamily: 'SFMono-Regular,Consolas,Liberation Mono,Menlo,monospace, "Microsoft YaHei", SimSun',
+  fontSize: 16
 });
 
 let history = [];
@@ -47,6 +49,8 @@ document.addEventListener("DOMContentLoaded", function () {
   const el_terminal = document.getElementById('terminal');
   const el_input = document.getElementById('command');
   el_input.setAttribute("disabled", "disabled");
+  el_input.style.fontFamily = term.getOption("fontFamily");
+  el_input.style.fontSize = term.getOption("fontSize") + "px";
 
   term.open(el_terminal);
 
@@ -76,6 +80,12 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   el_input.addEventListener("keydown", function(e) {
+    if (e.key === "Tab") {
+      e.stopPropagation();
+      e.preventDefault();
+      return ;
+    }
+
     if (e.key === "Enter") {
       if(el_input.value) {
         history.push(el_input.value);
