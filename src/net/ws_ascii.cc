@@ -39,7 +39,7 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
 
   switch (reason) {
     case LWS_CALLBACK_PROTOCOL_INIT: {
-      lwsl_notice("LWS_CALLBACK_PROTOCOL_INIT\n");
+      lwsl_info("LWS_CALLBACK_PROTOCOL_INIT\n");
 
       vhd = reinterpret_cast<per_vhost_data *>(lws_protocol_vh_priv_zalloc(
           lws_get_vhost(wsi), lws_get_protocol(wsi), sizeof(struct per_vhost_data)));
@@ -48,11 +48,11 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
       vhd->vhost = lws_get_vhost(wsi);
     } break;
     case LWS_CALLBACK_PROTOCOL_DESTROY:
-      lwsl_notice("LWS_CALLBACK_PROTOCOL_DESTROY\n");
+      lwsl_info("LWS_CALLBACK_PROTOCOL_DESTROY\n");
       break;
     case LWS_CALLBACK_ESTABLISHED: {
       /* generate a block of output before travis times us out */
-      lwsl_notice("LWS_CALLBACK_ESTABLISHED\n");
+      lwsl_info("LWS_CALLBACK_ESTABLISHED\n");
 
       auto port = (port_def_t *)lws_context_user(lws_get_context(wsi));
       auto fd = lws_get_socket_fd(wsi);
@@ -85,7 +85,7 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
       break;
     }
     case LWS_CALLBACK_CLOSED: {
-      lwsl_user("LWS_CALLBACK_CLOSED: wsi %p\n", wsi);
+      lwsl_info("LWS_CALLBACK_CLOSED: wsi %p\n", wsi);
 
       auto ip = pss->user;
       if (!ip) {
@@ -101,7 +101,7 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
       break;
     }
     case LWS_CALLBACK_SERVER_WRITEABLE: {
-      lwsl_notice("LWS_CALLBACK_SERVER_WRITEABLE\n");
+      lwsl_info("LWS_CALLBACK_SERVER_WRITEABLE\n");
 
       auto total = evbuffer_get_length(pss->buffer);
 
@@ -120,7 +120,7 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
         // better to let client deal with incorrect encoding.
         auto m = lws_write(wsi, buf + LWS_PRE, numbytes, LWS_WRITE_BINARY);
         if (m < 0) {
-          lwsl_err("ERROR %d writing to ws socket\n", m);
+          lwsl_warn("ERROR %d writing to ws socket.\n", m);
           return -1;
         }
         evbuffer_drain(pss->buffer, m);
@@ -133,7 +133,7 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
       break;
     }
     case LWS_CALLBACK_RECEIVE: {
-      lwsl_notice(
+      lwsl_info(
           "LWS_CALLBACK_RECEIVE: %4d (rpp %5d, first %d, "
           "last %d, bin %d, len %zd)\n",
           (int)len, (int)lws_remaining_packet_payload(wsi), lws_is_first_fragment(wsi),
@@ -154,7 +154,7 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
       break;
     }
     default:
-      lwsl_notice("Unknown callback: %d, \n", reason);
+      lwsl_info("Unknown callback: %d, \n", reason);
       break;
   }
 
