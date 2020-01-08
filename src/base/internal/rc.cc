@@ -303,7 +303,7 @@ void read_config(char *filename) {
             external_port[i].kind = PORT_MUD;
           } else if (!strcmp(kind, "websocket")) {
             external_port[i].kind = PORT_WEBSOCKET;
-            scan_config_line("websocket http dir: %[^\n]", tmp, kMustHave);
+            scan_config_line("websocket http dir : %[^\n]", tmp, kMustHave);
             CONFIG_STR(__RC_WEBSOCKET_HTTP_DIR__) = alloc_cstring(tmp, "config file: whd");
           } else {
             fprintf(stderr, "Unknown kind of external port: %s\n", kind);
