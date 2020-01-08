@@ -2994,9 +2994,8 @@ void add_predefines() {
   add_predefine("__PACKAGE_DB__", -1, "");
 #endif
   add_predefine("__GET_CHAR_IS_BUFFERED__", -1, "");
-#ifdef PACKAGE_DSLIB
+  // all support for DSLIB is built in
   add_predefine("__DSLIB__", -1, "");
-#endif
 #ifdef PACKAGE_DWLIB
   add_predefine("__DWLIB__", -1, "");
 #endif
