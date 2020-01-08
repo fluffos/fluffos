@@ -441,6 +441,11 @@ print_target_properties(driver)
 install(TARGETS driver
   RUNTIME DESTINATION bin)
 
+# LPC include files
+install(DIRECTORY include
+        DESTINATION bin)
+
+# Websocket http files
 install(DIRECTORY www
         DESTINATION bin)
 
