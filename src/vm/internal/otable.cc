@@ -93,7 +93,7 @@ int ObjectTable::showStatus(outbuffer_t* out, int verbose) {
       break;
   }
   {
-      std::string tmp(std::move(ss.str());
+      std::string tmp = ss.str();
       outbuf_add(out, tmp.c_str());
   }
 
