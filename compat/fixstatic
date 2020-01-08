@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl -pi
+#!/usr/bin/perl -pi
 
 # Beek - 970910
 # Perl, as a language, is far from my favorite.  However, this task is
@@ -22,17 +22,17 @@
 # if it contains an open (, which is not part of a ({, ([, or (:, then it
 # is a function prototype or definition
 #
-# Note: this is wrong for initializers that contain (.  For example
-# static object this = this_object();  Perhaps we should handle =
-# first ...
-if (/\([^{[:]/) {
-    s/static/protected/;
-}
 # commas and assignments are pretty clear indictations of variables.  Note
 # that we don't have to worry about commas in argument lists since we have
 # already handled lines with (, which must appear between static and any comma.
-elsif (/,/ || /=/) {
+if (/,/ || /=/) {
     s/static/nosave/;
+}
+# Note: this is wrong for initializers that contain (.  For example
+# static object this = this_object();  Perhaps we should handle =
+# first ...
+elsif (/\([^{[:]/) {
+    s/static/protected/;
 }
 # static with a ; on the same line implies the entire line is here.  If it
 # was a prototype, it had a (.  Must be a variable.
