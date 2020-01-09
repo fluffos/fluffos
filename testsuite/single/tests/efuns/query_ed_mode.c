@@ -1,16 +1,14 @@
 void do_tests() {
 #ifndef __OLD_ED__
-    ASSERT(query_ed_mode() == -1);
+    ASSERT_EQ(-1, query_ed_mode());
     ed_start("/ed_test");
-    ASSERT(query_ed_mode() == 0);
-    ed_cmd("h");
-    ASSERT(query_ed_mode() == -2);
+    ASSERT_EQ(0, query_ed_mode());
     ed_cmd("");
-    ASSERT(query_ed_mode() == 0);
+    ASSERT_EQ(0, query_ed_mode());
     ed_cmd("2c");
-    ASSERT(query_ed_mode() == 2);
+    ASSERT_EQ(2, query_ed_mode());
     ed_cmd(".");
     ed_cmd("Q");
-    ASSERT(query_ed_mode() == -1);
+    ASSERT_EQ(-1, query_ed_mode());
 #endif
 }
