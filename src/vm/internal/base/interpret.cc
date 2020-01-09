@@ -750,7 +750,8 @@ static void push_lvalue_range(int code) {
   if (lv->type == T_STRING) {
     ind2 = sp->u.number;
     ind2 = (code & 0x01) ? (u8len - ind2) : ind2;
-    if (++ind2 < 0 || (ind2 > u8len)) {
+    ind2 = ind2 + 1;
+    if (ind2 < 0 || ind2 > u8len) {
       error(
           "The 2nd index to range lvalue must be >= -1 and < sizeof(indexed "
           "value)\n");
@@ -761,7 +762,8 @@ static void push_lvalue_range(int code) {
     }
   } else {
     ind2 = (code & 0x01) ? (size - sp->u.number) : sp->u.number;
-    if (++ind2 < 0 || (ind2 > size)) {
+    ind2 = ind2 + 1;
+    if (ind2 <= 0 || (ind2 > size)) {
       error(
           "The 2nd index to range lvalue must be >= -1 and < sizeof(indexed "
           "value)\n");
@@ -775,9 +777,9 @@ static void push_lvalue_range(int code) {
   if (lv->type == T_STRING) {
     ind1 = sp->u.number;
     ind1 = (code & 0x10) ? (u8len - ind1) : ind1;
-    if (ind1 < 0 || ind1 > u8len) {
+    if (ind1 < 0 || ind1 >= u8len) {
       error(
-          "The 1st index to range lvalue must be >= 0 and <= sizeof(indexed "
+          "The 1st index to range lvalue must be >= 0 and < sizeof(indexed "
           "value)\n");
     }
     ind1 = u8_egc_index_to_offset(lv->u.string, ind1);
@@ -3170,7 +3172,8 @@ void eval_instruction(char *p) {
             if (!success) {
               error("Bad UTF-8 String: f_index.");
             }
-            if (i >= codepoints || i < 0) {
+            // COMPAT: allow str[strlen(str)] == 0
+            if (i > codepoints || i < 0) {
               error("String index out of bounds.\n");
             }
             UChar32 res = u8_egc_index_as_single_codepoint(sp->u.string, i);
@@ -3239,12 +3242,13 @@ void eval_instruction(char *p) {
               error("Invalid UTF8 string: f_rindex.\n");
             }
             i = count - (sp - 1)->u.number;
-            if ((i >= count) || (i < 0)) {
-              error("String index out of bounds.\n");
+            // COMPAT: allow str[<0] == 0
+            if ((i > count) || (i < 0)) {
+              error("String rindex out of bounds.\n");
             }
             UChar32 c = u8_egc_index_as_single_codepoint(sp->u.string, i);
             if (c < 0) {
-              error("String index only work for single codepoint character.\n");
+              error("String rindex only work for single codepoint character.\n");
             }
             free_string_svalue(sp);
             (--sp)->u.number = c;
