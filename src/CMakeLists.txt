@@ -441,6 +441,10 @@ print_target_properties(driver)
 install(TARGETS driver
   RUNTIME DESTINATION bin)
 
+# LPC stdlib files
+install(DIRECTORY ../testsuite/std
+        DESTINATION bin)
+
 # LPC include files
 install(DIRECTORY include
         DESTINATION bin)
