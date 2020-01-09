@@ -10,40 +10,101 @@
 
 namespace {
 
-const auto fn_not_isspace = [](int c) { return !std::isspace(c); };
+    // --------------------------------------------------------------------------
+    /// @brief removes given characters from beginning of string
+    ///
+    /// @param str   string to be trimmed
+    /// @param chars characters to be removed, defaults to whitespace
+    ///
+    /// @return returns trimmed string
+    // --------------------------------------------------------------------------
+    inline std::string& ltrim(std::string&& str, const std::string& chars = "\t\n\v\f\r ")
+    {
+            str.erase(0, str.find_first_not_of(chars));
+            return str;
+    }
 
-// trim from start
-inline std::string &ltrim(std::string &s) {
-  s.erase(s.begin(), std::find_if(s.begin(), s.end(), fn_not_isspace));
-  return s;
-}
+    inline std::string ltrim(const std::string& str, const std::string& chars = "\t\n\v\f\r ")
+    {
+        std::string ret {str};
 
-// trim from end
-inline std::string &rtrim(std::string &s) {
-  s.erase(std::find_if(s.rbegin(), s.rend(), fn_not_isspace).base(), s.end());
-  return s;
-}
+        ret.erase(0, str.find_first_not_of(chars));
+        return ret;
+    }
 
-// trim from both ends
-inline std::string &trim(std::string &s) { return ltrim(rtrim(s)); }
+    // --------------------------------------------------------------------------
+    /// @brief removes given characters from end of string
+    ///
+    /// @param str   string to be trimmed
+    /// @param chars characters to be removed, defaults to whitespace
+    ///
+    /// @return returns trimmed string
+    // --------------------------------------------------------------------------
+    inline std::string& rtrim(std::string&& str, const std::string& chars = "\t\n\v\f\r ")
+    {
+            str.erase(str.find_last_not_of(chars) + 1);
+                return str;
+    }
 
-inline bool starts_with(const std::string &big_str, const std::string &small_str) {
-  return big_str.compare(0, small_str.length(), small_str) == 0;
-}
+    inline std::string rtrim(const std::string& str, const std::string& chars = "\t\n\v\f\r ")
+    {
+        std::string ret {str};
 
-inline bool ends_with(const std::string &str, const std::string &ending) {
-  if (str.length() < ending.length()) return false;
-  return str.compare(str.length() - ending.length(), ending.length(), ending) == 0;
-}
+        ret.erase(str.find_last_not_of(chars) + 1);
+        return ret;
+    }
 
-inline void ReplaceStringInPlace(std::string &subject, const std::string &search,
-                                 const std::string &replace) {
-  size_t pos = 0;
-  while ((pos = subject.find(search, pos)) != std::string::npos) {
-    subject.replace(pos, search.length(), replace);
-    pos += replace.length();
-  }
-}
+    // --------------------------------------------------------------------------
+    /// @brief removes given chars from beginning and end of string
+    ///
+    /// @param str   string to be trimmed
+    /// @param chars characters to be removed, defaults to whitespace
+    ///
+    /// @return returns trimmed string
+    // --------------------------------------------------------------------------
+    inline std::string& trim(std::string&& str, const std::string& chars = "\t\n\v\f\r ")
+    {
+        return ltrim(rtrim(str, chars), chars);
+    }
+
+    inline std::string trim(const std::string& str, const std::string& chars = "\t\n\v\f\r ")
+    {
+        return ltrim(rtrim(str, chars), chars);
+    }
+
+    // --------------------------------------------------------------------------
+    /// @brief checks beginning of string1 for presens of string2
+    ///
+    /// @param str   string to be examined
+    /// @param start string to be searched
+    ///
+    /// @return returns true if str begins with startm false otherwise
+    // --------------------------------------------------------------------------
+    inline bool starts_with(const std::string &str, const std::string &start) {
+        return str.compare(0, start.length(), start) == 0;
+    }
+
+    // --------------------------------------------------------------------------
+    /// @brief checks end of string 1 for presens of string 2
+    ///
+    /// @param str   string to be examined
+    /// @param end   string to be searched
+    ///
+    /// @return returns true if str begins with startm false otherwise
+    // --------------------------------------------------------------------------
+    inline bool ends_with(const std::string &str, const std::string &end) {
+        if (str.length() < end.length())
+            return false;
+        return str.compare(str.length() - end.length(), end.length(), end) == 0;
+    }
+
+    inline void ReplaceStringInPlace(std::string &subject, const std::string &search, const std::string &replace) {
+        size_t pos = 0;
+        while ((pos = subject.find(search, pos)) != std::string::npos) {
+            subject.replace(pos, search.length(), replace);
+            pos += replace.length();
+        }
+    }
 }  // namespace
 
 // Check string s is valid utf8
