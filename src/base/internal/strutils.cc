@@ -61,13 +61,50 @@ bool u8_egc_count(const char *src, size_t *count) {
 
 // Return the egc at given index of src, if it is an single code point
 UChar32 u8_egc_index_as_single_codepoint(const char *src, int32_t index) {
-  UChar32 c = U_SENTINEL;
-  auto start = u8_egc_index_to_offset(src, index);
-  auto end = u8_egc_index_to_offset(src, index + 1);
+  UErrorCode status = U_ZERO_ERROR;
+  int32_t pos = -1;
+  UText text = UTEXT_INITIALIZER;
 
-  if (start >= 0 && end >= start && end - start < U8_MAX_LENGTH) U8_NEXT_UNSAFE(src, start, c);
+  utext_openUTF8(&text, src, -1, &status);
+  if (!U_SUCCESS(status)) {
+    utext_close(&text);
+    return -1;
+  }
 
-  return c;
+  std::unique_ptr<icu::BreakIterator> brk(
+      icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status));
+  if (!U_SUCCESS(status)) {
+    utext_close(&text);
+    return -1;
+  }
+
+  brk->setText(&text, status);
+  if (!U_SUCCESS(status)) {
+    utext_close(&text);
+    return -1;
+  }
+
+  pos = brk->first();
+  while (index-- > 0 && pos >= 0) {
+    pos = brk->next();
+  }
+
+  // index is end-of-string
+  if (src[pos] == 0) {
+    utext_close(&text);
+    return 0;
+  }
+
+  UChar32 res = U_SENTINEL;
+  auto next_pos = brk->next();
+  if (next_pos >= 0) {
+    if (next_pos - pos <= U8_MAX_LENGTH) {
+      U8_NEXT((const uint8_t*) src, pos, -1, res);
+    }
+  }
+
+  utext_close(&text);
+  return res;
 }
 
 // Copy string src to dest, replacing character at index to c. Assuming dst is already allocated.
