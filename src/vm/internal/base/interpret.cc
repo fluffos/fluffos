@@ -340,30 +340,7 @@ static svalue_t *find_value(int num) {
 #define find_value(num) (&current_object->variables[num])
 #endif
 
-void free_string_svalue(svalue_t *v) {
-  const char *str = v->u.string;
-
-  if (v->subtype & STRING_COUNTED) {
-    int size = MSTR_SIZE(str);
-    if (DEC_COUNTED_REF(str)) {
-      SUB_STRING(size);
-      NDBG(BLOCK(str));
-      if (v->subtype & STRING_HASHED) {
-        SUB_NEW_STRING(size, sizeof(block_t));
-        deallocate_string(const_cast<char *>(str));
-        CHECK_STRING_STATS;
-      } else {
-        SUB_NEW_STRING(size, sizeof(malloc_block_t));
-        FREE(MSTR_BLOCK(str));
-        CHECK_STRING_STATS;
-      }
-    } else {
-      SUB_STRING(size);
-      NDBG(BLOCK(str));
-    }
-  }
-}
-
+#if 0
 void unlink_string_svalue(svalue_t *s) {
   char *str;
 
@@ -389,6 +366,7 @@ void unlink_string_svalue(svalue_t *s) {
       break;
   }
 }
+#endif
 
 void process_efun_callback(int narg, function_to_call_t *ftc, int f) {
   int argc = st_num_arg;
@@ -3901,7 +3879,7 @@ void call___INIT(object_t *ob) {
 /*
  * Call a function in all objects in a array.
  */
-array_t *call_all_other(array_t *v, const char *func, int numargs) {
+array_t *call_all_other(array_t *v, const std::string func, int numargs) {
   int size;
   svalue_t *tmp, *vptr, *rptr;
   array_t *ret;
@@ -3977,7 +3955,7 @@ char *function_name(program_t *prog, int findex) {
  * functions exist.  Note that if you actually intend to call the function,
  * it's faster to just try to call it and check if apply() returns zero.
  */
-const char *function_exists(const char *fun, object_t *ob, int flag) {
+const std::string function_exists(const std::string fun, object_t *ob, int flag) {
   int findex, runtime_index;
   program_t *prog;
   int flags;
@@ -3985,19 +3963,19 @@ const char *function_exists(const char *fun, object_t *ob, int flag) {
   DEBUG_CHECK(ob->flags & O_DESTRUCTED, "function_exists() on destructed object\n");
 
   if (fun[0] == APPLY___INIT_SPECIAL_CHAR) {
-    return nullptr;
+    return "";
   }
 
   prog = find_function_by_name(ob, fun, &findex, &runtime_index);
   if (!prog) {
-    return nullptr;
+    return "";
   }
 
   flags = ob->prog->function_flags[runtime_index];
 
   if ((flags & FUNC_UNDEFINED) ||
       (!flag && (flags & (DECL_PROTECTED | DECL_PRIVATE | DECL_HIDDEN)))) {
-    return nullptr;
+    return "";
   }
 
   return prog->filename;
@@ -4008,7 +3986,7 @@ const char *function_exists(const char *fun, object_t *ob, int flag) {
   is_static: returns 1 if a function named 'fun' is declared 'static' in 'ob';
   0 otherwise.
 */
-int is_static(const char *fun, object_t *ob) {
+int is_static(const std::string fun, object_t *ob) {
   int findex;
   int runtime_index;
   program_t *prog;
@@ -4644,8 +4622,8 @@ int last_instructions() {
 }
 
 /* Generate a debug message to the user */
-void do_trace(const char *msg, const char *fname, const char *post) {
-  const char *objname;
+void do_trace(const std::string msg, const std::string fname, const std::string post) {
+  const std::string objname;
 
   if (!TRACEHB) {
     return;

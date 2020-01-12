@@ -160,12 +160,12 @@ void f_bind(void) {
 static void print_cache_stats(outbuffer_t *ob) {
   outbuf_add(ob, "Apply lookup cache information\n");
   outbuf_add(ob, "-------------------------------\n");
-  outbuf_addv(ob, "%% cache hits:    %10.2f\n",
-              100 * (static_cast<LPC_FLOAT>(apply_cache_hits) / apply_cache_lookups));
-  outbuf_addv(ob, "total lookup:     %10lu\n", apply_cache_lookups);
-  outbuf_addv(ob, "cache hits:      %10lu\n", apply_cache_hits);
-  outbuf_addv(ob, "cache size (bytes w/o overhead):  %10lu\n",
-              apply_cache_items * sizeof(lookup_entry_s));
+  outbuf_add(ob, "% cache hits:    {:10.2}\n",
+             100 * (static_cast<LPC_FLOAT>(apply_cache_hits) / apply_cache_lookups));
+  outbuf_add(ob, "total lookup:     {:10l}\n", apply_cache_lookups);
+  outbuf_add(ob, "cache hits:      {:10l}\n", apply_cache_hits);
+  outbuf_add(ob, "cache size (bytes w/o overhead):  {:10l}\n",
+             apply_cache_items * sizeof(lookup_entry_s));
 }
 
 void f_cache_stats(void) {
@@ -181,7 +181,7 @@ void f_cache_stats(void) {
 /* enhanced call_other written 930314 by Luke Mewburn <zak@rmit.edu.au> */
 void f__call_other(void) {
   svalue_t *arg;
-  const char *funcname;
+  std::string funcname;
   int num_arg = st_num_arg;
   object_t *ob;
 
@@ -238,6 +238,8 @@ void f__call_other(void) {
 }
 #endif
 
+#if 0
+// apply.h provides an 'origin_to_name(int)' with the same semantics
 #if defined(F_CALL_STACK) || defined(F_ORIGIN)
 static const char *origin_name(int orig) {
   /* FIXME: this should use ffs() if available (BSD) */
@@ -249,6 +251,7 @@ static const char *origin_name(int orig) {
   }
   return origins[i];
 }
+#endif
 #endif
 
 #ifdef F_CALL_STACK
@@ -265,11 +268,9 @@ void f_call_stack(void) {
   switch (sp->u.number) {
     case 0:
       ret->item[0].type = T_STRING;
-      ret->item[0].subtype = STRING_MALLOC;
       ret->item[0].u.string = add_slash(current_prog->filename);
       for (i = 1; i < n; i++) {
         ret->item[i].type = T_STRING;
-        ret->item[i].subtype = STRING_MALLOC;
         ret->item[i].u.string = add_slash((csp - i + 1)->prog->filename);
       }
       break;
@@ -291,25 +292,21 @@ void f_call_stack(void) {
           int index = (csp - i)->fr.table_index;
           function_t *cfp = &prog->function_table[index];
 
-          ret->item[i].subtype = STRING_SHARED;
           ret->item[i].u.string = cfp->funcname;
-          ref_string(cfp->funcname);
         } else {
-          ret->item[i].subtype = STRING_CONSTANT;
-          ret->item[i].u.string =
-              (((csp - i)->framekind & FRAME_MASK) == FRAME_CATCH) ? "CATCH" : "<function>";
+          ret->item[i].u.string = std::string {(((csp - i)->framekind & FRAME_MASK) == FRAME_CATCH) ?
+              "CATCH" :
+              "<function>"};
         }
       }
       break;
     case 3:
       ret->item[0].type = T_STRING;
-      ret->item[0].subtype = STRING_CONSTANT;
-      ret->item[0].u.string = origin_name(caller_type);
+      ret->item[0].u.string = origin_to_name(caller_type);
 
       for (i = 1; i < n; i++) {
         ret->item[i].type = T_STRING;
-        ret->item[i].subtype = STRING_CONSTANT;
-        ret->item[i].u.string = origin_name((csp - i + 1)->caller_type);
+        ret->item[i].u.string = origin_to_name((csp - i + 1)->caller_type);
       }
       break;
     case 4:
@@ -318,16 +315,14 @@ void f_call_stack(void) {
         if (true || ((csp - i)->framekind & FRAME_MASK) == FRAME_FUNCTION ||
             ((csp - i)->framekind & FRAME_MASK) == FRAME_FUNP) {
           const program_t *prog = (i ? (csp - i + 1)->prog : current_prog);
-          int index = (csp - i)->fr.table_index;
           char *progc = (i ? (csp - i + 1)->pc : pc);
+          int index = (csp - i)->fr.table_index;
           function_t *cfp = &prog->function_table[index];
-          ret->item[i].type = T_STRING;
-          ret->item[i].subtype = STRING_MALLOC;
-          ret->item[i].u.string = string_copy(get_line_number(progc, prog), "call_stack");
+          ret->item[i].u.string = get_line_number(progc, prog);
         } else {
-          ret->item[i].subtype = STRING_CONSTANT;
-          ret->item[i].u.string =
-              (((csp - i)->framekind & FRAME_MASK) == FRAME_CATCH) ? "CATCH" : "<function>";
+          ret->item[i].u.string = std::string {(((csp - i)->framekind & FRAME_MASK) == FRAME_CATCH) ?
+              "CATCH" :
+              "<function>"};
         }
       }
       break;
@@ -339,11 +334,12 @@ void f_call_stack(void) {
 
 #ifdef F_CAPITALIZE
 void f_capitalize(void) {
-  if (uislower(sp->u.string[0])) {
-    unlink_string_svalue(sp);
-    // unlinked, so this is ok
-    (const_cast<char *>(sp->u.string))[0] = toupper(static_cast<unsigned char>(sp->u.string[0]));
-  }
+    if (sp->u.string->size() && (uislower(sp->u.string->at(0)))) {
+        std::string arg {sp->u.string};
+
+        arg.at(0) = toupper(arg.at(0));
+        put_string(arg);
+    }
 }
 #endif
 
@@ -368,40 +364,40 @@ void f_children(void) {
 void f_classp(void) {
   if (sp->type == T_CLASS) {
     free_class(sp->u.arr);
-    *sp = const1;
+    *sp = 1;
   } else {
     free_svalue(sp, "f_classp");
-    *sp = const0;
+    *sp = 0;
   }
 }
 #endif
 
 #ifdef F_CLEAR_BIT
 void f_clear_bit(void) {
-  char *str;
-  int len, ind, bit;
+    std::string str;
+    size_t len, ind, bit;
+    size_t max_bitfield_bits {static_cast<size_t>(CONFIG_INT(__MAX_BITFIELD_BITS__))};
 
-  auto max_bitfield_bits = CONFIG_INT(__MAX_BITFIELD_BITS__);
-  if (sp->u.number > max_bitfield_bits) {
-    error("clear_bit() bit requested : %d > maximum bits: %d\n", sp->u.number, max_bitfield_bits);
-  }
-  bit = (sp--)->u.number;
-  if (bit < 0) {
-    error("Bad argument 2 (negative) to clear_bit().\n");
-  }
-  ind = bit / 6;
-  bit %= 6;
-  len = SVALUE_STRLEN(sp);
-  if (ind >= len) {
-    return; /* return first arg unmodified */
-  }
-  unlink_string_svalue(sp);
-  str = const_cast<char *>(sp->u.string);
+    bit = static_cast<size_t>((sp--)->u.number);
+    if (bit > max_bitfield_bits) {
+        error("clear_bit() bit requested : {} > maximum bits: {}\n", bit, max_bitfield_bits);
+    }
 
-  if (str[ind] > 0x3f + ' ' || str[ind] < ' ') {
-    error("Illegal bit pattern in clear_bit character %d\n", ind);
-  }
-  str[ind] = ((str[ind] - ' ') & ~(1 << bit)) + ' ';
+    ind = bit / 6;
+    bit %= 6;
+
+    str = sp->u.string;
+    len = str.size();
+
+    if (ind >= len) {
+        return; /* return first arg unmodified */
+    }
+
+    if (str[ind] > 0x3f + ' ' || str[ind] < ' ') {
+        error("Illegal bit pattern {:02x} in clear_bit character {}\n", static_cast<uint8_t>(str[ind] - ' '), ind);
+    }
+    str.at(ind) = ((str.at(ind) - ' ') & ~(1 << bit)) + ' ';
+    put_string(rtrim(str));
 }
 #endif
 
@@ -409,10 +405,10 @@ void f_clear_bit(void) {
 void f_clonep(void) {
   if ((sp->type == T_OBJECT) && (sp->u.ob->flags & O_CLONE)) {
     free_object(&sp->u.ob, "f_clonep");
-    *sp = const1;
+    *sp = 1;
   } else {
     free_svalue(sp, "f_clonep");
-    *sp = const0;
+    *sp = 0;
   }
 }
 #endif
@@ -428,32 +424,23 @@ void f__new(void) {
   if (ob) {
     put_unrefed_undested_object(ob, "f_clone_object");
   } else {
-    *sp = const0;
+    *sp = 0;
   }
 }
 #endif
 
 #ifdef F_CTIME
 void f_ctime(void) {
-  const char *cp, *nl;
-  char *p;
-  int l;
-  if (st_num_arg) {
-    cp = time_string(sp->u.number);
-  } else {
-    push_number(0);
-    cp = time_string(get_current_time());
-  }
-  if ((nl = strchr(cp, '\n'))) {
-    l = nl - cp;
-  } else {
-    l = strlen(cp);
-  }
+    std::string cp;
 
-  p = new_string(l, "f_ctime");
-  strncpy(p, cp, l);
-  p[l] = '\0';
-  put_malloced_string(p);
+    if (st_num_arg) {
+        cp = time_string(sp->u.number);
+    } else {
+        push_number(0);
+        cp = time_string(get_current_time());
+    }
+
+    put_string(trim(cp));
 }
 #endif
 
@@ -537,21 +524,9 @@ void f_enable_wizard(void) {
 
 #ifdef F_ERROR
 void f_error(void) {
-  int l = SVALUE_STRLEN(sp);
-  if (l && sp->u.string[l - 1] == '\n') {
-    l--;
-  }
-  const auto max_string_length = LARGEST_PRINTABLE_STRING;
-  l = std::min(l, max_string_length - 3);
+    std::string err_buf {'*'};
 
-  // VLA
-  char err_buf[l + 3];
-
-  err_buf[0] = '*';
-  u8_strncpy(reinterpret_cast<uint8_t *>(err_buf + 1),
-             reinterpret_cast<const uint8_t *>(sp->u.string), l);
-  err_buf[l + 1] = '\n';
-  err_buf[l + 2] = 0;
+  err_buf += trim(*(sp->u.string)) + '\n';
 
   error_handler(err_buf);
 }
@@ -591,9 +566,7 @@ void f_environment(void) {
 void f_explode(void) {
   array_t *vec;
 
-  int len = SVALUE_STRLEN(sp - 1);
-
-  vec = explode_string((sp - 1)->u.string, len, sp->u.string, SVALUE_STRLEN(sp));
+  vec = explode_string((sp - 1)->u.string, sp->u.string);
   free_string_svalue(sp--);
   free_string_svalue(sp);
   put_array(vec);
@@ -602,12 +575,10 @@ void f_explode(void) {
 
 #ifdef F_FILE_NAME
 void f_file_name(void) {
-  char *res;
+    std::string res {add_slash(sp->u.ob->obname)};
 
-  /* This function now returns a leading '/' */
-  res = add_slash(sp->u.ob->obname);
   free_object(&sp->u.ob, "f_file_name");
-  put_malloced_string(res);
+  put_string(res);
 }
 #endif
 
@@ -652,7 +623,7 @@ void f_find_object(void) {
     /* find_object only returns undested objects */
     put_unrefed_undested_object(ob, "find_object");
   } else {
-    *sp = const0;
+    *sp = 0;
   }
 }
 #endif
@@ -690,9 +661,8 @@ void f_function_profile(void) {
 
 #ifdef F_FUNCTION_EXISTS
 void f_function_exists(void) {
-  const char *str;
-  char *res;
-  int l;
+    std::string str;
+    std::string res;
   object_t *ob;
   int flag = 0;
 
@@ -705,7 +675,7 @@ void f_function_exists(void) {
   } else {
     if (current_object->flags & O_DESTRUCTED) {
       free_string_svalue(sp);
-      *sp = const0;
+      *sp = 0;
       return;
     }
     ob = current_object;
@@ -713,17 +683,12 @@ void f_function_exists(void) {
 
   str = function_exists(sp->u.string, ob, flag);
   free_string_svalue(sp);
-  if (str) {
-    l = SHARED_STRLEN(str) - 2; /* no .c */
-    res = new_string(l + 1, "function_exists");
-    res[0] = '/';
-    strncpy(res + 1, str, l);
-    res[l + 1] = 0;
+  if (!str.empty()) {
+    std::string res = {str.substr(0, str.size()-2)};
 
-    sp->subtype = STRING_MALLOC;
     sp->u.string = res;
   } else {
-    *sp = const0;
+    *sp = 0;
   }
 }
 #endif
@@ -754,7 +719,7 @@ void f_get_char(void) {
 #ifdef F_IMPLODE
 void f_implode(void) {
   array_t *arr;
-  int flag;
+  bool flag;
   svalue_t *args;
 
   if (st_num_arg == 3) {
@@ -764,22 +729,21 @@ void f_implode(void) {
           "Third argument to implode() is illegal with implode(array, "
           "string)\n");
     }
-    flag = 1;
+    flag = true;
   } else {
     args = (sp - 1);
-    flag = 0;
+    flag = false;
   }
   arr = args->u.arr;
   check_for_destr(arr);
 
   if (args[1].type == T_STRING) {
     /* st_num_arg == 2 here */
-    char *str;
+      std::string str {implode_string(arr, sp->u.string)};
 
-    str = implode_string(arr, sp->u.string, SVALUE_STRLEN(sp));
     free_string_svalue(sp--);
     free_array(arr);
-    put_malloced_string(str);
+    put_string(str);
   } else { /* function */
     funptr_t *funp = args[1].u.fp;
 
@@ -945,7 +909,7 @@ void f_functionp(void) {
     put_number(i);
     return;
   }
-  assign_svalue(sp, &const0);
+  *sp = 0;
 }
 #endif
 
@@ -971,24 +935,25 @@ void f_values(void) {
 
 #ifdef F_LOWER_CASE
 void f_lower_case(void) {
-  char *str;
+    size_t len {sp->u.string->size()};
+    if (len) {
+        std::string str {sp->u.string};
+        bool f {false};
 
-  str = const_cast<char *>(sp->u.string);
-  /* find first upper case letter, if any */
-  for (; *str; str++) {
-    if (uisupper(*str)) {
-      int l = str - sp->u.string;
-      unlink_string_svalue(sp);
-      str = const_cast<char *>(sp->u.string) + l;
-      *str = tolower(static_cast<unsigned char>(*str));
-      for (str++; *str; str++) {
-        if (uisupper(*str)) {
-          *str = tolower(static_cast<unsigned char>(*str));
+        /* find first upper case letter, if any */
+        for (size_t i {0}; i < len; i++) {
+            if (uisupper(str.at(i))) {
+                str.at(i) = tolower(static_cast<unsigned char>(str.at(i)));
+                if (!f) {
+                    f = true;
+                }
+            }
         }
-      }
-      return;
+        if (f) {
+        put_string(str);
+        }
     }
-  }
+    return;
 }
 #endif
 
@@ -1023,10 +988,10 @@ void f_map_delete(void) {
 void f_mapp(void) {
   if (sp->type == T_MAPPING) {
     free_mapping(sp->u.map);
-    *sp = const1;
+    *sp = 1;
   } else {
     free_svalue(sp, "f_mapp");
-    *sp = const0;
+    *sp = 0;
   }
 }
 #endif
@@ -1069,8 +1034,9 @@ void f_master(void) {
  */
 #ifdef F_MATCH_PATH
 void f_match_path(void) {
+  const char *src {sp->u.string->c_str()};
+  size_t s_len {sp->u.string->size()};
   svalue_t *value;
-  const char *src;
   char *dst;
   svalue_t *nvalue;
   mapping_t *map;
@@ -1078,9 +1044,8 @@ void f_match_path(void) {
 
   value = &const0u;
 
-  tmpstr = reinterpret_cast<char *>(DMALLOC(SVALUE_STRLEN(sp) + 1, TAG_STRING, "match_path"));
+  tmpstr = reinterpret_cast<char *>(DMALLOC(s_len + 1, TAG_STRING, "match_path"));
 
-  src = sp->u.string;
   dst = tmpstr;
 
   while (*src != '\0') {
@@ -1106,7 +1071,7 @@ void f_match_path(void) {
   FREE(tmpstr);
   /* Don't free mapping first, in case sometimes one uses a ref 1 mapping */
   /* Randor - 5/29/94 */
-  free_string_svalue(sp--);
+  free_svalue(sp--, "efun::match_path");
   map = sp->u.map;
   assign_svalue_no_free(sp, value);
   free_mapping(map);
@@ -1116,7 +1081,7 @@ void f_match_path(void) {
 #ifdef F_MEMBER_ARRAY
 void f_member_array(void) {
   array_t *v;
-  int flag = 0;
+  int flag {0};
   int i;
   int size;
 
@@ -1136,60 +1101,46 @@ void f_member_array(void) {
   }
 
   if (sp->type == T_STRING) {
-    const char *res;
-    if (flag & 2) {
-      error("member_array: can not search backwards in strings");
-    }
+    size_t res;
     CHECK_TYPES(sp - 1, T_NUMBER, 1, F_MEMBER_ARRAY);
-    if (i > SVALUE_STRLEN(sp)) {
+    if (i > sp->u.string->size()) {
       error("Index to start search from in member_array() is > string length.\n");
     }
-    if ((res = strchr(sp->u.string + i, (sp - 1)->u.number))) {
-      i = res - sp->u.string;
+    if (flag & 2) {         // of course one can find the last occurance in a string...
+        res = sp->u.string->find_last_of(static_cast<char>((sp-1)->u.number), i);
     } else {
+        res = sp->u.string->find_first_of(static_cast<char>((sp-1)->u.number), i);
+    }
+    if (res == std::string::npos) {     // not found
       i = -1;
+    } else {
+      i = res;
     }
     free_string_svalue(sp--);
   } else {
     svalue_t *sv;
     svalue_t *find;
-    int flen;
+    size_t flen {0};
 
     size = (v = sp->u.arr)->size;
     find = (sp - 1);
     /* optimize a bit */
     if (find->type == T_STRING) {
-      /* *not* COUNTED_STRLEN() which can do a (costly) strlen() call */
-      if (find->subtype & STRING_COUNTED) {
-        flen = MSTR_SIZE(find->u.string);
-      } else if (flag & 1) {
-        flen = strlen(find->u.string);
-      } else {
-        flen = 0;
-      }
+        flen = find->u.string->size();
     }
 
     for (; i < size; i++) {
       int tmp = i;
-      if (flag & 2) {
+      if (flag & 2) {           // for compatibility with existing mudlibs
         tmp = size - tmp - 1;
       }
       switch (find->type | (sv = v->item + tmp)->type) {
         case T_STRING:
-          if (flag & 1) {
-            if (flen && (sv->subtype & STRING_COUNTED) && flen > MSTR_SIZE(sv->u.string)) {
+          if (flen > sv->u.string->size()) {
               continue;
-            }
-            if (strncmp(find->u.string, sv->u.string, flen)) {
-              continue;
-            }
-          } else {
-            if (flen && (sv->subtype & STRING_COUNTED) && flen != MSTR_SIZE(sv->u.string)) {
-              continue;
-            }
-            if (strcmp(find->u.string, sv->u.string)) {
-              continue;
-            }
+          }
+          if (find->u.string != sv->u.string) {
+            continue;
           }
           break;
         case T_NUMBER:
@@ -1273,7 +1224,7 @@ void f_message(void) {
     case T_OBJECT:
     case T_STRING:
       use = allocate_empty_array(1);
-      use->item[0] = args[2];
+      assign_svalue(&(use->item[0]), &(args[2]));
       args[2].type = T_ARRAY;
       args[2].u.arr = use;
       break;
@@ -1281,17 +1232,6 @@ void f_message(void) {
       use = args[2].u.arr;
       break;
     case T_NUMBER: {
-      int len = SVALUE_STRLEN(args + 1);
-
-      /* this is really bad and probably should be rm'ed -Beek;
-       * on the other hand, we don't have a debug_message() efun yet.
-       * Well, there is one in contrib now ...
-       */
-      /* for compatibility (write() simul_efuns, etc)  -bobf */
-      if (len > LARGEST_PRINTABLE_STRING) {
-        error("Printable strings limited to length of %d.\n", LARGEST_PRINTABLE_STRING);
-      }
-
       add_message(command_giver, args[1].u.string);
       pop_n_elems(num_arg);
       return;
@@ -1303,7 +1243,7 @@ void f_message(void) {
     switch (args[3].type) {
       case T_OBJECT:
         avoid = allocate_empty_array(1);
-        avoid->item[0] = args[3];
+        assign_svalue(&(avoid->item[0]), &(args[3]));
         args[3].type = T_ARRAY;
         args[3].u.arr = avoid;
         break;
@@ -1345,7 +1285,7 @@ void f_move_object(void) {
 
 #ifdef F_MUD_STATUS
 void f_mud_status(void) {
-  uint64_t tot = 0;
+  size_t tot = 0;
   int verbose = 0;
   outbuffer_t ob;
 
@@ -1354,14 +1294,13 @@ void f_mud_status(void) {
 
   if (verbose) {
     char dir_buf[1024];
-    outbuf_addv(&ob, "current working directory: %s\n\n", get_current_dir(dir_buf, 1024));
+    outbuf_add(&ob, "current working directory: {}\n\n", get_current_dir(dir_buf, 1024));
     outbuf_add(&ob, "add_message statistics\n");
     outbuf_add(&ob, "------------------------------\n");
-    outbuf_addv(&ob,
-                "Calls to add_message: %8" PRIu64 "   Packets: %8" PRIu64
-                "   Average packet size: %.2lf bytes\n\n",
-                add_message_calls, inet_packets,
-                inet_volume && inet_packets ? static_cast<double>(inet_volume) / inet_packets : 0);
+    outbuf_add(&ob,
+               "Calls to add_message: {:8}   Packets: {:8}   Average packet size: {:.2} bytes\n\n",
+               add_message_calls, inet_packets,
+               inet_volume && inet_packets ? static_cast<double>(inet_volume) / inet_packets : 0);
 
     stat_living_objects(&ob);
 
@@ -1378,26 +1317,26 @@ void f_mud_status(void) {
     tot += print_call_out_usage(&ob, verbose);
   } else {
     /* !verbose */
-    outbuf_addv(&ob, "Sentences:\t\t\t%8d %8d\n", tot_alloc_sentence,
-                tot_alloc_sentence * sizeof(sentence_t));
+    outbuf_add(&ob, "Sentences:\t\t\t%8d %8d\n", tot_alloc_sentence,
+               tot_alloc_sentence * sizeof(sentence_t));
 #ifndef DEBUG
-    outbuf_addv(&ob, "Objects:\t\t\t%8" PRIu64 " %8" PRIu64 "\n", tot_alloc_object,
-                tot_alloc_object_size);
+    outbuf_add(&ob, "Objects:\t\t\t{:8} {:8}\n", tot_alloc_object,
+               tot_alloc_object_size);
 #else
-    outbuf_addv(&ob, "Objects:\t\t\t%8" PRIu64 " %8" PRIu64 " (%8" PRIu64 " dangling)\n",
-                tot_alloc_object, tot_alloc_object_size, tot_dangling_object);
+    outbuf_add(&ob, "Objects:\t\t\t{:8} {:8} ({:8} dangling)\n",
+               tot_alloc_object, tot_alloc_object_size, tot_dangling_object);
 #endif
-    outbuf_addv(&ob, "Prog blocks:\t\t\t%8" PRIu64 " %8" PRIu64 "\n", total_num_prog_blocks,
-                total_prog_block_size);
-    outbuf_addv(&ob, "Arrays:\t\t\t\t%8" PRIu64 " %8" PRIu64 "\n", num_arrays, total_array_size);
-    outbuf_addv(&ob, "Classes:\t\t\t%8" PRIu64 " %8" PRIu64 "\n", num_classes, total_class_size);
+    outbuf_add(&ob, "Prog blocks:\t\t\t{:8} {:8}\n", total_num_prog_blocks,
+               total_prog_block_size);
+    outbuf_add(&ob, "Arrays:\t\t\t\t{:8} {:8}\n", num_arrays, total_array_size);
+    outbuf_add(&ob, "Classes:\t\t\t{:8} {:8}\n", num_classes, total_class_size);
 
-    outbuf_addv(&ob, "Mappings:\t\t\t%8" PRIu64 " %8" PRIu64 "\n", num_mappings,
-                total_mapping_size);
-    outbuf_addv(&ob, "Mappings(nodes):\t\t%8" PRIu64 "\n", total_mapping_nodes);
+    outbuf_add(&ob, "Mappings:\t\t\t{:8} {:8}\n", num_mappings,
+               total_mapping_size);
+    outbuf_add(&ob, "Mappings(nodes):\t\t{:8}\n", total_mapping_nodes);
 
-    outbuf_addv(&ob, "Interactives:\t\t\t%8d %8" PRIu64 "\n", users_num(true),
-                (uint64_t)(users_num(true)) * sizeof(interactive_t));
+    outbuf_add(&ob, "Interactives:\t\t\t%8d {:8}\n", users_num(true),
+               (uint64_t)(users_num(true)) * sizeof(interactive_t));
 
     tot = ObjectTable::instance().showStatus(&ob, verbose) + heart_beat_status(&ob, verbose) +
           add_string_status(&ob, verbose) + print_call_out_usage(&ob, verbose);
@@ -1409,7 +1348,7 @@ void f_mud_status(void) {
 
   if (!verbose) {
     outbuf_add(&ob, "\t\t\t\t\t --------\n");
-    outbuf_addv(&ob, "Total:\t\t\t\t\t %8d\n", tot);
+    outbuf_add(&ob, "Total:\t\t\t\t\t {:8}\n", tot);
   }
   outbuf_push(&ob);
 }
@@ -1419,26 +1358,26 @@ void f_mud_status(void) {
 void f_objectp(void) {
   if (sp->type == T_OBJECT && !(sp->u.ob->flags & O_DESTRUCTED)) {
     free_object(&sp->u.ob, "f_objectp");
-    *sp = const1;
+    *sp = 1;
   } else {
     free_svalue(sp, "f_objectp");
-    *sp = const0;
+    *sp = 0;
   }
 }
 #endif
 
 #ifdef F_ORIGIN
-void f_origin(void) { push_constant_string(origin_name(caller_type)); }
+void f_origin(void) { push_string(origin_to_name(caller_type)); }
 #endif
 
 #ifdef F_POINTERP
 void f_pointerp(void) {
   if (sp->type == T_ARRAY) {
     free_array(sp->u.arr);
-    *sp = const1;
+    *sp = 1;
   } else {
     free_svalue(sp, "f_pointerp");
-    *sp = const0;
+    *sp = 0;
   }
 }
 #endif
@@ -1501,7 +1440,8 @@ void f_previous_object(void) {
         v->item[0].u.ob = previous_ob;
         add_ref(previous_ob, "previous_object(-1)");
       } else {
-        v->item[0] = const0u;
+        v->item[0] = 0;
+        v->item[0].subtype = T_UNDEFINED;
       }
       i = 1;
     } else {
@@ -1514,7 +1454,8 @@ void f_previous_object(void) {
           v->item[i].u.ob = ob;
           add_ref(ob, "previous_object(-1)");
         } else {
-          v->item[i] = const0u;
+          v->item[i] = 0;
+          v->item[i].subtype = T_UNDEFINED;
         }
         i++;
       }
@@ -1538,10 +1479,10 @@ void f_printf(void) {
   char *ret;
 
   if (command_giver) {
-    ret = string_print_formatted((sp - num_arg + 1)->u.string, num_arg - 1, sp - num_arg + 2);
+    ret = string_print_formatted((sp - num_arg + 1)->u.string->c_str(), num_arg - 1, sp - num_arg + 2);
     if (ret) {
-      tell_object(command_giver, ret, COUNTED_STRLEN(ret));
-      FREE_MSTR(ret);
+      tell_object(command_giver, ret);
+      free(ret);
     }
   }
 
@@ -1556,7 +1497,7 @@ void f_process_string(void) {
   str = process_string(sp->u.string);
   if (str != sp->u.string) {
     free_string_svalue(sp);
-    put_malloced_string(str);
+    put_string(str);
   }
 }
 #endif
@@ -1570,7 +1511,7 @@ void f_process_value(void) {
   if (ret) {
     assign_svalue_no_free(sp, ret);
   } else {
-    *sp = const0;
+    *sp = 0;
   }
 }
 #endif
@@ -1591,13 +1532,7 @@ void f_query_ed_mode(void) {
 
 #ifdef F_QUERY_HOST_NAME
 void f_query_host_name(void) {
-  char *tmp;
-
-  if ((tmp = query_host_name())) {
-    push_constant_string(tmp);
-  } else {
-    push_number(0);
-  }
+    push_string(query_host_name());
 }
 #endif
 
@@ -1613,57 +1548,42 @@ void f_query_idle(void) {
 
 #ifdef F_QUERY_IP_NAME
 void f_query_ip_name(void) {
-  const char *tmp;
+  const std::string tmp {query_ip_name(st_num_arg ? sp->u.ob : nullptr)};
 
-  tmp = query_ip_name(st_num_arg ? sp->u.ob : nullptr);
   if (st_num_arg) {
     free_object(&(sp--)->u.ob, "f_query_ip_name");
   }
-  if (!tmp) {
-    push_number(0);
-  } else {
-    push_shared_string(tmp);
-  }
-  // no need to free
+  push_string(tmp);
 }
 #endif
 
 #ifdef F_QUERY_IP_NUMBER
 void f_query_ip_number(void) {
-  const char *tmp;
+  const std::string tmp {query_ip_number(st_num_arg ? sp->u.ob : nullptr)};
 
-  tmp = query_ip_number(st_num_arg ? sp->u.ob : nullptr);
   if (st_num_arg) {
     free_object(&(sp--)->u.ob, "f_query_ip_number");
   }
-  if (!tmp) {
-    push_number(0);
-  } else {
-    copy_and_push_string(tmp);
-  }
-
-  if (tmp) free_string(tmp);
+  push_string(tmp);
 }
 #endif
 
 #ifdef F_QUERY_LOAD_AVERAGE
-void f_query_load_average(void) { copy_and_push_string(query_load_av().c_str()); }
+void f_query_load_average(void) { push_string(query_load_av().c_str()); }
 #endif
 
 #ifdef F_QUERY_PRIVS
 void f_query_privs(void) {
-  object_t *ob;
+    object_t *ob;
 
-  ob = sp->u.ob;
-  if (ob->privs != NULL) {
-    sp->type = T_STRING;
-    sp->u.string = make_shared_string(ob->privs);
-    sp->subtype = STRING_SHARED;
+    ob = sp->u.ob;
+    if (!ob->privs.empty()) {
+        sp->type = T_STRING;
+        sp->u.string = ob->privs;
+    } else {
+        *sp = 0;
+    }
     free_object(&ob, "f_query_privs");
-  } else {
-    free_object(&ob, "f_query_privs");
-    *sp = const0;
-  }
 }
 #endif
 
@@ -1676,7 +1596,7 @@ void f_query_snooping(void) {
   if (ob) {
     put_unrefed_undested_object(ob, "query_snooping");
   } else {
-    *sp = const0;
+    *sp = 0;
   }
 }
 #endif
@@ -1690,7 +1610,7 @@ void f_query_snoop(void) {
   if (ob) {
     put_unrefed_undested_object(ob, "query_snoop");
   } else {
-    *sp = const0;
+    *sp = 0;
   }
 }
 #endif
@@ -1707,92 +1627,101 @@ void f_random(void) {
 
 #ifdef F_READ_BYTES
 void f_read_bytes(void) {
-  char *str;
-  int start = 0, len = 0, rlen = 0, num_arg = st_num_arg;
-  svalue_t *arg;
+    std::string *str {nullptr};
+    int start {0};
+    int len {0};
+    int rlen {0};
+    int num_arg {st_num_arg};
+    svalue_t *arg;
 
-  arg = sp - num_arg + 1;
-  if (num_arg > 1) {
-    start = arg[1].u.number;
-  }
-  if (num_arg == 3) {
-    len = arg[2].u.number;
-  }
-  str = read_bytes(arg[0].u.string, start, len, &rlen);
-  pop_n_elems(num_arg);
-  if (str == nullptr) {
-    push_number(0);
-  } else {
-    u8_sanitize(str);
-    push_malloced_string(str);
-  }
+    arg = sp - num_arg + 1;
+    if (num_arg > 1) {
+        start = arg[1].u.number;
+    }
+    if (num_arg == 3) {
+        len = arg[2].u.number;
+    }
+    str = read_bytes(arg[0].u.string, start, len, &rlen);
+    pop_n_elems(num_arg);
+    if (str == nullptr) {
+        push_number(0);
+    } else {
+        u8_sanitize(*str);
+        push_string(*str);
+        delete str;
+    }
 }
 #endif
 
 #ifdef F_READ_BUFFER
 void f_read_buffer(void) {
-  char *str;
-  int start = 0, len = 0, rlen = 0, num_arg = st_num_arg;
-  int from_file = 0; /* new line */
-  svalue_t *arg = sp - num_arg + 1;
+    std::string *str;
+    int start {0};
+    int len {0};
+    int rlen {0};
+    int num_arg {st_num_arg};
+    int from_file = 0; /* new line */
+    svalue_t *arg = sp - num_arg + 1;
 
-  if (num_arg > 1) {
-    start = arg[1].u.number;
-    if (num_arg == 3) {
-      len = arg[2].u.number;
+    if (num_arg > 1) {
+        start = arg[1].u.number;
+        if (num_arg == 3) {
+            len = arg[2].u.number;
+        }
     }
-  }
-  if (arg[0].type == T_STRING) {
-    from_file = 1; /* new line */
-    str = read_bytes(arg[0].u.string, start, len, &rlen);
-  } else { /* T_BUFFER */
-    str = read_buffer(arg[0].u.buf, start, len, &rlen);
-  }
-  pop_n_elems(num_arg);
-  if (str == nullptr) {
-    push_number(0);
-  } else if (from_file) { /* changed */
-    buffer_t *buf;
+    if (arg[0].type == T_STRING) {
+        from_file = 1; /* new line */
+        str = read_bytes(arg[0].u.string, start, len, &rlen);
+    } else { /* T_BUFFER */
+        str = read_buffer(arg[0].u.buf, start, len, &rlen);
+    }
+    pop_n_elems(num_arg);
+    if (str == nullptr) {
+        push_number(0);
+    } else if (from_file) { /* changed */
+        buffer_t *buf;
 
-    buf = allocate_buffer(rlen);
-    memcpy(buf->item, str, rlen);
-    STACK_INC;
-    sp->type = T_BUFFER;
-    sp->u.buf = buf;
-    FREE_MSTR(str);
-  } else { /* T_BUFFER */
-    push_malloced_string(str);
-  }
+        buf = allocate_buffer(rlen);
+        memcpy(buf->item, str->c_str(), rlen);
+        STACK_INC;
+        sp->type = T_BUFFER;
+        sp->u.buf = buf;
+        delete str;
+    } else { /* T_BUFFER */
+        push_string(*str);
+        delete str;
+    }
 }
 #endif
 
 #ifdef F_READ_FILE
 void f_read_file(void) {
-  char *str;
-  int start = 0, len = 0;
+    std::string *str;
+    int start = 0, len = 0;
 
-  switch (st_num_arg) {
-    case 3:
-      len = sp->u.number;
-      pop_stack();
-    /* fall through */
-    case 2:
-      start = sp->u.number;
-      pop_stack();
-    /* fall through */
-    case 1:
-      break;
-    default:
-      error("Wrong number of arguments!");
-  }
-  str = read_file(sp->u.string, start, len);
-  pop_stack();
-  if (!str) {
-    push_svalue(&const0);
-  } else {
-    u8_sanitize(str);
-    push_malloced_string(str);
-  }
+    switch (st_num_arg) {
+        case 3:
+            len = sp->u.number;
+            pop_stack();
+            [[gnu::fallthrough]];
+        case 2:
+            start = sp->u.number;
+            pop_stack();
+            [[gnu::fallthrough]];
+        case 1:
+            break;
+        default:
+            error("Wrong number of arguments!");
+    }
+    str = read_file(sp->u.string, start, len);
+    pop_stack();
+    if (!str) {
+        push_svalue(&const0);
+    } else {
+        u8_sanitize(*str);
+        push_string(*str);
+        delete str;
+    }
 }
 #endif
 
@@ -1800,10 +1729,10 @@ void f_read_file(void) {
 void f_receive(void) {
   if (sp->type == T_STRING) {
     if (current_object->interactive) {
-      int len = SVALUE_STRLEN(sp);
+      size_t len = sp->u.string->size();
 
       if (len > LARGEST_PRINTABLE_STRING) {
-        error("Printable strings limited to length of %d.\n", LARGEST_PRINTABLE_STRING);
+        error("Printable strings limited to length of {}.\n", LARGEST_PRINTABLE_STRING);
       }
 
       add_message(current_object, sp->u.string);
@@ -1860,12 +1789,12 @@ void f_regexp(void) {
     flag = 0;
   }
   if (sp[-1].type == T_STRING) {
-    flag = match_single_regexp((sp - 1)->u.string, sp->u.string);
+    flag = match_single_regexp((sp - 1)->u.string->c_str(), sp->u.string->c_str());
     free_string_svalue(sp--);
     free_string_svalue(sp);
     put_number(flag);
   } else {
-    v = match_regexp((sp - 1)->u.arr, sp->u.string, flag);
+    v = match_regexp((sp - 1)->u.arr, sp->u.string->c_str(), flag);
 
     free_string_svalue(sp--);
     free_array(sp->u.arr);
@@ -1954,21 +1883,18 @@ void f_rename(void) {
  */
 
 void f_replace_string(void) {
-  auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
+  size_t first {1};
+  size_t last  {std::string::npos};
+  size_t cur   {0};
 
-  int plen, rlen, dlen, slen, first, last, cur, j;
+  std::string pattern;
+  std::string replace;
+  std::string src;
 
-  const char *pattern;
-  const char *replace;
-  const char *src;
-  char *dst1, *dst2;
+  size_t plen, rlen;
+  size_t pos {0};
+
   svalue_t *arg;
-  int skip_table[256];
-  const char *slimit;
-  const char *flimit;
-  char *climit;
-  int probe;
-  int skip;
 
   if (st_num_arg > 5) {
     error("Too many args to replace_string.\n");
@@ -1977,8 +1903,6 @@ void f_replace_string(void) {
   }
   arg = sp - st_num_arg + 1;
   src = arg->u.string;
-  first = 0;
-  last = 0;
 
   if (st_num_arg >= 4) {
     CHECK_TYPES((arg + 3), T_NUMBER, 4, F_REPLACE_STRING);
@@ -1995,7 +1919,10 @@ void f_replace_string(void) {
   }
 
   if (!last) {
-    last = max_string_length;
+    last = std::string::npos;
+  }
+  if (!first) {
+      first = 1;
   }
 
   if (first > last) { /* just return it */
@@ -2003,213 +1930,37 @@ void f_replace_string(void) {
     return;
   }
   pattern = (arg + 1)->u.string;
-  plen = SVALUE_STRLEN(arg + 1);
+  plen = pattern.size();
   if (!plen) {
     pop_n_elems(st_num_arg - 1); /* just return it */
-
     return;
   }
   replace = (arg + 2)->u.string;
-  rlen = SVALUE_STRLEN(arg + 2);
-  dlen = 0;
-  cur = 0;
+  rlen = replace.size();
 
-  if (rlen <= plen) {
-    /* we're going to do in string replacement */
-    unlink_string_svalue(arg);
-    src = arg->u.string;
-  }
-
-  if (plen > 1) {
-    /* build skip table */
-    for (j = 0; j < 256; j++) {
-      skip_table[j] = plen;
-    }
-    for (j = 0; j < plen; j++) {
-      skip_table[static_cast<unsigned char>(pattern[j])] = plen - j - 1;
-    }
-    slen = SVALUE_STRLEN(arg);
-    slimit = src + slen;
-    flimit = slimit - plen + 1;
-    probe = plen - 1;
-  }
-
-  if (rlen <= plen) {
-    /* in string replacement */
-    dst2 = dst1 = const_cast<char *>(arg->u.string);
-
-    if (plen > 1) { /* pattern length > 1, jump table most efficient */
-      while (src < flimit) {
-        if ((skip = skip_table[static_cast<unsigned char>(src[probe])])) {
-          for (climit = dst2 + skip; dst2 < climit; *dst2++ = *src++) {
-            ;
-          }
-        } else if (memcmp(src, pattern, plen) == 0) {
-          cur++;
-          if ((cur >= first) && (cur <= last)) {
-            if (rlen) {
-              memmove(dst2, replace, rlen);
-              dst2 += rlen;
-            }
-            src += plen;
-            if (cur == last) {
-              break;
-            }
-          } else {
-            memmove(dst2, src, plen);
-            dst2 += plen;
-            src += plen;
-          }
-        } else {
-          *dst2++ = *src++;
-        }
-      }
-      memmove(dst2, src, slimit - src);
-      dst2 += (slimit - src);
-      *dst2 = 0;
-      arg->u.string = extend_string(dst1, dst2 - dst1);
-    } else { /* pattern length <= 1, brute force most efficient */
-      /* Beek - if it was zero, we already returned, so plen == 1 */
-      /* assume source string is a string < maximum string length */
-      if (rlen) {
-        while (*src) {
-          if (*src == *pattern) {
-            cur++;
-
-            if (cur >= first && cur <= last) {
-              *const_cast<char *>(src) = *replace;
-            }
-          }
-          src++;
-        }
-      } else { /* rlen is zero */
-        while (*src) {
-          if (*src++ == *pattern) {
-            cur++;
-            if (cur >= first) {
-              dst2 = const_cast<char *>(src) - 1;
-              while (*src) {
-                if (*src == *pattern) {
-                  cur++;
-                  if (cur <= last) {
-                    src++;
-                    continue;
-                  } else {
-                    while (*src) {
-                      *dst2++ = *src++;
-                    }
-                    break;
-                  }
-                }
-                *dst2++ = *src++;
-              }
-              *dst2 = 0;
-              arg->u.string = extend_string(dst1, dst2 - dst1);
-              break;
-            }
-          }
-        }
-      }
-    }
-    pop_n_elems(st_num_arg - 1);
-  } else {
-    dst2 = dst1 = new_string(max_string_length, "f_replace_string: 2");
-
-    if (plen > 1) {
-      while (src < flimit) {
-        if ((skip = skip_table[static_cast<unsigned char>(src[probe])])) {
-          for (climit = dst2 + skip; dst2 < climit; *dst2++ = *src++) {
-            ;
-          }
-
-        } else if (memcmp(src, pattern, plen) == 0) {
-          cur++;
-          if ((cur >= first) && (cur <= last)) {
-            if (max_string_length - dlen <= rlen) {
-              pop_n_elems(st_num_arg);
-              push_svalue(&const0u);
-              FREE_MSTR(dst1);
-              return;
-            }
-            memmove(dst2, replace, rlen);
-            dst2 += rlen;
-            dlen += rlen;
-            src += plen;
-            if (cur == last) {
-              break;
-            }
-          } else {
-            dlen += plen;
-            if (max_string_length - dlen <= 0) {
-              pop_n_elems(st_num_arg);
-              push_svalue(&const0u);
-
-              FREE_MSTR(dst1);
-              return;
-            }
-            memmove(dst2, src, plen);
-            dst2 += plen;
-            src += plen;
-          }
-        } else {
-          if (max_string_length - dlen <= 1) {
-            pop_n_elems(st_num_arg);
-            push_svalue(&const0u);
-
-            FREE_MSTR(dst1);
-            return;
-          }
-          *dst2++ = *src++;
-          dlen++;
-        }
-      }
-      if (max_string_length - dlen <= (slimit - src)) {
-        pop_n_elems(st_num_arg);
-        push_svalue(&const0u);
-        FREE_MSTR(dst1);
-        return;
-      }
-      memmove(dst2, src, slimit - src);
-      dst2 += (slimit - src);
-    } else { /* plen <= 1 */
-      /* Beek: plen == 1 */
-      while (*src != '\0') {
-        if (*src == *pattern) {
-          cur++;
-          if (cur >= first && cur <= last) {
-            if (rlen != 0) {
-              if (max_string_length - dlen <= rlen) {
-                pop_n_elems(st_num_arg);
-                push_svalue(&const0u);
-                FREE_MSTR(dst1);
-                return;
-              }
-              strncpy(dst2, replace, rlen);
-              dst2 += rlen;
-              dlen += rlen;
-            }
-            src++;
-            continue;
-          }
-        }
-        if (max_string_length - dlen <= 1) {
-          pop_n_elems(st_num_arg);
-          push_svalue(&const0u);
-          FREE_MSTR(dst1);
+  while (true) {
+      pos = src.find(pattern, pos);
+      if (pos == std::string::npos) {
+          pop_n_elems(st_num_arg - 1); /* just return it */
           return;
-        }
-        *dst2++ = *src++;
-        dlen++;
       }
-    }
-    *dst2 = '\0';
-
-    pop_n_elems(st_num_arg);
-    /*
-     * shrink block or make a copy of exact size
-     */
-    push_malloced_string(extend_string(dst1, dst2 - dst1));
+      if (++cur == first) {
+          break;
+      }
+      pos += plen;
   }
+
+  while (cur++ <= last) {
+      src.replace(pos, plen, replace);
+      pos += rlen;
+      pos = src.find(pattern, pos);
+      if (pos == std::string::npos) {
+          break;
+      }
+  }
+
+  pop_n_elems(st_num_arg);
+  push_string(src);
 }
 #endif
 
@@ -2235,15 +1986,14 @@ void f_rm(void) {
 
 #ifdef F_RMDIR
 void f_rmdir(void) {
-  const char *path;
+    std::string const path {check_valid_path(sp->u.string, current_object, "rmdir", 1)};
 
-  path = check_valid_path(sp->u.string, current_object, "rmdir", 1);
-  if (!path || rmdir(path) == -1) {
+  if (path.empty() || rmdir(path.c_str()) == -1) {
     free_string_svalue(sp);
-    *sp = const0;
+    *sp = 0;
   } else {
     free_string_svalue(sp);
-    *sp = const1;
+    *sp = 1;
   }
 }
 #endif
@@ -2307,44 +2057,30 @@ void f_set_eval_limit(void) {
 
 #ifdef F_SET_BIT
 void f_set_bit(void) {
-  char *str;
-  int len, old_len, ind, bit;
+    std::string str;
+    size_t len, ind, bit;
+    size_t max_bitfield_bits {static_cast<size_t>(CONFIG_INT(__MAX_BITFIELD_BITS__))};
 
-  auto max_bitfield_bits = CONFIG_INT(__MAX_BITFIELD_BITS__);
-  if (sp->u.number > max_bitfield_bits) {
-    error("set_bit() bit requested: %d > maximum bits: %d\n", sp->u.number, max_bitfield_bits);
-  }
-  bit = (sp--)->u.number;
-  if (bit < 0) {
-    error("Bad argument 2 (negative) to set_bit().\n");
-  }
-  ind = bit / 6;
-  bit %= 6;
-  old_len = len = SVALUE_STRLEN(sp);
-  if (ind >= len) {
-    len = ind + 1;
-  }
-  if (ind < old_len) {
-    unlink_string_svalue(sp);
-    str = const_cast<char *>(sp->u.string);
-  } else {
-    str = new_string(len, "f_set_bit: str");
-    str[len] = '\0';
-    if (old_len) {
-      memcpy(str, sp->u.string, old_len);
+    bit = static_cast<size_t>((sp--)->u.number);
+    if (bit > max_bitfield_bits) {
+        error("set_bit() bit requested: {} > maximum bits: {}\n", bit, max_bitfield_bits);
     }
-    if (len > old_len) {
-      memset(str + old_len, ' ', len - old_len);
-    }
-    free_string_svalue(sp);
-    sp->subtype = STRING_MALLOC;
-    sp->u.string = str;
-  }
 
-  if (str[ind] > 0x3f + ' ' || str[ind] < ' ') {
-    error("Illegal bit pattern in set_bit character %d\n", ind);
-  }
-  str[ind] = ((str[ind] - ' ') | (1 << bit)) + ' ';
+    ind = bit / 6;
+    bit %= 6;
+
+    str = sp->u.string;
+    len = str.size();
+
+    while(len++ < ind) {
+        str += ' ';
+    }
+
+    if (str.at(ind) > 0x3f + ' ' || str.at(ind) < ' ') {
+        error("Illegal bit pattern {:02x} in set_bit character {}\n", static_cast<uint8_t>(str[ind] - ' '), ind);
+    }
+    str.at(ind) = ((str.at(ind) - ' ') | (1 << bit)) + ' ';
+    put_string(str);
 }
 #endif
 
@@ -2393,21 +2129,16 @@ void f_set_light(void) {
 
 #ifdef F_SET_PRIVS
 void f_set_privs(void) {
-  object_t *ob;
+    object_t *ob;
 
-  ob = (sp - 1)->u.ob;
-  if (ob->privs != NULL) {
-    free_string(ob->privs);
-  }
-  if (!(sp->type == T_STRING)) {
-    ob->privs = NULL;
-    sp--; /* It's a number */
-  } else {
-    ob->privs = make_shared_string(sp->u.string);
+    CHECK_TYPES((sp-1), T_OBJECT, 1, F_SET_PRIVS);
+    CHECK_TYPES(sp, T_STRING, 2, F_SET_PRIVS);
+
+    ob = (sp - 1)->u.ob;
+    ob->privs = sp->u.string;
     free_string_svalue(sp--);
-  }
-  free_object(&ob, "f_set_privs");
-  sp--;
+    free_object(&ob, "f_set_privs");
+    sp--;
 }
 #endif
 
@@ -2423,7 +2154,7 @@ void f_shadow(void) {
       add_ref(ob, "shadow(ob, 0)");
       sp->u.ob = ob;
     } else {
-      *sp = const0;
+      *sp = 0;
     }
     return;
   }
@@ -2433,7 +2164,7 @@ void f_shadow(void) {
   if (validate_shadowing(ob)) {
     if (current_object->flags & O_DESTRUCTED) {
       free_object(&ob, "f_shadow:2");
-      *sp = const0;
+      *sp = 0;
       return;
     }
     /*
@@ -2450,14 +2181,16 @@ void f_shadow(void) {
     return;
   }
   free_object(&sp->u.ob, "f_shadow:4");
-  *sp = const0;
+  *sp = 0;
 }
 #endif
 
 #ifdef F_SHOUT
 void f_shout(void) {
-  shout_string(sp->u.string);
-  free_string_svalue(sp--);
+    CHECK_TYPES(sp, T_STRING, 1, F_SHOUT);
+
+    shout_string(sp->u.string);
+    free_string_svalue(sp--);
 }
 #endif
 
@@ -2474,7 +2207,7 @@ void f_shutdown(void) {
 
 #ifdef F_SIZEOF
 void f_sizeof(void) {
-  size_t i;
+  size_t i {0};
 
   switch (sp->type) {
     case T_CLASS:
@@ -2494,7 +2227,7 @@ void f_sizeof(void) {
       free_buffer(sp->u.buf);
       break;
     case T_STRING: {
-      auto success = u8_egc_count(sp->u.string, &i);
+      auto success [[gnu::unused]] = u8_egc_count(sp->u.string, i);
       DEBUG_CHECK(!success, "Invalid UTF8 string!");
       free_string_svalue(sp);
       break;
@@ -2516,13 +2249,13 @@ void f_snoop(void) {
   if (st_num_arg == 1) {
     if (!new_set_snoop(sp->u.ob, nullptr) || (sp->u.ob->flags & O_DESTRUCTED)) {
       free_object(&sp->u.ob, "f_snoop:1");
-      *sp = const0;
+      *sp = 0;
     }
   } else {
     if (!new_set_snoop((sp - 1)->u.ob, sp->u.ob) || (sp->u.ob->flags & O_DESTRUCTED)) {
       free_object(&(sp--)->u.ob, "f_snoop:2");
       free_object(&sp->u.ob, "f_snoop:3");
-      *sp = const0;
+      *sp = 0;
     } else {
       free_object(&(--sp)->u.ob, "f_snoop:4");
       sp->u.ob = (sp + 1)->u.ob;
@@ -2536,35 +2269,32 @@ void f_sprintf(void) {
   char *s;
   int num_arg = st_num_arg;
 
-  s = string_print_formatted((sp - num_arg + 1)->u.string, num_arg - 1, sp - num_arg + 2);
+    CHECK_TYPES((sp - num_arg + 1), T_STRING, 1, F_SPRINTF);
+  s = string_print_formatted((sp - num_arg + 1)->u.string->c_str(), num_arg - 1, sp - num_arg + 2);
   pop_n_elems(num_arg);
 
   STACK_INC;
-  sp->type = T_STRING;
   if (!s) {
-    sp->subtype = STRING_CONSTANT;
-    sp->u.string = "";
+    put_string("");
   } else {
-    sp->subtype = STRING_MALLOC;
-    sp->u.string = s;
+    put_string(s);
   }
 }
 #endif
 
 #ifdef F_STAT
 void f_stat(void) {
+  const std::string path {check_valid_path((--sp)->u.string, current_object, "stat", 0)};
   struct stat buf;
-  const char *path;
   array_t *v;
   object_t *ob;
 
-  path = check_valid_path((--sp)->u.string, current_object, "stat", 0);
-  if (!path) {
+  if (path.empty()) {
     free_string_svalue(sp);
-    *sp = const0;
+    *sp = 0;
     return;
   }
-  if (stat(path, &buf) != -1) {
+  if (stat(path.c_str(), &buf) != -1) {
     if (buf.st_mode & S_IFREG) { /* if a regular file */
       v = allocate_empty_array(3);
       v->item[0].type = T_NUMBER;
@@ -2594,7 +2324,7 @@ void f_stat(void) {
   if (v) {
     put_array(v);
   } else {
-    *sp = const0;
+    *sp = 0;
   }
 }
 #endif
@@ -2609,74 +2339,38 @@ void f_stat(void) {
  */
 
 void f_strsrch(void) {
-  const char *big, *little, *pos;
-  static char buf[2]; /* should be initialized to 0 */
-  int i, blen, llen;
+    std::string big;
+    std::string little;
+    size_t blen, llen, pos;
+    int i;
 
-  sp--;
-  big = (sp - 1)->u.string;
-  blen = SVALUE_STRLEN(sp - 1);
-  if (sp->type == T_NUMBER) {
-    little = buf;
-    if ((buf[0] = static_cast<char>(sp->u.number))) {
-      llen = 1;
-    } else {
-      llen = 0;
+    CHECK_TYPES((sp-2), T_STRING, 1, F_STRSRCH);
+    CHECK_TYPES((sp-1), T_STRING|T_NUMBER, 2, F_STRSRCH);
+    CHECK_TYPES((sp  ), T_NUMBER, 3, F_STRSRCH);
+
+    sp--;
+    big     = (sp - 1)->u.string;
+    blen    = big.size();
+
+    little  = (sp->type == T_STRING) ? static_cast<std::string>(sp->u.string)
+                                     : std::string {static_cast<char>(sp->u.number)};
+    llen    = little.size();
+
+    if (!llen || blen < llen) {             // nothing to search or too big needle
+        pos = std::string::npos;
+    } else if (!((sp + 1)->u.number)) {     // start at left
+        pos = big.find(little);
+    } else {                                // start at right
+        pos = big.rfind(little);
     }
-  } else {
-    little = sp->u.string;
-    llen = SVALUE_STRLEN(sp);
-  }
 
-  if (!llen || blen < llen) {
-    pos = nullptr;
+    i = (pos == std::string::npos) ? -1 : pos;
 
-    /* start at left */
-  } else if (!((sp + 1)->u.number)) {
-    if (!little[1]) { /* 1 char srch pattern */
-      pos = strchr(big, little[0]);
-    } else {
-      pos = const_cast<char *>(strstr(big, little));
+    if (sp->type == T_STRING) {
+        free_string_svalue(sp);
     }
-    /* start at right */
-  } else {            /* XXX: maybe test for -1 */
-    if (!little[1]) { /* 1 char srch pattern */
-      pos = strrchr(big, little[0]);
-    } else {
-      char c = *little;
-
-      pos = big + blen; /* find end */
-      pos -= llen;      /* find rightmost pos it _can_ be */
-      do {
-        do {
-          if (*pos == c) {
-            break;
-          }
-        } while (--pos >= big);
-        if (pos < big) {
-          pos = nullptr;
-          break;
-        }
-        for (i = 1; little[i] && (pos[i] == little[i]); i++) {
-          ;
-        } /* scan all chars */
-        if (!little[i]) {
-          break;
-        }
-      } while (--pos >= big);
-    }
-  }
-
-  if (!pos) {
-    i = -1;
-  } else {
-    i = pos - big;
-  }
-  if (sp->type == T_STRING) {
-    free_string_svalue(sp);
-  }
-  free_string_svalue(--sp);
-  put_number(i);
+    free_string_svalue(--sp);
+    put_number(i);
 } /* strsrch */
 #endif
 
@@ -2684,42 +2378,45 @@ void f_strsrch(void) {
 void f_strcmp(void) {
   int i;
 
-  i = strcmp((sp - 1)->u.string, sp->u.string);
-  free_string_svalue(sp--);
-  free_string_svalue(sp);
-  put_number(i);
+    CHECK_TYPES((sp-1), T_STRING, 1, F_STRCMP);
+    CHECK_TYPES((sp  ), T_STRING, 2, F_STRCMP);
+
+    i = (sp - 1)->u.string->compare(sp->u.string);
+    free_string_svalue(sp--);
+    free_string_svalue(sp);
+    put_number(i);
 }
 #endif
 
 #ifdef F_STRINGP
 void f_stringp(void) {
-  if (sp->type == T_STRING) {
-    free_string_svalue(sp);
-    *sp = const1;
-  } else {
-    free_svalue(sp, "f_stringp");
-    *sp = const0;
-  }
+    if (sp->type == T_STRING) {
+        free_string_svalue(sp);
+        *sp = 1;
+    } else {
+        free_svalue(sp, "f_stringp");
+        *sp = 0;
+    }
 }
 #endif
 
 #ifdef F_BUFFERP
 void f_bufferp(void) {
-  if (sp->type == T_BUFFER) {
-    free_buffer(sp->u.buf);
-    *sp = const1;
-  } else {
-    free_svalue(sp, "f_bufferp");
-    *sp = const0;
-  }
+    if (sp->type == T_BUFFER) {
+        free_buffer(sp->u.buf);
+        *sp = 1;
+    } else {
+        free_svalue(sp, "f_bufferp");
+        *sp = 0;
+    }
 }
 #endif
 
 #ifdef F_TELL_OBJECT
 void f_tell_object(void) {
-  tell_object((sp - 1)->u.ob, sp->u.string, SVALUE_STRLEN(sp));
-  free_string_svalue(sp--);
-  pop_stack();
+    tell_object((sp - 1)->u.ob, sp->u.string);
+    free_string_svalue(sp--);
+    pop_stack();
 }
 #endif
 
@@ -2773,85 +2470,94 @@ void f_tell_room(void) {
 
 #ifdef F_TEST_BIT
 void f_test_bit(void) {
-  int ind = (sp--)->u.number;
+    std::string str;
+    size_t len, ind, bit;
+    size_t max_bitfield_bits {static_cast<size_t>(CONFIG_INT(__MAX_BITFIELD_BITS__))};
 
-  if (ind / 6 >= SVALUE_STRLEN(sp)) {
-    free_string_svalue(sp);
-    *sp = const0;
-    return;
-  }
-  if (ind < 0) {
-    error("Bad argument 2 (negative) to test_bit().\n");
-  }
-  if ((sp->u.string[ind / 6] - ' ') & (1 << (ind % 6))) {
-    free_string_svalue(sp);
-    *sp = const1;
-  } else {
-    free_string_svalue(sp);
-    *sp = const0;
-  }
+    bit = static_cast<size_t>((sp--)->u.number);
+    if (bit > max_bitfield_bits) {
+        error("test_bit() bit requested: {} > maximum bits: {}\n", bit, max_bitfield_bits);
+    }
+
+    ind = bit / 6;
+    bit %= 6;
+
+    str = sp->u.string;
+    len = str.size();
+
+    if (ind > len) {
+        free_string_svalue(sp);
+        *sp = 0;
+        return;
+    }
+    if ((str.at(ind) - ' ') & (1 << bit)) {
+        free_string_svalue(sp);
+        *sp = 1;
+    } else {
+        free_string_svalue(sp);
+        *sp = 0;
+    }
 }
 #endif
 
 #ifdef F_NEXT_BIT
 void f_next_bit(void) {
-  int start = (sp--)->u.number;
-  int len = SVALUE_STRLEN(sp);
-  int which, bit = 0, value;
+    CHECK_TYPES((sp-1), T_STRING, 1, F_NEXT_BIT);
+    CHECK_TYPES(sp    , T_NUMBER, 2, F_NEXT_BIT);
 
-  if (!len || start / 6 >= len) {
+    size_t start {static_cast<size_t>((sp--)->u.number)};
+    std::string str {sp->u.string};
+    size_t len {str.size()};
+    size_t which {0};
+    size_t bit {0};
+    int value;
+
     free_string_svalue(sp);
-    put_number(-1);
-    return;
-  }
-  /* Find the next bit AFTER start */
-  if (start > 0) {
-    if (start % 6 == 5) {
-      which = (start / 6) + 1;
-      value = sp->u.string[which] - ' ';
+    if (!len || start / 6 >= len) {
+        put_number(-1);
+        return;
+    }
+    /* Find the next bit AFTER start */
+    if (start > 0) {
+        if (start % 6 == 5) {
+            which = (start / 6) + 1;
+            value = str.at(which) - ' ';
+        } else {
+            /* we have a partial byte to check */
+            which = start / 6;
+            bit = 0x3f - ((1 << ((start % 6) + 1)) - 1);
+            value = (str.at(which) - ' ') & bit;
+        }
     } else {
-      /* we have a partial byte to check */
-      which = start / 6;
-      bit = 0x3f - ((1 << ((start % 6) + 1)) - 1);
-      value = (sp->u.string[which] - ' ') & bit;
+        value = str.at(0) - ' ';
     }
-  } else {
-    which = 0;
-    value = *sp->u.string - ' ';
-  }
 
-  while (true) {
-    if (value) {
-      if (value & 0x07) {
-        if (value & 0x01) {
-          bit = which * 6;
-        } else if (value & 0x02) {
-          bit = which * 6 + 1;
-        } else if (value & 0x04) {
-          bit = which * 6 + 2;
+    while (true) {
+        if (value) {
+            if (value & 0x01) {
+                bit = which * 6;
+            } else if (value & 0x02) {
+                bit = which * 6 + 1;
+            } else if (value & 0x04) {
+                bit = which * 6 + 2;
+            } else if (value & 0x08) {
+                bit = which * 6 + 3;
+            } else if (value & 0x10) {
+                bit = which * 6 + 4;
+            } else if (value & 0x20) {
+                bit = which * 6 + 5;
+            }
+            break;
         }
-        break;
-      } else if (value & 0x38) {
-        if (value & 0x08) {
-          bit = which * 6 + 3;
-        } else if (value & 0x10) {
-          bit = which * 6 + 4;
-        } else if (value & 0x20) {
-          bit = which * 6 + 5;
+        which++;
+        if (which == len) {
+            put_number(-1);
+            return;
         }
-        break;
-      }
+        value = str.at(which) - ' ';
     }
-    which++;
-    if (which == len) {
-      bit = -1;
-      break;
-    }
-    value = sp->u.string[which] - ' ';
-  }
 
-  free_string_svalue(sp);
-  put_number(bit);
+    put_number(bit);
 }
 #endif
 
@@ -2893,7 +2599,8 @@ void f_set_this_player(void) {
 #ifdef F_THROW
 void f_throw(void) {
   free_svalue(&catch_value, "f_throw");
-  catch_value = *sp--;
+  assign_svalue(&catch_value, sp);
+  sp--;
   throw_error(); /* do the longjump, with extra checks... */
 }
 #endif
@@ -2904,16 +2611,25 @@ void f_time(void) { push_number(get_current_time()); }
 
 #ifdef F__TO_FLOAT
 void f__to_float(void) {
-  LPC_FLOAT temp = 0;
-
   switch (sp->type) {
     case T_NUMBER:
       sp->type = T_REAL;
       sp->u.real = static_cast<LPC_FLOAT>(sp->u.number);
       break;
     case T_STRING:
-      temp = strtod(sp->u.string, nullptr);
+      std::string str {sp->u.string};
+      LPC_FLOAT temp;
+
       free_string_svalue(sp);
+      try {
+          temp = std::stod(str);
+      }
+      catch(const std::invalid_argument &e) {
+          sp->type = T_NUMBER;
+          sp->subtype = T_UNDEFINED;
+          sp->u.number = 0;
+          return;
+      }
       sp->type = T_REAL;
       sp->u.real = temp;
   }
@@ -2928,44 +2644,27 @@ void f__to_int(void) {
       sp->u.number = static_cast<LPC_INT>(sp->u.real);
       break;
     case T_STRING: {
+      size_t pos;
       LPC_INT temp;
-      char *p;
+      std::string str {sp->u.string};
 
-      temp = strtoll(sp->u.string, &p, 10);
-      if (*p) {
-        /* have to be a little careful here.  Checkign if p ==
-         * sp->u.string isn't good enough.
-         *
-         * Odd cases:
-         * to_int("  foo")  // p == sp->u.string + 2
-         *
-         * POSIX guarantees the strtoll() works in terms of isspace(),
-         * though.  If there is something other than whitespace, then
-         * there was a valid character consistent with the base,
-         * so we were successful.
-         *
-         * (note: this means to_int("10x") == 10.  If you want to
-         *  detect trailing garbage, use sscanf(str, "%d%s", ...).
-         */
-        while (p > sp->u.string && uisspace(*(p - 1))) {
-          p--;
-        }
-
-        if (p == sp->u.string) {
-          free_string_svalue(sp);
-          *sp = const0u;
-          break;
-        }
-      }
       free_string_svalue(sp);
-      sp->u.number = temp;
       sp->type = T_NUMBER;
+      try {
+          temp = std::stoll(str, &pos, 10);
+      }
+      catch(const std::invalid_argument &e) {
+          sp->subtype = T_UNDEFINED;
+          sp->u.number = 0;
+          break;
+      }
+      sp->u.number = temp;
       break;
     }
     case T_BUFFER:
       if (sp->u.buf->size < sizeof(int)) {
         free_buffer(sp->u.buf);
-        *sp = const0;
+        *sp = 0;
       } else {
         int hostint, netint;
 
@@ -2980,10 +2679,10 @@ void f__to_int(void) {
 
 #ifdef F_TYPEOF
 void f_typeof(void) {
-  const char *t = type_name(sp->type);
+    std::string t {type_name(sp->type)};
 
-  free_svalue(sp, "f_typeof");
-  put_constant_string(t);
+    free_svalue(sp, "f_typeof");
+    put_string(t);
 }
 #endif
 
@@ -2991,13 +2690,13 @@ void f_typeof(void) {
 void f_undefinedp(void) {
   if (sp->type == T_NUMBER) {
     if (!sp->u.number && (sp->subtype == T_UNDEFINED)) {
-      *sp = const1;
+      *sp = 1;
     } else {
-      *sp = const0;
+      *sp = 0;
     }
   } else {
     free_svalue(sp, "f_undefinedp");
-    *sp = const0;
+    *sp = 0;
   }
 }
 #endif
@@ -3018,7 +2717,7 @@ void f_userp(void) {
 
 #ifdef F_USERS
 void f_users(void) {
-  bool include_hidden = true;
+  bool include_hidden {true};
 #ifdef F_SET_HIDE
   include_hidden = (current_object->flags & O_HIDDEN) || (valid_hide(current_object));
 #endif
@@ -3075,83 +2774,74 @@ void f_write(void) {
 
 #ifdef F_WRITE_BYTES
 void f_write_bytes(void) {
-  int i = 0;
+    int i = 0;
 
-  switch (sp->type) {
-    case T_NUMBER: {
-      int netint;
-      char *netbuf;
+    CHECK_TYPES((sp-2), T_STRING, 1, F_WRITE_BYTES);
+    CHECK_TYPES((sp-1), T_NUMBER, 2, F_WRITE_BYTES);
+    CHECK_TYPES(sp    , T_STRING, 3, F_WRITE_BYTES);
 
-      if (!sp->u.number) {
-        bad_arg(3, F_WRITE_BYTES);
-      }
-      /* convert to network byte-order */
-      netint = htonl(sp->u.number);
-      netbuf = reinterpret_cast<char *>(&netint);
-      i = write_bytes((sp - 2)->u.string, (sp - 1)->u.number, netbuf, sizeof(int));
-      break;
-    }
+    i = write_bytes((sp - 2)->u.string, (sp - 1)->u.number, sp->u.string);
 
-    case T_BUFFER: {
-      i = write_bytes((sp - 2)->u.string, (sp - 1)->u.number,
-                      reinterpret_cast<char *>(sp->u.buf->item), sp->u.buf->size);
-      break;
-    }
-
-    case T_STRING: {
-      i = write_bytes((sp - 2)->u.string, (sp - 1)->u.number, sp->u.string, SVALUE_STRLEN(sp));
-      break;
-    }
-
-    default: {
-      bad_argument(sp, T_BUFFER | T_STRING | T_NUMBER, 3, F_WRITE_BYTES);
-    }
-  }
-  free_svalue(sp--, "f_write_bytes");
-  free_string_svalue(--sp);
-  put_number(i);
+    free_svalue(sp--, "f_write_bytes");
+    free_string_svalue(--sp);
+    put_number(i);
 }
 #endif
 
 #ifdef F_WRITE_BUFFER
 void f_write_buffer(void) {
-  int i = 0;
+    int i {0};
+    bool to_file {false};
+    int offset;
+    std::string fn;
+    buffer_t *buf;
 
-  if ((sp - 2)->type == T_STRING) {
-    f_write_bytes();
-    return;
-  }
+    CHECK_TYPES((sp-2), T_STRING|T_BUFFER, 1, F_WRITE_BYTES);
+    CHECK_TYPES((sp-1), T_NUMBER, 2, F_WRITE_BYTES);
+    CHECK_TYPES(sp    , T_STRING|T_NUMBER|T_BUFFER, 3, F_WRITE_BYTES);
 
-  switch (sp->type) {
-    case T_NUMBER: {
-      int netint;
-      char *netbuf;
-
-      /* convert to network byte-order */
-      netint = htonl(sp->u.number);
-      netbuf = reinterpret_cast<char *>(&netint);
-      i = write_buffer((sp - 2)->u.buf, (sp - 1)->u.number, netbuf, sizeof(int));
-      break;
+    if ((sp - 2)->type == T_STRING) {
+        to_file = true;
+        fn = (sp - 2)->u.string;
+    } else {
+        buf = (sp - 2)->u.buf;
     }
+    offset = (sp - 1)->u.number;
 
-    case T_BUFFER: {
-      i = write_buffer((sp - 2)->u.buf, (sp - 1)->u.number,
-                       reinterpret_cast<char *>(sp->u.buf->item), sp->u.buf->size);
-      break;
-    }
+    switch (sp->type) {
+        case T_NUMBER: {
+            int netint;
+            char *netbuf;
 
-    case T_STRING: {
-      i = write_buffer((sp - 2)->u.buf, (sp - 1)->u.number, sp->u.string, SVALUE_STRLEN(sp));
-      break;
-    }
+            /* convert to network byte-order */
+            netint = htonl(sp->u.number);
+            netbuf = reinterpret_cast<char *>(&netint);
+            i = to_file ?
+                write_bytes(fn, offset, netbuf, sizeof(int)) :
+                write_buffer(buf, offset, netbuf, sizeof(int));
+            break;
+        }
 
-    default: {
-      bad_argument(sp, T_BUFFER | T_STRING | T_NUMBER, 3, F_WRITE_BUFFER);
+        case T_BUFFER: {
+            char *data {reinterpret_cast<char *>(sp->u.buf->item)};
+
+            i = to_file ?
+                write_bytes(fn, offset, data, sp->u.buf->size) :
+                write_buffer(buf, offset, data, sp->u.buf->size);
+            break;
+        }
+
+        case T_STRING: {
+            std::string data {sp->u.string};
+            i = to_file ?
+                write_bytes(fn, offset, data) :
+                write_buffer(buf, offset, data.c_str(), data.size());
+            break;
+        }
     }
-  }
-  free_svalue(sp--, "f_write_buffer");
-  free_svalue(--sp, "f_write_buffer");
-  put_number(i);
+    free_svalue(sp--, "f_write_buffer");
+    free_svalue(--sp, "f_write_buffer");
+    put_number(i);
 }
 #endif
 
@@ -3230,7 +2920,7 @@ void f_query_shadowing(void) {
     free_object(&ob, "f_query_shadowing");
   } else {
     free_svalue(sp, "f_query_shadowing");
-    *sp = const0;
+    *sp = 0;
   }
 }
 #endif
@@ -3260,7 +2950,7 @@ void f_floatp(void) {
     sp->u.number = 1;
   } else {
     free_svalue(sp, "f_floatp");
-    *sp = const0;
+    *sp = 0;
   }
 }
 #endif
@@ -3287,7 +2977,7 @@ void f_first_inventory(void) {
   if (ob) {
     put_unrefed_undested_object(ob, "first_inventory");
   } else {
-    *sp = const0;
+    *sp = 0;
   }
 }
 #endif
@@ -3309,7 +2999,7 @@ void f_next_inventory(void) {
     add_ref(ob, "next_inventory(ob) : 1");
     sp->u.ob = ob;
   } else {
-    *sp = const0;
+    *sp = 0;
   }
 }
 #endif
@@ -3327,12 +3017,14 @@ void f_defer() {
     newlist->next = csp->defers;
   }
   // Configure the new item.
-  newlist->func = *sp--;
+  assign_svalue(&(newlist->func), sp);
+  sp--;
   if (command_giver) {
     push_object(command_giver);
-    newlist->tp = *sp--;
+    assign_svalue(&(newlist->tp), sp);
+    sp--;
   } else {
-    newlist->tp = const0;
+    newlist->tp = 0;
   }
 
   // In reverse mode, if list is not null, then add new item to the end.
@@ -3356,88 +3048,100 @@ void f_defer() {
 
 #ifdef F_CRYPT
 void f_crypt(void) {
-  const int SHA512_PREFIX_LEN = 3;
-  const int SHA512_SALT_LEN = 16;
-  char salt[SHA512_PREFIX_LEN + SHA512_SALT_LEN + 1];
-  const char *saltp = nullptr;
-  const char *choice = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./";
+    const int SHA512_PREFIX_LEN = 3;
+    const int SHA512_SALT_LEN = 16;
+    char salt[SHA512_PREFIX_LEN + SHA512_SALT_LEN + 1];
+    const char *saltp = nullptr;
+    static const std::string choice {"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./"};
 
-  if (sp->type == T_STRING) {
-    // Support $1$, $2a$ (a,x,y), $5$, $6$
-    if (sp->u.string[0] == '$') {
-      // $2?$
-      if (SVALUE_STRLEN(sp) >= 4 && sp->u.string[1] == '2' &&
-          (sp->u.string[2] == 'a' || sp->u.string[2] == 'x' || sp->u.string[2] == 'y') &&
-          sp->u.string[3] == '$') {
-        saltp = sp->u.string;
-      } else {
-        if (SVALUE_STRLEN(sp) >= 3 &&
-            (sp->u.string[1] == '1' || sp->u.string[1] == '5' || sp->u.string[1] == '6') &&
-            sp->u.string[2] == '$') {
-          saltp = sp->u.string;
+    std::string data;
+    std::string seed;
+
+    CHECK_TYPES((sp-1), T_STRING, 1, F_CRYPT);
+    CHECK_TYPES(sp    , T_STRING|T_NUMBER, 2, F_CRYPT);
+
+    data = (sp-1)->u.string;
+
+    if (sp->type == T_STRING) {
+        seed = sp->u.string;
+
+        // Support $1$, $2a$ (a,x,y), $5$, $6$
+        if (seed[0] == '$') {
+            // $2?$
+            if (seed.size() >= 4 && seed[1] == '2' &&
+                    (seed[2] == 'a' || seed[2] == 'x' || seed[2] == 'y') &&
+                    seed[3] == '$') {
+                saltp = seed.c_str();
+            } else {
+                if (seed.size() >= 3 &&
+                        (seed[1] == '1' || seed[1] == '5' || seed[1] == '6') &&
+                        seed[2] == '$') {
+                    saltp = seed.c_str();
+                }
+            }
+        } else if (seed.size() >= 2) {
+            // Compat: Old f_crypt only use first two character as key.
+            debug_message(
+                    "old crypt() password detected, It is only using first 2 character as key and ignore "
+                    "password beyond 8 characters, please upgrade to SHA512 using crypt(password) "
+                    "immediately.\n");
+            salt[0] = seed[0];
+            salt[1] = seed[1];
+            salt[2] = '\0';
+            saltp = salt;
         }
-      }
-    } else if (SVALUE_STRLEN(sp) >= 2) {
-      // Compat: Old f_crypt only use first two character as key.
-      debug_message(
-          "old crypt() password detected, It is only using first 2 character as key and ignore "
-          "password beyond 8 characters, please upgrade to SHA512 using crypt(password) "
-          "immediately.\n");
-      salt[0] = sp->u.string[0];
-      salt[1] = sp->u.string[1];
-      salt[2] = '\0';
-      saltp = salt;
     }
-  }
 
-  if (saltp == nullptr) {
-    salt[0] = '$';
-    salt[1] = '6';
-    salt[2] = '$';
-    for (auto i = 0; i < SHA512_SALT_LEN; i++) {
-      salt[3 + i] = choice[random_number(strlen(choice))];
+    if (saltp == nullptr) {
+        size_t size {choice.size()};
+        salt[0] = '$';
+        salt[1] = '6';
+        salt[2] = '$';
+        for (auto i = 0; i < SHA512_SALT_LEN; i++) {
+            salt[3 + i] = choice[random_number(size)];
+        }
+        salt[sizeof(salt) - 1] = '\0';
+        saltp = salt;
     }
-    salt[sizeof(salt) - 1] = '\0';
-    saltp = salt;
-  }
 
-  auto result = crypt((sp - 1)->u.string, saltp);
-  if (result == nullptr || (result && result[0] == '*')) {
-    error("Error in crypt(), check your salt");
-    return;
-  }
-  result = string_copy(result, "f_crypt");
-  pop_2_elems();
-  push_malloced_string(result);
+    auto result = crypt(data.c_str(), saltp);
+    if (result == nullptr || (result && result[0] == '*')) {
+        error("Error in crypt(), check your salt");
+        return;
+    }
+    pop_2_elems();
+    push_string(result);
 }
 #endif
 
 #ifdef F_OLDCRYPT
 void f_oldcrypt(void) {
-  const int SALT_LEN = 8;
+    const size_t SALT_LEN = 8;
 
-  const char *res, *p;
-  char salt[SALT_LEN + 1];
-  const char *choice = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ./";
+    const char *res, *p;
+    char salt[SALT_LEN + 1];
+    static const std::string choice {"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ./"};
 
-  if (sp->type == T_STRING && SVALUE_STRLEN(sp) >= 2) {
-    p = sp->u.string;
-  } else {
-    int i;
+    CHECK_TYPES((sp-1), T_STRING, 1, F_CRYPT);
+    CHECK_TYPES(sp    , T_STRING|T_NUMBER, 2, F_CRYPT);
 
-    for (i = 0; i < SALT_LEN; i++) {
-      salt[i] = choice[random_number(strlen(choice))];
-    }
+    if (sp->type == T_STRING && sp->u.string->size() >= 2) {
+        p = sp->u.string->c_str();
+    } else {
+        size_t size {choice.size()};
+        for (int i = 0; i < SALT_LEN; i++) {
+            salt[i] = choice[random_number(size)];
+        }
 
     salt[SALT_LEN] = 0;
     p = salt;
-  }
-  debug_message(
-      "oldcrypt() is deprecated! it is using MD5 and unsafe, please upgrade your code to use "
-      "crypt(password).\n");
-  res = string_copy(custom_crypt((sp - 1)->u.string, p, nullptr), "f_oldcrypt");
-  pop_2_elems();
-  push_malloced_string(res);
+    }
+    debug_message(
+    "oldcrypt() is deprecated! it is using MD5 and unsafe, please upgrade your code to use "
+    "crypt(password).\n");
+    res = custom_crypt((sp - 1)->u.string->c_str(), p, nullptr);
+    pop_2_elems();
+    push_string(res);
 }
 #endif
 
@@ -3478,20 +3182,19 @@ void f_localtime(void) {
   vec->item[LT_YDAY].type = T_NUMBER;
   vec->item[LT_YDAY].u.number = tm->tm_yday;
   vec->item[LT_GMTOFF].type = T_NUMBER;
-  vec->item[LT_ZONE].type = T_STRING;
-  vec->item[LT_ZONE].subtype = STRING_MALLOC;
-  vec->item[LT_ISDST].type = T_NUMBER;
-  vec->item[LT_ISDST].u.number = tm->tm_isdst;
 #ifdef __FreeBSD__
   vec->item[LT_GMTOFF].u.number = tm->tm_gmtoff;
 #else
   vec->item[LT_GMTOFF].u.number = timezone;
 #endif
+  vec->item[LT_ZONE].type = T_STRING;
   if (!tm->tm_isdst) {
-    vec->item[LT_ZONE].u.string = string_copy(tzname[0], "f_localtime");
+    vec->item[LT_ZONE].u.string = std::string {tzname[0]};
   } else {
-    vec->item[LT_ZONE].u.string = string_copy(tzname[1], "f_localtime");
+    vec->item[LT_ZONE].u.string = std::string {tzname[1]};
   }
+  vec->item[LT_ISDST].type = T_NUMBER;
+  vec->item[LT_ISDST].u.number = tm->tm_isdst;
   push_refed_array(vec);
 }
 #endif

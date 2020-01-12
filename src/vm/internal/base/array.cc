@@ -219,7 +219,7 @@ array_t *resize_array(array_t *p, unsigned int n) {
   return p;
 }
 
-array_t *explode_string(const char *str, int slen, const char *del, int len) {
+array_t *explode_string(const std::string str, const std::string del) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   const char *p, *beg, *lastdel = nullptr;
@@ -410,7 +410,7 @@ array_t *explode_string(const char *str, int slen, const char *del, int len) {
   return ret;
 }
 
-char *implode_string(array_t *arr, const char *del, int del_len) {
+std::string implode_string(array_t *arr, const std::string &del) {
   int size, i, num;
   char *p, *q;
 
@@ -442,7 +442,7 @@ char *implode_string(array_t *arr, const char *del, int del_len) {
   return q;
 }
 
-void implode_array(funptr_t *fptr, array_t *arr, svalue_t *dest, int first_on_stack) {
+void implode_array(funptr_t *fptr, array_t *arr, svalue_t *dest, bool first_on_stack) {
   int i = 0, n;
   svalue_t *v;
 

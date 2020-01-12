@@ -312,6 +312,7 @@ set(SRC
   "base/internal/outbuf.cc"
   "base/internal/port.cc"
   "base/internal/rc.cc"
+  "base/internal/shared_string.cc"
   "base/internal/stats.cc"
   "compiler/internal/compiler.cc"
   "compiler/internal/generate.cc"

@@ -9,7 +9,7 @@ title: interactive / query_ip_name
 
 ### SYNOPSIS
 
-    string query_ip_name( object ob );
+    string query_ip_name( object ob = this_player() );
 
 ### DESCRIPTION
 

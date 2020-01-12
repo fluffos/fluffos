@@ -1,4 +1,5 @@
 #include <cctype>
+#include <cstring>
 #include <string.h>
 #include <unicode/brkiter.h>
 
@@ -42,9 +43,19 @@ void u8_sanitize(char *src) {
   }
 }
 
-bool u8_egc_count(const char *src, size_t *count) {
+void u8_sanitize(std::string &src) {
+    size_t len {src.size()+1};
+    char *tmp {new char[len]};
+
+    std::memcpy(tmp, src.c_str(), len);
+    u8_sanitize(tmp);
+
+    src = std::string(tmp);
+    delete[] tmp;
+}
+
+bool u8_egc_count(const char *src, size_t &count) {
   UErrorCode status = U_ZERO_ERROR;
-  size_t total = 0;
   UText text = UTEXT_INITIALIZER;
 
   utext_openUTF8(&text, src, -1, &status);
@@ -66,12 +77,15 @@ bool u8_egc_count(const char *src, size_t *count) {
     return false;
   }
   brk->first();
-  while (brk->next() != icu::BreakIterator::DONE) ++total;
-
-  *count = total;
+  while (brk->next() != icu::BreakIterator::DONE)
+      ++count;
 
   utext_close(&text);
   return true;
+}
+
+bool u8_egc_count(const std::string src, size_t &count) {
+    return u8_egc_count(src.c_str(), count);
 }
 
 // Return the egc at given index of src, if it is an single code point

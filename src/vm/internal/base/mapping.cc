@@ -1197,7 +1197,7 @@ static svalue_t *insert_in_mapping(mapping_t *m, const char *key) {
   return ret;
 }
 
-void add_mapping_pair(mapping_t *m, const char *key, long value) {
+void add_mapping_pair(mapping_t *m, const std::string key, long value) {
   svalue_t *s;
 
   s = insert_in_mapping(m, key);
@@ -1206,25 +1206,7 @@ void add_mapping_pair(mapping_t *m, const char *key, long value) {
   s->u.number = value;
 }
 
-void add_mapping_string(mapping_t *m, const char *key, const char *value) {
-  svalue_t *s;
-
-  s = insert_in_mapping(m, key);
-  s->type = T_STRING;
-  s->subtype = STRING_SHARED;
-  s->u.string = make_shared_string(value);
-}
-
-void add_mapping_malloced_string(mapping_t *m, const char *key, char *value) {
-  svalue_t *s;
-
-  s = insert_in_mapping(m, key);
-  s->type = T_STRING;
-  s->subtype = STRING_MALLOC;
-  s->u.string = value;
-}
-
-void add_mapping_object(mapping_t *m, const char *key, object_t *value) {
+void add_mapping_object(mapping_t *m, const std::string key, object_t *value) {
   svalue_t *s;
 
   s = insert_in_mapping(m, key);
@@ -1244,11 +1226,11 @@ void add_mapping_array(mapping_t *m, const char *key, array_t *value) {
   value->ref++;
 }
 
-void add_mapping_shared_string(mapping_t *m, const char *key, char *value) {
+void add_mapping_string(mapping_t *m, const std::string key, std::string value) {
   svalue_t *s;
 
   s = insert_in_mapping(m, key);
   s->type = T_STRING;
-  s->subtype = STRING_SHARED;
-  s->u.string = ref_string(value);
+  s->subtype = STRING_MALLOC;
+  s->u.string = value;
 }

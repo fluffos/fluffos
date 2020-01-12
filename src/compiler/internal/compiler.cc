@@ -2086,6 +2086,7 @@ parse_node_t *validate_efun_call(int f, parse_node_t *args) {
 void yyerror(const char *str) {
   extern int num_parse_error;
 
+  printf("Error in file: '%s', line %d: (%s)\n", current_file, current_line, str);
   function_context.num_parameters = -1;
   if (num_parse_error > 5) {
     lex_fatal = 1;

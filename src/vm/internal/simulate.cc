@@ -1256,7 +1256,7 @@ void tell_room(object_t *room, svalue_t *v, array_t *avoid) {
 #endif
 #endif
 
-void shout_string(const char *str) {
+void shout_string(const std::string str) {
   object_t *ob;
 
   check_legal_string(str);
@@ -1269,7 +1269,7 @@ void shout_string(const char *str) {
     ) {
       continue;
     }
-    tell_object(ob, str, strlen(str));
+    tell_object(ob, str);
   }
 }
 
@@ -1445,7 +1445,7 @@ void do_write(svalue_t *arg) {
  * returned.
  */
 
-object_t *find_object(const char *str) {
+object_t *find_object(const std::string str) {
   object_t *ob;
   char tmpbuf[MAX_OBJECT_NAME_SIZE];
 
@@ -1464,7 +1464,7 @@ object_t *find_object(const char *str) {
 }
 
 /* Look for a loaded object. Return 0 if non found. */
-object_t *find_object2(const char *str) {
+object_t *find_object2(const std::string str) {
   object_t *ob;
   char p[MAX_OBJECT_NAME_SIZE];
 
@@ -1774,8 +1774,8 @@ static void mudlib_error_handler(char *err, int katch) {
 }
 
 namespace {
-void _error_handler(char *err) {
-  const char *object_name;
+void _error_handler(std::string err) {
+  std::string object_name;
 
   debug_message_with_location(err + 1);
   if (CONFIG_INT(__RC_TRACE_CODE__)) {

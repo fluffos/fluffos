@@ -10,11 +10,15 @@
 #include <string>
 #include <memory>
 #include <fmt/format.h>
+#include <fmt/ranges.h>
+#include <fmt/chrono.h>
 
 #include "templates/shared_storage.hh"
 
 using shared_string         = shared_storage<std::string>;
 using shared_string_ptr_t   = std::unique_ptr<shared_string>;
+
+int add_string_status(outbuffer_t *out, int verbose);
 
 namespace fmt {
     // format shared_string as std::string
@@ -26,5 +30,7 @@ namespace fmt {
                 }
         };
 }
+
+int add_string_status(outbuffer_t *, int);
 
 #endif // SHARED_STRING_HH

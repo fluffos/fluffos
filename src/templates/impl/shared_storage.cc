@@ -325,7 +325,11 @@ auto shared_storage<T, hash>::get_status(bool verbose) -> typename std::enable_i
     LOCK(mtx());                                            // we might use multi threading
 #endif
 
-    status.size = storage().size();
+    status.size             = storage().size();
+    status.num_buckets      = storage().bucket_count();
+    status.max_num_buckets  = storage().max_bucket_count();
+    status.max_bucket_size  = storage().load_factor();
+    status.av_bucket_size   = storage().load_factor();
 
     if(verbose)
     {

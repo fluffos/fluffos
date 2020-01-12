@@ -28,4 +28,7 @@
 #cmakedefine TIME_WITH_SYS_TIME 1
 #cmakedefine HAVE_SYS_STAT_H 1
 
+// we link against libpthread
+#define USE_THREADS
+
 #endif /* _CONFIG_H_ */

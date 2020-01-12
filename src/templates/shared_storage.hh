@@ -138,6 +138,11 @@ class shared_storage {
             size_t unref;               ///< @brief unreferenced string count
             size_t max_ref;             ///< @brief threshold at which point a string becomes protected
             size_t prot;                ///< @brief proteted string count
+
+            size_t num_buckets;         ///< @brief current number of underlying buckets;
+            size_t max_buckets;         ///< @brief maximum number of underlying buckets;
+            float  max_bucket_size;     ///< @brief maximum size of underlying buckets;
+            float  av_bucket_size;      ///< @brief current average size of underlying buckets;
         };
         /// @brief structure holding additional status informations
         template<typename A>
@@ -146,6 +151,11 @@ class shared_storage {
             size_t unref;               ///< @brief unreferenced string count
             size_t max_ref;             ///< @brief threshold at which point a string becomes protected
             size_t prot;                ///< @brief proteted string count
+
+            size_t num_buckets;         ///< @brief current number of underlying buckets;
+            size_t max_buckets;         ///< @brief maximum number of underlying buckets;
+            float  max_bucket_size;     ///< @brief maximum size of underlying buckets;
+            float  av_bucket_size;      ///< @brief current average size of underlying buckets;
 
             size_t data_size;           ///< @brief size of stored data (only updated when asking for verbose status)
             size_t unref_size;          ///< @brief size of stored but unregerenced data (only updated when asking for verbose status)
@@ -184,7 +194,11 @@ class shared_storage {
         // retrievals and it doesn't have problems with possible multi threaded
         // environments
         using avl_tree_t    = boost::container::tree_assoc_options<boost::container::tree_type<boost::container::avl_tree>>::type;
+
+    public:
         using value_t       = std::pair<const size_t, shared_storage_vt>;
+
+    private:
         using storage_t     = boost::container::multimap<size_t, shared_storage_vt, std::less<size_t>, boost::container::new_allocator<value_t>, avl_tree_t>;
 
         // value represented by *this

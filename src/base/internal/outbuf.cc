@@ -13,17 +13,16 @@ void outbuf_zero(outbuffer_t *outbuf) {
   outbuf->buffer = nullptr;
 }
 
-int outbuf_extend(outbuffer_t *outbuf, int l) {
+size_t outbuf_extend(outbuffer_t *outbuf, size_t l) {
   const auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
-
-  int limit;
 
   DEBUG_CHECK(l < 0, "Negative length passed to outbuf_extend.\n");
 
   l = (l > max_string_length ? max_string_length : l);
 
   if (outbuf->buffer) {
-    limit = MSTR_SIZE(outbuf->buffer);
+    size_t limit {MSTR_SIZE(outbuf->buffer)};
+
     if (outbuf->real_size + l > limit) {
       if (outbuf->real_size == max_string_length) {
         return 0;
@@ -45,20 +44,6 @@ int outbuf_extend(outbuffer_t *outbuf, int l) {
   return l;
 }
 
-void outbuf_add(outbuffer_t *outbuf, const char *str) {
-  int l, limit;
-
-  if (!outbuf) {
-    return;
-  }
-  l = strlen(str);
-  if ((limit = outbuf_extend(outbuf, l)) > 0) {
-    strncpy(outbuf->buffer + outbuf->real_size, str, limit);
-    outbuf->real_size += (l > limit ? limit : l);
-    *(outbuf->buffer + outbuf->real_size) = 0;
-  }
-}
-
 void outbuf_addchar(outbuffer_t *outbuf, char c) {
   if (outbuf && (outbuf_extend(outbuf, 1) > 0)) {
     *(outbuf->buffer + outbuf->real_size++) = c;
@@ -66,19 +51,29 @@ void outbuf_addchar(outbuffer_t *outbuf, char c) {
   }
 }
 
-void outbuf_addv(outbuffer_t *outbuf, const char *format, ...) {
-  char buf[LARGEST_PRINTABLE_STRING + 1];
-  va_list args;
+void outbuf_add_internal(outbuffer_t *outbuf, const std::string format, fmt::format_args args) {
+    std::string buf;
+    size_t l {0};
+    size_t limit {0};
 
-  va_start(args, format);
-  vsnprintf(buf, sizeof(buf), format, args);
-  va_end(args);
+    if (outbuf == nullptr) {
+        return;
+    }
 
-  if (!outbuf) {
-    return;
-  }
+    try {
+        buf = fmt::vformat(format, args);
+    }
+    catch(const std::exception &e) {
+        buf = std::string("BUG! driver[outbuf_add_internal]: ") + e.what() + "\nFormatstring: \"" + format + "\"\n";
+        std::cerr << deb_buf;
+    }
 
-  outbuf_add(outbuf, buf);
+    l = buf.size();
+    if ((limit = outbuf_extend(outbuf, l)) > 0) {
+        strncpy(outbuf->buffer + outbuf->real_size, buf.c_str(), limit);
+        outbuf->real_size += (l > limit ? limit : l);
+        *(outbuf->buffer + outbuf->real_size) = 0;
+    }
 }
 
 void outbuf_fix(outbuffer_t *outbuf) {

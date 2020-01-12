@@ -109,7 +109,7 @@ struct object_t {
   struct userid_t *euid; /* the effective "owner" */
 #endif
 #ifdef PRIVS
-  char *privs; /* object's privledges */
+  std::string privs; /* object's privledges */
 #endif         /* PRIVS */
 #ifdef PACKAGE_MUDLIB_STATS
   struct statgroup_t stats; /* mudlib stats */

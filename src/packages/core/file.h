@@ -8,16 +8,19 @@
 const std::string check_valid_path(const std::string, object_t *, const std::string, int);
 void dump_file_descriptors(outbuffer_t *);
 
-char *read_file(const char *, int, int);
-char *read_bytes(const char *, int, int, int *);
-int write_file(const char *, const char *, int);
-int write_bytes(const char *, int, const char *, int);
-array_t *get_dir(const char *, int);
+std::string *read_file(const std::string, int, int);
+std::string *read_bytes(const std::string, int, int, int *);
+int write_file(const std::string, const std::string, int);
+int write_bytes(const std::string, int, const std::string);
+int write_bytes(const std::string, int, const char *, size_t);
+array_t *get_dir(const std::string, int);
 int tail(char *);
 int file_size(const char *);
 int copy_file(const char *, const char *);
-int do_rename(const char *, const char *, int);
-int remove_file(const char *);
+#ifdef F_RENAME
+int do_rename(const std::string, const std::string, int);
+#endif
+int remove_file(const std::string);
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_file_sv(void);

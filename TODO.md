@@ -15,11 +15,35 @@
 
     e.g. vm/internal/base/object.cc depends on package/compress enabled!
 - substitute struct svalue\_t by class and provide proper API
+- check all string handling for utf-8 conformity
 
 ## packages/core/ed.cc ##
 - missing 'check\_valid\_path(...)' for write operation with new api.
 - needs probably rewrite (from first look not reentrant!)
 - doesn't compile with ```#define RECEIVE_ED``` (for how long?)
+
+## packages/core/sprintf.cc ##
+- reimplement using std::string
+
+## efun::\*, compiler & vm ##
+- change efun::\* signature from  
+    - 'void -> void'
+
+    to
+    - 'LPC_stack -> void'
+
+    with some to be defined ```class LPC_stack```, providing a multi instance
+    capable stack for the virtual machine.
+- finalize svalue_t API
+
+## vm & compiler ##
+- encapsulate vm/interpreter and compiler in distinct, multi instance capable
+  classes.
+- make sure variadic efuns get the number of parameters they are called with either
+    - on the stack
+
+    or
+    - as argument
 
 # Minor #
 ## documentation ##
@@ -34,6 +58,9 @@
 
 ## base/internal/log.h
 - \#define debug(...) still uses char\*
+
+## base/internal/outbuf.cc ##
+- change ```struct outbuf_t``` into class with full API
 
 ## packages/core/crc32.cc ##
 - switch to CRCpp (see: [github repo](https://github.com/Shea690901/CRCpp "forked from d-bahr/CRCpp"))
@@ -54,6 +81,12 @@
 
 - string\_difference
     - rename? there are different kind of string differences...
+
+## packages/core/efun_main.cc ##
+- reimplement:
+    - ```efun::process_string(string)```
+    - ```efun::process_value(string)```
+- switch to std::regexp
 
 ## packages/core/file.cc ##
 - add support for 'lstat' if available
@@ -85,3 +118,8 @@
 
 ## iconv ##
 - provide (MT safe) c++ wrapper
+
+# after switch to C++17 (or later) ##
+- check all attributes
+    - e.g.: C++17 knows ```[[fallthrough]]``` as such occurences of
+      ```[[gnu::fallthrogh]]``` may be deleted/replaced.

@@ -105,11 +105,9 @@ void dealloc_mapping(mapping_t *);
 void mark_mapping_node_blocks(void);
 mapping_t *mkmapping(array_t *, array_t *);
 LPC_INT svalue_to_int(svalue_t *);
-void add_mapping_pair(mapping_t *, const char *, long);
-void add_mapping_string(mapping_t *, const char *, const char *);
-void add_mapping_malloced_string(mapping_t *, const char *, char *);
-void add_mapping_object(mapping_t *, const char *, object_t *);
-void add_mapping_array(mapping_t *, const char *, array_t *);
-void add_mapping_shared_string(mapping_t *, const char *, char *);
+void add_mapping_pair(mapping_t *, const std::string, long);
+void add_mapping_object(mapping_t *, const std::string, object_t *);
+void add_mapping_array(mapping_t *, const std::string, array_t *);
+void add_mapping_string(mapping_t *, const std::string, const std::string);
 
 #endif /* _MAPPING_H */

@@ -75,7 +75,6 @@ namespace fs = ghc::filesystem;
 #endif
 
 static int match_string(char * /*match*/, char * /*str*/);
-static int do_move(const char *from, const char *to, int flag);
 static int pstrcmp(const void * /*p1*/, const void * /*p2*/);
 static int parrcmp(const void * /*p1*/, const void * /*p2*/);
 static void encode_stat(svalue_t * /*vp*/, int /*flags*/, char * /*str*/, struct stat * /*st*/);
@@ -144,7 +143,7 @@ static void encode_stat(svalue_t *vp, int flags, char *str, struct stat *st) {
 /* WIN32 should be fixed to do this correctly (i.e. no ifdefs for it) */
 #define MAX_FNAME_SIZE 255
 #define MAX_PATH_LEN 1024
-array_t *get_dir(const char *path, int flags) {
+array_t *get_dir(const std::string path, int flags) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   array_t *v;
@@ -159,7 +158,7 @@ array_t *get_dir(const char *path, int flags) {
   char regexppath[MAX_FNAME_SIZE + MAX_PATH_LEN + 2];
   char *p;
 
-  if (!path) {
+  if (path.empty()) {
     return nullptr;
   }
 
@@ -169,7 +168,7 @@ array_t *get_dir(const char *path, int flags) {
     return nullptr;
   }
 
-  if (strlen(path) < 2) {
+  if (path.size() < 2) {
     temppath[0] = path[0] ? path[0] : '.';
     temppath[1] = '\000';
     p = temppath;
@@ -268,7 +267,7 @@ array_t *get_dir(const char *path, int flags) {
   return v;
 }
 
-int remove_file(const char *path) {
+int remove_file(const std::string path) {
   path = check_valid_path(path, current_object, "remove_file", 1);
 
   if (path == nullptr) {
@@ -283,7 +282,7 @@ int remove_file(const char *path) {
 /*
  * Append string to file. Return 0 for failure, otherwise 1.
  */
-int write_file(const char *file, const char *str, int flags) {
+int write_file(const std::string file, const std::string str, int flags) {
   FILE *f;
   gzFile gf;
 
@@ -319,107 +318,112 @@ int write_file(const char *file, const char *str, int flags) {
 }
 
 /* Reads file, starting from line of "start", with maximum lines of "lines".
- * Returns a malloced_string.
+ * Returns a new string.
  */
-char *read_file(const char *file, int start, int lines) {
-  const auto read_file_max_size = CONFIG_INT(__MAX_READ_FILE_SIZE__);
+std::string *read_file(const std::string file, int start, int lines) {
+    static char *theBuff {nullptr};
+    std::string *ret {nullptr};
+    const auto read_file_max_size = CONFIG_INT(__MAX_READ_FILE_SIZE__);
 
-  if (lines < 0) {
-    debug(file, "read_file: trying to read negative lines: %d", lines);
-    return nullptr;
-  }
+    if (lines < 0) {
+        debug(file, "read_file: trying to read negative lines: %d", lines);
+        return ret;
+    }
 
-  const char *real_file;
+    const char *real_file;
 
-  real_file = check_valid_path(file, current_object, "read_file", 0);
-  if (!real_file) {
-    return nullptr;
-  }
+    real_file = check_valid_path(file, current_object, "read_file", 0);
+    if (!real_file) {
+        return ret;
+    }
 
-  auto fs_real_file = fs::path(real_file);
+    auto fs_real_file = fs::path(real_file);
 
-  /*
-   * file doesn't exist, or is really a directory
-   */
-  if (!fs::exists(fs_real_file) || fs::is_directory(fs_real_file)) {
-    return nullptr;
-  }
+    /*
+    * file doesn't exist, or is really a directory
+    */
+    if (!fs::exists(fs_real_file) || fs::is_directory(fs_real_file)) {
+        return ret;
+    }
 
-  if (fs::is_empty(fs_real_file)) {
+    if (fs::is_empty(fs_real_file)) {
     /* zero length file */
-    char *result = new_string(0, "read_file: empty");
-    result[0] = '\0';
-    return result;
-  }
-
-  gzFile f = gzopen(real_file, "rb");
-
-  if (f == nullptr) {
-    debug(file, "read_file: fail to open: %s.\n", file);
-    return nullptr;
-  }
-
-  static char *theBuff = nullptr;
-  if (!theBuff) {
-    theBuff = reinterpret_cast<char *>(
-        DMALLOC(2 * read_file_max_size + 1, TAG_PERMANENT, "read_file: theBuff"));
-  }
-
-  int total_bytes_read = gzread(f, (void *)theBuff, 2 * read_file_max_size);
-  gzclose(f);
-
-  if (total_bytes_read <= 0) {
-    debug(file, "read_file: read error: %s.\n", file);
-    return nullptr;
-  }
-  theBuff[total_bytes_read] = '\0';
-
-  // skip forward until the "start"-th line
-  const char *ptr_start = theBuff;
-  while (start > 1 && ptr_start < theBuff + total_bytes_read) {
-    if (*ptr_start == '\0') {
-      debug(file, "read_file: file contains '\\0': %s.\n", file);
-      return nullptr;
+        ret = new std::string();
+        return ret;
     }
-    if (*ptr_start == '\n') {
-      start--;
+
+    gzFile f = gzopen(real_file, "rb");
+
+    if (f == nullptr) {
+        debug(file, "read_file: fail to open: {}.\n", file);
+        return ret;
     }
-    ptr_start++;
-  }
 
-  // not found
-  if (start > 1) {
-    debug(file, "read_file: reached EOF searching for start: %s.\n", file);
-    return nullptr;
-  }
-
-  char* ptr_end = (char*) theBuff + total_bytes_read;
-
-  if (lines > 0) {
-    // continue searching forward for "lines" of '\n'
-    ptr_end = (char *)ptr_start;
-    while (lines > 0 && ptr_end <= theBuff + total_bytes_read) {
-      if (*ptr_end++ == '\n') {
-        lines--;
-      }
+    if (!theBuff) {
+        theBuff = reinterpret_cast<char *>(DMALLOC(2 * read_file_max_size + 1, TAG_PERMANENT, "read_file: theBuff"));
     }
-  }
 
-  // Truncate result to read_file_max_size
-  if (ptr_end > ptr_start + read_file_max_size) {
-    ptr_end = (char *) ptr_start + read_file_max_size;
-  }
+    int total_bytes_read = gzread(f, (void *)theBuff, 2 * read_file_max_size);
+    gzclose(f);
 
-  *ptr_end = '\0';
+    if (total_bytes_read <= 0) {
+        debug(file, "read_file: read error: {}.\n", file);
+        return ret;
+    }
+    theBuff[total_bytes_read] = '\0';
 
-  bool found_crlf = strchr(ptr_start, '\r') != nullptr;
-  if (found_crlf) {
-    // Deal with CRLF.
-    std::string content(ptr_start);
-    ReplaceStringInPlace(content, "\r\n", "\n");
-    return string_copy(content.c_str(), "read file: CRLF result");
-  }
-  return string_copy(ptr_start, "read_file: result");
+    // skip forward until the "start"-th line
+    char *ptr_start = theBuff;
+    while (start > 1 && ptr_start < theBuff + total_bytes_read) {
+        if (*ptr_start == '\0') {
+            debug(file, "read_file: file contains '\\0': {}.\n", file);
+            return ret;
+        }
+        if (*ptr_start == '\n') {
+            start--;
+        }
+        ptr_start++;
+    }
+
+    // not found
+    if (start > 1) {
+        debug(file, "read_file: reached EOF searching for start: {}.\n", file);
+        return ret;
+    }
+
+    char *ptr_end {nullptr};
+    // search forward for "lines" of '\n' for the end
+    if (lines == 0) {
+        ptr_end = ptr_start + read_file_max_size;
+        if (ptr_end > theBuff + total_bytes_read) {
+            ptr_end = theBuff + total_bytes_read + 1;
+        }
+    } else {
+        ptr_end = ptr_start;
+        while (lines > 0 && ptr_end < theBuff + total_bytes_read) {
+            if (*ptr_end++ == '\n') {
+                lines--;
+            }
+        }
+        // not enough lines, directly go to the end.
+        if (lines > 0) {
+            ptr_end = theBuff + total_bytes_read + 1;
+        }
+    }
+
+    *ptr_end = '\0';
+    // result is too big.
+    if (strlen(ptr_start) > read_file_max_size) {
+        debug(file, "read_file: result too big: {}.\n", file);
+        return ret;
+    }
+
+    ret = new std::string(ptr_start);
+    if (ret->find('\r') != std::string::npos) {;
+        // Deal with CRLF.
+        ReplaceStringInPlace(*ret, "\r\n", "\n");
+    }
+    return ret;
 }
 
 char *read_bytes(const char *file, int start, int len, int *rlen) {
@@ -489,7 +493,11 @@ char *read_bytes(const char *file, int start, int len, int *rlen) {
   return str;
 }
 
-int write_bytes(const char *file, int start, const char *str, int theLength) {
+int write_bytes(const std::string file, int start, const std::string str) {
+    return write_bytes(filem start, str, str.size());
+}
+
+int write_bytes(const std::string file, int start, const char *str, size_t len) {
   const auto max_byte_transfer = CONFIG_INT(__MAX_BYTE_TRANSFER__);
 
   struct stat st;
@@ -572,8 +580,7 @@ int file_size(const char *file) {
  * Otherwise, the returned path is temporarily allocated by apply(), which
  * means it will be deallocated at next apply().
  */
-const char *check_valid_path(const char *path, object_t *call_object, const char *const call_fun,
-                             int writeflg) {
+const std::string check_valid_path(const std::string path, object_t *call_object, const char *const call_fun, int writeflg) {
   svalue_t *v;
 
   if (!master_ob && !call_object) {
@@ -629,7 +636,7 @@ const char *check_valid_path(const char *path, object_t *call_object, const char
   return nullptr;
 }
 
-static int match_string(char *match, char *str) {
+static int match_string(char const *match, char const *str) {
   int i;
 
 again:
@@ -662,7 +669,7 @@ again:
       if (*match == '\0') {
         return 0;
       }
-    /* Fall through ! */
+      [[gnu::fallthrough]];
     default:
       if (*match == *str) {
         match++;
@@ -673,33 +680,51 @@ again:
   }
 }
 
-static struct stat to_stats, from_stats;
+void debug_perror(const char *what, const char *file) {
+  if (file) {
+    debug_message("System Error: {}:{}:{}\n", what, file, strerror(errno));
+  } else {
+    debug_message("System Error: {}:{}\n", what, strerror(errno));
+  }
+}
+
+static svalue_t from_sv = {T_NUMBER};
+static svalue_t to_sv = {T_NUMBER};
+
+#ifdef DEBUGMALLOC_EXTENSIONS
+void mark_file_sv() {
+  mark_svalue(&from_sv);
+  mark_svalue(&to_sv);
+}
+#endif
 
 /* Move FROM onto TO.  Handles cross-filesystem moves.
    If TO is a directory, FROM must be also.
    Return 0 if successful, 1 if an error occurred.  */
 
 #ifdef F_RENAME
-static int do_move(const char *from, const char *to, int flag) {
+static int do_move(const std::string from, const std::string to, int flag) {
+    struct stat to_stats, from_stats;
+
   if (lstat(from, &from_stats) != 0) {
-    error("/%s: lstat failed\n", from);
+    error("/{}: lstat failed\n", from);
     return 1;
   }
   if (lstat(to, &to_stats) == 0) {
 #ifdef __WIN32
-    if (strcmp(from, to) == 0) {
+    if (from == to) {
 #else
     if (from_stats.st_dev == to_stats.st_dev && from_stats.st_ino == to_stats.st_ino) {
 #endif
-      error("`/%s' and `/%s' are the same file", from, to);
+      error("`/{}' and `/{}' are the same file", from, to);
       return 1;
     }
     if (S_ISDIR(to_stats.st_mode)) {
-      error("/%s: cannot overwrite directory", to);
+      error("/{}: cannot overwrite directory", to);
       return 1;
     }
   } else if (errno != ENOENT) {
-    error("/%s: unknown error\n", to);
+    error("/{}: unknown error\n", to);
     return 1;
   }
   if (flag == F_RENAME) {
@@ -719,9 +744,9 @@ static int do_move(const char *from, const char *to, int flag) {
 
   if (errno != EXDEV) {
     if (flag == F_RENAME) {
-      error("cannot move `/%s' to `/%s'\n", from, to);
+      error("cannot move `/{}' to `/{}'\n", from, to);
     } else {
-      error("cannot link `/%s' to `/%s'\n", from, to);
+      error("cannot link `/{}' to `/{}'\n", from, to);
     }
     return 1;
   }
@@ -731,7 +756,7 @@ static int do_move(const char *from, const char *to, int flag) {
       return 1;
     }
     if (unlink(from)) {
-      error("cannot remove `/%s'", from);
+      error("cannot remove `/{}'", from);
       return 1;
     }
   }
@@ -744,32 +769,12 @@ static int do_move(const char *from, const char *to, int flag) {
 #endif
   return 0;
 }
-#endif
-
-void debug_perror(const char *what, const char *file) {
-  if (file) {
-    debug_message("System Error: {}:{}:{}\n", what, file, strerror(errno));
-  } else {
-    debug_message("System Error: {}:{}\n", what, strerror(errno));
-  }
-}
 
 /*
  * do_rename is used by the efun rename. It is basically a combination
  * of the unix system call rename and the unix command mv.
  */
 
-static svalue_t from_sv = {T_NUMBER};
-static svalue_t to_sv = {T_NUMBER};
-
-#ifdef DEBUGMALLOC_EXTENSIONS
-void mark_file_sv() {
-  mark_svalue(&from_sv);
-  mark_svalue(&to_sv);
-}
-#endif
-
-#ifdef F_RENAME
 int do_rename(const char *fr, const char *t, int flag) {
   const char *from;
   const char *to;
@@ -838,6 +843,8 @@ int do_rename(const char *fr, const char *t, int flag) {
 #endif /* F_RENAME */
 
 int copy_file(const char *from, const char *to) {
+    struct stat to_stats, from_stats;
+
   extern svalue_t apply_ret_value;
 
   from = check_valid_path(from, current_object, "move_file", 0);

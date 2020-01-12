@@ -221,10 +221,18 @@ const std::string query_ip_number(object_t *ob) {
     ob = command_giver;
   }
   if (!ob || ob->interactive == nullptr) {
-    return nullptr;
+    return std::string {};
   }
   char host[NI_MAXHOST];
   getnameinfo(reinterpret_cast<sockaddr *>(&ob->interactive->addr), sizeof(ob->interactive->addr),
               host, sizeof(host), nullptr, 0, NI_NUMERICHOST);
   return std::string(host);
 }
+
+std::string query_host_name() {
+    static char name[400];
+
+    gethostname(name, sizeof(name));
+    name[sizeof(name) - 1] = '\0';      // Just to make sure
+    return (name);
+} /* query_host_name() */

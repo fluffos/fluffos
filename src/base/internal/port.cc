@@ -4,17 +4,8 @@
 #ifdef HAVE_SYS_RESOURCE_H
 #include <sys/resource.h>
 #endif
-#ifdef TIME_WITH_SYS_TIME
-#include <sys/time.h>
-#include <time.h>
-#else
-#ifdef HAVE_SYS_TIME_H
-#include <sys/time.h>
-#else
-#include <time.h>
-#endif
-#endif
 #include <unistd.h>
+#include <chrono>
 
 // Returns a pseudo-random number in the range 0 .. n-1
 int64_t random_number(int64_t n) {
@@ -40,14 +31,14 @@ int64_t random_number(int64_t n) {
  * of seconds since 1970.
  */
 
-time_t get_current_time() { return time(nullptr); /* Just use the old time() for now */ }
+time_t get_current_time() {
+    return std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+}
 
-const char *time_string(time_t t) {
-  const char *res = ctime(&t);
-  if (!res) {
-    res = "ctime failed";
-  }
-  return res;
+std::string time_string(time_t t) {
+    std::time_t t {std::time(nullptr)};
+
+    return fmt::format("%c", *std::localtime(&t));
 }
 
 /*

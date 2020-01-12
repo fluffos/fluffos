@@ -383,20 +383,20 @@ int print_call_out_usage(outbuffer_t *ob, int verbose) {
   if (verbose == 1) {
     outbuf_add(ob, "Call out information:\n");
     outbuf_add(ob, "---------------------\n");
-    outbuf_addv(ob, "Number of allocated call outs: {:8}, {:8} bytes.\n", g_callout_handle_map.size(),
-                g_callout_handle_map.size() * sizeof(pending_call_t));
-    outbuf_addv(ob, "Current handle map bucket: {}\n", g_callout_handle_map.bucket_count());
-    outbuf_addv(ob, "Current handle map load_factor: {}\n", g_callout_handle_map.load_factor());
-    outbuf_addv(ob, "Current object map bucket: {}\n", g_callout_object_handle_map.bucket_count());
-    outbuf_addv(ob, "Current object map load_factor: {}\n",
-                g_callout_object_handle_map.load_factor());
-    outbuf_addv(ob, "Number of garbage entry in object map: {}\n",
-                g_callout_object_handle_map.size() - g_callout_handle_map.size());
+    outbuf_add(ob, "Number of allocated call outs: {:8}, {:8} bytes.\n", g_callout_handle_map.size(),
+               g_callout_handle_map.size() * sizeof(pending_call_t));
+    outbuf_add(ob, "Current handle map bucket: {}\n", g_callout_handle_map.bucket_count());
+    outbuf_add(ob, "Current handle map load_factor: {}\n", g_callout_handle_map.load_factor());
+    outbuf_add(ob, "Current object map bucket: {}\n", g_callout_object_handle_map.bucket_count());
+    outbuf_add(ob, "Current object map load_factor: {}\n",
+               g_callout_object_handle_map.load_factor());
+    outbuf_add(ob, "Number of garbage entry in object map: {}\n",
+               g_callout_object_handle_map.size() - g_callout_handle_map.size());
   } else {
     if (verbose != -1) {
-      outbuf_addv(ob, "call out:\t\t\t{:8} {:8} (load_factor {})\n", g_callout_handle_map.size(),
-                  g_callout_handle_map.size() * sizeof(pending_call_t),
-                  g_callout_handle_map.load_factor());
+      outbuf_add(ob, "call out:\t\t\t{:8} {:8} (load_factor {})\n", g_callout_handle_map.size(),
+                 g_callout_handle_map.size() * sizeof(pending_call_t),
+                 g_callout_handle_map.load_factor());
     }
   }
   return g_callout_handle_map.size() * sizeof(pending_call_t);

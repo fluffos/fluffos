@@ -223,12 +223,13 @@ static void push_sprintf_state(void) {
   sprintf_state = state;
 }
 
+#define SPRINTF_ERROR_BUFSIZE   2048
 /* Signal an error.  Note that we call error, so this routine never returns.
  * Anything that has been allocated should be somewhere it can be found and
  * freed later.
  */
 static void sprintf_error(int which, char *premade) {
-  char lbuf[2048];
+  char lbuf[SPRINTF_ERROR_BUFSIZE];
   const char *err;
 
   switch (which) {
@@ -281,7 +282,7 @@ static void sprintf_error(int which, char *premade) {
       err = "undefined error in (s)printf!\n";
       break;
   }
-  sprintf(lbuf, "(s)printf(): %s (arg: %d)\n", err, sprintf_state->cur_arg);
+  snprintf(lbuf, SPRINTF_ERROR_BUFSIZE, "(s)printf(): %s (arg: %d)\n", err, sprintf_state->cur_arg);
   error(lbuf);
 }
 
@@ -328,10 +329,10 @@ void svalue_to_string(svalue_t *obj, outbuffer_t *outbuf, int indent, int traili
       }
       break;
     case T_NUMBER:
-      outbuf_addv(outbuf, "%" LPC_INT_FMTSTR_P, obj->u.number);
+      outbuf_add(outbuf, "{}", obj->u.number);
       break;
     case T_REAL:
-      outbuf_addv(outbuf, "%" LPC_FLOAT_FMTSTR_P, obj->u.real);
+      outbuf_add(outbuf, "{}", obj->u.real);
       break;
     case T_STRING:
       outbuf_add(outbuf, "\"");
@@ -341,7 +342,7 @@ void svalue_to_string(svalue_t *obj, outbuffer_t *outbuf, int indent, int traili
     case T_CLASS: {
       int n = obj->u.arr->size;
       outbuf_add(outbuf, "CLASS( ");
-      outbuf_addv(outbuf, "%d", n);
+      outbuf_add(outbuf, "{}", n);
       outbuf_add(outbuf, n == 1 ? " element\n" : " elements\n");
       for (i = 0; i < (obj->u.arr->size) - 1; i++) {
         svalue_to_string(&(obj->u.arr->item[i]), outbuf, indent + 2, 1, 0);
@@ -357,7 +358,7 @@ void svalue_to_string(svalue_t *obj, outbuffer_t *outbuf, int indent, int traili
         outbuf_add(outbuf, "({ })");
       } else {
         outbuf_add(outbuf, "({ /* sizeof() == ");
-        outbuf_addv(outbuf, "%d", obj->u.arr->size);
+        outbuf_add(outbuf, "{}", obj->u.arr->size);
         outbuf_add(outbuf, " */\n");
         for (i = 0; i < (obj->u.arr->size) - 1; i++) {
           svalue_to_string(&(obj->u.arr->item[i]), outbuf, indent + 2, 1, 0);
@@ -405,12 +406,10 @@ void svalue_to_string(svalue_t *obj, outbuffer_t *outbuf, int indent, int traili
 
           outbuf_add(outbuf, "<code>(");
           for (i = 1; i < n; i++) {
-            sprintf(buf, "$%i, ", i);
-            outbuf_add(outbuf, buf);
+            outbuf_add(outbuf, "${}", i);
           }
           if (n) {
-            sprintf(buf, "$%i", n);
-            outbuf_add(outbuf, buf);
+            outbuf_add(outbuf, "${}", n);
           }
           outbuf_add(outbuf, ")");
           break;
@@ -436,7 +435,7 @@ void svalue_to_string(svalue_t *obj, outbuffer_t *outbuf, int indent, int traili
         outbuf_add(outbuf, "([ ])");
       } else {
         outbuf_add(outbuf, "([ /* sizeof() == ");
-        outbuf_addv(outbuf, "%u", obj->u.map->count);
+        outbuf_add(outbuf, "{}", obj->u.map->count);
         outbuf_add(outbuf, " */\n");
         for (i = 0; i <= obj->u.map->table_size; i++) {
           mapping_node_t *elm;
@@ -455,7 +454,7 @@ void svalue_to_string(svalue_t *obj, outbuffer_t *outbuf, int indent, int traili
       svalue_t *temp;
 
       if (obj->u.ob->flags & O_DESTRUCTED) {
-        outbuf_addv(outbuf, "%d", 0);
+        outbuf_add(outbuf, "0");
         break;
       }
 
@@ -474,7 +473,7 @@ void svalue_to_string(svalue_t *obj, outbuffer_t *outbuf, int indent, int traili
       break;
     }
     default:
-      outbuf_addv(outbuf, "!ERROR: GARBAGE SVALUE: %x!", obj->type);
+      outbuf_add(outbuf, "!ERROR: GARBAGE SVALUE: {:#0{}x}!", obj->type, (sizeof(obj->type)*2 + 2));
   } /* end of switch (obj->type) */
   if (trailing) {
     outbuf_add(outbuf, ",\n");
@@ -1248,7 +1247,9 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
           if ((cheat[i - 1] == 'f' && carg->type != T_REAL) ||
               (cheat[i - 1] != 'f' && carg->type != T_NUMBER)) {
 #ifdef RETURN_ERROR_MESSAGES
-            sprintf(buff,
+              char buff[SPRINTF_ERROR_BUFSIZE];
+
+            snprintf(buff, SPRINTF_ERROR_BUFSIZE,
                     "ERROR: (s)printf(): Incorrect argument type to %%%c. "
                     "(arg: %u)\n",
                     cheat[i - 1], sprintf_state->cur_arg);

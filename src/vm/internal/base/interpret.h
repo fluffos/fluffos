@@ -116,8 +116,10 @@ struct function_lookup_info_t {
 #define put_unrefed_undested_object(x, y) \
   SAFE(if(sp->type == T_STRING) sp->u.string.~shared_string(); sp->type = T_OBJECT; sp->u.ob = (x); add_ref((x), y);)
 #define put_unrefed_object(x, y)                             \
-  SAFE(if(sp->type == T_STRING) sp->u.string.~shared_string(); if (!(x) || (x)->flags & O_DESTRUCTED) *sp = const0u; \
+  SAFE(if(sp->type == T_STRING) sp->u.string.~shared_string(); if (!(x) || (x)->flags & O_DESTRUCTED) \
+          { sp->type = T_NUMBER; sp->subtype = T_UNDEFINED; sp->u.number = 0; } \
        else put_unrefed_undested_object(x, y);)
+#define put_array(x) SAFE(if(sp->type == T_STRING) sp->u.string.~shared_string(); sp->type = T_ARRAY; sp->u.arr = (x);)
 /* see comments on push_constant_string */
 #define put_string(x)   \
     SAFE(if(sp->type == T_STRING) sp->u.string.~shared_string(); sp->type = T_STRING; sp->u.string = shared_string {x};)
@@ -171,21 +173,21 @@ int is_static(const std::string, object_t *);
 svalue_t *call_function_pointer(funptr_t *, int);
 svalue_t *safe_call_function_pointer(funptr_t *, int);
 void call___INIT(object_t *);
-array_t *call_all_other(array_t *, const char *, int);
-const char *function_exists(const char *, object_t *, int);
+array_t *call_all_other(array_t *, const std::string, int);
+const std::string function_exists(const std::string, object_t *, int);
 void call_function(program_t *, int);
 void mark_apply_low_cache(void);
 void translate_absolute_line(int, unsigned short *, int *, int *);
 std::string add_slash(const std::string);
 int strpref(const char *, const char *);
-void do_trace(const char *, const char *, const char *);
+void do_trace(const std::string, const std::string, const std::string);
 void opcdump(const char *);
 int inter_sscanf(svalue_t *, svalue_t *, svalue_t *, int);
 char *get_line_number_if_any(void);
-char *get_line_number(char *, const program_t *);
+std::string get_line_number(std::string, const program_t *);
 void get_line_number_info(const char **, int *);
 void reset_machine(int);
-void unlink_string_svalue(svalue_t *);
+[[gnu::deprecated]] void unlink_string_svalue(svalue_t *);
 void copy_lvalue_range(svalue_t *);
 void assign_lvalue_range(svalue_t *);
 void debug_perror(const char *, const char *);

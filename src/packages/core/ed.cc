@@ -1714,7 +1714,7 @@ static void indent(char *buf) {
             token = LHOOK2;
             break;
           }
-          // fall through
+          [[gnu::fallthrough]];
         case '[':
           token = LHOOK;
           break;
@@ -1742,7 +1742,7 @@ static void indent(char *buf) {
                                                 (stack[1] == ROPERATOR && stack[2] == LHOOK2))))) {
             p++;
           }
-          // fall through
+          [[gnu::fallthrough]];
         case ')':
           token = RHOOK;
           break;
