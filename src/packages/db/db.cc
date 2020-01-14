@@ -722,13 +722,9 @@ static array_t *MySQL_fetch(dbconn_t *c, int row) {
         case FIELD_TYPE_STRING:
         case FIELD_TYPE_VAR_STRING:
           if (field->flags & BINARY_FLAG) {
-#ifndef NO_BUFFER_TYPE
             v->item[i].type = T_BUFFER;
             v->item[i].u.buf = allocate_buffer(field->max_length);
             write_buffer(v->item[i].u.buf, 0, target_row[i], field->max_length);
-#else
-            v->item[i] = const0u;
-#endif
           } else {
             v->item[i].type = T_STRING;
             if (target_row[i]) {
@@ -1345,15 +1341,11 @@ static array_t *SQLite3_fetch(dbconn_t *c, int row) {
         break;
 
       case SQLITE_BLOB:
-#ifndef NO_BUFFER_TYPE
         length = sqlite3_column_bytes(c->SQLite3.results, i);
         v->item[i].type = T_BUFFER;
         v->item[i].u.buf = allocate_buffer(length);
         write_buffer(v->item[i].u.buf, 0, (char *)sqlite3_column_blob(c->SQLite3.results, i),
                      length);
-#else
-        v->item[i] = const0u;
-#endif
         break;
 
       default:

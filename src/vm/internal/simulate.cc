@@ -1406,11 +1406,9 @@ void print_svalue(svalue_t *arg) {
       case T_FUNCTION:
         tell_object(command_giver, "<FUNCTION>", strlen("<FUNCTION>"));
         break;
-#ifndef NO_BUFFER_TYPE
       case T_BUFFER:
         tell_object(command_giver, "<BUFFER>", strlen("<BUFFER>"));
         break;
-#endif
       default:
         tell_object(command_giver, "<UNKNOWN>", strlen("<UNKNOWN>"));
         break;

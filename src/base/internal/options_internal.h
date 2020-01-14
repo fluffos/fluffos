@@ -41,12 +41,6 @@
  */
 #undef CHECK_MEMORY
 
-/* NO_BUFFER_TYPE: if this is #define'd then LPC code using the 'buffer'
- *   type won't be allowed to compile (since the 'buffer' type won't be
- *   recognized by the lexer).
- */
-#undef NO_BUFFER_TYPE
-
 /* ARRAY_RESERVED_WORD: If this is defined then the word 'array' can
  *   be used to define arrays, as in:
  *

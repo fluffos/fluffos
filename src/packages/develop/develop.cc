@@ -126,11 +126,9 @@ void f_refs(void) {
     case T_FUNCTION:
       r = sp->u.fp->hdr.ref;
       break;
-#ifndef NO_BUFFER_TYPE
     case T_BUFFER:
       r = sp->u.buf->ref;
       break;
-#endif
     case T_STRING:
       if (sp->subtype & STRING_COUNTED) {
         r = MSTR_REF(sp->u.string);

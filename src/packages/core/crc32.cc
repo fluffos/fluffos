@@ -33,17 +33,11 @@ void f_crc32(void) {
   if (sp->type == T_STRING) {
     len = SVALUE_STRLEN(sp);
     buf = (unsigned char *)sp->u.string;
-#ifndef NO_BUFFER_TYPE
   } else if (sp->type == T_BUFFER) {
     len = sp->u.buf->size;
     buf = sp->u.buf->item;
-#endif
   } else {
-#ifdef NO_BUFFER_TYPE
-    bad_argument(sp, T_STRING, 1, F_CRC32);
-#else
     bad_argument(sp, T_STRING | T_BUFFER, 1, F_CRC32);
-#endif
   }
   crc = compute_crc32(buf, len);
   free_svalue(sp, "f_crc32");

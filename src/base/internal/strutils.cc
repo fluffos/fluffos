@@ -27,6 +27,21 @@ bool u8_validate(const uint8_t *s, size_t len) {
   return state == UTF8_ACCEPT;
 }
 
+void u8_sanitize(char *src) {
+  int total = strlen(src);
+  int32_t src_offset = 0;
+  int32_t written = 0;
+  UChar32 c = -1;
+  U8_NEXT(src, src_offset, -1, c);
+  while (c != 0) {
+    UBool isError = FALSE;
+    U8_APPEND((uint8_t *)src, written, total, c > 0 ? c : 0xfffd, isError);
+    if (isError == TRUE) break;
+
+    U8_NEXT((uint8_t *)src, src_offset, -1, c);
+  }
+}
+
 bool u8_egc_count(const char *src, size_t *count) {
   UErrorCode status = U_ZERO_ERROR;
   size_t total = 0;
@@ -99,7 +114,7 @@ UChar32 u8_egc_index_as_single_codepoint(const char *src, int32_t index) {
   auto next_pos = brk->next();
   if (next_pos >= 0) {
     if (next_pos - pos <= U8_MAX_LENGTH) {
-      U8_NEXT((const uint8_t*) src, pos, -1, res);
+      U8_NEXT((const uint8_t *)src, pos, -1, res);
     }
   }
 

@@ -153,9 +153,7 @@ static keyword_t reswords[] = {
 #endif
     {"asm", 0, 0},
     {"break", L_BREAK, 0},
-#ifndef NO_BUFFER_TYPE
     {"buffer", L_BASIC_TYPE, TYPE_BUFFER},
-#endif
     {"case", L_CASE, 0},
     {"catch", L_CATCH, 0},
 #ifdef STRUCT_CLASS
@@ -3252,11 +3250,7 @@ static void init_instrs() {
  * eoperators have a return type now.  T_* is used instead of TYPE_*
  * since operators can return multiple types.
  */
-#ifdef NO_BUFFER_TYPE
-#define OR_BUFFER
-#else
 #define OR_BUFFER | T_BUFFER
-#endif
 
   add_instr_name("<", "c_lt();\n", F_LT, T_NUMBER);
   add_instr_name(">", "c_gt();\n", F_GT, T_NUMBER);

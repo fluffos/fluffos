@@ -8,9 +8,11 @@
 // JSON sefun
 inherit "std/json";
 
-int
-same(mixed x, mixed y) {
-    if (typeof(x) != typeof(y)) return 0;
+int same(mixed x, mixed y) {
+    // Allow comparing array with buffer
+    if (!(typeof(x) == ARRAY && typeof(y) == BUFFER || typeof(y) == ARRAY && typeof(x) == BUFFER))
+      if (typeof(x) != typeof(y))
+        return 0;
     switch (typeof(x)) {
     case INT:
     case STRING:

@@ -368,11 +368,20 @@ void svalue_to_string(svalue_t *obj, outbuffer_t *outbuf, int indent, int traili
         outbuf_add(outbuf, "})");
       }
       break;
-#ifndef NO_BUFFER_TYPE
     case T_BUFFER:
-      outbuf_add(outbuf, "<buffer>");
+      outbuf_add(outbuf, "BUFFER ( /* sizeof() == ");
+      outbuf_addv(outbuf, "%d", obj->u.buf->size);
+      outbuf_add(outbuf, " */\n");
+      for (i = 0; i < (obj->u.buf->size) - 1; i++) {
+        add_space(outbuf, indent + 2);
+        outbuf_addv(outbuf, "0x%hhx,\n", (char)obj->u.buf->item[i]);
+      }
+      add_space(outbuf, indent + 2);
+      outbuf_addv(outbuf, "0x%hhx", (char)obj->u.buf->item[i]);
+      outbuf_add(outbuf, "\n");
+      add_space(outbuf, indent);
+      outbuf_add(outbuf, ")");
       break;
-#endif
     case T_FUNCTION: {
       object_t *ob;
 

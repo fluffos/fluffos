@@ -116,13 +116,11 @@ void int_free_svalue(svalue_t *v)
             dealloc_array(v->u.arr);
           }
           break;
-#ifndef NO_BUFFER_TYPE
         case T_BUFFER:
           if (v->u.buf != &null_buf) {
             FREE((char *)v->u.buf);
           }
           break;
-#endif
         case T_MAPPING:
           dealloc_mapping(v->u.map);
           break;
