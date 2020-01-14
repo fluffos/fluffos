@@ -5,7 +5,7 @@ void do_tests() {
     // TODO: add more test cases
 
     // Decoding
-    ASSERT_EQ(({1,2,3,4,5}), json_decode("[1,2,3,4,5]"));
+    ASSERT_EQ(({0,1,2,3,4,5,0,4,0.0}), json_decode("[0,1,2,3,4,5,-0,4,0.0]"));
     ASSERT_EQ(({}), json_decode("[]"));
 
     // Encoding
