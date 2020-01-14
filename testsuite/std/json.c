@@ -18,6 +18,7 @@
  * v1.0.2: define array keyword for LDMud & use it consistently
  * v1.0.3: fix for empty data structures
  * v1.0.4: Removed array keyword. (Yucong Sun)
+ * v1.0.5: Fix decoding number 0.
  *
  * LICENSE
  *
@@ -349,19 +350,25 @@ private mixed json_decode_parse_number(mixed* parse) {
     case '-'            :
         {
             int next_ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS] + 1];
-            if(next_ch != '0')
-                break;
+            if(!next_ch) json_decode_parse_error(parse, "Unexpected end of data");
+            if(next_ch < '0' || next_ch > '9')
+                json_decode_parse_error(parse, "Unexpected character", next_ch);
             json_decode_parse_next_char(parse);
         }
         // Fallthrough
     case '0'            :
+        // 0 can only either be an direct int value 0, or an float value of 0.X.
         json_decode_parse_next_char(parse);
         ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
-        if(ch) {
-            if(ch != '.')
-                json_decode_parse_error(parse, "Unexpected character", ch);
-            dot = parse[JSON_DECODE_PARSE_POS];
+        // skip all whitespace
+        while(ch == ' ') {
+          parse[JSON_DECODE_PARSE_POS]++;
+          ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
         }
+        if(!ch) json_decode_parse_error(parse, "Unexpected end of data");
+        if(ch == ',') return 0;
+        if(ch != '.') json_decode_parse_error(parse, "Unexpected character", ch);
+        dot = parse[JSON_DECODE_PARSE_POS];
         break;
     }
     json_decode_parse_next_char(parse);
