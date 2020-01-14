@@ -3,10 +3,10 @@ layout: default
 title: Applies
 ---
 
-Auto generated on 2018-12-30 16:19:45 STD for [e555ec1](https://github.com/fluffos/fluffos/tree/e555ec1).
+Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluffos/fluffos/tree/a7c93c73).
+
 
 ### interactive
-
 <table class='table table-condensed'>
 <tr>
 <td>
