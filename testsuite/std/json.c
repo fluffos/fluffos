@@ -74,6 +74,19 @@ private void json_decode_parse_next_line(mixed* parse) {
     parse[JSON_DECODE_PARSE_CHAR] = 1;
 }
 
+private void json_decode_skip_whitespaces(mixed* parse) {
+    int ch;
+    while(1) {
+      json_decode_parse_next_char(parse);
+      ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
+      if (ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t') {
+        continue;
+      } else {
+        return ;
+      }
+    }
+}
+
 private int json_decode_hexdigit(int ch) {
     switch(ch) {
     case '0'    :
@@ -343,35 +356,40 @@ private mixed json_decode_parse_number(mixed* parse) {
     int to = -1;
     int dot = -1;
     int exp = -1;
-    int first_ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
     int ch;
+    int next_ch;
     string number;
-    switch(first_ch) {
-    case '-'            :
-        {
-            int next_ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS] + 1];
-            if(!next_ch) json_decode_parse_error(parse, "Unexpected end of data");
-            if(next_ch < '0' || next_ch > '9')
-                json_decode_parse_error(parse, "Unexpected character", next_ch);
-            json_decode_parse_next_char(parse);
-        }
-        // Fallthrough
-    case '0'            :
-        // 0 can only either be an direct int value 0, or an float value of 0.X.
+
+    ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
+    if (ch == '-') {
+        next_ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS] + 1];
+        if(!next_ch) json_decode_parse_error(parse, "Unexpected end of data");
+        if(next_ch < '0' || next_ch > '9')
+            json_decode_parse_error(parse, "Unexpected character", next_ch);
         json_decode_parse_next_char(parse);
-        ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
-        // skip all whitespace
-        while(ch == ' ') {
-          parse[JSON_DECODE_PARSE_POS]++;
-          ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
-        }
-        if(!ch) json_decode_parse_error(parse, "Unexpected end of data");
-        if(ch == ',') return 0;
-        if(ch != '.') json_decode_parse_error(parse, "Unexpected character", ch);
-        dot = parse[JSON_DECODE_PARSE_POS];
-        break;
     }
-    json_decode_parse_next_char(parse);
+
+    ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
+    if (ch == '0') {
+        // 0 can only either be an direct int value 0, or 0e or 0E
+        next_ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS] + 1];
+        // 0 before EOF
+        if(next_ch == 0) {
+          json_decode_parse_next_char(parse);
+          return 0;
+        }
+        // only valid char here are .eE, continue parse
+        if (next_ch == '.' || next_ch == 'e' || next_ch == 'E') {
+          json_decode_parse_next_char(parse);
+        } else {
+          // consume until next non-whitespace
+          json_decode_skip_whitespaces(parse);
+          next_ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
+          // can not continue to be number.
+          if ((next_ch >= '0' && next_ch <= '9') || next_ch == '-') json_decode_parse_error(parse, "Unexpected character", next_ch);
+          return 0;
+        }
+    }
     while(to == -1) {
         ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
         switch(ch) {
