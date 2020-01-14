@@ -3,17 +3,19 @@
 
 #define SAFE(x) do {x} while(0)
 
+#define CLEAR_ERROR (("/single/master"->clear_last_error() || 1))
+
 #define OUTPUT(x) SAFE(write(catch(error(x))); \
   if(!this_player()) { shutdown(-1); })
 #define WHERE __FILE__ + ":" + __LINE__
 
-#define ASSERT(x) if (!(x)) { OUTPUT(WHERE + ", Check failed.\n"); }
-#define ASSERT2(x, r) if (!(x)) { OUTPUT(WHERE + ", Check failed: " + r + ".\n"); }
-#define ASSERT_EQ(x, y) if (!same((x),(y))) { \
+#define ASSERT(x) if (CLEAR_ERROR && !(x)) { OUTPUT(WHERE + ", Check failed.\n"); }
+#define ASSERT2(x, r) if (CLEAR_ERROR && !(x)) { OUTPUT(WHERE + ", Check failed: " + r + ".\n"); }
+#define ASSERT_EQ(x, y) if (CLEAR_ERROR && !same((x),(y))) { \
   OUTPUT(WHERE + ", Check Failed: \n" + \
   "Expected: \n" + sprintf("%O", (x)) + "\nActual: \n" + sprintf("%O", (y)) + "\nTrace: \n" + sprintf("%s", "/single/master"->get_last_error()) + "\n"); }
 
-#define ASSERT_NE(x, y) if (same((x),(y))) { \
+#define ASSERT_NE(x, y) if (CLEAR_ERROR && same((x),(y))) { \
   OUTPUT(WHERE + ", Check Failed: \n" + \
   "Expect Not: \n" + sprintf("%O", (x)) + "\nActual: \n" + sprintf("%O", (y)) + "\nTrace: \n" + sprintf("%s", "/single/master"->get_last_error()) + "\n"); }
 
