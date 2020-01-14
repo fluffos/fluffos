@@ -6,7 +6,6 @@
 #ifndef _BUFFER_H_
 #define _BUFFER_H_
 
-#ifndef NO_BUFFER_TYPE
 struct buffer_t {
   /* first two elements of struct must be 'ref' followed by 'size' */
   unsigned short ref;
@@ -27,6 +26,5 @@ void free_buffer(buffer_t *);
 buffer_t *allocate_buffer(int);
 int write_buffer(buffer_t *, int, const char *, int);
 char *read_buffer(buffer_t *, int, int, int *);
-#endif
 
 #endif

@@ -60,17 +60,13 @@ void f_sha1(void) {
   unsigned char final[128] = {0};
   int input_length, final_length, i;
 
-#ifndef NO_BUFFER_TYPE
   if (sp->type == T_BUFFER) {
     str = (const unsigned char *)sp->u.buf->item;
     input_length = sp->u.buf->size;
   } else {
-#endif
     str = reinterpret_cast<const unsigned char *>(sp->u.string);
     input_length = SVALUE_STRLEN(sp);
-#ifndef NO_BUFFER_TYPE
   }
-#endif
 
   i = input_length % 64;
 

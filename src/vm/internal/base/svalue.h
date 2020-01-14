@@ -17,9 +17,7 @@ union u {
 
   refed_t *refed; /* any of the block below */
 
-#ifndef NO_BUFFER_TYPE
   struct buffer_t *buf;
-#endif
   struct object_t *ob;
   struct array_t *arr;
   struct mapping_t *map;
@@ -62,9 +60,7 @@ struct ref_t {
 #define T_OBJECT 0x10
 #define T_MAPPING 0x20
 #define T_FUNCTION 0x40
-#ifndef NO_BUFFER_TYPE
 #define T_BUFFER 0x100
-#endif
 #define T_CLASS 0x200
 
 #define T_LVALUE_BYTE 0x400 /* byte-sized lvalue */
@@ -83,11 +79,7 @@ struct ref_t {
 #define TYPE_MOD_CLASS 0x0080 /* a class */
 #define CLASS_NUM_MASK 0x007f
 
-#ifdef NO_BUFFER_TYPE
-#define T_REFED (T_ARRAY | T_OBJECT | T_MAPPING | T_FUNCTION | T_CLASS | T_REF)
-#else
 #define T_REFED (T_ARRAY | T_OBJECT | T_MAPPING | T_FUNCTION | T_BUFFER | T_CLASS | T_REF)
-#endif
 #define T_ANY (T_REFED | T_STRING | T_NUMBER | T_REAL)
 
 /* values for subtype field of svalue struct */

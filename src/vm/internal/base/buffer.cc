@@ -4,8 +4,6 @@
 
 #include "vm/internal/base/machine.h"
 
-#ifndef NO_BUFFER_TYPE
-
 buffer_t null_buf = {
     1, /* Ref count, which will ensure that it will
         * never be deallocated */
@@ -31,7 +29,6 @@ buffer_t *allocate_buffer(int size) {
 
   buffer_t *buf;
 
-#ifndef NO_BUFFER_TYPE
   if ((size < 0) || (size > max_buffer_size)) {
     error("Illegal buffer size.\n");
   }
@@ -44,9 +41,6 @@ buffer_t *allocate_buffer(int size) {
   buf->size = size;
   buf->ref = 1;
   return buf;
-#else
-  return NULL;
-#endif
 }
 
 int write_buffer(buffer_t *buf, int start, const char *str, int theLength) {
@@ -104,4 +98,3 @@ char *read_buffer(buffer_t *b, int start, int len, int *rlen) {
 
   return str;
 } /* read_buffer() */
-#endif

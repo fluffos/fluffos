@@ -18,7 +18,7 @@ namespace {
 
 // trim from start
 inline std::string &_ltrim(std::string &s, const std::string &charset) {
-  std::string trimset {charset};
+  std::string trimset{charset};
 
   if (trimset.empty()) {
     trimset = "\t\n\v\f\r ";
@@ -29,7 +29,7 @@ inline std::string &_ltrim(std::string &s, const std::string &charset) {
 
 // trim from end
 inline std::string &_rtrim(std::string &s, const std::string &charset) {
-  std::string trimset {charset};
+  std::string trimset{charset};
 
   if (trimset.empty()) {
     trimset = "\t\n\v\f\r ";
@@ -40,7 +40,7 @@ inline std::string &_rtrim(std::string &s, const std::string &charset) {
 
 // trim from both ends
 inline std::string &_trim(std::string &s, const std::string &charset) {
-  std::string trimset {charset};
+  std::string trimset{charset};
 
   if (trimset.empty()) {
     trimset = "\t\n\v\f\r ";

@@ -162,14 +162,12 @@ void f_eq() {
       free_funp(sp->u.fp);
       break;
     }
-#ifndef NO_BUFFER_TYPE
     case T_BUFFER: {
       i = (sp - 1)->u.buf == sp->u.buf;
       free_buffer((sp--)->u.buf);
       free_buffer(sp->u.buf);
       break;
     }
-#endif
     default:
       pop_stack();
       free_svalue(sp, "f_eq");
@@ -504,14 +502,12 @@ void f_ne() {
       break;
     }
 
-#ifndef NO_BUFFER_TYPE
     case T_BUFFER: {
       i = (sp - 1)->u.buf != sp->u.buf;
       free_buffer((sp--)->u.buf);
       free_buffer(sp->u.buf);
       break;
     }
-#endif
 
     default:
       pop_stack();
@@ -688,7 +684,6 @@ void f_range(int code) {
       free_string_svalue(sp + 2);
       break;
     }
-#ifndef NO_BUFFER_TYPE
     case T_BUFFER: {
       int from, to, len;
 
@@ -735,7 +730,6 @@ void f_range(int code) {
       }
       break;
     }
-#endif
 
     case T_ARRAY: {
       int from, to;
@@ -802,7 +796,6 @@ void f_extract_range(int code) {
       free_string_svalue(sp + 1);
       break;
     }
-#ifndef NO_BUFFER_TYPE
     case T_BUFFER: {
       int32_t from;
       size_t len;
@@ -835,7 +828,6 @@ void f_extract_range(int code) {
       put_buffer(nbuf);
       break;
     }
-#endif
 
     case T_ARRAY: {
       size_t from;
