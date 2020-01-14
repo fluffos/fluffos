@@ -322,26 +322,43 @@ private varargs mixed json_decode_parse_string(mixed* parse, int initiator_check
         if(strsrch(out, "\\t") != -1)
             out = replace_string(out, "\\t", "\t");
         if(strsrch(out, "\\u") != -1) {
-            string* parts = explode(out, "\\u");
-            int entries = sizeof(parts) * 2 - 1;
-            string* proc = allocate(entries);
-            int i, j;
-            proc[0] = parts[0];
-            for(i = 1, j = sizeof(parts); i < j; i++) {
-                string part = parts[i];
-                int* nybbles = allocate(4);
-                int* bytes = allocate(2);
-                for(int k = 0; k < 4; k++)
-                    if((nybbles[k] = json_decode_hexdigit(part[k])) == -1)
-                        json_decode_parse_error(parse, "Invalid hex digit", part[k]);
-                bytes[0] = (nybbles[0] << 4) | nybbles[1];
-                bytes[1] = (nybbles[2] << 4) | nybbles[3];
-                if(member_array(0, bytes) != -1)
-                    bytes -= ({ 0 });
-                proc[i * 2 - 1] = sprintf("%@c", bytes);
-                proc[i * 2] = part[4..];
+          for (int i = 0; i< strlen(out); i++) {
+            if (out[i] == '\\' && out[i+1] == 'u') {
+              int* nybbles = allocate(4);
+              int character = 0;
+              i += 2;
+              for(int k = 0; k < 4; k++) {
+                if((nybbles[k] = json_decode_hexdigit(out[i + k])) == -1)
+                  json_decode_parse_error(parse, "Invalid hex digit", out[i + k]);
+              }
+              character = (nybbles[0] << 12) | (nybbles[1] << 8 )| (nybbles[2] << 4) | nybbles[3];
+              // Single codepoint character
+              if (!(((character)&0xfffff800)==0xd800)) {
+                i -= 2;
+                out[i .. i + 2 + 4 - 1] = sprintf("%c", character);
+                i = 0;
+                continue;
+              } else {
+                // UTF16 - Surrogate, attempts to parse the second value
+                int codepoint;
+                int next_character = 0;
+                int* nybbles2 = allocate(4);
+                i += 4;
+                if (out[i .. i+1] != "\\u") json_decode_parse_error(parse, "Invalid string, missing surrogate pair");
+                i += 2;
+                for(int k = 0; k < 4; k++) {
+                  if((nybbles2[k] = json_decode_hexdigit(out[i + k])) == -1)
+                    json_decode_parse_error(parse, "Invalid hex digit", out[i + k]);
+                }
+                next_character = (nybbles2[0] << 12) | (nybbles2[1] << 8) | (nybbles2[2] << 4) | (nybbles2[3]);
+                i -= 2 + 4 + 2; // reset to first \u
+                codepoint = 0x10000 + (character - 0xd800) * 0x400 + (next_character - 0xDC00);
+                out[i .. i + 2 + 4 + 2 + 4 - 1] = sprintf("%c", codepoint);
+                i = 0;
+                continue;
+              }
             }
-            out = implode(proc, "");
+          }
         }
         if(member_array('/', out) != -1)
             out = replace_string(out, "\\/", "/");
