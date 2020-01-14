@@ -207,11 +207,9 @@ void mark_svalue(svalue_t *sv) {
     case T_FUNCTION:
       sv->u.fp->hdr.extra_ref++;
       break;
-#ifndef NO_BUFFER_TYPE
     case T_BUFFER:
       sv->u.buf->extra_ref++;
       break;
-#endif
     case T_STRING:
       switch (sv->subtype) {
         case STRING_MALLOC:
@@ -293,11 +291,9 @@ static void md_print_array(array_t *vec) {
       case T_CLASS:
         outbuf_add(&out, "<class>");
         break;
-#ifndef NO_BUFFER_TYPE
       case T_BUFFER:
         outbuf_add(&out, "<buffer>");
         break;
-#endif
       case T_FUNCTION:
         outbuf_add(&out, "<function>");
         break;
@@ -457,9 +453,7 @@ void check_all_blocks(int flag) {
   object_t *ob;
   array_t *vec;
   mapping_t *map;
-#ifndef NO_BUFFER_TYPE
   buffer_t *buf;
-#endif
   funptr_t *fp;
   mapping_node_t *node;
   program_t *prog;
@@ -546,12 +540,10 @@ void check_all_blocks(int flag) {
           fp = NODET_TO_PTR(entry, funptr_t *);
           fp->hdr.extra_ref = 0;
           break;
-#ifndef NO_BUFFER_TYPE
         case TAG_BUFFER:
           buf = NODET_TO_PTR(entry, buffer_t *);
           buf->extra_ref = 0;
           break;
-#endif
       }
     }
   }
@@ -907,7 +899,6 @@ void check_all_blocks(int flag) {
                           fp->hdr.extra_ref);
             }
             break;
-#ifndef NO_BUFFER_TYPE
           case TAG_BUFFER:
             buf = NODET_TO_PTR(entry, buffer_t *);
             if (buf->ref != buf->extra_ref) {
@@ -915,7 +906,6 @@ void check_all_blocks(int flag) {
                           buf->extra_ref);
             }
             break;
-#endif
           case TAG_PREDEFINES:
             outbuf_addv(&out, "WARNING: Found orphan predefine: %s %04x\n", entry->desc,
                         entry->tag);

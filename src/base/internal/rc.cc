@@ -292,10 +292,6 @@ void read_config(char *filename) {
           if (!strcmp(kind, "telnet")) {
             external_port[i].kind = PORT_TELNET;
           } else if (!strcmp(kind, "binary")) {
-#ifdef NO_BUFFER_TYPE
-            fprintf(stderr, "binary ports unavailable with NO_BUFFER_TYPE defined.\n");
-            exit(-1);
-#endif
             external_port[i].kind = PORT_BINARY;
           } else if (!strcmp(kind, "ascii")) {
             external_port[i].kind = PORT_ASCII;

@@ -154,7 +154,7 @@ void f_store_variable(void) {
   }
 
   idx = find_global_variable(ob->prog, name, &type, 0);
-  if (idx == -1 ||  (ob != current_object && (type & DECL_PRIVATE))) {
+  if (idx == -1 || (ob != current_object && (type & DECL_PRIVATE))) {
     error("Variable named '%s' does not exist or is not visible!\n", name);
   }
   assign_svalue(&ob->variables[idx], sv);
@@ -298,13 +298,11 @@ static void deep_copy_svalue(svalue_t *from, svalue_t *to) {
       to->u.map = deep_copy_mapping(from->u.map);
       depth--;
       break;
-#ifndef NO_BUFFER_TYPE
     case T_BUFFER:
       *to = *from;
       to->u.buf = allocate_buffer(from->u.buf->size);
       memcpy(to->u.buf->item, from->u.buf->item, from->u.buf->size);
       break;
-#endif
     default:
       assign_svalue_no_free(to, from);
   }
@@ -2040,11 +2038,9 @@ static int memory_share(svalue_t *sv) {
       calldepth--;
       return total + subtotal / sv->u.fp->hdr.ref;
     }
-#ifndef NO_BUFFER_TYPE
     case T_BUFFER:
       /* first byte is stored inside the buffer struct */
       return total + (sizeof(buffer_t) + sv->u.buf->size - 1) / sv->u.buf->ref;
-#endif
   }
   return total;
 }

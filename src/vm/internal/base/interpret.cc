@@ -585,7 +585,6 @@ void push_indexed_lvalue(int reverse) {
         break;
       }
 
-#ifndef NO_BUFFER_TYPE
       case T_BUFFER: {
         if (reverse) {
           ind = lv->u.buf->size - ind;
@@ -603,7 +602,6 @@ void push_indexed_lvalue(int reverse) {
 #endif
         break;
       }
-#endif
 
       case T_ARRAY: {
         if (reverse) {
@@ -659,7 +657,6 @@ void push_indexed_lvalue(int reverse) {
         break;
       }
 
-#ifndef NO_BUFFER_TYPE
       case T_BUFFER: {
         if (reverse) {
           ind = sp->u.buf->size - ind;
@@ -678,7 +675,6 @@ void push_indexed_lvalue(int reverse) {
         global_lvalue_byte.u.lvalue_byte = (sp + 1)->u.buf->item + ind;
         break;
       }
-#endif
 
       case T_ARRAY: {
         if (reverse) {
@@ -732,11 +728,9 @@ static void push_lvalue_range(int code) {
         unlink_string_svalue(lv);
         break;
       }
-#ifndef NO_BUFFER_TYPE
       case T_BUFFER:
         size = lv->u.buf->size;
         break;
-#endif
       default:
         error("Range lvalue on illegal type\n");
         return;
@@ -909,7 +903,6 @@ void copy_lvalue_range(svalue_t *from) {
       break;
     }
 
-#ifndef NO_BUFFER_TYPE
     case T_BUFFER: {
       if (from->type != T_BUFFER) {
         error("Illegal rhs to buffer range lvalue.\n");
@@ -940,7 +933,6 @@ void copy_lvalue_range(svalue_t *from) {
       free_buffer(from->u.buf);
       break;
     }
-#endif
   }
 }
 
@@ -1062,7 +1054,6 @@ void assign_lvalue_range(svalue_t *from) {
       break;
     }
 
-#ifndef NO_BUFFER_TYPE
     case T_BUFFER: {
       if (from->type != T_BUFFER) {
         error("Illegal rhs to buffer range lvalue.\n");
@@ -1092,7 +1083,6 @@ void assign_lvalue_range(svalue_t *from) {
       }
       break;
     }
-#endif
   }
 }
 
@@ -1272,7 +1262,6 @@ void push_refed_array(array_t *v) {
   sp->u.arr = v;
 }
 
-#ifndef NO_BUFFER_TYPE
 void push_buffer(buffer_t *b) {
   STACK_INC;
   b->ref++;
@@ -1285,7 +1274,6 @@ void push_refed_buffer(buffer_t *b) {
   sp->type = T_BUFFER;
   sp->u.buf = b;
 }
-#endif
 
 /*
  * Push a mapping on the stack.  See push_array(), above.
@@ -2295,7 +2283,6 @@ void eval_instruction(char *p) {
         break;
       case F_ADD: {
         switch (sp->type) {
-#ifndef NO_BUFFER_TYPE
           case T_BUFFER: {
             if (!((sp - 1)->type == T_BUFFER)) {
               error("Bad type argument to +. Had %s and %s.\n", type_name((sp - 1)->type),
@@ -2312,7 +2299,6 @@ void eval_instruction(char *p) {
             }
             break;
           } /* end of x + T_BUFFER */
-#endif
           case T_NUMBER: {
             switch ((--sp)->type) {
               case T_NUMBER:
@@ -2487,7 +2473,6 @@ void eval_instruction(char *p) {
                   "not a number.\n");
             }
             break;
-#ifndef NO_BUFFER_TYPE
           case T_BUFFER:
             if (sp->type != T_BUFFER) {
               bad_argument(sp, T_BUFFER, 2, instruction);
@@ -2502,7 +2487,6 @@ void eval_instruction(char *p) {
               lval->u.buf = b;
             }
             break;
-#endif
           case T_ARRAY:
             if (sp->type != T_ARRAY) {
               bad_argument(sp, T_ARRAY, 2, instruction);
@@ -3145,14 +3129,13 @@ void eval_instruction(char *p) {
             free_mapping(m);
             break;
           }
-#ifndef NO_BUFFER_TYPE
           case T_BUFFER: {
             if ((sp - 1)->type != T_NUMBER) {
               error("Buffer indexes must be integers.\n");
             }
 
             i = (sp - 1)->u.number;
-            if ((i > sp->u.buf->size) || (i < 0)) {
+            if ((i >= sp->u.buf->size) || (i < 0)) {
               error("Buffer index out of bounds.\n");
             }
             i = sp->u.buf->item[i];
@@ -3161,7 +3144,6 @@ void eval_instruction(char *p) {
             sp->subtype = 0;
             break;
           }
-#endif
           case T_STRING: {
             if ((sp - 1)->type != T_NUMBER) {
               error("String indexes must be integers.\n");
@@ -3214,7 +3196,6 @@ void eval_instruction(char *p) {
         break;
       case F_RINDEX:
         switch (sp->type) {
-#ifndef NO_BUFFER_TYPE
           case T_BUFFER: {
             if ((sp - 1)->type != T_NUMBER) {
               error("Indexing a buffer with an illegal type.\n");
@@ -3231,7 +3212,6 @@ void eval_instruction(char *p) {
             sp->subtype = 0;
             break;
           }
-#endif
           case T_STRING: {
             if ((sp - 1)->type != T_NUMBER) {
               error("Indexing a string with an illegal type.\n");

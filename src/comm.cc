@@ -813,7 +813,6 @@ void get_user_data(interactive_t *ip) {
       }
     } break;
 
-#ifndef NO_BUFFER_TYPE
     case PORT_BINARY: {
       buffer_t *buffer;
 
@@ -823,7 +822,6 @@ void get_user_data(interactive_t *ip) {
       push_refed_buffer(buffer);
       safe_apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
     } break;
-#endif
   }
 }
 
