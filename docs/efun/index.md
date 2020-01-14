@@ -3,10 +3,10 @@ layout: default
 title: EFUN
 ---
 
-Auto generated on 2018-12-30 16:19:37 STD for [e555ec1](https://github.com/fluffos/fluffos/tree/e555ec1).
+Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluffos/fluffos/tree/a7c93c73).
+
 
 ### arrays
-
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -46,6 +46,9 @@ Auto generated on 2018-12-30 16:19:37 STD for [e555ec1](https://github.com/fluff
 <a href='buffers/allocate_buffer.html'>allocate_buffer</a>
 </td>
 <td>
+<a href='buffers/buffer_transcode.html'>buffer_transcode</a>
+</td>
+<td>
 <a href='buffers/bufferp.html'>bufferp</a>
 </td>
 <td>
@@ -54,9 +57,15 @@ Auto generated on 2018-12-30 16:19:37 STD for [e555ec1](https://github.com/fluff
 <td>
 <a href='buffers/read_buffer.html'>read_buffer</a>
 </td>
+</tr>
+<tr>
 <td>
 <a href='buffers/write_buffer.html'>write_buffer</a>
 </td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
 </tr>
 </table>
 ### calls
@@ -541,16 +550,19 @@ Auto generated on 2018-12-30 16:19:37 STD for [e555ec1](https://github.com/fluff
 <a href='interactive/printf.html'>printf</a>
 </td>
 <td>
+<a href='interactive/query_encoding.html'>query_encoding</a>
+</td>
+<td>
 <a href='interactive/query_host_name.html'>query_host_name</a>
 </td>
 <td>
 <a href='interactive/query_idle.html'>query_idle</a>
 </td>
+</tr>
+<tr>
 <td>
 <a href='interactive/query_ip_name.html'>query_ip_name</a>
 </td>
-</tr>
-<tr>
 <td>
 <a href='interactive/query_ip_number.html'>query_ip_number</a>
 </td>
@@ -563,11 +575,11 @@ Auto generated on 2018-12-30 16:19:37 STD for [e555ec1](https://github.com/fluff
 <td>
 <a href='interactive/receive.html'>receive</a>
 </td>
+</tr>
+<tr>
 <td>
 <a href='interactive/remove_action.html'>remove_action</a>
 </td>
-</tr>
-<tr>
 <td>
 <a href='interactive/resolve.html'>resolve</a>
 </td>
@@ -575,16 +587,19 @@ Auto generated on 2018-12-30 16:19:37 STD for [e555ec1](https://github.com/fluff
 <a href='interactive/say.html'>say</a>
 </td>
 <td>
+<a href='interactive/set_encoding.html'>set_encoding</a>
+</td>
+<td>
 <a href='interactive/set_this_player.html'>set_this_player</a>
 </td>
+</tr>
+<tr>
 <td>
 <a href='interactive/shout.html'>shout</a>
 </td>
 <td>
 <a href='interactive/snoop.html'>snoop</a>
 </td>
-</tr>
-<tr>
 <td>
 <a href='interactive/this_interactive.html'>this_interactive</a>
 </td>
@@ -594,12 +609,17 @@ Auto generated on 2018-12-30 16:19:37 STD for [e555ec1](https://github.com/fluff
 <td>
 <a href='interactive/userp.html'>userp</a>
 </td>
+</tr>
+<tr>
 <td>
 <a href='interactive/users.html'>users</a>
 </td>
 <td>
 <a href='interactive/write.html'>write</a>
 </td>
+<td></td>
+<td></td>
+<td></td>
 </tr>
 </table>
 ### internals
@@ -1013,10 +1033,16 @@ Auto generated on 2018-12-30 16:19:37 STD for [e555ec1](https://github.com/fluff
 <a href='strings/strcmp.html'>strcmp</a>
 </td>
 <td>
-<a href='strings/stringp.html'>stringp</a>
+<a href='strings/string_decode.html'>string_decode</a>
 </td>
 </tr>
 <tr>
+<td>
+<a href='strings/string_encode.html'>string_encode</a>
+</td>
+<td>
+<a href='strings/stringp.html'>stringp</a>
+</td>
 <td>
 <a href='strings/strlen.html'>strlen</a>
 </td>
@@ -1026,8 +1052,6 @@ Auto generated on 2018-12-30 16:19:37 STD for [e555ec1](https://github.com/fluff
 <td>
 <a href='strings/test_bit.html'>test_bit</a>
 </td>
-<td></td>
-<td></td>
 </tr>
 </table>
 ### system
