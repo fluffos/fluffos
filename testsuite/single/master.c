@@ -8,6 +8,10 @@ inherit "/inherit/master/valid";
 nosave int has_error = 0;
 nosave string last_error = "";
 
+public string clear_last_error() {
+  last_error = "";
+}
+
 public string get_last_error() {
   return last_error;
 }
