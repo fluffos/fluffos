@@ -1,0 +1,77 @@
+name: CI on Windows
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+jobs:
+  build:
+    runs-on: windows-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [64]
+        build: ["Debug", "RelWithDebInfo"]
+
+    steps:
+      - uses: actions/checkout@v1
+      - name: Cache msys2
+        id: cache-msys2
+        uses: actions/cache@v1
+        with:
+          path: msys${{ matrix.arch }}
+          key: msys2-x${{ matrix.arch }}
+      - name: Install msys2
+        if: steps.cache-msys2.outputs.cache-hit != 'true'
+        run: |
+          if ( "${{ matrix.arch }}" -eq "32" ) {
+            (New-Object net.webclient).DownloadFile("http://repo.msys2.org/distrib/i686/msys2-base-i686-20190524.tar.xz","msys2.tar.xz")
+          } else {
+            (New-Object net.webclient).DownloadFile("http://repo.msys2.org/distrib/x86_64/msys2-base-x86_64-20190524.tar.xz","msys2.tar.xz")
+          }
+          tar xf msys2.tar.xz -C $env:GITHUB_WORKSPACE.Replace("\", "/")
+      - run: |
+          $env:MSYSTEM = "MINGW${{ matrix.arch }}"
+          $env:MSYS2_PATH_TYPE = "strict"
+          $script = @'
+            uname -m
+            uname -a
+            echo $PATH
+            pacman --noconfirm -Syu
+          '@
+          & "$env:GITHUB_WORKSPACE\msys${{ matrix.arch }}\usr\bin\bash" -c -l $script
+      - name: Pacman
+        run: |
+          $env:MSYSTEM = "MINGW${{ matrix.arch }}"
+          $env:MSYS2_PATH_TYPE = "strict"
+          $script = @'
+            if [ "$MSYSTEM" = "MINGW32" ]; then
+              echo "TODO"
+            else
+              pacman --noconfirm -S mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-zlib mingw-w64-x86_64-libevent mingw-w64-x86_64-pcre mingw-w64-x86_64-icu
+            fi
+            pacman --noconfirm -S bison make
+          '@
+          & "$env:GITHUB_WORKSPACE\msys${{ matrix.arch }}\usr\bin\bash" -c -l $script
+      - name: Build
+        run: |
+          $env:MSYSTEM = "MINGW${{ matrix.arch }}"
+          $env:MSYS2_PATH_TYPE = "strict"
+          $script = @'
+            cd $OLDPWD
+            mkdir build && cd build && cmake -G \"MSYS Makefiles\" -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DPACKAGE_CRYPTO=OFF -DPACKAGE_DB=OFF .. && make -j 2 install
+          '@
+          & "$env:GITHUB_WORKSPACE\msys${{ matrix.arch }}\usr\bin\bash" -c -l $script
+      - name: Testsuite
+        run: |
+          $env:MSYSTEM = "MINGW${{ matrix.arch }}"
+          $env:MSYS2_PATH_TYPE = "strict"
+          $script = @'
+            cd $OLDPWD
+            cd testsuite && ../build/bin/driver etc/config.test -ftest
+          '@
+          & "$env:GITHUB_WORKSPACE\msys${{ matrix.arch }}\usr\bin\bash" -c -l $script
