@@ -375,7 +375,7 @@ char *read_file(const char *file, int start, int lines) {
   theBuff[total_bytes_read] = '\0';
 
   // skip forward until the "start"-th line
-  char *ptr_start = theBuff;
+  const char *ptr_start = theBuff;
   while (start > 1 && ptr_start < theBuff + total_bytes_read) {
     if (*ptr_start == '\0') {
       debug(file, "read_file: file contains '\\0': %s.\n", file);
@@ -393,32 +393,24 @@ char *read_file(const char *file, int start, int lines) {
     return nullptr;
   }
 
-  char *ptr_end = nullptr;
-  // search forward for "lines" of '\n' for the end
-  if (lines == 0) {
-    ptr_end = ptr_start + read_file_max_size;
-    if (ptr_end > theBuff + total_bytes_read) {
-      ptr_end = theBuff + total_bytes_read + 1;
-    }
-  } else {
-    ptr_end = ptr_start;
-    while (lines > 0 && ptr_end < theBuff + total_bytes_read) {
+  char* ptr_end = (char*) theBuff + total_bytes_read;
+
+  if (lines > 0) {
+    // continue searching forward for "lines" of '\n'
+    ptr_end = (char *)ptr_start;
+    while (lines > 0 && ptr_end <= theBuff + total_bytes_read) {
       if (*ptr_end++ == '\n') {
         lines--;
       }
     }
-    // not enough lines, directly go to the end.
-    if (lines > 0) {
-      ptr_end = theBuff + total_bytes_read + 1;
-    }
+  }
+
+  // Truncate result to read_file_max_size
+  if (ptr_end > ptr_start + read_file_max_size) {
+    ptr_end = (char *) ptr_start + read_file_max_size;
   }
 
   *ptr_end = '\0';
-  // result is too big.
-  if (strlen(ptr_start) > read_file_max_size) {
-    debug(file, "read_file: result too big: %s.\n", file);
-    return nullptr;
-  }
 
   bool found_crlf = strchr(ptr_start, '\r') != nullptr;
   if (found_crlf) {

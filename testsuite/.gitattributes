@@ -1,4 +1,5 @@
 testfile text eol=lf
 test_file text eol=lf
 *.o text eol=lf
-*.crlf text eol=crlf
+*.lf binary
+*.crlf binary
