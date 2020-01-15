@@ -187,6 +187,40 @@ int32_t u8_strncpy(uint8_t *dest, const uint8_t *src, const int32_t maxlen) {
 // From ICU 61
 #ifndef U8_TRUNCATE_IF_INCOMPLETE
 /**
+ * Internal bit vector for 3-byte UTF-8 validity check, for use in U8_IS_VALID_LEAD3_AND_T1.
+ * Each bit indicates whether one lead byte + first trail byte pair starts a valid sequence.
+ * Lead byte E0..EF bits 3..0 are used as byte index,
+ * first trail byte bits 7..5 are used as bit index into that byte.
+ * @see U8_IS_VALID_LEAD3_AND_T1
+ * @internal
+ */
+#define U8_LEAD3_T1_BITS "\x20\x30\x30\x30\x30\x30\x30\x30\x30\x30\x30\x30\x30\x10\x30\x30"
+
+/**
+ * Internal 3-byte UTF-8 validity check.
+ * Non-zero if lead byte E0..EF and first trail byte 00..FF start a valid sequence.
+ * @internal
+ */
+#define U8_IS_VALID_LEAD3_AND_T1(lead, t1) (U8_LEAD3_T1_BITS[(lead)&0xf]&(1<<((uint8_t)(t1)>>5)))
+
+/**
+ * Internal bit vector for 4-byte UTF-8 validity check, for use in U8_IS_VALID_LEAD4_AND_T1.
+ * Each bit indicates whether one lead byte + first trail byte pair starts a valid sequence.
+ * First trail byte bits 7..4 are used as byte index,
+ * lead byte F0..F4 bits 2..0 are used as bit index into that byte.
+ * @see U8_IS_VALID_LEAD4_AND_T1
+ * @internal
+ */
+#define U8_LEAD4_T1_BITS "\x00\x00\x00\x00\x00\x00\x00\x00\x1E\x0F\x0F\x0F\x00\x00\x00\x00"
+
+/**
+ * Internal 4-byte UTF-8 validity check.
+ * Non-zero if lead byte F0..F4 and first trail byte 00..FF start a valid sequence.
+ * @internal
+ */
+#define U8_IS_VALID_LEAD4_AND_T1(lead, t1) (U8_LEAD4_T1_BITS[(uint8_t)(t1)>>4]&(1<<((lead)&7)))
+
+/**
  * If the string ends with a UTF-8 byte sequence that is valid so far
  * but incomplete, then reduce the length of the string to end before
  * the lead byte of that incomplete sequence.
