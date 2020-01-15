@@ -2,8 +2,8 @@ void do_tests() {
     // basic case
     write_file("/rename_test", "Hmm.");
     rename("/rename_test", "/ren_test");
-    ASSERT(file_size("/rename_test") == -1);
-    ASSERT(read_file("/ren_test") == "Hmm.");
+    ASSERT_EQ(file_size("/rename_test"), -1);
+    ASSERT_EQ("Hmm.", read_file("/ren_test"));
     // move into directory
     rename("/ren_test", "/single");
     ASSERT(file_size("/ren_test") == -1);
