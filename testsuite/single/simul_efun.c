@@ -25,6 +25,7 @@ int same(mixed x, mixed y) {
 	if (!same(keys(x), keys(y))) return 0;
 	if (!same(values(x), values(y))) return 0;
 	return 1;
+    case BUFFER:
     case ARRAY:
 	if (x == y) return 1; // speed up this case
 	if (sizeof(x) != sizeof(y)) return 0;
@@ -32,7 +33,6 @@ int same(mixed x, mixed y) {
 	    if (!same(x[i], y[i])) return 0;
 	}
 	return 1;
-    case BUFFER:
     case FUNCTION:
     case CLASS:
 	error("Not implemented.");

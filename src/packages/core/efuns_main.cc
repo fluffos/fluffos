@@ -1723,6 +1723,7 @@ void f_read_bytes(void) {
   if (str == nullptr) {
     push_number(0);
   } else {
+    u8_sanitize(str);
     push_malloced_string(str);
   }
 }
@@ -1789,6 +1790,7 @@ void f_read_file(void) {
   if (!str) {
     push_svalue(&const0);
   } else {
+    u8_sanitize(str);
     push_malloced_string(str);
   }
 }
