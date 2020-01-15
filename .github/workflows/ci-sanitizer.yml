@@ -5,10 +5,12 @@ on:
     branches:
       - master
   pull_request:
-
+    branches:
+      - master
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         compiler:
           - CC: "gcc"
@@ -25,6 +27,6 @@ jobs:
         sudo apt install -y build-essential clang-6.0 autoconf automake bison expect libevent-dev libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
     - name: compile
       env: ${{ matrix.compiler }}
-      run: mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DENABLE_SANITIZER=ON .. && make install && cd ..
+      run: mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DENABLE_SANITIZER=ON .. && make -j 2 install && cd ..
     - name: testsuite
       run: cd testsuite && ../build/bin/driver etc/config.test -ftest
