@@ -31,7 +31,8 @@ static void check_svalue(svalue_t *v) {
     case T_OBJECT:
       if (v->u.ob->flags & O_DESTRUCTED) {
         free_svalue(v, "reclaim_objects");
-        *v = const0u;
+        *v = 0;
+        v->subtype = T_UNDEFINED;
         cleaned++;
       }
       break;
@@ -52,7 +53,7 @@ static void check_svalue(svalue_t *v) {
         if (v->u.fp->hdr.type == (FP_LOCAL | FP_NOT_BINDABLE)) {
           prog = v->u.fp->hdr.owner->prog;
           prog->func_ref--;
-          debug(d_flag, "subtr func ref /%s: now %i\n", prog->filename, prog->func_ref);
+          debug(d_flag, "subtr func ref /{}: now {}\n", prog->filename, prog->func_ref);
           if (!prog->ref && !prog->func_ref) {
             deallocate_program(prog);
           }

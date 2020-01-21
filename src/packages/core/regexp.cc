@@ -1438,6 +1438,8 @@ array_t *reg_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *def) {
   size_t size;
   const char *tmp;
   array_t *ret;
+  std::unique_ptr<unsigned char>i_pat_str {nullptr};
+  std::unique_ptr<unsigned char>i_tok_str {nullptr};
 
   regexp_user = EFUN_REGEXP;
   if ((size = pat->size) != tok->size) {
@@ -1468,7 +1470,10 @@ array_t *reg_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *def) {
     rgpp = reinterpret_cast<struct regexp **>(
         DCALLOC(size, sizeof(struct regexp *), TAG_TEMPORARY, "reg_assoc : rgpp"));
     for (i = 0; i < size; i++) {
-      if (!(rgpp[i] = regcomp((unsigned char *)pat->item[i].u.string, 0))) {
+      size_t pat_str_s {pat->item[i].u.string->size()+1};
+      i_pat_str.reset(new unsigned char[pat_str_s]);
+      memcpy(i_pat_str.get(), pat->item[i].u.string->c_str(), pat_str_s);
+      if (!(rgpp[i] = regcomp(i_pat_str.get(), 0))) {
         while (i--) {
           FREE((char *)rgpp[i]);
         }
@@ -1478,7 +1483,7 @@ array_t *reg_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *def) {
       }
     }
 
-    tmp = str->u.string;
+    tmp = str->u.string->c_str();
     while (*tmp) {
       /* Sigh - need a kludge here - Randor */
       /* In the future I may alter regexp.c to include branch info */
@@ -1541,34 +1546,36 @@ array_t *reg_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *def) {
       error("internal error in reg_assoc\n");
     }
 
-    tmp = str->u.string;
+    tmp = str->u.string->c_str();
 
     while (num_match--) {
-      char *svtmp;
+      std::unique_ptr<char> svtmp {nullptr};
 
       length = rmp->begin - tmp;
+      svtmp.reset(new char[length+1]);
+      strncpy(svtmp.get(), tmp, length);
+      svtmp.get()[length] = 0;
       sv1->type = T_STRING;
-      sv1->subtype = STRING_MALLOC;
-      sv1->u.string = svtmp = new_string(length, "reg_assoc : sv1");
-      strncpy(svtmp, tmp, length);
-      svtmp[length] = 0;
+      sv1->subtype = 0;
+      sv1->u.string = std::string {svtmp.get()};
       sv1++;
       assign_svalue_no_free(sv2++, def);
       tmp += length;
       length = rmp->end - rmp->begin;
+      svtmp.reset(new char[length]);
+      strncpy(svtmp.get(), tmp, length);
+      svtmp.get()[length] = 0;
       sv1->type = T_STRING;
-      sv1->subtype = STRING_MALLOC;
-      sv1->u.string = svtmp = new_string(length, "reg_assoc : sv1");
-      strncpy(svtmp, tmp, length);
-      svtmp[length] = 0;
+      sv1->subtype = 0;
+      sv1->u.string = std::string {svtmp.get()};
       sv1++;
       assign_svalue_no_free(sv2++, &tok->item[rmp->tok_i]);
       tmp += length;
       rmp = rmp->next;
     }
     sv1->type = T_STRING;
-    sv1->subtype = STRING_MALLOC;
-    sv1->u.string = string_copy(tmp, "reg_assoc");
+    sv1->subtype = 0;
+    sv1->u.string = std::string {tmp};
     assign_svalue_no_free(sv2, def);
     for (i = 0; i < size; i++) {
       FREE((char *)rgpp[i]);
@@ -1614,7 +1621,7 @@ array_t *match_regexp(array_t *v, const char *pattern, int flag) {
   sv1 = v->item + size;
   num_match = 0;
   while (size--) {
-    if (!((--sv1)->type == T_STRING) || (regexec(reg, sv1->u.string) != match)) {
+    if (!((--sv1)->type == T_STRING) || (regexec(reg, sv1->u.string->c_str()) != match)) {
       res[size] = 0;
     } else {
       res[size] = 1;
@@ -1634,11 +1641,7 @@ array_t *match_regexp(array_t *v, const char *pattern, int flag) {
       }
       (--sv2)->type = T_STRING;
       sv1 = v->item + size;
-      *sv2 = *sv1;
-      if (sv1->subtype & STRING_COUNTED) {
-        INC_COUNTED_REF(sv1->u.string);
-        ADD_STRING(MSTR_SIZE(sv1->u.string));
-      }
+      assign_svalue(sv2, sv1);
       if (!--num_match) {
         break;
       }

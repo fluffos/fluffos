@@ -109,6 +109,9 @@
     remove dependency on efun::rename from efun::link and correctly support
     links within all relevant functions
 
+## packages/core/regexp.cc ##
+- rewrite using ```std::basic_regex```
+
 ## path handling ##
 - simplify handling of paths:
 
