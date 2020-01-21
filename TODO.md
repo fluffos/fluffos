@@ -20,6 +20,7 @@
     e.g. vm/internal/base/object.cc depends on package/compress enabled!
 - substitute struct svalue\_t by class and provide proper API
 - check all string handling for utf-8 conformity
+- switch buffer from ```char *``` to ```std::vector```
 
 ## packages/core/ed.cc ##
 - missing 'check\_valid\_path(...)' for write operation with new api.
@@ -119,9 +120,6 @@
 ## vm/internal/simulate.cc ##
 - give_uid_to_object
     after calling master::creator_file doubled check for ```!ret```.
-
-## iconv ##
-- provide (MT safe) c++ wrapper
 
 # after switch to C++17 (or later) ##
 - check all attributes

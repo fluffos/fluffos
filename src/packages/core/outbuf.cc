@@ -6,12 +6,12 @@ void outbuf_push(outbuffer_t *outbuf) {
   STACK_INC;
   sp->type = T_STRING;
   if (outbuf && outbuf->buffer) {
-    outbuf->buffer = extend_string(outbuf->buffer, outbuf->real_size);
+    outbuf->buffer = static_cast<char*>(realloc(outbuf->buffer, outbuf->real_size));
 
-    sp->subtype = STRING_MALLOC;
-    sp->u.string = outbuf->buffer;
+    sp->subtype = 0;
+    sp->u.string = std::string{outbuf->buffer};
   } else {
-    sp->subtype = STRING_CONSTANT;
-    sp->u.string = "";
+    sp->subtype = 0;
+    sp->u.string = std::string {""};
   }
 }
