@@ -9,6 +9,10 @@
 
     add gnulib modules
 
+## packages/core/file.cc ##
+- complete rewrite
+    - check for global vars (make them at least thread-local)
+
 # Major #
 ## complete source ##
 - check for package dependencies

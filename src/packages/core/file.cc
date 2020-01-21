@@ -42,8 +42,7 @@
 #include <zlib.h>
 
 #include "base/internal/strutils.h"
-#include "ghc/filesystem.hpp"
-namespace fs = ghc::filesystem;
+#include "ghc/fs_std.hpp"
 
 /*
  * Credits for some of the code below goes to Free Software Foundation
@@ -74,7 +73,7 @@ namespace fs = ghc::filesystem;
 #define OS_mkdir(x, y) mkdir(x, y)
 #endif
 
-static int match_string(char * /*match*/, char * /*str*/);
+static int match_string(char const * /*match*/, char const * /*str*/);
 static int pstrcmp(const void * /*p1*/, const void * /*p2*/);
 static int parrcmp(const void * /*p1*/, const void * /*p2*/);
 static void encode_stat(svalue_t * /*vp*/, int /*flags*/, char * /*str*/, struct stat * /*st*/);
@@ -85,17 +84,17 @@ static void encode_stat(svalue_t * /*vp*/, int /*flags*/, char * /*str*/, struct
  * These are used by qsort in get_dir().
  */
 static int pstrcmp(const void *p1, const void *p2) {
-  auto *x = (svalue_t *)p1;
-  auto *y = (svalue_t *)p2;
+  auto *x = reinterpret_cast<svalue_t const *>(p1);
+  auto *y = reinterpret_cast<svalue_t const *>(p2);
 
-  return strcmp(x->u.string, y->u.string);
+  return x->u.string->compare(y->u.string);
 }
 
 static int parrcmp(const void *p1, const void *p2) {
-  auto *x = (svalue_t *)p1;
-  auto *y = (svalue_t *)p2;
+  auto *x = reinterpret_cast<svalue_t const *>(p1);
+  auto *y = reinterpret_cast<svalue_t const *>(p2);
 
-  return strcmp(x->u.arr->item[0].u.string, y->u.arr->item[0].u.string);
+  return x->u.arr->item[0].u.string->compare(y->u.arr->item[0].u.string);
 }
 
 static void encode_stat(svalue_t *vp, int flags, char *str, struct stat *st) {
@@ -103,8 +102,8 @@ static void encode_stat(svalue_t *vp, int flags, char *str, struct stat *st) {
     array_t *v = allocate_empty_array(3);
 
     v->item[0].type = T_STRING;
-    v->item[0].subtype = STRING_MALLOC;
-    v->item[0].u.string = string_copy(str, "encode_stat");
+    v->item[0].subtype = 0;
+    v->item[0].u.string = std::string {str};
     v->item[1].type = T_NUMBER;
     v->item[1].u.number = ((st->st_mode & S_IFDIR) ? -2 : st->st_size);
     v->item[2].type = T_NUMBER;
@@ -113,8 +112,8 @@ static void encode_stat(svalue_t *vp, int flags, char *str, struct stat *st) {
     vp->u.arr = v;
   } else {
     vp->type = T_STRING;
-    vp->subtype = STRING_MALLOC;
-    vp->u.string = string_copy(str, "encode_stat");
+    vp->subtype = 0;
+    vp->u.string = std::string {str};
   }
 }
 
@@ -162,18 +161,18 @@ array_t *get_dir(const std::string path, int flags) {
     return nullptr;
   }
 
-  path = check_valid_path(path, current_object, "stat", 0);
+  auto i_path {check_valid_path(path, current_object, "stat", 0)};
 
-  if (path == nullptr) {
+  if (i_path.empty()) {
     return nullptr;
   }
 
-  if (path.size() < 2) {
-    temppath[0] = path[0] ? path[0] : '.';
+  if (i_path.size() < 2) {
+    temppath[0] = i_path[0] ? i_path[0] : '.';
     temppath[1] = '\000';
     p = temppath;
   } else {
-    strncpy(temppath, path, MAX_FNAME_SIZE + MAX_PATH_LEN + 1);
+    strncpy(temppath, i_path.c_str(), MAX_FNAME_SIZE + MAX_PATH_LEN + 1);
     temppath[MAX_FNAME_SIZE + MAX_PATH_LEN + 1] = '\0';
 
     /*
@@ -192,11 +191,11 @@ array_t *get_dir(const std::string path, int flags) {
       return nullptr;
     }
     if (p != temppath) {
-      strcpy(regexppath, p + 1);
+      strncpy(regexppath, p + 1, MAX_FNAME_SIZE + MAX_PATH_LEN + 1);
       *p = '\0';
     } else {
-      strcpy(regexppath, p);
-      strcpy(temppath, ".");
+      strncpy(regexppath, p, MAX_FNAME_SIZE + MAX_PATH_LEN + 1);
+      strncpy(temppath, ".", MAX_FNAME_SIZE + MAX_PATH_LEN + 1);
     }
     do_match = 1;
   } else if (*p != '\0' && strcmp(temppath, ".")) {
@@ -237,9 +236,10 @@ array_t *get_dir(const std::string path, int flags) {
     return v;
   }
   rewinddir(dirp);
-  endtemp = temppath + strlen(temppath);
+  size_t size {strlen(temppath)};
+  endtemp = temppath + size;
 
-  strcat(endtemp++, "/");
+  strncat(endtemp++, "/", MAX_FNAME_SIZE + MAX_PATH_LEN + 1 - size++);
 
   for (i = 0, de = readdir(dirp); i < count; de = readdir(dirp)) {
     namelen = strlen(de->d_name);
@@ -255,8 +255,8 @@ array_t *get_dir(const std::string path, int flags) {
        * We'll have to .... sigh.... stat() the file to get some add'tl
        * info.
        */
-      strcpy(endtemp, de->d_name);
-      stat(temppath, &st); /* We assume it works. */
+      strncpy(endtemp, de->d_name, MAX_FNAME_SIZE + MAX_PATH_LEN + 1 - size);
+      stat(temppath, &st); /* We assume it works. */ // Not a good idea....
     }
     encode_stat(&v->item[i], flags, de->d_name, &st);
     i++;
@@ -268,12 +268,12 @@ array_t *get_dir(const std::string path, int flags) {
 }
 
 int remove_file(const std::string path) {
-  path = check_valid_path(path, current_object, "remove_file", 1);
+  auto i_path {check_valid_path(path, current_object, "remove_file", 1)};
 
-  if (path == nullptr) {
+  if (i_path.empty()) {
     return 0;
   }
-  if (unlink(path) == -1) {
+  if (unlink(i_path.c_str()) == -1) {
     return 0;
   }
   return 1;
@@ -286,27 +286,27 @@ int write_file(const std::string file, const std::string str, int flags) {
   FILE *f;
   gzFile gf;
 
-  file = check_valid_path(file, current_object, "write_file", 1);
-  if (!file) {
+  auto i_file = check_valid_path(file, current_object, "write_file", 1);
+  if (i_file.empty()) {
     return 0;
   }
   if (flags & 2) {
-    gf = gzopen(file, (flags & 1) ? "wb" : "ab");
+    gf = gzopen(i_file.c_str(), (flags & 1) ? "wb" : "ab");
     if (!gf) {
       error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n", file,
             (flags & 1) ? "overwrite" : "append", strerror(errno));
     }
   } else {
-    f = fopen(file, (flags & 1) ? "wb" : "ab");
+    f = fopen(i_file.c_str(), (flags & 1) ? "wb" : "ab");
     if (f == nullptr) {
       error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n", file,
             (flags & 1) ? "overwrite" : "append", strerror(errno));
     }
   }
   if (flags & 2) {
-    gzwrite(gf, str, strlen(str));
+    gzwrite(gf, str.c_str(), str.size());
   } else {
-    fwrite(str, strlen(str), 1, f);
+    fwrite(str.c_str(), str.size(), 1, f);
   }
 
   if (flags & 2) {
@@ -330,10 +330,8 @@ std::string *read_file(const std::string file, int start, int lines) {
         return ret;
     }
 
-    const char *real_file;
-
-    real_file = check_valid_path(file, current_object, "read_file", 0);
-    if (!real_file) {
+    auto real_file {check_valid_path(file, current_object, "read_file", 0)};
+    if (real_file.empty()) {
         return ret;
     }
 
@@ -352,7 +350,7 @@ std::string *read_file(const std::string file, int start, int lines) {
         return ret;
     }
 
-    gzFile f = gzopen(real_file, "rb");
+    gzFile f = gzopen(real_file.c_str(), "rb");
 
     if (f == nullptr) {
         debug(file, "read_file: fail to open: {}.\n", file);
@@ -426,24 +424,25 @@ std::string *read_file(const std::string file, int start, int lines) {
     return ret;
 }
 
-char *read_bytes(const char *file, int start, int len, int *rlen) {
+std::string *read_bytes(const std::string file, int start, int len, int *rlen) {
   const auto max_byte_transfer = CONFIG_INT(__MAX_BYTE_TRANSFER__);
 
   struct stat st;
   FILE *fptr;
   char *str;
   int size;
+  std::string *ret {nullptr};
 
   if (len < 0) {
-    return nullptr;
+    return ret;
   }
-  file = check_valid_path(file, current_object, "read_bytes", 0);
-  if (!file) {
-    return nullptr;
+  auto i_file {check_valid_path(file, current_object, "read_bytes", 0)};
+  if (i_file.empty()) {
+    return ret;
   }
-  fptr = fopen(file, "rb");
+  fptr = fopen(i_file.c_str(), "rb");
   if (fptr == nullptr) {
-    return nullptr;
+    return ret;
   }
   if (fstat(fileno(fptr), &st) == -1) {
     fatal("Could not stat an open file.\n");
@@ -459,11 +458,11 @@ char *read_bytes(const char *file, int start, int len, int *rlen) {
   if (len > max_byte_transfer) {
     fclose(fptr);
     error("Transfer exceeded maximum allowed number of bytes.\n");
-    return nullptr;
+    return ret;
   }
   if (start >= size) {
     fclose(fptr);
-    return nullptr;
+    return ret;
   }
   if ((start + len) > size) {
     len = (size - start);
@@ -471,30 +470,32 @@ char *read_bytes(const char *file, int start, int len, int *rlen) {
 
   if ((size = fseek(fptr, start, 0)) < 0) {
     fclose(fptr);
-    return nullptr;
+    return ret;
   }
 
-  str = new_string(len, "read_bytes: str");
+  str = new char[len];
 
   size = fread(str, 1, len, fptr);
 
   fclose(fptr);
 
   if (size <= 0) {
-    FREE_MSTR(str);
-    return nullptr;
+    delete[] str;
+    return ret;
   }
   /*
    * The string has to end to '\0'!!!
    */
   str[size] = '\0';
+  ret = new std::string(str);
+  delete[] str;
 
   *rlen = size;
-  return str;
+  return ret;
 }
 
 int write_bytes(const std::string file, int start, const std::string str) {
-    return write_bytes(filem start, str, str.size());
+    return write_bytes(file, start, str.c_str(), str.size());
 }
 
 int write_bytes(const std::string file, int start, const char *str, size_t len) {
@@ -504,12 +505,12 @@ int write_bytes(const std::string file, int start, const char *str, size_t len) 
   int size;
   FILE *fptr;
 
-  file = check_valid_path(file, current_object, "write_bytes", 1);
+  auto i_file {check_valid_path(file, current_object, "write_bytes", 1)};
 
-  if (!file) {
+  if (i_file.empty()) {
     return 0;
   }
-  if (theLength > max_byte_transfer) {
+  if (len > max_byte_transfer) {
     return 0;
   }
   /* Under system V, it isn't possible change existing data in a file
@@ -518,10 +519,10 @@ int write_bytes(const std::string file, int start, const char *str, size_t len) 
    * opening for w or w+ will truncate it if it does exist.  So we
    * have to check if it exists first.
    */
-  if (stat(file, &st) == -1) {
-    fptr = fopen(file, "wb");
+  if (stat(i_file.c_str(), &st) == -1) {
+    fptr = fopen(i_file.c_str(), "wb");
   } else {
-    fptr = fopen(file, "r+b");
+    fptr = fopen(i_file.c_str(), "r+b");
   }
   if (fptr == nullptr) {
     return 0;
@@ -541,7 +542,7 @@ int write_bytes(const std::string file, int start, const char *str, size_t len) 
     fclose(fptr);
     return 0;
   }
-  size = fwrite(str, 1, theLength, fptr);
+  size = fwrite(str, 1, len, fptr);
 
   fclose(fptr);
 
@@ -551,16 +552,16 @@ int write_bytes(const std::string file, int start, const char *str, size_t len) 
   return 1;
 }
 
-int file_size(const char *file) {
+int file_size(const std::string file) {
   struct stat st;
   long ret;
 
-  file = check_valid_path(file, current_object, "file_size", 0);
-  if (!file) {
+  auto i_file {check_valid_path(file, current_object, "file_size", 0)};
+  if (i_file.empty()) {
     return -1;
   }
 
-  if (stat(file, &st) == -1) {
+  if (stat(i_file.c_str(), &st) == -1) {
     ret = -1;
   } else if (S_IFDIR & st.st_mode) {
     ret = -2;
@@ -582,23 +583,24 @@ int file_size(const char *file) {
  */
 const std::string check_valid_path(const std::string path, object_t *call_object, const char *const call_fun, int writeflg) {
   svalue_t *v;
+  std::string ret {};
 
   if (!master_ob && !call_object) {
     // early startup, ignore security
     free_svalue(&apply_ret_value, "check_valid_path");
     apply_ret_value.type = T_STRING;
-    apply_ret_value.subtype = STRING_MALLOC;
-    path = apply_ret_value.u.string = string_copy(path, "check_valid_path");
+    apply_ret_value.subtype = 0;
+    apply_ret_value.u.string = path;
     return path;
   }
 
   if (call_object == nullptr || call_object->flags & O_DESTRUCTED) {
-    return nullptr;
+    return ret;
   }
 
-  copy_and_push_string(path);
+  push_string(path);
   push_object(call_object);
-  push_constant_string(call_fun);
+  push_string(call_fun);
   if (writeflg) {
     v = apply_master_ob(APPLY_VALID_WRITE, 3);
   } else {
@@ -610,27 +612,27 @@ const std::string check_valid_path(const std::string path, object_t *call_object
   }
 
   if (v && v->type == T_NUMBER && v->u.number == 0) {
-    return nullptr;
+    return ret;
   }
   if (v && v->type == T_STRING) {
-    path = v->u.string;
+    ret = v->u.string;
   } else {
     extern svalue_t apply_ret_value;
 
     free_svalue(&apply_ret_value, "check_valid_path");
     apply_ret_value.type = T_STRING;
     apply_ret_value.subtype = STRING_MALLOC;
-    path = apply_ret_value.u.string = string_copy(path, "check_valid_path");
+    ret = apply_ret_value.u.string = path;
   }
 
-  if (path[0] == '/') {
-    path++;
+  if (ret[0] == '/') {
+    ret = ret.substr(1, std::string::npos);
   }
-  if (path[0] == '\0') {
-    path = ".";
+  if (ret.empty()) {
+    ret = ".";
   }
-  if (legal_path(path)) {
-    return path;
+  if (legal_path(ret)) {
+    return ret;
   }
 
   return nullptr;
@@ -688,8 +690,8 @@ void debug_perror(const char *what, const char *file) {
   }
 }
 
-static svalue_t from_sv = {T_NUMBER};
-static svalue_t to_sv = {T_NUMBER};
+static svalue_t from_sv;
+static svalue_t to_sv;
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_file_sv() {
@@ -706,11 +708,11 @@ void mark_file_sv() {
 static int do_move(const std::string from, const std::string to, int flag) {
     struct stat to_stats, from_stats;
 
-  if (lstat(from, &from_stats) != 0) {
+  if (lstat(from.c_str(), &from_stats) != 0) {
     error("/{}: lstat failed\n", from);
     return 1;
   }
-  if (lstat(to, &to_stats) == 0) {
+  if (lstat(to.c_str(), &to_stats) == 0) {
 #ifdef __WIN32
     if (from == to) {
 #else
@@ -736,7 +738,7 @@ static int do_move(const std::string from, const std::string to, int flag) {
   }
 #ifdef F_LINK
   else if (flag == F_LINK) {
-    if (link(from, to) == 0) {
+    if (link(from.c_str(), to.c_str()) == 0) {
       return 0;
     }
   }
@@ -755,14 +757,14 @@ static int do_move(const std::string from, const std::string to, int flag) {
     if (copy_file(from, to)) {
       return 1;
     }
-    if (unlink(from)) {
+    if (unlink(from.c_str())) {
       error("cannot remove `/{}'", from);
       return 1;
     }
   }
 #ifdef F_LINK
   else if (flag == F_LINK) {
-    if (symlink(from, to) == 0) { /* symbolic link */
+    if (symlink(from.c_str(), to.c_str()) == 0) { /* symbolic link */
       return 0;
     }
   }
@@ -775,11 +777,7 @@ static int do_move(const std::string from, const std::string to, int flag) {
  * of the unix system call rename and the unix command mv.
  */
 
-int do_rename(const char *fr, const char *t, int flag) {
-  const char *from;
-  const char *to;
-  char newfrom[MAX_FNAME_SIZE + MAX_PATH_LEN + 2];
-  int flen;
+int do_rename(const std::string fr, const std::string t, int flag) {
   extern svalue_t apply_ret_value;
 
   /*
@@ -790,106 +788,94 @@ int do_rename(const char *fr, const char *t, int flag) {
    * is prevent linking to a file unless the person doing the linking has
    * permission to move the file.
    */
-  from = check_valid_path(fr, current_object, "rename", 1);
-  if (!from) {
+  std::string from {check_valid_path(fr, current_object, "rename", 1)};
+  if (from.empty()) {
     return 1;
   }
 
   assign_svalue(&from_sv, &apply_ret_value);
 
-  to = check_valid_path(t, current_object, "rename", 1);
-  if (!to) {
+  auto to {check_valid_path(t, current_object, "rename", 1)};
+  if (to.empty()) {
     return 1;
   }
 
   assign_svalue(&to_sv, &apply_ret_value);
-  if (!strlen(to) && !strcmp(t, "/")) {
+  if (to.empty() && !t.compare("/")) {
     to = "./";
   }
 
   /* Strip trailing slashes */
-  flen = strlen(from);
-  if (flen > 1 && from[flen - 1] == '/') {
-    const char *p = from + flen - 2;
-    int n;
-
-    while (*p == '/' && (p > from)) {
-      p--;
-    }
-    n = p - from + 1;
-    memcpy(newfrom, from, n);
-    newfrom[n] = 0;
-    from = newfrom;
-  }
+  from = rtrim(from, "/");
 
   if (file_size(to) == -2) {
     /* Target is a directory; build full target filename. */
     const char *cp;
-    char newto[MAX_FNAME_SIZE + MAX_PATH_LEN + 2];
+    std::string newto;
 
-    cp = strrchr(from, '/');
+    cp = strrchr(from.c_str(), '/');
     if (cp) {
       cp++;
     } else {
-      cp = from;
+      cp = from.c_str();
     }
 
-    sprintf(newto, "%s/%s", to, cp);
-    return do_move(from, newto, flag);
+    newto = to + '/' + cp;
+    return do_move(from.c_str(), newto.c_str(), flag);
   } else {
-    return do_move(from, to, flag);
+    return do_move(from.c_str(), to.c_str(), flag);
   }
 }
 #endif /* F_RENAME */
 
-int copy_file(const char *from, const char *to) {
+int copy_file(const std::string from, const std::string to) {
     struct stat to_stats, from_stats;
 
   extern svalue_t apply_ret_value;
 
-  from = check_valid_path(from, current_object, "move_file", 0);
+  auto i_from = check_valid_path(from, current_object, "move_file", 0);
   assign_svalue(&from_sv, &apply_ret_value);
 
-  to = check_valid_path(to, current_object, "move_file", 1);
+  auto i_to = check_valid_path(to, current_object, "move_file", 1);
   assign_svalue(&to_sv, &apply_ret_value);
 
-  if (from == nullptr) {
+  if (i_from.empty()) {
     return -1;
   }
-  if (to == nullptr) {
+  if (i_to.empty()) {
     return -2;
   }
 
-  if (lstat(from, &from_stats) != 0) {
-    error("/%s: lstat failed\n", from);
+  if (lstat(i_from.c_str(), &from_stats) != 0) {
+    error("/{}: lstat failed\n", from);
     return 1;
   }
-  if (lstat(to, &to_stats) == 0) {
+  if (lstat(i_to.c_str(), &to_stats) == 0) {
 #ifdef __WIN32
-    if (!strcmp(from, to)) {
+    if (!from.compare(to)) {
 #else
     if (from_stats.st_dev == to_stats.st_dev && from_stats.st_ino == to_stats.st_ino) {
 #endif
-      error("`/%s' and `/%s' are the same file", from, to);
+      error("`/{}' and `/{}' are the same file", from, to);
       return 1;
     }
   } else if (errno != ENOENT) {
-    error("/%s: unknown error\n", to);
+    error("/{}: unknown error\n", to);
     return 1;
   }
 
   if (file_size(to) == -2) {
     /* Target is a directory; build full target filename. */
     const char *cp;
-    char newto[MAX_FNAME_SIZE + MAX_PATH_LEN + 2];
+    std::string newto;
 
-    cp = strrchr(from, '/');
+    cp = strrchr(from.c_str(), '/');
     if (cp) {
       cp++;
     } else {
-      cp = from;
+      cp = from.c_str();
     }
-    sprintf(newto, "%s/%s", to, cp);
+    newto = to + '/' + cp;
     return copy_file(from, newto);
   }
 
@@ -934,7 +920,7 @@ void f_get_dir(void) {
   if (vec) {
     put_array(vec);
   } else {
-    *sp = const0;
+    *sp = 0;
   }
 }
 #endif
@@ -961,15 +947,13 @@ void f_link(void) {
 
 #ifdef F_MKDIR
 void f_mkdir(void) {
-  const char *path;
-
-  path = check_valid_path(sp->u.string, current_object, "mkdir", 1);
-  if (!path || OS_mkdir(path, 0770) == -1) {
+  const std::string path {check_valid_path(sp->u.string, current_object, "mkdir", 1)};
+  if (path.empty() || OS_mkdir(path.c_str(), 0770) == -1) {
     free_string_svalue(sp);
-    *sp = const0;
+    *sp = 0;
   } else {
     free_string_svalue(sp);
-    *sp = const1;
+    *sp = 1;
   }
 }
 #endif

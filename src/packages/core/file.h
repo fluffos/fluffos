@@ -14,9 +14,9 @@ int write_file(const std::string, const std::string, int);
 int write_bytes(const std::string, int, const std::string);
 int write_bytes(const std::string, int, const char *, size_t);
 array_t *get_dir(const std::string, int);
-int tail(char *);
-int file_size(const char *);
-int copy_file(const char *, const char *);
+int tail(std::string);
+int file_size(const std::string);
+int copy_file(const std::string, const std::string);
 #ifdef F_RENAME
 int do_rename(const std::string, const std::string, int);
 #endif
