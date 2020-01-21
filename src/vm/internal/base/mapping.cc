@@ -748,7 +748,7 @@ svalue_t *find_in_mapping(mapping_t *m, svalue_t *lv) {
   return &const0u;
 }
 
-svalue_t *find_string_in_mapping(mapping_t *m, const char *p) {
+svalue_t *find_string_in_mapping(mapping_t *m, const std::string p) {
   char *ss = findstring(p);
   int i;
   mapping_node_t *n;

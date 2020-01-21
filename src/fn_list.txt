@@ -90,6 +90,8 @@ void add_mapping_malloced_string(mapping_t *,           |   void add_mapping_str
         const char *, char *)                           |            const std::string)
 void add_mapping_shared_string(mapping_t *,             |   void add_mapping_string(mapping_t *, const std::string,
         const char *, char *)                           |            const std::string)
+svalue_t *find_string_in_mapping(mapping_t *,           |   svalue_t *find_string_in_mapping(mapping_t *,
+        const char *)                                   |            const std::string)
 
 packages/core/add_action.cc:
 int parse_command(char *, object_t *)                   |   int parse_command(std::string, object_t *)

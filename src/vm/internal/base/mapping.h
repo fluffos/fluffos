@@ -84,7 +84,7 @@ mapping_t *allocate_mapping(int);
 mapping_t *allocate_mapping2(array_t *, svalue_t *);
 void free_mapping(mapping_t *);
 svalue_t *find_in_mapping(mapping_t *, svalue_t *);
-svalue_t *find_string_in_mapping(mapping_t *, const char *);
+svalue_t *find_string_in_mapping(mapping_t *, const std::string);
 svalue_t *find_for_insert(mapping_t *, svalue_t *, int);
 void absorb_mapping(mapping_t *, mapping_t *);
 void mapping_delete(mapping_t *, svalue_t *);
