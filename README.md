@@ -8,28 +8,28 @@ Welcome
 FluffOS is an actively maintained LPMUD driver, based on the last release of MudOS.
 it includes many bug fixes and codebase modernization.
 
-if your LPMUD previously runs on MudOSv22+, it should run on FluffOS with little modification. 
-if not, let us know and we will make it happen.
+FluffOS supports LPC based mud with little modification. if your codebase previously ran on Fluffos 2.X, FluffOS v2017 , I will help you migrate to FluffOS v2019. Ask away!
 
-Release
+Releases
+--------
+Previous release, v2017 is being used by many chinese LPMUD in production and will continue to
+receive support until EOY 2020. v2017 supports compiling on centOS/ubuntu and under windows using CYGWIN.
+
+Current release, v2019 is being actively developed. This release uses cmake system, ran on Linux/MacOS/Windows, and have full UTF-8 and Websocket support with very high level of backward compatbility. If you migrate your mud, you will have an fully funcitonal web interface from day 1.
+
+Support
 -------
-Current release, v2017 is being used by many chinese mud in production and will be continue to
-receive support through out 2019. Supports centOS/ubuntu and under windows using CYGWIN.
-
-Next release, v2019 is being actively developed: cmake support, native build under windows and 
-nodeJS interop underway. 
-
-Official Website & Forum
-----------------
-Website: <https://www.fluffos.info>
+Website / Documentation: <https://www.fluffos.info>
 
 Forum: <https://forum.fluffos.info>
 
 QQ support Group: 451819151 [![451819151](https://pub.idqqimg.com/wpa/images/group.png)](https://shang.qq.com/wpa/qunwpa?idkey=3fd552adb8ace1a8e3ae3a712e5d314c7caf49af8b87449473c595b7e1f1ddf9)
 
-Build & Usage
--------------
-Please checkout official website for now.
+Gitter Support: [![Gitter](https://badges.gitter.im/fluffos/community.svg)](https://gitter.im/fluffos/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
+
+How to
+------
+Please checkout official website <https://www.fluffos.info>.
 
 Donations
 ---------
@@ -83,5 +83,3 @@ Support this project by becoming a sponsor. Your logo will show up here with a l
 <a href="https://opencollective.com/fluffos-579/sponsor/7/website" target="_blank"><img src="https://opencollective.com/fluffos-579/sponsor/7/avatar.svg"></a>
 <a href="https://opencollective.com/fluffos-579/sponsor/8/website" target="_blank"><img src="https://opencollective.com/fluffos-579/sponsor/8/avatar.svg"></a>
 <a href="https://opencollective.com/fluffos-579/sponsor/9/website" target="_blank"><img src="https://opencollective.com/fluffos-579/sponsor/9/avatar.svg"></a>
-
-
