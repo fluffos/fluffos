@@ -46,29 +46,34 @@ void replace_programs(void) {
       /* move our variables up to the top */
       for (i = 0; i < r_ob->new_prog->num_variables_total; i++) {
         free_svalue(svp, "replace_programs");
-        *svp = *(svp + offset);
-        *(svp + offset) = const0u;
+        assign_svalue(svp, (svp + offset));
+        free_svalue((svp + offset), "replace_programs");
+        (svp + offset)->type = T_NUMBER;
+        (svp + offset)->subtype = T_UNDEFINED;
+        (svp + offset)->u.number = 0;
         svp++;
       }
       /* free the rest */
       for (i = 0; i < num_fewer; i++) {
         free_svalue(svp, "replace_programs");
-        *svp++ = const0u;
+        svp->type = T_NUMBER;
+        svp->subtype = T_UNDEFINED;
+        svp->u.number = 0;
+        svp++;
       }
     } else {
       /* We just need to remove the last num_fewer variables */
       svp = &r_ob->ob->variables[r_ob->new_prog->num_variables_total];
       for (i = 0; i < num_fewer; i++) {
         free_svalue(svp, "replace_programs");
-        *svp++ = const0u;
+        svp->type = T_NUMBER;
+        svp->subtype = T_UNDEFINED;
+        svp->u.number = 0;
+        svp++;
       }
     }
 
-    if (r_ob->ob->replaced_program) {
-      FREE_MSTR(r_ob->ob->replaced_program);
-      r_ob->ob->replaced_program = nullptr;
-    }
-    r_ob->ob->replaced_program = string_copy(r_ob->new_prog->filename, "replace_programs");
+    r_ob->ob->replaced_program = r_ob->new_prog->filename;
 
     reference_prog(r_ob->new_prog, "replace_programs");
     old_prog = r_ob->ob->prog;
@@ -99,7 +104,7 @@ void replace_programs(void) {
       r_ob->ob->shadowing = nullptr;
     }
 #endif
-    FREE((char *)r_ob);
+    FREE(r_ob);
   }
   obj_list_replace = (replace_ob_t *)nullptr;
   debug(d_flag, ("end of replace_programs"));
@@ -111,14 +116,14 @@ static program_t *search_inherited(char *str, program_t *prg, int *offpnt) {
   int i;
 
   debug(d_flag, "search_inherited started");
-  debug(d_flag, "searching for PRG(/%s) in PRG(/%s)", str, prg->filename);
-  debug(d_flag, "num_inherited=%d\n", prg->num_inherited);
+  debug(d_flag, "searching for PRG(/{}) in PRG(/{})", str, prg->filename);
+  debug(d_flag, "num_inherited={}\n", prg->num_inherited);
 
   for (i = 0; i < prg->num_inherited; i++) {
-    debug(d_flag, "index %d:", i);
-    debug(d_flag, "checking PRG(/%s)", prg->inherit[i].prog->filename);
+    debug(d_flag, "index {}:", i);
+    debug(d_flag, "checking PRG(/{})", prg->inherit[i].prog->filename);
 
-    if (strcmp(str, prg->inherit[i].prog->filename) == 0) {
+    if (prg->inherit[i].prog->filename == str) {
       debug(d_flag, "match found");
 
       *offpnt = prg->inherit[i].variable_index_offset;
@@ -148,7 +153,7 @@ static replace_ob_t *retrieve_replace_program_entry(void) {
 
 void f_replace_program(void) {
   replace_ob_t *tmp;
-  int name_len;
+  size_t name_len;
   char *name, *xname;
   program_t *new_prog;
   int var_offset;
@@ -170,10 +175,10 @@ void f_replace_program(void) {
                   current_object->prog->filename);
   }
 
-  name_len = SVALUE_STRLEN(sp);
+  name_len = sp->u.string->size();
   name = reinterpret_cast<char *>(DMALLOC(name_len + 3, TAG_TEMPORARY, "replace_program"));
   xname = name;
-  strcpy(name, sp->u.string);
+  strcpy(name, sp->u.string->c_str());
   if (name_len < 3) {
     strcat(name, ".c");
   } else {

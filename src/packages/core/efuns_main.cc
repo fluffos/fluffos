@@ -773,7 +773,7 @@ int inherits(program_t *prog, program_t *thep) {
     if ((pg = prog->inherit[j].prog) == thep) {
       return 1;
     }
-    if (!strcmp(pg->filename, thep->filename)) {
+    if (!pg->filename->compare(thep->filename)) {
       return 2;
     }
     if ((l = inherits(pg, thep))) {
