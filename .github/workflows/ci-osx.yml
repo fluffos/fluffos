@@ -20,7 +20,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Install packages
-      run: brew install cmake pkg-config mysql pcre libgcrypt libevent openssl jemalloc icu4c
+      run: brew install cmake pkg-config pcre libgcrypt libevent openssl jemalloc icu4c mysql-client
     - name: compile
       run: mkdir build && cd build &&  cmake -DCMAKE_BUILD_TYPE=${{ matrix.build }} .. && make -j 2 install && cd ..
       env:
