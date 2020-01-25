@@ -124,6 +124,9 @@
 - give_uid_to_object
     after calling master::creator_file doubled check for ```!ret```.
 
+## packages/* ##
+- check all efuns and rewrite as appropriate
+
 # after switch to C++17 (or later) ##
 - check all attributes
     - e.g.: C++17 knows ```[[fallthrough]]``` as such occurences of

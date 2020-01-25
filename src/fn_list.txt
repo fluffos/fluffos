@@ -93,6 +93,12 @@ void add_mapping_shared_string(mapping_t *,             |   void add_mapping_str
 svalue_t *find_string_in_mapping(mapping_t *,           |   svalue_t *find_string_in_mapping(mapping_t *,
         const char *)                                   |            const std::string)
 
+vm/internal/base/object.cc:
+int save_object(object_t *, const char *, int)          |   int save_object(object_t *, const std::string, int)
+int save_object_str(object_t *, int, char *, int)       |   int save_object_str(object_t *, int, std::string, int)
+int restore_object(object_t *, const char *, int)       |   int restore_object(object_t *, const std::string, int)
+void restore_variable(svalue_t *, char *)               |   void restore_variable(svalue_t *, std::string)
+
 packages/core/add_action.cc:
 int parse_command(char *, object_t *)                   |   int parse_command(std::string, object_t *)
 object_t *find_living_object(const char *, int)         |   object_t *find_living_object(const std::string, int)

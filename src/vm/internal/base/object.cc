@@ -32,7 +32,7 @@ namespace fs = ghc::filesystem;
 #endif
 
 #define too_deep_save_error() \
-  error("Mappings and/or arrays nested too deep (%d) for save_object\n", MAX_SAVE_SVALUE_DEPTH);
+  error("Mappings and/or arrays nested too deep ({}) for save_object\n", MAX_SAVE_SVALUE_DEPTH);
 
 object_t *previous_ob;
 
@@ -1278,7 +1278,7 @@ void restore_object_from_line(object_t *ob, char *line, int noclear) {
   }
   space = strchr(line, ' ');
   if (!space || ((space - line) >= sizeof(var))) {
-    error("restore_object(): Illegal file format - 1 (%s).\n", line);
+    error("restore_object(): Illegal file format - 1 ({}).\n", line);
   }
   (void)strncpy(var, line, space - line);
   var[space - line] = '\0';
@@ -1296,19 +1296,19 @@ void restore_object_from_line(object_t *ob, char *line, int noclear) {
   }
   if (rc & ROB_ERROR) {
     if (rc & ROB_GENERAL_ERROR) {
-      error("restore_object(): Illegal general format while restoring %s.\n", var);
+      error("restore_object(): Illegal general format while restoring {}.\n", var);
     } else if (rc & ROB_NUMERAL_ERROR) {
-      error("restore_object(): Illegal numeric format while restoring %s.\n", var);
+      error("restore_object(): Illegal numeric format while restoring {}.\n", var);
     } else if (rc & ROB_ARRAY_ERROR) {
-      error("restore_object(): Illegal array format while restoring %s.\n", var);
+      error("restore_object(): Illegal array format while restoring {}.\n", var);
     } else if (rc & ROB_MAPPING_ERROR) {
-      error("restore_object(): Illegal mapping format while restoring %s.\n", var);
+      error("restore_object(): Illegal mapping format while restoring {}.\n", var);
     } else if (rc & ROB_STRING_ERROR) {
-      error("restore_object(): Illegal string format while restoring %s.\n", var);
+      error("restore_object(): Illegal string format while restoring {}.\n", var);
     } else if (rc & ROB_STRING_UTF8_ERROR) {
-      error("restore_object(): Invalid utf8 string while restoring %s.\n", var);
+      error("restore_object(): Invalid utf8 string while restoring {}.\n", var);
     } else if (rc & ROB_CLASS_ERROR) {
-      error("restore_object(): Illegal class format while restoring %s.\n", var);
+      error("restore_object(): Illegal class format while restoring {}.\n", var);
     }
   }
   if (idx == -1) {
@@ -1465,7 +1465,7 @@ int sel = -1;
 
 static const int SAVE_EXTENSION_GZ_LENGTH = strlen(SAVE_GZ_EXTENSION);
 
-int save_object(object_t *ob, const char *file, int save_zeros) {
+int save_object(object_t *ob, const std::string file, int save_zeros) {
   char *name, *p;
   static char save_name[256], tmp_name[256];
   int len;
@@ -1537,14 +1537,14 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
   if (save_compressed) {
     gzf = gzopen(tmp_name, "wb");
     if (!gzf) {
-      error("Could not open /%s for a save.\n", tmp_name);
+      error("Could not open /{} for a save.\n", tmp_name);
     }
     if (!gzprintf(gzf, "#/%s\n", ob->prog->filename)) {
-      error("Could not open /%s for a save.\n", tmp_name);
+      error("Could not open /{} for a save.\n", tmp_name);
     }
   } else {
     if (!(f = fopen(tmp_name, "wb")) || fprintf(f, "#/%s\n", save_name) < 0) {
-      error("Could not open /%s for a save.\n", tmp_name);
+      error("Could not open /{} for a save.\n", tmp_name);
     }
   }
   v = ob->variables;
@@ -1585,7 +1585,7 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
   return success;
 }
 
-int save_object_str(object_t *ob, int save_zeros, char *saved, int size) {
+int save_object_str(object_t *ob, int save_zeros, std::string saved, int size) {
   char *p;
   int success;
   svalue_t *v;
@@ -1671,7 +1671,7 @@ void restore_object_from_buff(object_t *ob, const char *buf, int noclear) {
   }
 }
 
-int restore_object(object_t *ob, const char *file, int noclear) {
+int restore_object(object_t *ob, const std::string file, int noclear) {
   object_t *save = current_object;
 
   if (ob->flags & O_DESTRUCTED) {
@@ -1705,7 +1705,7 @@ int restore_object(object_t *ob, const char *file, int noclear) {
   // valid read permission.
   file = check_valid_path(filename.c_str(), ob, "restore_object", 0);
   if (!file) {
-    error("restore_object: read permission denied: %s.\n", filename.c_str());
+    error("restore_object: read permission denied: {}.\n", filename.c_str());
   }
 
   // We always use zlib functions here and below, as it handles non-gzip file as well.
@@ -1730,7 +1730,7 @@ int restore_object(object_t *ob, const char *file, int noclear) {
       int err;
       std::string errstr(gzerror(gzf, &err));
       gzclose(gzf);
-      error("restore_object: Error reading file: %s,  error: %s.\n", file, errstr.c_str());
+      error("restore_object: Error reading file: {},  error: {}.\n", file, errstr.c_str());
     }
     // Read successfully
     total_bytes_read += bytes_read;
@@ -1738,7 +1738,7 @@ int restore_object(object_t *ob, const char *file, int noclear) {
     // Avoid use up all memory.
     if (bytes_read == chunk) {
       if (buf.size() >= max_memory) {
-        error("restore_object: Maximum memory limit %d reached trying to read file: %s.\n",
+        error("restore_object: Maximum memory limit {} reached trying to read file: {}.\n",
               max_memory, file);
       }
       buf.resize(buf.size() + chunk);
@@ -1777,12 +1777,12 @@ int restore_object(object_t *ob, const char *file, int noclear) {
   pop_context(&econ);
 
   current_object = save;
-  debug(d_flag, "Object /%s restored from /%s.\n", ob->obname, file);
+  debug(d_flag, "Object /{} restored from /{}.\n", ob->obname, file);
 
   return 1;
 }
 
-void restore_variable(svalue_t *var, char *str) {
+void restore_variable(svalue_t *var, std::string str) {
   int rc;
   rc = restore_svalue(str, var);
 
@@ -1809,11 +1809,11 @@ void dealloc_object(object_t *ob, const char *from) {
   object_t *prev_all = 0;
 #endif
 
-  debug(d_flag, "free_object: /%s.\n", ob->obname);
+  debug(d_flag, "free_object: /{}.\n", ob->obname);
 
   if (!(ob->flags & O_DESTRUCTED)) {
     if (ob->next_all != ob) { /* This is fatal, and should never happen. */
-      fatal("FATAL: Object 0x%x /%s ref count 0, but not destructed (from %s).\n", ob, ob->obname,
+      fatal("FATAL: Object {:#08x} /{} ref count 0, but not destructed (from {}).\n", ob, ob->obname,
             from);
     } else {
       destruct_object(ob);
@@ -1841,10 +1841,10 @@ void dealloc_object(object_t *ob, const char *from) {
   }
 #endif
   if (ob->obname) {
-    debug(d_flag, "Free object /%s\n", ob->obname);
+    debug(d_flag, "Free object /{}\n", ob->obname);
 
     DEBUG_CHECK1(ObjectTable::instance().find(ob->obname) == ob,
-                 "Freeing object /%s but name still in name table", ob->obname);
+                 "Freeing object /{} but name still in name table", ob->obname);
     FREE((char *)ob->obname);
     SETOBNAME(ob, nullptr);
   }

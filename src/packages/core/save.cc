@@ -27,48 +27,48 @@ void f_save_object(void) {
     put_number(flag);
   } else {
     pop_n_elems(st_num_arg);
-    char *saved = new_string(max_string_length, "save_object_str");
-    push_malloced_string(saved);
+    std::string saved {};
+    push_string(saved);
     int left = max_string_length;
     flag = save_object_str(current_object, flag, saved, left);
     if (!flag) {
       pop_stack();
       push_undefined();
     } else {
-      saved = new_string(strlen(sp->u.string), "save_object_str2");
-      strcpy(saved, sp->u.string);
+      saved = sp->u.string;
       pop_stack();
-      push_malloced_string(saved);
+      push_string(saved);
     }
   }
 }
 #endif
 
+#ifdef F_SAVE_VARIABLE
 /*
  * return a string representing an svalue in the form that save_object()
  * would write it.
  */
-char *save_variable(svalue_t *var) {
+std::string save_variable(svalue_t *var) {
   int theSize;
-  char *new_str, *p;
+  std::unique_ptr<char> new_str;
+  char *p;
 
   save_svalue_depth = 0;
   theSize = svalue_save_size(var);
-  new_str = new_string(theSize - 1, "save_variable");
+  new_str.reset(new char[theSize - 1]);
   *new_str = '\0';
-  p = new_str;
+  p = new_str.get();
   save_svalue(var, &p);
-  DEBUG_CHECK(p - new_str != theSize - 1, "Length miscalculated in save_variable");
-  return new_str;
+  DEBUG_CHECK(p - new_str.get() != theSize - 1, "Length miscalculated in save_variable");
+  return std::string {new_str.get()};
 }
 
-#ifdef F_SAVE_VARIABLE
 void f_save_variable(void) {
-  char *p;
+    std::string p;
 
-  p = save_variable(sp);
-  pop_stack();
-  push_malloced_string(p);
+    p = save_variable(sp);
+    pop_stack();
+    push_string(p);
 }
 #endif
 
@@ -89,12 +89,9 @@ void f_restore_object(void) {
 void f_restore_variable(void) {
   svalue_t v;
 
-  unlink_string_svalue(sp);
   v.type = T_NUMBER;
 
-  // unlinked string
-  restore_variable(&v, const_cast<char *>(sp->u.string));
-  FREE_MSTR(sp->u.string);
-  *sp = v;
+  restore_variable(&v, sp->u.string);
+  assign_svalue(sp, &v);
 }
 #endif
