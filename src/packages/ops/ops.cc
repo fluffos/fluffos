@@ -139,11 +139,7 @@ void f_eq() {
     }
 
     case T_STRING: {
-      if (SVALUE_STRLEN_DIFFERS(sp - 1, sp)) {
-        i = 0;
-      } else {
-        i = !strcmp((sp - 1)->u.string, sp->u.string);
-      }
+      i = !((sp-1)->u.string->compare(sp->u.string));
       free_string_svalue(sp--);
       free_string_svalue(sp);
       break;
@@ -198,7 +194,7 @@ void f_ge() {
       sp->subtype = 0;
       break;
     case T_STRING:
-      i = strcmp(sp->u.string, (sp + 1)->u.string) >= 0;
+      i = sp->u.string->compare((sp + 1)->u.string) >= 0;
       free_string_svalue(sp + 1);
       free_string_svalue(sp);
       put_number(i);
@@ -239,7 +235,7 @@ void f_gt() {
       sp->subtype = 0;
       break;
     case T_STRING:
-      i = strcmp(sp->u.string, (sp + 1)->u.string) > 0;
+      i = sp->u.string->compare((sp + 1)->u.string) > 0;
       free_string_svalue(sp + 1);
       free_string_svalue(sp);
       put_number(i);
@@ -280,7 +276,7 @@ void f_le() {
       break;
 
     case T_STRING:
-      i = strcmp(sp->u.string, (sp + 1)->u.string) <= 0;
+      i = sp->u.string->compare((sp + 1)->u.string) <= 0;
       free_string_svalue(sp + 1);
       free_string_svalue(sp);
       sp->type = T_NUMBER;
@@ -323,7 +319,7 @@ void f_lt() {
       }
       break;
     case T_STRING:
-      i = (strcmp(sp->u.string, (sp + 1)->u.string) < 0);
+      i = sp->u.string->compare((sp + 1)->u.string) < 0;
       free_string_svalue(sp + 1);
       free_string_svalue(sp);
       sp->type = T_NUMBER;
@@ -478,11 +474,7 @@ void f_ne() {
     }
 
     case T_STRING: {
-      if (SVALUE_STRLEN_DIFFERS(sp - 1, sp)) {
-        i = 1;
-      } else {
-        i = !!strcmp((sp - 1)->u.string, sp->u.string);
-      }
+      i = !!(sp - 1)->u.string->compare(sp->u.string);
       free_string_svalue(sp--);
       free_string_svalue(sp);
       break;
@@ -579,10 +571,11 @@ void f_parse_command() {
   CHECK_STACK_OVERFLOW(num_arg + 1);
   sp += num_arg + 1;
   arg = sp;
-  *(arg--) = *(fp--); /* move pattern to top of stack */
-  *(arg--) = *(fp--); /* move source object or array to just below
-                           the pattern */
-  *(arg) = *(fp);     /* move source string just below the object */
+  assign_svalue(arg, fp);   /* move pattern to top of stack */
+  arg--; fp--;
+  assign_svalue(arg, fp);   /* move source object or array to just below the pattern */
+  arg--; fp--;
+  assign_svalue(arg, fp);   /* move source string just below the object */
   fp->type = T_NUMBER;
 
   /*
@@ -621,9 +614,9 @@ void f_range(int code) {
     case T_STRING: {
       int32_t from, to;
       size_t len;
-      const char *res = sp->u.string;
+      const char *res = sp->u.string->c_str();
 
-      auto success = u8_egc_count(res, &len);
+      auto success = u8_egc_count(res, len);
       if (!success) {
         error("Invalid UTF-8 string: f_range");
       }
@@ -659,8 +652,8 @@ void f_range(int code) {
       if (to < from || from >= len) {
         free_string_svalue(sp + 2);
         sp->type = T_STRING;
-        sp->subtype = STRING_CONSTANT;
-        sp->u.string = "";
+        sp->subtype = 0;
+        sp->u.string = std::string {""};
         return;
       }
 
@@ -669,17 +662,17 @@ void f_range(int code) {
         if (offset < 0) {
           error("f_range: invalid offset");
         }
-        put_malloced_string(string_copy(res + offset, "f_range"));
+        put_string(std::string {res + offset});
       } else {
         auto start = u8_egc_index_to_offset(res, from);
         auto end = u8_egc_index_to_offset(res, from + (to - from + 1));
         if (start < 0 || end < 0) {
           error("f_range: invalid offset");
         }
-        char *tmp = new_string(end - start, "f_range");
-        strncpy(tmp, res + start, end - start);
-        tmp[end - start] = '\0';
-        put_malloced_string(tmp);
+        std::unique_ptr<char> tmp {new char[end - start]};
+        strncpy(tmp.get(), res + start, end - start);
+        tmp.get()[end - start] = '\0';
+        put_string(std::string {tmp.get()});
       }
       free_string_svalue(sp + 2);
       break;
@@ -762,8 +755,8 @@ void f_extract_range(int code) {
       int32_t from;
       size_t len;
 
-      const char *res = sp->u.string;
-      auto success = u8_egc_count(res, &len);
+      const char *res = sp->u.string->c_str();
+      auto success = u8_egc_count(res, len);
       if (!success) {
         error("Invalid UTF-8 String: f_extract_range.");
       }
@@ -784,14 +777,14 @@ void f_extract_range(int code) {
       }
       if (from >= len) {
         sp->type = T_STRING;
-        sp->subtype = STRING_CONSTANT;
-        sp->u.string = "";
+        sp->subtype = 0;
+        sp->u.string = std::string {""};
       } else {
         auto offset = u8_egc_index_to_offset(res, from);
         if (offset < 0) {
           error("f_range: invalid offset");
         }
-        put_malloced_string(string_copy(res + offset, "f_extract_range"));
+        put_string(std::string {res + offset});
       }
       free_string_svalue(sp + 1);
       break;
@@ -991,11 +984,10 @@ void f_switch() {
       sp--;
     } else if (sp->type == T_STRING) {
       if (sp->subtype == STRING_SHARED) {
-        s = ((POINTER_INT)sp->u.string);
-        free_string(sp->u.string);
-        sp--;
+        s = ((POINTER_INT)(sp->u.string->c_str()));
+        free_string_svalue(sp--);
       } else {
-        s = ((POINTER_INT)findstring(sp->u.string));
+        s = ((POINTER_INT)((*(shared_string::find(sp->u.string)))->c_str()));
         free_string_svalue(sp--);
       }
       if (s == 0) {
@@ -1250,12 +1242,13 @@ void f_sscanf() {
   fp = sp;
   CHECK_STACK_OVERFLOW(num_arg + 1);
   sp += num_arg + 1;
-  *sp = *(fp--);       /* move format description to top of stack */
-  *(sp - 1) = *(fp);   /* move source string just below the format
-                        * desc. */
-  fp->type = T_NUMBER; /* this svalue isn't invalidated below, and
-                        * if we don't change it to something safe,
-                        * it will get freed twice if an error occurs */
+  assign_svalue(sp, fp);    /* move format description to top of stack */
+  fp--;
+  assign_svalue(sp-1, fp);  /* move source string just below the format desc. */
+  free_svalue(fp, "f_sscanf");
+  fp->type = T_NUMBER;      /* this svalue isn't invalidated below, and
+                             * if we don't change it to something safe,
+                            *  it will get freed twice if an error occurs */
   /*
    * prep area for rvalues
    */
