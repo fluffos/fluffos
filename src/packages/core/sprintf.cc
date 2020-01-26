@@ -192,7 +192,7 @@ static void pop_sprintf_state(void) {
   sprintf_state = sprintf_state->next;
 
   if (state->obuff.buffer) {
-    FREE_MSTR(state->obuff.buffer);
+    FREE(state->obuff.buffer);
   }
   while (state->csts) {
     cst *next = state->csts->next;
@@ -371,14 +371,14 @@ void svalue_to_string(svalue_t *obj, outbuffer_t *outbuf, int indent, int traili
       break;
     case T_BUFFER:
       outbuf_add(outbuf, "BUFFER ( /* sizeof() == ");
-      outbuf_addv(outbuf, "%d", obj->u.buf->size);
+      outbuf_add(outbuf, "%d", obj->u.buf->size);
       outbuf_add(outbuf, " */\n");
       for (i = 0; i < (obj->u.buf->size) - 1; i++) {
         add_space(outbuf, indent + 2);
-        outbuf_addv(outbuf, "0x%hhx,\n", (char)obj->u.buf->item[i]);
+        outbuf_add(outbuf, "0x%hhx,\n", (char)obj->u.buf->item[i]);
       }
       add_space(outbuf, indent + 2);
-      outbuf_addv(outbuf, "0x%hhx", (char)obj->u.buf->item[i]);
+      outbuf_add(outbuf, "0x%hhx", (char)obj->u.buf->item[i]);
       outbuf_add(outbuf, "\n");
       add_space(outbuf, indent);
       outbuf_add(outbuf, ")");
@@ -401,7 +401,6 @@ void svalue_to_string(svalue_t *obj, outbuffer_t *outbuf, int indent, int traili
           break;
         case FP_FUNCTIONAL:
         case FP_FUNCTIONAL | FP_NOT_BINDABLE: {
-          char buf[10];
           int n = obj->u.fp->f.functional.num_arg;
 
           outbuf_add(outbuf, "<code>(");
@@ -997,8 +996,8 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
           outbuf_fix(&outbuf);
 
           sprintf_state->clean.type = T_STRING;
-          sprintf_state->clean.subtype = STRING_MALLOC;
-          sprintf_state->clean.u.string = outbuf.buffer;
+          sprintf_state->clean.subtype = 0;
+          sprintf_state->clean.u.string = std::string {outbuf.buffer};
           carg = &(sprintf_state->clean);
           finfo ^= INFO_T_LPC;
           finfo |= INFO_T_STRING;
@@ -1018,14 +1017,14 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
            */
           if (carg->type == T_NUMBER && carg->u.number == 0) {
             sprintf_state->clean.type = T_STRING;
-            sprintf_state->clean.subtype = STRING_MALLOC;
-            sprintf_state->clean.u.string = string_copy("0", "sprintf NULL");
+            sprintf_state->clean.subtype = 0;
+            sprintf_state->clean.u.string = std::string {"0"};
             carg = &(sprintf_state->clean);
           } else if (carg->type != T_STRING) {
             SPRINTF_ERROR(ERR_INCORRECT_ARG_S);
           }
-          int swidth = u8_width(carg->u.string);
-          int slen = SVALUE_STRLEN(carg);
+          int swidth = u8_width(carg->u.string->c_str());
+          int slen = carg->u.string->size();
           if ((finfo & INFO_COLS) || (finfo & INFO_TABLE)) {
             cst **temp;
 
@@ -1045,7 +1044,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
               *temp =
                   reinterpret_cast<cst *>(DMALLOC(sizeof(cst), TAG_TEMPORARY, "string_print: 3"));
               (*temp)->next = nullptr;
-              (*temp)->d.col = carg->u.string;
+              (*temp)->d.col = carg->u.string->c_str();
               (*temp)->pad = make_pad(&pad);
               (*temp)->size = fs;
               (*temp)->pres = (pres) ? pres : fs;
@@ -1063,7 +1062,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
               unsigned int n, len, max_len;
               const char *p1, *p2;
 
-#define TABLE carg->u.string
+#define TABLE carg->u.string->c_str()
               (*temp) =
                   reinterpret_cast<cst *>(DMALLOC(sizeof(cst), TAG_TEMPORARY, "string_print: 4"));
               (*temp)->d.tab = nullptr;
@@ -1132,7 +1131,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
               (*temp)->nocols = pres; /* heavy sigh */
               (*temp)->d.tab[0].start = TABLE;
               if (pres == 1) {
-                (*temp)->d.tab[1].start = TABLE + SVALUE_STRLEN(carg) + 1;
+                (*temp)->d.tab[1].start = TABLE + carg->u.string->size() + 1;
               } else {
                 i = 1; /* the next column number */
                 n = 0; /* the current "word" number in this
@@ -1159,11 +1158,11 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
             if (pres && pres < swidth) {
               swidth = pres;
             }
-            add_justified(carg->u.string, swidth, slen, &pad, fs, finfo,
+            add_justified(carg->u.string->c_str(), swidth, slen, &pad, fs, finfo,
                           (((format_str[fpos] != '\n') && (format_str[fpos] != '\0')) ||
                            ((finfo & INFO_ARRAY) &&
                             (nelemno < (argv + sprintf_state->cur_arg)->u.arr->size))) ||
-                              (slen && (carg->u.string[slen - 1] != '\n')));
+                              (slen && (carg->u.string->at(slen - 1) != '\n')));
           }
         } else if ((finfo & INFO_T) == INFO_T_CHAR) {
           if (carg->type != T_NUMBER) {
