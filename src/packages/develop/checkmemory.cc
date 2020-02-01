@@ -682,7 +682,9 @@ void check_all_blocks(int flag) {
 #ifdef PACKAGE_MUDLIB_STATS
     mark_mudlib_stats();
 #endif
+#ifdef PACKAGE_SOCKETS
     mark_sockets();
+#endif
 #ifdef PACKAGE_PARSER
     parser_mark_verbs();
 #endif
