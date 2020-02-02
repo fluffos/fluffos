@@ -140,7 +140,7 @@ void sig_cld(int sig) {
  restart
  */
 void sig_usr1(int sig) {
-  push_constant_string("Host machine shutting down");
+  push_string("Host machine shutting down");
   push_undefined();
   push_undefined();
   apply_master_ob(APPLY_CRASH, 3);
@@ -330,9 +330,9 @@ int driver_main(int argc, char **argv) {
        * Look at flags. ignore those already been tested.
        */
       switch (argv[i][1]) {
-        case 'f':
+        case 'f': {
           debug_message("Calling master::flag(\"{}\")...\n", argv[i] + 2);
-          push_constant_string(argv[i] + 2);
+          push_string(argv[i] + 2);
           auto ret = safe_apply_master_ob(APPLY_FLAG, 1);
           if (ret == (svalue_t *)-1 || ret == nullptr || MudOS_is_being_shut_down) {
             debug_message("Shutdown by master object.\n");
