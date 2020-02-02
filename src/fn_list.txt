@@ -134,3 +134,8 @@ int write_bytes(const char *, int, const char *, int)   |   int write_bytes(cons
 int tail(char *)                                        |   int tail(std::string)
 int file_size(const char *)                             |   int file_size(const std::string)
 int copy_file(const char *, const char *)               |   int copy_file(const std::string, const std::string)
+
+packages/ops/parse.cc:
+int parse(const char *, svalue_t *, const char *,       |   int parse(const std::string, svalue_t *, const std::string,
+        svalue_t *, int)                                |           svalue_t *, int)
+

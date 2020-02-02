@@ -9,10 +9,6 @@
 
     add gnulib modules
 
-## packages/core/file.cc ##
-- complete rewrite
-    - check for global vars (make them at least thread-local)
-
 # Major #
 ## complete source ##
 - check for package dependencies
@@ -27,7 +23,14 @@
 - needs probably rewrite (from first look not reentrant!)
 - doesn't compile with ```#define RECEIVE_ED``` (for how long?)
 
+## packages/core/file.cc ##
+- complete rewrite
+    - check for global vars (make them at least thread-local)
+
 ## packages/core/sprintf.cc ##
+- reimplement using std::string
+
+## packages/ops/parse.cc ##
 - reimplement using std::string
 
 ## efun::\*, compiler & vm ##
@@ -88,9 +91,6 @@
     - rename? there are different kind of string differences...
 
 ## packages/core/efun_main.cc ##
-- reimplement:
-    - ```efun::process_string(string)```
-    - ```efun::process_value(string)```
 - switch to std::regexp
 
 ## packages/core/file.cc ##
