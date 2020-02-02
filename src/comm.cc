@@ -489,7 +489,7 @@ static int shadow_catch_message(object_t *ob, const char *str) {
     ob = ob->shadowed;
   }
   while (ob->shadowing) {
-    copy_and_push_string(str);
+    push_string(str);
     if (apply(APPLY_CATCH_TELL, ob, 1, ORIGIN_DRIVER))
     /* this will work, since we know the */
     /* function is defined */
@@ -530,25 +530,25 @@ void add_message(object_t *who, const std::string data) {
     case PORT_ASCII:
     case PORT_TELNET: {
       // Handle charset transcoding
-      auto transdata = const_cast<char *>(data);
+      char *transdata = const_cast<char*>(data.c_str());
       auto translen = len;
 
       if (ip->trans) {
         UErrorCode error_code = U_ZERO_ERROR;
 
-        auto required = ucnv_fromAlgorithmic(ip->trans, UConverterType::UCNV_UTF8, nullptr, 0, data,
+        auto required = ucnv_fromAlgorithmic(ip->trans, UConverterType::UCNV_UTF8, nullptr, 0, data.c_str(),
                                              len, &error_code);
         if (error_code == U_BUFFER_OVERFLOW_ERROR) {
           translen = required;
-          transdata = (char *)DMALLOC(translen, TAG_TEMPORARY, "add_message (translate)");
+          transdata = static_cast<char *>(DMALLOC(translen, TAG_TEMPORARY, "add_message (translate)"));
 
           error_code = U_ZERO_ERROR;
-          auto written = ucnv_fromAlgorithmic(ip->trans, UConverterType::UCNV_UTF8, transdata,
-                                              translen, data, len, &error_code);
+          auto written [[gnu::unused]] = ucnv_fromAlgorithmic(ip->trans, UConverterType::UCNV_UTF8, transdata,
+                                              translen, data.c_str(), len, &error_code);
           DEBUG_CHECK(written != translen, "Bug: translation buffer size calculation error");
           if (U_FAILURE(error_code)) {
             debug_message("add_message: Translation failed!");
-            transdata = const_cast<char *>(data);
+            transdata = const_cast<char*>(data.c_str());
             translen = len;
           };
         }
@@ -558,16 +558,16 @@ void add_message(object_t *who, const std::string data) {
       if (ip->connection_type == PORT_TELNET) {
         telnet_send_text(ip->telnet, transdata, translen);
       } else {
-        bufferevent_write(ip->ev_buffer, data, len);
+        bufferevent_write(ip->ev_buffer, data.c_str(), len);
       }
 
-      if (transdata != data) {
+      if (transdata != data.c_str()) {
         FREE(transdata);
       }
     } break;
     case PORT_WEBSOCKET: {
       if (ip->iflags & HANDSHAKE_COMPLETE) {
-        websocket_send_text(ip->lws, data, len);
+        websocket_send_text(ip->lws, data.c_str(), len);
       } else {
         debug_message("User hasn't completed websocket upgrade! can't send message.\n");
       }
@@ -575,7 +575,7 @@ void add_message(object_t *who, const std::string data) {
     }
     default: {
       inet_volume += len;
-      bufferevent_write(ip->ev_buffer, data, len);
+      bufferevent_write(ip->ev_buffer, data.c_str(), len);
       break;
     }
   }
@@ -763,7 +763,7 @@ void get_user_data(interactive_t *ip) {
           ip->text[ip->text_end] = 0;
           if (restore_svalue(ip->text + 4, &value) == 0) {
             STACK_INC;
-            *sp = value;
+            assign_svalue(sp, &value);
           } else {
             push_undefined();
           }
@@ -789,11 +789,11 @@ void get_user_data(interactive_t *ip) {
         }
 
         if (!(ip->ob->flags & O_DESTRUCTED)) {
-          char *str;
+          char *str {new char[nl-p]};
 
-          str = new_string(nl - p, "PORT_ASCII");
           memcpy(str, p, nl - p + 1);
-          push_malloced_string(str);
+          push_string(str);
+          delete[] str;
           safe_apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
         }
 
@@ -1045,7 +1045,7 @@ static void process_input(interactive_t *ip, char *user_command) {
    * support for things like command history and mud shell
    * programming languages.
    */
-  copy_and_push_string(user_command);
+  push_string(user_command);
   ret = apply(APPLY_PROCESS_INPUT, command_giver, 1, ORIGIN_DRIVER);
   if (!IP_VALID(ip, command_giver)) {
     return;
@@ -1060,7 +1060,7 @@ static void process_input(interactive_t *ip, char *user_command) {
   if (ret->type == T_STRING) {
     static char buf[MAX_TEXT];
 
-    strncpy(buf, ret->u.string, MAX_TEXT - 1);
+    strncpy(buf, ret->u.string->c_str(), MAX_TEXT - 1);
     parse_command(buf, command_giver);
   } else {
     if (ret->type != T_NUMBER || !ret->u.number) {
@@ -1108,7 +1108,7 @@ int process_user_command(interactive_t *ip) {
   if ((ip->iflags & USING_MXP) && user_command[0] == ' ' && user_command[1] == '[' &&
       user_command[3] == 'z') {
     svalue_t *ret;
-    copy_and_push_string(user_command);
+    push_string(user_command);
 
     ret = safe_apply(APPLY_MXP_TAG, ip->ob, 1, ORIGIN_DRIVER);
     if (ret && ret->type == T_NUMBER && ret->u.number) {
@@ -1279,7 +1279,7 @@ void remove_interactive(object_t *ob, int dested) {
 static int call_function_interactive(interactive_t *i, char *str) {
   object_t *ob;
   funptr_t *funp;
-  char *function;
+  std::string function;
   svalue_t *args;
   sentence_t *sent;
   int num_arg;
@@ -1328,15 +1328,14 @@ static int call_function_interactive(interactive_t *i, char *str) {
   /* we put the function on the stack in case of an error */
   STACK_INC;
   if (sent->flags & V_FUNCTION) {
-    function = nullptr;
+    function = "";
     sp->type = T_FUNCTION;
     sp->u.fp = funp = sent->function.f;
     funp->hdr.ref++;
   } else {
     sp->type = T_STRING;
     sp->subtype = STRING_SHARED;
-    sp->u.string = function = sent->function.s;
-    ref_string(function);
+    sp->u.string = function = *(sent->function.s);
   }
   ob = sent->ob;
 
@@ -1380,7 +1379,7 @@ static int call_function_interactive(interactive_t *i, char *str) {
     set_localecho(i, true);
   }
 
-  copy_and_push_string(str);
+  push_string(str);
   /*
    * If we have args, we have to push them onto the stack in the order they
    * were in when we got them.  They will be popped off by the called
@@ -1391,7 +1390,7 @@ static int call_function_interactive(interactive_t *i, char *str) {
     FREE(args);
   }
   /* current_object no longer set */
-  if (function) {
+  if (!function.empty()) {
     if (function[0] == APPLY___INIT_SPECIAL_CHAR) {
       error("Illegal function name.\n");
     }
@@ -1441,11 +1440,11 @@ static void print_prompt(interactive_t *ip) {
 #endif
     /* give user object a chance to write its own prompt */
     if (!(ip->iflags & HAS_WRITE_PROMPT)) {
-      tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
+      tell_object(ip->ob, ip->prompt);
     }
 #ifdef OLD_ED
     else if (ip->ed_buffer) {
-      tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
+      tell_object(ip->ob, ip->prompt);
     }
 #endif
     else if (!apply(APPLY_WRITE_PROMPT, ip->ob, 0, ORIGIN_DRIVER)) {
@@ -1453,7 +1452,7 @@ static void print_prompt(interactive_t *ip) {
         return;
       }
       ip->iflags &= ~HAS_WRITE_PROMPT;
-      tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
+      tell_object(ip->ob, ip->prompt);
     }
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
   }
@@ -1474,10 +1473,11 @@ static void receive_snoop(const char *buf, int len, object_t *snooper) {
   if (CONFIG_INT(__RC_RECEIVE_SNOOP__)) {
     char *str;
 
-    str = new_string(len, "receive_snoop");
+    str = new char[len];
     memcpy(str, buf, len);
     str[len] = 0;
-    push_malloced_string(str);
+    push_string(str);
+    delete[] str;
     apply(APPLY_RECEIVE_SNOOP, snooper, 1, ORIGIN_DRIVER);
   } else {
     /* snoop output is now % in all cases */
