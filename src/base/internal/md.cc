@@ -26,7 +26,6 @@ unsigned int hiwater = 0L;
 
 void MDmalloc(md_node_t *node, int size, int tag, const char *desc) {
   unsigned long h;
-  static int count = 0;
 
   assert(size > 0);
 
