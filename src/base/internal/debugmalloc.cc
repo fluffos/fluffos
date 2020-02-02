@@ -7,8 +7,8 @@
 
 #include "debugmalloc.h"
 
+#include "base/std.h"
 #include "base/internal/md.h"      // for md_node_t, MDmalloc, etc
-#include "base/internal/outbuf.h"  // for outbuf_addv, outbuf_add, etc
 
 // Would have been provided somewhere.
 void fatal(const char *, ...);
@@ -94,12 +94,12 @@ void dump_malloc_data(outbuffer_t *ob) {
 
   net = stats.alloc_calls - stats.free_calls;
   outbuf_add(ob, "using debug malloc:\n\n");
-  outbuf_addv(ob, "total malloc'd:   %10lu\n", total_malloced);
-  outbuf_addv(ob, "high water mark:  %10lu\n", hiwater);
-  outbuf_addv(ob, "overhead:         %10lu\n",
-              (MD_TABLE_SIZE * sizeof(md_node_t *)) + (net * MD_OVERHEAD));
-  outbuf_addv(ob, "#alloc calls:     %10lu\n", stats.alloc_calls);
-  outbuf_addv(ob, "#free calls:      %10lu\n", stats.free_calls);
-  outbuf_addv(ob, "#alloc - #free:   %10lu\n", net);
-  outbuf_addv(ob, "#realloc calls:   %10lu\n", stats.realloc_calls);
+  outbuf_add(ob, "total malloc'd:   {:10}\n", total_malloced);
+  outbuf_add(ob, "high water mark:  {:10}\n", hiwater);
+  outbuf_add(ob, "overhead:         {:10}\n",
+             (MD_TABLE_SIZE * sizeof(md_node_t *)) + (net * MD_OVERHEAD));
+  outbuf_add(ob, "#alloc calls:     {:10}\n", stats.alloc_calls);
+  outbuf_add(ob, "#free calls:      {:10}\n", stats.free_calls);
+  outbuf_add(ob, "#alloc - #free:   {:10}\n", net);
+  outbuf_add(ob, "#realloc calls:   {:10}\n", stats.realloc_calls);
 }
