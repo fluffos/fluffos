@@ -47,7 +47,7 @@ static inline void on_telnet_data(const char *buffer, unsigned long size, intera
     if (error_code == U_BUFFER_OVERFLOW_ERROR) {
       error_code = U_ZERO_ERROR;
       transdata = (char *)DMALLOC(translen, TAG_TEMPORARY, "on_telnet_data: transcoding");
-      auto written = ucnv_toAlgorithmic(UConverterType::UCNV_UTF8, ip->trans, transdata, translen,
+      auto written [[gnu::unused]] = ucnv_toAlgorithmic(UConverterType::UCNV_UTF8, ip->trans, transdata, translen,
                                         buffer, size, &error_code);
       DEBUG_CHECK(written != translen, "Bug: translation buffer size calculation error");
       if (U_FAILURE(error_code)) {
@@ -284,22 +284,26 @@ static inline void on_telnet_subnegotiation(unsigned char cmd, const char *buf, 
     }
     case TELNET_TELOPT_GMCP: {
       // We need to make sure the string will be NULL-termed.
-      char *str = new_string(size, "telnet gmcp");
+      char *str {new char[size]};
       str[size] = '\0';
       strncpy(str, buf, size);
 
-      push_malloced_string(str);
+      push_string(str);
+      delete[] str;
+
       safe_apply(APPLY_GMCP, ip->ob, 1, ORIGIN_DRIVER);
       break;
     }
     default: {
       // translate NUL to 'I', apparently
-      char *str = new_string(size, "telnet suboption");
+      char *str {new char[size]};
       str[size] = '\0';
       for (int i = 0; i < size; i++) {
         str[i] = (buf[i] ? buf[i] : 'I');
       }
-      push_malloced_string(str);
+      push_string(str);
+      delete[] str;
+
       safe_apply(APPLY_TELNET_SUBOPTION, ip->ob, 1, ORIGIN_DRIVER);
       break;
     }
@@ -319,12 +323,12 @@ static inline void on_telnet_environ(const struct telnet_environ_t *values, unsi
     sprintf(buf, "%d%s%d%s", ENV_FILLER, values[i].var, 1, values[i].value);
     str.append(buf);
   }
-  copy_and_push_string(str.c_str());
+  push_string(str.c_str());
   safe_apply(APPLY_RECEIVE_ENVIRON, ip->ob, 1, ORIGIN_DRIVER);
 }
 
 static inline void on_telnet_ttype(const char *name, interactive_t *ip) {
-  copy_and_push_string(name);
+  push_string(name);
   safe_apply(APPLY_TERMINAL_TYPE, ip->ob, 1, ORIGIN_DRIVER);
 }
 
