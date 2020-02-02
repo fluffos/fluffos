@@ -1,10 +1,41 @@
 void do_tests() {
     string src = "This is a test";
 
+    ASSERT(replace_string("aaaaaa", "aa", "x") == "xxx");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 1) == "xaaaa");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 2) == "xxaa");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 3) == "xxx");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 4) == "xxx");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 0, 0) == "xxx");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 0, 1) == "xaaaa");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 0, 2) == "xxaa");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 0, 3) == "xxx");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 0, 4) == "xxx");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 1, 0) == "xxx");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 1, 1) == "xaaaa");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 1, 2) == "xxaa");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 1, 3) == "xxx");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 1, 4) == "xxx");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 2, 0) == "aaxx");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 2, 1) == "aaaaaa");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 2, 2) == "aaxaa");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 2, 3) == "aaxx");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 2, 4) == "aaxx");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 3, 0) == "aaaax");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 3, 1) == "aaaaaa");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 3, 2) == "aaaaaa");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 3, 3) == "aaaax");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 3, 4) == "aaaax");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 4, 0) == "aaaaaa");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 4, 1) == "aaaaaa");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 4, 2) == "aaaaaa");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 4, 3) == "aaaaaa");
+    ASSERT(replace_string("aaaaaa", "aa", "x", 4, 4) == "aaaaaa");
+
     for (int i = 0; i < 2; i++) {
 	ASSERT(replace_string(src, "", "bar") == src);
 	ASSERT(replace_string(src, "foo", "bar", 5, 4) == src);
-    
+
 	// case 1: rlen <= plen, plen > 1, rlen > 0
 	ASSERT(replace_string(src, "is", "x") == "Thx x a test");
 	ASSERT(replace_string(src, "is", "x", 1) == "Thx is a test");
