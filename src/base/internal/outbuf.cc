@@ -3,6 +3,7 @@
 #include <cstdarg>  // for va_*
 #include <cstring>  // for strlen
 #include <cstdio>   // for vsnprintf
+#include <iostream>
 
 #include "base/internal/rc.h"        // for CONFIG_*
 #include "base/internal/log.h"       // for DEBUG_*
@@ -65,7 +66,7 @@ void outbuf_add_internal(outbuffer_t *outbuf, const std::string format, fmt::for
     }
     catch(const std::exception &e) {
         buf = std::string("BUG! driver[outbuf_add_internal]: ") + e.what() + "\nFormatstring: \"" + format + "\"\n";
-        std::cerr << deb_buf;
+        std::cerr << buf;
     }
 
     l = buf.size();

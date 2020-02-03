@@ -1,6 +1,10 @@
 #ifndef _OUTBUF_H_
 #define _OUTBUF_H_
 
+#include <cstddef>
+#include <string>
+#include "fmt/format.h"
+
 struct outbuffer_t {
   size_t real_size;
   char *buffer;
