@@ -6,6 +6,19 @@
 #endif
 #include <unistd.h>
 #include <chrono>
+#ifdef TIME_WITH_SYS_TIME
+#include <sys/time.h>
+#include <time.h>
+#else
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#else
+#include <time.h>
+#endif
+#endif
+
+#include "fmt/format.h"
+#include "fmt/chrono.h"
 
 // Returns a pseudo-random number in the range 0 .. n-1
 int64_t random_number(int64_t n) {
@@ -35,10 +48,9 @@ time_t get_current_time() {
     return std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 }
 
-std::string time_string(time_t t) {
-    std::time_t t {std::time(nullptr)};
+std::string time_string(time_t t = std::time(nullptr)) {
 
-    return fmt::format("%c", *std::localtime(&t));
+    return fmt::format("{:%c}", *std::localtime(&t));
 }
 
 /*
