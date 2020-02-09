@@ -201,7 +201,8 @@ int32_t u8_strncpy(uint8_t *dest, const uint8_t *src, const int32_t maxlen) {
  * Non-zero if lead byte E0..EF and first trail byte 00..FF start a valid sequence.
  * @internal
  */
-#define U8_IS_VALID_LEAD3_AND_T1(lead, t1) (U8_LEAD3_T1_BITS[(lead)&0xf]&(1<<((uint8_t)(t1)>>5)))
+#define U8_IS_VALID_LEAD3_AND_T1(lead, t1) \
+  (U8_LEAD3_T1_BITS[(lead)&0xf] & (1 << ((uint8_t)(t1) >> 5)))
 
 /**
  * Internal bit vector for 4-byte UTF-8 validity check, for use in U8_IS_VALID_LEAD4_AND_T1.
@@ -218,7 +219,8 @@ int32_t u8_strncpy(uint8_t *dest, const uint8_t *src, const int32_t maxlen) {
  * Non-zero if lead byte F0..F4 and first trail byte 00..FF start a valid sequence.
  * @internal
  */
-#define U8_IS_VALID_LEAD4_AND_T1(lead, t1) (U8_LEAD4_T1_BITS[(uint8_t)(t1)>>4]&(1<<((lead)&7)))
+#define U8_IS_VALID_LEAD4_AND_T1(lead, t1) \
+  (U8_LEAD4_T1_BITS[(uint8_t)(t1) >> 4] & (1 << ((lead)&7)))
 
 /**
  * If the string ends with a UTF-8 byte sequence that is valid so far
