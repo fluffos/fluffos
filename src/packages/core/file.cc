@@ -393,7 +393,7 @@ char *read_file(const char *file, int start, int lines) {
     return nullptr;
   }
 
-  char* ptr_end = (char*) theBuff + total_bytes_read;
+  char *ptr_end = (char *)theBuff + total_bytes_read;
 
   if (lines > 0) {
     // continue searching forward for "lines" of '\n'
@@ -407,7 +407,7 @@ char *read_file(const char *file, int start, int lines) {
 
   // Truncate result to read_file_max_size
   if (ptr_end > ptr_start + read_file_max_size) {
-    ptr_end = (char *) ptr_start + read_file_max_size;
+    ptr_end = (char *)ptr_start + read_file_max_size;
   }
 
   *ptr_end = '\0';
