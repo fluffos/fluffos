@@ -13,12 +13,7 @@
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif
-#ifdef HAVE_SYS_RESOURCE_H
-#include <sys/resource.h>
-#endif
-#ifdef HAVE_SYS_RUSAGE_H
-#include <sys/rusage.h>
-#endif
+
 #include <unistd.h>  // for rmdir(), FIXME
 
 #include "packages/core/call_out.h"
@@ -3498,17 +3493,18 @@ void f_localtime(void) {
 
 #ifdef F_RUSAGE
 void f_rusage(void) {
-#ifdef HAVE_SYS_RUSAGE_H
-  struct rusage rus;
   mapping_t *m;
-  long usertime, stime, maxrss;
+  struct rusage rus = {};
 
   if (getrusage(RUSAGE_SELF, &rus) < 0) {
     m = allocate_mapping(0);
   } else {
+    uint64_t usertime, stime, maxrss;
+
     usertime = rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_usec / 1000;
     stime = rus.ru_stime.tv_sec * 1000 + rus.ru_stime.tv_usec / 1000;
     maxrss = rus.ru_maxrss;
+
     m = allocate_mapping(16);
     add_mapping_pair(m, "utime", usertime);
     add_mapping_pair(m, "stime", stime);
@@ -3528,10 +3524,5 @@ void f_rusage(void) {
     add_mapping_pair(m, "nivcsw", rus.ru_nivcsw);
   }
   push_refed_mapping(m);
-#else
-  mapping_t *m;
-  m = allocate_mapping(16);
-  push_refed_mapping(m);
-#endif
 }
 #endif
