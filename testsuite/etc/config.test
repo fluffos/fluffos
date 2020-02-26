@@ -16,7 +16,7 @@ external_port_2: websocket 4001
 websocket http dir : ../src/www
 
 # Restrict IP binding, if omitted, bind to all addresses.
-mud ip : 127.0.0.1
+mud ip : 0.0.0.0
 
 # absolute pathname of mudlib
 mudlib directory : ./
