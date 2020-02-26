@@ -307,6 +307,7 @@ set(SRC
   "base/internal/outbuf.cc"
   "base/internal/port.cc"
   "base/internal/rc.cc"
+  "base/internal/rusage.cc"
   "base/internal/stats.cc"
   "base/internal/stralloc.cc"
   "base/internal/strput.cc"

@@ -154,6 +154,8 @@
 
 #include "base/internal/port.h"
 
+#include "base/internal/rusage.h"
+
 #include "base/internal/rc.h"
 
 #include "base/internal/stats.h"

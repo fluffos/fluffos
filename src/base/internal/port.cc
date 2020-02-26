@@ -1,9 +1,9 @@
+#include "base/internal/rc.h"
+
+#include "base/internal/rusage.h"
 #include "config.h"
 
 #include <random>
-#ifdef HAVE_SYS_RESOURCE_H
-#include <sys/resource.h>
-#endif
 #ifdef TIME_WITH_SYS_TIME
 #include <sys/time.h>
 #include <time.h>
@@ -62,7 +62,6 @@ void get_usec_clock(long *sec, long *usec) {
 }
 
 long get_cpu_times(unsigned long *secs, unsigned long *usecs) {
-#ifndef _WIN32
   struct rusage rus;
 
   if (getrusage(RUSAGE_SELF, &rus) < 0) {
@@ -70,10 +69,7 @@ long get_cpu_times(unsigned long *secs, unsigned long *usecs) {
   }
   *secs = rus.ru_utime.tv_sec + rus.ru_stime.tv_sec;
   *usecs = rus.ru_utime.tv_usec + rus.ru_stime.tv_usec;
-#else
-  *secs = 0;
-  *usecs = 0;
-#endif
+
   return 1;
 }
 
