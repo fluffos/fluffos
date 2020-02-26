@@ -235,7 +235,6 @@ array_t *explode_string(const char *str, int slen, const char *del, int len) {
   /* return an array of length strlen(str) -w- one character per element */
   if (len == 0) {
     sz = 1;
-    auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
     if (slen > max_array_size) {
       slen = max_array_size;
