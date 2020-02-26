@@ -1,7 +1,6 @@
 void do_tests() {
   mapping info = rusage();
 
-  // These two fields are guaranteed to exists.
+  // stime and utime are guaranteed to exists, however stime maybe zero.
   ASSERT_NE(info["utime"], 0);
-  ASSERT_NE(info["stime"], 0);
 }
