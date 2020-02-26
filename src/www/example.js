@@ -4,8 +4,7 @@
  * @returns {Boolean}
  */
 function isMobile() {
-  var userAgent = navigator.userAgent || navigator.vendor || window.opera;
-
+  const userAgent = navigator.userAgent || navigator.vendor || window.opera;
   // Windows Phone must come first because its UA also contains "Android"
   if (/windows phone/i.test(userAgent)) {
     return true;
@@ -31,7 +30,7 @@ const term = new Terminal({
   scrollback: 1024,
   tabStopWidth: 4,
   fontFamily: 'SFMono-Regular,Consolas,Liberation Mono,Menlo,monospace, "Microsoft YaHei", SimSun',
-  fontSize: screen.width > 500 ? WebFontSize : MobileFontSize
+  fontSize: isMobile() ?  MobileFontSize: WebFontSize
 });
 
 const unicode11Addon = new Unicode11Addon.Unicode11Addon();
@@ -78,22 +77,29 @@ function new_ws(urlpath, protocol) {
   return new WebSocket(urlpath, protocol);
 }
 
-
-window.addEventListener('scroll', function(e) {
-  window.scrollTo(0,0);
-  e.preventDefault();
-  e.stopPropagation();
-});
-
 document.addEventListener("DOMContentLoaded", function () {
   const el_container = document.getElementById('container');
   const el_terminal = document.getElementById('terminal');
   const el_input = document.getElementById('command');
 
+  window.addEventListener('scroll', function(e) {
+    window.scrollTo(0,0);
+    fitAddon.fit();
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
+  window.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
   if(isMobile()) {
     el_container.style.height = "50vh";
+    fitAddon.fit();
   } else {
-    el_container.style.height = "100vh";
+    el_container.style.height = $(window).height();
+    fitAddon.fit();
   }
 
   el_input.setAttribute("disabled", "disabled");
