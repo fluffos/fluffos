@@ -600,34 +600,62 @@ static void add_justified(const char *str, int swidth, int slen, pad_info_t *pad
  * Returns 2 if column completed has a \n at the end.
  */
 static int add_column(cst **column, int trailing) {
-  unsigned int done;
-  char c;
-  int space = -1;
   int ret;
   cst *col = *column;             /* always holds (*column) */
   const char *col_d = col->d.col; /* always holds (col->d.col) */
 
-  done = 0;
-  /* find a good spot to break the line */
-  while ((c = col_d[done]) && c != '\n') {
-    if (c == ' ') {
-      space = done;
+  int char_index = 0;
+  unsigned int total_width = 0;
+
+  // the breakpoint index
+  int break_index = -1;
+  // total width at breakponint
+  unsigned int break_width = 0;
+
+  UChar32 c = 0;
+  U8_NEXT(col_d, char_index, -1, c);
+
+  /* find a good spot (space) to break the line */
+  while (c > 0) {
+    total_width += u8_charwidth(c);
+    // If we found '\n' break right away
+    if (c == '\n') {
+      break_index = char_index - 1;
+      break_width = total_width;
+      break;
     }
-    if (++done == col->pres) {
-      if (space != -1) {
-        c = col_d[done];
-        if (c != '\n' && c != ' ' && c) {
-          done = space;
-        }
+    // remember possible break point.
+    if (c == ' ') {
+      break_index = char_index - 1;
+      break_width = total_width;
+    }
+    // break if we are already over width
+    if (total_width >= col->pres) {
+      // Over width and no breakpoints, break at previous point.
+      if (total_width > col->pres && break_index == -1) {
+        U8_PREV(col_d, 0, char_index, c);
+        break_index = char_index;
+        break_width = total_width - u8_charwidth(c);
       }
       break;
     }
+    U8_NEXT(col_d, char_index, -1, c);
   }
-  // TODO: Support UTF-8
-  int swidth = done;
-  add_justified(col_d, swidth, done, col->pad, col->size, col->info, trailing || col->next);
-  col_d += done;
+  // If we don't know breakpoint, use current point for break
+  if (break_index == -1) {
+    if (c == 0) {
+      break_index = char_index - 1;
+    } else {
+      break_index = char_index;
+    }
+    break_width = total_width;
+  }
+  add_justified(col_d, break_width, break_index, col->pad, col->size, col->info, trailing || col->next);
+  col_d += break_index;
   ret = 1;
+  // Eat the space if break
+  if (*col_d == ' ') col_d ++;
+
   if (*col_d == '\n') {
     col_d++;
     ret = 2;
@@ -637,7 +665,7 @@ static int add_column(cst **column, int trailing) {
    * if the next character is a NULL then take this column out of
    * the list.
    */
-  if (!(*col_d)) {
+  if (*col_d == '\0') {
     cst *temp;
 
     temp = col->next;
