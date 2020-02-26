@@ -5,14 +5,14 @@
   <meta charset="utf-8">
   <title>FluffOS v2019</title>
   <meta name="description" content="">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui" />
 
   <link rel="stylesheet" href="normalize.css"/>
   <link rel="stylesheet" href="xterm.css"/>
   <style>
     html, body {
-      position:relative;
-      overflow:hidden;
+      height: 100%;
+      overflow: hidden;
     }
   </style>
 
@@ -20,15 +20,16 @@
   <script src="xterm-addon-attach.min.js"></script>
   <script src="xterm-addon-unicode11.min.js"></script>
   <script src="xterm-addon-fit.min.js"></script>
+  <script src="jquery.min.js"></script>
   <script src="example.js"></script>
 </head>
 <body>
 <!--[if IE]>
 <p class="browserupgrade">You are using an <strong>outdated</strong> browser. Please <a href="https://browsehappy.com/">upgrade your browser</a> to improve your experience and security.</p>
 <![endif]-->
-<div id="container" style="height: 100%">
-  <div id="terminal" style="height: 100%"></div>
-  <input id="command" style="width: 97vw" />
+<div id="container" style="position:relative; display: flex; flex-direction: column; height: 100vh; margin: 0; padding: 0;">
+  <div id="terminal" style="flex: 1"></div>
+  <input id="command" style="height: 15px; width: 97vw" />
 </div>
 </body>
 
