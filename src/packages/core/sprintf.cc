@@ -55,6 +55,8 @@
 
 #include "packages/core/sprintf.h"
 
+#include <unicode/brkiter.h>
+
 #if defined(F_SPRINTF) || defined(F_PRINTF)
 
 typedef unsigned int format_info;
@@ -368,11 +370,20 @@ void svalue_to_string(svalue_t *obj, outbuffer_t *outbuf, int indent, int traili
         outbuf_add(outbuf, "})");
       }
       break;
-#ifndef NO_BUFFER_TYPE
     case T_BUFFER:
-      outbuf_add(outbuf, "<buffer>");
+      outbuf_add(outbuf, "BUFFER ( /* sizeof() == ");
+      outbuf_addv(outbuf, "%d", obj->u.buf->size);
+      outbuf_add(outbuf, " */\n");
+      for (i = 0; i < (obj->u.buf->size) - 1; i++) {
+        add_space(outbuf, indent + 2);
+        outbuf_addv(outbuf, "0x%hhx,\n", (char)obj->u.buf->item[i]);
+      }
+      add_space(outbuf, indent + 2);
+      outbuf_addv(outbuf, "0x%hhx", (char)obj->u.buf->item[i]);
+      outbuf_add(outbuf, "\n");
+      add_space(outbuf, indent);
+      outbuf_add(outbuf, ")");
       break;
-#endif
     case T_FUNCTION: {
       object_t *ob;
 
@@ -591,34 +602,98 @@ static void add_justified(const char *str, int swidth, int slen, pad_info_t *pad
  * Returns 2 if column completed has a \n at the end.
  */
 static int add_column(cst **column, int trailing) {
-  unsigned int done;
-  char c;
-  int space = -1;
   int ret;
   cst *col = *column;             /* always holds (*column) */
   const char *col_d = col->d.col; /* always holds (col->d.col) */
 
-  done = 0;
-  /* find a good spot to break the line */
-  while ((c = col_d[done]) && c != '\n') {
-    if (c == ' ') {
-      space = done;
+  unsigned int total_width = 0;
+  // point to the next character after the break.
+  int break_index = -1;
+  // total width at breakponint
+  unsigned int break_width = 0;
+  // if we are now finished with the current string
+  bool finished = false;
+
+  UErrorCode status = U_ZERO_ERROR;
+  int32_t pos = -1;
+
+  std::unique_ptr<icu::BreakIterator> brk(
+      icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status));
+  if (!U_SUCCESS(status)) {
+    fatal("Unable to create break iterator!");
+  }
+
+  status = U_ZERO_ERROR;
+  UText text = UTEXT_INITIALIZER;
+  utext_openUTF8(&text, col_d, -1, &status);
+  if (!U_SUCCESS(status)) {
+    utext_close(&text);
+    fatal("add_column: Unable to create break iterator!");
+  }
+
+  status = U_ZERO_ERROR;
+  brk->setText(&text, status);
+  if (!U_SUCCESS(status)) {
+    utext_close(&text);
+    fatal("Unable to create break iterator!");
+  }
+
+  pos = brk->first();
+
+  /* find a good spot (space) to break the line */
+  while (pos != icu::BreakIterator::DONE) {
+    char c = col_d[pos];
+    // If we found '\n' break right away
+    // remember possible break point.
+    if (c == '\n') {
+      break_index = pos;
+      break_width = total_width;
+      break;
     }
-    if (++done == col->pres) {
-      if (space != -1) {
-        c = col_d[done];
-        if (c != '\n' && c != ' ' && c) {
-          done = space;
-        }
+    // Remember possible break point
+    if (c == ' ') {
+      break_index = pos;
+      break_width = total_width;
+    }
+    // break if we are now at or over width
+    if (total_width >= col->pres) {
+      // if already overwidth and have breakpoints, break at previous point.
+      if (total_width > col->pres && break_index != -1) {
+        break;
+      } else {
+        // break at current point;
+        break_index = pos;
+        break_width = total_width;
       }
       break;
     }
+    // Try next character
+    auto next_pos = brk->next();
+    DEBUG_CHECK(next_pos == icu::BreakIterator::DONE, "Non NULL Terminated string detected!");
+    total_width += u8_width(col_d + pos, next_pos - pos);
+    if (col_d[next_pos] == 0) {
+      pos = next_pos;
+      finished = true;
+      break;
+    }
+    pos = next_pos;
   }
-  // TODO: Support UTF-8
-  int swidth = done;
-  add_justified(col_d, swidth, done, col->pad, col->size, col->info, trailing || col->next);
-  col_d += done;
+
+  utext_close(&text);
+
+  // If we don't know breakpoint, use current point for break
+  if (break_index == -1) {
+    break_index = pos;
+    break_width = total_width;
+  }
+
+  add_justified(col_d, break_width, break_index, col->pad, col->size, col->info,
+                trailing || col->next);
+  col_d += break_index;
   ret = 1;
+  // Eat the space if break
+  if (*col_d == ' ') col_d++;
+
   if (*col_d == '\n') {
     col_d++;
     ret = 2;
@@ -628,7 +703,7 @@ static int add_column(cst **column, int trailing) {
    * if the next character is a NULL then take this column out of
    * the list.
    */
-  if (!(*col_d)) {
+  if (finished) {
     cst *temp;
 
     temp = col->next;
@@ -1016,7 +1091,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
           } else if (carg->type != T_STRING) {
             SPRINTF_ERROR(ERR_INCORRECT_ARG_S);
           }
-          int swidth = u8_width(carg->u.string);
+          int swidth = u8_width(carg->u.string, -1);
           int slen = SVALUE_STRLEN(carg);
           if ((finfo & INFO_COLS) || (finfo & INFO_TABLE)) {
             cst **temp;
@@ -1173,7 +1248,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
           temp[4] = 0;
 
           int tmpl = strlen(temp);
-          int swidth = u8_width(temp);
+          int swidth = u8_width(temp, -1);
 
           add_justified(
               temp, swidth, tmpl, &pad, fs, finfo,
@@ -1265,7 +1340,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
           }
           {
             int tmpl = strlen(temp);
-            int swidth = u8_width(temp);
+            int swidth = u8_width(temp, -1);
 
             add_justified(temp, swidth, tmpl, &pad, fs, finfo,
                           (((format_str[fpos] != '\n') && (format_str[fpos] != '\0')) ||

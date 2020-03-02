@@ -319,7 +319,6 @@ int find_new_socket() {
  */
 int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *close_callback) {
   int type, i, fd;
-#ifndef NO_BUFFER_TYPE
   int binary = 0;
 
   if (mode == STREAM_BINARY) {
@@ -329,7 +328,6 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
     binary = 1;
     mode = DATAGRAM;
   }
-#endif
   switch (mode) {
     case MUD:
     case STREAM:
@@ -396,11 +394,9 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
     set_write_callback(i, nullptr);
     set_close_callback(i, close_callback);
 
-#ifndef NO_BUFFER_TYPE
     if (binary) {
       lpc_socks[i].flags |= S_BINARY;
     }
-#endif
     lpc_socks[i].mode = mode;
     lpc_socks[i].state = STATE_UNBOUND;
     lpc_socks[i].owner_ob = current_object;
@@ -780,7 +776,6 @@ int socket_write(int fd, svalue_t *message, const char *name) {
       debug(sockets, "socket_write: sending tcp message to %s\n",
             sockaddr_to_string((struct sockaddr *)&lpc_socks[fd].r_addr, lpc_socks[fd].r_addrlen));
       switch (message->type) {
-#ifndef NO_BUFFER_TYPE
         case T_BUFFER:
           len = message->u.buf->size;
           if (len == 0) {
@@ -793,7 +788,6 @@ int socket_write(int fd, svalue_t *message, const char *name) {
           }
           memcpy(buf, message->u.buf->item, len);
           break;
-#endif
         case T_STRING:
           len = SVALUE_STRLEN(message);
           if (len == 0) {
@@ -855,7 +849,6 @@ int socket_write(int fd, svalue_t *message, const char *name) {
           }
           break;
 
-#ifndef NO_BUFFER_TYPE
         case T_BUFFER:
           if ((off = sendto(lpc_socks[fd].fd, reinterpret_cast<char *>(message->u.buf->item),
                             message->u.buf->size, 0, reinterpret_cast<struct sockaddr *>(&addr),
@@ -865,7 +858,6 @@ int socket_write(int fd, svalue_t *message, const char *name) {
             return EESENDTO;
           }
           break;
-#endif
 
         default:
           return EETYPENOTSUPP;
@@ -1023,8 +1015,7 @@ void socket_read_select_handler(int fd) {
             }
           }
           push_number(fd);
-#ifndef NO_BUFFER_TYPE
-          if (lpc_socks[fd].flags & S_BINARY) {
+          if (lpc_socks[fd].flags & S_BINARY || !u8_validate(buf)) {
             buffer_t *b;
 
             b = allocate_buffer(cc);
@@ -1035,11 +1026,9 @@ void socket_read_select_handler(int fd) {
               push_number(0);
             }
           } else {
-#endif
+            u8_sanitize(buf);
             copy_and_push_string(buf);
-#ifndef NO_BUFFER_TYPE
           }
-#endif
           copy_and_push_string(addr);
           debug(sockets, ("read_socket_handler: apply\n"));
           call_callback(fd, S_READ_FP, 3);
@@ -1154,7 +1143,6 @@ void socket_read_select_handler(int fd) {
           debug(sockets, "read_socket_handler: read %d bytes\n", cc);
           buf[cc] = '\0';
           push_number(fd);
-#ifndef NO_BUFFER_TYPE
           if (lpc_socks[fd].flags & S_BINARY) {
             buffer_t *b;
 
@@ -1167,11 +1155,9 @@ void socket_read_select_handler(int fd) {
               push_number(0);
             }
           } else {
-#endif
+            u8_sanitize(buf);
             copy_and_push_string(buf);
-#ifndef NO_BUFFER_TYPE
           }
-#endif
           debug(sockets, ("read_socket_handler: apply read callback\n"));
           call_callback(fd, S_READ_FP, 2);
           return;

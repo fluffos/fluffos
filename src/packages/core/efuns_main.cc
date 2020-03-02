@@ -13,12 +13,7 @@
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif
-#ifdef HAVE_SYS_RESOURCE_H
-#include <sys/resource.h>
-#endif
-#ifdef HAVE_SYS_RUSAGE_H
-#include <sys/rusage.h>
-#endif
+
 #include <unistd.h>  // for rmdir(), FIXME
 
 #include "packages/core/call_out.h"
@@ -1232,13 +1227,11 @@ void f_member_array(void) {
             break;
           }
           continue;
-#ifndef NO_BUFFER_TYPE
         case T_BUFFER:
           if (find->u.buf == sv->u.buf) {
             break;
           }
           continue;
-#endif
         default:
           if (sv->type == T_OBJECT && (sv->u.ob->flags & O_DESTRUCTED)) {
             assign_svalue(sv, &const0u);
@@ -1725,6 +1718,7 @@ void f_read_bytes(void) {
   if (str == nullptr) {
     push_number(0);
   } else {
+    u8_sanitize(str);
     push_malloced_string(str);
   }
 }
@@ -1791,6 +1785,7 @@ void f_read_file(void) {
   if (!str) {
     push_svalue(&const0);
   } else {
+    u8_sanitize(str);
     push_malloced_string(str);
   }
 }
@@ -1809,16 +1804,13 @@ void f_receive(void) {
       add_message(current_object, sp->u.string, len);
     }
     free_string_svalue(sp--);
-  }
-#ifndef NO_BUFFER_TYPE
-  else {
+  } else {
     if (current_object->interactive) {
       add_message(current_object, reinterpret_cast<char *>(sp->u.buf->item), sp->u.buf->size);
     }
 
     free_buffer((sp--)->u.buf);
   }
-#endif
 }
 #endif
 
@@ -2492,12 +2484,10 @@ void f_sizeof(void) {
       i = sp->u.map->count;
       free_mapping(sp->u.map);
       break;
-#ifndef NO_BUFFER_TYPE
     case T_BUFFER:
       i = sp->u.buf->size;
       free_buffer(sp->u.buf);
       break;
-#endif
     case T_STRING: {
       auto success = u8_egc_count(sp->u.string, &i);
       DEBUG_CHECK(!success, "Invalid UTF8 string!");
@@ -2967,7 +2957,6 @@ void f__to_int(void) {
       sp->type = T_NUMBER;
       break;
     }
-#ifndef NO_BUFFER_TYPE
     case T_BUFFER:
       if (sp->u.buf->size < sizeof(int)) {
         free_buffer(sp->u.buf);
@@ -2980,7 +2969,6 @@ void f__to_int(void) {
         free_buffer(sp->u.buf);
         put_number(hostint);
       }
-#endif
   }
 }
 #endif
@@ -3099,13 +3087,11 @@ void f_write_bytes(void) {
       break;
     }
 
-#ifndef NO_BUFFER_TYPE
     case T_BUFFER: {
       i = write_bytes((sp - 2)->u.string, (sp - 1)->u.number,
                       reinterpret_cast<char *>(sp->u.buf->item), sp->u.buf->size);
       break;
     }
-#endif
 
     case T_STRING: {
       i = write_bytes((sp - 2)->u.string, (sp - 1)->u.number, sp->u.string, SVALUE_STRLEN(sp));
@@ -3113,11 +3099,7 @@ void f_write_bytes(void) {
     }
 
     default: {
-#ifdef NO_BUFFER_TYPE
-      bad_argument(sp, T_STRING | T_NUMBER, 3, F_WRITE_BYTES);
-#else
       bad_argument(sp, T_BUFFER | T_STRING | T_NUMBER, 3, F_WRITE_BYTES);
-#endif
     }
   }
   free_svalue(sp--, "f_write_bytes");
@@ -3511,17 +3493,18 @@ void f_localtime(void) {
 
 #ifdef F_RUSAGE
 void f_rusage(void) {
-#ifdef HAVE_SYS_RUSAGE_H
-  struct rusage rus;
   mapping_t *m;
-  long usertime, stime, maxrss;
+  struct rusage rus = {};
 
   if (getrusage(RUSAGE_SELF, &rus) < 0) {
     m = allocate_mapping(0);
   } else {
+    uint64_t usertime, stime, maxrss;
+
     usertime = rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_usec / 1000;
     stime = rus.ru_stime.tv_sec * 1000 + rus.ru_stime.tv_usec / 1000;
     maxrss = rus.ru_maxrss;
+
     m = allocate_mapping(16);
     add_mapping_pair(m, "utime", usertime);
     add_mapping_pair(m, "stime", stime);
@@ -3541,10 +3524,5 @@ void f_rusage(void) {
     add_mapping_pair(m, "nivcsw", rus.ru_nivcsw);
   }
   push_refed_mapping(m);
-#else
-  mapping_t *m;
-  m = allocate_mapping(16);
-  push_refed_mapping(m);
-#endif
 }
 #endif

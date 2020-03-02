@@ -18,6 +18,7 @@
  * v1.0.2: define array keyword for LDMud & use it consistently
  * v1.0.3: fix for empty data structures
  * v1.0.4: Removed array keyword. (Yucong Sun)
+ * v1.0.5: Fix decoding number 0.
  *
  * LICENSE
  *
@@ -71,6 +72,19 @@ private void json_decode_parse_next_line(mixed* parse) {
     parse[JSON_DECODE_PARSE_POS]++;
     parse[JSON_DECODE_PARSE_LINE]++;
     parse[JSON_DECODE_PARSE_CHAR] = 1;
+}
+
+private void json_decode_skip_whitespaces(mixed* parse) {
+    int ch;
+    while(1) {
+      json_decode_parse_next_char(parse);
+      ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
+      if (ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t') {
+        continue;
+      } else {
+        return ;
+      }
+    }
 }
 
 private int json_decode_hexdigit(int ch) {
@@ -308,26 +322,43 @@ private varargs mixed json_decode_parse_string(mixed* parse, int initiator_check
         if(strsrch(out, "\\t") != -1)
             out = replace_string(out, "\\t", "\t");
         if(strsrch(out, "\\u") != -1) {
-            string* parts = explode(out, "\\u");
-            int entries = sizeof(parts) * 2 - 1;
-            string* proc = allocate(entries);
-            int i, j;
-            proc[0] = parts[0];
-            for(i = 1, j = sizeof(parts); i < j; i++) {
-                string part = parts[i];
-                int* nybbles = allocate(4);
-                int* bytes = allocate(2);
-                for(int k = 0; k < 4; k++)
-                    if((nybbles[k] = json_decode_hexdigit(part[k])) == -1)
-                        json_decode_parse_error(parse, "Invalid hex digit", part[k]);
-                bytes[0] = (nybbles[0] << 4) | nybbles[1];
-                bytes[1] = (nybbles[2] << 4) | nybbles[3];
-                if(member_array(0, bytes) != -1)
-                    bytes -= ({ 0 });
-                proc[i * 2 - 1] = sprintf("%@c", bytes);
-                proc[i * 2] = part[4..];
+          for (int i = 0; i< strlen(out); i++) {
+            if (out[i] == '\\' && out[i+1] == 'u') {
+              int* nybbles = allocate(4);
+              int character = 0;
+              i += 2;
+              for(int k = 0; k < 4; k++) {
+                if((nybbles[k] = json_decode_hexdigit(out[i + k])) == -1)
+                  json_decode_parse_error(parse, "Invalid hex digit", out[i + k]);
+              }
+              character = (nybbles[0] << 12) | (nybbles[1] << 8 )| (nybbles[2] << 4) | nybbles[3];
+              // Single codepoint character
+              if (!(((character)&0xfffff800)==0xd800)) {
+                i -= 2;
+                out[i .. i + 2 + 4 - 1] = sprintf("%c", character);
+                i = 0;
+                continue;
+              } else {
+                // UTF16 - Surrogate, attempts to parse the second value
+                int codepoint;
+                int next_character = 0;
+                int* nybbles2 = allocate(4);
+                i += 4;
+                if (out[i .. i+1] != "\\u") json_decode_parse_error(parse, "Invalid string, missing surrogate pair");
+                i += 2;
+                for(int k = 0; k < 4; k++) {
+                  if((nybbles2[k] = json_decode_hexdigit(out[i + k])) == -1)
+                    json_decode_parse_error(parse, "Invalid hex digit", out[i + k]);
+                }
+                next_character = (nybbles2[0] << 12) | (nybbles2[1] << 8) | (nybbles2[2] << 4) | (nybbles2[3]);
+                i -= 2 + 4 + 2; // reset to first \u
+                codepoint = 0x10000 + (character - 0xd800) * 0x400 + (next_character - 0xDC00);
+                out[i .. i + 2 + 4 + 2 + 4 - 1] = sprintf("%c", codepoint);
+                i = 0;
+                continue;
+              }
             }
-            out = implode(proc, "");
+          }
         }
         if(member_array('/', out) != -1)
             out = replace_string(out, "\\/", "/");
@@ -342,29 +373,40 @@ private mixed json_decode_parse_number(mixed* parse) {
     int to = -1;
     int dot = -1;
     int exp = -1;
-    int first_ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
     int ch;
+    int next_ch;
     string number;
-    switch(first_ch) {
-    case '-'            :
-        {
-            int next_ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS] + 1];
-            if(next_ch != '0')
-                break;
-            json_decode_parse_next_char(parse);
-        }
-        // Fallthrough
-    case '0'            :
+
+    ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
+    if (ch == '-') {
+        next_ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS] + 1];
+        if(!next_ch) json_decode_parse_error(parse, "Unexpected end of data");
+        if(next_ch < '0' || next_ch > '9')
+            json_decode_parse_error(parse, "Unexpected character", next_ch);
         json_decode_parse_next_char(parse);
-        ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
-        if(ch) {
-            if(ch != '.')
-                json_decode_parse_error(parse, "Unexpected character", ch);
-            dot = parse[JSON_DECODE_PARSE_POS];
-        }
-        break;
     }
-    json_decode_parse_next_char(parse);
+
+    ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
+    if (ch == '0') {
+        // 0 can only either be an direct int value 0, or 0e or 0E
+        next_ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS] + 1];
+        // 0 before EOF
+        if(next_ch == 0) {
+          json_decode_parse_next_char(parse);
+          return 0;
+        }
+        // only valid char here are .eE, continue parse
+        if (next_ch == '.' || next_ch == 'e' || next_ch == 'E') {
+          json_decode_parse_next_char(parse);
+        } else {
+          // consume until next non-whitespace
+          json_decode_skip_whitespaces(parse);
+          next_ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
+          // can not continue to be number.
+          if ((next_ch >= '0' && next_ch <= '9') || next_ch == '-') json_decode_parse_error(parse, "Unexpected character", next_ch);
+          return 0;
+        }
+    }
     while(to == -1) {
         ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
         switch(ch) {

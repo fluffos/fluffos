@@ -6,6 +6,15 @@
 inherit "/inherit/master/valid";
 
 nosave int has_error = 0;
+nosave string last_error = "";
+
+public string clear_last_error() {
+  last_error = "";
+}
+
+public string get_last_error() {
+  return last_error;
+}
 
 void flag(string str) {
   mixed error;
@@ -252,6 +261,7 @@ staticf void error_handler(mapping map, int flag) {
       implode(map_array(map["trace"],
           (: sprintf("Line: %O  File: %O Object: %O Program: %O", $1["line"], $1["file"], $1["object"] || "No object", $1["program"] ||
                      "No program") :)), "\n"));
+  last_error = str;
   write_file("/log/log", str);
   if (!flag && ob) tell_object(ob, str);
 }

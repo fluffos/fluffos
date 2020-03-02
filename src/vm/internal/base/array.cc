@@ -235,7 +235,6 @@ array_t *explode_string(const char *str, int slen, const char *del, int len) {
   /* return an array of length strlen(str) -w- one character per element */
   if (len == 0) {
     sz = 1;
-    auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
     if (slen > max_array_size) {
       slen = max_array_size;
@@ -733,10 +732,8 @@ int sameval(svalue_t *arg1, svalue_t *arg2) {
       return arg1->u.fp == arg2->u.fp;
     case T_REAL:
       return arg1->u.real == arg2->u.real;
-#ifndef NO_BUFFER_TYPE
     case T_BUFFER:
       return arg1->u.buf == arg2->u.buf;
-#endif
   }
   return 0;
 }

@@ -27,6 +27,21 @@ bool u8_validate(const uint8_t *s, size_t len) {
   return state == UTF8_ACCEPT;
 }
 
+void u8_sanitize(char *src) {
+  int total = strlen(src);
+  int32_t src_offset = 0;
+  int32_t written = 0;
+  UChar32 c = -1;
+  U8_NEXT(src, src_offset, -1, c);
+  while (c != 0) {
+    UBool isError = FALSE;
+    U8_APPEND((uint8_t *)src, written, total, c > 0 ? c : 0xfffd, isError);
+    if (isError == TRUE) break;
+
+    U8_NEXT((uint8_t *)src, src_offset, -1, c);
+  }
+}
+
 bool u8_egc_count(const char *src, size_t *count) {
   UErrorCode status = U_ZERO_ERROR;
   size_t total = 0;
@@ -99,7 +114,7 @@ UChar32 u8_egc_index_as_single_codepoint(const char *src, int32_t index) {
   auto next_pos = brk->next();
   if (next_pos >= 0) {
     if (next_pos - pos <= U8_MAX_LENGTH) {
-      U8_NEXT((const uint8_t*) src, pos, -1, res);
+      U8_NEXT((const uint8_t *)src, pos, -1, res);
     }
   }
 
@@ -172,6 +187,42 @@ int32_t u8_strncpy(uint8_t *dest, const uint8_t *src, const int32_t maxlen) {
 // From ICU 61
 #ifndef U8_TRUNCATE_IF_INCOMPLETE
 /**
+ * Internal bit vector for 3-byte UTF-8 validity check, for use in U8_IS_VALID_LEAD3_AND_T1.
+ * Each bit indicates whether one lead byte + first trail byte pair starts a valid sequence.
+ * Lead byte E0..EF bits 3..0 are used as byte index,
+ * first trail byte bits 7..5 are used as bit index into that byte.
+ * @see U8_IS_VALID_LEAD3_AND_T1
+ * @internal
+ */
+#define U8_LEAD3_T1_BITS "\x20\x30\x30\x30\x30\x30\x30\x30\x30\x30\x30\x30\x30\x10\x30\x30"
+
+/**
+ * Internal 3-byte UTF-8 validity check.
+ * Non-zero if lead byte E0..EF and first trail byte 00..FF start a valid sequence.
+ * @internal
+ */
+#define U8_IS_VALID_LEAD3_AND_T1(lead, t1) \
+  (U8_LEAD3_T1_BITS[(lead)&0xf] & (1 << ((uint8_t)(t1) >> 5)))
+
+/**
+ * Internal bit vector for 4-byte UTF-8 validity check, for use in U8_IS_VALID_LEAD4_AND_T1.
+ * Each bit indicates whether one lead byte + first trail byte pair starts a valid sequence.
+ * First trail byte bits 7..4 are used as byte index,
+ * lead byte F0..F4 bits 2..0 are used as bit index into that byte.
+ * @see U8_IS_VALID_LEAD4_AND_T1
+ * @internal
+ */
+#define U8_LEAD4_T1_BITS "\x00\x00\x00\x00\x00\x00\x00\x00\x1E\x0F\x0F\x0F\x00\x00\x00\x00"
+
+/**
+ * Internal 4-byte UTF-8 validity check.
+ * Non-zero if lead byte F0..F4 and first trail byte 00..FF start a valid sequence.
+ * @internal
+ */
+#define U8_IS_VALID_LEAD4_AND_T1(lead, t1) \
+  (U8_LEAD4_T1_BITS[(uint8_t)(t1) >> 4] & (1 << ((lead)&7)))
+
+/**
  * If the string ends with a UTF-8 byte sequence that is valid so far
  * but incomplete, then reduce the length of the string to end before
  * the lead byte of that incomplete sequence.
@@ -231,7 +282,7 @@ size_t u8_truncate(const uint8_t *src, size_t len) {
 }
 
 // Total width of characters(grapheme cluster). Also adjust for east asain full width characters
-size_t u8_width(const char *src) {
+size_t u8_width(const char *src, int len) {
   size_t total = 0;
   int32_t src_offset = 0;
 
@@ -239,8 +290,11 @@ size_t u8_width(const char *src) {
   UChar32 prev = 0;
   for (;;) {
     prev = c;
-    U8_NEXT(src, src_offset, -1, c);
+    U8_NEXT(src, src_offset, len, c);
+
+    // Treat invalid codpoints as replacement chars
     if (c < 0) c = 0xfffd;
+
     if (c == 0) break;
     if (c == 0x200d || prev == 0x200d) {  // zwj, skip the next character
       continue;
@@ -251,6 +305,7 @@ size_t u8_width(const char *src) {
     } else if (width == widechar_ambiguous) {
       total += 2;
     }
+    if (len > 0 && src_offset >= len) break;
   }
   return total;
 }

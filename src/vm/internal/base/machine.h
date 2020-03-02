@@ -64,10 +64,8 @@ void copy_and_push_string(const char *);
 void share_and_push_string(const char *);
 void push_array(array_t *);
 void push_refed_array(array_t *);
-#ifndef NO_BUFFER_TYPE
 void push_buffer(buffer_t *);
 void push_refed_buffer(buffer_t *);
-#endif
 void push_mapping(mapping_t *);
 void push_refed_mapping(mapping_t *);
 void push_class(array_t *);
