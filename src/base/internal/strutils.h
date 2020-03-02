@@ -111,8 +111,8 @@ void u8_copy_and_replace_codepoint_at(const char *src, char *dst, int32_t index,
 int32_t u8_egc_index_to_offset(const char *src, int32_t index);
 int32_t u8_strncpy(uint8_t *, const uint8_t *, const int32_t);
 size_t u8_truncate(const uint8_t *, size_t);
-size_t u8_charwidth(const UChar32 c);
-size_t u8_width(const char *src);
+// Return display width for string piece, len could be -1 for NULL terminated string.
+size_t u8_width(const char *src, int len);
 void u8_sanitize(char *src);
 
 #endif  // STRUTILS_H
