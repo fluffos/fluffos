@@ -281,21 +281,8 @@ size_t u8_truncate(const uint8_t *src, size_t len) {
   return res;
 }
 
-size_t u8_charwidth(const UChar32 c) {
-  if (c == 0x200d) {  // zwj, skip the next character
-    return 0;
-  }
-  auto width = widechar_wcwidth(c);
-  if (width > 0) {
-    return width;
-  } else if (width == widechar_ambiguous) {
-    return 2;
-  }
-  return 0;
-}
-
 // Total width of characters(grapheme cluster). Also adjust for east asain full width characters
-size_t u8_width(const char *src) {
+size_t u8_width(const char *src, int len) {
   size_t total = 0;
   int32_t src_offset = 0;
 
@@ -303,8 +290,11 @@ size_t u8_width(const char *src) {
   UChar32 prev = 0;
   for (;;) {
     prev = c;
-    U8_NEXT(src, src_offset, -1, c);
+    U8_NEXT(src, src_offset, len, c);
+
+    // Treat invalid codpoints as replacement chars
     if (c < 0) c = 0xfffd;
+
     if (c == 0) break;
     if (c == 0x200d || prev == 0x200d) {  // zwj, skip the next character
       continue;
@@ -315,6 +305,7 @@ size_t u8_width(const char *src) {
     } else if (width == widechar_ambiguous) {
       total += 2;
     }
+    if (len > 0 && src_offset >= len) break;
   }
   return total;
 }
