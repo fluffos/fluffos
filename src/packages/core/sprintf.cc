@@ -534,30 +534,6 @@ static void add_nstr(const char *str, int len) {
  */
 static void add_justified(const char *str, int swidth, int slen, pad_info_t *pad, int fs,
                           format_info finfo, short int trailing) {
-  // Strip ANSI codes from input string.
-  // https://en.wikipedia.org/wiki/ANSI_escape_code#Colors
-  // format is "\x1b[X;Ym"
-  if (CONFIG_INT(__RC_SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__)) {
-    const char *str_a;
-    for (str_a = str; str_a - str < slen;) {
-      if (*str_a == '\x1B') {
-        str_a++;
-        fs++;
-
-        if (*str_a++ == '[') {
-          fs++;
-          while (isdigit(*str_a) || *str_a == ';') {
-            str_a++;
-            fs++;
-          }
-          str_a++;
-          fs++;
-        }
-        continue;
-      }
-      str_a++;
-    }
-  }
   fs -= swidth;
   if (fs <= 0) {
     add_nstr(str, slen);
@@ -643,8 +619,36 @@ static int add_column(cst **column, int trailing) {
   /* find a good spot (space) to break the line */
   while (pos != icu::BreakIterator::DONE) {
     char c = col_d[pos];
+
+    // Skip over ansi code
+    if (CONFIG_INT(__RC_SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__)) {
+      while (c == '\x1B') {
+        pos = brk->next();
+        c = col_d[pos];
+        if (c == '[') {
+          pos = brk->next();
+          c = col_d[pos];
+          while (c == ';' || isdigit(c)) {
+            pos = brk->next();
+            c = col_d[pos];
+          }
+          if (c == 'm') {
+            pos = brk->next();
+            c = col_d[pos];
+          }
+        }
+      }
+    }
+
+    // No more?
+    if (c == '\0') {
+      finished = true;
+      break_index = pos;
+      break_width = total_width;
+      break;
+    }
+
     // If we found '\n' break right away
-    // remember possible break point.
     if (c == '\n') {
       break_index = pos;
       break_width = total_width;
@@ -655,6 +659,7 @@ static int add_column(cst **column, int trailing) {
       break_index = pos;
       break_width = total_width;
     }
+
     // break if we are now at or over width
     if (total_width >= col->pres) {
       // if already overwidth and have breakpoints, break at previous point.
@@ -667,9 +672,15 @@ static int add_column(cst **column, int trailing) {
       }
       break;
     }
+
     // Try next character
     auto next_pos = brk->next();
     DEBUG_CHECK(next_pos == icu::BreakIterator::DONE, "Non NULL Terminated string detected!");
+    // skip over ansi code
+    if (col_d[next_pos] == '\x1b') {
+      pos = next_pos;
+      continue;
+    }
     total_width += u8_width(col_d + pos, next_pos - pos);
     if (col_d[next_pos] == 0) {
       pos = next_pos;
