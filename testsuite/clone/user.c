@@ -1,4 +1,4 @@
-// mudlib:   Lil 
+// mudlib:   Lil
 // file:     user.c
 // purpose:  is the representation of an interactive (user) in the MUD
 
@@ -229,4 +229,10 @@ reconnect()
     tell_room(environment(), "Reconnected.\n");
     tell_room(environment(), query_name() + " has reconnected.\n");
 #endif
+}
+
+// receive_environ
+void receive_environ(string var, string value) {
+  string msg = sprintf("TELNET ENV received: %s=%s\n", var, value);
+  receive(msg);
 }
