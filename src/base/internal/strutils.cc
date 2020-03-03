@@ -1,11 +1,13 @@
+#include "base/internal/strutils.h"
+
+#include "base/internal/rc.h"
+
 #include <cctype>
 #include <string.h>
 #include <unicode/brkiter.h>
 
 #include "thirdparty/utf8_decoder_dfa/decoder.h"
 #include "thirdparty/widecharwidth/widechar_width.h"
-
-#include "strutils.h"
 
 // Addition by Yucong Sun
 
@@ -294,11 +296,31 @@ size_t u8_width(const char *src, int len) {
 
     // Treat invalid codpoints as replacement chars
     if (c < 0) c = 0xfffd;
-
     if (c == 0) break;
     if (c == 0x200d || prev == 0x200d) {  // zwj, skip the next character
       continue;
     }
+
+    // ignoring ANSI codes when calculating display width
+    // https://en.wikipedia.org/wiki/ANSI_escape_code#Colors
+    // format is "\x1b[X;Ym"
+    if (CONFIG_INT(__RC_SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__)) {
+      if (c == 0x1B) {
+        auto p = src + src_offset;
+        auto end = (len > 0) ? src + len : nullptr;
+        if (p != end && *p == '[') {
+          p++;
+          // we don't check validity here, just assume valid code
+          while (p != end && (isdigit(*p) || *p == ';')) p++;
+          if (p != end && *p == 'm') {
+            p++;
+            src_offset = p - src;
+            continue;
+          }
+        }
+      }
+    }
+
     auto width = widechar_wcwidth(c);
     if (width > 0) {
       total += width;
