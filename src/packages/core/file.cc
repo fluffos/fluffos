@@ -913,6 +913,20 @@ void f_cp(void) {
 #ifdef F_FILE_SIZE
 void f_file_size(void) {
   LPC_INT i = file_size(sp->u.string);
+
+  // cross platform fix
+#ifdef _WIN32
+  if (i == -1 && sp->u.string[SVALUE_STRLEN(sp) - 1] == '/') {
+    auto len = SVALUE_STRLEN(sp);
+    auto tmp = string_copy(sp->u.string, "f_file_size");
+    tmp[len - 1] = '\0';
+    if (file_size(tmp) == -2) {
+      i = -2;
+    }
+    FREE_MSTR(tmp);
+  }
+#endif
+
   free_string_svalue(sp);
   put_number(i);
 }
