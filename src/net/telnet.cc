@@ -309,18 +309,20 @@ static inline void on_telnet_subnegotiation(unsigned char cmd, const char *buf, 
 
 static inline void on_telnet_environ(const struct telnet_environ_t *values, unsigned long size,
                                      interactive_t *ip) {
-  static const int ENV_FILLER = 0x1e;
-
-  std::string str = "";
-
   for (int i = 0; i < size; i++) {
-    char buf[1024];
-    buf[0] = '\0';
-    sprintf(buf, "%d%s%d%s", ENV_FILLER, values[i].var, 1, values[i].value);
-    str.append(buf);
+    if (values[i].var == nullptr || values[i].value == nullptr) {
+      continue;
+    }
+    auto var = string_copy(values[i].var, "on_telnet_environ: var");
+    u8_sanitize(var);
+    push_malloced_string(var);
+
+    auto value = string_copy(values[i].value, "on_telnet_environ: value");
+    u8_sanitize(value);
+    push_malloced_string(value);
+
+    safe_apply(APPLY_RECEIVE_ENVIRON, ip->ob, 2, ORIGIN_DRIVER);
   }
-  copy_and_push_string(str.c_str());
-  safe_apply(APPLY_RECEIVE_ENVIRON, ip->ob, 1, ORIGIN_DRIVER);
 }
 
 static inline void on_telnet_ttype(const char *name, interactive_t *ip) {
@@ -386,7 +388,7 @@ void telnet_event_handler(telnet_t *telnet, telnet_event_t *ev, void *user_data)
       break;
     }
     case TELNET_EV_ENVIRON: {
-      if (ev->environ.cmd == TELNET_ENVIRON_IS) {
+      if (ev->environ.cmd == TELNET_ENVIRON_IS || ev->environ.cmd == TELNET_ENVIRON_INFO) {
         on_telnet_environ(ev->environ.values, ev->environ.size, ip);
         break;
       }
