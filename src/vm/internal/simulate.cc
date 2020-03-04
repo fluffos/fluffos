@@ -566,7 +566,7 @@ object_t *load_object(const char *lname, int callcreate) {
   restore_command_giver();
 
   if (ob) {
-    debug(d_flag, "--/%s loaded", ob->obname);
+    debug(d_flag, "--/%s loaded.\n", ob->obname);
   }
 
   ob->load_time = get_current_time();

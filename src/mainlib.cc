@@ -246,11 +246,6 @@ struct event_base *init_main(int argc, char **argv) {
   // Initialize VM layer
   vm_init();
 
-  // from lex.cc
-  debug_message("==== LPC Predefines ====\n");
-  print_all_predefines();
-  debug_message("========================\n");
-
   return base;
 }
 
@@ -312,6 +307,11 @@ int driver_main(int argc, char **argv) {
 #endif
 
   auto base = init_main(argc, argv);
+
+  // from lex.cc
+  debug_message("==== LPC Predefines ====\n");
+  print_all_predefines();
+  debug_message("========================\n");
 
   // Make sure mudlib dir is correct.
   if (chdir(CONFIG_STR(__MUD_LIB_DIR__)) == -1) {
