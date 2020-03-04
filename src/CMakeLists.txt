@@ -292,7 +292,6 @@ set(GENERATRED_GRAMMAR_FILES
 set(SRC
   "backend.cc"
   "comm.cc"
-  "main.cc"
   "mainlib.cc"
   "user.cc"
   "net/telnet.cc"
@@ -313,6 +312,7 @@ set(SRC
   "base/internal/strput.cc"
   "base/internal/strutils.cc"
   "compiler/internal/compiler.cc"
+  "compiler/internal/disassembler.cc"
   "compiler/internal/generate.cc"
   "compiler/internal/icode.cc"
   "compiler/internal/lex.cc"
@@ -354,41 +354,40 @@ add_library(autogen ${GENERATED_HEADERS} ${GENERATRED_SOURCE}
   ${GENERATRED_GRAMMAR_FILES})
 add_dependencies(autogen make_options_defs)
 
-add_executable(driver
+add_library(libdriver
   ${SRC} ${SRC_HEADER}
   )
 
-target_link_libraries(driver PRIVATE ghc_filesystem)
+target_link_libraries(libdriver PUBLIC ghc_filesystem)
 
-target_link_libraries(driver PUBLIC autogen)
+target_link_libraries(libdriver PUBLIC autogen)
 
 add_subdirectory(packages) # provides FLUFFOS_PACKAGES
 message(STATUS "ALL PACKAGES: ${FLUFFOS_PACKAGES}")
 foreach (PACKAGE ${FLUFFOS_PACKAGES})
   # TODO: packages files currently depenends on generated headers, so they must be built after driver
   add_dependencies("${PACKAGE}" autogen)
-  target_link_libraries(driver PUBLIC "${PACKAGE}")
+  target_link_libraries(libdriver PUBLIC "${PACKAGE}")
 endforeach ()
 
 add_subdirectory(thirdparty/crypt)
-target_link_libraries(driver PRIVATE crypt)
+target_link_libraries(libdriver PUBLIC crypt)
 
 # DTRACE support
 if (ENABLE_DTRACE)
   message(STATUS "DTRACE Support: ON")
   add_subdirectory(tracing)
-  target_link_libraries(driver PRIVATE tracing)
+  target_link_libraries(libdriver PUBLIC tracing)
 endif ()
 
-target_link_libraries(driver PRIVATE ${LIBWEBSOCKETS_LIBRARIES_STATIC})
+target_link_libraries(libdriver PUBLIC ${LIBWEBSOCKETS_LIBRARIES_STATIC})
 # Third party libraries
 add_subdirectory(thirdparty/libtelnet EXCLUDE_FROM_ALL)
-target_link_libraries(driver PUBLIC libtelnet)
+target_link_libraries(libdriver PUBLIC libtelnet)
 
-target_link_libraries(driver PUBLIC ${ICU_LIBRARIES})
+target_link_libraries(libdriver PUBLIC ${ICU_LIBRARIES})
 
 add_subdirectory(thirdparty/backward-cpp EXCLUDE_FROM_ALL)
-add_backward(driver)
 
 # JEMALLOC
 if (CYGWIN)
@@ -404,29 +403,29 @@ if (USE_JEMALLOC)
   find_package(jemalloc REQUIRED)
   set(HAVE_JEMALLOC TRUE) # used in config.h.in
   include_directories(SYSTEM ${JEMALLOC_INCLUDE_DIR})
-  target_link_libraries(driver PRIVATE ${JEMALLOC_LIBRARIES})
+  target_link_libraries(libdriver PUBLIC ${JEMALLOC_LIBRARIES})
 endif ()
 # end of JEMALLOC
 
 # libevent
-target_link_libraries(driver PUBLIC ${LIBEVENT_LIBRARIES})
+target_link_libraries(libdriver PUBLIC ${LIBEVENT_LIBRARIES})
 
 # Platform Libraries
 
 # Winsocks
 IF (WIN32)
-  target_link_libraries(driver PRIVATE ws2_32)
+  target_link_libraries(libdriver PUBLIC ws2_32)
 ENDIF ()
 
 if(NOT WIN32)
   find_package(Threads REQUIRED)
-  target_link_libraries(driver PRIVATE Threads::Threads)
+  target_link_libraries(libdriver PUBLIC Threads::Threads)
 endif()
 
 include(CheckLibraryExists)
 CHECK_LIBRARY_EXISTS(rt clock_gettime "time.h" HAVE_CLOCK_GETTIME_IN_RT)
 if (HAVE_CLOCK_GETTIME_IN_RT)
-  target_link_libraries(driver PRIVATE rt)
+  target_link_libraries(libdriver PUBLIC rt)
 endif ()
 
 # GTEST
@@ -434,12 +433,26 @@ endif ()
 #enable_testing()
 #gtest_discover_tests(driver)
 
+set(LINK_WHOLE_ARCHIVE -Wl,--whole-archive)
+set(LINK_NO_WHOLE_ARCHIVE -Wl,--no-whole-archive)
+if (APPLE)
+  set(LINK_WHOLE_ARCHIVE -Wl,-force_load)
+  set(LINK_NO_WHOLE_ARCHIVE "")
+endif()
+
+add_executable(driver "main.cc")
+target_link_libraries(driver PUBLIC ${LINK_WHOLE_ARCHIVE} libdriver ${LINK_NO_WHOLE_ARCHIVE})
+add_backward(driver) # Must apply to executable
+
+add_executable(lpcc "main_lpcc.cc")
+target_link_libraries(lpcc PUBLIC ${LINK_WHOLE_ARCHIVE} libdriver ${LINK_NO_WHOLE_ARCHIVE})
+
 include(helper)
 
 message("Final Compile Flags: ")
 print_target_properties(driver)
 
-install(TARGETS driver
+install(TARGETS driver lpcc
   RUNTIME DESTINATION bin)
 
 # LPC stdlib files
