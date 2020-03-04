@@ -28,6 +28,8 @@
 #include "compiler/internal/icode.h"
 
 // APIs to LPC programs
+#include "compiler/internal/disassembler.h"
+
 #include "include/localtime.h"
 #ifdef PACKAGE_PARSER
 #include "include/parser_error.h"
