@@ -113,6 +113,8 @@ int32_t u8_strncpy(uint8_t *, const uint8_t *, const int32_t);
 size_t u8_truncate(const uint8_t *, size_t);
 // Return display width for string piece, len could be -1 for NULL terminated string.
 size_t u8_width(const char *src, int len);
+void u8_truncate_below_width(const char *src, size_t len, size_t max_width, bool break_before_space,
+                             bool always_break_before_newline, size_t *out_len, size_t *out_width);
 void u8_sanitize(char *src);
 
 #endif  // STRUTILS_H

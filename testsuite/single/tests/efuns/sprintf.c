@@ -221,6 +221,9 @@ void do_tests() {
     hmm = sprintf("%#-20s\n", "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\nk\nl\no\n");
     ASSERT2(hmm == "a   d   g   j   o\nb   e   h   k   \nc   f   i   l   \n", hmm);
 
+    // string truncation
+    ASSERT_EQ("very l", sprintf("%.6s", "very long string"));
+
     // https://github.com/fluffos/fluffos/issues/580
     ASSERT_EQ("\x1B", sprintf("%c", 27));
 
@@ -235,4 +238,5 @@ void do_tests() {
     ASSERT_EQ(ANSI_RED"t\ne\ns\nt"ANSI_RESET, sprintf("%-=1s", ANSI_RED "test" ANSI_RESET));
     ASSERT_EQ(ANSI_RED "" ANSI_RESET, sprintf("%-=1s", ANSI_RED "" ANSI_RESET));
 
+    ASSERT_EQ("this\nis a\nvery\nlong\nsenten\nce.", sprintf("%-=6s", "this is a very long sentence."));
 }
