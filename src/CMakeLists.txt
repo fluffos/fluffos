@@ -206,7 +206,6 @@ endif ()
 #CHECK_INCLUDE_FILES ("sys/param.h;sys/mount.h" HAVE_SYS_MOUNT_H)
 # AC_CHECK_HEADERS([arpa/inet.h fcntl.h inttypes.h limits.h locale.h netdb.h netinet/in.h stddef.h stdint.h stdlib.h string.h sys/param.h sys/socket.h sys/time.h unistd.h])
 
-
 set(GENERATED_HEADERS
   "${CMAKE_CURRENT_BINARY_DIR}/config.h"
   "${CMAKE_CURRENT_BINARY_DIR}/packages/packages.autogen.h"
@@ -260,6 +259,11 @@ add_custom_command(
   COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/build_packages_genfiles.sh" "${CMAKE_CURRENT_SOURCE_DIR}/../" "${CMAKE_CXX_COMPILER}" "-I${CMAKE_CURRENT_BINARY_DIR}" "-I${CMAKE_CURRENT_SOURCE_DIR}"
   DEPENDS "tools/build_packages_genfiles.sh" "base/internal/options_incl.h"
 )
+file(GLOB ALL_SPEC_FILES files "packages/*/*.spec")
+foreach (file ${ALL_SPEC_FILES})
+  add_custom_command(OUTPUT "packages.fullspec"
+          DEPENDS "${file}" APPEND)
+endforeach ()
 
 add_custom_command(
   OUTPUT "efuns.autogen.cc" "efuns.autogen.h"
