@@ -3526,3 +3526,12 @@ void f_rusage(void) {
   push_refed_mapping(m);
 }
 #endif
+
+#ifdef F_STRWIDTH
+void f_strwidth() {
+  auto width = u8_width(sp->u.string, -1);
+
+  pop_stack();
+  push_number(width);
+}
+#endif
