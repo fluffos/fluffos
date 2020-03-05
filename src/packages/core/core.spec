@@ -367,3 +367,5 @@ void request_term_size(void | int);
 void shutdown(void | int);
 // Get current LPC stacktrace
 mixed* dump_trace();
+// Get display width of given string
+int strwidth(string);
