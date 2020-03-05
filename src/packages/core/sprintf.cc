@@ -582,130 +582,21 @@ static int add_column(cst **column, int trailing) {
   cst *col = *column;             /* always holds (*column) */
   const char *col_d = col->d.col; /* always holds (col->d.col) */
 
-  unsigned int total_width = 0;
-  // point to the next character after the break.
-  int break_index = -1;
-  // total width at breakponint
-  unsigned int break_width = 0;
-  // if we are now finished with the current string
-  bool finished = false;
+  auto slen = strlen(col_d);
+  size_t break_width, break_len;
+  u8_truncate_below_width(col_d, slen, col->pres, true, true, &break_len, &break_width);
 
-  UErrorCode status = U_ZERO_ERROR;
-  int32_t pos = -1;
-
-  std::unique_ptr<icu::BreakIterator> brk(
-      icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status));
-  if (!U_SUCCESS(status)) {
-    fatal("Unable to create break iterator!");
-  }
-
-  status = U_ZERO_ERROR;
-  UText text = UTEXT_INITIALIZER;
-  utext_openUTF8(&text, col_d, -1, &status);
-  if (!U_SUCCESS(status)) {
-    utext_close(&text);
-    fatal("add_column: Unable to create break iterator!");
-  }
-
-  status = U_ZERO_ERROR;
-  brk->setText(&text, status);
-  if (!U_SUCCESS(status)) {
-    utext_close(&text);
-    fatal("Unable to create break iterator!");
-  }
-
-  pos = brk->first();
-
-  /* find a good spot (space) to break the line */
-  while (pos != icu::BreakIterator::DONE) {
-    char c = col_d[pos];
-
-    // Skip over ansi code
-    if (CONFIG_INT(__RC_SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__)) {
-      while (c == '\x1B') {
-        pos = brk->next();
-        c = col_d[pos];
-        if (c == '[') {
-          pos = brk->next();
-          c = col_d[pos];
-          while (c == ';' || isdigit(c)) {
-            pos = brk->next();
-            c = col_d[pos];
-          }
-          if (c == 'm') {
-            pos = brk->next();
-            c = col_d[pos];
-          }
-        }
-      }
-    }
-
-    // No more?
-    if (c == '\0') {
-      finished = true;
-      break_index = pos;
-      break_width = total_width;
-      break;
-    }
-
-    // If we found '\n' break right away
-    if (c == '\n') {
-      break_index = pos;
-      break_width = total_width;
-      break;
-    }
-    // Remember possible break point
-    if (c == ' ') {
-      break_index = pos;
-      break_width = total_width;
-    }
-
-    // break if we are now at or over width
-    if (total_width >= col->pres) {
-      // if already overwidth and have breakpoints, break at previous point.
-      if (total_width > col->pres && break_index != -1) {
-        break;
-      } else {
-        // break at current point;
-        break_index = pos;
-        break_width = total_width;
-      }
-      break;
-    }
-
-    // Try next character
-    auto next_pos = brk->next();
-    DEBUG_CHECK(next_pos == icu::BreakIterator::DONE, "Non NULL Terminated string detected!");
-    // skip over ansi code
-    if (col_d[next_pos] == '\x1b') {
-      pos = next_pos;
-      continue;
-    }
-    total_width += u8_width(col_d + pos, next_pos - pos);
-    if (col_d[next_pos] == 0) {
-      pos = next_pos;
-      finished = true;
-      break;
-    }
-    pos = next_pos;
-  }
-
-  utext_close(&text);
-
-  // If we don't know breakpoint, use current point for break
-  if (break_index == -1) {
-    break_index = pos;
-    break_width = total_width;
-  }
-
-  add_justified(col_d, break_width, break_index, col->pad, col->size, col->info,
+  add_justified(col_d, break_width, break_len, col->pad, col->size, col->info,
                 trailing || col->next);
-  col_d += break_index;
-  ret = 1;
-  // Eat the space if break
-  if (*col_d == ' ') col_d++;
 
-  if (*col_d == '\n') {
+  col_d += break_len;
+  ret = 1;
+
+  // Eat the space if break
+  if (*col_d == ' ') {
+    col_d++;
+  } else if (*col_d == '\n') {
+    // landed on an '\n'
     col_d++;
     ret = 2;
   }
@@ -714,7 +605,7 @@ static int add_column(cst **column, int trailing) {
    * if the next character is a NULL then take this column out of
    * the list.
    */
-  if (finished) {
+  if (*col_d == '\0') {
     cst *temp;
 
     temp = col->next;
@@ -744,10 +635,12 @@ static int add_table(cst **table) {
     end = tab_d[i + 1].start - tab_di - 1;
     for (done = 0; done != end && tab_di[done] != '\n'; done++)
       ;
-    // TODO: support UTF8
-    auto swidth = (done > tab->size ? tab->size : done);
-    add_justified(tab_di, swidth, (done > tab->size ? tab->size : done), tab->pad, tab->size,
-                  tab->info, tab->pad || (i < tab->nocols - 1) || tab->next);
+    size_t slen = strlen(tab_di);
+    size_t swidth;
+    u8_truncate_below_width(tab_di, slen, (done > tab->size ? tab->size : done), false, false,
+                            &slen, &swidth);
+    add_justified(tab_di, swidth, slen, tab->pad, tab->size, tab->info,
+                  tab->pad || (i < tab->nocols - 1) || tab->next);
     if (done >= end - 1) {
       tab_di = nullptr;
     } else {
@@ -1102,8 +995,6 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
           } else if (carg->type != T_STRING) {
             SPRINTF_ERROR(ERR_INCORRECT_ARG_S);
           }
-          int swidth = u8_width(carg->u.string, -1);
-          int slen = SVALUE_STRLEN(carg);
           if ((finfo & INFO_COLS) || (finfo & INFO_TABLE)) {
             cst **temp;
 
@@ -1234,8 +1125,12 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
               add_table(temp);
             }
           } else { /* not column or table */
-            if (pres && pres < swidth) {
-              swidth = pres;
+            size_t slen = SVALUE_STRLEN(carg);
+            size_t swidth;
+            if (pres) {
+              u8_truncate_below_width(carg->u.string, slen, pres, false, false, &slen, &swidth);
+            } else {
+              swidth = u8_width(carg->u.string, -1);
             }
             add_justified(carg->u.string, swidth, slen, &pad, fs, finfo,
                           (((format_str[fpos] != '\n') && (format_str[fpos] != '\0')) ||
@@ -1260,7 +1155,6 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
 
           int tmpl = strlen(temp);
           int swidth = u8_width(temp, -1);
-
           add_justified(
               temp, swidth, tmpl, &pad, fs, finfo,
               (((format_str[fpos] != '\n') && (format_str[fpos] != '\0')) ||

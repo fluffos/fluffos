@@ -309,8 +309,16 @@ void do_tests() {
   tmp = "欲穷千里目🍆🍠🧮😊👌💩更上一层楼";
   ASSERT_EQ(tmp, sprintf("%s", tmp));
   ASSERT_EQ("\"" + tmp + "\"", sprintf("%O", tmp));
+
   // truncation
-  ASSERT_EQ(tmp, sprintf("%.10s", tmp));
+  ASSERT_EQ("欲穷千里目", sprintf("%.10s", tmp));
+  ASSERT_EQ("欲穷千里目", sprintf("%.11s", tmp));
+  ASSERT_EQ("欲穷千里", sprintf("%.9s", tmp));
+  ASSERT_EQ("欲穷千里目🍆", sprintf("%.12s", tmp));
+  ASSERT_EQ(tmp, sprintf("%.99s", tmp));
+
+  // https://github.com/fluffos/fluffos/issues/590
+  ASSERT_EQ("测试ab", sprintf("%.6s","测试abcd 啊看 is abc sentence 好 不好\n"));
 
   // left, center, and right adjustment,
   // and count CJK chars and emojis as 2 width,  40 - 16 * 2 = 8
@@ -329,11 +337,11 @@ void do_tests() {
   tmp = "欲穷千里目";
   ASSERT_EQ("欲\n穷\n千\n里\n目", sprintf("%-=1s", tmp));
   ASSERT_EQ("欲\n穷\n千\n里\n目", sprintf("%-=2s", tmp));
-  ASSERT_EQ("欲穷\n千里\n目", sprintf("%-=3s", tmp));
+  ASSERT_EQ("欲\n穷\n千\n里\n目", sprintf("%-=3s", tmp));
   ASSERT_EQ("欲穷\n千里\n目", sprintf("%-=4s", tmp));
 
   tmp = "欲a穷aa千aaa里aaaa目";
-  ASSERT_EQ("欲\na穷\naa\n千\naa\na里\naa\naa\n目", sprintf("%-=2s", tmp));
+  ASSERT_EQ("欲\na\n穷\naa\n千\naa\na\n里\naa\naa\n目", sprintf("%-=2s", tmp));
   ASSERT_EQ("欲a穷\naa千a\naa里a\naaa目", sprintf("%-=5s", tmp));
 
   // column mode with breakpoints
@@ -342,6 +350,9 @@ void do_tests() {
 
   tmp = "欲穷千里目 🍆🍠🧮\n😊👌💩\n更上一层楼欲穷千里目🍆🍠🧮😊👌💩更上一层楼";
   ASSERT_EQ("欲穷千里目\n🍆🍠🧮\n😊👌💩\n更上一层楼欲\n穷千里目🍆🍠\n🧮😊👌💩更上\n一层楼", sprintf("%-=12s", tmp));
+
+  // https://github.com/fluffos/fluffos/issues/590
+  ASSERT_EQ("测试看\n啊看\nis\nabc s\nsenten\nce\n好不好", sprintf("%=-6s", "测试看 啊看 is abc s sentence 好不好"));
 
   // TODO: table mode
   // TODO: padding with utf8 chars!
