@@ -317,6 +317,8 @@ void do_tests() {
   ASSERT_EQ("欲穷千里目🍆", sprintf("%.12s", tmp));
   ASSERT_EQ(tmp, sprintf("%.99s", tmp));
 
+  ASSERT_EQ("欲穷千里目", sprintf("%1.10s", tmp));
+
   // https://github.com/fluffos/fluffos/issues/590
   ASSERT_EQ("测试ab", sprintf("%.6s","测试abcd 啊看 is abc sentence 好 不好\n"));
 
@@ -351,11 +353,190 @@ void do_tests() {
   tmp = "欲穷千里目 🍆🍠🧮\n😊👌💩\n更上一层楼欲穷千里目🍆🍠🧮😊👌💩更上一层楼";
   ASSERT_EQ("欲穷千里目\n🍆🍠🧮\n😊👌💩\n更上一层楼欲\n穷千里目🍆🍠\n🧮😊👌💩更上\n一层楼", sprintf("%-=12s", tmp));
 
+  // column mode with truncation
+  // https://github.com/fluffos/fluffos/issues/597
+  tmp = "欲穷千里目";
+  ASSERT_EQ("欲穷\n千里\n  目", sprintf("%1.4=s", tmp));
+
   // https://github.com/fluffos/fluffos/issues/590
   ASSERT_EQ("测试看\n啊看\nis\nabc s\nsenten\nce\n好不好", sprintf("%=-6s", "测试看 啊看 is abc s sentence 好不好"));
 
-  // TODO: table mode
-  // TODO: padding with utf8 chars!
+  // table mode
+  tmp = "一\n二\n三\n四\n五\n六\n七\n八\n九\n十\n甲\n乙\n丙\n丁\n戊";
+
+  // perfect case
+  ASSERT_EQ("一四七十丙\n"
+            "二五八甲丁\n"
+            "三六九乙戊",
+            sprintf("%#10.5s", tmp));
+
+  ASSERT_EQ("一六甲\n"
+            "二七乙\n"
+            "三八丙\n"
+            "四九丁\n"
+            "五十戊",
+            sprintf("%#6.3s", tmp));
+
+  // less perfect cases: not enough items
+  ASSERT_EQ("一五九丙\n"
+            "二六十丁\n"
+            "三七甲戊\n"
+            "四八乙",
+            sprintf("%#8.4s", tmp));
+  ASSERT_EQ(sprintf("%#8.4s", tmp), sprintf("%#10.4s", tmp));
+
+  ASSERT_EQ("一四七十丙  \n"
+            "二五八甲丁\n"
+            "三六九乙戊",
+            sprintf("%#12.6s", tmp));
+
+  ASSERT_EQ("一四七十丙    \n"
+            "二五八甲丁\n"
+            "三六九乙戊",
+            sprintf("%#14.7s", tmp));
+
+  ASSERT_EQ("一三五七九甲丙戊\n"
+            "二四六八十乙丁",
+            sprintf("%#16.8s", tmp));
+
+  ASSERT_EQ("一三五七九甲丙戊  \n"
+            "二四六八十乙丁",
+            sprintf("%#18.9s", tmp));
+
+  ASSERT_EQ("一三五七九甲丙戊    \n"
+            "二四六八十乙丁",
+            sprintf("%#20.10s", tmp));
+
+  ASSERT_EQ("一三五七九甲丙戊      \n"
+            "二四六八十乙丁",
+            sprintf("%#22.11s", tmp));
+
+  ASSERT_EQ("一二三四五六七八九十甲乙丙丁戊",
+            sprintf("%#30.15s", tmp));
+
+  ASSERT_EQ("一二三四五六七八九十甲乙丙丁戊",
+            sprintf("%#32.16s", tmp));
+
+  ASSERT_EQ("一九\n"
+            "二十\n"
+            "三甲\n"
+            "四乙\n"
+            "五丙\n"
+            "六丁\n"
+            "七戊\n"
+            "八",
+            sprintf("%#4.2s", tmp));
+
+  // adjustment
+  ASSERT_EQ("  一  四  七  十  丙\n"
+            "  二  五  八  甲  丁\n"
+            "  三  六  九  乙  戊",
+            sprintf("%#20.5s", tmp));
+
+  ASSERT_EQ(" 一 四 七 十 丙\n"
+            " 二 五 八 甲 丁\n"
+            " 三 六 九 乙 戊",
+            sprintf("%#19.5s", tmp));
+
+  ASSERT_EQ("  一  四  七  十  丙\n"
+            "  二  五  八  甲  丁\n"
+            "  三  六  九  乙  戊",
+            sprintf("%#21.5s", tmp));
+
+  // truncation
+  tmp = "一一\n二二\n三三\n四四\n五五\n六六\n七七\n八八\n九九\n十十\n甲甲\n乙乙\n丙丙\n丁丁\n戊戊";
+  ASSERT_EQ("一一四四七七十十丙丙\n"
+            "二二五五八八甲甲丁丁\n"
+            "三三六六九九乙乙戊戊",
+            sprintf("%#20.5s", tmp));
+
+  ASSERT_EQ(" 一 四 七 十 丙\n"
+            " 二 五 八 甲 丁\n"
+            " 三 六 九 乙 戊",
+            sprintf("%#19.5s", tmp));
+  for(int i = 18; i > 14; i--) {
+    ASSERT_EQ(sprintf("%#19.5s", tmp), sprintf("%#*.5s", i, tmp));
+  }
+
+  ASSERT_EQ("一四七十丙\n"
+            "二五八甲丁\n"
+            "三六九乙戊",
+            sprintf("%#10.5s", tmp));
+  for(int i = 14; i > 0; i--) {
+    ASSERT_EQ(sprintf("%#10.5s", tmp), sprintf("%#*.5s", i, tmp));
+  }
+
+  ASSERT_EQ("我 看 \n"
+            "测 效 ", sprintf("%#-10.3s","我说就是\n测试\n看看\n效果如何"));
+
+  // auto columns
+  // max_width = 8, fs= 8: col = 1
+  ASSERT_EQ("我说就是\n"
+            "    测试\n"
+            "    看看\n"
+            "效果如何", sprintf("%#8s","我说就是\n测试\n看看\n效果如何"));
+
+  // col = 1
+  ASSERT_EQ(" 我说就是\n"
+            "     测试\n"
+            "     看看\n"
+            " 效果如何", sprintf("%#9s","我说就是\n测试\n看看\n效果如何"));
+
+  // col = 1, with truncation
+  ASSERT_EQ(" 我说就\n"
+            "   测试\n"
+            "   看看\n"
+            " 效果如", sprintf("%#7s","我说就是\n测试\n看看\n效果如何"));
+
+  // col = 2
+  ASSERT_EQ("  我说就是      看看\n"
+            "      测试  效果如何", sprintf("%#20s","我说就是\n测试\n看看\n效果如何"));
+
+  // col = 3 will leave 1 item on next line, so back to col = 2
+  ASSERT_EQ("       我说就是           看看\n"
+            "           测试       效果如何", sprintf("%#30s","我说就是\n测试\n看看\n效果如何"));
+
+  // col = 4
+  ASSERT_EQ("  我说就是      测试      看看  效果如何", sprintf("%#40s","我说就是\n测试\n看看\n效果如何"));
+
+  // padding with utf8 chars!
+  tmp = "测试";
+  ASSERT_EQ("田田田田测试田田田田", sprintf("%'田'|20s", tmp));
+  ASSERT_EQ("测试田田田田田田田田", sprintf("%'田'-20s", tmp));
+  ASSERT_EQ("田田田田田田田田测试", sprintf("%'田'20s", tmp));
+
+  // less perfect cases
+  ASSERT_EQ(" 田田田田测试田田田田", sprintf("%'田'|21s", tmp));
+  ASSERT_EQ("测试田田田田田田田田 ", sprintf("%'田'-21s", tmp));
+  ASSERT_EQ(" 田田田田田田田田测试", sprintf("%'田'21s", tmp));
+
+  ASSERT_EQ("田田田田测试田田田 ", sprintf("%'田'|19s", tmp));
+  ASSERT_EQ("测试田田田田田田田 ", sprintf("%'田'-19s", tmp));
+  ASSERT_EQ(" 田田田田田田田测试", sprintf("%'田'19s", tmp));
+
+  ASSERT_EQ(" 田田田田测试田田田田 ", sprintf("%'田'|22s", tmp));
+  ASSERT_EQ("测试田田田田田田田田田", sprintf("%'田'-22s", tmp));
+  ASSERT_EQ("田田田田田田田田田测试", sprintf("%'田'22s", tmp));
+
+  // complex pad string with truncations
+  ASSERT_EQ("aa田baa田测试aa田baa田", sprintf("%'aa田b'|22s", tmp));
+  ASSERT_EQ("测试aa田baa田baa田baa ", sprintf("%'aa田b'-22s", tmp));
+  ASSERT_EQ(" aa田baa田baa田baa测试", sprintf("%'aa田b'22s", tmp));
+
+  // special char in pad string
+  ASSERT_EQ("a\\b田c'a\\b测试a\\b田c'a\\b", sprintf("%'a\\\\b田c\\''|20s", tmp));
+  ASSERT_EQ("测试a\\b田c'a\\b田c'a\\b田c'a", sprintf("%'a\\\\b田c\\''-20s", tmp));
+  ASSERT_EQ("a\\b田c'a\\b田c'a\\b田c'a测试", sprintf("%'a\\\\b田c\\''20s", tmp));
+
+  tmp = "一\n二\n三\n四\n五\n六\n七\n八\n九\n十\n甲\n乙\n丙\n丁\n戊";
+  ASSERT_EQ("田一田四田七田十田丙\n"
+            "田二田五田八田甲田丁\n"
+            "田三田六田九田乙田戊",
+            sprintf("%#'田'20.5s", tmp));
+  ASSERT_EQ("田一田四田七田十田丙 \n"
+            "田二田五田八田甲田丁 \n"
+            "田三田六田九田乙田戊 ",
+            sprintf("%#'田'21.5s", tmp));
 
   // char
   ASSERT_EQ(tmp[0..0], sprintf("%c", tmp[0]));

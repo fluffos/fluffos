@@ -239,4 +239,9 @@ void do_tests() {
     ASSERT_EQ(ANSI_RED "" ANSI_RESET, sprintf("%-=1s", ANSI_RED "" ANSI_RESET));
 
     ASSERT_EQ("this\nis a\nvery\nlong\nsenten\nce.", sprintf("%-=6s", "this is a very long sentence."));
+
+    ASSERT_EQ("      ", sprintf("%6-|s", ""));
+    ASSERT_EQ("         a b c d e f g        ", sprintf("%30|s", "a b c d e f g"));
+    // https://github.com/fluffos/fluffos/issues/595
+    ASSERT_EQ("   Mit indent sieht das so aus", sprintf("%30=s","Mit indent sieht das so aus"));
 }
