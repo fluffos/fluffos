@@ -399,6 +399,8 @@ void u8_truncate_below_width(const char *src, size_t len, size_t max_width, bool
     // Try next character, see if we will be over width
     auto next_pos = brk->next();
     if (next_pos == icu::BreakIterator::DONE) {
+      break_length = pos;
+      break_width = total_width;
       break;
     }
 
@@ -483,6 +485,8 @@ size_t u8_width(const char *src, int len) {
 
   UChar32 c = 0;
   UChar32 prev = 0;
+
+  if (len == 0) return 0;
   for (;;) {
     prev = c;
     U8_NEXT(src, src_offset, len, c);

@@ -146,6 +146,7 @@ typedef unsigned int format_info;
 typedef struct {
   const char *what;
   int len;
+  int width;
 } pad_info_t;
 
 typedef struct {
@@ -229,7 +230,7 @@ static void push_sprintf_state(void) {
  * Anything that has been allocated should be somewhere it can be found and
  * freed later.
  */
-static void sprintf_error(int which, char *premade) {
+static void sprintf_error(int which, const char *premade) {
   char lbuf[2048];
   const char *err;
 
@@ -483,38 +484,86 @@ void svalue_to_string(svalue_t *obj, outbuffer_t *outbuf, int indent, int traili
   }
 } /* end of svalue_to_string() */
 
-static void add_pad(pad_info_t *pad, int len) {
-  char *p;
-  int padlen;
+static void add_pad(pad_info_t *pad, int width, bool start_from_right) {
+  int output_len = width;  // default use ' ' to pad.
 
-  if (outbuf_extend(&(sprintf_state->obuff), len) < len) {
-    SPRINTF_ERROR(ERR_BUFF_OVERFLOW);
+  // Use whitespace by default.
+  if (!pad || !pad->len) {
+    char *p;
+
+    if (outbuf_extend(&(sprintf_state->obuff), output_len) < output_len) {
+      SPRINTF_ERROR(ERR_BUFF_OVERFLOW);
+    }
+
+    p = sprintf_state->obuff.buffer + sprintf_state->obuff.real_size;
+    sprintf_state->obuff.real_size += output_len;
+    p[output_len] = 0;
+
+    memset(p, ' ', output_len);
+    return;
   }
-  p = sprintf_state->obuff.buffer + sprintf_state->obuff.real_size;
-  sprintf_state->obuff.real_size += len;
-  p[len] = 0;
 
-  if (pad && (padlen = pad->len)) {
-    char *end;
-    const char *pstr = pad->what;
-    int i;
-    char c;
+  // Get an sanitized version of pad_string first
+  std::string _pad_string;
+  {
+    _pad_string.reserve(pad->len);
 
-    for (i = 0, end = p + len; p < end; i++) {
-      if (i == padlen) {
-        i = 0;
+    auto padp = pad->what;
+    for (int i = 0; i < pad->len; i++) {
+      char c = *padp++;
+      if (c == '\\') c = *padp++;
+      _pad_string.push_back(c);
+    }
+  }
+  const auto &pad_string = _pad_string;
+
+  std::string pad_result;
+  pad_result.reserve(output_len);
+
+  int padded_width = 0;
+  while (padded_width < width) {
+    if (padded_width + pad->width <= width) {
+      pad_result.append(pad_string);
+      padded_width += pad->width;
+    } else {
+      // no more room for entire pad string, try truncate
+      {
+        auto leftover_width = width - padded_width;
+        size_t truncated_len, truncated_width;
+        u8_truncate_below_width(pad_string.c_str(), pad->len, leftover_width, false, false,
+                                &truncated_len, &truncated_width);
+        if (truncated_len && truncated_width && truncated_width <= leftover_width) {
+          pad_result.append(pad_string.substr(0, truncated_len));
+          padded_width += truncated_width;
+        }
       }
 
-      if ((c = pstr[i]) == '\\') {
-        /* guaranteed to have a valid char next */
-        *p++ = pstr[++i];
-      } else {
-        *p++ = c;
+      // we may still ends up missing some width after truncation, fill with whitespace then.
+      if (padded_width < width) {
+        if (start_from_right) {
+          for (auto i = 0; i < width - padded_width; i++) {
+            pad_result.insert(0, " ");
+          }
+        } else {
+          for (auto i = 0; i < width - padded_width; i++) {
+            pad_result.push_back(' ');
+          }
+        }
+        padded_width = width;
       }
     }
-  } else {
-    memset(p, ' ', len);
   }
+  output_len = pad_result.length();
+
+  if (outbuf_extend(&(sprintf_state->obuff), output_len) < output_len) {
+    SPRINTF_ERROR(ERR_BUFF_OVERFLOW);
+  }
+
+  auto p = sprintf_state->obuff.buffer + sprintf_state->obuff.real_size;
+  sprintf_state->obuff.real_size += output_len;
+  p[output_len] = 0;
+
+  memcpy(p, pad_result.c_str(), output_len);
 }
 
 static void add_nstr(const char *str, int len) {
@@ -543,29 +592,29 @@ static void add_justified(const char *str, int swidth, int slen, pad_info_t *pad
       case INFO_J_LEFT:
         add_nstr(str, slen);
         if (trailing) {
-          add_pad(pad, fs);
+          add_pad(pad, fs, false);
         }
         break;
       case INFO_J_CENTRE:
         i = fs / 2 + fs % 2;
-        add_pad(pad, i);
+        add_pad(pad, i, true);
         add_nstr(str, slen);
         if (trailing) {
-          add_pad(pad, fs - i);
+          add_pad(pad, fs - i, false);
         }
         break;
       case INFO_J_CENTRE | INFO_J_LEFT:
         i = fs / 2;
-        add_pad(pad, i);
+        add_pad(pad, i, true);
         add_nstr(str, slen);
         if (trailing) {
-          add_pad(pad, fs - i);
+          add_pad(pad, fs - i, false);
         }
         break;
       default:
         /* std (s)printf defaults to right
          * justification */
-        add_pad(pad, fs);
+        add_pad(pad, fs, true);
         add_nstr(str, slen);
     }
   }
@@ -625,22 +674,27 @@ static int add_column(cst **column, int trailing) {
  * Returns 1 if table completed.
  */
 static int add_table(cst **table) {
-  int done, i;
+  int i;
   cst *tab = *table;              /* always (*table) */
   tab_data_t *tab_d = tab->d.tab; /* always tab->d.tab */
   const char *tab_di;             /* always tab->d.tab[i].cur */
-  int end;
 
   for (i = 0; i < tab->nocols && (tab_di = tab_d[i].cur); i++) {
-    end = tab_d[i + 1].start - tab_di - 1;
+    int done;
+    int end = tab_d[i + 1].start - tab_di - 1;
+    // Look for next '\n'
     for (done = 0; done != end && tab_di[done] != '\n'; done++)
       ;
-    size_t slen = strlen(tab_di);
-    size_t swidth;
-    u8_truncate_below_width(tab_di, slen, (done > tab->size ? tab->size : done), false, false,
-                            &slen, &swidth);
-    add_justified(tab_di, swidth, slen, tab->pad, tab->size, tab->info,
-                  tab->pad || (i < tab->nocols - 1) || tab->next);
+    // Check if this is over width
+    {
+      size_t slen = done;
+      size_t swidth = u8_width(tab_di, done);
+      if (swidth > tab->size) {
+        u8_truncate_below_width(tab_di, slen, tab->size, false, false, &slen, &swidth);
+      }
+      add_justified(tab_di, swidth, slen, tab->pad, tab->size, tab->info,
+                    tab->pad || (i < tab->nocols - 1) || tab->next);
+    }
     if (done >= end - 1) {
       tab_di = nullptr;
     } else {
@@ -650,9 +704,9 @@ static int add_table(cst **table) {
   }
   if (tab->pad) {
     while (i++ < tab->nocols) {
-      add_pad(tab->pad, tab->size);
+      add_pad(tab->pad, tab->size, true);
     }
-    add_pad(tab->pad, tab->remainder);
+    add_pad(tab->pad, tab->remainder, false);
   }
   if (!tab_d[0].cur) {
     cst *temp;
@@ -700,6 +754,7 @@ static pad_info_t *make_pad(pad_info_t *p) {
   x = reinterpret_cast<pad_info_t *>(DMALLOC(sizeof(pad_info_t), TAG_TEMPORARY, "make_pad"));
   x->what = p->what;
   x->len = p->len;
+  x->width = p->width;
   return x;
 }
 
@@ -760,13 +815,13 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
                 (*temp)->d.col++;
               }
             }
-            add_pad(nullptr, (*temp)->start - get_curpos());
+            add_pad(nullptr, (*temp)->start - get_curpos(), true);
             column_stat = add_column(temp, 0);
             if (!column_stat) {
               temp = &((*temp)->next);
             }
           } else {
-            add_pad(nullptr, (*temp)->start - get_curpos());
+            add_pad(nullptr, (*temp)->start - get_curpos(), true);
             if (!add_table(temp)) {
               temp = &((*temp)->next);
             }
@@ -828,6 +883,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
                  (format_str[fpos + 1] == '*'))) {
               pad.what = "0";
               pad.len = 1;
+              pad.width = 1;
             } else {
               if (format_str[fpos] == '*') {
                 if (carg->type != T_NUMBER) {
@@ -919,22 +975,36 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
           case '\'':
             fpos++;
             pad.what = format_str + fpos;
+            pad.len = 0;
+            pad.width = 0;  // need to handle '\\' characters, which should be ignored.
             while (true) {
               if (!format_str[fpos]) {
                 SPRINTF_ERROR(ERR_UNEXPECTED_EOS);
               }
               if (format_str[fpos] == '\\') {
-                if (!format_str[++fpos]) {
-                  SPRINTF_ERROR(ERR_UNEXPECTED_EOS);
+                char nextc = format_str[fpos + 1];
+                if (!nextc) SPRINTF_ERROR(ERR_UNEXPECTED_EOS);
+                if (nextc != '\'' && nextc != '\\') {
+                  sprintf_error(
+                      ERR_RECOVERY_ONLY,
+                      "padding string '\\' must be followed by another '\\' or single quote");
                 }
+                fpos += 2;
+                pad.len -= 1;
+                pad.width -= 1;
+                continue;
               } else if (format_str[fpos] == '\'') {
-                pad.len = format_str + fpos - pad.what;
+                pad.len += format_str + fpos - pad.what;
                 if (!pad.len) {
                   SPRINTF_ERROR(ERR_NULL_PS);
                 }
                 break;
               }
               fpos++;
+            }
+            pad.width += u8_width(pad.what, pad.len);
+            if (!pad.width) {
+              SPRINTF_ERROR(ERR_NULL_PS);
             }
             break;
           default:
@@ -1009,7 +1079,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
             if (finfo & INFO_COLS) {
               int tmp;
               if (pres > fs) {
-                pres = fs;
+                fs = pres;
               }
               *temp =
                   reinterpret_cast<cst *>(DMALLOC(sizeof(cst), TAG_TEMPORARY, "string_print: 3"));
@@ -1029,7 +1099,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
                 ADD_CHAR('\n');
               }
             } else { /* (finfo & INFO_TABLE) */
-              unsigned int n, len, max_len;
+              unsigned int n, items_per_column, max_width;
               const char *p1, *p2;
 
 #define TABLE carg->u.string
@@ -1040,14 +1110,18 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
               (*temp)->info = finfo;
               (*temp)->start = get_curpos();
               (*temp)->next = nullptr;
-              max_len = 0;
+              max_width = 0;
               n = 1;
 
               p2 = p1 = TABLE;
+              // calculate number of items, also find out max width for each column.
               while (*p1) {
                 if (*p1 == '\n') {
-                  if (p1 - p2 > max_len) {
-                    max_len = p1 - p2;
+                  if (!pres) {
+                    auto new_max_width = u8_width(p2, p1 - p2);
+                    if (new_max_width > max_width) {
+                      max_width = new_max_width;
+                    }
                   }
                   p1++;
                   if (*(p2 = p1)) {
@@ -1057,13 +1131,16 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
                   p1++;
                 }
               }
+              /* the null terminated word */
               if (!pres) {
-                /* the null terminated word */
-                if (p1 - p2 > max_len) {
-                  max_len = p1 - p2;
+                auto new_max_width = u8_width(p2, p1 - p2);
+                if (new_max_width > max_width) {
+                  max_width = new_max_width;
                 }
-                pres = fs / (max_len + 2); /* at least two
-                                            * separating spaces */
+              }
+              if (!pres) {
+                pres = fs / (max_width + 2); /* at least two
+                                              * separating spaces */
                 if (!pres) {
                   pres = 1;
                 }
@@ -1078,12 +1155,12 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
                  * X               X X X X
                  *
                  */
-                len = (n - 1) / pres + 1;
+                items_per_column = (n - 1) / pres + 1;
                 if (n > pres && n % pres) {
-                  pres -= (pres - n % pres) / len;
+                  pres -= (pres - n % pres) / items_per_column;
                 }
               } else {
-                len = (n - 1) / pres + 1;
+                items_per_column = (n - 1) / pres + 1;
               }
               (*temp)->size = fs / pres;
               (*temp)->remainder = fs % pres;
@@ -1109,7 +1186,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
 
                 p1 = TABLE;
                 while (*p1) {
-                  if (*p1++ == '\n' && ++n >= len) {
+                  if (*p1++ == '\n' && ++n >= items_per_column) {
                     (*temp)->d.tab[i++].start = p1;
                     n = 0;
                   }
@@ -1136,7 +1213,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
                           (((format_str[fpos] != '\n') && (format_str[fpos] != '\0')) ||
                            ((finfo & INFO_ARRAY) &&
                             (nelemno < (argv + sprintf_state->cur_arg)->u.arr->size))) ||
-                              (slen && (carg->u.string[slen - 1] != '\n')));
+                              slen == 0 || (slen && carg->u.string[slen - 1] != '\n'));
           }
         } else if ((finfo & INFO_T) == INFO_T_CHAR) {
           if (carg->type != T_NUMBER) {
