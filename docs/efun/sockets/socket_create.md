@@ -19,11 +19,15 @@ title: sockets / socket_create
     socket_create()  creates  an efun socket. mode determines which type of
     socket is created. Currently supported socket modes are:
 
-    MUD         for sending LPC data types using TCP protocol.
+    0  MUD             for sending LPC data types using TCP protocol.
 
-    STREAM      for sending raw data using TCP protocol.
+    1  STREAM          for sending raw data using TCP protocol.
 
-    DATAGRAM    for using UDP protocol.
+    2  DATAGRAM        for using UDP protocol.
+
+    3  STREAM_BINARY   for exchange binary message with TCP protocol.
+
+    4  DATAGRAM_BINARY for exchange binary message with UDP protocol.
 
     The argument read_callback is the name of a function for the driver  to
     call  when the socket gets data from its peer. The read callback should
@@ -33,6 +37,10 @@ title: sockets / socket_create
 
     Where fd is the socket which received the data, and message is the data
     which was received.
+
+    In non-binary mode, message will be sanitized with UTF8 encoding and returned as an string.
+
+    In binary mode, raw messages will be returned as a buffer.
 
     The argument close_callback is the name of a function for the driver to
     call if the socket closes unexpectedly, i.e. not as  the  result  of  a
