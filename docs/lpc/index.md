@@ -3,10 +3,11 @@ layout: default
 title: lpc
 ---
 
-Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluffos/fluffos/tree/a7c93c73).
+Auto generated on 2020-03-09 00:24:13 PDT for [e4f84a7a](https://github.com/fluffos/fluffos/tree/e4f84a7a).
 
 
 ### constructs
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -39,7 +40,9 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <td></td>
 </tr>
 </table>
+
 ### preprocessor
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -55,7 +58,23 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <td></td>
 </tr>
 </table>
+
+### stdlib
+
+<table class='table table-condensed'>
+<tr>
+<td>
+<a href='stdlib/break_string.html'>break_string</a>
+</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</table>
+
 ### types
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -88,3 +107,4 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <td></td>
 </tr>
 </table>
+

@@ -3,10 +3,11 @@ layout: default
 title: concepts
 ---
 
-Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluffos/fluffos/tree/a7c93c73).
+Auto generated on 2020-03-09 00:24:13 PDT for [e4f84a7a](https://github.com/fluffos/fluffos/tree/e4f84a7a).
 
 
 ### general
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -41,3 +42,4 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <td></td>
 </tr>
 </table>
+

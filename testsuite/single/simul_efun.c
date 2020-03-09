@@ -7,6 +7,8 @@
 
 // JSON sefun
 inherit "std/json";
+// Breakstring sefun
+inherit "std/break_string";
 
 int same(mixed x, mixed y) {
     // Allow comparing array with buffer
