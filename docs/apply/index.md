@@ -3,10 +3,11 @@ layout: default
 title: Applies
 ---
 
-Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluffos/fluffos/tree/a7c93c73).
+Auto generated on 2020-03-09 00:24:13 PDT for [e4f84a7a](https://github.com/fluffos/fluffos/tree/e4f84a7a).
 
 
 ### interactive
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -22,10 +23,13 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <a href='interactive/process_input.html'>process_input</a>
 </td>
 <td>
-<a href='interactive/receive_message.html'>receive_message</a>
+<a href='interactive/receive_environ.html'>receive_environ</a>
 </td>
 </tr>
 <tr>
+<td>
+<a href='interactive/receive_message.html'>receive_message</a>
+</td>
 <td>
 <a href='interactive/receive_snoop.html'>receive_snoop</a>
 </td>
@@ -38,10 +42,11 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <td>
 <a href='interactive/write_prompt.html'>write_prompt</a>
 </td>
-<td></td>
 </tr>
 </table>
+
 ### master
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -161,7 +166,9 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <td></td>
 </tr>
 </table>
+
 ### object
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -192,3 +199,4 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <td></td>
 </tr>
 </table>
+

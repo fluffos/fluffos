@@ -3,10 +3,11 @@ layout: default
 title: EFUN
 ---
 
-Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluffos/fluffos/tree/a7c93c73).
+Auto generated on 2020-03-09 00:24:13 PDT for [e4f84a7a](https://github.com/fluffos/fluffos/tree/e4f84a7a).
 
 
 ### arrays
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -39,7 +40,9 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <td></td>
 </tr>
 </table>
+
 ### buffers
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -68,7 +71,9 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <td></td>
 </tr>
 </table>
+
 ### calls
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -105,7 +110,9 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 </td>
 </tr>
 </table>
+
 ### contrib
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -289,7 +296,9 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <td></td>
 </tr>
 </table>
+
 ### db
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -320,7 +329,9 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <td></td>
 </tr>
 </table>
+
 ### ed
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -336,7 +347,9 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <td></td>
 </tr>
 </table>
+
 ### filesystem
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -388,7 +401,9 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <td></td>
 </tr>
 </table>
+
 ### floats
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -440,7 +455,9 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <td></td>
 </tr>
 </table>
+
 ### functions
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -458,7 +475,9 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <td></td>
 </tr>
 </table>
+
 ### general
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -489,7 +508,9 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <td></td>
 </tr>
 </table>
+
 ### interactive
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -622,7 +643,9 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <td></td>
 </tr>
 </table>
+
 ### internals
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -704,7 +727,9 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <td></td>
 </tr>
 </table>
+
 ### mappings
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -741,7 +766,9 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 </td>
 </tr>
 </table>
+
 ### mudlib
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -804,7 +831,9 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <td></td>
 </tr>
 </table>
+
 ### numbers
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -820,7 +849,9 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <td></td>
 </tr>
 </table>
+
 ### objects
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -919,7 +950,9 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <td></td>
 </tr>
 </table>
+
 ### parsing
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -937,7 +970,9 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <td></td>
 </tr>
 </table>
+
 ### sockets
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -983,7 +1018,9 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <td></td>
 </tr>
 </table>
+
 ### strings
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -1050,11 +1087,22 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <a href='strings/strsrch.html'>strsrch</a>
 </td>
 <td>
-<a href='strings/test_bit.html'>test_bit</a>
+<a href='strings/strwidth.html'>strwidth</a>
 </td>
 </tr>
+<tr>
+<td>
+<a href='strings/test_bit.html'>test_bit</a>
+</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
 </table>
+
 ### system
+
 <table class='table table-condensed'>
 <tr>
 <td>
@@ -1136,3 +1184,4 @@ Auto generated on 2020-01-13 23:28:11 PST for [a7c93c73](https://github.com/fluf
 <td></td>
 </tr>
 </table>
+
