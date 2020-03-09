@@ -23,7 +23,7 @@ Auto generated on %s for [%s](https://github.com/fluffos/fluffos/tree/%s).
 """ % (title, time.strftime("%Y-%m-%d %H:%M:%S %Z", time.localtime()), version, version)
 
   for cat in sorted(category_efun_map.iterkeys()):
-    print "### %s" % cat
+    print "### %s\n" % cat
     print "<table class='table table-condensed'>"
     i = 0
 
@@ -42,8 +42,7 @@ Auto generated on %s for [%s](https://github.com/fluffos/fluffos/tree/%s).
         for x in xrange(i - len(items)):
           print "<td></td>"
       print "</tr>"
-    print "</table>"
-
+    print "</table>\n"
 
 if __name__ == '__main__':
   main(*sys.argv[1:])
