@@ -392,6 +392,9 @@ target_link_libraries(libdriver PUBLIC libtelnet)
 target_link_libraries(libdriver PUBLIC ${ICU_LIBRARIES})
 
 add_subdirectory(thirdparty/backward-cpp EXCLUDE_FROM_ALL)
+target_compile_definitions(libdriver PUBLIC ${BACKWARD_DEFINITIONS})
+target_include_directories(libdriver PUBLIC ${BACKWARD_INCLUDE_DIRS})
+target_link_libraries(libdriver PUBLIC ${BACKWARD_LIBRARIES})
 
 # JEMALLOC
 if (CYGWIN)
@@ -446,7 +449,6 @@ endif()
 
 add_executable(driver "main.cc")
 target_link_libraries(driver PUBLIC ${LINK_WHOLE_ARCHIVE} libdriver ${LINK_NO_WHOLE_ARCHIVE})
-add_backward(driver) # Must apply to executable
 
 add_executable(lpcc "main_lpcc.cc")
 target_link_libraries(lpcc PUBLIC ${LINK_WHOLE_ARCHIVE} libdriver ${LINK_NO_WHOLE_ARCHIVE})
