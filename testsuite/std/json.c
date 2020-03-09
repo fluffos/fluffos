@@ -624,8 +624,8 @@ varargs string json_encode(mixed value, mixed* pointers) {
                 return "[]";
             return sprintf("[%s]", out);
         } else {
-	        return "[]";
-		}
+            return "[]";
+        }
     }
     // Values that cannot be represented in JSON are replaced by nulls.
     return "null";
