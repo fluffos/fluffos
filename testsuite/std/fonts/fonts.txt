@@ -1,0 +1,7 @@
+ASC12	8x12 ASCII点阵 一个字符12Byte
+ASC14	8x14 ASCII点阵 一个字符14Byte
+ASC16	8x16 ASCII点阵 一个字符16Byte
+
+HZK12	16x12 汉字点阵 一个汉字24Byte
+HZK14	16x14 汉字点阵 一个汉字28Byte
+HZK16	16x16 汉字点阵 一个汉字32Byte
