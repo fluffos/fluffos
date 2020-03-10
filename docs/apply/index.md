@@ -3,7 +3,7 @@ layout: default
 title: Applies
 ---
 
-Auto generated on 2020-03-09 00:24:13 PDT for [e4f84a7a](https://github.com/fluffos/fluffos/tree/e4f84a7a).
+Auto generated on 2020-03-10 23:38:24 CST for [b65a362c](https://github.com/fluffos/fluffos/tree/b65a362c).
 
 
 ### interactive
@@ -181,20 +181,22 @@ Auto generated on 2020-03-09 00:24:13 PDT for [e4f84a7a](https://github.com/fluf
 <a href='object/create.html'>create</a>
 </td>
 <td>
-<a href='object/id.html'>id</a>
+<a href='object/heart_beat.html'>heart_beat</a>
 </td>
 <td>
-<a href='object/init.html'>init</a>
+<a href='object/id.html'>id</a>
 </td>
 </tr>
 <tr>
+<td>
+<a href='object/init.html'>init</a>
+</td>
 <td>
 <a href='object/move_or_destruct.html'>move_or_destruct</a>
 </td>
 <td>
 <a href='object/reset.html'>reset</a>
 </td>
-<td></td>
 <td></td>
 <td></td>
 </tr>
