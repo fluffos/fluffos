@@ -3,6 +3,14 @@ layout: default
 title: contrib / shuffle.pre
 ---
 
-mixed _shuffle(mixed _);
+### NAME
 
-randomly reorders the elements of the given array (changes original!!!)
+    shuffle
+
+### SYNOPSIS
+
+    mixed shuffle(mixed);
+
+### DESCRIPTION
+
+    randomly reorders the elements of the given array (changes original!!!)

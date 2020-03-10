@@ -3,6 +3,14 @@ layout: default
 title: contrib / element_of.pre
 ---
 
-mixed element_of(mixed \*);
+### NAME
 
-returns random elememt of given array
+    element_of() - returns random elememt of given array
+
+### SYNOPSIS
+
+    mixed element_of(mixed *arr);
+
+### DESCRIPTION
+
+    returns random elememt of given array

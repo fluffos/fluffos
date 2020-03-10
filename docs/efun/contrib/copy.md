@@ -3,13 +3,21 @@ layout: default
 title: contrib / copy.pre
 ---
 
-mixed copy(mixed);
+### NAME
 
-arg is either one of:
+    mixed copy(mixed);
 
-- array
-- buffer (if compiled into driver)
-- class
-- mapping
+### SYNOPSIS
 
-returns deep copy
+    mixed copy(mixed);
+
+### DESCRIPTION
+
+    arg is either one of:
+
+    - array
+    - buffer (if compiled into driver)
+    - class
+    - mapping
+
+    returns deep copy

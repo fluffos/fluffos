@@ -3,12 +3,22 @@ layout: default
 title: contrib / file_length.pre
 ---
 
-int file_length(string);
+### NAME
 
-returns
+    file_length - return the line count of a file
 
-- line count
-- -1 in case of error (e.g insufficient privs)
-- -2 if file is directory
+### SYNOPSIS
 
-see file_size(3)
+    int file_length(string);
+
+### DESCRIPTION
+
+    returns
+
+    - line count
+    - -1 in case of error (e.g insufficient privs)
+    - -2 if file is directory
+
+### SEE ALSO
+
+    file_size(3)

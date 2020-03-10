@@ -3,7 +3,14 @@ layout: default
 title: contrib / test_load.pre
 ---
 
-int test_load(string);
+### NAME
 
-returns 1 if file is loadable
-0 otherwise
+    test_load - test if a file is loadable
+
+### SYNOPSIS
+
+    int test_load( string );
+
+### DESCRIPTION
+
+    returns 1 if file is loadable 0 otherwise.

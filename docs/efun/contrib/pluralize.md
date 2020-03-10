@@ -3,10 +3,22 @@ layout: default
 title: contrib / pluralize.pre
 ---
 
-string pluralize(string);
+### NAME
 
-for english only!
+    pluralize - return plural form
 
-returns plural form:
-'a red house' -> 'red houses'
-'a sack of rice' -> 'sacks of rice'
+### SYNOPSIS
+
+    string pluralize(string);
+
+### DESCRIPTION
+
+    for english only!
+
+    returns plural form:
+    'a red house' -> 'red houses'
+    'a sack of rice' -> 'sacks of rice'
+
+### SEE ALSO
+
+    query_num(3)

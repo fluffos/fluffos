@@ -3,7 +3,15 @@ layout: default
 title: contrib / compressedp.pre
 ---
 
-int compressedp(object);
+### NAME
 
-returns if interactive connection uses telopt compress
-#ifdef PACKAGE_COMPRESS
+    compressedp
+
+### SYNOPSIS
+
+    int compressedp(object);
+
+### DESCRIPTION
+
+    returns if interactive connection uses telopt compress
+    #ifdef PACKAGE_COMPRESS

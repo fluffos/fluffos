@@ -3,16 +3,24 @@ layout: default
 title: contrib / repeat_string.pre
 ---
 
-string repeat_string(string, int);
+### NAME
 
-returns a new string
+    repeat_string
 
-- int <= 0: ""
-- int > 0 original string repeated either int times or the maximum number of
-  times without getting greater than the maximum string length
+### SYNOPSIS
 
-maxstrlen = 5:
-repeat_string("ab", 3) = "abab"
+    string repeat_string(string, int);
 
-maxstrlen >=6:
-repeat_string("ab", 3) = "ababab"
+### DESCRIPTION
+
+    returns a new string
+
+    - int <= 0: ""
+    - int > 0 original string repeated either int times or the maximum number of
+      times without getting greater than the maximum string length
+
+    maxstrlen = 5:
+    repeat_string("ab", 3) = "abab"
+
+    maxstrlen >=6:
+    repeat_string("ab", 3) = "ababab"

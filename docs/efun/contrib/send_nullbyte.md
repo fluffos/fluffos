@@ -3,9 +3,14 @@ layout: default
 title: contrib / send_nullbyte.pre
 ---
 
-int send_nullbyte(object);
+### NAME
 
-sends '\0' to interactive
+    send_nullbyte - sends '\0' to interactive
 
-returns -2 in case of error
-1 otherwise
+### SYNOPSIS
+
+    int send_nullbyte(object);
+
+### DESCRIPTION
+
+    sends '\0' to interactive, returns -2 in case of error 1 otherwise

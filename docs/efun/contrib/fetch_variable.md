@@ -3,13 +3,23 @@ layout: default
 title: contrib / fetch_variable.pre
 ---
 
-mixed fetch_variable(string, object | void);
+### NAME
 
-object defaults to this_object()
-string is name of global variable (not private!!!) in object
+    fetch_variable
 
-returns object.string
+### SYNOPSIS
 
-POSSIBLE SECURITY HAZARD!!!!
+    mixed fetch_variable(string, object | void);
 
-see store_variable.3
+### DESCRIPTION
+
+    object defaults to this_object()
+    string is name of global variable (not private!!!) in object
+
+    returns object.string
+
+    POSSIBLE SECURITY HAZARD!!!!
+
+### SEE ALSO
+
+    store_variable(3)

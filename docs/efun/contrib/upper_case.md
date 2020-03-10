@@ -3,8 +3,18 @@ layout: default
 title: contrib / upper_case.pre
 ---
 
-string upper_case(string);
+### NAME
 
-returns new string with every lower case character turned upper case
+    upper_case
 
-see capitalize(3), lower_case(3)
+### SYNOPSIS
+
+    string upper_case(string);
+
+### DESCRIPTION
+
+    returns new string with every lower case character turned upper case
+
+### SEE ALSO
+
+    capitalize(3), lower_case(3)

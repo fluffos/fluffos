@@ -3,12 +3,22 @@ layout: default
 title: contrib / variables.pre
 ---
 
-mixed \*variables(object, int default: 0);
+### NAME
 
-int == 0:
-returns array of global variable names
+    variables - returns array of global variable names
 
-int != 0
-returns array of arrays of variable name & type
+### SYNOPSIS
 
-see functions(3)
+    mixed *variables(object, int default: 0);
+
+### DESCRIPTION
+
+    int == 0:
+    returns array of global variable names
+
+    int != 0
+    returns array of arrays of variable name & type
+
+### SEE ALSO
+
+    functions(3)
