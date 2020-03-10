@@ -3,8 +3,18 @@ layout: default
 title: contrib / disassemble_class.pre
 ---
 
-mixed \*disassemble_class(mixed);
+### NAME
 
-???
+    disassemble_class
 
-see assemble_class(3)
+### SYNOPSIS
+
+    mixed *disassemble_class(mixed);
+
+### DESCRIPTION
+
+    // todo
+
+### SEE ALSO
+
+    assemble_class(3)

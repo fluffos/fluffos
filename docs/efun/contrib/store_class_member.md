@@ -3,6 +3,18 @@ layout: default
 title: contrib / store_class_member.pre
 ---
 
-mixed store_class_member(mixed, int, mixed);
+### NAME
 
-see fetch_class_member(3)
+    store_class_member
+
+### SYNOPSIS
+
+    mixed store_class_member(mixed, int, mixed);
+
+### DESCRIPTION
+
+    // todo
+
+### SEE ALSO
+
+    fetch_class_member(3)

@@ -3,8 +3,16 @@ layout: default
 title: contrib / query_ip_port.pre
 ---
 
-int query_ip_port(void | object);
+### NAME
 
-object defaults to this_player()
+    query_ip_port - returns local_port of connection
 
-returns local_port of connection or 0 if object not interactive
+### SYNOPSIS
+
+    int query_ip_port(void | object);
+
+### DESCRIPTION
+
+    object defaults to this_player()
+
+    returns local_port of connection or 0 if object not interactive

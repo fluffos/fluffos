@@ -3,17 +3,25 @@ layout: default
 title: contrib / program_info.pre
 ---
 
-mapping program_info(void | object);
+### NAME
 
-object defaults to ALL objects
+    program_info
 
-returns mapping consinsting of:
+### SYNOPSIS
 
-- header size : int
-- code size : int
-- function size : int
-- var size : int
-- class size : int
-- inherit size : int
-- saved type size : int
-- total size : int
+    mapping program_info(void | object);
+
+### DESCRIPTION
+
+    object defaults to ALL objects
+
+    returns mapping consinsting of:
+
+    - header size : int
+    - code size : int
+    - function size : int
+    - var size : int
+    - class size : int
+    - inherit size : int
+    - saved type size : int
+    - total size : int
