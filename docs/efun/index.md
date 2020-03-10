@@ -3,7 +3,7 @@ layout: default
 title: EFUN
 ---
 
-Auto generated on 2020-03-09 00:24:13 PDT for [e4f84a7a](https://github.com/fluffos/fluffos/tree/e4f84a7a).
+Auto generated on 2020-03-10 23:38:24 CST for [b65a362c](https://github.com/fluffos/fluffos/tree/b65a362c).
 
 
 ### arrays
@@ -221,9 +221,6 @@ Auto generated on 2020-03-09 00:24:13 PDT for [e4f84a7a](https://github.com/fluf
 <a href='contrib/query_replaced_program.html'>query_replaced_program</a>
 </td>
 <td>
-<a href='contrib/questions.html'>questions</a>
-</td>
-<td>
 <a href='contrib/real_time.html'>real_time</a>
 </td>
 <td>
@@ -232,11 +229,11 @@ Auto generated on 2020-03-09 00:24:13 PDT for [e4f84a7a](https://github.com/fluf
 <td>
 <a href='contrib/remove_get_char.html'>remove_get_char</a>
 </td>
-</tr>
-<tr>
 <td>
 <a href='contrib/remove_interactive.html'>remove_interactive</a>
 </td>
+</tr>
+<tr>
 <td>
 <a href='contrib/remove_shadow.html'>remove_shadow</a>
 </td>
@@ -249,11 +246,11 @@ Auto generated on 2020-03-09 00:24:13 PDT for [e4f84a7a](https://github.com/fluf
 <td>
 <a href='contrib/restore_from_string.html'>restore_from_string</a>
 </td>
-</tr>
-<tr>
 <td>
 <a href='contrib/roll_MdN.html'>roll_MdN</a>
 </td>
+</tr>
+<tr>
 <td>
 <a href='contrib/send_nullbyte.html'>send_nullbyte</a>
 </td>
@@ -266,11 +263,11 @@ Auto generated on 2020-03-09 00:24:13 PDT for [e4f84a7a](https://github.com/fluf
 <td>
 <a href='contrib/store_class_member.html'>store_class_member</a>
 </td>
-</tr>
-<tr>
 <td>
 <a href='contrib/store_variable.html'>store_variable</a>
 </td>
+</tr>
+<tr>
 <td>
 <a href='contrib/string_difference.html'>string_difference</a>
 </td>
@@ -283,14 +280,15 @@ Auto generated on 2020-03-09 00:24:13 PDT for [e4f84a7a](https://github.com/fluf
 <td>
 <a href='contrib/upper_case.html'>upper_case</a>
 </td>
-</tr>
-<tr>
 <td>
 <a href='contrib/variables.html'>variables</a>
 </td>
+</tr>
+<tr>
 <td>
 <a href='contrib/zonetime.html'>zonetime</a>
 </td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -441,6 +439,9 @@ Auto generated on 2020-03-09 00:24:13 PDT for [e4f84a7a](https://github.com/fluf
 </tr>
 <tr>
 <td>
+<a href='floats/round.html'>round</a>
+</td>
+<td>
 <a href='floats/sin.html'>sin</a>
 </td>
 <td>
@@ -452,7 +453,6 @@ Auto generated on 2020-03-09 00:24:13 PDT for [e4f84a7a](https://github.com/fluf
 <td>
 <a href='floats/to_int.html'>to_int</a>
 </td>
-<td></td>
 </tr>
 </table>
 
@@ -460,9 +460,6 @@ Auto generated on 2020-03-09 00:24:13 PDT for [e4f84a7a](https://github.com/fluf
 
 <table class='table table-condensed'>
 <tr>
-<td>
-<a href='functions/apply.html'>apply</a>
-</td>
 <td>
 <a href='functions/bind.html'>bind</a>
 </td>
@@ -472,6 +469,7 @@ Auto generated on 2020-03-09 00:24:13 PDT for [e4f84a7a](https://github.com/fluf
 <td>
 <a href='functions/functionp.html'>functionp</a>
 </td>
+<td></td>
 <td></td>
 </tr>
 </table>
@@ -971,6 +969,39 @@ Auto generated on 2020-03-09 00:24:13 PDT for [e4f84a7a](https://github.com/fluf
 </tr>
 </table>
 
+### pcre
+
+<table class='table table-condensed'>
+<tr>
+<td>
+<a href='pcre/pcre_assoc.html'>pcre_assoc</a>
+</td>
+<td>
+<a href='pcre/pcre_cache.html'>pcre_cache</a>
+</td>
+<td>
+<a href='pcre/pcre_extract.html'>pcre_extract</a>
+</td>
+<td>
+<a href='pcre/pcre_match.html'>pcre_match</a>
+</td>
+<td>
+<a href='pcre/pcre_replace.html'>pcre_replace</a>
+</td>
+</tr>
+<tr>
+<td>
+<a href='pcre/pcre_replace_callback.html'>pcre_replace_callback</a>
+</td>
+<td>
+<a href='pcre/pcre_version.html'>pcre_version</a>
+</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</table>
+
 ### sockets
 
 <table class='table table-condensed'>
@@ -1010,9 +1041,11 @@ Auto generated on 2020-03-09 00:24:13 PDT for [e4f84a7a](https://github.com/fluf
 </tr>
 <tr>
 <td>
+<a href='sockets/socket_status.html'>socket_status</a>
+</td>
+<td>
 <a href='sockets/socket_write.html'>socket_write</a>
 </td>
-<td></td>
 <td></td>
 <td></td>
 <td></td>

@@ -3,7 +3,7 @@ layout: default
 title: concepts
 ---
 
-Auto generated on 2020-03-09 00:24:13 PDT for [e4f84a7a](https://github.com/fluffos/fluffos/tree/e4f84a7a).
+Auto generated on 2020-03-10 23:38:24 CST for [b65a362c](https://github.com/fluffos/fluffos/tree/b65a362c).
 
 
 ### general
