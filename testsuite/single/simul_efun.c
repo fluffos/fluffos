@@ -9,6 +9,8 @@
 inherit "std/json";
 // Breakstring sefun
 inherit "std/break_string";
+// bitmap_font sefun
+inherit "std/bitmap_font";
 
 int same(mixed x, mixed y) {
     // Allow comparing array with buffer
