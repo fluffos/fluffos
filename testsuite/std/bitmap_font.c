@@ -7,9 +7,9 @@ Date: 2020-02-20
 Description:
     display ASCII and chinese with bitmap font
 *****************************************************************************/
-// 字体目录(请根据需要修改)
-#define HZK __DIR__ "system/etc/fonts/HZK"
-#define ASC __DIR__ "system/etc/fonts/ASC"
+// 字体文件(请根据需要修改)
+#define HZK __DIR__ "fonts/HZK"
+#define ASC __DIR__ "fonts/ASC"
 // 默认前景字符
 #define DEFAULT_FILL "8"
 // 默认背景字符
@@ -68,7 +68,9 @@ varargs string bitmap_font(string str, int size, string fill, string bg, string 
             offset = fontsize * ((bstr[k] - 0xA1) * 94 + bstr[k+1] - 0xA1);
             char = read_buffer(file, offset, fontsize);
             k++;
-        } else {
+        }
+        else
+        {
             // 英文每个字符占1字节
             offset = bstr[k] * size;
             char = read_buffer(ASC + size, offset, size);
