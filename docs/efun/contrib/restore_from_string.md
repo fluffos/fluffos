@@ -3,9 +3,18 @@ layout: default
 title: contrib / restore_from_string.pre
 ---
 
-void restore_from_string(string, int default:0);
+### NAME
 
-uses string as restore_object uses file
-meaning of int the same
+    restore_from_string
 
-see restore_object(3)
+### SYNOPSIS
+
+    void restore_from_string(string, int default:0);
+
+### DESCRIPTION
+
+    uses string as restore_object uses file meaning of int the same
+
+### SEE ALSO
+
+    restore_object(3)

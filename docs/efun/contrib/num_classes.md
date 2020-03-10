@@ -3,6 +3,18 @@ layout: default
 title: contrib / num_classes.pre
 ---
 
-int num_classes(object);
+### NAME
 
-returns the number of classes used by object
+    num_classes - returns the number of classes used by object
+
+### SYNOPSIS
+
+    int num_classes(object);
+
+### DESCRIPTION
+
+    returns the number of classes used by object
+
+### SEE ALSO
+
+    classes(3)

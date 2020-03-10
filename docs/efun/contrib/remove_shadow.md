@@ -3,16 +3,24 @@ layout: default
 title: contrib / remove_shadow.pre
 ---
 
-int remove_shadow(object);
+### NAME
 
-object defaults to this_object()
-returns 0 if object is either destroyed or is no shadow and isn't shadowed
-returns 1 otherwise
+    remove_shadow
 
-ob <- shadow1 <- shadow2
+### SYNOPSIS
 
-remove(shadow2): ob <- shadow1 shadow2
-remove(shadow1): ob <- shadow2 shadow1
-remove(ob): shadow1 <- shadow2 ob
+    int remove_shadow(object);
 
-#ifndef NO_SHADOWS
+### DESCRIPTION
+
+    object defaults to this_object()
+    returns 0 if object is either destroyed or is no shadow and isn't shadowed
+    returns 1 otherwise
+
+    ob <- shadow1 <- shadow2
+
+    remove(shadow2): ob <- shadow1 shadow2
+    remove(shadow1): ob <- shadow2 shadow1
+    remove(ob): shadow1 <- shadow2 ob
+
+    #ifndef NO_SHADOWS

@@ -3,12 +3,20 @@ layout: default
 title: contrib / event.pre
 ---
 
-void event(object | object \*, string, ...);
+### NAME
 
-calls "event\_" + string(...) in:
+    event
 
-object \*:
-each given object
+### SYNOPSIS
 
-object:
-object + (if not destructed) all_inventory(object)
+    void event(object | object *, string, ...);
+
+### DESCRIPTION
+
+    calls "event_" + string(...) in:
+
+    object *:
+    each given object
+
+    object:
+    object + (if not destructed) all_inventory(object)
