@@ -3,9 +3,9 @@ layout: default
 title: general / preprocessor
 ---
 
-    LPC Preprocessor Manual
-    ~~~~~~~~~~~~~~~~~~~~~~~
-    (Updated 93.07.17)
+### LPC Preprocessor Manual
+
+> (Updated 93.07.17)
 
 The preprocessor is a front end to the LPC compiler that provides such
 handy features as:
@@ -21,19 +21,24 @@ The first three are identical to C usage, so those already familiar with
 C may want to just skim the last few sections of this document.
 
 Note:
-For those directives that begin with '#' (such as #include), the
-'#' symbol must start in the first column (of the line).
+
+    For those directives that begin with '#' (such as #include), the
+    '#' symbol must start in the first column (of the line).
 
 Sharing Definitions and Code
 
-```
 This facility is provided through the #include directive.
 
-    Syntax 1:   #include <file.h>
+Syntax 1:
 
-    Syntax 2:   #include "file.h"
+    #include <file.h>
+
+Syntax 2:
+
+    #include "file.h"
 
 Notes:
+
     The '#include <file.h>' form looks for the file, 'file.h' in the
     system's standard include directories.
     (On TMI this is just '/include'.)
@@ -52,18 +57,23 @@ compile time (in the same way that the error would occur if you simply typed
 in file.h rather than using #include).
 
 
-Macros
-~~~~~~
+#### Macros
+
 Macro definitions are used to replace subsequent instances of a given
 word with a different sequence of text.  Reasons for doing so include
 hiding implementation details, reducing the number of keystrokes, and
 ease in changing constants.
 
-    Syntax 1:   #define identifier token_sequence
+Syntax 1:
 
-    Syntax 2:   #define identifier(id_list) token_sequence
+    #define identifier token_sequence
+
+Syntax 2:
+
+    #define identifier(id_list) token_sequence
 
 Notes:
+
     As a matter of convention, identifiers are usually capitalized to
     emphasize their presence in the code, and defined close to the
     start of program, or in a separate header file which you #include.
@@ -73,42 +83,49 @@ Notes:
 
 Example:
 
-    // Create a 40 cell array of integers and initialize each cell
-    // to its cell number times 2,
-    //   i.e. stack[0] = 0, stack[1] = 2, stack[2] = 4, etc
+```c
+// Create a 40 cell array of integers and initialize each cell
+// to its cell number times 2,
+//   i.e. stack[0] = 0, stack[1] = 2, stack[2] = 4, etc
 
-    #define STACKSIZE 40
-    #define INITCELL(x) 2*x
+#define STACKSIZE 40
+#define INITCELL(x) 2*x
 
-    int *stack;
+int *stack;
 
-    create() {
+create() {
     int i;
 
     stack = allocate(STACKSIZE);
 
     for (i = 0; i < STACKSIZE; i++)
     stack[i] = INITCELL(i);
-    }
+}
+```
 
 Lastly, it's sometimes useful to undefine (i.e. make the compiler forget
 about) a macro.  The following directive is then used:
 
-    Syntax:     #undef identifier
+Syntax:
+
+    #undef identifier
 
 Note:
+
     It's perfectly acceptable to undefine an identifier that hasn't been
     defined yet.
 
 
-Conditional Compilation
-~~~~~~~~~~~~~~~~~~~~~~~
+#### Conditional Compilation
+
 These directives can add flexibility to your code.  Based on whether an
 identifier is defined (or not defined), variations of the code can be
 produced for different effects.  Applications include selective admin
 logging and support for multiple drivers (or versions of the same driver).
 
-    Syntax:     #ifdef <identifier>
+Syntax:
+
+    #ifdef <identifier>
     #ifndef <identifier>
     #if <expression>
     #elif <expression>
@@ -116,6 +133,7 @@ logging and support for multiple drivers (or versions of the same driver).
     #endif
 
 Note:
+
     <identifier> refers to an identifier that has been (or could be) defined
     by your program, a file you have included, or a symbol predefined by
     the driver.
@@ -147,56 +165,64 @@ Note:
 
 Example 1:
 
-    // Using #if 0 allows you to comment out a block of code that
-    // contains comments.  One reason to do so may be to keep a copy
-    // of the old code around in case the new code doesn't work.
-    #if 0
-    // In this case, the constant expression evaluates
-    // (or is) 0, so the code here is not compiled
+```c
+// Using #if 0 allows you to comment out a block of code that
+// contains comments.  One reason to do so may be to keep a copy
+// of the old code around in case the new code doesn't work.
+#if 0
+// In this case, the constant expression evaluates
+// (or is) 0, so the code here is not compiled
 
-    write(user_name + " has " + total_coins + " coins\n");
-    #else
-    // This is the alternate case (non-zero), so the code
-    // here _is_ compiled
+write(user_name + " has " + total_coins + " coins\n");
+#else
+// This is the alternate case (non-zero), so the code
+// here _is_ compiled
 
-    printf("%s has %d coins\n", user_name, total_coins);
-    #endif
+printf("%s has %d coins\n", user_name, total_coins);
+#endif
+```
 
 Example 2:
 
-    // This example is derived from TMI's /adm/simul_efun/system.c
-    #ifdef __VERSION
-    string version() { return __VERSION__; }
-    #elif defined(MUDOS_VERSION)
-    string version() { return MUDOS_VERSION; }
-    #else
-    #  if defined(VERSION)
-    string version() { return VERSION; }
-    #  else
-    string version() { return -1; }
-    #  endif
-    #endif
+```c
+// This example is derived from TMI's /adm/simul_efun/system.c
+#ifdef __VERSION
+string version() { return __VERSION__; }
+#elif defined(MUDOS_VERSION)
+string version() { return MUDOS_VERSION; }
+#else
+#if defined(VERSION)
+string version() { return VERSION; }
+#else
+string version() { return -1; }
+#endif
+#endif
+```
 
+#### Debugging
 
-Debugging
-~~~~~~~~~
 The '#echo' directive allows you to print messages to the driver's stderr
 (STanDard ERRor) stream.  This facility is useful for diagnostics and
 debugging.
 
-    Syntax:     #echo This is a message
+Syntax:
+
+    #echo This is a message
 
 Note:
+
     The rest of the line (or end-of-file, which ever comes first) is the
     message, and is printed verbatim.  It's not necessary to enclose text
     with quotes.
 
 
-Compiler Specific
-~~~~~~~~~~~~~~~~~
+#### Compiler Specific
+
 This facility performs implementation-dependent actions.
 
-    Syntax:     #pragma keyword
+Syntax:
+
+    #pragma keyword
 
 At this time the following control keywords are recognized:
 
@@ -210,6 +236,7 @@ At this time the following control keywords are recognized:
 Also, #pragma no_keyword can be used to turn a pragma off.
 
 Notes:
+
     'strict_types' informs the compiler that the return value from
     call_other()'d functions must be casted
 
@@ -228,22 +255,26 @@ Notes:
     'error_context' adds more text to error messages indicating where on
     the line the error occured
 
-Text Formatting Shortcuts
-~~~~~~~~~~~~~~~~~~~~~~~~~
+#### Text Formatting Shortcuts
+
 This facility makes it easier to format text for help messages, room
 descriptions, etc.
 
-    Syntax 1:   @marker
+Syntax 1:
+
+    @marker
     <... text block ...>
     marker
 
-    Syntax 2:   @@marker
+Syntax 2:
+
+    @@marker
     <... text block ...>
     marker
 
 Notes:
-    @   - produces a string suitable for write()
 
+    @   - produces a string suitable for write()
     @@  - produces an array of strings, suitable for the body pager
 
 These are used by prepending '@' (or '@@') before an end marker word.  This
@@ -256,38 +287,44 @@ with each line being a string surrounded by quotes.
 
 Example 1:
 
-    int help() {
+```c
+int help() {
     write( @ENDHELP
-    This is the help text.
-    It's hopelessly inadequate.
-###         ENDHELP
+This is the help text.
+It's hopelessly inadequate.
+@ENDHELP
     );
     return 1;
-    }
+}
 
-    Is equivalent to:
+Is equivalent to:
 
-    int help() {
+```c
+int help() {
     write( "This is the help text\nIt's hopelessly inadequate.\n" );
     return 1;
-    }
+}
+```
 
 Example 2:
 
-    int help() {
+```c
+int help() {
     this_player()->more( @@ENDHELP
-    This is the help text.
-    It's hopelessly inadequate.
-###         ENDHELP
+This is the help text.
+It's hopelessly inadequate.
+@@ENDHELP
     , 1);
     return 1;
-    }
+}
+```
 
-    Is equivalent to:
+Is equivalent to:
 
-    int help() {
+```c
+int help() {
     this_player()->more( ({ "This is the help text.",
     "It's hopelessly inadequate." }), 1);
     return 1;
-    }
+}
 ```

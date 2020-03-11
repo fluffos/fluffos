@@ -8,8 +8,8 @@ Description:
     display ASCII and chinese with bitmap font
 *****************************************************************************/
 // 字体文件(请根据需要修改路径)
-#define HZK __DIR__ "fonts/HZK"
-#define ASC __DIR__ "fonts/ASC"
+#define HZK "/std/fonts/HZK"
+#define ASC "/std/fonts/ASC"
 // 默认前景字符
 #define DEFAULT_FILL "8"
 // 默认背景字符
@@ -40,7 +40,6 @@ varargs string bitmap_font(string str, int size, string fill, string bg, string 
         fontsize = size * size / 8;
 
     out = allocate(size, "");
-    scale = fontsize / size;
 
     if (!sizeof(fill)) fill = DEFAULT_FILL;
     if (!sizeof(bg)) bg = DEFAULT_BG;
@@ -67,6 +66,7 @@ varargs string bitmap_font(string str, int size, string fill, string bg, string 
             // offset = (94 * (区码 - 1) + (位码 - 1)) * fontsize;
             offset = fontsize * ((bstr[k] - 0xA1) * 94 + bstr[k+1] - 0xA1);
             char = read_buffer(file, offset, fontsize);
+            scale = fontsize / size;
             k++;
         }
         else
