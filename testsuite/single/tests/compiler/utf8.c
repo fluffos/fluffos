@@ -344,7 +344,7 @@ void do_tests() {
 
   tmp = "欲a穷aa千aaa里aaaa目";
   ASSERT_EQ("欲\na\n穷\naa\n千\naa\na\n里\naa\naa\n目", sprintf("%-=2s", tmp));
-  ASSERT_EQ("欲a穷\naa千a\naa里a\naaa目", sprintf("%-=5s", tmp));
+  ASSERT_EQ("欲a穷\naa千\naaa里\naaaa\n目", sprintf("%-=5s", tmp));
 
   // column mode with breakpoints
   tmp = "欲 穷 千 里 目";
@@ -359,7 +359,7 @@ void do_tests() {
   ASSERT_EQ("欲穷\n千里\n  目", sprintf("%1.4=s", tmp));
 
   // https://github.com/fluffos/fluffos/issues/590
-  ASSERT_EQ("测试看\n啊看\nis\nabc s\nsenten\nce\n好不好", sprintf("%=-6s", "测试看 啊看 is abc s sentence 好不好"));
+  ASSERT_EQ("测试看\n啊看\nis abc\ns\nsenten\nce 好\n不好", sprintf("%=-6s", "测试看 啊看 is abc s sentence 好不好"));
 
   // table mode
   tmp = "一\n二\n三\n四\n五\n六\n七\n八\n九\n十\n甲\n乙\n丙\n丁\n戊";
