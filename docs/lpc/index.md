@@ -3,7 +3,7 @@ layout: default
 title: lpc
 ---
 
-Auto generated on 2020-03-10 23:38:24 CST for [b65a362c](https://github.com/fluffos/fluffos/tree/b65a362c).
+Auto generated on 2020-03-11 23:23:49 CST for [bf629e69](https://github.com/fluffos/fluffos/tree/bf629e69).
 
 
 ### constructs
@@ -64,9 +64,11 @@ Auto generated on 2020-03-10 23:38:24 CST for [b65a362c](https://github.com/fluf
 <table class='table table-condensed'>
 <tr>
 <td>
+<a href='stdlib/bitfont_map.html'>bitfont_map</a>
+</td>
+<td>
 <a href='stdlib/break_string.html'>break_string</a>
 </td>
-<td></td>
 <td></td>
 <td></td>
 <td></td>
