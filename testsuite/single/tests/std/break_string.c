@@ -3,7 +3,7 @@
 void do_tests() {
   ASSERT_EQ("This is a longer text.\n"
             "Just as an example.\n",
-            break_string("This is a longer text. Just as an example.", 27));
+            break_string("This is a longer text. Just as an example.", 26));
 
   ASSERT_EQ("Wargon says: It looks like\n"
             "Wargon says: this with indent\n",
