@@ -3,7 +3,7 @@ layout: default
 title: EFUN
 ---
 
-Auto generated on 2020-03-10 23:38:24 CST for [b65a362c](https://github.com/fluffos/fluffos/tree/b65a362c).
+Auto generated on 2020-03-11 23:23:49 CST for [bf629e69](https://github.com/fluffos/fluffos/tree/bf629e69).
 
 
 ### arrays
@@ -1080,16 +1080,22 @@ Auto generated on 2020-03-10 23:38:24 CST for [b65a362c](https://github.com/fluf
 <a href='strings/lower_case.html'>lower_case</a>
 </td>
 <td>
+<a href='strings/ltrim.html'>ltrim</a>
+</td>
+<td>
 <a href='strings/reg_assoc.html'>reg_assoc</a>
 </td>
 <td>
 <a href='strings/regexp.html'>regexp</a>
 </td>
+</tr>
+<tr>
 <td>
 <a href='strings/replace_string.html'>replace_string</a>
 </td>
-</tr>
-<tr>
+<td>
+<a href='strings/rtrim.html'>rtrim</a>
+</td>
 <td>
 <a href='strings/set_bit.html'>set_bit</a>
 </td>
@@ -1099,14 +1105,14 @@ Auto generated on 2020-03-10 23:38:24 CST for [b65a362c](https://github.com/fluf
 <td>
 <a href='strings/sscanf.html'>sscanf</a>
 </td>
+</tr>
+<tr>
 <td>
 <a href='strings/strcmp.html'>strcmp</a>
 </td>
 <td>
 <a href='strings/string_decode.html'>string_decode</a>
 </td>
-</tr>
-<tr>
 <td>
 <a href='strings/string_encode.html'>string_encode</a>
 </td>
@@ -1116,20 +1122,20 @@ Auto generated on 2020-03-10 23:38:24 CST for [b65a362c](https://github.com/fluf
 <td>
 <a href='strings/strlen.html'>strlen</a>
 </td>
+</tr>
+<tr>
 <td>
 <a href='strings/strsrch.html'>strsrch</a>
 </td>
 <td>
 <a href='strings/strwidth.html'>strwidth</a>
 </td>
-</tr>
-<tr>
 <td>
 <a href='strings/test_bit.html'>test_bit</a>
 </td>
-<td></td>
-<td></td>
-<td></td>
+<td>
+<a href='strings/trim.html'>trim</a>
+</td>
 <td></td>
 </tr>
 </table>
