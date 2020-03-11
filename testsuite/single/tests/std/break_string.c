@@ -1,4 +1,9 @@
-#include "/std/break_string.h"
+#define BS_LEAVE_MY_LFS         1
+#define BS_SINGLE_SPACE         2
+#define BS_BLOCK                4
+#define BS_NO_PARINDENT         8
+#define BS_INDENT_ONCE         16
+#define BS_PREPEND_INDENT      32
 
 void do_tests() {
   ASSERT_EQ("This is a longer text.\n"
