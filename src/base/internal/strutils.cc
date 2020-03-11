@@ -287,23 +287,36 @@ size_t u8_truncate(const uint8_t *src, size_t len) {
 // new len. If brake_at_space, then attempts to truncate before the last ' ' character. If
 // always_break_at_newline, then always truncate to first '\n' character. Invalid codepoints are
 // replaced to 0xfffd;
-void u8_truncate_below_width(const char *src, size_t len, size_t max_width, bool break_before_space,
+void u8_truncate_below_width(const char *src, size_t len, size_t max_width, bool break_for_line,
                              bool always_break_before_newline, size_t *out_len, size_t *out_width) {
-  size_t total_width = 0;
+  if (len == 0) {
+    *out_len = 0;
+    *out_width = 0;
+    return;
+  }
+
+  bool hardwrap = false;
 
   // length to the breakpoint
-  size_t break_length = len;
-  // total width at breakponint
-  size_t break_width = len;
-
-  // if we have an previous breakpoint;
-  bool have_breakpoint = false;
+  size_t break_length = 0;
+  // total width at breakponint, expect to be updated.
+  size_t break_width = 0;
 
   UErrorCode status = U_ZERO_ERROR;
-  int32_t pos = -1;
 
   std::unique_ptr<icu::BreakIterator> brk(
-      icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status));
+        icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status)
+      );
+  if (!U_SUCCESS(status)) {
+    debug_message("u8_truncate_below_width: Unable to create break iterator! error %d: %s\n",
+                  status, u_errorName(status));
+    return;
+  }
+
+  status = U_ZERO_ERROR;
+  std::unique_ptr<icu::BreakIterator> linebrk(
+      icu::BreakIterator::createLineInstance(icu::Locale::getDefault(), status)
+  );
   if (!U_SUCCESS(status)) {
     debug_message("u8_truncate_below_width: Unable to create break iterator! error %d: %s\n",
                   status, u_errorName(status));
@@ -328,40 +341,48 @@ void u8_truncate_below_width(const char *src, size_t len, size_t max_width, bool
     return;
   }
 
-  pos = brk->first();
+  status = U_ZERO_ERROR;
+  linebrk->setText(&text, status);
+  if (!U_SUCCESS(status)) {
+    utext_close(&text);
+    debug_message("u8_truncate_below_width: setText error %d: %s\n", status, u_errorName(status));
+    return;
+  }
 
-  /* find a good spot (space) to break the line */
+  break_length = brk->first();
+  int pos = break_length;
+
   while (pos != icu::BreakIterator::DONE) {
     char c = src[pos];
 
-    // Skip over ansi code
+    // Skip over possible ansi color code
     if (CONFIG_INT(__RC_SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__)) {
       while (c == '\x1B') {
         auto start_pos = pos;
-        pos = brk->next();
-        if (pos == icu::BreakIterator::DONE) {
+        pos++;
+        if (pos == len) {
           pos = start_pos;
           break;
         }
         c = src[pos];
         if (c == '[') {
-          pos = brk->next();
-          if (pos == icu::BreakIterator::DONE) {
+          pos++;
+          if (pos == len) {
             pos = start_pos;
             break;
           }
           c = src[pos];
           while (c == ';' || isdigit(c)) {
-            pos = brk->next();
-            if (pos == icu::BreakIterator::DONE) {
+            pos++;
+            if (pos == len) {
               pos = start_pos;
               break;
             }
             c = src[pos];
           }
           if (c == 'm') {
-            pos = brk->next();
-            if (pos == icu::BreakIterator::DONE) {
+            pos++;
+            if (pos > len) {
               pos = start_pos;
               break;
             }
@@ -370,107 +391,67 @@ void u8_truncate_below_width(const char *src, size_t len, size_t max_width, bool
         }
       }
     }
+
+    c = src[pos];
 
     // If we found '\n' break right away
     if (always_break_before_newline) {
       if (c == '\n') {
-        // But if this is the first '\n', just ignore it
-        if (total_width) {
-          break_length = pos;
-          break_width = total_width;
-          break;
-        } else {
-          pos = brk->next();
-          continue;
-        }
-      }
-    }
+        hardwrap = true;
 
-    // Remember possible break point
-    if (break_before_space) {
-      if (c == ' ') {
         break_length = pos;
-        break_width = total_width;
-
-        have_breakpoint = true;
+        break_width = u8_width(src, break_length);
+        break;
       }
     }
 
-    // Try next character, see if we will be over width
-    auto next_pos = brk->next();
-    if (next_pos == icu::BreakIterator::DONE) {
+    auto new_width = break_width + u8_width(src + break_length, pos - break_length);
+
+    // break right on spot
+    if (new_width > 0 && new_width == max_width) {
       break_length = pos;
-      break_width = total_width;
+      break_width = new_width;
       break;
     }
 
-    // Skip over ansi code (yeah, again)
-    c = src[next_pos];
-    if (CONFIG_INT(__RC_SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__)) {
-      while (c == '\x1B') {
-        auto start_pos = next_pos;
-        next_pos = brk->next();
-        if (next_pos == icu::BreakIterator::DONE) {
-          next_pos = start_pos;
-          break;
-        }
-        c = src[next_pos];
-        if (c == '[') {
-          next_pos = brk->next();
-          if (next_pos == icu::BreakIterator::DONE) {
-            next_pos = start_pos;
-            break;
-          }
-          c = src[next_pos];
-          while (c == ';' || isdigit(c)) {
-            next_pos = brk->next();
-            if (next_pos == icu::BreakIterator::DONE) {
-              next_pos = start_pos;
-              break;
-            }
-            c = src[next_pos];
-          }
-          if (c == 'm') {
-            next_pos = brk->next();
-            if (next_pos == icu::BreakIterator::DONE) {
-              next_pos = start_pos;
-              break;
-            }
-            c = src[next_pos];
-          }
-        }
-      }
-    }
-
-    auto new_width = u8_width(src + pos, next_pos - pos);
-    // break now if we will be over width
-    if (total_width + new_width >= max_width) {
-      // use previous breakpoints if possible
-      if (have_breakpoint) {
-        break;
-      }
-      // break right on spot
-      if (total_width + new_width == max_width) {
-        break_length = next_pos;
-        break_width = total_width + new_width;
-        break;
-      }
-      // If we will ends up with nothing, break at next character
+    if (new_width > max_width) {
+      // If we will ends up with nothing, force break at current character
       // This is special case for wide character, sprintf("%-=1s", "一二三四五")
-      if (total_width == 0) {
-        break_length = next_pos;
-        break_width = total_width + new_width;
+      if (break_width == 0) {
+        hardwrap = true;
+
+        break_length = pos;
+        break_width = new_width;
         break;
       }
-      // Finally: normal case, break at current position
-      break_length = pos;
-      break_width = total_width;
+      // Otherwise just break on last point
       break;
     }
-    // Otherwise, move on to next character
-    total_width += new_width;
-    pos = next_pos;
+
+    // not enough width yet, move on to next character
+    break_length = pos;
+    break_width = new_width;
+    pos = brk->next();
   }
+
+  if (break_for_line) {
+    // Try to find an better line break point
+    if (!hardwrap && src[break_length] != ' ' && !linebrk->isBoundary(break_length)) {
+      auto potential_breakpoint = linebrk->preceding(break_length);
+      // Suitable breakpoints
+      if (potential_breakpoint > 0) {
+        break_length = potential_breakpoint;
+        break_width = u8_width(src, break_length);
+      }
+    }
+    // Eat the last space
+    if (break_length > 1 && src[break_length-1] == ' ') {
+      break_length --;
+      break_width --;
+    }
+  }
+
+  DEBUG_CHECK(break_length == 0 && src[break_length] != ' ' && src[break_length] != '\n', "BUG: truncated to empty string!");
 
   utext_close(&text);
 

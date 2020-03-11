@@ -632,13 +632,13 @@ static int add_column(cst **column, int trailing) {
   const char *col_d = col->d.col; /* always holds (col->d.col) */
 
   auto slen = strlen(col_d);
-  size_t break_width, break_len;
-  u8_truncate_below_width(col_d, slen, col->pres, true, true, &break_len, &break_width);
+  size_t swidth;
 
-  add_justified(col_d, break_width, break_len, col->pad, col->size, col->info,
+  u8_truncate_below_width(col_d, slen, col->pres, true, true, &slen, &swidth);
+  add_justified(col_d, swidth, slen, col->pad, col->size, col->info,
                 trailing || col->next);
 
-  col_d += break_len;
+  col_d += slen;
   ret = 1;
 
   // Eat the space if break
