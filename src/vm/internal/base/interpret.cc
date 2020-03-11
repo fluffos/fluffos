@@ -1889,7 +1889,7 @@ void eval_instruction(char *p) {
       }
     }
     if (outoftime) {
-      debug_message("Eval interrupted: cost limit reached, limit: %ld usec.\n",
+      debug_message("Eval interrupted: object %s cost limit reached, limit: %ld usec.\n",
                     current_object->obname, max_eval_cost);
       set_eval(max_eval_cost);
       max_eval_error = 1;
