@@ -20,13 +20,13 @@ field of the C struct as a key in the mapping.
 
 A mapping is declared like this:
 
-mapping x;
+    mapping x;
 
 A mapping can be initialized in one of two ways:
 
     x = ([key0 : value0, key1 : value1, ...]);
 
-    (note: 'x = ([]);' can be used to create an empty mapping)
+note: `x = ([]);` can be used to create an empty mapping
 
 Note that a mapping _must_ be initialized before you may assign any elements
 to it. This restriction exists because of the way the gamedriver
@@ -36,7 +36,7 @@ when you try to assign an element to the mapping.
 
 New (key, value) pairs may be added to the map in the following way:
 
-x[key] = value;
+    x[key] = value;
 
 The above statement causes the driver to search the mapping named 'x' for the
 specified key. If the mapping contains that key, then the associated value
@@ -59,11 +59,13 @@ this deletion will cause the following expression to evaluate to true (1):
 
 so that you could write code such as this:
 
+```c
 if (undefinedp(value = x["MudOS"])) {
-write("'MudOS' is not used as a key in the mapping 'x'\n");
+    write("'MudOS' is not used as a key in the mapping 'x'\n");
 } else {
-write("the value for the key 'MudOS' is " + value + "\n");
+    write("the value for the key 'MudOS' is " + value + "\n");
 }
+```
 
 A list of the keys (indices) may be obtained using the keys() efun, for
 example:
@@ -95,8 +97,8 @@ do. For example:
     mixed *pair;
 
     while ((pair = each(x)) != ({})) {
-    write("key   = " + pair[0] + "\n");
-    write("value = " + pair[1] + "\n");
+        write("key   = " + pair[0] + "\n");
+        write("value = " + pair[1] + "\n");
     }
 
 Mappings can be two-dimensional (or n-dimensional for that matter) in the same
@@ -110,10 +112,12 @@ sense that LPC arrays can be.
     y["a"] = "c";
     x["b"] = y;
 
-    And then x["b"]["a"]  == "c"
+And then :
 
-    Mappings can also be composed using the '*' operator (composed in the
-    mathematical sense of the word):
+    x["b"]["a"]  == "c"
+
+Mappings can also be composed using the '*' operator (composed in the
+mathematical sense of the word):
 
     mapping r1, r2, a;
 
@@ -127,15 +131,17 @@ so:
 
     a = r1 * r2
 
-defines a to be a map with: a["driver"] == "castle";
+defines a to be a map with:
+
+    a["driver"] == "castle";
 
 You may also add two mappings. The sum of two mappings is defined
 as the union of the two mappings.
 
     a = r1 + r2
 
-defines a to be a map with a["driver"] == "mudlib" and
-a["mudlib"] == "castle"
+defines a to be a map with `a["driver"] == "mudlib"` and
+`a["mudlib"] == "castle"`
 
 The += operator is also supported. Thus you could use:
 

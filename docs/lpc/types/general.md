@@ -39,7 +39,9 @@ An example when querying the short description of an object:
 ###
 
     (string)call_other(ob, "short");
-    ...or...
+
+...or...
+
     (string)ob->short();
 
 ###
@@ -61,7 +63,7 @@ by names, but do not have to have the same names as in the real definition.
 All types must of course be the same. The name of the argument can also
 be omitted:
 
-string func(int);
+    string func(int);
 
 ###
 
@@ -105,58 +107,67 @@ Basic types
 
 ###
 
-int
-An integer number (32 bit).
+### int
+
+    An integer number (32 bit).
 
 ###
 
-float
-A floating point number (32 bit).
+### float
+
+    A floating point number (32 bit).
 
 ###
 
-string
-An unlimited string of characters (no '\0' allowed tho).
+### string
+
+    An unlimited string of characters (no '\0' allowed tho).
 
 ###
 
-object
-A pointer to an object.
+### object
+
+    A pointer to an object.
 
 ###
 
-mapping
-A form of associative array; see separate documentation.
+### mapping
+
+    A form of associative array; see separate documentation.
 
 ###
 
-function
-A special type that points to a function of some sort; see
-separate documentation.
+### function
+
+    A special type that points to a function of some sort; see
+    separate documentation.
 
 ###
 
-Arrays
-Arrays are declared using a '*' following a basic type. For example,
-declaring an array of numbers: int *arr;. Use the type mixed if you want an
-array of arrays, or a mixed combination of types.
+### Arrays
+
+    Arrays are declared using a '*' following a basic type. For example,
+    declaring an array of numbers: int *arr;. Use the type mixed if you want an
+    array of arrays, or a mixed combination of types.
 
 ###
 
-void
-This type is only usable for functions. It means that the function will not
-return any value. The compiler will complain (when type checking is enabled)
-if a return value is used.
+### void
+
+    This type is only usable for functions. It means that the function will not
+    return any value. The compiler will complain (when type checking is enabled)
+    if a return value is used.
 
 ###
 
-mixed
-This type is special, in that it is valid to use in any context. Thus, if
-everything was declared mixed, then the compiler would never complain. This
-is of course not the idea. It is really only supposed to be used when a
-variable really is going to contain different types of values. This should
-be avoided if possible. It is not good coding practice to allow a function,
-for example, to return different types.
+### mixed
+
+    This type is special, in that it is valid to use in any context. Thus, if
+    everything was declared mixed, then the compiler would never complain. This
+    is of course not the idea. It is really only supposed to be used when a
+    variable really is going to contain different types of values. This should
+    be avoided if possible. It is not good coding practice to allow a function,
+    for example, to return different types.
 
 ###
 
@@ -172,34 +183,39 @@ not be redefined as private in a private inheritance statement.
 
 ###
 
-varargs
-A function of this type can be called with a variable number of arguments.
-Otherwise, the number of arguments is checked, and can generate an error.
+### varargs
+
+    A function of this type can be called with a variable number of arguments.
+    Otherwise, the number of arguments is checked, and can generate an error.
 
 ###
 
-private
-Can be given for both functions and variables. Functions that are private in
-object A can not be called through call_other() in another object. They're
-also not accessable to any object that inherits A.
+### private
+
+    Can be given for both functions and variables. Functions that are private in
+    object A can not be called through call_other() in another object. They're
+    also not accessable to any object that inherits A.
 
 ###
 
-static
-This special type behaves different for variables and functions. It is
-similar to private for functions, in that they cannot be called from other
-objects with call_other(). static variables will be neither saved nor
-restored when using save_object() or restore_object().
+### static
+
+    This special type behaves different for variables and functions. It is
+    similar to private for functions, in that they cannot be called from other
+    objects with call_other(). static variables will be neither saved nor
+    restored when using save_object() or restore_object().
 
 ###
 
-public
-A function defined as public will always be accessible from other objects,
-even if private inheritance is used.
+### public
+
+    A function defined as public will always be accessible from other objects,
+    even if private inheritance is used.
 
 ###
 
-nomask
-All symbols defined as nomask cannot be redefined by inheritance. They can
-still be used and accessed as usual. nomask also blocks functions from
-being shadowed with shadow().
+### nomask
+
+    All symbols defined as nomask cannot be redefined by inheritance. They can
+    still be used and accessed as usual. nomask also blocks functions from
+    being shadowed with shadow().

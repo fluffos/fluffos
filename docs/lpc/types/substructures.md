@@ -3,21 +3,18 @@ layout: default
 title: types / substructures
 ---
 
-    	LPC Substructures
+## LPC Substructures
 
-1. Indexing and Ranging - General Introduction
+### Indexing and Ranging - General Introduction
 
----
-
-    Since v20.25a6, MudOS provides a way of indexing or getting
+> Since v20.25a6, MudOS provides a way of indexing or getting
 
 slices (which I will, following common use, call 'ranging') of
 strings/buffers/arrays/mappings (for mappings only indexing is
 available) as well as means of changing the values of data
 via lvalues (i.e. 'assignable values') formed by indexing/ranging.
 
-    As an example, if we set str as "abcdefg", str[0] will
-
+As an example, if we set str as "abcdefg", str[0] will
 be 'a', str[1] 'b' etc. Similarly, the nth element of an array
 arr is accessed via arr[n-1], and the value corresponding to
 key x of mapping m, m[x]. The '<' token can be used to denote
@@ -25,8 +22,7 @@ indexing from the right, i.e. str[<x] means str[strlen(str) - x]
 if str is a string. More generally arr[<x] means arr[sizeof(arr)-x].
 (Note that sizeof(arr) is the same as strlen if arr is a string).
 
-    Indexed values are reasonable lvalues, so one could do for e.g.
-
+Indexed values are reasonable lvalues, so one could do for e.g.
 str[0] = 'g' to change the 1st character of str to g. Although it is
 possible to use ({ 1,2 })[1] as a value (which is currently optimized
 in MudOS to compile to 2 directly), it is not possible to use it as an
@@ -35,8 +31,7 @@ lvalue (Even if we did support it, it would be useless, since there
 is no other reference to the affected mapping). I will describe in
 more detail later what are the actually allowed lvalues.
 
-    Another method of obtaining a subpart of an LPC value is via
-
+Another method of obtaining a subpart of an LPC value is via
 ranging. An example of this is str[1..2], where for str being
 "abcdefg", gives "bc". In general str[n1..n2] returns a substring
 consisting of the (n1+1) to (n2+1)th characters of str. If n1 or n2
@@ -59,29 +54,27 @@ result if x is negative). One can however, also use < in ranging
 to mean counting from the end. So str[<x..<y] means
 str[strlen(str)-x..strlen(str)-y].
 
-/_ Remark: If OLD_RANGE_BEHAVIOR is defined, then the priority of <
+Remark: If OLD_RANGE_BEHAVIOR is defined, then the priority of <
 is higher than the priority of checking if it's negative.
 That is, if you do str[<x..y], it will mean the same
 as str[strlen(str)-x..y], meaning therefore that it will
 check only now if strlen(str)-x is negative and if so,
 takes it to be from the end, leading you back to x again
-_/
 
 Thus far, str[<x..<y], str[<x..y], str[x..<y], str[<x..] (meaning the
 same as str[<x..<1]) and str[x..] (same as str[x..<1]) are supported.
 The same holds for arrays/buffers.
 
-    Perhaps this might seem strange at first, but ranges also
-
+Perhaps this might seem strange at first, but ranges also
 are allowed to be lvalues! The meaning of doing
 
-    str[x..y] = foo;  (1)
+    str[x..y] = foo; // (1)
 
 is basically 'at least' doing
 
-    str = str[0..x-1] + foo + str[y+1..];  (2)
+    str = str[0..x-1] + foo + str[y+1..]; // (2)
 
-    Here x can range from 0..sizeof(str) and y from -1 to
+Here x can range from 0..sizeof(str) and y from -1 to
 
 sizeof(str) - 1. The reason for these bounds is because, if I
 wanted to add foo to the front,
@@ -94,13 +87,12 @@ this is essentially the same as
 
 since str[0..-1] is just "".
 
-/_ Remark: As far as range lvalues are concerned, negative indexes
+Remark: As far as range lvalues are concerned, negative indexes
 do not translate into counting from the end even if
 OLD_RANGE_BEHAVIOR is defined. Perhaps this is confusing,
 but there is no good way of allowing for range lvalue
 assignments which essentially result in the addition
 of foo to the front as above otherwise
-_/
 
 Hence, that's the same as doing
 str = str[0..0-1] + foo + str[0..];
@@ -115,24 +107,23 @@ this :))
 
     Similarly, I will leave it to you to verify that
 
-    str[sizeof(str)..sizeof(str)-1] = foo; (3)
+    str[sizeof(str)..sizeof(str)-1] = foo; // (3)
 
 would lead to str = str + foo. Now, we can use < in range lvalues
 as well, so (3) could have been written as
 
-    str[<0..<1] = foo; (4)
+    str[<0..<1] = foo; // (4)
 
 or even
 
-    str[<0..] = foo; (5)
+    str[<0..] = foo; // (5)
 
 which is more compact and faster.
 
-/_ Remark: The code for str[<0..] = foo; is generated at compile time
+Remark: The code for str[<0..] = foo; is generated at compile time
 to be identical to that for str[<0..<1] = foo; so neither
 should be faster than the other (in principle) at runtime,
 but (4) is faster than (3).
-_/
 
 Now we come to the part where I mentioned 'at least' above. For strings,
 we know that when we do x = "abc"; y = x;, y has a new copy of the string
@@ -152,34 +143,29 @@ it will not (i.e. if you do x[0..-1] = ({ 2,3 }). This only applies
 to arrays/buffers, for strings it will never affect y if we assign to a
 range of x.
 
-2. More complex lvalues and applications
+### More complex lvalues and applications
 
----
-
-    Since arrays/mappings can contain other arrays/mappings, it
+Since arrays/mappings can contain other arrays/mappings, it
 
 is possible in principle to index them twice or more. So for e.g.
 if arr is ({ ({ 1,"foo",3 }),4 }) then arr[0][1] (read as the 2nd
 element of arr[0], which is the 1st element of arr) is "foo". If we
 do, for e.g. arr[0][2] = 5, then arr will be ({ ({ 1, "foo", 5 }), 4 }).
 
-/_ Remark: by the 'will be' or 'is' above, I mean technically: recursively
+Remark: by the 'will be' or 'is' above, I mean technically: recursively
 equal. (This is just if some people are confused)
-_/
 
-    Similarly, arr[0][1][1] = 'g' changes arr to ({ ({ 1, "fgo", 3 }),
-
+Similarly, arr[0][1][1] = 'g' changes arr to ({ ({ 1, "fgo", 3 }),
 4 }), and arr[0][1][0..1] = "heh" (note that the right hand side can
 have a different length, imagine this being like taking the 1st two
 characters out from arr[0][1], which is currently "foo", and putting
 "heh" in place, resulting in "heho") gives arr as ({ ({ 1, "heho", 3 }),
 4 }). You should now be able to generate more examples at your fancy.
 
-    Now I want to discuss some simple applications.
+Now I want to discuss some simple applications.
+Some of you may know that when we are doing
 
-    Some of you may know that when we are doing
-
-    sscanf("This is a test", "This %s %s test", x, y) (6)
+    sscanf("This is a test", "This %s %s test", x, y) //(6)
 
 that x and y are technically lvalues. This is since what the driver
 does is to parse the original string into the format you give, and
@@ -192,8 +178,7 @@ general lvalues, we may do
 
     sscanf("Written on a roadside: the char for 'y' has value 121\n",
            "Written on %sside: the char for 'y' has value %d\n",
-           arr[3][0][<0..], x[1]);
-                                                       (7)
+           arr[3][0][<0..], x[1]); //(7)
 
 will result in arr being ({ 1, 2, 3, ({ "This is a road" }) }) and
 x being "symmetry". (See how we have extended the string in arr[3][0]
@@ -201,72 +186,59 @@ via sscanf?) The driver essentially parses the string to gives the
 matches "a road" and 121, it then does the assignments to the lvalues,
 which is how we got them as above.
 
-    The ++,--,+= and -= operators are supported for char lvalues,
-
+The ++,--,+= and -= operators are supported for char lvalues,
 i.e. lvalues obtained by indexing strings. Thus for e.g. to get
 an array consisting of 26 elements "test.a","test.b", .., "test.z",
 one might use a global var tmp as follows:
 
-    mixed tmp;
+```c
+mixed tmp;
 
-    create(){
-       string *arr;
+create(){
+    string *arr;
 
-       ...
+    ...
 
-       tmp = "test.'";
-       arr = map_array(allocate(26), (: tmp[4]++ && tmp :));
+    tmp = "test.'";
+    arr = map_array(allocate(26), (: tmp[4]++ && tmp :));
 
-       ...
-    }
+    ...
+} // (8)
+```
 
-    						  (8)
+### General syntax of valid lvalues
 
-3. General syntax of valid lvalues
-
----
-
-    Finally, as a reference, I will just put here the grammar of
-
+Finally, as a reference, I will just put here the grammar of
 valid lvalues accepted by the driver.
 
-    By a basic lvalue I mean a global or local variable name, or a
-
+By a basic lvalue I mean a global or local variable name, or a
 parameter in a functional function pointer such as \$2.
 
-    A basic lvalue is a valid lvalue, and so are indexed lvalues of
-
+A basic lvalue is a valid lvalue, and so are indexed lvalues of
 basic or indexed lvalues. (Notice that I did not say indexed lvalues of
 just basic lvalues to allow for a[1][2]). I will generally call an lvalue
 obtained from a basic lvalue by indexing only indexed lvalues.
 
-    The following lvalues are also valid at compile time:
+The following lvalues are also valid at compile time:
 
-       (<basic lvalue> <assignment token> <rhs>)[a_1][a_2]...[a_n]
-       (<indexed lvalue> <assignment token> <rhs>)[a_1][a_2]...[a_n]
-
-                                                            (9)
+    (<basic lvalue> <assignment token> <rhs>)[a_1][a_2]...[a_n]
+    (<indexed lvalue> <assignment token> <rhs>)[a_1][a_2]...[a_n] // (9)
     /* Remark: n >= 1 here */
 
     assignment token is one of +=, -=, *=, &=, /=, %=, ^=, |=, =, <<=,
-
 > > =.
 
-    However, because of the same reason that when we assign to a
-
+However, because of the same reason that when we assign to a
 string, we obtain a new copy, (x = "foo")[2] = 'a' is invalidated at
 runtime. (One way to think about this is, essentially, assignment leaves
 the rhs as a return value, so x = "foo" returns "foo", the right hand
 side, which is not the same "foo" as the one in x. For arrays/buffers
 this is no problem because by assigning, we share the array/buffer)
 
-    Call the lvalues in (9) complex lvalues. Then the following is
-
+Call the lvalues in (9) complex lvalues. Then the following is
 also a valid lvalue:
 
-    (<complex lvalue> <assignment token> <rhs>)[a_1][a_2]...[a_n]
-
-                                                             (10)
+    (<complex lvalue> <assignment token> <rhs>)[a_1][a_2]...[a_n] // (10)
 
 ###
 
@@ -274,29 +246,25 @@ and if we now call the above lvalues also complex lvalues, it would
 still be consistent, i.e. (((a[0] = b)[1] = c)[2] = d)[3] is an okay
 lvalue (though I wouldn't suggest using it for clarity's sake :)).
 
-    Now, the last class of valid lvalues are range lvalues, which
-
+Now, the last class of valid lvalues are range lvalues, which
 are denoted by ranging either a basic, indexed or complex lvalue:
 
     <basic lvalue>[n1..n2]
     <indexed lvalue>[n1..n2]
     <complex lvalue>[n1..n2]
 
-    plus other ranges such as [<n1..<n2] etc.
-    	                                                 (11)
+plus other ranges such as [<n1..<n2] etc. (11)
 
-    There is maximally only one 'range' you can take to obtain a
-
+There is maximally only one 'range' you can take to obtain a
 valid lvalue, i.e. arr[2..3][0..1] is not a valid lvalue (note that
 a naive interpretation of this syntax is one equivalent to using
 arr[2..3] itself)
 
-4. Compile-time errors that occur and what they mean
+### Compile-time errors that occur and what they mean
 
 ---
 
-    Here I put some notes on compile-time errors for valid lvalues,
-
+Here I put some notes on compile-time errors for valid lvalues,
 hopefully to be useful for you.
 
 Err 1: Can't do range lvalue of range lvalue
@@ -325,12 +293,9 @@ Diagnosis: Oops, we are out of luck here :) Try looking at your lvalue
 more carefully, and see that it obeys the rules described
 in section 3 above.
 
-5. Coming attractions
+### Coming attractions
 
----
-
-    Perhaps a pointer type will be introduced to allow passing
-
+Perhaps a pointer type will be introduced to allow passing
 by reference into functions. Mappings may be multivalued and
 multi-indexable.
 
