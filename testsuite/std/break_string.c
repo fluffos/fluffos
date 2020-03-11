@@ -1,44 +1,22 @@
 // From MorgenGrauen MUDlib
 // Rewirtten by lonely for driver of fluffos v2019
 
-#include "break_string.h"
-
-varargs string remove_space(string str, int flag, string dest)
-{
-    string result;
-
-    if (!stringp(str) || str == "")
-        return "";
-
-    if (intp(flag) && flag == TRIM_LEFT)
-    {
-        result = ltrim(str);
-    }
-    else if (intp(flag) && flag == TRIM_RIGHT)
-    {
-        result = rtrim(str);
-    }
-    else
-    {
-        result = trim(str);
-    }
-
-    if (result != "" && stringp(dest) && dest != "")
-        result = replace_string(result, dest, "");
-
-    return result;
-}
+#define BS_LEAVE_MY_LFS         1
+#define BS_SINGLE_SPACE         2
+#define BS_BLOCK                4
+#define BS_NO_PARINDENT         8
+#define BS_INDENT_ONCE         16
+#define BS_PREPEND_INDENT      32
 
 private string stretch(string str, int width)
 {
     int len = strwidth(str);
     string trimmed, *words;
     int start_spaces, word_count, space_count, space_per_word, rest;
-    string temp;
 
     if (len == width) return str;
 
-    trimmed = remove_space(str, TRIM_LEFT);
+    trimmed = ltrim(str);
 
     if (trimmed == "") return str;
 
@@ -49,7 +27,7 @@ private string stretch(string str, int width)
     word_count = sizeof(words) - 1;
 
     if (!word_count)
-        return sprintf("%*s", start_spaces, " ") + words[0];
+        return sprintf("%*' 's", start_spaces, "") + words[0];
 
     space_count = width - len;
 
@@ -59,8 +37,7 @@ private string stretch(string str, int width)
 
     for (int pos = 0; pos < rest; pos++) words[pos] += " ";
 
-    temp = sprintf("%*s", space_per_word, " ");
-    return sprintf("%*s", start_spaces, " ") + implode(words, temp);
+    return sprintf("%*' 's", start_spaces, "") + implode(words, sprintf("%*' 's", space_per_word, ""));
 }
 
 private varargs string block_string(string str, int width, int flags)
@@ -69,7 +46,7 @@ private varargs string block_string(string str, int width, int flags)
 
     if ((flags & BS_LEAVE_MY_LFS) && !(flags & BS_NO_PARINDENT))
     {
-        str = " " + replace_string(str, "\n", "\n ", 1);
+        str = " " + replace_string(str, "\n", "\n ");
     }
 
     str = sprintf("%-*=s", width, str);
@@ -77,7 +54,7 @@ private varargs string block_string(string str, int width, int flags)
     tmp = explode(str, "\n");
 
     if (sizeof(tmp) > 1)
-        return implode(map(tmp[0.. < 2], (: stretch($1, $(width)) :)), "\n") + "\n" + tmp[ < 1];
+        return implode(map_array(tmp[0.. < 2], (: stretch($1, $(width)) :)), "\n") + "\n" + tmp[ < 1];
 
     return str;
 }
@@ -93,7 +70,7 @@ varargs string break_string(string str, int width, mixed indent, int flags)
 
     if (intp(indent))
     {
-        temp = sprintf("%*s", indent, " ");
+        temp = sprintf("%*' 's", indent, "");
         indent = indent ? temp : "";
     }
 
@@ -105,12 +82,15 @@ varargs string break_string(string str, int width, mixed indent, int flags)
     }
 
     if (!(flags & BS_LEAVE_MY_LFS))
-        str = replace_string(str, "\n", " ", 1);
+        str = replace_string(str, "\n", " ");
 
     if (flags & BS_SINGLE_SPACE)
-        str = replace_string(str, "(^|\n| )  *", "\\1", 1);
+    {
+        str = replace_string(str, "\n", " ");
+        str = implode(explode(str, " ") - ({""}), " ");
+    }
 
-    if (indentlen && flags & BS_PREPEND_INDENT)
+    if (indentlen && (flags & BS_PREPEND_INDENT))
     {
         if (indentlen + strwidth(str) > width || (flags & BS_LEAVE_MY_LFS) && strsrch(str, "\n") > -1)
         {
@@ -126,15 +106,14 @@ varargs string break_string(string str, int width, mixed indent, int flags)
     }
     else
     {
-        str = sprintf("%-*=s", width - indentlen, str);
+        str = sprintf("%-1.*=s", width - indentlen, str);
     }
 
     if (str[ < 1] != '\n') str += "\n";
 
     if (!indentlen) return prefix + str;
 
-    temp = sprintf("%*s", indentlen, " ");
-    indent2 = (flags & BS_INDENT_ONCE) ? temp : indent;
+    indent2 = (flags & BS_INDENT_ONCE) ? sprintf("%*' 's", indentlen, "") : indent;
 
-    return prefix + indent + replace_string(str[0.. < 2], "\n", "\n" + indent2, 1) + "\n";
+    return prefix + indent + replace_string(str[0.. < 2], "\n", "\n" + indent2) + "\n";
 }
