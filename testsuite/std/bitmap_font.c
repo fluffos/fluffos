@@ -7,7 +7,7 @@ Date: 2020-02-20
 Description:
     display ASCII and chinese with bitmap font
 *****************************************************************************/
-// 字体文件(请根据需要修改)
+// 字体文件(请根据需要修改路径)
 #define HZK __DIR__ "fonts/HZK"
 #define ASC __DIR__ "fonts/ASC"
 // 默认前景字符
@@ -33,13 +33,13 @@ varargs string bitmap_font(string str, int size, string fill, string bg, string 
     if (member_array(size, ({12, 14, 16})) < 0)
         size = AUTO_SIZE;
 
-    out = allocate(size, "");
-    // 中文字体占用的字节数
+    // 中文字体占用的字节数(支持32x32等字库)
     if (size < 16)
         fontsize = size * 2;
     else
         fontsize = size * size / 8;
 
+    out = allocate(size, "");
     scale = fontsize / size;
 
     if (!sizeof(fill)) fill = DEFAULT_FILL;
