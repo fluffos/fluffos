@@ -3,20 +3,20 @@ layout: default
 title: constructs / while
 ---
 
-The LPC while loop:
+### The LPC while loop:
 
 LPC's while loop is identical to that provided by C. Syntax is as follows:
 
-while (expression)
-statement;
+    while (expression)
+        statement;
 
 where statement may be replaced by a block of statements delimited by
 matching curly brackets. For example:
 
-while (expression) {
-statement0;
-statement1;
-}
+    while (expression) {
+        statement0;
+        statement1;
+    }
 
 The statements inside the body of the while loop will be executed
 repeatedly for as long as the test expression evaluates to non-zero.
@@ -28,18 +28,21 @@ in the body of the loop will continue the execution from the beginning
 of the loop (skipping the remainder of the statements in the loop for
 the current iteration).
 
+```c
 int test(int limit)
 {
-total = 0;
-j = 0;
-while (j < limit) {
-if ((j % 2) != 0)
-continue;
-total += j;
-j++;
+    int total = 0;
+    int j = 0;
+    while (j < limit) {
+        j++;
+        if ((j % 2) != 0)
+            continue;
+        else
+            total += j;
+    }
+    return total;
 }
-return total;
-}
+```
 
 The results of this code fragment will be to sum all of the even numbers
 from 0 to to limit - 1.

@@ -3,33 +3,33 @@ layout: default
 title: constructs / if
 ---
 
-- The if else statement:
+### The if else statement
 
 LPC's if statement is identical to that provided by C. Syntax is as follows:
 
     if (expression)
-    statement;
+        statement;
 
 Alternately:
 
     if (expression) {
-    statements;
+        statements;
     }
 
 Alternately:
 
     if (expression0) {
-    statements;
+        statements;
     } else {
-    statements1;
+        statements1;
     }
 
 Alternately:
 
     if (expression0) {
-    statements0;
+        statements0;
     } else if (expression1) {
-    statements1;
+        statements1;
     }
 
 The number of else clauses is not explicitly limited.
@@ -44,9 +44,9 @@ operates identical to C. The syntax is:
 In some cases, ? : is an shorter way of expression constructs such as:
 
     if (expression0)
-    var = expression1;
+        var = expression1;
     else
-    var = expression2;
+        var = expression2;
 
 which can be equivalently translated to:
 

@@ -3,9 +3,11 @@ layout: default
 title: constructs / inherit
 ---
 
-The LPC inherit statement:
+### The LPC inherit statement
 
-Syntax: inherit pathname;
+Syntax:
+
+    inherit pathname;
 
 where pathname is a full path delimited by quotes (e.g. "/std/Object").
 
@@ -29,7 +31,7 @@ overrides the definition provided by B. If A wishes to access the definition
 provided by B, then it may do so. For example suppose that object A defines
 its own function named query_long and yet wishes to call the query_long
 function provided by the /std/Object.c object. Then A may refer to the
-query_long in Object.c as Object::query_long(). If A defines a variable
+query_long in Object.c as `Object::query_long()`. If A defines a variable
 of the same name as a global variable defined in B, then the only way that A
 can access that variable is via functions provided by B. If B defines
 a global variable that is not declared in A, then by default A may use that
@@ -43,8 +45,8 @@ one other object. Suppose special.c inherits weapon.c and armor.c and that
 both weapon.c and armor.c each provide their own version of query_long().
 We may assume that special.c wants to sometimes act like a weapon and
 sometimes act like armor. When special.c is to look like armor it
-can use armor::query_long() and when it is to look like a weapon it
-can use weapon::query_long().
+can use `armor::query_long()` and when it is to look like a weapon it
+can use `weapon::query_long()`.
 
 See the tutorial named 'types/modifiers' for more information on how
 inherited objects may hide data and function definitions from objects that
