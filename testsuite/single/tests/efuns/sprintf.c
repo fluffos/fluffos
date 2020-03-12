@@ -235,8 +235,9 @@ void do_tests() {
 
     ASSERT_EQ("          " ANSI_RED ANSI_RESET, sprintf("%10s", ANSI_RED "" ANSI_RESET));
 
+    // TODO: doesn't work yet
     //ASSERT_EQ(ANSI_RED"t\ne\ns\nt"ANSI_RESET, sprintf("%-=1s", ANSI_RED "test" ANSI_RESET));
-    // ASSERT_EQ(ANSI_RED "" ANSI_RESET, sprintf("%-=1s", ANSI_RED "" ANSI_RESET));
+    //ASSERT_EQ(ANSI_RED "" ANSI_RESET, sprintf("%-=1s", ANSI_RED "" ANSI_RESET));
 
     ASSERT_EQ("this\nis a\nvery\nlong\nsenten\nce.", sprintf("%-=6s", "this is a very long sentence."));
 

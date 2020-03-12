@@ -18,9 +18,7 @@ layout: default
 title: %s
 ---
 
-Auto generated on %s for [%s](https://github.com/fluffos/fluffos/tree/%s).
-
-""" % (title, time.strftime("%Y-%m-%d %H:%M:%S %Z", time.localtime()), version, version)
+""" % (title)
 
   for cat in sorted(category_efun_map.iterkeys()):
     print "### %s\n" % cat
@@ -43,6 +41,12 @@ Auto generated on %s for [%s](https://github.com/fluffos/fluffos/tree/%s).
           print "<div>&nbsp;</div>"
       print "</div>"
     print "</div>\n"
+
+  print """
+
+This page is auto generated on %s for [%s](https://github.com/fluffos/fluffos/tree/%s).
+
+""" % (time.strftime("%Y-%m-%d %H:%M:%S %Z", time.localtime()), version, version)
 
 if __name__ == '__main__':
   main(*sys.argv[1:])
