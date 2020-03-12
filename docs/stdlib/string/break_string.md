@@ -1,6 +1,6 @@
 ---
 layout: default
-title: stdlib/break_string
+title: stdlib / break_string
 ---
 
 ### NAME
@@ -19,7 +19,7 @@ title: stdlib/break_string
 
 
 ### ARGUMENTS
-    
+
     str - string to wrap
     width - optional: maximum line length (default 78)
     indent - optional: String that appears before each broken line
@@ -33,16 +33,16 @@ DESCRIPTION
     In the first form, the string 'str' is changed by inserting "\n"
     broken that with a subsequent output line no longer as 'width' characters.
     Possibly existing "\n" in 'str' are removed beforehand.
-    
+
     If you also add a string 'indent', this will be used to  set each of
     the wrapped lines.
-    
+
     Similarly, when specifying the number 'space', a string with 'space'
     characters in front of each broken line.
-    
+
     In addition, there are the following optional flags, which can be combined as desired
     can:
-    
+
            BS_LEAVE_MY_LFS - "\n" that already exist in the text are retained
            BS_SINGLE_SPACE - double spaces and spaces after line
                                breaks are removed
@@ -64,7 +64,7 @@ RETURN VALUE
 =============
 
     The wrapped text.
-    
+
     Runtime error if the indent is longer than the specified width.
 
 EXAMPLES

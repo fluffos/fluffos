@@ -1,104 +1,115 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="x-ua-compatible" content="ie=edge">
-    <title>FluffOS - {{ page.title }}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <title>FluffOS - {{ page.title }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
-    <link rel="stylesheet" href={{ "/css/default.css" | relative_url }}>
-    <!-- Global site tag (gtag.js) - Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-2912700-7"></script>
-	<script>
-		  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css"
+        integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+  <link rel="stylesheet" href={{
+  "/css/default.css" | relative_url }}>
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=UA-2912700-7"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
 
-  gtag('config', 'UA-2912700-7');
-	</script>
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'UA-2912700-7');
+  </script>
   {% seo %}
-  </head>
-  <body>
-    <div class="container">
-      <div class="row">
-        <div class="col-4 col-sm-4 col-lg-3 text-right">
-          <a href="/"><h1>FluffOS</h1></a>
-        </div>
-        <div class="col-8 col-sm-8 col-lg-8" style="margin-top: 15px"> <gcse:searchbox-only></gcse:searchbox-only> </div>
-      </div>
-      <div class="row">
-        <div class="col-4 col-sm-4 col-lg-3">
-          <div id="pages">
-            <ol>
-              <li>Start Here
-                <ol>
-                  <li><a href="/">Welcome</a></li>
-                  <li><a href="/build_v2017.html">Build Driver (v2017)</a></li>
-                  <li><a href="/build.html">Build Driver (v2019)</a></li>
-                  <li><a href="/bug.html">Bug Report</a></li>
-                </ol>
-              </li>
-              <li>Documentation
-                <ol>
-                  <li><a href="/lpc">LPC Language</a></li>
-                  <li><a href="/concepts">Concepts</a></li>
-                  <li><a href="/driver">Driver</a></li>
-                  <li><a href="/apply">Apply</a></li>
-                  <li><a href="/efun">EFUN</a></li>
-                </ol>
-              </li>
-              <li>Packages
-                <!--
-                  <ol>
-                  <li><a href="#"></a></li>
-                  </ol>
-                -->
-              </li>
-              <li>Development
-                <ol>
-                  <li><a href="https://github.com/fluffos/fluffos">GitHub Repo</a></li>
-                  <li><a href="https://travis-ci.org/fluffos/fluffos">Travis CI</a></li>
-                  <li><a href="https://coveralls.io/github/fluffos/fluffos">Coverage</a></li>
-                  <li><a href="https://scan.coverity.com/projects/483?tab=Overview">Coverity Scan</a></li>
-                </ol>
+</head>
 
-              </li>
-
-              <li>Contact
-                <ol>
-                  <li><a href="https://forum.fluffos.info">Forum</a></li>
-                </ol>
-              </li>
-            </ol>
-          </div>
-        </div>
-
-        <div class="col-8 col-sm-8 col-lg-8">
-		<h2>{{ page.title }}</h2>
-		<p><small><span class="glyphicon glyphicon-pencil"></span>{% github_edit_link "Edit this article on Github" %}.</small></p>
-          <div id="content">
-            {{ content }}
-          </div>
-          <div id='discourse-comments'></div>
-<script type="text/javascript">
-  if (location.pathname.match(/\/(lpc|concepts|driver|apply|efun)\/.+/)) {
-    DiscourseEmbed = { discourseUrl: 'https://forum.fluffos.info/',
-                       discourseEmbedUrl: location.href };
-
-    (function() {
-      var d = document.createElement('script'); d.type = 'text/javascript'; d.async = true;
-      d.src = DiscourseEmbed.discourseUrl + 'javascripts/embed.js';
-      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(d);
-    })();
-  }
-</script>
-        </div>
+<body>
+<div class="container col-10 col-lg-8">
+  <header class="blog-header py-3">
+    <div class="row flex-nowrap justify-content-between align-items-center">
+      <div class="col-12 text-center">
+        <a class="blog-header-logo text-dark"> {{ page.title }}</a>
       </div>
     </div>
-    <!-- GCSE -->
-  <script>
-  (function() {
+  </header>
+  <nav class="navbar navbar-expand-lg navbar-light bg-light">
+      <div class="navbar-header">
+        <a class="navbar-brand" href="/">FluffOS</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
+                aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+      </div>
+      <div class="collapse navbar-collapse justify-content-center" id="navbarSupportedContent">
+          <ul class="navbar-nav mr-auto">
+            <li>
+              <a class="nav-link" href="/lpc">LPC Language</a>
+            </li>
+              <a class="nav-link" href="/apply">Apply</a>
+            </li>
+              <a class="nav-link" href="/efun">EFUN</a>
+            </li>
+              <a class="nav-link" href="/stdlib">STDLIB</a>
+            </li>
+            <li>
+              <div class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown2" role="button" data-toggle="dropdown"
+                   aria-haspopup="true" aria-expanded="false">
+                  Build Driver
+                </a>
+                <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                  <a class="dropdown-item" href="/build.html">Build (v2019)</a>
+                  <a class="dropdown-item" href="/build_v2017.html">Build (v2017)</a>
+                  <a class="dropdown-item" href="/concepts">Concept</a>
+                  <a class="dropdown-item" href="/driver">Hack Notes</a>
+                  <a class="dropdown-item" href="/bug.html">Bug Report</a>
+                </div>
+              </div>
+            </li>
+          </ul>
+        <div>
+          <div class="gcse-search"></div>
+        </div>
+      </div>
+  </nav>
+  <div id="content" class="text-justify px-2 py-2">
+    {{ content }}
+  </div>
+  <div class="card">
+    <div class="card-header">
+      Improve this page
+    </div>
+    <div class="card-body">
+      <p class="card-text">Every page on this site is maintained by user like you!</p>
+      <a href="{% github_edit_link %}" class="my-2">Edit On Github</a>
+    </div>
+  </div>
+  <div class="container">
+    <div id='discourse-comments'></div>
+    <script type="text/javascript">
+      if (location.pathname.match(/\/(lpc|concepts|driver|apply|efun)\/.+/)) {
+        DiscourseEmbed = {
+          discourseUrl: 'https://forum.fluffos.info/',
+          discourseEmbedUrl: location.href
+        };
+
+        (function () {
+          const d = document.createElement('script');
+          d.type = 'text/javascript';
+          d.async = true;
+          d.src = DiscourseEmbed.discourseUrl + 'javascripts/embed.js';
+          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(d);
+        })();
+      }
+    </script>
+  </div>
+</div>
+<!-- GCSE -->
+<script>
+  (function () {
     var cx = '015880077353261870029:ujn3ynk194o';
     var gcse = document.createElement('script');
     gcse.type = 'text/javascript';
@@ -108,9 +119,15 @@
     s.parentNode.insertBefore(gcse, s);
   })();
 </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
-
-    <script src="https://cdn.rawgit.com/google/code-prettify/master/loader/run_prettify.js"></script>
-  </body>
+<script src="https://code.jquery.com/jquery-3.4.1.slim.min.js"
+        integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n"
+        crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"
+        integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo"
+        crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js"
+        integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6"
+        crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/gh/google/code-prettify@master/loader/run_prettify.js"></script>
+</body>
 </html>
