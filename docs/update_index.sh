@@ -13,6 +13,9 @@ TARGET_DIR=./efun
 TARGET_DIR=./apply
 ./gen_index.py $TARGET_DIR Applies $TAG > $TARGET_DIR/index.md
 
+TARGET_DIR=./stdlib
+./gen_index.py $TARGET_DIR stdlib $TAG > $TARGET_DIR/index.md
+
 # Copy rest of docs
 for topic in concepts driver lpc; do
   TARGET_DIR=./$topic
