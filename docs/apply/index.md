@@ -23,6 +23,9 @@ title: Applies
 </div>
 <div class='row'>
 <div class='col-sm-3'>
+<div><a href='interactive/receive_environ.html'>receive_environ</a></div>
+</div>
+<div class='col-sm-3'>
 <div><a href='interactive/receive_message.html'>receive_message</a></div>
 </div>
 <div class='col-sm-3'>
@@ -31,9 +34,16 @@ title: Applies
 <div class='col-sm-3'>
 <div><a href='interactive/telnet_suboption.html'>telnet_suboption</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='interactive/terminal_type.html'>terminal_type</a></div>
 </div>
+<div class='col-sm-3'>
+<div><a href='interactive/write_prompt.html'>write_prompt</a></div>
+</div>
+<div>&nbsp;</div>
+<div>&nbsp;</div>
 </div>
 </div>
 
@@ -56,6 +66,9 @@ title: Applies
 </div>
 <div class='row'>
 <div class='col-sm-3'>
+<div><a href='master/creator_file.html'>creator_file</a></div>
+</div>
+<div class='col-sm-3'>
 <div><a href='master/domain_file.html'>domain_file</a></div>
 </div>
 <div class='col-sm-3'>
@@ -64,28 +77,36 @@ title: Applies
 <div class='col-sm-3'>
 <div><a href='master/error_handler.html'>error_handler</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='master/flag.html'>flag</a></div>
 </div>
+<div class='col-sm-3'>
+<div><a href='master/get_bb_uid.html'>get_bb_uid</a></div>
 </div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='master/get_include_path.html'>get_include_path</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='master/get_mud_stats.html'>get_mud_stats</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='master/get_root_uid.html'>get_root_uid</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='master/get_save_file_name.html'>get_save_file_name</a></div>
 </div>
+<div class='col-sm-3'>
+<div><a href='master/log_error.html'>log_error</a></div>
 </div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='master/make_path_absolute.html'>make_path_absolute</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='master/object_name.html'>object_name</a></div>
 </div>
@@ -94,6 +115,9 @@ title: Applies
 </div>
 <div class='col-sm-3'>
 <div><a href='master/privs_file.html'>privs_file</a></div>
+</div>
+<div class='col-sm-3'>
+<div><a href='master/retrieve_ed_setup.html'>retrieve_ed_setup</a></div>
 </div>
 </div>
 <div class='row'>
@@ -112,6 +136,9 @@ title: Applies
 </div>
 <div class='row'>
 <div class='col-sm-3'>
+<div><a href='master/valid_link.html'>valid_link</a></div>
+</div>
+<div class='col-sm-3'>
 <div><a href='master/valid_object.html'>valid_object</a></div>
 </div>
 <div class='col-sm-3'>
@@ -120,23 +147,29 @@ title: Applies
 <div class='col-sm-3'>
 <div><a href='master/valid_read.html'>valid_read</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='master/valid_save_binary.html'>valid_save_binary</a></div>
 </div>
+<div class='col-sm-3'>
+<div><a href='master/valid_seteuid.html'>valid_seteuid</a></div>
 </div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='master/valid_shadow.html'>valid_shadow</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='master/valid_socket.html'>valid_socket</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='master/valid_write.html'>valid_write</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='master/view_errors.html'>view_errors</a></div>
 </div>
+<div>&nbsp;</div>
 <div>&nbsp;</div>
 </div>
 </div>
@@ -160,6 +193,9 @@ title: Applies
 </div>
 <div class='row'>
 <div class='col-sm-3'>
+<div><a href='object/id.html'>id</a></div>
+</div>
+<div class='col-sm-3'>
 <div><a href='object/init.html'>init</a></div>
 </div>
 <div class='col-sm-3'>
@@ -168,13 +204,11 @@ title: Applies
 <div class='col-sm-3'>
 <div><a href='object/reset.html'>reset</a></div>
 </div>
-<div>&nbsp;</div>
-<div>&nbsp;</div>
 </div>
 </div>
 
 
 
-This page is auto generated on 2020-03-12 02:33:57 PDT for [2fcbe4b2](https://github.com/fluffos/fluffos/tree/2fcbe4b2).
+This page is auto generated on 2020-03-14 20:49:23 PDT for [689fb58f](https://github.com/fluffos/fluffos/tree/689fb58f).
 
 
