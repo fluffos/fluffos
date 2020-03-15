@@ -34,7 +34,7 @@ title: %s
         print "<div class='col-sm-3'>"
         print "<div><a href='%s'>%s</a></div>" % ("%s/%s.html" % (cat, item), item)
         print "</div>"
-      i = i + 5
+      i = i + 4 
       # round up
       if i > len(items):
         for x in xrange(i - len(items)):
