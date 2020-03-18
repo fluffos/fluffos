@@ -70,11 +70,13 @@ if (undefinedp(value = x["MudOS"])) {
 A list of the keys (indices) may be obtained using the keys() efun, for
 example:
 
-    mixed *idx;
-    map x;
+```c
+mixed *idx;
+map x;
 
-    x = ([ "x" : 3, "y" : 4]);
-    idx = keys(x);  /* idx == ({"x", "y"}) or ({"y", "x"}) */
+x = ([ "x" : 3, "y" : 4]);
+idx = keys(x);  /* idx == ({"x", "y"}) or ({"y", "x"}) */
+```
 
 Note that keys() will return the list of indices in an apparently random
 order (the order is a side effect of the implementation used to store
@@ -89,17 +91,24 @@ causes idx to be equal to ({3, 4}) or ({4, 3}). Note that values() will
 return the values in the same order as keys() returns the corresponding
 keys.
 
+---
 The (key, value) pairs in a mapping may be iterated over using the each()
 efun. each() returns a null vector when the end of the mapping is reached.
 each() returns the (key, value) pairs in the same order as keys() and values()
 do. For example:
 
-    mixed *pair;
+```c
+mixed *pair;
 
-    while ((pair = each(x)) != ({})) {
-        write("key   = " + pair[0] + "\n");
-        write("value = " + pair[1] + "\n");
-    }
+while ((pair = each(x)) != ({})) {
+    write("key   = " + pair[0] + "\n");
+    write("value = " + pair[1] + "\n");
+}
+```
+
+`Warning: each is not a efun in fluffos, you can simul it.`
+
+---
 
 Mappings can be two-dimensional (or n-dimensional for that matter) in the same
 sense that LPC arrays can be.
@@ -140,8 +149,7 @@ as the union of the two mappings.
 
     a = r1 + r2
 
-defines a to be a map with `a["driver"] == "mudlib"` and
-`a["mudlib"] == "castle"`
+defines a to be a map with `a["driver"] == "mudlib"` and `a["mudlib"] == "castle"`
 
 The += operator is also supported. Thus you could use:
 
