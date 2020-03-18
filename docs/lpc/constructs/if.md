@@ -7,30 +7,38 @@ title: constructs / if
 
 LPC's if statement is identical to that provided by C. Syntax is as follows:
 
-    if (expression)
-        statement;
+```c
+if (expression)
+    statement;
+```
 
 Alternately:
 
-    if (expression) {
-        statements;
-    }
+```c
+if (expression) {
+    statements;
+}
+```
 
 Alternately:
 
-    if (expression0) {
-        statements;
-    } else {
-        statements1;
-    }
+```c
+if (expression0) {
+    statements;
+} else {
+    statements1;
+}
+```
 
 Alternately:
 
-    if (expression0) {
-        statements0;
-    } else if (expression1) {
-        statements1;
-    }
+```c
+if (expression0) {
+    statements0;
+} else if (expression1) {
+    statements1;
+}
+```
 
 The number of else clauses is not explicitly limited.
 
@@ -43,10 +51,12 @@ operates identical to C. The syntax is:
 
 In some cases, ? : is an shorter way of expression constructs such as:
 
-    if (expression0)
-        var = expression1;
-    else
-        var = expression2;
+```c
+if (expression0)
+    var = expression1;
+else
+    var = expression2;
+```
 
 which can be equivalently translated to:
 
