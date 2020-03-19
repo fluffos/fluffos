@@ -89,13 +89,24 @@ title: Applies
 <div><a href='master/get_include_path.html'>get_include_path</a></div>
 </div>
 <div class='col-sm-3'>
-<div><a href='master/get_root_uid.html'>get_root_uid</a></div>
+<div><a href='master/get_mud_stats.html'>get_mud_stats</a></div>
 </div>
 </div>
 <div class='row'>
 <div class='col-sm-3'>
+<div><a href='master/get_root_uid.html'>get_root_uid</a></div>
+</div>
+<div class='col-sm-3'>
+<div><a href='master/get_save_file_name.html'>get_save_file_name</a></div>
+</div>
+<div class='col-sm-3'>
 <div><a href='master/log_error.html'>log_error</a></div>
 </div>
+<div class='col-sm-3'>
+<div><a href='master/make_path_absolute.html'>make_path_absolute</a></div>
+</div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='master/object_name.html'>object_name</a></div>
 </div>
@@ -103,44 +114,59 @@ title: Applies
 <div><a href='master/preload.html'>preload</a></div>
 </div>
 <div class='col-sm-3'>
-<div><a href='master/valid_bind.html'>valid_bind</a></div>
+<div><a href='master/privs_file.html'>privs_file</a></div>
+</div>
+<div class='col-sm-3'>
+<div><a href='master/retrieve_ed_setup.html'>retrieve_ed_setup</a></div>
 </div>
 </div>
 <div class='row'>
+<div class='col-sm-3'>
+<div><a href='master/save_ed_setup.html'>save_ed_setup</a></div>
+</div>
+<div class='col-sm-3'>
+<div><a href='master/valid_bind.html'>valid_bind</a></div>
+</div>
 <div class='col-sm-3'>
 <div><a href='master/valid_database.html'>valid_database</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='master/valid_hide.html'>valid_hide</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='master/valid_link.html'>valid_link</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='master/valid_object.html'>valid_object</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='master/valid_override.html'>valid_override</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='master/valid_read.html'>valid_read</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='master/valid_seteuid.html'>valid_seteuid</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='master/valid_shadow.html'>valid_shadow</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='master/valid_socket.html'>valid_socket</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='master/valid_write.html'>valid_write</a></div>
 </div>
+</div>
+<div class='row'>
+<div class='col-sm-3'>
+<div><a href='master/view_errors.html'>view_errors</a></div>
+</div>
+<div>&nbsp;</div>
 <div>&nbsp;</div>
 <div>&nbsp;</div>
 </div>
@@ -179,6 +205,6 @@ title: Applies
 
 
 
-This page is auto generated on 2020-03-18 18:19:32 CST for [0e00716b](https://github.com/fluffos/fluffos/tree/0e00716b).
+This page is auto generated on 2020-03-19 17:28:07 CST for [7a1faa6c](https://github.com/fluffos/fluffos/tree/7a1faa6c).
 
 
