@@ -123,7 +123,7 @@ int yyparse (void);
 /*
  * YYTYPE
  *
- * Anything with size > 4 is commented.  Sizes assume typical 32 bit
+ * Anything with size > 4 is commented.  Sizes assume typical 64 bit
  * architecture.  This size of the largest element of this union should
  * be kept as small as possible to optimize copying of compiler stack
  * elements.
@@ -140,13 +140,13 @@ int yyparse (void);
   struct {
     parse_node_t *node;
     char num;
-  } decl; /* 5 */
+  } decl; /* 9 */
   struct {
-    char num_local;
-    char max_num_locals;
-    short context;
-    unsigned short save_current_type;
-    unsigned short save_exact_types;
+    uint8_t num_local;
+    uint8_t max_num_locals;
+    uint16_t context;
+    uint16_t save_current_type;
+    uint16_t save_exact_types;
   } func_block; /* 8 */
 }
 
@@ -2724,10 +2724,11 @@ expr4:
           char *end = EndOf(buf);
           char *p;
 
+          auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
           p = strput(buf, end, "Undefined variable '");
           p = strput(p, end, $1->name);
           p = strput(p, end, "'");
-          if (current_number_of_locals < CFG_MAX_LOCAL_VARIABLES) {
+          if (current_number_of_locals < max_local_variables) {
             add_local_name($1->name, TYPE_ANY);
           }
           CREATE_ERROR($$);
@@ -2740,10 +2741,11 @@ expr4:
       char *end = EndOf(buf);
       char *p;
 
+      auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
       p = strput(buf, end, "Undefined variable '");
       p = strput(p, end, $1);
       p = strput(p, end, "'");
-      if (current_number_of_locals < CFG_MAX_LOCAL_VARIABLES) {
+      if (current_number_of_locals < max_local_variables) {
         add_local_name($1, TYPE_ANY);
       }
       CREATE_ERROR($$);
@@ -2957,13 +2959,15 @@ expr4:
 #endif
   | L_BASIC_TYPE
     {
+      auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
+
       if ($1 != TYPE_FUNCTION) yyerror("Reserved type name unexpected.");
       $<func_block>$.num_local = current_number_of_locals;
       $<func_block>$.max_num_locals = max_num_locals;
       $<func_block>$.context = context;
       $<func_block>$.save_current_type = current_type;
       $<func_block>$.save_exact_types = exact_types;
-      if (type_of_locals_ptr + max_num_locals + CFG_MAX_LOCAL_VARIABLES >= &type_of_locals[type_of_locals_size])
+      if (type_of_locals_ptr + max_num_locals + max_local_variables >= &type_of_locals[type_of_locals_size])
         reallocate_locals();
       deactivate_current_locals();
       locals_ptr += current_number_of_locals;
