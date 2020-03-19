@@ -35,6 +35,8 @@ struct flagEntry {
   std::string key;
   int pos;
   int defaultValue;
+  int minValue = 0;
+  int maxValue = INT_MAX;
 };
 
 static const flagEntry kDefaultFlags[] = {
@@ -47,7 +49,7 @@ static const flagEntry kDefaultFlags[] = {
 
     {"inherit chain size", __INHERIT_CHAIN_SIZE__, 30},
     {"maximum evaluation cost", __MAX_EVAL_COST__, 30000000},
-    {"maximum local variables", __MAX_LOCAL_VARIABLES__, CFG_MAX_LOCAL_VARIABLES},
+    {"maximum local variables", __MAX_LOCAL_VARIABLES__, 64, 64, UINT8_MAX},
     {"maximum call depth", __MAX_CALL_DEPTH__, CFG_MAX_CALL_DEPTH},
 
     {"maximum array size", __MAX_ARRAY_SIZE__, 15000},
@@ -345,6 +347,7 @@ void read_config(char *filename) {
   }
 
   std::cout << "==== Runtime Config Table ====" << std::endl;
+
   // process int flags
   for (const auto &kDefaultFlag : kDefaultFlags) {
     std::cout << kDefaultFlag.key << ": " << kDefaultFlag.defaultValue;
@@ -355,6 +358,13 @@ void read_config(char *filename) {
 
     if (scan_config_line(buf, &value, kOptional)) {
       if (value != kDefaultFlag.defaultValue) {
+        if (value < kDefaultFlag.minValue) {
+          std::cout << " (invalid new value: " << value << ")";
+          value = kDefaultFlag.defaultValue;
+        } else if (value > kDefaultFlag.maxValue){
+          std::cout << " (invalid new value: " << value << ")";
+          value = kDefaultFlag.maxValue;
+        }
         CONFIG_INT(kDefaultFlag.pos) = value;
         std::cout << " (new: " << value << ")";
       }
