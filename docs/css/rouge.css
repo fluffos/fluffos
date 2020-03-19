@@ -1,4 +1,4 @@
-highlight table td { padding: 5px; }
+.highlight table td { padding: 5px; }
 .highlight table pre { margin: 0; }
 .highlight .gh {
   color: #999999;
@@ -192,4 +192,5 @@ div[class="highlight"] > pre {
   padding: 2em;
   white-space: pre-wrap;
   word-wrap: break-word;
+  text-align: left;
 }

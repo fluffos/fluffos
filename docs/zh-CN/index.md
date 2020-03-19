@@ -69,13 +69,16 @@ title: zh-CN
 <div><a href='efun/asin.html'>asin</a></div>
 </div>
 <div class='col-sm-3'>
-<div><a href='efun/atan.html'>atan</a></div>
+<div><a href='efun/assemble_class.html'>assemble_class</a></div>
 </div>
 <div class='col-sm-3'>
-<div><a href='efun/author_stats.html'>author_stats</a></div>
+<div><a href='efun/atan.html'>atan</a></div>
 </div>
 </div>
 <div class='row'>
+<div class='col-sm-3'>
+<div><a href='efun/author_stats.html'>author_stats</a></div>
+</div>
 <div class='col-sm-3'>
 <div><a href='efun/base_name.html'>base_name</a></div>
 </div>
@@ -85,11 +88,11 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/buffer_transcode.html'>buffer_transcode</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/bufferp.html'>bufferp</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/cache_stats.html'>cache_stats</a></div>
 </div>
@@ -99,11 +102,11 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/call_out.html'>call_out</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/call_out_info.html'>call_out_info</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/capitalize.html'>capitalize</a></div>
 </div>
@@ -113,11 +116,11 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/ceil.html'>ceil</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/children.html'>children</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/classes.html'>classes</a></div>
 </div>
@@ -127,11 +130,11 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/clear_bit.html'>clear_bit</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/clone_object.html'>clone_object</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/clonep.html'>clonep</a></div>
 </div>
@@ -141,84 +144,92 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/commands.html'>commands</a></div>
 </div>
+</div>
+<div class='row'>
+<div class='col-sm-3'>
+<div><a href='efun/compressedp.html'>compressedp</a></div>
+</div>
 <div class='col-sm-3'>
 <div><a href='efun/copy.html'>copy</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/cos.html'>cos</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/cp.html'>cp</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/crc32.html'>crc32</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/crypt.html'>crypt</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/ctime.html'>ctime</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/db_close.html'>db_close</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/db_commit.html'>db_commit</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/db_connect.html'>db_connect</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/db_exec.html'>db_exec</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/db_fetch.html'>db_fetch</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/db_rollback.html'>db_rollback</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/db_status.html'>db_status</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/debug_info.html'>debug_info</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/debug_message.html'>debug_message</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/deep_inherit_list.html'>deep_inherit_list</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/deep_inventory.html'>deep_inventory</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/destruct.html'>destruct</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/disable_commands.html'>disable_commands</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/disable_wizard.html'>disable_wizard</a></div>
 </div>
 <div class='col-sm-3'>
+<div><a href='efun/disassemble_class.html'>disassemble_class</a></div>
+</div>
+<div class='col-sm-3'>
 <div><a href='efun/domain_stats.html'>domain_stats</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/dump_file_descriptors.html'>dump_file_descriptors</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/dump_prog.html'>dump_prog</a></div>
 </div>
@@ -228,11 +239,11 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/ed.html'>ed</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/ed_cmd.html'>ed_cmd</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/ed_start.html'>ed_start</a></div>
 </div>
@@ -242,11 +253,11 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/enable_commands.html'>enable_commands</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/enable_wizard.html'>enable_wizard</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/environment.html'>environment</a></div>
 </div>
@@ -256,11 +267,11 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/eval_cost.html'>eval_cost</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/evaluate.html'>evaluate</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/event.html'>event</a></div>
 </div>
@@ -270,13 +281,16 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/exp.html'>exp</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/explode.html'>explode</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/export_uid.html'>export_uid</a></div>
+</div>
+<div class='col-sm-3'>
+<div><a href='efun/fetch_class_member.html'>fetch_class_member</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/fetch_variable.html'>fetch_variable</a></div>
@@ -394,10 +408,13 @@ title: zh-CN
 <div><a href='efun/intp.html'>intp</a></div>
 </div>
 <div class='col-sm-3'>
-<div><a href='efun/keys.html'>keys</a></div>
+<div><a href='efun/is_daylight_savings_time.html'>is_daylight_savings_time</a></div>
 </div>
 </div>
 <div class='row'>
+<div class='col-sm-3'>
+<div><a href='efun/keys.html'>keys</a></div>
+</div>
 <div class='col-sm-3'>
 <div><a href='efun/link.html'>link</a></div>
 </div>
@@ -407,11 +424,11 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/livings.html'>livings</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/load_object.html'>load_object</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/localtime.html'>localtime</a></div>
 </div>
@@ -421,14 +438,22 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/lower_case.html'>lower_case</a></div>
 </div>
-<div class='col-sm-3'>
-<div><a href='efun/map.html'>map</a></div>
-</div>
 </div>
 <div class='row'>
 <div class='col-sm-3'>
+<div><a href='efun/ltrim.html'>ltrim</a></div>
+</div>
+<div class='col-sm-3'>
+<div><a href='efun/malloc_status.html'>malloc_status</a></div>
+</div>
+<div class='col-sm-3'>
+<div><a href='efun/map.html'>map</a></div>
+</div>
+<div class='col-sm-3'>
 <div><a href='efun/map_array.html'>map_array</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/map_delete.html'>map_delete</a></div>
 </div>
@@ -438,10 +463,13 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/mapp.html'>mapp</a></div>
 </div>
+<div class='col-sm-3'>
+<div><a href='efun/master.html'>master</a></div>
+</div>
 </div>
 <div class='row'>
 <div class='col-sm-3'>
-<div><a href='efun/master.html'>master</a></div>
+<div><a href='efun/match_path.html'>match_path</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/max.html'>max</a></div>
@@ -520,10 +548,41 @@ title: zh-CN
 <div><a href='efun/origin.html'>origin</a></div>
 </div>
 <div class='col-sm-3'>
+<div><a href='efun/parse_command.html'>parse_command</a></div>
+</div>
+</div>
+<div class='row'>
+<div class='col-sm-3'>
+<div><a href='efun/pcre_assoc.html'>pcre_assoc</a></div>
+</div>
+<div class='col-sm-3'>
+<div><a href='efun/pcre_cache.html'>pcre_cache</a></div>
+</div>
+<div class='col-sm-3'>
+<div><a href='efun/pcre_extract.html'>pcre_extract</a></div>
+</div>
+<div class='col-sm-3'>
+<div><a href='efun/pcre_match.html'>pcre_match</a></div>
+</div>
+</div>
+<div class='row'>
+<div class='col-sm-3'>
+<div><a href='efun/pcre_replace.html'>pcre_replace</a></div>
+</div>
+<div class='col-sm-3'>
+<div><a href='efun/pcre_replace_callback.html'>pcre_replace_callback</a></div>
+</div>
+<div class='col-sm-3'>
+<div><a href='efun/pcre_version.html'>pcre_version</a></div>
+</div>
+<div class='col-sm-3'>
 <div><a href='efun/pluralize.html'>pluralize</a></div>
 </div>
 </div>
 <div class='row'>
+<div class='col-sm-3'>
+<div><a href='efun/pointerp.html'>pointerp</a></div>
+</div>
 <div class='col-sm-3'>
 <div><a href='efun/pow.html'>pow</a></div>
 </div>
@@ -533,47 +592,58 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/previous_object.html'>previous_object</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/printf.html'>printf</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/program_info.html'>program_info</a></div>
 </div>
 <div class='col-sm-3'>
+<div><a href='efun/query_charmode.html'>query_charmode</a></div>
+</div>
+<div class='col-sm-3'>
 <div><a href='efun/query_ed_mode.html'>query_ed_mode</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/query_encoding.html'>query_encoding</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/query_heart_beat.html'>query_heart_beat</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/query_host_name.html'>query_host_name</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/query_idle.html'>query_idle</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/query_ip_name.html'>query_ip_name</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/query_ip_number.html'>query_ip_number</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/query_ip_port.html'>query_ip_port</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/query_load_average.html'>query_load_average</a></div>
 </div>
+</div>
+<div class='row'>
+<div class='col-sm-3'>
+<div><a href='efun/query_notify_fail.html'>query_notify_fail</a></div>
+</div>
 <div class='col-sm-3'>
 <div><a href='efun/query_num.html'>query_num</a></div>
+</div>
+<div class='col-sm-3'>
+<div><a href='efun/query_privs.html'>query_privs</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/query_replaced_program.html'>query_replaced_program</a></div>
@@ -618,10 +688,13 @@ title: zh-CN
 <div><a href='efun/reclaim_objects.html'>reclaim_objects</a></div>
 </div>
 <div class='col-sm-3'>
-<div><a href='efun/reg_assoc.html'>reg_assoc</a></div>
+<div><a href='efun/refs.html'>refs</a></div>
 </div>
 </div>
 <div class='row'>
+<div class='col-sm-3'>
+<div><a href='efun/reg_assoc.html'>reg_assoc</a></div>
+</div>
 <div class='col-sm-3'>
 <div><a href='efun/regexp.html'>regexp</a></div>
 </div>
@@ -631,14 +704,22 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/remove_action.html'>remove_action</a></div>
 </div>
-<div class='col-sm-3'>
-<div><a href='efun/remove_call_out.html'>remove_call_out</a></div>
-</div>
 </div>
 <div class='row'>
 <div class='col-sm-3'>
+<div><a href='efun/remove_call_out.html'>remove_call_out</a></div>
+</div>
+<div class='col-sm-3'>
+<div><a href='efun/remove_charmode.html'>remove_charmode</a></div>
+</div>
+<div class='col-sm-3'>
+<div><a href='efun/remove_get_char.html'>remove_get_char</a></div>
+</div>
+<div class='col-sm-3'>
 <div><a href='efun/remove_interactive.html'>remove_interactive</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/remove_shadow.html'>remove_shadow</a></div>
 </div>
@@ -648,11 +729,11 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/repeat_string.html'>repeat_string</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/replace_program.html'>replace_program</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/replace_string.html'>replace_string</a></div>
 </div>
@@ -662,11 +743,11 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/reset_eval_cost.html'>reset_eval_cost</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/resolve.html'>resolve</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/restore_from_string.html'>restore_from_string</a></div>
 </div>
@@ -676,11 +757,11 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/restore_variable.html'>restore_variable</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/rm.html'>rm</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/rmdir.html'>rmdir</a></div>
 </div>
@@ -689,6 +770,9 @@ title: zh-CN
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/round.html'>round</a></div>
+</div>
+<div class='col-sm-3'>
+<div><a href='efun/rtrim.html'>rtrim</a></div>
 </div>
 </div>
 <div class='row'>
@@ -716,10 +800,13 @@ title: zh-CN
 <div><a href='efun/set_bit.html'>set_bit</a></div>
 </div>
 <div class='col-sm-3'>
-<div><a href='efun/set_encoding.html'>set_encoding</a></div>
+<div><a href='efun/set_debug_level.html'>set_debug_level</a></div>
 </div>
 </div>
 <div class='row'>
+<div class='col-sm-3'>
+<div><a href='efun/set_encoding.html'>set_encoding</a></div>
+</div>
 <div class='col-sm-3'>
 <div><a href='efun/set_eval_limit.html'>set_eval_limit</a></div>
 </div>
@@ -729,84 +816,92 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/set_hide.html'>set_hide</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/set_light.html'>set_light</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/set_living_name.html'>set_living_name</a></div>
 </div>
 <div class='col-sm-3'>
+<div><a href='efun/set_privs.html'>set_privs</a></div>
+</div>
+<div class='col-sm-3'>
 <div><a href='efun/set_reset.html'>set_reset</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/seteuid.html'>seteuid</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/shadow.html'>shadow</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/shout.html'>shout</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/shuffle.html'>shuffle</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/shutdown.html'>shutdown</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/sin.html'>sin</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/sizeof.html'>sizeof</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/snoop.html'>snoop</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/socket_accept.html'>socket_accept</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/socket_acquire.html'>socket_acquire</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/socket_address.html'>socket_address</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/socket_bind.html'>socket_bind</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/socket_close.html'>socket_close</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/socket_connect.html'>socket_connect</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/socket_create.html'>socket_create</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/socket_error.html'>socket_error</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/socket_listen.html'>socket_listen</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/socket_release.html'>socket_release</a></div>
 </div>
+<div class='col-sm-3'>
+<div><a href='efun/socket_status.html'>socket_status</a></div>
 </div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/socket_write.html'>socket_write</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/sort_array.html'>sort_array</a></div>
 </div>
@@ -816,13 +911,16 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/sqrt.html'>sqrt</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/sscanf.html'>sscanf</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/stat.html'>stat</a></div>
+</div>
+<div class='col-sm-3'>
+<div><a href='efun/store_class_member.html'>store_class_member</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/store_variable.html'>store_variable</a></div>
@@ -867,13 +965,16 @@ title: zh-CN
 <div><a href='efun/tell_room.html'>tell_room</a></div>
 </div>
 <div class='col-sm-3'>
-<div><a href='efun/test_bit.html'>test_bit</a></div>
+<div><a href='efun/terminal_colour.html'>terminal_colour</a></div>
 </div>
 <div class='col-sm-3'>
-<div><a href='efun/test_load.html'>test_load</a></div>
+<div><a href='efun/test_bit.html'>test_bit</a></div>
 </div>
 </div>
 <div class='row'>
+<div class='col-sm-3'>
+<div><a href='efun/test_load.html'>test_load</a></div>
+</div>
 <div class='col-sm-3'>
 <div><a href='efun/this_interactive.html'>this_interactive</a></div>
 </div>
@@ -883,11 +984,11 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/this_player.html'>this_player</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/this_user.html'>this_user</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/throw.html'>throw</a></div>
 </div>
@@ -897,80 +998,81 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/time_expression.html'>time_expression</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/to_float.html'>to_float</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/to_int.html'>to_int</a></div>
 </div>
 <div class='col-sm-3'>
+<div><a href='efun/trim.html'>trim</a></div>
+</div>
+<div class='col-sm-3'>
 <div><a href='efun/typeof.html'>typeof</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/undefinedp.html'>undefinedp</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/unique_array.html'>unique_array</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/unique_mapping.html'>unique_mapping</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/upper_case.html'>upper_case</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/uptime.html'>uptime</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/userp.html'>userp</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/users.html'>users</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/values.html'>values</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/variables.html'>variables</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/virtualp.html'>virtualp</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/wizardp.html'>wizardp</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/write.html'>write</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/write_buffer.html'>write_buffer</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/write_bytes.html'>write_bytes</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/write_file.html'>write_file</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/zonetime.html'>zonetime</a></div>
 </div>
-<div>&nbsp;</div>
-<div>&nbsp;</div>
 </div>
 </div>
 
 
 
-This page is auto generated on 2020-03-18 18:19:32 CST for [0e00716b](https://github.com/fluffos/fluffos/tree/0e00716b).
+This page is auto generated on 2020-03-19 17:28:07 CST for [7a1faa6c](https://github.com/fluffos/fluffos/tree/7a1faa6c).
 
 
