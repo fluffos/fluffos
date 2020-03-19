@@ -50,3 +50,7 @@ h1, h2, h3, h4, h5, h6 {
   color: #000;
   vertical-align: center;
 }
+
+#content p img {
+  max-width: 100%;
+}

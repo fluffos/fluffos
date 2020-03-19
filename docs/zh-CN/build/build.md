@@ -26,7 +26,7 @@ v2019 版目前支持在以下系统中编译：ubuntu 18.04+ (包括 WSL), rasp
 
 Ubuntu 系统请执行以下指令安装编译所需的包，包括编译 v2017 和 v2019 所需的库。
 
-    sudo apt install libjemalloc-dev bison zlib1g-dev libssl-dev libmysqlclient-dev libpcre3-dev libevent-dev libicu-dev gcc g++ autoconf automake cmake -y
+    sudo apt install libjemalloc-dev bison zlib1g-dev libssl-dev libmariadb-dev libpcre3-dev libevent-dev libicu-dev gcc g++ autoconf automake cmake -y
 
 ### v2017 编译
 
@@ -42,7 +42,7 @@ v2017 编译完成后的驱动文件在 fluffos/bin 目录中，包括 `driver` 
 
 请在 `fluffos` 目录下使用以下指令：
 
-    mkdir build && cd build
+    rm -rf build && mkdir build && cd build
     cmake ..
     make install
 
@@ -137,3 +137,16 @@ MSYS2 官方网站：https://www.msys2.org/ 下载安装后需运行 Mingw-w64 6
     make build && cd build
     OPENSSL_ROOT_DIR="/usr/local/opt/openssl" ICU_ROOT="/usr/local/opt/icu4c" cmake ..
     make install
+
+## 编译演示
+
+fluffos v2019 编译演示：
+
+[![asciicast](https://asciinema.org/a/311570.svg)](https://asciinema.org/a/311570?autoplay=1&speed=3)
+
+fluffos v2017 编译演示：
+
+[![asciicast](https://asciinema.org/a/311567.svg)](https://asciinema.org/a/311567?autoplay=1&speed=2)
+
+
+提示：演示视频可随时暂停，演示的指令也可直接复制。
