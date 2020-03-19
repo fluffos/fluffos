@@ -892,6 +892,10 @@ static const int ANSI_SUBSTITUTE = 0x20;
 // each time.
 void on_user_input(interactive_t *ip, const char *data, size_t len) {
   for (int i = 0; i < len; i++) {
+    if (ip->text_end == sizeof(ip->text) - 1) {
+      // No more space
+      break;
+    }
     auto c = static_cast<unsigned char>(data[i]);
     switch (c) {
       case 0x08:  // BACKSPACE
