@@ -635,8 +635,7 @@ static int add_column(cst **column, int trailing) {
   size_t swidth;
 
   u8_truncate_below_width(col_d, slen, col->pres, true, true, &slen, &swidth);
-  add_justified(col_d, swidth, slen, col->pad, col->size, col->info,
-                trailing || col->next);
+  add_justified(col_d, swidth, slen, col->pad, col->size, col->info, trailing || col->next);
 
   col_d += slen;
   ret = 1;

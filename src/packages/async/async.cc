@@ -53,23 +53,23 @@ struct request {
 };
 
 struct work {
-  struct request* data;
+  struct request *data;
   void *(*func)(struct request *);
 };
 
 std::deque<struct work *> reqs;
 std::mutex reqs_lock;
 
-std::deque<struct request*> finished_reqs;
+std::deque<struct request *> finished_reqs;
 std::mutex finished_reqs_lock;
 
 void thread_func() {
-  while(true) {
-    struct work* w = nullptr;
+  while (true) {
+    struct work *w = nullptr;
     {
       std::lock_guard<std::mutex> _lock(reqs_lock);
       if (reqs.empty()) {
-        return ;
+        return;
       }
       w = reqs.front();
       reqs.pop_front();
@@ -77,7 +77,7 @@ void thread_func() {
 
     if (w) {
       w->func(w->data);
-      if(w->data->status == DONE) {
+      if (w->data->status == DONE) {
         {
           std::lock_guard<std::mutex> _lock(finished_reqs_lock);
           finished_reqs.push_back(w->data);
@@ -94,7 +94,7 @@ void thread_func() {
 void do_stuff(void *(*func)(struct request *), struct request *data) {
   std::lock_guard<std::mutex> _lock(reqs_lock);
 
-  if(reqs.empty()) {
+  if (reqs.empty()) {
     std::thread(thread_func).detach();
   }
 
@@ -210,7 +210,7 @@ int aio_db_exec(struct request *req) {
 
 #ifdef F_ASYNC_GETDIR
 void *getdirthread(struct request *req) {
-  DIR* dirp = nullptr;
+  DIR *dirp = nullptr;
   if ((dirp = opendir(req->path)) == nullptr) {
     req->ret = 0;
     req->status = DONE;
@@ -222,7 +222,7 @@ void *getdirthread(struct request *req) {
   int i = 0;
   for (auto de = readdir(dirp); de; de = readdir(dirp)) {
     if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) continue;
-    memcpy(&((dirent*)(req->buf))[i], de, sizeof(*de));
+    memcpy(&((dirent *)(req->buf))[i], de, sizeof(*de));
     i++;
   }
 
@@ -283,7 +283,7 @@ int add_getdir(const char *fname, function_to_call_t *fun) {
 int add_write(const char *fname, const char *buf, int size, char flags, function_to_call_t *fun) {
   if (fname) {
     auto *req = new request();
-    req->buf = (void *) buf;
+    req->buf = (void *)buf;
     req->size = size;
     req->fun = fun;
     req->type = awrite;
@@ -393,7 +393,7 @@ void handle_db_exec(struct request *req) {
 
 void check_reqs() {
   std::lock_guard<std::mutex> _lock(finished_reqs_lock);
-  while(!finished_reqs.empty()) {
+  while (!finished_reqs.empty()) {
     auto req = finished_reqs.front();
     finished_reqs.pop_front();
 
@@ -428,10 +428,10 @@ void check_reqs() {
 }
 
 void complete_all_asyncio() {
-  while(true) {
+  while (true) {
     std::lock_guard<std::mutex> _lock(reqs_lock);
 
-    if(reqs.empty()) {
+    if (reqs.empty()) {
       break;
     }
   }

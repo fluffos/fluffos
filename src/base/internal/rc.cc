@@ -361,7 +361,7 @@ void read_config(char *filename) {
         if (value < kDefaultFlag.minValue) {
           std::cout << " (invalid new value: " << value << ")";
           value = kDefaultFlag.defaultValue;
-        } else if (value > kDefaultFlag.maxValue){
+        } else if (value > kDefaultFlag.maxValue) {
           std::cout << " (invalid new value: " << value << ")";
           value = kDefaultFlag.maxValue;
         }
