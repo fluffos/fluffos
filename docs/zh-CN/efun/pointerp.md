@@ -3,20 +3,27 @@ layout: default
 title: arrays / pointerp
 ---
 
-### NAME
+### 名称
 
-    pointerp() - determine whether or not a given variable is an array
+    arrayp() / pointerp() - 判断一个给定变量是否为数组。
 
-### SYNOPSIS
+### 语法
 
-    int pointerp( mixed arg );
+    int arrayp(mixed arg);
+    int pointerp(mixed arg);
 
-### DESCRIPTION
+### 描述
 
-    Return 1 if 'arg' is an array.
+    如果变量 `arg` 是数组则返回1，否则返回0。
 
-### SEE ALSO
+### 返回值
 
-    mapp(3),  stringp(3), objectp(3), intp(3), bufferp(3), floatp(3), func‐
-    tionp(3), nullp(3), undefinedp(3), errorp(3), arrayp(3)
+    1 或者 0
 
+### 参考
+
+    mapp(3),  stringp(3), objectp(3), intp(3), bufferp(3), floatp(3), functionp(3), nullp(3), undefinedp(3), errorp(3), pointerp(3)
+
+### 翻译
+
+    雪风(i@mud.ren)
