@@ -111,6 +111,6 @@ void f_sha1(void) {
 
   sprintf(reinterpret_cast<char *>(final), "%08x%08x%08x%08x%08x", h0, h1, h2, h3, h4);
   pop_stack();
-  push_malloced_string(string_copy((char *)final, "f_sha1"));
+  push_malloced_string(string_copy((char *) final, "f_sha1"));
 }
 #endif
