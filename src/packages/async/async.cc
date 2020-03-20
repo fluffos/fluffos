@@ -2,18 +2,30 @@
 
 #include "packages/async/async.h"
 
+#include <chrono>
+#include <deque>
+#include <mutex>
+#include <thread>
+
+#if HAVE_DIRENT_H
 #include <dirent.h>
+#else
+#define dirent direct
+#if HAVE_SYS_NDIR_H
+#include <sys/ndir.h>
+#endif
+#if HAVE_SYS_DIR_H
+#include <sys/dir.h>
+#endif
+#if HAVE_NDIR_H
+#include <ndir.h>
+#endif
+#endif
+
 #include <sys/param.h>  // for MAXPATHLEN
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <pthread.h>
-#ifdef F_ASYNC_GETDIR
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
-#include <sys/syscall.h>
-#endif
 #include <unistd.h>
 #include <zlib.h>
 
@@ -30,165 +42,67 @@ enum astates { BUSY, DONE };
 struct request {
   char path[MAXPATHLEN];
   int flags;
-  int status;
   int ret;
-  const char *buf;
+  void *buf;
   int size;
   function_to_call_t *fun;
   struct request *next;
   svalue_t tmp;
   enum atypes type;
+  int status;
 };
 
-void add_req(struct request *req);
-
-#if defined(F_ASYNC_READ) || defined(F_ASYNC_WRITE)
-
-struct cb_mem {
-  function_to_call_t cb;
-  struct cb_mem *next;
-} *cbs = nullptr;
-
-struct req_mem {
-  struct request req;
-  struct req_mem *next;
-} * reqms;
-
-struct stuff {
+struct work {
+  struct request* data;
   void *(*func)(struct request *);
-  struct request *data;
-  struct stuff *next;
-} * todo, *lasttodo;
+};
 
-struct stuff_mem {
-  struct stuff stuff;
-  struct stuff_mem *next;
-} * stuffs;
+std::deque<struct work *> reqs;
+std::mutex reqs_lock;
 
-pthread_mutex_t mem_mut;
+std::deque<struct request*> finished_reqs;
+std::mutex finished_reqs_lock;
 
-struct stuff *get_stuff() {
-  struct stuff *ret;
-  if (stuffs) {
-    pthread_mutex_lock(&mem_mut);
-    ret = &stuffs->stuff;
-    stuffs = stuffs->next;
-    (reinterpret_cast<struct stuff_mem *>(ret))->next = nullptr;
-    pthread_mutex_unlock(&mem_mut);
-  } else {
-    ret = reinterpret_cast<struct stuff *>(
-        DMALLOC(sizeof(struct stuff_mem), TAG_PERMANENT, "get_stuff"));
-    (reinterpret_cast<struct stuff_mem *>(ret))->next = nullptr;
-  }
-  return ret;
-}
-
-void free_stuff(struct stuff *stuff) {
-  auto *stufft = reinterpret_cast<struct stuff_mem *>(stuff);
-  pthread_mutex_lock(&mem_mut);
-  stufft->next = stuffs;
-  stuffs = stufft;
-  pthread_mutex_unlock(&mem_mut);
-}
-
-pthread_mutex_t mut;
-pthread_mutex_t work_mut;
-int thread_started = 0;
-
-void *thread_func(void *mydata) {
-  while (true) {
-    pthread_mutex_lock(&mut);
-    while (todo) {
-      pthread_mutex_lock(&work_mut);
-      struct stuff *work = todo;
-      todo = todo->next;
-      if (!todo) {
-        lasttodo = nullptr;
+void thread_func() {
+  while(true) {
+    struct work* w = nullptr;
+    {
+      std::lock_guard<std::mutex> _lock(reqs_lock);
+      if (reqs.empty()) {
+        return ;
       }
-      pthread_mutex_unlock(&work_mut);
-      work->func(work->data);
-      free_stuff(work);
+      w = reqs.front();
+      reqs.pop_front();
+    }
+
+    if (w) {
+      w->func(w->data);
+      if(w->data->status == DONE) {
+        {
+          std::lock_guard<std::mutex> _lock(finished_reqs_lock);
+          finished_reqs.push_back(w->data);
+        }
+        delete w;
+      } else {
+        std::lock_guard<std::mutex> _lock(reqs_lock);
+        reqs.push_back(w);
+      }
     }
   }
 }
 
 void do_stuff(void *(*func)(struct request *), struct request *data) {
-  if (!thread_started) {
-    pthread_mutex_init(&mut, nullptr);
-    pthread_mutex_init(&mem_mut, nullptr);
-    pthread_mutex_init(&work_mut, nullptr);
-    pthread_mutex_lock(&mut);
-    pthread_t t;
-    pthread_create(&t, nullptr, &thread_func, nullptr);
-    thread_started = 1;
-  }
-  struct stuff *work = get_stuff();
-  work->func = func;
-  work->data = data;
-  work->next = nullptr;
-  pthread_mutex_lock(&work_mut);
-  add_req(data);
-  if (lasttodo) {
-    lasttodo->next = work;
-    lasttodo = work;
-  } else {
-    todo = lasttodo = work;
-  }
-  pthread_mutex_unlock(&work_mut);
-  pthread_mutex_unlock(&mut);
-}
+  std::lock_guard<std::mutex> _lock(reqs_lock);
 
-function_to_call_t *get_cb() {
-  function_to_call_t *ret;
-  if (cbs) {
-    ret = &cbs->cb;
-    cbs = cbs->next;
-    (reinterpret_cast<struct cb_mem *>(ret))->next = nullptr;
-  } else {
-    ret = reinterpret_cast<function_to_call_t *>(
-        DMALLOC(sizeof(struct cb_mem), TAG_PERMANENT, "get_cb"));
-    (reinterpret_cast<struct cb_mem *>(ret))->next = nullptr;
+  if(reqs.empty()) {
+    std::thread(thread_func).detach();
   }
-  memset(ret, 0, sizeof(function_to_call_t));
-  return ret;
-}
 
-void free_cb(function_to_call_t *cb) {
-  auto *cbt = reinterpret_cast<struct cb_mem *>(cb);
-  cbt->next = cbs;
-  cbs = cbt;
-}
+  auto i = new work;
+  i->func = func;
+  i->data = data;
 
-struct request *get_req() {
-  struct request *ret;
-  if (reqms) {
-    ret = &reqms->req;
-    reqms = reqms->next;
-    (reinterpret_cast<struct req_mem *>(ret))->next = nullptr;
-  } else {
-    ret = reinterpret_cast<struct request *>(
-        DMALLOC(sizeof(struct req_mem), TAG_PERMANENT, "get_cb"));
-    (reinterpret_cast<struct req_mem *>(ret))->next = nullptr;
-  }
-  return ret;
-}
-
-void free_req(struct request *req) {
-  auto *reqt = reinterpret_cast<struct req_mem *>(req);
-  reqt->next = reqms;
-  reqms = reqt;
-}
-
-static struct request *reqs = nullptr;
-static struct request *lastreq = nullptr;
-void add_req(struct request *req) {
-  if (lastreq) {
-    lastreq->next = req;
-  } else {
-    reqs = req;
-  }
-  req->next = nullptr;
-  lastreq = req;
+  reqs.push_back(i);
 }
 
 void *gzreadthread(struct request *req) {
@@ -221,7 +135,6 @@ int aio_gzwrite(struct request *req) {
   do_stuff(gzwritethread, req);
   return 0;
 }
-#endif
 
 void *writethread(struct request *req) {
   int fd =
@@ -297,25 +210,26 @@ int aio_db_exec(struct request *req) {
 
 #ifdef F_ASYNC_GETDIR
 void *getdirthread(struct request *req) {
-  int fd = open(req->path, O_RDONLY);
-  int size = syscall(SYS_getdents, fd, req->buf, req->size);
-  if (size == -1) {
-    close(fd);
+  DIR* dirp = nullptr;
+  if ((dirp = opendir(req->path)) == nullptr) {
     req->ret = 0;
     req->status = DONE;
     return nullptr;
   }
-  req->ret = size;
-  while ((size = syscall(SYS_getdents, fd, req->buf + req->ret, req->size - req->ret))) {
-    if (size == -1) {
-      close(fd);
-      req->status = DONE;
-      return nullptr;
-    }
-    req->ret += size;
+  /*
+   * Count files
+   */
+  int i = 0;
+  for (auto de = readdir(dirp); de; de = readdir(dirp)) {
+    if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) continue;
+    memcpy(&((dirent*)(req->buf))[i], de, sizeof(*de));
+    i++;
   }
+
+  closedir(dirp);
+
+  req->ret = i;
   req->status = DONE;
-  close(fd);
   return nullptr;
 }
 
@@ -331,7 +245,7 @@ int add_read(const char *fname, function_to_call_t *fun) {
   const auto read_file_max_size = CONFIG_INT(__MAX_READ_FILE_SIZE__);
 
   if (fname) {
-    struct request *req = get_req();
+    auto *req = new request();
     // printf("fname: %s\n", fname);
     req->buf = reinterpret_cast<char *>(DMALLOC(read_file_max_size, TAG_PERMANENT, "add_read"));
     req->size = read_file_max_size;
@@ -352,10 +266,9 @@ int add_getdir(const char *fname, function_to_call_t *fun) {
 
   if (fname) {
     // printf("fname: %s\n", fname);
-    struct request *req = get_req();
-    req->buf = reinterpret_cast<char *>(
-        DMALLOC(sizeof(struct dirent) * max_array_size, TAG_PERMANENT, "add_getdir"));
-    req->size = sizeof(struct dirent) * max_array_size;
+    auto *req = new request();
+    req->buf = DMALLOC(sizeof(struct dirent) * max_array_size, TAG_PERMANENT, "add_getdir");
+    req->size = max_array_size;
     req->fun = fun;
     req->type = agetdir;
     strcpy(req->path, fname);
@@ -369,8 +282,8 @@ int add_getdir(const char *fname, function_to_call_t *fun) {
 
 int add_write(const char *fname, const char *buf, int size, char flags, function_to_call_t *fun) {
   if (fname) {
-    struct request *req = get_req();
-    req->buf = buf;
+    auto *req = new request();
+    req->buf = (void *) buf;
     req->size = size;
     req->fun = fun;
     req->type = awrite;
@@ -390,7 +303,7 @@ int add_write(const char *fname, const char *buf, int size, char flags, function
 
 #ifdef F_ASYNC_DB_EXEC
 int add_db_exec(int handle, function_to_call_t *fun) {
-  struct request *req = get_req();
+  auto *req = new request();
   req->fun = fun;
   req->type = adbexec;
   req->buf = reinterpret_cast<char *>(handle);
@@ -409,7 +322,7 @@ void handle_read(struct request *req) {
     return;
   }
   char *file = new_string(val, "read_file_async: str");
-  memcpy(file, const_cast<char *>(req->buf), val);
+  memcpy(file, (char *)(req->buf), val);
   file[val] = 0;
   push_malloced_string(file);
   FREE((void *)req->buf);
@@ -419,40 +332,34 @@ void handle_read(struct request *req) {
 
 #ifdef F_ASYNC_GETDIR
 
-struct linux_dirent {
-  unsigned long d_ino;     /* Inode number */
-  unsigned long d_off;     /* Offset to next dirent */
-  unsigned short d_reclen; /* Length of this dirent */
-  char d_name[];           /* Filename (null-terminated) */
-                           /* length is actually (d_reclen - 2 -
-           offsetof(struct linux_dirent, d_name) */
-};
-
 void handle_getdir(struct request *req) {
-  int tmp_buf_size = 0;
-  int ret_size = 0;
-  while (tmp_buf_size < req->ret) {
-    auto *de = (struct linux_dirent *)(req->buf + tmp_buf_size);
-    ++ret_size;
-    tmp_buf_size += de->d_reclen;
-  }
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
+
+  int ret_size = req->ret;
   if (ret_size > max_array_size) {
     ret_size = max_array_size;
   }
   array_t *ret = allocate_empty_array(ret_size);
   if (ret_size > 0) {
-    auto *de = (struct linux_dirent *)req->buf;
     for (int i = 0; i < ret_size; i++) {
+      auto de = ((struct dirent *)req->buf)[i];
       svalue_t *vp = &(ret->item[i]);
       vp->type = T_STRING;
       vp->subtype = STRING_MALLOC;
-      vp->u.string = string_copy(de->d_name, "encode_stat");
-      de = reinterpret_cast<struct linux_dirent *>((reinterpret_cast<char *>(de)) + de->d_reclen);
+      vp->u.string = string_copy(de.d_name, "encode_stat");
     }
+
+    qsort((void *)ret->item, ret_size, sizeof ret->item[0], [](const void *p1, const void *p2)-> int {
+      auto *x = (svalue_t *)p1;
+      auto *y = (svalue_t *)p2;
+
+      return strcmp(x->u.string, y->u.string);
+    });
   }
-  push_refed_array(ret);
+
   FREE((void *)req->buf);
+
+  push_refed_array(ret);
   set_eval(max_eval_cost);
   safe_call_efun_callback(req->fun, 1);
 }
@@ -485,60 +392,57 @@ void handle_db_exec(struct request *req) {
 }
 
 void check_reqs() {
-  while (reqs) {
-    int val = reqs->status;
-    if (val != BUSY) {
-      enum atypes type = (reqs->type);
-      reqs->type = done;
-      switch (type) {
-        case aread:
-          handle_read(reqs);
-          break;
-        case awrite:
-          handle_write(reqs);
-          break;
+  std::lock_guard<std::mutex> _lock(finished_reqs_lock);
+  while(!finished_reqs.empty()) {
+    auto req = finished_reqs.front();
+    finished_reqs.pop_front();
+
+    enum atypes type = (req->type);
+    req->type = done;
+    switch (type) {
+      case aread:
+        handle_read(req);
+        break;
+      case awrite:
+        handle_write(req);
+        break;
 #ifdef F_ASYNC_GETDIR
-        case agetdir:
-          handle_getdir(reqs);
-          break;
+      case agetdir:
+        handle_getdir(req);
+        break;
 #endif
 #ifdef F_ASYNC_DB_EXEC
-        case adbexec:
-          handle_db_exec(reqs);
-          break;
+      case adbexec:
+        handle_db_exec(req);
+        break;
 #endif
-        case done:
-          // must have had an error while handling it before.
-          break;
-        default:
-          fatal("unknown async type\n");
-      }
-      struct request *here = reqs;
-      reqs = reqs->next;
-      if (!reqs) {
-        lastreq = reqs;
-      }
-      free_funp(here->fun->f.fp);
-      free_cb(here->fun);
-      free_req(here);
-    } else {
-      return;
+      case done:
+        // must have had an error while handling it before.
+        break;
+      default:
+        fatal("unknown async type\n");
     }
+    delete req->fun;
+    delete req;
   }
 }
 
 void complete_all_asyncio() {
-  while (reqs) {
-    check_reqs();
+  while(true) {
+    std::lock_guard<std::mutex> _lock(reqs_lock);
+
+    if(reqs.empty()) {
+      break;
+    }
   }
+  check_reqs();
 }
 
 #ifdef F_ASYNC_READ
 
 void f_async_read() {
-  function_to_call_t *cb = get_cb();
+  auto *cb = new function_to_call_t;
   process_efun_callback(1, cb, F_ASYNC_READ);
-  cb->f.fp->hdr.ref++;
   add_read(check_valid_path((sp - 1)->u.string, current_object, "read_file", 0), cb);
   pop_2_elems();
 }
@@ -546,9 +450,8 @@ void f_async_read() {
 
 #ifdef F_ASYNC_WRITE
 void f_async_write() {
-  function_to_call_t *cb = get_cb();
+  auto *cb = new function_to_call_t;
   process_efun_callback(3, cb, F_ASYNC_WRITE);
-  cb->f.fp->hdr.ref++;
   add_write(check_valid_path((sp - 3)->u.string, current_object, "write_file", 1),
             (sp - 2)->u.string, strlen((sp - 2)->u.string), (sp - 1)->u.number, cb);
   pop_n_elems(4);
@@ -557,9 +460,8 @@ void f_async_write() {
 
 #ifdef F_ASYNC_GETDIR
 void f_async_getdir() {
-  function_to_call_t *cb = get_cb();
-  process_efun_callback(1, cb, F_ASYNC_READ);
-  cb->f.fp->hdr.ref++;
+  auto *cb = new function_to_call_t;
+  process_efun_callback(1, cb, F_ASYNC_GETDIR);
   add_getdir(check_valid_path((sp - 1)->u.string, current_object, "get_dir", 0), cb);
   pop_2_elems();
 }
@@ -584,7 +486,7 @@ void f_async_db_exec() {
     pthread_mutex_init(db_mut, nullptr);
   }
   st_num_arg = num_arg;
-  function_to_call_t *cb = get_cb();
+  auto *cb = new function_to_call_t;
   process_efun_callback(2, cb, F_ASYNC_DB_EXEC);
   cb->f.fp->hdr.ref++;
 
