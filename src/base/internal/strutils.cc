@@ -305,8 +305,7 @@ void u8_truncate_below_width(const char *src, size_t len, size_t max_width, bool
   UErrorCode status = U_ZERO_ERROR;
 
   std::unique_ptr<icu::BreakIterator> brk(
-        icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status)
-      );
+      icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status));
   if (!U_SUCCESS(status)) {
     debug_message("u8_truncate_below_width: Unable to create break iterator! error %d: %s\n",
                   status, u_errorName(status));
@@ -315,8 +314,7 @@ void u8_truncate_below_width(const char *src, size_t len, size_t max_width, bool
 
   status = U_ZERO_ERROR;
   std::unique_ptr<icu::BreakIterator> linebrk(
-      icu::BreakIterator::createLineInstance(icu::Locale::getDefault(), status)
-  );
+      icu::BreakIterator::createLineInstance(icu::Locale::getDefault(), status));
   if (!U_SUCCESS(status)) {
     debug_message("u8_truncate_below_width: Unable to create break iterator! error %d: %s\n",
                   status, u_errorName(status));
@@ -445,13 +443,14 @@ void u8_truncate_below_width(const char *src, size_t len, size_t max_width, bool
       }
     }
     // Eat the last space
-    if (break_length > 1 && src[break_length-1] == ' ') {
-      break_length --;
-      break_width --;
+    if (break_length > 1 && src[break_length - 1] == ' ') {
+      break_length--;
+      break_width--;
     }
   }
 
-  DEBUG_CHECK(break_length == 0 && src[break_length] != ' ' && src[break_length] != '\n', "BUG: truncated to empty string!");
+  DEBUG_CHECK(break_length == 0 && src[break_length] != ' ' && src[break_length] != '\n',
+              "BUG: truncated to empty string!");
 
   utext_close(&text);
 
