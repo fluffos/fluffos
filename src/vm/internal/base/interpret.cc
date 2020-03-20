@@ -460,7 +460,7 @@ svalue_t *safe_call_efun_callback(function_to_call_t *ftc, int n) {
     if (ftc->ob->flags & O_DESTRUCTED) {
       error("Object destructed during efun callback.\n");
     }
-    v = apply(ftc->f.str, ftc->ob, n + ftc->narg, ORIGIN_EFUN);
+    v = safe_apply(ftc->f.str, ftc->ob, n + ftc->narg, ORIGIN_EFUN);
   } else {
     v = safe_call_function_pointer(ftc->f.fp, n + ftc->narg);
   }
