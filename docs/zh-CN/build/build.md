@@ -122,7 +122,7 @@ MSYS2 官方网站：https://www.msys2.org/ 下载安装后需运行 Mingw-w64 6
 
 编译方式和 Ubuntu 下 v2019 类似，在 `fluffos` 目录执行以下指令：
 
-    mkdir build && cd build
+    rm -rf build && mkdir build && cd build
     cmake -G "MSYS Makefiles" -DPACKAGE_DB=OFF ..
     make install
 
@@ -134,7 +134,7 @@ MSYS2 官方网站：https://www.msys2.org/ 下载安装后需运行 Mingw-w64 6
 
 编译方式和 Ubuntu 下 v2019 类似，在 `fluffos` 目录执行以下指令：
 
-    make build && cd build
+    rm -rf build && mkdir build && cd build
     OPENSSL_ROOT_DIR="/usr/local/opt/openssl" ICU_ROOT="/usr/local/opt/icu4c" cmake ..
     make install
 
