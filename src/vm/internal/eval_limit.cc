@@ -9,6 +9,7 @@ uint64_t max_eval_cost;
 void init_eval() {
 #ifdef __linux__
   init_posix_timers();
+#else
   debug_message("WARNING: Platform doesn't support eval limit!\n");
 #endif
 }
