@@ -349,12 +349,13 @@ void handle_getdir(struct request *req) {
       vp->u.string = string_copy(de.d_name, "encode_stat");
     }
 
-    qsort((void *)ret->item, ret_size, sizeof ret->item[0], [](const void *p1, const void *p2)-> int {
-      auto *x = (svalue_t *)p1;
-      auto *y = (svalue_t *)p2;
+    qsort((void *)ret->item, ret_size, sizeof ret->item[0],
+          [](const void *p1, const void *p2) -> int {
+            auto *x = (svalue_t *)p1;
+            auto *y = (svalue_t *)p2;
 
-      return strcmp(x->u.string, y->u.string);
-    });
+            return strcmp(x->u.string, y->u.string);
+          });
   }
 
   FREE((void *)req->buf);

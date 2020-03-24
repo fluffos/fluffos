@@ -288,7 +288,7 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
           sprintf(buff, "(mapping) %s %i, %s %i", left, EXTRACT_UCHAR(tmp), right,
                   EXTRACT_UCHAR(pc++));
         } else {
-          sprintf(buff, "(array) %s %i", left, EXTRACT_UCHAR(pc++));
+          sprintf(buff, "(array | string) %s %i", left, EXTRACT_UCHAR(pc++));
         }
         break;
       }
