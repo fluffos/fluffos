@@ -962,7 +962,9 @@ void assign_lvalue_codepoint(F &&func) {
                                      global_lvalue_codepoint.index, c);
 
     free_string_svalue(global_lvalue_codepoint.owner);
+
     global_lvalue_codepoint.owner->u.string = res;
+    global_lvalue_codepoint.owner->subtype = STRING_MALLOC;
   }
 }
 
@@ -2030,6 +2032,10 @@ void eval_instruction(char *p) {
           if (reflval->type == T_LVALUE_BYTE) {
             push_number(*global_lvalue_byte.u.lvalue_byte);
             break;
+          } else if (reflval->type == T_LVALUE_CODEPOINT) {
+            push_number(u8_egc_index_as_single_codepoint(global_lvalue_codepoint.owner->u.string,
+                                                         global_lvalue_codepoint.index));
+            break;
           }
         }
 
@@ -2570,8 +2576,14 @@ void eval_instruction(char *p) {
         } else if (sp->type == T_STRING) {
           STACK_INC;
           sp->type = T_NUMBER;
-          sp->u.lvalue_byte = (unsigned char *)((sp - 1)->u.string);
-          sp->subtype = SVALUE_STRLEN(sp - 1);
+          global_lvalue_codepoint.index = -1;
+          global_lvalue_codepoint.owner = sp - 1;
+          size_t count = 0;
+          auto success = u8_egc_count((sp - 1)->u.string, &count);
+          if (!success) {
+            error("foreach: Invalid utf-8 string.");
+          }
+          sp->subtype = count;
         } else {
           CHECK_TYPES(sp, T_ARRAY, 2, F_FOREACH);
 
@@ -2637,13 +2649,14 @@ void eval_instruction(char *p) {
           if ((sp - 1)->subtype--) {
             if ((sp - 2)->type == T_STRING) {
               if (sp->type == T_REF) {
-                sp->u.ref->lvalue = &global_lvalue_byte;
-                global_lvalue_byte.u.lvalue_byte = ((sp - 1)->u.lvalue_byte++);
+                sp->u.ref->lvalue = &global_lvalue_codepoint_sv;
+                global_lvalue_codepoint.index++;
               } else {
                 free_svalue(sp->u.lvalue, "foreach-string");
                 sp->u.lvalue->type = T_NUMBER;
                 sp->u.lvalue->subtype = 0;
-                sp->u.lvalue->u.number = *((sp - 1)->u.lvalue_byte)++;
+                sp->u.lvalue->u.number = u8_egc_index_as_single_codepoint(
+                    global_lvalue_codepoint.owner->u.string, global_lvalue_codepoint.index++);
               }
             } else {
               if (sp->type == T_REF) {
@@ -2664,6 +2677,15 @@ void eval_instruction(char *p) {
         stack_in_use_as_temporary--;
 #endif
         if (sp->type == T_REF) {
+          if (sp->u.ref->lvalue == &global_lvalue_codepoint_sv) {
+            sp->u.ref->lvalue = nullptr;
+
+            global_lvalue_codepoint.index = 0;
+            global_lvalue_codepoint.owner = nullptr;
+          } else {
+            sp->u.ref->lvalue = nullptr;
+          }
+
           if (!(--sp->u.ref->ref) && sp->u.ref->lvalue == nullptr) {
             FREE(sp->u.ref);
           }
