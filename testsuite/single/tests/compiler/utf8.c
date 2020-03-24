@@ -275,6 +275,31 @@ void do_tests() {
   ASSERT_EQ(30333, tmp[10]);
   ASSERT_EQ(601, tmp[11]);
 
+  // FOREACH
+  {
+    int count = 0;
+
+    tmp = "欲穷千里目🍆🍠🧮😊👌💩更上一层楼";
+    foreach(int x in tmp) {
+      count ++;
+    }
+
+    ASSERT_EQ(strlen(tmp), count);
+  }
+
+  // FOREACH REF
+  {
+    int count = 0;
+
+    tmp = "欲穷千里目🍆🍠🧮😊👌💩更上一层楼";
+    foreach(int ref x in tmp) {
+      x++;
+      count ++;
+    }
+
+    ASSERT_EQ(strlen(tmp), count);
+  }
+
   // range operator, based on codepoint
   ASSERT_EQ("入", "黄河入海流"[2..2]);
   ASSERT_EQ("", "黄河入海流"[5..3]);
