@@ -33,9 +33,9 @@ void do_tests() {
     write("PACKAGE_ASYNC disabled, skipping...");
     return;
 #else
-    async_getdir("/u/", "callback_getdir");
+    async_getdir("/u/", (: callback_getdir :));
 
-    call_out((: async_getdir, "/std/", "callback_getdir2" :), 1);
+    call_out((: async_getdir, "/std/", (: callback_getdir2 :) :), 1);
 
     call_out((: check, 1 :), 3);
     call_out((: check, 2 :), 4);

@@ -4,7 +4,9 @@
 
 #include <chrono>
 #include <deque>
+#include <memory>
 #include <mutex>
+#include <string>
 #include <thread>
 
 #if HAVE_DIRENT_H
@@ -28,6 +30,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <zlib.h>
+#include <vm/internal/base/interpret.h>
 
 #ifdef F_ASYNC_DB_EXEC
 #include "packages/db/db.h"
@@ -45,6 +48,7 @@ struct request {
   int ret;
   void *buf;
   int size;
+  std::string sql;
   function_to_call_t *fun;
   struct request *next;
   svalue_t tmp;
@@ -174,14 +178,14 @@ pthread_mutex_t *db_mut = nullptr;
 void *dbexecthread(struct request *req) {
   pthread_mutex_lock(db_mut);
   // see add_db_exec
-  db_t *db = find_db_conn(static_cast<int>(reinterpret_cast<long>(req->buf)));
+  db_t *db = find_db_conn((intptr_t)(req->buf));
   int ret = -1;
-  if (db->type->execute) {
+  if (db && db->type->execute) {
     if (db->type->cleanup) {
       db->type->cleanup(&(db->c));
     }
 
-    ret = db->type->execute(&(db->c), req->tmp.u.string);
+    ret = db->type->execute(&(db->c), req->sql.c_str());
     if (ret == -1) {
       if (db->type->error) {
         char *tmp;
@@ -260,7 +264,6 @@ int add_read(const char *fname, function_to_call_t *fun) {
 }
 
 #ifdef F_ASYNC_GETDIR
-extern int max_array_size;
 int add_getdir(const char *fname, function_to_call_t *fun) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
@@ -289,7 +292,7 @@ int add_write(const char *fname, const char *buf, int size, char flags, function
     req->type = awrite;
     req->flags = flags;
     strcpy(req->path, fname);
-    assign_svalue_no_free(&req->tmp, sp - 2);
+    assign_svalue_no_free(&req->tmp, sp - 1);
     if (flags & 2) {
       return aio_gzwrite(req);
     } else {
@@ -302,12 +305,12 @@ int add_write(const char *fname, const char *buf, int size, char flags, function
 }
 
 #ifdef F_ASYNC_DB_EXEC
-int add_db_exec(int handle, function_to_call_t *fun) {
+int add_db_exec(int handle, const char *sql, function_to_call_t *fun) {
   auto *req = new request();
   req->fun = fun;
   req->type = adbexec;
-  req->buf = reinterpret_cast<char *>(handle);
-  assign_svalue_no_free(&req->tmp, sp - 1);
+  req->buf = reinterpret_cast<void *>((intptr_t)(handle));
+  req->sql = sql;
   return aio_db_exec(req);
 }
 #endif
@@ -423,6 +426,10 @@ void check_reqs() {
       default:
         fatal("unknown async type\n");
     }
+#ifdef DEBUGMALLOC_EXTENSIONS
+    req->fun->f.fp->hdr.extra_ref--;
+#endif
+    free_funp(req->fun->f.fp);
     delete req->fun;
     delete req;
   }
@@ -442,56 +449,77 @@ void complete_all_asyncio() {
 #ifdef F_ASYNC_READ
 
 void f_async_read() {
-  auto *cb = new function_to_call_t;
-  process_efun_callback(1, cb, F_ASYNC_READ);
-  add_read(check_valid_path((sp - 1)->u.string, current_object, "read_file", 0), cb);
-  pop_2_elems();
+  std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
+  process_efun_callback(1, cb.get(), F_ASYNC_READ);
+  cb->f.fp->hdr.ref++;
+#ifdef DEBUGMALLOC_EXTENSIONS
+  cb->f.fp->hdr.extra_ref++;
+#endif
+  pop_stack();
+
+  add_read(check_valid_path(sp->u.string, current_object, "read_file", 0), cb.release());
+  pop_stack();
 }
 #endif
 
 #ifdef F_ASYNC_WRITE
 void f_async_write() {
-  auto *cb = new function_to_call_t;
-  process_efun_callback(3, cb, F_ASYNC_WRITE);
-  add_write(check_valid_path((sp - 3)->u.string, current_object, "write_file", 1),
-            (sp - 2)->u.string, strlen((sp - 2)->u.string), (sp - 1)->u.number, cb);
-  pop_n_elems(4);
+  std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
+  process_efun_callback(3, cb.get(), F_ASYNC_WRITE);
+  cb->f.fp->hdr.ref++;
+#ifdef DEBUGMALLOC_EXTENSIONS
+  cb->f.fp->hdr.extra_ref++;
+#endif
+  pop_stack();
+
+  add_write(check_valid_path((sp - 2)->u.string, current_object, "write_file", 1),
+            (sp - 1)->u.string, strlen((sp - 1)->u.string), sp->u.number, cb.release());
+  pop_3_elems();
 }
 #endif
 
 #ifdef F_ASYNC_GETDIR
 void f_async_getdir() {
-  auto *cb = new function_to_call_t;
-  process_efun_callback(1, cb, F_ASYNC_GETDIR);
-  add_getdir(check_valid_path((sp - 1)->u.string, current_object, "get_dir", 0), cb);
-  pop_2_elems();
+  std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
+  process_efun_callback(1, cb.get(), F_ASYNC_GETDIR);
+  cb->f.fp->hdr.ref++;
+#ifdef DEBUGMALLOC_EXTENSIONS
+  cb->f.fp->hdr.extra_ref++;
+#endif
+  pop_stack();
+
+  add_getdir(check_valid_path(sp->u.string, current_object, "get_dir", 0), cb.release());
+  pop_stack();
 }
 #endif
 #ifdef F_ASYNC_DB_EXEC
 void f_async_db_exec() {
+  std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
+  process_efun_callback(2, cb.get(), F_ASYNC_DB_EXEC);
+  cb->f.fp->hdr.ref++;
+#ifdef DEBUGMALLOC_EXTENSIONS
+  cb->f.fp->hdr.extra_ref++;
+#endif
+  pop_stack();
+
   array_t *info;
-  db_t *db;
   info = allocate_empty_array(1);
   info->item[0].type = T_STRING;
   info->item[0].subtype = STRING_MALLOC;
-  info->item[0].u.string = string_copy((sp - 1)->u.string, "f_db_exec");
-  int num_arg = st_num_arg;
+  info->item[0].u.string = string_copy(sp->u.string, "f_db_exec");
   valid_database("exec", info);
 
-  db = find_db_conn((sp - 2)->u.number);
+  db_t *db;
+  db = find_db_conn((sp - 1)->u.number);
   if (!db) {
     error("Attempt to exec on an invalid database handle\n");
   }
+
   if (!db_mut) {
     db_mut = (pthread_mutex_t *)DMALLOC(sizeof(pthread_mutex_t), TAG_PERMANENT, "async_db_exec");
     pthread_mutex_init(db_mut, nullptr);
   }
-  st_num_arg = num_arg;
-  auto *cb = new function_to_call_t;
-  process_efun_callback(2, cb, F_ASYNC_DB_EXEC);
-  cb->f.fp->hdr.ref++;
-
-  add_db_exec((sp - 2)->u.number, cb);
-  pop_3_elems();
+  add_db_exec((sp - 1)->u.number, sp->u.string, cb.release());
+  pop_2_elems();
 }
 #endif

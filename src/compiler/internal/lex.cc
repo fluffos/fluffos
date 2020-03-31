@@ -2988,9 +2988,26 @@ void add_predefines() {
 
   add_predefine("MUDOS", -1, "");
   add_predefine("FLUFFOS", -1, "");
+
+#define _STR_HELPER(x) #x
+#define _STR(x) _STR_HELPER(x)
+
 #ifdef PACKAGE_DB
   add_predefine("__PACKAGE_DB__", -1, "");
 #endif
+#ifdef USE_MYSQL
+  add_predefine("__USE_MYSQL__", -1, _STR(USE_MYSQL));
+#endif
+#ifdef USE_POSTGRES
+  add_predefine("__USE_POSTGRES__", -1, _STR(USE_POSTGRES));
+#endif
+#ifdef USE_SQLITE3
+  add_predefine("__USE_SQLITE3__", -1, _STR(USE_SQLITE3));
+#endif
+#ifdef DEFAULT_DB
+  add_predefine("__DEFAULT_DB__", -1, _STR(DEFAULT_DB));
+#endif
+
   add_predefine("__GET_CHAR_IS_BUFFERED__", -1, "");
   // all support for DSLIB is built in
   add_predefine("__DSLIB__", -1, "");
