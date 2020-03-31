@@ -21,21 +21,29 @@ title: db / db_fetch
 
 ### EXAMPLE
 
-    string *res; mixed rows; int dbconn, i;
+    string *res;
+    mixed rows;
+    int dbconn, i;
 
-    dbconn = db_connect("db.server", "db_mud"); if(dbconn < 1)
-        return  0;  rows  =  db_exec(dbconn,  "SELECT player_name, exp FROM
-    t_player"); if(!rows)
-        write("No rows return3d."); else if(stringp(rows))  /* error */
-        write(rows); else
-        for(i = 1; i <= rows; i++)
-        {
-            res = db_fetch(dbconn, i);
-            write(res[0]);
-            write(res[1]);
-        } db_close(dbconn);
+    dbconn = db_connect("db.server", "db_mud");
+    if(dbconn < 1)
+        return  0;
+    rows  =  db_exec(dbconn,  "SELECT player_name, exp FROM t_player");
+    if(!rows)
+        write("No rows return3d.");
+    else
+        if(stringp(rows))  /* error */
+            write(rows);
+        else
+            for(i = 1; i <= rows; i++)
+            {
+                res = db_fetch(dbconn, i);
+                write(res[0]);
+                write(res[1]);
+            }
+
+    db_close(dbconn);
 
 ### SEE ALSO
 
     db_exec(3), valid_database(4)
-

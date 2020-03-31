@@ -52,7 +52,7 @@ jobs:
             if [ "$MSYSTEM" = "MINGW32" ]; then
               echo "TODO"
             else
-              pacman --noconfirm -S --needed mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-zlib mingw-w64-x86_64-libevent mingw-w64-x86_64-pcre mingw-w64-x86_64-icu
+              pacman --noconfirm -S --needed mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-zlib mingw-w64-x86_64-libevent mingw-w64-x86_64-pcre mingw-w64-x86_64-icu mingw-w64-x86_64-sqlite3
             fi
             pacman --noconfirm -S --needed bison make
           '@
@@ -63,7 +63,7 @@ jobs:
           $env:MSYS2_PATH_TYPE = "strict"
           $script = @'
             cd $OLDPWD
-            mkdir build && cd build && cmake -G \"MSYS Makefiles\" -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DMARCH_NATIVE=OFF -DPACKAGE_CRYPTO=OFF -DPACKAGE_DB=OFF .. && make -j 2 install
+            mkdir build && cd build && cmake -G \"MSYS Makefiles\" -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DMARCH_NATIVE=OFF -DPACKAGE_CRYPTO=OFF -DPACKAGE_DB_MYSQL=\"\" -DPACKAGE_DB_SQLITE=1 .. && make -j 2 install
           '@
           & "$env:GITHUB_WORKSPACE\msys${{ matrix.arch }}\usr\bin\bash" -c -l $script
       - name: Testsuite

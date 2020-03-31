@@ -286,3 +286,10 @@ mixed get_include_path(string file)
       return ({ ":DEFAULT:" });;
   }
 }
+
+int valid_database(object ob, string action, mixed *info) {
+  write("MASTER valid_database called: " + sprintf("ob:%O action:%O info:%O", ob, action, info) + "\n");
+
+  // Approve!
+  return 1;
+}
