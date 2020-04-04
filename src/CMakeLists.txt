@@ -3,7 +3,6 @@ option(MARCH_NATIVE "use march=native for GCC" ON)
 option(STATIC "Build static version of driver" OFF)
 option(USE_JEMALLOC "Build driver with jemalloc support" ON)
 option(ENABLE_SANITIZER "Build driver with sanitizer support" OFF)
-option(ENABLE_DTRACE "Build driver with dtrace (system-tap) support" OFF)
 # Packages
 option(PACKAGE_ASYNC "async package" ON)
 option(PACKAGE_COMPRESS "compress package" ON)
@@ -52,7 +51,7 @@ set(CMAKE_ENABLE_EXPORTS ON)
 
 if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "AppleClang")
   foreach (lang C CXX)
-    set(CMAKE_${lang}_FLAGS_DEBUG "-O0 -g3")
+    set(CMAKE_${lang}_FLAGS_DEBUG "-O1 -g3")
     # include (minimal) debug information even for RELEASE build.
     set(CMAKE_${lang}_FLAGS_RELEASE "-O3 -DNDEBUG -g")
     set(CMAKE_${lang}_FLAGS_RELWITHDEBINFO "${CMAKE_${lang}_FLAGS_RELEASE}")
@@ -319,6 +318,7 @@ set(SRC
   "base/internal/stralloc.cc"
   "base/internal/strput.cc"
   "base/internal/strutils.cc"
+  "base/internal/tracing.cc"
   "compiler/internal/compiler.cc"
   "compiler/internal/disassembler.cc"
   "compiler/internal/generate.cc"
@@ -400,13 +400,6 @@ endforeach ()
 
 add_subdirectory(thirdparty/crypt)
 target_link_libraries(libdriver PUBLIC crypt)
-
-# DTRACE support
-if (ENABLE_DTRACE)
-  message(STATUS "DTRACE Support: ON")
-  add_subdirectory(tracing)
-  target_link_libraries(libdriver PUBLIC tracing)
-endif ()
 
 target_link_libraries(libdriver PUBLIC ${LIBWEBSOCKETS_LIBRARIES_STATIC})
 # Third party libraries

@@ -9,6 +9,7 @@ buffer uncompact(string input);
 void do_tests()
 {
     string *messages, *hashes;
+    int sizeof_messages;
 
     /* Validate the hashes in http://www.nsrl.nist.gov/testdata/NSRLvectors.zip */
     messages = read_data(MESSAGE_FILE);
@@ -20,7 +21,8 @@ void do_tests()
     ASSERT(sizeof(messages) > 0);
     ASSERT_EQ(sizeof(messages), sizeof(hashes));
 
-    for (int i = 0; i < sizeof(messages); i++) {
+    sizeof_messages = sizeof(messages);
+    for (int i = 0; i < sizeof_messages; i++) {
 	ASSERT_EQ(sha1(messages[i]), hashes[i]);
     }
 
@@ -43,7 +45,7 @@ void do_tests()
 string * read_data(string filename)
 {
     string contents, *lines;
-   
+
     contents = read_file(filename);
     contents = replace_string(contents, "\r", "");
 

@@ -1,3 +1,4 @@
+#ifdef __PACKAGE_DB__
 int CALLED = 0;
 void on_async_db_exec(int conn) {
   int rows = 0;
@@ -19,10 +20,11 @@ void on_async_db_exec(int conn) {
 
   db_close(conn);
 }
-
 void check_result() {
   ASSERT_EQ(1, CALLED);
 }
+#endif
+
 void do_tests() {
 #ifndef __PACKAGE_DB__
   write("PACKAGE_DB is not enabled, skipping...\n");

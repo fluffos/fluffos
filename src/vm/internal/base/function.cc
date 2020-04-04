@@ -1,3 +1,4 @@
+#include <base/internal/tracing.h>
 #include "base/std.h"
 
 #include "vm/vm.h"
@@ -123,8 +124,7 @@ funptr_t *make_lfun_funp(int index, svalue_t *args) {
         "replace_program()\n");
   }
 
-  fp = reinterpret_cast<funptr_t *>(
-      DMALLOC(sizeof(funptr_t), TAG_FUNP, "make_lfun_funp"));
+  fp = reinterpret_cast<funptr_t *>(DMALLOC(sizeof(funptr_t), TAG_FUNP, "make_lfun_funp"));
   fp->hdr.owner = current_object;
   add_ref(current_object, "make_lfun_funp");
   fp->hdr.type = FP_LOCAL | FP_NOT_BINDABLE;
@@ -153,8 +153,7 @@ funptr_t *make_lfun_funp(int index, svalue_t *args) {
 funptr_t *make_simul_funp(int index, svalue_t *args) {
   funptr_t *fp;
 
-  fp = reinterpret_cast<funptr_t *>(
-      DMALLOC(sizeof(funptr_t), TAG_FUNP, "make_simul_funp"));
+  fp = reinterpret_cast<funptr_t *>(DMALLOC(sizeof(funptr_t), TAG_FUNP, "make_simul_funp"));
   fp->hdr.owner = current_object;
   add_ref(current_object, "make_simul_funp");
   fp->hdr.type = FP_SIMUL;
@@ -182,8 +181,7 @@ funptr_t *make_functional_funp(short num_arg, short num_local, short len, svalue
         "replace_program()\n");
   }
 
-  fp = reinterpret_cast<funptr_t *>(
-      DMALLOC(sizeof(funptr_t), TAG_FUNP, "make_functional_funp"));
+  fp = reinterpret_cast<funptr_t *>(DMALLOC(sizeof(funptr_t), TAG_FUNP, "make_functional_funp"));
   fp->hdr.owner = current_object;
   add_ref(current_object, "make_functional_funp");
   fp->hdr.type = FP_FUNCTIONAL + flag;
@@ -261,7 +259,21 @@ svalue_t *call_function_pointer(funptr_t *funp, int num_arg) {
         for (j = 0; j < n; j++) {
           CHECK_TYPES(sp - num_arg + j + 1, instrs[i].type[j], j + 1, i);
         }
-        (*efun_table[i - EFUN_BASE])();
+
+        {
+          json trace_context = {};
+          if (Tracer::enabled()) {
+            json args = json::array();
+            for (int i = st_num_arg; i > 0; i--) {
+              args.push_back(svalue_to_json_summary(sp - i + 1));
+            }
+            trace_context["args"] = args;
+          }
+          ScopedTracer _efun_tracer(instrs[i].name, EventCategory::LPC_EFUN,
+                                    std::move(trace_context));
+
+          (*efun_table[i - EFUN_BASE])();
+        }
 
         free_svalue(&apply_ret_value, "call_function_pointer");
         if (instrs[i].ret_type == TYPE_NOVALUE) {

@@ -14,10 +14,15 @@
 #include <vector>
 #include <zlib.h>
 
+#include "applies_table.autogen.h"
 #include "base/internal/strutils.h"  // for startsWith, endsWith
 #include "comm.h"                    // add_message FIXME: reverse API
+#include "vm/internal/apply.h"
 #include "vm/internal/base/machine.h"
+#include "vm/internal/eval_limit.h"
 #include "vm/internal/otable.h"  // FIXME:
+#include "vm/internal/master.h"
+#include "vm/internal/simulate.h"
 #include "ghc/filesystem.hpp"
 namespace fs = ghc::filesystem;
 

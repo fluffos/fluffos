@@ -27,7 +27,7 @@ void debug_message(const char *fmt, ...) {
      * check whether config file specified this option
      */
     auto dlf = CONFIG_STR(__DEBUG_LOG_FILE__);
-    if (strlen(dlf)) {
+    if (dlf && strlen(dlf)) {
       snprintf(deb, 1023, "%s/%s", CONFIG_STR(__LOG_DIR__), dlf);
     } else {
       snprintf(deb, 1023, "%s/debug.log", CONFIG_STR(__LOG_DIR__));

@@ -26,6 +26,7 @@
 #include "packages/core/reclaim.h"
 #include "packages/core/custom_crypt.h"
 #include "packages/core/ed.h"
+#include "packages/core/heartbeat.h"
 #include "thirdparty/crypt/include/crypt.h"
 
 int data_size(object_t *ob);
@@ -217,11 +218,6 @@ void f__call_other(void) {
     }
   }
   /* Send the remaining arguments to the function. */
-  if (CONFIG_INT(__RC_TRACE__)) {
-    if (TRACEP(TRACE_CALL_OTHER)) {
-      do_trace("Call other ", funcname, "\n");
-    }
-  }
   if (apply(funcname, ob, num_arg - 2, ORIGIN_CALL_OTHER) == nullptr) { /* Function not found */
     pop_2_elems();
     push_undefined();

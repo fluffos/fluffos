@@ -1216,15 +1216,19 @@ title: EFUN
 <div><a href='system/time.html'>time</a></div>
 </div>
 <div class='col-sm-3'>
+<div><a href='system/trace_end.html'>trace_end</a></div>
+</div>
+<div class='col-sm-3'>
+<div><a href='system/trace_start.html'>trace_start</a></div>
+</div>
+<div class='col-sm-3'>
 <div><a href='system/uptime.html'>uptime</a></div>
 </div>
-<div>&nbsp;</div>
-<div>&nbsp;</div>
 </div>
 </div>
 
 
 
-This page is auto generated on 2020-03-19 17:28:07 CST for [7a1faa6c](https://github.com/fluffos/fluffos/tree/7a1faa6c).
+This page is auto generated on 2020-04-12 22:40:55 PDT for [72164e82](https://github.com/fluffos/fluffos/tree/72164e82).
 
 

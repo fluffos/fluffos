@@ -9,6 +9,7 @@
 #include <unicode/ucnv.h>
 
 #include "comm.h"
+#include "interactive.h"
 #include "packages/core/mssp.h"
 #include "packages/core/telnet_ext.h"
 #include "thirdparty/libtelnet/libtelnet.h"  // for telnet_t, telnet_event_t*

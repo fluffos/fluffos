@@ -16,9 +16,6 @@
 #include "base/std.h"
 
 #include "lex.h"
-#include "vm/internal/base/array.h"
-#include "vm/internal/base/interpret.h"
-#include "vm/internal/master.h"
 
 #include <cstdio>    // for EOF
 #include <fcntl.h>   // for O_RDONLY etc
@@ -29,6 +26,7 @@
 #include <algorithm>  // for std::sort
 #include <unicode/ustring.h>
 
+#include "vm/vm.h"
 #include "include/function.h"
 #include "efuns.autogen.h"
 #include "options.autogen.h"
