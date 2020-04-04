@@ -6,26 +6,8 @@
 #ifndef INTERPRET_H
 #define INTERPRET_H
 
-#include "packages/core/heartbeat.h"  // FIXME: for heartbeat
-#include "interactive.h"              // FIXME: for TRACE* macro
-
-/* Trace defines */
-#define TRACE_CALL 1
-#define TRACE_CALL_OTHER 2
-#define TRACE_RETURN 4
-#define TRACE_ARGS 8
-#define TRACE_EXEC 16
-#define TRACE_HEART_BEAT 32
-#define TRACE_APPLY 64
-#define TRACE_OBJNAME 128
-#define TRACETST(b) (command_giver->interactive->trace_level & (b))
-#define TRACEP(b)                                                \
-  (command_giver && command_giver->interactive && TRACETST(b) && \
-   (command_giver->interactive->trace_prefix == 0 ||             \
-    (current_object &&                                           \
-     strpref(command_giver->interactive->trace_prefix, current_object->obname))))
-#define TRACEHB \
-  (g_current_heartbeat_obj == 0 || (command_giver->interactive->trace_level & TRACE_HEART_BEAT))
+#include "vm/internal/base/program.h"
+#include "vm/internal/base/svalue.h"
 
 /*
  * Control stack element.
@@ -69,6 +51,8 @@ struct control_stack_t {
   int variable_index_offset; /* Same */
   short caller_type;         /* was this a locally called function? */
   short framekind;
+
+  std::string trace_id;
 };
 
 struct function_to_call_t {
@@ -218,8 +202,6 @@ void mark_stack(void);
 
 // TODO: move these to correct places
 void setup_varargs_variables(int, int, int);
-extern int tracedepth;
-void do_trace_call(int);
 
 inline const char *access_to_name(int mode) {
   switch (mode) {

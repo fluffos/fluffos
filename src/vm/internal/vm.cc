@@ -9,10 +9,12 @@
 
 #include <cstdlib>
 
+#include "applies_table.autogen.h"
+#include "vm/internal/base/machine.h"  // for reset_machine
 #include "vm/internal/eval_limit.h"
 #include "vm/internal/master.h"
 #include "vm/internal/simul_efun.h"
-#include "vm/internal/base/machine.h"    // for reset_machine
+#include "vm/internal/simulate.h"
 #include "compiler/internal/lex.h"       // for add_predefines, fixme!
 #include "compiler/internal/compiler.h"  // for init_locals, fixme!
 

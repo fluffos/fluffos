@@ -3,11 +3,15 @@
 #include "vm/internal/trace.h"
 
 #include "vm/internal/base/interpret.h"
+#include "vm/internal/base/machine.h"
 
 // FIXME: for svalue_to_string
 #include "packages/core/sprintf.h"
 
 // Dump a stack trace at current location.
+
+/* The end of a static buffer */
+#define EndOf(x) (x + sizeof(x) / sizeof(x[0]))
 
 namespace {
 
@@ -57,11 +61,8 @@ const char *dump_trace(int how) {
   if (csp < &control_stack[0]) {
     return nullptr;
   }
-
-  if (CONFIG_INT(__RC_TRACE_CODE__)) {
-    if (how) {
-      last_instructions();
-    }
+  if (how) {
+    last_instructions();
   }
   debug_message("--- trace ---\n");
   for (p = &control_stack[0]; p <= csp; p++) {

@@ -5,9 +5,7 @@
 #include <algorithm>  // for std::min
 #include <cstdio>     // for sprintf
 
-#ifdef ENABLE_DTRACE
-#include "tracing/tracing.autogen.h"
-#endif
+#include "base/internal/tracing.h"
 #include "vm/internal/base/apply_cache.h"
 #include "vm/internal/base/machine.h"
 #include "compiler/internal/compiler.h"
@@ -159,6 +157,8 @@ void check_co_args(int num_arg, const program_t *prog, function_t *fun, int find
  */
 
 int apply_low(const char *fun, object_t *ob, int num_arg) {
+  ScopedTracer _tracer(__PRETTY_FUNCTION__);
+
   int local_call_origin = call_origin;
 
 #ifdef DEBUG
@@ -261,17 +261,6 @@ retry_for_shadow:
     } else {
       setup_variables(csp->num_local_variables, funp->num_local, funp->num_arg);
     }
-    if (CONFIG_INT(__RC_TRACE__)) {
-      tracedepth++;
-      if (TRACEP(TRACE_CALL)) {
-        do_trace_call(findex);
-      }
-    }
-#ifdef ENABLE_DTRACE
-    if (FLUFFOS_LPC_ENTRY_ENABLED()) {
-      FLUFFOS_LPC_ENTRY(ob->obname, fun, current_prog->filename);
-    }
-#endif
     /* Call the program */
     previous_ob = current_object;
     current_object = ob;
@@ -299,19 +288,8 @@ svalue_t *apply(const char *fun, object_t *ob, int num_arg, int where) {
   svalue_t *expected_sp;
 #endif
 
-  tracedepth = 0;
   call_origin = where;
 
-  if (CONFIG_INT(__RC_TRACE__)) {
-    if (TRACEP(TRACE_APPLY)) {
-      static int inapply = 0;
-      if (!inapply) {
-        inapply = 1;
-        do_trace("Apply", "", "\n");
-        inapply = 0;
-      }
-    }
-  }
 #ifdef DEBUG
   expected_sp = sp - num_arg;
 #endif

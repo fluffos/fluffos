@@ -30,6 +30,8 @@
 #endif
 #include <unicode/uversion.h>
 
+#include "base/internal/tracing.h"
+#include "thirdparty/scope_guard/scope_guard.hpp"
 #include "packages/core/dns.h"                   // for init_dns_event_base.
 #include "vm/vm.h"                               // for push_constant_string, etc
 #include "comm.h"                                // for init_user_conn
@@ -226,11 +228,16 @@ struct event_base *init_main(int argc, char **argv) {
   /* read in the configuration file */
   bool got_config = false;
   for (int i = 1; i < argc; i++) {
-    if (argv[i][0] != '-') {
-      read_config(argv[i]);
-      got_config = true;
-      break;
+    if (argv[i][0] == '-') {
+      // skip --flag val .
+      if (argv[i][1] == '-') {
+        i++;
+      }
+      continue;
     }
+    read_config(argv[i]);
+    got_config = true;
+    break;
   }
   if (!got_config) {
     fprintf(stderr, "Usage: %s config_file\n", argv[0]);
@@ -292,6 +299,34 @@ void init_win32() {
 }
 
 int driver_main(int argc, char **argv) {
+  // First look for '--tracing' to decide if enable tracing from driver start.
+  std::string trace_log;
+
+  for (int i = 1; i < argc; i++) {
+    if (argv[i][0] != '-') {
+      continue;
+    }
+
+    if (strcmp(argv[i], "--tracing") == 0) {
+      if (i + 1 >= argc) {
+        std::cerr << "--tracing require an argument";
+        exit(-1);
+      }
+      trace_log = argv[i + 1];
+      break;
+    }
+  }
+
+  DEFER { Tracer::collect(); };
+
+  if (!trace_log.empty()) {
+    std::cout << "Saving tracing log to: " << trace_log << std::endl;
+    Tracer::start(trace_log.c_str());
+  }
+
+  Tracer::setThreadName("FluffOS Main");
+  ScopedTracer _main_tracer(__PRETTY_FUNCTION__);
+
   // backward-cpp doesn't yet work on win32
 #ifndef _WIN32
   // register crash handlers
@@ -331,7 +366,11 @@ int driver_main(int argc, char **argv) {
        */
       switch (argv[i][1]) {
         case 'f': {
+          ScopedTracer _tracer("Driver Flag: calling master::flag", EventCategory::DEFAULT,
+                               {std::string(argv[i] + 2)});
+
           debug_message("Calling master::flag(\"%s\")...\n", argv[i] + 2);
+
           push_constant_string(argv[i] + 2);
           auto ret = safe_apply_master_ob(APPLY_FLAG, 1);
           if (ret == (svalue_t *)-1 || ret == nullptr || MudOS_is_being_shut_down) {
@@ -348,6 +387,12 @@ int driver_main(int argc, char **argv) {
           }
           debug_message("Debug Level: %d\n", debug_level);
           continue;
+        case '-':
+          if (strcmp(argv[i], "--tracing") == 0) {
+            i++;
+            continue;
+          }
+          // fall-through
         default:
           debug_message("Unknown flag: %s\n", argv[i]);
           exit(-1);
