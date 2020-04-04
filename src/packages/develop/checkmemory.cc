@@ -10,6 +10,7 @@
 #include "packages/core/file.h"
 #include "packages/core/call_out.h"
 #include "packages/core/outbuf.h"
+#include "packages/core/heartbeat.h"
 #ifdef PACKAGE_PARSER
 #include "packages/parser/parser.h"
 #endif

@@ -27,9 +27,6 @@
 
 #include "vm/vm.h"
 
-#ifdef PACKAGE_ASYNC
-#include "packages/async/async.h"
-#endif
 #include "packages/core/heartbeat.h"
 #include "packages/core/reclaim.h"
 #ifdef PACKAGE_MUDLIB_STATS
@@ -128,10 +125,6 @@ inline void call_tick_events() {
       delete event;
     }
   }
-// TODO: Move this into timer based.
-#ifdef PACKAGE_ASYNC
-  check_reqs();
-#endif
 }
 
 void on_game_tick(evutil_socket_t fd, short what, void *arg) {

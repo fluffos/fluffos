@@ -6,6 +6,7 @@
 #include <cstdio>   // for sprintf
 #include <cctype>   // for isspace
 
+#include "base/internal/tracing.h"
 #include "efuns.autogen.h"          // FIXME
 #include "applies_table.autogen.h"  // FIXME:
 
@@ -2137,10 +2138,12 @@ program_t *compile_file(int f, char *name) {
   }
   guard = 1;
 
-  prolog(f, name);
-  func_present = 0;
-  yyparse();
-  prog = epilog();
+  {
+    prolog(f, name);
+    func_present = 0;
+    yyparse();
+    prog = epilog();
+  }
 
   guard = 0;
   return prog;

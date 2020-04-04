@@ -4,6 +4,7 @@
  */
 #include "base/package_api.h"
 
+#include "base/internal/tracing.h"
 #include "packages/core/file.h"
 
 #include <iostream>

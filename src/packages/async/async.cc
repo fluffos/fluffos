@@ -68,6 +68,10 @@ std::deque<struct request *> finished_reqs;
 std::mutex finished_reqs_lock;
 
 void thread_func() {
+  Tracer::setThreadName("Package Async thread");
+
+  ScopedTracer _tracer("Async thread loop");
+
   while (true) {
     struct work *w = nullptr;
     {
@@ -80,7 +84,12 @@ void thread_func() {
     }
 
     if (w) {
-      w->func(w->data);
+      {
+        ScopedTracer _work_tracer("Async thread work", EventCategory::DEFAULT,
+                                  {{"type", w->data->type}});
+
+        w->func(w->data);
+      }
       if (w->data->status == DONE) {
         {
           std::lock_guard<std::mutex> _lock(finished_reqs_lock);
@@ -91,6 +100,9 @@ void thread_func() {
         std::lock_guard<std::mutex> _lock(reqs_lock);
         reqs.push_back(w);
       }
+
+      add_walltime_event(std::chrono::milliseconds(0),
+                         tick_event::callback_type([] { check_reqs(); }));
     }
   }
 }
@@ -176,6 +188,8 @@ int aio_read(struct request *req) {
 pthread_mutex_t *db_mut = nullptr;
 
 void *dbexecthread(struct request *req) {
+  ScopedTracer _work_tracer("db_exec", EventCategory::DEFAULT, {req->sql});
+
   pthread_mutex_lock(db_mut);
   // see add_db_exec
   db_t *db = find_db_conn((intptr_t)(req->buf));
@@ -214,6 +228,8 @@ int aio_db_exec(struct request *req) {
 
 #ifdef F_ASYNC_GETDIR
 void *getdirthread(struct request *req) {
+  ScopedTracer _work_tracer("getdir", EventCategory::DEFAULT, {req->path});
+
   DIR *dirp = nullptr;
   if ((dirp = opendir(req->path)) == nullptr) {
     req->ret = 0;
@@ -396,6 +412,8 @@ void handle_db_exec(struct request *req) {
 }
 
 void check_reqs() {
+  ScopedTracer _tracer("Async callback");
+
   std::lock_guard<std::mutex> _lock(finished_reqs_lock);
   while (!finished_reqs.empty()) {
     auto req = finished_reqs.front();

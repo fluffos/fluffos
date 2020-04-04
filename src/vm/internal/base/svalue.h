@@ -4,6 +4,8 @@
 /* It is usually better to include "lpc_incl.h" instead of including this
  directly */
 #include "vm/internal/base/number.h"
+#include "thirdparty/json/include/nlohmann/json_fwd.hpp"
+using json = nlohmann::json;
 
 typedef struct {
   unsigned short ref;
@@ -176,5 +178,8 @@ extern svalue_t const0, const1, const0u;
     }                                                                                             \
     (x)->u.string = ssj_res;                                                                      \
   })
+
+// Translate svalue into json summary, only suitable for
+json svalue_to_json_summary(const svalue_t *obj, int depth = 0);
 
 #endif /* LPC_SVALUE_H */

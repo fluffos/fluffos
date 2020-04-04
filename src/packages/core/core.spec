@@ -369,3 +369,8 @@ void shutdown(void | int);
 mixed* dump_trace();
 // Get display width of given string
 int strwidth(string);
+
+// start to collect tracing data
+void trace_start(string, int default: 10);
+// stop to collect tracing data right away.
+void trace_end();
