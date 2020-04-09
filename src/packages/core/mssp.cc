@@ -35,6 +35,7 @@ static int send_mssp_val(mapping_t *map, mapping_node_t *el, void *data) {
 }
 
 void on_telnet_do_mssp(interactive_t *ip) {
+  set_eval(max_eval_cost);
   svalue_t *res = safe_apply_master_ob(APPLY_GET_MUD_STATS, 0);
   mapping_t *map;
   if (res <= (svalue_t *)nullptr || res->type != T_MAPPING) {

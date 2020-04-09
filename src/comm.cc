@@ -306,6 +306,7 @@ void on_user_logon(interactive_t *user) {
   set_prompt("> ");
 
   // Call logon() on the object.
+  set_eval(max_eval_cost);
   ret = safe_apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
   if (ret == nullptr) {
     debug_message("new_user_handler: logon() on object %s has failed, the user is disconnected.\n",
@@ -775,6 +776,7 @@ void get_user_data(interactive_t *ip) {
             push_undefined();
           }
           ip->text_end = 0;
+          set_eval(max_eval_cost);
           safe_apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
         }
       }
@@ -801,6 +803,7 @@ void get_user_data(interactive_t *ip) {
           str = new_string(nl - p, "PORT_ASCII");
           memcpy(str, p, nl - p + 1);
           push_malloced_string(str);
+          set_eval(max_eval_cost);
           safe_apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
         }
 
@@ -820,6 +823,7 @@ void get_user_data(interactive_t *ip) {
       memcpy(buffer->item, buf, num_bytes);
 
       push_refed_buffer(buffer);
+      set_eval(max_eval_cost);
       safe_apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
     } break;
   }
@@ -1120,7 +1124,7 @@ int process_user_command(interactive_t *ip) {
       user_command[3] == 'z') {
     svalue_t *ret;
     copy_and_push_string(user_command);
-
+    set_eval(max_eval_cost);
     ret = safe_apply(APPLY_MXP_TAG, ip->ob, 1, ORIGIN_DRIVER);
     if (ret && ret->type == T_NUMBER && ret->u.number) {
       goto exit;
@@ -1224,6 +1228,7 @@ void remove_interactive(object_t *ob, int dested) {
      * auto-notification of net death
      */
     save_command_giver(ob);
+    set_eval(max_eval_cost);
     safe_apply(APPLY_NET_DEAD, ob, 0, ORIGIN_DRIVER);
     restore_command_giver();
   }

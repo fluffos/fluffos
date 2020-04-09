@@ -1650,9 +1650,9 @@ void free_sentence(sentence_t *p) {
       // it will catch the problem and allow debugging.
       break;
 #endif
-      debug_message("FluffOS driver attempting to exit gracefully.\n", msg_buf);
+      debug_message("FluffOS driver attempting to exit gracefully.\n");
       if (current_file) {
-        debug_message("(occured during compilation of %s at line %d)\n", current_file,
+        debug_message("(occurred during compilation of %s at line %d)\n", current_file,
                       current_line);
       }
       if (current_object) {
@@ -1670,6 +1670,7 @@ void free_sentence(sentence_t *p) {
         copy_and_push_string(msg_buf);
         push_object(command_giver);
         push_object(current_object);
+        set_eval(0x7fffffff);
         safe_apply_master_ob(APPLY_CRASH, 3);
         debug_message("crash() in master called successfully.  Aborting.\n");
       }
