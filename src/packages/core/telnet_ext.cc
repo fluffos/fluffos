@@ -53,6 +53,7 @@ void on_telnet_do_zmp(const char** argv, unsigned long argc, interactive_t* ip) 
   }
   push_refed_array(arr);
 
+  set_eval(max_eval_cost);
   safe_apply(APPLY_ZMP, ip->ob, 2, ORIGIN_DRIVER);
 }
 
