@@ -780,7 +780,7 @@ static void lexerror(const char *s) {
 }
 
 static int skip_to(const char *token, const char *atoken) {
-  char b[20], *p;
+  char b[20] = {0}, *p;
   unsigned char c;
   char *yyp = outp, *startp;
   char *b_end = b + 19;
