@@ -52,8 +52,9 @@ void preload_objects() {
     if (prefiles->item[i].type != T_STRING) {
       continue;
     }
-    push_svalue(&prefiles->item[i]);
     debug_message("%s...\n", prefiles->item[i].u.string);
+
+    push_svalue(&prefiles->item[i]);
     set_eval(max_eval_cost);
     safe_apply_master_ob(APPLY_PRELOAD, 1);
   }

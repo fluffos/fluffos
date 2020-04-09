@@ -591,6 +591,7 @@ static void free_ed_buffer(object_t *who) {
     set_prompt("> ");
 
     /* make this "safe" */
+    set_eval(max_eval_cost);
     safe_apply(exit_fn, exit_ob, 0, ORIGIN_INTERNAL);
     FREE(exit_fn);
     free_object(&exit_ob, "ed EOF");
@@ -769,6 +770,7 @@ static int dowrite(int from, int to, const char *fname, int apflg) {
 
     push_malloced_string(add_slash(fname));
     push_number(0);
+    set_eval(max_eval_cost);
     res = safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, 2, ORIGIN_INTERNAL);
     if (IS_ZERO(res)) {
       return (EDERR);
@@ -810,6 +812,7 @@ static int dowrite(int from, int to, const char *fname, int apflg) {
   if (ED_BUFFER->write_fn) {
     push_malloced_string(add_slash(fname));
     push_number(1);
+    set_eval(max_eval_cost);
     safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, 2, ORIGIN_INTERNAL);
   }
 #endif
