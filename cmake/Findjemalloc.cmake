@@ -1,21 +1,50 @@
-# - Find JeMalloc library
-# Find the native JeMalloc includes and library
-#
-# JEMALLOC_INCLUDE_DIR - where to find jemalloc.h, etc.
-# JEMALLOC_LIBRARIES - List of libraries when using jemalloc.
-# JEMALLOC_FOUND - True if jemalloc found.
+# - Try to find jemalloc
+# Once done this will define
+#  JEMALLOC_FOUND        - System has jemalloc
+#  JEMALLOC_INCLUDE_DIRS - The jemalloc include directories
+#  JEMALLOC_LIBRARIES    - The libraries needed to use jemalloc
+
+find_package(PkgConfig QUIET)
+pkg_check_modules(PC_JEMALLOC QUIET jemalloc)
 
 find_path(JEMALLOC_INCLUDE_DIR
-  NAMES jemalloc/jemalloc.h
-  HINTS ${JEMALLOC_ROOT_DIR}/include)
+        NAMES jemalloc/jemalloc.h
+        HINTS ${PC_JEMALLOC_INCLUDE_DIRS}
+        )
 
-find_library(JEMALLOC_LIBRARIES
-  NAMES jemalloc
-  HINTS ${JEMALLOC_ROOT_DIR}/lib)
+# Force using static library
+if (NOT WIN32)
+find_library(JEMALLOC_LIBRARY
+        NAMES ${CMAKE_FIND_LIBRARY_PREFIXES}jemalloc_pic${CMAKE_STATIC_LIBRARY_SUFFIX}
+        ${CMAKE_FIND_LIBRARY_PREFIXES}jemalloc${CMAKE_STATIC_LIBRARY_SUFFIX}
+        HINTS ${PC_JEMALLOC_LIBRARY_DIRS}
+        )
+else()
+  find_library(JEMALLOC_LIBRARY
+          NAMES jemalloc
+          HINTS ${PC_JEMALLOC_LIBRARY_DIRS}
+          )
+endif()
+
+if(JEMALLOC_INCLUDE_DIR)
+  set(_version_regex "^#define[ \t]+JEMALLOC_VERSION[ \t]+\"([^\"]+)\".*")
+  file(STRINGS "${JEMALLOC_INCLUDE_DIR}/jemalloc/jemalloc.h"
+          JEMALLOC_VERSION REGEX "${_version_regex}")
+  string(REGEX REPLACE "${_version_regex}" "\\1"
+          JEMALLOC_VERSION "${JEMALLOC_VERSION}")
+  unset(_version_regex)
+endif()
 
 include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(jemalloc DEFAULT_MSG JEMALLOC_LIBRARIES JEMALLOC_INCLUDE_DIR)
+# handle the QUIETLY and REQUIRED arguments and set JEMALLOC_FOUND to TRUE
+# if all listed variables are TRUE and the requested version matches.
+find_package_handle_standard_args(Jemalloc
+        REQUIRED_VARS JEMALLOC_LIBRARY JEMALLOC_INCLUDE_DIR
+        VERSION_VAR JEMALLOC_VERSION)
 
-mark_as_advanced(
-  JEMALLOC_LIBRARIES
-  JEMALLOC_INCLUDE_DIR)
+if(JEMALLOC_FOUND)
+  set(JEMALLOC_LIBRARIES    ${JEMALLOC_LIBRARY})
+  set(JEMALLOC_INCLUDE_DIRS ${JEMALLOC_INCLUDE_DIR})
+endif()
+
+mark_as_advanced(JEMALLOC_INCLUDE_DIR JEMALLOC_LIBRARY)
