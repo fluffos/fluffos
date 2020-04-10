@@ -88,7 +88,6 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL
       add_compile_options(
         "-fstack-protector-strong"
         "-Wstack-protector"
-        "--param" "ssp-buffer-size=4"
       )
       if (WIN32)
         link_libraries(ssp)
@@ -99,7 +98,6 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL
       add_compile_options(
         "-fstack-protector-all"
         "-Wstack-protector"
-        "--param" "ssp-buffer-size=4"
       )
       if (WIN32)
         link_libraries(ssp)
@@ -136,8 +134,14 @@ if(NOT ${CMAKE_BUILD_TYPE} STREQUAL "Debug")
   endif ()
 endif()
 
-# build PIE code by default
+# build PIC code by default
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag("-fPIE" SUPPORT_PIE)
+if (SUPPORT_PIE)
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pie")
+endif()
 
 # STATIC
 IF(WIN32)
@@ -150,7 +154,7 @@ if (STATIC)
   if (WIN32)
     set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
   elseif (APPLE)
-    message(FATAL_ERROR "Build staticly on OSX is not supported")
+    message(FATAL_ERROR "Build static driver on OSX is not supported")
   else ()
     set(CMAKE_FIND_LIBRARY_SUFFIXES .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
   endif ()
@@ -362,6 +366,26 @@ add_library(libdriver
   ${SRC} ${SRC_HEADER}
   )
 
+# JEMALLOC must be the first!
+if (CYGWIN)
+  set(USE_JEMALLOC OFF)
+  message(STATUS "JEMALLOC is not supported on CYGWIN.")
+endif ()
+if(ENABLE_SANITIZER)
+  set(USE_JEMALLOC OFF)
+  message(STATUS "AddressSanitizer doesn't work with JEMALLOC, force disabling!")
+endif()
+
+if (USE_JEMALLOC)
+  find_package(jemalloc REQUIRED)
+  set(HAVE_JEMALLOC TRUE) # used in config.h.in
+  message(STATUS "Jemalloc Version: ${JEMALLOC_VERSION}, linking ${JEMALLOC_LIBRARIES}")
+  include_directories(SYSTEM ${JEMALLOC_INCLUDE_DIRS})
+  target_link_libraries(libdriver PUBLIC ${JEMALLOC_LIBRARIES})
+  target_link_libraries(libdriver PUBLIC ${CMAKE_DL_LIBS})
+endif ()
+# end of JEMALLOC
+
 target_link_libraries(libdriver PUBLIC ghc_filesystem)
 
 target_link_libraries(libdriver PUBLIC autogen)
@@ -395,24 +419,6 @@ add_subdirectory(thirdparty/backward-cpp EXCLUDE_FROM_ALL)
 target_compile_definitions(libdriver PUBLIC ${BACKWARD_DEFINITIONS})
 target_include_directories(libdriver PUBLIC ${BACKWARD_INCLUDE_DIRS})
 target_link_libraries(libdriver PUBLIC ${BACKWARD_LIBRARIES})
-
-# JEMALLOC
-if (CYGWIN)
-  set(USE_JEMALLOC OFF)
-  message(STATUS "JEMALLOC is not supported on CYGWIN.")
-endif ()
-if(ENABLE_SANITIZER)
-  set(USE_JEMALLOC OFF)
-  message(STATUS "AddressSanitizer doesn't work with JEMALLOC, force disabling!")
-endif()
-
-if (USE_JEMALLOC)
-  find_package(jemalloc REQUIRED)
-  set(HAVE_JEMALLOC TRUE) # used in config.h.in
-  include_directories(SYSTEM ${JEMALLOC_INCLUDE_DIR})
-  target_link_libraries(libdriver PUBLIC ${JEMALLOC_LIBRARIES})
-endif ()
-# end of JEMALLOC
 
 # libevent
 target_link_libraries(libdriver PUBLIC ${LIBEVENT_LIBRARIES})
