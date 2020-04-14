@@ -745,10 +745,6 @@ static array_t *MySQL_fetch(dbconn_t *c, int row) {
   return v;
 }
 
-#ifndef MYSQL_SOCKET_ADDRESS
-#define MYSQL_SOCKET_ADDRESS "/tmp/mysql.sock"
-#endif
-
 static int MySQL_connect(dbconn_t *c, const char *host, const char *database, const char *username,
                          const char *password) {
   int ret;
@@ -758,7 +754,7 @@ static int MySQL_connect(dbconn_t *c, const char *host, const char *database, co
   tmp = mysql_init(tmp);
   *(c->mysql.errormsg) = 0;
   c->mysql.handle =
-      mysql_real_connect(tmp, host, username, password, database, 0, MYSQL_SOCKET_ADDRESS, 0);
+      mysql_real_connect(tmp, host, username, password, database, 0, nullptr, 0);
   // c->mysql.handle = mysql_connect(tmp, host, username, password);
   if (!c->mysql.handle) {
     strncpy(c->mysql.errormsg, mysql_error(tmp), sizeof(c->mysql.errormsg));
