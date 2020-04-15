@@ -2,6 +2,7 @@
 
 #include <sys/stat.h>  // for struct stat
 
+#include "packages/core/heartbeat.h"
 #include "packages/core/add_action.h"
 #include "packages/core/file.h"
 

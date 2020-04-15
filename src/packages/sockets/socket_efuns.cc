@@ -942,6 +942,8 @@ static void call_callback(int fd, int what, int num_arg) {
       break;
   }
 
+  set_eval(max_eval_cost);
+
   if (lpc_socks[fd].flags & what) {
     safe_call_function_pointer(callback.f, num_arg);
   } else if (callback.s) {
@@ -1346,6 +1348,7 @@ int socket_release(int fd, object_t *ob, svalue_t *callback) {
 
   push_number(fd);
   push_object(ob);
+  set_eval(max_eval_cost);
 
   if (callback->type == T_FUNCTION) {
     safe_call_function_pointer(callback->u.fp, 2);

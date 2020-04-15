@@ -4,11 +4,14 @@
 
 #include <algorithm>
 
+#include "base/internal/tracing.h"
 #include "vm/internal/base/program.h"
 
 static inline void fill_lookup_table(program_t *prog);
 
 lookup_entry_s apply_cache_lookup(const char *funcname, program_t *prog) {
+  ScopedTracer _tracer("Apply Cache Lookup", EventCategory::APPLY_CACHE, {{"name", funcname}});
+
   // All function names are shared string.
   auto key = (intptr_t)(findstring(funcname));
   if (key == 0) {

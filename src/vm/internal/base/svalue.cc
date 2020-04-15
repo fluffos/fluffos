@@ -2,6 +2,9 @@
 
 #include "vm/internal/base/machine.h"
 
+#include "thirdparty/json/single_include/nlohmann/json.hpp"
+using json = nlohmann::json;
+
 // FIXME: move init from main() to compile time;
 svalue_t const0{T_NUMBER, 0, {0}};
 svalue_t const1{T_NUMBER, 0, {1}};
@@ -145,3 +148,91 @@ void int_free_svalue(svalue_t *v)
   v->u.string = tag;
 #endif
 }
+
+/*
+ * Converts any LPC datatype into json format, only value types are supported.
+ */
+constexpr int _max_depth = 10;
+json svalue_to_json_summary(const svalue_t *obj, int depth) {
+  /* prevent an infinite recursion on self-referential structures */
+  if (depth >= _max_depth) {
+    return "truncated";
+  }
+  switch ((obj->type & ~T_FREED)) {
+    case T_INVALID:
+      return "T_INVALID";
+    case T_LVALUE:
+      return {{"lvalue", (intptr_t)obj->u.lvalue}};
+    case T_REF:
+      return {{"ref", (intptr_t)obj->u.ref->lvalue}};
+    case T_FUNCTION:
+      return "function";
+    case T_NUMBER:
+      return obj->u.number;
+    case T_REAL:
+      return obj->u.real;
+    case T_STRING: {
+      auto len = SVALUE_STRLEN(obj);
+      if (len < 32) {
+        return obj->u.string;
+      }
+      return std::string(obj->u.string,
+                         u8_truncate(reinterpret_cast<const uint8_t *>(obj->u.string), 32)) +
+             "...(len:" + std::to_string(len) + ")";
+    }
+    case T_CLASS:
+      /* fall through */
+    case T_ARRAY: {
+      json res = json::array();
+      for (int i = 0; i < std::min(3, obj->u.arr->size); i++) {
+        res.push_back(svalue_to_json_summary(&(obj->u.arr->item[i]), depth + 1));
+      }
+      if (obj->u.arr->size > 10) {
+        res.push_back("...(len:" + std::to_string(obj->u.arr->size) + ")");
+      }
+      return res;
+    }
+    case T_BUFFER: {
+      json res = json::array();
+      for (int i = 0; i < std::min(10u, obj->u.buf->size); i++) {
+        res.push_back((int)obj->u.buf->item[i]);
+      }
+      if (obj->u.buf->size > 10) {
+        res.push_back("...(len:" + std::to_string(obj->u.buf->size) + ")");
+      }
+      return res;
+    }
+    case T_MAPPING: {
+      json res = json::object();
+      auto limit = std::min(5u, obj->u.map->count);
+      for (int i = 0; i < obj->u.map->table_size; i++) {
+        mapping_node_t *elm;
+        for (elm = obj->u.map->table[i]; elm; elm = elm->next) {
+          auto key = &(elm->values[0]);
+          auto val = &(elm->values[1]);
+          if (key->type == T_STRING) {
+            res[key->u.string] = svalue_to_json_summary(val, depth + 1);
+          } else {
+            res[std::to_string((intptr_t)key)] = svalue_to_json_summary(val, depth + 1);
+          }
+          if (limit-- == 0) {
+            break;
+          }
+        }
+      }
+      if (obj->u.map->count > 4) {
+        res["_sizeof"] = std::to_string(obj->u.map->count);
+      }
+      return res;
+    }
+    case T_OBJECT: {
+      if (obj->u.ob->flags & O_DESTRUCTED) {
+        return {0};
+      }
+      return std::string("/") + obj->u.ob->obname;
+    }
+    default: {
+      return "unknown svalue";
+    }
+  }
+} /* end of svalue_to_json_summary() */

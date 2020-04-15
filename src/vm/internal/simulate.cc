@@ -9,18 +9,25 @@
 #include <unistd.h>    // for open()
 #ifdef HAVE_SIGNAL_H
 #include <signal.h>  // for signal*
+#include <base/internal/tracing.h>
 #endif
 
-#include "backend.h"  // for clear_tick_events , FIXME
-#include "user.h"     // for users_foreach, FIXME
-#include "vm/internal/otable.h"
+#include "applies_table.autogen.h"
+#include "backend.h"      // for clear_tick_events , FIXME
+#include "user.h"         // for users_foreach, FIXME
+#include "interactive.h"  // for interactive_t, FIXME
+#include "vm/internal/apply.h"
 #include "vm/internal/base/machine.h"
+#include "vm/internal/master.h"
+#include "vm/internal/otable.h"
+#include "vm/internal/simul_efun.h"
 #include "compiler/internal/lex.h"  // for total_lines, FIXME
 
 #include "packages/core/add_action.h"
 #include "packages/core/call_out.h"
 #include "packages/core/ed.h"
 #include "packages/core/file.h"
+#include "packages/core/heartbeat.h"
 #ifdef PACKAGE_ASYNC
 #include "packages/async/async.h"
 #endif
@@ -35,10 +42,6 @@ void db_cleanup(void);  // FIXME
 #endif
 #ifdef PACKAGE_PARSER
 #include "packages/parser/parser.h"
-#endif
-
-#ifdef ENABLE_DTRACE
-#include "tracing/tracing.autogen.h"
 #endif
 
 #include "comm.h"  // FIXME
@@ -85,6 +88,8 @@ void shutdownMudOS(int exit_code) {
 #ifdef PROFILING
   monitor(0, 0, 0, 0, 0); /* cause gmon.out to be written */
 #endif
+  Tracer::collect();
+
   exit(exit_code);
 }
 
@@ -402,6 +407,8 @@ int filename_to_obname(const char *src, char *dest, int size) {
  *
  */
 object_t *load_object(const char *lname, int callcreate) {
+  ScopedTracer _tracer("LPC Load Object", EventCategory::VM_LOAD_OBJECT, {lname});
+
   auto inherit_chain_size = CONFIG_INT(__INHERIT_CHAIN_SIZE__);
 
   int f;
@@ -1650,9 +1657,12 @@ void free_sentence(sentence_t *p) {
       // it will catch the problem and allow debugging.
       break;
 #endif
-      debug_message("FluffOS driver attempting to exit gracefully.\n", msg_buf);
+      if (Tracer::enabled()) {
+        Tracer::collect();
+      }
+      debug_message("FluffOS driver attempting to exit gracefully.\n");
       if (current_file) {
-        debug_message("(occured during compilation of %s at line %d)\n", current_file,
+        debug_message("(occurred during compilation of %s at line %d)\n", current_file,
                       current_line);
       }
       if (current_object) {
@@ -1670,6 +1680,7 @@ void free_sentence(sentence_t *p) {
         copy_and_push_string(msg_buf);
         push_object(command_giver);
         push_object(current_object);
+        set_eval(0x7fffffff);
         safe_apply_master_ob(APPLY_CRASH, 3);
         debug_message("crash() in master called successfully.  Aborting.\n");
       }
@@ -1776,11 +1787,7 @@ void _error_handler(char *err) {
   const char *object_name;
 
   debug_message_with_location(err + 1);
-  if (CONFIG_INT(__RC_TRACE_CODE__)) {
-    object_name = dump_trace(1);
-  } else {
-    object_name = dump_trace(0);
-  }
+  object_name = dump_trace(CONFIG_INT(__RC_TRACE_CODE__));
   if (object_name) {
     object_t *ob;
 
@@ -1940,11 +1947,6 @@ exit:
   vsnprintf(err_buf + 1, 2046, fmt, args);
   va_end(args);
   err_buf[0] = '*'; /* all system errors get a * at the start */
-#ifdef ENABLE_DTRACE
-  if (FLUFFOS_ERROR_ENABLED()) {
-    FLUFFOS_ERROR((char *)err_buf);
-  }
-#endif
   error_handler(err_buf);
 }
 

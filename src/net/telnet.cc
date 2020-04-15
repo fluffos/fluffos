@@ -9,6 +9,7 @@
 #include <unicode/ucnv.h>
 
 #include "comm.h"
+#include "interactive.h"
 #include "packages/core/mssp.h"
 #include "packages/core/telnet_ext.h"
 #include "thirdparty/libtelnet/libtelnet.h"  // for telnet_t, telnet_event_t*
@@ -125,6 +126,7 @@ static inline void on_telnet_will(unsigned char cmd, interactive_t *ip) {
     case TELNET_TELOPT_MXP:
       ip->iflags |= USING_MXP;
       /* Mxp is enabled, tell the mudlib about it. */
+      set_eval(max_eval_cost);
       safe_apply(APPLY_MXP_ENABLE, ip->ob, 0, ORIGIN_DRIVER);
       break;
     default:
@@ -278,6 +280,7 @@ static inline void on_telnet_subnegotiation(unsigned char cmd, const char *buf, 
       if (size >= 4) {
         push_number((static_cast<unsigned char>(buf[0]) << 8) | static_cast<unsigned char>(buf[1]));
         push_number((static_cast<unsigned char>(buf[2]) << 8) | static_cast<unsigned char>(buf[3]));
+        set_eval(max_eval_cost);
         safe_apply(APPLY_WINDOW_SIZE, ip->ob, 2, ORIGIN_DRIVER);
       }
       break;
@@ -289,6 +292,7 @@ static inline void on_telnet_subnegotiation(unsigned char cmd, const char *buf, 
       strncpy(str, buf, size);
 
       push_malloced_string(str);
+      set_eval(max_eval_cost);
       safe_apply(APPLY_GMCP, ip->ob, 1, ORIGIN_DRIVER);
       break;
     }
@@ -300,6 +304,7 @@ static inline void on_telnet_subnegotiation(unsigned char cmd, const char *buf, 
         str[i] = (buf[i] ? buf[i] : 'I');
       }
       push_malloced_string(str);
+      set_eval(max_eval_cost);
       safe_apply(APPLY_TELNET_SUBOPTION, ip->ob, 1, ORIGIN_DRIVER);
       break;
     }
@@ -321,12 +326,14 @@ static inline void on_telnet_environ(const struct telnet_environ_t *values, unsi
     u8_sanitize(value);
     push_malloced_string(value);
 
+    set_eval(max_eval_cost);
     safe_apply(APPLY_RECEIVE_ENVIRON, ip->ob, 2, ORIGIN_DRIVER);
   }
 }
 
 static inline void on_telnet_ttype(const char *name, interactive_t *ip) {
   copy_and_push_string(name);
+  set_eval(max_eval_cost);
   safe_apply(APPLY_TERMINAL_TYPE, ip->ob, 1, ORIGIN_DRIVER);
 }
 

@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 
+#include "vm/internal/apply.h"
 #include "vm/internal/base/machine.h"
 #include "vm/internal/simulate.h"
 #include "compiler/internal/lex.h"  // for ident_hash_elem_t etc, fix me!
@@ -194,11 +195,6 @@ void call_simul_efun(unsigned short index, int num_arg) {
   }
 
   if (simuls[index].func) {
-    if (CONFIG_INT(__RC_TRACE__)) {
-      if (TRACEP(TRACE_CALL_OTHER)) {
-        do_trace("simul_efun ", simuls[index].func->funcname, "\n");
-      }
-    }
     /* Don't need to use apply() since we have the pointer directly;
      * this saves function lookup.
      */

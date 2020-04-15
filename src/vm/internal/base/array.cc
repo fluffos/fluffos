@@ -4,6 +4,9 @@
 
 #include <stdlib.h>  // for qsort
 
+#include "vm/internal/apply.h"
+#include "vm/internal/simulate.h"
+
 #ifdef PACKAGE_MUDLIB_STATS
 #include "packages/mudlib_stats/mudlib_stats.h"
 #endif

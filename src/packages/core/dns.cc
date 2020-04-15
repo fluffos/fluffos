@@ -107,7 +107,7 @@ void on_query_addr_by_name_finish(addr_number_query *query) {
 
   // push the key
   push_number(query->key);
-
+  set_eval(max_eval_cost);
   if (query->call_back.type == T_STRING) {
     safe_apply(query->call_back.u.string, query->ob_to_call, 3, ORIGIN_INTERNAL);
   } else {

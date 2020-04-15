@@ -15,6 +15,8 @@
 // details about machine
 #include "vm/vm.h"
 
+#include "interactive.h"
+
 // FIXME: apply_cache
 #include "vm/internal/base/apply_cache.h"
 
@@ -47,6 +49,9 @@
 
 // trace.cc
 extern struct array_t *get_svalue_trace();
+
+// Tracing support
+#include "base/internal/tracing.h"
 
 // IWYU pragma: end_exports
 #endif /* SRC_BASE_PACKAGE_API_H_ */
