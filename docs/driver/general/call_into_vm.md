@@ -36,28 +36,29 @@ However, several parts of driver can't use these functions, instead they are usi
 3. call_program()
 
 For these code, the only correct way of doing this is documented here.
+
 ```
-// use push_number() , push_malloc_string() etc to push arguments into stack
-num_arg = X; // MUST remember how many arguments were pushed.
+//  use push_number() , push_malloc_string() etc to push arguments into stack
+    num_arg = X; // MUST remember how many arguments were pushed.
 
     // setup error context
     error_context_t econ;
     save_context(&econ);
 
     try {
-    ret = call_function_pointer(funp, num_arg);
+        ret = call_function_pointer(funp, num_arg);
     } catch (const char *) {
-    restore_context(&econ);
-    /* condition was restored to where it was when we came in */
-    pop_n_elems(num_arg);
-    ret = nullptr;
+        restore_context(&econ);
+        /* condition was restored to where it was when we came in */
+        pop_n_elems(num_arg);
+        ret = nullptr;
     }
     pop_context(&econ);
-
 ```
 
 (unfinished)
+
 LPC VM use C++ Exception to handle _any_ error encountered during LPC execution. This could come from following non-exausted list
 
-1. error generated from 'throw()' in LPC code.
-2. 'error()' function from EFUN implementations.
+    1. error generated from 'throw()' in LPC code.
+    2. 'error()' function from EFUN implementations.
