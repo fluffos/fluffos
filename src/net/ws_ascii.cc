@@ -64,6 +64,34 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
         lwsl_warn("LWS_CALLBACK_ESTABLISHED: getpeername error, %d\n", evutil_socket_geterror(fd));
         return -1;  // TODO: maybe do something else?
       }
+
+      // Process X-REAL-IP
+      {
+        char buf[64]; // maximum characters of ip address is 45.
+        auto buflen = lws_hdr_copy(wsi, buf, sizeof(buf), WSI_TOKEN_HTTP_X_REAL_IP);
+        if (buflen > 0) {
+          struct evutil_addrinfo hints = {0};
+          hints.ai_family = AF_UNSPEC;
+          hints.ai_socktype = SOCK_STREAM;
+          hints.ai_flags = AI_NUMERICHOST;
+          hints.ai_protocol = 0; /* Any protocol */
+
+          struct evutil_addrinfo *res = nullptr;
+          auto ret = evutil_getaddrinfo(buf, nullptr, &hints, &res);
+          if (ret) {
+            lwsl_warn("LWS_CALLBACK_ESTABLISHED: invalid X-REAL-IP : %s , error: %s.\n",
+                      buf, evutil_gai_strerror(ret));
+            return false;
+          }
+          if (res && res->ai_addrlen > 0) {
+            memcpy(&addr, res->ai_addr, res->ai_addrlen);
+            addrlen = res->ai_addrlen;
+
+            evutil_freeaddrinfo(res);
+          }
+        }
+      }
+
       auto ip = new_user(port, fd, reinterpret_cast<sockaddr *>(&addr), addrlen);
 
       pss->user = ip;
