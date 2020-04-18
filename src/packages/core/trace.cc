@@ -15,7 +15,7 @@ void f_trace_start() {
 
   auto realfile = check_valid_path((sp - 1)->u.string, current_object, "trace_start", 1);
 
-  if(!realfile) {
+  if (!realfile) {
     error("Permission denied for trace file: %s", (sp - 1)->u.string);
   }
 
@@ -28,9 +28,7 @@ void f_trace_start() {
 
   // Register event to start tracing.
   // This is done because we want to skip the rest of current LPC stack.
-  add_walltime_event(std::chrono::seconds(0),
-                     tick_event::callback_type([=] {
-
+  add_walltime_event(std::chrono::seconds(0), tick_event::callback_type([=] {
                        Tracer::start(filename.c_str());
                        Tracer::setThreadName("Fluffos Main");
 
