@@ -67,7 +67,7 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
 
       // Process X-REAL-IP
       {
-        char buf[64]; // maximum characters of ip address is 45.
+        char buf[64];  // maximum characters of ip address is 45.
         auto buflen = lws_hdr_copy(wsi, buf, sizeof(buf), WSI_TOKEN_HTTP_X_REAL_IP);
         if (buflen > 0) {
           struct evutil_addrinfo hints = {0};
@@ -79,8 +79,8 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
           struct evutil_addrinfo *res = nullptr;
           auto ret = evutil_getaddrinfo(buf, nullptr, &hints, &res);
           if (ret) {
-            lwsl_warn("LWS_CALLBACK_ESTABLISHED: invalid X-REAL-IP : %s , error: %s.\n",
-                      buf, evutil_gai_strerror(ret));
+            lwsl_warn("LWS_CALLBACK_ESTABLISHED: invalid X-REAL-IP : %s , error: %s.\n", buf,
+                      evutil_gai_strerror(ret));
             return false;
           }
           if (res && res->ai_addrlen > 0) {
