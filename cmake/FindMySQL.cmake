@@ -278,9 +278,15 @@ endif ()
 # case we know it is ".a", so we add it to the library name
 # we search for to make sure it is picked in the static case.
 if (WIN32)
-  set(_dynamic_libs "libmysql")
-  set(_static_libs "mysqlclient")
-  set(_static_lib_ext ".lib")   # Careful, can be import library for DLL
+  if(NOT MYSQLCLIENT_STATIC_LINKING) # link to official mysql client
+    set(_dynamic_libs "libmysql")
+    set(_static_libs "mysqlclient_r" "mysqlclient")
+    set(_static_lib_ext ".lib")   # Careful, can be import library for DLL
+  else() # link to libmariadb-client on mingw32
+    set(_dynamic_libs "mysqlclient_r" "mysqlclient")
+    set(_static_libs "libmysqlclient_r.a" "libmysqlclient.a")
+    set(_static_lib_ext ".a")
+  endif()
 elseif (MYSQLCLIENT_NO_THREADS)
   # In 5.1 and below there is a single threaded library
   set(_dynamic_libs "mysqlclient")
@@ -533,7 +539,7 @@ else ()
   endif ()
 
   # No specific paths, try some common install paths
-  find_path(MYSQL_INCLUDE_DIR mysql.h ${_include_fallback_path})
+  find_path(MYSQL_INCLUDE_DIR mysql.h ${_include_fallback_path} PATH_SUFFIXES mysql)
 
   if (NOT MYSQL_INCLUDE_DIR)
     message(FATAL_ERROR "Could not find \"mysql.h\" from searching "
@@ -707,8 +713,8 @@ else ()
       "\"${_pp_lib_fallback_path}\"")
   endif ()
 
-  get_filename_component(MYSQL_LIB_DIR "${MYSQL_LIB}" PATH)
-
+  get_filename_component(MYSQL_LIB_DIR "${MYSQL_LIB}" DIRECTORY)
+  set(MYSQL_LIBRARIES "${MYSQL_LIB}")
 endif ()
 
 ##########################################################################
@@ -718,10 +724,13 @@ endif ()
 ##########################################################################
 
 # FIXME needed?!
-if (MYSQLCLIENT_STATIC_LINKING AND
-  NOT WIN32 AND
-  NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-  list(APPEND MYSQL_LIBRARIES "rt")
+if (MYSQLCLIENT_STATIC_LINKING)
+  if(WIN32)
+    # From mariadb_config --libs_sys
+    list(APPEND MYSQL_LIBRARIES ws2_32 advapi32 kernel32 shlwapi crypt32 z secur32)
+  elseif (NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+      list(APPEND MYSQL_LIBRARIES "rt")
+  endif()
 endif ()
 
 # For dynamic linking use the built-in sys and strings
@@ -731,9 +740,9 @@ if (NOT MYSQLCLIENT_STATIC_LINKING)
   #list(APPEND SYS_LIBRARIES ${MYSQL_LIBRARIES})
   #SET(MYSQL_LIBRARIES ${SYS_LIBRARIES})
 
-  #if(NOT MYSQLCLIENT_STATIC_LINKING AND ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-  #  list(REVERSE MYSQL_LIBRARIES)
-  #endif()
+  if(NOT MYSQLCLIENT_STATIC_LINKING AND ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    list(REVERSE MYSQL_LIBRARIES)
+  endif()
 
 endif ()
 
