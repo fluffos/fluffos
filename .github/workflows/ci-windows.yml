@@ -18,13 +18,13 @@ jobs:
         build: ["Debug", "RelWithDebInfo"]
 
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
       - name: Cache msys2
         id: cache-msys2
         uses: actions/cache@v1
         with:
           path: msys${{ matrix.arch }}
-          key: msys2-x${{ matrix.arch }}
+          key: msys2-x${{ matrix.arch }}-20200421
       - name: Install msys2
         if: steps.cache-msys2.outputs.cache-hit != 'true'
         run: |
@@ -33,7 +33,8 @@ jobs:
           } else {
             (New-Object net.webclient).DownloadFile("http://repo.msys2.org/distrib/x86_64/msys2-base-x86_64-20190524.tar.xz","msys2.tar.xz")
           }
-          tar xf msys2.tar.xz -C $env:GITHUB_WORKSPACE.Replace("\", "/")
+          $target = $env:GITHUB_WORKSPACE.Replace("\", "/")
+          bash -c "tar xf msys2.tar.xz -C $target"
       - run: |
           $env:MSYSTEM = "MINGW${{ matrix.arch }}"
           $env:MSYS2_PATH_TYPE = "strict"
