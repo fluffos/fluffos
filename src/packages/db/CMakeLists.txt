@@ -30,7 +30,7 @@ if(${PACKAGE_DB})
         target_include_directories(package_db SYSTEM PUBLIC ${MYSQL_INCLUDE_DIR})
 
         target_link_libraries(package_db PRIVATE ${MYSQL_LINK_FLAGS})
-        target_link_libraries(package_db PRIVATE ${MYSQL_LIB})
+        target_link_libraries(package_db PRIVATE -L${MYSQL_LIB_DIR} ${MYSQL_LIBRARIES})
     endif()
 
     if(NOT "${PACKAGE_DB_SQLITE}" STREQUAL "")
