@@ -2145,23 +2145,21 @@ void eval_instruction(char *p) {
         }
         break;
       case F_BRANCH_WHEN_ZERO: /* relative offset */
-        if (sp->type == T_NUMBER) {
-          if (!((sp--)->u.number)) {
-            COPY_SHORT(&offset, pc);
-            pc += offset;
-            break;
-          }
+        if ((sp->type == T_NUMBER && !sp->u.number) || (sp->type == T_REAL && !sp->u.real)) {
+          sp--;
+          COPY_SHORT(&offset, pc);
+          pc += offset;
+          break;
         } else {
           pop_stack();
         }
         pc += 2; /* skip over the offset */
         break;
       case F_BRANCH_WHEN_NON_ZERO: /* relative offset */
-        if (sp->type == T_NUMBER) {
-          if (!((sp--)->u.number)) {
-            pc += 2;
-            break;
-          }
+        if ((sp->type == T_NUMBER && !sp->u.number) || (sp->type == T_REAL && !sp->u.real)) {
+          sp--;
+          pc += 2;
+          break;
         } else {
           pop_stack();
         }
@@ -2169,23 +2167,21 @@ void eval_instruction(char *p) {
         pc += offset;
         break;
       case F_BBRANCH_WHEN_ZERO: /* relative backwards offset */
-        if (sp->type == T_NUMBER) {
-          if (!((sp--)->u.number)) {
-            COPY_SHORT(&offset, pc);
-            pc -= offset;
-            break;
-          }
+        if ((sp->type == T_NUMBER && !sp->u.number) || (sp->type == T_REAL && !sp->u.real)) {
+          sp--;
+          COPY_SHORT(&offset, pc);
+          pc -= offset;
+          break;
         } else {
           pop_stack();
         }
         pc += 2;
         break;
       case F_BBRANCH_WHEN_NON_ZERO: /* relative backwards offset */
-        if (sp->type == T_NUMBER) {
-          if (!((sp--)->u.number)) {
-            pc += 2;
-            break;
-          }
+        if ((sp->type == T_NUMBER && !sp->u.number) || (sp->type == T_REAL && !sp->u.real)) {
+          sp--;
+          pc += 2;
+          break;
         } else {
           pop_stack();
         }
