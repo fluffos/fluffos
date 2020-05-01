@@ -735,14 +735,16 @@ endif ()
 
 # For dynamic linking use the built-in sys and strings
 if (NOT MYSQLCLIENT_STATIC_LINKING)
+  set(MYSQL_LIBRARIES "${MYSQL_LIB}")
+
   #list(APPEND SYS_LIBRARIES "mysql_sys")
   #list(APPEND SYS_LIBRARIES "mysql_strings")
   #list(APPEND SYS_LIBRARIES ${MYSQL_LIBRARIES})
   #SET(MYSQL_LIBRARIES ${SYS_LIBRARIES})
 
-  if(NOT MYSQLCLIENT_STATIC_LINKING AND ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    list(REVERSE MYSQL_LIBRARIES)
-  endif()
+  #if(NOT MYSQLCLIENT_STATIC_LINKING)
+  #  list(REVERSE MYSQL_LIBRARIES)
+  #endif()
 
 endif ()
 
