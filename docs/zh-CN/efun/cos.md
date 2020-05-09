@@ -5,7 +5,7 @@ title: floats / cos
 
 ### 名称
 
-    cos() - return the cosine of a float
+    cos() - 返回一个浮点数的余弦值
 
 ### 语法
 
@@ -13,7 +13,7 @@ title: floats / cos
 
 ### 描述
 
-    Returns the cosine of its argument, 'f', measured in radians.
+    返回参数“f”的余弦弧度值。
 
 ### 参考
 

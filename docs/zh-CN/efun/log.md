@@ -5,7 +5,7 @@ title: floats / log
 
 ### 名称
 
-    log() - returns the natural logarithm of a float
+    log() - 返回浮点数的自然对数
 
 ### 语法
 
@@ -13,7 +13,7 @@ title: floats / log
 
 ### 描述
 
-    Returns the natural logarithm of its argument, 'f'. 'f' must be positive.
+    返回参数“f”的自然对数，f 必须为正值。
 
 ### 参考
 

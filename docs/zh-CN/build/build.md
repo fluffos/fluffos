@@ -44,7 +44,7 @@ v2017 编译完成后的驱动文件在 fluffos/bin 目录中，包括 `driver` 
 
     rm -rf build && mkdir build && cd build
     cmake ..
-    make install
+    make -j4 install
 
 注意，如果不需要某个包，请使用类似以下指令编译：
 
