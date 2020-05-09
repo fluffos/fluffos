@@ -5,7 +5,7 @@ title: floats / asin
 
 ### 名称
 
-    asin() - return the arcsine of a float
+    asin() - 返回一个浮点数的反正弦值
 
 ### 语法
 
@@ -13,7 +13,7 @@ title: floats / asin
 
 ### 描述
 
-    Returns the arcsine of its argument, 'f', measured in radians.
+    返回参数“f”的反正弦弧度值。
 
 ### 参考
 

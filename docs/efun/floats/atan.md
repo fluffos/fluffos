@@ -5,7 +5,7 @@ title: floats / atan
 
 ### NAME
 
-    atan() - return the tangent of a float
+    atan() - return the arctangent of a float
 
 ### SYNOPSIS
 
@@ -18,4 +18,3 @@ title: floats / atan
 ### SEE ALSO
 
     acos(3), asin(3), cos(3), sin(3), tan(3)
-

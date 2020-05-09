@@ -5,7 +5,7 @@ title: floats / acos
 
 ### 名称
 
-    acos() - return the arccosine of a float
+    acos() - 返回一个浮点数的反余弦值
 
 ### 语法
 
@@ -13,7 +13,7 @@ title: floats / acos
 
 ### 描述
 
-    Returns the arccosine of its argument, 'f', measured in radians.
+    返回参数“f”的反余弦弧度值。
 
 ### 参考
 

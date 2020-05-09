@@ -5,7 +5,7 @@ title: floats / atan
 
 ### 名称
 
-    atan() - return the tangent of a float
+    atan() - 返回一个浮点数的反正切值
 
 ### 语法
 
@@ -13,7 +13,7 @@ title: floats / atan
 
 ### 描述
 
-    Returns the arctangent of its argument, 'f', measured in radians.
+    返回参数“f”的反正切弧度值。
 
 ### 参考
 

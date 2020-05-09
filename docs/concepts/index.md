@@ -47,6 +47,6 @@ title: concepts
 
 
 
-This page is auto generated on 2020-04-12 22:40:55 PDT for [72164e82](https://github.com/fluffos/fluffos/tree/72164e82).
+This page is auto generated on 2020-05-09 23:37:52 CST for [2e8fd1c4](https://github.com/fluffos/fluffos/tree/2e8fd1c4).
 
 
