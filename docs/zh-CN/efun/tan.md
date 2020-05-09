@@ -5,7 +5,7 @@ title: floats / tan
 
 ### 名称
 
-    tan() - return the tangent of a float
+    tan() - 返回一个浮点数的正切值
 
 ### 语法
 
@@ -13,7 +13,7 @@ title: floats / tan
 
 ### 描述
 
-    Returns the tangent of its argument, 'f', measured in radians.
+    返回参数“f”的正切弧度值。
 
 ### 参考
 

@@ -5,7 +5,7 @@ title: floats / exp
 
 ### 名称
 
-    exp() - find e to the power of a float
+    exp() - 返回以自然常数 e 为底数，以指定浮点数为指数的值
 
 ### 语法
 
@@ -13,7 +13,7 @@ title: floats / exp
 
 ### 描述
 
-    exp() returns e^f.
+    exp() 返回 e 的 f 次方。
 
 ### 参考
 

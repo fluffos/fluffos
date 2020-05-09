@@ -5,7 +5,7 @@ title: floats / sin
 
 ### 名称
 
-    sin() - return the sine of a float
+    sin() - 返回一个浮点数的正弦值
 
 ### 语法
 
@@ -13,7 +13,7 @@ title: floats / sin
 
 ### 描述
 
-    Returns the sine of its argument, 'f', measured in radians.
+    返回参数“f”的正弦弧度值。
 
 ### 参考
 

@@ -43,7 +43,7 @@ varargs string bitmap_font(string str, int size, string fill, string bg, string 
 
     if (!sizeof(fill)) fill = DEFAULT_FILL;
     if (!sizeof(bg)) bg = DEFAULT_BG;
-    if (sizeof(fill) != sizeof(bg))
+    if (strwidth(fill) != strwidth(bg))
     {
         fill = DEFAULT_FILL;
         bg = DEFAULT_BG;
