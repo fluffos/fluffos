@@ -11,11 +11,13 @@
 enum PROTOCOL_ID {
   WS_HTTP = 0,
   WS_ASCII = PROTOCOL_WS_ASCII,
+  WS_JSON = PROTOCOL_WS_JSON,
 };
 
 static struct lws_protocols protocols[] = {
     {"http", lws_callback_http_dummy, 0, 0, WS_HTTP},
     {"ascii", ws_ascii_callback, sizeof(struct ws_ascii_session), 4096, WS_ASCII, NULL, 0},
+    {"json", ws_ascii_callback, sizeof(struct ws_ascii_session), 4096, WS_JSON, NULL, 0},
     {NULL, NULL, 0, 0} /* terminator */
 };
 
@@ -101,11 +103,24 @@ struct lws *init_user_websocket(struct lws_context *context, evutil_socket_t fd)
   return lws_adopt_socket(context, fd);
 }
 
+void websocket_send_json(struct lws *wsi, const char *data, size_t len) {
+  char copy[len];
+  char json[len + 20];
+  strcpy(copy, data);
+  if (copy[len - 1] == '\n') {
+    copy[len - 1] = '\0';
+  }
+  sprintf(json, "{\"message\": \"%s\"}\n", copy);
+  ws_ascii_send(wsi, json, strlen(json));
+}
+
 void websocket_send_text(struct lws *wsi, const char *data, size_t len) {
   switch (lws_get_protocol(wsi)->id) {
     case WS_ASCII:
       ws_ascii_send(wsi, data, len);
       break;
+    case WS_JSON:
+      websocket_send_json(wsi, data, len);
     default:
       // No way to send message
       return;

@@ -162,7 +162,7 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
 }
 
 void ws_ascii_send(struct lws *wsi, const char *data, size_t len) {
-  DEBUG_CHECK(lws_get_protocol(wsi)->id != PROTOCOL_WS_ASCII, "wrong protocol!");
+  // DEBUG_CHECK(lws_get_protocol(wsi)->id != PROTOCOL_WS_ASCII, "wrong protocol!");
   auto pss = reinterpret_cast<ws_ascii_session *>(lws_wsi_user(wsi));
   DEBUG_CHECK(pss == nullptr, "no session data!");
 

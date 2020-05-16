@@ -12,5 +12,6 @@ struct lws* init_user_websocket(struct lws_context*, evutil_socket_t);
 void close_user_websocket(struct lws* wsi);
 
 void websocket_send_text(struct lws*, const char*, size_t);
+void websocket_send_json(struct lws*, const char*, size_t);
 
 #endif /* NET_WEBSOCKET_H */
