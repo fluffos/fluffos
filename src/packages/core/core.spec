@@ -62,6 +62,7 @@ int remove_call_out(int | void | string);
 int member_array(mixed, string | mixed *, void | int, void | int);
 int input_to(string | function, ...);
 int random(int);
+int secure_random(int);
 void defer(function);
 
 #ifndef NO_ENVIRONMENT
