@@ -1494,7 +1494,8 @@ static void receive_snoop(const char *buf, int len, object_t *snooper) {
     memcpy(str, buf, len);
     str[len] = 0;
     push_malloced_string(str);
-    apply(APPLY_RECEIVE_SNOOP, snooper, 1, ORIGIN_DRIVER);
+    set_eval(max_eval_cost);
+    safe_apply(APPLY_RECEIVE_SNOOP, snooper, 1, ORIGIN_DRIVER);
   } else {
     /* snoop output is now % in all cases */
     add_message(snooper, "%", 1);
