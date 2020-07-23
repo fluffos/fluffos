@@ -31,6 +31,19 @@ int64_t random_number(int64_t n) {
   return dist(engine);
 }
 
+// Returns a secure random number in the range 0 .. n-1
+int64_t secure_random_number(int64_t n) {
+#ifdef __WIN32
+  // On windows we trust default, since we use MINGW which is pretty recent
+  static std::random_device rd;
+#else
+  // On linux & osx we use urandom by default
+  static std::random_device rd("/dev/urandom");
+#endif
+  std::uniform_int_distribution<int64_t> dist(0, n - 1);
+  return dist(rd);
+}
+
 /*
  * The function time() can't really be trusted to return an integer.
  * But MudOS uses the 'current_time', which is an integer number

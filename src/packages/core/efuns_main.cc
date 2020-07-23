@@ -1696,6 +1696,16 @@ void f_random(void) {
 }
 #endif
 
+#ifdef F_SECURE_RANDOM
+void f_secure_random(void) {
+  if (sp->u.number <= 0) {
+    sp->u.number = 0;
+    return;
+  }
+  sp->u.number = secure_random_number(sp->u.number);
+}
+#endif
+
 #ifdef F_READ_BYTES
 void f_read_bytes(void) {
   char *str;
