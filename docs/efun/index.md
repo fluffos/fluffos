@@ -845,9 +845,11 @@ title: EFUN
 <div><a href='numbers/random.html'>random</a></div>
 </div>
 <div class='col-sm-3'>
+<div><a href='numbers/secure_random.html'>secure_random</a></div>
+</div>
+<div class='col-sm-3'>
 <div><a href='numbers/to_float.html'>to_float</a></div>
 </div>
-<div>&nbsp;</div>
 </div>
 </div>
 
@@ -1229,6 +1231,6 @@ title: EFUN
 
 
 
-This page is auto generated on 2020-05-09 23:37:52 CST for [2e8fd1c4](https://github.com/fluffos/fluffos/tree/2e8fd1c4).
+This page is auto generated on 2020-07-22 23:49:38 PDT for [0dc4d222](https://github.com/fluffos/fluffos/tree/0dc4d222).
 
 
