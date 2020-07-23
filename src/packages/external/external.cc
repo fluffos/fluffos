@@ -6,6 +6,8 @@
 #include <ctype.h>   // for isspace
 #include <unistd.h>  // for fork
 
+#include <event2/event.h>
+
 #include "include/socket_err.h"
 #include "packages/sockets/socket_efuns.h"
 
