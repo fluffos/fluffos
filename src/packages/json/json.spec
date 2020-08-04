@@ -1,2 +1,2 @@
-string json_encode(mixed);
+string json_encode(mixed,int);
 mixed json_decode(string);

@@ -88,7 +88,7 @@ void f_json_decode() {
   return;
 }
 
-svalue_t json_to_svalue(json j){
+static svalue_t json_to_svalue(json j){
   debug_message("json type:%s\n",j.type_name());
   svalue_t sv;
   if(j.is_structured()){
@@ -125,7 +125,7 @@ svalue_t json_to_svalue(json j){
   }
   return sv;
 }
-array_t * decode_array(json j){
+static array_t * decode_array(json j){
   array_t *arr = allocate_empty_array(j.size());
   if (j.size() < 1){
     return arr;
@@ -137,7 +137,7 @@ array_t * decode_array(json j){
   return arr;
 }
 
-mapping_t * decode_object(json j){
+static mapping_t * decode_object(json j){
   mapping_t *m = allocate_mapping(0);
   if(j.size() < 1){
     return m;
@@ -155,12 +155,15 @@ mapping_t * decode_object(json j){
   return m;
 }
 
-void f_json_encode() {
-  json j = svalue_to_json(sp, 0);
+ void f_json_encode() {
+   int indent =0;
+  if(st_num_arg == 2){
+    indent = (sp--)->u.number;
+  }
+  json j = svalue_to_json(sp--, 0);
 #ifdef DEBUG
-  debug_message(j.dump(4).c_str());
+  debug_message(j.dump(indent).c_str());
 #endif
-  sp--;
-  copy_and_push_string(j.dump().c_str());
+  copy_and_push_string(j.dump(indent).c_str());
   return;
 }

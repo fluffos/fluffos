@@ -12,3 +12,5 @@
 /docs/Gemfile
 /docs/Gemfile.lock
 /docs/vendor
+.DS_Store
+.vscode
