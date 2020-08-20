@@ -17,5 +17,6 @@ void telnet_dont_naws(struct telnet_t *);
 void telnet_start_request_ttype(struct telnet_t *);
 void telnet_request_ttype(struct telnet_t *);
 void telnet_request_term_size(struct telnet_t *);
+void telnet_send_nop(struct telnet_t *);
 
 #endif /* TELNET_H_ */

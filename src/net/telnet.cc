@@ -503,3 +503,9 @@ void telnet_start_request_ttype(struct telnet_t *telnet) {
 }
 void telnet_request_ttype(struct telnet_t *telnet) { telnet_begin_sb(telnet, TELNET_TTYPE_SEND); }
 void telnet_request_term_size(struct telnet_t * /*unused*/) {}
+
+void telnet_send_nop(struct telnet_t *telnet) {
+  if (telnet) {
+    telnet_iac(telnet, TELNET_NOP);
+  }
+}

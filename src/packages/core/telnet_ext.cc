@@ -77,3 +77,14 @@ void f_send_zmp() {
   }
 }
 #endif
+
+#ifdef F_TELNET_NOP
+void f_telnet_nop() {
+  auto ip = current_object->interactive;
+
+  if (ip && ip->telnet) {
+    telnet_send_nop(ip->telnet);
+    flush_message(ip);
+  }
+}
+#endif
