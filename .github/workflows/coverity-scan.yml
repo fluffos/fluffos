@@ -1,0 +1,60 @@
+name: Coverity Scan
+
+on:
+  schedule:
+    - cron: '0 18 * * 0' # Weekly at 18:00 UTC
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - CC: "gcc"
+            CXX: "g++"
+        build: ["Debug"]
+        os: ["ubuntu-18.04"]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install packages
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential clang-6.0 autoconf automake bison expect libevent-dev libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
+      - name: configure
+        env: ${{ matrix.compiler }}
+        run: |
+          mkdir build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DPACKAGE_DB_SQLITE=2 ..
+      - name: Download Coverity Build Tool
+        run: |
+          wget -q https://scan.coverity.com/download/cxx/linux64 --post-data "token=$TOKEN&project=fluffos%2Ffluffos" -O cov-analysis-linux64.tar.gz
+          mkdir cov-analysis-linux64
+          tar xzf cov-analysis-linux64.tar.gz --strip 1 -C cov-analysis-linux64
+        env:
+          TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
+      - name: Build with cov-build
+        run: |
+          export PATH=`pwd`/cov-analysis-linux64/bin:$PATH
+          cd build
+          cov-build --dir cov-int make -j 2 install
+      - name: Submit the result to Coverity Scan
+        run: |
+          cd build
+          tar czvf fluffos.tgz cov-int
+          curl \
+            --form project=fluffos \
+            --form token=$TOKEN \
+            --form email=sunyucong@gmail.com \
+            --form file=@fluffos.tgz \
+            --form version=`git describe` \
+            --form description="`git describe`" \
+            https://scan.coverity.com/builds?project=fluffos%2Ffluffos
+        env:
+          TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
