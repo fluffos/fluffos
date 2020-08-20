@@ -1,22 +1,25 @@
 /*
- * lws protocol handler plugin for "Dead Drop"
+ * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010 - 2018 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
 #if !defined (LWS_PLUGIN_STATIC)
@@ -147,10 +150,14 @@ scan_upload_dir(struct vhd_deaddrop *vhd)
 		de = readdir(dir[sp]);
 		if (!de) {
 			closedir(dir[sp]);
+#if !defined(__COVERITY__)
 			if (!sp)
+#endif
 				break;
+#if !defined(__COVERITY__)
 			sp--;
 			continue;
+#endif
 		}
 
 		p = filepath;
@@ -165,7 +172,11 @@ scan_upload_dir(struct vhd_deaddrop *vhd)
 		/* ignore temp files */
 		if (de->d_name[strlen(de->d_name) - 1] == '~')
 			continue;
-
+#if defined(__COVERITY__)
+		s.st_size = 0;
+		s.st_mtime = 0;
+#else
+		/* coverity[toctou] */
 		if (stat(filepath, &s))
 			continue;
 
@@ -189,6 +200,7 @@ scan_upload_dir(struct vhd_deaddrop *vhd)
 			}
 			continue;
 		}
+#endif
 
 		m = strlen(filepath + initial) + 1;
 		dire = lwsac_use(&lwsac_head, sizeof(*dire) + m, 0);
@@ -202,8 +214,10 @@ scan_upload_dir(struct vhd_deaddrop *vhd)
 		dire->size = s.st_size;
 		dire->mtime = s.st_mtime;
 		dire->user[0] = '\0';
+#if !defined(__COVERITY__)
 		if (sp)
 			lws_strncpy(dire->user, subdir[1], sizeof(dire->user));
+#endif
 
 		found++;
 
@@ -292,7 +306,7 @@ file_upload_cb(void *data, const char *name, const char *filename,
 			if (pss->file_length > pss->vhd->max_size) {
 				pss->response_code =
 					HTTP_STATUS_REQ_ENTITY_TOO_LARGE;
-				close((int)(long long)pss->fd);
+				close((int)(lws_intptr_t)pss->fd);
 				pss->fd = LWS_INVALID_FILE;
 				unlink(pss->filename);
 
@@ -300,7 +314,7 @@ file_upload_cb(void *data, const char *name, const char *filename,
 			}
 
 			if (pss->fd != LWS_INVALID_FILE) {
-				n = write((int)(long long)pss->fd, buf, len);
+				n = write((int)(lws_intptr_t)pss->fd, buf, len);
 				lwsl_debug("%s: write %d says %d\n", __func__,
 					   len, n);
 				lws_set_timeout(pss->wsi, PENDING_TIMEOUT_HTTP_CONTENT, 30);
@@ -310,7 +324,7 @@ file_upload_cb(void *data, const char *name, const char *filename,
 			break;
 
 		if (pss->fd != LWS_INVALID_FILE)
-			close((int)(long long)pss->fd);
+			close((int)(lws_intptr_t)pss->fd);
 
 		/* the temp filename without the ~ */
 		lws_strncpy(filename2, pss->filename, sizeof(filename2));
@@ -675,7 +689,7 @@ static const struct lws_protocols protocols[] = {
 	LWS_PLUGIN_PROTOCOL_DEADDROP
 };
 
-LWS_EXTERN LWS_VISIBLE int
+LWS_VISIBLE int
 init_protocol_deaddrop(struct lws_context *context,
 		       struct lws_plugin_capability *c)
 {
@@ -693,7 +707,7 @@ init_protocol_deaddrop(struct lws_context *context,
 	return 0;
 }
 
-LWS_EXTERN LWS_VISIBLE int
+LWS_VISIBLE int
 destroy_protocol_deaddrop(struct lws_context *context)
 {
 	return 0;

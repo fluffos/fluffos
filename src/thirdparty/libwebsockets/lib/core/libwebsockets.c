@@ -1,29 +1,119 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2020 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-#include "core/private.h"
+#include "private-lib-core.h"
 
 #ifdef LWS_HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
+#include <signal.h>
+
+void
+lws_ser_wu16be(uint8_t *b, uint16_t u)
+{
+	*b++ = (uint8_t)(u >> 8);
+	*b = (uint8_t)u;
+}
+
+void
+lws_ser_wu32be(uint8_t *b, uint32_t u32)
+{
+	*b++ = (uint8_t)(u32 >> 24);
+	*b++ = (uint8_t)(u32 >> 16);
+	*b++ = (uint8_t)(u32 >> 8);
+	*b = (uint8_t)u32;
+}
+
+void
+lws_ser_wu64be(uint8_t *b, uint64_t u64)
+{
+	lws_ser_wu32be(b, (uint32_t)(u64 >> 32));
+	lws_ser_wu32be(b + 4, (uint32_t)u64);
+}
+
+uint16_t
+lws_ser_ru16be(const uint8_t *b)
+{
+	return (b[0] << 8) | b[1];
+}
+
+uint32_t
+lws_ser_ru32be(const uint8_t *b)
+{
+	return (b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3];
+}
+
+uint64_t
+lws_ser_ru64be(const uint8_t *b)
+{
+	return (((uint64_t)lws_ser_ru32be(b)) << 32) | lws_ser_ru32be(b + 4);
+}
+
+int
+lws_vbi_encode(uint64_t value, void *buf)
+{
+	uint8_t *p = (uint8_t *)buf, b;
+
+	if (value > 0xfffffff) {
+		assert(0);
+		return -1;
+	}
+
+	do {
+		b = value & 0x7f;
+		value >>= 7;
+		if (value)
+			*p++ = (0x80 | b);
+		else
+			*p++ = b;
+	} while (value);
+
+	return lws_ptr_diff(p, buf);
+}
+
+int
+lws_vbi_decode(const void *buf, uint64_t *value, size_t len)
+{
+	const uint8_t *p = (const uint8_t *)buf, *end = p + len;
+	uint64_t v = 0;
+	int s = 0;
+
+	while (p < end) {
+		v |= (((uint64_t)(*p)) & 0x7f) << s;
+		if (*p & 0x80) {
+			*value = v;
+
+			return lws_ptr_diff(p, buf);
+		}
+		s += 7;
+		if (s >= 64)
+			return 0;
+		p++;
+	}
+
+	return 0;
+}
 
 signed char char_to_hex(const char c)
 {
@@ -60,13 +150,34 @@ lws_hex_to_byte_array(const char *h, uint8_t *dest, int max)
 	if (max < 0)
 		return -1;
 
-	return dest - odest;
+	return lws_ptr_diff(dest, odest);
 }
 
+static char *hexch = "0123456789abcdef";
+
+int
+lws_hex_random(struct lws_context *context, char *dest, size_t len)
+{
+	size_t n = (len - 1) / 2;
+	uint8_t b, *r = (uint8_t *)dest + len - n;
+
+	if (lws_get_random(context, r, n) != n)
+		return 1;
+
+	while (n--) {
+		b = *r++;
+		*dest++ = hexch[b >> 4];
+		*dest++ = hexch[b & 0xf];
+	}
+
+	*dest = '\0';
+
+	return 0;
+}
 
 #if !defined(LWS_PLAT_OPTEE)
 
-#if !defined(LWS_AMAZON_RTOS)
+#if defined(LWS_WITH_FILE_OPS)
 int lws_open(const char *__file, int __oflag, ...)
 {
 	va_list ap;
@@ -115,13 +226,13 @@ lws_pthread_self_to_tsi(struct lws_context *context)
 #endif
 }
 
-LWS_EXTERN void *
+void *
 lws_context_user(struct lws_context *context)
 {
 	return context->user_space;
 }
 
-LWS_VISIBLE void
+void
 lws_explicit_bzero(void *p, size_t len)
 {
 	volatile uint8_t *vp = p;
@@ -136,7 +247,7 @@ lws_explicit_bzero(void *p, size_t len)
  * lws_now_secs() - seconds since 1970-1-1
  *
  */
-LWS_VISIBLE LWS_EXTERN unsigned long
+unsigned long
 lws_now_secs(void)
 {
 	struct timeval tv;
@@ -147,85 +258,16 @@ lws_now_secs(void)
 }
 
 #endif
-LWS_VISIBLE extern const char *
+
+#if defined(LWS_WITH_SERVER)
+const char *
 lws_canonical_hostname(struct lws_context *context)
 {
 	return (const char *)context->canonical_hostname;
 }
-
-#if defined(LWS_WITH_SOCKS5)
-LWS_VISIBLE int
-lws_set_socks(struct lws_vhost *vhost, const char *socks)
-{
-	char *p_at, *p_colon;
-	char user[96];
-	char password[96];
-
-	if (!socks)
-		return -1;
-
-	vhost->socks_user[0] = '\0';
-	vhost->socks_password[0] = '\0';
-
-	p_at = strrchr(socks, '@');
-	if (p_at) { /* auth is around */
-		if ((unsigned int)(p_at - socks) > (sizeof(user)
-			+ sizeof(password) - 2)) {
-			lwsl_err("Socks auth too long\n");
-			goto bail;
-		}
-
-		p_colon = strchr(socks, ':');
-		if (p_colon) {
-			if ((unsigned int)(p_colon - socks) > (sizeof(user)
-				- 1) ) {
-				lwsl_err("Socks user too long\n");
-				goto bail;
-			}
-			if ((unsigned int)(p_at - p_colon) > (sizeof(password)
-				- 1) ) {
-				lwsl_err("Socks password too long\n");
-				goto bail;
-			}
-
-			lws_strncpy(vhost->socks_user, socks, p_colon - socks + 1);
-			lws_strncpy(vhost->socks_password, p_colon + 1,
-				p_at - (p_colon + 1) + 1);
-		}
-
-		lwsl_info(" Socks auth, user: %s, password: %s\n",
-			vhost->socks_user, vhost->socks_password );
-
-		socks = p_at + 1;
-	}
-
-	lws_strncpy(vhost->socks_proxy_address, socks,
-		    sizeof(vhost->socks_proxy_address));
-
-	p_colon = strchr(vhost->socks_proxy_address, ':');
-	if (!p_colon && !vhost->socks_proxy_port) {
-		lwsl_err("socks_proxy needs to be address:port\n");
-		return -1;
-	} else {
-		if (p_colon) {
-			*p_colon = '\0';
-			vhost->socks_proxy_port = atoi(p_colon + 1);
-		}
-	}
-
-	lwsl_info(" Socks %s:%u\n", vhost->socks_proxy_address,
-			vhost->socks_proxy_port);
-
-	return 0;
-
-bail:
-	return -1;
-}
 #endif
 
-
-
-LWS_VISIBLE LWS_EXTERN int
+int
 lws_get_count_threads(struct lws_context *context)
 {
 	return context->count_threads;
@@ -259,7 +301,7 @@ static const unsigned char e0f4[] = {
 	0x80 | ((4 - 1) << 2) | 1, /* s3 */
 };
 
-LWS_EXTERN int
+int
 lws_check_byte_utf8(unsigned char state, unsigned char c)
 {
 	unsigned char s = state;
@@ -282,7 +324,7 @@ lws_check_byte_utf8(unsigned char state, unsigned char c)
 	return e0f4[21 + (s & 3)];
 }
 
-LWS_EXTERN int
+int
 lws_check_utf8(unsigned char *state, unsigned char *buf, size_t len)
 {
 	unsigned char s = *state;
@@ -324,9 +366,117 @@ lws_strdup(const char *s)
 	return d;
 }
 
+const char *
+lws_nstrstr(const char *buf, size_t len, const char *name, size_t nl)
+{
+	const char *end = buf + len - nl + 1;
+	size_t n;
+
+	if (nl > len)
+		/* it cannot be found if the needle is longer than the haystack */
+		return NULL;
+
+	while (buf < end) {
+		if (*buf != name[0]) {
+			buf++;
+			continue;
+		}
+
+		if (nl == 1)
+			/* single char match, we are done */
+			return buf;
+
+		if (buf[nl - 1] == name[nl - 1]) {
+			/*
+			 * This is looking interesting then... the first
+			 * and last chars match, let's check the insides
+			 */
+			n = 1;
+			while (n < nl && buf[n] == name[n])
+				n++;
+
+			if (n == nl)
+				/* it's a hit */
+				return buf;
+		}
+
+		buf++;
+	}
+
+	return NULL;
+}
+
+/*
+ * name wants to be something like "\"myname\":"
+ */
+
+const char *
+lws_json_simple_find(const char *buf, size_t len, const char *name, size_t *alen)
+{
+	size_t nl = strlen(name);
+	const char *np = lws_nstrstr(buf, len, name, nl),
+		   *end = buf + len, *as;
+	int qu = 0;
+
+	if (!np)
+		return NULL;
+
+	np += nl;
+
+	while (np < end && (*np == ' ' || *np == '\t'))
+		np++;
+
+	if (np >= end)
+		return NULL;
+
+	/*
+	 * The arg could be lots of things after "name": with JSON, commonly a
+	 * string like "mystring", true, false, null, [...] or {...} ... we want
+	 * to handle common, simple cases cheaply with this; the user can choose
+	 * a full JSON parser like lejp if it's complicated.  So if no opening
+	 * quote, return until a terminator like , ] }.  If there's an opening
+	 * quote, return until closing quote, handling escaped quotes.
+	 */
+
+	if (*np == '\"') {
+		qu = 1;
+		np++;
+	}
+
+	as = np;
+	while (np < end &&
+	       (!qu || *np != '\"') && /* end quote is EOT if quoted */
+	       (qu || (*np != '}' && *np != ']' && *np != ',')) /* delimiters */
+	) {
+		if (qu && *np == '\\') /* skip next char if quoted escape */
+			np++;
+		np++;
+	}
+
+	*alen = lws_ptr_diff(np, as);
+
+	return as;
+}
+
+int
+lws_json_simple_strcmp(const char *buf, size_t len, const char *name,
+		       const char *comp)
+{
+	size_t al;
+	const char *hit = lws_json_simple_find(buf, len, name, &al);
+
+	if (!hit)
+		return -1;
+
+	if (al != strlen(comp))
+		return -1;
+
+	return strncmp(hit, comp, al);
+}
+
 static const char *hex = "0123456789ABCDEF";
 
-LWS_VISIBLE LWS_EXTERN const char *
+const char *
 lws_sql_purify(char *escaped, const char *string, int len)
 {
 	const char *p = string;
@@ -346,8 +496,22 @@ lws_sql_purify(char *escaped, const char *string, int len)
 	return escaped;
 }
 
-LWS_VISIBLE LWS_EXTERN const char *
-lws_json_purify(char *escaped, const char *string, int len)
+int
+lws_sql_purify_len(const char *p)
+{
+	int olen = 0;
+
+	while (*p) {
+		if (*p++ == '\'')
+			olen++;
+		olen++;
+	}
+
+	return olen;
+}
+
+const char *
+lws_json_purify(char *escaped, const char *string, int len, int *in_used)
 {
 	const char *p = string;
 	char *q = escaped;
@@ -379,7 +543,14 @@ lws_json_purify(char *escaped, const char *string, int len)
 			continue;
 		}
 
-		if (*p == '\"' || *p == '\\' || *p < 0x20) {
+		if (*p == '\\') {
+			p++;
+			*q++ = '\\';
+			*q++ = '\\';
+			continue;
+		}
+
+		if (*p == '\"' || *p < 0x20) {
 			*q++ = '\\';
 			*q++ = 'u';
 			*q++ = '0';
@@ -393,10 +564,38 @@ lws_json_purify(char *escaped, const char *string, int len)
 	}
 	*q = '\0';
 
+	if (in_used)
+		*in_used = lws_ptr_diff(p, string);
+
 	return escaped;
 }
 
-LWS_VISIBLE LWS_EXTERN void
+int
+lws_json_purify_len(const char *string)
+{
+	int len = 0;
+	const char *p = string;
+
+	while (*p) {
+		if (*p == '\t' || *p == '\n' || *p == '\r') {
+			p++;
+			len += 2;
+			continue;
+		}
+
+		if (*p == '\"' || *p == '\\' || *p < 0x20) {
+			len += 6;
+			p++;
+			continue;
+		}
+		p++;
+		len++;
+	}
+
+	return len;
+}
+
+void
 lws_filename_purify_inplace(char *filename)
 {
 	while (*filename) {
@@ -407,7 +606,9 @@ lws_filename_purify_inplace(char *filename)
 		}
 
 		if (*filename == ':' ||
+#if !defined(WIN32)
 		    *filename == '\\' ||
+#endif
 		    *filename == '$' ||
 		    *filename == '%')
 			*filename = '_';
@@ -416,7 +617,7 @@ lws_filename_purify_inplace(char *filename)
 	}
 }
 
-LWS_VISIBLE LWS_EXTERN const char *
+const char *
 lws_urlencode(char *escaped, const char *string, int len)
 {
 	const char *p = string;
@@ -446,7 +647,7 @@ lws_urlencode(char *escaped, const char *string, int len)
 	return escaped;
 }
 
-LWS_VISIBLE LWS_EXTERN int
+int
 lws_urldecode(char *string, const char *escaped, int len)
 {
 	int state = 0, n;
@@ -495,7 +696,7 @@ lws_urldecode(char *string, const char *escaped, int len)
 	return 0;
 }
 
-LWS_VISIBLE LWS_EXTERN int
+int
 lws_finalize_startup(struct lws_context *context)
 {
 	if (lws_check_opt(context->options, LWS_SERVER_OPTION_EXPLICIT_VHOSTS))
@@ -505,12 +706,14 @@ lws_finalize_startup(struct lws_context *context)
 	return 0;
 }
 
-LWS_VISIBLE LWS_EXTERN void
+#if !defined(LWS_PLAT_FREERTOS)
+void
 lws_get_effective_uid_gid(struct lws_context *context, int *uid, int *gid)
 {
 	*uid = context->uid;
 	*gid = context->gid;
 }
+#endif
 
 int
 lws_snprintf(char *str, size_t size, const char *format, ...)
@@ -560,18 +763,14 @@ typedef enum {
 	LWS_TOKZS_TOKEN_POST_TERMINAL
 } lws_tokenize_state;
 
-#if defined(LWS_AMAZON_RTOS)
 lws_tokenize_elem
-#else
-int
-#endif
 lws_tokenize(struct lws_tokenize *ts)
 {
 	const char *rfc7230_delims = "(),/:;<=>?@[\\]{}";
 	lws_tokenize_state state = LWS_TOKZS_LEADING_WHITESPACE;
 	char c, flo = 0, d_minus = '-', d_dot = '.', s_minus = '\0',
-	     s_dot = '\0';
-	signed char num = ts->flags & LWS_TOKENIZE_F_NO_INTEGERS ? 0 : -1;
+	     s_dot = '\0', skipping = 0;
+	signed char num = (ts->flags & LWS_TOKENIZE_F_NO_INTEGERS) ? 0 : -1;
 	int utf8 = 0;
 
 	/* for speed, compute the effect of the flags outside the loop */
@@ -598,6 +797,22 @@ lws_tokenize(struct lws_tokenize *ts)
 
 		if (!c)
 			break;
+
+		if (skipping) {
+			if (c != '\r' && c != '\n')
+				continue;
+			else
+				skipping = 0;
+		}
+
+		/* comment */
+
+		if (ts->flags & LWS_TOKENIZE_F_HASH_COMMENT &&
+		    state != LWS_TOKZS_QUOTED_STRING &&
+		    c == '#') {
+			skipping = 1;
+			continue;
+		}
 
 		/* whitespace */
 
@@ -692,7 +907,8 @@ lws_tokenize(struct lws_tokenize *ts)
 		     (c < 'a' || c > 'z') && c != '_') &&
 		     c != s_minus && c != s_dot) ||
 		    c == d_minus || c == d_dot
-		    )) {
+		    ) &&
+		    !((ts->flags & LWS_TOKENIZE_F_SLASH_NONTERM) && c == '/')) {
 			switch (state) {
 			case LWS_TOKZS_LEADING_WHITESPACE:
 				if (ts->flags & LWS_TOKENIZE_F_COMMA_SEP_LIST) {
@@ -786,8 +1002,8 @@ token_or_numeric:
 }
 
 
-LWS_VISIBLE LWS_EXTERN int
-lws_tokenize_cstr(struct lws_tokenize *ts, char *str, int max)
+int
+lws_tokenize_cstr(struct lws_tokenize *ts, char *str, size_t max)
 {
 	if (ts->token_len + 1 >= max)
 		return 1;
@@ -798,7 +1014,7 @@ lws_tokenize_cstr(struct lws_tokenize *ts, char *str, int max)
 	return 0;
 }
 
-LWS_VISIBLE LWS_EXTERN void
+void
 lws_tokenize_init(struct lws_tokenize *ts, const char *start, int flags)
 {
 	ts->start = start;
@@ -806,6 +1022,119 @@ lws_tokenize_init(struct lws_tokenize *ts, const char *start, int flags)
 	ts->flags = flags;
 	ts->delim = LWSTZ_DT_NEED_FIRST_CONTENT;
 }
+
+
+typedef enum {
+	LWS_EXPS_LITERAL,
+	LWS_EXPS_OPEN_OR_LIT,
+	LWS_EXPS_NAME_OR_CLOSE,
+	LWS_EXPS_DRAIN,
+} lws_strexp_state;
+
+void
+lws_strexp_init(lws_strexp_t *exp, void *priv, lws_strexp_expand_cb cb,
+		 char *out, size_t olen)
+{
+	memset(exp, 0, sizeof(*exp));
+	exp->cb = cb;
+	exp->out = out;
+	exp->olen = olen;
+	exp->state = LWS_EXPS_LITERAL;
+	exp->priv = priv;
+}
+
+void
+lws_strexp_reset_out(lws_strexp_t *exp, char *out, size_t olen)
+{
+	exp->out = out;
+	exp->olen = olen;
+	exp->pos = 0;
+}
+
+int
+lws_strexp_expand(lws_strexp_t *exp, const char *in, size_t len,
+		  size_t *pused_in, size_t *pused_out)
+{
+	size_t used = 0;
+	int n;
+
+	while (used < len) {
+
+		switch (exp->state) {
+		case LWS_EXPS_LITERAL:
+			if (*in == '$') {
+				exp->state = LWS_EXPS_OPEN_OR_LIT;
+				break;
+			}
+
+			if (exp->out)
+				exp->out[exp->pos] = *in;
+			exp->pos++;
+			if (exp->olen - exp->pos < 1) {
+				*pused_in = used + 1;
+				*pused_out = exp->pos;
+				return LSTRX_FILLED_OUT;
+			}
+			break;
+
+		case LWS_EXPS_OPEN_OR_LIT:
+			if (*in == '{') {
+				exp->state = LWS_EXPS_NAME_OR_CLOSE;
+				exp->name_pos = 0;
+				exp->exp_ofs = 0;
+				break;
+			}
+			/* treat as a literal */
+			if (exp->olen - exp->pos < 3)
+				return -1;
+
+			if (exp->out) {
+				exp->out[exp->pos++] = '$';
+				exp->out[exp->pos++] = *in;
+			} else
+				exp->pos += 2;
+			if (*in != '$')
+				exp->state = LWS_EXPS_LITERAL;
+			break;
+
+		case LWS_EXPS_NAME_OR_CLOSE:
+			if (*in == '}') {
+				exp->name[exp->name_pos] = '\0';
+				exp->state = LWS_EXPS_DRAIN;
+				goto drain;
+			}
+			if (exp->name_pos >= sizeof(exp->name) - 1)
+				return LSTRX_FATAL_NAME_TOO_LONG;
+
+			exp->name[exp->name_pos++] = *in;
+			break;
+
+		case LWS_EXPS_DRAIN:
+drain:
+			*pused_in = used;
+			n = exp->cb(exp->priv, exp->name, exp->out, &exp->pos,
+				    exp->olen, &exp->exp_ofs);
+			*pused_out = exp->pos;
+			if (n == LSTRX_FILLED_OUT ||
+			    n == LSTRX_FATAL_NAME_UNKNOWN)
+				return n;
+
+			exp->state = LWS_EXPS_LITERAL;
+			break;
+		}
+
+		used++;
+		in++;
+	}
+
+	if (exp->out)
+		exp->out[exp->pos] = '\0';
+	*pused_in = used;
+	*pused_out = exp->pos;
+
+	return LSTRX_DONE;
+}
+
 
 #if LWS_MAX_SMP > 1
 
@@ -883,11 +1212,68 @@ lws_cmdline_option(int argc, const char **argv, const char *val)
 				return argv[c + 1];
 			}
 
+			if (argv[c][n] == '=')
+				return &argv[c][n + 1];
 			return argv[c] + n;
 		}
 	}
 
 	return NULL;
+}
+
+static const char * const builtins[] = {
+	"-d",
+#if defined(LWS_WITH_UDP)
+	"--udp-tx-loss",
+	"--udp-rx-loss",
+#endif
+	"--ignore-sigterm"
+};
+
+#if !defined(LWS_PLAT_FREERTOS)
+static void
+lws_sigterm_catch(int sig)
+{
+}
+#endif
+
+void
+lws_cmdline_option_handle_builtin(int argc, const char **argv,
+				  struct lws_context_creation_info *info)
+{
+	const char *p;
+	int n, m, logs = LLL_USER | LLL_ERR | LLL_WARN | LLL_NOTICE;
+
+	for (n = 0; n < (int)LWS_ARRAY_SIZE(builtins); n++) {
+		p = lws_cmdline_option(argc, argv, builtins[n]);
+		if (!p)
+			continue;
+
+		m = atoi(p);
+
+		switch (n) {
+		case 0:
+			logs = m;
+			break;
+#if defined(LWS_WITH_UDP)
+		case 1:
+			info->udp_loss_sim_tx_pc = m;
+			break;
+		case 2:
+			info->udp_loss_sim_rx_pc = m;
+			break;
+		case 3:
+#else
+		case 1:
+#endif
+#if !defined(LWS_PLAT_FREERTOS)
+			signal(SIGTERM, lws_sigterm_catch);
+#endif
+			break;
+		}
+	}
+
+	lws_set_log_level(logs, NULL);
 }
 
 
@@ -912,44 +1298,58 @@ const lws_humanize_unit_t humanize_schema_us[] = {
 	{ NULL, 0 }
 };
 
+static int
+decim(char *r, uint64_t v, char chars, char leading)
+{
+	int n = chars - 1;
+	uint64_t q = 1;
+
+	r += n;
+
+	while (n >= 0) {
+		if (v / q)
+			*r-- = '0' + ((v / q) % 10);
+		else
+			*r-- = leading ? '0' : ' ';
+		q = q * 10;
+		n--;
+	}
+
+	if (v / q)
+		/* the number is bigger than the allowed chars! */
+		r[1] = '!';
+
+	return chars;
+}
+
 int
 lws_humanize(char *p, int len, uint64_t v, const lws_humanize_unit_t *schema)
 {
+	char *end = p + len;
+
 	do {
 		if (v >= schema->factor || schema->factor == 1) {
-			if (schema->factor == 1)
-				return lws_snprintf(p, len,
-					" %4"PRIu64"%s    ",
-					v / schema->factor, schema->name);
+			if (schema->factor == 1) {
+				*p++ = ' ';
+				p += decim(p, v, 4, 0);
+				return lws_snprintf(p, lws_ptr_diff(end, p),
+						    "%s    ", schema->name);
+			}
 
-			return lws_snprintf(p, len, " %4"PRIu64".%03"PRIu64"%s",
-				v / schema->factor,
-				(v % schema->factor) / (schema->factor / 1000),
-				schema->name);
+			*p++ = ' ';
+			p += decim(p, v / schema->factor, 4, 0);
+			*p++ = '.';
+			p += decim(p, (v % schema->factor) /
+					(schema->factor / 1000), 3, 1);
+
+			return lws_snprintf(p, lws_ptr_diff(end, p),
+					    "%s", schema->name);
 		}
 		schema++;
 	} while (schema->name);
 
 	assert(0);
+	strncpy(p, "unknown value", len);
 
 	return 0;
-}
-
-int
-lws_system_get_info(struct lws_context *context, lws_system_item_t item,
-		    lws_system_arg_t arg, size_t *len)
-{
-	if (!context->system_ops || !context->system_ops->get_info)
-		return 1;
-
-	return context->system_ops->get_info(item, arg, len);
-}
-
-int
-lws_system_reboot(struct lws_context *context)
-{
-	if (!context->system_ops || !context->system_ops->reboot)
-		return 1;
-
-	return context->system_ops->reboot();
 }

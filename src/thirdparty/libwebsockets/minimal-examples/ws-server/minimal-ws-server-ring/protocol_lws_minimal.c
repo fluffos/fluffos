@@ -30,8 +30,8 @@ struct msg {
 
 /* one of these is created for each client connecting to us */
 
-struct per_session_data {
-	struct per_session_data *pss_list;
+struct per_session_data__minimal {
+	struct per_session_data__minimal *pss_list;
 	struct lws *wsi;
 	uint32_t tail;
 
@@ -40,22 +40,22 @@ struct per_session_data {
 
 /* one of these is created for each vhost our protocol is used with */
 
-struct per_vhost_data {
+struct per_vhost_data__minimal {
 	struct lws_context *context;
 	struct lws_vhost *vhost;
 	const struct lws_protocols *protocol;
 
-	struct per_session_data *pss_list; /* linked-list of live pss*/
+	struct per_session_data__minimal *pss_list; /* linked-list of live pss*/
 
 	struct lws_ring *ring; /* ringbuffer holding unsent messages */
 };
 
 static void
-cull_lagging_clients(struct per_vhost_data *vhd)
+cull_lagging_clients(struct per_vhost_data__minimal *vhd)
 {
 	uint32_t oldest_tail = lws_ring_get_oldest_tail(vhd->ring);
-	struct per_session_data *old_pss = NULL;
-	int most = 0, before = lws_ring_get_count_waiting_elements(vhd->ring,
+	struct per_session_data__minimal *old_pss = NULL;
+	int most = 0, before = (int)lws_ring_get_count_waiting_elements(vhd->ring,
 					&oldest_tail), m;
 
 	/*
@@ -111,7 +111,7 @@ cull_lagging_clients(struct per_vhost_data *vhd)
 			 * what is the largest number of pending ring elements
 			 * for any survivor.
 			 */
-			m = lws_ring_get_count_waiting_elements(vhd->ring,
+			m = (int)lws_ring_get_count_waiting_elements(vhd->ring,
 							&((*ppss)->tail));
 			if (m > most)
 				most = m;
@@ -151,10 +151,10 @@ static int
 callback_minimal(struct lws *wsi, enum lws_callback_reasons reason,
 			void *user, void *in, size_t len)
 {
-	struct per_session_data *pss =
-			(struct per_session_data *)user;
-	struct per_vhost_data *vhd =
-			(struct per_vhost_data *)
+	struct per_session_data__minimal *pss =
+			(struct per_session_data__minimal *)user;
+	struct per_vhost_data__minimal *vhd =
+			(struct per_vhost_data__minimal *)
 			lws_protocol_vh_priv_get(lws_get_vhost(wsi),
 					lws_get_protocol(wsi));
 	const struct msg *pmsg;
@@ -165,7 +165,7 @@ callback_minimal(struct lws *wsi, enum lws_callback_reasons reason,
 	case LWS_CALLBACK_PROTOCOL_INIT:
 		vhd = lws_protocol_vh_priv_zalloc(lws_get_vhost(wsi),
 				lws_get_protocol(wsi),
-				sizeof(struct per_vhost_data));
+				sizeof(struct per_vhost_data__minimal));
 		vhd->context = lws_get_context(wsi);
 		vhd->protocol = lws_get_protocol(wsi);
 		vhd->vhost = lws_get_vhost(wsi);
@@ -275,7 +275,7 @@ callback_minimal(struct lws *wsi, enum lws_callback_reasons reason,
 	{ \
 		"lws-minimal", \
 		callback_minimal, \
-		sizeof(struct per_session_data), \
+		sizeof(struct per_session_data__minimal), \
 		0, \
 		0, NULL, 0 \
 	}
@@ -288,7 +288,7 @@ static const struct lws_protocols protocols[] = {
 	LWS_PLUGIN_PROTOCOL_MINIMAL
 };
 
-LWS_EXTERN LWS_VISIBLE int
+int
 init_protocol_minimal(struct lws_context *context,
 		      struct lws_plugin_capability *c)
 {
@@ -306,7 +306,7 @@ init_protocol_minimal(struct lws_context *context,
 	return 0;
 }
 
-LWS_EXTERN LWS_VISIBLE int
+int
 destroy_protocol_minimal(struct lws_context *context)
 {
 	return 0;

@@ -1,25 +1,28 @@
 /*
- * ./lib/extension-permessage-deflate.c
+ * libwebsockets - small server side websockets and web server implementation
  *
- *  Copyright (C) 2016 - 2018 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-#include "core/private.h"
+#include "private-lib-core.h"
 #include "extension-permessage-deflate.h"
 #include <stdio.h>
 #include <string.h>
@@ -49,9 +52,9 @@ lws_extension_pmdeflate_restrict_args(struct lws *wsi,
 
 	/* cap the RX buf at the nearest power of 2 to protocol rx buf */
 
-	n = wsi->context->pt_serv_buf_size;
-	if (wsi->protocol->rx_buffer_size)
-		n = (int)wsi->protocol->rx_buffer_size;
+	n = wsi->a.context->pt_serv_buf_size;
+	if (wsi->a.protocol->rx_buffer_size)
+		n = (int)wsi->a.protocol->rx_buffer_size;
 
 	extra = 7;
 	while (n >= 1 << (extra + 1))
@@ -127,13 +130,13 @@ lws_extension_callback_pm_deflate(struct lws_context *context,
 	case LWS_EXT_CB_CONSTRUCT:
 
 		n = context->pt_serv_buf_size;
-		if (wsi->protocol->rx_buffer_size)
-			n = (int)wsi->protocol->rx_buffer_size;
+		if (wsi->a.protocol->rx_buffer_size)
+			n = (int)wsi->a.protocol->rx_buffer_size;
 
 		if (n < 128) {
 			lwsl_info(" permessage-deflate requires the protocol "
 				  "(%s) to have an RX buffer >= 128\n",
-				  wsi->protocol->name);
+				  wsi->a.protocol->name);
 			return -1;
 		}
 
@@ -183,6 +186,9 @@ lws_extension_callback_pm_deflate(struct lws_context *context,
 
 
 	case LWS_EXT_CB_PAYLOAD_RX:
+		/*
+		 * ie, we are INFLATING
+		 */
 		lwsl_ext(" %s: LWS_EXT_CB_PAYLOAD_RX: in %d, existing in %d\n",
 			 __func__, pmdrx->eb_in.len, priv->rx.avail_in);
 
@@ -201,9 +207,8 @@ lws_extension_callback_pm_deflate(struct lws_context *context,
 		pmdrx->eb_out.len = 0;
 
 		lwsl_ext("%s: LWS_EXT_CB_PAYLOAD_RX: in %d, "
-			    "existing avail in %d, pkt fin: %d\n", __func__,
-				    pmdrx->eb_in.len, priv->rx.avail_in,
-				    wsi->ws->final);
+			 "existing avail in %d, pkt fin: %d\n", __func__,
+			 pmdrx->eb_in.len, priv->rx.avail_in, wsi->ws->final);
 
 		/* if needed, initialize the inflator */
 
@@ -247,14 +252,12 @@ lws_extension_callback_pm_deflate(struct lws_context *context,
 		pmdrx->eb_out.token = priv->rx.next_out;
 		priv->rx.avail_out = 1 << priv->args[PMD_RX_BUF_PWR2];
 
-		pen = penbits = 0;
-		deflatePending(&priv->rx, &pen, &penbits);
-		pen |= penbits;
-
 		/* so... if...
 		 *
 		 *  - he has no remaining input content for this message, and
+		 *
 		 *  - and this is the final fragment, and
+		 *
 		 *  - we used everything that could be drained on the input side
 		 *
 		 * ...then put back the 00 00 FF FF the sender stripped as our
@@ -276,7 +279,7 @@ lws_extension_callback_pm_deflate(struct lws_context *context,
 		 * him right now, bail without having done anything
 		 */
 
-		if (!priv->rx.avail_in && !pen)
+		if (!priv->rx.avail_in)
 			return PMDR_DID_NOTHING;
 
 		n = inflate(&priv->rx, was_fin ? Z_SYNC_FLUSH : Z_NO_FLUSH);
@@ -300,25 +303,18 @@ lws_extension_callback_pm_deflate(struct lws_context *context,
 				         (pmdrx->eb_in.len - priv->rx.avail_in);
 		pmdrx->eb_in.len = priv->rx.avail_in;
 
-		pen = penbits = 0;
-		deflatePending(&priv->rx, &pen, &penbits);
-		pen |= penbits;
-
-		lwsl_debug("%s: %d %d %d %d %d %d\n", __func__,
+		lwsl_debug("%s: %d %d %d %d %d\n", __func__,
 				priv->rx.avail_in,
 				wsi->ws->final,
 				(int)wsi->ws->rx_packet_length,
 				was_fin,
-				wsi->ws->pmd_trailer_application,
-				pen);
+				wsi->ws->pmd_trailer_application);
 
 		if (!priv->rx.avail_in &&
 		    wsi->ws->final &&
 		    !wsi->ws->rx_packet_length &&
 		    !was_fin &&
-		    wsi->ws->pmd_trailer_application &&
-		    !pen
-		) {
+		    wsi->ws->pmd_trailer_application) {
 			lwsl_ext("%s: RX trailer apply 2\n", __func__);
 
 			/* we overallocated just for this situation where
@@ -331,7 +327,7 @@ lws_extension_callback_pm_deflate(struct lws_context *context,
 			priv->rx.avail_in = sizeof(trail);
 			n = inflate(&priv->rx, Z_SYNC_FLUSH);
 			lwsl_ext("RX trailer infl ret %d, avi %d, avo %d\n",
-				    n, priv->rx.avail_in, priv->rx.avail_out);
+				 n, priv->rx.avail_in, priv->rx.avail_out);
 			switch (n) {
 			case Z_NEED_DICT:
 			case Z_STREAM_ERROR:
@@ -343,10 +339,6 @@ lws_extension_callback_pm_deflate(struct lws_context *context,
 			}
 
 			assert(priv->rx.avail_out);
-
-			pen = penbits = 0;
-			deflatePending(&priv->rx, &pen, &penbits);
-			pen |= penbits;
 		}
 
 		pmdrx->eb_out.len = lws_ptr_diff(priv->rx.next_out,
@@ -358,7 +350,7 @@ lws_extension_callback_pm_deflate(struct lws_context *context,
 			 __func__, pmdrx->eb_out.len, priv->rx.avail_in,
 			 (unsigned long)priv->count_rx_between_fin);
 
-		if (was_fin && !pen) {
+		if (was_fin) {
 			lwsl_ext("%s: was_fin\n", __func__);
 			priv->count_rx_between_fin = 0;
 			if (priv->args[PMD_SERVER_NO_CONTEXT_TAKEOVER]) {
@@ -370,20 +362,24 @@ lws_extension_callback_pm_deflate(struct lws_context *context,
 			return PMDR_EMPTY_FINAL;
 		}
 
-		if (pen || priv->rx.avail_in)
+		if (priv->rx.avail_in)
 			return PMDR_HAS_PENDING;
 
 		return PMDR_EMPTY_NONFINAL;
 
 	case LWS_EXT_CB_PAYLOAD_TX:
 
-		/* initialize us if needed */
+		/*
+		 * ie, we are DEFLATING
+		 *
+		 * initialize us if needed
+		 */
 
 		if (!priv->tx_init) {
 			n = deflateInit2(&priv->tx, priv->args[PMD_COMP_LEVEL],
 					 Z_DEFLATED,
 					 -priv->args[PMD_SERVER_MAX_WINDOW_BITS +
-						(wsi->vhost->listen_port <= 0)],
+						(wsi->a.vhost->listen_port <= 0)],
 					 priv->args[PMD_MEM_LEVEL],
 					 Z_DEFAULT_STRATEGY);
 			if (n != Z_OK) {

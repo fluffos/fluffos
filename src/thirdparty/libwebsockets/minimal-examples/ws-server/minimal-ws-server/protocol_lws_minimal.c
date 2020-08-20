@@ -28,20 +28,20 @@ struct msg {
 
 /* one of these is created for each client connecting to us */
 
-struct per_session_data {
-	struct per_session_data *pss_list;
+struct per_session_data__minimal {
+	struct per_session_data__minimal *pss_list;
 	struct lws *wsi;
 	int last; /* the last message number we sent */
 };
 
 /* one of these is created for each vhost our protocol is used with */
 
-struct per_vhost_data {
+struct per_vhost_data__minimal {
 	struct lws_context *context;
 	struct lws_vhost *vhost;
 	const struct lws_protocols *protocol;
 
-	struct per_session_data *pss_list; /* linked-list of live pss*/
+	struct per_session_data__minimal *pss_list; /* linked-list of live pss*/
 
 	struct msg amsg; /* the one pending message... */
 	int current; /* the current message number we are caching */
@@ -63,10 +63,10 @@ static int
 callback_minimal(struct lws *wsi, enum lws_callback_reasons reason,
 			void *user, void *in, size_t len)
 {
-	struct per_session_data *pss =
-			(struct per_session_data *)user;
-	struct per_vhost_data *vhd =
-			(struct per_vhost_data *)
+	struct per_session_data__minimal *pss =
+			(struct per_session_data__minimal *)user;
+	struct per_vhost_data__minimal *vhd =
+			(struct per_vhost_data__minimal *)
 			lws_protocol_vh_priv_get(lws_get_vhost(wsi),
 					lws_get_protocol(wsi));
 	int m;
@@ -75,7 +75,7 @@ callback_minimal(struct lws *wsi, enum lws_callback_reasons reason,
 	case LWS_CALLBACK_PROTOCOL_INIT:
 		vhd = lws_protocol_vh_priv_zalloc(lws_get_vhost(wsi),
 				lws_get_protocol(wsi),
-				sizeof(struct per_vhost_data));
+				sizeof(struct per_vhost_data__minimal));
 		vhd->context = lws_get_context(wsi);
 		vhd->protocol = lws_get_protocol(wsi);
 		vhd->vhost = lws_get_vhost(wsi);
@@ -148,7 +148,7 @@ callback_minimal(struct lws *wsi, enum lws_callback_reasons reason,
 	{ \
 		"lws-minimal", \
 		callback_minimal, \
-		sizeof(struct per_session_data), \
+		sizeof(struct per_session_data__minimal), \
 		128, \
 		0, NULL, 0 \
 	}
@@ -161,7 +161,7 @@ static const struct lws_protocols protocols[] = {
 	LWS_PLUGIN_PROTOCOL_MINIMAL
 };
 
-LWS_EXTERN LWS_VISIBLE int
+int
 init_protocol_minimal(struct lws_context *context,
 		      struct lws_plugin_capability *c)
 {
@@ -179,7 +179,7 @@ init_protocol_minimal(struct lws_context *context,
 	return 0;
 }
 
-LWS_EXTERN LWS_VISIBLE int
+int
 destroy_protocol_minimal(struct lws_context *context)
 {
 	return 0;

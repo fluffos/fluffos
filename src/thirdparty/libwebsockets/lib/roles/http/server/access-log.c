@@ -1,25 +1,28 @@
 /*
- * libwebsockets - server access log handling
+ * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2017 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-#include "core/private.h"
+#include "private-lib-core.h"
 
 /*
  * Produce Apache-compatible log string for wsi, like this:
@@ -41,21 +44,17 @@ void
 lws_prepare_access_log_info(struct lws *wsi, char *uri_ptr, int uri_len, int meth)
 {
 	char da[64], uri[256];
-	const char *pa, *me;
 	time_t t = time(NULL);
+	struct lws *nwsi;
+	const char *me;
 	int l = 256, m;
-#ifdef LWS_WITH_IPV6
-	char ads[INET6_ADDRSTRLEN];
-#else
-	char ads[INET_ADDRSTRLEN];
-#endif
 	struct tm *tmp;
 
-	if (!wsi->vhost)
+	if (!wsi->a.vhost)
 		return;
 
 	/* only worry about preparing it if we store it */
-	if (wsi->vhost->log_fd == (int)LWS_INVALID_FILE)
+	if (wsi->a.vhost->log_fd == (int)LWS_INVALID_FILE)
 		return;
 
 	if (wsi->access_log_pending)
@@ -71,11 +70,7 @@ lws_prepare_access_log_info(struct lws *wsi, char *uri_ptr, int uri_len, int met
 	else
 		strcpy(da, "01/Jan/1970:00:00:00 +0000");
 
-	pa = lws_get_peer_simple(wsi, ads, sizeof(ads));
-	if (!pa)
-		pa = "(unknown)";
-
-	if (wsi->http2_substream)
+	if (wsi->mux_substream)
 		me = lws_hdr_simple_ptr(wsi, WSI_TOKEN_HTTP_COLON_METHOD);
 	else
 		me = method_names[meth];
@@ -89,9 +84,12 @@ lws_prepare_access_log_info(struct lws *wsi, char *uri_ptr, int uri_len, int met
 	strncpy(uri, uri_ptr, m);
 	uri[m] = '\0';
 
+	nwsi = lws_get_network_wsi(wsi);
+
 	lws_snprintf(wsi->http.access_log.header_log, l,
 		     "%s - - [%s] \"%s %s %s\"",
-		     pa, da, me, uri, hver[wsi->http.request_version]);
+		     nwsi->simple_ip[0] ? nwsi->simple_ip : "unknown", da, me, uri,
+			hver[wsi->http.request_version]);
 
 	//lwsl_notice("%s\n", wsi->http.access_log.header_log);
 
@@ -140,10 +138,10 @@ lws_access_log(struct lws *wsi)
 	     *p1 = wsi->http.access_log.referrer;
 	int l;
 
-	if (!wsi->vhost)
+	if (!wsi->a.vhost)
 		return 0;
 
-	if (wsi->vhost->log_fd == (int)LWS_INVALID_FILE)
+	if (wsi->a.vhost->log_fd == (int)LWS_INVALID_FILE)
 		return 0;
 
 	if (!wsi->access_log_pending)
@@ -175,7 +173,7 @@ lws_access_log(struct lws *wsi)
 
 	ass[sizeof(ass) - 1] = '\0';
 
-	if (write(wsi->vhost->log_fd, ass, l) != l)
+	if (write(wsi->a.vhost->log_fd, ass, l) != l)
 		lwsl_err("Failed to write log\n");
 
 	if (wsi->http.access_log.header_log) {

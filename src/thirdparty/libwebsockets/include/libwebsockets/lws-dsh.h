@@ -1,24 +1,25 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
- *
- * included from libwebsockets.h
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
 /*
@@ -61,7 +62,7 @@
  *
  * Returns an opaque pointer to the dsh, or NULL if allocation failed.
  */
-LWS_VISIBLE LWS_EXTERN lws_dsh_t *
+LWS_VISIBLE LWS_EXTERN struct lws_dsh *
 lws_dsh_create(lws_dll2_owner_t *owner, size_t buffer_size, int count_kinds);
 
 /**
@@ -79,7 +80,7 @@ lws_dsh_create(lws_dll2_owner_t *owner, size_t buffer_size, int count_kinds);
  * unmigratable objects are cleanly destroyed.
  */
 LWS_VISIBLE LWS_EXTERN void
-lws_dsh_destroy(lws_dsh_t **pdsh);
+lws_dsh_destroy(struct lws_dsh **pdsh);
 
 /**
  * lws_dsh_alloc_tail() - make a suballocation inside a dsh
@@ -100,8 +101,8 @@ lws_dsh_destroy(lws_dsh_t **pdsh);
  * The suballocation is added to the kind-specific FIFO at the tail.
  */
 LWS_VISIBLE LWS_EXTERN int
-lws_dsh_alloc_tail(lws_dsh_t *dsh, int kind, const void *src1, size_t size1,
-		    const void *src2, size_t size2);
+lws_dsh_alloc_tail(struct lws_dsh *dsh, int kind, const void *src1,
+		   size_t size1, const void *src2, size_t size2);
 
 /**
  * lws_dsh_free() - free a suballocation from the dsh
@@ -115,7 +116,7 @@ LWS_VISIBLE LWS_EXTERN void
 lws_dsh_free(void **obj);
 
 /**
- * lws_dsh_get_head() - free a suballocation from the dsh
+ * lws_dsh_get_head() - get the head allocation inside the dsh
  *
  * \param dsh: the dsh tracking the allocation
  * \param kind: the kind of allocation
@@ -130,7 +131,7 @@ lws_dsh_free(void **obj);
  * free list.
  */
 LWS_VISIBLE LWS_EXTERN int
-lws_dsh_get_head(lws_dsh_t *dsh, int kind, void **obj, size_t *size);
+lws_dsh_get_head(struct lws_dsh *dsh, int kind, void **obj, size_t *size);
 
 /**
  * lws_dsh_describe() - DEBUG BUILDS ONLY dump the dsh to the logs
@@ -141,4 +142,4 @@ lws_dsh_get_head(lws_dsh_t *dsh, int kind, void **obj, size_t *size);
  * Useful information for debugging lws_dsh
  */
 LWS_VISIBLE LWS_EXTERN void
-lws_dsh_describe(lws_dsh_t *dsh, const char *desc);
+lws_dsh_describe(struct lws_dsh *dsh, const char *desc);

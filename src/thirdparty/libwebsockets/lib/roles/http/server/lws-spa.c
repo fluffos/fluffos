@@ -1,25 +1,28 @@
 /*
- * libwebsockets - Stateful urldecode for POST
+ * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-#include "core/private.h"
+#include "private-lib-core.h"
 
 #define LWS_MAX_ELEM_NAME 32
 
@@ -39,10 +42,13 @@ enum urldecode_stateful {
 	MT_COMPLETED,
 };
 
-static const char * const mp_hdr[] = {
-	"content-disposition: ",
-	"content-type: ",
-	"\x0d\x0a"
+static struct mp_hdr {
+	const char * const	hdr;
+	uint8_t			hdr_len;
+} mp_hdrs[] = {
+	{ "content-disposition: ", 21 },
+	{ "content-type: ", 14 },
+	{ "\x0d\x0a", 2 }
 };
 
 struct lws_spa;
@@ -66,10 +72,12 @@ struct lws_urldecode_stateful {
 	int mp;
 	int sum;
 
-	unsigned int multipart_form_data:1;
-	unsigned int inside_quote:1;
-	unsigned int subname:1;
-	unsigned int boundary_real_crlf:1;
+	uint8_t matchable;
+
+	uint8_t multipart_form_data:1;
+	uint8_t inside_quote:1;
+	uint8_t subname:1;
+	uint8_t boundary_real_crlf:1;
 
 	enum urldecode_stateful state;
 
@@ -118,7 +126,8 @@ lws_urldecode_s_create(struct lws_spa *spa, struct lws *wsi, char *out,
 	/* multipart/form-data;
 	 * boundary=----WebKitFormBoundarycc7YgAPEIHvgE9Bf */
 
-		if (!strncmp(buf, "multipart/form-data", 19)) {
+		if (!strncmp(buf, "multipart/form-data", 19) ||
+		    !strncmp(buf, "multipart/related", 17)) {
 			s->multipart_form_data = 1;
 			s->state = MT_LOOK_BOUND_IN;
 			s->mp = 2;
@@ -129,13 +138,14 @@ lws_urldecode_s_create(struct lws_spa *spa, struct lws *wsi, char *out,
 				s->mime_boundary[m++] = '\x0a';
 				s->mime_boundary[m++] = '-';
 				s->mime_boundary[m++] = '-';
+				if (*p == '\"')
+					p++;
 				while (m < (int)sizeof(s->mime_boundary) - 1 &&
-				       *p && *p != ' ')
+				       *p && *p != ' ' && *p != ';' && *p != '\"')
 					s->mime_boundary[m++] = *p++;
-
 				s->mime_boundary[m] = '\0';
 
-				lwsl_info("boundary '%s'\n", s->mime_boundary);
+				lwsl_notice("boundary '%s'\n", s->mime_boundary);
 			}
 		}
 	}
@@ -147,8 +157,8 @@ static int
 lws_urldecode_s_process(struct lws_urldecode_stateful *s, const char *in,
 			int len)
 {
-	int n, m, hit = 0;
-	char c, was_end = 0;
+	int n, hit;
+	char c;
 
 	while (len--) {
 		if (s->pos == s->out_len - s->mp - 1) {
@@ -156,9 +166,9 @@ lws_urldecode_s_process(struct lws_urldecode_stateful *s, const char *in,
 				      LWS_UFS_CONTENT))
 				return -1;
 
-			was_end = s->pos;
 			s->pos = 0;
 		}
+
 		switch (s->state) {
 
 		/* states for url arg style */
@@ -183,7 +193,8 @@ lws_urldecode_s_process(struct lws_urldecode_stateful *s, const char *in,
 				continue;
 			}
 			if (s->pos >= (int)sizeof(s->name) - 1) {
-				lwsl_notice("Name too long\n");
+				lwsl_hexdump_notice(s->name, s->pos);
+				lwsl_notice("Name too long...\n");
 				return -1;
 			}
 			s->name[s->pos++] = *in++;
@@ -244,11 +255,10 @@ retry_as_first:
 					s->mp = 0;
 					s->state = MT_IGNORE1;
 
-					if (s->pos || was_end)
-						if (s->output(s->data, s->name,
+					if (s->output(s->data, s->name,
 						      &s->out, s->pos,
 						      LWS_UFS_FINAL_CONTENT))
-							return -1;
+						return -1;
 
 					s->pos = 0;
 
@@ -278,29 +288,52 @@ retry_as_first:
 			break;
 
 		case MT_HNAME:
-			m = 0;
 			c =*in;
 			if (c >= 'A' && c <= 'Z')
 				c += 'a' - 'A';
-			for (n = 0; n < (int)LWS_ARRAY_SIZE(mp_hdr); n++)
-				if (c == mp_hdr[n][s->mp]) {
-					m++;
-					hit = n;
+			if (!s->mp)
+				/* initially, any of them might match */
+				s->matchable = (1 << LWS_ARRAY_SIZE(mp_hdrs)) - 1; 
+
+			hit = -1;
+			for (n = 0; n < (int)LWS_ARRAY_SIZE(mp_hdrs); n++) {
+
+				if (!(s->matchable & (1 << n)))
+					continue;
+				/* this guy is still in contention... */
+
+				if (s->mp >= mp_hdrs[n].hdr_len) {
+					/* he went past the end of it */
+					s->matchable &= ~(1 << n);
+					continue;
 				}
+
+				if (c != mp_hdrs[n].hdr[s->mp]) {
+					/* mismatched a char */
+					s->matchable &= ~(1 << n);
+					continue;
+				}
+
+				if (s->mp + 1 == mp_hdrs[n].hdr_len) {
+					/* we have a winner... */
+					hit = n;
+					break;
+				}
+			}
+
 			in++;
-			if (!m) {
-				/* Unknown header - ignore it */
+			if (hit == -1 && !s->matchable) {
+				/* We ruled them all out */
 				s->state = MT_IGNORE1;
 				s->mp = 0;
 				continue;
 			}
 
 			s->mp++;
-			if (m != 1)
+			if (hit < 0)
 				continue;
 
-			if (mp_hdr[hit][s->mp])
-				continue;
+			/* we matched the one in hit */
 
 			s->mp = 0;
 			s->temp[0] = '\0';
@@ -565,7 +598,7 @@ lws_spa_create_via_info(struct lws *wsi, const lws_spa_create_info_t *i)
 			goto bail5;
 	}
 
-	lwsl_info("%s: Created SPA %p\n", __func__, spa);
+	lwsl_notice("%s: Created SPA %p\n", __func__, spa);
 
 	return spa;
 

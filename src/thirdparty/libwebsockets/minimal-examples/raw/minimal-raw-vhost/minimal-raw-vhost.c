@@ -53,7 +53,7 @@ callback_raw_test(struct lws *wsi, enum lws_callback_reasons reason,
 
 	switch (reason) {
 	case LWS_CALLBACK_PROTOCOL_INIT:
-		vhd = lws_protocol_vh_priv_zalloc(lws_get_vhost(wsi),
+		lws_protocol_vh_priv_zalloc(lws_get_vhost(wsi),
 				lws_get_protocol(wsi), sizeof(struct raw_vhd));
 		break;
 
@@ -75,7 +75,7 @@ callback_raw_test(struct lws *wsi, enum lws_callback_reasons reason,
 
 	case LWS_CALLBACK_RAW_RX:
 		lwsl_user("LWS_CALLBACK_RAW_RX: %d\n", (int)len);
-		vhd->len = len;
+		vhd->len = (int)len;
 		if (vhd->len > (int)sizeof(vhd->buf))
 			vhd->len = sizeof(vhd->buf);
 		memcpy(vhd->buf, in, vhd->len);
@@ -137,11 +137,13 @@ int main(int argc, const char **argv)
 	info.protocols = protocols;
 	info.options = LWS_SERVER_OPTION_ONLY_RAW; /* vhost accepts RAW */
 
+#if defined(LWS_WITH_TLS)
 	if (lws_cmdline_option(argc, argv, "-s")) {
 		info.options |= LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
 		info.ssl_cert_filepath = "localhost-100y.cert";
 		info.ssl_private_key_filepath = "localhost-100y.key";
 	}
+#endif
 
 	context = lws_create_context(&info);
 	if (!context) {

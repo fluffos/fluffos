@@ -153,7 +153,10 @@ int main(int argc, const char **argv)
 		lwsl_err("Problem reading from stdin\n");
 		return 1;
 	}
-	temp_len -= n;
+
+	/* account for padding as well */
+
+	temp_len -= (int)lws_gencrypto_padded_length(LWS_AES_CBC_BLOCKLEN, n);
 
 	/* grab the key */
 
@@ -216,7 +219,11 @@ int main(int argc, const char **argv)
 		if (lws_cmdline_option(argc, argv, "-c"))
 			format_c(compact);
 		else
-			if (write(1, compact, strlen(compact)) < 0) {
+			if (write(1, compact,
+#if defined(WIN32)
+					(unsigned int)
+#endif
+					strlen(compact)) < 0) {
 				lwsl_err("Write stdout failed\n");
 				goto bail1;
 			}

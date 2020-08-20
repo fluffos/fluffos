@@ -510,6 +510,7 @@ static const struct lws_protocols protocols[] = {
 	{ NULL, NULL, 0, 0 } /* end */
 };
 
+#if defined(LWS_ROLE_WS)
 static const struct lws_extension exts[] = {
 	{
 		"permessage-deflate",
@@ -523,7 +524,7 @@ static const struct lws_extension exts[] = {
 	},
 	{ NULL, NULL, NULL /* terminator */ }
 };
-
+#endif
 
 
 void sighandler(int sig)
@@ -547,7 +548,6 @@ static struct option options[] = {
 	{ "longlived",	no_argument,		NULL, 'l' },
 	{ "post",	no_argument,		NULL, 'o' },
 	{ "once",	no_argument,		NULL, 'O' },
-	{ "pingpong-secs", required_argument,	NULL, 'P' },
 	{ "ssl-cert",  required_argument,	NULL, 'C' },
 	{ "ssl-key",  required_argument,	NULL, 'K' },
 	{ "ssl-ca",  required_argument,		NULL, 'A' },
@@ -575,8 +575,7 @@ static int ratelimit_connects(unsigned int *last, unsigned int secs)
 int main(int argc, char **argv)
 {
 	int n = 0, m, ret = 0, port = 7681, use_ssl = 0, ietf_version = -1;
-	unsigned int rl_dumb = 0, rl_mirror = 0, do_ws = 1, pp_secs = 0,
-		     do_multi = 0;
+	unsigned int rl_dumb = 0, rl_mirror = 0, do_ws = 1, do_multi = 0;
 	struct lws_context_creation_info info;
 	struct lws_client_connect_info i;
 	struct lws_context *context;
@@ -589,7 +588,7 @@ int main(int argc, char **argv)
 
 	memset(&info, 0, sizeof info);
 
-	lwsl_notice("libwebsockets test client - license LGPL2.1+SLE\n");
+	lwsl_notice("libwebsockets test client - license MIT\n");
 	lwsl_notice("(C) Copyright 2010-2018 Andy Green <andy@warmcat.com>\n");
 
 	if (argc < 2)
@@ -597,9 +596,9 @@ int main(int argc, char **argv)
 
 	while (n >= 0) {
 #if defined(LWS_HAS_GETOPT_LONG) || defined(WIN32)
-       n = getopt_long(argc, argv, "Sjnuv:hsp:d:lC:K:A:P:moeO", options, NULL);
+       n = getopt_long(argc, argv, "Sjnuv:hsp:d:lC:K:A:moeO", options, NULL);
 #else
-       n = getopt(argc, argv, "Sjnuv:hsp:d:lC:K:A:P:moeO");
+       n = getopt(argc, argv, "Sjnuv:hsp:d:lC:K:A:moeO");
 #endif
 		if (n < 0)
 			continue;
@@ -620,10 +619,6 @@ int main(int argc, char **argv)
 			break;
 		case 'e':
 			flag_echo = 1;
-			break;
-		case 'P':
-			pp_secs = atoi(optarg);
-			lwsl_notice("Setting pingpong interval to %d\n", pp_secs);
 			break;
 		case 'j':
 			justmirror = 1;
@@ -709,8 +704,9 @@ int main(int argc, char **argv)
 	info.protocols = protocols;
 	info.gid = -1;
 	info.uid = -1;
-	info.ws_ping_pong_interval = pp_secs;
+#if defined(LWS_ROLE_WS)
 	info.extensions = exts;
+#endif
 
 	/*
 	 * since we know this lws context is only ever going to be used with
@@ -725,7 +721,7 @@ int main(int argc, char **argv)
 #endif
 
 	info.options |= LWS_SERVER_OPTION_H2_JUST_FIX_WINDOW_UPDATE_OVERFLOW;
-
+#if defined(LWS_WITH_TLS)
 	if (use_ssl) {
 		/*
 		 * If the server wants us to present a valid SSL client certificate
@@ -766,7 +762,7 @@ int main(int argc, char **argv)
 		lwsl_notice(" Skipping peer cert hostname check\n");
 	else
 		lwsl_notice(" Requiring peer cert hostname matches\n");
-
+#endif
 	context = lws_create_context(&info);
 	if (context == NULL) {
 		fprintf(stderr, "Creating libwebsocket context failed\n");

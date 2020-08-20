@@ -1,27 +1,31 @@
 /*
- * libwebsockets - lws-ring multi-tail abstract ringbuffer api
+ * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2017 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-#include "core/private.h"
+#include <libwebsockets.h>
+#include "private-lib-core.h"
 
-LWS_VISIBLE LWS_EXTERN struct lws_ring *
+struct lws_ring *
 lws_ring_create(size_t element_len, size_t count,
 		void (*destroy_element)(void *))
 {
@@ -46,7 +50,7 @@ lws_ring_create(size_t element_len, size_t count,
 	return ring;
 }
 
-LWS_VISIBLE LWS_EXTERN void
+void
 lws_ring_destroy(struct lws_ring *ring)
 {
 	if (ring->destroy_element)
@@ -63,7 +67,7 @@ lws_ring_destroy(struct lws_ring *ring)
 	lws_free(ring);
 }
 
-LWS_VISIBLE LWS_EXTERN size_t
+size_t
 lws_ring_get_count_free_elements(struct lws_ring *ring)
 {
 	int f;
@@ -93,7 +97,7 @@ lws_ring_get_count_free_elements(struct lws_ring *ring)
 	return f / ring->element_len;
 }
 
-LWS_VISIBLE LWS_EXTERN size_t
+size_t
 lws_ring_get_count_waiting_elements(struct lws_ring *ring, uint32_t *tail)
 {	int f;
 
@@ -119,7 +123,7 @@ lws_ring_get_count_waiting_elements(struct lws_ring *ring, uint32_t *tail)
 	return f / ring->element_len;
 }
 
-LWS_VISIBLE LWS_EXTERN int
+int
 lws_ring_next_linear_insert_range(struct lws_ring *ring, void **start,
 				  size_t *bytes)
 {
@@ -144,13 +148,13 @@ lws_ring_next_linear_insert_range(struct lws_ring *ring, void **start,
 	return 0;
 }
 
-LWS_VISIBLE LWS_EXTERN void
+void
 lws_ring_bump_head(struct lws_ring *ring, size_t bytes)
 {
 	ring->head = (ring->head + (uint32_t)bytes) % ring->buflen;
 }
 
-LWS_VISIBLE LWS_EXTERN size_t
+size_t
 lws_ring_insert(struct lws_ring *ring, const void *src, size_t max_count)
 {
 	const uint8_t *osrc = src;
@@ -191,7 +195,7 @@ lws_ring_insert(struct lws_ring *ring, const void *src, size_t max_count)
 	return (((uint8_t *)src + n) - osrc) / ring->element_len;
 }
 
-LWS_VISIBLE LWS_EXTERN size_t
+size_t
 lws_ring_consume(struct lws_ring *ring, uint32_t *tail, void *dest,
 		 size_t max_count)
 {
@@ -247,7 +251,7 @@ lws_ring_consume(struct lws_ring *ring, uint32_t *tail, void *dest,
 	return (((uint8_t *)dest + n) - odest) / ring->element_len;
 }
 
-LWS_VISIBLE LWS_EXTERN const void *
+const void *
 lws_ring_get_element(struct lws_ring *ring, uint32_t *tail)
 {
 	if (!tail)
@@ -259,7 +263,7 @@ lws_ring_get_element(struct lws_ring *ring, uint32_t *tail)
 	return ((uint8_t *)ring->buf) + *tail;
 }
 
-LWS_VISIBLE LWS_EXTERN void
+void
 lws_ring_update_oldest_tail(struct lws_ring *ring, uint32_t tail)
 {
 	if (!ring->destroy_element) {
@@ -274,21 +278,21 @@ lws_ring_update_oldest_tail(struct lws_ring *ring, uint32_t tail)
 	}
 }
 
-LWS_VISIBLE LWS_EXTERN uint32_t
+uint32_t
 lws_ring_get_oldest_tail(struct lws_ring *ring)
 {
 	return ring->oldest_tail;
 }
 
-LWS_VISIBLE LWS_EXTERN void
+void
 lws_ring_dump(struct lws_ring *ring, uint32_t *tail)
 {
 	if (tail == NULL)
 		tail = &ring->oldest_tail;
 	lwsl_notice("ring %p: buflen %u, elem_len %u, head %u, oldest_tail %u\n"
 		    "     free_elems: %u; for tail %u, waiting elements: %u\n",
-		    ring, ring->buflen, ring->element_len, ring->head,
-		    ring->oldest_tail,
-		    (int)lws_ring_get_count_free_elements(ring), *tail,
+		    ring, (int)ring->buflen, (int)ring->element_len,
+		    (int)ring->head, (int)ring->oldest_tail,
+		    (int)lws_ring_get_count_free_elements(ring), (int)*tail,
 		    (int)lws_ring_get_count_waiting_elements(ring, tail));
 }

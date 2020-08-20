@@ -1,30 +1,33 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2018 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-#include "core/private.h"
+#include "private-lib-core.h"
 
 int
 lws_callback_as_writeable(struct lws *wsi)
 {
-	struct lws_context_per_thread *pt = &wsi->context->pt[(int)wsi->tsi];
+	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
 	int n, m;
 
 	lws_stats_bump(pt, LWSSTATS_C_WRITEABLE_CB, 1);
@@ -38,17 +41,26 @@ lws_callback_as_writeable(struct lws *wsi)
 		wsi->active_writable_req_us = 0;
 	}
 #endif
+#if defined(LWS_WITH_DETAILED_LATENCY)
+	if (wsi->a.context->detailed_latency_cb && lwsi_state_est(wsi)) {
+		lws_usec_t us = lws_now_usecs();
 
+		wsi->detlat.earliest_write_req_pre_write =
+					wsi->detlat.earliest_write_req;
+		wsi->detlat.earliest_write_req = 0;
+		wsi->detlat.latencies[LAT_DUR_PROXY_RX_TO_ONWARD_TX] =
+		      ((uint32_t)us - wsi->detlat.earliest_write_req_pre_write);
+	}
+#endif
 	n = wsi->role_ops->writeable_cb[lwsi_role_server(wsi)];
-
-	m = user_callback_handle_rxflow(wsi->protocol->callback,
+	m = user_callback_handle_rxflow(wsi->a.protocol->callback,
 					wsi, (enum lws_callback_reasons) n,
 					wsi->user_space, NULL, 0);
 
 	return m;
 }
 
-LWS_VISIBLE int
+int
 lws_handle_POLLOUT_event(struct lws *wsi, struct lws_pollfd *pollfd)
 {
 	volatile struct lws *vwsi = (volatile struct lws *)wsi;
@@ -134,11 +146,13 @@ lws_handle_POLLOUT_event(struct lws *wsi, struct lws_pollfd *pollfd)
 	if (!wsi->role_ops->handle_POLLOUT)
 		goto bail_ok;
 
-	switch ((wsi->role_ops->handle_POLLOUT)(wsi)) {
+	n = wsi->role_ops->handle_POLLOUT(wsi);
+	switch (n) {
 	case LWS_HP_RET_BAIL_OK:
 		goto bail_ok;
 	case LWS_HP_RET_BAIL_DIE:
 		goto bail_die;
+	case LWS_HP_RET_DROP_POLLOUT:
 	case LWS_HP_RET_USER_SERVICE:
 		break;
 	default:
@@ -180,6 +194,9 @@ lws_handle_POLLOUT_event(struct lws *wsi, struct lws_pollfd *pollfd)
 	     lwsi_state(wsi) != LRS_ISSUE_HTTP_BODY)
 		goto bail_ok;
 
+	if (n == LWS_HP_RET_DROP_POLLOUT)
+		goto bail_ok;
+
 
 #ifdef LWS_WITH_CGI
 user_service_go_again:
@@ -191,7 +208,7 @@ user_service_go_again:
 		else
 			goto bail_ok;
 	}
-	
+
 	lwsl_debug("%s: %p: non mux: wsistate 0x%lx, ops %s\n", __func__, wsi,
 		   (unsigned long)wsi->wsistate, wsi->role_ops->name);
 
@@ -228,7 +245,7 @@ bail_die:
 int
 lws_rxflow_cache(struct lws *wsi, unsigned char *buf, int n, int len)
 {
-	struct lws_context_per_thread *pt = &wsi->context->pt[(int)wsi->tsi];
+	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
 	uint8_t *buffered;
 	size_t blen;
 	int ret = LWSRXFC_CACHED, m;
@@ -256,13 +273,15 @@ lws_rxflow_cache(struct lws *wsi, unsigned char *buf, int n, int len)
 
 	/* a new rxflow, buffer it and warn caller */
 
+	lwsl_debug("%s: rxflow append %d\n", __func__, len - n);
 	m = lws_buflist_append_segment(&wsi->buflist, buf + n, len - n);
 
 	if (m < 0)
 		return LWSRXFC_ERROR;
 	if (m) {
 		lwsl_debug("%s: added %p to rxflow list\n", __func__, wsi);
-		lws_dll2_add_head(&wsi->dll_buflist, &pt->dll_buflist_owner);
+		if (lws_dll2_is_detached(&wsi->dll_buflist))
+			lws_dll2_add_head(&wsi->dll_buflist, &pt->dll_buflist_owner);
 	}
 
 	return ret;
@@ -272,10 +291,23 @@ lws_rxflow_cache(struct lws *wsi, unsigned char *buf, int n, int len)
  * activity in poll() when we have something that already needs service
  */
 
-LWS_VISIBLE LWS_EXTERN int
+int
 lws_service_adjust_timeout(struct lws_context *context, int timeout_ms, int tsi)
 {
-	struct lws_context_per_thread *pt = &context->pt[tsi];
+	struct lws_context_per_thread *pt;
+
+	if (!context)
+		return 1;
+
+#if defined(LWS_WITH_SYS_SMD)
+	if (!tsi && lws_smd_message_pending(context)) {
+		lws_smd_msg_distribute(context);
+		if (lws_smd_message_pending(context))
+			return 0;
+	}
+#endif
+
+	pt = &context->pt[tsi];
 
 	/*
 	 * Figure out if we really want to wait in poll()... we only need to
@@ -327,52 +359,103 @@ lws_service_adjust_timeout(struct lws_context *context, int timeout_ms, int tsi)
  */
 int
 lws_buflist_aware_read(struct lws_context_per_thread *pt, struct lws *wsi,
-		       struct lws_tokens *ebuf)
+		       struct lws_tokens *ebuf, char fr, const char *hint)
 {
-	int n, prior = (int)lws_buflist_next_segment_len(&wsi->buflist, NULL);
+	int n, e, bns;
+	uint8_t *ep, *b;
 
-	ebuf->token = pt->serv_buf;
-	ebuf->len = lws_ssl_capable_read(wsi, pt->serv_buf,
-					 wsi->context->pt_serv_buf_size);
+	// lwsl_debug("%s: wsi %p: %s: prior %d\n", __func__, wsi, hint, prior);
+	// lws_buflist_describe(&wsi->buflist, wsi, __func__);
 
-	if (ebuf->len == LWS_SSL_CAPABLE_MORE_SERVICE && prior)
-		goto get_from_buflist;
+	(void)hint;
+	if (!ebuf->token)
+		ebuf->token = pt->serv_buf + LWS_PRE;
+	if (!ebuf->len ||
+	    (unsigned int)ebuf->len > wsi->a.context->pt_serv_buf_size - LWS_PRE)
+		ebuf->len = wsi->a.context->pt_serv_buf_size - LWS_PRE;
 
-	if (ebuf->len <= 0)
-		return 0;
+	e = ebuf->len;
+	ep = ebuf->token;
 
-	/* nothing in buflist already?  Then just use what we read */
+	/* h2 or muxed stream... must force the read due to HOL blocking */
 
-	if (!prior)
-		return 0;
+	if (wsi->mux_substream)
+		fr = 1;
 
-	/* stash what we read */
+	/* there's something on the buflist? */
 
-	n = lws_buflist_append_segment(&wsi->buflist, ebuf->token,
-				       ebuf->len);
-	if (n < 0)
+	bns = (int)lws_buflist_next_segment_len(&wsi->buflist, &ebuf->token);
+	b = ebuf->token;
+
+	if (!fr && bns)
+		goto buflist_material;
+
+	/* we're going to read something */
+
+	ebuf->token = ep;
+	ebuf->len = n = lws_ssl_capable_read(wsi, ep, e);
+
+	lwsl_debug("%s: wsi %p: %s: ssl_capable_read %d\n", __func__,
+			wsi, hint, ebuf->len);
+
+	if (!bns && /* only acknowledge error when we handled buflist content */
+	    n == LWS_SSL_CAPABLE_ERROR) {
+		lwsl_debug("%s: SSL_CAPABLE_ERROR\n", __func__);
 		return -1;
-	if (n) {
-		lwsl_debug("%s: added %p to rxflow list\n", __func__, wsi);
-		lws_dll2_add_head(&wsi->dll_buflist, &pt->dll_buflist_owner);
 	}
 
-	/* get the first buflist guy in line */
+	if (n <= 0 && bns)
+		/*
+		 * There wasn't anything to read yet, but there's something
+		 * on the buflist to give him
+		 */
+		goto buflist_material;
 
-get_from_buflist:
+	/* we read something */
 
-	ebuf->len = (int)lws_buflist_next_segment_len(&wsi->buflist,
-						      &ebuf->token);
+	if (fr && bns) {
+		/*
+		 * Stash what we read, since there's earlier buflist material
+		 */
 
-	return 1; /* came from buflist */
+		n = lws_buflist_append_segment(&wsi->buflist, ebuf->token, ebuf->len);
+		if (n < 0)
+			return -1;
+		if (n && lws_dll2_is_detached(&wsi->dll_buflist))
+			lws_dll2_add_head(&wsi->dll_buflist,
+					  &pt->dll_buflist_owner);
+
+		goto buflist_material;
+	}
+
+	/*
+	 * directly return what we read
+	 */
+
+	return 0;
+
+buflist_material:
+
+	ebuf->token = b;
+	if (e < bns)
+		/* restrict to e, if more than e available */
+		ebuf->len = e;
+	else
+		ebuf->len = bns;
+
+	return 1; /* from buflist */
 }
 
 int
-lws_buflist_aware_consume(struct lws *wsi, struct lws_tokens *ebuf, int used,
-			  int buffered)
+lws_buflist_aware_finished_consuming(struct lws *wsi, struct lws_tokens *ebuf,
+				     int used, int buffered, const char *hint)
 {
-	struct lws_context_per_thread *pt = &wsi->context->pt[(int)wsi->tsi];
+	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
 	int m;
+
+	//lwsl_debug("%s %s consuming buffered %d used %zu / %zu\n", __func__, hint,
+	//		buffered, (size_t)used, (size_t)ebuf->len);
+	// lws_buflist_describe(&wsi->buflist, wsi, __func__);
 
 	/* it's in the buflist; we didn't use any */
 
@@ -380,11 +463,13 @@ lws_buflist_aware_consume(struct lws *wsi, struct lws_tokens *ebuf, int used,
 		return 0;
 
 	if (used && buffered) {
-		m = lws_buflist_use_segment(&wsi->buflist, used);
-		lwsl_info("%s: draining rxflow: used %d, next %d\n",
-			    __func__, used, m);
-		if (m)
-			return 0;
+		if (wsi->buflist) {
+			m = (int)lws_buflist_use_segment(&wsi->buflist, (size_t)used);
+			// lwsl_notice("%s: used %d, next %d\n", __func__, used, m);
+			// lws_buflist_describe(&wsi->buflist, wsi, __func__);
+			if (m)
+				return 0;
+		}
 
 		lwsl_info("%s: removed %p from dll_buflist\n", __func__, wsi);
 		lws_dll2_remove(&wsi->dll_buflist);
@@ -395,6 +480,8 @@ lws_buflist_aware_consume(struct lws *wsi, struct lws_tokens *ebuf, int used,
 	/* any remainder goes on the buflist */
 
 	if (used != ebuf->len) {
+		// lwsl_notice("%s %s bac appending %d\n", __func__, hint,
+		//		ebuf->len - used);
 		m = lws_buflist_append_segment(&wsi->buflist,
 					       ebuf->token + used,
 					       ebuf->len - used);
@@ -403,9 +490,11 @@ lws_buflist_aware_consume(struct lws *wsi, struct lws_tokens *ebuf, int used,
 		if (m) {
 			lwsl_debug("%s: added %p to rxflow list\n",
 				   __func__, wsi);
-			lws_dll2_add_head(&wsi->dll_buflist,
+			if (lws_dll2_is_detached(&wsi->dll_buflist))
+				lws_dll2_add_head(&wsi->dll_buflist,
 					 &pt->dll_buflist_owner);
 		}
+		// lws_buflist_describe(&wsi->buflist, wsi, __func__);
 	}
 
 	return 0;
@@ -439,11 +528,15 @@ lws_service_do_ripe_rxflow(struct lws_context_per_thread *pt)
 			   (unsigned long)wsi->wsistate);
 
 		if (!lws_is_flowcontrolled(wsi) &&
-		    lwsi_state(wsi) != LRS_DEFERRING_ACTION &&
-		    (wsi->role_ops->handle_POLLIN)(pt, wsi, &pfd) ==
+		    lwsi_state(wsi) != LRS_DEFERRING_ACTION) {
+			pt->inside_lws_service = 1;
+
+			if ((wsi->role_ops->handle_POLLIN)(pt, wsi, &pfd) ==
 						   LWS_HPI_RET_PLEASE_CLOSE_ME)
-			lws_close_free_wsi(wsi, LWS_CLOSE_STATUS_NOSTATUS,
-					   "close_and_handled");
+				lws_close_free_wsi(wsi, LWS_CLOSE_STATUS_NOSTATUS,
+						"close_and_handled");
+			pt->inside_lws_service = 0;
+		}
 
 	} lws_end_foreach_dll_safe(d, d1);
 
@@ -459,8 +552,13 @@ lws_service_do_ripe_rxflow(struct lws_context_per_thread *pt)
 int
 lws_service_flag_pending(struct lws_context *context, int tsi)
 {
-	struct lws_context_per_thread *pt = &context->pt[tsi];
+	struct lws_context_per_thread *pt;
 	int forced = 0;
+
+	if (!context)
+		return 1;
+
+	pt = &context->pt[tsi];
 
 	lws_pt_lock(pt, __func__);
 
@@ -495,17 +593,19 @@ lws_service_flag_pending(struct lws_context *context, int tsi)
 		struct lws *wsi = lws_container_of(p, struct lws,
 						   tls.dll_pending_tls);
 
-		pt->fds[wsi->position_in_fds_table].revents |=
-			pt->fds[wsi->position_in_fds_table].events & LWS_POLLIN;
-		if (pt->fds[wsi->position_in_fds_table].revents & LWS_POLLIN) {
-			forced = 1;
-			/*
-			 * he's going to get serviced now, take him off the
-			 * list of guys with buffered SSL.  If he still has some
-			 * at the end of the service, he'll get put back on the
-			 * list then.
-			 */
-			__lws_ssl_remove_wsi_from_buffered_list(wsi);
+		if (wsi->position_in_fds_table >= 0) {
+
+			pt->fds[wsi->position_in_fds_table].revents |=
+				pt->fds[wsi->position_in_fds_table].events &
+								LWS_POLLIN;
+			if (pt->fds[wsi->position_in_fds_table].revents &
+								LWS_POLLIN)
+				/*
+				 * We're not going to remove the wsi from the
+				 * pending tls list.  The processing will have
+				 * to do it if he exhausts the pending tls.
+				 */
+				forced = 1;
 		}
 
 	} lws_end_foreach_dll_safe(p, p1);
@@ -516,15 +616,17 @@ lws_service_flag_pending(struct lws_context *context, int tsi)
 	return forced;
 }
 
-LWS_VISIBLE int
+int
 lws_service_fd_tsi(struct lws_context *context, struct lws_pollfd *pollfd,
 		   int tsi)
 {
-	struct lws_context_per_thread *pt = &context->pt[tsi];
+	struct lws_context_per_thread *pt;
 	struct lws *wsi;
 
-	if (!context || context->being_destroyed1 )
+	if (!context || context->being_destroyed1)
 		return -1;
+
+	pt = &context->pt[tsi];
 
 	if (!pollfd) {
 		/*
@@ -595,6 +697,7 @@ lws_service_fd_tsi(struct lws_context *context, struct lws_pollfd *pollfd,
 	}
 #endif
 	wsi->could_have_pending = 0; /* clear back-to-back write detection */
+	pt->inside_lws_service = 1;
 
 	/* okay, what we came here to do... */
 
@@ -606,6 +709,7 @@ lws_service_fd_tsi(struct lws_context *context, struct lws_pollfd *pollfd,
 
 	switch ((wsi->role_ops->handle_POLLIN)(pt, wsi, pollfd)) {
 	case LWS_HPI_RET_WSI_ALREADY_DIED:
+		pt->inside_lws_service = 0;
 		return 1;
 	case LWS_HPI_RET_HANDLED:
 		break;
@@ -630,6 +734,7 @@ close_and_handled:
 		 * we can't clear revents now because it'd be the wrong guy's
 		 * revents
 		 */
+		pt->inside_lws_service = 0;
 		return 1;
 	default:
 		assert(0);
@@ -638,31 +743,27 @@ close_and_handled:
 handled:
 #endif
 	pollfd->revents = 0;
-
-	if (!context->protocol_init_done)
-		if (lws_protocol_init(context)) {
-			lwsl_err("%s: lws_protocol_init failed\n", __func__);
-			return -1;
-		}
+	pt->inside_lws_service = 0;
 
 	return 0;
 }
 
-LWS_VISIBLE int
+int
 lws_service_fd(struct lws_context *context, struct lws_pollfd *pollfd)
 {
 	return lws_service_fd_tsi(context, pollfd, 0);
 }
 
-LWS_VISIBLE int
+int
 lws_service(struct lws_context *context, int timeout_ms)
 {
-	struct lws_context_per_thread *pt = &context->pt[0];
+	struct lws_context_per_thread *pt;
 	int n;
 
 	if (!context)
 		return 1;
 
+	pt = &context->pt[0];
 	pt->inside_service = 1;
 
 	if (context->event_loop_ops->run_pt) {
@@ -680,12 +781,16 @@ lws_service(struct lws_context *context, int timeout_ms)
 	return n;
 }
 
-LWS_VISIBLE int
+int
 lws_service_tsi(struct lws_context *context, int timeout_ms, int tsi)
 {
-	struct lws_context_per_thread *pt = &context->pt[tsi];
+	struct lws_context_per_thread *pt;
 	int n;
 
+	if (!context)
+		return 1;
+
+	pt = &context->pt[tsi];
 	pt->inside_service = 1;
 #if LWS_MAX_SMP > 1
 	pt->self = pthread_self();

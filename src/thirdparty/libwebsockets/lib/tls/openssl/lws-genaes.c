@@ -1,35 +1,40 @@
-/*
- * libwebsockets - generic AES api hiding the backend
+ /*
+ * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2017 - 2018 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  *
  *  lws_genaes provides an AES abstraction api in lws that works the
  *  same whether you are using openssl or mbedtls hash functions underneath.
  */
-#include "core/private.h"
-#include "../../jose/private.h"
+#include "private-lib-core.h"
+#if defined(LWS_WITH_JOSE)
+#include "private-lib-jose.h"
+#endif
 
 /*
  * Care: many openssl apis return 1 for success.  These are translated to the
  * lws convention of 0 for success.
  */
 
-LWS_VISIBLE int
+int
 lws_genaes_create(struct lws_genaes_ctx *ctx, enum enum_aes_operation op,
 		  enum enum_aes_modes mode, struct lws_gencrypto_keyelem *el,
 		  enum enum_aes_padding padding, void *engine)
@@ -231,11 +236,11 @@ bail:
 	return -1;
 }
 
-LWS_VISIBLE int
+int
 lws_genaes_destroy(struct lws_genaes_ctx *ctx, unsigned char *tag, size_t tlen)
 {
-	int outl = 0, n = 0;
 	uint8_t buf[256];
+	int outl = sizeof(buf), n = 0;
 
 	if (!ctx->ctx)
 		return 0;
@@ -258,7 +263,11 @@ lws_genaes_destroy(struct lws_genaes_ctx *ctx, unsigned char *tag, size_t tlen)
 					n = 1;
 				}
 			}
+			if (ctx->mode == LWS_GAESM_CBC)
+				memcpy(tag, buf, outl);
+
 			break;
+
 		case LWS_GAESO_DEC:
 			if (EVP_DecryptFinal_ex(ctx->ctx, buf, &outl) != 1) {
 				lwsl_err("%s: dec final failed\n", __func__);
@@ -279,7 +288,7 @@ lws_genaes_destroy(struct lws_genaes_ctx *ctx, unsigned char *tag, size_t tlen)
 	return n;
 }
 
-LWS_VISIBLE int
+int
 lws_genaes_crypt(struct lws_genaes_ctx *ctx,
 		 const uint8_t *in, size_t len, uint8_t *out,
 		 uint8_t *iv_or_nonce_ctr_or_data_unit_16,
@@ -293,7 +302,7 @@ lws_genaes_crypt(struct lws_genaes_ctx *ctx,
 
 		if (ctx->mode == LWS_GAESM_GCM) {
 			n = EVP_CIPHER_CTX_ctrl(ctx->ctx, EVP_CTRL_GCM_SET_IVLEN,
-					    *nc_or_iv_off, NULL);
+					   (int)*nc_or_iv_off, NULL);
 			if (n != 1) {
 				lwsl_err("%s: SET_IVLEN failed\n", __func__);
 				return -1;
@@ -337,10 +346,10 @@ lws_genaes_crypt(struct lws_genaes_ctx *ctx,
 
 		switch (ctx->op) {
 		case LWS_GAESO_ENC:
-			n = EVP_EncryptUpdate(ctx->ctx, NULL, &olen, in, len);
+			n = EVP_EncryptUpdate(ctx->ctx, NULL, &olen, in, (int)len);
 			break;
 		case LWS_GAESO_DEC:
-			n = EVP_DecryptUpdate(ctx->ctx, NULL, &olen, in, len);
+			n = EVP_DecryptUpdate(ctx->ctx, NULL, &olen, in, (int)len);
 			break;
 		default:
 			return -1;
@@ -357,10 +366,10 @@ lws_genaes_crypt(struct lws_genaes_ctx *ctx,
 
 	switch (ctx->op) {
 	case LWS_GAESO_ENC:
-		n = EVP_EncryptUpdate(ctx->ctx, out, &outl, in, len);
+		n = EVP_EncryptUpdate(ctx->ctx, out, &outl, in, (int)len);
 		break;
 	case LWS_GAESO_DEC:
-		n = EVP_DecryptUpdate(ctx->ctx, out, &outl, in, len);
+		n = EVP_DecryptUpdate(ctx->ctx, out, &outl, in, (int)len);
 		break;
 	default:
 		return -1;

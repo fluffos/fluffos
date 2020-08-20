@@ -1,24 +1,28 @@
 /*
- * libwebsockets - generic crypto hiding the backend - common parts
+ * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2017 - 2018 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
-#include "core/private.h"
+
+#include "private-lib-core.h"
 
 /*
  * These came from RFC7518 (JSON Web Algorithms) Section 3
@@ -234,6 +238,8 @@ static const struct lws_jose_jwe_alg lws_gencrypto_jws_alg_map[] = {
 		"PS512", NULL, 2048, 4096, 0
 	},
 #endif
+	/* list terminator */
+	{ 0, 0, 0, 0, NULL, NULL, 0, 0, 0}
 };
 
 /*
@@ -566,7 +572,7 @@ static const struct lws_jose_jwe_alg lws_gencrypto_jwe_enc_map[] = {
 	{ 0, 0, 0, 0, NULL, NULL, 0, 0, 0 } /* sentinel */
 };
 
-LWS_VISIBLE int
+int
 lws_gencrypto_jws_alg_to_definition(const char *alg,
 				    const struct lws_jose_jwe_alg **jose)
 {
@@ -584,7 +590,7 @@ lws_gencrypto_jws_alg_to_definition(const char *alg,
 	return 1;
 }
 
-LWS_VISIBLE int
+int
 lws_gencrypto_jwe_alg_to_definition(const char *alg,
 				    const struct lws_jose_jwe_alg **jose)
 {
@@ -602,7 +608,7 @@ lws_gencrypto_jwe_alg_to_definition(const char *alg,
 	return 1;
 }
 
-LWS_VISIBLE int
+int
 lws_gencrypto_jwe_enc_to_definition(const char *enc,
 				    const struct lws_jose_jwe_alg **jose)
 {
@@ -681,4 +687,9 @@ lws_gencrypto_destroy_elements(struct lws_gencrypto_keyelem *el, int m)
 	for (n = 0; n < m; n++)
 		if (el[n].buf)
 			lws_free_set_NULL(el[n].buf);
+}
+
+size_t lws_gencrypto_padded_length(size_t pad_block_size, size_t len)
+{
+	return (len / pad_block_size + 1) * pad_block_size;
 }

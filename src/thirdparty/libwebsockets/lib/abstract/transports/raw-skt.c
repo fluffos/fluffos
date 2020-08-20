@@ -1,26 +1,29 @@
 /*
- * libwebsockets lib/abstract/transports/raw-skt.c
+ * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-#include "core/private.h"
-#include "abstract/private.h"
+#include "private-lib-core.h"
+#include "private-lib-abstract.h"
 
 typedef struct lws_abstxp_raw_skt_priv {
 	struct lws_abs *abs;
@@ -210,7 +213,7 @@ lws_atcrs_tx(lws_abs_transport_inst_t *ati, uint8_t *buf, size_t len)
 	return 0;
 }
 
-#if !defined(LWS_WITHOUT_CLIENT)
+#if defined(LWS_WITH_CLIENT)
 static int
 lws_atcrs_client_conn(const lws_abs_t *abs)
 {
@@ -270,6 +273,16 @@ lws_atcrs_client_conn(const lws_abs_t *abs)
 	i.seq = abs->seq;
 	i.opaque_user_data = abs->opaque_user_data;
 
+	/*
+	 * the protocol itself has some natural attributes we should pass on
+	 */
+
+	if (abs->ap->flags & LWS_AP_FLAG_PIPELINE_TRANSACTIONS)
+		i.ssl_connection |= LCCSCF_PIPELINE;
+
+	if (abs->ap->flags & LWS_AP_FLAG_MUXABLE_STREAM)
+		i.ssl_connection |= LCCSCF_MUXABLE_STREAM;
+
 	priv->wsi = lws_client_connect_via_info(&i);
 	if (!priv->wsi)
 		return 1;
@@ -308,9 +321,9 @@ static void
 lws_atcrs_destroy(lws_abs_transport_inst_t **pati)
 {
 	/*
-	 * We don't free anything because the abstract layer combined our
-	 * allocation with that of the instance, and it will free the whole
-	 * thing after this.
+	 * For ourselves, we don't free anything because the abstract layer
+	 * combined our allocation with that of the abs instance, and it will
+	 * free the whole thing after this.
 	 */
 	*pati = NULL;
 }
@@ -336,15 +349,54 @@ lws_atcrs_state(lws_abs_transport_inst_t *ati)
 	return 1;
 }
 
+static int
+lws_atcrs_compare(lws_abs_t *abs1, lws_abs_t *abs2)
+{
+	const lws_token_map_t *tm1, *tm2;
+
+	tm1 = lws_abs_get_token(abs1->at_tokens, LTMI_PEER_V_DNS_ADDRESS);
+	tm2 = lws_abs_get_token(abs2->at_tokens, LTMI_PEER_V_DNS_ADDRESS);
+
+	/* Address token is mandatory and must match */
+	if (!tm1 || !tm2 || strcmp(tm1->u.value, tm2->u.value))
+		return 1;
+
+	/* Port token is mandatory and must match */
+	tm1 = lws_abs_get_token(abs1->at_tokens, LTMI_PEER_LV_PORT);
+	tm2 = lws_abs_get_token(abs2->at_tokens, LTMI_PEER_LV_PORT);
+	if (!tm1 || !tm2 || tm1->u.lvalue != tm2->u.lvalue)
+		return 1;
+
+	/* TLS is optional... */
+	tm1 = lws_abs_get_token(abs1->at_tokens, LTMI_PEER_LV_TLS_FLAGS);
+	tm2 = lws_abs_get_token(abs2->at_tokens, LTMI_PEER_LV_TLS_FLAGS);
+
+	/* ... but both must have the same situation with it given or not... */
+	if (!!tm1 != !!tm2)
+		return 1;
+
+	/* if not using TLS, then that's enough to call it */
+	if (!tm1)
+		return 0;
+
+	/* ...and if there are tls flags, both must have the same tls flags */
+	if (tm1->u.lvalue != tm2->u.lvalue)
+		return 1;
+
+	/* ... and both must use the same client tls ctx / vhost */
+	return abs1->vh != abs2->vh;
+}
+
 const lws_abs_transport_t lws_abs_transport_cli_raw_skt = {
 	.name			= "raw_skt",
 	.alloc			= sizeof(abs_raw_skt_priv_t),
 
 	.create			= lws_atcrs_create,
 	.destroy		= lws_atcrs_destroy,
+	.compare		= lws_atcrs_compare,
 
 	.tx			= lws_atcrs_tx,
-#if defined(LWS_WITHOUT_CLIENT)
+#if !defined(LWS_WITH_CLIENT)
 	.client_conn		= NULL,
 #else
 	.client_conn		= lws_atcrs_client_conn,

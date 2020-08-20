@@ -324,7 +324,7 @@ main(int argc, const char **argv)
 	int n = 1, logs = LLL_USER | LLL_ERR | LLL_WARN | LLL_NOTICE;
 	struct lws_context_creation_info info;
 	struct lws_context *context;
-	lws_seq_t *seq;
+	struct lws_sequencer *seq;
 	struct lws_vhost *vh;
 	lws_seq_info_t i;
 	struct myseq *s;
@@ -346,7 +346,7 @@ main(int argc, const char **argv)
 		       LWS_SERVER_OPTION_EXPLICIT_VHOSTS;
 	info.protocols = protocols;
 
-#if defined(LWS_WITH_MBEDTLS)
+#if defined(LWS_WITH_MBEDTLS) || defined(USE_WOLFSSL)
 	/*
 	 * OpenSSL uses the system trust store.  mbedTLS has to be told which
 	 * CA to trust explicitly.

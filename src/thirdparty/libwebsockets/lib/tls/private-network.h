@@ -1,24 +1,27 @@
-/*
+ /*
  * libwebsockets - small server side websockets and web server implementation
  *
  * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  *
- *  This is included from core/private.h if LWS_WITH_TLS
+ *  This is included from private-lib-core.h if LWS_WITH_TLS
  */
 
 struct lws_context_per_thread;
@@ -84,7 +87,8 @@ lws_ssl_capable_write(struct lws *wsi, unsigned char *buf, int len);
 LWS_EXTERN int LWS_WARN_UNUSED_RESULT
 lws_ssl_pending(struct lws *wsi);
 LWS_EXTERN int LWS_WARN_UNUSED_RESULT
-lws_server_socket_service_ssl(struct lws *new_wsi, lws_sockfd_type accept_fd);
+lws_server_socket_service_ssl(struct lws *new_wsi, lws_sockfd_type accept_fd,
+				char is_pollin);
 LWS_EXTERN int
 lws_ssl_close(struct lws *wsi);
 LWS_EXTERN void
@@ -98,7 +102,7 @@ lws_ssl_remove_wsi_from_buffered_list(struct lws *wsi);
 LWS_EXTERN int
 lws_ssl_client_bio_create(struct lws *wsi);
 LWS_EXTERN int
-lws_ssl_client_connect1(struct lws *wsi);
+lws_ssl_client_connect1(struct lws *wsi, char *errbuf, int len);
 LWS_EXTERN int
 lws_ssl_client_connect2(struct lws *wsi, char *errbuf, int len);
 LWS_EXTERN int
@@ -118,7 +122,7 @@ lws_tls_server_certs_load(struct lws_vhost *vhost, struct lws *wsi,
 LWS_EXTERN enum lws_tls_extant
 lws_tls_generic_cert_checks(struct lws_vhost *vhost, const char *cert,
 			    const char *private_key);
-#if !defined(LWS_NO_SERVER)
+#if defined(LWS_WITH_SERVER)
  LWS_EXTERN int
  lws_context_init_server_ssl(const struct lws_context_creation_info *info,
 			     struct lws_vhost *vhost);
@@ -154,7 +158,7 @@ LWS_EXTERN enum lws_ssl_capable_status
 __lws_tls_shutdown(struct lws *wsi);
 
 LWS_EXTERN enum lws_ssl_capable_status
-lws_tls_client_connect(struct lws *wsi);
+lws_tls_client_connect(struct lws *wsi, char *errbuf, int len);
 LWS_EXTERN int
 lws_tls_client_confirm_peer_cert(struct lws *wsi, char *ebuf, int ebuf_len);
 LWS_EXTERN int
@@ -167,7 +171,10 @@ lws_tls_client_create_vhost_context(struct lws_vhost *vh,
 			    const char *cert_filepath,
 			    const void *cert_mem,
 			    unsigned int cert_mem_len,
-			    const char *private_key_filepath);
+			    const char *private_key_filepath,
+			    const void *key_mem,
+			    unsigned int key_mem_len);
+
 
 LWS_EXTERN lws_tls_ctx *
 lws_tls_ctx_from_wsi(struct lws *wsi);
@@ -183,8 +190,3 @@ lws_ssl_info_callback(const lws_tls_conn *ssl, int where, int ret);
 
 int
 lws_tls_fake_POLLIN_for_buffered(struct lws_context_per_thread *pt);
-
-
-
-
-

@@ -1,24 +1,25 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2018 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
- *
- * included from libwebsockets.h
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
 /** \defgroup callback-when-writeable Callback when writeable
@@ -222,4 +223,24 @@ lws_get_socket_fd(struct lws *wsi);
  */
 LWS_VISIBLE LWS_EXTERN lws_fileofs_t
 lws_get_peer_write_allowance(struct lws *wsi);
+
+/**
+ * lws_wsi_tx_credit() - get / set generic tx credit if role supports it
+ *
+ * \param wsi: connection to set / get tx credit on
+ * \param peer_to_us: 0 = set / get us-to-peer direction, else peer-to-us
+ * \param add: amount of credit to add
+ *
+ * If the wsi does not support tx credit, returns 0.
+ *
+ * If add is zero, returns one of the wsi tx credit values for the wsi.
+ * If add is nonzero, \p add is added to the selected tx credit value
+ * for the wsi.
+ */
+#define LWSTXCR_US_TO_PEER 0
+#define LWSTXCR_PEER_TO_US 1
+
+LWS_VISIBLE LWS_EXTERN int
+lws_wsi_tx_credit(struct lws *wsi, char peer_to_us, int add);
+
 ///@}
