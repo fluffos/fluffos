@@ -623,6 +623,9 @@ title: EFUN
 </div>
 <div class='row'>
 <div class='col-sm-3'>
+<div><a href='interactive/telnet_nop.html'>telnet_nop</a></div>
+</div>
+<div class='col-sm-3'>
 <div><a href='interactive/this_interactive.html'>this_interactive</a></div>
 </div>
 <div class='col-sm-3'>
@@ -631,15 +634,14 @@ title: EFUN
 <div class='col-sm-3'>
 <div><a href='interactive/userp.html'>userp</a></div>
 </div>
-<div class='col-sm-3'>
-<div><a href='interactive/users.html'>users</a></div>
-</div>
 </div>
 <div class='row'>
 <div class='col-sm-3'>
+<div><a href='interactive/users.html'>users</a></div>
+</div>
+<div class='col-sm-3'>
 <div><a href='interactive/write.html'>write</a></div>
 </div>
-<div>&nbsp;</div>
 <div>&nbsp;</div>
 <div>&nbsp;</div>
 </div>
@@ -1231,6 +1233,6 @@ title: EFUN
 
 
 
-This page is auto generated on 2020-07-22 23:49:38 PDT for [0dc4d222](https://github.com/fluffos/fluffos/tree/0dc4d222).
+This page is auto generated on 2020-08-19 18:53:40 PDT for [b2c0ff45](https://github.com/fluffos/fluffos/tree/b2c0ff45).
 
 
