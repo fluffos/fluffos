@@ -1,24 +1,25 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2018 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
- *
- * included from libwebsockets.h
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
 /*! \defgroup jws JSON Web Signature
@@ -397,8 +398,162 @@ lws_jws_base64_enc(const char *in, size_t in_len, char *out, size_t out_max);
  * Returns either -1 if problems, or the number of bytes written to \p out.
  * If the section is not the first one, '.' is prepended.
  */
-
 LWS_VISIBLE LWS_EXTERN int
 lws_jws_encode_section(const char *in, size_t in_len, int first, char **p,
 		       char *end);
+
+/**
+ * lws_jwt_signed_validate() - check a compact JWT against a key and alg
+ *
+ * \param ctx: the lws_context
+ * \param jwk: the key for checking the signature
+ * \param alg_list: the expected alg name, like "ES512"
+ * \param com: the compact JWT
+ * \param len: the length of com
+ * \param temp: a temp scratchpad
+ * \param tl: available length of temp scratchpad
+ * \param out: the output buffer to hold the validated plaintext
+ * \param out_len: on entry, max length of out; on exit, used length of out
+ *
+ * Returns nonzero if the JWT cannot be validated or the plaintext can't fit the
+ * provided output buffer, or 0 if it is validated as being signed by the
+ * provided jwk.
+ *
+ * If validated, the plaintext in the JWT is copied into out and out_len set to
+ * the used length.
+ *
+ * temp can be discarded or reused after the call returned, it's used to hold
+ * transformations of the B64 JWS in the JWT.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_jwt_signed_validate(struct lws_context *ctx, struct lws_jwk *jwk,
+			const char *alg_list, const char *com, size_t len,
+			char *temp, int tl, char *out, size_t *out_len);
+
+/**
+ * lws_jwt_sign_compact() - generate a compact JWT using a key and alg
+ *
+ * \param ctx: the lws_context
+ * \param jwk: the signing key
+ * \param alg: the signing alg name, like "ES512"
+ * \param out: the output buffer to hold the signed JWT in compact form
+ * \param out_len: on entry, the length of out; on exit, the used amount of out
+ * \param temp: a temp scratchpad
+ * \param tl: available length of temp scratchpad
+ * \param format: a printf style format specification
+ * \param ...: zero or more args for the format specification
+ *
+ * Creates a JWT in a single step, from the format string and args through to
+ * outputting a well-formed compact JWT representation in out.
+ *
+ * Returns 0 if all is well and *out_len is the amount of data in out, else
+ * nonzero if failed.  Temp must be large enough to hold various intermediate
+ * representations.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_jwt_sign_compact(struct lws_context *ctx, struct lws_jwk *jwk,
+		     const char *alg, char *out, size_t *out_len, char *temp,
+		     int tl, const char *format, ...) LWS_FORMAT(8);
+
+/**
+ * lws_jwt_token_sanity() - check a validated jwt payload for sanity
+ *
+ * \param in: the JWT payload
+ * \param in_len: the length of the JWT payload
+ * \param iss: the expected issuer of the token
+ * \param aud: the expected audience of the token
+ * \param csrf_in: NULL, or the csrf token that came in on a URL
+ * \param sub: a buffer to hold the subject name in the JWT (eg, account name)
+ * \param sub_len: the max length of the sub buffer
+ * \param secs_left: set to the number of seconds of valid auth left if valid
+ *
+ * This performs some generic sanity tests on validated JWT payload...
+ *
+ *  - the issuer is as expected
+ *  - the audience is us
+ *  - current time is OK for nbf ("not before") in the token
+ *  - current time is OK for exp ("expiry") in the token
+ *  - if csrf_in is not NULL, that the JWK has a csrf and it matches it
+ *  - if sub is not NULL, that the JWK provides a subject (and copies it to sub)
+ *
+ * If the tests pass, *secs_left is set to the number of remaining seconds the
+ * auth is valid.
+ *
+ * Returns 0 if no inconsistency, else nonzero.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_jwt_token_sanity(const char *in, size_t in_len,
+		     const char *iss, const char *aud, const char *csrf_in,
+		     char *sub, size_t sub_len, unsigned long *exp_unix_time);
+
+#if defined(LWS_ROLE_H1) || defined(LWS_ROLE_H2)
+
+struct lws_jwt_sign_set_cookie {
+	struct lws_jwk			*jwk;
+	/**< entry: required signing key */
+	const char			*alg;
+	/**< entry: required signing alg, eg, "ES512" */
+	const char 			*iss;
+	/**< entry: issuer name to use */
+	const char			*aud;
+	/**< entry: audience */
+	const char			*cookie_name;
+	/**< entry: the name of the cookie */
+	char				sub[33];
+	/**< sign-entry, validate-exit: subject */
+	const char			*extra_json;
+	/**< sign-entry, validate-exit:
+	 * optional "ext" JSON object contents for the JWT */
+	size_t				extra_json_len;
+	/**< validate-exit:
+	 * length of optional "ext" JSON object contents for the JWT */
+	const char			*csrf_in;
+	/**< validate-entry:
+	 * NULL, or an external CSRF token to check against what is in the JWT */
+	unsigned long			expiry_unix_time;
+	/**< sign-entry: seconds the JWT and cookie may live,
+	 * validate-exit: expiry unix time */
+};
+
+/**
+ * lws_jwt_sign_token_set_cookie() - creates sets a JWT in a wsi cookie
+ *
+ * \param wsi: the wsi to create the cookie header on
+ * \param i: structure describing what should be in the JWT
+ * \param p: wsi headers area
+ * \param end: end of wsi headers area
+ *
+ * Creates a JWT specified \p i, and attaches it to the outgoing headers on
+ * wsi.  Returns 0 if successful.
+ *
+ * Best-practice security restrictions are applied to the cookie set action,
+ * including forcing httponly, and __Host- prefix.  As required by __Host-, the
+ * cookie Path is set to /.  __Host- is applied by the function, the cookie_name
+ * should just be "xyz" for "__Host-xyz".
+ *
+ * \p extra_json should just be the bare JSON, a { } is provided around it by
+ * the function if it's non-NULL.  For example, "\"authorization\": 1".
+ *
+ * It's recommended the secs parameter is kept as small as consistent with one
+ * user session on the site if possible, eg, 10 minutes or 20 minutes.  At the
+ * server, it can determine how much time is left in the auth and inform the
+ * client; if the JWT validity expires, the page should reload so the UI always
+ * reflects what's possible to do with the authorization state correctly.  If
+ * the JWT expires, the user can log back in using credentials usually stored in
+ * the browser and auto-filled-in, so this is not very inconvenient.
+ *
+ * This is a helper on top of the other JOSE and JWT apis that somewhat crosses
+ * over between JWT and HTTP, since it knows about cookies.  So it is only built
+ * if both LWS_WITH_JOSE and one of the http-related roles enabled.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_jwt_sign_token_set_http_cookie(struct lws *wsi,
+				   const struct lws_jwt_sign_set_cookie *i,
+				   uint8_t **p, uint8_t *end);
+LWS_VISIBLE LWS_EXTERN int
+lws_jwt_get_http_cookie_validate_jwt(struct lws *wsi,
+				     struct lws_jwt_sign_set_cookie *i,
+				     char *out, size_t *out_len);
+#endif
+
 ///@}

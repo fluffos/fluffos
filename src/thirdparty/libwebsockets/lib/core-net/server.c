@@ -1,25 +1,28 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-#include "core/private.h"
+#include "private-lib-core.h"
 
 #if defined(LWS_WITH_SERVER_STATUS)
 
@@ -45,7 +48,7 @@ lws_sum_stats(const struct lws_context *ctx, struct lws_conn_stats *cs)
 	}
 }
 
-LWS_EXTERN int
+int
 lws_json_dump_vhost(const struct lws_vhost *vh, char *buf, int len)
 {
 #if defined(LWS_ROLE_H1) || defined(LWS_ROLE_H2)
@@ -59,8 +62,8 @@ lws_json_dump_vhost(const struct lws_vhost *vh, char *buf, int len)
 		"callback://"
 	};
 #endif
-	char *orig = buf, *end = buf + len - 1, first = 1;
-	int n = 0;
+	char *orig = buf, *end = buf + len - 1, first;
+	int n;
 
 	if (len < 100)
 		return 0;
@@ -103,6 +106,7 @@ lws_json_dump_vhost(const struct lws_vhost *vh, char *buf, int len)
 		const struct lws_http_mount *m = vh->http.mount_list;
 
 		buf += lws_snprintf(buf, end - buf, ",\n \"mounts\":[");
+		first = 1;
 		while (m) {
 			if (!first)
 				buf += lws_snprintf(buf, end - buf, ",");
@@ -157,7 +161,7 @@ lws_json_dump_vhost(const struct lws_vhost *vh, char *buf, int len)
 }
 
 
-LWS_EXTERN LWS_VISIBLE int
+int
 lws_json_dump_context(const struct lws_context *context, char *buf, int len,
 		int hide_vhosts)
 {
@@ -182,6 +186,9 @@ lws_json_dump_context(const struct lws_context *context, char *buf, int len,
 			    (long)d);
 
 #ifdef LWS_HAVE_GETLOADAVG
+#if defined(__sun)
+#include <sys/loadavg.h>
+#endif
 	{
 		double d[3];
 		int m;
@@ -203,7 +210,7 @@ lws_json_dump_context(const struct lws_context *context, char *buf, int len,
 			contents[n] = '\0';
 			if (contents[n - 1] == '\n')
 				contents[--n] = '\0';
-			lws_json_purify(pure, contents, sizeof(pure));
+			lws_json_purify(pure, contents, sizeof(pure), NULL);
 
 			buf += lws_snprintf(buf, end - buf,
 					  "\"statm\": \"%s\",\n", pure);
@@ -221,7 +228,8 @@ lws_json_dump_context(const struct lws_context *context, char *buf, int len,
 				"\"ah_pool_max\":\"%d\",\n"
 				"\"deprecated\":\"%d\",\n"
 				"\"wsi_alive\":\"%d\",\n",
-				(unsigned long long)(lws_now_usecs() - context->time_up),
+				(unsigned long long)(lws_now_usecs() - context->time_up) /
+					LWS_US_PER_SEC,
 				context->count_cgi_spawned,
 				context->fd_limit_per_thread,
 				context->max_http_header_pool,

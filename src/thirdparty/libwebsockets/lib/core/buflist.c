@@ -1,25 +1,28 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-#include "core/private.h"
+#include "private-lib-core.h"
 
 #ifdef LWS_HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -56,7 +59,8 @@ lws_buflist_append_segment(struct lws_buflist **head, const uint8_t *buf,
 	lwsl_info("%s: len %u first %d %p\n", __func__, (unsigned int)len,
 					      first, p);
 
-	nbuf = (struct lws_buflist *)lws_malloc(sizeof(**head) + len, __func__);
+	nbuf = (struct lws_buflist *)lws_malloc(sizeof(struct lws_buflist) +
+						len + LWS_PRE + 1, __func__);
 	if (!nbuf) {
 		lwsl_err("%s: OOM\n", __func__);
 		return -1;
@@ -66,7 +70,8 @@ lws_buflist_append_segment(struct lws_buflist **head, const uint8_t *buf,
 	nbuf->pos = 0;
 	nbuf->next = NULL;
 
-	p = (void *)nbuf->buf;
+	/* whoever consumes this might need LWS_PRE from the start... */
+	p = (uint8_t *)nbuf + sizeof(*nbuf) + LWS_PRE;
 	memcpy(p, buf, len);
 
 	*head = nbuf;
@@ -82,6 +87,7 @@ lws_buflist_destroy_segment(struct lws_buflist **head)
 	assert(*head);
 	*head = old->next;
 	old->next = NULL;
+	old->pos = old->len = 0;
 	lws_free(old);
 
 	return !*head; /* returns 1 if last segment just destroyed */
@@ -105,59 +111,105 @@ lws_buflist_destroy_all_segments(struct lws_buflist **head)
 size_t
 lws_buflist_next_segment_len(struct lws_buflist **head, uint8_t **buf)
 {
-	if (!*head) {
-		if (buf)
-			*buf = NULL;
-
-		return 0;
-	}
-
-	if (!(*head)->len && (*head)->next)
-		lws_buflist_destroy_segment(head);
-
-	if (!*head) {
-		if (buf)
-			*buf = NULL;
-
-		return 0;
-	}
-
-	assert((*head)->pos < (*head)->len);
+	struct lws_buflist *b = (*head);
 
 	if (buf)
-		*buf = (*head)->buf + (*head)->pos;
+		*buf = NULL;
 
-	return (*head)->len - (*head)->pos;
+	if (!b)
+		return 0;	/* there is no next segment len */
+
+	if (!b->len && b->next)
+		if (lws_buflist_destroy_segment(head))
+			return 0;
+
+	b = (*head);
+	if (!b)
+		return 0;	/* there is no next segment len */
+
+	assert(b->pos < b->len);
+
+	if (buf)
+		*buf = ((uint8_t *)b) + sizeof(*b) + b->pos + LWS_PRE;
+
+	return b->len - b->pos;
+}
+
+size_t
+lws_buflist_use_segment(struct lws_buflist **head, size_t len)
+{
+	struct lws_buflist *b = (*head);
+
+	assert(b);
+	assert(len);
+	assert(b->pos + len <= b->len);
+
+	b->pos = b->pos + (size_t)len;
+
+	assert(b->pos <= b->len);
+
+	if (b->pos < b->len)
+		return (int)(b->len - b->pos);
+
+	if (lws_buflist_destroy_segment(head))
+		/* last segment was just destroyed */
+		return 0;
+
+	return lws_buflist_next_segment_len(head, NULL);
+}
+
+size_t
+lws_buflist_total_len(struct lws_buflist **head)
+{
+	struct lws_buflist *p = *head;
+	size_t size = 0;
+
+	while (p) {
+		size += p->len;
+		p = p->next;
+	}
+
+	return size;
 }
 
 int
-lws_buflist_use_segment(struct lws_buflist **head, size_t len)
+lws_buflist_linear_copy(struct lws_buflist **head, size_t ofs, uint8_t *buf,
+			size_t len)
 {
-	assert(*head);
-	assert(len);
-	assert((*head)->pos + len <= (*head)->len);
+	struct lws_buflist *p = *head;
+	uint8_t *obuf = buf;
+	size_t s;
 
-	(*head)->pos += len;
-	if ((*head)->pos == (*head)->len)
-		lws_buflist_destroy_segment(head);
+	while (p && len) {
+		if (ofs < p->len) {
+			s = p->len - ofs;
+			if (s > len)
+				s = len;
+			memcpy(buf, ((uint8_t *)&p[1]) + LWS_PRE + ofs, s);
+			len -= s;
+			buf += s;
+			ofs = 0;
+		} else
+			ofs -= p->len;
+		p = p->next;
+	}
 
-	if (!*head)
-		return 0;
-
-	return (int)((*head)->len - (*head)->pos);
+	return lws_ptr_diff(buf, obuf);
 }
 
+#if defined(_DEBUG)
 void
-lws_buflist_describe(struct lws_buflist **head, void *id)
+lws_buflist_describe(struct lws_buflist **head, void *id, const char *reason)
 {
 	struct lws_buflist *old;
 	int n = 0;
 
 	if (*head == NULL)
-		lwsl_notice("%p: buflist empty\n", id);
+		lwsl_notice("%p: %s: buflist empty\n", id, reason);
 
 	while (*head) {
-		lwsl_notice("%p: %d: %llu / %llu (%llu left)\n", id, n,
+		lwsl_notice("%p: %s: %d: %llu / %llu (%llu left)\n", id,
+			    reason, n,
 			    (unsigned long long)(*head)->pos,
 			    (unsigned long long)(*head)->len,
 			    (unsigned long long)(*head)->len - (*head)->pos);
@@ -170,3 +222,4 @@ lws_buflist_describe(struct lws_buflist **head, void *id)
 		n++;
 	}
 }
+#endif

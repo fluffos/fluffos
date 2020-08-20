@@ -18,14 +18,18 @@
 
 /* mbedtls include */
 #include "mbedtls/platform.h"
+#if defined(LWS_HAVE_MBEDTLS_NET_SOCKETS)
 #include "mbedtls/net_sockets.h"
+#else
+#include "mbedtls/net.h"
+#endif
 #include "mbedtls/debug.h"
 #include "mbedtls/entropy.h"
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/error.h"
 #include "mbedtls/certs.h"
 
-#include "core/private.h"
+#include "private-lib-core.h"
 
 #define X509_INFO_STRING_LENGTH 8192
 
@@ -62,6 +66,7 @@ struct pkey_pm
 };
 
 unsigned int max_content_len;
+
 
 /*********************************************************************************************/
 /************************************ SSL arch interface *************************************/
@@ -181,7 +186,9 @@ int ssl_pm_new(SSL *ssl)
         goto mbedtls_err2;
     }
 
-    mbedtls_ssl_set_bio(&ssl_pm->ssl, &ssl_pm->fd, mbedtls_net_send, mbedtls_net_recv, NULL);
+    mbedtls_ssl_set_bio(&ssl_pm->ssl, &ssl_pm->fd,
+		        lws_plat_mbedtls_net_send,
+			lws_plat_mbedtls_net_recv, NULL);
 
     ssl->ssl_pm = ssl_pm;
 
@@ -544,6 +551,7 @@ OSSL_HANDSHAKE_STATE ssl_pm_get_state(const SSL *ssl)
 
 int x509_pm_show_info(X509 *x)
 {
+#if 0
     int ret;
     char *buf;
     mbedtls_x509_crt *x509_crt;
@@ -583,6 +591,9 @@ mbedtls_err1:
     ssl_mem_free(buf);
 no_mem:
     return -1;
+#else
+    return 0;
+#endif
 }
 
 int x509_pm_new(X509 *x, X509 *m_x)

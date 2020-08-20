@@ -1,12 +1,26 @@
 /* lws-fts.js - JS supporting lws fulltext search
  *
- * Copyright (C) 2018 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
+
 
 (function() {
 	
@@ -14,8 +28,8 @@
 	
 	function san(s)
 	{
-		s.replace("<", "!");
-		s.replace("%", "!");
+		s.replace(/</g, "!");
+		s.replace(/%/g, "!");
 		
 		return s;
 	}
@@ -32,16 +46,12 @@
 		};
 
 		xhr.onload = function(e) {	
-			var jj, n, m, s = "", x, lic = 0, hl, re;
+			var jj, n, m, s = "", lic = 0;
 			var sr = document.getElementById("searchresults");
-			var ac = document.getElementById("acomplete");
 			var inp = document.getElementById("lws_fts");
 			sr.style.width = (parseInt(sr.parentNode.offsetWidth, 10) - 88) + "px";
 			sr.style.opacity = "1";
 			inp.blur();
-			
-			hl = document.getElementById("lws_fts").value;
-			re = new RegExp(hl, "gi");
 			
 			// console.log(xhr.responseText);
 			jj = JSON.parse(xhr.responseText);
@@ -49,7 +59,6 @@
 			if (jj.fp) {
 				lic = jj.fp.length;						
 				for (n = 0; n < lic; n++) {
-					var q;
 					
 					s += "<div class='filepath'>" + jj.fp[n].path + "</div>";
 					
@@ -115,7 +124,7 @@
 			xhr.setRequestHeader("cache-control", "max-age=0");
 		};
 		xhr.onload = function(e) {
-			var jj, n, s = "", x, lic = 0;
+			var jj, n, s = "", lic = 0;
 			var inp = document.getElementById("lws_fts");
 			var ac = document.getElementById("acomplete");
 			

@@ -20,7 +20,7 @@
 struct expected {
 	lws_tokenize_elem e;
 	const char *value;
-	int len;
+	size_t len;
 };
 
 struct tests {
@@ -169,8 +169,11 @@ struct expected expected1[] = {
 		{ LWS_TOKZE_TOKEN_NAME_EQUALS, "a", 1 },
 		{ LWS_TOKZE_TOKEN, "5", 1 },
 		{ LWS_TOKZE_ENDED, "", 0 },
+	},
+	expected17[] = {
+		{ LWS_TOKZE_TOKEN, "hello", 5 },
+		{ LWS_TOKZE_ENDED, "", 0 },
 	}
-
 ;
 
 struct tests tests[] = {
@@ -247,6 +250,10 @@ struct tests tests[] = {
 		"a=5", expected16, LWS_ARRAY_SIZE(expected16),
 		LWS_TOKENIZE_F_NO_INTEGERS
 	},
+	{
+		"# comment1\r\nhello #comment2\r\n#comment3", expected17,
+		LWS_ARRAY_SIZE(expected17), LWS_TOKENIZE_F_HASH_COMMENT
+	}
 };
 
 /*
@@ -270,6 +277,41 @@ static const char *element_names[] = {
 	"LWS_TOKZE_QUOTED_STRING",
 };
 
+
+int
+exp_cb1(void *priv, const char *name, char *out, size_t *pos, size_t olen,
+	size_t *exp_ofs)
+{
+	const char *replace = NULL;
+	size_t total, budget;
+
+	if (!strcmp(name, "test")) {
+		replace = "replacement_string";
+		total = strlen(replace);
+		goto expand;
+	}
+
+	return LSTRX_FATAL_NAME_UNKNOWN;
+
+expand:
+	budget = olen - *pos;
+	total -= *exp_ofs;
+	if (total < budget)
+		budget = total;
+
+	if (out)
+		memcpy(out + *pos, replace + (*exp_ofs), budget);
+	*exp_ofs += budget;
+	*pos += budget;
+
+	if (budget == total)
+		return LSTRX_DONE;
+
+	return LSTRX_FILLED_OUT;
+}
+
+static const char *exp_inp1 = "this-is-a-${test}-for-strexp";
+
 int main(int argc, const char **argv)
 {
 	struct lws_tokenize ts;
@@ -283,6 +325,7 @@ int main(int argc, const char **argv)
 			/* | LLL_EXT */ /* | LLL_CLIENT */ /* | LLL_LATENCY */
 			/* | LLL_DEBUG */;
 	int fail = 0, ok = 0, flags = 0;
+	char dotstar[512];
 
 	if ((p = lws_cmdline_option(argc, argv, "-d")))
 		logs = atoi(p);
@@ -293,12 +336,162 @@ int main(int argc, const char **argv)
 	if ((p = lws_cmdline_option(argc, argv, "-f")))
 		flags = atoi(p);
 
+	/* lws_strexp */
+
+	{
+		size_t in_len, used_in, used_out;
+		lws_strexp_t exp;
+		char obuf[128];
+		const char *p;
+
+		obuf[0] = '\0';
+		lws_strexp_init(&exp, NULL, exp_cb1, obuf, sizeof(obuf));
+		n = lws_strexp_expand(&exp, exp_inp1, 28, &used_in, &used_out);
+		if (n != LSTRX_DONE || used_in != 28 ||
+		    strcmp(obuf, "this-is-a-replacement_string-for-strexp")) {
+			lwsl_notice("%s: obuf %s\n", __func__, obuf);
+			lwsl_err("%s: lws_strexp test 1 failed: %d\n", __func__, n);
+
+			return 1;
+		}
+
+		/* as above, but don't generate output, just find the length */
+
+		lws_strexp_init(&exp, NULL, exp_cb1, NULL, (size_t)-1);
+		n = lws_strexp_expand(&exp, exp_inp1, 28, &used_in, &used_out);
+		if (n != LSTRX_DONE || used_in != 28 || used_out != 39) {
+			lwsl_err("%s: lws_strexp test 2 failed: %d, used_out: %d\n",
+					__func__, n, (int)used_out);
+
+			return 1;
+		}
+
+		p = exp_inp1;
+		in_len = strlen(p);
+		memset(obuf, 0, sizeof(obuf));
+		lws_strexp_init(&exp, NULL, exp_cb1, obuf, 16);
+		n = lws_strexp_expand(&exp, p, in_len, &used_in, &used_out);
+		if (n != LSTRX_FILLED_OUT || used_in != 16 || used_out != 16) {
+			lwsl_err("a\n");
+			return 1;
+		}
+
+		p += used_in;
+		in_len -= used_in;
+
+		memset(obuf, 0, sizeof(obuf));
+		lws_strexp_reset_out(&exp, obuf, 16);
+
+		n = lws_strexp_expand(&exp, p, in_len, &used_in, &used_out);
+		if (n != LSTRX_FILLED_OUT || used_in != 5 || used_out != 16) {
+			lwsl_err("b: n %d, used_in %d, used_out %d\n", n,
+					(int)used_in, (int)used_out);
+			return 2;
+		}
+
+		p += used_in;
+		in_len -= used_in;
+
+		memset(obuf, 0, sizeof(obuf));
+		lws_strexp_reset_out(&exp, obuf, 16);
+
+		n = lws_strexp_expand(&exp, p, in_len, &used_in, &used_out);
+		if (n != LSTRX_DONE || used_in != 7 || used_out != 7) {
+			lwsl_err("c: n %d, used_in %d, used_out %d\n", n, (int)used_in, (int)used_out);
+			return 2;
+		}
+	}
+
+	/* sanity check lws_strnncpy() */
+
+	lws_strnncpy(dotstar, "12345678", 4, sizeof(dotstar));
+	if (strcmp(dotstar, "1234")) {
+		lwsl_err("%s: lws_strnncpy check failed\n", __func__);
+
+		return 1;
+	}
+	lws_strnncpy(dotstar, "12345678", 8, 6);
+	if (strcmp(dotstar, "12345")) {
+		lwsl_err("%s: lws_strnncpy check failed\n", __func__);
+
+		return 1;
+	}
+
+	/* sanity check lws_nstrstr() */
+
+	{
+		static const char *t1 = "abc123456";
+		const char *mcp;
+
+		mcp = lws_nstrstr(t1, strlen(t1), "abc", 3);
+		if (mcp != t1) {
+			lwsl_err("%s: lws_nstrstr 1 failed\n", __func__);
+			return 1;
+		}
+		mcp = lws_nstrstr(t1, strlen(t1), "def", 3);
+		if (mcp != NULL) {
+			lwsl_err("%s: lws_nstrstr 2 failed\n", __func__);
+			return 1;
+		}
+		mcp = lws_nstrstr(t1, strlen(t1), "456", 3);
+		if (mcp != t1 + 6) {
+			lwsl_err("%s: lws_nstrstr 3 failed: %p\n", __func__, mcp);
+			return 1;
+		}
+		mcp = lws_nstrstr(t1, strlen(t1), "1", 1);
+		if (mcp != t1 + 3) {
+			lwsl_err("%s: lws_nstrstr 4 failed\n", __func__);
+			return 1;
+		}
+		mcp = lws_nstrstr(t1, strlen(t1), "abc1234567", 10);
+		if (mcp != NULL) {
+			lwsl_err("%s: lws_nstrstr 5 failed\n", __func__);
+			return 1;
+		}
+	}
+
+	/* sanity check lws_json_simple_find() */
+
+	{
+		static const char *t1 = "{\"myname1\":true,"
+					 "\"myname2\":\"string\", "
+					 "\"myname3\": 123}";
+		size_t alen;
+		const char *mcp;
+
+		mcp = lws_json_simple_find(t1, strlen(t1), "\"myname1\":", &alen);
+		if (mcp != t1 + 11 || alen != 4) {
+			lwsl_err("%s: lws_json_simple_find 1 failed: (%d) %s\n",
+				 __func__, (int)alen, mcp);
+			return 1;
+		}
+
+		mcp = lws_json_simple_find(t1, strlen(t1), "\"myname2\":", &alen);
+		if (mcp != t1 + 27 || alen != 6) {
+			lwsl_err("%s: lws_json_simple_find 2 failed\n", __func__);
+			return 1;
+		}
+
+		mcp = lws_json_simple_find(t1, strlen(t1), "\"myname3\":", &alen);
+		if (mcp != t1 + 47 || alen != 3) {
+			lwsl_err("%s: lws_json_simple_find 3 failed\n", __func__);
+			return 1;
+		}
+
+		mcp = lws_json_simple_find(t1, strlen(t1), "\"nope\":", &alen);
+		if (mcp != NULL) {
+			lwsl_err("%s: lws_json_simple_find 4 failed\n", __func__);
+			return 1;
+		}
+	}
+
 	p = lws_cmdline_option(argc, argv, "-s");
 
 	for (n = 0; n < (int)LWS_ARRAY_SIZE(tests); n++) {
 		int m = 0, in_fail = fail;
 		struct expected *exp = tests[n].exp;
 
+		memset(&ts, 0, sizeof(ts));
 		ts.start = tests[n].string;
 		ts.len = strlen(ts.start);
 		ts.flags = tests[n].flags;
@@ -306,9 +499,10 @@ int main(int argc, const char **argv)
 		do {
 			e = lws_tokenize(&ts);
 
-			lwsl_info("{ %s, \"%.*s\", %d }\n",
-				  element_names[e + LWS_TOKZE_ERRS],
-				  (int)ts.token_len, ts.token,
+			lws_strnncpy(dotstar, ts.token, ts.token_len,
+				     sizeof(dotstar));
+			lwsl_info("{ %s, \"%s\", %d }\n",
+				  element_names[e + LWS_TOKZE_ERRS], dotstar,
 				  (int)ts.token_len);
 
 			if (m == (int)tests[n].count) {
@@ -328,8 +522,11 @@ int main(int argc, const char **argv)
 			if (e > 0 &&
 			    (ts.token_len != exp->len ||
 			     memcmp(exp->value, ts.token, exp->len))) {
-				lwsl_notice("fail token mismatch %d %d %.*s\n",
-						ts.token_len, exp->len, ts.token_len, ts.token);
+				lws_strnncpy(dotstar, ts.token, ts.token_len,
+					     sizeof(dotstar));
+				lwsl_notice("fail token mismatch %d %d %s\n",
+					    (int)ts.token_len, (int)exp->len,
+					    dotstar);
 				fail++;
 				break;
 			}
@@ -391,16 +588,17 @@ int main(int argc, const char **argv)
 		do {
 			e = lws_tokenize(&ts);
 
-			printf("\t\t{ %s, \"%.*s\", %d },\n",
+			lws_strnncpy(dotstar, ts.token, ts.token_len,
+				     sizeof(dotstar));
+
+			printf("\t\t{ %s, \"%s\", %d },\n",
 				  element_names[e + LWS_TOKZE_ERRS],
-				  (int)ts.token_len,
-				  ts.token, (int)ts.token_len);
+				  dotstar, (int)ts.token_len);
 
 		} while (e > 0);
 
 		printf("\t}\n");
 	}
-
 
 	lwsl_user("Completed: PASS: %d, FAIL: %d\n", ok, fail);
 

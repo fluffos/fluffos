@@ -1,52 +1,54 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-#include "core/private.h"
+#include "private-lib-core.h"
 
-
-LWS_VISIBLE LWS_EXTERN void
+void
 lws_set_fops(struct lws_context *context, const struct lws_plat_file_ops *fops)
 {
 	context->fops = fops;
 }
 
-LWS_VISIBLE LWS_EXTERN lws_filepos_t
+lws_filepos_t
 lws_vfs_tell(lws_fop_fd_t fop_fd)
 {
 	return fop_fd->pos;
 }
 
-LWS_VISIBLE LWS_EXTERN lws_filepos_t
+lws_filepos_t
 lws_vfs_get_length(lws_fop_fd_t fop_fd)
 {
 	return fop_fd->len;
 }
 
-LWS_VISIBLE LWS_EXTERN uint32_t
+uint32_t
 lws_vfs_get_mod_time(lws_fop_fd_t fop_fd)
 {
 	return fop_fd->mod_time;
 }
 
-LWS_VISIBLE lws_fileofs_t
+lws_fileofs_t
 lws_vfs_file_seek_set(lws_fop_fd_t fop_fd, lws_fileofs_t offset)
 {
 	lws_fileofs_t ofs;
@@ -57,7 +59,7 @@ lws_vfs_file_seek_set(lws_fop_fd_t fop_fd, lws_fileofs_t offset)
 }
 
 
-LWS_VISIBLE lws_fileofs_t
+lws_fileofs_t
 lws_vfs_file_seek_end(lws_fop_fd_t fop_fd, lws_fileofs_t offset)
 {
 	return fop_fd->fops->LWS_FOP_SEEK_CUR(fop_fd, fop_fd->len +
@@ -113,7 +115,7 @@ lws_vfs_select_fops(const struct lws_plat_file_ops *fops, const char *vfs_path,
 	return fops;
 }
 
-LWS_VISIBLE LWS_EXTERN lws_fop_fd_t LWS_WARN_UNUSED_RESULT
+lws_fop_fd_t LWS_WARN_UNUSED_RESULT
 lws_vfs_file_open(const struct lws_plat_file_ops *fops, const char *vfs_path,
 		  lws_fop_flags_t *flags)
 {
@@ -126,7 +128,7 @@ lws_vfs_file_open(const struct lws_plat_file_ops *fops, const char *vfs_path,
 }
 
 
-LWS_VISIBLE struct lws_plat_file_ops *
+struct lws_plat_file_ops *
 lws_get_fops(struct lws_context *context)
 {
 	return (struct lws_plat_file_ops *)context->fops;

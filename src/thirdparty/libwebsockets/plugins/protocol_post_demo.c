@@ -80,7 +80,7 @@ file_upload_cb(void *data, const char *name, const char *filename,
 		 * simple demo use a fixed name so we don't have to deal with
 		 * attacks  */
 #if !defined(LWS_WITH_ESP32)
-		pss->fd = (lws_filefd_type)(long long)lws_open("/tmp/post-file",
+		pss->fd = (lws_filefd_type)(lws_intptr_t)lws_open("/tmp/post-file",
 			       O_CREAT | O_TRUNC | O_RDWR, 0600);
 #endif
 		break;
@@ -94,7 +94,7 @@ file_upload_cb(void *data, const char *name, const char *filename,
 				return 1;
 
 #if !defined(LWS_WITH_ESP32)
-			n = write((int)(long long)pss->fd, buf, len);
+			n = write((int)(lws_intptr_t)pss->fd, buf, len);
 			lwsl_info("%s: write %d says %d\n", __func__, len, n);
 #else
 			lwsl_notice("%s: Received chunk size %d\n", __func__, len);
@@ -103,7 +103,7 @@ file_upload_cb(void *data, const char *name, const char *filename,
 		if (state == LWS_UFS_CONTENT)
 			break;
 #if !defined(LWS_WITH_ESP32)
-		close((int)(long long)pss->fd);
+		close((int)(lws_intptr_t)pss->fd);
 		pss->fd = LWS_INVALID_FILE;
 #endif
 		break;
@@ -287,7 +287,7 @@ static const struct lws_protocols protocols[] = {
 	LWS_PLUGIN_PROTOCOL_POST_DEMO
 };
 
-LWS_EXTERN LWS_VISIBLE int
+LWS_VISIBLE int
 init_protocol_post_demo(struct lws_context *context,
 			struct lws_plugin_capability *c)
 {
@@ -305,7 +305,7 @@ init_protocol_post_demo(struct lws_context *context,
 	return 0;
 }
 
-LWS_EXTERN LWS_VISIBLE int
+LWS_VISIBLE int
 destroy_protocol_post_demo(struct lws_context *context)
 {
 	return 0;

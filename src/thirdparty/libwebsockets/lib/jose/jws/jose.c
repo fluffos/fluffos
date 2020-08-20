@@ -1,29 +1,32 @@
-/*
- * libwebsockets - JSON Web Signature support
+ /*
+ * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2017 - 2018 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  *
  * JOSE is actually specified as part of JWS RFC7515.  JWE references RFC7515
  * to specify its JOSE JSON object.  So it lives in ./lib/jose/jws/jose.c.
  */
 
-#include "core/private.h"
-#include "jose/private.h"
+#include "private-lib-core.h"
+#include "jose/private-lib-jose.h"
 
 #include <stdint.h>
 
@@ -225,8 +228,8 @@ lws_jws_jose_cb(struct lejp_ctx *ctx, char reason)
 		return 0;
 
 	case LJJHI_TYP: /* Optional: string: media type */
-		if (strcmp(ctx->buf, "JWT"))
-			return -1;
+		lws_strnncpy(args->jose->typ, ctx->buf, ctx->npos,
+			     sizeof(args->jose->typ));
 		break;
 
 	case LJJHI_JKU:	/* Optional: string */
@@ -427,10 +430,10 @@ lws_jose_parse(struct lws_jose *jose, const uint8_t *buf, int n,
 	lejp_construct(&jctx, lws_jws_jose_cb, &args, jws_jose,
 		       LWS_ARRAY_SIZE(jws_jose));
 
-	m = (int)(signed char)lejp_parse(&jctx, (uint8_t *)buf, n);
+	m = lejp_parse(&jctx, (uint8_t *)buf, n);
 	lejp_destruct(&jctx);
 	if (m < 0) {
-		lwsl_notice("%s: parse %.*s returned %d\n", __func__, n, buf, m);
+		lwsl_notice("%s: parse returned %d\n", __func__, m);
 		return -1;
 	}
 
@@ -506,7 +509,7 @@ lws_jose_render(struct lws_jose *jose, struct lws_jwk *aux_jwk,
 				sub = 1;
 				m = lws_b64_encode_string_url((const char *)
 						jose->e[n].buf, jose->e[n].len,
-						out, end - out);
+						out, lws_ptr_diff(end, out));
 				if (m < 0)
 					return -1;
 				out += m;
@@ -525,7 +528,7 @@ lws_jose_render(struct lws_jose *jose, struct lws_jwk *aux_jwk,
 				sub = 1;
 				m = lws_b64_encode_string((const char *)
 						jose->e[n].buf, jose->e[n].len,
-						out, end - out);
+						out, lws_ptr_diff(end, out));
 				if (m < 0)
 					return -1;
 				out += m;
@@ -543,7 +546,7 @@ lws_jose_render(struct lws_jose *jose, struct lws_jwk *aux_jwk,
 			out += lws_snprintf(out, end - out, "%s\"%s\":",
 					    sub ? ",\n" : "", jws_jose[n]);
 			sub = 1;
-			vl = end - out;
+			vl = lws_ptr_diff(end, out);
 			m = lws_jwk_export(jwk, 0, out, &vl);
 			if (m < 0) {
 				lwsl_notice("%s: failed to export key\n",
@@ -595,7 +598,7 @@ lws_jose_render(struct lws_jose *jose, struct lws_jwk *aux_jwk,
 	if (out > end - 2)
 		return -1;
 
-	return out_len - (end - out) - 1;
+	return lws_ptr_diff(out_len, (end - out)) - 1;
 
 bail:
 	return -1;

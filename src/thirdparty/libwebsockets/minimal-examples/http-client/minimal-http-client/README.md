@@ -21,6 +21,10 @@ Commandline option|Meaning
 -j|Apply tls option LCCSCF_ALLOW_SELFSIGNED
 -m|Apply tls option LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK
 -e|Apply tls option LCCSCF_ALLOW_EXPIRED
+-v|Connection validity use 3s / 10s instead of default 5m / 5m10s
+--nossl| disable ssl connection
+--user <username>| Set Basic Auth username
+--password <password> | Set Basic Auth password
 
 ```
  $ ./lws-minimal-http-client
@@ -61,4 +65,12 @@ Commandline option|Meaning
 [2018/03/04 14:43:23:3042] USER: Completed
 ```
 
+You can also test the client Basic Auth support against the http-server/minimal-http-server-basicauth
+example.  In one console window run the server and in the other
+
+```
+$ lws-minimal-http-client -l --nossl --path /secret/index.html --user user --password password
+```
+
+The Basic Auth credentials for the test server are literally username "user" and password "password".
 

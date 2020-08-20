@@ -1,30 +1,33 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-#include "core/private.h"
+#include "private-lib-core.h"
 
 void
 __lws_wsi_remove_from_sul(struct lws *wsi)
 {
-	//struct lws_context_per_thread *pt = &wsi->context->pt[(int)wsi->tsi];
+	//struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
 
 	//lwsl_notice("%s: wsi %p, to %p, hr %p\n", __func__, wsi,
 	//		&wsi->sul_timeout.list, &wsi->sul_hrtimer.list);
@@ -32,6 +35,7 @@ __lws_wsi_remove_from_sul(struct lws *wsi)
 	// lws_dll2_describe(&pt->pt_sul_owner, "pre-remove");
 	lws_dll2_remove(&wsi->sul_timeout.list);
 	lws_dll2_remove(&wsi->sul_hrtimer.list);
+	lws_dll2_remove(&wsi->sul_validity.list);
 	// lws_dll2_describe(&pt->pt_sul_owner, "post-remove");
 }
 
@@ -44,8 +48,8 @@ lws_sul_hrtimer_cb(lws_sorted_usec_list_t *sul)
 {
 	struct lws *wsi = lws_container_of(sul, struct lws, sul_hrtimer);
 
-	if (wsi->protocol &&
-	    wsi->protocol->callback(wsi, LWS_CALLBACK_TIMER,
+	if (wsi->a.protocol &&
+	    wsi->a.protocol->callback(wsi, LWS_CALLBACK_TIMER,
 				    wsi->user_space, NULL, 0))
 		__lws_close_free_wsi(wsi, LWS_CLOSE_STATUS_NOSTATUS,
 				     "hrtimer cb errored");
@@ -54,13 +58,14 @@ lws_sul_hrtimer_cb(lws_sorted_usec_list_t *sul)
 void
 __lws_set_timer_usecs(struct lws *wsi, lws_usec_t us)
 {
-	struct lws_context_per_thread *pt = &wsi->context->pt[(int)wsi->tsi];
+	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
 
 	wsi->sul_hrtimer.cb = lws_sul_hrtimer_cb;
-	__lws_sul_insert(&pt->pt_sul_owner, &wsi->sul_hrtimer, us);
+	__lws_sul_insert_us(&pt->pt_sul_owner[LWSSULLI_MISS_IF_SUSPENDED],
+			    &wsi->sul_hrtimer, us);
 }
 
-LWS_VISIBLE void
+void
 lws_set_timer_usecs(struct lws *wsi, lws_usec_t usecs)
 {
 	__lws_set_timer_usecs(wsi, usecs);
@@ -74,7 +79,7 @@ static void
 lws_sul_wsitimeout_cb(lws_sorted_usec_list_t *sul)
 {
 	struct lws *wsi = lws_container_of(sul, struct lws, sul_timeout);
-	struct lws_context_per_thread *pt = &wsi->context->pt[(int)wsi->tsi];
+	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
 
 	if (wsi->pending_timeout != PENDING_TIMEOUT_USER_OK)
 		lws_stats_bump(pt, LWSSTATS_C_TIMEOUTS, 1);
@@ -107,7 +112,7 @@ lws_sul_wsitimeout_cb(lws_sorted_usec_list_t *sul)
 		 * don't try to do protocol cleanup like flush partials.
 		 */
 		wsi->socket_is_permanently_unusable = 1;
-#if !defined(LWS_NO_CLIENT)
+#if defined(LWS_WITH_CLIENT)
 	if (lwsi_state(wsi) == LRS_WAITING_SSL)
 		lws_inform_client_conn_fail(wsi,
 			(void *)"Timed out waiting SSL", 21);
@@ -119,11 +124,12 @@ lws_sul_wsitimeout_cb(lws_sorted_usec_list_t *sul)
 void
 __lws_set_timeout(struct lws *wsi, enum pending_timeout reason, int secs)
 {
-	struct lws_context_per_thread *pt = &wsi->context->pt[(int)wsi->tsi];
+	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
 
 	wsi->sul_timeout.cb = lws_sul_wsitimeout_cb;
-	__lws_sul_insert(&pt->pt_sul_owner, &wsi->sul_timeout,
-			 ((lws_usec_t)secs) * LWS_US_PER_SEC);
+	__lws_sul_insert_us(&pt->pt_sul_owner[LWSSULLI_MISS_IF_SUSPENDED],
+			    &wsi->sul_timeout,
+			    ((lws_usec_t)secs) * LWS_US_PER_SEC);
 
 	lwsl_debug("%s: %p: %d secs, reason %d\n", __func__, wsi, secs, reason);
 
@@ -133,7 +139,7 @@ __lws_set_timeout(struct lws *wsi, enum pending_timeout reason, int secs)
 void
 lws_set_timeout(struct lws *wsi, enum pending_timeout reason, int secs)
 {
-	struct lws_context_per_thread *pt = &wsi->context->pt[(int)wsi->tsi];
+	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
 
 	lws_pt_lock(pt, __func__);
 	lws_dll2_remove(&wsi->sul_timeout.list);
@@ -152,6 +158,10 @@ lws_set_timeout(struct lws *wsi, enum pending_timeout reason, int secs)
 	if (secs == LWS_TO_KILL_ASYNC)
 		secs = 0;
 
+	// assert(!secs || !wsi->mux_stream_immortal);
+	if (secs && wsi->mux_stream_immortal)
+		lwsl_err("%s: on immortal stream %d %d\n", __func__, reason, secs);
+
 	lws_pt_lock(pt, __func__);
 	__lws_set_timeout(wsi, reason, secs);
 	lws_pt_unlock(pt);
@@ -160,7 +170,7 @@ lws_set_timeout(struct lws *wsi, enum pending_timeout reason, int secs)
 void
 lws_set_timeout_us(struct lws *wsi, enum pending_timeout reason, lws_usec_t us)
 {
-	struct lws_context_per_thread *pt = &wsi->context->pt[(int)wsi->tsi];
+	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
 
 	lws_pt_lock(pt, __func__);
 	lws_dll2_remove(&wsi->sul_timeout.list);
@@ -170,7 +180,8 @@ lws_set_timeout_us(struct lws *wsi, enum pending_timeout reason, lws_usec_t us)
 		return;
 
 	lws_pt_lock(pt, __func__);
-	__lws_sul_insert(&pt->pt_sul_owner, &wsi->sul_timeout, us);
+	__lws_sul_insert_us(&pt->pt_sul_owner[LWSSULLI_MISS_IF_SUSPENDED],
+			    &wsi->sul_timeout, us);
 
 	lwsl_notice("%s: %p: %llu us, reason %d\n", __func__, wsi,
 		   (unsigned long long)us, reason);
@@ -178,6 +189,8 @@ lws_set_timeout_us(struct lws *wsi, enum pending_timeout reason, lws_usec_t us)
 	wsi->pending_timeout = reason;
 	lws_pt_unlock(pt);
 }
+
+#if defined(LWS_WITH_DEPRECATED_THINGS)
 
 /* requires context + vh lock */
 
@@ -203,23 +216,21 @@ lws_sul_timed_callback_vh_protocol_cb(lws_sorted_usec_list_t *sul)
 {
 	struct lws_timed_vh_protocol *tvp = lws_container_of(sul,
 					struct lws_timed_vh_protocol, sul);
-	struct lws_context_per_thread *pt =
-				&tvp->vhost->context->pt[tvp->tsi_req];
+	lws_fakewsi_def_plwsa(&tvp->vhost->context->pt[0]);
 
-	pt->fake_wsi->context = tvp->vhost->context;
-
-	pt->fake_wsi->vhost = tvp->vhost; /* not a real bound wsi */
-	pt->fake_wsi->protocol = tvp->protocol;
+	lws_fakewsi_prep_plwsa_ctx(tvp->vhost->context);
+	plwsa->vhost = tvp->vhost; /* not a real bound wsi */
+	plwsa->protocol = tvp->protocol;
 
 	lwsl_debug("%s: timed cb: vh %s, protocol %s, reason %d\n", __func__,
 		   tvp->vhost->name, tvp->protocol->name, tvp->reason);
 
-	tvp->protocol->callback(pt->fake_wsi, tvp->reason, NULL, NULL, 0);
+	tvp->protocol->callback((struct lws *)plwsa, tvp->reason, NULL, NULL, 0);
 
 	__lws_timed_callback_remove(tvp->vhost, tvp);
 }
 
-LWS_VISIBLE LWS_EXTERN int
+int
 lws_timed_callback_vh_protocol_us(struct lws_vhost *vh,
 				  const struct lws_protocols *prot, int reason,
 				  lws_usec_t us)
@@ -259,11 +270,97 @@ lws_timed_callback_vh_protocol_us(struct lws_vhost *vh,
 	return 0;
 }
 
-LWS_VISIBLE LWS_EXTERN int
+int
 lws_timed_callback_vh_protocol(struct lws_vhost *vh,
 			       const struct lws_protocols *prot, int reason,
 			       int secs)
 {
 	return lws_timed_callback_vh_protocol_us(vh, prot, reason,
 					((lws_usec_t)secs) * LWS_US_PER_SEC);
+}
+
+#endif
+
+static void
+lws_validity_cb(lws_sorted_usec_list_t *sul)
+{
+	struct lws *wsi = lws_container_of(sul, struct lws, sul_validity);
+	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
+	const lws_retry_bo_t *rbo = wsi->retry_policy;
+
+	/* one of either the ping or hangup validity threshold was crossed */
+
+	if (wsi->validity_hup) {
+		lwsl_info("%s: wsi %p: validity too old\n", __func__, wsi);
+		__lws_close_free_wsi(wsi, LWS_CLOSE_STATUS_NOSTATUS,
+				     "validity timeout");
+		return;
+	}
+
+	/* schedule a protocol-dependent ping */
+
+	lwsl_info("%s: wsi %p: scheduling validity check\n", __func__, wsi);
+
+	if (wsi->role_ops && wsi->role_ops->issue_keepalive)
+		wsi->role_ops->issue_keepalive(wsi, 0);
+
+	/*
+	 * We arrange to come back here after the additional ping to hangup time
+	 * and do the hangup, unless we get validated (by, eg, a PONG) and
+	 * reset the timer
+	 */
+
+	assert(rbo->secs_since_valid_hangup > rbo->secs_since_valid_ping);
+
+	wsi->validity_hup = 1;
+	__lws_sul_insert_us(&pt->pt_sul_owner[!!wsi->conn_validity_wakesuspend],
+			    &wsi->sul_validity,
+			    ((uint64_t)rbo->secs_since_valid_hangup -
+				 rbo->secs_since_valid_ping) * LWS_US_PER_SEC);
+}
+
+/*
+ * The role calls this back to actually confirm validity on a particular wsi
+ * (which may not be the original wsi)
+ */
+
+void
+_lws_validity_confirmed_role(struct lws *wsi)
+{
+	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
+	const lws_retry_bo_t *rbo = wsi->retry_policy;
+
+	if (!rbo || !rbo->secs_since_valid_hangup)
+		return;
+
+	wsi->validity_hup = 0;
+	wsi->sul_validity.cb = lws_validity_cb;
+
+	wsi->validity_hup = rbo->secs_since_valid_ping >=
+			    rbo->secs_since_valid_hangup;
+
+	lwsl_info("%s: wsi %p: setting validity timer %ds (hup %d)\n",
+			__func__, wsi,
+			wsi->validity_hup ? rbo->secs_since_valid_hangup :
+					    rbo->secs_since_valid_ping,
+			wsi->validity_hup);
+
+	__lws_sul_insert_us(&pt->pt_sul_owner[!!wsi->conn_validity_wakesuspend],
+			    &wsi->sul_validity,
+			    ((uint64_t)(wsi->validity_hup ?
+				rbo->secs_since_valid_hangup :
+				rbo->secs_since_valid_ping)) * LWS_US_PER_SEC);
+}
+
+void
+lws_validity_confirmed(struct lws *wsi)
+{
+	/*
+	 * This may be a stream inside a muxed network connection... leave it
+	 * to the role to figure out who actually needs to understand their
+	 * validity was confirmed.
+	 */
+	if (!wsi->h2_stream_carries_ws && /* only if not encapsulated */
+	    wsi->role_ops && wsi->role_ops->issue_keepalive)
+		wsi->role_ops->issue_keepalive(wsi, 1);
 }

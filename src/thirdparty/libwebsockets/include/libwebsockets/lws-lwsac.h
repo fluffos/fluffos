@@ -1,24 +1,25 @@
 /*
- * libwebsockets - lws alloc chunk
+ * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2018 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2020 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
- *
- * included from libwebsockets.h
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
 /** \defgroup lwsac lwsac
@@ -94,13 +95,16 @@ lws_list_ptr_insert(lws_list_ptr *phead, lws_list_ptr *add,
  * whatever is necessary to return you a pointer to ensure bytes of memory
  * reserved for the caller.
  *
+ * This always allocates in the current chunk or a new chunk... see the
+ * lwsac_use_backfill() variant to try first to find space in earlier chunks.
+ *
  * Returns NULL if OOM.
  */
 LWS_VISIBLE LWS_EXTERN void *
 lwsac_use(struct lwsac **head, size_t ensure, size_t chunk_size);
 
 /**
- * lwsac_use_zero - allocate / use some memory from a lwsac and zero it
+ * lwsac_use_backfill - allocate / use some memory from a lwsac
  *
  * \param head: pointer to the lwsac list object
  * \param ensure: the number of bytes we want to use
@@ -113,12 +117,13 @@ lwsac_use(struct lwsac **head, size_t ensure, size_t chunk_size);
  * whatever is necessary to return you a pointer to ensure bytes of memory
  * reserved for the caller.
  *
- * \p ensure bytes at the return address are zeroed if the allocation succeeded.
+ * Also checks if earlier blocks have enough remaining space to take the
+ * allocation before making a new allocation.
  *
  * Returns NULL if OOM.
  */
 LWS_VISIBLE LWS_EXTERN void *
-lwsac_use_zero(struct lwsac **head, size_t ensure, size_t chunk_size);
+lwsac_use_backfill(struct lwsac **head, size_t ensure, size_t chunk_size);
 
 /**
  * lwsac_use - allocate / use some memory from a lwsac
@@ -136,7 +141,9 @@ lwsac_use_zero(struct lwsac **head, size_t ensure, size_t chunk_size);
  * Returns NULL if OOM.
  */
 LWS_VISIBLE LWS_EXTERN void *
-lwsac_use_zeroed(struct lwsac **head, size_t ensure, size_t chunk_size);
+lwsac_use_zero(struct lwsac **head, size_t ensure, size_t chunk_size);
+
+#define lwsac_use_zeroed lwsac_use_zero
 
 /**
  * lwsac_free - deallocate all chunks in the lwsac and set head NULL
@@ -191,6 +198,38 @@ lwsac_reference(struct lwsac *head);
 LWS_VISIBLE LWS_EXTERN void
 lwsac_unreference(struct lwsac **head);
 
+/**
+ * lwsac_extend() - try to increase the size of the last block
+ *
+ * \param head: pointer to the lwsac list object
+ * \param amount: amount to try to increase usage for
+ *
+ * This will either increase the usage reservation of the last allocated block
+ * by amount and return 0, or fail and return 1.
+ *
+ * This is very cheap to call and is designed to optimize usage after a static
+ * struct for vari-sized additional content which may flow into an additional
+ * block in a new chunk if necessary, but wants to make the most of the space
+ * in front of it first to try to avoid gaps and the new chunk if it can.
+ *
+ * The additional area if the call succeeds will have been memset to 0.
+ *
+ * To use it, the following must be true:
+ *
+ * - only the last lwsac use can be extended
+ *
+ * - if another use happens inbetween the use and extend, it will break
+ *
+ * - the use cannot have been using backfill
+ *
+ * - a user object must be tracking the current allocated size of the last use
+ *   (lwsac doesn't know it) and increment by amount if the extend call succeeds
+ *
+ * Despite these restrictions this can be an important optimization for some
+ * cases
+ */
+LWS_VISIBLE LWS_EXTERN int
+lwsac_extend(struct lwsac *head, int amount);
 
 /* helpers to keep a file cached in memory */
 
@@ -209,8 +248,9 @@ lwsac_cached_file(const char *filepath, lwsac_cached_file_t *cache,
 
 /* more advanced helpers */
 
+/* offset from lac to start of payload, first = 1 = first lac in chain */
 LWS_VISIBLE LWS_EXTERN size_t
-lwsac_sizeof(void);
+lwsac_sizeof(int first);
 
 LWS_VISIBLE LWS_EXTERN size_t
 lwsac_get_tail_pos(struct lwsac *lac);
@@ -226,5 +266,25 @@ lwsac_info(struct lwsac *head);
 
 LWS_VISIBLE LWS_EXTERN uint64_t
 lwsac_total_alloc(struct lwsac *head);
+
+LWS_VISIBLE LWS_EXTERN uint64_t
+lwsac_total_overhead(struct lwsac *head);
+
+/**
+ * lwsac_scan_extant() - returns existing copy of blob, or NULL
+ *
+ * \param head: the lwsac to scan
+ * \param find: the blob to look for
+ * \param len: the length of the blob to look for
+ * \param nul: nonzero if the next byte must be NUL
+ *
+ * Helper that looks through a whole lwsac for a given binary blob already
+ * present.  Used in the case that lwsac contents are const once written, and
+ * strings or blobs may be repeated in the input: this allows the earlier
+ * copy to be pointed to by subsequent references without repeating the string
+ * or blob redundantly.
+ */
+LWS_VISIBLE LWS_EXTERN uint8_t *
+lwsac_scan_extant(struct lwsac *head, uint8_t *find, size_t len, int nul);
 
 ///@}

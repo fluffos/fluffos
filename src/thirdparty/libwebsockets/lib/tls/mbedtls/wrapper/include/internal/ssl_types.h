@@ -19,9 +19,9 @@
  extern "C" {
 #endif
 
-//#include "core/private.h"
+//#include "private-lib-core.h"
 #include <lws_config.h>
-#if defined(LWS_WITH_ESP32)
+#if defined(LWS_PLAT_FREERTOS)
  /* AMAZON RTOS has its own setting via MTK_MBEDTLS_CONFIG_FILE */
  #if !defined(LWS_AMAZON_RTOS)
   #undef MBEDTLS_CONFIG_FILE

@@ -1,25 +1,35 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2018 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
- *
- * included from libwebsockets.h
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
+
+#if defined(LWS_WITH_SPAWN)
+
+#if defined(WIN32) || defined(_WIN32)
+#else
+#include <sys/wait.h>
+#include <sys/times.h>
+#endif
+#endif
 
 /** \defgroup misc Miscellaneous APIs
 * ##Miscellaneous APIs
@@ -27,313 +37,6 @@
 * Various APIs outside of other categories
 */
 ///@{
-
-/**
- * lws_start_foreach_ll(): linkedlist iterator helper start
- *
- * \param type: type of iteration, eg, struct xyz *
- * \param it: iterator var name to create
- * \param start: start of list
- *
- * This helper creates an iterator and starts a while (it) {
- * loop.  The iterator runs through the linked list starting at start and
- * ends when it gets a NULL.
- * The while loop should be terminated using lws_start_foreach_ll().
- */
-#define lws_start_foreach_ll(type, it, start)\
-{ \
-	type it = start; \
-	while (it) {
-
-/**
- * lws_end_foreach_ll(): linkedlist iterator helper end
- *
- * \param it: same iterator var name given when starting
- * \param nxt: member name in the iterator pointing to next list element
- *
- * This helper is the partner for lws_start_foreach_ll() that ends the
- * while loop.
- */
-
-#define lws_end_foreach_ll(it, nxt) \
-		it = it->nxt; \
-	} \
-}
-
-/**
- * lws_start_foreach_ll_safe(): linkedlist iterator helper start safe against delete
- *
- * \param type: type of iteration, eg, struct xyz *
- * \param it: iterator var name to create
- * \param start: start of list
- * \param nxt: member name in the iterator pointing to next list element
- *
- * This helper creates an iterator and starts a while (it) {
- * loop.  The iterator runs through the linked list starting at start and
- * ends when it gets a NULL.
- * The while loop should be terminated using lws_end_foreach_ll_safe().
- * Performs storage of next increment for situations where iterator can become invalidated
- * during iteration.
- */
-#define lws_start_foreach_ll_safe(type, it, start, nxt)\
-{ \
-	type it = start; \
-	while (it) { \
-		type next_##it = it->nxt;
-
-/**
- * lws_end_foreach_ll_safe(): linkedlist iterator helper end (pre increment storage)
- *
- * \param it: same iterator var name given when starting
- *
- * This helper is the partner for lws_start_foreach_ll_safe() that ends the
- * while loop. It uses the precreated next_ variable already stored during
- * start.
- */
-
-#define lws_end_foreach_ll_safe(it) \
-		it = next_##it; \
-	} \
-}
-
-/**
- * lws_start_foreach_llp(): linkedlist pointer iterator helper start
- *
- * \param type: type of iteration, eg, struct xyz **
- * \param it: iterator var name to create
- * \param start: start of list
- *
- * This helper creates an iterator and starts a while (it) {
- * loop.  The iterator runs through the linked list starting at the
- * address of start and ends when it gets a NULL.
- * The while loop should be terminated using lws_start_foreach_llp().
- *
- * This helper variant iterates using a pointer to the previous linked-list
- * element.  That allows you to easily delete list members by rewriting the
- * previous pointer to the element's next pointer.
- */
-#define lws_start_foreach_llp(type, it, start)\
-{ \
-	type it = &(start); \
-	while (*(it)) {
-
-#define lws_start_foreach_llp_safe(type, it, start, nxt)\
-{ \
-	type it = &(start); \
-	type next; \
-	while (*(it)) { \
-		next = &((*(it))->nxt); \
-
-/**
- * lws_end_foreach_llp(): linkedlist pointer iterator helper end
- *
- * \param it: same iterator var name given when starting
- * \param nxt: member name in the iterator pointing to next list element
- *
- * This helper is the partner for lws_start_foreach_llp() that ends the
- * while loop.
- */
-
-#define lws_end_foreach_llp(it, nxt) \
-		it = &(*(it))->nxt; \
-	} \
-}
-
-#define lws_end_foreach_llp_safe(it) \
-		it = next; \
-	} \
-}
-
-#define lws_ll_fwd_insert(\
-	___new_object,	/* pointer to new object */ \
-	___m_list,	/* member for next list object ptr */ \
-	___list_head	/* list head */ \
-		) {\
-		___new_object->___m_list = ___list_head; \
-		___list_head = ___new_object; \
-	}
-
-#define lws_ll_fwd_remove(\
-	___type,	/* type of listed object */ \
-	___m_list,	/* member for next list object ptr */ \
-	___target,	/* object to remove from list */ \
-	___list_head	/* list head */ \
-	) { \
-                lws_start_foreach_llp(___type **, ___ppss, ___list_head) { \
-                        if (*___ppss == ___target) { \
-                                *___ppss = ___target->___m_list; \
-                                break; \
-                        } \
-                } lws_end_foreach_llp(___ppss, ___m_list); \
-	}
-
-/*
- * doubly linked-list
- */
-
-#if defined (LWS_WITH_DEPRECATED_LWS_DLL)
-
-/*
- * This is going away in v4.1.  You can set the cmake option above to keep it
- * around temporarily.  Migrate your stuff to the more capable and robust
- * lws_dll2 below
- */
-
-struct lws_dll {
-	struct lws_dll *prev;
-	struct lws_dll *next;
-};
-
-/*
- * these all point to the composed list objects... you have to use the
- * lws_container_of() helper to recover the start of the containing struct
- */
-
-#define lws_dll_add_front lws_dll_add_head
-
-LWS_VISIBLE LWS_EXTERN void
-lws_dll_add_head(struct lws_dll *d, struct lws_dll *phead);
-
-LWS_VISIBLE LWS_EXTERN void
-lws_dll_add_tail(struct lws_dll *d, struct lws_dll *phead);
-
-LWS_VISIBLE LWS_EXTERN void
-lws_dll_insert(struct lws_dll *d, struct lws_dll *target,
-	       struct lws_dll *phead, int before);
-
-static LWS_INLINE struct lws_dll *
-lws_dll_get_head(struct lws_dll *phead) { return phead->next; }
-
-static LWS_INLINE struct lws_dll *
-lws_dll_get_tail(struct lws_dll *phead) { return phead->prev; }
-
-/*
- * caution, this doesn't track the tail in the head struct.  Use
- * lws_dll_remove_track_tail() instead of this if you want tail tracking.  Using
- * this means you can't use lws_dll_add_tail() amd
- */
-LWS_VISIBLE LWS_EXTERN void
-lws_dll_remove(struct lws_dll *d) LWS_WARN_DEPRECATED;
-
-LWS_VISIBLE LWS_EXTERN void
-lws_dll_remove_track_tail(struct lws_dll *d, struct lws_dll *phead);
-
-/* another way to do lws_start_foreach_dll_safe() on a list via a cb */
-
-LWS_VISIBLE LWS_EXTERN int
-lws_dll_foreach_safe(struct lws_dll *phead, void *user,
-		     int (*cb)(struct lws_dll *d, void *user));
-
-#define lws_dll_is_detached(___dll, __head) \
-	(!(___dll)->prev && !(___dll)->next && (__head)->prev != (___dll))
-
-#endif
-
-/*
- * lws_dll2_owner / lws_dll2 : more capable version of lws_dll.  Differences:
- *
- *  - there's an explicit lws_dll2_owner struct which holds head, tail and
- *    count of members.
- *
- *  - list members all hold a pointer to their owner.  So user code does not
- *    have to track anything about exactly what lws_dll2_owner list the object
- *    is a member of.
- *
- *  - you can use lws_dll unless you want the member count or the ability to
- *    not track exactly which list it's on.
- *
- *  - layout is compatible with lws_dll (but lws_dll apis will not update the
- *    new stuff)
- */
-
-
-struct lws_dll2;
-struct lws_dll2_owner;
-
-typedef struct lws_dll2 {
-	struct lws_dll2		*prev;
-	struct lws_dll2		*next;
-	struct lws_dll2_owner	*owner;
-} lws_dll2_t;
-
-typedef struct lws_dll2_owner {
-	struct lws_dll2		*tail;
-	struct lws_dll2		*head;
-
-	uint32_t		count;
-} lws_dll2_owner_t;
-
-static LWS_INLINE int
-lws_dll2_is_detached(const struct lws_dll2 *d) { return !d->owner; }
-
-static LWS_INLINE const struct lws_dll2_owner *
-lws_dll2_owner(const struct lws_dll2 *d) { return d->owner; }
-
-static LWS_INLINE struct lws_dll2 *
-lws_dll2_get_head(struct lws_dll2_owner *owner) { return owner->head; }
-
-static LWS_INLINE struct lws_dll2 *
-lws_dll2_get_tail(struct lws_dll2_owner *owner) { return owner->tail; }
-
-LWS_VISIBLE LWS_EXTERN void
-lws_dll2_add_head(struct lws_dll2 *d, struct lws_dll2_owner *owner);
-
-LWS_VISIBLE LWS_EXTERN void
-lws_dll2_add_tail(struct lws_dll2 *d, struct lws_dll2_owner *owner);
-
-LWS_VISIBLE LWS_EXTERN void
-lws_dll2_remove(struct lws_dll2 *d);
-
-LWS_VISIBLE LWS_EXTERN int
-lws_dll2_foreach_safe(struct lws_dll2_owner *owner, void *user,
-		      int (*cb)(struct lws_dll2 *d, void *user));
-
-LWS_VISIBLE LWS_EXTERN void
-lws_dll2_clear(struct lws_dll2 *d);
-
-LWS_VISIBLE LWS_EXTERN void
-lws_dll2_owner_clear(struct lws_dll2_owner *d);
-
-LWS_VISIBLE LWS_EXTERN void
-lws_dll2_add_before(struct lws_dll2 *d, struct lws_dll2 *after);
-
-LWS_VISIBLE LWS_EXTERN void
-lws_dll2_add_sorted(lws_dll2_t *d, lws_dll2_owner_t *own,
-		    int (*compare)(const lws_dll2_t *d, const lws_dll2_t *i));
-
-#if defined(_DEBUG)
-void
-lws_dll2_describe(struct lws_dll2_owner *owner, const char *desc);
-#else
-#define lws_dll2_describe(x, y)
-#endif
-
-/*
- * these are safe against the current container object getting deleted,
- * since the hold his next in a temp and go to that next.  ___tmp is
- * the temp.
- */
-
-#define lws_start_foreach_dll_safe(___type, ___it, ___tmp, ___start) \
-{ \
-	___type ___it = ___start; \
-	while (___it) { \
-		___type ___tmp = (___it)->next;
-
-#define lws_end_foreach_dll_safe(___it, ___tmp) \
-		___it = ___tmp; \
-	} \
-}
-
-#define lws_start_foreach_dll(___type, ___it, ___start) \
-{ \
-	___type ___it = ___start; \
-	while (___it) {
-
-#define lws_end_foreach_dll(___it) \
-		___it = (___it)->next; \
-	} \
-}
 
 struct lws_buflist;
 
@@ -378,8 +81,33 @@ lws_buflist_next_segment_len(struct lws_buflist **head, uint8_t **buf);
  * Returns the number of bytes left in the current segment.  0 indicates
  * that the buflist is empty (there are no segments on the buflist).
  */
-LWS_VISIBLE LWS_EXTERN int
+LWS_VISIBLE LWS_EXTERN size_t
 lws_buflist_use_segment(struct lws_buflist **head, size_t len);
+
+/**
+ * lws_buflist_total_len(): Get the total size of the buflist
+ *
+ * \param head: list head
+ *
+ * Returns the total number of bytes held on all segments of the buflist
+ */
+LWS_VISIBLE LWS_EXTERN size_t
+lws_buflist_total_len(struct lws_buflist **head);
+
+/**
+ * lws_buflist_linear_copy(): copy everything out as one without consuming
+ *
+ * \param head: list head
+ * \param ofs: start offset into buflist in bytes
+ * \param buf: buffer to copy linearly into
+ * \param len: length of buffer available
+ *
+ * Returns -1 if len is too small, or bytes copied.  Happy to do partial
+ * copies, returns 0 when there are no more bytes to copy.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_buflist_linear_copy(struct lws_buflist **head, size_t ofs, uint8_t *buf,
+			size_t len);
 
 /**
  * lws_buflist_destroy_all_segments(): free all segments on the list
@@ -392,8 +120,18 @@ lws_buflist_use_segment(struct lws_buflist **head, size_t len);
 LWS_VISIBLE LWS_EXTERN void
 lws_buflist_destroy_all_segments(struct lws_buflist **head);
 
-void
-lws_buflist_describe(struct lws_buflist **head, void *id);
+/**
+ * lws_buflist_describe(): debug helper logging buflist status
+ *
+ * \param head: list head
+ * \param id: pointer shown in debug list
+ * \param reason: reason string show in debug list
+ *
+ * Iterates through the buflist segments showing position and size.
+ * This only exists when lws was built in debug mode
+ */
+LWS_VISIBLE LWS_EXTERN void
+lws_buflist_describe(struct lws_buflist **head, void *id, const char *reason);
 
 /**
  * lws_ptr_diff(): helper to report distance between pointers as an int
@@ -434,6 +172,76 @@ lws_snprintf(char *str, size_t size, const char *format, ...) LWS_FORMAT(3);
 LWS_VISIBLE LWS_EXTERN char *
 lws_strncpy(char *dest, const char *src, size_t size);
 
+/*
+ * Variation where we want to use the smaller of two lengths, useful when the
+ * source string is not NUL terminated
+ */
+#define lws_strnncpy(dest, src, size1, destsize) \
+	lws_strncpy(dest, src, (size_t)(size1 + 1) < (size_t)(destsize) ? \
+				(size_t)(size1 + 1) : (size_t)(destsize))
+
+/**
+ * lws_nstrstr(): like strstr for length-based strings without terminating NUL
+ *
+ * \param buf: the string to search
+ * \param len: the length of the string to search
+ * \param name: the substring to search for
+ * \param nl: the length of name
+ *
+ * Returns NULL if \p name is not present in \p buf.  Otherwise returns the
+ * address of the first instance of \p name in \p buf.
+ *
+ * Neither buf nor name need to be NUL-terminated.
+ */
+LWS_VISIBLE LWS_EXTERN const char *
+lws_nstrstr(const char *buf, size_t len, const char *name, size_t nl);
+
+/**
+ * lws_json_simple_find(): dumb JSON string parser
+ *
+ * \param buf: the JSON to search
+ * \param len: the length of the JSON to search
+ * \param name: the name field to search the JSON for, eg, "\"myname\":"
+ * \param alen: set to the length of the argument part if non-NULL return
+ *
+ * Either returns NULL if \p name is not present in buf, or returns a pointer
+ * to the argument body of the first instance of \p name, and sets *alen to the
+ * length of the argument body.
+ *
+ * This can cheaply handle fishing out, eg, myarg from {"myname": "myarg"} by
+ * searching for "\"myname\":".  It will return a pointer to myarg and set *alen
+ * to 5.  It equally handles args like "myname": true, or "myname":false, and
+ * null or numbers are all returned as delimited strings.
+ *
+ * Anything more complicated like the value is a subobject or array, you should
+ * parse it using a full parser like lejp.  This is suitable is the JSON is
+ * and will remain short and simple, and contains well-known names amongst other
+ * extensible JSON members.
+ */
+LWS_VISIBLE LWS_EXTERN const char *
+lws_json_simple_find(const char *buf, size_t len, const char *name, size_t *alen);
+
+/**
+ * lws_json_simple_strcmp(): dumb JSON string comparison
+ *
+ * \param buf: the JSON to search
+ * \param len: the length of the JSON to search
+ * \param name: the name field to search the JSON for, eg, "\"myname\":"
+ * \param comp: return a strcmp of this and the discovered argument
+ *
+ * Helper that combines lws_json_simple_find() with strcmp() if it was found.
+ * If the \p name was not found, returns -1.  Otherwise returns a strcmp()
+ * between what was found and \p comp, ie, return 0 if they match or something
+ * else if they don't.
+ *
+ * If the JSON is relatively simple and you want to target constrained
+ * devices, this can be a good choice.  If the JSON may be complex, you
+ * should use a full JSON parser.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_json_simple_strcmp(const char *buf, size_t len, const char *name, const char *comp);
+
+
 /**
  * lws_hex_to_byte_array(): convert hex string like 0123456789ab into byte data
  *
@@ -452,6 +260,26 @@ lws_strncpy(char *dest, const char *src, size_t size);
  */
 LWS_VISIBLE LWS_EXTERN int
 lws_hex_to_byte_array(const char *h, uint8_t *dest, int max);
+
+
+/**
+ * lws_hex_random(): generate len - 1 or - 2 characters of random ascii hex
+ *
+ * \param context: the lws_context used to get the random
+ * \param dest: destination for hex ascii chars
+ * \param len: the number of bytes the buffer dest points to can hold
+ *
+ * This creates random ascii-hex strings up to a given length, with a
+ * terminating NUL.  Hex characters are produced in pairs, if the length of
+ * the destination buffer is even, after accounting for the NUL there will be
+ * an unused byte at the end after the NUL.  So lengths should be odd to get
+ * length - 1 characters exactly followed by the NUL.
+ *
+ * There will not be any characters produced that are not 0-9, a-f, so it's
+ * safe to go straight into, eg, JSON.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_hex_random(struct lws_context *context, char *dest, size_t len);
 
 /*
  * lws_timingsafe_bcmp(): constant time memcmp
@@ -479,8 +307,8 @@ lws_timingsafe_bcmp(const void *a, const void *b, uint32_t len);
  * Fills buf with len bytes of random.  Returns the number of bytes set, if
  * not equal to len, then getting the random failed.
  */
-LWS_VISIBLE LWS_EXTERN int
-lws_get_random(struct lws_context *context, void *buf, int len);
+LWS_VISIBLE LWS_EXTERN size_t
+lws_get_random(struct lws_context *context, void *buf, size_t len);
 /**
  * lws_daemonize(): make current process run in the background
  *
@@ -564,6 +392,22 @@ lws_parse_uri(char *p, const char **prot, const char **ads, int *port,
  */
 LWS_VISIBLE LWS_EXTERN const char *
 lws_cmdline_option(int argc, const char **argv, const char *val);
+
+/**
+ * lws_cmdline_option_handle_builtin(): apply standard cmdline options
+ *
+ * \param argc:		count of argument strings
+ * \param argv:		argument strings
+ * \param info:		context creation info
+ *
+ * Applies standard options to the context creation info to save them having
+ * to be (unevenly) copied into the minimal examples.
+ *
+ * Applies default log levels that can be overriden by -d
+ */
+LWS_VISIBLE LWS_EXTERN void
+lws_cmdline_option_handle_builtin(int argc, const char **argv,
+				  struct lws_context_creation_info *info);
 
 /**
  * lws_now_secs(): return seconds since 1970-1-1
@@ -815,6 +659,53 @@ lws_dir_callback_function(const char *dirpath, void *user,
  */
 LWS_VISIBLE LWS_EXTERN int
 lws_dir(const char *dirpath, void *user, lws_dir_callback_function cb);
+
+/**
+ * lws_dir_rm_rf_cb() - callback for lws_dir that performs recursive rm -rf
+ *
+ * \param dirpath: directory we are at in lws_dir
+ * \param user: ignored
+ * \param lde: lws_dir info on the file or directory we are at
+ *
+ * This is a readymade rm -rf callback for use with lws_dir.  It recursively
+ * removes everything below the starting dir and then the starting dir itself.
+ * Works on linux, OSX and Windows at least.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_dir_rm_rf_cb(const char *dirpath, void *user, struct lws_dir_entry *lde);
+
+/*
+ * We pass every file in the base dir through a filter, and call back on the
+ * ones that match.  Directories are ignored.
+ *
+ * The original path filter string may look like, eg, "sai-*.deb" or "*.txt"
+ */
+
+typedef int (*lws_dir_glob_cb_t)(void *data, const char *path);
+
+typedef struct lws_dir_glob {
+	const char		*filter;
+	lws_dir_glob_cb_t	cb;
+	void			*user;
+} lws_dir_glob_t;
+
+/**
+ * lws_dir_glob_cb() - callback for lws_dir that performs filename globbing
+ *
+ * \param dirpath: directory we are at in lws_dir
+ * \param user: pointer to your prepared lws_dir_glob_cb_t
+ * \param lde: lws_dir info on the file or directory we are at
+ *
+ * \p user is prepared with an `lws_dir_glob_t` containing a callback for paths
+ * that pass the filtering, a user pointer to pass to that callback, and a
+ * glob string like "*.txt".  It may not contain directories, the lws_dir musr
+ * be started at the correct dir.
+ *
+ * Only the base path passed to lws_dir is scanned, it does not look in subdirs.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_dir_glob_cb(const char *dirpath, void *user, struct lws_dir_entry *lde);
+
 #endif
 
 /**
@@ -835,12 +726,19 @@ lws_dir(const char *dirpath, void *user, lws_dir_callback_function cb);
 size_t lws_get_allocated_heap(void);
 
 /**
+ * lws_get_tsi() - Get thread service index wsi belong to
+ * \param wsi:  websocket connection to check
+ *
+ * Returns more than zero (or zero if only one service thread as is the default).
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_get_tsi(struct lws *wsi);
+
+/**
  * lws_is_ssl() - Find out if connection is using SSL
  * \param wsi:	websocket connection to check
  *
- *	Returns 0 if the connection is not using SSL, 1 if using SSL and
- *	using verified cert, and 2 if using SSL but the cert was not
- *	checked (appears for client wsi told to skip check on connection)
+ * Returns nonzero if the wsi is inside a tls tunnel, else zero.
  */
 LWS_VISIBLE LWS_EXTERN int
 lws_is_ssl(struct lws *wsi);
@@ -893,20 +791,20 @@ typedef struct lws_humanize_unit {
 	const char *name; /* array ends with NULL name */
 	uint64_t factor;
 } lws_humanize_unit_t;
-/*
-LWS_VISIBLE LWS_EXTERN const lws_humanize_unit_t humanize_schema_si[7];
-LWS_VISIBLE LWS_EXTERN const lws_humanize_unit_t humanize_schema_si_bytes[7];
-LWS_VISIBLE LWS_EXTERN const lws_humanize_unit_t humanize_schema_us[8];
-*/
+
+LWS_VISIBLE extern const lws_humanize_unit_t humanize_schema_si[7];
+LWS_VISIBLE extern const lws_humanize_unit_t humanize_schema_si_bytes[7];
+LWS_VISIBLE extern const lws_humanize_unit_t humanize_schema_us[8];
+
 /**
- * lws_humanize() - Convert possibly large number to himan-readable uints
+ * lws_humanize() - Convert possibly large number to human-readable uints
  *
  * \param buf: result string buffer
  * \param len: remaining length in \p buf
  * \param value: the uint64_t value to represent
  * \param schema: and array of scaling factors and units
  *
- * This produces a concise string representation of \p value, referening the
+ * This produces a concise string representation of \p value, referencing the
  * schema \p schema of scaling factors and units to find the smallest way to
  * render it.
  *
@@ -923,4 +821,216 @@ LWS_VISIBLE LWS_EXTERN int
 lws_humanize(char *buf, int len, uint64_t value,
 	     const lws_humanize_unit_t *schema);
 
+LWS_VISIBLE LWS_EXTERN void
+lws_ser_wu16be(uint8_t *b, uint16_t u);
+
+LWS_VISIBLE LWS_EXTERN void
+lws_ser_wu32be(uint8_t *b, uint32_t u32);
+
+LWS_VISIBLE LWS_EXTERN void
+lws_ser_wu64be(uint8_t *b, uint64_t u64);
+
+LWS_VISIBLE LWS_EXTERN uint16_t
+lws_ser_ru16be(const uint8_t *b);
+
+LWS_VISIBLE LWS_EXTERN uint32_t
+lws_ser_ru32be(const uint8_t *b);
+
+LWS_VISIBLE LWS_EXTERN uint64_t
+lws_ser_ru64be(const uint8_t *b);
+
+LWS_VISIBLE LWS_EXTERN int
+lws_vbi_encode(uint64_t value, void *buf);
+
+LWS_VISIBLE LWS_EXTERN int
+lws_vbi_decode(const void *buf, uint64_t *value, size_t len);
+
 ///@}
+
+#if defined(LWS_WITH_SPAWN)
+
+/* opaque internal struct */
+struct lws_spawn_piped;
+
+#if defined(WIN32)
+struct _lws_siginfo_t {
+	int retcode;
+};
+typedef struct _lws_siginfo_t siginfo_t;
+#endif
+
+typedef void (*lsp_cb_t)(void *opaque, lws_usec_t *accounting, siginfo_t *si,
+			 int we_killed_him);
+
+
+/**
+ * lws_spawn_piped_info - details given to create a spawned pipe
+ *
+ * \p owner: lws_dll2_owner_t that lists all active spawns, or NULL
+ * \p vh: vhost to bind stdwsi to... from opt_parent if given
+ * \p opt_parent: optional parent wsi for stdwsi
+ * \p exec_array: argv for process to spawn
+ * \p env_array: environment for spawned process, NULL ends env list
+ * \p protocol_name: NULL, or vhost protocol name to bind stdwsi to
+ * \p chroot_path: NULL, or chroot patch for child process
+ * \p wd: working directory to cd to after fork, NULL defaults to /tmp
+ * \p plsp: NULL, or pointer to the outer lsp pointer so it can be set NULL when destroyed
+ * \p opaque: pointer passed to the reap callback, if any
+ * \p timeout: optional us-resolution timeout, or zero
+ * \p reap_cb: callback when child process has been reaped and the lsp destroyed
+ * \p tsi: tsi to bind stdwsi to... from opt_parent if given
+ */
+struct lws_spawn_piped_info {
+	struct lws_dll2_owner		*owner;
+	struct lws_vhost		*vh;
+	struct lws			*opt_parent;
+
+	const char * const		*exec_array;
+	char				**env_array;
+	const char			*protocol_name;
+	const char			*chroot_path;
+	const char			*wd;
+
+	struct lws_spawn_piped		**plsp;
+
+	void				*opaque;
+
+	lsp_cb_t			reap_cb;
+
+	lws_usec_t			timeout_us;
+	int				max_log_lines;
+	int				tsi;
+
+	const struct lws_role_ops	*ops; /* NULL is raw file */
+
+	uint8_t				disable_ctrlc;
+};
+
+/**
+ * lws_spawn_piped() - spawn a child process with stdxxx redirected
+ *
+ * \p lspi: info struct describing details of spawn to create
+ *
+ * This spawns a child process managed in the lsp object and with attributes
+ * set in the arguments.  The stdin/out/err streams are redirected to pipes
+ * which are instantiated into wsi that become child wsi of \p parent if non-
+ * NULL.  .opaque_user_data on the stdwsi created is set to point to the
+ * lsp object, so this can be recovered easily in the protocol handler.
+ *
+ * If \p owner is non-NULL, successful spawns join the given dll2 owner in the
+ * original process.
+ *
+ * If \p timeout is non-zero, successful spawns register a sul with the us-
+ * resolution timeout to callback \p timeout_cb, in the original process.
+ *
+ * Returns 0 if the spawn went OK or nonzero if it failed and was cleaned up.
+ * The spawned process continues asynchronously and this will return after
+ * starting it if all went well.
+ */
+LWS_VISIBLE LWS_EXTERN struct lws_spawn_piped *
+lws_spawn_piped(const struct lws_spawn_piped_info *lspi);
+
+/*
+ * lws_spawn_piped_kill_child_process() - attempt to kill child process
+ *
+ * \p lsp: child object to kill
+ *
+ * Attempts to signal the child process in \p lsp to terminate.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_spawn_piped_kill_child_process(struct lws_spawn_piped *lsp);
+
+/**
+ * lws_spawn_stdwsi_closed() - inform the spawn one of its stdxxx pipes closed
+ *
+ * \p lsp: the spawn object
+ * \p wsi: the wsi that is closing
+ *
+ * When you notice one of the spawn stdxxx pipes closed, inform the spawn
+ * instance using this api.  When it sees all three have closed, it will
+ * automatically try to reap the child process.
+ *
+ * This is the mechanism whereby the spawn object can understand its child
+ * has closed.
+ */
+LWS_VISIBLE LWS_EXTERN void
+lws_spawn_stdwsi_closed(struct lws_spawn_piped *lsp, struct lws *wsi);
+
+/**
+ * lws_spawn_get_stdfd() - return std channel index for stdwsi
+ *
+ * \p wsi: the wsi
+ *
+ * If you know wsi is a stdwsi from a spawn, you can determine its original
+ * channel index / fd before the pipes replaced the default fds.  It will return
+ * one of 0 (STDIN), 1 (STDOUT) or 2 (STDERR).  You can handle all three in the
+ * same protocol handler and then disambiguate them using this api.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_spawn_get_stdfd(struct lws *wsi);
+
+#endif
+
+struct lws_fsmount {
+	const char	*layers_path;	/* where layers live */
+	const char	*overlay_path;	/* where overlay instantiations live */
+
+	char		mp[256];	/* mountpoint path */
+	char		ovname[64];	/* unique name for mount instance */
+	char		distro[64];	/* unique name for layer source */
+
+#if defined(__linux__)
+	const char	*layers[4];	/* distro layers, like "base", "env" */
+#endif
+};
+
+/**
+ * lws_fsmount_mount() - Mounts an overlayfs stack of layers
+ *
+ * \p fsm: struct lws_fsmount specifying the mount layout
+ *
+ * This api is able to assemble up to 4 layer directories on to a mountpoint
+ * using overlayfs mount (Linux only).
+ *
+ * Set fsm.layers_path to the base dir where the layers themselves live, the
+ * entries in fsm.layers[] specifies the relative path to the layer, comprising
+ * fsm.layers_path/fsm.distro/fsm.layers[], with [0] being the deepest, earliest
+ * layer and the rest being progressively on top of [0]; NULL indicates the
+ * layer is unused.
+ *
+ * fsm.overlay_path is the base path of the overlayfs instantiations... empty
+ * dirs must exist at
+ *
+ * fsm.overlay_path/overlays/fsm.ovname/work
+ * fsm.overlay_path/overlays/fsm.ovname/session
+ *
+ * Set fsm.mp to the path of an already-existing empty dir that will be the
+ * mountpoint, this can be whereever you like.
+ *
+ * Overlayfs merges the union of all the contributing layers at the mountpoint,
+ * the mount is writeable but the layer themselves are immutable, all additions
+ * and changes are stored in
+ *
+ * fsm.overlay_path/overlays/fsm.ovname/session
+ *
+ * Returns 0 if mounted OK, nonzero if errors.
+ *
+ * Retain fsm for use with unmounting.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_fsmount_mount(struct lws_fsmount *fsm);
+
+/**
+ * lws_fsmount_unmount() - Unmounts an overlayfs dir
+ *
+ * \p fsm: struct lws_fsmount specifying the mount layout
+ *
+ * Unmounts the mountpoint in fsm.mp.
+ *
+ * Delete fsm.overlay_path/overlays/fsm.ovname/session to permanently eradicate
+ * all changes from the time the mountpoint was in use.
+ *
+ * Returns 0 if unmounted OK.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_fsmount_unmount(struct lws_fsmount *fsm);

@@ -1,10 +1,41 @@
+/*
+ * libwebsockets - small server side websockets and web server implementation
+ *
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+
 #ifndef _WINSOCK_DEPRECATED_NO_WARNINGS
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #endif
-#include "core/private.h"
+#include "private-lib-core.h"
 
+#if defined(LWS_WITH_MBEDTLS)
+#if defined(LWS_HAVE_MBEDTLS_NET_SOCKETS)
+#include "mbedtls/net_sockets.h"
+#else
+#include "mbedtls/net.h"
+#endif
+#endif
 
-LWS_VISIBLE int
+int
 lws_send_pipe_choked(struct lws *wsi)
 {	struct lws *wsi_eff;
 
@@ -43,7 +74,7 @@ lws_poll_listen_fd(struct lws_pollfd *fd)
 }
 
 int
-lws_plat_set_nonblocking(int fd)
+lws_plat_set_nonblocking(lws_sockfd_type fd)
 {
 	u_long optl = 1;
 	int result = !!ioctlsocket(fd, FIONBIO, &optl);
@@ -114,10 +145,11 @@ lws_plat_set_socket_options(struct lws_vhost *vhost, lws_sockfd_type fd,
 }
 
 
-LWS_EXTERN int
+int
 lws_interface_to_sa(int ipv6,
 		const char *ifname, struct sockaddr_in *addr, size_t addrlen)
 {
+	long long address;
 #ifdef LWS_WITH_IPV6
 	struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)addr;
 
@@ -128,7 +160,7 @@ lws_interface_to_sa(int ipv6,
 	}
 #endif
 
-	long long address = inet_addr(ifname);
+	address = inet_addr(ifname);
 
 	if (address == INADDR_NONE) {
 		struct hostent *entry = gethostbyname(ifname);
@@ -211,7 +243,7 @@ const char *
 lws_plat_inet_ntop(int af, const void *src, char *dst, int cnt)
 {
 	WCHAR *buffer;
-	DWORD bufferlen = cnt;
+	size_t bufferlen = (size_t)cnt;
 	BOOL ok = FALSE;
 
 	buffer = lws_malloc(bufferlen * 2, "inet_ntop");
@@ -226,7 +258,9 @@ lws_plat_inet_ntop(int af, const void *src, char *dst, int cnt)
 		srcaddr.sin_family = AF_INET;
 		memcpy(&(srcaddr.sin_addr), src, sizeof(srcaddr.sin_addr));
 
-		if (!WSAAddressToStringW((struct sockaddr*)&srcaddr, sizeof(srcaddr), 0, buffer, &bufferlen))
+		if (!WSAAddressToStringW((struct sockaddr*)&srcaddr,
+					sizeof(srcaddr), 0, buffer,
+					(LPDWORD)&bufferlen))
 			ok = TRUE;
 #ifdef LWS_WITH_IPV6
 	} else if (af == AF_INET6) {
@@ -235,7 +269,9 @@ lws_plat_inet_ntop(int af, const void *src, char *dst, int cnt)
 		srcaddr.sin6_family = AF_INET6;
 		memcpy(&(srcaddr.sin6_addr), src, sizeof(srcaddr.sin6_addr));
 
-		if (!WSAAddressToStringW((struct sockaddr*)&srcaddr, sizeof(srcaddr), 0, buffer, &bufferlen))
+		if (!WSAAddressToStringW((struct sockaddr*)&srcaddr,
+					 sizeof(srcaddr), 0, buffer,
+					 (LPDWORD)&bufferlen))
 			ok = TRUE;
 #endif
 	} else
@@ -245,7 +281,8 @@ lws_plat_inet_ntop(int af, const void *src, char *dst, int cnt)
 		int rv = WSAGetLastError();
 		lwsl_err("WSAAddressToString() : %d\n", rv);
 	} else {
-		if (WideCharToMultiByte(CP_ACP, 0, buffer, bufferlen, dst, cnt, 0, NULL) <= 0)
+		if (WideCharToMultiByte(CP_ACP, 0, buffer, (int)bufferlen, dst,
+					cnt, 0, NULL) <= 0)
 			ok = FALSE;
 	}
 
@@ -257,7 +294,7 @@ int
 lws_plat_inet_pton(int af, const char *src, void *dst)
 {
 	WCHAR *buffer;
-	DWORD bufferlen = (int)strlen(src) + 1;
+	size_t bufferlen = strlen(src) + 1;
 	BOOL ok = FALSE;
 
 	buffer = lws_malloc(bufferlen * 2, "inet_pton");
@@ -266,7 +303,8 @@ lws_plat_inet_pton(int af, const char *src, void *dst)
 		return -1;
 	}
 
-	if (MultiByteToWideChar(CP_ACP, 0, src, bufferlen, buffer, bufferlen) <= 0) {
+	if (MultiByteToWideChar(CP_ACP, 0, src, (int)bufferlen, buffer,
+				(int)bufferlen) <= 0) {
 		lwsl_err("Failed to convert multi byte to wide char\n");
 		lws_free(buffer);
 		return -1;
@@ -307,3 +345,92 @@ lws_plat_inet_pton(int af, const char *src, void *dst)
 	lws_free(buffer);
 	return ok ? 1 : -1;
 }
+
+int
+lws_plat_ifname_to_hwaddr(int fd, const char *ifname, uint8_t *hwaddr, int len)
+{
+	lwsl_err("%s: UNIMPLEMENTED on this platform\n", __func__);
+
+	return -1;
+}
+
+int
+lws_plat_rawudp_broadcast(uint8_t *p, const uint8_t *canned, int canned_len,
+			  int n, int fd, const char *iface)
+{
+	lwsl_err("%s: UNIMPLEMENTED on this platform\n", __func__);
+
+	return -1;
+}
+
+int
+lws_plat_if_up(const char *ifname, int fd, int up)
+{
+	lwsl_err("%s: UNIMPLEMENTED on this platform\n", __func__);
+
+	return -1;
+}
+
+int
+lws_plat_BINDTODEVICE(lws_sockfd_type fd, const char *ifname)
+{
+	lwsl_err("%s: UNIMPLEMENTED on this platform\n", __func__);
+
+	return -1;
+}
+
+int
+lws_plat_ifconfig_ip(const char *ifname, int fd, uint8_t *ip, uint8_t *mask_ip,
+			uint8_t *gateway_ip)
+{
+	lwsl_err("%s: UNIMPLEMENTED on this platform\n", __func__);
+
+	return -1;
+}
+
+#if defined(LWS_WITH_MBEDTLS)
+int
+lws_plat_mbedtls_net_send(void *ctx, const uint8_t *buf, size_t len)
+{
+	int fd = ((mbedtls_net_context *) ctx)->fd;
+	int ret;
+
+	if (fd < 0)
+		return MBEDTLS_ERR_NET_INVALID_CONTEXT;
+
+	ret = write(fd, buf, len);
+	if (ret >= 0)
+		return ret;
+
+	if (errno == EAGAIN || errno == EWOULDBLOCK)
+		return MBEDTLS_ERR_SSL_WANT_WRITE;
+
+        if (WSAGetLastError() == WSAECONNRESET )
+            return( MBEDTLS_ERR_NET_CONN_RESET );
+
+	return MBEDTLS_ERR_NET_SEND_FAILED;
+}
+
+int
+lws_plat_mbedtls_net_recv(void *ctx, unsigned char *buf, size_t len)
+{
+	int fd = ((mbedtls_net_context *) ctx)->fd;
+	int ret;
+
+	if (fd < 0)
+		return MBEDTLS_ERR_NET_INVALID_CONTEXT;
+
+	ret = (int)read(fd, buf, len);
+	if (ret >= 0)
+		return ret;
+
+	if (errno == EAGAIN || errno == EWOULDBLOCK)
+		return MBEDTLS_ERR_SSL_WANT_READ;
+
+        if (WSAGetLastError() == WSAECONNRESET)
+            return MBEDTLS_ERR_NET_CONN_RESET;
+
+	return MBEDTLS_ERR_NET_RECV_FAILED;
+}
+#endif
+

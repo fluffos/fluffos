@@ -1,22 +1,25 @@
 /*
- * libwebsockets - abstract top level header
+ * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
 /*
@@ -39,8 +42,7 @@ typedef struct lws_token_map {
 /*
  * The indvidual protocols and transports define their own name_index-es which
  * are meaningful to them.  Define index 0 globally as the end of an array of
- * them, and separate the ones used for protocols and transport so we can
- * sanity check they are at least in the correct category.
+ * them, and provide bases so user protocol and transport ones don't overlap.
  */
 
 enum {
@@ -53,6 +55,7 @@ enum {
 
 struct lws_abs_transport;
 struct lws_abs_protocol;
+typedef struct lws_abs lws_abs_t;
 
 LWS_VISIBLE LWS_EXTERN const lws_token_map_t *
 lws_abs_get_token(const lws_token_map_t *token_map, short name_index);
@@ -64,28 +67,40 @@ lws_abs_get_token(const lws_token_map_t *token_map, short name_index);
 typedef void lws_abs_transport_inst_t;
 typedef void lws_abs_protocol_inst_t;
 
-typedef struct lws_abs {
-	void				*user;
-	struct lws_vhost		*vh;
+/**
+ * lws_abstract_alloc() - allocate and configure an lws_abs_t
+ *
+ * \param vhost: the struct lws_vhost to bind to
+ * \param user: opaque user pointer
+ * \param abstract_path: "protocol.transport" names
+ * \param ap_tokens: tokens for protocol options
+ * \param at_tokens: tokens for transport
+ * \param seq: optional sequencer we should bind to, or NULL
+ * \param opaque_user_data: data given in sequencer callback, if any
+ *
+ * Returns an allocated lws_abs_t pointer set up with the other arguments.
+ *
+ * Doesn't create a connection instance, just allocates the lws_abs_t and
+ * sets it up with the arguments.
+ *
+ * Returns NULL is there's any problem.
+ */
+LWS_VISIBLE LWS_EXTERN lws_abs_t *
+lws_abstract_alloc(struct lws_vhost *vhost, void *user,
+		   const char *abstract_path, const lws_token_map_t *ap_tokens,
+		   const lws_token_map_t *at_tokens, struct lws_sequencer *seq,
+		   void *opaque_user_data);
 
-	const struct lws_abs_protocol	*ap;
-	const lws_token_map_t		*ap_tokens;
-	const struct lws_abs_transport	*at;
-	const lws_token_map_t		*at_tokens;
+/**
+ * lws_abstract_free() - free an allocated lws_abs_t
+ *
+ * \param pabs: pointer to the lws_abs_t * to free
+ *
+ * Frees and sets the pointer to NULL.
+ */
 
-	lws_seq_t			*seq;
-	void				*opaque_user_data;
-
-	/*
-	 * These are filled in by lws_abs_bind_and_create_instance() in the
-	 * instance copy.  They do not need to be set when creating the struct
-	 * for use by lws_abs_bind_and_create_instance()
-	 */
-
-	struct lws_dll2			abstract_instances;
-	lws_abs_transport_inst_t	*ati;
-	lws_abs_protocol_inst_t		*api;
-} lws_abs_t;
+LWS_VISIBLE LWS_EXTERN void
+lws_abstract_free(lws_abs_t **pabs);
 
 /**
  * lws_abs_bind_and_create_instance - use an abstract protocol and transport

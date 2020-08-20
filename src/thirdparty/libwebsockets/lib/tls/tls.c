@@ -3,27 +3,146 @@
  *
  * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-#include "core/private.h"
-#include "tls/private.h"
+#include "private-lib-core.h"
+#include "private-lib-tls.h"
+
+#if defined(LWS_WITH_NETWORK)
+#if defined(LWS_WITH_MBEDTLS) || (defined(OPENSSL_VERSION_NUMBER) && \
+				  OPENSSL_VERSION_NUMBER >= 0x10002000L)
+static int
+alpn_cb(SSL *s, const unsigned char **out, unsigned char *outlen,
+	const unsigned char *in, unsigned int inlen, void *arg)
+{
+#if !defined(LWS_WITH_MBEDTLS)
+	struct alpn_ctx *alpn_ctx = (struct alpn_ctx *)arg;
+
+	if (SSL_select_next_proto((unsigned char **)out, outlen, alpn_ctx->data,
+				  alpn_ctx->len, in, inlen) !=
+	    OPENSSL_NPN_NEGOTIATED)
+		return SSL_TLSEXT_ERR_NOACK;
+#endif
+
+	return SSL_TLSEXT_ERR_OK;
+}
+#endif
+
+int
+lws_tls_restrict_borrow(struct lws_context *context)
+{
+	if (!context->simultaneous_ssl_restriction)
+		return 0;
+
+	if (context->simultaneous_ssl >= context->simultaneous_ssl_restriction) {
+		lwsl_notice("%s: tls connection limit %d\n", __func__,
+			    context->simultaneous_ssl);
+		return 1;
+	}
+
+	if (++context->simultaneous_ssl == context->simultaneous_ssl_restriction)
+		/* that was the last allowed SSL connection */
+		lws_gate_accepts(context, 0);
+
+	lwsl_info("%s: %d -> %d\n", __func__,
+		  context->simultaneous_ssl - 1,
+		  context->simultaneous_ssl);
+
+	return 0;
+}
+
+void
+lws_tls_restrict_return(struct lws_context *context)
+{
+	if (context->simultaneous_ssl_restriction) {
+		if (context->simultaneous_ssl-- ==
+					context->simultaneous_ssl_restriction)
+			/* we made space and can do an accept */
+			lws_gate_accepts(context, 1);
+		lwsl_info("%s: %d -> %d\n", __func__,
+			  context->simultaneous_ssl + 1,
+			  context->simultaneous_ssl);
+	}
+}
+
+void
+lws_context_init_alpn(struct lws_vhost *vhost)
+{
+#if defined(LWS_WITH_MBEDTLS) || (defined(OPENSSL_VERSION_NUMBER) && \
+				  OPENSSL_VERSION_NUMBER >= 0x10002000L)
+	const char *alpn_comma = vhost->context->tls.alpn_default;
+
+	if (vhost->tls.alpn)
+		alpn_comma = vhost->tls.alpn;
+
+	lwsl_info(" Server '%s' advertising ALPN: %s\n",
+		    vhost->name, alpn_comma);
+	vhost->tls.alpn_ctx.len = lws_alpn_comma_to_openssl(alpn_comma,
+					vhost->tls.alpn_ctx.data,
+					sizeof(vhost->tls.alpn_ctx.data) - 1);
+
+	SSL_CTX_set_alpn_select_cb(vhost->tls.ssl_ctx, alpn_cb,
+				   &vhost->tls.alpn_ctx);
+#else
+	lwsl_err(
+		" HTTP2 / ALPN configured but not supported by OpenSSL 0x%lx\n",
+		    OPENSSL_VERSION_NUMBER);
+#endif // OPENSSL_VERSION_NUMBER >= 0x10002000L
+}
+
+int
+lws_tls_server_conn_alpn(struct lws *wsi)
+{
+#if defined(LWS_WITH_MBEDTLS) || (defined(OPENSSL_VERSION_NUMBER) && \
+				  OPENSSL_VERSION_NUMBER >= 0x10002000L)
+	const unsigned char *name = NULL;
+	char cstr[10];
+	unsigned len;
+
+	if (!wsi->tls.ssl)
+		return 0;
+
+	SSL_get0_alpn_selected(wsi->tls.ssl, &name, &len);
+	if (!len) {
+		lwsl_info("no ALPN upgrade\n");
+		return 0;
+	}
+
+	if (len > sizeof(cstr) - 1)
+		len = sizeof(cstr) - 1;
+
+	memcpy(cstr, name, len);
+	cstr[len] = '\0';
+
+	lwsl_info("negotiated '%s' using ALPN\n", cstr);
+	wsi->tls.use_ssl |= LCCSCF_USE_SSL;
+
+	return lws_role_call_alpn_negotiated(wsi, (const char *)cstr);
+#endif // OPENSSL_VERSION_NUMBER >= 0x10002000L
+
+	return 0;
+}
+#endif
 
 #if !defined(LWS_PLAT_OPTEE) && !defined(OPTEE_DEV_KIT)
-#if defined(LWS_WITH_ESP32) && !defined(LWS_AMAZON_RTOS)
+#if defined(LWS_PLAT_FREERTOS) && !defined(LWS_AMAZON_RTOS)
 int alloc_file(struct lws_context *context, const char *filename, uint8_t **buf,
 	       lws_filepos_t *amount)
 {
@@ -147,11 +266,11 @@ lws_tls_alloc_pem_to_der_file(struct lws_context *context, const char *filename,
 
 		/* take it as being already DER */
 
-		pem = lws_malloc(inlen, "alloc_der");
+		pem = lws_malloc((size_t)inlen, "alloc_der");
 		if (!pem)
 			return 1;
 
-		memcpy(pem, inbuf, inlen);
+		memcpy(pem, inbuf, (size_t)inlen);
 
 		*buf = pem;
 		*amount = inlen;
@@ -163,7 +282,7 @@ lws_tls_alloc_pem_to_der_file(struct lws_context *context, const char *filename,
 
 	if (!filename) {
 		/* we don't know if it's in const memory... alloc the output */
-		pem = lws_malloc((inlen * 3) / 4, "alloc_der");
+		pem = lws_malloc(((size_t)inlen * 3) / 4, "alloc_der");
 		if (!pem) {
 			lwsl_err("a\n");
 			return 1;
@@ -226,7 +345,7 @@ bail:
 
 #endif
 
-#if !defined(LWS_WITH_ESP32) && !defined(LWS_PLAT_OPTEE) && !defined(OPTEE_DEV_KIT)
+#if !defined(LWS_PLAT_FREERTOS) && !defined(LWS_PLAT_OPTEE) && !defined(OPTEE_DEV_KIT)
 
 
 static int
@@ -275,15 +394,15 @@ lws_tls_extant(const char *name)
  * 4) LWS_TLS_EXTANT_YES: The certs are present with the correct name and we
  *    have the rights to read them.
  */
-#if !defined(LWS_AMAZON_RTOS)
+
 enum lws_tls_extant
 lws_tls_use_any_upgrade_check_extant(const char *name)
 {
-#if !defined(LWS_PLAT_OPTEE)
+#if !defined(LWS_PLAT_OPTEE) && !defined(LWS_AMAZON_RTOS)
 
 	int n;
 
-#if !defined(LWS_WITH_ESP32)
+#if !defined(LWS_PLAT_FREERTOS)
 	char buf[256];
 
 	lws_snprintf(buf, sizeof(buf) - 1, "%s.upd", name);
@@ -332,5 +451,3 @@ lws_tls_use_any_upgrade_check_extant(const char *name)
 #endif
 	return LWS_TLS_EXTANT_YES;
 }
-#endif
-

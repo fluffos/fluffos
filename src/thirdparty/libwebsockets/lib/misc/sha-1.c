@@ -32,7 +32,8 @@
  * implemented by Jun-ichiro itojun Itoh <itojun@itojun.org>
  */
 
-#include "core/private.h"
+#include <libwebsockets.h>
+#include "private-lib-core.h"
 
 #ifdef LWS_HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -281,7 +282,7 @@ sha1_result(struct sha1_ctxt *ctxt, void *digest0)
  * This should look and work like the libcrypto implementation
  */
 
-LWS_VISIBLE unsigned char *
+unsigned char *
 lws_SHA1(const unsigned char *d, size_t n, unsigned char *md)
 {
 	struct sha1_ctxt ctx;

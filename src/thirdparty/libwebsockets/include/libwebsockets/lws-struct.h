@@ -1,24 +1,25 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2020 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
- *
- * included from libwebsockets.h
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
 #if defined(LWS_WITH_STRUCT_SQLITE3)
@@ -34,6 +35,7 @@ typedef enum {
 	LSMT_LIST,
 	LSMT_CHILD_PTR,
 	LSMT_SCHEMA,
+	LSMT_BLOB_PTR,
 
 } lws_struct_map_type_eum;
 
@@ -68,6 +70,8 @@ typedef struct lws_struct_args {
 	size_t map_entries_st[LEJP_MAX_PARSING_STACK_DEPTH];
 	size_t ac_block_size;
 	int subtype;
+
+	int top_schema_index;
 
 	/*
 	 * temp ac used to collate unknown possibly huge strings before final
@@ -186,6 +190,23 @@ typedef struct lws_struct_args {
 	  LSMT_SCHEMA \
 	}
 
+/*
+ * This is just used to create the table schema, it is not part of serialization
+ * and deserialization.  Blobs should be accessed separately.
+ */
+
+#define LSM_BLOB_PTR(type, blobptr_name, qname) \
+	{ \
+	  qname, /* JSON item, or sqlite3 column name */ \
+	  NULL, \
+	  NULL, \
+	  offsetof(type, blobptr_name),       /* member that points to blob */ \
+	  sizeof (((type *)0)->blobptr_name),       /* size of blob pointer */ \
+	  0,		 /* member holding blob len */ \
+	  0, /* size of blob length member */ \
+	  LSMT_BLOB_PTR \
+	}
+
 typedef struct lws_struct_serialize_st {
 	const struct lws_dll2 *dllpos;
 	const lws_struct_map_t *map;
@@ -198,7 +219,8 @@ typedef struct lws_struct_serialize_st {
 } lws_struct_serialize_st_t;
 
 enum {
-	LSSERJ_FLAG_PRETTY = 1
+	LSSERJ_FLAG_PRETTY	= (1 << 0),
+	LSSERJ_FLAG_OMIT_SCHEMA = (1 << 1)
 };
 
 typedef struct lws_struct_serialize {
@@ -229,7 +251,8 @@ lws_struct_default_lejp_cb(struct lejp_ctx *ctx, char reason);
 
 LWS_VISIBLE LWS_EXTERN lws_struct_serialize_t *
 lws_struct_json_serialize_create(const lws_struct_map_t *map,
-				 size_t map_entries, int flags, void *ptoplevel);
+				 size_t map_entries, int flags,
+				 const void *ptoplevel);
 
 LWS_VISIBLE LWS_EXTERN void
 lws_struct_json_serialize_destroy(lws_struct_serialize_t **pjs);
@@ -238,21 +261,24 @@ LWS_VISIBLE LWS_EXTERN lws_struct_json_serialize_result_t
 lws_struct_json_serialize(lws_struct_serialize_t *js, uint8_t *buf,
 			  size_t len, size_t *written);
 
-#if defined(LWS_WITH_STRUCT_SQLITE3)
+typedef struct sqlite3 sqlite3;
 
 LWS_VISIBLE LWS_EXTERN int
-lws_struct_sq3_deserialize(sqlite3 *pdb, const lws_struct_map_t *schema,
-			   lws_dll2_owner_t *o, struct lwsac **ac,
-			   uint64_t start, int limit);
+lws_struct_sq3_serialize(sqlite3 *pdb, const lws_struct_map_t *schema,
+			 lws_dll2_owner_t *owner, uint32_t manual_idx);
+
+LWS_VISIBLE LWS_EXTERN int
+lws_struct_sq3_deserialize(sqlite3 *pdb, const char *filter, const char *order,
+			   const lws_struct_map_t *schema, lws_dll2_owner_t *o,
+			   struct lwsac **ac, int start, int limit);
 
 LWS_VISIBLE LWS_EXTERN int
 lws_struct_sq3_create_table(sqlite3 *pdb, const lws_struct_map_t *schema);
 
 LWS_VISIBLE LWS_EXTERN int
 lws_struct_sq3_open(struct lws_context *context, const char *sqlite3_path,
-		    sqlite3 **pdb);
+		    char create_if_missing, sqlite3 **pdb);
 
 LWS_VISIBLE LWS_EXTERN int
 lws_struct_sq3_close(sqlite3 **pdb);
 
-#endif

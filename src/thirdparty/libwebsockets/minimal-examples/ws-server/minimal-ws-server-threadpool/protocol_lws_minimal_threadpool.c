@@ -32,8 +32,10 @@
 
 #include <string.h>
 
-struct per_vhost_data {
+struct per_vhost_data__minimal {
 	struct lws_threadpool *tp;
+	struct lws_context *context;
+	lws_sorted_usec_list_t sul;
 	const char *config;
 };
 
@@ -42,6 +44,10 @@ struct task_data {
 
 	uint64_t pos, end;
 };
+
+#if defined(WIN32)
+static void usleep(unsigned long l) { Sleep(l / 1000); }
+#endif
 
 /*
  * Create the private data for the task
@@ -129,12 +135,28 @@ task_function(void *user, enum lws_threadpool_task_status s)
 	return LWS_TP_RETURN_CHECKING_IN;
 }
 
+
+static void
+sul_tp_dump(struct lws_sorted_usec_list *sul)
+{
+	struct per_vhost_data__minimal *vhd =
+		lws_container_of(sul, struct per_vhost_data__minimal, sul);
+	/*
+	 * in debug mode, dump the threadpool stat to the logs once
+	 * a second
+	 */
+	lws_threadpool_dump(vhd->tp);
+	lws_sul_schedule(vhd->context, 0, &vhd->sul,
+			 sul_tp_dump, LWS_US_PER_SEC);
+}
+
+
 static int
 callback_minimal(struct lws *wsi, enum lws_callback_reasons reason,
 			void *user, void *in, size_t len)
 {
-	struct per_vhost_data *vhd =
-			(struct per_vhost_data *)
+	struct per_vhost_data__minimal *vhd =
+			(struct per_vhost_data__minimal *)
 			lws_protocol_vh_priv_get(lws_get_vhost(wsi),
 					lws_get_protocol(wsi));
 	const struct lws_protocol_vhost_options *pvo;
@@ -151,9 +173,11 @@ callback_minimal(struct lws *wsi, enum lws_callback_reasons reason,
 		/* create our per-vhost struct */
 		vhd = lws_protocol_vh_priv_zalloc(lws_get_vhost(wsi),
 				lws_get_protocol(wsi),
-				sizeof(struct per_vhost_data));
+				sizeof(struct per_vhost_data__minimal));
 		if (!vhd)
 			return 1;
+
+		vhd->context = lws_get_context(wsi);
 
 		/* recover the pointer to the globals struct */
 		pvo = lws_pvo_search(
@@ -175,27 +199,14 @@ callback_minimal(struct lws *wsi, enum lws_callback_reasons reason,
 		if (!vhd->tp)
 			return 1;
 
-		lws_timed_callback_vh_protocol(lws_get_vhost(wsi),
-					       lws_get_protocol(wsi),
-					       LWS_CALLBACK_USER, 1);
-
+		lws_sul_schedule(vhd->context, 0, &vhd->sul,
+				 sul_tp_dump, LWS_US_PER_SEC);
 		break;
 
 	case LWS_CALLBACK_PROTOCOL_DESTROY:
 		lws_threadpool_finish(vhd->tp);
 		lws_threadpool_destroy(vhd->tp);
-		break;
-
-	case LWS_CALLBACK_USER:
-
-		/*
-		 * in debug mode, dump the threadpool stat to the logs once
-		 * a second
-		 */
-		lws_threadpool_dump(vhd->tp);
-		lws_timed_callback_vh_protocol(lws_get_vhost(wsi),
-					       lws_get_protocol(wsi),
-					       LWS_CALLBACK_USER, 1);
+		lws_sul_cancel(&vhd->sul);
 		break;
 
 	case LWS_CALLBACK_ESTABLISHED:
@@ -237,7 +248,7 @@ callback_minimal(struct lws *wsi, enum lws_callback_reasons reason,
 
 	case LWS_CALLBACK_WS_SERVER_DROP_PROTOCOL:
 		lwsl_debug("LWS_CALLBACK_WS_SERVER_DROP_PROTOCOL: %p\n", wsi);
-		lws_threadpool_dequeue(wsi);
+		lws_threadpool_dequeue_task(lws_threadpool_get_task_wsi(wsi));
 		break;
 
 	case LWS_CALLBACK_SERVER_WRITEABLE:
@@ -253,7 +264,10 @@ callback_minimal(struct lws *wsi, enum lws_callback_reasons reason,
 		 * private task data.
 		 */
 
-		n = lws_threadpool_task_status_wsi(wsi, &task, &_user);
+		task = lws_threadpool_get_task_wsi(wsi);
+		if (!task)
+			break;
+		n = lws_threadpool_task_status(task, &_user);
 		lwsl_debug("%s: LWS_CALLBACK_SERVER_WRITEABLE: status %d\n",
 			   __func__, n);
 		switch(n) {
@@ -276,7 +290,7 @@ callback_minimal(struct lws *wsi, enum lws_callback_reasons reason,
 
 		lws_set_timeout(wsi, PENDING_TIMEOUT_THREADPOOL_TASK, 5);
 
-		n = strlen(priv->result + LWS_PRE);
+		n = (int)strlen(priv->result + LWS_PRE);
 		m = lws_write(wsi, (unsigned char *)priv->result + LWS_PRE,
 			      n, LWS_WRITE_TEXT);
 		if (m < n) {
@@ -317,7 +331,7 @@ static const struct lws_protocols protocols[] = {
 	LWS_PLUGIN_PROTOCOL_MINIMAL
 };
 
-LWS_EXTERN LWS_VISIBLE int
+int
 init_protocol_minimal(struct lws_context *context,
 		      struct lws_plugin_capability *c)
 {
@@ -335,7 +349,7 @@ init_protocol_minimal(struct lws_context *context,
 	return 0;
 }
 
-LWS_EXTERN LWS_VISIBLE int
+int
 destroy_protocol_minimal(struct lws_context *context)
 {
 	return 0;

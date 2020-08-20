@@ -1,25 +1,28 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-#include "core/private.h"
+#include "private-lib-core.h"
 
 #ifdef LWS_HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -206,21 +209,42 @@ lws_dll2_add_sorted(lws_dll2_t *d, lws_dll2_owner_t *own,
 	lws_dll2_add_tail(d, own);
 }
 
+void *
+_lws_dll2_search_sz_pl(lws_dll2_owner_t *own, const char *name, size_t namelen,
+		       size_t dll2_ofs, size_t ptr_ofs)
+{
+	lws_start_foreach_dll(struct lws_dll2 *, p, lws_dll2_get_head(own)) {
+		uint8_t *ref = ((uint8_t *)p) - dll2_ofs;
+		/*
+		 * We have to read the const char * at the computed place and
+		 * the string is where that points
+		 */
+		const char *str = *((const char **)(ref + ptr_ofs));
+
+		if (str && !strncmp(str, name, namelen) && !str[namelen])
+			return (void *)ref;
+	} lws_end_foreach_dll(p);
+
+	return NULL;
+}
+
 #if defined(_DEBUG)
 
 void
 lws_dll2_describe(lws_dll2_owner_t *owner, const char *desc)
 {
+#if _LWS_ENABLED_LOGS & LLL_INFO
 	int n = 1;
 
 	lwsl_info("%s: %s: owner %p: count %d, head %p, tail %p\n",
-		    __func__, desc, owner, owner->count, owner->head, owner->tail);
+		    __func__, desc, owner, (int)owner->count, owner->head, owner->tail);
 
 	lws_start_foreach_dll_safe(struct lws_dll2 *, p, tp,
 				   lws_dll2_get_head(owner)) {
 		lwsl_info("%s:    %d: %p: owner %p, prev %p, next %p\n",
 			    __func__, n++, p, p->owner, p->prev, p->next);
 	} lws_end_foreach_dll_safe(p, tp);
+#endif
 }
 
 #endif
