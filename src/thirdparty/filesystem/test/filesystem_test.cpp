@@ -1,32 +1,24 @@
 //---------------------------------------------------------------------------------------
 //
 // Copyright (c) 2018, Steffen Schümann <s.schuemann@pobox.com>
-// All rights reserved.
 //
-// Redistribution and use in source and binary forms, with or without modification,
-// are permitted provided that the following conditions are met:
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
 //
-// 1. Redistributions of source code must retain the above copyright notice, this
-//    list of conditions and the following disclaimer.
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
 //
-// 2. Redistributions in binary form must reproduce the above copyright notice,
-//    this list of conditions and the following disclaimer in the documentation
-//    and/or other materials provided with the distribution.
-//
-// 3. Neither the name of the copyright holder nor the names of its contributors
-//    may be used to endorse or promote products derived from this software without
-//    specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-// ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 //
 //---------------------------------------------------------------------------------------
 #include <algorithm>
@@ -890,6 +882,7 @@ TEST_CASE("30.10.8.4.11 path generation", "[filesystem][path][fs.path.gen]")
     CHECK(fs::path("a/b/c").lexically_relative("a/b/c/x/y") == "../..");
     CHECK(fs::path("a/b/c").lexically_relative("a/b/c") == ".");
     CHECK(fs::path("a/b").lexically_relative("c/d") == "../../a/b");
+    CHECK(fs::path("a/b").lexically_relative("a/") == "b");
     if (has_host_root_name_support()) {
         CHECK(fs::path("//host1/foo").lexically_relative("//host2.bar") == "");
     }
@@ -1515,6 +1508,11 @@ TEST_CASE("30.10.15.1 absolute", "[filesystem][operations][fs.op.absolute]")
 TEST_CASE("30.10.15.2 canonical", "[filesystem][operations][fs.op.canonical]")
 {
     CHECK_THROWS_AS(fs::canonical(""), fs::filesystem_error);
+    {
+        std::error_code ec;
+        CHECK(fs::canonical("", ec) == "");
+        CHECK(ec);
+    }
     CHECK(fs::canonical(fs::current_path()) == fs::current_path());
 
     CHECK(fs::canonical(".") == fs::current_path());
@@ -1677,6 +1675,7 @@ TEST_CASE("30.10.15.6 create_directories", "[filesystem][operations][fs.op.creat
     CHECK(fs::create_directories(p2));
     CHECK(fs::is_directory(p));
     CHECK(fs::is_directory(p2));
+    CHECK(!fs::create_directories(p2));
 #ifdef TEST_LWG_2935_BEHAVIOUR
     INFO("This test expects LWG #2935 result conformance.");
     p = t.path() / "testfile";
@@ -2629,13 +2628,28 @@ TEST_CASE("30.10.15.39 weakly_canonical", "[filesystem][operations][fs.op.weakly
 TEST_CASE("std::string_view support", "[filesystem][fs.string_view]")
 {
 #if __cpp_lib_string_view
-    std::string p("foo/bar");
-    std::string_view sv(p);
-    CHECK(fs::path(sv, fs::path::format::generic_format).generic_string() == "foo/bar");
-    fs::path p2("fo");
-    p2 += std::string_view("o");
-    CHECK(p2 == "foo");
-    CHECK(p2.compare(std::string_view("foo")) == 0);
+    {
+        std::string p("foo/bar");
+        std::string_view sv(p);
+        CHECK(fs::path(sv, fs::path::format::generic_format).generic_string() == "foo/bar");
+        fs::path p2("fo");
+        p2 += std::string_view("o");
+        CHECK(p2 == "foo");
+        CHECK(p2.compare(std::string_view("foo")) == 0);
+    }
+
+#if defined(IS_WCHAR_PATH) || defined(GHC_USE_WCHAR_T)
+    {
+        std::wstring p(L"foo/bar");
+        std::wstring_view sv(p);
+        CHECK(fs::path(sv, fs::path::format::generic_format).generic_string() == "foo/bar");
+        fs::path p2(L"fo");
+        p2 += std::wstring_view(L"o");
+        CHECK(p2 == "foo");
+        CHECK(p2.compare(std::wstring_view(L"foo")) == 0);
+    }
+#endif
+
 #else
     WARN("std::string_view specific tests are empty without std::string_view.");
 #endif
