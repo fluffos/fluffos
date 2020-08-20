@@ -147,14 +147,14 @@ callback_minimal_pmd_bulk(struct lws *wsi, enum lws_callback_reasons reason,
 				if (s > (size_t)n)
 					s = n;
 				memcpy(p, &redundant_string[m], s);
-				pss->position_tx += s;
+				pss->position_tx += (int)s;
 				p += s;
-				n -= s;
+				n -= (int)s;
 			}
 		} else {
 			pss->position_tx += n;
 			while (n--)
-				*p++ = rng(&pss->rng_tx);
+				*p++ = (uint8_t)rng(&pss->rng_tx);
 		}
 
 		n = lws_ptr_diff(p, start);
@@ -172,7 +172,7 @@ callback_minimal_pmd_bulk(struct lws *wsi, enum lws_callback_reasons reason,
 		lwsl_user("LWS_CALLBACK_RECEIVE: %4d (pss->pos=%d, rpp %5d, last %d)\n",
 				(int)len, (int)pss->position_rx, (int)lws_remaining_packet_payload(wsi),
 				lws_is_final_fragment(wsi));
-		olen = len;
+		olen = (int)len;
 
 		if (*vhd->options & 1) {
 			while (len) {
@@ -185,13 +185,13 @@ callback_minimal_pmd_bulk(struct lws *wsi, enum lws_callback_reasons reason,
 					lwsl_user("echo'd data doesn't match\n");
 					return -1;
 				}
-				pss->position_rx += s;
+				pss->position_rx += (int)s;
 				in = ((char *)in) + s;
 				len -= s;
 			}
 		} else {
 			p = (uint8_t *)in;
-			pss->position_rx += len;
+			pss->position_rx += (int)len;
 			while (len--) {
 				if (*p++ != (uint8_t)rng(&pss->rng_rx)) {
 					lwsl_user("echo'd data doesn't match: 0x%02X 0x%02X (%d)\n",
@@ -230,7 +230,7 @@ static const struct lws_protocols protocols[] = {
 	LWS_PLUGIN_PROTOCOL_MINIMAL_PMD_BULK
 };
 
-LWS_EXTERN LWS_VISIBLE int
+int
 init_protocol_minimal_pmd_bulk(struct lws_context *context,
 			       struct lws_plugin_capability *c)
 {
@@ -248,7 +248,7 @@ init_protocol_minimal_pmd_bulk(struct lws_context *context,
 	return 0;
 }
 
-LWS_EXTERN LWS_VISIBLE int
+int
 destroy_protocol_minimal_pmd_bulk(struct lws_context *context)
 {
 	return 0;

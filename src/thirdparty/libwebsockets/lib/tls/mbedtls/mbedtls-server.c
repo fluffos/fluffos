@@ -1,26 +1,30 @@
 /*
- * libwebsockets - mbedTLS-specific server functions
+ * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2017 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-#include "core/private.h"
+#include "private-lib-core.h"
 #include <mbedtls/x509_csr.h>
+#include <errno.h>
 
 int
 lws_tls_server_client_cert_verify_config(struct lws_vhost *vh)
@@ -261,7 +265,7 @@ int
 lws_tls_server_new_nonblocking(struct lws *wsi, lws_sockfd_type accept_fd)
 {
 	errno = 0;
-	wsi->tls.ssl = SSL_new(wsi->vhost->tls.ssl_ctx);
+	wsi->tls.ssl = SSL_new(wsi->a.vhost->tls.ssl_ctx);
 	if (wsi->tls.ssl == NULL) {
 		lwsl_err("SSL_new failed: errno %d\n", errno);
 
@@ -271,10 +275,10 @@ lws_tls_server_new_nonblocking(struct lws *wsi, lws_sockfd_type accept_fd)
 
 	SSL_set_fd(wsi->tls.ssl, accept_fd);
 
-	if (wsi->vhost->tls.ssl_info_event_mask)
+	if (wsi->a.vhost->tls.ssl_info_event_mask)
 		SSL_set_info_callback(wsi->tls.ssl, lws_ssl_info_callback);
 
-	SSL_set_sni_callback(wsi->tls.ssl, lws_mbedtls_sni_cb, wsi->context);
+	SSL_set_sni_callback(wsi->tls.ssl, lws_mbedtls_sni_cb, wsi->a.context);
 
 	return 0;
 }
@@ -299,9 +303,11 @@ lws_tls_server_accept(struct lws *wsi)
 	int m, n;
 
 	n = SSL_accept(wsi->tls.ssl);
+
+	wsi->skip_fallback = 1;
 	if (n == 1) {
 
-		if (strstr(wsi->vhost->name, ".invalid")) {
+		if (strstr(wsi->a.vhost->name, ".invalid")) {
 			lwsl_notice("%s: vhost has .invalid, "
 				    "rejecting accept\n", __func__);
 
@@ -320,12 +326,17 @@ lws_tls_server_accept(struct lws *wsi)
 	}
 
 	m = SSL_get_error(wsi->tls.ssl, n);
-	lwsl_debug("%s: %p: accept SSL_get_error %d errno %d\n", __func__,
+	lwsl_notice("%s: %p: accept SSL_get_error %d errno %d\n", __func__,
 		   wsi, m, errno);
 
 	// mbedtls wrapper only
 	if (m == SSL_ERROR_SYSCALL && errno == 11)
 		return LWS_SSL_CAPABLE_MORE_SERVICE_READ;
+
+#if defined(__APPLE__)
+	if (m == SSL_ERROR_SYSCALL && errno == 35)
+		return LWS_SSL_CAPABLE_MORE_SERVICE_READ;
+#endif
 
 #if defined(WIN32)
 	if (m == SSL_ERROR_SYSCALL && errno == 0)
@@ -459,14 +470,14 @@ static uint8_t ss_cert_leadin[] = {
 
 #define SAN_A_LENGTH 78
 
-LWS_VISIBLE int
+int
 lws_tls_acme_sni_cert_create(struct lws_vhost *vhost, const char *san_a,
 			     const char *san_b)
 {
 	int buflen = 0x560;
 	uint8_t *buf = lws_malloc(buflen, "tmp cert buf"), *p = buf, *pkey_asn1;
 	struct lws_genrsa_ctx ctx;
-	struct lws_gencrypto_keyelem el;
+	struct lws_gencrypto_keyelem el[LWS_GENCRYPTO_RSA_KEYEL_COUNT];
 	uint8_t digest[32];
 	struct lws_genhash_ctx hash_ctx;
 	int pkey_asn1_len = 3 * 1024;
@@ -475,9 +486,10 @@ lws_tls_acme_sni_cert_create(struct lws_vhost *vhost, const char *san_a,
 	if (!buf)
 		return 1;
 
-	n = lws_genrsa_new_keypair(vhost->context, &ctx, &el, keybits);
+	n = lws_genrsa_new_keypair(vhost->context, &ctx, LGRSAM_PKCS1_1_5,
+				   &el[0], keybits);
 	if (n < 0) {
-		lws_genrsa_destroy_elements(&el);
+		lws_genrsa_destroy_elements(&el[0]);
 		goto bail1;
 	}
 
@@ -511,8 +523,8 @@ lws_tls_acme_sni_cert_create(struct lws_vhost *vhost, const char *san_a,
 	/* we need to drop 1 + (keybits / 8) bytes of n in here, 00 + key */
 
 	*p++ = 0x00;
-	memcpy(p, el.e[LWS_GENCRYPTO_RSA_KEYEL_N].buf, el.e[LWS_GENCRYPTO_RSA_KEYEL_N].len);
-	p += el.e[LWS_GENCRYPTO_RSA_KEYEL_N].len;
+	memcpy(p, el[LWS_GENCRYPTO_RSA_KEYEL_N].buf, el[LWS_GENCRYPTO_RSA_KEYEL_N].len);
+	p += el[LWS_GENCRYPTO_RSA_KEYEL_N].len;
 
 	memcpy(p, ss_cert_san_leadin, sizeof(ss_cert_san_leadin));
 	p += sizeof(ss_cert_san_leadin);
@@ -581,7 +593,7 @@ lws_tls_acme_sni_cert_create(struct lws_vhost *vhost, const char *san_a,
 	}
 
 	lws_genrsa_destroy(&ctx);
-	lws_genrsa_destroy_elements(&el);
+	lws_genrsa_destroy_elements(&el[0]);
 
 	lws_free(buf);
 
@@ -589,7 +601,7 @@ lws_tls_acme_sni_cert_create(struct lws_vhost *vhost, const char *san_a,
 
 bail2:
 	lws_genrsa_destroy(&ctx);
-	lws_genrsa_destroy_elements(&el);
+	lws_genrsa_destroy_elements(&el[0]);
 bail1:
 	lws_free(buf);
 
@@ -617,7 +629,7 @@ static const char *x5[] = { "C", "ST", "L", "O", "CN" };
  * CSR is output formatted as b64url(DER)
  * Private key is output as a PEM in memory
  */
-LWS_VISIBLE LWS_EXTERN int
+int
 lws_tls_acme_sni_csr_create(struct lws_context *context, const char *elements[],
 			    uint8_t *dcsr, size_t csr_len, char **privkey_pem,
 			    size_t *privkey_len)

@@ -1,24 +1,25 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2018 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2020 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
- *
- * included from libwebsockets.h
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
 /* minimal space for typical headers and CSP stuff */
@@ -212,97 +213,129 @@ struct lws_tokens {
  * add it at where specified so existing users are unaffected.
  */
 enum lws_token_indexes {
-	WSI_TOKEN_GET_URI					=  0,
-	WSI_TOKEN_POST_URI					=  1,
-	WSI_TOKEN_OPTIONS_URI					=  2,
-	WSI_TOKEN_HOST						=  3,
-	WSI_TOKEN_CONNECTION					=  4,
-	WSI_TOKEN_UPGRADE					=  5,
-	WSI_TOKEN_ORIGIN					=  6,
-	WSI_TOKEN_DRAFT						=  7,
-	WSI_TOKEN_CHALLENGE					=  8,
-	WSI_TOKEN_EXTENSIONS					=  9,
-	WSI_TOKEN_KEY1						= 10,
-	WSI_TOKEN_KEY2						= 11,
-	WSI_TOKEN_PROTOCOL					= 12,
-	WSI_TOKEN_ACCEPT					= 13,
-	WSI_TOKEN_NONCE						= 14,
-	WSI_TOKEN_HTTP						= 15,
-	WSI_TOKEN_HTTP2_SETTINGS				= 16,
-	WSI_TOKEN_HTTP_ACCEPT					= 17,
-	WSI_TOKEN_HTTP_AC_REQUEST_HEADERS			= 18,
-	WSI_TOKEN_HTTP_IF_MODIFIED_SINCE			= 19,
-	WSI_TOKEN_HTTP_IF_NONE_MATCH				= 20,
-	WSI_TOKEN_HTTP_ACCEPT_ENCODING				= 21,
-	WSI_TOKEN_HTTP_ACCEPT_LANGUAGE				= 22,
-	WSI_TOKEN_HTTP_PRAGMA					= 23,
-	WSI_TOKEN_HTTP_CACHE_CONTROL				= 24,
-	WSI_TOKEN_HTTP_AUTHORIZATION				= 25,
-	WSI_TOKEN_HTTP_COOKIE					= 26,
-	WSI_TOKEN_HTTP_CONTENT_LENGTH				= 27,
-	WSI_TOKEN_HTTP_CONTENT_TYPE				= 28,
-	WSI_TOKEN_HTTP_DATE					= 29,
-	WSI_TOKEN_HTTP_RANGE					= 30,
-	WSI_TOKEN_HTTP_REFERER					= 31,
-	WSI_TOKEN_KEY						= 32,
-	WSI_TOKEN_VERSION					= 33,
-	WSI_TOKEN_SWORIGIN					= 34,
+	WSI_TOKEN_GET_URI, /* 0 */
+	WSI_TOKEN_POST_URI,
+#if defined(LWS_WITH_HTTP_UNCOMMON_HEADERS) || defined(LWS_HTTP_HEADERS_ALL)
+	WSI_TOKEN_OPTIONS_URI,
+#endif
+	WSI_TOKEN_HOST,
+	WSI_TOKEN_CONNECTION,
+	WSI_TOKEN_UPGRADE, /* 5 */
+	WSI_TOKEN_ORIGIN,
+#if defined(LWS_ROLE_WS) || defined(LWS_HTTP_HEADERS_ALL)
+	WSI_TOKEN_DRAFT,
+#endif
+	WSI_TOKEN_CHALLENGE,
+#if defined(LWS_ROLE_WS) || defined(LWS_HTTP_HEADERS_ALL)
+	WSI_TOKEN_EXTENSIONS,
+	WSI_TOKEN_KEY1, /* 10 */
+	WSI_TOKEN_KEY2,
+	WSI_TOKEN_PROTOCOL,
+	WSI_TOKEN_ACCEPT,
+	WSI_TOKEN_NONCE,
+#endif
+	WSI_TOKEN_HTTP,
+#if defined(LWS_ROLE_H2) || defined(LWS_HTTP_HEADERS_ALL)
+	WSI_TOKEN_HTTP2_SETTINGS, /* 16 */
+#endif
+	WSI_TOKEN_HTTP_ACCEPT,
+#if defined(LWS_WITH_HTTP_UNCOMMON_HEADERS) || defined(LWS_HTTP_HEADERS_ALL)
+	WSI_TOKEN_HTTP_AC_REQUEST_HEADERS,
+#endif
+	WSI_TOKEN_HTTP_IF_MODIFIED_SINCE,
+	WSI_TOKEN_HTTP_IF_NONE_MATCH, /* 20 */
+	WSI_TOKEN_HTTP_ACCEPT_ENCODING,
+	WSI_TOKEN_HTTP_ACCEPT_LANGUAGE,
+	WSI_TOKEN_HTTP_PRAGMA,
+	WSI_TOKEN_HTTP_CACHE_CONTROL,
+	WSI_TOKEN_HTTP_AUTHORIZATION,
+	WSI_TOKEN_HTTP_COOKIE,
+	WSI_TOKEN_HTTP_CONTENT_LENGTH, /* 27 */
+	WSI_TOKEN_HTTP_CONTENT_TYPE,
+	WSI_TOKEN_HTTP_DATE,
+	WSI_TOKEN_HTTP_RANGE,
+#if defined(LWS_WITH_HTTP_UNCOMMON_HEADERS) || defined(LWS_ROLE_H2) || defined(LWS_HTTP_HEADERS_ALL)
+	WSI_TOKEN_HTTP_REFERER,
+#endif
+#if defined(LWS_ROLE_WS) || defined(LWS_HTTP_HEADERS_ALL)
+	WSI_TOKEN_KEY,
+	WSI_TOKEN_VERSION,
+	WSI_TOKEN_SWORIGIN,
+#endif
+#if defined(LWS_ROLE_H2) || defined(LWS_HTTP_HEADERS_ALL)
+	WSI_TOKEN_HTTP_COLON_AUTHORITY,
+	WSI_TOKEN_HTTP_COLON_METHOD,
+	WSI_TOKEN_HTTP_COLON_PATH,
+	WSI_TOKEN_HTTP_COLON_SCHEME,
+	WSI_TOKEN_HTTP_COLON_STATUS,
+#endif
 
-	WSI_TOKEN_HTTP_COLON_AUTHORITY				= 35,
-	WSI_TOKEN_HTTP_COLON_METHOD				= 36,
-	WSI_TOKEN_HTTP_COLON_PATH				= 37,
-	WSI_TOKEN_HTTP_COLON_SCHEME				= 38,
-	WSI_TOKEN_HTTP_COLON_STATUS				= 39,
+#if defined(LWS_WITH_HTTP_UNCOMMON_HEADERS) || defined(LWS_ROLE_H2) || defined(LWS_HTTP_HEADERS_ALL)
+	WSI_TOKEN_HTTP_ACCEPT_CHARSET,
+#endif
+	WSI_TOKEN_HTTP_ACCEPT_RANGES,
+#if defined(LWS_WITH_HTTP_UNCOMMON_HEADERS) || defined(LWS_ROLE_H2) || defined(LWS_HTTP_HEADERS_ALL)
+	WSI_TOKEN_HTTP_ACCESS_CONTROL_ALLOW_ORIGIN,
+#endif
+	WSI_TOKEN_HTTP_AGE,
+	WSI_TOKEN_HTTP_ALLOW,
+	WSI_TOKEN_HTTP_CONTENT_DISPOSITION,
+	WSI_TOKEN_HTTP_CONTENT_ENCODING,
+	WSI_TOKEN_HTTP_CONTENT_LANGUAGE,
+	WSI_TOKEN_HTTP_CONTENT_LOCATION,
+	WSI_TOKEN_HTTP_CONTENT_RANGE,
+	WSI_TOKEN_HTTP_ETAG,
+	WSI_TOKEN_HTTP_EXPECT,
+	WSI_TOKEN_HTTP_EXPIRES,
+	WSI_TOKEN_HTTP_FROM,
+	WSI_TOKEN_HTTP_IF_MATCH,
+	WSI_TOKEN_HTTP_IF_RANGE,
+	WSI_TOKEN_HTTP_IF_UNMODIFIED_SINCE,
+	WSI_TOKEN_HTTP_LAST_MODIFIED,
+	WSI_TOKEN_HTTP_LINK,
+	WSI_TOKEN_HTTP_LOCATION,
+#if defined(LWS_WITH_HTTP_UNCOMMON_HEADERS) || defined(LWS_ROLE_H2) || defined(LWS_HTTP_HEADERS_ALL)
+	WSI_TOKEN_HTTP_MAX_FORWARDS,
+	WSI_TOKEN_HTTP_PROXY_AUTHENTICATE,
+	WSI_TOKEN_HTTP_PROXY_AUTHORIZATION,
+#endif
+	WSI_TOKEN_HTTP_REFRESH,
+	WSI_TOKEN_HTTP_RETRY_AFTER,
+	WSI_TOKEN_HTTP_SERVER,
+	WSI_TOKEN_HTTP_SET_COOKIE,
+#if defined(LWS_WITH_HTTP_UNCOMMON_HEADERS) || defined(LWS_ROLE_H2) || defined(LWS_HTTP_HEADERS_ALL)
+	WSI_TOKEN_HTTP_STRICT_TRANSPORT_SECURITY,
+#endif
+	WSI_TOKEN_HTTP_TRANSFER_ENCODING,
+#if defined(LWS_WITH_HTTP_UNCOMMON_HEADERS) || defined(LWS_ROLE_H2) || defined(LWS_HTTP_HEADERS_ALL)
+	WSI_TOKEN_HTTP_USER_AGENT,
+	WSI_TOKEN_HTTP_VARY,
+	WSI_TOKEN_HTTP_VIA,
+	WSI_TOKEN_HTTP_WWW_AUTHENTICATE,
+#endif
+#if defined(LWS_WITH_HTTP_UNCOMMON_HEADERS) || defined(LWS_HTTP_HEADERS_ALL)
+	WSI_TOKEN_PATCH_URI,
+	WSI_TOKEN_PUT_URI,
+	WSI_TOKEN_DELETE_URI,
+#endif
 
-	WSI_TOKEN_HTTP_ACCEPT_CHARSET				= 40,
-	WSI_TOKEN_HTTP_ACCEPT_RANGES				= 41,
-	WSI_TOKEN_HTTP_ACCESS_CONTROL_ALLOW_ORIGIN		= 42,
-	WSI_TOKEN_HTTP_AGE					= 43,
-	WSI_TOKEN_HTTP_ALLOW					= 44,
-	WSI_TOKEN_HTTP_CONTENT_DISPOSITION			= 45,
-	WSI_TOKEN_HTTP_CONTENT_ENCODING				= 46,
-	WSI_TOKEN_HTTP_CONTENT_LANGUAGE				= 47,
-	WSI_TOKEN_HTTP_CONTENT_LOCATION				= 48,
-	WSI_TOKEN_HTTP_CONTENT_RANGE				= 49,
-	WSI_TOKEN_HTTP_ETAG					= 50,
-	WSI_TOKEN_HTTP_EXPECT					= 51,
-	WSI_TOKEN_HTTP_EXPIRES					= 52,
-	WSI_TOKEN_HTTP_FROM					= 53,
-	WSI_TOKEN_HTTP_IF_MATCH					= 54,
-	WSI_TOKEN_HTTP_IF_RANGE					= 55,
-	WSI_TOKEN_HTTP_IF_UNMODIFIED_SINCE			= 56,
-	WSI_TOKEN_HTTP_LAST_MODIFIED				= 57,
-	WSI_TOKEN_HTTP_LINK					= 58,
-	WSI_TOKEN_HTTP_LOCATION					= 59,
-	WSI_TOKEN_HTTP_MAX_FORWARDS				= 60,
-	WSI_TOKEN_HTTP_PROXY_AUTHENTICATE			= 61,
-	WSI_TOKEN_HTTP_PROXY_AUTHORIZATION			= 62,
-	WSI_TOKEN_HTTP_REFRESH					= 63,
-	WSI_TOKEN_HTTP_RETRY_AFTER				= 64,
-	WSI_TOKEN_HTTP_SERVER					= 65,
-	WSI_TOKEN_HTTP_SET_COOKIE				= 66,
-	WSI_TOKEN_HTTP_STRICT_TRANSPORT_SECURITY		= 67,
-	WSI_TOKEN_HTTP_TRANSFER_ENCODING			= 68,
-	WSI_TOKEN_HTTP_USER_AGENT				= 69,
-	WSI_TOKEN_HTTP_VARY					= 70,
-	WSI_TOKEN_HTTP_VIA					= 71,
-	WSI_TOKEN_HTTP_WWW_AUTHENTICATE				= 72,
-
-	WSI_TOKEN_PATCH_URI					= 73,
-	WSI_TOKEN_PUT_URI					= 74,
-	WSI_TOKEN_DELETE_URI					= 75,
-
-	WSI_TOKEN_HTTP_URI_ARGS					= 76,
-	WSI_TOKEN_PROXY						= 77,
-	WSI_TOKEN_HTTP_X_REAL_IP				= 78,
-	WSI_TOKEN_HTTP1_0					= 79,
-	WSI_TOKEN_X_FORWARDED_FOR				= 80,
-	WSI_TOKEN_CONNECT					= 81,
-	WSI_TOKEN_HEAD_URI					= 82,
-	WSI_TOKEN_TE						= 83,
-	WSI_TOKEN_REPLAY_NONCE					= 84,
-	WSI_TOKEN_COLON_PROTOCOL				= 85,
-	WSI_TOKEN_X_AUTH_TOKEN					= 86,
+	WSI_TOKEN_HTTP_URI_ARGS,
+#if defined(LWS_WITH_HTTP_UNCOMMON_HEADERS) || defined(LWS_HTTP_HEADERS_ALL)
+	WSI_TOKEN_PROXY,
+	WSI_TOKEN_HTTP_X_REAL_IP,
+#endif
+	WSI_TOKEN_HTTP1_0,
+	WSI_TOKEN_X_FORWARDED_FOR,
+	WSI_TOKEN_CONNECT,
+	WSI_TOKEN_HEAD_URI,
+#if defined(LWS_WITH_HTTP_UNCOMMON_HEADERS) || defined(LWS_ROLE_H2) || defined(LWS_HTTP_HEADERS_ALL)
+	WSI_TOKEN_TE,
+	WSI_TOKEN_REPLAY_NONCE, /* ACME */
+#endif
+#if defined(LWS_ROLE_H2) || defined(LWS_HTTP_HEADERS_ALL)
+	WSI_TOKEN_COLON_PROTOCOL,
+#endif
+	WSI_TOKEN_X_AUTH_TOKEN,
 
 	/****** add new things just above ---^ ******/
 
@@ -323,7 +356,7 @@ enum lws_token_indexes {
 
 	/* parser state additions, no storage associated */
 	WSI_TOKEN_NAME_PART,
-#if defined(LWS_WITH_CUSTOM_HEADERS)
+#if defined(LWS_WITH_CUSTOM_HEADERS) || defined(LWS_HTTP_HEADERS_ALL)
 	WSI_TOKEN_UNKNOWN_VALUE_PART,
 #endif
 	WSI_TOKEN_SKIPPING,
@@ -334,6 +367,19 @@ enum lws_token_indexes {
 
 struct lws_token_limits {
 	unsigned short token_limit[WSI_TOKEN_COUNT]; /**< max chars for this token */
+};
+
+enum lws_h2_settings {
+	H2SET_HEADER_TABLE_SIZE = 1,
+	H2SET_ENABLE_PUSH,
+	H2SET_MAX_CONCURRENT_STREAMS,
+	H2SET_INITIAL_WINDOW_SIZE,
+	H2SET_MAX_FRAME_SIZE,
+	H2SET_MAX_HEADER_LIST_SIZE,
+	H2SET_RESERVED7,
+	H2SET_ENABLE_CONNECT_PROTOCOL, /* defined in mcmanus-httpbis-h2-ws-02 */
+
+	H2SET_COUNT /* always last */
 };
 
 /**
@@ -606,6 +652,18 @@ lws_add_http_common_headers(struct lws *wsi, unsigned int code,
 			    const char *content_type, lws_filepos_t content_len,
 			    unsigned char **p, unsigned char *end);
 
+enum {
+	LWSHUMETH_GET,
+	LWSHUMETH_POST,
+	LWSHUMETH_OPTIONS,
+	LWSHUMETH_PUT,
+	LWSHUMETH_PATCH,
+	LWSHUMETH_DELETE,
+	LWSHUMETH_CONNECT,
+	LWSHUMETH_HEAD,
+	LWSHUMETH_COLON_PATH,
+};
+
 /**
  * lws_http_get_uri_and_method() - Get information on method and url
  *
@@ -613,17 +671,7 @@ lws_add_http_common_headers(struct lws *wsi, unsigned int code,
  * \param puri_ptr: points to pointer to set to url
  * \param puri_len: points to int to set to uri length
  *
- * Returns -1 or method index
- *
- * GET      0
- * POST     1
- * OPTIONS  2
- * PUT      3
- * PATCH    4
- * DELETE   5
- * CONNECT  6
- * HEAD     7
- * :path    8
+ * Returns -1 or method index as one of the LWSHUMETH_ constants
  *
  * If returns method, *puri_ptr is set to the method's URI string and *puri_len
  * to its length
@@ -745,6 +793,24 @@ LWS_VISIBLE LWS_EXTERN int
 lws_http_mark_sse(struct lws *wsi);
 
 /**
+ * lws_h2_client_stream_long_poll_rxonly() - h2 stream to immortal read-only
+ *
+ * \param wsi: h2 stream client wsi
+ *
+ * Send END_STREAM-flagged zero-length DATA frame to set client stream wsi into
+ * half-closed (local) and remote into half-closed (remote).  Set the client
+ * stream wsi to be immortal (not subject to timeouts).
+ *
+ * Used if the remote server supports immortal long poll to put the stream into
+ * a read-only state where it can wait as long as needed for rx.
+ *
+ * Returns 0 if the process (which happens asynchronously) started or non-zero
+ * if it wasn't an h2 stream.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_h2_client_stream_long_poll_rxonly(struct lws *wsi);
+
+/**
  * lws_http_compression_apply() - apply an http compression transform
  *
  * \param wsi: the wsi to apply the compression transform to
@@ -769,8 +835,94 @@ lws_http_mark_sse(struct lws *wsi);
  * LWS_WITH_HTTP_STREAM_COMPRESSION set, then a NOP is provided for this api,
  * allowing user code to build either way and use compression if available.
  */
-LWS_VISIBLE int
+LWS_VISIBLE LWS_EXTERN int
 lws_http_compression_apply(struct lws *wsi, const char *name,
 			   unsigned char **p, unsigned char *end, char decomp);
+
+/**
+ * lws_http_is_redirected_to_get() - true if redirected to GET
+ *
+ * \param wsi: the wsi to check
+ *
+ * Check if the wsi is currently in GET mode, after, eg, doing a POST and
+ * receiving a 303.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_http_is_redirected_to_get(struct lws *wsi);
+
+/**
+ * lws_http_cookie_get() - return copy of named cookie if present
+ *
+ * \param wsi: the wsi to check
+ * \param name: name of the cookie
+ * \param buf: buffer to store the cookie contents into
+ * \param max_len: on entry, maximum length of buf... on exit, used len of buf
+ *
+ * If no cookie header, or no cookie of the requested name, or the value is
+ * larger than can fit in buf, returns nonzero.
+ *
+ * If the cookie is found, copies its value into buf with a terminating NUL,
+ * sets *max_len to the used length, and returns 0.
+ *
+ * This handles the parsing of the possibly multi-cookie header string and
+ * terminating the requested cookie at the next ; if present.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_http_cookie_get(struct lws *wsi, const char *name, char *buf, size_t *max);
+
+/**
+ * lws_http_client_http_error() - determine if the response code indicates an error
+ *
+ * \param code: the response code to test
+ *
+ * Returns nonzero if the code indicates an error, else zero if reflects a
+ * non-error condition
+ */
+#define lws_http_client_http_resp_is_error(code) (!(code < 400))
+
+/**
+ * lws_h2_update_peer_txcredit() - manually update stream peer tx credit
+ *
+ * \param wsi: the h2 child stream whose peer credit to change
+ * \param sid: the stream ID, or LWS_H2_STREAM_SID for the wsi stream ID
+ * \param bump: signed change to confer upon peer tx credit for sid
+ *
+ * In conjunction with LCCSCF_H2_MANUAL_RXFLOW flag, allows the user code to
+ * selectively starve the remote peer of the ability to send us data on a client
+ * connection.
+ *
+ * Normally lws sends an initial window size for the peer to send to it of 0,
+ * but during the header phase it sends a WINDOW_UPDATE to increase the amount
+ * available.  LCCSCF_H2_MANUAL_RXFLOW restricts this initial increase in tx
+ * credit for the stream, before it has been asked to send us anything, to the
+ * amount specified in the client info .manual_initial_tx_credit member, and
+ * this api can be called to send the other side permission to send us up to
+ * \p bump additional bytes.
+ *
+ * The nwsi tx credit is updated automatically for exactly what was sent to us
+ * on a stream with LCCSCF_H2_MANUAL_RXFLOW flag, but the stream's own tx credit
+ * must be handled manually by user code via this api.
+ *
+ * Returns 0 for success or nonzero for failure.
+ */
+#define LWS_H2_STREAM_SID -1
+LWS_VISIBLE LWS_EXTERN int
+lws_h2_update_peer_txcredit(struct lws *wsi, int sid, int bump);
+
+
+/**
+ * lws_h2_get_peer_txcredit_estimate() - return peer tx credit estimate
+ *
+ * \param wsi: the h2 child stream whose peer credit estimate to return
+ *
+ * Returns the estimated amount of tx credit at the peer, in other words the
+ * number of bytes the peer is authorized to send to us.
+ *
+ * It's an 'estimate' because we don't know how much is already in flight
+ * towards us and actually already used.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_h2_get_peer_txcredit_estimate(struct lws *wsi);
+
 ///@}
 

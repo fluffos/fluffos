@@ -82,8 +82,8 @@ char crl_path[1024] = "";
 #include "../plugins/protocol_lws_mirror.c"
 #include "../plugins/protocol_lws_status.c"
 #include "../plugins/protocol_dumb_increment.c"
-#include "../plugins/protocol_post_demo.c"
 #endif
+#include "../plugins/protocol_post_demo.c"
 
 static int
 lws_callback_http(struct lws *wsi, enum lws_callback_reasons reason, void *user,
@@ -155,8 +155,8 @@ static struct lws_protocols protocols[] = {
 	LWS_PLUGIN_PROTOCOL_DUMB_INCREMENT,
 	LWS_PLUGIN_PROTOCOL_MIRROR,
 	LWS_PLUGIN_PROTOCOL_LWS_STATUS,
-	LWS_PLUGIN_PROTOCOL_POST_DEMO,
 #endif
+	LWS_PLUGIN_PROTOCOL_POST_DEMO,
 	{ NULL, NULL, 0, 0 } /* terminator */
 };
 
@@ -206,6 +206,7 @@ void sighandler(int sig)
 	lws_cancel_service(context);
 }
 
+#if defined(LWS_ROLE_WS)
 static const struct lws_extension exts[] = {
 	{
 		"permessage-deflate",
@@ -214,6 +215,7 @@ static const struct lws_extension exts[] = {
 	},
 	{ NULL, NULL, NULL /* terminator */ }
 };
+#endif
 
 /*
  * mount handlers for sections of the URL space
@@ -317,6 +319,7 @@ static struct option options[] = {
 	{ "ssl-cert",  required_argument,	NULL, 'C' },
 	{ "ssl-key",  required_argument,	NULL, 'K' },
 	{ "ssl-ca",  required_argument,		NULL, 'A' },
+	{ "resource-path",  required_argument,		NULL, 'r' },
 #if defined(LWS_WITH_TLS)
 	{ "ssl-verify-client",	no_argument,		NULL, 'v' },
 #if defined(LWS_HAVE_SSL_CTX_set1_param)
@@ -328,10 +331,16 @@ static struct option options[] = {
 #ifndef LWS_NO_DAEMONIZE
 	{ "daemonize",	no_argument,		NULL, 'D' },
 #endif
-	{ "pingpong-secs", required_argument,	NULL, 'P' },
+	{ "ignore-sigterm", no_argument,	NULL, 'I' },
+
 	{ NULL, 0, 0, 0 }
 };
 #endif
+
+static void
+sigterm_catch(int sig)
+{
+}
 
 int main(int argc, char **argv)
 {
@@ -344,7 +353,6 @@ int main(int argc, char **argv)
 	char ca_path[1024] = "";
 	int uid = -1, gid = -1;
 	int use_ssl = 0;
-	int pp_secs = 0;
 	int opts = 0;
 	int n = 0;
 #ifndef LWS_NO_DAEMONIZE
@@ -360,9 +368,9 @@ int main(int argc, char **argv)
 
 	while (n >= 0) {
 #if defined(LWS_HAS_GETOPT_LONG) || defined(WIN32)
-		n = getopt_long(argc, argv, "eci:hsap:d:DC:K:A:R:vu:g:P:kU:n", options, NULL);
+		n = getopt_long(argc, argv, "eci:hsap:d:DC:K:A:R:vu:g:kU:niIr:", options, NULL);
 #else
-		n = getopt(argc, argv, "eci:hsap:d:DC:K:A:R:vu:g:P:kU:n");
+		n = getopt(argc, argv, "eci:hsap:d:DC:K:A:R:vu:g:kU:nIr:");
 #endif
 		if (n < 0)
 			continue;
@@ -387,6 +395,12 @@ int main(int argc, char **argv)
 		case 'n':
 			/* no dumb increment send */
 			test_options |= 1;
+			break;
+		case 'I':
+			signal(SIGTERM, sigterm_catch);
+			break;
+		case 'r':
+			resource_path = optarg;
 			break;
 		case 's':
 			use_ssl = 1;
@@ -428,10 +442,6 @@ int main(int argc, char **argv)
 			break;
 		case 'A':
 			lws_strncpy(ca_path, optarg, sizeof(ca_path));
-			break;
-		case 'P':
-			pp_secs = atoi(optarg);
-			lwsl_notice("Setting pingpong interval to %d\n", pp_secs);
 			break;
 #if defined(LWS_WITH_TLS)
 		case 'v':
@@ -475,7 +485,7 @@ int main(int argc, char **argv)
 	/* tell the library what debug level to emit and to send it to stderr */
 	lws_set_log_level(debug_level, NULL);
 
-	lwsl_notice("libwebsockets test server - license LGPL2.1+SLE\n");
+	lwsl_notice("libwebsockets test server - license MIT\n");
 	lwsl_notice("(C) Copyright 2010-2018 Andy Green <andy@warmcat.com>\n");
 
 	printf("Using resource path \"%s\"\n", resource_path);
@@ -495,9 +505,10 @@ int main(int argc, char **argv)
 
 	info.iface = iface;
 	info.protocols = protocols;
+
+#if defined(LWS_WITH_TLS)
 	info.ssl_cert_filepath = NULL;
 	info.ssl_private_key_filepath = NULL;
-	info.ws_ping_pong_interval = pp_secs;
 
 	if (use_ssl) {
 		if (strlen(resource_path) > sizeof(cert_path) - 32) {
@@ -514,17 +525,22 @@ int main(int argc, char **argv)
 		if (!key_path[0])
 			sprintf(key_path, "%s/libwebsockets-test-server.key.pem",
 								resource_path);
-
+#if defined(LWS_WITH_TLS)
 		info.ssl_cert_filepath = cert_path;
 		info.ssl_private_key_filepath = key_path;
 		if (ca_path[0])
 			info.ssl_ca_filepath = ca_path;
+#endif
 	}
+#endif
 	info.gid = gid;
 	info.uid = uid;
 	info.options = opts | LWS_SERVER_OPTION_VALIDATE_UTF8 | LWS_SERVER_OPTION_EXPLICIT_VHOSTS;
+#if defined(LWS_ROLE_WS)
 	info.extensions = exts;
+#endif
 	info.timeout_secs = 5;
+#if defined(LWS_WITH_TLS)
 	info.ssl_cipher_list = "ECDHE-ECDSA-AES256-GCM-SHA384:"
 			       "ECDHE-RSA-AES256-GCM-SHA384:"
 			       "DHE-RSA-AES256-GCM-SHA384:"
@@ -538,9 +554,12 @@ int main(int argc, char **argv)
 			       "!DHE-RSA-AES256-SHA256:"
 			       "!AES256-GCM-SHA384:"
 			       "!AES256-SHA256";
+#endif
 	info.mounts = &mount;
-	info.ip_limit_ah = 24; /* for testing */
-	info.ip_limit_wsi = 400; /* for testing */
+#if defined(LWS_WITH_PEER_LIMITS)
+	info.ip_limit_ah = 128; /* for testing */
+	info.ip_limit_wsi = 800; /* for testing */
+#endif
 
 	if (use_ssl)
 		/* redirect guys coming on http */
@@ -568,7 +587,7 @@ int main(int argc, char **argv)
 
 	info.port++;
 
-#if !defined(LWS_NO_CLIENT) && defined(LWS_WITH_TLS)
+#if defined(LWS_WITH_CLIENT) && defined(LWS_WITH_TLS)
 	lws_init_vhost_client_ssl(&info, vhost);
 #endif
 

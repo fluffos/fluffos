@@ -206,7 +206,7 @@ static int corner_lengths[] = {
 
 /* one of these is created for each client connecting to us */
 
-struct per_session_data {
+struct per_session_data__minimal {
 	int which;
 	int last; /* 0 no test, else test number in corner_lengths[] + 1 */
 };
@@ -215,8 +215,8 @@ static int
 callback_minimal(struct lws *wsi, enum lws_callback_reasons reason,
 			void *user, void *in, size_t len)
 {
-	struct per_session_data *pss =
-			(struct per_session_data *)user;
+	struct per_session_data__minimal *pss =
+			(struct per_session_data__minimal *)user;
 	unsigned char buf[LWS_PRE + 2048];
 	int m;
 
@@ -265,7 +265,7 @@ callback_minimal(struct lws *wsi, enum lws_callback_reasons reason,
 	{ \
 		"lws-minimal", \
 		callback_minimal, \
-		sizeof(struct per_session_data), \
+		sizeof(struct per_session_data__minimal), \
 		2048, \
 		0, NULL, 0 \
 	}
@@ -278,7 +278,7 @@ static const struct lws_protocols protocols[] = {
 	LWS_PLUGIN_PROTOCOL_MINIMAL
 };
 
-LWS_EXTERN LWS_VISIBLE int
+int
 init_protocol_minimal(struct lws_context *context,
 		      struct lws_plugin_capability *c)
 {
@@ -296,7 +296,7 @@ init_protocol_minimal(struct lws_context *context,
 	return 0;
 }
 
-LWS_EXTERN LWS_VISIBLE int
+int
 destroy_protocol_minimal(struct lws_context *context)
 {
 	return 0;

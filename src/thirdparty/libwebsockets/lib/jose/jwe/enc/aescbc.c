@@ -1,39 +1,40 @@
 /*
- * libwebsockets - JSON Web Encryption support
+ * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2018 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
- *
- *
- * JWE code for payload encrypt / decrypt using aescbc
- *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
-#include "core/private.h"
-#include "jose/jwe/private.h"
+
+#include "private-lib-core.h"
+#include "private-lib-jose-jwe.h"
 
 int
 lws_jwe_encrypt_cbc_hs(struct lws_jwe *jwe, uint8_t *cek,
 		       uint8_t *aad, int aad_len)
 {
-	int n, hlen = lws_genhmac_size(jwe->jose.enc_alg->hmac_type);
+	int n, hlen = (int)lws_genhmac_size(jwe->jose.enc_alg->hmac_type);
 	uint8_t digest[LWS_GENHASH_LARGEST];
 	struct lws_gencrypto_keyelem el;
 	struct lws_genhmac_ctx hmacctx;
 	struct lws_genaes_ctx aesctx;
+	size_t paddedlen;
 	uint8_t al[8];
 
 	/* Caller must have prepared space for the results */
@@ -81,22 +82,27 @@ lws_jwe_encrypt_cbc_hs(struct lws_jwe *jwe, uint8_t *cek,
 	el.len = hlen / 2;
 
 	if (lws_genaes_create(&aesctx, LWS_GAESO_ENC, LWS_GAESM_CBC, &el,
-			      LWS_GAESP_NO_PADDING, NULL)) {
+			      LWS_GAESP_WITH_PADDING, NULL)) {
 		lwsl_err("%s: lws_genaes_create failed\n", __func__);
 
 		return -1;
 	}
 
 	/*
-	 * the plaintext gets delivered to us in LJWE_CTXT, this replaces
-	 * the plaintext there with the same amount of ciphertext
+	 * the plaintext gets delivered to us in LJWE_CTXT, this replaces the
+	 * plaintext there with the ciphertext, which will be larger by some
+	 * padding bytes
 	 */
 	n = lws_genaes_crypt(&aesctx, (uint8_t *)jwe->jws.map.buf[LJWE_CTXT],
 			     jwe->jws.map.len[LJWE_CTXT],
 			     (uint8_t *)jwe->jws.map.buf[LJWE_CTXT],
 			     (uint8_t *)jwe->jws.map.buf[LJWE_IV],
-			     NULL, NULL, 16);
-	lws_genaes_destroy(&aesctx, NULL, 0);
+			     NULL, NULL, LWS_AES_CBC_BLOCKLEN);
+	paddedlen = lws_gencrypto_padded_length(LWS_AES_CBC_BLOCKLEN,
+						jwe->jws.map.len[LJWE_CTXT]);
+	jwe->jws.map.len[LJWE_CTXT] = (uint32_t)paddedlen;
+	lws_genaes_destroy(&aesctx, (uint8_t *)jwe->jws.map.buf[LJWE_CTXT] +
+			   paddedlen - LWS_AES_CBC_BLOCKLEN, LWS_AES_CBC_BLOCKLEN);
 	if (n) {
 		lwsl_err("%s: lws_genaes_crypt failed\n", __func__);
 		return -1;
@@ -156,7 +162,7 @@ int
 lws_jwe_auth_and_decrypt_cbc_hs(struct lws_jwe *jwe, uint8_t *enc_cek,
 				uint8_t *aad, int aad_len)
 {
-	int n, hlen = lws_genhmac_size(jwe->jose.enc_alg->hmac_type);
+	int n, hlen = (int)lws_genhmac_size(jwe->jose.enc_alg->hmac_type);
 	uint8_t digest[LWS_GENHASH_LARGEST];
 	struct lws_gencrypto_keyelem el;
 	struct lws_genhmac_ctx hmacctx;
@@ -241,6 +247,19 @@ lws_jwe_auth_and_decrypt_cbc_hs(struct lws_jwe *jwe, uint8_t *enc_cek,
 			     jwe->jws.map.len[LJWE_CTXT],
 			     (uint8_t *)jwe->jws.map.buf[LJWE_CTXT],
 			     (uint8_t *)jwe->jws.map.buf[LJWE_IV], NULL, NULL, 16);
+
+	/* Strip the PKCS #7 padding */
+
+	if (jwe->jws.map.len[LJWE_CTXT] < LWS_AES_CBC_BLOCKLEN ||
+	    jwe->jws.map.len[LJWE_CTXT] <= (unsigned char)jwe->jws.map.buf[LJWE_CTXT]
+						[jwe->jws.map.len[LJWE_CTXT] - 1]) {
+		lwsl_err("%s: invalid padded ciphertext length: %d. Corrupt data?\n",
+				__func__, jwe->jws.map.len[LJWE_CTXT]);
+		return -1;
+	}
+	jwe->jws.map.len[LJWE_CTXT] -= jwe->jws.map.buf[LJWE_CTXT][
+						jwe->jws.map.len[LJWE_CTXT] - 1];
+
 	n |= lws_genaes_destroy(&aesctx, NULL, 0);
 	if (n) {
 		lwsl_err("%s: lws_genaes_crypt failed\n", __func__);

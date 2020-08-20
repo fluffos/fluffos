@@ -1,25 +1,28 @@
 /*
- * libwebsockets - lib/core-net/sequencer.c
+ * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-#include "core/private.h"
+#include "private-lib-core.h"
 
 /*
  * per pending event
@@ -35,7 +38,7 @@ typedef struct lws_seq_event {
 /*
  * per sequencer
  */
-struct lws_sequencer {
+typedef struct lws_sequencer {
 	struct lws_dll2			seq_list;
 
 	lws_sorted_usec_list_t		sul_timeout;
@@ -50,8 +53,9 @@ struct lws_sequencer {
 	lws_usec_t			time_created;
 	lws_usec_t			timeout; /* 0 or time we timeout */
 
-	char				going_down;
-};
+	uint8_t				going_down:1;
+	uint8_t				wakesuspend:1;
+} lws_seq_t;
 
 #define QUEUE_SANITY_LIMIT 10
 
@@ -74,8 +78,8 @@ lws_sul_seq_heartbeat_cb(lws_sorted_usec_list_t *sul)
 
 	/* schedule the next one */
 
-	__lws_sul_insert(&pt->pt_sul_owner, &pt->sul_seq_heartbeat,
-			 LWS_US_PER_SEC);
+	__lws_sul_insert_us(&pt->pt_sul_owner[LWSSULLI_MISS_IF_SUSPENDED],
+			    &pt->sul_seq_heartbeat, LWS_US_PER_SEC);
 }
 
 int
@@ -84,8 +88,8 @@ lws_seq_pt_init(struct lws_context_per_thread *pt)
 	pt->sul_seq_heartbeat.cb = lws_sul_seq_heartbeat_cb;
 
 	/* schedule the first heartbeat */
-	__lws_sul_insert(&pt->pt_sul_owner, &pt->sul_seq_heartbeat,
-			 LWS_US_PER_SEC);
+	__lws_sul_insert_us(&pt->pt_sul_owner[LWSSULLI_MISS_IF_SUSPENDED],
+			    &pt->sul_seq_heartbeat, LWS_US_PER_SEC);
 
 	return 0;
 }
@@ -103,6 +107,7 @@ lws_seq_create(lws_seq_info_t *i)
 	seq->pt = pt;
 	seq->name = i->name;
 	seq->retry = i->retry;
+	seq->wakesuspend = i->wakesuspend;
 
 	*i->puser = (void *)&seq[1];
 
@@ -239,7 +244,8 @@ lws_seq_queue_event(lws_seq_t *seq, lws_seq_events_t e, void *data, void *aux)
 	lws_dll2_add_tail(&seqe->seq_event_list, &seq->seq_event_owner);
 
 	seq->sul_pending.cb = lws_seq_sul_pending_cb;
-	__lws_sul_insert(&seq->pt->pt_sul_owner, &seq->sul_pending, 1);
+	__lws_sul_insert_us(&seq->pt->pt_sul_owner[seq->wakesuspend],
+			    &seq->sul_pending, 1);
 
 	lws_pt_unlock(seq->pt); /* } pt ------------------------------------- */
 
@@ -297,8 +303,10 @@ lws_seq_timeout_us(lws_seq_t *seq, lws_usec_t us)
 {
 	seq->sul_timeout.cb = lws_seq_sul_timeout_cb;
 	/* list is always at the very top of the sul */
-	return __lws_sul_insert(&seq->pt->pt_sul_owner,
+	__lws_sul_insert_us(&seq->pt->pt_sul_owner[seq->wakesuspend],
 			(lws_sorted_usec_list_t *)&seq->sul_timeout.list, us);
+
+	return 0;
 }
 
 lws_seq_t *

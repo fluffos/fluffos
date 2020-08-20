@@ -120,8 +120,10 @@ callback_lws_status(struct lws *wsi, enum lws_callback_reasons reason,
 		time(&pss->time_est);
 		pss->wsi = wsi;
 
+#if defined(LWS_WITH_HTTP_UNCOMMON_HEADERS)
 		if (lws_hdr_copy(wsi, pss->user_agent, sizeof(pss->user_agent),
 			     WSI_TOKEN_HTTP_USER_AGENT) < 0) /* too big */
+#endif
 			strcpy(pss->user_agent, "unknown");
 		trigger_resend(vhd);
 		break;
@@ -244,7 +246,7 @@ static const struct lws_protocols protocols[] = {
 };
 
 
-LWS_EXTERN LWS_VISIBLE int
+LWS_VISIBLE int
 init_protocol_lws_status(struct lws_context *context,
 			     struct lws_plugin_capability *c)
 {
@@ -262,7 +264,7 @@ init_protocol_lws_status(struct lws_context *context,
 	return 0;
 }
 
-LWS_EXTERN LWS_VISIBLE int
+LWS_VISIBLE int
 destroy_protocol_lws_status(struct lws_context *context)
 {
 	return 0;

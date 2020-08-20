@@ -1,31 +1,33 @@
-/*
- * libwebsockets lib/abstract/transports/unit-test.c
+ /*
+ * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
- *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  *
  * An abstract transport that is useful for unit testing an abstract protocol.
  * It doesn't actually connect to anything, but checks the protocol's response
  * to provided canned packets from an array of test vectors.
  */
 
-#include "core/private.h"
-#include "abstract/private.h"
+#include "private-lib-core.h"
+#include "private-lib-abstract.h"
 
 /* this is the transport priv instantiated at abs->ati */
 
@@ -33,7 +35,7 @@ typedef struct lws_abstxp_unit_test_priv {
 	char					note[128];
 	struct lws_abs				*abs;
 
-	lws_seq_t				*seq;
+	struct lws_sequencer			*seq;
 	lws_unit_test_t				*current_test;
 	lws_unit_test_packet_t			*expect;
 	lws_unit_test_packet_test_cb		result_cb;
@@ -339,7 +341,7 @@ lws_atcut_tx(lws_abs_transport_inst_t *ati, uint8_t *buf, size_t len)
 	return 0;
 }
 
-#if !defined(LWS_WITHOUT_CLIENT)
+#if defined(LWS_WITH_CLIENT)
 static int
 lws_atcut_client_conn(const lws_abs_t *abs)
 {
@@ -417,7 +419,7 @@ static int
 lws_atcut_create(lws_abs_t *ai)
 {
 	abs_unit_test_priv_t *priv;
-	lws_seq_t *seq;
+	struct lws_sequencer *seq;
 	lws_seq_info_t i;
 	seq_priv_t *s;
 
@@ -511,15 +513,22 @@ lws_unit_test_result_name(int in)
 	return dnames[in];
 }
 
+static int
+lws_atcut_compare(lws_abs_t *abs1, lws_abs_t *abs2)
+{
+	return 0;
+}
+
 const lws_abs_transport_t lws_abs_transport_cli_unit_test = {
 	.name			= "unit_test",
 	.alloc			= sizeof(abs_unit_test_priv_t),
 
 	.create			= lws_atcut_create,
 	.destroy		= lws_atcut_destroy,
+	.compare		= lws_atcut_compare,
 
 	.tx			= lws_atcut_tx,
-#if defined(LWS_WITHOUT_CLIENT)
+#if !defined(LWS_WITH_CLIENT)
 	.client_conn		= NULL,
 #else
 	.client_conn		= lws_atcut_client_conn,

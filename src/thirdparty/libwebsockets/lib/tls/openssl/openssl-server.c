@@ -1,25 +1,28 @@
 /*
- * libwebsockets - OpenSSL-specific server functions
+ * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2018 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-#include "core/private.h"
+#include "private-lib-core.h"
 
 /*
  * Care: many openssl apis return 1 for success.  These are translated to the
@@ -56,7 +59,7 @@ OpenSSL_verify_callback(int preverify_ok, X509_STORE_CTX *x509_ctx)
 	else
 		lwsl_info("%s: couldn't get client cert CN\n", __func__);
 
-	n = wsi->vhost->protocols[0].callback(wsi,
+	n = wsi->a.vhost->protocols[0].callback(wsi,
 			LWS_CALLBACK_OPENSSL_PERFORM_CLIENT_CERT_VERIFICATION,
 					   x509_ctx, ssl, preverify_ok);
 
@@ -166,11 +169,10 @@ lws_tls_server_certs_load(struct lws_vhost *vhost, struct lws *wsi,
 	unsigned long error;
 	lws_filepos_t flen;
 	uint8_t *p;
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
 	int ret;
-
+#endif
 	int n = lws_tls_generic_cert_checks(vhost, cert, private_key), m;
-
-	(void)ret;
 
 	if (!cert && !private_key)
 		n = LWS_TLS_EXTANT_ALTERNATIVE;
@@ -517,8 +519,13 @@ lws_tls_server_vhost_backend_init(const struct lws_context_creation_info *info,
 #endif
 
 	if (info->ssl_ca_filepath &&
+#if defined(LWS_HAVE_SSL_CTX_load_verify_file)
+	    !SSL_CTX_load_verify_file(vhost->tls.ssl_ctx,
+				      info->ssl_ca_filepath)) {
+#else
 	    !SSL_CTX_load_verify_locations(vhost->tls.ssl_ctx,
 					   info->ssl_ca_filepath, NULL)) {
+#endif
 		lwsl_err("%s: SSL_CTX_load_verify_locations unhappy\n",
 			 __func__);
 	}
@@ -558,7 +565,7 @@ lws_tls_server_new_nonblocking(struct lws *wsi, lws_sockfd_type accept_fd)
 
 	errno = 0;
 	ERR_clear_error();
-	wsi->tls.ssl = SSL_new(wsi->vhost->tls.ssl_ctx);
+	wsi->tls.ssl = SSL_new(wsi->a.vhost->tls.ssl_ctx);
 	if (wsi->tls.ssl == NULL) {
 		lwsl_err("SSL_new failed: %d (errno %d)\n",
 			 lws_ssl_get_error(wsi, 0), errno);
@@ -568,7 +575,7 @@ lws_tls_server_new_nonblocking(struct lws *wsi, lws_sockfd_type accept_fd)
 	}
 
 	SSL_set_ex_data(wsi->tls.ssl, openssl_websocket_private_data_index, wsi);
-	SSL_set_fd(wsi->tls.ssl, (int)(long long)accept_fd);
+	SSL_set_fd(wsi->tls.ssl, (int)(lws_intptr_t)accept_fd);
 
 #ifdef USE_WOLFSSL
 #ifdef USE_OLD_CYASSL
@@ -593,7 +600,7 @@ lws_tls_server_new_nonblocking(struct lws *wsi, lws_sockfd_type accept_fd)
 #endif
 
 #if defined (LWS_HAVE_SSL_SET_INFO_CALLBACK)
-		if (wsi->vhost->tls.ssl_info_event_mask)
+		if (wsi->a.vhost->tls.ssl_info_event_mask)
 			SSL_set_info_callback(wsi->tls.ssl, lws_ssl_info_callback);
 #endif
 
@@ -612,13 +619,15 @@ lws_tls_server_abort_connection(struct lws *wsi)
 enum lws_ssl_capable_status
 lws_tls_server_accept(struct lws *wsi)
 {
-	struct lws_context_per_thread *pt = &wsi->context->pt[(int)wsi->tsi];
+	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
 	union lws_tls_cert_info_results ir;
 	int m, n;
 
 	errno = 0;
 	ERR_clear_error();
 	n = SSL_accept(wsi->tls.ssl);
+
+	wsi->skip_fallback = 1;
 
 	if (n == 1) {
 		n = lws_tls_peer_cert_info(wsi, LWS_TLS_CERT_INFO_COMMON_NAME, &ir,
@@ -708,7 +717,7 @@ struct lws_tls_ss_pieces {
 	RSA *rsa;
 };
 
-LWS_VISIBLE LWS_EXTERN int
+int
 lws_tls_acme_sni_cert_create(struct lws_vhost *vhost, const char *san_a,
 			     const char *san_b)
 {
@@ -865,10 +874,11 @@ static int nid_list[] = {
 	NID_localityName,		/* LWS_TLS_REQ_ELEMENT_LOCALITY */
 	NID_organizationName,		/* LWS_TLS_REQ_ELEMENT_ORGANIZATION */
 	NID_commonName,			/* LWS_TLS_REQ_ELEMENT_COMMON_NAME */
-	NID_organizationalUnitName,	/* LWS_TLS_REQ_ELEMENT_EMAIL */
+	NID_subject_alt_name,		/* LWS_TLS_REQ_ELEMENT_SUBJECT_ALT_NAME */
+	NID_pkcs9_emailAddress,		/* LWS_TLS_REQ_ELEMENT_EMAIL */
 };
 
-LWS_VISIBLE LWS_EXTERN int
+int
 lws_tls_acme_sni_csr_create(struct lws_context *context, const char *elements[],
 			    uint8_t *csr, size_t csr_len, char **privkey_pem,
 			    size_t *privkey_len)
@@ -903,14 +913,44 @@ lws_tls_acme_sni_csr_create(struct lws_context *context, const char *elements[],
 		goto bail2;
 
 	for (n = 0; n < LWS_TLS_REQ_ELEMENT_COUNT; n++)
-		if (lws_tls_openssl_add_nid(subj, nid_list[n], elements[n])) {
-			lwsl_notice("%s: failed to add element %d\n", __func__,
-				    n);
+		if (elements[n] &&
+			lws_tls_openssl_add_nid(subj, nid_list[n],
+				elements[n])) {
+				lwsl_notice("%s: failed to add element %d\n",
+						__func__, n);
 			goto bail3;
 		}
 
 	if (X509_REQ_set_subject_name(req, subj) != 1)
 		goto bail3;
+
+	if (elements[LWS_TLS_REQ_ELEMENT_SUBJECT_ALT_NAME]) {
+		STACK_OF(X509_EXTENSION) *exts;
+		X509_EXTENSION *ext;
+		char san[256];
+
+		exts = sk_X509_EXTENSION_new_null();
+		if (!exts)
+			goto bail3;
+
+		lws_snprintf(san, sizeof(san), "DNS:%s,DNS:%s",
+				elements[LWS_TLS_REQ_ELEMENT_COMMON_NAME],
+				elements[LWS_TLS_REQ_ELEMENT_SUBJECT_ALT_NAME]);
+
+		ext = X509V3_EXT_conf_nid(NULL, NULL, NID_subject_alt_name,
+				san);
+		if (!ext) {
+			sk_X509_EXTENSION_pop_free(exts, X509_EXTENSION_free);
+			goto bail3;
+		}
+		sk_X509_EXTENSION_push(exts, ext);
+
+		if (!X509_REQ_add_extensions(req, exts)) {
+			sk_X509_EXTENSION_pop_free(exts, X509_EXTENSION_free);
+			goto bail3;
+		}
+		sk_X509_EXTENSION_pop_free(exts, X509_EXTENSION_free);
+	}
 
 	if (!X509_REQ_sign(req, pkey, EVP_sha256()))
 		goto bail3;

@@ -1,24 +1,25 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2018 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2020 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
- *
- * included from libwebsockets.h
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
 /** \defgroup threadpool Threadpool related functions
@@ -70,7 +71,11 @@ struct lws_threadpool_create_args {
 };
 
 struct lws_threadpool_task_args {
-	struct lws *wsi;	/**< user must set to wsi task is bound to */
+#if defined(LWS_WITH_SECURE_STREAMS)
+	struct lws_ss_handle *ss; /**< either wsi or ss must be set */
+#endif
+	struct lws *wsi;	/**< either wsi or ss must be set */
+
 	void *user;		/**< user may set (user-private pointer) */
 	const char *name;	/**< user may set to describe task */
 	char async_task;	/**< set to allow the task to shrug off the loss
@@ -172,12 +177,21 @@ lws_threadpool_enqueue(struct lws_threadpool *tp,
  * This doesn't free the task.  It only shortcuts it to state
  * LWS_TP_STATUS_STOPPED.  lws_threadpool_task_status() must be performed on
  * the task separately once it is in LWS_TP_STATUS_STOPPED to free the task.
+ *
+ * DEPRECATED: You should use lws_threadpool_dequeue_task() with
+ * lws_threadpool_get_task_wsi() / _ss() if you know there can only be one task
+ * per connection, or call it via lws_threadpool_foreach_task_wsi() / _ss() to
+ * get the tasks bound to the connection.
  */
 LWS_VISIBLE LWS_EXTERN int
-lws_threadpool_dequeue(struct lws *wsi);
+lws_threadpool_dequeue(struct lws *wsi) LWS_WARN_DEPRECATED;
+
+LWS_VISIBLE LWS_EXTERN int
+lws_threadpool_dequeue_task(struct lws_threadpool_task *task);
+
 
 /**
- * lws_threadpool_task_status() - Dequeue or try to stop a running task
+ * lws_threadpool_task_status() - reap completed tasks
  *
  * \param wsi: the wsi to query the current task of
  * \param task: receives a pointer to the opaque task
@@ -192,10 +206,21 @@ lws_threadpool_dequeue(struct lws *wsi);
  *
  * Its use is to make sure the service thread has seen the state of the task
  * before deleting it.
+ *
+ * DEPRECATED... use lws_threadpool_task_status() instead and get the task
+ * pointer from lws_threadpool_get_task_wsi() / _ss() if you know there can only
+ * be one, else call it via lws_threadpool_foreach_task_wsi() / _ss()
  */
 LWS_VISIBLE LWS_EXTERN enum lws_threadpool_task_status
 lws_threadpool_task_status_wsi(struct lws *wsi,
-			       struct lws_threadpool_task **task, void **user);
+			       struct lws_threadpool_task **task, void **user)
+				LWS_WARN_DEPRECATED;
+
+LWS_VISIBLE LWS_EXTERN enum lws_threadpool_task_status
+lws_threadpool_task_status(struct lws_threadpool_task *task, void **user);
+
+LWS_VISIBLE LWS_EXTERN enum lws_threadpool_task_status
+lws_threadpool_task_status_noreap(struct lws_threadpool_task *task);
 
 /**
  * lws_threadpool_task_sync() - Indicate to a stalled task it may continue
@@ -228,4 +253,28 @@ lws_threadpool_task_sync(struct lws_threadpool_task *task, int stop);
 
 LWS_VISIBLE LWS_EXTERN void
 lws_threadpool_dump(struct lws_threadpool *tp);
+
+
+
+LWS_VISIBLE LWS_EXTERN struct lws_threadpool_task *
+lws_threadpool_get_task_wsi(struct lws *wsi);
+
+#if defined(LWS_WITH_SECURE_STREAMS)
+LWS_VISIBLE LWS_EXTERN struct lws_threadpool_task *
+lws_threadpool_get_task_ss(struct lws_ss_handle *ss);
+#endif
+
+
+LWS_VISIBLE LWS_EXTERN int
+lws_threadpool_foreach_task_wsi(struct lws *wsi, void *user,
+				int (*cb)(struct lws_threadpool_task *task,
+					  void *user));
+
+#if defined(LWS_WITH_SECURE_STREAMS)
+LWS_VISIBLE LWS_EXTERN int
+lws_threadpool_foreach_task_ss(struct lws_ss_handle *ss, void *user,
+		int (*cb)(struct lws_threadpool_task *task, void *user));
+#endif
+
+
 //@}

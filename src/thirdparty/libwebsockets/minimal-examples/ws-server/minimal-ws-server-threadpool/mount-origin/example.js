@@ -28,9 +28,6 @@ function get_appropriate_ws_url(extra_url)
 
 function new_ws(urlpath, protocol)
 {
-	if (typeof MozWebSocket != "undefined")
-		return new MozWebSocket(urlpath, protocol);
-
 	return new WebSocket(urlpath, protocol);
 }
 
@@ -40,7 +37,7 @@ document.addEventListener("DOMContentLoaded", function() {
 	
 	for (n = 0; n < 8; n++) {
 	
-		ws = new_ws(get_appropriate_ws_url(""), "lws-minimal");
+		var ws = new_ws(get_appropriate_ws_url(""), "lws-minimal");
 		wsa.push(ws);
 		try {
 			ws.onopen = function() {
@@ -68,7 +65,8 @@ document.addEventListener("DOMContentLoaded", function() {
 			};
 
 			ws.onclose = function(){
-				if (--alive === 0)
+				alive--;
+				if (alive === 0)
 					document.getElementById("r").disabled = 1;
 			};
 		} catch(exception) {

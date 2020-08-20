@@ -27,15 +27,12 @@ function get_appropriate_ws_url(extra_url)
 
 function new_ws(urlpath, protocol)
 {
-	if (typeof MozWebSocket != "undefined")
-		return new MozWebSocket(urlpath, protocol);
-
 	return new WebSocket(urlpath, protocol);
 }
 
 document.addEventListener("DOMContentLoaded", function() {
 
-	ws = new_ws(get_appropriate_ws_url(""), "lws-minimal-pmd-bulk");
+	var ws = new_ws(get_appropriate_ws_url(""), "lws-minimal-pmd-bulk");
 	try {
 		ws.onopen = function() {
 			document.getElementById("r").disabled = 0;

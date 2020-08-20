@@ -1,5 +1,36 @@
-#include "core/private.h"
+/*
+ * libwebsockets - small server side websockets and web server implementation
+ *
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
 
+#include "private-lib-core.h"
+
+#if defined(LWS_WITH_MBEDTLS)
+#if defined(LWS_HAVE_MBEDTLS_NET_SOCKETS)
+#include "mbedtls/net_sockets.h"
+#else
+#include "mbedtls/net.h"
+#endif
+#endif
 
 int
 lws_plat_pipe_create(struct lws *wsi)
@@ -18,7 +49,7 @@ lws_plat_pipe_close(struct lws *wsi)
 {
 }
 
-LWS_VISIBLE int
+int
 lws_send_pipe_choked(struct lws *wsi)
 {
 	struct lws *wsi_eff;
@@ -55,7 +86,7 @@ lws_poll_listen_fd(struct lws_pollfd *fd)
 }
 
 
-LWS_EXTERN int
+int
 _lws_plat_service_tsi(struct lws_context *context, int timeout_ms, int tsi)
 {
 	lws_usec_t timeout_us = timeout_ms * LWS_US_PER_MS;
@@ -65,7 +96,7 @@ _lws_plat_service_tsi(struct lws_context *context, int timeout_ms, int tsi)
 
 	/* stay dead once we are dead */
 
-	if (!context || !context->vhost_list)
+	if (!context)
 		return 1;
 
 	pt = &context->pt[tsi];
@@ -75,7 +106,7 @@ _lws_plat_service_tsi(struct lws_context *context, int timeout_ms, int tsi)
 	else
 		timeout_ms = 2000000000;
 
-	if (!pt->service_tid_detected) {
+	if (!pt->service_tid_detected && context->vhost_list) {
 		struct lws _lws;
 
 		memset(&_lws, 0, sizeof(_lws));
@@ -97,7 +128,9 @@ again:
 
 			lws_pt_lock(pt, __func__);
 			/* don't stay in poll wait longer than next hr timeout */
-			us = __lws_sul_service_ripe(&pt->pt_sul_owner, lws_now_usecs());
+			us = __lws_sul_service_ripe(pt->pt_sul_owner,
+						    LWS_COUNT_PT_SUL_OWNERS,
+						    lws_now_usecs());
 			if (us && us < timeout_us)
 				timeout_us = us;
 
@@ -152,12 +185,6 @@ again:
 	if (a)
 		goto again;
 
-	return 0;
-}
-
-int
-lws_plat_check_connection_error(struct lws *wsi)
-{
 	return 0;
 }
 
@@ -229,4 +256,55 @@ lws_plat_inet_pton(int af, const char *src, void *dst)
 	return 1;
 }
 
+#if defined(LWS_WITH_MBEDTLS)
+int
+lws_plat_mbedtls_net_send(void *ctx, const uint8_t *buf, size_t len)
+{
+	int fd = ((mbedtls_net_context *) ctx)->fd;
+	int ret;
 
+	if (fd < 0)
+		return MBEDTLS_ERR_NET_INVALID_CONTEXT;
+
+	ret = write(fd, buf, len);
+	if (ret >= 0)
+		return ret;
+
+	if (errno == EAGAIN || errno == EWOULDBLOCK)
+		return MBEDTLS_ERR_SSL_WANT_WRITE;
+
+	if (errno == EPIPE || errno == ECONNRESET)
+		return MBEDTLS_ERR_NET_CONN_RESET;
+
+	if( errno == EINTR )
+		return MBEDTLS_ERR_SSL_WANT_WRITE;
+
+	return MBEDTLS_ERR_NET_SEND_FAILED;
+}
+
+int
+lws_plat_mbedtls_net_recv(void *ctx, unsigned char *buf, size_t len)
+{
+	int fd = ((mbedtls_net_context *) ctx)->fd;
+	int ret;
+
+	if (fd < 0)
+		return MBEDTLS_ERR_NET_INVALID_CONTEXT;
+
+	ret = (int)read(fd, buf, len);
+	if (ret >= 0)
+		return ret;
+
+	if (errno == EAGAIN || errno == EWOULDBLOCK)
+		return MBEDTLS_ERR_SSL_WANT_READ;
+
+	if (errno == EPIPE || errno == ECONNRESET)
+		return MBEDTLS_ERR_NET_CONN_RESET;
+
+	if (errno == EINTR)
+		return MBEDTLS_ERR_SSL_WANT_READ;
+
+	return MBEDTLS_ERR_NET_RECV_FAILED;
+}
+
+#endif

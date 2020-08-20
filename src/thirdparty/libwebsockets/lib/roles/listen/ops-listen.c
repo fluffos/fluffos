@@ -1,39 +1,44 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2018 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-#include <core/private.h>
+#include <private-lib-core.h>
 
 static int
 rops_handle_POLLIN_listen(struct lws_context_per_thread *pt, struct lws *wsi,
 			  struct lws_pollfd *pollfd)
 {
-	struct lws_context *context = wsi->context;
+	struct lws_context *context = wsi->a.context;
 	lws_sockfd_type accept_fd = LWS_SOCK_INVALID;
 	lws_sock_file_fd_type fd;
 	struct sockaddr_storage cli_addr;
 	socklen_t clilen;
 
+	memset(&cli_addr, 0, sizeof(cli_addr));
+
 	/* if our vhost is going down, ignore it */
 
-	if (wsi->vhost->being_destroyed)
+	if (wsi->a.vhost->being_destroyed)
 		return LWS_HPI_RET_HANDLED;
 
 	/* pollin means a client has connected to us then
@@ -56,7 +61,7 @@ rops_handle_POLLIN_listen(struct lws_context_per_thread *pt, struct lws *wsi,
 		 * another vhost may also have had POLLIN on his
 		 * listener this round and used it up already
 		 */
-		if (wsi->vhost->tls.use_ssl &&
+		if (wsi->a.vhost->tls.use_ssl &&
 		    context->simultaneous_ssl_restriction &&
 		    context->simultaneous_ssl ==
 				  context->simultaneous_ssl_restriction)
@@ -70,7 +75,6 @@ rops_handle_POLLIN_listen(struct lws_context_per_thread *pt, struct lws *wsi,
 		/* listen socket got an unencrypted connection... */
 
 		clilen = sizeof(cli_addr);
-		lws_latency_pre(context, wsi);
 
 		/*
 		 * We cannot identify the peer who is in the listen
@@ -81,14 +85,12 @@ rops_handle_POLLIN_listen(struct lws_context_per_thread *pt, struct lws *wsi,
 
 		accept_fd = accept((int)pollfd->fd,
 				   (struct sockaddr *)&cli_addr, &clilen);
-		lws_latency(context, wsi, "listener accept",
-			    (int)accept_fd, accept_fd != LWS_SOCK_INVALID);
 		if (accept_fd == LWS_SOCK_INVALID) {
 			if (LWS_ERRNO == LWS_EAGAIN ||
 			    LWS_ERRNO == LWS_EWOULDBLOCK) {
 				break;
 			}
-			lwsl_err("accept: %s\n", strerror(LWS_ERRNO));
+			lwsl_err("accept: errno %d\n", LWS_ERRNO);
 			return LWS_HPI_RET_HANDLED;
 		}
 
@@ -97,7 +99,7 @@ rops_handle_POLLIN_listen(struct lws_context_per_thread *pt, struct lws *wsi,
 			return LWS_HPI_RET_PLEASE_CLOSE_ME;
 		}
 
-		lws_plat_set_socket_options(wsi->vhost, accept_fd, 0);
+		lws_plat_set_socket_options(wsi->a.vhost, accept_fd, 0);
 
 #if defined(LWS_WITH_IPV6)
 		lwsl_debug("accepted new conn port %u on fd=%d\n",
@@ -108,6 +110,7 @@ rops_handle_POLLIN_listen(struct lws_context_per_thread *pt, struct lws *wsi,
 #else
 		{
 		struct sockaddr_in sain;
+
 		memcpy(&sain, &cli_addr, sizeof(sain));
 		lwsl_debug("accepted new conn port %u on fd=%d\n",
 			   ntohs(sain.sin_port),
@@ -121,35 +124,36 @@ rops_handle_POLLIN_listen(struct lws_context_per_thread *pt, struct lws *wsi,
 		 * protocol selected yet so we issue this to
 		 * protocols[0]
 		 */
-		if ((wsi->vhost->protocols[0].callback)(wsi,
+		if ((wsi->a.vhost->protocols[0].callback)(wsi,
 				LWS_CALLBACK_FILTER_NETWORK_CONNECTION,
 				NULL,
 				(void *)(lws_intptr_t)accept_fd, 0)) {
 			lwsl_debug("Callback denied net connection\n");
 			compatible_close(accept_fd);
-			return LWS_HPI_RET_PLEASE_CLOSE_ME;
+			return LWS_HPI_RET_HANDLED;
 		}
 
-		if (!(wsi->vhost->options &
+		if (!(wsi->a.vhost->options &
 			LWS_SERVER_OPTION_ADOPT_APPLY_LISTEN_ACCEPT_CONFIG))
 			opts |= LWS_ADOPT_HTTP;
 
 #if defined(LWS_WITH_TLS)
-		if (!wsi->vhost->tls.use_ssl)
+		if (!wsi->a.vhost->tls.use_ssl)
 #endif
 			opts &= ~LWS_ADOPT_ALLOW_SSL;
 
 		fd.sockfd = accept_fd;
-		cwsi = lws_adopt_descriptor_vhost(wsi->vhost, opts, fd,
-						  NULL, NULL);
+		cwsi = lws_adopt_descriptor_vhost(wsi->a.vhost, opts, fd,
+				wsi->a.vhost->listen_accept_protocol, NULL);
 		if (!cwsi) {
-			lwsl_err("%s: lws_adopt_descriptor_vhost failed\n",
-					__func__);
+			lwsl_info("%s: vh %s: adopt failed\n", __func__,
+					wsi->a.vhost->name);
+
 			/* already closed cleanly as necessary */
 			return LWS_HPI_RET_WSI_ALREADY_DIED;
 		}
 /*
-		if (lws_server_socket_service_ssl(cwsi, accept_fd)) {
+		if (lws_server_socket_service_ssl(cwsi, accept_fd, 1)) {
 			lws_close_free_wsi(cwsi, LWS_CLOSE_STATUS_NOSTATUS,
 					   "listen svc fail");
 			return LWS_HPI_RET_WSI_ALREADY_DIED;
@@ -172,14 +176,13 @@ int rops_handle_POLLOUT_listen(struct lws *wsi)
 	return LWS_HP_RET_USER_SERVICE;
 }
 
-struct lws_role_ops role_ops_listen = {
+const struct lws_role_ops role_ops_listen = {
 	/* role name */			"listen",
 	/* alpn id */			NULL,
 	/* check_upgrades */		NULL,
-	/* init_context */		NULL,
+	/* pt_init_destroy */		NULL,
 	/* init_vhost */		NULL,
 	/* destroy_vhost */		NULL,
-	/* periodic_checks */		NULL,
 	/* service_flag_pending */	NULL,
 	/* handle_POLLIN */		rops_handle_POLLIN_listen,
 	/* handle_POLLOUT */		rops_handle_POLLOUT_listen,
@@ -195,6 +198,7 @@ struct lws_role_ops role_ops_listen = {
 	/* destroy_role */		NULL,
 	/* adoption_bind */		NULL,
 	/* client_bind */		NULL,
+	/* issue_keepalive */		NULL,
 	/* adoption_cb clnt, srv */	{ 0, 0 },
 	/* rx_cb clnt, srv */		{ 0, 0 },
 	/* writeable cb clnt, srv */	{ 0, 0 },

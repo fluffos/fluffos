@@ -244,7 +244,7 @@ var lwsgs_email_check = '0';
 
 function lwsgs_rupdate()
 {
-	var en_register = 1, en_forgot = 0;
+	var en_register = 1, en_forgot = 0, op;
 
 	if (document.getElementById('rpassword').value ==
 	    document.getElementById('password2').value) {
@@ -335,7 +335,7 @@ function lwsgs_rupdate()
 
 function lwsgs_cupdate()
 {
-	var en_change = 1, en_forgot = 1, pwok = 1;
+	var en_change = 1, en_forgot = 1, pwok = 1, op;
 	
 	if (lwsgs_auth & 8) {
 		document.getElementById('ccurpw').style.display = "none";
@@ -609,11 +609,8 @@ window.addEventListener("load", function() {
 	}
 
 	if (lwsgs_user) {
-		if (typeof MozWebSocket != "undefined")
-			ws = new MozWebSocket(get_appropriate_ws_url(),
-					   "protocol-lws-messageboard");
-		else
-			ws = new WebSocket(get_appropriate_ws_url(),
+
+		ws = new WebSocket(get_appropriate_ws_url(),
 					   "protocol-lws-messageboard");
 
 		try {

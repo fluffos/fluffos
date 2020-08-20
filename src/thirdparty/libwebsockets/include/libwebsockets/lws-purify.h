@@ -1,26 +1,26 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2018 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
- *
- * included from libwebsockets.h
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
-
 
 /*! \defgroup pur Sanitize / purify SQL and JSON helpers
  *
@@ -44,17 +44,41 @@ LWS_VISIBLE LWS_EXTERN const char *
 lws_sql_purify(char *escaped, const char *string, int len);
 
 /**
+ * lws_sql_purify_len() - return length of purified version of input string
+ *
+ * \param string: input buffer ('/0' terminated)
+ *
+ * Calculates any character escaping without writing it anywhere and returns the
+ * calculated length of the purified string.
+ */
+int
+lws_sql_purify_len(const char *p);
+
+/**
  * lws_json_purify() - like strncpy but with escaping for json chars
  *
  * \param escaped: output buffer
  * \param string: input buffer ('/0' terminated)
  * \param len: output buffer max length
+ * \param in_used: number of bytes of string we could escape in len
  *
  * Because escaping expands the output string, it's not
  * possible to do it in-place, ie, with escaped == string
  */
 LWS_VISIBLE LWS_EXTERN const char *
-lws_json_purify(char *escaped, const char *string, int len);
+lws_json_purify(char *escaped, const char *string, int len, int *in_used);
+
+/**
+ * lws_json_purify_len() - find out the escaped length of a string
+ *
+ * \param string: input buffer ('/0' terminated)
+ *
+ * JSON may have to expand escapes by up to 6x the original depending on what
+ * it is.  This doesn't actually do the escaping but goes through the motions
+ * and computes the length of the escaped string.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_json_purify_len(const char *string);
 
 /**
  * lws_filename_purify_inplace() - replace scary filename chars with underscore

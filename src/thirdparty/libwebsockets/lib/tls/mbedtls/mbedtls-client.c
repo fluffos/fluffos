@@ -1,25 +1,28 @@
 /*
- * libwebsockets - mbedtls-specific client TLS code
+ * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2017 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2020 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-#include "core/private.h"
+#include "private-lib-core.h"
 
 static int
 OpenSSL_client_verify_callback(int preverify_ok, X509_STORE_CTX *x509_ctx)
@@ -31,15 +34,18 @@ int
 lws_ssl_client_bio_create(struct lws *wsi)
 {
 	char hostname[128], *p;
-	const char *alpn_comma = wsi->context->tls.alpn_default;
+	const char *alpn_comma = wsi->a.context->tls.alpn_default;
 	struct alpn_ctx protos;
 
-	if (lws_hdr_copy(wsi, hostname, sizeof(hostname),
-			 _WSI_TOKEN_CLIENT_HOST) <= 0) {
-		lwsl_err("%s: Unable to get hostname\n", __func__);
+	if (wsi->stash)
+		lws_strncpy(hostname, wsi->stash->cis[CIS_HOST], sizeof(hostname));
+	else
+		if (lws_hdr_copy(wsi, hostname, sizeof(hostname),
+				_WSI_TOKEN_CLIENT_HOST) <= 0) {
+			lwsl_err("%s: Unable to get hostname\n", __func__);
 
-		return -1;
-	}
+			return -1;
+		}
 
 	/*
 	 * remove any :port part on the hostname... necessary for network
@@ -54,13 +60,13 @@ lws_ssl_client_bio_create(struct lws *wsi)
 		p++;
 	}
 
-	wsi->tls.ssl = SSL_new(wsi->vhost->tls.ssl_client_ctx);
+	wsi->tls.ssl = SSL_new(wsi->a.vhost->tls.ssl_client_ctx);
 	if (!wsi->tls.ssl) {
 		lwsl_info("%s: SSL_new() failed\n", __func__);
 		return -1;
 	}
 
-	if (wsi->vhost->tls.ssl_info_event_mask)
+	if (wsi->a.vhost->tls.ssl_info_event_mask)
 		SSL_set_info_callback(wsi->tls.ssl, lws_ssl_info_callback);
 
 	if (!(wsi->tls.use_ssl & LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK)) {
@@ -71,12 +77,17 @@ lws_ssl_client_bio_create(struct lws *wsi)
 		X509_VERIFY_PARAM_set1_host(param, hostname, 0);
 	}
 
-	if (wsi->vhost->tls.alpn)
-		alpn_comma = wsi->vhost->tls.alpn;
+	if (wsi->a.vhost->tls.alpn)
+		alpn_comma = wsi->a.vhost->tls.alpn;
 
-	if (lws_hdr_copy(wsi, hostname, sizeof(hostname),
-			 _WSI_TOKEN_CLIENT_ALPN) > 0)
-		alpn_comma = hostname;
+	if (wsi->stash) {
+		lws_strncpy(hostname, wsi->stash->cis[CIS_HOST], sizeof(hostname));
+		alpn_comma = wsi->stash->cis[CIS_ALPN];
+	} else {
+		if (lws_hdr_copy(wsi, hostname, sizeof(hostname),
+				_WSI_TOKEN_CLIENT_ALPN) > 0)
+			alpn_comma = hostname;
+	}
 
 	lwsl_info("%s: %p: client conn sending ALPN list '%s'\n",
 		  __func__, wsi, alpn_comma);
@@ -96,7 +107,58 @@ lws_ssl_client_bio_create(struct lws *wsi)
 
 	SSL_set_fd(wsi->tls.ssl, wsi->desc.sockfd);
 
+	if (wsi->sys_tls_client_cert) {
+		lws_system_blob_t *b = lws_system_get_blob(wsi->a.context,
+					LWS_SYSBLOB_TYPE_CLIENT_CERT_DER,
+					wsi->sys_tls_client_cert - 1);
+		const uint8_t *data;
+		size_t size;
+
+		if (!b)
+			goto no_client_cert;
+
+		/*
+		 * Set up the per-connection client cert
+		 */
+
+		size = lws_system_blob_get_size(b);
+		if (!size)
+			goto no_client_cert;
+
+		if (lws_system_blob_get_single_ptr(b, &data))
+			goto no_client_cert;
+
+		if (SSL_use_certificate_ASN1(wsi->tls.ssl, data, size) != 1)
+			goto no_client_cert;
+
+		b = lws_system_get_blob(wsi->a.context,
+					LWS_SYSBLOB_TYPE_CLIENT_KEY_DER,
+					wsi->sys_tls_client_cert - 1);
+		if (!b)
+			goto no_client_cert;
+		size = lws_system_blob_get_size(b);
+		if (!size)
+			goto no_client_cert;
+
+		if (lws_system_blob_get_single_ptr(b, &data))
+			goto no_client_cert;
+
+		if (SSL_use_PrivateKey_ASN1(0, wsi->tls.ssl, data, size) != 1)
+			goto no_client_cert;
+
+		/* no wrapper api for check key */
+
+		lwsl_notice("%s: set system client cert %u\n", __func__,
+				wsi->sys_tls_client_cert - 1);
+	}
+
 	return 0;
+
+no_client_cert:
+	lwsl_err("%s: unable to set up system client cert %d\n", __func__,
+			wsi->sys_tls_client_cert - 1);
+
+	return 1;
 }
 
 int ERR_get_error(void)
@@ -105,7 +167,7 @@ int ERR_get_error(void)
 }
 
 enum lws_ssl_capable_status
-lws_tls_client_connect(struct lws *wsi)
+lws_tls_client_connect(struct lws *wsi, char *errbuf, int elen)
 {
 	int m, n = SSL_connect(wsi->tls.ssl);
 	const unsigned char *prot;
@@ -129,6 +191,8 @@ lws_tls_client_connect(struct lws *wsi)
 	if (!n) /* we don't know what he wants, but he says to retry */
 		return LWS_SSL_CAPABLE_MORE_SERVICE;
 
+	lws_snprintf(errbuf, elen, "mbedtls connect %d %d %d", n, m, errno);
+
 	return LWS_SSL_CAPABLE_ERROR;
 }
 
@@ -137,7 +201,7 @@ lws_tls_client_confirm_peer_cert(struct lws *wsi, char *ebuf, int ebuf_len)
 {
 	int n;
 	X509 *peer = SSL_get_peer_certificate(wsi->tls.ssl);
-	struct lws_context_per_thread *pt = &wsi->context->pt[(int)wsi->tsi];
+	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
 	char *sb = (char *)&pt->serv_buf[0];
 
 	if (!peer) {
@@ -149,9 +213,6 @@ lws_tls_client_confirm_peer_cert(struct lws *wsi, char *ebuf, int ebuf_len)
 	lwsl_info("peer provided cert\n");
 
 	n = SSL_get_verify_result(wsi->tls.ssl);
-	lws_latency(wsi->context, wsi,
-			"SSL_get_verify_result LWS_CONNMODE..HANDSHAKE", n, n > 0);
-
         lwsl_debug("get_verify says %d\n", n);
 
 	if (n == X509_V_OK)
@@ -177,8 +238,8 @@ lws_tls_client_confirm_peer_cert(struct lws *wsi, char *ebuf, int ebuf_len)
 		return 0;
 	}
 	lws_snprintf(ebuf, ebuf_len,
-		"server's cert didn't look good, X509_V_ERR = %d: %s\n",
-		 n, ERR_error_string(n, sb));
+		"server's cert didn't look good, (use_ssl 0x%x) X509_V_ERR = %d: %s\n",
+		(unsigned int)wsi->tls.use_ssl, n, ERR_error_string(n, sb));
 	lwsl_info("%s\n", ebuf);
 	lws_tls_err_describe_clear();
 
@@ -195,7 +256,10 @@ lws_tls_client_create_vhost_context(struct lws_vhost *vh,
 				    const char *cert_filepath,
 				    const void *cert_mem,
 				    unsigned int cert_mem_len,
-				    const char *private_key_filepath)
+				    const char *private_key_filepath,
+					const void *key_mem,
+					unsigned int key_mem_len
+					)
 {
 	X509 *d2i_X509(X509 **cert, const unsigned char *buffer, long len);
 	SSL_METHOD *method = (SSL_METHOD *)TLS_client_method();
@@ -286,13 +350,13 @@ lws_tls_client_create_vhost_context(struct lws_vhost *vh,
 		lwsl_notice("Loaded client cert %s\n", cert_filepath);
 #endif
 	} else if (cert_mem && cert_mem_len) {
-		// lwsl_hexdump_notice(cert_mem, cert_mem_len - 1);
+		/* lwsl_hexdump_notice(cert_mem, cert_mem_len - 1); */
 		SSL_CTX_use_PrivateKey_ASN1(0, vh->tls.ssl_client_ctx,
 				cert_mem, cert_mem_len - 1);
 		n = SSL_CTX_use_certificate_ASN1(vh->tls.ssl_client_ctx,
 						 cert_mem_len, cert_mem);
 		if (n < 1) {
-			lwsl_err("%s: problem interpreting client cert\n",
+			lwsl_err("%s: (mbedtls) problem interpreting client cert\n",
 				 __func__);
 			lws_tls_err_describe_clear();
 			return 1;
@@ -303,3 +367,16 @@ lws_tls_client_create_vhost_context(struct lws_vhost *vh,
 
 	return 0;
 }
+
+int
+lws_tls_client_vhost_extra_cert_mem(struct lws_vhost *vh,
+                const uint8_t *der, size_t der_len)
+{
+	if (SSL_CTX_add_client_CA_ASN1(vh->tls.ssl_client_ctx, der_len, der) != 1) {
+		lwsl_err("%s: failed\n", __func__);
+			return 1;
+	}
+
+	return 0;
+}
+

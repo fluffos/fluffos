@@ -5,21 +5,16 @@
 		#define _DEBUG
 	#endif
 #endif
+#cmakedefine LWIP_PROVIDE_ERRNO
 
 /* Define to 1 to use CyaSSL as a replacement for OpenSSL. 
  * LWS_OPENSSL_SUPPORT needs to be set also for this to work. */
 #cmakedefine USE_CYASSL
 
-/* Define to 1 if you have the <dlfcn.h> header file. */
-#cmakedefine LWS_HAVE_DLFCN_H
-
-/* Define to 1 if you have the <fcntl.h> header file. */
-#cmakedefine LWS_HAVE_FCNTL_H
-
 /* Define to 1 if you have the `fork' function. */
 #cmakedefine LWS_HAVE_FORK
 
-/* Define to 1 if you have the `getenv’ function. */
+/* Define to 1 if you have the `getenv' function. */
 #cmakedefine LWS_HAVE_GETENV
 
 /* Define to 1 if you have the <in6addr.h> header file. */
@@ -32,18 +27,8 @@
 /* Define to 1 if you have the <memory.h> header file. */
 #cmakedefine LWS_HAVE_MEMORY_H
 
-/* Define to 1 if you have the `memset' function. */
-#cmakedefine LWS_HAVE_MEMSET
-
 /* Define to 1 if you have the <netinet/in.h> header file. */
 #cmakedefine LWS_HAVE_NETINET_IN_H
-
-/* Define to 1 if your system has a GNU libc compatible `realloc' function,
-   and to 0 otherwise. */
-#cmakedefine LWS_HAVE_REALLOC
-
-/* Define to 1 if you have the `socket' function. */
-#cmakedefine LWS_HAVE_SOCKET
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #cmakedefine LWS_HAVE_STDINT_H

@@ -13,6 +13,12 @@
 #include <libwebsockets.h>
 #include <string.h>
 #include <signal.h>
+#if defined(WIN32)
+#define HAVE_STRUCT_TIMESPEC
+#if defined(pid_t)
+#undef pid_t
+#endif
+#endif
 #include <pthread.h>
 
 enum {
@@ -64,6 +70,7 @@ connect_client(int idx)
 	clients[idx].state = CLIENT_CONNECTING;
 	tries++;
 
+	lwsl_notice("%s: connection %s:%d\n", __func__, i.address, i.port);
 	if (!lws_client_connect_via_info(&i)) {
 		clients[idx].wsi = NULL;
 		clients[idx].state = CLIENT_IDLE;
@@ -199,7 +206,7 @@ int main(int argc, const char **argv)
 	info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
 	info.port = CONTEXT_PORT_NO_LISTEN; /* we do not run any server */
 	info.protocols = protocols;
-#if defined(LWS_WITH_MBEDTLS)
+#if defined(LWS_WITH_MBEDTLS) || defined(USE_WOLFSSL)
 	/*
 	 * OpenSSL uses the system trust store.  mbedTLS has to be told which
 	 * CA to trust explicitly.
@@ -251,6 +258,8 @@ int main(int argc, const char **argv)
 
 	while (n >= 0 && !interrupted)
 		n = lws_service(context, 0);
+
+	lwsl_notice("%s: exiting service loop\n", __func__);
 
 	lws_context_destroy(context);
 

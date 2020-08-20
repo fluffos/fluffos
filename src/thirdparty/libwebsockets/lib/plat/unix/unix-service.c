@@ -1,28 +1,31 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2018 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-#ifndef _GNU_SOURCE
+#if !defined(_GNU_SOURCE)
 #define _GNU_SOURCE
 #endif
-#include "core/private.h"
+#include "private-lib-core.h"
 
 int
 lws_poll_listen_fd(struct lws_pollfd *fd)
@@ -34,9 +37,9 @@ int
 _lws_plat_service_forced_tsi(struct lws_context *context, int tsi)
 {
 	struct lws_context_per_thread *pt = &context->pt[tsi];
-	int m, n;
+	int m, n, r;
 
-	lws_service_flag_pending(context, tsi);
+	r = lws_service_flag_pending(context, tsi);
 
 	/* any socket with events to service? */
 	for (n = 0; n < (int)pt->fds_count; n++) {
@@ -56,7 +59,7 @@ _lws_plat_service_forced_tsi(struct lws_context *context, int tsi)
 
 	lws_service_do_ripe_rxflow(pt);
 
-	return 0;
+	return r;
 }
 
 #define LWS_POLL_WAIT_LIMIT 2000000000
@@ -75,7 +78,7 @@ _lws_plat_service_tsi(struct lws_context *context, int timeout_ms, int tsi)
 
 	/* stay dead once we are dead */
 
-	if (!context || !context->vhost_list)
+	if (!context)
 		return 1;
 
 	pt = &context->pt[tsi];
@@ -93,14 +96,14 @@ _lws_plat_service_tsi(struct lws_context *context, int timeout_ms, int tsi)
 	if (context->event_loop_ops->run_pt)
 		context->event_loop_ops->run_pt(context, tsi);
 
-	if (!pt->service_tid_detected) {
-		struct lws _lws;
+	if (!pt->service_tid_detected && context->vhost_list) {
+		lws_fakewsi_def_plwsa(pt);
 
-		memset(&_lws, 0, sizeof(_lws));
-		_lws.context = context;
+		lws_fakewsi_prep_plwsa_ctx(context);
 
 		pt->service_tid = context->vhost_list->protocols[0].callback(
-					&_lws, LWS_CALLBACK_GET_THREAD_ID,
+					(struct lws *)plwsa,
+					LWS_CALLBACK_GET_THREAD_ID,
 					NULL, NULL, 0);
 		pt->service_tid_detected = 1;
 	}
@@ -110,7 +113,7 @@ _lws_plat_service_tsi(struct lws_context *context, int timeout_ms, int tsi)
 	/*
 	 * service ripe scheduled events, and limit wait to next expected one
 	 */
-	us = __lws_sul_service_ripe(&pt->pt_sul_owner, us);
+	us = __lws_sul_service_ripe(pt->pt_sul_owner, LWS_COUNT_PT_SUL_OWNERS, us);
 	if (us && us < timeout_us)
 		timeout_us = us;
 
@@ -125,8 +128,6 @@ _lws_plat_service_tsi(struct lws_context *context, int timeout_ms, int tsi)
 	/* ensure we don't wrap at 2^31 with poll()'s signed int ms */
 
 	timeout_us /= LWS_US_PER_MS; /* ms now */
-	if (timeout_us > LWS_POLL_WAIT_LIMIT)
-		timeout_us = LWS_POLL_WAIT_LIMIT;
 
 	vpt->inside_poll = 1;
 	lws_memory_barrier();
@@ -203,15 +204,14 @@ _lws_plat_service_tsi(struct lws_context *context, int timeout_ms, int tsi)
 		return 0;
 	}
 
-	if (_lws_plat_service_forced_tsi(context, tsi))
+	if (_lws_plat_service_forced_tsi(context, tsi) < 0)
 		return -1;
 
-	return 0;
-}
+	if (pt->destroy_self) {
+		lws_context_destroy(pt->context);
+		return -1;
+	}
 
-int
-lws_plat_check_connection_error(struct lws *wsi)
-{
 	return 0;
 }
 

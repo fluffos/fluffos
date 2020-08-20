@@ -1,28 +1,31 @@
 /*
- * libwebsockets - lws alloc chunk live file caching
+ * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2018 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
 #if !defined(LWS_PLAT_OPTEE) && !defined(OPTEE_DEV_KIT)
 
-#include "core/private.h"
-#include "misc/lwsac/private.h"
+#include "private-lib-core.h"
+#include "private-lib-misc-lwsac.h"
 
 /*
  * Helper for caching a file in memory in a lac, but also to check at intervals
@@ -68,31 +71,35 @@
 
 #define cache_file_to_lac(c) ((struct lwsac *)((char *)c - \
 			      sizeof(struct cached_file_info) - \
+			      sizeof(struct lwsac_head) - \
 			      sizeof(struct lwsac)))
 
 void
 lwsac_use_cached_file_start(lwsac_cached_file_t cache)
 {
 	struct lwsac *lac = cache_file_to_lac(cache);
+	struct lwsac_head *lachead = (struct lwsac_head *)&lac->head[1];
 
-	lac->refcount++;
-	// lwsl_debug("%s: html refcount: %d\n", __func__, lac->refcount);
+	lachead->refcount++;
+	// lwsl_debug("%s: html refcount: %d\n", __func__, lachead->refcount);
 }
 
 void
 lwsac_use_cached_file_end(lwsac_cached_file_t *cache)
 {
 	struct lwsac *lac;
+	struct lwsac_head *lachead;
 
 	if (!cache || !*cache)
 		return;
 
 	lac = cache_file_to_lac(*cache);
+	lachead = (struct lwsac_head *)&lac->head[1];
 
-	if (!lac->refcount)
+	if (!lachead->refcount)
 		lwsl_err("%s: html refcount zero on entry\n", __func__);
 
-	if (lac->refcount && !--lac->refcount && lac->detached) {
+	if (lachead->refcount && !--lachead->refcount && lachead->detached) {
 		*cache = NULL; /* not usable any more */
 		lwsac_free(&lac);
 	}
@@ -102,10 +109,15 @@ void
 lwsac_use_cached_file_detach(lwsac_cached_file_t *cache)
 {
 	struct lwsac *lac = cache_file_to_lac(*cache);
+	struct lwsac_head *lachead = NULL;
 
-	lac->detached = 1;
-	if (lac->refcount)
-		return;
+	if (lac) {
+		lachead = (struct lwsac_head *)&lac->head[1];
+
+		lachead->detached = 1;
+		if (lachead->refcount)
+			return;
+	}
 
 	*cache = NULL;
 	lwsac_free(&lac);
@@ -165,7 +177,7 @@ lwsac_cached_file(const char *filepath, lwsac_cached_file_t *cache, size_t *len)
 	 * it... reload in a new lac and then detach the old lac.
 	 */
 
-	all = sizeof(*info) + s.st_size + 1;
+	all = sizeof(*info) + s.st_size + 2;
 
 	info = lwsac_use(&lac, all, all);
 	if (!info)

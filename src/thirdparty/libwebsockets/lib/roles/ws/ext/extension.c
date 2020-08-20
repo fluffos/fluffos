@@ -1,8 +1,32 @@
-#include "core/private.h"
+/*
+ * libwebsockets - small server side websockets and web server implementation
+ *
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+
+#include "private-lib-core.h"
 
 #include "extension-permessage-deflate.h"
 
-LWS_VISIBLE void
+void
 lws_context_init_extensions(const struct lws_context_creation_info *info,
 			    struct lws_context *context)
 {
@@ -17,7 +41,7 @@ enum lws_ext_option_parser_states {
 	LEAPS_SEEK_ARG_TERM
 };
 
-LWS_VISIBLE int
+int
 lws_ext_parse_options(const struct lws_extension *ext, struct lws *wsi,
 		      void *ext_user, const struct lws_ext_options *opts,
 		      const char *in, int len)
@@ -196,10 +220,10 @@ int lws_ext_cb_all_exts(struct lws_context *context, struct lws *wsi,
 	int n = 0, m, handled = 0;
 	const struct lws_extension *ext;
 
-	if (!wsi || !wsi->vhost || !wsi->ws)
+	if (!wsi || !wsi->a.vhost || !wsi->ws)
 		return 0;
 
-	ext = wsi->vhost->ws.extensions;
+	ext = wsi->a.vhost->ws.extensions;
 
 	while (ext && ext->callback && !handled) {
 		m = ext->callback(context, ext, wsi, reason,
@@ -309,7 +333,7 @@ int
 lws_any_extension_handled(struct lws *wsi, enum lws_extension_callback_reasons r,
 			  void *v, size_t len)
 {
-	struct lws_context *context = wsi->context;
+	struct lws_context *context = wsi->a.context;
 	int n, handled = 0;
 
 	if (!wsi->ws)
@@ -352,7 +376,7 @@ lws_set_extension_option(struct lws *wsi, const char *ext_name,
 	oa.start = opt_val;
 	oa.len = 0;
 
-	return wsi->ws->active_extensions[idx]->callback(wsi->context,
+	return wsi->ws->active_extensions[idx]->callback(wsi->a.context,
 			wsi->ws->active_extensions[idx], wsi,
 			LWS_EXT_CB_NAMED_OPTION_SET, wsi->ws->act_ext_user[idx],
 			&oa, 0);

@@ -1,25 +1,28 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2018 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-#include <core/private.h>
+#include <private-lib-core.h>
 
 /*
  * In-place str to lower case
@@ -62,7 +65,7 @@ lws_create_client_ws_object(const struct lws_client_connect_info *i,
 	return 0;
 }
 
-#if !defined(LWS_NO_CLIENT)
+#if defined(LWS_WITH_CLIENT)
 int
 lws_ws_handshake_client(struct lws *wsi, unsigned char **buf, size_t len)
 {
@@ -128,7 +131,7 @@ lws_ws_handshake_client(struct lws *wsi, unsigned char **buf, size_t len)
 		 */
 
 		if (lws_ws_client_rx_sm(wsi, *(*buf)++)) {
-			lwsl_notice("%s: client_rx_sm exited, DROPPING %d\n",
+			lwsl_info("%s: client_rx_sm exited, DROPPING %d\n",
 				    __func__, (int)len);
 			return -1;
 		}
@@ -153,13 +156,13 @@ lws_generate_client_ws_handshake(struct lws *wsi, char *p, const char *conn1)
 	/*
 	 * create the random key
 	 */
-	n = lws_get_random(wsi->context, hash, 16);
-	if (n != 16) {
+	if (lws_get_random(wsi->a.context, hash, 16) != 16) {
 		lwsl_err("Unable to read from random dev %s\n",
 			 SYSTEM_RANDOM_FILEPATH);
 		return NULL;
 	}
 
+	/* coverity[tainted_scalar] */
 	lws_b64_encode_string(hash, 16, key_b64, sizeof(key_b64));
 
 	p += sprintf(p, "Upgrade: websocket\x0d\x0a"
@@ -176,10 +179,10 @@ lws_generate_client_ws_handshake(struct lws *wsi, char *p, const char *conn1)
 	/* tell the server what extensions we could support */
 
 #if !defined(LWS_WITHOUT_EXTENSIONS)
-	ext = wsi->vhost->ws.extensions;
+	ext = wsi->a.vhost->ws.extensions;
 	while (ext && ext->callback) {
 
-		n = wsi->vhost->protocols[0].callback(wsi,
+		n = wsi->a.vhost->protocols[0].callback(wsi,
 			LWS_CALLBACK_CLIENT_CONFIRM_EXTENSION_SUPPORTED,
 				wsi->user_space, (char *)ext->name, 0);
 
@@ -231,14 +234,14 @@ lws_generate_client_ws_handshake(struct lws *wsi, char *p, const char *conn1)
 int
 lws_client_ws_upgrade(struct lws *wsi, const char **cce)
 {
-	struct lws_context_per_thread *pt = &wsi->context->pt[(int)wsi->tsi];
-	struct lws_context *context = wsi->context;
+	struct lws_context *context = wsi->a.context;
 	struct lws_tokenize ts;
 	int n, len, okay = 0;
 	lws_tokenize_elem e;
 	char *p, buf[64];
 	const char *pc;
 #if !defined(LWS_WITHOUT_EXTENSIONS)
+	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
 	char *sb = (char *)&pt->serv_buf[0];
 	const struct lws_ext_options *opts;
 	const struct lws_extension *ext;
@@ -248,7 +251,12 @@ lws_client_ws_upgrade(struct lws *wsi, const char **cce)
 	char ignore;
 #endif
 
-	if (wsi->client_h2_substream) {/* !!! client ws-over-h2 not there yet */
+#if defined(LWS_WITH_DETAILED_LATENCY)
+		wsi->detlat.earliest_write_req = 0;
+		wsi->detlat.earliest_write_req_pre_write = 0;
+#endif
+
+	if (wsi->client_mux_substream) {/* !!! client ws-over-h2 not there yet */
 		lwsl_warn("%s: client ws-over-h2 upgrade not supported yet\n",
 			  __func__);
 		*cce = "HS: h2 / ws upgrade unsupported";
@@ -295,9 +303,10 @@ lws_client_ws_upgrade(struct lws *wsi, const char **cce)
 
 	lws_tokenize_init(&ts, buf, LWS_TOKENIZE_F_COMMA_SEP_LIST |
 				    LWS_TOKENIZE_F_MINUS_NONTERM);
-	ts.len = lws_hdr_copy(wsi, buf, sizeof(buf) - 1, WSI_TOKEN_CONNECTION);
-	if (ts.len <= 0) /* won't fit, or absent */
+	n = lws_hdr_copy(wsi, buf, sizeof(buf) - 1, WSI_TOKEN_CONNECTION);
+	if (n <= 0) /* won't fit, or absent */
 		goto bad_conn_format;
+	ts.len = n;
 
 	do {
 		e = lws_tokenize(&ts);
@@ -340,15 +349,15 @@ bad_conn_format:
 		 * default to first protocol
 		 */
 
-		if (wsi->protocol) {
-			p = (char *)wsi->protocol->name;
+		if (wsi->a.protocol) {
+			p = (char *)wsi->a.protocol->name;
 			goto identify_protocol;
 		}
 
 		/* no choice but to use the default protocol */
 
 		n = 0;
-		wsi->protocol = &wsi->vhost->protocols[0];
+		wsi->a.protocol = &wsi->a.vhost->protocols[0];
 		goto check_extensions;
 	}
 
@@ -386,18 +395,18 @@ identify_protocol:
 	n = 0;
 	/* keep client connection pre-bound protocol */
 	if (!lwsi_role_client(wsi))
-		wsi->protocol = NULL;
+		wsi->a.protocol = NULL;
 
-	while (wsi->vhost->protocols[n].callback) {
-		if (!wsi->protocol &&
-		    strcmp(p, wsi->vhost->protocols[n].name) == 0) {
-			wsi->protocol = &wsi->vhost->protocols[n];
+	while (n < wsi->a.vhost->count_protocols) {
+		if (!wsi->a.protocol &&
+		    strcmp(p, wsi->a.vhost->protocols[n].name) == 0) {
+			wsi->a.protocol = &wsi->a.vhost->protocols[n];
 			break;
 		}
 		n++;
 	}
 
-	if (!wsi->vhost->protocols[n].callback) { /* no match */
+	if (n == wsi->a.vhost->count_protocols) { /* no match */
 		/* if server, that's already fatal */
 		if (!lwsi_role_client(wsi)) {
 			lwsl_info("%s: fail protocol %s\n", __func__, p);
@@ -408,19 +417,19 @@ identify_protocol:
 		/* for client, find the index of our pre-bound protocol */
 
 		n = 0;
-		while (wsi->vhost->protocols[n].callback) {
-			if (wsi->protocol && strcmp(wsi->protocol->name,
-				   wsi->vhost->protocols[n].name) == 0) {
-				wsi->protocol = &wsi->vhost->protocols[n];
+		while (wsi->a.vhost->protocols[n].callback) {
+			if (wsi->a.protocol && strcmp(wsi->a.protocol->name,
+				   wsi->a.vhost->protocols[n].name) == 0) {
+				wsi->a.protocol = &wsi->a.vhost->protocols[n];
 				break;
 			}
 			n++;
 		}
 
-		if (!wsi->vhost->protocols[n].callback) {
-			if (wsi->protocol)
+		if (!wsi->a.vhost->protocols[n].callback) {
+			if (wsi->a.protocol)
 				lwsl_err("Failed to match protocol %s\n",
-						wsi->protocol->name);
+						wsi->a.protocol->name);
 			else
 				lwsl_err("No protocol on client\n");
 			*cce = "ws protocol no match";
@@ -428,7 +437,7 @@ identify_protocol:
 		}
 	}
 
-	lwsl_debug("Selected protocol %s\n", wsi->protocol->name);
+	lwsl_debug("Selected protocol %s\n", wsi->a.protocol->name);
 
 check_extensions:
 	/*
@@ -498,7 +507,7 @@ check_extensions:
 		lwsl_notice("checking client ext %s\n", ext_name);
 
 		n = 0;
-		ext = wsi->vhost->ws.extensions;
+		ext = wsi->a.vhost->ws.extensions;
 		while (ext && ext->callback) {
 			if (strcmp(ext_name, ext->name)) {
 				ext++;
@@ -530,7 +539,7 @@ check_extensions:
 			 * wants to
 			 */
 			ext_name[0] = '\0';
-			if (user_callback_handle_rxflow(wsi->protocol->callback,
+			if (user_callback_handle_rxflow(wsi->a.protocol->callback,
 					wsi, LWS_CALLBACK_WS_EXT_DEFAULTS,
 					(char *)ext->name, ext_name,
 					sizeof(ext_name))) {
@@ -614,7 +623,7 @@ check_accept:
 	 * we seem to be good to go, give client last chance to check
 	 * headers and OK it
 	 */
-	if (wsi->protocol->callback(wsi,
+	if (wsi->a.protocol->callback(wsi,
 				    LWS_CALLBACK_CLIENT_FILTER_PRE_ESTABLISH,
 				    wsi->user_space, NULL, 0)) {
 		*cce = "HS: Rejected by filter cb";
@@ -627,15 +636,8 @@ check_accept:
 	/* free up his parsing allocations */
 	lws_header_table_detach(wsi, 0);
 
-	lws_role_transition(wsi, LWSIFR_CLIENT, LRS_ESTABLISHED,
-			    &role_ops_ws);
-
-	if (wsi->context->ws_ping_pong_interval && !wsi->http2_substream ) {
-		wsi->sul_ping.cb = lws_sul_wsping_cb;
-		__lws_sul_insert(&pt->pt_sul_owner, &wsi->sul_ping,
-				 (lws_usec_t)wsi->context->ws_ping_pong_interval *
-				 LWS_USEC_PER_SEC);
-	}
+	lws_role_transition(wsi, LWSIFR_CLIENT, LRS_ESTABLISHED, &role_ops_ws);
+	lws_validity_confirmed(wsi);
 
 	wsi->rxflow_change_to = LWS_RXFLOW_ALLOW;
 
@@ -644,7 +646,7 @@ check_accept:
 	 * size mentioned in the protocol definition.  If 0 there, then
 	 * use a big default for compatibility
 	 */
-	n = (int)wsi->protocol->rx_buffer_size;
+	n = (int)wsi->a.protocol->rx_buffer_size;
 	if (!n)
 		n = context->pt_serv_buf_size;
 	n += LWS_PRE;
@@ -656,22 +658,12 @@ check_accept:
 		goto bail2;
 	}
 	wsi->ws->rx_ubuf_alloc = n;
-	lwsl_info("Allocating client RX buffer %d\n", n);
 
-#if !defined(LWS_WITH_ESP32)
-	if (setsockopt(wsi->desc.sockfd, SOL_SOCKET, SO_SNDBUF,
-		       (const char *)&n, sizeof n)) {
-		lwsl_warn("Failed to set SNDBUF to %d", n);
-		*cce = "HS: SO_SNDBUF failed";
-		goto bail3;
-	}
-#endif
-
-	lwsl_debug("handshake OK for protocol %s\n", wsi->protocol->name);
+	lwsl_debug("handshake OK for protocol %s\n", wsi->a.protocol->name);
 
 	/* call him back to inform him he is up */
 
-	if (wsi->protocol->callback(wsi, LWS_CALLBACK_CLIENT_ESTABLISHED,
+	if (wsi->a.protocol->callback(wsi, LWS_CALLBACK_CLIENT_ESTABLISHED,
 				    wsi->user_space, NULL, 0)) {
 		*cce = "HS: Rejected at CLIENT_ESTABLISHED";
 		goto bail3;

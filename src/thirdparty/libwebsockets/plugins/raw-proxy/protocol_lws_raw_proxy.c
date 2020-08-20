@@ -1,22 +1,25 @@
 /*
- * libwebsockets - plugin for raw proxying
+ * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2018 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
 #if !defined (LWS_PLUGIN_STATIC)
@@ -249,10 +252,12 @@ bad_onward:
 		break;
 
         case LWS_CALLBACK_RAW_PROXY_CLI_ADOPT:
-		lwsl_debug("LWS_CALLBACK_RAW_CLI_ADOPT: pss %p\n", pss);
+		lwsl_debug("%s: %p: LWS_CALLBACK_RAW_CLI_ADOPT: pss %p\n", __func__, wsi, pss);
 		if (conn || !pss)
 			break;
 		conn = pss->conn = lws_get_opaque_user_data(wsi);
+		if (!conn)
+			break;
 		conn->established[ONW] = 1;
 		/* they start enabled */
 		conn->rx_enabled[ACC] = 1;
@@ -442,6 +447,9 @@ bad_onward:
 			return -1;
 		}
 
+		if (!len)
+			return 0;
+
 		pkt.payload = malloc(len);
 		if (!pkt.payload) {
 			lwsl_notice("OOM: dropping\n");
@@ -554,7 +562,7 @@ static const struct lws_protocols protocols[] = {
 	LWS_PLUGIN_PROTOCOL_RAW_PROXY
 };
 
-LWS_EXTERN LWS_VISIBLE int
+LWS_VISIBLE int
 init_protocol_lws_raw_proxy(struct lws_context *context,
 			    struct lws_plugin_capability *c)
 {
@@ -572,7 +580,7 @@ init_protocol_lws_raw_proxy(struct lws_context *context,
 	return 0;
 }
 
-LWS_EXTERN LWS_VISIBLE int
+LWS_VISIBLE int
 destroy_protocol_lws_raw_proxy(struct lws_context *context)
 {
 	return 0;

@@ -1,25 +1,28 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2018 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-#include "core/private.h"
+#include "private-lib-core.h"
 
 static void
 lws_uv_sultimer_cb(uv_timer_t *timer
@@ -33,7 +36,8 @@ lws_uv_sultimer_cb(uv_timer_t *timer
 	lws_usec_t us;
 
 	lws_pt_lock(pt, __func__);
-	us = __lws_sul_service_ripe(&pt->pt_sul_owner, lws_now_usecs());
+	us = __lws_sul_service_ripe(pt->pt_sul_owner, LWS_COUNT_PT_SUL_OWNERS,
+				    lws_now_usecs());
 	if (us)
 		uv_timer_start(&pt->uv.sultimer, lws_uv_sultimer_cb,
 			       LWS_US_TO_MS(us), 0);
@@ -63,7 +67,8 @@ lws_uv_idle(uv_idle_t *handle
 	/* account for sultimer */
 
 	lws_pt_lock(pt, __func__);
-	us = __lws_sul_service_ripe(&pt->pt_sul_owner, lws_now_usecs());
+	us = __lws_sul_service_ripe(pt->pt_sul_owner, LWS_COUNT_PT_SUL_OWNERS,
+				    lws_now_usecs());
 	if (us)
 		uv_timer_start(&pt->uv.sultimer, lws_uv_sultimer_cb,
 			       LWS_US_TO_MS(us), 0);
@@ -77,9 +82,12 @@ static void
 lws_io_cb(uv_poll_t *watcher, int status, int revents)
 {
 	struct lws *wsi = (struct lws *)((uv_handle_t *)watcher)->data;
-	struct lws_context *context = wsi->context;
+	struct lws_context *context = wsi->a.context;
 	struct lws_context_per_thread *pt = &context->pt[(int)wsi->tsi];
 	struct lws_pollfd eventfd;
+
+	if (pt->is_destroyed)
+		return;
 
 #if defined(WIN32) || defined(_WIN32)
 	eventfd.fd = watcher->socket;
@@ -112,6 +120,11 @@ lws_io_cb(uv_poll_t *watcher, int status, int revents)
 		}
 	}
 	lws_service_fd_tsi(context, &eventfd, wsi->tsi);
+
+	if (pt->destroy_self) {
+		lws_context_destroy(pt->context);
+		return;
+	}
 
 	uv_idle_start(&pt->uv.idle, lws_uv_idle);
 }
@@ -236,7 +249,7 @@ lws_uv_close_cb_sa(uv_handle_t *handle)
  * .... when the libuv object is created...
  */
 
-LWS_VISIBLE void
+void
 lws_libuv_static_refcount_add(uv_handle_t *h, struct lws_context *context)
 {
 	LWS_UV_REFCOUNT_STATIC_HANDLE_NEW(h, context);
@@ -246,7 +259,7 @@ lws_libuv_static_refcount_add(uv_handle_t *h, struct lws_context *context)
  * ... and in the close callback when the object is closed.
  */
 
-LWS_VISIBLE void
+void
 lws_libuv_static_refcount_del(uv_handle_t *h)
 {
 	lws_uv_close_cb_sa(h);
@@ -263,14 +276,14 @@ static void lws_uv_walk_cb(uv_handle_t *handle, void *arg)
 		uv_close(handle, lws_uv_close_cb);
 }
 
-LWS_VISIBLE void
+void
 lws_close_all_handles_in_loop(uv_loop_t *loop)
 {
 	uv_walk(loop, lws_uv_walk_cb, NULL);
 }
 
 
-LWS_VISIBLE void
+void
 lws_libuv_stop_without_kill(const struct lws_context *context, int tsi)
 {
 	if (context->pt[tsi].uv.io_loop)
@@ -279,7 +292,7 @@ lws_libuv_stop_without_kill(const struct lws_context *context, int tsi)
 
 
 
-LWS_VISIBLE uv_loop_t *
+uv_loop_t *
 lws_uv_getloop(struct lws_context *context, int tsi)
 {
 	if (context->pt[tsi].uv.io_loop)
@@ -364,8 +377,8 @@ lws_uv_plugins_init(struct lws_context *context, const char * const *d)
 #endif
 			if (uv_dlsym(&lib, path, &v)) {
 				uv_dlerror(&lib);
-				lwsl_err("Failed to get %s on %s: %s", path,
-						dent.name, lib.errmsg);
+				lwsl_err("%s: Failed to get '%s' on %s: %s\n",
+					 __func__, path, dent.name, lib.errmsg);
 				uv_dlclose(&lib);
 				goto bail;
 			}
@@ -494,7 +507,7 @@ elops_destroy_context1_uv(struct lws_context *context)
 						  UV_RUN_NOWAIT)))
 					;
 			if (m)
-				lwsl_err("%s: tsi %d: not all closed\n",
+				lwsl_info("%s: tsi %d: not all closed\n",
 					 __func__, n);
 
 		}
@@ -534,7 +547,8 @@ elops_destroy_context2_uv(struct lws_context *context)
 static int
 elops_wsi_logical_close_uv(struct lws *wsi)
 {
-	if (!lws_socket_is_valid(wsi->desc.sockfd))
+	if (!lws_socket_is_valid(wsi->desc.sockfd) &&
+	    wsi->role_ops != &role_ops_raw_file)
 		return 0;
 
 	if (wsi->listener || wsi->event_pipe) {
@@ -600,9 +614,9 @@ elops_close_handle_manually_uv(struct lws *wsi)
 static int
 elops_accept_uv(struct lws *wsi)
 {
-	struct lws_context_per_thread *pt = &wsi->context->pt[(int)wsi->tsi];
+	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
 
-	wsi->w_read.context = wsi->context;
+	wsi->w_read.context = wsi->a.context;
 
 	wsi->w_read.uv.pwatcher =
 		lws_malloc(sizeof(*wsi->w_read.uv.pwatcher), "uvh");
@@ -611,7 +625,7 @@ elops_accept_uv(struct lws *wsi)
 
 	if (wsi->role_ops->file_handle)
 		uv_poll_init(pt->uv.io_loop, wsi->w_read.uv.pwatcher,
-			     (int)(long long)wsi->desc.filefd);
+			     (int)(lws_intptr_t)wsi->desc.filefd);
 	else
 		uv_poll_init_socket(pt->uv.io_loop,
 				    wsi->w_read.uv.pwatcher,
@@ -625,7 +639,7 @@ elops_accept_uv(struct lws *wsi)
 static void
 elops_io_uv(struct lws *wsi, int flags)
 {
-	struct lws_context_per_thread *pt = &wsi->context->pt[(int)wsi->tsi];
+	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
 	struct lws_io_watcher *w = &wsi->w_read;
 	int current_events = w->actual_events & (UV_READABLE | UV_WRITABLE);
 
@@ -645,7 +659,7 @@ elops_io_uv(struct lws *wsi, int flags)
 	}
 
 	if (!w->uv.pwatcher || wsi->told_event_loop_closed) {
-		lwsl_err("%s: no watcher\n", __func__);
+		lwsl_info("%s: no watcher\n", __func__);
 
 		return;
 	}
@@ -686,11 +700,11 @@ elops_init_vhost_listen_wsi_uv(struct lws *wsi)
 	if (wsi->w_read.context)
 		return 0;
 
-	pt = &wsi->context->pt[(int)wsi->tsi];
+	pt = &wsi->a.context->pt[(int)wsi->tsi];
 	if (!pt->uv.io_loop)
 		return 0;
 
-	wsi->w_read.context = wsi->context;
+	wsi->w_read.context = wsi->a.context;
 
 	wsi->w_read.uv.pwatcher =
 		lws_malloc(sizeof(*wsi->w_read.uv.pwatcher), "uvh");
@@ -769,7 +783,7 @@ elops_destroy_pt_uv(struct lws_context *context, int tsi)
  * called again to bind the vhost
  */
 
-LWS_VISIBLE int
+int
 elops_init_pt_uv(struct lws_context *context, void *_loop, int tsi)
 {
 	struct lws_context_per_thread *pt = &context->pt[tsi];
@@ -848,7 +862,7 @@ lws_libuv_closewsi(uv_handle_t* handle)
 	struct lws *wsi = (struct lws *)handle->data;
 	struct lws_context *context = lws_get_context(wsi);
 	struct lws_context_per_thread *pt = &context->pt[(int)wsi->tsi];
-#if !defined(LWS_WITHOUT_SERVER)
+#if defined(LWS_WITH_SERVER)
 	int lspd = 0;
 #endif
 
@@ -858,8 +872,8 @@ lws_libuv_closewsi(uv_handle_t* handle)
 	 * We get called back here for every wsi that closes
 	 */
 
-#if !defined(LWS_WITHOUT_SERVER)
-	if (wsi->role_ops == &role_ops_listen && wsi->context->deprecated) {
+#if defined(LWS_WITH_SERVER)
+	if (wsi->role_ops == &role_ops_listen && wsi->a.context->deprecated) {
 		lspd = 1;
 		context->deprecation_pending_listen_close_count--;
 		if (!context->deprecation_pending_listen_close_count)
@@ -874,7 +888,7 @@ lws_libuv_closewsi(uv_handle_t* handle)
 	/* it's our job to close the handle finally */
 	lws_free(handle);
 
-#if !defined(LWS_WITHOUT_SERVER)
+#if defined(LWS_WITH_SERVER)
 	if (lspd == 2 && context->deprecation_cb) {
 		lwsl_notice("calling deprecation callback\n");
 		context->deprecation_cb();
@@ -965,5 +979,5 @@ struct lws_event_loop_ops event_loop_ops_uv = {
 	/* destroy_pt */		elops_destroy_pt_uv,
 	/* destroy wsi */		NULL,
 
-	/* periodic_events_available */	0,
+	/* flags */			0,
 };

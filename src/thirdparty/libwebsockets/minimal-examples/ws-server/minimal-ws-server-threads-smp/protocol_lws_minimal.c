@@ -28,20 +28,20 @@ struct msg {
  * It is ONLY read or written from the lws service thread context.
  */
 
-struct per_session_data {
-	struct per_session_data *pss_list;
+struct per_session_data__minimal {
+	struct per_session_data__minimal *pss_list;
 	struct lws *wsi;
 	uint32_t tail;
 };
 
 /* one of these is created for each vhost our protocol is used with */
 
-struct per_vhost_data {
+struct per_vhost_data__minimal {
 	struct lws_context *context;
 	struct lws_vhost *vhost;
 	const struct lws_protocols *protocol;
 
-	struct per_session_data *pss_list; /* linked-list of live pss*/
+	struct per_session_data__minimal *pss_list; /* linked-list of live pss*/
 	pthread_t pthread_spam[2];
 
 	pthread_mutex_t lock_ring; /* serialize access to the ring buffer */
@@ -80,10 +80,14 @@ __minimal_destroy_message(void *_msg)
 static void *
 thread_spam(void *d)
 {
-	struct per_vhost_data *vhd =
-			(struct per_vhost_data *)d;
+	struct per_vhost_data__minimal *vhd =
+			(struct per_vhost_data__minimal *)d;
 	struct msg amsg;
-	int len = 128, index = 1, n;
+	int len = 128, index = 1, n, whoami = 0;
+
+	for (n = 0; n < (int)LWS_ARRAY_SIZE(vhd->pthread_spam); n++)
+		if (pthread_equal(pthread_self(), vhd->pthread_spam[n]))
+			whoami = n + 1;
 
 	do {
 		/* don't generate output if nobody connected */
@@ -105,10 +109,10 @@ thread_spam(void *d)
 			goto wait_unlock;
 		}
 		n = lws_snprintf((char *)amsg.payload + LWS_PRE, len,
-			         "%s: spam tid: %p, msg: %d", vhd->config,
-			         (void *)pthread_self(), index++);
+			         "%s: spam tid: %d, msg: %d", vhd->config,
+			         whoami, index++);
 		amsg.len = n;
-		n = lws_ring_insert(vhd->ring, &amsg, 1);
+		n = (int)lws_ring_insert(vhd->ring, &amsg, 1);
 		if (n != 1) {
 			__minimal_destroy_message(&amsg);
 			lwsl_user("dropping!\n");
@@ -127,7 +131,7 @@ wait:
 
 	} while (!vhd->finished);
 
-	lwsl_notice("thread_spam %p exiting\n", (void *)pthread_self());
+	lwsl_notice("thread_spam %d exiting\n", whoami);
 
 	pthread_exit(NULL);
 
@@ -140,10 +144,10 @@ static int
 callback_minimal(struct lws *wsi, enum lws_callback_reasons reason,
 			void *user, void *in, size_t len)
 {
-	struct per_session_data *pss =
-			(struct per_session_data *)user;
-	struct per_vhost_data *vhd =
-			(struct per_vhost_data *)
+	struct per_session_data__minimal *pss =
+			(struct per_session_data__minimal *)user;
+	struct per_vhost_data__minimal *vhd =
+			(struct per_vhost_data__minimal *)
 			lws_protocol_vh_priv_get(lws_get_vhost(wsi),
 					lws_get_protocol(wsi));
 	const struct lws_protocol_vhost_options *pvo;
@@ -157,7 +161,7 @@ callback_minimal(struct lws *wsi, enum lws_callback_reasons reason,
 		/* create our per-vhost struct */
 		vhd = lws_protocol_vh_priv_zalloc(lws_get_vhost(wsi),
 				lws_get_protocol(wsi),
-				sizeof(struct per_vhost_data));
+				sizeof(struct per_vhost_data__minimal));
 		if (!vhd)
 			return 1;
 
@@ -199,8 +203,7 @@ callback_minimal(struct lws *wsi, enum lws_callback_reasons reason,
 init_fail:
 		vhd->finished = 1;
 		for (n = 0; n < (int)LWS_ARRAY_SIZE(vhd->pthread_spam); n++)
-			if (vhd->pthread_spam[n])
-				pthread_join(vhd->pthread_spam[n], &retval);
+			pthread_join(vhd->pthread_spam[n], &retval);
 
 		if (vhd->ring)
 			lws_ring_destroy(vhd->ring);
@@ -231,7 +234,7 @@ init_fail:
 		}
 
 		n = lws_snprintf(temp + LWS_PRE, sizeof(temp) - LWS_PRE,
-			      "svc tid:%p, %s", (void *)pthread_self(),
+			      "svc, %s",
 			      (char *)pmsg->payload + LWS_PRE);
 
 		/* notice we allowed for LWS_PRE in the payload already */
@@ -265,8 +268,7 @@ init_fail:
 		break;
 
 	case LWS_CALLBACK_EVENT_WAIT_CANCELLED:
-		lwsl_notice("LWS_CALLBACK_EVENT_WAIT_CANCELLED in svc tid %p\n",
-				(void *)pthread_self());
+		lwsl_notice("LWS_CALLBACK_EVENT_WAIT_CANCELLED in svc\n");
 		if (!vhd)
 			break;
 		/*
@@ -294,7 +296,7 @@ init_fail:
 	{ \
 		"lws-minimal", \
 		callback_minimal, \
-		sizeof(struct per_session_data), \
+		sizeof(struct per_session_data__minimal), \
 		128, \
 		0, NULL, 0 \
 	}
@@ -307,7 +309,7 @@ static const struct lws_protocols protocols[] = {
 	LWS_PLUGIN_PROTOCOL_MINIMAL
 };
 
-LWS_EXTERN LWS_VISIBLE int
+int
 init_protocol_minimal(struct lws_context *context,
 		      struct lws_plugin_capability *c)
 {
@@ -325,7 +327,7 @@ init_protocol_minimal(struct lws_context *context,
 	return 0;
 }
 
-LWS_EXTERN LWS_VISIBLE int
+int
 destroy_protocol_minimal(struct lws_context *context)
 {
 	return 0;

@@ -1,23 +1,25 @@
-/*
- * libwebsockets - dbus role
+ /*
+ * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2018 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
- *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  *
  * This role for wrapping dbus fds in a wsi + role is unusual in that the
  * wsi it creates and binds to the role do not have control over the related fd
@@ -33,7 +35,7 @@
  * worries we create a new shadow wsi until it looks like it is closing again.
  */
 
-#include <core/private.h>
+#include <private-lib-core.h>
 
 #include <libwebsockets/lws-dbus.h>
 
@@ -74,10 +76,10 @@ __lws_shadow_wsi(struct lws_dbus_ctx *ctx, DBusWatch *w, int fd, int create_ok)
 
 	lwsl_info("%s: creating shadow wsi\n", __func__);
 
-	wsi->context = ctx->vh->context;
+	wsi->a.context = ctx->vh->context;
 	wsi->desc.sockfd = fd;
 	lws_role_transition(wsi, 0, LRS_ESTABLISHED, &role_ops_dbus);
-	wsi->protocol = ctx->vh->protocols;
+	wsi->a.protocol = ctx->vh->protocols;
 	wsi->tsi = ctx->tsi;
 	wsi->shadow = 1;
 	wsi->opaque_parent_data = ctx;
@@ -470,23 +472,18 @@ rops_handle_POLLIN_dbus(struct lws_context_per_thread *pt, struct lws *wsi,
 	return LWS_HPI_RET_HANDLED;
 }
 
-static int
-rops_periodic_checks_dbus(struct lws_context *context, int tsi, time_t now)
+static void
+lws_dbus_sul_cb(lws_sorted_usec_list_t *sul)
 {
-	struct lws_context_per_thread *pt = &context->pt[tsi];
-
-	/*
-	 * locking shouldn't be needed here, because periodic_checks is called
-	 * from the tsi-specific service thread context, and only the same
-	 * service thread can modify stuff on the same pt.
-	 */
+	struct lws_context_per_thread *pt = lws_container_of(sul,
+				struct lws_context_per_thread, dbus.sul);
 
 	lws_start_foreach_dll_safe(struct lws_dll2 *, rdt, nx,
 			 lws_dll2_get_head(&pt->dbus.timer_list_owner)) {
 		struct lws_role_dbus_timer *r = lws_container_of(rdt,
 					struct lws_role_dbus_timer, timer_list);
 
-		if (now > r->fire) {
+		if (time(NULL) > r->fire) {
 			lwsl_notice("%s: firing timer\n", __func__);
 			dbus_timeout_handle(r->data);
 			lws_dll2_remove(rdt);
@@ -494,17 +491,31 @@ rops_periodic_checks_dbus(struct lws_context *context, int tsi, time_t now)
 		}
 	} lws_end_foreach_dll_safe(rdt, nx);
 
+	lws_sul_schedule(pt->context, pt->tid, &pt->dbus.sul, lws_dbus_sul_cb,
+			 3 * LWS_US_PER_SEC);
+}
+
+static int
+rops_pt_init_destroy_dbus(struct lws_context *context,
+		    const struct lws_context_creation_info *info,
+		    struct lws_context_per_thread *pt, int destroy)
+{
+	if (!destroy) {
+		lws_sul_schedule(context, pt->tid, &pt->dbus.sul, lws_dbus_sul_cb,
+				 3 * LWS_US_PER_SEC);
+	} else
+		lws_sul_cancel(&pt->dbus.sul);
+
 	return 0;
 }
 
-struct lws_role_ops role_ops_dbus = {
+const struct lws_role_ops role_ops_dbus = {
 	/* role name */			"dbus",
 	/* alpn id */			NULL,
 	/* check_upgrades */		NULL,
-	/* init_context */		NULL,
+	/* pt_init_destroy */		rops_pt_init_destroy_dbus,
 	/* init_vhost */		NULL,
 	/* destroy_vhost */		NULL,
-	/* periodic_checks */		rops_periodic_checks_dbus,
 	/* service_flag_pending */	NULL,
 	/* handle_POLLIN */		rops_handle_POLLIN_dbus,
 	/* handle_POLLOUT */		NULL,
@@ -520,6 +531,7 @@ struct lws_role_ops role_ops_dbus = {
 	/* destroy_role */		NULL,
 	/* adoption_bind */		NULL,
 	/* client_bind */		NULL,
+	/* issue_keepalive */		NULL,
 	/* adoption_cb clnt, srv */	{ 0, 0 },
 	/* rx_cb clnt, srv */		{ 0, 0 },
 	/* writeable cb clnt, srv */	{ 0, 0 },

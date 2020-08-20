@@ -1,25 +1,28 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-#include "core/private.h"
+#include "private-lib-core.h"
 
 static int
 sul_compare(const lws_dll2_t *d, const lws_dll2_t *i)
@@ -40,99 +43,279 @@ sul_compare(const lws_dll2_t *d, const lws_dll2_t *i)
 	return 0;
 }
 
+/*
+ * notice owner was chosen already, and sul->us was already computed
+ */
+
 int
-__lws_sul_insert(lws_dll2_owner_t *own, lws_sorted_usec_list_t *sul,
-		 lws_usec_t us)
+__lws_sul_insert(lws_dll2_owner_t *own, lws_sorted_usec_list_t *sul)
 {
-	lws_usec_t now = lws_now_usecs();
 	lws_dll2_remove(&sul->list);
 
-	if (us == LWS_SET_TIMER_USEC_CANCEL) {
-		/* we are clearing the timeout */
-		sul->us = 0;
-
-		return 0;
-	}
-
-	sul->us = now + us;
 	assert(sul->cb);
 
 	/*
 	 * we sort the pt's list of sequencers with pending timeouts, so it's
-	 * cheap to check it every second
+	 * cheap to check it every poll wait
 	 */
 
 	lws_dll2_add_sorted(&sul->list, own, sul_compare);
-
-#if 0 // defined(_DEBUG)
-	{
-		lws_usec_t worst = 0;
-		int n = 1;
-
-		lwsl_info("%s: own %p: count %d\n", __func__, own, own->count);
-
-		lws_start_foreach_dll_safe(struct lws_dll2 *, p, tp,
-					   lws_dll2_get_head(own)) {
-			lws_sorted_usec_list_t *sul = (lws_sorted_usec_list_t *)p;
-			lwsl_info("%s:    %d: %llu (+%lld)\n", __func__, n++,
-					(unsigned long long)sul->us,
-					(long long)(sul->us - now));
-			if (sul->us < worst) {
-				lwsl_err("%s: wrongly sorted sul entry!\n",
-						__func__);
-				assert(0);
-			}
-			worst = sul->us;
-		} lws_end_foreach_dll_safe(p, tp);
-	}
-#endif
 
 	return 0;
 }
 
 void
-lws_sul_schedule(struct lws_context *context, int tsi,
-	         lws_sorted_usec_list_t *sul, sul_cb_t cb, lws_usec_t us)
+lws_sul_cancel(lws_sorted_usec_list_t *sul)
+{
+	lws_dll2_remove(&sul->list);
+
+	/* we are clearing the timeout and leaving ourselves detached */
+	sul->us = 0;
+}
+
+void
+lws_sul2_schedule(struct lws_context *context, int tsi, int flags,
+	          lws_sorted_usec_list_t *sul)
 {
 	struct lws_context_per_thread *pt = &context->pt[tsi];
 
-	sul->cb = cb;
-
-	__lws_sul_insert(&pt->pt_sul_owner, sul, us);
+	__lws_sul_insert(
+		&pt->pt_sul_owner[!!(flags & LWSSULLI_WAKE_IF_SUSPENDED)], sul);
 }
 
+/*
+ * own points to the first in an array of length own_len
+ *
+ * While any sul list owner has a "ripe", ie, ready to handle sul we do them
+ * strictly in order of sul time.  When nobody has a ripe sul we return 0, if
+ * actually nobody has any sul, or the interval between usnow and the next
+ * earliest scheduled event on any list.
+ */
+
 lws_usec_t
-__lws_sul_service_ripe(lws_dll2_owner_t *own, lws_usec_t usnow)
+__lws_sul_service_ripe(lws_dll2_owner_t *own, int own_len, lws_usec_t usnow)
 {
-	while (lws_dll2_get_head(own)) {
-                /* .list is always first member in lws_sorted_usec_list_t */
-                lws_sorted_usec_list_t *sul = (lws_sorted_usec_list_t *)
-                                                        lws_dll2_get_head(own);
-		assert(sul->us); /* shouldn't be on the list otherwise */
-		if (sul->us > usnow)
-			/*
-			 * No need to look further if we met one later than now:
-			 * the list is sorted in ascending time order
-			 */
-			return sul->us - usnow;
+	struct lws_context_per_thread *pt = (struct lws_context_per_thread *)
+			lws_container_of(own, struct lws_context_per_thread,
+					 pt_sul_owner);
 
-		/* his moment has come... remove him from timeout list */
+	if (pt->attach_owner.count)
+		lws_system_do_attach(pt);
 
-		lws_dll2_remove(&sul->list);
-		sul->us = 0;
-		sul->cb(sul);
-                /*
-                 * The callback may have done any mixture of delete
-                 * and add sul entries... eg, close a wsi may pull out
-                 * multiple entries making iterating it statefully
-                 * unsafe.  Always restart at the current head of list.
-                 */
-	}
+	/* must be at least 1 */
+	assert(own_len > 0);
 
 	/*
-	 * Nothing left to take care of in the list (cannot return 0 otherwise
-	 * because we will service anything equal to usnow rather than return)
+	 * Of the own_len sul owning lists, the earliest next sul could be on
+	 * any of them.  We have to find it and handle each in turn until no
+	 * ripe sul left on any owning list, and we can exit.
+	 *
+	 * This ensures the ripe sul are handled strictly in the right order no
+	 * matter which owning list they are on.
 	 */
+
+	do {
+		lws_sorted_usec_list_t *hit = NULL;
+		lws_usec_t lowest;
+		int n = 0;
+
+		for (n = 0; n < own_len; n++) {
+			lws_sorted_usec_list_t *sul;
+			if (!own[n].count)
+				continue;
+			 sul = (lws_sorted_usec_list_t *)
+						     lws_dll2_get_head(&own[n]);
+
+			if (!hit || sul->us <= lowest) {
+				hit = sul;
+				lowest = sul->us;
+			}
+		}
+
+		if (!hit)
+			return 0;
+
+		if (lowest > usnow)
+			return lowest - usnow;
+
+		/* his moment has come... remove him from his owning list */
+
+		lws_dll2_remove(&hit->list);
+		hit->us = 0;
+
+		pt->inside_lws_service = 1;
+		hit->cb(hit);
+		pt->inside_lws_service = 0;
+
+	} while (1);
+
+	/* unreachable */
 
 	return 0;
 }
+
+/*
+ * Normally we use the OS monotonic time, which does not step when the
+ * gettimeofday() time is adjusted after, eg, ntpclient.  But on some OSes,
+ * high resolution monotonic time doesn't exist; sul time is computed from and
+ * compared against gettimeofday() time and breaks when that steps.
+ *
+ * For those cases, this allows us to retrospectively adjust existing suls on
+ * all owning lists by the step amount, at the same time we adjust the
+ * nonmonotonic clock.  Then nothing breaks so long as we do this when the
+ * gettimeofday() clock is stepped.
+ *
+ * Linux and so on offer Posix MONOTONIC, which lws uses.  FreeRTOS doesn't
+ * have a high-resolution monotonic clock and has to use gettimeofday(), which
+ * requires this adjustment when it is stepped.
+ */
+
+lws_usec_t
+lws_sul_nonmonotonic_adjust(struct lws_context *ctx, int64_t step_us)
+{
+	struct lws_context_per_thread *pt = &ctx->pt[0];
+	int n, m;
+
+	/*
+	 * for each pt
+	 */
+
+	for (m = 0; m < ctx->count_threads; m++) {
+
+		/*
+		 * For each owning list...
+		 */
+
+		lws_pt_lock(pt, __func__);
+
+		for (n = 0; n < LWS_COUNT_PT_SUL_OWNERS; n++) {
+
+			if (!pt->pt_sul_owner[n].count)
+				continue;
+
+			/* ... and for every existing sul on a list... */
+
+			lws_start_foreach_dll(struct lws_dll2 *, p,
+					      lws_dll2_get_head(
+							&pt->pt_sul_owner[n])) {
+				lws_sorted_usec_list_t *sul = lws_container_of(
+					       p, lws_sorted_usec_list_t, list);
+
+				/*
+				 * ... retrospectively step its ripe time by the
+				 * step we will adjust the gettimeofday() clock
+				 * with
+				 */
+
+				sul->us += step_us;
+
+			} lws_end_foreach_dll(p);
+		}
+
+		lws_pt_unlock(pt);
+
+		pt++;
+	}
+
+	return 0;
+}
+
+/*
+ * Earliest wakeable event on any pt
+ */
+
+int
+lws_sul_earliest_wakeable_event(struct lws_context *ctx, lws_usec_t *pearliest)
+{
+	struct lws_context_per_thread *pt;
+	int n = 0, hit = -1;
+	lws_usec_t lowest;
+
+	for (n = 0; n < ctx->count_threads; n++) {
+		pt = &ctx->pt[n];
+
+		lws_pt_lock(pt, __func__);
+
+		if (pt->pt_sul_owner[LWSSULLI_WAKE_IF_SUSPENDED].count) {
+			lws_sorted_usec_list_t *sul = (lws_sorted_usec_list_t *)
+					lws_dll2_get_head(&pt->pt_sul_owner[
+					           LWSSULLI_WAKE_IF_SUSPENDED]);
+
+			if (hit == -1 || sul->us < lowest) {
+				hit = n;
+				lowest = sul->us;
+			}
+		}
+
+		lws_pt_unlock(pt);
+	}
+
+
+	if (hit == -1)
+		/* there is no pending event */
+		return 1;
+
+	*pearliest = lowest;
+
+	return 0;
+}
+
+#if defined(LWS_WITH_SUL_DEBUGGING)
+
+/*
+ * Sanity checker for any sul left scheduled when its containing object is
+ * freed... code scheduling suls must take care to cancel them when destroying
+ * their object.  This optional debugging helper checks that when an object is
+ * being destroyed, there is no live sul scheduled from inside the object.
+ */
+
+void
+lws_sul_debug_zombies(struct lws_context *ctx, void *po, size_t len,
+		      const char *destroy_description)
+{
+	struct lws_context_per_thread *pt;
+	int n, m;
+
+	for (n = 0; n < ctx->count_threads; n++) {
+		pt = &ctx->pt[n];
+
+		lws_pt_lock(pt, __func__);
+
+		for (m = 0; m < LWS_COUNT_PT_SUL_OWNERS; m++) {
+
+			lws_start_foreach_dll(struct lws_dll2 *, p,
+				      lws_dll2_get_head(&pt->pt_sul_owner[m])) {
+				lws_sorted_usec_list_t *sul =
+					lws_container_of(p,
+						lws_sorted_usec_list_t, list);
+
+				/*
+				 * Is the sul resident inside the object that is
+				 * indicated as being deleted?
+				 */
+
+				if (sul >= po && lws_ptr_diff(sul, po) < len) {
+					lwsl_err("%s: ERROR: Zombie Sul "
+						 "(on list %d) %s\n", __func__,
+						 m, destroy_description);
+					/*
+					 * This assert fires if you have left
+					 * a sul scheduled to fire later, but
+					 * are about to destroy the object the
+					 * sul lives in.  You must take care to
+					 * do lws_sul_cancel(&sul) on any suls
+					 * that may be scheduled before
+					 * destroying the object the sul lives
+					 * inside.
+					 */
+					assert(0);
+				}
+
+			} lws_end_foreach_dll(p);
+		}
+
+		lws_pt_unlock(pt);
+	}
+}
+
+#endif

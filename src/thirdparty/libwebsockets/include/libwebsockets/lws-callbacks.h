@@ -1,24 +1,25 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2018 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
- *
- * included from libwebsockets.h
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
 /*! \defgroup usercb User Callback
@@ -61,6 +62,7 @@ enum {
 	LWS_TLS_REQ_ELEMENT_LOCALITY,
 	LWS_TLS_REQ_ELEMENT_ORGANIZATION,
 	LWS_TLS_REQ_ELEMENT_COMMON_NAME,
+	LWS_TLS_REQ_ELEMENT_SUBJECT_ALT_NAME,
 	LWS_TLS_REQ_ELEMENT_EMAIL,
 
 	LWS_TLS_REQ_ELEMENT_COUNT,
@@ -104,6 +106,9 @@ enum lws_callback_reasons {
 
 	LWS_CALLBACK_WSI_DESTROY				= 30,
 	/**< outermost (latest) wsi destroy notification to protocols[0] */
+
+	LWS_CALLBACK_WSI_TX_CREDIT_GET				= 103,
+	/**< manually-managed connection received TX credit (len is int32) */
 
 
 	/* ---------------------------------------------------------------------
@@ -278,6 +283,15 @@ enum lws_callback_reasons {
 	 *          break;
 	 */
 
+	LWS_CALLBACK_VERIFY_BASIC_AUTHORIZATION = 102,
+	/**< This gives the user code a chance to accept or reject credentials
+	 * provided HTTP to basic authorization. It will only be called if the
+	 * http mount's authentication_mode is set to LWSAUTHM_BASIC_AUTH_CALLBACK
+	 * `in` points to a credential string of the form `username:password` If
+	 * the callback returns zero (the default if unhandled), then the
+	 * transaction ends with HTTP_STATUS_UNAUTHORIZED, otherwise the request
+	 * will be processed */
+
 	LWS_CALLBACK_CHECK_ACCESS_RIGHTS			= 51,
 	/**< This gives the user code a chance to forbid an http access.
 	 * `in` points to a `struct lws_process_html_args`, which
@@ -375,6 +389,9 @@ enum lws_callback_reasons {
 	 * From this callback, when you have sent everything, you should let
 	 * lws know by calling lws_client_http_body_pending(wsi, 0)
 	 */
+
+	LWS_CALLBACK_CLIENT_HTTP_REDIRECT			= 104,
+	/**< we're handling a 3xx redirect... return nonzero to hang up */
 
 	LWS_CALLBACK_CLIENT_HTTP_BIND_PROTOCOL			= 85,
 	LWS_CALLBACK_CLIENT_HTTP_DROP_PROTOCOL			= 76,
@@ -813,6 +830,30 @@ enum lws_callback_reasons {
 	 * and failure.  in points to optional JSON, and len represents the
 	 * connection state using enum lws_cert_update_state */
 
+	/* ---------------------------------------------------------------------
+	 * ----- Callbacks related to MQTT Client  -----
+	 */
+
+	LWS_CALLBACK_MQTT_NEW_CLIENT_INSTANTIATED		= 200,
+	LWS_CALLBACK_MQTT_IDLE					= 201,
+	LWS_CALLBACK_MQTT_CLIENT_ESTABLISHED			= 202,
+	LWS_CALLBACK_MQTT_SUBSCRIBED				= 203,
+	LWS_CALLBACK_MQTT_CLIENT_WRITEABLE			= 204,
+	LWS_CALLBACK_MQTT_CLIENT_RX				= 205,
+	LWS_CALLBACK_MQTT_UNSUBSCRIBED				= 206,
+	LWS_CALLBACK_MQTT_DROP_PROTOCOL				= 207,
+	LWS_CALLBACK_MQTT_CLIENT_CLOSED				= 208,
+	LWS_CALLBACK_MQTT_ACK					= 209,
+	/**< When a message is fully sent, if QoS0 this callback is generated
+	 * to locally "acknowledge" it.  For QoS1, this callback is only
+	 * generated when the matching PUBACK is received.  Return nonzero to
+	 * close the wsi.
+	 */
+	LWS_CALLBACK_MQTT_RESEND				= 210,
+	/**< In QoS1, this callback is generated instead of the _ACK one if
+	 * we timed out waiting for a PUBACK and we must resend the message.
+	 * Return nonzero to close the wsi.
+	 */
 
 	/****** add new things just above ---^ ******/
 

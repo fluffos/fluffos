@@ -1,24 +1,25 @@
-/*
+ /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010-2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation:
- *  version 2.1 of the License.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- *  MA  02110-1301  USA
- *
- * included from libwebsockets.h
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  *
  * lws_sequencer is intended to help implement sequences that:
  *
@@ -47,6 +48,14 @@ typedef enum {
 	LWSSEQ_WSI_CONNECTED,	/* wsi we bound to us has connected */
 	LWSSEQ_WSI_CONN_FAIL,	/* wsi we bound to us has failed to connect */
 	LWSSEQ_WSI_CONN_CLOSE,	/* wsi we bound to us has closed */
+
+
+	LWSSEQ_SS_STATE_BASE,	/* secure streams owned by a sequencer provide
+				 * automatic messages about state changes on
+				 * the sequencer, passing the oridinal in the
+				 * event argument field.  The message index is
+				 * LWSSEQ_SS_STATE_BASE + the enum from
+				 * lws_ss_constate_t */
 
 	LWSSEQ_USER_BASE = 100	/* define your events from here */
 } lws_seq_events_t;
@@ -78,6 +87,8 @@ typedef struct lws_seq_info {
 	lws_seq_event_cb		cb;	    /* seq callback */
 	const char			*name;	    /* seq name */
 	const lws_retry_bo_t		*retry;	    /* retry policy */
+	uint8_t				wakesuspend:1; /* important enough to
+						     * wake system */
 } lws_seq_info_t;
 
 /**
@@ -95,7 +106,7 @@ typedef struct lws_seq_info {
  *
  * pt locking is used to protect the related data structures.
  */
-LWS_VISIBLE LWS_EXTERN lws_seq_t *
+LWS_VISIBLE LWS_EXTERN struct lws_sequencer *
 lws_seq_create(lws_seq_info_t *info);
 
 /**
@@ -109,7 +120,7 @@ lws_seq_create(lws_seq_info_t *info);
  * set to NULL.
  */
 LWS_VISIBLE LWS_EXTERN void
-lws_seq_destroy(lws_seq_t **seq);
+lws_seq_destroy(struct lws_sequencer **seq);
 
 /**
  * lws_seq_queue_event() - queue an event on the given sequencer
@@ -129,7 +140,7 @@ lws_seq_destroy(lws_seq_t **seq);
  * values here.
  */
 LWS_VISIBLE LWS_EXTERN int
-lws_seq_queue_event(lws_seq_t *seq, lws_seq_events_t e, void *data,
+lws_seq_queue_event(struct lws_sequencer *seq, lws_seq_events_t e, void *data,
 			  void *aux);
 
 /**
@@ -149,7 +160,7 @@ lws_seq_queue_event(lws_seq_t *seq, lws_seq_events_t e, void *data,
  * close message yet.
  */
 LWS_VISIBLE LWS_EXTERN int
-lws_seq_check_wsi(lws_seq_t *seq, struct lws *wsi);
+lws_seq_check_wsi(struct lws_sequencer *seq, struct lws *wsi);
 
 #define LWSSEQTO_NONE 0
 
@@ -179,7 +190,7 @@ lws_seq_check_wsi(lws_seq_t *seq, struct lws *wsi);
  * react appropriately.
  */
 LWS_VISIBLE LWS_EXTERN int
-lws_seq_timeout_us(lws_seq_t *seq, lws_usec_t us);
+lws_seq_timeout_us(struct lws_sequencer *seq, lws_usec_t us);
 
 /**
  * lws_seq_from_user(): get the lws_seq_t pointer from the user ptr
@@ -194,7 +205,7 @@ lws_seq_timeout_us(lws_seq_t *seq, lws_usec_t us);
  * size of the lws_seq_t is unknown to user code, this helper does it for
  * you.
  */
-LWS_VISIBLE LWS_EXTERN lws_seq_t *
+LWS_VISIBLE LWS_EXTERN struct lws_sequencer *
 lws_seq_from_user(void *u);
 
 /**
@@ -207,7 +218,7 @@ lws_seq_from_user(void *u);
  * step considering a global sequencer lifetime limit.
  */
 LWS_VISIBLE LWS_EXTERN lws_usec_t
-lws_seq_us_since_creation(lws_seq_t *seq);
+lws_seq_us_since_creation(struct lws_sequencer *seq);
 
 /**
  * lws_seq_name(): get the name of this sequencer
@@ -218,7 +229,7 @@ lws_seq_us_since_creation(lws_seq_t *seq);
  * annotate logging when then are multiple sequencers in play.
  */
 LWS_VISIBLE LWS_EXTERN const char *
-lws_seq_name(lws_seq_t *seq);
+lws_seq_name(struct lws_sequencer *seq);
 
 /**
  * lws_seq_get_context(): get the lws_context sequencer was created on
@@ -229,4 +240,4 @@ lws_seq_name(lws_seq_t *seq);
  * pointer handy.
  */
 LWS_VISIBLE LWS_EXTERN struct lws_context *
-lws_seq_get_context(lws_seq_t *seq);
+lws_seq_get_context(struct lws_sequencer *seq);
