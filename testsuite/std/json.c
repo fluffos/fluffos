@@ -307,7 +307,7 @@ private varargs mixed json_decode_parse_string(mixed* parse, int initiator_check
         }
         json_decode_parse_next_char(parse);
     }
-    out = parse[JSON_DECODE_PARSE_TEXT][from .. to];
+    out = string_decode(parse[JSON_DECODE_PARSE_TEXT][from .. to], "utf-8");
     if(esc_active) {
         if(member_array('"', out) != -1)
             out = replace_string(out, "\\\"", "\"");
@@ -449,7 +449,7 @@ private mixed json_decode_parse_number(mixed* parse) {
             break;
         }
     }
-    number = parse[JSON_DECODE_PARSE_TEXT][from .. to];
+    number = string_decode(parse[JSON_DECODE_PARSE_TEXT][from .. to], "utf-8");
     if(dot != -1 || exp != -1)
         return to_float(number);
     else
@@ -458,7 +458,8 @@ private mixed json_decode_parse_number(mixed* parse) {
 
 private mixed json_decode_parse_value(mixed* parse) {
     for(;;) {
-        int ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
+        int ch;
+        ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
         switch(ch) {
         case 0          :
             json_decode_parse_error(parse, "Unexpected end of data");
@@ -540,8 +541,16 @@ private mixed json_decode_parse(mixed* parse) {
 }
 
 mixed json_decode(string text) {
-    mixed* parse = allocate(JSON_DECODE_PARSE_FIELDS);
-    parse[JSON_DECODE_PARSE_TEXT] = text;
+    mixed* parse;
+    buffer endl = allocate_buffer(1);
+    endl[0] = 0;
+
+    if(!text) {
+      return 0;
+    }
+
+    parse = allocate(JSON_DECODE_PARSE_FIELDS);
+    parse[JSON_DECODE_PARSE_TEXT] = string_encode(text, "utf-8") + endl;
     parse[JSON_DECODE_PARSE_POS] = 0;
     parse[JSON_DECODE_PARSE_CHAR] = 1;
     parse[JSON_DECODE_PARSE_LINE] = 1;

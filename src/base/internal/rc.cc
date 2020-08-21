@@ -96,6 +96,8 @@ static const flagEntry kDefaultFlags[] = {
     {"enable_commands call init", __RC_ENABLE_COMMANDS_CALL_INIT__, 1},
     {"sprintf add_justified ignore ANSI colors", __RC_SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__, 1},
     {"call_out(0) nest level", __RC_CALL_OUT_ZERO_NEST_LEVEL__, 1000},
+    {"trace lpc execution context", __RC_TRACE_CONTEXT__, 0},
+    {"trace lpc instructions", __RC_TRACE_INSTR__, 0},
 };
 
 void config_init() {

@@ -4,6 +4,7 @@
 #include <functional>
 
 #include "applies_table.autogen.h"
+#include "base/internal/lru_cache.h"
 #include "base/internal/tracing.h"
 #include "comm.h"  // add_vmessage FIXME: reverse API
 #include "thirdparty/scope_guard/scope_guard.hpp"
@@ -235,6 +236,8 @@ static program_t *ffbn_recurse(program_t * /*prog*/, char * /*name*/, int * /*in
 #ifndef NO_SHADOWS
 
 static char *check_shadow_functions(program_t *shadow, program_t *victim) {
+  ScopedTracer _tracer(__PRETTY_FUNCTION__);
+
   int i;
   int pindex, runtime_index;
   program_t *prog;
@@ -1170,7 +1173,7 @@ void push_control_stack(int frkind) {
   csp->function_index_offset = function_index_offset;
   csp->variable_index_offset = variable_index_offset;
   csp->defers = nullptr;
-  csp->trace_id.clear();
+  csp->trace_id.reset();
 }
 
 /*
@@ -1239,9 +1242,9 @@ void pop_control_stack() {
   function_index_offset = csp->function_index_offset;
   variable_index_offset = csp->variable_index_offset;
   if (Tracer::enabled()) {
-    if (!csp->trace_id.empty()) {
-      Tracer::end(csp->trace_id, EventCategory::LPC_FUNCTION);
-      csp->trace_id.clear();
+    if (!csp->trace_id->empty()) {
+      Tracer::end(*csp->trace_id, EventCategory::LPC_FUNCTION);
+      csp->trace_id.reset();
     }
   }
   csp--;
@@ -1782,12 +1785,21 @@ bail_hard:
 }
 
 namespace {
-std::string get_trace_id(control_stack_t *csp) {
-  auto _current_line = get_line_number_if_any();
-  return ((csp->framekind & FRAME_MASK) == FRAME_FUNCTION
-              ? std::string(current_prog->function_table[csp->fr.table_index].funcname)
-              : std::string("")) +
-         " at " + _current_line;
+
+std::shared_ptr<std::string> get_trace_id(control_stack_t *csp) {
+  static lru_cache<char *, std::shared_ptr<std::string>> trace_id_cache(4096);
+  auto result = trace_id_cache.get(pc);
+  if (!result) {
+    auto _current_line = get_line_number_if_any();
+    std::string trace_id((csp->framekind & FRAME_MASK) == FRAME_FUNCTION
+                             ? current_prog->function_table[csp->fr.table_index].funcname
+                             : "");
+    trace_id += " at ";
+    trace_id += _current_line;
+    result = std::make_shared<std::string>(trace_id);
+    trace_id_cache.insert(pc, result.value());
+  }
+  return result.value();
 }
 
 json get_trace_args(svalue_t *sp, int num_args) {
@@ -1800,13 +1812,14 @@ json get_trace_args(svalue_t *sp, int num_args) {
 
 json get_trace_context(control_stack_t *csp, svalue_t *sp) {
   json context = json::object();
-  if ((csp->framekind & FRAME_MASK) == FRAME_FUNCTION) {
-    auto num_args = current_prog->function_table[csp->fr.table_index].num_arg;
-    context["args"] = get_trace_args(sp, num_args);
+  if (CONFIG_INT(__RC_TRACE_CONTEXT__)) {
+    if ((csp->framekind & FRAME_MASK) == FRAME_FUNCTION) {
+      auto num_args = current_prog->function_table[csp->fr.table_index].num_arg;
+      context["args"] = get_trace_args(sp, num_args);
+    }
+    context["previous_object"] = csp->prev_ob ? csp->prev_ob->obname : "null";
+    context["current_object"] = csp->ob ? csp->ob->obname : "null";
   }
-  context["previous_object"] = csp->prev_ob ? csp->prev_ob->obname : "null";
-  context["current_object"] = csp->ob ? csp->ob->obname : "null";
-
   return context;
 }
 
@@ -1850,11 +1863,11 @@ void eval_instruction(char *p) {
 
   json trace_context = {};
   if (Tracer::enabled()) {
-    if (csp->trace_id.empty()) {
+    if (!csp->trace_id) {
       csp->trace_id = ::get_trace_id(csp);
     }
     trace_context = ::get_trace_context(csp, sp);
-    Tracer::begin(csp->trace_id, EventCategory::LPC_FUNCTION, std::move(trace_context));
+    Tracer::begin(*csp->trace_id, EventCategory::LPC_FUNCTION, std::move(trace_context));
   }
 
   while (true) {
@@ -1893,6 +1906,9 @@ void eval_instruction(char *p) {
      * LPC must return a value. This does not apply to control
      * instructions, like F_JUMP.
      */
+    if (CONFIG_INT(__RC_TRACE_INSTR__)) {
+      ScopedTracer _tracer_ins(instrs[instruction].name ? instrs[instruction].name : "unknown");
+    }
 
     switch (instruction) {
       case F_PUSH: /* Push a number of things onto the stack */
@@ -2908,7 +2924,7 @@ void eval_instruction(char *p) {
         if (Tracer::enabled()) {
           csp->trace_id = ::get_trace_id(csp);
           trace_context = ::get_trace_context(csp, sp);
-          Tracer::begin(csp->trace_id, EventCategory::LPC_FUNCTION, std::move(trace_context));
+          Tracer::begin(*csp->trace_id, EventCategory::LPC_FUNCTION, std::move(trace_context));
         }
       } break;
       case F_CALL_INHERITED: {
@@ -2936,7 +2952,7 @@ void eval_instruction(char *p) {
         if (Tracer::enabled()) {
           csp->trace_id = ::get_trace_id(csp);
           trace_context = ::get_trace_context(csp, sp);
-          Tracer::begin(csp->trace_id, EventCategory::LPC_FUNCTION, std::move(trace_context));
+          Tracer::begin(*csp->trace_id, EventCategory::LPC_FUNCTION, std::move(trace_context));
         }
       } break;
       case F_COMPL:
@@ -3137,6 +3153,8 @@ void eval_instruction(char *p) {
       case F_INDEX:
         switch (sp->type) {
           case T_MAPPING: {
+            ScopedTracer _tracer_index("F_INDEX: mapping");
+
             svalue_t *v;
             mapping_t *m;
 
@@ -3149,6 +3167,8 @@ void eval_instruction(char *p) {
             break;
           }
           case T_BUFFER: {
+            ScopedTracer _tracer_index("F_INDEX: buffer");
+
             if ((sp - 1)->type != T_NUMBER) {
               error("Buffer indexes must be integers.\n");
             }
@@ -3164,21 +3184,20 @@ void eval_instruction(char *p) {
             break;
           }
           case T_STRING: {
+            ScopedTracer _tracer_index("F_INDEX: string");
+
             if ((sp - 1)->type != T_NUMBER) {
               error("String indexes must be integers.\n");
             }
             i = (sp - 1)->u.number;
-            size_t codepoints;
-            auto success = u8_egc_count(sp->u.string, &codepoints);
-            if (!success) {
-              error("Bad UTF-8 String: f_index.");
-            }
-            // COMPAT: allow str[strlen(str)] == 0
-            if (i > codepoints || i < 0) {
+            if (i < 0) {
               error("String index out of bounds.\n");
             }
+
             UChar32 res = u8_egc_index_as_single_codepoint(sp->u.string, i);
-            if (res < 0) {
+            if (res == -2) {
+              error("String index out of bounds.\n");
+            } else if (res < 0) {
               error("String index only work for single codepoint character.\n");
             }
             free_string_svalue(sp);
@@ -3186,6 +3205,8 @@ void eval_instruction(char *p) {
             break;
           }
           case T_ARRAY: {
+            ScopedTracer _tracer_index("F_INDEX: array");
+
             array_t *arr;
 
             if ((sp - 1)->type != T_NUMBER) {
@@ -3744,7 +3765,7 @@ void eval_instruction(char *p) {
         num_arg = st_num_arg;
 #endif
         {
-          if (Tracer::enabled()) {
+          if (Tracer::enabled() && CONFIG_INT(__RC_TRACE_CONTEXT__)) {
             trace_context["args"] = get_trace_args(sp, st_num_arg);
           }
           ScopedTracer _efun_tracer(instrs[instruction].name, EventCategory::LPC_EFUN,
@@ -4113,6 +4134,8 @@ void translate_absolute_line(int abs_line, unsigned short *file_info, int *ret_f
 }
 
 static int find_line(char *p, const program_t *progp, const char **ret_file, int *ret_line) {
+  ScopedTracer _tracer(__PRETTY_FUNCTION__);
+
   int offset;
   unsigned char *lns;
   ADDRESS_TYPE abs_line;
@@ -4651,10 +4674,10 @@ static const char *get_arg(int a, int b) {
     return buff;
   }
   if (to - from == 5) {
-    int arg;
+    LPC_INT arg;
 
     COPY_INT(&arg, from + 1);
-    sprintf(buff, "%d", arg);
+    sprintf(buff, "%lld", arg);
     return buff;
   }
   return "";
