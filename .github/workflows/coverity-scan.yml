@@ -53,7 +53,7 @@ jobs:
             --form token=$TOKEN \
             --form email=sunyucong@gmail.com \
             --form file=@fluffos.tgz \
-            --form version=`git describe` \
+            --form version="`git describe`" \
             --form description="`git describe`" \
             https://scan.coverity.com/builds?project=fluffos%2Ffluffos
         env:

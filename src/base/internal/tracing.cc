@@ -2,7 +2,7 @@
 //
 // Generate driver tracing data to be viewed in chrome http://about:tracing
 
-#include <deque>
+#include <vector>
 #include <fstream>
 #include <mutex>
 #include <sstream>
@@ -62,62 +62,101 @@ class TraceWriter {
   void log(const Event& e) {
     std::lock_guard<std::mutex> _guard(lock);
 
-    if (buffer.size() >= MAX_EVENTS) {
+    if (!buffer) {
+      buffer = std::make_shared<std::vector<Event>>();
+      buffer->reserve(MAX_EVENTS);
+    }
+
+    if (buffer->size() >= MAX_EVENTS) {
       Tracer::stop();
     }
 
-    buffer.push_back(e);
+    buffer->push_back(e);
   }
   void flush(const std::string& file);
 
  private:
   std::mutex lock;
-  std::deque<Event> buffer;
+  std::shared_ptr<std::vector<Event>> buffer;
 };
 
 TraceWriter::~TraceWriter() {
   std::lock_guard<std::mutex> _lock(lock);
-  if (!buffer.empty()) {
-    debug_message("Uncollected profiling events: %ld.\n", buffer.size());
+  if (buffer && !buffer->empty()) {
+    debug_message("Uncollected profiling events: %ld.\n", buffer->size());
   }
 }
 
 void TraceWriter::flush(const std::string& filename) {
-  std::ofstream file;
-  file.open(filename);
+  decltype(buffer) current_buffer;
 
-  file << "[";
   {
     std::lock_guard<std::mutex> _guard(lock);
+    if (!buffer) {
+      return;
+    }
+    current_buffer = buffer;
+    buffer.reset();
 
-    debug_message("Dumping %ld events to %s.\n", buffer.size(), filename.c_str());
+    debug_message("Trace duration: %lf ms, dumping %ld events to %s in separate thread.\n",
+                  Tracer::timestamp(), current_buffer->size(), filename.c_str());
+  }
+
+  std::thread t1([=] {
+    auto begin = std::chrono::high_resolution_clock::now();
+
+    std::ofstream file(filename, std::ofstream::out | std::ofstream::binary);
+
+    if (!file) {
+      debug_message("Error opening file %s: .\n", filename.c_str());
+      current_buffer->clear();
+      return;
+    }
+
+    file << "[";
 
     bool is_first = true;
 
-    for (auto& e : buffer) {
+    for (auto& e : *current_buffer) {
       if (is_first)
         is_first = false;
       else
         file << ",";
-      file << std::endl;
+      file << "\n";  // use std::endl flush the buffer, best to avoid.
 
-      json item = {
-          {"cat", e.category_name()}, {"pid", e.process_id}, {"tid", e.thread_id},
-          {"ts", e.timestamp},        {"ph", e.phase},       {"name", e.name},
-      };
-      if (!e.args.empty()) {
-        item["args"] = std::move(e.args);
+      file << "{"
+           << R"("pid":)" << e.process_id << ","
+           << R"("tid":)" << e.thread_id << ","
+           << R"("ts":)" << e.timestamp << ","
+           << R"("dur":)" << e.duration << ","
+           << R"("ph":")" << e.phase << "\""
+           << ","
+           << R"("cat":")" << e.category_name() << "\""
+           << ","
+           << R"("name":)" << e.name;
+
+      if (e.phase[0] == 'X') {
+        file << ","
+             << R"("dur":)" << e.duration;
       }
-      file << item;
+
+      if (!e.args.empty()) {
+        file << ","
+             << R"("args":)" << e.args;
+      }
+      file << "}";
     }
 
-    buffer.clear();
-    buffer.shrink_to_fit();
-  }
+    file << "\n"
+         << "]";
 
-  file << std::endl << "]";
+    auto dur_us = std::chrono::duration_cast<std::chrono::milliseconds>(
+                      std::chrono::high_resolution_clock::now() - begin)
+                      .count();
 
-  file.close();
+    debug_message("Dump trace successfully to file %s, cost %lld ms.\n", filename.c_str(), dur_us);
+  });
+  t1.detach();
 }
 
 bool Tracer::is_enabled = false;
@@ -126,7 +165,7 @@ std::string Tracer::filename;
 #ifdef _WIN32
 LARGE_INTEGER Tracer::basetime;
 #else
-std::chrono::steady_clock::time_point Tracer::basetime;
+std::chrono::high_resolution_clock::time_point Tracer::basetime;
 #endif
 
 void Tracer::log(const Event& e) {
@@ -148,7 +187,7 @@ void Tracer::begin(const std::string& name, const EventCategory& category, json&
   e.name = name;
   e.category = category;
   e.phase = "B";
-  e.args = std::move(args);
+  e.args = args;
   log(e);
 }
 void Tracer::end(const std::string& name, const EventCategory& category) {

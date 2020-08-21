@@ -8,6 +8,10 @@ void f_dump_trace() { push_array(get_svalue_trace()); }
 
 #ifdef F_TRACE_START
 void f_trace_start() {
+  if (Tracer::enabled()) {
+    Tracer::collect();
+  }
+
   auto duration_secs = sp->u.number;
   if (duration_secs < 0 || duration_secs > 5 * 60) {
     error("Invalid duration specified.");
@@ -19,24 +23,17 @@ void f_trace_start() {
     error("Permission denied for trace file: %s", (sp - 1)->u.string);
   }
 
-  if (Tracer::enabled()) {
-    Tracer::collect();
-  }
-
   // Used later in the block.
   std::string filename(realfile);
 
-  // Register event to start tracing.
-  // This is done because we want to skip the rest of current LPC stack.
-  add_walltime_event(std::chrono::seconds(0), tick_event::callback_type([=] {
-                       Tracer::start(filename.c_str());
-                       Tracer::setThreadName("Fluffos Main");
-
-                       // register closure.
-                       add_walltime_event(std::chrono::seconds(duration_secs),
-                                          tick_event::callback_type([] { Tracer::collect(); }));
+  Tracer::start(filename.c_str());
+  Tracer::setThreadName("FluffOS Main");
+  // register closure.
+  add_walltime_event(std::chrono::seconds(duration_secs), tick_event::callback_type([] {
+                       if (Tracer::enabled()) {
+                         Tracer::collect();
+                       }
                      }));
-
   pop_2_elems();
 }
 #endif
