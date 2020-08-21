@@ -28,10 +28,10 @@ static const struct lws_extension extensions[] = {
 
 // modified on create.
 static struct lws_http_mount mount = {
-    /* .mount_next */ nullptr,  /* linked-list "next" */
-    /* .mountpoint */ "/",   /* mountpoint URL */
-    /* .origin */ nullptr,   /* serve from dir */
-    /* .def */ "index.html", /* default filename */
+    /* .mount_next */ nullptr, /* linked-list "next" */
+    /* .mountpoint */ "/",     /* mountpoint URL */
+    /* .origin */ nullptr,     /* serve from dir */
+    /* .def */ "index.html",   /* default filename */
     /* .protocol */ nullptr,
     /* .cgienv */ nullptr,
     /* .extra_mimetypes */ nullptr,

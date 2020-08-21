@@ -52,7 +52,7 @@ struct control_stack_t {
   short caller_type;         /* was this a locally called function? */
   short framekind;
 
-  std::string trace_id;
+  std::shared_ptr<std::string> trace_id;
 };
 
 struct function_to_call_t {

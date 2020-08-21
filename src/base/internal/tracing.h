@@ -36,9 +36,10 @@ class Event {
   const unsigned long process_id;
   const unsigned long thread_id;
   double timestamp;
+  double duration;
   EventCategory category = EventCategory::DEFAULT;
   const char* phase = "i";
-  std::string name = "DEFAULT";
+  json name = "DEFAULT";
   json args = {};
 
   inline const char* category_name() {
@@ -84,7 +85,7 @@ class Tracer {
 #ifdef _WIN32
     QueryPerformanceCounter(&basetime);
 #else
-    basetime = std::chrono::steady_clock::now();
+    basetime = std::chrono::high_resolution_clock::now();
 #endif
     filename = file;
     is_enabled = true;
@@ -94,7 +95,7 @@ class Tracer {
 
   static inline bool enabled() { return is_enabled; }
 
-  static inline auto timestamp() {
+  static inline double timestamp() {
 #ifdef _WIN32
     static LARGE_INTEGER Frequency{};
     if (Frequency.QuadPart == 0) {
@@ -108,7 +109,8 @@ class Tracer {
     elapsed *= 1000000;
     return elapsed / Frequency.QuadPart;
 #else
-    return std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - basetime)
+    return std::chrono::duration<double, std::micro>(std::chrono::high_resolution_clock::now() -
+                                                     basetime)
         .count();
 #endif
   }
@@ -122,7 +124,7 @@ class Tracer {
 #ifdef _WIN32
   static LARGE_INTEGER basetime;
 #else
-  static std::chrono::steady_clock::time_point basetime;
+  static std::chrono::high_resolution_clock::time_point basetime;
 #endif
   static std::string filename;
   static bool is_enabled;
@@ -132,28 +134,33 @@ class Tracer {
 class ScopedTracer {
  public:
   explicit ScopedTracer(const std::string& name,
-                        const EventCategory category = EventCategory::DEFAULT, json&& args = {}) {
+                        const EventCategory category = EventCategory::DEFAULT, json&& args = {},
+                        double time_limit_usec = 100)
+      : time_limit_usec(time_limit_usec) {
     if (!Tracer::enabled()) {
       is_enabled = false;
       return;
     }
 
-    this->_name = name;
-    this->category = category;
-
-    Tracer::begin(name, category, std::move(args));
+    this->event = std::make_unique<Event>();
+    this->event->name = name;
+    this->event->category = category;
+    this->event->phase = "X";
   }
 
-  ~ScopedTracer() {
+  virtual ~ScopedTracer() {
     if (!Tracer::enabled() || !is_enabled) return;
 
-    Tracer::end(_name, category);
+    this->event->duration = Tracer::timestamp() - this->event->timestamp;
+    if (this->event->duration >= time_limit_usec) {
+      Tracer::log(*this->event);
+    }
   }
 
  private:
   bool is_enabled = true;
-  std::string _name;
-  EventCategory category;
+  double time_limit_usec;
+  std::unique_ptr<Event> event;
 
   DISALLOW_COPY_AND_ASSIGN(ScopedTracer);
 };

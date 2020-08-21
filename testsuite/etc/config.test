@@ -239,6 +239,12 @@ trace : 1
 #
 trace code : 0
 
+# TRACE: set this to 1 to collect context information during LPC traces.
+trace lpc execution context : 0
+g
+# TRACE: set this to 1 to collect LPC instruction information during LPC traces.
+trace lpc instructions : 0
+
 # INTERACTIVE_CATCH_TELL: define this if you want catch_tell called on
 #   interactives as well as NPCs.  If this is defined, user.c will need a
 #   catch_tell(msg) method that calls receive(msg);
