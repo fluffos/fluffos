@@ -139,7 +139,7 @@ bool scan_config_line(const char *fmt, void *dest, int required) {
   *(reinterpret_cast<int *>(dest)) = 0;
 
   bool found = false;
-  for (auto line : config_lines) {
+  for (const auto& line : config_lines) {
     if (sscanf(line.c_str(), fmt, dest) == 1) {
       found = true;
       break;
