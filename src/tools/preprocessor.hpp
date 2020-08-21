@@ -956,7 +956,7 @@ static void handle_include(char *name) {
 
   bool found = false;
   fs::path include_file;
-  for(auto base_dir: base_dirs) {
+  for(const auto& base_dir: base_dirs) {
     include_file = base_dir / name;
     if (fs::exists(include_file)) {
       found = true;

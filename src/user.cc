@@ -11,6 +11,7 @@
 #include <algorithm>   // for count_if, for_each, remove
 #include <cstring>     // for memset
 #include <functional>  // for function
+#include <utility>
 #include <vector>      // for vector
 
 #include "interactive.h"  // for interactive_t->ob
@@ -46,5 +47,5 @@ int users_num(bool include_hidden) {
 }
 
 void users_foreach(std::function<void(interactive_t *)> func) {
-  std::for_each(all_users.begin(), all_users.end(), func);
+  std::for_each(all_users.begin(), all_users.end(), std::move(func));
 }
