@@ -2430,8 +2430,7 @@ static program_t *epilog(void) {
   }
 
   p = reinterpret_cast<char *>(DMALLOC(size, TAG_PROGRAM, "epilog: 1"));
-  prog = reinterpret_cast<program_t *>(p);
-  *prog = NULL_program;
+  prog = new(p) program_t;
   prog->total_size = size;
   prog->ref = 0;
   prog->func_ref = 0;
@@ -2537,7 +2536,7 @@ static program_t *epilog(void) {
     prog->inherit = nullptr;
   }
 
-  prog->apply_lookup_table = nullptr;
+  prog->apply_lookup_table.release();
 
 #ifdef DEBUG
   if (p - reinterpret_cast<char *>(prog) != size) {
