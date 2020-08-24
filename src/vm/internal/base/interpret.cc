@@ -4677,7 +4677,7 @@ static const char *get_arg(int a, int b) {
     LPC_INT arg;
 
     COPY_INT(&arg, from + 1);
-    sprintf(buff, "%lld", arg);
+    sprintf(buff, "%" LPC_INT_FMTSTR_P, arg);
     return buff;
   }
   return "";

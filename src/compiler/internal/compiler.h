@@ -170,7 +170,6 @@ extern int exact_types, global_modifiers;
 extern int current_type;
 extern char *prog_code;
 extern char *prog_code_max;
-extern program_t NULL_program;
 extern unsigned char string_tags[0x20];
 extern short freed_string;
 extern local_info_t *locals, *locals_ptr;
