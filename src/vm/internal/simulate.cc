@@ -305,7 +305,7 @@ static object_t *load_virtual_object(const char *name, int clone) {
        * allow this.  Destruct the new object and raise an error.
        */
       destruct_object(new_ob);
-      error("Virtual object name duplicates an existing object name.\n");
+      error("Virtual object name duplicates an existing object name: '%s'.\n", name);
     }
     /* Make sure O_CLONE is NOT set */
     new_ob->flags &= ~O_CLONE;
