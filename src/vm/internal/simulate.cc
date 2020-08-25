@@ -1871,7 +1871,6 @@ void _error_handler(char *err) {
     catch_value.u.string = string_copy(err, "caught error");
 
     throw("error handler");
-    fatal("throw error failed");
   }
 
   if (num_error > 0) {
@@ -1880,8 +1879,8 @@ void _error_handler(char *err) {
     too_deep_error = max_eval_error = 0;
     if (current_error_context) {
       throw("error handler error");
-      fatal("throw error failed");
     }
+    fatal("Driver BUG: no error context.");
   }
 
   num_error++;
@@ -1926,7 +1925,7 @@ exit:
   if (current_error_context) {
     throw("error handler error2");
   }
-  throw("BUG: Impossible to get here.");
+  fatal("Driver BUG: no error context.");
 }
 
 [[noreturn]] void error_needs_free(char *s) {
