@@ -205,10 +205,18 @@ title: Applies
 <div><a href='object/reset.html'>reset</a></div>
 </div>
 </div>
+<div class='row'>
+<div class='col-sm-3'>
+<div><a href='object/virtual_start.html'>virtual_start</a></div>
+</div>
+<div>&nbsp;</div>
+<div>&nbsp;</div>
+<div>&nbsp;</div>
+</div>
 </div>
 
 
 
-This page is auto generated on 2020-08-19 18:53:40 PDT for [b2c0ff45](https://github.com/fluffos/fluffos/tree/b2c0ff45).
+This page is auto generated on 2020-08-25 20:35:07 PDT for [116ac9f1](https://github.com/fluffos/fluffos/tree/116ac9f1).
 
 

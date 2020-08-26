@@ -346,6 +346,7 @@ static object_t *load_virtual_object(const char *name, int clone) {
   /* reassign uid */
   give_uid_to_object(new_ob);
 #endif
+  apply(APPLY_VIRTUAL_START, new_ob, 0, ORIGIN_DRIVER);
   return new_ob;
 }
 
