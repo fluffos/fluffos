@@ -36,7 +36,7 @@ class Event {
   const unsigned long process_id;
   const unsigned long thread_id;
   double timestamp;
-  double duration;
+  double duration{};
   EventCategory category = EventCategory::DEFAULT;
   const char* phase = "i";
   json name = "DEFAULT";

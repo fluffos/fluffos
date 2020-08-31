@@ -231,7 +231,7 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
         i = EXTRACT_UCHAR(pc++);
         while (i--) {
           j = EXTRACT_UCHAR(pc++);
-          fprintf(f, "%s %ld", pushes[(j & PUSH_WHAT) >> 6], j & PUSH_MASK);
+          fprintf(f, "%s %d", pushes[(j & PUSH_WHAT) >> 6], j & PUSH_MASK);
           if (i) {
             fprintf(f, ", ");
           } else {
@@ -375,7 +375,7 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
         if (static_cast<unsigned>(iarg = EXTRACT_UCHAR(pc)) < NUM_VARS) {
           sprintf(buff, "%s", variable_name(prog, iarg));
         } else {
-          sprintf(buff, "<out of range %lld>", iarg);
+          sprintf(buff, "<out of range %" LPC_INT_FMTSTR_P ">", iarg);
         }
         pc++;
         break;
@@ -407,7 +407,8 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
         COPY_SHORT(&sarg, pc);
         offset = (pc - code) - sarg;
         pc += 2;
-        sprintf(buff, "LV%d < %lld bbranch_when_non_zero %04x (%04x)", i, iarg, sarg, offset);
+        sprintf(buff, "LV%d < %" LPC_INT_FMTSTR_P " bbranch_when_non_zero %04x (%04x)", i, iarg,
+                sarg, offset);
         break;
       case F_LOOP_COND_LOCAL:
         i = EXTRACT_UCHAR(pc++);
@@ -415,7 +416,8 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
         COPY_SHORT(&sarg, pc);
         offset = (pc - code) - sarg;
         pc += 2;
-        sprintf(buff, "LV%d < LV%lld bbranch_when_non_zero %04x (%04x)", i, iarg, sarg, offset);
+        sprintf(buff, "LV%d < LV%" LPC_INT_FMTSTR_P " bbranch_when_non_zero %04x (%04x)", i, iarg,
+                sarg, offset);
         break;
       case F_STRING:
         COPY_SHORT(&sarg, pc);
@@ -553,7 +555,7 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
             pc += 2;
           }
           COPY_INT(&iarg, pc);
-          fprintf(f, "\tminval = %lld\n", iarg);
+          fprintf(f, "\tminval = %" LPC_INT_FMTSTR_P "\n", iarg);
           pc += 4;
         } else {
           while (pc < aptr + etable) {

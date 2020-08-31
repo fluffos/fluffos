@@ -51,7 +51,7 @@ void f_debug_info(void) {
 #ifndef NO_LIGHT
       outbuf_addv(&out, "total light : %d\n", ob->total_light);
 #endif
-      outbuf_addv(&out, "time_of_ref : %d\n", ob->time_of_ref);
+      outbuf_addv(&out, "time_of_ref : %lld\n", ob->time_of_ref);
       outbuf_addv(&out, "ref         : %d\n", ob->ref);
 #ifdef DEBUGMALLOC_EXTENSIONS
       outbuf_addv(&out, "extra_ref   : %d\n", ob->extra_ref);

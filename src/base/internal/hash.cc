@@ -4,9 +4,9 @@
 
 unsigned int whashstr(const char *s) {
   int i = 0;
-  unsigned long __h = 0;
+  unsigned long _h = 0;
   for (; *s && i++ < 100; ++s) {
-    __h = 37 * __h + *s;
+    _h = 37 * _h + *s;
   }
-  return __h;
+  return _h;
 }

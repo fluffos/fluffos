@@ -203,7 +203,7 @@ const char *ref_string(const char *str) {
 
   b = BLOCK(str);
   DEBUG_CHECK1(b != findblock(str), "stralloc.c: called ref_string on non-shared string: %s.\n",
-               str)
+               str);
   if (REFS(b)) {
     REFS(b)++;
   }
