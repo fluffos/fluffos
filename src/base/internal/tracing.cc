@@ -63,7 +63,7 @@ class TraceWriter {
     std::lock_guard<std::mutex> _guard(lock);
 
     if (!buffer) {
-      buffer = std::make_shared<std::vector<Event>>();
+      buffer = std::make_unique<std::vector<Event>>();
       buffer->reserve(MAX_EVENTS);
     }
 
@@ -77,7 +77,8 @@ class TraceWriter {
 
  private:
   std::mutex lock;
-  std::shared_ptr<std::vector<Event>> buffer;
+  std::unique_ptr<std::vector<Event>> buffer;
+  std::vector<std::thread> dump_threads;
 };
 
 TraceWriter::~TraceWriter() {
@@ -85,24 +86,24 @@ TraceWriter::~TraceWriter() {
   if (buffer && !buffer->empty()) {
     debug_message("Uncollected profiling events: %ld.\n", buffer->size());
   }
+  for(auto &t: dump_threads) {
+    if(t.joinable()) {
+      t.join();
+    }
+  }
 }
 
 void TraceWriter::flush(const std::string& filename) {
-  decltype(buffer) current_buffer;
+  std::lock_guard<std::mutex> _guard(lock);
 
-  {
-    std::lock_guard<std::mutex> _guard(lock);
-    if (!buffer) {
-      return;
-    }
-    current_buffer = buffer;
-    buffer.reset();
-
-    debug_message("Trace duration: %lf ms, dumping %ld events to %s in separate thread.\n",
-                  Tracer::timestamp(), current_buffer->size(), filename.c_str());
+  if (!buffer || buffer->empty()) {
+    return;
   }
 
-  std::thread t1([=] {
+  debug_message("Trace duration: %lf us, dumping %ld events to %s in separate thread.\n",
+                Tracer::timestamp(), buffer->size(), filename.c_str());
+
+  this->dump_threads.emplace_back([current_buffer = move(buffer), filename] {
     auto begin = std::chrono::high_resolution_clock::now();
 
     std::ofstream file(filename, std::ofstream::out | std::ofstream::binary);
@@ -154,9 +155,9 @@ void TraceWriter::flush(const std::string& filename) {
                       std::chrono::high_resolution_clock::now() - begin)
                       .count();
 
-    debug_message("Dump trace successfully to file %s, cost %lld ms.\n", filename.c_str(), dur_us);
+    debug_message("[thread %lud]: Dump trace successfully to file %s, cost %lld ms.\n",
+                  _get_current_thread_id(), filename.c_str(), dur_us);
   });
-  t1.detach();
 }
 
 bool Tracer::is_enabled = false;
