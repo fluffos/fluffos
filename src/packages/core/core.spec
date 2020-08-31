@@ -102,7 +102,7 @@ int restore_object(string, void | int);
 mixed save_object(string | int | void, void | int);
 string save_variable(mixed);
 mixed restore_variable(string);
-object *users();
+object* users();
 mixed *get_dir(string, int default: 0);
 int strsrch(string, string | int, int default: 0);
 #ifdef COMPAT_32

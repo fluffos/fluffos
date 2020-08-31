@@ -67,7 +67,7 @@ const char *time_string(time_t t) {
  * Get a microsecond clock sample.
  */
 void get_usec_clock(long *sec, long *usec) {
-  struct timeval tv;
+  struct timeval tv {};
 
   gettimeofday(&tv, nullptr);
   *sec = tv.tv_sec;
@@ -75,7 +75,7 @@ void get_usec_clock(long *sec, long *usec) {
 }
 
 long get_cpu_times(unsigned long *secs, unsigned long *usecs) {
-  struct rusage rus;
+  struct rusage rus {};
 
   if (getrusage(RUSAGE_SELF, &rus) < 0) {
     return 0;

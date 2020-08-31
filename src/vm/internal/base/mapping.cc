@@ -462,17 +462,13 @@ LPC_INT svalue_to_int(svalue_t *v) {
 }
 
 int msameval(svalue_t *arg1, svalue_t *arg2) {
-  if (sizeof(long) == 8) {
-    return (arg1->u.number == arg2->u.number);
-  } else {
-    switch (arg1->type | arg2->type) {
-      case T_NUMBER:
-        return arg1->u.number == arg2->u.number;
-      case T_REAL:
-        return arg1->u.real == arg2->u.real;
-      default:
-        return arg1->u.arr == arg2->u.arr;
-    }
+  switch (arg1->type | arg2->type) {
+    case T_NUMBER:
+      return arg1->u.number == arg2->u.number;
+    case T_REAL:
+      return arg1->u.real == arg2->u.real;
+    default:
+      return arg1->u.arr == arg2->u.arr;
   }
 }
 

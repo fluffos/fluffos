@@ -66,7 +66,7 @@ void debug_message(const char *fmt, ...) {
   va_end(args2);
 }
 
-int debug_level = 0;
+unsigned int debug_level = 0;
 
 #define NELEM(x) (sizeof(x) / sizeof(x[0]))
 

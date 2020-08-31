@@ -155,7 +155,7 @@ void u8_copy_and_replace_codepoint_at(const char *src, char *dst, int32_t index,
   U8_APPEND_UNSAFE(dst, dst_offset, c);
 
   U8_FWD_1_UNSAFE(src, src_offset);
-  strcpy((char *)dst + dst_offset, (const char *)src + src_offset);
+  strcpy(dst + dst_offset, src + src_offset);
 }
 
 // Get the byte offset to the egc index, doesn't check validity or bounds.

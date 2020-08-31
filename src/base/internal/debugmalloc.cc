@@ -90,7 +90,7 @@ void debugfree(void *ptr) {
 }
 
 void dump_malloc_data(outbuffer_t *ob) {
-  int net;
+  unsigned int net;
 
   net = stats.alloc_calls - stats.free_calls;
   outbuf_add(ob, "using debug malloc:\n\n");
