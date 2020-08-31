@@ -20,37 +20,37 @@
 
 #define MAX_OBJECT_NAME_SIZE 2048
 
-#define O_HEART_BEAT 0x01 /* Does it have an heart beat ?      */
+#define O_HEART_BEAT 0x01u /* Does it have an heart beat ?      */
 #ifndef NO_WIZARDS
-#define O_IS_WIZARD 0x02 /* used to be O_IS_WIZARD            */
+#define O_IS_WIZARD 0x02u /* used to be O_IS_WIZARD            */
 #endif
 
-#define O_LISTENER 0x04 /* can hear say(), etc */
+#define O_LISTENER 0x04u /* can hear say(), etc */
 #ifndef NO_ADD_ACTION
-#define O_ENABLE_COMMANDS 0x04 /* Can it execute commands ?         */
+#define O_ENABLE_COMMANDS 0x04u /* Can it execute commands ?         */
 #else
-#define O_CATCH_TELL 0x04
+#define O_CATCH_TELL 0x04u
 #endif
 
-#define O_CLONE 0x08            /* Is it cloned from a master copy ? */
-#define O_DESTRUCTED 0x10       /* Is it destructed ?                */
-#define O_ONCE_INTERACTIVE 0x40 /* Has it ever been interactive ?    */
-#define O_RESET_STATE 0x80      /* Object in a 'reset':ed state ?    */
-#define O_WILL_CLEAN_UP 0x100   /* clean_up will be called next time */
-#define O_VIRTUAL 0x200         /* We're a virtual object            */
+#define O_CLONE 0x08u            /* Is it cloned from a master copy ? */
+#define O_DESTRUCTED 0x10u       /* Is it destructed ?                */
+#define O_ONCE_INTERACTIVE 0x40u /* Has it ever been interactive ?    */
+#define O_RESET_STATE 0x80u      /* Object in a 'reset':ed state ?    */
+#define O_WILL_CLEAN_UP 0x100u   /* clean_up will be called next time */
+#define O_VIRTUAL 0x200u         /* We're a virtual object            */
 #ifdef F_SET_HIDE
-#define O_HIDDEN 0x400 /* We're hidden from nonprived objs  */
+#define O_HIDDEN 0x400u /* We're hidden from nonprived objs  */
 #endif
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
-#define O_EFUN_SOCKET 0x800 /* efun socket references object     */
+#define O_EFUN_SOCKET 0x800u /* efun socket references object     */
 #endif
-#define O_WILL_RESET 0x1000 /* reset will be called next time    */
+#define O_WILL_RESET 0x100u /* reset will be called next time    */
 #ifndef OLD_ED
-#define O_IN_EDIT 0x2000 /* object has an ed buffer open      */
+#define O_IN_EDIT 0x2000u /* object has an ed buffer open      */
 #endif
-#define O_BEING_DESTRUCTED 0x4000
+#define O_BEING_DESTRUCTED 0x4000u
 #ifndef NO_SNOOP
-#define O_SNOOP 0x8000
+#define O_SNOOP 0x8000u
 #endif
 
 /*
@@ -81,7 +81,7 @@ struct object_t {
 #ifndef NO_RESET
   int next_reset; /* Time of next reset of this object */
 #endif
-  int time_of_ref; /* Time when last referenced. Used by clean_uo */
+  uint64_t time_of_ref; /* Time when last referenced. Used by clean_uo */
   program_t *prog;
   struct object_t *next_all;
   struct object_t *prev_all;

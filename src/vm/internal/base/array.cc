@@ -99,7 +99,7 @@ array_t *allocate_empty_array(int n) {
   return int_allocate_empty_array(n);
 }
 
-static array_t *int_allocate_array(int n) {
+static array_t *int_allocate_array(unsigned int n) {
   array_t *p = int_allocate_empty_array(n);
 
   while (n--) {
@@ -201,7 +201,7 @@ static array_t *fix_array(array_t *p, unsigned int n) {
 
 array_t *resize_array(array_t *p, unsigned int n) {
   // it is possible that n < p->size, be careful to not upgrade the result to unsigned.
-  total_array_size += (int)((int)n - (int)p->size) * int(sizeof(svalue_t));
+  total_array_size += ((int)n - p->size) * int(sizeof(svalue_t));
   if (n) {
     ms_remove_stats(p);
     p = RESIZE_ARRAY(p, n);

@@ -2430,7 +2430,7 @@ static program_t *epilog(void) {
   }
 
   p = reinterpret_cast<char *>(DMALLOC(size, TAG_PROGRAM, "epilog: 1"));
-  prog = new(p) program_t;
+  prog = new (p) program_t;
   prog->total_size = size;
   prog->ref = 0;
   prog->func_ref = 0;

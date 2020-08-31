@@ -25,8 +25,8 @@ lookup_entry_s apply_cache_lookup(const char *funcname, program_t *prog) {
 
   apply_cache_lookups++;
 
-  auto pos =  prog->apply_lookup_table->find(key);
-  if (pos !=  prog->apply_lookup_table->end()) {
+  auto pos = prog->apply_lookup_table->find(key);
+  if (pos != prog->apply_lookup_table->end()) {
     apply_cache_hits++;
     return pos->second;
   } else {
@@ -35,7 +35,8 @@ lookup_entry_s apply_cache_lookup(const char *funcname, program_t *prog) {
 }
 
 static inline void fill_lookup_table_recurse(
-    std::unique_ptr<program_t::apply_lookup_table_type>& table, program_t *prog, uint16_t fio, uint16_t vio) {
+    std::unique_ptr<program_t::apply_lookup_table_type> &table, program_t *prog, uint16_t fio,
+    uint16_t vio) {
   // add all defined functions
   for (int i = 0; i < prog->num_functions_defined; i++) {
     auto runtime_index = i + prog->last_inherited;

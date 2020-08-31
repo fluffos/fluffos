@@ -25,15 +25,15 @@ class lru_cache {
   typedef std::unordered_map<key_type, std::pair<value_type, typename list_type::iterator> >
       map_type;
 
-  lru_cache(size_t capacity) : m_capacity(capacity) {}
+  explicit lru_cache(size_t capacity) : m_capacity(capacity) {}
 
-  ~lru_cache() {}
+  ~lru_cache() = default;
 
-  size_t size() const { return m_map.size(); }
+  [[nodiscard]] size_t size() const { return m_map.size(); }
 
-  size_t capacity() const { return m_capacity; }
+  [[nodiscard]] size_t capacity() const { return m_capacity; }
 
-  bool empty() const { return m_map.empty(); }
+  [[nodiscard]] bool empty() const { return m_map.empty(); }
 
   bool contains(const key_type &key) { return m_map.find(key) != m_map.end(); }
 

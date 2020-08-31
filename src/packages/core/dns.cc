@@ -58,8 +58,8 @@ void query_name_by_addr(object_t *ob) {
     in6_addr *addr6 = &((reinterpret_cast<sockaddr_in6 *>(&query->addr))->sin6_addr);
     if (IN6_IS_ADDR_V4MAPPED(addr6) || IN6_IS_ADDR_V4COMPAT(addr6)) {
       in_addr *addr4 = &(reinterpret_cast<in_addr *>(addr6))[3];
-      debug(dns, "Found mapped v4 address, using extracted v4 address to resolve.\n") query->req =
-          evdns_base_resolve_reverse(g_dns_base, addr4, 0, on_addr_name_result, query);
+      debug(dns, "Found mapped v4 address, using extracted v4 address to resolve.\n");
+      query->req = evdns_base_resolve_reverse(g_dns_base, addr4, 0, on_addr_name_result, query);
     } else {
       query->req =
           evdns_base_resolve_reverse_ipv6(g_dns_base, addr6, 0, on_addr_name_result, query);

@@ -29,7 +29,7 @@ static const char *type_names[] = {"int",      "string", "array",  "object", "ma
 #define TYPE_CODES_START 0x2
 
 #ifdef PACKAGE_UIDS
-extern userid_t *backbone_uid;
+extern struct userid_t *backbone_uid;
 #endif
 extern int call_origin;
 static int find_line(char * /*p*/, const program_t * /*progp*/, const char ** /*ret_file*/,
