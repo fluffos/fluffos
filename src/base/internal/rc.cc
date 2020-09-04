@@ -98,6 +98,10 @@ const flagEntry kDefaultFlags[] = {
     {"call_out(0) nest level", __RC_CALL_OUT_ZERO_NEST_LEVEL__, 1000},
     {"trace lpc execution context", __RC_TRACE_CONTEXT__, 0},
     {"trace lpc instructions", __RC_TRACE_INSTR__, 0},
+    {"enable mxp", __RC_ENABLE_MXP__, 0},
+    {"enable gmcp", __RC_ENABLE_GMCP__, 0},
+    {"enable zmp", __RC_ENABLE_ZMP__, 0},
+    {"enable mssp", __RC_ENABLE_MSSP__, 1},
 };
 
 void config_init() {

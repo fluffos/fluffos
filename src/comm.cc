@@ -1120,14 +1120,12 @@ int process_user_command(interactive_t *ip) {
     goto exit;
   }
 
-  if ((ip->iflags & USING_MXP) && user_command[0] == ' ' && user_command[1] == '[' &&
-      user_command[3] == 'z') {
-    svalue_t *ret;
-    copy_and_push_string(user_command);
-    set_eval(max_eval_cost);
-    ret = safe_apply(APPLY_MXP_TAG, ip->ob, 1, ORIGIN_DRIVER);
-    if (ret && ret->type == T_NUMBER && ret->u.number) {
-      goto exit;
+  if (ip->iflags & USING_MXP) {
+    if (user_command[0] == ' ' && user_command[1] == '[' &&
+        user_command[3] == 'z') {
+      if (!on_receive_mxp_tag(ip, user_command)) {
+        goto exit;
+      }
     }
   }
 
