@@ -11,7 +11,6 @@
 #include "comm.h"
 #include "interactive.h"
 #include "packages/core/mssp.h"
-#include "packages/core/telnet_ext.h"
 #include "thirdparty/libtelnet/libtelnet.h"  // for telnet_t, telnet_event_t*
 #include "vm/vm.h"
 
@@ -124,10 +123,11 @@ static inline void on_telnet_will(unsigned char cmd, interactive_t *ip) {
       break;
     }
     case TELNET_TELOPT_MXP:
-      ip->iflags |= USING_MXP;
-      /* Mxp is enabled, tell the mudlib about it. */
-      set_eval(max_eval_cost);
-      safe_apply(APPLY_MXP_ENABLE, ip->ob, 0, ORIGIN_DRIVER);
+      if (CONFIG_INT(__RC_ENABLE_MXP__)) {
+        on_telnet_will_mxp(ip);
+      } else {
+        telnet_negotiate(ip->telnet, TELNET_DONT, TELNET_TELOPT_MXP);
+      }
       break;
     default:
       debug(telnet, "on_telnet_will: unimplemented command %d.\n", cmd);
@@ -158,31 +158,57 @@ static inline void on_telnet_wont(unsigned char cmd, interactive_t *ip) {
 static inline void on_telnet_do(unsigned char cmd, interactive_t *ip) {
   switch (cmd) {
     case TELNET_TELOPT_TM:
-      telnet_negotiate(ip->telnet, TELNET_TELOPT_TM, TELNET_WILL);
+      telnet_negotiate(ip->telnet, TELNET_WILL, TELNET_TELOPT_TM);
       break;
     case TELNET_TELOPT_ECHO:
       /* do nothing, but don't send a wont response */
       break;
     case TELNET_TELOPT_SGA:
       ip->iflags |= SUPPRESS_GA;
-      telnet_negotiate(ip->telnet, TELNET_TELOPT_SGA, TELNET_WILL);
+      telnet_negotiate(ip->telnet, TELNET_WILL, TELNET_TELOPT_SGA);
       break;
     case TELNET_TELOPT_GMCP:
+      if(!CONFIG_INT(__RC_ENABLE_GMCP__)) {
+#ifdef DEBUG
+        debug_message("Bad client: bogus IAC DO GMCP from %s.",
+                      sockaddr_to_string(reinterpret_cast<const sockaddr *>(&ip->addr), ip->addrlen));
+        remove_interactive(ip->ob, false);
+#else
+        // do nothing
+#endif
+      }
       on_telnet_do_gmcp(ip);
       break;
     case TELNET_TELOPT_MSSP:
+      if(!CONFIG_INT(__RC_ENABLE_MSSP__)) {
+#ifdef DEBUG
+        debug_message("Bad client: bogus IAC DO MSSP from %s.",
+                      sockaddr_to_string(reinterpret_cast<const sockaddr *>(&ip->addr), ip->addrlen));
+        remove_interactive(ip->ob, false);
+#else
+        // do nothing
+#endif
+      }
       on_telnet_do_mssp(ip);
       break;
     case TELNET_TELOPT_ZMP:
+      if(!CONFIG_INT(__RC_ENABLE_ZMP__)) {
+#ifdef DEBUG
+        debug_message("Bad client: bogus IAC DO ZMP from %s.",
+                      sockaddr_to_string(reinterpret_cast<const sockaddr *>(&ip->addr), ip->addrlen));
+        remove_interactive(ip->ob, false);
+#else
+        // do nothing
+#endif
+      }
       ip->iflags |= USING_ZMP;
-      // real event is triggered in on_telnet_event;
       break;
     case TELNET_TELOPT_COMPRESS2:
       telnet_begin_compress2(ip->telnet);
       break;
     default:
       debug(telnet, "on_telnet_do: unimplemented code: %d.\n", cmd);
-      telnet_negotiate(ip->telnet, cmd, TELNET_WONT);
+      telnet_negotiate(ip->telnet, TELNET_WONT, cmd);
       break;
   }
   flush_message(ip);
@@ -196,7 +222,7 @@ static inline void on_telnet_dont(unsigned char cmd, interactive_t *ip) {
     case TELNET_TELOPT_SGA:
       if (ip->iflags & USING_LINEMODE) {
         ip->iflags &= ~SUPPRESS_GA;
-        telnet_negotiate(ip->telnet, TELNET_TELOPT_SGA, TELNET_WONT);
+        telnet_negotiate(ip->telnet, TELNET_WONT, TELNET_TELOPT_SGA);
       }
       break;
     default:
@@ -444,17 +470,25 @@ void send_initial_telnet_negotiations(struct interactive_t *user) {
 #endif
 
   // Ask them if they support mxp.
-  telnet_negotiate(user->telnet, TELNET_DO, TELNET_TELOPT_MXP);
+  if(CONFIG_INT(__RC_ENABLE_MXP__)) {
+    telnet_negotiate(user->telnet, TELNET_DO, TELNET_TELOPT_MXP);
+  }
+
+  // gmcp
+  if(CONFIG_INT(__RC_ENABLE_GMCP__)) {
+    telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_GMCP);
+  }
+
+  // zmp
+  if(CONFIG_INT(__RC_ENABLE_ZMP__)) {
+    telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_ZMP);
+  }
 
   // And we support mssp
   // http://tintin.sourceforge.net/mssp/ , server send WILL first.
-  telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_MSSP);
-
-  // May as well ask for zmp while we're there!
-  telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_ZMP);
-
-  // gmcp *yawn*
-  telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_GMCP);
+  if(CONFIG_INT(__RC_ENABLE_MSSP__)) {
+    telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_MSSP);
+  }
 }
 
 void set_linemode(interactive_t *ip, bool flush) {
@@ -502,10 +536,59 @@ void telnet_start_request_ttype(struct telnet_t *telnet) {
   telnet_negotiate(telnet, TELNET_DO, TELNET_TELOPT_TTYPE);
 }
 void telnet_request_ttype(struct telnet_t *telnet) { telnet_begin_sb(telnet, TELNET_TTYPE_SEND); }
-void telnet_request_term_size(struct telnet_t * /*unused*/) {}
 
 void telnet_send_nop(struct telnet_t *telnet) {
   if (telnet) {
     telnet_iac(telnet, TELNET_NOP);
   }
+}
+
+/* MXP */
+
+void on_telnet_will_mxp(interactive_t* ip) {
+  ip->iflags |= USING_MXP;
+  /* Mxp is enabled, tell the mudlib about it. */
+  set_eval(max_eval_cost);
+  safe_apply(APPLY_MXP_ENABLE, ip->ob, 0, ORIGIN_DRIVER);
+}
+
+bool on_receive_mxp_tag(interactive_t* ip, const char* user_command) {
+  copy_and_push_string(user_command);
+
+  set_eval(max_eval_cost);
+  auto ret = safe_apply(APPLY_MXP_TAG, ip->ob, 1, ORIGIN_DRIVER);
+  if (ret && ret->type == T_NUMBER && ret->u.number) {
+    return false;
+  }
+  return true;
+}
+
+/* GMCP */
+
+void on_telnet_do_gmcp(interactive_t* ip) {
+  ip->iflags |= USING_GMCP;
+
+  set_eval(max_eval_cost);
+  safe_apply(APPLY_GMCP_ENABLE, ip->ob, 0, ORIGIN_DRIVER);
+}
+
+/* ZMP */
+
+void on_telnet_do_zmp(const char** argv, unsigned long argc, interactive_t* ip) {
+  ip->iflags |= USING_ZMP;
+
+  // Push the command
+  copy_and_push_string(argv[0]);
+
+  // Push the array
+  array_t* arr = allocate_array(argc - 1);
+  for (int i = 1; i < argc; i++) {
+    arr->item[i].u.string = string_copy(argv[i], "ZMP");
+    arr->item[i].type = T_STRING;
+    arr->item[i].subtype = STRING_MALLOC;
+  }
+  push_refed_array(arr);
+
+  set_eval(max_eval_cost);
+  safe_apply(APPLY_ZMP, ip->ob, 2, ORIGIN_DRIVER);
 }

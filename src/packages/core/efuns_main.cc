@@ -870,45 +870,6 @@ void f_interactive(void) {
 }
 #endif
 
-#ifdef F_HAS_MXP
-void f_has_mxp(void) {
-  int i = 0;
-
-  if (sp->u.ob->interactive) {
-    i = sp->u.ob->interactive->iflags & USING_MXP;
-    i = !!i;  // force 1 or 0
-  }
-  free_object(&sp->u.ob, "f_has_mxp");
-  put_number(i);
-}
-#endif
-
-#ifdef F_HAS_ZMP
-void f_has_zmp(void) {
-  int i = 0;
-
-  if (sp->u.ob->interactive) {
-    i = sp->u.ob->interactive->iflags & USING_ZMP;
-    i = !!i;  // force 1 or 0
-  }
-  free_object(&sp->u.ob, "f_has_zmp");
-  put_number(i);
-}
-#endif
-
-#ifdef F_HAS_GMCP
-void f_has_gmcp() {
-  int i = 0;
-
-  if (sp->u.ob->interactive) {
-    i = sp->u.ob->interactive->iflags & USING_GMCP;
-    i = !!i;  // force 1 or 0
-  }
-  free_object(&sp->u.ob, "f_has_gmcp");
-  put_number(i);
-}
-#endif
-
 #ifdef F_INTP
 void f_intp(void) {
   if (sp->type == T_NUMBER) {

@@ -1,6 +1,5 @@
 #include "base/package_api.h"
 
-#include "packages/core/telnet_ext.h"
 #include "packages/core/mssp.h"
 
 #include "thirdparty/libtelnet/libtelnet.h"  // FIXME?
