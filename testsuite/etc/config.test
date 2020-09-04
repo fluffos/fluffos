@@ -338,12 +338,18 @@ enable_commands call init : 0
 #
 sprintf add_justified ignore ANSI colors : 1
 
-# call_out(0) loop prvention:
+# call_out(0) loop prevention:
 #
 # This is the number of call_out(.., 0) call can be scheduled on the same
 # gametick.
 #
 call_out(0) nest level : 10
+
+# telnet extensions support
+enable mxp : 1
+enable gmcp : 1
+enable zmp : 1
+enable mssp : 1
 
 ###############################################################################
 #          The following aren't currently used or implemented (yet)           #

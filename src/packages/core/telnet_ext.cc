@@ -2,35 +2,117 @@
 
 #include "base/package_api.h"
 
-#include "packages/core/telnet_ext.h"
-
 #include "thirdparty/libtelnet/libtelnet.h"  // FIXME?
 
+/* TELNET */
+#ifdef F_REQUEST_TERM_TYPE
+void f_request_term_type() {
+  if (command_giver) {
+    auto ip = command_giver->interactive;
+    if (ip && ip->telnet) {
+      telnet_request_ttype(ip->telnet);
+      flush_message(ip);
+    }
+  }
+}
+#endif
+
+#ifdef F_START_REQUEST_TERM_TYPE
+void f_start_request_term_type() {
+  if(command_giver) {
+    auto ip = command_giver->interactive;
+    if (ip && ip->telnet) {
+      telnet_start_request_ttype(ip->telnet);
+      flush_message(ip);
+    }
+  }
+}
+#endif
+
+#ifdef F_REQUEST_TERM_SIZE
+void f_request_term_size() {
+  if(command_giver) {
+    auto ip = command_giver->interactive;
+
+    if (ip && ip->telnet) {
+      if ((st_num_arg == 1) && (sp->u.number == 0)) {
+        telnet_dont_naws(ip->telnet);
+      } else {
+        telnet_do_naws(ip->telnet);
+      }
+      flush_message(ip);
+    }
+  }
+  if (st_num_arg == 1) {
+    sp--;
+  }
+}
+#endif
+
+#ifdef F_TELNET_NOP
+void f_telnet_nop() {
+  if(command_giver) {
+    auto ip = command_giver->interactive;
+
+    if (ip && ip->telnet) {
+      telnet_send_nop(ip->telnet);
+      flush_message(ip);
+    }
+  }
+}
+#endif
+
 /* MXP */
+#ifdef F_HAS_MXP
+void f_has_mxp(void) {
+  int i = 0;
+
+  if (sp->u.ob->interactive) {
+    i = sp->u.ob->interactive->iflags & USING_MXP;
+    i = !!i;  // force 1 or 0
+  }
+  free_object(&sp->u.ob, "f_has_mxp");
+  put_number(i);
+}
+#endif
 
 #ifdef F_ACT_MXP
 void f_act_mxp() {
-  // start MXP
-  auto ip = current_object->interactive;
-  if (ip && ip->telnet) {
-    telnet_begin_sb(ip->telnet, TELNET_TELOPT_MXP);
+  if(command_giver) {
+    auto ip = command_giver->interactive;
+
+    if (ip && ip->telnet) {
+      // start MXP
+      telnet_begin_sb(ip->telnet, TELNET_TELOPT_MXP);
+    }
   }
 }
 #endif
 
 /* GMCP */
 
-void on_telnet_do_gmcp(interactive_t* ip) {
-  ip->iflags |= USING_GMCP;
-  apply(APPLY_GMCP_ENABLE, ip->ob, 0, ORIGIN_DRIVER);
+#ifdef F_HAS_GMCP
+void f_has_gmcp() {
+  int i = 0;
+
+  if (sp->u.ob->interactive) {
+    i = sp->u.ob->interactive->iflags & USING_GMCP;
+    i = !!i;  // force 1 or 0
+  }
+  free_object(&sp->u.ob, "f_has_gmcp");
+  put_number(i);
 }
+#endif
 
 #ifdef F_SEND_GMCP
 void f_send_gmcp() {
-  auto ip = current_object->interactive;
-  if (ip && ip->telnet) {
-    telnet_subnegotiation(ip->telnet, TELNET_TELOPT_GMCP, sp->u.string, SVALUE_STRLEN(sp));
-    flush_message(ip);
+  if(command_giver) {
+    auto ip = command_giver->interactive;
+
+    if (ip && ip->telnet) {
+      telnet_subnegotiation(ip->telnet, TELNET_TELOPT_GMCP, sp->u.string, SVALUE_STRLEN(sp));
+      flush_message(ip);
+    }
   }
   pop_stack();
 }
@@ -38,53 +120,37 @@ void f_send_gmcp() {
 
 /* ZMP */
 
-void on_telnet_do_zmp(const char** argv, unsigned long argc, interactive_t* ip) {
-  ip->iflags |= USING_ZMP;
+#ifdef F_HAS_ZMP
+void f_has_zmp(void) {
+  int i = 0;
 
-  // Push the command
-  copy_and_push_string(argv[0]);
-
-  // Push the array
-  array_t* arr = allocate_array(argc - 1);
-  for (int i = 1; i < argc; i++) {
-    arr->item[i].u.string = string_copy(argv[i], "ZMP");
-    arr->item[i].type = T_STRING;
-    arr->item[i].subtype = STRING_MALLOC;
+  if (sp->u.ob->interactive) {
+    i = sp->u.ob->interactive->iflags & USING_ZMP;
+    i = !!i;  // force 1 or 0
   }
-  push_refed_array(arr);
-
-  set_eval(max_eval_cost);
-  safe_apply(APPLY_ZMP, ip->ob, 2, ORIGIN_DRIVER);
-}
-
-#ifdef F_SEND_ZMP
-void f_send_zmp() {
-  auto ip = current_object->interactive;
-
-  if (ip && ip->telnet) {
-    telnet_begin_zmp(ip->telnet, (sp - 1)->u.string);
-
-    for (int i = 0; i < sp->u.arr->size; i++) {
-      if (sp->u.arr->item[i].type == T_STRING) {
-        telnet_zmp_arg(ip->telnet, sp->u.arr->item[i].u.string);
-      }
-    }
-
-    telnet_finish_zmp(ip->telnet);
-
-    flush_message(ip);
-    pop_2_elems();
-  }
+  free_object(&sp->u.ob, "f_has_zmp");
+  put_number(i);
 }
 #endif
 
-#ifdef F_TELNET_NOP
-void f_telnet_nop() {
-  auto ip = current_object->interactive;
+#ifdef F_SEND_ZMP
+void f_send_zmp() {
+  if(command_giver) {
+    auto ip = command_giver->interactive;
+    if (ip && ip->telnet) {
+      telnet_begin_zmp(ip->telnet, (sp - 1)->u.string);
 
-  if (ip && ip->telnet) {
-    telnet_send_nop(ip->telnet);
-    flush_message(ip);
+      for (int i = 0; i < sp->u.arr->size; i++) {
+        if (sp->u.arr->item[i].type == T_STRING) {
+          telnet_zmp_arg(ip->telnet, sp->u.arr->item[i].u.string);
+        }
+      }
+
+      telnet_finish_zmp(ip->telnet);
+
+      flush_message(ip);
+    }
   }
+  pop_2_elems();
 }
 #endif

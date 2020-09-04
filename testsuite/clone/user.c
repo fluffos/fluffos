@@ -236,3 +236,21 @@ void receive_environ(string var, string value) {
   string msg = sprintf("TELNET ENV received: %s=%s\n", var, value);
   receive(msg);
 }
+
+void mxp_enable() {
+  receive("<MXP negotiation: enabled.>\n");
+}
+
+void gmcp_enable() {
+  receive("<GMCP negotiation: enabled.>\n");
+}
+
+void gmcp(string req) {
+  receive("<GMCP request received.>\n");
+  receive(req);
+  receive("\n<GMCP request end.>\n");
+}
+
+void mxp_tag(string command) {
+  receive("<MXP TAG: " + command + ".>\n");
+}
