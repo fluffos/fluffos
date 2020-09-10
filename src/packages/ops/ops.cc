@@ -370,10 +370,10 @@ void f_mod_eq() {
   svalue_t *argp;
 
   if ((argp = sp->u.lvalue)->type != T_NUMBER) {
-    error("Bad left type to %=\n");
+    error("Bad left type to %%=\n");
   }
   if ((--sp)->type != T_NUMBER) {
-    error("Bad right type to %=\n");
+    error("Bad right type to %%=\n");
   }
   if (sp->u.number == 0) {
     error("Modulo by 0\n");

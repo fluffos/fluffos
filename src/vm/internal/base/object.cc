@@ -1819,7 +1819,7 @@ void dealloc_object(object_t *ob, const char *from) {
 
   if (!(ob->flags & O_DESTRUCTED)) {
     if (ob->next_all != ob) { /* This is fatal, and should never happen. */
-      fatal("FATAL: Object 0x%x /%s ref count 0, but not destructed (from %s).\n", ob, ob->obname,
+      fatal("FATAL: Object %p /%s ref count 0, but not destructed (from %s).\n", ob, ob->obname,
             from);
     } else {
       destruct_object(ob);

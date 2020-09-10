@@ -374,7 +374,8 @@ void f_clear_bit(void) {
 
   auto max_bitfield_bits = CONFIG_INT(__MAX_BITFIELD_BITS__);
   if (sp->u.number > max_bitfield_bits) {
-    error("clear_bit() bit requested : %d > maximum bits: %d\n", sp->u.number, max_bitfield_bits);
+    error("clear_bit() bit requested : %" LPC_INT_FMTSTR_P " > maximum bits: %d\n", sp->u.number,
+          max_bitfield_bits);
   }
   bit = (sp--)->u.number;
   if (bit < 0) {
@@ -1330,7 +1331,7 @@ void f_mud_status(void) {
     tot += print_call_out_usage(&ob, verbose);
   } else {
     /* !verbose */
-    outbuf_addv(&ob, "Sentences:\t\t\t%8d %8d\n", tot_alloc_sentence,
+    outbuf_addv(&ob, "Sentences:\t\t\t%8" PRIu64 " %8" PRIu64 "\n", tot_alloc_sentence,
                 tot_alloc_sentence * sizeof(sentence_t));
 #ifndef DEBUG
     outbuf_addv(&ob, "Objects:\t\t\t%8" PRIu64 " %8" PRIu64 "\n", tot_alloc_object,
@@ -1361,7 +1362,7 @@ void f_mud_status(void) {
 
   if (!verbose) {
     outbuf_add(&ob, "\t\t\t\t\t --------\n");
-    outbuf_addv(&ob, "Total:\t\t\t\t\t %8d\n", tot);
+    outbuf_addv(&ob, "Total:\t\t\t\t\t %8" PRIu64 "\n", tot);
   }
   outbuf_push(&ob);
 }
@@ -2274,7 +2275,8 @@ void f_set_bit(void) {
 
   auto max_bitfield_bits = CONFIG_INT(__MAX_BITFIELD_BITS__);
   if (sp->u.number > max_bitfield_bits) {
-    error("set_bit() bit requested: %d > maximum bits: %d\n", sp->u.number, max_bitfield_bits);
+    error("set_bit() bit requested: %" LPC_INT_FMTSTR_P " > maximum bits: %d\n", sp->u.number,
+          max_bitfield_bits);
   }
   bit = (sp--)->u.number;
   if (bit < 0) {
@@ -3412,7 +3414,7 @@ void f_localtime(void) {
   time_t lt;
 
   lt = sp->u.number;
-  auto tm = LOCALTIME_FUNC(&lt, &res);
+  auto tm = localtime_r(&lt, &res);
 
   pop_stack();
 
