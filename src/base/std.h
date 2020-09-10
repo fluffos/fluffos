@@ -139,6 +139,8 @@
 /* Compare two number */
 #define COMPARE_NUMS(x, y) (((x) > (y) ? 1 : ((x) < (y) ? -1 : 0)))
 
+#include "base/internal/port.h"  // must be first
+
 #include "base/internal/debugmalloc.h"
 #include "base/internal/md.h"
 
@@ -151,8 +153,6 @@
 #include "base/internal/log.h"
 
 #include "base/internal/outbuf.h"
-
-#include "base/internal/port.h"
 
 #include "base/internal/rusage.h"
 

@@ -98,7 +98,8 @@ void print_version_and_time() {
   {
     time_t tm;
     time(&tm);
-    std::cout << "Boot Time: " << ctime(&tm);
+    char buf[256] = {};
+    std::cout << "Boot Time: " << ctime_r(&tm, buf);
   }
 
   /* Print FluffOS version */
