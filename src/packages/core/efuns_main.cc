@@ -3407,12 +3407,12 @@ void f_oldcrypt(void) {
 /* FIXME: most of the #ifdefs here should be based on configure checks
    instead.  Same for rusage() */
 void f_localtime(void) {
-  struct tm *tm;
+  struct tm res = {};
   array_t *vec;
   time_t lt;
 
   lt = sp->u.number;
-  tm = localtime(&lt);
+  auto tm = LOCALTIME_FUNC(&lt, &res);
 
   pop_stack();
 
