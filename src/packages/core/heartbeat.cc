@@ -230,7 +230,7 @@ int heart_beat_status(outbuffer_t *buf, int verbose) {
   if (verbose == 1) {
     outbuf_add(buf, "Heart beat information:\n");
     outbuf_add(buf, "-----------------------\n");
-    outbuf_addv(buf, "Number of objects with heart beat: %d.\n",
+    outbuf_addv(buf, "Number of objects with heart beat: %" PRIu64 ".\n",
                 heartbeats.size() + heartbeats_next.size());
   }
   return 0;

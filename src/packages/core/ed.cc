@@ -804,7 +804,7 @@ static int dowrite(int from, int to, const char *fname, int apflg) {
   }
 
   if (!P_RESTRICT) {
-    ED_OUTPUTV(ED_DEST, "%u lines %lu bytes\n", lines, bytes);
+    ED_OUTPUTV(ED_DEST, "%u lines %u bytes\n", lines, bytes);
   }
   fclose(fp);
 

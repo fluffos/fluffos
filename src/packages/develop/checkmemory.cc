@@ -519,7 +519,7 @@ void check_all_blocks(int flag) {
           if (msbl->size != USHRT_MAX && msbl->size != strlen(str)) {
             outbuf_addv(&out,
                         "Malloc'ed string length is incorrect: %s %04x '%s': "
-                        "is: %i should be: %i\n",
+                        "is: %i should be: %" PRIu64 "\n",
                         entry->desc, entry->tag, str, msbl->size, strlen(str));
           }
           break;
@@ -615,8 +615,8 @@ void check_all_blocks(int flag) {
       outbuf_addv(&out, "WARNING: %" PRIu64 " tables for %" PRIu64 " mappings\n",
                   blocks[TAG_MAP_TBL & 0xff], num_mappings);
     if (blocks[TAG_INTERACTIVE & 0xff] != users_num(true))
-      outbuf_addv(&out, "WATNING: num_user is: %" PRIu64 " should be: %" PRIu64 "\n",
-                  users_num(true), blocks[TAG_INTERACTIVE & 0xff]);
+      outbuf_addv(&out, "WATNING: num_user is: %d should be: %" PRIu64 "\n", users_num(true),
+                  blocks[TAG_INTERACTIVE & 0xff]);
     check_string_stats(&out);
 
 #ifdef PACKAGE_EXTERNAL
@@ -945,7 +945,7 @@ void check_all_blocks(int flag) {
           case TAG_SENTENCE:
             sent = NODET_TO_PTR(entry, sentence_t *);
             outbuf_addv(&out, "WARNING: Found orphan sentence: %s:%s - %s %04x\n", sent->ob->obname,
-                        sent->function, entry->desc, entry->tag);
+                        sent->function.s, entry->desc, entry->tag);
             break;
           case TAG_PERM_IDENT:
             outbuf_addv(&out, "WARNING: Found orphan permanent identifier: %s %04x\n", entry->desc,
@@ -1020,7 +1020,7 @@ void check_all_blocks(int flag) {
     outbuf_add(&out, "------------------------------ ------ --------\n");
     for (i = 1; i < MAX_CATEGORY; i++) {
       if (totals[i]) {
-        outbuf_addv(&out, "%-30s %6d %8d\n", sources[i], blocks[i], totals[i]);
+        outbuf_addv(&out, "%-30s %6" PRIu64 " %8" PRIu64 "\n", sources[i], blocks[i], totals[i]);
       }
       if (i == 5) {
         outbuf_add(&out, "\n");
