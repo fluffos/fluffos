@@ -72,7 +72,7 @@ void *debugcalloc(int nitems, int size, int tag, const char *desc) {
   }
 
   stats.alloc_calls++;
-  tmp = calloc(nitems * size + MD_OVERHEAD, 1);
+  tmp = calloc((uint64_t)nitems * size + MD_OVERHEAD, 1);
   MDmalloc(reinterpret_cast<md_node_t *>(tmp), nitems * size, tag, desc);
   NOISY3("calloc: %i (%x), %s\n", nitems * size, (md_node_t *)tmp + 1, desc);
   return reinterpret_cast<md_node_t *>(tmp) + 1;
@@ -94,12 +94,12 @@ void dump_malloc_data(outbuffer_t *ob) {
 
   net = stats.alloc_calls - stats.free_calls;
   outbuf_add(ob, "using debug malloc:\n\n");
-  outbuf_addv(ob, "total malloc'd:   %10lu\n", total_malloced);
-  outbuf_addv(ob, "high water mark:  %10lu\n", hiwater);
-  outbuf_addv(ob, "overhead:         %10lu\n",
+  outbuf_addv(ob, "total malloc'd:   %10u\n", total_malloced);
+  outbuf_addv(ob, "high water mark:  %10u\n", hiwater);
+  outbuf_addv(ob, "overhead:         %10" PRIu64 "\n",
               (MD_TABLE_SIZE * sizeof(md_node_t *)) + (net * MD_OVERHEAD));
-  outbuf_addv(ob, "#alloc calls:     %10lu\n", stats.alloc_calls);
-  outbuf_addv(ob, "#free calls:      %10lu\n", stats.free_calls);
-  outbuf_addv(ob, "#alloc - #free:   %10lu\n", net);
-  outbuf_addv(ob, "#realloc calls:   %10lu\n", stats.realloc_calls);
+  outbuf_addv(ob, "#alloc calls:     %10u\n", stats.alloc_calls);
+  outbuf_addv(ob, "#free calls:      %10u\n", stats.free_calls);
+  outbuf_addv(ob, "#alloc - #free:   %10u\n", net);
+  outbuf_addv(ob, "#realloc calls:   %10u\n", stats.realloc_calls);
 }
