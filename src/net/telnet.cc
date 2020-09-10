@@ -168,10 +168,11 @@ static inline void on_telnet_do(unsigned char cmd, interactive_t *ip) {
       telnet_negotiate(ip->telnet, TELNET_WILL, TELNET_TELOPT_SGA);
       break;
     case TELNET_TELOPT_GMCP:
-      if(!CONFIG_INT(__RC_ENABLE_GMCP__)) {
+      if (!CONFIG_INT(__RC_ENABLE_GMCP__)) {
 #ifdef DEBUG
-        debug_message("Bad client: bogus IAC DO GMCP from %s.",
-                      sockaddr_to_string(reinterpret_cast<const sockaddr *>(&ip->addr), ip->addrlen));
+        debug_message(
+            "Bad client: bogus IAC DO GMCP from %s.",
+            sockaddr_to_string(reinterpret_cast<const sockaddr *>(&ip->addr), ip->addrlen));
         remove_interactive(ip->ob, false);
 #else
         // do nothing
@@ -180,10 +181,11 @@ static inline void on_telnet_do(unsigned char cmd, interactive_t *ip) {
       on_telnet_do_gmcp(ip);
       break;
     case TELNET_TELOPT_MSSP:
-      if(!CONFIG_INT(__RC_ENABLE_MSSP__)) {
+      if (!CONFIG_INT(__RC_ENABLE_MSSP__)) {
 #ifdef DEBUG
-        debug_message("Bad client: bogus IAC DO MSSP from %s.",
-                      sockaddr_to_string(reinterpret_cast<const sockaddr *>(&ip->addr), ip->addrlen));
+        debug_message(
+            "Bad client: bogus IAC DO MSSP from %s.",
+            sockaddr_to_string(reinterpret_cast<const sockaddr *>(&ip->addr), ip->addrlen));
         remove_interactive(ip->ob, false);
 #else
         // do nothing
@@ -192,10 +194,11 @@ static inline void on_telnet_do(unsigned char cmd, interactive_t *ip) {
       on_telnet_do_mssp(ip);
       break;
     case TELNET_TELOPT_ZMP:
-      if(!CONFIG_INT(__RC_ENABLE_ZMP__)) {
+      if (!CONFIG_INT(__RC_ENABLE_ZMP__)) {
 #ifdef DEBUG
-        debug_message("Bad client: bogus IAC DO ZMP from %s.",
-                      sockaddr_to_string(reinterpret_cast<const sockaddr *>(&ip->addr), ip->addrlen));
+        debug_message(
+            "Bad client: bogus IAC DO ZMP from %s.",
+            sockaddr_to_string(reinterpret_cast<const sockaddr *>(&ip->addr), ip->addrlen));
         remove_interactive(ip->ob, false);
 #else
         // do nothing
@@ -470,23 +473,23 @@ void send_initial_telnet_negotiations(struct interactive_t *user) {
 #endif
 
   // Ask them if they support mxp.
-  if(CONFIG_INT(__RC_ENABLE_MXP__)) {
+  if (CONFIG_INT(__RC_ENABLE_MXP__)) {
     telnet_negotiate(user->telnet, TELNET_DO, TELNET_TELOPT_MXP);
   }
 
   // gmcp
-  if(CONFIG_INT(__RC_ENABLE_GMCP__)) {
+  if (CONFIG_INT(__RC_ENABLE_GMCP__)) {
     telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_GMCP);
   }
 
   // zmp
-  if(CONFIG_INT(__RC_ENABLE_ZMP__)) {
+  if (CONFIG_INT(__RC_ENABLE_ZMP__)) {
     telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_ZMP);
   }
 
   // And we support mssp
   // http://tintin.sourceforge.net/mssp/ , server send WILL first.
-  if(CONFIG_INT(__RC_ENABLE_MSSP__)) {
+  if (CONFIG_INT(__RC_ENABLE_MSSP__)) {
     telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_MSSP);
   }
 }
@@ -545,14 +548,14 @@ void telnet_send_nop(struct telnet_t *telnet) {
 
 /* MXP */
 
-void on_telnet_will_mxp(interactive_t* ip) {
+void on_telnet_will_mxp(interactive_t *ip) {
   ip->iflags |= USING_MXP;
   /* Mxp is enabled, tell the mudlib about it. */
   set_eval(max_eval_cost);
   safe_apply(APPLY_MXP_ENABLE, ip->ob, 0, ORIGIN_DRIVER);
 }
 
-bool on_receive_mxp_tag(interactive_t* ip, const char* user_command) {
+bool on_receive_mxp_tag(interactive_t *ip, const char *user_command) {
   copy_and_push_string(user_command);
 
   set_eval(max_eval_cost);
@@ -565,7 +568,7 @@ bool on_receive_mxp_tag(interactive_t* ip, const char* user_command) {
 
 /* GMCP */
 
-void on_telnet_do_gmcp(interactive_t* ip) {
+void on_telnet_do_gmcp(interactive_t *ip) {
   ip->iflags |= USING_GMCP;
 
   set_eval(max_eval_cost);
@@ -574,14 +577,14 @@ void on_telnet_do_gmcp(interactive_t* ip) {
 
 /* ZMP */
 
-void on_telnet_do_zmp(const char** argv, unsigned long argc, interactive_t* ip) {
+void on_telnet_do_zmp(const char **argv, unsigned long argc, interactive_t *ip) {
   ip->iflags |= USING_ZMP;
 
   // Push the command
   copy_and_push_string(argv[0]);
 
   // Push the array
-  array_t* arr = allocate_array(argc - 1);
+  array_t *arr = allocate_array(argc - 1);
   for (int i = 1; i < argc; i++) {
     arr->item[i].u.string = string_copy(argv[i], "ZMP");
     arr->item[i].type = T_STRING;
