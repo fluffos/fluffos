@@ -86,8 +86,8 @@ TraceWriter::~TraceWriter() {
   if (buffer && !buffer->empty()) {
     debug_message("Uncollected profiling events: %ld.\n", buffer->size());
   }
-  for(auto &t: dump_threads) {
-    if(t.joinable()) {
+  for (auto& t : dump_threads) {
+    if (t.joinable()) {
       t.join();
     }
   }

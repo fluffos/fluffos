@@ -19,7 +19,7 @@ void f_request_term_type() {
 
 #ifdef F_START_REQUEST_TERM_TYPE
 void f_start_request_term_type() {
-  if(command_giver) {
+  if (command_giver) {
     auto ip = command_giver->interactive;
     if (ip && ip->telnet) {
       telnet_start_request_ttype(ip->telnet);
@@ -31,7 +31,7 @@ void f_start_request_term_type() {
 
 #ifdef F_REQUEST_TERM_SIZE
 void f_request_term_size() {
-  if(command_giver) {
+  if (command_giver) {
     auto ip = command_giver->interactive;
 
     if (ip && ip->telnet) {
@@ -51,7 +51,7 @@ void f_request_term_size() {
 
 #ifdef F_TELNET_NOP
 void f_telnet_nop() {
-  if(command_giver) {
+  if (command_giver) {
     auto ip = command_giver->interactive;
 
     if (ip && ip->telnet) {
@@ -78,7 +78,7 @@ void f_has_mxp(void) {
 
 #ifdef F_ACT_MXP
 void f_act_mxp() {
-  if(command_giver) {
+  if (command_giver) {
     auto ip = command_giver->interactive;
 
     if (ip && ip->telnet) {
@@ -106,7 +106,7 @@ void f_has_gmcp() {
 
 #ifdef F_SEND_GMCP
 void f_send_gmcp() {
-  if(command_giver) {
+  if (command_giver) {
     auto ip = command_giver->interactive;
 
     if (ip && ip->telnet) {
@@ -135,7 +135,7 @@ void f_has_zmp(void) {
 
 #ifdef F_SEND_ZMP
 void f_send_zmp() {
-  if(command_giver) {
+  if (command_giver) {
     auto ip = command_giver->interactive;
     if (ip && ip->telnet) {
       telnet_begin_zmp(ip->telnet, (sp - 1)->u.string);
