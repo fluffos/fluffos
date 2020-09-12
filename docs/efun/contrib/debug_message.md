@@ -5,7 +5,7 @@ title: contrib / debug_message
 
 ### NAME
 
-    debug_message() - logs a debug mssage
+    debug_message() - logs a debug message
 
 ### SYNOPSIS
 
