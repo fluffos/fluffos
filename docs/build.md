@@ -35,7 +35,8 @@ This is the best platform to build & run FluffOS, support for other platform is 
     $ sudo apt update
     $ sudo apt install build-essential bison \
     libevent-dev libmysqlclient-dev libpcre3-dev libpq-dev \
-    libsqlite3-dev libssl-dev libz-dev libjemalloc-dev
+    libsqlite3-dev libssl-dev libz-dev libjemalloc-dev \
+    libicu-dev
 
 Build
 
