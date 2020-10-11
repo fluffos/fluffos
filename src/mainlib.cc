@@ -96,8 +96,7 @@ void print_commandline(int argc, char **argv) {
 void print_version_and_time() {
   /* Print current time */
   {
-    time_t tm;
-    time(&tm);
+    time_t tm = get_current_time();
     char buf[256] = {};
     std::cout << "Boot Time: " << ctime_r(&tm, buf);
   }
