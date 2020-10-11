@@ -427,15 +427,24 @@ void f__new(void) {
 
 #ifdef F_CTIME
 void f_ctime(void) {
-  const char *cp, *nl;
+  char buf[255] = {};
+  const char *cp = buf, *nl;
   char *p;
   int l;
+  time_t timestamp;
+
   if (st_num_arg) {
-    cp = time_string(sp->u.number);
+    timestamp = sp->u.number;
   } else {
     push_number(0);
-    cp = time_string(get_current_time());
+    timestamp = get_current_time();
   }
+
+  cp = ctime_r(&timestamp, buf);
+  if (!cp) {
+    cp = "ctime failed!";
+  }
+
   if ((nl = strchr(cp, '\n'))) {
     l = nl - cp;
   } else {
