@@ -328,14 +328,13 @@ int driver_main(int argc, char **argv) {
   ScopedTracer _main_tracer(__PRETTY_FUNCTION__);
 
   // backward-cpp doesn't yet work on win32
-#ifndef _WIN32
+
   // register crash handlers
   backward::SignalHandling sh;
   if (!sh.loaded()) {
     std::cout << "Warning: Signal handler installation failed, not backtrace on crash!"
               << std::endl;
   }
-#endif
 
 #ifdef _WIN32
   init_win32();
