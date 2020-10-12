@@ -5,7 +5,7 @@ title: arrays / arrayp
 
 ### NAME
 
-    arrayp() - determine whether or not a given variable is an array
+    arrayp() - identifies whether a given variable is an array
 
 ### SYNOPSIS
 
@@ -13,7 +13,12 @@ title: arrays / arrayp
 
 ### DESCRIPTION
 
-    Return 1 if 'arg' is an array.
+    Returns 1 if 'arg' is an array, otherwise returns 0.
+
+### EXAMPLE
+
+    int is_array = arrayp( ({ 1, 2, 3, 4 }) ); // 1
+    int is_array = arrayp( "Foo" ); // 0
 
 ### SEE ALSO
 
