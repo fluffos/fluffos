@@ -15,6 +15,7 @@
 #endif
 
 #include <unistd.h>  // for rmdir(), FIXME
+#include "thirdparty/crypt/crypt.h"
 
 #include "packages/core/call_out.h"
 #include "packages/core/dns.h"
@@ -27,7 +28,6 @@
 #include "packages/core/custom_crypt.h"
 #include "packages/core/ed.h"
 #include "packages/core/heartbeat.h"
-#include "thirdparty/crypt/include/crypt.h"
 
 int data_size(object_t *ob);
 void reload_object(object_t *obj);
@@ -3373,8 +3373,8 @@ void f_crypt(void) {
     salt[sizeof(salt) - 1] = '\0';
     saltp = salt;
   }
-
-  auto result = crypt((sp - 1)->u.string, saltp);
+  auto key = (sp - 1)->u.string;
+  auto result = __crypt(key, saltp);
   if (result == nullptr || (result && result[0] == '*')) {
     error("Error in crypt(), check your salt");
     return;

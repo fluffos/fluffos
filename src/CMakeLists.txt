@@ -52,7 +52,7 @@ set(CMAKE_ENABLE_EXPORTS ON)
 
 if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "AppleClang")
   foreach (lang C CXX)
-    set(CMAKE_${lang}_FLAGS_DEBUG "-O1 -g3")
+    set(CMAKE_${lang}_FLAGS_DEBUG "-O0 -g3")
     # include (minimal) debug information even for RELEASE build.
     set(CMAKE_${lang}_FLAGS_RELEASE "-O3 -DNDEBUG -g")
     set(CMAKE_${lang}_FLAGS_RELWITHDEBINFO "${CMAKE_${lang}_FLAGS_RELEASE}")
@@ -403,7 +403,7 @@ foreach (PACKAGE ${FLUFFOS_PACKAGES})
 endforeach ()
 
 add_subdirectory(thirdparty/crypt)
-target_link_libraries(libdriver PUBLIC crypt)
+target_link_libraries(libdriver PRIVATE crypt)
 
 target_link_libraries(libdriver PUBLIC ${LIBWEBSOCKETS_LIBRARIES_STATIC})
 # Third party libraries
