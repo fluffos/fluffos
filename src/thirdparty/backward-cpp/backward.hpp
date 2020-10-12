@@ -795,8 +795,6 @@ namespace details {
 template <typename F> class Unwinder {
 public:
   size_t operator()(F &f, size_t depth) {
-    return 0;
-
     _f = &f;
     _index = -1;
     _depth = depth;
