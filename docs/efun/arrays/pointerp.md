@@ -5,7 +5,7 @@ title: arrays / pointerp
 
 ### NAME
 
-    pointerp() - determine whether or not a given variable is an array
+    pointerp() - identifies whether a given variable is an array
 
 ### SYNOPSIS
 
@@ -13,7 +13,12 @@ title: arrays / pointerp
 
 ### DESCRIPTION
 
-    Return 1 if 'arg' is an array.
+    Returns 1 if 'arg' is an array, otherwise returns 0.
+    
+### EXAMPLE
+
+    int is_array = pointerp( ({ 1, 2, 3, 4 }) ); // 1
+    int is_array = pointerp( "Foo" ); // 0
 
 ### SEE ALSO
 
