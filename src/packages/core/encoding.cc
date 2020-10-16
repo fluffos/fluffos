@@ -106,9 +106,9 @@ void f_string_encode() {
   error_code = U_ZERO_ERROR;
   auto required =
       ucnv_fromAlgorithmic(trans, UConverterType::UCNV_UTF8, nullptr, 0, data, len, &error_code);
-  if (error_code != U_BUFFER_OVERFLOW_ERROR) {
+  if (U_FAILURE(error_code) && error_code != U_BUFFER_OVERFLOW_ERROR) {
     ucnv_close(trans);
-    error("string_encode: error: %s", u_errorName(error_code));
+    error("string_encode: error: %s.", u_errorName(error_code));
   }
 
   size_t translen = required;
@@ -118,11 +118,11 @@ void f_string_encode() {
 
   auto written = ucnv_fromAlgorithmic(trans, UConverterType::UCNV_UTF8, transdata, translen, data,
                                       len, &error_code);
-  DEBUG_CHECK(written != translen, "Bug: translation buffer size calculation error");
+  DEBUG_CHECK(written != translen, "Bug: translation buffer size calculation error.");
   if (U_FAILURE(error_code)) {
     ucnv_close(trans);
     free_buffer(buffer);
-    error("string_encode: error: %s", u_errorName(error_code));
+    error("string_encode: error: %s.", u_errorName(error_code));
   }
   pop_2_elems();
   push_refed_buffer(buffer);
@@ -146,9 +146,9 @@ void f_string_decode() {
   error_code = U_ZERO_ERROR;
   auto required =
       ucnv_toAlgorithmic(UConverterType::UCNV_UTF8, trans, nullptr, 0, data, len, &error_code);
-  if (error_code != U_BUFFER_OVERFLOW_ERROR) {
+  if (U_FAILURE(error_code) && error_code != U_BUFFER_OVERFLOW_ERROR) {
     ucnv_close(trans);
-    error("string_decode: error: %s", u_errorName(error_code));
+    error("string_decode: error: %s.", u_errorName(error_code));
   }
 
   auto res = new_string(required, "f_string_decode");
@@ -160,9 +160,9 @@ void f_string_decode() {
   if (U_FAILURE(error_code)) {
     ucnv_close(trans);
     FREE_MSTR(res);
-    error("string_decode: error: %s", u_errorName(error_code));
+    error("string_decode: error: %s.", u_errorName(error_code));
   }
-  DEBUG_CHECK(written != required, "Bug: translation buffer size calculation error");
+  DEBUG_CHECK(written != required, "Bug: translation buffer size calculation error.");
   pop_2_elems();
   push_malloced_string(res);
 
@@ -182,7 +182,7 @@ void f_buffer_transcode() {
   error_code = U_ZERO_ERROR;
   auto required = ucnv_convert(to_encoding, from_encoding, nullptr, 0, data, len, &error_code);
   if (error_code != U_BUFFER_OVERFLOW_ERROR) {
-    error("buffer_transcode: error: %s", u_errorName(error_code));
+    error("buffer_transcode: error: %s.", u_errorName(error_code));
   }
 
   auto res = allocate_buffer(required);
@@ -190,10 +190,10 @@ void f_buffer_transcode() {
   error_code = U_ZERO_ERROR;
   auto written =
       ucnv_convert(to_encoding, from_encoding, (char *)res->item, required, data, len, &error_code);
-  DEBUG_CHECK(written != required, "Bug: translation buffer size calculation error");
+  DEBUG_CHECK(written != required, "Bug: translation buffer size calculation error.");
   if (U_FAILURE(error_code)) {
     free_buffer(res);
-    error("buffer_transcode: error: %s", u_errorName(error_code));
+    error("buffer_transcode: error: %s.", u_errorName(error_code));
   }
   pop_3_elems();
   push_refed_buffer(res);
