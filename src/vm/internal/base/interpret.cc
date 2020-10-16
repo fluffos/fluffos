@@ -1242,7 +1242,7 @@ void pop_control_stack() {
   function_index_offset = csp->function_index_offset;
   variable_index_offset = csp->variable_index_offset;
   if (Tracer::enabled()) {
-    if (!csp->trace_id->empty()) {
+    if (csp->trace_id && !csp->trace_id->empty()) {
       Tracer::end(*csp->trace_id, EventCategory::LPC_FUNCTION);
       csp->trace_id.reset();
     }
