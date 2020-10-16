@@ -1,0 +1,78 @@
+{
+  "harvest time"      : 30,
+  "spawn chance"      : 35,
+  "vein chance"       : 5,
+  "vein size"         : 5,
+  "yield"             : 1,
+  "disabled"          : false,
+  "refined multiplier": 10,
+  "skill up chance"   : 15,
+  "mass"              : {
+    "raw" : {
+      "herb"   : 60,
+      "lumber" : 60,
+      "ore"    : 60,
+      "skin"   : 60,
+      "other"  : 60
+    },
+    "refined" : {
+      "herb"   : 45,
+      "lumber" : 45,
+      "ore"    : 45,
+      "skin"   : 45,
+      "other"  : 45
+    }
+  },
+  "resource classes"  : [ "herb", "lumber", "skin", "ore", "other" ],
+  "nodes"             : {
+    "sizes"   : [ 100, 25, 10, 5 ],
+    "prefixes":
+    {
+      "herb"  : [ "", "flourishing", "vivacious", "overgrown", "enormous" ],
+      "ore"   : [ "", "large", "huge", "massive", "colossal" ],
+      "skin"  : [ "", "large", "oversized", "enormous", "gargantuan" ],
+      "lumber": [ "", "flourishing", "oversized", "massive", "gigantic" ],
+      "other" : [ "", "", "", "", "" ]
+    }
+  },
+  "veins" : {
+    "herb"  : "cluster",
+    "lumber": "grove",
+    "ore"   : "vein",
+    "skin"  : "mutant"
+  },
+  "harvesting" : {
+    "herb" : {
+      "verb"      : "clip",
+      "skill name": "herbalist",
+      "begin"     : "clipping",
+      "tool func" : "query_clipping_tool",
+      "proc item" : "pure_herb_extract",
+      "pre spam"  : [ "RUSTLE!", "RUSTLE! RUSTLE!", "SNIP! SNIP!", "SNIP!", "SNIP! RUSTLE!", "RUSTLE! SNIP!" ]
+    },
+    "lumber" : {
+      "verb"      : "chop",
+      "skill name": "lumberjack",
+      "begin"     : "chopping",
+      "tool func" : "query_chopping_tool",
+      "proc item" : "pure_lumber_heart",
+      "pre spam"  : [ "CHOP!", "CHOP! CHOP!", "HACK!", "HACK! HACK!", "HACK! CHOP!", "CHOP! HACK!" ]
+    },
+    "ore" : {
+      "verb"      : "mine",
+      "skill name": "miner",
+      "begin"     : "mining",
+      "tool func" : "query_mining_tool",
+      "proc item" : "pure_ore_dust",
+      "pre spam"  : [ "CLINK!", "CLANK!", "CLINK! CLANK!", "CLANK! CLINK!", "CLANG!", "KA-CHINK!" ]
+    },
+    "skin" : {
+      "verb"      : "skin",
+      "skill name": "furrier",
+      "begin"     : "skinning",
+      "tool func" : "query_skinning_tool",
+      "proc item" : "vial_oil",
+      "pre spam"  : [ "SCHICK!", "SCHICK! SLICE!", "SLICE! SLICE!", "SLICE!", "SLICE! SCHICK!" ]
+    }
+  }
+}
