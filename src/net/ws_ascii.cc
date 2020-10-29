@@ -105,8 +105,6 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
           base, -1, EV_TIMEOUT,
           [](evutil_socket_t fd, short what, void *arg) {
             auto user = reinterpret_cast<interactive_t *>(arg);
-            // Force returning to line start, no line-feed.
-            ws_ascii_send(user->lws, "\r", 1);
             on_user_logon(user);
           },
           (void *)ip, nullptr);
