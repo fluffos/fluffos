@@ -6,7 +6,7 @@ option(ENABLE_SANITIZER "Build driver with sanitizer support" OFF)
 # Packages
 option(PACKAGE_ASYNC "async package" ON)
 option(PACKAGE_COMPRESS "compress package" ON)
-option(PACKAGE_CONTRIB "compress package" ON)
+option(PACKAGE_CONTRIB "contrib package" ON)
 # PACKAGE CORE should always be on
 set(PACKAGE_CORE ON)
 option(PACKAGE_CRYPTO "crypto package" ON)
