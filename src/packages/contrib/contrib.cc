@@ -2744,15 +2744,28 @@ void f_abs() {
 
 void f_roll_MdN() {
   LPC_INT roll = 0;
+  int num_dice, sides_of_dice, bonus ;
 
-  if ((sp - 1)->u.number > 0 && sp->u.number > 0) {
-    while ((sp - 1)->u.number--) {
-      roll += 1 + random_number(sp->u.number);
-    }
+  if(st_num_arg == 3)
+  {
+    num_dice = (sp - 2)->u.number ;
+    sides_of_dice = (sp - 1)->u.number;
+    bonus = (sp - 0)->u.number ;
+  }
+  else
+  {
+    num_dice = (sp - 1)->u.number ;
+    sides_of_dice = (sp - 0)->u.number;
+    bonus = 0 ;
   }
 
-  pop_stack();          // Pop one...
-  sp->u.number = roll;  // And change the other!
+  while( num_dice-- )
+  {
+    roll += 1 + random_number( sides_of_dice ) + bonus ;
+  }
+
+  pop_n_elems( st_num_arg );
+  push_number( roll );
 }
 
 #endif
