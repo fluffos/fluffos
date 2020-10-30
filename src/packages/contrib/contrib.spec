@@ -62,3 +62,4 @@ mixed *classes(object, int default : 0);
 int test_load(string);
 mixed highest(...);
 mixed lowest(...);
+mixed range(int | float, int | float, int | float);

@@ -3194,3 +3194,57 @@ void f_lowest()
 }
 
 #endif // F_LOWEST
+
+#ifdef F_RANGE
+void f_range()
+{
+  // Integers
+  if( (sp - 2)->type == T_NUMBER && (sp - 1)->type == T_NUMBER && (sp - 0)->type == T_NUMBER )
+  {
+    LPC_INT lower = (sp - 2)->u.number ;
+    LPC_INT upper = (sp - 1)->u.number ;
+    LPC_INT val   = (sp - 0)->u.number ;
+    LPC_INT min, max ;
+
+    if( upper < val )
+    {
+      min = upper ;
+      max = val ;
+    }
+    else
+    {
+      min = val ;
+      max = upper ;
+    }
+
+    pop_n_elems( st_num_arg );
+    push_number( lower < min ? min : (lower > max ? max : lower) ) ;
+  }
+  // Floats
+  else if( (sp - 2)->type == T_REAL && (sp - 1)->type == T_REAL && (sp - 0)->type == T_REAL )
+  {
+    LPC_FLOAT lower = (sp - 2)->u.real ;
+    LPC_FLOAT upper = (sp - 1)->u.real ;
+    LPC_FLOAT val   = (sp - 0)->u.real ;
+    LPC_FLOAT min, max ;
+
+    if( upper < val )
+    {
+      min = upper ;
+      max = val ;
+    }
+    else
+    {
+      min = val ;
+      max = upper ;
+    }
+
+    pop_n_elems( st_num_arg );
+    push_real( lower < min ? min : (lower > max ? max : lower) ) ;
+  }
+  else
+  {
+    error("range() All argument values must be of the same type (int or float).\n");
+  }
+}
+#endif // F_RANGE
