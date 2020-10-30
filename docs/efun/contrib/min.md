@@ -19,4 +19,4 @@ title: contrib / min
 
 ### SEE ALSO
 
-    max, highest
+    max, highest, lowest

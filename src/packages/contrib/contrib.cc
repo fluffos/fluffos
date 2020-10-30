@@ -3135,3 +3135,62 @@ void f_highest()
 }
 
 #endif // F_HIGHEST
+
+#ifdef F_LOWEST
+void f_lowest()
+{
+  int num = st_num_arg ;
+  int cnt = num - 1;
+
+  if( num == 0 )
+  {
+    error("lowest() requires at least one argument of type int or float.\n");
+  }
+
+  // Sanity check to make sure that all arguments are the same type and that they
+  // are of valid types: int or float
+  do
+  {
+    if( (sp - cnt)->type != sp->type || ( (sp - cnt)->type != T_NUMBER && (sp - cnt)->type != T_REAL ) )
+    {
+      error("lowest() All argument values must be of the same type (int or float).\n");
+    }
+  } while( cnt-- > 0 );
+
+  // If we only have one, just return it
+  if( num == 1 ) return ;
+
+  // Reset the counter
+  cnt = num - 1;
+
+  // If we're dealing with integers
+  if(sp->type == T_NUMBER)
+  {
+    LPC_INT lowest = sp->u.number ;
+
+    do {
+      lowest = ( sp - cnt )->u.number < lowest ? ( sp - cnt )->u.number : lowest ;
+    } while(cnt-- > 0);
+
+    pop_n_elems( num );
+    push_number( lowest );
+  }
+  // If we're dealing with floats
+  else if(sp->type == T_REAL)
+  {
+    LPC_FLOAT lowest = sp->u.real ;
+
+    do {
+      lowest = ( sp - cnt )->u.real < lowest ? ( sp - cnt )->u.real : lowest ;
+    } while(cnt-- > 0);
+
+    pop_n_elems( num );
+    push_real( lowest );
+  }
+  else
+  {
+    error("This is broken and should be reachable.") ;
+  }
+}
+
+#endif // F_LOWEST
