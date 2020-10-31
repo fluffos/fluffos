@@ -14,6 +14,8 @@ inherit "std/bitmap_font";
 inherit "std/highest" ;
 inherit "std/lowest" ;
 inherit "std/range" ;
+inherit "std/sum" ;
+inherit "std/element_of_weighted" ; // requires: sum
 
 int same(mixed x, mixed y) {
     // Allow comparing array with buffer
