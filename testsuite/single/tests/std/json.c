@@ -28,7 +28,10 @@ void do_tests() {
 
   content = read_file("/single/tests/std/test.json");
   ASSERT(content);
+  ASSERT(json_encode(json_decode(content)));
 
+  content = read_file("/single/tests/std/test2.json");
+  ASSERT(content);
   ASSERT(json_encode(json_decode(content)));
 
   trace_end();

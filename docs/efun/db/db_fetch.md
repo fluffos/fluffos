@@ -5,7 +5,7 @@ title: db / db_fetch
 
 ### NAME
 
-    db_fetch() - fetches a ruslt set
+    db_fetch() - fetches a result set
 
 ### SYNOPSIS
 

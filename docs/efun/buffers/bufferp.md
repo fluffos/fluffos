@@ -5,7 +5,7 @@ title: buffers / bufferp
 
 ### NAME
 
-    bufferp() - determine whether or not a given variable is a buffer
+    bufferp() - identifies whether a given variable is a buffer
 
 ### SYNOPSIS
 
@@ -14,6 +14,11 @@ title: buffers / bufferp
 ### DESCRIPTION
 
     Return 1 if 'arg' is a buffer value and zero (0) otherwise.
+
+### EXAMPLE
+
+    int is_buffer = bufferp( allocate_buffer(10) ); // 1
+    int is_buffer = bufferp( "Foo" ); // 0    
 
 ### SEE ALSO
 

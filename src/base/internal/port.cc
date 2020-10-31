@@ -1,5 +1,6 @@
-#include "base/internal/rc.h"
+#include "base/internal/port.h"
 
+#include "base/internal/rc.h"
 #include "base/internal/rusage.h"
 #include "config.h"
 
@@ -44,19 +45,6 @@ int64_t secure_random_number(int64_t n) {
  */
 
 time_t get_current_time() { return time(nullptr); /* Just use the old time() for now */ }
-
-const char *time_string(time_t t) {
-#ifndef __WIN32
-  char buf[255] = {};
-  const char *res = ctime_r(&t, buf);
-#else
-  const char *res = ctime(&t);
-#endif
-  if (!res) {
-    res = "ctime failed";
-  }
-  return res;
-}
 
 /*
  * Get a microsecond clock sample.

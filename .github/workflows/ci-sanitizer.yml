@@ -16,15 +16,13 @@ jobs:
           - CC: "clang"
             CXX: "clang++"
         build: ["Debug", "RelWithDebInfo"]
-
-    runs-on: "ubuntu-18.04"
-
+    runs-on: "ubuntu-20.04"
     steps:
     - uses: actions/checkout@v2
     - name: Install packages
       run: |
         sudo apt update
-        sudo apt install -y build-essential clang-6.0 autoconf automake bison expect libevent-dev libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
+        sudo apt install -y build-essential autoconf automake bison expect libevent-dev libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev libdw-dev
     - name: compile
       env: ${{ matrix.compiler }}
       run: mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DPACKAGE_DB_SQLITE=2 -DENABLE_SANITIZER=ON .. && make -j 2 install && cd ..
