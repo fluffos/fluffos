@@ -56,6 +56,16 @@ v2017 编译完成后的驱动文件在 fluffos/bin 目录中，包括 `driver` 
 
 v2019 编译完成后的驱动文件在 fluffos/build/bin 目录中，包括 `driver`、`lpcc`、`portbind`三个程序和 `include`、`std`、`www`三个目录，分别是驱动定义的头文件、驱动提供的sefun和 websocket 的 http dir 目录。
 
+补充说明：经测试在CentOS 7下也可编译通过，不过 CentOS 7 系统 cmake 和 g++ 版本过低，可使用以下指令更新：
+
+    # 更新cmake
+    sudo yum -y install python-pip
+    sudo pip install --upgrade cmake
+    # 更新g++
+    sudo yum install centos-release-scl -y
+    sudo yum install devtoolset-8 -y
+    scl enable devtoolset-8 bash
+
 ## Windows 系统编译
 
 ### v2017
@@ -150,3 +160,5 @@ fluffos v2017 编译演示：
 
 
 提示：演示视频可随时暂停，演示的指令也可直接复制。
+
+另外，对编译不太熟悉的网友可以在这里上机实操体验：https://cloud.tencent.com/developer/labs/lab/10482
