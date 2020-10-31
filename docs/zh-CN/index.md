@@ -791,6 +791,9 @@ title: zh-CN
 </div>
 <div class='row'>
 <div class='col-sm-3'>
+<div><a href='efun/secure_random.html'>secure_random</a></div>
+</div>
+<div class='col-sm-3'>
 <div><a href='efun/send_nullbyte.html'>send_nullbyte</a></div>
 </div>
 <div class='col-sm-3'>
@@ -799,11 +802,11 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/set_bit.html'>set_bit</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/set_debug_level.html'>set_debug_level</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/set_encoding.html'>set_encoding</a></div>
 </div>
@@ -813,11 +816,11 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/set_heart_beat.html'>set_heart_beat</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/set_hide.html'>set_hide</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/set_light.html'>set_light</a></div>
 </div>
@@ -827,11 +830,11 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/set_privs.html'>set_privs</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/set_reset.html'>set_reset</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/seteuid.html'>seteuid</a></div>
 </div>
@@ -841,11 +844,11 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/shout.html'>shout</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/shuffle.html'>shuffle</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/shutdown.html'>shutdown</a></div>
 </div>
@@ -855,11 +858,11 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/sizeof.html'>sizeof</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/snoop.html'>snoop</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/socket_accept.html'>socket_accept</a></div>
 </div>
@@ -869,11 +872,11 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/socket_address.html'>socket_address</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/socket_bind.html'>socket_bind</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/socket_close.html'>socket_close</a></div>
 </div>
@@ -883,11 +886,11 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/socket_create.html'>socket_create</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/socket_error.html'>socket_error</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/socket_listen.html'>socket_listen</a></div>
 </div>
@@ -897,11 +900,11 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/socket_status.html'>socket_status</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/socket_write.html'>socket_write</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/sort_array.html'>sort_array</a></div>
 </div>
@@ -911,11 +914,11 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/sqrt.html'>sqrt</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/sscanf.html'>sscanf</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/stat.html'>stat</a></div>
 </div>
@@ -925,11 +928,11 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/store_variable.html'>store_variable</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/strcmp.html'>strcmp</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/string_decode.html'>string_decode</a></div>
 </div>
@@ -939,11 +942,11 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/string_encode.html'>string_encode</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/stringp.html'>stringp</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/strlen.html'>strlen</a></div>
 </div>
@@ -953,11 +956,11 @@ title: zh-CN
 <div class='col-sm-3'>
 <div><a href='efun/strwidth.html'>strwidth</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/tan.html'>tan</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/tell_object.html'>tell_object</a></div>
 </div>
@@ -965,124 +968,125 @@ title: zh-CN
 <div><a href='efun/tell_room.html'>tell_room</a></div>
 </div>
 <div class='col-sm-3'>
+<div><a href='efun/telnet_nop.html'>telnet_nop</a></div>
+</div>
+</div>
+<div class='row'>
+<div class='col-sm-3'>
 <div><a href='efun/terminal_colour.html'>terminal_colour</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/test_bit.html'>test_bit</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/test_load.html'>test_load</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/this_interactive.html'>this_interactive</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/this_object.html'>this_object</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/this_player.html'>this_player</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/this_user.html'>this_user</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/throw.html'>throw</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/time.html'>time</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/time_expression.html'>time_expression</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/to_float.html'>to_float</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/to_int.html'>to_int</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/trace_end.html'>trace_end</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/trace_start.html'>trace_start</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/trim.html'>trim</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/typeof.html'>typeof</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/undefinedp.html'>undefinedp</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/unique_array.html'>unique_array</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/unique_mapping.html'>unique_mapping</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/upper_case.html'>upper_case</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/uptime.html'>uptime</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/userp.html'>userp</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/users.html'>users</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/values.html'>values</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/variables.html'>variables</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/virtualp.html'>virtualp</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/wizardp.html'>wizardp</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/write.html'>write</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/write_buffer.html'>write_buffer</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/write_bytes.html'>write_bytes</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='efun/write_file.html'>write_file</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='efun/zonetime.html'>zonetime</a></div>
 </div>
-<div>&nbsp;</div>
-<div>&nbsp;</div>
 </div>
 </div>
 
 
 
-This page is auto generated on 2020-10-11 18:01:28 PDT for [d2819440](https://github.com/fluffos/fluffos/tree/d2819440).
+This page is auto generated on 2020-10-31 18:54:32 CST for [a841a069](https://github.com/fluffos/fluffos/tree/a841a069).
 
 
