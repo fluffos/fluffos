@@ -21,7 +21,7 @@ Simulated efuns have many uses. One is that it is now possible to make major
 changes (and even removals) to the behavior of efuns without modifying
 the driver (by making a simul_efun having the same name as an efun). Suppose
 you wish to modify the behavior of the move_object() efun. You could do
-so by defining a simulated efun having the same name. The simulate efun
+so by defining a simulated efun having the same name. The simulated efun
 could perform various restrictive checks and then call efun::move_object().
 The efun:: prefix is necessary so that the driver will know you wish to call
 the move_object efun and not recursively call the simulate_efun within which
@@ -31,5 +31,5 @@ prefix]. Simulated efuns are also useful for adding functions that many
 different objects may need to call but which aren't appropriate for
 inclusion in an inherited file.
 
-Any function in the simulated efun file that is declared static, will
+Any function in the simulated efun file that is declared protected, will
 not be callable by functions outside the simulated efun file.
