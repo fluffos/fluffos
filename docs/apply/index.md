@@ -40,9 +40,11 @@ title: Applies
 <div><a href='interactive/terminal_type.html'>terminal_type</a></div>
 </div>
 <div class='col-sm-3'>
+<div><a href='interactive/window_size.html'>window_size</a></div>
+</div>
+<div class='col-sm-3'>
 <div><a href='interactive/write_prompt.html'>write_prompt</a></div>
 </div>
-<div>&nbsp;</div>
 <div>&nbsp;</div>
 </div>
 </div>
@@ -217,6 +219,6 @@ title: Applies
 
 
 
-This page is auto generated on 2020-10-11 18:01:28 PDT for [d2819440](https://github.com/fluffos/fluffos/tree/d2819440).
+This page is auto generated on 2020-10-31 18:54:32 CST for [a841a069](https://github.com/fluffos/fluffos/tree/a841a069).
 
 
