@@ -3,11 +3,16 @@ OBJ_DUMP2
 PROG_DUMP
 test_file
 testfile
+testfile1
 testfile.zerolength
 /log/log
 /log/debug.log
 /log/compile
+/log/compile_fail
 /log/author_stats
 /log/domain_stats
 sf.o
 driver
+tmp_eval_file.c
+rename_test1
+trace_json.json
