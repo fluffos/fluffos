@@ -11,6 +11,9 @@ inherit "std/json";
 inherit "std/break_string";
 // bitmap_font sefun
 inherit "std/bitmap_font";
+inherit "std/highest" ;
+inherit "std/lowest" ;
+inherit "std/range" ;
 
 int same(mixed x, mixed y) {
     // Allow comparing array with buffer
