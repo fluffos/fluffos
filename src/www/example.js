@@ -40,6 +40,8 @@ term.unicode.activeVersion = '11';
 const fitAddon  = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
 
+const weblinksAddon = new WebLinksAddon.WebLinksAddon();
+term.loadAddon(weblinksAddon);
 
 let history = [];
 let history_index = -1;
