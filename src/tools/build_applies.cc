@@ -47,8 +47,11 @@ int main(int argc, char **argv) {
           "const char *applies_table[] = "
           "{\n");
 
-  while (fgets(buf, 8192, f)) {
+  while (fgets(buf, sizeof(buf), f)) {
     buf[strlen(buf) - 1] = 0;
+    if(buf[strlen(buf) - 1] == '\r') {
+      buf[strlen(buf) - 1] = 0;
+    }
     if (buf[0] == '#') {
       break;
     }
@@ -60,13 +63,20 @@ int main(int argc, char **argv) {
       p = buf;
       while (*p) {
         *p = tolower(*p);
+        if(*p == '\r') {
+          *p = 0;
+          break;
+        }
         p++;
       }
       fprintf(out, "\"%s\"\n", buf);
     }
   }
-  while (fgets(buf, 8192, f)) {
+  while (fgets(buf, sizeof(buf), f)) {
     buf[strlen(buf) - 1] = 0;
+    if(buf[strlen(buf) - 1] == '\r') {
+      buf[strlen(buf) - 1] = 0;
+    }
     if ((colon = strchr(buf, ':'))) {
       *colon++ = 0;
       fprintf(table, "\t\"%s\",\n", colon);
@@ -76,6 +86,10 @@ int main(int argc, char **argv) {
       p = buf;
       while (*p) {
         *p = tolower(*p);
+        if(*p == '\r') {
+          *p = 0;
+          break;
+        }
         p++;
       }
       fprintf(table, "\t\"%s\",\n", buf);
