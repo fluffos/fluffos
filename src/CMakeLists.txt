@@ -258,7 +258,7 @@ set(GENERATRED_SOURCE
 add_custom_command(
   OUTPUT "applies_table.autogen.cc" "applies_table.autogen.h"
   COMMAND "build_applies" "${CMAKE_CURRENT_SOURCE_DIR}"
-  DEPENDS "vm/internal/applies"
+  DEPENDS "vm/internal/applies" "build_applies"
 )
 
 add_custom_command(
