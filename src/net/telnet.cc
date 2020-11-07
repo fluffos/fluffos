@@ -347,13 +347,11 @@ static inline void on_telnet_environ(const struct telnet_environ_t *values, unsi
     if (values[i].var == nullptr || values[i].value == nullptr) {
       continue;
     }
-    auto var = string_copy(values[i].var, "on_telnet_environ: var");
-    u8_sanitize(var);
-    push_malloced_string(var);
+    auto sanitized_var = u8_sanitize(values[i].var);
+    copy_and_push_string(sanitized_var.c_str());
 
-    auto value = string_copy(values[i].value, "on_telnet_environ: value");
-    u8_sanitize(value);
-    push_malloced_string(value);
+    auto sanitized_value = u8_sanitize(values[i].value);
+    copy_and_push_string(sanitized_value.c_str());
 
     set_eval(max_eval_cost);
     safe_apply(APPLY_RECEIVE_ENVIRON, ip->ob, 2, ORIGIN_DRIVER);

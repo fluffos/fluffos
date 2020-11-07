@@ -137,12 +137,16 @@ void on_getaddr_result(int err, evutil_addrinfo *res, void *arg) {
  * Try to resolve "name" and call the callback when finish.
  */
 int query_addr_by_name(const char *name, svalue_t *call_back) {
-  static int key = 0;
+  static unsigned int key = 0;
 
-  struct evutil_addrinfo hints;
-  memset(&hints, 0, sizeof(hints));
+  struct evutil_addrinfo hints = {0};
+#ifdef IPV6
   hints.ai_family = AF_UNSPEC;
-  hints.ai_flags = 0;  // EVUTIL_AI_V4MAPPED | EVUTIL_AI_ADDRCONFIG;
+  hints.ai_flags |= EVUTIL_AI_V4MAPPED;
+#else
+  hints.ai_family = AF_INET;
+  hints.ai_flags = 0;
+#endif
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_protocol = 0;
 

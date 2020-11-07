@@ -9,15 +9,19 @@
 
 #include "packages/sockets/socket_efuns.h"
 
-#include <errno.h>
 #include <event2/event.h>
 #include <event2/util.h>
 #include <deque>
 #include <string>
 #include <unistd.h>  // for close
+
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#define ERR(e) WSA##e
+#else
+#include <errno.h>
+#define ERR(e) e
 #endif
 
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
@@ -470,13 +474,13 @@ int socket_bind(int fd, int port, const char *addr) {
   }
 
   if (bind(lpc_socks[fd].fd, reinterpret_cast<struct sockaddr *>(&sockaddr), len) == -1) {
-    switch (errno) {
-      case EADDRINUSE:
+    auto e = evutil_socket_geterror(lpc_socks[fd].fd);
+    switch (e) {
+      case ERR(EADDRINUSE):
         debug(sockets, "socket_bind: address is in use.");
         return EEADDRINUSE;
       default:
-        debug(sockets, "socket_bind: bind error: %s.\n",
-              evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
+        debug(sockets, "socket_bind: bind error: %s.\n", evutil_socket_error_to_string(e));
         return EEBIND;
     }
   }
@@ -485,14 +489,14 @@ int socket_bind(int fd, int port, const char *addr) {
   lpc_socks[fd].l_addrlen = sizeof(lpc_socks[fd].l_addr);
   if (getsockname(lpc_socks[fd].fd, reinterpret_cast<struct sockaddr *>(&lpc_socks[fd].l_addr),
                   &lpc_socks[fd].l_addrlen) == -1) {
-    debug(sockets, "socket_bind: getsockname error: %s.\n",
-          evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
+    auto e = evutil_socket_geterror(lpc_socks[fd].fd);
+    debug(sockets, "socket_bind: getsockname error: %s.\n", evutil_socket_error_to_string(e));
     return EEGETSOCKNAME;
   }
 
   lpc_socks[fd].state = STATE_BOUND;
 
-  debug(sockets, "socket_bind: bound lpc socket %d (real fd %d) to %s.\n", fd, lpc_socks[fd].fd,
+  debug(sockets, "socket_bind: bound lpc socket %d (real fd %lld) to %s.\n", fd, lpc_socks[fd].fd,
         sockaddr_to_string((struct sockaddr *)&lpc_socks[fd].l_addr, lpc_socks[fd].l_addrlen));
 
   // register read event.
@@ -571,16 +575,14 @@ int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback) {
   addrlen = sizeof(addr);
   accept_fd = accept(lpc_socks[fd].fd, reinterpret_cast<struct sockaddr *>(&addr), &addrlen);
   if (accept_fd == -1) {
-    switch (errno) {
-#ifdef EWOULDBLOCK
-      case EWOULDBLOCK:
+    auto e = evutil_socket_geterror(lpc_socks[fd].fd);
+    switch (e) {
+      case ERR(EWOULDBLOCK):
         return EEWOULDBLOCK;
-#endif
-      case EINTR:
+      case ERR(EINTR):
         return EEINTR;
       default:
-        debug(sockets, "socket_accept: accept error: %s.\n",
-              evutil_socket_error_to_string(evutil_socket_geterror(accept_fd)));
+        debug(sockets, "socket_accept: accept error: %s.\n", evutil_socket_error_to_string(e));
         return EEACCEPT;
     }
   }
@@ -592,9 +594,12 @@ int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback) {
     return EENONBLOCK;
   }
 
-#ifdef FD_CLOEXEC
-  fcntl(accept_fd, F_SETFD, FD_CLOEXEC);
-#endif
+  if (evutil_make_socket_closeonexec(fd) == -1) {
+    debug(sockets, "socket_accept: make_socket_closeonexec error: %s.\n",
+          evutil_socket_error_to_string(evutil_socket_geterror(fd)));
+    close(fd);
+    return EESETSOCKOPT;
+  }
 
   i = find_new_socket();
   if (i >= 0) {
@@ -675,21 +680,22 @@ int socket_connect(int fd, const char *name, svalue_t *read_callback, svalue_t *
 
   if (connect(lpc_socks[fd].fd, reinterpret_cast<struct sockaddr *>(&lpc_socks[fd].r_addr),
               lpc_socks[fd].r_addrlen) == -1) {
-    switch (errno) {
-      case EINTR:
+    auto e = evutil_socket_geterror(lpc_socks[fd].fd);
+    switch (e) {
+      case ERR(EINTR):
         return EEINTR;
-      case EADDRINUSE:
+      case ERR(EADDRINUSE):
         return EEADDRINUSE;
-      case EALREADY:
+      case ERR(EALREADY):
         return EEALREADY;
-      case ECONNREFUSED:
+      case ERR(ECONNREFUSED):
         return EECONNREFUSED;
-      case EINPROGRESS:
+      case ERR(EWOULDBLOCK):
+      case ERR(EINPROGRESS):
         break;
       default:
-        debug(sockets, "socket_connect: lpc socket %d (real fd %d) connect error: %s.\n", fd,
-              lpc_socks[fd].fd,
-              evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
+        debug(sockets, "socket_connect: lpc socket %d (real fd %lld) connect error: %s.\n",
+              fd, lpc_socks[fd].fd, evutil_socket_error_to_string(e));
         return EECONNECT;
     }
   }
@@ -697,7 +703,7 @@ int socket_connect(int fd, const char *name, svalue_t *read_callback, svalue_t *
   lpc_socks[fd].state = STATE_DATA_XFER;
   lpc_socks[fd].flags |= S_BLOCKED;
 
-  debug(sockets, "socket_connect: lpc socket %d (real fd %d) connected.\n", fd, lpc_socks[fd].fd);
+  debug(sockets, "socket_connect: lpc socket %d (real fd %lld) connected.\n", fd, lpc_socks[fd].fd);
 
   event_add(lpc_socks[fd].ev_read, nullptr);
   event_add(lpc_socks[fd].ev_write, nullptr);
@@ -884,19 +890,22 @@ int socket_write(int fd, svalue_t *message, const char *name) {
   debug(sockets, "socket_write: message size %d.\n", len);
   off = send(lpc_socks[fd].fd, buf, len, 0);
   if (off <= 0) {
+    auto e = evutil_socket_geterror(lpc_socks[fd].fd);
     FREE(buf);
-    if (off == -1 && errno == EWOULDBLOCK) {
-      debug(sockets, "socket_write: write would block.\n");
-      return EEWOULDBLOCK;
+    if (off == -1) {
+      switch (e) {
+        case ERR(EWOULDBLOCK): {
+          debug(sockets, "socket_write: write would block.\n");
+          return EEWOULDBLOCK;
+        }
+        case ERR(EINTR): {
+          debug(sockets, "socket_write: write interrupted.\n");
+          return EEINTR;
+        }
+      }
     }
-    if (off == -1 && errno == EINTR) {
-      debug(sockets, "socket_write: write interrupted.\n");
-      return EEINTR;
-    }
-
-    debug(sockets, "socket_write: lpc socket %d (real fd %d) send error: %s.\n", fd,
-          lpc_socks[fd].fd,
-          evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
+    debug(sockets, "socket_write: lpc socket %d (real fd %lld) send error: %s.\n",
+          fd, lpc_socks[fd].fd, evutil_socket_error_to_string(e));
     lpc_socks[fd].flags |= S_LINKDEAD;
     socket_close(fd, SC_FORCE | SC_DO_CALLBACK | SC_FINAL_CLOSE);
     return EESEND;
@@ -1169,8 +1178,9 @@ void socket_read_select_handler(int fd) {
       break;
   }
   if (cc == -1) {
-    switch (errno) {
-      case ECONNREFUSED:
+    auto e = evutil_socket_geterror(lpc_socks[fd].fd);
+    switch (e) {
+      case ERR(ECONNREFUSED):
         /* Evidentally, on Linux 1.2.1, ECONNREFUSED gets returned
          * if an ICMP_PORT_UNREACHED error happens internally.  Why
          * they use this error message, I have no idea, but this seems
@@ -1180,11 +1190,9 @@ void socket_read_select_handler(int fd) {
           return;
         }
         break;
-      case EINTR:
-#ifdef EWOULDBLOCK
-      case EWOULDBLOCK:
+      case ERR(EINTR):
+      case ERR(EWOULDBLOCK):
         return;
-#endif
       default:
         break;
     }
@@ -1200,7 +1208,7 @@ void socket_read_select_handler(int fd) {
 void socket_write_select_handler(int fd) {
   int cc;
 
-  debug(sockets, "write_socket_handler: lpc socket %d (real fd %d) state %d\n", fd,
+  debug(sockets, "write_socket_handler: lpc socket %d (real fd %lld) state %d\n", fd,
         lpc_socks[fd].fd, lpc_socks[fd].state);
 
   /* if the socket isn't blocked, we've got nothing to send */
@@ -1212,15 +1220,15 @@ void socket_write_select_handler(int fd) {
   if (lpc_socks[fd].w_buf != nullptr) {
     cc = send(lpc_socks[fd].fd, lpc_socks[fd].w_buf + lpc_socks[fd].w_off, lpc_socks[fd].w_len, 0);
     if (cc < 0) {
-      if (cc == -1 && (errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR)) {
+      int e = evutil_socket_geterror(lpc_socks[fd].fd);
+      if (cc == -1 && (e == ERR(EWOULDBLOCK) || e == EAGAIN /* linux only */ || e == ERR(EINTR))) {
         event_add(lpc_socks[fd].ev_write, nullptr);
         return;
       }
       debug(sockets,
-            "write_socket_handler: lpc_socket %d (real fd %d) write failed: "
+            "write_socket_handler: lpc_socket %d (real fd %lld) write failed: "
             "%s, connection dead.\n",
-            fd, lpc_socks[fd].fd,
-            evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
+            fd, lpc_socks[fd].fd, evutil_socket_error_to_string(e));
       lpc_socks[fd].flags |= S_LINKDEAD;
       if (lpc_socks[fd].state == STATE_FLUSHING) {
         lpc_socks[fd].flags &= ~S_BLOCKED;
@@ -1308,10 +1316,7 @@ int socket_close(int fd, int flags) {
     delete lpc_socks[fd].ev_data;
     lpc_socks[fd].ev_data = nullptr;
   }
-
-  while (evutil_closesocket(lpc_socks[fd].fd) == -1 && errno == EINTR) {
-    ; /* empty while */
-  }
+  evutil_closesocket(lpc_socks[fd].fd);
   if (lpc_socks[fd].r_buf != nullptr) {
     FREE(lpc_socks[fd].r_buf);
   }
@@ -1602,8 +1607,8 @@ void lpc_socks_closeall() {
     if (sock.state == STATE_CLOSED) {
       continue;
     }
-    while (evutil_closesocket(sock.fd) == -1 && errno == EINTR) {
-      ;
+    if(sock.fd != -1) {
+      evutil_closesocket(sock.fd);
     }
   }
 }

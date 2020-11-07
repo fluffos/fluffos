@@ -3,8 +3,11 @@
 #include <cctype>
 #include <string.h>
 #include <unicode/brkiter.h>
+#include <unicode/unistr.h>
+
 #include "thirdparty/utf8_decoder_dfa/decoder.h"
 #include "thirdparty/widecharwidth/widechar_width.h"
+#include "thirdparty/utfcpp/source/utf8.h"
 
 #include "base/internal/log.h"
 #include "base/internal/rc.h"
@@ -30,19 +33,9 @@ bool u8_validate(const uint8_t *s, size_t len) {
   return state == UTF8_ACCEPT;
 }
 
-void u8_sanitize(char *src) {
-  int total = strlen(src);
-  int32_t src_offset = 0;
-  int32_t written = 0;
-  UChar32 c = -1;
-  U8_NEXT(src, src_offset, -1, c);
-  while (c != 0) {
-    UBool isError = FALSE;
-    U8_APPEND((uint8_t *)src, written, total, c > 0 ? c : 0xfffd, isError);
-    if (isError == TRUE) break;
-
-    U8_NEXT((uint8_t *)src, src_offset, -1, c);
-  }
+std::string u8_sanitize(char *src) {
+  std::string source(src);
+  return utf8::replace_invalid(source);
 }
 
 bool u8_egc_count(const char *src, size_t *count) {
