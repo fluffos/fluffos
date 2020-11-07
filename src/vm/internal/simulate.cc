@@ -9,8 +9,12 @@
 #include <unistd.h>    // for open()
 #ifdef HAVE_SIGNAL_H
 #include <signal.h>  // for signal*
-#include <base/internal/tracing.h>
 #endif
+#ifdef _WIN32
+#include <winsock.h> // for WSACleanup()
+#endif
+
+#include "base/internal/tracing.h"
 
 #include "applies_table.autogen.h"
 #include "backend.h"      // for clear_tick_events , FIXME
@@ -47,7 +51,6 @@ void db_cleanup(void);  // FIXME
 #include "comm.h"  // FIXME
 
 #include "vm/internal/trace.h"  // for dump_trace && get_svalue_trace
-
 /*
  * This one is called from HUP.
  */
@@ -89,6 +92,10 @@ void shutdownMudOS(int exit_code) {
   monitor(0, 0, 0, 0, 0); /* cause gmon.out to be written */
 #endif
   Tracer::collect();
+
+#ifdef _WIN32
+  WSACleanup();
+#endif
 
   exit(exit_code);
 }
