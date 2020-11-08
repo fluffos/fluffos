@@ -63,12 +63,12 @@ void new_lpc_socket_event_listener(int idx, lpc_socket_t *sock, evutil_socket_t 
 }
 
 /* flags for socket_close */
-#define SC_FORCE 1
-#define SC_DO_CALLBACK 2
-#define SC_FINAL_CLOSE 4
+#define SC_FORCE 1u
+#define SC_DO_CALLBACK 2u
+#define SC_FINAL_CLOSE 4u
 
 #ifdef PACKAGE_SOCKETS
-static char *old_sockaddr_to_string(struct sockaddr * /*addr*/, ev_socklen_t /*len*/);
+static char *sockaddr_to_lpcaddr(struct sockaddr *addr /*addr*/, ev_socklen_t /*len*/len);
 #endif
 
 const char *error_strings[ERROR_STRINGS] = {"Problem creating socket",
@@ -140,7 +140,7 @@ static bool lpcaddr_to_sockaddr(const char *name, struct sockaddr *addr, ev_sock
 
   int ret;
   if ((ret = evutil_getaddrinfo(host, service, &hints, &res))) {
-    debug(sockets, "lpcaddr_to_sockaddr: getaddrinfo error: %s", evutil_gai_strerror(ret));
+    debug(sockets, "lpcaddr_to_sockaddr: getaddrinfo error: %s.\n", evutil_gai_strerror(ret));
     return false;
   }
 
@@ -480,7 +480,7 @@ int socket_bind(int fd, int port, const char *addr) {
         debug(sockets, "socket_bind: address is in use.");
         return EEADDRINUSE;
       default:
-        debug(sockets, "socket_bind: bind error: %s.\n", evutil_socket_error_to_string(e));
+        debug(sockets, "socket_bind: bind error: %d(%s).\n", e, evutil_socket_error_to_string(e));
         return EEBIND;
     }
   }
@@ -531,8 +531,9 @@ int socket_listen(int fd, svalue_t *callback) {
   }
 
   if (listen(lpc_socks[fd].fd, 5) == -1) {
-    debug(sockets, "socket_listen: listen error: %s.\n",
-          evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
+    auto e = evutil_socket_geterror(lpc_socks[fd].fd);
+    debug(sockets, "socket_listen: %d (real fd %lld) listen error: %d (%s).\n",
+          fd, lpc_socks[fd].fd, e, evutil_socket_error_to_string(e));
     return EELISTEN;
   }
   lpc_socks[fd].state = STATE_LISTEN;
@@ -700,10 +701,20 @@ int socket_connect(int fd, const char *name, svalue_t *read_callback, svalue_t *
     }
   }
 
+  // fill-in socket information.
+  if (lpc_socks[fd].l_addrlen == 0) {
+    lpc_socks[fd].l_addrlen = sizeof(lpc_socks[fd].l_addr);
+    if (getsockname(lpc_socks[fd].fd, reinterpret_cast<struct sockaddr *>(&lpc_socks[fd].l_addr),
+                    &lpc_socks[fd].l_addrlen) == -1) {
+      auto e = evutil_socket_geterror(lpc_socks[fd].fd);
+      debug(sockets, "socket_connect: getsockname error: %s.\n", evutil_socket_error_to_string(e));
+    }
+  }
+
   lpc_socks[fd].state = STATE_DATA_XFER;
   lpc_socks[fd].flags |= S_BLOCKED;
 
-  debug(sockets, "socket_connect: lpc socket %d (real fd %lld) connected.\n", fd, lpc_socks[fd].fd);
+  debug(sockets, "socket_connect: lpc socket %d (real fd %lld) connecting.\n", fd, lpc_socks[fd].fd);
 
   event_add(lpc_socks[fd].ev_read, nullptr);
   event_add(lpc_socks[fd].ev_write, nullptr);
@@ -1037,8 +1048,8 @@ void socket_read_select_handler(int fd) {
               push_number(0);
             }
           } else {
-            u8_sanitize(buf);
-            copy_and_push_string(buf);
+            auto res = u8_sanitize(buf);
+            copy_and_push_string(res.c_str());
           }
           copy_and_push_string(addr);
           debug(sockets, ("read_socket_handler: apply\n"));
@@ -1166,8 +1177,8 @@ void socket_read_select_handler(int fd) {
               push_number(0);
             }
           } else {
-            u8_sanitize(buf);
-            copy_and_push_string(buf);
+            auto res = u8_sanitize(buf);
+            copy_and_push_string(res.c_str());
           }
           debug(sockets, ("read_socket_handler: apply read callback\n"));
           call_callback(fd, S_READ_FP, 2);
@@ -1217,10 +1228,41 @@ void socket_write_select_handler(int fd) {
     return;
   }
 
+  if (lpc_socks[fd].flags & S_BLOCKED) {
+    int optval = 0;
+    ev_socklen_t optlen = sizeof(optval);
+    auto e = getsockopt(lpc_socks[fd].fd, SOL_SOCKET, SO_ERROR,
+#ifndef _WIN32
+                        (void*) &optval,
+#else
+                        (char*) &optval,
+#endif
+                        &optlen);
+    if (e == -1) {
+      debug(sockets,
+            "write_socket_handler: getsockopt failure: %s.\n", evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
+      return;
+    }
+
+    if (optval) {
+      debug(sockets,
+            "write_socket_handler: getsockopt : %d (%s).\n", optval, evutil_socket_error_to_string(optval));
+
+      if (optval == ERR(EINTR) || optval == ERR(EINPROGRESS) || optval == ERR(EWOULDBLOCK)) {
+        // still connecting
+        return;
+      }
+      lpc_socks[fd].flags |= S_LINKDEAD;
+      socket_close(fd, SC_FORCE | SC_DO_CALLBACK | SC_FINAL_CLOSE);
+      return ;
+    }
+  }
+
+
   if (lpc_socks[fd].w_buf != nullptr) {
     cc = send(lpc_socks[fd].fd, lpc_socks[fd].w_buf + lpc_socks[fd].w_off, lpc_socks[fd].w_len, 0);
     if (cc < 0) {
-      int e = evutil_socket_geterror(lpc_socks[fd].fd);
+      auto e = evutil_socket_geterror(lpc_socks[fd].fd);
       if (cc == -1 && (e == ERR(EWOULDBLOCK) || e == EAGAIN /* linux only */ || e == ERR(EINTR))) {
         event_add(lpc_socks[fd].ev_write, nullptr);
         return;
@@ -1285,7 +1327,7 @@ int socket_close(int fd, int flags) {
   }
 
   if (flags & SC_DO_CALLBACK) {
-    debug(sockets, ("read_socket_handler: apply close callback\n"));
+    debug(sockets, ("socket_close: apply close callback\n"));
     push_number(fd);
     call_callback(fd, S_CLOSE_FP, 1);
   }
@@ -1495,16 +1537,21 @@ void close_referencing_sockets(object_t *ob) {
  * Return the string representation of a sockaddr.
  * NOTE: this special format is exposed to userland and should be preserved.
  */
-static char *old_sockaddr_to_string(struct sockaddr *addr, socklen_t len) {
+static char *sockaddr_to_lpcaddr(struct sockaddr *addr, socklen_t len) {
   static char result[NI_MAXHOST + NI_MAXSERV];
+
+  memset(result, 0, sizeof(result));
+
+  if (!len) {
+    return result;
+  }
 
   char host[NI_MAXHOST], service[NI_MAXSERV];
   int ret = getnameinfo(addr, len, host, sizeof(host), service, sizeof(service),
                         NI_NUMERICHOST | NI_NUMERICSERV);
 
   if (ret) {
-    debug(sockets, "inet_address: %s", evutil_gai_strerror(ret));
-    memset(result, 0, sizeof(result));
+    debug(sockets, "sockaddr_to_string: %s.\n", evutil_gai_strerror(ret));
     return result;
   }
 
@@ -1546,15 +1593,15 @@ array_t *socket_status(int which) {
   ret->item[3].type = T_STRING;
   ret->item[3].subtype = STRING_MALLOC;
   ret->item[3].u.string =
-      string_copy(old_sockaddr_to_string((struct sockaddr *)&lpc_socks[which].l_addr,
-                                         lpc_socks[which].l_addrlen),
+      string_copy(sockaddr_to_lpcaddr((struct sockaddr *) &lpc_socks[which].l_addr,
+                                      lpc_socks[which].l_addrlen),
                   "socket_status");
 
   ret->item[4].type = T_STRING;
   ret->item[4].subtype = STRING_MALLOC;
   ret->item[4].u.string =
-      string_copy(old_sockaddr_to_string((struct sockaddr *)&lpc_socks[which].r_addr,
-                                         lpc_socks[which].r_addrlen),
+      string_copy(sockaddr_to_lpcaddr((struct sockaddr *) &lpc_socks[which].r_addr,
+                                      lpc_socks[which].r_addrlen),
                   "socket_status");
 
   if (!(lpc_socks[which].flags & STATE_FLUSHING) && lpc_socks[which].owner_ob &&
