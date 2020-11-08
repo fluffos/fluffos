@@ -20,7 +20,7 @@ enum socket_state {
   STATE_DATA_XFER
 };
 
-#define BUF_SIZE 2048 /* max reliable packet size        */
+#define BUF_SIZE 8192 /* max reliable packet size        */
 #ifdef IPV6
 #define ADDR_BUF_SIZE INET6_ADDRSTRLEN
 #else
@@ -28,7 +28,7 @@ enum socket_state {
 #endif
 struct lpc_socket_t {
   evutil_socket_t fd;
-  short flags;
+  unsigned short flags;
   enum socket_mode mode;
   enum socket_state state;
   struct sockaddr_storage l_addr;
