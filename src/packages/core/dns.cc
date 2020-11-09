@@ -13,7 +13,12 @@ static struct evdns_base *g_dns_base = nullptr;
 
 void init_dns_event_base(struct event_base *base) {
   // Configure a DNS resolver with default nameserver
-  g_dns_base = evdns_base_new(base, 1);
+  g_dns_base = evdns_base_new(base, EVDNS_BASE_INITIALIZE_NAMESERVERS);
+
+#ifdef _WIN32
+  // Hack: force loading localhost entires
+  evdns_base_load_hosts(g_dns_base, nullptr);
+#endif
 }
 
 static void add_ip_entry(struct sockaddr * /*addr*/, ev_socklen_t size, char * /*name*/);
@@ -88,21 +93,35 @@ void on_query_addr_by_name_finish(addr_number_query *query) {
     push_undefined();
     push_undefined();
   } else {
-    // push the name
-    copy_and_push_string(query->name);
-
-    // push IP address
-    char host[NI_MAXHOST];
-    int ret = getnameinfo(query->res->ai_addr, query->res->ai_addrlen, host, sizeof(host), nullptr,
-                          0, NI_NUMERICHOST);
-    if (!ret) {
-      copy_and_push_string(host);
-    } else {
-      debug(dns, "on_query_addr_by_name_finish: getnameinfo: %s \n", evutil_gai_strerror(ret));
-      push_undefined();
+    auto result = query->res;
+#ifndef IPV6
+    // Skip to first IPv4 result.
+    while(result != nullptr && result->ai_family != AF_INET) {
+      debug(dns, "Skipping IPv6 results %s -> %s \n", query->name, sockaddr_to_string(result->ai_addr, result->ai_addrlen));
+      result = result->ai_next;
     }
-    debug(dns, "DNS lookup success: id %" LPC_INT_FMTSTR_P ": %s -> %s \n", query->key, query->name,
-          host);
+#endif
+    if(result == nullptr) {
+      debug(dns, "%" LPC_INT_FMTSTR_P ": DNS lookup success but no suitable result.\n", query->key);
+      push_undefined();
+      push_undefined();
+    } else {
+      // push the name
+      copy_and_push_string(query->name);
+
+      // push IP address
+      char host[NI_MAXHOST];
+      int ret = getnameinfo(result->ai_addr, result->ai_addrlen, host, sizeof(host), nullptr,
+                            0, NI_NUMERICHOST);
+      if (!ret) {
+        copy_and_push_string(host);
+      } else {
+        debug(dns, "on_query_addr_by_name_finish: getnameinfo: %s \n", evutil_gai_strerror(ret));
+        push_undefined();
+      }
+      debug(dns, "DNS lookup success: id %" LPC_INT_FMTSTR_P ": %s -> %s \n", query->key, query->name,
+            host);
+    }
   }
 
   // push the key
@@ -140,13 +159,8 @@ int query_addr_by_name(const char *name, svalue_t *call_back) {
   static unsigned int key = 0;
 
   struct evutil_addrinfo hints = {0};
-#ifdef IPV6
   hints.ai_family = AF_UNSPEC;
-  hints.ai_flags |= EVUTIL_AI_V4MAPPED;
-#else
-  hints.ai_family = AF_INET;
-  hints.ai_flags = 0;
-#endif
+  hints.ai_flags = EVUTIL_AI_ADDRCONFIG;
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_protocol = 0;
 
