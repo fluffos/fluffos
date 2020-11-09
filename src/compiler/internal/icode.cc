@@ -1162,7 +1162,7 @@ void optimize_icode(char *start, char *pc, char *end) {
           sarg = tmp - pc;
         } else {
 #ifdef DEBUG
-          fprintf(stderr, "Optimization failed; can't || or && backwards.\n");
+          debug_message("Optimization failed; can't || or && backwards.\n");
 #endif
           pc += 2;
           break;

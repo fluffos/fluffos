@@ -24,6 +24,7 @@
 // Defined by simulate.cc, this belongs to driver layer.
 [[noreturn]] extern void fatal(const char *, ...);
 
+void reset_debug_message_fp();
 void debug_message(const char *, ...);
 
 #define SAFE(x) \
@@ -61,26 +62,29 @@ void debug_level_clear(const char *);
   } while (0)
 
 /* bit sets here */
-#define DBG_call_out 1u
-#define DBG_addr_server 2u
-#define DBG_d_flag 4u
-#define DBG_connections 8u
-#define DBG_mapping 16u
-#define DBG_sockets 32u
-#define DBG_comp_func_tab 64u
-#define DBG_LPC 128u
-#define DBG_LPC_line 256u
-#define DBG_event 512u
-#define DBG_dns 1024u
-#define DBG_file 2048u
-#define DBG_add_action 4096u
-#define DBG_telnet 8192u
+#define DBG_all ~0u
+#define DBG_call_out 1u << 0
+#define DBG_addr_server 1u << 1
+#define DBG_d_flag 1u << 2
+#define DBG_connections 1u << 3
+#define DBG_mapping 1u << 4
+#define DBG_sockets 1u << 5
+#define DBG_comp_func_tab 1u << 6
+#define DBG_LPC 1u << 7
+#define DBG_LPC_line 1u << 8
+#define DBG_event 1u << 9
+#define DBG_dns 1u << 10
+#define DBG_file 1u << 11
+#define DBG_add_action 1u << 12
+#define DBG_telnet 1u << 13
+#define DBG_websocket 1u << 14
+// remember to add new entry to levels in log.cc!
 
 #define DBG_DEFAULT (DBG_connections | DBG_telnet)
 
 struct debug_t {
   const char *name;
-  int bit;
+  unsigned int bit;
 };
 
 extern const debug_t levels[];

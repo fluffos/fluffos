@@ -16,11 +16,11 @@
 #include <sstream>
 #include <stdlib.h>  // for exit
 #include <string>
-#include <iomanip>
 
 #include "base/internal/external_port.h"
 #include "base/internal/stralloc.h"
 #include "base/internal/strutils.h"
+#include "log.h"
 
 char *config_str[NUM_CONFIG_STRS];
 int config_int[NUM_CONFIG_INTS];
@@ -39,7 +39,7 @@ struct flagEntry {
   int maxValue = INT_MAX;
 };
 
-const flagEntry kDefaultFlags[] = {
+const flagEntry intFlags[] = {
     {"time to clean up", __TIME_TO_CLEAN_UP__, 600},
     {"time to reset", __TIME_TO_RESET__, 900},
     {"time to swap", __TIME_TO_SWAP__, 300},
@@ -115,8 +115,8 @@ void config_init() {
   }
 
   // populate default value for int flags.
-  for (const auto &kDefaultFlag : kDefaultFlags) {
-    CONFIG_INT(kDefaultFlag.pos) = kDefaultFlag.defaultValue;
+  for (const auto &flag : intFlags) {
+    CONFIG_INT(flag.pos) = flag.defaultValue;
   }
 }
 
@@ -160,8 +160,8 @@ bool scan_config_line(const char *fmt, void *dest, int required) {
     switch (required) {
       case kWarnFound:
         // obsolete
-        fprintf(stderr, "*Warning: obsolete line in config file, please delete:\n\t%s\n",
-                line.c_str());
+        debug_message("*Warning: obsolete line in config file, please delete:\n\t%s\n",
+                      line.c_str());
         return false;
     }
     return true;
@@ -169,14 +169,14 @@ bool scan_config_line(const char *fmt, void *dest, int required) {
     switch (required) {
       case kWarnMissing:
         // optional but warn
-        fprintf(stderr, "*Warning: Missing line in config file:\n\t%s\n", line.c_str());
+        debug_message("*Warning: Missing line in config file:\n\t%s\n", line.c_str());
         return false;
       case kOptional:
         // optional
         return false;
       case kMustHave:
         // required
-        fprintf(stderr, "*Error in config file.  Missing line:\n\t%s\n", line.c_str());
+        debug_message("*Error in config file.  Missing line:\n\t%s\n", line.c_str());
         exit(-1);
     }
   }
@@ -188,7 +188,7 @@ bool scan_config_line(const char *fmt, void *dest, int required) {
 void read_config(char *filename) {
   config_init();
 
-  fprintf(stdout, "Processing config file: %s\n", filename);
+  debug_message("Processing config file: %s\n", filename);
 
   std::ifstream f(filename);
   if (!f.is_open()) {
@@ -202,11 +202,18 @@ void read_config(char *filename) {
   char tmp[kMaxConfigLineLength];
   while (buffer.getline(&tmp[0], sizeof(tmp), '\n')) {
     if (strlen(tmp) == kMaxConfigLineLength - 1) {
-      fprintf(stderr, "*Warning: possible truncated config line: %s", tmp);
+      debug_message("*Warning: possible truncated config line: %s\n", tmp);
     }
-    std::string v = std::string(tmp);
-    trim(v);
-    if (v.length() == 0) {
+
+    std::string v(tmp);
+
+    // ignore anything after # in the line.
+    auto pos = v.find_first_of('#');
+    if (pos != std::string::npos) {
+      v.erase(pos);
+    }
+    v = trim(v);
+    if (v.empty()) {
       continue;
     }
     config_lines.push_back(v + "\n");
@@ -219,9 +226,7 @@ void read_config(char *filename) {
     /* check if the global include file is quoted */
     std::string v(tmp);
     if (!starts_with(v, "\"") && !starts_with(v, "<")) {
-      fprintf(stderr,
-              "Missing '\"' or '<' around global include file name; adding "
-              "quotes.\n");
+      debug_message("Missing '\"' or '<' around global include file name; adding quotes.\n");
       // not very efficient, but who cares.
       CONFIG_STR(__GLOBAL_INCLUDE_FILE__) =
           alloc_cstring(("\"" + v + "\"").c_str(), "config file: gif");
@@ -281,11 +286,11 @@ void read_config(char *filename) {
     if (port_start == 1) {
       if (scan_config_line("external_port_1 : %[^\n]", tmp, 0)) {
         int port = CONFIG_INT(__MUD_PORT__);
-        fprintf(stderr,
-                "Warning: external_port_1 already defined to be 'telnet %i' by "
-                "the line\n    'port number : %i'; ignoring the line "
-                "'external_port_1 : %s'\n",
-                port, port, tmp);
+        debug_message(
+            "Warning: external_port_1 already defined to be 'telnet %i' by "
+            "the line\n    'port number : %i'; ignoring the line "
+            "'external_port_1 : %s'\n",
+            port, port, tmp);
       }
     }
     for (i = port_start; i < 5; i++) {
@@ -310,11 +315,11 @@ void read_config(char *filename) {
             scan_config_line("websocket http dir : %[^\n]", tmp, kMustHave);
             CONFIG_STR(__RC_WEBSOCKET_HTTP_DIR__) = alloc_cstring(tmp, "config file: whd");
           } else {
-            fprintf(stderr, "Unknown kind of external port: %s\n", kind);
+            debug_message("Unknown kind of external port: %s\n", kind);
             exit(-1);
           }
         } else {
-          fprintf(stderr, "Syntax error in port specification\n");
+          debug_message("Syntax error in port specification\n");
           exit(-1);
         }
       }
@@ -352,34 +357,34 @@ void read_config(char *filename) {
     }
   }
 
-  std::cout << "==== Runtime Config Table ====" << std::endl;
-
   // process int flags
-  for (const auto &kDefaultFlag : kDefaultFlags) {
-    std::cout << kDefaultFlag.key << ": " << kDefaultFlag.defaultValue;
-
+  for (const auto &flag : intFlags) {
     int value = 0;
     char buf[256];
-    sprintf(buf, "%s : %%d\n", kDefaultFlag.key.c_str());
+    sprintf(buf, "%s : %%d\n", flag.key.c_str());
 
     if (scan_config_line(buf, &value, kOptional)) {
-      if (value != kDefaultFlag.defaultValue) {
-        if (value < kDefaultFlag.minValue) {
-          std::cout << " (invalid new value: " << value << ")";
-          value = kDefaultFlag.defaultValue;
-        } else if (value > kDefaultFlag.maxValue) {
-          std::cout << " (invalid new value: " << value << ")";
-          value = kDefaultFlag.maxValue;
+      if (value != flag.defaultValue) {
+        if (value < flag.minValue || value > flag.maxValue) {
+          debug_message("%s: invalid new value, resetting to default.\n", flag.key.c_str());
+          value = flag.defaultValue;
         }
-        CONFIG_INT(kDefaultFlag.pos) = value;
-        std::cout << " (new: " << value << ")";
+        CONFIG_INT(flag.pos) = value;
       }
     }
-    std::cout << std::endl;
   }
-  std::cout << "==============================" << std::endl;
-
   // TODO: get rid of config_lines all together.
   config_lines.clear();
   config_lines.shrink_to_fit();
+}
+
+void print_rc_table() {
+  for (const auto &flag : intFlags) {
+    auto val = CONFIG_INT(flag.pos);
+    if (val != flag.defaultValue) {
+      debug_message("%s : %d # default: %d\n", flag.key.c_str(), val, flag.defaultValue);
+    } else {
+      debug_message("%s : %d\n", flag.key.c_str(), val);
+    }
+  }
 }

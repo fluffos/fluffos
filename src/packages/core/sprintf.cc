@@ -1048,7 +1048,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
 #ifdef DEBUG
         } else if ((finfo & INFO_T) == INFO_T_NULL) {
           /* never reached... */
-          fprintf(stderr, "/%s: (s)printf: INFO_T_NULL.... found.\n", current_object->obname);
+          debug_message("/%s: (s)printf: INFO_T_NULL.... found.\n", current_object->obname);
           ADD_CHAR('%');
 #endif
         } else if ((finfo & INFO_T) == INFO_T_STRING) {
@@ -1299,8 +1299,8 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
                     "ERROR: (s)printf(): Incorrect argument type to %%%c. "
                     "(arg: %u)\n",
                     cheat[i - 1], sprintf_state->cur_arg);
-            fprintf(stderr, "Program /%s File: %s: %s", current_prog->name,
-                    get_line_number_if_any(), buff);
+            debug_message("Program /%s File: %s: %s", current_prog->name, get_line_number_if_any(),
+                          buff);
             debug_message("%s", buff);
             if (current_object) {
               debug_message("program: /%s, object: %s, file: %s\n",

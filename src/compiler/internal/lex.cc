@@ -4098,9 +4098,10 @@ void set_inc_list(char *list) {
   char *p;
 
   if (list == nullptr) {
-    fprintf(stderr, "The config string 'include dirs' must bet set.\n");
-    fprintf(stderr, "It should contain a list of all directories to be searched\n");
-    fprintf(stderr, "for include files, separated by a ':'.\n");
+    debug_message(
+        "The config string 'include dirs' must bet set, \n"
+        "It should contain a list of all directories to be searched, \n"
+        "for include files, separated by a ':'.\n");
     exit(-1);
   }
   size = 1;
@@ -4123,7 +4124,7 @@ void set_inc_list(char *list) {
       p++;
     } else {
       if (i) {
-        fprintf(stderr, "Fatal error in set_inc_list: bad state.\n");
+        debug_message("Fatal error in set_inc_list: bad state.\n");
         exit(1);
       }
       p = list;
@@ -4135,7 +4136,7 @@ void set_inc_list(char *list) {
      * Even make sure that the mud administrator has not made an error.
      */
     if (!legal_path(p)) {
-      fprintf(stderr, "'include dirs' must give paths without any '..'\n");
+      debug_message("'include dirs' must give paths without any '..'\n");
       exit(-1);
     }
     inc_list[i] = make_shared_string(p);
