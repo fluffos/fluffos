@@ -96,12 +96,13 @@ void on_query_addr_by_name_finish(addr_number_query *query) {
     auto result = query->res;
 #ifndef IPV6
     // Skip to first IPv4 result.
-    while(result != nullptr && result->ai_family != AF_INET) {
-      debug(dns, "Skipping IPv6 results %s -> %s \n", query->name, sockaddr_to_string(result->ai_addr, result->ai_addrlen));
+    while (result != nullptr && result->ai_family != AF_INET) {
+      debug(dns, "Skipping IPv6 results %s -> %s \n", query->name,
+            sockaddr_to_string(result->ai_addr, result->ai_addrlen));
       result = result->ai_next;
     }
 #endif
-    if(result == nullptr) {
+    if (result == nullptr) {
       debug(dns, "%" LPC_INT_FMTSTR_P ": DNS lookup success but no suitable result.\n", query->key);
       push_undefined();
       push_undefined();
@@ -111,16 +112,16 @@ void on_query_addr_by_name_finish(addr_number_query *query) {
 
       // push IP address
       char host[NI_MAXHOST];
-      int ret = getnameinfo(result->ai_addr, result->ai_addrlen, host, sizeof(host), nullptr,
-                            0, NI_NUMERICHOST);
+      int ret = getnameinfo(result->ai_addr, result->ai_addrlen, host, sizeof(host), nullptr, 0,
+                            NI_NUMERICHOST);
       if (!ret) {
         copy_and_push_string(host);
       } else {
         debug(dns, "on_query_addr_by_name_finish: getnameinfo: %s \n", evutil_gai_strerror(ret));
         push_undefined();
       }
-      debug(dns, "DNS lookup success: id %" LPC_INT_FMTSTR_P ": %s -> %s \n", query->key, query->name,
-            host);
+      debug(dns, "DNS lookup success: id %" LPC_INT_FMTSTR_P ": %s -> %s \n", query->key,
+            query->name, host);
     }
   }
 

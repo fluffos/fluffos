@@ -1126,7 +1126,7 @@ static int Postgres_execute(dbconn_t *c, const char *s) {
     return 0;
   }
 
-  fprintf(stderr, "FT: Query failed: \"%s\"\n", PQresultErrorMessage(c->postgres.res));
+  debug_message("FT: Query failed: \"%s\"\n", PQresultErrorMessage(c->postgres.res));
   return -1;
 }
 

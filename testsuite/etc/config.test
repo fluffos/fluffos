@@ -19,7 +19,7 @@ websocket http dir : ../src/www
 mud ip : 0.0.0.0
 
 # absolute pathname of mudlib
-mudlib directory : ./
+mudlib directory : ./ # test #
 
 # debug.log and author/domain stats are stored here
 log directory : /log

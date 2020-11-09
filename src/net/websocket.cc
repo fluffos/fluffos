@@ -47,18 +47,19 @@ static struct lws_http_mount mount = {
     /* .basic_auth_login_file */ nullptr,
 };
 
+void lws_log(int severity, const char *msg) { debug(websocket, "lws:%d:%s", severity, msg); }
+
 struct lws_context *init_websocket_context(event_base *base, port_def_t *port) {
+  int logs = LLL_USER | LLL_WARN | LLL_ERR;
+
 #ifdef DEBUG
-  int logs = LLL_USER | LLL_ERR;
   logs |= LLL_WARN | LLL_NOTICE | LLL_INFO;
-
   // More debug levels
-
   /* | LLL_INFO */ /* | LLL_PARSER */ /* | LLL_HEADER */
   /* | LLL_EXT */ /* | LLL_CLIENT */  /* | LLL_LATENCY */
   /* | LLL_DEBUG */;
-  lws_set_log_level(logs, nullptr);
 #endif
+  lws_set_log_level(logs, lws_log);
 
   struct lws_context_creation_info info = {0};
   void *foreign_loops[1] = {base};

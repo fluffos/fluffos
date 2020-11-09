@@ -37,11 +37,11 @@ void check_all_blocks(int);
 #define NODET_TO_PTR(x, y) ((y)(x + 1))
 #define PTR_TO_NODET(x) ((md_node_t *)(x)-1)
 
-#define DO_MARK(ptr, kind)                                                                      \
-  if (PTR_TO_NODET(ptr)->tag != kind)                                                           \
-    fprintf(stderr, "Expected node of type %04x: got %s %04x\n", kind, PTR_TO_NODET(ptr)->desc, \
-            PTR_TO_NODET(ptr)->tag);                                                            \
-  else                                                                                          \
+#define DO_MARK(ptr, kind)                                                                    \
+  if (PTR_TO_NODET(ptr)->tag != kind)                                                         \
+    debug_message("Expected node of type %04x: got %s %04x\n", kind, PTR_TO_NODET(ptr)->desc, \
+                  PTR_TO_NODET(ptr)->tag);                                                    \
+  else                                                                                        \
     PTR_TO_NODET(ptr)->tag |= TAG_MARKED
 
 #ifdef DEBUGMALLOC_EXTENSIONS

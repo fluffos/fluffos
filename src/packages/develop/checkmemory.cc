@@ -359,14 +359,14 @@ void compute_string_totals(int *asp, int *abp, int *bp) {
 
 static void dump_stralloc() {
   md_node_t *entry;
-  fprintf(stderr, "===STRALLOC DUMP: allocd_strings: %i \n", allocd_strings);
+  debug_message("===STRALLOC DUMP: allocd_strings: %i \n", allocd_strings);
 
   for (int hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
     for (entry = table[hsh]; entry; entry = entry->next) {
       if (entry->tag == TAG_MALLOC_STRING || entry->tag == TAG_SHARED_STRING) {
-        fprintf(stderr, "%-20s: sz %7d: id %6d: tag %08x, a %8p, \"%.20s\"\n", entry->desc,
-                entry->size, entry->id, entry->tag, PTR(entry),
-                STRING(NODET_TO_PTR(entry, block_t *)));
+        debug_message("%-20s: sz %7d: id %6d: tag %08x, a %8p, \"%.20s\"\n", entry->desc,
+                      entry->size, entry->id, entry->tag, PTR(entry),
+                      STRING(NODET_TO_PTR(entry, block_t *)));
       }
     }
   }

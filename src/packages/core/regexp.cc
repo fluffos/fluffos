@@ -1219,11 +1219,6 @@ void regdump(regexp *r) {
   char op = EXACTLY; /* Arbitrary non-END op. */
   char *nxt;
 
-#ifdef _AIX
-  extern char *strchr();
-
-#endif /* _AIX */
-
   s = r->program + 1;
   while (op != END) { /* While that wasn't END last time... */
     op = OP(s);

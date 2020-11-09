@@ -57,7 +57,7 @@ void init_master(const char *master_file) {
 
   new_ob = load_object(buf, 1);
   if (new_ob == nullptr) {
-    fprintf(stderr, "The master file %s was not loaded.\n", master_file);
+    debug_message("The master file %s was not loaded.\n", master_file);
     exit(-1);
   }
   set_master(new_ob);
