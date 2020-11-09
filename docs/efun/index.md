@@ -994,6 +994,9 @@ title: EFUN
 </div>
 <div class='row'>
 <div class='col-sm-3'>
+<div><a href='pcre/pcre_match_all.html'>pcre_match_all</a></div>
+</div>
+<div class='col-sm-3'>
 <div><a href='pcre/pcre_replace.html'>pcre_replace</a></div>
 </div>
 <div class='col-sm-3'>
@@ -1002,7 +1005,6 @@ title: EFUN
 <div class='col-sm-3'>
 <div><a href='pcre/pcre_version.html'>pcre_version</a></div>
 </div>
-<div>&nbsp;</div>
 </div>
 </div>
 
@@ -1233,6 +1235,6 @@ title: EFUN
 
 
 
-This page is auto generated on 2020-11-06 19:38:46 PST for [bee55f88](https://github.com/fluffos/fluffos/tree/bee55f88).
+This page is auto generated on 2020-11-09 01:08:19 PST for [a87ebd6b](https://github.com/fluffos/fluffos/tree/a87ebd6b).
 
 

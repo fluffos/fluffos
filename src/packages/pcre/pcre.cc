@@ -61,6 +61,7 @@
 // match_all ? see previous
 // store reg->error & reg->erroffset before error(..)
 
+#include <thirdparty/scope_guard/scope_guard.hpp>
 #include "base/package_api.h"
 
 #include "pcre.h"
@@ -157,10 +158,8 @@ void f_pcre_extract(void) {
   run->ovecsize = 0;
 
   if (pcre_magic(run) < 0) {
-    error("PCRE compilation failed at offset %d: %s\n", run->erroffset, run->error);
-    pop_2_elems();
     pcre_free_memory(run);
-    return;
+    error("PCRE compilation failed at offset %d: %s\n", run->erroffset, run->error);
   }
 
   /* Pop the 2 arguments from the stack */
@@ -171,19 +170,15 @@ void f_pcre_extract(void) {
     push_refed_array(&the_null_array);
     return;
   } else if (run->rc > (run->ovecsize / 3 - 1)) {
-    pop_2_elems();
     pcre_free_memory(run);
     error("Too many substrings.\n");
-    return;
   }
 
   ret = pcre_get_substrings(run);
   pop_2_elems();
 
   push_refed_array(ret);
-
   pcre_free_memory(run);
-  return;
 }
 
 void f_pcre_replace(void) {
@@ -382,6 +377,71 @@ static int pcre_magic(pcre_t *p) {
 
 static int pcre_query_match(pcre_t *p) { return p->rc < 0 ? 0 : 1; }
 
+auto pcre_match_all(const char *subject, size_t subject_len, const char *pattern) {
+  pcre_t *run;
+  int ret;
+
+  run = (pcre_t *)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "pcre_match_single : run");
+  run->ovector = nullptr;
+  run->ovecsize = 0;
+  run->pattern = pattern;
+  run->subject = subject;
+  run->s_length = subject_len;
+
+  DEFER { pcre_free_memory(run); };
+
+  run->re = pcre_get_cached_pattern(&pcre_cache, run->pattern);
+
+  if (run->re == nullptr) {
+    pcre_local_compile(run);
+    pcre_cache_pattern(&pcre_cache, run->re, run->pattern);
+  }
+
+  if (run->re == nullptr) {
+    error("PCRE compilation failed at offset %d: %s\n", run->erroffset, run->error);
+  }
+
+  {
+    int size = 0;
+    pcre_fullinfo(run->re, nullptr, PCRE_INFO_CAPTURECOUNT, &size);
+    size += 2;
+    size *= 3;
+    if (run->ovector) {
+      FREE(run->ovector);
+    }
+    run->ovector = (int *)DCALLOC(size + 1, sizeof(int), TAG_TEMPORARY,
+                                  "pcre_local_exec");  // too much, but who cares
+    run->ovecsize = size;
+  }
+
+  std::vector<std::vector<svalue_t>> matches;
+
+  int rc = 0;
+  int offset = 0;
+  while (offset < run->s_length && (rc = pcre_exec(run->re, nullptr, run->subject, run->s_length,
+                                                   offset, 0, run->ovector, run->ovecsize)) >= 0) {
+    std::vector<svalue_t> match;
+    for (int i = 0; i < rc; ++i) {
+      unsigned int start, length;
+      length = run->ovector[2 * i + 1] - run->ovector[2 * i];
+      start = run->ovector[2 * i];
+
+      char *match_str = new_string(length, "pcre get substrings");
+      snprintf(match_str, length + 1, "%.*s", length, run->subject + start);
+      svalue_t item = {
+          .type = T_STRING,
+          .subtype = STRING_MALLOC,
+          .u = { .string = match_str },
+      };
+      match.push_back(item);
+    }
+    matches.push_back(match);
+    offset = run->ovector[1];
+  }
+
+  return matches;
+}
+
 static int pcre_match_single(svalue_t *str, const char *pattern) {
   pcre_t *run;
   int ret;
@@ -394,9 +454,8 @@ static int pcre_match_single(svalue_t *str, const char *pattern) {
   run->s_length = SVALUE_STRLEN(str);
 
   if (pcre_magic(run) < 0) {
-    error("PCRE compilation failed at offset %d: %s\n", run->erroffset, run->error);
     pcre_free_memory(run);
-    return 0;
+    error("PCRE compilation failed at offset %d: %s\n", run->erroffset, run->error);
   }
 
   ret = pcre_query_match(run);
@@ -927,3 +986,28 @@ void mark_pcre_cache() {
   }
 }
 #endif
+
+void f_pcre_match_all(void) {
+  array_t *v;
+
+  auto pattern = (sp)->u.string;
+  auto subject = (sp - 1)->u.string;
+  auto subject_len = SVALUE_STRLEN(sp - 1);
+
+  auto matches = pcre_match_all(subject, subject_len, pattern);
+
+  pop_2_elems();
+
+  v = allocate_array(matches.size());
+  for (int i = 0; i < matches.size(); i++) {
+    auto &match = matches[i];
+    auto match_array = allocate_array(match.size());
+    v->item[i].type = T_ARRAY;
+    v->item[i].u.arr = match_array;
+    for (int j = 0; j < match.size(); j++) {
+      match_array->item[j] = match[j];
+    }
+  }
+
+  push_refed_array(v);
+}
