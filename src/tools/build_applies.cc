@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
 
   while (fgets(buf, sizeof(buf), f)) {
     buf[strlen(buf) - 1] = 0;
-    if(buf[strlen(buf) - 1] == '\r') {
+    if (buf[strlen(buf) - 1] == '\r') {
       buf[strlen(buf) - 1] = 0;
     }
     if (buf[0] == '#') {
@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
       p = buf;
       while (*p) {
         *p = tolower(*p);
-        if(*p == '\r') {
+        if (*p == '\r') {
           *p = 0;
           break;
         }
@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
   }
   while (fgets(buf, sizeof(buf), f)) {
     buf[strlen(buf) - 1] = 0;
-    if(buf[strlen(buf) - 1] == '\r') {
+    if (buf[strlen(buf) - 1] == '\r') {
       buf[strlen(buf) - 1] = 0;
     }
     if ((colon = strchr(buf, ':'))) {
@@ -86,7 +86,7 @@ int main(int argc, char **argv) {
       p = buf;
       while (*p) {
         *p = tolower(*p);
-        if(*p == '\r') {
+        if (*p == '\r') {
           *p = 0;
           break;
         }

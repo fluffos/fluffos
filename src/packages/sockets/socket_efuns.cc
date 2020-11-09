@@ -68,7 +68,7 @@ void new_lpc_socket_event_listener(int idx, lpc_socket_t *sock, evutil_socket_t 
 #define SC_FINAL_CLOSE 4u
 
 #ifdef PACKAGE_SOCKETS
-static char *sockaddr_to_lpcaddr(struct sockaddr *addr /*addr*/, ev_socklen_t /*len*/len);
+static char *sockaddr_to_lpcaddr(struct sockaddr *addr /*addr*/, ev_socklen_t /*len*/ len);
 #endif
 
 const char *error_strings[ERROR_STRINGS] = {"Problem creating socket",
@@ -532,8 +532,8 @@ int socket_listen(int fd, svalue_t *callback) {
 
   if (listen(lpc_socks[fd].fd, 5) == -1) {
     auto e = evutil_socket_geterror(lpc_socks[fd].fd);
-    debug(sockets, "socket_listen: %d (real fd %lld) listen error: %d (%s).\n",
-          fd, lpc_socks[fd].fd, e, evutil_socket_error_to_string(e));
+    debug(sockets, "socket_listen: %d (real fd %lld) listen error: %d (%s).\n", fd,
+          lpc_socks[fd].fd, e, evutil_socket_error_to_string(e));
     return EELISTEN;
   }
   lpc_socks[fd].state = STATE_LISTEN;
@@ -695,8 +695,8 @@ int socket_connect(int fd, const char *name, svalue_t *read_callback, svalue_t *
       case ERR(EINPROGRESS):
         break;
       default:
-        debug(sockets, "socket_connect: lpc socket %d (real fd %lld) connect error: %s.\n",
-              fd, lpc_socks[fd].fd, evutil_socket_error_to_string(e));
+        debug(sockets, "socket_connect: lpc socket %d (real fd %lld) connect error: %s.\n", fd,
+              lpc_socks[fd].fd, evutil_socket_error_to_string(e));
         return EECONNECT;
     }
   }
@@ -714,7 +714,8 @@ int socket_connect(int fd, const char *name, svalue_t *read_callback, svalue_t *
   lpc_socks[fd].state = STATE_DATA_XFER;
   lpc_socks[fd].flags |= S_BLOCKED;
 
-  debug(sockets, "socket_connect: lpc socket %d (real fd %lld) connecting.\n", fd, lpc_socks[fd].fd);
+  debug(sockets, "socket_connect: lpc socket %d (real fd %lld) connecting.\n", fd,
+        lpc_socks[fd].fd);
 
   event_add(lpc_socks[fd].ev_read, nullptr);
   event_add(lpc_socks[fd].ev_write, nullptr);
@@ -915,8 +916,8 @@ int socket_write(int fd, svalue_t *message, const char *name) {
         }
       }
     }
-    debug(sockets, "socket_write: lpc socket %d (real fd %lld) send error: %s.\n",
-          fd, lpc_socks[fd].fd, evutil_socket_error_to_string(e));
+    debug(sockets, "socket_write: lpc socket %d (real fd %lld) send error: %s.\n", fd,
+          lpc_socks[fd].fd, evutil_socket_error_to_string(e));
     lpc_socks[fd].flags |= S_LINKDEAD;
     socket_close(fd, SC_FORCE | SC_DO_CALLBACK | SC_FINAL_CLOSE);
     return EESEND;
@@ -1233,20 +1234,20 @@ void socket_write_select_handler(int fd) {
     ev_socklen_t optlen = sizeof(optval);
     auto e = getsockopt(lpc_socks[fd].fd, SOL_SOCKET, SO_ERROR,
 #ifndef _WIN32
-                        (void*) &optval,
+                        (void *)&optval,
 #else
-                        (char*) &optval,
+                        (char *)&optval,
 #endif
                         &optlen);
     if (e == -1) {
-      debug(sockets,
-            "write_socket_handler: getsockopt failure: %s.\n", evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
+      debug(sockets, "write_socket_handler: getsockopt failure: %s.\n",
+            evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
       return;
     }
 
     if (optval) {
-      debug(sockets,
-            "write_socket_handler: getsockopt : %d (%s).\n", optval, evutil_socket_error_to_string(optval));
+      debug(sockets, "write_socket_handler: getsockopt : %d (%s).\n", optval,
+            evutil_socket_error_to_string(optval));
 
       if (optval == ERR(EINTR) || optval == ERR(EINPROGRESS) || optval == ERR(EWOULDBLOCK)) {
         // still connecting
@@ -1254,10 +1255,9 @@ void socket_write_select_handler(int fd) {
       }
       lpc_socks[fd].flags |= S_LINKDEAD;
       socket_close(fd, SC_FORCE | SC_DO_CALLBACK | SC_FINAL_CLOSE);
-      return ;
+      return;
     }
   }
-
 
   if (lpc_socks[fd].w_buf != nullptr) {
     cc = send(lpc_socks[fd].fd, lpc_socks[fd].w_buf + lpc_socks[fd].w_off, lpc_socks[fd].w_len, 0);
@@ -1592,17 +1592,15 @@ array_t *socket_status(int which) {
 
   ret->item[3].type = T_STRING;
   ret->item[3].subtype = STRING_MALLOC;
-  ret->item[3].u.string =
-      string_copy(sockaddr_to_lpcaddr((struct sockaddr *) &lpc_socks[which].l_addr,
-                                      lpc_socks[which].l_addrlen),
-                  "socket_status");
+  ret->item[3].u.string = string_copy(
+      sockaddr_to_lpcaddr((struct sockaddr *)&lpc_socks[which].l_addr, lpc_socks[which].l_addrlen),
+      "socket_status");
 
   ret->item[4].type = T_STRING;
   ret->item[4].subtype = STRING_MALLOC;
-  ret->item[4].u.string =
-      string_copy(sockaddr_to_lpcaddr((struct sockaddr *) &lpc_socks[which].r_addr,
-                                      lpc_socks[which].r_addrlen),
-                  "socket_status");
+  ret->item[4].u.string = string_copy(
+      sockaddr_to_lpcaddr((struct sockaddr *)&lpc_socks[which].r_addr, lpc_socks[which].r_addrlen),
+      "socket_status");
 
   if (!(lpc_socks[which].flags & STATE_FLUSHING) && lpc_socks[which].owner_ob &&
       !(lpc_socks[which].owner_ob->flags & O_DESTRUCTED)) {
@@ -1654,7 +1652,7 @@ void lpc_socks_closeall() {
     if (sock.state == STATE_CLOSED) {
       continue;
     }
-    if(sock.fd != -1) {
+    if (sock.fd != -1) {
       evutil_closesocket(sock.fd);
     }
   }

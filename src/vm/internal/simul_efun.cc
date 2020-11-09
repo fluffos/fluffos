@@ -58,7 +58,7 @@ void init_simul_efun(const char *file) {
   object_t *new_ob;
 
   if (!file || !file[0]) {
-    fprintf(stderr, "No simul_efun\n");
+    debug_message("No simul_efun\n");
     return;
   }
   if (!filename_to_obname(file, buf, sizeof buf)) {
@@ -71,7 +71,7 @@ void init_simul_efun(const char *file) {
 
   new_ob = load_object(buf, 1);
   if (new_ob == nullptr) {
-    fprintf(stderr, "The simul_efun file %s was not loaded.\n", buf);
+    debug_message("The simul_efun file %s was not loaded.\n", buf);
     exit(-1);
   }
   set_simul_efun(new_ob);

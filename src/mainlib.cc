@@ -2,7 +2,6 @@
 
 #include "mainlib.h"
 
-#include <iostream>  // for cout
 #include <locale.h>  // for setlocale, LC_ALL
 #ifdef HAVE_SIGNAL_H
 #include <signal.h>  //  for signal, SIG_DFL, SIGABRT, etc
@@ -42,7 +41,7 @@
 extern void print_all_predefines();
 
 namespace {
-inline void print_sep() { std::cout << std::string(72, '=') << std::endl; }
+inline void print_sep() { debug_message("%s\n", std::string(72, '=').c_str()); }
 
 void incrase_fd_rlimit() {
 #ifndef _WIN32
@@ -73,24 +72,24 @@ void print_rlimit() {
     perror("Error reading RLIMIT_CORE: ");
     exit(1);
   } else {
-    std::cout << "Core Dump: " << (rlim.rlim_cur == 0 ? "No" : "Yes") << ", ";
+    debug_message("Core Dump: %s, ", (rlim.rlim_cur == 0 ? "No" : "Yes"));
   }
 
   if (getrlimit(RLIMIT_NOFILE, &rlim)) {
     perror("Error reading RLIMIT_NOFILE: ");
     exit(1);
   } else {
-    std::cout << "Max FD: " << rlim.rlim_cur << std::endl;
+    debug_message("Max FD: %lu.\n", rlim.rlim_cur);
   }
 #endif
 }
 
 void print_commandline(int argc, char **argv) {
-  std::cout << "Full Command Line: ";
+  debug_message("Full Command Line: ");
   for (int i = 0; i < argc; i++) {
-    std::cout << argv[i] << " ";
+    debug_message("%s ", argv[i]);
   }
-  std::cout << std::endl;
+  debug_message("\n");
 }
 
 void print_version_and_time() {
@@ -98,11 +97,11 @@ void print_version_and_time() {
   {
     time_t tm = get_current_time();
     char buf[256] = {};
-    std::cout << "Boot Time: " << ctime_r(&tm, buf);
+    debug_message("Boot Time: %s", ctime_r(&tm, buf));
   }
 
   /* Print FluffOS version */
-  std::cout << "Version: " << PROJECT_VERSION << " (" << ARCH << ")" << std::endl;
+  debug_message("Version: %s (%s)\n", PROJECT_VERSION, ARCH);
 
 #ifdef HAVE_JEMALLOC
   /* Print jemalloc version */
@@ -110,21 +109,20 @@ void print_version_and_time() {
     const char *ver;
     size_t resultlen = sizeof(ver);
     mallctl("version", &ver, &resultlen, NULL, 0);
-    std::cout << "Jemalloc Version: " << ver << std::endl;
+    debug_message("jemalloc Version: %s\n", ver);
   }
 #else
-  std::cout << "Jemalloc is disabled, this is not suitable for production." << std::endl;
+  debug_message("Jemalloc is disabled, this is not suitable for production.\n");
 #endif
-  std::cout << "ICU Version: " << U_ICU_VERSION << std::endl;
+  debug_message("ICU Version: %s\n", U_ICU_VERSION);
 
 #ifndef _WIN32
 #if BACKWARD_HAS_DW == 1
-  std::cout << "Backtrace support: libdw." << std::endl;
+  debug_message("Backtrace support: libdw.\n");
 #elif BACKWARD_HAS_BFD == 1
-  std::cout << "Backtrace support: libbfd." << std::endl;
+  debug_message("Backtrace support: libbfd.\n");
 #else
-  std::cout << "libdw or libbfd is not found, you will only get very limited crash stacktrace."
-            << std::endl;
+  debug_message("libdw or libbfd is not found, you will only get very limited crash stacktrace.\n");
 #endif
 #endif /* _WIN32 */
 }
@@ -199,8 +197,8 @@ void init_locale() {
                  [](unsigned char c) { return std::tolower(c); });
 #ifndef _WIN32
   if (current_locale.find(".utf-8") == std::string::npos) {
-    std::cerr << "Your locale '" << current_locale
-              << "' is not UTF8 compliant, you will likely run into issues." << std::endl;
+    debug_message("Your locale '%s' is not UTF8 compliant, you will likely run into issues.\n",
+                  current_locale.c_str());
   }
 #endif
 }
@@ -215,16 +213,6 @@ void init_tz() {
 }  // namespace
 
 struct event_base *init_main(int argc, char **argv) {
-  init_locale();
-  init_tz();
-
-  print_sep();
-  print_commandline(argc, argv);
-  print_version_and_time();
-  incrase_fd_rlimit();
-  print_rlimit();
-  print_sep();
-
   /* read in the configuration file */
   bool got_config = false;
   for (int i = 1; i < argc; i++) {
@@ -240,7 +228,15 @@ struct event_base *init_main(int argc, char **argv) {
     break;
   }
   if (!got_config) {
-    fprintf(stderr, "Usage: %s config_file\n", argv[0]);
+    debug_message("Usage: %s config_file\n", argv[0]);
+    exit(-1);
+  }
+
+  reset_debug_message_fp();
+
+  // Make sure mudlib dir is correct.
+  if (chdir(CONFIG_STR(__MUD_LIB_DIR__)) == -1) {
+    debug_message("Bad mudlib directory: '%s'.\n", CONFIG_STR(__MUD_LIB_DIR__));
     exit(-1);
   }
 
@@ -295,10 +291,34 @@ void init_win32() {
     printf("WSAStartup failed with error: %d\n", err);
     exit(-1);
   }
+
+  // try to get UTF-8 output
+  SetConsoleOutputCP(65001);
 #endif
 }
 
 int driver_main(int argc, char **argv) {
+  init_locale();
+  init_tz();
+  incrase_fd_rlimit();
+#ifdef _WIN32
+  init_win32();
+#endif
+
+  print_sep();
+  print_commandline(argc, argv);
+  print_version_and_time();
+  print_rlimit();
+  print_sep();
+
+  // backward-cpp doesn't yet work on win32
+
+  // register crash handlers
+  backward::SignalHandling sh;
+  if (!sh.loaded()) {
+    debug_message("Warning: Signal handler installation failed, not backtrace on crash!\n");
+  }
+
   // First look for '--tracing' to decide if enable tracing from driver start.
   std::string trace_log;
 
@@ -309,7 +329,7 @@ int driver_main(int argc, char **argv) {
 
     if (strcmp(argv[i], "--tracing") == 0) {
       if (i + 1 >= argc) {
-        std::cerr << "--tracing require an argument";
+        debug_message("--tracing require an argument");
         exit(-1);
       }
       trace_log = argv[i + 1];
@@ -320,38 +340,42 @@ int driver_main(int argc, char **argv) {
   DEFER { Tracer::collect(); };
 
   if (!trace_log.empty()) {
-    std::cout << "Saving tracing log to: " << trace_log << std::endl;
+    debug_message("Saving tracing log to: %s\n", trace_log.c_str());
     Tracer::start(trace_log.c_str());
   }
 
   Tracer::setThreadName("FluffOS Main");
   ScopedTracer _main_tracer(__PRETTY_FUNCTION__);
 
-  // backward-cpp doesn't yet work on win32
-
-  // register crash handlers
-  backward::SignalHandling sh;
-  if (!sh.loaded()) {
-    std::cout << "Warning: Signal handler installation failed, not backtrace on crash!"
-              << std::endl;
+  // Set debug log level first.
+  for (int i = 1; i < argc; i++) {
+    if (argv[i][0] != '-') {
+      continue;
+    }
+    switch (argv[i][1]) {
+      case 'd':
+        if (argv[i][2]) {
+          debug_level_set(&argv[i][2]);
+          debug_message("Debug log enabled: %s\n", &argv[i][2]);
+        } else {
+          debug_level |= DBG_DEFAULT;
+          debug_message("Debug log enabled: %s\n", "default");
+        }
+        continue;
+    }
   }
-
-#ifdef _WIN32
-  init_win32();
-#endif
+  debug_message("Final Debug Level: %d\n", debug_level);
 
   auto base = init_main(argc, argv);
+
+  debug_message("==== Runtime Config Table ====\n");
+  print_rc_table();
+  debug_message("==============================\n");
 
   // from lex.cc
   debug_message("==== LPC Predefines ====\n");
   print_all_predefines();
   debug_message("========================\n");
-
-  // Make sure mudlib dir is correct.
-  if (chdir(CONFIG_STR(__MUD_LIB_DIR__)) == -1) {
-    fprintf(stderr, "Bad mudlib directory: %s\n", CONFIG_STR(__MUD_LIB_DIR__));
-    exit(-1);
-  }
 
   // Start running.
   vm_start();
@@ -379,12 +403,6 @@ int driver_main(int argc, char **argv) {
         }
           continue;
         case 'd':
-          if (argv[i][2]) {
-            debug_level_set(&argv[i][2]);
-          } else {
-            debug_level |= DBG_DEFAULT;
-          }
-          debug_message("Debug Level: %d\n", debug_level);
           continue;
         case '-':
           if (strcmp(argv[i], "--tracing") == 0) {

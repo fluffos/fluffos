@@ -312,17 +312,17 @@ static void print_matrix(Matrix m, const char *label) {
   int i;
   int j;
 
-  fprintf(stderr, "%s:\n", label);
+  debug_message("%s:\n", label);
   for (i = 0; i < 4; i++) {
     for (j = 0; j < 4; j++) {
-      fprintf(stderr, "%f\t", m[i * 4 + j]);
+      debug_message("%f\t", m[i * 4 + j]);
     }
-    fprintf(stderr, "\n");
+    debug_message("\n");
   }
 }
 
 static void print_array(Vector *v, const char *label) {
-  fprintf(stderr, "%s:\t%f\t%f\t%f\n", label, v->x, v->y, v->z);
+  debug_message("%s:\t%f\t%f\t%f\n", label, v->x, v->y, v->z);
 }
 #endif
 

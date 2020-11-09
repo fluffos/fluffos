@@ -18,6 +18,7 @@ constexpr int g_num_external_cmds = 100;
 extern char *external_cmd[g_num_external_cmds];
 
 void read_config(char *);
+void print_rc_table();
 
 extern int config_int[NUM_CONFIG_INTS];
 extern char *config_str[NUM_CONFIG_STRS];
