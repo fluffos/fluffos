@@ -431,7 +431,7 @@ auto pcre_match_all(const char *subject, size_t subject_len, const char *pattern
       svalue_t item = {
           .type = T_STRING,
           .subtype = STRING_MALLOC,
-          .u = { .string = match_str },
+          .u = {.string = match_str},
       };
       match.push_back(item);
     }
