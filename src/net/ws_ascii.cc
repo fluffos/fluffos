@@ -168,8 +168,9 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
       if (len <= 0) {
         break;
       }
-      // TODO: maybe need to handle fragment
-      if (!u8_validate((const uint8_t *)in, len)) {
+      // don't accept binary frame, we want client to always send valid utf8.
+      // lws handles the utf8 check for us.
+      if(lws_frame_is_binary(wsi)) {
         return -1;
       }
       auto ip = pss->user;
