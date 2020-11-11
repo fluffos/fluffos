@@ -553,6 +553,11 @@ void add_message(object_t *who, const char *data, int len) {
       inet_volume += translen;
       if (ip->connection_type == PORT_TELNET) {
         telnet_send_text(ip->telnet, transdata, translen);
+        // Stavros: A lot of clients use this TELNET_GA to differentiate
+        // prompts from other text
+        if (ip->telnet && (ip->iflags & USING_TELNET) && !(ip->iflags & SUPPRESS_GA)) {
+          telnet_iac(ip->telnet, TELNET_GA);
+        }
       } else {
         bufferevent_write(ip->ev_buffer, data, len);
       }
@@ -1473,11 +1478,6 @@ static void print_prompt(interactive_t *ip) {
 #endif
   if (!IP_VALID(ip, ob)) {
     return;
-  }
-  // Stavros: A lot of clients use this TELNET_GA to differentiate
-  // prompts from other text
-  if ((ip->iflags & USING_TELNET) && !(ip->iflags & SUPPRESS_GA)) {
-    telnet_iac(ip->telnet, TELNET_GA);
   }
 } /* print_prompt() */
 
