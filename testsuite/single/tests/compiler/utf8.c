@@ -568,4 +568,31 @@ void do_tests() {
 
   // repeat_string
   ASSERT_EQ(text4 + repeat_string(text4, 2), repeat_string(text4, 3));
+
+  // strsrch
+  tmp = "一欲穷千里目🍆🍠🧮👩‍👩‍👧‍👧😊👌💩更上一层楼";
+  // string searching
+  ASSERT_EQ(0, strsrch(tmp, tmp[0..0]));
+  ASSERT_EQ(15, strsrch(tmp, "一", 1));
+  ASSERT_EQ(13, strsrch(tmp, "更"));
+  ASSERT_EQ(13, strsrch(tmp, "更", 1));
+  ASSERT_EQ(6, strsrch(tmp, "🍆🍠🧮"));
+  ASSERT_EQ(6, strsrch(tmp, "🍆🍠🧮", 1));
+  // EGC character based searching, not codepoint
+  ASSERT_EQ(9, strsrch(tmp, "👩‍👩‍👧‍👧"));
+  ASSERT_EQ(9, strsrch(tmp, "👩‍👩‍👧‍👧", 1));
+  ASSERT_EQ(-1, strsrch(tmp, "👩‍👧"));
+  ASSERT_EQ(-1, strsrch(tmp, "👩‍👧", 1));
+  ASSERT_EQ(-1, strsrch(tmp, "🧮👩"));
+  ASSERT_EQ(-1, strsrch(tmp, "🧮👩", 1));
+  ASSERT_EQ(-1, strsrch(tmp, "‍👧😊‍"));
+  ASSERT_EQ(-1, strsrch(tmp, "‍👧😊", 1));
+  // codepoint based searching works for single codepoint characters
+  ASSERT_EQ(0, strsrch(tmp, tmp[0]));
+  ASSERT_EQ(15, strsrch(tmp, tmp[0], 1));
+  ASSERT_EQ(-1, strsrch(tmp, 65533));
+  ASSERT_EQ(-1, strsrch(tmp, 65533, 1));
+  // but not for multi and invalid codepoints.
+  ASSERT(catch(strsrch(tmp, 999999999999)));
+  ASSERT(catch(strsrch(tmp, 999999999999, 1)));
 }
