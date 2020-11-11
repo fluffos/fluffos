@@ -418,7 +418,7 @@ bool init_user_conn() {
       }
 
       if (bind(fd, res->ai_addr, res->ai_addrlen) == -1) {
-        debug_message("socket_create: bind error: %s.\n",
+        debug_message("init_user_conn: bind error: %s.\n",
                       evutil_socket_error_to_string(evutil_socket_geterror(fd)));
         evutil_closesocket(fd);
         evutil_freeaddrinfo(res);
