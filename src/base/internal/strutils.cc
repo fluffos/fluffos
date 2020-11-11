@@ -38,7 +38,9 @@ std::string u8_sanitize(char *src) {
   return utf8::replace_invalid(source);
 }
 
-bool u8_egc_count(const char *src, size_t *count) {
+namespace {
+typedef std::function<void(std::unique_ptr<icu::BreakIterator> &)> u8_char_iter_callback;
+bool u8_char_iter(const char *src, const u8_char_iter_callback &cb) {
   static std::unique_ptr<icu::BreakIterator> brk = nullptr;
 
   /* create an iterator for graphemes */
@@ -46,12 +48,11 @@ bool u8_egc_count(const char *src, size_t *count) {
     UErrorCode status = U_ZERO_ERROR;
     brk.reset(icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status));
     if (!U_SUCCESS(status)) {
-      return -1;
+      return false;
     }
   }
 
   UErrorCode status = U_ZERO_ERROR;
-  size_t total = 0;
   UText text = UTEXT_INITIALIZER;
 
   utext_openUTF8(&text, src, -1, &status);
@@ -67,74 +68,107 @@ bool u8_egc_count(const char *src, size_t *count) {
     return false;
   }
   brk->first();
-  while (brk->next() != icu::BreakIterator::DONE) ++total;
 
-  *count = total;
+  cb(brk);
 
   utext_close(&text);
   return true;
 }
+}  // namespace
+
+bool u8_egc_count(const char *src, size_t *count) {
+  *count = 0;
+
+  return u8_char_iter(src, [&](std::unique_ptr<icu::BreakIterator> &brk) {
+    int total = 0;
+    brk->first();
+    while (brk->next() != icu::BreakIterator::DONE) ++total;
+    *count = total;
+  });
+}
+
+// Search "needle' in 'haystack', making sure it matches EGC boundary.
+int u8_egc_find(const char *haystack, size_t haystack_len, const char *needle, size_t needle_len,
+                bool reverse) {
+  int index = -1;
+
+  u8_char_iter(haystack, [=, &index](std::unique_ptr<icu::BreakIterator> &brk) {
+    bool found = false;
+    std::unique_ptr<icu::BreakIterator> brk_tmp(brk->clone());
+    if (!reverse) {
+      brk->first();
+      while (true) {
+        auto start = brk->current();
+        if ((haystack_len - start) >= needle_len && brk_tmp->isBoundary(start + needle_len)) {
+          if (memcmp(&haystack[start], needle, needle_len) == 0) {
+            found = true;
+            break;
+          }
+        }
+        if (brk->next() == icu::BreakIterator::DONE) {
+          break;
+        }
+      }
+    } else {
+      brk->last();
+      while (true) {
+        auto start = brk->current();
+        if ((haystack_len - start) >= needle_len && brk_tmp->isBoundary(start + needle_len)) {
+          if (memcmp(&haystack[start], needle, needle_len) == 0) {
+            found = true;
+            break;
+          }
+        }
+        if (brk->previous() == icu::BreakIterator::DONE) {
+          break;
+        }
+      }
+    }
+    if (!found) {
+      index = -1;
+    } else {
+      // reverse counting
+      index = 0;
+      while (brk->previous() != icu::BreakIterator::DONE) index++;
+    }
+  });
+
+  return index;
+}
 
 // Return the egc at given index of src, if it is an single code point
 UChar32 u8_egc_index_as_single_codepoint(const char *src, int32_t index) {
-  static std::unique_ptr<icu::BreakIterator> brk = nullptr;
-
-  if (!brk) {
-    ScopedTracer _tracer_brk("brk_init");
-
-    UErrorCode status = U_ZERO_ERROR;
-    brk.reset(icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status));
-    if (!U_SUCCESS(status)) {
-      return -1;
-    }
-  }
-
-  UErrorCode status = U_ZERO_ERROR;
-  int32_t pos = -1;
-  UText text = UTEXT_INITIALIZER;
-
-  utext_openUTF8(&text, src, -1, &status);
-  if (!U_SUCCESS(status)) {
-    utext_close(&text);
-    return -1;
-  }
-
-  status = U_ZERO_ERROR;
-  brk->setText(&text, status);
-  if (!U_SUCCESS(status)) {
-    utext_close(&text);
-    return -1;
-  }
-
-  {
-    pos = brk->first();
-    while (index-- > 0 && pos >= 0) {
-      pos = brk->next();
-    }
-  }
-
-  // out-of-bounds
-  if (pos < 0) {
-    utext_close(&text);
-    return -2;
-  }
-
-  // index is end-of-string
-  if (src[pos] == 0) {
-    utext_close(&text);
-    return 0;
-  }
-
   UChar32 res = U_SENTINEL;
 
-  auto next_pos = brk->next();
-  if (next_pos >= 0) {
-    if (next_pos - pos <= U8_MAX_LENGTH) {
-      U8_NEXT((const uint8_t *)src, pos, -1, res);
+  u8_char_iter(src, [&](std::unique_ptr<icu::BreakIterator> &brk) {
+    int32_t pos = -1;
+    {
+      pos = brk->first();
+      while (index-- > 0 && pos >= 0) {
+        pos = brk->next();
+      }
     }
-  }
 
-  utext_close(&text);
+    // out-of-bounds
+    if (pos < 0) {
+      res = -2;
+      return;
+    }
+
+    // index is end-of-string
+    if (src[pos] == 0) {
+      res = 0;
+      return;
+    }
+
+    auto next_pos = brk->next();
+    if (next_pos >= 0) {
+      if (next_pos - pos <= U8_MAX_LENGTH) {
+        U8_NEXT((const uint8_t *)src, pos, -1, res);
+      }
+    }
+  });
+
   return res;
 }
 
@@ -153,39 +187,15 @@ void u8_copy_and_replace_codepoint_at(const char *src, char *dst, int32_t index,
 
 // Get the byte offset to the egc index, doesn't check validity or bounds.
 int32_t u8_egc_index_to_offset(const char *src, int32_t index) {
-  static std::unique_ptr<icu::BreakIterator> brk = nullptr;
+  int pos = -1;
 
-  if (!brk) {
-    UErrorCode status = U_ZERO_ERROR;
-    brk.reset(icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status));
-    if (!U_SUCCESS(status)) {
-      return -1;
+  u8_char_iter(src, [&](std::unique_ptr<icu::BreakIterator> &brk) {
+    pos = brk->first();
+    while (index-- > 0 && pos >= 0) {
+      pos = brk->next();
     }
-  }
+  });
 
-  UErrorCode status = U_ZERO_ERROR;
-  int32_t pos = -1;
-  UText text = UTEXT_INITIALIZER;
-
-  utext_openUTF8(&text, src, -1, &status);
-  if (!U_SUCCESS(status)) {
-    utext_close(&text);
-    return -1;
-  }
-
-  status = U_ZERO_ERROR;
-  brk->setText(&text, status);
-  if (!U_SUCCESS(status)) {
-    utext_close(&text);
-    return -1;
-  }
-
-  pos = brk->first();
-  while (index-- > 0 && pos >= 0) {
-    pos = brk->next();
-  }
-
-  utext_close(&text);
   return pos;
 }
 
