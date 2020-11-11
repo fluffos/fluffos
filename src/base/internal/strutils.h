@@ -117,5 +117,7 @@ size_t u8_width(const char *src, int len);
 void u8_truncate_below_width(const char *src, size_t len, size_t max_width, bool break_for_line,
                              bool always_break_before_newline, size_t *out_len, size_t *out_width);
 std::string u8_sanitize(char *src);
+int u8_egc_find(const char *haystack, size_t haystack_len, const char *needle, size_t needle_len,
+                bool reverse);
 
 #endif  // STRUTILS_H

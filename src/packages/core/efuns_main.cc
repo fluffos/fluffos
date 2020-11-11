@@ -2584,74 +2584,38 @@ void f_stat(void) {
  */
 
 void f_strsrch(void) {
-  const char *big, *little, *pos;
-  static char buf[2]; /* should be initialized to 0 */
-  int i, blen, llen;
+  auto arg1 = sp - 2;
+  auto arg2 = sp - 1;
+  auto arg3 = sp;
 
-  sp--;
-  big = (sp - 1)->u.string;
-  blen = SVALUE_STRLEN(sp - 1);
-  if (sp->type == T_NUMBER) {
-    little = buf;
-    if ((buf[0] = static_cast<char>(sp->u.number))) {
-      llen = 1;
-    } else {
-      llen = 0;
+  size_t src_len = SVALUE_STRLEN(arg1);
+
+  uint8_t buf[U8_MAX_LENGTH + 1] = {0};
+  const char *find = nullptr;
+  size_t find_len = 0;
+  if (arg2->type == T_NUMBER) {
+    UBool isError = false;
+    int offset = 0;
+    U8_APPEND(buf, offset, sizeof(buf), arg2->u.number, isError);
+    if (isError) {
+      error("Invalid codepoint to search.");
     }
+    buf[offset] = '\0';
+    find = (const char *)buf;
+    find_len = offset;
   } else {
-    little = sp->u.string;
-    llen = SVALUE_STRLEN(sp);
+    find = arg2->u.string;
+    find_len = SVALUE_STRLEN(arg2);
   }
 
-  if (!llen || blen < llen) {
-    pos = nullptr;
-
-    /* start at left */
-  } else if (!((sp + 1)->u.number)) {
-    if (!little[1]) { /* 1 char srch pattern */
-      pos = strchr(big, little[0]);
-    } else {
-      pos = const_cast<char *>(strstr(big, little));
-    }
-    /* start at right */
-  } else {            /* XXX: maybe test for -1 */
-    if (!little[1]) { /* 1 char srch pattern */
-      pos = strrchr(big, little[0]);
-    } else {
-      char c = *little;
-
-      pos = big + blen; /* find end */
-      pos -= llen;      /* find rightmost pos it _can_ be */
-      do {
-        do {
-          if (*pos == c) {
-            break;
-          }
-        } while (--pos >= big);
-        if (pos < big) {
-          pos = nullptr;
-          break;
-        }
-        for (i = 1; little[i] && (pos[i] == little[i]); i++) {
-          ;
-        } /* scan all chars */
-        if (!little[i]) {
-          break;
-        }
-      } while (--pos >= big);
-    }
+  LPC_INT ret = -1;
+  // only search if there is a chance.
+  if (find_len <= src_len) {
+    ret = u8_egc_find(arg1->u.string, src_len, find, find_len, arg3->u.number != 0);
   }
 
-  if (!pos) {
-    i = -1;
-  } else {
-    i = pos - big;
-  }
-  if (sp->type == T_STRING) {
-    free_string_svalue(sp);
-  }
-  free_string_svalue(--sp);
-  put_number(i);
+  pop_3_elems();
+  push_number(ret);
 } /* strsrch */
 #endif
 
