@@ -553,11 +553,6 @@ void add_message(object_t *who, const char *data, int len) {
       inet_volume += translen;
       if (ip->connection_type == PORT_TELNET) {
         telnet_send_text(ip->telnet, transdata, translen);
-        // Stavros: A lot of clients use this TELNET_GA to differentiate
-        // prompts from other text
-        if (ip->telnet && (ip->iflags & USING_TELNET) && !(ip->iflags & SUPPRESS_GA)) {
-          telnet_iac(ip->telnet, TELNET_GA);
-        }
       } else {
         bufferevent_write(ip->ev_buffer, data, len);
       }
@@ -1427,16 +1422,21 @@ int set_call(object_t *ob, sentence_t *sent, int flags) {
   if (ob == nullptr || sent == nullptr) {
     return (0);
   }
-  if (ob->interactive == nullptr || ob->interactive->input_to) {
+  auto ip = ob->interactive;
+  if (ip == nullptr || ip->input_to) {
     return (0);
   }
-  ob->interactive->input_to = sent;
-  ob->interactive->iflags |= (flags & (I_NOECHO | I_NOESC | I_SINGLE_CHAR));
+  ip->input_to = sent;
+  ip->iflags |= (flags & (I_NOECHO | I_NOESC | I_SINGLE_CHAR));
   if (flags & I_NOECHO) {
-    set_localecho(ob->interactive, false);
+    set_localecho(ip, false);
   }
   if (flags & I_SINGLE_CHAR) {
-    set_charmode(ob->interactive);
+    set_charmode(ip);
+  }
+  // Make sure client like mudlet flush previous outputs.
+  if (ip->telnet && (ip->iflags & USING_TELNET) && !(ip->iflags & SUPPRESS_GA)) {
+    telnet_iac(ip->telnet, TELNET_GA);
   }
   return (1);
 } /* set_call() */
@@ -1478,6 +1478,11 @@ static void print_prompt(interactive_t *ip) {
 #endif
   if (!IP_VALID(ip, ob)) {
     return;
+  }
+  // Stavros: A lot of clients use this TELNET_GA to differentiate
+  // prompts from other text
+  if (ip->telnet && (ip->iflags & USING_TELNET) && !(ip->iflags & SUPPRESS_GA)) {
+    telnet_iac(ip->telnet, TELNET_GA);
   }
 } /* print_prompt() */
 
