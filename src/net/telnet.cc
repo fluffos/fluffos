@@ -454,7 +454,6 @@ void send_initial_telnet_negotiations(struct interactive_t *user) {
   set_linemode(user, false);
 
   // Get rid of GA, save some byte
-  telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_SGA);
   telnet_negotiate(user->telnet, TELNET_DO, TELNET_TELOPT_SGA);
 
   /* Ask permission to ask them for their terminal type */
