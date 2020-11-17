@@ -49,7 +49,6 @@ nosave object receiver;
 void create() {
   hostname_to_fd = ([]);
   status = ([]);
-  receiver = this_player();
 }
 
 void socket_shutdown(int fd) {
@@ -67,32 +66,37 @@ void write_data(int fd) {
 
   tell_object(receiver, sprintf("%O", status));
 
-  socket_write(fd, "GET "+ status[fd]["path"] + " HTTP/1.0\n\r\n\r");
+  socket_write(fd, "GET " + status[fd]["path"] + " HTTP/1.0\nHost: " + status[fd]["host"] + "\n\r\n\r");
 }
 
-void on_resolve(string host, string addr) {
+void on_resolve(string host, string addr, int key) {
   int fd;
   int ret;
 
   tell_object(receiver, sprintf("%s: %s\n", host, addr));
 
-  fd = hostname_to_fd[host];
+  if (addr)
+  {
+    fd = hostname_to_fd[host];
 
-  ret = socket_connect(fd, addr + " " + status[fd]["port"], "receive_data", "write_data");
-  if(ret != EESUCCESS){
-    tell_object(receiver, "unable to connect: " + socket_error(ret) + "\n");
-    socket_close(fd);
-    return ;
+    ret = socket_connect(fd, addr + " " + status[fd]["port"], "receive_data", "write_data");
+    if(ret != EESUCCESS){
+      tell_object(receiver, "unable to connect: " + socket_error(ret) + "\n");
+      socket_close(fd);
+      return ;
+    }
+
+    status[fd]["status"] = STATE_CONNECTING;
+    tell_object(receiver, sprintf("%O", socket_status(fd)));
   }
-
-  status[fd]["status"] = STATE_CONNECTING;
-  tell_object(receiver, sprintf("%O", socket_status(fd)));
 }
 
 
 int get(string host, int port, string path) {
   int ret;
   int fd;
+
+  receiver = this_player();
 
   fd = socket_create(STREAM, "receive_data", "socket_shutdown");
   status[fd] = ([]);

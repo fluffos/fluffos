@@ -142,26 +142,22 @@ Note:
     condition.  The expression may contain any legal combination of the
     following:
     operators: ||, &&, >>, <<,
-    +, -, *, /, %,
-    &, |, ^, !, ~,
-    ==, !=, <, >, <=, >=, ?:
+               +, -, *, /, %,
+               &, |, ^, !, ~,
+               ==, !=, <, >, <=, >=, ?:
     parentheses for grouping: (, )
     calls of the form: defined(identifier)
-    and identifiers
 
-    #ifdef identifier
-    can be considered shorthand for:
-    #if defined(identifier)
+    and identifiers `#ifdef identifier` can be considered shorthand for:
+    `#if defined(identifier)`
 
-    #ifndef identifier
-    can be considered shorthand for:
-    #if !defined(identifier)
+    `#ifndef identifier` can be considered shorthand for:
+    `#if !defined(identifier)`
 
-    #elif expression
-    can be considered shorthand for the sequence:
+    `#elif expression` can be considered shorthand for the sequence:
     #else
-    #  if expression
-    #  endif
+    #if expression
+    #endif
 
 Example 1:
 
@@ -292,7 +288,7 @@ int help() {
     write( @ENDHELP
 This is the help text.
 It's hopelessly inadequate.
-@ENDHELP
+ENDHELP
     );
     return 1;
 }
@@ -313,7 +309,7 @@ int help() {
     this_player()->more( @@ENDHELP
 This is the help text.
 It's hopelessly inadequate.
-@@ENDHELP
+ENDHELP
     , 1);
     return 1;
 }
