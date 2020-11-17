@@ -27,13 +27,13 @@ title: sockets / socket_create
     #define DATAGRAM_BINARY     4
     ------------------------------------------------
 
-    参数 `read_callback` 是 socket 接收数据后驱动程序调用的函数名称，此函数原型应该是以下格式：
+    参数 `read_callback` 是在UDP协议下 socket 接收数据后驱动程序调用的函数名称，此函数原型应该是以下格式：
 
-    void read_callback(int fd, mixed message);
+    void read_callback(int fd, mixed message, string addr);
 
-    其中参数 `fd` 是接收到数据的 socket 连接，参数 `message` 是接收到的数据。
+    其中参数 `fd` 是接收到数据的 socket 连接；参数 `message` 是接收到的数据，在非二进制模式下返回值是 utf-8 格式的字符串，在二进制模式下返回值是 buffer；第三个参数 `addr` 为客户端地址。
 
-    参数 `close_callback` 是 socket 意外关闭时驱动程序调用的函数名称（如不是通过 socket_close() 关闭）。此函数原型应该是以下格式：
+    参数 `close_callback` 是在TCP协议下 socket 意外关闭时驱动程序调用的函数名称（如不是通过 socket_close() 关闭）。此函数原型应该是以下格式：
 
     void close_callback(int fd);
 

@@ -16,7 +16,7 @@ title: sockets / socket_write
 
     socket_write() 在 socket `s` 上发送消息 `message`，如果 socket `s` 是 STREAM 或 MUD 模式，socket 必须已经连接且不能指定参数 `address`，如果 socket `s` 是 DATAGRAM 模式, 地址参数 `address` 必须指定，地址格式类似: "127.0.0.1 23"。
 
-### 参考
+### 返回值
 
     成功时返回 EESUCCESS，失败（错误）时返回代表以下意义的负值：
 
