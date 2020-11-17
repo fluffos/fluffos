@@ -30,6 +30,15 @@ void do_tests() {
   ASSERT(content);
   ASSERT(json_encode(json_decode(content)));
 
+  // Handle \e
+  content = "\e你好";
+  ASSERT_EQ(content, json_decode(json_encode(content)));
+
+  // Handle \x in LPC
+  content = "\x1b你好";
+  ASSERT_EQ(content, json_decode(json_encode(content)));
+
+  // e2e
   content = read_file("/single/tests/std/test2.json");
   ASSERT(content);
   ASSERT(json_encode(json_decode(content)));

@@ -581,6 +581,9 @@ varargs string json_encode(mixed value, mixed* pointers) {
             value = replace_string(value, "\r", "\\r");
         if(member_array('\t', value) != -1)
             value = replace_string(value, "\t", "\\t");
+        if(member_array(0x1b, value) != -1)
+          value = replace_string(value, "\x1b", "\\u001b");
+
         return value;
     }
     if(mapp(value)) {
