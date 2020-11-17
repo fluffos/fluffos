@@ -33,10 +33,10 @@ title: sockets / socket_create
     call  when the socket gets data from its peer. The read callback should
     follow this format:
 
-        void read_callback(int fd, mixed message)
+        void read_callback(int fd, mixed message, string addr)
 
     Where fd is the socket which received the data, and message is the data
-    which was received.
+    which was received, addr is the client address.
 
     In non-binary mode, message will be sanitized with UTF8 encoding and returned as an string.
 
@@ -77,4 +77,3 @@ title: sockets / socket_create
 
     socket_accept(3), socket_bind(3),  socket_close(3),  socket_connect(3),
     socket_listen(3), socket_write(3)
-

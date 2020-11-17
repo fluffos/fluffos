@@ -3,7 +3,7 @@
  * SYNOPSIS: string number_string ( int | float num1 number, void | int add_commas )
  * DESCRIPTION: Converts an integer or a float into a string. Optionally, can comma-delimit the results.
  * EXAMPLE: number_string(2500.36) // "2500.360000"
- * EXAMPLE: number_string(2500.36) // "2,500.360000"
+ * EXAMPLE: number_string(2500.36, 1) // "2,500.360000"
  */
 
 #include <lpctypes.h>
@@ -34,7 +34,7 @@ varargs string number_string( mixed number, int add_commas )
             int_part = work ;
         }
 
-        // empty work 
+        // empty work
         work = "" ;
 
         while( strlen( int_part ) > 3 )
