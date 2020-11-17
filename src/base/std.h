@@ -136,6 +136,10 @@
 #define uisascii(x) isascii((unsigned char)x)
 #define uisprint(x) isprint((unsigned char)x)
 
+#define __STRINGIFY(x) #x
+#define __TOSTRING(x) __STRINGIFY(x)
+#define __CURRENT_FILE_LINE__ __FILE__ ":" __TOSTRING(__LINE__)
+
 /* Compare two number */
 #define COMPARE_NUMS(x, y) (((x) > (y) ? 1 : ((x) < (y) ? -1 : 0)))
 

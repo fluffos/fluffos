@@ -22,8 +22,6 @@
 
 #include "base/package_api.h"
 
-#include <cstdarg>
-
 #include "packages/parser/parser.h"
 #include "packages/core/outbuf.h"
 
@@ -169,6 +167,9 @@ void parser_mark_verbs() {
     verb_t *verb_entry = verbs[i];
 
     while (verb_entry) {
+      DO_MARK(verb_entry, TAG_PARSER);
+      DO_MARK(verb_entry->node, TAG_PARSER);
+
       EXTRA_REF(BLOCK(verb_entry->real_name))++;
       EXTRA_REF(BLOCK(verb_entry->match_name))++;
       verb_entry = verb_entry->next;
@@ -183,6 +184,8 @@ void parser_mark_verbs() {
     special_word_t *swp = special_table[i];
 
     while (swp) {
+      DO_MARK(swp, TAG_PARSER);
+
       EXTRA_REF(BLOCK(swp->wrd))++;
       swp = swp->next;
     }
@@ -200,15 +203,28 @@ void parser_mark_verbs() {
 void parser_mark(parse_info_t *pinfo) {
   int i;
 
+  DO_MARK(pinfo, TAG_PARSER);
+
   if (!(pinfo->flags & PI_SETUP)) {
     return;
   }
 
+  if(pinfo->num_ids) {
+    DO_MARK(pinfo->ids, TAG_PARSER);
+  }
   for (i = 0; i < pinfo->num_ids; i++) {
     EXTRA_REF(BLOCK(pinfo->ids[i]))++;
   }
+
+  if(pinfo->num_adjs) {
+    DO_MARK(pinfo->adjs, TAG_PARSER);
+  }
   for (i = 0; i < pinfo->num_adjs; i++) {
     EXTRA_REF(BLOCK(pinfo->adjs[i]))++;
+  }
+
+  if(pinfo->num_plurals) {
+    DO_MARK(pinfo->plurals, TAG_PARSER);
   }
   for (i = 0; i < pinfo->num_plurals; i++) {
     EXTRA_REF(BLOCK(pinfo->plurals[i]))++;
@@ -342,7 +358,7 @@ static match_t *add_match(parse_state_t *state, int token, int start, int end) {
   return ret;
 }
 
-static int parse_copy_array(array_t *arr, char ***sarrp) {
+static int parse_copy_array(array_t *arr, char ***sarrp, const char* desc) {
   const char **table;
   char **table2;
   int j;
@@ -353,7 +369,7 @@ static int parse_copy_array(array_t *arr, char ***sarrp) {
     return 0;
   }
 
-  table2 = *sarrp = (char **)DCALLOC(arr->size, sizeof(char *), TAG_PARSER, "parse_copy_array");
+  table2 = *sarrp = (char **)DCALLOC(arr->size, sizeof(char *), TAG_PARSER, desc);
   table = (const char **)table2;
   for (j = 0; j < arr->size; j++) {
     if (arr->item[j].type == T_STRING) {
@@ -373,7 +389,7 @@ static int parse_copy_array(array_t *arr, char ***sarrp) {
 
 static void add_special_word(const char *wrd, int kind, int arg) {
   char *p = make_shared_string(wrd);
-  int h = DO_HASH(p, SPECIAL_HASH_SIZE);
+  auto h = DO_HASH(p, SPECIAL_HASH_SIZE);
   auto *swp = (special_word_t *)DMALLOC(sizeof(special_word_t), TAG_PARSER, "add_special_word");
 
   swp->wrd = p;
@@ -384,7 +400,7 @@ static void add_special_word(const char *wrd, int kind, int arg) {
 }
 
 static int check_special_word(const char *wrd, long *arg) {
-  int h = DO_HASH(wrd, SPECIAL_HASH_SIZE);
+  auto h = DO_HASH(wrd, SPECIAL_HASH_SIZE);
   special_word_t *swp = special_table[h];
 
   while (swp) {
@@ -461,7 +477,7 @@ static void interrogate_master(void) {
     ret = apply_master_ob(APPLY_LITERALS, 0);
 
     if (ret && ret->type == T_ARRAY) {
-      num_literals = parse_copy_array(ret->u.arr, &literals);
+      num_literals = parse_copy_array(ret->u.arr, &literals, __CURRENT_FILE_LINE__);
     } else {
       num_literals = 0;
     }
@@ -569,7 +585,7 @@ void f_parse_refresh(void) {
    * object involved in the parse.
    */
   if (pi->flags & PI_VERB_HANDLER) {
-    svalue_t *ret = apply(LIVINGS_ARE_REMOTE, current_object, 0, ORIGIN_DRIVER);
+    svalue_t *ret = safe_apply(LIVINGS_ARE_REMOTE, current_object, 0, ORIGIN_DRIVER);
     if (current_object->flags & O_DESTRUCTED) {
       return;
     }
@@ -843,9 +859,9 @@ static void interrogate_object(object_t *ob) {
   DEBUG_P(("Interogating /%s.", ob->obname));
 
   DEBUG_PP(("[%s]", APPLY_NOUN));
-  ret = apply(APPLY_NOUN, ob, 0, ORIGIN_DRIVER);
+  ret = safe_apply(APPLY_NOUN, ob, 0, ORIGIN_DRIVER);
   if (ret && ret->type == T_ARRAY) {
-    ob->pinfo->num_ids = parse_copy_array(ret->u.arr, &ob->pinfo->ids);
+    ob->pinfo->num_ids = parse_copy_array(ret->u.arr, &ob->pinfo->ids, __CURRENT_FILE_LINE__);
   } else {
     ob->pinfo->num_ids = 0;
   }
@@ -859,9 +875,9 @@ static void interrogate_object(object_t *ob) {
   ob->pinfo->num_plurals = 0;
 
   DEBUG_PP(("[%s]", APPLY_PLURAL));
-  ret = apply(APPLY_PLURAL, ob, 0, ORIGIN_DRIVER);
+  ret = safe_apply(APPLY_PLURAL, ob, 0, ORIGIN_DRIVER);
   if (ret && ret->type == T_ARRAY) {
-    ob->pinfo->num_plurals = parse_copy_array(ret->u.arr, &ob->pinfo->plurals);
+    ob->pinfo->num_plurals = parse_copy_array(ret->u.arr, &ob->pinfo->plurals, __CURRENT_FILE_LINE__);
   } else {
     ob->pinfo->num_plurals = 0;
   }
@@ -870,9 +886,9 @@ static void interrogate_object(object_t *ob) {
   }
 
   DEBUG_PP(("[%s]", APPLY_ADJECTIVE));
-  ret = apply(APPLY_ADJECTIVE, ob, 0, ORIGIN_DRIVER);
+  ret = safe_apply(APPLY_ADJECTIVE, ob, 0, ORIGIN_DRIVER);
   if (ret && ret->type == T_ARRAY) {
-    ob->pinfo->num_adjs = parse_copy_array(ret->u.arr, &ob->pinfo->adjs);
+    ob->pinfo->num_adjs = parse_copy_array(ret->u.arr, &ob->pinfo->adjs, __CURRENT_FILE_LINE__);
   } else {
     ob->pinfo->num_adjs = 0;
   }
@@ -881,7 +897,7 @@ static void interrogate_object(object_t *ob) {
   }
 
   DEBUG_PP(("[%s]", IS_LIVING));
-  ret = apply(IS_LIVING, ob, 0, ORIGIN_DRIVER);
+  ret = safe_apply(IS_LIVING, ob, 0, ORIGIN_DRIVER);
   if (!IS_ZERO(ret)) {
     ob->pinfo->flags |= PI_LIVING;
     DEBUG_PP(("(yes)"));
@@ -891,7 +907,7 @@ static void interrogate_object(object_t *ob) {
   }
 
   DEBUG_PP(("[%s]", INVENTORY_ACCESSIBLE));
-  ret = apply(INVENTORY_ACCESSIBLE, ob, 0, ORIGIN_DRIVER);
+  ret = safe_apply(INVENTORY_ACCESSIBLE, ob, 0, ORIGIN_DRIVER);
   if (!IS_ZERO(ret)) {
     ob->pinfo->flags |= PI_INV_ACCESSIBLE;
     DEBUG_PP(("(yes)"));
@@ -901,7 +917,7 @@ static void interrogate_object(object_t *ob) {
   }
 
   DEBUG_PP(("[%s]", INVENTORY_VISIBLE));
-  ret = apply(INVENTORY_VISIBLE, ob, 0, ORIGIN_DRIVER);
+  ret = safe_apply(INVENTORY_VISIBLE, ob, 0, ORIGIN_DRIVER);
   if (!IS_ZERO(ret)) {
     ob->pinfo->flags |= PI_INV_VISIBLE;
     DEBUG_PP(("(yes)"));
@@ -1368,10 +1384,10 @@ static int get_single(bitvec_t *bv) {
 static char *query_the_short(char *start, char *end, object_t *ob) {
   svalue_t *ret;
 
-  if (ob == nullptr || (intptr_t)ob == 0x9 || ob == nullptr) {
+  if (ob == nullptr) {
     return strput(start, end, "the thing");
   }
-  if ((ob->flags & O_DESTRUCTED) || (!(ret = apply("the_short", ob, 0, ORIGIN_DRIVER))) ||
+  if ((ob->flags & O_DESTRUCTED) || (!(ret = safe_apply("the_short", ob, 0, ORIGIN_DRIVER))) ||
       (ret->type != T_STRING)) {
     return strput(start, end, "the thing");
   }
@@ -1381,7 +1397,7 @@ static char *query_the_short(char *start, char *end, object_t *ob) {
 static char *strput_words(char *str, char *limit, int first, int last) {
   char *p = words[first].start;
   char *end = words[last].end;
-  int num;
+  size_t num;
 
   /* strip leading and trailing whitespace */
   while (uisspace(p[0])) {
@@ -2064,8 +2080,6 @@ static int make_function(char *buf, char *end, int which, parse_state_t *state, 
         } else if (matches[match].val.number < 0) {
           push_number(0);
         } else if (loaded_objects[matches[match].val.number] == nullptr ||
-                   loaded_objects[matches[match].val.number] == nullptr ||
-                   (intptr_t)loaded_objects[matches[match].val.number] == 0x9 ||
                    loaded_objects[matches[match].val.number]->flags & O_DESTRUCTED) {
           push_number(0);
         } else {
@@ -2085,7 +2099,7 @@ static int make_function(char *buf, char *end, int which, parse_state_t *state, 
       case WRD_TOKEN: {
         char tmp[1024];
         buf = strput(buf, end, "wrd");
-        strput_words(tmp, end, matches[match].first, matches[match].last);
+        strput_words(tmp, EndOf(tmp), matches[match].first, matches[match].last);
         push_malloced_string(string_copy(tmp, "push_real_names"));
         match++;
         on_stack++;
@@ -2119,7 +2133,7 @@ static int check_functions(object_t *obj, parse_state_t *state) {
     args = make_function(func, EndOf(func), 0, state, tryy % 4, obj);
     args += push_real_names(tryy % 4, 0);
     DEBUG_P(("Trying %s ... (/%s)", func, ob->obname));
-    ret = process_answer(state, apply(func, ob, args, ORIGIN_DRIVER), 0);
+    ret = process_answer(state, safe_apply(func, ob, args, ORIGIN_DRIVER), 0);
     if (ob->flags & O_DESTRUCTED) {
       return 0;
     }
@@ -2184,7 +2198,7 @@ static int parallel_check_functions(object_t *obj, parse_state_t *state, int whi
   int tryy, ret, args;
 
   free_parser_error(&parallel_error_info);
-  if (obj && (intptr_t)obj != 0x9) {
+  if (obj) {
     SET_OB(obj);
     for (tryy = 0, ret = 0; !ret && tryy < 8; tryy++) {
       if (tryy == 4) {
@@ -2193,7 +2207,7 @@ static int parallel_check_functions(object_t *obj, parse_state_t *state, int whi
       args = make_function(func, EndOf(func), which, state, tryy % 4, obj);
       args += push_real_names(tryy % 4, which);
       DEBUG_P(("Trying %s ... (/%s)", func, ob->obname));
-      ret = parallel_process_answer(state, apply(func, ob, args, ORIGIN_DRIVER), which);
+      ret = parallel_process_answer(state, safe_apply(func, ob, args, ORIGIN_DRIVER), which);
       if (ob->flags & O_DESTRUCTED) {
         return 0;
       }
@@ -2867,7 +2881,7 @@ static void do_the_call(void) {
     }
     best_result->res[i].args = nullptr;
     DEBUG_P(("Calling %s ...", best_result->res[i].func));
-    if (apply(best_result->res[i].func, ob, best_result->res[i].num, ORIGIN_DRIVER)) {
+    if (safe_apply(best_result->res[i].func, ob, best_result->res[i].num, ORIGIN_DRIVER)) {
       return;
     }
   }
@@ -3515,7 +3529,7 @@ void f_parse_add_rule() {
   }
 
   verb_node =
-      (verb_node_t *)DMALLOC(sizeof(verb_node_t) + sizeof(int) * i, TAG_PARSER, "parse_add_rule");
+      (verb_node_t *)DMALLOC(sizeof(verb_node_t) + sizeof(int) * i, TAG_PARSER, "parse_add_rule 2");
 
   verb_node->lit[0] = lit[0];
   verb_node->lit[1] = lit[1];
@@ -3531,7 +3545,7 @@ void f_parse_add_rule() {
   verb_node->next = verb_entry->node;
   verb_entry->node = verb_node;
 
-  ret = apply(LIVINGS_ARE_REMOTE, handler, 0, ORIGIN_DRIVER);
+  ret = safe_apply(LIVINGS_ARE_REMOTE, handler, 0, ORIGIN_DRIVER);
   if (!IS_ZERO(ret)) {
     handler->pinfo->flags |= PI_REMOTE_LIVINGS;
   }
