@@ -33,9 +33,8 @@ bool u8_validate(const uint8_t *s, size_t len) {
   return state == UTF8_ACCEPT;
 }
 
-std::string u8_sanitize(char *src) {
-  std::string source(src);
-  return utf8::replace_invalid(source);
+std::string u8_sanitize(std::string_view src) {
+  return utf8::replace_invalid(src);
 }
 
 namespace {
