@@ -58,7 +58,8 @@ static inline void on_telnet_data(const char *buffer, unsigned long size, intera
     }
   }
 
-  on_user_input(ip, transdata, translen);
+  auto sanitized = u8_sanitize({transdata, translen});
+  on_user_input(ip, sanitized.c_str(), sanitized.length());
 
   if (transdata != buffer) {
     FREE(transdata);
