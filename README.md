@@ -1,21 +1,38 @@
-[![CI Status](https://github.com/fluffos/fluffos/workflows/Rust/Cmake%20CI/badge.svg)](https://github.com/fluffos/fluffos/actions)
-[![CI-OSX Status](https://github.com/fluffos/fluffos/workflows/Rust/Cmake%20CI%20on%20OSX/badge.svg)](https://github.com/fluffos/fluffos/actions)
+[![CI Status](https://github.com/fluffos/fluffos/workflows/CI%20on%20ubuntu/badge.svg)](https://github.com/fluffos/fluffos/actions)
+[![CI Status](https://github.com/fluffos/fluffos/workflows/CI%20on%20OSX/badge.svg)](https://github.com/fluffos/fluffos/actions)
+[![CI Status](https://github.com/fluffos/fluffos/workflows/CI%20on%20Windows/badge.svg)](https://github.com/fluffos/fluffos/actions)
+
+
 [![Backers on Open Collective](https://opencollective.com/fluffos-579/backers/badge.svg)](#backers)
 [![Sponsors on Open Collective](https://opencollective.com/fluffos-579/sponsors/badge.svg)](#sponsors)
 
 Welcome
 =======
-FluffOS is an actively maintained LPMUD driver, based on the last release of MudOS.
-it includes many bug fixes and codebase modernization.
+FluffOS is an LPMUD driver, based on the last release of MudOS (v22.2b14), includes 10+ years of bug
+ fixes and performance enhancement, with active support.
 
-FluffOS supports LPC based mud with little modification. if your codebase previously ran on Fluffos 2.X, FluffOS v2017 , I will help you migrate to FluffOS v2019. Ask away!
+FluffOS supports all LPC based mud with very little code changes. if you are currently still using MudOS somehow
+ it is definitely time to upgrade!
 
-Releases
+Version
 --------
-Previous release, v2017 is being used by many chinese LPMUD in production and will continue to
-receive support until EOY 2020. v2017 supports compiling on centOS/ubuntu and under windows using CYGWIN.
+The current release is v2019. With cmake based build system, it supports running on Linux/OSX/Windows(both WSL & msys2).
 
-Current release, v2019 is being actively developed. This release uses cmake system, ran on Linux/MacOS/Windows, and have full UTF-8 and Websocket support with very high level of backward compatbility. If you migrate your mud, you will have an fully funcitonal web interface from day 1.
+V2019 features includes:
+- Built in websocket support.
+- full UTF-8 aware LPC string & EFUNs, with transparent user input/output transcoding.
+- SHA512 crypt by default.
+- LPC Tracing
+
+V2019 Platform Targets:
+- Linux Ubuntu 18.04
+- MacOS OSX 10.15
+- MSYS2/mingw64 on Windows 7+
+
+The previous release is v2017. With an autoconf based build system, it supports compiling on centOS/ubuntu and under
+ windows using CYGWIN. This release is no longer supported, it is kept only for historical interest now.
+
+All previous MudOS and FluffOS releases are also kept in the code base as tags for historical reference.
 
 Support
 -------
@@ -27,18 +44,41 @@ QQ support Group: 451819151 [![451819151](https://pub.idqqimg.com/wpa/images/gro
 
 Gitter Support: [![Gitter](https://badges.gitter.im/fluffos/community.svg)](https://gitter.im/fluffos/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
-How to
-------
-Please checkout official website <https://www.fluffos.info>.
+How to Build
+------------
+see <https://www.fluffos.info/build.html>
+
+Bundled Third-party Dependencies
+----------------------
+- libwebsockets: <https://libwebsockets.org/>
+- backward-cpp <https://github.com/bombela/backward-cpp>
+- crypt from musl: <https://www.musl-libc.org/>
+- ghc::filesystem <https://github.com/gulrak/filesystem>
+- nlohmann::json <https://github.com/nlohmann/json>
+- scope_guard <https://github.com/Neargye/scope_guard>
+- utfcpp <https://github.com/nemtrif/utfcpp>
+- utf8_decoder <http://bjoern.hoehrmann.de/utf-8/decoder/dfa/>
+- libtelnet, based on <https://github.com/seanmiddleditch/libtelnet> with local modifications
+
+Non-bundled platform dependencies includes: libevent, ICU4C, OpenSSL, Zlib etc.
+
+Projects Using FluffOS
+----------------------
+[Add Your Own](https://github.com/fluffos/fluffos/edit/master/README.md)
 
 Donations
 ---------
 I would like to personal thank all the sponsors and contributors for showing their support.
-All donations are 100% used towards purchasing tools, equipments and hosting cost for website and forum.
+All donations are 100% used towards purchasing tools, equipments and hosting cost for FluffOS development and website
+ and forum hosting.
 
 The list is in descending order by time donation received.
 
-#### Received in 2019 Jan
+##### Received in 2020 Jan
+
+##### Received in 2020 Jan
+
+##### Received in 2019 Jan
 
 - 逍遥山人, qq1102907881
 - lostsnow
@@ -58,16 +98,14 @@ The list is in descending order by time donation received.
 
 ## Contributors
 
-This project exists thanks to all the people who contribute. 
+This project exists thanks to all the people who contribute.
 <a href="https://github.com/fluffos/fluffos/graphs/contributors"><img src="https://opencollective.com/fluffos-579/contributors.svg?width=890&button=false" /></a>
-
 
 ## Backers
 
 Thank you to all our backers! 🙏 [[Become a backer](https://opencollective.com/fluffos-579#backer)]
 
 <a href="https://opencollective.com/fluffos-579#backers" target="_blank"><img src="https://opencollective.com/fluffos-579/backers.svg?width=890"></a>
-
 
 ## Sponsors
 
