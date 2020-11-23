@@ -49,6 +49,7 @@ lws_create_new_server_wsi(struct lws_vhost *vhost, int fixed_tsi)
 {
 	struct lws *new_wsi;
 	int n = fixed_tsi;
+	size_t s = sizeof(struct lws);
 
 	if (n < 0)
 		n = lws_get_idlest_tsi(vhost->context);
@@ -58,11 +59,19 @@ lws_create_new_server_wsi(struct lws_vhost *vhost, int fixed_tsi)
 		return NULL;
 	}
 
-	new_wsi = lws_zalloc(sizeof(struct lws), "new server wsi");
+#if defined(LWS_WITH_EVENT_LIBS)
+	s += vhost->context->event_loop_ops->evlib_size_wsi;
+#endif
+
+	new_wsi = lws_zalloc(s, "new server wsi");
 	if (new_wsi == NULL) {
 		lwsl_err("Out of memory for new connection\n");
 		return NULL;
 	}
+
+#if defined(LWS_WITH_EVENT_LIBS)
+	new_wsi->evlib_wsi = (uint8_t *)new_wsi + sizeof(*new_wsi);
+#endif
 
 	new_wsi->wsistate |= LWSIFR_SERVER;
 	new_wsi->tsi = n;
@@ -131,16 +140,22 @@ lws_adopt_descriptor_vhost1(struct lws_vhost *vh, lws_adoption_type type,
 	 * we initialize it, it may become "live" concurrently unexpectedly...
 	 */
 
+	lws_context_lock(vh->context, __func__);
+
 	n = -1;
 	if (parent)
 		n = parent->tsi;
 	new_wsi = lws_create_new_server_wsi(vh, n);
-	if (!new_wsi)
+	if (!new_wsi) {
+		lws_context_unlock(vh->context);
 		return NULL;
+	}
 
 	new_wsi->a.opaque_user_data = opaque;
 
 	pt = &context->pt[(int)new_wsi->tsi];
+	lws_pt_lock(pt, __func__);
+
 	lws_stats_bump(pt, LWSSTATS_C_CONNECTIONS, 1);
 
 	if (parent) {
@@ -163,22 +178,28 @@ lws_adopt_descriptor_vhost1(struct lws_vhost *vh, lws_adoption_type type,
 		}
 	}
 
-  if (!LWS_SSL_ENABLED(new_wsi->a.vhost) ||
-      !(type & LWS_ADOPT_SOCKET))
-    type &= ~LWS_ADOPT_ALLOW_SSL;
+	if (!LWS_SSL_ENABLED(new_wsi->a.vhost) ||
+	    !(type & LWS_ADOPT_SOCKET))
+		type &= ~LWS_ADOPT_ALLOW_SSL;
 
 	if (lws_role_call_adoption_bind(new_wsi, type, vh_prot_name)) {
 		lwsl_err("%s: no role for desc type 0x%x\n", __func__, type);
 		goto bail;
 	}
 
+	lws_pt_unlock(pt);
+
 	/*
 	 * he's an allocated wsi, but he's not on any fds list or child list,
 	 * join him to the vhost's list of these kinds of incomplete wsi until
 	 * he gets another identity (he may do async dns now...)
 	 */
+	lws_vhost_lock(new_wsi->a.vhost);
 	lws_dll2_add_head(&new_wsi->vh_awaiting_socket,
 			  &new_wsi->a.vhost->vh_awaiting_socket_owner);
+	lws_vhost_unlock(new_wsi->a.vhost);
+
+	lws_context_unlock(vh->context);
 
 	return new_wsi;
 
@@ -192,7 +213,11 @@ bail:
 	vh->context->count_wsi_allocated--;
 
 	lws_vhost_unbind_wsi(new_wsi);
+
 	lws_free(new_wsi);
+
+	lws_pt_unlock(pt);
+	lws_context_unlock(vh->context);
 
 	return NULL;
 }
@@ -259,6 +284,7 @@ lws_adopt_ss_server_accept(struct lws *new_wsi)
 	h->wsi = new_wsi;
 	new_wsi->a.opaque_user_data = h;
 	h->info.flags |= LWSSSINFLAGS_ACCEPTED;
+	new_wsi->for_ss = 1; /* indicate wsi should invalidate any ss link to it on close */
 
 	// lwsl_notice("%s: opaq %p, role %s\n", __func__,
 	//		new_wsi->a.opaque_user_data, new_wsi->role_ops->name);
@@ -368,8 +394,10 @@ lws_adopt_descriptor_vhost2(struct lws *new_wsi, lws_adoption_type type,
 		}
 #endif
 
+	lws_vhost_lock(new_wsi->a.vhost);
 	/* he has fds visibility now, remove from vhost orphan list */
 	lws_dll2_remove(&new_wsi->vh_awaiting_socket);
+	lws_vhost_unlock(new_wsi->a.vhost);
 
 	/*
 	 *  by deferring callback to this point, after insertion to fds,
@@ -496,9 +524,7 @@ lws_adopt_socket_vhost(struct lws_vhost *vh, lws_sockfd_type accept_fd)
 
 	fd.sockfd = accept_fd;
 	return lws_adopt_descriptor_vhost(vh, LWS_ADOPT_SOCKET |
-			LWS_ADOPT_HTTP
-			| LWS_ADOPT_ALLOW_SSL
-			, fd, NULL, NULL);
+			LWS_ADOPT_HTTP | LWS_ADOPT_ALLOW_SSL, fd, NULL, NULL);
 }
 
 struct lws *
@@ -736,7 +762,9 @@ lws_create_adopt_udp(struct lws_vhost *vhost, const char *ads, int port,
 		h.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
 		h.ai_socktype = SOCK_DGRAM;
 		h.ai_protocol = IPPROTO_UDP;
+#if defined(AI_PASSIVE)
 		h.ai_flags = AI_PASSIVE;
+#endif
 #ifdef AI_ADDRCONFIG
 		h.ai_flags |= AI_ADDRCONFIG;
 #endif

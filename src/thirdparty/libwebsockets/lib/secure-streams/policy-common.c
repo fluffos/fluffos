@@ -175,7 +175,7 @@ lws_ss_policy_ref_trust_store(struct lws_context *context,
 			pol->trust.store->ssx509[0]->ca_der_len;
 #endif
 	i.port = CONTEXT_PORT_NO_LISTEN;
-	lwsl_notice("%s: %s trust store initial '%s'\n", __func__,
+	lwsl_info("%s: %s trust store initial '%s'\n", __func__,
 		  i.vhost_name, pol->trust.store->ssx509[0]->vhost_name);
 
 	v = lws_create_vhost(context, &i);
@@ -313,6 +313,7 @@ lws_ss_policy_set(struct lws_context *context, const char *name)
 	else
 		m = 0;
 
+	(void)m;
 	lwsl_info("%s: %s, pad %d%c: %s\n", __func__, buf, m, '%', name);
 
 	/* Create vhosts for each type of trust store */

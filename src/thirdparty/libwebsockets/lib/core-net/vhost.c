@@ -46,22 +46,6 @@ const struct lws_role_ops *available_roles[] = {
 	NULL
 };
 
-const struct lws_event_loop_ops *available_event_libs[] = {
-#if defined(LWS_WITH_POLL)
-	&event_loop_ops_poll,
-#endif
-#if defined(LWS_WITH_LIBUV)
-	&event_loop_ops_uv,
-#endif
-#if defined(LWS_WITH_LIBEVENT)
-	&event_loop_ops_event,
-#endif
-#if defined(LWS_WITH_LIBEV)
-	&event_loop_ops_ev,
-#endif
-	NULL
-};
-
 #if defined(LWS_WITH_ABSTRACT)
 const struct lws_protocols *available_abstract_protocols[] = {
 #if defined(LWS_ROLE_RAW)
@@ -433,8 +417,9 @@ next:
 	context->protocol_init_done = 1;
 
 #if defined(LWS_WITH_SERVER)
-	if (any)
+	if (any) {
 		lws_tls_check_all_cert_lifetimes(context);
+	}
 #endif
 
 	return 0;
@@ -470,8 +455,7 @@ struct lws_vhost *
 lws_create_vhost(struct lws_context *context,
 		 const struct lws_context_creation_info *info)
 {
-	struct lws_vhost *vh = lws_zalloc(sizeof(*vh), "create vhost"),
-			 **vh1 = &context->vhost_list;
+	struct lws_vhost *vh, **vh1 = &context->vhost_list;
 	const struct lws_http_mount *mounts;
 	const struct lws_protocols *pcols = info->protocols;
 #ifdef LWS_WITH_PLUGINS
@@ -489,8 +473,18 @@ lws_create_vhost(struct lws_context *context,
 #endif
 	int n;
 
+
+	vh = lws_zalloc(sizeof(*vh)
+#if defined(LWS_WITH_EVENT_LIBS)
+			+ context->event_loop_ops->evlib_size_vh
+#endif
+			, __func__);
 	if (!vh)
 		return NULL;
+
+#if defined(LWS_WITH_EVENT_LIBS)
+	vh->evlib_vh = (void *)&vh[1];
+#endif
 
 #if LWS_MAX_SMP > 1
 	pthread_mutex_init(&vh->lock, NULL);
@@ -684,15 +678,18 @@ lws_create_vhost(struct lws_context *context,
 #ifdef LWS_WITH_PLUGINS
 	if (plugin) {
 		while (plugin) {
-			for (n = 0; n < plugin->caps.count_protocols; n++) {
+			const lws_plugin_protocol_t *plpr =
+				(const lws_plugin_protocol_t *)plugin->hdr;
+
+			for (n = 0; n < plpr->count_protocols; n++) {
 				/*
 				 * for compatibility's sake, no pvo implies
 				 * allow all protocols
 				 */
 				if (f || lws_vhost_protocol_options(vh,
-				    plugin->caps.protocols[n].name)) {
+						plpr->protocols[n].name)) {
 					memcpy(&lwsp[m],
-					       &plugin->caps.protocols[n],
+					       &plpr->protocols[n],
 					       sizeof(struct lws_protocols));
 					m++;
 					vh->count_protocols++;
@@ -831,7 +828,10 @@ lws_create_vhost(struct lws_context *context,
 		goto bail1;
 	}
 #endif
+
+#if defined(LWS_WITH_SYS_ASYNC_DNS)
 	n = !!context->vhost_list;
+#endif
 
 	while (1) {
 		if (!(*vh1)) {
@@ -908,6 +908,8 @@ lws_cancel_service(struct lws_context *context)
 int
 lws_create_event_pipes(struct lws_context *context)
 {
+	struct lws_context_per_thread *pt;
+	size_t s = sizeof(struct lws);
 	struct lws *wsi;
 	int n;
 
@@ -922,14 +924,23 @@ lws_create_event_pipes(struct lws_context *context)
 	n = 0;
 	{
 #endif
-		if (context->pt[n].pipe_wsi)
+		pt = &context->pt[n];
+
+		if (pt->pipe_wsi)
 			return 0;
 
-		wsi = lws_zalloc(sizeof(*wsi), "event pipe wsi");
+#if defined(LWS_WITH_EVENT_LIBS)
+		s += context->event_loop_ops->evlib_size_wsi;
+#endif
+
+		wsi = lws_zalloc(s, "event pipe wsi");
 		if (!wsi) {
 			lwsl_err("%s: Out of mem\n", __func__);
 			return 1;
 		}
+#if defined(LWS_WITH_EVENT_LIBS)
+		wsi->evlib_wsi = (uint8_t *)wsi + sizeof(*wsi);
+#endif
 		wsi->a.context = context;
 		lws_role_transition(wsi, 0, LRS_UNCONNECTED, &role_ops_pipe);
 		wsi->a.protocol = NULL;
@@ -939,6 +950,8 @@ lws_create_event_pipes(struct lws_context *context)
 		wsi->desc.sockfd = LWS_SOCK_INVALID;
 		context->pt[n].pipe_wsi = wsi;
 		context->count_wsi_allocated++;
+
+		lws_pt_lock(pt, __func__); /* -------------- pt { */
 
 		if (!lws_plat_pipe_create(wsi)) {
 			/*
@@ -955,14 +968,21 @@ lws_create_event_pipes(struct lws_context *context)
 
 			if (context->event_loop_ops->sock_accept)
 				if (context->event_loop_ops->sock_accept(wsi))
-					return 1;
+					goto bail;
 
 			if (__insert_wsi_socket_into_fds(context, wsi))
-				return 1;
+				goto bail;
 		}
+
+		lws_pt_unlock(pt);
 	}
 
 	return 0;
+
+bail:
+	lws_pt_unlock(pt);
+
+	return 1;
 }
 
 void
@@ -1143,8 +1163,10 @@ __lws_vhost_destroy2(struct lws_vhost *vh)
 
 	/* add ourselves to the pending destruction list */
 
-	vh->vhost_next = vh->context->vhost_pending_destruction_list;
-	vh->context->vhost_pending_destruction_list = vh;
+	if (vh->context->vhost_pending_destruction_list != vh) {
+		vh->vhost_next = vh->context->vhost_pending_destruction_list;
+		vh->context->vhost_pending_destruction_list = vh;
+	}
 
 	lwsl_info("%s: %p\n", __func__, vh);
 

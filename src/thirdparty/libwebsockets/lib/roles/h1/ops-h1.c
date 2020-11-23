@@ -203,7 +203,7 @@ postbody_completion:
 					 */
 
 					if (lws_http_transaction_completed(wsi))
-						return -1;
+						goto bail;
 					break;
 				}
 #endif
@@ -1021,12 +1021,13 @@ rops_client_bind_h1(struct lws *wsi, const struct lws_client_connect_info *i)
 #if defined(LWS_ROLE_WS)
 		if (lws_create_client_ws_object(i, wsi))
 			goto fail_wsi;
+
+		goto bind_h1;
 #else
 		lwsl_err("%s: ws role not configured\n", __func__);
 
 		goto fail_wsi;
 #endif
-		goto bind_h1;
 	}
 
 	/* if a recognized http method, bind to it */
@@ -1148,8 +1149,8 @@ rops_pt_init_destroy_h1(struct lws_context *context,
 
 		pt->sul_ah_lifecheck.cb = lws_sul_http_ah_lifecheck;
 
-		__lws_sul_insert(&pt->pt_sul_owner, &pt->sul_ah_lifecheck,
-				 30 * LWS_US_PER_SEC);
+		__lws_sul_insert_us(&pt->pt_sul_owner[LWSSULLI_MISS_IF_SUSPENDED],
+				 &pt->sul_ah_lifecheck, 30 * LWS_US_PER_SEC);
 	} else
 		lws_dll2_remove(&pt->sul_ah_lifecheck.list);
 #endif

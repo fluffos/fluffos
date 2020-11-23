@@ -122,7 +122,6 @@ configure_file(
 add_subdir_include_dirs(core)
 add_subdir_include_dirs(misc)
 add_subdir_include_dirs(system)
-add_subdir_include_dirs(event-libs)
 
 if (LWS_WITH_DRIVERS)
 	add_subdir_include_dirs(drivers)
@@ -144,6 +143,8 @@ if (LWS_WITH_SECURE_STREAMS)
 	add_subdir_include_dirs(secure-streams)
 endif()
 
+add_subdir_include_dirs(event-libs)
+
 if (LWS_WITH_STATIC)
     if (LWS_STATIC_PIC)
         set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -162,16 +163,6 @@ if (LWS_WITH_STATIC)
 			OUTPUT_NAME websockets_static)
 	endif()
 	
-	if (UNIX AND LWS_WITH_PLUGINS)
-	set (CMAKE_POSITION_INDEPENDENT_CODE ON)
-	if (NOT((${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD") OR
-	   (${CMAKE_SYSTEM_NAME} MATCHES "QNX")))
-		if (LWS_WITH_STATIC)
-			target_link_libraries(websockets dl)
-		endif()
-	endif()
-endif()
-
 endif()
 
 if (LWS_WITH_SHARED)
@@ -179,7 +170,7 @@ if (LWS_WITH_SHARED)
 		set(RESOURCES "")
 	endif()
 	
-	add_library(websockets_shared SHARED ${SOURCES})# ${RESOURCES} ${HDR_PUBLIC})
+	add_library(websockets_shared SHARED ${SOURCES} ${RESOURCES})# ${HDR_PUBLIC})
 	set_target_properties(websockets_shared PROPERTIES LINKER_LANGUAGE C)
 	list(APPEND LWS_LIBRARIES websockets_shared)
 	target_include_directories(websockets_shared PRIVATE ${LWS_LIB_BUILD_INC_PATHS})
@@ -201,6 +192,16 @@ if (LWS_WITH_SHARED)
 
 	if (APPLE)
 		set_property(TARGET websockets_shared PROPERTY MACOSX_RPATH YES)
+	endif()
+
+	if (UNIX AND LWS_WITH_PLUGINS_API)
+		set (CMAKE_POSITION_INDEPENDENT_CODE ON)
+		if (NOT((${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD") OR
+		   (${CMAKE_SYSTEM_NAME} MATCHES "QNX")))
+		   if (LWS_WITH_SHARED)
+				target_link_libraries(websockets_shared dl)
+			endif()
+		endif()
 	endif()
 
 endif()
@@ -249,12 +250,12 @@ endif()
 # Install libs and headers.
 install(TARGETS ${LWS_LIBRARIES}
 		EXPORT LibwebsocketsTargets
-		LIBRARY DESTINATION "${LWS_INSTALL_LIB_DIR}${LIB_SUFFIX}" COMPONENT libraries
-		ARCHIVE DESTINATION "${LWS_INSTALL_LIB_DIR}${LIB_SUFFIX}" COMPONENT libraries
-		RUNTIME DESTINATION "${LWS_INSTALL_BIN_DIR}" COMPONENT libraries # Windows DLLs
+		LIBRARY DESTINATION "${LWS_INSTALL_LIB_DIR}${LIB_SUFFIX}" COMPONENT core
+		ARCHIVE DESTINATION "${LWS_INSTALL_LIB_DIR}${LIB_SUFFIX}" COMPONENT core
+		RUNTIME DESTINATION "${LWS_INSTALL_BIN_DIR}" COMPONENT core # Windows DLLs
 		PUBLIC_HEADER DESTINATION "${LWS_INSTALL_INCLUDE_DIR}" COMPONENT dev)
 		
-set(CPACK_COMPONENT_LIBRARIES_DISPLAY_NAME "Libraries" PARENT_SCOPE)
+	#set(CPACK_COMPONENT_LIBRARIES_DISPLAY_NAME "Libraries" PARENT_SCOPE)
 set(CPACK_COMPONENT_DEV_DISPLAY_NAME "Development files" PARENT_SCOPE)
 
 

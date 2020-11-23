@@ -132,6 +132,8 @@ lws_ss_serialize_rx_payload(struct lws_dsh *dsh, const uint8_t *buf,
 		 * on a non-default rideshare
 		 */
 		assert(rsp);
+		if (!rsp)
+			return 1;
 		l = strlen(rsp);
 		est += 1 + l;
 	} else
@@ -204,7 +206,16 @@ lws_ss_deserialize_tx_payload(struct lws_dsh *dsh, struct lws *wsi,
 	}
 
 	*len = lws_ser_ru16be(&p[1]) - (23 - 3);
-	assert(*len == si - 23);
+	if (*len != si - 23) {
+		/*
+		 * We cannot accept any length that doesn't reflect the actual
+		 * length of what came in from the dsh, either something nasty
+		 * happened with truncation or we are being attacked
+		 */
+		assert(0);
+
+		return 1;
+	}
 
 	memcpy(buf, p + 23, si - 23);
 
@@ -251,18 +262,27 @@ int
 lws_ss_serialize_state(struct lws_dsh *dsh, lws_ss_constate_t state,
 		       lws_ss_tx_ordinal_t ack)
 {
-	uint8_t pre[8];
+	uint8_t pre[12];
+	int n = 4;
 
 	lwsl_info("%s: %s, ord 0x%x\n", __func__, lws_ss_state_name(state),
 		  (unsigned int)ack);
 
 	pre[0] = LWSSS_SER_RXPRE_CONNSTATE;
 	pre[1] = 0;
-	pre[2] = 5;
-	pre[3] = (uint8_t)state;
-	lws_ser_wu32be(&pre[4], ack);
 
-	if (lws_dsh_alloc_tail(dsh, KIND_SS_TO_P, pre, 8, NULL, 0)) {
+	if (state > 255) {
+		pre[2] = 8;
+		lws_ser_wu32be(&pre[3], state);
+		n = 7;
+	} else {
+		pre[2] = 5;
+		pre[3] = (uint8_t)state;
+	}
+
+	lws_ser_wu32be(&pre[n], ack);
+
+	if (lws_dsh_alloc_tail(dsh, KIND_SS_TO_P, pre, n + 4, NULL, 0)) {
 		lwsl_err("%s: unable to alloc in dsh 2\n", __func__);
 
 		return 1;
@@ -470,10 +490,11 @@ lws_ss_deserialize_parse(struct lws_ss_serialization_parser *par,
 				    *state != LPCSCLI_OPERATIONAL)
 					goto hangup;
 
-				if (par->rem < 4)
+				if (par->rem < 5 || par->rem > 8)
 					goto hangup;
 
 				par->ps = RPAR_STATEINDEX;
+				par->ctr = 0;
 				break;
 
 			case LWSSS_SER_RXPRE_TXCR_UPDATE:
@@ -1020,8 +1041,6 @@ payload_ff:
 			lws_ss_serialize_state_transition(state,
 							  LPCSCLI_LOCAL_CONNECTED);
 			h = lws_container_of(par, lws_sspc_handle_t, parser);
-			if (h->cwsi)
-				lws_callback_on_writable(h->cwsi);
 
 			/*
 			 * This is telling us that the streamtype could be (and
@@ -1030,11 +1049,38 @@ payload_ff:
 			 *
 			 * We'll get a proxied state() coming later that informs
 			 * us about the situation with that.
+			 *
+			 * However at this point, we should choose to inform
+			 * the client that his stream was created... we will
+			 * later get a proxied CREATING state from the peer
+			 * but we should do it now and suppress the later one.
+			 *
+			 * The reason is he may set metadata in CREATING, and
+			 * we will try to do writeables to sync the stream to
+			 * master and ultimately bring up the onward connection now
+			 * now we are in LOCAL_CONNECTED.  We need to do the
+			 * CREATING now so we'll know the metadata to sync.
 			 */
+
+			h->creating_cb_done = 1;
+
+			n = ssi->state(client_pss_to_userdata(pss),
+						NULL, LWSSSCS_CREATING, 0);
+			switch (n) {
+			case LWSSSSRET_OK:
+				break;
+			case LWSSSSRET_DISCONNECT_ME:
+				goto hangup;
+			case LWSSSSRET_DESTROY_ME:
+				return LWSSSSRET_DESTROY_ME;
+			}
+
+			if (h->cwsi)
+				lws_callback_on_writable(h->cwsi);
 
 			par->rsl_pos = 0;
 			par->rsl_idx = 0;
-			h = lws_container_of(par, lws_sspc_handle_t, parser);
+
 			memset(&h->rideshare_ofs[0], 0, sizeof(h->rideshare_ofs[0]));
 			h->rideshare_list[0] = '\0';
 			h->rsidx = 0;
@@ -1063,8 +1109,9 @@ payload_ff:
 			break;
 
 		case RPAR_STATEINDEX:
-			par->ctr = *cp++;
-			par->ps = RPAR_ORD3;
+			par->ctr = (par->ctr << 8) | (*cp++);
+			if (--par->rem == 4)
+				par->ps = RPAR_ORD3;
 			break;
 
 		case RPAR_ORD3:
@@ -1129,13 +1176,26 @@ payload_ff:
 				break;
 			}
 
-			if (par->ctr < 0 || par->ctr > 16)
+			if (par->ctr < 0)
 				goto hangup;
 
 #if defined(_DEBUG)
 			lwsl_info("%s: forwarding proxied state %s\n",
 					__func__, lws_ss_state_name(par->ctr));
 #endif
+
+			if (par->ctr == LWSSSCS_CREATING) {
+				if (h->creating_cb_done)
+					/*
+					 * We have told him he's CREATING when
+					 * we heard we had linked up to the
+					 * proxy, so suppress the remote
+					 * CREATING so that he only sees it once
+					 */
+				break;
+
+				h->creating_cb_done = 1;
+			}
 
 			n = ssi->state(client_pss_to_userdata(pss),
 						NULL, par->ctr, par->flags);

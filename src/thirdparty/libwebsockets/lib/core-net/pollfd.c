@@ -27,8 +27,7 @@
 int
 _lws_change_pollfd(struct lws *wsi, int _and, int _or, struct lws_pollargs *pa)
 {
-#if !defined(LWS_WITH_LIBUV) && !defined(LWS_WITH_LIBEV) && \
-    !defined(LWS_WITH_LIBEVENT) && !defined(LWS_WITH_GLIB)
+#if !defined(LWS_WITH_EVENT_LIBS)
 	volatile struct lws_context_per_thread *vpt;
 #endif
 	struct lws_context_per_thread *pt;
@@ -72,8 +71,7 @@ _lws_change_pollfd(struct lws *wsi, int _and, int _or, struct lws_pollargs *pa)
 
 	assert(wsi->position_in_fds_table < (int)pt->fds_count);
 
-#if !defined(LWS_WITH_LIBUV) && !defined(LWS_WITH_LIBEV) && \
-    !defined(LWS_WITH_LIBEVENT) && !defined(LWS_WITH_GLIB)
+#if !defined(LWS_WITH_EVENT_LIBS)
 	/*
 	 * This only applies when we use the default poll() event loop.
 	 *
@@ -273,6 +271,8 @@ __insert_wsi_socket_into_fds(struct lws_context *context, struct lws *wsi)
 
 //	__dump_fds(pt, "pre insert");
 
+	lws_pt_assert_lock_held(pt);
+
 	lwsl_debug("%s: %p: tsi=%d, sock=%d, pos-in-fds=%d\n",
 		  __func__, wsi, wsi->tsi, wsi->desc.sockfd, pt->fds_count);
 
@@ -353,6 +353,8 @@ __remove_wsi_socket_from_fds(struct lws *wsi)
 	struct lws_context_per_thread *pt = &context->pt[(int)wsi->tsi];
 	struct lws *end_wsi;
 	int v, m, ret = 0;
+
+	lws_pt_assert_lock_held(pt);
 
 //	__dump_fds(pt, "pre remove");
 

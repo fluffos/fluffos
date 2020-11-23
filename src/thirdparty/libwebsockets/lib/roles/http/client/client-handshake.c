@@ -145,6 +145,10 @@ lws_client_connect_4_established(struct lws *wsi, struct lws *wsi_piggyback,
 #endif
 #endif
 
+	/* coverity */
+	if (!wsi->a.protocol)
+		return NULL;
+
 #if defined(LWS_WITH_SOCKS5)
 	if (lwsi_state(wsi) != 	LRS_ESTABLISHED)
 		switch (lws_socks5c_greet(wsi, &cce)) {
@@ -371,9 +375,10 @@ lws_client_connect_3_connect(struct lws *wsi, const char *ads,
 				      LWS_SERVER_OPTION_IPV6_V6ONLY_MODIFY |
 				      LWS_SERVER_OPTION_IPV6_V6ONLY_VALUE);
 #endif
+	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
 	const struct sockaddr *psa = NULL;
-	const char *cce = "", *iface;
 	uint16_t port = wsi->c_port;
+	const char *cce, *iface;
 	lws_sockaddr46 sa46;
 	ssize_t plen = 0;
 	char ni[48];
@@ -504,7 +509,6 @@ lws_client_connect_3_connect(struct lws *wsi, const char *ads,
 	 * Priority 1: connect to http proxy */
 
 	if (wsi->a.vhost->http.http_proxy_port) {
-		ads = wsi->a.vhost->http.http_proxy_address;
 		port = wsi->a.vhost->http.http_proxy_port;
 #else
 		if (0) {
@@ -649,8 +653,12 @@ ads_known:
 			if (wsi->a.context->event_loop_ops->sock_accept(wsi))
 				goto try_next_result_closesock;
 
-		if (__insert_wsi_socket_into_fds(wsi->a.context, wsi))
+		lws_pt_lock(pt, __func__);
+		if (__insert_wsi_socket_into_fds(wsi->a.context, wsi)) {
+			lws_pt_unlock(pt);
 			goto try_next_result_closesock;
+		}
+		lws_pt_unlock(pt);
 
 		/*
 		 * The fd + wsi combination is entered into the wsi tables
@@ -996,6 +1004,14 @@ solo:
 		ads = wsi->stash->cis[CIS_ADDRESS];
 	else
 		ads = lws_hdr_simple_ptr(wsi, _WSI_TOKEN_CLIENT_PEER_ADDRESS);
+
+	/*
+	 * Since address must be given at client creation, should not be
+	 * possible, but necessary to satisfy coverity
+	 */
+	if (!ads)
+		return NULL;
+
 #if defined(LWS_WITH_UNIX_SOCK)
 	if (*ads == '+') {
 		wsi->unix_skt = 1;
@@ -1190,7 +1206,8 @@ lws_client_reset(struct lws **pwsi, int ssl, const char *address, int port,
 	 */
 
 	for (n = 0; n < (int)LWS_ARRAY_SIZE(hnames2); n++)
-		if (lws_hdr_total_length(wsi, hnames2[n])) {
+		if (lws_hdr_total_length(wsi, hnames2[n]) &&
+		    lws_hdr_simple_ptr(wsi, hnames2[n])) {
 			memcpy(p, lws_hdr_simple_ptr(wsi, hnames2[n]), (size_t)(
 			       lws_hdr_total_length(wsi, hnames2[n]) + 1));
 			p += (size_t)(lws_hdr_total_length(wsi, hnames2[n]) + 1);

@@ -50,7 +50,7 @@
 #endif
 #endif /* win32 */
 
-#define COMBO_SIZEOF 256
+#define COMBO_SIZEOF 512
 
 #if !defined(LWS_PLAT_FREERTOS)
 
@@ -132,6 +132,7 @@ lws_dir(const char *dirpath, void *user, lws_dir_callback_function cb)
 	}
 
 	for (i = 0; i < n; i++) {
+		unsigned int type = namelist[i]->d_type;
 		if (strchr(namelist[i]->d_name, '~'))
 			goto skip;
 		lde.name = namelist[i]->d_name;
@@ -148,48 +149,27 @@ lws_dir(const char *dirpath, void *user, lws_dir_callback_function cb)
 		 * XFS on Linux doesn't fill in d_type at all, always zero.
 		 */
 
-		switch (namelist[i]->d_type) {
-#if DT_BLK != DT_UNKNOWN
-		case DT_BLK:
+		if (DT_BLK != DT_UNKNOWN && type == DT_BLK)
 			lde.type = LDOT_BLOCK;
-			break;
-#endif
-#if DT_CHR != DT_UNKNOWN
-		case DT_CHR:
+		else if (DT_CHR != DT_UNKNOWN && type == DT_CHR)
 			lde.type = LDOT_CHAR;
-			break;
-#endif
-#if DT_DIR != DT_UNKNOWN
-		case DT_DIR:
+		else if (DT_DIR != DT_UNKNOWN && type == DT_DIR)
 			lde.type = LDOT_DIR;
-			break;
-#endif
-#if DT_FIFO != DT_UNKNOWN
-		case DT_FIFO:
+		else if (DT_FIFO != DT_UNKNOWN && type == DT_FIFO)
 			lde.type = LDOT_FIFO;
-			break;
-#endif
-#if DT_LNK != DT_UNKNOWN
-		case DT_LNK:
+		else if (DT_LNK != DT_UNKNOWN && type == DT_LNK)
 			lde.type = LDOT_LINK;
-			break;
-#endif
-		case DT_REG:
+		else if (DT_REG != DT_UNKNOWN && type == DT_REG)
 			lde.type = LDOT_FILE;
-			break;
-#if DT_SOCK != DT_UNKNOWN
-		case DT_SOCK:
+		else if (DT_SOCK != DT_UNKNOWN && type == DT_SOCK)
 			lde.type = LDOTT_SOCKET;
-			break;
-#endif
-		default:
+		else {
 			lde.type = LDOT_UNKNOWN;
 			lws_dir_via_stat(combo, l, namelist[i]->d_name, &lde);
-			break;
 		}
 #endif
 		if (cb(dirpath, user, &lde)) {
-			while (i++ < n)
+			while (++i < n)
 				free(namelist[i]);
 			goto bail;
 		}
@@ -265,7 +245,24 @@ lws_dir_rm_rf_cb(const char *dirpath, void *user, struct lws_dir_entry *lde)
 	lws_snprintf(path, sizeof(path), "%s%c%s", dirpath, csep, lde->name);
 
 	if (lde->type == LDOT_DIR) {
-		lws_dir(path, NULL, lws_dir_rm_rf_cb);
+#if !defined(WIN32) && !defined(_WIN32) && !defined(__COVERITY__)
+		char dummy[8];
+		/*
+		 * hm... eg, recursive dir symlinks can show up a LDOT_DIR
+		 * here.  If it's a symlink, don't recurse into it.
+		 *
+		 * Notice we immediately discard dummy without looking in it.
+		 * There is no way to get into trouble from its lack of NUL
+		 * termination in dummy[].  We just wanted to know if it was
+		 * a symlink at all.
+		 *
+		 * Hide this from Coverity since it flags any use of readlink()
+		 * even if safe.
+		 */
+		if (readlink(path, dummy, sizeof(dummy)) < 0)
+#endif
+			lws_dir(path, NULL, lws_dir_rm_rf_cb);
+
 		if (rmdir(path))
 			lwsl_warn("%s: rmdir %s failed %d\n", __func__, path, errno);
 	} else {
@@ -285,4 +282,96 @@ lws_dir_rm_rf_cb(const char *dirpath, void *user, struct lws_dir_entry *lde)
 }
 
 
+#endif
+
+#if defined(LWS_WITH_PLUGINS_API)
+
+struct lws_plugins_args {
+	struct lws_plugin	**pplugin;
+	const char		*_class;
+	const char		*filter;
+	each_plugin_cb_t	each;
+	void			*each_user;
+};
+
+static int
+lws_plugins_dir_cb(const char *dirpath, void *user, struct lws_dir_entry *lde)
+{
+	struct lws_plugins_args *pa = (struct lws_plugins_args *)user;
+	char path[256], base[64], *q = base;
+	const char *p;
+
+	if (strlen(lde->name) < 7)
+		return 0;
+
+	/*
+	 * The actual plugin names for protocol plugins look like
+	 * "libprotocol_lws_ssh_base.so" and for event libs
+	 * "libwebsockets-evlib_ev.so"... to recover the base name of
+	 * "lws_ssh_base" and "evlib_ev" we strip from the left to after the
+	 * first _ or -, and then truncate at the first .
+	 */
+
+	p = lde->name;
+	while (*p && *p != '_' && *p != '-')
+		p++;
+	if (!*p)
+		return 0;
+	p++;
+	while (*p && *p != '.' && lws_ptr_diff(q, base) < (int)sizeof(base) - 1)
+		*q++ = *p++;
+	*q = '\0';
+
+	/* if he's given a filter, only match if base matches it */
+	if (pa->filter && strcmp(base, pa->filter))
+		return 0;
+
+	lws_snprintf(path, sizeof(path) - 1, "%s/%s", dirpath, lde->name);
+	lwsl_notice("   %s\n", path);
+
+	return !lws_plat_dlopen(pa->pplugin, path, base, pa->_class,
+				pa->each, pa->each_user);
+}
+
+int
+lws_plugins_init(struct lws_plugin **pplugin, const char * const *d,
+		 const char *_class, const char *filter,
+		 each_plugin_cb_t each, void *each_user)
+{
+	struct lws_plugins_args pa;
+
+	pa.pplugin = pplugin;
+	pa._class = _class;
+	pa.each = each;
+	pa.each_user = each_user;
+	pa.filter = filter;
+
+	while (d && *d) {
+		lws_dir(*d, &pa, lws_plugins_dir_cb);
+		d++;
+	}
+
+	return 0;
+}
+
+int
+lws_plugins_destroy(struct lws_plugin **pplugin, each_plugin_cb_t each,
+		    void *each_user)
+{
+	struct lws_plugin *p = *pplugin, *p1;
+
+	while (p) {
+		if (each)
+			each(p, each_user);
+		lws_plat_destroy_dl(p);
+		p1 = p->list;
+		p->list = NULL;
+		lws_free(p);
+		p = p1;
+	}
+
+	*pplugin = NULL;
+
+	return 0;
+}
 #endif

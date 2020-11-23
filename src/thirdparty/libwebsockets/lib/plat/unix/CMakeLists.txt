@@ -65,7 +65,7 @@ if (LWS_WITH_NETWORK)
 	endif()
 endif()
 	
-if (LWS_WITH_PLUGINS AND LWS_WITH_LIBUV)
+if (LWS_WITH_PLUGINS_API)
 	list(APPEND SOURCES plat/unix/unix-plugins.c)
 endif()
 
