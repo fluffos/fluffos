@@ -111,6 +111,7 @@
  #define strerror(x) ""
 #endif
 
+
  /*
   *
   *  ------ private platform defines ------
@@ -211,48 +212,16 @@ struct lws_ring {
 struct lws_protocols;
 struct lws;
 
-#if defined(LWS_WITH_NETWORK)
+#if defined(LWS_WITH_NETWORK) /* network */
 #include "private-lib-event-libs.h"
 
 #if defined(LWS_WITH_SECURE_STREAMS)
 #include "private-lib-secure-streams.h"
 #endif
 
-
 #if defined(LWS_WITH_SYS_SMD)
 #include "private-lib-system-smd.h"
 #endif
-
-struct lws_io_watcher {
-#ifdef LWS_WITH_LIBEV
-	struct lws_io_watcher_libev ev;
-#endif
-#ifdef LWS_WITH_LIBUV
-	struct lws_io_watcher_libuv uv;
-#endif
-#ifdef LWS_WITH_LIBEVENT
-	struct lws_io_watcher_libevent event;
-#endif
-#ifdef LWS_WITH_GLIB
-	struct lws_io_watcher_glib glib;
-#endif
-	struct lws_context *context;
-
-	uint8_t actual_events;
-};
-
-struct lws_signal_watcher {
-#ifdef LWS_WITH_LIBEV
-	struct lws_signal_watcher_libev ev;
-#endif
-#ifdef LWS_WITH_LIBUV
-	struct lws_signal_watcher_libuv uv;
-#endif
-#ifdef LWS_WITH_LIBEVENT
-	struct lws_signal_watcher_libevent event;
-#endif
-	struct lws_context *context;
-};
 
 struct lws_foreign_thread_pollfd {
 	struct lws_foreign_thread_pollfd *next;
@@ -260,30 +229,7 @@ struct lws_foreign_thread_pollfd {
 	int _and;
 	int _or;
 };
-#endif
-
-#if LWS_MAX_SMP > 1
-
-struct lws_mutex_refcount {
-	pthread_mutex_t lock;
-	pthread_t lock_owner;
-	const char *last_lock_reason;
-	char lock_depth;
-	char metadata;
-};
-
-void
-lws_mutex_refcount_init(struct lws_mutex_refcount *mr);
-
-void
-lws_mutex_refcount_destroy(struct lws_mutex_refcount *mr);
-
-void
-lws_mutex_refcount_lock(struct lws_mutex_refcount *mr, const char *reason);
-
-void
-lws_mutex_refcount_unlock(struct lws_mutex_refcount *mr);
-#endif
+#endif /* network */
 
 #if defined(LWS_WITH_NETWORK)
 #include "private-lib-core-net.h"
@@ -367,20 +313,13 @@ struct lws_context {
  * LWS_WITH_NETWORK =====>
  */
 
-#if defined(LWS_WITH_LIBEV)
-	struct lws_context_eventlibs_libev	ev;
+#if defined(LWS_WITH_EVENT_LIBS)
+	struct lws_plugin		*evlib_plugin_list;
+	void				*evlib_ctx; /* overallocated */
 #endif
-#if defined(LWS_WITH_LIBUV)
-	struct lws_context_eventlibs_libuv	uv;
-#endif
-#if defined(LWS_WITH_LIBEVENT)
-	struct lws_context_eventlibs_libevent	event;
-#endif
-#if defined(LWS_WITH_GLIB)
-	struct lws_context_eventlibs_glib	glib;
-#endif
+
 #if defined(LWS_WITH_TLS)
-	struct lws_context_tls			tls;
+	struct lws_context_tls		tls;
 #endif
 #if defined(LWS_WITH_DRIVERS)
 	lws_netdevs_t			netdevs;
@@ -426,7 +365,7 @@ struct lws_context {
 	const char			*server_string;
 #endif
 
-	struct lws_event_loop_ops	*event_loop_ops;
+	const struct lws_event_loop_ops	*event_loop_ops;
 #endif
 
 #if defined(LWS_WITH_TLS)
@@ -470,7 +409,7 @@ struct lws_context {
 	const char *detailed_latency_filepath;
 #endif
 
-#if defined(LWS_AMAZON_RTOS)
+#if defined(LWS_AMAZON_RTOS) && defined(LWS_WITH_MBEDTLS)
 	mbedtls_entropy_context mec;
 	mbedtls_ctr_drbg_context mcdc;
 #endif
@@ -682,6 +621,7 @@ lws_vhost_unlock(struct lws_vhost *vhost)
 #define lws_pt_mutex_init(_a) (void)(_a)
 #define lws_pt_mutex_destroy(_a) (void)(_a)
 #define lws_pt_lock(_a, b) (void)(_a)
+#define lws_pt_assert_lock_held(_a) (void)(_a)
 #define lws_pt_unlock(_a) (void)(_a)
 #define lws_context_lock(_a, _b) (void)(_a)
 #define lws_context_unlock(_a) (void)(_a)

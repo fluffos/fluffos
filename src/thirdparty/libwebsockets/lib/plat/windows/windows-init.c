@@ -55,6 +55,21 @@ lws_plat_context_early_init(void)
 	return 1;
 }
 
+#if defined(LWS_WITH_PLUGINS)
+static int
+protocol_plugin_cb(struct lws_plugin *pin, void *each_user)
+{
+	struct lws_context *context = (struct lws_context *)each_user;
+	const lws_plugin_protocol_t *plpr =
+			(const lws_plugin_protocol_t *)pin->hdr;
+
+	context->plugin_protocol_count += plpr->count_protocols;
+	context->plugin_extension_count += plpr->count_extensions;
+
+	return 0;
+}
+#endif
+
 int
 lws_plat_init(struct lws_context *context,
 	      const struct lws_context_creation_info *info)
@@ -72,8 +87,10 @@ lws_plat_init(struct lws_context *context,
 	}
 
 	while (n--) {
+               int m;
 		pt->fds_count = 0;
-		pt->events = WSACreateEvent(); /* the cancel event */
+               for (m = 0; m < WSA_MAXIMUM_WAIT_EVENTS; m++)
+                       pt->events[m] = WSACreateEvent();
 		InitializeCriticalSection(&pt->interrupt_lock);
 
 		pt++;
@@ -81,9 +98,11 @@ lws_plat_init(struct lws_context *context,
 
 	context->fd_random = 0;
 
-#ifdef LWS_WITH_PLUGINS
+#if defined(LWS_WITH_PLUGINS)
 	if (info->plugin_dirs)
-		lws_plat_plugins_init(context, info->plugin_dirs);
+		lws_plat_plugins_init(&context->plugin_list, info->plugin_dirs,
+				      "lws_protocol_plugin",
+				      protocol_plugin_cb, context);
 #endif
 
 	return 0;
@@ -96,7 +115,9 @@ lws_plat_context_early_destroy(struct lws_context *context)
 	int n = context->count_threads;
 
 	while (n--) {
-		WSACloseEvent(pt->events);
+		int m;
+		for (m = 0; m < WSA_MAXIMUM_WAIT_EVENTS; m++)
+			WSACloseEvent(pt->events[m]);
 		DeleteCriticalSection(&pt->interrupt_lock);
 		pt++;
 	}
@@ -106,6 +127,11 @@ void
 lws_plat_context_late_destroy(struct lws_context *context)
 {
 	int n;
+
+#ifdef LWS_WITH_PLUGINS
+	if (context->plugin_list)
+		lws_plugins_destroy(&context->plugin_list);
+#endif
 
 	for (n = 0; n < FD_HASHTABLE_MODULUS; n++) {
 		if (context->fd_hashtable[n].wsi)

@@ -3,6 +3,7 @@
 
 #include "gettimeofday.h"
 
+#ifndef LWS_MINGW_SUPPORT
 int gettimeofday(struct timeval *tv, struct timezone *tz)
 {
 	FILETIME ft;
@@ -22,7 +23,7 @@ int gettimeofday(struct timeval *tv, struct timezone *tz)
 		tv->tv_sec = (long)(tmpres / 1000000UL);
 		tv->tv_usec = (long)(tmpres % 1000000UL);
 	}
- 
+
 	if (NULL != tz) {
 		if (!tzflag) {
 			_tzset();
@@ -34,3 +35,4 @@ int gettimeofday(struct timeval *tv, struct timezone *tz)
 
 	return 0;
 }
+#endif

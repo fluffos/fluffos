@@ -100,11 +100,7 @@ int fork(void);
 #define SIGINT 2
 #endif
 
-#if !defined(__MINGW32__) && !defined(__MINGW64__)
 #include <gettimeofday.h>
-#else
-#include <sys/time.h>
-#endif
 
 #ifndef BIG_ENDIAN
  #define BIG_ENDIAN    4321  /* to show byte order (taken from gcc) */

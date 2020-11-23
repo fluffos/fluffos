@@ -30,7 +30,7 @@
 
 static const char *library_version = LWS_LIBRARY_VERSION;
 
-#if defined(__linux__) || defined(__FreeBSD__) || defined(__illumos__)
+#if defined(LWS_HAVE_SYS_RESOURCE_H)
 /* for setrlimit */
 #include <sys/resource.h>
 #endif
@@ -113,6 +113,9 @@ lws_state_notify_protocol_init(struct lws_state_manager *mgr,
 {
 	struct lws_context *context = lws_container_of(mgr, struct lws_context,
 						       mgr_system);
+#if defined(LWS_WITH_SECURE_STREAMS) && defined(LWS_WITH_SECURE_STREAMS_SYS_AUTH_API_AMAZON_COM)
+	lws_system_blob_t *ab0, *ab1;
+#endif
 	int n;
 
 	/*
@@ -150,14 +153,14 @@ lws_state_notify_protocol_init(struct lws_state_manager *mgr,
 	 *
 	 * If root token is empty, skip too.
 	 */
+
+	ab0 = lws_system_get_blob(context, LWS_SYSBLOB_TYPE_AUTH, 0);
+	ab1 = lws_system_get_blob(context, LWS_SYSBLOB_TYPE_AUTH, 1);
+
 	if (target == LWS_SYSTATE_AUTH1 &&
-	    context->pss_policies &&
-	    !lws_system_blob_get_size(lws_system_get_blob(context,
-						          LWS_SYSBLOB_TYPE_AUTH,
-						          0)) &&
-	    lws_system_blob_get_size(lws_system_get_blob(context,
-						          LWS_SYSBLOB_TYPE_AUTH,
-						          1))) {
+	    context->pss_policies && ab0 && ab1 &&
+	    !lws_system_blob_get_size(ab0) &&
+	    lws_system_blob_get_size(ab1)) {
 		lwsl_info("%s: AUTH1 state triggering api.amazon.com auth\n", __func__);
 		/*
 		 * Start trying to acquire it if it's not already in progress
@@ -211,9 +214,8 @@ lws_state_notify_protocol_init(struct lws_state_manager *mgr,
 		return 0;
 
 	lwsl_info("%s: doing protocol init on POLICY_VALID\n", __func__);
-	lws_protocol_init(context);
 
-	return 0;
+	return lws_protocol_init(context);
 }
 
 static void
@@ -329,6 +331,22 @@ static const char * const opts_str =
 
 #endif
 
+#if defined(LWS_WITH_EVLIB_PLUGINS) && defined(LWS_WITH_EVENT_LIBS)
+static const struct lws_evlib_map {
+	uint64_t	flag;
+	const char	*name;
+} map[] = {
+	{ LWS_SERVER_OPTION_LIBUV,    "evlib_uv" },
+	{ LWS_SERVER_OPTION_LIBEVENT, "evlib_event" },
+	{ LWS_SERVER_OPTION_GLIB,     "evlib_glib" },
+	{ LWS_SERVER_OPTION_LIBEV,    "evlib_ev" },
+};
+static const char * const dlist[] = {
+	LWS_INSTALL_LIBDIR,
+	NULL
+};
+#endif
+
 struct lws_context *
 lws_create_context(const struct lws_context_creation_info *info)
 {
@@ -358,6 +376,10 @@ lws_create_context(const struct lws_context_creation_info *info)
 #endif
 		size = sizeof(struct lws_context);
 	int n, lpf = info->fd_limit_per_thread;
+	const lws_plugin_evlib_t *plev = NULL;
+#if defined(LWS_WITH_EVLIB_PLUGINS) && defined(LWS_WITH_EVENT_LIBS)
+	struct lws_plugin		*evlib_plugin_list = NULL;
+#endif
 
 	if (lpf) {
 		lpf+= 2;
@@ -405,6 +427,102 @@ lws_create_context(const struct lws_context_creation_info *info)
 #if !defined(LWS_PLAT_FREERTOS)
 	size += (count_threads * sizeof(struct lws));
 #endif
+#endif /* network */
+
+#if defined(LWS_WITH_POLL)
+	{
+		extern const lws_plugin_evlib_t evlib_poll;
+		plev = &evlib_poll;
+	}
+#endif
+
+#if defined(LWS_WITH_EVLIB_PLUGINS) && defined(LWS_WITH_EVENT_LIBS)
+
+	/*
+	 * New style dynamically loaded event lib support
+	 *
+	 * We have to pick and load the event lib plugin before we allocate
+	 * the context object, so we can overallocate it correctly
+	 */
+
+	lwsl_info("%s: ev lib path %s\n", __func__, LWS_INSTALL_LIBDIR);
+
+	for (n = 0; n < (int)LWS_ARRAY_SIZE(map); n++) {
+		if (!lws_check_opt(info->options, map[n].flag))
+			continue;
+
+		if (lws_plugins_init(&evlib_plugin_list,
+				     dlist, "lws_evlib_plugin",
+				     map[n].name, NULL, NULL)) {
+			lwsl_err("%s: failed to load %s\n", __func__,
+					map[n].name);
+			goto bail;
+		}
+
+		if (!evlib_plugin_list) {
+			lwsl_err("%s: unable to load evlib plugin %s\n",
+					__func__, map[n].name);
+
+			goto bail;
+		}
+		plev = (const lws_plugin_evlib_t *)evlib_plugin_list->hdr;
+		break;
+	}
+#else
+#if defined(LWS_WITH_EVENT_LIBS)
+	/*
+	 * set the context event loops ops struct
+	 *
+	 * after this, all event_loop actions use the generic ops
+	 */
+
+	/*
+	 * oldstyle built-in event lib support
+	 *
+	 * We have composed them into the libwebsockets lib itself, we can
+	 * just pick the ops we want and done
+	 */
+
+#if defined(LWS_WITH_LIBUV)
+	if (lws_check_opt(info->options, LWS_SERVER_OPTION_LIBUV)) {
+		extern const lws_plugin_evlib_t evlib_uv;
+		plev = &evlib_uv;
+	}
+#endif
+
+#if defined(LWS_WITH_LIBEVENT)
+	if (lws_check_opt(info->options, LWS_SERVER_OPTION_LIBEVENT)) {
+		extern const lws_plugin_evlib_t evlib_event;
+		plev = &evlib_event;
+	}
+#endif
+
+#if defined(LWS_WITH_GLIB)
+	if (lws_check_opt(info->options, LWS_SERVER_OPTION_GLIB)) {
+		extern const lws_plugin_evlib_t evlib_glib;
+		plev = &evlib_glib;
+	}
+#endif
+
+#if defined(LWS_WITH_LIBEV)
+	if (lws_check_opt(info->options, LWS_SERVER_OPTION_LIBEV)) {
+		extern const lws_plugin_evlib_t evlib_ev;
+		plev = &evlib_ev;
+	}
+#endif
+
+#endif /* with event libs */
+
+#endif /* not with ev plugins */
+
+	if (!plev)
+		goto fail_event_libs;
+
+#if defined(LWS_WITH_NETWORK)
+	size += (size_t)plev->ops->evlib_size_ctx /* the ctx evlib priv */ +
+		(count_threads * (size_t)plev->ops->evlib_size_pt) /* the pt evlib priv */;
+
+	lwsl_info("Event loop: %s\n", plev->ops->name);
 #endif
 
 	context = lws_zalloc(size, "context");
@@ -412,6 +530,18 @@ lws_create_context(const struct lws_context_creation_info *info)
 		lwsl_err("No memory for websocket context\n");
 		return NULL;
 	}
+
+#if defined(LWS_WITH_NETWORK)
+	context->event_loop_ops = plev->ops;
+#endif
+#if defined(LWS_WITH_EVENT_LIBS)
+	/* at the very end */
+	context->evlib_ctx = (uint8_t *)context + size -
+					plev->ops->evlib_size_ctx;
+#endif
+#if defined(LWS_WITH_EVLIB_PLUGINS) && defined(LWS_WITH_EVENT_LIBS)
+	context->evlib_plugin_list = evlib_plugin_list;
+#endif
 
 #if !defined(LWS_PLAT_FREERTOS)
 	context->uid = info->uid;
@@ -458,7 +588,7 @@ lws_create_context(const struct lws_context_creation_info *info)
         if (info->extensions)
                 lwsl_warn("%s: LWS_WITHOUT_EXTENSIONS but extensions ptr set\n", __func__);
 #endif
-#endif
+#endif /* network */
 
 #if defined(LWS_WITH_SECURE_STREAMS)
 #if !defined(LWS_WITH_SECURE_STREAMS_STATIC_POLICY_ONLY)
@@ -576,7 +706,18 @@ lws_create_context(const struct lws_context_creation_info *info)
 #if defined(WIN32) || defined(_WIN32) || defined(LWS_AMAZON_RTOS) || defined(LWS_ESP_PLATFORM)
 	context->max_fds = getdtablesize();
 #else
-	context->max_fds = sysconf(_SC_OPEN_MAX);
+	{
+		long l = sysconf(_SC_OPEN_MAX);
+
+		context->max_fds = 2560;
+
+		if (l > 10000000)
+			lwsl_warn("%s: unreasonable ulimit -n workaround\n",
+				  __func__);
+		else
+			if (l != -1l)
+				context->max_fds = (int)l;
+	}
 #endif
 	if (context->max_fds < 0) {
 		lwsl_err("%s: problem getting process max files\n",
@@ -601,52 +742,9 @@ lws_create_context(const struct lws_context_creation_info *info)
 	}
 
 #if defined(LWS_WITH_NETWORK)
-
 	context->token_limits = info->token_limits;
-
-	/*
-	 * set the context event loops ops struct
-	 *
-	 * after this, all event_loop actions use the generic ops
-	 */
-
-#if defined(LWS_WITH_POLL)
-	context->event_loop_ops = &event_loop_ops_poll;
 #endif
 
-	if (lws_check_opt(context->options, LWS_SERVER_OPTION_LIBUV))
-#if defined(LWS_WITH_LIBUV)
-		context->event_loop_ops = &event_loop_ops_uv;
-#else
-		goto fail_event_libs;
-#endif
-
-	if (lws_check_opt(context->options, LWS_SERVER_OPTION_LIBEV))
-#if defined(LWS_WITH_LIBEV)
-		context->event_loop_ops = &event_loop_ops_ev;
-#else
-		goto fail_event_libs;
-#endif
-
-	if (lws_check_opt(context->options, LWS_SERVER_OPTION_LIBEVENT))
-#if defined(LWS_WITH_LIBEVENT)
-		context->event_loop_ops = &event_loop_ops_event;
-#else
-		goto fail_event_libs;
-#endif
-
-	if (lws_check_opt(context->options, LWS_SERVER_OPTION_GLIB))
-#if defined(LWS_WITH_GLIB)
-		context->event_loop_ops = &event_loop_ops_glib;
-#else
-		goto fail_event_libs;
-#endif
-
-	if (!context->event_loop_ops)
-		goto fail_event_libs;
-
-	lwsl_info("Using event loop: %s\n", context->event_loop_ops->name);
-#endif
 
 #if defined(LWS_WITH_TLS) && defined(LWS_WITH_NETWORK)
 	time(&context->tls.last_cert_check_s);
@@ -726,7 +824,7 @@ lws_create_context(const struct lws_context_creation_info *info)
 	}
 #endif
 
-n = 0;
+	n = 0;
 #if defined(LWS_WITH_NETWORK)
 
 	context->default_retry.retry_ms_table = default_backoff_table;
@@ -769,6 +867,11 @@ n = 0;
 		u += sizeof(struct lws);
 
 		memset(context->pt[n].fake_wsi, 0, sizeof(struct lws));
+#endif
+
+#if defined(LWS_WITH_EVENT_LIBS)
+		context->pt[n].evlib_pt = u;
+		u += plev->ops->evlib_size_pt;
 #endif
 
 #if defined(LWS_ROLE_H1) || defined(LWS_ROLE_H2)
@@ -1098,19 +1201,9 @@ bail:
 
 	return NULL;
 
-#if defined(LWS_WITH_NETWORK)
 fail_event_libs:
-	lwsl_err("Requested event library support not configured, available:\n");
-	{
-		extern const struct lws_event_loop_ops *available_event_libs[];
-		const struct lws_event_loop_ops **elops = available_event_libs;
+	lwsl_err("Requested event library support not configured\n");
 
-		while (*elops) {
-			lwsl_err("  - %s\n", (*elops)->name);
-			elops++;
-		}
-	}
-#endif
 	lws_free(context);
 
 	return NULL;
@@ -1280,6 +1373,11 @@ lws_context_destroy3(struct lws_context *context)
 		lws_free(df);
 	};
 
+#if defined(LWS_WITH_EVLIB_PLUGINS) && defined(LWS_WITH_EVENT_LIBS)
+	if (context->evlib_plugin_list)
+		lws_plugins_destroy(&context->evlib_plugin_list, NULL, NULL);
+#endif
+
 	lws_free(context);
 	lwsl_debug("%s: ctx %p freed\n", __func__, context);
 
@@ -1421,14 +1519,14 @@ lws_context_destroy2(struct lws_context *context)
 
 	lwsl_debug("%p: post dc2\n", __func__);
 
-	if (!context->pt[0].event_loop_foreign) {
-		int n;
+//	if (!context->pt[0].event_loop_foreign) {
+//		int n;
 		for (n = 0; n < context->count_threads; n++)
 			if (context->pt[n].inside_service) {
 				lwsl_debug("%p: bailing as inside service\n", __func__);
 				return;
 			}
-	}
+//	}
 #endif
 
 	lws_context_destroy3(context);
@@ -1453,8 +1551,10 @@ lws_pt_destroy(struct lws_context_per_thread *pt)
 	}
 	vpt->foreign_pfd_list = NULL;
 
+	lws_pt_lock(pt, __func__);
 	if (pt->pipe_wsi)
 		lws_destroy_event_pipe(pt->pipe_wsi);
+	lws_pt_unlock(pt);
 	pt->pipe_wsi = NULL;
 
 	while (pt->fds_count) {

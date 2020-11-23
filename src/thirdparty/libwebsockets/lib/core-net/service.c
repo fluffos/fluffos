@@ -309,6 +309,15 @@ lws_service_adjust_timeout(struct lws_context *context, int timeout_ms, int tsi)
 
 	pt = &context->pt[tsi];
 
+#if defined(LWS_WITH_EXTERNAL_POLL)
+	{
+		lws_usec_t u = __lws_sul_service_ripe(pt->pt_sul_owner,
+				      LWS_COUNT_PT_SUL_OWNERS, lws_now_usecs());
+		if (u < timeout_ms * 1000)
+			timeout_ms = u / 1000;
+	}
+#endif
+
 	/*
 	 * Figure out if we really want to wait in poll()... we only need to
 	 * wait if really nothing already to do and we have to wait for
@@ -714,6 +723,8 @@ lws_service_fd_tsi(struct lws_context *context, struct lws_pollfd *pollfd,
 	case LWS_HPI_RET_HANDLED:
 		break;
 	case LWS_HPI_RET_PLEASE_CLOSE_ME:
+		//lwsl_notice("%s: %s pollin says please close me\n", __func__,
+		//		wsi->role_ops->name);
 close_and_handled:
 		lwsl_debug("%p: Close and handled\n", wsi);
 		lws_close_free_wsi(wsi, LWS_CLOSE_STATUS_NOSTATUS,
@@ -724,7 +735,7 @@ close_and_handled:
 		 * it waits for libuv service to complete the first async
 		 * close
 		 */
-		if (context->event_loop_ops == &event_loop_ops_uv)
+		if (!strcmp(context->event_loop_ops->name, "libuv"))
 			lws_close_free_wsi(wsi, LWS_CLOSE_STATUS_NOSTATUS,
 					   "close_and_handled uv repeat test");
 #endif

@@ -633,6 +633,7 @@ drain_extension:
 				return -1;
 			}
 			if (n == PMDR_DID_NOTHING)
+				/* ie, not PMDR_NOTHING_WE_SHOULD_DO */
 				break;
 #endif
 			lwsl_debug("%s: post ext ret %d, ebuf in %d / out %d\n",
@@ -691,7 +692,8 @@ utf8_fail:
 
 			/* if pmd not enabled, in == out */
 
-			if (n == PMDR_DID_NOTHING
+			if (n == PMDR_DID_NOTHING ||
+			    n == PMDR_NOTHING_WE_SHOULD_DO
 #if !defined(LWS_WITHOUT_EXTENSIONS)
 				       	||
 			    n == PMDR_UNKNOWN
@@ -1209,6 +1211,13 @@ drain:
 	}
 
 	pending = lws_ssl_pending(wsi);
+
+#if defined(LWS_WITH_CLIENT)
+	if (!pending && (wsi->flags & LCCSCF_PRIORITIZE_READS) &&
+	    lws_buflist_total_len(&wsi->buflist))
+		pending = 9999999;
+#endif
+
 	if (pending) {
 		if (lws_is_ws_with_ext(wsi))
 			pending = pending > wsi->ws->rx_ubuf_alloc ?
@@ -1960,11 +1969,14 @@ rops_init_vhost_ws(struct lws_vhost *vh,
 		       sizeof(struct lws_extension) * m);
 		plugin = vh->context->plugin_list;
 		while (plugin) {
+			const lws_plugin_protocol_t *plpr =
+				(const lws_plugin_protocol_t *)plugin->hdr;
+
 			memcpy((struct lws_extension *)&vh->ws.extensions[m],
-				plugin->caps.extensions,
+				plpr->extensions,
 			       sizeof(struct lws_extension) *
-			       plugin->caps.count_extensions);
-			m += plugin->caps.count_extensions;
+			       plpr->count_extensions);
+			m += plpr->count_extensions;
 			plugin = plugin->list;
 		}
 	} else

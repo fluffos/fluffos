@@ -57,7 +57,7 @@ int fork(void)
 
 static struct lws_context *context;
 static lws_sorted_usec_list_t sul_lwsws;
-static char config_dir[128];
+static char config_dir[128], default_plugin_path = 1;
 static int opts = 0, do_reload = 1;
 static uv_loop_t loop;
 static uv_signal_t signal_outer[2];
@@ -77,16 +77,19 @@ static const struct lws_extension exts[] = {
 	{ NULL, NULL, NULL /* terminator */ }
 };
 
+#if defined(LWS_WITH_PLUGINS)
 static const char * const plugin_dirs[] = {
 	INSTALL_DATADIR"/libwebsockets-test-server/plugins/",
 	NULL
 };
+#endif
 
 #if defined(LWS_HAS_GETOPT_LONG) || defined(WIN32)
 static struct option options[] = {
 	{ "help",	no_argument,		NULL, 'h' },
 	{ "debug",	required_argument,	NULL, 'd' },
 	{ "configdir",  required_argument,	NULL, 'c' },
+	{ "no-default-plugins",  no_argument,	NULL, 'n' },
 	{ NULL, 0, 0, 0 }
 };
 #endif
@@ -150,7 +153,10 @@ context_creation(void)
 			      LWS_SERVER_OPTION_EXPLICIT_VHOSTS |
 			      LWS_SERVER_OPTION_LIBUV;
 
-	info.plugin_dirs = plugin_dirs;
+#if defined(LWS_WITH_PLUGINS)
+	if (default_plugin_path)
+		info.plugin_dirs = plugin_dirs;
+#endif
 	lwsl_notice("Using config dir: \"%s\"\n", config_dir);
 
 	/*
@@ -240,9 +246,9 @@ int main(int argc, char **argv)
 	strcpy(config_dir, "/etc/lwsws");
 	while (n >= 0) {
 #if defined(LWS_HAS_GETOPT_LONG) || defined(WIN32)
-		n = getopt_long(argc, argv, "hd:c:", options, NULL);
+		n = getopt_long(argc, argv, "hd:c:n", options, NULL);
 #else
-		n = getopt(argc, argv, "hd:c:");
+		n = getopt(argc, argv, "hd:c:n");
 #endif
 		if (n < 0)
 			continue;
@@ -250,12 +256,16 @@ int main(int argc, char **argv)
 		case 'd':
 			debug_level = atoi(optarg);
 			break;
+		case 'n':
+			default_plugin_path = 0;
+			break;
 		case 'c':
 			lws_strncpy(config_dir, optarg, sizeof(config_dir));
 			break;
 		case 'h':
 			fprintf(stderr, "Usage: lwsws [-c <config dir>] "
-					"[-d <log bitfield>] [--help]\n");
+					"[-d <log bitfield>] [--help] "
+					"[-n]\n");
 			exit(1);
 		}
 	}

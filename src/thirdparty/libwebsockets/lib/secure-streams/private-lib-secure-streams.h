@@ -153,6 +153,7 @@ typedef struct lws_ss_handle {
 	uint8_t			hanging_som:1;
 	uint8_t			inside_msg:1;
 	uint8_t			being_serialized:1; /* we are not the consumer */
+	uint8_t			destroying:1;
 } lws_ss_handle_t;
 
 /* connection helper that doesn't need to hang around after connection starts */
@@ -287,6 +288,7 @@ typedef struct lws_sspc_handle {
 	uint8_t			ignore_txc:1;
 	uint8_t			pending_timeout_update:1;
 	uint8_t			pending_writeable_len:1;
+	uint8_t			creating_cb_done:1;
 } lws_sspc_handle_t;
 
 typedef struct backoffs {
@@ -377,11 +379,15 @@ lws_ss_policy_set(struct lws_context *context, const char *name);
 int
 lws_ss_sys_fetch_policy(struct lws_context *context);
 
-int
+lws_ss_state_return_t
 lws_ss_event_helper(lws_ss_handle_t *h, lws_ss_constate_t cs);
 
-int
+lws_ss_state_return_t
 lws_ss_backoff(lws_ss_handle_t *h);
+
+int
+_lws_ss_handle_state_ret(lws_ss_state_return_t r, struct lws *wsi,
+			 lws_ss_handle_t **ph);
 
 int
 lws_ss_set_timeout_us(lws_ss_handle_t *h, lws_usec_t us);

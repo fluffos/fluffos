@@ -49,9 +49,9 @@ endif()
 #   debug builds include source level debug info and extra logging
 
 set(LWS_WITH_BUNDLED_ZLIB_DEFAULT OFF)
-#if(WIN32)
-#	set(LWS_WITH_BUNDLED_ZLIB_DEFAULT ON)
-#endif()
+if(WIN32)
+	set(LWS_WITH_BUNDLED_ZLIB_DEFAULT ON)
+endif()
 
 set(LWS_ROLE_RAW 1)
 set(LWS_WITH_POLL 1)
@@ -92,7 +92,7 @@ option(LWS_WITH_LWSWS "Libwebsockets Webserver" OFF)
 option(LWS_WITH_CGI "Include CGI (spawn process with network-connected stdin/out/err) APIs" OFF)
 option(LWS_IPV6 "Compile with support for ipv6" OFF)
 option(LWS_UNIX_SOCK "Compile with support for UNIX domain socket if OS supports it" ON)
-option(LWS_WITH_PLUGINS "Support plugins for protocols and extensions" OFF)
+option(LWS_WITH_PLUGINS "Support plugins for protocols and extensions (implies LWS_WITH_PLUGINS_API)" OFF)
 option(LWS_WITH_HTTP_PROXY "Support for active HTTP proxying" OFF)
 option(LWS_WITH_ZIP_FOPS "Support serving pre-zipped files" OFF)
 option(LWS_WITH_SOCKS5 "Allow use of SOCKS5 proxy on client connections" OFF)
@@ -153,6 +153,13 @@ option(LWS_WITH_LIBUV "Compile with support for libuv" OFF)
 option(LWS_WITH_LIBEVENT "Compile with support for libevent" OFF)
 option(LWS_WITH_GLIB "Compile with support for glib event loop" OFF)
 
+if (UNIX)
+# since v4.1, on unix platforms default is build any event libs as runtime plugins
+option(LWS_WITH_EVLIB_PLUGINS "Compile event lib support into runtime-selected plugins" ON)
+else()
+# otherwise default to linking the event lib(s) to libwebsockets.so
+option(LWS_WITH_EVLIB_PLUGINS "Compile event lib support into runtime-selected plugins" OFF)
+endif()
 #
 # LWS Drivers
 #
@@ -231,7 +238,7 @@ option(LWS_WITH_ZLIB "Include zlib support (required for extensions)" OFF)
 option(LWS_WITH_BUNDLED_ZLIB "Use bundled zlib version (Windows only)" ${LWS_WITH_BUNDLED_ZLIB_DEFAULT})
 option(LWS_WITH_MINIZ "Use miniz instead of zlib" OFF)
 option(LWS_WITH_DEPRECATED_THINGS "Temporary workaround for deprecated apis" OFF)
-option(LWS_WITH_SEQUENCER "lws_seq_t support" ON)
+option(LWS_WITH_SEQUENCER "lws_seq_t support" OFF)
 option(LWS_WITH_EXTERNAL_POLL "Support external POLL integration using callback messages (not recommended)" OFF)
 option(LWS_WITH_LWS_DSH "Support lws_dsh_t Disordered Shared Heap" OFF)
 option(LWS_CLIENT_HTTP_PROXYING "Support external http proxies for client connections" ON)
@@ -243,6 +250,7 @@ option(LWS_WITH_FSMOUNT "Overlayfs and fallback mounting apis" OFF)
 option(LWS_WITH_FANALYZER "Enable gcc -fanalyzer if compiler supports" OFF)
 option(LWS_HTTP_HEADERS_ALL "Override header reduction optimization and include all like older lws versions" OFF)
 option(LWS_WITH_SUL_DEBUGGING "Enable zombie lws_sul checking on object deletion" OFF)
+option(LWS_WITH_PLUGINS_API "Build generic lws_plugins apis (see LWS_WITH_PLUGINS to also build protocol plugins)" OFF)
 
 #
 # to use miniz, enable both LWS_WITH_ZLIB and LWS_WITH_MINIZ
@@ -329,8 +337,8 @@ set(PACKAGE "libwebsockets")
 set(CPACK_RPM_PACKAGE_LICENSE "MIT")
 set(CPACK_PACKAGE_NAME "${PACKAGE}")
 set(CPACK_PACKAGE_VERSION_MAJOR "4")
-set(CPACK_PACKAGE_VERSION_MINOR "0")
-set(CPACK_PACKAGE_VERSION_PATCH_NUMBER "99")
+set(CPACK_PACKAGE_VERSION_MINOR "1")
+set(CPACK_PACKAGE_VERSION_PATCH_NUMBER "4")
 
 set(CPACK_PACKAGE_VERSION_PATCH "${CPACK_PACKAGE_VERSION_PATCH_NUMBER}-${LWS_BUILD_HASH}")
 set(CPACK_PACKAGE_RELEASE 1)
@@ -339,7 +347,7 @@ set(CPACK_PACKAGE_VERSION "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSIO
 set(CPACK_PACKAGE_VENDOR "andy@warmcat.com")
 set(CPACK_PACKAGE_CONTACT "andy@warmcat.com")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PACKAGE} ${CPACK_PACKAGE_VERSION}")
-set(SOVERSION "16")
+set(SOVERSION "17")
 if(NOT CPACK_GENERATOR)
     if(UNIX)
         set(CPACK_GENERATOR "TGZ")
@@ -353,15 +361,19 @@ set(VERSION "${CPACK_PACKAGE_VERSION}")
 
 set(CPACK_RPM_PACKAGE_RELEASE_DIST ON)
 set(CPACK_RPM_FILE_NAME "RPM-DEFAULT")
-set(CPACK_RPM_DEBUGINFO_PACKAGE ON)
+# below makes path length problems in CI
+set(CPACK_RPM_DEBUGINFO_PACKAGE OFF)
 # below makes some kind of chimera rpm with binaries and sources
 set(CPACK_RPM_PACKAGE_SOURCES OFF)
 set(CPACK_RPM_INSTALL_WITH_EXEC ON)
+set(CPACK_RPM_COMPONENT_INSTALL ON)
 
 set(CPACK_DEBIAN_FILE_NAME "DEB-DEFAULT")
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 set(CPACK_DEBIAN_DEBUGINFO_PACKAGE ON)
 set(CPACK_DEBIAN_PACKAGE_SOURCE ON)
+set(CPACK_DEBIAN_COMPONENT_INSTALL ON)
+
 
 set(LWS_LIBRARY_VERSION ${CPACK_PACKAGE_VERSION})
 set(LWS_LIBRARY_VERSION_MAJOR ${CPACK_PACKAGE_VERSION_MAJOR})
@@ -527,6 +539,11 @@ if (LWS_WITH_ZLIB AND NOT LWS_WITH_BUNDLED_ZLIB)
 	list(APPEND LIB_LIST_AT_END "${ZLIB_LIBRARIES}")
 endif()
 
+if (LWS_WITH_PLUGINS_API AND UNIX AND NOT (${CMAKE_SYSTEM_NAME} MATCHES "QNX"))
+	list(APPEND LIB_LIST_AT_END "dl")
+endif()
+
+
 CHECK_INCLUDE_FILE(in6addr.h LWS_HAVE_IN6ADDR_H)
 CHECK_INCLUDE_FILE(memory.h LWS_HAVE_MEMORY_H)
 CHECK_INCLUDE_FILE(netinet/in.h LWS_HAVE_NETINET_IN_H)
@@ -545,6 +562,7 @@ CHECK_INCLUDE_FILE(sys/capability.h LWS_HAVE_SYS_CAPABILITY_H)
 CHECK_INCLUDE_FILE(malloc.h LWS_HAVE_MALLOC_H)
 CHECK_INCLUDE_FILE(pthread.h LWS_HAVE_PTHREAD_H)
 CHECK_INCLUDE_FILE(inttypes.h LWS_HAVE_INTTYPES_H)
+CHECK_INCLUDE_FILE(sys/resource.h LWS_HAVE_SYS_RESOURCE_H)
 
 if (WIN32 OR MSVC)
 	CHECK_C_SOURCE_COMPILES("#include <winsock2.h>
@@ -552,7 +570,8 @@ if (WIN32 OR MSVC)
 				 int main() { return 0; }" LWS_HAVE_WIN32_AFUNIX_H)
 
 	if (LWS_UNIX_SOCK AND NOT LWS_HAVE_WIN32_AFUNIX_H)
-		message(FATAL_ERROR "No afunix.h in toolchain for LWS_UNIX_SOCK")
+		message("No afunix.h found. Disabling LWS_UNIX_SOCK.")
+		set(LWS_WITH_UNIX_SOCK OFF)
 	endif()
 endif()
 
@@ -591,19 +610,6 @@ if ((CMAKE_C_COMPILER_ID MATCHES "Clang") OR
 endif()
 
 if (LWS_HAVE_PTHREAD_H AND NOT LWS_PLAT_FREERTOS)
-	if (NOT WIN32 AND NOT MSVC)
-		if (COMPILER_IS_CLANG)
-			set(LWS_PTHR_FLAGS "-pthread")# -Wno-error=unused-command-line-argument")
-		else()
-			set(LWS_PTHR_FLAGS "-pthread")
-		endif()
-
-		#		set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_REQUIRED_LIBRARIES} ${LWS_PTHR_FLAGS})
-		#		if (NOT WIN32 AND NOT MSVC)
-		#	list(APPEND LIB_LIST_AT_END ${LWS_PTHR_FLAGS})
-		#endif()
-	endif()
-
 	CHECK_C_SOURCE_COMPILES("#define _GNU_SOURCE
 		#include <pthread.h>
 		int main(void) {
@@ -680,20 +686,24 @@ if (CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX OR COMPILER_IS_CLANG)
 		set(CMAKE_C_FLAGS "-fanalyzer ${CMAKE_C_FLAGS}" )
 	endif()
 
+	if (CMAKE_COMPILER_IS_CLANG OR CMAKE_C_COMPILER_VERSION VERSION_GREATER 4.4)
+		set(CMAKE_C_FLAGS "-Wuninitialized ${CMAKE_C_FLAGS}")
+	endif()
+
 	# always warn all and generate debug info
-    if (UNIX AND NOT LWS_PLAT_FREERTOS)
-	    set(CMAKE_C_FLAGS "-g -Wall -Wsign-compare -Wstrict-aliasing -Wuninitialized ${VISIBILITY_FLAG} -Wundef ${GCOV_FLAGS} ${CMAKE_C_FLAGS} ${ASAN_FLAGS}" )
-    else()
-	    set(CMAKE_C_FLAGS "-g -Wall -Wsign-compare -Wuninitialized ${VISIBILITY_FLAG} ${GCOV_FLAGS} ${CMAKE_C_FLAGS}" )
-    endif()
-	    if ("${DISABLE_WERROR}" STREQUAL "OFF")
-		    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror")
-	    endif()
+	if (UNIX AND NOT LWS_PLAT_FREERTOS)
+		set(CMAKE_C_FLAGS "-Wall -Wsign-compare -Wstrict-aliasing ${VISIBILITY_FLAG} -Wundef ${GCOV_FLAGS} ${CMAKE_C_FLAGS} ${ASAN_FLAGS}" )
+	else()
+		set(CMAKE_C_FLAGS "-Wall -Wsign-compare ${VISIBILITY_FLAG} ${GCOV_FLAGS} ${CMAKE_C_FLAGS}" )
+	endif()
+
+	if ("${DISABLE_WERROR}" STREQUAL "OFF")
+		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror")
+	endif()
 endif ()
 
-
 if ((CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX) AND NOT LWS_WITHOUT_TESTAPPS)
-	if (UNIX AND LWS_HAVE_PTHREAD_H)
+	if (UNIX AND LWS_HAVE_PTHREAD_H AND NOT (${CMAKE_SYSTEM_NAME} MATCHES "QNX"))
 	# jeez clang understands -pthread but dies if he sees it at link time!
 	# http://stackoverflow.com/questions/2391194/what-is-gs-pthread-equiv-in-clang
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread" )
@@ -916,9 +926,9 @@ endif()
 export(PACKAGE libwebsockets)
 
 install(DIRECTORY include/libwebsockets
-	DESTINATION "${LWS_INSTALL_INCLUDE_DIR}" COMPONENT dev_headers)
+	DESTINATION "${LWS_INSTALL_INCLUDE_DIR}" COMPONENT dev)
 install(FILES ${PROJECT_BINARY_DIR}/include/libwebsockets.h ${PROJECT_BINARY_DIR}/include/lws_config.h
-	DESTINATION "${LWS_INSTALL_INCLUDE_DIR}" COMPONENT dev_headers)
+	DESTINATION "${LWS_INSTALL_INCLUDE_DIR}" COMPONENT dev)
 
 # Generate the config file for the installation tree.
 get_filename_component(LWS_ABSOLUTE_INSTALL_CMAKE_DIR ${LWS_INSTALL_CMAKE_DIR} ABSOLUTE)

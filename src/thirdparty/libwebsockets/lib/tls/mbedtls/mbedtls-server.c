@@ -153,9 +153,6 @@ lws_tls_server_certs_load(struct lws_vhost *vhost, struct lws *wsi,
 		 */
 		cert = NULL;
 		private_key = NULL;
-
-		if (!mem_cert)
-			return 1;
 	}
 	if (lws_tls_alloc_pem_to_der_file(vhost->context, cert, mem_cert,
 					  mem_cert_len, &p, &flen)) {
@@ -183,14 +180,6 @@ lws_tls_server_certs_load(struct lws_vhost *vhost, struct lws *wsi,
 	lws_free_set_NULL(p);
 	if (!err) {
 		lwsl_err("Problem loading key\n");
-
-		return 1;
-	}
-
-	if (!private_key && !mem_privkey && vhost->protocols[0].callback(wsi,
-			LWS_CALLBACK_OPENSSL_CONTEXT_REQUIRES_PRIVATE_KEY,
-			vhost->tls.ssl_ctx, NULL, 0)) {
-		lwsl_err("ssl private key not set\n");
 
 		return 1;
 	}
