@@ -4024,10 +4024,10 @@ int expand_define(void) {
 /* Stuff to evaluate expression.  I havn't really checked it. /LA
 ** Written by "J\"orn Rennecke" <amylaar@cs.tu-berlin.de>
 */
-#define SKPW            \
-  do                    \
-    c = *outp++;        \
-  while (is_wspace(c)); \
+#define SKPW              \
+  do {                    \
+    c = *outp++;          \
+  } while (is_wspace(c)); \
   outp--
 
 static char exgetc() {
