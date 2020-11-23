@@ -5,7 +5,7 @@
 //  ____) | (_| (_) | |_) |  __/ | |__| | |_| | (_| | | | (_| | | |____|_|   |_|
 // |_____/ \___\___/| .__/ \___|  \_____|\__,_|\__,_|_|  \__,_|  \_____|
 //                  | | https://github.com/Neargye/scope_guard
-//                  |_| version 0.7.0
+//                  |_| version 0.9.0
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
@@ -33,13 +33,10 @@
 #define NEARGYE_SCOPE_GUARD_HPP
 
 #define SCOPE_GUARD_VERSION_MAJOR 0
-#define SCOPE_GUARD_VERSION_MINOR 7
+#define SCOPE_GUARD_VERSION_MINOR 9
 #define SCOPE_GUARD_VERSION_PATCH 0
 
-#include <cstddef>
-#include <new>
 #include <type_traits>
-#include <utility>
 #if (defined(_MSC_VER) && _MSC_VER >= 1900) || ((defined(__clang__) || defined(__GNUC__)) && __cplusplus >= 201700L)
 #include <exception>
 #endif
@@ -49,7 +46,7 @@
 // SCOPE_GUARD_MAY_THROW_ACTION action may throw exceptions.
 // SCOPE_GUARD_NO_THROW_ACTION requires noexcept action.
 // SCOPE_GUARD_SUPPRESS_THROW_ACTION exceptions during action will be suppressed.
-// SCOPE_GUARD_CATCH_HANDLER exceptions handler.
+// SCOPE_GUARD_CATCH_HANDLER exceptions handler. If SCOPE_GUARD_SUPPRESS_THROW_ACTIONS is not defined, it will do nothing.
 
 #if !defined(SCOPE_GUARD_MAY_THROW_ACTION) && !defined(SCOPE_GUARD_NO_THROW_ACTION) && !defined(SCOPE_GUARD_SUPPRESS_THROW_ACTION)
 #  define SCOPE_GUARD_MAY_THROW_ACTION
@@ -58,28 +55,52 @@
 #endif
 
 #if !defined(SCOPE_GUARD_CATCH_HANDLER)
-#  define SCOPE_GUARD_CATCH_HANDLER /* Suppress exception. */
+#  define SCOPE_GUARD_CATCH_HANDLER /* Suppress exception.*/
 #endif
 
-#if !defined(NEARGYE_SCOPE_POLICY)
-#  define NEARGYE_SCOPE_POLICY 1
-namespace neargye {
+namespace scope_guard {
+
 namespace detail {
 
-class on_exit_policy {
-  bool execute_;
+#if defined(SCOPE_GUARD_SUPPRESS_THROW_ACTION) && (defined(__cpp_exceptions) || defined(__EXCEPTIONS) || (_HAS_EXCEPTIONS))
+#  define NEARGYE_NOEXCEPT(...) noexcept
+#  define NEARGYE_TRY try {
+#  define NEARGYE_CATCH } catch (...) { SCOPE_GUARD_CATCH_HANDLER }
+#else
+#  define NEARGYE_NOEXCEPT(...) noexcept(__VA_ARGS__)
+#  define NEARGYE_TRY
+#  define NEARGYE_CATCH
+#endif
 
- public:
-  explicit on_exit_policy(bool execute) noexcept : execute_{execute} {}
+#define NEARGYE_MOV(...) static_cast<typename std::remove_reference<decltype(__VA_ARGS__)>::type&&>(__VA_ARGS__)
+#define NEARGYE_FWD(...) static_cast<decltype(__VA_ARGS__)&&>(__VA_ARGS__)
 
-  void dismiss() noexcept {
-    execute_ = false;
-  }
-
-  bool should_execute() const noexcept {
-    return execute_;
-  }
-};
+// NEARGYE_NODISCARD encourages the compiler to issue a warning if the return value is discarded.
+#if !defined(NEARGYE_NODISCARD)
+#  if defined(__clang__)
+#    if (__clang_major__ * 10 + __clang_minor__) >= 39 && __cplusplus >= 201703L
+#      define NEARGYE_NODISCARD [[nodiscard]]
+#    else
+#      define NEARGYE_NODISCARD __attribute__((__warn_unused_result__))
+#    endif
+#  elif defined(__GNUC__)
+#    if __GNUC__ >= 7 && __cplusplus >= 201703L
+#      define NEARGYE_NODISCARD [[nodiscard]]
+#    else
+#      define NEARGYE_NODISCARD __attribute__((__warn_unused_result__))
+#    endif
+#  elif defined(_MSC_VER)
+#    if _MSC_VER >= 1911 && defined(_MSVC_LANG) && _MSVC_LANG >= 201703L
+#      define NEARGYE_NODISCARD [[nodiscard]]
+#    elif defined(_Check_return_)
+#      define NEARGYE_NODISCARD _Check_return_
+#    else
+#      define NEARGYE_NODISCARD
+#    endif
+#  else
+#    define NEARGYE_NODISCARD
+#  endif
+#endif
 
 #if defined(_MSC_VER) && _MSC_VER < 1900
 inline int uncaught_exceptions() noexcept {
@@ -96,6 +117,21 @@ inline int uncaught_exceptions() noexcept {
   return std::uncaught_exceptions();
 }
 #endif
+
+class on_exit_policy {
+  bool execute_;
+
+ public:
+  explicit on_exit_policy(bool execute) noexcept : execute_{execute} {}
+
+  void dismiss() noexcept {
+    execute_ = false;
+  }
+
+  bool should_execute() const noexcept {
+    return execute_;
+  }
+};
 
 class on_fail_policy {
   int ec_;
@@ -126,56 +162,6 @@ class on_success_policy {
     return ec_ != -1 && ec_ >= uncaught_exceptions();
   }
 };
-
-} // namespace neargye::detail
-} // namespace neargye
-#endif
-
-namespace scope_guard {
-
-namespace detail {
-
-#if defined(SCOPE_GUARD_SUPPRESS_THROW_ACTION) && (defined(__cpp_exceptions) || defined(__EXCEPTIONS) || defined(_CPPUNWIND))
-#  define NEARGYE_NOEXCEPT(...) noexcept
-#  define NEARGYE_TRY try {
-#  define NEARGYE_CATCH } catch (...) { SCOPE_GUARD_CATCH_HANDLER }
-#else
-#  define NEARGYE_NOEXCEPT(...) noexcept(__VA_ARGS__)
-#  define NEARGYE_TRY
-#  define NEARGYE_CATCH
-#endif
-
-// NEARGYE_NODISCARD encourages the compiler to issue a warning if the return value is discarded.
-#if !defined(NEARGYE_NODISCARD)
-#  if defined(__clang__)
-#    if (__clang_major__ * 10 + __clang_minor__) >= 39 && __cplusplus >= 201703L
-#      define NEARGYE_NODISCARD [[nodiscard]]
-#    else
-#      define NEARGYE_NODISCARD __attribute__((__warn_unused_result__))
-#    endif
-#  elif defined(__GNUC__)
-#    if __GNUC__ >= 7 && __cplusplus >= 201703L
-#      define NEARGYE_NODISCARD [[nodiscard]]
-#    else
-#      define NEARGYE_NODISCARD __attribute__((__warn_unused_result__))
-#    endif
-#  elif defined(_MSC_VER)
-#    if _MSC_VER >= 1911 && defined(_MSVC_LANG) && _MSVC_LANG >= 201703L
-#      define NEARGYE_NODISCARD [[nodiscard]]
-#    elif defined(_Check_return_)
-#      define NEARGYE_NODISCARD _Check_return_
-#    else
-#      define NEARGYE_NODISCARD
-#    endif
-#  else
-#    define NEARGYE_NODISCARD
-#  endif
-#endif
-
-using ::neargye::detail::uncaught_exceptions;
-using ::neargye::detail::on_exit_policy;
-using ::neargye::detail::on_fail_policy;
-using ::neargye::detail::on_success_policy;
 
 template <typename T, typename = void>
 struct is_noarg_returns_void_action
@@ -224,8 +210,8 @@ class scope_guard {
 
   scope_guard(scope_guard&& other) noexcept(std::is_nothrow_move_constructible<A>::value)
       : policy_{false},
-        action_{std::move(other.action_)} {
-    policy_ = std::move(other.policy_);
+        action_{NEARGYE_MOV(other.action_)} {
+    policy_ = NEARGYE_MOV(other.policy_);
     other.policy_.dismiss();
   }
 
@@ -234,7 +220,7 @@ class scope_guard {
 
   explicit scope_guard(A&& action) noexcept(std::is_nothrow_move_constructible<A>::value)
       : policy_{true},
-        action_{std::move(action)} {}
+        action_{NEARGYE_MOV(action)} {}
 
   void dismiss() noexcept {
     policy_.dismiss();
@@ -252,48 +238,50 @@ class scope_guard {
 template <typename F>
 using scope_exit = scope_guard<F, on_exit_policy>;
 
+template <typename F, typename std::enable_if<is_noarg_returns_void_action<F>::value, int>::type = 0>
+NEARGYE_NODISCARD scope_exit<F> make_scope_exit(F&& action) noexcept(noexcept(scope_exit<F>{NEARGYE_FWD(action)})) {
+  return scope_exit<F>{NEARGYE_FWD(action)};
+}
+
 template <typename F>
 using scope_fail = scope_guard<F, on_fail_policy>;
 
+template <typename F, typename std::enable_if<is_noarg_returns_void_action<F>::value, int>::type = 0>
+NEARGYE_NODISCARD scope_fail<F> make_scope_fail(F&& action) noexcept(noexcept(scope_fail<F>{NEARGYE_FWD(action)})) {
+  return scope_fail<F>{NEARGYE_FWD(action)};
+}
+
 template <typename F>
-using scope_succes = scope_guard<F, on_success_policy>;
+using scope_success = scope_guard<F, on_success_policy>;
 
 template <typename F, typename std::enable_if<is_noarg_returns_void_action<F>::value, int>::type = 0>
-NEARGYE_NODISCARD scope_exit<F> make_scope_exit(F&& action) noexcept(noexcept(scope_exit<F>{std::forward<F>(action)})) {
-  return scope_exit<F>{std::forward<F>(action)};
-}
-
-template <typename F, typename std::enable_if<is_noarg_returns_void_action<F>::value, int>::type = 0>
-NEARGYE_NODISCARD scope_fail<F> make_scope_fail(F&& action) noexcept(noexcept(scope_fail<F>{std::forward<F>(action)})) {
-  return scope_fail<F>{std::forward<F>(action)};
-}
-
-template <typename F, typename std::enable_if<is_noarg_returns_void_action<F>::value, int>::type = 0>
-NEARGYE_NODISCARD scope_succes<F> make_scope_succes(F&& action) noexcept(noexcept(scope_succes<F>{std::forward<F>(action)})) {
-  return scope_succes<F>{std::forward<F>(action)};
+NEARGYE_NODISCARD scope_success<F> make_scope_success(F&& action) noexcept(noexcept(scope_success<F>{NEARGYE_FWD(action)})) {
+  return scope_success<F>{NEARGYE_FWD(action)};
 }
 
 struct scope_exit_tag {};
 
 template <typename F, typename std::enable_if<is_noarg_returns_void_action<F>::value, int>::type = 0>
-scope_exit<F> operator+(scope_exit_tag, F&& action) noexcept(noexcept(scope_exit<F>{std::forward<F>(action)})) {
-  return scope_exit<F>{std::forward<F>(action)};
+scope_exit<F> operator+(scope_exit_tag, F&& action) noexcept(noexcept(scope_exit<F>{NEARGYE_FWD(action)})) {
+  return scope_exit<F>{NEARGYE_FWD(action)};
 }
 
 struct scope_fail_tag {};
 
 template <typename F, typename std::enable_if<is_noarg_returns_void_action<F>::value, int>::type = 0>
-scope_fail<F> operator+(scope_fail_tag, F&& action) noexcept(noexcept(scope_fail<F>{std::forward<F>(action)})) {
-  return scope_fail<F>{std::forward<F>(action)};
+scope_fail<F> operator+(scope_fail_tag, F&& action) noexcept(noexcept(scope_fail<F>{NEARGYE_FWD(action)})) {
+  return scope_fail<F>{NEARGYE_FWD(action)};
 }
 
-struct scope_succes_tag {};
+struct scope_success_tag {};
 
 template <typename F, typename std::enable_if<is_noarg_returns_void_action<F>::value, int>::type = 0>
-scope_succes<F> operator+(scope_succes_tag, F&& action) noexcept(noexcept(scope_succes<F>{std::forward<F>(action)})) {
-  return scope_succes<F>{std::forward<F>(action)};
+scope_success<F> operator+(scope_success_tag, F&& action) noexcept(noexcept(scope_success<F>{NEARGYE_FWD(action)})) {
+  return scope_success<F>{NEARGYE_FWD(action)};
 }
 
+#undef NEARGYE_MOV
+#undef NEARGYE_FWD
 #undef NEARGYE_NOEXCEPT
 #undef NEARGYE_TRY
 #undef NEARGYE_CATCH
@@ -303,7 +291,7 @@ scope_succes<F> operator+(scope_succes_tag, F&& action) noexcept(noexcept(scope_
 
 using detail::make_scope_exit;
 using detail::make_scope_fail;
-using detail::make_scope_succes;
+using detail::make_scope_success;
 
 } // namespace scope_guard
 
@@ -369,7 +357,7 @@ using detail::make_scope_succes;
 #define WITH_SCOPE_FAIL(guard) NEARGYE_SCOPE_GUARD_WITH(SCOPE_FAIL{guard})
 
 // SCOPE_SUCCESS executing action on scope exit when no exceptions have been thrown before scope exit.
-#define MAKE_SCOPE_SUCCESS(name) auto name = NEARGYE_MAKE_SCOPE_EXIT(::scope_guard::detail::scope_succes_tag)
+#define MAKE_SCOPE_SUCCESS(name) auto name = NEARGYE_MAKE_SCOPE_EXIT(::scope_guard::detail::scope_success_tag)
 #define SCOPE_SUCCESS NEARGYE_MAYBE_UNUSED const MAKE_SCOPE_SUCCESS(NEARGYE_STR_CONCAT(SCOPE_SUCCESS_, NEARGYE_COUNTER))
 #define WITH_SCOPE_SUCCESS(guard) NEARGYE_SCOPE_GUARD_WITH(SCOPE_SUCCESS{guard})
 
