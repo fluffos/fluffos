@@ -19,12 +19,11 @@
  * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- * IN THE SOFTWARE.
- *
- *  This is included from private-lib-core.h if LWS_ROLE_WS
+ * IN THE SOFTWARE
  */
 
 #include <private-lib-core.h>
+#include "private-lib-event-libs-poll.h"
 
 struct lws_event_loop_ops event_loop_ops_poll = {
 	/* name */			"poll",
@@ -43,4 +42,19 @@ struct lws_event_loop_ops event_loop_ops_poll = {
 	/* destroy wsi */		NULL,
 
 	/* flags */			LELOF_ISPOLL,
+
+	/* evlib_size_ctx */	0,
+	/* evlib_size_pt */	0,
+	/* evlib_size_vh */	0,
+	/* evlib_size_wsi */	0,
+};
+
+const lws_plugin_evlib_t evlib_poll = {
+	.hdr = {
+		"poll",
+		"lws_evlib_plugin",
+		LWS_PLUGIN_API_MAGIC
+	},
+
+	.ops	= &event_loop_ops_poll
 };

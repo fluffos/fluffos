@@ -174,6 +174,7 @@ enum pmd_return {
 	PMDR_HAS_PENDING,
 	PMDR_EMPTY_NONFINAL,
 	PMDR_EMPTY_FINAL,
+	PMDR_NOTHING_WE_SHOULD_DO,
 
 	PMDR_FAILED = -1
 };
@@ -409,7 +410,7 @@ struct lws_context_per_thread {
 	struct lws_pollfd *fds;
 	volatile struct lws_foreign_thread_pollfd * volatile foreign_pfd_list;
 #ifdef _WIN32
-	WSAEVENT events;
+       WSAEVENT events[WSA_MAXIMUM_WAIT_EVENTS];
 	CRITICAL_SECTION interrupt_lock;
 #endif
 	lws_sockfd_type dummy_pipe_fds[2];
@@ -428,22 +429,8 @@ struct lws_context_per_thread {
 #endif
 	/* --- event library based members --- */
 
-#if defined(LWS_WITH_LIBEV)
-	struct lws_pt_eventlibs_libev ev;
-#endif
-#if defined(LWS_WITH_LIBUV)
-	struct lws_pt_eventlibs_libuv uv;
-#endif
-#if defined(LWS_WITH_LIBEVENT)
-	struct lws_pt_eventlibs_libevent event;
-#endif
-#if defined(LWS_WITH_GLIB)
-	struct lws_pt_eventlibs_glib glib;
-#endif
-
-#if defined(LWS_WITH_LIBEV) || defined(LWS_WITH_LIBUV) || \
-    defined(LWS_WITH_LIBEVENT) || defined(LWS_WITH_GLIB)
-	struct lws_signal_watcher w_sigint;
+#if defined(LWS_WITH_EVENT_LIBS)
+	void		*evlib_pt; /* overallocated */
 #endif
 
 #if defined(LWS_WITH_DETAILED_LATENCY)
@@ -475,9 +462,6 @@ struct lws_context_per_thread {
 	unsigned char event_loop_destroy_processing_done:1;
 	unsigned char destroy_self:1;
 	unsigned char is_destroyed:1;
-#ifdef _WIN32
-	unsigned char interrupt_requested:1;
-#endif
 };
 
 #if defined(LWS_WITH_SERVER_STATUS)
@@ -530,8 +514,8 @@ struct lws_vhost {
 	char socks_user[96];
 	char socks_password[96];
 #endif
-#if defined(LWS_WITH_LIBEV)
-	struct lws_io_watcher w_accept;
+#if defined(LWS_WITH_EVENT_LIBS)
+	void		*evlib_vh; /* overallocated */
 #endif
 #if defined(LWS_WITH_SERVER_STATUS)
 	struct lws_conn_stats conn_stats;
@@ -719,12 +703,8 @@ struct lws {
 
 	/* lifetime members */
 
-#if defined(LWS_WITH_LIBEV) || defined(LWS_WITH_LIBUV) || \
-    defined(LWS_WITH_LIBEVENT) || defined(LWS_WITH_GLIB)
-	struct lws_io_watcher		w_read;
-#endif
-#if defined(LWS_WITH_LIBEV) || defined(LWS_WITH_LIBEVENT)
-	struct lws_io_watcher		w_write;
+#if defined(LWS_WITH_EVENT_LIBS)
+	void				*evlib_wsi; /* overallocated */
 #endif
 
 #if defined(LWS_WITH_DETAILED_LATENCY)
@@ -855,6 +835,9 @@ struct lws {
 	unsigned int			could_have_pending:1; /* detect back-to-back writes */
 	unsigned int			outer_will_close:1;
 	unsigned int			shadow:1; /* we do not control fd lifecycle at all */
+#if defined(LWS_WITH_SECURE_STREAMS)
+	unsigned int			for_ss:1;
+#endif
 
 #ifdef LWS_WITH_ACCESS_LOG
 	unsigned int			access_log_pending:1;
@@ -1017,6 +1000,7 @@ lws_pt_mutex_destroy(struct lws_context_per_thread *pt)
 
 #define lws_pt_lock(pt, reason) lws_mutex_refcount_lock(&pt->mr, reason)
 #define lws_pt_unlock(pt) lws_mutex_refcount_unlock(&pt->mr)
+#define lws_pt_assert_lock_held(pt) lws_mutex_refcount_assert_held(&pt->mr)
 
 static LWS_INLINE void
 lws_pt_stats_lock(struct lws_context_per_thread *pt)
@@ -1158,11 +1142,15 @@ lws_libuv_closehandle(struct lws *wsi);
 int
 lws_libuv_check_watcher_active(struct lws *wsi);
 
-LWS_VISIBLE LWS_EXTERN int
-lws_plat_plugins_init(struct lws_context * context, const char * const *d);
+#if defined(LWS_WITH_EVLIB_PLUGINS) || defined(LWS_WITH_PLUGINS)
+const lws_plugin_header_t *
+lws_plat_dlopen(struct lws_plugin **pplugin, const char *libpath,
+		const char *sofilename, const char *_class,
+		each_plugin_cb_t each, void *each_user);
 
-LWS_VISIBLE LWS_EXTERN int
-lws_plat_plugins_destroy(struct lws_context * context);
+int
+lws_plat_destroy_dl(struct lws_plugin *p);
+#endif
 
 struct lws *
 lws_adopt_socket_vhost(struct lws_vhost *vh, lws_sockfd_type accept_fd);

@@ -52,6 +52,7 @@ int
 _lws_vhost_init_server(const struct lws_context_creation_info *info,
 		       struct lws_vhost *vhost)
 {
+	struct lws_context_per_thread *pt;
 	int n, opt = 1, limit = 1;
 	lws_sockfd_type sockfd;
 	struct lws_vhost *vh;
@@ -271,10 +272,21 @@ done_list:
 			goto deal;
 		}
 
-		wsi = lws_zalloc(sizeof(struct lws), "listen wsi");
-		if (wsi == NULL) {
-			lwsl_err("Out of mem\n");
-			goto bail;
+		{
+			size_t s = sizeof(struct lws);
+
+#if defined(LWS_WITH_EVENT_LIBS)
+			s += vhost->context->event_loop_ops->evlib_size_wsi;
+#endif
+
+			wsi = lws_zalloc(s, "listen wsi");
+			if (wsi == NULL) {
+				lwsl_err("Out of mem\n");
+				goto bail;
+			}
+#if defined(LWS_WITH_EVENT_LIBS)
+			wsi->evlib_wsi = (uint8_t *)wsi + sizeof(*wsi);
+#endif
 		}
 
 #ifdef LWS_WITH_UNIX_SOCK
@@ -298,13 +310,18 @@ done_list:
 		if (wsi->a.context->event_loop_ops->init_vhost_listen_wsi)
 			wsi->a.context->event_loop_ops->init_vhost_listen_wsi(wsi);
 
+		pt = &vhost->context->pt[m];
+		lws_pt_lock(pt, __func__);
+
 		if (__insert_wsi_socket_into_fds(vhost->context, wsi)) {
 			lwsl_notice("inserting wsi socket into fds failed\n");
+			lws_pt_unlock(pt);
 			goto bail;
 		}
 
 		vhost->context->count_wsi_allocated++;
 		vhost->lserv_wsi = wsi;
+		lws_pt_unlock(pt);
 
 		n = listen(wsi->desc.sockfd, LWS_SOMAXCONN);
 		if (n < 0) {
@@ -1382,8 +1399,11 @@ lws_http_action(struct lws *wsi)
 	enum http_conn_type conn_type;
 	char content_length_str[32];
 	char http_version_str[12];
-	char *uri_ptr = NULL, *s;
 	char http_conn_str[25];
+	char *uri_ptr = NULL;
+#if defined(LWS_WITH_FILE_OPS)
+	char *s;
+#endif
 	unsigned int n;
 
 	meth = lws_http_get_uri_and_method(wsi, &uri_ptr, &uri_len);
@@ -1504,6 +1524,9 @@ lws_http_action(struct lws *wsi)
 		if (!n || n > 128)
 			goto bail_nuke_ah;
 
+		if (!lws_hdr_simple_ptr(wsi, WSI_TOKEN_HOST))
+			goto bail_nuke_ah;
+
 		p += lws_snprintf((char *)p, lws_ptr_diff(end, p), "https://");
 		memcpy(p, lws_hdr_simple_ptr(wsi, WSI_TOKEN_HOST), n);
 		p += n;
@@ -1545,7 +1568,9 @@ lws_http_action(struct lws *wsi)
 		goto after;
 	}
 
+#if defined(LWS_WITH_FILE_OPS)
 	s = uri_ptr + hit->mountpoint_len;
+#endif
 	n = lws_http_redirect_hit(pt, wsi, hit, uri_ptr, uri_len, &ha);
 	if (ha)
 		return n;
@@ -1669,19 +1694,21 @@ lws_http_action(struct lws *wsi)
 	}
 #endif
 
+#if defined(LWS_WITH_FILE_OPS)
 	n = uri_len - lws_ptr_diff(s, uri_ptr);
 	if (s[0] == '\0' || (n == 1 && s[n - 1] == '/'))
 		s = (char *)hit->def;
 	if (!s)
 		s = "index.html";
+#endif
 
 	wsi->cache_secs = hit->cache_max_age;
 	wsi->cache_reuse = hit->cache_reusable;
 	wsi->cache_revalidate = hit->cache_revalidate;
 	wsi->cache_intermediaries = hit->cache_intermediaries;
 
-	m = 1;
 #if defined(LWS_WITH_FILE_OPS)
+	m = 1;
 	if (hit->origin_protocol == LWSMPRO_FILE)
 		m = lws_http_serve(wsi, s, hit->origin, hit);
 
@@ -1695,6 +1722,10 @@ lws_http_action(struct lws *wsi)
 			const struct lws_protocols *pp =
 					lws_vhost_name_to_protocol(
 						wsi->a.vhost, hit->protocol);
+
+			/* coverity */
+			if (!pp)
+				return 1;
 
 			lwsi_set_state(wsi, LRS_DOING_TRANSACTION);
 
@@ -1913,7 +1944,8 @@ lws_http_to_fallback(struct lws *wsi, unsigned char *obuf, size_t olen)
 
 	lwsl_notice("%s: vh %s, peer: %s, role %s, "
 		    "protocol %s, cb %d, ah %p\n", __func__, wsi->a.vhost->name,
-		    ipbuf, role->name, protocol->name, n, wsi->http.ah);
+		    ipbuf, role ? role->name : "null", protocol->name, n,
+		    wsi->http.ah);
 
 	if ((wsi->a.protocol->callback)(wsi, n, wsi->user_space, NULL, 0))
 		return 1;
@@ -1992,6 +2024,10 @@ raw_transition:
 			lwsl_info("lws_parse failed\n");
 			goto bail_nuke_ah;
 		}
+
+		/* coverity... */
+		if (!wsi->http.ah)
+			goto bail_nuke_ah;
 
 		if (wsi->http.ah->parser_state != WSI_PARSING_COMPLETE)
 			continue;
@@ -2100,7 +2136,6 @@ raw_transition:
 
 		if (lws_hdr_total_length(wsi, WSI_TOKEN_CONNECT)) {
 			lwsl_info("Changing to RAW mode\n");
-			m = 0;
 			goto raw_transition;
 		}
 
@@ -3053,8 +3088,10 @@ lws_server_get_canonical_hostname(struct lws_context *context,
 		return;
 #if !defined(LWS_PLAT_FREERTOS)
 	/* find canonical hostname */
-	gethostname((char *)context->canonical_hostname,
-		    sizeof(context->canonical_hostname) - 1);
+	if (gethostname((char *)context->canonical_hostname,
+		        sizeof(context->canonical_hostname) - 1))
+		lws_strncpy((char *)context->canonical_hostname, "unknown",
+			    sizeof(context->canonical_hostname));
 
 	lwsl_info(" canonical_hostname = %s\n", context->canonical_hostname);
 #else

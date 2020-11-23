@@ -71,8 +71,11 @@ __lws_reset_wsi(struct lws *wsi)
 	}
 #endif
 
-	if (wsi->a.vhost)
+	if (wsi->a.vhost) {
+		lws_vhost_lock(wsi->a.vhost);
 		lws_dll2_remove(&wsi->vh_awaiting_socket);
+		lws_vhost_unlock(wsi->a.vhost);
+	}
 
 	/*
 	 * Protocol user data may be allocated either internally by lws
@@ -272,6 +275,9 @@ __lws_close_free_wsi(struct lws *wsi, enum lws_close_status reason,
 
 	context = wsi->a.context;
 	pt = &context->pt[(int)wsi->tsi];
+
+	lws_pt_assert_lock_held(pt);
+
 	lws_stats_bump(pt, LWSSTATS_C_API_CLOSE, 1);
 
 #if defined(LWS_WITH_CLIENT)
@@ -442,6 +448,7 @@ just_kill_connection:
 		lws_vfs_file_close(&wsi->http.fop_fd);
 #endif
 
+	lws_sul_cancel(&wsi->sul_connect_timeout);
 #if defined(LWS_WITH_SYS_ASYNC_DNS)
 	lws_async_dns_cancel(wsi);
 #endif
@@ -477,8 +484,33 @@ just_kill_connection:
 		wsi->protocol_bind_balance = 0;
 	}
 
+#if defined(LWS_WITH_SECURE_STREAMS) && defined(LWS_WITH_SERVER)
+	if (wsi->for_ss) {
+		/*
+		 * We were adopted for a particular ss, but, eg, we may not
+		 * have succeeded with the connection... we are closing which is
+		 * good, but we have to invalidate any pointer the related ss
+		 * handle may be holding on us
+		 */
+		lws_ss_handle_t *h = (lws_ss_handle_t *)wsi->a.opaque_user_data;
+
+		if (h) {
+			h->wsi = NULL;
+			wsi->a.opaque_user_data = NULL;
+		}
+	}
+#endif
+
 #if defined(LWS_WITH_CLIENT)
-	if ((lwsi_state(wsi) == LRS_WAITING_SERVER_REPLY ||
+	if ((
+#if defined(LWS_ROLE_WS)
+		/*
+		 * If our goal is a ws upgrade, effectively we did not reach
+		 * ESTABLISHED if we did not get the upgrade server reply
+		 */
+		(lwsi_state(wsi) == LRS_WAITING_SERVER_REPLY &&
+		 wsi->role_ops == &role_ops_ws) ||
+#endif
 	     lwsi_state(wsi) == LRS_WAITING_DNS ||
 	     lwsi_state(wsi) == LRS_WAITING_CONNECT) &&
 	     !wsi->already_did_cce && wsi->a.protocol) {
@@ -618,6 +650,13 @@ just_kill_connection:
 		ccb = 1;
 
 	pro = wsi->a.protocol;
+
+	if (wsi->already_did_cce)
+		/*
+		 * If we handled this by CLIENT_CONNECTION_ERROR, it's
+		 * mutually exclusive with CLOSE
+		 */
+		ccb = 0;
 
 #if defined(LWS_WITH_CLIENT)
 	if (!ccb && (lwsi_state_PRE_CLOSE(wsi) & LWSIFS_NOT_EST) &&

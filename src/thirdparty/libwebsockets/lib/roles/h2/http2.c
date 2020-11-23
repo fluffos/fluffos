@@ -1116,7 +1116,7 @@ lws_h2_parse_frame_header(struct lws *wsi)
 		}
 
 		if (!(h2n->flags & LWS_H2_FLAG_SETTINGS_ACK)) {
-			if ((!h2n->length) || h2n->length % 6) {
+			if (h2n->length % 6) {
 				lws_h2_goaway(wsi, H2_ERR_FRAME_SIZE_ERROR,
 						 "Settings length error");
 				break;
@@ -1542,9 +1542,12 @@ lws_h2_parse_end_of_frame(struct lws *wsi)
 #endif
 
 		if (lws_hdr_extant(h2n->swsi, WSI_TOKEN_HTTP_CONTENT_LENGTH)) {
-			h2n->swsi->http.rx_content_length  = atoll(
-				lws_hdr_simple_ptr(h2n->swsi,
-				      WSI_TOKEN_HTTP_CONTENT_LENGTH));
+			const char *simp = lws_hdr_simple_ptr(h2n->swsi,
+					      WSI_TOKEN_HTTP_CONTENT_LENGTH);
+
+			if (!simp) /* coverity */
+				return 1;
+			h2n->swsi->http.rx_content_length  = atoll(simp);
 			h2n->swsi->http.rx_content_remain =
 					h2n->swsi->http.rx_content_length;
 			lwsl_info("setting rx_content_length %lld\n",
@@ -1627,6 +1630,7 @@ lws_h2_parse_end_of_frame(struct lws *wsi)
 			n = lws_hdr_total_length(h2n->swsi, WSI_TOKEN_TE);
 
 			if (n != 8 ||
+			    !lws_hdr_simple_ptr(h2n->swsi, WSI_TOKEN_TE) ||
 			    strncmp(lws_hdr_simple_ptr(h2n->swsi, WSI_TOKEN_TE),
 				  "trailers", n)) {
 				lws_h2_goaway(wsi, H2_ERR_PROTOCOL_ERROR,
@@ -1648,7 +1652,7 @@ lws_h2_parse_end_of_frame(struct lws *wsi)
 		 * index, so that it looks the same as h1 in the ah
 		 */
 		for (n = 0; n < (int)LWS_ARRAY_SIZE(method_names); n++)
-			if (!strcasecmp(p, method_names[n])) {
+			if (p && !strcasecmp(p, method_names[n])) {
 				h2n->swsi->http.ah->frag_index[method_index[n]] =
 						h2n->swsi->http.ah->frag_index[
 				                     WSI_TOKEN_HTTP_COLON_PATH];
@@ -2332,7 +2336,7 @@ lws_h2_client_handshake(struct lws *wsi)
 	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
 	uint8_t *buf, *start, *p, *p1, *end;
 	char *meth = lws_hdr_simple_ptr(wsi, _WSI_TOKEN_CLIENT_METHOD),
-	     *uri = lws_hdr_simple_ptr(wsi, _WSI_TOKEN_CLIENT_URI);
+	     *uri = lws_hdr_simple_ptr(wsi, _WSI_TOKEN_CLIENT_URI), *simp;
 	struct lws *nwsi = lws_get_network_wsi(wsi);
 	int n, m;
 	/*
@@ -2382,29 +2386,25 @@ lws_h2_client_handshake(struct lws *wsi)
 				&p, end))
 		goto fail_length;
 
-	if (lws_add_http_header_by_token(wsi,
+	n = lws_hdr_total_length(wsi, _WSI_TOKEN_CLIENT_URI);
+	if (n && lws_add_http_header_by_token(wsi,
 				WSI_TOKEN_HTTP_COLON_PATH,
-				(unsigned char *)uri,
-				lws_hdr_total_length(wsi, _WSI_TOKEN_CLIENT_URI),
-				&p, end))
+				(unsigned char *)uri, n, &p, end))
 		goto fail_length;
 
-	if (lws_add_http_header_by_token(wsi,
+	n = lws_hdr_total_length(wsi, _WSI_TOKEN_CLIENT_ORIGIN);
+	simp = lws_hdr_simple_ptr(wsi, _WSI_TOKEN_CLIENT_ORIGIN);
+	if (n && simp && lws_add_http_header_by_token(wsi,
 				WSI_TOKEN_HTTP_COLON_AUTHORITY,
-				(unsigned char *)lws_hdr_simple_ptr(wsi,
-						_WSI_TOKEN_CLIENT_ORIGIN),
-			lws_hdr_total_length(wsi, _WSI_TOKEN_CLIENT_ORIGIN),
-				&p, end))
+				(unsigned char *)simp, n, &p, end))
 		goto fail_length;
 
-	if (!wsi->client_h2_alpn &&
-	    lws_hdr_simple_ptr(wsi, _WSI_TOKEN_CLIENT_HOST) && /* coverity */
-	    lws_hdr_total_length(wsi, _WSI_TOKEN_CLIENT_HOST) && /* coverity */
+	n = lws_hdr_total_length(wsi, _WSI_TOKEN_CLIENT_HOST);
+	simp = lws_hdr_simple_ptr(wsi, _WSI_TOKEN_CLIENT_HOST);
+
+	if (!wsi->client_h2_alpn && n && simp &&
 	    lws_add_http_header_by_token(wsi, WSI_TOKEN_HOST,
-				(unsigned char *)lws_hdr_simple_ptr(wsi,
-						_WSI_TOKEN_CLIENT_HOST),
-			lws_hdr_total_length(wsi, _WSI_TOKEN_CLIENT_HOST),
-				&p, end))
+				(unsigned char *)simp, n, &p, end))
 		goto fail_length;
 
 	if (lws_add_http_header_by_token(wsi, WSI_TOKEN_HTTP_USER_AGENT,

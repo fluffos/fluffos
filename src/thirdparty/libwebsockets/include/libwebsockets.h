@@ -190,21 +190,17 @@ typedef unsigned long long lws_intptr_t;
 #endif
 #endif
 
-#if defined(LWS_WITH_LIBEV)
-#include <ev.h>
-#endif /* LWS_WITH_LIBEV */
-#ifdef LWS_WITH_LIBUV
+#if defined(LWS_WITH_LIBUV_INTERNAL)
 #include <uv.h>
+
 #ifdef LWS_HAVE_UV_VERSION_H
 #include <uv-version.h>
 #endif
+
 #ifdef LWS_HAVE_NEW_UV_VERSION_H
 #include <uv/version.h>
 #endif
-#endif /* LWS_WITH_LIBUV */
-#if defined(LWS_WITH_LIBEVENT)
-#include <event2/event.h>
-#endif /* LWS_WITH_LIBEVENT */
+#endif
 
 #if defined(LWS_WITH_TLS)
 
@@ -247,9 +243,11 @@ typedef unsigned long long lws_intptr_t;
 #define MBEDTLS_CONFIG_FILE <mbedtls/esp_config.h>
 #endif
 #endif
+#if defined(LWS_WITH_TLS)
 #include <mbedtls/ssl.h>
 #include <mbedtls/entropy.h>
 #include <mbedtls/ctr_drbg.h>
+#endif
 #else
 #include <openssl/ssl.h>
 #if !defined(LWS_WITH_MBEDTLS)
@@ -347,6 +345,7 @@ struct lws_pollfd {
 	lws_sockfd_type fd; /**< file descriptor */
 	SHORT events; /**< which events to respond to */
 	SHORT revents; /**< which events happened */
+	uint8_t write_blocked;
 };
 #define LWS_POLLHUP (FD_CLOSE)
 #define LWS_POLLIN (FD_READ | FD_ACCEPT)
@@ -546,7 +545,6 @@ struct lws;
 #include <libwebsockets/lws-ws-state.h>
 #include <libwebsockets/lws-ws-ext.h>
 #include <libwebsockets/lws-protocols-plugins.h>
-#include <libwebsockets/lws-plugin-generic-sessions.h>
 
 #include <libwebsockets/lws-context-vhost.h>
 
@@ -611,6 +609,7 @@ struct lws;
 
 #endif
 
+#include <libwebsockets/lws-eventlib-exports.h>
 #include <libwebsockets/lws-i2c.h>
 #include <libwebsockets/lws-spi.h>
 #include <libwebsockets/lws-gpio.h>

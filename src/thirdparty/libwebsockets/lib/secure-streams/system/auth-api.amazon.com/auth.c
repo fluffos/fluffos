@@ -74,6 +74,7 @@ auth_api_amazon_com_parser_cb(struct lejp_ctx *ctx, char reason)
 {
 	ss_api_amazon_auth_t *m = (ss_api_amazon_auth_t *)ctx->user;
 	struct lws_context *context = (struct lws_context *)m->opaque_data;
+	lws_system_blob_t *blob;
 
 	if (!(reason & LEJP_FLAG_CB_IS_VALUE) || !ctx->path_match)
 		return 0;
@@ -82,12 +83,17 @@ auth_api_amazon_com_parser_cb(struct lejp_ctx *ctx, char reason)
 	case LSSPPT_ACCESS_TOKEN:
 		if (!ctx->npos)
 			break;
-		if (lws_system_blob_heap_append(lws_system_get_blob(context,
-						LWS_SYSBLOB_TYPE_AUTH,
-						AUTH_IDX_LWA),
+
+		blob = lws_system_get_blob(context, LWS_SYSBLOB_TYPE_AUTH,
+					   AUTH_IDX_LWA);
+		if (!blob)
+			return -1;
+
+		if (lws_system_blob_heap_append(blob,
 						(const uint8_t *)ctx->buf,
 						ctx->npos)) {
 			lwsl_err("%s: unable to store auth token\n", __func__);
+
 			return -1;
 		}
 		break;
@@ -104,7 +110,7 @@ auth_api_amazon_com_parser_cb(struct lejp_ctx *ctx, char reason)
 
 /* secure streams payload interface */
 
-static int
+static lws_ss_state_return_t
 ss_api_amazon_auth_rx(void *userobj, const uint8_t *buf, size_t len, int flags)
 {
 	ss_api_amazon_auth_t *m = (ss_api_amazon_auth_t *)userobj;
@@ -114,6 +120,9 @@ ss_api_amazon_auth_rx(void *userobj, const uint8_t *buf, size_t len, int flags)
 	int n;
 
 	ab = lws_system_get_blob(context, LWS_SYSBLOB_TYPE_AUTH, AUTH_IDX_LWA);
+	/* coverity */
+	if (!ab)
+		return -1;
 
 	if (buf) {
 		if (flags & LWSSS_FLAG_SOM) {
@@ -150,7 +159,7 @@ ss_api_amazon_auth_rx(void *userobj, const uint8_t *buf, size_t len, int flags)
 	return 0;
 }
 
-static int
+static lws_ss_state_return_t
 ss_api_amazon_auth_tx(void *userobj, lws_ss_tx_ordinal_t ord, uint8_t *buf,
 		      size_t *len, int *flags)
 {
@@ -166,6 +175,9 @@ ss_api_amazon_auth_tx(void *userobj, lws_ss_tx_ordinal_t ord, uint8_t *buf,
 	 */
 
 	ab = lws_system_get_blob(context, LWS_SYSBLOB_TYPE_AUTH, AUTH_IDX_ROOT);
+	if (!ab)
+		return LWSSSSRET_DESTROY_ME;
+
 	total = lws_system_blob_get_size(ab);
 
 	n = lws_system_blob_get(ab, buf, len, m->pos);
@@ -185,25 +197,31 @@ ss_api_amazon_auth_tx(void *userobj, lws_ss_tx_ordinal_t ord, uint8_t *buf,
 	return 0;
 }
 
-static int
+static lws_ss_state_return_t
 ss_api_amazon_auth_state(void *userobj, void *sh, lws_ss_constate_t state,
 			 lws_ss_tx_ordinal_t ack)
 {
 	ss_api_amazon_auth_t *m = (ss_api_amazon_auth_t *)userobj;
 	struct lws_context *context = (struct lws_context *)m->opaque_data;
+	lws_system_blob_t *ab;
 	size_t s;
 
 	lwsl_info("%s: %s, ord 0x%x\n", __func__, lws_ss_state_name(state),
 		  (unsigned int)ack);
+
+	ab = lws_system_get_blob(context, LWS_SYSBLOB_TYPE_AUTH, AUTH_IDX_ROOT);
+	/* coverity */
+	if (!ab)
+		return LWSSSSRET_DESTROY_ME;
 
 	switch (state) {
 	case LWSSSCS_CREATING:
         	lws_ss_set_metadata(m->ss, "ctype", "application/json", 16);
 		/* fallthru */
 	case LWSSSCS_CONNECTING:
-		s = lws_system_blob_get_size(
-			lws_system_get_blob(context, LWS_SYSBLOB_TYPE_AUTH,
-					    AUTH_IDX_ROOT));
+		s = lws_system_blob_get_size(ab);
+		if (!s)
+			lwsl_debug("%s: no auth blob\n", __func__);
 		lws_ss_request_tx_len(m->ss, (unsigned long)s);
 		m->pos = 0;
 		break;
@@ -221,9 +239,7 @@ ss_api_amazon_auth_state(void *userobj, void *sh, lws_ss_constate_t state,
 		 * when the close process for the auth wsi has completed and
 		 * the related tls is already freed.
 		 */
-		s = lws_system_blob_get_size(
-			lws_system_get_blob(context, LWS_SYSBLOB_TYPE_AUTH,
-					    AUTH_IDX_LWA));
+		s = lws_system_blob_get_size(ab);
 
 		if (s && context->mgr_system.state != LWS_SYSTATE_OPERATIONAL)
 			lws_sul_schedule(context, 0,
