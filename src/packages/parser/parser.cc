@@ -209,21 +209,21 @@ void parser_mark(parse_info_t *pinfo) {
     return;
   }
 
-  if(pinfo->num_ids) {
+  if (pinfo->num_ids) {
     DO_MARK(pinfo->ids, TAG_PARSER);
   }
   for (i = 0; i < pinfo->num_ids; i++) {
     EXTRA_REF(BLOCK(pinfo->ids[i]))++;
   }
 
-  if(pinfo->num_adjs) {
+  if (pinfo->num_adjs) {
     DO_MARK(pinfo->adjs, TAG_PARSER);
   }
   for (i = 0; i < pinfo->num_adjs; i++) {
     EXTRA_REF(BLOCK(pinfo->adjs[i]))++;
   }
 
-  if(pinfo->num_plurals) {
+  if (pinfo->num_plurals) {
     DO_MARK(pinfo->plurals, TAG_PARSER);
   }
   for (i = 0; i < pinfo->num_plurals; i++) {
@@ -358,7 +358,7 @@ static match_t *add_match(parse_state_t *state, int token, int start, int end) {
   return ret;
 }
 
-static int parse_copy_array(array_t *arr, char ***sarrp, const char* desc) {
+static int parse_copy_array(array_t *arr, char ***sarrp, const char *desc) {
   const char **table;
   char **table2;
   int j;
@@ -877,7 +877,8 @@ static void interrogate_object(object_t *ob) {
   DEBUG_PP(("[%s]", APPLY_PLURAL));
   ret = safe_apply(APPLY_PLURAL, ob, 0, ORIGIN_DRIVER);
   if (ret && ret->type == T_ARRAY) {
-    ob->pinfo->num_plurals = parse_copy_array(ret->u.arr, &ob->pinfo->plurals, __CURRENT_FILE_LINE__);
+    ob->pinfo->num_plurals =
+        parse_copy_array(ret->u.arr, &ob->pinfo->plurals, __CURRENT_FILE_LINE__);
   } else {
     ob->pinfo->num_plurals = 0;
   }

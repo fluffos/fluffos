@@ -33,9 +33,7 @@ bool u8_validate(const uint8_t *s, size_t len) {
   return state == UTF8_ACCEPT;
 }
 
-std::string u8_sanitize(std::string_view src) {
-  return utf8::replace_invalid(src);
-}
+std::string u8_sanitize(std::string_view src) { return utf8::replace_invalid(src); }
 
 namespace {
 typedef std::function<void(std::unique_ptr<icu::BreakIterator> &)> u8_char_iter_callback;
