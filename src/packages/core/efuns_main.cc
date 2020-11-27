@@ -1763,9 +1763,14 @@ void f_read_file(void) {
   if (!str) {
     push_svalue(&const0);
   } else {
+#ifdef MULTI_BYTES
+    copy_and_push_string(str);
+#else
     auto res = u8_sanitize(str);
     copy_and_push_string(res.c_str());
+#endif     
     FREE_MSTR(str);
+    
   }
 }
 #endif

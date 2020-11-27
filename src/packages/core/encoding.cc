@@ -3,7 +3,11 @@
 #include <unicode/ucnv.h>
 
 namespace {
+#ifdef MULTI_BYTES
+const char *DEFAULT_ENCODING = "GB2312";
+#else
 const char *DEFAULT_ENCODING = "utf-8";
+#endif // MULTI_BYTES
 }  // namespace
 
 #ifdef F_SET_ENCODING

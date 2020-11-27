@@ -3193,7 +3193,11 @@ void eval_instruction(char *p) {
             if (i < 0) {
               error("String index out of bounds.\n");
             }
-
+#ifdef MULTI_BYTES
+            i = static_cast<unsigned char>(sp->u.string[i]);
+            free_string_svalue(sp);
+            (--sp)->u.number = i;
+#else
             UChar32 res = u8_egc_index_as_single_codepoint(sp->u.string, i);
             if (res == -2) {
               error("String index out of bounds.\n");
@@ -3202,6 +3206,7 @@ void eval_instruction(char *p) {
             }
             free_string_svalue(sp);
             (--sp)->u.number = res;
+#endif // MULTI_BYTES
             break;
           }
           case T_ARRAY: {

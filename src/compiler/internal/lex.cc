@@ -54,7 +54,7 @@ extern int NUM_OPTION_DEFS;
 // FIXME: This means current source code can not contain "NUL" byte,
 //  for now it seems suffice, but this should be fixed to check pointer address
 //  for EOF, not for value.
-#define LEX_EOF ((unsigned char)0)
+#define LEX_EOF ((unsigned char)EOF)
 
 char lex_ctype[256] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -921,6 +921,10 @@ static int inc_open(char *buf, char *name, int check_local) {
   int i, f;
   char *p;
   const char *tmp;
+
+#ifdef LOCAL_HEADERS
+  check_local = 1;
+#endif // LOCAL_HEADERS
 
   if (check_local) {
     merge(name, buf);
@@ -2508,6 +2512,7 @@ int yylex() {
                   }
                   break;
                 }
+#ifndef MULTI_BYTES
                   // \uhhhh, 2 byte
                 case 'u': {
                   UChar res[2];  // possible surrogate pairs
@@ -2604,6 +2609,7 @@ int yylex() {
                   to += written;
                   break;
                 }
+#endif // 
                 default:
                   *to++ = *(outp - 1);
                   yywarn("Unknown \\ escape.");
