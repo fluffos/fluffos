@@ -2512,7 +2512,7 @@ int yylex() {
                   }
                   break;
                 }
-#ifndef MULTI_BYTES
+#ifndef NON_UNICODE_MUDLIB
                   // \uhhhh, 2 byte
                 case 'u': {
                   UChar res[2];  // possible surrogate pairs
@@ -2609,7 +2609,7 @@ int yylex() {
                   to += written;
                   break;
                 }
-#endif // 
+#endif // NON_UNICODE_MUDLIB
                 default:
                   *to++ = *(outp - 1);
                   yywarn("Unknown \\ escape.");

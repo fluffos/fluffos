@@ -2,6 +2,7 @@
 #define NET_WS_ASCII_H
 
 #include <libwebsockets.h>
+#include <unicode/ucnv.h>
 
 /* one of these is created for each client connecting to us */
 const int PROTOCOL_WS_ASCII = 1;
@@ -17,5 +18,7 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
                       size_t len);
 
 void ws_ascii_send(struct lws *wsi, const char *data, size_t len);
+
+void ws_ascii_send_non_unicode(struct lws *wsi, const char *data, size_t len);
 
 #endif /* NET_WS_ASCII_H */

@@ -3193,7 +3193,7 @@ void eval_instruction(char *p) {
             if (i < 0) {
               error("String index out of bounds.\n");
             }
-#ifdef MULTI_BYTES
+#ifdef NON_UNICODE_MUDLIB
             i = static_cast<unsigned char>(sp->u.string[i]);
             free_string_svalue(sp);
             (--sp)->u.number = i;
@@ -3206,7 +3206,7 @@ void eval_instruction(char *p) {
             }
             free_string_svalue(sp);
             (--sp)->u.number = res;
-#endif // MULTI_BYTES
+#endif // NON_UNICODE_MUDLIB
             break;
           }
           case T_ARRAY: {

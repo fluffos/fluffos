@@ -104,7 +104,11 @@ struct lws *init_user_websocket(struct lws_context *context, evutil_socket_t fd)
 void websocket_send_text(struct lws *wsi, const char *data, size_t len) {
   switch (lws_get_protocol(wsi)->id) {
     case WS_ASCII:
+#ifdef NON_UNICODE_MUDLIB
+     ws_ascii_send_non_unicode(wsi, data, len);
+#else
       ws_ascii_send(wsi, data, len);
+#endif // MULTI_BYTES
       break;
     default:
       // No way to send message

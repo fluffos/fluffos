@@ -196,3 +196,34 @@ void ws_ascii_send(struct lws *wsi, const char *data, size_t len) {
   evbuffer_add(pss->buffer, data, len);
   lws_callback_on_writable(wsi);
 }
+
+void ws_ascii_send_non_unicode(struct lws *wsi, const char *data, size_t len) {
+    UErrorCode error_code = U_ZERO_ERROR;
+    auto trans = ucnv_open(DEFAULT_MUDLIB_ENCODING, &error_code);
+    if (U_FAILURE(error_code)) {
+        debug_message("failed open uconv with error code %s", u_errorName(error_code));
+        return;
+    }
+
+    error_code = U_ZERO_ERROR;
+    auto required =
+      ucnv_toAlgorithmic(UConverterType::UCNV_UTF8, trans, nullptr, 0, 
+      data, len, &error_code);
+
+    if (U_FAILURE(error_code) && error_code != U_BUFFER_OVERFLOW_ERROR) {
+        ucnv_close(trans);
+        debug_message("string_decode: error: %s.", u_errorName(error_code));
+    }
+
+    auto res = new_string(required, "ws_ascii_send_non_unicode");
+
+    error_code = U_ZERO_ERROR;
+    auto written =
+      ucnv_toAlgorithmic(UConverterType::UCNV_UTF8, trans, res, required, 
+      data, len, &error_code);
+    res[required] = '\0';
+
+    ucnv_close(trans);
+
+    ws_ascii_send(wsi, res, required);
+}

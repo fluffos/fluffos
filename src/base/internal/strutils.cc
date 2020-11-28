@@ -16,10 +16,10 @@
 // Addition by Yucong Sun
 
 bool u8_validate(const char *s) {
-	
-#ifdef MULTI_BYTES
-	return true;
-#endif //MULTI_BYTES
+
+#ifdef NON_UNICODE_MUDLIB
+    return true;
+#endif //NON_UNICODE_MUDLIB
   auto p = (const uint8_t *)s;
   uint32_t codepoint, state = 0;
 
@@ -30,9 +30,9 @@ bool u8_validate(const char *s) {
 
 bool u8_validate(const uint8_t *s, size_t len) {
 
-#ifdef MULTI_BYTES
+#ifdef NON_UNICODE_MUDLIB
   return true;
-#endif //MULTI_BYTES
+#endif //NON_UNICODE_MUDLIB
   auto end = s + len;
   uint32_t codepoint, state = 0;
 
@@ -44,9 +44,9 @@ bool u8_validate(const uint8_t *s, size_t len) {
 #
 std::string u8_sanitize(std::string_view src) 
 {
-#ifdef MULTI_BYTES
+#ifdef NON_UNICODE_MUDLIB
   return {src.data(), src.size()};
-#endif //MULTI_BYTES
+#endif //NON_UNICODE_MUDLIB
   return utf8::replace_invalid(src); 
 }
 

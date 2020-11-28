@@ -46,10 +46,15 @@
 #undef IPV6
 
 /* for ANSI mudlibs */
-#define MULTI_BYTES
+#define NON_UNICODE_MUDLIB
+
+#define DEFAULT_MUDLIB_ENCODING "GB2312"
 
 /* local headers */
 #define LOCAL_HEADERS
+
+/* old encrypt */
+#define USE_OLD_CRYPT
 
 /****************************************************************************
  *                              PACKAGES                                    *

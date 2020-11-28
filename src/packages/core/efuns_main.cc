@@ -1763,14 +1763,13 @@ void f_read_file(void) {
   if (!str) {
     push_svalue(&const0);
   } else {
-#ifdef MULTI_BYTES
+#ifdef NON_UNICODE_MUDLIB
     copy_and_push_string(str);
 #else
     auto res = u8_sanitize(str);
     copy_and_push_string(res.c_str());
-#endif     
+#endif // NON_UNICODE_MUDLIB
     FREE_MSTR(str);
-    
   }
 }
 #endif
@@ -3323,10 +3322,12 @@ void f_crypt(void) {
       }
     } else if (SVALUE_STRLEN(sp) >= 2) {
       // Compat: Old f_crypt only use first two character as key.
+#ifndef USE_OLD_CRYPT
       debug_message(
           "old crypt() password detected, It is only using first 2 character as key and ignore "
           "password beyond 8 characters, please upgrade to SHA512 using crypt(password) "
           "immediately.\n");
+#endif // USE_OLD_CRYPT
       salt[0] = sp->u.string[0];
       salt[1] = sp->u.string[1];
       salt[2] = '\0';
