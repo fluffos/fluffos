@@ -509,6 +509,9 @@ void u8_truncate_below_width(const char *src, size_t len, size_t max_width, bool
 
 // Total width of characters(grapheme cluster). Also adjust for east asain full width characters
 size_t u8_width(const char *src, int len) {
+#ifdef NON_UNICODE_MUDLIB
+    return strlen(src);
+#endif // NON_UNICODE_MUDLIB
   size_t total = 0;
   int32_t src_offset = 0;
 
