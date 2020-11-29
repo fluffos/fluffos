@@ -9,11 +9,15 @@ title: contrib / upper_case.pre
 
 ### SYNOPSIS
 
-    string upper_case(string);
+    string upper_case(string text);
 
 ### DESCRIPTION
 
-    returns new string with every lower case character turned upper case
+    Returns a new string with every character in <text> converted to upper case.
+
+### EXAMPLE
+
+    string text = upper_case( "I like cheese." ) ; // "I LIKE CHEESE."
 
 ### SEE ALSO
 
