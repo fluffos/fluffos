@@ -41,7 +41,6 @@ bool u8_validate(const uint8_t *s, size_t len) {
   return state == UTF8_ACCEPT;
 }
 
-#
 std::string u8_sanitize(std::string_view src) 
 {
 #ifdef NON_UNICODE_MUDLIB

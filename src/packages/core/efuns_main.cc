@@ -2473,9 +2473,13 @@ void f_sizeof(void) {
       free_buffer(sp->u.buf);
       break;
     case T_STRING: {
+#ifdef NON_UNICODE_MUDLIB
+     i = SVALUE_STRLEN(sp);
+#else
       auto success = u8_egc_count(sp->u.string, &i);
       DEBUG_CHECK(!success, "Invalid UTF8 string!");
       free_string_svalue(sp);
+#endif // NON_UNICODE_MUDLIB
       break;
     }
     default:
