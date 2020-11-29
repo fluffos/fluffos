@@ -214,7 +214,7 @@ void f__call_other(void) {
   } else {
     ob = find_object(arg[0].u.string);
     if (!ob || !object_visible(ob)) {
-      error("call_other() couldn't find object\n");
+      error("call_other() couldn't find object '%s'.\n", arg[0].u.string);
     }
   }
   /* Send the remaining arguments to the function. */
