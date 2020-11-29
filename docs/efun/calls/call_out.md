@@ -19,7 +19,9 @@ title: calls / call_out
 
     If the gametick in the runtime config is less than 1000, you may specify
     a <delay> as a float in milliseconds (gametick / 1000) representing a 
-    value that is divisible by the gametick.
+    value that is divisible by the gametick. A <delay> which is not equally
+    divisible by the gametick value will be rounded up to the next game tick.
+    A <delay> of 0 is special, see below.
 
     For example, if your gametick is set to 250ms in the runtime config,
     you may perform callouts with a granularity of a quarter of a second.
@@ -27,18 +29,19 @@ title: calls / call_out
     (750 milliseconds), thereby affording more precision over timing
     when calling out.
 
-    A <delay> of 0 (or 0.0), will perform <fun> on the next game tick, a
-    distance of time defined in the runtime config.
+    A <delay> of 0 (or 0.0), will perform <fun> on the same gametick in which
+    it was called after all previous call_outs have been executed. The number
+    of call_outs(0)s which may be executed on the same gametick may be configured
+    via the "call_out(0) nest level" property in the runtime config.
 
     Please note that you can't rely on write() or say() in <fun> since
     this_player() is set to 0. Use tell_object() instead.
 
-    The define THIS_PLAYER_IN_CALL_OUT exists to remedy the above problem.
+    The runtime config value "this_player in call_out" exists to remedy the above
+    problem.
 
-    The return value is an integer representing the game tick number of the
-    scheduled call to <fun> in the driver. This may not necessarily be useful
-    in the mudlib as the gametick counter in the driver wraps after
-    4,294,967,295.
+    The return value is an integer representing the handle of the call_out
+    which may be used as an argument to remove_call_out().
 
 ### SEE ALSO
 
