@@ -384,16 +384,14 @@ title: EFUN
 <div><a href='filesystem/stat.html'>stat</a></div>
 </div>
 <div class='col-sm-3'>
-<div><a href='filesystem/tail.html'>tail</a></div>
+<div><a href='filesystem/write_bytes.html'>write_bytes</a></div>
 </div>
 </div>
 <div class='row'>
 <div class='col-sm-3'>
-<div><a href='filesystem/write_bytes.html'>write_bytes</a></div>
-</div>
-<div class='col-sm-3'>
 <div><a href='filesystem/write_file.html'>write_file</a></div>
 </div>
+<div>&nbsp;</div>
 <div>&nbsp;</div>
 <div>&nbsp;</div>
 </div>
@@ -740,19 +738,16 @@ title: EFUN
 <div><a href='mappings/allocate_mapping.html'>allocate_mapping</a></div>
 </div>
 <div class='col-sm-3'>
-<div><a href='mappings/each.html'>each</a></div>
-</div>
-<div class='col-sm-3'>
 <div><a href='mappings/filter_mapping.html'>filter_mapping</a></div>
 </div>
 <div class='col-sm-3'>
 <div><a href='mappings/keys.html'>keys</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='mappings/map_delete.html'>map_delete</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='mappings/map_mapping.html'>map_mapping</a></div>
 </div>
@@ -762,14 +757,15 @@ title: EFUN
 <div class='col-sm-3'>
 <div><a href='mappings/match_path.html'>match_path</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='mappings/unique_mapping.html'>unique_mapping</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='mappings/values.html'>values</a></div>
 </div>
+<div>&nbsp;</div>
 <div>&nbsp;</div>
 <div>&nbsp;</div>
 </div>
@@ -1060,9 +1056,6 @@ title: EFUN
 <div class='container'>
 <div class='row'>
 <div class='col-sm-3'>
-<div><a href='strings/break_string.html'>break_string</a></div>
-</div>
-<div class='col-sm-3'>
 <div><a href='strings/capitalize.html'>capitalize</a></div>
 </div>
 <div class='col-sm-3'>
@@ -1071,11 +1064,11 @@ title: EFUN
 <div class='col-sm-3'>
 <div><a href='strings/crypt.html'>crypt</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='strings/explode.html'>explode</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='strings/implode.html'>implode</a></div>
 </div>
@@ -1085,11 +1078,11 @@ title: EFUN
 <div class='col-sm-3'>
 <div><a href='strings/ltrim.html'>ltrim</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='strings/reg_assoc.html'>reg_assoc</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='strings/regexp.html'>regexp</a></div>
 </div>
@@ -1099,11 +1092,11 @@ title: EFUN
 <div class='col-sm-3'>
 <div><a href='strings/rtrim.html'>rtrim</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='strings/set_bit.html'>set_bit</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='strings/sprintf.html'>sprintf</a></div>
 </div>
@@ -1113,11 +1106,11 @@ title: EFUN
 <div class='col-sm-3'>
 <div><a href='strings/strcmp.html'>strcmp</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='strings/string_decode.html'>string_decode</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='strings/string_encode.html'>string_encode</a></div>
 </div>
@@ -1127,11 +1120,11 @@ title: EFUN
 <div class='col-sm-3'>
 <div><a href='strings/strlen.html'>strlen</a></div>
 </div>
-</div>
-<div class='row'>
 <div class='col-sm-3'>
 <div><a href='strings/strsrch.html'>strsrch</a></div>
 </div>
+</div>
+<div class='row'>
 <div class='col-sm-3'>
 <div><a href='strings/strwidth.html'>strwidth</a></div>
 </div>
@@ -1141,6 +1134,7 @@ title: EFUN
 <div class='col-sm-3'>
 <div><a href='strings/trim.html'>trim</a></div>
 </div>
+<div>&nbsp;</div>
 </div>
 </div>
 
@@ -1235,6 +1229,6 @@ title: EFUN
 
 
 
-This page is auto generated on 2020-11-09 01:08:19 PST for [a87ebd6b](https://github.com/fluffos/fluffos/tree/a87ebd6b).
+This page is auto generated on 2020-12-06 22:59:00 CST for [75ec329a](https://github.com/fluffos/fluffos/tree/75ec329a).
 
 

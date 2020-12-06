@@ -9,11 +9,11 @@ title: contrib / num_classes.pre
 
 ### 语法
 
-   int num_classes(object ob);
+    int num_classes(object ob);
 
 ### 描述
 
-    此外部函数对象 `ob` 中定义的 class 类型变量的数量。
+    此外部函数返回对象 `ob` 中定义的 class 类型变量的数量。
 
 ### 参考
 
