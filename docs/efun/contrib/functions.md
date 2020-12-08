@@ -14,20 +14,16 @@ title: contrib / functions.pre
 ### DESCRIPTION
     Returns an array of strings containing the function names found in
     <ob>. The functions returned will include all functions, whether public,
-    protected, or private.
-
-    The <flag> option is by default zero and shows only as described above,
-    with just the string names of the functions. All available flag values
-    are below with their behaviour.
+    protected, or private. The <flag> parameter is by default zero.
 
     Flag: 0
-    Returns: all function names in the deep_inherit_list in a string array 
+    Returns: a string array containing function names, including all inherited
+    functions.
     ({ "func1", "func2", "func3", "func4", ... })
 
     Flag: 1
     Returns: A two-dimensional array of mixed arrays containing additional
-    information about each function. All functions are from the
-    deep_inherit_list.
+    information about each function, including all inherited functions.
 
     ({
         ({
@@ -41,12 +37,10 @@ title: contrib / functions.pre
     })
 
     Flag: 2
-    Like Flag 0, but only contains functions local to that object's file,
-    and not from the deep_inherit_list.
+    Like Flag 0, but excludes inherited functions.
 
     Flag: 3
-    Like Flag 1, but only contains functions local to that object's file,
-    and not from the deep_inherit_list.
+    Like Flag 1, but excludes inherited functions.
 
 ### SEE ALSO
 
