@@ -28,5 +28,10 @@ void do_tests() {
     ASSERT_EQ(fetch_variable("var", target), v);
     ASSERT_EQ(fetch_variable("var"), 0);
   }
+
+  // variable doesn't exist will throw error
+  ASSERT(catch(fetch_variable("not_exists")));
+  ASSERT(catch(fetch_variable("not_exists", target)));
+
 #endif
 }
