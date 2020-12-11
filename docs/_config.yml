@@ -1,16 +1,7 @@
-plugins:
-  - jekyll-sitemap
-  - jekyll-seo-tag
-  - jekyll-relative-links
-  - jekyll-octicons
-  - jemoji
-
-markdown: kramdown
-
-kramdown:
-  input: GFM
-
-highlighter: rouge
-
+encoding: UTF-8
 timezone: America/Los_Angles
 url: https://www.fluffos.info
+
+plugins:
+  - jekyll-seo-tag                  # https://github.com/jekyll/jekyll-seo-tag
+  - jekyll-sitemap                  # https://github.com/jekyll/jekyll-sitemap/

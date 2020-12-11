@@ -23,7 +23,7 @@ title: {title}
   for cat in sorted(category_efun_map.keys()):
     print(f"""
 <h2 class="border-bottom py-3 text-uppercase">
-  {{% octicon bookmark height:16 %}} <a class='text-secondary' name="{cat}" href="#{cat}">{cat}</a>
+  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="{cat}" href="#{cat}">{cat}</a>
 </h2>
 """)
     i = 0
@@ -46,7 +46,7 @@ title: {title}
 
   print(f"""
 <div class="alert alert-info my-4" role="alert">
-    {{% octicon info height:16 %}}
+    <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/info.svg">
     This page is auto generated on {time.strftime("%Y-%m-%d %H:%M:%S %Z", time.localtime())} for {version}.</a>
 </div>
 """)
