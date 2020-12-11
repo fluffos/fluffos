@@ -37,35 +37,35 @@ title: stdlib / reduce
     The function should return what will become the new total.
 
 ### EXAMPLE
-
-```C
+```c
 reduce( ({ 1, 2, 3, 4 }), function( int total, int current ) {
    return total + current ;
 }) ;
 //Result: 10
-````
-```C
+```
+
+```c
 reduce( ({ 1, 2, 3, 4 }), function( int total, int current ) {
    return total + current ;
 }, 10) ;
 //Result: 20
-````
+```
 
-```C
+```c
 result7 = reduce( explode("FluffOS", ""), function( int total, int current, int idx, int* arr ) {
     return total + arr[sizeof(arr) - idx - 1] ;
 }, "") ;
 //Result: "SOffulF"
 ```
 
-```C
+```c
 reduce( ({ "north", "south", "east", "west" }), function( string total, string current, int idx, string* arr, string conjunction ) {
     if( idx == 0 ) return current ;
 
     total += ", " ;
 
     if( idx == sizeof( arr ) - 1 ) total += conjunction + " " ;
-    
+
     return total + current ;
 }, "", "or") ;
 //Result: "north, south, east, or west"
