@@ -18,35 +18,37 @@ def main(basedir, title, version):
 layout: default
 title: {title}
 ---
-
 """)
 
   for cat in sorted(category_efun_map.keys()):
-    print("### %s\n" % cat)
-    print("<div class='container'>")
+    print(f"""
+<h2 class="border-bottom py-3 text-uppercase">
+  {{% octicon bookmark height:16 %}} <a class='text-secondary' name="{cat}" href="#{cat}">{cat}</a>
+</h2>
+""")
     i = 0
 
     # remove ".md" suffix
     items = sorted([x[:-3] for x in category_efun_map[cat] if x.endswith('.md')])
 
+    print("<div class='row'>")
     while i < len(items):
-      print("<div class='row'>")
       for item in items[i: i + 4]:
-        print("<div class='col-sm-3'>")
+        print("<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>")
         print(f"<div><a href='{cat}/{item}.html'>{item}</a></div>")
         print("</div>")
       i = i + 4
       # round up
-      if i > len(items):
-        for x in range(i - len(items)):
-          print("<div>&nbsp;</div>")
-      print("</div>")
-    print("</div>\n")
+      #if i > len(items):
+      #  for x in range(i - len(items)):
+      #    print("<div>&nbsp;</div>")
+    print("</div>")
 
   print(f"""
-
-This page is auto generated on {time.strftime("%Y-%m-%d %H:%M:%S %Z", time.localtime())} for [{version}](https://github.com/fluffos/fluffos/tree/{version}).
-
+<div class="alert alert-info my-4" role="alert">
+    {{% octicon info height:16 %}}
+    This page is auto generated on {time.strftime("%Y-%m-%d %H:%M:%S %Z", time.localtime())} for {version}.</a>
+</div>
 """)
 
 

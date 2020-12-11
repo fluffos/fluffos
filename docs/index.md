@@ -11,9 +11,10 @@ I'm always eager to help people migrate to FluffOS, if you have an working mud t
 
 [ALL RELEASES](https://github.com/fluffos/fluffos/releases)
 
-* v2017: Current release (branch v2017), bugfix only, support ubuntu 16.04, centos 7, cygwin, using autoconf build system, critical bugfix only.
+* v2019: Current Release (branch master), cmake build system, supports ubuntu 18.04, OSX 10.15, and MSYS2/mingw64
 
-* v2019: Currently in pre-release (branch master), cmake build system, supports ubuntu 18.04, OSX 10.15, and MSYS2/mingw64
+* v2017: historical release (branch v2017), bugfix only, support ubuntu 16.04, centos 7, cygwin, using autoconf build
+ system, no more support.
 
 ## ChangeLog
 
@@ -54,4 +55,4 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 # Historical License
 
-please see [https://github.com/fluffos/fluffos/blob/master/Copyright](https://github.com/fluffos/fluffos/blob/master/Copyright)
+please see <https://github.com/fluffos/fluffos/blob/master/Copyright>

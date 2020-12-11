@@ -20,10 +20,10 @@ title: stdlib / array_sum
 
 ### EXAMPLE
 
-```C
+```c
 array_sum( ({ 1, 2, 3, 4, 5, 6 }) ); // Result: 21
 array_sum( ({ 1, 2, 3.5, 4, 5, 6 }) ); // Result: 21.500000
-````
+```
 
 ### SEE ALSO
 
