@@ -1,6 +1,16 @@
 plugins:
   - jekyll-sitemap
   - jekyll-seo-tag
+  - jekyll-relative-links
+  - jekyll-octicons
+  - jemoji
+
+markdown: kramdown
+
+kramdown:
+  input: GFM
+
+highlighter: rouge
 
 timezone: America/Los_Angles
 url: https://www.fluffos.info

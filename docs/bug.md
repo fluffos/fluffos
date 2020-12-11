@@ -24,14 +24,20 @@ If you have met an crash, the driver should automatically print out an list of b
 
 If you want to catch the crash, try running driver under GDB directly
 
-    gdb --args driver <argumnets>
-    handle SIGPIPE nostop noprint pass
-    run
+```shell
+$ gdb --args driver <argumnets>
+
+then in GDB prompt
+> handle SIGPIPE nostop noprint pass
+> run
+```
 
 and when you met an crash, do this
 
-    bt
-    info locals
+```shell
+> bt
+> info locals
+```
 
 and paste the result to your issue!
 
@@ -46,11 +52,14 @@ Here is how you should generate a bug report with Sanitizer.
 
 Build driver in sanitizer enabled mode
 
-    $ cmake .. -DENABLE_SANITIZER=ON
-
+```shell
+$ cmake .. -DENABLE_SANITIZER=ON
+```
 Launch driver as usual
 
-    $ ./driver <args>
+```shell
+$ ./driver <args>
+```
 
 Login to your lib as usual, do something fishy.
 

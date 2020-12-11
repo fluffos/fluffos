@@ -4,49 +4,42 @@ title: concepts
 ---
 
 
-### general
+<h2 class="border-bottom py-3 text-uppercase">
+  {% octicon bookmark height:16 %} <a class='text-secondary' name="general" href="#general">general</a>
+</h2>
 
-<div class='container'>
 <div class='row'>
-<div class='col-sm-3'>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='general/MudOSdriver.html'>MudOSdriver</a></div>
 </div>
-<div class='col-sm-3'>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='general/global_include_file.html'>global_include_file</a></div>
 </div>
-<div class='col-sm-3'>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='general/lpc.html'>lpc</a></div>
 </div>
-<div class='col-sm-3'>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='general/message_doc.html'>message_doc</a></div>
 </div>
-</div>
-<div class='row'>
-<div class='col-sm-3'>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='general/objects.html'>objects</a></div>
 </div>
-<div class='col-sm-3'>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='general/oop.html'>oop</a></div>
 </div>
-<div class='col-sm-3'>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='general/preprocessor.html'>preprocessor</a></div>
 </div>
-<div class='col-sm-3'>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='general/simul_efun.html'>simul_efun</a></div>
 </div>
-</div>
-<div class='row'>
-<div class='col-sm-3'>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='general/socket_efuns.html'>socket_efuns</a></div>
 </div>
-<div>&nbsp;</div>
-<div>&nbsp;</div>
-<div>&nbsp;</div>
-</div>
 </div>
 
-
-
-This page is auto generated on 2020-12-10 14:05:51 PST for [e836be49](https://github.com/fluffos/fluffos/tree/e836be49).
-
+<div class="alert alert-info my-4" role="alert">
+    {% octicon info height:16 %}
+    This page is auto generated on 2020-12-10 18:34:36 PST for v2019.20201121-13-gaf7f17bb.</a>
+</div>
 
