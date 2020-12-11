@@ -5,7 +5,7 @@ title: EFUN
 
 
 <h2 class="border-bottom py-3 text-uppercase">
-  {% octicon bookmark height:16 %} <a class='text-secondary' name="arrays" href="#arrays">arrays</a>
+  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="arrays" href="#arrays">arrays</a>
 </h2>
 
 <div class='row'>
@@ -36,7 +36,7 @@ title: EFUN
 </div>
 
 <h2 class="border-bottom py-3 text-uppercase">
-  {% octicon bookmark height:16 %} <a class='text-secondary' name="buffers" href="#buffers">buffers</a>
+  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="buffers" href="#buffers">buffers</a>
 </h2>
 
 <div class='row'>
@@ -61,7 +61,7 @@ title: EFUN
 </div>
 
 <h2 class="border-bottom py-3 text-uppercase">
-  {% octicon bookmark height:16 %} <a class='text-secondary' name="calls" href="#calls">calls</a>
+  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="calls" href="#calls">calls</a>
 </h2>
 
 <div class='row'>
@@ -98,7 +98,7 @@ title: EFUN
 </div>
 
 <h2 class="border-bottom py-3 text-uppercase">
-  {% octicon bookmark height:16 %} <a class='text-secondary' name="contrib" href="#contrib">contrib</a>
+  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="contrib" href="#contrib">contrib</a>
 </h2>
 
 <div class='row'>
@@ -258,7 +258,7 @@ title: EFUN
 </div>
 
 <h2 class="border-bottom py-3 text-uppercase">
-  {% octicon bookmark height:16 %} <a class='text-secondary' name="db" href="#db">db</a>
+  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="db" href="#db">db</a>
 </h2>
 
 <div class='row'>
@@ -286,7 +286,7 @@ title: EFUN
 </div>
 
 <h2 class="border-bottom py-3 text-uppercase">
-  {% octicon bookmark height:16 %} <a class='text-secondary' name="ed" href="#ed">ed</a>
+  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="ed" href="#ed">ed</a>
 </h2>
 
 <div class='row'>
@@ -302,7 +302,7 @@ title: EFUN
 </div>
 
 <h2 class="border-bottom py-3 text-uppercase">
-  {% octicon bookmark height:16 %} <a class='text-secondary' name="filesystem" href="#filesystem">filesystem</a>
+  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="filesystem" href="#filesystem">filesystem</a>
 </h2>
 
 <div class='row'>
@@ -348,7 +348,7 @@ title: EFUN
 </div>
 
 <h2 class="border-bottom py-3 text-uppercase">
-  {% octicon bookmark height:16 %} <a class='text-secondary' name="floats" href="#floats">floats</a>
+  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="floats" href="#floats">floats</a>
 </h2>
 
 <div class='row'>
@@ -400,7 +400,7 @@ title: EFUN
 </div>
 
 <h2 class="border-bottom py-3 text-uppercase">
-  {% octicon bookmark height:16 %} <a class='text-secondary' name="functions" href="#functions">functions</a>
+  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="functions" href="#functions">functions</a>
 </h2>
 
 <div class='row'>
@@ -416,7 +416,7 @@ title: EFUN
 </div>
 
 <h2 class="border-bottom py-3 text-uppercase">
-  {% octicon bookmark height:16 %} <a class='text-secondary' name="general" href="#general">general</a>
+  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="general" href="#general">general</a>
 </h2>
 
 <div class='row'>
@@ -444,7 +444,7 @@ title: EFUN
 </div>
 
 <h2 class="border-bottom py-3 text-uppercase">
-  {% octicon bookmark height:16 %} <a class='text-secondary' name="interactive" href="#interactive">interactive</a>
+  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="interactive" href="#interactive">interactive</a>
 </h2>
 
 <div class='row'>
@@ -565,7 +565,7 @@ title: EFUN
 </div>
 
 <h2 class="border-bottom py-3 text-uppercase">
-  {% octicon bookmark height:16 %} <a class='text-secondary' name="internals" href="#internals">internals</a>
+  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="internals" href="#internals">internals</a>
 </h2>
 
 <div class='row'>
@@ -638,7 +638,7 @@ title: EFUN
 </div>
 
 <h2 class="border-bottom py-3 text-uppercase">
-  {% octicon bookmark height:16 %} <a class='text-secondary' name="mappings" href="#mappings">mappings</a>
+  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="mappings" href="#mappings">mappings</a>
 </h2>
 
 <div class='row'>
@@ -672,7 +672,7 @@ title: EFUN
 </div>
 
 <h2 class="border-bottom py-3 text-uppercase">
-  {% octicon bookmark height:16 %} <a class='text-secondary' name="mudlib" href="#mudlib">mudlib</a>
+  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="mudlib" href="#mudlib">mudlib</a>
 </h2>
 
 <div class='row'>
@@ -727,7 +727,7 @@ title: EFUN
 </div>
 
 <h2 class="border-bottom py-3 text-uppercase">
-  {% octicon bookmark height:16 %} <a class='text-secondary' name="numbers" href="#numbers">numbers</a>
+  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="numbers" href="#numbers">numbers</a>
 </h2>
 
 <div class='row'>
@@ -746,7 +746,7 @@ title: EFUN
 </div>
 
 <h2 class="border-bottom py-3 text-uppercase">
-  {% octicon bookmark height:16 %} <a class='text-secondary' name="objects" href="#objects">objects</a>
+  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="objects" href="#objects">objects</a>
 </h2>
 
 <div class='row'>
@@ -834,7 +834,7 @@ title: EFUN
 </div>
 
 <h2 class="border-bottom py-3 text-uppercase">
-  {% octicon bookmark height:16 %} <a class='text-secondary' name="parsing" href="#parsing">parsing</a>
+  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="parsing" href="#parsing">parsing</a>
 </h2>
 
 <div class='row'>
@@ -853,7 +853,7 @@ title: EFUN
 </div>
 
 <h2 class="border-bottom py-3 text-uppercase">
-  {% octicon bookmark height:16 %} <a class='text-secondary' name="pcre" href="#pcre">pcre</a>
+  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="pcre" href="#pcre">pcre</a>
 </h2>
 
 <div class='row'>
@@ -884,7 +884,7 @@ title: EFUN
 </div>
 
 <h2 class="border-bottom py-3 text-uppercase">
-  {% octicon bookmark height:16 %} <a class='text-secondary' name="sockets" href="#sockets">sockets</a>
+  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="sockets" href="#sockets">sockets</a>
 </h2>
 
 <div class='row'>
@@ -927,7 +927,7 @@ title: EFUN
 </div>
 
 <h2 class="border-bottom py-3 text-uppercase">
-  {% octicon bookmark height:16 %} <a class='text-secondary' name="strings" href="#strings">strings</a>
+  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="strings" href="#strings">strings</a>
 </h2>
 
 <div class='row'>
@@ -1003,7 +1003,7 @@ title: EFUN
 </div>
 
 <h2 class="border-bottom py-3 text-uppercase">
-  {% octicon bookmark height:16 %} <a class='text-secondary' name="system" href="#system">system</a>
+  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="system" href="#system">system</a>
 </h2>
 
 <div class='row'>
@@ -1082,7 +1082,7 @@ title: EFUN
 </div>
 
 <div class="alert alert-info my-4" role="alert">
-    {% octicon info height:16 %}
-    This page is auto generated on 2020-12-10 18:34:35 PST for v2019.20201121-13-gaf7f17bb.</a>
+    <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/info.svg">
+    This page is auto generated on 2020-12-13 18:10:15 PST for v2019.20201121-14-g833c706e.</a>
 </div>
 
