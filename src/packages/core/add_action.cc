@@ -328,7 +328,10 @@ static int user_parser(char *buff) {
    * copy user_verb into a static character buffer to be pointed to by
    * last_verb.
    */
-  strncpy(verb_buff, user_verb, MAX_VERB_BUFF - 1);
+  u8_strncpy(reinterpret_cast<uint8_t *>(verb_buff), reinterpret_cast<const uint8_t *>(user_verb),
+             sizeof(verb_buff) - 1);
+  verb_buff[sizeof(verb_buff) - 1] = '\0';
+
   if (p) {
     int pos;
 

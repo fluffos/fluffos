@@ -36,10 +36,12 @@ void debug_message(const char *, ...);
 #define DEBUG_CHECK(x, y) SAFE(if (x) { fatal((y)); })
 #define DEBUG_CHECK1(x, y, a) SAFE(if (x) { fatal((y), (a)); })
 #define DEBUG_CHECK2(x, y, a, b) SAFE(if (x) { fatal((y), (a), (b)); })
+#define DEBUG_FATAL(x) SAFE(fatal(x);)
 #else
 #define DEBUG_CHECK(x, y)
 #define DEBUG_CHECK1(x, y, a)
 #define DEBUG_CHECK2(x, y, a, b)
+#define DEBUG_FATAL(x) SAFE(debug_message(x);)
 #endif
 
 extern unsigned int debug_level;

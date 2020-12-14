@@ -83,7 +83,7 @@ void on_user_command(evutil_socket_t fd, short what, void *arg) {
   auto user = reinterpret_cast<interactive_t *>(arg);
 
   if (user == nullptr) {
-    fatal("on_user_command: user == NULL, Driver BUG.");
+    DEBUG_FATAL("on_user_command: user == NULL, Driver BUG.");
     return;
   }
 
@@ -117,7 +117,7 @@ void on_user_read(bufferevent *bev, void *arg) {
   auto user = reinterpret_cast<interactive_t *>(arg);
 
   if (user == nullptr) {
-    fatal("on_user_read: user == NULL, Driver BUG.");
+    DEBUG_FATAL("on_user_read: user == NULL, Driver BUG.");
     return;
   }
 
@@ -131,7 +131,7 @@ void on_user_read(bufferevent *bev, void *arg) {
 void on_user_write(bufferevent *bev, void *arg) {
   auto user = reinterpret_cast<interactive_t *>(arg);
   if (user == nullptr) {
-    fatal("on_user_write: user == NULL, Driver BUG.");
+    DEBUG_FATAL("on_user_write: user == NULL, Driver BUG.");
     return;
   }
   // nothing to do.
@@ -141,7 +141,7 @@ void on_user_events(bufferevent *bev, short events, void *arg) {
   auto user = reinterpret_cast<interactive_t *>(arg);
 
   if (user == nullptr) {
-    fatal("on_user_events: user == NULL, Driver BUG.");
+    DEBUG_FATAL("on_user_events: user == NULL, Driver BUG.");
     return;
   }
 
@@ -674,20 +674,20 @@ void get_user_data(interactive_t *ip) {
       // Impossible, we don't handle it here.
       break;
     case PORT_TELNET:
-      text_space = MAX_TEXT - ip->text_end;
+      text_space = sizeof(ip->text) - ip->text_end;
 
       /* check if we need more space */
-      if (text_space < MAX_TEXT / 16) {
+      if (text_space < sizeof(ip->text) / 16) {
         if (ip->text_start > 0) {
           memmove(ip->text, ip->text + ip->text_start, ip->text_end - ip->text_start);
           text_space += ip->text_start;
           ip->text_end -= ip->text_start;
           ip->text_start = 0;
         }
-        if (text_space < MAX_TEXT / 16) {
+        if (text_space < sizeof(ip->text) / 16) {
           ip->iflags |= SKIP_COMMAND;
           ip->text_start = ip->text_end = 0;
-          text_space = MAX_TEXT;
+          text_space = sizeof(ip->text);
         }
       }
       break;
@@ -862,7 +862,7 @@ void on_user_websocket_received(interactive_t *ip, const char *data, size_t len)
     return;
   }
 
-  auto text_space = MAX_TEXT - ip->text_end;
+  auto text_space = sizeof(ip->text) - ip->text_end;
 
   /* check if we need more space */
   if (text_space < len) {
@@ -875,7 +875,7 @@ void on_user_websocket_received(interactive_t *ip, const char *data, size_t len)
     if (text_space < len) {
       ip->iflags |= SKIP_COMMAND;
       ip->text_start = ip->text_end = 0;
-      text_space = MAX_TEXT;
+      text_space = sizeof(ip->text);
     }
   }
 
@@ -939,7 +939,6 @@ int cmd_in_buf(interactive_t *ip) {
     return 1;
   }
 
-  /* search for a newline.  if found, we have a command */
   for (p = ip->text + ip->text_start; p < ip->text + ip->text_end; p++) {
     if (*p == '\r' || *p == '\n') {
       return 1;
@@ -975,7 +974,8 @@ static char *first_cmd_in_buf(interactive_t *ip) {
   }
 
   /* search for the newline */
-  while (ip->text[ip->text_start] != '\n' && ip->text[ip->text_start] != '\r') {
+  while (ip->text_start < ip->text_end && ip->text[ip->text_start] != '\n' &&
+         ip->text[ip->text_start] != '\r') {
     ip->text_start++;
   }
 
@@ -987,6 +987,7 @@ static char *first_cmd_in_buf(interactive_t *ip) {
   }
 
   ip->text[ip->text_start++] = 0;
+
   if (!cmd_in_buf(ip)) {
     ip->iflags &= ~CMD_IN_BUF;
   }
@@ -1073,10 +1074,9 @@ static void process_input(interactive_t *ip, char *user_command) {
 
 #ifndef NO_ADD_ACTION
   if (ret->type == T_STRING) {
-    static char buf[MAX_TEXT];
-
-    strncpy(buf, ret->u.string, MAX_TEXT - 1);
-    parse_command(buf, command_giver);
+    auto command = string_copy(ret->u.string, __CURRENT_FILE_LINE__);
+    DEFER { FREE_MSTR(command); };
+    parse_command(command, command_giver);
   } else {
     if (ret->type != T_NUMBER || !ret->u.number) {
       parse_command(user_command, command_giver);
@@ -1103,7 +1103,7 @@ int process_user_command(interactive_t *ip) {
   }
 
   if (ip != command_giver->interactive) {
-    fatal("BUG: process_user_command.");
+    DEBUG_FATAL("BUG: process_user_command.");
   }
 
   current_interactive = command_giver; /* this is yuck phooey, sigh */
@@ -1603,8 +1603,7 @@ object_t *query_snooping(object_t *ob) {
       return user->ob;
     }
   }
-  // TODO: change this to dfatal
-  // fatal("couldn't find snoop target.\n");
+  DEBUG_FATAL("couldn't find snoop target.\n");
   return nullptr;
 } /* query_snooping() */
 #endif
