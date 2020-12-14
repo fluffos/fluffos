@@ -20,7 +20,6 @@ extern int MudOS_is_being_shut_down;
 extern object_t *obj_list_dangling;
 #endif
 
-void debug_fatal(char *, ...);
 [[noreturn]] void fatal(const char *, ...);
 void check_legal_string(const char *);
 #ifndef NO_LIGHT

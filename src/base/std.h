@@ -170,5 +170,7 @@
 
 #include "base/internal/strutils.h"
 
+#include "thirdparty/scope_guard/scope_guard.hpp"
+
 // IWYU pragma: end_exports
 #endif  // STD_H
