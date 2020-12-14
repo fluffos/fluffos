@@ -1778,7 +1778,8 @@ parse_node_t *promote_to_float(parse_node_t *node) {
   parse_node_t *expr;
   if (node->kind == NODE_NUMBER) {
     node->kind = NODE_REAL;
-    node->v.real = node->v.number;
+    decltype(node->v.real) tmp = node->v.number;
+    node->v.real = tmp;
     return node;
   }
   expr = new_node();
@@ -1799,7 +1800,8 @@ parse_node_t *promote_to_int(parse_node_t *node) {
   parse_node_t *expr;
   if (node->kind == NODE_REAL) {
     node->kind = NODE_NUMBER;
-    node->v.number = node->v.real;
+    decltype(node->v.number) tmp = node->v.real;
+    node->v.number = tmp;
     return node;
   }
   expr = new_node();

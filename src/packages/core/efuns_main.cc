@@ -2847,8 +2847,9 @@ void f__to_float(void) {
 
   switch (sp->type) {
     case T_NUMBER:
+      temp = sp->u.number;
       sp->type = T_REAL;
-      sp->u.real = static_cast<LPC_FLOAT>(sp->u.number);
+      sp->u.real = temp;
       break;
     case T_STRING:
       temp = strtod(sp->u.string, nullptr);
@@ -2861,13 +2862,14 @@ void f__to_float(void) {
 
 #ifdef F__TO_INT
 void f__to_int(void) {
+  LPC_INT temp = 0;
   switch (sp->type) {
     case T_REAL:
+      temp = sp->u.real;
       sp->type = T_NUMBER;
-      sp->u.number = static_cast<LPC_INT>(sp->u.real);
+      sp->u.number = temp;
       break;
     case T_STRING: {
-      LPC_INT temp;
       char *p;
 
       temp = strtoll(sp->u.string, &p, 10);
