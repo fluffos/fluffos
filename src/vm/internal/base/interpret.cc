@@ -3768,9 +3768,8 @@ void eval_instruction(char *p) {
           if (Tracer::enabled() && CONFIG_INT(__RC_TRACE_CONTEXT__)) {
             trace_context["args"] = get_trace_args(sp, st_num_arg);
           }
-          ScopedTracer _efun_tracer(instrs[instruction].name, EventCategory::LPC_EFUN,
-                                    std::move(trace_context));
 
+          ScopedTracer _efun_tracer(instrs[instruction].name, EventCategory::LPC_EFUN, std::move(trace_context));
           (*efun_table[instruction - EFUN_BASE])();
         }
 

@@ -1115,7 +1115,7 @@ void f_member_array(void) {
   } else {
     svalue_t *sv;
     svalue_t *find;
-    int flen;
+    int flen = 0;
 
     size = (v = sp->u.arr)->size;
     find = (sp - 1);
