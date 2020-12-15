@@ -86,7 +86,7 @@ void thread_func() {
     if (w) {
       {
         ScopedTracer _work_tracer("Async thread work", EventCategory::DEFAULT,
-                                  {{"type", w->data->type}});
+                                  json{{"type", w->data->type}});
 
         w->func(w->data);
       }
@@ -188,7 +188,7 @@ int aio_read(struct request *req) {
 pthread_mutex_t *db_mut = nullptr;
 
 void *dbexecthread(struct request *req) {
-  ScopedTracer _work_tracer("db_exec", EventCategory::DEFAULT, {req->sql});
+  ScopedTracer _work_tracer("db_exec", EventCategory::DEFAULT, json{req->sql});
 
   pthread_mutex_lock(db_mut);
   // see add_db_exec
@@ -228,7 +228,7 @@ int aio_db_exec(struct request *req) {
 
 #ifdef F_ASYNC_GETDIR
 void *getdirthread(struct request *req) {
-  ScopedTracer _work_tracer("getdir", EventCategory::DEFAULT, {req->path});
+  ScopedTracer _work_tracer("getdir", EventCategory::DEFAULT, json{req->path});
 
   DIR *dirp = nullptr;
   if ((dirp = opendir(req->path)) == nullptr) {
