@@ -9,7 +9,6 @@
 #include <memory>
 
 #include "rc.h"  // for CONFIG_*
-#include "thirdparty/scope_guard/scope_guard.hpp"
 
 #define E(x) \
   { #x, DBG_##x }
