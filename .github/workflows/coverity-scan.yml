@@ -12,10 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        compiler:
-          - CC: "gcc"
-            CXX: "g++"
-        build: ["Debug"]
+        build: ["Debug", "RelWithDebInfo"]
         os: ["ubuntu-18.04"]
 
     runs-on: ${{ matrix.os }}
@@ -27,7 +24,6 @@ jobs:
           sudo apt update
           sudo apt install -y build-essential clang-6.0 autoconf automake bison expect libevent-dev libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
       - name: configure
-        env: ${{ matrix.compiler }}
         run: |
           mkdir build
           cd build
