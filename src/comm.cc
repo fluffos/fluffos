@@ -1434,10 +1434,6 @@ int set_call(object_t *ob, sentence_t *sent, int flags) {
   if (flags & I_SINGLE_CHAR) {
     set_charmode(ip);
   }
-  // Make sure client like mudlet flush previous outputs.
-  if (ip->telnet && (ip->iflags & USING_TELNET) && !(ip->iflags & SUPPRESS_GA)) {
-    telnet_iac(ip->telnet, TELNET_GA);
-  }
   return (1);
 } /* set_call() */
 #endif
