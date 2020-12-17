@@ -50,7 +50,8 @@ unsigned long _get_current_thread_id() {
 
 }  // namespace
 
-Event::Event(std::string_view name, EventCategory category, const char *phase, std::optional<json>&& args)
+Event::Event(std::string_view name, EventCategory category, const char* phase,
+             std::optional<json>&& args)
     : process_id(::_get_current_process_id()),
       thread_id(::_get_current_thread_id()),
       timestamp(Tracer::timestamp()),
@@ -173,7 +174,7 @@ LARGE_INTEGER Tracer::basetime;
 std::chrono::high_resolution_clock::time_point Tracer::basetime;
 #endif
 
-void Tracer::log(Event &&e) {
+void Tracer::log(Event&& e) {
   if (Tracer::enabled()) {
     instance().log(std::move(e));
   }
@@ -202,23 +203,24 @@ void Tracer::end(const std::string_view& name, const EventCategory& category) {
 
 void Tracer::setThreadName(const std::string_view& name) {
   if (Tracer::enabled()) {
-    Event e("thread_name", EventCategory::DEFAULT, "M", json{
-        {"name", name},
-    });
+    Event e("thread_name", EventCategory::DEFAULT, "M",
+            json{
+                {"name", name},
+            });
     e.timestamp = 0;
     log(std::move(e));
   }
 }
 
 void Tracer::counter(const std::string_view& name, long n) {
-   if (Tracer::enabled())  {
-     counter(name, {{name, n}});
-   }
+  if (Tracer::enabled()) {
+    counter(name, {{name, n}});
+  }
 }
 
 void Tracer::counter(const std::string_view& name, std::optional<json>&& args) {
-  if (Tracer::enabled())  {
-      log({name, EventCategory::DEFAULT, "C", std::move(args)});
+  if (Tracer::enabled()) {
+    log({name, EventCategory::DEFAULT, "C", std::move(args)});
   }
 }
 
@@ -237,10 +239,10 @@ TraceWriter& Tracer::instance() {
   return _trace_writer;
 }
 
-ScopedTracerInner::ScopedTracerInner(const std::string &name, const EventCategory category, json &&args, double time_limit_usec)
+ScopedTracerInner::ScopedTracerInner(const std::string& name, const EventCategory category,
+                                     json&& args, double time_limit_usec)
     : time_limit_usec(time_limit_usec),
-      event(std::make_unique<Event>(name, category, "X", std::move(args))) {
-}
+      event(std::make_unique<Event>(name, category, "X", std::move(args))) {}
 
 ScopedTracerInner::~ScopedTracerInner() {
   if (!this->event) return;

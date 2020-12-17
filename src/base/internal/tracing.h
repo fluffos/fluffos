@@ -27,7 +27,8 @@ enum EventCategory {
 
 class Event {
  public:
-  Event(std::string_view name, EventCategory category, const char *phase, std::optional<json>&& args = std::nullopt);
+  Event(std::string_view name, EventCategory category, const char* phase,
+        std::optional<json>&& args = std::nullopt);
 
   unsigned long process_id;
   unsigned long thread_id;
@@ -61,6 +62,7 @@ class Event {
     }
     return "Unknown";
   }
+
  public:
   // Move only
   Event(Event&& other) = default;
@@ -134,19 +136,17 @@ class Tracer {
  public:
   // Not copyable or movable
   Tracer(const Tracer&) = delete;
-  Tracer& operator=(const Tracer&)= delete;
+  Tracer& operator=(const Tracer&) = delete;
   // The move operations are implicitly disabled, but you can
   // spell that out explicitly if you want:
   Tracer(Tracer&&) = delete;
-  Tracer& operator=(Tracer&&)= delete;
+  Tracer& operator=(Tracer&&) = delete;
 };
 
 class ScopedTracerInner {
  public:
-  ScopedTracerInner(const std::string& name,
-                    const EventCategory category = EventCategory::DEFAULT,
-                    json&& args = {},
-                    double time_limit_usec = 100);
+  ScopedTracerInner(const std::string& name, const EventCategory category = EventCategory::DEFAULT,
+                    json&& args = {}, double time_limit_usec = 100);
 
   virtual ~ScopedTracerInner();
 
@@ -157,28 +157,32 @@ class ScopedTracerInner {
  public:
   // Not copyable or movable
   ScopedTracerInner(const ScopedTracerInner&) = delete;
-  ScopedTracerInner& operator=(const ScopedTracerInner&)= delete;
+  ScopedTracerInner& operator=(const ScopedTracerInner&) = delete;
 
   // The move operations are implicitly disabled, but you can
   // spell that out explicitly if you want:
   ScopedTracerInner(ScopedTracerInner&&) = delete;
-  ScopedTracerInner& operator=(ScopedTracerInner&&)= delete;
+  ScopedTracerInner& operator=(ScopedTracerInner&&) = delete;
 };
 
 class ScopedTracer {
  public:
-  template<typename... _Arg>
-  ScopedTracer(_Arg&&... __arg ): _data(Tracer::enabled() ? std::make_optional<ScopedTracerInner>(std::forward<_Arg>(__arg)...) : std::nullopt){};
+  template <typename... _Arg>
+  ScopedTracer(_Arg&&... __arg)
+      : _data(Tracer::enabled()
+                  ? std::make_optional<ScopedTracerInner>(std::forward<_Arg>(__arg)...)
+                  : std::nullopt){};
+
  private:
   std::optional<ScopedTracerInner> _data;
 
  public:
   // Not copyable or movable
   ScopedTracer(const ScopedTracer&) = delete;
-  ScopedTracer& operator=(const ScopedTracer&)= delete;
+  ScopedTracer& operator=(const ScopedTracer&) = delete;
 
   // The move operations are implicitly disabled, but you can
   // spell that out explicitly if you want:
   ScopedTracer(ScopedTracer&&) = delete;
-  ScopedTracer& operator=(ScopedTracer&&)= delete;
+  ScopedTracer& operator=(ScopedTracer&&) = delete;
 };
