@@ -862,7 +862,7 @@ void f_input_to(void) {
     st_num_arg--; /* Don't count the flag as an arg */
     flag = arg[1].u.number;
   }
-  st_num_arg--; /* Don't count the name of the func either. */
+  st_num_arg--; /* Don't count the name of the func eicther. */
   i = input_to(arg, flag, st_num_arg, &arg[1 + tmp]);
   free_svalue(arg, "f_input_to");
   (sp = arg)->type = T_NUMBER;

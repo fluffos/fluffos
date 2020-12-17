@@ -9,6 +9,7 @@
 #include <unistd.h>    // for open()
 #ifdef HAVE_SIGNAL_H
 #include <signal.h>  // for signal*
+#include <net/telnet.h>
 #endif
 #ifdef _WIN32
 #include <winsock.h>  // for WSACleanup()
@@ -1329,6 +1330,13 @@ int input_to(svalue_t *fun, int flag, int num_arg, svalue_t *args) {
     }
     s->ob = current_object;
     add_ref(current_object, "input_to");
+
+    // need to send out our own GA
+    if(auto ip = command_giver->interactive){
+      if (ip->telnet && (ip->iflags & USING_TELNET) && !(ip->iflags & SUPPRESS_GA)) {
+        telnet_send_ga(ip->telnet);
+      }
+    }
     return 1;
   }
   free_sentence(s);

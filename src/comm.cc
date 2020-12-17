@@ -1448,37 +1448,34 @@ void set_prompt(const char *str) {
  * Print the prompt, but only if input_to not is disabled.
  */
 static void print_prompt(interactive_t *ip) {
-  object_t *ob = ip->ob;
+  if (!ip || !ip->ob || !IP_VALID(ip, ip->ob)) {
+    return;
+  }
 
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
-  if (ip->input_to == nullptr) {
-#endif
-    /* give user object a chance to write its own prompt */
-    if (!(ip->iflags & HAS_WRITE_PROMPT)) {
-      tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
-    }
-#ifdef OLD_ED
-    else if (ip->ed_buffer) {
-      tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
-    }
-#endif
-    else if (!apply(APPLY_WRITE_PROMPT, ip->ob, 0, ORIGIN_DRIVER)) {
-      if (!IP_VALID(ip, ob)) {
-        return;
-      }
-      ip->iflags &= ~HAS_WRITE_PROMPT;
-      tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
-    }
-#if defined(F_INPUT_TO) || defined(F_GET_CHAR)
+  if (ip->input_to != nullptr) {
+    // while in single char mode there won't e any prompt.
+    return ;
   }
 #endif
-  if (!IP_VALID(ip, ob)) {
-    return;
+
+  /* give user object a chance to write its own prompt */
+  if (!(ip->iflags & HAS_WRITE_PROMPT)) {
+    tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
+  }
+#ifdef OLD_ED
+  else if (ip->ed_buffer) {
+    tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
+  }
+#endif
+  else if (!apply(APPLY_WRITE_PROMPT, ip->ob, 0, ORIGIN_DRIVER)) {
+    ip->iflags &= ~HAS_WRITE_PROMPT;
+    tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
   }
   // Stavros: A lot of clients use this TELNET_GA to differentiate
   // prompts from other text
   if (ip->telnet && (ip->iflags & USING_TELNET) && !(ip->iflags & SUPPRESS_GA)) {
-    telnet_iac(ip->telnet, TELNET_GA);
+    telnet_send_ga(ip->telnet);
   }
 } /* print_prompt() */
 
