@@ -1455,7 +1455,7 @@ static void print_prompt(interactive_t *ip) {
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
   if (ip->input_to != nullptr) {
     // while in single char mode there won't e any prompt.
-    return ;
+    return;
   }
 #endif
 
