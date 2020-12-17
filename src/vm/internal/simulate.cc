@@ -1332,7 +1332,7 @@ int input_to(svalue_t *fun, int flag, int num_arg, svalue_t *args) {
     add_ref(current_object, "input_to");
 
     // need to send out our own GA
-    if(auto ip = command_giver->interactive){
+    if (auto ip = command_giver->interactive) {
       if (ip->telnet && (ip->iflags & USING_TELNET) && !(ip->iflags & SUPPRESS_GA)) {
         telnet_send_ga(ip->telnet);
       }
