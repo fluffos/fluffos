@@ -545,6 +545,12 @@ void telnet_send_nop(struct telnet_t *telnet) {
   }
 }
 
+void telnet_send_ga(struct telnet_t *telnet) {
+  if (telnet) {
+    telnet_iac(telnet, TELNET_GA);
+  }
+}
+
 /* MXP */
 
 void on_telnet_will_mxp(interactive_t *ip) {

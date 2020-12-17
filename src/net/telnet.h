@@ -17,6 +17,7 @@ void telnet_dont_naws(struct telnet_t *);
 void telnet_start_request_ttype(struct telnet_t *);
 void telnet_request_ttype(struct telnet_t *);
 void telnet_send_nop(struct telnet_t *);
+void telnet_send_ga(struct telnet_t *);
 
 // Various mud extension protocol using telnet.
 #define TELNET_TELOPT_MXP 91  // mud extension protocol
