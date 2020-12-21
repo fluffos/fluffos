@@ -62,6 +62,7 @@ void f_dump_prog(void) {
       return;
     }
     dump_prog(prog, f, d);
+    fclose(f);
   }
   pop_n_elems(narg);
 }

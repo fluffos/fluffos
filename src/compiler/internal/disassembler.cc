@@ -116,7 +116,6 @@ void dump_prog(program_t *prog, FILE *f, int flags) {
     fprintf(f, "\n;;;  *** Line Number Info ***\n");
     dump_line_numbers(f, prog);
   }
-  fclose(f);
 }
 
 static const char *disassem_string(const char *str) {

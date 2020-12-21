@@ -68,9 +68,9 @@ int main(int argc, char** argv) {
     dump_prog(obj->prog, stdout, 1 | 2);
   }
 
-  clear_state();
-
   Tracer::collect();
+
+  clear_state();
 
   return 0;
 }
