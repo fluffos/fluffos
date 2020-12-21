@@ -96,6 +96,7 @@ TraceWriter::~TraceWriter() {
       t.join();
     }
   }
+  dump_threads.clear();
 }
 
 void TraceWriter::flush(const std::string& filename) {
