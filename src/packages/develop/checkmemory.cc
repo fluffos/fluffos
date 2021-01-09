@@ -324,12 +324,12 @@ static void mark_config(void) {
   }
 }
 
-static int base_overhead = 0;
+static uint64_t base_overhead = 0;
 
 /* Compute the correct values of allocd_strings, allocd_bytes, and
  * bytes_distinct_strings based on blocks that are actually allocated.
  */
-void compute_string_totals(int *asp, int *abp, int *bp) {
+void compute_string_totals(uint64_t *asp, uint64_t *abp, uint64_t *bp) {
   int hsh;
   md_node_t *entry;
   malloc_block_t *msbl;
@@ -357,31 +357,16 @@ void compute_string_totals(int *asp, int *abp, int *bp) {
   }
 }
 
-static void dump_stralloc() {
-  md_node_t *entry;
-  debug_message("===STRALLOC DUMP: allocd_strings: %i \n", allocd_strings);
-
-  for (int hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
-    for (entry = table[hsh]; entry; entry = entry->next) {
-      if (entry->tag == TAG_MALLOC_STRING || entry->tag == TAG_SHARED_STRING) {
-        debug_message("%-20s: sz %7d: id %6d: tag %08x, a %8p, \"%.20s\"\n", entry->desc,
-                      entry->size, entry->id, entry->tag, PTR(entry),
-                      STRING(NODET_TO_PTR(entry, block_t *)));
-      }
-    }
-  }
-}
-
 /*
  * Verify string statistics.  out can be zero, in which case any errors
  * are printed to stdout and abort() is called.  Otherwise the error messages
  * are added to the outbuffer.
  */
 void check_string_stats(outbuffer_t *out) {
-  int overhead = blocks[TAG_SHARED_STRING & 0xff] * sizeof(block_t) +
-                 blocks[TAG_MALLOC_STRING & 0xff] * sizeof(malloc_block_t);
-  int num = blocks[TAG_SHARED_STRING & 0xff] + blocks[TAG_MALLOC_STRING & 0xff];
-  int bytes, as, ab;
+  uint64_t overhead = blocks[TAG_SHARED_STRING & 0xff] * sizeof(block_t) +
+                      blocks[TAG_MALLOC_STRING & 0xff] * sizeof(malloc_block_t);
+  uint64_t num = blocks[TAG_SHARED_STRING & 0xff] + blocks[TAG_MALLOC_STRING & 0xff];
+  uint64_t bytes, as, ab;
   int need_dump = 0;
 
   compute_string_totals(&as, &ab, &bytes);
@@ -394,59 +379,65 @@ void check_string_stats(outbuffer_t *out) {
   if (num != num_distinct_strings) {
     need_dump = 1;
     if (out) {
-      outbuf_addv(out, "WARNING: num_distinct_strings is: %i should be: %i\n", num_distinct_strings,
-                  num);
+      outbuf_addv(out, "WARNING: num_distinct_strings is: %" PRIu64 " should be: %" PRIu64 "\n",
+                  num_distinct_strings, num);
     } else {
-      printf("WARNING: num_distinct_strings is: %i should be: %i\n", num_distinct_strings, num);
-      dump_stralloc();
+      printf("WARNING: num_distinct_strings is: %" PRIu64 " should be: %" PRIu64 " \n",
+             num_distinct_strings, num);
+      dump_stralloc(nullptr);
       abort();
     }
   }
   if (overhead != overhead_bytes) {
     need_dump = 1;
     if (out) {
-      outbuf_addv(out, "WARNING: overhead_bytes is: %i should be: %i\n", overhead_bytes, overhead);
+      outbuf_addv(out, "WARNING: overhead_bytes is: %" PRIu64 " should be: %" PRIu64 "\n",
+                  overhead_bytes, overhead);
     } else {
-      printf("WARNING: overhead_bytes is: %i should be: %i\n", overhead_bytes, overhead);
-      dump_stralloc();
+      printf("WARNING: overhead_bytes is: %" PRIu64 " should be: %" PRIu64 "\n", overhead_bytes,
+             overhead);
+      dump_stralloc(nullptr);
       abort();
     }
   }
   if (bytes != bytes_distinct_strings) {
     need_dump = 1;
     if (out) {
-      outbuf_addv(out, "WARNING: bytes_distinct_strings is: %i should be: %i\n",
-                  bytes_distinct_strings, bytes - (overhead - base_overhead));
+      outbuf_addv(out, "WARNING: bytes_distinct_strings is: %" PRIu64 " should be: %" PRIu64 "\n",
+                  bytes_distinct_strings, bytes);
     } else {
-      printf("WARNING: bytes_distinct_strings is: %i should be: %i\n", bytes_distinct_strings,
-             bytes - (overhead - base_overhead));
-      dump_stralloc();
+      printf("WARNING: bytes_distinct_strings is: %" PRIu64 " should be: %" PRIu64 "\n",
+             bytes_distinct_strings, bytes);
+      dump_stralloc(nullptr);
       abort();
     }
   }
   if (allocd_strings != as) {
     need_dump = 1;
     if (out) {
-      outbuf_addv(out, "WARNING: allocd_strings is: %i should be: %i\n", allocd_strings, as);
+      outbuf_addv(out, "WARNING: allocd_strings is: %" PRIu64 " should be: %" PRIu64 "\n",
+                  allocd_strings, as);
     } else {
-      printf("WARNING: allocd_strings is: %i should be: %i\n", allocd_strings, as);
-      dump_stralloc();
+      printf("WARNING: allocd_strings is: %" PRIu64 " should be: %" PRIu64 "\n", allocd_strings,
+             as);
+      dump_stralloc(nullptr);
       abort();
     }
   }
   if (allocd_bytes != ab) {
     need_dump = 1;
     if (out) {
-      outbuf_addv(out, "WARNING: allocd_bytes is: %i should be: %i\n", allocd_bytes, ab);
+      outbuf_addv(out, "WARNING: allocd_bytes is: %" PRIu64 " should be: %" PRIu64 "\n",
+                  allocd_bytes, ab);
     } else {
-      printf("WARNING: allocd_bytes is: %i should be: %i\n", allocd_bytes, ab);
-      dump_stralloc();
+      printf("WARNING: allocd_bytes is: %" PRIu64 " should be: %" PRIu64 "\n", allocd_bytes, ab);
+      dump_stralloc(nullptr);
       abort();
     }
   }
 
   if (need_dump) {
-    dump_stralloc();
+    dump_stralloc(out);
   }
 }
 
@@ -617,6 +608,8 @@ void check_all_blocks(int flag) {
     if (blocks[TAG_INTERACTIVE & 0xff] != users_num(true))
       outbuf_addv(&out, "WATNING: num_user is: %d should be: %" PRIu64 "\n", users_num(true),
                   blocks[TAG_INTERACTIVE & 0xff]);
+
+    // String checks
     check_string_stats(&out);
 
 #ifdef PACKAGE_EXTERNAL
@@ -961,6 +954,11 @@ void check_all_blocks(int flag) {
             /* don't give an error for the return value we are
                constructing :) */
             if (msbl == MSTR_BLOCK(out.buffer)) {
+              break;
+            }
+
+            // ignore the current executing command
+            if (starts_with(entry->desc, "current_command:")) {
               break;
             }
 
