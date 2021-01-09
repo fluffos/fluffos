@@ -377,3 +377,6 @@ int strwidth(string);
 void trace_start(string, int default: 10);
 // stop to collect tracing data right away.
 void trace_end();
+
+// return highest resolution clock in nanoseconds
+int perf_counter_ns();
