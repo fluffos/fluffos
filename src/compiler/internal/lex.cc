@@ -76,7 +76,7 @@ int current_line_base;  /* number of lines from other files */
 int current_line_saved; /* last line in this file where line num
                            info was saved */
 int total_lines;        /* Used to compute average compiled lines/s */
-char *current_file;
+const char *current_file;
 int current_file_id;
 
 /* Bit flags for pragmas in effect */
@@ -88,9 +88,9 @@ lpc_predef_t *lpc_predefs = nullptr;
 
 static int yyin_desc;
 int lex_fatal;
-static char **inc_list;  // global include path from runtime config
+static const char **inc_list;  // global include path from runtime config
 static int inc_list_size;
-static char **inc_path;  // include path used for current compile
+static const char **inc_path;  // include path used for current compile
 static int inc_path_size;
 static int defines_need_freed = 0;
 static char *last_nl;
@@ -107,7 +107,7 @@ typedef struct incstate_s {
   struct incstate_s *next;
   int yyin_desc;
   int line;
-  char *file;
+  const char *file;
   int file_id;
   char *last_nl;
   char *outp;
@@ -856,7 +856,7 @@ void init_include_path() {
     debug_message("got empty include path for 'master::get_include_path(%s)'\n", current_file);
     return;  // we still have the runtime configuration
   }
-  char **path = static_cast<char **>(
+  const char **path = static_cast<const char **>(
       DMALLOC(sizeof(char *) * size, TAG_COMPILER, "compiler:init_include_path"));
 
   // check elements and build working copy
@@ -872,7 +872,7 @@ void init_include_path() {
     const char *elem;
     if (!strcmp(elem = arr->item[i].u.string, ":DEFAULT:")) {  // replace with runtime configuration
       size += inc_list_size - 1;                               // get additional space
-      path = static_cast<char **>(
+      path = static_cast<const char **>(
           DREALLOC(path, sizeof(char *) * size, TAG_COMPILER, "compiler:init_include_path"));
       for (k = 0; k < inc_list_size;) {  // and copy runtime configuration
         path[j++] = make_shared_string(inc_list[k++]);
@@ -4115,7 +4115,7 @@ void set_inc_list(char *list) {
     p++;
   }
   inc_path = inc_list =
-      reinterpret_cast<char **>(DCALLOC(size, sizeof(char *), TAG_INC_LIST, "set_inc_list"));
+      reinterpret_cast<const char **>(DCALLOC(size, sizeof(char *), TAG_INC_LIST, "set_inc_list"));
   inc_path_size = inc_list_size = size;
   for (i = size - 1; i >= 0; i--) {
     p = strrchr(list, ':');
@@ -4146,7 +4146,7 @@ void set_inc_list(char *list) {
   }
 }
 
-char *main_file_name() {
+const char *main_file_name() {
   incstate_t *is;
 
   if (inctop == nullptr) {

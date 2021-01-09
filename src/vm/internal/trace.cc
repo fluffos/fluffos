@@ -15,7 +15,7 @@
 
 namespace {
 
-void get_trace_details(const program_t *prog, long findex, char **fname, int *na, int *nl) {
+void get_trace_details(const program_t *prog, long findex, const char **fname, int *na, int *nl) {
   function_t *cfp = &prog->function_table[findex];
 
   *fname = cfp->funcname;
@@ -85,7 +85,7 @@ const char *dump_trace(int how) {
 
     switch (p[0].framekind & FRAME_MASK) {
       case FRAME_FUNCTION: {
-        char *fname;
+        const char *fname;
         get_trace_details(trace_prog, p[0].fr.table_index, &fname, &num_arg, &num_local);
         dump_trace_line(fname, trace_prog->filename, trace_obj->obname,
                         get_line_number(trace_pc, trace_prog));
@@ -175,7 +175,7 @@ array_t *get_svalue_trace() {
   mapping_t *m;
   const char *file;
   int line;
-  char *fname;
+  const char *fname;
   int num_arg, num_local = -1;
 
   svalue_t *ptr;

@@ -294,7 +294,7 @@ static int user_parser(char *buff) {
   sentence_t *s;
   char *p;
   int length;
-  char *user_verb = nullptr;
+  const char *user_verb = nullptr;
   int where;
   int save_illegal_sentence_action;
 

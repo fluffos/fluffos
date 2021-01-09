@@ -11,7 +11,7 @@
 #define _UID_H_
 
 struct userid_t {
-  char *name;
+  const char *name;
 };
 
 extern userid_t *backbone_uid;

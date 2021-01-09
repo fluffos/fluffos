@@ -1515,7 +1515,7 @@ static long alist_cmp(svalue_t *p1, svalue_t *p2) {
 static svalue_t *alist_sort(array_t *inlist) {
   long size, j, curix, parix, child1, child2, flag;
   svalue_t *sv_tab, *tmp, *table, *sv_ptr, val;
-  char *str;
+  const char *str;
 
   if (!(size = inlist->size)) {
     return (svalue_t *)nullptr;
@@ -1716,7 +1716,7 @@ array_t *intersect_array(array_t *a1, array_t *a2) {
       }
     }
   } else {
-    char *str;
+    const char *str;
 
     sv_tab = a2->item;
     for (j = 0; j < a2s; j++) {
@@ -1872,7 +1872,7 @@ array_t *union_array(array_t *a1, array_t *a2) {
       }
     }
   } else {
-    char *str;
+    const char *str;
 
     sv_tab = a2->item;
     for (j = 0; j < a2s; j++) {

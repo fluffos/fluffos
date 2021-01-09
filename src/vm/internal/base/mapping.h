@@ -13,7 +13,7 @@
 #define MAP_SVAL_HASH(x) sval_hash(x)
 
 //#define MAP_SVAL_HASH(x) (((POINTER_INT)((x).u.number)) >> 5)
-LPC_INT sval_hash(svalue_t);
+size_t sval_hash(svalue_t);
 
 typedef struct mapping_node_s {
   struct mapping_node_s *next;
@@ -76,15 +76,15 @@ typedef struct minfo_s {
  */
 extern mapping_node_t *locked_map_nodes;
 
-int msameval(svalue_t *, svalue_t *);
+int msameval(const svalue_t *, const svalue_t *);
 int mapping_save_size(mapping_t *);
 mapping_t *mapTraverse(mapping_t *, int (*)(mapping_t *, mapping_node_t *, void *), void *);
 mapping_t *load_mapping_from_aggregate(svalue_t *, int);
 mapping_t *allocate_mapping(int);
 mapping_t *allocate_mapping2(array_t *, svalue_t *);
 void free_mapping(mapping_t *);
-svalue_t *find_in_mapping(mapping_t *, svalue_t *);
-svalue_t *find_string_in_mapping(mapping_t *, const char *);
+svalue_t *find_in_mapping(const mapping_t *, svalue_t);
+svalue_t *find_string_in_mapping(const mapping_t *, const char *);
 svalue_t *find_for_insert(mapping_t *, svalue_t *, int);
 void absorb_mapping(mapping_t *, mapping_t *);
 void mapping_delete(mapping_t *, svalue_t *);
