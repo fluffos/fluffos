@@ -746,12 +746,14 @@ svalue_t *find_in_mapping(mapping_t *m, svalue_t *lv) {
 
 svalue_t *find_string_in_mapping(mapping_t *m, const char *p) {
   char *ss = findstring(p);
-  int i;
-  mapping_node_t *n;
-  static svalue_t str = {T_STRING, STRING_SHARED};
   if (!ss) {
     return &const0u;
   }
+
+  int i;
+  mapping_node_t *n;
+  static svalue_t str = {T_STRING, STRING_SHARED};
+
   str.u.string = ss;
   i = MAP_SVAL_HASH(str);
   n = m->table[i & m->table_size];
