@@ -176,6 +176,8 @@ endif ()
 
 add_subdirectory(thirdparty/filesystem EXCLUDE_FROM_ALL)
 include_directories(thirdparty/filesystem/include)
+add_subdirectory(thirdparty/fmt EXCLUDE_FROM_ALL)
+include_directories(thirdparty/fmt/include)
 
 set(DISABLE_WERROR ON CACHE BOOL "" FORCE)
 set(LWS_WITH_SHARED OFF CACHE BOOL "" FORCE)
@@ -391,6 +393,7 @@ endif ()
 # end of JEMALLOC
 
 target_link_libraries(libdriver PUBLIC ghc_filesystem)
+target_link_libraries(libdriver PRIVATE fmt::fmt-header-only)
 
 target_link_libraries(libdriver PUBLIC autogen)
 

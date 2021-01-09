@@ -1074,7 +1074,7 @@ static void process_input(interactive_t *ip, char *user_command) {
 
 #ifndef NO_ADD_ACTION
   if (ret->type == T_STRING) {
-    auto command = string_copy(ret->u.string, __CURRENT_FILE_LINE__);
+    auto command = string_copy(ret->u.string, "current_command: " __CURRENT_FILE_LINE__);
     DEFER { FREE_MSTR(command); };
     parse_command(command, command_giver);
   } else {

@@ -1,5 +1,6 @@
 #include "base/package_api.h"
 
+#include "packages/core/file.h"
 #include "packages/core/sprintf.h"
 #include "packages/core/outbuf.h"
 
@@ -169,6 +170,37 @@ void f_destructed_objects(void) {
   }
 
   push_refed_array(ret);
+}
+#endif
+
+#ifdef F_DUMP_STRALLOC
+void dump_stralloc(outbuffer_t *);
+
+void f_dump_stralloc(void) {
+  auto target_file = sp->u.string;
+  const char *fn;
+  FILE *fp;
+  fn = check_valid_path(target_file, current_object, "debugmalloc", 1);
+  if (!fn) {
+    error("Invalid path '%s' for writing.\n", target_file);
+  }
+  fp = fopen(fn, "w");
+  if (!fp) {
+    error("Unable to open %s for writing.\n", fn);
+  }
+
+  outbuffer_t out;
+  outbuf_zero(&out);
+
+  dump_stralloc(&out);
+
+  outbuf_fix(&out);
+
+  fputs(out.buffer, fp);
+  fclose(fp);
+
+  pop_stack();
+  outbuf_push(&out);
 }
 #endif
 
