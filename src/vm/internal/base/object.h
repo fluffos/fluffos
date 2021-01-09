@@ -59,7 +59,7 @@
 
 struct sentence_t {
 #ifndef NO_ADD_ACTION
-  char *verb;
+  const char *verb;
 #endif
   struct sentence_t *next;
   struct object_t *ob;
@@ -102,15 +102,15 @@ struct object_t {
 #ifndef NO_ADD_ACTION
   sentence_t *sent;
   struct object_t *next_hashed_living;
-  char *living_name; /* Name of living object if in hash */
+  const char *living_name; /* Name of living object if in hash */
 #endif
 #ifdef PACKAGE_UIDS
   struct userid_t *uid;  /* the "owner" of this object */
   struct userid_t *euid; /* the effective "owner" */
 #endif
 #ifdef PRIVS
-  char *privs; /* object's privledges */
-#endif         /* PRIVS */
+  const char *privs; /* object's privledges */
+#endif               /* PRIVS */
 #ifdef PACKAGE_MUDLIB_STATS
   struct statgroup_t stats; /* mudlib stats */
 #endif

@@ -1292,7 +1292,7 @@ void remove_interactive(object_t *ob, int dested) {
 static int call_function_interactive(interactive_t *i, char *str) {
   object_t *ob;
   funptr_t *funp;
-  char *function;
+  const char *function;
   svalue_t *args;
   sentence_t *sent;
   int num_arg;
