@@ -26,8 +26,16 @@ void flag(string str) {
         write(error);
       }
       break;
+    case "speed":
+      error = catch("/command/speed"->main());
+      if(error) {
+        has_error = 1;
+        write(error);
+      }
+      shutdown(0);
+      break;
     default:
-      write("The only supproted flag is 'test', got '" + str + "'.\n");
+      write("The only supproted flag is 'test' and 'speed', got '" + str + "'.\n");
       break;
   }
   if (has_error) { shutdown(-1); }
