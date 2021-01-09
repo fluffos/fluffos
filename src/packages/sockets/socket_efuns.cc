@@ -213,7 +213,7 @@ static void clear_socket(int which, int dofree) {
  * Set the callbacks for a socket
  */
 void set_read_callback(int which, svalue_t *cb) {
-  char *s;
+  const char *s;
 
   if (lpc_socks[which].flags & S_READ_FP) {
     free_funp(lpc_socks[which].read_callback.f);
@@ -236,7 +236,7 @@ void set_read_callback(int which, svalue_t *cb) {
 }
 
 void set_write_callback(int which, svalue_t *cb) {
-  char *s;
+  const char *s;
 
   if (lpc_socks[which].flags & S_WRITE_FP) {
     free_funp(lpc_socks[which].write_callback.f);
@@ -259,7 +259,7 @@ void set_write_callback(int which, svalue_t *cb) {
 }
 
 void set_close_callback(int which, svalue_t *cb) {
-  char *s;
+  const char *s;
 
   if (lpc_socks[which].flags & S_CLOSE_FP) {
     free_funp(lpc_socks[which].close_callback.f);
@@ -284,7 +284,7 @@ void set_close_callback(int which, svalue_t *cb) {
 #ifdef PACKAGE_SOCKETS
 
 static void copy_close_callback(int to, int from) {
-  char *s;
+  const char *s;
 
   if (lpc_socks[to].flags & S_CLOSE_FP) {
     free_funp(lpc_socks[to].close_callback.f);
@@ -1625,7 +1625,7 @@ lpc_socket_t *lpc_socks_get(int i) {
 // Mark all lpc sockets.
 void mark_sockets(void) {
   int i;
-  char *s;
+  const char *s;
 
   for (i = 0; i < lpc_socks.size(); i++) {
     if (lpc_socks[i].flags & S_READ_FP) {

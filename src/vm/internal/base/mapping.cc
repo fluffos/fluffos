@@ -4,6 +4,7 @@
 
 #include <deque>
 #include <map>
+#include <functional>
 
 #include "vm/internal/base/machine.h"
 
@@ -22,16 +23,12 @@ mapping_node_t *locked_map_nodes = nullptr;
  *   at some point as well.
  */
 
-LPC_INT sval_hash(svalue_t x) {
+size_t sval_hash(svalue_t x) {
   switch (x.type) {
     case T_STRING:
       return HASH(BLOCK(x.u.string));
-    case T_NUMBER:
-      return static_cast<unsigned long>(x.u.number);
-    case T_OBJECT:
-    // return HASH(BLOCK(x.u.ob->obname));
     default:
-      return ((((x).u.number)) >> 5);
+      return std::hash<decltype(x.u.arr)>{}(x.u.arr);
   }
 }
 /*
@@ -447,7 +444,7 @@ int restore_hash_string(char **val, svalue_t *sv) {
 
 LPC_INT svalue_to_int(svalue_t *v) {
   if (v->type == T_STRING && v->subtype != STRING_SHARED) {
-    char *p = make_shared_string(v->u.string);
+    const char *p = make_shared_string(v->u.string);
     free_string_svalue(v);
     v->subtype = STRING_SHARED;
     v->u.string = p;
@@ -461,7 +458,7 @@ LPC_INT svalue_to_int(svalue_t *v) {
   return MAP_SVAL_HASH(*v);
 }
 
-int msameval(svalue_t *arg1, svalue_t *arg2) {
+int msameval(const svalue_t *arg1, const svalue_t *arg2) {
   switch (arg1->type | arg2->type) {
     case T_NUMBER:
       return arg1->u.number == arg2->u.number;
@@ -730,12 +727,27 @@ mapping_t *load_mapping_from_aggregate(svalue_t *sp, int n) {
 
 /* is ok */
 
-svalue_t *find_in_mapping(mapping_t *m, svalue_t *lv) {
-  int i = svalue_to_int(lv) & m->table_size;
+svalue_t *find_in_mapping(const mapping_t *m, svalue_t key) {
+  int i = 0;
+
+  // NOTE: svalue_to_int() will also make string into shared string, which is not what we want
+  // however since all map keys are shared string, we can do a fast lookup here.
+  if (key.type == T_STRING) {
+    if (key.subtype != STRING_SHARED) {
+      key.u.string = findstring(key.u.string);
+      if (!key.u.string) {
+        return &const0u;
+      }
+    }
+    i = HASH(BLOCK(key.u.string));
+  } else {
+    i = svalue_to_int(&key);
+  }
+  i = i & m->table_size;
   mapping_node_t *n = m->table[i];
 
   while (n) {
-    if (msameval(n->values, lv)) {
+    if (msameval(n->values, &key)) {
       return n->values + 1;
     }
     n = n->next;
@@ -744,27 +756,14 @@ svalue_t *find_in_mapping(mapping_t *m, svalue_t *lv) {
   return &const0u;
 }
 
-svalue_t *find_string_in_mapping(mapping_t *m, const char *p) {
-  char *ss = findstring(p);
+svalue_t *find_string_in_mapping(const mapping_t *m, const char *p) {
+  const char *ss = findstring(p);
   if (!ss) {
     return &const0u;
   }
-
-  int i;
-  mapping_node_t *n;
-  static svalue_t str = {T_STRING, STRING_SHARED};
-
+  svalue_t str = {T_STRING, STRING_SHARED};
   str.u.string = ss;
-  i = MAP_SVAL_HASH(str);
-  n = m->table[i & m->table_size];
-
-  while (n) {
-    if (n->values->type == T_STRING && n->values->u.string == ss) {
-      return n->values + 1;
-    }
-    n = n->next;
-  }
-  return &const0u;
+  return find_in_mapping(m, str);
 }
 
 /*

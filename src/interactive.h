@@ -62,8 +62,8 @@ struct interactive_t {
   /* this or What ? is printed when error    */
   union string_or_func default_err_message;
 #endif
-  int trace_level;    /* debug flags -- 0 means no debugging     */
-  char *trace_prefix; /* trace only object which has this as name  */
+  int trace_level;          /* debug flags -- 0 means no debugging     */
+  const char *trace_prefix; /* trace only object which has this as name  */
 #ifdef OLD_ED
   struct ed_buffer_s *ed_buffer; /* local ed                        */
 #endif

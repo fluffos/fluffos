@@ -164,8 +164,8 @@ static_assert(sizeof(malloc_block_t) == sizeof(block_t),
  * stralloc.c
  */
 void init_strings(void);
-char *findstring(const char *);
-char *make_shared_string(const char *);
+const char *findstring(const char *);
+const char *make_shared_string(const char *);
 const char *ref_string(const char *);
 void free_string(const char *);
 void deallocate_string(char *);

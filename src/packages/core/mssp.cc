@@ -50,7 +50,7 @@ void on_telnet_do_mssp(interactive_t *ip) {
 
   // ok, so we have a mapping, first make sure we send the required
   // values
-  char *tmp = findstring("NAME");
+  const char *tmp = findstring("NAME");
   if (tmp) {
     svalue_t *name = find_string_in_mapping(map, tmp);
     if (!name || name->type != T_STRING) {

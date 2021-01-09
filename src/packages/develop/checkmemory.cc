@@ -674,7 +674,7 @@ void check_all_blocks(int flag) {
       char buf[8192];
       strcpy(buf, dfm);
       strcat(buf, "\n");
-      char *target = findstring(buf);
+      const char *target = findstring(buf);
       if (target) {
         EXTRA_REF(BLOCK(target))++;
       }

@@ -367,7 +367,7 @@ static void copy_new_function(program_t *prog, int index, program_t *defprog, in
   ihe->dn.function_num = where;
 }
 
-static int find_class_member(int which, char *name, unsigned short *type) {
+static int find_class_member(int which, const char *name, unsigned short *type) {
   int i;
   class_def_t *cd;
   class_member_entry_t *cme;
@@ -397,7 +397,7 @@ static int find_class_member(int which, char *name, unsigned short *type) {
 int lookup_any_class_member(char *name, unsigned short *type) {
   int nc = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
   int i, ret = -1, nret;
-  char *s = findstring(name);
+  const char *s = findstring(name);
 
   if (s) {
     for (i = 0; i < nc; i++) {
@@ -434,7 +434,7 @@ int lookup_any_class_member(char *name, unsigned short *type) {
 }
 
 int lookup_class_member(int which, char *name, unsigned short *type) {
-  char *s = findstring(name);
+  const char *s = findstring(name);
   int ret;
 
   if (s) {
@@ -610,13 +610,13 @@ void copy_structures(const program_t *prog) {
 
 typedef struct ovlwarn_s {
   struct ovlwarn_s *next;
-  char *func;
+  const char *func;
   char *warn;
 } ovlwarn_t;
 
 ovlwarn_t *overload_warnings = nullptr;
 
-static void remove_overload_warnings(char *func) {
+static void remove_overload_warnings(const char *func) {
   ovlwarn_t **p;
   ovlwarn_t *tmp;
 
@@ -968,7 +968,7 @@ int compatible_types2(int t1, int t2) {
  *
  * Note: this function is now only used for resolving :: references
  */
-static int find_matching_function(program_t *prog, char *name, parse_node_t *node) {
+static int find_matching_function(program_t *prog, const char *name, parse_node_t *node) {
   int high = prog->num_functions_defined - 1;
   int low = 0;
   int i, res;
@@ -976,7 +976,7 @@ static int find_matching_function(program_t *prog, char *name, parse_node_t *nod
   /* Search our function table */
   while (high >= low) {
     int mid = (high + low) / 2;
-    char *p = prog->function_table[mid].funcname;
+    const char *p = prog->function_table[mid].funcname;
 
     if (name < p) {
       high = mid - 1;
@@ -1030,7 +1030,7 @@ int arrange_call_inherited(char *name, parse_node_t *node) {
   inherit_t *ip;
   int num_inherits, super_length;
   char *super_name, *p, *real_name = name;
-  char *shared_string;
+  const char *shared_string;
   int ret;
 
   if (real_name[0] == ':') {
@@ -1325,7 +1325,7 @@ int define_new_function(const char *name, int num_arg, int num_local, int flags,
   return newindex;
 }
 
-int define_variable(char *name, int type) {
+int define_variable(const char *name, int type) {
   variable_t *dummy;
   int n;
   ident_hash_elem_t *ihe;
@@ -1382,15 +1382,15 @@ int define_variable(char *name, int type) {
   return n;
 }
 
-int define_new_variable(char *name, int type) {
+int define_new_variable(const char *name, int type) {
   int n;
   unsigned short *tp;
-  char **np;
+  const char **np;
 
   var_defined = 1;
   name = make_shared_string(name);
   n = define_variable(name, type);
-  np = reinterpret_cast<char **>(allocate_in_mem_block(A_VAR_NAME, sizeof(char *)));
+  np = reinterpret_cast<const char **>(allocate_in_mem_block(A_VAR_NAME, sizeof(char *)));
   *np = name;
   tp =
       reinterpret_cast<unsigned short *>(allocate_in_mem_block(A_VAR_TYPE, sizeof(unsigned short)));
@@ -2172,8 +2172,8 @@ static void copy_in(int which, char **start) {
 }
 
 static int compare_funcs(const void *x, const void *y) {
-  char *n1 = FUNC(*(unsigned short *)x)->funcname;
-  char *n2 = FUNC(*(unsigned short *)y)->funcname;
+  const char *n1 = FUNC(*(unsigned short *)x)->funcname;
+  const char *n2 = FUNC(*(unsigned short *)y)->funcname;
   int sp1, sp2;
 
   /* make sure #global_init# stays last; also shuffle empty entries to
@@ -2690,7 +2690,7 @@ static void clean_parser() {
   free_unused_identifiers();
 }
 
-char *the_file_name(char *name) {
+char *the_file_name(const char *name) {
   char *tmp;
   int len;
 

@@ -135,7 +135,7 @@ static block_t *sfindblock(const char *s, int h) {
   return ((block_t *)nullptr); /* not found */
 }
 
-char *findstring(const char *s) {
+const char *findstring(const char *s) {
   block_t *b;
 
   if ((b = findblock(s))) {
@@ -165,7 +165,7 @@ static block_t *alloc_new_string(const char *string, int h, const char *why) {
   [len] = '\0'; /* strncpy doesn't put on \0 if 'from' too
                  * long */
   if (cut) {
-    h = whashstr(STRING(b)) & htable_size_minus_one;
+    h = StrHash(STRING(b));
   }
   SIZE(b) = (len > UINT_MAX ? UINT_MAX : len);
   REFS(b) = 1;
@@ -177,7 +177,7 @@ static block_t *alloc_new_string(const char *string, int h, const char *why) {
   return (b);
 }
 
-char *make_shared_string(const char *str) {
+const char *make_shared_string(const char *str) {
   block_t *b;
   int h;
 

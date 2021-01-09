@@ -50,7 +50,7 @@ struct funptr_t {
 
 union string_or_func {
   funptr_t *f;
-  char *s;
+  const char *s;
 };
 
 void dealloc_funp(funptr_t *);

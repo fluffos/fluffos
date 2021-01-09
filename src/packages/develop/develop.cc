@@ -208,7 +208,7 @@ void f_trace(void) {
 
 #ifdef F_TRACEPREFIX
 void f_traceprefix(void) {
-  char *old = 0;
+  const char *old = 0;
 
   if (command_giver && command_giver->interactive) {
     old = command_giver->interactive->trace_prefix;

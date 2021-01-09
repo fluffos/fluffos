@@ -230,18 +230,18 @@ const char *type_name(int c) {
  * function names are pointers to shared strings, which means that equality
  * can be tested simply through pointer comparison.
  */
-static program_t *ffbn_recurse(program_t * /*prog*/, char * /*name*/, int * /*indexp*/,
+static program_t *ffbn_recurse(program_t * /*prog*/, const char * /*name*/, int * /*indexp*/,
                                int * /*runtime_index*/);
 
 #ifndef NO_SHADOWS
 
-static char *check_shadow_functions(program_t *shadow, program_t *victim) {
+static const char *check_shadow_functions(program_t *shadow, program_t *victim) {
   ScopedTracer _tracer(__PRETTY_FUNCTION__);
 
   int i;
   int pindex, runtime_index;
   program_t *prog;
-  char *fun;
+  const char *fun;
 
   for (i = 0; i < shadow->num_functions_defined; i++) {
     prog = ffbn_recurse(victim, shadow->function_table[i].funcname, &pindex, &runtime_index);
@@ -263,7 +263,7 @@ static char *check_shadow_functions(program_t *shadow, program_t *victim) {
 int validate_shadowing(object_t *ob) {
   program_t *shadow = current_object->prog, *victim = ob->prog;
   svalue_t *ret;
-  char *fun;
+  const char *fun;
 
   if (current_object->shadowing) {
     error("shadow: Already shadowing.\n");
@@ -2631,7 +2631,7 @@ void eval_instruction(char *p) {
           /* mapping */
           if ((sp - 2)->subtype--) {
             svalue_t *key = (sp - 2)->u.lvalue++;
-            svalue_t *value = find_in_mapping((sp - 4)->u.map, key);
+            svalue_t *value = find_in_mapping((sp - 4)->u.map, *key);
 
             assign_svalue((sp - 1)->u.lvalue, key);
             if (sp->type == T_REF) {
@@ -3158,7 +3158,7 @@ void eval_instruction(char *p) {
             svalue_t *v;
             mapping_t *m;
 
-            v = find_in_mapping(m = sp->u.map, sp - 1);
+            v = find_in_mapping(m = sp->u.map, *(sp - 1));
             if (v->type == T_OBJECT && (v->u.ob->flags & O_DESTRUCTED)) {
               assign_svalue(v, &const0u);
             }
@@ -3845,11 +3845,11 @@ static void do_catch(char *pc, unsigned short new_pc_offset) {
   pop_context(&econ);
 }
 
-static program_t *ffbn_recurse(program_t *prog, char *name, int *indexp, int *runtime_index) {
+static program_t *ffbn_recurse(program_t *prog, const char *name, int *indexp, int *runtime_index) {
   int high = prog->num_functions_defined - 1;
   int low = 0, mid;
   int ri;
-  char *p;
+  const char *p;
 
   /* Search our function table */
   while (high >= low) {
@@ -3885,7 +3885,7 @@ static program_t *ffbn_recurse(program_t *prog, char *name, int *indexp, int *ru
 }
 
 program_t *find_function_by_name(object_t *ob, const char *name, int *indexp, int *runtime_index) {
-  char *funname = findstring(name);
+  const char *funname = findstring(name);
 
   if (!funname) {
     return nullptr;
@@ -3994,7 +3994,7 @@ array_t *call_all_other(array_t *v, const char *func, int numargs) {
   return ret;
 }
 
-char *function_name(program_t *prog, int findex) {
+const char *function_name(program_t *prog, int findex) {
   int low, high, mid;
 
   /* Walk up the inheritance tree to the real definition */
