@@ -88,7 +88,7 @@ static const char *sources[] = {"*",
 void mark_svalue(svalue_t *sv);
 
 char *dump_debugmalloc(const char *tfn, int mask) {
-  int j, total = 0, chunks = 0, total2 = 0;
+  int j, total = 0, chunks = 0;
   const char *fn;
   md_node_t *entry;
   FILE *fp;
@@ -102,11 +102,12 @@ char *dump_debugmalloc(const char *tfn, int mask) {
   if (!fp) {
     error("Unable to open %s for writing.\n", fn);
   }
+  fprintf(fp, "%12s %5s %6s %7s %s\n", "ptr", "tag", "id", "sz", "desc");
   for (j = 0; j < MD_TABLE_SIZE; j++) {
     for (entry = table[j]; entry; entry = entry->next) {
       if (!mask || (entry->tag == mask)) {
-        fprintf(fp, "%-30s: sz %7d: id %6d: tag %08x, a %8zx\n", entry->desc, entry->size,
-                entry->id, entry->tag, (uintptr_t)PTR(entry));
+        fprintf(fp, "%12tx %1d:%03d %6d %7d %s\n", (uintptr_t)PTR(entry), (entry->tag >> 8) & 0xff,
+                entry->tag & 0xff, entry->id, entry->size, entry->desc);
         total += entry->size;
         chunks++;
       }
@@ -114,18 +115,20 @@ char *dump_debugmalloc(const char *tfn, int mask) {
   }
   fprintf(fp, "total =    %8d\n", total);
   fprintf(fp, "# chunks = %8d\n", chunks);
-  fprintf(fp, "ave. bytes per chunk = %7.2f\n\n", (float)total / chunks);
+  fprintf(fp, "ave. bytes per chunk = %7.2f\n\n", (double)total / chunks);
   fprintf(fp, "categories:\n\n");
   for (j = 0; j < MAX_CATEGORY; j++) {
-    fprintf(fp, "%4d: %10" PRIu64 "\n", j, totals[j]);
-    total2 += totals[j];
+    fprintf(fp, "%4d: %10" PRIu64 " %10" PRIu64 "\n", j, blocks[j], totals[j]);
   }
-  fprintf(fp, "\ntotal = %11d\n", total2);
+  fprintf(fp, "tags:\n\n");
+  for (j = MAX_CATEGORY + 1; j < MAX_TAGS; j++) {
+    fprintf(fp, "%4d: %10" PRIu64 " %10" PRIu64 "\n", j, blocks[j], totals[j]);
+  }
   fclose(fp);
   outbuf_addv(&out, "total =    %8d\n", total);
   outbuf_addv(&out, "# chunks = %8d\n", chunks);
   if (chunks) {
-    outbuf_addv(&out, "ave. bytes per chunk = %7.2f\n", (float)total / chunks);
+    outbuf_addv(&out, "ave. bytes per chunk = %7.2f\n", (double)total / chunks);
   }
   outbuf_fix(&out);
   return out.buffer;
@@ -568,7 +571,7 @@ void check_all_blocks(int flag) {
     }
     {
       int a = totals[TAG_CALL_OUT & 0xff];
-      int b = print_call_out_usage(&out, -1);
+      int b = total_callout_size();
       if (a != b) {
         outbuf_addv(&out, "WARNING: wrong number of call_out blocks allocated: %d vs %d.\n", a, b);
         print_call_out_usage(&out, 1);
@@ -1016,7 +1019,7 @@ void check_all_blocks(int flag) {
     outbuf_add(&out, "\n\n");
     outbuf_add(&out, "      source                    blks   total\n");
     outbuf_add(&out, "------------------------------ ------ --------\n");
-    for (i = 1; i < MAX_CATEGORY; i++) {
+    for (i = 1; i < MAX_TAGS; i++) {
       if (totals[i]) {
         outbuf_addv(&out, "%-30s %6" PRIu64 " %8" PRIu64 "\n", sources[i], blocks[i], totals[i]);
       }

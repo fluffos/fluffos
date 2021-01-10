@@ -150,6 +150,7 @@ void stat_living_objects(outbuffer_t *out) {
   outbuf_add(out, "-----------------------------\n");
   outbuf_addv(out, "%d living named objects, average search length: %4.2f\n\n", num_living_names,
               static_cast<double>(search_length) / num_searches);
+  return;
 }
 
 void setup_new_commands(object_t *dest, object_t *item) {

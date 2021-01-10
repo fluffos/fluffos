@@ -34,17 +34,15 @@ typedef struct stats_s {
 static stats_t stats = {0, 0, 0};
 
 void *debugrealloc(void *ptr, int size, int tag, const char *desc) {
-  void *tmp;
-
   if (size <= 0) {
     fatal("illegal size in debugrealloc()");
   }
 
   NOISY3("realloc: %i (%x), %s\n", size, ptr, desc);
   stats.realloc_calls++;
-  tmp = reinterpret_cast<md_node_t *>(ptr) - 1;
+  auto tmp = PTR_TO_NODET(ptr);
   if (MDfree(tmp)) {
-    tmp = realloc(tmp, size + MD_OVERHEAD);
+    tmp = reinterpret_cast<md_node_s *>(realloc(tmp, size + MD_OVERHEAD));
     MDmalloc(reinterpret_cast<md_node_t *>(tmp), size, tag, desc);
     return reinterpret_cast<md_node_t *>(tmp) + 1;
   }
@@ -79,11 +77,9 @@ void *debugcalloc(int nitems, int size, int tag, const char *desc) {
 }
 
 void debugfree(void *ptr) {
-  md_node_t *tmp;
-
   NOISY1("free (%x)\n", ptr);
   stats.free_calls++;
-  tmp = reinterpret_cast<md_node_t *>(ptr) - 1;
+  auto tmp = PTR_TO_NODET(ptr);
   if (MDfree(tmp)) {
     free(tmp); /* only free if safe to do so */
   }
