@@ -178,5 +178,5 @@ char *extend_string(const char *, int);
 extern unsigned int svalue_strlen_size;
 
 #define make_shared_string(s) int_make_shared_string(s, __CURRENT_FILE_LINE__)
-
+void dump_stralloc(outbuffer_t *out);
 #endif

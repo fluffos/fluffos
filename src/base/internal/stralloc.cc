@@ -448,16 +448,14 @@ void dump_stralloc(outbuffer_t *out) {
   ss << "===STRALLOC DUMP: allocd_strings:" << allocd_strings << "\n";
   // can't direct output to outbuf since it might realloc
   for (int hsh = 0; hsh < htable_size; hsh++) {
-    for (block_t* entry = base_table[hsh]; entry; entry = entry->next) {
+    for (block_t *entry = base_table[hsh]; entry; entry = entry->next) {
 #if defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS)
-        auto md_entry = PTR_TO_NODET(entry);
-        ss << fmt::format(FMT_STRING("{:d},{:d},{:s},{:.40s}"),
-                          md_entry->id,
-                          md_entry->size,
-                          md_entry->tag == TAG_SHARED_STRING ? "S" : "M",
-                          md_entry->desc);
+      auto md_entry = PTR_TO_NODET(entry);
+      ss << fmt::format(FMT_STRING("{:d},{:d},{:s},{:.40s}"), md_entry->id, md_entry->size,
+                        md_entry->tag == TAG_SHARED_STRING ? "S" : "M", md_entry->desc);
 #endif
-        ss << fmt::format(FMT_STRING("{:d},{:x},{:d},{:.40s}\n"), entry->refs, entry->hash, entry->size, STRING(entry));
+      ss << fmt::format(FMT_STRING("{:d},{:x},{:d},{:.40s}\n"), entry->refs, entry->hash,
+                        entry->size, STRING(entry));
     }
   }
   auto res = ss.str();

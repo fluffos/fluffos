@@ -233,7 +233,9 @@ int heart_beat_status(outbuffer_t *buf, int verbose) {
     outbuf_addv(buf, "Number of objects with heart beat: %" PRIu64 ".\n",
                 heartbeats.size() + heartbeats_next.size());
   }
-  return 0;
+  // may overcount, but this usually not called during heartbeat.
+  return (heartbeats.size() + heartbeats_next.size()) *
+         (sizeof(heart_beat_t *) + sizeof(heart_beat_t));
 } /* heart_beat_status() */
 
 #ifdef F_HEART_BEATS

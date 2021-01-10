@@ -1,7 +1,7 @@
 /*
  * stats.h
  *
- * This files contians all statistic collected by various part of the driver.
+ * This files contains all statistic collected by various part of the driver.
  *
  * TODO: encapsulate into an class.
  */

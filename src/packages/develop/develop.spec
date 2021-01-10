@@ -15,7 +15,7 @@
 #endif
 
 #if (defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS))
-    string debugmalloc(string, int);
+    string debugmalloc(string, int default: 0);
     void set_malloc_mask(int);
     string check_memory(int default: 0);
 #endif
