@@ -14,11 +14,12 @@
 #include <inttypes.h>
 
 #include "base/internal/log.h"
+#include "base/internal/stralloc.h"
 
-uint64_t totals[MAX_CATEGORY];
-uint64_t blocks[MAX_CATEGORY];
+uint64_t blocks[MAX_TAGS];
+uint64_t totals[MAX_TAGS];
 
-int malloc_mask = 121;
+int malloc_mask = 0;
 
 md_node_t *table[MD_TABLE_SIZE];
 unsigned int total_malloced = 0L;
@@ -38,13 +39,14 @@ void MDmalloc(md_node_t *node, int size, int tag, const char *desc) {
   node->size = size;
   node->next = table[h];
 #ifdef DEBUGMALLOC_EXTENSIONS
-  if ((tag & 0xff) < MAX_CATEGORY) {
+  if ((tag & 0xff) > MAX_CATEGORY) {
     totals[tag & 0xff] += size;
     blocks[tag & 0xff]++;
   }
-  if (((tag >> 8) & 0xff) < MAX_CATEGORY) {
-    totals[(tag >> 8) & 0xff] += size;
-    blocks[(tag >> 8) & 0xff]++;
+  auto cat = tag >> 8;
+  if (cat != tag) {
+    totals[cat & 0xff] += size;
+    blocks[cat & 0xff]++;
   }
   node->tag = tag;
   node->id = count++;
@@ -53,8 +55,8 @@ void MDmalloc(md_node_t *node, int size, int tag, const char *desc) {
   assert(desc != nullptr);
 
   if (malloc_mask == node->tag) {
-    debug_message("MDmalloc: %5d, [%-25s], %8lx:(%d)\n", node->tag, node->desc, PTR(node),
-                  node->size);
+    debug_message("%d MDmalloc: %5d, [%-25s], %8lx:(%d)\n", node->id, node->tag, node->desc,
+                  PTR(node), node->size);
   }
 #endif
   table[h] = node;
@@ -64,27 +66,30 @@ void MDmalloc(md_node_t *node, int size, int tag, const char *desc) {
 void set_tag(const void *ptr, int tag) {
   md_node_t *node = PTR_TO_NODET(ptr);
 
-  if ((node->tag & 0xff) < MAX_CATEGORY) {
+  if ((node->tag & 0xff) > MAX_CATEGORY) {
     totals[node->tag & 0xff] -= node->size;
     blocks[node->tag & 0xff]--;
   }
-  if (((node->tag >> 8) & 0xff) < MAX_CATEGORY) {
-    totals[(node->tag >> 8) & 0xff] -= node->size;
-    blocks[(node->tag >> 8) & 0xff]--;
+  auto cat = node->tag >> 8;
+  if (cat != node->tag) {
+    totals[cat & 0xff] -= node->size;
+    blocks[cat & 0xff]--;
   }
+
   node->tag = tag;
-  if ((node->tag & 0xff) < MAX_CATEGORY) {
+  if ((node->tag & 0xff) > MAX_CATEGORY) {
     totals[node->tag & 0xff] += node->size;
     blocks[node->tag & 0xff]++;
   }
-  if (((node->tag >> 8) & 0xff) < MAX_CATEGORY) {
-    totals[(node->tag >> 8) & 0xff] += node->size;
-    blocks[(node->tag >> 8) & 0xff]++;
+  cat = node->tag >> 8;
+  if (cat != node->tag) {
+    totals[cat & 0xff] += node->size;
+    blocks[cat & 0xff]++;
   }
 }
 #endif
 
-int MDfree(void *ptr) {
+int MDfree(md_node_t *ptr) {
   unsigned long h;
   md_node_t *entry, **oentry;
 
@@ -99,16 +104,17 @@ int MDfree(void *ptr) {
   }
   if (entry) {
 #ifdef DEBUGMALLOC_EXTENSIONS
-    if ((entry->tag & 0xff) < MAX_CATEGORY) {
+    if ((entry->tag & 0xff) > MAX_CATEGORY) {
       totals[entry->tag & 0xff] -= entry->size;
       blocks[entry->tag & 0xff]--;
     }
-    if (((entry->tag >> 8) & 0xff) < MAX_CATEGORY) {
-      totals[(entry->tag >> 8) & 0xff] -= entry->size;
-      blocks[(entry->tag >> 8) & 0xff]--;
+    auto cat = entry->tag >> 8;
+    if (cat != entry->tag) {
+      totals[cat & 0xff] -= entry->size;
+      blocks[cat & 0xff]--;
     }
     if (malloc_mask == entry->tag) {
-      debug_message("MDfree: %5d, [%-25s], %8lx:(%d)\n", entry->tag, entry->desc,
+      debug_message("%d MDfree: %5d, [%-25s], %8lx:(%d)\n", entry->id, entry->tag, entry->desc,
                     (uintptr_t)PTR(entry), entry->size);
     }
 #endif

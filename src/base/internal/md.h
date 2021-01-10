@@ -50,16 +50,18 @@ void check_all_blocks(int);
 #define SET_TAG(x, y)
 #endif
 
-#define MAX_CATEGORY 130
+#define MAX_CATEGORY 10
+#define MAX_TAGS 255
+extern uint64_t blocks[MAX_TAGS];
+extern uint64_t totals[MAX_TAGS];
+
 extern md_node_t *table[];
-extern uint64_t totals[MAX_CATEGORY];
-extern uint64_t blocks[MAX_CATEGORY];
 
 extern int malloc_mask;
 extern unsigned int total_malloced;
 extern unsigned int hiwater;
 void MDmalloc(md_node_t *, int, int, const char *);
-int MDfree(void *);
+int MDfree(md_node_t *);
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void set_tag(const void *, int);
