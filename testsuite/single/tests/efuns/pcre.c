@@ -138,4 +138,7 @@ TEXT;
             })
       }),
       pcre_match_all(tmp, re));
+
+      tmp = "foobar";
+      ASSERT_EQ("foo->bar", pcre_replace_callback(tmp, "(foo)", (: $1 + "->" :)));
 }
