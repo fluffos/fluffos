@@ -1056,6 +1056,16 @@ void destruct_object(object_t *ob) {
     num_hidden--;
   }
 #endif
+
+#ifdef DEBUG
+  tot_dangling_object++;
+  ob->next_all = obj_list_dangling;
+  if (obj_list_dangling) {
+    obj_list_dangling->prev_all = ob;
+  }
+  obj_list_dangling = ob;
+  ob->prev_all = 0;
+#endif
 }
 
 /*
@@ -1106,16 +1116,6 @@ void destruct2(object_t *ob) {
     s = next;
   }
   ob->sent = nullptr;
-#endif
-
-#ifdef DEBUG
-  tot_dangling_object++;
-  ob->next_all = obj_list_dangling;
-  if (obj_list_dangling) {
-    obj_list_dangling->prev_all = ob;
-  }
-  obj_list_dangling = ob;
-  ob->prev_all = 0;
 #endif
 
   free_object(&ob, "destruct_object");

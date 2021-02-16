@@ -1388,7 +1388,6 @@ int calculate_and_maybe_print_memory_info(outbuffer_t *ob, int verbose) {
   tot += add_string_status(ob, verbose);
   if (verbose && verbose != -1) outbuf_add(ob, "\n");
 
-  tot += print_call_out_usage(ob, verbose);
   return tot;
 }
 }  // namespace
@@ -3181,7 +3180,12 @@ void f_dump_file_descriptors(void) {
 #endif
 
 #ifdef F_RECLAIM_OBJECTS
-void f_reclaim_objects(void) { push_number(reclaim_objects(false)); }
+void f_reclaim_objects(void) {
+  auto res = reclaim_objects(false);
+  add_gametick_event(std::chrono::seconds(0),
+                     tick_event::callback_type([] { remove_destructed_objects(); }));
+  push_number(res);
+}
 #endif
 
 #ifdef F_MEMORY_INFO

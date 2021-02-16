@@ -18,6 +18,7 @@ typedef struct md_node_s {
   int id;
   int tag;
   const char *desc;
+  uint64_t gametick;
 #endif
 } md_node_t;
 

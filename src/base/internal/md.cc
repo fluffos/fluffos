@@ -25,6 +25,9 @@ md_node_t *table[MD_TABLE_SIZE];
 unsigned int total_malloced = 0L;
 unsigned int hiwater = 0L;
 
+// TODO: defined in backend.cc
+extern uint64_t g_current_gametick;
+
 void MDmalloc(md_node_t *node, int size, int tag, const char *desc) {
   unsigned long h;
   static int count = 0;
@@ -51,6 +54,7 @@ void MDmalloc(md_node_t *node, int size, int tag, const char *desc) {
   node->tag = tag;
   node->id = count++;
   node->desc = desc ? desc : "default";
+  node->gametick = g_current_gametick;
 
   assert(desc != nullptr);
 
