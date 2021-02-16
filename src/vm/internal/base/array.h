@@ -8,7 +8,7 @@
 #endif
 
 struct array_t {
-  unsigned short ref;
+  uint32_t ref;
 #ifdef DEBUGMALLOC_EXTENSIONS
   int extra_ref;
 #endif
