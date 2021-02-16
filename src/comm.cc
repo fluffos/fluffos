@@ -1451,27 +1451,28 @@ static void print_prompt(interactive_t *ip) {
   if (!ip || !ip->ob || !IP_VALID(ip, ip->ob)) {
     return;
   }
+  auto ob = ip->ob;
 
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
-  if (ip->input_to != nullptr) {
-    // while in single char mode there won't e any prompt.
-    return;
-  }
+  if (ip->input_to == nullptr) {
 #endif
-
-  /* give user object a chance to write its own prompt */
-  if (!(ip->iflags & HAS_WRITE_PROMPT)) {
-    tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
-  }
+    /* give user object a chance to write its own prompt */
+    if (!(ip->iflags & HAS_WRITE_PROMPT)) {
+      tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
+    }
 #ifdef OLD_ED
-  else if (ip->ed_buffer) {
-    tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
+    else if (ip->ed_buffer) {
+      tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
+    }
+#endif
+    else if (!safe_apply(APPLY_WRITE_PROMPT, ip->ob, 0, ORIGIN_DRIVER)) {
+      ip->iflags &= ~HAS_WRITE_PROMPT;
+      tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
+    }
+#if defined(F_INPUT_TO) || defined(F_GET_CHAR)
   }
 #endif
-  else if (!apply(APPLY_WRITE_PROMPT, ip->ob, 0, ORIGIN_DRIVER)) {
-    ip->iflags &= ~HAS_WRITE_PROMPT;
-    tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
-  }
+  if (!IP_VALID(ip, ob)) return;
   // Stavros: A lot of clients use this TELNET_GA to differentiate
   // prompts from other text
   if (ip->telnet && (ip->iflags & USING_TELNET) && !(ip->iflags & SUPPRESS_GA)) {
