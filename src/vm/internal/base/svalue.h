@@ -8,7 +8,7 @@
 using json = nlohmann::json;
 
 typedef struct {
-  unsigned short ref;
+  uint32_t ref;
 } refed_t;
 
 typedef const char *LPC_STRING;
@@ -43,7 +43,8 @@ struct svalue_t {
 };
 
 struct ref_t {
-  unsigned short ref;
+  uint32_t ref;
+
   struct ref_t *next, *prev;
   struct control_stack_t *csp;
   svalue_t *lvalue;

@@ -29,7 +29,7 @@ struct functional_t {
 
 /* common header */
 struct funptr_hdr_t {
-  unsigned short ref;
+  uint32_t ref;
   short type; /* FP_* is used */
 #ifdef DEBUGMALLOC_EXTENSIONS
   int extra_ref;

@@ -8,7 +8,7 @@
 
 struct buffer_t {
   /* first two elements of struct must be 'ref' followed by 'size' */
-  unsigned short ref;
+  uint32_t ref;
   unsigned int size;
 #ifdef DEBUGMALLOC_EXTENSIONS
   unsigned short extra_ref;

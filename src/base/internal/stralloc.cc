@@ -290,7 +290,7 @@ uint64_t add_string_status(outbuffer_t *out, int verbose) {
     outbuf_add(out, "-------------------------\t Strings    Bytes\n");
   }
   if (verbose != -1) {
-    outbuf_addv(out, "All strings:\t\t\t%8d %8d + %d overhead\n", num_distinct_strings,
+    outbuf_addv(out, "%-20s %8d %8d + %d overhead\n", "All strings", num_distinct_strings,
                 bytes_distinct_strings, overhead_bytes);
   }
   if (verbose == 1) {

@@ -85,7 +85,8 @@ int ObjectTable::showStatus(outbuffer_t* out, int verbose) {
       break;
 
     case 0:
-      ss << fmt::format(FMT_STRING("{:<20s} {:>8d} {:>8d}"), "oname htable", objects_.size(), total)
+      ss << fmt::format(FMT_STRING("{:<20s} {:>8d} {:>8d} (buckets {:d})"), "oname htable",
+                        objects_.size(), total, objects_.bucket_count())
          << "\n";
       break;
 

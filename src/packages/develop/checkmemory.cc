@@ -102,12 +102,13 @@ char *dump_debugmalloc(const char *tfn, int mask) {
   if (!fp) {
     error("Unable to open %s for writing.\n", fn);
   }
-  fprintf(fp, "%12s %5s %6s %7s %s\n", "ptr", "tag", "id", "sz", "desc");
+  fprintf(fp, "%12s %12s %12s %5s %7s %s\n", "id", "gametick", "ptr", "tag", "sz", "desc");
   for (j = 0; j < MD_TABLE_SIZE; j++) {
     for (entry = table[j]; entry; entry = entry->next) {
       if (!mask || (entry->tag == mask)) {
-        fprintf(fp, "%12tx %1d:%03d %6d %7d %s\n", (uintptr_t)PTR(entry), (entry->tag >> 8) & 0xff,
-                entry->tag & 0xff, entry->id, entry->size, entry->desc);
+        fprintf(fp, "%12d %12td %12tx %1d:%03d %7d %s\n",
+                entry->id, entry->gametick, (uintptr_t)PTR(entry), (entry->tag >> 8) & 0xff,
+                entry->tag & 0xff, entry->size, entry->desc);
         total += entry->size;
         chunks++;
       }
