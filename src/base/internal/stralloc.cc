@@ -290,14 +290,14 @@ uint64_t add_string_status(outbuffer_t *out, int verbose) {
     outbuf_add(out, "-------------------------\t Strings    Bytes\n");
   }
   if (verbose != -1) {
-    outbuf_addv(out, "%-20s %8d %8d + %d overhead\n", "All strings", num_distinct_strings,
-                bytes_distinct_strings, overhead_bytes);
+    outbuf_addv(out, "%-20s %8" PRIu64 " %8" PRIu64 " + %" PRIu64 " overhead\n", "All strings",
+                num_distinct_strings, bytes_distinct_strings, overhead_bytes);
   }
   if (verbose == 1) {
-    outbuf_addv(out, "Total asked for\t\t\t%8d %8d\n", allocd_strings, allocd_bytes);
-    outbuf_addv(out, "Space actually required/total string bytes %d%%\n",
-                (bytes_distinct_strings + overhead_bytes) * 100 / allocd_bytes);
-    outbuf_addv(out, "Searches: %d\tAverage search length: %6.3f\n", num_str_searches,
+    outbuf_addv(out, "Total asked for\t\t\t%8" PRIu64 " %8" PRIu64 "\n", allocd_strings, allocd_bytes);
+    outbuf_addv(out, "Space actually required/total string bytes %f%%\n",
+                static_cast<double>(bytes_distinct_strings + overhead_bytes) * 100 / allocd_bytes);
+    outbuf_addv(out, "Searches: %" PRIu64 "\tAverage search length: %6.3f\n", num_str_searches,
                 static_cast<double>(search_len) / num_str_searches);
 
     auto load_factor = num_distinct_strings * 1.0 / htable_size;

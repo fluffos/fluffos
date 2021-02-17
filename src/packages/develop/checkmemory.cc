@@ -106,8 +106,8 @@ char *dump_debugmalloc(const char *tfn, int mask) {
   for (j = 0; j < MD_TABLE_SIZE; j++) {
     for (entry = table[j]; entry; entry = entry->next) {
       if (!mask || (entry->tag == mask)) {
-        fprintf(fp, "%12d %12td %12tx %1d:%03d %7d %s\n",
-                entry->id, entry->gametick, (uintptr_t)PTR(entry), (entry->tag >> 8) & 0xff,
+        fprintf(fp, "%12d %12td %12p %1d:%03d %7d %s\n",
+                entry->id, entry->gametick, PTR(entry), (entry->tag >> 8) & 0xff,
                 entry->tag & 0xff, entry->size, entry->desc);
         total += entry->size;
         chunks++;
@@ -349,13 +349,13 @@ void compute_string_totals(uint64_t *asp, uint64_t *abp, uint64_t *bp) {
         msbl = NODET_TO_PTR(entry, malloc_block_t *);
         *bp += msbl->size + 1;
         *asp += msbl->ref;
-        *abp += msbl->ref * (msbl->size + 1);
+        *abp += (uint64_t)(msbl->ref) * (msbl->size + 1);
       }
       if (entry->tag == TAG_SHARED_STRING) {
         ssbl = NODET_TO_PTR(entry, block_t *);
         *bp += ssbl->size + 1;
         *asp += ssbl->refs;
-        *abp += ssbl->refs * (ssbl->size + 1);
+        *abp += (uint64_t)(ssbl->refs) * (ssbl->size + 1);
       }
     }
   }
