@@ -33,6 +33,12 @@ title: STDLIB
 <div><a href='numbers/array_sum.html'>array_sum</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='numbers/percent.html'>percent</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='numbers/percent_of.html'>percent_of</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='numbers/sum.html'>sum</a></div>
 </div>
 </div>
@@ -52,6 +58,6 @@ title: STDLIB
 
 <div class="alert alert-info my-4" role="alert">
     <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/info.svg">
-    This page is auto generated on 2020-12-13 18:10:15 PST for v2019.20201121-14-g833c706e.</a>
+    This page is auto generated on 2021-02-17 09:38:37 EST for v2019.20201121-32-g75d20d0f.</a>
 </div>
 
