@@ -1339,7 +1339,7 @@ int calculate_and_maybe_print_memory_info(outbuffer_t *ob, int verbose) {
 
   if (verbose != -1) {
 #ifndef DEBUG
-    outbuf_addv(ob, "Objects:\t\t\t%8" PRIu64 " %8" PRIu64 "\n", tot_alloc_object,
+    outbuf_addv(ob, "%-20s %8" PRIu64 " %8" PRIu64 "\n", "Objects", tot_alloc_object,
                 tot_alloc_object_size);
 #else
     outbuf_addv(ob, "%-20s %8" PRIu64 " %8" PRIu64 " (%" PRIu64 " dangling)\n",
