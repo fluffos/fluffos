@@ -13,7 +13,7 @@ int main(string arg)
 
     res = "Char.Vitals " + json_encode(char_info) + "\n";
     write("GMCP sending: " + res);
-    send_gmcp(res);
+    this_player()->send_gmcp(res);
   }
 
   return 1;

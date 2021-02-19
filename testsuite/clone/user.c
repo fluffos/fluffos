@@ -231,6 +231,11 @@ reconnect()
 #endif
 }
 
+void window_size(int width, int height) {
+  string msg = sprintf("TELNET NAWS: %dx%d\n", width, height);
+  receive(msg);
+}
+
 // receive_environ
 void receive_environ(string var, string value) {
   string msg = sprintf("TELNET ENV received: %s=%s\n", var, value);
@@ -253,4 +258,12 @@ void gmcp(string req) {
 
 void mxp_tag(string command) {
   receive("<MXP TAG: " + command + ".>\n");
+}
+
+void act_mxp() {
+  efun::act_mxp();
+}
+
+void send_gmcp(string req) {
+  efun::send_gmcp(req);
 }
