@@ -301,3 +301,7 @@ int valid_database(object ob, string action, mixed *info) {
   // Approve!
   return 1;
 }
+
+string object_name(object ob) {
+  return ob->name();
+}

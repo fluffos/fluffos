@@ -1786,7 +1786,9 @@ static void mudlib_error_handler(char *err, int katch) {
   if ((mret == (svalue_t *)-1) || !mret) {
     debug_message("No error handler for error: ");
     debug_message_with_location(err);
-    dump_trace(0);
+    if (num_mudlib_error == 1) {
+      dump_trace(CONFIG_INT(__RC_TRACE_CODE__));
+    }
   } else if (mret->type == T_STRING) {
     debug_message("%s", mret->u.string);
   }
@@ -1794,10 +1796,12 @@ static void mudlib_error_handler(char *err, int katch) {
 
 namespace {
 void _error_handler(char *err) {
-  const char *object_name;
+  const char *object_name = nullptr;
 
   debug_message_with_location(err + 1);
-  object_name = dump_trace(CONFIG_INT(__RC_TRACE_CODE__));
+  if (num_mudlib_error == 1) {
+    object_name = dump_trace(CONFIG_INT(__RC_TRACE_CODE__));
+  }
   if (object_name) {
     object_t *ob;
 
@@ -1848,18 +1852,20 @@ void _error_handler(char *err) {
     /* This is added so that catches generate messages in the log file. */
     if (!CONFIG_INT(__RC_MUDLIB_ERROR_HANDLER__)) {
       debug_message_with_location(err);
-      (void)dump_trace(0);
+      dump_trace(CONFIG_INT(__RC_TRACE_CODE__));
     } else {
       if (num_mudlib_error) {
         debug_message("Error in error handler: ");
         num_error++;
         debug_message_with_location(err);
-        (void)dump_trace(0);
+        if(num_mudlib_error == 1) {
+          dump_trace(CONFIG_INT(__RC_TRACE_CODE__));
+        }
         num_error--;
         num_mudlib_error = 0;
       } else {
         if (max_eval_error) {
-          set_eval(INT64_MAX);
+          set_eval(max_eval_cost);
           outoftime = 0;
         }
 
@@ -1883,16 +1889,6 @@ void _error_handler(char *err) {
     throw("error handler");
   }
 
-  if (num_error > 0) {
-    /* This can happen via errors in the object_name() apply. */
-    debug_message("Error '%s' while trying to print error trace -- trace suppressed.\n", err);
-    too_deep_error = max_eval_error = 0;
-    if (current_error_context) {
-      throw("error handler error");
-    }
-    fatal("Driver BUG: no error context.");
-  }
-
   num_error++;
 #ifdef PACKAGE_MUDLIB_STATS
   if (current_object) {
@@ -1913,12 +1909,7 @@ void _error_handler(char *err) {
   }
 
   // Error occured while running mudlib error handler.
-  if (num_mudlib_error) {
-    debug_message("Error in mudlib error handler: ");
-    debug_message_with_location(err);
-    (void)dump_trace(0);
-    num_mudlib_error = 0;
-  } else {
+  if (!num_mudlib_error) {
     num_mudlib_error++;
     num_error--;
     outoftime = 0;
@@ -1928,12 +1919,23 @@ void _error_handler(char *err) {
     }
     num_mudlib_error--;
     num_error++;
+  } else if (num_mudlib_error == 1) {
+    debug_message("Error in mudlib error handler: ");
+    debug_message_with_location(err);
+    dump_trace(CONFIG_INT(__RC_TRACE_CODE__));
+    num_mudlib_error--;
   }
 exit:
   num_error--;
-  too_deep_error = max_eval_error = 0;
+
+  if (num_error || num_mudlib_error) {
+    /* This can happen via errors in the object_name() apply. */
+    debug_message("Error '%s' occurred while trying to print error trace -- trace suppressed.\n", err);
+  } else {
+    too_deep_error = max_eval_error = 0;
+  }
   if (current_error_context) {
-    throw("error handler error2");
+    throw("error handler error");
   }
   fatal("Driver BUG: no error context.");
 }

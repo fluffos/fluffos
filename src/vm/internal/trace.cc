@@ -61,11 +61,13 @@ const char *dump_trace(int how) {
   if (csp < &control_stack[0]) {
     return nullptr;
   }
+
   if (how) {
     last_instructions();
   }
+
   debug_message("--- trace ---\n");
-  for (p = &control_stack[0]; p <= csp; p++) {
+  for (p = csp; p >= &control_stack[0]; p--) {
     struct program_t *trace_prog;
     struct object_t *trace_obj;
     char *trace_pc;
@@ -82,7 +84,7 @@ const char *dump_trace(int how) {
       trace_pc = p[1].pc;
       trace_fp = p[1].fp;
     }
-
+    debug_message("--- frame %d ----\n", p - &control_stack[0]);
     switch (p[0].framekind & FRAME_MASK) {
       case FRAME_FUNCTION: {
         const char *fname;
