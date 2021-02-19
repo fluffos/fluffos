@@ -504,12 +504,11 @@ void set_linemode(interactive_t *ip, bool flush) {
       const unsigned char sb_mode[] = {LM_MODE, MODE_EDIT | MODE_TRAPSIG};
       telnet_subnegotiation(ip->telnet, TELNET_TELOPT_LINEMODE,
                             reinterpret_cast<const char *>(sb_mode), sizeof(sb_mode));
-
-      if (flush) {
-        flush_message(ip);
-      }
     } else {
       telnet_negotiate(ip->telnet, TELNET_WONT, TELNET_TELOPT_SGA);
+    }
+    if (flush) {
+      flush_message(ip);
     }
   }
 }
