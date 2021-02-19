@@ -53,8 +53,8 @@ int main(int argc, char** argv) {
       obj = find_object(file);
     } catch (...) {
       restore_context(&econ);
-      pop_context(&econ);
     }
+    pop_context(&econ);
   }
 
   if (obj == nullptr || obj->prog == nullptr) {
