@@ -87,9 +87,10 @@ bool u8_egc_count(const char *src, size_t *count) {
   });
 }
 
-// Search "needle' in 'haystack', making sure it matches EGC boundary, returning character index, not the byte offset.
-int u8_egc_find_as_index(const char *haystack, size_t haystack_len, const char *needle, size_t needle_len,
-                         bool reverse) {
+// Search "needle' in 'haystack', making sure it matches EGC boundary, returning character index,
+// not the byte offset.
+int u8_egc_find_as_index(const char *haystack, size_t haystack_len, const char *needle,
+                         size_t needle_len, bool reverse) {
   int index = -1;
 
   u8_egc_iter(haystack, haystack_len, [=, &index](std::unique_ptr<icu::BreakIterator> &brk) {
@@ -164,7 +165,7 @@ UChar32 u8_egc_index_as_single_codepoint(const char *src, int32_t index) {
     auto next_pos = brk->next();
     if (next_pos >= 0) {
       if (next_pos - pos <= U8_MAX_LENGTH) {
-        U8_NEXT((const uint8_t *) src, pos, -1, res);
+        U8_NEXT((const uint8_t *)src, pos, -1, res);
       }
     }
   });
@@ -543,7 +544,7 @@ size_t u8_width(const char *src, int len) {
   return total;
 }
 
-std::vector<std::string> u8_egc_split(const char* src) {
+std::vector<std::string> u8_egc_split(const char *src) {
   std::vector<std::string> result;
 
   u8_egc_iter(src, -1, [&](std::unique_ptr<icu::BreakIterator> &brk) {

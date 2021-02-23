@@ -257,7 +257,8 @@ array_t *explode_string(const char *str, int slen, const char *del, int dellen, 
    * in reversible mode, no skipping at all.
    * in sane mode, only skip one.
    */
-  while (sourcelen && u8_egc_index_to_offset(source, u8_egc_find_as_index(source, sourcelen, del, dellen, false)) == 0) {
+  while (sourcelen && u8_egc_index_to_offset(source, u8_egc_find_as_index(source, sourcelen, del,
+                                                                          dellen, false)) == 0) {
     source += dellen;
     sourcelen -= dellen;
     num_leading++;
@@ -277,7 +278,9 @@ array_t *explode_string(const char *str, int slen, const char *del, int dellen, 
    * in reversible mode, no skipping at all.
    * in other mode, only skip one.
    */
-  while (sourcelen && u8_egc_index_to_offset(source, u8_egc_find_as_index(source, sourcelen, del, dellen, true)) == (sourcelen - dellen)) {
+  while (sourcelen && u8_egc_index_to_offset(
+                          source, u8_egc_find_as_index(source, sourcelen, del, dellen, true)) ==
+                          (sourcelen - dellen)) {
     sourcelen -= dellen;
     num_trailing++;
   }
@@ -292,11 +295,12 @@ array_t *explode_string(const char *str, int slen, const char *del, int dellen, 
   }
 
   std::vector<std::string> results;
-  for (int i = 0; i< num_leading; i++) {
+  for (int i = 0; i < num_leading; i++) {
     results.push_back("");
   }
   while (sourcelen) {
-    int i = u8_egc_index_to_offset(source, u8_egc_find_as_index(source, sourcelen, del, dellen, false));
+    int i =
+        u8_egc_index_to_offset(source, u8_egc_find_as_index(source, sourcelen, del, dellen, false));
     // no more occurrence, copy the remaining part.
     if (i == -1) {
       results.push_back(std::string(source, sourcelen));
@@ -316,7 +320,7 @@ array_t *explode_string(const char *str, int slen, const char *del, int dellen, 
       sourcelen -= dellen;
     }
   }
-  for (int i = 0; i< num_trailing; i++) {
+  for (int i = 0; i < num_trailing; i++) {
     results.push_back("");
   }
 

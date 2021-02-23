@@ -599,7 +599,8 @@ void f_explode(void) {
 
   int len = SVALUE_STRLEN(sp - 1);
 
-  vec = explode_string((sp - 1)->u.string, len, sp->u.string, SVALUE_STRLEN(sp), CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__) != 0);
+  vec = explode_string((sp - 1)->u.string, len, sp->u.string, SVALUE_STRLEN(sp),
+                       CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__) != 0);
   free_string_svalue(sp--);
   free_string_svalue(sp);
   put_array(vec);

@@ -1339,9 +1339,9 @@ static int call_function_interactive(interactive_t *i, char *str) {
     ret = 0;
   } else {
     /*
-    * We must all references to input_to fields before the call to apply(),
-    * because someone might want to set up a new input_to().
-    */
+     * We must all references to input_to fields before the call to apply(),
+     * because someone might want to set up a new input_to().
+     */
 
     /* we put the function on the stack in case of an error */
     STACK_INC;
@@ -1390,7 +1390,7 @@ static int call_function_interactive(interactive_t *i, char *str) {
       if (function[0] == APPLY___INIT_SPECIAL_CHAR) {
         error("Illegal function name.\n");
       }
-      (void) safe_apply(function, ob, num_arg + 1, ORIGIN_INTERNAL);
+      (void)safe_apply(function, ob, num_arg + 1, ORIGIN_INTERNAL);
     } else {
       safe_call_function_pointer(funp, num_arg + 1);
     }
