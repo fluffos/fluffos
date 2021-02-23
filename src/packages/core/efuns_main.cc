@@ -2672,7 +2672,7 @@ void f_strsrch(void) {
   LPC_INT ret = -1;
   // only search if there is a chance.
   if (find_len <= src_len) {
-    ret = u8_egc_find(arg1->u.string, src_len, find, find_len, arg3->u.number != 0);
+    ret = u8_egc_find_as_index(arg1->u.string, src_len, find, find_len, arg3->u.number != 0);
   }
 
   pop_3_elems();
