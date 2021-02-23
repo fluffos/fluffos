@@ -430,39 +430,6 @@ void f__new(void) {
 }
 #endif
 
-#ifdef F_CTIME
-void f_ctime(void) {
-  char buf[255] = {};
-  const char *cp = buf, *nl;
-  char *p;
-  int l;
-  time_t timestamp;
-
-  if (st_num_arg) {
-    timestamp = sp->u.number;
-  } else {
-    push_number(0);
-    timestamp = get_current_time();
-  }
-
-  cp = ctime_r(&timestamp, buf);
-  if (!cp) {
-    cp = "ctime failed!";
-  }
-
-  if ((nl = strchr(cp, '\n'))) {
-    l = nl - cp;
-  } else {
-    l = strlen(cp);
-  }
-
-  p = new_string(l, "f_ctime");
-  strncpy(p, cp, l);
-  p[l] = '\0';
-  put_malloced_string(p);
-}
-#endif
-
 #ifdef F_DEEP_INHERIT_LIST
 void f_deep_inherit_list(void) {
   array_t *vec;
@@ -2917,10 +2884,6 @@ void f_throw(void) {
 }
 #endif
 
-#ifdef F_TIME
-void f_time(void) { push_number(get_current_time()); }
-#endif
-
 #ifdef F__TO_FLOAT
 void f__to_float(void) {
   LPC_FLOAT temp = 0;
@@ -3458,61 +3421,6 @@ void f_oldcrypt(void) {
   res = string_copy(custom_crypt((sp - 1)->u.string, p, nullptr), "f_oldcrypt");
   pop_2_elems();
   push_malloced_string(res);
-}
-#endif
-
-#ifdef F_LOCALTIME
-/* FIXME: most of the #ifdefs here should be based on configure checks
-   instead.  Same for rusage() */
-void f_localtime(void) {
-  struct tm res = {};
-  array_t *vec;
-  time_t lt;
-
-  lt = sp->u.number;
-  auto tm = localtime_r(&lt, &res);
-
-  pop_stack();
-
-  if (!tm) {
-    push_svalue(&const0u);
-    return;
-  }
-
-  vec = allocate_empty_array(11);
-
-  vec->item[LT_SEC].type = T_NUMBER;
-  vec->item[LT_SEC].u.number = tm->tm_sec;
-  vec->item[LT_MIN].type = T_NUMBER;
-  vec->item[LT_MIN].u.number = tm->tm_min;
-  vec->item[LT_HOUR].type = T_NUMBER;
-  vec->item[LT_HOUR].u.number = tm->tm_hour;
-  vec->item[LT_MDAY].type = T_NUMBER;
-  vec->item[LT_MDAY].u.number = tm->tm_mday;
-  vec->item[LT_MON].type = T_NUMBER;
-  vec->item[LT_MON].u.number = tm->tm_mon;
-  vec->item[LT_YEAR].type = T_NUMBER;
-  vec->item[LT_YEAR].u.number = tm->tm_year + 1900;
-  vec->item[LT_WDAY].type = T_NUMBER;
-  vec->item[LT_WDAY].u.number = tm->tm_wday;
-  vec->item[LT_YDAY].type = T_NUMBER;
-  vec->item[LT_YDAY].u.number = tm->tm_yday;
-  vec->item[LT_GMTOFF].type = T_NUMBER;
-  vec->item[LT_ZONE].type = T_STRING;
-  vec->item[LT_ZONE].subtype = STRING_MALLOC;
-  vec->item[LT_ISDST].type = T_NUMBER;
-  vec->item[LT_ISDST].u.number = tm->tm_isdst;
-#ifdef __FreeBSD__
-  vec->item[LT_GMTOFF].u.number = tm->tm_gmtoff;
-#else
-  vec->item[LT_GMTOFF].u.number = timezone;
-#endif
-  if (!tm->tm_isdst) {
-    vec->item[LT_ZONE].u.string = string_copy(tzname[0], "f_localtime");
-  } else {
-    vec->item[LT_ZONE].u.string = string_copy(tzname[1], "f_localtime");
-  }
-  push_refed_array(vec);
 }
 #endif
 
