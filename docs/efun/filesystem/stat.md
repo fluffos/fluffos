@@ -17,7 +17,7 @@ title: filesystem / stat
     will return an array of information pertaining to that file.  The  form
     of the array is as follows:
 
-           ({ file_size, last_time_file_touched, time_object_loaded })
+           ({ file_size, last_time_file_touched, time_object_loaded, time_file_created })
 
     If stat is called on a directory (not a regular file), or with a second
     argument of -1, then stat() behaves identically to get_dir(3).

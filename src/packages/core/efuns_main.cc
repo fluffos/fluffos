@@ -2616,7 +2616,7 @@ void f_stat(void) {
   }
   if (stat(path, &buf) != -1) {
     if (buf.st_mode & S_IFREG) { /* if a regular file */
-      v = allocate_empty_array(3);
+      v = allocate_empty_array(4);
       v->item[0].type = T_NUMBER;
       v->item[0].subtype = 0;
       v->item[0].u.number = buf.st_size;
@@ -2634,6 +2634,11 @@ void f_stat(void) {
       } else {
         v->item[2].u.number = 0;
       }
+
+      v->item[3].type = T_NUMBER;
+      v->item[3].subtype = 0;
+      v->item[3].u.number = buf.st_ctime;
+
       free_string_svalue(sp);
       put_array(v);
       return;
