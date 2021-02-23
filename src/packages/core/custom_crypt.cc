@@ -45,10 +45,6 @@
 
 #include "packages/core/custom_crypt.h"
 
-#ifndef min
-#define min(a, b) ((a) < (b) ? (a) : (b))
-#endif
-
 /* Can we cheat and just use network byte order (and htonl/ntohl) here?
  * -Beek
  */
@@ -77,6 +73,7 @@
 /* Left rotation. */
 #define RLEFT(a, n) (a) = (((a) << (n)) | ((a) >> (32 - (n))))
 
+namespace {
 /* Table T constructed from a sine function, mentioned in RFC, section 3.4.
  * Table T[i], 1 <= i <= 64,    = trunc (4294967296 * |sin i|).
  */
@@ -336,7 +333,7 @@ void crunchbuffer(BytE *buf,      /* Buffer to be crunched.       */
     }
 
     /* Work out how many bytes we can add to `buf', and do it. */
-    crunched = min((maxlen - used), addlen);
+    crunched = std::min((maxlen - used), addlen);
     memcpy(&(buf[used]), addition, crunched);
 
     /* Update counters and pointers. */
@@ -349,6 +346,7 @@ void crunchbuffer(BytE *buf,      /* Buffer to be crunched.       */
 
   return;
 }
+}  // namespace
 
 /* Return hash of buffer `key' using salt `salt', which
  * must both be null-terminated strings if given.
