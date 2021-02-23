@@ -410,9 +410,7 @@ int print_call_out_usage(outbuffer_t *ob, int verbose) {
 }
 
 // only used in checkmemory
-int total_callout_size() {
-  return g_callout_handle_map.size() * sizeof(pending_call_t);
-}
+int total_callout_size() { return g_callout_handle_map.size() * sizeof(pending_call_t); }
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_call_outs() {

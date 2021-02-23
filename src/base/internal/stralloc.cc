@@ -294,7 +294,8 @@ uint64_t add_string_status(outbuffer_t *out, int verbose) {
                 num_distinct_strings, bytes_distinct_strings, overhead_bytes);
   }
   if (verbose == 1) {
-    outbuf_addv(out, "Total asked for\t\t\t%8" PRIu64 " %8" PRIu64 "\n", allocd_strings, allocd_bytes);
+    outbuf_addv(out, "Total asked for\t\t\t%8" PRIu64 " %8" PRIu64 "\n", allocd_strings,
+                allocd_bytes);
     outbuf_addv(out, "Space actually required/total string bytes %f%%\n",
                 static_cast<double>(bytes_distinct_strings + overhead_bytes) * 100 / allocd_bytes);
     outbuf_addv(out, "Searches: %" PRIu64 "\tAverage search length: %6.3f\n", num_str_searches,

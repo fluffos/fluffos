@@ -1858,7 +1858,7 @@ void _error_handler(char *err) {
         debug_message("Error in error handler: ");
         num_error++;
         debug_message_with_location(err);
-        if(num_mudlib_error == 1) {
+        if (num_mudlib_error == 1) {
           dump_trace(CONFIG_INT(__RC_TRACE_CODE__));
         }
         num_error--;
@@ -1930,7 +1930,8 @@ exit:
 
   if (num_error || num_mudlib_error) {
     /* This can happen via errors in the object_name() apply. */
-    debug_message("Error '%s' occurred while trying to print error trace -- trace suppressed.\n", err);
+    debug_message("Error '%s' occurred while trying to print error trace -- trace suppressed.\n",
+                  err);
   } else {
     too_deep_error = max_eval_error = 0;
   }
