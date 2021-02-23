@@ -1,6 +1,9 @@
 #include "base/internal/strutils.h"
 
 #include <cctype>
+#include <vector>
+#include <string>
+#include <memory>
 #include <string.h>
 #include <unicode/brkiter.h>
 #include <unicode/unistr.h>
@@ -36,8 +39,8 @@ bool u8_validate(const uint8_t *s, size_t len) {
 std::string u8_sanitize(std::string_view src) { return utf8::replace_invalid(src); }
 
 namespace {
-typedef std::function<void(std::unique_ptr<icu::BreakIterator> &)> u8_char_iter_callback;
-bool u8_char_iter(const char *src, const u8_char_iter_callback &cb) {
+typedef std::function<void(std::unique_ptr<icu::BreakIterator> &)> u8_egc_iter_callback;
+bool u8_egc_iter(const char *src, const u8_egc_iter_callback &cb) {
   static std::unique_ptr<icu::BreakIterator> brk = nullptr;
 
   /* create an iterator for graphemes */
@@ -76,7 +79,7 @@ bool u8_char_iter(const char *src, const u8_char_iter_callback &cb) {
 bool u8_egc_count(const char *src, size_t *count) {
   *count = 0;
 
-  return u8_char_iter(src, [&](std::unique_ptr<icu::BreakIterator> &brk) {
+  return u8_egc_iter(src, [&](std::unique_ptr<icu::BreakIterator> &brk) {
     int total = 0;
     brk->first();
     while (brk->next() != icu::BreakIterator::DONE) ++total;
@@ -84,12 +87,12 @@ bool u8_egc_count(const char *src, size_t *count) {
   });
 }
 
-// Search "needle' in 'haystack', making sure it matches EGC boundary.
-int u8_egc_find(const char *haystack, size_t haystack_len, const char *needle, size_t needle_len,
-                bool reverse) {
+// Search "needle' in 'haystack', making sure it matches EGC boundary, returning character index, not the byte offset.
+int u8_egc_find_as_index(const char *haystack, size_t haystack_len, const char *needle, size_t needle_len,
+                         bool reverse) {
   int index = -1;
 
-  u8_char_iter(haystack, [=, &index](std::unique_ptr<icu::BreakIterator> &brk) {
+  u8_egc_iter(haystack, [=, &index](std::unique_ptr<icu::BreakIterator> &brk) {
     bool found = false;
     std::unique_ptr<icu::BreakIterator> brk_tmp(brk->clone());
     if (!reverse) {
@@ -137,7 +140,7 @@ int u8_egc_find(const char *haystack, size_t haystack_len, const char *needle, s
 UChar32 u8_egc_index_as_single_codepoint(const char *src, int32_t index) {
   UChar32 res = U_SENTINEL;
 
-  u8_char_iter(src, [&](std::unique_ptr<icu::BreakIterator> &brk) {
+  u8_egc_iter(src, [&](std::unique_ptr<icu::BreakIterator> &brk) {
     int32_t pos = -1;
     {
       pos = brk->first();
@@ -161,7 +164,7 @@ UChar32 u8_egc_index_as_single_codepoint(const char *src, int32_t index) {
     auto next_pos = brk->next();
     if (next_pos >= 0) {
       if (next_pos - pos <= U8_MAX_LENGTH) {
-        U8_NEXT((const uint8_t *)src, pos, -1, res);
+        U8_NEXT((const uint8_t *) src, pos, -1, res);
       }
     }
   });
@@ -184,9 +187,11 @@ void u8_copy_and_replace_codepoint_at(const char *src, char *dst, int32_t index,
 
 // Get the byte offset to the egc index, doesn't check validity or bounds.
 int32_t u8_egc_index_to_offset(const char *src, int32_t index) {
+  if (index <= 0) return index;
+
   int pos = -1;
 
-  u8_char_iter(src, [&](std::unique_ptr<icu::BreakIterator> &brk) {
+  u8_egc_iter(src, [&](std::unique_ptr<icu::BreakIterator> &brk) {
     pos = brk->first();
     while (index-- > 0 && pos >= 0) {
       pos = brk->next();
@@ -536,4 +541,20 @@ size_t u8_width(const char *src, int len) {
     if (len > 0 && src_offset >= len) break;
   }
   return total;
+}
+
+std::vector<std::string> u8_egc_split(const char* src) {
+  std::vector<std::string> result;
+
+  u8_egc_iter(src, [&](std::unique_ptr<icu::BreakIterator> &brk) {
+    brk->first();
+    auto start = brk->current();
+    while (brk->next() != icu::BreakIterator::DONE) {
+      auto size = brk->current() - start;
+      result.push_back(std::string(src + start, size));
+      start = brk->current();
+    }
+  });
+
+  return result;
 }

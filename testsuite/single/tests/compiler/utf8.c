@@ -595,4 +595,10 @@ void do_tests() {
   // but not for multi and invalid codepoints.
   ASSERT(catch(strsrch(tmp, 999999999999)));
   ASSERT(catch(strsrch(tmp, 999999999999, 1)));
+
+  ASSERT_EQ(({"一", "二", "三"}), explode("一二三", ""));
+  ASSERT_EQ(({"一", "a", "二", "b", "三", "c"}), explode("一a二b三c", ""));
+  ASSERT_EQ(({"一", "二", "三", "四"}), explode("一👩‍👩‍👧‍👧二👩‍👩‍👧‍👧三👩‍👩‍👧‍👧四", "👩‍👩‍👧‍👧"));
+  // explode also only works on EGCs, not codepoints
+  ASSERT_EQ(({"一👩‍👩‍👧‍👧二👩‍👩‍👧‍👧三👩‍👩‍👧‍👧四"}), explode("一👩‍👩‍👧‍👧二👩‍👩‍👧‍👧三👩‍👩‍👧‍👧四", "‍"));
 }
