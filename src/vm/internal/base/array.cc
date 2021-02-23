@@ -222,7 +222,7 @@ array_t *resize_array(array_t *p, unsigned int n) {
   return p;
 }
 
-array_t *explode_string(const char *str, int slen, const char *del, int dellen) {
+array_t *explode_string(const char *str, int slen, const char *del, int dellen, bool reversible) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   if (!slen) {
@@ -246,47 +246,78 @@ array_t *explode_string(const char *str, int slen, const char *del, int dellen) 
     return ret;
   }
 
-  if (!CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__)) {
-    /*
-     * Skip leading 'del' strings, if any.
-     */
-    while (strncmp(str, del, dellen) == 0) {
-      str += dellen;
-      slen -= dellen;
-      if (str[0] == '\0') {
-        return &the_null_array;
-      }
+  auto source = str;
+  auto sourcelen = slen;
+
+  auto num_leading = 0;
+  auto num_trailing = 0;
+
+  /*
+   * Count leading 'del' strings.
+   * in reversible mode, no skipping at all.
+   * in sane mode, only skip one.
+   */
+  while (sourcelen && u8_egc_index_to_offset(source, u8_egc_find_as_index(source, sourcelen, del, dellen, false)) == 0) {
+    source += dellen;
+    sourcelen -= dellen;
+    num_leading++;
+  }
+  if (num_leading) {
+    if (!reversible) {
       if (CONFIG_INT(__RC_SANE_EXPLODE_STRING__)) {
-        // only skip 1
-        break;
+        num_leading--;
+      } else {
+        num_leading = 0;
       }
     }
+  }
+
+  /*
+   * Count trailing 'del' strings.
+   * in reversible mode, no skipping at all.
+   * in other mode, only skip one.
+   */
+  while (sourcelen && u8_egc_index_to_offset(source, u8_egc_find_as_index(source, sourcelen, del, dellen, true)) == (sourcelen - dellen)) {
+    sourcelen -= dellen;
+    num_trailing++;
+  }
+  if (num_trailing) {
+    if (!reversible) {
+      num_trailing--;
+    }
+  }
+
+  if (!sourcelen || source[0] == '\0') {
+    return &the_null_array;
   }
 
   std::vector<std::string> results;
-  auto source = str;
-  auto sourcelen = slen;
+  for (int i = 0; i< num_leading; i++) {
+    results.push_back("");
+  }
   while (sourcelen) {
     int i = u8_egc_index_to_offset(source, u8_egc_find_as_index(source, sourcelen, del, dellen, false));
-    if (i == -1) break;
-
-    // if we have text before delimiter, add them
-    if (i > 0) {
+    // no more occurrence, copy the remaining part.
+    if (i == -1) {
+      results.push_back(std::string(source, sourcelen));
+      break;
+    } else if (i > 0) {
+      // if we have text before delimiter, add them
       results.push_back(std::string(source, i));
       source += i;
       sourcelen -= i;
+
+      source += dellen;
+      sourcelen -= dellen;
     } else if (i == 0) {
-      // if we only have delimiter, add a empty string, also skip the last one unless we are in reversible mode.
-      if (CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__) || sourcelen != dellen) {
-        results.push_back("");
-      }
+      results.push_back("");
+
+      source += dellen;
+      sourcelen -= dellen;
     }
-    source += dellen;
-    sourcelen -= dellen;
   }
-  // copy the remaining part
-  if (sourcelen) {
-    results.push_back(std::string(source));
+  for (int i = 0; i< num_trailing; i++) {
+    results.push_back("");
   }
 
   auto num = results.size();

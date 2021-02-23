@@ -498,10 +498,10 @@ int parse(const char *cmd,       /* Command to parse */
   push_parse_globals();
 
   /* Array of words in command */
-  parse_warr = explode_string(cmd, strlen(cmd), " ", 1);
+  parse_warr = explode_string(cmd, strlen(cmd), " ", 1, false);
 
   /* Array of pattern elements */
-  parse_patarr = explode_string(pattern, strlen(pattern), " ", 1);
+  parse_patarr = explode_string(pattern, strlen(pattern), " ", 1, false);
 
   /*
    * Explode can return '0'.
@@ -1171,7 +1171,7 @@ static svalue_t *prepos_parse(array_t *warr, int *cix_in, int *fail, svalue_t *p
         break;
       }
     } else {
-      tarr = explode_string(tmp, strlen(tmp), " ", 1);
+      tarr = explode_string(tmp, strlen(tmp), " ", 1, false);
       for (tix = 0; tix < tarr->size; tix++) {
         if ((*cix_in + tix >= warr->size) ||
             (!EQ(warr->item[*cix_in + tix].u.string, tarr->item[tix].u.string))) {
@@ -1316,7 +1316,7 @@ static int find_string(const char *str, array_t *warr, int *cix_in) {
       continue;
     }
 
-    split = explode_string(str, strlen(str), " ", 1);
+    split = explode_string(str, strlen(str), " ", 1, false);
 
     /*
      * warr->size - *cix_in ==
@@ -1478,7 +1478,7 @@ static const char *parse_to_plural(const char *str) {
     return string_copy(parse_one_plural(str), "parse_to_plural");
   }
 
-  words = explode_string(str, strlen(str), " ", 1);
+  words = explode_string(str, strlen(str), " ", 1, false);
 
   for (changed = 0, il = 1; il < words->size; il++) {
     if ((EQ(words->item[il].u.string, "of")) || (il + 1 == words->size)) {

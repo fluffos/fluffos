@@ -40,7 +40,7 @@ std::string u8_sanitize(std::string_view src) { return utf8::replace_invalid(src
 
 namespace {
 typedef std::function<void(std::unique_ptr<icu::BreakIterator> &)> u8_egc_iter_callback;
-bool u8_egc_iter(const char *src, const u8_egc_iter_callback &cb) {
+bool u8_egc_iter(const char *src, int slen, const u8_egc_iter_callback &cb) {
   static std::unique_ptr<icu::BreakIterator> brk = nullptr;
 
   /* create an iterator for graphemes */
@@ -55,7 +55,7 @@ bool u8_egc_iter(const char *src, const u8_egc_iter_callback &cb) {
   UErrorCode status = U_ZERO_ERROR;
   UText text = UTEXT_INITIALIZER;
 
-  utext_openUTF8(&text, src, -1, &status);
+  utext_openUTF8(&text, src, slen, &status);
   if (!U_SUCCESS(status)) {
     utext_close(&text);
     return false;
@@ -79,7 +79,7 @@ bool u8_egc_iter(const char *src, const u8_egc_iter_callback &cb) {
 bool u8_egc_count(const char *src, size_t *count) {
   *count = 0;
 
-  return u8_egc_iter(src, [&](std::unique_ptr<icu::BreakIterator> &brk) {
+  return u8_egc_iter(src, -1, [&](std::unique_ptr<icu::BreakIterator> &brk) {
     int total = 0;
     brk->first();
     while (brk->next() != icu::BreakIterator::DONE) ++total;
@@ -92,7 +92,7 @@ int u8_egc_find_as_index(const char *haystack, size_t haystack_len, const char *
                          bool reverse) {
   int index = -1;
 
-  u8_egc_iter(haystack, [=, &index](std::unique_ptr<icu::BreakIterator> &brk) {
+  u8_egc_iter(haystack, haystack_len, [=, &index](std::unique_ptr<icu::BreakIterator> &brk) {
     bool found = false;
     std::unique_ptr<icu::BreakIterator> brk_tmp(brk->clone());
     if (!reverse) {
@@ -140,7 +140,7 @@ int u8_egc_find_as_index(const char *haystack, size_t haystack_len, const char *
 UChar32 u8_egc_index_as_single_codepoint(const char *src, int32_t index) {
   UChar32 res = U_SENTINEL;
 
-  u8_egc_iter(src, [&](std::unique_ptr<icu::BreakIterator> &brk) {
+  u8_egc_iter(src, -1, [&](std::unique_ptr<icu::BreakIterator> &brk) {
     int32_t pos = -1;
     {
       pos = brk->first();
@@ -191,7 +191,7 @@ int32_t u8_egc_index_to_offset(const char *src, int32_t index) {
 
   int pos = -1;
 
-  u8_egc_iter(src, [&](std::unique_ptr<icu::BreakIterator> &brk) {
+  u8_egc_iter(src, -1, [&](std::unique_ptr<icu::BreakIterator> &brk) {
     pos = brk->first();
     while (index-- > 0 && pos >= 0) {
       pos = brk->next();
@@ -546,7 +546,7 @@ size_t u8_width(const char *src, int len) {
 std::vector<std::string> u8_egc_split(const char* src) {
   std::vector<std::string> result;
 
-  u8_egc_iter(src, [&](std::unique_ptr<icu::BreakIterator> &brk) {
+  u8_egc_iter(src, -1, [&](std::unique_ptr<icu::BreakIterator> &brk) {
     brk->first();
     auto start = brk->current();
     while (brk->next() != icu::BreakIterator::DONE) {
