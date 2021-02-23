@@ -51,6 +51,7 @@ void destruct(object default: F__THIS_OBJECT);
 string file_name(object default: F__THIS_OBJECT);
 string capitalize(string);
 string *explode(string, string);
+string *explode_reversible(string, string);
 mixed implode(mixed *, string | function, void | mixed);
 
 int call_out(string | function, int|float, ...);
