@@ -84,7 +84,7 @@ const char *dump_trace(int how) {
       trace_pc = p[1].pc;
       trace_fp = p[1].fp;
     }
-    debug_message("--- frame %d ----\n", p - &control_stack[0]);
+    debug_message("--- frame %td ----\n", p - &control_stack[0]);
     switch (p[0].framekind & FRAME_MASK) {
       case FRAME_FUNCTION: {
         const char *fname;

@@ -1466,9 +1466,10 @@ static int save_object_recurse_str(program_t *prog, svalue_t **svp, int type, in
   return textsize;
 }
 
+namespace {
 int sel = -1;
-
-static const int SAVE_EXTENSION_GZ_LENGTH = strlen(SAVE_GZ_EXTENSION);
+const int SAVE_EXTENSION_GZ_LENGTH = strlen(SAVE_GZ_EXTENSION);
+}  // namespace
 
 int save_object(object_t *ob, const char *file, int save_zeros) {
   char *name, *p;

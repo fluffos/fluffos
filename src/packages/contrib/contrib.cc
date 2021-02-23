@@ -1015,8 +1015,8 @@ void f_terminal_colour(void) {
 #ifndef DEBUG
   if (ncp - deststr != j) {
     fatal(
-        "Length miscalculated in terminal_colour()\n    Expected: %i Was: %i\n "
-        "   String: %s\n    Indent: %i Wrap: %i\n",
+        "Length miscalculated in terminal_colour()\n    Expected: %d Was: %td\n "
+        "   String: %s\n    Indent: %" LPC_INT_FMTSTR_P " Wrap: %" LPC_INT_FMTSTR_P "\n",
         j, ncp - deststr, sp->u.string, indent, wrap);
   }
 #endif
