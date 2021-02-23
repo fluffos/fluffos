@@ -12,7 +12,8 @@ void f_request_term_type() {
     telnet_request_ttype(ip->telnet);
     flush_message(ip);
   } else if (!ip) {
-    debug_message("Warning: wrong usage. request_term_type() should only be called by a user object.\n");
+    debug_message(
+        "Warning: wrong usage. request_term_type() should only be called by a user object.\n");
   }
 }
 #endif
@@ -24,7 +25,9 @@ void f_start_request_term_type() {
     telnet_start_request_ttype(ip->telnet);
     flush_message(ip);
   } else if (!ip) {
-    debug_message("Warning: wrong usage. start_request_term_type() should only be called by a user object.\n");
+    debug_message(
+        "Warning: wrong usage. start_request_term_type() should only be called by a user "
+        "object.\n");
   }
 }
 #endif
@@ -41,7 +44,8 @@ void f_request_term_size() {
     }
     flush_message(ip);
   } else if (!ip) {
-    debug_message("Warning: wrong usage. request_term_size() should only be called by a user object.\n");
+    debug_message(
+        "Warning: wrong usage. request_term_size() should only be called by a user object.\n");
   }
   if (st_num_arg == 1) {
     sp--;
