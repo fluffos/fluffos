@@ -2,6 +2,10 @@
 
 void report() {
   write("After: \n" + mud_status(0) + "\n");
+#ifdef __HAVE_JEMALLOC__
+  dump_jemalloc();
+  write("jemalloc dump done...\n");
+#endif
 }
 
 int main(string arg) {
