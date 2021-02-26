@@ -105,7 +105,7 @@ void f_localtime(void) {
 #ifdef F_STRFTIME
 void f_strftime() {
   auto arg_time = sp->u.number;
-  auto arg_fmt = (sp-1)->u.string;
+  auto arg_fmt = (sp - 1)->u.string;
 
   time_t lt = arg_time;
   if (lt <= 0) lt = get_current_time();
@@ -130,7 +130,7 @@ void f_strftime() {
 #ifdef F_STRPTIME
 void f_strptime() {
   auto arg_timestr = (sp)->u.string;
-  auto arg_fmt = (sp-1)->u.string;
+  auto arg_fmt = (sp - 1)->u.string;
 
   struct tm res = {};
   std::istringstream ss(arg_timestr);
