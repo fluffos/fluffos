@@ -204,6 +204,22 @@ void f_dump_stralloc(void) {
 }
 #endif
 
+#ifdef F_DUMP_JEMALLOC
+#ifdef HAVE_JEMALLOC
+#define JEMALLOC_MANGLE
+#include <jemalloc/jemalloc.h>  // for mallctl
+#endif
+
+void f_dump_jemalloc() {
+#ifdef HAVE_JEMALLOC
+  mallctl("prof.dump", NULL, NULL, NULL, 0);
+  malloc_stats_print(nullptr, nullptr, "");
+#else
+  debug_message("Jemalloc is disabled, dump_jemalloc() has no effect.\n");
+#endif
+}
+#endif
+
 #if (defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS))
 #ifdef F_DEBUGMALLOC
 void f_debugmalloc(void) {

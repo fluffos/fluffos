@@ -24,3 +24,4 @@
     string traceprefix(string | int);
     int trace(int);
 #endif
+    void dump_jemalloc();
