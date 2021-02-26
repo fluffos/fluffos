@@ -298,6 +298,14 @@ void init_win32() {
 }
 
 int driver_main(int argc, char **argv) {
+#ifdef HAVE_JEMALLOC
+  {
+    bool var = true;
+    size_t varlen = sizeof(var);
+    mallctl("background_thread", NULL, NULL, &var, varlen);
+  }
+#endif
+
   init_locale();
   init_tz();
   incrase_fd_rlimit();
