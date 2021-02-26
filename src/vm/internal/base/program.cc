@@ -46,7 +46,7 @@ void deallocate_program(program_t *progp) {
 
   if (progp->apply_lookup_table != nullptr) {
     apply_cache_items -= progp->apply_lookup_table->size();
-    progp->apply_lookup_table.release();
+    progp->apply_lookup_table.reset(nullptr);
   }
 
   FREE((char *)progp);
