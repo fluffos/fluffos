@@ -52,7 +52,13 @@ if(${PACKAGE_DB})
               "${PACKAGE_DB_POSTGRESQL}" STREQUAL "{PACKAGE_DB_SQLITE}")
         message(FATAL "Conflicting DB type!")
       endif()
-      message(FATAL "Not supported yet!")
+
+      find_package(PostgreSQL REQUIRED)
+      message(STATUS "PACKAGE_DB USE_POSTGRES: ${PACKAGE_DB_POSTGRESQL}, Found version ${PostgreSQL_VERSION_STRING}")
+
+      target_compile_definitions(package_db PUBLIC "USE_POSTGRES=${PACKAGE_DB_POSTGRESQL}")
+      target_include_directories(package_db SYSTEM PUBLIC ${PostgreSQL_INCLUDE_DIRS})
+      target_link_libraries(package_db PRIVATE -L${PostgreSQL_LIBRARY_DIRS} ${PostgreSQL_LIBRARIES})
     endif()
 
 endif()
