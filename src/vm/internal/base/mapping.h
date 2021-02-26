@@ -27,8 +27,8 @@ typedef struct mapping_node_block_s {
   mapping_node_t nodes[MNB_SIZE];
 } mapping_node_block_t;
 
-#define MAP_HASH_TABLE_SIZE 8 /* must be a power of 2 */
-#define FILL_PERCENT 80       /* must not be larger than 99 */
+#define MAP_HASH_TABLE_SIZE 16 /* must be a power of 2 */
+#define FILL_PERCENT 75        /* must not be larger than 99 */
 
 #define MAPSIZE(size) sizeof(mapping_t)
 
@@ -92,6 +92,7 @@ mapping_node_t *new_map_node(void);
 int restore_hash_string(char **str, svalue_t *);
 int growMap(mapping_t *);
 void free_node(mapping_t *, mapping_node_t *);
+uint64_t free_node_count();
 void unlock_mapping(mapping_t *);
 void map_mapping(svalue_t *, int);
 void filter_mapping(svalue_t *, int);

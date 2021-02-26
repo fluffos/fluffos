@@ -120,41 +120,44 @@ mapping_t *mapTraverse(mapping_t *m, int (*func)(mapping_t *, mapping_node_t *, 
 /* free_mapping */
 
 void dealloc_mapping(mapping_t *m) {
-  debug(mapping, "mapping.c: actual free of %p\n", (void *)m);
-  num_mappings--;
+  debug(mapping, "mapping.c: actual free of %p\n", m);
   {
     int j = m->table_size, c = MAP_COUNT(m);
     mapping_node_t *elt, *nelt, **a = m->table;
 
-    total_mapping_size -=
-        (sizeof(mapping_t) + sizeof(mapping_node_t *) * (j + 1) + sizeof(mapping_node_t) * c);
+    total_mapping_size -= sizeof(mapping_node_t *) * (j + 1) + sizeof(mapping_node_t) * c;
     total_mapping_nodes -= c;
 #ifdef PACKAGE_MUDLIB_STATS
     add_array_size(&m->stats, -(c << 1));
 #endif
-
     do {
       for (elt = a[j]; elt; elt = nelt) {
         nelt = elt->next;
         free_svalue(elt->values, "free_mapping");
+        *(elt->values) = const0u;
         free_node(m, elt);
       }
     } while (j--);
 
     debug(mapping, ("in free_mapping: before table\n"));
-    FREE((char *)a);
+    FREE(a);
   }
 
   debug(mapping, ("in free_mapping: after table\n"));
-  FREE((char *)m);
+  FREE(m);
+  num_mappings--;
+  total_mapping_size -= sizeof(mapping_t);
   debug(mapping, ("in free_mapping: after m\n"));
   debug(mapping, ("mapping.c: free_mapping end\n"));
 }
 
 void free_mapping(mapping_t *m) {
   debug(mapping, "mapping.c: free_mapping begin, ptr = %p\n", (void *)m);
+  if (m->ref > 0) {
+    m->ref--;
+  }
   /* some other object is still referencing this mapping */
-  if (--m->ref > 0) {
+  if (m->ref > 0) {
     return;
   }
   dealloc_mapping(m);
@@ -187,8 +190,13 @@ mapping_node_t *new_map_node() {
     mnb->next = mapping_node_blocks;
     mapping_node_blocks = mnb;
     mnb->nodes[MNB_SIZE - 1].next = nullptr;
+    mnb->nodes[MNB_SIZE - 1].values[0] = const0u;
+    mnb->nodes[MNB_SIZE - 1].values[1] = const0u;
+
     for (i = MNB_SIZE - 1; i--;) {
       mnb->nodes[i].next = &mnb->nodes[i + 1];
+      mnb->nodes[i].values[0] = const0u;
+      mnb->nodes[i].values[1] = const0u;
     }
     ret = &mnb->nodes[0];
     free_nodes = &mnb->nodes[1];
@@ -223,9 +231,21 @@ void free_node(mapping_t *m, mapping_node_t *mn) {
     mn->values[0].u.map = m;
   } else {
     free_svalue(mn->values + 1, "free_node");
+    *(mn->values + 1) = const0u;
     mn->next = free_nodes;
     free_nodes = mn;
   }
+}
+
+uint64_t free_node_count() {
+  if (!free_nodes) return 0;
+
+  uint64_t count = 1;
+  auto p = free_nodes;
+  while ((p = p->next)) {
+    count++;
+  }
+  return count;
 }
 
 /* allocate_mapping(int n)
@@ -263,12 +283,10 @@ mapping_t *allocate_mapping(int n) {
   /* The size is actually 1 higher */
   newmap->unfilled = n * static_cast<unsigned>(FILL_PERCENT) / static_cast<unsigned>(100);
   a = newmap->table = reinterpret_cast<mapping_node_t **>(
-      DMALLOC(n *= sizeof(mapping_node_t *), TAG_MAP_TBL, "allocate_mapping: 3"));
+      DCALLOC(1, n *= sizeof(mapping_node_t *), TAG_MAP_TBL, "allocate_mapping: 3"));
   if (!a) {
     error("Allocate_mapping 2 - out of memory.\n");
   }
-  /* zero out the hash table */
-  memset(a, 0, n);
   total_mapping_size += sizeof(mapping_t) + n;
   newmap->ref = 1;
   newmap->count = 0;
