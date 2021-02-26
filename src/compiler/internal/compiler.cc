@@ -2538,7 +2538,7 @@ static program_t *epilog(void) {
     prog->inherit = nullptr;
   }
 
-  prog->apply_lookup_table.release();
+  prog->apply_lookup_table.reset(nullptr);
 
 #ifdef DEBUG
   if (p - reinterpret_cast<char *>(prog) != size) {
