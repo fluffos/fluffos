@@ -1353,14 +1353,18 @@ int calculate_and_maybe_print_memory_info(outbuffer_t *ob, int verbose) {
   }
   tot += total_class_size;
 
+  auto total_mapping_free_nodes = free_node_count();
+  auto total_mapping_free_nodes_size = total_mapping_free_nodes * sizeof(mapping_node_t);
   auto total_mapping_nodes_size = total_mapping_nodes * sizeof(mapping_node_t);
   if (verbose != -1) {
-    outbuf_addv(ob, "%-20s %8" PRIu64 " %8" PRIu64 "\n", "Mappings", num_mappings,
-                total_mapping_size);
-    outbuf_addv(ob, "%-20s %8" PRIu64 " %8" PRIu64 "\n", "Mappings(nodes)", total_mapping_nodes,
-                total_mapping_nodes_size);
+    outbuf_addv(ob,
+                "%-20s %8" PRIu64 " %8" PRIu64 " (nodes %" PRIu64 ", size %" PRIu64
+                ", free %" PRIu64 ", size %" PRIu64 ")\n",
+                "Mappings", num_mappings, total_mapping_size + total_mapping_free_nodes_size,
+                total_mapping_nodes, total_mapping_nodes_size, total_mapping_free_nodes,
+                total_mapping_free_nodes_size);
   }
-  tot += total_mapping_size + total_mapping_nodes_size;
+  tot += total_mapping_size + total_mapping_free_nodes_size;
   if (verbose && verbose != -1) outbuf_add(ob, "\n");
 
   tot += heart_beat_status(ob, verbose);

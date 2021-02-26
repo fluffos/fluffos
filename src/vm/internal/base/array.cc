@@ -200,8 +200,8 @@ static array_t *fix_array(array_t *p, unsigned int n) {
 }
 
 array_t *resize_array(array_t *p, unsigned int n) {
-  // it is possible that n < p->size, be careful to not upgrade the result to unsigned.
-  total_array_size += ((int)n - p->size) * int(sizeof(svalue_t));
+  total_array_size -= p->size * sizeof(svalue_t);
+  total_array_size += n * sizeof(svalue_t);
   if (n) {
     ms_remove_stats(p);
     p = RESIZE_ARRAY(p, n);
