@@ -18,6 +18,7 @@
 #include "compiler/internal/lex.h"       // for add_predefines, fixme!
 #include "compiler/internal/compiler.h"  // for init_locals, fixme!
 
+#include "packages/core/add_action.h"
 #include "packages/core/replace_program.h"
 #ifdef PACKAGE_MUDLIB_STATS
 #include "packages/mudlib_stats/mudlib_stats.h"
@@ -73,6 +74,7 @@ void vm_init() {
   init_strings();     /* in stralloc.c */
   init_identifiers(); /* in lex.c */
   init_locals();      /* in compiler.c */
+  init_living();      /* in add_actions.cc */
 
   max_eval_cost = CONFIG_INT(__MAX_EVAL_COST__);
   set_inc_list(CONFIG_STR(__INCLUDE_DIRS__));

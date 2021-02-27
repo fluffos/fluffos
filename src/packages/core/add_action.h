@@ -2,8 +2,9 @@
 #define ADD_ACTION_H 1
 
 #ifndef NO_ADD_ACTION
-extern object_t *hashed_living[CFG_LIVING_HASH_SIZE];
+extern object_t **hashed_living;
 
+void init_living();
 int parse_command(char *, object_t *);
 void clear_notify(object_t *);
 void stat_living_objects(outbuffer_t *);
