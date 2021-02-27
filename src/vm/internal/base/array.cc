@@ -278,9 +278,10 @@ array_t *explode_string(const char *str, int slen, const char *del, int dellen, 
    * in reversible mode, no skipping at all.
    * in other mode, only skip one.
    */
-  while (sourcelen && u8_egc_index_to_offset(
-                          source, u8_egc_find_as_index(source, sourcelen, del, dellen, true)) ==
-                          (sourcelen - dellen)) {
+  while (sourcelen) {
+    auto i = u8_egc_index_to_offset(
+        source, u8_egc_find_as_index(source, sourcelen, del, dellen, true));
+    if (i <= 0 || i != (sourcelen - dellen)) break;
     sourcelen -= dellen;
     num_trailing++;
   }

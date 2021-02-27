@@ -2,6 +2,14 @@ void do_tests() {
   string tmp = "this is a test";
   mixed *ret;
 
+  // Edge cases
+  ASSERT_EQ(({ "abcd" }), explode("abcd", " and "));
+  ASSERT_EQ(({ "abcd" }), explode_reversible("abcd", " and "));
+  ASSERT_EQ(({ }), explode("", " and "));
+  ASSERT_EQ(({ }), explode_reversible("", " and "));
+  ASSERT_EQ(({ " an" }), explode(" an", " and "));
+  ASSERT_EQ(({ " an" }), explode_reversible(" an", " and "));
+
   ret = explode(tmp, "");
   ASSERT_EQ(({ "t", "h", "i", "s", " ", "i", "s", " ", "a", " ", "t", "e", "s", "t"}), ret);
   ASSERT_EQ(ret, explode_reversible(tmp, ""));
