@@ -19,11 +19,10 @@ title: contrib / classes.pre
 
     If <verbose> is non-zero, then  additional  information  will  be
     returned.
-    
-    
+
 ### EXAMPLE
 
-    string *classes_used = classes( ob ) ; 
+    string *classes_used = classes( ob ) ;
     // ({ "class_name", }) ;
 
     mixed *classes_used = classes( ob, 1 ) ;
