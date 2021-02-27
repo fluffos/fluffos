@@ -50,7 +50,7 @@ void f_named_livings() {
   obtab = reinterpret_cast<object_t **>(
       DCALLOC(max_array_size, sizeof(object_t *), TAG_TEMPORARY, "named_livings"));
 
-  for (i = 0; i < CFG_LIVING_HASH_SIZE; i++) {
+  for (i = 0; i < CONFIG_INT(__LIVING_HASH_TABLE_SIZE__); i++) {
     for (ob = hashed_living[i]; ob; ob = ob->next_hashed_living) {
       if (!(ob->flags & O_ENABLE_COMMANDS)) {
         continue;

@@ -62,8 +62,7 @@ const flagEntry intFlags[] = {
 
     {"hash table size", __SHARED_STRING_HASH_TABLE_SIZE__, 65536, 7001},
     {"object table size", __OBJECT_HASH_TABLE_SIZE__, 4096, 1024},
-    {"living hash table size", __LIVING_HASH_TABLE_SIZE__, CFG_LIVING_HASH_SIZE,
-     CFG_LIVING_HASH_SIZE},
+    {"living hash table size", __LIVING_HASH_TABLE_SIZE__, 256, 256},
 
     {"gametick msec", __RC_GAMETICK_MSEC__, 1000},
     {"heartbeat interval msec", __RC_HEARTBEAT_INTERVAL_MSEC__, 1000},
