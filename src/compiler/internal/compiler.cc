@@ -1526,8 +1526,8 @@ char *get_type_name(char *where, char *end, int type) {
 }
 
 #define STRING_HASH(var, str)                \
-  var = (intptr_t)str ^ (intptr_t)str >> 16; \
-  var = (var ^ var >> 8) & 0xff;
+  var = (intptr_t)str ^ ((intptr_t)str >> 16); \
+  var = (var ^ (var >> 8)) & 0xff;
 
 short store_prog_string(const char *str) {
   short i, next, *next_tab, *idxp;
@@ -1549,8 +1549,7 @@ short store_prog_string(const char *str) {
     /* search hash chain to see if it's there */
     for (i = *idxp; i >= 0; i = next_tab[i]) {
       if (p[i] == str) {
-        free_string(str); /* needed as string is only free'ed
-                           * once. */
+        free_string(str); /* needed as string is only free'ed once. */
         (reinterpret_cast<short *>(mem_block[A_STRING_REFS].block))[i]++;
         return i;
       }
@@ -2234,6 +2233,7 @@ static void handle_functions() {
       func_index_map[i] = i;
     }
 
+    // FIXME: compare_func uses pointer address to sort the index, which is not deterministic.
     qsort(func_index_map, num_func, sizeof(unsigned short), compare_funcs);
 
     i = num_func;

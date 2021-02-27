@@ -395,14 +395,16 @@ void f_functions(void) {
       subvec->item[1].subtype = 0;
       subvec->item[1].u.number = funp->num_arg;
 
-      get_type_name(buf, end, funp->type);
+      auto p = get_type_name(buf, end, funp->type);
+      *(p - 1) = '\0';  // get rid of last space
       subvec->item[2].type = T_STRING;
       subvec->item[2].subtype = STRING_SHARED;
       subvec->item[2].u.string = make_shared_string(buf);
 
       for (j = 0; j < funp->num_arg; j++) {
         if (types) {
-          get_type_name(buf, end, types[j]);
+          auto p = get_type_name(buf, end, types[j]);
+          *(p - 1) = '\0';  // get rid of last space
           subvec->item[3 + j].type = T_STRING;
           subvec->item[3 + j].subtype = STRING_SHARED;
           subvec->item[3 + j].u.string = make_shared_string(buf);
@@ -441,7 +443,8 @@ static void fv_recurse(array_t *arr, int *idx, program_t *prog, int type, int fl
       subarr->item[0].type = T_STRING;
       subarr->item[0].subtype = STRING_SHARED;
       subarr->item[0].u.string = ref_string(prog->variable_table[i]);
-      get_type_name(buf, end, prog->variable_types[i]);
+      auto p = get_type_name(buf, end, prog->variable_types[i]);
+      *(p - 1) = '\0';  // get rid of last space
       subarr->item[1].type = T_STRING;
       subarr->item[1].subtype = STRING_SHARED;
       subarr->item[1].u.string = make_shared_string(buf);
@@ -2999,7 +3002,8 @@ void f_classes() {
             make_shared_string(prog->strings[prog->class_members[offset].membername]);
 
         // ...and type.
-        get_type_name(buf, end, prog->class_members[offset].type);
+        auto p = get_type_name(buf, end, prog->class_members[offset].type);
+        *(p - 1) = '\0';  // get rid of last space
         subsubvec->item[1].type = T_STRING;
         subsubvec->item[1].subtype = STRING_SHARED;
         subsubvec->item[1].u.string = make_shared_string(buf);
