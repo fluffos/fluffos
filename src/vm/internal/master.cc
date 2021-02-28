@@ -8,10 +8,12 @@
 #include "packages/mudlib_stats/mudlib_stats.h"  // for set_domain_author etc
 #include "packages/uids/uids.h"                  // for set_uids etc
 
+#include "vm/internal/base/apply_cache.h"
 #include "vm/internal/base/machine.h"
 #include "applies_table.autogen.h"
 #include "vm/internal/apply.h"
 #include "vm/internal/simulate.h"
+
 
 struct object_t *master_ob = nullptr;
 struct function_lookup_info_t *master_applies = nullptr;
@@ -75,11 +77,10 @@ static void get_master_applies(object_t *ob) {
 
   for (i = 0; i < NUM_MASTER_APPLIES; i++) {
     const char *name = applies_table[i];
-    int ind, ri;
-
-    if (find_function_by_name(ob, name, &ind, &ri)) {
-      master_applies[i].func = find_func_entry(ob->prog, ri);
-      master_applies[i].index = ri;
+    auto result = apply_cache_lookup(name, ob->prog);
+    if (result.funp) {
+      master_applies[i].func = result.funp;
+      master_applies[i].index = result.runtime_index;
     } else {
       master_applies[i].func = nullptr;
     }
