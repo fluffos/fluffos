@@ -141,7 +141,6 @@ void call_direct(object_t *, int, int, int);
 void eval_instruction(char *p);
 
 function_t *setup_inherited_frame(int);
-program_t *find_function_by_name(object_t *, const char *, int *, int *);
 const char *function_name(program_t *, int);
 void remove_object_from_stack(object_t *);
 void setup_fake_frame(funptr_t *);

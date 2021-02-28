@@ -9,6 +9,7 @@
 #include "comm.h"  // add_vmessage FIXME: reverse API
 #include "thirdparty/scope_guard/scope_guard.hpp"
 #include "vm/internal/apply.h"
+#include "vm/internal/base/apply_cache.h"
 #include "vm/internal/base/machine.h"
 #include "vm/internal/eval_limit.h"
 #include "vm/internal/master.h"
@@ -230,23 +231,19 @@ const char *type_name(int c) {
  * function names are pointers to shared strings, which means that equality
  * can be tested simply through pointer comparison.
  */
-static program_t *ffbn_recurse(program_t * /*prog*/, const char * /*name*/, int * /*indexp*/,
-                               int * /*runtime_index*/);
-
 #ifndef NO_SHADOWS
 
 static const char *check_shadow_functions(program_t *shadow, program_t *victim) {
   ScopedTracer _tracer(__PRETTY_FUNCTION__);
 
   int i;
-  int pindex, runtime_index;
-  program_t *prog;
   const char *fun;
 
   for (i = 0; i < shadow->num_functions_defined; i++) {
-    prog = ffbn_recurse(victim, shadow->function_table[i].funcname, &pindex, &runtime_index);
-    if (prog && (victim->function_flags[runtime_index] & DECL_NOMASK)) {
-      return prog->function_table[pindex].funcname;
+    auto lookup_result = apply_cache_lookup(shadow->function_table[i].funcname, victim);
+    auto funp = lookup_result.funp;
+    if (funp && (victim->function_flags[lookup_result.runtime_index] & DECL_NOMASK)) {
+      return funp->funcname;
     }
   }
 
@@ -3845,54 +3842,6 @@ static void do_catch(char *pc, unsigned short new_pc_offset) {
   pop_context(&econ);
 }
 
-static program_t *ffbn_recurse(program_t *prog, const char *name, int *indexp, int *runtime_index) {
-  int high = prog->num_functions_defined - 1;
-  int low = 0, mid;
-  int ri;
-  const char *p;
-
-  /* Search our function table */
-  while (high >= low) {
-    mid = (high + low) >> 1;
-    p = prog->function_table[mid].funcname;
-    if (name < p) {
-      high = mid - 1;
-    } else if (name > p) {
-      low = mid + 1;
-    } else {
-      ri = mid + prog->last_inherited;
-
-      if (prog->function_flags[ri] & (FUNC_UNDEFINED | FUNC_PROTOTYPE)) {
-        return nullptr;
-      }
-
-      *indexp = mid;
-      *runtime_index = ri;
-      return prog;
-    }
-  }
-
-  /* Search inherited function tables */
-  mid = prog->num_inherited;
-  while (mid--) {
-    program_t *ret = ffbn_recurse(prog->inherit[mid].prog, name, indexp, runtime_index);
-    if (ret) {
-      *runtime_index += prog->inherit[mid].function_index_offset;
-      return ret;
-    }
-  }
-  return nullptr;
-}
-
-program_t *find_function_by_name(object_t *ob, const char *name, int *indexp, int *runtime_index) {
-  const char *funname = findstring(name);
-
-  if (!funname) {
-    return nullptr;
-  }
-  return ffbn_recurse(ob->prog, funname, indexp, runtime_index);
-}
-
 /* Reason for the following 1. save cache space 2. speed :) */
 /* The following is to be called only from reset_object for */
 /* otherwise extra checks are needed - Sym                  */
@@ -4031,9 +3980,11 @@ const char *function_name(program_t *prog, int findex) {
  * it's faster to just try to call it and check if apply() returns zero.
  */
 const char *function_exists(const char *fun, object_t *ob, int flag) {
-  int findex, runtime_index;
-  program_t *prog;
-  int flags;
+  program_t *prog = ob->prog;
+
+  if (!prog) {
+    return nullptr;
+  }
 
   DEBUG_CHECK(ob->flags & O_DESTRUCTED, "function_exists() on destructed object\n");
 
@@ -4041,13 +3992,12 @@ const char *function_exists(const char *fun, object_t *ob, int flag) {
     return nullptr;
   }
 
-  prog = find_function_by_name(ob, fun, &findex, &runtime_index);
-  if (!prog) {
+  auto lookup_result = apply_cache_lookup(fun, prog);
+  if (!lookup_result.funp) {
     return nullptr;
   }
 
-  flags = ob->prog->function_flags[runtime_index];
-
+  int flags = ob->prog->function_flags[lookup_result.runtime_index];
   if ((flags & FUNC_UNDEFINED) ||
       (!flag && (flags & (DECL_PROTECTED | DECL_PRIVATE | DECL_HIDDEN)))) {
     return nullptr;
@@ -4069,12 +4019,12 @@ int is_static(const char *fun, object_t *ob) {
 
   DEBUG_CHECK(ob->flags & O_DESTRUCTED, "is_static() on destructed object\n");
 
-  prog = find_function_by_name(ob, fun, &findex, &runtime_index);
-  if (!prog) {
+  auto lookup_result = apply_cache_lookup(fun, ob->prog);
+  if (!lookup_result.funp) {
     return 0;
   }
 
-  flags = ob->prog->function_flags[runtime_index];
+  flags = ob->prog->function_flags[lookup_result.runtime_index];
   if (flags & (FUNC_UNDEFINED | FUNC_PROTOTYPE)) {
     return 0;
   }
