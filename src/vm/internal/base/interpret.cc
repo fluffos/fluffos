@@ -4012,11 +4012,6 @@ const char *function_exists(const char *fun, object_t *ob, int flag) {
   0 otherwise.
 */
 int is_static(const char *fun, object_t *ob) {
-  int findex;
-  int runtime_index;
-  program_t *prog;
-  int flags;
-
   DEBUG_CHECK(ob->flags & O_DESTRUCTED, "is_static() on destructed object\n");
 
   auto lookup_result = apply_cache_lookup(fun, ob->prog);
@@ -4024,7 +4019,7 @@ int is_static(const char *fun, object_t *ob) {
     return 0;
   }
 
-  flags = ob->prog->function_flags[lookup_result.runtime_index];
+  auto flags = ob->prog->function_flags[lookup_result.runtime_index];
   if (flags & (FUNC_UNDEFINED | FUNC_PROTOTYPE)) {
     return 0;
   }
