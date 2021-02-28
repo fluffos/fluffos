@@ -187,7 +187,8 @@ void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
                    (const char *)&one,
 #endif
                    sizeof(one)) == -1) {
-      debug(connections, "new_user_handler: user fd %td, set_socket_tcp_nodelay error: %s.\n", fd,
+      debug(connections,
+            "new_user_handler: user fd %" FMT_SOCKET_FD ", set_socket_tcp_nodelay error: %s.\n", fd,
             evutil_socket_error_to_string(evutil_socket_geterror(fd)));
     }
   }

@@ -316,7 +316,6 @@ void f_call_stack(void) {
           const program_t *prog = (i ? (csp - i + 1)->prog : current_prog);
           int index = (csp - i)->fr.table_index;
           char *progc = (i ? (csp - i + 1)->pc : pc);
-          function_t *cfp = &prog->function_table[index];
           ret->item[i].type = T_STRING;
           ret->item[i].subtype = STRING_MALLOC;
           ret->item[i].u.string = string_copy(get_line_number(progc, prog), "call_stack");

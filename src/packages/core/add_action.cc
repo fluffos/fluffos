@@ -16,8 +16,9 @@ static const char *last_verb;
 static object_t *illegal_sentence_ob;
 
 void init_living() {
-  hashed_living = reinterpret_cast<object_t**>(DCALLOC(
-      CONFIG_INT(__LIVING_HASH_TABLE_SIZE__), sizeof(object_t *), TAG_PERMANENT, __CURRENT_FILE_LINE__));
+  hashed_living = reinterpret_cast<object_t **>(DCALLOC(CONFIG_INT(__LIVING_HASH_TABLE_SIZE__),
+                                                        sizeof(object_t *), TAG_PERMANENT,
+                                                        __CURRENT_FILE_LINE__));
 }
 
 static void notify_no_command(void) {
@@ -66,7 +67,9 @@ void clear_notify(object_t *ob) {
   ip->default_err_message.s = nullptr;
 }
 
-static int hash_living_name(const char *str) { return whashstr(str) & (CONFIG_INT(__LIVING_HASH_TABLE_SIZE__) - 1); }
+static int hash_living_name(const char *str) {
+  return whashstr(str) & (CONFIG_INT(__LIVING_HASH_TABLE_SIZE__) - 1);
+}
 
 object_t *find_living_object(const char *str, int user) {
   object_t **obp, *tmp;
