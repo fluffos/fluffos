@@ -14,7 +14,6 @@
 #include "vm/internal/apply.h"
 #include "vm/internal/simulate.h"
 
-
 struct object_t *master_ob = nullptr;
 struct function_lookup_info_t *master_applies = nullptr;
 

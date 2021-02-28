@@ -366,7 +366,6 @@ static int pcre_query_match(pcre_t *p) { return p->rc < 0 ? 0 : 1; }
 
 auto pcre_match_all(const char *subject, size_t subject_len, const char *pattern) {
   pcre_t *run;
-  int ret;
 
   run = (pcre_t *)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "pcre_match_single : run");
   run->ovector = nullptr;

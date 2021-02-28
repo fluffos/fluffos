@@ -2196,7 +2196,7 @@ static int save_last_parallel_error(int ob) {
 static int parallel_check_functions(object_t *obj, parse_state_t *state, int which) {
   object_t *ob;
   char func[CHAR_FUNC];
-  int tryy, ret, args;
+  int tryy, ret = 0, args;
 
   free_parser_error(&parallel_error_info);
   if (obj) {

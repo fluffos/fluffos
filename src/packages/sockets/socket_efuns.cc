@@ -9,6 +9,7 @@
 
 #include "packages/sockets/socket_efuns.h"
 
+#include <inttypes.h>
 #include <event2/event.h>
 #include <event2/util.h>
 #include <deque>
@@ -35,7 +36,7 @@ namespace {
 std::deque<lpc_socket_t> lpc_socks;
 
 void on_lpc_sock_read(evutil_socket_t fd, short what, void *arg) {
-  debug(event, "Got an event on socket %d:%s%s%s%s \n", (int)fd,
+  debug(event, "Got an event on socket %" FMT_SOCKET_FD ":%s%s%s%s \n", fd,
         (what & EV_TIMEOUT) ? " timeout" : "", (what & EV_READ) ? " read" : "",
         (what & EV_WRITE) ? " write" : "", (what & EV_SIGNAL) ? " signal" : "");
 
@@ -43,7 +44,7 @@ void on_lpc_sock_read(evutil_socket_t fd, short what, void *arg) {
   socket_read_select_handler(data->idx);
 }
 void on_lpc_sock_write(evutil_socket_t fd, short what, void *arg) {
-  debug(event, "Got an event on socket %d:%s%s%s%s \n", (int)fd,
+  debug(event, "Got an event on socket %" FMT_SOCKET_FD ":%s%s%s%s \n", fd,
         (what & EV_TIMEOUT) ? " timeout" : "", (what & EV_READ) ? " read" : "",
         (what & EV_WRITE) ? " write" : "", (what & EV_SIGNAL) ? " signal" : "");
 
@@ -496,7 +497,8 @@ int socket_bind(int fd, int port, const char *addr) {
 
   lpc_socks[fd].state = STATE_BOUND;
 
-  debug(sockets, "socket_bind: bound lpc socket %d (real fd %lld) to %s.\n", fd, lpc_socks[fd].fd,
+  debug(sockets, "socket_bind: bound lpc socket %d (real fd %" FMT_SOCKET_FD ") to %s.\n", fd,
+        lpc_socks[fd].fd,
         sockaddr_to_string((struct sockaddr *)&lpc_socks[fd].l_addr, lpc_socks[fd].l_addrlen));
 
   // register read event.
@@ -532,7 +534,7 @@ int socket_listen(int fd, svalue_t *callback) {
 
   if (listen(lpc_socks[fd].fd, 5) == -1) {
     auto e = evutil_socket_geterror(lpc_socks[fd].fd);
-    debug(sockets, "socket_listen: %d (real fd %lld) listen error: %d (%s).\n", fd,
+    debug(sockets, "socket_listen: %d (real fd %" FMT_SOCKET_FD ") listen error: %d (%s).\n", fd,
           lpc_socks[fd].fd, e, evutil_socket_error_to_string(e));
     return EELISTEN;
   }
@@ -695,7 +697,8 @@ int socket_connect(int fd, const char *name, svalue_t *read_callback, svalue_t *
       case ERR(EINPROGRESS):
         break;
       default:
-        debug(sockets, "socket_connect: lpc socket %d (real fd %lld) connect error: %s.\n", fd,
+        debug(sockets,
+              "socket_connect: lpc socket %d (real fd %" FMT_SOCKET_FD ") connect error: %s.\n", fd,
               lpc_socks[fd].fd, evutil_socket_error_to_string(e));
         return EECONNECT;
     }
@@ -714,7 +717,7 @@ int socket_connect(int fd, const char *name, svalue_t *read_callback, svalue_t *
   lpc_socks[fd].state = STATE_DATA_XFER;
   lpc_socks[fd].flags |= S_BLOCKED;
 
-  debug(sockets, "socket_connect: lpc socket %d (real fd %lld) connecting.\n", fd,
+  debug(sockets, "socket_connect: lpc socket %d (real fd %" FMT_SOCKET_FD ") connecting.\n", fd,
         lpc_socks[fd].fd);
 
   event_add(lpc_socks[fd].ev_read, nullptr);
@@ -916,7 +919,7 @@ int socket_write(int fd, svalue_t *message, const char *name) {
         }
       }
     }
-    debug(sockets, "socket_write: lpc socket %d (real fd %lld) send error: %s.\n", fd,
+    debug(sockets, "socket_write: lpc socket %d (real fd %" FMT_SOCKET_FD ") send error: %s.\n", fd,
           lpc_socks[fd].fd, evutil_socket_error_to_string(e));
     lpc_socks[fd].flags |= S_LINKDEAD;
     socket_close(fd, SC_FORCE | SC_DO_CALLBACK | SC_FINAL_CLOSE);
@@ -1220,7 +1223,7 @@ void socket_read_select_handler(int fd) {
 void socket_write_select_handler(int fd) {
   int cc;
 
-  debug(sockets, "write_socket_handler: lpc socket %d (real fd %lld) state %d\n", fd,
+  debug(sockets, "write_socket_handler: lpc socket %d (real fd %" FMT_SOCKET_FD ") state %d\n", fd,
         lpc_socks[fd].fd, lpc_socks[fd].state);
 
   /* if the socket isn't blocked, we've got nothing to send */
@@ -1268,7 +1271,8 @@ void socket_write_select_handler(int fd) {
         return;
       }
       debug(sockets,
-            "write_socket_handler: lpc_socket %d (real fd %lld) write failed: "
+            "write_socket_handler: lpc_socket %d (real fd %" FMT_SOCKET_FD
+            ") write failed: "
             "%s, connection dead.\n",
             fd, lpc_socks[fd].fd, evutil_socket_error_to_string(e));
       lpc_socks[fd].flags |= S_LINKDEAD;

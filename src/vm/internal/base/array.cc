@@ -279,8 +279,8 @@ array_t *explode_string(const char *str, int slen, const char *del, int dellen, 
    * in other mode, only skip one.
    */
   while (sourcelen) {
-    auto i = u8_egc_index_to_offset(
-        source, u8_egc_find_as_index(source, sourcelen, del, dellen, true));
+    auto i =
+        u8_egc_index_to_offset(source, u8_egc_find_as_index(source, sourcelen, del, dellen, true));
     if (i <= 0 || i != (sourcelen - dellen)) break;
     sourcelen -= dellen;
     num_trailing++;
@@ -349,7 +349,9 @@ char *implode_string(array_t *arr, const char *del, int del_len) {
     }
   }
   if (num == 0) {
-    return string_copy("", "implode_string");
+    auto res = new_string(0, "implode_string");
+    res[0] = '\0';
+    return res;
   }
 
   p = new_string(size + (num - 1) * del_len, "implode_string: p");
