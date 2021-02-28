@@ -48,6 +48,7 @@ static inline void fill_lookup_table_recurse(
     lookup_entry_s entry = {nullptr};
     entry.progp = prog;
     entry.funp = &(prog->function_table[i]);
+    entry.runtime_index = runtime_index;
     entry.function_index_offset = fio;
     entry.variable_index_offset = vio;
 

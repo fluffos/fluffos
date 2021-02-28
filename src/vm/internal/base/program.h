@@ -189,6 +189,7 @@ struct lookup_entry_s {
   struct function_t *funp;
   unsigned short function_index_offset;
   unsigned short variable_index_offset;
+  unsigned short runtime_index;
 };
 
 struct program_t {
