@@ -44,7 +44,7 @@ Build Steps
 ```shell
 $ git clone https://github.com/fluffos/fluffos.git
 $ cd fluffos
-$ git checkout v2019 #(or an v2019 release tag)
+$ git checkout master #(or an release tag)
 ```
 - Upgrade your cmake
 ```shell
