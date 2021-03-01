@@ -96,9 +96,10 @@ void init_strings() {
 
   /* ensure that htable size is a power of 2 */
   y = CONFIG_INT(__SHARED_STRING_HASH_TABLE_SIZE__);
-  for (htable_size = 1; htable_size < y; htable_size *= 2) {
-    ;
+  for (htable_size = 1; htable_size <= y; htable_size <<= 1) {
   }
+  CONFIG_INT(__SHARED_STRING_HASH_TABLE_SIZE__) = htable_size;
+
   htable_size_minus_one = htable_size - 1;
   base_table = reinterpret_cast<block_t **>(
       DCALLOC(htable_size, sizeof(block_t *), TAG_STR_TBL, "init_strings"));

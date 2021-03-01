@@ -16,6 +16,14 @@ static const char *last_verb;
 static object_t *illegal_sentence_ob;
 
 void init_living() {
+  // make sure size is power of 2.
+  {
+    auto new_size = 1;
+    for (; new_size <= CONFIG_INT(__LIVING_HASH_TABLE_SIZE__); new_size <<= 1) {
+    }
+    CONFIG_INT(__LIVING_HASH_TABLE_SIZE__) = new_size;
+  }
+
   hashed_living = reinterpret_cast<object_t **>(DCALLOC(CONFIG_INT(__LIVING_HASH_TABLE_SIZE__),
                                                         sizeof(object_t *), TAG_PERMANENT,
                                                         __CURRENT_FILE_LINE__));
