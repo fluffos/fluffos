@@ -8,6 +8,7 @@
 #if defined _WIN32 && !defined __CYGWIN__
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <psapi.h>
 #endif
 
 #include <errno.h>
@@ -55,6 +56,12 @@ int getrusage(int who, struct rusage *usage_p) {
         usage_p->ru_utime.tv_usec = user_usec % 1000000U;
         usage_p->ru_stime.tv_sec = kernel_usec / 1000000U;
         usage_p->ru_stime.tv_usec = kernel_usec % 1000000U;
+      }
+      /* Fill in memory related information. */
+      PROCESS_MEMORY_COUNTERS pmc;
+      if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc))) {
+        usage_p->ru_majflt = pmc.PageFaultCount;
+        usage_p->ru_maxrss = pmc.PeakWorkingSetSize / 1024;
       }
     }
 #else
