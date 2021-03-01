@@ -49,6 +49,12 @@ title: STDLIB
 
 <div class='row'>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='string/base64decode.html'>base64decode</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='string/base64encode.html'>base64encode</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='string/bitmap_font.html'>bitmap_font</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
@@ -58,6 +64,6 @@ title: STDLIB
 
 <div class="alert alert-info my-4" role="alert">
     <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/info.svg">
-    This page is auto generated on 2021-02-17 09:38:37 EST for v2019.20201121-32-g75d20d0f.</a>
+    This page is auto generated on 2021-03-01 01:09:57 EST for v2019.20201121-33-gc72b462b-dirty.</a>
 </div>
 
