@@ -239,10 +239,36 @@ void do_tests() {
     //ASSERT_EQ(ANSI_RED"t\ne\ns\nt"ANSI_RESET, sprintf("%-=1s", ANSI_RED "test" ANSI_RESET));
     //ASSERT_EQ(ANSI_RED "" ANSI_RESET, sprintf("%-=1s", ANSI_RED "" ANSI_RESET));
 
-    ASSERT_EQ("this\nis a\nvery\nlong\nsenten\nce.", sprintf("%-=6s", "this is a very long sentence."));
+    ASSERT_EQ("this\nis a\nvery\nlong\nsentence.", sprintf("%-=6s", "this is a very long sentence."));
 
     ASSERT_EQ("      ", sprintf("%6-|s", ""));
     ASSERT_EQ("         a b c d e f g        ", sprintf("%30|s", "a b c d e f g"));
     // https://github.com/fluffos/fluffos/issues/595
     ASSERT_EQ("   Mit indent sieht das so aus", sprintf("%30=s","Mit indent sieht das so aus"));
+
+    // https://github.com/fluffos/fluffos/issues/696
+  shouldbe = @TEXT
+one        line1
+two        line2
+three      line3
+TEXT;
+  ASSERT_EQ(shouldbe, sprintf("%-=10s %-=20s\n",
+                              implode(({ "one",     "two",      "three"}), "\n"),
+                              implode(({ "line1 ",  "line2 ",   "line3 " }), "\n")));
+  shouldbe = @TEXT
+111 aaa
+2222bbb
+33333cccc
+TEXT;
+  ASSERT_EQ(shouldbe, sprintf("%-=1s %-=2s\n",
+                              implode(({ "111",     "2222",      "33333"}), "\n"),
+                              implode(({ "aaa",  "bbb",   "cccc" }), "\n")));
+  shouldbe = @TEXT
+11111 aaa
+2222  bbb
+333   cccc
+TEXT;
+  ASSERT_EQ(shouldbe, sprintf("%-=1s %-=2s\n",
+                              implode(({ "11111",     "2222",      "333"}), "\n"),
+                              implode(({ "aaa",  "bbb",   "cccc" }), "\n")));
 }

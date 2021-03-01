@@ -485,6 +485,8 @@ void svalue_to_string(svalue_t *obj, outbuffer_t *outbuf, int indent, int traili
 } /* end of svalue_to_string() */
 
 static void add_pad(pad_info_t *pad, int width, bool start_from_right) {
+  if (width <= 0) return;
+
   int output_len = width;  // default use ' ' to pad.
 
   // Use whitespace by default.
@@ -643,7 +645,9 @@ static int add_column(cst **column, int trailing) {
   // Eat the space if break
   if (*col_d == ' ') {
     col_d++;
-  } else if (*col_d == '\n') {
+  }
+
+  if (*col_d == '\n') {
     // landed on an '\n'
     col_d++;
     ret = 2;
