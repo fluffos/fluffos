@@ -1213,7 +1213,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
               swidth = u8_width(carg->u.string, -1);
             }
             add_justified(carg->u.string, swidth, slen, &pad, fs, finfo,
-                          (((format_str[fpos] != '\n') && (format_str[fpos] != '\0')) ||
+                          (true ||
                            ((finfo & INFO_ARRAY) &&
                             (nelemno < (argv + sprintf_state->cur_arg)->u.arr->size))) ||
                               slen == 0 || (slen && carg->u.string[slen - 1] != '\n'));
@@ -1237,13 +1237,13 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
           int swidth = u8_width(temp, -1);
           add_justified(
               temp, swidth, tmpl, &pad, fs, finfo,
-              (((format_str[fpos] != '\n') && (format_str[fpos] != '\0')) ||
+              (true ||
                ((finfo & INFO_ARRAY) && (nelemno < (argv + sprintf_state->cur_arg)->u.arr->size))));
         } else if (finfo & INFO_T_INT) {
-          /* one of the integer
-           * types */
-          char cheat[40];
-          char temp[400];
+          /* one of the integer types */
+          static char cheat[40];
+          // https://stackoverflow.com/questions/1701055/what-is-the-maximum-length-in-chars-needed-to-represent-any-double-value
+          static char temp[3 + DBL_MANT_DIG - DBL_MIN_EXP + 1];
 
           *cheat = '%';
           i = 1;
@@ -1325,10 +1325,10 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
           }
           {
             int tmpl = strlen(temp);
-            int swidth = u8_width(temp, -1);
+            int swidth = u8_width(temp, tmpl);
 
             add_justified(temp, swidth, tmpl, &pad, fs, finfo,
-                          (((format_str[fpos] != '\n') && (format_str[fpos] != '\0')) ||
+                          (true ||
                            ((finfo & INFO_ARRAY) &&
                             (nelemno < (argv + sprintf_state->cur_arg)->u.arr->size))));
           }
