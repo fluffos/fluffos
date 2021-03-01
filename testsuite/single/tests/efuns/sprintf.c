@@ -210,8 +210,19 @@ void do_tests() {
 	format = "$" + mx[0] + "^";
 	shouldbe = "$" + mx[1] + "^";
   actual = sprintf(format, mx[2..]...);
+  if(shouldbe != actual) {
+    printf("FORMAT: '%s', ARG: '%O'\n", format, mx[2..]);
+  }
 	ASSERT_EQ(shouldbe, actual);
     }
+
+  ASSERT_EQ("12345     ", sprintf("%-10d", 12345));
+  ASSERT_EQ("12345     ", sprintf("%-10s", "12345"));
+  ASSERT_EQ("A         ", sprintf("%-10c", 65));
+  ASSERT_EQ("   12345  ", sprintf("%|10d", 12345));
+  ASSERT_EQ("   12345  ", sprintf("%|10s", "12345"));
+  ASSERT_EQ("     A    ", sprintf("%|10c", 65));
+  ASSERT_EQ("  12345   ", sprintf("%-|10s", "12345"));
 
     hmm = sprintf("xxx%#-20.5s\n", "This\nis\na\ntest\nof\nsprintf\ntable\nmode\n");
     ASSERT_EQ("xxxThisa   of  tabl\n   is  testsprimode\n", hmm);
