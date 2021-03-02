@@ -7,7 +7,6 @@ mapping values = ([
     "\"\\\"\"" : "\"",
     "\"\\\"\\x\r\"" : "\"x\n",
     // Special cases for encoding '\r'
-    "\"a\\\rb\\\rc\\\rd\\\r\r\\\radsfasdsdf\\\r\"": "a\rb\rc\rd\r\n\radsfasdsdf\r",
     "-1" : -1,
     "0" : 0,
     "1" : 1,
@@ -15,7 +14,8 @@ mapping values = ([
     "1.2" : 1.2,
     "333" : 333,
     "({})" : ({}),
-    "({,})" : ({0})
+    "({,})" : ({0}),
+    "\"∮ E⋅da = Q,  n → ∞, ∑ f(i) = ���∏ g(i), ∀x∈ℝ: ⌈x⌉ = −⌊−x⌋, α ∧ ¬β = ¬(¬α ∨ �β)\"": "∮ E⋅da = Q,  n → ∞, ∑ f(i) = ���∏ g(i), ∀x∈ℝ: ⌈x⌉ = −⌊−x⌋, α ∧ ¬β = ¬(¬α ∨ �β)",
 ]);
 
 void do_tests() {
