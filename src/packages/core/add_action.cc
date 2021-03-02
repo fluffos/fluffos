@@ -19,7 +19,7 @@ void init_living() {
   // make sure size is power of 2.
   {
     auto new_size = 1;
-    for (; new_size <= CONFIG_INT(__LIVING_HASH_TABLE_SIZE__); new_size <<= 1) {
+    for (; new_size < CONFIG_INT(__LIVING_HASH_TABLE_SIZE__); new_size <<= 1) {
     }
     CONFIG_INT(__LIVING_HASH_TABLE_SIZE__) = new_size;
   }
