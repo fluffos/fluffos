@@ -228,12 +228,14 @@ array_t *get_heart_beats() {
 #endif
 
   auto fn = [&](heart_beat_t &hb) {
-    if (hb.ob && hb.ob->flags & O_HIDDEN) {
-      if (!display_hidden) {
-        return;
+    if (hb.ob) {
+      if (hb.ob->flags & O_HIDDEN) {
+        if (!display_hidden) {
+          return;
+        }
       }
+      result.push_back(hb.ob);
     }
-    result.push_back(hb.ob);
   };
 
   std::for_each(heartbeats.begin(), heartbeats.end(), fn);
