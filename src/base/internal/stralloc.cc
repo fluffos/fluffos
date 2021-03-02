@@ -96,7 +96,7 @@ void init_strings() {
 
   /* ensure that htable size is a power of 2 */
   y = CONFIG_INT(__SHARED_STRING_HASH_TABLE_SIZE__);
-  for (htable_size = 1; htable_size <= y; htable_size <<= 1) {
+  for (htable_size = 1; htable_size < y; htable_size <<= 1) {
   }
   CONFIG_INT(__SHARED_STRING_HASH_TABLE_SIZE__) = htable_size;
 
