@@ -1,3 +1,5 @@
+inherit "/inherit/tests";
+
 #ifndef __SENSIBLE_MODIFIERS__
 static
 #else
@@ -18,4 +20,5 @@ void do_tests() {
 
     ASSERT_EQ(0, function_exists("bar", this_object()));
     ASSERT_EQ(__FILE__, function_exists("do_tests", this_object()) + ".c");
+    ASSERT_EQ("/inherit/tests.c", function_exists("describe_test", this_object()) + ".c");
 }
