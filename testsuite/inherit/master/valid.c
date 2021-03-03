@@ -5,6 +5,10 @@
 
 #include <globals.h>
 
+int inherit_called = 0;
+int get_inherit_called() {
+  return inherit_called;
+}
 
 void create() {
 }
@@ -83,7 +87,8 @@ valid_socket(object, string, mixed *)
 int
 valid_write(string, mixed, string)
 {
-    return 1;
+  inherit_called++;
+  return 1;
 }
 
 // valid_read:  called exactly the same as valid_write()
@@ -91,15 +96,18 @@ valid_write(string, mixed, string)
 int
 valid_read(string, mixed, string)
 {
+    inherit_called++;
     return 1;
 }
 
 int valid_bind() {
+    inherit_called++;
     // This is really unsafe, but testsuite uses it to test bind()
     return 1;
 }
 
 int valid_hide() {
+    inherit_called++;
     // same here
     return 1;
 }

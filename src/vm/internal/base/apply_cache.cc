@@ -39,20 +39,21 @@ static inline void fill_lookup_table_recurse(
     uint16_t vio) {
   // add all defined functions
   for (int i = 0; i < prog->num_functions_defined; i++) {
-    auto runtime_index = i + prog->last_inherited;
-    if (prog->function_flags[runtime_index] & (FUNC_UNDEFINED | FUNC_PROTOTYPE)) {
+    auto idx = i + prog->last_inherited;
+    if (prog->function_flags[idx] & (FUNC_UNDEFINED | FUNC_PROTOTYPE)) {
       continue;
     }
 
     auto key = (intptr_t)(prog->function_table[i].funcname);
-    lookup_entry_s entry = {nullptr};
-    entry.progp = prog;
-    entry.funp = &(prog->function_table[i]);
-    entry.runtime_index = runtime_index;
-    entry.function_index_offset = fio;
-    entry.variable_index_offset = vio;
-
-    table->insert({key, entry});
+    if (table->find(key) == table->end()) {
+      lookup_entry_s entry = {nullptr};
+      entry.progp = prog;
+      entry.funp = &(prog->function_table[i]);
+      entry.runtime_index = fio + idx;
+      entry.function_index_offset = fio;
+      entry.variable_index_offset = vio;
+      table->insert({key, entry});
+    }
   }
 
   // add inherited functions (must go backwards)
