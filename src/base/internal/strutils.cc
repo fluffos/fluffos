@@ -478,8 +478,8 @@ void u8_truncate_below_width(const char *src, size_t len, size_t max_width, bool
       } else {
         auto next_linebreak = linebrk->following(break_length);
         if (next_linebreak > 0) {
-          if(src[next_linebreak - 1] == '\n') {
-            next_linebreak --;
+          if (src[next_linebreak - 1] == '\n') {
+            next_linebreak--;
           }
           break_length = next_linebreak;
           break_width = u8_width(src, break_length);

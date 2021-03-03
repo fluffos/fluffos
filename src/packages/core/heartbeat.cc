@@ -12,8 +12,8 @@
 #include <vector>
 
 struct heart_beat_t {
-  object_t *ob;  // nullptr also means deleted entries.
-  short heart_beat_ticks;  // remaining ticks
+  object_t *ob;              // nullptr also means deleted entries.
+  short heart_beat_ticks;    // remaining ticks
   short time_to_heart_beat;  // interval
 };
 
@@ -48,8 +48,7 @@ void call_heart_beat() {
     {
       auto &hb = heartbeats.front();
       // skip invalid entries.
-      if (hb.ob == nullptr || !(hb.ob->flags & O_HEART_BEAT) ||
-          hb.ob->flags & O_DESTRUCTED) {
+      if (hb.ob == nullptr || !(hb.ob->flags & O_HEART_BEAT) || hb.ob->flags & O_DESTRUCTED) {
         heartbeats.pop_front();
         continue;
       }
@@ -257,14 +256,12 @@ void check_heartbeats() {
   std::set<object_t *> objset;
   for (auto &hb : heartbeats) {
     if (hb.ob) {
-      DEBUG_CHECK(!objset.insert(hb.ob).second,
-                  "Driver BUG: Duplicated/Missing heartbeats found");
+      DEBUG_CHECK(!objset.insert(hb.ob).second, "Driver BUG: Duplicated/Missing heartbeats found");
     }
   }
   for (auto hb : heartbeats_next) {
     if (hb.ob) {
-      DEBUG_CHECK(!objset.insert(hb.ob).second,
-                  "Driver BUG: Duplicated/Missing heartbeats found");
+      DEBUG_CHECK(!objset.insert(hb.ob).second, "Driver BUG: Duplicated/Missing heartbeats found");
     }
   }
 }

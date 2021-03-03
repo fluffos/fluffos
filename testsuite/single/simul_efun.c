@@ -51,6 +51,20 @@ int same(mixed x, mixed y) {
     }
 }
 
+void __assert_eq(mixed expected, mixed actual, string where) {
+  if (!same(expected, actual)) {
+    OUTPUT(where + ", Check Failed: \n" +
+        "Expected: \n" + sprintf("%O", expected) + "\nActual: \n" + sprintf("%O", actual) + "\nTrace: \n" + sprintf("%s", "/single/master"->get_last_error()) + "\n");
+  }
+}
+
+void __assert_ne(mixed expected, mixed actual, string where) {
+  if (same(expected, actual)) {
+    OUTPUT(where + ", Check Failed: \n" +
+        "Expect Not: \n" + sprintf("%O", expected) + "\nActual: \n" + sprintf("%O", actual) + "\nTrace: \n" + sprintf("%s", "/single/master"->get_last_error()) + "\n");
+  }
+}
+
 void
 cat(string file)
 {

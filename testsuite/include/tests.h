@@ -11,13 +11,8 @@
 
 #define ASSERT(x) if (CLEAR_ERROR && !(x)) { OUTPUT(WHERE + ", Check failed.\n"); }
 #define ASSERT2(x, r) if (CLEAR_ERROR && !(x)) { OUTPUT(WHERE + ", Check failed: " + r + ".\n"); }
-#define ASSERT_EQ(x, y) if (CLEAR_ERROR && !same((x),(y))) { \
-  OUTPUT(WHERE + ", Check Failed: \n" + \
-  "Expected: \n" + sprintf("%O", (x)) + "\nActual: \n" + sprintf("%O", (y)) + "\nTrace: \n" + sprintf("%s", "/single/master"->get_last_error()) + "\n"); }
-
-#define ASSERT_NE(x, y) if (CLEAR_ERROR && same((x),(y))) { \
-  OUTPUT(WHERE + ", Check Failed: \n" + \
-  "Expect Not: \n" + sprintf("%O", (x)) + "\nActual: \n" + sprintf("%O", (y)) + "\nTrace: \n" + sprintf("%s", "/single/master"->get_last_error()) + "\n"); }
+#define ASSERT_EQ(x, y) do { CLEAR_ERROR; __assert_eq((x), (y), WHERE); } while (0)
+#define ASSERT_NE(x, y) do { CLEAR_ERROR; __assert_ne((x), (y), WHERE); } while (0)
 
 #define SAVETP tp = this_player()
 #define RESTORETP { if (tp) evaluate(bind( (: enable_commands :), tp)); else { object youd_never_use_this_as_a_var = new("/single/void"); evaluate(bind( (: enable_commands :), youd_never_use_this_as_a_var)); destruct(youd_never_use_this_as_a_var); } }
