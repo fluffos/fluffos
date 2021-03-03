@@ -4003,7 +4003,7 @@ const char *function_exists(const char *fun, object_t *ob, int flag) {
     return nullptr;
   }
 
-  return prog->filename;
+  return lookup_result.progp->filename;
 }
 
 #ifndef NO_SHADOWS
