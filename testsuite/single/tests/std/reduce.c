@@ -14,7 +14,7 @@ void do_tests()
     }, 0), 10 ) ;
 
     // Testing with a functional
-    ASSERT_EQ( reduce( numbers, (: $1 + $2 :), 0), 10)
+    ASSERT_EQ( reduce( numbers, (: $1 + $2 :), 0), 10);
 
     // Testing with a functional
     ASSERT_EQ( reduce( numbers, (: $1 + $2 :), ""), "1234" );
@@ -35,7 +35,7 @@ void do_tests()
         total += ", " ;
 
         if( idx == sizeof( arr ) - 1 ) total += conjunction + " " ;
-        
+
         return total + current ;
     }, "", "or"), "north, south, east, or west") ;
 }
