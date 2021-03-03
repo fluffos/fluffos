@@ -218,10 +218,7 @@ retry_for_shadow:
     int need;
     function_t *funp = entry.funp;
     int findex = (funp - entry.progp->function_table);
-    int funflags, runtime_index;
-
-    runtime_index = findex + entry.progp->last_inherited + entry.function_index_offset;
-    funflags = ob->prog->function_flags[runtime_index];
+    int funflags = ob->prog->function_flags[entry.runtime_index];
 
     need = (local_call_origin == ORIGIN_DRIVER
                 ? DECL_HIDDEN
