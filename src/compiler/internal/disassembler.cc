@@ -6,39 +6,78 @@
 #include "compiler/internal/lex.h"
 #include "compiler/internal/icode.h"
 
-static void disassemble(FILE * /*f*/, char * /*code*/, int /*start*/, int /*end*/,
-                        program_t * /*prog*/);
+static void disassemble(FILE *f /*f*/, char *code /*code*/, int /*start*/ start, int /*end*/ end,
+                        program_t *prog /*prog*/);
 static const char *disassem_string(const char * /*str*/);
 static int short_compare(const void * /*a*/, const void * /*b*/);
 static void dump_line_numbers(FILE * /*f*/, program_t * /*prog*/);
 
+void dump_prog_details(program_t *prog, FILE *f, int flags) {
+  int i, j;
+
+  fprintf(f, "\n;;; %s\n\n", prog->filename);
+
+  fprintf(f, "VARIABLES:\n");
+  for (i = 0; i < prog->num_variables_defined; i++) {
+    char buf[255];
+    auto end = &buf[sizeof(buf) - 1];
+    get_type_name(&buf[0], end, prog->variable_types[i]);
+    fprintf(f, "%4d: %s%s\n", i, buf, prog->variable_table[i]);
+  }
+  fprintf(f, "STRINGS:\n");
+  for (i = 0; i < prog->num_strings; i++) {
+    fprintf(f, "%4d: ", i);
+    for (j = 0; j < 32; j++) {
+      char c;
+
+      if (!(c = prog->strings[i][j])) {
+        break;
+      } else if (c == '\n') {
+        fprintf(f, "\\n");
+      } else {
+        fputc(c, f);
+      }
+    }
+    fputc('\n', f);
+  }
+
+  if (flags & 1) {
+    fprintf(f, "DISASSEMBLY:\n");
+    disassemble(f, prog->program, 0, prog->program_size, prog);
+  } else {
+    fprintf(f, "PROGRAM:");
+    for (i = 0; i < prog->program_size; i++) {
+      if (i % 16 == 0) {
+        fprintf(f, "\n\t%04x: ", static_cast<unsigned int>(i));
+      }
+      fprintf(f, "%02d ", static_cast<unsigned char>(prog->program[i]));
+    }
+    fputc('\n', f);
+  }
+  if (flags & 2) {
+    fprintf(f, "\n;;;  *** Line Number Info ***\n");
+    dump_line_numbers(f, prog);
+  }
+}
 /* Current flags:
  * 1 - do disassembly
  * 2 - dump line number table
  */
 void dump_prog(program_t *prog, FILE *f, int flags) {
-  int i, j;
+  int i;
   int num_funcs_total;
 
   fprintf(f, "NAME: /%s\n", prog->filename);
   fprintf(f, "INHERITS:\n");
-  fprintf(f, "\tname                    fio    vio\n");
-  fprintf(f, "\t----------------        ---    ---\n");
+  fprintf(f, "      name                    fio    vio\n");
+  fprintf(f, "      ----------------        ---    ---\n");
   for (i = 0; i < prog->num_inherited; i++) {
     fprintf(f, "\t%-20s  %5d  %5d\n", prog->inherit[i].prog->filename,
             prog->inherit[i].function_index_offset, prog->inherit[i].variable_index_offset);
   }
-  fprintf(f, "PROGRAM:");
-  for (i = 0; i < prog->program_size; i++) {
-    if (i % 16 == 0) {
-      fprintf(f, "\n\t%04x: ", static_cast<unsigned int>(i));
-    }
-    fprintf(f, "%02d ", static_cast<unsigned char>(prog->program[i]));
-  }
-  fputc('\n', f);
   fprintf(f, "FUNCTIONS:\n");
-  fprintf(f, "      name                  offset  flags  fio  # locals  # args\n");
-  fprintf(f, "      --------------------- ------ ------- ---  --------  ------\n");
+  fprintf(f, "      name                  offset  mods   flags   fio  # locals  # args\n");
+  fprintf(f, "      --------------------- ------  ----  -------  ---  --------  ------\n");
   num_funcs_total = prog->last_inherited + prog->num_functions_defined;
 
   for (i = 0; i < num_funcs_total; i++) {
@@ -58,6 +97,15 @@ void dump_prog(program_t *prog, FILE *f, int flags) {
     }
 
     flags = prog->function_flags[runtime_index];
+
+    char smods[4];
+    smods[0] = (flags & DECL_HIDDEN) ? '-' : '-';
+    smods[0] = (flags & DECL_PRIVATE) ? 'p' : '-';
+    smods[0] = (flags & DECL_PROTECTED) ? 'P' : '-';
+    smods[0] = (flags & DECL_PUBLIC) ? '+' : '-';
+    smods[1] = (flags & DECL_NOMASK) ? 'm' : '-';
+    smods[2] = (flags & DECL_NOSAVE) ? 's' : '-';
+    smods[3] = '\0';
 
     sflags[0] = (flags & FUNC_INHERITED) ? 'i' : '-';
     sflags[1] = (flags & FUNC_UNDEFINED) ? 'u' : '-';
@@ -79,43 +127,19 @@ void dump_prog(program_t *prog, FILE *f, int flags) {
         }
       }
 
-      fprintf(f, "%4d: %-20s  %5d  %7s %5d\n", i, func_entry->funcname, low, sflags,
+      fprintf(f, "%4d: %-20s  %6d  %4s  %7s  %3d\n", i, func_entry->funcname, low, smods, sflags,
               runtime_index - prog->inherit[low].function_index_offset);
     } else {
-      fprintf(f, "%4d: %-20s  %5d  %7s      %7d   %5d\n", i, func_entry->funcname,
-              runtime_index - prog->last_inherited, sflags, func_entry->num_arg,
+      fprintf(f, "%4d: %-20s  %6d  %4s  %7s        %7d   %5d\n", i, func_entry->funcname,
+              runtime_index - prog->last_inherited, smods, sflags, func_entry->num_arg,
               func_entry->num_local);
     }
   }
-  fprintf(f, "VARIABLES:\n");
-  for (i = 0; i < prog->num_variables_defined; i++) {
-    fprintf(f, "%4d: %-12s\n", i, prog->variable_table[i]);
-  }
-  fprintf(f, "STRINGS:\n");
-  for (i = 0; i < prog->num_strings; i++) {
-    fprintf(f, "%4d: ", i);
-    for (j = 0; j < 32; j++) {
-      char c;
 
-      if (!(c = prog->strings[i][j])) {
-        break;
-      } else if (c == '\n') {
-        fprintf(f, "\\n");
-      } else {
-        fputc(c, f);
-      }
-    }
-    fputc('\n', f);
+  for (i = 0; i < prog->num_inherited; i++) {
+    dump_prog_details(prog->inherit[i].prog, f, flags);
   }
-
-  if (flags & 1) {
-    fprintf(f, "\n;;;  *** Disassembly ***\n");
-    disassemble(f, prog->program, 0, prog->program_size, prog);
-  }
-  if (flags & 2) {
-    fprintf(f, "\n;;;  *** Line Number Info ***\n");
-    dump_line_numbers(f, prog);
-  }
+  dump_prog_details(prog, f, flags);
 }
 
 static const char *disassem_string(const char *str) {
@@ -160,6 +184,37 @@ static int short_compare(const void *a, const void *b) {
 
 static const char *pushes[] = {"string", "number", "global", "local"};
 
+static void print_function_sig(FILE *f, program_t *prog, int idx) {
+  char buf[255];
+  auto end = &buf[sizeof(buf) - 1];
+
+  auto funp = prog->function_table[idx];
+  get_type_name(&buf[0], end, funp.type);
+  fprintf(f, "%s", buf);
+  fprintf(f, "%s", funp.funcname);
+
+  fprintf(f, "(");
+  unsigned short *types;
+  if (prog->type_start && prog->type_start[idx] != INDEX_START_NONE) {
+    types = &prog->argument_types[prog->type_start[idx]];
+  } else {
+    types = nullptr;
+  }
+  if (funp.num_arg > 0) {
+    if (types) {
+      for (int i = 0; i < funp.num_arg; i++) {
+        auto p = get_type_name(buf, end, types[i]);
+        *(p - 1) = '\0';  // get rid of last space
+        if (i != 0) fprintf(f, ",");
+        fprintf(f, "%s", buf);
+      }
+    } else {
+      fprintf(f, "args: %d", funp.num_arg);
+    }
+  }
+  fprintf(f, ")");
+}
+
 static void disassemble(FILE *f, char *code, int start, int end, program_t *prog) {
   extern int num_simul_efun;
   short instr;
@@ -198,47 +253,62 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
   int last_line = 0;
 
   while ((pc - code) < end) {
-    {
-      const char *new_file;
-      int new_line;
-      get_explicit_line_number_info(pc, prog, &new_file, &new_line);
-      if (last_file != new_file || last_line != new_line) {
-        last_file = new_file;
-        last_line = new_line;
-        fprintf(f, "# %s:%d\n", new_file, new_line);
-      }
-    }
     if ((next_func >= 0) && ((pc - code) >= offsets[next_func])) {
-      fprintf(f, "\n;; Function %s\n", prog->function_table[offsets[next_func + 1]].funcname);
+      if (next_func > 0) {
+        if (last_file && last_line > 0) {
+          fprintf(f, "; %s:%d\n", last_file, last_line);
+        }
+        last_file = nullptr;
+        last_line = 0;
+      }
+      fprintf(f, "\n;; Function: ");
+      auto func_idx = offsets[next_func + 1];
+      print_function_sig(f, prog, func_idx);
+      fprintf(f, "\n");
+
       next_func += 2;
       if (next_func >= (NUM_FUNS_D * 2)) {
         next_func = -1;
       }
     }
 
-    fprintf(f, "%04x: ", static_cast<unsigned>(pc - code));
-
+    auto saved_pc = pc;
     instr = *pc++;
     buff[0] = 0;
     sarg = 0;
 
+    {
+      const char *new_file = nullptr;
+      int new_line = 0;
+      get_explicit_line_number_info(pc, prog, &new_file, &new_line);
+      if (last_file != new_file || last_line != new_line) {
+        if (last_file && last_line > 0) {
+          fprintf(f, "; %s:%d\n", last_file, last_line);
+        }
+        last_file = new_file;
+        last_line = new_line;
+      }
+    }
+
     fflush(f);
+    fprintf(f, "%04tx: ", (pc - 1) - code);
 
     switch (instr) {
-      case F_PUSH:
-        fprintf(f, "push ");
+      case F_PUSH: {
+        auto p = buff;
+        p += sprintf(p, "push ");
         i = EXTRACT_UCHAR(pc++);
         while (i--) {
           j = EXTRACT_UCHAR(pc++);
-          fprintf(f, "%s %d", pushes[(j & PUSH_WHAT) >> 6], j & PUSH_MASK);
+          p += sprintf(p, "%s %d", pushes[(j & PUSH_WHAT) >> 6], j & PUSH_MASK);
           if (i) {
-            fprintf(f, ", ");
+            p += sprintf(p, ", ");
           } else {
             break;
           }
         }
-        fprintf(f, "\n");
-        continue;
+        break;
+      }
         /* Single numeric arg */
       case F_BRANCH_NE:
       case F_BRANCH_GE:
@@ -264,7 +334,6 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
         sprintf(buff, "%04x (%04x)", static_cast<unsigned>(sarg), static_cast<unsigned>(offset));
         pc += 2;
         break;
-
       case F_FOREACH: {
         int flags = EXTRACT_UCHAR(pc++);
         const char *left = "local", *right = "local";
@@ -341,7 +410,6 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
       case F_NEW_EMPTY_CLASS:
       case F_NEW_CLASS: {
         int which = EXTRACT_UCHAR(pc++);
-
         strcpy(buff, STRS[CLSS[which].classname]);
         break;
       }
@@ -370,15 +438,16 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
         break;
       }
       case F_GLOBAL_LVALUE:
-      case F_GLOBAL:
-        if (static_cast<unsigned>(iarg = EXTRACT_UCHAR(pc)) < NUM_VARS) {
-          sprintf(buff, "%s", variable_name(prog, iarg));
+      case F_GLOBAL: {
+        short iarg;
+        LOAD2(iarg, pc);
+        if (iarg < NUM_VARS) {
+          sprintf(buff, "%s(%d)", variable_name(prog, iarg), iarg);
         } else {
-          sprintf(buff, "<out of range %" LPC_INT_FMTSTR_P ">", iarg);
+          sprintf(buff, "<out of range %d >", iarg);
         }
-        pc++;
         break;
-
+      }
       case F_LOOP_INCR:
         sprintf(buff, "LV%d", EXTRACT_UCHAR(pc));
         pc++;
@@ -440,7 +509,7 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
         if (sarg >= num_simul_efun) {
           sprintf(buff, "<invalid %d> %d\n", sarg, pc[2]);
         } else {
-          sprintf(buff, "\"%s\" %d", simuls[sarg].func->funcname, pc[2]);
+          sprintf(buff, "\"%s\" args: %d", simuls[sarg].func->funcname, pc[2]);
         }
         pc += 3;
         break;
@@ -574,26 +643,44 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
         }
         continue;
       }
-      case F_EFUNV:
-        LOAD_SHORT(instr, pc);
-        sprintf(buff, "EFUN_V ARGS: %d", EXTRACT_UCHAR(pc++));
+      case F_EFUNV: {
+        short efun;
+        LOAD_SHORT(efun, pc);
+        auto args = EXTRACT_UCHAR(pc++);
+        sprintf(buff, "EFUN_V (ARGS: %d) %s(%d)", args, query_instr_name(efun), efun);
+        sprintf(buff, "EFUN: %s(%d)", query_instr_name(efun), efun);
         break;
+      }
       case F_EFUN0:
       case F_EFUN1:
       case F_EFUN2:
-      case F_EFUN3:
-        LOAD_SHORT(instr, pc);
-        sprintf(buff, "EFUN: %d", instr);
+      case F_EFUN3: {
+        short efun;
+        LOAD_SHORT(efun, pc);
+        sprintf(buff, "EFUN: %s(%d)", query_instr_name(efun), efun);
         break;
+      }
       case 0:
         fprintf(f, "*** zero opcode ***\n");
         continue;
       default:
-        fprintf(f, "*** %s (%d) ***\n", query_instr_name(instr), instr);
-        continue;
+        // fprintf(f, "*** %s (%d) ***\n", query_instr_name(instr), instr);
+        // continue;
+        break;
     }
-    fprintf(f, "%s %s\n", query_instr_name(instr), buff);
+    {
+      char tmp[256 + 1] = {};
+      auto p = &tmp[0];
+      while (saved_pc != pc) {
+        p += sprintf(p,  "%02hhX ", *saved_pc++);
+      }
+      fprintf(f, " %-25s", tmp);
+    }
+    fprintf(f, " %-20s; %s\n", query_instr_name(instr), buff);
   }
+
+  // print last line
+  fprintf(f, "; %s:%d\n", last_file, last_line);
 
   if (offsets) {
     free(offsets);

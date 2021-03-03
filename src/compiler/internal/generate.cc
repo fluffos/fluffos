@@ -436,7 +436,6 @@ void dump_tree(parse_node_t *expr) {
   if (!expr) {
     return;
   }
-
   switch (expr->kind) {
     case NODE_TERNARY_OP:
       printf("(%s ", instrs[expr->r.expr->v.number].name);
@@ -542,7 +541,6 @@ void dump_tree(parse_node_t *expr) {
       break;
     case NODE_TWO_VALUES:
       dump_tree(expr->l.expr);
-      printf("\n");
       dump_tree(expr->r.expr);
       break;
     case NODE_CONTROL_JUMP:
@@ -655,11 +653,15 @@ void dump_tree(parse_node_t *expr) {
       dump_expr_list(expr->r.expr);
       printf(")");
       break;
+    case NODE_FUNCTION:
+      printf("(function ");
+      dump_tree(expr->r.expr);
+      printf(")");
+      break;
     default:
-      printf("(unknown)");
+      printf("(unknown: %d)", expr->kind);
       break;
   }
-  fflush(stdout);
 }
 
 void lpc_tree_form(parse_node_t *expr, parse_node_t *dest) {
