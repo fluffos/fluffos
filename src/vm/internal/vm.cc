@@ -74,7 +74,6 @@ void vm_init() {
   init_strings();     /* in stralloc.c */
   init_identifiers(); /* in lex.c */
   init_locals();      /* in compiler.c */
-  init_living();      /* in add_actions.cc */
 
   max_eval_cost = CONFIG_INT(__MAX_EVAL_COST__);
   set_inc_list(CONFIG_STR(__INCLUDE_DIRS__));
@@ -83,6 +82,10 @@ void vm_init() {
   reset_machine(1);
 
   set_eval(max_eval_cost);
+
+#ifndef NO_ADD_ACTION
+  init_living();      /* in add_actions.cc */
+#endif
 }
 
 void vm_start() {
