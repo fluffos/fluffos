@@ -1530,12 +1530,14 @@ static const char *parse_one_plural(const char *str) {
         pbuf[sl - 1] = 0;
         return strcat(pbuf, "ves");
       }
+      break;
     case 'f':
       return strcat(pbuf, "ves");
     case 'h':
       if (ch2 == 's' || ch2 == 'c') {
         return strcat(pbuf, "hes");
       }
+      break;
     case 's':
       return strcat(pbuf, "ses");
     case 'x':
@@ -1549,6 +1551,7 @@ static const char *parse_one_plural(const char *str) {
           (ch2 == 'u' && ch3 == 'q')) {
         return strcat(pbuf, "ies");
       }
+      break;
   }
 
   if (EQ(str, "corpse")) {
