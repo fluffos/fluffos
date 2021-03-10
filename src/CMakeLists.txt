@@ -112,6 +112,7 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL
     "-Werror=format-security"
     $<$<COMPILE_LANGUAGE:C>:-Werror=implicit-function-declaration>
     # Turn off some warnings from GCC.
+    "-Wno-unknown-warning-option"
     "-Wno-char-subscripts"
     "-Wno-sign-compare"
     "-Wno-unused-function"
@@ -376,6 +377,8 @@ add_library(libdriver
   ${SRC} ${SRC_HEADER}
   )
 
+list(APPEND FLUFFOS_LIBRARIES libdriver)
+
 # JEMALLOC must be the first!
 if (CYGWIN)
   set(USE_JEMALLOC OFF)
@@ -399,14 +402,14 @@ endif ()
 target_link_libraries(libdriver PUBLIC ghc_filesystem)
 target_link_libraries(libdriver PRIVATE fmt::fmt-header-only)
 
-target_link_libraries(libdriver PUBLIC autogen)
+list(APPEND FLUFFOS_LIBRARIES autogen)
 
 add_subdirectory(packages) # provides FLUFFOS_PACKAGES
 message(STATUS "ALL PACKAGES: ${FLUFFOS_PACKAGES}")
 foreach (PACKAGE ${FLUFFOS_PACKAGES})
   # TODO: packages files currently depenends on generated headers, so they must be built after driver
   add_dependencies("${PACKAGE}" autogen)
-  target_link_libraries(libdriver PUBLIC "${PACKAGE}")
+  list(APPEND FLUFFOS_LIBRARIES "${PACKAGE}")
 endforeach ()
 
 add_subdirectory(thirdparty/crypt)
@@ -457,11 +460,17 @@ if (APPLE)
   set(LINK_NO_WHOLE_ARCHIVE "")
 endif()
 
+if(APPLE)
+  set(FLUFFOS_LINK ${LINK_WHOLE_ARCHIVE} ${FLUFFOS_LIBRARIES} ${LINK_NO_WHOLE_ARCHIVE})
+else()
+  set(FLUFFOS_LINK -Wl,--start-group ${FLUFFOS_LIBRARIES} -Wl,--end-group)
+endif()
+
 add_executable(driver "main.cc")
-target_link_libraries(driver PUBLIC ${LINK_WHOLE_ARCHIVE} libdriver ${LINK_NO_WHOLE_ARCHIVE})
+target_link_libraries(driver PUBLIC ${FLUFFOS_LINK})
 
 add_executable(lpcc "main_lpcc.cc")
-target_link_libraries(lpcc PUBLIC ${LINK_WHOLE_ARCHIVE} libdriver ${LINK_NO_WHOLE_ARCHIVE})
+target_link_libraries(lpcc PUBLIC ${FLUFFOS_LINK})
 
 include(helper)
 
