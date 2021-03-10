@@ -114,9 +114,13 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL
     # Turn off some warnings from GCC.
     "-Wno-char-subscripts"
     "-Wno-sign-compare"
+    "-Wno-unused-function"
     "-Wno-unused-parameter"
+    "-Wno-unused-variable"
+    "-Wno-unused-but-set-variable"
     # TODO: Code has a lot of implicit zero initializations
     "-Wno-missing-field-initializers"
+    "-Wno-missing-braces"
     # features
     "-fdiagnostics-show-option"
     "-fmessage-length=0"
