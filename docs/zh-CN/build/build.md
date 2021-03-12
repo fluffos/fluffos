@@ -22,11 +22,15 @@ v2019 版目前支持在以下系统中编译：ubuntu 18.04+ (包括 WSL), rasp
     # 如果要使用 v2017 版还需以下指令切换版本
     git checkout v2017
 
+如果你访问github.com速度太慢，可以使用国内镜像地址下载项目：
+
+    git clone https://gitee.com/mudren/fluffos.git
+
 ## Ubuntu & Raspberry 系统编译
 
 Ubuntu 系统请执行以下指令安装编译所需的包，包括编译 v2017 和 v2019 所需的库。
 
-    sudo apt install libjemalloc-dev bison zlib1g-dev libssl-dev libmariadb-dev libpcre3-dev libevent-dev libicu-dev gcc g++ autoconf automake cmake -y
+    sudo apt install bison libjemalloc-dev zlib1g-dev libssl-dev libmariadb-dev libpcre3-dev libevent-dev libicu-dev libdw-dev binutils-dev gcc g++ autoconf automake cmake git -y
 
 ### v2017 编译
 
@@ -56,7 +60,7 @@ v2017 编译完成后的驱动文件在 fluffos/bin 目录中，包括 `driver` 
 
 v2019 编译完成后的驱动文件在 fluffos/build/bin 目录中，包括 `driver`、`lpcc`、`portbind`三个程序和 `include`、`std`、`www`三个目录，分别是驱动定义的头文件、驱动提供的sefun和 websocket 的 http dir 目录。
 
-补充说明：经测试在CentOS 7下也可编译通过，不过 CentOS 7 系统 cmake 和 g++ 版本过低，可使用以下指令更新：
+补充说明，经测试在CentOS 7下也可编译通过，不过 CentOS 7 系统 cmake 和 g++ 版本过低，可使用以下指令更新：
 
     # 更新cmake
     sudo yum -y install python-pip
@@ -65,6 +69,8 @@ v2019 编译完成后的驱动文件在 fluffos/build/bin 目录中，包括 `dr
     sudo yum install centos-release-scl -y
     sudo yum install devtoolset-8 -y
     scl enable devtoolset-8 bash
+
+另外，还需要下载源码编译安装libevent、libicu等，相对ubuntu来说，麻烦很多，问题也很多，都需要自己根据提示处理，不推荐尝试。
 
 ## Windows 系统编译
 
@@ -107,19 +113,28 @@ CYGWIN下载地址： http://www.cygwin.org/setup-x86_64.exe
 
 FluffOS v2019 如果要在 windows 系统下使用，可以在 MSYS2 环境编译。如果对 MSYS2 不了解，请先补充相关知识。
 
-MSYS2 官方网站：https://www.msys2.org/ 下载安装后需运行 Mingw-w64 64 bit，更新系统并安装必须的包，国外镜像速度慢，可以先根据以下配置修改为国内镜像：
+MSYS2 官方网站：https://www.msys2.org/ 下载安装后需运行 Mingw-w64 64 bit，更新系统并安装必须的包，国外镜像速度慢，最新版配置中包括了国内镜像，但非优先使用，可以先根据以下配置修改：
 
-编辑 `/etc/pacman.d/mirrorlist.mingw32` ，在文件开头添加：
+编辑 `/etc/pacman.d/mirrorlist.mingw32` ，把以下镜像放在文件开头：
 
-    Server = http://mirrors.ustc.edu.cn/msys2/mingw/i686
+    Server = http://mirror.bit.edu.cn/msys2/mingw/i686/
+    Server = http://mirrors.ustc.edu.cn/msys2/mingw/i686/
+    Server = https://mirrors.sjtug.sjtu.edu.cn/msys2/mingw/i686/
+    Server = https://mirrors.tuna.tsinghua.edu.cn/msys2/mingw/i686/
 
-编辑 `/etc/pacman.d/mirrorlist.mingw64` ，在文件开头添加：
+编辑 `/etc/pacman.d/mirrorlist.mingw64` ，把以下镜像放在文件开头：
 
-    Server = http://mirrors.ustc.edu.cn/msys2/mingw/x86_64
+    Server = http://mirror.bit.edu.cn/msys2/mingw/x86_64/
+    Server = http://mirrors.ustc.edu.cn/msys2/mingw/x86_64/
+    Server = https://mirrors.sjtug.sjtu.edu.cn/msys2/mingw/x86_64/
+    Server = https://mirrors.tuna.tsinghua.edu.cn/msys2/mingw/x86_64/
 
-编辑 `/etc/pacman.d/mirrorlist.msys` ，在文件开头添加：
+编辑 `/etc/pacman.d/mirrorlist.msys` ，把以下镜像放在文件开头：
 
-    Server = http://mirrors.ustc.edu.cn/msys2/msys/$arch
+    Server = http://mirror.bit.edu.cn/msys2/msys/$arch/
+    Server = http://mirrors.ustc.edu.cn/msys2/msys/$arch/
+    Server = https://mirrors.sjtug.sjtu.edu.cn/msys2/msys/$arch/
+    Server = https://mirrors.tuna.tsinghua.edu.cn/msys2/msys/$arch/
 
 然后执行 `pacman -Sy` 刷新源。
 
@@ -146,7 +161,26 @@ MSYS2 官方网站：https://www.msys2.org/ 下载安装后需运行 Mingw-w64 6
 
     rm -rf build && mkdir build && cd build
     OPENSSL_ROOT_DIR="/usr/local/opt/openssl" ICU_ROOT="/usr/local/opt/icu4c" cmake ..
-    make install
+    make -j4 install
+
+## 友情提示
+
+因为最新版驱动不定期更新，为了方便更新编译，可以在你的 fluffos 源码目录下新建一个脚本文件 `build.sh`，内容如下：
+
+```bash
+#!/bin/bash
+
+git pull
+rm -rf build
+mkdir build && cd build
+cmake .. && make -j4 install
+```
+
+然后使用 `chmod +x build.sh` 让脚本可执行，以后只需在源码目录中输入 `./build.sh` 即可自动下载更新并编译驱动。
+
+如果你使用的是windows系统，不想自己每次编译新版，可在此下载最新版驱动：https://bbs.mud.ren/threads/4
+
+如果你习惯使用docker，也可以使用fluffos驱动的docker镜像：https://hub.docker.com/r/fluffos/fluffos
 
 ## 编译演示
 
