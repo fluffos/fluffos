@@ -549,6 +549,11 @@ void db_cleanup(void) {
 int create_db_conn(void) {
   int i;
 
+#ifdef PACKAGE_ASYNC
+  pthread_mutex_lock(db_mut);
+  DEFER { pthread_mutex_unlock(db_mut); };
+#endif
+
   /* allocate more slots if we need them */
   if (dbConnAlloc == dbConnUsed) {
     i = dbConnAlloc;
@@ -556,13 +561,7 @@ int create_db_conn(void) {
     if (!dbConnList) {
       dbConnList = (db_t *)DCALLOC(dbConnAlloc, sizeof(db_t), TAG_DB, "create_db_conn");
     } else {
-#ifdef PACKAGE_ASYNC
-      pthread_mutex_lock(db_mut);
-#endif
       dbConnList = RESIZE(dbConnList, dbConnAlloc, db_t, TAG_DB, "create_db_conn");
-#ifdef PACKAGE_ASYNC
-      pthread_mutex_unlock(db_mut);
-#endif
     }
     while (i < dbConnAlloc) {
       dbConnList[i++].flags = DB_FLAG_EMPTY;
