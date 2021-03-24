@@ -5,7 +5,7 @@
 
 private nosave string b64chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/" ;
 
-string base64encode( string source )
+string base64encode(string source_str)
 {
     string *b ;
     string r = "";
@@ -14,8 +14,9 @@ string base64encode( string source )
     int n;
     int n1, n2, n3, n4;
     int rlen, slen, plen;
+    buffer source = string_encode(source_str, "UTF-8");
 
-    if( nullp( source ) || !strlen( source ) )
+    if( nullp( source_str ) || !sizeof( source_str ) )
     {
         error("Missing argument 1 to base64encode") ;
     }
@@ -54,15 +55,15 @@ string base64encode( string source )
     return r;
 }
 
-string base64decode( string source )
+string base64decode(string source)
 {
     string *b ;
     string f = "";
-    int i;
+    int i, j;
     int c;
     int n;
     int plen = 0;
-    string r = "";
+    buffer result;
 
     if( nullp( source ) || !strlen( source ) )
     {
@@ -96,6 +97,8 @@ string base64decode( string source )
     if (sizeof(f) % 4)
         return "Invalid input.";
 
+    result = allocate_buffer(sizeof(f) / 4 * 3);
+    j = 0;
     for (i = 0; i < sizeof(f); i += 4)
     {
         c = strsrch(b64chars, f[i]);
@@ -107,8 +110,10 @@ string base64decode( string source )
         c = strsrch(b64chars, f[i+3]);
         n += c;
 
-        r += "" + sprintf("%c%c%c", ((n >> 16) & 0xFF), ((n >> 8) & 0xFF), (n & 0xFF));
+        result[j++] = (n >> 16) & 0xFF;
+        result[j++] = (n >> 8) & 0xFF;
+        result[j++] = n & 0xFF;
     }
 
-    return r;
+    return string_decode(result, "UTF-8");
 }

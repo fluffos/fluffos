@@ -672,7 +672,7 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
       char tmp[256 + 1] = {};
       auto p = &tmp[0];
       while (saved_pc != pc) {
-        p += sprintf(p,  "%02hhX ", *saved_pc++);
+        p += sprintf(p, "%02hhX ", *saved_pc++);
       }
       fprintf(f, " %-25s", tmp);
     }
