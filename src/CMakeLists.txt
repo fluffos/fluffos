@@ -376,6 +376,7 @@ add_dependencies(autogen make_options_defs)
 add_library(libdriver
   ${SRC} ${SRC_HEADER}
   )
+add_dependencies(libdriver autogen)
 
 list(APPEND FLUFFOS_LIBRARIES libdriver)
 
