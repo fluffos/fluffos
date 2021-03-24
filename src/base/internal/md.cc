@@ -59,7 +59,7 @@ void MDmalloc(md_node_t *node, int size, int tag, const char *desc) {
   assert(desc != nullptr);
 
   if (malloc_mask == node->tag) {
-    debug_message("%d MDmalloc: %5d, [%-25s], %8lx:(%d)\n", node->id, node->tag, node->desc,
+    debug_message("%d MDmalloc: %5d, [%-25s], %p:(%d)\n", node->id, node->tag, node->desc,
                   PTR(node), node->size);
   }
 #endif
