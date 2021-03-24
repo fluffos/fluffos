@@ -84,7 +84,7 @@ void vm_init() {
   set_eval(max_eval_cost);
 
 #ifndef NO_ADD_ACTION
-  init_living();      /* in add_actions.cc */
+  init_living(); /* in add_actions.cc */
 #endif
 }
 

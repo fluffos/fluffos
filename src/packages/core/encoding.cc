@@ -137,6 +137,9 @@ void f_string_decode() {
   auto data = (char *)((sp - 1)->u.buf->item);
   auto len = (sp - 1)->u.buf->size;
 
+  // get rid of all ending '\0's from buffer.
+  while (len > 1 && data[len - 1] == '\0') len--;
+
   UErrorCode error_code = U_ZERO_ERROR;
   auto trans = ucnv_open(encoding, &error_code);
   if (U_FAILURE(error_code)) {
