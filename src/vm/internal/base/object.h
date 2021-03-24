@@ -44,7 +44,7 @@
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
 #define O_EFUN_SOCKET 0x800u /* efun socket references object     */
 #endif
-#define O_WILL_RESET 0x100u /* reset will be called next time    */
+#define O_WILL_RESET 0x1000u /* reset will be called next time    */
 #ifndef OLD_ED
 #define O_IN_EDIT 0x2000u /* object has an ed buffer open      */
 #endif
