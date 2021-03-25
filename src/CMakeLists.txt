@@ -411,6 +411,7 @@ foreach (PACKAGE ${FLUFFOS_PACKAGES})
   # TODO: packages files currently depenends on generated headers, so they must be built after driver
   add_dependencies("${PACKAGE}" autogen)
   list(APPEND FLUFFOS_LIBRARIES "${PACKAGE}")
+  target_link_libraries(libdriver PUBLIC "${PACKAGE}")
 endforeach ()
 
 add_subdirectory(thirdparty/crypt)
