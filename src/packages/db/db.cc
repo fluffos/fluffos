@@ -376,10 +376,6 @@ void f_db_exec(void) {
   }
 
 #ifdef PACKAGE_ASYNC
-  if (!db_mut) {
-    db_mut = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
-    pthread_mutex_init(db_mut, nullptr);
-  }
   pthread_mutex_lock(db_mut);
 #endif
   if (db->type->cleanup) {
@@ -550,6 +546,10 @@ int create_db_conn(void) {
   int i;
 
 #ifdef PACKAGE_ASYNC
+  if (!db_mut) {
+    db_mut = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+    pthread_mutex_init(db_mut, nullptr);
+  }
   pthread_mutex_lock(db_mut);
   DEFER { pthread_mutex_unlock(db_mut); };
 #endif
