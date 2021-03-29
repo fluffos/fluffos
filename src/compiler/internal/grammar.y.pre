@@ -2769,7 +2769,7 @@ expr4:
 
       current_function_context = $<contextp>3;
 
-      if (!current_function_context || current_function_context->num_parameters == -2) {
+      if (!current_function_context || current_function_context->num_parameters < 0) {
         /* This was illegal, and error'ed when the '$' token
          * was returned.
          */

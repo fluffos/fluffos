@@ -2024,7 +2024,7 @@ int yylex() {
           yyerror("$var illegal outside of function pointer.");
           return '$';
         }
-        if (current_function_context->num_parameters == -2) {
+        if (current_function_context->num_parameters < 0) {
           yyerror("$var illegal inside anonymous function pointer.");
           return '$';
         } else {
