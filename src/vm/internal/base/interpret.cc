@@ -1914,14 +1914,16 @@ void eval_instruction(char *p) {
           i = EXTRACT_UCHAR(pc++);
           switch (i & PUSH_WHAT) {
             case PUSH_STRING:
-              DEBUG_CHECK1((i & PUSH_MASK) >= current_prog->num_strings,
-                           "string %d out of range in F_STRING!\n", i & PUSH_MASK);
+              if ((i & PUSH_MASK) >= current_prog->num_strings) {
+                error("Invalid Program: string %d out of range in F_STRING!", i & PUSH_MASK);
+              }
               push_shared_string(current_prog->strings[i & PUSH_MASK]);
               break;
             case PUSH_LOCAL:
               lval = fp + (i & PUSH_MASK);
-              DEBUG_CHECK((fp - lval) >= csp->num_local_variables,
-                          "Tried to push non-existent local\n");
+              if ((fp - lval) >= csp->num_local_variables) {
+                error("Invalid Program: op PUSH Tried to push non-existent local\n");
+              }
               if ((lval->type == T_OBJECT) && (lval->u.ob->flags & O_DESTRUCTED)) {
                 assign_svalue(lval, &const0u);
               }
@@ -1941,7 +1943,9 @@ void eval_instruction(char *p) {
         }
         break;
       case F_INC:
-        DEBUG_CHECK(sp->type != T_LVALUE, "non-lvalue argument to ++\n");
+        if (sp->type != T_LVALUE) {
+          error("Invalid Program: non-lvalue argument to ++\n");
+        }
         lval = (sp--)->u.lvalue;
         switch (lval->type) {
           case T_NUMBER:
@@ -2259,7 +2263,9 @@ void eval_instruction(char *p) {
         svalue_t *s;
 
         s = fp + EXTRACT_UCHAR(pc++);
-        DEBUG_CHECK((fp - s) >= csp->num_local_variables, "Tried to push non-existent local\n");
+        if ((fp - s) >= csp->num_local_variables) {
+          error("Invalid Program: op F_TRANSFER_LOCAL Tried to push non-existent local.");
+        }
         if ((s->type == T_OBJECT) && (s->u.ob->flags & O_DESTRUCTED)) {
           assign_svalue(s, &const0u);
         }
@@ -2272,7 +2278,8 @@ void eval_instruction(char *p) {
         svalue_t *s;
 
         s = fp + EXTRACT_UCHAR(pc++);
-        DEBUG_CHECK((fp - s) >= csp->num_local_variables, "Tried to push non-existent local\n");
+        if ((fp - s) >= csp->num_local_variables)
+          error("Invalid Program: op F_LOCAL Tried to push non-existent local.");
 
         /*
          * If variable points to a destructed object, replace it
@@ -2427,7 +2434,7 @@ void eval_instruction(char *p) {
       }
       case F_VOID_ADD_EQ:
       case F_ADD_EQ:
-        DEBUG_CHECK(sp->type != T_LVALUE, "non-lvalue argument to +=\n");
+        if (sp->type != T_LVALUE) error("Invalid Program: non-lvalue argument to +=.");
         lval = sp->u.lvalue;
         sp--; /* points to the RHS */
         switch (lval->type) {
@@ -2610,9 +2617,10 @@ void eval_instruction(char *p) {
           STACK_INC;
           sp->type = T_REF;
           sp->u.ref = ref;
-          DEBUG_CHECK(loc->type != T_NUMBER && loc->type != T_REF,
-                      "Somehow a reference in foreach acquired a value before "
-                      "coming into scope");
+          if (loc->type != T_NUMBER && loc->type != T_REF)
+            error(
+                "Invalid Program: Somehow a reference in foreach acquired a value before coming "
+                "into scope.");
           loc->type = T_REF;
           loc->u.ref = ref;
           ref->ref++;
@@ -2889,9 +2897,9 @@ void eval_instruction(char *p) {
          * must look in the last table, which is pointed to by
          * current_object.
          */
-        DEBUG_CHECK(offset >= current_object->prog->last_inherited +
-                                  current_object->prog->num_functions_defined,
-                    "Illegal function index\n");
+        if (offset >=
+            current_object->prog->last_inherited + current_object->prog->num_functions_defined)
+          error("Invalid Program: Illegal function index.");
 
         if (current_object->prog->function_flags[offset] & FUNC_ALIAS) {
           offset = current_object->prog->function_flags[offset] & ~FUNC_ALIAS;
@@ -2966,7 +2974,7 @@ void eval_instruction(char *p) {
         push_number(1);
         break;
       case F_PRE_DEC:
-        DEBUG_CHECK(sp->type != T_LVALUE, "non-lvalue argument to --\n");
+        if (sp->type != T_LVALUE) error("Invalid Program: non-lvalue argument to --.");
         lval = sp->u.lvalue;
         switch (lval->type) {
           case T_NUMBER:
@@ -2991,7 +2999,7 @@ void eval_instruction(char *p) {
         }
         break;
       case F_DEC:
-        DEBUG_CHECK(sp->type != T_LVALUE, "non-lvalue argument to --\n");
+        if (sp->type != T_LVALUE) error("Invalid Program: non-lvalue argument to --.");
         lval = (sp--)->u.lvalue;
         switch (lval->type) {
           case T_NUMBER:
@@ -3084,7 +3092,7 @@ void eval_instruction(char *p) {
         break;
       }
       case F_PRE_INC:
-        DEBUG_CHECK(sp->type != T_LVALUE, "non-lvalue argument to ++\n");
+        if (sp->type != T_LVALUE) error("Invalid Program: non-lvalue argument to ++.");
         lval = sp->u.lvalue;
         switch (lval->type) {
           case T_NUMBER:
@@ -3418,7 +3426,7 @@ void eval_instruction(char *p) {
         pop_stack();
         break;
       case F_POST_DEC:
-        DEBUG_CHECK(sp->type != T_LVALUE, "non-lvalue argument to --\n");
+        if (sp->type != T_LVALUE) error("Invalid Program: non-lvalue argument to --.");
         lval = sp->u.lvalue;
         switch (lval->type) {
           case T_NUMBER:
@@ -3443,7 +3451,7 @@ void eval_instruction(char *p) {
         }
         break;
       case F_POST_INC:
-        DEBUG_CHECK(sp->type != T_LVALUE, "non-lvalue argument to ++\n");
+        if (sp->type != T_LVALUE) error("Invalid Program: non-lvalue argument to ++.");
         lval = sp->u.lvalue;
         switch (lval->type) {
           case T_NUMBER:
@@ -3576,13 +3584,13 @@ void eval_instruction(char *p) {
         break;
       case F_STRING:
         LOAD_SHORT(offset, pc);
-        DEBUG_CHECK1(offset >= current_prog->num_strings, "string %d out of range in F_STRING!\n",
-                     offset);
+        if (offset >= current_prog->num_strings)
+          error("Invalid Program: string %d out of range in F_STRING!", offset);
         push_shared_string(current_prog->strings[offset]);
         break;
       case F_SHORT_STRING:
-        DEBUG_CHECK1(EXTRACT_UCHAR(pc) >= current_prog->num_strings,
-                     "string %d out of range in F_STRING!\n", EXTRACT_UCHAR(pc));
+        if (EXTRACT_UCHAR(pc) >= current_prog->num_strings)
+          error("Invalid Program: string %d out of range in F_STRING!", EXTRACT_UCHAR(pc));
         push_shared_string(current_prog->strings[EXTRACT_UCHAR(pc++)]);
         break;
       case F_SUBTRACT: {
@@ -3807,13 +3815,7 @@ static void do_catch(char *pc, unsigned short new_pc_offset) {
   save_context(&econ);
   push_control_stack(FRAME_CATCH);
   csp->pc = current_prog->program + new_pc_offset;
-  if (CONFIG_INT(__RC_TRACE_CODE__)) {
-    csp->num_local_variables = (csp - 1)->num_local_variables; /* marion */
-  } else {
-#if defined(DEBUG)
-    csp->num_local_variables = (csp - 1)->num_local_variables; /* marion */
-#endif
-  }
+  csp->num_local_variables = (csp - 1)->num_local_variables;
 
   assign_svalue(&catch_value, &const1);
   try {
