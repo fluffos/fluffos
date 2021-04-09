@@ -5,21 +5,30 @@ title: contrib / fetch_variable.pre
 
 ### NAME
 
-    fetch_variable
+    fetch_variable - fetch a value stored in an object's global variable
 
 ### SYNOPSIS
 
-    mixed fetch_variable(string, object | void);
+    mixed fetch_variable(string variable_name, object ob | void);
 
 ### DESCRIPTION
 
-    object defaults to this_object()
-    string is name of global variable (not private!!!) in object
+    This efun returns the value stored in the global variable variable_name in ob.
+    The variable must not be private.
 
-    returns object.string
+    variable_name is name of the global variable
+    ob defaults to this_object() if not specified
 
-    POSSIBLE SECURITY HAZARD!!!!
+    This is a potential security hazard and, therefore, you may wish to overload
+    this function to perform security checks.
+
+### EXAMPLE
+
+    int weight = fetch_variable( "weight", this_player() ) ;
+    printf("%d\n", weight") ;
+    
+    // result: 150
 
 ### SEE ALSO
 
-    store_variable(3)
+    store_variable
