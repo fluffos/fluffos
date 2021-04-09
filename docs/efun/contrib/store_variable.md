@@ -5,23 +5,28 @@ title: contrib / store_variable.pre
 
 ### NAME
 
-    store_variable - store object's global variable
+    store_variable - store a value in an object's global variable
 
 ### SYNOPSIS
 
-    void store_variable(string, mixed, object | void);
+    void store_variable(string variable_name, mixed value, object ob | void);
 
 ### DESCRIPTION
 
-    object defaults to this_object()
-    string is name of global variable (not private!!!) in object
+    This efun stores the value in the global variable variable_name in ob.
+    The variable must not be private.
 
-    object.string = mixed
+    variable_name is name of the global variable
+    value is the data to be stored in the global variable
+    ob defaults to this_object() if not specified
 
-    POSSIBLE SECURITY HAZARD!!!!
-    store_variable("access_level", maximum, find_object(myself))
-    [or equivalent depending on mudlib)
+    This is a potential security hazard and, therefore, you may wish to overload
+    this function to perform security checks.
+
+### EXAMPLE
+
+    store_variable( "weight", 150, this_player() ) ;
 
 ### SEE ALSO
 
-    fetch_variable(3)
+    fetch_variable
