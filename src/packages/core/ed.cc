@@ -631,7 +631,7 @@ static int prntln(char *str, char *outstr, int vflg, int lineno) {
       break;
     }
     // output special ASCII control code
-    if (*str < ' ' || *str == DEL) {
+    if ((*str >= 0 && *str < ' ') || *str == DEL) {
       switch (*str) {
         case '\t':
           /* have to be smart about this or the indentor will fail */
