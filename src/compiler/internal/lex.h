@@ -112,7 +112,7 @@ extern int arrow_efun, evaluate_efun, this_efun, to_float_efun, to_int_efun, new
 
 void push_function_context(void);
 void pop_function_context(void);
-int yylex(void);
+int yylex(bool in_lpcfmt = false);
 void init_num_args(void);
 const char *query_instr_name(int);
 char *get_f_name(int);

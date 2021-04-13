@@ -10,6 +10,7 @@
 %{
 // #include "base/std.h"
 
+// #include "compiler/internal/grammar_rules.h"
 // #include "vm/vm.h"
 // #include "vm/internal/base/machine.h"
 // #include "compiler/internal/compiler.h"
@@ -41,6 +42,7 @@ int func_present;
 int yyparse (void);
 
 %}
+
 /*
  * Token definitions.
  *
@@ -53,7 +55,6 @@ int yyparse (void);
  *      '{'  '}'  ','  ';'  ':'
  *      '('  ')'  '['  ']'  '$'
  */
-
 %token L_STRING L_NUMBER L_REAL
 %token L_BASIC_TYPE L_TYPE_MODIFIER
 %token L_DEFINED_NAME L_IDENTIFIER
@@ -75,22 +76,21 @@ int yyparse (void);
 %token L_ARRAY_OPEN L_MAPPING_OPEN L_FUNCTION_OPEN L_NEW_FUNCTION_OPEN
 
 %token L_SSCANF L_CATCH
-#ifdef DEBUG
-%token L_TREE
-#endif
-#ifdef ARRAY_RESERVED_WORD
 %token L_ARRAY
-#endif
-#ifdef REF_RESERVED_WORD
 %token L_REF
-#endif
 %token L_PARSE_COMMAND L_TIME_EXPRESSION
 %token L_CLASS L_NEW
 %token L_PARAMETER
 
+// only in DEBUG
+%token L_TREE
+
 #ifdef COMPAT_32
 %token L_LAMBDA
 #endif
+
+// Only ever used in lpcfmt
+%token L_PREPROCESSOR_COMMAND
 
 /*
  * 'Dangling else' shift/reduce conflict is well known...
@@ -133,7 +133,7 @@ int yyparse (void);
   LPC_INT number; /* 8 */
   LPC_FLOAT real; /* 8 */
   char *string;
-  struct { short num_arg; char flags; } argument;
+  struct argument_t argument;
   ident_hash_elem_t *ihe;
   parse_node_t *node;
   function_context_t *contextp;
@@ -183,9 +183,7 @@ int yyparse (void);
 %type <number> type optional_star type_modifier_list
 %type <number> opt_basic_type L_TYPE_MODIFIER L_BASIC_TYPE basic_type atomic_type
 %type <number> cast arg_type
-#ifdef ARRAY_RESERVED_WORD
 %type <number> opt_atomic_type
-#endif
 
 /* This holds compressed and less flexible def_name information */
 %type <number> L_NEW_FUNCTION_OPEN l_new_function_open
@@ -206,11 +204,9 @@ int yyparse (void);
 %type <node> case_label statements switch_block
 %type <node> expr_list_node expr_or_block
 %type <node> single_new_local_def_with_init
-%type <node> class_init opt_class_init all def
+%type <node> class_init opt_class_init all def function
 %type <node> program modifier_change inheritance type_decl
-#ifdef DEBUG
 %type <node> tree
-#endif
 
 /* The following hold information about blocks and local vars */
 %type <decl> local_declarations local_name_list block decl_block
@@ -222,285 +218,67 @@ int yyparse (void);
 %%
 
 all:
-  program
-    {
-      comp_trees[TREE_MAIN] = $$;
-    }
+  program { rule_program($$); }
 ;
 
 program:
-  program def possible_semi_colon
-    {
-      CREATE_TWO_VALUES($$, 0, $1, $2);
-    }
-  | /* empty */
-    {
-      $$ = 0;
-    }
+  program def possible_semi_colon { CREATE_TWO_VALUES($$, 0, $1, $2); }
+  | /* empty */ { $$ = 0; }
 ;
 
 possible_semi_colon:
   /* empty */
-  | ';'
-    {
-      yywarn("Extra ';'. Ignored.");
-    }
+  | ';' { yywarn("Extra ';'. Ignored."); }
 ;
 
 inheritance:
-  type_modifier_list L_INHERIT string_con1 ';'
-    {
-      object_t *ob;
-      inherit_t inherit;
-      int initializer;
-#ifdef SENSIBLE_MODIFIERS
-      int acc_mod;
-#endif
-
-      $1 |= global_modifiers;
-
-#ifdef SENSIBLE_MODIFIERS
-      acc_mod = ($1 & DECL_ACCESS) & ~global_modifiers;
-      if (acc_mod & (acc_mod - 1)) {
-        char buf[256];
-        char *end = EndOf(buf);
-        char *p;
-
-        p = strput(buf, end, "Multiple access modifiers (");
-        p = get_type_modifiers(p, end, $1);
-        p = strput(p, end, ") for inheritance");
-        yyerror(buf);
-      }
-#endif
-
-      if (!($1 & DECL_ACCESS)) $1 |= DECL_PUBLIC;
-      if (var_defined)
-        yyerror("Illegal to inherit after defining global variables.");
-      if (var_defined){
-        inherit_file = 0;
-        YYACCEPT;
-      }
-      ob = find_object2($3);
-      if (ob == 0) {
-        inherit_file = alloc_cstring($3, "inherit");
-        /* Return back to load_object() */
-        YYACCEPT;
-      }
-      scratch_free($3);
-      inherit.prog = ob->prog;
-
-      if (mem_block[A_INHERITS].current_size){
-        inherit_t *prev_inherit = INHERIT(NUM_INHERITS - 1);
-
-        inherit.function_index_offset
-          = prev_inherit->function_index_offset
-          + prev_inherit->prog->num_functions_defined
-          + prev_inherit->prog->last_inherited;
-        if (prev_inherit->prog->num_functions_defined &&
-            prev_inherit->prog->function_table[prev_inherit->prog->num_functions_defined - 1].funcname[0] == APPLY___INIT_SPECIAL_CHAR)
-          inherit.function_index_offset--;
-      } else inherit.function_index_offset = 0;
-
-      inherit.variable_index_offset =
-        mem_block[A_VAR_TEMP].current_size /
-        sizeof (variable_t);
-      inherit.type_mod = $1;
-      add_to_mem_block(A_INHERITS, (char *)&inherit, sizeof inherit);
-
-      /* The following has to come before copy_vars - Sym */
-      copy_structures(ob->prog);
-      copy_variables(ob->prog, $1);
-      initializer = copy_functions(ob->prog, $1);
-      if (initializer >= 0) {
-        parse_node_t *node, *newnode;
-        /* initializer is an index into the object we're
-           inheriting's function table; this finds the
-           appropriate entry in our table and generates
-           a call to it */
-        node = new_node_no_line();
-        node->kind = NODE_CALL_2;
-        node->r.expr = 0;
-        node->v.number = F_CALL_INHERITED;
-        node->l.number = initializer | ((NUM_INHERITS - 1) << 16);
-        node->type = TYPE_ANY;
-
-        /* The following illustrates a distinction between */
-        /* macros and funcs...newnode is needed here - Sym */
-        newnode = comp_trees[TREE_INIT];
-        CREATE_TWO_VALUES(comp_trees[TREE_INIT],0, newnode, node);
-        comp_trees[TREE_INIT] = pop_value(comp_trees[TREE_INIT]);
-
-      }
-      $$ = 0;
-    }
+  type_modifier_list L_INHERIT string_con1 ';' { if (rule_inheritence(&$$, $1, $3)) { YYACCEPT; } }
 ;
 
 real:
-  L_REAL
-    {
-      CREATE_REAL($$, $1);
-    }
+  L_REAL { CREATE_REAL($$, $1); }
 ;
 
 number:
-  L_NUMBER
-    {
-      CREATE_NUMBER($$, $1);
-    }
+  L_NUMBER { CREATE_NUMBER($$, $1); }
 ;
 
 optional_star:
-  /* empty */
-    {
-      $$ = 0;
-    }
-  |   '*'
-    {
-      $$ = TYPE_MOD_ARRAY;
-    }
+  /* empty */   { $$ = 0; }
+  |   '*'       { $$ = TYPE_MOD_ARRAY; }
 ;
 
 block_or_semi:
   block
-    {
-      $$ = $1.node;
-      if (!$$) {
-        CREATE_RETURN($$, 0);
-      }
-    }
-  |   ';'
-    {
-      $$ = 0;
-    }
-  | error
-    {
-      $$ = 0;
-    }
+          {
+            $$ = $1.node;
+            if (!$$) {
+              CREATE_RETURN($$, 0);
+            }
+          }
+  |   ';' { $$ = 0; }
+  | error { $$ = 0; }
 ;
 
 identifier:
-  L_DEFINED_NAME
-    {
-      $$ = scratch_copy($1->name);
-    }
+  L_DEFINED_NAME { $$ = scratch_copy($1->name); }
   |  L_IDENTIFIER
 ;
 
+function:
+  type optional_star identifier   { $1 = rule_func_type($1, $2, $3); }
+    '(' argument ')'              { $<number>$ = rule_func_proto($1, $2, &$3, $6); }
+      block_or_semi               { rule_func(&$$, $1, $2, $3, $6, &$<number>8, &$9); }
+
+
 def:
-  type optional_star identifier
-    {
-      int flags;
-#ifdef SENSIBLE_MODIFIERS
-      int acc_mod;
-#endif
-      func_present = 1;
-      flags = ($1 >> 16);
-
-      flags |= global_modifiers;
-
-#ifdef SENSIBLE_MODIFIERS
-      acc_mod = (flags & DECL_ACCESS) & ~global_modifiers;
-      if (acc_mod & (acc_mod - 1)) {
-        char buf[256];
-        char *end = EndOf(buf);
-        char *p;
-
-        p = strput(buf, end, "Multiple access modifiers (");
-        p = get_type_modifiers(p, end, flags);
-        p = strput(p, end, ") for function");
-        yyerror(buf);
-      }
-#endif
-
-      if (!(flags & DECL_ACCESS)) flags |= DECL_PUBLIC;
-#ifdef SENSIBLE_MODIFIERS
-      if (flags & DECL_NOSAVE) {
-        yywarn("Illegal to declare nosave function.");
-        flags &= ~DECL_NOSAVE;
-      }
-#endif
-      $1 = (flags << 16) | ($1 & 0xffff);
-      /* Handle type checking here so we know whether to typecheck
-         'argument' */
-      if ($1 & 0xffff) {
-        if (CONFIG_INT(__RC_OLD_TYPE_BEHAVIOR__)) {
-          exact_types = 0;
-        } else {
-          exact_types = ($1& 0xffff) | $2;
-        }
-      } else {
-        if (pragmas & PRAGMA_STRICT_TYPES) {
-          if (strcmp($3, "create") != 0)
-            yyerror("\"#pragma strict_types\" requires type of function");
-          else
-            exact_types = TYPE_VOID; /* default for create() */
-        } else
-          exact_types = 0;
-      }
-    }
-  '(' argument ')'
-    {
-      char *p = $3;
-      $3 = (char *)make_shared_string($3);
-      scratch_free(p);
-
-      /* If we had nested functions, we would need to check */
-      /* here if we have enough space for locals */
-
-      /*
-       * Define a prototype. If it is a real function, then the
-       * prototype will be replaced below.
-       */
-
-      $<number>$ = FUNC_PROTOTYPE;
-      if ($6.flags & ARG_IS_VARARGS) {
-        $<number>$ |= (FUNC_TRUE_VARARGS | FUNC_VARARGS);
-      }
-      $<number>$ |= ($1 >> 16);
-
-      define_new_function($3, $6.num_arg, 0, $<number>$, ($1 & 0xffff)| $2);
-      /* This is safe since it is guaranteed to be in the
-         function table, so it can't be dangling */
-      free_string($3);
-      context = 0;
-    }
-  block_or_semi
-    {
-      /* Either a prototype or a block */
-      if ($9) {
-        int fun;
-
-        $<number>8 &= ~FUNC_PROTOTYPE;
-        if ($9->kind != NODE_RETURN &&
-            ($9->kind != NODE_TWO_VALUES
-             || $9->r.expr->kind != NODE_RETURN)) {
-          parse_node_t *replacement;
-          CREATE_STATEMENTS(replacement, $9, 0);
-          CREATE_RETURN(replacement->r.expr, 0);
-          $9 = replacement;
-        }
-
-        fun = define_new_function($3, $6.num_arg,
-            max_num_locals - $6.num_arg,
-            $<number>8, ($1 & 0xffff) | $2);
-        if (fun != -1) {
-          $$ = new_node_no_line();
-          $$->kind = NODE_FUNCTION;
-          $$->v.number = fun;
-          $$->l.number = max_num_locals;
-          $$->r.expr = $9;
-        } else
-          $$ = 0;
-      } else
-        $$ = 0;
-      free_all_local_names(!!$9);
-    }
+  function
   |   type name_list ';'
-      {
-        if (!($1 & ~(DECL_MODS)) && (pragmas & PRAGMA_STRICT_TYPES))
-          yyerror("Missing type for global variable declaration");
-        $$ = 0;
-      }
+                                  {
+                                    if (!($1 & ~(DECL_MODS)) && (pragmas & PRAGMA_STRICT_TYPES))
+                                      yyerror("Missing type for global variable declaration");
+                                    $$ = 0;
+                                  }
   |   inheritance
   |   type_decl
   |   modifier_change
@@ -508,32 +286,32 @@ def:
 
 modifier_change:
   type_modifier_list ':'
-    {
-      if (!$1)
-        yyerror("modifier list may not be empty.");
+                          {
+                            if (!$1)
+                              yyerror("modifier list may not be empty.");
 
-      if ($1 & FUNC_VARARGS) {
-        yyerror("Illegal modifier 'varargs' in global modifier list.");
-        $1 &= ~FUNC_VARARGS;
-      }
+                            if ($1 & FUNC_VARARGS) {
+                              yyerror("Illegal modifier 'varargs' in global modifier list.");
+                              $1 &= ~FUNC_VARARGS;
+                            }
 
-      if (!($1 & DECL_ACCESS)) $1 |= DECL_PUBLIC;
-      global_modifiers = $1;
-      $$ = 0;
-    }
+                            if (!($1 & DECL_ACCESS)) $1 |= DECL_PUBLIC;
+                            global_modifiers = $1;
+                            $$ = 0;
+                          }
 ;
 
 member_name:
   optional_star identifier
-    {
-      /* At this point, the current_type here is only a basic_type */
-      /* and cannot be unused yet - Sym */
+                              {
+                                /* At this point, the current_type here is only a basic_type */
+                                /* and cannot be unused yet - Sym */
 
-      if (current_type == TYPE_VOID)
-        yyerror("Illegal to declare class member of type void.");
-      add_local_name($2, current_type | $1);
-      scratch_free($2);
-    }
+                                if (current_type == TYPE_VOID)
+                                  yyerror("Illegal to declare class member of type void.");
+                                add_local_name($2, current_type | $1);
+                                scratch_free($2);
+                              }
 ;
 
 member_name_list:
@@ -543,108 +321,24 @@ member_name_list:
 
 member_list:
   /* empty */
-  | member_list basic_type
-    {
-      current_type = $2;
-    }
-  member_name_list ';'
+  | member_list basic_type { current_type = $2; }
+      member_name_list ';'
 ;
 
 type_decl:
-  type_modifier_list L_CLASS identifier '{'
-    {
-      ident_hash_elem_t *ihe;
-
-      ihe = find_or_add_ident(
-          PROG_STRING($<number>$ = store_prog_string($3)),
-          FOA_GLOBAL_SCOPE);
-      if (ihe->dn.class_num == -1) {
-        ihe->sem_value++;
-        ihe->dn.class_num = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
-        if (ihe->dn.class_num > CLASS_NUM_MASK){
-          char buf[256];
-          char *p;
-
-          p = buf;
-          sprintf(p, "Too many classes, max is %d.\n", CLASS_NUM_MASK + 1);
-          yyerror(buf);
-        }
-
-        scratch_free($3);
-        $<ihe>2 = 0;
-      }
-      else {
-        $<ihe>2 = ihe;
-      }
-    }
-  member_list '}'
-    {
-      class_def_t *sd;
-      class_member_entry_t *sme;
-      int i, raise_error = 0;
-
-      /* check for a redefinition */
-      if ($<ihe>2 != 0) {
-        sd = CLASS($<ihe>2->dn.class_num);
-        if (sd->size != current_number_of_locals)
-          raise_error = 1;
-        else {
-          i = sd->size;
-          sme = (class_member_entry_t *)mem_block[A_CLASS_MEMBER].block + sd->index;
-          while (i--) {
-            /* check for matching names and types */
-            if (strcmp(PROG_STRING(sme[i].membername), locals_ptr[i].ihe->name) != 0 ||
-                sme[i].type != (type_of_locals_ptr[i] & ~LOCAL_MODS)) {
-              raise_error = 1;
-              break;
-            }
-          }
-        }
-      }
-
-      if (raise_error) {
-        char buf[512];
-        char *end = EndOf(buf);
-        char *p;
-
-        p = strput(buf, end, "Illegal to redefine class ");
-        p = strput(p, end, PROG_STRING($<number>$));
-        yyerror(buf);
-      } else {
-        sd = (class_def_t *)allocate_in_mem_block(A_CLASS_DEF, sizeof(class_def_t));
-        i = sd->size = current_number_of_locals;
-        sd->index = mem_block[A_CLASS_MEMBER].current_size / sizeof(class_member_entry_t);
-        sd->classname = $<number>5;
-
-        sme = (class_member_entry_t *)allocate_in_mem_block(A_CLASS_MEMBER, sizeof(class_member_entry_t) * current_number_of_locals);
-
-        while (i--) {
-          sme[i].membername = store_prog_string(locals_ptr[i].ihe->name);
-          sme[i].type = type_of_locals_ptr[i] & ~LOCAL_MODS;
-        }
-      }
-
-      free_all_local_names(0);
-      $$ = 0;
-    }
+  type_modifier_list L_CLASS identifier '{'  { $<ihe>2 = rule_define_class(&$<number>$, $3); }
+    member_list '}'                          { rule_define_class_members($<ihe>2, $<number>5); $$ = 0; }
 ;
 
 new_local_name:
   L_IDENTIFIER
   | L_DEFINED_NAME
-    {
-      if ($1->dn.local_num != -1) {
-        char buff[256];
-        char *end = EndOf(buff);
-        char *p;
-
-        p = strput(buff, end, "Illegal to redeclare local name '");
-        p = strput(p, end, $1->name);
-        p = strput(p, end, "'");
-        yyerror(buff);
-      }
-      $$ = scratch_copy($1->name);
-    }
+                    {
+                      if ($1->dn.local_num != -1) {
+                        yyerror("Illegal to redeclare local name '%s'", $1->name);
+                      }
+                      $$ = scratch_copy($1->name);
+                    }
 ;
 
 atomic_type:
@@ -652,14 +346,7 @@ atomic_type:
   | L_CLASS L_DEFINED_NAME
     {
       if ($2->dn.class_num == -1) {
-        char buf[256];
-        char *end = EndOf(buf);
-        char *p;
-
-        p = strput(buf, end, "Undefined class '");
-        p = strput(p, end, $2->name);
-        p = strput(p, end, "'");
-        yyerror(buf);
+        yyerror("Undefined class '%s'", $2->name);
         $$ = TYPE_ANY;
       } else {
         $$ = $2->dn.class_num | TYPE_MOD_CLASS;
@@ -667,19 +354,11 @@ atomic_type:
     }
   | L_CLASS L_IDENTIFIER
     {
-      char buf[256];
-      char *end = EndOf(buf);
-      char *p;
-
-      p = strput(buf, end, "Undefined class '");
-      p = strput(p, end, $2);
-      p = strput(p, end, "'");
-      yyerror(buf);
+      yyerror("Undefined class '%s'", $2);
       $$ = TYPE_ANY;
     }
 ;
 
-#ifdef ARRAY_RESERVED_WORD
 opt_atomic_type:
   atomic_type
   | /* empty */
@@ -687,27 +366,22 @@ opt_atomic_type:
       $$ = TYPE_ANY;
     }
 ;
-#endif
 
 basic_type:
   atomic_type
-#ifdef ARRAY_RESERVED_WORD
   | opt_atomic_type L_ARRAY
     {
       $$ = $1 | TYPE_MOD_ARRAY;
     }
-#endif
-       ;
+;
 
 arg_type:
   basic_type
-#ifdef REF_RESERVED_WORD
   | basic_type ref
     {
       $$ = $1 | LOCAL_MOD_REF;
     }
-#endif
-       ;
+;
 
 new_arg:
   arg_type optional_star
@@ -790,23 +464,14 @@ type_modifier_list:
     }
   | L_TYPE_MODIFIER type_modifier_list
     {
-#ifdef SENSIBLE_MODIFIERS
-      int acc_mod;
-#endif
-
       $$ = $1 | $2;
-
+      int acc_mod = $$ & DECL_ACCESS;
 #ifdef SENSIBLE_MODIFIERS
-      acc_mod = ($$ & DECL_ACCESS) & ~global_modifiers;
       if (acc_mod & (acc_mod - 1)) {
         char buf[256];
         char *end = EndOf(buf);
-        char *p;
-
-        p = strput(buf, end, "Multiple access modifiers (");
-        p = get_type_modifiers(p, end, $$);
-        p = strput(p, end, ") ");
-        yyerror(buf);
+        get_type_modifiers(buf, end, acc_mod);
+        yyerror("Multiple access modifiers (%s)", buf);
         $$ = DECL_PUBLIC;
       }
 #endif
@@ -1536,17 +1201,14 @@ comma_expr:
     }
 ;
 
-#ifdef REF_RESERVED_WORD
 ref:
   L_REF
 #ifdef COMPAT_32
   | '&'
 #endif
 ;
-#endif
 
 expr0:
-#ifdef REF_RESERVED_WORD
   ref lvalue
     {
       int op;
@@ -1574,9 +1236,7 @@ expr0:
       }
       CREATE_UNARY_OP_1($$, F_MAKE_REF, TYPE_ANY, $2, op);
     }
-  |
-#endif
-  lvalue L_ASSIGN expr0
+  | lvalue L_ASSIGN expr0
     {
       parse_node_t *l = $1, *r = $3;
       /* set this up here so we can change it below */
