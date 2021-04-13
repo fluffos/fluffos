@@ -30,9 +30,6 @@ object _new(string, ...);
 
 unknown call_other _call_other(object | string | object *, string | mixed *, ...);
 mixed evaluate _evaluate(mixed, ...);
-#ifdef COMPAT_32
-mixed funcall _evaluate(mixed, ...);
-#endif
 object this_object _this_object();
 int to_int _to_int(string | float | int OR_BUFFER);
 float to_float _to_float(string | float | int);
@@ -106,9 +103,6 @@ mixed restore_variable(string);
 object* users();
 mixed *get_dir(string, int default: 0);
 int strsrch(string, string | int, int default: 0);
-#ifdef COMPAT_32
-int strstr strsrch(string, string | int, int default: 0);
-#endif
 
 /* communication functions */
 
@@ -129,14 +123,7 @@ object load_object find_object(string, int default: 1);
 mapping allocate_mapping(int | mixed *, void | mixed);
 mixed *values(mapping);
 mixed *keys(mapping);
-#ifdef COMPAT_32
-mapping map_delete(mapping, mixed);
-mapping m_delete map_delete(mapping, mixed);
-mixed *m_values values(mapping);
-mixed *m_indices keys(mapping);
-#else
 void map_delete(mapping, mixed);
-#endif
 
 mixed match_path(mapping, string);
 
@@ -150,9 +137,6 @@ int floatp(mixed);
 int stringp(mixed);
 int virtualp(object default: F__THIS_OBJECT);
 int functionp(mixed);
-#ifdef COMPAT_32
-int closurep functionp(mixed);
-#endif
 int pointerp(mixed);
 int arrayp pointerp(mixed);
 int objectp(mixed);
@@ -239,11 +223,7 @@ mixed *unique_array(mixed *, string | function, void | mixed);
 mapping unique_mapping(mixed *, string | function, ...);
 string *deep_inherit_list(object default:F__THIS_OBJECT);
 string *shallow_inherit_list(object default:F__THIS_OBJECT);
-#ifdef COMPAT_32
-string *inherit_list deep_inherit_list(object default:F__THIS_OBJECT);
-#else
 string *inherit_list shallow_inherit_list(object default:F__THIS_OBJECT);
-#endif
 void printf(string, ...);
 string sprintf(string, ...);
 int mapp(mixed);
@@ -261,9 +241,6 @@ void send_gmcp(string);
 string in_edit(object default:F__THIS_OBJECT);
 int in_input(object default:F__THIS_OBJECT);
 int userp(object);
-#ifdef COMPAT_32
-int query_once_interactive userp(object);
-#endif
 
 #ifndef NO_WIZARDS
 void enable_wizard();
@@ -294,9 +271,6 @@ object *children(string);
 void reload_object(object);
 
 void error(string);
-#ifdef COMPAT_32
-void raise_error error(string);
-#endif
 int uptime();
 int strcmp(string, string);
 
@@ -345,9 +319,6 @@ int set_eval_limit(int);
 int reset_eval_cost set_eval_limit(int default: 0);
 int eval_cost set_eval_limit(int default: -1);
 int max_eval_cost set_eval_limit(int default: 1);
-#ifdef COMPAT_32
-int get_eval_cost set_eval_limit(int default: -1);
-#endif
 
 void set_debug_level(int | string);
 mapping debug_levels();

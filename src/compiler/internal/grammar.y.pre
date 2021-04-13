@@ -85,10 +85,6 @@ int yyparse (void);
 // only in DEBUG
 %token L_TREE
 
-#ifdef COMPAT_32
-%token L_LAMBDA
-#endif
-
 // Only ever used in lpcfmt
 %token L_PREPROCESSOR_COMMAND
 
@@ -187,9 +183,6 @@ int yyparse (void);
 
 /* This holds compressed and less flexible def_name information */
 %type <number> L_NEW_FUNCTION_OPEN l_new_function_open
-#ifdef COMPAT_32
-%type <number> simple_function_pointer
-#endif
 
 /* holds an identifier or some sort */
 %type <string> L_IDENTIFIER L_EFUN function_name identifier
@@ -1203,9 +1196,6 @@ comma_expr:
 
 ref:
   L_REF
-#ifdef COMPAT_32
-  | '&'
-#endif
 ;
 
 expr0:
@@ -2325,31 +2315,6 @@ l_new_function_open:
     }
 ;
 
-#ifdef COMPAT_32
-simple_function_pointer:
-  l_new_function_open ':' ')'
-    {
-      $$ = $1;
-    }
-  | L_LAMBDA L_DEFINED_NAME
-    {
-      int val;
-
-      if ((val=$2->dn.local_num) >= 0){
-        $$ = (val << 8) | FP_L_VAR;
-      } else if ((val=$2->dn.global_num) >= 0) {
-        $$ = (val << 8) | FP_G_VAR;
-      } else if ((val=$2->dn.function_num) >=0) {
-        $$ = (val << 8)|FP_LOCAL;
-      } else if ((val=$2->dn.simul_num) >=0) {
-        $$ = (val << 8)|FP_SIMUL;
-      } else if ((val=$2->dn.efun_num) >=0) {
-        $$ = (val << 8)|FP_EFUN;
-      }
-    }
-;
-#endif
-
 expr4:
   function_call
   | L_DEFINED_NAME
@@ -2674,11 +2639,7 @@ expr4:
       type_of_locals_ptr -= max_num_locals;
       reactivate_current_locals();
     }
-#ifdef COMPAT_32
-  | simple_function_pointer
-#else
   | l_new_function_open ':' ')'
-#endif
     {
       if (CONFIG_INT(__RC_WOMBLES__)) {
         if(*(outp-2) != ':') {
