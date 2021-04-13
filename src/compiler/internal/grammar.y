@@ -250,7 +250,7 @@ block_or_semi:
 ;
 
 identifier:
-  L_DEFINED_NAME { $$ = scratch_copy($1->name); }
+  L_DEFINED_NAME                  { $$ = scratch_copy($1->name); }
   |  L_IDENTIFIER
 ;
 
@@ -275,32 +275,32 @@ def:
 
 modifier_change:
   type_modifier_list ':'
-                          {
-                            if (!$1)
-                              yyerror("modifier list may not be empty.");
+                                  {
+                                    if (!$1)
+                                      yyerror("modifier list may not be empty.");
 
-                            if ($1 & FUNC_VARARGS) {
-                              yyerror("Illegal modifier 'varargs' in global modifier list.");
-                              $1 &= ~FUNC_VARARGS;
-                            }
+                                    if ($1 & FUNC_VARARGS) {
+                                      yyerror("Illegal modifier 'varargs' in global modifier list.");
+                                      $1 &= ~FUNC_VARARGS;
+                                    }
 
-                            if (!($1 & DECL_ACCESS)) $1 |= DECL_PUBLIC;
-                            global_modifiers = $1;
-                            $$ = 0;
-                          }
+                                    if (!($1 & DECL_ACCESS)) $1 |= DECL_PUBLIC;
+                                    global_modifiers = $1;
+                                    $$ = 0;
+                                  }
 ;
 
 member_name:
   optional_star identifier
-                              {
-                                /* At this point, the current_type here is only a basic_type */
-                                /* and cannot be unused yet - Sym */
+                                  {
+                                    /* At this point, the current_type here is only a basic_type */
+                                    /* and cannot be unused yet - Sym */
 
-                                if (current_type == TYPE_VOID)
-                                  yyerror("Illegal to declare class member of type void.");
-                                add_local_name($2, current_type | $1);
-                                scratch_free($2);
-                              }
+                                    if (current_type == TYPE_VOID)
+                                      yyerror("Illegal to declare class member of type void.");
+                                    add_local_name($2, current_type | $1);
+                                    scratch_free($2);
+                                  }
 ;
 
 member_name_list:
@@ -322,80 +322,71 @@ type_decl:
 new_local_name:
   L_IDENTIFIER
   | L_DEFINED_NAME
-                    {
-                      if ($1->dn.local_num != -1) {
-                        yyerror("Illegal to redeclare local name '%s'", $1->name);
-                      }
-                      $$ = scratch_copy($1->name);
-                    }
+                                            {
+                                              if ($1->dn.local_num != -1) {
+                                                yyerror("Illegal to redeclare local name '%s'", $1->name);
+                                              }
+                                              $$ = scratch_copy($1->name);
+                                            }
 ;
 
 atomic_type:
   L_BASIC_TYPE
   | L_CLASS L_DEFINED_NAME
-    {
-      if ($2->dn.class_num == -1) {
-        yyerror("Undefined class '%s'", $2->name);
-        $$ = TYPE_ANY;
-      } else {
-        $$ = $2->dn.class_num | TYPE_MOD_CLASS;
-      }
-    }
+                                            {
+                                              if ($2->dn.class_num == -1) {
+                                                yyerror("Undefined class '%s'", $2->name);
+                                                $$ = TYPE_ANY;
+                                              } else {
+                                                $$ = $2->dn.class_num | TYPE_MOD_CLASS;
+                                              }
+                                            }
   | L_CLASS L_IDENTIFIER
-    {
-      yyerror("Undefined class '%s'", $2);
-      $$ = TYPE_ANY;
-    }
+                                            {
+                                              yyerror("Undefined class '%s'", $2);
+                                              $$ = TYPE_ANY;
+                                            }
 ;
 
 opt_atomic_type:
   atomic_type
-  | /* empty */
-    {
-      $$ = TYPE_ANY;
-    }
+  | /* empty */ { $$ = TYPE_ANY; }
 ;
 
 basic_type:
   atomic_type
-  | opt_atomic_type L_ARRAY
-    {
-      $$ = $1 | TYPE_MOD_ARRAY;
-    }
+  | opt_atomic_type L_ARRAY { $$ = $1 | TYPE_MOD_ARRAY; }
 ;
 
 arg_type:
   basic_type
-  | basic_type ref
-    {
-      $$ = $1 | LOCAL_MOD_REF;
-    }
+  | basic_type ref { $$ = $1 | LOCAL_MOD_REF; }
 ;
 
 new_arg:
   arg_type optional_star
-    {
-      $$ = $1 | $2;
-      if ($1 != TYPE_VOID)
-        add_local_name("", $1 | $2);
-    }
+                                              {
+                                                $$ = $1 | $2;
+                                                if ($1 != TYPE_VOID)
+                                                  add_local_name("", $1 | $2);
+                                              }
   | arg_type optional_star new_local_name
-    {
-      if ($1 == TYPE_VOID)
-        yyerror("Illegal to declare argument of type void.");
-      add_local_name($3, $1 | $2);
-      scratch_free($3);
-      $$ = $1 | $2;
-    }
+                                              {
+                                                if ($1 == TYPE_VOID)
+                                                  yyerror("Illegal to declare argument of type void.");
+                                                add_local_name($3, $1 | $2);
+                                                scratch_free($3);
+                                                $$ = $1 | $2;
+                                              }
   | new_local_name
-    {
-      if (exact_types) {
-        yyerror("Missing type for argument");
-      }
-      add_local_name($1, TYPE_ANY);
-      scratch_free($1);
-      $$ = TYPE_ANY;
-    }
+                                              {
+                                                if (exact_types) {
+                                                  yyerror("Missing type for argument");
+                                                }
+                                                add_local_name($1, TYPE_ANY);
+                                                scratch_free($1);
+                                                $$ = TYPE_ANY;
+                                              }
 ;
 
 argument:
