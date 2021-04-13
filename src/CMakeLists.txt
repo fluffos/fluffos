@@ -291,18 +291,11 @@ add_custom_command(
   DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/base/internal/options_incl.h"
 )
 
-add_custom_command(
-  OUTPUT "grammar.autogen.y"
-  COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/make_grammar.sh" "${CMAKE_CURRENT_SOURCE_DIR}/../" "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.y.pre" "${CMAKE_CXX_COMPILER}" "-I${CMAKE_CURRENT_BINARY_DIR}" "-I${CMAKE_CURRENT_SOURCE_DIR}"
-  DEPENDS "tools/make_grammar.sh" "compiler/internal/grammar.y.pre"
-)
-
 find_package(BISON REQUIRED)
-BISON_TARGET(Grammar ${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.y ${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.cc
+BISON_TARGET(Grammar "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.y" ${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.cc
   DEFINES_FILE "${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.h")
 
 set(GENERATRED_GRAMMAR_FILES
-  "${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.y"
   "${BISON_Grammar_OUTPUT_SOURCE}"
   "${BISON_Grammar_OUTPUT_HEADER}"
   )

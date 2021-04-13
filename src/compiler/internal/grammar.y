@@ -1,22 +1,18 @@
 /* This is to make emacs edit this in C mode: -*-C-*- */
-/* This file will be processed by tools/make_grammar.sh in two phases,
- * First run through CPP with options macros, then run by sed, to change all
- * '// #include' into #include.
- */
 
 /* TODO(sunyc): use %locations to eanble location tracking, for better error. */
 /* TODO(sunyc): use %define api.pure full to enable re-entrant parser. */
 
 %{
-// #include "base/std.h"
+#include "base/std.h"
 
-// #include "compiler/internal/grammar_rules.h"
-// #include "vm/vm.h"
-// #include "vm/internal/base/machine.h"
-// #include "compiler/internal/compiler.h"
-// #include "compiler/internal/lex.h"
-// #include "compiler/internal/scratchpad.h"
-// #include "compiler/internal/generate.h"
+#include "compiler/internal/grammar_rules.h"
+#include "vm/vm.h"
+#include "vm/internal/base/machine.h"
+#include "compiler/internal/compiler.h"
+#include "compiler/internal/lex.h"
+#include "compiler/internal/scratchpad.h"
+#include "compiler/internal/generate.h"
 
 extern char *outp;
 
@@ -2579,9 +2575,7 @@ expr4:
       $$ = $2;
     }
   | catch
-#ifdef DEBUG
   | tree
-#endif
   | L_BASIC_TYPE
     {
       auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
@@ -2839,7 +2833,6 @@ catch:
     }
   ;
 
-#ifdef DEBUG
 tree:
   L_TREE block
     {
@@ -2852,7 +2845,6 @@ tree:
       lpc_tree_form($3, $$);
     }
 ;
-#endif
 
 sscanf:
   L_SSCANF '(' expr0 ',' expr0 lvalue_list ')'
