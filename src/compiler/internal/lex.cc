@@ -160,9 +160,6 @@ static keyword_t reswords[] = {
 #ifdef STRUCT_CLASS
     {"class", L_CLASS, 0},
 #endif
-#ifdef COMPAT_32
-    {"closure", L_BASIC_TYPE, TYPE_FUNCTION},
-#endif
     {"continue", L_CONTINUE, 0},
     {"default", L_DEFAULT, 0},
     {"do", L_DO, 0},
@@ -2265,12 +2262,6 @@ int yylex(bool in_lpcfmt) {
             break;
           }
         } else {
-#ifdef COMPAT_32
-          if (*outp == '\'') {
-            outp++;
-            return L_LAMBDA;
-          }
-#endif
           goto badlex;
         }
       case '\'':
