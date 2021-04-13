@@ -1460,6 +1460,9 @@ char *get_type_modifiers(char *where, char *end, int type) {
   if (type & DECL_PROTECTED) {
     where = strput(where, end, "protected ");
   }
+  if (type & DECL_PUBLIC) {
+    where = strput(where, end, "public ");
+  }
   if (type & DECL_NOSAVE) {
     where = strput(where, end, "nosave ");
   }
@@ -2098,7 +2101,15 @@ parse_node_t *validate_efun_call(int f, parse_node_t *args) {
   return args;
 }
 
-void yyerror(const char *str) {
+void yyerror(const char *fmt, ...) {
+  static char buf[1024 + 1];
+
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, args);
+  va_end(args);
+  buf[sizeof(buf) - 1] = '\0';
+
   extern int num_parse_error;
 
   function_context.num_parameters = -1;
@@ -2106,7 +2117,7 @@ void yyerror(const char *str) {
     lex_fatal = 1;
     return;
   }
-  smart_log(current_file, current_line, str, 0);
+  smart_log(current_file, current_line, buf, 0);
 #ifdef PACKAGE_MUDLIB_STATS
   add_errors_for_file(current_file, 1);
 #endif

@@ -34,7 +34,10 @@
 #include "vm/internal/base/svalue.h"
 #include "compiler.h"
 #include "keyword.h"
+
+#include "compiler/internal/grammar_rules.h"
 #include "grammar.autogen.h"
+
 #include "scratchpad.h"
 
 // FIXME: in master.h
@@ -1751,7 +1754,7 @@ static int old_func() {
    at this function */
 static void lex_breakpoint() {}
 
-int yylex() {
+int yylex(bool in_lpcfmt) {
   static char partial[MAXLINE + 5]; /* extra 5 for safety buffer */
   static char terminator[MAXLINE + 5];
   int is_float;
@@ -1833,6 +1836,9 @@ int yylex() {
         total_lines++;
         if (outp == last_nl + 1) {
           refill_buffer();
+        }
+        if (in_lpcfmt) {
+          return '\n';
         }
       case ' ':
       case '\f':
@@ -2128,6 +2134,18 @@ int yylex() {
         outp--;
         goto badlex;
       case '#':
+        if (in_lpcfmt) {
+          auto start = outp;
+          while (*outp++ != '\n') {
+            ;
+          }
+          *outp = '\0';
+          // Deal with trailing \r
+          if (*(outp - 1) == '\r') *(outp - 1) = '\0';
+          outp++;
+          yylval.string = scratch_copy(start);
+          return L_PREPROCESSOR_COMMAND;
+        }
         if (*(outp - 2) == '\n') {
           char *sp = nullptr;
           int quote;
