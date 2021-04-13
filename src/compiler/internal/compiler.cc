@@ -439,7 +439,8 @@ parse_node_t *reorder_class_values(int which, parse_node_t *node) {
     i = lookup_class_member(which, reinterpret_cast<char *>(node->l.expr), nullptr);
     if (i != -1) {
       if (tmp[i]) {
-        yyerror("Redefinition of member '%s' in instantiation of class '%s'", reinterpret_cast<char *>(node->l.expr), PROG_STRING(cd->classname));
+        yyerror("Redefinition of member '%s' in instantiation of class '%s'",
+                reinterpret_cast<char *>(node->l.expr), PROG_STRING(cd->classname));
       } else {
         tmp[i] = node->v.expr;
       }
@@ -1002,9 +1003,7 @@ int arrange_call_inherited(char *name, parse_node_t *node) {
       }
     }
   } /* if in shared string table */
-  {
-    yyerror("No such inherited function '%s'.", name);
-  }
+  { yyerror("No such inherited function '%s'.", name); }
 
 invalid:
   node->kind = NODE_CALL_2;
@@ -1567,9 +1566,11 @@ int validate_function_call(int f, parse_node_t *args) {
      */
     if (!(funflags & FUNC_VARARGS) && (funflags & FUNC_STRICT_TYPES)) {
       if (num_var) {
-        yyerror("Illegal to pass a variable number of arguments to non-varargs function '%s'.", funp->funcname);
+        yyerror("Illegal to pass a variable number of arguments to non-varargs function '%s'.",
+                funp->funcname);
       } else if (funp->num_arg != num_arg) {
-        yyerror("Wrong number of arguments to '%s', expected: %d, got: %d.", funp->funcname, funp->num_arg, num_arg);
+        yyerror("Wrong number of arguments to '%s', expected: %d, got: %d.", funp->funcname,
+                funp->num_arg, num_arg);
       }
     }
     /*
@@ -1856,7 +1857,8 @@ parse_node_t *validate_efun_call(int f, parse_node_t *args) {
       args->v.number++;
       num++;
     } else if (num_var && max_arg != -1) {
-      yyerror("Illegal to pass variable number of arguments to non-varargs efun '%s'.", predefs[f].word);
+      yyerror("Illegal to pass variable number of arguments to non-varargs efun '%s'.",
+              predefs[f].word);
       CREATE_ERROR(args);
       return args;
     } else if ((num - num_var) < min_arg) {

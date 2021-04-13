@@ -33,7 +33,6 @@
 Checks: >
   -*,
   bugprone-*,
-#  google-*,
   misc-*,
   modernize-*,
   performance-*,

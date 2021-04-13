@@ -8,14 +8,12 @@
 #include "compiler/internal/generate.h"
 #include "compiler/internal/grammar_rules.h"
 
-extern int context; // FIXME
-extern int func_present; // FIXME
+extern int context;       // FIXME
+extern int func_present;  // FIXME
 
-void rule_program(parse_node_t *$$) {
-  comp_trees[TREE_MAIN] = $$;
-}
+void rule_program(parse_node_t *$$) { comp_trees[TREE_MAIN] = $$; }
 
-bool rule_inheritence(parse_node_t **$$, int $1, char* $3) {
+bool rule_inheritence(parse_node_t **$$, int $1, char *$3) {
   object_t *ob;
   inherit_t inherit;
   int initializer;
@@ -54,21 +52,20 @@ bool rule_inheritence(parse_node_t **$$, int $1, char* $3) {
   scratch_free($3);
   inherit.prog = ob->prog;
 
-  if (mem_block[A_INHERITS].current_size){
+  if (mem_block[A_INHERITS].current_size) {
     inherit_t *prev_inherit = INHERIT(NUM_INHERITS - 1);
 
-    inherit.function_index_offset
-        = prev_inherit->function_index_offset
-        + prev_inherit->prog->num_functions_defined
-        + prev_inherit->prog->last_inherited;
+    inherit.function_index_offset = prev_inherit->function_index_offset +
+                                    prev_inherit->prog->num_functions_defined +
+                                    prev_inherit->prog->last_inherited;
     if (prev_inherit->prog->num_functions_defined &&
-        prev_inherit->prog->function_table[prev_inherit->prog->num_functions_defined - 1].funcname[0] == APPLY___INIT_SPECIAL_CHAR)
+        prev_inherit->prog->function_table[prev_inherit->prog->num_functions_defined - 1]
+                .funcname[0] == APPLY___INIT_SPECIAL_CHAR)
       inherit.function_index_offset--;
-  } else inherit.function_index_offset = 0;
+  } else
+    inherit.function_index_offset = 0;
 
-  inherit.variable_index_offset =
-      mem_block[A_VAR_TEMP].current_size /
-          sizeof (variable_t);
+  inherit.variable_index_offset = mem_block[A_VAR_TEMP].current_size / sizeof(variable_t);
   inherit.type_mod = $1;
   add_to_mem_block(A_INHERITS, (char *)&inherit, sizeof inherit);
 
@@ -92,16 +89,15 @@ bool rule_inheritence(parse_node_t **$$, int $1, char* $3) {
     /* The following illustrates a distinction between */
     /* macros and funcs...newnode is needed here - Sym */
     newnode = comp_trees[TREE_INIT];
-    CREATE_TWO_VALUES(comp_trees[TREE_INIT],0, newnode, node);
+    CREATE_TWO_VALUES(comp_trees[TREE_INIT], 0, newnode, node);
     comp_trees[TREE_INIT] = pop_value(comp_trees[TREE_INIT]);
-
   }
   *$$ = 0;
 
   return false;
 }
 
-LPC_INT rule_func_type(LPC_INT $1, LPC_INT $2, char* $3) {
+LPC_INT rule_func_type(LPC_INT $1, LPC_INT $2, char *$3) {
   int flags;
 #ifdef SENSIBLE_MODIFIERS
   int acc_mod;
@@ -139,7 +135,7 @@ LPC_INT rule_func_type(LPC_INT $1, LPC_INT $2, char* $3) {
     if (CONFIG_INT(__RC_OLD_TYPE_BEHAVIOR__)) {
       exact_types = 0;
     } else {
-      exact_types = ($1& 0xffff) | $2;
+      exact_types = ($1 & 0xffff) | $2;
     }
   } else {
     if (pragmas & PRAGMA_STRICT_TYPES) {
@@ -153,7 +149,7 @@ LPC_INT rule_func_type(LPC_INT $1, LPC_INT $2, char* $3) {
   return $1;
 }
 
-LPC_INT rule_func_proto(LPC_INT $1, LPC_INT $2, char** $3, argument_t $5) {
+LPC_INT rule_func_proto(LPC_INT $1, LPC_INT $2, char **$3, argument_t $5) {
   char *p = *$3;
   *$3 = (char *)make_shared_string(*$3);
   scratch_free(p);
@@ -172,7 +168,7 @@ LPC_INT rule_func_proto(LPC_INT $1, LPC_INT $2, char** $3, argument_t $5) {
   }
   func_types |= ($1 >> 16);
 
-  define_new_function(*$3, $5.num_arg, 0, func_types, ($1 & 0xffff)| $2);
+  define_new_function(*$3, $5.num_arg, 0, func_types, ($1 & 0xffff) | $2);
   /* This is safe since it is guaranteed to be in the
      function table, so it can't be dangling */
   free_string(*$3);
@@ -181,23 +177,22 @@ LPC_INT rule_func_proto(LPC_INT $1, LPC_INT $2, char** $3, argument_t $5) {
   return func_types;
 }
 
-
-void rule_func(parse_node_t** $$, LPC_INT $1, LPC_INT $2, char* $3, argument_t $5, LPC_INT *$8, parse_node_t** $9) {
+void rule_func(parse_node_t **$$, LPC_INT $1, LPC_INT $2, char *$3, argument_t $5, LPC_INT *$8,
+               parse_node_t **$9) {
   /* Either a prototype or a block */
   if (*$9) {
     int fun;
 
     *$8 &= ~FUNC_PROTOTYPE;
     if ((*$9)->kind != NODE_RETURN &&
-        ((*$9)->kind != NODE_TWO_VALUES
-            || (*$9)->r.expr->kind != NODE_RETURN)) {
+        ((*$9)->kind != NODE_TWO_VALUES || (*$9)->r.expr->kind != NODE_RETURN)) {
       parse_node_t *replacement;
       CREATE_STATEMENTS(replacement, *$9, 0);
       CREATE_RETURN(replacement->r.expr, 0);
       *$9 = replacement;
     }
 
-    fun = define_new_function($3, $5.num_arg, max_num_locals - $5.num_arg, *$8, ($1 & 0xffff)| $2);
+    fun = define_new_function($3, $5.num_arg, max_num_locals - $5.num_arg, *$8, ($1 & 0xffff) | $2);
     if (fun != -1) {
       *$$ = new_node_no_line();
       (*$$)->kind = NODE_FUNCTION;
@@ -211,12 +206,10 @@ void rule_func(parse_node_t** $$, LPC_INT $1, LPC_INT $2, char* $3, argument_t $
   free_all_local_names(!!(*$9));
 }
 
-ident_hash_elem_t* rule_define_class(LPC_INT *$$, char* $3) {
+ident_hash_elem_t *rule_define_class(LPC_INT *$$, char *$3) {
   ident_hash_elem_t *ihe;
 
-  ihe = find_or_add_ident(
-      PROG_STRING(*$$ = store_prog_string($3)),
-      FOA_GLOBAL_SCOPE);
+  ihe = find_or_add_ident(PROG_STRING(*$$ = store_prog_string($3)), FOA_GLOBAL_SCOPE);
   if (ihe->dn.class_num == -1) {
     ihe->sem_value++;
     ihe->dn.class_num = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
@@ -226,13 +219,12 @@ ident_hash_elem_t* rule_define_class(LPC_INT *$$, char* $3) {
 
     scratch_free($3);
     return nullptr;
-  }
-  else {
+  } else {
     return ihe;
   }
 }
 
-void rule_define_class_members(struct ident_hash_elem_t* $2, LPC_INT $5) {
+void rule_define_class_members(struct ident_hash_elem_t *$2, LPC_INT $5) {
   class_def_t *sd;
   class_member_entry_t *sme;
   int i, raise_error = 0;
@@ -264,7 +256,8 @@ void rule_define_class_members(struct ident_hash_elem_t* $2, LPC_INT $5) {
     sd->index = mem_block[A_CLASS_MEMBER].current_size / sizeof(class_member_entry_t);
     sd->classname = $5;
 
-    sme = (class_member_entry_t *)allocate_in_mem_block(A_CLASS_MEMBER, sizeof(class_member_entry_t) * current_number_of_locals);
+    sme = (class_member_entry_t *)allocate_in_mem_block(
+        A_CLASS_MEMBER, sizeof(class_member_entry_t) * current_number_of_locals);
 
     while (i--) {
       sme[i].membername = store_prog_string(locals_ptr[i].ihe->name);
