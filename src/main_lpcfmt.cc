@@ -10,6 +10,7 @@
 #include "include/function.h"
 #include "efuns.autogen.h"
 #include "vm/internal/base/number.h"
+#include "compiler/internal/grammar_rules.h"
 #include "grammar.autogen.h"
 #include "compiler/internal/lex.h"
 #include "thirdparty/fmt/include/fmt/format.h"
