@@ -120,10 +120,7 @@ static void upd_short(int offset, int l, const char *where) {
                "patch offset %x larger than current program size %x.\n", offset,
                CURRENT_PROGRAM_SIZE);
   if (l > USHRT_MAX) {
-    char buf[256];
-
-    sprintf(buf, "branch limit exceeded in %s, near line %i", where, line_being_generated);
-    yyerror(buf);
+    yyerror("branch limit exceeded in %s, near line %i", where, line_being_generated);
   }
   s = l;
 
@@ -132,10 +129,7 @@ static void upd_short(int offset, int l, const char *where) {
 
 static void ins_rel_short(int l) {
   if (l > USHRT_MAX) {
-    char buf[256];
-
-    sprintf(buf, "branch limit exceeded in switch table, near line %i", line_being_generated);
-    yyerror(buf);
+    yyerror("branch limit exceeded in switch table, near line %i", line_being_generated);
   }
   ins_short(l);
 }

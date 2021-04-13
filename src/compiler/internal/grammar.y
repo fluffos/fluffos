@@ -2827,13 +2827,17 @@ catch:
 tree:
   L_TREE block
     {
+#ifdef DEBUG
       $$ = new_node_no_line();
       lpc_tree_form($2.node, $$);
+#endif
     }
   | L_TREE '(' comma_expr ')'
     {
+#ifdef DEBUG
       $$ = new_node_no_line();
       lpc_tree_form($3, $$);
+#endif
     }
 ;
 
@@ -3254,13 +3258,7 @@ efun_override:
 
       $$ = (ihe = lookup_ident($3)) ? ihe->dn.efun_num : -1;
       if ($$ == -1) {
-        char buf[256];
-        char *end = EndOf(buf);
-        char *p;
-
-        p = strput(buf, end, "Unknown efun: ");
-        p = strput(p, end, $3);
-        yyerror(buf);
+        yyerror("Unknown efun: %s", $3);
       } else {
         push_malloced_string(the_file_name(current_file));
         share_and_push_string($3);
