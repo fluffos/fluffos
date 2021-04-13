@@ -193,7 +193,7 @@ void init_locals(void);
 
 void save_file_info(int, int);
 int add_program_file(char *, int);
-void yyerror(const char *);
+void yyerror(const char *fmt, ...);
 void yywarn(const char *);
 char *the_file_name(const char *);
 void free_all_local_names(int);
