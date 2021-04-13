@@ -144,14 +144,7 @@ void free_all_local_names(int flag) {
 
   for (i = 0; i < current_number_of_locals; i++) {
     if (flag && (type_of_locals_ptr[locals_ptr[i].runtime_index] & LOCAL_MOD_UNUSED)) {
-      char buf[256];
-      char *end = EndOf(buf);
-      char *p;
-
-      p = strput(buf, end, "Unused local variable '");
-      p = strput(p, end, locals_ptr[i].ihe->name);
-      p = strput(p, end, "'");
-      yywarn(buf);
+      yywarn("Unused local variable '%s'", locals_ptr[i].ihe->name);
     }
     locals_ptr[i].ihe->sem_value--;
     locals_ptr[i].ihe->dn.local_num = -1;
@@ -206,14 +199,7 @@ void pop_n_locals(int num) {
   i1 = num;
   while (i1--) {
     if (type_of_locals_ptr[ltype_start] & LOCAL_MOD_UNUSED) {
-      char buf[256];
-      char *end = EndOf(buf);
-      char *p;
-
-      p = strput(buf, end, "Unused local variable '");
-      p = strput(p, end, locals_ptr[lcur_start].ihe->name);
-      p = strput(p, end, "'");
-      yywarn(buf);
+      yywarn("Unused local variable '%s'", locals_ptr[lcur_start].ihe->name);
     }
     locals_ptr[lcur_start].ihe->sem_value--;
     locals_ptr[lcur_start].ihe->dn.local_num = -1;
@@ -406,28 +392,14 @@ int lookup_any_class_member(char *name, unsigned short *type) {
         continue;
       }
       if (ret != -1 && nret != ret) {
-        char buf[256];
-        char *end = EndOf(buf);
-        char *p;
-
-        p = strput(buf, end, "More than one class in scope has member '");
-        p = strput(p, end, name);
-        p = strput(buf, end, "'; use a cast to disambiguate");
-        yyerror(buf);
+        yyerror("More than one class in scope has member '%s'; use a cast to disambiguate.", name);
       }
       ret = nret;
     }
   }
 
   if (ret == -1) {
-    char buf[256];
-    char *end = EndOf(buf);
-    char *p;
-
-    p = strput(buf, end, "No class in scope has no member '");
-    p = strput(p, end, name);
-    p = strput(p, end, "'");
-    yyerror(buf);
+    yyerror("No class in scope has no member '%s'.", name);
   }
 
   return ret;
@@ -445,17 +417,7 @@ int lookup_class_member(int which, char *name, unsigned short *type) {
 
   if (ret == -1) {
     class_def_t *cd = (reinterpret_cast<class_def_t *>(mem_block[A_CLASS_DEF].block)) + which;
-    char buf[256];
-    char *end = EndOf(buf);
-    char *p;
-
-    p = strput(buf, end, "Class '");
-    p = strput(p, end, PROG_STRING(cd->classname));
-    p = strput(p, end, "' has no member '");
-    p = strput(p, end, name);
-    p = strput(p, end, "'");
-
-    yyerror(buf);
+    yyerror("Class '%s' has no member '%s'", PROG_STRING(cd->classname), name);
   }
   return ret;
 }
@@ -477,16 +439,7 @@ parse_node_t *reorder_class_values(int which, parse_node_t *node) {
     i = lookup_class_member(which, reinterpret_cast<char *>(node->l.expr), nullptr);
     if (i != -1) {
       if (tmp[i]) {
-        char buf[256];
-        char *end = EndOf(buf);
-        char *p;
-
-        p = strput(buf, end, "Redefinition of member '");
-        p = strput(p, end, reinterpret_cast<char *>(node->l.expr));
-        p = strput(p, end, "' in instantiation of class  '");
-        p = strput(p, end, PROG_STRING(cd->classname));
-        p = strput(p, end, "'");
-        yyerror(buf);
+        yyerror("Redefinition of member '%s' in instantiation of class '%s'", reinterpret_cast<char *>(node->l.expr), PROG_STRING(cd->classname));
       } else {
         tmp[i] = node->v.expr;
       }
@@ -522,14 +475,7 @@ static void check_class(char *name, const program_t *prog, int idx, int nidx) {
 
   n = sd1->size;
   if (sd1->size != sd2->size) {
-    char buf[256];
-    char *end = EndOf(buf);
-    char *p;
-
-    p = strput(buf, end, "Definitions of class '");
-    p = strput(p, end, name);
-    p = strput(p, end, "' differ in size.");
-    yyerror(buf);
+    yyerror("Definitions of class '%s' differ in size.", name);
     return;
   }
 
@@ -545,14 +491,7 @@ static void check_class(char *name, const program_t *prog, int idx, int nidx) {
 
     if (sme2[i].type != newtype ||
         prog->strings[sme1[i].membername] != PROG_STRING(sme2[i].membername)) {
-      char buf[512];
-      char *end = EndOf(buf);
-      char *p;
-
-      p = strput(buf, end, "Definitions of class '");
-      p = strput(p, end, name);
-      p = strput(p, end, "' disagree.");
-      yyerror(buf);
+      yyerror("Definitions of class '%s' disagree.", name);
       return;
     }
   }
@@ -568,14 +507,7 @@ void copy_structures(const program_t *prog) {
   int i, j, offset;
 
   if (prog->num_classes + sd_off > CLASS_NUM_MASK) {
-    char buf[512];
-    char *end = EndOf(buf);
-    char *p;
-
-    p = strput(buf, end, "Too many classes, max is ");
-    p = strput_int(p, end, CLASS_NUM_MASK - 1);
-    p = strput(p, end, ".\n");
-    yyerror(buf);
+    yyerror("Too many classes, max is %d.\n", CLASS_NUM_MASK - 1);
     return;
   }
 
@@ -677,14 +609,7 @@ static void overload_function(program_t *prog, int index, program_t *defprog, in
 
   /* check that we aren't overloading a nomask function */
   if ((oldflags & DECL_NOMASK) && !((oldflags | newflags) & (FUNC_NO_CODE))) {
-    char buf[256];
-    char *end = EndOf(buf);
-    char *p;
-
-    p = strput(buf, end, "Illegal to redefine 'nomask' function \"");
-    p = strput(p, end, definition->funcname);
-    p = strput(p, end, "\"");
-    yyerror(buf);
+    yyerror("Illegal to redefine 'nomask' function '%s'.", definition->funcname);
   }
 
   /* Try to prevent some confusion re: overloading.
@@ -1078,13 +1003,7 @@ int arrange_call_inherited(char *name, parse_node_t *node) {
     }
   } /* if in shared string table */
   {
-    char buff[256];
-    char *end = EndOf(buff);
-    char *p;
-
-    p = strput(buff, end, "No such inherited function ");
-    p = strput(p, end, name);
-    yyerror(buff);
+    yyerror("No such inherited function '%s'.", name);
   }
 
 invalid:
@@ -1134,14 +1053,7 @@ int define_new_function(const char *name, int num_arg, int num_local, int flags,
 
     if (!(funflags & (FUNC_INHERITED | FUNC_PROTOTYPE | FUNC_UNDEFINED)) &&
         !(flags & FUNC_PROTOTYPE)) {
-      char buff[256];
-      char *end = EndOf(buff);
-      char *p;
-
-      p = strput(buff, end, "Redeclaration of function ");
-      p = strput(p, end, name);
-      p = strput(p, end, ".");
-      yyerror(buff);
+      yyerror("Redeclaration of function '%s'.", name);
       return -1;
     }
     /*
@@ -1156,14 +1068,7 @@ int define_new_function(const char *name, int num_arg, int num_local, int flags,
      * 'nomask' functions may not be redefined.
      */
     if ((funflags & DECL_NOMASK) && !((flags | funflags) & (FUNC_UNDEFINED | FUNC_PROTOTYPE))) {
-      char buf[256];
-      char *end = EndOf(buf);
-      char *p;
-
-      p = strput(buf, end, "Illegal to redefine 'nomask' function \"");
-      p = strput(p, end, name);
-      p = strput(p, end, "\"");
-      yyerror(buf);
+      yyerror("Illegal to redefine 'nomask' function '%s'.", name);
     }
 
     /* only check prototypes for matching.  It shouldn't be required that
@@ -1294,14 +1199,7 @@ int define_new_function(const char *name, int num_arg, int num_local, int flags,
     if (!(flags & FUNC_PROTOTYPE)) {
       for (i = 0; i < current_number_of_locals; i++) {
         if (type_of_locals_ptr[locals_ptr[i].runtime_index] & LOCAL_MOD_UNUSED) {
-          char buf[256];
-          char *end = EndOf(buf);
-          char *p;
-
-          p = strput(buf, end, "Unused local variable '");
-          p = strput(p, end, locals_ptr[i].ihe->name);
-          p = strput(p, end, "'");
-          yywarn(buf);
+          yywarn("Unused local variable '%s'", locals_ptr[i].ihe->name);
           type_of_locals_ptr[locals_ptr[i].runtime_index] &= ~LOCAL_MOD_UNUSED;
         }
       }
@@ -1341,24 +1239,10 @@ int define_variable(const char *name, int type) {
       yyerror("Too many global variables");
     }
   } else {
-    char buf[CFG_MAX_GLOBAL_VARIABLES];
-    char *end = EndOf(buf);
-    char *p;
-
-    p = strput(buf, end, "Redeclaration of global variable '");
-    p = strput(p, end, ihe->name);
-    p = strput(p, end, "'.");
-    yywarn(buf);
+    yywarn("Redeclaration of global variable '%s'.", ihe->name);
 
     if (VAR_TEMP(ihe->dn.global_num)->type & DECL_NOMASK) {
-      char buf[CFG_MAX_GLOBAL_VARIABLES];
-      char *end = EndOf(buf);
-      char *p;
-
-      p = strput(buf, end, "Illegal to redefine 'nomask' variable \"");
-      p = strput(p, end, name);
-      p = strput(p, end, "\"");
-      yyerror(buf);
+      yyerror("Illegal to redefine 'nomask' variable '%s'.", name);
     }
     /* Okay, the nasty idiots have two variables of the same name in
        the same object.  This causes headaches for save_object().
@@ -1668,14 +1552,7 @@ int validate_function_call(int f, parse_node_t *args) {
 
   /* Make sure it isn't private */
   if (funflags & DECL_HIDDEN) {
-    char buf[256];
-    char *end = EndOf(buf);
-    char *p;
-
-    p = strput(buf, end, "Illegal to call inherited private function '");
-    p = strput(p, end, funp->funcname);
-    p = strput(p, end, "'");
-    yyerror(buf);
+    yyerror("Illegal to call inherited private function '%s'", funp->funcname);
   }
 
   /*
@@ -1683,38 +1560,16 @@ int validate_function_call(int f, parse_node_t *args) {
    */
   if (exact_types) {
     if ((funflags & FUNC_UNDEFINED)) {
-      char buf[256];
-      char *end = EndOf(buf);
-      char *p;
-
-      p = strput(buf, end, "Function ");
-      p = strput(p, end, funp->funcname);
-      p = strput(p, end, " undefined");
-      yyerror(buf);
+      yyerror("Function '%s' undefined.", funp->funcname);
     }
     /*
      * Check number of arguments.
      */
     if (!(funflags & FUNC_VARARGS) && (funflags & FUNC_STRICT_TYPES)) {
-      char buff[256];
-      char *end = EndOf(buff);
-      char *p;
-
       if (num_var) {
-        p = strput(buff, end,
-                   "Illegal to pass a variable number of arguments to "
-                   "non-varargs function ");
-        p = strput(p, end, funp->funcname);
-        p = strput(p, end, "\n");
-        yyerror(buff);
+        yyerror("Illegal to pass a variable number of arguments to non-varargs function '%s'.", funp->funcname);
       } else if (funp->num_arg != num_arg) {
-        p = strput(buff, end, "Wrong number of arguments to ");
-        p = strput(p, end, funp->funcname);
-        p = strput(p, end, "\n    Expected: ");
-        p = strput_int(p, end, funp->num_arg);
-        p = strput(p, end, "  Got: ");
-        p = strput_int(p, end, num_arg);
-        yyerror(buff);
+        yyerror("Wrong number of arguments to '%s', expected: %d, got: %d.", funp->funcname, funp->num_arg, num_arg);
       }
     }
     /*
@@ -2001,33 +1856,15 @@ parse_node_t *validate_efun_call(int f, parse_node_t *args) {
       args->v.number++;
       num++;
     } else if (num_var && max_arg != -1) {
-      char buff[256];
-      char *end = EndOf(buff);
-      char *p;
-
-      p = strput(buff, end, "Illegal to pass variable number of arguments to non-varargs efun ");
-      p = strput(p, end, predefs[f].word);
-      yyerror(buff);
+      yyerror("Illegal to pass variable number of arguments to non-varargs efun '%s'.", predefs[f].word);
       CREATE_ERROR(args);
       return args;
     } else if ((num - num_var) < min_arg) {
-      char buff[256];
-      char *end = EndOf(buff);
-      char *p;
-
-      p = strput(buff, end, "Too few arguments to ");
-      p = strput(p, end, predefs[f].word);
+      yyerror("Too few arguments to '%s'.", predefs[f].word);
       CREATE_ERROR(args);
-      yyerror(buff);
       return args;
     } else if (num > max_arg && max_arg != -1) {
-      char buff[256];
-      char *end = EndOf(buff);
-      char *p;
-
-      p = strput(buff, end, "Too many arguments to ");
-      p = strput(p, end, predefs[f].word);
-      yyerror(buff);
+      yyerror("Too many arguments to '%s'.", predefs[f].word);
       CREATE_ERROR(args);
       return args;
     }
@@ -2036,9 +1873,6 @@ parse_node_t *validate_efun_call(int f, parse_node_t *args) {
        * Now check all types of arguments to efuns.
        */
       int i, argn, tmp;
-      char buff[256];
-      char *end = EndOf(buff);
-      char *p;
       parse_node_t *enode = args;
       argp = &efun_arg_types[predefs[f].arg_index];
 
@@ -2057,12 +1891,7 @@ parse_node_t *validate_efun_call(int f, parse_node_t *args) {
         }
 
         if (argp[i] == 0) {
-          p = strput(buff, end, "Bad argument ");
-          p = strput_int(p, end, argn + 1);
-          p = strput(p, end, " to efun ");
-          p = strput(p, end, predefs[f].word);
-          p = strput(p, end, "()");
-          yyerror(buff);
+          yyerror("Bad argument %d to efun %s()", argn + 1, predefs[f].word);
         } else {
           /* check for (int) -> (float) promotion */
           if (tmp == TYPE_NUMBER && argp[i] == TYPE_REAL) {
@@ -2124,12 +1953,20 @@ void yyerror(const char *fmt, ...) {
   num_parse_error++;
 }
 
-void yywarn(const char *str) {
+void yywarn(const char *fmt, ...) {
+  static char buf[1024 + 1];
+
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, args);
+  va_end(args);
+  buf[sizeof(buf) - 1] = '\0';
+
   if (!(pragmas & PRAGMA_WARNINGS)) {
     return;
   }
 
-  smart_log(current_file, current_line, str, 1);
+  smart_log(current_file, current_line, buf, 1);
 }
 
 /*

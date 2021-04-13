@@ -221,12 +221,7 @@ ident_hash_elem_t* rule_define_class(LPC_INT *$$, char* $3) {
     ihe->sem_value++;
     ihe->dn.class_num = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
     if (ihe->dn.class_num > CLASS_NUM_MASK) {
-      char buf[256];
-      char *p;
-
-      p = buf;
-      sprintf(p, "Too many classes, max is %d.\n", CLASS_NUM_MASK + 1);
-      yyerror(buf);
+      yyerror("Too many classes, max is %d.\n", CLASS_NUM_MASK + 1);
     }
 
     scratch_free($3);
@@ -262,13 +257,7 @@ void rule_define_class_members(struct ident_hash_elem_t* $2, LPC_INT $5) {
   }
 
   if (raise_error) {
-    char buf[512];
-    char *end = EndOf(buf);
-    char *p;
-
-    p = strput(buf, end, "Illegal to redefine class ");
-    p = strput(p, end, PROG_STRING($5));
-    yyerror(buf);
+    yyerror("Illegal to redefine class '%s',", PROG_STRING($5));
   } else {
     sd = (class_def_t *)allocate_in_mem_block(A_CLASS_DEF, sizeof(class_def_t));
     i = sd->size = current_number_of_locals;

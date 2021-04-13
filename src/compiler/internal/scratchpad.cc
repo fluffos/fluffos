@@ -5,7 +5,7 @@
 #include <cstdlib>
 
 // FIXME: figure out where this is
-extern void yywarn(const char *);
+extern void yywarn(const char *, ...);
 
 /*
  * This is a first attempt at beating malloc() for allocation of strings
