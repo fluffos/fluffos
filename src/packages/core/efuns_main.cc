@@ -894,9 +894,7 @@ void f_malloc_status(void) {
 void f_map_delete(void) {
   mapping_delete((sp - 1)->u.map, sp);
   pop_stack();
-#ifndef COMPAT_32
   free_mapping((sp--)->u.map);
-#endif
 }
 #endif
 

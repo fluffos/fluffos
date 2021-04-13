@@ -210,11 +210,7 @@ static int give_uid_to_object(object_t *ob) {
 /*
  * The loaded object has the same uid as the loader.
  */
-#ifndef COMPAT_32
     ob->uid = current_object->uid;
-#else
-    ob->uid = current_object->euid;
-#endif
     ob->euid = current_object->euid;
     return 1;
   }
