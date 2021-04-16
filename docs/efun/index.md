@@ -411,6 +411,9 @@ title: EFUN
 <div><a href='functions/bind.html'>bind</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='functions/defer.html'>defer</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='functions/evaluate.html'>evaluate</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
@@ -1095,6 +1098,6 @@ title: EFUN
 
 <div class="alert alert-info my-4" role="alert">
     <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/info.svg">
-    This page is auto generated on 2021-04-10 10:43:54 PDT for v2019.20210324-3-g5d103255.</a>
+    This page is auto generated on 2021-04-16 15:29:57 UTC for v2019.20210324-7-g76da2942.</a>
 </div>
 
