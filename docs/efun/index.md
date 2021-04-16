@@ -1059,6 +1059,9 @@ title: EFUN
 <div><a href='system/max_eval_cost.html'>max_eval_cost</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='system/perf_counter_ns.html'>perf_counter_ns</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='system/reclaim_objects.html'>reclaim_objects</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
@@ -1098,6 +1101,6 @@ title: EFUN
 
 <div class="alert alert-info my-4" role="alert">
     <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/info.svg">
-    This page is auto generated on 2021-04-16 15:29:57 UTC for v2019.20210324-7-g76da2942.</a>
+    This page is auto generated on 2021-04-16 17:02:41 UTC for v2019.20210324-9-g57fe32a1.</a>
 </div>
 
