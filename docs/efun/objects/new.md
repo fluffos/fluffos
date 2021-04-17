@@ -15,7 +15,8 @@ title: objects / new
 
     Load  a  new  object  from  definition <name>, and give it a new unique
     name.  Returns the new object.  An object with a nonzero  environment()
-    cannot be cloned.
+    cannot be cloned.  Optionally, additional arguments may be passed to
+    clone_object() which will then be passed to 'create()' in the new object.
 
 ### SEE ALSO
 
