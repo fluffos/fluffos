@@ -374,24 +374,52 @@ char *read_file(const char *file, int start, int lines) {
     return nullptr;
   }
   theBuff[total_bytes_read] = '\0';
-
-  // skip forward until the "start"-th line
-  const char *ptr_start = theBuff;
-  while (start > 1 && ptr_start < theBuff + total_bytes_read) {
-    if (*ptr_start == '\0') {
-      debug(file, "read_file: file contains '\\0': %s.\n", file);
+  const char *ptr_start;
+  
+  if ( start > 1 )
+  {
+    // skip forward until the "start"-th line
+    ptr_start = theBuff;
+    while (start > 1 && ptr_start < theBuff + total_bytes_read) {
+      if (*ptr_start == '\0') {
+        debug(file, "read_file: file contains '\\0': %s.\n", file);
+        return nullptr;
+      }
+      if (*ptr_start == '\n') {
+        start--;
+      }
+      ptr_start++;
+    }
+    
+    // not found
+    if (start > 1) {
+      debug(file, "read_file: reached EOF searching for start: %s.\n", file);
       return nullptr;
     }
-    if (*ptr_start == '\n') {
-      start--;
-    }
-    ptr_start++;
   }
-
-  // not found
-  if (start > 1) {
-    debug(file, "read_file: reached EOF searching for start: %s.\n", file);
-    return nullptr;
+  else if ( start < 0 )
+  {
+    // move backwards from end by "start"-th lines
+    ptr_start = theBuff + total_bytes_read;
+    while (start < 0 && ptr_start > theBuff) {
+      // start decrementing pointer first because we start on '\0'
+      ptr_start--;
+      if (*ptr_start == '\0') {
+        debug(file, "read_file: file contains '\\0': %s.\n", file);
+        return nullptr;
+      }
+      if (*ptr_start == '\n') {
+        start++;
+      }
+      // move pointer past '\n' if we have enough lines
+      if ( !start ) {
+        ptr_start++;
+      }
+    }  
+    
+    if (start < 0) {
+      ptr_start = theBuff;
+    }
   }
 
   char *ptr_end = (char *)theBuff + total_bytes_read;
