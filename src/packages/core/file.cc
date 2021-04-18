@@ -374,12 +374,11 @@ char *read_file(const char *file, int start, int lines) {
     return nullptr;
   }
   theBuff[total_bytes_read] = '\0';
-  const char *ptr_start;
+  const char *ptr_start = theBuff;
   
   if ( start > 1 )
   {
     // skip forward until the "start"-th line
-    ptr_start = theBuff;
     while (start > 1 && ptr_start < theBuff + total_bytes_read) {
       if (*ptr_start == '\0') {
         debug(file, "read_file: file contains '\\0': %s.\n", file);
@@ -400,7 +399,7 @@ char *read_file(const char *file, int start, int lines) {
   else if ( start < 0 )
   {
     // move backwards from end by "start"-th lines
-    ptr_start = theBuff + total_bytes_read;
+    ptr_start += total_bytes_read;
     while (start < 0 && ptr_start > theBuff) {
       // start decrementing pointer first because we start on '\0'
       ptr_start--;
