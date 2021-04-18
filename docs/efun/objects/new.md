@@ -9,13 +9,14 @@ title: objects / new
 
 ### SYNOPSIS
 
-    object new( string name );
+    object new( string name, ... );
 
 ### DESCRIPTION
 
     Load  a  new  object  from  definition <name>, and give it a new unique
     name.  Returns the new object.  An object with a nonzero  environment()
-    cannot be cloned.
+    cannot be cloned.  Optionally, additional arguments may be passed to
+    new() which will be passed to 'create()' in the new object.
 
 ### SEE ALSO
 
