@@ -425,7 +425,7 @@ object_t *load_object(const char *lname, int callcreate) {
   object_t *ob;
   svalue_t *mret;
   struct stat c_st;
-  char real_name[400], name[400], actualname[400], obname[400];
+  char name[400], actualname[400], real_name[sizeof(name)+2], obname[sizeof(real_name)];
 
   const char *pname = check_valid_path(lname, master_ob, "load_object", 0);
   if (!pname) {
