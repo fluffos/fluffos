@@ -420,6 +420,10 @@ char *read_file(const char *file, int start, int lines) {
         ptr_start++;
       }
     }  
+    
+    if (start < 0) {
+      ptr_start = theBuff;
+    }
   }
 
   char *ptr_end = (char *)theBuff + total_bytes_read;
