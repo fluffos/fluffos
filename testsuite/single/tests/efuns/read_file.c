@@ -27,5 +27,6 @@ void do_tests() {
     
     // CRLF tests
     ASSERT(read_file("/crlf_test_file.lf") == read_file("/crlf_test_file.crlf"));
-    ASSERT(read_file("/crlf_test_file.lf", -1000) == read_file("/crlf_test_file.crlf", -1000));
+    ASSERT_EQ(read_file("/crlf_test_file.lf", -2, 1), read_file("/crlf_test_file.crlf", -2, 1));
+    ASSERT_EQ(read_file("/crlf_test_file.lf", -1000), read_file("/crlf_test_file.crlf", -1000));
 }
