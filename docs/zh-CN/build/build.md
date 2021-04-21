@@ -60,17 +60,51 @@ v2017 编译完成后的驱动文件在 fluffos/bin 目录中，包括 `driver` 
 
 v2019 编译完成后的驱动文件在 fluffos/build/bin 目录中，包括 `driver`、`lpcc`、`portbind`三个程序和 `include`、`std`、`www`三个目录，分别是驱动定义的头文件、驱动提供的sefun和 websocket 的 http dir 目录。
 
-补充说明，经测试在CentOS 7下也可编译通过，不过 CentOS 7 系统 cmake 和 g++ 版本过低，可使用以下指令更新：
+## CentOS 系统编译
 
-    # 更新cmake
-    sudo yum -y install python-pip
-    sudo pip install --upgrade cmake
-    # 更新g++
-    sudo yum install centos-release-scl -y
-    sudo yum install devtoolset-8 -y
+经测试在CentOS 7下也可编译fluffos v2019，相对ubuntu来说，麻烦很多，因为cmake、g++、libevent-devel、libicu-devel版本过低，需要我们单独安装新版：
+
+    # 安装pip
+    yum -y install epel-release
+    yum -y install python-pip
+    # 安装cmake
+    pip install --upgrade cmake
+    # 安装devtoolset(g++)
+    yum -y install centos-release-scl
+    yum -y install devtoolset-8
+    # 切换到gcc8版本
     scl enable devtoolset-8 bash
+    # 安装其它组件
+    yum -y install zlib-devel
+    # yum install libevent-devel
+    # yum install libicu-devel
+    yum -y install bison
+    yum -y install jemalloc-devel
+    yum -y install openssl-devel
+    yum -y install mariadb-devel
+    yum -y install binutils-devel
+    yum -y install gith
 
-另外，还需要下载源码编译安装libevent、libicu等，相对ubuntu来说，麻烦很多，问题也很多，都需要自己根据提示处理，不推荐尝试。
+下载源码编译安装libevent和libicu最新版：
+
+    # 安装libevent
+    $ wget https://github.com/libevent/libevent/releases/download/release-2.1.12-stable/libevent-2.1.12-stable.tar.gz
+    $ tar -zxvf libevent-2.1.12-stable.tar.gz
+    $ cd libevent-2.1.12-stable
+    $ ./configure –prefix=/usr
+    $ make -j4
+    $ make install
+    # 安装libicu
+    $ wget https://github.com/unicode-org/icu/releases/download/release-69-1/icu4c-69_1-src.tgz
+    $ tar -zxvf icu4c-69_1-src.tgz
+    $ cd icu/source/
+    $ ./configure -prefix=/usr
+    $ make -j4
+    $ make install
+    # 更新动态链接库
+    $ ldconfig
+
+通过以上操作后，可和 ubuntu 系统下一样编译驱动。
 
 ## Windows 系统编译
 
