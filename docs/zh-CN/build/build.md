@@ -83,7 +83,7 @@ v2019 编译完成后的驱动文件在 fluffos/build/bin 目录中，包括 `dr
     yum -y install openssl-devel
     yum -y install mariadb-devel
     yum -y install binutils-devel
-    yum -y install gith
+    yum -y install git
 
 下载源码编译安装libevent和libicu最新版：
 

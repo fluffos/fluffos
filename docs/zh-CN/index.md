@@ -180,6 +180,9 @@ title: zh-CN
 <div><a href='efun/deep_inventory.html'>deep_inventory</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='efun/defer.html'>defer</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='efun/destruct.html'>destruct</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
@@ -322,6 +325,9 @@ title: zh-CN
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='efun/getuid.html'>getuid</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='efun/hash.html'>hash</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='efun/heart_beats.html'>heart_beats</a></div>
@@ -493,6 +499,9 @@ title: zh-CN
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='efun/pcre_version.html'>pcre_version</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='efun/perf_counter_ns.html'>perf_counter_ns</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='efun/pluralize.html'>pluralize</a></div>
@@ -720,6 +729,9 @@ title: zh-CN
 <div><a href='efun/seteuid.html'>seteuid</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='efun/sha1.html'>sha1</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='efun/shadow.html'>shadow</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
@@ -933,6 +945,6 @@ title: zh-CN
 
 <div class="alert alert-info my-4" role="alert">
     <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/info.svg">
-    This page is auto generated on 2021-04-17 19:11:20 UTC for v2019.20210324-9-g555f6a55.</a>
+    This page is auto generated on 2021-04-23 11:46:42 CST for v2019.20210324-14-g0a8fc22e-dirty.</a>
 </div>
 

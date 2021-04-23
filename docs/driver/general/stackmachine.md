@@ -15,7 +15,7 @@ There are two stacks:
     variables are supposed to be fast, by simply indexing in the value stack
     using the frame pointer as offset.
 
-    ```
+```
     Start of stack -----
                     |
     Frame pointer-> | Argument number 0
@@ -27,7 +27,7 @@ There are two stacks:
                     | Temporary stack values
                     | etc
                     v
-    ```
+```
 
 2.  The control stack that contains return addresses, frame pointer etc.
 
@@ -41,14 +41,14 @@ explicitly.
 
 Instruction format:
 
-    ```
+```
     b0 b1 b2 b3
 
     b0 = F_FUNCTION.
     b1, b2 = The number of the function to be called.
     b3 = Number of arguments sent.
 
-    ```
+```
 
 The `F_FUNCTION` instruction will also initiate the frame pointer to point
 to the first argument.
@@ -73,13 +73,13 @@ If flag `extern_call` is set, then the evaluator should return. Otherwise,
 the evaluator will continue to execute the instruction at the returned
 address.
 
-    ```
+```
     Format:
 
     b0
 
     b0 = F_RETURN.
-    ```
+```
 
 ## CALLING PREDEFINED FUNCTIONS.
 
@@ -87,11 +87,11 @@ Arguments are pushed to the stack. A value is always returned (on the stack).
 
 Instruction format:
 
-    ```
+```
     b1
 
     b1 = The F\_ code of the called function.
-    ```
+```
 
 If a variable number of arguments are allowed, then an extra byte will
 follow the instruction, that states number of actual arguments.
@@ -114,22 +114,22 @@ is given as a one byte code supplied to the F_SSCANF instruction.
 
 This command takes one argument, a byte which gives the number of arguments.
 
-    ```
+```
     b1, b2
 
     b1 = F_CALL_OTHER, b2 = number of arguments.
-    ```
+```
 
 ## F_AGGREGATE
 
 This command takes one argument, the size of the array. The elements of
 the array are picked from the top of stack.
 
-    ```
+```
     b1, b2, b3
 
     b1 = F_AGGREGATE, (b2,b3) = Size of the array (max 0xffff).
-    ```
+```
 
 ## F_CATCH
 
@@ -144,11 +144,11 @@ F_THROW will do a longjmp().
 
 format:
 
-    ```
+```
     F_THROW, b1, b2, (instructions...), F_RETURN
 
     Where b1,b2 is the address of the instruction after the return instruction.
-    ```
+```
 
 ## F_RETURN
 
