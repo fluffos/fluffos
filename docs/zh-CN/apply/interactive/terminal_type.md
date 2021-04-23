@@ -3,14 +3,18 @@ layout: default
 title: interactive / terminal_type
 ---
 
-### NAME
+### 名称
 
-    terminal_type - inform the mudlib of the user's terminal type
+    terminal_type - 通知mudlib用户的终端类型
 
-### SYNOPSIS
+### 语法
 
     void terminal_type( string term );
 
-### DESCRIPTION
+### 描述
 
-    This apply is called on the interactive object with term set to the terminal type for the user, as reported by telnet negotiation.  If the user's client never responds (it's not telnet, for example) this will never be called.
+    这个 apply 在玩家连线对象上自动调用，变量 `term` 被设置为用户的终端类型，如果客户端一直没有响应（比如客户端不是telnet协议），这个apply不再被调用。
+
+### 翻译 ###
+
+    雪风@mud.ren
