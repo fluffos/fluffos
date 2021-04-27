@@ -51,14 +51,16 @@ void do_tests() {
 
   // https://sqlite.org/cli.html
   rows = db_exec(conn,  "DROP TABLE IF EXISTS tbl1");
-  rows = db_exec(conn,  "create table IF NOT EXISTS tbl1(one varchar(10), two smallint);");
+  rows = db_exec(conn,  "create table IF NOT EXISTS tbl1(one varchar(10), two bigint);");
   ASSERT_EQ(0, rows);
   rows = db_exec(conn,  "insert into tbl1 values('hello!',10);");
   ASSERT_EQ(0, rows);
   rows = db_exec(conn,  "insert into tbl1 values('goodbye', 20);");
   ASSERT_EQ(0, rows);
+  rows = db_exec(conn,  "insert into tbl1 values('largeint', 9223372036854775807);");
+  ASSERT_EQ(0, rows);
   rows = db_exec(conn,  "select * from tbl1;");
-  ASSERT_EQ(2, rows);
+  ASSERT_EQ(3, rows);
 
   {
     mixed res;
@@ -69,6 +71,9 @@ void do_tests() {
 
     res = db_fetch(conn, 2);
     ASSERT_EQ(({ "goodbye", 20 }), res);
+
+    res = db_fetch(conn, 3);
+    ASSERT_EQ(({ "largeint", MAX_INT }), res);
   }
 
   rows = db_exec(conn,  "drop table tbl1;");

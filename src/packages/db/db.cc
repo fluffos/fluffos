@@ -702,13 +702,13 @@ static array_t *MySQL_fetch(dbconn_t *c, int row) {
         case FIELD_TYPE_LONGLONG:
           v->item[i].type = T_NUMBER;
           v->item[i].subtype = 0;
-          v->item[i].u.number = atoi(target_row[i]);
+          v->item[i].u.number = strtoull(target_row[i], nullptr, 10);
           break;
 
         case FIELD_TYPE_FLOAT:
         case FIELD_TYPE_DOUBLE:
           v->item[i].type = T_REAL;
-          v->item[i].u.real = atof(target_row[i]);
+          v->item[i].u.real = strtod(target_row[i], nullptr);
           break;
 
         case FIELD_TYPE_TINY_BLOB:
@@ -1057,7 +1057,7 @@ static array_t *SQLite3_fetch(dbconn_t *c, int row) {
     switch (sqlite3_column_type(c->SQLite3.results, i)) {
       case SQLITE_INTEGER:
         v->item[i].type = T_NUMBER;
-        v->item[i].u.number = sqlite3_column_int(c->SQLite3.results, i);
+        v->item[i].u.number = sqlite3_column_int64(c->SQLite3.results, i);
         break;
 
       case SQLITE_FLOAT:
