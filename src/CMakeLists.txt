@@ -468,9 +468,6 @@ target_link_libraries(driver PUBLIC ${FLUFFOS_LINK})
 add_executable(lpcc "main_lpcc.cc")
 target_link_libraries(lpcc PUBLIC ${FLUFFOS_LINK})
 
-add_executable(lpcfmt "main_lpcfmt.cc")
-target_link_libraries(lpcfmt PUBLIC ${FLUFFOS_LINK})
-
 include(helper)
 
 message("Final Compile Flags: ")
