@@ -17,6 +17,8 @@
 #include "ghc/filesystem.hpp"
 namespace fs = ghc::filesystem;
 
+#define YYLEX_EOF 0
+
 unsigned int whashstr(const char *s) {
   int i = 0;
   unsigned long __h = 0;
@@ -144,12 +146,15 @@ static void add_input(const char *p) {
 #define SKIPW(foo) \
   while (isspace(*foo)) foo++;
 
+static void refill();
+
 static char *skip_comment(char *tmp, int flag) {
-  int c;
+  char c;
 
   for (;;) {
     while ((c = *++tmp) != '*') {
-      if (c == EOF) yyerror("End of file in a comment");
+      if (c == YYLEX_EOF)
+          yyerror("End of file in a comment");
       if (c == '\n') {
         nexpands = 0;
         current_line++;
@@ -160,6 +165,7 @@ static char *skip_comment(char *tmp, int flag) {
     }
     do {
       if ((c = *tmp++) == '/') return tmp + 1;
+      if (c == '\r') { c = *tmp++; }
       if (c == '\n') {
         nexpands = 0;
         current_line++;
@@ -176,7 +182,7 @@ static void refill() {
   char c;
 
   if (fgets(p = yyp = defbuf + (DEFMAX >> 1), MAXLINE - 1, yyin)) {
-    while (((c = *yyp++) != '\n') && (c != EOF)) {
+    while (((c = *yyp++) != '\n') && (c != YYLEX_EOF)) {
       if (c == '/') {
         if ((c = *yyp) == '*') {
           yyp = skip_comment(yyp, 0);
@@ -386,7 +392,7 @@ static int expand_define() {
           n++;
           break;
         } else {
-          if (c == EOF) yyerror("Unexpected end of file");
+          if (c == YYLEX_EOF) yyerror("Unexpected end of file");
           if (q >= expbuf + DEFMAX - 5) {
             yyerror("Macro argument overflow");
           } else {
@@ -484,7 +490,7 @@ static int skip_to(const char *token, const char *atoken) {
     if ((c = *outp++) == ppchar) {
       while (isspace(*outp)) outp++;
       end = b + sizeof b - 1;
-      for (p = b; (c = *outp++) != '\n' && !isspace(c) && c != EOF;) {
+      for (p = b; (c = *outp++) != '\n' && !isspace(c) && c != YYLEX_EOF;) {
         if (p < end) *p++ = c;
       }
       *p = 0;
@@ -1032,7 +1038,7 @@ static void preprocess() {
               break;
           }
           if (!outp && isspace(c)) outp = yyp;
-          if (c == '\n' || c == EOF) break;
+          if (c == '\n' || c == YYLEX_EOF) break;
         }
         *yyp++ = c;
       }

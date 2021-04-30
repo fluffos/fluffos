@@ -9,14 +9,15 @@
 
 #include <event2/buffer.h>       // for evbuffer_freeze, etc
 #include <event2/bufferevent.h>  // for bufferevent_enable, etc
-#include <event2/event.h>        // for EV_TIMEOUT, etc
-#include <event2/listener.h>     // for evconnlistener_free, etc
-#include <event2/util.h>         // for evutil_closesocket, etc
-#include <stdarg.h>              // for va_end, va_list, va_copy, etc
-#include <stdio.h>               // for snprintf, vsnprintf, fwrite, etc
-#include <string.h>              // for NULL, memcpy, strlen, etc
-#include <unistd.h>              // for gethostname
-#include <memory>                // for unique_ptr
+#include <event2/bufferevent_ssl.h>
+#include <event2/event.h>     // for EV_TIMEOUT, etc
+#include <event2/listener.h>  // for evconnlistener_free, etc
+#include <event2/util.h>      // for evutil_closesocket, etc
+#include <stdarg.h>           // for va_end, va_list, va_copy, etc
+#include <stdio.h>            // for snprintf, vsnprintf, fwrite, etc
+#include <string.h>           // for NULL, memcpy, strlen, etc
+#include <unistd.h>           // for gethostname
+#include <memory>             // for unique_ptr
 // Network stuff
 #ifndef _WIN32
 #include <netdb.h>        // for addrinfo, freeaddrinfo, etc
@@ -34,8 +35,12 @@
 #include "thirdparty/libtelnet/libtelnet.h"
 #include "net/telnet.h"
 #include "net/websocket.h"
+#include "net/tls.h"
 #include "user.h"
 #include "vm/vm.h"
+
+#include "ghc/filesystem.hpp"
+namespace fs = ghc::filesystem;
 
 #include "packages/core/add_action.h"  // FIXME?
 #include "packages/core/dns.h"         // FIXME?
@@ -154,13 +159,14 @@ void on_user_events(bufferevent *bev, short events, void *arg) {
 }
 
 void new_user_event_listener(event_base *base, interactive_t *user) {
-  auto bev =
-      bufferevent_socket_new(base, user->fd, BEV_OPT_CLOSE_ON_FREE | BEV_OPT_DEFER_CALLBACKS);
+  auto options = BEV_OPT_CLOSE_ON_FREE | BEV_OPT_DEFER_CALLBACKS;
+  auto *bev = user->ssl ? bufferevent_openssl_socket_new(base, user->fd, user->ssl,
+                                                         BUFFEREVENT_SSL_ACCEPTING, options)
+                        : bufferevent_socket_new(base, user->fd, options);
+
   bufferevent_setcb(bev, on_user_read, on_user_write, on_user_events, user);
   bufferevent_enable(bev, EV_READ | EV_WRITE);
-
   bufferevent_set_timeouts(bev, nullptr, nullptr);
-
   user->ev_buffer = bev;
 }
 
@@ -170,7 +176,7 @@ void new_user_event_listener(event_base *base, interactive_t *user) {
  * If space is available, an interactive data structure is initialized and
  * the user is connected.
  */
-void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct sockaddr *addr,
+void new_conn_handler(evconnlistener *listener, evutil_socket_t fd, struct sockaddr *addr,
                       int addrlen, void *arg) {
   debug(connections, "New connection from %s.\n", sockaddr_to_string(addr, addrlen));
 
@@ -188,7 +194,7 @@ void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
 #endif
                    sizeof(one)) == -1) {
       debug(connections,
-            "new_user_handler: user fd %" FMT_SOCKET_FD ", set_socket_tcp_nodelay error: %s.\n", fd,
+            "new_conn_handler: user fd %" FMT_SOCKET_FD ", set_socket_tcp_nodelay error: %s.\n", fd,
             evutil_socket_error_to_string(evutil_socket_geterror(fd)));
     }
   }
@@ -217,8 +223,8 @@ void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
         },
         (void *)user, nullptr);
   }
-  debug(connections, ("new_user_handler: end\n"));
-} /* new_user_handler() */
+  debug(connections, ("new_conn_handler: end\n"));
+} /* new_conn_handler() */
 
 }  // namespace
 
@@ -237,9 +243,11 @@ interactive_t *new_user(port_def_t *port, evutil_socket_t fd, sockaddr *addr,
   user->fd = fd;
   user->local_port = port->port;
   user->external_port = (port - external_port);  // FIXME: pointer arith
-
   memcpy(&user->addr, addr, addrlen);
   user->addrlen = addrlen;
+  if (port->ssl) {
+    user->ssl = tls_get_client_ctx(port->ssl);
+  }
 
   // Command handler
   auto base = evconnlistener_get_base(port->ev_conn);
@@ -310,7 +318,7 @@ void on_user_logon(interactive_t *user) {
   set_eval(max_eval_cost);
   ret = safe_apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
   if (ret == nullptr) {
-    debug_message("new_user_handler: logon() on object %s has failed, the user is disconnected.\n",
+    debug_message("new_conn_handler: logon() on object %s has failed, the user is disconnected.\n",
                   ob->obname);
     remove_interactive(ob, false);
   } else if (ob->flags & O_DESTRUCTED) {
@@ -324,14 +332,14 @@ void on_user_logon(interactive_t *user) {
  * Initialize new user connection socket.
  */
 bool init_user_conn() {
-  for (auto &i : external_port) {
+  for (auto &port : external_port) {
 #ifdef F_NETWORK_STATS
-    i.in_packets = 0;
-    i.in_volume = 0;
-    i.out_packets = 0;
-    i.out_volume = 0;
+    port.in_packets = 0;
+    port.in_volume = 0;
+    port.out_packets = 0;
+    port.out_volume = 0;
 #endif
-    if (!i.port) continue;
+    if (!port.port) continue;
 #ifdef IPV6
     auto fd = socket(AF_INET6, SOCK_STREAM, 0);
 #else
@@ -385,6 +393,30 @@ bool init_user_conn() {
     }
 #endif
 #endif
+    // Enable TLS
+    {
+      if (!port.tls_cert.empty() && !port.tls_key.empty()) {
+        debug_message("Processing TLS config for port %d...\n", port.port);
+        fs::path mudlib_path(CONFIG_STR(__MUD_LIB_DIR__));
+        auto real_cert_path = mudlib_path / port.tls_cert;
+        auto real_key_path = mudlib_path / port.tls_key;
+        try {
+          if (!fs::exists(real_cert_path)) {
+            debug_message("cert file missing: %s.\n", real_cert_path.c_str());
+            return false;
+          }
+          if (!fs::exists(real_key_path)) {
+            debug_message("key file missing: %s.\n", real_key_path.c_str());
+            return false;
+          }
+        } catch (fs::filesystem_error &e) {
+          debug_message("Error: %s (%d).\n", e.what(), e.code().value());
+          return false;
+        }
+        port.tls_cert = fs::absolute(real_cert_path).string();
+        port.tls_key = fs::absolute(real_key_path).string();
+      }
+    }
     {
       /*
        * fill in socket address information.
@@ -392,7 +424,7 @@ bool init_user_conn() {
       struct addrinfo *res;
 
       char service[NI_MAXSERV];
-      snprintf(service, sizeof(service), "%u", i.port);
+      snprintf(service, sizeof(service), "%u", port.port);
 
       // Must be initialized to all zero.
       struct addrinfo hints = {0};
@@ -425,22 +457,36 @@ bool init_user_conn() {
         evutil_freeaddrinfo(res);
         return false;
       }
-      debug_message("Accepting %s connections on %s.\n", port_kind_name(i.kind),
+
+      // Websocket TLS is handled in init_websocket_context
+      if (!port.tls_cert.empty() && port.kind != PORT_WEBSOCKET) {
+        SSL_CTX *ctx = tls_server_init(port.tls_cert, port.tls_key);
+        if (!ctx) {
+          debug_message("Unable to create TLS context.\n");
+          evutil_closesocket(fd);
+          return false;
+        }
+        port.ssl = ctx;
+      }
+
+      debug_message("Accepting %s%s connections on %s.\n", port_kind_name(port.kind),
+                    !port.tls_cert.empty() ? "(TLS)" : "",
                     sockaddr_to_string(res->ai_addr, res->ai_addrlen));
       evutil_freeaddrinfo(res);
     }
+
     // Listen on connection event
     auto conn = evconnlistener_new(
-        g_event_base, new_user_handler, &i,
+        g_event_base, new_conn_handler, &port,
         LEV_OPT_REUSEABLE | LEV_OPT_CLOSE_ON_FREE | LEV_OPT_CLOSE_ON_EXEC, 1024, fd);
     if (conn == nullptr) {
       debug_message("listening failed: %s !", evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
       return false;
     }
-    i.ev_conn = conn;
-    i.fd = fd;
-    if (i.kind == PORT_WEBSOCKET) {
-      i.lws_context = init_websocket_context(g_event_base, &i);
+    port.ev_conn = conn;
+    port.fd = fd;
+    if (port.kind == PORT_WEBSOCKET) {
+      port.lws_context = init_websocket_context(g_event_base, &port);
     }
   }
   return true;
@@ -631,9 +677,22 @@ int flush_message(interactive_t *ip) {
 
   // Flush things normally
   if (ip->ev_buffer) {
-    if (bufferevent_flush(ip->ev_buffer, EV_WRITE, BEV_FLUSH) == -1) {
-      return 0;
+    if (bufferevent_flush(ip->ev_buffer, EV_WRITE, BEV_FLUSH) == -1) return 0;
+  }
+  if (ip->ssl) {
+    auto *output = bufferevent_get_output(ip->ev_buffer);
+    auto len = evbuffer_get_length(output);
+    if (len > 0) {
+      evbuffer_unfreeze(output, 1);
+      auto *data = evbuffer_pullup(output, len);
+      auto wrote = SSL_write(ip->ssl, data, len);
+      if (wrote > 0) {
+        evbuffer_drain(output, wrote);
+      }
+      evbuffer_freeze(output, 1);
+      return wrote > 0;
     }
+  } else {
     // For socket bufferevent, bufferevent_flush is actually a no-op, thus we have to
     // implement our own.
     auto fd = bufferevent_getfd(ip->ev_buffer);
@@ -650,6 +709,7 @@ int flush_message(interactive_t *ip) {
       return wrote != -1;
     }
   }
+
   return 0;
 }
 
@@ -1241,9 +1301,14 @@ void remove_interactive(object_t *ob, int dested) {
     ip->snooped_by = nullptr;
   }
 #endif
-
-  // Cleanup events
+  // Cleanup events, must happen after ssl.
   if (ip->ev_buffer != nullptr) {
+    // see http://www.wangafu.net/~nickm/libevent-book/Ref6a_advanced_bufferevents.html
+    if (ip->ssl) {
+      SSL_set_shutdown(ip->ssl, SSL_RECEIVED_SHUTDOWN);
+      SSL_shutdown(ip->ssl);
+      ip->ssl = nullptr;
+    }
     bufferevent_free(ip->ev_buffer);
     ip->ev_buffer = nullptr;
   }
