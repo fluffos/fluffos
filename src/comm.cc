@@ -409,12 +409,12 @@ bool init_user_conn() {
             debug_message("key file missing: %s.\n", real_key_path.c_str());
             return false;
           }
+          port.tls_cert = fs::absolute(real_cert_path).string();
+          port.tls_key = fs::absolute(real_key_path).string();
         } catch (fs::filesystem_error &e) {
           debug_message("Error: %s (%d).\n", e.what(), e.code().value());
           return false;
         }
-        port.tls_cert = fs::absolute(real_cert_path).string();
-        port.tls_key = fs::absolute(real_key_path).string();
       }
     }
     {

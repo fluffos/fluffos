@@ -306,7 +306,9 @@ void f_uncompress(void) {
     write_buffer(buffer, 0, reinterpret_cast<char *>(output_data), len);
     FREE(output_data);
     push_refed_buffer(buffer);
+    FREE(compressed);
   } else {
+    FREE(compressed);
     error("inflate: no ZSTREAM_END\n");
   }
 }
