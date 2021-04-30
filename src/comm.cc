@@ -675,38 +675,39 @@ int flush_message(interactive_t *ip) {
     return 0;
   }
 
-  // Flush things normally
+  // Currently only support Libevent based connections, for websocket based connections, they use ip->lws.
   if (ip->ev_buffer) {
+    // Try to flush things normally
     if (bufferevent_flush(ip->ev_buffer, EV_WRITE, BEV_FLUSH) == -1) return 0;
-  }
-  if (ip->ssl) {
-    auto *output = bufferevent_get_output(ip->ev_buffer);
-    auto len = evbuffer_get_length(output);
-    if (len > 0) {
-      evbuffer_unfreeze(output, 1);
-      auto *data = evbuffer_pullup(output, len);
-      auto wrote = SSL_write(ip->ssl, data, len);
-      if (wrote > 0) {
-        evbuffer_drain(output, wrote);
-      }
-      evbuffer_freeze(output, 1);
-      return wrote > 0;
-    }
-  } else {
-    // For socket bufferevent, bufferevent_flush is actually a no-op, thus we have to
-    // implement our own.
-    auto fd = bufferevent_getfd(ip->ev_buffer);
-    if (fd == -1) {
-      return 0;
-    }
 
-    auto output = bufferevent_get_output(ip->ev_buffer);
-    auto total = evbuffer_get_length(output);
-    if (total > 0) {
-      evbuffer_unfreeze(output, 1);
-      auto wrote = evbuffer_write(output, fd);
-      evbuffer_freeze(output, 1);
-      return wrote != -1;
+    // For socket based bufferevent, bufferevent_flush is actually a no-op, thus we have to
+    // implement our own.
+    if (ip->ssl) {
+      auto *output = bufferevent_get_output(ip->ev_buffer);
+      auto len = evbuffer_get_length(output);
+      if (len > 0) {
+        evbuffer_unfreeze(output, 1);
+        auto *data = evbuffer_pullup(output, len);
+        auto wrote = SSL_write(ip->ssl, data, len);
+        if (wrote > 0) {
+          evbuffer_drain(output, wrote);
+        }
+        evbuffer_freeze(output, 1);
+        return wrote > 0;
+      }
+    } else {
+      auto fd = bufferevent_getfd(ip->ev_buffer);
+      if (fd == -1) {
+        return 0;
+      }
+      auto output = bufferevent_get_output(ip->ev_buffer);
+      auto total = evbuffer_get_length(output);
+      if (total > 0) {
+        evbuffer_unfreeze(output, 1);
+        auto wrote = evbuffer_write(output, fd);
+        evbuffer_freeze(output, 1);
+        return wrote != -1;
+      }
     }
   }
 
