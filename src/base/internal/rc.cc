@@ -312,8 +312,10 @@ void read_config(char *filename) {
             external_port[i].kind = PORT_MUD;
           } else if (!strcmp(kind, "websocket")) {
             external_port[i].kind = PORT_WEBSOCKET;
-            scan_config_line("websocket http dir : %[^\n]", tmp, kMustHave);
-            CONFIG_STR(__RC_WEBSOCKET_HTTP_DIR__) = alloc_cstring(tmp, "config file: whd");
+            if (!CONFIG_STR(__RC_WEBSOCKET_HTTP_DIR__)) {
+              scan_config_line("websocket http dir : %[^\n]", tmp, kMustHave);
+              CONFIG_STR(__RC_WEBSOCKET_HTTP_DIR__) = alloc_cstring(tmp, "config file: whd");
+            }
           } else {
             debug_message("Unknown kind of external port: %s\n", kind);
             exit(-1);
@@ -321,6 +323,24 @@ void read_config(char *filename) {
         } else {
           debug_message("Syntax error in port specification\n");
           exit(-1);
+        }
+      }
+    }
+    // TLS support status
+    for (i = port_start; i < 5; i++) {
+      if (external_port[i].kind != 0) {
+        char kind[kMaxConfigLineLength];
+        sprintf(kind, "external_port_%i_tls : %%[^\n]", i + 1);
+        if (scan_config_line(kind, tmp, 0)) {
+          char cert[255 + 1]{}, key[255 + 1]{};
+          if (sscanf(tmp, "cert=%255s key=%255s", cert, key) == 2) {
+            if (strlen(cert) == 0 || strlen(key) == 0) {
+              debug_message("cert/key path can't be empty.\n");
+              exit(-1);
+            }
+            external_port[i].tls_cert = cert;
+            external_port[i].tls_key = key;
+          }
         }
       }
     }

@@ -3,6 +3,6 @@ if(${PACKAGE_CRYPTO})
             "crypto.cc"
             )
     find_package (OpenSSL REQUIRED)
-    target_link_libraries(package_crypto ${OPENSSL_LIBRARIES})
+    target_link_libraries(package_crypto OpenSSL::Crypto)
     target_include_directories(package_crypto SYSTEM PUBLIC ${OPENSSL_INCLUDE_DIR})
 endif()
