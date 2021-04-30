@@ -9,6 +9,8 @@
 #define BASE_INTERNAL_EXTERNAL_PORT_H_
 
 #include <event2/util.h>
+#include <openssl/ssl.h>
+#include <string>
 
 #define PORT_UNDEFINED 0
 #define PORT_TELNET 1
@@ -29,6 +31,10 @@ struct port_def_t {
   struct evconnlistener* ev_conn;
   // websocket context
   struct lws_context* lws_context;
+  // ssl context
+  SSL_CTX* ssl;
+  std::string tls_cert;
+  std::string tls_key;
 };
 
 static inline const char* port_kind_name(int kind) {

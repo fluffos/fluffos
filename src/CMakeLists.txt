@@ -179,31 +179,7 @@ else ()
   set(DEBUG OFF)
 endif ()
 
-add_subdirectory(thirdparty/filesystem EXCLUDE_FROM_ALL)
-include_directories(thirdparty/filesystem/include)
-add_subdirectory(thirdparty/fmt EXCLUDE_FROM_ALL)
-include_directories(thirdparty/fmt/include)
-
-set(DISABLE_WERROR ON CACHE BOOL "" FORCE)
-set(LWS_WITH_SHARED OFF CACHE BOOL "" FORCE)
-set(LWS_WITHOUT_TESTAPPS ON CACHE BOOL "" FORCE)
-set(LWS_IPV6 ON CACHE BOOL "" FORCE)
-set(LWS_WITHOUT_EXTENSIONS OFF CACHE BOOL "" FORCE)
-set(LWS_WITH_LIBEVENT ON CACHE BOOL "" FORCE)
-set(LWS_STATIC_PIC ON CACHE BOOL "" FORCE)
-set(LWS_WITH_DIR OFF CACHE BOOL "" FORCE)
-set(LWS_WITH_SSL OFF CACHE BOOL "" FORCE)
-set(LWS_WITHOUT_TESTAPPS ON CACHE BOOL "" FORCE)
-set(LWS_WITHOUT_TEST_SERVER ON CACHE BOOL "" FORCE)
-set(LWS_WITHOUT_TEST_SERVER_EXTPOLL ON CACHE BOOL "" FORCE)
-set(LWS_WITHOUT_TEST_PING ON CACHE BOOL "" FORCE)
-set(LWS_WITHOUT_TEST_CLIENT ON CACHE BOOL "" FORCE)
-set(LWS_WITH_LEJP OFF CACHE BOOL "" FORCE)
-set(LWS_WITH_LEJP_CONF OFF CACHE BOOL "" FORCE)
-set(LWS_UNIX_SOCK OFF CACHE BOOL "" FORCE)
-add_subdirectory(thirdparty/libwebsockets EXCLUDE_FROM_ALL)
-include_directories("thirdparty/libwebsockets/include" SYSTEM)
-include_directories("${CMAKE_CURRENT_BINARY_DIR}/thirdparty/libwebsockets")
+# System headers
 
 INCLUDE(CheckIncludeFileCXX)
 # usage: CHECK_INCLUDE_FILES (<header> <RESULT_VARIABLE> )
@@ -217,31 +193,63 @@ CHECK_INCLUDE_FILE_CXX(sys/time.h HAVE_SYS_TIME_H)
 if (HAVE_TIME_H AND HAVE_SYS_TIME_H)
   set(TIME_WITH_SYS_TIME 1)
 endif ()
-#CHECK_INCLUDE_FILES ("sys/param.h;sys/mount.h" HAVE_SYS_MOUNT_H)
-# AC_CHECK_HEADERS([arpa/inet.h fcntl.h inttypes.h limits.h locale.h netdb.h netinet/in.h stddef.h stdint.h stdlib.h string.h sys/param.h sys/socket.h sys/time.h unistd.h])
 
-set(GENERATED_HEADERS
-  "${CMAKE_CURRENT_BINARY_DIR}/config.h"
-  "${CMAKE_CURRENT_BINARY_DIR}/packages/packages.autogen.h"
-  )
+# System Libraries
+find_package(OpenSSL 1.0.1 COMPONENTS SSL REQUIRED)
+include_directories(SYSTEM ${OPENSSL_INCLUDE_DIR})
 
-# Libraries
 if(WIN32)
-  find_package(Libevent 2.0 REQUIRED COMPONENTS libevent)
+  find_package(Libevent 2.1 REQUIRED COMPONENTS core extra openssl)
 else()
-  find_package(Libevent 2.0 REQUIRED COMPONENTS libevent pthreads)
+  find_package(Libevent 2.1 REQUIRED COMPONENTS core extra openssl pthreads)
 endif()
 # multiple packages uses this, so we simply do a global inclusion
 include_directories(SYSTEM ${LIBEVENT_INCLUDE_DIR})
 
-# Libraries
 find_package(ICU REQUIRED COMPONENTS uc dt)
 # Make ICU use utf-8 internally
 add_compile_options("-DU_CHARSET_IS_UTF8=1")
 # multiple packages uses this, so we simply do a global inclusion too.
 include_directories(SYSTEM ${ICU_INCLUDE_DIRS})
 
+# Bundled libraries
+add_subdirectory(thirdparty/crypt EXCLUDE_FROM_ALL)
+add_subdirectory(thirdparty/libtelnet EXCLUDE_FROM_ALL)
+add_subdirectory(thirdparty/filesystem EXCLUDE_FROM_ALL)
+include_directories(thirdparty/filesystem/include)
+add_subdirectory(thirdparty/fmt EXCLUDE_FROM_ALL)
+include_directories(thirdparty/fmt/include)
+add_subdirectory(thirdparty/backward-cpp EXCLUDE_FROM_ALL)
+
+set(DISABLE_WERROR ON CACHE BOOL "" FORCE)
+set(LWS_WITH_SHARED OFF CACHE BOOL "" FORCE)
+set(LWS_WITHOUT_TESTAPPS ON CACHE BOOL "" FORCE)
+set(LWS_IPV6 ON CACHE BOOL "" FORCE)
+set(LWS_WITHOUT_EXTENSIONS OFF CACHE BOOL "" FORCE)
+set(LWS_WITH_LIBEVENT ON CACHE BOOL "" FORCE)
+set(LWS_STATIC_PIC ON CACHE BOOL "" FORCE)
+set(LWS_WITH_DIR OFF CACHE BOOL "" FORCE)
+set(LWS_WITH_SSL ON CACHE BOOL "" FORCE)
+set(LWS_WITH_HTTP2 OFF CACHE BOOL "" FORCE)
+set(LWS_WITHOUT_TESTAPPS ON CACHE BOOL "" FORCE)
+set(LWS_WITHOUT_TEST_SERVER ON CACHE BOOL "" FORCE)
+set(LWS_WITHOUT_TEST_SERVER_EXTPOLL ON CACHE BOOL "" FORCE)
+set(LWS_WITHOUT_TEST_PING ON CACHE BOOL "" FORCE)
+set(LWS_WITHOUT_TEST_CLIENT ON CACHE BOOL "" FORCE)
+set(LWS_WITH_LEJP OFF CACHE BOOL "" FORCE)
+set(LWS_WITH_LEJP_CONF OFF CACHE BOOL "" FORCE)
+set(LWS_UNIX_SOCK OFF CACHE BOOL "" FORCE)
+set(OPENSSL_FOUND 0) # hack to force lws re-search openssl
+add_subdirectory(thirdparty/libwebsockets EXCLUDE_FROM_ALL)
+include_directories("thirdparty/libwebsockets/include" SYSTEM)
+include_directories("${CMAKE_CURRENT_BINARY_DIR}/thirdparty/libwebsockets")
+
 # Build phase
+
+set(GENERATED_HEADERS
+        "${CMAKE_CURRENT_BINARY_DIR}/config.h"
+        "${CMAKE_CURRENT_BINARY_DIR}/packages/packages.autogen.h"
+        )
 
 # Tools
 add_subdirectory(tools)
@@ -305,6 +313,7 @@ set(SRC
   "comm.cc"
   "mainlib.cc"
   "user.cc"
+  "net/tls.cc"
   "net/telnet.cc"
   "net/websocket.cc"
   "net/ws_ascii.cc"
@@ -408,22 +417,17 @@ foreach (PACKAGE ${FLUFFOS_PACKAGES})
   target_link_libraries(libdriver PUBLIC "${PACKAGE}")
 endforeach ()
 
-add_subdirectory(thirdparty/crypt)
+
 target_link_libraries(libdriver PRIVATE crypt)
-
 target_link_libraries(libdriver PUBLIC ${LIBWEBSOCKETS_LIBRARIES_STATIC})
-# Third party libraries
-add_subdirectory(thirdparty/libtelnet EXCLUDE_FROM_ALL)
 target_link_libraries(libdriver PUBLIC libtelnet)
-
-target_link_libraries(libdriver PUBLIC ${ICU_LIBRARIES})
-
-add_subdirectory(thirdparty/backward-cpp EXCLUDE_FROM_ALL)
 target_compile_definitions(libdriver PUBLIC ${BACKWARD_DEFINITIONS})
 target_include_directories(libdriver PUBLIC ${BACKWARD_INCLUDE_DIRS})
 target_link_libraries(libdriver PUBLIC ${BACKWARD_LIBRARIES})
 
-# libevent
+# System libraries
+target_link_libraries(libdriver PUBLIC OpenSSL::SSL)
+target_link_libraries(libdriver PUBLIC ${ICU_LIBRARIES})
 target_link_libraries(libdriver PUBLIC ${LIBEVENT_LIBRARIES})
 
 # Platform Libraries

@@ -113,7 +113,7 @@ if (LWS_WITH_SSL)
 		list(APPEND SOURCES
 			tls/tls-network.c)
 	endif()
-		
+
 	if (LWS_WITH_MBEDTLS)
 		list(APPEND SOURCES
 			tls/mbedtls/mbedtls-tls.c
@@ -149,7 +149,7 @@ if (LWS_WITH_SSL)
 				tls/openssl/lws-gencrypto.c)
 		endif()
 	endif()
-		
+
 	if (NOT LWS_WITHOUT_SERVER)
 		list(APPEND SOURCES
 			tls/tls-server.c)
@@ -171,7 +171,7 @@ if (LWS_WITH_SSL)
 			list(APPEND SOURCES
 				tls/openssl/openssl-client.c)
 		endif()
-		
+
 	endif()
 endif()
 
@@ -224,7 +224,7 @@ if (LWS_WITH_SSL)
 
 		list(INSERT LIB_LIST 0 "${MBEDTLS_LIBRARIES}")
 	endif()
-	
+
 	if (LWS_WITH_MBEDTLS)
 		set(chose_ssl 1)
 	endif()
@@ -235,7 +235,7 @@ if (LWS_WITH_SSL)
 			if (NOT LWS_PLAT_FREERTOS)
 				find_package(PkgConfig QUIET)
 				pkg_check_modules(PC_OPENSSL openssl QUIET)
-				find_package(OpenSSL REQUIRED)
+				find_package(OpenSSL COMPONENTS SSL Crypto REQUIRED)
 				list(APPEND OPENSSL_LIBRARIES ${PC_OPENSSL_LIBRARIES})
 				set(OPENSSL_LIBRARIES ${OPENSSL_LIBRARIES} PARENT_SCOPE)
 			endif()
@@ -249,22 +249,23 @@ if (LWS_WITH_SSL)
 
 		if (OPENSSL_INCLUDE_DIRS)
 			include_directories("${OPENSSL_INCLUDE_DIRS}")
-			if (NOT LWS_PLAT_FREERTOS)
-				list(INSERT LIB_LIST 0 ${OPENSSL_LIBRARIES})
-			endif()
-	
-			if (NOT LWS_WITH_MBEDTLS)
-				# older (0.98) Openssl lacks this
-				set(CMAKE_REQUIRED_INCLUDES ${CMAKE_REQUIRED_INCLUDES} ${OPENSSL_INCLUDE_DIRS} PARENT_SCOPE)
-				check_include_file(openssl/ecdh.h LWS_HAVE_OPENSSL_ECDH_H)
-		
-				if (LWS_SSL_SERVER_WITH_ECDH_CERT AND NOT LWS_HAVE_OPENSSL_ECDH_H)
-					message(FATAL_ERROR "Missing openssl/ecdh.h, so cannot use LWS_SSL_SERVER_WITH_ECDH_CERT")
-				endif()
-			else()
-				unset(LWS_HAVE_OPENSSL_ECDH_H PARENT_SCOPE)
-			endif(NOT LWS_WITH_MBEDTLS)
 		endif()
+
+		if (NOT LWS_PLAT_FREERTOS)
+			list(INSERT LIB_LIST 0 ${OPENSSL_LIBRARIES})
+		endif()
+
+		if (NOT LWS_WITH_MBEDTLS)
+			# older (0.98) Openssl lacks this
+			set(CMAKE_REQUIRED_INCLUDES ${CMAKE_REQUIRED_INCLUDES} ${OPENSSL_INCLUDE_DIRS} PARENT_SCOPE)
+			check_include_file(openssl/ecdh.h LWS_HAVE_OPENSSL_ECDH_H)
+
+			if (LWS_SSL_SERVER_WITH_ECDH_CERT AND NOT LWS_HAVE_OPENSSL_ECDH_H)
+				message(FATAL_ERROR "Missing openssl/ecdh.h, so cannot use LWS_SSL_SERVER_WITH_ECDH_CERT")
+			endif()
+		else()
+			unset(LWS_HAVE_OPENSSL_ECDH_H PARENT_SCOPE)
+		endif(NOT LWS_WITH_MBEDTLS)
 	endif()
 
 endif(LWS_WITH_SSL)
@@ -351,7 +352,7 @@ if (LWS_WITH_SSL AND NOT LWS_WITH_WOLFSSL)
 	find_package(OpenSSLbins)
 	if (DEFINED OPENSSL_EXECUTABLE)
 		message("OpenSSL executable: ${OPENSSL_EXECUTABLE}")
-		
+
 		if (OPENSSL_EXECUTABLE MATCHES "^$")
 			set(OPENSSL_EXECUTABLE openssl)
 		endif()
@@ -429,7 +430,7 @@ if (GENCERTS)
 		endif()
 	endif()
 
-	list(APPEND TEST_SERVER_DATA 
+	list(APPEND TEST_SERVER_DATA
 		"${TEST_SERVER_SSL_KEY}"
 		"${TEST_SERVER_SSL_CERT}")
 endif()

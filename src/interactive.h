@@ -1,6 +1,7 @@
 #ifndef INTERACITVE_H
 #define INTERACITVE_H
 
+#include <openssl/ssl.h>
 #include <event2/util.h>
 
 #include "vm/vm.h"  // FIXME: for union string_or_func
@@ -81,6 +82,9 @@ struct interactive_t {
 
   // libwebsocket handle
   struct lws *lws;
+
+  // TLS context
+  SSL *ssl;
 };
 
 #endif /* INTERACTIVE_H */
