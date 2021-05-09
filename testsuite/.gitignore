@@ -17,3 +17,4 @@ tmp_eval_file.c
 rename_test1
 trace_json.json
 test.sqlite
+sqlite.db
