@@ -1,29 +1,59 @@
 ---
 layout: default
-title: stdlib / DB
+title: stdlib / database
 ---
 
 ## 基础配置
 
-在以下说明中，我们把 `DB.c` 文件定义为宏 `DATABASE`。
-
-在做数据库增删改查之前先做数据库连接配置：
+当你需要使用数据库增删改查功能时，可直接使用`CORE_DB`(`/std/database.c`)，这个文件提供了一系列的方法链式操作数据库。
 
 ```c
-// 初始化数据库对象
-object DB = new(DATABASE, host, db, user);
+void test()
+{
+    /**
+     * @brief 初始化数据库连接
+     *
+     */
+    object DB = new(CORE_DB, host, db, user);
+
+    // ...
+}
 ```
 
-或者使用`setConnection`方法配置数据库连接：
+或者使用 `setConnection()` 方法配置数据库：
 
 ```c
-object DB = new(DATABASE);
-DB->setConnection(([
-    "host":"127.0.0.1",
-    "database":"mud",
-    "user":"root"
-]));
+void test()
+{
+    object DB = new(CORE_DB);
+    mapping db = ([
+        "host":"127.0.0.1",
+        "database":"mud",
+        "user":"root",
+    ]);
+    DB->setConnection(db);
+}
 ```
+
+上以配置使用以的是系统默认数据库类型`__DEFAULT_DB__`，如果要指定数据库类型可以使用以下方式：
+
+```c
+void test()
+{
+    // 初始化时指定type
+    object DB = new(CORE_DB, host, db, user, type);
+    // 通过配置指定type(使用SQLITE3)
+    mapping db = ([
+        "host":"",
+        "database":"/data/mudlite.db",
+        "user":"",
+        "type":__USE_SQLITE3__
+    ]);
+    DB->setConnection(db);
+}
+```
+
+数据库类型可以使用宏定义：`__USE_MYSQL__`、`__USE_SQLITE3__`、`__USE_POSTGRE__`或`__DEFAULT_DB__`。
 
 ----
 
@@ -31,14 +61,16 @@ DB->setConnection(([
 
 ### 从数据表中查询所有行
 
-使用`DB`对象`table`方法指定要查询的数据表并返回一个查询对象，使用`get`方法获取所有结果，返回值为结果二维数组，示例代码：
+使用`DB`对象的`table`方法指定要查询的数据表并返回一个查询对象，使用`get`方法获取所有结果，返回值为结果二维数组，示例代码：
+
 ```c
-int test()
+inherit CORE_DB;
+
+void test()
 {
-    object DB = new(DATABASE, "127.0.0.1", "mud", "root");
     mixed res;
 
-    // 查询所有结果
+    // 获取 users 表的所有结果
     res = DB->table("users")->get();
     printf("%O\n", res);
 }
@@ -58,6 +90,7 @@ res = DB->table("users")->where("name", "ivy")->first();
 ```
 
 如果不需要整行数据，则可以使用`value`方法从记录中获取单个值。该方法将直接返回该字段的值：
+
 ```c
 // 获得用户 ivy 的 email
 email = DB->table("users")->where("name", "ivy")->value("email");
@@ -66,6 +99,7 @@ email = DB->table("users")->inRandomOrder()->value("email");
 ```
 
 如果是通过 id 字段值获取一行数据，可以使用 find 方法：
+
 ```c
 // 获取 ID 为 1 的用户数据
 res = DB->table("users")->find(1);
@@ -116,6 +150,7 @@ user = DB->table("users")->where("name", "mudren")->get();
 ```
 
 当然，你也可以使用其他的运算符来编写 `where` 子句：
+
 ```c
 users = DB->table("users")
                 ->where("id", ">=", 100)
@@ -150,6 +185,7 @@ res = DB->table("topics")->where("user_id", ">", 7)->where("category_id", 4)->ge
 // 相当于 WHERE user_id>7 OR category_id=4
 res = DB->table("topics")->where("user_id", ">", 7)->orWhere("category_id", 4)->get();
 ```
+
 请注意：`orWhere`方法之前必须至少有一次`where`调用，否则报错。
 
 ### 附加 Where 语句
@@ -159,6 +195,7 @@ res = DB->table("topics")->where("user_id", ">", 7)->orWhere("category_id", 4)->
 #### whereBetween / orWhereBetween / whereNotBetween / orWhereNotBetween
 
 验证字段值是否在给定的两个值之间或之外：
+
 ```c
 users = DB->table("users")
            ->whereBetween("votes", ({1, 100}))
@@ -168,6 +205,7 @@ users = DB->table("users")
 #### whereNull / orWhereNull / whereNotNull / orWhereNotNull
 
 验证指定的字段是否是 `NULL`：
+
 ```c
 users = DB->table("users")
            ->whereNull("updated_at")
@@ -185,6 +223,7 @@ users = DB->table("users")
                 ->orderBy("name", "desc")
                 ->get();
 ```
+
 如果你需要使用多个字段进行排序，你可以多次引用 `orderBy`：
 
 ```c
@@ -254,14 +293,34 @@ res = DB->sql("select * from users")->pluck("name");
 res = DB->sql("select * from users where name='mudren'")->value("email");
 // 删除
 res = DB->sql("delete from users where id>130 limit 5")->exec();
-
 ```
 
 ----
 
+## 长连接
+
+需要注意的是，`CORE_DB` 默认使用的是短连接，所有数据库操作完成后自动释放 db_handle ，如果需要大量或高频次查询，最好改为长连接，并自己在必要时操作释放 db_handle 。
+
+如需长连接，请使用 `setAutoClose(0)` 方法禁用自动释放，并在执行结束时调用 `close(1)` 方法释放 db_handle。
+
+```c
+void test()
+{
+    // 初始化数据库连接
+    object DB = new(CORE_DB, host, db, user);
+    // 禁用自动关闭连接
+    DB->setAutoClose(0);
+
+    // ...数据库操作
+
+    // 关闭数据库连接
+    DB->close(1);
+}
+```
+
 ## 调试
 
-在绑定查询的时候，您可以使用 `dump` 方法来输出最近一次查询SQL：
+您可以使用 `dump` 方法来输出最近一次查询SQL：
 
 ```c
 printf(DB->dump());
@@ -282,3 +341,31 @@ printf(DB->dump());
     })
     db_sql = SELECT user_id,title FROM topics WHERE user_id > '7' AND category_id='4'
     -*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*-
+
+----
+
+如果你只是简单查询，可以通过继承`CORE_DB`的方式，而不需要用 `new()` 方法生成数据库连接对象，示例如下：
+
+```c
+inherit CORE_DB;
+
+void test()
+{
+    mixed res;
+
+    /**
+     * @brief 配置数据库连接
+     *
+     */
+     mapping db = ([
+     	"host":"127.0.0.1",
+        "database":"mud",
+        "user":"root"
+     ]);
+    DB::setConnection(db);
+
+    // 获取 users 表的所有结果
+    res = DB::table("users")->get();
+    printf("%O", res);
+}
+```

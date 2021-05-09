@@ -80,7 +80,7 @@ nosave int db_sql_offset;
 nosave int db_distinct;
 nosave int db_inRandomOrder;
 nosave int db_withColumn;
-
+nosave int db_autoClose = 1;
 /**
  * @brief 数据库连接初始化
  *
@@ -118,6 +118,19 @@ void setConnection(mapping db)
     db_host = db["host"];
     db_db = db["database"];
     db_user = db["user"];
+    if (db["type"])
+    {
+        db_type = db["type"];
+    }
+}
+/**
+ * @brief 是否自动关闭数据库连接
+ *
+ * @param flag
+ */
+void setAutoClose(int flag)
+{
+    db_autoClose = flag;
 }
 // 重置查询
 void resetSql()
@@ -504,26 +517,57 @@ private string db_sql()
     return db_sql;
 }
 /**
- * @brief 执行SQL语句并返回结果行数
+ * @brief 连接数据库并返回handle
  *
- * @return private
  */
-protected varargs mixed exec()
+private mixed connect()
 {
-    mixed rows;
     // 连接数据库
-    db_handle = db_connect(db_host, db_db, db_user, db_type);
+    if (!db_handle || stringp(db_handle))
+    {
+        db_handle = db_connect(db_host, db_db, db_user, db_type);
+    }
     /* error */
     if (stringp(db_handle))
         return db_error = db_handle;
     else
-        db_exec(db_handle, "set names utf8mb4");
+    {
+        // 默认mysql编码
+        // db_exec(db_handle, "set names utf8mb4");
+        return db_handle;
+    }
+}
+/**
+ * @brief 关闭数据库连接
+ *
+ */
+varargs mixed close(int flag)
+{
+    if ((flag || db_autoClose) && intp(db_handle) && db_handle && db_close(db_handle))
+    {
+        db_handle = 0;
+    }
+
+    return db_handle;
+}
+/**
+ * @brief 执行SQL语句并返回结果行数
+ *
+ */
+varargs mixed exec()
+{
+    mixed rows;
+    // 连接数据库
+    if (stringp(connect()))
+    {
+        return db_error;
+    }
     // 执行SQL语句
     rows = db_exec(db_handle, db_sql());
     /* error */
     if (stringp(rows))
     {
-        db_close(db_handle);
+        close();
         return db_error = rows;
     }
     // 保存数据表头
@@ -553,7 +597,7 @@ varargs mixed get(string *columns...)
     {
         res[i - 1] = db_fetch(db_handle, i);
     }
-    db_close(db_handle);
+    close();
 
     if (db_inRandomOrder)
     {
@@ -561,7 +605,7 @@ varargs mixed get(string *columns...)
     }
     if (db_withColumn)
     {
-        res = db_table_column + res;
+        res = ({ db_table_column }) + res;
     }
 
     return res;
@@ -609,9 +653,8 @@ varargs mixed first(string *columns...)
     {
         i = random(rows) + 1;
     }
-
     res = db_fetch(db_handle, i);
-    db_close(db_handle);
+    close();
 
     return res;
 }
@@ -663,7 +706,7 @@ private mixed aggregate(string func, mixed column)
     }
 
     res = db_fetch(db_handle, 1);
-    db_close(db_handle);
+    close();
 
     return res[0];
 }
@@ -713,7 +756,7 @@ mixed insert(mapping m)
     {
         return db_error;
     }
-    db_close(db_handle);
+    close();
 
     return 1;
 }
@@ -742,7 +785,7 @@ mixed update(mapping m)
     {
         return db_error;
     }
-    db_close(db_handle);
+    close();
 
     return 1;
 }
@@ -763,7 +806,7 @@ mixed delete()
     {
         return db_error;
     }
-    db_close(db_handle);
+    close();
 
     return 1;
 }
