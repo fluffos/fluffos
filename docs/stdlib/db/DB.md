@@ -3,57 +3,26 @@ layout: default
 title: stdlib / DB
 ---
 
-
 ## 基础配置
 
-当你需要使用数据库增删改查功能时，需要继承`/inherit/DB.c`，并做如下配置：
+在以下说明中，我们把 `DB.c` 文件定义为宏 `DATABASE`。
+
+在做数据库增删改查之前先做数据库连接配置：
 
 ```c
-inherit "/inherit/DB";
+// 初始化数据库对象
+object DB = new(DATABASE, host, db, user);
 ```
 
-同时在你的`mysql.h`文件中配置数据库连接：
+或者使用`setConnection`方法配置数据库连接：
 
 ```c
-#ifndef MYSQL_H
-#define MYSQL_H
-
-#define DB_HOST     "127.0.0.1"
-#define DB_DATABASE "mud"
-#define DB_USERNAME "root"
-#define DB_PASSWORD "root"
-
-#endift
-```
-
-注意，`mysql.h`文件中只是指定了数据库默认配置，如果不使用文件配置，可以使用`setConnection`配置数据库连接。
-
-在以下说明中，我们把 `/inherit/DB.c` 定义为宏 `DB`。
-
-```c
-inherit DB;
-
-int main(object me, string arg)
-{
-    /**
-     * @brief 配置数据库连接
-     *
-     */
-     mapping db = ([
-     	"host":"127.0.0.1",
-        "database":"mud",
-        "user":"root"
-     ]);
-    DB::setConnection(db);
-}
-```
-
-如果要配置多个数据库连接，请使用`new`方法：
-
-```c
-object DB1 = new(DB, host1, db1, user1);
-object DB2 = new(DB, host2, db2, user2);
-object DB3 = new(DB, host2, db2, user3);
+object DB = new(DATABASE);
+DB->setConnection(([
+    "host":"127.0.0.1",
+    "database":"mud",
+    "user":"root"
+]));
 ```
 
 ----
@@ -62,26 +31,18 @@ object DB3 = new(DB, host2, db2, user3);
 
 ### 从数据表中查询所有行
 
-使用`DB`接口的`table`方法指定要查询的数据表并返回一个查询对象，使用`get`方法获取所有结果，返回值为结果二维数组，示例代码：
+使用`DB`对象`table`方法指定要查询的数据表并返回一个查询对象，使用`get`方法获取所有结果，返回值为结果二维数组，示例代码：
 ```c
-inherit DB;
-
-int main(object me, string table)
+int test()
 {
+    object DB = new(DATABASE, "127.0.0.1", "mud", "root");
     mixed res;
 
-    /**
-     * @brief 查询所有结果
-     *
-     */
-    res = DB::table(table)->get();
+    // 查询所有结果
+    res = DB->table("users")->get();
     printf("%O\n", res);
-    return 1;
 }
 ```
-
-如果是多数据库连接，请修改`DB::table(table)`为`DB1->table(table)`、`DB2->table(table)`等。
-
 
 ### 从数据表中获取单行或单列
 
@@ -89,25 +50,25 @@ int main(object me, string table)
 
 ```c
 // 查询用户表中的第一条数据
-res = DB::table("users")->first();
+res = DB->table("users")->first();
 // 查询用户表中的第一条数据的name和email
-res = DB::table("users")->first("name", "email");
+res = DB->table("users")->first("name", "email");
 // 查询用户表中用户名为 ivy 的数据
-res = DB::table("users")->where("name", "ivy")->first();
+res = DB->table("users")->where("name", "ivy")->first();
 ```
 
 如果不需要整行数据，则可以使用`value`方法从记录中获取单个值。该方法将直接返回该字段的值：
 ```c
 // 获得用户 ivy 的 email
-email = DB::table("users")->where("name", "ivy")->value("email");
+email = DB->table("users")->where("name", "ivy")->value("email");
 // 获取随机用户的 email
-email = DB::table("users")->inRandomOrder()->value("email");
+email = DB->table("users")->inRandomOrder()->value("email");
 ```
 
 如果是通过 id 字段值获取一行数据，可以使用 find 方法：
 ```c
 // 获取 ID 为 1 的用户数据
-res = DB::table("users")->find(1);
+res = DB->table("users")->find(1);
 ```
 
 ### 获取一列的值
@@ -115,7 +76,7 @@ res = DB::table("users")->find(1);
 如果你想获取单列数据的集合，则可以使用 pluck 方法。在下面的例子中，我们将获取角色表中所有邮箱：
 ```c
 // 返回所有用户的邮箱数组
-res = DB::table("users")->pluck("email");
+res = DB->table("users")->pluck("email");
 ```
 
 ### 聚合
@@ -124,18 +85,18 @@ res = DB::table("users")->pluck("email");
 
 ```c
 // 获取用户总数
-users = DB::table("users")->count();
+users = DB->table("users")->count();
 // 获取等级最高的用户
-level = DB::table("users")->max("level");
+level = DB->table("users")->max("level");
 ```
 
 同样，你可以通过条件查询限制聚合查询：
 
 ```c
 // 返回ID为9的用户发贴的访问量之和
-res = DB::table("topics")->where("user_id", 9)->sum("view_count");
+res = DB->table("topics")->where("user_id", 9)->sum("view_count");
 // 判断用户mudren是否存在
-count = DB::table("users")->where("name", "mudren")->count();
+count = DB->table("users")->where("name", "mudren")->count();
 ```
 
 ### Where Clauses
@@ -145,26 +106,26 @@ count = DB::table("users")->where("name", "mudren")->count();
 在构造 `where` 查询实例中，你可以使用 `where` 方法。调用 `where` 最基本的方式是需要传递三个参数：第一个参数是列名，第二个参数是任意一个数据库系统支持的运算符，第三个是该列要比较的值。如：
 
 ```c
-user = DB::table("users")->where("name", "=", "mudren")->get();
+user = DB->table("users")->where("name", "=", "mudren")->get();
 ```
 
 为了方便，如果你只是简单比较列值和给定数值是否相等，可以将数值直接作为 where 方法的第二个参数：
 
 ```c
-user = DB::table("users")->where("name", "mudren")->get();
+user = DB->table("users")->where("name", "mudren")->get();
 ```
 
 当然，你也可以使用其他的运算符来编写 `where` 子句：
 ```c
-users = DB::table("users")
+users = DB->table("users")
                 ->where("id", ">=", 100)
                 ->get();
 
-users = DB::table("users")
+users = DB->table("users")
                 ->where("id", "<>", 100)
                 ->get();
 
-users = DB::table("users")
+users = DB->table("users")
                 ->where("email", "like", "%@mud.ren")
                 ->get();
 ```
@@ -173,13 +134,13 @@ users = DB::table("users")
 
 ```c
 // 相当于 WHERE user_id>7 AND category_id=4
-res = DB::table("topics")->where(({ ({"user_id", ">", 7}), ({"category_id", 4}) }))->get();
+res = DB->table("topics")->where(({ ({"user_id", ">", 7}), ({"category_id", 4}) }))->get();
 ```
 
 你也可以对 `where` 函数链式调用，以上查询可以使用以下方式：
 ```c
 // 相当于 WHERE user_id>7 AND category_id=4
-res = DB::table("topics")->where("user_id", ">", 7)->where("category_id", 4)->get();
+res = DB->table("topics")->where("user_id", ">", 7)->where("category_id", 4)->get();
 ```
 
 #### orWhere 语句
@@ -187,7 +148,7 @@ res = DB::table("topics")->where("user_id", ">", 7)->where("category_id", 4)->ge
 
 ```c
 // 相当于 WHERE user_id>7 OR category_id=4
-res = DB::table("topics")->where("user_id", ">", 7)->orWhere("category_id", 4)->get();
+res = DB->table("topics")->where("user_id", ">", 7)->orWhere("category_id", 4)->get();
 ```
 请注意：`orWhere`方法之前必须至少有一次`where`调用，否则报错。
 
@@ -199,7 +160,7 @@ res = DB::table("topics")->where("user_id", ">", 7)->orWhere("category_id", 4)->
 
 验证字段值是否在给定的两个值之间或之外：
 ```c
-users = DB::table("users")
+users = DB->table("users")
            ->whereBetween("votes", ({1, 100}))
            ->get();
 ```
@@ -208,7 +169,7 @@ users = DB::table("users")
 
 验证指定的字段是否是 `NULL`：
 ```c
-users = DB::table("users")
+users = DB->table("users")
            ->whereNull("updated_at")
            ->get();
 ```
@@ -220,14 +181,14 @@ users = DB::table("users")
 `orderBy` 方法允许你通过给定字段对结果集进行排序。 `orderBy` 的第一个参数应该是你希望排序的字段，第二个参数控制排序的方向，可以是 `asc` 或 `desc`：
 
 ```c
-users = DB::table("users")
+users = DB->table("users")
                 ->orderBy("name", "desc")
                 ->get();
 ```
 如果你需要使用多个字段进行排序，你可以多次引用 `orderBy`：
 
 ```c
-users = DB::table("users")
+users = DB->table("users")
                 ->orderBy("name", "desc")
                 ->orderBy("email", "asc")
                 ->get();
@@ -238,7 +199,7 @@ users = DB::table("users")
 `inRandomOrder` 方法被用来将结果进行随机排序。例如，你可以使用此方法随机找到一个用户：
 
 ```c
-randomUser = DB::table("users")
+randomUser = DB->table("users")
                 ->inRandomOrder()
                 ->first();
 ```
@@ -248,7 +209,7 @@ randomUser = DB::table("users")
 要限制结果的返回数量，或跳过指定数量的结果，你可以使用 `limit` 和 `offset` 方法：
 
 ```c
-users = DB::table("users")
+users = DB->table("users")
                 ->offset(10)
                 ->limit(5)
                 ->get();
@@ -261,7 +222,7 @@ users = DB::table("users")
 查询构造器还提供了 `insert` 方法用于插入记录到数据库中。 `insert` 方法接收映射形式的字段名和字段值进行插入操作：
 
 ```c
-DB::table("users")->insert((["name":"test", "email":"test@mud.ren"]));
+DB->table("users")->insert((["name":"test", "email":"test@mud.ren"]));
 ```
 
 ## 更新
@@ -269,7 +230,7 @@ DB::table("users")->insert((["name":"test", "email":"test@mud.ren"]));
 查询构造器也可以通过 `update` 方法更新已有的记录。 `update` 方法和 `insert` 方法一样，接受包含要更新的字段及值的映射。你可以通过 `where` 子句对 `update` 查询进行约束：
 
 ```c
-DB::table("users")->where("id", ">", 120)->limit(5)->update((["level":777]));
+DB->table("users")->where("id", ">", 120)->limit(5)->update((["level":777]));
 ```
 
 ## 删除
@@ -277,7 +238,7 @@ DB::table("users")->where("id", ">", 120)->limit(5)->update((["level":777]));
 查询构造器也可以使用 `delete` 方法从表中删除记录。 在使用 `delete` 前，可以添加 `where` 子句来约束 `delete` 语法：
 
 ```c
-DB::table("migrations")->where("id",">", 55)->limit(5)->delete();
+DB->table("migrations")->where("id",">", 55)->limit(5)->delete();
 ```
 
 ----
@@ -288,11 +249,11 @@ DB::table("migrations")->where("id",">", 55)->limit(5)->delete();
 
 ```c
 // 查询
-res = DB::sql("select * from users")->get();
-res = DB::sql("select * from users")->pluck("name");
-res = DB::sql("select * from users where name='mudren'")->value("email");
+res = DB->sql("select * from users")->get();
+res = DB->sql("select * from users")->pluck("name");
+res = DB->sql("select * from users where name='mudren'")->value("email");
 // 删除
-res = DB::sql("delete from users where id>130 limit 5")->exec();
+res = DB->sql("delete from users where id>130 limit 5")->exec();
 
 ```
 
@@ -303,7 +264,7 @@ res = DB::sql("delete from users where id>130 limit 5")->exec();
 在绑定查询的时候，您可以使用 `dump` 方法来输出最近一次查询SQL：
 
 ```c
-printf(DB::dump());
+printf(DB->dump());
 ```
 
 调试输出结果类似以下：

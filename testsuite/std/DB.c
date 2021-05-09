@@ -1,14 +1,14 @@
 /**
  * @brief LPMUD数据库操作模块，使用链式调用优雅的增删改查
  * @author 雪风@mud.ren
- * @copyright mudcore@mud.ren
  */
 #ifdef __PACKAGE_DB__
-#include "mysql.h"
+
 // 数据库配置
 nosave string db_host;
 nosave string db_db;
 nosave string db_user;
+nosave int db_type = __DEFAULT_DB__;
 // 数据库查询
 nosave mixed db_handle;
 // 错误消息
@@ -89,33 +89,23 @@ nosave int db_withColumn;
  * @param user
  * @return void
  */
-varargs void create(string host, string db, string user)
+varargs void create(string host, string db, string user, int type)
 {
     if (host)
     {
         db_host = host;
     }
-    else
-    {
-        db_host = DB_HOST;
-    }
-
     if (db)
     {
         db_db = db;
     }
-    else
-    {
-        db_db = DB_DATABASE;
-    }
-
     if (user)
     {
         db_user = user;
     }
-    else
+    if (type)
     {
-        db_user = DB_USERNAME;
+        db_type = type;
     }
 }
 /**
@@ -522,7 +512,7 @@ protected varargs mixed exec()
 {
     mixed rows;
     // 连接数据库
-    db_handle = db_connect(db_host, db_db, db_user);
+    db_handle = db_connect(db_host, db_db, db_user, db_type);
     /* error */
     if (stringp(db_handle))
         return db_error = db_handle;
