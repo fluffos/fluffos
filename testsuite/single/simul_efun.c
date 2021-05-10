@@ -20,6 +20,7 @@ inherit "std/element_of_weighted" ; // requires: sum
 inherit "std/number_string" ;
 inherit "std/reduce" ;
 inherit "std/percent" ;
+inherit "std/all_environment" ;
 
 int same(mixed x, mixed y) {
     // Allow comparing array with buffer
