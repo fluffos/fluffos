@@ -21,6 +21,7 @@ inherit "std/number_string" ;
 inherit "std/reduce" ;
 inherit "std/percent" ;
 inherit "std/all_environment" ;
+inherit "std/present_clone" ;
 
 int same(mixed x, mixed y) {
     // Allow comparing array with buffer
