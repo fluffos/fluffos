@@ -61,6 +61,9 @@ title: STDLIB
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='objects/all_environment.html'>all_environment</a></div>
 </div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='objects/present_clone.html'>present_clone</a></div>
+</div>
 </div>
 
 <h2 class="border-bottom py-3 text-uppercase">
@@ -84,6 +87,6 @@ title: STDLIB
 
 <div class="alert alert-info my-4" role="alert">
     <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/info.svg">
-    This page is auto generated on 2021-05-10 09:46:58 EDT for v2019.20210429-12-g44532e02-dirty.</a>
+    This page is auto generated on 2021-05-11 19:16:24 EDT for v2019.20210429-13-g37c54583-dirty.</a>
 </div>
 
