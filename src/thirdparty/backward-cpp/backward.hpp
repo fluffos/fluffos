@@ -71,6 +71,10 @@
 #endif
 #endif
 
+#if defined(BACKWARD_SYSTEM_LINUX) and !defined(BACKWARD_STATIC)
+#undef BACKWARD_SYSTEM_LINUX
+#endif
+
 #if !defined(BACKWARD_SYSTEM_LINUX) and !defined(BACKWARD_SYSTEM_DARWIN) and !defined(BACKWARD_SYSTEM_WINDOWS)
 #define BACKWARD_SYSTEM_UNKNOWN
 #endif

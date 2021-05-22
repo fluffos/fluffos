@@ -82,6 +82,10 @@ if (STACK_WALKING_LIBUNWIND)
 	set(STACK_WALKING_BACKTRACE FALSE)
 endif()
 
+if (STATIC)
+add_compile_definitions(BACKWARD_STATIC)
+endif()
+
 if (${STACK_DETAILS_AUTO_DETECT})
 	# find libdw
 	find_path(LIBDW_INCLUDE_DIR NAMES "elfutils/libdw.h" "elfutils/libdwfl.h")
