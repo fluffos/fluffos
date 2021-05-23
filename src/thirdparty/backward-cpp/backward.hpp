@@ -71,10 +71,6 @@
 #endif
 #endif
 
-#if defined(BACKWARD_SYSTEM_LINUX) and !defined(BACKWARD_STATIC)
-#undef BACKWARD_SYSTEM_LINUX
-#endif
-
 #if !defined(BACKWARD_SYSTEM_LINUX) and !defined(BACKWARD_SYSTEM_DARWIN) and !defined(BACKWARD_SYSTEM_WINDOWS)
 #define BACKWARD_SYSTEM_UNKNOWN
 #endif
@@ -262,6 +258,7 @@
 #if (BACKWARD_HAS_BACKTRACE == 1) || (BACKWARD_HAS_BACKTRACE_SYMBOL == 1)
 // then we shall rely on backtrace
 #include <execinfo.h>
+#include <dlfcn.h>
 #endif
 
 #endif // defined(BACKWARD_SYSTEM_LINUX)
