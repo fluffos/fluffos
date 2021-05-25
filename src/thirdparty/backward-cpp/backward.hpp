@@ -258,6 +258,7 @@
 #if (BACKWARD_HAS_BACKTRACE == 1) || (BACKWARD_HAS_BACKTRACE_SYMBOL == 1)
 // then we shall rely on backtrace
 #include <execinfo.h>
+#include <dlfcn.h>
 #endif
 
 #endif // defined(BACKWARD_SYSTEM_LINUX)

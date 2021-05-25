@@ -670,7 +670,7 @@ elseif (MYSQL_CONFIG_EXECUTABLE)
     # Replace the current library references with the full path
     # to the library, i.e. the -L will be ignored
     _mysql_config_replace(MYSQL_LIBRARIES
-      "(mysqlclient|mysqlclient_r)" "${MYSQL_LIB}" "(^| )-l" "--libs")
+      "(mysqlclient|mysqlclient_r|mariadb)" "${MYSQL_LIB}" "(^| )-l" "--libs")
 
   else ()
 
