@@ -107,7 +107,43 @@ $ cmake .. -DMARCH_NATIVE=OFF
 ## Static linking
 
 you can pass -DSTATIC=ON to force driver to link staticly for all libraries, this will only work in a specialized
- environment like alpine linux and Windows. Check the result file to make sure it is an static file.
+ environment like alpine linux and Windows.
+
+### Alpine Linux
+
+Installing Dependencies
+
+```shell
+# Install all libs
+$ apk add linux-headers gcc g++ clang-dev make cmake python2 bash \
+    mariadb-dev mariadb-static postgresql-dev sqlite-dev sqlite-static\
+    libevent-dev libevent-static libexecinfo-dev libexecinfo-static \
+    openssl-dev openssl-libs-static zlib-dev zlib-static icu-dev icu-static \
+    pcre-dev bison
+```
+
+Installing jemalloc
+
+```shell
+$ wget -O - https://github.com/jemalloc/jemalloc/releases/download/5.2.1/jemalloc-5.2.1.tar.bz2 | tar -xj && \
+    cd jemalloc-5.2.1 && \
+    ./configure --prefix=/usr && \
+    make && \
+    make install
+```
+
+Build Steps
+
+```shell
+$ git clone https://github.com/fluffos/fluffos.git
+$ cd fluffos
+
+$ mkdir build && cd build
+$ cmake .. -DMARCH_NATIVE=OFF -DSTATIC=ON
+$ make install
+```
+
+Check the result file to make sure it is an static file.
 
 ```shell
 $ ldd bin/driver
