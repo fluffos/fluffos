@@ -65,6 +65,18 @@ void f_telnet_nop() {
 }
 #endif
 
+#ifdef F_TELNET_GA
+void f_telnet_ga() {
+  auto ip = current_object->interactive;
+  if (ip && ip->telnet) {
+    telnet_send_ga(ip->telnet);
+    flush_message(ip);
+  } else if (!ip) {
+    debug_message("Warning: wrong usage. telnet_ga() should only be called by a user object.\n");
+  }
+}
+#endif
+
 /* MXP */
 #ifdef F_HAS_MXP
 void f_has_mxp(void) {

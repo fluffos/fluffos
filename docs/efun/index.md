@@ -551,6 +551,9 @@ title: EFUN
 <div><a href='interactive/snoop.html'>snoop</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='interactive/telnet_ga.html'>telnet_ga</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='interactive/telnet_nop.html'>telnet_nop</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
@@ -1101,6 +1104,6 @@ title: EFUN
 
 <div class="alert alert-info my-4" role="alert">
     <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/info.svg">
-    This page is auto generated on 2021-05-09 21:09:57 CST for v2019.20210429-15-g8827ca4b.</a>
+    This page is auto generated on 2021-06-05 19:30:14 EDT for v2019.20210429-15-gf6db6945-dirty.</a>
 </div>
 
