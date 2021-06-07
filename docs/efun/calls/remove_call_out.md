@@ -23,7 +23,7 @@ title: calls / remove_call_out
     In the second form, this function removes a pending call out identified
     by  the  <handle>  returned  from the  call_out()  function. The return
     value is the number of remaining seconds before the call_out was to  be
-    called,  or -1  if  there  was  no  valid  call_out  identified  by the 
+    called,  or -1  if  there  was  no  valid  call_out  identified  by the
     specified <handle>.
 
     In the third form all pending call outs for the current object will be
@@ -31,5 +31,5 @@ title: calls / remove_call_out
 
 ### SEE ALSO
 
-    call_out(3), call_out_info(3).
+    call_out, call_out_info, call_out_walltime
 
