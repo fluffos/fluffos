@@ -19,5 +19,5 @@ title: system / call_out_info
 
 ### SEE ALSO
 
-    call_out(3), remove_call_out(3)
+    call_out, remove_call_out, call_out_walltime
 

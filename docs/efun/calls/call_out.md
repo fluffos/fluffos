@@ -18,7 +18,7 @@ title: calls / call_out
     <arg> can be of any type.
 
     If the gametick in the runtime config is less than 1000, you may specify
-    a <delay> as a float in milliseconds (gametick / 1000) representing a 
+    a <delay> as a float in milliseconds (gametick / 1000) representing a
     value that is divisible by the gametick. A <delay> which is not equally
     divisible by the gametick value will be rounded up to the next game tick.
     A <delay> of 0 is special, see below.
@@ -45,5 +45,5 @@ title: calls / call_out
 
 ### SEE ALSO
 
-    remove_call_out(3), call_out_info(3)
+    remove_call_out, call_out_info, call_out_walltime
 
