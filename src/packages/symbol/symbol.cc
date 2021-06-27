@@ -24,7 +24,7 @@ void symbol_start(const char *filename) {
   if (out != NULL) symbol_end();
   sprintf(buff, "%s%s", dir, filename);
 #ifdef _WIN32
-  _mkdir(dir, 0700);
+  _mkdir(dir);
 #else
   mkdir(dir, 0700);
 #endif
