@@ -14,7 +14,7 @@ static char buff[1024];
 
 static int enable = 0;
 
-const char *dir = "log/symbol/";
+const char *symbolDir = "log/symbol/";
 
 void symbol_enable(int op) { enable = op; }
 
@@ -22,13 +22,13 @@ void symbol_start(const char *filename) {
   int i;
   if (!enable) return;
   if (out != NULL) symbol_end();
-  sprintf(buff, "%s%s", dir, filename);
+  sprintf(buff, "%s%s", symbolDir, filename);
 #ifdef _WIN32
   _mkdir(dir);
 #else
-  mkdir(dir, 0700);
+  mkdir(symbolDir, 0700);
 #endif
-  for (i = strlen(dir); i < strlen(buff) && i < sizeof(buff); i++) {
+  for (i = strlen(symbolDir); i < strlen(buff) && i < sizeof(buff); i++) {
     if (buff[i] == '/') buff[i] = '#';
   }
   out = fopen(buff, "w");
