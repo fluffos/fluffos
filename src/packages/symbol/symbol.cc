@@ -28,7 +28,7 @@ void symbol_start(const char *filename) {
 #else
   mkdir(dir, 0700);
 #endif
-  for (i = strlen(dir); i < strlen(buff); i++) {
+  for (i = strlen(dir); i < strlen(buff) && i < sizeof(buff); i++) {
     if (buff[i] == '/') buff[i] = '#';
   }
   out = fopen(buff, "w");
