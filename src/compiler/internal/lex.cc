@@ -40,9 +40,7 @@
 
 #include "scratchpad.h"
 
-#ifdef PACKAGE_SYMBOL
-#include "packages/symbol/symbol.h"
-#endif
+#include "symbol.h"
 
 // FIXME: in master.h
 extern struct object_t *master_ob;
@@ -978,9 +976,7 @@ static void handle_include(char *name, int global) {
   incstate_t *is;
   int delim, f;
 
-#ifdef PACKAGE_SYMBOL
   symbol_record(OP_SYMBOL_INC, current_file, current_line, name);
-#endif
 
   if (*name != '"' && *name != '<') {
     defn_t *d;
@@ -3478,9 +3474,7 @@ static void handle_define(char *yyt) {
   char mtext[MLEN];
   char *p, *q;
 
-#ifdef PACKAGE_SYMBOL
   symbol_record(OP_SYMBOL_DEFINE, current_file, current_line, yyt);
-#endif
   p = yyt;
   strcat(p, " ");
   q = namebuf;

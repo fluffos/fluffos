@@ -9,7 +9,7 @@
 #include "mainlib.h"
 
 #include "vm/vm.h"
-#include "packages/symbol/symbol.h"
+#include "symbol.h"
 
 int main(int argc, char** argv) {
   if (argc != 3) {
