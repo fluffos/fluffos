@@ -1,0 +1,1 @@
+mixed this_object(){}
