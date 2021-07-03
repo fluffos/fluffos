@@ -1,0 +1,9 @@
+{
+    "coc-lpcd.efunc": [
+        "/single/simul_efun.c",
+        "/etc/efun_define.c"
+    ],
+    "coc-lpcd.include": "include",
+    "coc-lpcd.workspace": "testsuite",
+    "coc-lpcd.complie": "/home/panzhihao/fluffos/build/src/symbol etc/config.test "
+}

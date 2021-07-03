@@ -40,6 +40,8 @@
 
 #include "scratchpad.h"
 
+#include "symbol.h"
+
 // FIXME: in master.h
 extern struct object_t *master_ob;
 // FIXME: in file.h
@@ -973,6 +975,8 @@ static void handle_include(char *name, int global) {
   static char buf[MAXLINE];
   incstate_t *is;
   int delim, f;
+
+  symbol_record(OP_SYMBOL_INC, current_file, current_line, name);
 
   if (*name != '"' && *name != '<') {
     defn_t *d;
@@ -3470,6 +3474,7 @@ static void handle_define(char *yyt) {
   char mtext[MLEN];
   char *p, *q;
 
+  symbol_record(OP_SYMBOL_DEFINE, current_file, current_line, yyt);
   p = yyt;
   strcat(p, " ");
   q = namebuf;

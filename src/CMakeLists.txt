@@ -313,6 +313,7 @@ set(SRC
   "comm.cc"
   "mainlib.cc"
   "user.cc"
+  "symbol.cc"
   "net/tls.cc"
   "net/telnet.cc"
   "net/websocket.cc"
@@ -471,6 +472,9 @@ target_link_libraries(driver PUBLIC ${FLUFFOS_LINK})
 
 add_executable(lpcc "main_lpcc.cc")
 target_link_libraries(lpcc PUBLIC ${FLUFFOS_LINK})
+
+add_executable(symbol "main_symbol.cc")
+target_link_libraries(symbol PUBLIC ${FLUFFOS_LINK})
 
 include(helper)
 

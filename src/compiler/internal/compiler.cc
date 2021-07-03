@@ -17,12 +17,15 @@
 #include "lex.h"
 #include "scratchpad.h"
 #include "keyword.h"
+#include "symbol.h"
+#include <string>
 
 #include "vm/internal/base/machine.h"  // for error(), FIXME
 
 #ifdef PACKAGE_MUDLIB_STATS
 #include "packages/mudlib_stats/mudlib_stats.h"
 #endif
+
 
 // Align to pointer-size boundary, this will work fine for both x86 & x86_64, because we don't use
 // long double (16-bytes).
@@ -151,6 +154,7 @@ void free_all_local_names(int flag) {
   }
   current_number_of_locals = 0;
   max_num_locals = 0;
+  symbol_record(OP_SYMBOL_FREE, current_file, current_line, "");
 }
 
 void deactivate_current_locals() {
@@ -192,7 +196,7 @@ void pop_n_locals(int num) {
   if (num == 0) {
     return;
   }
-
+  symbol_record(OP_SYMBOL_POP, current_file, current_line, std::to_string(num).c_str());
   lcur_start = current_number_of_locals -= num;
   ltype_start = locals_ptr[lcur_start].runtime_index;
 
@@ -216,7 +220,7 @@ int add_local_name(const char *str, int type) {
     return 0;
   } else {
     ident_hash_elem_t *ihe;
-
+    symbol_record(OP_SYMBOL_NEW, current_file, current_line, str);
     ihe = find_or_add_ident(str, FOA_NEEDS_MALLOC);
     type_of_locals_ptr[max_num_locals] = type;
     locals_ptr[current_number_of_locals].ihe = ihe;
@@ -1219,6 +1223,9 @@ int define_new_function(const char *name, int num_arg, int num_local, int flags,
       }
     }
   }
+  if(flags & FUNC_PROTOTYPE) {
+    symbol_record(OP_SYMBOL_FUNC, current_file, current_line, name);
+  }
   return newindex;
 }
 
@@ -1278,7 +1285,7 @@ int define_new_variable(const char *name, int type) {
   tp =
       reinterpret_cast<unsigned short *>(allocate_in_mem_block(A_VAR_TYPE, sizeof(unsigned short)));
   *tp = type;
-
+  symbol_record(OP_SYMBOL_VAR, current_file, current_line, name);
   return n;
 }
 
@@ -1990,9 +1997,11 @@ program_t *compile_file(int f, char *name) {
   guard = 1;
 
   {
+    symbol_start(name);
     prolog(f, name);
     func_present = 0;
     yyparse();
+    symbol_end();
     prog = epilog();
   }
 

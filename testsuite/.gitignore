@@ -11,6 +11,7 @@ testfile.zerolength
 /log/compile_fail
 /log/author_stats
 /log/domain_stats
+/log/symbol
 sf.o
 driver
 tmp_eval_file.c
