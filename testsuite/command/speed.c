@@ -187,6 +187,12 @@ int main() {
     TIMEDIFF("string += (sm)",100000,s = s1; s += s3, ss);
     TIMEDIFF("string += (ms)",100000,s = s3; s += s1, sm);
     TIMEDIFF("string += (mm)",100000,s = s3; s += s3, sm);
+    s = read_file("/2000.txt");
+    TIME("string find/strsrch early",1000,strsrch(s, "\n"));
+    TIME("string find/strsrch late",1000,strsrch(s, s[<10..]));
+    TIME("string find/strsrch miss",1000,strsrch(s, "aaaaa"));
+    TIME("string split/explode char",1000,explode(s, ""));
+    TIME("string split/explode newline",1000,explode(s, "\n"));
 #endif
 #ifdef ARRAY_TESTS
     TIME("allocate array",10000, a = allocate(100));

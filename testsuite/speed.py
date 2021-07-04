@@ -6,6 +6,7 @@ import sys
 import string
 import random
 
+
 def perf_counter_ns():
   if sys.version_info.major == 3 and sys.version_info.minor <= 6:
     return time.perf_counter() * 1000 * 1000 * 1000
@@ -26,17 +27,19 @@ def fib(n):
   def _powLF(n):
     if n == 1:
       return (1, 1)
-    L, F = _powLF(n//2)
-    L, F = (L**2 + 5*F**2) >> 1, L*F
+    L, F = _powLF(n // 2)
+    L, F = (L ** 2 + 5 * F ** 2) >> 1, L * F
     if n & 1:
-      return ((L + 5*F) >> 1, (L + F) >> 1)
+      return ((L + 5 * F) >> 1, (L + F) >> 1)
     else:
       return (L, F)
+
   if n & 1:
     return _powLF(n)[1]
   else:
     L, F = _powLF(n // 2)
     return L * F
+
 
 def fib_recur(n):
   if n == 0:
@@ -44,7 +47,7 @@ def fib_recur(n):
   elif n == 1:
     return 1
   else:
-    return fib_recur(n-1) + fib_recur(n-2)
+    return fib_recur(n - 1) + fib_recur(n - 2)
 
 
 def report(*args):
@@ -76,8 +79,6 @@ while True:
     break
   """, number=10))
 
-
-
 s1 = "This is a test"
 s2 = " of the emergency broadcast system."
 s3 = s1 + s2
@@ -93,12 +94,21 @@ report("string += (sm)", 0)
 report("string += (ms)", 0)
 report("string += (mm)", 0)
 
+f = open('./2000.txt', 'r')
+txt = f.read()
+f.close()
+report("string find/strsrch early", _timeit("txt.find('\\n')", globals=globals(), number=1000))
+report("string find/strsrch late", _timeit("txt.find(txt[-10:])", globals=globals(), number=1000))
+report("string find/strsrch miss", _timeit("txt.find('aaaaa')", globals=globals(), number=1000))
+report("string split/explode char", _timeit("list(txt)", globals=globals(), number=1000))
+report("string split/explode newline", _timeit("txt.split('\\n')", globals=globals(), number=1000))
+
 report("allocate array", _timeit("[ 0 for x in range(100) ]"))
 report("array creation (int)", _timeit("[ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ]"))
 report("array creation (string)", _timeit('[ "1", "2", "3", "4", "5", "6", "7", "8", "9", "10" ]'))
-a1 = [ 5, 1, 3, 4, 2 ]
-a2 = [ 9, 8, 7, 6, 10 ]
-a3 = [ 4, 1 ]
+a1 = [5, 1, 3, 4, 2]
+a2 = [9, 8, 7, 6, 10]
+a3 = [4, 1]
 report("array assign", _timeit("a = a1", globals=globals()))
 report("array addition", _timeit("a1 + a2", globals=globals()))
 report("array subtraction", _timeit("[x for x in a1 if x not in a2]", globals=globals()))
@@ -109,8 +119,8 @@ report("array -=", 0)
 report("allocate mapping", _timeit("{0: 0 for i in range(100)}"))
 report("mapping creation (int)", _timeit("{1 : 2, 3 : 4, 5 : 6, 7 : 8}"))
 report("mapping creation (string)", _timeit('{ "1" : "a", "2" : "b", "3" : "c", "4" : "d", "5" : "e"}'))
-m1 = { "1" : "a", "2" : "b", "3" : "c", "4" : "d", "5" : "e" }
-m2 = { 1 : "a", 2 : "b", 3 : "c", 4 : "d", 5 : "e" }
+m1 = {"1": "a", "2": "b", "3": "c", "4": "d", "5": "e"}
+m2 = {1: "a", 2: "b", 3: "c", 4: "d", 5: "e"}
 report("mapping assign", _timeit("m = m1", globals=globals()))
 report("lookup string (exist)", _timeit('m1["3"]', globals=globals()))
 report("lookup string (missing)", _timeit('m1.get("6")', globals=globals()))
