@@ -620,13 +620,13 @@ void f_range(int code) {
   switch (sp->type) {
     case T_STRING: {
       int32_t from, to;
-      size_t len;
-      const char *res = sp->u.string;
 
-      auto success = u8_egc_count(res, &len);
-      if (!success) {
+      EGCIterator iter(sp->u.string, -1);
+      if (!iter.ok()) {
         error("Invalid UTF-8 string: f_range");
       }
+      // TODO: optimize out
+      auto len = iter.count();
 
       to = (--sp)->u.number;
 
@@ -665,19 +665,20 @@ void f_range(int code) {
       }
 
       if (to >= len - 1) {
-        auto offset = u8_egc_index_to_offset(res, from);
+        auto offset = iter.index_to_offset(from);
         if (offset < 0) {
           error("f_range: invalid offset");
         }
-        put_malloced_string(string_copy(res + offset, "f_range"));
+        put_malloced_string(string_copy(iter.data() + offset, "f_range"));
       } else {
-        auto start = u8_egc_index_to_offset(res, from);
-        auto end = u8_egc_index_to_offset(res, from + (to - from + 1));
+        // TODO: optimize
+        auto start = iter.index_to_offset(from);
+        auto end = iter.index_to_offset(from + (to - from + 1));
         if (start < 0 || end < 0) {
           error("f_range: invalid offset");
         }
         char *tmp = new_string(end - start, "f_range");
-        strncpy(tmp, res + start, end - start);
+        strncpy(tmp, iter.data() + start, end - start);
         tmp[end - start] = '\0';
         put_malloced_string(tmp);
       }
@@ -760,13 +761,12 @@ void f_extract_range(int code) {
   switch (sp->type) {
     case T_STRING: {
       int32_t from;
-      size_t len;
 
-      const char *res = sp->u.string;
-      auto success = u8_egc_count(res, &len);
-      if (!success) {
+      EGCIterator iter(sp->u.string, -1);
+      if (!iter.ok()) {
         error("Invalid UTF-8 String: f_extract_range.");
       }
+      auto len = iter.count();
       from = (--sp)->u.number;
       if (code) {
         from = len - from;
@@ -787,11 +787,11 @@ void f_extract_range(int code) {
         sp->subtype = STRING_CONSTANT;
         sp->u.string = "";
       } else {
-        auto offset = u8_egc_index_to_offset(res, from);
+        auto offset = iter.index_to_offset(from);
         if (offset < 0) {
           error("f_range: invalid offset");
         }
-        put_malloced_string(string_copy(res + offset, "f_extract_range"));
+        put_malloced_string(string_copy(iter.data() + offset, "f_extract_range"));
       }
       free_string_svalue(sp + 1);
       break;

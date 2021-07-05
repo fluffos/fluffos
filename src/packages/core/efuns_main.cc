@@ -2446,8 +2446,9 @@ void f_sizeof(void) {
       free_buffer(sp->u.buf);
       break;
     case T_STRING: {
-      auto success = u8_egc_count(sp->u.string, &i);
-      DEBUG_CHECK(!success, "Invalid UTF8 string!");
+      EGCIterator iter(sp->u.string, -1);
+      if(!iter.ok()) { error("f_sizeof: Invalid UTF8 string!"); }
+      i = iter.count();
       free_string_svalue(sp);
       break;
     }
@@ -2570,11 +2571,46 @@ void f_strsrch(void) {
   auto arg2 = sp - 1;
   auto arg3 = sp;
 
-  size_t src_len = SVALUE_STRLEN(arg1);
+  // fast track empty string search
+  if(arg1->u.string[0] == '\0') {
+    auto ret = -1;
+    if (
+        (arg2->type == T_STRING && arg2->u.string[0] == '\0')
+        || (arg2->type == T_NUMBER && arg2->u.number == '\0')
+    ) {
+      ret = 0;
+    }
+
+    pop_3_elems();
+    push_number(ret);
+    return ;
+  }
+
+  // fast track single ascii character search
+  {
+    bool single_char_search = false;
+    char single = -1;
+    if (arg2->type == T_STRING && (arg2->u.string[0] != '\0' && arg2->u.string[1] == '\0') && U8_IS_SINGLE(arg2->u.string[0])) {
+      single = arg2->u.string[0];
+      single_char_search = true;
+    } else if (arg2->type == T_NUMBER && arg2->u.number >= 0 && arg2->u.number <= 0x7f) {
+      single = arg2->u.number;
+      single_char_search = true;
+    }
+    if (single_char_search && single >= 0) {
+      const auto *res = arg3->u.number == 0 ? strchr(arg1->u.string, single) : strrchr(arg1->u.string, single);
+      auto ret = res == nullptr ? -1 : (const char *) res - arg1->u.string;
+
+      pop_3_elems();
+      push_number(ret);
+      return;
+    }
+  }
 
   uint8_t buf[U8_MAX_LENGTH + 1] = {0};
   const char *find = nullptr;
   size_t find_len = 0;
+
   if (arg2->type == T_NUMBER) {
     UBool isError = false;
     int offset = 0;
@@ -2589,11 +2625,13 @@ void f_strsrch(void) {
     find = arg2->u.string;
     find_len = SVALUE_STRLEN(arg2);
   }
+  size_t src_len = SVALUE_STRLEN(arg1);
 
   LPC_INT ret = -1;
   // only search if there is a chance.
   if (find_len <= src_len) {
-    ret = u8_egc_find_as_index(arg1->u.string, src_len, find, find_len, arg3->u.number != 0);
+    auto pos = u8_egc_find_as_offset(arg1->u.string, src_len, find, find_len, arg3->u.number != 0);
+    ret = pos == -1 ? -1: u8_egc_offset_to_index(arg1->u.string, pos);
   }
 
   pop_3_elems();
