@@ -563,9 +563,11 @@ void push_indexed_lvalue(int reverse) {
 
     switch (lv->type) {
       case T_STRING: {
-        size_t count;
-        auto success = u8_egc_count(lv->u.string, &count);
-        DEBUG_CHECK(!success, "Bad UTF-8 String: push_indexed_lvalue");
+        EGCIterator iter(lv->u.string, -1);
+        if(!iter.ok()) {
+          error("Bad UTF-8 String: push_indexed_lvalue");
+        };
+        size_t count = iter.count();
 
         if (reverse) {
           ind = count - ind;
@@ -717,6 +719,7 @@ static void push_lvalue_range(int code) {
   int32_t ind1, ind2;
   size_t size = 0, u8len = 0;
   svalue_t *lv;
+  std::unique_ptr<EGCIterator> iter = nullptr;
 
   {
     switch ((lv = global_lvalue_range.owner = sp->u.lvalue)->type) {
@@ -725,10 +728,11 @@ static void push_lvalue_range(int code) {
         break;
       case T_STRING: {
         size = SVALUE_STRLEN(lv);
-        auto success = u8_egc_count(lv->u.string, &u8len);
-        if (!success) {
+        iter.reset(new EGCIterator(lv->u.string, size));
+        if (!iter->ok()) {
           error("Invalid UTF-8 String: push_lvalue_range");
         }
+        u8len = iter->count();
         unlink_string_svalue(lv);
         break;
       }
@@ -754,7 +758,7 @@ static void push_lvalue_range(int code) {
           "The 2nd index to range lvalue must be >= -1 and < sizeof(indexed "
           "value)\n");
     }
-    ind2 = u8_egc_index_to_offset(lv->u.string, ind2);
+    ind2 = iter->index_to_offset(ind2);
     if (ind2 < 0) {
       error("push_lvalue_range: invalid ind2");
     }
@@ -780,7 +784,7 @@ static void push_lvalue_range(int code) {
           "The 1st index to range lvalue must be >= 0 and < sizeof(indexed "
           "value)\n");
     }
-    ind1 = u8_egc_index_to_offset(lv->u.string, ind1);
+    ind1 = iter->index_to_offset(ind1);
     if (ind1 < 0) {
       error("push_lvalue_range: invalid ind1");
     }
@@ -2585,11 +2589,11 @@ void eval_instruction(char *p) {
           sp->type = T_NUMBER;
           global_lvalue_codepoint.index = -1;
           global_lvalue_codepoint.owner = sp - 1;
-          size_t count = 0;
-          auto success = u8_egc_count((sp - 1)->u.string, &count);
-          if (!success) {
-            error("foreach: Invalid utf-8 string.");
+          EGCIterator iter((sp - 1)->u.string, -1);
+          if (!iter.ok()) {
+            error("f_foreach: Invalid utf-8 string.");
           }
+          size_t count = iter.count();
           sp->subtype = count;
         } else {
           CHECK_TYPES(sp, T_ARRAY, 2, F_FOREACH);
@@ -3261,11 +3265,11 @@ void eval_instruction(char *p) {
             if ((sp - 1)->type != T_NUMBER) {
               error("Indexing a string with an illegal type.\n");
             }
-            size_t count;
-            auto success = u8_egc_count(sp->u.string, &count);
-            if (!success) {
-              error("Invalid UTF8 string: f_rindex.\n");
+            EGCIterator iter(sp->u.string, -1);
+            if (!iter.ok()) {
+              error("f_rindex: Invalid UTF8 string.\n");
             }
+            size_t count = iter.count();
             i = count - (sp - 1)->u.number;
             // COMPAT: allow str[<0] == 0
             if ((i > count) || (i < 0)) {

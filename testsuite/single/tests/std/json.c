@@ -3,8 +3,6 @@
 void do_tests() {
   string content = "";
 
-  trace_start("trace_json.json");
-
   if(!find_object("/std/json")) {
     write("json not loaded, skipped");
     return;
@@ -43,5 +41,4 @@ void do_tests() {
   ASSERT(content);
   ASSERT(json_encode(json_decode(content)));
 
-  trace_end();
 }

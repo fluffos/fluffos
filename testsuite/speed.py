@@ -97,11 +97,19 @@ report("string += (mm)", 0)
 f = open('./2000.txt', 'r')
 txt = f.read()
 f.close()
-report("string find/strsrch early", _timeit("txt.find('\\n')", globals=globals(), number=1000))
-report("string find/strsrch late", _timeit("txt.find(txt[-10:])", globals=globals(), number=1000))
+report("string find/strsrch single", _timeit("txt.find('\\n')", globals=globals(), number=1000))
+txt1 = txt[40:60]
+report("string find/strsrch early", _timeit("txt.find(txt1)", globals=globals(), number=1000))
+txt1 = txt[-10:]
+report("string find/strsrch late", _timeit("txt.find(txt1)", globals=globals(), number=1000))
 report("string find/strsrch miss", _timeit("txt.find('aaaaa')", globals=globals(), number=1000))
-report("string split/explode char", _timeit("list(txt)", globals=globals(), number=1000))
+report("string split/explode per-char", _timeit("list(txt)", globals=globals(), number=1000) / len(txt))
 report("string split/explode newline", _timeit("txt.split('\\n')", globals=globals(), number=1000))
+txt1 = txt[40:43]
+report("string split/explode hit1", _timeit("txt.split(txt1)", globals=globals(), number=1000))
+txt1 = txt[40:60]
+report("string split/explode hit2", _timeit("txt.split(txt1)", globals=globals(), number=1000))
+report("string split/explode miss", _timeit("txt.split('一二三')", globals=globals(), number=1000))
 
 report("allocate array", _timeit("[ 0 for x in range(100) ]"))
 report("array creation (int)", _timeit("[ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ]"))

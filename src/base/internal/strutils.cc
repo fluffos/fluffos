@@ -5,8 +5,7 @@
 #include <string>
 #include <memory>
 #include <string.h>
-#include <unicode/brkiter.h>
-#include <unicode/unistr.h>
+#include <iostream>
 
 #include "thirdparty/utf8_decoder_dfa/decoder.h"
 #include "thirdparty/widecharwidth/widechar_width.h"
@@ -38,103 +37,57 @@ bool u8_validate(const uint8_t *s, size_t len) {
 
 std::string u8_sanitize(std::string_view src) { return utf8::replace_invalid(src); }
 
-namespace {
-typedef std::function<void(std::unique_ptr<icu::BreakIterator> &)> u8_egc_iter_callback;
-bool u8_egc_iter(const char *src, int slen, const u8_egc_iter_callback &cb) {
-  static std::unique_ptr<icu::BreakIterator> brk = nullptr;
+// Search "needle' in 'haystack', making sure it matches EGC boundary, returning byte offset.
+int32_t u8_egc_find_as_offset(const char *haystack, size_t haystack_len, const char *needle,
+                          size_t needle_len, bool reverse) {
+  // no way
+  if (needle_len > haystack_len) {
+    return -1;
+  }
 
-  /* create an iterator for graphemes */
-  if (!brk) {
-    UErrorCode status = U_ZERO_ERROR;
-    brk.reset(icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status));
-    if (!U_SUCCESS(status)) {
-      return false;
+  // fast track ascii string search upto 4 characters.
+  if (!reverse) {
+    bool is_all_ascii = false;
+    for (int i = 0; i < 4 && i < needle_len; i++) {
+      char c = needle[i];
+      is_all_ascii = c >= 0;
+      if (!is_all_ascii) break;
+      if (c == '\0') break;
+      if (i == 3) is_all_ascii = false;
+    }
+    if (is_all_ascii) {
+      // strstr doesn't follow haystack_len, so we may overrun, wasting some cycles.
+      const auto *res = strstr(haystack, needle);
+      auto ret =  res == nullptr ? -1 : (decltype(haystack))res - haystack;
+      if(ret >= haystack_len) ret = -1;
+      return ret;
     }
   }
 
-  UErrorCode status = U_ZERO_ERROR;
-  UText text = UTEXT_INITIALIZER;
-
-  utext_openUTF8(&text, src, slen, &status);
-  if (!U_SUCCESS(status)) {
-    utext_close(&text);
-    return false;
-  }
-
-  status = U_ZERO_ERROR;
-  brk->setText(&text, status);
-  if (!U_SUCCESS(status)) {
-    utext_close(&text);
-    return false;
-  }
-  brk->first();
-
-  cb(brk);
-
-  utext_close(&text);
-  return true;
-}
-}  // namespace
-
-bool u8_egc_count(const char *src, size_t *count) {
-  *count = 0;
-
-  return u8_egc_iter(src, -1, [&](std::unique_ptr<icu::BreakIterator> &brk) {
-    int total = 0;
-    brk->first();
-    while (brk->next() != icu::BreakIterator::DONE) ++total;
-    *count = total;
-  });
-}
-
-// Search "needle' in 'haystack', making sure it matches EGC boundary, returning character index,
-// not the byte offset.
-int u8_egc_find_as_index(const char *haystack, size_t haystack_len, const char *needle,
-                         size_t needle_len, bool reverse) {
-  int index = -1;
-
-  u8_egc_iter(haystack, haystack_len, [=, &index](std::unique_ptr<icu::BreakIterator> &brk) {
-    bool found = false;
-    std::unique_ptr<icu::BreakIterator> brk_tmp(brk->clone());
+  int res = -1;
+  u8_egc_iter(haystack, haystack_len, [=, &res](std::unique_ptr<icu::BreakIterator> &brk) {
+    std::string_view sv_haystack(haystack, haystack_len);
+    std::string_view sv_needle(needle, needle_len);
+    auto pos = std::string_view::npos;
     if (!reverse) {
-      brk->first();
-      while (true) {
-        auto start = brk->current();
-        if ((haystack_len - start) >= needle_len && brk_tmp->isBoundary(start + needle_len)) {
-          if (memcmp(&haystack[start], needle, needle_len) == 0) {
-            found = true;
-            break;
-          }
-        }
-        if (brk->next() == icu::BreakIterator::DONE) {
-          break;
-        }
+      pos = 0;
+      while((pos = sv_haystack.find(sv_needle, pos)) != std::string_view::npos) {
+        if(brk->isBoundary(pos) && brk->isBoundary(pos + sv_needle.length())) break;
+        pos++;
       }
     } else {
-      brk->last();
-      while (true) {
-        auto start = brk->current();
-        if ((haystack_len - start) >= needle_len && brk_tmp->isBoundary(start + needle_len)) {
-          if (memcmp(&haystack[start], needle, needle_len) == 0) {
-            found = true;
-            break;
-          }
-        }
-        if (brk->previous() == icu::BreakIterator::DONE) {
-          break;
-        }
+      pos = std::string_view::npos;
+      while((pos = sv_haystack.rfind(sv_needle, pos)) != std::string_view::npos) {
+        if(brk->isBoundary(pos) && brk->isBoundary(pos + sv_needle.length())) break;
+        pos--;
       }
     }
-    if (!found) {
-      index = -1;
-    } else {
-      // reverse counting
-      index = 0;
-      while (brk->previous() != icu::BreakIterator::DONE) index++;
+    if (pos != std::string_view::npos) {
+       res = pos;
     }
   });
 
-  return index;
+  return res;
 }
 
 // Return the egc at given index of src, if it is an single code point
@@ -175,7 +128,8 @@ UChar32 u8_egc_index_as_single_codepoint(const char *src, int32_t index) {
 
 // Copy string src to dest, replacing character at index to c. Assuming dst is already allocated.
 void u8_copy_and_replace_codepoint_at(const char *src, char *dst, int32_t index, UChar32 c) {
-  int32_t src_offset = u8_egc_index_to_offset(src, index);
+  EGCIterator iter(src, -1);
+  int32_t src_offset = iter.index_to_offset(index);
   int32_t dst_offset = 0;
 
   memcpy(dst, src, src_offset);
@@ -187,19 +141,23 @@ void u8_copy_and_replace_codepoint_at(const char *src, char *dst, int32_t index,
 }
 
 // Get the byte offset to the egc index, doesn't check validity or bounds.
-int32_t u8_egc_index_to_offset(const char *src, int32_t index) {
-  if (index <= 0) return index;
+int32_t u8_egc_offset_to_index(const char *src, int32_t offset) {
+  if (offset <= 0) return offset;
 
-  int pos = -1;
+  int idx = -1;
+  int pos = 0;
 
   u8_egc_iter(src, -1, [&](std::unique_ptr<icu::BreakIterator> &brk) {
     pos = brk->first();
-    while (index-- > 0 && pos >= 0) {
+    idx = 0;
+    do {
       pos = brk->next();
-    }
+      idx++;
+    } while(pos != icu::BreakIterator::DONE && pos < offset);
   });
+  if (pos == icu::BreakIterator::DONE) idx = -1;
 
-  return pos;
+  return idx;
 }
 
 // same as strncpy, copy up to maxlen bytes but will not copy broken characters.
@@ -553,15 +511,16 @@ size_t u8_width(const char *src, int len) {
   return total;
 }
 
-std::vector<std::string> u8_egc_split(const char *src) {
-  std::vector<std::string> result;
+std::vector<std::string_view> u8_egc_split(const char *src) {
+  std::vector<std::string_view> result;
+  result.reserve(16);
 
   u8_egc_iter(src, -1, [&](std::unique_ptr<icu::BreakIterator> &brk) {
     brk->first();
     auto start = brk->current();
     while (brk->next() != icu::BreakIterator::DONE) {
       auto size = brk->current() - start;
-      result.push_back(std::string(src + start, size));
+      result.emplace_back(src + start, size);
       start = brk->current();
     }
   });
