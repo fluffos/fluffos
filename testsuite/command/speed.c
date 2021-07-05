@@ -73,7 +73,7 @@ int fib_recur(int n) {
 }
 
 #define START do { reset_eval_cost();  set_eval_limit(0x7fffffff);  before = perf_counter_ns(); } while (0)
-#define END   after = perf_counter_ns(); time = (after - before);
+#define END   do { after = perf_counter_ns(); time = (after - before); } while(0)
 
 #define REPORT(z, t) out(sprintf("%-30s: %10d ns\n", z, t))
 #define LOOP(n, x) for (i = 0; i < (n); i++) { x; }
@@ -188,11 +188,31 @@ int main() {
     TIMEDIFF("string += (ms)",100000,s = s3; s += s1, sm);
     TIMEDIFF("string += (mm)",100000,s = s3; s += s3, sm);
     s = read_file("/2000.txt");
-    TIME("string find/strsrch early",1000,strsrch(s, "\n"));
-    TIME("string find/strsrch late",1000,strsrch(s, s[<10..]));
-    TIME("string find/strsrch miss",1000,strsrch(s, "aaaaa"));
-    TIME("string split/explode char",1000,explode(s, ""));
+    TIME("string range early",1000,s1 = s[40..60]);
+    TIME("string range late",1000,s1 = s[<10..]);
+    TIME("string find/strsrch single",1000,strsrch(s, "\n"));
+    TIME("string find/strsrch single",1000,strsrch(s, '\n'));
+    s1 = s[40..60];
+    ASSERT_EQ(40, strsrch(s, s1));
+    TIME("string find/strsrch early",1000,strsrch(s, s1));
+    s1 = s[<10..];
+    ASSERT_EQ(5613, strsrch(s, s1));
+    TIME("string find/strsrch late slow",1000,strsrch(s, s1));
+    s1 = s[<3..];
+    ASSERT_EQ(5620, strsrch(s, s1));
+    TIME("string find/strsrch late fast",1000,strsrch(s, s1));
+    ASSERT_EQ(-1, strsrch(s, "aaaaa"));
+    TIME("string find/strsrch miss1",1000,strsrch(s, "aaaa"));
+    TIME("string find/strsrch miss2",1000,strsrch(s, "aaaaa"));
+    TIME("string find/strsrch miss3",1000,strsrch(s, "一二三"));
+    SAVETIME(save,1000,explode(s, ""));
+    REPORT("string split/explode per char", save / 1000 / sizeof(explode(s, "")));
     TIME("string split/explode newline",1000,explode(s, "\n"));
+    s1 = s[40..43]; // fast path
+    TIME("string split/explode hit1",1000,explode(s, s1));
+    s1 = s[40..60]; // slow path
+    TIME("string split/explode hit2",1000,explode(s, s1));
+    TIME("string split/explode miss",1000,explode(s, "一二三"));
 #endif
 #ifdef ARRAY_TESTS
     TIME("allocate array",10000, a = allocate(100));

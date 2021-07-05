@@ -8,6 +8,8 @@
 #include <string>
 #include <unicode/utf8.h>
 #include <unicode/uchar.h>
+#include <unicode/brkiter.h>
+#include <unicode/unistr.h>
 
 namespace {
 
@@ -100,6 +102,98 @@ inline void ReplaceStringInPlace(std::string &subject, const std::string &search
     pos += replace.length();
   }
 }
+
+class EGCIterator {
+ public:
+  EGCIterator(const char* src, int32_t slen): src_(src) {
+    brk_.reset(icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status_));
+    if (!U_SUCCESS(status_)) {
+      return;
+    }
+
+    status_ = U_ZERO_ERROR;
+    utext_openUTF8(&text_, src, slen, &status_);
+    if (!U_SUCCESS(status_)) {
+      utext_close(&text_);
+      return;
+    }
+
+    status_ = U_ZERO_ERROR;
+    brk_->setText(&text_, status_);
+    if (!U_SUCCESS(status_)) {
+      utext_close(&text_);
+      return;
+    }
+    brk_->first();
+  }
+  ~EGCIterator() {
+    if (this->ok()) {
+      utext_close(&text_);
+      brk_.reset();
+    }
+  }
+  bool ok() { return U_SUCCESS(status_); }
+  const char* data() { return src_; };
+  icu::BreakIterator* operator ->() { return brk_.operator->(); }
+  size_t count() {
+    if (count_ == -1) {
+      count_ = 0;
+      brk_->first();
+      while (brk_->next() != icu::BreakIterator::DONE) ++count_;
+    }
+    return count_;
+  }
+  int32_t index_to_offset(int32_t index) {
+    if (index <= 0) return index;
+    int pos = -1;
+    brk_->first();
+    pos = brk_->next(index);
+    return pos;
+  }
+ private:
+  const char* src_;
+  int32_t count_ = -1;
+  UErrorCode status_ = U_ZERO_ERROR;
+  std::unique_ptr<icu::BreakIterator> brk_ = nullptr;
+  UText text_ = UTEXT_INITIALIZER;
+};
+
+typedef std::function<void(std::unique_ptr<icu::BreakIterator> &)> u8_egc_iter_callback;
+inline bool u8_egc_iter(const char *src, int slen, const u8_egc_iter_callback &cb) {
+  static std::unique_ptr<icu::BreakIterator> brk = nullptr;
+
+  /* create an iterator for graphemes */
+  if (!brk) {
+    UErrorCode status = U_ZERO_ERROR;
+    brk.reset(icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status));
+    if (!U_SUCCESS(status)) {
+      return false;
+    }
+  }
+
+  UErrorCode status = U_ZERO_ERROR;
+  UText text = UTEXT_INITIALIZER;
+
+  utext_openUTF8(&text, src, slen, &status);
+  if (!U_SUCCESS(status)) {
+    utext_close(&text);
+    return false;
+  }
+
+  status = U_ZERO_ERROR;
+  brk->setText(&text, status);
+  if (!U_SUCCESS(status)) {
+    utext_close(&text);
+    return false;
+  }
+  brk->first();
+
+  cb(brk);
+
+  utext_close(&text);
+  return true;
+}
+
 }  // namespace
 
 // Check string s is valid utf8
@@ -110,6 +204,7 @@ bool u8_egc_count(const char *src, size_t *count);
 UChar32 u8_egc_index_as_single_codepoint(const char *str, int32_t index);
 void u8_copy_and_replace_codepoint_at(const char *src, char *dst, int32_t index, UChar32 c);
 int32_t u8_egc_index_to_offset(const char *src, int32_t index);
+int32_t u8_egc_offset_to_index(const char *src, int32_t offset);
 int32_t u8_strncpy(uint8_t *, const uint8_t *, const int32_t);
 size_t u8_truncate(const uint8_t *, size_t);
 // Return display width for string piece, len could be -1 for NULL terminated string.
@@ -117,9 +212,9 @@ size_t u8_width(const char *src, int len);
 void u8_truncate_below_width(const char *src, size_t len, size_t max_width, bool break_for_line,
                              bool always_break_before_newline, size_t *out_len, size_t *out_width);
 std::string u8_sanitize(std::string_view src);
-int u8_egc_find_as_index(const char *haystack, size_t haystack_len, const char *needle,
-                         size_t needle_len, bool reverse);
+int u8_egc_find_as_offset(const char *haystack, size_t haystack_len, const char *needle,
+                          size_t needle_len, bool reverse);
 
-std::vector<std::string> u8_egc_split(const char *src);
+std::vector<std::string_view> u8_egc_split(const char *src);
 
 #endif  // STRUTILS_H

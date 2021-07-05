@@ -572,6 +572,7 @@ void do_tests() {
   // strsrch
   tmp = "一欲穷千里目🍆🍠🧮👩‍👩‍👧‍👧😊👌💩更上一层楼";
   // string searching
+  ASSERT_EQ("一", tmp[0..0]);
   ASSERT_EQ(0, strsrch(tmp, tmp[0..0]));
   ASSERT_EQ(15, strsrch(tmp, "一", 1));
   ASSERT_EQ(13, strsrch(tmp, "更"));

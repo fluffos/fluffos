@@ -58,7 +58,7 @@ const flagEntry intFlags[] = {
     {"maximum string length", __MAX_STRING_LENGTH__, 200000},
     {"maximum bits in a bitfield", __MAX_BITFIELD_BITS__, 12000},
     {"maximum byte transfer", __MAX_BYTE_TRANSFER__, 200000},
-    {"maximum read file size", __MAX_READ_FILE_SIZE__, 200000},
+    {"maximum read file size", __MAX_READ_FILE_SIZE__, 1 << 12},
 
     {"hash table size", __SHARED_STRING_HASH_TABLE_SIZE__, 65536, 7001},
     {"object table size", __OBJECT_HASH_TABLE_SIZE__, 4096, 1024},
