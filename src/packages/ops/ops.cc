@@ -621,42 +621,32 @@ void f_range(int code) {
     case T_STRING: {
       int32_t from, to;
 
-      EGCIterator iter(sp->u.string, -1);
+      EGCIterator iter(sp->u.string, SVALUE_STRLEN(sp));
       if (!iter.ok()) {
         error("Invalid UTF-8 string: f_range");
       }
-      // TODO: optimize out
-      auto len = iter.count();
 
       to = (--sp)->u.number;
+      from = (--sp)->u.number;
 
       if (!CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
         if (code & 0x01) {
-          to = len - to;
+          to = -1 * to;
         }
-        from = (--sp)->u.number;
         if (code & 0x10) {
-          from = len - from;
+          from = -1 * from;
         }
       } else {
         if (code & 0x01) {
-          to = len - to;
-        } else if (to < 0) {
-          to += len;
+          to = -1 * to;
         }
-        from = (--sp)->u.number;
         if (code & 0x10) {
-          from = len - from;
-        } else if (from < 0) {
-          from += len;
+          from = -1 * from;
         }
       }
 
-      if (from < 0) {
-        from = 0;
-      }
-
-      if (to < from || from >= len) {
+      if ((from > 0 && to > 0 && to < from)
+          || (from < 0 && to < 0 && to < from)) {
         free_string_svalue(sp + 2);
         sp->type = T_STRING;
         sp->subtype = STRING_CONSTANT;
@@ -664,21 +654,23 @@ void f_range(int code) {
         return;
       }
 
-      if (to >= len - 1) {
-        auto offset = iter.index_to_offset(from);
-        if (offset < 0) {
-          error("f_range: invalid offset");
-        }
-        put_malloced_string(string_copy(iter.data() + offset, "f_range"));
+      auto start = iter.index_to_offset(from);
+      if (start < 0) {
+        start = 0;
+      }
+      auto end = iter.post_index_to_offset(to);
+      if (end < 0) {
+        put_malloced_string(string_copy(iter.data() + start, "f_range"));
       } else {
-        // TODO: optimize
-        auto start = iter.index_to_offset(from);
-        auto end = iter.index_to_offset(from + (to - from + 1));
-        if (start < 0 || end < 0) {
-          error("f_range: invalid offset");
+        if (end < start) {
+          free_string_svalue(sp + 2);
+          sp->type = T_STRING;
+          sp->subtype = STRING_CONSTANT;
+          sp->u.string = "";
+          return ;
         }
         char *tmp = new_string(end - start, "f_range");
-        strncpy(tmp, iter.data() + start, end - start);
+        memcpy(tmp, iter.data() + start, end - start);
         tmp[end - start] = '\0';
         put_malloced_string(tmp);
       }
@@ -762,35 +754,25 @@ void f_extract_range(int code) {
     case T_STRING: {
       int32_t from;
 
-      EGCIterator iter(sp->u.string, -1);
+      EGCIterator iter(sp->u.string, SVALUE_STRLEN(sp));
       if (!iter.ok()) {
         error("Invalid UTF-8 String: f_extract_range.");
       }
-      auto len = iter.count();
       from = (--sp)->u.number;
-      if (code) {
-        from = len - from;
-      }
-      if (CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
-        if (from < 0) {
-          if ((from += len) < 0) {
-            from = 0;
-          }
-        }
-      } else {
+      if (!CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
         if (from < 0) {
           from = 0;
         }
       }
-      if (from >= len) {
+      if (code) {
+        from = -1 * from;
+      }
+      auto offset = iter.index_to_offset(from);
+      if (offset < 0) {
         sp->type = T_STRING;
         sp->subtype = STRING_CONSTANT;
         sp->u.string = "";
       } else {
-        auto offset = iter.index_to_offset(from);
-        if (offset < 0) {
-          error("f_range: invalid offset");
-        }
         put_malloced_string(string_copy(iter.data() + offset, "f_extract_range"));
       }
       free_string_svalue(sp + 1);

@@ -2446,7 +2446,7 @@ void f_sizeof(void) {
       free_buffer(sp->u.buf);
       break;
     case T_STRING: {
-      EGCIterator iter(sp->u.string, -1);
+      EGCIterator iter(sp->u.string, SVALUE_STRLEN(sp));
       if(!iter.ok()) { error("f_sizeof: Invalid UTF8 string!"); }
       i = iter.count();
       free_string_svalue(sp);
