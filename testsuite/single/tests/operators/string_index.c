@@ -82,6 +82,10 @@ void do_tests() {
   ASSERT_EQ("def", tmp[3..5]);
   ASSERT_EQ("bcdefg", tmp[<6..6]);
 
+  // Compat: index underflow is ignored.
+  ASSERT_EQ(tmp, tmp[-999..]);
+
+
   // lvalue out of bound
   ASSERT(catch(tmp[0..strlen(tmp)] = ""));
   ASSERT(catch(tmp[0..999] = ""));

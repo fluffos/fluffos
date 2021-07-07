@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <memory>
 
 #include "applies_table.autogen.h"
 #include "base/internal/lru_cache.h"
@@ -717,7 +718,7 @@ static svalue_t global_lvalue_range_sv = {T_LVALUE_RANGE};
 
 static void push_lvalue_range(int code) {
   int32_t ind1, ind2;
-  size_t size = 0, u8len = 0;
+  size_t size = 0;
   svalue_t *lv;
   std::unique_ptr<EGCIterator> iter = nullptr;
 
@@ -728,11 +729,10 @@ static void push_lvalue_range(int code) {
         break;
       case T_STRING: {
         size = SVALUE_STRLEN(lv);
-        iter.reset(new EGCIterator(lv->u.string, size));
+        iter = std::make_unique<EGCIterator>(lv->u.string, size);
         if (!iter->ok()) {
           error("Invalid UTF-8 String: push_lvalue_range");
         }
-        u8len = iter->count();
         unlink_string_svalue(lv);
         break;
       }
@@ -751,14 +751,9 @@ static void push_lvalue_range(int code) {
 
   if (lv->type == T_STRING) {
     ind2 = sp->u.number;
-    ind2 = (code & 0x01) ? (u8len - ind2) : ind2;
-    ind2 = ind2 + 1;
-    if (ind2 < 0 || ind2 > u8len) {
-      error(
-          "The 2nd index to range lvalue must be >= -1 and < sizeof(indexed "
-          "value)\n");
-    }
-    ind2 = iter->index_to_offset(ind2);
+    if (code & 0x01 && ind2 == 0) error("push_lvalue_range: invalid ind2");
+    ind2 = (code & 0x01) ? (-1 * ind2) : ind2;
+    ind2 = iter->post_index_to_offset(ind2);
     if (ind2 < 0) {
       error("push_lvalue_range: invalid ind2");
     }
@@ -778,12 +773,8 @@ static void push_lvalue_range(int code) {
 
   if (lv->type == T_STRING) {
     ind1 = sp->u.number;
-    ind1 = (code & 0x10) ? (u8len - ind1) : ind1;
-    if (ind1 < 0 || ind1 >= u8len) {
-      error(
-          "The 1st index to range lvalue must be >= 0 and < sizeof(indexed "
-          "value)\n");
-    }
+    if (code & 0x10 && ind1 == 0) error("push_lvalue_range: invalid ind1");
+    ind1 = (code & 0x10) ? (-1 * ind1) : ind1;
     ind1 = iter->index_to_offset(ind1);
     if (ind1 < 0) {
       error("push_lvalue_range: invalid ind1");
@@ -2589,7 +2580,7 @@ void eval_instruction(char *p) {
           sp->type = T_NUMBER;
           global_lvalue_codepoint.index = -1;
           global_lvalue_codepoint.owner = sp - 1;
-          EGCIterator iter((sp - 1)->u.string, -1);
+          EGCIterator iter((sp - 1)->u.string, SVALUE_STRLEN((sp -1)));
           if (!iter.ok()) {
             error("f_foreach: Invalid utf-8 string.");
           }
@@ -3265,7 +3256,7 @@ void eval_instruction(char *p) {
             if ((sp - 1)->type != T_NUMBER) {
               error("Indexing a string with an illegal type.\n");
             }
-            EGCIterator iter(sp->u.string, -1);
+            EGCIterator iter(sp->u.string, SVALUE_STRLEN(sp));
             if (!iter.ok()) {
               error("f_rindex: Invalid UTF8 string.\n");
             }
