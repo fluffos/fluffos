@@ -92,38 +92,18 @@ int32_t u8_egc_find_as_offset(const char *haystack, size_t haystack_len, const c
 
 // Return the egc at given index of src, if it is an single code point
 UChar32 u8_egc_index_as_single_codepoint(const char *src, int32_t index) {
-  UChar32 res = U_SENTINEL;
+  EGCIterator iter(src, -1);
+  UChar32 c = U_SENTINEL;
+  auto pos = iter.index_to_offset(index);
+  // out-of-bounds
+  if (pos < 0) return -2;
+  auto post_pos = iter.post_index_to_offset(index);
+  // end-of-string
+  if (post_pos < 0) return 0;
 
-  u8_egc_iter(src, -1, [&](std::unique_ptr<icu::BreakIterator> &brk) {
-    int32_t pos = -1;
-    {
-      pos = brk->first();
-      while (index-- > 0 && pos >= 0) {
-        pos = brk->next();
-      }
-    }
-
-    // out-of-bounds
-    if (pos < 0) {
-      res = -2;
-      return;
-    }
-
-    // index is end-of-string
-    if (src[pos] == 0) {
-      res = 0;
-      return;
-    }
-
-    auto next_pos = brk->next();
-    if (next_pos >= 0) {
-      if (next_pos - pos <= U8_MAX_LENGTH) {
-        U8_NEXT((const uint8_t *)src, pos, -1, res);
-      }
-    }
-  });
-
-  return res;
+  if(post_pos - pos > U8_MAX_LENGTH) return c;
+  U8_NEXT((const uint8_t *)src, pos, -1, c);
+  return c;
 }
 
 // Copy string src to dest, replacing character at index to c. Assuming dst is already allocated.
