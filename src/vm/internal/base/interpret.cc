@@ -564,20 +564,20 @@ void push_indexed_lvalue(int reverse) {
 
     switch (lv->type) {
       case T_STRING: {
-        EGCIterator iter(lv->u.string, -1);
+        EGCIterator iter(lv->u.string, SVALUE_STRLEN(lv));
         if(!iter.ok()) {
           error("Bad UTF-8 String: push_indexed_lvalue");
         };
-        size_t count = iter.count();
-
         if (reverse) {
-          ind = count - ind;
-        }
-        if (ind >= count || ind < 0) {
-          error("Index out of bounds in string index lvalue.\n");
+          if (ind <= 0) error("Index out of bounds in string index lvalue.\n");
+          ind = -1 * ind;
+        } else {
+          if (ind <= 0) error("Index out of bounds in string index lvalue.\n");
         }
         UChar32 c = u8_egc_index_as_single_codepoint(lv->u.string, ind);
-        if (c < 0) {
+        if (c == -2 || c == 0) {
+          error("Index out of bounds in string index lvalue.\n");
+        } else if (c < 0) {
           error("Indexed character is multi-codepoint.\n");
         }
         unlink_string_svalue(lv);
@@ -3260,13 +3260,17 @@ void eval_instruction(char *p) {
             if (!iter.ok()) {
               error("f_rindex: Invalid UTF8 string.\n");
             }
-            size_t count = iter.count();
-            i = count - (sp - 1)->u.number;
-            // COMPAT: allow str[<0] == 0
-            if ((i > count) || (i < 0)) {
-              error("String rindex out of bounds.\n");
+            i = -1 * ((sp - 1)->u.number);
+            // COMPAT: RINDEX 0 is 0.
+            if (i == 0) {
+              free_string_svalue(sp);
+              (--sp)->u.number = 0;
+              break ;
             }
             UChar32 c = u8_egc_index_as_single_codepoint(sp->u.string, i);
+            if (c == -2) {
+              error("String rindex out of bounds.\n");
+            }
             if (c < 0) {
               error("String rindex only work for single codepoint character.\n");
             }
