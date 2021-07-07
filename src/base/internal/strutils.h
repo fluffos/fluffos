@@ -140,17 +140,50 @@ class EGCIterator {
       count_ = 0;
       brk_->first();
       while (brk_->next() != icu::BreakIterator::DONE) ++count_;
+      current_idx_ = count_;
     }
     return count_;
   }
   int32_t index_to_offset(int32_t index) {
-    if (index <= 0) return index;
-    int pos = -1;
-    brk_->first();
-    pos = brk_->next(index);
+    if (index == 0) {
+      current_idx_ = 0;
+      return brk_->first();
+    }
+    if (index == -1) {
+      current_idx_ = -1;
+      brk_->last();
+      return brk_->previous();
+    }
+    if (index > 0) { // forward search
+      if (current_idx_ < 0 || (current_idx_ >= 0 && current_idx_ > 2 * index)) {
+        current_idx_ = 0;
+        brk_->first();
+      }
+    } else { // reverse search
+      if(current_idx_ >= 0 || (current_idx_ < 0 && current_idx_ < 2 * index)) {
+        current_idx_ = -1;
+        brk_->last();
+        brk_->previous();
+      }
+    }
+    auto oldpos = brk_->current();
+    auto pos = brk_->next(index - current_idx_);
+    if (pos == icu::BreakIterator::DONE) {
+      brk_->isBoundary(oldpos); // reset back
+    } else {
+      current_idx_ = index;
+    }
+    return pos;
+  }
+  int32_t post_index_to_offset(int32_t index) {
+    auto pos = index_to_offset(index);
+    if (pos < 0) return pos;
+    pos = brk_->next();
+    brk_->previous();
     return pos;
   }
  private:
+  int32_t current_idx_ = 0;
   const char* src_;
   int32_t count_ = -1;
   UErrorCode status_ = U_ZERO_ERROR;
