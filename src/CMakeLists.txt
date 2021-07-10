@@ -209,12 +209,18 @@ include_directories(SYSTEM ${LIBEVENT_INCLUDE_DIR})
 find_package(ICU REQUIRED COMPONENTS uc dt)
 # Make ICU use utf-8 internally
 add_compile_options("-DU_CHARSET_IS_UTF8=1")
+if(STATIC)
+  add_compile_options("-DU_STATIC_IMPLEMENTATION")
+ENDIF()
+
 # multiple packages uses this, so we simply do a global inclusion too.
 include_directories(SYSTEM ${ICU_INCLUDE_DIRS})
 
 # Bundled libraries
 add_subdirectory(thirdparty/crypt EXCLUDE_FROM_ALL)
 add_subdirectory(thirdparty/libtelnet EXCLUDE_FROM_ALL)
+# TODO: required by windows code
+add_compile_options("-DGHC_WIN_DISABLE_WSTRING_STORAGE_TYPE")
 add_subdirectory(thirdparty/filesystem EXCLUDE_FROM_ALL)
 include_directories(thirdparty/filesystem/include)
 add_subdirectory(thirdparty/fmt EXCLUDE_FROM_ALL)
@@ -406,6 +412,7 @@ endif ()
 # end of JEMALLOC
 
 target_link_libraries(libdriver PUBLIC ghc_filesystem)
+
 target_link_libraries(libdriver PRIVATE fmt::fmt-header-only)
 
 list(APPEND FLUFFOS_LIBRARIES autogen)
