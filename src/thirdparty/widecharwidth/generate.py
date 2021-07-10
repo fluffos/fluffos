@@ -18,10 +18,10 @@ try:
 except NameError:
   xrange = range
 
-VERSION = "12.1.0"
+VERSION = "13.0.0"
 UNICODE_DATA_URL = 'https://unicode.org/Public/%s/ucd/UnicodeData.txt' % VERSION
 EAW_URL = 'https://unicode.org/Public/%s/ucd/EastAsianWidth.txt' % VERSION
-EMOJI_DATA_URL = 'https://unicode.org/Public/emoji/12.1/emoji-data.txt'
+EMOJI_DATA_URL = 'https://unicode.org/Public/emoji/13.0/emoji-data.txt'
 
 # A handful of field names
 # See https://www.unicode.org/L2/L1999/UnicodeData.html
