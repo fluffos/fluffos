@@ -2446,7 +2446,7 @@ void f_sizeof(void) {
       free_buffer(sp->u.buf);
       break;
     case T_STRING: {
-      EGCIterator iter(sp->u.string, SVALUE_STRLEN(sp));
+      EGCSmartIterator iter(sp->u.string, SVALUE_STRLEN(sp));
       if(!iter.ok()) { error("f_sizeof: Invalid UTF8 string!"); }
       i = iter.count();
       free_string_svalue(sp);
@@ -2631,7 +2631,7 @@ void f_strsrch(void) {
   // only search if there is a chance.
   if (find_len <= src_len) {
     auto pos = u8_egc_find_as_offset(arg1->u.string, src_len, find, find_len, arg3->u.number != 0);
-    ret = pos == -1 ? -1: u8_egc_offset_to_index(arg1->u.string, pos);
+    ret = pos == -1 ? -1: u8_offset_to_egc_index(arg1->u.string, pos);
   }
 
   pop_3_elems();

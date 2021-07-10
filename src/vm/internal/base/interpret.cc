@@ -564,7 +564,7 @@ void push_indexed_lvalue(int reverse) {
 
     switch (lv->type) {
       case T_STRING: {
-        EGCIterator iter(lv->u.string, SVALUE_STRLEN(lv));
+        EGCSmartIterator iter(lv->u.string, SVALUE_STRLEN(lv));
         if(!iter.ok()) {
           error("Bad UTF-8 String: push_indexed_lvalue");
         };
@@ -720,7 +720,7 @@ static void push_lvalue_range(int code) {
   int32_t ind1, ind2;
   size_t size = 0;
   svalue_t *lv;
-  std::unique_ptr<EGCIterator> iter = nullptr;
+  std::unique_ptr<EGCSmartIterator> iter = nullptr;
 
   {
     switch ((lv = global_lvalue_range.owner = sp->u.lvalue)->type) {
@@ -729,7 +729,7 @@ static void push_lvalue_range(int code) {
         break;
       case T_STRING: {
         size = SVALUE_STRLEN(lv);
-        iter = std::make_unique<EGCIterator>(lv->u.string, size);
+        iter = std::make_unique<EGCSmartIterator>(lv->u.string, size);
         if (!iter->ok()) {
           error("Invalid UTF-8 String: push_lvalue_range");
         }
@@ -2580,7 +2580,7 @@ void eval_instruction(char *p) {
           sp->type = T_NUMBER;
           global_lvalue_codepoint.index = -1;
           global_lvalue_codepoint.owner = sp - 1;
-          EGCIterator iter((sp - 1)->u.string, SVALUE_STRLEN((sp -1)));
+          EGCSmartIterator iter((sp - 1)->u.string, SVALUE_STRLEN((sp -1)));
           if (!iter.ok()) {
             error("f_foreach: Invalid utf-8 string.");
           }
@@ -3256,7 +3256,7 @@ void eval_instruction(char *p) {
             if ((sp - 1)->type != T_NUMBER) {
               error("Indexing a string with an illegal type.\n");
             }
-            EGCIterator iter(sp->u.string, SVALUE_STRLEN(sp));
+            EGCSmartIterator iter(sp->u.string, SVALUE_STRLEN(sp));
             if (!iter.ok()) {
               error("f_rindex: Invalid UTF8 string.\n");
             }
