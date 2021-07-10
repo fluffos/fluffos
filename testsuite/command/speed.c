@@ -188,10 +188,9 @@ int main() {
     TIMEDIFF("string += (ms)",100000,s = s3; s += s1, sm);
     TIMEDIFF("string += (mm)",100000,s = s3; s += s3, sm);
     s = read_file("/2000.txt");
-    TIME("string range early",1000,s1 = s[40..60]);
-    TIME("string range late",1000,s1 = s[<10..]);
-    TIME("string find/strsrch single",1000,strsrch(s, "\n"));
-    TIME("string find/strsrch single",1000,strsrch(s, '\n'));
+    TIME("string range early",10000,s1 = s[40..60]);
+    TIME("string range late",10000,s1 = s[<10..]);
+    TIME("string find/strsrch single",100000,strsrch(s, "\n"));
     s1 = s[40..60];
     ASSERT_EQ(40, strsrch(s, s1));
     TIME("string find/strsrch early",1000,strsrch(s, s1));
