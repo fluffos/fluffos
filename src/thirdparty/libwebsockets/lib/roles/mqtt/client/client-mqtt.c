@@ -52,10 +52,7 @@ lws_mqtt_generate_id(struct lws* wsi, lws_mqtt_str_t **ms, const char *client_id
 	if (client_id)
 		len = strlen(client_id);
 	else
-		len = 23;
-
-	if (len > 23) /* 3.1.3.1-5: Server MUST... between 1 and 23 chars... */
-		return 1;
+		len = LWS_MQTT_RANDOM_CIDLEN;
 
 	*ms = lws_mqtt_str_create((uint16_t)(len + 1));
 	if (!*ms)
@@ -95,7 +92,7 @@ lws_read_mqtt(struct lws *wsi, unsigned char *buf, lws_filepos_t len)
 {
 	lws_mqttc_t *c = &wsi->mqtt->client;
 
-	return _lws_mqtt_rx_parser(wsi, &c->par, buf, len);
+	return _lws_mqtt_rx_parser(wsi, &c->par, buf, (size_t)len);
 }
 
 int
@@ -120,10 +117,13 @@ lws_create_client_mqtt_object(const struct lws_client_connect_info *i,
 	lwsl_info("%s: using client id '%.*s'\n", __func__, c->id->len,
 			(const char *)c->id->buf);
 
-	if (cp->clean_start || !cp->client_id[0])
+	if (cp->clean_start || !(cp->client_id &&
+				 cp->client_id[0]))
 		c->conn_flags = LMQCFT_CLEAN_START;
+	lws_free((void *)cp->client_id);
 
 	c->keep_alive_secs = cp->keep_alive;
+	c->aws_iot = cp->aws_iot;
 
 	if (cp->will_param.topic &&
 	    *cp->will_param.topic) {
@@ -138,8 +138,8 @@ lws_create_client_mqtt_object(const struct lws_client_connect_info *i,
 			if (!c->will.message)
 				goto oom2;
 		}
-		c->conn_flags |= (cp->will_param.qos << 3) & LMQCFT_WILL_QOS_MASK;
-		c->conn_flags |= (!!cp->will_param.retain) * LMQCFT_WILL_RETAIN;
+		c->conn_flags = (uint8_t)(unsigned int)(c->conn_flags | ((cp->will_param.qos << 3) & LMQCFT_WILL_QOS_MASK));
+		c->conn_flags |= (uint8_t)((!!cp->will_param.retain) * LMQCFT_WILL_RETAIN);
 	}
 
 	if (cp->username &&
@@ -148,12 +148,14 @@ lws_create_client_mqtt_object(const struct lws_client_connect_info *i,
 		if (!c->username)
 			goto oom3;
 		c->conn_flags |= LMQCFT_USERNAME;
+		lws_free((void *)cp->username);
 		if (cp->password) {
 			c->password =
 				lws_mqtt_str_create_cstr_dup(cp->password, 0);
 			if (!c->password)
 				goto oom4;
 			c->conn_flags |= LMQCFT_PASSWORD;
+			lws_free((void *)cp->password);
 		}
 	}
 
@@ -180,7 +182,7 @@ lws_mqtt_client_socket_service(struct lws *wsi, struct lws_pollfd *pollfd,
 	int n = 0, m = 0;
 	struct lws_tokens ebuf;
 	int buffered = 0;
-	char pending = 0;
+	int pending = 0;
 #if defined(LWS_WITH_TLS)
 	char erbuf[128];
 #endif
@@ -263,39 +265,6 @@ lws_mqtt_client_socket_service(struct lws *wsi, struct lws_pollfd *pollfd,
 			wsi->tls.ssl = NULL;
 #endif /* LWS_WITH_TLS */
 
-#if defined(LWS_WITH_DETAILED_LATENCY)
-		if (context->detailed_latency_cb) {
-			wsi->detlat.type = LDLT_TLS_NEG_CLIENT;
-			wsi->detlat.latencies[LAT_DUR_PROXY_CLIENT_REQ_TO_WRITE] =
-				lws_now_usecs() -
-				wsi->detlat.earliest_write_req_pre_write;
-			wsi->detlat.latencies[LAT_DUR_USERCB] = 0;
-			lws_det_lat_cb(wsi->a.context, &wsi->detlat);
-		}
-#endif
-#if 0
-		if (wsi->client_h2_alpn) {
-			/*
-			 * We connected to the server and set up tls, and
-			 * negotiated "h2".
-			 *
-			 * So this is it, we are an h2 master client connection
-			 * now, not an h1 client connection.
-			 */
-#if defined(LWS_WITH_TLS)
-			lws_tls_server_conn_alpn(wsi);
-#endif
-
-			/* send the H2 preface to legitimize the connection */
-			if (lws_h2_issue_preface(wsi)) {
-				cce = "error sending h2 preface";
-				goto bail3;
-			}
-
-			break;
-		}
-#endif
-
 		/* fallthru */
 
 #if defined(LWS_WITH_SOCKS5)
@@ -303,7 +272,7 @@ start_ws_handshake:
 #endif
 		lwsi_set_state(wsi, LRS_MQTTC_IDLE);
 		lws_set_timeout(wsi, PENDING_TIMEOUT_AWAITING_CLIENT_HS_SEND,
-				context->timeout_secs);
+				(int)context->timeout_secs);
 
 		/* fallthru */
 
@@ -311,8 +280,8 @@ start_ws_handshake:
 		/*
 		 * we should be ready to send out MQTT CONNECT
 		 */
-		lwsl_info("%s: wsi %p: Transport established, send out CONNECT\n",
-				__func__, wsi);
+		lwsl_info("%s: %s: Transport established, send out CONNECT\n",
+				__func__, lws_wsi_tag(wsi));
 		if (lws_change_pollfd(wsi, LWS_POLLOUT, 0))
 			return -1;
 		if (!lws_mqtt_client_send_connect(wsi)) {
@@ -329,17 +298,17 @@ start_ws_handshake:
 	case LRS_MQTTC_AWAIT_CONNACK:
 		buffered = 0;
 		ebuf.token = pt->serv_buf;
-		ebuf.len = wsi->a.context->pt_serv_buf_size;
+		ebuf.len = (int)wsi->a.context->pt_serv_buf_size;
 
 		if ((unsigned int)ebuf.len > wsi->a.context->pt_serv_buf_size)
-			ebuf.len = wsi->a.context->pt_serv_buf_size;
+			ebuf.len = (int)wsi->a.context->pt_serv_buf_size;
 
 		if ((int)pending > ebuf.len)
-			pending = ebuf.len;
+			pending = (char)ebuf.len;
 
 		ebuf.len = lws_ssl_capable_read(wsi, ebuf.token,
-						pending ? (int)pending :
-						ebuf.len);
+						(unsigned int)(pending ? pending :
+						ebuf.len));
 		switch (ebuf.len) {
 		case 0:
 			lwsl_info("%s: zero length read\n",
@@ -357,7 +326,7 @@ start_ws_handshake:
 		if (ebuf.len < 0)
 			n = -1;
 		else
-			n = lws_read_mqtt(wsi, ebuf.token, ebuf.len);
+			n = lws_read_mqtt(wsi, ebuf.token, (unsigned int)ebuf.len);
 		if (n < 0) {
 			lwsl_err("%s: Parsing packet failed\n", __func__);
 			goto fail;

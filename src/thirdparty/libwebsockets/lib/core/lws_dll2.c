@@ -29,6 +29,31 @@
 #endif
 
 int
+lws_dll2_is_detached(const struct lws_dll2 *d)
+{
+	if (d->owner)
+		return 0;
+
+	if (d->next || d->prev) {
+		lwsl_err("%s: dll2 %p: detached but next %p, prev %p\n",
+				__func__, d, d->next, d->prev);
+		/*
+		 * New lws_dll2 objects and removed lws_dll2 objects
+		 * have .owner, .next and .prev all set to NULL, so we
+		 * can just check .owner to see if we are detached.
+		 *
+		 * We assert here if we encounter an lws_dll2 in the illegal
+		 * state of NULL .owner, but non-NULL in .next or .prev,
+		 * it's evidence of corruption, use-after-free, threads
+		 * contending on accessing without locking etc.
+		 */
+		assert(0);
+	}
+
+	return 1;
+}
+
+int
 lws_dll2_foreach_safe(struct lws_dll2_owner *owner, void *user,
 		      int (*cb)(struct lws_dll2 *d, void *user))
 {
@@ -184,6 +209,31 @@ lws_dll2_owner_clear(struct lws_dll2_owner *d)
 }
 
 void
+lws_dll2_add_sorted_priv(lws_dll2_t *d, lws_dll2_owner_t *own, void *priv,
+			 int (*compare3)(void *priv, const lws_dll2_t *d,
+					const lws_dll2_t *i))
+{
+	lws_start_foreach_dll_safe(struct lws_dll2 *, p, tp,
+				   lws_dll2_get_head(own)) {
+		assert(p != d);
+
+		if (compare3(priv, p, d) >= 0) {
+			/* drop us in before this guy */
+			lws_dll2_add_before(d, p);
+
+			return;
+		}
+	} lws_end_foreach_dll_safe(p, tp);
+
+	/*
+	 * Either nobody on the list yet to compare him to, or he's the
+	 * furthest away timeout... stick him at the tail end
+	 */
+
+	lws_dll2_add_tail(d, own);
+}
+
+void
 lws_dll2_add_sorted(lws_dll2_t *d, lws_dll2_owner_t *own,
 		    int (*compare)(const lws_dll2_t *d, const lws_dll2_t *i))
 {
@@ -194,8 +244,6 @@ lws_dll2_add_sorted(lws_dll2_t *d, lws_dll2_owner_t *own,
 		if (compare(p, d) >= 0) {
 			/* drop us in before this guy */
 			lws_dll2_add_before(d, p);
-
-			// lws_dll2_describe(own, "post-insert");
 
 			return;
 		}

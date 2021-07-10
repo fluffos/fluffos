@@ -45,9 +45,10 @@ if (LWS_WITH_SYS_STATE)
 	)
 endif()
 
-if (LWS_WITH_DETAILED_LATENCY)
+if (LWS_WITH_NETLINK)
 	list(APPEND SOURCES
-		core-net/detailed-latency.c)
+		core-net/route.c
+	)
 endif()
 
 if (LWS_WITH_LWS_DSH)
@@ -60,26 +61,25 @@ if (LWS_WITH_SEQUENCER)
 		core-net/sequencer.c)
 endif()
 
-if (NOT LWS_WITHOUT_CLIENT)
+if (LWS_WITH_CLIENT)
 	list(APPEND SOURCES
-		core-net/connect.c
-		core-net/client.c)
-endif()
-
-if (NOT LWS_WITHOUT_SERVER)
-	list(APPEND SOURCES
-		core-net/server.c)
+		core-net/client/client.c
+		core-net/client/connect.c
+		core-net/client/connect2.c
+		core-net/client/connect3.c
+		core-net/client/connect4.c
+		core-net/client/sort-dns.c
+	)
+	if (LWS_WITH_CONMON)
+		list(APPEND SOURCES
+			core-net/client/conmon.c
+		)
+	endif()
 endif()
 
 if (LWS_WITH_SOCKS5 AND NOT LWS_WITHOUT_CLIENT)
 	list(APPEND SOURCES
 		core-net/socks5-client.c)
-endif()
-
-if (LWS_WITH_NETWORK AND LWS_WITH_STATS)
-	list(APPEND SOURCES
-		core-net/stats.c
-	)
 endif()
 
 exports_to_parent_scope()

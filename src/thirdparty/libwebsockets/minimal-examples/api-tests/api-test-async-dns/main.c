@@ -88,10 +88,10 @@ static const struct async_dns_tests {
 #if defined(LWS_WITH_IPV6)
 	{ "warmcat.com", LWS_ADNS_RECORD_AAAA, 16, /* check ipv6 */
 		{ 0x20, 0x01, 0x41, 0xd0, 0x00, 0x02, 0xee, 0x93,
-				0, 0, 0, 0, 0, 0, 0, 0, } },
+				0, 0, 0, 0, 0, 0, 0, 1, } },
 	{ "ipv6only.warmcat.com", LWS_ADNS_RECORD_AAAA, 16, /* check ipv6 */
 		{ 0x20, 0x01, 0x41, 0xd0, 0x00, 0x02, 0xee, 0x93,
-				0, 0, 0, 0, 0, 0, 0, 0, } },
+				0, 0, 0, 0, 0, 0, 0, 1, } },
 #endif
 };
 
@@ -110,14 +110,13 @@ next_test_cb(lws_sorted_usec_list_t *sul)
 
 	m = lws_async_dns_query(context, 0,
 				adt[dtest].dns_name,
-				adt[dtest].recordtype, cb1, NULL,
+				(adns_query_type_t)adt[dtest].recordtype, cb1, NULL,
 				context);
-	if (m != LADNS_RET_CONTINUING && m != LADNS_RET_FOUND) {
-		lwsl_err("%s: adns 1 failed: %d\n", __func__, m);
+	if (m != LADNS_RET_CONTINUING && m != LADNS_RET_FOUND && m != LADNS_RET_FAILED_WSI_CLOSED) {
+		lwsl_err("%s: adns 1: %s failed: %d\n", __func__, adt[dtest].dns_name, m);
 		interrupted = 1;
 	}
 }
-
 
 struct lws *
 cb1(struct lws *wsi_unused, const char *ads, const struct addrinfo *a, int n,
@@ -169,7 +168,7 @@ cb1(struct lws *wsi_unused, const char *ads, const struct addrinfo *a, int n,
 #endif
 		}
 		if (alen == adt[dtest - 1].addrlen &&
-		    !memcmp(adt[dtest - 1].ads, addr, alen)) {
+		    !memcmp(adt[dtest - 1].ads, addr, (unsigned int)alen)) {
 			ok++;
 			goto next;
 		}
@@ -199,6 +198,58 @@ next:
 	return NULL;
 }
 
+static lws_sorted_usec_list_t sul_l;
+
+struct lws *
+cb_loop(struct lws *wsi_unused, const char *ads, const struct addrinfo *a, int n,
+		void *opaque)
+{
+	if (!a) {
+		lwsl_err("%s: no results\n", __func__);
+		return NULL;
+	}
+
+	lwsl_notice("%s: addrinfo %p\n", __func__, a);\
+	lws_async_dns_freeaddrinfo(&a);
+
+	return NULL;
+}
+
+
+static void
+sul_retry_l(struct lws_sorted_usec_list *sul)
+{
+	int m;
+
+	lwsl_user("%s: starting new query\n", __func__);
+
+	m = lws_async_dns_query(context, 0, "warmcat.com",
+				    (adns_query_type_t)LWS_ADNS_RECORD_A,
+				    cb_loop, NULL, context);
+	switch (m) {
+	case LADNS_RET_FAILED_WSI_CLOSED:
+		lwsl_warn("%s: LADNS_RET_FAILED_WSI_CLOSED "
+			  "(== from cache / success in this test)\n", __func__);
+		break;
+	case LADNS_RET_NXDOMAIN:
+		lwsl_warn("%s: LADNS_RET_NXDOMAIN\n", __func__);
+		break;
+	case LADNS_RET_TIMEDOUT:
+		lwsl_warn("%s: LADNS_RET_TIMEDOUT\n", __func__);
+		break;
+	case LADNS_RET_FAILED:
+		lwsl_warn("%s: LADNS_RET_FAILED\n", __func__);
+		break;
+	case LADNS_RET_FOUND:
+		lwsl_warn("%s: LADNS_RET_FOUND\n", __func__);
+		break;
+	case LADNS_RET_CONTINUING:
+		lwsl_warn("%s: LADNS_RET_CONTINUING\n", __func__);
+		break;
+	}
+
+	lws_sul_schedule(context, 0, &sul_l, sul_retry_l, 5 * LWS_US_PER_SEC);
+}
 
 void sigint_handler(int sig)
 {
@@ -232,6 +283,11 @@ main(int argc, const char **argv)
 		return 1;
 	}
 
+	if (lws_cmdline_option(argc, argv, "-l")) {
+		lws_sul_schedule(context, 0, &sul_l, sul_retry_l, LWS_US_PER_SEC);
+		goto evloop;
+	}
+
 
 	/* ip address parser tests */
 
@@ -247,10 +303,10 @@ main(int argc, const char **argv)
 		}
 
 		if (m > 0) {
-			if (memcmp(ipt[n].b, u, m)) {
+			if (memcmp(ipt[n].b, u, (unsigned int)m)) {
 				lwsl_err("%s: fail %s compare\n", __func__,
 						ipt[n].test);
-				lwsl_hexdump_notice(u, m);
+				lwsl_hexdump_notice(u, (unsigned int)m);
 				fail++;
 				continue;
 			}
@@ -281,7 +337,7 @@ main(int argc, const char **argv)
 			if (strcmp(ipt[n].emit_test, buf)) {
 				lwsl_err("%s: fail %s compare\n", __func__,
 						ipt[n].test);
-				lwsl_hexdump_notice(buf, m);
+				lwsl_hexdump_notice(buf, (unsigned int)m);
 				fail++;
 				continue;
 			}
@@ -297,6 +353,7 @@ main(int argc, const char **argv)
 
 	lws_sul_schedule(context, 0, &sul, next_test_cb, 1);
 
+evloop:
 	/* the usual lws event loop */
 
 	n = 1;

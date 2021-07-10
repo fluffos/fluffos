@@ -16,6 +16,25 @@ various scenarios, CC0-licensed (public domain) for cut-and-paste, allow you to 
 News
 ----
 
+## Transition from master branch to main branch
+
+"master" branch was just the default branch name from git originally, it was not selected
+for lws to have any semantic value in itself.  There's no problem changing it to the more
+universally neutral "main" other than any explicit references spread around over the last
+10 years to "master" breaking, which can be managed.
+
+As a first step, I updated my push scripts, that keep libwebsockets.org git and the github
+mirror in sync, to push stuff on "master" also to "main" branch to establish it.  If you
+currently refer to "master" branch in lws for build or CI, you should switch to using
+"main".
+
+For the next months the two should run in parallel and I'll move over references to
+"master" in lws docs to use "main", eventually some point after the next release,
+master will be deleted.
+
+In github, I changed its default branch for libwebsockets to "main", since main and
+master are updated in lockstep currently, this should hopefully have limited impact.
+
 ## v4.1.0 and v4.1-stable are released
 
 See the [changelog](https://libwebsockets.org/git/libwebsockets/tree/changelog), summary
@@ -359,7 +378,8 @@ with `api-tests/api-test-async-dns` minimal example.
 You can now opt to measure and store us-resolution statistics on effective
 latencies for client operations, and easily spool them to a file in a
 format suitable for gnuplot, or handle in your own callback.  Enable
-`-DLWS_WITH_DETAILED_LATENCY=1` in cmake to build it into lws.
+`-DLWS_WITH_DETAILED_LATENCY=1` in cmake to build it into lws. (NB 2021-01-12
+this has been replaced by the lws_metrics support)
 
 If you are concerned about operation latency or potential blocking from
 user code, or behaviour under load, or latency variability on specific
@@ -373,7 +393,7 @@ See `READMEs/README.detailed-latency.md` for how to use it.
 
 ## Client connection logic rewrite
 
-Lws master now makes much better use of the DNS results for ipv4 and ipv6... it
+Lws now makes much better use of the DNS results for ipv4 and ipv6... it
 will iterate through them automatically making the best use it can of what's
 provided and attempting new connections for each potentially usable one in turn
 before giving up on the whole client connection attempt.
@@ -405,7 +425,7 @@ H1 is not so simple to parse because the header length is not known until it
 has been fully parsed.  The next header, or http body may be directly coalesced
 with the header as well.  Lws has supported bulk h1 parsing from a buffer for a
 long time, but on clientside due to interactions with http proxying it had
-been stuck parsing the header bytewise out of the tls buffer.  In master,
+been stuck parsing the header bytewise out of the tls buffer.  Now,
 everything now bulk parses from a buffer and uses a buflist to pass leftovers
 through the event loop cleanly.
 
@@ -423,7 +443,7 @@ schedule your own arbitrary callbacks using this system.
 
 ## Master is now MIT-licensed
 
-Libwebsockets master is now under the MIT license. See ./LICENSE.
+Libwebsockets is now under the MIT license. See ./LICENSE.
 
 ## Support
 
@@ -440,5 +460,5 @@ You can get the latest version of the library from git:
 
 - https://libwebsockets.org/git
 
-Doxygen API docs for master: https://libwebsockets.org/lws-api-doc-master/html/index.html
+Doxygen API docs for development: https://libwebsockets.org/lws-api-doc-master/html/index.html
 

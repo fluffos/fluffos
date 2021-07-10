@@ -40,35 +40,179 @@ static void (*lwsl_emit)(int level, const char *line)
 	= lwsl_emit_optee;
 #endif
 	;
-#ifndef LWS_PLAT_OPTEE
+#if !defined(LWS_PLAT_OPTEE) && !defined(LWS_WITH_NO_LOGS)
 static const char * log_level_names ="EWNIDPHXCLUT??";
 #endif
 
+/*
+ * Name an instance tag and attach to a group
+ */
+
+void
+__lws_lc_tag(lws_lifecycle_group_t *grp, lws_lifecycle_t *lc,
+	     const char *format, ...)
+{
+	va_list ap;
+	int n = 1;
+
+	if (*lc->gutag == '[') {
+		/* appending inside [] */
+
+		char *cp = strchr(lc->gutag, ']');
+		char rend[96];
+		size_t ll, k;
+		int n;
+
+		if (!cp)
+			return;
+
+		/* length of closing brace and anything else after it */
+		k = strlen(cp);
+
+		/* compute the remaining gutag unused */
+		ll = sizeof(lc->gutag) - lws_ptr_diff_size_t(cp, lc->gutag) - k - 1;
+		if (ll > sizeof(rend) - 1)
+			ll = sizeof(rend) - 1;
+		va_start(ap, format);
+		n = vsnprintf(rend, ll, format, ap);
+		va_end(ap);
+
+		if ((unsigned int)n > ll)
+			n = (int)ll;
+
+		/* shove the trailer up by what we added */
+		memmove(cp + n, cp, k);
+		assert(k + (unsigned int)n < sizeof(lc->gutag));
+		cp[k + (unsigned int)n] = '\0';
+		/* copy what we added into place */
+		memcpy(cp, rend, (unsigned int)n);
+
+		return;
+	}
+
+	assert(grp);
+	assert(grp->tag_prefix); /* lc group must have a tag prefix string */
+
+	lc->gutag[0] = '[';
+
+#if defined(LWS_WITH_SECURE_STREAMS_PROXY_API) /* ie, will have getpid if set */
+	n += lws_snprintf(&lc->gutag[n], sizeof(lc->gutag) - (unsigned int)n - 1u,
+			"%u|", getpid());
+#endif
+	n += lws_snprintf(&lc->gutag[n], sizeof(lc->gutag) - (unsigned int)n - 1u,
+			"%s|%lx|", grp->tag_prefix, (unsigned long)grp->ordinal++);
+
+	va_start(ap, format);
+	n += vsnprintf(&lc->gutag[n], sizeof(lc->gutag) - (unsigned int)n -
+			1u, format, ap);
+	va_end(ap);
+
+	if (n < (int)sizeof(lc->gutag) - 2) {
+		lc->gutag[n++] = ']';
+		lc->gutag[n++] = '\0';
+	} else {
+		lc->gutag[sizeof(lc->gutag) - 2] = ']';
+		lc->gutag[sizeof(lc->gutag) - 1] = '\0';
+	}
+
+	lc->us_creation = (uint64_t)lws_now_usecs();
+	lws_dll2_add_tail(&lc->list, &grp->owner);
+
+#if defined(LWS_LOG_TAG_LIFECYCLE)
+	lwsl_notice(" ++ %s (%d)\n", lc->gutag, (int)grp->owner.count);
+#endif
+}
+
+/*
+ * Normally we want to set the tag one time at creation.  But sometimes we
+ * don't have enough information at that point to give it a meaningful tag, eg,
+ * it's an accepted, served connection but we haven't read data from it yet
+ * to find out what it wants to be.
+ *
+ * This allows you to append some extra info to the tag in those cases, the
+ * initial tag remains the same on the lhs so it can be tracked correctly.
+ */
+
+void
+__lws_lc_tag_append(lws_lifecycle_t *lc, const char *app)
+{
+	int n = (int)strlen(lc->gutag);
+
+	if (n && lc->gutag[n - 1] == ']')
+		n--;
+
+	n += lws_snprintf(&lc->gutag[n], sizeof(lc->gutag) - 2u - (unsigned int)n,
+			"|%s]", app);
+
+	if ((unsigned int)n >= sizeof(lc->gutag) - 2u) {
+		lc->gutag[sizeof(lc->gutag) - 2] = ']';
+		lc->gutag[sizeof(lc->gutag) - 1] = '\0';
+	}
+}
+
+/*
+ * Remove instance from group
+ */
+
+void
+__lws_lc_untag(lws_lifecycle_t *lc)
+{
+	//lws_lifecycle_group_t *grp;
+	char buf[24];
+
+	if (!lc->gutag[0]) { /* we never tagged this object... */
+		lwsl_err("%s: %s never tagged\n", __func__, lc->gutag);
+		assert(0);
+		return;
+	}
+
+	if (!lc->list.owner) { /* we already untagged this object... */
+		lwsl_err("%s: %s untagged twice\n", __func__, lc->gutag);
+		assert(0);
+		return;
+	}
+
+	//grp = lws_container_of(lc->list.owner, lws_lifecycle_group_t, owner);
+
+	lws_humanize(buf, sizeof(buf), (uint64_t)lws_now_usecs() - lc->us_creation,
+			humanize_schema_us);
+
+#if defined(LWS_LOG_TAG_LIFECYCLE)
+	lwsl_notice(" -- %s (%d) %s\n", lc->gutag, (int)lc->list.owner->count - 1, buf);
+#endif
+
+	lws_dll2_remove(&lc->list);
+}
+
+const char *
+lws_lc_tag(lws_lifecycle_t *lc)
+{
+	return lc->gutag;
+}
+
+
 #if defined(LWS_LOGS_TIMESTAMP)
 int
-lwsl_timestamp(int level, char *p, int len)
+lwsl_timestamp(int level, char *p, size_t len)
 {
-#ifndef LWS_PLAT_OPTEE
+#if !defined(LWS_PLAT_OPTEE) && !defined(LWS_WITH_NO_LOGS)
 	time_t o_now;
 	unsigned long long now;
 	struct timeval tv;
 	struct tm *ptm = NULL;
-#ifndef WIN32
+#if defined(LWS_HAVE_LOCALTIME_R)
 	struct tm tm;
 #endif
 	int n;
 
 	gettimeofday(&tv, NULL);
 	o_now = tv.tv_sec;
-	now = ((unsigned long long)tv.tv_sec * 10000) + (tv.tv_usec / 100);
+	now = ((unsigned long long)tv.tv_sec * 10000) + (unsigned int)(tv.tv_usec / 100);
 
-#ifndef _WIN32_WCE
-#ifdef WIN32
-	ptm = localtime(&o_now);
+#if defined(LWS_HAVE_LOCALTIME_R)
+	ptm = localtime_r(&o_now, &tm);
 #else
-	if (localtime_r(&o_now, &tm))
-		ptm = &tm;
-#endif
+	ptm = localtime(&o_now);
 #endif
 	p[0] = '\0';
 	for (n = 0; n < LLL_COUNT; n++) {
@@ -124,7 +268,7 @@ _lwsl_emit_stderr(int level, const char *line, int ts)
 	int n, m = LWS_ARRAY_SIZE(colours) - 1;
 
 	if (!tty)
-		tty = isatty(2) | 2;
+		tty = (char)(isatty(2) | 2);
 
 	buf[0] = '\0';
 #if defined(LWS_LOGS_TIMESTAMP)
@@ -246,7 +390,7 @@ lwsl_hexdump_level(int hexdump_level, const void *vbuf, size_t len)
 
 		for (m = 0; m < 16 && (start + m) < len; m++) {
 			if (buf[start + m] >= ' ' && buf[start + m] < 127)
-				*p++ = buf[start + m];
+				*p++ = (char)buf[start + m];
 			else
 				*p++ = '.';
 		}

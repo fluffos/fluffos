@@ -27,6 +27,13 @@
 #include "private-lib-core.h"
 #include "private-lib-tls-openssl.h"
 
+#if !defined(OPENSSL_NO_EC) && defined(LWS_HAVE_EC_KEY_new_by_curve_name) && \
+    (OPENSSL_VERSION_NUMBER >= 0x30000000l) && \
+     !defined(LWS_SUPPRESS_DEPRECATED_API_WARNINGS)
+/* msvc doesn't have #warning... */
+#error "You probably need LWS_SUPPRESS_DEPRECATED_API_WARNINGS"
+#endif
+
 /*
  * Care: many openssl apis return 1 for success.  These are translated to the
  * lws convention of 0 for success.
@@ -61,12 +68,14 @@ int BN_bn2binpad(const BIGNUM *a, unsigned char *to, int tolen)
     int i;
     BN_ULONG l;
 
+#if !defined(LIBRESSL_VERSION_NUMBER)
     bn_check_top(a);
+#endif
     i = BN_num_bytes(a);
 
     /* Add leading zeroes if necessary */
     if (tolen > i) {
-        memset(to, 0, tolen - i);
+        memset(to, 0, (size_t)(tolen - i));
         to += tolen - i;
     }
     while (i--) {
@@ -111,13 +120,13 @@ lws_genec_eckey_import(int nid, EVP_PKEY *pkey, struct lws_gencrypto_keyelem *el
 	 */
 
 	bn_x = BN_bin2bn(el[LWS_GENCRYPTO_EC_KEYEL_X].buf,
-			 el[LWS_GENCRYPTO_EC_KEYEL_X].len, NULL);
+			 (int)el[LWS_GENCRYPTO_EC_KEYEL_X].len, NULL);
 	if (!bn_x) {
 		lwsl_err("%s: BN_bin2bn (x) fail\n", __func__);
 		goto bail;
 	}
 	bn_y = BN_bin2bn(el[LWS_GENCRYPTO_EC_KEYEL_Y].buf,
-			 el[LWS_GENCRYPTO_EC_KEYEL_Y].len, NULL);
+			(int)el[LWS_GENCRYPTO_EC_KEYEL_Y].len, NULL);
 	if (!bn_y) {
 		lwsl_err("%s: BN_bin2bn (y) fail\n", __func__);
 		goto bail1;
@@ -135,7 +144,7 @@ lws_genec_eckey_import(int nid, EVP_PKEY *pkey, struct lws_gencrypto_keyelem *el
 
 	if (el[LWS_GENCRYPTO_EC_KEYEL_D].len) {
 		bn_d = BN_bin2bn(el[LWS_GENCRYPTO_EC_KEYEL_D].buf,
-				 el[LWS_GENCRYPTO_EC_KEYEL_D].len, NULL);
+				(int)el[LWS_GENCRYPTO_EC_KEYEL_D].len, NULL);
 		if (!bn_d) {
 			lwsl_err("%s: BN_bin2bn (d) fail\n", __func__);
 			goto bail;
@@ -383,7 +392,7 @@ lws_genec_new_keypair(struct lws_genec_ctx *ctx, enum enum_lws_dh_side side,
 		if (!el[n].buf)
 			goto bail2;
 
-		m = BN_bn2binpad(bn[n - 1], el[n].buf, el[n].len);
+		m = BN_bn2binpad(bn[n - 1], el[n].buf, (int32_t)el[n].len);
 		if ((uint32_t)m != el[n].len)
 			goto bail2;
 	}
@@ -651,7 +660,7 @@ lws_genecdh_compute_shared_secret(struct lws_genec_ctx *ctx, uint8_t *ss,
 
 	len = (EC_GROUP_get_degree(EC_KEY_get0_group(eckey[LDHS_OURS])) + 7) / 8;
 	if (len <= *ss_len) {
-		*ss_len = ECDH_compute_key(ss, len,
+		*ss_len = ECDH_compute_key(ss, (unsigned int)len,
 				EC_KEY_get0_public_key(eckey[LDHS_THEIRS]),
 				eckey[LDHS_OURS], NULL);
 		ret = -(*ss_len < 0);

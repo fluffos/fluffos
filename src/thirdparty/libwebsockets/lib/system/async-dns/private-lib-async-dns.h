@@ -42,10 +42,11 @@ typedef struct lws_adns_cache {
 	struct lws_adns_cache	*firstcache;
 	struct lws_adns_cache	*chain;
 	struct addrinfo		*results;
+	const char		*name;
 	uint8_t			flags;	/* b0 = has ipv4, b1 = has ipv6 */
 	char			refcount;
 	char			incomplete;
-	/* name, and then result struct addrinfos overallocated here */
+	/* addrinfo, lws_sa46, then name overallocated here */
 } lws_adns_cache_t;
 
 /*
@@ -54,7 +55,10 @@ typedef struct lws_adns_cache {
 
 typedef struct {
 	lws_sorted_usec_list_t	sul;	/* per-query write retry timer */
+	lws_sorted_usec_list_t	write_sul;	/* fail if unable to write by this time */
 	lws_dll2_t		list;
+
+	lws_metrics_caliper_compose(metcal)
 
 	lws_dll2_owner_t	wsi_adns;
 	lws_async_dns_cb_t	standalone_cb;	/* if not associated to wsi */
@@ -66,7 +70,7 @@ typedef struct {
 	lws_adns_cache_t	*firstcache;
 
 	lws_async_dns_retcode_t	ret;
-	uint16_t		tid;
+	uint16_t		tid[3]; /* last 3 sent tid */
 	uint16_t		qtype;
 	uint16_t		retry;
 	uint8_t			tsi;
@@ -80,9 +84,16 @@ typedef struct {
 	uint8_t			responded;
 
 	uint8_t			recursion;
+	uint8_t			tids;
+	uint8_t			go_nogo;
+
+	uint8_t			is_retry:1;
 
 	/* name overallocated here */
 } lws_adns_q_t;
+
+#define LADNS_MOST_RECENT_TID(_q) \
+		q->tid[(int)(_q->tids - 1) % (int)LWS_ARRAY_SIZE(q->tid)]
 
 enum {
 	DHO_TID,
@@ -122,3 +133,11 @@ lws_async_dns_trim_cache(lws_async_dns_t *dns);
 
 int
 lws_async_dns_get_new_tid(struct lws_context *context, lws_adns_q_t *q);
+
+
+#if defined(_DEBUG)
+void
+lws_adns_dump(lws_async_dns_t *dns);
+#else
+#define lws_adns_dump(_d)
+#endif

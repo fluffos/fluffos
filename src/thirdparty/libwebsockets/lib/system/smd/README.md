@@ -14,17 +14,31 @@ Message payloads are short, less than 384 bytes, below system limits for atomic
 pipe or UDS datagrams and consistent with heap usage on smaller systems, but
 large enough to carry JSON usefully.  Messages are typically low duty cycle.
 
+![SMD message](/doc-assets/smd-message.png)
+
 Messages may be sent by any registered participant, they are allocated on heap
-in a linked-list, and delivered no sooner than next time around the event loop.
-This retains the ability to handle multiple event queuing in one event loop trip
-while guaranteeing message handling is nonrecursive.  Messages are passed to all
-other registered participants before being destroyed.
+in a linked-list, and delivered to all other registered participants for that
+message class no sooner than next time around the event loop.  This retains the
+ability to handle multiple event queuing in one event loop trip while
+guaranteeing message handling is nonrecursive and so with modest stack usage.
+Messages are passed to all other registered participants before being destroyed.
+
+Messages are delivered to all particpants on the same lws_context by default.
+
+![SMD message](/doc-assets/smd-single-process.png)
 
 `lws_smd` apis allow publication and subscription of message objects between
 participants that are in a single process and are informed by callback from lws
-service thread context, and, via Secure Streams proxying as the IPC method, also
-between those in different processes.  Registering as a participant and sending
-messages are threadsafe APIs.
+service thread context.
+
+SMD messages can also broadcast between particpants in different lws_contexts in
+different processes, using existing Secure Streams proxying.  In this way
+different application processes can intercommunicate and all observe any system
+smd messages they are interested in.
+
+![SMD message](/doc-assets/smd-proxy.png)
+
+Registering as a participant and sending messages are threadsafe APIs.
 
 ## Message Class
 
@@ -44,13 +58,18 @@ appear as soon as a participant appears that wants them.  The message generation
 action should be bypassed without error in the case lws_smd_msg_alloc()
 returns NULL.
 
+Various well-known high level classes are defined but also a bit index
+`LWSSMDCL_USER_BASE_BITNUM`, which can be used by user code to define up to 8
+private classes, with class bit values `(1 << LWSSMDCL_USER_BASE_BITNUM)` thru
+`(1 << (LWSSMDCL_USER_BASE_BITNUM + 7))`
+
 ## Messaging guarantees
 
 Sent messages are delivered to all registered participants whose class mask
 indicates they want it, including the sender.  The send apis are threadsafe.
 
 Locally-delivered message delivery callbacks occur from lws event loop thread
-context 0 (the only one in the default case LWS_MAX_SMP = 1).  Clients in
+context 0 (the only one in the default case `LWS_MAX_SMP` = 1).  Clients in
 different processes receive callbacks from the thread context of their UDS
 networking thread.
 
@@ -108,6 +127,16 @@ needs setting, the timestamp is fetched and added by lws.
 
  - MSB-first 64-bit class bitfield (currently only 32 least-sig in use) 
  - MSB-First Order 64-bit us-resolution timestamp
+ 
+A helper `lws_smd_ss_msg_printf()` is provided to format and create and smd
+message from the SS tx() callback in one step, using the same api layout as
+for direct messages via `lws_smd_msg_printf()`
+
+```
+int
+lws_smd_ss_msg_printf(const char *tag, uint8_t *buf, size_t *len,
+		      lws_smd_class_t _class, const char *format, ...);
+```
 
 ## Well-known message schema
 
@@ -150,6 +179,36 @@ up|The button has come up, useful for duration-based response
 click|The button activity resulted in a classification as a single-click
 longclick|The button activity resulted in a classification as a long-click
 doubleclick|The button activity resulted in a classification as a double-click
+
+### Routing Table Change
+
+Class: `LWSSMDCL_NETWORK`
+
+If able to subscribe to OS routing table changes (eg, by rtnetlink on Linux
+which is supported), lws announces there have been changes using SMD.
+
+If Captive Portal Detect is enabled, and routing tables changes can be seen,
+then a new CPD is requested automatically and the results will be seen over SMD
+when that completes.
+
+Schema:
+
+```
+	{
+	  "rt":      "add|del",   "add" if being added
+	}
+```
+
+When the context / pts are created, if linux then lws attempts to get the
+routing table sent, which requires root.  This is done before the permissions
+are dropped after protocols init.
+
+Lws maintains a cache of the routing table in each pt.  Upon changes, existing
+connections are reassessed to see if their peer can still be routed to, if not
+the connection is closed.
+
+If a gateway route changes, `{"trigger":"cpdcheck","src":"gw-change"}` is
+issued on SMD as well.
 
 ### Captive Portal Detection
 

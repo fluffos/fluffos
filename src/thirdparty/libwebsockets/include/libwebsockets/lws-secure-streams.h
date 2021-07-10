@@ -63,8 +63,10 @@
  *
  *   -  0: LWSSS_SER_TXPRE_STREAMTYPE
  *   -  1: 2-byte MSB-first rest-of-frame length
- *   -  3: 4 byte MSB-first initial tx credit
- *   -  7: the streamtype name with no NUL
+ *   -  3: 1-byte Client SSS protocol version (introduced in SSSv1)
+ *   -  4: 4-byte Client PID (introduced in SSSv1)
+ *   -  8: 4-byte MSB-first initial tx credit
+ *   - 12: the streamtype name with no NUL
  *
  * - Proxied tx
  *
@@ -113,8 +115,10 @@
  *   -  0: LWSSS_SER_RXPRE_CREATE_RESULT
  *   -  1: 2 byte MSB-first rest-of-frame length (usually 00, 03)
  *   -  3: 1 byte result, 0 = success.  On failure, proxy will close connection.
- *   -  4: 2 byte MSB-first initial tx credit
- *   -  6: if present, comma-sep list of rideshare types from policy
+ *   -  4: 4 byte client dsh allocation recommended for stream type, from policy
+ *         (introduced in SSSv1)
+ *   -  8: 2 byte MSB-first initial tx credit
+ *   - 10: if present, comma-sep list of rideshare types from policy
  *
  * - Proxied rx
  *
@@ -132,13 +136,26 @@
  *   -  1: 00, 04
  *   -  3: 4-byte MSB-first addition tx credit bytes
  *
- * - Proxied state
+ * - Proxied rx metadata
+ *
+ *   -  0: LWSSS_SER_RXPRE_METADATA
+ *   -  1: 2-byte MSB-first rest-of-frame length
+ *   -  3: 1-byte metadata name length
+ *   -  4: metadata name
+ *   -  ...: metadata value (for rest of packet)
+ *
+ * - Proxied state (8 or 11 byte packet)
  *
  *   -  0: LWSSS_SER_RXPRE_CONNSTATE
  *   -  1: 00, 05 if state < 256, else 00, 08
  *   -  3: 1 byte state index if state < 256, else 4-byte MSB-first state index
  *   -  4 or 7: 4-byte MSB-first ordinal
  *
+ * - Proxied performance information
+ *
+ *   -  0: LWSSS_SER_RXPRE_PERF
+ *   -  1: 2-byte MSB-first rest-of-frame length
+ *   -  3: ... performance JSON (for rest of packet)
  *
  * Proxied tx may be read by the proxy but rejected due to lack of buffer space
  * at the proxy.  For that reason, tx must be held at the sender until it has
@@ -161,6 +178,13 @@
  *    (*rx) with the client stream's
  */
 
+/** \defgroup secstr Secure Streams
+* ##Secure Streams
+*
+* Secure Streams related apis
+*/
+///@{
+
 #define LWS_SS_MTU 1540
 
 struct lws_ss_handle;
@@ -168,11 +192,16 @@ typedef uint32_t lws_ss_tx_ordinal_t;
 
 /*
  * connection state events
+ *
+ * If you add states, take care about the state names and state transition
+ * validity enforcement tables too
  */
 typedef enum {
-	LWSSSCS_CREATING,
+	/* zero means unset */
+	LWSSSCS_CREATING		= 1,
 	LWSSSCS_DISCONNECTED,
-	LWSSSCS_UNREACHABLE,
+	LWSSSCS_UNREACHABLE,		/* oridinal arg = 1 = caused by dns
+					 * server reachability failure */
 	LWSSSCS_AUTH_FAILED,
 	LWSSSCS_CONNECTED,
 	LWSSSCS_CONNECTING,
@@ -192,6 +221,8 @@ typedef enum {
 					 * stream joins the sink */
 	LWSSSCS_SINK_PART,		/* sinks get this when a new source
 					 * stream leaves the sink */
+
+	LWSSSCS_USER_BASE = 1000
 } lws_ss_constate_t;
 
 enum {
@@ -210,6 +241,9 @@ enum {
 	LWSSS_FLAG_RIDESHARE					= (1 << 5),
 	/* Serialized payload starts with non-default rideshare name length and
 	 * name string without NUL, then payload */
+	LWSSS_FLAG_PERF_JSON					= (1 << 6),
+	/* This RX is JSON performance data, only on streams with "perf" flag
+	 * set */
 
 	/*
 	 * In the case the secure stream is proxied across a process or thread
@@ -227,7 +261,9 @@ enum {
 	LWSSS_SER_RXPRE_CREATE_RESULT,
 	LWSSS_SER_RXPRE_CONNSTATE,
 	LWSSS_SER_RXPRE_TXCR_UPDATE,
+	LWSSS_SER_RXPRE_METADATA,
 	LWSSS_SER_RXPRE_TLSNEG_ENCLAVE_SIGN,
+	LWSSS_SER_RXPRE_PERF,
 
 	/* tx (send by client) prepends for proxied connections */
 
@@ -263,7 +299,7 @@ typedef enum {
  */
 
 typedef enum lws_ss_state_return {
-	LWSSSSRET_TX_DONT_SEND		=  1, /* (*tx) only */
+	LWSSSSRET_TX_DONT_SEND		=  1, /* (*tx) only, or failure */
 
 	LWSSSSRET_OK			=  0, /* no error */
 	LWSSSSRET_DISCONNECT_ME		= -1, /* caller should disconnect us */
@@ -299,6 +335,18 @@ enum {
 	 * we are an accepted connection from a server's listening socket */
 };
 
+typedef lws_ss_state_return_t (*lws_sscb_rx)(void *userobj, const uint8_t *buf,
+					     size_t len, int flags);
+typedef lws_ss_state_return_t (*lws_sscb_tx)(void *userobj,
+					     lws_ss_tx_ordinal_t ord,
+					     uint8_t *buf, size_t *len,
+					     int *flags);
+typedef lws_ss_state_return_t (*lws_sscb_state)(void *userobj, void *h_src,
+						lws_ss_constate_t state,
+						lws_ss_tx_ordinal_t ack);
+
+struct lws_ss_policy;
+
 typedef struct lws_ss_info {
 	const char *streamtype; /**< type of stream we want to create */
 	size_t	    user_alloc; /**< size of user allocation */
@@ -308,15 +356,24 @@ typedef struct lws_ss_info {
 	/**< offset of opaque user data ptr in user_alloc type, set to
 	     offsetof(mytype, opaque_ud_member) */
 
-	lws_ss_state_return_t (*rx)(void *userobj, const uint8_t *buf,
-				    size_t len, int flags);
+#if defined(LWS_WITH_SECURE_STREAMS_CPP)
+	const struct lws_ss_policy	*policy;
+	/**< Normally NULL, or a locally-generated policy to apply to this
+	 * connection instead of a named streamtype */
+#endif
+
+#if defined(LWS_WITH_SYS_FAULT_INJECTION)
+	lws_fi_ctx_t				fic;
+	/**< Attach external Fault Injection context to the stream, hierarchy
+	 * is ss->context */
+#endif
+
+	lws_sscb_rx rx;
 	/**< callback with rx payload for this stream */
-	lws_ss_state_return_t (*tx)(void *userobj, lws_ss_tx_ordinal_t ord,
-				    uint8_t *buf, size_t *len, int *flags);
+	lws_sscb_tx tx;
 	/**< callback to send payload on this stream... 0 = send as set in
 	 * len and flags, 1 = do not send anything (ie, not even 0 len frame) */
-	lws_ss_state_return_t (*state)(void *userobj, void *h_src /* ss handle type */,
-			      lws_ss_constate_t state, lws_ss_tx_ordinal_t ack);
+	lws_sscb_state state;
 	/**< advisory cb about state of stream and QoS status if applicable...
 	 * h_src is only used with sinks and LWSSSCS_SINK_JOIN/_PART events.
 	 * Return nonzero to indicate you want to destroy the stream. */
@@ -328,7 +385,18 @@ typedef struct lws_ss_info {
 	 * In the special case of _lws_smd streamtype, this is used to indicate
 	 * the connection's rx class mask.
 	 * */
-	uint8_t	    flags;
+	uint32_t	client_pid;
+	/**< used in proxy / serialization case to hold the client pid this
+	 * proxied connection is to be tagged with
+	 */
+	uint8_t		flags;
+	uint8_t		sss_protocol_version;
+	/**< used in proxy / serialization case to hold the SS serialization
+	 * protocol level to use with this peer... clients automatically request
+	 * the most recent version they were built with
+	 * (LWS_SSS_CLIENT_PROTOCOL_VERSION) and the proxy stores the requested
+	 * version in here
+	 */
 
 } lws_ss_info_t;
 
@@ -344,7 +412,7 @@ typedef struct lws_ss_info {
  *			name from the policy
  *
  * Requests a new secure stream described by \p ssi be created.  If successful,
- * the stream is created, its state callback called with LWSSSCS_CREATING, *ppss
+ * the stream is created, its state callback called with LWSSSCS_CREATING, \p *ppss
  * is set to point to the handle, and it returns 0.  If it failed, it returns
  * nonzero.
  *
@@ -378,7 +446,7 @@ lws_ss_create(struct lws_context *context, int tsi, const lws_ss_info_t *ssi,
  *
  * \param ppss: pointer to lws_ss_t pointer to be destroyed
  *
- * Destroys the lws_ss_t pointed to by *ppss, and sets *ppss to NULL.
+ * Destroys the lws_ss_t pointed to by \p *ppss, and sets \p *ppss to NULL.
  */
 LWS_VISIBLE LWS_EXTERN void
 lws_ss_destroy(struct lws_ss_handle **ppss);
@@ -389,7 +457,7 @@ lws_ss_destroy(struct lws_ss_handle **ppss);
  * \param pss: pointer to lws_ss_t representing stream that wants to transmit
  *
  * Schedules a write on the stream represented by \p pss.  When it's possible to
- * write on this stream, the *tx callback will occur with an empty buffer for
+ * write on this stream, the \p *tx callback will occur with an empty buffer for
  * the stream owner to fill in.
  *
  * Returns 0 or LWSSSSRET_SS_HANDLE_DESTROYED
@@ -404,7 +472,7 @@ lws_ss_request_tx(struct lws_ss_handle *pss);
  * \param len: the length of the write in bytes
  *
  * Schedules a write on the stream represented by \p pss.  When it's possible to
- * write on this stream, the *tx callback will occur with an empty buffer for
+ * write on this stream, the \p *tx callback will occur with an empty buffer for
  * the stream owner to fill in.
  *
  * This api variant should be used when it's possible the payload will go out
@@ -418,10 +486,15 @@ lws_ss_request_tx_len(struct lws_ss_handle *pss, unsigned long len);
  *
  * \param h: secure streams handle
  *
- * Starts the connection process for the secure stream.  Returns 0 if OK or
- * nonzero if we have already failed.
+ * Starts the connection process for the secure stream.
+ *
+ * Can return any of the lws_ss_state_return_t values depending on user
+ * state callback returns.
+ *
+ * LWSSSSRET_OK means the connection is ongoing.
+ *
  */
-LWS_VISIBLE LWS_EXTERN int
+LWS_VISIBLE LWS_EXTERN lws_ss_state_return_t
 lws_ss_client_connect(struct lws_ss_handle *h);
 
 /**
@@ -558,13 +631,61 @@ lws_ss_rideshare(struct lws_ss_handle *h);
  * name with the value of the metadata on the left.
  *
  * Return 0 if OK or nonzero if, eg, metadata name does not exist on the
- * streamtype.
+ * streamtype.  You must check the result of this, eg, transient OOM can cause
+ * these to fail and you should retry later.
  */
-LWS_VISIBLE LWS_EXTERN int
+LWS_VISIBLE LWS_EXTERN int LWS_WARN_UNUSED_RESULT
 lws_ss_set_metadata(struct lws_ss_handle *h, const char *name,
 		    const void *value, size_t len);
 
-/*
+/**
+ * lws_ss_alloc_set_metadata() - copy data and bind to ss metadata
+ *
+ * \param h: secure streams handle
+ * \param name: metadata name from the policy
+ * \param value: pointer to user-managed data to bind to name
+ * \param len: length of the user-managed data in value
+ *
+ * Same as lws_ss_set_metadata(), but allocates a heap buffer for the data
+ * first and takes a copy of it, so the original can go out of scope
+ * immediately after.
+ */
+LWS_VISIBLE LWS_EXTERN int LWS_WARN_UNUSED_RESULT
+lws_ss_alloc_set_metadata(struct lws_ss_handle *h, const char *name,
+			  const void *value, size_t len);
+
+/**
+ * lws_ss_get_metadata() - get current value of stream metadata item
+ *
+ * \param h: secure streams handle
+ * \param name: metadata name from the policy
+ * \param value: pointer to pointer to be set to point at the value
+ * \param len: pointer to size_t to set to the length of the value
+ *
+ * Binds user-managed data to the named metadata item from the ss policy.
+ * If present, the metadata item is handled in a protocol-specific way using
+ * the associated policy information.  For example, in the policy
+ *
+ *  	"\"metadata\":"		"["
+ *		"{\"uptag\":"  "\"X-Upload-Tag:\"},"
+ *		"{\"ctype\":"  "\"Content-Type:\"},"
+ *		"{\"xctype\":" "\"\"}"
+ *	"],"
+ *
+ * when the policy is using h1 is interpreted to add h1 headers of the given
+ * name with the value of the metadata on the left.
+ *
+ * Return 0 if \p *value and \p *len set OK, or nonzero if, eg, metadata \p name does
+ * not exist on the streamtype.
+ *
+ * The pointed-to values may only exist until the next time around the event
+ * loop.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_ss_get_metadata(struct lws_ss_handle *h, const char *name,
+		    const void **value, size_t *len);
+
+/**
  * lws_ss_server_ack() - indicate how we feel about what the server has sent
  *
  * \param h: ss handle of accepted connection
@@ -585,6 +706,24 @@ lws_ss_set_metadata(struct lws_ss_handle *h, const char *name,
  */
 LWS_VISIBLE LWS_EXTERN void
 lws_ss_server_ack(struct lws_ss_handle *h, int nack);
+
+typedef void (*lws_sssfec_cb)(struct lws_ss_handle *h, void *arg);
+
+/**
+ * lws_ss_server_foreach_client() - callback for each live client connected to server
+ *
+ * \param h: server ss handle
+ * \param cb: the callback
+ * \param arg: arg passed to callback
+ *
+ * For SERVER secure streams
+ *
+ * Call the callback \p cb once for each client ss connected to the server,
+ * passing \p arg as an additional callback argument each time.
+ */
+LWS_VISIBLE LWS_EXTERN void
+lws_ss_server_foreach_client(struct lws_ss_handle *h, lws_sssfec_cb cb,
+			     void *arg);
 
 /**
  * lws_ss_change_handlers() - helper for dynamically changing stream handlers
@@ -612,12 +751,8 @@ lws_ss_server_ack(struct lws_ss_handle *h, int nack);
  * to the default when the transaction wanting it is completed.
  */
 LWS_VISIBLE LWS_EXTERN void
-lws_ss_change_handlers(struct lws_ss_handle *h,
-	int (*rx)(void *userobj, const uint8_t *buf, size_t len, int flags),
-	int (*tx)(void *userobj, lws_ss_tx_ordinal_t ord, uint8_t *buf,
-		  size_t *len, int *flags),
-	int (*state)(void *userobj, void *h_src /* ss handle type */,
-		     lws_ss_constate_t state, lws_ss_tx_ordinal_t ack));
+lws_ss_change_handlers(struct lws_ss_handle *h, lws_sscb_rx rx, lws_sscb_tx tx,
+		       lws_sscb_state state);
 
 /**
  * lws_ss_add_peer_tx_credit() - allow peer to transmit more to us
@@ -643,3 +778,51 @@ lws_ss_add_peer_tx_credit(struct lws_ss_handle *h, int32_t add);
  */
 LWS_VISIBLE LWS_EXTERN int
 lws_ss_get_est_peer_tx_credit(struct lws_ss_handle *h);
+
+LWS_VISIBLE LWS_EXTERN const char *
+lws_ss_tag(struct lws_ss_handle *h);
+
+
+#if defined(LWS_WITH_SECURE_STREAMS_AUTH_SIGV4)
+/**
+ * lws_ss_sigv4_set_aws_key() - set aws credential into system blob
+ *
+ * \param context: lws_context
+ * \param idx:     the system blob index specified in the policy, currently
+ *                  up to 4 blobs.
+ * \param keyid:   aws access keyid
+ * \param key:     aws access key
+ *
+ * Return 0 if OK or nonzero if e.g. idx is invalid; system blob heap appending
+ * fails.
+ */
+
+LWS_VISIBLE LWS_EXTERN int
+lws_ss_sigv4_set_aws_key(struct lws_context* context, uint8_t idx,
+		                const char * keyid, const char * key);
+
+/**
+ * lws_aws_filesystem_credentials_helper() - read aws credentials from file
+ *
+ * \param path: path to read, ~ at start is converted to $HOME contents if any
+ * \param kid: eg, "aws_access_key_id"
+ * \param ak: eg, "aws_secret_access_key"
+ * \param aws_keyid: pointer to pointer for allocated keyid from credentials file
+ * \param aws_key: pointer to pointer for allocated key from credentials file
+ *
+ * Return 0 if both *aws_keyid and *aws_key allocated from the config file, else
+ * nonzero, and neither *aws_keyid or *aws_key are allocated.
+ *
+ * If *aws_keyid and *aws_key are set, it's the user's responsibility to
+ * free() them when they are no longer needed.
+ */
+
+LWS_VISIBLE LWS_EXTERN int
+lws_aws_filesystem_credentials_helper(const char *path, const char *kid,
+				      const char *ak, char **aws_keyid,
+				      char **aws_key);
+
+#endif
+
+///@}
+

@@ -207,8 +207,8 @@ typedef struct lws_dll2_owner {
 	uint32_t		count;
 } lws_dll2_owner_t;
 
-static LWS_INLINE int
-lws_dll2_is_detached(const struct lws_dll2 *d) { return !d->owner; }
+LWS_VISIBLE LWS_EXTERN int
+lws_dll2_is_detached(const struct lws_dll2 *d);
 
 static LWS_INLINE const struct lws_dll2_owner *
 lws_dll2_owner(const struct lws_dll2 *d) { return d->owner; }
@@ -244,6 +244,11 @@ lws_dll2_add_before(struct lws_dll2 *d, struct lws_dll2 *after);
 LWS_VISIBLE LWS_EXTERN void
 lws_dll2_add_sorted(lws_dll2_t *d, lws_dll2_owner_t *own,
 		    int (*compare)(const lws_dll2_t *d, const lws_dll2_t *i));
+
+LWS_VISIBLE LWS_EXTERN void
+lws_dll2_add_sorted_priv(lws_dll2_t *d, lws_dll2_owner_t *own, void *priv,
+			 int (*compare3)(void *priv, const lws_dll2_t *d,
+					 const lws_dll2_t *i));
 
 LWS_VISIBLE LWS_EXTERN void *
 _lws_dll2_search_sz_pl(lws_dll2_owner_t *own, const char *name, size_t namelen,

@@ -238,8 +238,10 @@ void SSL_CTX_free(SSL_CTX* ctx)
 
     X509_free(ctx->client_CA);
 
-    if (ctx->alpn_protos)
-	    ssl_mem_free(ctx->alpn_protos);
+    if (ctx->alpn_protos) {
+	    ssl_mem_free((void *)ctx->alpn_protos);
+	    ctx->alpn_protos = NULL;
+    }
 
     ssl_mem_free(ctx);
 }
@@ -353,8 +355,10 @@ void SSL_free(SSL *ssl)
 
     SSL_SESSION_free(ssl->session);
 
-    if (ssl->alpn_protos)
-	    ssl_mem_free(ssl->alpn_protos);
+    if (ssl->alpn_protos) {
+	    ssl_mem_free((void *)ssl->alpn_protos);
+	    ssl->alpn_protos = NULL;
+    }
 
     ssl_mem_free(ssl);
 }
@@ -834,7 +838,7 @@ void SSL_CTX_set_default_read_buffer_len(SSL_CTX *ctx, size_t len)
 {
     SSL_ASSERT3(ctx);
 
-    ctx->read_buffer_len = len;
+    ctx->read_buffer_len = (int)len;
 }
 
 /**
@@ -845,7 +849,7 @@ void SSL_set_default_read_buffer_len(SSL *ssl, size_t len)
     SSL_ASSERT3(ssl);
     SSL_ASSERT3(len);
 
-    SSL_METHOD_CALL(set_bufflen, ssl, len);
+    SSL_METHOD_CALL(set_bufflen, ssl, (int)len);
 }
 
 /**
@@ -1167,7 +1171,7 @@ _openssl_alpn_to_mbedtls(struct alpn_ctx *ac, char ***palpn_protos)
 
 	/* allocate space for count + 1 pointers and the data afterwards */
 
-	alpn_protos = ssl_mem_zalloc((count + 1) * sizeof(char *) + ac->len + 1);
+	alpn_protos = ssl_mem_zalloc((unsigned int)(count + 1) * sizeof(char *) + ac->len + 1);
 	if (!alpn_protos)
 		return;
 
@@ -1175,7 +1179,7 @@ _openssl_alpn_to_mbedtls(struct alpn_ctx *ac, char ***palpn_protos)
 
 	/* convert to mbedtls format */
 
-	q = (unsigned char *)alpn_protos + (count + 1) * sizeof(char *);
+	q = (unsigned char *)alpn_protos + (unsigned int)(count + 1) * sizeof(char *);
 	p = ac->data;
 	count = 0;
 

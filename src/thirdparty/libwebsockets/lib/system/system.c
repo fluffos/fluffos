@@ -99,7 +99,7 @@ lws_system_blob_get(lws_system_blob_t *b, uint8_t *buf, size_t *len, size_t ofs)
 	if (n < 0)
 		return -2;
 
-	*len = n;
+	*len = (unsigned int)n;
 
 	return 0;
 }
@@ -118,7 +118,7 @@ lws_system_blob_get_single_ptr(lws_system_blob_t *b, const uint8_t **ptr)
 	if (b->u.bl->next)
 		return -1;  /* multipart buflist, no single pointer to it all */
 
-	*ptr = (const uint8_t *)&b->u.bl[1];
+	*ptr = (const uint8_t *)&b->u.bl[1] + LWS_PRE;
 
 	return 0;
 }
@@ -141,7 +141,7 @@ lws_system_get_blob(struct lws_context *context, lws_system_blob_item_t type,
 	    idx >= (int)LWS_ARRAY_SIZE(context->system_blobs))
 		return NULL;
 
-	return &context->system_blobs[type + idx];
+	return &context->system_blobs[type + (unsigned int)idx];
 }
 
 #if defined(LWS_WITH_NETWORK)

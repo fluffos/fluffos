@@ -42,6 +42,7 @@ lws_sul_plat_unix(lws_sorted_usec_list_t *sul)
 	struct lws_context_per_thread *pt =
 		lws_container_of(sul, struct lws_context_per_thread, sul_plat);
 	struct lws_context *context = pt->context;
+	int n = 0, m = 0;
 
 #if !defined(LWS_NO_DAEMONIZE)
 	/* if our parent went down, don't linger around */
@@ -50,13 +51,14 @@ lws_sul_plat_unix(lws_sorted_usec_list_t *sul)
 		kill(getpid(), SIGTERM);
 #endif
 
-	if (pt->context->deprecated && !pt->context->count_wsi_allocated) {
+	for (n = 0; n < context->count_threads; n++)
+		m = m | (int)pt->fds_count;
+
+	if (context->deprecated && !m) {
 		lwsl_notice("%s: ending deprecated context\n", __func__);
 		kill(getpid(), SIGINT);
 		return;
 	}
-
-	lws_check_deferred_free(context, 0, 0);
 
 #if defined(LWS_WITH_SERVER)
 	lws_context_lock(context, "periodic checks");
@@ -88,8 +90,10 @@ protocol_plugin_cb(struct lws_plugin *pin, void *each_user)
 	const lws_plugin_protocol_t *plpr =
 			(const lws_plugin_protocol_t *)pin->hdr;
 
-	context->plugin_protocol_count += plpr->count_protocols;
-	context->plugin_extension_count += plpr->count_extensions;
+	context->plugin_protocol_count = (short)(context->plugin_protocol_count +
+						 plpr->count_protocols);
+	context->plugin_extension_count = (short)(context->plugin_extension_count +
+						  plpr->count_extensions);
 
 	return 0;
 }
@@ -102,7 +106,7 @@ lws_plat_init(struct lws_context *context,
 	int fd;
 #if defined(LWS_WITH_NETWORK)
 	/*
-	 * master context has the process-global fd lookup array.  This can be
+	 * context has the process-global fd lookup array.  This can be
 	 * done two different ways now; one or the other is done depending on if
 	 * info->fd_limit_per_thread was snonzero
 	 *
@@ -148,10 +152,23 @@ lws_plat_init(struct lws_context *context,
 	}
 
 #if defined(LWS_WITH_PLUGINS)
-	if (info->plugin_dirs)
-		lws_plugins_init(&context->plugin_list, info->plugin_dirs,
-				 "lws_protocol_plugin", NULL,
-				 protocol_plugin_cb, context);
+	{
+		char *ld_env = getenv("LD_LIBRARY_PATH");
+
+		if (ld_env) {
+			const char *pp[2] = { ld_env, NULL };
+
+			lws_plugins_init(&context->plugin_list, pp,
+					 "lws_protocol_plugin", NULL,
+					 protocol_plugin_cb, context);
+		}
+
+		if (info->plugin_dirs)
+			lws_plugins_init(&context->plugin_list,
+					 info->plugin_dirs,
+					 "lws_protocol_plugin", NULL,
+					 protocol_plugin_cb, context);
+	}
 #endif
 
 

@@ -33,8 +33,8 @@ lws_mqtt_client_send_connect(struct lws *wsi)
 	/* static int */
 	/* 	lws_mqttc_abs_writeable(lws_abs_protocol_inst_t *api, size_t budget) */
 	const lws_mqttc_t *c = &wsi->mqtt->client;
-	uint8_t b[256 + LWS_PRE], *start = b + LWS_PRE, *p = start,
-		len = MQTT_CONNECT_MSG_BASE_LEN;
+	uint8_t b[256 + LWS_PRE], *start = b + LWS_PRE, *p = start;
+	unsigned int len = MQTT_CONNECT_MSG_BASE_LEN;
 
 	switch (lwsi_state(wsi)) {
 	case LRS_MQTTC_IDLE:
@@ -56,13 +56,13 @@ lws_mqtt_client_send_connect(struct lws *wsi)
 		 */
 		len +=  c->id->len;
 		if (c->conn_flags & LMQCFT_USERNAME && c->username) {
-			len += c->username->len + 2;
+			len = len + (unsigned int)c->username->len + 2;
 			if (c->conn_flags & LMQCFT_PASSWORD)
-				len += (c->password ? c->password->len : 0) + 2;
+				len += (unsigned int)(c->password ? c->password->len : 0) + 2u;
 		}
 		if (c->conn_flags & LMQCFT_WILL_FLAG && c->will.topic) {
-			len += c->will.topic->len + 2;
-			len += (c->will.message ? c->will.message->len : 0) + 2;
+			len = len + (unsigned int)c->will.topic->len + 2;
+			len += (c->will.message ? c->will.message->len : 0) + 2u;
 		}
 		p += lws_mqtt_vbi_encode(len, p);
 
@@ -104,10 +104,6 @@ lws_mqtt_client_send_connect(struct lws *wsi)
 			*p++ = 0;
 		}
 
-		if ((c->conn_flags & ~LMQCFT_CLEAN_START) == 0) {
-			*p++ = 0; /* no properties */
-			break;
-		}
 		if (c->conn_flags & LMQCFT_WILL_FLAG) {
 			if (lws_mqtt_str_is_not_empty(c->will.topic)) {
 				lws_ser_wu16be(p, c->will.topic->len);
@@ -115,7 +111,7 @@ lws_mqtt_client_send_connect(struct lws *wsi)
 				memcpy(p, c->will.topic->buf, c->will.topic->len);
 				p += c->will.topic->len;
 				if (lws_mqtt_str_is_not_empty(c->will.message)) {
-					lws_ser_wu16be(p, c->will.topic->len);
+					lws_ser_wu16be(p, c->will.message->len);
 					p += 2;
 					memcpy(p, c->will.message->buf,
 					       c->will.message->len);
@@ -171,7 +167,7 @@ lws_mqtt_client_send_connect(struct lws *wsi)
 	/*
 	 * Perform the actual write
 	 */
-	if (lws_write(wsi, (unsigned char *)&b[LWS_PRE], lws_ptr_diff(p, start),
+	if (lws_write(wsi, (unsigned char *)&b[LWS_PRE], lws_ptr_diff_size_t(p, start),
 		  LWS_WRITE_BINARY) != lws_ptr_diff(p, start)) {
 		lwsl_notice("%s: write failed\n", __func__);
 

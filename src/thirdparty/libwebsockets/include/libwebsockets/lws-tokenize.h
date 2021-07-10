@@ -43,6 +43,10 @@
 #define LWS_TOKENIZE_F_HASH_COMMENT	(1 << 7)
 /* Do not treat / as a terminal character, so "multipart/related" is one token */
 #define LWS_TOKENIZE_F_SLASH_NONTERM	(1 << 8)
+/* Do not treat * as a terminal character, so "myfile*" is one token */
+#define LWS_TOKENIZE_F_ASTERISK_NONTERM	(1 << 9)
+/* Do not treat = as a terminal character, so "x=y" is one token */
+#define LWS_TOKENIZE_F_EQUALS_NONTERM	(1 << 10)
 
 typedef enum {
 
@@ -251,3 +255,15 @@ LWS_VISIBLE LWS_EXTERN int
 lws_strexp_expand(lws_strexp_t *exp, const char *in, size_t len,
 		  size_t *pused_in, size_t *pused_out);
 
+/**
+ * lws_strcmp_wildcard() - strcmp but the first arg can have wildcards
+ *
+ * \p wildcard: a string that may contain zero to three *, and may lack a NUL
+ * \p len: length of the wildcard string
+ * \p check: string to test to see if it matches wildcard
+ *
+ * Exactly like strcmp, but supports patterns like "a*", "a*b", "a*b*" etc
+ * where a and b are arbitrary substrings
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_strcmp_wildcard(const char *wildcard, size_t len, const char *check);

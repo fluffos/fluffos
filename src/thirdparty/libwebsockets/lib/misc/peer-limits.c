@@ -39,9 +39,24 @@ __lws_peer_remove_from_peer_wait_list(struct lws_context *context,
 			*p = df->peer_wait_list;
 			df->peer_wait_list = NULL;
 
+			if (!context->peer_wait_list)
+				lws_sul_cancel(&context->pt[0].sul_peer_limits);
+
 			return;
 		}
 	} lws_end_foreach_llp(p, peer_wait_list);
+}
+
+void
+lws_sul_peer_limits_cb(lws_sorted_usec_list_t *sul)
+{
+	struct lws_context_per_thread *pt = lws_container_of(sul,
+			struct lws_context_per_thread, sul_peer_limits);
+
+	lws_peer_cull_peer_wait_list(pt->context);
+
+	lws_sul_schedule(pt->context, 0, &pt->context->pt[0].sul_peer_limits,
+			 lws_sul_peer_limits_cb, 10 * LWS_US_PER_SEC);
 }
 
 /* requires context->lock */
@@ -53,6 +68,10 @@ __lws_peer_add_to_peer_wait_list(struct lws_context *context,
 
 	peer->peer_wait_list = context->peer_wait_list;
 	context->peer_wait_list = peer;
+
+	if (!context->pt[0].sul_peer_limits.list.owner)
+		lws_sul_schedule(context, 0, &context->pt[0].sul_peer_limits,
+				lws_sul_peer_limits_cb, 10 * LWS_US_PER_SEC);
 }
 
 
@@ -89,7 +108,10 @@ lws_get_or_create_peer(struct lws_vhost *vhost, lws_sockfd_type sockfd)
 
 	q8 = q;
 	for (n = 0; n < (int)rlen; n++)
-		hash = (((hash << 4) | (hash >> 28)) * n) ^ q8[n];
+		hash = (uint32_t)((((hash << 4) | (hash >> 28)) * (uint32_t)n) ^ q8[n]);
+
+	if (!context->pl_hash_elements)
+		return NULL;
 
 	hash = hash % context->pl_hash_elements;
 
@@ -219,14 +241,15 @@ lws_peer_dump_from_wsi(struct lws *wsi)
 	peer = wsi->peer;
 
 #if defined(LWS_ROLE_H1) || defined(LWS_ROLE_H2)
-	lwsl_notice("%s: wsi %p: created %llu: wsi: %d/%d, ah %d/%d\n",
-			__func__,
-			wsi, (unsigned long long)peer->time_created,
+	lwsl_notice("%s: %s: created %llu: wsi: %d/%d, ah %d/%d\n",
+			__func__, lws_wsi_tag(wsi),
+			(unsigned long long)peer->time_created,
 			peer->count_wsi, peer->total_wsi,
 			peer->http.count_ah, peer->http.total_ah);
 #else
-	lwsl_notice("%s: wsi %p: created %llu: wsi: %d/%d\n", __func__,
-			wsi, (unsigned long long)peer->time_created,
+	lwsl_notice("%s: %s: created %llu: wsi: %d/%d\n", __func__,
+			lws_wsi_tag(wsi),
+			(unsigned long long)peer->time_created,
 			peer->count_wsi, peer->total_wsi);
 #endif
 }

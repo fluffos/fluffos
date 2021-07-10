@@ -1,5 +1,5 @@
 project(lws-minimal-http-client-post C)
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8.12)
 find_package(libwebsockets CONFIG REQUIRED)
 list(APPEND CMAKE_MODULE_PATH ${LWS_CMAKE_DIR})
 include(CheckCSourceCompiles)
@@ -9,11 +9,15 @@ set(SAMP lws-minimal-http-client-post)
 set(SRCS minimal-http-client-post.c)
 
 set(requirements 1)
+set(MBEDTLS 0)
 require_lws_config(LWS_ROLE_H1 1 requirements)
 require_lws_config(LWS_WITH_CLIENT 1 requirements)
 
+require_lws_config(LWS_WITH_MBEDTLS 1 MBEDTLS)
+
 if (requirements)
 	add_executable(${SAMP} ${SRCS})
+	find_program(VALGRIND "valgrind")
 	
 	#
 	# instantiate the server per sai builder instance, they are running in the same
@@ -44,15 +48,30 @@ if (WIN32)
 	add_test(NAME st_hcp_srv COMMAND cmd.exe /c start /b $<TARGET_FILE:test-server> -s --port ${PORT_HCP_SRV})
 	add_test(NAME ki_hcp_srv COMMAND taskkill /F /IM $<TARGET_FILE_NAME:test-server> /T)
 else()
-	add_test(NAME st_hcp_srv COMMAND
-		${CMAKE_SOURCE_DIR}/scripts/ctest-background.sh
-				hcp_srv
-				$<TARGET_FILE:test-server>
-				-r ${CMAKE_SOURCE_DIR}/destdir/usr/local/share/libwebsockets-test-server/
-				-s --port ${PORT_HCP_SRV} --ignore-sigterm)
-	add_test(NAME ki_hcp_srv COMMAND
-		${CMAKE_SOURCE_DIR}/scripts/ctest-background-kill.sh hcp_srv
-				$<TARGET_FILE_NAME:test-server> --port ${PORT_HCP_SRV})
+	#
+	# mbedtls is too slow to keep up on some targets, when ctest is in parallel
+	#
+	if (VALGRIND AND NOT MBEDTLS)
+		add_test(NAME st_hcp_srv COMMAND
+			${CMAKE_SOURCE_DIR}/scripts/ctest-background.sh
+					hcp_srv ${VALGRIND} --tool=memcheck 
+					$<TARGET_FILE:test-server>
+					-r ${CMAKE_SOURCE_DIR}/destdir/usr/local/share/libwebsockets-test-server/
+					-s --port ${PORT_HCP_SRV} -d1151)
+		add_test(NAME ki_hcp_srv COMMAND
+			${CMAKE_SOURCE_DIR}/scripts/ctest-background-kill.sh hcp_srv ${VALGRIND}
+					$<TARGET_FILE_NAME:test-server> --port ${PORT_HCP_SRV})
+	else()
+		add_test(NAME st_hcp_srv COMMAND
+			${CMAKE_SOURCE_DIR}/scripts/ctest-background.sh
+					hcp_srv
+					$<TARGET_FILE:test-server>
+					-r ${CMAKE_SOURCE_DIR}/destdir/usr/local/share/libwebsockets-test-server/
+					-s --port ${PORT_HCP_SRV} )
+		add_test(NAME ki_hcp_srv COMMAND
+			${CMAKE_SOURCE_DIR}/scripts/ctest-background-kill.sh hcp_srv
+					$<TARGET_FILE_NAME:test-server> --port ${PORT_HCP_SRV})
+	endif()
 endif()
 
 	set_tests_properties(st_hcp_srv PROPERTIES
