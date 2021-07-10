@@ -184,8 +184,6 @@ class EGCSmartIterator : public EGCIterator {
 // Check string s is valid utf8
 bool u8_validate(const char *);
 bool u8_validate(const uint8_t *, size_t);
-// Saves number of EGC/Characters in string src, to count, return false if string is not valid utf8.
-bool u8_egc_count(const char *src, size_t *count);
 UChar32 u8_egc_index_as_single_codepoint(const char *str, int32_t index);
 void u8_copy_and_replace_codepoint_at(const char *src, char *dst, int32_t index, UChar32 c);
 int32_t u8_offset_to_egc_index(const char *src, int32_t offset);
