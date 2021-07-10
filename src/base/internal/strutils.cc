@@ -14,6 +14,7 @@
 #include "base/internal/log.h"
 #include "base/internal/rc.h"
 #include "base/internal/tracing.h"
+#include "EGCIterator.h"
 
 // Addition by Yucong Sun
 
@@ -65,35 +66,41 @@ int32_t u8_egc_find_as_offset(const char *haystack, size_t haystack_len, const c
   }
 
   int res = -1;
-  u8_egc_iter(haystack, haystack_len, [=, &res](std::unique_ptr<icu::BreakIterator> &brk) {
-    std::string_view sv_haystack(haystack, haystack_len);
-    std::string_view sv_needle(needle, needle_len);
-    auto pos = std::string_view::npos;
-    if (!reverse) {
-      pos = 0;
-      while((pos = sv_haystack.find(sv_needle, pos)) != std::string_view::npos) {
-        if(brk->isBoundary(pos) && brk->isBoundary(pos + sv_needle.length())) break;
-        pos++;
-      }
-    } else {
-      pos = std::string_view::npos;
-      while((pos = sv_haystack.rfind(sv_needle, pos)) != std::string_view::npos) {
-        if(brk->isBoundary(pos) && brk->isBoundary(pos + sv_needle.length())) break;
-        pos--;
-      }
-    }
-    if (pos != std::string_view::npos) {
-       res = pos;
-    }
-  });
 
+  EGCIterator iter(haystack, haystack_len);
+  if(!iter.ok()) return res;
+
+  std::string_view sv_haystack(haystack, haystack_len);
+  std::string_view sv_needle(needle, needle_len);
+  auto pos = std::string_view::npos;
+  if (!reverse) {
+    pos = 0;
+    while((pos = sv_haystack.find(sv_needle, pos)) != std::string_view::npos) {
+      if(iter->isBoundary(pos) && iter->isBoundary(pos + sv_needle.length())) break;
+      pos++;
+    }
+  } else {
+    pos = std::string_view::npos;
+    while((pos = sv_haystack.rfind(sv_needle, pos)) != std::string_view::npos) {
+      if(iter->isBoundary(pos) && iter->isBoundary(pos + sv_needle.length())) break;
+      pos--;
+    }
+  }
+  if (pos != std::string_view::npos) {
+     res = pos;
+  }
   return res;
 }
 
-// Return the egc at given index of src, if it is an single code point
+// Return the egc at given index of src, if it is an single code point.
+// Return -2 if requested index is out of bounds
+// Return -1 if requested EGC is multi codepoint
 UChar32 u8_egc_index_as_single_codepoint(const char *src, int32_t index) {
-  EGCIterator iter(src, -1);
   UChar32 c = U_SENTINEL;
+
+  EGCSmartIterator iter(src, -1);
+  if(!iter.ok()) return c;
+
   auto pos = iter.index_to_offset(index);
   // out-of-bounds
   if (pos < 0) return -2;
@@ -108,7 +115,9 @@ UChar32 u8_egc_index_as_single_codepoint(const char *src, int32_t index) {
 
 // Copy string src to dest, replacing character at index to c. Assuming dst is already allocated.
 void u8_copy_and_replace_codepoint_at(const char *src, char *dst, int32_t index, UChar32 c) {
-  EGCIterator iter(src, -1);
+  EGCSmartIterator iter(src, -1);
+  if(!iter.ok()) return;
+
   int32_t src_offset = iter.index_to_offset(index);
   int32_t dst_offset = 0;
 
@@ -120,22 +129,25 @@ void u8_copy_and_replace_codepoint_at(const char *src, char *dst, int32_t index,
   strcpy(dst + dst_offset, src + src_offset);
 }
 
-// Get the byte offset to the egc index, doesn't check validity or bounds.
-int32_t u8_egc_offset_to_index(const char *src, int32_t offset) {
+// Get the byte offset to the egc index, return -1 for non boundary.
+int32_t u8_offset_to_egc_index(const char *src, int32_t offset) {
   if (offset <= 0) return offset;
 
   int idx = -1;
   int pos = 0;
 
-  u8_egc_iter(src, -1, [&](std::unique_ptr<icu::BreakIterator> &brk) {
-    pos = brk->first();
-    idx = 0;
-    do {
-      pos = brk->next();
-      idx++;
-    } while(pos != icu::BreakIterator::DONE && pos < offset);
-  });
+  EGCIterator iter(src, -1);
+  if(!iter.ok()) return idx;
+
+  pos = iter->first();
+  idx = 0;
+  do {
+    pos = iter->next();
+    idx++;
+  } while(pos != icu::BreakIterator::DONE && pos < offset);
+
   if (pos == icu::BreakIterator::DONE) idx = -1;
+  if (pos != offset) idx = -1;
 
   return idx;
 }
@@ -495,15 +507,16 @@ std::vector<std::string_view> u8_egc_split(const char *src) {
   std::vector<std::string_view> result;
   result.reserve(16);
 
-  u8_egc_iter(src, -1, [&](std::unique_ptr<icu::BreakIterator> &brk) {
-    brk->first();
-    auto start = brk->current();
-    while (brk->next() != icu::BreakIterator::DONE) {
-      auto size = brk->current() - start;
-      result.emplace_back(src + start, size);
-      start = brk->current();
-    }
-  });
+  EGCSmartIterator iter(src, -1);
+  if(!iter.ok()) return result;
+
+  iter->first();
+  auto start = iter->current();
+  while (iter->next() != icu::BreakIterator::DONE) {
+    auto size = iter->current() - start;
+    result.emplace_back(src + start, size);
+    start = iter->current();
+  }
 
   return result;
 }

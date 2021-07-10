@@ -621,7 +621,7 @@ void f_range(int code) {
     case T_STRING: {
       int32_t from, to;
 
-      EGCIterator iter(sp->u.string, SVALUE_STRLEN(sp));
+      EGCSmartIterator iter(sp->u.string, SVALUE_STRLEN(sp));
       if (!iter.ok()) {
         error("Invalid UTF-8 string: f_range");
       }
@@ -754,7 +754,7 @@ void f_extract_range(int code) {
     case T_STRING: {
       int32_t from;
 
-      EGCIterator iter(sp->u.string, SVALUE_STRLEN(sp));
+      EGCSmartIterator iter(sp->u.string, SVALUE_STRLEN(sp));
       if (!iter.ok()) {
         error("Invalid UTF-8 String: f_extract_range.");
       }
