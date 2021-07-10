@@ -97,7 +97,9 @@ report("string += (mm)", 0)
 f = open('./2000.txt', 'r')
 txt = f.read()
 f.close()
-report("string find/strsrch single", _timeit("txt.find('\\n')", globals=globals(), number=1000))
+report("string range early", _timeit("txt[40:60]", globals=globals(), number=10000))
+report("string range late", _timeit("txt[-10:]", globals=globals(), number=10000))
+report("string find/strsrch single", _timeit("txt.find('\\n')", globals=globals(), number=100000))
 txt1 = txt[40:60]
 report("string find/strsrch early", _timeit("txt.find(txt1)", globals=globals(), number=1000))
 txt1 = txt[-10:]

@@ -5,7 +5,6 @@
 #include <string>
 #include <memory>
 #include <string.h>
-#include <iostream>
 
 #include "thirdparty/utf8_decoder_dfa/decoder.h"
 #include "thirdparty/widecharwidth/widechar_width.h"
@@ -13,7 +12,6 @@
 
 #include "base/internal/log.h"
 #include "base/internal/rc.h"
-#include "base/internal/tracing.h"
 #include "EGCIterator.h"
 
 // Addition by Yucong Sun
