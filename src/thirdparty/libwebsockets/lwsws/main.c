@@ -64,7 +64,7 @@ static uv_signal_t signal_outer[2];
 static int pids[32];
 void lwsl_emit_stderr(int level, const char *line);
 
-#define LWSWS_CONFIG_STRING_SIZE (32 * 1024)
+#define LWSWS_CONFIG_STRING_SIZE (64 * 1024)
 
 static const struct lws_extension exts[] = {
 #if !defined(LWS_WITHOUT_EXTENSIONS)
@@ -149,9 +149,9 @@ context_creation(void)
 
 	info.external_baggage_free_on_destroy = config_strings;
 	info.pt_serv_buf_size = 8192;
-	info.options = opts | LWS_SERVER_OPTION_VALIDATE_UTF8 |
+	info.options = (uint64_t)((uint64_t)opts | LWS_SERVER_OPTION_VALIDATE_UTF8 |
 			      LWS_SERVER_OPTION_EXPLICIT_VHOSTS |
-			      LWS_SERVER_OPTION_LIBUV;
+			      LWS_SERVER_OPTION_LIBUV);
 
 #if defined(LWS_WITH_PLUGINS)
 	if (default_plugin_path)
@@ -222,7 +222,7 @@ reload_handler(int signum)
 	case SIGINT:
 	case SIGTERM:
 	case SIGKILL:
-		fprintf(stderr, "master process waiting 2s...\n");
+		fprintf(stderr, "parent process waiting 2s...\n");
 		sleep(2); /* give children a chance to deal with the signal */
 		fprintf(stderr, "killing service processes\n");
 		for (m = 0; m < (int)LWS_ARRAY_SIZE(pids); m++)

@@ -1,5 +1,5 @@
 project(lws-minimal-http-client-multi C)
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8.12)
 find_package(libwebsockets CONFIG REQUIRED)
 list(APPEND CMAKE_MODULE_PATH ${LWS_CMAKE_DIR})
 include(CheckCSourceCompiles)
@@ -9,13 +9,18 @@ set(SAMP lws-minimal-http-client-multi)
 set(SRCS minimal-http-client-multi.c)
 
 set(requirements 1)
+set(MBEDTLS 0)
 require_lws_config(LWS_ROLE_H1 1 requirements)
 require_lws_config(LWS_WITH_CLIENT 1 requirements)
 require_lws_config(LWS_WITH_TLS 1 requirements)
 
+require_lws_config(LWS_WITH_MBEDTLS 1 MBEDTLS)
+
 
 if (requirements)
 	add_executable(${SAMP} ${SRCS})
+	
+	find_program(VALGRIND "valgrind")
 	
        #
        # instantiate the server per sai builder instance, they are running in the same
@@ -49,23 +54,46 @@ if (WIN32)
 	add_test(NAME st_hcmp_srv COMMAND cmd.exe /c start /b $<TARGET_FILE:test-server> -s --port 1${PORT_HCM_SRV})
 	add_test(NAME ki_hcmp_srv COMMAND taskkill /F /IM $<TARGET_FILE_NAME:test-server> /T)
 else()
-	add_test(NAME st_hcm_srv COMMAND
-		${CMAKE_SOURCE_DIR}/scripts/ctest-background.sh
-			hcm_srv $<TARGET_FILE:lws-minimal-http-server-tls>
-			--port ${PORT_HCM_SRV} --ignore-sigterm)
-	add_test(NAME ki_hcm_srv COMMAND
-		${CMAKE_SOURCE_DIR}/scripts/ctest-background-kill.sh
-			hcm_srv $<TARGET_FILE_NAME:lws-minimal-http-server-tls>
-				--port ${PORT_HCM_SRV})
-	add_test(NAME st_hcmp_srv COMMAND
+	#
+	# mbedtls is too slow to keep up on some targets, when ctest is in parallel
+	#
+	if (VALGRIND AND NOT MBEDTLS)
+		add_test(NAME st_hcm_srv COMMAND
 			${CMAKE_SOURCE_DIR}/scripts/ctest-background.sh
-				hcmp_srv $<TARGET_FILE:test-server> -s
-				-r ${CMAKE_SOURCE_DIR}/destdir/usr/local/share/libwebsockets-test-server/
-				--port 1${PORT_HCM_SRV} --ignore-sigterm)
-	add_test(NAME ki_hcmp_srv COMMAND
+				hcm_srv ${VALGRIND} --tool=memcheck $<TARGET_FILE:lws-minimal-http-server-tls>
+				--port ${PORT_HCM_SRV})
+		add_test(NAME ki_hcm_srv COMMAND
 			${CMAKE_SOURCE_DIR}/scripts/ctest-background-kill.sh
-				hcmp_srv $<TARGET_FILE_NAME:test-server>
-				--port 1${PORT_HCM_SRV})
+				hcm_srv ${VALGRIND} $<TARGET_FILE_NAME:lws-minimal-http-server-tls>
+					--port ${PORT_HCM_SRV})
+		add_test(NAME st_hcmp_srv COMMAND
+				${CMAKE_SOURCE_DIR}/scripts/ctest-background.sh
+					hcmp_srv ${VALGRIND} --tool=memcheck $<TARGET_FILE:test-server> -s
+					-r ${CMAKE_SOURCE_DIR}/destdir/usr/local/share/libwebsockets-test-server/
+					--port 1${PORT_HCM_SRV})
+		add_test(NAME ki_hcmp_srv COMMAND
+				${CMAKE_SOURCE_DIR}/scripts/ctest-background-kill.sh
+					hcmp_srv ${VALGRIND} $<TARGET_FILE_NAME:test-server>
+					--port 1${PORT_HCM_SRV})
+	else()
+		add_test(NAME st_hcm_srv COMMAND
+			${CMAKE_SOURCE_DIR}/scripts/ctest-background.sh
+				hcm_srv $<TARGET_FILE:lws-minimal-http-server-tls>
+				--port ${PORT_HCM_SRV} )
+		add_test(NAME ki_hcm_srv COMMAND
+			${CMAKE_SOURCE_DIR}/scripts/ctest-background-kill.sh
+				hcm_srv $<TARGET_FILE_NAME:lws-minimal-http-server-tls>
+					--port ${PORT_HCM_SRV})
+		add_test(NAME st_hcmp_srv COMMAND
+				${CMAKE_SOURCE_DIR}/scripts/ctest-background.sh
+					hcmp_srv $<TARGET_FILE:test-server> -s
+					-r ${CMAKE_SOURCE_DIR}/destdir/usr/local/share/libwebsockets-test-server/
+					--port 1${PORT_HCM_SRV} )
+		add_test(NAME ki_hcmp_srv COMMAND
+				${CMAKE_SOURCE_DIR}/scripts/ctest-background-kill.sh
+					hcmp_srv $<TARGET_FILE_NAME:test-server>
+					--port 1${PORT_HCM_SRV})
+	endif()
 endif()
 
 	set_tests_properties(st_hcm_srv PROPERTIES
@@ -87,9 +115,9 @@ endif()
 	#
 
 	add_test(NAME http-client-multi COMMAND lws-minimal-http-client-multi
-			-l --port ${PORT_HCM_SRV})
+			-l --port ${PORT_HCM_SRV} -d 1151)
 	add_test(NAME http-client-multi-h1 COMMAND lws-minimal-http-client-multi
-			--h1 -l --port ${PORT_HCM_SRV})
+			--h1 -l --port ${PORT_HCM_SRV} -d1151)
 	add_test(NAME http-client-multi-pipe COMMAND lws-minimal-http-client-multi
 			-p -l --port ${PORT_HCM_SRV})
 	add_test(NAME http-client-multi-h1-pipe COMMAND lws-minimal-http-client-multi
@@ -131,7 +159,7 @@ endif()
 			     PROPERTIES
 			     FIXTURES_REQUIRED "hcm_srv"
 			     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/minimal-examples/http-client/minimal-http-client-multi
-			     TIMEOUT 20)
+			     TIMEOUT 50)
 
 	# POSTs against local http-server-form-post
 	add_test(NAME http-client-multi-post COMMAND lws-minimal-http-client-multi

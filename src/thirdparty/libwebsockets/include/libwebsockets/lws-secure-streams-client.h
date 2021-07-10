@@ -52,12 +52,16 @@
 #define lws_ss_get_context		lws_sspc_get_context
 #define lws_ss_rideshare		lws_sspc_rideshare
 #define lws_ss_set_metadata		lws_sspc_set_metadata
+#define lws_ss_get_metadata		lws_sspc_get_metadata
 #define lws_ss_add_peer_tx_credit	lws_sspc_add_peer_tx_credit
 #define lws_ss_get_est_peer_tx_credit	lws_sspc_get_est_peer_tx_credit
 #define lws_ss_start_timeout		lws_sspc_start_timeout
 #define lws_ss_cancel_timeout		lws_sspc_cancel_timeout
 #define lws_ss_to_user_object		lws_sspc_to_user_object
 #define lws_ss_change_handlers		lws_sspc_change_handlers
+#define lws_smd_ss_rx_forward		lws_smd_sspc_rx_forward
+#define lws_ss_tag			lws_sspc_tag
+#define _lws_fi_user_ss_fi		_lws_fi_user_sspc_fi
 #endif
 
 
@@ -118,7 +122,7 @@ lws_sspc_request_tx_len(struct lws_sspc_handle *h, unsigned long len);
  * Starts the connection process for the secure stream.  Returns 0 if OK or
  * nonzero if we have already failed.
  */
-LWS_VISIBLE LWS_EXTERN int
+LWS_VISIBLE LWS_EXTERN lws_ss_state_return_t
 lws_sspc_client_connect(struct lws_sspc_handle *h);
 
 /**
@@ -157,7 +161,7 @@ lws_sspc_proxy_create(struct lws_context *context);
 LWS_VISIBLE LWS_EXTERN struct lws_context *
 lws_sspc_get_context(struct lws_sspc_handle *h);
 
-LWS_VISIBLE LWS_EXTERN const struct lws_protocols lws_sspc_protocols[];
+LWS_VISIBLE extern const struct lws_protocols lws_sspc_protocols[2];
 
 LWS_VISIBLE LWS_EXTERN const char *
 lws_sspc_rideshare(struct lws_sspc_handle *h);
@@ -191,6 +195,10 @@ lws_sspc_set_metadata(struct lws_sspc_handle *h, const char *name,
 		      const void *value, size_t len);
 
 LWS_VISIBLE LWS_EXTERN int
+lws_sspc_get_metadata(struct lws_sspc_handle *h, const char *name,
+		      const void **value, size_t *len);
+
+LWS_VISIBLE LWS_EXTERN int
 lws_sspc_add_peer_tx_credit(struct lws_sspc_handle *h, int32_t add);
 
 LWS_VISIBLE LWS_EXTERN int
@@ -216,3 +224,5 @@ lws_sspc_change_handlers(struct lws_sspc_handle *h,
 				       lws_ss_constate_t state,
 				       lws_ss_tx_ordinal_t ack));
 
+const char *
+lws_sspc_tag(struct lws_sspc_handle *h);

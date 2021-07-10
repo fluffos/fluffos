@@ -27,7 +27,7 @@ typedef struct myss {
  * This is the Secure Streams Server RX and TX
  */
 
-static int
+static lws_ss_state_return_t
 myss_raw_rx(void *userobj, const uint8_t *buf, size_t len, int flags)
 {
 //	myss_srv_t *m = (myss_srv_t *)userobj;
@@ -60,7 +60,7 @@ spam_sul_cb(struct lws_sorted_usec_list *sul)
 			 100 * LWS_US_PER_MS);
 }
 
-static int
+static lws_ss_state_return_t
 myss_raw_tx(void *userobj, lws_ss_tx_ordinal_t ord, uint8_t *buf, size_t *len,
 	int *flags)
 {
@@ -68,7 +68,7 @@ myss_raw_tx(void *userobj, lws_ss_tx_ordinal_t ord, uint8_t *buf, size_t *len,
 
 	*flags = LWSSS_FLAG_SOM | LWSSS_FLAG_EOM;
 
-	*len = lws_snprintf((char *)buf, *len, "hello from raw %d\n", m->count++);
+	*len = (unsigned int)lws_snprintf((char *)buf, *len, "hello from raw %d\n", m->count++);
 
 	lws_sul_schedule(lws_ss_get_context(m->ss), 0, &m->sul, spam_sul_cb,
 			 100 * LWS_US_PER_MS);
@@ -76,14 +76,14 @@ myss_raw_tx(void *userobj, lws_ss_tx_ordinal_t ord, uint8_t *buf, size_t *len,
 	return 0;
 }
 
-static int
+static lws_ss_state_return_t
 myss_raw_state(void *userobj, void *sh, lws_ss_constate_t state,
 	   lws_ss_tx_ordinal_t ack)
 {
 	myss_srv_t *m = (myss_srv_t *)userobj;
 
 	lwsl_user("%s: %p %s, ord 0x%x\n", __func__, m->ss,
-		  lws_ss_state_name(state), (unsigned int)ack);
+		  lws_ss_state_name((int)state), (unsigned int)ack);
 
 	switch (state) {
 	case LWSSSCS_DISCONNECTED:

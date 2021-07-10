@@ -71,20 +71,20 @@ lws_ntpc_retry_conn(struct lws_sorted_usec_list *sul)
 {
 	struct vhd_ntpc *v = lws_container_of(sul, struct vhd_ntpc, sul_conn);
 
-	lwsl_debug("%s: wsi_udp: %p\n", __func__, v->wsi_udp);
+	lwsl_debug("%s: wsi_udp: %s\n", __func__, lws_wsi_tag(v->wsi_udp));
 
 	if (v->wsi_udp || !lws_dll2_is_detached(&v->sul_conn.list))
 		return;
 
 	/* create the UDP socket aimed at the server */
 
-	lwsl_debug("%s: server %s\n", __func__, v->ntp_server_ads);
+	lwsl_notice("%s: server %s\n", __func__, v->ntp_server_ads);
 
 	v->retry_count_write = 0;
 	v->wsi_udp = lws_create_adopt_udp(v->vhost, v->ntp_server_ads, 123, 0,
 					  v->protocol->name, NULL, NULL, NULL,
-					  &bo2);
-	lwsl_debug("%s: created wsi_udp: %p\n", __func__, v->wsi_udp);
+					  &bo2, "ntpclient");
+	lwsl_debug("%s: created wsi_udp: %s\n", __func__, lws_wsi_tag(v->wsi_udp));
 	if (!v->wsi_udp) {
 		lwsl_err("%s: unable to create udp skt\n", __func__);
 
@@ -153,7 +153,7 @@ callback_ntpc(struct lws *wsi, enum lws_callback_reasons reason, void *user,
 		if (!v->ntp_server_ads || v->ntp_server_ads[0] == '\0')
 			v->ntp_server_ads = "pool.ntp.org";
 
-		lwsl_info("%s: using ntp server %s\n", __func__,
+		lwsl_notice("%s: using ntp server %s\n", __func__,
 			  v->ntp_server_ads);
 		break;
 
@@ -203,7 +203,7 @@ do_close:
 		 * and add in the ns
 		 */
 
-		ns = lws_ser_ru32be(((uint8_t *)in) + 40) - 2208988800;
+		ns = (uint64_t)lws_ser_ru32be(((uint8_t *)in) + 40) - (uint64_t)2208988800;
 		ns = (ns * 1000000000) + lws_ser_ru32be(((uint8_t *)in) + 44);
 
 		/*
@@ -212,7 +212,7 @@ do_close:
 
 		gettimeofday(&t1, NULL);
 
-		delta_us = (ns / 1000) -
+		delta_us = ((int64_t)ns / 1000) -
 				((t1.tv_sec * LWS_US_PER_SEC) + t1.tv_usec);
 
 		lwsl_notice("%s: Unix time: %llu, step: %lldus\n", __func__,
@@ -233,7 +233,7 @@ do_close:
 #endif
 		if (lws_system_get_ops(wsi->a.context) &&
 		    lws_system_get_ops(wsi->a.context)->set_clock)
-			lws_system_get_ops(wsi->a.context)->set_clock(ns / 1000);
+			lws_system_get_ops(wsi->a.context)->set_clock((int64_t)ns / 1000);
 
 		v->set_time = 1;
 		lws_state_transition_steps(&wsi->a.context->mgr_system,

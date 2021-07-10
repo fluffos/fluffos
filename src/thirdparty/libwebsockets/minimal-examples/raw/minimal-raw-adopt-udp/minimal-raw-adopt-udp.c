@@ -113,7 +113,8 @@ callback_raw_test(struct lws *wsi, enum lws_callback_reasons reason,
 #if defined(WIN32)
 			(int)
 #endif
-			sendlen, 0, &udp.sa, (socklen_t)udp.salen);
+			sendlen, 0, sa46_sockaddr(&udp.sa46),
+			sa46_socklen(&udp.sa46));
 		if (n < (ssize_t)len)
 			lwsl_notice("%s: send returned %d\n", __func__, (int)n);
 		break;
@@ -181,7 +182,8 @@ int main(int argc, const char **argv)
 	 * Create our own "foreign" UDP socket bound to 7681/udp
 	 */
 	if (!lws_create_adopt_udp(vhost, NULL, 7681, LWS_CAUDP_BIND,
-				  protocols[0].name, NULL, NULL, NULL, NULL)) {
+				  protocols[0].name, NULL, NULL, NULL, NULL,
+				  "user")) {
 		lwsl_err("%s: foreign socket adoption failed\n", __func__);
 		goto bail;
 	}

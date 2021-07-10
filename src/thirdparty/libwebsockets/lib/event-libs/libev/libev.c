@@ -142,8 +142,8 @@ elops_init_pt_ev(struct lws_context *context, void *_loop, int tsi)
 	struct ev_loop *loop = (struct ev_loop *)_loop;
 	struct lws_vhost *vh = context->vhost_list;
 	const char *backend_name;
+	unsigned int backend;
 	int status = 0;
-	int backend;
 
 	lwsl_info("%s: loop %p\n", __func__, _loop);
 
@@ -296,14 +296,14 @@ elops_accept_ev(struct lws *wsi)
 }
 
 static void
-elops_io_ev(struct lws *wsi, int flags)
+elops_io_ev(struct lws *wsi, unsigned int flags)
 {
 	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
 	struct lws_pt_eventlibs_libev *ptpr = pt_to_priv_ev(pt);
 	struct lws_wsi_eventlibs_libev *w = wsi_to_priv_ev(wsi);
 
-	lwsl_notice("%s: wsi %p %s flags 0x%x %p %d\n", __func__,
-				wsi, wsi->role_ops->name, flags,
+	lwsl_debug("%s: %s %s flags 0x%x %p %d\n", __func__,
+				lws_wsi_tag(wsi), wsi->role_ops->name, flags,
 				ptpr->io_loop, pt->is_destroyed);
 
 	if (!ptpr->io_loop || pt->is_destroyed)
@@ -355,7 +355,7 @@ elops_destroy_context2_ev(struct lws_context *context)
 		if (pt->event_loop_foreign || !ptpr->io_loop)
 			continue;
 
-		if (!context->finalize_destroy_after_internal_loops_stopped) {
+		if (!context->evlib_finalize_destroy_after_int_loops_stop) {
 			ev_break(ptpr->io_loop, EVBREAK_ONE);
 			continue;
 		}
@@ -439,6 +439,7 @@ const lws_plugin_evlib_t evlib_ev = {
 	.hdr = {
 		"libev event loop",
 		"lws_evlib_plugin",
+		LWS_BUILD_HASH,
 		LWS_PLUGIN_API_MAGIC
 	},
 

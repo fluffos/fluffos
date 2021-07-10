@@ -72,6 +72,27 @@ enum lws_client_connect_ssl_connection_flags {
 	 * means you may block other connection processing in favour of incoming
 	 * data processing on this one if it receives back to back incoming rx.
 	 */
+	LCCSCF_SECSTREAM_CLIENT			= (1 << 21),
+	/**< used to mark client wsi as bound to secure stream */
+	LCCSCF_SECSTREAM_PROXY_LINK		= (1 << 22),
+	/**< client is a link between SS client and SS proxy */
+	LCCSCF_SECSTREAM_PROXY_ONWARD		= (1 << 23),
+	/**< client the SS proxy's onward connection */
+
+	LCCSCF_IP_LOW_LATENCY			= (1 << 24),
+	/**< set the "low delay" bit on the IP packets of this connection */
+	LCCSCF_IP_HIGH_THROUGHPUT		= (1 << 25),
+	/**< set the "high throughput" bit on the IP packets of this
+	 *   connection */
+	LCCSCF_IP_HIGH_RELIABILITY		= (1 << 26),
+	/**< set the "high reliability" bit on the IP packets of this
+	 *   connection */
+	LCCSCF_IP_LOW_COST			= (1 << 27),
+	/**< set the "minimize monetary cost" bit on the IP packets of this
+	 *   connection */
+	LCCSCF_CONMON				= (1 << 28),
+	/**< If LWS_WITH_CONMON enabled for build, keeps a copy of the
+	 * getaddrinfo results so they can be queried subsequently */
 };
 
 /** struct lws_client_connect_info - parameters to connect with when using
@@ -171,11 +192,29 @@ struct lws_client_connect_info {
 	 * to the client connection.
 	 */
 
+	uint8_t		priority;
+	/**< 0 means normal priority... otherwise sets the IP priority on
+	 * packets coming from this connection, from 1 - 7.  Setting 7
+	 * (network management priority) requires CAP_NET_ADMIN capability but
+	 * the others can be set by anyone.
+	 */
+
 #if defined(LWS_ROLE_MQTT)
 	const lws_mqtt_client_connect_param_t *mqtt_cp;
 #else
 	void		*mqtt_cp;
 #endif
+
+#if defined(LWS_WITH_SYS_FAULT_INJECTION)
+	lws_fi_ctx_t				fic;
+	/**< Attach external Fault Injection context to the client wsi,
+	 * hierarchy is wsi -> vhost -> context */
+#endif
+	/* for convenience, available when FI disabled in build */
+	const char				*fi_wsi_name;
+	/**< specific Fault Injection namespace name for wsi created for this
+	 * connection, allows targeting by "wsi=XXX/..." if you give XXX here.
+	 */
 
 	uint16_t	keep_warm_secs;
 	/**< 0 means 5s.  If the client connection to the endpoint becomes idle,
@@ -339,5 +378,22 @@ lws_client_http_multipart(struct lws *wsi, const char *name,
  */
 LWS_VISIBLE LWS_EXTERN int
 lws_http_basic_auth_gen(const char *user, const char *pw, char *buf, size_t len);
+
+/**
+ * lws_tls_session_is_reused() - returns nonzero if tls session was cached
+ *
+ * \param wsi: the wsi
+ *
+ * Returns zero if the tls session is fresh, else nonzero if the tls session was
+ * taken from the cache.  If lws is built with LWS_WITH_TLS_SESSIONS and the vhost
+ * was created with the option LWS_SERVER_OPTION_ENABLE_TLS_SESSION_CACHE, then
+ * on full tls session establishment of a client connection, the session is added
+ * to the tls cache.
+ *
+ * This lets you find out if your session was new (0) or from the cache (nonzero),
+ * it'a mainly useful for stats and testing.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_tls_session_is_reused(struct lws *wsi);
 
 ///@}

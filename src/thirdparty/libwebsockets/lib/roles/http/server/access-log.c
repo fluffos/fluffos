@@ -43,12 +43,15 @@ static const char * const hver[] = {
 void
 lws_prepare_access_log_info(struct lws *wsi, char *uri_ptr, int uri_len, int meth)
 {
-	char da[64], uri[256];
+	char da[64], uri[256], ta[64];
 	time_t t = time(NULL);
 	struct lws *nwsi;
 	const char *me;
 	int l = 256, m;
-	struct tm *tmp;
+	struct tm *ptm = NULL;
+#if defined(LWS_HAVE_LOCALTIME_R)
+	struct tm tm;
+#endif
 
 	if (!wsi->a.vhost)
 		return;
@@ -60,13 +63,17 @@ lws_prepare_access_log_info(struct lws *wsi, char *uri_ptr, int uri_len, int met
 	if (wsi->access_log_pending)
 		lws_access_log(wsi);
 
-	wsi->http.access_log.header_log = lws_malloc(l, "access log");
+	wsi->http.access_log.header_log = lws_malloc((unsigned int)l, "access log");
 	if (!wsi->http.access_log.header_log)
 		return;
 
-	tmp = localtime(&t);
-	if (tmp)
-		strftime(da, sizeof(da), "%d/%b/%Y:%H:%M:%S %z", tmp);
+#if defined(LWS_HAVE_LOCALTIME_R)
+	ptm = localtime_r(&t, &tm);
+#else
+	ptm = localtime(&t);
+#endif
+	if (ptm)
+		strftime(da, sizeof(da), "%d/%b/%Y:%H:%M:%S %z", ptm);
 	else
 		strcpy(da, "01/Jan/1970:00:00:00 +0000");
 
@@ -84,22 +91,26 @@ lws_prepare_access_log_info(struct lws *wsi, char *uri_ptr, int uri_len, int met
 	if (m > (int)sizeof(uri) - 1)
 		m = sizeof(uri) - 1;
 
-	strncpy(uri, uri_ptr, m);
+	strncpy(uri, uri_ptr, (unsigned int)m);
 	uri[m] = '\0';
 
 	nwsi = lws_get_network_wsi(wsi);
 
-	lws_snprintf(wsi->http.access_log.header_log, l,
+	if (wsi->sa46_peer.sa4.sin_family)
+		lws_sa46_write_numeric_address(&nwsi->sa46_peer, ta, sizeof(ta));
+	else
+		strncpy(ta, "unknown", sizeof(ta));
+
+	lws_snprintf(wsi->http.access_log.header_log, (size_t)l,
 		     "%s - - [%s] \"%s %s %s\"",
-		     nwsi->simple_ip[0] ? nwsi->simple_ip : "unknown", da, me, uri,
-			hver[wsi->http.request_version]);
+		     ta, da, me, uri, hver[wsi->http.request_version]);
 
 	//lwsl_notice("%s\n", wsi->http.access_log.header_log);
 
 	l = lws_hdr_total_length(wsi, WSI_TOKEN_HTTP_USER_AGENT);
 	if (l) {
 		wsi->http.access_log.user_agent =
-				lws_malloc(l + 5, "access log");
+				lws_malloc((unsigned int)l + 5, "access log");
 		if (!wsi->http.access_log.user_agent) {
 			lwsl_err("OOM getting user agent\n");
 			lws_free_set_NULL(wsi->http.access_log.header_log);
@@ -115,7 +126,7 @@ lws_prepare_access_log_info(struct lws *wsi, char *uri_ptr, int uri_len, int met
 	}
 	l = lws_hdr_total_length(wsi, WSI_TOKEN_HTTP_REFERER);
 	if (l) {
-		wsi->http.access_log.referrer = lws_malloc(l + 5, "referrer");
+		wsi->http.access_log.referrer = lws_malloc((unsigned int)l + 5, "referrer");
 		if (!wsi->http.access_log.referrer) {
 			lwsl_err("OOM getting referrer\n");
 			lws_free_set_NULL(wsi->http.access_log.user_agent);
@@ -168,15 +179,15 @@ lws_access_log(struct lws *wsi)
 			 wsi->http.access_log.header_log,
 			 wsi->http.access_log.response,
 			 wsi->http.access_log.sent, p1);
-	if (strlen(p) > sizeof(ass) - 6 - l) {
-		p[sizeof(ass) - 6 - l] = '\0';
+	if (strlen(p) > sizeof(ass) - 6 - (unsigned int)l) {
+		p[sizeof(ass) - 6 - (unsigned int)l] = '\0';
 		l--;
 	}
-	l += lws_snprintf(ass + l, sizeof(ass) - 1 - l, "\" \"%s\"\n", p);
+	l += lws_snprintf(ass + (unsigned int)l, sizeof(ass) - 1 - (unsigned int)l, "\" \"%s\"\n", p);
 
 	ass[sizeof(ass) - 1] = '\0';
 
-	if (write(wsi->a.vhost->log_fd, ass, l) != l)
+	if ((int)write(wsi->a.vhost->log_fd, ass, (size_t)l) != l)
 		lwsl_err("Failed to write log\n");
 
 	if (wsi->http.access_log.header_log) {

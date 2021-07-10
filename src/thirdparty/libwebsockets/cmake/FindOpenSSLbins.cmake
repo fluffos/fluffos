@@ -3,14 +3,14 @@ if(OPENSSL_FOUND)
 
 	find_program(OPENSSL_EXECUTABLE openssl openssl.exe bin/openssl.exe
 		HINTS ${_OPENSSL_ROOT_HINTS}
-		PATH
-			/usr/bin/
+		PATH 
+			/usr/bin/ 
 			bin/
 	  	DOC "Openssl executable")
 
 	mark_as_advanced(OPENSSL_EXECUTABLE)
-
-	# On Windows, we need to copy the OpenSSL dlls
+	
+	# On Windows, we need to copy the OpenSSL dlls 
 	# to the output directory.
   # BUT only if non-static libs (referencing dlls) are used
   # In this case
@@ -19,7 +19,7 @@ if(OPENSSL_FOUND)
   #    and typically reside in the same or in a close by directory as the executable
   # ** we do NOT want to find dlls in general dll directories such as C:\Windows\systemXX
   #    because these IN GENERAL are not compatible with the libs
-	if(WIN32 AND OPENSSL_VERSION)
+	if (WIN32 AND OPENSSL_VERSION)
 		set(OPENSSL_BIN_FOUND 0)
 
     # we check for OpenSSL versioning, as described in https://wiki.openssl.org/index.php/Versioning
@@ -52,7 +52,7 @@ if(OPENSSL_FOUND)
       endif()
       message(VERBOSE "OPENSSL_EXECUTABLE_BIN_PATH=${OPENSSL_EXECUTABLE_BIN_PATH}")
 
-      unset(LIBCRYPTO_BIN)         # clear
+      unset(LIBCRYPTO_BIN)         # clear 
       unset(LIBCRYPTO_BIN CACHE)   # clear as well, because otherwise find_file might use it
       find_file(LIBCRYPTO_BIN
         NO_DEFAULT_PATH
@@ -61,7 +61,7 @@ if(OPENSSL_FOUND)
       )
       message(VERBOSE "LIBCRYPTO_BIN=${LIBCRYPTO_BIN}")
 
-      unset(LIBSSL_BIN)         # clear
+      unset(LIBSSL_BIN)         # clear 
       unset(LIBSSL_BIN CACHE)   # clear as well, because otherwise find_file might use it
 		  find_file(LIBSSL_BIN
         NO_DEFAULT_PATH
@@ -71,7 +71,7 @@ if(OPENSSL_FOUND)
       message(VERBOSE "LIBSSL_BIN=${LIBSSL_BIN}")
 
     else() # the version regex did not match
-
+    
     # as a fallback, we check for "old" OpenSSL library (used before OpenSSL 1.1.0)
 
 		find_file(LIBCRYPTO_BIN
@@ -81,7 +81,7 @@ if(OPENSSL_FOUND)
 			${_OPENSSL_ROOT_HINTS}
 			PATH_SUFFIXES
 			bin)
-
+		
 		find_file(LIBSSL_BIN
 			NAMES
 			ssleay32.dll
@@ -89,7 +89,7 @@ if(OPENSSL_FOUND)
 			${_OPENSSL_ROOT_HINTS}
 			PATH_SUFFIXES
 			bin)
-
+		
     endif()
 
 		if(LIBCRYPTO_BIN AND LIBSSL_BIN)
@@ -97,6 +97,6 @@ if(OPENSSL_FOUND)
 		endif()
 
 	endif(WIN32 AND OPENSSL_VERSION)
-
+		
 endif(OPENSSL_FOUND)
 

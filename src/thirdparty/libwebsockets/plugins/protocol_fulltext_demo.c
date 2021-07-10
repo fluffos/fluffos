@@ -19,8 +19,12 @@
  */
 
 #if !defined (LWS_PLUGIN_STATIC)
+#if !defined(LWS_DLL)
 #define LWS_DLL
+#endif
+#if !defined(LWS_INTERNAL)
 #define LWS_INTERNAL
+#endif
 #include <libwebsockets.h>
 #endif
 
@@ -74,7 +78,7 @@ callback_fts(struct lws *wsi, enum lws_callback_reasons reason, void *user,
 		vhd = lws_protocol_vh_priv_zalloc(lws_get_vhost(wsi),
 			     lws_get_protocol(wsi),sizeof(struct vhd_fts_demo));
 		if (!vhd)
-			return 1;
+			return 0;
 		if (lws_pvo_get_str(in, "indexpath",
 				    (const char **)&vhd->indexpath))
 			return 1;
@@ -158,11 +162,11 @@ reply_404:
 
 		n = LWS_WRITE_HTTP;
 		if (pss->first)
-			p += lws_snprintf((char *)p, lws_ptr_diff(end, p),
+			p += lws_snprintf((char *)p, lws_ptr_diff_size_t(end, p),
 				"{\"indexed\": %d, \"ac\": [", !!pss->result);
 
 		while (pss->ac && lws_ptr_diff(end, p) > 256) {
-			p += lws_snprintf((char *)p, lws_ptr_diff(end, p),
+			p += lws_snprintf((char *)p, lws_ptr_diff_size_t(end, p),
 				"%c{\"ac\": \"%s\",\"matches\": %d,"
 				"\"agg\": %d, \"elided\": %d}",
 				pss->first ? ' ' : ',', (char *)(pss->ac + 1),
@@ -176,14 +180,14 @@ reply_404:
 		if (!pss->ac_done && !pss->ac && pss->fp) {
 			pss->ac_done = 1;
 
-			p += lws_snprintf((char *)p, lws_ptr_diff(end, p),
+			p += lws_snprintf((char *)p, lws_ptr_diff_size_t(end, p),
 					  "], \"fp\": [");
 		}
 
-		while (pss->fp && lws_ptr_diff(end, p) > 256) {
+		while (pss->fp && lws_ptr_diff_size_t(end, p) > 256) {
 			if (!pss->fp_init_done) {
 				p += lws_snprintf((char *)p,
-					lws_ptr_diff(end, p),
+						lws_ptr_diff_size_t(end, p),
 					"%c{\"path\": \"%s\",\"matches\": %d,"
 					"\"origlines\": %d,"
 					"\"hits\": [", pss->first ? ' ' : ',',
@@ -201,7 +205,7 @@ reply_404:
 				       lws_ptr_diff(end, p) > 256) {
 
 					p += lws_snprintf((char *)p,
-						lws_ptr_diff(end, p),
+							lws_ptr_diff_size_t(end, p),
 						"%c\n{\"l\":%d,\"o\":%d,"
 						"\"s\":\"%s\"}",
 						!pss->done ? ' ' : ',',
@@ -224,12 +228,12 @@ reply_404:
 
 		if (!pss->ac && !pss->fp) {
 			n = LWS_WRITE_HTTP_FINAL;
-			p += lws_snprintf((char *)p, lws_ptr_diff(end, p),
+			p += lws_snprintf((char *)p, lws_ptr_diff_size_t(end, p),
 						"]}");
 		}
 
 		if (lws_write(wsi, (uint8_t *)start,
-			      lws_ptr_diff(p, start), n) !=
+				lws_ptr_diff_size_t(p, start), (enum lws_write_protocol)n) !=
 					      lws_ptr_diff(p, start))
 			return 1;
 
@@ -262,7 +266,7 @@ reply_404:
 
 #if !defined (LWS_PLUGIN_STATIC)
 
-static const struct lws_protocols protocols[] = {
+LWS_VISIBLE const struct lws_protocols fulltext_demo_protocols[] = {
 	LWS_PLUGIN_PROTOCOL_FULLTEXT_DEMO
 };
 
@@ -270,11 +274,12 @@ LWS_VISIBLE const lws_plugin_protocol_t fulltext_demo = {
 	.hdr = {
 		"fulltext demo",
 		"lws_protocol_plugin",
+		LWS_BUILD_HASH,
 		LWS_PLUGIN_API_MAGIC
 	},
 
-	.protocols = protocols,
-	.count_protocols = LWS_ARRAY_SIZE(protocols),
+	.protocols = fulltext_demo_protocols,
+	.count_protocols = LWS_ARRAY_SIZE(fulltext_demo_protocols),
 	.extensions = NULL,
 	.count_extensions = 0,
 };

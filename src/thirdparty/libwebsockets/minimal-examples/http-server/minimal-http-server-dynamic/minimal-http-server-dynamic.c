@@ -45,6 +45,9 @@ callback_dynamic_http(struct lws *wsi, enum lws_callback_reasons reason,
 		*end = &buf[sizeof(buf) - LWS_PRE - 1];
 	time_t t;
 	int n;
+#if defined(LWS_HAVE_CTIME_R)
+	char date[32];
+#endif
 
 	switch (reason) {
 	case LWS_CALLBACK_HTTP:
@@ -70,6 +73,19 @@ callback_dynamic_http(struct lws *wsi, enum lws_callback_reasons reason,
 		lws_get_peer_simple(wsi, (char *)buf, sizeof(buf));
 		lwsl_notice("%s: HTTP: connection %s, path %s\n", __func__,
 				(const char *)buf, pss->path);
+
+		/*
+		 * Demonstrates how to retreive a urlarg x=value
+		 */
+
+		{
+			char value[100];
+			int z = lws_get_urlarg_by_name_safe(wsi, "x", value,
+					   sizeof(value) - 1);
+
+			if (z >= 0)
+				lwsl_hexdump_notice(value, (size_t)z);
+		}
 
 		/*
 		 * prepare and write http headers... with regards to content-
@@ -145,14 +161,19 @@ callback_dynamic_http(struct lws *wsi, enum lws_callback_reasons reason,
 			 * to work with http/2, we must take care about LWS_PRE
 			 * valid behind the buffer we will send.
 			 */
-			p += lws_snprintf((char *)p, end - p, "<html>"
+			p += lws_snprintf((char *)p, lws_ptr_diff_size_t(end, p), "<html>"
 				"<head><meta charset=utf-8 "
 				"http-equiv=\"Content-Language\" "
 				"content=\"en\"/></head><body>"
 				"<img src=\"/libwebsockets.org-logo.svg\">"
 				"<br>Dynamic content for '%s' from mountpoint."
 				"<br>Time: %s<br><br>"
-				"</body></html>", pss->path, ctime(&t));
+				"</body></html>", pss->path,
+#if defined(LWS_HAVE_CTIME_R)
+				ctime_r(&t, date));
+#else
+				ctime(&t));
+#endif
 		} else {
 			/*
 			 * after the first time, we create bulk content.
@@ -162,15 +183,15 @@ callback_dynamic_http(struct lws *wsi, enum lws_callback_reasons reason,
 			 */
 
 			while (lws_ptr_diff(end, p) > 80)
-				p += lws_snprintf((char *)p, end - p,
+				p += lws_snprintf((char *)p, lws_ptr_diff_size_t(end, p),
 					"%d.%d: this is some content... ",
 					pss->times, pss->content_lines++);
 
-			p += lws_snprintf((char *)p, end - p, "<br><br>");
+			p += lws_snprintf((char *)p, lws_ptr_diff_size_t(end, p), "<br><br>");
 		}
 
 		pss->times++;
-		if (lws_write(wsi, (uint8_t *)start, lws_ptr_diff(p, start), n) !=
+		if (lws_write(wsi, (uint8_t *)start, lws_ptr_diff_size_t(p, start), (enum lws_write_protocol)n) !=
 				lws_ptr_diff(p, start))
 			return 1;
 

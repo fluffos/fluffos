@@ -19,8 +19,12 @@
  */
 
 #if !defined (LWS_PLUGIN_STATIC)
+#if !defined(LWS_DLL)
 #define LWS_DLL
+#endif
+#if !defined(LWS_INTERNAL)
 #define LWS_INTERNAL
+#endif
 #include <libwebsockets.h>
 #endif
 
@@ -55,7 +59,7 @@ callback_dumb_increment(struct lws *wsi, enum lws_callback_reasons reason,
 			lws_get_protocol(wsi),
 			sizeof(struct vhd__dumb_increment));
 		if (!vhd)
-			return -1;
+			return 0;
 		if ((opt = lws_pvo_search(
 				(const struct lws_protocol_vhost_options *)in,
 				"options")))
@@ -71,7 +75,7 @@ callback_dumb_increment(struct lws *wsi, enum lws_callback_reasons reason,
 	case LWS_CALLBACK_SERVER_WRITEABLE:
 		n = lws_snprintf((char *)p, sizeof(buf) - LWS_PRE, "%d",
 				 pss->number++);
-		m = lws_write(wsi, p, n, LWS_WRITE_TEXT);
+		m = lws_write(wsi, p, (unsigned int)n, LWS_WRITE_TEXT);
 		if (m < n) {
 			lwsl_err("ERROR %d writing to di socket\n", n);
 			return -1;
@@ -117,7 +121,7 @@ callback_dumb_increment(struct lws *wsi, enum lws_callback_reasons reason,
 
 #if !defined (LWS_PLUGIN_STATIC)
 		
-static const struct lws_protocols protocols[] = {
+LWS_VISIBLE const struct lws_protocols dumb_increment_protocols[] = {
 	LWS_PLUGIN_PROTOCOL_DUMB_INCREMENT
 };
 
@@ -125,11 +129,12 @@ LWS_VISIBLE const lws_plugin_protocol_t dumb_increment = {
 	.hdr = {
 		"dumb increment",
 		"lws_protocol_plugin",
+		LWS_BUILD_HASH,
 		LWS_PLUGIN_API_MAGIC
 	},
 
-	.protocols = protocols,
-	.count_protocols = LWS_ARRAY_SIZE(protocols),
+	.protocols = dumb_increment_protocols,
+	.count_protocols = LWS_ARRAY_SIZE(dumb_increment_protocols),
 	.extensions = NULL,
 	.count_extensions = 0,
 };

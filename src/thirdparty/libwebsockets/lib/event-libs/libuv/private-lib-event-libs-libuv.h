@@ -37,13 +37,13 @@
  *  - contribute to context->uv_count_static_asset_handles
  *    counting
  */
-#define LWS_UV_REFCOUNT_STATIC_HANDLE_NEW(_x, _ctx) \
-		{ uv_handle_t *_uht = (uv_handle_t *)(_x); _uht->data = _ctx; \
-		_ctx->count_event_loop_static_asset_handles++; }
-#define LWS_UV_REFCOUNT_STATIC_HANDLE_TO_CONTEXT(_x) \
-		((struct lws_context *)((uv_handle_t *)((_x)->data)))
+#define LWS_UV_REFCOUNT_STATIC_HANDLE_NEW(_x, _pt) \
+		{ uv_handle_t *_uht = (uv_handle_t *)(_x); _uht->data = _pt; \
+		_pt->count_event_loop_static_asset_handles++; }
+#define LWS_UV_REFCOUNT_STATIC_HANDLE_TO_PT(_x) \
+		((struct lws_context_per_thread *)((uv_handle_t *)((_x)->data)))
 #define LWS_UV_REFCOUNT_STATIC_HANDLE_DESTROYED(_x) \
-		(--(LWS_UV_REFCOUNT_STATIC_HANDLE_TO_CONTEXT(_x)-> \
+		(--(LWS_UV_REFCOUNT_STATIC_HANDLE_TO_PT(_x)-> \
 				count_event_loop_static_asset_handles))
 
 struct lws_signal_watcher_libuv {
@@ -58,6 +58,7 @@ struct lws_pt_eventlibs_libuv {
 	uv_timer_t sultimer;
 	uv_idle_t idle;
 	struct lws_signal_watcher_libuv w_sigint;
+	int extant_handles;
 };
 
 struct lws_context_eventlibs_libuv {

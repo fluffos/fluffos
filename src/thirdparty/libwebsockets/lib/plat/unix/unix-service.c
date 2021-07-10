@@ -43,6 +43,8 @@ _lws_plat_service_forced_tsi(struct lws_context *context, int tsi)
 
 	/* any socket with events to service? */
 	for (n = 0; n < (int)pt->fds_count; n++) {
+		lws_sockfd_type fd = pt->fds[n].fd;
+
 		if (!pt->fds[n].revents)
 			continue;
 
@@ -52,8 +54,10 @@ _lws_plat_service_forced_tsi(struct lws_context *context, int tsi)
 				 __func__, m);
 			return -1;
 		}
-		/* if something closed, retry this slot */
-		if (m)
+
+		/* if something closed, retry this slot since may have been
+		 * swapped with end fd */
+		if (m && pt->fds[n].fd != fd)
 			n--;
 	}
 
@@ -71,6 +75,9 @@ _lws_plat_service_tsi(struct lws_context *context, int timeout_ms, int tsi)
 	volatile struct lws_context_per_thread *vpt;
 	struct lws_context_per_thread *pt;
 	lws_usec_t timeout_us, us;
+#if defined(LWS_WITH_SYS_METRICS)
+	lws_usec_t a, b;
+#endif
 	int n;
 #if (defined(LWS_ROLE_WS) && !defined(LWS_WITHOUT_EXTENSIONS)) || defined(LWS_WITH_TLS)
 	int m;
@@ -81,10 +88,13 @@ _lws_plat_service_tsi(struct lws_context *context, int timeout_ms, int tsi)
 	if (!context)
 		return 1;
 
+#if defined(LWS_WITH_SYS_METRICS)
+	b =
+#endif
+			us = lws_now_usecs();
+
 	pt = &context->pt[tsi];
 	vpt = (volatile struct lws_context_per_thread *)pt;
-
-	lws_stats_bump(pt, LWSSTATS_C_SERVICE_ENTRY, 1);
 
 	if (timeout_ms < 0)
 		timeout_ms = 0;
@@ -108,14 +118,19 @@ _lws_plat_service_tsi(struct lws_context *context, int timeout_ms, int tsi)
 		pt->service_tid_detected = 1;
 	}
 
-	us = lws_now_usecs();
 	lws_pt_lock(pt, __func__);
 	/*
 	 * service ripe scheduled events, and limit wait to next expected one
 	 */
 	us = __lws_sul_service_ripe(pt->pt_sul_owner, LWS_COUNT_PT_SUL_OWNERS, us);
 	if (us && us < timeout_us)
-		timeout_us = us;
+		/*
+		 * If something wants zero wait, that's OK, but if the next sul
+		 * coming ripe is an interval less than our wait resolution,
+		 * bump it to be the wait resolution.
+		 */
+		timeout_us = us < context->us_wait_resolution ?
+					context->us_wait_resolution : us;
 
 	lws_pt_unlock(pt);
 
@@ -129,21 +144,18 @@ _lws_plat_service_tsi(struct lws_context *context, int timeout_ms, int tsi)
 
 	timeout_us /= LWS_US_PER_MS; /* ms now */
 
+#if defined(LWS_WITH_SYS_METRICS)
+	a = lws_now_usecs() - b;
+#endif
 	vpt->inside_poll = 1;
 	lws_memory_barrier();
-	n = poll(pt->fds, pt->fds_count, timeout_us /* ms now */ );
+	n = poll(pt->fds, pt->fds_count, (int)timeout_us /* ms now */ );
 	vpt->inside_poll = 0;
 	lws_memory_barrier();
 
-	#if defined(LWS_WITH_DETAILED_LATENCY)
-	/*
-	 * so we can track how long it took before we actually read a
-	 * POLLIN that was signalled when we last exited poll()
-	 */
-	if (context->detailed_latency_cb)
-		pt->ust_left_poll = lws_now_usecs();
+#if defined(LWS_WITH_SYS_METRICS)
+	b = lws_now_usecs();
 #endif
-
 	/* Collision will be rare and brief.  Spin until it completes */
 	while (vpt->foreign_spinlock)
 		;
@@ -198,14 +210,16 @@ _lws_plat_service_tsi(struct lws_context *context, int timeout_ms, int tsi)
 #if (defined(LWS_ROLE_WS) && !defined(LWS_WITHOUT_EXTENSIONS)) || defined(LWS_WITH_TLS)
 		!m &&
 #endif
-		!n) { /* nothing to do */
+		!n) /* nothing to do */
 		lws_service_do_ripe_rxflow(pt);
+	else
+		if (_lws_plat_service_forced_tsi(context, tsi) < 0)
+			return -1;
 
-		return 0;
-	}
-
-	if (_lws_plat_service_forced_tsi(context, tsi) < 0)
-		return -1;
+#if defined(LWS_WITH_SYS_METRICS)
+	lws_metric_event(context->mt_service, METRES_GO,
+			 (u_mt_t) (a + (lws_now_usecs() - b)));
+#endif
 
 	if (pt->destroy_self) {
 		lws_context_destroy(pt->context);

@@ -1,5 +1,5 @@
 /*
- * lws-minimal-secure-streams
+ * lws-minimal-secure-streams-staticpolicy
  *
  * Written in 2010-2020 by Andy Green <andy@warmcat.com>
  *
@@ -100,8 +100,8 @@ myss_state(void *userobj, void *sh, lws_ss_constate_t state,
 	case LWSSSCS_CREATING:
 		lws_ss_set_metadata(m->ss, "uptag", "myuptag123", 10);
 		lws_ss_set_metadata(m->ss, "ctype", "myctype", 7);
-		lws_ss_client_connect(m->ss);
-		break;
+		return lws_ss_client_connect(m->ss);
+
 	case LWSSSCS_ALL_RETRIES_FAILED:
 		/* if we're out of retries, we want to close the app and FAIL */
 		interrupted = 1;
@@ -230,10 +230,6 @@ int main(int argc, const char **argv)
 	info.options = LWS_SERVER_OPTION_EXPLICIT_VHOSTS |
 		       LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
 #endif
-#if defined(LWS_WITH_DETAILED_LATENCY)
-	info.detailed_latency_cb = lws_det_lat_plot_cb;
-	info.detailed_latency_filepath = "/tmp/lws-latency-ssproxy";
-#endif
 
 	/* integrate us with lws system state management when context created */
 
@@ -276,7 +272,7 @@ int main(int argc, const char **argv)
 
 	lws_system_blob_heap_append(lws_system_get_blob(context,
 				    LWS_SYSBLOB_TYPE_DEVICE_TYPE, 0),
-				   (const uint8_t *)"spacerocket", 11);
+				    (const uint8_t *)"spacerocket", 11);
 
 	/* the event loop */
 
