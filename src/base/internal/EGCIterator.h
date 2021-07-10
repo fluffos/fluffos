@@ -29,8 +29,8 @@ class EGCIterator {
  public:
   bool ok() { return ok_; }
   const char* data() { return src_; }
-  auto operator ->() {return brk_.operator->();};
-  EGCIterator(const char* src, int32_t slen): src_(src) {
+  auto operator->() { return brk_.operator->(); };
+  EGCIterator(const char* src, int32_t slen) : src_(src) {
     UErrorCode status = U_ZERO_ERROR;
     brk_.reset(icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status));
     if (!U_SUCCESS(status)) {
@@ -61,4 +61,4 @@ class EGCIterator {
   }
 };
 
-#endif //FLUFFOS_SRC_BASE_INTERNAL_STRUTILS_CC_EGCSTRINGVIEW_H_
+#endif  // FLUFFOS_SRC_BASE_INTERNAL_STRUTILS_CC_EGCSTRINGVIEW_H_

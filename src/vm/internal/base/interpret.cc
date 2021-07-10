@@ -565,7 +565,7 @@ void push_indexed_lvalue(int reverse) {
     switch (lv->type) {
       case T_STRING: {
         EGCSmartIterator iter(lv->u.string, SVALUE_STRLEN(lv));
-        if(!iter.ok()) {
+        if (!iter.ok()) {
           error("Bad UTF-8 String: push_indexed_lvalue");
         };
         if (reverse) {
@@ -2580,7 +2580,7 @@ void eval_instruction(char *p) {
           sp->type = T_NUMBER;
           global_lvalue_codepoint.index = -1;
           global_lvalue_codepoint.owner = sp - 1;
-          EGCSmartIterator iter((sp - 1)->u.string, SVALUE_STRLEN((sp -1)));
+          EGCSmartIterator iter((sp - 1)->u.string, SVALUE_STRLEN((sp - 1)));
           if (!iter.ok()) {
             error("f_foreach: Invalid utf-8 string.");
           }
@@ -3265,7 +3265,7 @@ void eval_instruction(char *p) {
             if (i == 0) {
               free_string_svalue(sp);
               (--sp)->u.number = 0;
-              break ;
+              break;
             }
             UChar32 c = u8_egc_index_as_single_codepoint(sp->u.string, i);
             if (c == -2) {

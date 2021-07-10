@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
   }
 
   symbol_enable(1);
-  
+
   // Initialize libevent, This should be done before executing LPC.
   auto base = init_main(argc, argv);
 

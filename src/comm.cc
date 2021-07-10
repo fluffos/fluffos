@@ -675,7 +675,8 @@ int flush_message(interactive_t *ip) {
     return 0;
   }
 
-  // Currently only support Libevent based connections, for websocket based connections, they use ip->lws.
+  // Currently only support Libevent based connections, for websocket based connections, they use
+  // ip->lws.
   if (ip->ev_buffer) {
     // Try to flush things normally
     if (bufferevent_flush(ip->ev_buffer, EV_WRITE, BEV_FLUSH) == -1) return 0;
@@ -684,7 +685,7 @@ int flush_message(interactive_t *ip) {
     // implement our own.
     if (ip->ssl) {
       // TODO: implement this
-   } else {
+    } else {
       auto fd = bufferevent_getfd(ip->ev_buffer);
       if (fd == -1) {
         return 0;
