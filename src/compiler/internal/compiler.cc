@@ -26,7 +26,6 @@
 #include "packages/mudlib_stats/mudlib_stats.h"
 #endif
 
-
 // Align to pointer-size boundary, this will work fine for both x86 & x86_64, because we don't use
 // long double (16-bytes).
 #define align(x) (((x) + (sizeof(void *) - 1)) & ~(sizeof(void *) - 1))
@@ -1223,7 +1222,7 @@ int define_new_function(const char *name, int num_arg, int num_local, int flags,
       }
     }
   }
-  if(flags & FUNC_PROTOTYPE) {
+  if (flags & FUNC_PROTOTYPE) {
     symbol_record(OP_SYMBOL_FUNC, current_file, current_line, name);
   }
   return newindex;

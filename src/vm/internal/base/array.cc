@@ -284,7 +284,7 @@ array_t *explode_string(const char *str, int slen, const char *del, int dellen, 
    * in other mode, only skip one.
    */
   while (sourcelen) {
-    auto i =u8_egc_find_as_offset(source, sourcelen, del, dellen, true);
+    auto i = u8_egc_find_as_offset(source, sourcelen, del, dellen, true);
     if (i <= 0 || i != (sourcelen - dellen)) break;
     sourcelen -= dellen;
     num_trailing++;

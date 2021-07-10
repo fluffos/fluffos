@@ -645,8 +645,7 @@ void f_range(int code) {
         }
       }
 
-      if ((from > 0 && to > 0 && to < from)
-          || (from < 0 && to < 0 && to < from)) {
+      if ((from > 0 && to > 0 && to < from) || (from < 0 && to < 0 && to < from)) {
         free_string_svalue(sp + 2);
         sp->type = T_STRING;
         sp->subtype = STRING_CONSTANT;
@@ -667,7 +666,7 @@ void f_range(int code) {
           sp->type = T_STRING;
           sp->subtype = STRING_CONSTANT;
           sp->u.string = "";
-          return ;
+          return;
         }
         char *tmp = new_string(end - start, "f_range");
         memcpy(tmp, iter.data() + start, end - start);
