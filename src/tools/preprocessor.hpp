@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
+#include <iostream>
 
 #include "ghc/filesystem.hpp"
 namespace fs = ghc::filesystem;
@@ -975,7 +976,7 @@ static void handle_include(char *name) {
     return;
   }
 
-  fprintf(stderr, "Opening file: %s\n", include_file.c_str());
+  std::cerr << "Opening file: " << include_file << std::endl;
   if ((f = fopen(include_file.c_str(), "r")) != nullptr) {
     is = (incstate *)malloc(sizeof(incstate) /*, 61, "handle_include: 1" */);
     is->yyin = yyin;
