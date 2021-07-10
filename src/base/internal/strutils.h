@@ -103,14 +103,13 @@ inline void ReplaceStringInPlace(std::string &subject, const std::string &search
     pos += replace.length();
   }
 }
-} // namespace
-
+}  // namespace
 
 // a smarter subclass that remembers current location and attempt to do
 // relative movement to improve speed. but offer no access to underlying break iterator.
 class EGCSmartIterator : public EGCIterator {
  public:
-  EGCSmartIterator(const char* src, int32_t slen): EGCIterator(src, slen) {}
+  EGCSmartIterator(const char *src, int32_t slen) : EGCIterator(src, slen) {}
   size_t count() {
     if (count_ == -1) {
       count_ = 0;
@@ -130,13 +129,13 @@ class EGCSmartIterator : public EGCIterator {
       brk_->last();
       return brk_->previous();
     }
-    if (index > 0) { // forward search
+    if (index > 0) {  // forward search
       if (current_idx_ < 0 || (current_idx_ >= 0 && current_idx_ > 2 * index)) {
         current_idx_ = 0;
         brk_->first();
       }
-    } else { // reverse search
-      if(current_idx_ >= 0 || (current_idx_ < 0 && current_idx_ < 2 * index)) {
+    } else {  // reverse search
+      if (current_idx_ >= 0 || (current_idx_ < 0 && current_idx_ < 2 * index)) {
         current_idx_ = -1;
         brk_->last();
         brk_->previous();
@@ -145,7 +144,7 @@ class EGCSmartIterator : public EGCIterator {
     auto oldpos = brk_->current();
     auto pos = brk_->next(index - current_idx_);
     if (pos == icu::BreakIterator::DONE) {
-      brk_->isBoundary(oldpos); // reset back
+      brk_->isBoundary(oldpos);  // reset back
     } else {
       current_idx_ = index;
     }
@@ -169,13 +168,14 @@ class EGCSmartIterator : public EGCIterator {
   int32_t next() {
     auto oldpos = brk_->current();
     auto pos = brk_->next();
-    if(pos == icu::BreakIterator::DONE) {
-      brk_->isBoundary(oldpos); // reset
+    if (pos == icu::BreakIterator::DONE) {
+      brk_->isBoundary(oldpos);  // reset
     } else {
       current_idx_++;
     }
     return pos;
   }
+
  private:
   int32_t current_idx_ = 0;
   int32_t count_ = -1;

@@ -2447,7 +2447,9 @@ void f_sizeof(void) {
       break;
     case T_STRING: {
       EGCSmartIterator iter(sp->u.string, SVALUE_STRLEN(sp));
-      if(!iter.ok()) { error("f_sizeof: Invalid UTF8 string!"); }
+      if (!iter.ok()) {
+        error("f_sizeof: Invalid UTF8 string!");
+      }
       i = iter.count();
       free_string_svalue(sp);
       break;
@@ -2572,25 +2574,24 @@ void f_strsrch(void) {
   auto arg3 = sp;
 
   // fast track empty string search
-  if(arg1->u.string[0] == '\0') {
+  if (arg1->u.string[0] == '\0') {
     auto ret = -1;
-    if (
-        (arg2->type == T_STRING && arg2->u.string[0] == '\0')
-        || (arg2->type == T_NUMBER && arg2->u.number == '\0')
-    ) {
+    if ((arg2->type == T_STRING && arg2->u.string[0] == '\0') ||
+        (arg2->type == T_NUMBER && arg2->u.number == '\0')) {
       ret = 0;
     }
 
     pop_3_elems();
     push_number(ret);
-    return ;
+    return;
   }
 
   // fast track single ascii character search
   {
     bool single_char_search = false;
     char single = -1;
-    if (arg2->type == T_STRING && (arg2->u.string[0] != '\0' && arg2->u.string[1] == '\0') && U8_IS_SINGLE(arg2->u.string[0])) {
+    if (arg2->type == T_STRING && (arg2->u.string[0] != '\0' && arg2->u.string[1] == '\0') &&
+        U8_IS_SINGLE(arg2->u.string[0])) {
       single = arg2->u.string[0];
       single_char_search = true;
     } else if (arg2->type == T_NUMBER && arg2->u.number >= 0 && arg2->u.number <= 0x7f) {
@@ -2598,8 +2599,9 @@ void f_strsrch(void) {
       single_char_search = true;
     }
     if (single_char_search && single >= 0) {
-      const auto *res = arg3->u.number == 0 ? strchr(arg1->u.string, single) : strrchr(arg1->u.string, single);
-      auto ret = res == nullptr ? -1 : (const char *) res - arg1->u.string;
+      const auto *res =
+          arg3->u.number == 0 ? strchr(arg1->u.string, single) : strrchr(arg1->u.string, single);
+      auto ret = res == nullptr ? -1 : (const char *)res - arg1->u.string;
 
       pop_3_elems();
       push_number(ret);
@@ -2631,7 +2633,7 @@ void f_strsrch(void) {
   // only search if there is a chance.
   if (find_len <= src_len) {
     auto pos = u8_egc_find_as_offset(arg1->u.string, src_len, find, find_len, arg3->u.number != 0);
-    ret = pos == -1 ? -1: u8_offset_to_egc_index(arg1->u.string, pos);
+    ret = pos == -1 ? -1 : u8_offset_to_egc_index(arg1->u.string, pos);
   }
 
   pop_3_elems();

@@ -38,7 +38,7 @@ std::string u8_sanitize(std::string_view src) { return utf8::replace_invalid(src
 
 // Search "needle' in 'haystack', making sure it matches EGC boundary, returning byte offset.
 int32_t u8_egc_find_as_offset(const char *haystack, size_t haystack_len, const char *needle,
-                          size_t needle_len, bool reverse) {
+                              size_t needle_len, bool reverse) {
   // no way
   if (needle_len > haystack_len) {
     return -1;
@@ -57,8 +57,8 @@ int32_t u8_egc_find_as_offset(const char *haystack, size_t haystack_len, const c
     if (is_all_ascii) {
       // strstr doesn't follow haystack_len, so we may overrun, wasting some cycles.
       const auto *res = strstr(haystack, needle);
-      auto ret =  res == nullptr ? -1 : (decltype(haystack))res - haystack;
-      if(ret >= haystack_len) ret = -1;
+      auto ret = res == nullptr ? -1 : (decltype(haystack))res - haystack;
+      if (ret >= haystack_len) ret = -1;
       return ret;
     }
   }
@@ -66,26 +66,26 @@ int32_t u8_egc_find_as_offset(const char *haystack, size_t haystack_len, const c
   int res = -1;
 
   EGCIterator iter(haystack, haystack_len);
-  if(!iter.ok()) return res;
+  if (!iter.ok()) return res;
 
   std::string_view sv_haystack(haystack, haystack_len);
   std::string_view sv_needle(needle, needle_len);
   auto pos = std::string_view::npos;
   if (!reverse) {
     pos = 0;
-    while((pos = sv_haystack.find(sv_needle, pos)) != std::string_view::npos) {
-      if(iter->isBoundary(pos) && iter->isBoundary(pos + sv_needle.length())) break;
+    while ((pos = sv_haystack.find(sv_needle, pos)) != std::string_view::npos) {
+      if (iter->isBoundary(pos) && iter->isBoundary(pos + sv_needle.length())) break;
       pos++;
     }
   } else {
     pos = std::string_view::npos;
-    while((pos = sv_haystack.rfind(sv_needle, pos)) != std::string_view::npos) {
-      if(iter->isBoundary(pos) && iter->isBoundary(pos + sv_needle.length())) break;
+    while ((pos = sv_haystack.rfind(sv_needle, pos)) != std::string_view::npos) {
+      if (iter->isBoundary(pos) && iter->isBoundary(pos + sv_needle.length())) break;
       pos--;
     }
   }
   if (pos != std::string_view::npos) {
-     res = pos;
+    res = pos;
   }
   return res;
 }
@@ -97,7 +97,7 @@ UChar32 u8_egc_index_as_single_codepoint(const char *src, int32_t index) {
   UChar32 c = U_SENTINEL;
 
   EGCSmartIterator iter(src, -1);
-  if(!iter.ok()) return c;
+  if (!iter.ok()) return c;
 
   auto pos = iter.index_to_offset(index);
   // out-of-bounds
@@ -106,7 +106,7 @@ UChar32 u8_egc_index_as_single_codepoint(const char *src, int32_t index) {
   // end-of-string
   if (post_pos < 0) return 0;
 
-  if(post_pos - pos > U8_MAX_LENGTH) return c;
+  if (post_pos - pos > U8_MAX_LENGTH) return c;
   U8_NEXT((const uint8_t *)src, pos, -1, c);
   return c;
 }
@@ -114,7 +114,7 @@ UChar32 u8_egc_index_as_single_codepoint(const char *src, int32_t index) {
 // Copy string src to dest, replacing character at index to c. Assuming dst is already allocated.
 void u8_copy_and_replace_codepoint_at(const char *src, char *dst, int32_t index, UChar32 c) {
   EGCSmartIterator iter(src, -1);
-  if(!iter.ok()) return;
+  if (!iter.ok()) return;
 
   int32_t src_offset = iter.index_to_offset(index);
   int32_t dst_offset = 0;
@@ -135,14 +135,14 @@ int32_t u8_offset_to_egc_index(const char *src, int32_t offset) {
   int pos = 0;
 
   EGCIterator iter(src, -1);
-  if(!iter.ok()) return idx;
+  if (!iter.ok()) return idx;
 
   pos = iter->first();
   idx = 0;
   do {
     pos = iter->next();
     idx++;
-  } while(pos != icu::BreakIterator::DONE && pos < offset);
+  } while (pos != icu::BreakIterator::DONE && pos < offset);
 
   if (pos == icu::BreakIterator::DONE) idx = -1;
   if (pos != offset) idx = -1;
@@ -506,7 +506,7 @@ std::vector<std::string_view> u8_egc_split(const char *src) {
   result.reserve(16);
 
   EGCSmartIterator iter(src, -1);
-  if(!iter.ok()) return result;
+  if (!iter.ok()) return result;
 
   iter->first();
   auto start = iter->current();
