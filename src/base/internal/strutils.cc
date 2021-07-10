@@ -12,7 +12,7 @@
 
 #include "base/internal/log.h"
 #include "base/internal/rc.h"
-#include "EGCIterator.h"
+#include "base/internal/EGCIterator.h"
 
 // Addition by Yucong Sun
 

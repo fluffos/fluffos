@@ -10,7 +10,8 @@
 #include <unicode/uchar.h>
 #include <unicode/brkiter.h>
 #include <unicode/unistr.h>
-#include "EGCIterator.h"
+
+#include "base/internal/EGCIterator.h"
 
 namespace {
 
