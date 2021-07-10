@@ -16,6 +16,7 @@
 #include <signal.h>
 
 static int interrupted, bad = 1, count_p1, count_p2, count_tx;
+static unsigned int how_many_msg = 100, usec_interval = 1000;
 static lws_sorted_usec_list_t sul_timeout;
 
 /*
@@ -70,17 +71,21 @@ typedef struct myss {
 
 /* secure streams payload interface */
 
-static int
+static lws_ss_state_return_t
 myss_rx(void *userobj, const uint8_t *buf, size_t len, int flags)
 {
-//	myss_t *m = (myss_t *)userobj;
+	/*
+	 * Call the helper to translate into a real smd message and forward to
+	 * this context / process smd participants... except us, since we
+	 * definitely already received it
+	 */
 
-	lwsl_notice("%s: len %d, flags: %d\n", __func__, (int)len, flags);
-	lwsl_hexdump_notice(buf, len);
+	if (lws_smd_ss_rx_forward(userobj, buf, len))
+		lwsl_warn("%s: forward failed\n", __func__);
 
 	count_p1++;
 
-	return 0;
+	return LWSSSSRET_OK;
 }
 
 static void
@@ -88,17 +93,17 @@ sul_tx_periodic_cb(lws_sorted_usec_list_t *sul)
 {
 	myss_t *m = lws_container_of(sul, myss_t, sul);
 
-	lwsl_notice("%s: requesting TX\n", __func__);
+	lwsl_info("%s: requesting TX\n", __func__);
 	lws_ss_request_tx(m->ss);
 }
 
-static int
+static lws_ss_state_return_t
 myss_tx(void *userobj, lws_ss_tx_ordinal_t ord, uint8_t *buf, size_t *len,
 	int *flags)
 {
 	myss_t *m = (myss_t *)userobj;
 
-	lwsl_notice("%s: sending SS smd\n", __func__);
+	lwsl_info("%s: sending SS smd\n", __func__);
 
 	/*
 	 * The SS RX isn't going to see INTERACTION messages, because its class
@@ -110,52 +115,58 @@ myss_tx(void *userobj, lws_ss_tx_ordinal_t ord, uint8_t *buf, size_t *len,
 	 */
 
 	m->alternate++;
-	lws_ser_wu64be(buf, (m->alternate & 1) ? LWSSMDCL_NETWORK : LWSSMDCL_INTERACTION);
-	lws_ser_wu64be(buf + 8, 0); /* valgrind notices uninitialized if left */
 
 	if (m->alternate == 4) {
 		/*
 		 * after a few, let's request a CPD check
 		 */
-		*len = LWS_SMD_SS_RX_HEADER_LEN +
-			lws_snprintf((char *)buf + LWS_SMD_SS_RX_HEADER_LEN, *len,
-				    "{\"trigger\": \"cpdcheck\", \"src\":\"SS-test\"}");
-	} else
 
-		*len = LWS_SMD_SS_RX_HEADER_LEN +
-			lws_snprintf((char *)buf + LWS_SMD_SS_RX_HEADER_LEN, *len,
-				     (m->alternate & 1) ? "{\"class\":\"NETWORK\"}" :
-						    "{\"class\":\"INTERACTION\"}");
+		if (lws_smd_ss_msg_printf(lws_ss_tag(m->ss), buf, len, LWSSMDCL_NETWORK,
+					  "{\"trigger\": \"cpdcheck\", "
+					   "\"src\":\"SS-test\"}"))
+			return LWSSSSRET_TX_DONT_SEND;
+	} else
+		if (lws_smd_ss_msg_printf(lws_ss_tag(m->ss), buf, len,
+					  (m->alternate & 1) ? LWSSMDCL_NETWORK :
+							       LWSSMDCL_INTERACTION,
+					  (m->alternate & 1) ?
+					       "{\"class\":\"NETWORK\",\"x\":%d}" :
+					       "{\"class\":\"INTERACTION\",\"x\":%d}",
+					       count_tx))
+			return LWSSSSRET_TX_DONT_SEND;
 
 	*flags = LWSSS_FLAG_SOM | LWSSS_FLAG_EOM;
 
 	count_tx++;
 
 	lws_sul_schedule(lws_ss_get_context(m->ss), 0, &m->sul,
-			 sul_tx_periodic_cb, 250 * LWS_US_PER_MS);
+			 sul_tx_periodic_cb, usec_interval);
 
-	return 0;
+	return LWSSSSRET_OK;
 }
 
-static int
+static lws_ss_state_return_t
 myss_state(void *userobj, void *h_src, lws_ss_constate_t state,
 	   lws_ss_tx_ordinal_t ack)
 {
 	myss_t *m = (myss_t *)userobj;
 
+	lwsl_notice("%s: %s: %s (%d), ord 0x%x\n", __func__, lws_ss_tag(m->ss),
+		    lws_ss_state_name((int)state), state, (unsigned int)ack);
+
 	if (state == LWSSSCS_DESTROYING) {
 		lws_sul_cancel(&m->sul);
-		return 0;
+		return LWSSSSRET_OK;
 	}
 
 	if (state == LWSSSCS_CONNECTED) {
 		lwsl_notice("%s: CONNECTED\n", __func__);
 		lws_sul_schedule(lws_ss_get_context(m->ss), 0, &m->sul,
 				 sul_tx_periodic_cb, 1);
-		return 0;
+		return LWSSSSRET_OK;
 	}
 
-	return 0;
+	return LWSSSSRET_OK;
 }
 
 static const lws_ss_info_t ssi_lws_smd = {
@@ -167,6 +178,7 @@ static const lws_ss_info_t ssi_lws_smd = {
 	.user_alloc		  = sizeof(myss_t),
 	.streamtype		  = LWS_SMD_STREAMTYPENAME,
 	.manual_initial_tx_credit = LWSSMDCL_SYSTEM_STATE |
+				    LWSSMDCL_METRICS |
 				    LWSSMDCL_NETWORK,
 };
 
@@ -178,9 +190,9 @@ direct_smd_cb(void *opaque, lws_smd_class_t _class, lws_usec_t timestamp,
 {
 	struct lws_context **pctx = (struct lws_context **)opaque;
 
-	lwsl_notice("%s: class: 0x%x, ts: %llu\n", __func__, _class,
-		  (unsigned long long)timestamp);
-	lwsl_hexdump_notice(buf, len);
+//	lwsl_notice("%s: class: 0x%x, ts: %llu\n", __func__, _class,
+//		  (unsigned long long)timestamp);
+//	lwsl_hexdump_notice(buf, len);
 
 	count_p2++;
 
@@ -224,6 +236,7 @@ direct_smd_cb(void *opaque, lws_smd_class_t _class, lws_usec_t timestamp,
 static void
 sul_timeout_cb(lws_sorted_usec_list_t *sul)
 {
+	lwsl_notice("%s: test finishing\n", __func__);
 	interrupted = 1;
 }
 
@@ -234,17 +247,33 @@ sigint_handler(int sig)
 	interrupted = 1;
 }
 
+extern int smd_ss_multi_test(int argc, const char **argv);
+
 int main(int argc, const char **argv)
 {
 	struct lws_context_creation_info info;
 	struct lws_context *context;
+	const char *p;
 
 	signal(SIGINT, sigint_handler);
 
 	memset(&info, 0, sizeof info);
+
+#if defined(LWS_SS_USE_SSPC)
+	if (lws_cmdline_option(argc, argv, "--multi"))
+		return smd_ss_multi_test(argc, argv);
+#endif
+
 	lws_cmdline_option_handle_builtin(argc, argv, &info);
 
-	lwsl_user("LWS Secure Streams SMD test client [-d<verb>]\n");
+	if ((p = lws_cmdline_option(argc, argv, "--count")))
+		how_many_msg = (unsigned int)atol(p);
+
+	if ((p = lws_cmdline_option(argc, argv, "--interval")))
+		usec_interval = (unsigned int)atol(p);
+
+	lwsl_user("LWS Secure Streams SMD test client [-d<verb>]: "
+		  "%u msgs at %uus interval\n", how_many_msg, usec_interval);
 
 	info.fd_limit_per_thread	= 1 + 6 + 1;
 	info.port			= CONTEXT_PORT_NO_LISTEN;
@@ -252,6 +281,22 @@ int main(int argc, const char **argv)
 	info.pss_policies_json		= default_ss_policy;
 #else
 	info.protocols			= lws_sspc_protocols;
+	{
+		/* connect to ssproxy via UDS by default, else via
+		 * tcp connection to this port */
+		if ((p = lws_cmdline_option(argc, argv, "-p")))
+			info.ss_proxy_port = (uint16_t)atoi(p);
+
+		/* UDS "proxy.ss.lws" in abstract namespace, else this socket
+		 * path; when -p given this can specify the network interface
+		 * to bind to */
+		if ((p = lws_cmdline_option(argc, argv, "-i")))
+			info.ss_proxy_bind = p;
+
+		/* if -p given, -a specifies the proxy address to connect to */
+		if ((p = lws_cmdline_option(argc, argv, "-a")))
+			info.ss_proxy_address = p;
+	}
 #endif
 	info.options			= LWS_SERVER_OPTION_EXPLICIT_VHOSTS |
 					  LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
@@ -278,7 +323,7 @@ int main(int argc, const char **argv)
 	/* set up the test timeout */
 
 	lws_sul_schedule(context, 0, &sul_timeout, sul_timeout_cb,
-			 4 * LWS_US_PER_SEC);
+			 (how_many_msg * (usec_interval + 1000)) + LWS_US_PER_SEC);
 
 	/* the event loop */
 

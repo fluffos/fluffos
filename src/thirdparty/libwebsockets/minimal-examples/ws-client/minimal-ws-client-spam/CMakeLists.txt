@@ -1,5 +1,5 @@
 project(lws-minimal-ws-client-spam C)
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8.12)
 find_package(libwebsockets CONFIG REQUIRED)
 list(APPEND CMAKE_MODULE_PATH ${LWS_CMAKE_DIR})
 include(CheckIncludeFile)
@@ -13,9 +13,11 @@ set(requirements 1)
 require_pthreads(requirements)
 require_lws_config(LWS_ROLE_WS 1 requirements)
 require_lws_config(LWS_WITH_CLIENT 1 requirements)
+require_lws_config(LWS_WITH_TLS 1 requirements)
 
 if (requirements)
 	add_executable(${SAMP} ${SRCS})
+	find_program(VALGRIND "valgrind")
        #
        # instantiate the server per sai builder instance, they are running in the same
        # machine context in parallel so they can tread on each other otherwise
@@ -43,14 +45,25 @@ if (WIN32)
 	add_test(NAME st_wcs_srv COMMAND cmd.exe /c start /b $<TARGET_FILE:test-server> -s --port ${PORT_WCS_SRV})
 	add_test(NAME ki_wcs_srv COMMAND taskkill /F /IM $<TARGET_FILE_NAME:test-server> /T)
 else()
-	add_test(NAME st_wcs_srv COMMAND
-		${CMAKE_SOURCE_DIR}/scripts/ctest-background.sh
-		wcs_srv $<TARGET_FILE:test-server>
-			-r ${CMAKE_SOURCE_DIR}/destdir/usr/local/share/libwebsockets-test-server/
-			-s --port ${PORT_WCS_SRV} --ignore-sigterm)
-	add_test(NAME ki_wcs_srv COMMAND
-		${CMAKE_SOURCE_DIR}/scripts/ctest-background-kill.sh
-		wcs_srv $<TARGET_FILE_NAME:test-server> --port ${PORT_WCS_SRV})
+	if (VALGRIND)
+		add_test(NAME st_wcs_srv COMMAND
+			${CMAKE_SOURCE_DIR}/scripts/ctest-background.sh
+			wcs_srv ${VALGRIND} --tool=memcheck $<TARGET_FILE:test-server>
+				-r ${CMAKE_SOURCE_DIR}/destdir/usr/local/share/libwebsockets-test-server/
+				-s --port ${PORT_WCS_SRV} )
+		add_test(NAME ki_wcs_srv COMMAND
+			${CMAKE_SOURCE_DIR}/scripts/ctest-background-kill.sh
+			wcs_srv ${VALGRIND} $<TARGET_FILE_NAME:test-server> --port ${PORT_WCS_SRV})
+	else()
+		add_test(NAME st_wcs_srv COMMAND
+			${CMAKE_SOURCE_DIR}/scripts/ctest-background.sh
+			wcs_srv $<TARGET_FILE:test-server>
+				-r ${CMAKE_SOURCE_DIR}/destdir/usr/local/share/libwebsockets-test-server/
+				-s --port ${PORT_WCS_SRV} )
+		add_test(NAME ki_wcs_srv COMMAND
+			${CMAKE_SOURCE_DIR}/scripts/ctest-background-kill.sh
+			wcs_srv $<TARGET_FILE_NAME:test-server> --port ${PORT_WCS_SRV})
+	endif()
 endif()
 
 	set_tests_properties(st_wcs_srv PROPERTIES WORKING_DIRECTORY . FIXTURES_SETUP wcs_srv TIMEOUT 800)

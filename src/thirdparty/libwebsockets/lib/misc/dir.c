@@ -29,7 +29,6 @@
 #define _DARWIN_C_SOURCE
 #endif
 
-#include <libwebsockets.h>
 #include "private-lib-core.h"
 #include <string.h>
 #include <stdio.h>
@@ -121,7 +120,7 @@ lws_dir(const char *dirpath, void *user, lws_dir_callback_function cb)
 	char combo[COMBO_SIZEOF];
 	size_t l;
 
-	l = lws_snprintf(combo, COMBO_SIZEOF - 2, "%s", dirpath);
+	l = (size_t)(ssize_t)lws_snprintf(combo, COMBO_SIZEOF - 2, "%s", dirpath);
 	combo[l++] = csep;
 	combo[l] = '\0';
 
@@ -132,7 +131,9 @@ lws_dir(const char *dirpath, void *user, lws_dir_callback_function cb)
 	}
 
 	for (i = 0; i < n; i++) {
+#if !defined(__sun)
 		unsigned int type = namelist[i]->d_type;
+#endif
 		if (strchr(namelist[i]->d_name, '~'))
 			goto skip;
 		lde.name = namelist[i]->d_name;
@@ -169,15 +170,14 @@ lws_dir(const char *dirpath, void *user, lws_dir_callback_function cb)
 		}
 #endif
 		if (cb(dirpath, user, &lde)) {
-			while (++i < n)
-				free(namelist[i]);
+			while (i < n)
+				free(namelist[i++]);
+			ret = 0; /* told to stop by cb */
 			goto bail;
 		}
 skip:
 		free(namelist[i]);
 	}
-
-	ret = 0;
 
 bail:
 	free(namelist);
@@ -299,10 +299,11 @@ lws_plugins_dir_cb(const char *dirpath, void *user, struct lws_dir_entry *lde)
 {
 	struct lws_plugins_args *pa = (struct lws_plugins_args *)user;
 	char path[256], base[64], *q = base;
+	const lws_plugin_header_t *pl;
 	const char *p;
 
 	if (strlen(lde->name) < 7)
-		return 0;
+		return 0; /* keep going */
 
 	/*
 	 * The actual plugin names for protocol plugins look like
@@ -324,13 +325,21 @@ lws_plugins_dir_cb(const char *dirpath, void *user, struct lws_dir_entry *lde)
 
 	/* if he's given a filter, only match if base matches it */
 	if (pa->filter && strcmp(base, pa->filter))
-		return 0;
+		return 0; /* keep going */
 
 	lws_snprintf(path, sizeof(path) - 1, "%s/%s", dirpath, lde->name);
-	lwsl_notice("   %s\n", path);
 
-	return !lws_plat_dlopen(pa->pplugin, path, base, pa->_class,
-				pa->each, pa->each_user);
+	pl = lws_plat_dlopen(pa->pplugin, path, base, pa->_class,
+			     pa->each, pa->each_user);
+
+	/*
+	 * If we were looking for a specific plugin, finding it should make
+	 * us stop looking (eg, to account for directory precedence of the
+	 * same plugin).  If scanning for plugins in a dir, we always keep
+	 * going.
+	 */
+
+	return pa->filter && pl;
 }
 
 int
@@ -339,6 +348,8 @@ lws_plugins_init(struct lws_plugin **pplugin, const char * const *d,
 		 each_plugin_cb_t each, void *each_user)
 {
 	struct lws_plugins_args pa;
+	char *ld_env;
+	int ret = 1;
 
 	pa.pplugin = pplugin;
 	pa._class = _class;
@@ -346,12 +357,49 @@ lws_plugins_init(struct lws_plugin **pplugin, const char * const *d,
 	pa.each_user = each_user;
 	pa.filter = filter;
 
+	/*
+	 * Check LD_LIBRARY_PATH override path first if present
+	 */
+
+	ld_env = getenv("LD_LIBRARY_PATH");
+	if (ld_env) {
+		char temp[128];
+		struct lws_tokenize ts;
+
+		memset(&ts, 0, sizeof(ts));
+		ts.start = ld_env;
+		ts.len = strlen(ld_env);
+		ts.flags = LWS_TOKENIZE_F_SLASH_NONTERM |
+			   LWS_TOKENIZE_F_DOT_NONTERM |
+			   LWS_TOKENIZE_F_MINUS_NONTERM |
+			   LWS_TOKENIZE_F_NO_INTEGERS |
+			   LWS_TOKENIZE_F_NO_FLOATS;
+
+		do {
+			ts.e = (int8_t)lws_tokenize(&ts);
+			if (ts.e != LWS_TOKZE_TOKEN)
+				continue;
+
+			lws_strnncpy(temp, ts.token,
+				     ts.token_len,
+				     sizeof(temp));
+
+			lwsl_info("%s: trying %s\n", __func__, temp);
+			if (!lws_dir(temp, &pa, lws_plugins_dir_cb))
+				ret = 0;
+
+		} while (ts.e > 0);
+	}
+
 	while (d && *d) {
-		lws_dir(*d, &pa, lws_plugins_dir_cb);
+		lwsl_info("%s: trying %s\n", __func__, *d);
+		if (!lws_dir(*d, &pa, lws_plugins_dir_cb))
+			ret = 0;
+
 		d++;
 	}
 
-	return 0;
+	return ret;
 }
 
 int

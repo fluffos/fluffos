@@ -188,7 +188,7 @@ LWS_VISIBLE LWS_EXTERN void
 lwsac_reference(struct lwsac *head);
 
 /**
- * lwsac_reference() - increase the lwsac reference count
+ * lwsac_unreference() - decrease the lwsac reference count
  *
  * \param head: pointer to the lwsac list object
  *
@@ -229,7 +229,7 @@ lwsac_unreference(struct lwsac **head);
  * cases
  */
 LWS_VISIBLE LWS_EXTERN int
-lwsac_extend(struct lwsac *head, int amount);
+lwsac_extend(struct lwsac *head, size_t amount);
 
 /* helpers to keep a file cached in memory */
 

@@ -27,7 +27,7 @@
 static int
 lws_get_idlest_tsi(struct lws_context *context)
 {
-	unsigned int lowest = ~0;
+	unsigned int lowest = ~0u;
 	int n = 0, hit = -1;
 
 	for (; n < context->count_threads; n++) {
@@ -45,11 +45,10 @@ lws_get_idlest_tsi(struct lws_context *context)
 }
 
 struct lws *
-lws_create_new_server_wsi(struct lws_vhost *vhost, int fixed_tsi)
+lws_create_new_server_wsi(struct lws_vhost *vhost, int fixed_tsi, const char *desc)
 {
 	struct lws *new_wsi;
 	int n = fixed_tsi;
-	size_t s = sizeof(struct lws);
 
 	if (n < 0)
 		n = lws_get_idlest_tsi(vhost->context);
@@ -59,35 +58,28 @@ lws_create_new_server_wsi(struct lws_vhost *vhost, int fixed_tsi)
 		return NULL;
 	}
 
-#if defined(LWS_WITH_EVENT_LIBS)
-	s += vhost->context->event_loop_ops->evlib_size_wsi;
-#endif
-
-	new_wsi = lws_zalloc(s, "new server wsi");
+	lws_context_lock(vhost->context, __func__);
+	new_wsi = __lws_wsi_create_with_role(vhost->context, n, NULL);
+	lws_context_unlock(vhost->context);
 	if (new_wsi == NULL) {
 		lwsl_err("Out of memory for new connection\n");
 		return NULL;
 	}
 
-#if defined(LWS_WITH_EVENT_LIBS)
-	new_wsi->evlib_wsi = (uint8_t *)new_wsi + sizeof(*new_wsi);
+	__lws_lc_tag(&vhost->context->lcg[
+#if defined(LWS_ROLE_H2) || defined(LWS_ROLE_MQTT)
+	strcmp(desc, "adopted") ? LWSLCG_WSI_MUX :
 #endif
+	LWSLCG_WSI_SERVER], &new_wsi->lc, desc);
 
 	new_wsi->wsistate |= LWSIFR_SERVER;
-	new_wsi->tsi = n;
-	lwsl_debug("new wsi %p joining vhost %s, tsi %d\n", new_wsi,
+	new_wsi->tsi = (char)n;
+	lwsl_debug("%s joining vhost %s, tsi %d\n", new_wsi->lc.gutag,
 		   vhost->name, new_wsi->tsi);
 
 	lws_vhost_bind_wsi(vhost, new_wsi);
-	new_wsi->a.context = vhost->context;
-	new_wsi->pending_timeout = NO_PENDING_TIMEOUT;
 	new_wsi->rxflow_change_to = LWS_RXFLOW_ALLOW;
 	new_wsi->retry_policy = vhost->retry_policy;
-
-#if defined(LWS_WITH_DETAILED_LATENCY)
-	if (vhost->context->detailed_latency_cb)
-		new_wsi->detlat.earliest_write_req_pre_write = lws_now_usecs();
-#endif
 
 	/* initialize the instance struct */
 
@@ -106,10 +98,6 @@ lws_create_new_server_wsi(struct lws_vhost *vhost, int fixed_tsi)
 	 */
 	new_wsi->a.protocol = vhost->protocols;
 	new_wsi->user_space = NULL;
-	new_wsi->desc.sockfd = LWS_SOCK_INVALID;
-	new_wsi->position_in_fds_table = LWS_NO_FDS_POS;
-
-	vhost->context->count_wsi_allocated++;
 
 	/*
 	 * outermost create notification for wsi
@@ -122,12 +110,14 @@ lws_create_new_server_wsi(struct lws_vhost *vhost, int fixed_tsi)
 }
 
 
-/* if not a socket, it's a raw, non-ssl file descriptor */
+/* if not a socket, it's a raw, non-ssl file descriptor
+ * req cx lock, acq pt lock, acq vh lock
+ */
 
 static struct lws *
-lws_adopt_descriptor_vhost1(struct lws_vhost *vh, lws_adoption_type type,
+__lws_adopt_descriptor_vhost1(struct lws_vhost *vh, lws_adoption_type type,
 			    const char *vh_prot_name, struct lws *parent,
-			    void *opaque)
+			    void *opaque, const char *fi_wsi_name)
 {
 	struct lws_context *context = vh->context;
 	struct lws_context_per_thread *pt;
@@ -140,14 +130,21 @@ lws_adopt_descriptor_vhost1(struct lws_vhost *vh, lws_adoption_type type,
 	 * we initialize it, it may become "live" concurrently unexpectedly...
 	 */
 
-	lws_context_lock(vh->context, __func__);
+	lws_context_assert_lock_held(vh->context);
 
 	n = -1;
 	if (parent)
 		n = parent->tsi;
-	new_wsi = lws_create_new_server_wsi(vh, n);
-	if (!new_wsi) {
-		lws_context_unlock(vh->context);
+	new_wsi = lws_create_new_server_wsi(vh, n, "adopted");
+	if (!new_wsi)
+		return NULL;
+
+	/* bring in specific fault injection rules early */
+	lws_fi_inherit_copy(&new_wsi->fic, &context->fic, "wsi", fi_wsi_name);
+
+	if (lws_fi(&new_wsi->fic, "createfail")) {
+		lws_fi_destroy(&new_wsi->fic);
+
 		return NULL;
 	}
 
@@ -155,8 +152,6 @@ lws_adopt_descriptor_vhost1(struct lws_vhost *vh, lws_adoption_type type,
 
 	pt = &context->pt[(int)new_wsi->tsi];
 	lws_pt_lock(pt, __func__);
-
-	lws_stats_bump(pt, LWSSTATS_C_CONNECTIONS, 1);
 
 	if (parent) {
 		new_wsi->parent = parent;
@@ -180,12 +175,17 @@ lws_adopt_descriptor_vhost1(struct lws_vhost *vh, lws_adoption_type type,
 
 	if (!LWS_SSL_ENABLED(new_wsi->a.vhost) ||
 	    !(type & LWS_ADOPT_SOCKET))
-		type &= ~LWS_ADOPT_ALLOW_SSL;
+		type &= (unsigned int)~LWS_ADOPT_ALLOW_SSL;
 
-	if (lws_role_call_adoption_bind(new_wsi, type, vh_prot_name)) {
+	if (lws_role_call_adoption_bind(new_wsi, (int)type, vh_prot_name)) {
 		lwsl_err("%s: no role for desc type 0x%x\n", __func__, type);
 		goto bail;
 	}
+
+#if defined(LWS_WITH_SERVER)
+	if (new_wsi->role_ops)
+		lws_metrics_tag_wsi_add(new_wsi, "role", new_wsi->role_ops->name);
+#endif
 
 	lws_pt_unlock(pt);
 
@@ -199,8 +199,6 @@ lws_adopt_descriptor_vhost1(struct lws_vhost *vh, lws_adoption_type type,
 			  &new_wsi->a.vhost->vh_awaiting_socket_owner);
 	lws_vhost_unlock(new_wsi->a.vhost);
 
-	lws_context_unlock(vh->context);
-
 	return new_wsi;
 
 bail:
@@ -210,14 +208,12 @@ bail:
 	if (new_wsi->user_space)
 		lws_free(new_wsi->user_space);
 
-	vh->context->count_wsi_allocated--;
-
-	lws_vhost_unbind_wsi(new_wsi);
-
-	lws_free(new_wsi);
+	lws_fi_destroy(&new_wsi->fic);
 
 	lws_pt_unlock(pt);
-	lws_context_unlock(vh->context);
+	__lws_vhost_unbind_wsi(new_wsi); /* req cx, acq vh lock */
+
+	lws_free(new_wsi);
 
 	return NULL;
 }
@@ -243,6 +239,8 @@ bail:
 int
 lws_adopt_ss_server_accept(struct lws *new_wsi)
 {
+	struct lws_context_per_thread *pt =
+			&new_wsi->a.context->pt[(int)new_wsi->tsi];
 	lws_ss_handle_t *h;
 	void *pv, **ppv;
 
@@ -284,12 +282,35 @@ lws_adopt_ss_server_accept(struct lws *new_wsi)
 	h->wsi = new_wsi;
 	new_wsi->a.opaque_user_data = h;
 	h->info.flags |= LWSSSINFLAGS_ACCEPTED;
-	new_wsi->for_ss = 1; /* indicate wsi should invalidate any ss link to it on close */
+	/* indicate wsi should invalidate any ss link to it on close */
+	new_wsi->for_ss = 1;
 
 	// lwsl_notice("%s: opaq %p, role %s\n", __func__,
 	//		new_wsi->a.opaque_user_data, new_wsi->role_ops->name);
 
 	h->policy = new_wsi->a.vhost->ss_handle->policy;
+
+	/* apply requested socket options */
+	if (lws_plat_set_socket_options_ip(new_wsi->desc.sockfd,
+					   h->policy->priority,
+		      (LCCSCF_IP_LOW_LATENCY *
+		       !!(h->policy->flags & LWSSSPOLF_ATTR_LOW_LATENCY)) |
+		      (LCCSCF_IP_HIGH_THROUGHPUT *
+		       !!(h->policy->flags & LWSSSPOLF_ATTR_HIGH_THROUGHPUT)) |
+		      (LCCSCF_IP_HIGH_RELIABILITY *
+		       !!(h->policy->flags & LWSSSPOLF_ATTR_HIGH_RELIABILITY)) |
+		      (LCCSCF_IP_LOW_COST *
+		       !!(h->policy->flags & LWSSSPOLF_ATTR_LOW_COST))))
+		lwsl_warn("%s: %s: unable to set ip options\n",
+			  __func__, new_wsi->lc.gutag);
+
+	/*
+	 * add us to the list of clients that came in from the server
+	 */
+
+	lws_pt_lock(pt, __func__);
+	lws_dll2_add_tail(&h->cli_list, &new_wsi->a.vhost->ss_handle->src_list);
+	lws_pt_unlock(pt);
 
 	/*
 	 * Let's give it appropriate state notifications
@@ -299,8 +320,11 @@ lws_adopt_ss_server_accept(struct lws *new_wsi)
 		goto fail;
 	if (lws_ss_event_helper(h, LWSSSCS_CONNECTING))
 		goto fail;
-	if (lws_ss_event_helper(h, LWSSSCS_CONNECTED))
-		goto fail;
+
+	/* defer CONNECTED until we see if he is upgrading */
+
+//	if (lws_ss_event_helper(h, LWSSSCS_CONNECTED))
+//		goto fail;
 
 	// lwsl_notice("%s: accepted ss complete, pcol %s\n", __func__,
 	//		new_wsi->a.protocol->name);
@@ -346,7 +370,7 @@ lws_adopt_descriptor_vhost2(struct lws *new_wsi, lws_adoption_type type,
 
 	if (!LWS_SSL_ENABLED(new_wsi->a.vhost) ||
 	    !(type & LWS_ADOPT_SOCKET))
-		type &= ~LWS_ADOPT_ALLOW_SSL;
+		type &= (unsigned int)~LWS_ADOPT_ALLOW_SSL;
 
 	/*
 	 * A new connection was accepted. Give the user a chance to
@@ -384,12 +408,8 @@ lws_adopt_descriptor_vhost2(struct lws *new_wsi, lws_adoption_type type,
 #if defined(LWS_WITH_SERVER)
 	 else
 		if (lws_server_socket_service_ssl(new_wsi, fd.sockfd, 0)) {
-#if defined(LWS_WITH_ACCESS_LOG)
-			lwsl_notice("%s: fail ssl negotiation: %s\n", __func__,
-					new_wsi->simple_ip);
-#else
 			lwsl_info("%s: fail ssl negotiation\n", __func__);
-#endif
+
 			goto fail;
 		}
 #endif
@@ -403,13 +423,13 @@ lws_adopt_descriptor_vhost2(struct lws *new_wsi, lws_adoption_type type,
 	 *  by deferring callback to this point, after insertion to fds,
 	 * lws_callback_on_writable() can work from the callback
 	 */
-	if ((new_wsi->a.protocol->callback)(new_wsi, n, new_wsi->user_space,
+	if ((new_wsi->a.protocol->callback)(new_wsi, (enum lws_callback_reasons)n, new_wsi->user_space,
 					  NULL, 0))
 		goto fail;
 
 	/* role may need to do something after all adoption completed */
 
-	lws_role_call_adoption_bind(new_wsi, type | _LWS_ADOPT_FINISH,
+	lws_role_call_adoption_bind(new_wsi, (int)type | _LWS_ADOPT_FINISH,
 				    new_wsi->a.protocol->name);
 
 #if defined(LWS_WITH_SERVER) && defined(LWS_WITH_SECURE_STREAMS)
@@ -418,11 +438,11 @@ lws_adopt_descriptor_vhost2(struct lws *new_wsi, lws_adoption_type type,
 	 *
 	 * !!! For mux protocols, this will cause an additional inactive ss
 	 * representing the nwsi.  Doing that allows us to support both h1
-	 * (here) and h2 (at lws_wsi_server_new())
+	 * (here) and h2 (at __lws_wsi_server_new())
 	 */
 
-	lwsl_info("%s: wsi %p, vhost %s ss_handle %p\n", __func__, new_wsi,
-			new_wsi->a.vhost->name, new_wsi->a.vhost->ss_handle);
+	lwsl_info("%s: %s, vhost %s\n", __func__, new_wsi->lc.gutag,
+			new_wsi->a.vhost->lc.gutag);
 
 	if (lws_adopt_ss_server_accept(new_wsi))
 		goto fail;
@@ -470,7 +490,9 @@ lws_adopt_descriptor_vhost(struct lws_vhost *vh, lws_adoption_type type,
 struct lws *
 lws_adopt_descriptor_vhost_via_info(const lws_adopt_desc_t *info)
 {
+	socklen_t slen = sizeof(lws_sockaddr46);
 	struct lws *new_wsi;
+
 #if defined(LWS_WITH_PEER_LIMITS)
 	struct lws_peer *peer = NULL;
 
@@ -481,9 +503,6 @@ lws_adopt_descriptor_vhost_via_info(const lws_adopt_desc_t *info)
 		    peer->count_wsi >= info->vh->context->ip_limit_wsi) {
 			lwsl_info("Peer reached wsi limit %d\n",
 					info->vh->context->ip_limit_wsi);
-			lws_stats_bump(&info->vh->context->pt[0],
-					      LWSSTATS_C_PEER_LIMIT_WSI_DENIED,
-					      1);
 			if (info->vh->context->pl_notify_cb)
 				info->vh->context->pl_notify_cb(
 							info->vh->context,
@@ -495,26 +514,33 @@ lws_adopt_descriptor_vhost_via_info(const lws_adopt_desc_t *info)
 	}
 #endif
 
-	new_wsi = lws_adopt_descriptor_vhost1(info->vh, info->type,
+	lws_context_lock(info->vh->context, __func__);
+
+	new_wsi = __lws_adopt_descriptor_vhost1(info->vh, info->type,
 					      info->vh_prot_name, info->parent,
-					      info->opaque);
+					      info->opaque, info->fi_wsi_name);
 	if (!new_wsi) {
 		if (info->type & LWS_ADOPT_SOCKET)
 			compatible_close(info->fd.sockfd);
-		return NULL;
+		goto bail;
 	}
 
-#if defined(LWS_WITH_ACCESS_LOG)
-		lws_get_peer_simple_fd(info->fd.sockfd, new_wsi->simple_ip,
-					sizeof(new_wsi->simple_ip));
-#endif
+	if (info->type & LWS_ADOPT_SOCKET &&
+	    getpeername(info->fd.sockfd, (struct sockaddr *)&new_wsi->sa46_peer,
+								    &slen) < 0)
+		lwsl_info("%s: getpeername failed\n", __func__);
 
 #if defined(LWS_WITH_PEER_LIMITS)
 	if (peer)
 		lws_peer_add_wsi(info->vh->context, peer, new_wsi);
 #endif
 
-	return lws_adopt_descriptor_vhost2(new_wsi, info->type, info->fd);
+	new_wsi = lws_adopt_descriptor_vhost2(new_wsi, info->type, info->fd);
+
+bail:
+	lws_context_unlock(info->vh->context);
+
+	return new_wsi;
 }
 
 struct lws *
@@ -601,17 +627,20 @@ bail:
 
 #if defined(LWS_WITH_UDP)
 #if defined(LWS_WITH_CLIENT)
+
+/*
+ * This is the ASYNC_DNS callback target for udp client, it's analogous to
+ * connect3()
+ */
+
 static struct lws *
 lws_create_adopt_udp2(struct lws *wsi, const char *ads,
 		      const struct addrinfo *r, int n, void *opaque)
 {
 	lws_sock_file_fd_type sock;
-	int bc = 1;
+	int bc = 1, m;
 
 	assert(wsi);
-
-	if (!wsi->dns_results)
-		wsi->dns_results_next = wsi->dns_results = r;
 
 	if (ads && (n < 0 || !r)) {
 		/*
@@ -620,16 +649,28 @@ lws_create_adopt_udp2(struct lws *wsi, const char *ads,
 		 */
 		lwsl_notice("%s: bad: n %d, r %p\n", __func__, n, r);
 
-		/*
-		 * We didn't get a callback on a cache item and bump the
-		 * refcount.  So don't let the cleanup continue to think it
-		 * needs to decrement any refcount.
-		 */
-		wsi->dns_results_next = wsi->dns_results = NULL;
 		goto bail;
 	}
 
-	while (wsi->dns_results_next) {
+	m = lws_sort_dns(wsi, r);
+#if defined(LWS_WITH_SYS_ASYNC_DNS)
+	lws_async_dns_freeaddrinfo(&r);
+#else
+	freeaddrinfo((struct addrinfo *)r);
+#endif
+	if (m)
+		goto bail;
+
+	while (lws_dll2_get_head(&wsi->dns_sorted_list)) {
+		lws_dns_sort_t *s = lws_container_of(
+				lws_dll2_get_head(&wsi->dns_sorted_list),
+				lws_dns_sort_t, list);
+
+		/*
+		 * Remove it from the head, but don't free it yet... we are
+		 * taking responsibility to free it
+		 */
+		lws_dll2_remove(&s->list);
 
 		/*
 		 * We have done the dns lookup, identify the result we want
@@ -642,30 +683,35 @@ lws_create_adopt_udp2(struct lws *wsi, const char *ads,
 		 */
 
 #if !defined(__linux__)
-		/* PF_PACKET is linux-only */
-		sock.sockfd = socket(wsi->dns_results_next->ai_family,
+		sock.sockfd = socket(s->dest.sa4.sin_family,
 				     SOCK_DGRAM, IPPROTO_UDP);
 #else
+		/* PF_PACKET is linux-only */
 		sock.sockfd = socket(wsi->pf_packet ? PF_PACKET :
-					wsi->dns_results_next->ai_family,
+						s->dest.sa4.sin_family,
 				     SOCK_DGRAM, wsi->pf_packet ?
 					htons(0x800) : IPPROTO_UDP);
 #endif
 		if (sock.sockfd == LWS_SOCK_INVALID)
 			goto resume;
 
-		((struct sockaddr_in *)wsi->dns_results_next->ai_addr)->sin_port =
-				htons(wsi->c_port);
+		/* ipv6 udp!!! */
 
-		if (setsockopt(sock.sockfd, SOL_SOCKET, SO_REUSEADDR, (const char *)&bc,
-			       sizeof(bc)) < 0)
+		if (s->af == AF_INET)
+			s->dest.sa4.sin_port = htons(wsi->c_port);
+#if defined(LWS_WITH_IPV6)
+		else
+			s->dest.sa6.sin6_port = htons(wsi->c_port);
+#endif
+
+		if (setsockopt(sock.sockfd, SOL_SOCKET, SO_REUSEADDR,
+			       (const char *)&bc, sizeof(bc)) < 0)
 			lwsl_err("%s: failed to set reuse\n", __func__);
 
 		if (wsi->do_broadcast &&
-		    setsockopt(sock.sockfd, SOL_SOCKET, SO_BROADCAST, (const char *)&bc,
-			       sizeof(bc)) < 0)
-				lwsl_err("%s: failed to set broadcast\n",
-						__func__);
+		    setsockopt(sock.sockfd, SOL_SOCKET, SO_BROADCAST,
+			       (const char *)&bc, sizeof(bc)) < 0)
+			lwsl_err("%s: failed to set broadcast\n", __func__);
 
 		/* Bind the udp socket to a particular network interface */
 
@@ -674,52 +720,64 @@ lws_create_adopt_udp2(struct lws *wsi, const char *ads,
 			goto resume;
 
 		if (wsi->do_bind &&
-		    bind(sock.sockfd, wsi->dns_results_next->ai_addr,
+		    bind(sock.sockfd, sa46_sockaddr(&s->dest),
 #if defined(_WIN32)
-			 (int)wsi->dns_results_next->ai_addrlen
+			 (int)sa46_socklen(&s->dest)
 #else
-			 sizeof(struct sockaddr)//wsi->dns_results_next->ai_addrlen
+			 sizeof(struct sockaddr)
 #endif
-								    ) == -1) {
+		) == -1) {
 			lwsl_err("%s: bind failed\n", __func__);
 			goto resume;
 		}
 
 		if (!wsi->do_bind && !wsi->pf_packet) {
 #if !defined(__APPLE__)
-			if (connect(sock.sockfd, wsi->dns_results_next->ai_addr,
-				     (socklen_t)wsi->dns_results_next->ai_addrlen) == -1) {
+			if (connect(sock.sockfd, sa46_sockaddr(&s->dest),
+				    sa46_socklen(&s->dest)) == -1 &&
+			    errno != EADDRNOTAVAIL /* openbsd */ ) {
 				lwsl_err("%s: conn fd %d fam %d %s:%u failed "
-					 "(salen %d) errno %d\n", __func__,
-					 sock.sockfd,
-					 wsi->dns_results_next->ai_addr->sa_family,
+					 "errno %d\n", __func__, sock.sockfd,
+					 s->dest.sa4.sin_family,
 					 ads ? ads : "null", wsi->c_port,
-					 (int)wsi->dns_results_next->ai_addrlen,
 					 LWS_ERRNO);
 				compatible_close(sock.sockfd);
 				goto resume;
 			}
 #endif
-			memcpy(&wsi->udp->sa, wsi->dns_results_next->ai_addr,
-			       wsi->dns_results_next->ai_addrlen);
-			wsi->udp->salen = (socklen_t)wsi->dns_results_next->ai_addrlen;
 		}
+
+		if (wsi->udp)
+			wsi->udp->sa46 = s->dest;
+		wsi->sa46_peer = s->dest;
 
 		/* we connected: complete the udp socket adoption flow */
 
+#if defined(LWS_WITH_SYS_ASYNC_DNS)
+	if (wsi->a.context->async_dns.wsi == wsi)
+		wsi->a.context->async_dns.dns_server_connected = 1;
+#endif
+
+		lws_free(s);
 		lws_addrinfo_clean(wsi);
 		return lws_adopt_descriptor_vhost2(wsi,
 						LWS_ADOPT_RAW_SOCKET_UDP, sock);
 
 resume:
-		wsi->dns_results_next = wsi->dns_results_next->ai_next;
+		lws_free(s);
 	}
 
 	lwsl_err("%s: unable to create INET socket %d\n", __func__, LWS_ERRNO);
 	lws_addrinfo_clean(wsi);
 
+#if defined(LWS_WITH_SYS_ASYNC_DNS)
+	if (wsi->a.context->async_dns.wsi == wsi)
+		lws_async_dns_drop_server(wsi->a.context);
+#endif
+
 bail:
-	lws_close_free_wsi(wsi, LWS_CLOSE_STATUS_NOSTATUS, "adopt udp2 fail");
+
+	/* caller must close */
 
 	return NULL;
 }
@@ -728,7 +786,7 @@ struct lws *
 lws_create_adopt_udp(struct lws_vhost *vhost, const char *ads, int port,
 		     int flags, const char *protocol_name, const char *ifname,
 		     struct lws *parent_wsi, void *opaque,
-		     const lws_retry_bo_t *retry_policy)
+		     const lws_retry_bo_t *retry_policy, const char *fi_wsi_name)
 {
 #if !defined(LWS_PLAT_OPTEE)
 	struct lws *wsi;
@@ -738,16 +796,25 @@ lws_create_adopt_udp(struct lws_vhost *vhost, const char *ads, int port,
 
 	/* create the logical wsi without any valid fd */
 
-	wsi = lws_adopt_descriptor_vhost1(vhost, LWS_ADOPT_RAW_SOCKET_UDP,
-					  protocol_name, parent_wsi, opaque);
+	lws_context_lock(vhost->context, __func__);
+
+	wsi = __lws_adopt_descriptor_vhost1(vhost, LWS_ADOPT_SOCKET |
+						 LWS_ADOPT_RAW_SOCKET_UDP,
+					  protocol_name, parent_wsi, opaque,
+					  fi_wsi_name);
+
+	lws_context_unlock(vhost->context);
 	if (!wsi) {
 		lwsl_err("%s: udp wsi creation failed\n", __func__);
 		goto bail;
 	}
+
+	// lwsl_notice("%s: role %s\n", __func__, wsi->role_ops->name);
+
 	wsi->do_bind = !!(flags & LWS_CAUDP_BIND);
 	wsi->do_broadcast = !!(flags & LWS_CAUDP_BROADCAST);
 	wsi->pf_packet = !!(flags & LWS_CAUDP_PF_PACKET);
-	wsi->c_port = port;
+	wsi->c_port = (uint16_t)(unsigned int)port;
 	if (retry_policy)
 		wsi->retry_policy = retry_policy;
 	else
@@ -783,8 +850,11 @@ lws_create_adopt_udp(struct lws_vhost *vhost, const char *ads, int port,
 			//freeaddrinfo(r);
 			goto bail1;
 		}
-		/* complete it immediately after the blocking dns lookup
-		 * finished... free r when connect either completed or failed */
+		/*
+		 * With synchronous dns, complete it immediately after the
+		 * blocking dns lookup finished... free r when connect either
+		 * completed or failed
+		 */
 		wsi = lws_create_adopt_udp2(wsi, ads, r, 0, NULL);
 
 		return wsi;
@@ -805,8 +875,9 @@ lws_create_adopt_udp(struct lws_vhost *vhost, const char *ads, int port,
 		 */
 		n = lws_async_dns_query(vhost->context, 0, ads,
 					LWS_ADNS_RECORD_A,
-					lws_create_adopt_udp2, wsi, (void *)ifname);
-		lwsl_debug("%s: dns query returned %d\n", __func__, n);
+					lws_create_adopt_udp2, wsi,
+					(void *)ifname);
+		// lwsl_notice("%s: dns query returned %d\n", __func__, n);
 		if (n == LADNS_RET_FAILED) {
 			lwsl_err("%s: async dns failed\n", __func__);
 			wsi = NULL;
@@ -823,7 +894,8 @@ lws_create_adopt_udp(struct lws_vhost *vhost, const char *ads, int port,
 
 	/* dns lookup is happening asynchronously */
 
-	lwsl_debug("%s: returning wsi %p\n", __func__, wsi);
+	// lwsl_notice("%s: returning wsi %p\n", __func__, wsi);
+
 	return wsi;
 #endif
 #if !defined(LWS_WITH_SYS_ASYNC_DNS)

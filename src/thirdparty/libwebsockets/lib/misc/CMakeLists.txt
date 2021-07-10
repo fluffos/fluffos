@@ -33,6 +33,7 @@ include_directories(.)
 
 list(APPEND SOURCES
 	misc/base64-decode.c
+	misc/prng.c
 	misc/lws-ring.c)
 
 if (LWS_WITH_FTS)
@@ -79,6 +80,9 @@ if (LWS_WITH_LWSAC)
 	if (NOT LWS_PLAT_FREERTOS)
 		list(APPEND SOURCES
 			misc/lwsac/cached-file.c)
+	endif()
+	if (LWS_WITH_SECURE_STREAMS_CPP)
+		list(APPEND SOURCES misc/lwsac/lwsac.cxx)
 	endif()
 endif()
 

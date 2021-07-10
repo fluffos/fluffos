@@ -1,7 +1,7 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2021 Andy Green <andy@warmcat.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -26,7 +26,10 @@
 #include "private-lib-tls-openssl.h"
 
 extern int openssl_websocket_private_data_index,
-openssl_SSL_CTX_private_data_index;
+	   openssl_SSL_CTX_private_data_index;
+#if defined(LWS_WITH_NETWORK)
+static char openssl_ex_indexes_acquired;
+#endif
 
 char* lws_ssl_get_error_string(int status, int ret, char *buf, size_t len) {
 	switch (status) {
@@ -78,7 +81,11 @@ lws_tls_err_describe_clear(void)
 		if (!l)
 			break;
 
-		ERR_error_string_n(l, buf, sizeof(buf));
+		ERR_error_string_n(
+#if defined(LWS_WITH_BORINGSSL)
+				(uint32_t)
+#endif
+				l, buf, sizeof(buf));
 		lwsl_info("   openssl error: %s\n", buf);
 	} while (l);
 	lwsl_info("\n");
@@ -86,7 +93,7 @@ lws_tls_err_describe_clear(void)
 
 #if LWS_MAX_SMP != 1
 
-static pthread_mutex_t *openssl_mutexes;
+static pthread_mutex_t *openssl_mutexes = NULL;
 
 static void
 lws_openssl_lock_callback(int mode, int type, const char *file, int line)
@@ -103,7 +110,11 @@ lws_openssl_lock_callback(int mode, int type, const char *file, int line)
 static unsigned long
 lws_openssl_thread_id(void)
 {
+#ifdef __PTW32_H
+	return (unsigned long)(intptr_t)(pthread_self()).p;
+#else
 	return (unsigned long)pthread_self();
+#endif
 }
 #endif
 
@@ -142,11 +153,15 @@ lws_context_init_ssl_library(const struct lws_context_creation_info *info)
 	OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS, NULL);
 #endif
 #if defined(LWS_WITH_NETWORK)
-	openssl_websocket_private_data_index =
-		SSL_get_ex_new_index(0, "lws", NULL, NULL, NULL);
+	if (!openssl_ex_indexes_acquired) {
+		openssl_websocket_private_data_index =
+			SSL_get_ex_new_index(0, "lws", NULL, NULL, NULL);
 
-	openssl_SSL_CTX_private_data_index = SSL_CTX_get_ex_new_index(0,
-			NULL, NULL, NULL, NULL);
+		openssl_SSL_CTX_private_data_index =
+			SSL_CTX_get_ex_new_index(0, NULL, NULL, NULL, NULL);
+
+		openssl_ex_indexes_acquired = 1;
+	}
 #endif
 
 #if LWS_MAX_SMP != 1
@@ -154,8 +169,8 @@ lws_context_init_ssl_library(const struct lws_context_creation_info *info)
 		int n;
 
 		openssl_mutexes = (pthread_mutex_t *)
-				OPENSSL_malloc(CRYPTO_num_locks() *
-					       sizeof(openssl_mutexes[0]));
+				OPENSSL_malloc((size_t)((unsigned long)CRYPTO_num_locks() *
+					       (unsigned long)sizeof(openssl_mutexes[0])));
 
 		for (n = 0; n < CRYPTO_num_locks(); n++)
 			pthread_mutex_init(&openssl_mutexes[n], NULL);
@@ -188,9 +203,12 @@ lws_context_deinit_ssl_library(struct lws_context *context)
 
 	CRYPTO_set_locking_callback(NULL);
 
-	for (n = 0; n < CRYPTO_num_locks(); n++)
-		pthread_mutex_destroy(&openssl_mutexes[n]);
+	if (openssl_mutexes) {
+		for (n = 0; n < CRYPTO_num_locks(); n++)
+			pthread_mutex_destroy(&openssl_mutexes[n]);
 
-	OPENSSL_free(openssl_mutexes);
+		OPENSSL_free(openssl_mutexes);
+		openssl_mutexes = NULL;
+	}
 #endif
 }

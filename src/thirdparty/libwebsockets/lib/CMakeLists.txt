@@ -103,7 +103,15 @@ endif()
 
 # ideally we want to use pipe2()
 
-CHECK_C_SOURCE_COMPILES("#define _GNU_SOURCE\n#include <unistd.h>\nint main(void) {int fd[2];\n return pipe2(fd, 0);\n}\n" LWS_HAVE_PIPE2)
+CHECK_C_SOURCE_COMPILES("
+	#ifndef _GNU_SOURCE
+	#define _GNU_SOURCE
+	#endif
+	#include <unistd.h>
+	int main(void) {
+		int fd[2];
+		return pipe2(fd, 0);
+	}" LWS_HAVE_PIPE2)
 
 # tcp keepalive needs this on linux to work practically... but it only exists
 # after kernel 2.6.37
@@ -153,7 +161,13 @@ if (LWS_WITH_STATIC)
 	add_library(websockets STATIC ${SOURCES})# ${HDR_PUBLIC})
 	set_target_properties(websockets PROPERTIES LINKER_LANGUAGE C)
 	list(APPEND LWS_LIBRARIES websockets)
+	target_include_directories(websockets INTERFACE
+		$<INSTALL_INTERFACE:${LWS_INSTALL_INCLUDE_DIR}>
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/../include>
+	)
 	target_include_directories(websockets PRIVATE ${LWS_LIB_BUILD_INC_PATHS})
+	target_compile_definitions(websockets PRIVATE LWS_BUILDING_STATIC)
 
 	if (WIN32)
 		# Windows uses the same .lib ending for static libraries and shared
@@ -173,7 +187,13 @@ if (LWS_WITH_SHARED)
 	add_library(websockets_shared SHARED ${SOURCES} ${RESOURCES})# ${HDR_PUBLIC})
 	set_target_properties(websockets_shared PROPERTIES LINKER_LANGUAGE C)
 	list(APPEND LWS_LIBRARIES websockets_shared)
+	target_include_directories(websockets_shared INTERFACE
+		$<INSTALL_INTERFACE:${LWS_INSTALL_INCLUDE_DIR}>
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/../include>
+	)
 	target_include_directories(websockets_shared PRIVATE ${LWS_LIB_BUILD_INC_PATHS})
+	target_compile_definitions(websockets_shared PRIVATE LWS_BUILDING_SHARED)
 
 	# We want the shared lib to be named "libwebsockets"
 	# not "libwebsocket_shared".
@@ -197,6 +217,7 @@ if (LWS_WITH_SHARED)
 	if (UNIX AND LWS_WITH_PLUGINS_API)
 		set (CMAKE_POSITION_INDEPENDENT_CODE ON)
 		if (NOT((${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD") OR
+		   (${CMAKE_SYSTEM_NAME} MATCHES "OpenBSD") OR
 		   (${CMAKE_SYSTEM_NAME} MATCHES "QNX")))
 		   if (LWS_WITH_SHARED)
 				target_link_libraries(websockets_shared dl)

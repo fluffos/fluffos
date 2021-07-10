@@ -1,7 +1,7 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2020 Andy Green <andy@warmcat.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -33,12 +33,48 @@
 #include <lwip/sockets.h>
 #endif
 
-typedef union {
-#if defined(LWS_WITH_IPV6)
-	struct sockaddr_in6 sa6;
-#endif
-	struct sockaddr_in sa4;
-} lws_sockaddr46;
+typedef uint8_t lws_route_uidx_t;
+
+typedef struct lws_dns_score {
+	uint8_t precedence;
+	uint8_t label;
+} lws_dns_score_t;
+
+/*
+ * This represents an entry in the system routing table
+ */
+
+typedef struct lws_route {
+	lws_dll2_t		list;
+
+	lws_sockaddr46		src;
+	lws_sockaddr46		dest;
+	lws_sockaddr46		gateway;
+
+	struct lws_route	*source; /* when used as lws_dns_sort_t */
+	lws_dns_score_t		score; /* when used as lws_dns_sort_t */
+
+	int			if_idx;
+	int			priority;
+	int			ifa_flags; /* if source_ads */
+
+	lws_route_uidx_t	uidx; /* unique index for this route */
+
+	uint8_t			proto;
+	uint8_t			dest_len;
+	uint8_t			src_len;
+	uint8_t			scope; /* if source_ads */
+	uint8_t			af; /* if source_ads */
+
+	uint8_t			source_ads:1;
+} lws_route_t;
+
+/*
+ * We reuse the route object as the dns sort granule, so there's only one
+ * struct needs to know all the gnarly ipv6 details
+ */
+
+typedef lws_route_t lws_dns_sort_t;
 
 /**
  * lws_canonical_hostname() - returns this host's hostname
@@ -124,10 +160,27 @@ lws_interface_to_sa(int ipv6, const char *ifname, struct sockaddr_in *addr,
  * \param sa46a: first
  * \param sa46b: second
  *
- * Returns 0 if the address family and address are the same, otherwise nonzero.
+ * Returns 0 if the address family is INET or INET6 and the address is the same,
+ * or if the AF is the same but not INET or INET6, otherwise nonzero.
  */
 LWS_VISIBLE LWS_EXTERN int
 lws_sa46_compare_ads(const lws_sockaddr46 *sa46a, const lws_sockaddr46 *sa46b);
+
+/**
+ * lws_sa46_on_net() - checks if an sa46 is on the subnet represented by another
+ *
+ * \param sa46a: first
+ * \param sa46_net: network
+ * \param net_len: length of network non-mask
+ *
+ * Returns 0 if sa46a belongs on network sa46_net/net_len
+ *
+ * If there is an ipv4 / v6 mismatch between the ip and the net, the ipv4
+ * address is promoted to ::ffff:x.x.x.x before the comparison.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_sa46_on_net(const lws_sockaddr46 *sa46a, const lws_sockaddr46 *sa46_net,
+			int net_len);
 
 /*
  * lws_parse_numeric_address() - converts numeric ipv4 or ipv6 to byte address

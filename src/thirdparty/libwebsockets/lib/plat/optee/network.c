@@ -203,7 +203,7 @@ lws_plat_set_socket_options(struct lws_vhost *vhost, int fd, int unix_skt)
 
 int
 lws_plat_write_cert(struct lws_vhost *vhost, int is_key, int fd, void *buf,
-			int len)
+			size_t len)
 {
 	return 1;
 }
@@ -243,7 +243,7 @@ lws_plat_change_pollfd(struct lws_context *context,
 }
 
 const char *
-lws_plat_inet_ntop(int af, const void *src, char *dst, int cnt)
+lws_plat_inet_ntop(int af, const void *src, char *dst, socklen_t cnt)
 {
 	//return inet_ntop(af, src, dst, cnt);
 	return "lws_plat_inet_ntop";
@@ -254,6 +254,18 @@ lws_plat_inet_pton(int af, const char *src, void *dst)
 {
 	//return inet_pton(af, src, dst);
 	return 1;
+}
+
+int
+lws_plat_set_socket_options_ip(int fd, uint8_t pri, unsigned int lws_flags)
+{
+	return 0;
+}
+
+int
+lws_plat_vhost_tls_client_ctx_init(struct lws_vhost *vhost)
+{
+	return 0;
 }
 
 #if defined(LWS_WITH_MBEDTLS)

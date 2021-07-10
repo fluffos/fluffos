@@ -1,7 +1,7 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2021 Andy Green <andy@warmcat.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -60,12 +60,10 @@ int
 _lws_plat_service_tsi(struct lws_context *context, int timeout_ms, int tsi)
 {
 	struct lws_context_per_thread *pt;
-	WSANETWORKEVENTS networkevents;
 	struct lws_pollfd *pfd;
 	lws_usec_t timeout_us;
 	struct lws *wsi;
 	unsigned int i;
-	DWORD ev;
 	int n;
 
 	/* stay dead once we are dead */
@@ -135,7 +133,13 @@ _lws_plat_service_tsi(struct lws_context *context, int timeout_ms, int tsi)
 					    LWS_COUNT_PT_SUL_OWNERS,
 					    lws_now_usecs());
 		if (us && us < timeout_us)
-			timeout_us = us;
+			/*
+			 * If something wants zero wait, that's OK, but if the next sul
+			 * coming ripe is an interval less than our wait resolution,
+			 * bump it to be the wait resolution.
+			 */
+			timeout_us = us < context->us_wait_resolution ?
+					context->us_wait_resolution : us;
 
 		lws_pt_unlock(pt);
 	}
@@ -150,57 +154,15 @@ _lws_plat_service_tsi(struct lws_context *context, int timeout_ms, int tsi)
 	if (!lws_service_adjust_timeout(context, 1, tsi))
 		timeout_us = 0;
 
-	/*
-	 * WSA cannot actually tell us this from the wait... if anyone wants
-	 * POLLOUT and is not blocked for it, no need to wait since we will want
-	 * to service at least those.   Still enter the wait so we can pick up
-	 * other pending things...
-	 */
-
-	for (n = 0; n < (int)pt->fds_count; n++)
-		if (pt->fds[n].fd != LWS_SOCK_INVALID &&
-		    pt->fds[n].events & LWS_POLLOUT &&
-		    !pt->fds[n].write_blocked) {
-			timeout_us = 0;
-			break;
-		}
-
-	// lwsl_notice("%s: to %dms\n", __func__, (int)(timeout_us / 1000));
-	ev = WSAWaitForMultipleEvents(pt->fds_count + 1, pt->events, FALSE,
-				      (DWORD)(timeout_us / LWS_US_PER_MS),
-				      FALSE);
-	//lwsl_notice("%s: ev 0x%x\n", __func__, ev);
-
-	/*
-	 * The wait returns indicating the one event that had something, or
-	 * that we timed out, or something broken.
-	 *
-	 * Amazingly WSA can only handle 64 events, because the errors start
-	 * at ordinal 64.
-	 */
-
-	if (ev >= WSA_MAXIMUM_WAIT_EVENTS &&
-	    ev != WSA_WAIT_TIMEOUT)
-		/* some kind of error */
-		return 0;
-
-       if (!ev) {
-	       /*
-	        * The zero'th event is the cancel event specifically.  Lock
-	        * the event reset so we are definitely clearing it while we
-	        * try to clear it.
-	        */
-		EnterCriticalSection(&pt->interrupt_lock);
-		WSAResetEvent(pt->events[0]);
-		LeaveCriticalSection(&pt->interrupt_lock);
-		lws_broadcast(pt, LWS_CALLBACK_EVENT_WAIT_CANCELLED, NULL, 0);
-
+//	lwsl_notice("%s: in %dms, count %d\n", __func__, (int)(timeout_us / 1000), pt->fds_count);
+//	for (n = 0; n < (int)pt->fds_count; n++)
+//		lwsl_notice("%s: fd %d ev 0x%x POLLIN %d, POLLOUT %d\n", __func__, (int)pt->fds[n].fd, (int)pt->fds[n].events, POLLIN, POLLOUT);
+	int d = WSAPoll((WSAPOLLFD *)&pt->fds[0], pt->fds_count, (int)(timeout_us / LWS_US_PER_MS));
+	if (d < 0) {
+		lwsl_err("%s: WSAPoll failed: count %d, err %d: %d\n", __func__, pt->fds_count, d, WSAGetLastError());
 		return 0;
 	}
-
-       /*
-        * Otherwise at least fds[ev - 1] has something to do...
-        */
+//	lwsl_notice("%s: out\n", __func__);
 
 #if defined(LWS_WITH_TLS)
 	if (pt->context->tls_ops &&
@@ -208,109 +170,11 @@ _lws_plat_service_tsi(struct lws_context *context, int timeout_ms, int tsi)
 		pt->context->tls_ops->fake_POLLIN_for_buffered(pt);
 #endif
 
-	/*
-	 * POLLOUT for any fds that can
-	 */
-
 	for (n = 0; n < (int)pt->fds_count; n++)
-		if (pt->fds[n].fd != LWS_SOCK_INVALID &&
-		    pt->fds[n].events & LWS_POLLOUT &&
-		    !pt->fds[n].write_blocked) {
-			struct timeval tv;
-			fd_set se;
-
-			/*
-			 * We have to check if it is blocked...
-			 * if not, do the POLLOUT handling
-			 */
-
-			FD_ZERO(&se);
-			FD_SET(pt->fds[n].fd, &se);
-			tv.tv_sec = tv.tv_usec = 0;
-			if (select(1, NULL, &se, NULL, &tv) != 1)
-				pt->fds[n].write_blocked = 1;
-			else {
-				pt->fds[n].revents |= LWS_POLLOUT;
-				lws_service_fd_tsi(context, &pt->fds[n], tsi);
-			}
+		if (pt->fds[n].fd != LWS_SOCK_INVALID && pt->fds[n].revents) {
+//			lwsl_notice("%s: idx %d, revents 0x%x\n", __func__, n, pt->fds[n].revents);
+			lws_service_fd_tsi(context, &pt->fds[n], tsi);
 		}
-
-       if (ev && ev < WSA_MAXIMUM_WAIT_EVENTS) {
-		unsigned int err;
-
-		/* handle fds[ev - 1] */
-
-               if (WSAEnumNetworkEvents(pt->fds[ev - 1].fd, pt->events[ev],
-				&networkevents) == SOCKET_ERROR) {
-			lwsl_err("WSAEnumNetworkEvents() failed "
-				 "with error %d\n", LWS_ERRNO);
-			return -1;
-		}
-
-		pfd = &pt->fds[ev - 1];
-		pfd->revents = (short)networkevents.lNetworkEvents;
-
-	        if (!pfd->write_blocked && pfd->revents & FD_WRITE)
-	        	 pfd->write_blocked = 0;
-
-		err = networkevents.iErrorCode[FD_CONNECT_BIT];
-		if ((networkevents.lNetworkEvents & FD_CONNECT) &&
-		    wsi_from_fd(context, pfd->fd) &&
-		    !wsi_from_fd(context, pfd->fd)->udp) {
-                       lwsl_debug("%s: FD_CONNECT: %p\n", __func__,
-                		  wsi_from_fd(context, pfd->fd));
-			pfd->revents &= ~LWS_POLLOUT;
-			if (err && err != LWS_EALREADY &&
-			    err != LWS_EINPROGRESS &&
-			    err != LWS_EWOULDBLOCK &&
-			    err != WSAEINVAL) {
-				lwsl_debug("Unable to connect errno=%d\n", err);
-
-				/*
-				 * the connection has definitively failed... but
-				 * do we have more DNS entries to try?
-				 */
-				if (wsi_from_fd(context, pfd->fd)->dns_results_next) {
-					lws_sul_schedule(context, 0,
-						&wsi_from_fd(context, pfd->fd)->
-							sul_connect_timeout,
-						lws_client_conn_wait_timeout, 1);
-                                       return 0;
-                               } else
-					pfd->revents |= LWS_POLLHUP;
-			} else
-                               if (wsi_from_fd(context, pfd->fd)) {
-                                       if (wsi_from_fd(context, pfd->fd)->udp)
-                                               pfd->revents |= LWS_POLLHUP;
-                                       else
-                                               lws_client_connect_3_connect(
-                                        	  wsi_from_fd(context, pfd->fd),
-						  NULL, NULL,
-						  LWS_CONNECT_COMPLETION_GOOD,
-						  NULL);
-                               }
-		}
-
-		if (pfd->revents & LWS_POLLOUT) {
-			wsi = wsi_from_fd(context, pfd->fd);
-			if (wsi)
-				wsi->sock_send_blocking = 0;
-		}
-
-		if (pfd->revents) {
-			/*
-			 * On windows is somehow necessary to "acknowledge" the
-			 * POLLIN event, otherwise we never receive another one
-			 * on the TCP connection.  But it breaks UDP, so only
-			 * do it on non-UDP.
-			 */
-			wsi = wsi_from_fd(context, pfd->fd);
-			if (wsi && !wsi->udp)
-				recv(pfd->fd, NULL, 0, 0);
-
-			lws_service_fd_tsi(context, pfd, tsi);
-		}
-	}
 
 	return 0;
 }
