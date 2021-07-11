@@ -40,8 +40,20 @@
 struct event_base *g_event_base = nullptr;
 
 namespace {
-void libevent_log(int severity, const char *msg) { debug(event, "events:%d:%s\n", severity, msg); }
-void libevent_dns_log(int severity, const char *msg) { debug(dns, "dns:%d:%s\n", severity, msg); }
+void libevent_log(int severity, const char *msg) {
+  if (severity == EVENT_LOG_ERR) {
+    debug(all, "libevent:%d:%s\n", severity, msg);
+  } else {
+    debug(event, "libevent:%d:%s\n", severity, msg);
+  }
+}
+void libevent_dns_log(int severity, const char *msg) {
+  if (severity == EVENT_LOG_ERR) {
+    debug(all, "libevent dns:%d:%s\n", severity, msg);
+  } else {
+    debug(dns, "libevent dns:%d:%s\n", severity, msg);
+  }
+}
 }  // namespace
 // Initialize backend
 event_base *init_backend() {
