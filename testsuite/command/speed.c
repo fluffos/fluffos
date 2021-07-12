@@ -105,6 +105,7 @@ int main() {
         empty100000, empty200000, empty1000000;
     int save;
     int ss, sm;
+    int overall;
 
 #ifdef STRING_TESTS
     s1 = "This is a test";
@@ -120,6 +121,7 @@ int main() {
     m1 = ([ "1" : "a", "2" : "b", "3" : "c", "4" : "d", "5" : "e" ]);
     m2 = ([ 1 : "a", 2 : "b", 3 : "c", 4 : "d", 5 : "e" ]);
 #endif
+    overall = perf_counter_ns();
 
     write(__VERSION__+"\n");
 
@@ -253,5 +255,12 @@ int main() {
     TIME("save_object",300,save_object("/tmp"));
     TIME("restore_object",1000,restore_object("/tmp"));
 #endif
+    s = read_file("/single/tests/std/test.json");
+    TIME("json_decode",200,json_decode(s));
+    m = json_decode(s);
+    TIME("json_encode",200,json_encode(m));
+
+    write("\n");
+    write(sprintf("Total: %d ns.\n", perf_counter_ns() - overall));
     return 1;
 }
