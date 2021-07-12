@@ -5,6 +5,7 @@ import timeit
 import sys
 import string
 import random
+import json
 
 
 def perf_counter_ns():
@@ -136,3 +137,10 @@ report("lookup string (exist)", _timeit('m1["3"]', globals=globals()))
 report("lookup string (missing)", _timeit('m1.get("6")', globals=globals()))
 report("lookup int (exist)", _timeit('m2[3]', globals=globals()))
 report("lookup int (missing)", _timeit('m2.get(6)', globals=globals()))
+
+f = open("single/tests/std/test.json")
+txt = f.read()
+f.close()
+report("json_decode", _timeit('json.loads(txt)', globals=globals(), number=200))
+m = json.loads(txt)
+report("json_decode_encode", _timeit('json.dumps(m)', globals=globals(), number=200))
