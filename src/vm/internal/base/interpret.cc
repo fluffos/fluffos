@@ -572,7 +572,7 @@ void push_indexed_lvalue(int reverse) {
           if (ind <= 0) error("Index out of bounds in string index lvalue.\n");
           ind = -1 * ind;
         } else {
-          if (ind <= 0) error("Index out of bounds in string index lvalue.\n");
+          if (ind < 0) error("Index out of bounds in string index lvalue.\n");
         }
         UChar32 c = u8_egc_index_as_single_codepoint(lv->u.string, ind);
         if (c == -2 || c == 0) {
