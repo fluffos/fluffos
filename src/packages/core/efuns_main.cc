@@ -2601,7 +2601,10 @@ void f_strsrch(void) {
     if (single_char_search && single >= 0) {
       const auto *res =
           arg3->u.number == 0 ? strchr(arg1->u.string, single) : strrchr(arg1->u.string, single);
-      auto ret = res == nullptr ? -1 : (const char *)res - arg1->u.string;
+      auto pos = res == nullptr ? -1 : (const char *)res - arg1->u.string;
+
+      EGCIterator iter(arg1->u.string, SVALUE_STRLEN(arg1));
+      auto ret = pos == -1 || !iter.ok() ? -1 : u8_offset_to_egc_index(iter, pos);
 
       pop_3_elems();
       push_number(ret);
@@ -2632,8 +2635,9 @@ void f_strsrch(void) {
   LPC_INT ret = -1;
   // only search if there is a chance.
   if (find_len <= src_len) {
-    auto pos = u8_egc_find_as_offset(arg1->u.string, src_len, find, find_len, arg3->u.number != 0);
-    ret = pos == -1 ? -1 : u8_offset_to_egc_index(arg1->u.string, pos);
+    EGCIterator iter(arg1->u.string, src_len);
+    auto pos = u8_egc_find_as_offset(iter, arg1->u.string, src_len, find, find_len, arg3->u.number != 0);
+    ret = pos == -1 ? -1 : u8_offset_to_egc_index(iter, pos);
   }
 
   pop_3_elems();

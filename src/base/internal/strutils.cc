@@ -37,12 +37,17 @@ bool u8_validate(const uint8_t *s, size_t len) {
 std::string u8_sanitize(std::string_view src) { return utf8::replace_invalid(src); }
 
 // Search "needle' in 'haystack', making sure it matches EGC boundary, returning byte offset.
-int32_t u8_egc_find_as_offset(const char *haystack, size_t haystack_len, const char *needle,
-                              size_t needle_len, bool reverse) {
+int32_t u8_egc_find_as_offset(EGCIterator& iter,
+                              const char *haystack,
+                              size_t haystack_len,
+                              const char *needle,
+                              size_t needle_len,
+                              bool reverse) {
   // no way
   if (needle_len > haystack_len) {
     return -1;
   }
+  if (!iter.ok()) return -1;
 
   // fast track ascii string search upto 4 characters.
   if (!reverse) {
@@ -64,9 +69,6 @@ int32_t u8_egc_find_as_offset(const char *haystack, size_t haystack_len, const c
   }
 
   int res = -1;
-
-  EGCIterator iter(haystack, haystack_len);
-  if (!iter.ok()) return res;
 
   std::string_view sv_haystack(haystack, haystack_len);
   std::string_view sv_needle(needle, needle_len);
@@ -93,7 +95,7 @@ int32_t u8_egc_find_as_offset(const char *haystack, size_t haystack_len, const c
 // Return the egc at given index of src, if it is an single code point.
 // Return -2 if requested index is out of bounds
 // Return -1 if requested EGC is multi codepoint
-UChar32 u8_egc_index_as_single_codepoint(const char *src, int32_t index) {
+UChar32 u8_egc_index_as_single_codepoint(const char *src, int32_t src_len, int32_t index) {
   UChar32 c = U_SENTINEL;
 
   EGCSmartIterator iter(src, -1);
@@ -128,14 +130,12 @@ void u8_copy_and_replace_codepoint_at(const char *src, char *dst, int32_t index,
 }
 
 // Get the byte offset to the egc index, return -1 for non boundary.
-int32_t u8_offset_to_egc_index(const char *src, int32_t offset) {
+int32_t u8_offset_to_egc_index(EGCIterator &iter, int32_t offset) {
   if (offset <= 0) return offset;
+  if (!iter.ok()) return -1;
 
   int idx = -1;
   int pos = 0;
-
-  EGCIterator iter(src, -1);
-  if (!iter.ok()) return idx;
 
   pos = iter->first();
   idx = 0;
