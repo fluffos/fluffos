@@ -258,12 +258,13 @@ array_t *explode_string(const char *str, int slen, const char *del, int dellen, 
   auto num_leading = 0;
   auto num_trailing = 0;
 
+  EGCIterator iter(source, sourcelen);
   /*
    * Count leading 'del' strings.
    * in reversible mode, no skipping at all.
    * in sane mode, only skip one.
    */
-  while (sourcelen && u8_egc_find_as_offset(source, sourcelen, del, dellen, false) == 0) {
+  while (sourcelen && u8_egc_find_as_offset(iter, source, sourcelen, del, dellen, false) == 0) {
     source += dellen;
     sourcelen -= dellen;
     num_leading++;
@@ -284,7 +285,7 @@ array_t *explode_string(const char *str, int slen, const char *del, int dellen, 
    * in other mode, only skip one.
    */
   while (sourcelen) {
-    auto i = u8_egc_find_as_offset(source, sourcelen, del, dellen, true);
+    auto i = u8_egc_find_as_offset(iter, source, sourcelen, del, dellen, true);
     if (i <= 0 || i != (sourcelen - dellen)) break;
     sourcelen -= dellen;
     num_trailing++;
@@ -304,7 +305,7 @@ array_t *explode_string(const char *str, int slen, const char *del, int dellen, 
     results.push_back("");
   }
   while (sourcelen) {
-    int i = u8_egc_find_as_offset(source, sourcelen, del, dellen, false);
+    int i = u8_egc_find_as_offset(iter, source, sourcelen, del, dellen, false);
     // no more occurrence, copy the remaining part.
     if (i == -1) {
       results.emplace_back(source, sourcelen);
