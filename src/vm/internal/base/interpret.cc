@@ -564,17 +564,13 @@ void push_indexed_lvalue(int reverse) {
 
     switch (lv->type) {
       case T_STRING: {
-        EGCSmartIterator iter(lv->u.string, SVALUE_STRLEN(lv));
-        if (!iter.ok()) {
-          error("Bad UTF-8 String: push_indexed_lvalue");
-        };
         if (reverse) {
           if (ind <= 0) error("Index out of bounds in string index lvalue.\n");
           ind = -1 * ind;
         } else {
           if (ind < 0) error("Index out of bounds in string index lvalue.\n");
         }
-        UChar32 c = u8_egc_index_as_single_codepoint(lv->u.string, ind);
+        UChar32 c = u8_egc_index_as_single_codepoint(lv->u.string, SVALUE_STRLEN(lv), ind);
         if (c == -2 || c == 0) {
           error("Index out of bounds in string index lvalue.\n");
         } else if (c < 0) {
@@ -939,6 +935,7 @@ template <typename F>
 void assign_lvalue_codepoint(F &&func) {
   {
     UChar32 c = u8_egc_index_as_single_codepoint(global_lvalue_codepoint.owner->u.string,
+                                                 SVALUE_STRLEN(global_lvalue_codepoint.owner),
                                                  global_lvalue_codepoint.index);
     if (c < 0) {
       error("Invalid string index, multi-codepoint character.\n");
@@ -2037,6 +2034,7 @@ void eval_instruction(char *p) {
             break;
           } else if (reflval->type == T_LVALUE_CODEPOINT) {
             push_number(u8_egc_index_as_single_codepoint(global_lvalue_codepoint.owner->u.string,
+                                                         SVALUE_STRLEN(global_lvalue_codepoint.owner),
                                                          global_lvalue_codepoint.index));
             break;
           }
@@ -2659,7 +2657,9 @@ void eval_instruction(char *p) {
                 sp->u.lvalue->type = T_NUMBER;
                 sp->u.lvalue->subtype = 0;
                 sp->u.lvalue->u.number = u8_egc_index_as_single_codepoint(
-                    global_lvalue_codepoint.owner->u.string, global_lvalue_codepoint.index++);
+                    global_lvalue_codepoint.owner->u.string,
+                    SVALUE_STRLEN(global_lvalue_codepoint.owner),
+                    global_lvalue_codepoint.index++);
               }
             } else {
               if (sp->type == T_REF) {
@@ -3194,7 +3194,7 @@ void eval_instruction(char *p) {
               error("String index out of bounds.\n");
             }
 
-            UChar32 res = u8_egc_index_as_single_codepoint(sp->u.string, i);
+            UChar32 res = u8_egc_index_as_single_codepoint(sp->u.string, SVALUE_STRLEN(sp), i);
             if (res == -2) {
               error("String index out of bounds.\n");
             } else if (res < 0) {
@@ -3256,10 +3256,6 @@ void eval_instruction(char *p) {
             if ((sp - 1)->type != T_NUMBER) {
               error("Indexing a string with an illegal type.\n");
             }
-            EGCSmartIterator iter(sp->u.string, SVALUE_STRLEN(sp));
-            if (!iter.ok()) {
-              error("f_rindex: Invalid UTF8 string.\n");
-            }
             i = -1 * ((sp - 1)->u.number);
             // COMPAT: RINDEX 0 is 0.
             if (i == 0) {
@@ -3267,7 +3263,7 @@ void eval_instruction(char *p) {
               (--sp)->u.number = 0;
               break;
             }
-            UChar32 c = u8_egc_index_as_single_codepoint(sp->u.string, i);
+            UChar32 c = u8_egc_index_as_single_codepoint(sp->u.string, SVALUE_STRLEN(sp), i);
             if (c == -2) {
               error("String rindex out of bounds.\n");
             }

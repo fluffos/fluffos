@@ -1,7 +1,3 @@
-//
-// Created by fallentree on 7/10/21.
-//
-
 #ifndef FLUFFOS_SRC_BASE_INTERNAL_STRUTILS_CC_EGCSTRINGVIEW_H_
 #define FLUFFOS_SRC_BASE_INTERNAL_STRUTILS_CC_EGCSTRINGVIEW_H_
 
@@ -10,6 +6,7 @@
 #include <cctype>
 #include <locale>
 #include <string>
+#include <memory>
 #include <unicode/utf8.h>
 #include <unicode/uchar.h>
 #include <unicode/brkiter.h>
@@ -27,9 +24,9 @@ class EGCIterator {
   std::unique_ptr<icu::BreakIterator> brk_ = nullptr;
 
  public:
-  bool ok() { return ok_; }
-  const char* data() { return src_; }
-  auto operator->() { return brk_.operator->(); };
+  [[nodiscard]] bool ok() const { return ok_; }
+  [[nodiscard]] const char* data() const { return src_; }
+  auto operator->() { return brk_.operator->(); }
   EGCIterator(const char* src, int32_t slen) : src_(src) {
     UErrorCode status = U_ZERO_ERROR;
     brk_.reset(icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status));
