@@ -49,9 +49,9 @@ static struct lws_http_mount mount = {
 
 void lws_log(int severity, const char *msg) {
   if (severity == LLL_ERR) {
-    debug(all, "lws:%d:%s\n", severity, msg);
+    debug(all, "lws ERROR: %s", msg);
   } else {
-    debug(websocket, "lws:%d:%s\n", severity, msg);
+    debug(websocket, "lws %d: %s", severity, msg);
   }
 }
 
