@@ -55,7 +55,7 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
       lwsl_info("LWS_CALLBACK_ESTABLISHED\n");
 
       auto port = (port_def_t *)lws_context_user(lws_get_context(wsi));
-      auto fd = lws_get_socket_fd(wsi);
+      auto fd = lws_get_socket_fd(lws_get_network_wsi(wsi));
 
       sockaddr_storage addr = {0};
       socklen_t addrlen = sizeof(addr);
