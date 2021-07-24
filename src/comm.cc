@@ -27,8 +27,6 @@
 #else
 #include <ws2tcpip.h>
 #endif
-// ICU
-#include <unicode/ucnv.h>
 
 #include "backend.h"
 #include "interactive.h"
@@ -568,44 +566,17 @@ void add_message(object_t *who, const char *data, int len) {
 
   inet_packets++;
 
-  auto ip = who->interactive;
+  auto *ip = who->interactive;
   switch (ip->connection_type) {
     case PORT_ASCII:
     case PORT_TELNET: {
-      // Handle charset transcoding
-      auto transdata = const_cast<char *>(data);
-      auto translen = len;
-
-      if (ip->trans) {
-        UErrorCode error_code = U_ZERO_ERROR;
-
-        auto required = ucnv_fromAlgorithmic(ip->trans, UConverterType::UCNV_UTF8, nullptr, 0, data,
-                                             len, &error_code);
-        if (error_code == U_BUFFER_OVERFLOW_ERROR) {
-          translen = required;
-          transdata = (char *)DMALLOC(translen, TAG_TEMPORARY, "add_message (translate)");
-
-          error_code = U_ZERO_ERROR;
-          auto written = ucnv_fromAlgorithmic(ip->trans, UConverterType::UCNV_UTF8, transdata,
-                                              translen, data, len, &error_code);
-          DEBUG_CHECK(written != translen, "Bug: translation buffer size calculation error");
-          if (U_FAILURE(error_code)) {
-            debug_message("add_message: Translation failed!");
-            transdata = const_cast<char *>(data);
-            translen = len;
-          };
-        }
-      }
-
-      inet_volume += translen;
+      auto transdata = u8_convert_encoding(ip->trans, data, len);
+      auto result = transdata.empty() ? std::string_view(data, len) : transdata;
+      inet_volume += result.size();
       if (ip->connection_type == PORT_TELNET) {
-        telnet_send_text(ip->telnet, transdata, translen);
+        telnet_send_text(ip->telnet, result.data(), result.size());
       } else {
-        bufferevent_write(ip->ev_buffer, data, len);
-      }
-
-      if (transdata != data) {
-        FREE(transdata);
+        bufferevent_write(ip->ev_buffer, result.data(), result.size());
       }
     } break;
     case PORT_WEBSOCKET: {

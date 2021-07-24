@@ -120,9 +120,13 @@ void f_has_gmcp() {
 
 #ifdef F_SEND_GMCP
 void f_send_gmcp() {
-  auto ip = current_object->interactive;
+  auto *ip = current_object->interactive;
+  const auto *data = sp->u.string;
+  auto len = SVALUE_STRLEN(sp);
   if (ip && ip->telnet) {
-    telnet_subnegotiation(ip->telnet, TELNET_TELOPT_GMCP, sp->u.string, SVALUE_STRLEN(sp));
+    std::string transdata = u8_convert_encoding(ip->trans, data, len);
+    std::string_view result = transdata.empty() ? std::string_view(data, len) : transdata;
+    telnet_subnegotiation(ip->telnet, TELNET_TELOPT_GMCP, result.data(), result.size());
     flush_message(ip);
   } else if (!ip) {
     debug_message("Warning: wrong usage. send_gmcp() should only be called by a user object.\n");
