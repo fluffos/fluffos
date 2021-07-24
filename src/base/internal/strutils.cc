@@ -518,3 +518,26 @@ std::vector<std::string_view> u8_egc_split(const char *src) {
 
   return result;
 }
+
+// Return empty string if error or invalid translator.
+std::string u8_convert_encoding(UConverter *trans, const char *data, int len) {
+  std::string result;
+
+  if (trans) {
+    UErrorCode error_code = U_ZERO_ERROR;
+
+    auto required = ucnv_fromAlgorithmic(trans, UCNV_UTF8, nullptr, 0, data,
+                                         len, &error_code);
+    if (error_code == U_BUFFER_OVERFLOW_ERROR) {
+      result.resize(required);
+
+      error_code = U_ZERO_ERROR;
+      ucnv_fromAlgorithmic(trans, UCNV_UTF8, result.data(), result.size(), data, len, &error_code);
+      if (U_FAILURE(error_code)) {
+        debug_message("add_message: Translation failed!");
+        result = "";
+      }
+    }
+  }
+  return result;
+}

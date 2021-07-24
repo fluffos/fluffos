@@ -1,19 +1,19 @@
 #ifndef STRUTILS_H
 #define STRUTILS_H
 
+#include <unicode/utf8.h>
+#include <unicode/uchar.h>
+#include <unicode/brkiter.h>
+#include <unicode/unistr.h>
+#include <unicode/ucnv.h>
+
 #include <algorithm>
 #include <functional>
 #include <cctype>
 #include <locale>
 #include <string>
-#include <unicode/utf8.h>
-#include <unicode/uchar.h>
-#include <unicode/brkiter.h>
-#include <unicode/unistr.h>
 
 #include "base/internal/EGCIterator.h"
-
-namespace {
 
 // --------------------------------------------------------------------------
 /// @brief removes given characters from beginning of string
@@ -104,7 +104,6 @@ inline void ReplaceStringInPlace(std::string &subject, const std::string &search
     pos += replace.length();
   }
 }
-}  // namespace
 
 // a smarter subclass that remembers current location and attempt to do
 // relative movement to improve speed. but offer no access to underlying break iterator.
@@ -203,5 +202,5 @@ int32_t u8_egc_find_as_offset(EGCIterator &iter,
                               bool reverse);
 
 std::vector<std::string_view> u8_egc_split(const char *src);
-
+std::string u8_convert_encoding(UConverter *trans, const char *data, int len);
 #endif  // STRUTILS_H
