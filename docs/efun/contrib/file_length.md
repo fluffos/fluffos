@@ -1,6 +1,6 @@
 ---
 layout: default
-title: contrib / file_length.pre
+title: contrib / file_length
 ---
 
 ### NAME
