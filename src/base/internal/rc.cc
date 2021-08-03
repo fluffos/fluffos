@@ -53,12 +53,12 @@ const flagEntry intFlags[] = {
     {"maximum call depth", __MAX_CALL_DEPTH__, CFG_MAX_CALL_DEPTH},
 
     {"maximum array size", __MAX_ARRAY_SIZE__, 15000},
-    {"maximum buffer size", __MAX_BUFFER_SIZE__, 400000},
+    {"maximum buffer size", __MAX_BUFFER_SIZE__, 1 << 20},
     {"maximum mapping size", __MAX_MAPPING_SIZE__, 150000},
-    {"maximum string length", __MAX_STRING_LENGTH__, 200000},
+    {"maximum string length", __MAX_STRING_LENGTH__, 1 << 20},
     {"maximum bits in a bitfield", __MAX_BITFIELD_BITS__, 12000},
-    {"maximum byte transfer", __MAX_BYTE_TRANSFER__, 200000},
-    {"maximum read file size", __MAX_READ_FILE_SIZE__, 1 << 12},
+    {"maximum byte transfer", __MAX_BYTE_TRANSFER__, 1 << 18},
+    {"maximum read file size", __MAX_READ_FILE_SIZE__, 1 << 18},
 
     {"hash table size", __SHARED_STRING_HASH_TABLE_SIZE__, 65536, 7001},
     {"object table size", __OBJECT_HASH_TABLE_SIZE__, 4096, 1024},
