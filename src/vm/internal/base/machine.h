@@ -41,7 +41,7 @@ extern object_t *current_interactive;
 // TODO: defined in backend.cc
 extern uint64_t g_current_gametick;
 // Util to help translate gameticks with time.
-int time_to_gametick(std::chrono::milliseconds msec);
+int time_to_next_gametick(std::chrono::milliseconds msec);
 std::chrono::milliseconds gametick_to_time(int ticks);
 
 // TODO: defined in interpret.cc

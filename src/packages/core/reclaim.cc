@@ -111,7 +111,7 @@ static void gc_mapping(mapping_t *m) {
 
 int reclaim_objects(bool is_auto) {
   if (is_auto) {
-    add_gametick_event(std::chrono::seconds(30 + random_number(30)),
+    add_gametick_event(time_to_next_gametick(std::chrono::seconds(30 + random_number(30))),
                        tick_event::callback_type([] { return reclaim_objects(true); }));
   }
   int i;
