@@ -131,7 +131,7 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
 
       auto total = evbuffer_get_length(pss->buffer);
 
-      static unsigned char buf[LWS_PRE + MAX_TEXT];
+      static unsigned char buf[LWS_PRE + 2048];
       auto numbytes = evbuffer_copyout(pss->buffer, &buf[LWS_PRE], sizeof(buf) - LWS_PRE);
       if (numbytes > 0) {
         auto new_numbytes = u8_truncate(&buf[LWS_PRE], numbytes);
@@ -142,7 +142,7 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
         }
 #ifdef DEBUG
         if (!u8_validate(&buf[LWS_PRE], numbytes)) {
-          char buf1[MAX_TEXT + 1] = {};
+          char buf1[sizeof(buf) + 1] = {};
           strncpy(buf1, reinterpret_cast<const char *>(&buf[LWS_PRE]), numbytes);
           debug_message("Illegal UTF8 Websocket output string: %s.", buf1);
         }
