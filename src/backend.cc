@@ -78,7 +78,7 @@ event_base *init_backend() {
 uint64_t g_current_gametick;
 
 int time_to_next_gametick(std::chrono::milliseconds msec) {
-  return std::max(1, (int)(msec.count() / CONFIG_INT(__RC_GAMETICK_MSEC__)));
+  return std::max(1, (int)(ceil(msec.count() / (double)CONFIG_INT(__RC_GAMETICK_MSEC__))));
 }
 
 std::chrono::milliseconds gametick_to_time(int ticks) {
