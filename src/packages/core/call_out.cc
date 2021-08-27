@@ -116,6 +116,7 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, std::chrono::milliseconds dela
   } else {
     cop->target_time = g_current_gametick + delay_ticks;
   }
+  DBG_CALLOUT("  current: %" PRIu64 "\n", g_current_gametick);
   DBG_CALLOUT("  is_walltime: %d\n", cop->is_walltime ? 1 : 0);
   DBG_CALLOUT("  target_time: %" PRIu64 "\n", cop->target_time);
 
