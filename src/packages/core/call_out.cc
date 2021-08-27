@@ -105,8 +105,7 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, std::chrono::milliseconds dela
       DCALLOC(1, sizeof(pending_call_t), TAG_CALL_OUT, "new_call_out"));
 
   cop->is_walltime = walltime;
-  auto delay_ticks =
-      delay_msecs.count() == 0 ? 0 : time_to_next_gametick(delay_msecs);
+  auto delay_ticks = delay_msecs.count() == 0 ? 0 : time_to_next_gametick(delay_msecs);
 
   if (cop->is_walltime) {
     cop->target_time =
