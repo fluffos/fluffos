@@ -44,7 +44,11 @@ int64_t secure_random_number(int64_t n) {
  * of seconds since 1970.
  */
 
-time_t get_current_time() { return time(nullptr); /* Just use the old time() for now */ }
+time_t get_current_time() {
+  struct timeval t = {};
+  gettimeofday(&t, nullptr);
+  return t.tv_sec;
+}
 
 /*
  * Get a microsecond clock sample.
