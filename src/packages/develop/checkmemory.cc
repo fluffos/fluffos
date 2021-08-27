@@ -106,8 +106,8 @@ char *dump_debugmalloc(const char *tfn, int mask) {
   for (j = 0; j < MD_TABLE_SIZE; j++) {
     for (entry = table[j]; entry; entry = entry->next) {
       if (!mask || (entry->tag == mask)) {
-        fprintf(fp, "%12d %12" PRId64 " %12p %1d:%03d %7d %s\n", entry->id, entry->gametick, PTR(entry),
-                (entry->tag >> 8) & 0xff, entry->tag & 0xff, entry->size, entry->desc);
+        fprintf(fp, "%12d %12" PRId64 " %12p %1d:%03d %7d %s\n", entry->id, entry->gametick,
+                PTR(entry), (entry->tag >> 8) & 0xff, entry->tag & 0xff, entry->size, entry->desc);
         total += entry->size;
         chunks++;
       }
