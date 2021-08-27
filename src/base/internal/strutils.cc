@@ -37,12 +37,8 @@ bool u8_validate(const uint8_t *s, size_t len) {
 std::string u8_sanitize(std::string_view src) { return utf8::replace_invalid(src); }
 
 // Search "needle' in 'haystack', making sure it matches EGC boundary, returning byte offset.
-int32_t u8_egc_find_as_offset(EGCIterator& iter,
-                              const char *haystack,
-                              size_t haystack_len,
-                              const char *needle,
-                              size_t needle_len,
-                              bool reverse) {
+int32_t u8_egc_find_as_offset(EGCIterator &iter, const char *haystack, size_t haystack_len,
+                              const char *needle, size_t needle_len, bool reverse) {
   // no way
   if (needle_len > haystack_len) {
     return -1;
@@ -526,8 +522,7 @@ std::string u8_convert_encoding(UConverter *trans, const char *data, int len) {
   if (trans) {
     UErrorCode error_code = U_ZERO_ERROR;
 
-    auto required = ucnv_fromAlgorithmic(trans, UCNV_UTF8, nullptr, 0, data,
-                                         len, &error_code);
+    auto required = ucnv_fromAlgorithmic(trans, UCNV_UTF8, nullptr, 0, data, len, &error_code);
     if (error_code == U_BUFFER_OVERFLOW_ERROR) {
       result.resize(required);
 
