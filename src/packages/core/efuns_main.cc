@@ -2636,7 +2636,8 @@ void f_strsrch(void) {
   // only search if there is a chance.
   if (find_len <= src_len) {
     EGCIterator iter(arg1->u.string, src_len);
-    auto pos = u8_egc_find_as_offset(iter, arg1->u.string, src_len, find, find_len, arg3->u.number != 0);
+    auto pos =
+        u8_egc_find_as_offset(iter, arg1->u.string, src_len, find, find_len, arg3->u.number != 0);
     ret = pos == -1 ? -1 : u8_offset_to_egc_index(iter, pos);
   }
 
@@ -3143,8 +3144,7 @@ void f_dump_file_descriptors(void) {
 #ifdef F_RECLAIM_OBJECTS
 void f_reclaim_objects(void) {
   auto res = reclaim_objects(false);
-  add_gametick_event(std::chrono::seconds(0),
-                     tick_event::callback_type([] { remove_destructed_objects(); }));
+  add_gametick_event(0, tick_event::callback_type([] { remove_destructed_objects(); }));
   push_number(res);
 }
 #endif
@@ -3203,12 +3203,12 @@ void f_set_reset(void) {
 
   if (st_num_arg == 2) {
     (sp - 1)->u.ob->next_reset =
-        g_current_gametick + time_to_gametick(std::chrono::seconds(sp->u.number));
+        g_current_gametick + time_to_next_gametick(std::chrono::seconds(sp->u.number));
     free_object(&(--sp)->u.ob, "f_set_reset:1");
     sp--;
   } else {
     sp->u.ob->next_reset =
-        g_current_gametick + time_to_gametick(std::chrono::seconds(
+        g_current_gametick + time_to_next_gametick(std::chrono::seconds(
                                  time_to_reset / 2 + random_number(time_to_reset / 2)));
     free_object(&(sp--)->u.ob, "f_set_reset:2");
   }

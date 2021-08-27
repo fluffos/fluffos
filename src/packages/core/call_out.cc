@@ -86,7 +86,7 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, std::chrono::milliseconds dela
   // call_out(0) loop prevention. This is based on the fact that new call_out(0)
   // will be executed on the same gametick, and when the total exceed the limit
   // new_call_out will error(), thus breaking the loop.
-  if (delay_msecs == std::chrono::milliseconds(0)) {
+  if (delay_msecs.count() == 0) {
     if (g_current_gametick != new_call_out_zero_last_gametick) {
       // First time call_out(0) on this tick.
       new_call_out_zero_last_gametick = g_current_gametick;
@@ -105,6 +105,8 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, std::chrono::milliseconds dela
       DCALLOC(1, sizeof(pending_call_t), TAG_CALL_OUT, "new_call_out"));
 
   cop->is_walltime = walltime;
+  auto delay_ticks =
+      delay_msecs.count() == 0 ? 0 : time_to_next_gametick(delay_msecs);
 
   if (cop->is_walltime) {
     cop->target_time =
@@ -112,7 +114,7 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, std::chrono::milliseconds dela
             (std::chrono::high_resolution_clock::now() + delay_msecs).time_since_epoch())
             .count();
   } else {
-    cop->target_time = g_current_gametick + time_to_gametick(delay_msecs);
+    cop->target_time = g_current_gametick + delay_ticks;
   }
   DBG_CALLOUT("  is_walltime: %d\n", cop->is_walltime ? 1 : 0);
   DBG_CALLOUT("  target_time: %" PRIu64 "\n", cop->target_time);
@@ -156,7 +158,7 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, std::chrono::milliseconds dela
   if (walltime) {
     cop->tick_event = add_walltime_event(delay_msecs, tick_event::callback_type(callback));
   } else {
-    cop->tick_event = add_gametick_event(delay_msecs, tick_event::callback_type(callback));
+    cop->tick_event = add_gametick_event(delay_ticks, tick_event::callback_type(callback));
   }
   return cop->handle;
 }

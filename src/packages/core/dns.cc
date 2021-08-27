@@ -149,8 +149,7 @@ void on_getaddr_result(int err, evutil_addrinfo *res, void *arg) {
   query->res = res;
 
   // Schedule an immediate event to call LPC callback.
-  add_gametick_event(std::chrono::milliseconds(0),
-                     [=] { return on_query_addr_by_name_finish(query); });
+  add_gametick_event(0, [=] { return on_query_addr_by_name_finish(query); });
 }
 
 /*
