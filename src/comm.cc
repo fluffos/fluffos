@@ -498,6 +498,7 @@ void shutdown_external_ports() {
     if (!port.port) {
       continue;
     }
+    if (port.ssl) tls_server_close(port.ssl);
     // will also close the FD.
     if (port.ev_conn) evconnlistener_free(port.ev_conn);
     if (port.lws_context) close_websocket_context(port.lws_context);
