@@ -58,9 +58,11 @@ bool ObjectTable::remove(Key const& key) {
   objects_.erase(it1);
   // guaranteed to exist if object exists
   auto it2 = children_.find(basename(key));
+  if (it2 == children_.end()) return false;
   auto it3 = std::find_if(it2->second.begin(), it2->second.end(),
                           [&key](Value v) -> bool { return v->obname == key; });
   // guaranteed to be in list if basename(key) exists in children_
+  if (it3 == it2->second.end()) return false;
   it2->second.erase(it3);
   if (it2->second.size() == 0) {
     children_.erase(it2);
