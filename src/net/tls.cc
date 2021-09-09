@@ -7,15 +7,26 @@
 #include <openssl/rand.h>
 #include <string>
 
-SSL_CTX* tls_server_init(std::string_view file_cert, std::string_view file_key) {
-  /* Initialize the OpenSSL library */
+void tls_library_init() {
+  static int called = 0;
+
+  if (!called) {
+    called = 1;
+
+    /* Initialize the OpenSSL library */
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
-  SSL_library_init();
-  OpenSSL_add_all_algorithms();
-  SSL_load_error_strings();
+    SSL_library_init();
+    OpenSSL_add_all_algorithms();
+    SSL_load_error_strings();
 #else
-  OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS, nullptr);
+    OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS, nullptr);
 #endif
+  }
+}
+
+SSL_CTX* tls_server_init(std::string_view file_cert, std::string_view file_key) {
+  tls_library_init();
+
   /* We MUST have entropy, or else there's no point to crypto. */
   if (!RAND_poll() && !RAND_status()) return nullptr;
 
@@ -34,6 +45,10 @@ SSL_CTX* tls_server_init(std::string_view file_cert, std::string_view file_key) 
   SSL_CTX_set_options(server_ctx, SSL_OP_NO_TLSv1_1);
 
   return server_ctx;
+}
+
+void tls_server_close(SSL_CTX *ssl_ctx) {
+  SSL_CTX_free(ssl_ctx);
 }
 
 SSL* tls_get_client_ctx(SSL_CTX* server_ctx) {
