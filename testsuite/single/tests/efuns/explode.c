@@ -84,4 +84,8 @@ void do_tests() {
   ASSERT_EQ(({ "", "", "x", "y", "", "z", "", "" }), explode(tmp, "."));
 #endif
   ASSERT_EQ(({ "", "", "x", "y", "", "z", "", "" }), explode_reversible(tmp, "."));
+
+  ASSERT_EQ(
+      ({"lh15970183750", "abcdefghigk", "werert"}),
+      explode("lh15970183750║abcdefghigk║werert", "║"));
 }

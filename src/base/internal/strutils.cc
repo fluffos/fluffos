@@ -37,8 +37,10 @@ bool u8_validate(const uint8_t *s, size_t len) {
 std::string u8_sanitize(std::string_view src) { return utf8::replace_invalid(src); }
 
 // Search "needle' in 'haystack', making sure it matches EGC boundary, returning byte offset.
-int32_t u8_egc_find_as_offset(EGCIterator &iter, const char *haystack, size_t haystack_len,
-                              const char *needle, size_t needle_len, bool reverse) {
+int32_t u8_egc_find_as_offset(EGCIterator &iter, const char *needle, size_t needle_len, bool reverse) {
+  const char *haystack = iter.data();
+  size_t haystack_len = iter.len() == -1 ? strlen(haystack) : iter.len();
+
   // no way
   if (needle_len > haystack_len) {
     return -1;
@@ -94,7 +96,7 @@ int32_t u8_egc_find_as_offset(EGCIterator &iter, const char *haystack, size_t ha
 UChar32 u8_egc_index_as_single_codepoint(const char *src, int32_t src_len, int32_t index) {
   UChar32 c = U_SENTINEL;
 
-  EGCSmartIterator iter(src, -1);
+  EGCSmartIterator iter(src, src_len);
   if (!iter.ok()) return c;
 
   auto pos = iter.index_to_offset(index);
@@ -110,8 +112,8 @@ UChar32 u8_egc_index_as_single_codepoint(const char *src, int32_t src_len, int32
 }
 
 // Copy string src to dest, replacing character at index to c. Assuming dst is already allocated.
-void u8_copy_and_replace_codepoint_at(const char *src, char *dst, int32_t index, UChar32 c) {
-  EGCSmartIterator iter(src, -1);
+void u8_copy_and_replace_codepoint_at(const char *src, int32_t slen, char *dst, int32_t index, UChar32 c) {
+  EGCSmartIterator iter(src, slen);
   if (!iter.ok()) return;
 
   int32_t src_offset = iter.index_to_offset(index);
@@ -497,11 +499,11 @@ size_t u8_width(const char *src, int len) {
   return total;
 }
 
-std::vector<std::string_view> u8_egc_split(const char *src) {
+std::vector<std::string_view> u8_egc_split(const char *src, int32_t slen) {
   std::vector<std::string_view> result;
   result.reserve(16);
 
-  EGCSmartIterator iter(src, -1);
+  EGCSmartIterator iter(src, slen);
   if (!iter.ok()) return result;
 
   iter->first();

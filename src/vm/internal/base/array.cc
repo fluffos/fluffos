@@ -232,8 +232,8 @@ array_t *explode_string(const char *str, int slen, const char *del, int dellen, 
 
   /* return an array of length strlen(str) -w- one character per element */
   if (dellen == 0) {
-    auto result = u8_egc_split(str);
-    int size = result.size();
+    auto result = u8_egc_split(str, slen);
+    auto size = result.size();
 
     if (size > max_array_size) {
       size = max_array_size;
@@ -264,9 +264,10 @@ array_t *explode_string(const char *str, int slen, const char *del, int dellen, 
    * in reversible mode, no skipping at all.
    * in sane mode, only skip one.
    */
-  while (sourcelen && u8_egc_find_as_offset(iter, source, sourcelen, del, dellen, false) == 0) {
+  while (sourcelen && u8_egc_find_as_offset(iter, del, dellen, false) == 0) {
     source += dellen;
     sourcelen -= dellen;
+    iter.reset(source, sourcelen);
     num_leading++;
   }
   if (num_leading) {
@@ -285,9 +286,10 @@ array_t *explode_string(const char *str, int slen, const char *del, int dellen, 
    * in other mode, only skip one.
    */
   while (sourcelen) {
-    auto i = u8_egc_find_as_offset(iter, source, sourcelen, del, dellen, true);
+    auto i = u8_egc_find_as_offset(iter, del, dellen, true);
     if (i <= 0 || i != (sourcelen - dellen)) break;
     sourcelen -= dellen;
+    iter.reset(source, sourcelen);
     num_trailing++;
   }
   if (num_trailing) {
@@ -302,15 +304,18 @@ array_t *explode_string(const char *str, int slen, const char *del, int dellen, 
 
   std::vector<std::string_view> results;
   for (int i = 0; i < num_leading; i++) {
-    results.push_back("");
+    results.emplace_back("");
   }
   while (sourcelen) {
-    int i = u8_egc_find_as_offset(iter, source, sourcelen, del, dellen, false);
+    int i = u8_egc_find_as_offset(iter, del, dellen, false);
+
     // no more occurrence, copy the remaining part.
     if (i == -1) {
       results.emplace_back(source, sourcelen);
       break;
-    } else if (i > 0) {
+    }
+
+    if (i > 0) {
       // if we have text before delimiter, add them
       results.emplace_back(source, i);
       source += i;
@@ -318,22 +323,25 @@ array_t *explode_string(const char *str, int slen, const char *del, int dellen, 
 
       source += dellen;
       sourcelen -= dellen;
+
+      iter.reset(source, sourcelen);
     } else if (i == 0) {
-      results.push_back("");
+      results.emplace_back("");
 
       source += dellen;
       sourcelen -= dellen;
+      iter.reset(source, sourcelen);
     }
   }
   for (int i = 0; i < num_trailing; i++) {
-    results.push_back("");
+    results.emplace_back("");
   }
 
   auto num = results.size();
   if (num > max_array_size) {
     num = max_array_size;
   }
-  auto ret = int_allocate_empty_array(num);
+  auto *ret = int_allocate_empty_array(num);
   for (int i = 0; i < num; i++) {
     ret->item[i].type = T_STRING;
     ret->item[i].subtype = STRING_MALLOC;
