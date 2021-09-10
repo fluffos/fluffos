@@ -955,8 +955,8 @@ void assign_lvalue_codepoint(F &&func) {
     auto res = new_string(SVALUE_STRLEN(global_lvalue_codepoint.owner) - old_len + new_len,
                           "assign_lvalue_codepoint");
     u8_copy_and_replace_codepoint_at(global_lvalue_codepoint.owner->u.string,
-                                     SVALUE_STRLEN(global_lvalue_codepoint.owner),
-                                     res, global_lvalue_codepoint.index, c);
+                                     SVALUE_STRLEN(global_lvalue_codepoint.owner), res,
+                                     global_lvalue_codepoint.index, c);
 
     free_string_svalue(global_lvalue_codepoint.owner);
 
