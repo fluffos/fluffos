@@ -7,10 +7,62 @@
 #include <locale>
 #include <string>
 #include <memory>
+#include <utility>
 #include <unicode/utf8.h>
 #include <unicode/uchar.h>
 #include <unicode/brkiter.h>
 #include <unicode/unistr.h>
+
+#include <stack>
+
+class BreakIteratorPool {
+  class BreakIteratorPoolInner {
+   public:
+    std::stack<std::unique_ptr<icu::BreakIterator>> stack_;
+  };
+
+  struct ReturnToPool_Deleter {
+    explicit ReturnToPool_Deleter(std::weak_ptr<BreakIteratorPoolInner> origin)
+        : origin_(std::move(origin)) {}
+    void operator()(icu::BreakIterator* ptr) {
+      auto origin = origin_.lock();
+      if (origin) {
+        origin->stack_.emplace(ptr);
+      }
+    }
+
+   private:
+    std::weak_ptr<BreakIteratorPoolInner> origin_;
+  };
+
+ private:
+  std::shared_ptr<BreakIteratorPoolInner> inner_;
+
+  void add() {
+    UErrorCode status = U_ZERO_ERROR;
+    std::unique_ptr<icu::BreakIterator> ptr(
+        icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status));
+    if (!U_SUCCESS(status)) {
+      ptr.reset();
+    }
+    inner_->stack_.emplace(std::move(ptr));
+  }
+
+ public:
+  using item_type = std::unique_ptr<icu::BreakIterator, ReturnToPool_Deleter>;
+
+  BreakIteratorPool(int initial) : inner_(new BreakIteratorPoolInner) {
+    for (int i = 0; i < initial; i++) add();
+  }
+
+  item_type accquire() {
+    if (inner_->stack_.empty()) add();
+    auto res = std::unique_ptr<icu::BreakIterator, ReturnToPool_Deleter>(
+        inner_->stack_.top().release(), ReturnToPool_Deleter(inner_));
+    inner_->stack_.pop();
+    return res;
+  }
+};
 
 // Wrapper class to create a icu EGC iterator for given string.
 // can access underlying icu::BreakIterator
@@ -21,8 +73,13 @@ class EGCIterator {
   const char* src_;
   int32_t len_;
 
+  static BreakIteratorPool* pool() {
+    static BreakIteratorPool pool(32);
+    return &pool;
+  }
+
  protected:
-  std::unique_ptr<icu::BreakIterator> brk_ = nullptr;
+  BreakIteratorPool::item_type brk_;
 
  public:
   [[nodiscard]] bool ok() const { return ok_; }
@@ -35,7 +92,7 @@ class EGCIterator {
     utext_openUTF8(&text_, src, slen, &status);
     if (!U_SUCCESS(status)) {
       utext_close(&text_);
-      return ;
+      return;
     }
 
     status = U_ZERO_ERROR;
@@ -47,18 +104,15 @@ class EGCIterator {
     brk_->first();
 
     src_ = src;
-    len_ =  slen;
+    len_ = slen;
     ok_ = true;
   }
   auto operator->() { return brk_.operator->(); }
-  EGCIterator(const char* src, int32_t slen) {
-    UErrorCode status = U_ZERO_ERROR;
-    brk_.reset(icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status));
-    if (!U_SUCCESS(status)) {
-      return;
-    }
-    reset(src, slen);
-  }
+
+  static BreakIteratorPool::item_type GetBreakIterator() { return pool()->accquire(); }
+
+  EGCIterator(const char* src, int32_t slen) : src_(src), len_(slen), brk_(GetBreakIterator()) { reset(src, slen); }
+
   ~EGCIterator() {
     if (this->ok()) {
       utext_close(&text_);
@@ -66,5 +120,4 @@ class EGCIterator {
     }
   }
 };
-
 #endif  // FLUFFOS_SRC_BASE_INTERNAL_STRUTILS_CC_EGCSTRINGVIEW_H_
