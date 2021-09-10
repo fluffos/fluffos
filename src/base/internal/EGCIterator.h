@@ -19,6 +19,7 @@ class EGCIterator {
   UText text_ = UTEXT_INITIALIZER;
   bool ok_ = false;
   const char* src_;
+  int32_t len_;
 
  protected:
   std::unique_ptr<icu::BreakIterator> brk_ = nullptr;
@@ -26,19 +27,15 @@ class EGCIterator {
  public:
   [[nodiscard]] bool ok() const { return ok_; }
   [[nodiscard]] const char* data() const { return src_; }
-  auto operator->() { return brk_.operator->(); }
-  EGCIterator(const char* src, int32_t slen) : src_(src) {
-    UErrorCode status = U_ZERO_ERROR;
-    brk_.reset(icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status));
-    if (!U_SUCCESS(status)) {
-      return;
-    }
+  [[nodiscard]] int32_t len() const { return len_; }
+  void reset(const char* src, int32_t slen) {
+    ok_ = false;
 
-    status = U_ZERO_ERROR;
+    UErrorCode status = U_ZERO_ERROR;
     utext_openUTF8(&text_, src, slen, &status);
     if (!U_SUCCESS(status)) {
       utext_close(&text_);
-      return;
+      return ;
     }
 
     status = U_ZERO_ERROR;
@@ -48,7 +45,19 @@ class EGCIterator {
       return;
     }
     brk_->first();
+
+    src_ = src;
+    len_ =  slen;
     ok_ = true;
+  }
+  auto operator->() { return brk_.operator->(); }
+  EGCIterator(const char* src, int32_t slen) {
+    UErrorCode status = U_ZERO_ERROR;
+    brk_.reset(icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(), status));
+    if (!U_SUCCESS(status)) {
+      return;
+    }
+    reset(src, slen);
   }
   ~EGCIterator() {
     if (this->ok()) {
