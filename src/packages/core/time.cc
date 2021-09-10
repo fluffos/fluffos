@@ -8,15 +8,15 @@
 #ifdef F_PERF_COUNTER_NS
 void f_perf_counter_ns() {
 #ifdef _WIN32
-    static LARGE_INTEGER Frequency{};
-    if (Frequency.QuadPart == 0) {
-      QueryPerformanceFrequency(&Frequency);
-    }
+  static LARGE_INTEGER Frequency{};
+  if (Frequency.QuadPart == 0) {
+    QueryPerformanceFrequency(&Frequency);
+  }
 
-    LARGE_INTEGER t;
-    QueryPerformanceCounter(&t);
+  LARGE_INTEGER t;
+  QueryPerformanceCounter(&t);
 
-    push_number(t.QuadPart * 1000000 / Frequency.QuadPart);
+  push_number(t.QuadPart * 1000000 / Frequency.QuadPart);
 #else
   auto now = std::chrono::high_resolution_clock::now();
   push_number(std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count());
@@ -122,7 +122,7 @@ void f_strftime() {
   time_t lt = arg_time;
   if (lt <= 0) lt = get_current_time();
   struct tm res = {};
-  const struct tm* res_tm = localtime_r(&lt, &res);
+  const struct tm *res_tm = localtime_r(&lt, &res);
   if (!res_tm) {
     error("Invalid time passed to strftime");
   }

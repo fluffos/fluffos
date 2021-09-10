@@ -2636,8 +2636,8 @@ void f_strsrch(void) {
   // only search if there is a chance.
   if (find_len <= src_len) {
     EGCIterator iter(arg1->u.string, src_len);
-    auto pos =
-        u8_egc_find_as_offset(iter, find, find_len, arg3->u.number != 0);
+
+    auto pos = u8_egc_find_as_offset(iter, find, find_len, arg3->u.number != 0);
     ret = pos == -1 ? -1 : u8_offset_to_egc_index(iter, pos);
   }
 
