@@ -25,7 +25,9 @@
 #include "lws_config.h"
 #ifdef LWS_HAVE_X509_VERIFY_PARAM_set1_host
 /* Before glibc 2.10, strnlen required _GNU_SOURCE */
+#if !defined(_GNU_SOURCE)
 #define _GNU_SOURCE
+#endif
 #endif
 #include <string.h>
 
@@ -121,6 +123,9 @@ OpenSSL_client_verify_callback(int preverify_ok, X509_STORE_CTX *x509_ctx)
 			/* cert validation error was not handled in callback */
 			int depth = X509_STORE_CTX_get_error_depth(x509_ctx);
 			const char *msg = X509_verify_cert_error_string(err);
+
+			lws_strncpy(wsi->tls.err_helper, msg,
+				    sizeof(wsi->tls.err_helper));
 
 			lwsl_err("SSL error: %s (preverify_ok=%d;err=%d;"
 				 "depth=%d)\n", msg, preverify_ok, err, depth);
@@ -439,6 +444,7 @@ lws_tls_client_connect(struct lws *wsi, char *errbuf, size_t elen)
 #endif
 	errno = 0;
 	ERR_clear_error();
+	wsi->tls.err_helper[0] = '\0';
 	n = SSL_connect(wsi->tls.ssl);
 	en = errno;
 
@@ -457,8 +463,9 @@ lws_tls_client_connect(struct lws *wsi, char *errbuf, size_t elen)
 	}
 
 	if (m == SSL_ERROR_SSL) {
-		n = lws_snprintf(errbuf, elen, "connect SSL err %d: ", m);
-		ERR_error_string_n((unsigned int)m, errbuf + n, (elen - (unsigned int)n));
+		n = lws_snprintf(errbuf, elen, "tls: %s", wsi->tls.err_helper);
+		if (!wsi->tls.err_helper[0])
+			ERR_error_string_n((unsigned int)m, errbuf + n, (elen - (unsigned int)n));
 		return LWS_SSL_CAPABLE_ERROR;
 	}
 
@@ -494,6 +501,12 @@ lws_tls_client_connect(struct lws *wsi, char *errbuf, size_t elen)
 
 		lws_role_call_alpn_negotiated(wsi, (const char *)a);
 #endif
+#if defined(LWS_TLS_SYNTHESIZE_CB)
+		lws_sul_schedule(wsi->a.context, wsi->tsi,
+				 &wsi->tls.sul_cb_synth,
+				 lws_sess_cache_synth_cb, 500 * LWS_US_PER_MS);
+#endif
+
 		lwsl_info("client connect OK\n");
 		lws_openssl_describe_cipher(wsi);
 		return LWS_SSL_CAPABLE_DONE;

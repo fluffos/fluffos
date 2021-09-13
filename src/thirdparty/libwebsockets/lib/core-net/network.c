@@ -67,7 +67,13 @@ lws_get_addresses(struct lws_vhost *vh, void *ads, char *name,
 			memmove(rip, rip + 7, strlen(rip) - 6);
 
 		getnameinfo((struct sockaddr *)ads, sizeof(struct sockaddr_in6),
-			    name, (socklen_t)name_len, NULL, 0, 0);
+			    name,
+#if defined(__ANDROID__)
+			    (size_t)name_len,
+#else
+			    (socklen_t)name_len,
+#endif
+			    NULL, 0, 0);
 
 		return 0;
 	} else
@@ -81,7 +87,13 @@ lws_get_addresses(struct lws_vhost *vh, void *ads, char *name,
 #if !defined(LWS_PLAT_FREERTOS)
 		if (getnameinfo((struct sockaddr *)ads,
 				sizeof(struct sockaddr_in),
-				name, (unsigned int)name_len, NULL, 0, 0))
+				name,
+#if defined(__ANDROID__)
+				(size_t)name_len,
+#else
+				(socklen_t)name_len,
+#endif
+				NULL, 0, 0))
 			return -1;
 #endif
 
@@ -260,11 +272,16 @@ lws_socket_bind(struct lws_vhost *vhost, struct lws *wsi,
 					 __func__, iface);
 				return m;
 			}
-			serv_addr6.sin6_scope_id = (unsigned int)lws_get_addr_scope(iface);
-		}
+			if (serv_addr6.sin6_family == AF_INET6)
+				serv_addr6.sin6_scope_id = (unsigned int)htonl((uint32_t)
+						lws_get_addr_scope(iface));
+		} else
+			serv_addr6.sin6_family = AF_INET6;
 
-		serv_addr6.sin6_family = AF_INET6;
-		serv_addr6.sin6_port = (uint16_t)htons((uint16_t)port);
+		if (serv_addr6.sin6_family == AF_INET6)
+			serv_addr6.sin6_port = (uint16_t)htons((uint16_t)port);
+		else
+			((struct sockaddr_in *)v)->sin_port = (uint16_t)htons((uint16_t)port);
 	} else
 #endif
 	{

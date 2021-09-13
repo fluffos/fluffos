@@ -78,18 +78,6 @@ rops_handle_POLLIN_netlink(struct lws_context_per_thread *pt, struct lws *wsi,
 	if (!(pollfd->revents & LWS_POLLIN))
 		return LWS_HPI_RET_HANDLED;
 
-	if (!cx->nl_initial_done && pt == &cx->pt[0]) {
-		/*
-		 * While netlink info still coming, keep moving the timer for
-		 * calling it "done" to +100ms until after it stops coming
-		 */
-		lws_context_lock(cx, __func__);
-		lws_sul_schedule(cx, 0, &cx->sul_nl_coldplug,
-				 lws_netlink_coldplug_done_cb,
-				 100 * LWS_US_PER_MS);
-		lws_context_unlock(cx);
-	}
-
 	memset(&msg, 0, sizeof(msg));
 
 	iov.iov_base		= (void *)s;
@@ -125,7 +113,6 @@ rops_handle_POLLIN_netlink(struct lws_context_per_thread *pt, struct lws *wsi,
 
 		struct ifinfomsg *ifi;
 		struct rtattr *attribute;
-		lws_sockaddr46 *sa46;
 		unsigned int len;
 
 		lwsl_netlink("%s: RTM %d\n", __func__, h->nlmsg_type);
@@ -158,19 +145,6 @@ rops_handle_POLLIN_netlink(struct lws_context_per_thread *pt, struct lws *wsi,
 					lwsl_netlink("NETLINK ifidx %d : %s\n",
 						     ifi->ifi_index,
 						     (char *)RTA_DATA(attribute));
-					break;
-				case RTA_SRC:
-					sa46 = (lws_sockaddr46 *)RTA_DATA(attribute);
-					if (sa46->sa4.sin_family == 0xffff) {
-						lwsl_netlink("%s: down %d\n",
-							     __func__,
-							     ifi->ifi_index);
-						lws_pt_lock(pt, __func__);
-						_lws_route_table_ifdown(pt,
-								ifi->ifi_index);
-						_lws_route_pt_close_unroutable(pt);
-						lws_pt_unlock(pt);
-					}
 					break;
 				default:
 					break;
@@ -217,7 +191,12 @@ rops_handle_POLLIN_netlink(struct lws_context_per_thread *pt, struct lws *wsi,
 			lwsl_netlink("%s: %s\n", __func__,
 				     h->nlmsg_type == RTM_NEWADDR ?
 						     "NEWADDR" : "DELADDR");
-			break;
+
+			/*
+			 * almost nothing interesting within IFA_* attributes:
+			 * so skip it and goto to the second half
+			 */
+			goto second_half;
 
 		case RTM_NEWROUTE:
 		case RTM_DELROUTE:
@@ -266,6 +245,7 @@ rops_handle_POLLIN_netlink(struct lws_context_per_thread *pt, struct lws *wsi,
 
 		robj.proto = rm->rtm_protocol;
 
+		// iterate over route attributes
 		for ( ; RTA_OK(ra, ra_len); ra = RTA_NEXT(ra, ra_len)) {
 			// lwsl_netlink("%s: atr %d\n", __func__, ra->rta_type);
 			switch (ra->rta_type) {
@@ -294,11 +274,8 @@ rops_handle_POLLIN_netlink(struct lws_context_per_thread *pt, struct lws *wsi,
 				break;
 			case RTA_IIF: /* int: input interface index */
 			case RTA_OIF: /* int: output interface index */
-				if (h->nlmsg_type != RTM_NEWADDR &&
-				    h->nlmsg_type != RTM_DELADDR) {
-					robj.if_idx = *(int *)RTA_DATA(ra);
-					lwsl_netlink("%s: ifidx %d\n", __func__, robj.if_idx);
-				}
+				robj.if_idx = *(int *)RTA_DATA(ra);
+				lwsl_netlink("%s: ifidx %d\n", __func__, robj.if_idx);
 				break;
 			case RTA_PRIORITY: /* int: priority of route */
 				p = RTA_DATA(ra);
@@ -324,8 +301,7 @@ rops_handle_POLLIN_netlink(struct lws_context_per_thread *pt, struct lws *wsi,
 		/*
 		 * the second half, once all the attributes were collected
 		 */
-
-
+second_half:
 		switch (h->nlmsg_type) {
 
 		case RTM_DELROUTE:
@@ -462,6 +438,20 @@ inform:
 	}
 #endif
 
+	if (!cx->nl_initial_done &&
+	    pt == &cx->pt[0] &&
+	    cx->routing_table.count) {
+		/*
+		 * While netlink info still coming, keep moving the timer for
+		 * calling it "done" to +100ms until after it stops coming
+		 */
+		lws_context_lock(cx, __func__);
+		lws_sul_schedule(cx, 0, &cx->sul_nl_coldplug,
+				 lws_netlink_coldplug_done_cb,
+				 100 * LWS_US_PER_MS);
+		lws_context_unlock(cx);
+	}
+
 	return LWS_HPI_RET_HANDLED;
 }
 
@@ -480,7 +470,7 @@ rops_pt_init_destroy_netlink(struct lws_context *context,
 	struct msghdr msg;
 	struct iovec iov;
 	struct lws *wsi;
-	int n;
+	int n, ret = 1;
 
 	if (destroy) {
 
@@ -533,8 +523,10 @@ rops_pt_init_destroy_netlink(struct lws_context *context,
 #endif
 				 ;
 
-	if (bind(wsi->desc.sockfd, (struct sockaddr*)&sanl, sizeof(sanl)) < 0) {
-		lwsl_err("%s: netlink bind failed\n", __func__);
+	if (lws_fi(&context->fic, "netlink_bind") ||
+	    bind(wsi->desc.sockfd, (struct sockaddr*)&sanl, sizeof(sanl)) < 0) {
+		lwsl_warn("%s: netlink bind failed\n", __func__);
+		ret = 0; /* some systems deny access, just ignore */
 		goto bail2;
 	}
 
@@ -582,15 +574,13 @@ rops_pt_init_destroy_netlink(struct lws_context *context,
 	}
 
 	/*
-	 * Responses are going to come asynchronously, since we can't process
-	 * DNS lookups properly until we collected the initial netlink responses
-	 * let's set a timer that will let us advance from lws_system
-	 * LWS_SYSTATE_IFACE_COLDPLUG
+	 * Responses are going to come asynchronously, let's block moving
+	 * off state IFACE_COLDPLUG until we have had them.  This is important
+	 * since if we don't hold there, when we do get the responses we may
+	 * cull any ongoing connections as unroutable otherwise
 	 */
 
 	lwsl_debug("%s: starting netlink coldplug wait\n", __func__);
-	lws_sul_schedule(context, 0, &context->sul_nl_coldplug,
-			 lws_netlink_coldplug_done_cb, 450 * LWS_US_PER_MS);
 
 	return 0;
 
@@ -600,7 +590,7 @@ bail2:
 bail1:
 	lws_free(wsi);
 bail:
-	return 1;
+	return ret;
 }
 
 static const lws_rops_t rops_table_netlink[] = {

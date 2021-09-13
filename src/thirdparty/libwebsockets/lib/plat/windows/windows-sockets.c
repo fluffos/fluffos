@@ -200,6 +200,9 @@ lws_plat_insert_socket_into_fds(struct lws_context *context, struct lws *wsi)
 	}
 #endif
 
+	if (context->event_loop_ops->io)
+		context->event_loop_ops->io(wsi, LWS_EV_START | LWS_EV_READ);
+
 	pt->fds[pt->fds_count++].revents = 0;
 
 	lws_plat_change_pollfd(context, wsi, &pt->fds[pt->fds_count - 1]);
@@ -240,6 +243,8 @@ lws_plat_change_pollfd(struct lws_context *context, struct lws *wsi,
 
 	return 0;
 }
+
+#if defined(LWS_WITH_TLS)
 
 int
 lws_plat_vhost_tls_client_ctx_init(struct lws_vhost *vhost)
@@ -397,6 +402,8 @@ lws_plat_vhost_tls_client_ctx_init(struct lws_vhost *vhost)
 
 	return 0;
 }
+
+#endif
 
 const char *
 lws_plat_inet_ntop(int af, const void *src, char *dst, socklen_t cnt)

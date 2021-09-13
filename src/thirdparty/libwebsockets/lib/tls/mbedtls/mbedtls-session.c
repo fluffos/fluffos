@@ -110,6 +110,21 @@ bail:
 	lws_context_unlock(wsi->a.context); /* } cx --------------  */
 }
 
+int
+lws_tls_session_is_reused(struct lws *wsi)
+{
+#if defined(LWS_WITH_CLIENT)
+	struct lws *nwsi = lws_get_network_wsi(wsi);
+
+	if (!nwsi)
+		return 0;
+
+	return nwsi->tls_session_reused;
+#else
+	return 0;
+#endif
+}
+
 static int
 lws_tls_session_destroy_dll(struct lws_dll2 *d, void *user)
 {
@@ -204,9 +219,11 @@ lws_tls_session_new_mbedtls(struct lws *wsi)
 		memset(ts, 0, sizeof(*ts));
 		memcpy(&ts[1], buf, nl + 1);
 
-		if (mbedtls_ssl_get_session(msc, &ts->session))
+		if (mbedtls_ssl_get_session(msc, &ts->session)) {
+			lws_free(ts);
 			/* no joy for whatever reason */
 			goto bail;
+		}
 
 		lws_dll2_add_tail(&ts->list, &vh->tls_sessions);
 
@@ -252,6 +269,28 @@ bail:
 
 	return 0;
 }
+
+#if defined(LWS_TLS_SYNTHESIZE_CB)
+
+/*
+ * On openssl, there is an async cb coming when the server issues the session
+ * information on the link, so we can pick it up and update the cache at the
+ * right time.
+ *
+ * On mbedtls and some version at least of borning ssl, this cb is either not
+ * part of the tls library apis or fails to arrive.
+ */
+
+void
+lws_sess_cache_synth_cb(lws_sorted_usec_list_t *sul)
+{
+	struct lws_lws_tls *tls = lws_container_of(sul, struct lws_lws_tls,
+						   sul_cb_synth);
+	struct lws *wsi = lws_container_of(tls, struct lws, tls);
+
+	lws_tls_session_new_mbedtls(wsi);
+}
+#endif
 
 void
 lws_tls_session_cache(struct lws_vhost *vh, uint32_t ttl)

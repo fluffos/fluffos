@@ -130,7 +130,9 @@ lws_state_notify_protocol_init(struct lws_state_manager *mgr,
 	 * us to OPERATIONAL
 	 */
 
-	if (target == LWS_SYSTATE_IFACE_COLDPLUG && !context->nl_initial_done) {
+	if (target == LWS_SYSTATE_IFACE_COLDPLUG &&
+	    context->netlink &&
+	    !context->nl_initial_done) {
 		lwsl_info("%s: waiting for netlink coldplug\n", __func__);
 
 		return 1;
@@ -640,12 +642,12 @@ lws_create_context(const struct lws_context_creation_info *info)
 #else
 			2000000;
 #endif
-	context->smd_queue_depth = info->smd_queue_depth ?
+	context->smd_queue_depth = (uint16_t)(info->smd_queue_depth ?
 						info->smd_queue_depth :
 #if defined(LWS_PLAT_FREERTOS)
-						20;
+						20);
 #else
-						40;
+						40);
 #endif
 #endif
 
@@ -875,6 +877,7 @@ lws_create_context(const struct lws_context_creation_info *info)
 #if defined(LWS_WITH_TLS) && defined(LWS_WITH_NETWORK)
 	context->simultaneous_ssl_restriction =
 			info->simultaneous_ssl_restriction;
+	context->ssl_handshake_serialize = info->ssl_handshake_serialize;
 #endif
 
 	context->options = info->options;
@@ -1375,7 +1378,7 @@ lws_create_context(const struct lws_context_creation_info *info)
 			lwsl_err("%s: policy set failed\n", __func__);
 			goto bail_libuv_aware;
 		}
-	} else
+	}
 #else
 	if (context->pss_policies) {
 		/* user code set the policy objects directly, no parsing step */
@@ -1385,9 +1388,8 @@ lws_create_context(const struct lws_context_creation_info *info)
 			lwsl_err("%s: policy set failed\n", __func__);
 			goto bail_libuv_aware;
 		}
-	} //else
+	}
 #endif
-	//	lws_create_vhost(context, info);
 #endif
 
 	lws_context_init_extensions(info, context);
@@ -1623,9 +1625,23 @@ lws_pt_destroy(struct lws_context_per_thread *pt)
 	vpt->foreign_pfd_list = NULL;
 
 	lws_pt_lock(pt, __func__);
+
 	if (pt->pipe_wsi) {
 		lws_destroy_event_pipe(pt->pipe_wsi);
 		pt->pipe_wsi = NULL;
+	}
+
+	if (pt->dummy_pipe_fds[0]
+#if !defined(WIN32)
+	    && (int)pt->dummy_pipe_fds[0] != -1
+#endif
+	) {
+		struct lws wsi;
+
+		memset(&wsi, 0, sizeof(wsi));
+		wsi.a.context = pt->context;
+		wsi.tsi = (char)pt->tid;
+		lws_plat_pipe_close(&wsi);
 	}
 
 #if defined(LWS_WITH_SECURE_STREAMS)
@@ -2013,6 +2029,7 @@ next:
 			goto bail;
 		}
 #endif
+		/* fallthru */
 
 	case LWSCD_FINALIZATION:
 

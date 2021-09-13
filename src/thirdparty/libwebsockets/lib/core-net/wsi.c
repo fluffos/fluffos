@@ -549,19 +549,19 @@ lws_get_ssl(struct lws *wsi)
 int
 lws_has_buffered_out(struct lws *wsi)
 {
-       if (wsi->buflist_out)
-               return 1;
+	if (wsi->buflist_out)
+		return 1;
 
 #if defined(LWS_ROLE_H2)
-       {
-               struct lws *nwsi = lws_get_network_wsi(wsi);
+	{
+		struct lws *nwsi = lws_get_network_wsi(wsi);
 
-               if (nwsi->buflist_out)
-                       return 1;
-       }
+		if (nwsi->buflist_out)
+			return 1;
+	}
 #endif
 
-       return 0;
+	return 0;
 }
 
 int
@@ -584,7 +584,7 @@ void
 lws_role_transition(struct lws *wsi, enum lwsi_role role, enum lwsi_state state,
 		    const struct lws_role_ops *ops)
 {
-#if (_LWS_ENABLED_LOGS & LLL_DEBUG)
+#if (_LWS_ENABLED_LOGS & LLL_DEBUG) 
 	const char *name = "(unset)";
 #endif
 	wsi->wsistate = (unsigned int)role | (unsigned int)state;
@@ -1235,21 +1235,6 @@ lws_mux_mark_immortal(struct lws *wsi)
 	nwsi->immortal_substream_count++;
 	if (nwsi->immortal_substream_count == 1)
 		lws_set_timeout(nwsi, NO_PENDING_TIMEOUT, 0);
-}
-
-int
-lws_tls_session_is_reused(struct lws *wsi)
-{
-#if defined(LWS_WITH_CLIENT)
-	struct lws *nwsi = lws_get_network_wsi(wsi);
-
-	if (!nwsi)
-		return 0;
-
-	return nwsi->tls_session_reused;
-#else
-	return 0;
-#endif
 }
 
 int
