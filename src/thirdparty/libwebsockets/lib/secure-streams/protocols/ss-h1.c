@@ -363,14 +363,16 @@ lws_extract_metadata(lws_ss_handle_t *h, struct lws *wsi)
 
 					omd = lws_ss_get_handle_metadata(h,
 								   polmd->name);
+					if (omd) {
 
-					_lws_ss_set_metadata(omd,
-						polmd->name, p, (size_t)n);
-					omd->value_on_lws_heap = 1;
+						_lws_ss_set_metadata(omd,
+							polmd->name, p, (size_t)n);
+						omd->value_on_lws_heap = 1;
 
 #if defined(LWS_WITH_SECURE_STREAMS_PROXY_API)
-					omd->pending_onward = 1;
+						omd->pending_onward = 1;
 #endif
+					}
 				}
 			}
 #endif
@@ -417,20 +419,33 @@ secstream_h1(struct lws *wsi, enum lws_callback_reasons reason, void *user,
 		}
 		assert(h->policy);
 
+#if defined(LWS_WITH_CONMON)
 		lws_conmon_ss_json(h);
+#endif
 
 		lws_metrics_caliper_report_hist(h->cal_txn, wsi);
 		lwsl_info("%s: %s CLIENT_CONNECTION_ERROR: %s\n", __func__,
 			  h->lc.gutag, in ? (const char *)in : "none");
 		/* already disconnected, no action for DISCONNECT_ME */
 		r = lws_ss_event_helper(h, LWSSSCS_UNREACHABLE);
-		if (r)
+		if (r) {
+			if (h->inside_connect) {
+				h->pending_ret = r;
+				break;
+			}
+
 			return _lws_ss_handle_state_ret_CAN_DESTROY_HANDLE(r, wsi, &h);
+		}
 
 		h->wsi = NULL;
 		r = lws_ss_backoff(h);
-		if (r != LWSSSSRET_OK)
+		if (r != LWSSSSRET_OK) {
+			if (h->inside_connect) {
+				h->pending_ret = r;
+				break;
+			}
 			return _lws_ss_handle_state_ret_CAN_DESTROY_HANDLE(r, wsi, &h);
+		}
 		break;
 
 	case LWS_CALLBACK_CLIENT_HTTP_REDIRECT:
@@ -451,7 +466,9 @@ secstream_h1(struct lws *wsi, enum lws_callback_reasons reason, void *user,
 
 		lws_sul_cancel(&h->sul_timeout);
 
+#if defined(LWS_WITH_CONMON)
 		lws_conmon_ss_json(h);
+#endif
 
 		lws_metrics_caliper_report_hist(h->cal_txn, wsi);
 		//lwsl_notice("%s: %s LWS_CALLBACK_CLOSED_CLIENT_HTTP\n",
@@ -491,7 +508,9 @@ secstream_h1(struct lws *wsi, enum lws_callback_reasons reason, void *user,
 		if (!h)
 			return -1;
 
+#if defined(LWS_WITH_CONMON)
 		lws_conmon_ss_json(h);
+#endif
 
 		status = (int)lws_http_client_http_response(wsi);
 		lwsl_info("%s: LWS_CALLBACK_ESTABLISHED_CLIENT_HTTP: %d\n", __func__, status);
@@ -827,7 +846,7 @@ malformed:
 	case LWS_CALLBACK_CLIENT_HTTP_WRITEABLE:
 
 		if (!h || !h->info.tx) {
-			lwsl_notice("%s: %s no handle / tx\n", __func__, h->lc.gutag);
+			lwsl_notice("%s: no handle / tx\n", __func__);
 			return 0;
 		}
 
@@ -975,7 +994,7 @@ malformed:
 						     WSI_TOKEN_HTTP_COLON_METHOD), (unsigned int)m))
 					return -1;
 				m = lws_hdr_total_length(wsi, WSI_TOKEN_HTTP_COLON_PATH);
-				if (lws_ss_alloc_set_metadata(h, "path",
+				if (m && lws_ss_alloc_set_metadata(h, "path",
 						    lws_hdr_simple_ptr(wsi,
 						     WSI_TOKEN_HTTP_COLON_PATH), (unsigned int)m))
 					return -1;

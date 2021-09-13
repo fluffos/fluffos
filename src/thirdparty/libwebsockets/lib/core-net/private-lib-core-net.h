@@ -816,6 +816,7 @@ struct lws {
 	unsigned int			client_bound_sspc:1;
 	unsigned int			client_proxy_onward:1;
 #endif
+	unsigned int                    tls_borrowed:1;
 
 #ifdef LWS_WITH_ACCESS_LOG
 	unsigned int			access_log_pending:1;
@@ -1426,6 +1427,9 @@ html_parser_cb(const hubbub_token *token, void *pw);
 
 int
 lws_threadpool_tsi_context(struct lws_context *context, int tsi);
+
+void
+lws_threadpool_wsi_closing(struct lws *wsi);
 
 void
 __lws_wsi_remove_from_sul(struct lws *wsi);
