@@ -547,6 +547,24 @@ lws_get_ssl(struct lws *wsi)
 #endif
 
 int
+lws_has_buffered_out(struct lws *wsi)
+{
+       if (wsi->buflist_out)
+               return 1;
+
+#if defined(LWS_ROLE_H2)
+       {
+               struct lws *nwsi = lws_get_network_wsi(wsi);
+
+               if (nwsi->buflist_out)
+                       return 1;
+       }
+#endif
+
+       return 0;
+}
+
+int
 lws_partial_buffered(struct lws *wsi)
 {
 	return lws_has_buffered_out(wsi);
@@ -566,7 +584,7 @@ void
 lws_role_transition(struct lws *wsi, enum lwsi_role role, enum lwsi_state state,
 		    const struct lws_role_ops *ops)
 {
-#if (_LWS_ENABLED_LOGS & LLL_DEBUG) 
+#if (_LWS_ENABLED_LOGS & LLL_DEBUG)
 	const char *name = "(unset)";
 #endif
 	wsi->wsistate = (unsigned int)role | (unsigned int)state;
