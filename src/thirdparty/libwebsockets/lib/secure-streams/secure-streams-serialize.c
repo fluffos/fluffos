@@ -1,7 +1,7 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2019 - 2020 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2019 - 2021 Andy Green <andy@warmcat.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -746,7 +746,7 @@ payload_ff:
 				}
 
 				if (proxy_pss_to_ss_h(pss))
-					lws_ss_request_tx(
+					_lws_ss_request_tx(
 						proxy_pss_to_ss_h(pss));
 			} else {
 
@@ -921,7 +921,7 @@ payload_ff:
 						 __func__, par->temp32,
 						 proxy_pss_to_ss_h(pss)->wsi->
 							 txc.peer_tx_cr_est);
-					lws_ss_request_tx(proxy_pss_to_ss_h(pss));
+					_lws_ss_request_tx(proxy_pss_to_ss_h(pss));
 				} else
 #endif
 					lwsl_info("%s: dropping TXCR\n", __func__);
@@ -1095,6 +1095,11 @@ payload_ff:
 			if (!proxy_pss_to_ss_h(pss))
 				goto hangup;
 
+			if (!proxy_pss_to_ss_h(pss)->policy) {
+				lwsl_err("%s: null policy\n", __func__);
+				goto hangup;
+			}
+
 			/*
 			 * This is the policy's metadata list for the given
 			 * name
@@ -1113,25 +1118,28 @@ payload_ff:
 					proxy_pss_to_ss_h(pss),
 					par->metadata_name);
 
-			if (par->ssmd->value_on_lws_heap)
-				lws_free_set_NULL(par->ssmd->value__may_own_heap);
-			par->ssmd->value_on_lws_heap = 0;
+			if (par->ssmd) {
 
-			if (proxy_pss_to_ss_h(pss) &&
-			    lws_fi(&proxy_pss_to_ss_h(pss)->fic, "ssproxy_rx_metadata_oom"))
-				par->ssmd->value__may_own_heap = NULL;
-			else
-				par->ssmd->value__may_own_heap =
-					lws_malloc((unsigned int)par->rem + 1, "metadata");
+				if (par->ssmd->value_on_lws_heap)
+					lws_free_set_NULL(par->ssmd->value__may_own_heap);
+				par->ssmd->value_on_lws_heap = 0;
 
-			if (!par->ssmd->value__may_own_heap) {
-				lwsl_err("%s: OOM mdv\n", __func__);
-				goto hangup;
+				if (proxy_pss_to_ss_h(pss) &&
+				    lws_fi(&proxy_pss_to_ss_h(pss)->fic, "ssproxy_rx_metadata_oom"))
+					par->ssmd->value__may_own_heap = NULL;
+				else
+					par->ssmd->value__may_own_heap =
+						lws_malloc((unsigned int)par->rem + 1, "metadata");
+
+				if (!par->ssmd->value__may_own_heap) {
+					lwsl_err("%s: OOM mdv\n", __func__);
+					goto hangup;
+				}
+				par->ssmd->length = par->rem;
+				((uint8_t *)par->ssmd->value__may_own_heap)[par->rem] = '\0';
+				/* mark it as needing cleanup */
+				par->ssmd->value_on_lws_heap = 1;
 			}
-			par->ssmd->length = par->rem;
-			((uint8_t *)par->ssmd->value__may_own_heap)[par->rem] = '\0';
-			/* mark it as needing cleanup */
-			par->ssmd->value_on_lws_heap = 1;
 			par->ctr = 0;
 			break;
 
@@ -1267,7 +1275,6 @@ payload_ff:
 			if (++par->ctr < 4)
 				break;
 
-
 			/*
 			 * Client (par->temp32 == dsh alloc)
 			 */
@@ -1334,8 +1341,7 @@ payload_ff:
 			if (!h->dsh)
 				goto hangup;
 
-			if (h->cwsi)
-				lws_callback_on_writable(h->cwsi);
+			lws_callback_on_writable(h->cwsi);
 
 			par->rsl_pos = 0;
 			par->rsl_idx = 0;

@@ -27,7 +27,7 @@
 #include "mbedtls/entropy.h"
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/error.h"
-#include "mbedtls/certs.h"
+//#include "mbedtls/certs.h"
 
 #include "private-lib-core.h"
 
@@ -157,16 +157,14 @@ int ssl_pm_new(SSL *ssl)
             version = MBEDTLS_SSL_MINOR_VERSION_3;
         else if (TLS1_1_VERSION == ssl->version)
             version = MBEDTLS_SSL_MINOR_VERSION_2;
-        else if (TLS1_VERSION == ssl->version)
-            version = MBEDTLS_SSL_MINOR_VERSION_1;
         else
-            version = MBEDTLS_SSL_MINOR_VERSION_0;
+            version = MBEDTLS_SSL_MINOR_VERSION_1;
 
         mbedtls_ssl_conf_max_version(&ssl_pm->conf, MBEDTLS_SSL_MAJOR_VERSION_3, version);
         mbedtls_ssl_conf_min_version(&ssl_pm->conf, MBEDTLS_SSL_MAJOR_VERSION_3, version);
     } else {
         mbedtls_ssl_conf_max_version(&ssl_pm->conf, MBEDTLS_SSL_MAJOR_VERSION_3, MBEDTLS_SSL_MINOR_VERSION_3);
-        mbedtls_ssl_conf_min_version(&ssl_pm->conf, MBEDTLS_SSL_MAJOR_VERSION_3, MBEDTLS_SSL_MINOR_VERSION_0);
+        mbedtls_ssl_conf_min_version(&ssl_pm->conf, MBEDTLS_SSL_MAJOR_VERSION_3, MBEDTLS_SSL_MINOR_VERSION_1);
     }
 
     mbedtls_ssl_conf_rng(&ssl_pm->conf, mbedtls_ctr_drbg_random, &ssl_pm->ctr_drbg);
@@ -236,7 +234,7 @@ static int ssl_pm_reload_crt(SSL *ssl)
     if (ssl->verify_mode == SSL_VERIFY_PEER)
         mode = MBEDTLS_SSL_VERIFY_OPTIONAL;
     else if (ssl->verify_mode == SSL_VERIFY_FAIL_IF_NO_PEER_CERT)
-        mode = MBEDTLS_SSL_VERIFY_OPTIONAL;
+        mode = MBEDTLS_SSL_VERIFY_REQUIRED;
     else if (ssl->verify_mode == SSL_VERIFY_CLIENT_ONCE)
         mode = MBEDTLS_SSL_VERIFY_UNSET;
     else
@@ -937,10 +935,11 @@ void SSL_set_SSL_CTX(SSL *ssl, SSL_CTX *ctx)
 	ssl->cert = __ssl_cert_new(ctx->cert);
 
 #if defined(LWS_HAVE_mbedtls_ssl_set_hs_authmode)
+
 	if (ctx->verify_mode == SSL_VERIFY_PEER)
 		mode = MBEDTLS_SSL_VERIFY_OPTIONAL;
 	else if (ctx->verify_mode == SSL_VERIFY_FAIL_IF_NO_PEER_CERT)
-		mode = MBEDTLS_SSL_VERIFY_OPTIONAL;
+		mode = MBEDTLS_SSL_VERIFY_REQUIRED;
 	else if (ctx->verify_mode == SSL_VERIFY_CLIENT_ONCE)
 		mode = MBEDTLS_SSL_VERIFY_UNSET;
 	else

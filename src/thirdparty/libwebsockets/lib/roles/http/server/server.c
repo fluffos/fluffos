@@ -24,10 +24,6 @@
 
 #include "private-lib-core.h"
 
-#ifndef MIN
-#define MIN(a,b) ((a) < (b) ? (a) : (b))
-#endif
-
 const char * const method_names[] = {
 	"GET", "POST",
 #if defined(LWS_WITH_HTTP_UNCOMMON_HEADERS)
@@ -59,9 +55,12 @@ _lws_vhost_init_server(const struct lws_context_creation_info *info,
 	struct lws_context_per_thread *pt;
 	int n, opt = 1, limit = 1;
 	lws_sockfd_type sockfd;
+	int m = 0, is;
+#if defined(LWS_WITH_IPV6)
+	int af = 0;
+#endif
 	struct lws_vhost *vh;
 	struct lws *wsi;
-	int m = 0, is;
 
 	(void)method_names;
 	(void)opt;
@@ -187,14 +186,36 @@ done_list:
 #ifdef LWS_WITH_UNIX_SOCK
 			if (LWS_UNIX_SOCK_ENABLED(vhost))
 				sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
-			else
+			else {
 #endif
-#ifdef LWS_WITH_IPV6
-			if (LWS_IPV6_ENABLED(vhost))
+
+#if defined(LWS_WITH_IPV6)
+			/*
+			 * We have to assess iface if it's around, to choose
+			 * ahead of time to create a socket with the right AF
+			 */
+
+			if (vhost->iface) {
+				uint8_t buf[16];
+				int q;
+
+				q = lws_parse_numeric_address(vhost->iface, buf, sizeof(buf));
+
+				if (q == 4)
+					af = AF_INET;
+				if (q == 16)
+					af = AF_INET6;
+			}
+
+			if (LWS_IPV6_ENABLED(vhost) && af != AF_INET)
 				sockfd = socket(AF_INET6, SOCK_STREAM, 0);
 			else
 #endif
 				sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
+#ifdef LWS_WITH_UNIX_SOCK
+			}
+#endif
 		}
 
 		if (sockfd == LWS_SOCK_INVALID) {
@@ -583,9 +604,13 @@ lws_http_serve(struct lws *wsi, char *uri, const char *origin,
 		}
 #else
 #if defined(LWS_HAVE__STAT32I64)
-		if (_stat32i64(path, &st)) {
-			lwsl_info("unable to stat %s\n", path);
-			goto notfound;
+		{
+			WCHAR buf[MAX_PATH];
+			MultiByteToWideChar(CP_UTF8, 0, path, -1, buf, LWS_ARRAY_SIZE(buf));
+			if (_wstat32i64(buf, &st)) {
+				lwsl_info("unable to stat %s\n", path);
+				goto notfound;
+			}
 		}
 #else
 		if (stat(path, &st)) {
@@ -1906,15 +1931,15 @@ lws_confirm_host_header(struct lws *wsi)
 		port = 443;
 #endif
 
-	lws_tokenize_init(&ts, buf, LWS_TOKENIZE_F_DOT_NONTERM /* server.com */|
-				    LWS_TOKENIZE_F_NO_FLOATS /* 1.server.com */|
-				    LWS_TOKENIZE_F_MINUS_NONTERM /* a-b.com */);
 	n = lws_hdr_copy(wsi, buf, sizeof(buf) - 1, WSI_TOKEN_HOST);
 	if (n <= 0) {
 		lwsl_info("%s: missing or oversize host header\n", __func__);
 		return 1;
 	}
 	ts.len = (size_t)n;
+	lws_tokenize_init(&ts, buf, LWS_TOKENIZE_F_DOT_NONTERM /* server.com */|
+				    LWS_TOKENIZE_F_NO_FLOATS /* 1.server.com */|
+				    LWS_TOKENIZE_F_MINUS_NONTERM /* a-b.com */);
 
 	if (lws_tokenize(&ts) != LWS_TOKZE_TOKEN)
 		goto bad_format;
@@ -2850,6 +2875,9 @@ int lws_serve_http_file_fragment(struct lws *wsi)
 #if defined(LWS_WITH_RANGES)
 	unsigned char finished = 0;
 #endif
+#if defined(LWS_ROLE_H2)
+	struct lws *nwsi;
+#endif
 	int n, m;
 
 	lwsl_debug("wsi->mux_substream %d\n", wsi->mux_substream);
@@ -2932,14 +2960,18 @@ int lws_serve_http_file_fragment(struct lws *wsi)
 
 		poss = context->pt_serv_buf_size;
 
-#ifdef LWS_ROLE_H2
-    struct lws* nwsi = lws_get_network_wsi(wsi);
-    if (nwsi && nwsi->h2.h2n) {
-      poss = MIN(poss, nwsi->h2.h2n->peer_set.s[H2SET_MAX_FRAME_SIZE]);
-    }
+#if defined(LWS_ROLE_H2)
+               /*
+                * If it's h2, restrict any lump that we are sending to the
+                * max h2 frame size the peer indicated he could handle in
+                * his SETTINGS
+                */
+               nwsi = lws_get_network_wsi(wsi);
+               if (nwsi->h2.h2n &&
+                   poss > (lws_filepos_t)nwsi->h2.h2n->peer_set.s[H2SET_MAX_FRAME_SIZE])
+                       poss = (lws_filepos_t)nwsi->h2.h2n->peer_set.s[H2SET_MAX_FRAME_SIZE];
 #endif
-
-    poss = poss - (unsigned int)n - LWS_H2_FRAME_HEADER_LENGTH;
+		poss = poss - (lws_filepos_t)(n + LWS_H2_FRAME_HEADER_LENGTH);
 
 		if (wsi->http.tx_content_length)
 			if (poss > wsi->http.tx_content_remain)

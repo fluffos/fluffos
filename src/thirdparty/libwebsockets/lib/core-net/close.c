@@ -182,14 +182,28 @@ __lws_free_wsi(struct lws *wsi)
 
 #if defined(LWS_WITH_SECURE_STREAMS)
 	if (wsi->for_ss) {
-		/*
-		 * Make certain it is disconnected from the ss by now
-		 */
-		lws_ss_handle_t *h = (lws_ss_handle_t *)wsi->a.opaque_user_data;
 
-		if (h) {
-			h->wsi = NULL;
-			wsi->a.opaque_user_data = NULL;
+#if defined(LWS_WITH_SECURE_STREAMS_PROXY_API)
+		if (wsi->client_bound_sspc) {
+			lws_sspc_handle_t *h = (lws_sspc_handle_t *)
+							wsi->a.opaque_user_data;
+			if (h) {
+				h->cwsi = NULL;
+				wsi->a.opaque_user_data = NULL;
+			}
+		} else
+#endif
+		{
+			/*
+			 * Make certain it is disconnected from the ss by now
+			 */
+			lws_ss_handle_t *h = (lws_ss_handle_t *)
+							wsi->a.opaque_user_data;
+
+			if (h) {
+				h->wsi = NULL;
+				wsi->a.opaque_user_data = NULL;
+			}
 		}
 	}
 #endif
@@ -289,7 +303,7 @@ lws_addrinfo_clean(struct lws *wsi)
 #endif
 }
 
-/* requires cx lock */
+/* requires cx and pt lock */
 
 void
 __lws_close_free_wsi(struct lws *wsi, enum lws_close_status reason,
@@ -504,6 +518,10 @@ just_kill_connection:
 
 	lwsl_debug("%s: real just_kill_connection A: %s (sockfd %d)\n", __func__,
 		lws_wsi_tag(wsi), wsi->desc.sockfd);
+
+#if defined(LWS_WITH_THREADPOOL)
+	lws_threadpool_wsi_closing(wsi);
+#endif
 
 #if defined(LWS_WITH_FILE_OPS) && (defined(LWS_ROLE_H1) || defined(LWS_ROLE_H2))
 	if (lwsi_role_http(wsi) && lwsi_role_server(wsi) &&
@@ -729,7 +747,7 @@ just_kill_connection:
 async_close:
 #endif
 
-#if defined(LWS_WITH_SECURE_STREAMS) && defined(LWS_WITH_SERVER)
+#if defined(LWS_WITH_SECURE_STREAMS)
 	if (wsi->for_ss) {
 		lwsl_debug("%s: for_ss\n", __func__);
 		/*

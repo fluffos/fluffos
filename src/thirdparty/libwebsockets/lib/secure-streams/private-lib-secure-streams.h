@@ -1,7 +1,7 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2019 - 2020 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2019 - 2021 Andy Green <andy@warmcat.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -39,6 +39,7 @@ typedef enum {
 	SSSEQ_CONNECTED,
 } lws_ss_seq_state_t;
 
+struct conn;
 
 /**
  * lws_ss_handle_t: publicly-opaque secure stream object implementation
@@ -69,6 +70,8 @@ typedef struct lws_ss_handle {
 
 	struct lws_sequencer	*seq;	  /**< owning sequencer if any */
 	struct lws		*wsi;	  /**< the stream wsi if any */
+
+	struct conn		*conn_if_sspc_onw;
 
 #if defined(LWS_WITH_SSPLUGINS)
 	void			*nauthi;  /**< the nauth plugin instance data */
@@ -157,6 +160,8 @@ typedef struct lws_ss_handle {
 
 	lws_ss_constate_t	connstate;/**< public connection state */
 	lws_ss_seq_state_t	seqstate; /**< private connection state */
+	lws_ss_state_return_t	pending_ret; /**< holds desired disposition
+						* for ss during CCE */
 
 #if defined(LWS_WITH_SERVER)
 	int			txn_resp;
@@ -181,6 +186,9 @@ typedef struct lws_ss_handle {
 	uint8_t			destroying:1;
 	uint8_t			ss_dangling_connected:1;
 	uint8_t			proxy_onward:1; /* opaque is conn */
+	uint8_t			inside_connect:1; /* set if we are currently
+						   * creating the onward
+						   * connect */
 } lws_ss_handle_t;
 
 /* connection helper that doesn't need to hang around after connection starts */
@@ -481,6 +489,9 @@ _lws_ss_alloc_set_metadata(lws_ss_metadata_t *omd, const char *name,
 
 lws_ss_state_return_t
 _lws_ss_client_connect(lws_ss_handle_t *h, int is_retry, void *conn_if_sspc_onw);
+
+lws_ss_state_return_t
+_lws_ss_request_tx(lws_ss_handle_t *h);
 
 int
 __lws_ss_proxy_bind_ss_to_conn_wsi(void *parconn, size_t dsh_size);

@@ -1,7 +1,7 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2019 - 2020 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2019 - 2021 Andy Green <andy@warmcat.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -68,12 +68,11 @@ void
 lws_proxy_clean_conn_ss(struct lws *wsi)
 {
 #if 0
-	struct conn *conn;
+	lws_ss_handle_t *h = (lws_ss_handle_t *)wsi->a.opaque_user_data;
+	struct conn *conn = h->conn_if_sspc_onw;
 
 	if (!wsi)
 		return;
-
-	conn = (struct conn *)wsi->a.opaque_user_data;
 
 	if (conn && conn->ss)
 		conn->ss->wsi = NULL;
@@ -208,7 +207,7 @@ ss_proxy_onward_tx(void *userobj, lws_ss_tx_ordinal_t ord, uint8_t *buf,
 
 	/* ... there's more we want to send? */
 	if (!lws_dsh_get_head(m->conn->dsh, KIND_C_TO_P, (void **)&p, &si))
-		lws_ss_request_tx(m->conn->ss);
+		_lws_ss_request_tx(m->conn->ss);
 
 	if (!*len && !*flags)
 		/* we don't actually want to send anything */
@@ -609,6 +608,7 @@ callback_ss_proxy(struct lws *wsi, enum lws_callback_reasons reason,
 			 * priority 2
 			 */
 
+#if defined(LWS_WITH_CONMON)
 			if (conn->ss->conmon_json) {
 				unsigned int xlen = conn->ss->conmon_len;
 
@@ -626,7 +626,7 @@ callback_ss_proxy(struct lws *wsi, enum lws_callback_reasons reason,
 				pay = 0;
 				goto again;
 			}
-
+#endif
 			/*
 			 * if no fresh rx metadata, just pass through incoming
 			 * dsh

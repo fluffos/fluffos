@@ -68,13 +68,27 @@ include(CTest)
 
 if (ESP_PLATFORM)
        include_directories(
-       ${IDF_PATH}/components/freertos/port/xtensa/include/
-       ${IDF_PATH}/components/hal/include
-       ${IDF_PATH}/components/soc/${CONFIG_IDF_TARGET}/include/
-       ${IDF_PATH}/components/soc/include/
-       ${IDF_PATH}/components/esp_hw_support/include
-       ${IDF_PATH}/components/hal/${CONFIG_IDF_TARGET}/include/
-       )
+		$ENV{IDF_PATH}/components/esp_hw_support/include/soc/
+		$ENV{IDF_PATH}/components/freertos/include/
+		$ENV{IDF_PATH}/components/xtensa/${CONFIG_IDF_TARGET}/include/
+		$ENV{IDF_PATH}/components/freertos/include/esp_additions
+		$ENV{IDF_PATH}/components/hal/include
+		$ENV{IDF_PATH}/components/soc/${CONFIG_IDF_TARGET}/include/
+		$ENV{IDF_PATH}/components/soc/include/
+		$ENV{IDF_PATH}/components/esp_hw_support/include
+		$ENV{IDF_PATH}/components/hal/${CONFIG_IDF_TARGET}/include/
+	)
+
+	if (CONFIG_IDF_TARGET_ARCH_RISCV)
+                include_directories(
+                       $ENV{IDF_PATH}/components/freertos/port/riscv/include
+                       $ENV{IDF_PATH}/components/riscv/include)
+        else()
+                include_directories(
+                       $ENV{IDF_PATH}/components/freertos/port/xtensa/include
+                       $ENV{IDF_PATH}/components/xtensa/include)
+        endif()
+
 endif()
 
 
@@ -275,6 +289,7 @@ option(LWS_HTTP_HEADERS_ALL "Override header reduction optimization and include 
 option(LWS_WITH_SUL_DEBUGGING "Enable zombie lws_sul checking on object deletion" OFF)
 option(LWS_WITH_PLUGINS_API "Build generic lws_plugins apis (see LWS_WITH_PLUGINS to also build protocol plugins)" OFF)
 option(LWS_WITH_CONMON "Collect introspectable connection latency stats on individual client connections" ON)
+option(LWS_WITHOUT_EVENTFD "Force using pipe instead of eventfd" OFF)
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 	option(LWS_WITH_NETLINK "Monitor Netlink for Routing Table changes" ON)
@@ -369,12 +384,16 @@ if(GIT_EXECUTABLE)
 	message("Git commit hash: ${LWS_BUILD_HASH}")
 endif()
 
+if ("${LWS_BUILD_HASH}" STREQUAL "")
+	set(LWS_BUILD_HASH "unknown")
+endif()
+
 set(PACKAGE "libwebsockets")
 set(CPACK_RPM_PACKAGE_LICENSE "MIT")
 set(CPACK_PACKAGE_NAME "${PACKAGE}")
 set(CPACK_PACKAGE_VERSION_MAJOR "4")
 set(CPACK_PACKAGE_VERSION_MINOR "2")
-set(CPACK_PACKAGE_VERSION_PATCH_NUMBER "0")
+set(CPACK_PACKAGE_VERSION_PATCH_NUMBER "1")
 
 set(CPACK_PACKAGE_VERSION_PATCH "${CPACK_PACKAGE_VERSION_PATCH_NUMBER}-${LWS_BUILD_HASH}")
 set(CPACK_PACKAGE_RELEASE 1)
@@ -553,7 +572,14 @@ CHECK_FUNCTION_EXISTS(getgrgid_r LWS_HAVE_GETGRGID_R)
 CHECK_FUNCTION_EXISTS(getgrnam_r LWS_HAVE_GETGRNAM_R)
 CHECK_FUNCTION_EXISTS(getpwuid_r LWS_HAVE_GETPWUID_R)
 CHECK_FUNCTION_EXISTS(getpwnam_r LWS_HAVE_GETPWNAM_R)
+CHECK_FUNCTION_EXISTS(timegm LWS_HAVE_TIMEGM)
 
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+	if(CMAKE_OSX_DEPLOYMENT_TARGET LESS "10.12")
+		message("No clock_gettime found on macOS ${CMAKE_OSX_DEPLOYMENT_TARGET}. Disabling LWS_HAVE_CLOCK_GETTIME.")
+		set(LWS_HAVE_CLOCK_GETTIME 0)
+	endif()
+endif()
 
 if (NOT LWS_HAVE_GETIFADDRS)
 	if (LWS_WITHOUT_BUILTIN_GETIFADDRS)

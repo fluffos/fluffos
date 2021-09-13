@@ -102,8 +102,11 @@ lws_getaddrinfo46(struct lws *wsi, const char *ads, struct addrinfo **result)
 		lws_snprintf(buckname, sizeof(buckname), "dns=\"unreachable %d\"", n);
 		lws_metrics_hist_bump_priv_wsi(wsi, mth_conn_failures, buckname);
 #endif
+
+#if 0
 		lwsl_debug("%s: asking to recheck CPD in 1s\n", __func__);
 		lws_system_cpd_start_defer(wsi->a.context, LWS_US_PER_SEC);
+#endif
 	}
 
 	lwsl_info("%s: getaddrinfo '%s' says %d\n", __func__, ads, n);
@@ -119,6 +122,10 @@ lws_getaddrinfo46(struct lws *wsi, const char *ads, struct addrinfo **result)
 
 	return n;
 }
+#endif
+
+#if !defined(LWS_WITH_SYS_ASYNC_DNS) && defined(EAI_NONAME)
+static const char * const dns_nxdomain = "DNS NXDOMAIN";
 #endif
 
 struct lws *
@@ -341,6 +348,20 @@ solo:
 		 * blocking dns resolution
 		 */
 		n = lws_getaddrinfo46(wsi, ads, &result);
+#if defined(EAI_NONAME)
+		if (n == EAI_NONAME) {
+			/*
+			 * The DNS server responded with NXDOMAIN... even
+			 * though this is still in the client creation call,
+			 * we need to make a CCE, otherwise there won't be
+			 * any user indication of what went wrong
+			 */
+			wsi->client_suppress_CONNECTION_ERROR = 0;
+			lws_inform_client_conn_fail(wsi, (void *)dns_nxdomain,
+						    sizeof(dns_nxdomain));
+			goto failed1;
+		}
+#endif
 	}
 #else
 	/* this is either FAILED, CONTINUING, or already called connect_4 */
