@@ -159,6 +159,10 @@ void sig_usr2(int sig) {
  * -Beek
  */
 void attempt_shutdown(int sig) {
+  using namespace backward;
+  static StackTrace st;
+  static Printer p;
+
   const char *msg = "Unkonwn signal!";
   switch (sig) {
     case SIGTERM:
@@ -174,16 +178,11 @@ void attempt_shutdown(int sig) {
   signal(SIGINT, SIG_DFL);
 
   // Print backtrace
-  {
-    using namespace backward;
-    StackTrace st;
-    st.load_here(64);
-    Printer p;
-    p.object = true;
-    p.color_mode = ColorMode::automatic;
-    p.address = true;
-    p.print(st, stderr);
-  }
+  st.load_here(64);
+  p.object = true;
+  p.color_mode = ColorMode::automatic;
+  p.address = true;
+  p.print(st, stderr);
 
   // Attempt to call crash()
   fatal(msg);
