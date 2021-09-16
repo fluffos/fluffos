@@ -41,7 +41,10 @@ lws_plat_pipe_create(struct lws *wsi)
 #elif defined(LWS_HAVE_PIPE2)
 	return pipe2(pt->dummy_pipe_fds, O_NONBLOCK);
 #else
-	return pipe(pt->dummy_pipe_fds);
+	int ret =  pipe(pt->dummy_pipe_fds);
+	ret = fcntl(pt->dummy_pipe_fds[0], F_SETFL, O_NONBLOCK);
+	ret = fcntl(pt->dummy_pipe_fds[1], F_SETFL, O_NONBLOCK);
+	return ret;
 #endif
 }
 
