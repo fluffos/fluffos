@@ -198,14 +198,6 @@ endif ()
 find_package(OpenSSL 1.0.1 COMPONENTS SSL REQUIRED)
 include_directories(SYSTEM ${OPENSSL_INCLUDE_DIR})
 
-if(WIN32)
-  find_package(Libevent 2.1 REQUIRED COMPONENTS core extra openssl)
-else()
-  find_package(Libevent 2.1 REQUIRED COMPONENTS core extra openssl pthreads)
-endif()
-# multiple packages uses this, so we simply do a global inclusion
-include_directories(SYSTEM ${LIBEVENT_INCLUDE_DIR})
-
 find_package(ICU REQUIRED COMPONENTS uc dt)
 # Make ICU use utf-8 internally
 add_compile_options("-DU_CHARSET_IS_UTF8=1")
@@ -217,6 +209,17 @@ ENDIF()
 include_directories(SYSTEM ${ICU_INCLUDE_DIRS})
 
 # Bundled libraries
+set(EVENT__DISABLE_BENCHMARK ON CACHE BOOL "" FORCE)
+set(EVENT__DISABLE_MBEDTLS ON CACHE BOOL "" FORCE)
+set(EVENT__DISABLE_BENCHMARK ON CACHE BOOL "" FORCE)
+set(EVENT__DISABLE_TESTS ON CACHE BOOL "" FORCE)
+set(EVENT__DISABLE_REGRESS ON CACHE BOOL "" FORCE)
+set(EVENT__DISABLE_SAMPLES ON CACHE BOOL "" FORCE)
+set(EVENT__DISABLE_MM_REPLACEMENT ON CACHE BOOL "" FORCE)
+include_directories(SYSETEM ${CMAKE_CURRENT_BINARY_DIR}/thirdparty/libevent/include)
+include_directories(SYSETEM thirdparty/libevent/include)
+add_subdirectory(thirdparty/libevent EXCLUDE_FROM_ALL)
+
 add_subdirectory(thirdparty/crypt EXCLUDE_FROM_ALL)
 add_subdirectory(thirdparty/libtelnet EXCLUDE_FROM_ALL)
 # TODO: required by windows code
@@ -247,6 +250,8 @@ set(LWS_WITH_LEJP_CONF OFF CACHE BOOL "" FORCE)
 set(LWS_UNIX_SOCK OFF CACHE BOOL "" FORCE)
 set(LWS_WITH_NETLINK OFF CACHE BOOL "" FORCE)
 set(OPENSSL_FOUND 0) # hack to force lws re-search openssl
+set(LIBEVENT_FOUND 1) # hack to stop libwebsockets from finding libevent
+set(LIBEVENT_LIBRARIES "event_core_static")
 add_subdirectory(thirdparty/libwebsockets EXCLUDE_FROM_ALL)
 include_directories("thirdparty/libwebsockets/include" SYSTEM)
 include_directories("${CMAKE_CURRENT_BINARY_DIR}/thirdparty/libwebsockets")
@@ -427,6 +432,10 @@ foreach (PACKAGE ${FLUFFOS_PACKAGES})
 endforeach ()
 
 
+target_link_libraries(libdriver PRIVATE event_core_static event_extra_static event_openssl_static)
+if (NOT WIN32)
+  target_link_libraries(libdriver PRIVATE event_pthreads_static)
+endif()
 target_link_libraries(libdriver PRIVATE crypt)
 target_link_libraries(libdriver PUBLIC ${LIBWEBSOCKETS_LIBRARIES_STATIC})
 target_link_libraries(libdriver PUBLIC libtelnet)
@@ -437,7 +446,7 @@ target_link_libraries(libdriver PUBLIC ${BACKWARD_LIBRARIES})
 # System libraries
 target_link_libraries(libdriver PUBLIC OpenSSL::SSL)
 target_link_libraries(libdriver PUBLIC ${ICU_LIBRARIES})
-target_link_libraries(libdriver PUBLIC ${LIBEVENT_LIBRARIES})
+# target_link_libraries(libdriver PUBLIC ${LIBEVENT_LIBRARIES})
 
 # Platform Libraries
 
