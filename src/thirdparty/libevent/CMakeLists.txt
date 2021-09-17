@@ -347,7 +347,7 @@ if(WIN32)
         advapi32
         bcrypt
     )
-    set(CMAKE_REQUIRED_DEFINITIONS -FIwinsock2.h -FIws2tcpip.h -D_WIN32_WINNT=0x0600)
+    list(APPEND CMAKE_REQUIRED_DEFINITIONS -FIwinsock2.h -FIws2tcpip.h -D_WIN32_WINNT=0x0600)
 endif()
 if (SOLARIS)
     list(APPEND CMAKE_REQUIRED_LIBRARIES

@@ -11,7 +11,11 @@ on:
     tags: [ 'v*.*' ]
     paths-ignore:
       - 'docs/**'
-
+  pull_request:
+    branches:
+      - master
+    paths-ignore:
+      - 'docs/**'
 env:
   # Use docker.io for Docker Hub if empty
   REGISTRY: ghcr.io
