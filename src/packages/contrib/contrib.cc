@@ -1881,10 +1881,7 @@ void f_zonetime(void) {
 #ifdef F_IS_DAYLIGHT_SAVINGS_TIME
 void f_is_daylight_savings_time(void) {
   time_t time_to_check = sp->u.number;
-  pop_stack();
-  const char *new_tz = sp->u.string;
-  pop_stack();
-
+  const char *new_tz = (sp -1)->u.string;
   const char *old_tz = set_timezone(new_tz);
 
   if (time_to_check < 0) {
@@ -1892,6 +1889,9 @@ void f_is_daylight_savings_time(void) {
   }
   struct tm res = {};
   struct tm *t = localtime_r(&time_to_check, &res);
+
+  pop_stack();
+  pop_stack();
   if (t) {
     push_number((t->tm_isdst) > 0);
   } else {
