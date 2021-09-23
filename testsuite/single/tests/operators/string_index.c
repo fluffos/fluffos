@@ -87,9 +87,24 @@ void do_tests() {
   ASSERT_EQ("def", tmp[3..5]);
   ASSERT_EQ("bcdefg", tmp[<6..6]);
 
-  // Compat: index underflow is ignored.
+#ifndef __OLD_RANGE_BEHAVIOR__
+  // Compat: index underflow through negative value is same as 0.
   ASSERT_EQ(tmp, tmp[-999..]);
+  ASSERT_EQ("", tmp[-999..-999]);
+  ASSERT_EQ("", tmp[0..-999]);
 
+  // probably meaningless
+  ASSERT_EQ(tmp, tmp[<-999..]);
+  ASSERT_EQ(tmp, tmp[<-999..<-999]);
+  ASSERT_EQ(tmp, tmp[0..<-999]);
+
+  // Compat: index underflow or overflow just mean empty string
+  ASSERT_EQ("", "abc"[4..4]);
+  ASSERT_EQ("", "abc"[<4..<4]);
+  ASSERT_EQ("", "abc"[4..]);
+  ASSERT_EQ("abc", "abc"[<4..]);
+  // LPC not supported: ASSERT_EQ("", "abc"[..<4]);
+#endif
 
   // lvalue out of bound
   ASSERT(catch(tmp[0..strlen(tmp)] = ""));
