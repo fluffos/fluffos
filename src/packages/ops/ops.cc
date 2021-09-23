@@ -620,60 +620,73 @@ void f_range(int code) {
   switch (sp->type) {
     case T_STRING: {
       int32_t from, to;
+      int32_t len = SVALUE_STRLEN(sp);
 
-      EGCSmartIterator iter(sp->u.string, SVALUE_STRLEN(sp));
+      EGCSmartIterator iter(sp->u.string, len);
       if (!iter.ok()) {
         error("Invalid UTF-8 string: f_range");
       }
 
-      to = (--sp)->u.number;
-      from = (--sp)->u.number;
+      to = (sp - 1)->u.number;
+      from = (sp - 2)->u.number;
 
-      if (!CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
-        if (code & 0x01) {
-          to = -1 * to;
-        }
-        if (code & 0x10) {
-          from = -1 * from;
+      // Notes:
+      // ranges with indexes which are out of bounds do not give an error.
+      // Instead if a maximal subrange can be found within the range requested
+      // that lies within the bounds of the indexed value, it will be used.
+      if (code & 0x01) {
+        if (to < 0) {
+          to = len;
+        } else {
+          to = iter.post_index_to_offset(-1 * to);
         }
       } else {
-        if (code & 0x01) {
-          to = -1 * to;
-        }
-        if (code & 0x10) {
-          from = -1 * from;
+        if (to < 0) {
+          if (CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
+            to = iter.post_index_to_offset(to);
+          }
+        } else {
+          auto pos = iter.post_index_to_offset(to);
+          if (pos > 0) {
+            to = pos;
+          } else if (pos == -1 && to > iter.count()) {
+            to = len;
+          }
         }
       }
 
-      if ((from > 0 && to > 0 && to < from) || (from < 0 && to < 0 && to < from)) {
-        free_string_svalue(sp + 2);
-        sp->type = T_STRING;
-        sp->subtype = STRING_CONSTANT;
-        sp->u.string = "";
+      if (code & 0x10) {
+        if (from < 0) {
+          from = len;
+        } else {
+          from = iter.index_to_offset(-1 * from);
+        }
+      } else {
+        if (from < 0) {
+          if (CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
+              from = iter.index_to_offset(from);
+          } else {
+            from = 0;
+          }
+        } else {
+          from = iter.index_to_offset(from);
+        }
+      }
+
+      if (
+          (from < 0 || to < 0) /* invalid range */
+          || (to < from) /* empty range */
+          ) {
+        pop_3_elems();
+        push_constant_string("");
         return;
       }
+      char *tmp = new_string(to - from, "f_range");
+      memcpy(tmp, iter.data() + from, to - from);
+      tmp[to - from] = '\0';
 
-      auto start = iter.index_to_offset(from);
-      if (start < 0) {
-        start = 0;
-      }
-      auto end = iter.post_index_to_offset(to);
-      if (end < 0) {
-        put_malloced_string(string_copy(iter.data() + start, "f_range"));
-      } else {
-        if (end < start) {
-          free_string_svalue(sp + 2);
-          sp->type = T_STRING;
-          sp->subtype = STRING_CONSTANT;
-          sp->u.string = "";
-          return;
-        }
-        char *tmp = new_string(end - start, "f_range");
-        memcpy(tmp, iter.data() + start, end - start);
-        tmp[end - start] = '\0';
-        put_malloced_string(tmp);
-      }
-      free_string_svalue(sp + 2);
+      pop_3_elems();
+      push_malloced_string(tmp);
       break;
     }
     case T_BUFFER: {
@@ -767,6 +780,11 @@ void f_extract_range(int code) {
         from = -1 * from;
       }
       auto offset = iter.index_to_offset(from);
+      if (code && offset < 0) {
+        if ((-1 * from) > (int32_t) iter.count()) {
+          offset = 0;
+        }
+      }
       if (offset < 0) {
         sp->type = T_STRING;
         sp->subtype = STRING_CONSTANT;
