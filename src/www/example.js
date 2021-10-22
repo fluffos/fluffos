@@ -22,20 +22,18 @@ function isMobile() {
   return false;
 }
 
-const WebFontSize = 16;
+const WebFontSize = 14;
 const MobileFontSize = 9;
 const term = new Terminal({
   convertEol: true,
   disableStdin: true,
-  scrollback: 1024,
-  tabStopWidth: 4,
-  fontFamily: 'SFMono-Regular,Consolas,Liberation Mono,Menlo,monospace, "Microsoft YaHei", SimSun',
+  fontFamily: 'Noto Sans Mono',
   fontSize: isMobile() ?  MobileFontSize: WebFontSize
 });
 
-const unicode11Addon = new Unicode11Addon.Unicode11Addon();
-term.loadAddon(unicode11Addon);
-term.unicode.activeVersion = '11';
+const unicode14Addon = new Unicode14Addon(true);
+term.loadAddon(unicode14Addon);
+term.unicode.activeVersion = '14';
 
 const fitAddon  = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
@@ -79,7 +77,7 @@ function new_ws(urlpath, protocol) {
   return new WebSocket(urlpath, protocol);
 }
 
-document.addEventListener("DOMContentLoaded", function () {
+function onload() {
   const el_container = document.getElementById('container');
   const el_terminal = document.getElementById('terminal');
   const el_input = document.getElementById('command');
@@ -94,6 +92,10 @@ document.addEventListener("DOMContentLoaded", function () {
   window.addEventListener('touchmove', function(e) {
     e.preventDefault();
     e.stopPropagation();
+  });
+
+  window.addEventListener('resize', function (e) {
+    fitAddon.fit();
   });
 
   if(isMobile()) {
@@ -189,5 +191,10 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     }
   });
+}
 
+document.addEventListener("DOMContentLoaded", function () {
+  new FontFaceObserver("Noto Sans Mono").load().then(function () {
+    onload();
+  });
 }, false);
