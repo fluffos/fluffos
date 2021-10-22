@@ -14,6 +14,7 @@
 #include <unordered_map>
 #include <list>
 #include <utility>
+#include <optional>
 
 // a cache which evicts the least recently used item when it is full
 template <class Key, class Value>
