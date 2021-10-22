@@ -143,7 +143,7 @@ void f_strptime() {
   const auto *arg_fmt = (sp - 1)->u.string;
 
   struct tm res = {};
-  res.tm_isdst = -1; // make sure mktime check local dst time
+  res.tm_isdst = -1;  // make sure mktime check local dst time
 #ifndef _WIN32
   auto *p = strptime(arg_timestr, arg_fmt, &res);
   if (p == nullptr) {

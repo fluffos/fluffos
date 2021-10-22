@@ -1881,7 +1881,7 @@ void f_zonetime(void) {
 #ifdef F_IS_DAYLIGHT_SAVINGS_TIME
 void f_is_daylight_savings_time(void) {
   time_t time_to_check = sp->u.number;
-  const char *new_tz = (sp -1)->u.string;
+  const char *new_tz = (sp - 1)->u.string;
   const char *old_tz = set_timezone(new_tz);
 
   if (time_to_check < 0) {

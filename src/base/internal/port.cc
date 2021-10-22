@@ -80,14 +80,13 @@ char *get_current_dir(char *buf, int limit) { return getcwd(buf, limit); /* POSI
 
 /* jemalloc stub, this function can't otherwise be replaced */
 #ifdef HAVE_JEMALLOC
-char *strdup(const char *str)
-{
+char *strdup(const char *str) {
   if (!str) {
     errno = EINVAL;
     return NULL;
   }
   size_t ln = strlen(str);
-  void *p = malloc(ln+1);
+  void *p = malloc(ln + 1);
   return static_cast<char *>(memcpy(p, str, ln + 1));
 }
 #endif
