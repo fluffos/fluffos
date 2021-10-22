@@ -111,7 +111,9 @@ class EGCIterator {
 
   static BreakIteratorPool::item_type GetBreakIterator() { return pool()->accquire(); }
 
-  EGCIterator(const char* src, int32_t slen) : src_(src), len_(slen), brk_(GetBreakIterator()) { reset(src, slen); }
+  EGCIterator(const char* src, int32_t slen) : src_(src), len_(slen), brk_(GetBreakIterator()) {
+    reset(src, slen);
+  }
 
   ~EGCIterator() {
     if (this->ok()) {

@@ -669,8 +669,7 @@ void f_range(int code) {
           from = len;
         } else {
           from = iter.index_to_offset(-1 * from);
-          if (from < 0)
-            from = 0;
+          if (from < 0) from = 0;
         }
       } else {
         if (from < 0) {
@@ -680,10 +679,9 @@ void f_range(int code) {
         }
       }
 
-      if (
-          (from < 0 || to < 0) /* invalid range */
-          || (to < from) /* empty range */
-          ) {
+      if ((from < 0 || to < 0) /* invalid range */
+          || (to < from)       /* empty range */
+      ) {
         pop_3_elems();
         push_constant_string("");
         return;
@@ -792,7 +790,7 @@ void f_extract_range(int code) {
         offset = from < 0 ? 0 : iter.index_to_offset(from);
       }
       if (code && from > 0 && offset < 0) {
-        if (from > (int32_t) iter.count()) {
+        if (from > (int32_t)iter.count()) {
           offset = 0;
         }
       }
