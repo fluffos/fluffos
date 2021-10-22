@@ -24,7 +24,7 @@ jobs:
       - name: Install packages
         run: |
           sudo apt update
-          sudo apt install -y build-essential clang-6.0 autoconf automake bison expect libevent-dev libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
+          sudo apt install -y build-essential clang-6.0 autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
       - name: configure
         run: |
           mkdir build

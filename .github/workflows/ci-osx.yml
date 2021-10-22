@@ -24,7 +24,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Install packages
-      run: brew install cmake pkg-config pcre libgcrypt libevent openssl jemalloc icu4c mysql-client sqlite3
+      run: brew install cmake pkg-config pcre libgcrypt openssl jemalloc icu4c mysql-client sqlite3
     - name: compile
       run: mkdir build && cd build &&  cmake -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DPACKAGE_DB_SQLITE=2 .. && make -j 2 install && cd ..
       env:
