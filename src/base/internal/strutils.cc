@@ -493,7 +493,7 @@ size_t u8_width(const char *src, int len) {
     if (width > 0) {
       total += width;
     } else if (width == widechar_ambiguous) {
-      total += 2;
+      total += 1;
     }
     if (len > 0 && src_offset >= len) break;
   }
