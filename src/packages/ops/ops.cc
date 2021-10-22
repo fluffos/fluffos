@@ -630,21 +630,30 @@ void f_range(int code) {
       to = (sp - 1)->u.number;
       from = (sp - 2)->u.number;
 
+      if (CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
+        if (to < 0 && !(code & 0x01)) {
+          code |= 0x01;
+          to = to * -1;
+        }
+        if (from < 0 && !(code & 0x10)) {
+          code |= 0x10;
+          from = from * -1;
+        }
+      }
+
       // Notes:
       // ranges with indexes which are out of bounds do not give an error.
       // Instead if a maximal subrange can be found within the range requested
       // that lies within the bounds of the indexed value, it will be used.
       if (code & 0x01) {
-        if (to < 0) {
+        if (to <= 0) {
           to = len;
         } else {
           to = iter.post_index_to_offset(-1 * to);
         }
       } else {
         if (to < 0) {
-          if (CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
-            to = iter.post_index_to_offset(to);
-          }
+          to = -1;
         } else {
           auto pos = iter.post_index_to_offset(to);
           if (pos > 0) {
@@ -656,18 +665,16 @@ void f_range(int code) {
       }
 
       if (code & 0x10) {
-        if (from < 0) {
+        if (from <= 0) {
           from = len;
         } else {
           from = iter.index_to_offset(-1 * from);
+          if (from < 0)
+            from = 0;
         }
       } else {
         if (from < 0) {
-          if (CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
-              from = iter.index_to_offset(from);
-          } else {
-            from = 0;
-          }
+          from = 0;
         } else {
           from = iter.index_to_offset(from);
         }
@@ -771,17 +778,21 @@ void f_extract_range(int code) {
         error("Invalid UTF-8 String: f_extract_range.");
       }
       from = (--sp)->u.number;
-      if (!CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
-        if (from < 0) {
-          from = 0;
+      if (CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
+        if (!code && from < 0) {
+          code = 1;
+          from = -1 * from;
         }
       }
+
+      int offset;
       if (code) {
-        from = -1 * from;
+        offset = from <= 0 ? -1 : iter.index_to_offset(-1 * from);
+      } else {
+        offset = from < 0 ? 0 : iter.index_to_offset(from);
       }
-      auto offset = iter.index_to_offset(from);
-      if (code && offset < 0) {
-        if ((-1 * from) > (int32_t) iter.count()) {
+      if (code && from > 0 && offset < 0) {
+        if (from > (int32_t) iter.count()) {
           offset = 0;
         }
       }
