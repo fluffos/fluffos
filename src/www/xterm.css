@@ -36,7 +36,6 @@
  */
 
 .xterm {
-  font-feature-settings: "liga" 0;
   position: relative;
   user-select: none;
   -ms-user-select: none;
@@ -59,10 +58,10 @@
 }
 
 .xterm .xterm-helper-textarea {
-  /*
-   * HACK: to fix IE's blinking cursor
-   * Move textarea out of the screen to the far left, so that the cursor is not visible.
-   */
+  padding: 0;
+  border: 0;
+  margin: 0;
+  /* Move textarea out of the screen to the far left, so that the cursor is not visible */
   position: absolute;
   opacity: 0;
   left: -9999em;
@@ -168,4 +167,8 @@
 
 .xterm-underline {
   text-decoration: underline;
+}
+
+.xterm-strikethrough {
+  text-decoration: line-through;
 }

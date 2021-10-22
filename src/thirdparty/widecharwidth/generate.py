@@ -7,21 +7,22 @@ import hashlib
 import os.path
 import re
 import sys
+
 try:
-  #python3
+  # python3
   from urllib.request import urlretrieve
 except ImportError:
   from urllib import urlretrieve
 try:
-  #python3
+  # python3
   xrange
 except NameError:
   xrange = range
 
-VERSION = "13.0.0"
+VERSION = "14.0.0"
 UNICODE_DATA_URL = 'https://unicode.org/Public/%s/ucd/UnicodeData.txt' % VERSION
 EAW_URL = 'https://unicode.org/Public/%s/ucd/EastAsianWidth.txt' % VERSION
-EMOJI_DATA_URL = 'https://unicode.org/Public/emoji/13.0/emoji-data.txt'
+EMOJI_DATA_URL = 'https://unicode.org/Public/%s/ucd/emoji/emoji-data.txt' % VERSION
 
 # A handful of field names
 # See https://www.unicode.org/L2/L1999/UnicodeData.html
@@ -44,6 +45,7 @@ MAX_CODEPOINT = 0x110000
 CPP_PREFIX = 'widechar_'
 
 OUTPUT_FILENAME = 'widechar_width.h'
+OUTPUT_FILENAME_JS = 'widechar_width.js'
 
 OUTPUT_TEMPLATE = r'''
 /**
@@ -73,7 +75,6 @@ enum {{
   {p}ambiguous = -3,    // The character is East-Asian ambiguous width.
   {p}private_use = -4,  // The character is for private use.
   {p}unassigned = -5,   // The character is unassigned.
-  {p}widened_in_9 = -6  // Width is 1 in Unicode 8, 2 in Unicode 9+.
 }};
 
 /* An inclusive range of characters. */
@@ -118,11 +119,6 @@ static const struct {p}range {p}unassigned_table[] = {{
     {unassigned}
 }};
 
-/* Characters that were widened from with 1 to 2 in Unicode 9. */
-static const struct {p}range {p}widened_table[] = {{
-    {widenedin9}
-}};
-
 template<typename Collection>
 bool {p}in_table(const Collection &arr, int32_t c) {{
     auto where = std::lower_bound(std::begin(arr), std::end(arr), c,
@@ -146,8 +142,6 @@ int {p}wcwidth(int32_t c) {{
         return {p}ambiguous;
     if ({p}in_table({p}unassigned_table, c))
         return {p}unassigned;
-    if ({p}in_table({p}widened_table, c))
-        return {p}widened_in_9;
     return 1;
 }}
 
@@ -155,14 +149,110 @@ int {p}wcwidth(int32_t c) {{
 #endif // WIDECHAR_WIDTH_H
 '''
 
+OUTPUT_TEMPLATE_JS = r'''
+/*
+ * {filename}, generated on {today}.
+ * See https://github.com/ridiculousfish/widecharwidth/
+ *
+ * SHA1 file hashes:
+ *  UnicodeData.txt:     {unicode_hash}
+ *  EastAsianWidth.txt:  {eaw_hash}
+ *  emoji-data.txt:      {emoji_hash}
+ */
+
+/* Special width values */
+const {p}nonprint = -1;     // The character is not printable.
+const {p}combining = -2;    // The character is a zero-width combiner.
+const {p}ambiguous = -3;    // The character is East-Asian ambiguous width.
+const {p}private_use = -4;  // The character is for private use.
+const {p}unassigned = -5;   // The character is unassigned.
+
+/* Simple ASCII characters - used a lot, so we check them first. */
+const {p}ascii_table = [
+    {ascii}
+];
+
+/* Private usage range. */
+const {p}private_table = [
+    {private}
+];
+
+/* Nonprinting characters. */
+const {p}nonprint_table = [
+    {nonprint}
+];
+
+/* Width 0 combining marks. */
+const {p}combining_table = [
+    {combining}
+];
+
+/* Width.2 characters. */
+const {p}doublewide_table = [
+    {doublewide}
+];
+
+/* Ambiguous-width characters. */
+const {p}ambiguous_table = [
+    {ambiguous}
+];
+
+/* Unassigned characters. */
+const {p}unassigned_table = [
+    {unassigned}
+];
+
+// BMP lookup table, lazy initialized during first addon loading
+let table;
+function {p}in_table(data, ucs) {{
+    let min = 0;
+    let max = data.length - 1;
+    let mid;
+    if (ucs < data[0][0] || ucs > data[max][1])
+        return false;
+
+    while (max >= min) {{
+        mid = (min + max) >> 1;
+        if (ucs > data[mid][1]) {{
+            min = mid + 1;
+        }}
+        else if (ucs < data[mid][0]) {{
+            max = mid - 1;
+        }}
+        else {{
+            return true;
+        }}
+    }}
+    return false;
+}}
+
+/* Return the width of character c, or a special negative value. */
+function {p}wcwidth(c) {{
+    if ({p}in_table({p}ascii_table, c))
+        return 1;
+    if ({p}in_table({p}private_table, c))
+        return {p}private_use;
+    if ({p}in_table({p}nonprint_table, c))
+        return {p}nonprint;
+    if ({p}in_table({p}combining_table, c))
+        return {p}combining;
+    if ({p}in_table({p}doublewide_table, c))
+        return 2;
+    if ({p}in_table({p}ambiguous_table, c))
+        return {p}ambiguous;
+    if ({p}in_table({p}unassigned_table, c))
+        return {p}unassigned;
+    return 1;
+}}
+'''
+
 # Ambiguous East Asian characters
 WIDTH_AMBIGUOUS_EASTASIAN = -3
 
-# Width changed from 1 to 2 in Unicode 9.0
-WIDTH_WIDENED_IN_9 = -6
 
-class CodePoint(object): # pylint: disable=too-few-public-methods
+class CodePoint(object):  # pylint: disable=too-few-public-methods
   """ Represents a single Unicode codepoint """
+
   def __init__(self, codepoint):
     self.codepoint = codepoint
     self.width = None
@@ -231,14 +321,16 @@ def gen_seps(length):
     else:
       yield ', '
 
+RANGE_CHARS = ('{', '}')
 
 def codepoints_to_carray_str(cps):
+  global RANGE_CHARS
   """ Given a list of codepoints, return a C array string representing their inclusive ranges. """
   result = ''
   ranges = merged_codepoints(cps)
   seps = gen_seps(len(ranges))
   for (start, end) in ranges:
-    result += '{%s, %s}%s' % (start.hex(), end.hex(), next(seps))
+    result += '%s%s, %s%s%s' % (RANGE_CHARS[0], start.hex(), end.hex(), RANGE_CHARS[1], next(seps))
   return result
 
 
@@ -263,7 +355,7 @@ def parse_eaw_line(eaw_line):
   cps, width_type = fields
   # width_types:
   #  A: ambiguous, F: fullwidth, H: halfwidth,
-  #. N: neutral, Na: east-asian Narrow
+  # . N: neutral, Na: east-asian Narrow
   if width_type == 'A':
     width = WIDTH_AMBIGUOUS_EASTASIAN
   elif width_type in ['F', 'W']:
@@ -327,7 +419,8 @@ def set_emoji_widths(emoji_data_lines, cps):
       # in the emoji-data file as reserved/unused:
       if cp >= 0x1F000:
         if version > 1.0:
-          cps[cp].width = 2 if version >= 9.0 else WIDTH_WIDENED_IN_9
+          cps[cp].width = 2
+
 
 def set_hardcoded_ranges(cps):
   """ Mark private use and surrogate codepoints """
@@ -337,12 +430,12 @@ def set_hardcoded_ranges(cps):
   # so as to match wcwidth9().
   private_ranges = [(0xE000, 0xF8FF), (0xF0000, 0xFFFFD), (0x100000, 0x10FFFD)]
   for (first, last) in private_ranges:
-    for idx in xrange(first, last+1):
+    for idx in xrange(first, last + 1):
       cps[idx].category = CAT_PRIVATE_USE
 
   surrogate_ranges = [(0xD800, 0xDBFF), (0xDC00, 0xDFFF)]
   for (first, last) in surrogate_ranges:
-    for idx in xrange(first, last+1):
+    for idx in xrange(first, last + 1):
       cps[idx].category = CAT_SURROGATE
 
 
@@ -356,7 +449,7 @@ def generate():
   log("Thinking...")
 
   # Generate a CodePoint for each value.
-  cps = [CodePoint(i) for i in xrange(MAX_CODEPOINT+1)]
+  cps = [CodePoint(i) for i in xrange(MAX_CODEPOINT + 1)]
 
   set_general_categories(unicode_data, cps)
   set_eaw_widths(eaw_data, cps)
@@ -379,25 +472,33 @@ def generate():
     return codepoints_to_carray_str([cp for cp in cps if cp.codepoint < 0x7F and cp.codepoint >= 0x20])
 
   fields = {
-      'p': CPP_PREFIX,
-      'filename': OUTPUT_FILENAME,
-      'today': str(datetime.date.today()),
-      'unicode_hash': unicode_hash,
-      'eaw_hash': eaw_hash,
-      'emoji_hash': emoji_hash,
-      'ascii': ascii_codepoints(),
-      'private': categories([CAT_PRIVATE_USE]),
-      'nonprint': categories(['Cc', 'Cf', 'Zl', 'Zp', CAT_SURROGATE]),
-      'combining': categories(['Mn', 'Mc', 'Me']),
-      'doublewide': codepoints_with_width(2),
-      'unassigned': categories([CAT_UNASSIGNED]),
-      'ambiguous': codepoints_with_width(WIDTH_AMBIGUOUS_EASTASIAN),
-      'widenedin9': codepoints_with_width(WIDTH_WIDENED_IN_9),
+    'p': CPP_PREFIX,
+    'filename': OUTPUT_FILENAME,
+    'today': str(datetime.date.today()),
+    'unicode_hash': unicode_hash,
+    'eaw_hash': eaw_hash,
+    'emoji_hash': emoji_hash,
+    'ascii': ascii_codepoints(),
+    'private': categories([CAT_PRIVATE_USE]),
+    'nonprint': categories(['Cc', 'Cf', 'Zl', 'Zp', CAT_SURROGATE]),
+    'combining': categories(['Mn', 'Mc', 'Me']),
+    'doublewide': codepoints_with_width(2),
+    'unassigned': categories([CAT_UNASSIGNED]),
+    'ambiguous': codepoints_with_width(WIDTH_AMBIGUOUS_EASTASIAN),
   }
-  return OUTPUT_TEMPLATE.strip().format(**fields)
+  return fields
+
 
 if __name__ == '__main__':
+  fields = generate()
   with open(OUTPUT_FILENAME, 'w') as fd:
-    fd.write(generate())
+    fd.write(OUTPUT_TEMPLATE.strip().format(**fields))
     fd.write('\n')
   log("Output " + OUTPUT_FILENAME)
+
+  RANGE_CHARS = ('[', ']')
+  fields = generate()
+  with open(OUTPUT_FILENAME_JS, 'w') as fd:
+    fd.write(OUTPUT_TEMPLATE_JS.strip().format(**fields))
+    fd.write('\n')
+  log("Output " + OUTPUT_FILENAME_JS)
