@@ -26,7 +26,7 @@ jobs:
     - name: Install packages
       run: |
         sudo apt update
-        sudo apt install -y build-essential autoconf automake bison expect libevent-dev libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev libdw-dev
+        sudo apt install -y build-essential autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev libdw-dev
         sudo apt remove libgcc-11-dev gcc-11
     - name: compile
       env: ${{ matrix.compiler }}
