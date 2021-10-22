@@ -1363,6 +1363,13 @@ static int get_text_block(char *term) {
       if (c == '\n') {
         current_line++;
       }
+      if (len > 0) {
+        // Remove trailing CR
+        if (text_line[curchunk][len - 1] == '\r') {
+          text_line[curchunk][len - 1] = '\0';
+          len = len - 1;
+        }
+      }
       /*
        * make sure there's room in the current chunk for terminator (ie
        * it's simpler if we don't have to deal with a terminator that
@@ -1378,11 +1385,6 @@ static int get_text_block(char *term) {
         text_line[++curchunk] =
             reinterpret_cast<char *>(DMALLOC(MAXCHUNK, TAG_COMPILER, "text_block"));
         len = 0;
-      }
-      // Remove trailing CR
-      if (text_line[curchunk][len - 1] == '\r') {
-        text_line[curchunk][len - 1] = '\0';
-        len = len - 1;
       }
       /*
        * header
