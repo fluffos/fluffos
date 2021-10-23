@@ -492,6 +492,10 @@ size_t u8_width(const char *src, int len) {
     auto width = widechar_wcwidth(c);
     if (width > 0) {
       total += width;
+    } else if (width == widechar_widened_in_9) {
+      total += 2;
+    } else if (width == widechar_private_use) {
+      total += 1;
     } else if (width == widechar_ambiguous) {
       total += 1;
     }
