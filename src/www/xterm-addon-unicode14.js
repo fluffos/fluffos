@@ -5,6 +5,8 @@ const UnicodeV14 = /** @class */ (function () {
 
   UnicodeV14.prototype.wcwidth = function (num) {
     let x = widechar_wcwidth(num);
+    if (x === widechar_widened_in_9) x = 2;
+    if (x === widechar_private_use) x = 1;
     if (x === widechar_ambiguous) x = 1;
     if (x < 0) x = 0;
     return x;
