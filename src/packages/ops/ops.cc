@@ -658,8 +658,10 @@ void f_range(int code) {
           auto pos = iter.post_index_to_offset(to);
           if (pos > 0) {
             to = pos;
-          } else if (pos == -1 && to > iter.count()) {
+          } else if (pos == -1 && to >= iter.count()) {
             to = len;
+          } else {
+            to = -1;
           }
         }
       }
