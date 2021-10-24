@@ -1268,6 +1268,11 @@ void do_tests() {
   ASSERT_EQ("🧮😊", "🍆🍠🧮😊👌💩"[2..3]);
   ASSERT_EQ("👌💩", "🍆🍠🧮😊👌💩"[<2..<1]);
 
+  // overflow range
+  ASSERT_EQ("黄河入海流", "黄河入海流"[0..5]);
+  ASSERT_EQ("黄河入海流", "黄河入海流"[0..999]);
+  ASSERT_EQ("黄河入海流", "黄河入海流"[<999..999]);
+
   // range operator for arrays
   ASSERT_EQ(text5[7..8], text5[<10..8]);
 
