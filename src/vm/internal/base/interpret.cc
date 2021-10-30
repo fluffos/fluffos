@@ -529,6 +529,7 @@ refed_t *lv_owner;
 static struct {
   int32_t index;
   svalue_t *owner;
+  std::unique_ptr<EGCSmartIterator> iter;
 } global_lvalue_codepoint;
 static svalue_t global_lvalue_codepoint_sv = {T_LVALUE_CODEPOINT};
 
@@ -581,6 +582,7 @@ void push_indexed_lvalue(int reverse) {
         sp->u.lvalue = &global_lvalue_codepoint_sv;
         global_lvalue_codepoint.index = ind;
         global_lvalue_codepoint.owner = lv;
+        global_lvalue_codepoint.iter = std::make_unique<EGCSmartIterator>(lv->u.string, SVALUE_STRLEN(lv));
 #ifdef REF_RESERVED_WORD
         lv_owner_type = T_STRING;
         lv_owner = (refed_t *)lv->u.string;
@@ -934,9 +936,11 @@ void copy_lvalue_range(svalue_t *from) {
 template <typename F>
 void assign_lvalue_codepoint(F &&func) {
   {
+    auto pos = global_lvalue_codepoint.index;
+
     UChar32 c = u8_egc_index_as_single_codepoint(global_lvalue_codepoint.owner->u.string,
                                                  SVALUE_STRLEN(global_lvalue_codepoint.owner),
-                                                 global_lvalue_codepoint.index);
+                                                 pos);
     if (c < 0) {
       error("Invalid string index, multi-codepoint character.\n");
     }
@@ -954,14 +958,15 @@ void assign_lvalue_codepoint(F &&func) {
     }
     auto res = new_string(SVALUE_STRLEN(global_lvalue_codepoint.owner) - old_len + new_len,
                           "assign_lvalue_codepoint");
-    u8_copy_and_replace_codepoint_at(global_lvalue_codepoint.owner->u.string,
-                                     SVALUE_STRLEN(global_lvalue_codepoint.owner), res,
-                                     global_lvalue_codepoint.index, c);
+    u8_copy_and_replace_codepoint_at(*global_lvalue_codepoint.iter, res, pos, c);
 
     free_string_svalue(global_lvalue_codepoint.owner);
 
     global_lvalue_codepoint.owner->u.string = res;
     global_lvalue_codepoint.owner->subtype = STRING_MALLOC;
+    global_lvalue_codepoint.iter = std::make_unique<EGCSmartIterator>(
+        global_lvalue_codepoint.owner->u.string,
+        SVALUE_STRLEN(global_lvalue_codepoint.owner));
   }
 }
 
@@ -2577,14 +2582,13 @@ void eval_instruction(char *p) {
         } else if (sp->type == T_STRING) {
           STACK_INC;
           sp->type = T_NUMBER;
-          global_lvalue_codepoint.index = -1;
+          global_lvalue_codepoint.index = 0;
           global_lvalue_codepoint.owner = sp - 1;
-          EGCSmartIterator iter((sp - 1)->u.string, SVALUE_STRLEN((sp - 1)));
-          if (!iter.ok()) {
+          global_lvalue_codepoint.iter = std::make_unique<EGCSmartIterator>(
+              (sp - 1)->u.string, SVALUE_STRLEN((sp - 1)));
+          if (!global_lvalue_codepoint.iter->ok()) {
             error("f_foreach: Invalid utf-8 string.");
           }
-          size_t count = iter.count();
-          sp->subtype = count;
         } else {
           CHECK_TYPES(sp, T_ARRAY, 2, F_FOREACH);
 
@@ -2646,28 +2650,34 @@ void eval_instruction(char *p) {
             pc -= offset;
             break;
           }
-        } else {
-          /* array or string */
-          if ((sp - 1)->subtype--) {
-            if ((sp - 2)->type == T_STRING) {
+        } else if ((sp - 2)->type == T_STRING) { /* string */
+            auto pos = global_lvalue_codepoint.iter->post_index_to_offset(global_lvalue_codepoint.index);
+            if (pos > 0) {
               if (sp->type == T_REF) {
                 sp->u.ref->lvalue = &global_lvalue_codepoint_sv;
-                global_lvalue_codepoint.index++;
               } else {
                 free_svalue(sp->u.lvalue, "foreach-string");
                 sp->u.lvalue->type = T_NUMBER;
                 sp->u.lvalue->subtype = 0;
                 sp->u.lvalue->u.number = u8_egc_index_as_single_codepoint(
                     global_lvalue_codepoint.owner->u.string,
-                    SVALUE_STRLEN(global_lvalue_codepoint.owner), global_lvalue_codepoint.index++);
+                    SVALUE_STRLEN(global_lvalue_codepoint.owner), global_lvalue_codepoint.index);
               }
-            } else {
-              if (sp->type == T_REF) {
-                sp->u.ref->lvalue = (sp - 1)->u.lvalue++;
-              } else {
-                assign_svalue(sp->u.lvalue, (sp - 1)->u.lvalue++);
-              }
+              global_lvalue_codepoint.index++;
+
+              COPY_SHORT(&offset, pc);
+              pc -= offset;
+              break;
             }
+          } else { /* array */
+          if ((sp - 1)->subtype--) {
+            if (sp->type == T_REF) {
+              sp->u.ref->lvalue = (sp - 1)->u.lvalue;
+            } else {
+              assign_svalue(sp->u.lvalue, (sp - 1)->u.lvalue);
+            }
+            (sp - 1)->u.lvalue++;
+
             COPY_SHORT(&offset, pc);
             pc -= offset;
             break;
@@ -2685,6 +2695,7 @@ void eval_instruction(char *p) {
 
             global_lvalue_codepoint.index = 0;
             global_lvalue_codepoint.owner = nullptr;
+            global_lvalue_codepoint.iter.reset();
           } else {
             sp->u.ref->lvalue = nullptr;
           }
@@ -2703,6 +2714,10 @@ void eval_instruction(char *p) {
           sp -= 2;
           if (sp->type == T_STRING) {
             free_string_svalue(sp--);
+
+            global_lvalue_codepoint.index = 0;
+            global_lvalue_codepoint.owner = nullptr;
+            global_lvalue_codepoint.iter.reset();
           } else {
             free_array((sp--)->u.arr);
           }
