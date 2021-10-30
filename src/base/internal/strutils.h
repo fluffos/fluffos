@@ -185,8 +185,7 @@ class EGCSmartIterator : public EGCIterator {
 bool u8_validate(const char *);
 bool u8_validate(const uint8_t *, size_t);
 UChar32 u8_egc_index_as_single_codepoint(const char *, int32_t, int32_t);
-void u8_copy_and_replace_codepoint_at(const char *src, int32_t, char *dst, int32_t index,
-                                      UChar32 c);
+void u8_copy_and_replace_codepoint_at(EGCSmartIterator &iter, char *dst, int32_t index, UChar32 c);
 int32_t u8_offset_to_egc_index(EGCIterator &iter, int32_t offset);
 int32_t u8_strncpy(uint8_t *, const uint8_t *, const int32_t);
 size_t u8_truncate(const uint8_t *, size_t);

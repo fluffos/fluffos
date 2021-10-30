@@ -2,6 +2,7 @@ void do_tests() {
   int* x = ({1, 2, 3, 4});
   int* x_orig = ({1, 2, 3, 4});
   int count = 0;
+  string str = "abcdefg";
 
   foreach(int i in x) {
     count++;
@@ -32,4 +33,23 @@ void do_tests() {
 
     ASSERT_EQ(sizeof(tmp), count);
   }
+
+  {
+    string tmp = "";
+
+    foreach(int c in str) {
+      tmp += sprintf("%c", c);
+    }
+
+    ASSERT_EQ(tmp, str);
+  }
+
+  {
+    foreach(int ref c in str) {
+      c++;
+    }
+
+    ASSERT_EQ("abcdefg", str); // not suppose to change
+  }
+
 }
