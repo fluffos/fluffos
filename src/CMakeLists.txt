@@ -71,8 +71,9 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL
   # Sanitizer support
   if (ENABLE_SANITIZER)
     add_compile_options("-fsanitize=address,undefined")
+    add_compile_options("-fno-common")
     # add_linker_options is only avaiable cmake 3.13
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address,undefined")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address,undefined -fno-common")
   else ()
     add_compile_options(
       "-D_FORTIFY_SOURCE=2"
