@@ -111,8 +111,7 @@ UChar32 u8_egc_index_as_single_codepoint(const char *src, int32_t src_len, int32
 }
 
 // Copy string src to dest, replacing character at index to c. Assuming dst is already allocated.
-void u8_copy_and_replace_codepoint_at(EGCSmartIterator &iter, char *dst, int32_t index,
-                                      UChar32 c) {
+void u8_copy_and_replace_codepoint_at(EGCSmartIterator &iter, char *dst, int32_t index, UChar32 c) {
   if (!iter.ok()) return;
 
   const char *src = iter.data();
