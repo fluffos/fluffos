@@ -2029,6 +2029,10 @@ void eval_instruction(char *p) {
         svalue_t *s = fp + EXTRACT_UCHAR(pc++);
         svalue_t *reflval = nullptr;
 
+        if (s->type != T_REF) {
+          error("Reference is invalid.\n");
+        }
+
         {
           reflval = s->u.ref->lvalue;
           if (!reflval) {
