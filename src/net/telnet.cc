@@ -25,6 +25,7 @@ static const telnet_telopt_t my_telopts[] = {{TELNET_TELOPT_TM, TELNET_WILL, TEL
                                              {TELNET_TELOPT_ZMP, TELNET_WILL, TELNET_DO},
                                              {TELNET_TELOPT_MSSP, TELNET_WILL, TELNET_DO},
                                              {TELNET_TELOPT_GMCP, TELNET_WILL, TELNET_DO},
+                                             {TELNET_TELOPT_CHARSET, TELNET_WILL, TELNET_DO},
                                              {-1, 0, 0}};
 
 // Telnet event handler
@@ -159,6 +160,9 @@ static inline void on_telnet_wont(unsigned char cmd, interactive_t *ip) {
 
 static inline void on_telnet_do(unsigned char cmd, interactive_t *ip) {
   switch (cmd) {
+    case TELNET_TELOPT_CHARSET :
+      telnet_send_utf8(ip->telnet) ;
+      break ;
     case TELNET_TELOPT_TM:
       telnet_negotiate(ip->telnet, TELNET_WILL, TELNET_TELOPT_TM);
       break;
@@ -494,6 +498,8 @@ void send_initial_telnet_negotiations(struct interactive_t *user) {
   if (CONFIG_INT(__RC_ENABLE_MSSP__)) {
     telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_MSSP);
   }
+
+  telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_CHARSET) ;
 }
 
 void set_linemode(interactive_t *ip, bool flush) {

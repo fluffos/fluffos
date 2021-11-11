@@ -140,6 +140,7 @@ typedef struct telnet_telopt_t telnet_telopt_t;
 #define TELNET_TELOPT_AUTHENTICATION 37
 #define TELNET_TELOPT_ENCRYPT 38
 #define TELNET_TELOPT_NEW_ENVIRON 39
+#define TELNET_TELOPT_CHARSET 42
 #define TELNET_TELOPT_MSSP 70
 #define TELNET_TELOPT_COMPRESS 85
 #define TELNET_TELOPT_COMPRESS2 86
@@ -631,6 +632,8 @@ extern void telnet_ttype_send(telnet_t *telnet);
  */
 extern void telnet_ttype_is(telnet_t *telnet, const char* ttype);
 
+extern void telnet_send_utf8(telnet_t *telnet) ;
+
 /*!
  * \brief Send a ZMP command.
  *
@@ -689,3 +692,4 @@ extern void telnet_zmp_arg(telnet_t *telnet, const char *arg);
 #endif
 
 #endif /* !defined(LIBTELNET_INCLUDE) */
+
