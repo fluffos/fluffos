@@ -161,7 +161,7 @@ static inline void on_telnet_wont(unsigned char cmd, interactive_t *ip) {
 static inline void on_telnet_do(unsigned char cmd, interactive_t *ip) {
   switch (cmd) {
     case TELNET_TELOPT_CHARSET :
-      telnet_send_utf8(ip->telnet) ;
+      on_telnet_do_charset(ip->telnet) ;
       break ;
     case TELNET_TELOPT_TM:
       telnet_negotiate(ip->telnet, TELNET_WILL, TELNET_TELOPT_TM);
@@ -613,4 +613,13 @@ void on_telnet_do_zmp(const char **argv, unsigned long argc, interactive_t *ip) 
 
   set_eval(max_eval_cost);
   safe_apply(APPLY_ZMP, ip->ob, 2, ORIGIN_DRIVER);
+}
+
+/* send CHARSET OF UTF-8 command */
+void on_telnet_do_charset(telnet_t *telnet) {
+	const char utf8[] = { 1, ';', 'U', 'T', 'F', '-', '8', } ;
+
+	telnet_begin_sb(telnet, TELNET_TELOPT_CHARSET) ;
+  telnet_send(telnet, utf8, sizeof(utf8));
+	telnet_finish_sb(telnet) ;
 }

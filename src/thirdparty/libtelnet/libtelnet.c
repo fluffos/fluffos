@@ -1667,12 +1667,3 @@ void telnet_begin_zmp(telnet_t *telnet, const char *cmd) {
 void telnet_zmp_arg(telnet_t *telnet, const char* arg) {
 	telnet_send(telnet, arg, strlen(arg) + 1);
 }
-
-/* send CHARSET OF UTF-8 command */
-void telnet_send_utf8(telnet_t *telnet) {
-	static const unsigned char utf8[] = { 1, ';', 'U', 'T', 'F', '-', '8', } ;
-
-	telnet_begin_sb(telnet, TELNET_TELOPT_CHARSET) ;
-	_sendu(telnet, utf8, sizeof(utf8)) ;
-	telnet_finish_sb(telnet) ;
-}
