@@ -631,8 +631,6 @@ extern void telnet_ttype_send(telnet_t *telnet);
  */
 extern void telnet_ttype_is(telnet_t *telnet, const char* ttype);
 
-extern void telnet_send_utf8(telnet_t *telnet) ;
-
 /*!
  * \brief Send a ZMP command.
  *
