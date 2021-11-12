@@ -5,7 +5,7 @@ title: interactive / telnet_ga
 
 ### NAME
 
-    telnet_nop() - send an TELNET GA message
+    telnet_ga() - send an TELNET GA message
 
 ### SYNOPSIS
 
