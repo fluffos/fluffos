@@ -689,4 +689,3 @@ extern void telnet_zmp_arg(telnet_t *telnet, const char *arg);
 #endif
 
 #endif /* !defined(LIBTELNET_INCLUDE) */
-
