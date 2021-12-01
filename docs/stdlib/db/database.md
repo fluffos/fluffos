@@ -188,9 +188,11 @@ users = db->table("users")->whereNotBetween("age", ({14, 18}))->get();
 
 #### whereIn / whereNotIn / orWhereIn / orWhereNotIn
 
-> Not yet implemented!
-
 The `whereIn` method verifies that a given column's value is contained within the given array. The `whereNotIn` method verifies that the given column's value is not contained in the given array.
+
+```c
+users = db->table("users")->whereIn("age", ({14, 18, 24, 30}))->get();
+```
 
 #### whereNull / orWhereNull / whereNotNull / orWhereNotNull
 
