@@ -9,6 +9,7 @@ option(PACKAGE_COMPRESS "compress package" ON)
 option(PACKAGE_CONTRIB "contrib package" ON)
 # PACKAGE CORE should always be on
 set(PACKAGE_CORE ON)
+option(PACKAGE_CURL "curl package" ON)
 option(PACKAGE_CRYPTO "crypto package" ON)
 option(PACKAGE_DB "db package" ON)
 set(PACKAGE_DB_MYSQL "1" CACHE STRING "DB Type for Mysql")
