@@ -137,71 +137,63 @@ LPC_INT do_curl(LPC_STRING url, mapping_t *headersArg = nullptr, const std::func
 
 #ifdef F_CURL_GET
 void f_curl_get(void) {
-
   LPC_STRING url;
   mapping_t *headers = nullptr;
-
   int num_arg = st_num_arg;
+
+  CHECK_TYPES(sp, T_STRING, 0, F_CURL_GET);
 
   url = (sp - num_arg + 1)->u.string;
 
   if (num_arg > 1) {
-    if ((sp - num_arg + 3)->type != T_MAPPING) {
-      pop_n_elems(num_arg);
-      push_number(0);
-      return;
-    }
+    CHECK_TYPES(sp, T_MAPPING, 1, F_CURL_GET);
 
-    headers = (sp - num_arg + 3)->u.map;
+    headers = (sp - num_arg + 2)->u.map;
   }
 
-  pop_n_elems(num_arg);
-
   auto result_id = do_curl(url, headers);
+
+  pop_n_elems(num_arg);
   push_number(result_id);
 }
 #endif
 
 #ifdef F_CURL_POST
 void f_curl_post(void) {
-  CURLcode res;
-
   LPC_STRING url;
   LPC_STRING data;
   mapping_t *headers = nullptr;
-
   int num_arg = st_num_arg;
+
+  CHECK_TYPES(sp, T_STRING, 0, F_CURL_POST);
 
   url = (sp - num_arg + 1)->u.string;
 
   if (num_arg > 1) {
+    CHECK_TYPES(sp, T_STRING, 1, F_CURL_POST);
     data = (sp - num_arg + 2)->u.string;
   }
 
   if (num_arg > 2) {
-    if ((sp - num_arg + 3)->type != T_MAPPING) {
-      pop_n_elems(num_arg);
-      push_number(0);
-      return;
-    }
-
+    CHECK_TYPES(sp, T_MAPPING, 2, F_CURL_POST);
     headers = (sp - num_arg + 3)->u.map;
   }
-
-  pop_n_elems(num_arg);
 
   auto result_id = do_curl(url, headers, [data](CURL *curl) {
       curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
   });
 
+  pop_n_elems(num_arg);
   push_number(result_id);
 }
 #endif
 
 #ifdef F_CURL_GET_STATUS_CODE
 void f_curl_get_status_code(void) {
-  int num_arg = st_num_arg;
   LPC_INT result_id;
+  int num_arg = st_num_arg;
+
+  CHECK_TYPES(sp, T_NUMBER, 0, F_CURL_GET_STATUS_CODE);
 
   result_id = (sp - num_arg + 1)->u.number;
 
@@ -219,8 +211,10 @@ void f_curl_get_status_code(void) {
 
 #ifdef F_CURL_GET_STATUS_MESSAGE
 void f_curl_get_status_message(void) {
-  int num_arg = st_num_arg;
   LPC_INT result_id;
+  int num_arg = st_num_arg;
+
+  CHECK_TYPES(sp, T_NUMBER, 0, F_CURL_GET_STATUS_MESSAGE);
 
   result_id = (sp - num_arg + 1)->u.number;
 
@@ -238,8 +232,10 @@ void f_curl_get_status_message(void) {
 
 #ifdef F_CURL_GET_STATUS_MESSAGE
 void f_curl_get_body(void) {
-  int num_arg = st_num_arg;
   LPC_INT result_id;
+  int num_arg = st_num_arg;
+
+  CHECK_TYPES(sp, T_NUMBER, 0, F_CURL_GET_STATUS_MESSAGE);
 
   result_id = (sp - num_arg + 1)->u.number;
 
@@ -257,8 +253,10 @@ void f_curl_get_body(void) {
 
 #ifdef F_CURL_GET_HEADERS
 void f_curl_get_headers(void) {
-  int num_arg = st_num_arg;
   LPC_INT result_id;
+  int num_arg = st_num_arg;
+
+  CHECK_TYPES(sp, T_NUMBER, 0, F_CURL_GET_HEADERS);
 
   result_id = (sp - num_arg + 1)->u.number;
 
@@ -273,8 +271,8 @@ void f_curl_get_headers(void) {
   auto headers = results->second->headers;
   auto *mapping = allocate_mapping(headers.size());
 
-  for(auto kv : headers) {
-    add_mapping_string(mapping, kv.first.c_str(), kv.second.c_str());
+  for(const auto &header : headers) {
+    add_mapping_string(mapping, header.first.c_str(), header.second.c_str());
   }
 
   push_mapping(mapping);
@@ -283,8 +281,10 @@ void f_curl_get_headers(void) {
 
 #ifdef F_CURL_GET_HEADERS
 void f_curl_free(void) {
-  int num_arg = st_num_arg;
   LPC_INT result_id;
+  int num_arg = st_num_arg;
+
+  CHECK_TYPES(sp, T_NUMBER, 0, F_CURL_GET_HEADERS);
 
   result_id = (sp - num_arg + 1)->u.number;
 
