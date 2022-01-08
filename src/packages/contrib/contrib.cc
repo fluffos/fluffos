@@ -3062,3 +3062,19 @@ void f_test_load() {
   }
 }
 #endif
+
+#ifdef F_WILL_CLEAN_UP
+
+void f_will_clean_up(void)
+{
+    int flags = sp->u.ob->flags ;
+
+    pop_stack() ;
+
+    int result = flags & O_WILL_CLEAN_UP ? 1 : 0 ;
+    
+    push_number(result) ;
+
+} /* f_will_clean_up() */
+
+#endif

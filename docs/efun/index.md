@@ -259,6 +259,9 @@ title: EFUN
 <div><a href='contrib/variables.html'>variables</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='contrib/will_clean_up.html'>will_clean_up</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='contrib/zonetime.html'>zonetime</a></div>
 </div>
 </div>
@@ -1107,6 +1110,6 @@ title: EFUN
 
 <div class="alert alert-info my-4" role="alert">
     <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/info.svg">
-    This page is auto generated on 2021-06-07 16:44:42 EDT for v2019.20210429-16-gd04c15db-dirty.</a>
+    This page is auto generated on 2022-01-08 03:12:47 EST for v2019.20210429-88-gbf54d5d4-dirty.</a>
 </div>
 
