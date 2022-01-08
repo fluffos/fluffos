@@ -267,6 +267,11 @@ void look_for_objects_to_swap() {
                      tick_event::callback_type(look_for_objects_to_swap));
 
   object_t *ob, *next_ob, *last_good_ob;
+
+  // clean up destructed objects so that ref count will be accurate later for
+  // clean_up()
+  remove_destructed_objects() ;
+  
   /*
    * Objects object can be destructed, which means that next object to
    * investigate is saved in next_ob. If very unlucky, that object can be
@@ -340,7 +345,8 @@ void look_for_objects_to_swap() {
            * keeping them around seems justified.
            */
 
-          push_number(ob->flags & (O_CLONE) ? 0 : ob->prog->ref);
+          // ref - 1, because the ref count includes the object itself
+          push_number(ob->flags & (O_CLONE) ? 0 : ob->prog->ref - 1);
           set_eval(max_eval_cost);
           auto svp = safe_apply(APPLY_CLEAN_UP, ob, 1, ORIGIN_DRIVER);
           if (!svp || (svp->type == T_NUMBER && svp->u.number == 0)) {
