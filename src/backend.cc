@@ -271,7 +271,6 @@ void look_for_objects_to_swap() {
   // clean up destructed objects so that ref count will be accurate later for
   // clean_up()
   remove_destructed_objects() ;
-  
   /*
    * Objects object can be destructed, which means that next object to
    * investigate is saved in next_ob. If very unlucky, that object can be
@@ -346,7 +345,10 @@ void look_for_objects_to_swap() {
            */
 
           // ref - 1, because the ref count includes the object itself
-          push_number(ob->flags & (O_CLONE) ? 0 : ob->prog->ref - 1);
+          if(ob->flags & (O_CLONE)) push_number(0) ;
+          else if(ob->prog->ref > 0) push_number(ob->prog->ref - 1) ;
+          else push_number(ob->prog->ref) ;
+
           set_eval(max_eval_cost);
           auto svp = safe_apply(APPLY_CLEAN_UP, ob, 1, ORIGIN_DRIVER);
           if (!svp || (svp->type == T_NUMBER && svp->u.number == 0)) {
