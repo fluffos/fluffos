@@ -3071,7 +3071,7 @@ void f_will_clean_up(void)
 
     pop_stack() ;
 
-    int result = flags & O_WILL_CLEAN_UP ? 1 : 0 ;
+    int result = (flags & O_WILL_CLEAN_UP) ? 1 : 0 ;
     
     push_number(result) ;
 
