@@ -75,7 +75,7 @@ $ brew install cmake pkg-config mysql pcre libgcrypt libevent openssl jemalloc i
 3. build same as under linux, you will need to pass two environment variables
 ```shell
 $ mkdir build && cd build
-$ OPENSSL_ROOT_DIR="/usr/local/opt/openssl" ICU_ROOT="/usr/local/opt/icu4c" cmake ..
+$ OPENSSL_ROOT_DIR="/opt/homebrew/opt/openssl@3" ICU_ROOT="/opt/homebrew/opt/icu4c/" cmake .. -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/icu4c
 $ make install
 ```
 
