@@ -2520,7 +2520,7 @@ int yylex() {
                   if (U16_IS_SINGLE(res[0])) {
                     UErrorCode err = U_ZERO_ERROR;
                     int32_t written = 0;
-                    u_strToUTF8(reinterpret_cast<char *>(to), 4, &written, res, 2, &err);
+                    u_strToUTF8(reinterpret_cast<char *>(to), 4, &written, res, 1, &err);
                     if (U_FAILURE(err)) {
                       lexerror("Illegal unicode sequence.");
                       return LEX_EOF;
