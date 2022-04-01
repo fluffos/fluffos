@@ -106,6 +106,7 @@ int main() {
     int save;
     int ss, sm;
     int overall;
+    object this_ob = this_object();
 
 #ifdef STRING_TESTS
     s1 = "This is a test";
@@ -124,6 +125,12 @@ int main() {
     overall = perf_counter_ns();
 
     write(__VERSION__+"\n");
+
+    ASSERT_EQ(1, fib(1));
+    TIME("static invoke(fib(1))", 10000, fib(1));
+    // Dynamic invoke / call_other
+    ASSERT_EQ(1, call_other(this_ob, "fib", 1));
+    TIME("dynamic invoke(fib(1))",10000, call_other(this_ob, "fib", 1));
 
     // traditional recursive fib : ~3x compare to python3
     ASSERT_EQ(55, fib_recur(10));
