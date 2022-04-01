@@ -582,7 +582,8 @@ void push_indexed_lvalue(int reverse) {
         sp->u.lvalue = &global_lvalue_codepoint_sv;
         global_lvalue_codepoint.index = ind;
         global_lvalue_codepoint.owner = lv;
-        global_lvalue_codepoint.iter = std::make_unique<EGCSmartIterator>(lv->u.string, SVALUE_STRLEN(lv));
+        global_lvalue_codepoint.iter =
+            std::make_unique<EGCSmartIterator>(lv->u.string, SVALUE_STRLEN(lv));
 #ifdef REF_RESERVED_WORD
         lv_owner_type = T_STRING;
         lv_owner = (refed_t *)lv->u.string;
@@ -939,8 +940,7 @@ void assign_lvalue_codepoint(F &&func) {
     auto pos = global_lvalue_codepoint.index;
 
     UChar32 c = u8_egc_index_as_single_codepoint(global_lvalue_codepoint.owner->u.string,
-                                                 SVALUE_STRLEN(global_lvalue_codepoint.owner),
-                                                 pos);
+                                                 SVALUE_STRLEN(global_lvalue_codepoint.owner), pos);
     if (c < 0) {
       error("Invalid string index, multi-codepoint character.\n");
     }
@@ -965,8 +965,7 @@ void assign_lvalue_codepoint(F &&func) {
     global_lvalue_codepoint.owner->u.string = res;
     global_lvalue_codepoint.owner->subtype = STRING_MALLOC;
     global_lvalue_codepoint.iter = std::make_unique<EGCSmartIterator>(
-        global_lvalue_codepoint.owner->u.string,
-        SVALUE_STRLEN(global_lvalue_codepoint.owner));
+        global_lvalue_codepoint.owner->u.string, SVALUE_STRLEN(global_lvalue_codepoint.owner));
   }
 }
 
@@ -2588,8 +2587,8 @@ void eval_instruction(char *p) {
           sp->type = T_NUMBER;
           global_lvalue_codepoint.index = 0;
           global_lvalue_codepoint.owner = sp - 1;
-          global_lvalue_codepoint.iter = std::make_unique<EGCSmartIterator>(
-              (sp - 1)->u.string, SVALUE_STRLEN((sp - 1)));
+          global_lvalue_codepoint.iter =
+              std::make_unique<EGCSmartIterator>((sp - 1)->u.string, SVALUE_STRLEN((sp - 1)));
           if (!global_lvalue_codepoint.iter->ok()) {
             error("f_foreach: Invalid utf-8 string.");
           }
@@ -2655,25 +2654,26 @@ void eval_instruction(char *p) {
             break;
           }
         } else if ((sp - 2)->type == T_STRING) { /* string */
-            auto pos = global_lvalue_codepoint.iter->post_index_to_offset(global_lvalue_codepoint.index);
-            if (pos > 0) {
-              if (sp->type == T_REF) {
-                sp->u.ref->lvalue = &global_lvalue_codepoint_sv;
-              } else {
-                free_svalue(sp->u.lvalue, "foreach-string");
-                sp->u.lvalue->type = T_NUMBER;
-                sp->u.lvalue->subtype = 0;
-                sp->u.lvalue->u.number = u8_egc_index_as_single_codepoint(
-                    global_lvalue_codepoint.owner->u.string,
-                    SVALUE_STRLEN(global_lvalue_codepoint.owner), global_lvalue_codepoint.index);
-              }
-              global_lvalue_codepoint.index++;
-
-              COPY_SHORT(&offset, pc);
-              pc -= offset;
-              break;
+          auto pos =
+              global_lvalue_codepoint.iter->post_index_to_offset(global_lvalue_codepoint.index);
+          if (pos > 0) {
+            if (sp->type == T_REF) {
+              sp->u.ref->lvalue = &global_lvalue_codepoint_sv;
+            } else {
+              free_svalue(sp->u.lvalue, "foreach-string");
+              sp->u.lvalue->type = T_NUMBER;
+              sp->u.lvalue->subtype = 0;
+              sp->u.lvalue->u.number = u8_egc_index_as_single_codepoint(
+                  global_lvalue_codepoint.owner->u.string,
+                  SVALUE_STRLEN(global_lvalue_codepoint.owner), global_lvalue_codepoint.index);
             }
-          } else { /* array */
+            global_lvalue_codepoint.index++;
+
+            COPY_SHORT(&offset, pc);
+            pc -= offset;
+            break;
+          }
+        } else { /* array */
           if ((sp - 1)->subtype--) {
             if (sp->type == T_REF) {
               sp->u.ref->lvalue = (sp - 1)->u.lvalue;
@@ -3789,7 +3789,7 @@ void eval_instruction(char *p) {
           }
 
           ScopedTracer _efun_tracer(instrs[instruction].name, EventCategory::LPC_EFUN,
-                                    std::move(trace_context));
+                                    [&] { return trace_context; });
           (*efun_table[instruction - EFUN_BASE])();
         }
 

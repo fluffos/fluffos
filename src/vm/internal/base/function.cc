@@ -261,16 +261,16 @@ svalue_t *call_function_pointer(funptr_t *funp, int num_arg) {
         }
 
         {
-          json trace_context = {};
-          if (Tracer::enabled()) {
+          ScopedTracer _efun_tracer(instrs[i].name, EventCategory::LPC_EFUN, [&] {
+            json trace_context = {};
+
             json args = json::array();
             for (int i = st_num_arg; i > 0; i--) {
               args.push_back(svalue_to_json_summary(sp - i + 1));
             }
             trace_context["args"] = args;
-          }
-          ScopedTracer _efun_tracer(instrs[i].name, EventCategory::LPC_EFUN,
-                                    std::move(trace_context));
+            return trace_context;
+          });
 
           (*efun_table[i - EFUN_BASE])();
         }

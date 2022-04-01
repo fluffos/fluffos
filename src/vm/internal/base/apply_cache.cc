@@ -11,7 +11,9 @@
 static inline void fill_lookup_table(program_t *prog);
 
 lookup_entry_s apply_cache_lookup(const char *funcname, program_t *prog) {
-  ScopedTracer _tracer("Apply Cache Lookup", EventCategory::APPLY_CACHE, json{{"name", funcname}});
+  ScopedTracer _tracer("Apply Cache Lookup", EventCategory::APPLY_CACHE, [=] {
+    return json{"name", funcname};
+  });
 
   // All function names are shared string.
   auto key = (intptr_t)(findstring(funcname));

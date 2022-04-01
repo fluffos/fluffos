@@ -109,7 +109,7 @@ void TraceWriter::flush(const std::string& filename) {
   debug_message("Trace duration: %lf us, dumping %ld events to %s in separate thread.\n",
                 Tracer::timestamp(), buffer->size(), filename.c_str());
 
-  this->dump_threads.emplace_back([current_buffer = move(buffer), filename] {
+  this->dump_threads.emplace_back([current_buffer = std::move(buffer), filename] {
     auto begin = std::chrono::high_resolution_clock::now();
 
     std::ofstream file(filename, std::ofstream::out | std::ofstream::binary);
@@ -241,9 +241,12 @@ TraceWriter& Tracer::instance() {
 }
 
 ScopedTracerInner::ScopedTracerInner(const std::string& name, const EventCategory category,
-                                     json&& args, double time_limit_usec)
+                                     std::optional<std::function<json()>> lazy_arg,
+                                     double time_limit_usec)
     : time_limit_usec(time_limit_usec),
-      event(std::make_unique<Event>(name, category, "X", std::move(args))) {}
+      event(std::make_unique<Event>(
+          name, category, "X",
+          lazy_arg ? std::make_optional<json>((*lazy_arg)()) : std::nullopt)) {}
 
 ScopedTracerInner::~ScopedTracerInner() {
   if (!this->event) return;
