@@ -412,7 +412,8 @@ int filename_to_obname(const char *src, char *dest, int size) {
  *
  */
 object_t *load_object(const char *lname, int callcreate) {
-  ScopedTracer _tracer("LPC Load Object", EventCategory::VM_LOAD_OBJECT, json{lname});
+  ScopedTracer _tracer("LPC Load Object", EventCategory::VM_LOAD_OBJECT,
+                       [=] { return json{lname}; });
 
   auto inherit_chain_size = CONFIG_INT(__INHERIT_CHAIN_SIZE__);
 

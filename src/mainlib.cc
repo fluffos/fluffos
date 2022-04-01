@@ -397,7 +397,7 @@ int driver_main(int argc, char **argv) {
       switch (argv[i][1]) {
         case 'f': {
           ScopedTracer _tracer("Driver Flag: calling master::flag", EventCategory::DEFAULT,
-                               json{std::string(argv[i] + 2)});
+                               [=] { return json{std::string(argv[i] + 2)}; });
 
           debug_message("Calling master::flag(\"%s\")...\n", argv[i] + 2);
 

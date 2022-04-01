@@ -8,6 +8,7 @@
 
 #include <string>
 #include <optional>
+#include <functional>
 
 #include "thirdparty/json/single_include/nlohmann/json.hpp"
 using json = nlohmann::json;
@@ -147,7 +148,8 @@ class Tracer {
 class ScopedTracerInner {
  public:
   ScopedTracerInner(const std::string& name, const EventCategory category = EventCategory::DEFAULT,
-                    json&& args = {}, double time_limit_usec = 100);
+                    std::optional<std::function<json()>> args = std::nullopt,
+                    double time_limit_usec = 100);
 
   virtual ~ScopedTracerInner();
 
