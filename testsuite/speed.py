@@ -56,6 +56,9 @@ def report(*args):
 
 
 print("Python: " + str(sys.version_info))
+report('static invoke(fib(1)):', _timeit(lambda: fib(1), number=10000))
+this_module = sys.modules[__name__]
+report('dynamic invoke(fib(1)):', _timeit(lambda: getattr(this_module, "fib")(1), number=10000))
 report('fib_recur(10):', _timeit(lambda: fib_recur(10), number=10000))
 report('fib_recur(20):', _timeit(lambda: fib_recur(20), number=100))
 report('fib(10):', _timeit(lambda: fib(10), number=10000))
