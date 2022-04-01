@@ -160,9 +160,9 @@ static inline void on_telnet_wont(unsigned char cmd, interactive_t *ip) {
 
 static inline void on_telnet_do(unsigned char cmd, interactive_t *ip) {
   switch (cmd) {
-    case TELNET_TELOPT_CHARSET :
-      on_telnet_do_charset(ip->telnet) ;
-      break ;
+    case TELNET_TELOPT_CHARSET:
+      on_telnet_do_charset(ip->telnet);
+      break;
     case TELNET_TELOPT_TM:
       telnet_negotiate(ip->telnet, TELNET_WILL, TELNET_TELOPT_TM);
       break;
@@ -499,7 +499,7 @@ void send_initial_telnet_negotiations(struct interactive_t *user) {
     telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_MSSP);
   }
 
-  telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_CHARSET) ;
+  telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_CHARSET);
 }
 
 void set_linemode(interactive_t *ip, bool flush) {
@@ -617,9 +617,11 @@ void on_telnet_do_zmp(const char **argv, unsigned long argc, interactive_t *ip) 
 
 /* send CHARSET OF UTF-8 command */
 void on_telnet_do_charset(telnet_t *telnet) {
-	const char utf8[] = { 1, ';', 'U', 'T', 'F', '-', '8', } ;
+  const char utf8[] = {
+      1, ';', 'U', 'T', 'F', '-', '8',
+  };
 
-	telnet_begin_sb(telnet, TELNET_TELOPT_CHARSET) ;
+  telnet_begin_sb(telnet, TELNET_TELOPT_CHARSET);
   telnet_send(telnet, utf8, sizeof(utf8));
-	telnet_finish_sb(telnet) ;
+  telnet_finish_sb(telnet);
 }

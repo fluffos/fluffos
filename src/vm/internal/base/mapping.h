@@ -12,7 +12,7 @@
 
 #define MAP_SVAL_HASH(x) sval_hash(x)
 
-//#define MAP_SVAL_HASH(x) (((POINTER_INT)((x).u.number)) >> 5)
+// #define MAP_SVAL_HASH(x) (((POINTER_INT)((x).u.number)) >> 5)
 size_t sval_hash(svalue_t);
 
 typedef struct mapping_node_s {
