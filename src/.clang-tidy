@@ -31,7 +31,6 @@
 #      trigger a redundant declaration warning from this check.
 #
 Checks: >
-  -*,
   bugprone-*,
   misc-*,
   modernize-*,
@@ -49,7 +48,10 @@ Checks: >
   -readability-braces-around-statements,
   -readability-magic-numbers,
   -readability-named-parameter,
-  -readability-redundant-declaration
+  -readability-redundant-declaration,
+  -readability-isolate-declaration,
+  -readability-function-cognitive-complexity
+
 
 CheckOptions:
   - { key: readability-identifier-naming.NamespaceCase,          value: lower_case }
