@@ -2450,6 +2450,7 @@ void f_sizeof(void) {
       free_buffer(sp->u.buf);
       break;
     case T_STRING: {
+
 #ifdef NON_UNICODE_MUDLIB
      i = SVALUE_STRLEN(sp);
 #else

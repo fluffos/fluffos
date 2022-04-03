@@ -3212,17 +3212,14 @@ void eval_instruction(char *p) {
             if (i < 0) {
               error("String index out of bounds.\n");
             }
-<<<<<<< HEAD
+
 #ifdef NON_UNICODE_MUDLIB
             i = static_cast<unsigned char>(sp->u.string[i]);
             free_string_svalue(sp);
             (--sp)->u.number = i;
 #else
-            UChar32 res = u8_egc_index_as_single_codepoint(sp->u.string, i);
-=======
-
+ 
             UChar32 res = u8_egc_index_as_single_codepoint(sp->u.string, SVALUE_STRLEN(sp), i);
->>>>>>> 4ec62e92a6e32a7b1b7474fa4de7ae229ef75c5d
             if (res == -2) {
               error("String index out of bounds.\n");
             } else if (res < 0) {

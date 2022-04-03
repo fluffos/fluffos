@@ -101,6 +101,7 @@ int32_t u8_egc_find_as_offset(EGCIterator &iter, const char *needle, size_t need
     res = pos;
   }
   return res;
+
 }
 
 // Return the egc at given index of src, if it is an single code point.
