@@ -483,6 +483,7 @@ static int restore_interior_string(char **val, svalue_t *sv) {
           newstr = new_string(len = (news - start), "restore_string");
           strcpy(newstr, start);
           if (!u8_validate(newstr)) {
+            FREE_MSTR(newstr);
             return ROB_STRING_UTF8_ERROR;
           }
           sv->u.string = newstr;
@@ -506,6 +507,7 @@ static int restore_interior_string(char **val, svalue_t *sv) {
   newstr = new_string(len, "restore_string");
   strcpy(newstr, start);
   if (!u8_validate(newstr)) {
+    FREE_MSTR(newstr);
     return ROB_STRING_UTF8_ERROR;
   }
   sv->u.string = newstr;
@@ -1235,7 +1237,7 @@ static int safe_restore_svalue(char *cp, svalue_t *v) {
   return 0;
 }
 
-static int fgv_recurse(program_t *prog, int *idx, char *name, unsigned short *type,
+static int fgv_recurse(program_t *prog, int *idx, const char *name, unsigned short *type,
                        int check_nosave) {
   int i;
   for (i = 0; i < prog->num_inherited; i++) {
@@ -1260,7 +1262,7 @@ static int fgv_recurse(program_t *prog, int *idx, char *name, unsigned short *ty
 int find_global_variable(program_t *prog, const char *const name, unsigned short *type,
                          int check_nosave) {
   int idx = 0;
-  char *str = findstring(name);
+  const char *str = findstring(name);
 
   if (str && fgv_recurse(prog, &idx, str, type, check_nosave)) {
     return idx;
@@ -1466,9 +1468,10 @@ static int save_object_recurse_str(program_t *prog, svalue_t **svp, int type, in
   return textsize;
 }
 
+namespace {
 int sel = -1;
-
-static const int SAVE_EXTENSION_GZ_LENGTH = strlen(SAVE_GZ_EXTENSION);
+const int SAVE_EXTENSION_GZ_LENGTH = strlen(SAVE_GZ_EXTENSION);
+}  // namespace
 
 int save_object(object_t *ob, const char *file, int save_zeros) {
   char *name, *p;
@@ -1771,16 +1774,7 @@ int restore_object(object_t *ob, const char *file, int noclear) {
     clear_non_statics(ob);
   }
 
-  error_context_t econ;
-  save_context(&econ);
-  try {
-    restore_object_from_buff(ob, buf.data(), noclear);
-  } catch (const char *) {
-    restore_context(&econ);
-    pop_context(&econ);
-    return 0;
-  }
-  pop_context(&econ);
+  restore_object_from_buff(ob, buf.data(), noclear);
 
   current_object = save;
   debug(d_flag, "Object /%s restored from /%s.\n", ob->obname, file);
@@ -1934,7 +1928,8 @@ void set_nextreset(object_t *ob) {
   if (CONFIG_INT(__RC_RANDOMIZED_RESETS__)) {
     time_to_reset_secs = time_to_reset_secs / 2 + random_number(time_to_reset_secs / 2);
   }
-  ob->next_reset = g_current_gametick + time_to_gametick(std::chrono::seconds(time_to_reset_secs));
+  ob->next_reset =
+      g_current_gametick + time_to_next_gametick(std::chrono::seconds(time_to_reset_secs));
 }
 }  // namespace
 

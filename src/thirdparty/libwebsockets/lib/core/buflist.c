@@ -149,7 +149,7 @@ lws_buflist_use_segment(struct lws_buflist **head, size_t len)
 	assert(b->pos <= b->len);
 
 	if (b->pos < b->len)
-		return (int)(b->len - b->pos);
+		return (unsigned int)(b->len - b->pos);
 
 	if (lws_buflist_destroy_segment(head))
 		/* last segment was just destroyed */
@@ -193,6 +193,54 @@ lws_buflist_linear_copy(struct lws_buflist **head, size_t ofs, uint8_t *buf,
 			ofs -= p->len;
 		p = p->next;
 	}
+
+	return lws_ptr_diff(buf, obuf);
+}
+
+int
+lws_buflist_linear_use(struct lws_buflist **head, uint8_t *buf, size_t len)
+{
+	uint8_t *obuf = buf;
+	size_t s;
+
+	while (*head && len) {
+		s = (*head)->len - (*head)->pos;
+		if (s > len)
+			s = len;
+		memcpy(buf, ((uint8_t *)((*head) + 1)) +
+			    LWS_PRE + (*head)->pos, s);
+		len -= s;
+		buf += s;
+		lws_buflist_use_segment(head, s);
+	}
+
+	return lws_ptr_diff(buf, obuf);
+}
+
+int
+lws_buflist_fragment_use(struct lws_buflist **head, uint8_t *buf,
+			 size_t len, char *frag_first, char *frag_fin)
+{
+	uint8_t *obuf = buf;
+	size_t s;
+
+	if (!*head)
+		return 0;
+
+	s = (*head)->len - (*head)->pos;
+	if (s > len)
+		s = len;
+
+	if (frag_first)
+		*frag_first = !(*head)->pos;
+
+	if (frag_fin)
+		*frag_fin = (*head)->pos + s == (*head)->len;
+
+	memcpy(buf, ((uint8_t *)((*head) + 1)) + LWS_PRE + (*head)->pos, s);
+	len -= s;
+	buf += s;
+	lws_buflist_use_segment(head, s);
 
 	return lws_ptr_diff(buf, obuf);
 }

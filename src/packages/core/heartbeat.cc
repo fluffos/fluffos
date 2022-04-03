@@ -9,24 +9,22 @@
 #include <algorithm>
 #include <deque>
 #include <set>
+#include <vector>
 
 struct heart_beat_t {
-  bool deleted;
-
-  object_t *ob;
-  short heart_beat_ticks;
-  short time_to_heart_beat;
+  object_t *ob;              // nullptr also means deleted entries.
+  short heart_beat_ticks;    // remaining ticks
+  short time_to_heart_beat;  // interval
 };
 
 // Global pointer to current object executing heartbeat.
 object_t *g_current_heartbeat_obj;
-static heart_beat_t *g_current_heartbeat;
 
 /*
  * TODO: ideally we should be using vector here for performance, however dealing with
- * enable/disable heartbeat during execution make it diffcult to implement correctly.
+ * enable/disable heartbeat during execution make it difficult to implement correctly.
  */
-static std::deque<heart_beat_t *> heartbeats, heartbeats_next;
+static std::deque<heart_beat_t> heartbeats, heartbeats_next;
 
 /* Call all heart_beat() functions in all objects.
  *
@@ -36,42 +34,30 @@ static std::deque<heart_beat_t *> heartbeats, heartbeats_next;
 
 void call_heart_beat() {
   // Register for next call
-  add_gametick_event(std::chrono::milliseconds(CONFIG_INT(__RC_HEARTBEAT_INTERVAL_MSEC__)),
-                     tick_event::callback_type(call_heart_beat));
+  add_gametick_event(
+      time_to_next_gametick(std::chrono::milliseconds(CONFIG_INT(__RC_HEARTBEAT_INTERVAL_MSEC__))),
+      tick_event::callback_type(call_heart_beat));
 
-  if (!heartbeats_next.empty()) {
-    for (auto hb : heartbeats_next) {
-      heartbeats.push_back(hb);
-    }
-    heartbeats_next.clear();
-  }
+  heartbeats.insert(heartbeats.end(), heartbeats_next.begin(), heartbeats_next.end());
+  heartbeats_next.clear();
   // During the execution of heartbeat func, object can add/delete heartbeats, thus we can't use a
   // simple loop here. Instead, we extract each heartbeats, execute it, add it to
   // heartbeats_next. After all execution, heartbeats_after and heartbeats is swapped.
   //
   // NOTE: The order of heartbeat execution is preserved.
   while (!heartbeats.empty()) {
-    auto curr_hb = heartbeats.front();
-
-    // Move heartbeat into heartbeat_next, if still valid.
     {
+      auto &hb = heartbeats.front();
+      // skip invalid entries.
+      if (hb.ob == nullptr || !(hb.ob->flags & O_HEART_BEAT) || hb.ob->flags & O_DESTRUCTED) {
+        heartbeats.pop_front();
+        continue;
+      }
+      // place into next queue.
+      heartbeats_next.push_back(hb);
       heartbeats.pop_front();
-
-      if (curr_hb->deleted) {
-        delete curr_hb;
-        continue;
-      }
-
-      // Skip if we are in some weird situation.
-      if (curr_hb->ob == nullptr || !(curr_hb->ob->flags & O_HEART_BEAT) ||
-          curr_hb->ob->flags & O_DESTRUCTED) {
-        delete curr_hb;
-        continue;
-      }
-      heartbeats_next.push_back(curr_hb);
     }
-
-    auto ob = curr_hb->ob;
+    auto curr_hb = &heartbeats_next.back();
 
     if (--curr_hb->heart_beat_ticks > 0) {
       continue;
@@ -79,6 +65,7 @@ void call_heart_beat() {
       curr_hb->heart_beat_ticks = curr_hb->time_to_heart_beat;
     }
 
+    auto ob = curr_hb->ob;
     // No heartbeat function
     if (ob->prog->heart_beat == 0) {
       continue;
@@ -105,7 +92,6 @@ void call_heart_beat() {
       current_interactive = ob;
     }
     g_current_heartbeat_obj = ob;
-    g_current_heartbeat = curr_hb;
 
     error_context_t econ;
 
@@ -122,9 +108,8 @@ void call_heart_beat() {
 
     restore_command_giver();
     g_current_heartbeat_obj = nullptr;
-    g_current_heartbeat = nullptr;
+    curr_hb = nullptr;
   }
-  std::swap(heartbeats, heartbeats_next);
 } /* call_heart_beat() */
 
 // Query heartbeat interval for a object
@@ -133,17 +118,14 @@ int query_heart_beat(object_t *ob) {
   if (!(ob->flags & O_HEART_BEAT)) {
     return 0;
   }
-  if (g_current_heartbeat_obj == ob) {
-    return g_current_heartbeat->time_to_heart_beat;
-  }
-  for (auto hb : heartbeats) {
-    if (hb->ob == ob) {
-      return hb->time_to_heart_beat;
+  for (auto &hb : heartbeats) {
+    if (hb.ob == ob) {
+      return hb.time_to_heart_beat;
     }
   }
-  for (auto hb : heartbeats_next) {
-    if (hb->ob == ob) {
-      return hb->time_to_heart_beat;
+  for (auto &hb : heartbeats_next) {
+    if (hb.ob == ob) {
+      return hb.time_to_heart_beat;
     }
   }
   return 0;
@@ -168,62 +150,59 @@ int set_heart_beat(object_t *ob, int to) {
   }
 
   // Here are 3 possible cases:
-  // 1) Object currently doesn't have heartbeat.
+  // 1) Object is modifying itself during its heartbeat execution.
   // 2) Object currently have heartbeat and is in the queue.
-  // 3) Object is modifying itself during its heartbeat execution.
-
-  // Search from 3 places for target_hb.
-  heart_beat_t *target_hb = nullptr;
-
-  if (g_current_heartbeat_obj == ob) {
-    target_hb = g_current_heartbeat;
-  }
-  if (target_hb == nullptr) {
-    for (auto hb : heartbeats_next) {
-      if (hb->ob == ob) {
-        target_hb = hb;
-        break;
-      }
-    }
-  }
-  if (target_hb == nullptr) {
-    for (auto hb : heartbeats) {
-      if (hb->ob == ob) {
-        target_hb = hb;
-        break;
-      }
-    }
-  }
+  // 3) Object currently doesn't have heartbeat.
 
   // Removal: set the flag and hb will be deleted in next round.
   if (to == 0) {
     ob->flags &= ~O_HEART_BEAT;
-    if (target_hb != nullptr) {
-      target_hb->deleted = true;
-      return 1;
-    } else {
-      return 0;
+
+    bool found = false;
+    for (auto &hb : heartbeats) {
+      if (hb.ob == ob) {
+        hb.ob = nullptr;
+        found = true;
+      }
     }
+    for (auto &hb : heartbeats_next) {
+      if (hb.ob == ob) {
+        hb.ob = nullptr;
+        found = true;
+      }
+    }
+    return found ? 1 : 0;
   } else {
     ob->flags |= O_HEART_BEAT;
+
+    heart_beat_t *target_hb = nullptr;
+    for (auto &hb : heartbeats) {
+      if (hb.ob == ob) {
+        target_hb = &hb;
+        break;
+      }
+    }
+    for (auto &hb : heartbeats_next) {
+      if (hb.ob == ob) {
+        target_hb = &hb;
+        break;
+      }
+    }
     // Add: Didn't find target_hb, we need to create a new one.
     if (target_hb == nullptr) {
-      target_hb = new heart_beat_t();
-      heartbeats_next.push_back(target_hb);
-
+      target_hb = &heartbeats_next.emplace_back();
       target_hb->ob = ob;
       target_hb->time_to_heart_beat = to;
       target_hb->heart_beat_ticks = to;
       return 1;
     } else {
       // Modifying: target_hb is found.
-      DEBUG_CHECK(target_hb->ob != ob, "Driver BUG: set_heart_beat");
+      target_hb->ob = ob;
       target_hb->time_to_heart_beat = to;
       target_hb->heart_beat_ticks = to;
       return 1;
     }
   }
-  return 0;
 }
 
 int heart_beat_status(outbuffer_t *buf, int verbose) {
@@ -233,25 +212,30 @@ int heart_beat_status(outbuffer_t *buf, int verbose) {
     outbuf_addv(buf, "Number of objects with heart beat: %" PRIu64 ".\n",
                 heartbeats.size() + heartbeats_next.size());
   }
-  return 0;
+  // may overcount, but this usually not called during heartbeat.
+  return (heartbeats.size() + heartbeats_next.size()) *
+         (sizeof(heart_beat_t *) + sizeof(heart_beat_t));
 } /* heart_beat_status() */
 
 #ifdef F_HEART_BEATS
 array_t *get_heart_beats() {
-  std::deque<object_t *> result;
+  std::vector<object_t *> result;
+  result.reserve(heartbeats.size() + heartbeats_next.size());
 
   bool display_hidden = true;
 #ifdef F_SET_HIDE
   display_hidden = valid_hide(current_object);
 #endif
 
-  auto fn = [&](heart_beat_t *hb) {
-    if (hb->ob->flags & O_HIDDEN) {
-      if (!display_hidden) {
-        return;
+  auto fn = [&](heart_beat_t &hb) {
+    if (hb.ob) {
+      if (hb.ob->flags & O_HIDDEN) {
+        if (!display_hidden) {
+          return;
+        }
       }
+      result.push_back(hb.ob);
     }
-    result.push_back(hb->ob);
   };
 
   std::for_each(heartbeats.begin(), heartbeats.end(), fn);
@@ -271,23 +255,21 @@ array_t *get_heart_beats() {
 
 void check_heartbeats() {
   std::set<object_t *> objset;
-  for (auto hb : heartbeats) {
-    objset.insert(hb->ob);
+  for (auto &hb : heartbeats) {
+    if (hb.ob) {
+      DEBUG_CHECK(!objset.insert(hb.ob).second, "Driver BUG: Duplicated/Missing heartbeats found");
+    }
   }
   for (auto hb : heartbeats_next) {
-    objset.insert(hb->ob);
+    if (hb.ob) {
+      DEBUG_CHECK(!objset.insert(hb.ob).second, "Driver BUG: Duplicated/Missing heartbeats found");
+    }
   }
-  DEBUG_CHECK((objset.size() != heartbeats.size() + heartbeats_next.size()),
-              "Driver BUG: Duplicated/Missing heartbeats found");
 }
 
 void clear_heartbeats() {
   // TODO: instead of clearing everything blindly, should go through all objects with heartbeat flag
   // and delete corresponding heartbeats, thus exposing leftovers.
-  for (auto hb : heartbeats) {
-    delete hb;
-  }
-  for (auto hb : heartbeats_next) {
-    delete hb;
-  }
+  heartbeats.clear();
+  heartbeats_next.clear();
 }

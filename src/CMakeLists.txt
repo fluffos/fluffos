@@ -66,12 +66,14 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL
     "-fno-strict-aliasing"
     "-D_GLIBCXX_ASSERTIONS"
   )
+  list(APPEND CMAKE_REQUIRED_DEFINITIONS "-D_GNU_SOURCE")
 
   # Sanitizer support
   if (ENABLE_SANITIZER)
     add_compile_options("-fsanitize=address,undefined")
+    add_compile_options("-fno-common")
     # add_linker_options is only avaiable cmake 3.13
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address,undefined")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address,undefined -fno-common")
   else ()
     add_compile_options(
       "-D_FORTIFY_SOURCE=2"
@@ -112,11 +114,16 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL
     "-Werror=format-security"
     $<$<COMPILE_LANGUAGE:C>:-Werror=implicit-function-declaration>
     # Turn off some warnings from GCC.
+    "-Wno-unknown-warning-option"
     "-Wno-char-subscripts"
     "-Wno-sign-compare"
+    "-Wno-unused-function"
     "-Wno-unused-parameter"
+    "-Wno-unused-variable"
+    "-Wno-unused-but-set-variable"
     # TODO: Code has a lot of implicit zero initializations
     "-Wno-missing-field-initializers"
+    "-Wno-missing-braces"
     # features
     "-fdiagnostics-show-option"
     "-fmessage-length=0"
@@ -174,29 +181,7 @@ else ()
   set(DEBUG OFF)
 endif ()
 
-add_subdirectory(thirdparty/filesystem EXCLUDE_FROM_ALL)
-include_directories(thirdparty/filesystem/include)
-
-set(DISABLE_WERROR ON CACHE BOOL "" FORCE)
-set(LWS_WITH_SHARED OFF CACHE BOOL "" FORCE)
-set(LWS_WITHOUT_TESTAPPS ON CACHE BOOL "" FORCE)
-set(LWS_IPV6 ON CACHE BOOL "" FORCE)
-set(LWS_WITHOUT_EXTENSIONS OFF CACHE BOOL "" FORCE)
-set(LWS_WITH_LIBEVENT ON CACHE BOOL "" FORCE)
-set(LWS_STATIC_PIC ON CACHE BOOL "" FORCE)
-set(LWS_WITH_DIR OFF CACHE BOOL "" FORCE)
-set(LWS_WITH_SSL OFF CACHE BOOL "" FORCE)
-set(LWS_WITHOUT_TESTAPPS ON CACHE BOOL "" FORCE)
-set(LWS_WITHOUT_TEST_SERVER ON CACHE BOOL "" FORCE)
-set(LWS_WITHOUT_TEST_SERVER_EXTPOLL ON CACHE BOOL "" FORCE)
-set(LWS_WITHOUT_TEST_PING ON CACHE BOOL "" FORCE)
-set(LWS_WITHOUT_TEST_CLIENT ON CACHE BOOL "" FORCE)
-set(LWS_WITH_LEJP OFF CACHE BOOL "" FORCE)
-set(LWS_WITH_LEJP_CONF OFF CACHE BOOL "" FORCE)
-set(LWS_UNIX_SOCK OFF CACHE BOOL "" FORCE)
-add_subdirectory(thirdparty/libwebsockets EXCLUDE_FROM_ALL)
-include_directories("thirdparty/libwebsockets/include" SYSTEM)
-include_directories("${CMAKE_CURRENT_BINARY_DIR}/thirdparty/libwebsockets")
+# System headers
 
 INCLUDE(CheckIncludeFileCXX)
 # usage: CHECK_INCLUDE_FILES (<header> <RESULT_VARIABLE> )
@@ -210,31 +195,75 @@ CHECK_INCLUDE_FILE_CXX(sys/time.h HAVE_SYS_TIME_H)
 if (HAVE_TIME_H AND HAVE_SYS_TIME_H)
   set(TIME_WITH_SYS_TIME 1)
 endif ()
-#CHECK_INCLUDE_FILES ("sys/param.h;sys/mount.h" HAVE_SYS_MOUNT_H)
-# AC_CHECK_HEADERS([arpa/inet.h fcntl.h inttypes.h limits.h locale.h netdb.h netinet/in.h stddef.h stdint.h stdlib.h string.h sys/param.h sys/socket.h sys/time.h unistd.h])
 
-set(GENERATED_HEADERS
-  "${CMAKE_CURRENT_BINARY_DIR}/config.h"
-  "${CMAKE_CURRENT_BINARY_DIR}/packages/packages.autogen.h"
-  )
+# System Libraries
+find_package(OpenSSL 1.0.1 COMPONENTS SSL REQUIRED)
+include_directories(SYSTEM ${OPENSSL_INCLUDE_DIR})
 
-# Libraries
-if(WIN32)
-  find_package(Libevent 2.0 REQUIRED COMPONENTS libevent)
-else()
-  find_package(Libevent 2.0 REQUIRED COMPONENTS libevent pthreads)
-endif()
-# multiple packages uses this, so we simply do a global inclusion
-include_directories(SYSTEM ${LIBEVENT_INCLUDE_DIR})
-
-# Libraries
 find_package(ICU REQUIRED COMPONENTS uc dt)
 # Make ICU use utf-8 internally
 add_compile_options("-DU_CHARSET_IS_UTF8=1")
+if(STATIC)
+  add_compile_options("-DU_STATIC_IMPLEMENTATION")
+ENDIF()
+
 # multiple packages uses this, so we simply do a global inclusion too.
 include_directories(SYSTEM ${ICU_INCLUDE_DIRS})
 
+# Bundled libraries
+set(EVENT__DISABLE_BENCHMARK ON CACHE BOOL "" FORCE)
+set(EVENT__DISABLE_MBEDTLS ON CACHE BOOL "" FORCE)
+set(EVENT__DISABLE_BENCHMARK ON CACHE BOOL "" FORCE)
+set(EVENT__DISABLE_TESTS ON CACHE BOOL "" FORCE)
+set(EVENT__DISABLE_REGRESS ON CACHE BOOL "" FORCE)
+set(EVENT__DISABLE_SAMPLES ON CACHE BOOL "" FORCE)
+set(EVENT__DISABLE_MM_REPLACEMENT ON CACHE BOOL "" FORCE)
+include_directories(SYSETEM ${CMAKE_CURRENT_BINARY_DIR}/thirdparty/libevent/include)
+include_directories(SYSETEM thirdparty/libevent/include)
+add_subdirectory(thirdparty/libevent EXCLUDE_FROM_ALL)
+
+add_subdirectory(thirdparty/crypt EXCLUDE_FROM_ALL)
+add_subdirectory(thirdparty/libtelnet EXCLUDE_FROM_ALL)
+# TODO: required by windows code
+add_compile_options("-DGHC_WIN_DISABLE_WSTRING_STORAGE_TYPE")
+add_subdirectory(thirdparty/filesystem EXCLUDE_FROM_ALL)
+include_directories(thirdparty/filesystem/include)
+add_subdirectory(thirdparty/fmt EXCLUDE_FROM_ALL)
+include_directories(thirdparty/fmt/include)
+add_subdirectory(thirdparty/backward-cpp EXCLUDE_FROM_ALL)
+
+set(DISABLE_WERROR ON CACHE BOOL "" FORCE)
+set(LWS_WITH_SHARED OFF CACHE BOOL "" FORCE)
+set(LWS_WITHOUT_TESTAPPS ON CACHE BOOL "" FORCE)
+set(LWS_IPV6 ON CACHE BOOL "" FORCE)
+set(LWS_WITHOUT_EXTENSIONS OFF CACHE BOOL "" FORCE)
+set(LWS_WITH_LIBEVENT ON CACHE BOOL "" FORCE)
+set(LWS_STATIC_PIC ON CACHE BOOL "" FORCE)
+set(LWS_WITH_DIR OFF CACHE BOOL "" FORCE)
+set(LWS_WITH_SSL ON CACHE BOOL "" FORCE)
+set(LWS_WITH_HTTP2 ON CACHE BOOL "" FORCE)
+set(LWS_WITHOUT_TESTAPPS ON CACHE BOOL "" FORCE)
+set(LWS_WITHOUT_TEST_SERVER ON CACHE BOOL "" FORCE)
+set(LWS_WITHOUT_TEST_SERVER_EXTPOLL ON CACHE BOOL "" FORCE)
+set(LWS_WITHOUT_TEST_PING ON CACHE BOOL "" FORCE)
+set(LWS_WITHOUT_TEST_CLIENT ON CACHE BOOL "" FORCE)
+set(LWS_WITH_LEJP OFF CACHE BOOL "" FORCE)
+set(LWS_WITH_LEJP_CONF OFF CACHE BOOL "" FORCE)
+set(LWS_UNIX_SOCK OFF CACHE BOOL "" FORCE)
+set(LWS_WITH_NETLINK OFF CACHE BOOL "" FORCE)
+set(OPENSSL_FOUND 0) # hack to force lws re-search openssl
+set(LIBEVENT_FOUND 1) # hack to stop libwebsockets from finding libevent
+set(LIBEVENT_LIBRARIES "event_core_static")
+add_subdirectory(thirdparty/libwebsockets EXCLUDE_FROM_ALL)
+include_directories("thirdparty/libwebsockets/include" SYSTEM)
+include_directories("${CMAKE_CURRENT_BINARY_DIR}/thirdparty/libwebsockets")
+
 # Build phase
+
+set(GENERATED_HEADERS
+        "${CMAKE_CURRENT_BINARY_DIR}/config.h"
+        "${CMAKE_CURRENT_BINARY_DIR}/packages/packages.autogen.h"
+        )
 
 # Tools
 add_subdirectory(tools)
@@ -284,18 +313,11 @@ add_custom_command(
   DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/base/internal/options_incl.h"
 )
 
-add_custom_command(
-  OUTPUT "grammar.autogen.y"
-  COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/make_grammar.sh" "${CMAKE_CURRENT_SOURCE_DIR}/../" "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.y.pre" "${CMAKE_CXX_COMPILER}" "-I${CMAKE_CURRENT_BINARY_DIR}" "-I${CMAKE_CURRENT_SOURCE_DIR}"
-  DEPENDS "tools/make_grammar.sh" "compiler/internal/grammar.y.pre"
-)
-
 find_package(BISON REQUIRED)
-BISON_TARGET(Grammar ${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.y ${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.cc
+BISON_TARGET(Grammar "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.y" ${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.cc
   DEFINES_FILE "${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.h")
 
 set(GENERATRED_GRAMMAR_FILES
-  "${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.y"
   "${BISON_Grammar_OUTPUT_SOURCE}"
   "${BISON_Grammar_OUTPUT_HEADER}"
   )
@@ -305,6 +327,8 @@ set(SRC
   "comm.cc"
   "mainlib.cc"
   "user.cc"
+  "symbol.cc"
+  "net/tls.cc"
   "net/telnet.cc"
   "net/websocket.cc"
   "net/ws_ascii.cc"
@@ -323,6 +347,7 @@ set(SRC
   "base/internal/strput.cc"
   "base/internal/strutils.cc"
   "base/internal/tracing.cc"
+  "compiler/internal/grammar_rules.cc"
   "compiler/internal/compiler.cc"
   "compiler/internal/disassembler.cc"
   "compiler/internal/generate.cc"
@@ -369,6 +394,9 @@ add_dependencies(autogen make_options_defs)
 add_library(libdriver
   ${SRC} ${SRC_HEADER}
   )
+add_dependencies(libdriver autogen)
+
+list(APPEND FLUFFOS_LIBRARIES libdriver)
 
 # JEMALLOC must be the first!
 if (CYGWIN)
@@ -392,33 +420,35 @@ endif ()
 
 target_link_libraries(libdriver PUBLIC ghc_filesystem)
 
-target_link_libraries(libdriver PUBLIC autogen)
+target_link_libraries(libdriver PRIVATE fmt::fmt-header-only)
+
+list(APPEND FLUFFOS_LIBRARIES autogen)
 
 add_subdirectory(packages) # provides FLUFFOS_PACKAGES
 message(STATUS "ALL PACKAGES: ${FLUFFOS_PACKAGES}")
 foreach (PACKAGE ${FLUFFOS_PACKAGES})
   # TODO: packages files currently depenends on generated headers, so they must be built after driver
   add_dependencies("${PACKAGE}" autogen)
+  list(APPEND FLUFFOS_LIBRARIES "${PACKAGE}")
   target_link_libraries(libdriver PUBLIC "${PACKAGE}")
 endforeach ()
 
-add_subdirectory(thirdparty/crypt)
+
+target_link_libraries(libdriver PRIVATE event_core_static event_extra_static event_openssl_static)
+if (NOT WIN32)
+  target_link_libraries(libdriver PRIVATE event_pthreads_static)
+endif()
 target_link_libraries(libdriver PRIVATE crypt)
-
 target_link_libraries(libdriver PUBLIC ${LIBWEBSOCKETS_LIBRARIES_STATIC})
-# Third party libraries
-add_subdirectory(thirdparty/libtelnet EXCLUDE_FROM_ALL)
 target_link_libraries(libdriver PUBLIC libtelnet)
-
-target_link_libraries(libdriver PUBLIC ${ICU_LIBRARIES})
-
-add_subdirectory(thirdparty/backward-cpp EXCLUDE_FROM_ALL)
 target_compile_definitions(libdriver PUBLIC ${BACKWARD_DEFINITIONS})
 target_include_directories(libdriver PUBLIC ${BACKWARD_INCLUDE_DIRS})
 target_link_libraries(libdriver PUBLIC ${BACKWARD_LIBRARIES})
 
-# libevent
-target_link_libraries(libdriver PUBLIC ${LIBEVENT_LIBRARIES})
+# System libraries
+target_link_libraries(libdriver PUBLIC OpenSSL::SSL)
+target_link_libraries(libdriver PUBLIC ${ICU_LIBRARIES})
+# target_link_libraries(libdriver PUBLIC ${LIBEVENT_LIBRARIES})
 
 # Platform Libraries
 
@@ -450,11 +480,20 @@ if (APPLE)
   set(LINK_NO_WHOLE_ARCHIVE "")
 endif()
 
+if(APPLE)
+  set(FLUFFOS_LINK ${LINK_WHOLE_ARCHIVE} ${FLUFFOS_LIBRARIES} ${LINK_NO_WHOLE_ARCHIVE})
+else()
+  set(FLUFFOS_LINK -Wl,--start-group ${FLUFFOS_LIBRARIES} -Wl,--end-group)
+endif()
+
 add_executable(driver "main.cc")
-target_link_libraries(driver PUBLIC ${LINK_WHOLE_ARCHIVE} libdriver ${LINK_NO_WHOLE_ARCHIVE})
+target_link_libraries(driver PUBLIC ${FLUFFOS_LINK})
 
 add_executable(lpcc "main_lpcc.cc")
-target_link_libraries(lpcc PUBLIC ${LINK_WHOLE_ARCHIVE} libdriver ${LINK_NO_WHOLE_ARCHIVE})
+target_link_libraries(lpcc PUBLIC ${FLUFFOS_LINK})
+
+add_executable(symbol "main_symbol.cc")
+target_link_libraries(symbol PUBLIC ${FLUFFOS_LINK})
 
 include(helper)
 

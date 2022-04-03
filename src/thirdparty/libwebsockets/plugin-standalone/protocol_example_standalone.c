@@ -22,9 +22,15 @@
  * outside the library easily.
  */
 
+#if !defined (LWS_PLUGIN_STATIC)
+#if !defined(LWS_DLL)
 #define LWS_DLL
+#endif
+#if !defined(LWS_INTERNAL)
 #define LWS_INTERNAL
+#endif
 #include <libwebsockets.h>
+#endif
 
 #include <string.h>
 
@@ -131,6 +137,7 @@ LWS_VISIBLE const lws_plugin_protocol_t protocol_example_standalone = {
 	.hdr = {
 		"standalone",
 		"lws_protocol_plugin",
+		LWS_BUILD_HASH,
 		LWS_PLUGIN_API_MAGIC
 	},
 

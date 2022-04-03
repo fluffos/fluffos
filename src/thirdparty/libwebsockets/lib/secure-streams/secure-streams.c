@@ -1,7 +1,7 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2019 - 2020 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2019 - 2021 Andy Green <andy@warmcat.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -50,6 +50,7 @@ static const struct ss_pcols *ss_pcols[] = {
 };
 
 static const char *state_names[] = {
+	"(unset)",
 	"LWSSSCS_CREATING",
 	"LWSSSCS_DISCONNECTED",
 	"LWSSSCS_UNREACHABLE",
@@ -68,9 +69,260 @@ static const char *state_names[] = {
 	"LWSSSCS_SERVER_UPGRADE",
 };
 
+/*
+ * For each "current state", set bit offsets for valid "next states".
+ *
+ * Since there are complicated ways to arrive at state transitions like proxying
+ * and asynchronous destruction etc, so we monitor the state transitions we are
+ * giving the ss user code to ensure we never deliver illegal state transitions
+ * (because we will assert if we have bugs that do it)
+ */
+
+static const uint32_t ss_state_txn_validity[] = {
+
+	/* if we was last in this state...  we can legally go to these states */
+
+	[0]				= (1 << LWSSSCS_CREATING) |
+					  (1 << LWSSSCS_DESTROYING),
+
+	[LWSSSCS_CREATING]		= (1 << LWSSSCS_CONNECTING) |
+					  (1 << LWSSSCS_POLL) |
+					  (1 << LWSSSCS_SERVER_UPGRADE) |
+					  (1 << LWSSSCS_DESTROYING),
+
+	[LWSSSCS_DISCONNECTED]		= (1 << LWSSSCS_CONNECTING) |
+					  (1 << LWSSSCS_TIMEOUT) |
+					  (1 << LWSSSCS_POLL) |
+					  (1 << LWSSSCS_DESTROYING),
+
+	[LWSSSCS_UNREACHABLE]		= (1 << LWSSSCS_ALL_RETRIES_FAILED) |
+					  (1 << LWSSSCS_TIMEOUT) |
+					  (1 << LWSSSCS_POLL) |
+					  (1 << LWSSSCS_CONNECTING) |
+					  /* win conn failure > retry > succ */
+					  (1 << LWSSSCS_CONNECTED) |
+					  (1 << LWSSSCS_DESTROYING),
+
+	[LWSSSCS_AUTH_FAILED]		= (1 << LWSSSCS_ALL_RETRIES_FAILED) |
+					  (1 << LWSSSCS_TIMEOUT) |
+					  (1 << LWSSSCS_CONNECTING) |
+					  (1 << LWSSSCS_DESTROYING),
+
+	[LWSSSCS_CONNECTED]		= (1 << LWSSSCS_SERVER_UPGRADE) |
+					  (1 << LWSSSCS_SERVER_TXN) |
+					  (1 << LWSSSCS_AUTH_FAILED) |
+					  (1 << LWSSSCS_QOS_ACK_REMOTE) |
+					  (1 << LWSSSCS_QOS_NACK_REMOTE) |
+					  (1 << LWSSSCS_QOS_ACK_LOCAL) |
+					  (1 << LWSSSCS_QOS_NACK_LOCAL) |
+					  (1 << LWSSSCS_DISCONNECTED) |
+					  (1 << LWSSSCS_TIMEOUT) |
+					  (1 << LWSSSCS_POLL) | /* proxy retry */
+					  (1 << LWSSSCS_DESTROYING),
+
+	[LWSSSCS_CONNECTING]		= (1 << LWSSSCS_UNREACHABLE) |
+					  (1 << LWSSSCS_AUTH_FAILED) |
+					  (1 << LWSSSCS_CONNECTING) |
+					  (1 << LWSSSCS_CONNECTED) |
+					  (1 << LWSSSCS_TIMEOUT) |
+					  (1 << LWSSSCS_DISCONNECTED) | /* proxy retry */
+					  (1 << LWSSSCS_DESTROYING),
+
+	[LWSSSCS_DESTROYING]		= 0,
+
+	[LWSSSCS_POLL]			= (1 << LWSSSCS_CONNECTING) |
+					  (1 << LWSSSCS_TIMEOUT) |
+					  (1 << LWSSSCS_DESTROYING),
+
+	[LWSSSCS_ALL_RETRIES_FAILED]	= (1 << LWSSSCS_CONNECTING) |
+					  (1 << LWSSSCS_TIMEOUT) |
+					  (1 << LWSSSCS_DESTROYING),
+
+	[LWSSSCS_QOS_ACK_REMOTE]	= (1 << LWSSSCS_DISCONNECTED) |
+					  (1 << LWSSSCS_TIMEOUT) |
+#if defined(LWS_ROLE_MQTT)
+					  (1 << LWSSSCS_QOS_ACK_REMOTE) |
+#endif
+					  (1 << LWSSSCS_DESTROYING),
+
+	[LWSSSCS_QOS_NACK_REMOTE]	= (1 << LWSSSCS_DISCONNECTED) |
+					  (1 << LWSSSCS_TIMEOUT) |
+					  (1 << LWSSSCS_DESTROYING),
+
+	[LWSSSCS_QOS_ACK_LOCAL]		= (1 << LWSSSCS_DISCONNECTED) |
+					  (1 << LWSSSCS_TIMEOUT) |
+					  (1 << LWSSSCS_DESTROYING),
+
+	[LWSSSCS_QOS_NACK_LOCAL]	= (1 << LWSSSCS_DESTROYING) |
+					  (1 << LWSSSCS_TIMEOUT),
+
+	/* he can get the timeout at any point and take no action... */
+	[LWSSSCS_TIMEOUT]		= (1 << LWSSSCS_CONNECTING) |
+					  (1 << LWSSSCS_CONNECTED) |
+					  (1 << LWSSSCS_QOS_ACK_REMOTE) |
+					  (1 << LWSSSCS_QOS_NACK_REMOTE) |
+					  (1 << LWSSSCS_POLL) |
+					  (1 << LWSSSCS_TIMEOUT) |
+					  (1 << LWSSSCS_DISCONNECTED) |
+					  (1 << LWSSSCS_UNREACHABLE) |
+					  (1 << LWSSSCS_DESTROYING),
+
+	[LWSSSCS_SERVER_TXN]		= (1 << LWSSSCS_DISCONNECTED) |
+					  (1 << LWSSSCS_TIMEOUT) |
+					  (1 << LWSSSCS_DESTROYING),
+
+	[LWSSSCS_SERVER_UPGRADE]	= (1 << LWSSSCS_SERVER_TXN) |
+					  (1 << LWSSSCS_TIMEOUT) |
+					  (1 << LWSSSCS_DISCONNECTED) |
+					  (1 << LWSSSCS_DESTROYING),
+};
+
+#if defined(LWS_WITH_CONMON)
+
+/*
+ * Convert any conmon data to JSON and attach to the ss handle.
+ */
+
+lws_ss_state_return_t
+lws_conmon_ss_json(lws_ss_handle_t *h)
+{
+	char ads[48], *end, *buf, *obuf;
+	const struct addrinfo *ai;
+	lws_ss_state_return_t ret = LWSSSSRET_OK;
+	struct lws_conmon cm;
+	size_t len = 500;
+
+	if (!h->policy || !(h->policy->flags & LWSSSPOLF_PERF) || !h->wsi ||
+	    h->wsi->perf_done)
+		return LWSSSSRET_OK;
+
+	if (h->conmon_json)
+		lws_free_set_NULL(h->conmon_json);
+
+	h->conmon_json = lws_malloc(len, __func__);
+	if (!h->conmon_json)
+		return LWSSSSRET_OK;
+
+	obuf = buf = h->conmon_json;
+	end = buf + len - 1;
+
+	lws_conmon_wsi_take(h->wsi, &cm);
+
+	lws_sa46_write_numeric_address(&cm.peer46, ads, sizeof(ads));
+	buf += lws_snprintf(buf, lws_ptr_diff_size_t(end, buf),
+		     "{\"peer\":\"%s\","
+		      "\"dns_us\":%u,"
+		      "\"sockconn_us\":%u,"
+		      "\"tls_us\":%u,"
+		      "\"txn_resp_us:%u,"
+		      "\"dns\":[",
+		    ads,
+		    (unsigned int)cm.ciu_dns,
+		    (unsigned int)cm.ciu_sockconn,
+		    (unsigned int)cm.ciu_tls,
+		    (unsigned int)cm.ciu_txn_resp);
+
+	ai = cm.dns_results_copy;
+	while (ai) {
+		lws_sa46_write_numeric_address((lws_sockaddr46 *)ai->ai_addr, ads, sizeof(ads));
+		buf += lws_snprintf(buf, lws_ptr_diff_size_t(end, buf), "\"%s\"", ads);
+		if (ai->ai_next && buf < end - 2)
+			*buf++ = ',';
+		ai = ai->ai_next;
+	}
+
+	buf += lws_snprintf(buf, lws_ptr_diff_size_t(end, buf), "]}");
+
+	/*
+	 * This destroys the DNS list in the lws_conmon that we took
+	 * responsibility for when we used lws_conmon_wsi_take()
+	 */
+
+	lws_conmon_release(&cm);
+
+	h->conmon_len = (uint16_t)lws_ptr_diff(buf, obuf);
+
+#if defined(LWS_WITH_SECURE_STREAMS_PROXY_API)
+	if (h->proxy_onward) {
+
+		/*
+		 * ask to forward it on the proxy link
+		 */
+
+		ss_proxy_onward_link_req_writeable(h);
+		return LWSSSSRET_OK;
+	}
+#endif
+
+	/*
+	 * We can deliver it directly
+	 */
+
+	if (h->info.rx)
+		ret = h->info.rx(ss_to_userobj(h), (uint8_t *)h->conmon_json,
+				 (unsigned int)h->conmon_len,
+				 (int)(LWSSS_FLAG_SOM | LWSSS_FLAG_EOM |
+						 LWSSS_FLAG_PERF_JSON));
+
+	lws_free_set_NULL(h->conmon_json);
+
+	return ret;
+}
+#endif
+
+int
+lws_ss_check_next_state(lws_lifecycle_t *lc, uint8_t *prevstate,
+			lws_ss_constate_t cs)
+{
+	if (cs >= LWSSSCS_USER_BASE)
+		/*
+		 * we can't judge user states, leave the old state and
+		 * just wave them through
+		 */
+		return 0;
+
+	if (cs >= LWS_ARRAY_SIZE(ss_state_txn_validity)) {
+		/* we don't recognize this state as usable */
+		lwsl_err("%s: %s: bad new state %u\n", __func__, lc->gutag, cs);
+		assert(0);
+		return 1;
+	}
+
+	if (*prevstate >= LWS_ARRAY_SIZE(ss_state_txn_validity)) {
+		/* existing state is broken */
+		lwsl_err("%s: %s: bad existing state %u\n", __func__,
+			 lc->gutag, (unsigned int)*prevstate);
+		assert(0);
+		return 1;
+	}
+
+	if (ss_state_txn_validity[*prevstate] & (1u << cs)) {
+
+		lwsl_notice("%s: %s: %s -> %s\n", __func__, lc->gutag,
+			    lws_ss_state_name((int)*prevstate),
+			    lws_ss_state_name((int)cs));
+
+		/* this is explicitly allowed, update old state to new */
+		*prevstate = (uint8_t)cs;
+
+		return 0;
+	}
+
+	lwsl_err("%s: %s: transition from %s -> %s is illegal\n", __func__,
+		 lc->gutag, lws_ss_state_name((int)*prevstate),
+		 lws_ss_state_name((int)cs));
+
+	assert(0);
+
+	return 1;
+}
+
 const char *
 lws_ss_state_name(int state)
 {
+	if (state >= LWSSSCS_USER_BASE)
+		return "user state";
+
 	if (state >= (int)LWS_ARRAY_SIZE(state_names))
 		return "unknown";
 
@@ -85,6 +337,14 @@ lws_ss_event_helper(lws_ss_handle_t *h, lws_ss_constate_t cs)
 	if (!h)
 		return LWSSSSRET_OK;
 
+	if (lws_ss_check_next_state(&h->lc, &h->prev_ss_state, cs))
+		return LWSSSSRET_DESTROY_ME;
+
+	if (cs == LWSSSCS_CONNECTED)
+		h->ss_dangling_connected = 1;
+	if (cs == LWSSSCS_DISCONNECTED)
+		h->ss_dangling_connected = 0;
+
 #if defined(LWS_WITH_SEQUENCER)
 	/*
 	 * A parent sequencer for the ss is optional, if we have one, keep it
@@ -96,7 +356,9 @@ lws_ss_event_helper(lws_ss_handle_t *h, lws_ss_constate_t cs)
 #endif
 
 	if (h->info.state) {
-		r = h->info.state(ss_to_userobj(h), NULL, cs, 0);
+		r = h->info.state(ss_to_userobj(h), NULL, cs,
+			cs == LWSSSCS_UNREACHABLE &&
+			h->wsi && h->wsi->dns_reachability);
 #if defined(LWS_WITH_SERVER)
 		if ((h->info.flags & LWSSSINFLAGS_ACCEPTED) &&
 		    cs == LWSSSCS_DISCONNECTED)
@@ -109,12 +371,21 @@ lws_ss_event_helper(lws_ss_handle_t *h, lws_ss_constate_t cs)
 }
 
 int
-_lws_ss_handle_state_ret(lws_ss_state_return_t r, struct lws *wsi,
+_lws_ss_handle_state_ret_CAN_DESTROY_HANDLE(lws_ss_state_return_t r, struct lws *wsi,
 			 lws_ss_handle_t **ph)
 {
 	if (r == LWSSSSRET_DESTROY_ME) {
-		if (wsi)
+		lwsl_info("%s: DESTROY ME: %s, %s\n", __func__,
+				lws_wsi_tag(wsi), lws_ss_tag(*ph));
+		if (wsi) {
 			lws_set_opaque_user_data(wsi, NULL);
+			lws_set_timeout(wsi, 1, LWS_TO_KILL_ASYNC);
+		} else {
+			if ((*ph)->wsi) {
+				lws_set_opaque_user_data((*ph)->wsi, NULL);
+				lws_set_timeout((*ph)->wsi, 1, LWS_TO_KILL_ASYNC);
+			}
+		}
 		(*ph)->wsi = NULL;
 		lws_ss_destroy(ph);
 	}
@@ -125,14 +396,15 @@ _lws_ss_handle_state_ret(lws_ss_state_return_t r, struct lws *wsi,
 static void
 lws_ss_timeout_sul_check_cb(lws_sorted_usec_list_t *sul)
 {
+	lws_ss_state_return_t r;
 	lws_ss_handle_t *h = lws_container_of(sul, lws_ss_handle_t, sul);
 
-	lwsl_notice("%s: retrying ss h %p (%s) after backoff\n", __func__, h,
-		 h->policy->streamtype);
+	lwsl_info("%s: retrying %s after backoff\n", __func__, lws_ss_tag(h));
 	/* we want to retry... */
 	h->seqstate = SSSEQ_DO_RETRY;
 
-	lws_ss_request_tx(h);
+	r = _lws_ss_request_tx(h);
+	_lws_ss_handle_state_ret_CAN_DESTROY_HANDLE(r, NULL, &h);
 }
 
 int
@@ -142,7 +414,8 @@ lws_ss_exp_cb_metadata(void *priv, const char *name, char *out, size_t *pos,
 	lws_ss_handle_t *h = (lws_ss_handle_t *)priv;
 	const char *replace = NULL;
 	size_t total, budget;
-	lws_ss_metadata_t *md = lws_ss_policy_metadata(h->policy, name);
+	lws_ss_metadata_t *md = lws_ss_policy_metadata(h->policy, name),
+			  *hmd = lws_ss_get_handle_metadata(h, name);
 
 	if (!md) {
 		lwsl_err("%s: Unknown metadata %s\n", __func__, name);
@@ -150,11 +423,15 @@ lws_ss_exp_cb_metadata(void *priv, const char *name, char *out, size_t *pos,
 		return LSTRX_FATAL_NAME_UNKNOWN;
 	}
 
-	lwsl_info("%s %s %d\n", __func__, name, (int)md->length);
+	if (!hmd)
+		return LSTRX_FILLED_OUT;
 
-	replace = h->metadata[md->length].value;
-	total = h->metadata[md->length].length;
-	// lwsl_hexdump_err(replace, total);
+	replace = hmd->value__may_own_heap;
+
+	if (!replace)
+		return LSTRX_DONE;
+
+	total = hmd->length;
 
 	budget = olen - *pos;
 	total -= *exp_ofs;
@@ -186,7 +463,7 @@ lws_ss_set_timeout_us(lws_ss_handle_t *h, lws_usec_t us)
 }
 
 lws_ss_state_return_t
-lws_ss_backoff(lws_ss_handle_t *h)
+_lws_ss_backoff(lws_ss_handle_t *h, lws_usec_t us_override)
 {
 	uint64_t ms;
 	char conceal;
@@ -196,22 +473,38 @@ lws_ss_backoff(lws_ss_handle_t *h)
 
 	/* figure out what we should do about another retry */
 
-	lwsl_info("%s: ss %p: retry backoff after failure\n", __func__, h);
+	lwsl_info("%s: %s: retry backoff after failure\n", __func__, lws_ss_tag(h));
 	ms = lws_retry_get_delay_ms(h->context, h->policy->retry_bo,
 				    &h->retry, &conceal);
 	if (!conceal) {
-		lwsl_info("%s: ss %p: abandon conn attempt \n",__func__, h);
+		lwsl_info("%s: %s: abandon conn attempt \n",__func__, lws_ss_tag(h));
+
+		if (h->seqstate == SSSEQ_IDLE) /* been here? */
+			return LWSSSSRET_OK;
+
 		h->seqstate = SSSEQ_IDLE;
 
 		return lws_ss_event_helper(h, LWSSSCS_ALL_RETRIES_FAILED);
 	}
 
-	h->seqstate = SSSEQ_RECONNECT_WAIT;
-	lws_ss_set_timeout_us(h, ms * LWS_US_PER_MS);
+	/* Only increase our planned backoff, or go with it */
 
-	lwsl_info("%s: ss %p: retry wait %"PRIu64"ms\n", __func__, h, ms);
+	if (us_override < (lws_usec_t)ms * LWS_US_PER_MS)
+		us_override = (lws_usec_t)(ms * LWS_US_PER_MS);
+
+	h->seqstate = SSSEQ_RECONNECT_WAIT;
+	lws_ss_set_timeout_us(h, us_override);
+
+	lwsl_info("%s: %s: retry wait %dms\n", __func__, lws_ss_tag(h),
+						  (int)(us_override / 1000));
 
 	return LWSSSSRET_OK;
+}
+
+lws_ss_state_return_t
+lws_ss_backoff(lws_ss_handle_t *h)
+{
+	return _lws_ss_backoff(h, 0);
 }
 
 #if defined(LWS_WITH_SYS_SMD)
@@ -242,7 +535,7 @@ lws_smd_ss_cb(void *opaque, lws_smd_class_t _class,
 	 */
 
 	lws_ser_wu64be(p, _class);
-	lws_ser_wu64be(p + 8, timestamp);
+	lws_ser_wu64be(p + 8, (uint64_t)timestamp);
 
 	if (h->info.rx)
 		h->info.rx((void *)&h[1], p, len + LWS_SMD_SS_RX_HEADER_LEN,
@@ -289,23 +582,24 @@ lws_ss_smd_tx_cb(lws_sorted_usec_list_t *sul)
 
 #endif
 
-int
-_lws_ss_client_connect(lws_ss_handle_t *h, int is_retry)
+lws_ss_state_return_t
+_lws_ss_client_connect(lws_ss_handle_t *h, int is_retry, void *conn_if_sspc_onw)
 {
 	const char *prot, *_prot, *ipath, *_ipath, *ads, *_ads;
 	struct lws_client_connect_info i;
 	const struct ss_pcols *ssp;
 	size_t used_in, used_out;
 	union lws_ss_contemp ct;
-	char path[1024], ep[96];
 	lws_ss_state_return_t r;
 	int port, _port, tls;
+	char *path, ep[96];
 	lws_strexp_t exp;
+	struct lws *wsi;
 
 	if (!h->policy) {
 		lwsl_err("%s: ss with no policy\n", __func__);
 
-		return -1;
+		return LWSSSSRET_OK;
 	}
 
 	/*
@@ -322,7 +616,7 @@ _lws_ss_client_connect(lws_ss_handle_t *h, int is_retry)
 	if (h->policy == &pol_smd) {
 
 		if (h->u.smd.smd_peer)
-			return 0;
+			return LWSSSSRET_OK;
 
 		// lwsl_notice("%s: received connect for _lws_smd, registering for class mask 0x%x\n",
 		//		__func__, h->info.manual_initial_tx_credit);
@@ -330,17 +624,17 @@ _lws_ss_client_connect(lws_ss_handle_t *h, int is_retry)
 		h->u.smd.smd_peer = lws_smd_register(h->context, h,
 					(h->info.flags & LWSSSINFLAGS_PROXIED) ?
 						LWSSMDREG_FLAG_PROXIED_SS : 0,
-					h->info.manual_initial_tx_credit,
+					(lws_smd_class_t)h->info.manual_initial_tx_credit,
 					lws_smd_ss_cb);
 		if (!h->u.smd.smd_peer)
-			return -1;
+			return LWSSSSRET_TX_DONT_SEND;
 
 		if (lws_ss_event_helper(h, LWSSSCS_CONNECTING))
-			return -1;
-		// lwsl_err("%s: registered SS SMD\n", __func__);
+			return LWSSSSRET_TX_DONT_SEND;
+
 		if (lws_ss_event_helper(h, LWSSSCS_CONNECTED))
-			return -1;
-		return 0;
+			return LWSSSSRET_TX_DONT_SEND;
+		return LWSSSSRET_OK;
 	}
 #endif
 
@@ -356,7 +650,7 @@ _lws_ss_client_connect(lws_ss_handle_t *h, int is_retry)
 			      &used_in, &used_out) != LSTRX_DONE) {
 		lwsl_err("%s: address strexp failed\n", __func__);
 
-		return -1;
+		return LWSSSSRET_TX_DONT_SEND;
 	}
 
 	/*
@@ -413,6 +707,31 @@ _lws_ss_client_connect(lws_ss_handle_t *h, int is_retry)
 	if (h->policy->flags & LWSSSPOLF_WAKE_SUSPEND__VALIDITY)
 		i.ssl_connection |= LCCSCF_WAKE_SUSPEND__VALIDITY;
 
+	/* translate policy attributes to IP ToS flags */
+
+	if (h->policy->flags & LWSSSPOLF_ATTR_LOW_LATENCY)
+		i.ssl_connection |= LCCSCF_IP_LOW_LATENCY;
+	if (h->policy->flags & LWSSSPOLF_ATTR_HIGH_THROUGHPUT)
+		i.ssl_connection |= LCCSCF_IP_HIGH_THROUGHPUT;
+	if (h->policy->flags & LWSSSPOLF_ATTR_HIGH_RELIABILITY)
+		i.ssl_connection |= LCCSCF_IP_HIGH_RELIABILITY;
+	if (h->policy->flags & LWSSSPOLF_ATTR_LOW_COST)
+		i.ssl_connection |= LCCSCF_IP_LOW_COST;
+	if (h->policy->flags & LWSSSPOLF_PERF) /* collect conmon stats on this */
+		i.ssl_connection |= LCCSCF_CONMON;
+
+	/* mark the connection with the streamtype priority from the policy */
+
+	i.priority = h->policy->priority;
+
+	i.ssl_connection |= LCCSCF_SECSTREAM_CLIENT;
+
+	if (conn_if_sspc_onw) {
+		i.ssl_connection |= LCCSCF_SECSTREAM_PROXY_ONWARD;
+		h->conn_if_sspc_onw = conn_if_sspc_onw;
+	}
+
+
 	i.address		= ads;
 	i.port			= port;
 	i.host			= i.address;
@@ -431,7 +750,7 @@ _lws_ss_client_connect(lws_ss_handle_t *h, int is_retry)
 	if (!ssp) {
 		lwsl_err("%s: unsupported protocol\n", __func__);
 
-		return -1;
+		return LWSSSSRET_TX_DONT_SEND;
 	}
 	i.alpn = ssp->alpn;
 
@@ -443,43 +762,82 @@ _lws_ss_client_connect(lws_ss_handle_t *h, int is_retry)
 	i.protocol = ssp->protocol->name; /* lws protocol name */
 	i.local_protocol_name = i.protocol;
 
+	path = lws_malloc(h->context->max_http_header_data, __func__);
+	if (!path) {
+		lwsl_warn("%s: OOM on path prealloc\n", __func__);
+		return LWSSSSRET_TX_DONT_SEND;
+	}
+
 	if (ssp->munge) /* eg, raw doesn't use; endpoint strexp already done */
-		ssp->munge(h, path, sizeof(path), &i, &ct);
+		ssp->munge(h, path, h->context->max_http_header_data, &i, &ct);
 
 	i.pwsi = &h->wsi;
 
 #if defined(LWS_WITH_SSPLUGINS)
 	if (h->policy->plugins[0] && h->policy->plugins[0]->munge)
-		h->policy->plugins[0]->munge(h, path, sizeof(path));
+		h->policy->plugins[0]->munge(h, path, h->context->max_http_header_data);
 #endif
 
 	lwsl_info("%s: connecting %s, '%s' '%s' %s\n", __func__, i.method,
 			i.alpn, i.address, i.path);
 
+#if defined(LWS_WITH_SYS_METRICS)
+	/* possibly already hanging connect retry... */
+	if (!h->cal_txn.mt)
+		lws_metrics_caliper_bind(h->cal_txn, h->context->mth_ss_conn);
+
+	lws_metrics_tag_add(&h->cal_txn.mtags_owner, "ss", h->policy->streamtype);
+#endif
+
 	h->txn_ok = 0;
 	r = lws_ss_event_helper(h, LWSSSCS_CONNECTING);
-	if (r)
+	if (r) {
+		lws_free(path);
 		return r;
-
-	if (!lws_client_connect_via_info(&i)) {
-		r = lws_ss_event_helper(h, LWSSSCS_UNREACHABLE);
-		if (r)
-			return r;
-
-		r = lws_ss_backoff(h);
-		if (r)
-			return r;
-
-		return 1;
 	}
 
-	return 0;
+	h->inside_connect = 1;
+	h->pending_ret = LWSSSSRET_OK;
+	wsi = lws_client_connect_via_info(&i);
+	h->inside_connect = 0;
+	lws_free(path);
+	if (!wsi) {
+		/*
+		 * We already found that we could not connect, without even
+		 * having to go around the event loop
+		 */
+
+		if (h->pending_ret)
+			return h->pending_ret;
+
+		if (h->prev_ss_state != LWSSSCS_UNREACHABLE &&
+		    h->prev_ss_state != LWSSSCS_ALL_RETRIES_FAILED) {
+			/*
+			 * blocking DNS failure can get to unreachable via
+			 * CCE, and unreachable can get to ALL_RETRIES_FAILED
+			 */
+			r = lws_ss_event_helper(h, LWSSSCS_UNREACHABLE);
+			if (r)
+				return r;
+
+			r = lws_ss_backoff(h);
+			if (r)
+				return r;
+		}
+
+		return LWSSSSRET_TX_DONT_SEND;
+	}
+
+	return LWSSSSRET_OK;
 }
 
-int
+lws_ss_state_return_t
 lws_ss_client_connect(lws_ss_handle_t *h)
 {
-	return _lws_ss_client_connect(h, 0);
+	lws_ss_state_return_t r;
+	r = _lws_ss_client_connect(h, 0, 0);
+	_lws_ss_handle_state_ret_CAN_DESTROY_HANDLE(r, h->wsi, &h);
+	return r;
 }
 
 /*
@@ -497,6 +855,7 @@ lws_ss_create(struct lws_context *context, int tsi, const lws_ss_info_t *ssi,
 {
 	struct lws_context_per_thread *pt = &context->pt[tsi];
 	const lws_ss_policy_t *pol;
+	lws_ss_state_return_t r;
 	lws_ss_metadata_t *smd;
 	lws_ss_handle_t *h;
 	size_t size;
@@ -504,13 +863,43 @@ lws_ss_create(struct lws_context *context, int tsi, const lws_ss_info_t *ssi,
 	char *p;
 	int n;
 
-	pol = lws_ss_policy_lookup(context, ssi->streamtype);
+#if defined(LWS_WITH_SECURE_STREAMS_CPP)
+	pol = ssi->policy;
 	if (!pol) {
-		lwsl_info("%s: unknown stream type %s\n", __func__,
-			  ssi->streamtype);
-		return 1;
-	}
+#endif
 
+#if defined(LWS_WITH_SYS_FAULT_INJECTION)
+		lws_fi_ctx_t temp_fic;
+
+		/*
+		 * We have to do a temp inherit from context to find out
+		 * early if we are supposed to inject a fault concealing
+		 * the policy
+		 */
+
+		memset(&temp_fic, 0, sizeof(temp_fic));
+		lws_xos_init(&temp_fic.xos, lws_xos(&context->fic.xos));
+		lws_fi_inherit_copy(&temp_fic, &context->fic, "ss", ssi->streamtype);
+
+		if (lws_fi(&temp_fic, "ss_no_streamtype_policy"))
+			pol = NULL;
+		else
+			pol = lws_ss_policy_lookup(context, ssi->streamtype);
+
+		lws_fi_destroy(&temp_fic);
+#else
+		pol = lws_ss_policy_lookup(context, ssi->streamtype);
+#endif
+		if (!pol) {
+			lwsl_info("%s: unknown stream type %s\n", __func__,
+				  ssi->streamtype);
+			return 1;
+		}
+#if defined(LWS_WITH_SECURE_STREAMS_CPP)
+	}
+#endif
+
+#if 0
 	if (ssi->flags & LWSSSINFLAGS_REGISTER_SINK) {
 		/*
 		 * This can register a secure streams sink as well as normal
@@ -536,6 +925,7 @@ lws_ss_create(struct lws_context *context, int tsi, const lws_ss_info_t *ssi,
 		}
 //		lws_dll2_foreach_safe(&pt->ss_owner, NULL, lws_ss_destroy_dll);
 	}
+#endif
 
 	/*
 	 * We overallocate and point to things in the overallocation...
@@ -549,7 +939,8 @@ lws_ss_create(struct lws_context *context, int tsi, const lws_ss_info_t *ssi,
 	 * ... when we come to destroy it, just one free to do.
 	 */
 
-	size = sizeof(*h) + ssi->user_alloc + strlen(ssi->streamtype) + 1;
+	size = sizeof(*h) + ssi->user_alloc +
+			(ssi->streamtype ? strlen(ssi->streamtype): 0) + 1;
 #if defined(LWS_WITH_SSPLUGINS)
 	if (pol->plugins[0])
 		size += pol->plugins[0]->alloc;
@@ -562,11 +953,32 @@ lws_ss_create(struct lws_context *context, int tsi, const lws_ss_info_t *ssi,
 	if (!h)
 		return 2;
 
+	if (ssi->sss_protocol_version)
+		__lws_lc_tag(&context->lcg[LWSLCG_WSI_SS_CLIENT], &h->lc, "%s|v%u|%u",
+			     ssi->streamtype ? ssi->streamtype : "nostreamtype",
+			     (unsigned int)ssi->sss_protocol_version,
+			     (unsigned int)ssi->client_pid);
+	else
+		__lws_lc_tag(&context->lcg[LWSLCG_WSI_SS_CLIENT], &h->lc, "%s",
+				ssi->streamtype ? ssi->streamtype : "nostreamtype");
+
+#if defined(LWS_WITH_SYS_FAULT_INJECTION)
+	h->fic.name = "ss";
+	lws_xos_init(&h->fic.xos, lws_xos(&context->fic.xos));
+	if (ssi->fic.fi_owner.count)
+		lws_fi_import(&h->fic, &ssi->fic);
+
+	lws_fi_inherit_copy(&h->fic, &context->fic, "ss", ssi->streamtype);
+#endif
+
 	h->info = *ssi;
 	h->policy = pol;
 	h->context = context;
-	h->tsi = tsi;
+	h->tsi = (uint8_t)tsi;
 	h->seq = seq_owner;
+
+	if (h->info.flags & LWSSSINFLAGS_PROXIED)
+		h->proxy_onward = 1;
 
 	/* start of overallocated area */
 	p = (char *)&h[1];
@@ -610,10 +1022,11 @@ lws_ss_create(struct lws_context *context, int tsi, const lws_ss_info_t *ssi,
 		smd = smd->next;
 	}
 
-	memcpy(p, ssi->streamtype, strlen(ssi->streamtype) + 1);
+	if (ssi->streamtype)
+		memcpy(p, ssi->streamtype, strlen(ssi->streamtype) + 1);
 	/* don't mark accepted ss as being the server */
 	if (ssi->flags & LWSSSINFLAGS_SERVER)
-		h->info.flags &= ~LWSSSINFLAGS_SERVER;
+		h->info.flags &= (uint8_t)~LWSSSINFLAGS_SERVER;
 	h->info.streamtype = p;
 
 	lws_pt_lock(pt, __func__);
@@ -638,7 +1051,7 @@ lws_ss_create(struct lws_context *context, int tsi, const lws_ss_info_t *ssi,
 	 */
 	if (!(ssi->flags & LWSSSINFLAGS_PROXIED) &&
 	    pol == &pol_smd) {
-		lws_ss_state_return_t r;
+
 		/*
 		 * So he has asked to be wired up to SMD over a SS link.
 		 * Register him as an smd participant in his own right.
@@ -648,17 +1061,12 @@ lws_ss_create(struct lws_context *context, int tsi, const lws_ss_info_t *ssi,
 		 * format as well)
 		 */
 		h->u.smd.smd_peer = lws_smd_register(context, h, 0,
-						     ssi->manual_initial_tx_credit,
+						     (lws_smd_class_t)ssi->manual_initial_tx_credit,
 						     lws_smd_ss_cb);
 		if (!h->u.smd.smd_peer)
-			goto late_bail;
+			goto fail_creation;
+
 		lwsl_info("%s: registered SS SMD\n", __func__);
-		r = lws_ss_event_helper(h, LWSSSCS_CONNECTING);
-		if (r)
-			return r;
-		r = lws_ss_event_helper(h, LWSSSCS_CONNECTED);
-		if (r)
-			return r;
 	}
 #endif
 
@@ -666,9 +1074,29 @@ lws_ss_create(struct lws_context *context, int tsi, const lws_ss_info_t *ssi,
 	if (h->policy->flags & LWSSSPOLF_SERVER) {
 		const struct lws_protocols *pprot[3], **ppp = &pprot[0];
 		struct lws_context_creation_info i;
-		struct lws_vhost *vho;
+		struct lws_vhost *vho = NULL;
 
 		lwsl_info("%s: creating server\n", __func__);
+
+		if (h->policy->endpoint &&
+		    h->policy->endpoint[0] == '!') {
+			/*
+			 * There's already a vhost existing that we want to
+			 * bind to, we don't have to specify and create one.
+			 *
+			 * The vhost must enable any protocols that we want.
+			 */
+
+			vho = lws_get_vhost_by_name(context,
+						    &h->policy->endpoint[1]);
+			if (!vho) {
+				lwsl_err("%s: no vhost %s\n", __func__,
+						&h->policy->endpoint[1]);
+				goto fail_creation;
+			}
+
+			goto extant;
+		}
 
 		/*
 		 * This streamtype represents a server, we're being asked to
@@ -681,9 +1109,14 @@ lws_ss_create(struct lws_context *context, int tsi, const lws_ss_info_t *ssi,
 		i.vhost_name	= h->policy->streamtype;
 		i.port		= h->policy->port;
 
+		if (i.iface && i.iface[0] == '+') {
+			i.iface++;
+			i.options |= LWS_SERVER_OPTION_UNIX_SOCK;
+		}
+
 		if (!ss_pcols[h->policy->protocol]) {
 			lwsl_err("%s: unsupp protocol", __func__);
-			goto late_bail;
+			goto fail_creation;
 		}
 
 		*ppp++ = ss_pcols[h->policy->protocol]->protocol;
@@ -712,17 +1145,26 @@ lws_ss_create(struct lws_context *context, int tsi, const lws_ss_info_t *ssi,
 		}
 #endif
 
-		vho = lws_create_vhost(context, &i);
+
+		if (!lws_fi(&ssi->fic, "ss_srv_vh_fail"))
+			vho = lws_create_vhost(context, &i);
 		if (!vho) {
 			lwsl_err("%s: failed to create vh", __func__);
-			goto late_bail;
+			goto fail_creation;
 		}
+
+extant:
 
 		/*
 		 * Mark this vhost as having to apply ss server semantics to
 		 * any incoming accepted connection
 		 */
 		vho->ss_handle = h;
+
+		r = lws_ss_event_helper(h, LWSSSCS_CREATING);
+		lwsl_info("%s: CREATING returned status %d\n", __func__, (int)r);
+		if (r == LWSSSSRET_DESTROY_ME)
+			goto fail_creation;
 
 		lwsl_notice("%s: created server %s\n", __func__,
 				h->policy->streamtype);
@@ -745,19 +1187,28 @@ lws_ss_create(struct lws_context *context, int tsi, const lws_ss_info_t *ssi,
 
 	if (!lws_ss_policy_ref_trust_store(context, h->policy, 1 /* do the ref */)) {
 		lwsl_err("%s: unable to get vhost / trust store\n", __func__);
-		goto late_bail;
+		goto fail_creation;
 	}
 #endif
 
-	if (lws_ss_event_helper(h, LWSSSCS_CREATING)) {
-late_bail:
-		lws_pt_lock(pt, __func__);
-		lws_dll2_remove(&h->list);
-		lws_pt_unlock(pt);
-		lws_free(h);
+	r = lws_ss_event_helper(h, LWSSSCS_CREATING);
+	lwsl_info("%s: CREATING returned status %d\n", __func__, (int)r);
+	if (r == LWSSSSRET_DESTROY_ME)
+		goto fail_creation;
 
-		return 1;
+#if defined(LWS_WITH_SYS_SMD)
+	if (!(ssi->flags & LWSSSINFLAGS_PROXIED) &&
+	    pol == &pol_smd) {
+		lws_ss_state_return_t r;
+
+		r = lws_ss_event_helper(h, LWSSSCS_CONNECTING);
+		if (r)
+			return r;
+		r = lws_ss_event_helper(h, LWSSSCS_CONNECTED);
+		if (r)
+			return r;
 	}
+#endif
 
 	if (!(ssi->flags & LWSSSINFLAGS_REGISTER_SINK) &&
 	    ((h->policy->flags & LWSSSPOLF_NAILED_UP)
@@ -767,13 +1218,28 @@ late_bail:
 				)
 #endif
 			    ))
-		if (_lws_ss_client_connect(h, 0)) {
-			if (lws_ss_backoff(h))
-				/* has been destroyed */
-				return 1;
+		switch (_lws_ss_client_connect(h, 0, 0)) {
+		case LWSSSSRET_OK:
+			break;
+		case LWSSSSRET_TX_DONT_SEND:
+		case LWSSSSRET_DISCONNECT_ME:
+			if (lws_ss_backoff(h) == LWSSSSRET_DESTROY_ME)
+				goto fail_creation;
+			break;
+		case LWSSSSRET_DESTROY_ME:
+			goto fail_creation;
 		}
 
 	return 0;
+
+fail_creation:
+
+	if (ppss)
+		*ppss = NULL;
+
+	lws_ss_destroy(&h);
+
+	return 1;
 }
 
 void *
@@ -786,6 +1252,9 @@ void
 lws_ss_destroy(lws_ss_handle_t **ppss)
 {
 	struct lws_context_per_thread *pt;
+#if defined(LWS_WITH_SERVER)
+	struct lws_vhost *v = NULL;
+#endif
 	lws_ss_handle_t *h = *ppss;
 	lws_ss_metadata_t *pmd;
 
@@ -797,6 +1266,11 @@ lws_ss_destroy(lws_ss_handle_t **ppss)
 		return;
 	}
 	h->destroying = 1;
+
+#if defined(LWS_WITH_CONMON)
+	if (h->conmon_json)
+		lws_free_set_NULL(h->conmon_json);
+#endif
 
 	if (h->wsi) {
 		/*
@@ -812,9 +1286,13 @@ lws_ss_destroy(lws_ss_handle_t **ppss)
 	 */
 
 #if defined(LWS_WITH_SYS_SMD)
-	if (h->policy == &pol_smd && h->u.smd.smd_peer) {
-		lws_smd_unregister(h->u.smd.smd_peer);
-		h->u.smd.smd_peer = NULL;
+	if (h->policy == &pol_smd) {
+		lws_sul_cancel(&h->u.smd.sul_write);
+
+		if (h->u.smd.smd_peer) {
+			lws_smd_unregister(h->u.smd.smd_peer);
+			h->u.smd.smd_peer = NULL;
+		}
 	}
 #endif
 
@@ -823,10 +1301,36 @@ lws_ss_destroy(lws_ss_handle_t **ppss)
 	lws_pt_lock(pt, __func__);
 	*ppss = NULL;
 	lws_dll2_remove(&h->list);
+#if defined(LWS_WITH_SERVER)
+		lws_dll2_remove(&h->cli_list);
+#endif
 	lws_dll2_remove(&h->to_list);
 	lws_sul_cancel(&h->sul_timeout);
 
-	(void)lws_ss_event_helper(h, LWSSSCS_DESTROYING);
+	/*
+	 * for lss, DESTROYING deletes the C++ lss object, making the
+	 * self-defined h->policy radioactive
+	 */
+
+#if defined(LWS_WITH_SERVER)
+	if (h->policy && (h->policy->flags & LWSSSPOLF_SERVER))
+		v = lws_get_vhost_by_name(h->context, h->policy->streamtype);
+#endif
+
+	/*
+	 * Since we also come here to unpick create, it's possible we failed
+	 * the creation before issuing any states, even CREATING.  We should
+	 * only issue cleanup states on destroy if we previously got as far as
+	 * issuing CREATING.
+	 */
+
+	if (h->prev_ss_state) {
+		if (h->ss_dangling_connected)
+			(void)lws_ss_event_helper(h, LWSSSCS_DISCONNECTED);
+
+		(void)lws_ss_event_helper(h, LWSSSCS_DESTROYING);
+	}
+
 	lws_pt_unlock(pt);
 
 	/* in proxy case, metadata value on heap may need cleaning up */
@@ -835,7 +1339,8 @@ lws_ss_destroy(lws_ss_handle_t **ppss)
 	while (pmd) {
 		lwsl_info("%s: pmd %p\n", __func__, pmd);
 		if (pmd->value_on_lws_heap)
-			lws_free_set_NULL(pmd->value);
+			lws_free_set_NULL(pmd->value__may_own_heap);
+
 		pmd = pmd->next;
 	}
 
@@ -853,28 +1358,40 @@ lws_ss_destroy(lws_ss_handle_t **ppss)
 	 * to the ss connect code instead.
 	 */
 
-
-	lws_ss_policy_unref_trust_store(h->context, h->policy);
+	if (h->policy)
+		lws_ss_policy_unref_trust_store(h->context, h->policy);
 #endif
 
 #if defined(LWS_WITH_SERVER)
-	if (h->policy->flags & LWSSSPOLF_SERVER) {
-		struct lws_vhost *v = lws_get_vhost_by_name(h->context,
-							h->policy->streamtype);
-
+	if (v)
 		/*
 		 * For server, the policy describes a vhost that implements the
 		 * server, when we take down the ss, we take down the related
 		 * vhost (if it got that far)
 		 */
-		if (v)
-			lws_vhost_destroy(v);
-	}
+		lws_vhost_destroy(v);
 #endif
+
+#if defined(LWS_WITH_SYS_FAULT_INJECTION)
+	lws_fi_destroy(&h->fic);
+#endif
+
+#if defined(LWS_WITH_SYS_METRICS)
+	/*
+	 * If any hanging caliper measurement, dump it, and free any tags
+	 */
+	lws_metrics_caliper_report_hist(h->cal_txn, (struct lws *)NULL);
+#endif
+
+	lws_sul_cancel(&h->sul_timeout);
 
 	/* confirm no sul left scheduled in handle or user allocation object */
 	lws_sul_debug_zombies(h->context, h, sizeof(*h) + h->info.user_alloc,
 			      __func__);
+
+	__lws_lc_untag(&h->lc);
+
+	lws_explicit_bzero((void *)h, sizeof(*h) + h->info.user_alloc);
 
 	lws_free_set_NULL(h);
 }
@@ -886,10 +1403,33 @@ lws_ss_server_ack(struct lws_ss_handle *h, int nack)
 	h->txn_resp = nack;
 	h->txn_resp_set = 1;
 }
+
+void
+lws_ss_server_foreach_client(struct lws_ss_handle *h, lws_sssfec_cb cb,
+			     void *arg)
+{
+	lws_start_foreach_dll_safe(struct lws_dll2 *, d, d1, h->src_list.head) {
+		struct lws_ss_handle *h =
+			lws_container_of(d, struct lws_ss_handle, cli_list);
+
+		cb(h, arg);
+
+	} lws_end_foreach_dll_safe(d, d1);
+}
 #endif
 
 lws_ss_state_return_t
 lws_ss_request_tx(lws_ss_handle_t *h)
+{
+	lws_ss_state_return_t r;
+
+	r = _lws_ss_request_tx(h);
+	_lws_ss_handle_state_ret_CAN_DESTROY_HANDLE(r, NULL, &h);
+	return r;
+}
+
+lws_ss_state_return_t
+_lws_ss_request_tx(lws_ss_handle_t *h)
 {
 	lws_ss_state_return_t r;
 
@@ -898,6 +1438,12 @@ lws_ss_request_tx(lws_ss_handle_t *h)
 	if (h->wsi) {
 		lws_callback_on_writable(h->wsi);
 
+		return LWSSSSRET_OK;
+	}
+
+	if (!h->policy) {
+		/* avoid crash */
+		lwsl_err("%s: null policy\n", __func__);
 		return LWSSSSRET_OK;
 	}
 
@@ -937,7 +1483,7 @@ lws_ss_request_tx(lws_ss_handle_t *h)
 	 * Retries operate via lws_ss_request_tx(), explicitly ask for a
 	 * reconnection to clear the retry limit
 	 */
-	r = _lws_ss_client_connect(h, 1);
+	r = _lws_ss_client_connect(h, 1, 0);
 	if (r == LWSSSSRET_DESTROY_ME)
 		return r;
 
@@ -950,7 +1496,7 @@ lws_ss_request_tx(lws_ss_handle_t *h)
 lws_ss_state_return_t
 lws_ss_request_tx_len(lws_ss_handle_t *h, unsigned long len)
 {
-	if (h->wsi &&
+	if (h->wsi && h->policy &&
 	    (h->policy->protocol == LWSSSP_H1 ||
 	     h->policy->protocol == LWSSSP_H2 ||
 	     h->policy->protocol == LWSSSP_WS))
@@ -1034,14 +1580,18 @@ lws_ss_to_cb(lws_sorted_usec_list_t *sul)
 	lws_ss_handle_t *h = lws_container_of(sul, lws_ss_handle_t, sul_timeout);
 	lws_ss_state_return_t r;
 
-	lwsl_info("%s: ss %p timeout fired\n", __func__, h);
+	lwsl_info("%s: %s timeout fired\n", __func__, lws_ss_tag(h));
 
 	r = lws_ss_event_helper(h, LWSSSCS_TIMEOUT);
-	if (r == LWSSSSRET_DESTROY_ME) {
-		if (h->wsi)
-			lws_set_timeout(h->wsi, 1, LWS_TO_KILL_ASYNC);
-		_lws_ss_handle_state_ret(r, NULL, &h);
-	}
+	if (r != LWSSSSRET_DISCONNECT_ME && r != LWSSSSRET_DESTROY_ME)
+		return;
+
+	if (!h->wsi)
+		return;
+
+	lws_set_timeout(h->wsi, 1, LWS_TO_KILL_ASYNC);
+
+	_lws_ss_handle_state_ret_CAN_DESTROY_HANDLE(r, h->wsi, &h);
 }
 
 void
@@ -1077,4 +1627,12 @@ lws_ss_change_handlers(struct lws_ss_handle *h,
 		h->info.tx = tx;
 	if (state)
 		h->info.state = state;
+}
+
+const char *
+lws_ss_tag(struct lws_ss_handle *h)
+{
+	if (!h)
+		return "[null ss]";
+	return lws_lc_tag(&h->lc);
 }

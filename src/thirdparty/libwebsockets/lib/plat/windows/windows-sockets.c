@@ -1,7 +1,7 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2021 Andy Green <andy@warmcat.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -140,10 +140,22 @@ lws_plat_set_socket_options(struct lws_vhost *vhost, lws_sockfd_type fd,
 		lwsl_warn("setsockopt TCP_NODELAY 1 failed with error %d\n", error);
 	}
 
-
 	return lws_plat_set_nonblocking(fd);
 }
 
+int
+lws_plat_set_socket_options_ip(lws_sockfd_type fd, uint8_t pri, int lws_flags)
+{
+	/*
+	 * Seems to require "differeniated services" but no docs
+	 *
+	 * https://docs.microsoft.com/en-us/windows/win32/winsock/ipproto-ip-socket-options
+	 * https://docs.microsoft.com/en-us/previous-versions/windows/desktop/qos/differentiated-services
+	 */
+	lwsl_warn("%s: not implemented on windows platform\n", __func__);
+
+	return 0;
+}
 
 int
 lws_interface_to_sa(int ipv6,
@@ -181,10 +193,15 @@ lws_plat_insert_socket_into_fds(struct lws_context *context, struct lws *wsi)
 {
 	struct lws_context_per_thread *pt = &context->pt[(int)wsi->tsi];
 
+#if defined(LWS_WITH_UDP)
 	if (wsi->udp) {
 		lwsl_info("%s: UDP\n", __func__);
 		pt->fds[pt->fds_count].events |= LWS_POLLIN;
 	}
+#endif
+
+	if (context->event_loop_ops->io)
+		context->event_loop_ops->io(wsi, LWS_EV_START | LWS_EV_READ);
 
 	pt->fds[pt->fds_count++].revents = 0;
 
@@ -222,27 +239,174 @@ int
 lws_plat_change_pollfd(struct lws_context *context, struct lws *wsi,
 		       struct lws_pollfd *pfd)
 {
-	struct lws_context_per_thread *pt = &context->pt[(int)wsi->tsi];
-	long e = LWS_POLLHUP | FD_CONNECT | FD_ACCEPT | FD_CLOSE | FD_WRITE;
-
-	/*
-	 * On windows, FD_WRITE is only coming to indicate that we are writable
-	 * again after being choked.  So we must always listen for it.
-	 */
-
-	if (pfd->events & LWS_POLLIN)
-		e |= FD_READ;
-
-	if (WSAEventSelect(wsi->desc.sockfd, pt->events[(pfd - pt->fds) + 1], e)) {
-		lwsl_err("WSAEventSelect() failed with error %d\n", LWS_ERRNO);
-		return 1;
-	}
+	//struct lws_context_per_thread *pt = &context->pt[(int)wsi->tsi];
 
 	return 0;
 }
 
+#if defined(LWS_WITH_TLS)
+
+int
+lws_plat_vhost_tls_client_ctx_init(struct lws_vhost *vhost)
+{
+#if !defined(LWS_WITH_MBEDTLS) && defined(LWS_SSL_CLIENT_USE_OS_CA_CERTS)
+	PCCERT_CONTEXT pcc = NULL;
+	CERT_ENHKEY_USAGE* ceu = NULL;
+	DWORD ceu_alloc = 0;
+	X509_STORE* store;
+	HCERTSTORE hStore;
+	int imps = 0;
+
+	if (lws_check_opt(vhost->options,
+			  LWS_SERVER_OPTION_DISABLE_OS_CA_CERTS))
+		return 0;
+
+	/*
+	 * Windows Trust Store code adapted from curl (MIT) openssl.c
+	 * https://github.com/warmcat/libwebsockets/pull/2233
+	 */
+
+	store = SSL_CTX_get_cert_store(vhost->tls.ssl_client_ctx);
+	hStore = CertOpenSystemStore((HCRYPTPROV_LEGACY)NULL, TEXT("ROOT"));
+
+	if (!hStore) {
+		lwsl_notice("%s: no store\n", __func__);
+		return 1;
+	}
+
+	do {
+		const unsigned char* ecert;
+		char cert_name[256];
+		DWORD req_size = 0;
+		BYTE key_usage[2];
+		FILETIME ft;
+		X509* x509;
+
+		pcc = CertEnumCertificatesInStore(hStore, pcc);
+		if (!pcc)
+			break;
+
+		if (!CertGetNameStringA(pcc, CERT_NAME_SIMPLE_DISPLAY_TYPE,
+					0, NULL, cert_name, sizeof(cert_name)))
+			strcpy(cert_name, "Unknown");
+
+		lwsl_debug("%s: Checking cert \"%s\"\n", __func__, cert_name);
+
+		ecert = (const unsigned char*)pcc->pbCertEncoded;
+		if (!ecert)
+			continue;
+
+		GetSystemTimeAsFileTime(&ft);
+		if (CompareFileTime(&pcc->pCertInfo->NotBefore, &ft) > 0 ||
+		    CompareFileTime(&ft, &pcc->pCertInfo->NotAfter) > 0)
+			continue;
+
+		/* If key usage exists check for signing attribute */
+		if (CertGetIntendedKeyUsage(pcc->dwCertEncodingType,
+			pcc->pCertInfo,
+			key_usage, sizeof(key_usage))) {
+			if (!(key_usage[0] & CERT_KEY_CERT_SIGN_KEY_USAGE))
+				continue;
+		} else
+			if (GetLastError())
+				continue;
+
+		/*
+		 * If enhanced key usage exists check for server auth attribute.
+		 *
+		 * Note "In a Microsoft environment, a certificate might also
+		 * have EKU extended properties that specify valid uses for the
+		 * certificate."
+		 * The call below checks both, and behavior varies depending on
+		 * what is found. For more details see CertGetEnhancedKeyUsage
+		 * doc.
+		 */
+		if (!CertGetEnhancedKeyUsage(pcc, 0, NULL, &req_size))
+			continue;
+
+		if (req_size && req_size > ceu_alloc) {
+			void* tmp = lws_realloc(ceu, req_size, __func__);
+
+			if (!tmp) {
+				lwsl_err("%s: OOM", __func__);
+				break;
+			}
+
+			ceu = (CERT_ENHKEY_USAGE*)tmp;
+			ceu_alloc = req_size;
+		}
+
+		if (!CertGetEnhancedKeyUsage(pcc, 0, ceu, &req_size))
+			continue;
+
+		if (!ceu || (ceu && !ceu->cUsageIdentifier)) {
+			/*
+			 * "If GetLastError returns CRYPT_E_NOT_FOUND, the
+			 * certificate is good for all uses. If it returns
+			 * zero, the certificate has no valid uses."
+			 */
+			if ((HRESULT)GetLastError() != CRYPT_E_NOT_FOUND)
+				continue;
+
+			/* ... allow it... */
+
+		} else
+			if (ceu) {
+				BOOL found = FALSE;
+				DWORD i;
+
+				/*
+				 * If there is a CEU, check that it specifies
+				 * we can use the cert for server validation
+				 */
+
+				for (i = 0; i < ceu->cUsageIdentifier; i++) {
+					if (strcmp("1.3.6.1.5.5.7.3.1"
+						   /* OID server auth */,
+						   ceu->rgpszUsageIdentifier[i]))
+						continue;
+
+					found = TRUE;
+					break;
+				}
+
+				if (!found)
+					/* Don't use cert if no usage match */
+					continue;
+			}
+
+		x509 = d2i_X509(NULL, &ecert, pcc->cbCertEncoded);
+		if (!x509)
+			/* We can't parse it as am X.509, skip it */
+			continue;
+
+		if (X509_STORE_add_cert(store, x509) == 1) {
+			lwsl_debug("%s: Imported cert \"%s\"\n", __func__,
+				  cert_name);
+			imps++;
+		}
+
+		/*
+		 * Treat failure as nonfatal, eg, may be dupe
+		 */
+
+		X509_free(x509);
+	} while (1);
+
+	lws_free(ceu);
+	CertFreeCertificateContext(pcc);
+	CertCloseStore(hStore, 0);
+
+	lwsl_notice("%s: Imported %d certs from plat store\n", __func__, imps);
+#endif
+
+	return 0;
+}
+
+#endif
+
 const char *
-lws_plat_inet_ntop(int af, const void *src, char *dst, int cnt)
+lws_plat_inet_ntop(int af, const void *src, char *dst, socklen_t cnt)
 {
 	WCHAR *buffer;
 	size_t bufferlen = (size_t)cnt;
@@ -357,8 +521,8 @@ lws_plat_ifname_to_hwaddr(int fd, const char *ifname, uint8_t *hwaddr, int len)
 }
 
 int
-lws_plat_rawudp_broadcast(uint8_t *p, const uint8_t *canned, int canned_len,
-			  int n, int fd, const char *iface)
+lws_plat_rawudp_broadcast(uint8_t *p, const uint8_t *canned, size_t canned_len,
+			  size_t n, int fd, const char *iface)
 {
 	lwsl_err("%s: UNIMPLEMENTED on this platform\n", __func__);
 
@@ -382,8 +546,7 @@ lws_plat_BINDTODEVICE(lws_sockfd_type fd, const char *ifname)
 }
 
 int
-lws_plat_ifconfig_ip(const char *ifname, int fd, uint8_t *ip, uint8_t *mask_ip,
-			uint8_t *gateway_ip)
+lws_plat_ifconfig(int fd, uint8_t *ip, lws_dhcpc_ifstate_t *is)
 {
 	lwsl_err("%s: UNIMPLEMENTED on this platform\n", __func__);
 
@@ -400,7 +563,7 @@ lws_plat_mbedtls_net_send(void *ctx, const uint8_t *buf, size_t len)
 	if (fd < 0)
 		return MBEDTLS_ERR_NET_INVALID_CONTEXT;
 
-	ret = write(fd, buf, len);
+	ret = write(fd, buf, (unsigned int)len);
 	if (ret >= 0)
 		return ret;
 
@@ -422,7 +585,7 @@ lws_plat_mbedtls_net_recv(void *ctx, unsigned char *buf, size_t len)
 	if (fd < 0)
 		return MBEDTLS_ERR_NET_INVALID_CONTEXT;
 
-	ret = (int)read(fd, buf, len);
+	ret = (int)read(fd, buf, (unsigned int)len);
 	if (ret >= 0)
 		return ret;
 

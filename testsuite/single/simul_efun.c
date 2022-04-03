@@ -10,6 +10,7 @@ inherit "std/json";
 // Breakstring sefun
 inherit "std/break_string";
 // bitmap_font sefun
+inherit "std/base64" ;
 inherit "std/bitmap_font";
 inherit "std/highest" ;
 inherit "std/lowest" ;
@@ -17,6 +18,10 @@ inherit "std/range" ;
 inherit "std/sum" ;
 inherit "std/element_of_weighted" ; // requires: sum
 inherit "std/number_string" ;
+inherit "std/reduce" ;
+inherit "std/percent" ;
+inherit "std/all_environment" ;
+inherit "std/present_clone" ;
 
 int same(mixed x, mixed y) {
     // Allow comparing array with buffer
@@ -47,6 +52,20 @@ int same(mixed x, mixed y) {
     case CLASS:
 	error("Not implemented.");
     }
+}
+
+void __assert_eq(mixed expected, mixed actual, string where) {
+  if (!same(expected, actual)) {
+    OUTPUT(where + ", Check Failed: \n" +
+        "Expected: \n" + sprintf("%O", expected) + "\nActual: \n" + sprintf("%O", actual) + "\nTrace: \n" + sprintf("%s", "/single/master"->get_last_error()) + "\n");
+  }
+}
+
+void __assert_ne(mixed expected, mixed actual, string where) {
+  if (same(expected, actual)) {
+    OUTPUT(where + ", Check Failed: \n" +
+        "Expect Not: \n" + sprintf("%O", expected) + "\nActual: \n" + sprintf("%O", actual) + "\nTrace: \n" + sprintf("%s", "/single/master"->get_last_error()) + "\n");
+  }
 }
 
 void

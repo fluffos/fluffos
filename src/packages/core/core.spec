@@ -30,9 +30,6 @@ object _new(string, ...);
 
 unknown call_other _call_other(object | string | object *, string | mixed *, ...);
 mixed evaluate _evaluate(mixed, ...);
-#ifdef COMPAT_32
-mixed funcall _evaluate(mixed, ...);
-#endif
 object this_object _this_object();
 int to_int _to_int(string | float | int OR_BUFFER);
 float to_float _to_float(string | float | int);
@@ -51,6 +48,7 @@ void destruct(object default: F__THIS_OBJECT);
 string file_name(object default: F__THIS_OBJECT);
 string capitalize(string);
 string *explode(string, string);
+string *explode_reversible(string, string);
 mixed implode(mixed *, string | function, void | mixed);
 
 int call_out(string | function, int|float, ...);
@@ -105,9 +103,6 @@ mixed restore_variable(string);
 object* users();
 mixed *get_dir(string, int default: 0);
 int strsrch(string, string | int, int default: 0);
-#ifdef COMPAT_32
-int strstr strsrch(string, string | int, int default: 0);
-#endif
 
 /* communication functions */
 
@@ -128,14 +123,7 @@ object load_object find_object(string, int default: 1);
 mapping allocate_mapping(int | mixed *, void | mixed);
 mixed *values(mapping);
 mixed *keys(mapping);
-#ifdef COMPAT_32
-mapping map_delete(mapping, mixed);
-mapping m_delete map_delete(mapping, mixed);
-mixed *m_values values(mapping);
-mixed *m_indices keys(mapping);
-#else
 void map_delete(mapping, mixed);
-#endif
 
 mixed match_path(mapping, string);
 
@@ -149,9 +137,6 @@ int floatp(mixed);
 int stringp(mixed);
 int virtualp(object default: F__THIS_OBJECT);
 int functionp(mixed);
-#ifdef COMPAT_32
-int closurep functionp(mixed);
-#endif
 int pointerp(mixed);
 int arrayp pointerp(mixed);
 int objectp(mixed);
@@ -201,11 +186,15 @@ int next_bit(string, int);
 string crypt(string, string | int);
 string oldcrypt(string, string | int);
 
-string ctime(int | void);
-int exec(object, object);
-mixed *localtime(int);
-string function_exists(string, void | object, void | int);
 
+int time();
+string strftime(string, int);
+int strptime(string, string);
+string ctime(int | void);
+mixed *localtime(int);
+
+int exec(object, object);
+string function_exists(string, void | object, void | int);
 object *objects(void | string | function);
 string query_host_name();
 int query_idle(object);
@@ -230,16 +219,11 @@ object query_shadowing(object);
 #endif
 mixed *sort_array(mixed *, int | string | function, ...);
 void throw(mixed);
-int time();
 mixed *unique_array(mixed *, string | function, void | mixed);
 mapping unique_mapping(mixed *, string | function, ...);
 string *deep_inherit_list(object default:F__THIS_OBJECT);
 string *shallow_inherit_list(object default:F__THIS_OBJECT);
-#ifdef COMPAT_32
-string *inherit_list deep_inherit_list(object default:F__THIS_OBJECT);
-#else
 string *inherit_list shallow_inherit_list(object default:F__THIS_OBJECT);
-#endif
 void printf(string, ...);
 string sprintf(string, ...);
 int mapp(mixed);
@@ -257,9 +241,6 @@ void send_gmcp(string);
 string in_edit(object default:F__THIS_OBJECT);
 int in_input(object default:F__THIS_OBJECT);
 int userp(object);
-#ifdef COMPAT_32
-int query_once_interactive userp(object);
-#endif
 
 #ifndef NO_WIZARDS
 void enable_wizard();
@@ -290,9 +271,6 @@ object *children(string);
 void reload_object(object);
 
 void error(string);
-#ifdef COMPAT_32
-void raise_error error(string);
-#endif
 int uptime();
 int strcmp(string, string);
 
@@ -341,9 +319,6 @@ int set_eval_limit(int);
 int reset_eval_cost set_eval_limit(int default: 0);
 int eval_cost set_eval_limit(int default: -1);
 int max_eval_cost set_eval_limit(int default: 1);
-#ifdef COMPAT_32
-int get_eval_cost set_eval_limit(int default: -1);
-#endif
 
 void set_debug_level(int | string);
 mapping debug_levels();
@@ -365,6 +340,7 @@ void request_term_type();
 void start_request_term_type();
 void request_term_size(void | int);
 void telnet_nop();
+void telnet_ga();
 
 /* shutdown is at the end because it is only called once per boot cycle :) */
 void shutdown(void | int);
@@ -377,3 +353,6 @@ int strwidth(string);
 void trace_start(string, int default: 10);
 // stop to collect tracing data right away.
 void trace_end();
+
+// return highest resolution clock in nanoseconds
+int perf_counter_ns();

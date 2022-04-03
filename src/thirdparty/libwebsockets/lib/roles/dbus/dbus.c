@@ -42,13 +42,12 @@
 /*
  * retreives existing or creates new shadow wsi for fd owned by dbus stuff.
  *
- * Requires vhost lock
+ * Requires context + vhost lock
  */
 
 static struct lws *
 __lws_shadow_wsi(struct lws_dbus_ctx *ctx, DBusWatch *w, int fd, int create_ok)
 {
-	size_t s = sizeof(struct lws);
 	struct lws *wsi;
 
 	if (fd < 0 || fd >= (int)ctx->vh->context->fd_limit_per_thread) {
@@ -69,52 +68,49 @@ __lws_shadow_wsi(struct lws_dbus_ctx *ctx, DBusWatch *w, int fd, int create_ok)
 	if (!create_ok)
 		return NULL;
 
-#if defined(LWS_WITH_EVENT_LIBS)
-	s += ctx->vh->context->event_loop_ops->evlib_size_wsi;
-#endif
+	lws_context_assert_lock_held(wsi->a.context);
+	lws_vhost_assert_lock_held(wsi->a.vhost);
 
-	wsi = lws_zalloc(s, "shadow wsi");
+	/* requires context lock */
+	wsi = __lws_wsi_create_with_role(ctx->vh->context, ctx->tsi, NULL);
 	if (wsi == NULL) {
 		lwsl_err("Out of mem\n");
 		return NULL;
 	}
 
-#if defined(LWS_WITH_EVENT_LIBS)
-	wsi->evlib_wsi = (uint8_t *)wsi + sizeof(*wsi);
-#endif
-
 	lwsl_info("%s: creating shadow wsi\n", __func__);
 
-	wsi->a.context = ctx->vh->context;
 	wsi->desc.sockfd = fd;
 	lws_role_transition(wsi, 0, LRS_ESTABLISHED, &role_ops_dbus);
 	wsi->a.protocol = ctx->vh->protocols;
-	wsi->tsi = ctx->tsi;
 	wsi->shadow = 1;
 	wsi->opaque_parent_data = ctx;
 	ctx->w[0] = w;
 
+	__lws_lc_tag(&ctx->vh->context->lcg[LWSLCG_WSI], &wsi->lc, "dbus|%s", ctx->vh->name);
+
 	lws_vhost_bind_wsi(ctx->vh, wsi);
 	if (__insert_wsi_socket_into_fds(ctx->vh->context, wsi)) {
 		lwsl_err("inserting wsi socket into fds failed\n");
-		lws_vhost_unbind_wsi(wsi);
+		__lws_vhost_unbind_wsi(wsi); /* cx + vh lock */
 		lws_free(wsi);
 		return NULL;
 	}
-
-	ctx->vh->context->count_wsi_allocated++;
 
 	return wsi;
 }
 
 /*
- * Requires vhost lock
+ * Requires cx + vhost lock
  */
 
 static int
 __lws_shadow_wsi_destroy(struct lws_dbus_ctx *ctx, struct lws *wsi)
 {
 	lwsl_info("%s: destroying shadow wsi\n", __func__);
+
+	lws_context_assert_lock_held(wsi->a.context);
+	lws_vhost_assert_lock_held(wsi->a.vhost);
 
 	if (__remove_wsi_socket_from_fds(wsi)) {
 		lwsl_err("%s: unable to remove %d from fds\n", __func__,
@@ -123,8 +119,7 @@ __lws_shadow_wsi_destroy(struct lws_dbus_ctx *ctx, struct lws *wsi)
 		return 1;
 	}
 
-	ctx->vh->context->count_wsi_allocated--;
-	lws_vhost_unbind_wsi(wsi);
+	__lws_vhost_unbind_wsi(wsi);
 
 	lws_free(wsi);
 
@@ -157,11 +152,13 @@ lws_dbus_add_watch(DBusWatch *w, void *data)
 	struct lws *wsi;
 	int n;
 
+	lws_context_lock(pt->context, __func__);
 	lws_pt_lock(pt, __func__);
 
 	wsi = __lws_shadow_wsi(ctx, w, dbus_watch_get_unix_fd(w), 1);
 	if (!wsi) {
 		lws_pt_unlock(pt);
+		lws_context_unlock(pt->context);
 		lwsl_err("%s: unable to get wsi\n", __func__);
 
 		return FALSE;
@@ -179,7 +176,7 @@ lws_dbus_add_watch(DBusWatch *w, void *data)
 			}
 
 	for (n = 0; n < (int)LWS_ARRAY_SIZE(ctx->w); n++)
-		if (ctx->w[n])
+		if (ctx->w[n] && dbus_watch_get_enabled(ctx->w[n]))
 			flags |= dbus_watch_get_flags(ctx->w[n]);
 
 	if (flags & DBUS_WATCH_READABLE)
@@ -187,18 +184,22 @@ lws_dbus_add_watch(DBusWatch *w, void *data)
 	if (flags & DBUS_WATCH_WRITABLE)
 		lws_flags |= LWS_POLLOUT;
 
-	lwsl_info("%s: w %p, fd %d, data %p, flags %d\n", __func__, w,
-		  dbus_watch_get_unix_fd(w), data, lws_flags);
+	lwsl_info("%s: %s: %p, fd %d, data %p, fl %d\n", __func__,
+		  lws_wsi_tag(wsi), w, dbus_watch_get_unix_fd(w),
+		  data, lws_flags);
 
-	__lws_change_pollfd(wsi, 0, lws_flags);
+	if (lws_flags)
+		__lws_change_pollfd(wsi, 0, (int)lws_flags);
 
 	lws_pt_unlock(pt);
+	lws_context_unlock(pt->context);
 
 	return TRUE;
 }
 
+/* cx + vh lock */
 static int
-check_destroy_shadow_wsi(struct lws_dbus_ctx *ctx, struct lws *wsi)
+__check_destroy_shadow_wsi(struct lws_dbus_ctx *ctx, struct lws *wsi)
 {
 	int n;
 
@@ -233,6 +234,7 @@ lws_dbus_remove_watch(DBusWatch *w, void *data)
 	struct lws *wsi;
 	int n;
 
+	lws_context_lock(pt->context, __func__);
 	lws_pt_lock(pt, __func__);
 
 	wsi = __lws_shadow_wsi(ctx, w, dbus_watch_get_unix_fd(w), 0);
@@ -254,13 +256,15 @@ lws_dbus_remove_watch(DBusWatch *w, void *data)
 	if ((~flags) & DBUS_WATCH_WRITABLE)
 		lws_flags |= LWS_POLLOUT;
 
-	lwsl_info("%s: w %p, fd %d, data %p, clearing lws flags %d\n",
-		  __func__, w, dbus_watch_get_unix_fd(w), data, lws_flags);
+	lwsl_info("%s: %p, fd %d, data %p, clearing lws flags %d\n",
+		  __func__, w, dbus_watch_get_unix_fd(w),
+		  data, lws_flags);
 
-	__lws_change_pollfd(wsi, lws_flags, 0);
+	__lws_change_pollfd(wsi, (int)lws_flags, 0);
 
 bail:
 	lws_pt_unlock(pt);
+	lws_context_unlock(pt->context);
 }
 
 static void
@@ -272,6 +276,29 @@ lws_dbus_toggle_watch(DBusWatch *w, void *data)
 		lws_dbus_remove_watch(w, data);
 }
 
+static void
+lws_dbus_sul_cb(lws_sorted_usec_list_t *sul)
+{
+	struct lws_context_per_thread *pt = lws_container_of(sul,
+				struct lws_context_per_thread, dbus.sul);
+
+	lws_start_foreach_dll_safe(struct lws_dll2 *, rdt, nx,
+			 lws_dll2_get_head(&pt->dbus.timer_list_owner)) {
+		struct lws_role_dbus_timer *r = lws_container_of(rdt,
+					struct lws_role_dbus_timer, timer_list);
+
+		if (time(NULL) > r->fire) {
+			lwsl_notice("%s: firing timer\n", __func__);
+			dbus_timeout_handle(r->data);
+			lws_dll2_remove(rdt);
+			lws_free(rdt);
+		}
+	} lws_end_foreach_dll_safe(rdt, nx);
+
+	if (pt->dbus.timer_list_owner.count)
+		lws_sul_schedule(pt->context, pt->tid, &pt->dbus.sul,
+				 lws_dbus_sul_cb, 3 * LWS_US_PER_SEC);
+}
 
 static dbus_bool_t
 lws_dbus_add_timeout(DBusTimeout *t, void *data)
@@ -302,6 +329,10 @@ lws_dbus_add_timeout(DBusTimeout *t, void *data)
 	dbt->timer_list.owner = NULL;
 	lws_dll2_add_head(&dbt->timer_list, &pt->dbus.timer_list_owner);
 
+	if (!pt->dbus.sul.list.owner)
+		lws_sul_schedule(pt->context, pt->tid, &pt->dbus.sul,
+				 lws_dbus_sul_cb, 3 * LWS_US_PER_SEC);
+
 	ctx->timeouts++;
 
 	return TRUE;
@@ -326,6 +357,9 @@ lws_dbus_remove_timeout(DBusTimeout *t, void *data)
 			break;
 		}
 	} lws_end_foreach_dll_safe(rdt, nx);
+
+	if (!pt->dbus.timer_list_owner.count)
+		lws_sul_cancel(&pt->dbus.sul);
 }
 
 static void
@@ -472,7 +506,7 @@ rops_handle_POLLIN_dbus(struct lws_context_per_thread *pt, struct lws *wsi,
 
 		handle_dispatch_status(NULL, DBUS_DISPATCH_DATA_REMAINS, NULL);
 
-		check_destroy_shadow_wsi(ctx, wsi);
+		__check_destroy_shadow_wsi(ctx, wsi);
 	} else
 		if (ctx->dbs)
 			/* ??? */
@@ -481,66 +515,50 @@ rops_handle_POLLIN_dbus(struct lws_context_per_thread *pt, struct lws *wsi,
 	return LWS_HPI_RET_HANDLED;
 }
 
-static void
-lws_dbus_sul_cb(lws_sorted_usec_list_t *sul)
-{
-	struct lws_context_per_thread *pt = lws_container_of(sul,
-				struct lws_context_per_thread, dbus.sul);
-
-	lws_start_foreach_dll_safe(struct lws_dll2 *, rdt, nx,
-			 lws_dll2_get_head(&pt->dbus.timer_list_owner)) {
-		struct lws_role_dbus_timer *r = lws_container_of(rdt,
-					struct lws_role_dbus_timer, timer_list);
-
-		if (time(NULL) > r->fire) {
-			lwsl_notice("%s: firing timer\n", __func__);
-			dbus_timeout_handle(r->data);
-			lws_dll2_remove(rdt);
-			lws_free(rdt);
-		}
-	} lws_end_foreach_dll_safe(rdt, nx);
-
-	lws_sul_schedule(pt->context, pt->tid, &pt->dbus.sul, lws_dbus_sul_cb,
-			 3 * LWS_US_PER_SEC);
-}
-
 static int
 rops_pt_init_destroy_dbus(struct lws_context *context,
 		    const struct lws_context_creation_info *info,
 		    struct lws_context_per_thread *pt, int destroy)
 {
-	if (!destroy) {
-		lws_sul_schedule(context, pt->tid, &pt->dbus.sul, lws_dbus_sul_cb,
-				 3 * LWS_US_PER_SEC);
-	} else
+	if (destroy)
 		lws_sul_cancel(&pt->dbus.sul);
 
 	return 0;
 }
 
+static const lws_rops_t rops_table_dbus[] = {
+	/*  1 */ { .pt_init_destroy	= rops_pt_init_destroy_dbus },
+	/*  2 */ { .handle_POLLIN	= rops_handle_POLLIN_dbus },
+};
+
 const struct lws_role_ops role_ops_dbus = {
 	/* role name */			"dbus",
 	/* alpn id */			NULL,
-	/* check_upgrades */		NULL,
-	/* pt_init_destroy */		rops_pt_init_destroy_dbus,
-	/* init_vhost */		NULL,
-	/* destroy_vhost */		NULL,
-	/* service_flag_pending */	NULL,
-	/* handle_POLLIN */		rops_handle_POLLIN_dbus,
-	/* handle_POLLOUT */		NULL,
-	/* perform_user_POLLOUT */	NULL,
-	/* callback_on_writable */	NULL,
-	/* tx_credit */			NULL,
-	/* write_role_protocol */	NULL,
-	/* encapsulation_parent */	NULL,
-	/* alpn_negotiated */		NULL,
-	/* close_via_role_protocol */	NULL,
-	/* close_role */		NULL,
-	/* close_kill_connection */	NULL,
-	/* destroy_role */		NULL,
-	/* adoption_bind */		NULL,
-	/* client_bind */		NULL,
-	/* issue_keepalive */		NULL,
+
+	/* rops_table */		rops_table_dbus,
+	/* rops_idx */			{
+	  /* LWS_ROPS_check_upgrades */
+	  /* LWS_ROPS_pt_init_destroy */		0x01,
+	  /* LWS_ROPS_init_vhost */
+	  /* LWS_ROPS_destroy_vhost */			0x00,
+	  /* LWS_ROPS_service_flag_pending */
+	  /* LWS_ROPS_handle_POLLIN */			0x02,
+	  /* LWS_ROPS_handle_POLLOUT */
+	  /* LWS_ROPS_perform_user_POLLOUT */		0x00,
+	  /* LWS_ROPS_callback_on_writable */
+	  /* LWS_ROPS_tx_credit */			0x00,
+	  /* LWS_ROPS_write_role_protocol */
+	  /* LWS_ROPS_encapsulation_parent */		0x00,
+	  /* LWS_ROPS_alpn_negotiated */
+	  /* LWS_ROPS_close_via_role_protocol */	0x00,
+	  /* LWS_ROPS_close_role */
+	  /* LWS_ROPS_close_kill_connection */		0x00,
+	  /* LWS_ROPS_destroy_role */
+	  /* LWS_ROPS_adoption_bind */			0x00,
+	  /* LWS_ROPS_client_bind */
+	  /* LWS_ROPS_issue_keepalive */		0x00,
+					},
+
 	/* adoption_cb clnt, srv */	{ 0, 0 },
 	/* rx_cb clnt, srv */		{ 0, 0 },
 	/* writeable cb clnt, srv */	{ 0, 0 },

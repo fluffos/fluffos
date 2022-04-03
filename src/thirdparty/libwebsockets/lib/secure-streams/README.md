@@ -13,11 +13,11 @@ creation, but able to be updated from a remote copy.
 
 Both client and server networking can be handled using Secure Streams APIS.
 
-![overview](../doc-assets/ss-operation-modes.png)
+![overview](/doc-assets/ss-operation-modes.png)
 
 ## Secure Streams CLIENT State lifecycle
 
-![overview](../doc-assets/ss-state-flow.png)
+![overview](/doc-assets/ss-state-flow.png)
 
 Secure Streams are created using `lws_ss_create()`, after that they may acquire
 underlying connections, and lose them, but the lifecycle of the Secure Stream
@@ -55,7 +55,7 @@ destroy the handle themselves, in that case the handler should return
 
 ## Secure Streams SERVER State lifecycle
 
-![overview](../doc-assets/ss-state-flow-server.png)
+![overview](/doc-assets/ss-state-flow-server.png)
 
 You can also run servers defined using Secure Streams, the main difference is
 that the user code must assertively create a secure stream of the server type
@@ -210,6 +210,40 @@ with one of these to enforce validity checking of the remote server.
 
 Entries should be named using "name" and the stack array defined using "stack"
 
+### `auth`
+
+Optional section describing a map of available authentication streamtypes to
+auth token blob indexes.
+
+```
+...
+ "auth": [{"name":"newauth","type":"sigv4", "blob":0}]
+...
+```
+
+Streams can indicate they depend on a valid auth token from one of these schemes
+by using the `"use_auth": "name"` member in the streamtype definition, where name
+is, eg, "sigv4" in the example above.  If "use_auth" is not in the streamtype
+definition, default auth is lwa if "http_auth_header" is there.
+
+### `auth[].name`
+
+This is the name of the authentication scheme used by other streamtypes
+
+### `auth[].type`
+
+Indicate the auth type, e.g. sigv4
+
+### `auth[].streamtype`
+
+This is the auth streamtype to be used to refresh the authentication token
+
+### `auth[].blob`
+
+This is the auth blob index the authentication token is stored into and retreived
+from system blob, currently up to 4 blobs.
+
+
 ### `s`
 
 These are an array of policies for the supported stream type names.
@@ -239,6 +273,11 @@ configured with `-DLWS_UNIX_SOCK=1`
 
 **SERVER**: If given, the network interface name or IP address the listen socket
 should bind to.
+
+**SERVER**: If begins with '!', the rest of the endpoint name is the
+vhost name of an existing vhost to bind to, instead of creating a new
+one.  This is useful when the vhost layout is already being managed by
+lejp-conf JSON and it's more convenient to put the details in there.
 
 ### `port`
 
@@ -303,10 +342,48 @@ If user code applies the `lws_ss_start_timeout()` api on a stream with a
 timeout of LWSSS_TIMEOUT_FROM_POLICY, the `timeout_ms` entry given in the
 policy is applied.
 
+### `perf`
+
+If set to true, and lws was built with `LWS_WITH_CONMON`, causes this streamtype
+to receive additional rx payload with the `LWSSS_FLAG_PERF_JSON` flag set on it,
+that is JSON representing the onward connection performance information.
+
+These are based on the information captured in the struct defined in
+libwebsockets/lws-conmon.h, represented in JSON
+
+```
+	{
+	  "peer": "46.105.127.147",
+	  "dns_us": 1234,
+	  "sockconn_us": 1234,
+	  "tls_us": 1234,
+	  "txn_resp_us": 1234,
+	  "dns":["46.105.127.147", "2001:41d0:2:ee93::1"]
+	}
+```
+
+Streamtypes without "perf": true will never see the special rx payloads.
+Notice that the `LWSSS_FLAG_PERF_JSON` payloads must be handled out of band
+for the normal payloads, as they can appear inside normal payload messages.
+
 ### `tls_trust_store`
 
 The name of the trust store described in the `trust_stores` section to apply
 to validate the remote server cert.
+
+If missing and tls is enabled on the streamtype, then validation is
+attempted using the OS trust store, otherwise the connection fails.
+
+### `use_auth`
+
+Indicate that the streamtype should use the named auth type from the `auth`
+array in the policy
+
+### `aws_region`
+Indicate which metadata should be used to set aws region for certain streamtype
+
+### `aws_service`
+Indicate which metadata should be used to set aws service for certain streamtype
 
 ### `server_cert`
 
@@ -325,6 +402,89 @@ device that its locally-initiated periodic connection validity checks of the
 interval described in the associated retry / backoff selection, are important
 enough to wake the whole system from low power suspend so they happen on
 schedule.
+
+### `proxy_buflen`
+
+Only used when the streamtype is proxied... sets the maximum size of the
+payload buffering (in bytes) the proxy will hold for this type of stream.  If
+the endpoint dumps a lot of data without any flow control, this may need to
+be correspondingly large.  Default is 32KB.
+
+### `proxy_buflen_rxflow_on_above`, `proxy_buflen_rxflow_off_below`
+
+When `proxy_buflen` is set, you can also wire up the amount of buffered
+data intended for the client held at the proxy, to the onward ss wsi
+rx flow control state.  If more than `proxy_buflen_rxflow_on_above`
+bytes are buffered, rx flow control is set stopping further rx.  Once
+the dsh is drained below `proxy_buflen_rxflow_off_below`, the rx flow
+control is released and RX resumes.
+
+### `client_buflen`
+
+Only used when the streamtype is proxied... sets the maximum size of the
+payload buffering (in bytes) the client will hold for this type of stream.  If
+the client sends a lot of data without any flow control, this may need to
+be correspondingly large.  Default is 32KB.
+
+### `attr_priority`
+
+A number between 0 (normal priority) and 6 (very high priority).  7 is also
+possible, but requires CAP_NET_ADMIN on Linux and is reserved for network
+administration packets.  Normally default priority is fine, but under some
+conditions when transporting over IP packets, you may want to control the
+IP packet ToS priority for the streamtype by using this.
+
+### `attr_low_latency`
+
+This is a flag indicating that the streamtype packets should be transported
+in a way that results in lower latency where there is a choice.  For IP packets,
+this sets the ToS "low delay" flag on packets from this streamtype.
+
+### `attr_high_throughput`
+
+This is a flag indicating that this streamtype should be expected to produce
+bulk content that requires high throughput.  For IP packets,
+this sets the ToS "high throughput" flag on packets from this streamtype.
+
+### `attr_high_reliability`
+
+This is a flag indicating that extra efforts should be made to deliver packets
+from this streamtype where possible.  For IP packets, this sets the ToS "high
+reliability" flag on packets from this streamtype.
+
+### `attr_low_cost`
+
+This is a flag indicating that packets from this streamtype should be routed as
+inexpensively as possible by trading off latency and reliability where there is
+a choice.  For IP packets, this sets the ToS "low cost" flag on packets from
+this streamtype.
+
+### `metadata`
+
+This allows declaring basically dynamic symbol names to be used by the streamtype,
+along with an optional mapping to a protocol-specific entity such as a given
+http header.  Eg:
+
+```
+		"metadata": [ { "myname": "" }, { "ctype": "content-type:" } ],
+```
+
+In this example "ctype" is associated with the http header "content-type" while
+"myname" doesn't have any association to a header.
+
+Symbol names may be used in the other policy for the streamtype for string
+substitution using the syntax like `xxx${myname}yyy`, forward references are
+valid but the scope of the symbols is just the streamtype the metadata is
+defined for.
+
+Client code can set metadata by name, using the `lws_ss_set_metadata()` api, this
+should be done before a transaction.  And for metadata associated with a
+protocol-specific entity, like http headers, if incoming responses contain the
+mentioned header, the metadata symbol is set to that value at the client before
+any rx proceeds.
+
+Metadata continues to work the same for the client in the case it is proxying its
+connectivity, metadata is passed in both directions serialized over the proxy link.
 
 ## http transport
 
@@ -361,6 +521,21 @@ The URL path can include metatadata like this
 ${metadataname} will be replaced by the current value of the
 same metadata name.  The metadata names must be listed in the
 "metadata": [ ] section.
+
+### `http_resp_map`
+
+If your server overloads the meaning of the http transport response code with
+server-custom application codes, you can map these to discrete Secure Streams
+state callbacks using a JSON map, eg
+
+```
+		"http_resp_map": [ { "530": 1530 }, { "531": 1531 } ],
+```
+
+It's not recommended to abuse the transport layer http response code by
+mixing it with application state information like this, but if it's dealing
+with legacy serverside that takes this approach, it's possible to handle it
+in SS this way while removing the dependency on http.
 
 ### `http_auth_header`
 
@@ -660,7 +835,7 @@ proxy to get to the SS proxy, which then goes out to the internet
 
 ### 1 Start the SS proxy
 
-Tell it to listen on lo interface on port 1234 
+Tell it to listen on lo interface on port 1234
 
 ```
 $ ./bin/lws-minimal-secure-streams-proxy -p 1234 -i lo

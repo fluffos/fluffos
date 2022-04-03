@@ -79,19 +79,27 @@ lws_genaes_create(struct lws_genaes_ctx *ctx, enum enum_aes_operation op,
 			ctx->cipher = EVP_aes_128_cfb8();
 			break;
 #endif
+#if defined(LWS_HAVE_EVP_aes_128_ctr)
 		case LWS_GAESM_CTR:
 			ctx->cipher = EVP_aes_128_ctr();
 			break;
+#endif
+#if defined(LWS_HAVE_EVP_aes_128_ecb)
 		case LWS_GAESM_ECB:
 			ctx->cipher = EVP_aes_128_ecb();
 			break;
+#endif
+#if defined(LWS_HAVE_EVP_aes_128_ofb)
 		case LWS_GAESM_OFB:
 			ctx->cipher = EVP_aes_128_ofb();
 			break;
+#endif
+#if defined(LWS_HAVE_EVP_aes_128_xts)
 		case LWS_GAESM_XTS:
 			lwsl_err("%s: AES XTS requires double-length key\n",
 				 __func__);
 			break;
+#endif
 		case LWS_GAESM_GCM:
 			ctx->cipher = EVP_aes_128_gcm();
 			break;
@@ -126,18 +134,26 @@ lws_genaes_create(struct lws_genaes_ctx *ctx, enum enum_aes_operation op,
 			ctx->cipher = EVP_aes_192_cfb8();
 			break;
 #endif
+#if defined(LWS_HAVE_EVP_aes_128_ctr)
 		case LWS_GAESM_CTR:
 			ctx->cipher = EVP_aes_192_ctr();
 			break;
+#endif
+#if defined(LWS_HAVE_EVP_aes_128_ecb)
 		case LWS_GAESM_ECB:
 			ctx->cipher = EVP_aes_192_ecb();
 			break;
+#endif
+#if defined(LWS_HAVE_EVP_aes_128_ofb)
 		case LWS_GAESM_OFB:
 			ctx->cipher = EVP_aes_192_ofb();
 			break;
+#endif
+#if defined(LWS_HAVE_EVP_aes_128_xts)
 		case LWS_GAESM_XTS:
 			lwsl_err("%s: AES XTS 192 invalid\n", __func__);
 			goto bail;
+#endif
 		case LWS_GAESM_GCM:
 			ctx->cipher = EVP_aes_192_gcm();
 			break;
@@ -172,15 +188,21 @@ lws_genaes_create(struct lws_genaes_ctx *ctx, enum enum_aes_operation op,
 			ctx->cipher = EVP_aes_256_cfb8();
 			break;
 #endif
+#if defined(LWS_HAVE_EVP_aes_128_ctr)
 		case LWS_GAESM_CTR:
 			ctx->cipher = EVP_aes_256_ctr();
 			break;
+#endif
+#if defined(LWS_HAVE_EVP_aes_128_ecb)
 		case LWS_GAESM_ECB:
 			ctx->cipher = EVP_aes_256_ecb();
 			break;
+#endif
+#if defined(LWS_HAVE_EVP_aes_128_ofb)
 		case LWS_GAESM_OFB:
 			ctx->cipher = EVP_aes_256_ofb();
 			break;
+#endif
 #if defined(LWS_HAVE_EVP_aes_128_xts)
 		case LWS_GAESM_XTS:
 			ctx->cipher = EVP_aes_128_xts();
@@ -196,8 +218,10 @@ lws_genaes_create(struct lws_genaes_ctx *ctx, enum enum_aes_operation op,
 
 	case 512 / 8:
 		switch (mode) {
+#if defined(LWS_HAVE_EVP_aes_128_xts)
 		case LWS_GAESM_XTS:
 			ctx->cipher = EVP_aes_256_xts();
+#endif
 			break;
 		default:
 			goto bail;
@@ -214,12 +238,12 @@ lws_genaes_create(struct lws_genaes_ctx *ctx, enum enum_aes_operation op,
 	case LWS_GAESO_ENC:
 		n = EVP_EncryptInit_ex(ctx->ctx, ctx->cipher, ctx->engine,
 				       NULL, NULL);
-		EVP_CIPHER_CTX_set_padding(ctx->ctx, padding);
+		EVP_CIPHER_CTX_set_padding(ctx->ctx, (int)padding);
 		break;
 	case LWS_GAESO_DEC:
 		n = EVP_DecryptInit_ex(ctx->ctx, ctx->cipher, ctx->engine,
 				       NULL, NULL);
-		EVP_CIPHER_CTX_set_padding(ctx->ctx, padding);
+		EVP_CIPHER_CTX_set_padding(ctx->ctx, (int)padding);
 		break;
 	}
 	if (!n) {
@@ -264,7 +288,7 @@ lws_genaes_destroy(struct lws_genaes_ctx *ctx, unsigned char *tag, size_t tlen)
 				}
 			}
 			if (ctx->mode == LWS_GAESM_CBC)
-				memcpy(tag, buf, outl);
+				memcpy(tag, buf, (unsigned int)outl);
 
 			break;
 
@@ -298,7 +322,7 @@ lws_genaes_crypt(struct lws_genaes_ctx *ctx,
 
 	if (!ctx->init) {
 
-		EVP_CIPHER_CTX_set_key_length(ctx->ctx, ctx->k->len);
+		EVP_CIPHER_CTX_set_key_length(ctx->ctx, (int)ctx->k->len);
 
 		if (ctx->mode == LWS_GAESM_GCM) {
 			n = EVP_CIPHER_CTX_ctrl(ctx->ctx, EVP_CTRL_GCM_SET_IVLEN,
@@ -307,7 +331,7 @@ lws_genaes_crypt(struct lws_genaes_ctx *ctx,
 				lwsl_err("%s: SET_IVLEN failed\n", __func__);
 				return -1;
 			}
-			memcpy(ctx->tag, stream_block_16, taglen);
+			memcpy(ctx->tag, stream_block_16, (unsigned int)taglen);
 			ctx->taglen = taglen;
 		}
 

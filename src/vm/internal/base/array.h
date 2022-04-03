@@ -8,7 +8,7 @@
 #endif
 
 struct array_t {
-  unsigned short ref;
+  uint32_t ref;
 #ifdef DEBUGMALLOC_EXTENSIONS
   int extra_ref;
 #endif
@@ -35,7 +35,7 @@ array_t *add_array(array_t *, array_t *);
 void implode_array(funptr_t *, array_t *, svalue_t *, int);
 array_t *subtract_array(array_t *, array_t *);
 array_t *slice_array(array_t *, int, int);
-array_t *explode_string(const char *, int, const char *, int);
+array_t *explode_string(const char *str, int slen, const char *del, int dellen, bool reversible);
 char *implode_string(array_t *, const char *, int);
 array_t *commands(struct object_t *);
 void filter_array(svalue_t *, int);

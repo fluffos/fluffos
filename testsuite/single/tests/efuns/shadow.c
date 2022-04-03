@@ -1,3 +1,7 @@
+inherit "/inherit/nomask";
+inherit "/inherit/tests";
+inherit "/inherit/clean_up";
+
 object prev;
 
 void create() {
@@ -17,11 +21,15 @@ void do_tests() {
     ASSERT(shadow(this_object(), 0) == 0);
     ASSERT((object)this_object()->foo() == this_object());
 
+    new(__DIR__ "badshad2", 1);
+
+    ASSERT(shadow(this_object(), 0) == 0);
+    ASSERT((object)this_object()->foo() == this_object());
+
     ob = new(__DIR__ "goodshad", 1);
     ASSERT(shadow(this_object(), 0) == ob);
     ASSERT((object)this_object()->foo() == ob);
     ASSERT((object)new(__FILE__)->bar() == ob);
-
     ASSERT(catch(shadow(ob)));
     ASSERT(catch(shadow(new(__FILE__))));
 

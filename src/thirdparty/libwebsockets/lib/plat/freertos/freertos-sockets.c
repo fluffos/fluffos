@@ -139,6 +139,63 @@ lws_plat_set_socket_options(struct lws_vhost *vhost, int fd, int unix_skt)
 	return lws_plat_set_nonblocking(fd);
 }
 
+static const int ip_opt_lws_flags[] = {
+	LCCSCF_IP_LOW_LATENCY, LCCSCF_IP_HIGH_THROUGHPUT,
+	LCCSCF_IP_HIGH_RELIABILITY, LCCSCF_IP_LOW_COST
+}, ip_opt_val[] = {
+	IPTOS_LOWDELAY, IPTOS_THROUGHPUT, IPTOS_RELIABILITY, IPTOS_MINCOST
+};
+#if !defined(LWS_WITH_NO_LOGS)
+static const char *ip_opt_names[] = {
+	"LOWDELAY", "THROUGHPUT", "RELIABILITY", "MINCOST"
+};
+#endif
+
+int
+lws_plat_set_socket_options_ip(lws_sockfd_type fd, uint8_t pri, int lws_flags)
+{
+	int optval = (int)pri, ret = 0, n;
+	socklen_t optlen = sizeof(optval);
+#if !defined(LWS_WITH_NO_LOGS)
+	int en;
+#endif
+
+#if defined(SO_PRIORITY)
+	if (pri) { /* 0 is the default already */
+		if (setsockopt(fd, SOL_SOCKET, SO_PRIORITY,
+				(const void *)&optval, optlen) < 0) {
+#if !defined(LWS_WITH_NO_LOGS)
+			en = errno;
+			lwsl_warn("%s: unable to set socket pri %d: errno %d\n",
+				  __func__, (int)pri, en);
+#endif
+			ret = 1;
+		} else
+			lwsl_notice("%s: set pri %u\n", __func__, pri);
+	}
+#endif
+
+	for (n = 0; n < 4; n++) {
+		if (!(lws_flags & ip_opt_lws_flags[n]))
+			continue;
+
+		optval = (int)ip_opt_val[n];
+		if (setsockopt(fd, IPPROTO_IP, IP_TOS, (const void *)&optval,
+			       optlen) < 0) {
+#if !defined(LWS_WITH_NO_LOGS)
+			en = errno;
+			lwsl_warn("%s: unable to set %s: errno %d\n", __func__,
+				  ip_opt_names[n], en);
+#endif
+			ret = 1;
+		} else
+			lwsl_notice("%s: set ip flag %s\n", __func__,
+				    ip_opt_names[n]);
+	}
+
+	return ret;
+}
+
 /* cast a struct sockaddr_in6 * into addr for ipv6 */
 
 int
@@ -215,7 +272,7 @@ lws_interface_to_sa(int ipv6, const char *ifname, struct sockaddr_in *addr,
 }
 
 const char *
-lws_plat_inet_ntop(int af, const void *src, char *dst, int cnt)
+lws_plat_inet_ntop(int af, const void *src, char *dst, socklen_t cnt)
 {
 	return inet_ntop(af, src, dst, cnt);
 }
@@ -235,8 +292,8 @@ lws_plat_ifname_to_hwaddr(int fd, const char *ifname, uint8_t *hwaddr, int len)
 }
 
 int
-lws_plat_rawudp_broadcast(uint8_t *p, const uint8_t *canned, int canned_len,
-			  int n, int fd, const char *iface)
+lws_plat_rawudp_broadcast(uint8_t *p, const uint8_t *canned, size_t canned_len,
+			  size_t n, int fd, const char *iface)
 {
 	lwsl_err("%s: UNIMPLEMENTED on this platform\n", __func__);
 
@@ -260,12 +317,17 @@ lws_plat_BINDTODEVICE(lws_sockfd_type fd, const char *ifname)
 }
 
 int
-lws_plat_ifconfig_ip(const char *ifname, int fd, uint8_t *ip, uint8_t *mask_ip,
-			uint8_t *gateway_ip)
+lws_plat_ifconfig(int fd, lws_dhcpc_ifstate_t *is)
 {
 	lwsl_err("%s: UNIMPLEMENTED on this platform\n", __func__);
 
 	return -1;
+}
+
+int
+lws_plat_vhost_tls_client_ctx_init(struct lws_vhost *vhost)
+{
+	return 0;
 }
 
 #if defined(LWS_WITH_MBEDTLS)

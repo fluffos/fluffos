@@ -18,6 +18,7 @@
 #include "compiler/internal/lex.h"       // for add_predefines, fixme!
 #include "compiler/internal/compiler.h"  // for init_locals, fixme!
 
+#include "packages/core/add_action.h"
 #include "packages/core/replace_program.h"
 #ifdef PACKAGE_MUDLIB_STATS
 #include "packages/mudlib_stats/mudlib_stats.h"
@@ -81,6 +82,10 @@ void vm_init() {
   reset_machine(1);
 
   set_eval(max_eval_cost);
+
+#ifndef NO_ADD_ACTION
+  init_living(); /* in add_actions.cc */
+#endif
 }
 
 void vm_start() {

@@ -11,7 +11,9 @@
 static inline void fill_lookup_table(program_t *prog);
 
 lookup_entry_s apply_cache_lookup(const char *funcname, program_t *prog) {
-  ScopedTracer _tracer("Apply Cache Lookup", EventCategory::APPLY_CACHE, {{"name", funcname}});
+  ScopedTracer _tracer("Apply Cache Lookup", EventCategory::APPLY_CACHE, [=] {
+    return json{"name", funcname};
+  });
 
   // All function names are shared string.
   auto key = (intptr_t)(findstring(funcname));
@@ -39,19 +41,21 @@ static inline void fill_lookup_table_recurse(
     uint16_t vio) {
   // add all defined functions
   for (int i = 0; i < prog->num_functions_defined; i++) {
-    auto runtime_index = i + prog->last_inherited;
-    if (prog->function_flags[runtime_index] & (FUNC_UNDEFINED | FUNC_PROTOTYPE)) {
+    auto idx = i + prog->last_inherited;
+    if (prog->function_flags[idx] & (FUNC_UNDEFINED | FUNC_PROTOTYPE)) {
       continue;
     }
 
     auto key = (intptr_t)(prog->function_table[i].funcname);
-    lookup_entry_s entry = {nullptr};
-    entry.progp = prog;
-    entry.funp = &(prog->function_table[i]);
-    entry.function_index_offset = fio;
-    entry.variable_index_offset = vio;
-
-    table->insert({key, entry});
+    if (table->find(key) == table->end()) {
+      lookup_entry_s entry = {nullptr};
+      entry.progp = prog;
+      entry.funp = &(prog->function_table[i]);
+      entry.runtime_index = fio + idx;
+      entry.function_index_offset = fio;
+      entry.variable_index_offset = vio;
+      table->insert({key, entry});
+    }
   }
 
   // add inherited functions (must go backwards)

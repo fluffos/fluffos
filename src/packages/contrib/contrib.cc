@@ -50,7 +50,7 @@ void f_named_livings() {
   obtab = reinterpret_cast<object_t **>(
       DCALLOC(max_array_size, sizeof(object_t *), TAG_TEMPORARY, "named_livings"));
 
-  for (i = 0; i < CFG_LIVING_HASH_SIZE; i++) {
+  for (i = 0; i < CONFIG_INT(__LIVING_HASH_TABLE_SIZE__); i++) {
     for (ob = hashed_living[i]; ob; ob = ob->next_hashed_living) {
       if (!(ob->flags & O_ENABLE_COMMANDS)) {
         continue;
@@ -115,7 +115,7 @@ void f_remove_shadow(void) {
    when I added it (added function support, etc) -Beek */
 #ifdef F_QUERY_NOTIFY_FAIL
 void f_query_notify_fail(void) {
-  char *p;
+  const char *p;
 
   if (command_giver && command_giver->interactive) {
     if (command_giver->interactive->iflags & NOTIFY_FAIL_FUNC) {
@@ -347,7 +347,7 @@ void f_functions(void) {
   i = num;
 
   while (i--) {
-    unsigned short low, high, mid;
+    unsigned short low = 0, high = 0, mid = 0;
 
     prog = sp->u.ob->prog;
     ind = i + offset;
@@ -395,14 +395,16 @@ void f_functions(void) {
       subvec->item[1].subtype = 0;
       subvec->item[1].u.number = funp->num_arg;
 
-      get_type_name(buf, end, funp->type);
+      auto p = get_type_name(buf, end, funp->type);
+      *(p - 1) = '\0';  // get rid of last space
       subvec->item[2].type = T_STRING;
       subvec->item[2].subtype = STRING_SHARED;
       subvec->item[2].u.string = make_shared_string(buf);
 
       for (j = 0; j < funp->num_arg; j++) {
         if (types) {
-          get_type_name(buf, end, types[j]);
+          auto p = get_type_name(buf, end, types[j]);
+          *(p - 1) = '\0';  // get rid of last space
           subvec->item[3 + j].type = T_STRING;
           subvec->item[3 + j].subtype = STRING_SHARED;
           subvec->item[3 + j].u.string = make_shared_string(buf);
@@ -441,7 +443,8 @@ static void fv_recurse(array_t *arr, int *idx, program_t *prog, int type, int fl
       subarr->item[0].type = T_STRING;
       subarr->item[0].subtype = STRING_SHARED;
       subarr->item[0].u.string = ref_string(prog->variable_table[i]);
-      get_type_name(buf, end, prog->variable_types[i]);
+      auto p = get_type_name(buf, end, prog->variable_types[i]);
+      *(p - 1) = '\0';  // get rid of last space
       subarr->item[1].type = T_STRING;
       subarr->item[1].subtype = STRING_SHARED;
       subarr->item[1].u.string = make_shared_string(buf);
@@ -534,7 +537,7 @@ void f_terminal_colour(void) {
   int curcolourlen;
   int colourstartlen = 0;
   const char *resetstr = nullptr;
-  char *resetstrname;
+  const char *resetstrname;
   int resetstrlen = 0;
   int num, i, j, k, col, start, space, *lens, maybe_at_end;
   int space_garbage = 0;
@@ -1015,8 +1018,8 @@ void f_terminal_colour(void) {
 #ifndef DEBUG
   if (ncp - deststr != j) {
     fatal(
-        "Length miscalculated in terminal_colour()\n    Expected: %i Was: %i\n "
-        "   String: %s\n    Indent: %i Wrap: %i\n",
+        "Length miscalculated in terminal_colour()\n    Expected: %d Was: %td\n "
+        "   String: %s\n    Indent: %" LPC_INT_FMTSTR_P " Wrap: %" LPC_INT_FMTSTR_P "\n",
         j, ncp - deststr, sp->u.string, indent, wrap);
   }
 #endif
@@ -1534,8 +1537,8 @@ static int file_length(const char *file) {
   struct stat st;
   FILE *f;
   int ret = 0;
-  int num;
-  char buf[2049];
+  size_t num;
+  static char buf[2049];
   char *p, *newp;
 
   file = check_valid_path(file, current_object, "file_size", 0);
@@ -1549,16 +1552,16 @@ static int file_length(const char *file) {
   if (st.st_mode & S_IFDIR) {
     return -2;
   }
-  if (!(f = fopen(file, "r"))) {
+  if (!(f = fopen(file, "rb"))) {
     return -1;
   }
 
   do {
-    num = fread(buf, 1, 2048, f);
-    p = buf - 1;
-    while ((newp = reinterpret_cast<char *>(memchr(p + 1, '\n', num)))) {
-      num -= (newp - p);
-      p = newp;
+    num = fread(buf, 1, sizeof(buf) - 1, f);
+    p = buf;
+    while ((newp = reinterpret_cast<char *>(memchr(p, '\n', num)))) {
+      num -= (newp - (p - 1));
+      p = newp + 1;
       ret++;
     }
   } while (!feof(f));
@@ -1605,7 +1608,7 @@ void f_replaceable(void) {
   object_t *obj;
   program_t *prog;
   int i, j, num, numignore, replaceable;
-  char **ignore;
+  const char **ignore;
 
   if (st_num_arg == 2) {
     obj = (sp - 1)->u.ob;
@@ -1620,7 +1623,7 @@ void f_replaceable(void) {
     if (st_num_arg == 2) {
       numignore = sp->u.arr->size;
       if (numignore) {
-        ignore = reinterpret_cast<char **>(
+        ignore = reinterpret_cast<const char **>(
             DCALLOC(numignore + 2, sizeof(char *), TAG_TEMPORARY, "replaceable"));
       } else {
         ignore = nullptr;
@@ -1637,7 +1640,8 @@ void f_replaceable(void) {
       numignore += 2;
     } else {
       numignore = 2;
-      ignore = reinterpret_cast<char **>(DCALLOC(2, sizeof(char *), TAG_TEMPORARY, "replaceable"));
+      ignore =
+          reinterpret_cast<const char **>(DCALLOC(2, sizeof(char *), TAG_TEMPORARY, "replaceable"));
       ignore[0] = findstring(APPLY_CREATE);
       ignore[1] = findstring(APPLY___INIT);
     }
@@ -1818,12 +1822,12 @@ void f_query_ip_port(void) {
 
 #if defined F_ZONETIME || defined F_IS_DAYLIGHT_SAVINGS_TIME
 
-char *set_timezone(const char *timezone) {
+const char *set_timezone(const char *new_tz) {
   static char put_tz[80];
   char *old_tz;
 
   old_tz = getenv("TZ");
-  sprintf(put_tz, "TZ=%s", timezone);
+  snprintf(put_tz, sizeof(put_tz) / sizeof(char), "TZ=%s", new_tz);
   putenv(put_tz);
   tzset();
   return old_tz;
@@ -1832,7 +1836,7 @@ char *set_timezone(const char *timezone) {
 void reset_timezone(const char *old_tz) {
   static char put_tz[80];
   if (old_tz) {
-    sprintf(put_tz, "TZ=%s", old_tz);
+    snprintf(put_tz, sizeof(put_tz) / sizeof(char), "TZ=%s", old_tz);
     putenv(put_tz);
   } else {
 #ifndef __MINGW32__
@@ -1848,19 +1852,18 @@ void reset_timezone(const char *old_tz) {
 #endif
 
 #ifdef F_ZONETIME
-
 void f_zonetime(void) {
-  const char *timezone, *old_tz;
+  const char *new_tz, *old_tz;
   char *retv;
   time_t time_val;
   int len;
 
   time_val = sp->u.number;
   pop_stack();
-  timezone = sp->u.string;
+  new_tz = sp->u.string;
   pop_stack();
 
-  old_tz = set_timezone(timezone);
+  old_tz = set_timezone(new_tz);
   char buf[256] = {};
   retv = ctime_r(&time_val, buf);
   if (!retv) {
@@ -1877,22 +1880,18 @@ void f_zonetime(void) {
 
 #ifdef F_IS_DAYLIGHT_SAVINGS_TIME
 void f_is_daylight_savings_time(void) {
-  struct tm *t;
-  const char *timezone;
-  char *old_tz;
-
   time_t time_to_check = sp->u.number;
-  pop_stack();
-  timezone = sp->u.string;
-  pop_stack();
-
-  old_tz = set_timezone(timezone);
+  const char *new_tz = (sp - 1)->u.string;
+  const char *old_tz = set_timezone(new_tz);
 
   if (time_to_check < 0) {
     time_to_check = 0;
   }
   struct tm res = {};
-  t = localtime_r(&time_to_check, &res);
+  struct tm *t = localtime_r(&time_to_check, &res);
+
+  pop_stack();
+  pop_stack();
   if (t) {
     push_number((t->tm_isdst) > 0);
   } else {
@@ -3003,7 +3002,8 @@ void f_classes() {
             make_shared_string(prog->strings[prog->class_members[offset].membername]);
 
         // ...and type.
-        get_type_name(buf, end, prog->class_members[offset].type);
+        auto p = get_type_name(buf, end, prog->class_members[offset].type);
+        *(p - 1) = '\0';  // get rid of last space
         subsubvec->item[1].type = T_STRING;
         subsubvec->item[1].subtype = STRING_SHARED;
         subsubvec->item[1].u.string = make_shared_string(buf);

@@ -63,6 +63,7 @@ void f_hash(void) {
     unsigned char md[hash_size];               \
     func((unsigned char *)data, data_len, md); \
     result = hexdump(md, hash_size);           \
+    goto result;                               \
   })
 
 #ifndef OPENSSL_NO_SHA1
@@ -99,6 +100,7 @@ void f_hash(void) {
   DO_HASH_IF("ripemd160", RIPEMD160, RIPEMD160_DIGEST_LENGTH);
 #endif
 
+result:
   if (!result) {
     error("hash() unknown hash type: %s", algo);
   }

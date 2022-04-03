@@ -48,6 +48,9 @@ rops_handle_POLLIN_raw_proxy(struct lws_context_per_thread *pt, struct lws *wsi,
 		return LWS_HPI_RET_HANDLED;
 	}
 
+	if (lwsi_state(wsi) == LRS_WAITING_CONNECT)
+		goto try_pollout;
+
 	if ((pollfd->revents & pollfd->events & LWS_POLLIN) &&
 	    /* any tunnel has to have been established... */
 	    lwsi_state(wsi) != LRS_SSL_ACK_PENDING &&
@@ -85,7 +88,7 @@ rops_handle_POLLIN_raw_proxy(struct lws_context_per_thread *pt, struct lws *wsi,
 						 LWS_CALLBACK_RAW_PROXY_CLI_RX :
 						 LWS_CALLBACK_RAW_PROXY_SRV_RX,
 						wsi->user_space, ebuf.token,
-						ebuf.len);
+						(size_t)ebuf.len);
 		if (n < 0) {
 			lwsl_info("LWS_CALLBACK_RAW_PROXY_*_RX fail\n");
 			goto fail;
@@ -111,7 +114,7 @@ try_pollout:
 	}
 
 #if defined(LWS_WITH_CLIENT)
-	if (lws_client_socket_service(wsi, pollfd))
+	if (lws_http_client_socket_service(wsi, pollfd))
 		return LWS_HPI_RET_WSI_ALREADY_DIED;
 #endif
 
@@ -191,29 +194,42 @@ rops_handle_POLLOUT_raw_proxy(struct lws *wsi)
 	return LWS_HP_RET_BAIL_OK;
 }
 
+static const lws_rops_t rops_table_raw_proxy[] = {
+	/*  1 */ { .handle_POLLIN	= rops_handle_POLLIN_raw_proxy },
+	/*  2 */ { .handle_POLLOUT	= rops_handle_POLLOUT_raw_proxy },
+	/*  3 */ { .adoption_bind	= rops_adoption_bind_raw_proxy },
+	/*  4 */ { .client_bind		= rops_client_bind_raw_proxy },
+};
+
+
 const struct lws_role_ops role_ops_raw_proxy = {
 	/* role name */			"raw-proxy",
 	/* alpn id */			NULL,
-	/* check_upgrades */		NULL,
-	/* pt_init_destroy */		NULL,
-	/* init_vhost */		NULL,
-	/* destroy_vhost */		NULL,
-	/* service_flag_pending */	NULL,
-	/* handle_POLLIN */		rops_handle_POLLIN_raw_proxy,
-	/* handle_POLLOUT */		rops_handle_POLLOUT_raw_proxy,
-	/* perform_user_POLLOUT */	NULL,
-	/* callback_on_writable */	NULL,
-	/* tx_credit */			NULL,
-	/* write_role_protocol */	NULL,
-	/* encapsulation_parent */	NULL,
-	/* alpn_negotiated */		NULL,
-	/* close_via_role_protocol */	NULL,
-	/* close_role */		NULL,
-	/* close_kill_connection */	NULL,
-	/* destroy_role */		NULL,
-	/* adoption_bind */		rops_adoption_bind_raw_proxy,
-	/* client_bind */		rops_client_bind_raw_proxy,
-	/* issue_keepalive */		NULL,
+
+	/* rops_table */		rops_table_raw_proxy,
+	/* rops_idx */			{
+	  /* LWS_ROPS_check_upgrades */
+	  /* LWS_ROPS_pt_init_destroy */		0x00,
+	  /* LWS_ROPS_init_vhost */
+	  /* LWS_ROPS_destroy_vhost */			0x00,
+	  /* LWS_ROPS_service_flag_pending */
+	  /* LWS_ROPS_handle_POLLIN */			0x01,
+	  /* LWS_ROPS_handle_POLLOUT */
+	  /* LWS_ROPS_perform_user_POLLOUT */		0x20,
+	  /* LWS_ROPS_callback_on_writable */
+	  /* LWS_ROPS_tx_credit */			0x00,
+	  /* LWS_ROPS_write_role_protocol */
+	  /* LWS_ROPS_encapsulation_parent */		0x00,
+	  /* LWS_ROPS_alpn_negotiated */
+	  /* LWS_ROPS_close_via_role_protocol */	0x00,
+	  /* LWS_ROPS_close_role */
+	  /* LWS_ROPS_close_kill_connection */		0x00,
+	  /* LWS_ROPS_destroy_role */
+	  /* LWS_ROPS_adoption_bind */			0x03,
+	  /* LWS_ROPS_client_bind */
+	  /* LWS_ROPS_issue_keepalive */		0x40,
+					},
+
 	/* adoption_cb clnt, srv */	{ LWS_CALLBACK_RAW_PROXY_CLI_ADOPT,
 					  LWS_CALLBACK_RAW_PROXY_SRV_ADOPT },
 	/* rx_cb clnt, srv */		{ LWS_CALLBACK_RAW_PROXY_CLI_RX,

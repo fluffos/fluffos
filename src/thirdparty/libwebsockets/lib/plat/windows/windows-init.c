@@ -87,11 +87,7 @@ lws_plat_init(struct lws_context *context,
 	}
 
 	while (n--) {
-               int m;
 		pt->fds_count = 0;
-               for (m = 0; m < WSA_MAXIMUM_WAIT_EVENTS; m++)
-                       pt->events[m] = WSACreateEvent();
-		InitializeCriticalSection(&pt->interrupt_lock);
 
 		pt++;
 	}
@@ -111,16 +107,7 @@ lws_plat_init(struct lws_context *context,
 void
 lws_plat_context_early_destroy(struct lws_context *context)
 {
-	struct lws_context_per_thread *pt = &context->pt[0];
-	int n = context->count_threads;
 
-	while (n--) {
-		int m;
-		for (m = 0; m < WSA_MAXIMUM_WAIT_EVENTS; m++)
-			WSACloseEvent(pt->events[m]);
-		DeleteCriticalSection(&pt->interrupt_lock);
-		pt++;
-	}
 }
 
 void
@@ -130,7 +117,7 @@ lws_plat_context_late_destroy(struct lws_context *context)
 
 #ifdef LWS_WITH_PLUGINS
 	if (context->plugin_list)
-		lws_plugins_destroy(&context->plugin_list);
+		lws_plugins_destroy(&context->plugin_list, NULL, NULL);
 #endif
 
 	for (n = 0; n < FD_HASHTABLE_MODULUS; n++) {

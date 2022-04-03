@@ -79,18 +79,16 @@ static void
 lws_sul_wsitimeout_cb(lws_sorted_usec_list_t *sul)
 {
 	struct lws *wsi = lws_container_of(sul, struct lws, sul_timeout);
-	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
-
-	if (wsi->pending_timeout != PENDING_TIMEOUT_USER_OK)
-		lws_stats_bump(pt, LWSSTATS_C_TIMEOUTS, 1);
+	struct lws_context *cx = wsi->a.context;
+	struct lws_context_per_thread *pt = &cx->pt[(int)wsi->tsi];
 
 	/* no need to log normal idle keepalive timeout */
 //		if (wsi->pending_timeout != PENDING_TIMEOUT_HTTP_KEEPALIVE_IDLE)
 #if defined(LWS_ROLE_H1) || defined(LWS_ROLE_H2)
 	if (wsi->pending_timeout != PENDING_TIMEOUT_USER_OK)
-		lwsl_info("wsi %p: TIMEDOUT WAITING on %d "
-			  "(did hdr %d, ah %p, wl %d)\n",
-			  (void *)wsi, wsi->pending_timeout,
+		lwsl_info("%s: %s: TIMEDOUT WAITING on %d "
+			  "(did hdr %d, ah %p, wl %d)\n", __func__,
+			  lws_wsi_tag(wsi), wsi->pending_timeout,
 			  wsi->hdr_parsing_completed, wsi->http.ah,
 			  pt->http.ah_wait_list_length);
 #if defined(LWS_WITH_CGI)
@@ -99,8 +97,8 @@ lws_sul_wsitimeout_cb(lws_sorted_usec_list_t *sul)
 #endif
 #else
 	if (wsi->pending_timeout != PENDING_TIMEOUT_USER_OK)
-		lwsl_info("wsi %p: TIMEDOUT WAITING on %d ", (void *)wsi,
-				wsi->pending_timeout);
+		lwsl_info("%s: %s: TIMEDOUT WAITING on %d ", __func__,
+				lws_wsi_tag(wsi), wsi->pending_timeout);
 #endif
 	/* cgi timeout */
 	if (wsi->pending_timeout != PENDING_TIMEOUT_HTTP_KEEPALIVE_IDLE)
@@ -116,11 +114,16 @@ lws_sul_wsitimeout_cb(lws_sorted_usec_list_t *sul)
 	if (lwsi_state(wsi) == LRS_WAITING_SSL)
 		lws_inform_client_conn_fail(wsi,
 			(void *)"Timed out waiting SSL", 21);
+	if (lwsi_state(wsi) == LRS_WAITING_SERVER_REPLY)
+		lws_inform_client_conn_fail(wsi,
+			(void *)"Timed out waiting server reply", 30);
 #endif
 
+	lws_context_lock(cx, __func__);
 	lws_pt_lock(pt, __func__);
 	__lws_close_free_wsi(wsi, LWS_CLOSE_STATUS_NOSTATUS, "timeout");
 	lws_pt_unlock(pt);
+	lws_context_unlock(cx);
 }
 
 void
@@ -133,9 +136,10 @@ __lws_set_timeout(struct lws *wsi, enum pending_timeout reason, int secs)
 			    &wsi->sul_timeout,
 			    ((lws_usec_t)secs) * LWS_US_PER_SEC);
 
-	lwsl_debug("%s: %p: %d secs, reason %d\n", __func__, wsi, secs, reason);
+	lwsl_debug("%s: %s: %d secs, reason %d\n", __func__, lws_wsi_tag(wsi),
+			secs, reason);
 
-	wsi->pending_timeout = reason;
+	wsi->pending_timeout = (char)reason;
 }
 
 void
@@ -152,7 +156,7 @@ lws_set_timeout(struct lws *wsi, enum pending_timeout reason, int secs)
 		goto bail;
 
 	if (secs == LWS_TO_KILL_SYNC) {
-		lwsl_debug("synchronously killing %p\n", wsi);
+		lwsl_debug("%s: TO_KILL_SYNC %s\n", __func__, lws_wsi_tag(wsi));
 		lws_context_unlock(pt->context);
 		lws_close_free_wsi(wsi, LWS_CLOSE_STATUS_NOSTATUS,
 				   "to sync kill");
@@ -190,10 +194,10 @@ lws_set_timeout_us(struct lws *wsi, enum pending_timeout reason, lws_usec_t us)
 	__lws_sul_insert_us(&pt->pt_sul_owner[LWSSULLI_MISS_IF_SUSPENDED],
 			    &wsi->sul_timeout, us);
 
-	lwsl_notice("%s: %p: %llu us, reason %d\n", __func__, wsi,
+	lwsl_notice("%s: %s: %llu us, reason %d\n", __func__, lws_wsi_tag(wsi),
 		   (unsigned long long)us, reason);
 
-	wsi->pending_timeout = reason;
+	wsi->pending_timeout = (char)reason;
 	lws_pt_unlock(pt);
 }
 
@@ -229,8 +233,8 @@ lws_sul_timed_callback_vh_protocol_cb(lws_sorted_usec_list_t *sul)
 	plwsa->vhost = tvp->vhost; /* not a real bound wsi */
 	plwsa->protocol = tvp->protocol;
 
-	lwsl_debug("%s: timed cb: vh %s, protocol %s, reason %d\n", __func__,
-		   tvp->vhost->name, tvp->protocol->name, tvp->reason);
+	lwsl_debug("%s: timed cb: %s, protocol %s, reason %d\n", __func__,
+		   lws_vh_tag(tvp->vhost), tvp->protocol->name, tvp->reason);
 
 	tvp->protocol->callback((struct lws *)plwsa, tvp->reason, NULL, NULL, 0);
 
@@ -298,18 +302,26 @@ lws_validity_cb(lws_sorted_usec_list_t *sul)
 	/* one of either the ping or hangup validity threshold was crossed */
 
 	if (wsi->validity_hup) {
-		lwsl_info("%s: wsi %p: validity too old\n", __func__, wsi);
+		struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
+
+		lwsl_info("%s: %s: validity too old\n", __func__, lws_wsi_tag(wsi));
+
+		lws_context_lock(wsi->a.context, __func__);
+		lws_pt_lock(pt, __func__);
 		__lws_close_free_wsi(wsi, LWS_CLOSE_STATUS_NOSTATUS,
 				     "validity timeout");
+		lws_pt_unlock(pt);
+		lws_context_unlock(wsi->a.context);
 		return;
 	}
 
 	/* schedule a protocol-dependent ping */
 
-	lwsl_info("%s: wsi %p: scheduling validity check\n", __func__, wsi);
+	lwsl_info("%s: %s: scheduling validity check\n", __func__, lws_wsi_tag(wsi));
 
-	if (wsi->role_ops && wsi->role_ops->issue_keepalive)
-		wsi->role_ops->issue_keepalive(wsi, 0);
+	if (lws_rops_fidx(wsi->role_ops, LWS_ROPS_issue_keepalive))
+		lws_rops_func_fidx(wsi->role_ops, LWS_ROPS_issue_keepalive).
+							issue_keepalive(wsi, 0);
 
 	/*
 	 * We arrange to come back here after the additional ping to hangup time
@@ -346,8 +358,8 @@ _lws_validity_confirmed_role(struct lws *wsi)
 	wsi->validity_hup = rbo->secs_since_valid_ping >=
 			    rbo->secs_since_valid_hangup;
 
-	lwsl_info("%s: wsi %p: setting validity timer %ds (hup %d)\n",
-			__func__, wsi,
+	lwsl_info("%s: %s: setting validity timer %ds (hup %d)\n",
+			__func__, lws_wsi_tag(wsi),
 			wsi->validity_hup ? rbo->secs_since_valid_hangup :
 					    rbo->secs_since_valid_ping,
 			wsi->validity_hup);
@@ -368,6 +380,8 @@ lws_validity_confirmed(struct lws *wsi)
 	 * validity was confirmed.
 	 */
 	if (!wsi->h2_stream_carries_ws && /* only if not encapsulated */
-	    wsi->role_ops && wsi->role_ops->issue_keepalive)
-		wsi->role_ops->issue_keepalive(wsi, 1);
+	    wsi->role_ops &&
+	    lws_rops_fidx(wsi->role_ops, LWS_ROPS_issue_keepalive))
+		lws_rops_func_fidx(wsi->role_ops, LWS_ROPS_issue_keepalive).
+							issue_keepalive(wsi, 1);
 }

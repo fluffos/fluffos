@@ -112,7 +112,7 @@ more or less bytes according to the value.  So the peak memory requirements for
 large tries are much bigger than the size of the serialized trie file that is
 output.
 
-For the linux kernel at 4.14 and default indexing whitelist on a 2.8GHz AMD
+For the linux kernel at 4.14 and default indexing list on a 2.8GHz AMD
 threadripper (using one thread), the stats are:
 
 Name|Value
@@ -124,7 +124,7 @@ Peak alloc|78MiB
 Serialization time|202ms
 Trie File size|347MiB
 
-To index libwebsockets master under the same conditions:
+To index libwebsockets main branch under the same conditions:
 
 Name|Value
 ---|---

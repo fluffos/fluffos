@@ -58,13 +58,39 @@ set(LWS_WITH_POLL 1)
 
 if (ESP_PLATFORM)
 	set(LWS_ESP_PLATFORM 1)
-	set(CMAKE_TOOLCHAIN_FILE contrib/cross-esp32.cmake)
+	#set(CMAKE_TOOLCHAIN_FILE contrib/cross-esp32.cmake)
 	set(LWIP_PROVIDE_ERRNO 1)
 endif()
 
 # it's at this point any toolchain file is brought in
-project(libwebsockets C)
+project(libwebsockets C CXX)
 include(CTest)
+
+if (ESP_PLATFORM)
+       include_directories(
+		$ENV{IDF_PATH}/components/esp_hw_support/include/soc/
+		$ENV{IDF_PATH}/components/freertos/include/
+		$ENV{IDF_PATH}/components/xtensa/${CONFIG_IDF_TARGET}/include/
+		$ENV{IDF_PATH}/components/freertos/include/esp_additions
+		$ENV{IDF_PATH}/components/hal/include
+		$ENV{IDF_PATH}/components/soc/${CONFIG_IDF_TARGET}/include/
+		$ENV{IDF_PATH}/components/soc/include/
+		$ENV{IDF_PATH}/components/esp_hw_support/include
+		$ENV{IDF_PATH}/components/hal/${CONFIG_IDF_TARGET}/include/
+	)
+
+	if (CONFIG_IDF_TARGET_ARCH_RISCV)
+                include_directories(
+                       $ENV{IDF_PATH}/components/freertos/port/riscv/include
+                       $ENV{IDF_PATH}/components/riscv/include)
+        else()
+                include_directories(
+                       $ENV{IDF_PATH}/components/freertos/port/xtensa/include
+                       $ENV{IDF_PATH}/components/xtensa/include)
+        endif()
+
+endif()
+
 
 #
 # Select features recommended for PC distro packaging
@@ -93,13 +119,13 @@ option(LWS_WITH_CGI "Include CGI (spawn process with network-connected stdin/out
 option(LWS_IPV6 "Compile with support for ipv6" OFF)
 option(LWS_UNIX_SOCK "Compile with support for UNIX domain socket if OS supports it" ON)
 option(LWS_WITH_PLUGINS "Support plugins for protocols and extensions (implies LWS_WITH_PLUGINS_API)" OFF)
+option(LWS_WITH_PLUGINS_BUILTIN "Build the plugin protocols directly into lws library" OFF)
 option(LWS_WITH_HTTP_PROXY "Support for active HTTP proxying" OFF)
 option(LWS_WITH_ZIP_FOPS "Support serving pre-zipped files" OFF)
 option(LWS_WITH_SOCKS5 "Allow use of SOCKS5 proxy on client connections" OFF)
 option(LWS_WITH_PEER_LIMITS "Track peers and restrict resources a single peer can allocate" OFF)
 option(LWS_WITH_ACCESS_LOG "Support generating Apache-compatible access logs" OFF)
 option(LWS_WITH_RANGES "Support http ranges (RFC7233)" OFF)
-option(LWS_WITH_SERVER_STATUS "Support json + jscript server monitoring" OFF)
 option(LWS_WITH_THREADPOOL "Managed worker thread pool support (relies on pthreads)" OFF)
 option(LWS_WITH_HTTP_STREAM_COMPRESSION "Support HTTP stream compression" OFF)
 option(LWS_WITH_HTTP_BROTLI "Also offer brotli http stream compression (requires LWS_WITH_HTTP_STREAM_COMPRESSION)" OFF)
@@ -115,14 +141,18 @@ option(LWS_WITH_HTTP_BASIC_AUTH "Support Basic Auth" ON)
 option(LWS_WITH_HTTP_UNCOMMON_HEADERS "Include less common http header support" ON)
 option(LWS_WITH_SYS_STATE "lws_system state support" ON)
 option(LWS_WITH_SYS_SMD "Lws System Message Distribution" ON)
+option(LWS_WITH_SYS_FAULT_INJECTION "Enable fault injection support" OFF)
+option(LWS_WITH_SYS_METRICS "Lws Metrics API" OFF)
 
 #
 # Secure Streams
 #
 option(LWS_WITH_SECURE_STREAMS "Secure Streams protocol-agnostic API" OFF)
+option(LWS_WITH_SECURE_STREAMS_CPP "Secure Streams C++ classes" OFF)
 option(LWS_WITH_SECURE_STREAMS_PROXY_API "Secure Streams support to work across processes" OFF)
 option(LWS_WITH_SECURE_STREAMS_SYS_AUTH_API_AMAZON_COM "Auth support for api.amazon.com" OFF)
 option(LWS_WITH_SECURE_STREAMS_STATIC_POLICY_ONLY "Secure Streams Policy is hardcoded only" OFF)
+option(LWS_WITH_SECURE_STREAMS_AUTH_SIGV4 "Secure Streams Auth support for AWS Sigv4" OFF)
 
 #
 # CTest options
@@ -145,6 +175,10 @@ option(LWS_WITH_BORINGSSL "Use BoringSSL replacement for OpenSSL" OFF)
 option(LWS_WITH_CYASSL "Use CyaSSL replacement for OpenSSL. When setting this, you also need to specify LWS_CYASSL_LIBRARIES and LWS_CYASSL_INCLUDE_DIRS" OFF)
 option(LWS_WITH_WOLFSSL "Use wolfSSL replacement for OpenSSL. When setting this, you also need to specify LWS_WOLFSSL_LIBRARIES and LWS_WOLFSSL_INCLUDE_DIRS" OFF)
 option(LWS_SSL_CLIENT_USE_OS_CA_CERTS "SSL support should make use of the OS-installed CA root certs" ON)
+option(LWS_TLS_LOG_PLAINTEXT_RX "For debugging log the received plaintext as soon as decrypted" OFF)
+option(LWS_TLS_LOG_PLAINTEXT_TX "For debugging log the transmitted plaintext just before encryption" OFF)
+option(LWS_WITH_TLS_SESSIONS "Enable persistent, resumable TLS sessions" ON)
+
 #
 # Event library options (may select multiple, or none for default poll()
 #
@@ -152,6 +186,8 @@ option(LWS_WITH_LIBEV "Compile with support for libev" OFF)
 option(LWS_WITH_LIBUV "Compile with support for libuv" OFF)
 option(LWS_WITH_LIBEVENT "Compile with support for libevent" OFF)
 option(LWS_WITH_GLIB "Compile with support for glib event loop" OFF)
+option(LWS_WITH_SDEVENT "Compile with support for sd-event loop" OFF)
+option(LWS_WITH_ULOOP "Compile with support for uloop" OFF)
 
 if (UNIX)
 # since v4.1, on unix platforms default is build any event libs as runtime plugins
@@ -173,6 +209,8 @@ option(LWS_WITH_STATIC "Build the static version of the library" ON)
 option(LWS_WITH_SHARED "Build the shared version of the library" ON)
 option(LWS_LINK_TESTAPPS_DYNAMIC "Link the test apps to the shared version of the library. Default is to link statically" OFF)
 option(LWS_STATIC_PIC "Build the static version of the library with position-independent code" OFF)
+option(LWS_SUPPRESS_DEPRECATED_API_WARNINGS "Turn off complaints about, eg, openssl deprecated api usage" OFF)
+
 #
 # Specific platforms
 #
@@ -220,8 +258,8 @@ option(LWS_WITH_NO_LOGS "Disable all logging other than _err and _user from bein
 set(LWS_LOGGING_BITFIELD_SET 0 CACHE STRING "Bitfield describing which log levels to force included into the build")
 set(LWS_LOGGING_BITFIELD_CLEAR 0 CACHE STRING "Bitfield describing which log levels to force removed from the build")
 option(LWS_LOGS_TIMESTAMP "Timestamp at start of logs" ON)
+option(LWS_LOG_TAG_LIFECYCLE "Log tagged object lifecycle as NOTICE" ON)
 option(LWS_AVOID_SIGPIPE_IGN "Android 7+ reportedly needs this" OFF)
-option(LWS_WITH_STATS "Keep statistics of lws internal operations" OFF)
 option(LWS_WITH_JOSE "JSON Web Signature / Encryption / Keys (RFC7515/6/) API" OFF)
 option(LWS_WITH_GENCRYPTO "Enable support for Generic Crypto apis independent of TLS backend" OFF)
 option(LWS_WITH_SELFTESTS "Selftests run at context creation" OFF)
@@ -243,7 +281,6 @@ option(LWS_WITH_EXTERNAL_POLL "Support external POLL integration using callback 
 option(LWS_WITH_LWS_DSH "Support lws_dsh_t Disordered Shared Heap" OFF)
 option(LWS_CLIENT_HTTP_PROXYING "Support external http proxies for client connections" ON)
 option(LWS_WITH_FILE_OPS "Support file operations vfs" ON)
-option(LWS_WITH_DETAILED_LATENCY "Record detailed latency stats for each read and write" OFF)
 option(LWS_WITH_UDP "Platform supports UDP" ON)
 option(LWS_WITH_SPAWN "Spawn subprocesses with piped stdin/out/stderr" OFF)
 option(LWS_WITH_FSMOUNT "Overlayfs and fallback mounting apis" OFF)
@@ -251,6 +288,20 @@ option(LWS_WITH_FANALYZER "Enable gcc -fanalyzer if compiler supports" OFF)
 option(LWS_HTTP_HEADERS_ALL "Override header reduction optimization and include all like older lws versions" OFF)
 option(LWS_WITH_SUL_DEBUGGING "Enable zombie lws_sul checking on object deletion" OFF)
 option(LWS_WITH_PLUGINS_API "Build generic lws_plugins apis (see LWS_WITH_PLUGINS to also build protocol plugins)" OFF)
+option(LWS_WITH_CONMON "Collect introspectable connection latency stats on individual client connections" ON)
+option(LWS_WITHOUT_EVENTFD "Force using pipe instead of eventfd" OFF)
+
+if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+	option(LWS_WITH_NETLINK "Monitor Netlink for Routing Table changes" ON)
+else()
+	set(LWS_WITH_NETLINK 0)
+endif()
+
+if (${CMAKE_SYSTEM_NAME} MATCHES "SunOS")
+       # its openssl has md5 deprecated
+       set(LWS_SUPPRESS_DEPRECATED_API_WARNINGS 1)
+endif()
+
 
 #
 # to use miniz, enable both LWS_WITH_ZLIB and LWS_WITH_MINIZ
@@ -333,12 +384,16 @@ if(GIT_EXECUTABLE)
 	message("Git commit hash: ${LWS_BUILD_HASH}")
 endif()
 
+if ("${LWS_BUILD_HASH}" STREQUAL "")
+	set(LWS_BUILD_HASH "unknown")
+endif()
+
 set(PACKAGE "libwebsockets")
 set(CPACK_RPM_PACKAGE_LICENSE "MIT")
 set(CPACK_PACKAGE_NAME "${PACKAGE}")
 set(CPACK_PACKAGE_VERSION_MAJOR "4")
-set(CPACK_PACKAGE_VERSION_MINOR "1")
-set(CPACK_PACKAGE_VERSION_PATCH_NUMBER "4")
+set(CPACK_PACKAGE_VERSION_MINOR "2")
+set(CPACK_PACKAGE_VERSION_PATCH_NUMBER "1")
 
 set(CPACK_PACKAGE_VERSION_PATCH "${CPACK_PACKAGE_VERSION_PATCH_NUMBER}-${LWS_BUILD_HASH}")
 set(CPACK_PACKAGE_RELEASE 1)
@@ -347,7 +402,7 @@ set(CPACK_PACKAGE_VERSION "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSIO
 set(CPACK_PACKAGE_VENDOR "andy@warmcat.com")
 set(CPACK_PACKAGE_CONTACT "andy@warmcat.com")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PACKAGE} ${CPACK_PACKAGE_VERSION}")
-set(SOVERSION "17")
+set(SOVERSION "18")
 if(NOT CPACK_GENERATOR)
     if(UNIX)
         set(CPACK_GENERATOR "TGZ")
@@ -510,7 +565,21 @@ CHECK_FUNCTION_EXISTS(atoll LWS_HAVE_ATOLL)
 CHECK_FUNCTION_EXISTS(_atoi64 LWS_HAVE__ATOI64)
 CHECK_FUNCTION_EXISTS(_stat32i64 LWS_HAVE__STAT32I64)
 CHECK_FUNCTION_EXISTS(clock_gettime LWS_HAVE_CLOCK_GETTIME)
+CHECK_FUNCTION_EXISTS(localtime_r LWS_HAVE_LOCALTIME_R)
+CHECK_FUNCTION_EXISTS(gmtime_r LWS_HAVE_GMTIME_R)
+CHECK_FUNCTION_EXISTS(ctime_r LWS_HAVE_CTIME_R)
+CHECK_FUNCTION_EXISTS(getgrgid_r LWS_HAVE_GETGRGID_R)
+CHECK_FUNCTION_EXISTS(getgrnam_r LWS_HAVE_GETGRNAM_R)
+CHECK_FUNCTION_EXISTS(getpwuid_r LWS_HAVE_GETPWUID_R)
+CHECK_FUNCTION_EXISTS(getpwnam_r LWS_HAVE_GETPWNAM_R)
+CHECK_FUNCTION_EXISTS(timegm LWS_HAVE_TIMEGM)
 
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+	if(CMAKE_OSX_DEPLOYMENT_TARGET LESS "10.12")
+		message("No clock_gettime found on macOS ${CMAKE_OSX_DEPLOYMENT_TARGET}. Disabling LWS_HAVE_CLOCK_GETTIME.")
+		set(LWS_HAVE_CLOCK_GETTIME 0)
+	endif()
+endif()
 
 if (NOT LWS_HAVE_GETIFADDRS)
 	if (LWS_WITHOUT_BUILTIN_GETIFADDRS)
@@ -539,8 +608,8 @@ if (LWS_WITH_ZLIB AND NOT LWS_WITH_BUNDLED_ZLIB)
 	list(APPEND LIB_LIST_AT_END "${ZLIB_LIBRARIES}")
 endif()
 
-if (LWS_WITH_PLUGINS_API AND UNIX AND NOT (${CMAKE_SYSTEM_NAME} MATCHES "QNX"))
-	list(APPEND LIB_LIST_AT_END "dl")
+if (LWS_WITH_PLUGINS_API AND UNIX AND CMAKE_DL_LIBS AND NOT (${CMAKE_SYSTEM_NAME} MATCHES "QNX"))
+	list(APPEND LIB_LIST_AT_END ${CMAKE_DL_LIBS})
 endif()
 
 
@@ -610,10 +679,17 @@ if ((CMAKE_C_COMPILER_ID MATCHES "Clang") OR
 endif()
 
 if (LWS_HAVE_PTHREAD_H AND NOT LWS_PLAT_FREERTOS)
-	CHECK_C_SOURCE_COMPILES("#define _GNU_SOURCE
+	CHECK_C_SOURCE_COMPILES("
+		#ifndef _GNU_SOURCE
+		#define _GNU_SOURCE
+		#endif
 		#include <pthread.h>
 		int main(void) {
+		#ifdef __PTW32_H
+			pthread_t th = {0,0};
+		#else
 			pthread_t th = 0;
+		#endif
 			pthread_setname_np(th, NULL);
 			return 0;
 		}" LWS_HAS_PTHREAD_SETNAME_NP)
@@ -626,6 +702,17 @@ CHECK_C_SOURCE_COMPILES("#include <stddef.h>
 		return p != NULL;
 	}" LWS_HAS_GETOPT_LONG)
 
+CHECK_C_SOURCE_COMPILES("#include <linux/rtnetlink.h>
+	int main(void) {
+		int test = RTA_PREF;
+		return 0;
+	}" LWS_HAVE_RTA_PREF)
+
+CHECK_C_SOURCE_COMPILES("#include <sys/types.h>
+	int main(void) {
+		suseconds_t x = 0;
+		return (int)x;
+	}" LWS_HAVE_SUSECONDS_T)
 
 if (NOT PID_T_SIZE)
 	set(pid_t int)
@@ -673,6 +760,7 @@ if (CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX OR COMPILER_IS_CLANG)
 
 	check_c_compiler_flag("-Wignored-qualifiers" LWS_GCC_HAS_IGNORED_QUALIFIERS)
 	check_c_compiler_flag("-Wtype-limits" LWS_GCC_HAS_TYPE_LIMITS)
+	check_c_compiler_flag("-Wno-deprecated-declarations" LWS_GCC_HAS_NO_DEPRECATED_DECLARATIONS)
 
 	if (LWS_GCC_HAS_IGNORED_QUALIFIERS)
 		set(CMAKE_C_FLAGS "-Wignored-qualifiers ${CMAKE_C_FLAGS}" )
@@ -692,13 +780,20 @@ if (CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX OR COMPILER_IS_CLANG)
 
 	# always warn all and generate debug info
 	if (UNIX AND NOT LWS_PLAT_FREERTOS)
-		set(CMAKE_C_FLAGS "-Wall -Wsign-compare -Wstrict-aliasing ${VISIBILITY_FLAG} -Wundef ${GCOV_FLAGS} ${CMAKE_C_FLAGS} ${ASAN_FLAGS}" )
+		set(CMAKE_C_FLAGS "-Wall -Wconversion -Wsign-compare -Wstrict-aliasing ${VISIBILITY_FLAG} -Wundef ${GCOV_FLAGS} ${CMAKE_C_FLAGS} ${ASAN_FLAGS}" )
 	else()
 		set(CMAKE_C_FLAGS "-Wall -Wsign-compare ${VISIBILITY_FLAG} ${GCOV_FLAGS} ${CMAKE_C_FLAGS}" )
 	endif()
 
 	if ("${DISABLE_WERROR}" STREQUAL "OFF")
 		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror")
+	endif()
+
+	if (LWS_SUPPRESS_DEPRECATED_API_WARNINGS)
+		set(CMAKE_C_FLAGS "-Wno-deprecated ${CMAKE_C_FLAGS}")
+		if (LWS_GCC_HAS_NO_DEPRECATED_DECLARATIONS)
+			set(CMAKE_C_FLAGS "-Wno-deprecated-declarations ${CMAKE_C_FLAGS}")
+		endif()
 	endif()
 endif ()
 
@@ -707,6 +802,7 @@ if ((CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX) AND NOT LWS_WITHOUT_TE
 	# jeez clang understands -pthread but dies if he sees it at link time!
 	# http://stackoverflow.com/questions/2391194/what-is-gs-pthread-equiv-in-clang
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread" )
+	list(APPEND LIB_LIST_AT_END -lpthread)
     endif()
 endif()
 
@@ -814,6 +910,10 @@ if (LWS_HAVE_LIBCAP)
 	list(APPEND LIB_LIST ${LIBCAP_LIBRARIES} )
 endif()
 
+if (LWS_WITH_PLUGINS_BUILTIN)
+	add_subdirectory(plugins)
+endif()
+
 
 #
 # Append the "at end" pieces to the lib list
@@ -825,8 +925,8 @@ list(APPEND LIB_LIST ${LIB_LIST_AT_END})
 #
 
 include_directories("${PROJECT_SOURCE_DIR}/lib")
-add_subdirectory(lib)
 
+add_subdirectory(lib)
 
 
 if(WIN32 AND NOT CYGWIN)
@@ -835,13 +935,13 @@ else()
   set(DEF_INSTALL_CMAKE_DIR lib${LIB_SUFFIX}/cmake/libwebsockets)
 endif()
 
-if (DEFINED REL_INCLUDE_DIR)
-    set(LWS__INCLUDE_DIRS "\${LWS_CMAKE_DIR}/${REL_INCLUDE_DIR}")
-endif()
+configure_file(${PROJECT_SOURCE_DIR}/cmake/LwsCheckRequirements.cmake
+		${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/LwsCheckRequirements.cmake
+		@ONLY)
 
-configure_file(${PROJECT_SOURCE_DIR}/cmake/libwebsockets-config.cmake.in
-                ${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/libwebsockets-config.cmake
-                @ONLY)
+configure_file(${PROJECT_SOURCE_DIR}/cmake/LwsCheckRequirements.cmake
+		${PROJECT_BINARY_DIR}/LwsCheckRequirements.cmake
+		@ONLY)
 
 # Generate version info for both build-tree and install-tree.
 configure_file(${PROJECT_SOURCE_DIR}/cmake/libwebsockets-config-version.cmake.in
@@ -878,7 +978,9 @@ if (NOT LWS_WITHOUT_TESTAPPS)
 	add_subdirectory(test-apps)
 endif()
 
+if (NOT LWS_WITH_PLUGINS_BUILTIN)
 add_subdirectory(plugins)
+endif()
 add_subdirectory(lwsws)
 
 # Generate the lws_config.h that includes all the public compilation settings.
@@ -938,6 +1040,14 @@ file(RELATIVE_PATH
     "${LWS_ABSOLUTE_INSTALL_CMAKE_DIR}"
     "${LWS_ABSOLUTE_INSTALL_INCLUDE_DIR}") # Calculate the relative directory from the cmake dir.
 
+if (DEFINED REL_INCLUDE_DIR)
+    set(LWS__INCLUDE_DIRS "\${LWS_CMAKE_DIR}/${REL_INCLUDE_DIR}")
+endif()
+
+configure_file(${PROJECT_SOURCE_DIR}/cmake/libwebsockets-config.cmake.in
+                ${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/libwebsockets-config.cmake
+                @ONLY)
+
 set_target_properties(${LWS_LIBRARIES}
 		PROPERTIES PUBLIC_HEADER "${HDR_PUBLIC}")
 
@@ -945,7 +1055,7 @@ set_target_properties(${LWS_LIBRARIES}
 install(FILES
                "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/libwebsockets-config.cmake"
                "${PROJECT_BINARY_DIR}/libwebsockets-config-version.cmake"
-               "${PROJECT_SOURCE_DIR}/cmake/LwsCheckRequirements.cmake"
+               "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/LwsCheckRequirements.cmake"
                DESTINATION "${LWS_INSTALL_CMAKE_DIR}" COMPONENT dev)
 
 # Install exports for the install-tree.

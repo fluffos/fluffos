@@ -670,7 +670,7 @@ elseif (MYSQL_CONFIG_EXECUTABLE)
     # Replace the current library references with the full path
     # to the library, i.e. the -L will be ignored
     _mysql_config_replace(MYSQL_LIBRARIES
-      "(mysqlclient|mysqlclient_r)" "${MYSQL_LIB}" "(^| )-l" "--libs")
+      "(mysqlclient|mysqlclient_r|mariadb)" "${MYSQL_LIB}" "(^| )-l" "--libs")
 
   else ()
 
@@ -727,7 +727,7 @@ endif ()
 if (MYSQLCLIENT_STATIC_LINKING)
   if(WIN32)
     # From mariadb_config --libs_sys
-    list(APPEND MYSQL_LIBRARIES ws2_32 advapi32 kernel32 shlwapi crypt32 z secur32)
+    list(APPEND MYSQL_LIBRARIES ws2_32 advapi32 kernel32 shlwapi crypt32 z secur32 Bcrypt)
   elseif (NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
       list(APPEND MYSQL_LIBRARIES "rt")
   endif()

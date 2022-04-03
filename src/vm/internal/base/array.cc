@@ -200,8 +200,8 @@ static array_t *fix_array(array_t *p, unsigned int n) {
 }
 
 array_t *resize_array(array_t *p, unsigned int n) {
-  // it is possible that n < p->size, be careful to not upgrade the result to unsigned.
-  total_array_size += ((int)n - p->size) * int(sizeof(svalue_t));
+  total_array_size -= p->size * sizeof(svalue_t);
+  total_array_size += n * sizeof(svalue_t);
   if (n) {
     ms_remove_stats(p);
     p = RESIZE_ARRAY(p, n);
@@ -222,192 +222,135 @@ array_t *resize_array(array_t *p, unsigned int n) {
   return p;
 }
 
-array_t *explode_string(const char *str, int slen, const char *del, int len) {
+array_t *explode_string(const char *str, int slen, const char *del, int dellen, bool reversible) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
-  const char *p, *beg, *lastdel = nullptr;
-  int num, j, limit;
-  array_t *ret;
-  char *buff, *tmp;
-  int sz;
-
+  // fast track empty arrays
   if (!slen) {
     return &the_null_array;
   }
 
   /* return an array of length strlen(str) -w- one character per element */
-  if (len == 0) {
-    sz = 1;
+  if (dellen == 0) {
+    auto result = u8_egc_split(str, slen);
+    auto size = result.size();
 
-    if (slen > max_array_size) {
-      slen = max_array_size;
+    if (size > max_array_size) {
+      size = max_array_size;
     }
-    ret = int_allocate_empty_array(slen);
-    for (j = 0; j < slen; j++) {
+    auto *ret = int_allocate_empty_array(size);
+    for (int j = 0; j < size; j++) {
       ret->item[j].type = T_STRING;
       ret->item[j].subtype = STRING_MALLOC;
-      ret->item[j].u.string = tmp = new_string(1, "explode_string: tmp");
-      tmp[0] = str[j];
-      tmp[1] = '\0';
+
+      auto *dest = new_string(result[j].size(), "explode_string: tmp");
+      result[j].copy(dest, result[j].size());
+      dest[result[j].size()] = '\0';
+
+      ret->item[j].u.string = dest;
     }
     return ret;
   }
-  if (len == 1) {
-    char delimeter;
 
-    delimeter = *del;
+  auto source = str;
+  auto sourcelen = slen;
 
-    if (!CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__)) {
-      /*
-       * Skip leading 'del' strings, if any.
-       */
-      while (*str == delimeter) {
-        str++;
-        slen--;
-        if (str[0] == '\0') {
-          return &the_null_array;
-        }
-        if (CONFIG_INT(__RC_SANE_EXPLODE_STRING__) != 0) {
-          break;
-        }
-      }
-    }
-    /*
-     * Find number of occurences of the delimiter 'del'.
-     */
-    for (p = str, num = 0; *p;) {
-      if (*p == delimeter) {
-        num++;
-        lastdel = p;
-      }
-      p++;
-    }
+  auto num_leading = 0;
+  auto num_trailing = 0;
 
-    /*
-     * Compute number of array items. It is either number of delimiters,
-     * or, one more.
-     */
-    limit = max_array_size;
-    if (CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__)) {
-      num++;
-      limit--;
-    } else {
-      if (lastdel != (str + slen - 1)) {
-        num++;
-        limit--;
-      }
-    }
-    if (num > max_array_size) {
-      num = max_array_size;
-    }
-    ret = int_allocate_empty_array(num);
-    for (p = str, beg = str, num = 0; *p && (num < limit);) {
-      if (*p == delimeter) {
-        DEBUG_CHECK(num >= ret->size, "Index out of bounds in explode!\n");
-        sz = p - beg;
-        ret->item[num].type = T_STRING;
-        ret->item[num].subtype = STRING_MALLOC;
-        ret->item[num].u.string = buff = new_string(sz, "explode_string: buff");
-
-        strncpy(buff, beg, sz);
-        buff[sz] = '\0';
-        num++;
-        beg = ++p;
-      } else {
-        p++;
-      }
-    }
-
-    if (CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__)) {
-      ret->item[num].type = T_STRING;
-      ret->item[num].subtype = STRING_MALLOC;
-      ret->item[num].u.string = string_copy(beg, "explode_string: last, len == 1");
-    } else {
-      /* Copy last occurence, if there was not a 'del' at the end. */
-      if (*beg != '\0' && num != limit) {
-        ret->item[num].type = T_STRING;
-        ret->item[num].subtype = STRING_MALLOC;
-        ret->item[num].u.string = string_copy(beg, "explode_string: last, len == 1");
-      }
-    }
-    return ret;
-  } /* len == 1 */
-
-  if (!CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__)) {
-    /*
-     * Skip leading 'del' strings, if any.
-     */
-    while (strncmp(str, del, len) == 0) {
-      str += len;
-      slen -= len;
-      if (str[0] == '\0') {
-        return &the_null_array;
-      }
+  EGCIterator iter(source, sourcelen);
+  /*
+   * Count leading 'del' strings.
+   * in reversible mode, no skipping at all.
+   * in sane mode, only skip one.
+   */
+  while (sourcelen && u8_egc_find_as_offset(iter, del, dellen, false) == 0) {
+    source += dellen;
+    sourcelen -= dellen;
+    iter.reset(source, sourcelen);
+    num_leading++;
+  }
+  if (num_leading) {
+    if (!reversible) {
       if (CONFIG_INT(__RC_SANE_EXPLODE_STRING__)) {
-        break;
+        num_leading--;
+      } else {
+        num_leading = 0;
       }
-    }
-  }
-  /*
-   * Find number of occurences of the delimiter 'del'.
-   */
-  for (p = str, num = 0; *p;) {
-    if (strncmp(p, del, len) == 0) {
-      num++;
-      lastdel = p;
-      p += len;
-    } else {
-      p++;
     }
   }
 
   /*
-   * Compute number of array items. It is either number of delimiters, or,
-   * one more.
+   * Count trailing 'del' strings.
+   * in reversible mode, no skipping at all.
+   * in other mode, only skip one.
    */
-  if (CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__)) {
-    num++;
-  } else {
-    if (lastdel != (str + slen - len)) {
-      num++;
+  while (sourcelen) {
+    auto i = u8_egc_find_as_offset(iter, del, dellen, true);
+    if (i <= 0 || i != (sourcelen - dellen)) break;
+    sourcelen -= dellen;
+    iter.reset(source, sourcelen);
+    num_trailing++;
+  }
+  if (num_trailing) {
+    if (!reversible) {
+      num_trailing--;
     }
   }
+
+  if (!sourcelen || source[0] == '\0') {
+    return &the_null_array;
+  }
+
+  std::vector<std::string_view> results;
+  for (int i = 0; i < num_leading; i++) {
+    results.emplace_back("");
+  }
+  while (sourcelen) {
+    int i = u8_egc_find_as_offset(iter, del, dellen, false);
+
+    // no more occurrence, copy the remaining part.
+    if (i == -1) {
+      results.emplace_back(source, sourcelen);
+      break;
+    }
+
+    if (i > 0) {
+      // if we have text before delimiter, add them
+      results.emplace_back(source, i);
+      source += i;
+      sourcelen -= i;
+
+      source += dellen;
+      sourcelen -= dellen;
+
+      iter.reset(source, sourcelen);
+    } else if (i == 0) {
+      results.emplace_back("");
+
+      source += dellen;
+      sourcelen -= dellen;
+      iter.reset(source, sourcelen);
+    }
+  }
+  for (int i = 0; i < num_trailing; i++) {
+    results.emplace_back("");
+  }
+
+  auto num = results.size();
   if (num > max_array_size) {
     num = max_array_size;
   }
-  ret = int_allocate_empty_array(num);
-  limit = max_array_size - 1; /* extra element can be added after loop */
-  for (p = str, beg = str, num = 0; *p && (num < limit);) {
-    if (strncmp(p, del, len) == 0) {
-      if (num >= ret->size) {
-        fatal("Index out of bounds in explode!\n");
-      }
+  auto *ret = int_allocate_empty_array(num);
+  for (int i = 0; i < num; i++) {
+    ret->item[i].type = T_STRING;
+    ret->item[i].subtype = STRING_MALLOC;
 
-      ret->item[num].type = T_STRING;
-      ret->item[num].subtype = STRING_MALLOC;
-      ret->item[num].u.string = buff = new_string(p - beg, "explode_string: buff");
+    auto *dest = new_string(results[i].size(), "explode_string: buff");
+    results[i].copy(dest, results[i].size());
+    dest[results[i].length()] = '\0';
 
-      strncpy(buff, beg, p - beg);
-      buff[p - beg] = '\0';
-      num++;
-      beg = p + len;
-      p = beg;
-    } else {
-      p++;
-    }
-  }
-
-  /* Copy last occurence, if there was not a 'del' at the end. */
-  if (CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__)) {
-    ret->item[num].type = T_STRING;
-    ret->item[num].subtype = STRING_MALLOC;
-    ret->item[num].u.string = string_copy(beg, "explode_string: last, len != 1");
-  } else {
-    if (*beg != '\0' && num != limit) {
-      ret->item[num].type = T_STRING;
-      ret->item[num].subtype = STRING_MALLOC;
-      ret->item[num].u.string = string_copy(beg, "explode_string: last, len != 1");
-    }
+    ret->item[i].u.string = dest;
   }
   return ret;
 }
@@ -423,7 +366,9 @@ char *implode_string(array_t *arr, const char *del, int del_len) {
     }
   }
   if (num == 0) {
-    return string_copy("", "implode_string");
+    auto res = new_string(0, "implode_string");
+    res[0] = '\0';
+    return res;
   }
 
   p = new_string(size + (num - 1) * del_len, "implode_string: p");
@@ -1515,7 +1460,7 @@ static long alist_cmp(svalue_t *p1, svalue_t *p2) {
 static svalue_t *alist_sort(array_t *inlist) {
   long size, j, curix, parix, child1, child2, flag;
   svalue_t *sv_tab, *tmp, *table, *sv_ptr, val;
-  char *str;
+  const char *str;
 
   if (!(size = inlist->size)) {
     return (svalue_t *)nullptr;
@@ -1716,7 +1661,7 @@ array_t *intersect_array(array_t *a1, array_t *a2) {
       }
     }
   } else {
-    char *str;
+    const char *str;
 
     sv_tab = a2->item;
     for (j = 0; j < a2s; j++) {
@@ -1872,7 +1817,7 @@ array_t *union_array(array_t *a1, array_t *a2) {
       }
     }
   } else {
-    char *str;
+    const char *str;
 
     sv_tab = a2->item;
     for (j = 0; j < a2s; j++) {

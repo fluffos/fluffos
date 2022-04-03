@@ -55,7 +55,7 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
       lwsl_info("LWS_CALLBACK_ESTABLISHED\n");
 
       auto port = (port_def_t *)lws_context_user(lws_get_context(wsi));
-      auto fd = lws_get_socket_fd(wsi);
+      auto fd = lws_get_socket_fd(lws_get_network_wsi(wsi));
 
       sockaddr_storage addr = {0};
       socklen_t addrlen = sizeof(addr);
@@ -131,13 +131,18 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
 
       auto total = evbuffer_get_length(pss->buffer);
 
-      static unsigned char buf[LWS_PRE + MAX_TEXT];
+      static unsigned char buf[LWS_PRE + 2048];
       auto numbytes = evbuffer_copyout(pss->buffer, &buf[LWS_PRE], sizeof(buf) - LWS_PRE);
       if (numbytes > 0) {
-        numbytes = u8_truncate(&buf[LWS_PRE], numbytes);
+        auto new_numbytes = u8_truncate(&buf[LWS_PRE], numbytes);
+        if (new_numbytes != numbytes) {
+          auto rest = new_numbytes - numbytes;
+          evbuffer_prepend(pss->buffer, &buf[LWS_PRE + new_numbytes], rest);
+          numbytes = new_numbytes;
+        }
 #ifdef DEBUG
         if (!u8_validate(&buf[LWS_PRE], numbytes)) {
-          char buf1[MAX_TEXT + 1];
+          char buf1[sizeof(buf) + 1] = {};
           strncpy(buf1, reinterpret_cast<const char *>(&buf[LWS_PRE]), numbytes);
           debug_message("Illegal UTF8 Websocket output string: %s.", buf1);
         }

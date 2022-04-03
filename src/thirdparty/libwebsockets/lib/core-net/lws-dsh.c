@@ -1,7 +1,7 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2021 Andy Green <andy@warmcat.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -52,13 +52,15 @@ lws_dsh_align(size_t length)
 lws_dsh_t *
 lws_dsh_create(lws_dll2_owner_t *owner, size_t buf_len, int count_kinds)
 {
-	size_t oha_len = sizeof(lws_dsh_obj_head_t) * ++count_kinds;
+	size_t oha_len = sizeof(lws_dsh_obj_head_t) * (unsigned int)(++count_kinds);
 	lws_dsh_obj_t *obj;
 	lws_dsh_t *dsh;
 	int n;
 
 	assert(buf_len);
 	assert(count_kinds > 1);
+	assert(buf_len > sizeof(lws_dsh_t) + oha_len);
+	buf_len += 64;
 
 	dsh = lws_malloc(sizeof(lws_dsh_t) + buf_len + oha_len, __func__);
 	if (!dsh)
@@ -75,8 +77,10 @@ lws_dsh_create(lws_dll2_owner_t *owner, size_t buf_len, int count_kinds)
 	/* clear down the obj heads array */
 
 	memset(dsh->oha, 0, oha_len);
-	for (n = 0; n < count_kinds; n++)
+	for (n = 0; n < count_kinds; n++) {
 		dsh->oha[n].kind = n;
+		dsh->oha[n].total_size = 0;
+	}
 
 	/* initially the whole buffer is on the free kind (0) list */
 
@@ -242,6 +246,15 @@ lws_dsh_destroy(lws_dsh_t **pdsh)
 	lws_free_set_NULL(*pdsh);
 }
 
+size_t
+lws_dsh_get_size(struct lws_dsh *dsh, int kind)
+{
+	kind++;
+	assert(kind < dsh->count_kinds);
+
+	return dsh->oha[kind].total_size;
+}
+
 static int
 _lws_dsh_alloc_tail(lws_dsh_t *dsh, int kind, const void *src1, size_t size1,
 		    const void *src2, size_t size2, lws_dll2_t *replace)
@@ -295,6 +308,7 @@ _lws_dsh_alloc_tail(lws_dsh_t *dsh, int kind, const void *src1, size_t size1,
 		 */
 		lws_dll2_remove(&s.best->list);
 		s.best->dsh = s.dsh;
+		s.best->kind = kind;
 		s.best->size = size1 + size2;
 		memcpy(&s.best[1], src1, size1);
 		if (src2)
@@ -309,12 +323,15 @@ _lws_dsh_alloc_tail(lws_dsh_t *dsh, int kind, const void *src1, size_t size1,
 			if (replace->next)
 				replace->next->prev = &s.best->list;
 		} else
-			if (dsh)
+			if (dsh) {
+				assert(!(((unsigned long)(intptr_t)(s.best)) & (sizeof(int *) - 1)));
 				lws_dll2_add_tail(&s.best->list, &dsh->oha[kind].owner);
+			}
 
 		assert(s.dsh->locally_free >= s.best->asize);
 		s.dsh->locally_free -= s.best->asize;
 		s.dsh->locally_in_use += s.best->asize;
+		dsh->oha[kind].total_size += s.best->asize;
 		assert(s.dsh->locally_in_use <= s.dsh->buffer_size);
 	} else {
 		lws_dsh_obj_t *obj;
@@ -333,10 +350,11 @@ _lws_dsh_alloc_tail(lws_dsh_t *dsh, int kind, const void *src1, size_t size1,
 
 		/* latter part becomes new object */
 
-		obj = (lws_dsh_obj_t *)(((uint8_t *)s.best) + s.best->asize);
+		obj = (lws_dsh_obj_t *)(((uint8_t *)s.best) + lws_dsh_align(s.best->asize));
 
 		lws_dll2_clear(&obj->list);
 		obj->dsh = s.dsh;
+		obj->kind = kind;
 		obj->size = size1 + size2;
 		obj->asize = asize;
 
@@ -353,12 +371,15 @@ _lws_dsh_alloc_tail(lws_dsh_t *dsh, int kind, const void *src1, size_t size1,
 			if (replace->next)
 				replace->next->prev = &s.best->list;
 		} else
-			if (dsh)
+			if (dsh) {
+				assert(!(((unsigned long)(intptr_t)(obj)) & (sizeof(int *) - 1)));
 				lws_dll2_add_tail(&obj->list, &dsh->oha[kind].owner);
+			}
 
 		assert(s.dsh->locally_free >= asize);
 		s.dsh->locally_free -= asize;
 		s.dsh->locally_in_use += asize;
+		dsh->oha[kind].total_size += asize;
 		assert(s.dsh->locally_in_use <= s.dsh->buffer_size);
 	}
 
@@ -401,6 +422,7 @@ lws_dsh_free(void **pobj)
 	assert(dsh->locally_in_use >= _o->asize);
 	dsh->locally_free += _o->asize;
 	dsh->locally_in_use -= _o->asize;
+	dsh->oha[_o->kind].total_size -= _o->asize; /* account for usage by kind */
 	assert(dsh->locally_in_use <= dsh->buffer_size);
 
 	/*
@@ -454,8 +476,12 @@ lws_dsh_free(void **pobj)
 int
 lws_dsh_get_head(lws_dsh_t *dsh, int kind, void **obj, size_t *size)
 {
-	lws_dsh_obj_t *_obj = (lws_dsh_obj_t *)
-			lws_dll2_get_head(&dsh->oha[kind + 1].owner);
+	lws_dsh_obj_t *_obj;
+
+	if (!dsh)
+		return 1;
+
+	_obj = (lws_dsh_obj_t *)lws_dll2_get_head(&dsh->oha[kind + 1].owner);
 
 	if (!_obj) {
 		*obj = 0;
@@ -468,12 +494,12 @@ lws_dsh_get_head(lws_dsh_t *dsh, int kind, void **obj, size_t *size)
 	*size = _obj->size;
 
 	/* anything coming out of here must be aligned */
-	assert(!(((unsigned long)(*obj)) & (sizeof(int *) - 1)));
+	assert(!(((unsigned long)(intptr_t)(*obj)) & (sizeof(int *) - 1)));
 
 	return 0;	/* we returned the head */
 }
 
-#if defined(_DEBUG)
+#if defined(_DEBUG) && !defined(LWS_WITH_NO_LOGS)
 
 static int
 describe_kind(struct lws_dll2 *d, void *user)

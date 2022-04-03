@@ -119,17 +119,17 @@ read:
 
 		buffered = 0;
 		ebuf.token = pt->serv_buf;
-		ebuf.len = wsi->a.context->pt_serv_buf_size;
+		ebuf.len = (int)wsi->a.context->pt_serv_buf_size;
 
 		if ((unsigned int)ebuf.len > wsi->a.context->pt_serv_buf_size)
-			ebuf.len = wsi->a.context->pt_serv_buf_size;
+			ebuf.len = (int)wsi->a.context->pt_serv_buf_size;
 
 		if ((int)pending > ebuf.len)
-			pending = ebuf.len;
+			pending = (unsigned int)ebuf.len;
 
 		ebuf.len = lws_ssl_capable_read(wsi, ebuf.token,
-						pending ? (int)pending :
-						ebuf.len);
+						pending ? pending :
+						(unsigned int)ebuf.len);
 		switch (ebuf.len) {
 		case 0:
 			lwsl_info("%s: zero length read\n",
@@ -155,7 +155,7 @@ drain:
 	/* service incoming data */
 	//lws_buflist_describe(&wsi->buflist, wsi, __func__);
 	if (ebuf.len) {
-		n = lws_read_mqtt(wsi, ebuf.token, ebuf.len);
+		n = lws_read_mqtt(wsi, ebuf.token, (unsigned int)ebuf.len);
 		if (n < 0) {
 			lwsl_notice("%s: lws_read_mqtt returned %d\n",
 					__func__, n);
@@ -172,7 +172,7 @@ drain:
 	ebuf.token = NULL;
 	ebuf.len = 0;
 
-	pending = lws_ssl_pending(wsi);
+	pending = (unsigned int)lws_ssl_pending(wsi);
 	if (pending) {
 		pending = pending > wsi->a.context->pt_serv_buf_size ?
 			wsi->a.context->pt_serv_buf_size : pending;
@@ -181,7 +181,7 @@ drain:
 
 	if (buffered && /* were draining, now nothing left */
 	    !lws_buflist_next_segment_len(&wsi->buflist, NULL)) {
-		lwsl_info("%s: %p flow buf: drained\n", __func__, wsi);
+		lwsl_info("%s: %s flow buf: drained\n", __func__, lws_wsi_tag(wsi));
 		/* having drained the rxflow buffer, can rearm POLLIN */
 #if !defined(LWS_WITH_SERVER)
 		n =
@@ -313,6 +313,9 @@ rops_handle_POLLOUT_mqtt(struct lws *wsi)
 		return LWS_HP_RET_DROP_POLLOUT;
 	}
 
+	if (!wsi->mqtt)
+		return LWS_HP_RET_BAIL_DIE;
+
 	lws_wsi_mux_dump_waiting_children(wsi);
 
 	do {
@@ -343,8 +346,8 @@ rops_handle_POLLOUT_mqtt(struct lws *wsi)
 			goto next_child;
 		}
 
-		lwsl_debug("%s: child %p (wsistate 0x%x)\n", __func__, w,
-			    (unsigned int)w->wsistate);
+		lwsl_debug("%s: child %s (wsistate 0x%x)\n", __func__,
+			   lws_wsi_tag(w), (unsigned int)w->wsistate);
 
 		if (lwsi_state(wsi) == LRS_ESTABLISHED &&
 		    !wsi->mqtt->inside_payload &&
@@ -372,7 +375,7 @@ rops_handle_POLLOUT_mqtt(struct lws *wsi)
 		}
 
 		if (lws_callback_as_writeable(w)) {
-			lwsl_notice("%s: Closing child %p\n", __func__, w);
+			lwsl_notice("%s: Closing child %s\n", __func__, lws_wsi_tag(w));
 			lws_close_free_wsi(w, LWS_CLOSE_STATUS_NOSTATUS,
 					   "mqtt pollout handle");
 			wa = &wsi->mux.child_list;
@@ -470,7 +473,8 @@ rops_callback_on_writable_mqtt(struct lws *wsi)
 #endif
 	int already;
 
-	lwsl_debug("%s: %p (wsistate 0x%x)\n", __func__, wsi, (unsigned int)wsi->wsistate);
+	lwsl_debug("%s: %s (wsistate 0x%x)\n", __func__, lws_wsi_tag(wsi),
+			(unsigned int)wsi->wsistate);
 
 	if (wsi->mux.requested_POLLOUT
 #if defined(LWS_WITH_CLIENT)
@@ -520,8 +524,9 @@ rops_callback_on_writable_mqtt(struct lws *wsi)
 static int
 rops_close_kill_connection_mqtt(struct lws *wsi, enum lws_close_status reason)
 {
-	lwsl_info(" wsi: %p, his parent %p: child list %p, siblings:\n", wsi,
-			wsi->mux.parent_wsi, wsi->mux.child_list);
+	lwsl_info(" %s, his parent %s: child list %p, siblings:\n",
+			lws_wsi_tag(wsi),
+			lws_wsi_tag(wsi->mux.parent_wsi), wsi->mux.child_list);
 	//lws_wsi_mux_dump_children(wsi);
 
 	if (wsi->mux_substream
@@ -529,15 +534,17 @@ rops_close_kill_connection_mqtt(struct lws *wsi, enum lws_close_status reason)
 			|| wsi->client_mux_substream
 #endif
 	) {
-		lwsl_info("closing %p: parent %p: first child %p\n", wsi,
-				wsi->mux.parent_wsi, wsi->mux.child_list);
+		lwsl_info("closing %s: parent %s: first child %p\n",
+				lws_wsi_tag(wsi),
+				lws_wsi_tag(wsi->mux.parent_wsi),
+				wsi->mux.child_list);
 
 		if (wsi->mux.child_list && lwsl_visible(LLL_INFO)) {
-			lwsl_info(" parent %p: closing children: list:\n", wsi);
+			lwsl_info(" parent %s: closing children: list:\n", lws_wsi_tag(wsi));
 			lws_wsi_mux_dump_children(wsi);
 		}
 
-		lws_wsi_mux_close_children(wsi, reason);
+		lws_wsi_mux_close_children(wsi, (int)reason);
 	}
 
 	if ((
@@ -552,39 +559,51 @@ rops_close_kill_connection_mqtt(struct lws *wsi, enum lws_close_status reason)
 	return 0;
 }
 
+static const lws_rops_t rops_table_mqtt[] = {
+	/*  1 */ { .handle_POLLIN	  = rops_handle_POLLIN_mqtt },
+	/*  2 */ { .handle_POLLOUT	  = rops_handle_POLLOUT_mqtt },
+	/*  3 */ { .callback_on_writable  = rops_callback_on_writable_mqtt },
+	/*  4 */ { .close_role		  = rops_close_role_mqtt },
+	/*  5 */ { .close_kill_connection = rops_close_kill_connection_mqtt },
+#if defined(LWS_WITH_CLIENT)
+	/*  6 */ { .client_bind		  = rops_client_bind_mqtt },
+	/*  7 */ { .issue_keepalive	  = rops_issue_keepalive_mqtt },
+#endif
+};
 
 struct lws_role_ops role_ops_mqtt = {
 	/* role name */			"mqtt",
 	/* alpn id */			"x-amzn-mqtt-ca", /* "mqtt/3.1.1" */
-	/* check_upgrades */		NULL,
-	/* pt_init_destroy */		NULL,
-	/* init_vhost */		NULL,
-	/* destroy_vhost */		NULL,
-	/* service_flag_pending */	NULL,
-	.handle_POLLIN =		rops_handle_POLLIN_mqtt,
-	.handle_POLLOUT =		rops_handle_POLLOUT_mqtt,
-	/* perform_user_POLLOUT */	NULL,
-	/* callback_on_writable */	rops_callback_on_writable_mqtt,
-	/* tx_credit */			NULL,
-	.write_role_protocol =		NULL,
-	/* encapsulation_parent */	NULL,
-	/* alpn_negotiated */		NULL,
-	/* close_via_role_protocol */	NULL,
-	.close_role =			rops_close_role_mqtt,
-	.close_kill_connection =	rops_close_kill_connection_mqtt,
-	/* destroy_role */		NULL,
-#if 0  /* defined(LWS_WITH_SERVER) */
-	/* adoption_bind */		rops_adoption_bind_mqtt,
-#else
-					NULL,
-#endif
+
+	/* rops_table */		rops_table_mqtt,
+	/* rops_idx */			{
+	  /* LWS_ROPS_check_upgrades */
+	  /* LWS_ROPS_pt_init_destroy */		0x00,
+	  /* LWS_ROPS_init_vhost */
+	  /* LWS_ROPS_destroy_vhost */			0x00,
+	  /* LWS_ROPS_service_flag_pending */
+	  /* LWS_ROPS_handle_POLLIN */			0x01,
+	  /* LWS_ROPS_handle_POLLOUT */
+	  /* LWS_ROPS_perform_user_POLLOUT */		0x20,
+	  /* LWS_ROPS_callback_on_writable */
+	  /* LWS_ROPS_tx_credit */			0x30,
+	  /* LWS_ROPS_write_role_protocol */
+	  /* LWS_ROPS_encapsulation_parent */		0x00,
+	  /* LWS_ROPS_alpn_negotiated */
+	  /* LWS_ROPS_close_via_role_protocol */	0x00,
+	  /* LWS_ROPS_close_role */
+	  /* LWS_ROPS_close_kill_connection */		0x45,
+	  /* LWS_ROPS_destroy_role */
+	  /* LWS_ROPS_adoption_bind */			0x00,
+
+	  /* LWS_ROPS_client_bind */
 #if defined(LWS_WITH_CLIENT)
-	.client_bind =			rops_client_bind_mqtt,
-	.issue_keepalive =		rops_issue_keepalive_mqtt,
+	  /* LWS_ROPS_issue_keepalive */		0x67,
 #else
-	.client_bind =			NULL,
-	.issue_keepalive = 		NULL,
+	  /* LWS_ROPS_issue_keepalive */		0x00,
 #endif
+					},
+
 	.adoption_cb =			{ LWS_CALLBACK_MQTT_NEW_CLIENT_INSTANTIATED,
 					  LWS_CALLBACK_MQTT_NEW_CLIENT_INSTANTIATED },
 	.rx_cb =			{ LWS_CALLBACK_MQTT_CLIENT_RX,

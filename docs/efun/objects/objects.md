@@ -9,8 +9,7 @@ title: objects / objects
 
 ### SYNOPSIS
 
-    object  *objects(  string  func, object ob ); object *objects( function
-    f);
+    object *objects( void | string func | function f );
 
 ### DESCRIPTION
 
@@ -18,7 +17,7 @@ title: objects / objects
     Note  that if the system's maximum array size is set too low, objects()
     will truncate its array, in which case it might not be too useful.
 
-    If the optional 'func' and 'ob' parameters are given,  then  ob->func()
+    If the optional 'func' parameter is given, then func() in this_object()
     is  called  with  each  loaded  object as an argument.  If the function
     returns nonzero, then that object is returned by  objects(),  otherwise
     it isn't.

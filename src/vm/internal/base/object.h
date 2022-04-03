@@ -44,7 +44,7 @@
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
 #define O_EFUN_SOCKET 0x800u /* efun socket references object     */
 #endif
-#define O_WILL_RESET 0x100u /* reset will be called next time    */
+#define O_WILL_RESET 0x1000u /* reset will be called next time    */
 #ifndef OLD_ED
 #define O_IN_EDIT 0x2000u /* object has an ed buffer open      */
 #endif
@@ -59,7 +59,7 @@
 
 struct sentence_t {
 #ifndef NO_ADD_ACTION
-  char *verb;
+  const char *verb;
 #endif
   struct sentence_t *next;
   struct object_t *ob;
@@ -102,15 +102,15 @@ struct object_t {
 #ifndef NO_ADD_ACTION
   sentence_t *sent;
   struct object_t *next_hashed_living;
-  char *living_name; /* Name of living object if in hash */
+  const char *living_name; /* Name of living object if in hash */
 #endif
 #ifdef PACKAGE_UIDS
   struct userid_t *uid;  /* the "owner" of this object */
   struct userid_t *euid; /* the effective "owner" */
 #endif
 #ifdef PRIVS
-  char *privs; /* object's privledges */
-#endif         /* PRIVS */
+  const char *privs; /* object's privledges */
+#endif               /* PRIVS */
 #ifdef PACKAGE_MUDLIB_STATS
   struct statgroup_t stats; /* mudlib stats */
 #endif
@@ -124,7 +124,7 @@ struct object_t {
 typedef int (*get_objectsfn_t)(object_t *, void *);
 
 #define add_ref(ob, str)                                                                        \
-  SAFE(if (ob->ref++ > 0xfffffff0) {                                                            \
+  SAFE(if (ob->ref++ > static_cast<decltype(ob->ref)>(-10)) {                                   \
     debug_message("Ref count dangerously high: %s (%d) calling from %s\n", ob->obname, ob->ref, \
                   str);                                                                         \
   })

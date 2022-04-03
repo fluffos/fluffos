@@ -57,9 +57,6 @@ int lws_ws_client_rx_sm(struct lws *wsi, unsigned char c)
 	}
 #endif
 
-	if (wsi->socket_is_permanently_unusable)
-		return -1;
-
 	switch (wsi->lws_rx_parse_state) {
 	case LWS_RXPS_NEW:
 		/* control frames (PING) may interrupt checkable sequences */
@@ -213,7 +210,7 @@ int lws_ws_client_rx_sm(struct lws *wsi, unsigned char c)
 		break;
 
 	case LWS_RXPS_04_FRAME_HDR_LEN16_2:
-		wsi->ws->rx_packet_length = c << 8;
+		wsi->ws->rx_packet_length = (size_t)((unsigned int)c << 8);
 		wsi->lws_rx_parse_state = LWS_RXPS_04_FRAME_HDR_LEN16_1;
 		break;
 
@@ -406,15 +403,11 @@ spill:
 			lwsl_parser("client sees server close len = %d\n",
 						 (int)wsi->ws->rx_ubuf_head);
 			if (wsi->ws->rx_ubuf_head >= 2) {
-				close_code = (pp[0] << 8) | pp[1];
+				close_code = (unsigned short)((pp[0] << 8) | pp[1]);
 				if (close_code < 1000 ||
 				    close_code == 1004 ||
 				    close_code == 1005 ||
 				    close_code == 1006 ||
-				    close_code == 1012 ||
-				    close_code == 1013 ||
-				    close_code == 1014 ||
-				    close_code == 1015 ||
 				    (close_code >= 1016 && close_code < 3000)
 				) {
 					pp[0] = (LWS_CLOSE_STATUS_PROTOCOL_ERR >> 8) & 0xff;
@@ -431,7 +424,7 @@ spill:
 			memcpy(wsi->ws->ping_payload_buf + LWS_PRE, pp,
 			       wsi->ws->rx_ubuf_head);
 			wsi->ws->close_in_ping_buffer_len =
-					wsi->ws->rx_ubuf_head;
+					(uint8_t)wsi->ws->rx_ubuf_head;
 
 			lwsl_info("%s: scheduling return close as ack\n",
 				  __func__);
@@ -452,9 +445,9 @@ spill:
 			if (wsi->ws->close_in_ping_buffer_len)
 				goto ping_drop;
 
-			if (wsi->ws->ping_pending_flag) {
+			if (wsi->ws->pong_pending_flag) {
 				/*
-				 * there is already a pending ping payload
+				 * there is already a pending pong payload
 				 * we should just log and drop
 				 */
 				lwsl_parser("DROP PING since one pending\n");
@@ -468,12 +461,12 @@ spill:
 			}
 
 			/* stash the pong payload */
-			memcpy(wsi->ws->ping_payload_buf + LWS_PRE,
+			memcpy(wsi->ws->pong_payload_buf + LWS_PRE,
 			       &wsi->ws->rx_ubuf[LWS_PRE],
 			       wsi->ws->rx_ubuf_head);
 
-			wsi->ws->ping_payload_len = wsi->ws->rx_ubuf_head;
-			wsi->ws->ping_pending_flag = 1;
+			wsi->ws->pong_payload_len = (uint8_t)wsi->ws->rx_ubuf_head;
+			wsi->ws->pong_pending_flag = 1;
 
 			/* get it sent as soon as possible */
 			lws_callback_on_writable(wsi);
@@ -483,7 +476,7 @@ ping_drop:
 			break;
 
 		case LWSWSOPC_PONG:
-			lwsl_info("%s: client %p received pong\n", __func__, wsi);
+			lwsl_info("%s: %s received pong\n", __func__, lws_wsi_tag(wsi));
 			lwsl_hexdump(&wsi->ws->rx_ubuf[LWS_PRE],
 				     wsi->ws->rx_ubuf_head);
 
@@ -523,7 +516,7 @@ ping_drop:
 			goto already_done;
 
 		pmdrx.eb_in.token = &wsi->ws->rx_ubuf[LWS_PRE];
-		pmdrx.eb_in.len = wsi->ws->rx_ubuf_head;
+		pmdrx.eb_in.len = (int)wsi->ws->rx_ubuf_head;
 
 		/* for the non-pm-deflate case */
 
@@ -583,7 +576,7 @@ drain_extension:
 
 				if (lws_check_utf8(&wsi->ws->utf8,
 						   pmdrx.eb_out.token,
-						   pmdrx.eb_out.len)) {
+						   (unsigned int)pmdrx.eb_out.len)) {
 					lws_close_reason(wsi,
 						LWS_CLOSE_STATUS_INVALID_PAYLOAD,
 						(uint8_t *)"bad utf8", 8);
@@ -605,7 +598,7 @@ drain_extension:
 utf8_fail:
 					lwsl_info("utf8 error\n");
 					lwsl_hexdump_info(pmdrx.eb_out.token,
-							  pmdrx.eb_out.len);
+							  (unsigned int)pmdrx.eb_out.len);
 
 					return -1;
 				}
@@ -655,7 +648,7 @@ utf8_fail:
 			m = wsi->a.protocol->callback(wsi,
 					(enum lws_callback_reasons)callback_action,
 					wsi->user_space, pmdrx.eb_out.token,
-					pmdrx.eb_out.len);
+					(unsigned int)pmdrx.eb_out.len);
 
 			wsi->ws->first_fragment = 0;
 

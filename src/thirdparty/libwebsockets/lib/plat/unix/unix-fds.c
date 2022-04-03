@@ -90,7 +90,7 @@ sanity_assert_no_sockfd_traces(const struct lws_context *context,
 #else
 	struct lws **p, **done;
 
-	if (sfd == LWS_SOCK_INVALID)
+	if (sfd == LWS_SOCK_INVALID || !context->lws_lookup)
 		return 0;
 
 	if (!context->max_fds_unrelated_to_ulimit &&
@@ -174,7 +174,8 @@ delete_from_fd(const struct lws_context *context, int fd)
 	struct lws **p, **done;
 
 	if (!context->max_fds_unrelated_to_ulimit) {
-		context->lws_lookup[fd - lws_plat_socket_offset()] = NULL;
+		if (context->lws_lookup)
+			context->lws_lookup[fd - lws_plat_socket_offset()] = NULL;
 
 		return;
 	}
@@ -182,6 +183,8 @@ delete_from_fd(const struct lws_context *context, int fd)
 	/* slow fds handling */
 
 	p = context->lws_lookup;
+	assert(p);
+
 	done = &p[context->max_fds];
 
 	/* find the match */

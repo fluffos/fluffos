@@ -40,6 +40,9 @@ secstream_h2(struct lws *wsi, enum lws_callback_reasons reason, void *user,
 
 	case LWS_CALLBACK_ESTABLISHED_CLIENT_HTTP:
 
+		if (!h)
+			return -1;
+
 #if defined(LWS_WITH_SECURE_STREAMS_PROXY_API)
 		if (h->being_serialized) {
 			/*
@@ -56,29 +59,49 @@ secstream_h2(struct lws *wsi, enum lws_callback_reasons reason, void *user,
 		n = secstream_h1(wsi, reason, user, in, len);
 
 		if (!n && (h->policy->flags & LWSSSPOLF_LONG_POLL)) {
-			lwsl_notice("%s: h2 client %p entering LONG_POLL\n",
-					__func__, wsi);
+			lwsl_notice("%s: h2 client %s entering LONG_POLL\n",
+					__func__, lws_wsi_tag(wsi));
 			lws_h2_client_stream_long_poll_rxonly(wsi);
 		}
 		return n;
 
+	case LWS_CALLBACK_CLOSED_CLIENT_HTTP:
+		/*
+		 * Only allow the wsi that the handle believes is representing
+		 * him to report closure up to h1
+		 */
+		if (!h || h->wsi != wsi)
+			return 0;
+
+		break;
+
 	case LWS_CALLBACK_COMPLETED_CLIENT_HTTP:
+
+		if (!h)
+			return -1;
+
 		// lwsl_err("%s: h2 COMPLETED_CLIENT_HTTP\n", __func__);
-		r = h->info.rx(ss_to_userobj(h), NULL, 0, LWSSS_FLAG_EOM);
-		/* decouple the fates of the wsi and the ss */
-		h->wsi = NULL;
+		r = 0;
+		if (h->hanging_som)
+			r = h->info.rx(ss_to_userobj(h), NULL, 0, LWSSS_FLAG_EOM);
+
 		h->txn_ok = 1;
 		lws_cancel_service(lws_get_context(wsi)); /* abort poll wait */
-		if (r != LWSSSSRET_OK)
-			return _lws_ss_handle_state_ret(r, wsi, &h);
+		if (h->hanging_som && r == LWSSSSRET_DESTROY_ME)
+			return _lws_ss_handle_state_ret_CAN_DESTROY_HANDLE(r, wsi, &h);
+		h->hanging_som = 0;
 		break;
 
 	case LWS_CALLBACK_WSI_TX_CREDIT_GET:
+
+		if (!h)
+			return -1;
+
 		/*
 		 * The peer has sent us additional tx credit...
 		 */
 		lwsl_info("%s: LWS_CALLBACK_WSI_TX_CREDIT_GET: %d\n",
-			    __func__, (int32_t)len);
+			    __func__, (int)len);
 
 #if defined(LWS_WITH_SECURE_STREAMS_PROXY_API)
 		if (h->being_serialized)
@@ -169,9 +192,9 @@ secstream_connect_munge_h2(lws_ss_handle_t *h, char *buf, size_t len,
 static int
 secstream_tx_credit_add_h2(lws_ss_handle_t *h, int add)
 {
-	lwsl_info("%s: h %p: add %d\n", __func__, h, add);
+	lwsl_info("%s: %s: add %d\n", __func__, lws_ss_tag(h), add);
 	if (h->wsi)
-		return lws_h2_update_peer_txcredit(h->wsi, LWS_H2_STREAM_SID, add);
+		return lws_h2_update_peer_txcredit(h->wsi, (unsigned int)LWS_H2_STREAM_SID, add);
 
 	return 0;
 }
@@ -180,20 +203,20 @@ static int
 secstream_tx_credit_est_h2(lws_ss_handle_t *h)
 {
 	if (h->wsi) {
-		lwsl_info("%s: h %p: est %d\n", __func__, h,
+		lwsl_info("%s: %s: est %d\n", __func__, lws_ss_tag(h),
 				lws_h2_get_peer_txcredit_estimate(h->wsi));
 
 		return lws_h2_get_peer_txcredit_estimate(h->wsi);
 	}
 
-	lwsl_info("%s: h %p: Unknown (0)\n", __func__, h);
+	lwsl_info("%s: %s: Unknown (0)\n", __func__, lws_ss_tag(h));
 
 	return 0;
 }
 
 const struct ss_pcols ss_pcol_h2 = {
 	"h2",
-	NULL,
+	"h2",
 	&protocol_secstream_h2,
 	secstream_connect_munge_h2,
 	secstream_tx_credit_add_h2,

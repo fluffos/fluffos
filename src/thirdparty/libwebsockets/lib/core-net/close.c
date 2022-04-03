@@ -30,7 +30,7 @@ lws_close_trans_q_leader(struct lws_dll2 *d, void *user)
 {
 	struct lws *w = lws_container_of(d, struct lws, dll2_cli_txn_queue);
 
-	__lws_close_free_wsi(w, -1, "trans q leader closing");
+	__lws_close_free_wsi(w, (enum lws_close_status)-1, "trans q leader closing");
 
 	return 0;
 }
@@ -45,6 +45,19 @@ __lws_reset_wsi(struct lws *wsi)
 #if defined(LWS_WITH_CLIENT)
 
 	lws_free_set_NULL(wsi->cli_hostname_copy);
+
+#if defined(LWS_WITH_CONMON)
+
+	if (wsi->conmon.dns_results_copy) {
+		lws_conmon_addrinfo_destroy(wsi->conmon.dns_results_copy);
+		wsi->conmon.dns_results_copy = NULL;
+	}
+
+	wsi->conmon.ciu_dns =
+		wsi->conmon.ciu_sockconn =
+		wsi->conmon.ciu_tls =
+		wsi->conmon.ciu_txn_resp = 0;
+#endif
 
 	/*
 	 * if we have wsi in our transaction queue, if we are closing we
@@ -127,7 +140,6 @@ __lws_reset_wsi(struct lws *wsi)
 	if (wsi->a.vhost)
 		lws_dll2_remove(&wsi->dll_cli_active_conns);
 #endif
-	wsi->a.context->count_wsi_allocated--;
 
 	__lws_same_vh_protocol_remove(wsi);
 #if defined(LWS_WITH_CLIENT)
@@ -147,35 +159,74 @@ __lws_reset_wsi(struct lws *wsi)
 #endif
 	__lws_wsi_remove_from_sul(wsi);
 
-	if (wsi->role_ops->destroy_role)
-		wsi->role_ops->destroy_role(wsi);
+	if (lws_rops_fidx(wsi->role_ops, LWS_ROPS_destroy_role))
+		lws_rops_func_fidx(wsi->role_ops,
+				   LWS_ROPS_destroy_role).destroy_role(wsi);
 
 #if defined(LWS_ROLE_H1) || defined(LWS_ROLE_H2)
 	__lws_header_table_detach(wsi, 0);
 #endif
 }
 
+/* req cx lock */
+
 void
 __lws_free_wsi(struct lws *wsi)
 {
+	struct lws_vhost *vh;
+
 	if (!wsi)
 		return;
+
+	lws_context_assert_lock_held(wsi->a.context);
+
+#if defined(LWS_WITH_SECURE_STREAMS)
+	if (wsi->for_ss) {
+
+#if defined(LWS_WITH_SECURE_STREAMS_PROXY_API)
+		if (wsi->client_bound_sspc) {
+			lws_sspc_handle_t *h = (lws_sspc_handle_t *)
+							wsi->a.opaque_user_data;
+			if (h) {
+				h->cwsi = NULL;
+				wsi->a.opaque_user_data = NULL;
+			}
+		} else
+#endif
+		{
+			/*
+			 * Make certain it is disconnected from the ss by now
+			 */
+			lws_ss_handle_t *h = (lws_ss_handle_t *)
+							wsi->a.opaque_user_data;
+
+			if (h) {
+				h->wsi = NULL;
+				wsi->a.opaque_user_data = NULL;
+			}
+		}
+	}
+#endif
 
 	__lws_reset_wsi(wsi);
 	__lws_wsi_remove_from_sul(wsi);
 
+	vh = wsi->a.vhost;
+
 	if (wsi->a.context->event_loop_ops->destroy_wsi)
 		wsi->a.context->event_loop_ops->destroy_wsi(wsi);
 
-	lws_vhost_unbind_wsi(wsi);
+	if (vh)
+		__lws_vhost_unbind_wsi(wsi); /* req cx + vh lock */
 
-	lwsl_debug("%s: %p, remaining wsi %d, tsi fds count %d\n", __func__, wsi,
-			wsi->a.context->count_wsi_allocated,
+	lwsl_debug("%s: %s, tsi fds count %d\n", __func__,
+			lws_wsi_tag(wsi),
 			wsi->a.context->pt[(int)wsi->tsi].fds_count);
 
 	/* confirm no sul left scheduled in wsi itself */
 	lws_sul_debug_zombies(wsi->a.context, wsi, sizeof(wsi), __func__);
 
+	__lws_lc_untag(&wsi->lc);
 	lws_free(wsi);
 }
 
@@ -193,8 +244,8 @@ lws_remove_child_from_any_parent(struct lws *wsi)
 	pwsi = &wsi->parent->child_list;
 	while (*pwsi) {
 		if (*pwsi == wsi) {
-			lwsl_info("%s: detach %p from parent %p\n", __func__,
-				  wsi, wsi->parent);
+			lwsl_info("%s: detach %s from parent %s\n", __func__,
+					lws_wsi_tag(wsi), lws_wsi_tag(wsi->parent));
 
 			if (wsi->parent->a.protocol)
 				wsi->parent->a.protocol->callback(wsi,
@@ -223,8 +274,6 @@ lws_inform_client_conn_fail(struct lws *wsi, void *arg, size_t len)
 		return;
 
 	wsi->already_did_cce = 1;
-	lws_stats_bump(&wsi->a.context->pt[(int)wsi->tsi],
-		       LWSSTATS_C_CONNS_CLIENT_FAILED, 1);
 
 	if (!wsi->a.protocol)
 		return;
@@ -240,17 +289,21 @@ void
 lws_addrinfo_clean(struct lws *wsi)
 {
 #if defined(LWS_WITH_CLIENT)
-	if (!wsi->dns_results)
-		return;
+	struct lws_dll2 *d = lws_dll2_get_head(&wsi->dns_sorted_list), *d1;
 
-#if defined(LWS_WITH_SYS_ASYNC_DNS)
-	lws_async_dns_freeaddrinfo(&wsi->dns_results);
-#else
-	freeaddrinfo((struct addrinfo *)wsi->dns_results);
-#endif
-	wsi->dns_results = NULL;
+	while (d) {
+		lws_dns_sort_t *r = lws_container_of(d, lws_dns_sort_t, list);
+
+		d1 = d->next;
+		lws_dll2_remove(d);
+		lws_free(r);
+
+		d = d1;
+	}
 #endif
 }
+
+/* requires cx and pt lock */
 
 void
 __lws_close_free_wsi(struct lws *wsi, enum lws_close_status reason,
@@ -262,7 +315,7 @@ __lws_close_free_wsi(struct lws *wsi, enum lws_close_status reason,
 	struct lws *wsi1, *wsi2;
 	int n, ccb;
 
-	lwsl_info("%s: %p: caller: %s\n", __func__, wsi, caller);
+	lwsl_info("%s: %s: caller: %s\n", __func__, lws_wsi_tag(wsi), caller);
 
 	if (!wsi)
 		return;
@@ -270,15 +323,32 @@ __lws_close_free_wsi(struct lws *wsi, enum lws_close_status reason,
 	lws_access_log(wsi);
 
 	if (!lws_dll2_is_detached(&wsi->dll_buflist)) {
-		lwsl_info("%s: wsi %p: going down with stuff in buflist\n",
-				__func__, wsi); }
+		lwsl_info("%s: %s: going down with stuff in buflist\n",
+				__func__, lws_wsi_tag(wsi)); }
 
 	context = wsi->a.context;
 	pt = &context->pt[(int)wsi->tsi];
 
-	lws_pt_assert_lock_held(pt);
+#if defined(LWS_WITH_SYS_METRICS) && \
+    (defined(LWS_WITH_CLIENT) || defined(LWS_WITH_SERVER))
+	/* wsi level: only reports if dangling caliper */
+	if (wsi->cal_conn.mt && wsi->cal_conn.us_start) {
+		if ((lws_metrics_priv_to_pub(wsi->cal_conn.mt)->flags) & LWSMTFL_REPORT_HIST) {
+			lws_metrics_caliper_report_hist(wsi->cal_conn, (struct lws *)NULL);
+		} else {
+			lws_metrics_caliper_report(wsi->cal_conn, METRES_NOGO);
+			lws_metrics_caliper_done(wsi->cal_conn);
+		}
+	} else
+		lws_metrics_caliper_done(wsi->cal_conn);
+#endif
 
-	lws_stats_bump(pt, LWSSTATS_C_API_CLOSE, 1);
+#if defined(LWS_WITH_SYS_ASYNC_DNS)
+	if (wsi == context->async_dns.wsi)
+		context->async_dns.wsi = NULL;
+#endif
+
+	lws_pt_assert_lock_held(pt);
 
 #if defined(LWS_WITH_CLIENT)
 
@@ -336,7 +406,7 @@ __lws_close_free_wsi(struct lws *wsi, enum lws_close_status reason,
 //			if (wsi->parent->child_list == wsi && !wsi->sibling_list)
 //				lws_cgi_remove_and_kill(wsi->parent);
 
-			/* end the binding between us and master */
+			/* end the binding between us and network connection */
 			if (wsi->parent->http.cgi && wsi->parent->http.cgi->lsp)
 				wsi->parent->http.cgi->lsp->stdwsi[(int)wsi->lsp_channel] =
 									NULL;
@@ -392,7 +462,7 @@ __lws_close_free_wsi(struct lws *wsi, enum lws_close_status reason,
 			lws_callback_on_writable(wsi);
 			return;
 		}
-		lwsl_info("%p: end LRS_FLUSHING_BEFORE_CLOSE\n", wsi);
+		lwsl_info("%s: %s: end LRS_FLUSHING_BEFORE_CLOSE\n", __func__, lws_wsi_tag(wsi));
 		goto just_kill_connection;
 	default:
 		if (lws_has_buffered_out(wsi)
@@ -401,7 +471,7 @@ __lws_close_free_wsi(struct lws *wsi, enum lws_close_status reason,
 		    wsi->http.comp_ctx.may_have_more
 #endif
 		) {
-			lwsl_info("%p: LRS_FLUSHING_BEFORE_CLOSE\n", wsi);
+			lwsl_info("%s: %s: LRS_FLUSHING_BEFORE_CLOSE\n", __func__, lws_wsi_tag(wsi));
 			lwsi_set_state(wsi, LRS_FLUSHING_BEFORE_CLOSE);
 			__lws_set_timeout(wsi,
 				PENDING_FLUSH_STORED_SEND_BEFORE_CLOSE, 5);
@@ -436,11 +506,22 @@ __lws_close_free_wsi(struct lws *wsi, enum lws_close_status reason,
 	 * LRS_AWAITING_CLOSE_ACK and will skip doing this a second time.
 	 */
 
-	if (wsi->role_ops->close_via_role_protocol &&
-	    wsi->role_ops->close_via_role_protocol(wsi, reason))
+	if (lws_rops_fidx(wsi->role_ops, LWS_ROPS_close_via_role_protocol) &&
+	    lws_rops_func_fidx(wsi->role_ops, LWS_ROPS_close_via_role_protocol).
+					 close_via_role_protocol(wsi, reason)) {
+		lwsl_info("%s: clsoe_via_role took over: %s (sockfd %d)\n", __func__,
+				lws_wsi_tag(wsi), wsi->desc.sockfd);
 		return;
+	}
 
 just_kill_connection:
+
+	lwsl_debug("%s: real just_kill_connection A: %s (sockfd %d)\n", __func__,
+		lws_wsi_tag(wsi), wsi->desc.sockfd);
+
+#if defined(LWS_WITH_THREADPOOL)
+	lws_threadpool_wsi_closing(wsi);
+#endif
 
 #if defined(LWS_WITH_FILE_OPS) && (defined(LWS_ROLE_H1) || defined(LWS_ROLE_H2))
 	if (lwsi_role_http(wsi) && lwsi_role_server(wsi) &&
@@ -467,14 +548,16 @@ just_kill_connection:
 	}
 #endif
 
-	if (wsi->role_ops->close_kill_connection)
-		wsi->role_ops->close_kill_connection(wsi, reason);
+	if (lws_rops_fidx(wsi->role_ops, LWS_ROPS_close_kill_connection))
+		lws_rops_func_fidx(wsi->role_ops,
+				   LWS_ROPS_close_kill_connection).
+					    close_kill_connection(wsi, reason);
 
 	n = 0;
 
 	if (!wsi->told_user_closed && wsi->user_space &&
 	    wsi->protocol_bind_balance && wsi->a.protocol) {
-		lwsl_debug("%s: %p: DROP_PROTOCOL %s\n", __func__, wsi,
+		lwsl_debug("%s: %s: DROP_PROTOCOL %s\n", __func__, lws_wsi_tag(wsi),
 			   wsi->a.protocol ? wsi->a.protocol->name: "NULL");
 		if (wsi->a.protocol)
 			wsi->a.protocol->callback(wsi,
@@ -483,23 +566,6 @@ just_kill_connection:
 				       wsi->user_space, (void *)__func__, 0);
 		wsi->protocol_bind_balance = 0;
 	}
-
-#if defined(LWS_WITH_SECURE_STREAMS) && defined(LWS_WITH_SERVER)
-	if (wsi->for_ss) {
-		/*
-		 * We were adopted for a particular ss, but, eg, we may not
-		 * have succeeded with the connection... we are closing which is
-		 * good, but we have to invalidate any pointer the related ss
-		 * handle may be holding on us
-		 */
-		lws_ss_handle_t *h = (lws_ss_handle_t *)wsi->a.opaque_user_data;
-
-		if (h) {
-			h->wsi = NULL;
-			wsi->a.opaque_user_data = NULL;
-		}
-	}
-#endif
 
 #if defined(LWS_WITH_CLIENT)
 	if ((
@@ -552,8 +618,8 @@ just_kill_connection:
 		} else
 #endif
 		{
-			lwsl_info("%s: shutdown conn: %p (sk %d, state 0x%x)\n",
-				  __func__, wsi, (int)(lws_intptr_t)wsi->desc.sockfd,
+			lwsl_info("%s: shutdown conn: %s (sk %d, state 0x%x)\n",
+				  __func__, lws_wsi_tag(wsi), (int)(lws_intptr_t)wsi->desc.sockfd,
 				  lwsi_state(wsi));
 			if (!wsi->socket_is_permanently_unusable &&
 			    lws_socket_is_valid(wsi->desc.sockfd)) {
@@ -578,15 +644,15 @@ just_kill_connection:
 			__lws_change_pollfd(wsi, LWS_POLLOUT, LWS_POLLIN);
 			lwsi_set_state(wsi, LRS_SHUTDOWN);
 			__lws_set_timeout(wsi, PENDING_TIMEOUT_SHUTDOWN_FLUSH,
-					  context->timeout_secs);
+					  (int)context->timeout_secs);
 
 			return;
 		}
 #endif
 	}
 
-	lwsl_debug("%s: real just_kill_connection: %p (sockfd %d)\n", __func__,
-		   wsi, wsi->desc.sockfd);
+	lwsl_info("%s: real just_kill_connection: %s (sockfd %d)\n", __func__,
+			lws_wsi_tag(wsi), wsi->desc.sockfd);
 
 #ifdef LWS_WITH_HUBBUB
 	if (wsi->http.rw) {
@@ -608,8 +674,6 @@ just_kill_connection:
 	//if (wsi->told_event_loop_closed) // cgi std close case (dummy-callback)
 	//	return;
 
-	// lwsl_notice("%s: wsi %p, fd %d\n", __func__, wsi, wsi->desc.sockfd);
-
 	/* checking return redundant since we anyway close */
 	__remove_wsi_socket_from_fds(wsi);
 
@@ -617,8 +681,9 @@ just_kill_connection:
 	lws_buflist_destroy_all_segments(&wsi->buflist);
 	lws_dll2_remove(&wsi->dll_buflist);
 
-	if (wsi->role_ops->close_role)
-	    wsi->role_ops->close_role(pt, wsi);
+	if (lws_rops_fidx(wsi->role_ops, LWS_ROPS_close_role))
+		lws_rops_func_fidx(wsi->role_ops, LWS_ROPS_close_role).
+							close_role(pt, wsi);
 
 	/* tell the user it's all over for this guy */
 
@@ -648,6 +713,8 @@ just_kill_connection:
 		 * to issue him a close cb
 		 */
 		ccb = 1;
+
+	lwsl_info("%s: %s: cce=%d\n", __func__, lws_wsi_tag(wsi), ccb);
 
 	pro = wsi->a.protocol;
 
@@ -679,6 +746,70 @@ just_kill_connection:
 #if defined(LWS_ROLE_RAW_FILE)
 async_close:
 #endif
+
+#if defined(LWS_WITH_SECURE_STREAMS)
+	if (wsi->for_ss) {
+		lwsl_debug("%s: for_ss\n", __func__);
+		/*
+		 * We were adopted for a particular ss, but, eg, we may not
+		 * have succeeded with the connection... we are closing which is
+		 * good, but we have to invalidate any pointer the related ss
+		 * handle may be holding on us
+		 */
+#if defined(LWS_WITH_SECURE_STREAMS_PROXY_API)
+
+		if (wsi->client_proxy_onward) {
+			/*
+			 * We are an onward proxied wsi at the proxy,
+			 * opaque is proxing "conn", we must remove its pointer
+			 * to us since we are destroying
+			 */
+			lws_proxy_clean_conn_ss(wsi);
+		} else
+
+			if (wsi->client_bound_sspc) {
+				lws_sspc_handle_t *h = (lws_sspc_handle_t *)wsi->a.opaque_user_data;
+
+				if (h) { // && (h->info.flags & LWSSSINFLAGS_ACCEPTED)) {
+
+#if defined(LWS_WITH_SYS_METRICS)
+					/*
+					 * If any hanging caliper measurement, dump it, and free any tags
+					 */
+					lws_metrics_caliper_report_hist(h->cal_txn, (struct lws *)NULL);
+#endif
+
+					h->cwsi = NULL;
+					//wsi->a.opaque_user_data = NULL;
+				}
+			} else
+#endif
+		{
+			lws_ss_handle_t *h = (lws_ss_handle_t *)wsi->a.opaque_user_data;
+
+			if (h) { // && (h->info.flags & LWSSSINFLAGS_ACCEPTED)) {
+
+				/*
+				 * ss level: only reports if dangling caliper
+				 * not already reported
+				 */
+				lws_metrics_caliper_report_hist(h->cal_txn, wsi);
+
+				h->wsi = NULL;
+				wsi->a.opaque_user_data = NULL;
+
+				if (h->ss_dangling_connected &&
+				    lws_ss_event_helper(h, LWSSSCS_DISCONNECTED) ==
+						    LWSSSSRET_DESTROY_ME) {
+
+					lws_ss_destroy(&h);
+				}
+			}
+		}
+	}
+#endif
+
+
 	lws_remove_child_from_any_parent(wsi);
 	wsi->socket_is_permanently_unusable = 1;
 
@@ -689,6 +820,9 @@ async_close:
 	__lws_close_free_wsi_final(wsi);
 }
 
+
+/* cx + vh lock */
+
 void
 __lws_close_free_wsi_final(struct lws *wsi)
 {
@@ -696,7 +830,8 @@ __lws_close_free_wsi_final(struct lws *wsi)
 
 	if (!wsi->shadow &&
 	    lws_socket_is_valid(wsi->desc.sockfd) && !lws_ssl_close(wsi)) {
-		lwsl_debug("%s: wsi %p: fd %d\n", __func__, wsi, wsi->desc.sockfd);
+		lwsl_debug("%s: wsi %s: fd %d\n", __func__, lws_wsi_tag(wsi),
+				wsi->desc.sockfd);
 		n = compatible_close(wsi->desc.sockfd);
 		if (n)
 			lwsl_debug("closing: close ret %d\n", LWS_ERRNO);
@@ -727,6 +862,10 @@ __lws_close_free_wsi_final(struct lws *wsi)
 	}
 #endif
 
+#if defined(LWS_WITH_SYS_FAULT_INJECTION)
+	lws_fi_destroy(&wsi->fic);
+#endif
+
 	__lws_wsi_remove_from_sul(wsi);
 	sanity_assert_no_wsi_traces(wsi->a.context, wsi);
 	__lws_free_wsi(wsi);
@@ -736,11 +875,17 @@ __lws_close_free_wsi_final(struct lws *wsi)
 void
 lws_close_free_wsi(struct lws *wsi, enum lws_close_status reason, const char *caller)
 {
+	struct lws_context *cx = wsi->a.context;
 	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
 
+	lws_context_lock(cx, __func__);
+
 	lws_pt_lock(pt, __func__);
+	/* may destroy vhost, cannot hold vhost lock outside it */
 	__lws_close_free_wsi(wsi, reason, caller);
 	lws_pt_unlock(pt);
+
+	lws_context_unlock(cx);
 }
 
 

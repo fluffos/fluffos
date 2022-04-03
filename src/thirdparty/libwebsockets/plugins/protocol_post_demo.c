@@ -19,8 +19,12 @@
  */
 
 #if !defined (LWS_PLUGIN_STATIC)
+#if !defined(LWS_DLL)
 #define LWS_DLL
+#endif
+#if !defined(LWS_INTERNAL)
 #define LWS_INTERNAL
+#endif
 #include <libwebsockets.h>
 #endif
 
@@ -94,7 +98,7 @@ file_upload_cb(void *data, const char *name, const char *filename,
 				return 1;
 
 #if !defined(LWS_WITH_ESP32)
-			n = write((int)(lws_intptr_t)pss->fd, buf, len);
+			n = (int)write((int)(lws_intptr_t)pss->fd, buf, (unsigned int)len);
 			lwsl_info("%s: write %d says %d\n", __func__, len, n);
 #else
 			lwsl_notice("%s: Received chunk size %d\n", __func__, len);
@@ -128,7 +132,13 @@ format_result(struct per_session_data__post_demo *pss)
 	start = p;
 	end = p + sizeof(pss->result) - LWS_PRE - 1;
 
-	p += lws_snprintf((char *)p, end -p,
+	if (!pss->spa) {
+		p += lws_snprintf((char *)p, lws_ptr_diff_size_t(end, p),
+				  "pss->spa already NULL");
+		goto bail;
+	}
+
+	p += lws_snprintf((char *)p, lws_ptr_diff_size_t(end, p),
 			"<!DOCTYPE html><html lang=\"en\"><head>"
 			"<meta charset=utf-8 http-equiv=\"Content-Language\" "
 			"content=\"en\"/>"
@@ -138,12 +148,12 @@ format_result(struct per_session_data__post_demo *pss)
 
 	for (n = 0; n < (int)LWS_ARRAY_SIZE(param_names); n++) {
 		if (!lws_spa_get_string(pss->spa, n))
-			p += lws_snprintf((char *)p, end - p,
+			p += lws_snprintf((char *)p, lws_ptr_diff_size_t(end, p),
 			    "<tr><td><b>%s</b></td><td>0"
 			    "</td><td>NULL</td></tr>",
 			    param_names[n]);
 		else
-			p += lws_snprintf((char *)p, end - p,
+			p += lws_snprintf((char *)p, lws_ptr_diff_size_t(end, p),
 			    "<tr><td><b>%s</b></td><td>%d"
 			    "</td><td>%s</td></tr>",
 			    param_names[n],
@@ -151,13 +161,14 @@ format_result(struct per_session_data__post_demo *pss)
 			    lws_spa_get_string(pss->spa, n));
 	}
 
-	p += lws_snprintf((char *)p, end - p,
+	p += lws_snprintf((char *)p, lws_ptr_diff_size_t(end, p),
 			"</table><br><b>filename:</b> %s, "
 			"<b>length</b> %ld",
 			pss->filename, pss->file_length);
 
-	p += lws_snprintf((char *)p, end - p, "</body></html>");
+	p += lws_snprintf((char *)p, lws_ptr_diff_size_t(end, p), "</body></html>");
 
+bail:
 	return (int)lws_ptr_diff(p, start);
 }
 
@@ -190,7 +201,7 @@ callback_post_demo(struct lws *wsi, enum lws_callback_reasons reason,
 		break;
 
 	case LWS_CALLBACK_HTTP_BODY_COMPLETION:
-		lwsl_debug("LWS_CALLBACK_HTTP_BODY_COMPLETION: %p\n", wsi);
+		lwsl_debug("LWS_CALLBACK_HTTP_BODY_COMPLETION: %s\n", lws_wsi_tag(wsi));
 		/* call to inform no more payload data coming */
 		lws_spa_finalize(pss->spa);
 
@@ -218,13 +229,13 @@ callback_post_demo(struct lws *wsi, enum lws_callback_reasons reason,
 					(unsigned char *)"text/html", 9,
 					&p, end))
 				goto bail;
-			if (lws_add_http_header_content_length(wsi, n, &p, end))
+			if (lws_add_http_header_content_length(wsi, (unsigned int)n, &p, end))
 				goto bail;
 			if (lws_finalize_http_header(wsi, &p, end))
 				goto bail;
 
 			/* first send the headers ... */
-			n = lws_write(wsi, start, lws_ptr_diff(p, start),
+			n = lws_write(wsi, start, lws_ptr_diff_size_t(p, start),
 				      LWS_WRITE_HTTP_HEADERS);
 			if (n < 0)
 				goto bail;
@@ -237,7 +248,7 @@ callback_post_demo(struct lws *wsi, enum lws_callback_reasons reason,
 		if (!pss->sent_body) {
 			n = format_result(pss);
 
-			n = lws_write(wsi, (unsigned char *)start, n,
+			n = lws_write(wsi, (unsigned char *)start, (unsigned int)n,
 				      LWS_WRITE_HTTP_FINAL);
 
 			pss->sent_body = 1;
@@ -283,7 +294,7 @@ try_to_reuse:
 
 #if !defined (LWS_PLUGIN_STATIC)
 
-static const struct lws_protocols protocols[] = {
+LWS_VISIBLE const struct lws_protocols post_demo_protocols[] = {
 	LWS_PLUGIN_PROTOCOL_POST_DEMO
 };
 
@@ -291,11 +302,12 @@ LWS_VISIBLE const lws_plugin_protocol_t post_demo = {
 	.hdr = {
 		"post demo",
 		"lws_protocol_plugin",
+		LWS_BUILD_HASH,
 		LWS_PLUGIN_API_MAGIC
 	},
 
-	.protocols = protocols,
-	.count_protocols = LWS_ARRAY_SIZE(protocols),
+	.protocols = post_demo_protocols,
+	.count_protocols = LWS_ARRAY_SIZE(post_demo_protocols),
 	.extensions = NULL,
 	.count_extensions = 0,
 };

@@ -56,14 +56,14 @@ ss_fetch_policy_rx(void *userobj, const uint8_t *buf, size_t len, int flags)
 	if (flags & LWSSS_FLAG_EOM)
 		m->partway = 2;
 
-	return 0;
+	return LWSSSSRET_OK;
 }
 
 static lws_ss_state_return_t
 ss_fetch_policy_tx(void *userobj, lws_ss_tx_ordinal_t ord, uint8_t *buf,
 		   size_t *len, int *flags)
 {
-	return 1;
+	return LWSSSSRET_TX_DONT_SEND;
 }
 
 static void
@@ -97,7 +97,7 @@ ss_fetch_policy_state(void *userobj, void *sh, lws_ss_constate_t state,
 	ss_fetch_policy_t *m = (ss_fetch_policy_t *)userobj;
 	struct lws_context *context = (struct lws_context *)m->opaque_data;
 
-	lwsl_info("%s: %s, ord 0x%x\n", __func__, lws_ss_state_name(state),
+	lwsl_info("%s: %s, ord 0x%x\n", __func__, lws_ss_state_name((int)state),
 		  (unsigned int)ack);
 
 	switch (state) {
@@ -107,15 +107,18 @@ ss_fetch_policy_state(void *userobj, void *sh, lws_ss_constate_t state,
 	case LWSSSCS_CONNECTING:
 		break;
 
-	case LWSSSCS_DISCONNECTED:
-		lwsl_info("%s: DISCONNECTED\n", __func__);
+	case LWSSSCS_QOS_ACK_REMOTE:
 		switch (m->partway) {
-		case 1:
-			lws_ss_policy_parse_abandon(context);
-			break;
-
 		case 2:
 			lws_sul_schedule(context, 0, &m->sul, policy_set, 1);
+			m->partway = 0;
+			break;
+		}
+		break;
+
+	case LWSSSCS_DISCONNECTED:
+		if (m->partway == 1) {
+			lws_ss_policy_parse_abandon(context);
 			break;
 		}
 		m->partway = 0;
@@ -125,7 +128,7 @@ ss_fetch_policy_state(void *userobj, void *sh, lws_ss_constate_t state,
 		break;
 	}
 
-	return 0;
+	return LWSSSSRET_OK;
 }
 
 int
@@ -154,10 +157,14 @@ lws_ss_sys_fetch_policy(struct lws_context *context)
 		 * running on a proxied client with no policy of its own,
 		 * it's OK.
 		 */
-		lwsl_info("%s: Create LWA auth ss failed (policy?)\n", __func__);
+		lwsl_info("%s: Policy fetch ss failed (stub policy?)\n", __func__);
 
-		return 1;
+		return 0;
 	}
 
-	return 0;
+	lwsl_info("%s: policy fetching ongoing\n", __func__);
+
+	/* fetching it is ongoing */
+
+	return 1;
 }

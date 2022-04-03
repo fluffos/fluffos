@@ -78,7 +78,7 @@ if (HAIKU)
 	list(APPEND LIB_LIST_AT_END network)
 endif()
 
-IF (CMAKE_SYSTEM_NAME STREQUAL Linux)
+IF (CMAKE_SYSTEM_NAME STREQUAL Linux AND NOT LWS_WITHOUT_EVENTFD)
 	CHECK_FUNCTION_EXISTS(eventfd_read LWS_HAVE_EVENTFD)
 endif()
 
@@ -96,7 +96,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "QNX")
 	list(APPEND LIB_LIST_AT_END socket)
 endif()
 
-list(APPEND LIB_LIST_AT_END dl)
+list(APPEND LIB_LIST_AT_END ${CMAKE_DL_LIBS})
 
 #
 # Keep explicit parent scope exports at end

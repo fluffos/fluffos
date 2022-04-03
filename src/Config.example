@@ -90,7 +90,7 @@ evaluator stack size : 6000
 # Max inherit chain size
 inherit chain size : 30
 
-# Maximum amount of "eval cost" per thread - execution is halted when 
+# Maximum amount of "eval cost" per thread - execution is halted when
 # it is exceeded.
 maximum evaluation cost : 30000000
 
@@ -116,7 +116,7 @@ maximum string length : 200000
 # strings, 6 bits per byte.
 maximum bits in a bitfield : 12000
 
-# max number of bytes you allow to be read and written with read_bytes 
+# max number of bytes you allow to be read and written with read_bytes
 # and write_bytes
 maximum byte transfer : 200000
 
@@ -226,7 +226,7 @@ strip before process input : 1
 
 # Set this if you wish this_player() to be usable from within call_out()
 # callbacks.
-this player in call_out : 1
+this_player in call_out : 1
 
 # Set this to enable the trace() and traceprefix() efuns.  (keeping this
 # unset will cause the driver to run faster).
@@ -284,7 +284,7 @@ old type behavior : 0
 
 # Set this if you want negative indexes in string or buffer range values
 # (i.e.  foo = x[-2..-1]; not lvalue for e.g. not x[-2..-1] = foo, the latter is always
-# illegal) to mean counting from the end 
+# illegal) to mean counting from the end
 #
 # Compat status: Not horribly difficult to replace reliance on this, but not
 # trivial, and cannot be simulated.
@@ -303,7 +303,7 @@ enable_commands call init : 1
 sprintf add_justified ignore ANSI colors : 1
 
 # Defines the number of bits to use in the call_other cache (in interpret.c).
-# 
+#
 # Memory overhead is (1 << APPLY_CACHE_BITS)*16.
 # [assuming 32 bit pointers and 16 bit shorts]
 #

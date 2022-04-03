@@ -6,7 +6,7 @@
 
 #define MAX_VERB_BUFF 100
 
-object_t *hashed_living[CFG_LIVING_HASH_SIZE] = {nullptr};
+object_t **hashed_living = nullptr;
 
 static int num_living_names;
 static int num_searches = 1;
@@ -14,6 +14,20 @@ static int search_length = 1;
 static int illegal_sentence_action;
 static const char *last_verb;
 static object_t *illegal_sentence_ob;
+
+void init_living() {
+  // make sure size is power of 2.
+  {
+    auto new_size = 1;
+    for (; new_size < CONFIG_INT(__LIVING_HASH_TABLE_SIZE__); new_size <<= 1) {
+    }
+    CONFIG_INT(__LIVING_HASH_TABLE_SIZE__) = new_size;
+  }
+
+  hashed_living = reinterpret_cast<object_t **>(DCALLOC(CONFIG_INT(__LIVING_HASH_TABLE_SIZE__),
+                                                        sizeof(object_t *), TAG_PERMANENT,
+                                                        __CURRENT_FILE_LINE__));
+}
 
 static void notify_no_command(void) {
   union string_or_func p;
@@ -61,7 +75,9 @@ void clear_notify(object_t *ob) {
   ip->default_err_message.s = nullptr;
 }
 
-static int hash_living_name(const char *str) { return whashstr(str) & (CFG_LIVING_HASH_SIZE - 1); }
+static int hash_living_name(const char *str) {
+  return whashstr(str) & (CONFIG_INT(__LIVING_HASH_TABLE_SIZE__) - 1);
+}
 
 object_t *find_living_object(const char *str, int user) {
   object_t **obp, *tmp;
@@ -150,6 +166,7 @@ void stat_living_objects(outbuffer_t *out) {
   outbuf_add(out, "-----------------------------\n");
   outbuf_addv(out, "%d living named objects, average search length: %4.2f\n\n", num_living_names,
               static_cast<double>(search_length) / num_searches);
+  return;
 }
 
 void setup_new_commands(object_t *dest, object_t *item) {
@@ -294,7 +311,7 @@ static int user_parser(char *buff) {
   sentence_t *s;
   char *p;
   int length;
-  char *user_verb = nullptr;
+  const char *user_verb = nullptr;
   int where;
   int save_illegal_sentence_action;
 
@@ -328,7 +345,10 @@ static int user_parser(char *buff) {
    * copy user_verb into a static character buffer to be pointed to by
    * last_verb.
    */
-  strncpy(verb_buff, user_verb, MAX_VERB_BUFF - 1);
+  u8_strncpy(reinterpret_cast<uint8_t *>(verb_buff), reinterpret_cast<const uint8_t *>(user_verb),
+             sizeof(verb_buff) - 1);
+  verb_buff[sizeof(verb_buff) - 1] = '\0';
+
   if (p) {
     int pos;
 

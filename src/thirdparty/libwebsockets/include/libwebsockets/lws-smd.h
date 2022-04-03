@@ -52,6 +52,13 @@ enum {
 	 * Something happened on the network, eg, link-up or DHCP, or captive
 	 * portal state update
 	 */
+	LWSSMDCL_METRICS					= (1 << 3),
+	/**<
+	 * An SS client process is reporting a metric to the proxy (this class
+	 * is special in that it is not rebroadcast by the proxy)
+	 */
+
+	LWSSMDCL_USER_BASE_BITNUM				= 24
 };
 
 /**
@@ -129,6 +136,51 @@ lws_smd_msg_send(struct lws_context *ctx, void *payload);
 LWS_VISIBLE LWS_EXTERN int
 lws_smd_msg_printf(struct lws_context *ctx, lws_smd_class_t _class,
 		   const char *format, ...) LWS_FORMAT(3);
+
+/**
+ * lws_smd_ss_msg_printf() - helper to prepare smd ss message tx
+ *
+ * \param h: the ss handle
+ * \param buf: the ss tx buffer
+ * \param len: on entry, points to the ss tx buffer length, on exit, set to used
+ * \param _class: the message class
+ * \param format: the format string to prepare the payload with
+ * \param ...: arguments for the format string, if any
+ *
+ * This helper lets you produce SMD messages on an SS link of the builtin
+ * streamtype LWS_SMD_STREAMTYPENAME, using the same api format as
+ * lws_smd_msg_prinf(), but writing the message into the ss tx buffer from
+ * its tx() callback.
+ */
+
+struct lws_ss_handle;
+LWS_VISIBLE LWS_EXTERN int
+lws_smd_ss_msg_printf(const char *tag, uint8_t *buf, size_t *len,
+		      lws_smd_class_t _class, const char *format, ...)
+		      LWS_FORMAT(5);
+
+/**
+ * lws_smd_ss_rx_forward() - helper to forward smd messages that came in by SS
+ *
+ * \param ss_user: ss user pointer, as delivered to rx callback
+ * \param buf: the ss rx buffer
+ * \param len: the length of the ss rx buffer
+ *
+ * Proxied Secure Streams with the streamtype LWS_SMD_STREAMTYPENAME receive
+ * serialized SMD messages from the proxy, this helper allows them to be
+ * translated into deserialized SMD messages and forwarded to registered SMD
+ * participants in the local context in one step.
+ *
+ * Just pass through what arrived in the LWS_SMD_STREAMTYPENAME rx() callback
+ * to this api.
+ *
+ * Returns 0 if OK else nonzero if unable to queue the SMD message.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_smd_ss_rx_forward(void *ss_user, const uint8_t *buf, size_t len);
+
+LWS_VISIBLE LWS_EXTERN int
+lws_smd_sspc_rx_forward(void *ss_user, const uint8_t *buf, size_t len);
 
 typedef int (*lws_smd_notification_cb_t)(void *opaque, lws_smd_class_t _class,
 					 lws_usec_t timestamp, void *buf,

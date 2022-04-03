@@ -96,7 +96,7 @@ lws_read_h1(struct lws *wsi, unsigned char *buf, lws_filepos_t len)
 		 * Figure out how much was read, so that we can proceed
 		 * appropriately:
 		 */
-		len -= (buf - last_char);
+		len -= (unsigned int)lws_ptr_diff(buf, last_char);
 
 		if (!wsi->hdr_parsing_completed)
 			/* More header content on the way */
@@ -125,18 +125,22 @@ lws_read_h1(struct lws *wsi, unsigned char *buf, lws_filepos_t len)
 	case LRS_DISCARD_BODY:
 	case LRS_BODY:
 http_postbody:
-		lwsl_debug("%s: http post body: remain %d\n", __func__,
-			    (int)wsi->http.rx_content_remain);
+		lwsl_info("%s: http post body: cl set %d, remain %d, len %d\n", __func__,
+			    (int)wsi->http.content_length_given,
+			    (int)wsi->http.rx_content_remain, (int)len);
 
-		if (!wsi->http.rx_content_remain)
+		if (wsi->http.content_length_given && !wsi->http.rx_content_remain)
 			goto postbody_completion;
 
-		while (len && wsi->http.rx_content_remain) {
+		while (len && (!wsi->http.content_length_given || wsi->http.rx_content_remain)) {
 			/* Copy as much as possible, up to the limit of:
 			 * what we have in the read buffer (len)
 			 * remaining portion of the POST body (content_remain)
 			 */
-			body_chunk_len = min(wsi->http.rx_content_remain, len);
+			if (wsi->http.content_length_given)
+				body_chunk_len = min(wsi->http.rx_content_remain, len);
+			else
+				body_chunk_len = len;
 			wsi->http.rx_content_remain -= body_chunk_len;
 			// len -= body_chunk_len;
 #ifdef LWS_WITH_CGI
@@ -146,10 +150,10 @@ http_postbody:
 				args.ch = LWS_STDIN;
 				args.stdwsi = &wsi->http.cgi->lsp->stdwsi[0];
 				args.data = buf;
-				args.len = body_chunk_len;
+				args.len = (int)(unsigned int)body_chunk_len;
 
 				/* returns how much used */
-				n = user_callback_handle_rxflow(
+				n = (unsigned int)user_callback_handle_rxflow(
 					wsi->a.protocol->callback,
 					wsi, LWS_CALLBACK_CGI_STDIN_DATA,
 					wsi->user_space,
@@ -159,22 +163,43 @@ http_postbody:
 			} else {
 #endif
 				if (lwsi_state(wsi) != LRS_DISCARD_BODY) {
-				n = wsi->a.protocol->callback(wsi,
-					LWS_CALLBACK_HTTP_BODY, wsi->user_space,
-					buf, (size_t)body_chunk_len);
-				if (n)
-					goto bail;
+					lwsl_info("%s: HTTP_BODY %d\n", __func__, (int)body_chunk_len);
+					n = (unsigned int)wsi->a.protocol->callback(wsi,
+						LWS_CALLBACK_HTTP_BODY, wsi->user_space,
+						buf, (size_t)body_chunk_len);
+					if (n)
+						goto bail;
 				}
 				n = (size_t)body_chunk_len;
 #ifdef LWS_WITH_CGI
 			}
 #endif
+			lwsl_info("%s: advancing buf by %d\n", __func__, (int)n);
 			buf += n;
+
+#if defined(LWS_ROLE_H2)
+			if (lwsi_role_h2(wsi) && !wsi->http.content_length_given) {
+				struct lws *w = lws_get_network_wsi(wsi);
+
+				if (w)
+					lwsl_info("%s: h2: nwsi h2 flags %d\n", __func__,
+						w->h2.h2n ? w->h2.h2n->flags: -1);
+
+				if (w && w->h2.h2n && !(w->h2.h2n->flags & 1)) {
+					lwsl_info("%s: h2, no cl, not END_STREAM, continuing\n", __func__);
+					lws_set_timeout(wsi,
+						PENDING_TIMEOUT_HTTP_CONTENT,
+						(int)wsi->a.context->timeout_secs);
+					break;
+				}
+				goto postbody_completion;
+			}
+#endif
 
 			if (wsi->http.rx_content_remain)  {
 				lws_set_timeout(wsi,
 						PENDING_TIMEOUT_HTTP_CONTENT,
-						wsi->a.context->timeout_secs);
+						(int)wsi->a.context->timeout_secs);
 				break;
 			}
 			/* he sent all the content in time */
@@ -186,7 +211,7 @@ postbody_completion:
 			 */
 			if (wsi->http.cgi)
 				lws_set_timeout(wsi, PENDING_TIMEOUT_CGI,
-						wsi->a.context->timeout_secs);
+						(int)wsi->a.context->timeout_secs);
 			else
 #endif
 			lws_set_timeout(wsi, NO_PENDING_TIMEOUT, 0);
@@ -207,14 +232,16 @@ postbody_completion:
 					break;
 				}
 #endif
-				lwsl_info("HTTP_BODY_COMPLETION: %p (%s)\n",
-					  wsi, wsi->a.protocol->name);
+				lwsl_info("HTTP_BODY_COMPLETION: %s (%s)\n",
+					  lws_wsi_tag(wsi), wsi->a.protocol->name);
 
-				n = wsi->a.protocol->callback(wsi,
+				n = (unsigned int)wsi->a.protocol->callback(wsi,
 					LWS_CALLBACK_HTTP_BODY_COMPLETION,
 					wsi->user_space, NULL, 0);
-				if (n)
+				if (n) {
+					lwsl_info("%s: bailing after BODY_COMPLETION\n", __func__);
 					goto bail;
+				}
 
 				if (wsi->mux_substream)
 					lwsi_set_state(wsi, LRS_ESTABLISHED);
@@ -344,8 +371,8 @@ lws_h1_server_socket_service(struct lws *wsi, struct lws_pollfd *pollfd)
 	     lwsi_state(wsi) == LRS_BODY)) {
 
 		if (!wsi->http.ah && lws_header_table_attach(wsi, 0)) {
-			lwsl_info("%s: wsi %p: ah not available\n", __func__,
-				  wsi);
+			lwsl_info("%s: %s: ah not available\n", __func__,
+				  lws_wsi_tag(wsi));
 			goto try_pollout;
 		}
 
@@ -411,10 +438,10 @@ lws_h1_server_socket_service(struct lws *wsi, struct lws_pollfd *pollfd)
 		 */
 #if defined(LWS_ROLE_H2)
 		if (lwsi_role_h2(wsi) && lwsi_state(wsi) != LRS_BODY)
-			n = lws_read_h2(wsi, ebuf.token, ebuf.len);
+			n = lws_read_h2(wsi, ebuf.token, (unsigned int)ebuf.len);
 		else
 #endif
-			n = lws_read_h1(wsi, ebuf.token, ebuf.len);
+			n = lws_read_h1(wsi, ebuf.token, (unsigned int)ebuf.len);
 		if (n < 0) /* we closed wsi */
 			return LWS_HPI_RET_WSI_ALREADY_DIED;
 
@@ -494,19 +521,6 @@ try_pollout:
 			return LWS_HPI_RET_HANDLED;
 		}
 
-		lws_stats_bump(pt, LWSSTATS_C_WRITEABLE_CB, 1);
-#if defined(LWS_WITH_STATS)
-		if (wsi->active_writable_req_us) {
-			uint64_t ul = lws_now_usecs() -
-					wsi->active_writable_req_us;
-
-			lws_stats_bump(pt, LWSSTATS_US_WRITABLE_DELAY_AVG, ul);
-			lws_stats_max(pt,
-				  LWSSTATS_US_WORST_WRITABLE_DELAY, ul);
-			wsi->active_writable_req_us = 0;
-		}
-#endif
-
 		n = user_callback_handle_rxflow(wsi->a.protocol->callback, wsi,
 						LWS_CALLBACK_HTTP_WRITEABLE,
 						wsi->user_space, NULL, 0);
@@ -574,28 +588,6 @@ rops_handle_POLLIN_h1(struct lws_context_per_thread *pt, struct lws *wsi,
 	}
 #endif
 
-#if 0
-
-	/*
-	 * !!! lws_serve_http_file_fragment() seems to duplicate most of
-	 * lws_handle_POLLOUT_event() in its own loop...
-	 */
-	lwsl_debug("%s: %d %d\n", __func__, (pollfd->revents & LWS_POLLOUT),
-			lwsi_state_can_handle_POLLOUT(wsi));
-
-	if ((pollfd->revents & LWS_POLLOUT) &&
-	    lwsi_state_can_handle_POLLOUT(wsi) &&
-	    lws_handle_POLLOUT_event(wsi, pollfd)) {
-		if (lwsi_state(wsi) == LRS_RETURNED_CLOSE)
-			lwsi_set_state(wsi, LRS_FLUSHING_BEFORE_CLOSE);
-		/* the write failed... it's had it */
-		wsi->socket_is_permanently_unusable = 1;
-
-		return LWS_HPI_RET_PLEASE_CLOSE_ME;
-	}
-#endif
-
-
 	/* Priority 2: pre- compression transform */
 
 #if defined(LWS_WITH_HTTP_STREAM_COMPRESSION)
@@ -608,7 +600,9 @@ rops_handle_POLLIN_h1(struct lws_context_per_thread *pt, struct lws *wsi,
 				wsi->http.comp_ctx.may_have_more
 				);
 
-		if (wsi->role_ops->write_role_protocol(wsi, NULL, 0, &wp) < 0) {
+		if (lws_rops_fidx(wsi->role_ops, LWS_ROPS_write_role_protocol) &&
+		    lws_rops_func_fidx(wsi->role_ops, LWS_ROPS_write_role_protocol).
+					write_role_protocol(wsi, NULL, 0, &wp) < 0) {
 			lwsl_info("%s signalling to close\n", __func__);
 			return LWS_HPI_RET_PLEASE_CLOSE_ME;
 		}
@@ -636,8 +630,13 @@ rops_handle_POLLIN_h1(struct lws_context_per_thread *pt, struct lws *wsi,
 	if (!lwsi_role_client(wsi)) {
 		int n;
 
-		lwsl_debug("%s: %p: wsistate 0x%x\n", __func__, wsi,
-			   (int)wsi->wsistate);
+		lwsl_debug("%s: %s: wsistate 0x%x\n", __func__, lws_wsi_tag(wsi),
+			   (unsigned int)wsi->wsistate);
+
+		if (pollfd->revents & LWS_POLLHUP &&
+		    !lws_buflist_total_len(&wsi->buflist))
+			return LWS_HPI_RET_PLEASE_CLOSE_ME;
+
 		n = lws_h1_server_socket_service(wsi, pollfd);
 		if (n != LWS_HPI_RET_HANDLED)
 			return n;
@@ -696,9 +695,13 @@ rops_handle_POLLIN_h1(struct lws_context_per_thread *pt, struct lws *wsi,
 		return LWS_HPI_RET_PLEASE_CLOSE_ME;
 	}
 
-	if (lws_client_socket_service(wsi, pollfd))
+	if (lws_http_client_socket_service(wsi, pollfd))
 		return LWS_HPI_RET_WSI_ALREADY_DIED;
 #endif
+
+	if (lwsi_state(wsi) == LRS_WAITING_CONNECT &&
+	    (pollfd->revents & LWS_POLLHUP))
+		return LWS_HPI_RET_PLEASE_CLOSE_ME;
 
 	return LWS_HPI_RET_HANDLED;
 }
@@ -707,7 +710,9 @@ static int
 rops_handle_POLLOUT_h1(struct lws *wsi)
 {
 
-	if (lwsi_state(wsi) == LRS_ISSUE_HTTP_BODY) {
+
+	if (lwsi_state(wsi) == LRS_ISSUE_HTTP_BODY ||
+	    lwsi_state(wsi) == LRS_WAITING_SERVER_REPLY) {
 #if defined(LWS_WITH_HTTP_PROXY)
 		if (wsi->http.proxy_clientside) {
 			unsigned char *buf, prebuf[LWS_PRE + 1024];
@@ -719,11 +724,10 @@ rops_handle_POLLOUT_h1(struct lws *wsi)
 				len = sizeof(prebuf) - LWS_PRE;
 
 			if (len) {
-
 				memcpy(prebuf + LWS_PRE, buf, len);
 
-				lwsl_debug("%s: %p: proxying body %d %d %d %d %d\n",
-						__func__, wsi, (int)len,
+				lwsl_debug("%s: %s: proxying body %d %d %d %d %d\n",
+						__func__, lws_wsi_tag(wsi), (int)len,
 						(int)wsi->http.tx_content_length,
 						(int)wsi->http.tx_content_remain,
 						(int)wsi->http.rx_content_length,
@@ -738,23 +742,28 @@ rops_handle_POLLOUT_h1(struct lws *wsi)
 				}
 
 				lws_buflist_use_segment(&wsi->parent->http.buflist_post_body, len);
+
 			}
 
-			if (wsi->parent->http.buflist_post_body)
+			if (wsi->parent->http.buflist_post_body) {
 				lws_callback_on_writable(wsi);
-			else {
-#if defined(LWS_ROLE_H1) || defined(LWS_ROLE_H2)
-				/* prepare ourselves to do the parsing */
-				wsi->http.ah->parser_state = WSI_TOKEN_NAME_PART;
-				wsi->http.ah->lextable_pos = 0;
-#if defined(LWS_WITH_CUSTOM_HEADERS)
-				wsi->http.ah->unk_pos = 0;
-#endif
-#endif
-				lwsi_set_state(wsi, LRS_WAITING_SERVER_REPLY);
-				lws_set_timeout(wsi, PENDING_TIMEOUT_AWAITING_SERVER_RESPONSE,
-						wsi->a.context->timeout_secs);
+				return LWS_HP_RET_DROP_POLLOUT;
 			}
+
+			lwsl_err("%s: nothing to send\n", __func__);
+#if defined(LWS_ROLE_H1) || defined(LWS_ROLE_H2)
+			/* prepare ourselves to do the parsing */
+			wsi->http.ah->parser_state = WSI_TOKEN_NAME_PART;
+			wsi->http.ah->lextable_pos = 0;
+#if defined(LWS_WITH_CUSTOM_HEADERS)
+			wsi->http.ah->unk_pos = 0;
+#endif
+#endif
+			lwsi_set_state(wsi, LRS_WAITING_SERVER_REPLY);
+			lws_set_timeout(wsi, PENDING_TIMEOUT_AWAITING_SERVER_RESPONSE,
+					(int)wsi->a.context->timeout_secs);
+
+			return LWS_HP_RET_DROP_POLLOUT;
 		}
 #endif
 		return LWS_HP_RET_USER_SERVICE;
@@ -789,12 +798,13 @@ rops_write_role_protocol_h1(struct lws *wsi, unsigned char *buf, size_t len,
 		if (n)
 			return n;
 
-		lwsl_info("%s: %p: transformed %d bytes to %d "
-			   "(wp 0x%x, more %d)\n", __func__, wsi, (int)len,
+		lwsl_info("%s: %s: transformed %d bytes to %d "
+			   "(wp 0x%x, more %d)\n", __func__,
+			   lws_wsi_tag(wsi), (int)len,
 			   (int)o, (int)*wp, wsi->http.comp_ctx.may_have_more);
 
 		if (!o)
-			return olen;
+			return (int)olen;
 
 		if (wsi->http.comp_ctx.chunking) {
 			char c[LWS_HTTP_CHUNK_HDR_MAX_SIZE + 2];
@@ -805,8 +815,8 @@ rops_write_role_protocol_h1(struct lws *wsi, unsigned char *buf, size_t len,
 			n = lws_snprintf(c, sizeof(c), "%X\x0d\x0a", (int)o);
 			lwsl_info("%s: chunk (%d) %s", __func__, (int)o, c);
 			out -= n;
-			o += n;
-			memcpy(out, c, n);
+			o += (unsigned int)n;
+			memcpy(out, c, (unsigned int)n);
 			out[o++] = '\x0d';
 			out[o++] = '\x0a';
 
@@ -868,7 +878,8 @@ rops_destroy_role_h1(struct lws *wsi)
 
 	while (ah) {
 		if (ah->in_use && ah->wsi == wsi) {
-			lwsl_err("%s: ah leak: wsi %p\n", __func__, wsi);
+			lwsl_err("%s: ah leak: wsi %s\n", __func__,
+					lws_wsi_tag(wsi));
 			ah->in_use = 0;
 			ah->wsi = NULL;
 			pt->http.ah_count_in_use--;
@@ -921,6 +932,7 @@ rops_adoption_bind_h1(struct lws *wsi, int type, const char *vh_prot_name)
 #if defined(LWS_WITH_HTTP2)
 	if ((!(type & LWS_ADOPT_ALLOW_SSL)) && (wsi->a.vhost->options & LWS_SERVER_OPTION_H2_PRIOR_KNOWLEDGE)) {
 		lwsl_info("http/2 prior knowledge\n");
+		lws_metrics_tag_wsi_add(wsi, "upg", "h2_prior");
 		lws_role_call_alpn_negotiated(wsi, "h2");
 	}
 	else
@@ -943,7 +955,7 @@ rops_adoption_bind_h1(struct lws *wsi, int type, const char *vh_prot_name)
 
 	/* the transport is accepted... give him time to negotiate */
 	lws_set_timeout(wsi, PENDING_TIMEOUT_ESTABLISH_WITH_SERVER,
-			wsi->a.context->timeout_secs);
+			(int)wsi->a.context->timeout_secs);
 
 	return 1; /* bound */
 }
@@ -1051,73 +1063,6 @@ fail_wsi:
 }
 #endif
 
-#if 0
-static int
-rops_perform_user_POLLOUT_h1(struct lws *wsi)
-{
-	volatile struct lws *vwsi = (volatile struct lws *)wsi;
-	int n;
-
-	/* priority 1: post compression-transform buffered output */
-
-	if (lws_has_buffered_out(wsi)) {
-		lwsl_debug("%s: completing partial\n", __func__);
-		if (lws_issue_raw(wsi, NULL, 0) < 0) {
-			lwsl_info("%s signalling to close\n", __func__);
-			return -1;
-		}
-		n = 0;
-		vwsi->leave_pollout_active = 1;
-		goto cleanup;
-	}
-
-	/* priority 2: pre compression-transform buffered output */
-
-#if defined(LWS_WITH_HTTP_STREAM_COMPRESSION)
-	if (wsi->http.comp_ctx.buflist_comp ||
-	    wsi->http.comp_ctx.may_have_more) {
-		enum lws_write_protocol wp = LWS_WRITE_HTTP;
-
-		lwsl_info("%s: completing comp partial"
-			   "(buflist_comp %p, may %d)\n",
-			   __func__, wsi->http.comp_ctx.buflist_comp,
-			    wsi->http.comp_ctx.may_have_more);
-
-		if (rops_write_role_protocol_h1(wsi, NULL, 0, &wp) < 0) {
-			lwsl_info("%s signalling to close\n", __func__);
-			lws_close_free_wsi(wsi, LWS_CLOSE_STATUS_NOSTATUS,
-					   "comp write fail");
-		}
-		n = 0;
-		vwsi->leave_pollout_active = 1;
-		goto cleanup;
-	}
-#endif
-
-	/* priority 3: if no buffered out and waiting for that... */
-
-	if (lwsi_state(wsi) == LRS_FLUSHING_BEFORE_CLOSE) {
-		wsi->socket_is_permanently_unusable = 1;
-		return -1;
-	}
-
-	/* priority 4: user writeable callback */
-
-	vwsi = (volatile struct lws *)wsi;
-	vwsi->leave_pollout_active = 0;
-
-	n = lws_callback_as_writeable(wsi);
-
-cleanup:
-	vwsi->handling_pollout = 0;
-
-	if (vwsi->leave_pollout_active)
-		lws_change_pollfd(wsi, 0, LWS_POLLOUT);
-
-	return n;
-}
-#endif
-
 static int
 rops_close_kill_connection_h1(struct lws *wsi, enum lws_close_status reason)
 {
@@ -1158,37 +1103,61 @@ rops_pt_init_destroy_h1(struct lws_context *context,
 	return 0;
 }
 
+static const lws_rops_t rops_table_h1[] = {
+	/*  1 */ { .pt_init_destroy	  = rops_pt_init_destroy_h1 },
+	/*  2 */ { .handle_POLLIN	  = rops_handle_POLLIN_h1 },
+	/*  3 */ { .handle_POLLOUT	  = rops_handle_POLLOUT_h1 },
+	/*  4 */ { .write_role_protocol	  = rops_write_role_protocol_h1 },
+	/*  5 */ { .alpn_negotiated	  = rops_alpn_negotiated_h1 },
+	/*  6 */ { .close_kill_connection = rops_close_kill_connection_h1 },
+	/*  7 */ { .destroy_role	  = rops_destroy_role_h1 },
+#if defined(LWS_WITH_SERVER)
+	/*  8 */ { .adoption_bind	  = rops_adoption_bind_h1 },
+#endif
+#if defined(LWS_WITH_CLIENT)
+	/*  8 if client and no server */
+	/*  9 */ { .client_bind		  = rops_client_bind_h1 },
+#endif
+};
+
 const struct lws_role_ops role_ops_h1 = {
 	/* role name */			"h1",
 	/* alpn id */			"http/1.1",
-	/* check_upgrades */		NULL,
-	/* pt_init_destroy */		rops_pt_init_destroy_h1,
-	/* init_vhost */		NULL,
-	/* destroy_vhost */		NULL,
-	/* service_flag_pending */	NULL,
-	/* handle_POLLIN */		rops_handle_POLLIN_h1,
-	/* handle_POLLOUT */		rops_handle_POLLOUT_h1,
-	/* perform_user_POLLOUT */	NULL,
-	/* callback_on_writable */	NULL,
-	/* tx_credit */			NULL,
-	/* write_role_protocol */	rops_write_role_protocol_h1,
-	/* encapsulation_parent */	NULL,
-	/* alpn_negotiated */		rops_alpn_negotiated_h1,
-	/* close_via_role_protocol */	NULL,
-	/* close_role */		NULL,
-	/* close_kill_connection */	rops_close_kill_connection_h1,
-	/* destroy_role */		rops_destroy_role_h1,
+	/* rops_table */		rops_table_h1,
+	/* rops_idx */			{
+	  /* LWS_ROPS_check_upgrades */
+	  /* LWS_ROPS_pt_init_destroy */		0x01,
+	  /* LWS_ROPS_init_vhost */
+	  /* LWS_ROPS_destroy_vhost */			0x00,
+	  /* LWS_ROPS_service_flag_pending */
+	  /* LWS_ROPS_handle_POLLIN */			0x02,
+	  /* LWS_ROPS_handle_POLLOUT */
+	  /* LWS_ROPS_perform_user_POLLOUT */		0x30,
+	  /* LWS_ROPS_callback_on_writable */
+	  /* LWS_ROPS_tx_credit */			0x00,
+	  /* LWS_ROPS_write_role_protocol */
+	  /* LWS_ROPS_encapsulation_parent */		0x40,
+	  /* LWS_ROPS_alpn_negotiated */
+	  /* LWS_ROPS_close_via_role_protocol */	0x50,
+	  /* LWS_ROPS_close_role */
+	  /* LWS_ROPS_close_kill_connection */		0x06,
+	  /* LWS_ROPS_destroy_role */
 #if defined(LWS_WITH_SERVER)
-	/* adoption_bind */		rops_adoption_bind_h1,
+	  /* LWS_ROPS_adoption_bind */			0x78,
 #else
-					NULL,
+	  /* LWS_ROPS_adoption_bind */			0x70,
 #endif
+	  /* LWS_ROPS_client_bind */
 #if defined(LWS_WITH_CLIENT)
-	/* client_bind */		rops_client_bind_h1,
+#if defined(LWS_WITH_SERVER)
+	  /* LWS_ROPS_issue_keepalive */		0x90,
 #else
-					NULL,
+	  /* LWS_ROPS_issue_keepalive */		0x80,
 #endif
-	/* issue_keepalive */		NULL,
+#else
+	  /* LWS_ROPS_issue_keepalive */		0x00,
+#endif
+					},
 	/* adoption_cb clnt, srv */	{ LWS_CALLBACK_SERVER_NEW_CLIENT_INSTANTIATED,
 					  LWS_CALLBACK_SERVER_NEW_CLIENT_INSTANTIATED },
 	/* rx_cb clnt, srv */		{ LWS_CALLBACK_RECEIVE_CLIENT_HTTP,

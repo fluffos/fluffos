@@ -46,7 +46,7 @@ lws_uv_sultimer_cb(uv_timer_t *timer
 				    lws_now_usecs());
 	if (us)
 		uv_timer_start(&pt_to_priv_uv(pt)->sultimer, lws_uv_sultimer_cb,
-			       LWS_US_TO_MS(us), 0);
+			       LWS_US_TO_MS((uint64_t)us), 0);
 	lws_pt_unlock(pt);
 	lws_context_unlock(pt->context);
 }
@@ -80,7 +80,7 @@ lws_uv_idle(uv_idle_t *handle
 				    lws_now_usecs());
 	if (us)
 		uv_timer_start(&pt_to_priv_uv(pt)->sultimer, lws_uv_sultimer_cb,
-			       LWS_US_TO_MS(us), 0);
+			       LWS_US_TO_MS((uint64_t)us), 0);
 
 	/* there is nobody who needs service forcing, shut down idle */
 	uv_idle_stop(handle);
@@ -161,65 +161,86 @@ bail:
 static void
 lws_libuv_stop(struct lws_context *context)
 {
-	struct lws_context_per_thread *pt;
-	int n, m;
-
 	lwsl_err("%s\n", __func__);
 
-	if (context->requested_kill) {
+	if (context->requested_stop_internal_loops) {
 		lwsl_err("%s: ignoring\n", __func__);
 		return;
 	}
 
-	context->requested_kill = 1;
-
-	m = context->count_threads;
-	context->being_destroyed = 1;
-
-	/*
-	 * Phase 1: start the close of every dynamic uv handle
-	 */
-
-	while (m--) {
-		pt = &context->pt[m];
-
-		if (pt->pipe_wsi) {
-			uv_poll_stop(wsi_to_priv_uv(pt->pipe_wsi)->w_read.pwatcher);
-			lws_destroy_event_pipe(pt->pipe_wsi);
-			pt->pipe_wsi = NULL;
-		}
-
-		for (n = 0; (unsigned int)n < context->pt[m].fds_count; n++) {
-			struct lws *wsi = wsi_from_fd(context, pt->fds[n].fd);
-
-			if (!wsi)
-				continue;
-			lws_close_free_wsi(wsi,
-				LWS_CLOSE_STATUS_NOSTATUS_CONTEXT_DESTROY,
-				__func__ /* no protocol close */);
-			n--;
-		}
-	}
-
-	lwsl_info("%s: started closing all wsi\n", __func__);
-
-	/* we cannot have completed... there are at least the cancel pipes */
+	context->requested_stop_internal_loops = 1;
+	lws_context_destroy(context);
 }
 
 static void
 lws_uv_signal_handler(uv_signal_t *watcher, int signum)
 {
-	struct lws_context *context = watcher->data;
+	struct lws_context_per_thread *pt = (struct lws_context_per_thread *)
+							watcher->data;
 
-	if (context->eventlib_signal_cb) {
-		context->eventlib_signal_cb((void *)watcher, signum);
+	if (pt->context->eventlib_signal_cb) {
+		pt->context->eventlib_signal_cb((void *)watcher, signum);
 
 		return;
 	}
 
 	lwsl_err("internal signal handler caught signal %d\n", signum);
-	lws_libuv_stop(watcher->data);
+	lws_libuv_stop(pt->context);
 }
+
+static int
+lws_uv_finalize_pt(struct lws_context_per_thread *pt)
+{
+	pt->event_loop_pt_unused = 1;
+
+	lwsl_info("%s: thr %d\n", __func__, (int)(pt - pt->context->pt));
+
+	lws_context_lock(pt->context, __func__);
+
+	if (!--pt->context->undestroyed_threads) {
+		struct lws_vhost *vh = pt->context->vhost_list;
+
+		/*
+		 * eventually, we emptied all the pts...
+		 */
+
+		lwsl_debug("%s: all pts down now\n", __func__);
+
+		/* protocols may have initialized libuv objects */
+
+		while (vh) {
+			lws_vhost_destroy1(vh);
+			vh = vh->vhost_next;
+		}
+
+		if (!pt->count_event_loop_static_asset_handles &&
+		    pt->event_loop_foreign) {
+			lwsl_info("%s: resuming context_destroy\n",
+					__func__);
+			lws_context_unlock(pt->context);
+			lws_context_destroy(pt->context);
+			/*
+			 * For foreign, we're being called from the foreign
+			 * thread context the loop is associated with, we must
+			 * return to it cleanly even though we are done with it.
+			 */
+			return 1;
+		}
+	} else
+		lwsl_debug("%s: still %d undestroyed\n", __func__,
+				pt->context->undestroyed_threads);
+
+	lws_context_unlock(pt->context);
+
+	return 0;
+}
+
+// static void lws_uv_walk_cb(uv_handle_t *handle, void *arg)
+// {
+//      if (!uv_is_closing(handle))
+//	      lwsl_err("%s: handle %p still alive on loop\n", __func__, handle);
+// }
+
 
 static const int sigs[] = { SIGINT, SIGTERM, SIGSEGV, SIGFPE, SIGHUP };
 
@@ -230,19 +251,32 @@ static const int sigs[] = { SIGINT, SIGTERM, SIGSEGV, SIGFPE, SIGHUP };
 static void
 lws_uv_close_cb_sa(uv_handle_t *handle)
 {
-	struct lws_context *context =
-			LWS_UV_REFCOUNT_STATIC_HANDLE_TO_CONTEXT(handle);
-	int n;
+	struct lws_context_per_thread *pt =
+			LWS_UV_REFCOUNT_STATIC_HANDLE_TO_PT(handle);
+	struct lws_pt_eventlibs_libuv *ptpriv = pt_to_priv_uv(pt);
+	struct lws_context *context = pt->context;
+#if !defined(LWS_WITH_NO_LOGS) && defined(_DEBUG)
+	int tsi = (int)(pt - &context->pt[0]);
+#endif
 
-	lwsl_info("%s: sa left %d: dyn left: %d\n", __func__,
-		    context->count_event_loop_static_asset_handles,
-		    context->count_wsi_allocated);
+	lwsl_info("%s: thr %d: sa left %d: dyn left: %d (rk %d)\n", __func__,
+		    tsi,
+		    pt->count_event_loop_static_asset_handles - 1,
+		    ptpriv->extant_handles,
+		    context->requested_stop_internal_loops);
 
 	/* any static assets left? */
 
 	if (LWS_UV_REFCOUNT_STATIC_HANDLE_DESTROYED(handle) ||
-	    context->count_wsi_allocated)
+	    ptpriv->extant_handles)
 		return;
+
+	/*
+	 * So we believe nothing of ours left on the loop.  Let's sanity
+	 * check it to count what's still on the loop
+	 */
+
+	// uv_walk(pt_to_priv_uv(pt)->io_loop, lws_uv_walk_cb, NULL);
 
 	/*
 	 * That's it... all wsi were down, and now every
@@ -251,17 +285,14 @@ lws_uv_close_cb_sa(uv_handle_t *handle)
 	 * Stop the loop so we can get out of here.
 	 */
 
-	for (n = 0; n < context->count_threads; n++) {
-		struct lws_context_per_thread *pt = &context->pt[n];
+	lwsl_info("%s: thr %d: seen final static handle gone\n", __func__, tsi);
 
-		if (pt_to_priv_uv(pt)->io_loop && !pt->event_loop_foreign)
-			uv_stop(pt_to_priv_uv(pt)->io_loop);
-	}
-
-	if (!context->pt[0].event_loop_foreign) {
+	if (!pt->event_loop_foreign) {
 		lwsl_info("%s: calling lws_context_destroy2\n", __func__);
-		lws_context_destroy2(context);
+		lws_context_destroy(context);
 	}
+
+	lws_uv_finalize_pt(pt);
 
 	lwsl_info("%s: all done\n", __func__);
 }
@@ -273,9 +304,12 @@ lws_uv_close_cb_sa(uv_handle_t *handle)
  */
 
 void
-lws_libuv_static_refcount_add(uv_handle_t *h, struct lws_context *context)
+lws_libuv_static_refcount_add(uv_handle_t *h, struct lws_context *context,
+				int tsi)
 {
-	LWS_UV_REFCOUNT_STATIC_HANDLE_NEW(h, context);
+	struct lws_context_per_thread *pt = &context->pt[tsi];
+
+	LWS_UV_REFCOUNT_STATIC_HANDLE_NEW(h, pt);
 }
 
 /*
@@ -288,32 +322,12 @@ lws_libuv_static_refcount_del(uv_handle_t *h)
 	lws_uv_close_cb_sa(h);
 }
 
-
-static void lws_uv_close_cb(uv_handle_t *handle)
-{
-}
-
-static void lws_uv_walk_cb(uv_handle_t *handle, void *arg)
-{
-	if (!uv_is_closing(handle))
-		uv_close(handle, lws_uv_close_cb);
-}
-
-void
-lws_close_all_handles_in_loop(uv_loop_t *loop)
-{
-	uv_walk(loop, lws_uv_walk_cb, NULL);
-}
-
-
 void
 lws_libuv_stop_without_kill(const struct lws_context *context, int tsi)
 {
 	if (pt_to_priv_uv(&context->pt[tsi])->io_loop)
 		uv_stop(pt_to_priv_uv(&context->pt[tsi])->io_loop);
 }
-
-
 
 uv_loop_t *
 lws_uv_getloop(struct lws_context *context, int tsi)
@@ -390,7 +404,7 @@ elops_destroy_context2_uv(struct lws_context *context)
 
 		if (!pt->event_loop_foreign && pt_to_priv_uv(pt)->io_loop) {
 			internal = 1;
-			if (!context->finalize_destroy_after_internal_loops_stopped)
+			if (!context->evlib_finalize_destroy_after_int_loops_stop)
 				uv_stop(pt_to_priv_uv(pt)->io_loop);
 			else {
 #if UV_VERSION_MAJOR > 0
@@ -412,12 +426,12 @@ elops_wsi_logical_close_uv(struct lws *wsi)
 		return 0;
 
 	if (wsi->listener || wsi->event_pipe) {
-		lwsl_debug("%s: %p: %d %d stop listener / pipe poll\n",
-			   __func__, wsi, wsi->listener, wsi->event_pipe);
+		lwsl_debug("%s: %s: %d %d stop listener / pipe poll\n",
+			   __func__, lws_wsi_tag(wsi), wsi->listener, wsi->event_pipe);
 		if (wsi_to_priv_uv(wsi)->w_read.pwatcher)
 			uv_poll_stop(wsi_to_priv_uv(wsi)->w_read.pwatcher);
 	}
-	lwsl_debug("%s: lws_libuv_closehandle: wsi %p\n", __func__, wsi);
+	lwsl_debug("%s: lws_libuv_closehandle: %s\n", __func__, lws_wsi_tag(wsi));
 	/*
 	 * libuv has to do his own close handle processing asynchronously
 	 */
@@ -451,7 +465,7 @@ elops_close_handle_manually_uv(struct lws *wsi)
 {
 	uv_handle_t *h = (uv_handle_t *)wsi_to_priv_uv(wsi)->w_read.pwatcher;
 
-	lwsl_debug("%s: lws_libuv_closehandle: wsi %p\n", __func__, wsi);
+	lwsl_debug("%s: lws_libuv_closehandle: %s\n", __func__, lws_wsi_tag(wsi));
 
 	/*
 	 * the "manual" variant only closes the handle itself and the
@@ -475,7 +489,9 @@ static int
 elops_accept_uv(struct lws *wsi)
 {
 	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
+	struct lws_pt_eventlibs_libuv *ptpriv = pt_to_priv_uv(pt);
 	struct lws_io_watcher_libuv *w_read = &wsi_to_priv_uv(wsi)->w_read;
+
 
 	w_read->context = wsi->a.context;
 
@@ -492,17 +508,25 @@ elops_accept_uv(struct lws *wsi)
 
 	((uv_handle_t *)w_read->pwatcher)->data = (void *)wsi;
 
+	ptpriv->extant_handles++;
+
+	lwsl_debug("%s: thr %d: %s sa left %d: dyn left: %d\n", __func__,
+		    (int)(pt - &pt->context->pt[0]),
+		    lws_wsi_tag(wsi),
+		    pt->count_event_loop_static_asset_handles,
+		    ptpriv->extant_handles);
+
 	return 0;
 }
 
 static void
-elops_io_uv(struct lws *wsi, int flags)
+elops_io_uv(struct lws *wsi, unsigned int flags)
 {
 	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
 	struct lws_io_watcher_libuv *w = &(wsi_to_priv_uv(wsi)->w_read);
 	int current_events = w->actual_events & (UV_READABLE | UV_WRITABLE);
 
-	lwsl_debug("%s: %p: %d\n", __func__, wsi, flags);
+	lwsl_debug("%s: %s: %d\n", __func__, lws_wsi_tag(wsi), flags);
 
 	/* w->context is set after the loop is initialized */
 
@@ -544,13 +568,14 @@ elops_io_uv(struct lws *wsi, int flags)
 			uv_poll_start(w->pwatcher, current_events, lws_io_cb);
 	}
 
-	w->actual_events = current_events;
+	w->actual_events = (uint8_t)current_events;
 }
 
 static int
 elops_init_vhost_listen_wsi_uv(struct lws *wsi)
 {
 	struct lws_context_per_thread *pt;
+	struct lws_pt_eventlibs_libuv *ptpriv;
 	struct lws_io_watcher_libuv *w_read;
 	int n;
 
@@ -563,7 +588,8 @@ elops_init_vhost_listen_wsi_uv(struct lws *wsi)
 		return 0;
 
 	pt = &wsi->a.context->pt[(int)wsi->tsi];
-	if (!pt_to_priv_uv(pt)->io_loop)
+	ptpriv = pt_to_priv_uv(pt);
+	if (!ptpriv->io_loop)
 		return 0;
 
 	w_read->context = wsi->a.context;
@@ -580,6 +606,14 @@ elops_init_vhost_listen_wsi_uv(struct lws *wsi)
 
 		return -1;
 	}
+
+	ptpriv->extant_handles++;
+
+	lwsl_debug("%s: thr %d: %s sa left %d: dyn left: %d\n", __func__,
+		    (int)(pt - &pt->context->pt[0]),
+		    lws_wsi_tag(wsi),
+		    pt->count_event_loop_static_asset_handles,
+		    ptpriv->extant_handles);
 
 	((uv_handle_t *)w_read->pwatcher)->data = (void *)wsi;
 
@@ -599,22 +633,28 @@ static void
 elops_destroy_pt_uv(struct lws_context *context, int tsi)
 {
 	struct lws_context_per_thread *pt = &context->pt[tsi];
+	struct lws_pt_eventlibs_libuv *ptpriv = pt_to_priv_uv(pt);
 	int m, ns;
-
-	lwsl_info("%s: %d\n", __func__, tsi);
 
 	if (!lws_check_opt(context->options, LWS_SERVER_OPTION_LIBUV))
 		return;
 
-	if (!pt_to_priv_uv(pt)->io_loop)
+	if (!ptpriv->io_loop)
 		return;
 
-	if (pt->event_loop_destroy_processing_done)
+	if (pt->event_loop_destroy_processing_done) {
+		if (!pt->event_loop_foreign) {
+			lwsl_warn("%s: stopping event loop\n", __func__);
+			uv_stop(pt_to_priv_uv(pt)->io_loop);
+		}
 		return;
+	}
 
 	pt->event_loop_destroy_processing_done = 1;
+	lwsl_debug("%s: %d\n", __func__, tsi);
 
 	if (!pt->event_loop_foreign) {
+
 		uv_signal_stop(&pt_to_priv_uv(pt)->w_sigint.watcher);
 
 		ns = LWS_ARRAY_SIZE(sigs);
@@ -676,7 +716,7 @@ elops_init_pt_uv(struct lws_context *context, void *_loop, int tsi)
 
 		ptpriv->io_loop = loop;
 		uv_idle_init(loop, &ptpriv->idle);
-		LWS_UV_REFCOUNT_STATIC_HANDLE_NEW(&ptpriv->idle, context);
+		LWS_UV_REFCOUNT_STATIC_HANDLE_NEW(&ptpriv->idle, pt);
 		uv_idle_start(&ptpriv->idle, lws_uv_idle);
 
 		ns = LWS_ARRAY_SIZE(sigs);
@@ -688,9 +728,9 @@ elops_init_pt_uv(struct lws_context *context, void *_loop, int tsi)
 			assert(ns <= (int)LWS_ARRAY_SIZE(ptpriv->signals));
 			for (n = 0; n < ns; n++) {
 				uv_signal_init(loop, &ptpriv->signals[n]);
-				LWS_UV_REFCOUNT_STATIC_HANDLE_NEW(&ptpriv->signals[n],
-								  context);
-				ptpriv->signals[n].data = pt->context;
+				LWS_UV_REFCOUNT_STATIC_HANDLE_NEW(
+						&ptpriv->signals[n], pt);
+				ptpriv->signals[n].data = pt;
 				uv_signal_start(&ptpriv->signals[n],
 						lws_uv_signal_handler, sigs[n]);
 			}
@@ -715,7 +755,7 @@ elops_init_pt_uv(struct lws_context *context, void *_loop, int tsi)
 		return status;
 
 	uv_timer_init(ptpriv->io_loop, &ptpriv->sultimer);
-	LWS_UV_REFCOUNT_STATIC_HANDLE_NEW(&ptpriv->sultimer, context);
+	LWS_UV_REFCOUNT_STATIC_HANDLE_NEW(&ptpriv->sultimer, pt);
 
 	return status;
 }
@@ -726,11 +766,12 @@ lws_libuv_closewsi(uv_handle_t* handle)
 	struct lws *wsi = (struct lws *)handle->data;
 	struct lws_context *context = lws_get_context(wsi);
 	struct lws_context_per_thread *pt = &context->pt[(int)wsi->tsi];
+	struct lws_pt_eventlibs_libuv *ptpriv = pt_to_priv_uv(pt);
 #if defined(LWS_WITH_SERVER)
 	int lspd = 0;
 #endif
 
-	lwsl_info("%s: %p\n", __func__, wsi);
+	lwsl_notice("%s: %s\n", __func__, lws_wsi_tag(wsi));
 
 	lws_context_lock(context, __func__);
 
@@ -749,7 +790,17 @@ lws_libuv_closewsi(uv_handle_t* handle)
 #endif
 
 	lws_pt_lock(pt, __func__);
+
+	lwsl_notice("%s: thr %d: %s sa left %d: dyn left: %d (rk %d)\n", __func__,
+		    (int)(pt - &pt->context->pt[0]),
+		    lws_wsi_tag(wsi),
+		    pt->count_event_loop_static_asset_handles,
+		    ptpriv->extant_handles - 1,
+		    context->requested_stop_internal_loops);
+
 	__lws_close_free_wsi_final(wsi);
+	assert(ptpriv->extant_handles);
+	ptpriv->extant_handles--;
 	lws_pt_unlock(pt);
 
 	/* it's our job to close the handle finally */
@@ -762,42 +813,22 @@ lws_libuv_closewsi(uv_handle_t* handle)
 	}
 #endif
 
-	lwsl_info("%s: sa left %d: dyn left: %d (rk %d)\n", __func__,
-		    context->count_event_loop_static_asset_handles,
-		    context->count_wsi_allocated, context->requested_kill);
-
 	/*
 	 * eventually, we closed all the wsi...
 	 */
 
-	if (context->requested_kill && !context->count_wsi_allocated) {
-		struct lws_vhost *vh = context->vhost_list;
-		int m;
+	if (context->requested_stop_internal_loops &&
+	    !ptpriv->extant_handles &&
+	    !pt->count_event_loop_static_asset_handles) {
 
 		/*
-		 * Start Closing Phase 2: close of static handles
+		 * we closed everything on this pt
 		 */
 
-		lwsl_info("%s: all lws dynamic handles down, closing static\n",
-			    __func__);
+		lws_context_unlock(context);
+		lws_uv_finalize_pt(pt);
 
-		for (m = 0; m < context->count_threads; m++)
-			elops_destroy_pt_uv(context, m);
-
-		/* protocols may have initialized libuv objects */
-
-		while (vh) {
-			lws_vhost_destroy1(vh);
-			vh = vh->vhost_next;
-		}
-
-		if (!context->count_event_loop_static_asset_handles &&
-		    context->pt[0].event_loop_foreign) {
-			lwsl_info("%s: call lws_context_destroy2\n", __func__);
-			lws_context_unlock(context);
-			lws_context_destroy2(context);
-			return;
-		}
+		return;
 	}
 
 	lws_context_unlock(context);
@@ -817,7 +848,7 @@ lws_libuv_closehandle(struct lws *wsi)
 		return;
 	}
 
-	lwsl_debug("%s: %p\n", __func__, wsi);
+	lwsl_debug("%s: %s\n", __func__, lws_wsi_tag(wsi));
 
 	wsi->told_event_loop_closed = 1;
 
@@ -866,6 +897,7 @@ const lws_plugin_evlib_t evlib_uv = {
 	.hdr = {
 		"libuv event loop",
 		"lws_evlib_plugin",
+		LWS_BUILD_HASH,
 		LWS_PLUGIN_API_MAGIC
 	},
 

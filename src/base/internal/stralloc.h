@@ -1,10 +1,11 @@
 #ifndef _STRALLOC_H_
 #define _STRALLOC_H_
 
+#include "base/internal/options_incl.h"
+
+#include <cstdint>
 #include <climits>  // for UINT_MAX
 #include <cstring>  // for strlen
-
-#include "base/internal/options_incl.h"
 
 #ifdef DEBUGMALLOC
 char *int_string_copy(const char *const, const char *);
@@ -49,6 +50,7 @@ void bp(void);
 #define NDBG(x)
 #endif
 
+#define CHECK_STRING_STATS
 #if defined(DEBUG) && defined(DEBUGMALLOC_EXTENSIONS)
 /* Uncomment for very complete string ref checking, but be warned it runs
    _very_ slowly.  A conditional definition like:
@@ -59,26 +61,26 @@ void bp(void);
    is usually best.
  */
 void check_string_stats(outbuffer_t *);
-#define CHECK_STRING_STATS  // enable when need to debug: check_string_stats(nullptr)
-#else
+#undef CHECK_STRING_STATS
+// #define CHECK_STRING_STATS check_string_stats(nullptr)  // enable when need to debug
 #define CHECK_STRING_STATS
 #endif
 
-#define ADD_NEW_STRING(len, overhead) \
-  num_distinct_strings++;             \
-  bytes_distinct_strings += len + 1;  \
+#define ADD_NEW_STRING(len, overhead)  \
+  num_distinct_strings++;              \
+  bytes_distinct_strings += (len + 1); \
   overhead_bytes += overhead
-#define SUB_NEW_STRING(len, overhead) \
-  num_distinct_strings--;             \
-  bytes_distinct_strings -= len + 1;  \
+#define SUB_NEW_STRING(len, overhead)  \
+  num_distinct_strings--;              \
+  bytes_distinct_strings -= (len + 1); \
   overhead_bytes -= overhead
 #define ADD_STRING(len)    \
   allocd_strings++;        \
   allocd_bytes += len + 1; \
   CHECK_STRING_STATS
-#define ADD_STRING_SIZE(len) \
-  allocd_bytes += len;       \
-  bytes_distinct_strings += len
+#define ADD_STRING_SIZE(len)         \
+  allocd_bytes = allocd_bytes + len; \
+  bytes_distinct_strings = bytes_distinct_strings + len;
 #define SUB_STRING(len)    \
   allocd_strings--;        \
   allocd_bytes -= len + 1; \
@@ -164,21 +166,17 @@ static_assert(sizeof(malloc_block_t) == sizeof(block_t),
  * stralloc.c
  */
 void init_strings(void);
-char *findstring(const char *);
-char *make_shared_string(const char *);
+const char *findstring(const char *);
+const char *int_make_shared_string(const char *, const char *);
 const char *ref_string(const char *);
 void free_string(const char *);
 void deallocate_string(char *);
-int add_string_status(outbuffer_t *, int);
+uint64_t add_string_status(outbuffer_t *, int);
 
 char *extend_string(const char *, int);
 
 extern unsigned int svalue_strlen_size;
 
-extern int num_distinct_strings;
-extern int bytes_distinct_strings;
-extern int allocd_strings;
-extern int allocd_bytes;
-extern int overhead_bytes;
-
+#define make_shared_string(s) int_make_shared_string(s, __CURRENT_FILE_LINE__)
+void dump_stralloc(outbuffer_t *out);
 #endif

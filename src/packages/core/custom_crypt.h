@@ -28,10 +28,4 @@ typedef unsigned char BytE;
 
 char *custom_crypt(const char *key, const char *salt, unsigned char *rawout);
 
-int MD5Digest(BytE *, unsigned long buflen, BytE *);
-int encode(unsigned char *, BytE *, int);
-void decode(unsigned char *, BytE *, int);
-void getsalt(BytE *, BytE *);
-void crunchbuffer(BytE *buf, int *, char *, int, int);
-
 #endif

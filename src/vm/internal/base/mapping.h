@@ -12,8 +12,8 @@
 
 #define MAP_SVAL_HASH(x) sval_hash(x)
 
-//#define MAP_SVAL_HASH(x) (((POINTER_INT)((x).u.number)) >> 5)
-LPC_INT sval_hash(svalue_t);
+// #define MAP_SVAL_HASH(x) (((POINTER_INT)((x).u.number)) >> 5)
+size_t sval_hash(svalue_t);
 
 typedef struct mapping_node_s {
   struct mapping_node_s *next;
@@ -27,8 +27,8 @@ typedef struct mapping_node_block_s {
   mapping_node_t nodes[MNB_SIZE];
 } mapping_node_block_t;
 
-#define MAP_HASH_TABLE_SIZE 8 /* must be a power of 2 */
-#define FILL_PERCENT 80       /* must not be larger than 99 */
+#define MAP_HASH_TABLE_SIZE 16 /* must be a power of 2 */
+#define FILL_PERCENT 75        /* must not be larger than 99 */
 
 #define MAPSIZE(size) sizeof(mapping_t)
 
@@ -36,8 +36,7 @@ typedef struct mapping_node_block_s {
 #define MAP_COUNT(m) ((m)->count & ~MAP_LOCKED)
 
 struct mapping_t {
-  unsigned short ref; /* how many times this map has been
-                       * referenced */
+  uint32_t ref; /* how many times this map has been referenced */
 #ifdef DEBUGMALLOC_EXTENSIONS
   int extra_ref;
 #endif
@@ -76,15 +75,15 @@ typedef struct minfo_s {
  */
 extern mapping_node_t *locked_map_nodes;
 
-int msameval(svalue_t *, svalue_t *);
+int msameval(const svalue_t *, const svalue_t *);
 int mapping_save_size(mapping_t *);
 mapping_t *mapTraverse(mapping_t *, int (*)(mapping_t *, mapping_node_t *, void *), void *);
 mapping_t *load_mapping_from_aggregate(svalue_t *, int);
 mapping_t *allocate_mapping(int);
 mapping_t *allocate_mapping2(array_t *, svalue_t *);
 void free_mapping(mapping_t *);
-svalue_t *find_in_mapping(mapping_t *, svalue_t *);
-svalue_t *find_string_in_mapping(mapping_t *, const char *);
+svalue_t *find_in_mapping(const mapping_t *, svalue_t);
+svalue_t *find_string_in_mapping(const mapping_t *, const char *);
 svalue_t *find_for_insert(mapping_t *, svalue_t *, int);
 void absorb_mapping(mapping_t *, mapping_t *);
 void mapping_delete(mapping_t *, svalue_t *);
@@ -93,6 +92,7 @@ mapping_node_t *new_map_node(void);
 int restore_hash_string(char **str, svalue_t *);
 int growMap(mapping_t *);
 void free_node(mapping_t *, mapping_node_t *);
+uint64_t free_node_count();
 void unlock_mapping(mapping_t *);
 void map_mapping(svalue_t *, int);
 void filter_mapping(svalue_t *, int);

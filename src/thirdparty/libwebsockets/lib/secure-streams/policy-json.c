@@ -1,7 +1,7 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2019 - 2020 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2019 - 2021 Andy Green <andy@warmcat.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -41,6 +41,11 @@ static const char * const lejp_tokens_policy[] = {
 	"certs[].*",
 	"trust_stores[].name",
 	"trust_stores[].stack",
+	"metrics[].name",
+	"metrics[].us_schedule",
+	"metrics[].us_halflife",
+	"metrics[].min_outlier",
+	"metrics[].report",
 	"s[].*.endpoint",
 	"s[].*.via-socks5",
 	"s[].*.protocol",
@@ -53,12 +58,26 @@ static const char * const lejp_tokens_policy[] = {
 	"s[].*.allow_redirects",
 	"s[].*.urgent_tx",
 	"s[].*.urgent_rx",
+	"s[].*.attr_priority",
+	"s[].*.attr_low_latency",
+	"s[].*.attr_high_throughput",
+	"s[].*.attr_high_reliability",
+	"s[].*.attr_low_cost",
 	"s[].*.long_poll",
 	"s[].*.retry",
 	"s[].*.timeout_ms",
+	"s[].*.perf",
 	"s[].*.tls_trust_store",
+	"s[].*.proxy_buflen",
+	"s[].*.proxy_buflen_rxflow_on_above",
+	"s[].*.proxy_buflen_rxflow_off_below",
+	"s[].*.client_buflen",
+	"s[].*.client_buflen_rxflow_on_above",
+	"s[].*.client_buflen_rxflow_off_below",
 	"s[].*.metadata",
 	"s[].*.metadata[].*",
+	"s[].*.http_resp_map",
+	"s[].*.http_resp_map[].*",
 
 	"s[].*.http_auth_header",
 	"s[].*.http_dsn_header",
@@ -96,8 +115,17 @@ static const char * const lejp_tokens_policy[] = {
 	"s[].*.mqtt_will_message",
 	"s[].*.mqtt_will_qos",
 	"s[].*.mqtt_will_retain",
+	"s[].*.aws_iot",
 	"s[].*.swake_validity",
+	"s[].*.use_auth",
+	"s[].*.aws_region",
+	"s[].*.aws_service",
 	"s[].*",
+	"auth[].name",
+	"auth[].type",
+	"auth[].streamtype",
+	"auth[].blob",
+	"auth[]",
 };
 
 typedef enum {
@@ -114,6 +142,11 @@ typedef enum {
 	LSSPPT_CERTS,
 	LSSPPT_TRUST_STORES_NAME,
 	LSSPPT_TRUST_STORES_STACK,
+	LSSPPT_METRICS_NAME,
+	LSSPPT_METRICS_US_SCHEDULE,
+	LSSPPT_METRICS_US_HALFLIFE,
+	LSSPPT_METRICS_MIN_OUTLIER,
+	LSSPPT_METRICS_REPORT,
 	LSSPPT_ENDPOINT,
 	LSSPPT_VH_VIA_SOCKS5,
 	LSSPPT_PROTOCOL,
@@ -126,12 +159,26 @@ typedef enum {
 	LSSPPT_ALLOW_REDIRECTS,
 	LSSPPT_URGENT_TX,
 	LSSPPT_URGENT_RX,
+	LSSPPT_ATTR_PRIORITY,
+	LSSPPT_ATTR_LOW_LATENCY,
+	LSSPPT_ATTR_HIGH_THROUGHPUT,
+	LSSPPT_ATTR_HIGH_RELIABILITY,
+	LSSPPT_ATTR_LOW_COST,
 	LSSPPT_LONG_POLL,
 	LSSPPT_RETRYPTR,
 	LSSPPT_DEFAULT_TIMEOUT_MS,
+	LSSPPT_PERF,
 	LSSPPT_TRUST,
+	LSSPPT_PROXY_BUFLEN,
+	LSSPPT_PROXY_BUFLEN_RXFLOW_ON_ABOVE,
+	LSSPPT_PROXY_BUFLEN_RXFLOW_OFF_BELOW,
+	LSSPPT_CLIENT_BUFLEN,
+	LSSPPT_CLIENT_BUFLEN_RXFLOW_ON_ABOVE,
+	LSSPPT_CLIENT_BUFLEN_RXFLOW_OFF_BELOW,
 	LSSPPT_METADATA,
 	LSSPPT_METADATA_ITEM,
+	LSSPPT_HTTPRESPMAP,
+	LSSPPT_HTTPRESPMAP_ITEM,
 
 	LSSPPT_HTTP_AUTH_HEADER,
 	LSSPPT_HTTP_DSN_HEADER,
@@ -168,8 +215,17 @@ typedef enum {
 	LSSPPT_MQTT_WILL_MESSAGE,
 	LSSPPT_MQTT_WILL_QOS,
 	LSSPPT_MQTT_WILL_RETAIN,
+	LSSPPT_MQTT_AWS_IOT,
 	LSSPPT_SWAKE_VALIDITY,
+	LSSPPT_USE_AUTH,
+	LSSPPT_AWS_REGION,
+	LSSPPT_AWS_SERVICE,
 	LSSPPT_STREAMTYPES,
+	LSSPPT_AUTH_NAME,
+	LSSPPT_AUTH_TYPE,
+	LSSPPT_AUTH_STREAMTYPE,
+	LSSPPT_AUTH_BLOB,
+	LSSPPT_AUTH,
 
 } policy_token_t;
 
@@ -177,20 +233,59 @@ typedef enum {
 #define POL_AC_GRAIN	800
 #define MAX_CERT_TEMP	3072 /* used to discover actual cert size for realloc */
 
-static uint8_t sizes[] = {
+static uint16_t sizes[] = {
 	sizeof(backoff_t),
 	sizeof(lws_ss_x509_t),
 	sizeof(lws_ss_trust_store_t),
 	sizeof(lws_ss_policy_t),
+	sizeof(lws_ss_auth_t),
+	sizeof(lws_metric_policy_t),
 };
 
-static const char *protonames[] = {
+static const char * const protonames[] = {
 	"h1",		/* LWSSSP_H1 */
 	"h2",		/* LWSSSP_H2 */
 	"ws",		/* LWSSSP_WS */
 	"mqtt",		/* LWSSSP_MQTT */
 	"raw",		/* LWSSSP_RAW */
 };
+
+static const lws_ss_auth_t *
+lws_ss_policy_find_auth_by_name(struct policy_cb_args *a,
+				const char *name, size_t len)
+{
+	const lws_ss_auth_t *auth = a->heads[LTY_AUTH].a;
+
+	while (auth) {
+		if (auth->name &&
+		    len == strlen(auth->name) &&
+		    !strncmp(auth->name, name, len))
+			return auth;
+
+		auth = auth->next;
+	}
+
+	return NULL;
+}
+
+static int
+lws_ss_policy_alloc_helper(struct policy_cb_args *a, int type)
+{
+	/*
+	 * We do the pointers always as .b union member, all of the
+	 * participating structs begin with .next and .name the same
+	 */
+
+	a->curr[type].b = lwsac_use_zero(&a->ac,
+				sizes[type], POL_AC_GRAIN);
+	if (!a->curr[type].b)
+		return 1;
+
+	a->curr[type].b->next = a->heads[type].b;
+	a->heads[type].b = a->curr[type].b;
+
+	return 0;
+}
 
 static signed char
 lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
@@ -210,8 +305,8 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 	backoff_t *bot;
 	int n = -1;
 
-	lwsl_debug("%s: %d %d %s\n", __func__, reason, ctx->path_match - 1,
-		   ctx->path);
+//	lwsl_debug("%s: %d %d %s\n", __func__, reason, ctx->path_match - 1,
+//		   ctx->path);
 
 	switch (ctx->path_match - 1) {
 	case LSSPPT_RETRY:
@@ -227,18 +322,54 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 	case LSSPPT_STREAMTYPES:
 		n = LTY_POLICY;
 		break;
+	case LSSPPT_AUTH:
+		n = LTY_AUTH;
+		break;
+	case LSSPPT_METRICS_NAME:
+	case LSSPPT_METRICS_US_SCHEDULE:
+	case LSSPPT_METRICS_US_HALFLIFE:
+	case LSSPPT_METRICS_MIN_OUTLIER:
+	case LSSPPT_METRICS_REPORT:
+		n = LTY_METRICS;
+		break;
 	}
 
 	if (reason == LEJPCB_ARRAY_START &&
 	    (ctx->path_match - 1 == LSSPPT_PLUGINS ||
-	     ctx->path_match - 1 == LSSPPT_METADATA))
+	     ctx->path_match - 1 == LSSPPT_METADATA ||
+	     ctx->path_match - 1 == LSSPPT_HTTPRESPMAP))
 		a->count = 0;
+
+	if (reason == LEJPCB_OBJECT_START && n == LTY_AUTH) {
+		if (lws_ss_policy_alloc_helper(a, LTY_AUTH))
+			goto oom;
+		return 0;
+	}
 
 	if (reason == LEJPCB_ARRAY_END &&
 	    ctx->path_match - 1 == LSSPPT_TRUST_STORES_STACK && !a->count) {
 		lwsl_err("%s: at least one cert required in trust store\n",
 				__func__);
 		goto oom;
+	}
+
+	if (reason == LEJPCB_ARRAY_END && a->count && a->pending_respmap) {
+
+		// lwsl_notice("%s: allocating respmap %d\n", __func__, a->count);
+
+		a->curr[LTY_POLICY].p->u.http.respmap = lwsac_use_zero(&a->ac,
+			sizeof(lws_ss_http_respmap_t) * (unsigned int)a->count, POL_AC_GRAIN);
+
+		if (!a->curr[LTY_POLICY].p->u.http.respmap)
+			goto oom;
+
+		memcpy((void *)a->curr[LTY_POLICY].p->u.http.respmap,
+		       a->respmap, sizeof(lws_ss_http_respmap_t) * (unsigned int)a->count);
+		a->curr[LTY_POLICY].p->u.http.count_respmap = (uint8_t)a->count;
+		a->count = 0;
+		a->pending_respmap = 0;
+
+		return 0;
 	}
 
 	if (reason == LEJPCB_OBJECT_END && a->p) {
@@ -250,11 +381,11 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 		 * The struct *x is in the lwsac... the ca_der it points to
 		 * is individually allocated from the heap
 		 */
-		a->curr[LTY_X509].x->ca_der = lws_malloc(a->count, "ssx509");
+		a->curr[LTY_X509].x->ca_der = lws_malloc((unsigned int)a->count, "ssx509");
 		if (!a->curr[LTY_X509].x->ca_der)
 			goto oom;
-		memcpy((uint8_t *)a->curr[LTY_X509].x->ca_der, a->p, a->count);
-		a->curr[LTY_X509].x->ca_der_len = a->count;
+		memcpy((uint8_t *)a->curr[LTY_X509].x->ca_der, a->p, (unsigned int)a->count);
+		a->curr[LTY_X509].x->ca_der_len = (unsigned int)a->count;
 
 		/*
 		 * ... and then we can free the temp buffer
@@ -264,7 +395,8 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 		return 0;
 	}
 
-	if (reason == LEJPCB_PAIR_NAME && n != -1 && n != LTY_TRUSTSTORE) {
+	if (reason == LEJPCB_PAIR_NAME && n != -1 &&
+	    (n != LTY_TRUSTSTORE && n != LTY_AUTH && n != LTY_METRICS)) {
 
 		p2 = NULL;
 		if (n == LTY_POLICY) {
@@ -279,8 +411,8 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 			while (p2) {
 				if (!strncmp(p2->streamtype,
 					     ctx->path + ctx->st[ctx->sp].p,
-					     ctx->path_match_len -
-						          ctx->st[ctx->sp].p)) {
+					     (unsigned int)(ctx->path_match_len -
+						          ctx->st[ctx->sp].p))) {
 					lwsl_info("%s: overriding s[] %s\n",
 						  __func__, p2->streamtype);
 					break;
@@ -297,7 +429,8 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 		if (p2) /* we may be overriding existing streamtype... */
 			a->curr[n].b = (backoff_t *)p2;
 		else
-			a->curr[n].b = lwsac_use_zero(&a->ac, sizes[n], POL_AC_GRAIN);
+			a->curr[n].b = lwsac_use_zero(&a->ac, sizes[n],
+							POL_AC_GRAIN);
 		if (!a->curr[n].b)
 			goto oom;
 
@@ -355,23 +488,23 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 		}
 
 		((uint32_t *)b->retry_ms_table)
-				[b->retry_ms_table_count++] = atoi(ctx->buf);
+				[b->retry_ms_table_count++] = (uint32_t)atoi(ctx->buf);
 		break;
 
 	case LSSPPT_CONCEAL:
-		a->curr[LTY_BACKOFF].b->r.conceal_count = atoi(ctx->buf);
+		a->curr[LTY_BACKOFF].b->r.conceal_count = (uint16_t)atoi(ctx->buf);
 		break;
 
 	case LSSPPT_JITTERPC:
-		a->curr[LTY_BACKOFF].b->r.jitter_percent = atoi(ctx->buf);
+		a->curr[LTY_BACKOFF].b->r.jitter_percent = (uint8_t)atoi(ctx->buf);
 		break;
 
 	case LSSPPT_VALIDPING_S:
-		a->curr[LTY_BACKOFF].b->r.secs_since_valid_ping = atoi(ctx->buf);
+		a->curr[LTY_BACKOFF].b->r.secs_since_valid_ping = (uint16_t)atoi(ctx->buf);
 		break;
 
 	case LSSPPT_VALIDHUP_S:
-		a->curr[LTY_BACKOFF].b->r.secs_since_valid_hangup = atoi(ctx->buf);
+		a->curr[LTY_BACKOFF].b->r.secs_since_valid_hangup = (uint16_t)atoi(ctx->buf);
 		break;
 
 	case LSSPPT_CERTS:
@@ -380,7 +513,7 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 			goto oom;
 		}
 		inl = ctx->npos;
-		outl = MAX_CERT_TEMP - a->count;
+		outl = MAX_CERT_TEMP - (unsigned int)a->count;
 
 		lws_b64_decode_stateful(&a->b64, ctx->buf, &inl,
 					a->p + a->count, &outl,
@@ -393,18 +526,10 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 		break;
 
 	case LSSPPT_TRUST_STORES_NAME:
-		/*
-		 * We do the pointers always as .b, all of the participating
-		 * structs begin with .next and .name
-		 */
-		a->curr[LTY_TRUSTSTORE].b = lwsac_use_zero(&a->ac,
-					sizes[LTY_TRUSTSTORE], POL_AC_GRAIN);
-		if (!a->curr[LTY_TRUSTSTORE].b)
+		if (lws_ss_policy_alloc_helper(a, LTY_TRUSTSTORE))
 			goto oom;
 
 		a->count = 0;
-		a->curr[LTY_TRUSTSTORE].b->next = a->heads[LTY_TRUSTSTORE].b;
-		a->heads[LTY_TRUSTSTORE].b = a->curr[LTY_TRUSTSTORE].b;
 		pp = (char **)&a->curr[LTY_TRUSTSTORE].b->name;
 
 		goto string2;
@@ -431,6 +556,31 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 		lwsl_err("%s: unknown trust store entry %s\n", __func__,
 			 dotstar);
 		goto oom;
+#if defined(LWS_WITH_SYS_METRICS)
+	case LSSPPT_METRICS_NAME:
+		if (lws_ss_policy_alloc_helper(a, LTY_METRICS))
+			goto oom;
+
+		pp = (char **)&a->curr[LTY_METRICS].b->name;
+
+		goto string2;
+
+	case LSSPPT_METRICS_US_SCHEDULE:
+		a->curr[LTY_METRICS].m->us_schedule = (uint64_t)atoll(ctx->buf);
+		break;
+
+	case LSSPPT_METRICS_US_HALFLIFE:
+		a->curr[LTY_METRICS].m->us_decay_unit = (uint32_t)atol(ctx->buf);
+		break;
+
+	case LSSPPT_METRICS_MIN_OUTLIER:
+		a->curr[LTY_METRICS].m->min_contributors = (uint8_t)atoi(ctx->buf);
+		break;
+
+	case LSSPPT_METRICS_REPORT:
+		pp = (char **)&a->curr[LTY_METRICS].m->report;
+		goto string2;
+#endif
 
 	case LSSPPT_SERVER_CERT:
 	case LSSPPT_SERVER_KEY:
@@ -491,7 +641,33 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 		goto string2;
 
 	case LSSPPT_PORT:
-		a->curr[LTY_POLICY].p->port = atoi(ctx->buf);
+		a->curr[LTY_POLICY].p->port = (uint16_t)atoi(ctx->buf);
+		break;
+
+	case LSSPPT_PROXY_BUFLEN:
+		a->curr[LTY_POLICY].p->proxy_buflen = (uint32_t)atol(ctx->buf);
+		break;
+
+	case LSSPPT_PROXY_BUFLEN_RXFLOW_ON_ABOVE:
+		a->curr[LTY_POLICY].p->proxy_buflen_rxflow_on_above =
+						(uint32_t)atol(ctx->buf);
+		break;
+	case LSSPPT_PROXY_BUFLEN_RXFLOW_OFF_BELOW:
+		a->curr[LTY_POLICY].p->proxy_buflen_rxflow_off_below =
+						(uint32_t)atol(ctx->buf);
+		break;
+
+	case LSSPPT_CLIENT_BUFLEN:
+		a->curr[LTY_POLICY].p->client_buflen = (uint32_t)atol(ctx->buf);
+		break;
+
+	case LSSPPT_CLIENT_BUFLEN_RXFLOW_ON_ABOVE:
+		a->curr[LTY_POLICY].p->client_buflen_rxflow_on_above =
+						(uint32_t)atol(ctx->buf);
+		break;
+	case LSSPPT_CLIENT_BUFLEN_RXFLOW_OFF_BELOW:
+		a->curr[LTY_POLICY].p->client_buflen_rxflow_off_below =
+						(uint32_t)atol(ctx->buf);
 		break;
 
 	case LSSPPT_HTTP_METHOD:
@@ -540,15 +716,22 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 		break;
 
 	case LSSPPT_TLS_CLIENT_CERT:
-		a->curr[LTY_POLICY].p->client_cert = atoi(ctx->buf) + 1;
+		a->curr[LTY_POLICY].p->client_cert = (uint8_t)(atoi(ctx->buf) + 1);
 		break;
 
+	case LSSPPT_AUTH_BLOB:
+		a->curr[LTY_AUTH].a->blob_index = (uint8_t)atoi(ctx->buf);
+		break;
 	case LSSPPT_HTTP_EXPECT:
-		a->curr[LTY_POLICY].p->u.http.resp_expect = atoi(ctx->buf);
+		a->curr[LTY_POLICY].p->u.http.resp_expect = (uint16_t)atoi(ctx->buf);
 		break;
 
 	case LSSPPT_DEFAULT_TIMEOUT_MS:
-		a->curr[LTY_POLICY].p->timeout_ms = atoi(ctx->buf);
+		a->curr[LTY_POLICY].p->timeout_ms = (uint32_t)atoi(ctx->buf);
+		break;
+
+	case LSSPPT_ATTR_PRIORITY:
+		a->curr[LTY_POLICY].p->priority = (uint8_t)atoi(ctx->buf);
 		break;
 
 	case LSSPPT_OPPORTUNISTIC:
@@ -592,6 +775,34 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 						LWSSSPOLF_HTTP_MULTIPART_IN;
 		return 0;
 
+	case LSSPPT_ATTR_LOW_LATENCY:
+		if (reason == LEJPCB_VAL_TRUE)
+			a->curr[LTY_POLICY].p->flags |=
+						LWSSSPOLF_ATTR_LOW_LATENCY;
+		return 0;
+
+	case LSSPPT_ATTR_HIGH_THROUGHPUT:
+		if (reason == LEJPCB_VAL_TRUE)
+			a->curr[LTY_POLICY].p->flags |=
+						LWSSSPOLF_ATTR_HIGH_THROUGHPUT;
+		return 0;
+
+	case LSSPPT_ATTR_HIGH_RELIABILITY:
+		if (reason == LEJPCB_VAL_TRUE)
+			a->curr[LTY_POLICY].p->flags |=
+						LWSSSPOLF_ATTR_HIGH_RELIABILITY;
+		return 0;
+
+	case LSSPPT_ATTR_LOW_COST:
+		if (reason == LEJPCB_VAL_TRUE)
+			a->curr[LTY_POLICY].p->flags |= LWSSSPOLF_ATTR_LOW_COST;
+		return 0;
+
+	case LSSPPT_PERF:
+		if (reason == LEJPCB_VAL_TRUE)
+			a->curr[LTY_POLICY].p->flags |= LWSSSPOLF_PERF;
+		return 0;
+
 	case LSSPPT_RETRYPTR:
 		bot = a->heads[LTY_BACKOFF].b;
 		while (bot) {
@@ -624,11 +835,22 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 	case LSSPPT_METADATA:
 		break;
 
+	case LSSPPT_USE_AUTH:
+		a->curr[LTY_POLICY].p->auth =
+			lws_ss_policy_find_auth_by_name(a, ctx->buf, ctx->npos);
+		if (!a->curr[LTY_POLICY].p->auth) {
+			lws_strnncpy(dotstar, ctx->buf, ctx->npos, sizeof(dotstar));
+			lwsl_err("%s: unknown auth '%s'\n", __func__, dotstar);
+			return -1;
+		}
+		break;
+
+
 	case LSSPPT_METADATA_ITEM:
 		pmd = a->curr[LTY_POLICY].p->metadata;
 		a->curr[LTY_POLICY].p->metadata = lwsac_use_zero(&a->ac,
 			sizeof(lws_ss_metadata_t) + ctx->npos +
-			(ctx->path_match_len - ctx->st[ctx->sp - 2].p + 1) + 2,
+			(unsigned int)(ctx->path_match_len - ctx->st[ctx->sp - 2].p + 1) + 2,
 			POL_AC_GRAIN);
 		a->curr[LTY_POLICY].p->metadata->next = pmd;
 
@@ -636,17 +858,42 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 				sizeof(lws_ss_metadata_t);
 		a->curr[LTY_POLICY].p->metadata->name = q;
 		memcpy(q, ctx->path + ctx->st[ctx->sp - 2].p + 1,
-		       ctx->path_match_len - ctx->st[ctx->sp - 2].p);
+		       (unsigned int)(ctx->path_match_len - ctx->st[ctx->sp - 2].p));
 
 		q += ctx->path_match_len - ctx->st[ctx->sp - 2].p;
-		a->curr[LTY_POLICY].p->metadata->value = q;
+		a->curr[LTY_POLICY].p->metadata->value__may_own_heap = q;
 		memcpy(q, ctx->buf, ctx->npos);
+
+#if defined(LWS_ROLE_H1) || defined(LWS_ROLE_H2)
+		/*
+		 * Check the metadata value part to see if it's a well-known
+		 * http header... if so, LWS_HTTP_NO_KNOWN_HEADER (0xff) means
+		 * no header string match else it's the well-known header index
+		 */
+		a->curr[LTY_POLICY].p->metadata->value_is_http_token = (uint8_t)
+			lws_http_string_to_known_header(ctx->buf, ctx->npos);
+#endif
 
 		a->curr[LTY_POLICY].p->metadata->length = /* the index in handle->metadata */
 				a->curr[LTY_POLICY].p->metadata_count++;
+
+		a->curr[LTY_POLICY].p->metadata->value_length = ctx->npos;
 		break;
 
 #if defined(LWS_ROLE_H1) || defined(LWS_ROLE_H2)
+
+	case LSSPPT_HTTPRESPMAP_ITEM:
+		if (a->count >= (int)LWS_ARRAY_SIZE(a->respmap)) {
+			lwsl_err("%s: respmap too big\n", __func__);
+			return -1;
+		}
+		a->respmap[a->count].resp = (uint16_t)
+				atoi(ctx->path + ctx->st[ctx->sp - 2].p + 1);
+		a->respmap[a->count].state = (uint16_t)atoi(ctx->buf);
+		a->pending_respmap = 1;
+		a->count++;
+		break;
+
 	case LSSPPT_HTTP_AUTH_HEADER:
 	case LSSPPT_HTTP_DSN_HEADER:
 	case LSSPPT_HTTP_FWV_HEADER:
@@ -688,10 +935,30 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 		pp = (char **)&a->curr[LTY_POLICY].p->u.http.multipart_content_type;
 		goto string2;
 
+	case LSSPPT_AUTH_NAME:
+		pp = (char **)&a->curr[LTY_AUTH].a->name;
+		goto string2;
+
+	case LSSPPT_AUTH_STREAMTYPE:
+		pp = (char **)&a->curr[LTY_AUTH].a->streamtype;
+		goto string2;
+	case LSSPPT_AUTH_TYPE:
+		pp = (char **)&a->curr[LTY_AUTH].a->type;
+		goto string2;
 	case LSSPPT_HTTP_FAIL_REDIRECT:
 		a->curr[LTY_POLICY].p->u.http.fail_redirect =
 						reason == LEJPCB_VAL_TRUE;
 		break;
+#if defined(LWS_WITH_SECURE_STREAMS_AUTH_SIGV4)
+	case LSSPPT_AWS_REGION:
+		pp = (char **)&a->curr[LTY_POLICY].p->aws_region;
+		goto string2;
+
+	case LSSPPT_AWS_SERVICE:
+		pp = (char **)&a->curr[LTY_POLICY].p->aws_service;
+		goto string2;
+#endif
+
 #endif
 
 #if defined(LWS_ROLE_WS)
@@ -726,11 +993,11 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 		goto string2;
 
 	case LSSPPT_MQTT_QOS:
-		a->curr[LTY_POLICY].p->u.mqtt.qos = atoi(ctx->buf);
+		a->curr[LTY_POLICY].p->u.mqtt.qos = (uint8_t)atoi(ctx->buf);
 		break;
 
 	case LSSPPT_MQTT_KEEPALIVE:
-		a->curr[LTY_POLICY].p->u.mqtt.keep_alive = atoi(ctx->buf);
+		a->curr[LTY_POLICY].p->u.mqtt.keep_alive = (uint16_t)atoi(ctx->buf);
 		break;
 
 	case LSSPPT_MQTT_CLEAN_START:
@@ -746,10 +1013,15 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 		goto string2;
 
 	case LSSPPT_MQTT_WILL_QOS:
-		a->curr[LTY_POLICY].p->u.mqtt.will_qos = atoi(ctx->buf);
+		a->curr[LTY_POLICY].p->u.mqtt.will_qos = (uint8_t)atoi(ctx->buf);
 		break;
 	case LSSPPT_MQTT_WILL_RETAIN:
 		a->curr[LTY_POLICY].p->u.mqtt.will_retain =
+						reason == LEJPCB_VAL_TRUE;
+		break;
+	case LSSPPT_MQTT_AWS_IOT:
+		if (reason == LEJPCB_VAL_TRUE)
+			a->curr[LTY_POLICY].p->u.mqtt.aws_iot =
 						reason == LEJPCB_VAL_TRUE;
 		break;
 #endif
@@ -778,13 +1050,13 @@ string2:
 	 * If we can do const string folding, reuse the existing string rather
 	 * than make a new entry
 	 */
-	extant = lwsac_scan_extant(a->ac, (uint8_t *)ctx->buf, ctx->npos, 1);
+	extant = lwsac_scan_extant(a->ac, (uint8_t *)ctx->buf, (size_t)ctx->npos, 1);
 	if (extant) {
 		*pp = (char *)extant;
 
 		return 0;
 	}
-	*pp = lwsac_use_backfill(&a->ac, ctx->npos + 1, POL_AC_GRAIN);
+	*pp = lwsac_use_backfill(&a->ac, (size_t)(ctx->npos + 1), POL_AC_GRAIN);
 	if (!*pp)
 		goto oom;
 	memcpy(*pp, ctx->buf, ctx->npos);
@@ -794,11 +1066,11 @@ string2:
 
 string1:
 	n = ctx->st[ctx->sp].p;
-	*pp = lwsac_use_backfill(&a->ac, ctx->path_match_len + 1 - n,
+	*pp = lwsac_use_backfill(&a->ac, (size_t)ctx->path_match_len + (size_t)1 - (size_t)n,
 				 POL_AC_GRAIN);
 	if (!*pp)
 		goto oom;
-	memcpy(*pp, ctx->path + n, ctx->path_match_len - n);
+	memcpy(*pp, ctx->path + n, ctx->path_match_len - (unsigned int)n);
 	(*pp)[ctx->path_match_len - n] = '\0';
 
 	return 0;
@@ -850,6 +1122,21 @@ int
 lws_ss_policy_parse_abandon(struct lws_context *context)
 {
 	struct policy_cb_args *args = (struct policy_cb_args *)context->pol_args;
+	lws_ss_x509_t *x;
+
+	x = args->heads[LTY_X509].x;
+	while (x) {
+		/*
+		 * Free all the client DER buffers now they have been parsed
+		 * into tls library X.509 objects
+		 */
+		if (!x->keep) { /* used for server */
+			lws_free((void *)x->ca_der);
+			x->ca_der = NULL;
+		}
+
+		x = x->next;
+	}
 
 	lejp_destruct(&args->jctx);
 	lwsac_free(&args->ac);
@@ -858,11 +1145,59 @@ lws_ss_policy_parse_abandon(struct lws_context *context)
 	return 0;
 }
 
+#if !defined(LWS_PLAT_FREERTOS) && !defined(LWS_PLAT_OPTEE)
+int
+lws_ss_policy_parse_file(struct lws_context *cx, const char *filepath)
+{
+	struct policy_cb_args *args = (struct policy_cb_args *)cx->pol_args;
+	uint8_t buf[512];
+	int n, m, fd = lws_open(filepath, LWS_O_RDONLY);
+
+	if (fd < 0)
+		return -1;
+
+	do {
+		n = (int)read(fd, buf, sizeof(buf));
+		if (n < 0) {
+			m = -1;
+			goto bail;
+		}
+
+		m = lejp_parse(&args->jctx, buf, n);
+		if (m != LEJP_CONTINUE && m < 0) {
+			lwsl_err("%s: parse failed line %u: %d: %s\n", __func__,
+				 (unsigned int)args->jctx.line, m,
+				 lejp_error_to_string(m));
+			lws_ss_policy_parse_abandon(cx);
+
+			m = -1;
+			goto bail;
+		}
+
+		if (m != LEJP_CONTINUE)
+			break;
+	} while (n);
+
+	m = 0;
+bail:
+	close(fd);
+
+	return m;
+}
+#endif
+
 int
 lws_ss_policy_parse(struct lws_context *context, const uint8_t *buf, size_t len)
 {
 	struct policy_cb_args *args = (struct policy_cb_args *)context->pol_args;
 	int m;
+
+#if !defined(LWS_PLAT_FREERTOS) && !defined(LWS_PLAT_OPTEE)
+	if (!args->jctx.line && buf[0] != '{') {
+		puts((const char *)buf);
+		return lws_ss_policy_parse_file(context, (const char *)buf);
+	}
+#endif
 
 	m = lejp_parse(&args->jctx, buf, (int)len);
 	if (m == LEJP_CONTINUE || m >= 0)
@@ -893,4 +1228,15 @@ lws_ss_policy_get(struct lws_context *context)
 		return NULL;
 
 	return args->heads[LTY_POLICY].p;
+}
+
+const lws_ss_auth_t *
+lws_ss_auth_get(struct lws_context *context)
+{
+	struct policy_cb_args *args = (struct policy_cb_args *)context->pol_args;
+
+	if (!args)
+		return NULL;
+
+	return args->heads[LTY_AUTH].a;
 }

@@ -336,6 +336,7 @@ enum lws_token_indexes {
 	WSI_TOKEN_COLON_PROTOCOL,
 #endif
 	WSI_TOKEN_X_AUTH_TOKEN,
+	WSI_TOKEN_DSS_SIGNATURE,
 
 	/****** add new things just above ---^ ******/
 
@@ -494,7 +495,34 @@ lws_hdr_custom_copy(struct lws *wsi, char *dst, int len, const char *name,
 		    int nlen);
 
 /**
+ * lws_get_urlarg_by_name_safe() - get copy and return length of y for x=y urlargs
+ *
+ * \param wsi: the connection to check
+ * \param name: the arg name, like "token" or "token="
+ * \param buf: the buffer to receive the urlarg (including the name= part)
+ * \param len: the length of the buffer to receive the urlarg
+ *
+ * Returns -1 if not present, else the length of y in the urlarg name=y.  If
+ * zero or greater, then buf contains a copy of the string y.  Any = after the
+ * name match is trimmed off if the name does not end with = itself.
+ *
+ * This returns the explicit length and so can deal with binary blobs that are
+ * percent-encoded.  It also makes sure buf has a NUL just after the valid
+ * length so it can work with NUL-based apis if you don't care about truncation.
+ *
+ * buf may have been written even when -1 is returned indicating no match.
+ *
+ * Use this in place of lws_get_urlarg_by_name() that does not return an
+ * explicit length.
+ *
+ * Use lws_get_urlarg_by_name_safe() instead of this, which returns the length.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_get_urlarg_by_name_safe(struct lws *wsi, const char *name, char *buf, int len);
+
+/**
  * lws_get_urlarg_by_name() - return pointer to arg value if present
+ *
  * \param wsi: the connection to check
  * \param name: the arg name, like "token="
  * \param buf: the buffer to receive the urlarg (including the name= part)
@@ -502,9 +530,16 @@ lws_hdr_custom_copy(struct lws *wsi, char *dst, int len, const char *name,
  *
  *     Returns NULL if not found or a pointer inside buf to just after the
  *     name= part.
+ *
+ * This assumed the argument can be represented with a NUL-terminated string.
+ * It can't correctly deal with binary values encoded with %XX, eg. %00 will
+ * be understood to terminate the string.
+ *
+ * Use lws_get_urlarg_by_name_safe() instead of this, which returns the length.
  */
 LWS_VISIBLE LWS_EXTERN const char *
-lws_get_urlarg_by_name(struct lws *wsi, const char *name, char *buf, int len);
+lws_get_urlarg_by_name(struct lws *wsi, const char *name, char *buf, int len)
+/* LWS_WARN_DEPRECATED */;
 ///@}
 
 /*! \defgroup HTTP-headers-create HTTP headers: create
@@ -548,7 +583,7 @@ lws_add_http_header_status(struct lws *wsi,
  * lws_add_http_header_by_name() - append named header and value
  *
  * \param wsi: the connection to check
- * \param name: the hdr name, like "my-header"
+ * \param name: the hdr name, like "my-header:"
  * \param value: the value after the = for this header
  * \param length: the length of the value
  * \param p: pointer to current position in buffer pointer
@@ -732,6 +767,53 @@ lws_urldecode(char *string, const char *escaped, int len);
 ///@}
 
 /**
+ * lws_http_date_render_from_unix() - render unixtime as RFC7231 date string
+ *
+ * \param buf:		Destination string buffer
+ * \param len:		avilable length of dest string buffer in bytes
+ * \param t:		pointer to the time_t to render
+ *
+ * Returns 0 if time_t is rendered into the string buffer successfully, else
+ * nonzero.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_http_date_render_from_unix(char *buf, size_t len, const time_t *t);
+
+/**
+ * lws_http_date_parse_unix() - parse a RFC7231 date string into unixtime
+ *
+ * \param b:		Source string buffer
+ * \param len:		avilable length of source string buffer in bytes
+ * \param t:		pointer to the destination time_t to set
+ *
+ * Returns 0 if string buffer parsed as RFC7231 time successfully, and
+ * *t set to the parsed unixtime, else return nonzero.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_http_date_parse_unix(const char *b, size_t len, time_t *t);
+
+/**
+ * lws_http_check_retry_after() - increase a timeout if retry-after present
+ *
+ * \param wsi:		http stream this relates to
+ * \param us_interval_in_out: default us retry interval on entry may be updated
+ *
+ * This function may extend the incoming retry interval if the server has
+ * requested that using retry-after: header.  It won't reduce the incoming
+ * retry interval, only leave it alone or increase it.
+ *
+ * *us_interval_in_out should be set to a default retry interval on entry, if
+ * the wsi has a retry-after time or interval that resolves to an interval
+ * longer than the entry *us_interval_in_out, that will be updated to the longer
+ * interval and return 0.
+ *
+ * If no usable retry-after or the time is now or in the past,
+ * *us_interval_in_out is left alone and the function returns nonzero.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_http_check_retry_after(struct lws *wsi, lws_usec_t *us_interval_in_out);
+
+/**
  * lws_return_http_status() - Return simple http status
  * \param wsi:		Websocket instance (available from user callback)
  * \param code:		Status index, eg, 404
@@ -907,7 +989,7 @@ lws_http_cookie_get(struct lws *wsi, const char *name, char *buf, size_t *max);
  */
 #define LWS_H2_STREAM_SID -1
 LWS_VISIBLE LWS_EXTERN int
-lws_h2_update_peer_txcredit(struct lws *wsi, int sid, int bump);
+lws_h2_update_peer_txcredit(struct lws *wsi, unsigned int sid, int bump);
 
 
 /**

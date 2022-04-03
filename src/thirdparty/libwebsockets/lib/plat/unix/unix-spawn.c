@@ -29,6 +29,11 @@
 #include "private-lib-core.h"
 #include <unistd.h>
 
+#if defined(__OpenBSD__) || defined(__NetBSD__)
+#include <sys/resource.h>
+#include <sys/wait.h>
+#endif
+
 void
 lws_spawn_timeout(struct lws_sorted_usec_list *sul)
 {
@@ -63,38 +68,28 @@ lws_spawn_sul_reap(struct lws_sorted_usec_list *sul)
 }
 
 static struct lws *
-lws_create_basic_wsi(struct lws_context *context, int tsi,
+lws_create_stdwsi(struct lws_context *context, int tsi,
 		     const struct lws_role_ops *ops)
 {
-	size_t s = sizeof(struct lws);
+	struct lws_context_per_thread *pt = &context->pt[tsi];
 	struct lws *new_wsi;
 
 	if (!context->vhost_list)
 		return NULL;
 
-	if ((unsigned int)context->pt[tsi].fds_count ==
-	    context->fd_limit_per_thread - 1) {
+	if ((unsigned int)pt->fds_count == context->fd_limit_per_thread - 1) {
 		lwsl_err("no space for new conn\n");
 		return NULL;
 	}
 
-#if defined(LWS_WITH_EVENT_LIBS)
-	s += context->event_loop_ops->evlib_size_wsi;
-#endif
-
-	new_wsi = lws_zalloc(s, "new wsi");
+	lws_context_lock(context, __func__);
+	new_wsi = __lws_wsi_create_with_role(context, tsi, ops);
+	lws_context_unlock(context);
 	if (new_wsi == NULL) {
 		lwsl_err("Out of memory for new connection\n");
 		return NULL;
 	}
 
-#if defined(LWS_WITH_EVENT_LIBS)
-	new_wsi->evlib_wsi = (uint8_t *)new_wsi + sizeof(*new_wsi);
-#endif
-
-	new_wsi->tsi = tsi;
-	new_wsi->a.context = context;
-	new_wsi->pending_timeout = NO_PENDING_TIMEOUT;
 	new_wsi->rxflow_change_to = LWS_RXFLOW_ALLOW;
 
 	/* initialize the instance struct */
@@ -102,7 +97,6 @@ lws_create_basic_wsi(struct lws_context *context, int tsi,
 	lws_role_transition(new_wsi, 0, LRS_ESTABLISHED, ops);
 
 	new_wsi->hdr_parsing_completed = 0;
-	new_wsi->position_in_fds_table = LWS_NO_FDS_POS;
 
 	/*
 	 * these can only be set once the protocol is known
@@ -112,8 +106,6 @@ lws_create_basic_wsi(struct lws_context *context, int tsi,
 	 */
 
 	new_wsi->user_space = NULL;
-	new_wsi->desc.sockfd = LWS_SOCK_INVALID;
-	context->count_wsi_allocated++;
 
 	return new_wsi;
 }
@@ -159,6 +151,10 @@ lws_spawn_reap(struct lws_spawn_piped *lsp)
 	lsp_cb_t cb = lsp->info.reap_cb;
 	struct lws_spawn_piped temp;
 	struct tms tms;
+#if defined(__OpenBSD__) || defined(__NetBSD__)
+	struct rusage rusa;
+	int status;
+#endif
 	int n;
 
 	if (lsp->child_pid < 1)
@@ -167,7 +163,14 @@ lws_spawn_reap(struct lws_spawn_piped *lsp)
 	/* check if exited, do not reap yet */
 
 	memset(&lsp->si, 0, sizeof(lsp->si));
-	n = waitid(P_PID, lsp->child_pid, &lsp->si, WEXITED | WNOHANG | WNOWAIT);
+#if defined(__OpenBSD__) || defined(__NetBSD__)
+	n = wait4(lsp->child_pid, &status, WNOHANG, &rusa);
+	if (!n)
+		return 0;
+	lsp->si.si_code = WIFEXITED(status);
+#else
+	n = waitid(P_PID, (id_t)lsp->child_pid, &lsp->si, WEXITED | WNOHANG | WNOWAIT);
+#endif
 	if (n < 0) {
 		lwsl_info("%s: child %d still running\n", __func__, lsp->child_pid);
 		return 0;
@@ -218,14 +221,24 @@ lws_spawn_reap(struct lws_spawn_piped *lsp)
 		/*
 		 * Cpu accounting in us
 		 */
-		lsp->accounting[0] = ((uint64_t)tms.tms_cstime * 1000000) / hz;
-		lsp->accounting[1] = ((uint64_t)tms.tms_cutime * 1000000) / hz;
-		lsp->accounting[2] = ((uint64_t)tms.tms_stime * 1000000) / hz;
-		lsp->accounting[3] = ((uint64_t)tms.tms_utime * 1000000) / hz;
+		lsp->accounting[0] = (lws_usec_t)((uint64_t)tms.tms_cstime * 1000000) / hz;
+		lsp->accounting[1] = (lws_usec_t)((uint64_t)tms.tms_cutime * 1000000) / hz;
+		lsp->accounting[2] = (lws_usec_t)((uint64_t)tms.tms_stime * 1000000) / hz;
+		lsp->accounting[3] = (lws_usec_t)((uint64_t)tms.tms_utime * 1000000) / hz;
 	}
 
 	temp = *lsp;
-	n = waitid(P_PID, lsp->child_pid, &temp.si, WEXITED | WNOHANG);
+#if defined(__OpenBSD__) || defined(__NetBSD__)
+	n = wait4(lsp->child_pid, &status, WNOHANG, &rusa);
+	if (!n)
+		return 0;
+	lsp->si.si_code = WIFEXITED(status);
+	if (lsp->si.si_code == CLD_EXITED)
+		temp.si.si_code = CLD_EXITED;
+	temp.si.si_status = WEXITSTATUS(status);
+#else
+	n = waitid(P_PID, (id_t)lsp->child_pid, &temp.si, WEXITED | WNOHANG);
+#endif
 	temp.si.si_status &= 0xff; /* we use b8 + for flags */
 	lwsl_info("%s: waitd says %d, process exit %d\n",
 		    __func__, n, temp.si.si_status);
@@ -362,13 +375,17 @@ lws_spawn_piped(const struct lws_spawn_piped_info *i)
 	/* create wsis for each stdin/out/err fd */
 
 	for (n = 0; n < 3; n++) {
-		lsp->stdwsi[n] = lws_create_basic_wsi(i->vh->context, i->tsi,
+		lsp->stdwsi[n] = lws_create_stdwsi(i->vh->context, i->tsi,
 					  i->ops ? i->ops : &role_ops_raw_file);
 		if (!lsp->stdwsi[n]) {
 			lwsl_err("%s: unable to create lsp stdwsi\n", __func__);
 			goto bail2;
 		}
-		lsp->stdwsi[n]->lsp_channel = n;
+
+                __lws_lc_tag(&i->vh->context->lcg[LWSLCG_WSI], &lsp->stdwsi[n]->lc,
+                             "nspawn-stdwsi-%d", n);
+
+		lsp->stdwsi[n]->lsp_channel = (uint8_t)n;
 		lws_vhost_bind_wsi(i->vh, lsp->stdwsi[n]);
 		lsp->stdwsi[n]->a.protocol = pcol;
 		lsp->stdwsi[n]->a.opaque_user_data = i->opaque;
@@ -426,7 +443,7 @@ lws_spawn_piped(const struct lws_spawn_piped_info *i)
 		   lsp->stdwsi[LWS_STDERR]->desc.sockfd);
 
 	/* we are ready with the redirection pipes... do the (v)fork */
-#if !defined(LWS_HAVE_VFORK) || !defined(LWS_HAVE_EXECVPE)
+#if defined(__sun) || !defined(LWS_HAVE_VFORK) || !defined(LWS_HAVE_EXECVPE)
 	lsp->child_pid = fork();
 #else
 	lsp->child_pid = vfork();
@@ -444,7 +461,7 @@ lws_spawn_piped(const struct lws_spawn_piped_info *i)
 	if (lsp->info.disable_ctrlc)
 		/* stops non-daemonized main processess getting SIGINT
 		 * from TTY */
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
 		setpgid(0, 0);
 #else
 		setpgrp();
@@ -524,20 +541,23 @@ lws_spawn_piped(const struct lws_spawn_piped_info *i)
 		close(lsp->pipe_fds[m][m != 0]);
 	}
 
-#if !defined(LWS_HAVE_VFORK) || !defined(LWS_HAVE_EXECVPE)
-#if defined(__linux__) || defined(__APPLE__)
+#if defined(__sun) || !defined(LWS_HAVE_VFORK) || !defined(LWS_HAVE_EXECVPE)
+#if defined(__linux__) || defined(__APPLE__) || defined(__sun)
 	m = 0;
 	while (i->env_array[m]){
-		char *p = strchr(i->env_array[m], '=');
-		*p++ = '\0';
-		setenv(i->env_array[m], p, 1);
+		const char *p = strchr(i->env_array[m], '=');
+		int naml = lws_ptr_diff(p, i->env_array[m]);
+		char enam[32];
+
+		lws_strnncpy(enam, i->env_array[m], naml, sizeof(enam));
+		setenv(enam, p, 1);
 		m++;
 	}
 #endif
 	execvp(i->exec_array[0], (char * const *)&i->exec_array[0]);
 #else
 	execvpe(i->exec_array[0], (char * const *)&i->exec_array[0],
-		&i->env_array[0]);
+		(char **)&i->env_array[0]);
 #endif
 
 	lwsl_err("%s: child exec of %s failed %d\n", __func__, i->exec_array[0],

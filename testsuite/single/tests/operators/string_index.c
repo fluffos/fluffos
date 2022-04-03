@@ -35,9 +35,14 @@ void do_tests() {
   ASSERT_EQ(oob, catch(charAt("", -999)));
 
   // INDEX_LVALUE
+  tmp[0] = '#';
+  ASSERT_EQ("#bcdefg", tmp);
   tmp[3] = '#';
-  ASSERT_EQ("abc#efg", tmp);
+  ASSERT_EQ("#bc#efg", tmp);
   tmp[3] = 'd';
+  ASSERT_EQ("#bcdefg", tmp);
+  tmp[0] = 'a';
+  ASSERT_EQ("abcdefg", tmp);
   ASSERT_EQ(oob_l, catch(tmp[strlen(tmp)] = 'a'));
   ASSERT_EQ(oob_l, catch(tmp[999] = 'a'));
   ASSERT_EQ(oob_l, catch(tmp[-1] = 'a'));
@@ -81,6 +86,40 @@ void do_tests() {
   ASSERT_EQ("abc", tmp[0..2]);
   ASSERT_EQ("def", tmp[3..5]);
   ASSERT_EQ("bcdefg", tmp[<6..6]);
+
+#ifndef __OLD_RANGE_BEHAVIOR__
+  // Compat: index underflow through negative value is same as 0.
+  ASSERT_EQ("", tmp[-999..-999]);
+  ASSERT_EQ("", tmp[0..-999]);
+
+  // probably meaningless
+  ASSERT_EQ("", tmp[<-999..<-999]);
+  ASSERT_EQ(tmp, tmp[0..<-999]);
+
+  // Compat: index underflow or overflow just mean empty string
+  ASSERT_EQ("", "abc"[4..4]);
+  ASSERT_EQ("", "abc"[<4..<4]);
+  ASSERT_EQ("abc", "abc"[<4..]);
+  ASSERT_EQ("a", "abc"[<4..<3]);
+
+  ASSERT_EQ("", "abc"[<0..<3]);
+  ASSERT_EQ("abc", "abc"[0..<0]);
+#endif
+  // LPC not supported: ASSERT_EQ("", "abc"[..<4]);
+  ASSERT_EQ("a", "abc"[0..0]);
+  ASSERT_EQ("ab", "abc"[0..1]);
+  ASSERT_EQ("abc", "abc"[0..2]);
+
+  ASSERT_EQ("abc", "abc"[0..3]);
+  ASSERT_EQ("abc", "abc"[0..999]);
+  ASSERT_EQ("abc", "abc"[<999..999]);
+
+  ASSERT_EQ("abc", "abc"[0..]);
+  ASSERT_EQ("abc", "abc"[-999..]);
+  ASSERT_EQ("", "abc"[999..]);
+  ASSERT_EQ("abc", "abc"[<999..]);
+  ASSERT_EQ("", "abc"[<0..]);
+  ASSERT_EQ("", "abc"[<-10..]);
 
   // lvalue out of bound
   ASSERT(catch(tmp[0..strlen(tmp)] = ""));

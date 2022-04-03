@@ -9,14 +9,15 @@
 
 #include <event2/buffer.h>       // for evbuffer_freeze, etc
 #include <event2/bufferevent.h>  // for bufferevent_enable, etc
-#include <event2/event.h>        // for EV_TIMEOUT, etc
-#include <event2/listener.h>     // for evconnlistener_free, etc
-#include <event2/util.h>         // for evutil_closesocket, etc
-#include <stdarg.h>              // for va_end, va_list, va_copy, etc
-#include <stdio.h>               // for snprintf, vsnprintf, fwrite, etc
-#include <string.h>              // for NULL, memcpy, strlen, etc
-#include <unistd.h>              // for gethostname
-#include <memory>                // for unique_ptr
+#include <event2/bufferevent_ssl.h>
+#include <event2/event.h>     // for EV_TIMEOUT, etc
+#include <event2/listener.h>  // for evconnlistener_free, etc
+#include <event2/util.h>      // for evutil_closesocket, etc
+#include <stdarg.h>           // for va_end, va_list, va_copy, etc
+#include <stdio.h>            // for snprintf, vsnprintf, fwrite, etc
+#include <string.h>           // for NULL, memcpy, strlen, etc
+#include <unistd.h>           // for gethostname
+#include <memory>             // for unique_ptr
 // Network stuff
 #ifndef _WIN32
 #include <netdb.h>        // for addrinfo, freeaddrinfo, etc
@@ -26,16 +27,18 @@
 #else
 #include <ws2tcpip.h>
 #endif
-// ICU
-#include <unicode/ucnv.h>
 
 #include "backend.h"
 #include "interactive.h"
 #include "thirdparty/libtelnet/libtelnet.h"
 #include "net/telnet.h"
 #include "net/websocket.h"
+#include "net/tls.h"
 #include "user.h"
 #include "vm/vm.h"
+
+#include "ghc/filesystem.hpp"
+namespace fs = ghc::filesystem;
 
 #include "packages/core/add_action.h"  // FIXME?
 #include "packages/core/dns.h"         // FIXME?
@@ -83,7 +86,7 @@ void on_user_command(evutil_socket_t fd, short what, void *arg) {
   auto user = reinterpret_cast<interactive_t *>(arg);
 
   if (user == nullptr) {
-    fatal("on_user_command: user == NULL, Driver BUG.");
+    DEBUG_FATAL("on_user_command: user == NULL, Driver BUG.");
     return;
   }
 
@@ -117,7 +120,7 @@ void on_user_read(bufferevent *bev, void *arg) {
   auto user = reinterpret_cast<interactive_t *>(arg);
 
   if (user == nullptr) {
-    fatal("on_user_read: user == NULL, Driver BUG.");
+    DEBUG_FATAL("on_user_read: user == NULL, Driver BUG.");
     return;
   }
 
@@ -131,7 +134,7 @@ void on_user_read(bufferevent *bev, void *arg) {
 void on_user_write(bufferevent *bev, void *arg) {
   auto user = reinterpret_cast<interactive_t *>(arg);
   if (user == nullptr) {
-    fatal("on_user_write: user == NULL, Driver BUG.");
+    DEBUG_FATAL("on_user_write: user == NULL, Driver BUG.");
     return;
   }
   // nothing to do.
@@ -141,7 +144,7 @@ void on_user_events(bufferevent *bev, short events, void *arg) {
   auto user = reinterpret_cast<interactive_t *>(arg);
 
   if (user == nullptr) {
-    fatal("on_user_events: user == NULL, Driver BUG.");
+    DEBUG_FATAL("on_user_events: user == NULL, Driver BUG.");
     return;
   }
 
@@ -154,13 +157,14 @@ void on_user_events(bufferevent *bev, short events, void *arg) {
 }
 
 void new_user_event_listener(event_base *base, interactive_t *user) {
-  auto bev =
-      bufferevent_socket_new(base, user->fd, BEV_OPT_CLOSE_ON_FREE | BEV_OPT_DEFER_CALLBACKS);
+  auto options = BEV_OPT_CLOSE_ON_FREE | BEV_OPT_DEFER_CALLBACKS;
+  auto *bev = user->ssl ? bufferevent_openssl_socket_new(base, user->fd, user->ssl,
+                                                         BUFFEREVENT_SSL_ACCEPTING, options)
+                        : bufferevent_socket_new(base, user->fd, options);
+
   bufferevent_setcb(bev, on_user_read, on_user_write, on_user_events, user);
   bufferevent_enable(bev, EV_READ | EV_WRITE);
-
   bufferevent_set_timeouts(bev, nullptr, nullptr);
-
   user->ev_buffer = bev;
 }
 
@@ -170,7 +174,7 @@ void new_user_event_listener(event_base *base, interactive_t *user) {
  * If space is available, an interactive data structure is initialized and
  * the user is connected.
  */
-void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct sockaddr *addr,
+void new_conn_handler(evconnlistener *listener, evutil_socket_t fd, struct sockaddr *addr,
                       int addrlen, void *arg) {
   debug(connections, "New connection from %s.\n", sockaddr_to_string(addr, addrlen));
 
@@ -187,7 +191,8 @@ void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
                    (const char *)&one,
 #endif
                    sizeof(one)) == -1) {
-      debug(connections, "new_user_handler: user fd %td, set_socket_tcp_nodelay error: %s.\n", fd,
+      debug(connections,
+            "new_conn_handler: user fd %" FMT_SOCKET_FD ", set_socket_tcp_nodelay error: %s.\n", fd,
             evutil_socket_error_to_string(evutil_socket_geterror(fd)));
     }
   }
@@ -216,8 +221,8 @@ void new_user_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
         },
         (void *)user, nullptr);
   }
-  debug(connections, ("new_user_handler: end\n"));
-} /* new_user_handler() */
+  debug(connections, ("new_conn_handler: end\n"));
+} /* new_conn_handler() */
 
 }  // namespace
 
@@ -236,9 +241,11 @@ interactive_t *new_user(port_def_t *port, evutil_socket_t fd, sockaddr *addr,
   user->fd = fd;
   user->local_port = port->port;
   user->external_port = (port - external_port);  // FIXME: pointer arith
-
   memcpy(&user->addr, addr, addrlen);
   user->addrlen = addrlen;
+  if (port->ssl) {
+    user->ssl = tls_get_client_ctx(port->ssl);
+  }
 
   // Command handler
   auto base = evconnlistener_get_base(port->ev_conn);
@@ -309,7 +316,7 @@ void on_user_logon(interactive_t *user) {
   set_eval(max_eval_cost);
   ret = safe_apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
   if (ret == nullptr) {
-    debug_message("new_user_handler: logon() on object %s has failed, the user is disconnected.\n",
+    debug_message("new_conn_handler: logon() on object %s has failed, the user is disconnected.\n",
                   ob->obname);
     remove_interactive(ob, false);
   } else if (ob->flags & O_DESTRUCTED) {
@@ -323,14 +330,14 @@ void on_user_logon(interactive_t *user) {
  * Initialize new user connection socket.
  */
 bool init_user_conn() {
-  for (auto &i : external_port) {
+  for (auto &port : external_port) {
 #ifdef F_NETWORK_STATS
-    i.in_packets = 0;
-    i.in_volume = 0;
-    i.out_packets = 0;
-    i.out_volume = 0;
+    port.in_packets = 0;
+    port.in_volume = 0;
+    port.out_packets = 0;
+    port.out_volume = 0;
 #endif
-    if (!i.port) continue;
+    if (!port.port) continue;
 #ifdef IPV6
     auto fd = socket(AF_INET6, SOCK_STREAM, 0);
 #else
@@ -384,6 +391,30 @@ bool init_user_conn() {
     }
 #endif
 #endif
+    // Enable TLS
+    {
+      if (!port.tls_cert.empty() && !port.tls_key.empty()) {
+        debug_message("Processing TLS config for port %d...\n", port.port);
+        fs::path mudlib_path(CONFIG_STR(__MUD_LIB_DIR__));
+        auto real_cert_path = mudlib_path / port.tls_cert;
+        auto real_key_path = mudlib_path / port.tls_key;
+        try {
+          if (!fs::exists(real_cert_path)) {
+            debug_message("cert file missing: %s.\n", real_cert_path.c_str());
+            return false;
+          }
+          if (!fs::exists(real_key_path)) {
+            debug_message("key file missing: %s.\n", real_key_path.c_str());
+            return false;
+          }
+          port.tls_cert = fs::absolute(real_cert_path).string();
+          port.tls_key = fs::absolute(real_key_path).string();
+        } catch (fs::filesystem_error &e) {
+          debug_message("Error: %s (%d).\n", e.what(), e.code().value());
+          return false;
+        }
+      }
+    }
     {
       /*
        * fill in socket address information.
@@ -391,7 +422,7 @@ bool init_user_conn() {
       struct addrinfo *res;
 
       char service[NI_MAXSERV];
-      snprintf(service, sizeof(service), "%u", i.port);
+      snprintf(service, sizeof(service), "%u", port.port);
 
       // Must be initialized to all zero.
       struct addrinfo hints = {0};
@@ -424,22 +455,36 @@ bool init_user_conn() {
         evutil_freeaddrinfo(res);
         return false;
       }
-      debug_message("Accepting %s connections on %s.\n", port_kind_name(i.kind),
+
+      // Websocket TLS is handled in init_websocket_context
+      if (!port.tls_cert.empty() && port.kind != PORT_WEBSOCKET) {
+        SSL_CTX *ctx = tls_server_init(port.tls_cert, port.tls_key);
+        if (!ctx) {
+          debug_message("Unable to create TLS context.\n");
+          evutil_closesocket(fd);
+          return false;
+        }
+        port.ssl = ctx;
+      }
+
+      debug_message("Accepting %s%s connections on %s.\n", port_kind_name(port.kind),
+                    !port.tls_cert.empty() ? "(TLS)" : "",
                     sockaddr_to_string(res->ai_addr, res->ai_addrlen));
       evutil_freeaddrinfo(res);
     }
+
     // Listen on connection event
     auto conn = evconnlistener_new(
-        g_event_base, new_user_handler, &i,
+        g_event_base, new_conn_handler, &port,
         LEV_OPT_REUSEABLE | LEV_OPT_CLOSE_ON_FREE | LEV_OPT_CLOSE_ON_EXEC, 1024, fd);
     if (conn == nullptr) {
       debug_message("listening failed: %s !", evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
       return false;
     }
-    i.ev_conn = conn;
-    i.fd = fd;
-    if (i.kind == PORT_WEBSOCKET) {
-      i.lws_context = init_websocket_context(g_event_base, &i);
+    port.ev_conn = conn;
+    port.fd = fd;
+    if (port.kind == PORT_WEBSOCKET) {
+      port.lws_context = init_websocket_context(g_event_base, &port);
     }
   }
   return true;
@@ -453,6 +498,7 @@ void shutdown_external_ports() {
     if (!port.port) {
       continue;
     }
+    if (port.ssl) tls_server_close(port.ssl);
     // will also close the FD.
     if (port.ev_conn) evconnlistener_free(port.ev_conn);
     if (port.lws_context) close_websocket_context(port.lws_context);
@@ -521,44 +567,17 @@ void add_message(object_t *who, const char *data, int len) {
 
   inet_packets++;
 
-  auto ip = who->interactive;
+  auto *ip = who->interactive;
   switch (ip->connection_type) {
     case PORT_ASCII:
     case PORT_TELNET: {
-      // Handle charset transcoding
-      auto transdata = const_cast<char *>(data);
-      auto translen = len;
-
-      if (ip->trans) {
-        UErrorCode error_code = U_ZERO_ERROR;
-
-        auto required = ucnv_fromAlgorithmic(ip->trans, UConverterType::UCNV_UTF8, nullptr, 0, data,
-                                             len, &error_code);
-        if (error_code == U_BUFFER_OVERFLOW_ERROR) {
-          translen = required;
-          transdata = (char *)DMALLOC(translen, TAG_TEMPORARY, "add_message (translate)");
-
-          error_code = U_ZERO_ERROR;
-          auto written = ucnv_fromAlgorithmic(ip->trans, UConverterType::UCNV_UTF8, transdata,
-                                              translen, data, len, &error_code);
-          DEBUG_CHECK(written != translen, "Bug: translation buffer size calculation error");
-          if (U_FAILURE(error_code)) {
-            debug_message("add_message: Translation failed!");
-            transdata = const_cast<char *>(data);
-            translen = len;
-          };
-        }
-      }
-
-      inet_volume += translen;
+      auto transdata = u8_convert_encoding(ip->trans, data, len);
+      auto result = transdata.empty() ? std::string_view(data, len) : transdata;
+      inet_volume += result.size();
       if (ip->connection_type == PORT_TELNET) {
-        telnet_send_text(ip->telnet, transdata, translen);
+        telnet_send_text(ip->telnet, result.data(), result.size());
       } else {
-        bufferevent_write(ip->ev_buffer, data, len);
-      }
-
-      if (transdata != data) {
-        FREE(transdata);
+        bufferevent_write(ip->ev_buffer, result.data(), result.size());
       }
     } break;
     case PORT_WEBSOCKET: {
@@ -628,27 +647,44 @@ int flush_message(interactive_t *ip) {
     return 0;
   }
 
-  // Flush things normally
+  // Currently only support Libevent based connections, for websocket based connections, they use
+  // ip->lws.
   if (ip->ev_buffer) {
-    if (bufferevent_flush(ip->ev_buffer, EV_WRITE, BEV_FLUSH) == -1) {
-      return 0;
-    }
-    // For socket bufferevent, bufferevent_flush is actually a no-op, thus we have to
-    // implement our own.
-    auto fd = bufferevent_getfd(ip->ev_buffer);
-    if (fd == -1) {
-      return 0;
-    }
+    // Try to flush things normally
+    if (bufferevent_flush(ip->ev_buffer, EV_WRITE, BEV_FLUSH) == -1) return 0;
 
-    auto output = bufferevent_get_output(ip->ev_buffer);
-    auto total = evbuffer_get_length(output);
-    if (total > 0) {
-      evbuffer_unfreeze(output, 1);
-      auto wrote = evbuffer_write(output, fd);
-      evbuffer_freeze(output, 1);
-      return wrote != -1;
+    // For socket based bufferevent, bufferevent_flush is actually a no-op, thus we have to
+    // implement our own.
+    if (ip->ssl) {
+      auto *ssl = bufferevent_openssl_get_ssl(ip->ev_buffer);
+      auto *output = bufferevent_get_output(ip->ev_buffer);
+      auto len = evbuffer_get_length(output);
+      if (len > 0) {
+        evbuffer_unfreeze(output, 1);
+        auto *data = evbuffer_pullup(output, len);
+        auto wrote = SSL_write(ssl, data, len);
+        if (wrote > 0) {
+          evbuffer_drain(output, wrote);
+        }
+        evbuffer_freeze(output, 1);
+        return wrote > 0;
+      }
+    } else {
+      auto fd = bufferevent_getfd(ip->ev_buffer);
+      if (fd == -1) {
+        return 0;
+      }
+      auto output = bufferevent_get_output(ip->ev_buffer);
+      auto total = evbuffer_get_length(output);
+      if (total > 0) {
+        evbuffer_unfreeze(output, 1);
+        auto wrote = evbuffer_write(output, fd);
+        evbuffer_freeze(output, 1);
+        return wrote != -1;
+      }
     }
   }
+
   return 0;
 }
 
@@ -674,20 +710,20 @@ void get_user_data(interactive_t *ip) {
       // Impossible, we don't handle it here.
       break;
     case PORT_TELNET:
-      text_space = MAX_TEXT - ip->text_end;
+      text_space = sizeof(ip->text) - ip->text_end;
 
       /* check if we need more space */
-      if (text_space < MAX_TEXT / 16) {
+      if (text_space < sizeof(ip->text) / 16) {
         if (ip->text_start > 0) {
           memmove(ip->text, ip->text + ip->text_start, ip->text_end - ip->text_start);
           text_space += ip->text_start;
           ip->text_end -= ip->text_start;
           ip->text_start = 0;
         }
-        if (text_space < MAX_TEXT / 16) {
+        if (text_space < sizeof(ip->text) / 16) {
           ip->iflags |= SKIP_COMMAND;
           ip->text_start = ip->text_end = 0;
-          text_space = MAX_TEXT;
+          text_space = sizeof(ip->text);
         }
       }
       break;
@@ -862,7 +898,7 @@ void on_user_websocket_received(interactive_t *ip, const char *data, size_t len)
     return;
   }
 
-  auto text_space = MAX_TEXT - ip->text_end;
+  auto text_space = sizeof(ip->text) - ip->text_end;
 
   /* check if we need more space */
   if (text_space < len) {
@@ -875,7 +911,7 @@ void on_user_websocket_received(interactive_t *ip, const char *data, size_t len)
     if (text_space < len) {
       ip->iflags |= SKIP_COMMAND;
       ip->text_start = ip->text_end = 0;
-      text_space = MAX_TEXT;
+      text_space = sizeof(ip->text);
     }
   }
 
@@ -939,7 +975,6 @@ int cmd_in_buf(interactive_t *ip) {
     return 1;
   }
 
-  /* search for a newline.  if found, we have a command */
   for (p = ip->text + ip->text_start; p < ip->text + ip->text_end; p++) {
     if (*p == '\r' || *p == '\n') {
       return 1;
@@ -975,7 +1010,8 @@ static char *first_cmd_in_buf(interactive_t *ip) {
   }
 
   /* search for the newline */
-  while (ip->text[ip->text_start] != '\n' && ip->text[ip->text_start] != '\r') {
+  while (ip->text_start < ip->text_end && ip->text[ip->text_start] != '\n' &&
+         ip->text[ip->text_start] != '\r') {
     ip->text_start++;
   }
 
@@ -987,6 +1023,7 @@ static char *first_cmd_in_buf(interactive_t *ip) {
   }
 
   ip->text[ip->text_start++] = 0;
+
   if (!cmd_in_buf(ip)) {
     ip->iflags &= ~CMD_IN_BUF;
   }
@@ -1020,7 +1057,7 @@ static char *get_user_command(interactive_t *ip) {
   debug(connections, "get_user_command: user_command = (%s)\n", user_command);
   save_command_giver(ip->ob);
 
-  if ((ip->iflags & NOECHO) && !(ip->iflags & SINGLE_CHAR)) {
+  if ((ip->iflags & NOECHO)) {
     /* must not enable echo before the user input is received */
     set_localecho(command_giver->interactive, true);
     ip->iflags &= ~NOECHO;
@@ -1073,10 +1110,9 @@ static void process_input(interactive_t *ip, char *user_command) {
 
 #ifndef NO_ADD_ACTION
   if (ret->type == T_STRING) {
-    static char buf[MAX_TEXT];
-
-    strncpy(buf, ret->u.string, MAX_TEXT - 1);
-    parse_command(buf, command_giver);
+    auto command = string_copy(ret->u.string, "current_command: " __CURRENT_FILE_LINE__);
+    DEFER { FREE_MSTR(command); };
+    parse_command(command, command_giver);
   } else {
     if (ret->type != T_NUMBER || !ret->u.number) {
       parse_command(user_command, command_giver);
@@ -1103,7 +1139,7 @@ int process_user_command(interactive_t *ip) {
   }
 
   if (ip != command_giver->interactive) {
-    fatal("BUG: process_user_command.");
+    DEBUG_FATAL("BUG: process_user_command.");
   }
 
   current_interactive = command_giver; /* this is yuck phooey, sigh */
@@ -1158,7 +1194,6 @@ int process_user_command(interactive_t *ip) {
     goto exit;
   }
 #endif
-
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
   if (call_function_interactive(ip, user_command)) {
     goto exit;
@@ -1172,7 +1207,12 @@ exit:
    * Print a prompt if user is still here.
    */
   if (IP_VALID(ip, command_giver)) {
-    print_prompt(ip);
+    if (ip->input_to == nullptr) {
+      print_prompt(ip);
+    }
+    if (ip->telnet && (ip->iflags & USING_TELNET) && !(ip->iflags & SUPPRESS_GA)) {
+      telnet_send_ga(ip->telnet);
+    }
     // FIXME: this doesn't belong here, should be moved to event.cc
     maybe_schedule_user_command(ip);
   }
@@ -1236,9 +1276,14 @@ void remove_interactive(object_t *ob, int dested) {
     ip->snooped_by = nullptr;
   }
 #endif
-
-  // Cleanup events
+  // Cleanup events, must happen after ssl.
   if (ip->ev_buffer != nullptr) {
+    // see http://www.wangafu.net/~nickm/libevent-book/Ref6a_advanced_bufferevents.html
+    if (ip->ssl) {
+      SSL_set_shutdown(ip->ssl, SSL_RECEIVED_SHUTDOWN);
+      SSL_shutdown(ip->ssl);
+      ip->ssl = nullptr;
+    }
     bufferevent_free(ip->ev_buffer);
     ip->ev_buffer = nullptr;
   }
@@ -1292,23 +1337,36 @@ void remove_interactive(object_t *ob, int dested) {
 static int call_function_interactive(interactive_t *i, char *str) {
   object_t *ob;
   funptr_t *funp;
-  char *function;
+  const char *function;
   svalue_t *args;
   sentence_t *sent;
   int num_arg;
   int was_single = 0;
   int was_noecho = 0;
+  int ret = 0;
 
   i->iflags &= ~NOESC;
   if (!(sent = i->input_to)) {
     return (0);
   }
 
+  ob = sent->ob;
   /*
    * Special feature: input_to() has been called to setup a call to a
    * function.
    */
-  if (sent->ob->flags & O_DESTRUCTED) {
+  if (i->iflags & SINGLE_CHAR) {
+    /*
+     * clear single character mode
+     */
+    i->iflags &= ~SINGLE_CHAR;
+    was_single = 1;
+  }
+  if (i->iflags & NOECHO) {
+    was_noecho = 1;
+    i->iflags &= ~NOECHO;
+  }
+  if (ob->flags & O_DESTRUCTED) {
     /* Sorry, the object has selfdestructed ! */
     free_object(&sent->ob, "call_function_interactive");
     free_sentence(sent);
@@ -1319,103 +1377,84 @@ static int call_function_interactive(interactive_t *i, char *str) {
     i->carryover = nullptr;
     i->num_carry = 0;
     i->input_to = nullptr;
-    if (i->iflags & SINGLE_CHAR) {
-      /*
-       * clear single character mode
-       */
-      i->iflags &= ~SINGLE_CHAR;
-      set_linemode(i, true);
-      if (i->iflags & NOECHO) {
-        i->iflags &= ~NOECHO;
-        set_localecho(i, true);
-      }
-    }
-
-    return (0);
-  }
-  /*
-   * We must all references to input_to fields before the call to apply(),
-   * because someone might want to set up a new input_to().
-   */
-
-  /* we put the function on the stack in case of an error */
-  STACK_INC;
-  if (sent->flags & V_FUNCTION) {
-    function = nullptr;
-    sp->type = T_FUNCTION;
-    sp->u.fp = funp = sent->function.f;
-    funp->hdr.ref++;
+    ret = 0;
   } else {
-    sp->type = T_STRING;
-    sp->subtype = STRING_SHARED;
-    sp->u.string = function = sent->function.s;
-    ref_string(function);
-  }
-  ob = sent->ob;
-
-  free_object(&sent->ob, "call_function_interactive");
-  free_sentence(sent);
-
-  /*
-   * If we have args, we have to copy them, so the svalues on the
-   * interactive struct can be FREEd
-   */
-  num_arg = i->num_carry;
-  if (num_arg) {
-    args = i->carryover;
-    i->num_carry = 0;
-    i->carryover = nullptr;
-  } else {
-    args = nullptr;
-  }
-
-  i->input_to = nullptr;
-  if (i->iflags & SINGLE_CHAR) {
     /*
-     * clear single character mode
+     * We must all references to input_to fields before the call to apply(),
+     * because someone might want to set up a new input_to().
      */
-    i->iflags &= ~SINGLE_CHAR;
-    was_single = 1;
-    if (i->iflags & NOECHO) {
-      was_noecho = 1;
-      i->iflags &= ~NOECHO;
+
+    /* we put the function on the stack in case of an error */
+    STACK_INC;
+    if (sent->flags & V_FUNCTION) {
+      function = nullptr;
+      sp->type = T_FUNCTION;
+      sp->u.fp = funp = sent->function.f;
+      funp->hdr.ref++;
+    } else {
+      sp->type = T_STRING;
+      sp->subtype = STRING_SHARED;
+      sp->u.string = function = sent->function.s;
+      ref_string(function);
     }
+
+    free_object(&sent->ob, "call_function_interactive");
+    free_sentence(sent);
+
+    /*
+     * If we have args, we have to copy them, so the svalues on the
+     * interactive struct can be FREEd
+     */
+    num_arg = i->num_carry;
+    if (num_arg) {
+      args = i->carryover;
+      i->num_carry = 0;
+      i->carryover = nullptr;
+    } else {
+      args = nullptr;
+    }
+
+    i->input_to = nullptr;
+
+    copy_and_push_string(str);
+    /*
+     * If we have args, we have to push them onto the stack in the order they
+     * were in when we got them.  They will be popped off by the called
+     * function.
+     */
+    if (args) {
+      transfer_push_some_svalues(args, num_arg);
+      FREE(args);
+    }
+    /* current_object no longer set */
+    if (function) {
+      if (function[0] == APPLY___INIT_SPECIAL_CHAR) {
+        error("Illegal function name.\n");
+      }
+      (void)safe_apply(function, ob, num_arg + 1, ORIGIN_INTERNAL);
+    } else {
+      safe_call_function_pointer(funp, num_arg + 1);
+    }
+    // NOTE: we can't use "i" here anymore, it is possible that it
+    // has been freed.
+    pop_stack(); /* remove `function' from stack */
+
+    ret = 1;
   }
 
-  // FIXME: this logic can be combined with above.
-  if (was_single && !(i->iflags & SINGLE_CHAR)) {
-    i->text_start = i->text_end = 0;
-    i->text[0] = '\0';
-    i->iflags &= ~CMD_IN_BUF;
-    set_linemode(i, true);
-  }
-  if (was_noecho && !(i->iflags & NOECHO)) {
-    set_localecho(i, true);
-  }
-
-  copy_and_push_string(str);
-  /*
-   * If we have args, we have to push them onto the stack in the order they
-   * were in when we got them.  They will be popped off by the called
-   * function.
-   */
-  if (args) {
-    transfer_push_some_svalues(args, num_arg);
-    FREE(args);
-  }
-  /* current_object no longer set */
-  if (function) {
-    if (function[0] == APPLY___INIT_SPECIAL_CHAR) {
-      error("Illegal function name.\n");
+  if (!(ob->flags & O_DESTRUCTED) && ob->interactive) {
+    i = ob->interactive;
+    if (was_single && !(i->iflags & SINGLE_CHAR)) {
+      i->text_start = i->text_end = 0;
+      i->text[0] = '\0';
+      i->iflags &= ~CMD_IN_BUF;
+      set_linemode(i, true);
     }
-    (void)safe_apply(function, ob, num_arg + 1, ORIGIN_INTERNAL);
-  } else {
-    safe_call_function_pointer(funp, num_arg + 1);
+    if (was_noecho && !(i->iflags & NOECHO)) {
+      set_localecho(i, true);
+    }
   }
-  // NOTE: we can't use "i" here anymore, it is possible that it
-  // has been freed.
-  pop_stack(); /* remove `function' from stack */
-  return (1);
+  return ret;
 } /* call_function_interactive() */
 
 int set_call(object_t *ob, sentence_t *sent, int flags) {
@@ -1434,10 +1473,6 @@ int set_call(object_t *ob, sentence_t *sent, int flags) {
   if (flags & I_SINGLE_CHAR) {
     set_charmode(ip);
   }
-  // Make sure client like mudlet flush previous outputs.
-  if (ip->telnet && (ip->iflags & USING_TELNET) && !(ip->iflags & SUPPRESS_GA)) {
-    telnet_iac(ip->telnet, TELNET_GA);
-  }
   return (1);
 } /* set_call() */
 #endif
@@ -1452,37 +1487,21 @@ void set_prompt(const char *str) {
  * Print the prompt, but only if input_to not is disabled.
  */
 static void print_prompt(interactive_t *ip) {
-  object_t *ob = ip->ob;
-
-#if defined(F_INPUT_TO) || defined(F_GET_CHAR)
-  if (ip->input_to == nullptr) {
-#endif
-    /* give user object a chance to write its own prompt */
-    if (!(ip->iflags & HAS_WRITE_PROMPT)) {
-      tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
-    }
-#ifdef OLD_ED
-    else if (ip->ed_buffer) {
-      tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
-    }
-#endif
-    else if (!apply(APPLY_WRITE_PROMPT, ip->ob, 0, ORIGIN_DRIVER)) {
-      if (!IP_VALID(ip, ob)) {
-        return;
-      }
-      ip->iflags &= ~HAS_WRITE_PROMPT;
-      tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
-    }
-#if defined(F_INPUT_TO) || defined(F_GET_CHAR)
-  }
-#endif
-  if (!IP_VALID(ip, ob)) {
+  if (!ip || !ip->ob || !IP_VALID(ip, ip->ob)) {
     return;
   }
-  // Stavros: A lot of clients use this TELNET_GA to differentiate
-  // prompts from other text
-  if (ip->telnet && (ip->iflags & USING_TELNET) && !(ip->iflags & SUPPRESS_GA)) {
-    telnet_iac(ip->telnet, TELNET_GA);
+  /* give user object a chance to write its own prompt */
+  if (!(ip->iflags & HAS_WRITE_PROMPT)) {
+    tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
+  }
+#ifdef OLD_ED
+  else if (ip->ed_buffer) {
+    tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
+  }
+#endif
+  else if (!safe_apply(APPLY_WRITE_PROMPT, ip->ob, 0, ORIGIN_DRIVER)) {
+    ip->iflags &= ~HAS_WRITE_PROMPT;
+    tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
   }
 } /* print_prompt() */
 
@@ -1603,8 +1622,7 @@ object_t *query_snooping(object_t *ob) {
       return user->ob;
     }
   }
-  // TODO: change this to dfatal
-  // fatal("couldn't find snoop target.\n");
+  DEBUG_FATAL("couldn't find snoop target.\n");
   return nullptr;
 } /* query_snooping() */
 #endif

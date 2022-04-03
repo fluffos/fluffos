@@ -77,7 +77,7 @@ void query_name_by_addr(object_t *ob) {
 
 struct addr_number_query {
   LPC_INT key;
-  char *name;
+  const char *name;
   svalue_t call_back;
   object_t *ob_to_call;
   evdns_getaddrinfo_request *req;
@@ -149,8 +149,7 @@ void on_getaddr_result(int err, evutil_addrinfo *res, void *arg) {
   query->res = res;
 
   // Schedule an immediate event to call LPC callback.
-  add_gametick_event(std::chrono::milliseconds(0),
-                     [=] { return on_query_addr_by_name_finish(query); });
+  add_gametick_event(0, [=] { return on_query_addr_by_name_finish(query); });
 }
 
 /*
@@ -186,7 +185,7 @@ int query_addr_by_name(const char *name, svalue_t *call_back) {
 typedef struct {
   struct sockaddr_storage addr;
   socklen_t addrlen;
-  char *name;
+  const char *name;
 } ipentry_t;
 
 static ipentry_t iptable[IPSIZE];

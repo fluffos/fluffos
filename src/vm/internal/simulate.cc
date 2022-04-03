@@ -9,6 +9,7 @@
 #include <unistd.h>    // for open()
 #ifdef HAVE_SIGNAL_H
 #include <signal.h>  // for signal*
+#include <net/telnet.h>
 #endif
 #ifdef _WIN32
 #include <winsock.h>  // for WSACleanup()
@@ -206,14 +207,10 @@ static int give_uid_to_object(object_t *ob) {
    * again, because creator_name will be lost !
    */
   if (strcmp(current_object->uid->name, creator_name) == 0) {
-/*
- * The loaded object has the same uid as the loader.
- */
-#ifndef COMPAT_32
+    /*
+     * The loaded object has the same uid as the loader.
+     */
     ob->uid = current_object->uid;
-#else
-    ob->uid = current_object->euid;
-#endif
     ob->euid = current_object->euid;
     return 1;
   }
@@ -415,7 +412,8 @@ int filename_to_obname(const char *src, char *dest, int size) {
  *
  */
 object_t *load_object(const char *lname, int callcreate) {
-  ScopedTracer _tracer("LPC Load Object", EventCategory::VM_LOAD_OBJECT, {lname});
+  ScopedTracer _tracer("LPC Load Object", EventCategory::VM_LOAD_OBJECT,
+                       [=] { return json{lname}; });
 
   auto inherit_chain_size = CONFIG_INT(__INHERIT_CHAIN_SIZE__);
 
@@ -424,7 +422,7 @@ object_t *load_object(const char *lname, int callcreate) {
   object_t *ob;
   svalue_t *mret;
   struct stat c_st;
-  char real_name[400], name[400], actualname[400], obname[400];
+  char name[400], actualname[400], real_name[sizeof(name) + 2], obname[sizeof(real_name)];
 
   const char *pname = check_valid_path(lname, master_ob, "load_object", 0);
   if (!pname) {
@@ -1055,6 +1053,16 @@ void destruct_object(object_t *ob) {
     num_hidden--;
   }
 #endif
+
+#ifdef DEBUG
+  tot_dangling_object++;
+  ob->next_all = obj_list_dangling;
+  if (obj_list_dangling) {
+    obj_list_dangling->prev_all = ob;
+  }
+  obj_list_dangling = ob;
+  ob->prev_all = 0;
+#endif
 }
 
 /*
@@ -1105,16 +1113,6 @@ void destruct2(object_t *ob) {
     s = next;
   }
   ob->sent = nullptr;
-#endif
-
-#ifdef DEBUG
-  tot_dangling_object++;
-  ob->next_all = obj_list_dangling;
-  if (obj_list_dangling) {
-    obj_list_dangling->prev_all = ob;
-  }
-  obj_list_dangling = ob;
-  ob->prev_all = 0;
 #endif
 
   free_object(&ob, "destruct_object");
@@ -1329,6 +1327,7 @@ int input_to(svalue_t *fun, int flag, int num_arg, svalue_t *args) {
     }
     s->ob = current_object;
     add_ref(current_object, "input_to");
+
     return 1;
   }
   free_sentence(s);
@@ -1784,7 +1783,9 @@ static void mudlib_error_handler(char *err, int katch) {
   if ((mret == (svalue_t *)-1) || !mret) {
     debug_message("No error handler for error: ");
     debug_message_with_location(err);
-    dump_trace(0);
+    if (num_mudlib_error == 1) {
+      dump_trace(CONFIG_INT(__RC_TRACE_CODE__));
+    }
   } else if (mret->type == T_STRING) {
     debug_message("%s", mret->u.string);
   }
@@ -1792,10 +1793,12 @@ static void mudlib_error_handler(char *err, int katch) {
 
 namespace {
 void _error_handler(char *err) {
-  const char *object_name;
+  const char *object_name = nullptr;
 
   debug_message_with_location(err + 1);
-  object_name = dump_trace(CONFIG_INT(__RC_TRACE_CODE__));
+  if (num_mudlib_error == 1) {
+    object_name = dump_trace(CONFIG_INT(__RC_TRACE_CODE__));
+  }
   if (object_name) {
     object_t *ob;
 
@@ -1846,18 +1849,20 @@ void _error_handler(char *err) {
     /* This is added so that catches generate messages in the log file. */
     if (!CONFIG_INT(__RC_MUDLIB_ERROR_HANDLER__)) {
       debug_message_with_location(err);
-      (void)dump_trace(0);
+      dump_trace(CONFIG_INT(__RC_TRACE_CODE__));
     } else {
       if (num_mudlib_error) {
         debug_message("Error in error handler: ");
         num_error++;
         debug_message_with_location(err);
-        (void)dump_trace(0);
+        if (num_mudlib_error == 1) {
+          dump_trace(CONFIG_INT(__RC_TRACE_CODE__));
+        }
         num_error--;
         num_mudlib_error = 0;
       } else {
         if (max_eval_error) {
-          set_eval(INT64_MAX);
+          set_eval(max_eval_cost);
           outoftime = 0;
         }
 
@@ -1881,16 +1886,6 @@ void _error_handler(char *err) {
     throw("error handler");
   }
 
-  if (num_error > 0) {
-    /* This can happen via errors in the object_name() apply. */
-    debug_message("Error '%s' while trying to print error trace -- trace suppressed.\n", err);
-    too_deep_error = max_eval_error = 0;
-    if (current_error_context) {
-      throw("error handler error");
-    }
-    fatal("Driver BUG: no error context.");
-  }
-
   num_error++;
 #ifdef PACKAGE_MUDLIB_STATS
   if (current_object) {
@@ -1911,12 +1906,7 @@ void _error_handler(char *err) {
   }
 
   // Error occured while running mudlib error handler.
-  if (num_mudlib_error) {
-    debug_message("Error in mudlib error handler: ");
-    debug_message_with_location(err);
-    (void)dump_trace(0);
-    num_mudlib_error = 0;
-  } else {
+  if (!num_mudlib_error) {
     num_mudlib_error++;
     num_error--;
     outoftime = 0;
@@ -1926,12 +1916,24 @@ void _error_handler(char *err) {
     }
     num_mudlib_error--;
     num_error++;
+  } else if (num_mudlib_error == 1) {
+    debug_message("Error in mudlib error handler: ");
+    debug_message_with_location(err);
+    dump_trace(CONFIG_INT(__RC_TRACE_CODE__));
+    num_mudlib_error--;
   }
 exit:
   num_error--;
-  too_deep_error = max_eval_error = 0;
+
+  if (num_error || num_mudlib_error) {
+    /* This can happen via errors in the object_name() apply. */
+    debug_message("Error '%s' occurred while trying to print error trace -- trace suppressed.\n",
+                  err);
+  } else {
+    too_deep_error = max_eval_error = 0;
+  }
   if (current_error_context) {
-    throw("error handler error2");
+    throw("error handler error");
   }
   fatal("Driver BUG: no error context.");
 }

@@ -19,7 +19,7 @@ if(OPENSSL_FOUND)
   #    and typically reside in the same or in a close by directory as the executable
   # ** we do NOT want to find dlls in general dll directories such as C:\Windows\systemXX
   #    because these IN GENERAL are not compatible with the libs
-	if(WIN32 AND OPENSSL_VERSION)
+	if (WIN32 AND OPENSSL_VERSION)
 		set(OPENSSL_BIN_FOUND 0)
 
     # we check for OpenSSL versioning, as described in https://wiki.openssl.org/index.php/Versioning
@@ -96,7 +96,7 @@ if(OPENSSL_FOUND)
  			set(OPENSSL_BIN_FOUND 1)
 		endif()
 
-	endif(WIN32)
+	endif(WIN32 AND OPENSSL_VERSION)
 		
 endif(OPENSSL_FOUND)
 

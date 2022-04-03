@@ -96,6 +96,7 @@ void int_free_svalue(svalue_t *v)
         NDBG(BLOCK(str));
       }
     }
+    v->type |= T_FREED;
   } else if ((v->type & T_REFED) && !(v->type & T_FREED)) {
 #ifdef DEBUG
     if (v->type == T_OBJECT) {
@@ -136,15 +137,21 @@ void int_free_svalue(svalue_t *v)
           }
           break;
       }
+      v->type |= T_FREED;
     }
   } else if (v->type == T_ERROR_HANDLER) {
     (*v->u.error_handler)();
+    v->type |= T_FREED;
   }
 #ifdef DEBUG
-  else if (v->type == T_FREED) {
+  else if (v->type & T_FREED) {
     fatal("T_FREED svalue freed.  Previously freed by %s.\n", v->u.string);
   }
-  v->type = T_FREED;
+#endif
+  else {
+    v->type |= T_FREED;
+  }
+#ifdef DEBUG
   v->u.string = tag;
 #endif
 }

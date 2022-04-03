@@ -24,8 +24,45 @@
 
 #include "private-lib-core.h"
 
-int
-lws_ssl_client_connect1(struct lws *wsi, char *errbuf, int len)
+static int
+lws_ssl_handshake_serialize(struct lws_context *ctx, struct lws *wsi)
+{
+	struct lws_vhost *vh = ctx->vhost_list;
+#if LWS_MAX_SMP > 1
+	int tsi = lws_pthread_self_to_tsi(ctx);
+#else
+	int tsi = 0;
+#endif
+	struct lws_context_per_thread *pt = &ctx->pt[tsi];
+	unsigned int n;
+
+	while (vh) {
+		for (n = 0; n < pt->fds_count; n++) {
+			struct lws *w = wsi_from_fd(ctx, pt->fds[n].fd);
+
+			if (!w || w->tsi != tsi || w->a.vhost != vh || wsi == w)
+				continue;
+
+			/* Now we found other vhost's wsi in process */
+			if (lwsi_role_mqtt(w)) {
+				/* MQTT TLS connection not established yet.
+				 * Let it finish.
+				 */
+				if (lwsi_state(w) != LRS_ESTABLISHED)
+					return 1;
+			} else {
+				/* H1/H2 not finished yet. Let it finish. */
+				if (lwsi_state(w) != LRS_DEAD_SOCKET)
+					return 1;
+			}
+		}
+		vh = vh->vhost_next;
+	}
+	return 0;
+}
+
+static int
+lws_ssl_client_connect1(struct lws *wsi, char *errbuf, size_t len)
 {
 	int n;
 
@@ -34,6 +71,11 @@ lws_ssl_client_connect1(struct lws *wsi, char *errbuf, int len)
 	case LWS_SSL_CAPABLE_ERROR:
 		return -1;
 	case LWS_SSL_CAPABLE_DONE:
+		lws_metrics_caliper_report(wsi->cal_conn, METRES_GO);
+#if defined(LWS_WITH_CONMON)
+	wsi->conmon.ciu_tls = (lws_conmon_interval_us_t)
+					(lws_now_usecs() - wsi->conmon_datum);
+#endif
 		return 1; /* connected */
 	case LWS_SSL_CAPABLE_MORE_SERVICE_WRITE:
 		lws_callback_on_writable(wsi);
@@ -48,7 +90,7 @@ lws_ssl_client_connect1(struct lws *wsi, char *errbuf, int len)
 }
 
 int
-lws_ssl_client_connect2(struct lws *wsi, char *errbuf, int len)
+lws_ssl_client_connect2(struct lws *wsi, char *errbuf, size_t len)
 {
 	int n;
 
@@ -73,8 +115,16 @@ lws_ssl_client_connect2(struct lws *wsi, char *errbuf, int len)
 		}
 	}
 
-	if (lws_tls_client_confirm_peer_cert(wsi, errbuf, len))
+	if (lws_tls_client_confirm_peer_cert(wsi, errbuf, len)) {
+		lws_metrics_caliper_report(wsi->cal_conn, METRES_NOGO);
 		return -1;
+	}
+
+	lws_metrics_caliper_report(wsi->cal_conn, METRES_GO);
+#if defined(LWS_WITH_CONMON)
+	wsi->conmon.ciu_tls = (lws_conmon_interval_us_t)
+					(lws_now_usecs() - wsi->conmon_datum);
+#endif
 
 	return 1;
 }
@@ -160,3 +210,87 @@ int lws_context_init_client_ssl(const struct lws_context_creation_info *info,
 	return 0;
 }
 
+int
+lws_client_create_tls(struct lws *wsi, const char **pcce, int do_c1)
+{
+
+	/* we can retry this... just cook the SSL BIO the first time */
+
+	if (wsi->tls.use_ssl & LCCSCF_USE_SSL) {
+		int n;
+
+		if (!wsi->tls.ssl) {
+			if (lws_ssl_client_bio_create(wsi) < 0) {
+				*pcce = "bio_create failed";
+				return CCTLS_RETURN_ERROR;
+			}
+
+#if defined(LWS_WITH_TLS)
+			if (!wsi->transaction_from_pipeline_queue) {
+				if (lws_tls_restrict_borrow(wsi->a.context)) {
+					*pcce = "tls restriction limit";
+					return CCTLS_RETURN_ERROR;
+				}
+				wsi->tls_borrowed = 1;
+				if (wsi->a.context->ssl_handshake_serialize) {
+					if (lws_ssl_handshake_serialize(wsi->a.context, wsi)) {
+						lws_tls_restrict_return(wsi->a.context);
+						wsi->tls_borrowed = 0;
+						*pcce = "ssl handshake serialization";
+						return CCTLS_RETURN_ERROR;
+					}
+				}
+			}
+#endif
+		}
+
+		if (!do_c1)
+			return 0;
+
+		lws_metrics_caliper_report(wsi->cal_conn, METRES_GO);
+		lws_metrics_caliper_bind(wsi->cal_conn, wsi->a.context->mt_conn_tls);
+#if defined(LWS_WITH_CONMON)
+		wsi->conmon_datum = lws_now_usecs();
+#endif
+
+		n = lws_ssl_client_connect1(wsi, (char *)wsi->a.context->pt[(int)wsi->tsi].serv_buf,
+					    wsi->a.context->pt_serv_buf_size);
+		lwsl_debug("%s: lws_ssl_client_connect1: %d\n", __func__, n);
+		if (!n)
+			return CCTLS_RETURN_RETRY; /* caller should return 0 */
+		if (n < 0) {
+			*pcce = (const char *)wsi->a.context->pt[(int)wsi->tsi].serv_buf;
+			lws_metrics_caliper_report(wsi->cal_conn, METRES_NOGO);
+			return CCTLS_RETURN_ERROR;
+		}
+		/* ...connect1 already handled caliper if SSL_accept done */
+	} else
+		wsi->tls.ssl = NULL;
+
+#if 0
+#if defined (LWS_WITH_HTTP2)
+	if (wsi->client_h2_alpn) {
+		/*
+		 * We connected to the server and set up tls, and
+		 * negotiated "h2".
+		 *
+		 * So this is it, we are an h2 nwsi client connection
+		 * now, not an h1 client connection.
+		 */
+#if defined(LWS_WITH_TLS)
+		lws_tls_server_conn_alpn(wsi);
+#endif
+
+		/* send the H2 preface to legitimize the connection */
+		if (lws_h2_issue_preface(wsi)) {
+			*pcce = "error sending h2 preface";
+			return CCTLS_RETURN_ERROR;
+		}
+
+		lwsi_set_state(wsi, LRS_H1C_ISSUE_HANDSHAKE2);
+	}
+#endif
+#endif
+
+	return CCTLS_RETURN_DONE; /* OK */
+}

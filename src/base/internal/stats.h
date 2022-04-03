@@ -1,7 +1,7 @@
 /*
  * stats.h
  *
- * This files contians all statistic collected by various part of the driver.
+ * This files contains all statistic collected by various part of the driver.
  *
  * TODO: encapsulate into an class.
  */
@@ -10,8 +10,6 @@
 #define STATS_H
 
 #include <inttypes.h>
-
-#include "base/internal/options_incl.h"
 
 extern uint64_t add_message_calls;
 
@@ -48,5 +46,12 @@ extern uint64_t num_mappings, total_mapping_size, total_mapping_nodes;
 extern uint64_t apply_cache_lookups;
 extern uint64_t apply_cache_hits;
 extern uint64_t apply_cache_items;
+
+// string allocation stats
+extern uint64_t num_distinct_strings;
+extern uint64_t bytes_distinct_strings;
+extern uint64_t allocd_strings;
+extern uint64_t allocd_bytes;
+extern uint64_t overhead_bytes;
 
 #endif

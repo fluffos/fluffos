@@ -78,18 +78,16 @@ namespace utf8
         return is_valid(s.begin(), s.end());
     }
 
-    inline std::string replace_invalid(const std::string_view s, char32_t replacement)
+    inline std::string replace_invalid(const std::string& s, char32_t replacement)
     {
         std::string result;
-        result.reserve(s.length());
         replace_invalid(s.begin(), s.end(), std::back_inserter(result), replacement);
         return result;
     }
 
-    inline std::string replace_invalid(const std::string_view s)
+    inline std::string replace_invalid(const std::string& s)
     {
         std::string result;
-        result.reserve(s.length());
         replace_invalid(s.begin(), s.end(), std::back_inserter(result));
         return result;
     }
@@ -98,7 +96,7 @@ namespace utf8
     {
         return starts_with_bom(s.begin(), s.end());
     }
-
+ 
 } // namespace utf8
 
 #endif // header guard

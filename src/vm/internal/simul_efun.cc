@@ -27,7 +27,7 @@
  */
 
 struct simul_entry {
-  char *name;
+  const char *name;
   short index;
 };
 

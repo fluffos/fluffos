@@ -100,7 +100,7 @@ extern int current_line;
 extern int current_line_base;
 extern int current_line_saved;
 extern int total_lines;
-extern char *current_file;
+extern const char *current_file;
 extern int current_file_id;
 extern int pragmas;
 extern int num_parse_error;
@@ -112,7 +112,7 @@ extern int arrow_efun, evaluate_efun, this_efun, to_float_efun, to_int_efun, new
 
 void push_function_context(void);
 void pop_function_context(void);
-int yylex(void);
+int yylex();
 void init_num_args(void);
 const char *query_instr_name(int);
 char *get_f_name(int);
@@ -123,7 +123,7 @@ void start_new_file(int);
 void end_new_file(void);
 int lookup_predef(const char *);
 void add_predefines(void);
-char *main_file_name(void);
+const char *main_file_name(void);
 char *get_defined_name(defined_name_t *);
 ident_hash_elem_t *find_or_add_ident(const char *, int);
 ident_hash_elem_t *find_or_add_perm_ident(const char *);

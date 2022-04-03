@@ -159,6 +159,10 @@ void sig_usr2(int sig) {
  * -Beek
  */
 void attempt_shutdown(int sig) {
+  using namespace backward;
+  static StackTrace st;
+  static Printer p;
+
   const char *msg = "Unkonwn signal!";
   switch (sig) {
     case SIGTERM:
@@ -174,16 +178,11 @@ void attempt_shutdown(int sig) {
   signal(SIGINT, SIG_DFL);
 
   // Print backtrace
-  {
-    using namespace backward;
-    StackTrace st;
-    st.load_here(64);
-    Printer p;
-    p.object = true;
-    p.color_mode = ColorMode::automatic;
-    p.address = true;
-    p.print(st, stderr);
-  }
+  st.load_here(64);
+  p.object = true;
+  p.color_mode = ColorMode::automatic;
+  p.address = true;
+  p.print(st, stderr);
 
   // Attempt to call crash()
   fatal(msg);
@@ -298,6 +297,14 @@ void init_win32() {
 }
 
 int driver_main(int argc, char **argv) {
+#ifdef HAVE_JEMALLOC
+  {
+    bool var = true;
+    size_t varlen = sizeof(var);
+    mallctl("background_thread", NULL, NULL, &var, varlen);
+  }
+#endif
+
   init_locale();
   init_tz();
   incrase_fd_rlimit();
@@ -390,7 +397,7 @@ int driver_main(int argc, char **argv) {
       switch (argv[i][1]) {
         case 'f': {
           ScopedTracer _tracer("Driver Flag: calling master::flag", EventCategory::DEFAULT,
-                               {std::string(argv[i] + 2)});
+                               [=] { return json{std::string(argv[i] + 2)}; });
 
           debug_message("Calling master::flag(\"%s\")...\n", argv[i] + 2);
 

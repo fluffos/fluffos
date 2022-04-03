@@ -1,11 +1,12 @@
 #ifndef INTERACITVE_H
 #define INTERACITVE_H
 
+#include <openssl/ssl.h>
 #include <event2/util.h>
 
 #include "vm/vm.h"  // FIXME: for union string_or_func
 
-#define MAX_TEXT 2048
+#define MAX_TEXT 1 * 1024 * 1024
 
 #define I_NOECHO 0x1          /* input_to flag */
 #define I_NOESC 0x2           /* input_to flag */
@@ -24,14 +25,13 @@
 #define CMD_IN_BUF 0x0080        /* there is a full command in input buffer */
 #define NET_DEAD 0x0100
 #define NOTIFY_FAIL_FUNC 0x0200 /* default_err_mesg is a function pointer  */
-#define USING_TELNET 0x0400     /* they're using telnet, or something that */
-/* understands telnet codes                */
-#define SKIP_COMMAND 0x0800        /* skip current command                    */
-#define SUPPRESS_GA 0x1000         /* suppress go ahead                       */
-#define USING_LINEMODE 0x2000      /* we've negotiated linemode               */
-#define USING_MXP 0x4000           /* we've negotiated mxp */
-#define USING_ZMP 0x8000           /* we've negotiated zmp */
-#define USING_GMCP 0x10000         /* we've negotiated gmcp */
+#define USING_TELNET 0x0400   /* they're using telnet, or something that understands telnet codes */
+#define SKIP_COMMAND 0x0800   /* skip current command                    */
+#define SUPPRESS_GA 0x1000    /* suppress go ahead                       */
+#define USING_LINEMODE 0x2000 /* we've negotiated linemode               */
+#define USING_MXP 0x4000      /* we've negotiated mxp */
+#define USING_ZMP 0x8000      /* we've negotiated zmp */
+#define USING_GMCP 0x10000    /* we've negotiated gmcp */
 #define HANDSHAKE_COMPLETE 0x20000 /* websocket connected */
 #define USING_COMPRESS 0x40000     /* we've negotiated compress */
 
@@ -63,8 +63,8 @@ struct interactive_t {
   /* this or What ? is printed when error    */
   union string_or_func default_err_message;
 #endif
-  int trace_level;    /* debug flags -- 0 means no debugging     */
-  char *trace_prefix; /* trace only object which has this as name  */
+  int trace_level;          /* debug flags -- 0 means no debugging     */
+  const char *trace_prefix; /* trace only object which has this as name  */
 #ifdef OLD_ED
   struct ed_buffer_s *ed_buffer; /* local ed                        */
 #endif
@@ -82,6 +82,9 @@ struct interactive_t {
 
   // libwebsocket handle
   struct lws *lws;
+
+  // TLS context
+  SSL *ssl;
 };
 
 #endif /* INTERACTIVE_H */

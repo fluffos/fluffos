@@ -15,13 +15,11 @@
 #include "vm/vm.h"
 
 int main(int argc, char** argv) {
-  Tracer::setThreadName("lpcc main");
-
   Tracer::start("trace_lpcc.json");
 
-  ScopedTracer _trace(__PRETTY_FUNCTION__);
+  Tracer::setThreadName("lpcc main");
 
-  Tracer::setThreadName("lpcc");
+  ScopedTracer _trace(__PRETTY_FUNCTION__);
 
   if (argc != 3) {
     std::cerr << "Usage: lpcc <config> lpc_file" << std::endl;
@@ -35,12 +33,6 @@ int main(int argc, char** argv) {
 
   Tracer::end("init_main", EventCategory::DEFAULT);
 
-  // Make sure mudlib dir is correct.
-  if (chdir(CONFIG_STR(__MUD_LIB_DIR__)) == -1) {
-    fprintf(stderr, "Bad mudlib directory: %s\n", CONFIG_STR(__MUD_LIB_DIR__));
-    exit(-1);
-  }
-
   // Start running.
   {
     ScopedTracer _tracer("vm_start");
@@ -50,16 +42,18 @@ int main(int argc, char** argv) {
 
   current_object = master_ob;
   const char* file = argv[2];
-
-  error_context_t econ{};
-  save_context(&econ);
   struct object_t* obj = nullptr;
-  try {
+
+  {
     ScopedTracer _tracer("find_object");
 
-    obj = find_object(file);
-  } catch (...) {
-    restore_context(&econ);
+    error_context_t econ{};
+    save_context(&econ);
+    try {
+      obj = find_object(file);
+    } catch (...) {
+      restore_context(&econ);
+    }
     pop_context(&econ);
   }
 
@@ -74,9 +68,9 @@ int main(int argc, char** argv) {
     dump_prog(obj->prog, stdout, 1 | 2);
   }
 
-  clear_state();
-
   Tracer::collect();
+
+  clear_state();
 
   return 0;
 }

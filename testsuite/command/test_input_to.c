@@ -1,23 +1,38 @@
-string* res = ({ });
-nosave object receiver;
+string result = "";
 
-void create() {
-  restore_object("/1.o");
+void on_input_long(string item) {
+  write(item);
+
+  if(item == ".") {
+    // get rid of last newline
+    result = result[0..<2];
+    write("\nReceived: \n" + result + "\n");
+    return ;
+  }
+  result += item + "\n";
+
+  input_to("on_input_long", 1);
 }
 
-void on_input(string item) {
-  res += ({ item });
-  tell_object(receiver, sprintf("1: %O\n", res));
-  save_object("/1.o");
-  tell_object(receiver, sprintf("2: %O\n", res));
-  restore_object("/1.o");
-  tell_object(receiver, sprintf("3: %O\n", res));
+void on_input_secure(string item) {
+  write("received: " + item + "\n");
 }
 
-int main(string arg)
-{
-  receiver = this_player();
-  write("]");
-  input_to( (: on_input :), 2);
+void on_input_1(string item) {
+  write("received: " + item + "\n");
+}
+
+int main(string arg) {
+  if(arg == "1") {
+    write("prompt]");
+    input_to( (: on_input_1 :), 0);
+  } else if (arg == "2"){
+    write("secure prompt]");
+    input_to( (: on_input_secure :), 1);
+  } else if (arg == "3"){
+    write("long prompt]");
+    result = "";
+    input_to( (: on_input_long :), 1);
+  }
   return 1;
 }

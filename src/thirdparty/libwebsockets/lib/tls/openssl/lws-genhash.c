@@ -24,8 +24,9 @@
  *  lws_genhash provides a hash / hmac abstraction api in lws that works the
  *  same whether you are using openssl or mbedtls hash functions underneath.
  */
-#include "libwebsockets.h"
+#include <private-lib-core.h>
 #include <openssl/obj_mac.h>
+#include <openssl/opensslv.h>
 /*
  * Care: many openssl apis return 1 for success.  These are translated to the
  * lws convention of 0 for success.
@@ -34,7 +35,7 @@
 int
 lws_genhash_init(struct lws_genhash_ctx *ctx, enum lws_genhash_types type)
 {
-	ctx->type = type;
+	ctx->type = (uint8_t)type;
 	ctx->mdctx = EVP_MD_CTX_create();
 	if (!ctx->mdctx)
 		return 1;
@@ -104,7 +105,7 @@ lws_genhmac_init(struct lws_genhmac_ctx *ctx, enum lws_genhmac_types type,
 		return -1;
 
 	ctx->evp_type = 0;
-	ctx->type = type;
+	ctx->type = (uint8_t)type;
 
 	switch (type) {
 	case LWS_GENHMAC_TYPE_SHA256:
@@ -179,7 +180,7 @@ lws_genhmac_init(struct lws_genhmac_ctx *ctx, enum lws_genhmac_types type,
 #endif
 
 	ctx->evp_type = 0;
-	ctx->type = type;
+	ctx->type = (uint8_t)type;
 
 	switch (type) {
 	case LWS_GENHMAC_TYPE_SHA256:
@@ -217,8 +218,12 @@ int
 lws_genhmac_update(struct lws_genhmac_ctx *ctx, const void *in, size_t len)
 {
 #if defined(LWS_HAVE_HMAC_CTX_new)
+#if defined(LIBRESSL_VERSION_NUMBER)
 	if (HMAC_Update(ctx->ctx, in, len) != 1)
 #else
+	if (HMAC_Update(ctx->ctx, in, (int)len) != 1)
+#endif
+#else /* HMAC_CTX_new */
 	if (HMAC_Update(&ctx->ctx, in, len) != 1)
 #endif
 		return -1;

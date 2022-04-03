@@ -1,7 +1,7 @@
 /*
  * lws-minimal-ws-client-spam
  *
- * Written in 2010-2019 by Andy Green <andy@warmcat.com>
+ * Written in 2010-2021 by Andy Green <andy@warmcat.com>
  *
  * This file is made available under the Creative Commons CC0 1.0
  * Universal Public Domain Dedication.
@@ -110,8 +110,10 @@ callback_minimal_spam(struct lws *wsi, enum lws_callback_reasons reason,
 				break;
 			}
 		}
-		if (tries == closed + errors)
+		if (tries == closed + errors) {
 			interrupted = 1;
+			lws_cancel_service(lws_get_context(wsi));
+		}
 		break;
 
 	/* --- client callbacks --- */
@@ -126,8 +128,10 @@ callback_minimal_spam(struct lws *wsi, enum lws_callback_reasons reason,
 
 	case LWS_CALLBACK_CLIENT_CLOSED:
 		closed++;
-		if (tries == closed + errors)
+		if (tries == closed + errors) {
 			interrupted = 1;
+			lws_cancel_service(lws_get_context(wsi));
+		}
 		if (tries == limit) {
 			lwsl_user("%s: leaving CLOSED (try %d, est %d, sent %d, closed %d, err %d)\n",
 					__func__, tries, est, sent, closed, errors);
@@ -150,7 +154,7 @@ callback_minimal_spam(struct lws *wsi, enum lws_callback_reasons reason,
 		n = lws_snprintf((char *)ping + LWS_PRE, sizeof(ping) - LWS_PRE,
 					  "hello %d", pss->conn);
 
-		m = lws_write(wsi, ping + LWS_PRE, n, LWS_WRITE_TEXT);
+		m = lws_write(wsi, ping + LWS_PRE, (unsigned int)n, LWS_WRITE_TEXT);
 		if (m < n) {
 			lwsl_err("sending ping failed: %d\n", m);
 
@@ -174,6 +178,13 @@ static const struct lws_protocols protocols[] = {
 		0,
 	},
 	{ NULL, NULL, 0, 0 }
+};
+
+static struct lws_protocol_vhost_options pvo = {
+        NULL,                  /* "next" pvo linked-list */
+        NULL,                 /* "child" pvo linked-list */
+        "lws-spam-test",        /* protocol name we belong to on this vhost */
+        "OK"                     /* ignored */
 };
 
 static void
@@ -206,6 +217,7 @@ int main(int argc, const char **argv)
 	info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
 	info.port = CONTEXT_PORT_NO_LISTEN; /* we do not run any server */
 	info.protocols = protocols;
+	info.pvo = &pvo;
 #if defined(LWS_WITH_MBEDTLS) || defined(USE_WOLFSSL)
 	/*
 	 * OpenSSL uses the system trust store.  mbedTLS has to be told which
@@ -248,7 +260,7 @@ int main(int argc, const char **argv)
 	 * It will just allocate for 1 internal and n (+ 1 http2 nwsi) that we
 	 * will use.
 	 */
-	info.fd_limit_per_thread = 1 + concurrent + 1;
+	info.fd_limit_per_thread = (unsigned int)(1 + concurrent + 1);
 
 	context = lws_create_context(&info);
 	if (!context) {

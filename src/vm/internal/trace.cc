@@ -15,7 +15,7 @@
 
 namespace {
 
-void get_trace_details(const program_t *prog, long findex, char **fname, int *na, int *nl) {
+void get_trace_details(const program_t *prog, long findex, const char **fname, int *na, int *nl) {
   function_t *cfp = &prog->function_table[findex];
 
   *fname = cfp->funcname;
@@ -61,11 +61,13 @@ const char *dump_trace(int how) {
   if (csp < &control_stack[0]) {
     return nullptr;
   }
+
   if (how) {
     last_instructions();
   }
+
   debug_message("--- trace ---\n");
-  for (p = &control_stack[0]; p <= csp; p++) {
+  for (p = csp; p >= &control_stack[0]; p--) {
     struct program_t *trace_prog;
     struct object_t *trace_obj;
     char *trace_pc;
@@ -82,10 +84,10 @@ const char *dump_trace(int how) {
       trace_pc = p[1].pc;
       trace_fp = p[1].fp;
     }
-
+    debug_message("--- frame %td ----\n", p - &control_stack[0]);
     switch (p[0].framekind & FRAME_MASK) {
       case FRAME_FUNCTION: {
-        char *fname;
+        const char *fname;
         get_trace_details(trace_prog, p[0].fr.table_index, &fname, &num_arg, &num_local);
         dump_trace_line(fname, trace_prog->filename, trace_obj->obname,
                         get_line_number(trace_pc, trace_prog));
@@ -175,7 +177,7 @@ array_t *get_svalue_trace() {
   mapping_t *m;
   const char *file;
   int line;
-  char *fname;
+  const char *fname;
   int num_arg, num_local = -1;
 
   svalue_t *ptr;

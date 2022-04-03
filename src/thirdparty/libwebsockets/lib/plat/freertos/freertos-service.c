@@ -50,7 +50,6 @@ _lws_plat_service_tsi(struct lws_context *context, int timeout_ms, int tsi)
 		return 1;
 
 	pt = &context->pt[tsi];
-	lws_stats_bump(pt, LWSSTATS_C_SERVICE_ENTRY, 1);
 
 	{
 		unsigned long m = lws_now_secs();
@@ -100,9 +99,9 @@ _lws_plat_service_tsi(struct lws_context *context, int timeout_ms, int tsi)
 	/*
 	 * is there anybody with pending stuff that needs service forcing?
 	 */
+again:
 	if (lws_service_adjust_timeout(context, 1, tsi)) {
 
-again:
 		a = 0;
 		if (timeout_us) {
 			lws_usec_t us;
@@ -141,15 +140,6 @@ again:
 
 			n = select(max_fd + 1, &readfds, &writefds, &errfds, ptv);
 			n = 0;
-
-	#if defined(LWS_WITH_DETAILED_LATENCY)
-			/*
-			 * so we can track how long it took before we actually read a POLLIN
-			 * that was signalled when we last exited poll()
-			 */
-			if (context->detailed_latency_cb)
-				pt->ust_left_poll = lws_now_usecs();
-	#endif
 
 			for (m = 0; m < (int)pt->fds_count; m++) {
 				c = 0;

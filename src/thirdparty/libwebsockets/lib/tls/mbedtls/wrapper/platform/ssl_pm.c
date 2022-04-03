@@ -27,7 +27,7 @@
 #include "mbedtls/entropy.h"
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/error.h"
-#include "mbedtls/certs.h"
+//#include "mbedtls/certs.h"
 
 #include "private-lib-core.h"
 
@@ -123,7 +123,7 @@ int ssl_pm_new(SSL *ssl)
     if (!ssl->ctx->read_buffer_len)
 	    ssl->ctx->read_buffer_len = 2048;
 
-    max_content_len = ssl->ctx->read_buffer_len;
+    max_content_len = (unsigned int)ssl->ctx->read_buffer_len;
     // printf("ssl->ctx->read_buffer_len = %d ++++++++++++++++++++\n", ssl->ctx->read_buffer_len);
 
     mbedtls_net_init(&ssl_pm->fd);
@@ -157,16 +157,14 @@ int ssl_pm_new(SSL *ssl)
             version = MBEDTLS_SSL_MINOR_VERSION_3;
         else if (TLS1_1_VERSION == ssl->version)
             version = MBEDTLS_SSL_MINOR_VERSION_2;
-        else if (TLS1_VERSION == ssl->version)
-            version = MBEDTLS_SSL_MINOR_VERSION_1;
         else
-            version = MBEDTLS_SSL_MINOR_VERSION_0;
+            version = MBEDTLS_SSL_MINOR_VERSION_1;
 
         mbedtls_ssl_conf_max_version(&ssl_pm->conf, MBEDTLS_SSL_MAJOR_VERSION_3, version);
         mbedtls_ssl_conf_min_version(&ssl_pm->conf, MBEDTLS_SSL_MAJOR_VERSION_3, version);
     } else {
         mbedtls_ssl_conf_max_version(&ssl_pm->conf, MBEDTLS_SSL_MAJOR_VERSION_3, MBEDTLS_SSL_MINOR_VERSION_3);
-        mbedtls_ssl_conf_min_version(&ssl_pm->conf, MBEDTLS_SSL_MAJOR_VERSION_3, MBEDTLS_SSL_MINOR_VERSION_0);
+        mbedtls_ssl_conf_min_version(&ssl_pm->conf, MBEDTLS_SSL_MAJOR_VERSION_3, MBEDTLS_SSL_MINOR_VERSION_1);
     }
 
     mbedtls_ssl_conf_rng(&ssl_pm->conf, mbedtls_ctr_drbg_random, &ssl_pm->ctr_drbg);
@@ -236,7 +234,7 @@ static int ssl_pm_reload_crt(SSL *ssl)
     if (ssl->verify_mode == SSL_VERIFY_PEER)
         mode = MBEDTLS_SSL_VERIFY_OPTIONAL;
     else if (ssl->verify_mode == SSL_VERIFY_FAIL_IF_NO_PEER_CERT)
-        mode = MBEDTLS_SSL_VERIFY_OPTIONAL;
+        mode = MBEDTLS_SSL_VERIFY_REQUIRED;
     else if (ssl->verify_mode == SSL_VERIFY_CLIENT_ONCE)
         mode = MBEDTLS_SSL_VERIFY_UNSET;
     else
@@ -405,7 +403,7 @@ int ssl_pm_read(SSL *ssl, void *buffer, int len)
     int ret;
     struct ssl_pm *ssl_pm = (struct ssl_pm *)ssl->ssl_pm;
 
-    ret = mbedtls_ssl_read(&ssl_pm->ssl, buffer, len);
+    ret = mbedtls_ssl_read(&ssl_pm->ssl, buffer, (size_t)len);
     if (ret < 0) {
 	 //   lwsl_notice("%s: mbedtls_ssl_read says -0x%x\n", __func__, -ret);
         SSL_DEBUG(SSL_PLATFORM_ERROR_LEVEL, "mbedtls_ssl_read() return -0x%x", -ret);
@@ -428,7 +426,7 @@ int ssl_pm_send(SSL *ssl, const void *buffer, int len)
     int ret;
     struct ssl_pm *ssl_pm = (struct ssl_pm *)ssl->ssl_pm;
 
-    ret = mbedtls_ssl_write(&ssl_pm->ssl, buffer, len);
+    ret = mbedtls_ssl_write(&ssl_pm->ssl, buffer, (size_t)len);
     /*
      * We can get a positive number, which may be less than len... that
      * much was sent successfully and you can call again to send more.
@@ -474,7 +472,7 @@ int ssl_pm_pending(const SSL *ssl)
 {
     struct ssl_pm *ssl_pm = (struct ssl_pm *)ssl->ssl_pm;
 
-    return mbedtls_ssl_get_bytes_avail(&ssl_pm->ssl);
+    return (int)mbedtls_ssl_get_bytes_avail(&ssl_pm->ssl);
 }
 
 void ssl_pm_set_fd(SSL *ssl, int fd, int mode)
@@ -641,35 +639,29 @@ int x509_pm_load(X509 *x, const unsigned char *buffer, int len)
     unsigned char *load_buf;
     struct x509_pm *x509_pm = (struct x509_pm *)x->x509_pm;
 
-	if (x509_pm->x509_crt)
-        mbedtls_x509_crt_free(x509_pm->x509_crt);
-
     if (!x509_pm->x509_crt) {
         x509_pm->x509_crt = ssl_mem_malloc(sizeof(mbedtls_x509_crt));
         if (!x509_pm->x509_crt) {
             SSL_DEBUG(SSL_PLATFORM_ERROR_LEVEL, "no enough memory > (x509_pm->x509_crt)");
             goto no_mem;
         }
+        mbedtls_x509_crt_init(x509_pm->x509_crt);
     }
 
-    mbedtls_x509_crt_init(x509_pm->x509_crt);
     if (buffer[0] != 0x30) {
-	    load_buf = ssl_mem_malloc(len + 1);
+	    load_buf = ssl_mem_malloc((unsigned int)len + 1);
 	    if (!load_buf) {
 		SSL_DEBUG(SSL_PLATFORM_ERROR_LEVEL, "no enough memory > (load_buf)");
 		goto failed;
 	    }
 
-	    ssl_memcpy(load_buf, buffer, len);
+	    ssl_memcpy(load_buf, buffer, (unsigned int)len);
 	    load_buf[len] = '\0';
 
-	    ret = mbedtls_x509_crt_parse(x509_pm->x509_crt, load_buf, len + 1);
+	    ret = mbedtls_x509_crt_parse(x509_pm->x509_crt, load_buf, (unsigned int)len + 1);
 	    ssl_mem_free(load_buf);
-    } else {
-	    // printf("parsing as der\n");
-
-	    ret = mbedtls_x509_crt_parse_der(x509_pm->x509_crt, buffer, len);
-    }
+    } else
+	    ret = mbedtls_x509_crt_parse_der(x509_pm->x509_crt, buffer, (unsigned int)len);
 
     if (ret) {
         printf("mbedtls_x509_crt_parse return -0x%x", -ret);
@@ -737,18 +729,18 @@ int pkey_pm_load(EVP_PKEY *pk, const unsigned char *buffer, int len)
         }
     }
 
-    load_buf = ssl_mem_malloc(len + 1);
+    load_buf = ssl_mem_malloc((unsigned int)len + 1);
     if (!load_buf) {
         SSL_DEBUG(SSL_PLATFORM_ERROR_LEVEL, "no enough memory > (load_buf)");
         goto failed;
     }
 
-    ssl_memcpy(load_buf, buffer, len);
+    ssl_memcpy(load_buf, buffer, (unsigned int)len);
     load_buf[len] = '\0';
 
     mbedtls_pk_init(pkey_pm->pkey);
 
-    ret = mbedtls_pk_parse_key(pkey_pm->pkey, load_buf, len + 1, NULL, 0);
+    ret = mbedtls_pk_parse_key(pkey_pm->pkey, load_buf, (unsigned int)len + 1, NULL, 0);
     ssl_mem_free(load_buf);
 
     if (ret) {
@@ -770,7 +762,7 @@ no_mem:
 
 void ssl_pm_set_bufflen(SSL *ssl, int len)
 {
-    max_content_len = len;
+    max_content_len = (unsigned int)len;
 }
 
 long ssl_pm_get_verify_result(const SSL *ssl)
@@ -867,7 +859,7 @@ void SSL_get0_alpn_selected(const SSL *ssl, const unsigned char **data,
 
 	*data = (const unsigned char *)alp;
 	if (alp)
-		*len = strlen(alp);
+		*len = (unsigned int)strlen(alp);
 	else
 		*len = 0;
 #endif
@@ -889,6 +881,13 @@ SSL *SSL_SSL_from_mbedtls_ssl_context(mbedtls_ssl_context *msc)
 	struct ssl_pm *ssl_pm = (struct ssl_pm *)((char *)msc - offsetof(struct ssl_pm, ssl));
 
 	return ssl_pm->owner;
+}
+
+mbedtls_ssl_context *SSL_mbedtls_ssl_context_from_SSL(SSL *ssl)
+{
+	struct ssl_pm *ssl_pm = (struct ssl_pm *)ssl->ssl_pm;
+
+	return &ssl_pm->ssl;
 }
 
 #include "ssl_cert.h"
@@ -936,10 +935,11 @@ void SSL_set_SSL_CTX(SSL *ssl, SSL_CTX *ctx)
 	ssl->cert = __ssl_cert_new(ctx->cert);
 
 #if defined(LWS_HAVE_mbedtls_ssl_set_hs_authmode)
+
 	if (ctx->verify_mode == SSL_VERIFY_PEER)
 		mode = MBEDTLS_SSL_VERIFY_OPTIONAL;
 	else if (ctx->verify_mode == SSL_VERIFY_FAIL_IF_NO_PEER_CERT)
-		mode = MBEDTLS_SSL_VERIFY_OPTIONAL;
+		mode = MBEDTLS_SSL_VERIFY_REQUIRED;
 	else if (ctx->verify_mode == SSL_VERIFY_CLIENT_ONCE)
 		mode = MBEDTLS_SSL_VERIFY_UNSET;
 	else

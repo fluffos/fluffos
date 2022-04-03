@@ -53,16 +53,16 @@ const flagEntry intFlags[] = {
     {"maximum call depth", __MAX_CALL_DEPTH__, CFG_MAX_CALL_DEPTH},
 
     {"maximum array size", __MAX_ARRAY_SIZE__, 15000},
-    {"maximum buffer size", __MAX_BUFFER_SIZE__, 400000},
+    {"maximum buffer size", __MAX_BUFFER_SIZE__, 1 << 20},
     {"maximum mapping size", __MAX_MAPPING_SIZE__, 150000},
-    {"maximum string length", __MAX_STRING_LENGTH__, 200000},
+    {"maximum string length", __MAX_STRING_LENGTH__, 1 << 20},
     {"maximum bits in a bitfield", __MAX_BITFIELD_BITS__, 12000},
-    {"maximum byte transfer", __MAX_BYTE_TRANSFER__, 200000},
-    {"maximum read file size", __MAX_READ_FILE_SIZE__, 200000},
+    {"maximum byte transfer", __MAX_BYTE_TRANSFER__, 1 << 18},
+    {"maximum read file size", __MAX_READ_FILE_SIZE__, 1 << 18},
 
-    {"hash table size", __SHARED_STRING_HASH_TABLE_SIZE__, 7001},
-    {"object table size", __OBJECT_HASH_TABLE_SIZE__, 1501},
-    {"living hash table size", __LIVING_HASH_TABLE_SIZE__, CFG_LIVING_HASH_SIZE},
+    {"hash table size", __SHARED_STRING_HASH_TABLE_SIZE__, 65536, 7001},
+    {"object table size", __OBJECT_HASH_TABLE_SIZE__, 4096, 1024},
+    {"living hash table size", __LIVING_HASH_TABLE_SIZE__, 256, 256},
 
     {"gametick msec", __RC_GAMETICK_MSEC__, 1000},
     {"heartbeat interval msec", __RC_HEARTBEAT_INTERVAL_MSEC__, 1000},
@@ -312,8 +312,10 @@ void read_config(char *filename) {
             external_port[i].kind = PORT_MUD;
           } else if (!strcmp(kind, "websocket")) {
             external_port[i].kind = PORT_WEBSOCKET;
-            scan_config_line("websocket http dir : %[^\n]", tmp, kMustHave);
-            CONFIG_STR(__RC_WEBSOCKET_HTTP_DIR__) = alloc_cstring(tmp, "config file: whd");
+            if (!CONFIG_STR(__RC_WEBSOCKET_HTTP_DIR__)) {
+              scan_config_line("websocket http dir : %[^\n]", tmp, kMustHave);
+              CONFIG_STR(__RC_WEBSOCKET_HTTP_DIR__) = alloc_cstring(tmp, "config file: whd");
+            }
           } else {
             debug_message("Unknown kind of external port: %s\n", kind);
             exit(-1);
@@ -321,6 +323,24 @@ void read_config(char *filename) {
         } else {
           debug_message("Syntax error in port specification\n");
           exit(-1);
+        }
+      }
+    }
+    // TLS support status
+    for (i = port_start; i < 5; i++) {
+      if (external_port[i].kind != 0) {
+        char kind[kMaxConfigLineLength];
+        sprintf(kind, "external_port_%i_tls : %%[^\n]", i + 1);
+        if (scan_config_line(kind, tmp, 0)) {
+          char cert[255 + 1]{}, key[255 + 1]{};
+          if (sscanf(tmp, "cert=%255s key=%255s", cert, key) == 2) {
+            if (strlen(cert) == 0 || strlen(key) == 0) {
+              debug_message("cert/key path can't be empty.\n");
+              exit(-1);
+            }
+            external_port[i].tls_cert = cert;
+            external_port[i].tls_key = key;
+          }
         }
       }
     }

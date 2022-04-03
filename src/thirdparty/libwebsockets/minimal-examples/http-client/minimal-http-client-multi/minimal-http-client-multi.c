@@ -1,7 +1,7 @@
 /*
  * lws-minimal-http-client-multi
  *
- * Written in 2010-2020 by Andy Green <andy@warmcat.com>
+ * Written in 2010-2021 by Andy Green <andy@warmcat.com>
  *
  * This file is made available under the Creative Commons CC0 1.0
  * Universal Public Domain Dedication.
@@ -26,6 +26,12 @@
  * HTTP/1.0: Pipelining only possible if Keep-Alive: yes sent by server
  * HTTP/1.1: always possible... serializes requests
  * HTTP/2:   always possible... all requests sent as individual streams in parallel
+ *
+ * Note: stats are kept on tls session reuse and checked depending on mode
+ *
+ *  - default: no reuse expected (connections made too quickly at once)
+ *  - staggered, no pipeline: n - 1 reuse expected
+ *  - staggered, pipelined: no reuse expected
  */
 
 #include <libwebsockets.h>
@@ -33,6 +39,11 @@
 #include <signal.h>
 #include <assert.h>
 #include <time.h>
+#if !defined(WIN32)
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#endif
 
 #define COUNT 8
 
@@ -40,7 +51,8 @@ struct cliuser {
 	int index;
 };
 
-static int completed, failed, numbered, stagger_idx, posting, count = COUNT;
+static int completed, failed, numbered, stagger_idx, posting, count = COUNT,
+	   reuse, staggered;
 static lws_sorted_usec_list_t sul_stagger;
 static struct lws_client_connect_info i;
 static struct lws *client_wsi[COUNT];
@@ -52,6 +64,100 @@ static struct lws_context *context;
 struct pss {
 	char body_part;
 };
+
+#if defined(LWS_WITH_TLS_SESSIONS) && !defined(LWS_WITH_MBEDTLS) && !defined(WIN32)
+
+/* this should work OK on win32, but not adapted for non-posix file apis */
+
+static int
+sess_save_cb(struct lws_context *cx, struct lws_tls_session_dump *info)
+{
+	char path[128];
+	int fd, n;
+
+	lws_snprintf(path, sizeof(path), "%s/lws_tls_sess_%s", (const char *)info->opaque,
+			info->tag);
+	fd = open(path, LWS_O_WRONLY | O_CREAT | O_TRUNC, 0600);
+	if (fd < 0) {
+		lwsl_warn("%s: cannot open %s\n", __func__, path);
+		return 1;
+	}
+
+	n = (int)write(fd, info->blob, info->blob_len);
+
+	close(fd);
+
+	return n != (int)info->blob_len;
+}
+
+static int
+sess_load_cb(struct lws_context *cx, struct lws_tls_session_dump *info)
+{
+	struct stat sta;
+	char path[128];
+	int fd, n;
+
+	lws_snprintf(path, sizeof(path), "%s/lws_tls_sess_%s", (const char *)info->opaque,
+			info->tag);
+	fd = open(path, LWS_O_RDONLY);
+	if (fd < 0)
+		return 1;
+
+	if (fstat(fd, &sta) || !sta.st_size)
+		goto bail;
+
+	info->blob = malloc((size_t)sta.st_size);
+	/* caller will free this */
+	if (!info->blob)
+		goto bail;
+
+	info->blob_len = (size_t)sta.st_size;
+
+	n = (int)read(fd, info->blob, info->blob_len);
+	close(fd);
+
+	return n != (int)info->blob_len;
+
+bail:
+	close(fd);
+
+	return 1;
+}
+#endif
+
+#if defined(LWS_WITH_CONMON)
+void
+dump_conmon_data(struct lws *wsi)
+{
+	const struct addrinfo *ai;
+	struct lws_conmon cm;
+	char ads[48];
+
+	lws_conmon_wsi_take(wsi, &cm);
+
+	lws_sa46_write_numeric_address(&cm.peer46, ads, sizeof(ads));
+	lwsl_notice("%s: peer %s, dns: %uus, sockconn: %uus, tls: %uus, txn_resp: %uus\n",
+		    __func__, ads,
+		    (unsigned int)cm.ciu_dns,
+		    (unsigned int)cm.ciu_sockconn,
+		    (unsigned int)cm.ciu_tls,
+		    (unsigned int)cm.ciu_txn_resp);
+
+	ai = cm.dns_results_copy;
+	while (ai) {
+		lws_sa46_write_numeric_address((lws_sockaddr46 *)ai->ai_addr, ads, sizeof(ads));
+		lwsl_notice("%s: DNS %s\n", __func__, ads);
+		ai = ai->ai_next;
+	}
+
+	/*
+	 * This destroys the DNS list in the lws_conmon that we took
+	 * responsibility for when we used lws_conmon_wsi_take()
+	 */
+
+	lws_conmon_release(&cm);
+}
+#endif
 
 static int
 callback_http(struct lws *wsi, enum lws_callback_reasons reason,
@@ -65,8 +171,22 @@ callback_http(struct lws *wsi, enum lws_callback_reasons reason,
 	switch (reason) {
 
 	case LWS_CALLBACK_ESTABLISHED_CLIENT_HTTP:
-		lwsl_user("LWS_CALLBACK_ESTABLISHED_CLIENT_HTTP: idx: %d, resp %u\n",
-				idx, lws_http_client_http_response(wsi));
+		lwsl_user("LWS_CALLBACK_ESTABLISHED_CLIENT_HTTP: idx: %d, resp %u: tls-session-reuse: %d\n",
+				idx, lws_http_client_http_response(wsi), lws_tls_session_is_reused(wsi));
+
+		if (lws_tls_session_is_reused(wsi))
+			reuse++;
+#if defined(LWS_WITH_TLS_SESSIONS) && !defined(LWS_WITH_MBEDTLS) && !defined(WIN32)
+		else
+			/*
+			 * Attempt to store any new session into
+			 * external storage
+			 */
+			if (lws_tls_session_dump_save(lws_get_vhost_by_name(context, "default"),
+					i.host, (uint16_t)i.port,
+					sess_save_cb, "/tmp"))
+		lwsl_warn("%s: session save failed\n", __func__);
+#endif
 		break;
 
 	/* because we are protocols[0] ... */
@@ -75,6 +195,11 @@ callback_http(struct lws *wsi, enum lws_callback_reasons reason,
 			 in ? (char *)in : "(null)");
 		client_wsi[idx] = NULL;
 		failed++;
+
+#if defined(LWS_WITH_CONMON)
+		dump_conmon_data(wsi);
+#endif
+
 		goto finished;
 
 	/* chunks of chunked content, with header removed */
@@ -84,15 +209,16 @@ callback_http(struct lws *wsi, enum lws_callback_reasons reason,
 		return 0; /* don't passthru */
 
 	case LWS_CALLBACK_CLIENT_APPEND_HANDSHAKE_HEADER:
+
 		/*
 		 * Tell lws we are going to send the body next...
 		 */
 		if (posting && !lws_http_is_redirected_to_get(wsi)) {
-			lwsl_user("%s: doing POST flow\n", __func__);
+			lwsl_user("%s: conn %d, doing POST flow\n", __func__, idx);
 			lws_client_http_body_pending(wsi, 1);
 			lws_callback_on_writable(wsi);
 		} else
-			lwsl_user("%s: doing GET flow\n", __func__);
+			lwsl_user("%s: conn %d, doing GET flow\n", __func__, idx);
 		break;
 
 	/* uninterpreted http content */
@@ -108,13 +234,18 @@ callback_http(struct lws *wsi, enum lws_callback_reasons reason,
 		return 0; /* don't passthru */
 
 	case LWS_CALLBACK_COMPLETED_CLIENT_HTTP:
-		lwsl_user("LWS_CALLBACK_COMPLETED_CLIENT_HTTP %p: idx %d\n",
-			  wsi, idx);
+		lwsl_user("LWS_CALLBACK_COMPLETED_CLIENT_HTTP %s: idx %d\n",
+			  lws_wsi_tag(wsi), idx);
 		client_wsi[idx] = NULL;
 		goto finished;
 
 	case LWS_CALLBACK_CLOSED_CLIENT_HTTP:
-		lwsl_info("%s: closed: %p\n", __func__, client_wsi[idx]);
+		lwsl_info("%s: closed: %s\n", __func__, lws_wsi_tag(client_wsi[idx]));
+
+#if defined(LWS_WITH_CONMON)
+		dump_conmon_data(wsi);
+#endif
+
 		if (client_wsi[idx]) {
 			/*
 			 * If it completed normally, it will have been set to
@@ -132,8 +263,8 @@ callback_http(struct lws *wsi, enum lws_callback_reasons reason,
 			break;
 		if (lws_http_is_redirected_to_get(wsi))
 			break;
-		lwsl_info("LWS_CALLBACK_CLIENT_HTTP_WRITEABLE: %p, idx %d,"
-				" part %d\n", wsi, idx, pss->body_part);
+		lwsl_info("LWS_CALLBACK_CLIENT_HTTP_WRITEABLE: %s, idx %d,"
+				" part %d\n", lws_wsi_tag(wsi), idx, pss->body_part);
 
 		n = LWS_WRITE_HTTP;
 
@@ -150,13 +281,13 @@ callback_http(struct lws *wsi, enum lws_callback_reasons reason,
 						      &p, end))
 				return -1;
 			/* notice every usage of the boundary starts with -- */
-			p += lws_snprintf(p, end - p, "my text field\xd\xa");
+			p += lws_snprintf(p, lws_ptr_diff_size_t(end, p), "my text field\xd\xa");
 			break;
 		case 1:
 			if (lws_client_http_multipart(wsi, "file", "myfile.txt",
 						      "text/plain", &p, end))
 				return -1;
-			p += lws_snprintf(p, end - p,
+			p += lws_snprintf(p, lws_ptr_diff_size_t(end, p),
 					"This is the contents of the "
 					"uploaded file.\xd\xa"
 					"\xd\xa");
@@ -179,7 +310,7 @@ callback_http(struct lws *wsi, enum lws_callback_reasons reason,
 			return 0;
 		}
 
-		if (lws_write(wsi, (uint8_t *)start, lws_ptr_diff(p, start), n)
+		if (lws_write(wsi, (uint8_t *)start, lws_ptr_diff_size_t(p, start), (enum lws_write_protocol)n)
 				!= lws_ptr_diff(p, start))
 			return 1;
 
@@ -216,6 +347,89 @@ static const struct lws_protocols protocols[] = {
 	{ "http", callback_http, sizeof(struct pss), 0, },
 	{ NULL, NULL, 0, 0 }
 };
+
+#if defined(LWS_WITH_SYS_METRICS)
+
+static int
+my_metric_report(lws_metric_pub_t *mp)
+{
+	lws_metric_bucket_t *sub = mp->u.hist.head;
+	char buf[192];
+
+	do {
+		if (lws_metrics_format(mp, &sub, buf, sizeof(buf)))
+			lwsl_user("%s: %s\n", __func__, buf);
+	} while ((mp->flags & LWSMTFL_REPORT_HIST) && sub);
+
+	/* 0 = leave metric to accumulate, 1 = reset the metric */
+
+	return 1;
+}
+
+static const lws_system_ops_t system_ops = {
+	.metric_report = my_metric_report,
+};
+
+#endif
+
+static void
+stagger_cb(lws_sorted_usec_list_t *sul);
+
+static void
+lws_try_client_connection(struct lws_client_connect_info *i, int m)
+{
+	char path[128];
+
+	if (numbered) {
+		lws_snprintf(path, sizeof(path), "/%d.png", m + 1);
+		i->path = path;
+	} else
+		i->path = urlpath;
+
+	i->pwsi = &client_wsi[m];
+	i->opaque_user_data = (void *)(intptr_t)m;
+
+	if (!lws_client_connect_via_info(i)) {
+		failed++;
+		lwsl_user("%s: failed: conn idx %d\n", __func__, m);
+		if (++completed == count) {
+			lwsl_user("Done: failed: %d\n", failed);
+			lws_context_destroy(context);
+		}
+	} else
+		lwsl_user("started connection %s: idx %d (%s)\n",
+			  lws_wsi_tag(client_wsi[m]), m, i->path);
+}
+
+
+static int
+system_notify_cb(lws_state_manager_t *mgr, lws_state_notify_link_t *link,
+		   int current, int target)
+{
+	struct lws_context *context = mgr->parent;
+	int m;
+
+	if (current != LWS_SYSTATE_OPERATIONAL || target != LWS_SYSTATE_OPERATIONAL)
+		return 0;
+
+	/* all the system prerequisites are ready */
+
+	if (!staggered)
+		/*
+		 * just pile on all the connections at once, testing the
+		 * pipeline queuing before the first is connected
+		 */
+		for (m = 0; m < count; m++)
+			lws_try_client_connection(&i, m);
+	else
+		/*
+		 * delay the connections slightly
+		 */
+		lws_sul_schedule(context, 0, &sul_stagger, stagger_cb,
+				 50 * LWS_US_PER_MS);
+
+	return 0;
+}
 
 static void
 signal_cb(void *handle, int signum)
@@ -266,32 +480,7 @@ unsigned long long us(void)
 
 	gettimeofday(&t, NULL);
 
-	return (t.tv_sec * 1000000ull) + t.tv_usec;
-}
-
-static void
-lws_try_client_connection(struct lws_client_connect_info *i, int m)
-{
-	char path[128];
-
-	if (numbered) {
-		lws_snprintf(path, sizeof(path), "/%d.png", m + 1);
-		i->path = path;
-	} else
-		i->path = urlpath;
-
-	i->pwsi = &client_wsi[m];
-	i->opaque_user_data = (void *)(intptr_t)m;
-
-	if (!lws_client_connect_via_info(i)) {
-		failed++;
-		if (++completed == count) {
-			lwsl_user("Done: failed: %d\n", failed);
-			lws_context_destroy(context);
-		}
-	} else
-		lwsl_user("started connection %p: idx %d (%s)\n",
-			  client_wsi[m], m, i->path);
+	return ((unsigned long long)t.tv_sec * 1000000ull) + (unsigned long long)t.tv_usec;
 }
 
 static void
@@ -309,19 +498,28 @@ stagger_cb(lws_sorted_usec_list_t *sul)
 	if (stagger_idx == count)
 		return;
 
-	next = 300 * LWS_US_PER_MS;
+	next = 150 * LWS_US_PER_MS;
 	if (stagger_idx == count - 1)
-		next += 700 * LWS_US_PER_MS;
+		next += 400 * LWS_US_PER_MS;
+
+#if defined(LWS_WITH_TLS_SESSIONS)
+	if (stagger_idx == 1)
+		next += 600 * LWS_US_PER_MS;
+#endif
 
 	lws_sul_schedule(context, 0, &sul_stagger, stagger_cb, next);
 }
 
 int main(int argc, const char **argv)
 {
+	lws_state_notify_link_t notifier = { {0}, system_notify_cb, "app" };
+	lws_state_notify_link_t *na[] = { &notifier, NULL };
 	struct lws_context_creation_info info;
 	unsigned long long start;
-	int m, staggered = 0;
 	const char *p;
+#if defined(LWS_WITH_TLS_SESSIONS)
+	int pl = 0;
+#endif
 
 	memset(&info, 0, sizeof info); /* otherwise uninitialized garbage */
 	memset(&i, 0, sizeof i); /* otherwise uninitialized garbage */
@@ -361,6 +559,12 @@ int main(int argc, const char **argv)
 	 * network wsi) that we will use.
 	 */
 	info.fd_limit_per_thread = 1 + COUNT + 1;
+	info.register_notifier_list = na;
+	info.pcontext = &context;
+
+#if defined(LWS_WITH_SYS_METRICS)
+	info.system_ops = &system_ops;
+#endif
 
 #if defined(LWS_WITH_MBEDTLS) || defined(USE_WOLFSSL)
 	/*
@@ -370,19 +574,34 @@ int main(int argc, const char **argv)
 	info.client_ssl_ca_filepath = "./warmcat.com.cer";
 #endif
 
+	/* vhost option allowing tls session reuse, requires
+	 * LWS_WITH_TLS_SESSIONS build option */
+	if (lws_cmdline_option(argc, argv, "--no-tls-session-reuse"))
+		info.options |= LWS_SERVER_OPTION_DISABLE_TLS_SESSION_CACHE;
+
 	if ((p = lws_cmdline_option(argc, argv, "--limit")))
 		info.simultaneous_ssl_restriction = atoi(p);
 
-#if defined(LWS_WITH_DETAILED_LATENCY)
-	info.detailed_latency_cb = lws_det_lat_plot_cb;
-	info.detailed_latency_filepath = "/tmp/lws-latency-results";
-#endif
+	if (lws_cmdline_option(argc, argv, "--ssl-handshake-serialize"))
+		/* We only consider simultaneous_ssl_restriction > 1 use cases.
+		 * If ssl isn't limited or only 1 is allowed, we don't care.
+		 */
+		if (info.simultaneous_ssl_restriction > 1)
+			info.ssl_handshake_serialize = 1;
 
 	context = lws_create_context(&info);
 	if (!context) {
 		lwsl_err("lws init failed\n");
 		return 1;
 	}
+
+#if defined(LWS_ROLE_H2) && defined(LWS_ROLE_H1)
+	i.alpn = "h2,http/1.1";
+#elif defined(LWS_ROLE_H2)
+	i.alpn = "h2";
+#elif defined(LWS_ROLE_H1)
+	i.alpn = "http/1.1";
+#endif
 
 	i.context = context;
 	i.ssl_connection = LCCSCF_USE_SSL |
@@ -397,8 +616,17 @@ int main(int argc, const char **argv)
 		i.method = "GET";
 
 	/* enables h1 or h2 connection sharing */
-	if (lws_cmdline_option(argc, argv, "-p"))
+	if (lws_cmdline_option(argc, argv, "-p")) {
 		i.ssl_connection |= LCCSCF_PIPELINE;
+#if defined(LWS_WITH_TLS_SESSIONS)
+		pl = 1;
+#endif
+	}
+
+#if defined(LWS_WITH_CONMON)
+	if (lws_cmdline_option(argc, argv, "--conmon"))
+		i.ssl_connection |= LCCSCF_CONMON;
+#endif
 
 	/* force h1 even if h2 available */
 	if (lws_cmdline_option(argc, argv, "--h1"))
@@ -442,23 +670,28 @@ int main(int argc, const char **argv)
 	i.origin = i.address;
 	i.protocol = protocols[0].name;
 
-	if (!staggered)
-		/*
-		 * just pile on all the connections at once, testing the
-		 * pipeline queuing before the first is connected
-		 */
-		for (m = 0; m < count; m++)
-			lws_try_client_connection(&i, m);
-	else
-		/*
-		 * delay the connections slightly
-		 */
-		lws_sul_schedule(context, 0, &sul_stagger, stagger_cb,
-				 100 * LWS_US_PER_MS);
+#if defined(LWS_WITH_TLS_SESSIONS) && !defined(LWS_WITH_MBEDTLS) && !defined(WIN32)
+	/*
+	 * Attempt to preload a session from external storage
+	 */
+	if (lws_tls_session_dump_load(lws_get_vhost_by_name(context, "default"),
+				  i.host, (uint16_t)i.port, sess_load_cb, "/tmp"))
+		lwsl_warn("%s: session load failed\n", __func__);
+#endif
 
 	start = us();
 	while (!intr && !lws_service(context, 0))
 		;
+
+#if defined(LWS_WITH_TLS_SESSIONS)
+	lwsl_user("%s: session reuse count %d\n", __func__, reuse);
+
+	if (staggered && !pl && !reuse) {
+		lwsl_err("%s: failing, expected 1 .. %d reused\n", __func__, count - 1);
+		// too difficult to reproduce in CI
+		// failed = 1;
+	}
+#endif
 
 	lwsl_user("Duration: %lldms\n", (us() - start) / 1000);
 	lws_context_destroy(context);

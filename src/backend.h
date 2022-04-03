@@ -29,8 +29,7 @@ struct tick_event {
 };
 
 // Register a event to run on game ticks.
-tick_event *add_gametick_event(std::chrono::milliseconds delay_msecs,
-                               tick_event::callback_type callback);
+tick_event *add_gametick_event(int delay_ticks, tick_event::callback_type callback);
 // Realtime event will be executed as close to designated walltime as possible.
 tick_event *add_walltime_event(std::chrono::milliseconds delay_msecs,
                                tick_event::callback_type callback);
@@ -39,7 +38,7 @@ tick_event *add_walltime_event(std::chrono::milliseconds delay_msecs,
 void clear_tick_events();
 
 // Util to help translate gameticks with time.
-int time_to_gametick(std::chrono::milliseconds msec);
+int time_to_next_gametick(std::chrono::milliseconds msec);
 std::chrono::milliseconds gametick_to_time(int ticks);
 
 void update_load_av(void);

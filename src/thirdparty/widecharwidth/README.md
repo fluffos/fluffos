@@ -15,6 +15,7 @@ If you aren't sure how to handle negative return values, try this table:
  | `widechar_ambiguous`    | 1 |
  | `widechar_private_use`  | 1 |
  | `widechar_unassigned`   | 0 |
+ | `widechar_non_character`| 0 |
  | `widechar_widened_in_9` | 2 (or maybe 1, renderer dependent) |
 
 ## Regenerating the header

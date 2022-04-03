@@ -47,13 +47,19 @@ static struct lws_http_mount mount = {
     /* .basic_auth_login_file */ nullptr,
 };
 
-void lws_log(int severity, const char *msg) { debug(websocket, "lws:%d:%s", severity, msg); }
+void lws_log(int severity, const char *msg) {
+  if (severity == LLL_ERR) {
+    debug(all, "lws ERROR: %s", msg);
+  } else {
+    debug(websocket, "lws %d: %s", severity, msg);
+  }
+}
 
 struct lws_context *init_websocket_context(event_base *base, port_def_t *port) {
   int logs = LLL_USER | LLL_WARN | LLL_ERR;
 
 #ifdef DEBUG
-  logs |= LLL_WARN | LLL_NOTICE | LLL_INFO;
+  logs |= LLL_WARN | LLL_NOTICE | LLL_INFO | LLL_DEBUG;
   // More debug levels
   /* | LLL_INFO */ /* | LLL_PARSER */ /* | LLL_HEADER */
   /* | LLL_EXT */ /* | LLL_CLIENT */  /* | LLL_LATENCY */
@@ -73,8 +79,22 @@ struct lws_context *init_websocket_context(event_base *base, port_def_t *port) {
   info.port = CONTEXT_PORT_NO_LISTEN_SERVER;
   info.protocols = protocols;
   info.extensions = extensions;
-  info.pt_serv_buf_size = 32 * 1024;
+  info.pt_serv_buf_size = 128 * 1024;
   info.options = LWS_SERVER_OPTION_LIBEVENT | LWS_SERVER_OPTION_VALIDATE_UTF8;
+
+  if (!port->tls_cert.empty() && !port->tls_key.empty()) {
+    info.options |= LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
+    info.options |= LWS_SERVER_OPTION_ALLOW_NON_SSL_ON_SSL_PORT;
+    info.options |= LWS_SERVER_OPTION_REDIRECT_HTTP_TO_HTTPS;
+    info.ssl_cipher_list =
+        "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:"
+        "ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-"
+        "RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384";
+    info.ssl_cert_filepath = port->tls_cert.c_str();
+    info.ssl_private_key_filepath = port->tls_key.c_str();
+    info.ssl_options_clear = SSL_OP_CIPHER_SERVER_PREFERENCE;
+    info.ssl_options_set = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3;
+  }
   // info.options |= LWS_SERVER_OPTION_HTTP_HEADERS_SECURITY_BEST_PRACTICES_ENFORCE;
   info.user = (void *)port;
 

@@ -1,7 +1,7 @@
  /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2021 Andy Green <andy@warmcat.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -51,7 +51,7 @@ struct lws_event_loop_ops {
 	/* event loop accept processing  */
 	int (*sock_accept)(struct lws *wsi);
 	/* control wsi active events  */
-	void (*io)(struct lws *wsi, int flags);
+	void (*io)(struct lws *wsi, unsigned int flags);
 	/* run the event loop for a pt */
 	void (*run_pt)(struct lws_context *context, int tsi);
 	/* called before pt is destroyed */

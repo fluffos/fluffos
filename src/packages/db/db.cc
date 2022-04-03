@@ -376,10 +376,6 @@ void f_db_exec(void) {
   }
 
 #ifdef PACKAGE_ASYNC
-  if (!db_mut) {
-    db_mut = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
-    pthread_mutex_init(db_mut, nullptr);
-  }
   pthread_mutex_lock(db_mut);
 #endif
   if (db->type->cleanup) {
@@ -549,6 +545,15 @@ void db_cleanup(void) {
 int create_db_conn(void) {
   int i;
 
+#ifdef PACKAGE_ASYNC
+  if (!db_mut) {
+    db_mut = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+    pthread_mutex_init(db_mut, nullptr);
+  }
+  pthread_mutex_lock(db_mut);
+  DEFER { pthread_mutex_unlock(db_mut); };
+#endif
+
   /* allocate more slots if we need them */
   if (dbConnAlloc == dbConnUsed) {
     i = dbConnAlloc;
@@ -556,13 +561,7 @@ int create_db_conn(void) {
     if (!dbConnList) {
       dbConnList = (db_t *)DCALLOC(dbConnAlloc, sizeof(db_t), TAG_DB, "create_db_conn");
     } else {
-#ifdef PACKAGE_ASYNC
-      pthread_mutex_lock(db_mut);
-#endif
       dbConnList = RESIZE(dbConnList, dbConnAlloc, db_t, TAG_DB, "create_db_conn");
-#ifdef PACKAGE_ASYNC
-      pthread_mutex_unlock(db_mut);
-#endif
     }
     while (i < dbConnAlloc) {
       dbConnList[i++].flags = DB_FLAG_EMPTY;
@@ -703,13 +702,13 @@ static array_t *MySQL_fetch(dbconn_t *c, int row) {
         case FIELD_TYPE_LONGLONG:
           v->item[i].type = T_NUMBER;
           v->item[i].subtype = 0;
-          v->item[i].u.number = atoi(target_row[i]);
+          v->item[i].u.number = strtoull(target_row[i], nullptr, 10);
           break;
 
         case FIELD_TYPE_FLOAT:
         case FIELD_TYPE_DOUBLE:
           v->item[i].type = T_REAL;
-          v->item[i].u.real = atof(target_row[i]);
+          v->item[i].u.real = strtod(target_row[i], nullptr);
           break;
 
         case FIELD_TYPE_TINY_BLOB:
@@ -1058,7 +1057,7 @@ static array_t *SQLite3_fetch(dbconn_t *c, int row) {
     switch (sqlite3_column_type(c->SQLite3.results, i)) {
       case SQLITE_INTEGER:
         v->item[i].type = T_NUMBER;
-        v->item[i].u.number = sqlite3_column_int(c->SQLite3.results, i);
+        v->item[i].u.number = sqlite3_column_int64(c->SQLite3.results, i);
         break;
 
       case SQLITE_FLOAT:

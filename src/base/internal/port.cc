@@ -1,11 +1,13 @@
+#include "config.h"
+
 #include "base/internal/port.h"
 
 #include "base/internal/rc.h"
 #include "base/internal/rusage.h"
-#include "config.h"
 
 #include <random>
 #include <unistd.h>
+#include <cstring>
 
 // Returns a pseudo-random number in the range 0 .. n-1
 int64_t random_number(int64_t n) {
@@ -44,7 +46,11 @@ int64_t secure_random_number(int64_t n) {
  * of seconds since 1970.
  */
 
-time_t get_current_time() { return time(nullptr); /* Just use the old time() for now */ }
+time_t get_current_time() {
+  struct timeval t = {};
+  gettimeofday(&t, nullptr);
+  return t.tv_sec;
+}
 
 /*
  * Get a microsecond clock sample.
@@ -71,3 +77,16 @@ long get_cpu_times(unsigned long *secs, unsigned long *usecs) {
 
 /* return the current working directory */
 char *get_current_dir(char *buf, int limit) { return getcwd(buf, limit); /* POSIX */ }
+
+/* jemalloc stub, this function can't otherwise be replaced */
+#ifdef HAVE_JEMALLOC
+char *strdup(const char *str) {
+  if (!str) {
+    errno = EINVAL;
+    return NULL;
+  }
+  size_t ln = strlen(str);
+  void *p = malloc(ln + 1);
+  return static_cast<char *>(memcpy(p, str, ln + 1));
+}
+#endif

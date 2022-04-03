@@ -170,7 +170,7 @@ _lws_header_ensure_we_are_on_waiting_list(struct lws *wsi)
 		pwsi = &(*pwsi)->http.ah_wait_list;
 	}
 
-	lwsl_info("%s: wsi: %p\n", __func__, wsi);
+	lwsl_info("%s: wsi: %s\n", __func__, lws_wsi_tag(wsi));
 	wsi->http.ah_wait_list = pt->http.ah_wait_list;
 	pt->http.ah_wait_list = wsi;
 	pt->http.ah_wait_list_length++;
@@ -188,7 +188,7 @@ __lws_remove_from_ah_waiting_list(struct lws *wsi)
 
 	while (*pwsi) {
 		if (*pwsi == wsi) {
-			lwsl_info("%s: wsi %p\n", __func__, wsi);
+			lwsl_info("%s: wsi %s\n", __func__, lws_wsi_tag(wsi));
 			/* point prev guy to our next */
 			*pwsi = wsi->http.ah_wait_list;
 			/* we shouldn't point anywhere now */
@@ -216,8 +216,8 @@ lws_header_table_attach(struct lws *wsi, int autoservice)
 		goto connect_via_info2;
 #endif
 
-	lwsl_info("%s: wsi %p: ah %p (tsi %d, count = %d) in\n", __func__,
-		  (void *)wsi, (void *)wsi->http.ah, wsi->tsi,
+	lwsl_info("%s: %s: ah %p (tsi %d, count = %d) in\n", __func__,
+		  lws_wsi_tag(wsi), (void *)wsi->http.ah, wsi->tsi,
 		  pt->http.ah_count_in_use);
 
 	if (!lwsi_role_http(wsi)) {
@@ -234,13 +234,10 @@ lws_header_table_attach(struct lws *wsi, int autoservice)
 		goto reset;
 	}
 
-	n = pt->http.ah_count_in_use == context->max_http_header_pool;
+	n = pt->http.ah_count_in_use == (int)context->max_http_header_pool;
 #if defined(LWS_WITH_PEER_LIMITS)
-	if (!n) {
+	if (!n)
 		n = lws_peer_confirm_ah_attach_ok(context, wsi->peer);
-		if (n)
-			lws_stats_bump(pt, LWSSTATS_C_PEER_LIMIT_AH_DENIED, 1);
-	}
 #endif
 	if (n) {
 		/*
@@ -278,8 +275,8 @@ lws_header_table_attach(struct lws *wsi, int autoservice)
 
 	_lws_change_pollfd(wsi, 0, LWS_POLLIN, &pa);
 
-	lwsl_info("%s: did attach wsi %p: ah %p: count %d (on exit)\n", __func__,
-		  (void *)wsi, (void *)wsi->http.ah, pt->http.ah_count_in_use);
+	lwsl_info("%s: did attach wsi %s: ah %p: count %d (on exit)\n", __func__,
+		  lws_wsi_tag(wsi), (void *)wsi->http.ah, pt->http.ah_count_in_use);
 
 reset:
 	__lws_header_table_reset(wsi, autoservice);
@@ -320,8 +317,8 @@ int __lws_header_table_detach(struct lws *wsi, int autoservice)
 	if (!ah)
 		return 0;
 
-	lwsl_info("%s: wsi %p: ah %p (tsi=%d, count = %d)\n", __func__,
-		  (void *)wsi, (void *)ah, wsi->tsi,
+	lwsl_info("%s: %s: ah %p (tsi=%d, count = %d)\n", __func__,
+		  lws_wsi_tag(wsi), (void *)ah, wsi->tsi,
 		  pt->http.ah_count_in_use);
 
 	/* we did have an ah attached */
@@ -331,8 +328,9 @@ int __lws_header_table_detach(struct lws *wsi, int autoservice)
 		 * we're detaching the ah, but it was held an
 		 * unreasonably long time
 		 */
-		lwsl_debug("%s: wsi %p: ah held %ds, role/state 0x%lx 0x%x,"
-			    "\n", __func__, wsi, (int)(now - ah->assigned),
+		lwsl_debug("%s: %s: ah held %ds, role/state 0x%lx 0x%x,"
+			    "\n", __func__, lws_wsi_tag(wsi),
+			    (int)(now - ah->assigned),
 			    (unsigned long)lwsi_role(wsi), lwsi_state(wsi));
 	}
 
@@ -361,7 +359,7 @@ int __lws_header_table_detach(struct lws *wsi, int autoservice)
 	 * at least one wsi on the same tsi is waiting, give it to oldest guy
 	 * who is allowed to take it (if any)
 	 */
-	lwsl_info("pt wait list %p\n", *pwsi);
+	lwsl_info("%s: pt wait list %s\n", __func__, lws_wsi_tag(*pwsi));
 	wsi = NULL;
 	pwsi_eligible = NULL;
 
@@ -374,12 +372,7 @@ int __lws_header_table_detach(struct lws *wsi, int autoservice)
 			wsi = *pwsi;
 			pwsi_eligible = pwsi;
 		}
-#if defined(LWS_WITH_PEER_LIMITS)
-		else
-			if (!(*pwsi)->http.ah_wait_list)
-				lws_stats_bump(pt,
-					LWSSTATS_C_PEER_LIMIT_AH_DENIED, 1);
-#endif
+
 		pwsi = &(*pwsi)->http.ah_wait_list;
 	}
 
@@ -387,7 +380,7 @@ int __lws_header_table_detach(struct lws *wsi, int autoservice)
 		goto nobody_usable_waiting;
 
 	lwsl_info("%s: transferring ah to last eligible wsi in wait list "
-		  "%p (wsistate 0x%lx)\n", __func__, wsi,
+		  "%s (wsistate 0x%lx)\n", __func__, lws_wsi_tag(wsi),
 		  (unsigned long)wsi->wsistate);
 
 	wsi->http.ah = ah;
@@ -404,7 +397,7 @@ int __lws_header_table_detach(struct lws *wsi, int autoservice)
 
 	/* clients acquire the ah and then insert themselves in fds table... */
 	if (wsi->position_in_fds_table != LWS_NO_FDS_POS) {
-		lwsl_info("%s: Enabling %p POLLIN\n", __func__, wsi);
+		lwsl_info("%s: Enabling %s POLLIN\n", __func__, lws_wsi_tag(wsi));
 
 		/* he has been stuck waiting for an ah, but now his wait is
 		 * over, let him progress */
@@ -436,8 +429,8 @@ int __lws_header_table_detach(struct lws *wsi, int autoservice)
 	assert(!!pt->http.ah_wait_list_length ==
 			!!(lws_intptr_t)pt->http.ah_wait_list);
 bail:
-	lwsl_info("%s: wsi %p: ah %p (tsi=%d, count = %d)\n", __func__,
-		  (void *)wsi, (void *)ah, pt->tid, pt->http.ah_count_in_use);
+	lwsl_info("%s: %s: ah %p (tsi=%d, count = %d)\n", __func__,
+		  lws_wsi_tag(wsi), (void *)ah, pt->tid, pt->http.ah_count_in_use);
 
 	return 0;
 
@@ -497,8 +490,8 @@ int lws_hdr_total_length(struct lws *wsi, enum lws_token_indexes h)
 		len += wsi->http.ah->frags[n].len;
 		n = wsi->http.ah->frags[n].nfrag;
 
-		if (n && h != WSI_TOKEN_HTTP_COOKIE)
-			++len;
+		if (n)
+			len++;
 
 	} while (n);
 
@@ -539,9 +532,7 @@ int lws_hdr_copy_fragment(struct lws *wsi, char *dst, int len,
 int lws_hdr_copy(struct lws *wsi, char *dst, int len,
 			     enum lws_token_indexes h)
 {
-	int toklen = lws_hdr_total_length(wsi, h);
-	int n;
-	int comma;
+	int toklen = lws_hdr_total_length(wsi, h), n, comma;
 
 	*dst = '\0';
 	if (!toklen)
@@ -554,26 +545,55 @@ int lws_hdr_copy(struct lws *wsi, char *dst, int len,
 		return -1;
 
 	n = wsi->http.ah->frag_index[h];
+	if (h == WSI_TOKEN_HTTP_URI_ARGS)
+		lwsl_err("%s: WSI_TOKEN_HTTP_URI_ARGS start frag %d\n",
+				__func__, n);
+
+
 	if (!n)
 		return 0;
-
 	do {
-		comma = (wsi->http.ah->frags[n].nfrag &&
-			h != WSI_TOKEN_HTTP_COOKIE) ? 1 : 0;
+		comma = (wsi->http.ah->frags[n].nfrag) ? 1 : 0;
 
-		if (wsi->http.ah->frags[n].len + comma >= len)
+		if (h == WSI_TOKEN_HTTP_URI_ARGS)
+			lwsl_notice("%s: WSI_TOKEN_HTTP_URI_ARGS '%.*s'\n",
+				    __func__, (int)wsi->http.ah->frags[n].len,
+				    &wsi->http.ah->data[
+				                wsi->http.ah->frags[n].offset]);
+
+		if (wsi->http.ah->frags[n].len + comma >= len) {
+			lwsl_notice("blowout len\n");
 			return -1;
+		}
 		strncpy(dst, &wsi->http.ah->data[wsi->http.ah->frags[n].offset],
 		        wsi->http.ah->frags[n].len);
 		dst += wsi->http.ah->frags[n].len;
 		len -= wsi->http.ah->frags[n].len;
 		n = wsi->http.ah->frags[n].nfrag;
 
-		if (comma)
-			*dst++ = ',';
+		/*
+		 * Note if you change this logic, take care about updating len
+		 * and make sure lws_hdr_total_length() gives the same resulting
+		 * length
+		 */
+
+		if (comma) {
+			if (h == WSI_TOKEN_HTTP_COOKIE ||
+			    h == WSI_TOKEN_HTTP_SET_COOKIE)
+				*dst++ = ';';
+			else
+				if (h == WSI_TOKEN_HTTP_URI_ARGS)
+					*dst++ = '&';
+				else
+					*dst++ = ',';
+			len--;
+		}
 				
 	} while (n);
 	*dst = '\0';
+
+	if (h == WSI_TOKEN_HTTP_URI_ARGS)
+		lwsl_err("%s: WSI_TOKEN_HTTP_URI_ARGS toklen %d\n", __func__, (int)toklen);
 
 	return toklen;
 }
@@ -593,7 +613,7 @@ lws_hdr_custom_length(struct lws *wsi, const char *name, int nlen)
 			return -1;
 		if (nlen == lws_ser_ru16be(
 			(uint8_t *)&wsi->http.ah->data[ll + UHO_NLEN]) &&
-		    !strncmp(name, &wsi->http.ah->data[ll + UHO_NAME], nlen))
+		    !strncmp(name, &wsi->http.ah->data[ll + UHO_NAME], (unsigned int)nlen))
 			return lws_ser_ru16be(
 				(uint8_t *)&wsi->http.ah->data[ll + UHO_VLEN]);
 
@@ -621,12 +641,12 @@ lws_hdr_custom_copy(struct lws *wsi, char *dst, int len, const char *name,
 			return -1;
 		if (nlen == lws_ser_ru16be(
 			(uint8_t *)&wsi->http.ah->data[ll + UHO_NLEN]) &&
-		    !strncmp(name, &wsi->http.ah->data[ll + UHO_NAME], nlen)) {
+		    !strncmp(name, &wsi->http.ah->data[ll + UHO_NAME], (unsigned int)nlen)) {
 			n = lws_ser_ru16be(
 				(uint8_t *)&wsi->http.ah->data[ll + UHO_VLEN]);
 			if (n + 1 > len)
 				return -1;
-			strncpy(dst, &wsi->http.ah->data[ll + UHO_NAME + nlen], n);
+			strncpy(dst, &wsi->http.ah->data[ll + UHO_NAME + (unsigned int)nlen], (unsigned int)n);
 			dst[n] = '\0';
 
 			return n;
@@ -662,7 +682,7 @@ lws_pos_in_bounds(struct lws *wsi)
 	    (unsigned int)wsi->a.context->max_http_header_data)
 		return 0;
 
-	if ((int)wsi->http.ah->pos >= wsi->a.context->max_http_header_data - 1) {
+	if ((int)wsi->http.ah->pos >= (int)wsi->a.context->max_http_header_data - 1) {
 		lwsl_err("Ran out of header data space\n");
 		return 1;
 	}
@@ -731,9 +751,8 @@ issue_char(struct lws *wsi, unsigned char c)
 	 */
 	if (!wsi->http.ah->current_token_limit ||
 	    frag_len < wsi->http.ah->current_token_limit) {
-		wsi->http.ah->data[wsi->http.ah->pos++] = c;
-		if (c)
-			wsi->http.ah->frags[wsi->http.ah->nfrag].len++;
+		wsi->http.ah->data[wsi->http.ah->pos++] = (char)c;
+		wsi->http.ah->frags[wsi->http.ah->nfrag].len++;
 		return 0;
 	}
 
@@ -772,21 +791,21 @@ lws_parse_urldecode(struct lws *wsi, uint8_t *_c)
 		}
 		break;
 	case URIES_SEEN_PERCENT:
-		if (char_to_hex(c) < 0)
+		if (char_to_hex((char)c) < 0)
 			/* illegal post-% char */
 			goto forbid;
 
-		ah->esc_stash = c;
+		ah->esc_stash = (char)c;
 		ah->ues = URIES_SEEN_PERCENT_H1;
 		goto swallow;
 
 	case URIES_SEEN_PERCENT_H1:
-		if (char_to_hex(c) < 0)
+		if (char_to_hex((char)c) < 0)
 			/* illegal post-% char */
 			goto forbid;
 
-		*_c = (char_to_hex(ah->esc_stash) << 4) |
-				char_to_hex(c);
+		*_c = (uint8_t)(unsigned int)((char_to_hex(ah->esc_stash) << 4) |
+				char_to_hex((char)c));
 		c = *_c;
 		enc = 1;
 		ah->ues = URIES_IDLE;
@@ -802,16 +821,31 @@ lws_parse_urldecode(struct lws *wsi, uint8_t *_c)
 	 *  leave /.dir or whatever alone
 	 */
 
+	if (!c && (!ah->frag_index[WSI_TOKEN_HTTP_URI_ARGS] ||
+		   !ah->post_literal_equal)) {
+		/*
+		 * Since user code is typically going to parse the path using
+		 * NUL-terminated apis, it's too dangerous to allow NUL
+		 * injection here.
+		 *
+		 * It's allowed in the urlargs, because the apis to access
+		 * those only allow retreival with explicit length.
+		 */
+		lwsl_warn("%s: saw NUL outside of uri args\n", __func__);
+		return -1;
+	}
+
 	switch (ah->ups) {
 	case URIPS_IDLE:
-		if (!c)
-			return -1;
+
 		/* genuine delimiter */
 		if ((c == '&' || c == ';') && !enc) {
 			if (issue_char(wsi, '\0') < 0)
 				return -1;
+			/* don't account for it */
+			wsi->http.ah->frags[wsi->http.ah->nfrag].len--;
 			/* link to next fragment */
-			ah->frags[ah->nfrag].nfrag = ah->nfrag + 1;
+			ah->frags[ah->nfrag].nfrag = (uint8_t)(ah->nfrag + 1);
 			ah->nfrag++;
 			if (ah->nfrag >= LWS_ARRAY_SIZE(ah->frags))
 				goto excessive;
@@ -914,6 +948,9 @@ lws_parse_urldecode(struct lws *wsi, uint8_t *_c)
 		if (issue_char(wsi, '\0') < 0)
 			return -1;
 
+		/* don't account for it */
+		wsi->http.ah->frags[wsi->http.ah->nfrag].len--;
+
 		/* move to using WSI_TOKEN_HTTP_URI_ARGS */
 		ah->nfrag++;
 		if (ah->nfrag >= LWS_ARRAY_SIZE(ah->frags))
@@ -980,7 +1017,7 @@ lws_parse(struct lws *wsi, unsigned char *buf, int *len)
 				break;
 			if (c == '\n') {
 				lws_ser_wu16be((uint8_t *)&ah->data[ah->unk_pos + 2],
-					       ah->pos - ah->unk_value_pos);
+					       (uint16_t)(ah->pos - ah->unk_value_pos));
 				ah->parser_state = WSI_TOKEN_NAME_PART;
 				ah->unk_pos = 0;
 				ah->lextable_pos = 0;
@@ -994,7 +1031,7 @@ lws_parse(struct lws *wsi, unsigned char *buf, int *len)
 				if (lws_pos_in_bounds(wsi))
 					return LPR_FAIL;
 
-				ah->data[ah->pos++] = c;
+				ah->data[ah->pos++] = (char)c;
 			}
 			pos = ah->lextable_pos;
 			break;
@@ -1045,6 +1082,8 @@ lws_parse(struct lws *wsi, unsigned char *buf, int *len)
 				/* begin parsing HTTP version: */
 				if (issue_char(wsi, '\0') < 0)
 					return LPR_FAIL;
+				/* don't account for it */
+				wsi->http.ah->frags[wsi->http.ah->nfrag].len--;
 				ah->parser_state = WSI_TOKEN_HTTP;
 				goto start_fragment;
 			}
@@ -1072,7 +1111,8 @@ check_eol:
 				if (c == '\x0a') {
 					/* broken peer */
 					ah->parser_state = WSI_TOKEN_NAME_PART;
-					ah->unk_pos = ah->lextable_pos = 0;
+					ah->unk_pos = 0;
+					ah->lextable_pos = 0;
 				} else
 					ah->parser_state = WSI_TOKEN_SKIPPING_SAW_CR;
 
@@ -1080,11 +1120,22 @@ check_eol:
 				lwsl_parser("*\n");
 			}
 
-			n = issue_char(wsi, c);
+			n = (unsigned int)issue_char(wsi, c);
 			if ((int)n < 0)
 				return LPR_FAIL;
 			if (n > 0)
 				ah->parser_state = WSI_TOKEN_SKIPPING;
+			else {
+				/*
+				 * Explicit zeroes are legal in URI ARGS.
+				 * They can only exist as a safety terminator
+				 * after the valid part of the token contents
+				 * for other types.
+				 */
+				if (!c && ah->parser_state != WSI_TOKEN_HTTP_URI_ARGS)
+					/* don't account for safety terminator */
+					wsi->http.ah->frags[wsi->http.ah->nfrag].len--;
+			}
 
 swallow:
 			/* per-protocol end of headers management */
@@ -1106,7 +1157,7 @@ swallow:
 				goto set_parsing_complete;
 
 			if (c >= 'A' && c <= 'Z')
-				c += 'a' - 'A';
+				c = (unsigned char)(c + 'a' - 'A');
 			/*
 			 * ...in case it's an unknown header, speculatively
 			 * store it as the name comes in.  If we recognize it as
@@ -1133,7 +1184,7 @@ swallow:
 			if (lws_pos_in_bounds(wsi))
 				return LPR_FAIL;
 
-			ah->data[ah->pos++] = c;
+			ah->data[ah->pos++] = (char)c;
 			pos = ah->lextable_pos;
 
 #if defined(LWS_WITH_CUSTOM_HEADERS)
@@ -1160,7 +1211,7 @@ swallow:
 				ah->unk_ll_tail = ah->unk_pos;
 
 #if defined(_DEBUG)
-				uhlen = ah->pos - (ah->unk_pos + UHO_NAME);
+				uhlen = (int)(ah->pos - (ah->unk_pos + UHO_NAME));
 				lws_strnncpy(dotstar,
 					&ah->data[ah->unk_pos + UHO_NAME],
 					uhlen, sizeof(dotstar));
@@ -1173,7 +1224,7 @@ swallow:
 				/* set the unknown header name part length */
 
 				lws_ser_wu16be((uint8_t *)&ah->data[ah->unk_pos],
-					       (ah->pos - ah->unk_pos) - UHO_NAME);
+					       (uint16_t)((ah->pos - ah->unk_pos) - UHO_NAME));
 
 				ah->unk_value_pos = ah->pos;
 
@@ -1201,7 +1252,7 @@ nope:
 					if (lextable_h1[pos] == FAIL_CHAR)
 						goto nope;
 
-					ah->lextable_pos = pos;
+					ah->lextable_pos = (int16_t)pos;
 					break;
 				}
 
@@ -1221,14 +1272,14 @@ nope:
 						ah->unk_pos = 0;
 					}
 
-					ah->lextable_pos = pos;
+					ah->lextable_pos = (int16_t)pos;
 					break;
 				}
 
 				if (lextable_h1[pos] == c) { /* goto */
-					ah->lextable_pos = pos +
+					ah->lextable_pos = (int16_t)(pos +
 						(lextable_h1[pos + 1]) +
-						(lextable_h1[pos + 2] << 8);
+						(lextable_h1[pos + 2] << 8));
 					break;
 				}
 
@@ -1342,7 +1393,7 @@ nope:
 					n = WSI_TOKEN_ORIGIN;
 #endif
 
-				ah->parser_state = (enum lws_token_indexes)
+				ah->parser_state = (uint8_t)
 							(WSI_TOKEN_GET_URI + n);
 				ah->ups = URIPS_IDLE;
 
@@ -1404,7 +1455,8 @@ excessive:
 			if (c == '\x0a') {
 				/* broken peer */
 				ah->parser_state = WSI_TOKEN_NAME_PART;
-				ah->unk_pos = ah->lextable_pos = 0;
+				ah->unk_pos = 0;
+				ah->lextable_pos = 0;
 			}
 
 			if (c == '\x0d')
@@ -1417,7 +1469,8 @@ excessive:
 				goto forbid;
 			if (c == '\x0a') {
 				ah->parser_state = WSI_TOKEN_NAME_PART;
-				ah->unk_pos = ah->lextable_pos = 0;
+				ah->unk_pos = 0;
+				ah->lextable_pos = 0;
 			} else
 				ah->parser_state = WSI_TOKEN_SKIPPING;
 			break;
@@ -1440,7 +1493,7 @@ set_parsing_complete:
 #if defined(LWS_ROLE_WS)
 		const char *pv = lws_hdr_simple_ptr(wsi, WSI_TOKEN_VERSION);
 		if (pv)
-			wsi->rx_frame_type = atoi(pv);
+			wsi->rx_frame_type = (char)atoi(pv);
 
 		lwsl_parser("v%02d hdrs done\n", wsi->rx_frame_type);
 #endif
@@ -1463,25 +1516,64 @@ int
 lws_http_cookie_get(struct lws *wsi, const char *name, char *buf,
 		    size_t *max_len)
 {
-	int n, bl = (int)strlen(name);
-	size_t max = *max_len;
+	size_t max = *max_len, bl = strlen(name);
 	char *p, *bo = buf;
+	int n;
 
 	n = lws_hdr_total_length(wsi, WSI_TOKEN_HTTP_COOKIE);
-	lwsl_notice("%s: cookie hdr len %d\n", __func__, n);
-	if (n < bl + 1)
+	if ((unsigned int)n < bl + 1)
 		return 1;
+
+	/*
+	 * This can come to us two ways, in ah fragments (h2) or as a single
+	 * semicolon-delimited string (h1)
+	 */
+
+#if defined(LWS_ROLE_H2)
+	if (lws_hdr_total_length(wsi, WSI_TOKEN_HTTP_COLON_METHOD)) {
+
+		/*
+		 * The h2 way...
+		 */
+
+		int f = wsi->http.ah->frag_index[WSI_TOKEN_HTTP_COOKIE];
+		size_t fl;
+
+		while (f) {
+			p = wsi->http.ah->data + wsi->http.ah->frags[f].offset;
+			fl = (size_t)wsi->http.ah->frags[f].len;
+			if (fl >= bl + 1 &&
+			    p[bl] == '=' &&
+			    !memcmp(p, name, bl)) {
+				fl -= bl + 1;
+				if (max - 1 < fl)
+					fl = max - 1;
+				if (fl)
+					memcpy(buf, p + bl + 1, fl);
+				*max_len = fl;
+				buf[fl] = '\0';
+
+				return 0;
+			}
+			f = wsi->http.ah->frags[f].nfrag;
+		}
+
+		return -1;
+	}
+#endif
+
+	/*
+	 * The h1 way...
+	 */
 
 	p = lws_hdr_simple_ptr(wsi, WSI_TOKEN_HTTP_COOKIE);
 	if (!p)
 		return 1;
 
-	lwsl_hexdump_notice(p, n);
-
 	p += bl;
-	n -= bl;
-	while (n-- > bl) {
-		if (*p == '=' && !memcmp(p - bl, name, bl)) {
+	n -= (int)bl;
+	while (n-- > (int)bl) {
+		if (*p == '=' && !memcmp(p - bl, name, (unsigned int)bl)) {
 			p++;
 			while (*p != ';' && n-- && max) {
 				*buf++ = *p++;
@@ -1491,7 +1583,7 @@ lws_http_cookie_get(struct lws *wsi, const char *name, char *buf,
 				return 2;
 
 			*buf = '\0';
-			*max_len = lws_ptr_diff(buf, bo);
+			*max_len = lws_ptr_diff_size_t(buf, bo);
 
 			return 0;
 		}
@@ -1517,7 +1609,7 @@ lws_jwt_get_http_cookie_validate_jwt(struct lws *wsi,
 	/* first use out to hold the encoded JWT */
 
 	if (lws_http_cookie_get(wsi, i->cookie_name, out, out_len)) {
-		lwsl_notice("%s: cookie %s not provided\n", __func__,
+		lwsl_debug("%s: cookie %s not provided\n", __func__,
 				i->cookie_name);
 		return 1;
 	}
@@ -1526,7 +1618,7 @@ lws_jwt_get_http_cookie_validate_jwt(struct lws *wsi,
 
 	if (lws_jwt_signed_validate(wsi->a.context, i->jwk, i->alg, out,
 				    *out_len, temp, sizeof(temp), out, &cml)) {
-		lwsl_notice("%s: jwt validation failed\n", __func__);
+		lwsl_info("%s: jwt validation failed\n", __func__);
 		return 1;
 	}
 
@@ -1552,9 +1644,7 @@ lws_jwt_get_http_cookie_validate_jwt(struct lws *wsi,
 	if (cp)
 		i->extra_json = cp;
 
-	if (cp)
-		lwsl_hexdump_notice(cp, i->extra_json_len);
-	else
+	if (!cp)
 		lwsl_notice("%s: no ext JWT payload\n", __func__);
 
 	return 0;

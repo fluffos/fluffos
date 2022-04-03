@@ -34,8 +34,13 @@
 #include "vm/internal/base/svalue.h"
 #include "compiler.h"
 #include "keyword.h"
+
+#include "compiler/internal/grammar_rules.h"
 #include "grammar.autogen.h"
+
 #include "scratchpad.h"
+
+#include "symbol.h"
 
 // FIXME: in master.h
 extern struct object_t *master_ob;
@@ -76,7 +81,7 @@ int current_line_base;  /* number of lines from other files */
 int current_line_saved; /* last line in this file where line num
                            info was saved */
 int total_lines;        /* Used to compute average compiled lines/s */
-char *current_file;
+const char *current_file;
 int current_file_id;
 
 /* Bit flags for pragmas in effect */
@@ -88,9 +93,9 @@ lpc_predef_t *lpc_predefs = nullptr;
 
 static int yyin_desc;
 int lex_fatal;
-static char **inc_list;  // global include path from runtime config
+static const char **inc_list;  // global include path from runtime config
 static int inc_list_size;
-static char **inc_path;  // include path used for current compile
+static const char **inc_path;  // include path used for current compile
 static int inc_path_size;
 static int defines_need_freed = 0;
 static char *last_nl;
@@ -107,7 +112,7 @@ typedef struct incstate_s {
   struct incstate_s *next;
   int yyin_desc;
   int line;
-  char *file;
+  const char *file;
   int file_id;
   char *last_nl;
   char *outp;
@@ -156,9 +161,6 @@ static keyword_t reswords[] = {
     {"catch", L_CATCH, 0},
 #ifdef STRUCT_CLASS
     {"class", L_CLASS, 0},
-#endif
-#ifdef COMPAT_32
-    {"closure", L_BASIC_TYPE, TYPE_FUNCTION},
 #endif
     {"continue", L_CONTINUE, 0},
     {"default", L_DEFAULT, 0},
@@ -327,10 +329,7 @@ static void add_define(const char *name, int nargs, const char *exps) {
         return;
       }
       if (nargs != p->nargs || strcmp(exps, p->exps)) {
-        char buf[200 + NSIZE];
-
-        sprintf(buf, "redefinition of #define %s\n", name);
-        yywarn(buf);
+        yywarn("redefinition of #define %s\n", name);
 
         p->exps =
             reinterpret_cast<char *>(DREALLOC(p->exps, len + 1, TAG_COMPILER, "add_define: redef"));
@@ -856,7 +855,7 @@ void init_include_path() {
     debug_message("got empty include path for 'master::get_include_path(%s)'\n", current_file);
     return;  // we still have the runtime configuration
   }
-  char **path = static_cast<char **>(
+  const char **path = static_cast<const char **>(
       DMALLOC(sizeof(char *) * size, TAG_COMPILER, "compiler:init_include_path"));
 
   // check elements and build working copy
@@ -872,7 +871,7 @@ void init_include_path() {
     const char *elem;
     if (!strcmp(elem = arr->item[i].u.string, ":DEFAULT:")) {  // replace with runtime configuration
       size += inc_list_size - 1;                               // get additional space
-      path = static_cast<char **>(
+      path = static_cast<const char **>(
           DREALLOC(path, sizeof(char *) * size, TAG_COMPILER, "compiler:init_include_path"));
       for (k = 0; k < inc_list_size;) {  // and copy runtime configuration
         path[j++] = make_shared_string(inc_list[k++]);
@@ -980,6 +979,8 @@ static void handle_include(char *name, int global) {
   static char buf[MAXLINE];
   incstate_t *is;
   int delim, f;
+
+  symbol_record(OP_SYMBOL_INC, current_file, current_line, name);
 
   if (*name != '"' && *name != '<') {
     defn_t *d;
@@ -1366,6 +1367,13 @@ static int get_text_block(char *term) {
       if (c == '\n') {
         current_line++;
       }
+      if (len > 0) {
+        // Remove trailing CR
+        if (text_line[curchunk][len - 1] == '\r') {
+          text_line[curchunk][len - 1] = '\0';
+          len = len - 1;
+        }
+      }
       /*
        * make sure there's room in the current chunk for terminator (ie
        * it's simpler if we don't have to deal with a terminator that
@@ -1381,11 +1389,6 @@ static int get_text_block(char *term) {
         text_line[++curchunk] =
             reinterpret_cast<char *>(DMALLOC(MAXCHUNK, TAG_COMPILER, "text_block"));
         len = 0;
-      }
-      // Remove trailing CR
-      if (text_line[curchunk][len - 1] == '\r') {
-        text_line[curchunk][len - 1] = '\0';
-        len = len - 1;
       }
       /*
        * header
@@ -2028,7 +2031,7 @@ int yylex() {
           yyerror("$var illegal outside of function pointer.");
           return '$';
         }
-        if (current_function_context->num_parameters == -2) {
+        if (current_function_context->num_parameters < 0) {
           yyerror("$var illegal inside anonymous function pointer.");
           return '$';
         } else {
@@ -2231,15 +2234,9 @@ int yylex() {
             } else if (strcmp("echo", yytext) == 0) {
               debug_message("%s\n", sp);
             } else if (strcmp("error", yytext) == 0) {
-              char buf[MAXLINE + 1];
-              strcpy(buf, yytext);
-              strcat(buf, "\n");
-              yyerror(buf);
+              yyerror("%s\n", yytext);
             } else if (strcmp("warn", yytext) == 0) {
-              char buf[MAXLINE + 1];
-              strcpy(buf, yytext);
-              strcat(buf, "\n");
-              yywarn(buf);
+              yywarn("%s\n", yytext);
             } else if (strcmp("pragma", yytext) == 0) {
               handle_pragma(sp);
             } else if (strcmp("breakpoint", yytext) == 0) {
@@ -2251,12 +2248,6 @@ int yylex() {
             break;
           }
         } else {
-#ifdef COMPAT_32
-          if (*outp == '\'') {
-            outp++;
-            return L_LAMBDA;
-          }
-#endif
           goto badlex;
         }
       case '\'':
@@ -2534,7 +2525,7 @@ int yylex() {
                   if (U16_IS_SINGLE(res[0])) {
                     UErrorCode err = U_ZERO_ERROR;
                     int32_t written = 0;
-                    u_strToUTF8(reinterpret_cast<char *>(to), 4, &written, res, 2, &err);
+                    u_strToUTF8(reinterpret_cast<char *>(to), 4, &written, res, 1, &err);
                     if (U_FAILURE(err)) {
                       lexerror("Illegal unicode sequence.");
                       return LEX_EOF;
@@ -3491,6 +3482,7 @@ static void handle_define(char *yyt) {
   char mtext[MLEN];
   char *p, *q;
 
+  symbol_record(OP_SYMBOL_DEFINE, current_file, current_line, yyt);
   p = yyt;
   strcat(p, " ");
   q = namebuf;
@@ -3704,10 +3696,7 @@ static void add_predefine(const char *name, int nargs, const char *exps) {
 
   if ((p = lookup_define(name))) {
     if (nargs != p->nargs || strcmp(exps, p->exps)) {
-      char buf[200 + NSIZE];
-
-      sprintf(buf, "redefinition of #define %s\n", name);
-      yywarn(buf);
+      yywarn("redefinition of #define %s\n", name);
     }
     p->exps = reinterpret_cast<char *>(
         DREALLOC(p->exps, strlen(exps) + 1, TAG_PREDEFINES, "add_define: redef"));
@@ -4121,7 +4110,7 @@ void set_inc_list(char *list) {
     p++;
   }
   inc_path = inc_list =
-      reinterpret_cast<char **>(DCALLOC(size, sizeof(char *), TAG_INC_LIST, "set_inc_list"));
+      reinterpret_cast<const char **>(DCALLOC(size, sizeof(char *), TAG_INC_LIST, "set_inc_list"));
   inc_path_size = inc_list_size = size;
   for (i = size - 1; i >= 0; i--) {
     p = strrchr(list, ':');
@@ -4152,7 +4141,7 @@ void set_inc_list(char *list) {
   }
 }
 
-char *main_file_name() {
+const char *main_file_name() {
   incstate_t *is;
 
   if (inctop == nullptr) {

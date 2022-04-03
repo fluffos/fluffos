@@ -78,6 +78,24 @@ if (LWS_WITH_CLIENT)
 			)
 		endif()
 
+		if (LWS_WITH_SECURE_STREAMS_AUTH_SIGV4)
+			list(APPEND SOURCES
+				secure-streams/system/auth-sigv4/sign.c
+			)
+		endif()
+
+
+		if (LWS_WITH_SECURE_STREAMS_CPP)
+			list(APPEND SOURCES secure-streams/cpp/lss.cxx)
+
+			if (LWS_ROLE_H1 OR LWS_ROLE_H2)
+				list(APPEND SOURCES secure-streams/cpp/lssFile.cxx)
+			endif()
+
+			if (LWS_ROLE_WS)
+				list(APPEND SOURCES secure-streams/cpp/lssMsg.cxx)
+			endif()
+		endif()
 
 	#
 	# Helper function for adding a secure stream plugin

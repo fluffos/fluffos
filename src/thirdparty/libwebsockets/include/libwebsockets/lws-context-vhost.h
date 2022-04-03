@@ -1,7 +1,7 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2021 Andy Green <andy@warmcat.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -230,6 +230,19 @@
 	/**< (CTX) Disable lws_system state, eg, because we are a secure streams
 	 * proxy client that is not trying to track system state by itself. */
 
+#define LWS_SERVER_OPTION_SS_PROXY				 (1ll << 36)
+	/**< (VH) We are being a SS Proxy listen socket for the vhost */
+
+#define LWS_SERVER_OPTION_SDEVENT			 	 (1ll << 37)
+	/**< (CTX) Use sd-event loop */
+
+#define LWS_SERVER_OPTION_ULOOP					 (1ll << 38)
+	/**< (CTX) Use libubox / uloop event loop */
+
+#define LWS_SERVER_OPTION_DISABLE_TLS_SESSION_CACHE		 (1ll << 39)
+	/**< (VHOST) Disallow use of client tls caching (on by default) */
+
+
 	/****** add new things just above ---^ ******/
 
 
@@ -238,6 +251,7 @@
 struct lws_plat_file_ops;
 struct lws_ss_policy;
 struct lws_ss_plugin;
+struct lws_metric_policy;
 
 typedef int (*lws_context_ready_cb_t)(struct lws_context *context);
 
@@ -439,6 +453,9 @@ struct lws_context_creation_info {
 	int simultaneous_ssl_restriction;
 	/**< CONTEXT: 0 (no limit) or limit of simultaneous SSL sessions
 	 * possible.*/
+	int ssl_handshake_serialize;
+	/**< CONTEXT: 0 disables ssl handshake serialization (default).
+	 *            1 enables ssl handshake serialization. */
 	int ssl_info_event_mask;
 	/**< VHOST: mask of ssl events to be reported on LWS_CALLBACK_SSL_INFO
 	 * callback for connections on this vhost.  The mask values are of
@@ -560,10 +577,19 @@ struct lws_context_creation_info {
 	 * 0 defaults to 10s. */
 #endif /* WITH_NETWORK */
 
-	int gid;
+#if defined(LWS_WITH_TLS_SESSIONS)
+	uint32_t			tls_session_timeout;
+	/**< VHOST: seconds until timeout/ttl for newly created sessions.
+	 * 0 means default timeout (defined per protocol, usually 300s). */
+	uint32_t			tls_session_cache_max;
+	/**< VHOST: 0 for default limit of 10, or the maximum number of
+	 * client tls sessions we are willing to cache */
+#endif
+
+	gid_t gid;
 	/**< CONTEXT: group id to change to after setting listen socket,
 	 *   or -1. See also .username below. */
-	int uid;
+	uid_t uid;
 	/**< CONTEXT: user id to change to after setting listen socket,
 	 *   or -1.  See also .groupname below. */
 	uint64_t options;
@@ -718,13 +744,6 @@ struct lws_context_creation_info {
 	const lws_system_ops_t *system_ops;
 	/**< CONTEXT: hook up lws_system_ apis to system-specific
 	 * implementations */
-#if defined(LWS_WITH_DETAILED_LATENCY)
-	det_lat_buf_cb_t detailed_latency_cb;
-	/**< CONTEXT: NULL, or callback to receive detailed latency information
-	 * collected for each read and write */
-	const char *detailed_latency_filepath;
-	/**< CONTEXT: NULL, or filepath to put latency data into */
-#endif
 	const lws_retry_bo_t *retry_and_idle_policy;
 	/**< VHOST: optional retry and idle policy to apply to this vhost.
 	 *   Currently only the idle parts are applied to the connections.
@@ -742,7 +761,11 @@ struct lws_context_creation_info {
 #else
 	const char *pss_policies_json; /**< CONTEXT: point to a string
 	 * containing a JSON description of the secure streams policies.  Set
-	 * to NULL if not using Secure Streams. */
+	 * to NULL if not using Secure Streams.
+	 * If the platform supports files and the string does not begin with
+	 * '{', lws treats the string as a filepath to open to get the JSON
+	 * policy.
+	 */
 #endif
 	const struct lws_ss_plugin **pss_plugins; /**< CONTEXT: point to an array
 	 * of pointers to plugin structs here, terminated with a NULL ptr.
@@ -790,13 +813,15 @@ struct lws_context_creation_info {
 	 */
 
 #endif /* PEER_LIMITS */
-#if defined(LWS_WITH_UDP)
-	uint8_t udp_loss_sim_tx_pc;
-	/**< CONTEXT: percentage of udp writes we could have performed
-	 * to instead not do, in order to simulate and test udp retry flow */
-	uint8_t udp_loss_sim_rx_pc;
-	/**< CONTEXT: percentage of udp reads we actually received
-	 * to make disappear, in order to simulate and test udp retry flow */
+
+#if defined(LWS_WITH_SYS_FAULT_INJECTION)
+	lws_fi_ctx_t				fic;
+	/**< CONTEXT | VHOST: attach external Fault Injection context to the
+	 * lws_context or vhost.  If creating the context + default vhost in
+	 * one step, only the context binds to \p fi.  When creating a vhost
+	 * otherwise this can bind to the vhost so the faults can be injected
+	 * from the start.
+	 */
 #endif
 
 #if defined(LWS_WITH_SYS_SMD)
@@ -809,6 +834,26 @@ struct lws_context_creation_info {
 	 */
 	void					*early_smd_opaque;
 	lws_smd_class_t				early_smd_class_filter;
+	lws_usec_t				smd_ttl_us;
+	/**< CONTEXT: SMD messages older than this many us are removed from the
+	 * queue and destroyed even if not fully delivered yet.  If zero,
+	 * defaults to 2 seconds (5 second for FREERTOS).
+	 */
+	uint16_t				smd_queue_depth;
+	/**< CONTEXT: Maximum queue depth, If zero defaults to 40
+	 * (20 for FREERTOS) */
+#endif
+
+#if defined(LWS_WITH_SYS_METRICS)
+	const struct lws_metric_policy		*metrics_policies;
+	/**< non-SS policy metrics policies */
+	const char				*metrics_prefix;
+	/**< prefix for this context's metrics, used to distinguish metrics
+	 * pooled from different processes / applications, so, eg what would
+	 * be "cpu.svc" if this is NULL becomes "myapp.cpu.svc" is this is
+	 * set to "myapp".  Policies are applied using the name with the prefix,
+	 * if present.
+	 */
 #endif
 
 	/* Add new things just above here ---^
@@ -1112,6 +1157,27 @@ lws_vhost_user(struct lws_vhost *vhost);
  */
 LWS_VISIBLE LWS_EXTERN void *
 lws_context_user(struct lws_context *context);
+
+LWS_VISIBLE LWS_EXTERN const char *
+lws_vh_tag(struct lws_vhost *vh);
+
+/**
+ * lws_context_is_being_destroyed() - find out if context is being destroyed
+ *
+ * \param context: the struct lws_context pointer
+ *
+ * Returns nonzero if the context has had lws_context_destroy() called on it...
+ * when using event library loops the destroy process can be asynchronous.  In
+ * the special case of libuv foreign loops, the failure to create the context
+ * may have to do work on the foreign loop to reverse the partial creation,
+ * meaning a failed context create cannot unpick what it did and return NULL.
+ *
+ * In that condition, a valid context that is already started the destroy
+ * process is returned, and this test api will return nonzero as a way to
+ * find out the create is in the middle of failing.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_context_is_being_destroyed(struct lws_context *context);
 
 /*! \defgroup vhost-mounts Vhost mounts and options
  * \ingroup context-and-vhost-creation

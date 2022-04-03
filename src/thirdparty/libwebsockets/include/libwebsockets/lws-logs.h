@@ -59,7 +59,7 @@
  * returns length written in p
  */
 LWS_VISIBLE LWS_EXTERN int
-lwsl_timestamp(int level, char *p, int len);
+lwsl_timestamp(int level, char *p, size_t len);
 
 #if defined(LWS_PLAT_OPTEE) && !defined(LWS_WITH_NETWORK)
 #define _lws_log(aaa, ...) SMSG(__VA_ARGS__)
@@ -82,7 +82,11 @@ LWS_VISIBLE LWS_EXTERN void _lws_logv(int filter, const char *format, va_list vl
    #define _LWS_LINIT ((1 << LLL_COUNT) - 1)
  #endif
 #else /* not _DEBUG */
+#if defined(LWS_WITH_NO_LOGS)
+#define _LWS_LINIT (LLL_ERR | LLL_USER)
+#else
  #define _LWS_LINIT (LLL_ERR | LLL_USER | LLL_WARN | LLL_NOTICE)
+#endif
 #endif /* _DEBUG */
 
 /*
@@ -298,5 +302,10 @@ lwsl_emit_stderr_notimestamp(int level, const char *line);
  */
 LWS_VISIBLE LWS_EXTERN int
 lwsl_visible(int level);
+
+struct lws;
+
+LWS_VISIBLE LWS_EXTERN const char *
+lws_wsi_tag(struct lws *wsi);
 
 ///@}

@@ -6,16 +6,15 @@ on:
   push:
     branches:
       - master
+    paths-ignore:
+      - 'docs/**'
 
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
-        compiler:
-          - CC: "gcc"
-            CXX: "g++"
-        build: ["Debug"]
+        build: ["Debug", "RelWithDebInfo"]
         os: ["ubuntu-18.04"]
 
     runs-on: ${{ matrix.os }}
@@ -25,9 +24,8 @@ jobs:
       - name: Install packages
         run: |
           sudo apt update
-          sudo apt install -y build-essential clang-6.0 autoconf automake bison expect libevent-dev libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
+          sudo apt install -y build-essential clang-6.0 autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
       - name: configure
-        env: ${{ matrix.compiler }}
         run: |
           mkdir build
           cd build
@@ -53,8 +51,8 @@ jobs:
             --form token=$TOKEN \
             --form email=sunyucong@gmail.com \
             --form file=@fluffos.tgz \
-            --form version="`git describe`" \
-            --form description="`git describe`" \
+            --form version="`git describe --tags --always` - ${{ matrix.build }}" \
+            --form description="`git describe --tags --always` - ${{ matrix.build }}" \
             https://scan.coverity.com/builds?project=fluffos%2Ffluffos
         env:
           TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}

@@ -24,72 +24,6 @@
 
 #include "private-lib-core.h"
 
-#if defined(LWS_WITH_TLS)
-int
-lws_client_create_tls(struct lws *wsi, const char **pcce, int do_c1)
-{
-
-	/* we can retry this... just cook the SSL BIO the first time */
-
-	if (wsi->tls.use_ssl & LCCSCF_USE_SSL) {
-		int n;
-
-		if (!wsi->tls.ssl) {
-			if (lws_ssl_client_bio_create(wsi) < 0) {
-				*pcce = "bio_create failed";
-				return CCTLS_RETURN_ERROR;
-			}
-
-#if defined(LWS_WITH_TLS)
-			if (!wsi->transaction_from_pipeline_queue &&
-			    lws_tls_restrict_borrow(wsi->a.context)) {
-				*pcce = "tls restriction limit";
-				return CCTLS_RETURN_ERROR;
-			}
-#endif
-		}
-
-		if (!do_c1)
-			return 0;
-
-		n = lws_ssl_client_connect1(wsi, (char *)wsi->a.context->pt[(int)wsi->tsi].serv_buf,
-					    wsi->a.context->pt_serv_buf_size);
-		lwsl_debug("%s: lws_ssl_client_connect1: %d\n", __func__, n);
-		if (!n)
-			return CCTLS_RETURN_RETRY; /* caller should return 0 */
-		if (n < 0) {
-			*pcce = (const char *)wsi->a.context->pt[(int)wsi->tsi].serv_buf;
-			return CCTLS_RETURN_ERROR;
-		}
-	} else
-		wsi->tls.ssl = NULL;
-
-#if defined (LWS_WITH_HTTP2)
-	if (wsi->client_h2_alpn) {
-		/*
-		 * We connected to the server and set up tls, and
-		 * negotiated "h2".
-		 *
-		 * So this is it, we are an h2 master client connection
-		 * now, not an h1 client connection.
-		 */
-#if defined(LWS_WITH_TLS)
-		lws_tls_server_conn_alpn(wsi);
-#endif
-
-		/* send the H2 preface to legitimize the connection */
-		if (lws_h2_issue_preface(wsi)) {
-			*pcce = "error sending h2 preface";
-			return CCTLS_RETURN_ERROR;
-		}
-	}
-#endif
-
-	return CCTLS_RETURN_DONE; /* OK */
-}
-
-#endif
-
 void
 lws_client_http_body_pending(struct lws *wsi, int something_left_to_send)
 {
@@ -97,7 +31,7 @@ lws_client_http_body_pending(struct lws *wsi, int something_left_to_send)
 }
 
 int
-lws_client_socket_service(struct lws *wsi, struct lws_pollfd *pollfd)
+lws_http_client_socket_service(struct lws *wsi, struct lws_pollfd *pollfd)
 {
 	struct lws_context *context = wsi->a.context;
 	struct lws_context_per_thread *pt = &context->pt[(int)wsi->tsi];
@@ -116,7 +50,7 @@ lws_client_socket_service(struct lws *wsi, struct lws_pollfd *pollfd)
 		 * we are under PENDING_TIMEOUT_SENT_CLIENT_HANDSHAKE
 		 * timeout protection set in client-handshake.c
 		 */
-		lwsl_err("%s: wsi %p: WAITING_DNS\n", __func__, wsi);
+		lwsl_err("%s: %s: WAITING_DNS\n", __func__, lws_wsi_tag(wsi));
 		if (!lws_client_connect_2_dnsreq(wsi)) {
 			/* closed */
 			lwsl_client("closed\n");
@@ -133,7 +67,10 @@ lws_client_socket_service(struct lws *wsi, struct lws_pollfd *pollfd)
 		 * timeout protection set in client-handshake.c
 		 */
 		if (pollfd->revents & LWS_POLLOUT)
-			lws_client_connect_3_connect(wsi, NULL, NULL, 0, NULL);
+			if (lws_client_connect_3_connect(wsi, NULL, NULL, 0, NULL) == NULL) {
+				lwsl_client("closed\n");
+				return -1;
+			}
 		break;
 
 #if defined(LWS_WITH_SOCKS5)
@@ -163,14 +100,14 @@ lws_client_socket_service(struct lws *wsi, struct lws_pollfd *pollfd)
 
 		if (pollfd->revents & LWS_POLLHUP) {
 
-			lwsl_warn("Proxy connection %p (fd=%d) dead\n",
-				  (void *)wsi, pollfd->fd);
+			lwsl_warn("Proxy conn %s (fd=%d) dead\n",
+				  lws_wsi_tag(wsi), pollfd->fd);
 
 			cce = "proxy conn dead";
 			goto bail3;
 		}
 
-		n = recv(wsi->desc.sockfd, sb, context->pt_serv_buf_size, 0);
+		n = (int)recv(wsi->desc.sockfd, sb, context->pt_serv_buf_size, 0);
 		if (n < 0) {
 			if (LWS_ERRNO == LWS_EAGAIN) {
 				lwsl_debug("Proxy read EAGAIN... retrying\n");
@@ -181,13 +118,22 @@ lws_client_socket_service(struct lws *wsi, struct lws_pollfd *pollfd)
 			goto bail3;
 		}
 
+		/* sanity check what we were sent... */
+
 		pt->serv_buf[13] = '\0';
-		if (n < 13 || (strncmp(sb, "HTTP/1.0 200 ", 13) &&
-		    strncmp(sb, "HTTP/1.1 200 ", 13))) {
-			lwsl_err("%s: ERROR proxy did not reply with h1\n",
-					__func__);
+		if (n < 13 || strncmp(sb, "HTTP/1.", 7) ||
+			      (sb[7] != '0' && sb[7] != '1') || sb[8] != ' ') {
 			/* lwsl_hexdump_notice(sb, n); */
-			cce = "proxy not h1";
+			cce = "http_proxy fail";
+			goto bail3;
+		}
+
+		/* it's h1 alright... what's his logical response code? */
+		n = atoi(&sb[9]);
+		if (n != 200) {
+			lws_snprintf(sb, 20, "http_proxy -> %u",
+				     (unsigned int)n);
+			cce = sb;
 			goto bail3;
 		}
 
@@ -197,11 +143,15 @@ lws_client_socket_service(struct lws *wsi, struct lws_pollfd *pollfd)
 
 		lws_set_timeout(wsi, NO_PENDING_TIMEOUT, 0);
 
-		/* fallthrough */
+               /* fallthru */
 
 #endif
 
+               /* dummy fallthru to satisfy compiler */
+               /* fallthru */
 	case LRS_H1C_ISSUE_HANDSHAKE:
+
+		lwsl_debug("%s: LRS_H1C_ISSUE_HANDSHAKE\n", __func__);
 
 		/*
 		 * we are under PENDING_TIMEOUT_SENT_CLIENT_HANDSHAKE
@@ -216,12 +166,36 @@ start_ws_handshake:
 		if (lws_change_pollfd(wsi, LWS_POLLOUT, 0))
 			return -1;
 
+#if defined(LWS_ROLE_H2) || defined(LWS_WITH_TLS)
+		if (
+#if defined(LWS_WITH_TLS)
+		    !(wsi->tls.use_ssl & LCCSCF_USE_SSL)
+#endif
+#if defined(LWS_ROLE_H2) && defined(LWS_WITH_TLS)
+		    &&
+#endif
+#if defined(LWS_ROLE_H2)
+		    !(wsi->flags & LCCSCF_H2_PRIOR_KNOWLEDGE)
+#endif
+		    )
+			goto hs2;
+#endif
+
 #if defined(LWS_WITH_TLS)
 		n = lws_client_create_tls(wsi, &cce, 1);
-		if (n < 0)
+		if (n == CCTLS_RETURN_ERROR)
 			goto bail3;
-		if (n == 1)
+		if (n == CCTLS_RETURN_RETRY)
 			return 0;
+
+		/*
+		 * lws_client_create_tls() can already have done the
+		 * whole tls setup and preface send... if so he set our state
+		 * to LRS_H1C_ISSUE_HANDSHAKE2... let's proceed but be prepared
+		 * to notice our state and not resend the preface...
+		 */
+
+		lwsl_debug("%s: LRS_H1C_ISSUE_HANDSHAKE fallthru\n", __func__);
 
 		/* fallthru */
 
@@ -237,37 +211,27 @@ start_ws_handshake:
 			}
 		} else {
 			wsi->tls.ssl = NULL;
-			if(wsi->flags & LCCSCF_H2_PRIOR_KNOWLEDGE) {
+			if (wsi->flags & LCCSCF_H2_PRIOR_KNOWLEDGE) {
 				lwsl_info("h2 prior knowledge\n");
 				lws_role_call_alpn_negotiated(wsi, "h2");
 			}
 		}
 #endif
-#if defined(LWS_WITH_DETAILED_LATENCY)
-		if (context->detailed_latency_cb) {
-			wsi->detlat.type = LDLT_TLS_NEG_CLIENT;
-			wsi->detlat.latencies[LAT_DUR_PROXY_CLIENT_REQ_TO_WRITE] =
-				lws_now_usecs() -
-				wsi->detlat.earliest_write_req_pre_write;
-			wsi->detlat.latencies[LAT_DUR_USERCB] = 0;
-			lws_det_lat_cb(wsi->a.context, &wsi->detlat);
-		}
-#endif
+
 #if defined (LWS_WITH_HTTP2)
-		if (wsi->client_h2_alpn) {
+		if (wsi->client_h2_alpn && lwsi_state(wsi) != LRS_H1C_ISSUE_HANDSHAKE2) {
 			/*
 			 * We connected to the server and set up tls and
 			 * negotiated "h2" or connected as clear text
 			 * with http/2 prior knowledge.
 			 *
-			 * So this is it, we are an h2 master client connection
+			 * So this is it, we are an h2 nwsi client connection
 			 * now, not an h1 client connection.
 			 */
 
 #if defined(LWS_WITH_TLS)
-			if (wsi->tls.use_ssl & LCCSCF_USE_SSL) {
+			if (wsi->tls.use_ssl & LCCSCF_USE_SSL)
 				lws_tls_server_conn_alpn(wsi);
-			}
 #endif
 
 			/* send the H2 preface to legitimize the connection */
@@ -278,7 +242,7 @@ start_ws_handshake:
 
 		//	lwsi_set_state(wsi, LRS_H1C_ISSUE_HANDSHAKE2);
 			lws_set_timeout(wsi, PENDING_TIMEOUT_AWAITING_CLIENT_HS_SEND,
-					context->timeout_secs);
+					(int)context->timeout_secs);
 
 			break;
 		}
@@ -287,6 +251,9 @@ start_ws_handshake:
 		/* fallthru */
 
 	case LRS_H1C_ISSUE_HANDSHAKE2:
+
+hs2:
+
 		p = lws_generate_client_handshake(wsi, p);
 		if (p == NULL) {
 			if (wsi->role_ops == &role_ops_raw_skt
@@ -304,14 +271,12 @@ start_ws_handshake:
 
 		/* send our request to the server */
 
-		lwsl_info("%s: HANDSHAKE2: %p: sending headers "
+		lwsl_info("%s: HANDSHAKE2: %s: sending headers "
 			  "(wsistate 0x%lx), w sock %d\n",
-			  __func__, wsi, (unsigned long)wsi->wsistate,
-			  wsi->desc.sockfd);
-#if defined(LWS_WITH_DETAILED_LATENCY)
-		wsi->detlat.earliest_write_req_pre_write = lws_now_usecs();
-#endif
-		n = lws_ssl_capable_write(wsi, (unsigned char *)sb, (int)(p - sb));
+			  __func__, lws_wsi_tag(wsi),
+			  (unsigned long)wsi->wsistate, wsi->desc.sockfd);
+
+		n = lws_ssl_capable_write(wsi, (unsigned char *)sb, lws_ptr_diff_size_t(p, sb));
 		switch (n) {
 		case LWS_SSL_CAPABLE_ERROR:
 			lwsl_debug("ERROR writing to client socket\n");
@@ -323,17 +288,18 @@ start_ws_handshake:
 			break;
 		}
 
-		if (wsi->client_http_body_pending) {
+		if (wsi->client_http_body_pending || lws_has_buffered_out(wsi)) {
 			lwsl_debug("body pending\n");
 			lwsi_set_state(wsi, LRS_ISSUE_HTTP_BODY);
 			lws_set_timeout(wsi,
 					PENDING_TIMEOUT_CLIENT_ISSUE_PAYLOAD,
-					context->timeout_secs);
+					(int)context->timeout_secs);
 
 			if (wsi->flags & LCCSCF_HTTP_X_WWW_FORM_URLENCODED)
 				lws_callback_on_writable(wsi);
 #if defined(LWS_WITH_HTTP_PROXY)
-			if (wsi->http.proxy_clientside)
+			if (wsi->http.proxy_clientside && wsi->parent &&
+			    wsi->parent->http.buflist_post_body)
 				lws_callback_on_writable(wsi);
 #endif
 			/* user code must ask for writable callback */
@@ -356,7 +322,7 @@ start_ws_handshake:
 		}
 
 		lws_set_timeout(wsi, PENDING_TIMEOUT_AWAITING_SERVER_RESPONSE,
-				wsi->a.context->timeout_secs);
+				(int)wsi->a.context->timeout_secs);
 
 		lws_callback_on_writable(wsi);
 
@@ -364,12 +330,11 @@ start_ws_handshake:
 
 	case LRS_ISSUE_HTTP_BODY:
 #if defined(LWS_WITH_HTTP_PROXY)
-			if (wsi->http.proxy_clientside) {
+			if (wsi->http.proxy_clientside && wsi->parent &&
+			    wsi->parent->http.buflist_post_body)
 				lws_callback_on_writable(wsi);
-				break;
-			}
 #endif
-		if (wsi->client_http_body_pending) {
+		if (wsi->client_http_body_pending || lws_has_buffered_out(wsi)) {
 			//lws_set_timeout(wsi,
 			//		PENDING_TIMEOUT_CLIENT_ISSUE_PAYLOAD,
 			//		context->timeout_secs);
@@ -385,7 +350,7 @@ client_http_body_sent:
 #endif
 		lwsi_set_state(wsi, LRS_WAITING_SERVER_REPLY);
 		lws_set_timeout(wsi, PENDING_TIMEOUT_AWAITING_SERVER_RESPONSE,
-				context->timeout_secs);
+				(int)context->timeout_secs);
 		break;
 
 	case LRS_WAITING_SERVER_REPLY:
@@ -396,11 +361,19 @@ client_http_body_sent:
 		if ((pollfd->revents & (LWS_POLLIN | LWS_POLLHUP)) ==
 								LWS_POLLHUP) {
 
-			lwsl_debug("Server connection %p (fd=%d) dead\n",
-				(void *)wsi, pollfd->fd);
-			cce = "Peer hung up";
-			goto bail3;
+			if (lws_buflist_total_len(&wsi->buflist))
+				lws_set_timeout(wsi, PENDING_TIMEOUT_CLOSE_ACK, 3);
+			else {
+				lwsl_debug("Server conn %s (fd=%d) dead\n",
+						lws_wsi_tag(wsi), pollfd->fd);
+				cce = "Peer hung up";
+				goto bail3;
+			}
 		}
+
+		if (pollfd->revents & LWS_POLLOUT)
+			if (lws_change_pollfd(wsi, LWS_POLLOUT, 0))
+				return -1;
 
 		if (!(pollfd->revents & LWS_POLLIN))
 			break;
@@ -485,8 +458,8 @@ client_http_body_sent:
 		return lws_client_interpret_server_handshake(wsi);
 
 bail3:
-		lwsl_info("%s: closing conn at LWS_CONNMODE...SERVER_REPLY, wsi %p, state 0x%x\n",
-				__func__, wsi, lwsi_state(wsi));
+		lwsl_info("%s: closing conn at LWS_CONNMODE...SERVER_REPLY, %s, state 0x%x\n",
+				__func__, lws_wsi_tag(wsi), lwsi_state(wsi));
 		if (cce)
 			lwsl_info("reason: %s\n", cce);
 		else
@@ -511,7 +484,12 @@ lws_http_transaction_completed_client(struct lws *wsi)
 	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
 	int n;
 
-	lwsl_info("%s: wsi: %p (%s)\n", __func__, wsi, wsi->a.protocol->name);
+	lwsl_info("%s: %s (%s)\n", __func__, lws_wsi_tag(wsi),
+			wsi->a.protocol->name);
+
+	// if (wsi->http.ah && wsi->http.ah->http_response)
+	/* we're only judging if any (200, or 500 etc) http txn completed */
+	lws_metrics_caliper_report(wsi->cal_conn, METRES_GO);
 
 	if (user_callback_handle_rxflow(wsi->a.protocol->callback, wsi,
 					LWS_CALLBACK_COMPLETED_CLIENT_HTTP,
@@ -560,13 +538,13 @@ lws_http_transaction_completed_client(struct lws *wsi)
 	wsi->http.ah->unk_pos = 0;
 
 	lws_set_timeout(wsi, PENDING_TIMEOUT_AWAITING_SERVER_RESPONSE,
-			wsi->a.context->timeout_secs);
+			(int)wsi->a.context->timeout_secs);
 
 	/* If we're (re)starting on headers, need other implied init */
 	wsi->http.ah->ues = URIES_IDLE;
 	lwsi_set_state(wsi, LRS_H1C_ISSUE_HANDSHAKE2);
 
-	lwsl_info("%s: %p: new queued transaction\n", __func__, wsi);
+	lwsl_info("%s: %s: new queued transaction\n", __func__, lws_wsi_tag(wsi));
 	lws_callback_on_writable(wsi);
 
 	return 0;
@@ -601,7 +579,12 @@ lws_client_interpret_server_handshake(struct lws *wsi)
 	char *p = NULL, *q, *simp;
 	char new_path[300];
 
-	lws_free_set_NULL(wsi->stash);
+	// lws_free_set_NULL(wsi->stash);
+
+#if defined(LWS_WITH_CONMON)
+	wsi->conmon.ciu_txn_resp = (lws_conmon_interval_us_t)
+					(lws_now_usecs() - wsi->conmon_datum);
+#endif
 
 	ah = wsi->http.ah;
 	if (!wsi->do_ws) {
@@ -609,8 +592,8 @@ lws_client_interpret_server_handshake(struct lws *wsi)
 		 */
 #if defined(LWS_ROLE_H2)
 		if (wsi->client_h2_alpn || wsi->client_mux_substream) {
-			lwsl_debug("%s: %p: transitioning to h2 client\n",
-				   __func__, wsi);
+			lwsl_debug("%s: %s: transitioning to h2 client\n",
+				   __func__, lws_wsi_tag(wsi));
 			lws_role_transition(wsi, LWSIFR_CLIENT,
 					    LRS_ESTABLISHED, &role_ops_h2);
 		} else
@@ -618,8 +601,8 @@ lws_client_interpret_server_handshake(struct lws *wsi)
 		{
 #if defined(LWS_ROLE_H1)
 			{
-			lwsl_debug("%s: %p: transitioning to h1 client\n",
-				   __func__, wsi);
+			lwsl_debug("%s: %s: transitioning to h1 client\n",
+				   __func__, lws_wsi_tag(wsi));
 			lws_role_transition(wsi, LWSIFR_CLIENT,
 					    LRS_ESTABLISHED, &role_ops_h1);
 			}
@@ -683,7 +666,7 @@ lws_client_interpret_server_handshake(struct lws *wsi)
 #endif
 	n = atoi(p);
 	if (ah)
-		ah->http_response = n;
+		ah->http_response = (unsigned int)n;
 
 	if (!wsi->client_no_follow_redirect &&
 #if defined(LWS_WITH_HTTP_PROXY)
@@ -700,7 +683,7 @@ lws_client_interpret_server_handshake(struct lws *wsi)
 
 		if (wsi->a.protocol->callback(wsi,
 					    LWS_CALLBACK_CLIENT_HTTP_REDIRECT,
-					    wsi->user_space, p, n)) {
+					    wsi->user_space, p, (unsigned int)n)) {
 			cce = "HS: user code rejected redirect";
 			goto bail3;
 		}
@@ -769,7 +752,7 @@ lws_client_interpret_server_handshake(struct lws *wsi)
 			q = strrchr(new_path, '/');
 			if (q)
 				lws_strncpy(q + 1, p, sizeof(new_path) -
-							(q - new_path) - 1);
+							(unsigned int)(q - new_path) - 1);
 			else
 				path = p;
 		}
@@ -892,7 +875,7 @@ lws_client_interpret_server_handshake(struct lws *wsi)
 		if (!simp)
 			goto bail2;
 
-		wsi->http.rx_content_length = atoll(simp);
+		wsi->http.rx_content_length = (lws_filepos_t)atoll(simp);
 		lwsl_info("%s: incoming content length %llu\n",
 			    __func__, (unsigned long long)
 				    wsi->http.rx_content_length);
@@ -957,14 +940,16 @@ lws_client_interpret_server_handshake(struct lws *wsi)
 
 		wsi->http.ah = ah1;
 
-		lwsl_info("%s: wsi %p: client connection up\n", __func__, wsi);
+		lwsl_info("%s: %s: client conn up\n", __func__, lws_wsi_tag(wsi));
 
 		/*
 		 * Did we get a response from the server with an explicit
-		 * content-length of zero?  If so, this transaction is already
+		 * content-length of zero?  If so, and it's not H2 which will
+		 * notice it via END_STREAM, this transaction is already
 		 * completed at the end of the header processing...
 		 */
-		if (lws_hdr_total_length(wsi, WSI_TOKEN_HTTP_CONTENT_LENGTH) &&
+		if (!wsi->mux_substream && !wsi->client_mux_substream &&
+		    lws_hdr_total_length(wsi, WSI_TOKEN_HTTP_CONTENT_LENGTH) &&
 		    !wsi->http.rx_content_length)
 		        return !!lws_http_transaction_completed_client(wsi);
 
@@ -1014,7 +999,7 @@ bail2:
 				  wsi->a.protocol->name : "unknown", cce);
 
 	/* closing will free up his parsing allocations */
-	lws_close_free_wsi(wsi, close_reason, "c hs interp");
+	lws_close_free_wsi(wsi, (enum lws_close_status)close_reason, "c hs interp");
 
 	return 1;
 }
@@ -1063,7 +1048,7 @@ lws_client_http_multipart(struct lws *wsi, const char *name,
 	assert(wsi->http.multipart);
 
 	if (!name) {
-		*p += lws_snprintf((char *)(*p), lws_ptr_diff(end, *p),
+		*p += lws_snprintf((char *)(*p), lws_ptr_diff_size_t(end, *p),
 					"\xd\xa--%s--\xd\xa",
 					wsi->http.multipart_boundary);
 
@@ -1071,22 +1056,22 @@ lws_client_http_multipart(struct lws *wsi, const char *name,
 	}
 
 	if (wsi->client_subsequent_mime_part)
-		*p += lws_snprintf((char *)(*p), lws_ptr_diff(end, *p), "\xd\xa");
+		*p += lws_snprintf((char *)(*p), lws_ptr_diff_size_t(end, *p), "\xd\xa");
 	wsi->client_subsequent_mime_part = 1;
 
-	*p += lws_snprintf((char *)(*p), lws_ptr_diff(end, *p), "--%s\xd\xa"
+	*p += lws_snprintf((char *)(*p), lws_ptr_diff_size_t(end, *p), "--%s\xd\xa"
 				    "Content-Disposition: form-data; "
 				      "name=\"%s\"",
 				      wsi->http.multipart_boundary, name);
 	if (filename)
-		*p += lws_snprintf((char *)(*p), lws_ptr_diff(end, *p),
+		*p += lws_snprintf((char *)(*p), lws_ptr_diff_size_t(end, *p),
 				   "; filename=\"%s\"", filename);
 
 	if (content_type)
-		*p += lws_snprintf((char *)(*p), lws_ptr_diff(end, *p), "\xd\xa"
+		*p += lws_snprintf((char *)(*p), lws_ptr_diff_size_t(end, *p), "\xd\xa"
 				"Content-Type: %s", content_type);
 
-	*p += lws_snprintf((char *)(*p), lws_ptr_diff(end, *p), "\xd\xa\xd\xa");
+	*p += lws_snprintf((char *)(*p), lws_ptr_diff_size_t(end, *p), "\xd\xa\xd\xa");
 
 	return *p == end;
 }
@@ -1096,7 +1081,7 @@ lws_generate_client_handshake(struct lws *wsi, char *pkt)
 {
 	const char *meth, *pp = lws_hdr_simple_ptr(wsi,
 				_WSI_TOKEN_CLIENT_SENT_PROTOCOLS);
-	char *p = pkt, *p1;
+	char *p = pkt, *p1, *end = p + wsi->a.context->pt_serv_buf_size;
 
 	meth = lws_hdr_simple_ptr(wsi, _WSI_TOKEN_CLIENT_METHOD);
 	if (!meth) {
@@ -1148,24 +1133,29 @@ lws_generate_client_handshake(struct lws *wsi, char *pkt)
 	 * Sec-WebSocket-Version: 4
 	 */
 
-	p += lws_snprintf(p, 2048, "%s %s HTTP/1.1\x0d\x0a", meth,
-		     lws_hdr_simple_ptr(wsi, _WSI_TOKEN_CLIENT_URI));
+	p += lws_snprintf(p, lws_ptr_diff_size_t(end, p),
+			  "%s %s HTTP/1.1\x0d\x0a", meth,
+		          lws_hdr_simple_ptr(wsi, _WSI_TOKEN_CLIENT_URI));
 
-	p += lws_snprintf(p, 64, "Pragma: no-cache\x0d\x0a"
-			"Cache-Control: no-cache\x0d\x0a");
+	p += lws_snprintf(p,  lws_ptr_diff_size_t(end, p),
+			  "Pragma: no-cache\x0d\x0a"
+			  "Cache-Control: no-cache\x0d\x0a");
 
-	p += lws_snprintf(p, 128, "Host: %s\x0d\x0a",
-		     lws_hdr_simple_ptr(wsi, _WSI_TOKEN_CLIENT_HOST));
+	p += lws_snprintf(p,  lws_ptr_diff_size_t(end, p),
+			  "Host: %s\x0d\x0a",
+			  lws_hdr_simple_ptr(wsi, _WSI_TOKEN_CLIENT_HOST));
 
 	if (lws_hdr_simple_ptr(wsi, _WSI_TOKEN_CLIENT_ORIGIN)) {
 		if (lws_check_opt(wsi->a.context->options,
 				  LWS_SERVER_OPTION_JUST_USE_RAW_ORIGIN))
-			p += lws_snprintf(p, 128, "Origin: %s\x0d\x0a",
-				     lws_hdr_simple_ptr(wsi,
+			p += lws_snprintf(p,  lws_ptr_diff_size_t(end, p),
+					  "Origin: %s\x0d\x0a",
+					  lws_hdr_simple_ptr(wsi,
 						     _WSI_TOKEN_CLIENT_ORIGIN));
 		else
-			p += lws_snprintf(p, 128, "Origin: http://%s\x0d\x0a",
-				     lws_hdr_simple_ptr(wsi,
+			p += lws_snprintf(p,  lws_ptr_diff_size_t(end, p),
+					  "Origin: http://%s\x0d\x0a",
+					  lws_hdr_simple_ptr(wsi,
 						     _WSI_TOKEN_CLIENT_ORIGIN));
 	}
 
@@ -1179,19 +1169,22 @@ lws_generate_client_handshake(struct lws *wsi, char *pkt)
 #if defined(LWS_WITH_HTTP_PROXY)
 	if (wsi->parent &&
 	    lws_hdr_total_length(wsi->parent, WSI_TOKEN_HTTP_CONTENT_LENGTH)) {
-		p += lws_snprintf(p, 128, "Content-Length: %s\x0d\x0a",
+		p += lws_snprintf(p, lws_ptr_diff_size_t(end, p),
+				  "Content-Length: %s\x0d\x0a",
 			lws_hdr_simple_ptr(wsi->parent, WSI_TOKEN_HTTP_CONTENT_LENGTH));
 		if (atoi(lws_hdr_simple_ptr(wsi->parent, WSI_TOKEN_HTTP_CONTENT_LENGTH)))
 			wsi->client_http_body_pending = 1;
 	}
 	if (wsi->parent &&
 	    lws_hdr_total_length(wsi->parent, WSI_TOKEN_HTTP_AUTHORIZATION)) {
-		p += lws_snprintf(p, 128, "Authorization: %s\x0d\x0a",
+		p += lws_snprintf(p, lws_ptr_diff_size_t(end, p),
+				  "Authorization: %s\x0d\x0a",
 			lws_hdr_simple_ptr(wsi->parent, WSI_TOKEN_HTTP_AUTHORIZATION));
 	}
 	if (wsi->parent &&
 	    lws_hdr_total_length(wsi->parent, WSI_TOKEN_HTTP_CONTENT_TYPE)) {
-		p += lws_snprintf(p, 128, "Content-Type: %s\x0d\x0a",
+		p += lws_snprintf(p, lws_ptr_diff_size_t(end, p),
+				  "Content-Type: %s\x0d\x0a",
 			lws_hdr_simple_ptr(wsi->parent, WSI_TOKEN_HTTP_CONTENT_TYPE));
 	}
 #endif
@@ -1214,19 +1207,24 @@ lws_generate_client_handshake(struct lws *wsi, char *pkt)
 	if (wsi->a.protocol->callback(wsi,
 			LWS_CALLBACK_CLIENT_APPEND_HANDSHAKE_HEADER,
 			wsi->user_space, &p,
-			(pkt + wsi->a.context->pt_serv_buf_size) - p - 12))
+			(unsigned int)((pkt + wsi->a.context->pt_serv_buf_size) - p - 12)))
 		return NULL;
 
 	if (wsi->flags & LCCSCF_HTTP_X_WWW_FORM_URLENCODED) {
-		p += lws_snprintf(p, 128, "Content-Type: application/x-www-form-urlencoded\x0d\x0a");
-		p += lws_snprintf(p, 128, "Content-Length: %lu\x0d\x0a", wsi->http.writeable_len);
+		p += lws_snprintf(p, lws_ptr_diff_size_t(end, p), "Content-Type: application/x-www-form-urlencoded\x0d\x0a");
+		p += lws_snprintf(p,  lws_ptr_diff_size_t(end, p), "Content-Length: %lu\x0d\x0a", wsi->http.writeable_len);
 		lws_client_http_body_pending(wsi, 1);
 	}
 
-	p += lws_snprintf(p, 4, "\x0d\x0a");
+	p += lws_snprintf(p,  lws_ptr_diff_size_t(end, p), "\x0d\x0a");
 
-	if (wsi->client_http_body_pending)
+	if (wsi->client_http_body_pending || lws_has_buffered_out(wsi))
 		lws_callback_on_writable(wsi);
+
+	lws_metrics_caliper_bind(wsi->cal_conn, wsi->a.context->mt_http_txn);
+#if defined(LWS_WITH_CONMON)
+	wsi->conmon_datum = lws_now_usecs();
+#endif
 
 	// puts(pkt);
 
@@ -1247,7 +1245,7 @@ lws_http_basic_auth_gen(const char *user, const char *pw, char *buf, size_t len)
 
 	memcpy(buf, "Basic ", 6);
 
-	n = lws_snprintf(b, sizeof(b), "%s:%s", user, pw);
+	n = (unsigned int)lws_snprintf(b, sizeof(b), "%s:%s", user, pw);
 	if (n >= sizeof(b) - 2)
 		return 2;
 
@@ -1364,7 +1362,7 @@ spin_chunks:
 		case ELCP_POST_CR:
 			if ((*buf)[0] != '\x0d') {
 				lwsl_err("%s: chunking failure C\n", __func__);
-				lwsl_hexdump_err(*buf, *len);
+				lwsl_hexdump_err(*buf, (unsigned int)*len);
 
 				return -1;
 			}
@@ -1386,7 +1384,7 @@ spin_chunks:
 		case ELCP_TRAILER_CR:
 			if ((*buf)[0] != '\x0d') {
 				lwsl_err("%s: chunking failure F\n", __func__);
-				lwsl_hexdump_err(*buf, *len);
+				lwsl_hexdump_err(*buf, (unsigned int)*len);
 
 				return -1;
 			}
@@ -1397,7 +1395,7 @@ spin_chunks:
 		case ELCP_TRAILER_LF:
 			if ((*buf)[0] != '\x0a') {
 				lwsl_err("%s: chunking failure F\n", __func__);
-				lwsl_hexdump_err(*buf, *len);
+				lwsl_hexdump_err(*buf, (unsigned int)*len);
 
 				return -1;
 			}
@@ -1446,7 +1444,7 @@ spin_chunks:
 
 			q = user_callback_handle_rxflow(wsi->a.protocol->callback,
 				wsi, LWS_CALLBACK_RECEIVE_CLIENT_HTTP_READ,
-				wsi->user_space, *buf, n);
+				wsi->user_space, *buf, (unsigned int)n);
 			if (q) {
 				lwsl_info("%s: RECEIVE_CLIENT_HTTP_READ returned %d\n",
 						__func__, q);
@@ -1480,7 +1478,7 @@ spin_chunks:
 
 	/* if we know the content length, decrement the content remaining */
 	if (wsi->http.rx_content_length > 0)
-		wsi->http.rx_content_remain -= n;
+		wsi->http.rx_content_remain -= (unsigned int)n;
 
 	// lwsl_notice("rx_content_remain %lld, rx_content_length %lld, giv %d\n",
 	//	    wsi->http.rx_content_remain, wsi->http.rx_content_length,
@@ -1492,7 +1490,7 @@ spin_chunks:
 completed:
 
 	if (lws_http_transaction_completed_client(wsi)) {
-		lwsl_notice("%s: transaction completed says -1\n", __func__);
+		lwsl_info("%s: transaction completed says -1\n", __func__);
 		return -1;
 	}
 
@@ -1506,3 +1504,227 @@ account_and_ret:
 }
 
 #endif
+
+static uint8_t hnames2[] = {
+	_WSI_TOKEN_CLIENT_ORIGIN,
+	_WSI_TOKEN_CLIENT_SENT_PROTOCOLS,
+	_WSI_TOKEN_CLIENT_METHOD,
+	_WSI_TOKEN_CLIENT_IFACE,
+	_WSI_TOKEN_CLIENT_ALPN
+};
+
+/**
+ * lws_client_reset() - retarget a connected wsi to start over with a new
+ * 			connection (ie, redirect)
+ *			this only works if still in HTTP, ie, not upgraded yet
+ * wsi:		connection to reset
+ * address:	network address of the new server
+ * port:	port to connect to
+ * path:	uri path to connect to on the new server
+ * host:	host header to send to the new server
+ */
+struct lws *
+lws_client_reset(struct lws **pwsi, int ssl, const char *address, int port,
+		 const char *path, const char *host, char weak)
+{
+	struct lws_context_per_thread *pt;
+#if defined(LWS_ROLE_WS)
+	struct _lws_websocket_related *ws;
+#endif
+	char *stash, *p;
+	struct lws *wsi;
+	size_t size = 0;
+	int n;
+
+	if (!pwsi)
+		return NULL;
+
+	wsi = *pwsi;
+	pt = &wsi->a.context->pt[(int)wsi->tsi];
+
+	lwsl_debug("%s: %s: redir %d: %s\n", __func__, lws_wsi_tag(wsi),
+			wsi->redirects, address);
+
+	if (wsi->redirects == 3) {
+		lwsl_err("%s: Too many redirects\n", __func__);
+		return NULL;
+	}
+	wsi->redirects++;
+
+	/*
+	 * goal is to close our role part, close the sockfd, detach the ah
+	 * but leave our wsi extant and still bound to whatever vhost it was
+	 */
+
+	for (n = 0; n < (int)LWS_ARRAY_SIZE(hnames2); n++)
+		size += (unsigned int)lws_hdr_total_length(wsi, hnames2[n]) + 1u;
+
+	if (size < (size_t)lws_hdr_total_length(wsi, _WSI_TOKEN_CLIENT_URI) + 1)
+		size = (unsigned int)lws_hdr_total_length(wsi, _WSI_TOKEN_CLIENT_URI) + 1u;
+
+	/*
+	 * The incoming address and host can be from inside the existing ah
+	 * we are going to detach and reattch
+	 */
+
+	size += strlen(path) + 1 + strlen(address) + 1 + strlen(host) + 1 + 1;
+
+	p = stash = lws_malloc(size, __func__);
+	if (!stash)
+		return NULL;
+
+	/*
+	 * _WSI_TOKEN_CLIENT_ORIGIN,
+	 * _WSI_TOKEN_CLIENT_SENT_PROTOCOLS,
+	 * _WSI_TOKEN_CLIENT_METHOD,
+	 * _WSI_TOKEN_CLIENT_IFACE,
+	 * _WSI_TOKEN_CLIENT_ALPN
+	 * address
+	 * host
+	 * path
+	 */
+
+	for (n = 0; n < (int)LWS_ARRAY_SIZE(hnames2); n++)
+		if (lws_hdr_total_length(wsi, hnames2[n]) &&
+		    lws_hdr_simple_ptr(wsi, hnames2[n])) {
+			memcpy(p, lws_hdr_simple_ptr(wsi, hnames2[n]), (size_t)(
+			       lws_hdr_total_length(wsi, hnames2[n]) + 1));
+			p += (size_t)(lws_hdr_total_length(wsi, hnames2[n]) + 1);
+		} else
+			*p++ = '\0';
+
+	memcpy(p, address, strlen(address) + (size_t)1);
+	address = p;
+	p += strlen(address) + 1;
+	memcpy(p, host, strlen(host) + (size_t)1);
+	host = p;
+	p += strlen(host) + 1;
+	memcpy(p, path, strlen(path) + (size_t)1);
+	path = p;
+
+	if (!port) {
+		lwsl_info("%s: forcing port 443\n", __func__);
+
+		port = 443;
+		ssl = 1;
+	}
+
+	lwsl_info("redirect ads='%s', port=%d, path='%s', ssl = %d, pifds %d\n",
+		   address, port, path, ssl, wsi->position_in_fds_table);
+
+	lws_pt_lock(pt, __func__);
+	__remove_wsi_socket_from_fds(wsi);
+	lws_pt_unlock(pt);
+
+#if defined(LWS_ROLE_WS)
+	if (weak) {
+		ws = wsi->ws;
+		wsi->ws = NULL;
+	}
+#endif
+	__lws_reset_wsi(wsi); /* detaches ah here */
+#if defined(LWS_ROLE_WS)
+	if (weak)
+		wsi->ws = ws;
+#endif
+	wsi->client_pipeline = 1;
+
+	/* close the connection by hand */
+
+#if defined(LWS_WITH_TLS)
+	lws_ssl_close(wsi);
+#endif
+
+	if (wsi->role_ops &&
+	    lws_rops_fidx(wsi->role_ops, LWS_ROPS_close_kill_connection))
+		lws_rops_func_fidx(wsi->role_ops, LWS_ROPS_close_kill_connection).
+						close_kill_connection(wsi, 1);
+
+	if (wsi->a.context->event_loop_ops->close_handle_manually)
+		wsi->a.context->event_loop_ops->close_handle_manually(wsi);
+	else
+		if (wsi->desc.sockfd != LWS_SOCK_INVALID)
+			compatible_close(wsi->desc.sockfd);
+
+#if defined(LWS_WITH_TLS)
+	if (!ssl)
+		wsi->tls.use_ssl &= (unsigned int)~LCCSCF_USE_SSL;
+	else
+		wsi->tls.use_ssl |= LCCSCF_USE_SSL;
+#else
+	if (ssl) {
+		lwsl_err("%s: not configured for ssl\n", __func__);
+		goto bail;
+	}
+#endif
+
+	if (wsi->a.protocol && wsi->role_ops && wsi->protocol_bind_balance) {
+		wsi->a.protocol->callback(wsi,
+				wsi->role_ops->protocol_unbind_cb[
+				       !!lwsi_role_server(wsi)],
+				       wsi->user_space, (void *)__func__, 0);
+
+		wsi->protocol_bind_balance = 0;
+	}
+
+	wsi->desc.sockfd = LWS_SOCK_INVALID;
+	lws_role_transition(wsi, LWSIFR_CLIENT, LRS_UNCONNECTED, &role_ops_h1);
+//	wsi->a.protocol = NULL;
+	if (wsi->a.protocol)
+		lws_bind_protocol(wsi, wsi->a.protocol, "client_reset");
+	wsi->pending_timeout = NO_PENDING_TIMEOUT;
+	wsi->c_port = (uint16_t)port;
+	wsi->hdr_parsing_completed = 0;
+
+	if (lws_header_table_attach(wsi, 0)) {
+		lwsl_err("%s: failed to get ah\n", __func__);
+		goto bail;
+	}
+	//_lws_header_table_reset(wsi->http.ah);
+
+	if (lws_hdr_simple_create(wsi, _WSI_TOKEN_CLIENT_PEER_ADDRESS, address))
+		goto bail;
+
+	if (lws_hdr_simple_create(wsi, _WSI_TOKEN_CLIENT_HOST, host))
+		goto bail;
+
+	/*
+	 * _WSI_TOKEN_CLIENT_ORIGIN,
+	 * _WSI_TOKEN_CLIENT_SENT_PROTOCOLS,
+	 * _WSI_TOKEN_CLIENT_METHOD,
+	 * _WSI_TOKEN_CLIENT_IFACE,
+	 * _WSI_TOKEN_CLIENT_ALPN
+	 * address
+	 * host
+	 * path
+	 */
+
+	p = stash;
+	for (n = 0; n < (int)LWS_ARRAY_SIZE(hnames2); n++) {
+		if (lws_hdr_simple_create(wsi, hnames2[n], p))
+			goto bail;
+		p += lws_hdr_total_length(wsi, hnames2[n]) + 1;
+	}
+
+	stash[0] = '/';
+	memmove(&stash[1], path, size - 1 < strlen(path) + 1 ?
+					size - 1 : strlen(path) + (size_t)1);
+	if (lws_hdr_simple_create(wsi, _WSI_TOKEN_CLIENT_URI, stash))
+		goto bail;
+
+	lws_free_set_NULL(stash);
+
+#if defined(LWS_WITH_HTTP2)
+	if (wsi->client_mux_substream)
+		wsi->h2.END_STREAM = wsi->h2.END_HEADERS = 0;
+#endif
+
+	*pwsi = lws_client_connect_2_dnsreq(wsi);
+
+	return *pwsi;
+
+bail:
+	lws_free_set_NULL(stash);
+
+	return NULL;
+}

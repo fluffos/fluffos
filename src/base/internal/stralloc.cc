@@ -4,12 +4,17 @@
 #include <cstring>
 #include <cstdlib>
 #include <climits>
+#include <string>
+#include <sstream>
 
 #include "base/internal/debugmalloc.h"
 #include "base/internal/hash.h"
 #include "base/internal/log.h"
 #include "base/internal/outbuf.h"
 #include "base/internal/rc.h"
+#include "base/internal/md.h"
+
+#include <fmt/format.h>
 
 /* used temporarily by SVALUE_STRLEN() */
 unsigned int svalue_strlen_size;
@@ -57,13 +62,13 @@ void bp(void) {}
  * next element in the chain (which you specify when you call the functions).
  */
 
-int num_distinct_strings = 0;
-int bytes_distinct_strings = 0;
-int overhead_bytes = 0;
-int allocd_strings = 0;
-int allocd_bytes = 0;
-int search_len = 0;
-int num_str_searches = 0;
+uint64_t num_distinct_strings = 0;
+uint64_t bytes_distinct_strings = 0;
+uint64_t overhead_bytes = 0;
+uint64_t allocd_strings = 0;
+uint64_t allocd_bytes = 0;
+uint64_t search_len = 0;
+uint64_t num_str_searches = 0;
 
 #define StrHash(s) (whashstr((s)) & (htable_size_minus_one))
 
@@ -84,16 +89,17 @@ static block_t **base_table = (block_t **)nullptr;
 static int htable_size;
 static int htable_size_minus_one;
 
-static block_t *alloc_new_string(const char * /*string*/, int /*h*/, const char * /*why*/);
+static block_t *alloc_new_shared_string(const char * /*string*/, int /*h*/, const char * /*why*/);
 
 void init_strings() {
   int x, y;
 
   /* ensure that htable size is a power of 2 */
   y = CONFIG_INT(__SHARED_STRING_HASH_TABLE_SIZE__);
-  for (htable_size = 1; htable_size < y; htable_size *= 2) {
-    ;
+  for (htable_size = 1; htable_size < y; htable_size <<= 1) {
   }
+  CONFIG_INT(__SHARED_STRING_HASH_TABLE_SIZE__) = htable_size;
+
   htable_size_minus_one = htable_size - 1;
   base_table = reinterpret_cast<block_t **>(
       DCALLOC(htable_size, sizeof(block_t *), TAG_STR_TBL, "init_strings"));
@@ -135,7 +141,7 @@ static block_t *sfindblock(const char *s, int h) {
   return ((block_t *)nullptr); /* not found */
 }
 
-char *findstring(const char *s) {
+const char *findstring(const char *s) {
   block_t *b;
 
   if ((b = findblock(s))) {
@@ -147,7 +153,7 @@ char *findstring(const char *s) {
 
 /* alloc_new_string: Make a space for a string.  */
 
-static block_t *alloc_new_string(const char *string, int h, const char *why) {
+static block_t *alloc_new_shared_string(const char *string, int h, const char *why) {
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   block_t *b;
@@ -165,7 +171,7 @@ static block_t *alloc_new_string(const char *string, int h, const char *why) {
   [len] = '\0'; /* strncpy doesn't put on \0 if 'from' too
                  * long */
   if (cut) {
-    h = whashstr(STRING(b)) & htable_size_minus_one;
+    h = StrHash(STRING(b));
   }
   SIZE(b) = (len > UINT_MAX ? UINT_MAX : len);
   REFS(b) = 1;
@@ -177,13 +183,13 @@ static block_t *alloc_new_string(const char *string, int h, const char *why) {
   return (b);
 }
 
-char *make_shared_string(const char *str) {
+const char *int_make_shared_string(const char *str, const char *desc) {
   block_t *b;
   int h;
 
   b = hfindblock(str, h); /* hfindblock macro sets h = StrHash(s) */
   if (!b) {
-    b = alloc_new_string(str, h, "make_shared_string");
+    b = alloc_new_shared_string(str, h, desc);
   } else {
     if (REFS(b)) {
       REFS(b)++;
@@ -279,21 +285,30 @@ void deallocate_string(char *str) {
   FREE(b);
 }
 
-int add_string_status(outbuffer_t *out, int verbose) {
+uint64_t add_string_status(outbuffer_t *out, int verbose) {
   if (verbose == 1) {
     outbuf_add(out, "All strings:\n");
     outbuf_add(out, "-------------------------\t Strings    Bytes\n");
   }
   if (verbose != -1) {
-    outbuf_addv(out, "All strings:\t\t\t%8d %8d + %d overhead\n", num_distinct_strings,
-                bytes_distinct_strings, overhead_bytes);
+    outbuf_addv(out, "%-20s %8" PRIu64 " %8" PRIu64 " + %" PRIu64 " overhead\n", "All strings",
+                num_distinct_strings, bytes_distinct_strings, overhead_bytes);
   }
   if (verbose == 1) {
-    outbuf_addv(out, "Total asked for\t\t\t%8d %8d\n", allocd_strings, allocd_bytes);
-    outbuf_addv(out, "Space actually required/total string bytes %d%%\n",
-                (bytes_distinct_strings + overhead_bytes) * 100 / allocd_bytes);
-    outbuf_addv(out, "Searches: %d    Average search length: %6.3f\n", num_str_searches,
+    outbuf_addv(out, "Total asked for\t\t\t%8" PRIu64 " %8" PRIu64 "\n", allocd_strings,
+                allocd_bytes);
+    outbuf_addv(out, "Space actually required/total string bytes %f%%\n",
+                static_cast<double>(bytes_distinct_strings + overhead_bytes) * 100 / allocd_bytes);
+    outbuf_addv(out, "Searches: %" PRIu64 "\tAverage search length: %6.3f\n", num_str_searches,
                 static_cast<double>(search_len) / num_str_searches);
+
+    auto load_factor = num_distinct_strings * 1.0 / htable_size;
+    outbuf_addv(out, "Table size: %d, Load factor: %f\n", htable_size, load_factor);
+    if (load_factor > 0.75) {
+      outbuf_addv(
+          out,
+          "String pool is overloaded, please consider increase in the config 'hash table size'!\n");
+    }
   }
   return (bytes_distinct_strings + overhead_bytes);
 }
@@ -427,4 +442,28 @@ char *int_string_unlink(const char *str)
   CHECK_STRING_STATS;
 
   return reinterpret_cast<char *>(newmbt + 1);
+}
+
+void dump_stralloc(outbuffer_t *out) {
+  std::stringstream ss;
+
+  ss << "===STRALLOC DUMP: allocd_strings:" << allocd_strings << "\n";
+  // can't direct output to outbuf since it might realloc
+  for (int hsh = 0; hsh < htable_size; hsh++) {
+    for (block_t *entry = base_table[hsh]; entry; entry = entry->next) {
+#if defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS)
+      auto md_entry = PTR_TO_NODET(entry);
+      ss << fmt::format(FMT_STRING("{:d},{:d},{:s},{:.40s}"), md_entry->id, md_entry->size,
+                        md_entry->tag == TAG_SHARED_STRING ? "S" : "M", md_entry->desc);
+#endif
+      ss << fmt::format(FMT_STRING("{:d},{:x},{:d},{:.40s}\n"), entry->refs, entry->hash,
+                        entry->size, STRING(entry));
+    }
+  }
+  auto res = ss.str();
+  if (out) {
+    outbuf_add(out, res.c_str());
+  } else {
+    debug_message("%s", res.c_str());
+  }
 }

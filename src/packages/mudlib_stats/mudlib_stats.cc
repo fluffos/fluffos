@@ -256,7 +256,8 @@ void add_objects(statgroup_t *st, int objects) {
  *    heart_beats -= 10%
  */
 void mudlib_stats_decay() {
-  add_gametick_event(std::chrono::hours(1), tick_event::callback_type(mudlib_stats_decay));
+  add_gametick_event(time_to_next_gametick(std::chrono::hours(1)),
+                     tick_event::callback_type(mudlib_stats_decay));
 
   mudlib_stats_t *dl;
   for (dl = domains; dl; dl = dl->next) {

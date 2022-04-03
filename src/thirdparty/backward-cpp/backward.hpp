@@ -258,6 +258,7 @@
 #if (BACKWARD_HAS_BACKTRACE == 1) || (BACKWARD_HAS_BACKTRACE_SYMBOL == 1)
 // then we shall rely on backtrace
 #include <execinfo.h>
+#include <dlfcn.h>
 #endif
 
 #endif // defined(BACKWARD_SYSTEM_LINUX)
@@ -4159,6 +4160,8 @@ public:
     error_addr = reinterpret_cast<void *>(uctx->uc_mcontext.gregs[REG_EIP]);
 #elif defined(__arm__)
     error_addr = reinterpret_cast<void *>(uctx->uc_mcontext.arm_pc);
+#elif defined(__aarch64__) && defined(BACKWARD_SYSTEM_DARWIN)
+    error_addr = reinterpret_cast<void *>(uctx->uc_mcontext->__ss.__pc);
 #elif defined(__aarch64__)
     error_addr = reinterpret_cast<void *>(uctx->uc_mcontext.pc);
 #elif defined(__mips__)

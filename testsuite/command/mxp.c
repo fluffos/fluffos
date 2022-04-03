@@ -6,7 +6,7 @@ int main(string arg)
 
   if(mxp_enabled) {
     write("Entering MXP mode:\n");
-    act_mxp();
+    this_player()->act_mxp();
   }
 
   return 1;

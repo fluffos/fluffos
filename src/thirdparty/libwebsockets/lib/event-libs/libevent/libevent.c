@@ -40,8 +40,13 @@ lws_event_hrtimer_cb(evutil_socket_t fd, short event, void *p)
 	us = __lws_sul_service_ripe(pt->pt_sul_owner, LWS_COUNT_PT_SUL_OWNERS,
 				    lws_now_usecs());
 	if (us) {
-		tv.tv_sec = us / LWS_US_PER_SEC;
-		tv.tv_usec = us - (tv.tv_sec * LWS_US_PER_SEC);
+#if defined(__APPLE__)
+		tv.tv_sec = (int)(us / LWS_US_PER_SEC);
+		tv.tv_usec = (int)(us - (tv.tv_sec * LWS_US_PER_SEC));
+#else
+		tv.tv_sec = (long)(us / LWS_US_PER_SEC);
+		tv.tv_usec = (long)(us - (tv.tv_sec * LWS_US_PER_SEC));
+#endif
 		evtimer_add(ptpr->hrtimer, &tv);
 	}
 	lws_pt_unlock(pt);
@@ -86,8 +91,8 @@ lws_event_idle_timer_cb(evutil_socket_t fd, short event, void *p)
 	us = __lws_sul_service_ripe(pt->pt_sul_owner, LWS_COUNT_PT_SUL_OWNERS,
 				    lws_now_usecs());
 	if (us) {
-		tv.tv_sec = us / LWS_US_PER_SEC;
-		tv.tv_usec = us - (tv.tv_sec * LWS_US_PER_SEC);
+		tv.tv_sec = (suseconds_t)(us / LWS_US_PER_SEC);
+		tv.tv_usec = (suseconds_t)(us - (tv.tv_sec * LWS_US_PER_SEC));
 		evtimer_add(ptpr->hrtimer, &tv);
 	}
 	lws_pt_unlock(pt);
@@ -221,6 +226,12 @@ elops_init_pt_event(struct lws_context *context, void *_loop, int tsi)
 
 	ptpr->idle_timer = event_new(loop, -1, 0,
 					 lws_event_idle_timer_cb, pt);
+	{
+		struct timeval tv;
+		tv.tv_sec = (long)0;
+		tv.tv_usec = (long)1000;
+		evtimer_add(ptpr->hrtimer, &tv);
+	}
 
 	/* Register the signal watcher unless it's a foreign loop */
 
@@ -255,7 +266,7 @@ elops_accept_event(struct lws *wsi)
 	struct lws_context_per_thread *pt;
 	struct lws_pt_eventlibs_libevent *ptpr;
 	struct lws_wsi_eventlibs_libevent *wpr = wsi_to_priv_event(wsi);
-	evutil_socket_t fd;
+       evutil_socket_t fd;
 
 	wpr->w_read.context = context;
 	wpr->w_write.context = context;
@@ -265,7 +276,7 @@ elops_accept_event(struct lws *wsi)
 	ptpr = pt_to_priv_event(pt);
 
 	if (wsi->role_ops->file_handle)
-		fd = (ev_intptr_t) wsi->desc.filefd;
+               fd = (evutil_socket_t)(ev_intptr_t) wsi->desc.filefd;
 	else
 		fd = wsi->desc.sockfd;
 
@@ -278,7 +289,7 @@ elops_accept_event(struct lws *wsi)
 }
 
 static void
-elops_io_event(struct lws *wsi, int flags)
+elops_io_event(struct lws *wsi, unsigned int flags)
 {
 	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
 	struct lws_pt_eventlibs_libevent *ptpr = pt_to_priv_event(pt);
@@ -404,7 +415,7 @@ elops_init_vhost_listen_wsi_event(struct lws *wsi)
 	struct lws_context_per_thread *pt;
 	struct lws_pt_eventlibs_libevent *ptpr;
 	struct lws_wsi_eventlibs_libevent *w;
-	evutil_socket_t fd;
+       evutil_socket_t fd;
 
 	if (!wsi) {
 		assert(0);
@@ -420,7 +431,7 @@ elops_init_vhost_listen_wsi_event(struct lws *wsi)
 	ptpr = pt_to_priv_event(pt);
 
 	if (wsi->role_ops->file_handle)
-		fd = (evutil_socket_t) wsi->desc.filefd;
+               fd = (evutil_socket_t) wsi->desc.filefd;
 	else
 		fd = wsi->desc.sockfd;
 
@@ -455,7 +466,7 @@ elops_destroy_context2_event(struct lws_context *context)
 		if (pt->event_loop_foreign || !ptpr->io_loop)
 			continue;
 
-		if (!context->finalize_destroy_after_internal_loops_stopped) {
+		if (!context->evlib_finalize_destroy_after_int_loops_stop) {
 			event_base_loopexit(ptpr->io_loop, NULL);
 			continue;
 		}
@@ -511,6 +522,7 @@ const lws_plugin_evlib_t evlib_event = {
 	.hdr = {
 		"libevent event loop",
 		"lws_evlib_plugin",
+		LWS_BUILD_HASH,
 		LWS_PLUGIN_API_MAGIC
 	},
 

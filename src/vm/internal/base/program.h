@@ -2,6 +2,7 @@
 #define PROGRAM_H
 
 #include <cstdint>
+#include <memory>
 #include <unordered_map>
 
 /*
@@ -161,7 +162,7 @@ typedef struct {
 #endif
 
 struct function_t {
-  char *funcname;
+  const char *funcname;
   unsigned short type;
   unsigned char num_arg;
   unsigned char num_local;
@@ -172,7 +173,7 @@ struct function_t {
 };
 
 typedef struct {
-  char *name;
+  const char *name;
   unsigned short type; /* Type of variable. See above. TYPE_ */
 } variable_t;
 
@@ -188,6 +189,7 @@ struct lookup_entry_s {
   struct function_t *funp;
   unsigned short function_index_offset;
   unsigned short variable_index_offset;
+  unsigned short runtime_index;
 };
 
 struct program_t {

@@ -12,9 +12,6 @@ mixed copy(mixed);
 mixed *functions(object, int default: 0);
 mixed *variables(object, int default: 0);
 object *heart_beats();
-#ifdef COMPAT_32
-object *heart_beat_info heart_beats();
-#endif
 string terminal_colour(string, mapping, int | void, int | void);
 string pluralize(string);
 int file_length(string);

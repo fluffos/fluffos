@@ -39,40 +39,38 @@ if (LWS_PLAT_FREERTOS)
 	add_subdir_include_dirs(plat/freertos)
 	if (ESP_PLATFORM)
 		include_directories($ENV{IDF_PATH}/components/freertos/include
-			    $ENV{IDF_PATH}/components/freertos/xtensa/include
-			    $ENV{IDF_PATH}/components/xtensa/include
-			    $ENV{IDF_PATH}/components/xtensa/esp32/include
-			    $ENV{IDF_PATH}/components/esp_common/include
-			    $ENV{IDF_PATH}/components/esp_timer/include
-			    $ENV{IDF_PATH}/components/soc/include
-			    $ENV{IDF_PATH}/components/soc/src/esp32/include
-			    $ENV{IDF_PATH}/components/lwip/port/esp32/include
-			    $ENV{IDF_PATH}/components/lwip/lwip/src/include
-			    $ENV{IDF_PATH}/components/lwip/port/esp32/include
-			    ${CMAKE_BINARY_DIR}/config
-			    $ENV{IDF_PATH}/components/esp_rom/include
-			    $ENV{IDF_PATH}/components/esp_system/include
-			    $ENV{IDF_PATH}/components/lwip/include/apps/sntp
-			    $ENV{IDF_PATH}/components/soc/soc/esp32/include
-			    $ENV{IDF_PATH}/components/heap/include
-			    $ENV{IDF_PATH}/components/mbedtls/mbedtls/include
-			    $ENV{IDF_PATH}/components/mbedtls/port/include
-			    $ENV{IDF_PATH}/components/esp_wifi/include
-			    $ENV{IDF_PATH}/components/esp_event/include
-			    $ENV{IDF_PATH}/components/esp_netif/include
-			    $ENV{IDF_PATH}/components/esp_eth/include
-			    $ENV{IDF_PATH}/components/driver/include
-			    $ENV{IDF_PATH}/components/soc/soc/include
-			    $ENV{IDF_PATH}/components/tcpip_adapter/include
-			    $ENV{IDF_PATH}/components/lwip/include/apps
-			    $ENV{IDF_PATH}/components/nvs_flash/include
-			    $ENV{IDF_PATH}/components/esp32/include
-			    $ENV{IDF_PATH}/components/spi_flash/include
-			    $ENV{IDF_PATH}/components/mdns/include
-			    $ENV{IDF_PATH}/components/lwip/lwip/src/include/lwip
-			    $ENV{IDF_PATH}/components/lwip/lwip/src/include
-			    $ENV{IDF_PATH}/components/lwip/lwip/src/include/lwip
-			    $ENV{IDF_PATH}/components/newlib/platform_include )
+		    $ENV{IDF_PATH}/components/esp_hw_support/include/soc/
+		    $ENV{IDF_PATH}/components/esp_common/include
+		    $ENV{IDF_PATH}/components/esp_timer/include
+		    $ENV{IDF_PATH}/components/soc/include
+		    $ENV{IDF_PATH}/components/soc/src/esp32/include
+		    $ENV{IDF_PATH}/components/lwip/port/esp32/include
+		    $ENV{IDF_PATH}/components/lwip/lwip/src/include
+		    $ENV{IDF_PATH}/components/lwip/port/esp32/include
+		    ${CMAKE_BINARY_DIR}/config
+		    $ENV{IDF_PATH}/components/esp_rom/include
+		    $ENV{IDF_PATH}/components/esp_system/include
+		    $ENV{IDF_PATH}/components/lwip/include/apps/sntp
+		    $ENV{IDF_PATH}/components/soc/soc/esp32/include
+		    $ENV{IDF_PATH}/components/heap/include
+		    $ENV{IDF_PATH}/components/mbedtls/mbedtls/include
+		    $ENV{IDF_PATH}/components/mbedtls/port/include
+		    $ENV{IDF_PATH}/components/esp_wifi/include
+		    $ENV{IDF_PATH}/components/esp_event/include
+		    $ENV{IDF_PATH}/components/esp_netif/include
+		    $ENV{IDF_PATH}/components/esp_eth/include
+		    $ENV{IDF_PATH}/components/driver/include
+		    $ENV{IDF_PATH}/components/soc/soc/include
+		    $ENV{IDF_PATH}/components/tcpip_adapter/include
+		    $ENV{IDF_PATH}/components/lwip/include/apps
+		    $ENV{IDF_PATH}/components/nvs_flash/include
+		    $ENV{IDF_PATH}/components/esp32/include
+		    $ENV{IDF_PATH}/components/spi_flash/include
+		    $ENV{IDF_PATH}/components/mdns/include
+		    $ENV{IDF_PATH}/components/lwip/lwip/src/include/lwip
+		    $ENV{IDF_PATH}/components/lwip/lwip/src/include
+		    $ENV{IDF_PATH}/components/lwip/lwip/src/include/lwip
+		    $ENV{IDF_PATH}/components/newlib/platform_include )
 	endif()
 	
 else()
@@ -103,7 +101,15 @@ endif()
 
 # ideally we want to use pipe2()
 
-CHECK_C_SOURCE_COMPILES("#define _GNU_SOURCE\n#include <unistd.h>\nint main(void) {int fd[2];\n return pipe2(fd, 0);\n}\n" LWS_HAVE_PIPE2)
+CHECK_C_SOURCE_COMPILES("
+	#ifndef _GNU_SOURCE
+	#define _GNU_SOURCE
+	#endif
+	#include <unistd.h>
+	int main(void) {
+		int fd[2];
+		return pipe2(fd, 0);
+	}" LWS_HAVE_PIPE2)
 
 # tcp keepalive needs this on linux to work practically... but it only exists
 # after kernel 2.6.37
@@ -153,7 +159,13 @@ if (LWS_WITH_STATIC)
 	add_library(websockets STATIC ${SOURCES})# ${HDR_PUBLIC})
 	set_target_properties(websockets PROPERTIES LINKER_LANGUAGE C)
 	list(APPEND LWS_LIBRARIES websockets)
+	target_include_directories(websockets INTERFACE
+		$<INSTALL_INTERFACE:${LWS_INSTALL_INCLUDE_DIR}>
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/../include>
+	)
 	target_include_directories(websockets PRIVATE ${LWS_LIB_BUILD_INC_PATHS})
+	target_compile_definitions(websockets PRIVATE LWS_BUILDING_STATIC)
 
 	if (WIN32)
 		# Windows uses the same .lib ending for static libraries and shared
@@ -173,7 +185,13 @@ if (LWS_WITH_SHARED)
 	add_library(websockets_shared SHARED ${SOURCES} ${RESOURCES})# ${HDR_PUBLIC})
 	set_target_properties(websockets_shared PROPERTIES LINKER_LANGUAGE C)
 	list(APPEND LWS_LIBRARIES websockets_shared)
+	target_include_directories(websockets_shared INTERFACE
+		$<INSTALL_INTERFACE:${LWS_INSTALL_INCLUDE_DIR}>
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/../include>
+	)
 	target_include_directories(websockets_shared PRIVATE ${LWS_LIB_BUILD_INC_PATHS})
+	target_compile_definitions(websockets_shared PRIVATE LWS_BUILDING_SHARED)
 
 	# We want the shared lib to be named "libwebsockets"
 	# not "libwebsocket_shared".
@@ -197,6 +215,7 @@ if (LWS_WITH_SHARED)
 	if (UNIX AND LWS_WITH_PLUGINS_API)
 		set (CMAKE_POSITION_INDEPENDENT_CODE ON)
 		if (NOT((${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD") OR
+		   (${CMAKE_SYSTEM_NAME} MATCHES "OpenBSD") OR
 		   (${CMAKE_SYSTEM_NAME} MATCHES "QNX")))
 		   if (LWS_WITH_SHARED)
 				target_link_libraries(websockets_shared dl)
@@ -259,7 +278,7 @@ install(TARGETS ${LWS_LIBRARIES}
 set(CPACK_COMPONENT_DEV_DISPLAY_NAME "Development files" PARENT_SCOPE)
 
 
-if (UNIX)
+if (UNIX OR MINGW)
 
 # figure out pkfcfg required libs here
 
@@ -321,7 +340,7 @@ endif()
 	install(FILES "${PROJECT_BINARY_DIR}/libwebsockets_static.pc"
 		DESTINATION lib${LIB_SUFFIX}/pkgconfig)
 
-endif(UNIX)
+endif(UNIX OR MINGW)
 
 
 # Keep explicit parent scope exports at end

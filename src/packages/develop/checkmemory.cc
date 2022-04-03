@@ -88,7 +88,7 @@ static const char *sources[] = {"*",
 void mark_svalue(svalue_t *sv);
 
 char *dump_debugmalloc(const char *tfn, int mask) {
-  int j, total = 0, chunks = 0, total2 = 0;
+  int j, total = 0, chunks = 0;
   const char *fn;
   md_node_t *entry;
   FILE *fp;
@@ -102,11 +102,12 @@ char *dump_debugmalloc(const char *tfn, int mask) {
   if (!fp) {
     error("Unable to open %s for writing.\n", fn);
   }
+  fprintf(fp, "%12s %12s %12s %5s %7s %s\n", "id", "gametick", "ptr", "tag", "sz", "desc");
   for (j = 0; j < MD_TABLE_SIZE; j++) {
     for (entry = table[j]; entry; entry = entry->next) {
       if (!mask || (entry->tag == mask)) {
-        fprintf(fp, "%-30s: sz %7d: id %6d: tag %08x, a %8zx\n", entry->desc, entry->size,
-                entry->id, entry->tag, (uintptr_t)PTR(entry));
+        fprintf(fp, "%12d %12" PRId64 " %12p %1d:%03d %7d %s\n", entry->id, entry->gametick,
+                PTR(entry), (entry->tag >> 8) & 0xff, entry->tag & 0xff, entry->size, entry->desc);
         total += entry->size;
         chunks++;
       }
@@ -114,18 +115,20 @@ char *dump_debugmalloc(const char *tfn, int mask) {
   }
   fprintf(fp, "total =    %8d\n", total);
   fprintf(fp, "# chunks = %8d\n", chunks);
-  fprintf(fp, "ave. bytes per chunk = %7.2f\n\n", (float)total / chunks);
+  fprintf(fp, "ave. bytes per chunk = %7.2f\n\n", (double)total / chunks);
   fprintf(fp, "categories:\n\n");
   for (j = 0; j < MAX_CATEGORY; j++) {
-    fprintf(fp, "%4d: %10" PRIu64 "\n", j, totals[j]);
-    total2 += totals[j];
+    fprintf(fp, "%4d: %10" PRIu64 " %10" PRIu64 "\n", j, blocks[j], totals[j]);
   }
-  fprintf(fp, "\ntotal = %11d\n", total2);
+  fprintf(fp, "tags:\n\n");
+  for (j = MAX_CATEGORY + 1; j < MAX_TAGS; j++) {
+    fprintf(fp, "%4d: %10" PRIu64 " %10" PRIu64 "\n", j, blocks[j], totals[j]);
+  }
   fclose(fp);
   outbuf_addv(&out, "total =    %8d\n", total);
   outbuf_addv(&out, "# chunks = %8d\n", chunks);
   if (chunks) {
-    outbuf_addv(&out, "ave. bytes per chunk = %7.2f\n", (float)total / chunks);
+    outbuf_addv(&out, "ave. bytes per chunk = %7.2f\n", (double)total / chunks);
   }
   outbuf_fix(&out);
   return out.buffer;
@@ -324,12 +327,12 @@ static void mark_config(void) {
   }
 }
 
-static int base_overhead = 0;
+static uint64_t base_overhead = 0;
 
 /* Compute the correct values of allocd_strings, allocd_bytes, and
  * bytes_distinct_strings based on blocks that are actually allocated.
  */
-void compute_string_totals(int *asp, int *abp, int *bp) {
+void compute_string_totals(uint64_t *asp, uint64_t *abp, uint64_t *bp) {
   int hsh;
   md_node_t *entry;
   malloc_block_t *msbl;
@@ -345,28 +348,13 @@ void compute_string_totals(int *asp, int *abp, int *bp) {
         msbl = NODET_TO_PTR(entry, malloc_block_t *);
         *bp += msbl->size + 1;
         *asp += msbl->ref;
-        *abp += msbl->ref * (msbl->size + 1);
+        *abp += (uint64_t)(msbl->ref) * (msbl->size + 1);
       }
       if (entry->tag == TAG_SHARED_STRING) {
         ssbl = NODET_TO_PTR(entry, block_t *);
         *bp += ssbl->size + 1;
         *asp += ssbl->refs;
-        *abp += ssbl->refs * (ssbl->size + 1);
-      }
-    }
-  }
-}
-
-static void dump_stralloc() {
-  md_node_t *entry;
-  debug_message("===STRALLOC DUMP: allocd_strings: %i \n", allocd_strings);
-
-  for (int hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
-    for (entry = table[hsh]; entry; entry = entry->next) {
-      if (entry->tag == TAG_MALLOC_STRING || entry->tag == TAG_SHARED_STRING) {
-        debug_message("%-20s: sz %7d: id %6d: tag %08x, a %8p, \"%.20s\"\n", entry->desc,
-                      entry->size, entry->id, entry->tag, PTR(entry),
-                      STRING(NODET_TO_PTR(entry, block_t *)));
+        *abp += (uint64_t)(ssbl->refs) * (ssbl->size + 1);
       }
     }
   }
@@ -378,10 +366,10 @@ static void dump_stralloc() {
  * are added to the outbuffer.
  */
 void check_string_stats(outbuffer_t *out) {
-  int overhead = blocks[TAG_SHARED_STRING & 0xff] * sizeof(block_t) +
-                 blocks[TAG_MALLOC_STRING & 0xff] * sizeof(malloc_block_t);
-  int num = blocks[TAG_SHARED_STRING & 0xff] + blocks[TAG_MALLOC_STRING & 0xff];
-  int bytes, as, ab;
+  uint64_t overhead = blocks[TAG_SHARED_STRING & 0xff] * sizeof(block_t) +
+                      blocks[TAG_MALLOC_STRING & 0xff] * sizeof(malloc_block_t);
+  uint64_t num = blocks[TAG_SHARED_STRING & 0xff] + blocks[TAG_MALLOC_STRING & 0xff];
+  uint64_t bytes, as, ab;
   int need_dump = 0;
 
   compute_string_totals(&as, &ab, &bytes);
@@ -394,59 +382,65 @@ void check_string_stats(outbuffer_t *out) {
   if (num != num_distinct_strings) {
     need_dump = 1;
     if (out) {
-      outbuf_addv(out, "WARNING: num_distinct_strings is: %i should be: %i\n", num_distinct_strings,
-                  num);
+      outbuf_addv(out, "WARNING: num_distinct_strings is: %" PRIu64 " should be: %" PRIu64 "\n",
+                  num_distinct_strings, num);
     } else {
-      printf("WARNING: num_distinct_strings is: %i should be: %i\n", num_distinct_strings, num);
-      dump_stralloc();
+      printf("WARNING: num_distinct_strings is: %" PRIu64 " should be: %" PRIu64 " \n",
+             num_distinct_strings, num);
+      dump_stralloc(nullptr);
       abort();
     }
   }
   if (overhead != overhead_bytes) {
     need_dump = 1;
     if (out) {
-      outbuf_addv(out, "WARNING: overhead_bytes is: %i should be: %i\n", overhead_bytes, overhead);
+      outbuf_addv(out, "WARNING: overhead_bytes is: %" PRIu64 " should be: %" PRIu64 "\n",
+                  overhead_bytes, overhead);
     } else {
-      printf("WARNING: overhead_bytes is: %i should be: %i\n", overhead_bytes, overhead);
-      dump_stralloc();
+      printf("WARNING: overhead_bytes is: %" PRIu64 " should be: %" PRIu64 "\n", overhead_bytes,
+             overhead);
+      dump_stralloc(nullptr);
       abort();
     }
   }
   if (bytes != bytes_distinct_strings) {
     need_dump = 1;
     if (out) {
-      outbuf_addv(out, "WARNING: bytes_distinct_strings is: %i should be: %i\n",
-                  bytes_distinct_strings, bytes - (overhead - base_overhead));
+      outbuf_addv(out, "WARNING: bytes_distinct_strings is: %" PRIu64 " should be: %" PRIu64 "\n",
+                  bytes_distinct_strings, bytes);
     } else {
-      printf("WARNING: bytes_distinct_strings is: %i should be: %i\n", bytes_distinct_strings,
-             bytes - (overhead - base_overhead));
-      dump_stralloc();
+      printf("WARNING: bytes_distinct_strings is: %" PRIu64 " should be: %" PRIu64 "\n",
+             bytes_distinct_strings, bytes);
+      dump_stralloc(nullptr);
       abort();
     }
   }
   if (allocd_strings != as) {
     need_dump = 1;
     if (out) {
-      outbuf_addv(out, "WARNING: allocd_strings is: %i should be: %i\n", allocd_strings, as);
+      outbuf_addv(out, "WARNING: allocd_strings is: %" PRIu64 " should be: %" PRIu64 "\n",
+                  allocd_strings, as);
     } else {
-      printf("WARNING: allocd_strings is: %i should be: %i\n", allocd_strings, as);
-      dump_stralloc();
+      printf("WARNING: allocd_strings is: %" PRIu64 " should be: %" PRIu64 "\n", allocd_strings,
+             as);
+      dump_stralloc(nullptr);
       abort();
     }
   }
   if (allocd_bytes != ab) {
     need_dump = 1;
     if (out) {
-      outbuf_addv(out, "WARNING: allocd_bytes is: %i should be: %i\n", allocd_bytes, ab);
+      outbuf_addv(out, "WARNING: allocd_bytes is: %" PRIu64 " should be: %" PRIu64 "\n",
+                  allocd_bytes, ab);
     } else {
-      printf("WARNING: allocd_bytes is: %i should be: %i\n", allocd_bytes, ab);
-      dump_stralloc();
+      printf("WARNING: allocd_bytes is: %" PRIu64 " should be: %" PRIu64 "\n", allocd_bytes, ab);
+      dump_stralloc(nullptr);
       abort();
     }
   }
 
   if (need_dump) {
-    dump_stralloc();
+    dump_stralloc(out);
   }
 }
 
@@ -577,7 +571,7 @@ void check_all_blocks(int flag) {
     }
     {
       int a = totals[TAG_CALL_OUT & 0xff];
-      int b = print_call_out_usage(&out, -1);
+      int b = total_callout_size();
       if (a != b) {
         outbuf_addv(&out, "WARNING: wrong number of call_out blocks allocated: %d vs %d.\n", a, b);
         print_call_out_usage(&out, 1);
@@ -617,6 +611,8 @@ void check_all_blocks(int flag) {
     if (blocks[TAG_INTERACTIVE & 0xff] != users_num(true))
       outbuf_addv(&out, "WATNING: num_user is: %d should be: %" PRIu64 "\n", users_num(true),
                   blocks[TAG_INTERACTIVE & 0xff]);
+
+    // String checks
     check_string_stats(&out);
 
 #ifdef PACKAGE_EXTERNAL
@@ -674,7 +670,7 @@ void check_all_blocks(int flag) {
       char buf[8192];
       strcpy(buf, dfm);
       strcat(buf, "\n");
-      char *target = findstring(buf);
+      const char *target = findstring(buf);
       if (target) {
         EXTRA_REF(BLOCK(target))++;
       }
@@ -964,6 +960,11 @@ void check_all_blocks(int flag) {
               break;
             }
 
+            // ignore the current executing command
+            if (starts_with(entry->desc, "current_command:")) {
+              break;
+            }
+
             if (msbl->ref != msbl->extra_ref) {
               outbuf_addv(&out,
                           "Bad ref count for malloc string \"%s\" %s %04x, is "
@@ -1018,7 +1019,7 @@ void check_all_blocks(int flag) {
     outbuf_add(&out, "\n\n");
     outbuf_add(&out, "      source                    blks   total\n");
     outbuf_add(&out, "------------------------------ ------ --------\n");
-    for (i = 1; i < MAX_CATEGORY; i++) {
+    for (i = 1; i < MAX_TAGS; i++) {
       if (totals[i]) {
         outbuf_addv(&out, "%-30s %6" PRIu64 " %8" PRIu64 "\n", sources[i], blocks[i], totals[i]);
       }

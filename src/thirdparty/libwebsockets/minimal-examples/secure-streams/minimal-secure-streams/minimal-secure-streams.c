@@ -24,6 +24,8 @@
 #include <string.h>
 #include <signal.h>
 
+// #define FORCE_OS_TRUST_STORE
+
 /*
  * uncomment to force network traffic through 127.0.0.1:1080
  *
@@ -38,7 +40,7 @@
 // #define VIA_LOCALHOST_SOCKS
 
 static int interrupted, bad = 1, force_cpd_fail_portal,
-	   force_cpd_fail_no_internet;
+	   force_cpd_fail_no_internet, test_respmap, test_ots;
 static unsigned int timeout_ms = 3000;
 static lws_state_notify_link_t nl;
 
@@ -82,78 +84,38 @@ static const char * const default_ss_policy =
 		 * We fetch the real policy from there using SS and switch to
 		 * using that.
 		 */
-		"{\"isrg_root_x1\": \"" /* ISRG ROOT X1 */
-	"MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw"
-	"TzELMAkGA1UEBhMCVVMxKTAnBgNVBAoTIEludGVybmV0IFNlY3VyaXR5IFJlc2Vh"
-	"cmNoIEdyb3VwMRUwEwYDVQQDEwxJU1JHIFJvb3QgWDEwHhcNMTUwNjA0MTEwNDM4"
-	"WhcNMzUwNjA0MTEwNDM4WjBPMQswCQYDVQQGEwJVUzEpMCcGA1UEChMgSW50ZXJu"
-	"ZXQgU2VjdXJpdHkgUmVzZWFyY2ggR3JvdXAxFTATBgNVBAMTDElTUkcgUm9vdCBY"
-	"MTCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBAK3oJHP0FDfzm54rVygc"
-	"h77ct984kIxuPOZXoHj3dcKi/vVqbvYATyjb3miGbESTtrFj/RQSa78f0uoxmyF+"
-	"0TM8ukj13Xnfs7j/EvEhmkvBioZxaUpmZmyPfjxwv60pIgbz5MDmgK7iS4+3mX6U"
-	"A5/TR5d8mUgjU+g4rk8Kb4Mu0UlXjIB0ttov0DiNewNwIRt18jA8+o+u3dpjq+sW"
-	"T8KOEUt+zwvo/7V3LvSye0rgTBIlDHCNAymg4VMk7BPZ7hm/ELNKjD+Jo2FR3qyH"
-	"B5T0Y3HsLuJvW5iB4YlcNHlsdu87kGJ55tukmi8mxdAQ4Q7e2RCOFvu396j3x+UC"
-	"B5iPNgiV5+I3lg02dZ77DnKxHZu8A/lJBdiB3QW0KtZB6awBdpUKD9jf1b0SHzUv"
-	"KBds0pjBqAlkd25HN7rOrFleaJ1/ctaJxQZBKT5ZPt0m9STJEadao0xAH0ahmbWn"
-	"OlFuhjuefXKnEgV4We0+UXgVCwOPjdAvBbI+e0ocS3MFEvzG6uBQE3xDk3SzynTn"
-	"jh8BCNAw1FtxNrQHusEwMFxIt4I7mKZ9YIqioymCzLq9gwQbooMDQaHWBfEbwrbw"
-	"qHyGO0aoSCqI3Haadr8faqU9GY/rOPNk3sgrDQoo//fb4hVC1CLQJ13hef4Y53CI"
-	"rU7m2Ys6xt0nUW7/vGT1M0NPAgMBAAGjQjBAMA4GA1UdDwEB/wQEAwIBBjAPBgNV"
-	"HRMBAf8EBTADAQH/MB0GA1UdDgQWBBR5tFnme7bl5AFzgAiIyBpY9umbbjANBgkq"
-	"hkiG9w0BAQsFAAOCAgEAVR9YqbyyqFDQDLHYGmkgJykIrGF1XIpu+ILlaS/V9lZL"
-	"ubhzEFnTIZd+50xx+7LSYK05qAvqFyFWhfFQDlnrzuBZ6brJFe+GnY+EgPbk6ZGQ"
-	"3BebYhtF8GaV0nxvwuo77x/Py9auJ/GpsMiu/X1+mvoiBOv/2X/qkSsisRcOj/KK"
-	"NFtY2PwByVS5uCbMiogziUwthDyC3+6WVwW6LLv3xLfHTjuCvjHIInNzktHCgKQ5"
-	"ORAzI4JMPJ+GslWYHb4phowim57iaztXOoJwTdwJx4nLCgdNbOhdjsnvzqvHu7Ur"
-	"TkXWStAmzOVyyghqpZXjFaH3pO3JLF+l+/+sKAIuvtd7u+Nxe5AW0wdeRlN8NwdC"
-	"jNPElpzVmbUq4JUagEiuTDkHzsxHpFKVK7q4+63SM1N95R1NbdWhscdCb+ZAJzVc"
-	"oyi3B43njTOQ5yOf+1CceWxG1bQVs5ZufpsMljq4Ui0/1lvh+wjChP4kqKOJ2qxq"
-	"4RgqsahDYVvTH9w7jXbyLeiNdd8XM2w9U/t7y0Ff/9yi0GE44Za4rF2LN9d11TPA"
-	"mRGunUHBcnWEvgJBQl9nJEiU0Zsnvgc/ubhPgXRR4Xq37Z0j4r7g1SgEEzwxA57d"
-	"emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc="
-		"\"},"
-		"{\"LEX3_isrg_root_x1\": \"" /* LE X3 signed by ISRG X1 root */
-	"MIIFjTCCA3WgAwIBAgIRANOxciY0IzLc9AUoUSrsnGowDQYJKoZIhvcNAQELBQAw"
-	"TzELMAkGA1UEBhMCVVMxKTAnBgNVBAoTIEludGVybmV0IFNlY3VyaXR5IFJlc2Vh"
-	"cmNoIEdyb3VwMRUwEwYDVQQDEwxJU1JHIFJvb3QgWDEwHhcNMTYxMDA2MTU0MzU1"
-	"WhcNMjExMDA2MTU0MzU1WjBKMQswCQYDVQQGEwJVUzEWMBQGA1UEChMNTGV0J3Mg"
-	"RW5jcnlwdDEjMCEGA1UEAxMaTGV0J3MgRW5jcnlwdCBBdXRob3JpdHkgWDMwggEi"
-	"MA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCc0wzwWuUuR7dyXTeDs2hjMOrX"
-	"NSYZJeG9vjXxcJIvt7hLQQWrqZ41CFjssSrEaIcLo+N15Obzp2JxunmBYB/XkZqf"
-	"89B4Z3HIaQ6Vkc/+5pnpYDxIzH7KTXcSJJ1HG1rrueweNwAcnKx7pwXqzkrrvUHl"
-	"Npi5y/1tPJZo3yMqQpAMhnRnyH+lmrhSYRQTP2XpgofL2/oOVvaGifOFP5eGr7Dc"
-	"Gu9rDZUWfcQroGWymQQ2dYBrrErzG5BJeC+ilk8qICUpBMZ0wNAxzY8xOJUWuqgz"
-	"uEPxsR/DMH+ieTETPS02+OP88jNquTkxxa/EjQ0dZBYzqvqEKbbUC8DYfcOTAgMB"
-	"AAGjggFnMIIBYzAOBgNVHQ8BAf8EBAMCAYYwEgYDVR0TAQH/BAgwBgEB/wIBADBU"
-	"BgNVHSAETTBLMAgGBmeBDAECATA/BgsrBgEEAYLfEwEBATAwMC4GCCsGAQUFBwIB"
-	"FiJodHRwOi8vY3BzLnJvb3QteDEubGV0c2VuY3J5cHQub3JnMB0GA1UdDgQWBBSo"
-	"SmpjBH3duubRObemRWXv86jsoTAzBgNVHR8ELDAqMCigJqAkhiJodHRwOi8vY3Js"
-	"LnJvb3QteDEubGV0c2VuY3J5cHQub3JnMHIGCCsGAQUFBwEBBGYwZDAwBggrBgEF"
-	"BQcwAYYkaHR0cDovL29jc3Aucm9vdC14MS5sZXRzZW5jcnlwdC5vcmcvMDAGCCsG"
-	"AQUFBzAChiRodHRwOi8vY2VydC5yb290LXgxLmxldHNlbmNyeXB0Lm9yZy8wHwYD"
-	"VR0jBBgwFoAUebRZ5nu25eQBc4AIiMgaWPbpm24wDQYJKoZIhvcNAQELBQADggIB"
-	"ABnPdSA0LTqmRf/Q1eaM2jLonG4bQdEnqOJQ8nCqxOeTRrToEKtwT++36gTSlBGx"
-	"A/5dut82jJQ2jxN8RI8L9QFXrWi4xXnA2EqA10yjHiR6H9cj6MFiOnb5In1eWsRM"
-	"UM2v3e9tNsCAgBukPHAg1lQh07rvFKm/Bz9BCjaxorALINUfZ9DD64j2igLIxle2"
-	"DPxW8dI/F2loHMjXZjqG8RkqZUdoxtID5+90FgsGIfkMpqgRS05f4zPbCEHqCXl1"
-	"eO5HyELTgcVlLXXQDgAWnRzut1hFJeczY1tjQQno6f6s+nMydLN26WuU4s3UYvOu"
-	"OsUxRlJu7TSRHqDC3lSE5XggVkzdaPkuKGQbGpny+01/47hfXXNB7HntWNZ6N2Vw"
-	"p7G6OfY+YQrZwIaQmhrIqJZuigsrbe3W+gdn5ykE9+Ky0VgVUsfxo52mwFYs1JKY"
-	"2PGDuWx8M6DlS6qQkvHaRUo0FMd8TsSlbF0/v965qGFKhSDeQoMpYnwcmQilRh/0"
-	"ayLThlHLN81gSkJjVrPI0Y8xCVPB4twb1PFUd2fPM3sA1tJ83sZ5v8vgFv2yofKR"
-	"PB0t6JzUA81mSqM3kxl5e+IZwhYAyO0OTg3/fs8HqGTNKd9BqoUwSRBzp06JMg5b"
-	"rUCGwbCUDI0mxadJ3Bz4WxR6fyNpBK2yAinWEsikxqEt"
+#if !defined(FORCE_OS_TRUST_STORE)
+		"{\"dst_root_x3\": \""
+	"MIIDSjCCAjKgAwIBAgIQRK+wgNajJ7qJMDmGLvhAazANBgkqhkiG9w0BAQUFADA/"
+	"MSQwIgYDVQQKExtEaWdpdGFsIFNpZ25hdHVyZSBUcnVzdCBDby4xFzAVBgNVBAMT"
+	"DkRTVCBSb290IENBIFgzMB4XDTAwMDkzMDIxMTIxOVoXDTIxMDkzMDE0MDExNVow"
+	"PzEkMCIGA1UEChMbRGlnaXRhbCBTaWduYXR1cmUgVHJ1c3QgQ28uMRcwFQYDVQQD"
+	"Ew5EU1QgUm9vdCBDQSBYMzCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEB"
+	"AN+v6ZdQCINXtMxiZfaQguzH0yxrMMpb7NnDfcdAwRgUi+DoM3ZJKuM/IUmTrE4O"
+	"rz5Iy2Xu/NMhD2XSKtkyj4zl93ewEnu1lcCJo6m67XMuegwGMoOifooUMM0RoOEq"
+	"OLl5CjH9UL2AZd+3UWODyOKIYepLYYHsUmu5ouJLGiifSKOeDNoJjj4XLh7dIN9b"
+	"xiqKqy69cK3FCxolkHRyxXtqqzTWMIn/5WgTe1QLyNau7Fqckh49ZLOMxt+/yUFw"
+	"7BZy1SbsOFU5Q9D8/RhcQPGX69Wam40dutolucbY38EVAjqr2m7xPi71XAicPNaD"
+	"aeQQmxkqtilX4+U9m5/wAl0CAwEAAaNCMEAwDwYDVR0TAQH/BAUwAwEB/zAOBgNV"
+	"HQ8BAf8EBAMCAQYwHQYDVR0OBBYEFMSnsaR7LHH62+FLkHX/xBVghYkQMA0GCSqG"
+	"SIb3DQEBBQUAA4IBAQCjGiybFwBcqR7uKGY3Or+Dxz9LwwmglSBd49lZRNI+DT69"
+	"ikugdB/OEIKcdBodfpga3csTS7MgROSR6cz8faXbauX+5v3gTt23ADq1cEmv8uXr"
+	"AvHRAosZy5Q6XkjEGB5YGV8eAlrwDPGxrancWYaLbumR9YbK+rlmM6pZW87ipxZz"
+	"R8srzJmwN0jP41ZL9c8PDHIyh8bwRLtTcm1D9SZImlJnt1ir/md2cXjbDaJWFBM5"
+	"JDGFoqgCWjBH4d1QB7wCCZAA62RjYJsWvIjJEubSfZGL+T0yjWW06XyxV3bqxbYo"
+	"Ob8VZRzI9neWagqNdwvYkQsEjgfbKbYK7p2CNTUQ"
 		"\"}"
+#endif
 	  "],"
 	  "\"trust_stores\": [" /* named cert chains */
+#if !defined(FORCE_OS_TRUST_STORE)
 		"{"
-			"\"name\": \"le_via_isrg\","
+			"\"name\": \"le_via_dst\","
 			"\"stack\": ["
-				"\"isrg_root_x1\","
-				"\"LEX3_isrg_root_x1\""
+				"\"dst_root_x3\""
 			"]"
 		"}"
+#endif
 	  "],"
 	  "\"s\": ["
 	  	/*
@@ -169,12 +131,14 @@ static const char * const default_ss_policy =
 #if defined(VIA_LOCALHOST_SOCKS)
 			"\"http_url\":"		"\"policy/minimal-proxy-socks.json\","
 #else
-			"\"http_url\":"		"\"policy/minimal-proxy.json\","
+			"\"http_url\":"		"\"policy/minimal-proxy-v4.2-v2.json\","
 #endif
 			"\"tls\":"		"true,"
 			"\"opportunistic\":"	"true,"
-			"\"retry\":"		"\"default\","
-			"\"tls_trust_store\":"	"\"le_via_isrg\""
+#if !defined(FORCE_OS_TRUST_STORE)
+			"\"tls_trust_store\":"	"\"le_via_dst\","
+#endif
+			"\"retry\":"		"\"default\""
 		"}},{"
 			/*
 			 * "captive_portal_detect" describes
@@ -205,6 +169,9 @@ typedef struct myss {
 	void				*opaque_data;
 	/* ... application specific state ... */
 	lws_sorted_usec_list_t		sul;
+	size_t				amt;
+
+	struct lws_genhash_ctx		hash_ctx;
 } myss_t;
 
 #if !defined(LWS_SS_USE_SSPC)
@@ -227,12 +194,22 @@ static const char *canned_root_token_payload =
 
 /* secure streams payload interface */
 
-static int
+static lws_ss_state_return_t
 myss_rx(void *userobj, const uint8_t *buf, size_t len, int flags)
 {
-//	myss_t *m = (myss_t *)userobj;
+	myss_t *m = (myss_t *)userobj;
+	const char *md_srv = "not set", *md_test = "not set";
+	size_t md_srv_len = 7, md_test_len = 7;
 
-	lwsl_user("%s: len %d, flags: %d\n", __func__, (int)len, flags);
+	if (flags & LWSSS_FLAG_PERF_JSON)
+		return LWSSSSRET_OK;
+
+	lws_ss_get_metadata(m->ss, "srv", (const void **)&md_srv, &md_srv_len);
+	lws_ss_get_metadata(m->ss, "test", (const void **)&md_test, &md_test_len);
+
+	lwsl_user("%s: len %d, flags: %d, srv: %.*s, test: %.*s\n", __func__,
+		  (int)len, flags, (int)md_srv_len, md_srv,
+		  (int)md_test_len, md_test);
 	lwsl_hexdump_info(buf, len);
 
 	/*
@@ -244,10 +221,10 @@ myss_rx(void *userobj, const uint8_t *buf, size_t len, int flags)
 		interrupted = 1;
 	}
 
-	return 0;
+	return LWSSSSRET_OK;
 }
 
-static int
+static lws_ss_state_return_t
 myss_tx(void *userobj, lws_ss_tx_ordinal_t ord, uint8_t *buf, size_t *len,
 	int *flags)
 {
@@ -258,38 +235,57 @@ myss_tx(void *userobj, lws_ss_tx_ordinal_t ord, uint8_t *buf, size_t *len,
 	return LWSSSSRET_TX_DONT_SEND;
 }
 
-static int
+static lws_ss_state_return_t
 myss_state(void *userobj, void *sh, lws_ss_constate_t state,
 	   lws_ss_tx_ordinal_t ack)
 {
 	myss_t *m = (myss_t *)userobj;
 
-	lwsl_user("%s: %s, ord 0x%x\n", __func__, lws_ss_state_name(state),
-		  (unsigned int)ack);
+	lwsl_user("%s: %s (%d), ord 0x%x\n", __func__,
+		  lws_ss_state_name((int)state), state, (unsigned int)ack);
 
 	switch (state) {
 	case LWSSSCS_CREATING:
+		return lws_ss_client_connect(m->ss);
+
+	case LWSSSCS_CONNECTING:
 		lws_ss_start_timeout(m->ss, timeout_ms);
-		lws_ss_set_metadata(m->ss, "uptag", "myuptag123", 10);
-		lws_ss_set_metadata(m->ss, "ctype", "myctype", 7);
-		lws_ss_client_connect(m->ss);
+
+		if (lws_ss_set_metadata(m->ss, "uptag", "myuptag123", 10))
+			/* can fail, eg due to OOM, retry later if so */
+			return LWSSSSRET_DISCONNECT_ME;
+
+		if (lws_ss_set_metadata(m->ss, "ctype", "myctype", 7))
+			/* can fail, eg due to OOM, retry later if so */
+			return LWSSSSRET_DISCONNECT_ME;
 		break;
+
 	case LWSSSCS_ALL_RETRIES_FAILED:
 		/* if we're out of retries, we want to close the app and FAIL */
 		interrupted = 1;
+		bad = 2;
 		break;
+
 	case LWSSSCS_QOS_ACK_REMOTE:
 		lwsl_notice("%s: LWSSSCS_QOS_ACK_REMOTE\n", __func__);
 		break;
 
 	case LWSSSCS_TIMEOUT:
 		lwsl_notice("%s: LWSSSCS_TIMEOUT\n", __func__);
+		/* if we're out of time */
+		interrupted = 1;
+		bad = 3;
 		break;
+
+	case LWSSSCS_USER_BASE:
+		lwsl_notice("%s: LWSSSCS_USER_BASE\n", __func__);
+		break;
+
 	default:
 		break;
 	}
 
-	return 0;
+	return LWSSSSRET_OK;
 }
 
 static int
@@ -376,7 +372,8 @@ app_system_state_nf(lws_state_manager_t *mgr, lws_state_notify_link_t *link,
 			ssi.tx = myss_tx;
 			ssi.state = myss_state;
 			ssi.user_alloc = sizeof(myss_t);
-			ssi.streamtype = "mintest";
+			ssi.streamtype = test_ots ? "mintest-ots" :
+					 (test_respmap ? "respmap" : "mintest");
 
 			if (lws_ss_create(context, 0, &ssi, NULL, NULL,
 					  NULL, NULL)) {
@@ -395,6 +392,30 @@ static lws_state_notify_link_t * const app_notifier_list[] = {
 	&nl, NULL
 };
 
+#if defined(LWS_WITH_SYS_METRICS)
+
+static int
+my_metric_report(lws_metric_pub_t *mp)
+{
+	lws_metric_bucket_t *sub = mp->u.hist.head;
+	char buf[192];
+
+	do {
+		if (lws_metrics_format(mp, &sub, buf, sizeof(buf)))
+			lwsl_user("%s: %s\n", __func__, buf);
+	} while ((mp->flags & LWSMTFL_REPORT_HIST) && sub);
+
+	/* 0 = leave metric to accumulate, 1 = reset the metric */
+
+	return 1;
+}
+
+static const lws_system_ops_t system_ops = {
+	.metric_report = my_metric_report,
+};
+
+#endif
+
 static void
 sigint_handler(int sig)
 {
@@ -405,8 +426,8 @@ int main(int argc, const char **argv)
 {
 	struct lws_context_creation_info info;
 	struct lws_context *context;
+	int n = 0, expected = 0;
 	const char *p;
-	int n = 0;
 
 	signal(SIGINT, sigint_handler);
 
@@ -423,8 +444,18 @@ int main(int argc, const char **argv)
 	if (lws_cmdline_option(argc, argv, "--force-no-internet"))
 		force_cpd_fail_no_internet = 1;
 
+	if (lws_cmdline_option(argc, argv, "--respmap"))
+		test_respmap = 1;
+
+	if (lws_cmdline_option(argc, argv, "--ots"))
+		/*
+		 * Use a streamtype that relies on the OS trust store for
+		 * validation
+		 */
+		test_ots = 1;
+
 	if ((p = lws_cmdline_option(argc, argv, "--timeout_ms")))
-		timeout_ms = atoi(p);
+		timeout_ms = (unsigned int)atoi(p);
 
 	info.fd_limit_per_thread = 1 + 6 + 1;
 	info.port = CONTEXT_PORT_NO_LISTEN;
@@ -436,7 +467,7 @@ int main(int argc, const char **argv)
 		/* connect to ssproxy via UDS by default, else via
 		 * tcp connection to this port */
 		if ((p = lws_cmdline_option(argc, argv, "-p")))
-			info.ss_proxy_port = atoi(p);
+			info.ss_proxy_port = (uint16_t)atoi(p);
 
 		/* UDS "proxy.ss.lws" in abstract namespace, else this socket
 		 * path; when -p given this can specify the network interface
@@ -451,11 +482,8 @@ int main(int argc, const char **argv)
 #else
 	info.pss_policies_json = default_ss_policy;
 	info.options = LWS_SERVER_OPTION_EXPLICIT_VHOSTS |
+		       LWS_SERVER_OPTION_H2_JUST_FIX_WINDOW_UPDATE_OVERFLOW |
 		       LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
-#endif
-#if defined(LWS_WITH_DETAILED_LATENCY)
-	info.detailed_latency_cb = lws_det_lat_plot_cb;
-	info.detailed_latency_filepath = "/tmp/lws-latency-ssproxy";
 #endif
 
 	/* integrate us with lws system state management when context created */
@@ -464,12 +492,18 @@ int main(int argc, const char **argv)
 	nl.notify_cb = app_system_state_nf;
 	info.register_notifier_list = app_notifier_list;
 
+
+#if defined(LWS_WITH_SYS_METRICS)
+	info.system_ops = &system_ops;
+	info.metrics_prefix = "ssmex";
+#endif
+
 	/* create the context */
 
 	context = lws_create_context(&info);
 	if (!context) {
 		lwsl_err("lws init failed\n");
-		return 1;
+		goto bail;
 	}
 
 #if !defined(LWS_SS_USE_SSPC)
@@ -514,7 +548,15 @@ int main(int argc, const char **argv)
 
 	lws_context_destroy(context);
 
-	lwsl_user("Completed: %s\n", bad ? "failed" : "OK");
+bail:
+	if ((p = lws_cmdline_option(argc, argv, "--expected-exit")))
+		expected = atoi(p);
 
-	return bad;
+	if (bad == expected) {
+		lwsl_user("Completed: OK (seen expected %d)\n", expected);
+		return 0;
+	} else
+		lwsl_err("Completed: failed: exit %d, expected %d\n", bad, expected);
+
+	return 1;
 }

@@ -24,6 +24,7 @@
 #include <functional>   // for _Bind, less, bind, function
 #include <map>          // for multimap, _Rb_tree_iterator
 #include <utility>      // for pair, make_pair
+#include <algorithm>
 
 #include "vm/vm.h"
 
@@ -40,8 +41,20 @@
 struct event_base *g_event_base = nullptr;
 
 namespace {
-void libevent_log(int severity, const char *msg) { debug(event, "events:%d:%s\n", severity, msg); }
-void libevent_dns_log(int severity, const char *msg) { debug(dns, "dns:%d:%s\n", severity, msg); }
+void libevent_log(int severity, const char *msg) {
+  if (severity == EVENT_LOG_ERR) {
+    debug(all, "libevent:%d:%s\n", severity, msg);
+  } else {
+    debug(event, "libevent:%d:%s\n", severity, msg);
+  }
+}
+void libevent_dns_log(int severity, const char *msg) {
+  if (severity == EVENT_LOG_ERR) {
+    debug(all, "libevent dns:%d:%s\n", severity, msg);
+  } else {
+    debug(dns, "libevent dns:%d:%s\n", severity, msg);
+  }
+}
 }  // namespace
 // Initialize backend
 event_base *init_backend() {
@@ -64,8 +77,8 @@ event_base *init_backend() {
 // to avoid dealing with rollover.
 uint64_t g_current_gametick;
 
-int time_to_gametick(std::chrono::milliseconds msecs) {
-  return msecs.count() / CONFIG_INT(__RC_GAMETICK_MSEC__);
+int time_to_next_gametick(std::chrono::milliseconds msec) {
+  return std::max(1, (int)(ceil(msec.count() / (double)CONFIG_INT(__RC_GAMETICK_MSEC__))));
 }
 
 std::chrono::milliseconds gametick_to_time(int ticks) {
@@ -138,11 +151,9 @@ void on_game_tick(evutil_socket_t fd, short what, void *arg) {
 
 }  // namespace
 
-tick_event *add_gametick_event(std::chrono::milliseconds delay_msecs,
-                               tick_event::callback_type callback) {
+tick_event *add_gametick_event(int delay_ticks, tick_event::callback_type callback) {
   auto event = new tick_event(callback);
-  g_tick_queue.insert(
-      TickQueue::value_type(g_current_gametick + time_to_gametick(delay_msecs), event));
+  g_tick_queue.insert(TickQueue::value_type(g_current_gametick + delay_ticks, event));
   return event;
 }
 
@@ -189,7 +200,7 @@ void look_for_objects_to_swap(void);
 
 // FIXME:
 void call_remove_destructed_objects() {
-  add_gametick_event(std::chrono::minutes(5),
+  add_gametick_event(time_to_next_gametick(std::chrono::minutes(5)),
                      tick_event::callback_type(call_remove_destructed_objects));
   remove_destructed_objects();
 }
@@ -201,14 +212,16 @@ void backend(struct event_base *base) {
   g_current_gametick = 0;
 
   // Register various tick events
-  add_gametick_event(std::chrono::seconds(0), tick_event::callback_type(call_heart_beat));
-  add_gametick_event(std::chrono::minutes(5), tick_event::callback_type(look_for_objects_to_swap));
-  add_gametick_event(std::chrono::minutes(30),
+  add_gametick_event(0, tick_event::callback_type(call_heart_beat));
+  add_gametick_event(time_to_next_gametick(std::chrono::minutes(5)),
+                     tick_event::callback_type(look_for_objects_to_swap));
+  add_gametick_event(time_to_next_gametick(std::chrono::minutes(30)),
                      tick_event::callback_type([] { return reclaim_objects(true); }));
 #ifdef PACKAGE_MUDLIB_STATS
-  add_gametick_event(std::chrono::minutes(60), tick_event::callback_type(mudlib_stats_decay));
+  add_gametick_event(time_to_next_gametick(std::chrono::minutes(60)),
+                     tick_event::callback_type(mudlib_stats_decay));
 #endif
-  add_gametick_event(std::chrono::minutes(5),
+  add_gametick_event(time_to_next_gametick(std::chrono::minutes(5)),
                      tick_event::callback_type(call_remove_destructed_objects));
 
   // NOTE: we don't use EV_PERSITENT here because that use fix-rate scheduling.
@@ -250,7 +263,7 @@ void look_for_objects_to_swap() {
   auto time_to_clean_up = CONFIG_INT(__TIME_TO_CLEAN_UP__);
 
   /* Next time is in 5 minutes */
-  add_gametick_event(std::chrono::seconds(5 * 60),
+  add_gametick_event(time_to_next_gametick(std::chrono::seconds(5 * 60)),
                      tick_event::callback_type(look_for_objects_to_swap));
 
   object_t *ob, *next_ob, *last_good_ob;

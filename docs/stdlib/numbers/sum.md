@@ -19,10 +19,10 @@ title: stdlib / sum
 
 ### EXAMPLE
 
-```C
+```c
 sum( 1, 2, 3, 4, 5, 6 ); // Result: 21
 sum( 1, 2, 3.5, 4, 5, 6 ); // Result: 21.500000
-````
+```
 
 ### SEE ALSO
 

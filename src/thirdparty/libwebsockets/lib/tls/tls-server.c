@@ -130,6 +130,7 @@ lws_server_socket_service_ssl(struct lws *wsi, lws_sockfd_type accept_fd, char f
 	struct lws_context *context = wsi->a.context;
 	struct lws_context_per_thread *pt = &context->pt[(int)wsi->tsi];
 	struct lws_vhost *vh;
+	ssize_t s;
 	int n;
 
 	if (!LWS_SSL_ENABLED(wsi->a.vhost))
@@ -147,18 +148,17 @@ lws_server_socket_service_ssl(struct lws *wsi, lws_sockfd_type accept_fd, char f
 			lwsl_err("%s: failed on ssl restriction\n", __func__);
 			return 1;
 		}
+		wsi->tls_borrowed = 1;
 
 		if (lws_tls_server_new_nonblocking(wsi, accept_fd)) {
 			lwsl_err("%s: failed on lws_tls_server_new_nonblocking\n", __func__);
 			if (accept_fd != LWS_SOCK_INVALID)
 				compatible_close(accept_fd);
-			lws_tls_restrict_return(context);
+			if (wsi->tls_borrowed)
+				lws_tls_restrict_return(context);
 			goto fail;
 		}
 
-#if defined(LWS_WITH_STATS)
-		context->updated = 1;
-#endif
 		/*
 		 * we are not accepted yet, but we need to enter ourselves
 		 * as a live connection.  That way we can retry when more
@@ -174,7 +174,7 @@ lws_server_socket_service_ssl(struct lws *wsi, lws_sockfd_type accept_fd, char f
 		lws_pt_unlock(pt);
 
 		lws_set_timeout(wsi, PENDING_TIMEOUT_SSL_ACCEPT,
-				context->timeout_secs);
+				(int)context->timeout_secs);
 
 		lwsl_debug("inserted SSL accept into fds, trying SSL_accept\n");
 
@@ -193,7 +193,7 @@ lws_server_socket_service_ssl(struct lws *wsi, lws_sockfd_type accept_fd, char f
 			 * something to read...
 			 */
 
-			n = recv(wsi->desc.sockfd, (char *)pt->serv_buf,
+			s = recv(wsi->desc.sockfd, (char *)pt->serv_buf,
 				 context->pt_serv_buf_size, MSG_PEEK);
 			/*
 			 * We have LWS_SERVER_OPTION_ALLOW_NON_SSL_ON_SSL_PORT..
@@ -220,7 +220,7 @@ lws_server_socket_service_ssl(struct lws *wsi, lws_sockfd_type accept_fd, char f
 			 *     continue with that
 			 */
 
-			if (n >= 1 && pt->serv_buf[0] >= ' ') {
+			if (s >= 1 && pt->serv_buf[0] >= ' ') {
 				/*
 				* TLS content-type for Handshake is 0x16, and
 				* for ChangeCipherSpec Record, it's 0x14
@@ -270,7 +270,7 @@ lws_server_socket_service_ssl(struct lws *wsi, lws_sockfd_type accept_fd, char f
 					    __func__, wsi->a.vhost->name);
 				goto fail;
 			}
-			if (!n) {
+			if (!s) {
 				/*
 				 * POLLIN but nothing to read is supposed to
 				 * mean the connection is gone, we should
@@ -294,7 +294,7 @@ lws_server_socket_service_ssl(struct lws *wsi, lws_sockfd_type accept_fd, char f
 
 				goto fail;
 			}
-			if (n < 0 && (LWS_ERRNO == LWS_EAGAIN ||
+			if (s < 0 && (LWS_ERRNO == LWS_EAGAIN ||
 				      LWS_ERRNO == LWS_EWOULDBLOCK)) {
 
 punt:
@@ -317,20 +317,13 @@ punt:
 
 		/* normal SSL connection processing path */
 
-#if defined(LWS_WITH_STATS)
-		/* only set this the first time around */
-		if (!wsi->accept_start_us)
-			wsi->accept_start_us = lws_now_usecs();
-#endif
 		errno = 0;
-		lws_stats_bump(pt, LWSSTATS_C_SSL_ACCEPT_SPIN, 1);
 		n = lws_tls_server_accept(wsi);
 		lwsl_info("SSL_accept says %d\n", n);
 		switch (n) {
 		case LWS_SSL_CAPABLE_DONE:
 			break;
 		case LWS_SSL_CAPABLE_ERROR:
-			lws_stats_bump(pt, LWSSTATS_C_SSL_CONNECTIONS_FAILED, 1);
 	                lwsl_info("%s: SSL_accept failed socket %u: %d\n",
 	                		__func__, wsi->desc.sockfd, n);
 			wsi->socket_is_permanently_unusable = 1;
@@ -339,26 +332,6 @@ punt:
 		default: /* MORE_SERVICE */
 			return 0;
 		}
-
-		lws_stats_bump(pt, LWSSTATS_C_SSL_CONNECTIONS_ACCEPTED, 1);
-#if defined(LWS_WITH_STATS)
-		if (wsi->accept_start_us)
-			lws_stats_bump(pt,
-				      LWSSTATS_US_SSL_ACCEPT_LATENCY_AVG,
-				      lws_now_usecs() -
-					      wsi->accept_start_us);
-		wsi->accept_start_us = lws_now_usecs();
-#endif
-#if defined(LWS_WITH_DETAILED_LATENCY)
-		if (context->detailed_latency_cb) {
-			wsi->detlat.type = LDLT_TLS_NEG_SERVER;
-			wsi->detlat.latencies[LAT_DUR_PROXY_RX_TO_ONWARD_TX] =
-				lws_now_usecs() -
-				wsi->detlat.earliest_write_req_pre_write;
-			wsi->detlat.latencies[LAT_DUR_USERCB] = 0;
-			lws_det_lat_cb(wsi->a.context, &wsi->detlat);
-		}
-#endif
 
 		/* adapt our vhost to match the SNI SSL_CTX that was chosen */
 		vh = context->vhost_list;
@@ -374,7 +347,7 @@ punt:
 
 		/* OK, we are accepted... give him some time to negotiate */
 		lws_set_timeout(wsi, PENDING_TIMEOUT_ESTABLISH_WITH_SERVER,
-				context->timeout_secs);
+				(int)context->timeout_secs);
 
 		lwsi_set_state(wsi, LRS_ESTABLISHED);
 		if (lws_tls_server_conn_alpn(wsi)) {

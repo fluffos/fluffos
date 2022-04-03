@@ -141,6 +141,41 @@ lws_protocol_vh_priv_get(struct lws_vhost *vhost,
 			 const struct lws_protocols *prot);
 
 /**
+ * lws_vhd_find_by_pvo() - find a partner vhd
+ *
+ *  \param cx: the lws_context
+ *  \param protname: the name of the lws_protocol the vhd belongs to
+ *  \param pvo_name: the name of a pvo that must exist bound to the vhd
+ *  \param pvo_value: the required value of the named pvo
+ *
+ * This allows architectures with multiple protocols bound together to
+ * cleanly discover partner protocol instances even on completely
+ * different vhosts.  For example, a proxy may consist of two protocols
+ * listening on different vhosts, and there may be multiple instances
+ * of the proxy in the same process.  It's desirable that each side of
+ * the proxy is an independent protocol that can be freely bound to any
+ * vhost, eg, allowing Unix Domain to tls / h2 proxying, or each side
+ * bound to different network interfaces for localhost-only visibility
+ * on one side, using existing vhost management.
+ *
+ * That leaves the problem that the two sides have to find each other
+ * and bind at runtime.  This api allows each side to specify the
+ * protocol name, and a common pvo name and pvo value that indicates
+ * the two sides belong together, and search through all the instantiated
+ * vhost-protocols looking for a match.  If found, the private allocation
+ * (aka "vhd" of the match is returned).  NULL is returned on no match.
+ *
+ * Since this can only succeed when called by the last of the two
+ * protocols to be instantiated, both sides should call it and handle
+ * NULL gracefully, since it may mean that they were first and their
+ * partner vhsot-protocol has not been instantiated yet.
+ */
+LWS_VISIBLE LWS_EXTERN void *
+lws_vhd_find_by_pvo(struct lws_context *cx, const char *protname,
+		    const char *pvo_name, const char *pvo_value);
+
+
+/**
  * lws_adjust_protocol_psds - change a vhost protocol's per session data size
  *
  * \param wsi: a connection with the protocol to change
@@ -194,7 +229,7 @@ lws_pvo_get_str(void *in, const char *name, const char **result);
 LWS_VISIBLE LWS_EXTERN int
 lws_protocol_init(struct lws_context *context);
 
-#define LWS_PLUGIN_API_MAGIC 190
+#define LWS_PLUGIN_API_MAGIC 191
 
 /*
  * Abstract plugin header for any kind of plugin class, always at top of
@@ -210,6 +245,7 @@ lws_protocol_init(struct lws_context *context);
 typedef struct lws_plugin_header {
 	const char *name;
 	const char *_class;
+	const char *lws_build_hash; /* set to LWS_BUILD_HASH */
 
 	unsigned int api_magic;
 	/* set to LWS_PLUGIN_API_MAGIC at plugin build time */
@@ -305,5 +341,41 @@ lws_plugins_init(struct lws_plugin **pplugin, const char * const *d,
 LWS_VISIBLE LWS_EXTERN int
 lws_plugins_destroy(struct lws_plugin **pplugin, each_plugin_cb_t each,
 		    void *each_user);
+
+#if defined(LWS_WITH_PLUGINS_BUILTIN)
+
+/* provide exports for builtin plugin protocols */
+
+extern const struct lws_protocols post_demo_protocols[1];
+extern const struct lws_protocols lws_raw_proxy_protocols[1];
+extern const struct lws_protocols lws_status_protocols[1];
+extern const struct lws_protocols lws_mirror_protocols[1];
+extern const struct lws_protocols lws_ssh_base_protocols[2];
+extern const struct lws_protocols post_demo_protocols[1];
+extern const struct lws_protocols dumb_increment_protocols[1];
+extern const struct lws_protocols deaddrop_protocols[1];
+extern const struct lws_protocols lws_raw_test_protocols[1];
+extern const struct lws_protocols lws_sshd_demo_protocols[1];
+extern const struct lws_protocols lws_acme_client_protocols[1];
+extern const struct lws_protocols client_loopback_test_protocols[1];
+extern const struct lws_protocols fulltext_demo_protocols[1];
+extern const struct lws_protocols lws_openmetrics_export_protocols[
+#if defined(LWS_WITH_SERVER) && defined(LWS_WITH_CLIENT) && defined(LWS_ROLE_WS)
+	4
+#else
+#if defined(LWS_WITH_SERVER)
+	3
+#else
+	1
+#endif
+#endif
+	];
+
+#define LWSOMPROIDX_DIRECT_HTTP_SERVER		0
+#define LWSOMPROIDX_PROX_HTTP_SERVER		1
+#define LWSOMPROIDX_PROX_WS_SERVER		2
+#define LWSOMPROIDX_PROX_WS_CLIENT		3
+
+#endif
 
 ///@}

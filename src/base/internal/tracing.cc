@@ -50,16 +50,21 @@ unsigned long _get_current_thread_id() {
 
 }  // namespace
 
-Event::Event()
+Event::Event(std::string_view name, EventCategory category, const char* phase,
+             std::optional<json>&& args)
     : process_id(::_get_current_process_id()),
       thread_id(::_get_current_thread_id()),
-      timestamp(Tracer::timestamp()) {}
+      timestamp(Tracer::timestamp()),
+      category(category),
+      phase(phase),
+      name(name),
+      args(args) {}
 
 class TraceWriter {
  public:
   ~TraceWriter();
 
-  void log(const Event& e) {
+  void log(Event&& e) {
     std::lock_guard<std::mutex> _guard(lock);
 
     if (!buffer) {
@@ -71,7 +76,7 @@ class TraceWriter {
       Tracer::stop();
     }
 
-    buffer->push_back(e);
+    buffer->push_back(std::move(e));
   }
   void flush(const std::string& file);
 
@@ -91,6 +96,7 @@ TraceWriter::~TraceWriter() {
       t.join();
     }
   }
+  dump_threads.clear();
 }
 
 void TraceWriter::flush(const std::string& filename) {
@@ -103,7 +109,7 @@ void TraceWriter::flush(const std::string& filename) {
   debug_message("Trace duration: %lf us, dumping %ld events to %s in separate thread.\n",
                 Tracer::timestamp(), buffer->size(), filename.c_str());
 
-  this->dump_threads.emplace_back([current_buffer = move(buffer), filename] {
+  this->dump_threads.emplace_back([current_buffer = std::move(buffer), filename] {
     auto begin = std::chrono::high_resolution_clock::now();
 
     std::ofstream file(filename, std::ofstream::out | std::ofstream::binary);
@@ -134,16 +140,16 @@ void TraceWriter::flush(const std::string& filename) {
            << ","
            << R"("cat":")" << e.category_name() << "\""
            << ","
-           << R"("name":)" << e.name;
+           << R"("name":)" << json(e.name);
 
       if (e.phase[0] == 'X') {
         file << ","
              << R"("dur":)" << e.duration;
       }
 
-      if (!e.args.empty()) {
+      if (e.args && !e.args->empty()) {
         file << ","
-             << R"("args":)" << e.args;
+             << R"("args":)" << *e.args;
       }
       file << "}";
     }
@@ -169,58 +175,54 @@ LARGE_INTEGER Tracer::basetime;
 std::chrono::high_resolution_clock::time_point Tracer::basetime;
 #endif
 
-void Tracer::log(const Event& e) {
+void Tracer::log(Event&& e) {
   if (Tracer::enabled()) {
-    instance().log(e);
+    instance().log(std::move(e));
   }
 }
 
-void Tracer::logSimpleEvent(const std::string& name, const EventCategory& category) {
-  Event e;
-  e.name = name;
-  e.category = category;
-  e.phase = "i";
-
-  log(e);
+void Tracer::logSimpleEvent(const std::string_view& name, const EventCategory& category) {
+  if (Tracer::enabled()) {
+    log({name, category, "i"});
+  }
 }
-void Tracer::begin(const std::string& name, const EventCategory& category, json&& args) {
-  Event e;
-  e.name = name;
-  e.category = category;
-  e.phase = "B";
-  e.args = args;
-  log(e);
+void Tracer::begin(const std::string_view& name, const EventCategory& category, json&& args) {
+  if (Tracer::enabled()) {
+    log({name, category, "B", std::move(args)});
+  }
 }
-void Tracer::end(const std::string& name, const EventCategory& category) {
-  Event e;
-  e.name = name;
-  e.category = category;
-  e.phase = "E";
-  log(e);
+void Tracer::begin(const std::string_view& name, const EventCategory& category) {
+  if (Tracer::enabled()) {
+    log({name, category, "B"});
+  }
+}
+void Tracer::end(const std::string_view& name, const EventCategory& category) {
+  if (Tracer::enabled()) {
+    log({name, category, "E"});
+  }
 }
 
-void Tracer::setThreadName(const std::string& name) {
-  Event e;
-
-  e.name = "thread_name";
-  e.category = EventCategory::DEFAULT;
-  e.phase = "M";
-  e.timestamp = 0;
-  e.args = {
-      {"name", name},
-  };
-  log(e);
+void Tracer::setThreadName(const std::string_view& name) {
+  if (Tracer::enabled()) {
+    Event e("thread_name", EventCategory::DEFAULT, "M",
+            json{
+                {"name", name},
+            });
+    e.timestamp = 0;
+    log(std::move(e));
+  }
 }
 
-void Tracer::counter(const std::string& name, long n) { counter(name, {{name, n}}); }
+void Tracer::counter(const std::string_view& name, long n) {
+  if (Tracer::enabled()) {
+    counter(name, {{name, n}});
+  }
+}
 
-void Tracer::counter(const std::string& name, const json& args) {
-  Event e;
-  e.name = name;
-  e.category = EventCategory::DEFAULT;
-  e.phase = "C";
-  e.args = args;
-  log(e);
+void Tracer::counter(const std::string_view& name, std::optional<json>&& args) {
+  if (Tracer::enabled()) {
+    log({name, EventCategory::DEFAULT, "C", std::move(args)});
+  }
 }
 
 void Tracer::collect() {
@@ -236,4 +238,21 @@ void Tracer::collect() {
 TraceWriter& Tracer::instance() {
   static TraceWriter _trace_writer;
   return _trace_writer;
+}
+
+ScopedTracerInner::ScopedTracerInner(const std::string& name, const EventCategory category,
+                                     std::optional<std::function<json()>> lazy_arg,
+                                     double time_limit_usec)
+    : time_limit_usec(time_limit_usec),
+      event(std::make_unique<Event>(
+          name, category, "X",
+          lazy_arg ? std::make_optional<json>((*lazy_arg)()) : std::nullopt)) {}
+
+ScopedTracerInner::~ScopedTracerInner() {
+  if (!this->event) return;
+
+  this->event->duration = Tracer::timestamp() - this->event->timestamp;
+  if (this->event->duration >= time_limit_usec) {
+    Tracer::log(std::move(*this->event));
+  }
 }

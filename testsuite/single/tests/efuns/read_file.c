@@ -18,8 +18,15 @@ void do_tests() {
     ASSERT(all == read_file("/testfile", 10, 0x7fffffff));
     ASSERT(!read_file("/does_not_exist"));
     ASSERT(!read_file("/testfile", 10000, 1));
-
+    
+    // Start tests for end of file -lines
+    ASSERT_EQ(implode(explode(foo, "\n")[<15..<6], "\n") + "\n", read_file("/testfile", -15, 10));
+    // if we start too many lines before the end of the file, start at the beginning
+    ASSERT(read_file("/testfile", -10000, 1));
+    
+    
     // CRLF tests
     ASSERT(read_file("/crlf_test_file.lf") == read_file("/crlf_test_file.crlf"));
-
+    ASSERT_EQ(read_file("/crlf_test_file.lf", -2, 1), read_file("/crlf_test_file.crlf", -2, 1));
+    ASSERT_EQ(read_file("/crlf_test_file.lf", -1000), read_file("/crlf_test_file.crlf", -1000));
 }
