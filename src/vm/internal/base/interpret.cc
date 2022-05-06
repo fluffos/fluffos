@@ -4440,6 +4440,7 @@ int inter_sscanf(svalue_t *arg, svalue_t *s0, svalue_t *s1, int num_arg) {
           while (*tmp && (*tmp != '%')) {
             tmp++;
           }
+          number_of_matches--;
           break;
         case '(': {
           struct regexp *reg;
