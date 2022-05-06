@@ -34,6 +34,7 @@
 #define USING_GMCP 0x10000    /* we've negotiated gmcp */
 #define HANDSHAKE_COMPLETE 0x20000 /* websocket connected */
 #define USING_COMPRESS 0x40000     /* we've negotiated compress */
+#define USING_MSP 0x80000     /* we've negotiated msp */
 
 // from ICU
 struct UConverter;

@@ -44,6 +44,10 @@ void f_debug_info(void) {
                     ob->interactive->iflags & USING_GMCP ? "TRUE" : "FALSE");
         outbuf_addv(&out, "O_MXP             : %s\n",
                     ob->interactive->iflags & USING_MXP ? "TRUE" : "FALSE");
+        outbuf_addv(&out, "O_COMPRESS        : %s\n",
+                    ob->interactive->iflags & USING_COMPRESS ? "TRUE" : "FALSE");
+        outbuf_addv(&out, "O_MSP             : %s\n",
+                    ob->interactive->iflags & USING_MSP ? "TRUE" : "FALSE");
       }
 
       if (!CONFIG_INT(__RC_NO_RESETS__)) {
