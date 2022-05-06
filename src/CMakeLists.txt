@@ -328,6 +328,7 @@ set(SRC
   "mainlib.cc"
   "user.cc"
   "symbol.cc"
+  "net/msp.cc"
   "net/tls.cc"
   "net/telnet.cc"
   "net/websocket.cc"

@@ -102,6 +102,7 @@ const flagEntry intFlags[] = {
     {"enable gmcp", __RC_ENABLE_GMCP__, 0},
     {"enable zmp", __RC_ENABLE_ZMP__, 0},
     {"enable mssp", __RC_ENABLE_MSSP__, 1},
+    {"enable msp", __RC_ENABLE_MSP__, 1},
 };
 
 void config_init() {
