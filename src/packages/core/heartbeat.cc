@@ -88,9 +88,13 @@ void call_heart_beat() {
     add_heart_beats(&ob->stats, 1);
 #endif
     save_command_giver(new_command_giver);
-    if (ob->interactive) {  // note, NOT same as new_command_giver
+
+    // note, NOT same as new_command_giver
+    current_interactive = nullptr;
+    if (ob->interactive) {
       current_interactive = ob;
     }
+
     g_current_heartbeat_obj = ob;
 
     error_context_t econ;
@@ -107,6 +111,7 @@ void call_heart_beat() {
     pop_context(&econ);
 
     restore_command_giver();
+    current_interactive = nullptr;
     g_current_heartbeat_obj = nullptr;
     curr_hb = nullptr;
   }
