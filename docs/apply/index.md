@@ -19,6 +19,9 @@ title: APPLY
 <div><a href='interactive/logon.html'>logon</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='interactive/msp_enable.html'>msp_enable</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='interactive/net_dead.html'>net_dead</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
@@ -192,6 +195,6 @@ title: APPLY
 
 <div class="alert alert-info my-4" role="alert">
     <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/info.svg">
-    This page is auto generated on 2021-05-09 21:09:57 CST for v2019.20210429-15-g8827ca4b.</a>
+    This page is auto generated on 2022-05-06 15:22:51 PDT for v2019.20210429-94-g44d25a06.</a>
 </div>
 
