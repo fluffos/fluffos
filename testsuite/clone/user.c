@@ -267,3 +267,11 @@ void act_mxp() {
 void send_gmcp(string req) {
   efun::send_gmcp(req);
 }
+
+void msp_enable() {
+  receive("<MSP negotiation: enabled.>\n");
+}
+
+void msp_oob(string req) {
+  efun::telnet_msp_oob(req);
+}

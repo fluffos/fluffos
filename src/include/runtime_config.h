@@ -107,6 +107,7 @@
 #define __RC_ENABLE_GMCP__ CFG_INT(60)
 #define __RC_ENABLE_ZMP__ CFG_INT(61)
 #define __RC_ENABLE_MSSP__ CFG_INT(62)
+#define __RC_ENABLE_MSP__ CFG_INT(63)
 
 #define RC_LAST_CONFIG_INT CFG_INT(255)
 #endif /* RUNTIME_CONFIG_H */

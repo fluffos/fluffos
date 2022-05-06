@@ -354,6 +354,7 @@ enable mxp : 1
 enable gmcp : 1
 enable zmp : 1
 enable mssp : 1
+enable msp : 1
 
 ###############################################################################
 #          The following aren't currently used or implemented (yet)           #
