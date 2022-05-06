@@ -1,7 +1,7 @@
 inherit "/inherit/tests";
 
 void do_tests() {
-    string s;
+    string s, s1;
     int num;
 
     ASSERT(catch(sscanf("you%", "%s%", s)));
@@ -25,4 +25,8 @@ void do_tests() {
 
     sscanf("0x1293jsf", "%x", num);
     ASSERT_EQ(4755, num);
+
+    ASSERT_EQ(2, sscanf("abc%abc", "%s%%%s", s, s1));
+    ASSERT_EQ("abc", s);
+    ASSERT_EQ("abc", s1);
 }
