@@ -22,6 +22,9 @@ title: STDLIB
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='db/database.html'>database</a></div>
 </div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='db/database_zh.html'>database_zh</a></div>
+</div>
 </div>
 
 <h2 class="border-bottom py-3 text-uppercase">
@@ -87,6 +90,6 @@ title: STDLIB
 
 <div class="alert alert-info my-4" role="alert">
     <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/info.svg">
-    This page is auto generated on 2021-05-11 19:16:24 EDT for v2019.20210429-13-g37c54583-dirty.</a>
+    This page is auto generated on 2022-05-06 15:22:51 PDT for v2019.20210429-94-g44d25a06.</a>
 </div>
 
