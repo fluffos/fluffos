@@ -291,10 +291,10 @@ old type behavior : 0
 old range behavior : 0
 warn old range behavior : 1
 
-# supress warnings about unused arguments; only warn about unused local
+# suppress warnings about unused arguments; only warn about unused local
 # variables.  Makes older code (where argument names were required) compile
 # more quietly.
-supress argument warnings : 1
+suppress argument warnings : 1
 
 #
 enable_commands call init : 1
