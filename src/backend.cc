@@ -61,6 +61,7 @@ event_base *init_backend() {
   event_set_log_callback(libevent_log);
   evdns_set_log_fn(libevent_dns_log);
 #ifdef DEBUG
+  event_enable_debug_logging(EVENT_DBG_ALL);
   event_enable_debug_mode();
 #endif
 #ifdef _WIN32
