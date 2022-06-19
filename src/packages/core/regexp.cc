@@ -274,7 +274,7 @@ regexp *regcomp(unsigned char *exp, int excompat) /* \( \) operators like in uni
   }
 
   exp2 = reinterpret_cast<short *>(
-      DMALLOC((strlen((char *)exp) + 1) * (sizeof(short[8]) / sizeof(char[8])), TAG_TEMPORARY,
+      DMALLOC((strlen((char *)exp) + 1) * (sizeof(short[8]) / sizeof(short)), TAG_TEMPORARY,
               "regcomp: 1"));
   for (scan = exp, dest = exp2; (c = *scan++);) {
     switch (c) {
