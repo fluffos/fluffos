@@ -356,6 +356,10 @@ enable zmp : 1
 enable mssp : 1
 enable msp : 1
 
+# External commands
+external_cmd_1 : /usr/bin/curl
+external_cmd_2 : c:\Windows\System32\curl.exe
+
 ###############################################################################
 #          The following aren't currently used or implemented (yet)           #
 ###############################################################################
