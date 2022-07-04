@@ -65,6 +65,7 @@ Non-bundled platform dependencies includes: libevent, ICU4C, OpenSSL, Zlib etc.
 Projects Using FluffOS
 ----------------------
 [Add Your Own](https://github.com/fluffos/fluffos/edit/master/README.md)
+[ThresholdRPG](https://wiki.thresholdrpg.com/)
 
 Donations
 ---------
