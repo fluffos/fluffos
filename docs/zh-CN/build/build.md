@@ -228,5 +228,3 @@ fluffos v2017 编译演示：
 
 
 提示：演示视频可随时暂停，演示的指令也可直接复制。
-
-另外，对编译不太熟悉的网友可以在这里上机实操体验：https://cloud.tencent.com/developer/labs/lab/10482
