@@ -17,7 +17,7 @@ title: system / time
 
 ### 参考
 
-    ctime(3), localtime(3), time_expression(3), uptime(3)
+    ctime(3), localtime(3), time_expression(3), uptime(3), perf_counter_ns(3)
 
 ### 翻译 ###
 

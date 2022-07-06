@@ -17,4 +17,4 @@ title: system / perf_counter_ns
 
 ### 参考
 
-    ctime(3), localtime(3), time_expression(3), uptime(3)
+    ctime(3), localtime(3), time_expression(3), uptime(3), time(3)

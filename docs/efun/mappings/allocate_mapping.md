@@ -10,6 +10,7 @@ title: mappings / allocate_mapping
 ### SYNOPSIS
 
     mapping allocate_mapping( int size );
+    mapping allocate_mapping(mixed *key, mixed value);
 
 ### DESCRIPTION
 
@@ -36,7 +37,12 @@ title: mappings / allocate_mapping
     Note: at this point in time, 'size' is meaningless, x  =  allocate_map‐
     ping(200); is equivalent to x = ([ ]);
 
+    allocate_mapping(mixed *keys, mixed v):
+      - if v is an array, the returned array has keys 'keys' and values 'v' (like 3.2.x's mkmapping)
+      - if it is a function, the the mapping has keys 'keys' and values evaluate(v, key)
+      - otherwise, each key has the value 'v'
+
 ### SEE ALSO
 
-    map_delete(3)
+    map_delete(3), allocate(3)
 
