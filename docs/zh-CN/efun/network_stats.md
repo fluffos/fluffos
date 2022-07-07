@@ -5,7 +5,7 @@ title: contrib / network_stats.pre
 
 ### 名称
 
-    network_stats() - 返回所有已取名的生物对象
+    network_stats() - 返回网络连接相关数据统计
 
 ### 语法
 
