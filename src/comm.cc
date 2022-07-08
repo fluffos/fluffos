@@ -395,7 +395,7 @@ bool init_user_conn() {
     {
       if (!port.tls_cert.empty() && !port.tls_key.empty()) {
         debug_message("Processing TLS config for port %d...\n", port.port);
-        fs::path mudlib_path(CONFIG_STR(__MUD_LIB_DIR__));
+        auto mudlib_path = fs::u8path(CONFIG_STR(__MUD_LIB_DIR__));
         auto real_cert_path = mudlib_path / port.tls_cert;
         auto real_key_path = mudlib_path / port.tls_key;
         try {
