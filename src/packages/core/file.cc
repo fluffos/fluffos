@@ -337,20 +337,26 @@ char *read_file(const char *file, int start, int lines) {
     return nullptr;
   }
 
-  auto fs_real_file = fs::path(real_file);
+  try {
+    auto fs_real_file = fs::u8path(real_file);
 
-  /*
-   * file doesn't exist, or is really a directory
-   */
-  if (!fs::exists(fs_real_file) || fs::is_directory(fs_real_file)) {
-    return nullptr;
-  }
+    /*
+    * file doesn't exist, or is really a directory
+    */
+    if (!fs::exists(fs_real_file) || fs::is_directory(fs_real_file)) {
+      return nullptr;
+    }
 
-  if (fs::is_empty(fs_real_file)) {
-    /* zero length file */
-    char *result = new_string(0, "read_file: empty");
-    result[0] = '\0';
-    return result;
+    if (fs::is_empty(fs_real_file)) {
+      /* zero length file */
+      char *result = new_string(0, "read_file: empty");
+      result[0] = '\0';
+      return result;
+    }
+
+  } catch (fs::filesystem_error &err) {
+      debug(file, "read_file: filesystem error: %s (%d).\n", err.what(), err.code().value());
+      return nullptr;
   }
 
   gzFile f = gzopen(real_file, "rb");
