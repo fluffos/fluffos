@@ -10,6 +10,7 @@ title: mappings / allocate_mapping
 ### 语法
 
     mapping allocate_mapping( int size );
+    mapping allocate_mapping(mixed *key, mixed value);
 
 ### 描述
 
