@@ -16,6 +16,9 @@ title: EFUN
 <div><a href='arrays/arrayp.html'>arrayp</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='arrays/element_of.html'>element_of</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='arrays/filter_array.html'>filter_array</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
@@ -26,6 +29,9 @@ title: EFUN
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='arrays/pointerp.html'>pointerp</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='arrays/shuffle.html'>shuffle</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='arrays/sort_array.html'>sort_array</a></div>
@@ -854,7 +860,19 @@ title: EFUN
 
 <div class='row'>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='parsing/parse_add_rule.html'>parse_add_rule</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='parsing/parse_command.html'>parse_command</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='parsing/parse_init.html'>parse_init</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='parsing/parse_refresh.html'>parse_refresh</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='parsing/parse_sentence.html'>parse_sentence</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='parsing/process_string.html'>process_string</a></div>
@@ -1110,6 +1128,6 @@ title: EFUN
 
 <div class="alert alert-info my-4" role="alert">
     <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/info.svg">
-    This page is auto generated on 2022-05-06 15:22:51 PDT for v2019.20210429-94-g44d25a06.</a>
+    This page is auto generated on 2022-07-06 16:19:27 CST for v2019.20220507-7-g64a2b14d-dirty.</a>
 </div>
 

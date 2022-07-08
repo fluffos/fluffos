@@ -3,17 +3,20 @@ layout: default
 title: numbers / secure_random
 ---
 
-### NAME
+### 名称
 
-    secure_random() - return a pseudo-random number, this should be unpredictable, but maybe slightly slow.
+    secure_random() - 返回一个不可预测的伪随机数，但速度比random()慢
 
-### SYNOPSIS
+### 语法
 
     int secure_random( int n );
 
-### DESCRIPTION
+### 描述
 
-    Return a cryptographically secure random number from the range [0 .. (n -1)] (inclusive).
+    从范围[0 .. (n -1)] (包含)中返回加密安全的随机数。
 
-    On Linux & OSX, this function explicitly use randomness from /dev/urandom, on windows it is implementation
-     defined.
+    On Linux & OSX, this function explicitly use randomness from /dev/urandom, on windows it is implementation defined.
+
+### 参考
+
+    random()
