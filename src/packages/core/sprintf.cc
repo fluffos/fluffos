@@ -636,21 +636,23 @@ static int add_column(cst **column, int trailing) {
   auto slen = strlen(col_d);
   size_t swidth;
 
+  debug_message("'%s', slen: %d, pres: %d\n", col_d, slen, col->pres);
   u8_truncate_below_width(col_d, slen, col->pres, true, true, &slen, &swidth);
+  debug_message("'%s', new slen: %d, new swidth: %d\n", std::string(col_d, slen).c_str(), slen, swidth);
   add_justified(col_d, swidth, slen, col->pad, col->size, col->info, trailing || col->next);
 
   col_d += slen;
   ret = 1;
-
-  // Eat the space if break
-  if (*col_d == ' ') {
-    col_d++;
-  }
-
+  
+  // landed on an '\n'
   if (*col_d == '\n') {
-    // landed on an '\n'
+    debug_message("landed on \\n.\n");
     col_d++;
     ret = 2;
+  } else {
+    if (*col_d == ' ') {
+      col_d++;
+    }
   }
   col->d.col = col_d;
   /*

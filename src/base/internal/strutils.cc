@@ -266,7 +266,7 @@ size_t u8_truncate(const uint8_t *src, size_t len) {
 
 // Truncate string to last valid codepoint that doesn't exceed maximum width, returns real width and
 // new len. If brake_at_space, then attempts to truncate before the last ' ' character. If
-// always_break_at_newline, then always truncate to first '\n' character. Invalid codepoints are
+// always_break_before_newline, then always truncate to first '\n' character. Invalid codepoints are
 // replaced to 0xfffd;
 void u8_truncate_below_width(const char *src, size_t len, size_t max_width, bool break_for_line,
                              bool always_break_before_newline, size_t *out_len, size_t *out_width) {

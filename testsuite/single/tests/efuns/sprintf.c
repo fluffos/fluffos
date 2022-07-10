@@ -282,4 +282,13 @@ TEXT;
   ASSERT_EQ(shouldbe, sprintf("%-=1s %-=2s\n",
                               implode(({ "11111",     "2222",      "333"}), "\n"),
                               implode(({ "aaa",  "bbb",   "cccc" }), "\n")));
+
+  shouldbe = @TEXT
+ Mit indentsi
+ tfddkdfkdfkdfskdfks
+ll
+ dffs
+ dddeee
+TEXT;
+  ASSERT_EQ(shouldbe, sprintf("%-*=s", 20, " Mit indentsi\n tfddkdfkdfkdfskdfksll\n dffs\n dddeee"));
 }
