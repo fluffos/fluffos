@@ -13,3 +13,4 @@
 /docs/Gemfile.lock
 /docs/vendor
 /venv/
+/testsuite/trace_lpcc.json
