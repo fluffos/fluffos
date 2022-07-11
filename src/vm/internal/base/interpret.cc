@@ -2209,20 +2209,18 @@ void eval_instruction(char *p) {
         break;
       case F_LOR:
         /* replaces F_DUP; F_BRANCH_WHEN_NON_ZERO; F_POP */
-        if (sp->type == T_NUMBER) {
-          if (!sp->u.number) {
-            pc += 2;
-            sp--;
-            break;
-          }
+        if ((sp->type == T_NUMBER && !sp->u.number) || (sp->type == T_REAL && !sp->u.real)) {
+          pc += 2;
+          sp--;
+          break;
         }
         COPY_SHORT(&offset, pc);
         pc += offset;
         break;
       case F_LAND:
         /* replaces F_DUP; F_BRANCH_WHEN_ZERO; F_POP */
-        if (sp->type == T_NUMBER) {
-          if (!sp->u.number) {
+        if (sp->type == T_NUMBER || sp->type == T_REAL) {
+          if ((sp->type == T_NUMBER && !sp->u.number) || (sp->type == T_REAL && !sp->u.real)) {
             COPY_SHORT(&offset, pc);
             pc += offset;
             break;
