@@ -49,4 +49,11 @@ void do_tests() {
   // this will never be true since they are compared by type.
   ASSERT_NE(0.0, 0);
   ASSERT_NE(0.00000000000000, 0);
+
+  // https://github.com/fluffos/fluffos/issues/889
+  // 0.0 should be considered falsy in logical operations
+  ASSERT_EQ(1, 0.0 || 1);
+  ASSERT_EQ(1, 1 || 0.0);
+  ASSERT_EQ(0.0, 0.0 && 1);
+  ASSERT_EQ(0.0, 1 && 0.0);
 }
