@@ -2129,7 +2129,7 @@ int yylex() {
           return L_RANGE;
         }
         outp--;
-        goto badlex;
+        return L_DOT;
       case '#':
         if (*(outp - 2) == '\n') {
           char *sp = nullptr;
