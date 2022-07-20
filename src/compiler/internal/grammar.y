@@ -68,7 +68,7 @@ int yyparse (void);
 %token L_WHILE L_DO L_FOR L_FOREACH L_IN
 %token L_BREAK L_CONTINUE
 %token L_RETURN
-%token L_ARROW L_INHERIT L_COLON_COLON
+%token L_ARROW L_DOT L_INHERIT L_COLON_COLON
 %token L_ARRAY_OPEN L_MAPPING_OPEN L_FUNCTION_OPEN L_NEW_FUNCTION_OPEN
 
 %token L_SSCANF L_CATCH
@@ -2412,6 +2412,30 @@ expr4:
         }
       } else if (!IS_CLASS($1->type)) {
         yyerror("Left argument of -> is not a class");
+        CREATE_ERROR($$);
+      } else {
+        CREATE_UNARY_OP_1($$, F_MEMBER, 0, $1, 0);
+        $$->l.number = lookup_class_member(CLASS_IDX($1->type),
+            $3,
+            &($$->type));
+      }
+
+      scratch_free($3);
+    }
+  | expr4 L_DOT identifier
+    {
+      if ($1->type == TYPE_ANY) {
+        int cmi;
+        unsigned short tp;
+
+        if ((cmi = lookup_any_class_member($3, &tp)) != -1) {
+          CREATE_UNARY_OP_1($$, F_MEMBER, tp, $1, 0);
+          $$->l.number = cmi;
+        } else {
+          CREATE_ERROR($$);
+        }
+      } else if (!IS_CLASS($1->type)) {
+        yyerror("Left argument of . is not a class");
         CREATE_ERROR($$);
       } else {
         CREATE_UNARY_OP_1($$, F_MEMBER, 0, $1, 0);
