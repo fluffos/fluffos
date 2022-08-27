@@ -7,6 +7,7 @@
 
 #include <cstring>
 #include <cstdlib>
+#include <ctype.h>
 
 /*
  * Check that it is an legal path. No '..' are allowed.
@@ -20,13 +21,7 @@ int legal_path(const char *path) {
   if (path[0] == '/') {
     return 0;
   }
-  /*
-   * disallowing # seems the easiest way to solve a bug involving loading
-   * files containing that character
-   */
-  if (strchr(path, '#')) {
-    return 0;
-  }
+
   p = path;
   while (p) { /* Zak, 930530 - do better checking */
     if (p[0] == '.') {
@@ -45,5 +40,22 @@ int legal_path(const char *path) {
       p++; /* step over `/' */
     }
   }
+  
+  /*
+   * disallow # if it is not indicating an OID
+   */
+  p = strchr(path, '#');
+  while (p) {
+    p++;
+    if ( p[0] == '\0' ) {
+      break;
+    }
+    if (isdigit(p[0])) {
+      continue;
+    }
+    return 0;
+  }
+
+  
   return 1;
 } /* legal_path() */
