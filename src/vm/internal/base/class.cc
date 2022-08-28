@@ -43,7 +43,7 @@ array_t *allocate_class(class_def_t *cld, int has_values) {
     }
   } else {
     while (n--) {
-      p->item[n] = const0;
+      p->item[n] = const0u;
     }
   }
   return p;
@@ -61,7 +61,7 @@ array_t *allocate_class_by_size(int size) {
   p->size = size;
 
   while (size--) {
-    p->item[size] = const0;
+    p->item[size] = const0u;
   }
 
   return p;
