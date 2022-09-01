@@ -67,6 +67,7 @@ Projects Using FluffOS
 [Add Your Own](https://github.com/fluffos/fluffos/edit/master/README.md)
 
 -   [ThresholdRPG](https://wiki.thresholdrpg.com/)
+-   [SWmud](http://www.swmud.org/)
 
 Donations
 ---------
