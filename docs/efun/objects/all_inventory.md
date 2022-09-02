@@ -9,7 +9,7 @@ title: objects / all_inventory
 
 ### SYNOPSIS
 
-    object *all_inventory( object ob);
+    object *all_inventory( object ob );
 
 ### DESCRIPTION
 

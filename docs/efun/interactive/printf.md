@@ -94,5 +94,5 @@ title: interactive / printf
 
 ### SEE ALSO
 
-    sprintf, sscanf(3)
+    sprintf(3), sscanf(3)
 
