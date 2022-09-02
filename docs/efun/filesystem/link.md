@@ -20,6 +20,7 @@ title: filesystem / link
     same arguments.
 
     Note: This efun creates a hard link, not a symbolic one.
+    https://www.geeksforgeeks.org/difference-between-hard-link-and-soft-link/
 
 ### SEE ALSO
 

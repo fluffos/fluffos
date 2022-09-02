@@ -13,7 +13,7 @@ title: strings / strcmp
 
 ### DESCRIPTION
 
-    This  implementatin  of  strcmp()  is  identical  to the one found in C
+    This  implementation  of  strcmp()  is  identical  to the one found in C
     libraries.  If string one lexically precedes string two, then  strcmp()
     returns  a number less than 0.  If the two strings have the same value,
     strcmp() returns 0.  If string two lexically precedes string one,  then

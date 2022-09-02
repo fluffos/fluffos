@@ -5,7 +5,7 @@ title: contrib / restore_from_string.pre
 
 ### NAME
 
-    restore_from_string
+    restore_from_string()
 
 ### SYNOPSIS
 

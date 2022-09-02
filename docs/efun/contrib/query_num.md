@@ -18,13 +18,13 @@ title: contrib / query_num.pre
     2nd int is limit above which 1st int is "many"
     1st int > 99,999 is always "many", the same for <0 (<- huh???)
 
-    query_num(99999):
-    "ninetynine thousend nine hundred and ninetynine"
+    query_num(99999) ;
+    "ninety-nine thousand, nine hundred and ninety-nine"
 
-    query_num(99999, 50):
+    query_num(99999, 50) ;
     "many"
 
-    query_num(-99999):
+    query_num(-99999) ;
     "many" ????
 
 ### SEE ALSO

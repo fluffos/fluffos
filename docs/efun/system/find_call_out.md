@@ -16,7 +16,8 @@ title: system / find_call_out
     Find  the  first  call  out due to be executed for function 'func', and
     return the time left. If it is not found, then return -1.
 
+    This efun will only find call outs initiated by this_object().
+
 ### SEE ALSO
 
     call_out(3), remove_call_out(3), set_heart_beat(3)
-

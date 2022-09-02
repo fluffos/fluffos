@@ -9,8 +9,8 @@ title: arrays / unique_array
 
 ### SYNOPSIS
 
-    mixed  unique_array( object *obarr, string separator, void | mixed skip
-    ); mixed unique_array( mixed *arr, function f, void | mixed skip );
+    mixed unique_array( object *obarr, string separator, void | mixed skip);
+    mixed unique_array( mixed *arr, function f, void | mixed skip );
 
 ### DESCRIPTION
 
@@ -27,11 +27,11 @@ title: arrays / unique_array
 
     The return value is an array of arrays of objects on the form:
 
-         ({
-             ({Same1:1, Same1:2, Same1:3, .... Same1:N }),
-             ({Same2:1, Same2:2, Same2:3, .... Same2:N }),
-             ({Same3:1, Same3:2, Same3:3, .... Same3:N }),
-                           ....
-             ({SameM:1, SameM:2, SameM:3, .... SameM:N }),
-         })
+    ({
+        ({Same1:1, Same1:2, Same1:3, .... Same1:N }),
+        ({Same2:1, Same2:2, Same2:3, .... Same2:N }),
+        ({Same3:1, Same3:2, Same3:3, .... Same3:N }),
+                    ....
+        ({SameM:1, SameM:2, SameM:3, .... SameM:N }),
+    })
 

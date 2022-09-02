@@ -13,10 +13,10 @@ title: contrib / replaceable.pre
 
 ### DESCRIPTION
 
-    string *func defaults to ({ "create", "__INIT" }) and contains a list of functions which
-    may be ignored for checking
+    string *func defaults to ({ "create", "__INIT" }) and contains a list of
+    functions which may be ignored for checking
 
-    checks if object defines any functions itself (beside create and __INIT)
+    checks if object defines any functions itself (beside create)
 
     returns 1 if no and object is not simul_efun object and not ???
     0 otherwise

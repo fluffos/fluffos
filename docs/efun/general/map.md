@@ -10,9 +10,16 @@ title: general / map
 
 ### SYNOPSIS
 
-    mapping map( mapping | mixed* | string x, string fun, object ob,
-                 mixed extra, ... );
-    mapping map( mapping | mixed* | string x, function f, mixed extra, ... );
+    mapping map( mapping | mixed* | string x,
+                 string fun,
+                 object ob,
+                 mixed extra,
+                 ... );
+
+    mapping map( mapping | mixed* | string x,
+                 function f,
+                 mixed extra,
+                 ... );
 
 ### DESCRIPTION
 

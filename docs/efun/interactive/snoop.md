@@ -23,4 +23,3 @@ title: interactive / snoop
 ### SEE ALSO
 
     query_snoop(3), query_snooping(3)
-

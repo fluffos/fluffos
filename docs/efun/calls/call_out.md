@@ -31,14 +31,14 @@ title: calls / call_out
 
     A <delay> of 0 (or 0.0), will perform <fun> on the same gametick in which
     it was called after all previous call_outs have been executed. The number
-    of call_outs(0)s which may be executed on the same gametick may be configured
-    via the "call_out(0) nest level" property in the runtime config.
+    of call_outs(0)s which may be executed on the same gametick may be
+    configured via the "call_out(0) nest level" property in the runtime config.
 
     Please note that you can't rely on write() or say() in <fun> since
     this_player() is set to 0. Use tell_object() instead.
 
-    The runtime config value "this_player in call_out" exists to remedy the above
-    problem.
+    The runtime config value "this_player in call_out" exists to remedy the
+    above problem.
 
     The return value is an integer representing the handle of the call_out
     which may be used as an argument to remove_call_out().

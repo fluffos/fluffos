@@ -22,6 +22,9 @@ title: system / function_exists
 
     Note that function_exists() does not check shadows.
 
+    If no object is passed as the second argument, this efun will default
+    to this_object().
+
 ### SEE ALSO
 
     call_other(3), call_out(3), functionp(3), valid_shadow(4)

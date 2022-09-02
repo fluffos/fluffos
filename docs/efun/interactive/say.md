@@ -23,6 +23,9 @@ title: interactive / say
     object, but an array of objects, all those objects  are  excluded  from
     receiving the message.
 
+    This efun does not invoke the receive_message() apply, so you may wish to
+    override this efun if you wish it to be captured by this apply.
+
 ### SEE ALSO
 
     message(3), write(3), shout(3), tell_object(3), tell_room(3)

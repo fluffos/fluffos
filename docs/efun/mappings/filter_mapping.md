@@ -10,8 +10,11 @@ title: mappings / filter_mapping
 
 ### SYNOPSIS
 
-    mapping filter_mapping( mapping map, string fun, object ob,
-                              mixed extra, ... );
+    mapping filter_mapping( mapping map,
+                            string fun,
+                            object ob,
+                            mixed extra,
+                            ... );
     mapping map_mapping( mapping map, function f, mixed extra, ... );
 
 ### DESCRIPTION
