@@ -18,7 +18,7 @@ title: system / error
     to  the debug log.  'err' itself is allowed to have a length of maximal
     2045 characters not  counting  an  optional  '\n'  as  last  character.
     Before processing if the error the optional '\n' will be removed, a '*'
-    will be prepended unconditional an '\n' gets appended.
+    will be prepended and an unconditional '\n' gets appended.
 
 ### SEE ALSO
 

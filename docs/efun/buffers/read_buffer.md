@@ -11,7 +11,8 @@ title: buffers / read_buffer
 ### SYNOPSIS
 
     string | buffer read_buffer( string | buffer src,
-                                 int start,  int len );
+                                 int start,
+                                 int len );
 
 ### DESCRIPTION
 

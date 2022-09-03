@@ -23,17 +23,21 @@ title: functions / functionp
     The return value indicates the type of function pointer using the  val‐
     ues given in the driver include file "include/function.h".
 
-    function   pointer  type       value  ---------------------       -----
-    call_other               FP_CALL_OTHER    lfun                 FP_LOCAL
-    efun                FP_EFUN    simul_efun              FP_SIMUL   func‐
-    tional            FP_FUNCTIONAL
+    function pointer type       value
+    ---------------------       -----
+    call_other                  FP_CALL_OTHER
+    lfun                        FP_LOCAL
+    efun                        FP_EFUN
+    simul_efun                  FP_SIMUL
+    functional                  FP_FUNCTIONAL
 
-    In addition, the following values will be added in some  cases:  (argu‐
-    ments   provided)        FP_HAS_ARGUMENTS  (creator  has  been  dested)
-    FP_OWNER_DESTED (not rebindable)          FP_NOT_BINDABLE
+    In addition, the following values will be added in some cases:
+    FP_HAS_ARGUMENTS            arguments provided
+    FP_OWNER_DESTED             creator has been dested
+    FP_NOT_BINDABLE             not rebindable)
 
     The last set of values are bit values and can be tested with bit opera‐
-    tions.   The  value FP_MASK is provided for ignoring the bit values and
+    tions. The value FP_MASK is provided for ignoring the bit values and
     testing the basic type of the function pointer.
 
     Examples:

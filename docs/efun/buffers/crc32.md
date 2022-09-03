@@ -13,6 +13,5 @@ title: buffers / crc32
 
 ### DESCRIPTION
 
-    Computes  and  returns  the CRC-32 code for the given buffer or string,
-    'x'.
+    Computes  and  returns  the CRC-32 code for the given buffer or string, 'x'.
 

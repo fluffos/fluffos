@@ -29,18 +29,18 @@ title: system / localtime
     The index for each value is defined symbolically in  localtime.h.   The
     following table summarizes the array returned by localtime().
 
-         int  LT_SEC         Seconds after the minute (0..59)
-         int  LT_MIN         Minutes after the hour (0..59)
-         int  LT_HOUR        Hour since midnight (0..23)
-         int  LT_MDAY        Day of the month (1..31)
-         int  LT_MON         Months since January (0..11)
-         int  LT_YEAR        Year (guarenteed to be >= 1900)
-         int  LT_WDAY        Days since Sunday (0..6)
-         int  LT_YDAY        Days since January 1 (0..365)
-         int  LT_GMTOFF Seconds after GMT (UTC)
-         string    LT_ZONE        Timezone name
+         int        LT_SEC      Seconds after the minute (0..59)
+         int        LT_MIN      Minutes after the hour (0..59)
+         int        LT_HOUR     Hour since midnight (0..23)
+         int        LT_MDAY     Day of the month (1..31)
+         int        LT_MON      Months since January (0..11)
+         int        LT_YEAR     Year (guarenteed to be >= 1900)
+         int        LT_WDAY     Days since Sunday (0..6)
+         int        LT_YDAY     Days since January 1 (0..365)
+         int        LT_GMTOFF   Seconds after GMT (UTC)
+         string     LT_ZONE     Timezone name
+         int        LT_ISDST    If DST is currently being observed
 
 ### SEE ALSO
 
     ctime(3), time(3), time_expression(3), uptime(3), /include/localtime.h
-

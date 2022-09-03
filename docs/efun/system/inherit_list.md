@@ -17,6 +17,8 @@ title: system / inherit_list
     directly inherited files are returned.  E.g.  if  A  inherits  B  which
     inherits C, inherit_list(A) will return an array with B, but not C.
 
+    If no object is supplied, this efun will default to this_object().
+
 ### SEE ALSO
 
     deep_inherit_list(3), inherits(3)

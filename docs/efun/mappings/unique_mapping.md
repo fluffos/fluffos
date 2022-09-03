@@ -27,4 +27,3 @@ title: mappings / unique_mapping
 ### SEE ALSO
 
     filter_array(3), sort_array(3), map(3)
-

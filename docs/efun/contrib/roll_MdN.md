@@ -5,12 +5,21 @@ title: contrib / roll_MdN.pre
 
 ### NAME
 
-    roll_MdN
+    roll_MdN()
 
 ### SYNOPSIS
 
-    int roll_MdN(int, int)
+    int roll_MdN(int rolls, int sides)
 
 ### DESCRIPTION
 
-    roll 1st in times a 2nd int sided die and add all rolls, returns sum
+    rolls `sides`-sided die `rolls` number of times and returns the sum
+    of all rolls
+
+### EXAMPLE
+
+    // roll a 1d4
+    roll_MdN(1, 4)
+
+    // roll 2d6
+    roll_MdN(2, 6)

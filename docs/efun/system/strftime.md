@@ -13,7 +13,8 @@ title: system / strftime
 
 ### DESCRIPTION
 
-    Format given time with a format string, see https://man7.org/linux/man-pages/man3/strftime.3.html
+    Format given time with a format string, see:
+    https://man7.org/linux/man-pages/man3/strftime.3.html
 
 ### SEE ALSO
 

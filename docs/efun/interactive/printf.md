@@ -82,6 +82,8 @@ title: interactive / printf
 
     f       floating point number
 
+    This efun does not invoke the receive_message() apply.
+
 ### RETURN VALUES
 
     sprintf() returns the formatted string.
@@ -92,5 +94,5 @@ title: interactive / printf
 
 ### SEE ALSO
 
-    sscanf(3)
+    sprintf(3), sscanf(3)
 

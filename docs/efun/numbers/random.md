@@ -5,7 +5,8 @@ title: numbers / random
 
 ### NAME
 
-    random() - return a pseudo-random number, this is suitable for general simulation, but maybe predictable.
+    random() - return a pseudo-random number, this is suitable for general
+    simulation, but may be predictable.
 
 ### SYNOPSIS
 

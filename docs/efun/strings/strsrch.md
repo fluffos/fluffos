@@ -9,8 +9,7 @@ title: strings / strsrch
 
 ### SYNOPSIS
 
-    int strsrch( string str, string substr | int char,
-                 int flag );
+    int strsrch( string str, string substr | int char, int flag );
 
 ### DESCRIPTION
 

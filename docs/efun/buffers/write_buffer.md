@@ -10,7 +10,8 @@ title: buffers / write_buffer
 
 ### SYNOPSIS
 
-    int write_buffer( string | buffer dest, int start,
+    int write_buffer( string | buffer dest,
+                      int start,
                       mixed source );
 
 ### DESCRIPTION

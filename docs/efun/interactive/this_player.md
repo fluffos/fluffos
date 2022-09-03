@@ -21,4 +21,3 @@ title: interactive / this_player
 ### SEE ALSO
 
     this_object(3)
-
