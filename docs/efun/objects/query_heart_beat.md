@@ -17,6 +17,8 @@ title: objects / query_heart_beat
     'object'.  If object is not given, it defaults to the  current  object.
     If the object has no heart beat, 0 will be returned.
 
+    If no object is supplied, this efun will default to this_object().
+
 ### SEE ALSO
 
     heart_beat(4), set_heart_beat(3)

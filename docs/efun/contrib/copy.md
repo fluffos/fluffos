@@ -5,11 +5,12 @@ title: contrib / copy.pre
 
 ### NAME
 
-    mixed copy(mixed);
+    mixed copy(mixed arg) - return a deep copy of an array, buffer, class, or
+    mapping
 
 ### SYNOPSIS
 
-    mixed copy(mixed);
+    mixed copy(mixed arg);
 
 ### DESCRIPTION
 
@@ -21,3 +22,6 @@ title: contrib / copy.pre
     - mapping
 
     returns deep copy
+
+    This is particularly useful when you wish to have data that is passed
+    by reference, but do not want to alter the original.

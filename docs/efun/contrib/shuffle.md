@@ -9,7 +9,7 @@ title: contrib / shuffle.pre
 
 ### SYNOPSIS
 
-    mixed shuffle(mixed);
+    mixed *shuffle(mixed *arr);
 
 ### DESCRIPTION
 

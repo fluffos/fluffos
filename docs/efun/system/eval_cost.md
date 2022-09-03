@@ -9,7 +9,7 @@ title: system / eval_cost
 
 ### SYNOPSIS
 
-    void eval_cost()
+    int eval_cost()
 
 ### DESCRIPTION
 

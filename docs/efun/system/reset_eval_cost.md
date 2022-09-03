@@ -9,12 +9,14 @@ title: system / reset_eval_cost
 
 ### SYNOPSIS
 
-    void reset_eval_cost();
+    int reset_eval_cost();
 
 ### DESCRIPTION
 
     reset_eval_cost(),  resets the evaluation cost remaining to the maximum
     evaluation cost.
+
+    Returns the new eval cost.
 
 ### SEE ALSO
 

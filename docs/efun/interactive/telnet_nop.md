@@ -13,9 +13,5 @@ title: interactive / telnet_nop
 
 ### DESCRIPTION
 
-    if user is under telnet, then send an TELNET_IAC TELNET_NOP sequence, useful to keep the connection alive.
-
-### SEE ALSO
-
-    N/A
-
+    if user is under telnet, then send an TELNET_IAC TELNET_NOP sequence, useful
+    to keep the connection alive.

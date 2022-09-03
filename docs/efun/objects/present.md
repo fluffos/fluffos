@@ -14,18 +14,18 @@ title: objects / present
 ### DESCRIPTION
 
     if first argument is string, second argument is missing, searches for
-    a object that id(name) = 1 in this object inventory and  this  object's
-    environment's inventory.  Returns the found object.
+    a object in the object's environment using the id() apply where it answers 1
+    to indicate a match.
 
     if  first  argument is string, second argument is object, only searches
-    for traget in that object's inventory.
+    for target in that object's inventory using the same strategy as above.
 
     "foo 1" means the first "foo" in  the  inventory.   the  first  in  the
     inventory is the last object that moved in.
 
     if  first  argument  is  object, second argument is missing, check if
     object is in this object's inventory, or as a sibling in this  object's
-    evnironemnt's inventory, returns object's parent.  
+    environment's inventory, returns object's parent.  
 
     if first argument is  object,  second  argument  is  object,  check  if
     object1 is in object2 inventory, return object1 if true.

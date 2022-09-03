@@ -14,4 +14,3 @@ title: strings / string_decode
 ### SEE ALSO
 
     string_decode, buffer_transcode
-

@@ -21,4 +21,3 @@ title: interactive / set_encoding
 ### SEE ALSO
 
     query_encoding(3)
-

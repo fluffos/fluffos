@@ -13,7 +13,8 @@ title: system / strptime
 
 ### DESCRIPTION
 
-    Parse given time 'str' with a format string, see https://man7.org/linux/man-pages/man3/strptime.3.html
+    Parse given time 'str' with a format string, see:
+    https://man7.org/linux/man-pages/man3/strptime.3.html
 
 ### SEE ALSO
 

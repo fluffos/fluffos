@@ -18,4 +18,3 @@ title: interactive / userp
 ### SEE ALSO
 
     interactive(3), users(3), living(3)
-

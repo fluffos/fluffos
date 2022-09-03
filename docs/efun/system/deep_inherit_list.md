@@ -16,6 +16,8 @@ title: system / deep_inherit_list
     Returns  an  array  of filenames of all objects inherited (directly and
     indirectly) by obj.
 
+    If no object is supplied, this efun will default to this_object().
+
 ### SEE ALSO
 
     inherit_list(3), inherits(3)
