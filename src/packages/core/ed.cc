@@ -215,23 +215,23 @@ static struct tbl {
   const char *t_str;
   int t_and_mask;
   int t_or_mask;
-} * t, tbl[] = {
-           {"number", ~FALSE, NFLG_MASK},
-           {"nonumber", ~NFLG_MASK, FALSE},
-           {"list", ~FALSE, LFLG_MASK},
-           {"nolist", ~LFLG_MASK, FALSE},
-           {"print", ~FALSE, PFLG_MASK},
-           {"noprint", ~PFLG_MASK, FALSE},
-           {"eightbit", ~FALSE, EIGHTBIT_MASK},
-           {"noeightbit", ~EIGHTBIT_MASK, FALSE},
-           {"autoindent", ~FALSE, AUTOINDFLG_MASK},
-           {"noautoindent", ~AUTOINDFLG_MASK, FALSE},
-           {"excompatible", ~FALSE, EXCOMPAT_MASK},
-           {"noexcompatible", ~EXCOMPAT_MASK, FALSE},
-           {"dprint", ~FALSE, DPRINT_MASK},
-           {"nodprint", ~DPRINT_MASK, FALSE},
-           {"verbose", ~FALSE, VERBOSE_MASK},
-           {"noverbose", ~VERBOSE_MASK, FALSE},
+} *t, tbl[] = {
+          {"number", ~FALSE, NFLG_MASK},
+          {"nonumber", ~NFLG_MASK, FALSE},
+          {"list", ~FALSE, LFLG_MASK},
+          {"nolist", ~LFLG_MASK, FALSE},
+          {"print", ~FALSE, PFLG_MASK},
+          {"noprint", ~PFLG_MASK, FALSE},
+          {"eightbit", ~FALSE, EIGHTBIT_MASK},
+          {"noeightbit", ~EIGHTBIT_MASK, FALSE},
+          {"autoindent", ~FALSE, AUTOINDFLG_MASK},
+          {"noautoindent", ~AUTOINDFLG_MASK, FALSE},
+          {"excompatible", ~FALSE, EXCOMPAT_MASK},
+          {"noexcompatible", ~EXCOMPAT_MASK, FALSE},
+          {"dprint", ~FALSE, DPRINT_MASK},
+          {"nodprint", ~DPRINT_MASK, FALSE},
+          {"verbose", ~FALSE, VERBOSE_MASK},
+          {"noverbose", ~VERBOSE_MASK, FALSE},
 };
 
 /*________  Macros  ________________________________________________________*/

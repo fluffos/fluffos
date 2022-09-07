@@ -341,8 +341,8 @@ char *read_file(const char *file, int start, int lines) {
     auto fs_real_file = fs::u8path(real_file);
 
     /*
-    * file doesn't exist, or is really a directory
-    */
+     * file doesn't exist, or is really a directory
+     */
     if (!fs::exists(fs_real_file) || fs::is_directory(fs_real_file)) {
       return nullptr;
     }
@@ -355,8 +355,8 @@ char *read_file(const char *file, int start, int lines) {
     }
 
   } catch (fs::filesystem_error &err) {
-      debug(file, "read_file: filesystem error: %s (%d).\n", err.what(), err.code().value());
-      return nullptr;
+    debug(file, "read_file: filesystem error: %s (%d).\n", err.what(), err.code().value());
+    return nullptr;
   }
 
   gzFile f = gzopen(real_file, "rb");

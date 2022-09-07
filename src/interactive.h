@@ -34,7 +34,7 @@
 #define USING_GMCP 0x10000    /* we've negotiated gmcp */
 #define HANDSHAKE_COMPLETE 0x20000 /* websocket connected */
 #define USING_COMPRESS 0x40000     /* we've negotiated compress */
-#define USING_MSP 0x80000     /* we've negotiated msp */
+#define USING_MSP 0x80000          /* we've negotiated msp */
 
 // from ICU
 struct UConverter;
@@ -56,7 +56,7 @@ struct interactive_t {
   char text[MAX_TEXT]; /* input buffer for interactive object     */
   int text_end;        /* first free char in buffer               */
   int text_start;      /* where we are up to in user command buffer */
-  int last_time;       /* time of last command executed           */
+  time_t last_time;    /* time of last command executed           */
 #ifndef NO_SNOOP
   struct object_t *snooped_by;
 #endif

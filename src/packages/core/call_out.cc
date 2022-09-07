@@ -290,7 +290,7 @@ int remove_call_out(object_t *ob, const char *fun) {
       iter = g_callout_object_handle_map.erase(iter);
       continue;
     }
-    auto cop = iter_handle->second;
+    auto *cop = iter_handle->second;
 
     if (cop->ob == ob && strcmp(cop->function.s, fun) == 0) {
       auto remaining_time = time_left(cop);
@@ -322,7 +322,7 @@ int remove_call_out_by_handle(object_t *ob, LPC_INT handle) {
 
   auto iter = g_callout_handle_map.find(handle);
   if (iter != g_callout_handle_map.end()) {
-    auto cop = iter->second;
+    auto *cop = iter->second;
     auto remaining_time = time_left(cop);
     free_call(cop);
 
@@ -346,7 +346,7 @@ int find_call_out_by_handle(object_t *ob, LPC_INT handle) {
 
   auto iter = g_callout_handle_map.find(handle);
   if (iter != g_callout_handle_map.end()) {
-    auto cop = iter->second;
+    auto *cop = iter->second;
     if (cop->handle == handle && (cop->ob == ob || cop->function.f->hdr.owner == ob)) {
       auto remaining_time = time_left(cop);
       DBG_CALLOUT("  found: remaining time %d.\n", remaining_time);
@@ -372,7 +372,7 @@ int find_call_out(object_t *ob, const char *fun) {
       iter = g_callout_object_handle_map.erase(iter);
       continue;
     }
-    auto cop = iter_handle->second;
+    auto *cop = iter_handle->second;
     if (cop->ob == ob && strcmp(cop->function.s, fun) == 0) {
       auto remaining_time = time_left(cop);
       DBG_CALLOUT("  found: remaining time %d.\n", remaining_time);
@@ -417,7 +417,7 @@ int total_callout_size() { return g_callout_handle_map.size() * sizeof(pending_c
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_call_outs() {
   for (auto iter = g_callout_handle_map.cbegin(); iter != g_callout_handle_map.cend(); iter++) {
-    auto cop = iter->second;
+    auto *cop = iter->second;
     if (cop->vs) {
       cop->vs->extra_ref++;
     }
@@ -444,8 +444,8 @@ void mark_call_outs() {
  */
 array_t *get_all_call_outs() {
   int i = 0;
-  for (auto iter : g_callout_handle_map) {
-    auto cop = iter.second;
+  for (auto &iter : g_callout_handle_map) {
+    auto *cop = iter.second;
     object_t *ob = (cop->ob ? cop->ob : cop->function.f->hdr.owner);
     if (ob && !(ob->flags & O_DESTRUCTED)) {
       i++;
@@ -455,8 +455,8 @@ array_t *get_all_call_outs() {
   array_t *v = allocate_empty_array(i);
 
   i = 0;
-  for (auto iter : g_callout_handle_map) {
-    auto cop = iter.second;
+  for (auto &iter : g_callout_handle_map) {
+    auto *cop = iter.second;
     array_t *vv;
     object_t *ob;
     ob = (cop->ob ? cop->ob : cop->function.f->hdr.owner);
@@ -513,7 +513,7 @@ void remove_all_call_out(object_t *obj) {
       iter = g_callout_object_handle_map.erase(iter);
       continue;
     }
-    auto cop = iter_handle->second;
+    auto *cop = iter_handle->second;
     if ((cop->ob && ((cop->ob == obj) || (cop->ob->flags & O_DESTRUCTED))) ||
         (!(cop->ob) && (cop->function.f->hdr.owner == obj || !cop->function.f->hdr.owner ||
                         (cop->function.f->hdr.owner->flags & O_DESTRUCTED)))) {
@@ -532,7 +532,7 @@ void clear_call_outs() {
   int i = 0;
   auto iter = g_callout_handle_map.begin();
   while (iter != g_callout_handle_map.end()) {
-    auto cop = iter->second;
+    auto *cop = iter->second;
     free_call(cop);
     iter = g_callout_handle_map.erase(iter);
     i++;
@@ -548,7 +548,7 @@ void reclaim_call_outs() {
   {
     auto iter = g_callout_handle_map.begin();
     while (iter != g_callout_handle_map.end()) {
-      auto cop = iter->second;
+      auto *cop = iter->second;
       if ((cop->ob && (cop->ob->flags & O_DESTRUCTED)) ||
           (!cop->ob && (cop->function.f->hdr.owner->flags & O_DESTRUCTED))) {
         free_call(cop);
@@ -578,8 +578,8 @@ void reclaim_call_outs() {
 
   if (CONFIG_INT(__RC_THIS_PLAYER_IN_CALL_OUT__)) {
     i = 0;
-    for (auto iter : g_callout_handle_map) {
-      auto cop = iter.second;
+    for (auto &iter : g_callout_handle_map) {
+      auto *cop = iter.second;
       if (cop->command_giver && (cop->command_giver->flags & O_DESTRUCTED)) {
         free_object(&cop->command_giver, "reclaim_call_outs");
         cop->command_giver = nullptr;

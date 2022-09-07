@@ -57,7 +57,7 @@ void call_heart_beat() {
       heartbeats_next.push_back(hb);
       heartbeats.pop_front();
     }
-    auto curr_hb = &heartbeats_next.back();
+    auto *curr_hb = &heartbeats_next.back();
 
     if (--curr_hb->heart_beat_ticks > 0) {
       continue;
@@ -65,7 +65,7 @@ void call_heart_beat() {
       curr_hb->heart_beat_ticks = curr_hb->time_to_heart_beat;
     }
 
-    auto ob = curr_hb->ob;
+    auto *ob = curr_hb->ob;
     // No heartbeat function
     if (ob->prog->heart_beat == 0) {
       continue;
@@ -248,7 +248,7 @@ array_t *get_heart_beats() {
 
   array_t *arr = allocate_empty_array(result.size());
   int i = 0;
-  for (auto obj : result) {
+  for (auto *obj : result) {
     arr->item[i].type = T_OBJECT;
     arr->item[i].u.ob = obj;
     add_ref(arr->item[i].u.ob, "get_heart_beats");
@@ -265,7 +265,7 @@ void check_heartbeats() {
       DEBUG_CHECK(!objset.insert(hb.ob).second, "Driver BUG: Duplicated/Missing heartbeats found");
     }
   }
-  for (auto hb : heartbeats_next) {
+  for (auto &hb : heartbeats_next) {
     if (hb.ob) {
       DEBUG_CHECK(!objset.insert(hb.ob).second, "Driver BUG: Duplicated/Missing heartbeats found");
     }
