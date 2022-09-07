@@ -1805,7 +1805,7 @@ json get_trace_args(svalue_t *sp, int num_args) {
 }
 
 json get_trace_context(control_stack_t *csp, svalue_t *sp) {
-  json context = json::object();
+  auto context = json::object();
   if (CONFIG_INT(__RC_TRACE_CONTEXT__)) {
     if ((csp->framekind & FRAME_MASK) == FRAME_FUNCTION) {
       auto num_args = current_prog->function_table[csp->fr.table_index].num_arg;

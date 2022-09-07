@@ -174,12 +174,13 @@ void f_send_zmp() {
 
 #ifdef F_TELNET_MSP_OOB
 void f_telnet_msp_oob() {
-  auto* ip = current_object->interactive;
+  auto *ip = current_object->interactive;
   if (ip && ip->telnet) {
     telnet_send_msp_oob(ip, sp->u.string, SVALUE_STRLEN(sp));
     flush_message(ip);
   } else if (!ip) {
-    debug_message("Warning: wrong usage. telnet_msp_oob() should only be called by a user object.\n");
+    debug_message(
+        "Warning: wrong usage. telnet_msp_oob() should only be called by a user object.\n");
   }
   pop_stack();
 }

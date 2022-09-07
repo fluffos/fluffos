@@ -132,7 +132,7 @@ inline void call_tick_events() {
 
     // TODO: randomly shuffle the events
 
-    for (auto event : all_events) {
+    for (auto *event : all_events) {
       if (event->valid) {
         event->callback();
       }
@@ -145,7 +145,7 @@ void on_game_tick(evutil_socket_t fd, short what, void *arg) {
   call_tick_events();
   g_current_gametick++;
 
-  auto ev = *(reinterpret_cast<struct event **>(arg));
+  auto *ev = *(reinterpret_cast<struct event **>(arg));
   auto t = gametick_timeval();
   event_add(ev, &t);
 }
@@ -153,14 +153,14 @@ void on_game_tick(evutil_socket_t fd, short what, void *arg) {
 }  // namespace
 
 tick_event *add_gametick_event(int delay_ticks, tick_event::callback_type callback) {
-  auto event = new tick_event(callback);
+  auto *event = new tick_event(callback);
   g_tick_queue.insert(TickQueue::value_type(g_current_gametick + delay_ticks, event));
   return event;
 }
 
 namespace {
 void on_walltime_event(evutil_socket_t fd, short what, void *arg) {
-  auto event = reinterpret_cast<tick_event *>(arg);
+  auto *event = reinterpret_cast<tick_event *>(arg);
   if (event->valid) {
     event->callback();
   }
@@ -171,7 +171,7 @@ void on_walltime_event(evutil_socket_t fd, short what, void *arg) {
 // Schedule a immediate event on main loop.
 tick_event *add_walltime_event(std::chrono::milliseconds delay_msecs,
                                tick_event::callback_type callback) {
-  auto event = new tick_event(callback);
+  auto *event = new tick_event(callback);
   struct timeval val {
     (int)(delay_msecs.count() / 1000), (int)(delay_msecs.count() % 1000 * 1000),
   };
@@ -186,7 +186,7 @@ tick_event *add_walltime_event(std::chrono::milliseconds delay_msecs,
 void clear_tick_events() {
   int i = 0;
   if (!g_tick_queue.empty()) {
-    for (auto iter : g_tick_queue) {
+    for (auto &iter : g_tick_queue) {
       delete iter.second;
       i++;
     }
@@ -343,7 +343,7 @@ void look_for_objects_to_swap() {
 
           push_number(ob->flags & (O_CLONE) ? 0 : ob->prog->ref);
           set_eval(max_eval_cost);
-          auto svp = safe_apply(APPLY_CLEAN_UP, ob, 1, ORIGIN_DRIVER);
+          auto *svp = safe_apply(APPLY_CLEAN_UP, ob, 1, ORIGIN_DRIVER);
           if (!svp || (svp->type == T_NUMBER && svp->u.number == 0)) {
             ob->flags &= ~O_WILL_CLEAN_UP;
           }

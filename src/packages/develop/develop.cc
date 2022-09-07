@@ -51,7 +51,7 @@ void f_debug_info(void) {
       }
 
       if (!CONFIG_INT(__RC_NO_RESETS__)) {
-        outbuf_addv(&out, "next_reset  : %d\n", ob->next_reset);
+        outbuf_addv(&out, "next_reset  : %" PRId64 "\n", ob->next_reset);
       }
 #ifndef NO_LIGHT
       outbuf_addv(&out, "total light : %d\n", ob->total_light);

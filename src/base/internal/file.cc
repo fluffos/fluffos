@@ -40,14 +40,14 @@ int legal_path(const char *path) {
       p++; /* step over `/' */
     }
   }
-  
+
   /*
    * disallow # if it is not indicating an OID
    */
   p = strchr(path, '#');
   while (p) {
     p++;
-    if ( p[0] == '\0' ) {
+    if (p[0] == '\0') {
       break;
     }
     if (isdigit(p[0])) {
@@ -56,6 +56,5 @@ int legal_path(const char *path) {
     return 0;
   }
 
-  
   return 1;
 } /* legal_path() */

@@ -77,9 +77,9 @@ struct object_t {
   struct object_t *next_hash;
   struct object_t *next_ch_hash;
   /* the fields above must match lpc_object_t */
-  int load_time; /* time when this object was created */
+  int64_t load_time; /* time when this object was created */
 #ifndef NO_RESET
-  int next_reset; /* Time of next reset of this object */
+  int64_t next_reset; /* Time of next reset of this object */
 #endif
   uint64_t time_of_ref; /* Time when last referenced. Used by clean_uo */
   program_t *prog;

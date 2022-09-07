@@ -42,8 +42,8 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
     error("fork() in external_start() failed: %s\n", strerror(errno));
   }
   if (ret) {
-    debug_message("Launching external command '%s %s', pid: %d.\n",
-                  external_cmd[which], args->type == T_STRING ? args->u.string : "<ARRAY>", ret);
+    debug_message("Launching external command '%s %s', pid: %d.\n", external_cmd[which],
+                  args->type == T_STRING ? args->u.string : "<ARRAY>", ret);
 
     auto sock = lpc_socks_get(fd);
 
@@ -149,7 +149,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
 #ifdef _WIN32
 #include <windows.h>
 #include <fcntl.h>
-extern int socketpair_win32(SOCKET socks[2], int make_overlapped); // in socketpair.cc
+extern int socketpair_win32(SOCKET socks[2], int make_overlapped);  // in socketpair.cc
 
 int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, svalue_t *arg3) {
   int fd;
@@ -169,7 +169,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
 
   if (args->type == T_ARRAY) {
     std::vector<std::string> argv(args->u.arr->size);
-    for(int i = 0; i < args->u.arr->size; i++) {
+    for (int i = 0; i < args->u.arr->size; i++) {
       auto item = args->u.arr->item[i];
       if (item.type != T_STRING) {
         error("Bad argument list item %d to external_start()\n", i);
@@ -217,7 +217,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
   event_add(sock->ev_write, NULL);
   event_add(sock->ev_read, NULL);
 
-  STARTUPINFOA si={sizeof(si)};
+  STARTUPINFOA si = {sizeof(si)};
   si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
   si.wShowWindow = SW_HIDE;
   si.hStdInput = reinterpret_cast<HANDLE>(sv[0]);
@@ -226,22 +226,22 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
   PROCESS_INFORMATION processInfo{};
 
   // Start the child process.
-  if( !CreateProcessA(NULL,   // No module name (use command line)
-                      cmdline.data(),        // Command line
-                      NULL,           // Process handle not inheritable
-                      NULL,           // Thread handle not inheritable
-                      TRUE,          // Set handle inheritance to TRUE
-                       0,              // No creation flags
-                      NULL,           // Use parent's environment block
-                      NULL,           // Use parent's starting directory
-                      &si,            // Pointer to STARTUPINFO structure
-                      &processInfo )           // Pointer to PROCESS_INFORMATION structure
-      )
-  {
+  if (!CreateProcessA(NULL,            // No module name (use command line)
+                      cmdline.data(),  // Command line
+                      NULL,            // Process handle not inheritable
+                      NULL,            // Thread handle not inheritable
+                      TRUE,            // Set handle inheritance to TRUE
+                      0,               // No creation flags
+                      NULL,            // Use parent's environment block
+                      NULL,            // Use parent's starting directory
+                      &si,             // Pointer to STARTUPINFO structure
+                      &processInfo)    // Pointer to PROCESS_INFORMATION structure
+  ) {
     error("CreateProcess() in external_start() failed: %s\n", strerror(errno));
     return EESOCKET;
   }
-  debug_message("Launching external command '%s', pid: %d.\n", cmdline.c_str(), processInfo.dwProcessId);
+  debug_message("Launching external command '%s', pid: %d.\n", cmdline.c_str(),
+                processInfo.dwProcessId);
 
   std::thread([=]() {
     WaitForSingleObject(processInfo.hProcess, INFINITE);
