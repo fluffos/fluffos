@@ -245,8 +245,8 @@ ScopedTracerInner::ScopedTracerInner(const std::string& name, const EventCategor
                                      double time_limit_usec)
     : time_limit_usec(time_limit_usec),
       event(std::make_unique<Event>(
-          name, category, "X",
-          lazy_arg ? std::make_optional<json>((*lazy_arg)()) : std::nullopt)) {}
+          name, category, "X", lazy_arg ? std::make_optional<json>((*lazy_arg)()) : std::nullopt)) {
+}
 
 ScopedTracerInner::~ScopedTracerInner() {
   if (!this->event) return;

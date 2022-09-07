@@ -186,7 +186,7 @@ tick_event *add_walltime_event(std::chrono::milliseconds delay_msecs,
 void clear_tick_events() {
   int i = 0;
   if (!g_tick_queue.empty()) {
-    for (auto& iter : g_tick_queue) {
+    for (auto &iter : g_tick_queue) {
       delete iter.second;
       i++;
     }
