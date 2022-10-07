@@ -5,7 +5,8 @@ title: contrib / event.pre
 
 ### NAME
 
-    event
+    event() - call event_* in other objects with specified parameters. similar
+    to call_other, but with no return type.
 
 ### SYNOPSIS
 

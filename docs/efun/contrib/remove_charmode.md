@@ -5,7 +5,7 @@ title: contrib / remove_charmode.pre
 
 ### NAME
 
-    remove_charmode
+    remove_charmode() - switches interactive object into linemode
 
 ### SYNOPSIS
 
