@@ -5,7 +5,7 @@ title: interactive / process_input
 
 ### NAME
 
-    process_input  -  provide a hook for the driver to send a copy of what the
+    process_input()  -  provide a hook for the driver to send a copy of what the
     player is typing to the player object.
 
 ### SYNOPSIS
