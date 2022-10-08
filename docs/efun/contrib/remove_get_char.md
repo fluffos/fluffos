@@ -5,11 +5,11 @@ title: contrib / remove_get_char.pre
 
 ### NAME
 
-    remove_get_char
+    remove_get_char() - cancels active input_to
 
 ### SYNOPSIS
 
-    int remove_get_char(object);
+    int remove_get_char(object interactive);
 
 ### DESCRIPTION
 
@@ -22,8 +22,8 @@ title: contrib / remove_get_char.pre
     -1 if no input_to active
     1 otherwise
 
-#### QUESTION
+### QUESTION
 
-    - what's the meankng of
+    - what's the meaning of
     interactive->carryover?
     interactive->num_carry?

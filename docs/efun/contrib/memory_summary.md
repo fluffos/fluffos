@@ -5,7 +5,7 @@ title: contrib / memory_summary.pre
 
 ### NAME
 
-    memory_summary
+    memory_summary()
 
 ### SYNOPSIS
 

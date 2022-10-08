@@ -5,7 +5,7 @@ title: contrib / repeat_string.pre
 
 ### NAME
 
-    repeat_string
+    repeat_string() - repeat a string a certain number of times.
 
 ### SYNOPSIS
 

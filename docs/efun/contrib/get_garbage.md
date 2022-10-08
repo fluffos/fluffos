@@ -5,7 +5,8 @@ title: contrib / get_garbage.pre
 
 ### NAME
 
-    get_garbage
+    get_garbage() - get all clones without environments or inventories which are
+    not shadowing.
 
 ### SYNOPSIS
 

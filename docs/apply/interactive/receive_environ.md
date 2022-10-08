@@ -5,7 +5,8 @@ title: apply / interactive / receive_environ
 
 ### NAME
 
-    receive_environ
+    receive_environ() - called when interactive receives environment options
+    via telnet negotation.
 
 ### SYNOPSIS
 
@@ -13,8 +14,8 @@ title: apply / interactive / receive_environ
 
 ### DESCRIPTION
 
-    During telnet negotiations, if remote party sends over environment options defined according to
-    https://tools.ietf.org/html/rfc1572, the user object will receive this callback to
-    process it.
+    During telnet negotiations, if remote party sends over environment options
+    defined according to https://tools.ietf.org/html/rfc1572, the user object
+    will receive this callback to process it.
 
     The user object will be called once for each variable received.
