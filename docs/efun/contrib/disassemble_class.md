@@ -5,7 +5,8 @@ title: contrib / disassemble_class.pre
 
 ### NAME
 
-    disassemble_class
+    disassemble_class() - given an instantiated class, returns a mixed* array
+    with elements comprised of the values of each member of the class.
 
 ### SYNOPSIS
 
@@ -41,8 +42,8 @@ title: contrib / disassemble_class.pre
         //   "Foo",
         //   42,
         //   "Fooville"
-        // })        
-    }    
+        // })
+    }
 
 ### SEE ALSO
 

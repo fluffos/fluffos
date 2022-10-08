@@ -5,7 +5,8 @@ title: contrib / assemble_class.pre
 
 ### NAME
 
-    assemble_class
+    assemble_class() - provided an array, return a class composed of the members
+    of that array.
 
 ### SYNOPSIS
 

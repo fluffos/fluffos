@@ -5,15 +5,16 @@ title: contrib / remove_shadow.pre
 
 ### NAME
 
-    remove_shadow
+    remove_shadow() - remove all shadows from the specified object, or remove
+    a specified shadow from another object. does not destruct the shadow.
 
 ### SYNOPSIS
 
-    int remove_shadow(object);
+    int remove_shadow(object ob);
 
 ### DESCRIPTION
 
-    object defaults to this_object()
+    ob defaults to this_object()
     returns 0 if object is either destroyed or is no shadow and isn't shadowed
     returns 1 otherwise
 

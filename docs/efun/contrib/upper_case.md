@@ -5,7 +5,8 @@ title: contrib / upper_case.pre
 
 ### NAME
 
-    upper_case
+    upper_case() - returns a string with every letter supplied in the source
+    capitalised.
 
 ### SYNOPSIS
 

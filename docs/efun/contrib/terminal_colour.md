@@ -5,7 +5,9 @@ title: contrib / terminal_colour.pre
 
 ### NAME
 
-    terminal_colour
+    terminal_colour() - return a wrapped and indented string where the driver
+    substitutes %^KEY%^ in the string with the matching VALUE of KEY in the
+    supplied mapping.
 
 ### SYNOPSIS
 
@@ -14,7 +16,7 @@ title: contrib / terminal_colour.pre
 ### DESCRIPTION
 
     string: to be parsed for '%^KEY%^' sequences
-    mappingg: 'KEY:value' pairs
+    mapping: 'KEY:value' pairs
     1st int: wrap after int printed symbols
     if int < 0 fillout lines with blank's
 
@@ -23,11 +25,11 @@ title: contrib / terminal_colour.pre
     wrap = -4:
     '12 \n345 '
 
-    minmwrap: 2
+    minwrap: 2
 
-    2nd int: indent by int blank's
+    2nd int: indent by int blanks
     maxindent: wrap-2
 
     returns wrapped and indented string with each '%^KEY%^' replaced by KEY's value
-    or original string if no '%^KEY%^' sequence is found!!!
-    (shoudln't it at least be wrapped and indented?)
+    or original string if no '%^KEY%^' sequence is found
+    (shouldn't it at least be wrapped and indented?)

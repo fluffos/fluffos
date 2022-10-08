@@ -5,11 +5,11 @@ title: contrib / remove_interactive.pre
 
 ### NAME
 
-    remove_interactive
+    remove_interactive() - destructs and removes the interactive object.
 
 ### SYNOPSIS
 
-    int remove_interactive(object);
+    int remove_interactive(object interactive);
 
 ### DESCRIPTION
 

@@ -5,7 +5,8 @@ title: contrib / roll_MdN.pre
 
 ### NAME
 
-    roll_MdN()
+    roll_MdN() - dice roll generator where you specify the number of dice and
+    the number of sides to each die.
 
 ### SYNOPSIS
 
