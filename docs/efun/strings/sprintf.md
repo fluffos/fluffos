@@ -86,11 +86,29 @@ title: strings / sprintf
 
     sprintf() returns the formatted string.
 
+### EXAMPLE
+
+    Basic Usage:
+        sprintf("%s is %i", "X", 1)   =   "X is 1"
+
+    Alignment:
+        sprintf("%-20s", "left")      =   "left                "
+        sprintf("%20|s", "center")    =   "       center       "
+        sprintf("%20s", "right")      =   "               right"
+        sprintf("%-20'-'s", "left")   =   "left----------------"
+        sprintf("%20'-'|s", "center") =   "-------center-------"
+        sprintf("%20'-'s", "right")   =   "---------------right"
+
+    Numeric:
+        sprintf("%.2f", 1.2345)       =   "1.23"
+        sprintf("%10.2f", 1.2345)     =   "      1.23"
+        sprintf("%10.6f", 0.123)      =   "  0.123000"
+
 ### AUTHOR
 
     Sean A. Reith (Lynscar)
 
 ### SEE ALSO
 
-    sscanf(3)
+    printf(3), sscanf(3)
 
