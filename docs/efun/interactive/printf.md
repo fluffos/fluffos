@@ -54,12 +54,12 @@ title: interactive / printf
     "@"     the argument is an array.  the corresponding format_info (minus
             the "@") is applyed to each element of the array.
 
-    "´X´"   The char(s) between the single-quotes are used to pad to  field
+    "'X'"   The char(s) between the single-quotes are used to pad to  field
             size  (defaults  to  space)  (if both a zero (in front of field
             size) and a pad string are specified, the one specified  second
             overrules).   NOTE:  to include "'" in the pad string, you must
             use "\'" (as the backslash has to be escaped  past  the  inter‐
-            preter), similarly, to include "
+            preter), similarly, to include "\" requires "\\".
 
     The following are the possible type specifiers.
 
@@ -82,11 +82,29 @@ title: interactive / printf
 
     f       floating point number
 
-    This efun does not invoke the receive_message() apply.
-
 ### RETURN VALUES
 
-    sprintf() returns the formatted string.
+    printf() calls the tell_object() efun with the formatted string.
+
+    This efun does not invoke the receive_message() apply.
+
+### EXAMPLE
+
+    Basic Usage:
+        printf("%s is %i", "X", 1)    =   "X is 1"
+
+    Alignment:
+        printf("%-20s", "left")       =   "left                "
+        printf("%20|s", "center")     =   "       center       "
+        printf("%20s", "right")       =   "               right"
+        printf("%-20'-'s", "left")    =   "left----------------"
+        printf("%20'-'|s", "center")  =   "-------center-------"
+        printf("%20'-'s", "right")    =   "---------------right"
+
+    Numeric:
+        printf("%.2f", 1.2345)        =   "1.23"
+        printf("%10.2f", 1.2345)      =   "      1.23"
+        printf("%10.6f", 0.123)       =   "  0.123000"
 
 ### AUTHOR
 
