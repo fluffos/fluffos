@@ -5,7 +5,8 @@ title: contrib / functions.pre
 
 ### NAME
 
-    functions
+    functions() - returns a string array of function names or mixed* array of
+    information for all functions in a passed object.
 
 ### SYNOPSIS
 

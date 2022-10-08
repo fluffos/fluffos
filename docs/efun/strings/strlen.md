@@ -5,7 +5,7 @@ title: efuns / strings / strlen
 
 ### NAME
 
-    strlen()
+    strlen() - return the number of UTF-8 characters in a supplied string
 
 ### SYNOPSIS
 

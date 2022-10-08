@@ -5,11 +5,11 @@ title: contrib / compressedp.pre
 
 ### NAME
 
-    compressedp
+    compressedp() - returns if interactive connection uses telopt compress
 
 ### SYNOPSIS
 
-    int compressedp(object);
+    int compressedp(object ob);
 
 ### DESCRIPTION
 

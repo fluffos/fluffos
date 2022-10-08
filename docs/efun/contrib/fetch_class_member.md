@@ -5,7 +5,8 @@ title: contrib / fetch_class_member.pre
 
 ### NAME
 
-    fetch_class_member
+    fetch_class_member() - return the value of a specified, indexed member of
+    an instantiated class.
 
 ### SYNOPSIS
 

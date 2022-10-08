@@ -5,7 +5,8 @@ title: contrib / restore_from_string.pre
 
 ### NAME
 
-    restore_from_string()
+    restore_from_string() - like restore_object(), but restores variables from
+    a string where the string is in the same format as from restore_object()
 
 ### SYNOPSIS
 
