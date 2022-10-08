@@ -24,7 +24,7 @@
 #undef NO_SNOOP
 #undef NO_ENVIRONMENT
 #undef NO_WIZARDS
-#define NO_LIGHT
+#undef NO_LIGHT
 #define OLD_ED
 #undef ED_INDENT_CASE
 #define ED_INDENT_SPACES 4
@@ -37,14 +37,12 @@
 /****************************************************************************
  *                           MISCELLANEOUS                                  *
  ****************************************************************************/
-#undef COMPAT_32
-#define DEFAULT_PRAGMAS PRAGMA_SAVE_TYPES + PRAGMA_ERROR_CONTEXT + PRAGMA_OPTIMIZE
+#define DEFAULT_PRAGMAS PRAGMA_WARNINGS + PRAGMA_SAVE_TYPES + PRAGMA_ERROR_CONTEXT + PRAGMA_OPTIMIZE
 #define SAVE_EXTENSION ".o"
 #define PRIVS
 #undef NO_SHADOWS
 #undef USE_ICONV
 #undef IPV6
-#define HAS_CONSOLE 1
 
 /****************************************************************************
  *                              PACKAGES                                    *
