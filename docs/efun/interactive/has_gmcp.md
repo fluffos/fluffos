@@ -5,7 +5,7 @@ title: interactive / has_gmcp
 
 ### NAME
 
-    has_gmcp() - detects whether or not a given interactive user's client 
+    has_gmcp() - returns whether or not a given interactive user's client 
     has GMCP protocol enabled.
 
 ### SYNOPSIS
