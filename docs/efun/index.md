@@ -494,6 +494,9 @@ title: EFUN
 <div><a href='interactive/get_char.html'>get_char</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='interactive/has_gmcp.html'>has_gmcp</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='interactive/in_edit.html'>in_edit</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
@@ -546,6 +549,9 @@ title: EFUN
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='interactive/say.html'>say</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='interactive/send_gmcp.html'>send_gmcp</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='interactive/set_encoding.html'>set_encoding</a></div>
