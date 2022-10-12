@@ -5,7 +5,7 @@ title: interactive / send_gmcp
 
 ### NAME
 
-    send_gmcp() - sends a message to all living objects
+    send_gmcp() - send a GMCP message
 
 ### SYNOPSIS
 
