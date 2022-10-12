@@ -13,6 +13,9 @@ title: APPLY
 <div><a href='interactive/catch_tell.html'>catch_tell</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='interactive/gmcp_enable.html'>gmcp_enable</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='interactive/gmcp.html'>gmcp</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
