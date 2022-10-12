@@ -19,4 +19,4 @@ title: interactive / has_gmcp
 
 ### SEE ALSO
 
-    send_gmcp(3)
+    gmcp_enable(4), gmcp(4), send_gmcp(3)

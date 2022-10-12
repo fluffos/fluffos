@@ -9,11 +9,11 @@ title: interactive / send_gmcp
 
 ### SYNOPSIS
 
-    void send_gmcp( string payload );
+    void send_gmcp( string message );
 
 ### DESCRIPTION
 
-    Sends a GMCP data 'payload' for this_object() to the user's client. 
+    Sends a GMCP 'message' for this_object() to the user's client. 
 
     For payload formatting information see: http://www.gammon.com.au/gmcp, 
     https://github.com/keneanung/GMCPAdditions
@@ -22,5 +22,5 @@ title: interactive / send_gmcp
     
 ### SEE ALSO
 
-    has_gmcp(3)
+    gmcp_enable(4), gmcp(4), has_gmcp(3)
 
