@@ -44,6 +44,7 @@ extern svalue_t *safe_apply_master_ob(int, int);
 
 static void clean_parser(void);
 static void prolog(std::unique_ptr<LexStream>, const char * /*name*/);
+static void clean_incomplete_parse(void);
 static program_t *epilog(void);
 static void show_overload_warnings(void);
 
@@ -2022,7 +2023,21 @@ program_t *compile_file(std::unique_ptr<LexStream> stream, const char *name) {
     symbol_start(name);
     prolog(std::move(stream), name);
     func_present = 0;
-    yyparse();
+    /*
+     * `yyparse` may throw, so make sure we clean up and then re-throw.
+     */
+    try {
+      yyparse();
+    } catch (const char *) {
+
+      symbol_end();
+      deinit_include_path();
+      clean_incomplete_parse();
+
+      guard = 0;
+      throw;
+
+    }
     symbol_end();
     prog = epilog();
   }
@@ -2196,6 +2211,20 @@ static void handle_functions() {
   }
 }
 
+static void clean_incomplete_parse(void) {
+
+  /* don't print these; they can be wrong, since we didn't parse the
+     entire file */
+  if (pragmas & PRAGMA_WARNINGS) {
+    remove_overload_warnings(nullptr);
+  }
+  clean_parser();
+  end_new_file();
+  free_string(current_file);
+  current_file = nullptr;
+
+}
+
 /*
  * The program has been compiled. Prepare a 'program_t' to be returned.
  */
@@ -2210,15 +2239,7 @@ static program_t *epilog(void) {
   deinit_include_path();
 
   if (num_parse_error > 0 || inherit_file) {
-    /* don't print these; they can be wrong, since we didn't parse the
-       entire file */
-    if (pragmas & PRAGMA_WARNINGS) {
-      remove_overload_warnings(nullptr);
-    }
-    clean_parser();
-    end_new_file();
-    free_string(current_file);
-    current_file = nullptr;
+    clean_incomplete_parse();
     return nullptr;
   }
 
