@@ -5,7 +5,7 @@ title: objects / reload_object
 
 ### NAME
 
-    reload_object - return an object to its just-loaded state
+    reload_object() - return an object to its just-loaded state
 
 ### SYNOPSIS
 
