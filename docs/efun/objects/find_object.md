@@ -9,17 +9,20 @@ title: objects / find_object
 
 ### SYNOPSIS
 
-    object find_object( string str );
-    object find_object( string str, int flag );
+    object find_object( string str, void | int flag );
 
 ### DESCRIPTION
 
-    Find the object with the file name <str>. If the object is a cloned
-    object, then it can be found using the file name which would by
-    returned if file_name() was called with it as the argument.
+    Find the object with the file name 'str',  which can reference a cloned
+    object by using the file name format returned by file_name().
 
-    If 'flag' is 1, this function has the same effect as 'load_object'.
+    If 'flag' is 1, find_object() will behave like load_object().
+
+### RETURN VALUES
+
+    find_object() returns the loaded object if it can be located (or loaded
+    when 'flag' is 1), otherwise the value 0 will be returned.
 
 ### SEE ALSO
 
-    file_name(3), stat(3), load_object(3)
+    file_name(3), load_object(3), stat(3)
