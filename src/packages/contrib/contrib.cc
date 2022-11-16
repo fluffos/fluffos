@@ -2758,7 +2758,7 @@ void f_roll_MdN() {
 
   roll += bonus ;
 
-  pop_n_elems(st_num_arg) ;
+  pop_n_elems(num_arg) ;
   push_number(roll) ;
 }
 
