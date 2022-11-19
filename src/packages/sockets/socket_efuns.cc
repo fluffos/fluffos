@@ -127,7 +127,9 @@ static bool lpcaddr_to_sockaddr(const char *name, struct sockaddr *addr, ev_sock
   struct addrinfo hints = {0}, *res;
 #ifdef IPV6
   hints.ai_family = AF_UNSPEC;
+#ifdef AI_V4MAPPED
   hints.ai_flags |= AI_V4MAPPED;
+#endif
 #else
   hints.ai_family = AF_INET;
 #endif
@@ -450,7 +452,10 @@ int socket_bind(int fd, int port, const char *addr) {
     hints.ai_family = AF_INET;
 #endif
     hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE | AI_V4MAPPED;
+    hints.ai_flags = AI_PASSIVE;
+#ifdef AI_V4MAPPED
+    hints.ai_flags |= AI_V4MAPPED;
+#endif
     hints.ai_protocol = 0; /* Any protocol */
 
     int ret;
