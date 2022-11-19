@@ -428,7 +428,9 @@ bool init_user_conn() {
       struct addrinfo hints = {0};
 #ifdef IPV6
       hints.ai_family = AF_INET6;
+#ifdef AI_V4MAPPED
       hints.ai_flags |= AI_V4MAPPED;
+#endif
 #else
       hints.ai_family = AF_INET;
 #endif
