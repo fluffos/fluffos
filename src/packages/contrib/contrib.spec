@@ -48,7 +48,7 @@ mixed element_of(mixed *);
 mixed max(mixed *, int default:0);
 mixed min(mixed *, int default:0);
 mixed abs(int | float);
-int roll_MdN(int, int);
+int roll_MdN(int, int, int default:0);
 int string_difference(string, string);
 int query_charmode(object);
 int remove_charmode(object);
