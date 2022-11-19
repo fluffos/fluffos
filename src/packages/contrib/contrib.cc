@@ -2754,9 +2754,8 @@ void f_roll_MdN() {
     while (rolls--) {
       roll += 1 + random_number(sides);
     }
+    roll += bonus ;
   }
-
-  roll += bonus ;
 
   pop_n_elems(num_arg) ;
   push_number(roll) ;
