@@ -82,7 +82,7 @@ void on_telnet_do_mssp(interactive_t *ip) {
   }
   if (!tmp) {
     char num[20] = {};
-    snprintf(num, sizeof(num), "%zd", boot_time);
+    snprintf(num, sizeof(num), "%lld", (long long)boot_time);
     telnet_printf(ip->telnet, reinterpret_cast<const char *>(telnet_mssp_value), "UPTIME", num);
   }
   // now send the rest
