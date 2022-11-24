@@ -104,6 +104,11 @@ title: strings / sprintf
         sprintf("%10.2f", 1.2345)     =   "      1.23"
         sprintf("%10.6f", 0.123)      =   "  0.123000"
 
+    Dynamic Field Size:
+        sprintf("%-*s", 10, "ten")    =   "ten       "
+        sprintf("%|*s", 20, "twenty") =   "       twenty       "
+        sprintf("%*s", 30, "thirty")  =   "                        thirty"
+
 ### AUTHOR
 
     Sean A. Reith (Lynscar)
