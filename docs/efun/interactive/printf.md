@@ -106,6 +106,11 @@ title: interactive / printf
         printf("%10.2f", 1.2345)      =   "      1.23"
         printf("%10.6f", 0.123)       =   "  0.123000"
 
+    Dynamic Field Size:
+        printf("%-*s", 10, "ten")     =   "ten       "
+        printf("%|*s", 20, "twenty")  =   "       twenty       "
+        printf("%*s", 30, "thirty")   =   "                        thirty"
+
 ### AUTHOR
 
     Sean A. Reith (Lynscar)
