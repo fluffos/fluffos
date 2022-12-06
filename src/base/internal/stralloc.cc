@@ -72,7 +72,7 @@ uint64_t num_str_searches = 0;
 
 #define StrHash(s) (whashstr((s)) & (htable_size_minus_one))
 
-#define hfindblock(s, h) sfindblock(s, h = StrHash(s))
+#define hfindblock(s, h) sfindblock(s, (h) = StrHash(s))
 #define findblock(s) sfindblock(s, StrHash(s))
 
 static block_t *sfindblock(const char * /*s*/, int /*h*/);
@@ -146,9 +146,8 @@ const char *findstring(const char *s) {
 
   if ((b = findblock(s))) {
     return STRING(b);
-  } else {
-    return (nullptr);
-  }
+  }     return (nullptr);
+ 
 }
 
 /* alloc_new_string: Make a space for a string.  */
@@ -358,7 +357,7 @@ char *int_new_string(unsigned int size)
 
 char *extend_string(const char *str, int len) {
   malloc_block_t *mbt;
-  int oldsize = MSTR_SIZE(str);
+  int const oldsize = MSTR_SIZE(str);
 
   mbt = reinterpret_cast<malloc_block_t *>(DREALLOC(
       MSTR_BLOCK(str), len + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, "extend_string"));
@@ -424,7 +423,7 @@ char *int_string_unlink(const char *str)
   mbt->ref--;
 
   if (mbt->size == USHRT_MAX) {
-    int l = strlen(str + USHRT_MAX) + USHRT_MAX; /* ouch */
+    int const l = strlen(str + USHRT_MAX) + USHRT_MAX; /* ouch */
 
     newmbt = reinterpret_cast<malloc_block_t *>(
         DMALLOC(l + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, desc));
@@ -452,7 +451,7 @@ void dump_stralloc(outbuffer_t *out) {
   for (int hsh = 0; hsh < htable_size; hsh++) {
     for (block_t *entry = base_table[hsh]; entry; entry = entry->next) {
 #if defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS)
-      auto md_entry = PTR_TO_NODET(entry);
+      auto *md_entry = PTR_TO_NODET(entry);
       ss << fmt::format(FMT_STRING("{:d},{:d},{:s},{:.40s}"), md_entry->id, md_entry->size,
                         md_entry->tag == TAG_SHARED_STRING ? "S" : "M", md_entry->desc);
 #endif

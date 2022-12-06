@@ -11,7 +11,7 @@
 
 #include <cassert>  // for assert()
 #include <cstdlib>  // malloc etc
-#include <inttypes.h>
+#include <cinttypes>
 
 #include "base/internal/log.h"
 #include "base/internal/stralloc.h"

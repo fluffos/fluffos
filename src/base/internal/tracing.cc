@@ -24,36 +24,36 @@ using json = nlohmann::json;
 namespace {
 const int MAX_EVENTS = 1'000'000;
 
-unsigned long _get_current_process_id() {
-  static unsigned long _current_process_id =
+unsigned long get_current_process_id() {
+  static unsigned long const current_process_id =
 #ifdef _WIN32
       GetCurrentProcessId();
 #else
       ::getpid();
 #endif
-  return _current_process_id;
+  return current_process_id;
 }
 
 unsigned long thread_id_to_string(std::thread::id id) {
   std::ostringstream os;
   os << id;
-  std::string res = os.str();
+  std::string const res = os.str();
 
   return std::strtoul(res.c_str(), nullptr, 10);
 }
 
-unsigned long _get_current_thread_id() {
-  static thread_local unsigned long _current_thread_id =
+unsigned long get_current_thread_id() {
+  static thread_local unsigned long const current_thread_id =
       thread_id_to_string(std::this_thread::get_id());
-  return _current_thread_id;
+  return current_thread_id;
 }
 
 }  // namespace
 
 Event::Event(std::string_view name, EventCategory category, const char* phase,
              std::optional<json>&& args)
-    : process_id(::_get_current_process_id()),
-      thread_id(::_get_current_thread_id()),
+    : process_id(::get_current_process_id()),
+      thread_id(::get_current_thread_id()),
       timestamp(Tracer::timestamp()),
       category(category),
       phase(phase),
@@ -65,51 +65,51 @@ class TraceWriter {
   ~TraceWriter();
 
   void log(Event&& e) {
-    std::lock_guard<std::mutex> _guard(lock);
+    std::lock_guard<std::mutex> const guard(lock_);
 
-    if (!buffer) {
-      buffer = std::make_unique<std::vector<Event>>();
-      buffer->reserve(MAX_EVENTS);
+    if (!buffer_) {
+      buffer_ = std::make_unique<std::vector<Event>>();
+      buffer_->reserve(MAX_EVENTS);
     }
 
-    if (buffer->size() >= MAX_EVENTS) {
+    if (buffer_->size() >= MAX_EVENTS) {
       Tracer::stop();
     }
 
-    buffer->push_back(std::move(e));
+    buffer_->push_back(std::move(e));
   }
   void flush(const std::string& file);
 
  private:
-  std::mutex lock;
-  std::unique_ptr<std::vector<Event>> buffer;
-  std::vector<std::thread> dump_threads;
+  std::mutex lock_;
+  std::unique_ptr<std::vector<Event>> buffer_;
+  std::vector<std::thread> dump_threads_;
 };
 
 TraceWriter::~TraceWriter() {
-  std::lock_guard<std::mutex> _lock(lock);
-  if (buffer && !buffer->empty()) {
-    debug_message("Uncollected profiling events: %ld.\n", buffer->size());
+  std::lock_guard<std::mutex> const lock(lock_);
+  if (buffer_ && !buffer_->empty()) {
+    debug_message("Uncollected profiling events: %ld.\n", buffer_->size());
   }
-  for (auto& t : dump_threads) {
+  for (auto& t : dump_threads_) {
     if (t.joinable()) {
       t.join();
     }
   }
-  dump_threads.clear();
+  dump_threads_.clear();
 }
 
 void TraceWriter::flush(const std::string& filename) {
-  std::lock_guard<std::mutex> _guard(lock);
+  std::lock_guard<std::mutex> const guard(lock_);
 
-  if (!buffer || buffer->empty()) {
+  if (!buffer_ || buffer_->empty()) {
     return;
   }
 
   debug_message("Trace duration: %lf us, dumping %ld events to %s in separate thread.\n",
-                Tracer::timestamp(), buffer->size(), filename.c_str());
+                Tracer::timestamp(), buffer_->size(), filename.c_str());
 
-  this->dump_threads.emplace_back([current_buffer = std::move(buffer), filename] {
+  this->dump_threads_.emplace_back([current_buffer = std::move(buffer_), filename] {
     auto begin = std::chrono::high_resolution_clock::now();
 
     std::ofstream file(filename, std::ofstream::out | std::ofstream::binary);
@@ -162,7 +162,7 @@ void TraceWriter::flush(const std::string& filename) {
                       .count();
 
     debug_message("[thread %lud]: Dump trace successfully to file %s, cost %lld ms.\n",
-                  _get_current_thread_id(), filename.c_str(), dur_us);
+                  get_current_thread_id(), filename.c_str(), dur_us);
   });
 }
 
@@ -236,8 +236,8 @@ void Tracer::collect() {
 }
 
 TraceWriter& Tracer::instance() {
-  static TraceWriter _trace_writer;
-  return _trace_writer;
+  static TraceWriter trace_writer;
+  return trace_writer;
 }
 
 ScopedTracerInner::ScopedTracerInner(const std::string& name, const EventCategory category,

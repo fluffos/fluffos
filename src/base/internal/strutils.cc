@@ -4,7 +4,7 @@
 #include <vector>
 #include <string>
 #include <memory>
-#include <string.h>
+#include <cstring>
 
 #include "thirdparty/utf8_decoder_dfa/decoder.h"
 #include "thirdparty/widecharwidth/widechar_width.h"
@@ -15,7 +15,7 @@
 #include "base/internal/EGCIterator.h"
 
 bool u8_validate(const char *s) {
-  auto p = (const uint8_t *)s;
+  const auto *p = (const uint8_t *)s;
   uint32_t codepoint, state = 0;
 
   while (*p) decode(&state, &codepoint, *p++);
@@ -24,7 +24,7 @@ bool u8_validate(const char *s) {
 }
 
 bool u8_validate(const uint8_t *s, size_t len) {
-  auto end = s + len;
+  const auto *end = s + len;
   uint32_t codepoint, state = 0;
 
   while (s < end && *s) decode(&state, &codepoint, *s++);
@@ -38,7 +38,7 @@ std::string u8_sanitize(std::string_view src) { return utf8::replace_invalid(src
 int32_t u8_egc_find_as_offset(EGCIterator &iter, const char *needle, size_t needle_len,
                               bool reverse) {
   const char *haystack = iter.data();
-  size_t haystack_len = iter.len() == -1 ? strlen(haystack) : iter.len();
+  size_t const haystack_len = iter.len() == -1 ? strlen(haystack) : iter.len();
 
   // no way
   if (needle_len > haystack_len) {
@@ -50,7 +50,7 @@ int32_t u8_egc_find_as_offset(EGCIterator &iter, const char *needle, size_t need
   if (!reverse) {
     bool is_all_ascii = false;
     for (int i = 0; i < 4 && i < needle_len; i++) {
-      char c = needle[i];
+      char const c = needle[i];
       is_all_ascii = c >= 0;
       if (!is_all_ascii) break;
       if (c == '\0') break;
@@ -67,8 +67,8 @@ int32_t u8_egc_find_as_offset(EGCIterator &iter, const char *needle, size_t need
 
   int res = -1;
 
-  std::string_view sv_haystack(haystack, haystack_len);
-  std::string_view sv_needle(needle, needle_len);
+  std::string_view const sv_haystack(haystack, haystack_len);
+  std::string_view const sv_needle(needle, needle_len);
   auto pos = std::string_view::npos;
   if (!reverse) {
     pos = 0;
@@ -115,7 +115,7 @@ void u8_copy_and_replace_codepoint_at(EGCSmartIterator &iter, char *dst, int32_t
   if (!iter.ok()) return;
 
   const char *src = iter.data();
-  int32_t slen = iter.len();
+  int32_t const slen = iter.len();
 
   int32_t src_offset = iter.index_to_offset(index);
   int32_t dst_offset = 0;
@@ -475,8 +475,8 @@ size_t u8_width(const char *src, int len) {
     // format is "\x1b[X;Ym"
     if (CONFIG_INT(__RC_SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__)) {
       if (c == 0x1B) {
-        auto p = src + src_offset;
-        auto end = (len > 0) ? src + len : nullptr;
+        const auto *p = src + src_offset;
+        const auto *end = (len > 0) ? src + len : nullptr;
         if (p != end && *p == '[') {
           p++;
           // we don't check validity here, just assume valid code
