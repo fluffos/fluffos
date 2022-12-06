@@ -59,7 +59,7 @@
 
 #if defined(F_SPRINTF) || defined(F_PRINTF)
 
-typedef unsigned int format_info;
+using format_info = unsigned int;
 
 /*
  * Format of format_info:
@@ -143,19 +143,19 @@ typedef unsigned int format_info;
     carg = (argv + sprintf_state->cur_arg);                                \
   }
 
-typedef struct {
+using pad_info_t = struct {
   const char *what;
   int len;
   int width;
-} pad_info_t;
+};
 
-typedef struct {
+using tab_data_t = struct {
   const char *start;
   const char *cur;
-} tab_data_t;
+};
 
 /* slash here means 'or' */
-typedef struct ColumnSlashTable {
+using cst = struct ColumnSlashTable {
   union CSTData {
     const char *col;         /* column data */
     tab_data_t *tab;         /* table data */
@@ -168,15 +168,15 @@ typedef struct ColumnSlashTable {
   int pres;               /* precision */
   format_info info;       /* formatting data */
   struct ColumnSlashTable *next;
-} cst; /* Columns Slash Tables */
+}; /* Columns Slash Tables */
 
-typedef struct _sprintf_state {
+using sprintf_state_t = struct _sprintf_state {
   outbuffer_t obuff;
   cst *csts;
   int cur_arg;
   svalue_t clean;
   struct _sprintf_state *next;
-} sprintf_state_t;
+};
 
 static sprintf_state_t *sprintf_state = nullptr;
 
@@ -188,7 +188,7 @@ static int add_table(cst **table);
 
 #define SPRINTF_ERROR(x) sprintf_error(x, 0)
 
-static void pop_sprintf_state(void) {
+static void pop_sprintf_state() {
   sprintf_state_t *state;
 
   state = sprintf_state;
@@ -212,7 +212,7 @@ static void pop_sprintf_state(void) {
   FREE(state);
 }
 
-static void push_sprintf_state(void) {
+static void push_sprintf_state() {
   sprintf_state_t *state;
 
   state = reinterpret_cast<sprintf_state_t *>(
@@ -342,7 +342,7 @@ void svalue_to_string(svalue_t *obj, outbuffer_t *outbuf, int indent, int traili
       outbuf_add(outbuf, "\"");
       break;
     case T_CLASS: {
-      int n = obj->u.arr->size;
+      int const n = obj->u.arr->size;
       outbuf_add(outbuf, "CLASS( ");
       outbuf_addv(outbuf, "%d", n);
       outbuf_add(outbuf, n == 1 ? " element\n" : " elements\n");
@@ -404,7 +404,7 @@ void svalue_to_string(svalue_t *obj, outbuffer_t *outbuf, int indent, int traili
         case FP_FUNCTIONAL:
         case FP_FUNCTIONAL | FP_NOT_BINDABLE: {
           char buf[10];
-          int n = obj->u.fp->f.functional.num_arg;
+          int const n = obj->u.fp->f.functional.num_arg;
 
           outbuf_add(outbuf, "<code>(");
           for (i = 1; i < n; i++) {
@@ -506,18 +506,17 @@ static void add_pad(pad_info_t *pad, int width, bool start_from_right) {
   }
 
   // Get an sanitized version of pad_string first
-  std::string _pad_string;
+  std::string pad_string;
   {
-    _pad_string.reserve(pad->len);
+    pad_string.reserve(pad->len);
 
-    auto padp = pad->what;
+    const auto *padp = pad->what;
     for (int i = 0; i < pad->len; i++) {
       char c = *padp++;
       if (c == '\\') c = *padp++;
-      _pad_string.push_back(c);
+      pad_string.push_back(c);
     }
   }
-  const auto &pad_string = _pad_string;
 
   std::string pad_result;
   pad_result.reserve(output_len);
@@ -561,7 +560,7 @@ static void add_pad(pad_info_t *pad, int width, bool start_from_right) {
     SPRINTF_ERROR(ERR_BUFF_OVERFLOW);
   }
 
-  auto p = sprintf_state->obuff.buffer + sprintf_state->obuff.real_size;
+  auto *p = sprintf_state->obuff.buffer + sprintf_state->obuff.real_size;
   sprintf_state->obuff.real_size += output_len;
   p[output_len] = 0;
 
@@ -684,7 +683,7 @@ static int add_table(cst **table) {
 
   for (i = 0; i < tab->nocols && (tab_di = tab_d[i].cur); i++) {
     int done;
-    int end = tab_d[i + 1].start - tab_di - 1;
+    int const end = tab_d[i + 1].start - tab_di - 1;
     // Look for next '\n'
     for (done = 0; done != end && tab_di[done] != '\n'; done++)
       ;
@@ -741,9 +740,8 @@ static int get_curpos() {
 
   if (*p2 != '\n') {
     return p1 - p2 + 1;
-  } else {
-    return p1 - p2;
   }
+  return p1 - p2;
 }
 
 /* We can't use a pointer to a local in a table or column, since it
@@ -787,7 +785,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
 
   last = 0;
   for (fpos = 0; true; fpos++) {
-    char c = format_str[fpos];
+    char const c = format_str[fpos];
 
     if (c == '\n' || !c) {
       int column_stat = 0;
@@ -985,7 +983,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
                 SPRINTF_ERROR(ERR_UNEXPECTED_EOS);
               }
               if (format_str[fpos] == '\\') {
-                char nextc = format_str[fpos + 1];
+                char const nextc = format_str[fpos + 1];
                 if (!nextc) SPRINTF_ERROR(ERR_UNEXPECTED_EOS);
                 if (nextc != '\'' && nextc != '\\') {
                   sprintf_error(
@@ -996,7 +994,8 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
                 pad.len -= 1;
                 pad.width -= 1;
                 continue;
-              } else if (format_str[fpos] == '\'') {
+              }
+              if (format_str[fpos] == '\'') {
                 pad.len += format_str + fpos - pad.what;
                 if (!pad.len) {
                   SPRINTF_ERROR(ERR_NULL_PS);
@@ -1223,7 +1222,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
           }
           /* write UTF8 codepoint */
           char temp[4 + 1] = {0};
-          UChar32 c = carg->u.number;
+          UChar32 const c = carg->u.number;
 
           if (c == 0 || !u_isdefined(c)) {
             SPRINTF_ERROR(ERR_INVALID_ARG_C);
@@ -1232,8 +1231,8 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
           U8_APPEND_UNSAFE(temp, offset, c);
           temp[4] = 0;
 
-          int tmpl = strlen(temp);
-          int swidth = u8_width(temp, -1);
+          int const tmpl = strlen(temp);
+          int const swidth = u8_width(temp, -1);
           add_justified(temp, swidth, tmpl, &pad, fs, finfo,
                         (true || ((finfo & INFO_ARRAY) &&
                                   (nelemno < (argv + sprintf_state->cur_arg)->u.arr->size))));
@@ -1322,8 +1321,8 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
             sprintf(temp, cheat, carg->u.number);
           }
           {
-            int tmpl = strlen(temp);
-            int swidth = u8_width(temp, tmpl);
+            int const tmpl = strlen(temp);
+            int const swidth = u8_width(temp, tmpl);
 
             add_justified(temp, swidth, tmpl, &pad, fs, finfo,
                           (true || ((finfo & INFO_ARRAY) &&

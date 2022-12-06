@@ -3,7 +3,7 @@
 #include <unicode/ucnv.h>
 
 namespace {
-const char *DEFAULT_ENCODING = "utf-8";
+const char *default_encoding = "utf-8";
 }  // namespace
 
 #ifdef F_SET_ENCODING
@@ -12,11 +12,11 @@ void f_set_encoding() {
     if (st_num_arg) {
       pop_stack();
     }
-    push_malloced_string(string_copy(DEFAULT_ENCODING, "f_set_encoding: 1"));
+    push_malloced_string(string_copy(default_encoding, "f_set_encoding: 1"));
     return;
   }
 
-  auto ip = command_giver->interactive;
+  auto *ip = command_giver->interactive;
 
   // Reset to no-transcoding
   if (!st_num_arg) {
@@ -24,7 +24,7 @@ void f_set_encoding() {
       ucnv_close(ip->trans);
       ip->trans = nullptr;
     }
-    push_malloced_string(string_copy(DEFAULT_ENCODING, "f_set_encoding: 1"));
+    push_malloced_string(string_copy(default_encoding, "f_set_encoding: 1"));
     return;
   }
 
@@ -32,7 +32,7 @@ void f_set_encoding() {
 
   // ignore if user want utf8
   UConverter *new_trans = nullptr;
-  if (ucnv_compareNames(DEFAULT_ENCODING, sp->u.string) != 0) {
+  if (ucnv_compareNames(default_encoding, sp->u.string) != 0) {
     UErrorCode error_code = U_ZERO_ERROR;
     new_trans = ucnv_open(sp->u.string, &error_code);
     if (U_FAILURE(error_code)) {
@@ -50,12 +50,12 @@ void f_set_encoding() {
 
   // Now let's return an canonical name
   if (!ip->trans) {
-    push_malloced_string(string_copy(DEFAULT_ENCODING, "f_set_encoding: 2"));
+    push_malloced_string(string_copy(default_encoding, "f_set_encoding: 2"));
     return;
   }
 
   UErrorCode error_code = U_ZERO_ERROR;
-  auto name = ucnv_getName(ip->trans, &error_code);
+  const auto *name = ucnv_getName(ip->trans, &error_code);
   if (U_FAILURE(error_code)) {
     error("Fail to set encoding, ucnv_getName error: %s.", u_errorName(error_code));
   }
@@ -69,15 +69,15 @@ void f_query_encoding() {
     if (st_num_arg) {
       pop_stack();
     }
-    push_malloced_string(string_copy(DEFAULT_ENCODING, "f_set_encoding: 1"));
+    push_malloced_string(string_copy(default_encoding, "f_set_encoding: 1"));
     return;
   }
 
-  auto res = DEFAULT_ENCODING;
+  const auto *res = default_encoding;
 
-  auto ip = command_giver->interactive;
+  auto *ip = command_giver->interactive;
   if (ip) {
-    auto trans = ip->trans;
+    auto *trans = ip->trans;
     if (trans) {
       UErrorCode error_code = U_ZERO_ERROR;
       res = ucnv_getName(trans, &error_code);
@@ -93,12 +93,12 @@ void f_query_encoding() {
 
 #ifdef F_STRING_ENCODE
 void f_string_encode() {
-  auto encoding = sp->u.string;
-  auto data = (sp - 1)->u.string;
+  const auto *encoding = sp->u.string;
+  const auto *data = (sp - 1)->u.string;
   auto len = SVALUE_STRLEN(sp - 1);
 
   UErrorCode error_code = U_ZERO_ERROR;
-  auto trans = ucnv_open(encoding, &error_code);
+  auto *trans = ucnv_open(encoding, &error_code);
   if (U_FAILURE(error_code)) {
     error("string_encode: Invalid encoding '%s', error: %s.", encoding, u_errorName(error_code));
   }
@@ -111,10 +111,10 @@ void f_string_encode() {
     error("string_encode: error: %s.", u_errorName(error_code));
   }
 
-  size_t translen = required;
+  size_t const translen = required;
   error_code = U_ZERO_ERROR;
-  auto buffer = allocate_buffer(translen);
-  auto transdata = (char *)buffer->item;
+  auto *buffer = allocate_buffer(translen);
+  auto *transdata = (char *)buffer->item;
 
   auto written = ucnv_fromAlgorithmic(trans, UConverterType::UCNV_UTF8, transdata, translen, data,
                                       len, &error_code);
@@ -133,15 +133,15 @@ void f_string_encode() {
 
 #ifdef F_STRING_DECODE
 void f_string_decode() {
-  auto encoding = sp->u.string;
-  auto data = (char *)((sp - 1)->u.buf->item);
+  const auto *encoding = sp->u.string;
+  auto *data = (char *)((sp - 1)->u.buf->item);
   auto len = (sp - 1)->u.buf->size;
 
   // get rid of all ending '\0's from buffer.
   while (len > 1 && data[len - 1] == '\0') len--;
 
   UErrorCode error_code = U_ZERO_ERROR;
-  auto trans = ucnv_open(encoding, &error_code);
+  auto *trans = ucnv_open(encoding, &error_code);
   if (U_FAILURE(error_code)) {
     error("string_decode: Invalid encoding '%s', error: %s.", encoding, u_errorName(error_code));
   }
@@ -154,7 +154,7 @@ void f_string_decode() {
     error("string_decode: error: %s.", u_errorName(error_code));
   }
 
-  auto res = new_string(required, "f_string_decode");
+  auto *res = new_string(required, "f_string_decode");
 
   error_code = U_ZERO_ERROR;
   auto written =
@@ -175,9 +175,9 @@ void f_string_decode() {
 
 #ifdef F_BUFFER_TRANSCODE
 void f_buffer_transcode() {
-  auto to_encoding = sp->u.string;
-  auto from_encoding = (sp - 1)->u.string;
-  auto data = (char *)((sp - 2)->u.buf->item);
+  const auto *to_encoding = sp->u.string;
+  const auto *from_encoding = (sp - 1)->u.string;
+  auto *data = (char *)((sp - 2)->u.buf->item);
   auto len = (sp - 2)->u.buf->size;
 
   UErrorCode error_code = U_ZERO_ERROR;
@@ -188,7 +188,7 @@ void f_buffer_transcode() {
     error("buffer_transcode: error: %s.", u_errorName(error_code));
   }
 
-  auto res = allocate_buffer(required);
+  auto *res = allocate_buffer(required);
 
   error_code = U_ZERO_ERROR;
   auto written =

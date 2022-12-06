@@ -11,13 +11,13 @@
 
 #define GZ_EXTENSION ".gz"
 
-#define COMPRESS_BUF_SIZE 8096
+enum { COMPRESS_BUF_SIZE = 8096 };
 
 #ifdef F_COMPRESS_FILE
-void f_compress_file(void) {
+void f_compress_file() {
   int readb;
   int len;
-  int num_arg = st_num_arg;
+  int const num_arg = st_num_arg;
   const char *input_file;
   const char *output_file;
   const char *real_input_file;
@@ -108,10 +108,10 @@ void f_compress_file(void) {
 #endif
 
 #ifdef F_UNCOMPRESS_FILE
-void f_uncompress_file(void) {
+void f_uncompress_file() {
   int readb;
   int len;
-  int num_arg = st_num_arg;
+  int const num_arg = st_num_arg;
   const char *input_file;
   const char *output_file;
   const char *real_input_file;
@@ -139,7 +139,7 @@ void f_uncompress_file(void) {
   } else {
     char *tmp;
     len = strlen(input_file);
-    if (strcmp(input_file + len - strlen(GZ_EXTENSION), GZ_EXTENSION)) {
+    if (strcmp(input_file + len - strlen(GZ_EXTENSION), GZ_EXTENSION) != 0) {
       // Not compressed...
       pop_n_elems(num_arg);
       push_number(0);
@@ -205,7 +205,7 @@ void f_uncompress_file(void) {
 #endif
 
 #ifdef F_COMPRESS
-void f_compress(void) {
+void f_compress() {
   unsigned char *buffer;
   unsigned char *input;
   int size;
@@ -239,13 +239,13 @@ void f_compress(void) {
 #endif
 
 #ifdef F_UNCOMPRESS
-static void *zlib_alloc(void *opaque, unsigned int items, unsigned int size) {
+static void *zlib_alloc(void * /*opaque*/, unsigned int items, unsigned int size) {
   return DCALLOC(items, size, TAG_TEMPORARY, "zlib_alloc");
 }
 
-static void zlib_free(void *opaque, void *address) { FREE(address); }
+static void zlib_free(void * /*opaque*/, void *address) { FREE(address); }
 
-void f_uncompress(void) {
+void f_uncompress() {
   z_stream *compressed;
   unsigned char compress_buf[COMPRESS_BUF_SIZE];
   unsigned char *output_data = nullptr;

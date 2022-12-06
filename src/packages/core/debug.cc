@@ -7,7 +7,7 @@
 
 #include "base/package_api.h"
 
-mapping_t *debug_levels(void);
+mapping_t *debug_levels();
 
 mapping_t *debug_levels() {
   int dl = debug_level;

@@ -7,7 +7,7 @@
 static object_t *ob;
 
 #ifdef F_DEBUG_INFO
-void f_debug_info(void) {
+void f_debug_info() {
   svalue_t *arg;
   outbuffer_t out;
 
@@ -115,7 +115,7 @@ void f_debug_info(void) {
 #endif
 
 #ifdef F_REFS
-void f_refs(void) {
+void f_refs() {
   int r;
 
   switch (sp->type) {
@@ -153,7 +153,7 @@ void f_refs(void) {
 #endif
 
 #ifdef F_DESTRUCTED_OBJECTS
-void f_destructed_objects(void) {
+void f_destructed_objects() {
   int i;
   array_t *ret;
   object_t *ob;
@@ -180,8 +180,8 @@ void f_destructed_objects(void) {
 #ifdef F_DUMP_STRALLOC
 void dump_stralloc(outbuffer_t *);
 
-void f_dump_stralloc(void) {
-  auto target_file = sp->u.string;
+void f_dump_stralloc() {
+  const auto *target_file = sp->u.string;
   const char *fn;
   FILE *fp;
   fn = check_valid_path(target_file, current_object, "debugmalloc", 1);
@@ -216,7 +216,7 @@ void f_dump_stralloc(void) {
 
 void f_dump_jemalloc() {
 #ifdef HAVE_JEMALLOC
-  mallctl("prof.dump", NULL, NULL, NULL, 0);
+  mallctl("prof.dump", nullptr, nullptr, nullptr, 0);
   malloc_stats_print(nullptr, nullptr, "");
 #else
   debug_message("Jemalloc is disabled, dump_jemalloc() has no effect.\n");
@@ -226,7 +226,7 @@ void f_dump_jemalloc() {
 
 #if (defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS))
 #ifdef F_DEBUGMALLOC
-void f_debugmalloc(void) {
+void f_debugmalloc() {
   char *res;
 
   res = dump_debugmalloc((sp - 1)->u.string, sp->u.number);
@@ -237,17 +237,17 @@ void f_debugmalloc(void) {
 #endif
 
 #ifdef F_SET_MALLOC_MASK
-void f_set_malloc_mask(void) { set_malloc_mask((sp--)->u.number); }
+void f_set_malloc_mask() { set_malloc_mask((sp--)->u.number); }
 #endif
 
 #ifdef F_CHECK_MEMORY
-void f_check_memory(void) { check_all_blocks((sp--)->u.number); }
+void f_check_memory() { check_all_blocks((sp--)->u.number); }
 #endif
 #endif /* (defined(DEBUGMALLOC) && \
         * defined(DEBUGMALLOC_EXTENSIONS)) */
 
 #ifdef F_TRACE
-void f_trace(void) {
+void f_trace() {
   int ot = -1;
 
   if (command_giver && command_giver->interactive) {
@@ -259,8 +259,8 @@ void f_trace(void) {
 #endif
 
 #ifdef F_TRACEPREFIX
-void f_traceprefix(void) {
-  const char *old = 0;
+void f_traceprefix() {
+  const char *old = nullptr;
 
   if (command_giver && command_giver->interactive) {
     old = command_giver->interactive->trace_prefix;
@@ -273,7 +273,7 @@ void f_traceprefix(void) {
       command_giver->interactive->trace_prefix = make_shared_string(p);
       free_string_svalue(sp);
     } else {
-      command_giver->interactive->trace_prefix = 0;
+      command_giver->interactive->trace_prefix = nullptr;
     }
   }
   if (old) {

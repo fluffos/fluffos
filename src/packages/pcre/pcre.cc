@@ -86,13 +86,13 @@ int pcrecachesize = 0;
 struct pcre_cache_t pcre_cache = {{nullptr}};
 
 // efuns
-void f_pcre_version(void) {
+void f_pcre_version() {
   char *version;
   version = (char *)pcre_version();
   push_constant_string(version);
 }
 
-void f_pcre_match(void) {
+void f_pcre_match() {
   array_t *v;
   int flag = 0;
 
@@ -122,7 +122,7 @@ void f_pcre_match(void) {
   }
 }
 
-void f_pcre_assoc(void) {
+void f_pcre_assoc() {
   svalue_t *arg;
   array_t *vec;
 
@@ -146,7 +146,7 @@ void f_pcre_assoc(void) {
   sp->u.arr = vec;
 }
 
-void f_pcre_extract(void) {
+void f_pcre_extract() {
   pcre_t *run;
   array_t *ret;
 
@@ -168,7 +168,8 @@ void f_pcre_extract(void) {
     pop_2_elems();
     push_refed_array(&the_null_array);
     return;
-  } else if (run->rc > (run->ovecsize / 3 - 1)) {
+  }
+  if (run->rc > (run->ovecsize / 3 - 1)) {
     error("Too many substrings.\n");
   }
 
@@ -178,7 +179,7 @@ void f_pcre_extract(void) {
   push_refed_array(ret);
 }
 
-void f_pcre_replace(void) {
+void f_pcre_replace() {
   pcre_t *run;
   array_t *replacements;
 
@@ -208,7 +209,7 @@ void f_pcre_replace(void) {
     error("Too many substrings.\n");
   }
   if ((run->rc - 1) != replacements->size) {
-    int tmp = run->rc - 1;
+    int const tmp = run->rc - 1;
     error(
         "Number of captured substrings and replacements do not match, "
         "%d vs %d.\n",
@@ -226,11 +227,10 @@ void f_pcre_replace(void) {
 
   pop_3_elems();
   push_malloced_string(ret);
-  return;
 }
 
 // string pcre_replace_callback(string, string, function)
-void f_pcre_replace_callback(void) {
+void f_pcre_replace_callback() {
   int num_arg = st_num_arg, i;
   char *ret;
   pcre_t *run;
@@ -304,10 +304,9 @@ void f_pcre_replace_callback(void) {
 
   pop_n_elems(num_arg + 2);  // refed arrays
   push_malloced_string(ret);
-  return;
 }
 
-void f_pcre_cache(void) {
+void f_pcre_cache() {
   mapping_t *m = nullptr;
   m = pcre_get_cache();
   if (!m) {
@@ -414,7 +413,7 @@ auto pcre_match_all(const char *subject, size_t subject_len, const char *pattern
 
       char *match_str = new_string(length, "pcre get substrings");
       snprintf(match_str, length + 1, "%.*s", length, run->subject + start);
-      svalue_t item = {
+      svalue_t const item = {
           .type = T_STRING,
           .subtype = STRING_MALLOC,
           .u = {.string = match_str},
@@ -473,7 +472,7 @@ static array_t *pcre_match(array_t *v, const char *pattern, int flag) {
   if (run->re == nullptr) {
     if (pcre_local_compile(run) == nullptr) {
       const char *rerror = run->error;
-      int offset = run->erroffset;
+      int const offset = run->erroffset;
 
       error("PCRE compilation failed at offset %d: %s\n", offset, rerror);
     } else {
@@ -559,11 +558,11 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
 
   if (size) {
     pcre_t **rgpp;
-    struct reg_match {
+    struct RegMatch {
       int tok_i;
       const char *begin, *end;
-      struct reg_match *next;
-    } *rmp = (struct reg_match *)nullptr, *rmph = (struct reg_match *)nullptr;
+      struct RegMatch *next;
+    } *rmp = (struct RegMatch *)nullptr, *rmph = (struct RegMatch *)nullptr;
     int num_match = 0, length;
     svalue_t *sv1, *sv2, *sv;
     int regindex;
@@ -582,7 +581,7 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
       if (rgpp[i]->re == nullptr) {
         if (pcre_local_compile(rgpp[i]) == nullptr) {
           const char *rerror = rgpp[i]->error;
-          int offset = rgpp[i]->erroffset;
+          int const offset = rgpp[i]->erroffset;
 
           pcre_free_memory(rgpp[i]);
           while (i--) {
@@ -599,7 +598,7 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
     }
 
     tmp = str->u.string;
-    int totalsize = SVALUE_STRLEN(str);
+    int const totalsize = SVALUE_STRLEN(str);
     int used = 0;
     while (*tmp) {
       laststart = 0;
@@ -631,12 +630,12 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
         num_match++;
 
         if (rmp) {
-          rmp->next = (struct reg_match *)DMALLOC(sizeof(struct reg_match), TAG_TEMPORARY,
-                                                  "pcre_assoc : rmp->next");
+          rmp->next = (struct RegMatch *)DMALLOC(sizeof(struct RegMatch), TAG_TEMPORARY,
+                                                 "pcre_assoc : rmp->next");
           rmp = rmp->next;
         } else
-          rmph = rmp = (struct reg_match *)DMALLOC(sizeof(struct reg_match), TAG_TEMPORARY,
-                                                   "pcre_assoc : rmp");
+          rmph = rmp = (struct RegMatch *)DMALLOC(sizeof(struct RegMatch), TAG_TEMPORARY,
+                                                  "pcre_assoc : rmp");
 
         tmpreg = rgpp[regindex];
 
@@ -647,7 +646,7 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
         rmp->end = tmp = rmpe_tmp;
         used += tmpreg->ovector[1];
         rmp->tok_i = regindex;
-        rmp->next = (struct reg_match *)nullptr;
+        rmp->next = (struct RegMatch *)nullptr;
       } else {
         break;
       }
@@ -713,18 +712,17 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
       FREE((char *)rmp);
     }
     return ret;
-  } else {
-    svalue_t *temp;
-    svalue_t *sv;
-
-    (sv = ret->item)->type = T_ARRAY;
-    temp = (sv->u.arr = allocate_empty_array(1))->item;
-    assign_svalue_no_free(temp, str);
-    sv = &ret->item[1];
-    sv->type = T_ARRAY;
-    assign_svalue_no_free((sv->u.arr = allocate_empty_array(1))->item, def);
-    return ret;
   }
+  svalue_t *temp;
+  svalue_t *sv;
+
+  (sv = ret->item)->type = T_ARRAY;
+  temp = (sv->u.arr = allocate_empty_array(1))->item;
+  assign_svalue_no_free(temp, str);
+  sv = &ret->item[1];
+  sv->type = T_ARRAY;
+  assign_svalue_no_free((sv->u.arr = allocate_empty_array(1))->item, def);
+  return ret;
 }
 
 static array_t *pcre_get_substrings(pcre_t *run) {
@@ -832,8 +830,8 @@ static void pcre_free_memory(pcre_t *p) {
 static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
                               const char *pattern)  // must be shared string
 {
-  auto shared_pattern = make_shared_string(pattern);
-  unsigned int bucket = HASH(BLOCK(shared_pattern)) % PCRE_CACHE_SIZE;
+  const auto *shared_pattern = make_shared_string(pattern);
+  unsigned int const bucket = HASH(BLOCK(shared_pattern)) % PCRE_CACHE_SIZE;
   size_t sz;
   struct pcre_cache_bucket_t *tmp;
   struct pcre_cache_bucket_t *node;
@@ -901,8 +899,8 @@ static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
 }
 
 static pcre *pcre_get_cached_pattern(struct pcre_cache_t *table, const char *pattern) {
-  auto shared_pattern = make_shared_string(pattern);
-  unsigned int bucket = HASH(BLOCK(shared_pattern)) % PCRE_CACHE_SIZE;
+  const auto *shared_pattern = make_shared_string(pattern);
+  unsigned int const bucket = HASH(BLOCK(shared_pattern)) % PCRE_CACHE_SIZE;
   struct pcre_cache_bucket_t *node;
   struct pcre_cache_bucket_t *lnode = nullptr;
   node = table->buckets[bucket];
@@ -959,9 +957,9 @@ static mapping_t *pcre_get_cache() {
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_pcre_cache() {
-  for (auto i = 0; i < PCRE_CACHE_SIZE; i++) {
-    if (pcre_cache.buckets[i] != nullptr) {
-      auto node = pcre_cache.buckets[i];
+  for (auto &bucket : pcre_cache.buckets) {
+    if (bucket != nullptr) {
+      auto *node = bucket;
       while (node != nullptr) {
         DO_MARK(node, TAG_PCRE_CACHE);
         EXTRA_REF(BLOCK(node->pattern))++;
@@ -972,11 +970,11 @@ void mark_pcre_cache() {
 }
 #endif
 
-void f_pcre_match_all(void) {
+void f_pcre_match_all() {
   array_t *v;
 
-  auto pattern = (sp)->u.string;
-  auto subject = (sp - 1)->u.string;
+  const auto *pattern = (sp)->u.string;
+  const auto *subject = (sp - 1)->u.string;
   auto subject_len = SVALUE_STRLEN(sp - 1);
 
   auto matches = pcre_match_all(subject, subject_len, pattern);
@@ -986,7 +984,7 @@ void f_pcre_match_all(void) {
   v = allocate_array(matches.size());
   for (int i = 0; i < matches.size(); i++) {
     auto &match = matches[i];
-    auto match_array = allocate_array(match.size());
+    auto *match_array = allocate_array(match.size());
     v->item[i].type = T_ARRAY;
     v->item[i].u.arr = match_array;
     for (int j = 0; j < match.size(); j++) {

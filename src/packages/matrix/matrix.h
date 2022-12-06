@@ -26,10 +26,10 @@ void rotate_y_matrix(double a, Matrix m);
 
 void rotate_z_matrix(double a, Matrix m);
 
-void lookat_rotate(Matrix T, double x, double y, double z, Matrix m);
+void lookat_rotate(const Matrix T, double x, double y, double z, Matrix m);
 
 void lookat_rotate2(double a, double b, double c, double d, double e, double f, Matrix m);
 
-void mult_matrix(Matrix m1, Matrix m2, Matrix m);
+void mult_matrix(const Matrix m1, const Matrix m2, Matrix m);
 
 #endif /* _MATRIX_H_ */

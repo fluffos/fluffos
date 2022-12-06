@@ -6,16 +6,16 @@
 #include "packages/core/add_action.h"
 #include "packages/core/file.h"
 
-#define MAX_COLOUR_STRING 200
+enum { MAX_COLOUR_STRING = 200 };
 
 /* should be done in configure */
 
 #ifdef F_REAL_TIME
-void f_real_time(void) { push_number(time(nullptr)); }
+void f_real_time() { push_number(time(nullptr)); }
 #endif
 
 #ifdef F_COMPRESSEDP
-void f_compressedp(void) {
+void f_compressedp() {
   int i;
 
   i = sp->u.ob->interactive && (sp->u.ob->interactive->iflags & USING_COMPRESS);
@@ -88,7 +88,7 @@ void f_named_livings() {
 
 /* I forgot who wrote this, please claim it :) */
 #ifdef F_REMOVE_SHADOW
-void f_remove_shadow(void) {
+void f_remove_shadow() {
   object_t *ob;
 
   ob = current_object;
@@ -114,14 +114,15 @@ void f_remove_shadow(void) {
 /* This was originally written my Malic for Demon.  I rewrote parts of it
    when I added it (added function support, etc) -Beek */
 #ifdef F_QUERY_NOTIFY_FAIL
-void f_query_notify_fail(void) {
+void f_query_notify_fail() {
   const char *p;
 
   if (command_giver && command_giver->interactive) {
     if (command_giver->interactive->iflags & NOTIFY_FAIL_FUNC) {
       push_funp(command_giver->interactive->default_err_message.f);
       return;
-    } else if ((p = command_giver->interactive->default_err_message.s)) {
+    }
+    if ((p = command_giver->interactive->default_err_message.s)) {
       STACK_INC;
       sp->type = T_STRING;
       sp->subtype = STRING_SHARED;
@@ -136,7 +137,7 @@ void f_query_notify_fail(void) {
 
 /* Beek again */
 #ifdef F_STORE_VARIABLE
-void f_store_variable(void) {
+void f_store_variable() {
   int idx;
   svalue_t *sv;
   unsigned short type;
@@ -164,7 +165,7 @@ void f_store_variable(void) {
 #endif
 
 #ifdef F_FETCH_VARIABLE
-void f_fetch_variable(void) {
+void f_fetch_variable() {
   int idx;
   unsigned short type;
 
@@ -243,7 +244,7 @@ static array_t *deep_copy_class(array_t *arg) {
   return vec;
 }
 
-static int doCopy(mapping_t *map, mapping_node_t *elt, void *dest) {
+static int doCopy(mapping_t * /*map*/, mapping_node_t *elt, void *dest) {
   svalue_t *sv;
 
   sv = find_for_insert(reinterpret_cast<mapping_t *>(dest), &elt->values[0], 1);
@@ -309,7 +310,7 @@ static void deep_copy_svalue(svalue_t *from, svalue_t *to) {
   }
 }
 
-void f_copy(void) {
+void f_copy() {
   svalue_t ret;
 
   depth = 0;
@@ -322,17 +323,17 @@ void f_copy(void) {
 /* Gudu@VR */
 /* flag and extra info by Beek */
 #ifdef F_FUNCTIONS
-void f_functions(void) {
+void f_functions() {
   int i, j, num, ind;
   array_t *vec, *subvec;
   function_t *funp;
   program_t *prog;
-  int flag = (sp--)->u.number;
+  int const flag = (sp--)->u.number;
   unsigned short *types;
   char buf[256];
   char *end = EndOf(buf);
   program_t *progp = sp->u.ob->prog;
-  int offset = (flag & 2) ? progp->last_inherited : 0;
+  int const offset = (flag & 2) ? progp->last_inherited : 0;
 
   num = (flag & 2) ? progp->num_functions_defined
                    : progp->num_functions_defined + progp->last_inherited;
@@ -395,7 +396,7 @@ void f_functions(void) {
       subvec->item[1].subtype = 0;
       subvec->item[1].u.number = funp->num_arg;
 
-      auto p = get_type_name(buf, end, funp->type);
+      auto *p = get_type_name(buf, end, funp->type);
       *(p - 1) = '\0';  // get rid of last space
       subvec->item[2].type = T_STRING;
       subvec->item[2].subtype = STRING_SHARED;
@@ -403,7 +404,7 @@ void f_functions(void) {
 
       for (j = 0; j < funp->num_arg; j++) {
         if (types) {
-          auto p = get_type_name(buf, end, types[j]);
+          auto *p = get_type_name(buf, end, types[j]);
           *(p - 1) = '\0';  // get rid of last space
           subvec->item[3 + j].type = T_STRING;
           subvec->item[3 + j].subtype = STRING_SHARED;
@@ -443,7 +444,7 @@ static void fv_recurse(array_t *arr, int *idx, program_t *prog, int type, int fl
       subarr->item[0].type = T_STRING;
       subarr->item[0].subtype = STRING_SHARED;
       subarr->item[0].u.string = ref_string(prog->variable_table[i]);
-      auto p = get_type_name(buf, end, prog->variable_types[i]);
+      auto *p = get_type_name(buf, end, prog->variable_types[i]);
       *(p - 1) = '\0';  // get rid of last space
       subarr->item[1].type = T_STRING;
       subarr->item[1].subtype = STRING_SHARED;
@@ -457,10 +458,10 @@ static void fv_recurse(array_t *arr, int *idx, program_t *prog, int type, int fl
   *idx += prog->num_variables_defined;
 }
 
-void f_variables(void) {
+void f_variables() {
   int idx = 0;
   array_t *arr;
-  int flag = (sp--)->u.number;
+  int const flag = (sp--)->u.number;
   program_t *prog = sp->u.ob->prog;
 
   arr = allocate_empty_array(prog->num_variables_total);
@@ -473,7 +474,7 @@ void f_variables(void) {
 
 /* also Beek */
 #ifdef F_HEART_BEATS
-void f_heart_beats(void) { push_refed_array(get_heart_beats()); }
+void f_heart_beats() { push_refed_array(get_heart_beats()); }
 #endif
 
 /*Aleas@Nightmare */
@@ -515,7 +516,7 @@ void f_heart_beats(void) { push_refed_array(get_heart_beats()); }
 #define TC_FIRST_CHAR '%'
 #define TC_SECOND_CHAR '^'
 
-static int at_end(int i, int imax, int z, int *lens) {
+static int at_end(int i, int imax, int z, const int *lens) {
   if (z + 1 != lens[i]) {
     return 0;
   }
@@ -527,7 +528,7 @@ static int at_end(int i, int imax, int z, int *lens) {
   return 1;
 }
 
-void f_terminal_colour(void) {
+void f_terminal_colour() {
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   const char *instr, *cp, **parts;
@@ -796,7 +797,7 @@ void f_terminal_colour(void) {
       // the final output string.  j is the size of the final output
       // string and max_buflen is the size of the line.
       for (z = 0; z < lens[i]; z++) {
-        char c = p[z];
+        char const c = p[z];
         buflen++;
         if (c == '\n') {
           if (fillout) {
@@ -914,7 +915,7 @@ void f_terminal_colour(void) {
       for (k = 0; k < lens[i]; k++) {
         int n;
         int endpad = wrap - col;
-        char c = p[k];
+        char const c = p[k];
         *pt++ = c;
         buflen++;
         if (c == '\n') {
@@ -1515,7 +1516,7 @@ static char *pluralize(const char *str) {
   return news;
 } /* end of pluralize() */
 
-void f_pluralize(void) {
+void f_pluralize() {
   char *s;
 
   s = pluralize(sp->u.string);
@@ -1570,7 +1571,7 @@ static int file_length(const char *file) {
   return ret;
 } /* end of file_length() */
 
-void f_file_length(void) {
+void f_file_length() {
   int l;
 
   l = file_length(sp->u.string);
@@ -1580,7 +1581,7 @@ void f_file_length(void) {
 #endif
 
 #ifdef F_UPPER_CASE
-void f_upper_case(void) {
+void f_upper_case() {
   const char *str;
 
   str = sp->u.string;
@@ -1588,7 +1589,7 @@ void f_upper_case(void) {
   for (; *str; str++) {
     if (uislower(*str)) {
       char *newstr;
-      int l = str - sp->u.string;
+      int const l = str - sp->u.string;
       unlink_string_svalue(sp);
       newstr = const_cast<char *>(sp->u.string) + l;
       *newstr = toupper(static_cast<unsigned char>(*newstr));
@@ -1604,7 +1605,7 @@ void f_upper_case(void) {
 #endif
 
 #ifdef F_REPLACEABLE
-void f_replaceable(void) {
+void f_replaceable() {
   object_t *obj;
   program_t *prog;
   int i, j, num, numignore, replaceable;
@@ -1675,7 +1676,7 @@ void f_replaceable(void) {
 #endif
 
 #ifdef F_PROGRAM_INFO
-struct program_info_s {
+struct ProgramInfoS {
   int h_c,    // how many headers?
       p_s,    // how big are the compiled programs?
       ff_c,   // how many functions flags?
@@ -1689,7 +1690,7 @@ struct program_info_s {
       total;  // how big all together?
 };
 
-inline void sum_program_info(const program_t *const p, program_info_s &info) {
+inline void sum_program_info(const program_t *const p, ProgramInfoS &info) {
   int n;
 
   info.h_c++;
@@ -1712,7 +1713,7 @@ inline void sum_program_info(const program_t *const p, program_info_s &info) {
   n = 0;
   if (p->type_start) {
     unsigned short *ts = p->type_start;
-    int nfd = p->num_functions_defined;
+    int const nfd = p->num_functions_defined;
 
     for (int i = 0; i < nfd; i++) {
       if (ts[i] == INDEX_START_NONE) {
@@ -1725,8 +1726,8 @@ inline void sum_program_info(const program_t *const p, program_info_s &info) {
   info.total += p->total_size;
 }
 
-void f_program_info(void) {
-  program_info_s info{0};  // initialize all elements to 0
+void f_program_info() {
+  ProgramInfoS info{0};  // initialize all elements to 0
   object_t *ob;
   mapping_t *m;
 
@@ -1771,7 +1772,7 @@ void f_program_info(void) {
  */
 
 #ifdef F_REMOVE_INTERACTIVE
-void f_remove_interactive(void) {
+void f_remove_interactive() {
   if ((sp->u.ob->flags & O_DESTRUCTED) || !(sp->u.ob->interactive)) {
     free_object(&sp->u.ob, "f_remove_interactive");
     *sp = const0;
@@ -1798,7 +1799,7 @@ static int query_ip_port(object_t *ob) {
   return ob->interactive->local_port;
 }
 
-void f_query_ip_port(void) {
+void f_query_ip_port() {
   int tmp;
 
   if (st_num_arg) {
@@ -1852,7 +1853,7 @@ void reset_timezone(const char *old_tz) {
 #endif
 
 #ifdef F_ZONETIME
-void f_zonetime(void) {
+void f_zonetime() {
   const char *new_tz, *old_tz;
   char *retv;
   time_t time_val;
@@ -1879,7 +1880,7 @@ void f_zonetime(void) {
 #endif
 
 #ifdef F_IS_DAYLIGHT_SAVINGS_TIME
-void f_is_daylight_savings_time(void) {
+void f_is_daylight_savings_time() {
   time_t time_to_check = sp->u.number;
   const char *new_tz = (sp - 1)->u.string;
   const char *old_tz = set_timezone(new_tz);
@@ -1902,14 +1903,14 @@ void f_is_daylight_savings_time(void) {
 #endif
 
 #ifdef F_DEBUG_MESSAGE
-void f_debug_message(void) {
+void f_debug_message() {
   debug_message("%s\n", sp->u.string);
   free_string_svalue(sp--);
 }
 #endif
 
 #ifdef F_FUNCTION_OWNER
-void f_function_owner(void) {
+void f_function_owner() {
   object_t *owner = sp->u.fp->hdr.owner;
 
   free_funp(sp->u.fp);
@@ -1918,7 +1919,7 @@ void f_function_owner(void) {
 #endif
 
 #ifdef F_REPEAT_STRING
-void f_repeat_string(void) {
+void f_repeat_string() {
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   const char *str;
@@ -1958,7 +1959,7 @@ void f_repeat_string(void) {
 #ifdef F_MEMORY_SUMMARY
 static int memory_share(svalue_t * /*sv*/);
 
-static int node_share(mapping_t *m, mapping_node_t *elt, void *tp) {
+static int node_share(mapping_t * /*m*/, mapping_node_t *elt, void *tp) {
   int *t = reinterpret_cast<int *>(tp);
 
   *t += sizeof(mapping_node_t) - 2 * sizeof(svalue_t);
@@ -2065,7 +2066,7 @@ static void fms_recurse(mapping_t *map, object_t *ob, int *idx, program_t *prog)
   }
 
   for (i = 0; i < prog->num_variables_defined; i++) {
-    int size = memory_share(ob->variables + *idx + i);
+    int const size = memory_share(ob->variables + *idx + i);
 
     sv.u.string = prog->variable_table[i];
     entry = find_for_insert(map, &sv, 0);
@@ -2074,7 +2075,7 @@ static void fms_recurse(mapping_t *map, object_t *ob, int *idx, program_t *prog)
   *idx += prog->num_variables_defined;
 }
 
-void f_memory_summary(void) {
+void f_memory_summary() {
   mapping_t *result = allocate_mapping(8);
   object_t *ob;
   int idx;
@@ -2102,7 +2103,7 @@ void f_memory_summary(void) {
 
 /* Marius */
 #ifdef F_QUERY_REPLACED_PROGRAM
-void f_query_replaced_program(void) {
+void f_query_replaced_program() {
   char *res = nullptr;
 
   if (st_num_arg) {
@@ -2127,7 +2128,7 @@ void f_query_replaced_program(void) {
 
 /* Skullslayer@Realms of the Dragon */
 #ifdef F_NETWORK_STATS
-void f_network_stats(void) {
+void f_network_stats() {
   mapping_t *m;
   int i, ports = 0;
 
@@ -2250,14 +2251,13 @@ void event(svalue_t *event_ob, const char *event_fun, int numparam, svalue_t *ev
       pop_stack();
       if (!ob || ob->flags & O_DESTRUCTED) {
         continue;
-      } else {
-        push_object(origin);
-        for (i = 0; i < numparam; i++) {
-          push_svalue(event_param + i);
-        }
-
-        apply(name, ob, numparam + 1, ORIGIN_EFUN);
       }
+      push_object(origin);
+      for (i = 0; i < numparam; i++) {
+        push_svalue(event_param + i);
+      }
+
+      apply(name, ob, numparam + 1, ORIGIN_EFUN);
     }
 #endif
   }
@@ -2265,7 +2265,7 @@ void event(svalue_t *event_ob, const char *event_fun, int numparam, svalue_t *ev
   FREE_MSTR(name);
 }
 
-void f_event(void) {
+void f_event() {
   int num;
 
   num = st_num_arg;
@@ -2304,7 +2304,7 @@ void number_as_string(char *buf, LPC_INT n) {
   strcat(buf, single[n]);
 }
 
-void f_query_num(void) {
+void f_query_num() {
   char ret[100];
   int i;
   LPC_INT n, limit;
@@ -2373,7 +2373,7 @@ q_n_end:
 #endif
 
 #ifdef F_BASE_NAME
-void f_base_name(void) {
+void f_base_name() {
   char *name, *tmp;
   int i;
 
@@ -2407,7 +2407,7 @@ void f_base_name(void) {
 #endif
 
 #ifdef F_GET_GARBAGE
-int garbage_check(object_t *ob, void *data) {
+int garbage_check(object_t *ob, void * /*data*/) {
   return (ob->ref == 1) && (ob->flags & O_CLONE)
 #if defined NO_ENVIRONMENT && !defined NO_SHADOWS
          && !ob->shadowing
@@ -2419,7 +2419,7 @@ int garbage_check(object_t *ob, void *data) {
       ;
 }
 
-void f_get_garbage(void) {
+void f_get_garbage() {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   int count, i;
@@ -2445,7 +2445,7 @@ void f_get_garbage(void) {
 #ifdef F_NUM_CLASSES
 
 void f_num_classes() {
-  int i = sp->u.ob->prog->num_classes;
+  int const i = sp->u.ob->prog->num_classes;
   pop_stack();
   push_number(i);
 }
@@ -2501,7 +2501,7 @@ void f_fetch_class_member() {
 #ifdef F_STORE_CLASS_MEMBER
 
 void f_store_class_member() {
-  int pos = (sp - 1)->u.number;
+  int const pos = (sp - 1)->u.number;
   array_t *arr;
 
   if ((sp - 2)->type != T_CLASS) {
@@ -2742,7 +2742,7 @@ void f_abs() {
 #ifdef F_ROLL_MDN
 
 void f_roll_MdN() {
-  int num_arg = st_num_arg;
+  int const num_arg = st_num_arg;
   int sides, rolls, bonus;
   LPC_INT roll = 0;
 
@@ -2856,7 +2856,7 @@ static int query_charmode(object_t *ob) {
   return ret;
 }
 
-void f_query_charmode(void) {
+void f_query_charmode() {
   int tmp;
 
   if (st_num_arg) {
@@ -2879,7 +2879,7 @@ static int remove_charmode(object_t *ob) {
   return ret;
 }
 
-void f_remove_charmode(void) {
+void f_remove_charmode() {
   int tmp;
 
   if (st_num_arg) {
@@ -2913,7 +2913,7 @@ static int remove_get_char(object_t *ob) {
   return -1;
 }
 
-void f_remove_get_char(void) {
+void f_remove_get_char() {
   int tmp;
 
   if (st_num_arg) {
@@ -2927,7 +2927,7 @@ void f_remove_get_char(void) {
 
 #endif
 #ifdef F_SEND_NULLBYTE
-void f_send_nullbyte(void) {
+void f_send_nullbyte() {
   int tmp;
   object_t *who;
   tmp = 0;
@@ -3009,7 +3009,7 @@ void f_classes() {
             make_shared_string(prog->strings[prog->class_members[offset].membername]);
 
         // ...and type.
-        auto p = get_type_name(buf, end, prog->class_members[offset].type);
+        auto *p = get_type_name(buf, end, prog->class_members[offset].type);
         *(p - 1) = '\0';  // get rid of last space
         subsubvec->item[1].type = T_STRING;
         subsubvec->item[1].subtype = STRING_SHARED;

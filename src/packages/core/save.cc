@@ -3,7 +3,7 @@
 #include "base/package_api.h"
 
 #ifdef F_SAVE_OBJECT
-void f_save_object(void) {
+void f_save_object() {
   const auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   int flag;
@@ -29,7 +29,7 @@ void f_save_object(void) {
     pop_n_elems(st_num_arg);
     char *saved = new_string(max_string_length, "save_object_str");
     push_malloced_string(saved);
-    int left = max_string_length;
+    int const left = max_string_length;
     flag = save_object_str(current_object, flag, saved, left);
     if (!flag) {
       pop_stack();
@@ -49,21 +49,21 @@ void f_save_object(void) {
  * would write it.
  */
 char *save_variable(svalue_t *var) {
-  int theSize;
+  int the_size;
   char *new_str, *p;
 
   save_svalue_depth = 0;
-  theSize = svalue_save_size(var);
-  new_str = new_string(theSize - 1, "save_variable");
+  the_size = svalue_save_size(var);
+  new_str = new_string(the_size - 1, "save_variable");
   *new_str = '\0';
   p = new_str;
   save_svalue(var, &p);
-  DEBUG_CHECK(p - new_str != theSize - 1, "Length miscalculated in save_variable");
+  DEBUG_CHECK(p - new_str != the_size - 1, "Length miscalculated in save_variable");
   return new_str;
 }
 
 #ifdef F_SAVE_VARIABLE
-void f_save_variable(void) {
+void f_save_variable() {
   char *p;
 
   p = save_variable(sp);
@@ -73,7 +73,7 @@ void f_save_variable(void) {
 #endif
 
 #ifdef F_RESTORE_OBJECT
-void f_restore_object(void) {
+void f_restore_object() {
   int flag;
 
   flag = (st_num_arg > 1) ? (sp--)->u.number : 0;
@@ -86,7 +86,7 @@ void f_restore_object(void) {
 #endif
 
 #ifdef F_RESTORE_VARIABLE
-void f_restore_variable(void) {
+void f_restore_variable() {
   svalue_t v;
 
   unlink_string_svalue(sp);

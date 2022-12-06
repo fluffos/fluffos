@@ -12,20 +12,20 @@
 
 #include "base/package_api.h"
 
-#include <math.h>
-#include <limits.h>
+#include <cmath>
+#include <climits>
 
 #define SQUARE(n) ((n) * (n))
 
 #ifdef F_COS
-void f_cos(void) { sp->u.real = cos(sp->u.real); }
+void f_cos() { sp->u.real = cos(sp->u.real); }
 #endif
 
 #ifdef F_SIN
-void f_sin(void) { sp->u.real = sin(sp->u.real); }
+void f_sin() { sp->u.real = sin(sp->u.real); }
 #endif
 #ifdef F_TAN
-void f_tan(void) {
+void f_tan() {
   /*
    * maybe should try to check that tan won't blow up (x != (Pi/2 + N*Pi))
    */
@@ -34,11 +34,12 @@ void f_tan(void) {
 #endif
 
 #ifdef F_ASIN
-void f_asin(void) {
+void f_asin() {
   if (sp->u.real < -1.0) {
     error("math: asin(x) with (x < -1.0)\n");
     return;
-  } else if (sp->u.real > 1.0) {
+  }
+  if (sp->u.real > 1.0) {
     error("math: asin(x) with (x > 1.0)\n");
     return;
   }
@@ -47,11 +48,12 @@ void f_asin(void) {
 #endif
 
 #ifdef F_ACOS
-void f_acos(void) {
+void f_acos() {
   if (sp->u.real < -1.0) {
     error("math: acos(x) with (x < -1.0)\n");
     return;
-  } else if (sp->u.real > 1.0) {
+  }
+  if (sp->u.real > 1.0) {
     error("math: acos(x) with (x > 1.0)\n");
     return;
   }
@@ -60,11 +62,11 @@ void f_acos(void) {
 #endif
 
 #ifdef F_ATAN
-void f_atan(void) { sp->u.real = atan(sp->u.real); }
+void f_atan() { sp->u.real = atan(sp->u.real); }
 #endif
 
 #ifdef F_SQRT
-void f_sqrt(void) {
+void f_sqrt() {
   LPC_FLOAT val;
 
   if (sp->type == T_NUMBER) {
@@ -83,7 +85,7 @@ void f_sqrt(void) {
 #endif
 
 #ifdef F_LOG
-void f_log(void) {
+void f_log() {
   if (sp->u.real <= 0.0) {
     error("math: log(x) with (x <= 0.0)\n");
     return;
@@ -93,7 +95,7 @@ void f_log(void) {
 #endif
 
 #ifdef F_LOG10
-void f_log10(void) {
+void f_log10() {
   LPC_FLOAT val;
 
   if (sp->type == T_NUMBER) {
@@ -112,7 +114,7 @@ void f_log10(void) {
 #endif
 
 #ifdef F_LOG2
-void f_log2(void) {
+void f_log2() {
   LPC_FLOAT val;
 
   if (sp->type == T_NUMBER) {
@@ -131,7 +133,7 @@ void f_log2(void) {
 #endif
 
 #ifdef F_POW
-void f_pow(void) {
+void f_pow() {
   LPC_FLOAT val, val2;
 
   if ((sp - 1)->type == T_NUMBER) {
@@ -153,19 +155,19 @@ void f_pow(void) {
 #endif
 
 #ifdef F_EXP
-void f_exp(void) { sp->u.real = exp(sp->u.real); }
+void f_exp() { sp->u.real = exp(sp->u.real); }
 #endif
 
 #ifdef F_FLOOR
-void f_floor(void) { sp->u.real = floor(sp->u.real); }
+void f_floor() { sp->u.real = floor(sp->u.real); }
 #endif
 
 #ifdef F_CEIL
-void f_ceil(void) { sp->u.real = ceil(sp->u.real); }
+void f_ceil() { sp->u.real = ceil(sp->u.real); }
 #endif
 
 #ifdef F_ROUND
-void f_round(void) { sp->u.real = round(sp->u.real); }
+void f_round() { sp->u.real = round(sp->u.real); }
 #endif
 
 #ifdef F_NORM
@@ -190,8 +192,8 @@ static LPC_FLOAT norm(array_t *a) {
   return sqrt(total);
 }
 
-void f_norm(void) {
-  LPC_FLOAT val = norm(sp->u.arr);
+void f_norm() {
+  LPC_FLOAT const val = norm(sp->u.arr);
 
   if (val == (-INT_MAX + 1)) {
     pop_stack();
@@ -248,8 +250,8 @@ static LPC_FLOAT dotprod_mult(const LPC_FLOAT a, const LPC_FLOAT b) { return a *
 /* dot product of two vectors */
 static LPC_FLOAT dotprod(array_t *a, array_t *b) { return vector_op(a, b, dotprod_mult); }
 
-void f_dotprod(void) {
-  LPC_FLOAT total = vector_op((sp - 1)->u.arr, sp->u.arr, dotprod_mult);
+void f_dotprod() {
+  LPC_FLOAT const total = vector_op((sp - 1)->u.arr, sp->u.arr, dotprod_mult);
 
   if (total == -INT_MAX) {
     pop_2_elems();
@@ -272,8 +274,8 @@ void f_dotprod(void) {
 static LPC_FLOAT distance_mult(const LPC_FLOAT a, const LPC_FLOAT b) { return SQUARE(b - a); }
 
 /* The (Euclidian) distance between two points */
-void f_distance(void) {
-  LPC_FLOAT total = vector_op((sp - 1)->u.arr, sp->u.arr, distance_mult);
+void f_distance() {
+  LPC_FLOAT const total = vector_op((sp - 1)->u.arr, sp->u.arr, distance_mult);
 
   if (total == -INT_MAX) {
     pop_2_elems();
@@ -293,7 +295,7 @@ void f_distance(void) {
 #endif
 
 #ifdef F_ANGLE
-void f_angle(void) {
+void f_angle() {
   LPC_FLOAT dot, norma, normb;
 
   dot = dotprod((sp - 1)->u.arr, sp->u.arr);

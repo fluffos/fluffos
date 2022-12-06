@@ -166,20 +166,21 @@ bool scan_config_line(const char *fmt, void *dest, int required) {
         return false;
     }
     return true;
-  }     switch (required) {
-      case kWarnMissing:
-        // optional but warn
-        debug_message("*Warning: Missing line in config file:\n\t%s\n", line.c_str());
-        return false;
-      case kOptional:
-        // optional
-        return false;
-      case kMustHave:
-        // required
-        debug_message("*Error in config file.  Missing line:\n\t%s\n", line.c_str());
-        exit(-1);
-    }
- 
+  }
+  switch (required) {
+    case kWarnMissing:
+      // optional but warn
+      debug_message("*Warning: Missing line in config file:\n\t%s\n", line.c_str());
+      return false;
+    case kOptional:
+      // optional
+      return false;
+    case kMustHave:
+      // required
+      debug_message("*Error in config file.  Missing line:\n\t%s\n", line.c_str());
+      exit(-1);
+  }
+
   return false;
 }
 

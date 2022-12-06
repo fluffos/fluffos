@@ -1,10 +1,10 @@
 #include "base/package_api.h"
 
 #ifdef F_EXPLODE
-void f_explode(void) {
+void f_explode() {
   array_t *vec;
 
-  int len = SVALUE_STRLEN(sp - 1);
+  int const len = SVALUE_STRLEN(sp - 1);
 
   vec = explode_string((sp - 1)->u.string, len, sp->u.string, SVALUE_STRLEN(sp),
                        CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__) != 0);
@@ -15,10 +15,10 @@ void f_explode(void) {
 #endif
 
 #ifdef F_EXPLODE_REVERSIBLE
-void f_explode_reversible(void) {
+void f_explode_reversible() {
   array_t *vec;
 
-  int len = SVALUE_STRLEN(sp - 1);
+  int const len = SVALUE_STRLEN(sp - 1);
 
   vec = explode_string((sp - 1)->u.string, len, sp->u.string, SVALUE_STRLEN(sp), true);
   free_string_svalue(sp--);
@@ -28,7 +28,7 @@ void f_explode_reversible(void) {
 #endif
 
 #ifdef F_IMPLODE
-void f_implode(void) {
+void f_implode() {
   array_t *arr;
   int flag;
   svalue_t *args;

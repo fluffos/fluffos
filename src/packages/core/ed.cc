@@ -102,11 +102,11 @@
 
 static int version = 601;
 
-static int EdErr = 0;
+static int ed_err = 0;
 
 static int append(int /*line*/, int /*glob*/);
 static int more_append(const char * /*str*/);
-static int ckglob(void);
+static int ckglob();
 static int deflt(int /*def1*/, int /*def2*/);
 static int del(int /*from*/, int /*to*/);
 static int dolst(int /*line1*/, int /*line2*/);
@@ -123,24 +123,24 @@ static int dowrite(int /*from*/, int /*to*/, const char * /*fname*/, int /*apflg
 static int find(regexp * /*pat*/, int /*dir*/);
 static char *getfn(int /*writeflg*/);
 static int getnum(int /*first*/);
-static int getone(void);
-static int getlst(void);
+static int getone();
+static int getlst();
 static ed_line_t *getptr(int /*num*/);
 static int getrhs(char * /*sub*/);
 static int ins(const char * /*str*/);
 static int join(int /*first*/, int /*last*/);
 static int move(int /*num*/);
 static int transfer(int /*num*/);
-static regexp *optpat(void);
-static int set(void);
-static void set_ed_buf(void);
+static regexp *optpat();
+static int set();
+static void set_ed_buf();
 static int subst(regexp * /*pat*/, char * /*sub*/, int /*gflg*/, int /*pflag*/);
 static int docmd(int /*glob*/);
-static int doglob(void);
+static int doglob();
 static void free_ed_buffer(object_t * /*who*/);
 static void shift(char * /*text*/);
 static void indent(char * /*buf*/);
-static int indent_code(void);
+static int indent_code();
 static void report_status(int /*status*/);
 
 #ifndef OLD_ED
@@ -150,7 +150,7 @@ static void object_free_ed_buffer(void);
 #endif
 
 static void print_help(int arg);
-static void print_help2(void);
+static void print_help2();
 static void count_blanks(int line);
 static void _count_blanks(char *str, int blanks);
 
@@ -211,7 +211,7 @@ outbuffer_t current_ed_results;
 static char inlin[ED_MAXLINE];
 static char *inptr; /* tty input buffer */
 
-static struct tbl {
+static struct Tbl {
   const char *t_str;
   int t_and_mask;
   int t_or_mask;
@@ -678,7 +678,8 @@ static int egets(char *str, int size, FILE *stream) {
         ED_OUTPUT(ED_DEST, "[Incomplete last line]\n");
       }
       return (count);
-    } else if (c == NL) {
+    }
+    if (c == NL) {
       *cp = EOS;
       return (++count);
     } else if (c == 0) {
@@ -836,8 +837,8 @@ static int find(regexp *pat, int dir) {
     if (regexec(pat, gettxtl(lin))) {
       return (num);
     }
-    if (EdErr) {
-      EdErr = 0;
+    if (ed_err) {
+      ed_err = 0;
       break;
     }
     if (dir) {
@@ -1037,7 +1038,7 @@ static ed_line_t *getptr(int num) {
 /*      getrhs.c        */
 
 static int getrhs(char *sub) {
-  char delim = *inptr++;
+  char const delim = *inptr++;
   char *outmax = sub + MAXPAT;
 
   if (delim == NL || *inptr == NL) { /* check for eol */
@@ -1272,7 +1273,7 @@ static regexp *optpat() {
 static int set() {
   char word[16];
   int i;
-  struct tbl *limit;
+  struct Tbl *limit;
 
   if (*(++inptr) != 't') {
     if (*inptr != SP && *inptr != HT && *inptr != NL) {
@@ -1287,7 +1288,7 @@ static int set() {
     char *pos = out;
 
     pos += sprintf(pos, "ed version %d.%d\n", version / 100, version % 100);
-    limit = tbl + (sizeof(tbl) / sizeof(struct tbl));
+    limit = tbl + (sizeof(tbl) / sizeof(struct Tbl));
     for (t = tbl; t < limit; t += 2) {
       pos += sprintf(pos, "%s:%s ", t->t_str, P_FLAGS & t->t_or_mask ? "on" : "off");
     }
@@ -1305,7 +1306,7 @@ static int set() {
     word[i++] = *inptr++;
   }
   word[i] = EOS;
-  limit = tbl + (sizeof(tbl) / sizeof(struct tbl));
+  limit = tbl + (sizeof(tbl) / sizeof(struct Tbl));
   for (t = tbl; t < limit; t++) {
     if (strcmp(word, t->t_str) == 0) {
       P_FLAGS = (P_FLAGS & t->t_and_mask) | t->t_or_mask;
@@ -1373,7 +1374,7 @@ static int subst(regexp *pat, char *sub, int gflg, int pflag) {
     if (regexec(pat, txtptr = gettxtl(P_CURPTR))) {
       do {
         /* Copy leading text */
-        int diff = pat->startp[0] - txtptr;
+        int const diff = pat->startp[0] - txtptr;
 
         if ((space -= diff) < 0) { /* amylaar */
           return SUB_FAIL;
@@ -1523,10 +1524,10 @@ static int last_term_len;
  *              indentation.
  */
 static void indent(char *buf) {
-  static char f[] = {
+  static char const f[] = {
       7, 1, 7, 1, 2, 1, 1, 6, 4, 2, 6, 7, 7, 2, 0,
   };
-  static char g[] = {
+  static char const g[] = {
       2, 2, 1, 7, 1, 5, 5, 1, 3, 6, 2, 2, 2, 2, 0,
   };
   char text[ED_MAXLINE], ident[ED_MAXLINE];
@@ -1582,7 +1583,8 @@ static void indent(char *buf) {
       del(lineno, lineno);
       ins(p);
       return;
-    } else if (in_comment) {
+    }
+    if (in_comment) {
       shift(text); /* use previous shi */
     } else {
       do_indent = TRUE;
@@ -1613,8 +1615,8 @@ static void indent(char *buf) {
         p++;
       }
       continue;
-
-    } else if (quote != '\0') {
+    }
+    if (quote != '\0') {
       /* string or character constant */
       for (;;) {
         if (*p == quote) {
@@ -2525,7 +2527,6 @@ void ed_start(const char *file_arg, const char *write_fn, const char *exit_fn, i
     ED_OUTPUT(ED_DEST, "No file.\n");
   }
   set_prompt(":");
-  return;
 }
 #endif
 
@@ -3317,7 +3318,7 @@ char *object_ed_cmd(object_t *ob, const char *str) {
 #endif
 
 #ifdef F_ED
-void f_ed(void) {
+void f_ed() {
   if (!command_giver || !command_giver->interactive) {
     pop_n_elems(st_num_arg);
     return;
@@ -3498,7 +3499,7 @@ void f_ed_start(void) {
 #endif
 
 #ifdef F_IN_EDIT
-void f_in_edit(void) {
+void f_in_edit() {
   char *fn;
   ed_buffer_t *eb = nullptr;
 
@@ -3518,6 +3519,5 @@ void f_in_edit(void) {
   }
   free_object(&sp->u.ob, "f_in_edit:1");
   *sp = const0;
-  return;
 }
 #endif

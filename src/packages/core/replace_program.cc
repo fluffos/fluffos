@@ -12,7 +12,7 @@
 replace_ob_t *obj_list_replace = nullptr;
 
 static program_t *search_inherited(char * /*str*/, program_t * /*prg*/, int * /*offpnt*/);
-static replace_ob_t *retrieve_replace_program_entry(void);
+static replace_ob_t *retrieve_replace_program_entry();
 
 int replace_program_pending(object_t *ob) {
   replace_ob_t *r_ob;
@@ -26,7 +26,7 @@ int replace_program_pending(object_t *ob) {
   return 0;
 }
 
-void replace_programs(void) {
+void replace_programs() {
   replace_ob_t *r_ob, *r_next;
   int i, num_fewer, offset;
   svalue_t *svp;
@@ -123,7 +123,8 @@ static program_t *search_inherited(char *str, program_t *prg, int *offpnt) {
 
       *offpnt = prg->inherit[i].variable_index_offset;
       return prg->inherit[i].prog;
-    } else if ((tmp = search_inherited(str, prg->inherit[i].prog, offpnt))) {
+    }
+    if ((tmp = search_inherited(str, prg->inherit[i].prog, offpnt))) {
       debug(d_flag, "deferred match found");
 
       *offpnt += prg->inherit[i].variable_index_offset;
@@ -135,7 +136,7 @@ static program_t *search_inherited(char *str, program_t *prg, int *offpnt) {
   return (program_t *)nullptr;
 }
 
-static replace_ob_t *retrieve_replace_program_entry(void) {
+static replace_ob_t *retrieve_replace_program_entry() {
   replace_ob_t *r_ob;
 
   for (r_ob = obj_list_replace; r_ob; r_ob = r_ob->next) {
@@ -146,7 +147,7 @@ static replace_ob_t *retrieve_replace_program_entry(void) {
   return nullptr;
 }
 
-void f_replace_program(void) {
+void f_replace_program() {
   replace_ob_t *tmp;
   int name_len;
   char *name, *xname;

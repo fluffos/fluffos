@@ -4,20 +4,20 @@
 
 #include "thirdparty/libtelnet/libtelnet.h"  // FIXME?
 
-static const char telnet_mssp_value[] = {TELNET_MSSP_VAR, '%', 's', TELNET_MSSP_VAL, '%', 's', 0};
+static const char TELNET_MSSP_VALUE[] = {TELNET_MSSP_VAR, '%', 's', TELNET_MSSP_VAL, '%', 's', 0};
 
-static int send_mssp_val(mapping_t *map, mapping_node_t *el, void *data) {
-  auto ip = reinterpret_cast<interactive_t *>(data);
+static int send_mssp_val(mapping_t * /*map*/, mapping_node_t *el, void *data) {
+  auto *ip = reinterpret_cast<interactive_t *>(data);
   if (!ip->telnet) {
     return -1;
   }
 
   if (el->values[0].type == T_STRING && el->values[1].type == T_STRING) {
-    telnet_printf(ip->telnet, reinterpret_cast<const char *>(telnet_mssp_value),
+    telnet_printf(ip->telnet, reinterpret_cast<const char *>(TELNET_MSSP_VALUE),
                   el->values[0].u.string, el->values[1].u.string);
   } else if (el->values[0].type == T_STRING && el->values[1].type == T_ARRAY &&
              el->values[1].u.arr->size > 0 && el->values[1].u.arr->item[0].type == T_STRING) {
-    telnet_printf(ip->telnet, reinterpret_cast<const char *>(telnet_mssp_value),
+    telnet_printf(ip->telnet, reinterpret_cast<const char *>(TELNET_MSSP_VALUE),
                   el->values[0].u.string, el->values[1].u.arr->item[0].u.string);
     array_t *ar = el->values[1].u.arr;
     int i;
@@ -58,7 +58,7 @@ void on_telnet_do_mssp(interactive_t *ip) {
     }
   }
   if (!tmp) {
-    telnet_printf(ip->telnet, reinterpret_cast<const char *>(telnet_mssp_value), "NAME",
+    telnet_printf(ip->telnet, reinterpret_cast<const char *>(TELNET_MSSP_VALUE), "NAME",
                   CONFIG_STR(__MUD_NAME__));
   }
   tmp = findstring("PLAYERS");
@@ -71,7 +71,7 @@ void on_telnet_do_mssp(interactive_t *ip) {
   if (!tmp) {
     char num[5] = {};
     snprintf(num, sizeof(num), "%d", users_num(true));
-    telnet_printf(ip->telnet, reinterpret_cast<const char *>(telnet_mssp_value), "PLAYERS", num);
+    telnet_printf(ip->telnet, reinterpret_cast<const char *>(TELNET_MSSP_VALUE), "PLAYERS", num);
   }
   tmp = findstring("UPTIME");
   if (tmp) {
@@ -83,7 +83,7 @@ void on_telnet_do_mssp(interactive_t *ip) {
   if (!tmp) {
     char num[20] = {};
     snprintf(num, sizeof(num), "%lld", (long long)boot_time);
-    telnet_printf(ip->telnet, reinterpret_cast<const char *>(telnet_mssp_value), "UPTIME", num);
+    telnet_printf(ip->telnet, reinterpret_cast<const char *>(TELNET_MSSP_VALUE), "UPTIME", num);
   }
   // now send the rest
   mapTraverse(map, send_mssp_val, ip);

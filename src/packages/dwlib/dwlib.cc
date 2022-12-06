@@ -12,15 +12,15 @@ void query_multiple_short(svalue_t *arg, const char *type, int no_dollars, int q
   char default_function[] = "a_short";
   char separator[] = ", ";
   char andsep[] = " and ";
-  int mlen = strlen(m);
-  int slen = strlen(s);
-  int seplen = strlen(separator);
-  int andlen = strlen(andsep);
+  int const mlen = strlen(m);
+  int const slen = strlen(s);
+  int const seplen = strlen(separator);
+  int const andlen = strlen(andsep);
 
   array_t *arr = arg->u.arr;
   svalue_t *sv;
   svalue_t *v;
-  int size = arr->size;
+  int const size = arr->size;
   int i;
   int len;
   int total_len;
@@ -236,7 +236,7 @@ void query_multiple_short(svalue_t *arg, const char *type, int no_dollars, int q
 
 void f_query_multiple_short() {
   svalue_t *sv = sp - st_num_arg + 1;
-  const char *type = NULL;
+  const char *type = nullptr;
   int no_dollars = 0, quiet = 0, dark = 0;
 
   if (st_num_arg > 4) {
@@ -281,9 +281,9 @@ int reference_allowed(object_t *referee, object_t *referrer_obj, const char *ref
   svalue_t *v;
   svalue_t *item;
   array_t *vec;
-  const char *referee_name = NULL;
-  object_t *playtester_handler = NULL;
-  object_t *player_handler = NULL;
+  const char *referee_name = nullptr;
+  object_t *playtester_handler = nullptr;
+  object_t *player_handler = nullptr;
   int referrer_playtester = 0;
   int referrer_match = 0;
   int playtester_match = 0;
@@ -445,17 +445,17 @@ int reference_allowed(object_t *referee, object_t *referrer_obj, const char *ref
 
 void f_reference_allowed() {
   svalue_t *sv = sp - st_num_arg + 1;
-  object_t *referee = NULL;
+  object_t *referee = nullptr;
   object_t *referrer_obj = command_giver; /* Default to this_player(). */
-  const char *referrer_name = NULL;
+  const char *referrer_name = nullptr;
   int result = 0;
-  int num_arg = st_num_arg;
+  int const num_arg = st_num_arg;
 
   /* Maybe I could learn how to use this :p
    CHECK_TYPES(sp-1, T_NUMBER, 1, F_MEMBER_ARRAY); */
 
   if (referrer_obj && (referrer_obj->flags & O_DESTRUCTED)) {
-    referrer_obj = NULL;
+    referrer_obj = nullptr;
   }
 
   if (sv->type == T_OBJECT && sv->u.ob) {
@@ -489,7 +489,7 @@ void f_reference_allowed() {
     }
     if (sv[1].type == T_OBJECT && sv[1].u.ob) {
       referrer_obj = sv[1].u.ob;
-      referrer_name = NULL;
+      referrer_name = nullptr;
     }
   }
 
@@ -569,7 +569,7 @@ void f_add_a() {
       error("add_a() exceeded max string length.\n");
     }
     ret = new_string(len + 3, "f_add_a");
-    memcpy(ret, "an ", 3);
+    strcpy(ret, "an ");
     p = ret + 3;
   } else {  // Add a.
     if (len + 2 > max_string_length) {
@@ -577,7 +577,7 @@ void f_add_a() {
       error("add_a() exceeded max string length.\n");
     }
     ret = new_string(len + 2, "f_add_a");
-    memcpy(ret, "a ", 2);
+    strcpy(ret, "a ");
     p = ret + 2;
   }
 
@@ -591,7 +591,7 @@ void f_add_a() {
 
 // This along with add_a() is the only sfun in /secure/simul_efun/add_a.c
 void f_vowel() {
-  char v = (char)sp->u.number;
+  char const v = (char)sp->u.number;
 
   if (v == 'a' || v == 'e' || v == 'i' || v == 'o' || v == 'u' || v == 'A' || v == 'E' ||
       v == 'I' || v == 'O' || v == 'U') {
@@ -605,7 +605,8 @@ void f_replace() {
   svalue_t *arg2 = sp - st_num_arg + 2;
   if (arg2->type == T_STRING && st_num_arg == 3) {
     return f_replace_string();
-  } else if (st_num_arg == 2 && arg2->type != T_STRING) {
+  }
+  if (st_num_arg == 2 && arg2->type != T_STRING) {
     array_t *arr = arg2->u.arr;
     int i = 0;
     if (arr->size & 1) {
@@ -737,7 +738,7 @@ svalue_t *replace_objects(svalue_t *thing) {
     case T_OBJECT: {
       char buf[2000];
       strcpy(buf, thing->u.ob->obname);
-      svalue_t *tmp = 0;
+      svalue_t *tmp = nullptr;
       if (!(thing->u.ob->flags & O_DESTRUCTED)) {
         push_object(thing->u.ob);
         tmp = safe_apply_master_ob(APPLY_OBJECT_NAME, 1);
@@ -815,7 +816,7 @@ void f_replace_dollars() {
         const char *one = sp->u.arr->item[j].u.string;
         if (!strncmp(one, oldstr + i, COUNTED_STRLEN(one))) {
           const char *two = sp->u.arr->item[j + 1].u.string;
-          int len = i - (currentold - oldstr);
+          int const len = i - (currentold - oldstr);
           if (currentnew + len - newstr > max_string_length) {
             FREE_MSTR(newstr);
             error("string too long");
