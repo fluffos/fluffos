@@ -24,7 +24,7 @@ typedef struct pending_call_s {
   array_t *vs;
   object_t *command_giver;
   LPC_INT handle;
-  struct tick_event *tick_event;
+  struct TickEvent *tick_event;
   bool is_walltime;
 } pending_call_t;
 

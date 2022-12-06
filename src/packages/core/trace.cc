@@ -29,7 +29,7 @@ void f_trace_start() {
   Tracer::start(filename.c_str());
   Tracer::setThreadName("FluffOS Main");
   // register closure.
-  add_walltime_event(std::chrono::seconds(duration_secs), tick_event::callback_type([] {
+  add_walltime_event(std::chrono::seconds(duration_secs), TickEvent::callback_type([] {
                        if (Tracer::enabled()) {
                          Tracer::collect();
                        }

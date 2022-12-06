@@ -2742,23 +2742,23 @@ void f_abs() {
 #ifdef F_ROLL_MDN
 
 void f_roll_MdN() {
-  int num_arg = st_num_arg ;
-  int sides, rolls, bonus ;
+  int num_arg = st_num_arg;
+  int sides, rolls, bonus;
   LPC_INT roll = 0;
 
-  rolls = (sp-2)->u.number ;
-  sides = (sp-1)->u.number ;
-  bonus = sp->u.number ;
+  rolls = (sp - 2)->u.number;
+  sides = (sp - 1)->u.number;
+  bonus = sp->u.number;
 
   if (rolls > 0 && sides > 0) {
     while (rolls--) {
       roll += 1 + random_number(sides);
     }
-    roll += bonus ;
+    roll += bonus;
   }
 
-  pop_n_elems(num_arg) ;
-  push_number(roll) ;
+  pop_n_elems(num_arg);
+  push_number(roll);
 }
 
 #endif

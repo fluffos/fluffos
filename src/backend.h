@@ -19,20 +19,20 @@ void backend(struct event_base *);
 
 // API for registering game tick event.
 // Game ticks provides guaranteed spacing intervals between each invocation.
-struct tick_event {
-  bool valid;
+struct TickEvent {
+  bool valid{true};
 
-  typedef std::function<void()> callback_type;
+  using callback_type = std::function<void()>;
   callback_type callback;
 
-  tick_event(callback_type &callback) : valid(true), callback(callback) {}
+  TickEvent(callback_type &callback) : callback(callback) {}
 };
 
 // Register a event to run on game ticks.
-tick_event *add_gametick_event(int delay_ticks, tick_event::callback_type callback);
+TickEvent *add_gametick_event(int delay_ticks, TickEvent::callback_type callback);
 // Realtime event will be executed as close to designated walltime as possible.
-tick_event *add_walltime_event(std::chrono::milliseconds delay_msecs,
-                               tick_event::callback_type callback);
+TickEvent *add_walltime_event(std::chrono::milliseconds delay_msecs,
+                              TickEvent::callback_type callback);
 
 // Used in shutdownMudos()
 void clear_tick_events();
@@ -41,8 +41,8 @@ void clear_tick_events();
 int time_to_next_gametick(std::chrono::milliseconds msec);
 std::chrono::milliseconds gametick_to_time(int ticks);
 
-void update_load_av(void);
+void update_load_av();
 void update_compile_av(int);
-char *query_load_av(void);
+char *query_load_av();
 
 #endif
