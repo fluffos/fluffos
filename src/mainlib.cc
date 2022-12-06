@@ -321,7 +321,7 @@ int driver_main(int argc, char **argv) {
   // backward-cpp doesn't yet work on win32
 
   // register crash handlers
-  backward::SignalHandling const sh;
+  backward::SignalHandling sh;
   if (!sh.loaded()) {
     debug_message("Warning: Signal handler installation failed, not backtrace on crash!\n");
   }

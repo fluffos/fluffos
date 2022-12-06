@@ -319,7 +319,7 @@ static void md_print_array(array_t *vec) {
   print_depth--;
 }
 
-static void mark_config(void) {
+static void mark_config() {
   int i;
 
   for (i = 0; i < NUM_CONFIG_STRS; i++) {
@@ -368,7 +368,7 @@ void compute_string_totals(uint64_t *asp, uint64_t *abp, uint64_t *bp) {
 void check_string_stats(outbuffer_t *out) {
   uint64_t overhead = blocks[TAG_SHARED_STRING & 0xff] * sizeof(block_t) +
                       blocks[TAG_MALLOC_STRING & 0xff] * sizeof(malloc_block_t);
-  uint64_t num = blocks[TAG_SHARED_STRING & 0xff] + blocks[TAG_MALLOC_STRING & 0xff];
+  uint64_t const num = blocks[TAG_SHARED_STRING & 0xff] + blocks[TAG_MALLOC_STRING & 0xff];
   uint64_t bytes, as, ab;
   int need_dump = 0;
 
@@ -570,8 +570,8 @@ void check_all_blocks(int flag) {
       outbuf_add(&out, "WARNING: more than string table allocated.\n");
     }
     {
-      int a = totals[TAG_CALL_OUT & 0xff];
-      int b = total_callout_size();
+      int const a = totals[TAG_CALL_OUT & 0xff];
+      int const b = total_callout_size();
       if (a != b) {
         outbuf_addv(&out, "WARNING: wrong number of call_out blocks allocated: %d vs %d.\n", a, b);
         print_call_out_usage(&out, 1);
@@ -639,7 +639,7 @@ void check_all_blocks(int flag) {
     }
 
     /* now do a mark and sweep check to see what should be alloc'd */
-    for (auto &user : users()) {
+    for (const auto &user : users()) {
       DO_MARK(user, TAG_INTERACTIVE);
       user->ob->extra_ref++;
       // FIXME(sunyc): I can't explain this, appearently somewhere
@@ -665,7 +665,7 @@ void check_all_blocks(int flag) {
 #endif
     }
 
-    auto dfm = CONFIG_STR(__DEFAULT_FAIL_MESSAGE__);
+    auto *dfm = CONFIG_STR(__DEFAULT_FAIL_MESSAGE__);
     if (dfm != nullptr && strlen(dfm) > 0) {
       char buf[8192];
       strcpy(buf, dfm);

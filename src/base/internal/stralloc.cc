@@ -146,8 +146,8 @@ const char *findstring(const char *s) {
 
   if ((b = findblock(s))) {
     return STRING(b);
-  }     return (nullptr);
- 
+  }
+  return (nullptr);
 }
 
 /* alloc_new_string: Make a space for a string.  */

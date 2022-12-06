@@ -23,22 +23,22 @@ void init_dns_event_base(struct event_base *base) {
 
 static void add_ip_entry(struct sockaddr * /*addr*/, ev_socklen_t size, char * /*name*/);
 
-typedef struct addr_name_query_s {
+using addr_name_query_t = struct addr_name_query_s {
   sockaddr_storage addr;
   ev_socklen_t addrlen;
   struct evdns_request *req;
-} addr_name_query_t;
+};
 
 // Reverse DNS lookup.
-void on_addr_name_result(int err, char type, int count, int ttl, void *addresses, void *arg) {
-  auto query = reinterpret_cast<addr_name_query_t *>(arg);
+void on_addr_name_result(int err, char type, int count, int /*ttl*/, void *addresses, void *arg) {
+  auto *query = reinterpret_cast<addr_name_query_t *>(arg);
 
   if (err) {
     debug(dns, "DNS reverse lookup fail: %s.\n", evdns_err_to_string(err));
   } else if (count == 0) {
     debug(dns, "DNS reverse lookup returns no result.\n");
   } else {
-    auto result = *(reinterpret_cast<char **>(addresses));
+    auto *result = *(reinterpret_cast<char **>(addresses));
     debug(dns, "DNS reverse lookup result: %d: %s\n", type, result);
     add_ip_entry(reinterpret_cast<sockaddr *>(&query->addr), query->addrlen, result);
   }
@@ -47,7 +47,7 @@ void on_addr_name_result(int err, char type, int count, int ttl, void *addresses
 
 // Start a reverse lookup.
 void query_name_by_addr(object_t *ob) {
-  auto query = new addr_name_query_t;
+  auto *query = new addr_name_query_t;
 
   const char *addr = query_ip_number(ob);
   debug(dns, "query_name_by_addr: starting lookup for %s.\n", addr);
@@ -75,7 +75,7 @@ void query_name_by_addr(object_t *ob) {
   }
 }
 
-struct addr_number_query {
+struct AddrNumberQuery {
   LPC_INT key;
   const char *name;
   svalue_t call_back;
@@ -86,14 +86,14 @@ struct addr_number_query {
 };
 
 // query finished, call the LPC callback.
-void on_query_addr_by_name_finish(addr_number_query *query) {
+void on_query_addr_by_name_finish(AddrNumberQuery *query) {
   if (query->err) {
     debug(dns, "DNS lookup fail: %" LPC_INT_FMTSTR_P ",request: %s, err: %s.\n", query->key,
           query->name, evutil_gai_strerror(query->err));
     push_undefined();
     push_undefined();
   } else {
-    auto result = query->res;
+    auto *result = query->res;
 #ifndef IPV6
     // Skip to first IPv4 result.
     while (result != nullptr && result->ai_family != AF_INET) {
@@ -112,8 +112,8 @@ void on_query_addr_by_name_finish(addr_number_query *query) {
 
       // push IP address
       char host[NI_MAXHOST];
-      int ret = getnameinfo(result->ai_addr, result->ai_addrlen, host, sizeof(host), nullptr, 0,
-                            NI_NUMERICHOST);
+      int const ret = getnameinfo(result->ai_addr, result->ai_addrlen, host, sizeof(host), nullptr,
+                                  0, NI_NUMERICHOST);
       if (!ret) {
         copy_and_push_string(host);
       } else {
@@ -144,7 +144,7 @@ void on_query_addr_by_name_finish(addr_number_query *query) {
 
 // intermediate result from evdns_getaddrinfo
 void on_getaddr_result(int err, evutil_addrinfo *res, void *arg) {
-  auto query = reinterpret_cast<addr_number_query *>(arg);
+  auto *query = reinterpret_cast<AddrNumberQuery *>(arg);
   query->err = err;
   query->res = res;
 
@@ -164,8 +164,8 @@ int query_addr_by_name(const char *name, svalue_t *call_back) {
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_protocol = 0;
 
-  auto query = new addr_number_query;
-  memset(query, 0, sizeof(addr_number_query));
+  auto *query = new AddrNumberQuery;
+  memset(query, 0, sizeof(AddrNumberQuery));
 
   query->key = key++;
   query->name = make_shared_string(name);
@@ -181,12 +181,12 @@ int query_addr_by_name(const char *name, svalue_t *call_back) {
   return query->key;
 } /* query_addr_number() */
 
-#define IPSIZE 200
-typedef struct {
+enum { IPSIZE = 200 };
+using ipentry_t = struct {
   struct sockaddr_storage addr;
   socklen_t addrlen;
   const char *name;
-} ipentry_t;
+};
 
 static ipentry_t iptable[IPSIZE];
 static int ipcur;

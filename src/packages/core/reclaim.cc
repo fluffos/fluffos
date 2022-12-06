@@ -13,7 +13,7 @@
 
 #include "packages/core/call_out.h"
 
-#define MAX_RECURSION 25
+enum { MAX_RECURSION = 25 };
 
 static void gc_mapping(mapping_t * /*m*/);
 static void check_svalue(svalue_t * /*v*/);
@@ -70,7 +70,6 @@ static void check_svalue(svalue_t *v) {
     }
   }
   nested--;
-  return;
 }
 
 static void gc_mapping(mapping_t *m) {

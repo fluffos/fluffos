@@ -7,7 +7,7 @@
 /* TELNET */
 #ifdef F_REQUEST_TERM_TYPE
 void f_request_term_type() {
-  auto ip = current_object->interactive;
+  auto *ip = current_object->interactive;
   if (ip && ip->telnet) {
     telnet_request_ttype(ip->telnet);
     flush_message(ip);
@@ -20,7 +20,7 @@ void f_request_term_type() {
 
 #ifdef F_START_REQUEST_TERM_TYPE
 void f_start_request_term_type() {
-  auto ip = command_giver->interactive;
+  auto *ip = command_giver->interactive;
   if (ip && ip->telnet) {
     telnet_start_request_ttype(ip->telnet);
     flush_message(ip);
@@ -34,7 +34,7 @@ void f_start_request_term_type() {
 
 #ifdef F_REQUEST_TERM_SIZE
 void f_request_term_size() {
-  auto ip = current_object->interactive;
+  auto *ip = current_object->interactive;
 
   if (ip && ip->telnet) {
     if ((st_num_arg == 1) && (sp->u.number == 0)) {
@@ -55,7 +55,7 @@ void f_request_term_size() {
 
 #ifdef F_TELNET_NOP
 void f_telnet_nop() {
-  auto ip = current_object->interactive;
+  auto *ip = current_object->interactive;
   if (ip && ip->telnet) {
     telnet_send_nop(ip->telnet);
     flush_message(ip);
@@ -67,7 +67,7 @@ void f_telnet_nop() {
 
 #ifdef F_TELNET_GA
 void f_telnet_ga() {
-  auto ip = current_object->interactive;
+  auto *ip = current_object->interactive;
   if (ip && ip->telnet) {
     telnet_send_ga(ip->telnet);
     flush_message(ip);
@@ -79,7 +79,7 @@ void f_telnet_ga() {
 
 /* MXP */
 #ifdef F_HAS_MXP
-void f_has_mxp(void) {
+void f_has_mxp() {
   int i = 0;
 
   if (sp->u.ob->interactive) {
@@ -93,7 +93,7 @@ void f_has_mxp(void) {
 
 #ifdef F_ACT_MXP
 void f_act_mxp() {
-  auto ip = current_object->interactive;
+  auto *ip = current_object->interactive;
   if (ip && ip->telnet) {
     // start MXP
     telnet_begin_sb(ip->telnet, TELNET_TELOPT_MXP);
@@ -124,8 +124,8 @@ void f_send_gmcp() {
   const auto *data = sp->u.string;
   auto len = SVALUE_STRLEN(sp);
   if (ip && ip->telnet) {
-    std::string transdata = u8_convert_encoding(ip->trans, data, len);
-    std::string_view result = transdata.empty() ? std::string_view(data, len) : transdata;
+    std::string const transdata = u8_convert_encoding(ip->trans, data, len);
+    std::string_view const result = transdata.empty() ? std::string_view(data, len) : transdata;
     telnet_subnegotiation(ip->telnet, TELNET_TELOPT_GMCP, result.data(), result.size());
     flush_message(ip);
   } else if (!ip) {
@@ -138,7 +138,7 @@ void f_send_gmcp() {
 /* ZMP */
 
 #ifdef F_HAS_ZMP
-void f_has_zmp(void) {
+void f_has_zmp() {
   int i = 0;
 
   if (sp->u.ob->interactive) {
@@ -152,7 +152,7 @@ void f_has_zmp(void) {
 
 #ifdef F_SEND_ZMP
 void f_send_zmp() {
-  auto ip = command_giver->interactive;
+  auto *ip = command_giver->interactive;
   if (ip && ip->telnet) {
     telnet_begin_zmp(ip->telnet, (sp - 1)->u.string);
 

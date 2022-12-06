@@ -14,7 +14,7 @@
 #define VALID_SOCKET(x) check_valid_socket((x), fd, get_socket_owner(fd), addr, port)
 
 #ifdef F_SOCKET_CREATE
-void f_socket_create(void) {
+void f_socket_create() {
   int fd, num_arg = st_num_arg;
   svalue_t *arg;
 
@@ -38,7 +38,7 @@ void f_socket_create(void) {
 #endif
 
 #ifdef F_SOCKET_BIND
-void f_socket_bind(void) {
+void f_socket_bind() {
   int i, fd, port, num_arg = st_num_arg;
   svalue_t *arg;
   char addr[ADDR_BUF_SIZE];
@@ -63,7 +63,7 @@ void f_socket_bind(void) {
 #endif
 
 #ifdef F_SOCKET_LISTEN
-void f_socket_listen(void) {
+void f_socket_listen() {
   int i, fd, port;
   char addr[ADDR_BUF_SIZE];
 
@@ -82,7 +82,7 @@ void f_socket_listen(void) {
 #endif
 
 #ifdef F_SOCKET_ACCEPT
-void f_socket_accept(void) {
+void f_socket_accept() {
   int port, fd;
   char addr[ADDR_BUF_SIZE];
 
@@ -97,7 +97,7 @@ void f_socket_accept(void) {
 #endif
 
 #ifdef F_SOCKET_CONNECT
-void f_socket_connect(void) {
+void f_socket_connect() {
   int i, fd, port;
   char addr[ADDR_BUF_SIZE];
 
@@ -148,11 +148,11 @@ void f_socket_connect(void) {
 #endif
 
 #ifdef F_SOCKET_WRITE
-void f_socket_write(void) {
+void f_socket_write() {
   int i, fd, port;
   svalue_t *arg;
   char addr[ADDR_BUF_SIZE];
-  int num_arg = st_num_arg;
+  int const num_arg = st_num_arg;
 
   arg = sp - num_arg + 1;
   if ((num_arg == 3) && (arg[2].type != T_STRING)) {
@@ -173,7 +173,7 @@ void f_socket_write(void) {
 #endif
 
 #ifdef F_SOCKET_CLOSE
-void f_socket_close(void) {
+void f_socket_close() {
   int fd, port;
   char addr[ADDR_BUF_SIZE];
 
@@ -185,7 +185,7 @@ void f_socket_close(void) {
 #endif
 
 #ifdef F_SOCKET_RELEASE
-void f_socket_release(void) {
+void f_socket_release() {
   int fd, port;
   char addr[ADDR_BUF_SIZE];
 
@@ -208,7 +208,7 @@ void f_socket_release(void) {
 #endif
 
 #ifdef F_SOCKET_ACQUIRE
-void f_socket_acquire(void) {
+void f_socket_acquire() {
   int fd, port;
   char addr[ADDR_BUF_SIZE];
 
@@ -230,11 +230,11 @@ void f_socket_acquire(void) {
 #endif
 
 #ifdef F_SOCKET_ERROR
-void f_socket_error(void) { put_constant_string(socket_error(sp->u.number)); }
+void f_socket_error() { put_constant_string(socket_error(sp->u.number)); }
 #endif
 
 #ifdef F_SOCKET_ADDRESS
-void f_socket_address(void) {
+void f_socket_address() {
   char *str;
   int local, port;
   char addr[ADDR_BUF_SIZE];
@@ -254,9 +254,9 @@ void f_socket_address(void) {
     }
 
     char host[NI_MAXHOST], service[NI_MAXSERV];
-    int ret = getnameinfo(reinterpret_cast<struct sockaddr *>(&sp->u.ob->interactive->addr),
-                          sp->u.ob->interactive->addrlen, host, sizeof(host), service,
-                          sizeof(service), NI_NUMERICHOST | NI_NUMERICSERV);
+    int const ret = getnameinfo(reinterpret_cast<struct sockaddr *>(&sp->u.ob->interactive->addr),
+                                sp->u.ob->interactive->addrlen, host, sizeof(host), service,
+                                sizeof(service), NI_NUMERICHOST | NI_NUMERICSERV);
     if (ret) {
       strcpy(host, "0.0.0.0");
       strcpy(service, "0");
@@ -276,7 +276,7 @@ void f_socket_address(void) {
 #endif
 
 #ifdef F_SOCKET_STATUS
-void f_socket_status(void) {
+void f_socket_status() {
   array_t *info;
   int i;
 

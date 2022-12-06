@@ -1,9 +1,9 @@
 #include "base/package_api.h"
 
-#include <errno.h>
-#include <string.h>
-#include <stdlib.h>  // for exit
-#include <ctype.h>   // for isspace
+#include <cerrno>
+#include <cstring>
+#include <cstdlib>   // for exit
+#include <cctype>    // for isspace
 #include <unistd.h>  // for fork
 #include <thread>
 #include <string>
@@ -45,7 +45,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
     debug_message("Launching external command '%s %s', pid: %d.\n", external_cmd[which],
                   args->type == T_STRING ? args->u.string : "<ARRAY>", ret);
 
-    auto sock = lpc_socks_get(fd);
+    auto *sock = lpc_socks_get(fd);
 
     new_lpc_socket_event_listener(fd, sock, sv[0]);
 
@@ -61,88 +61,86 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
     memset(reinterpret_cast<char *>(&sock->l_addr), 0, sizeof(sock->l_addr));
     memset(reinterpret_cast<char *>(&sock->r_addr), 0, sizeof(sock->r_addr));
     sock->owner_ob = current_object;
-    sock->release_ob = NULL;
-    sock->r_buf = NULL;
+    sock->release_ob = nullptr;
+    sock->r_buf = nullptr;
     sock->r_off = 0;
     sock->r_len = 0;
-    sock->w_buf = NULL;
+    sock->w_buf = nullptr;
     sock->w_off = 0;
     sock->w_len = 0;
 
     current_object->flags |= O_EFUN_SOCKET;
 
-    event_add(sock->ev_read, NULL);
+    event_add(sock->ev_read, nullptr);
 
     return fd;
-  } else {
-    int flag = 1;
-    int i = 1;
-    int n = 1;
-    const char *p;
-    char *arg;
-
-    if (args->type == T_ARRAY) {
-      n = args->u.arr->size;
-    } else {
-      p = args->u.string;
-
-      while (*p) {
-        if (isspace(*p)) {
-          flag = 1;
-        } else {
-          if (flag) {
-            n++;
-            flag = 0;
-          }
-        }
-        p++;
-      }
-    }
-
-    argv =
-        reinterpret_cast<char **>(DCALLOC(n + 1, sizeof(char *), TAG_TEMPORARY, "external args"));
-
-    argv[0] = cmd;
-
-    /* need writable version */
-    if (args->type == T_ARRAY) {
-      int j;
-      svalue_t *sv = args->u.arr->item;
-
-      for (j = 0; j < n; j++) {
-        argv[i++] = alloc_cstring(sv[j].u.string, "external args");
-      }
-    } else {
-      flag = 1;
-      arg = alloc_cstring(args->u.string, "external args");
-      while (*arg) {
-        if (isspace(*arg)) {
-          *arg = 0;
-          flag = 1;
-        } else {
-          if (flag) {
-            argv[i++] = arg;
-            flag = 0;
-          }
-        }
-        arg++;
-      }
-    }
-    argv[i] = 0;
-
-    close(sv[0]);
-    for (i = 0; i < 5; i++) {
-      if (external_port[i].port) {
-        close(external_port[i].fd);  // close external ports
-      }
-    }
-    dup2(sv[1], 0);
-    dup2(sv[1], 1);
-    dup2(sv[1], 2);
-    execv(cmd, argv);
-    exit(0);
-    return 0;
   }
+  int flag = 1;
+  int i = 1;
+  int n = 1;
+  const char *p;
+  char *arg;
+
+  if (args->type == T_ARRAY) {
+    n = args->u.arr->size;
+  } else {
+    p = args->u.string;
+
+    while (*p) {
+      if (isspace(*p)) {
+        flag = 1;
+      } else {
+        if (flag) {
+          n++;
+          flag = 0;
+        }
+      }
+      p++;
+    }
+  }
+
+  argv = reinterpret_cast<char **>(DCALLOC(n + 1, sizeof(char *), TAG_TEMPORARY, "external args"));
+
+  argv[0] = cmd;
+
+  /* need writable version */
+  if (args->type == T_ARRAY) {
+    int j;
+    svalue_t *sv = args->u.arr->item;
+
+    for (j = 0; j < n; j++) {
+      argv[i++] = alloc_cstring(sv[j].u.string, "external args");
+    }
+  } else {
+    flag = 1;
+    arg = alloc_cstring(args->u.string, "external args");
+    while (*arg) {
+      if (isspace(*arg)) {
+        *arg = 0;
+        flag = 1;
+      } else {
+        if (flag) {
+          argv[i++] = arg;
+          flag = 0;
+        }
+      }
+      arg++;
+    }
+  }
+  argv[i] = 0;
+
+  close(sv[0]);
+  for (i = 0; i < 5; i++) {
+    if (external_port[i].port) {
+      close(external_port[i].fd);  // close external ports
+    }
+  }
+  dup2(sv[1], 0);
+  dup2(sv[1], 1);
+  dup2(sv[1], 2);
+  execv(cmd, argv);
+  exit(0);
+  return 0;
 }
 #endif
 
@@ -259,12 +257,13 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
 #endif
 
 #ifdef F_EXTERNAL_START
-void f_external_start(void) {
+void f_external_start() {
   int fd, num_arg = st_num_arg;
   svalue_t *arg = sp - num_arg + 1;
 
   if (check_valid_socket("external", -1, current_object, "N/A", -1)) {
-    fd = external_start(arg[0].u.number, arg + 1, arg + 2, arg + 3, (num_arg == 5 ? arg + 4 : 0));
+    fd = external_start(arg[0].u.number, arg + 1, arg + 2, arg + 3,
+                        (num_arg == 5 ? arg + 4 : nullptr));
     pop_n_elems(num_arg - 1);
     sp->u.number = fd;
   } else {

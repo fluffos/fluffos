@@ -4,7 +4,7 @@
 
 #include <chrono>
 #include <functional>
-#include <math.h>
+#include <cmath>
 #include <unordered_map>
 
 #include "packages/core/sprintf.h"
@@ -16,13 +16,13 @@
  */
 
 // main callout map, for fastest reference
-typedef std::unordered_map<LPC_INT, pending_call_t *> CalloutHandleMapType;
+using CalloutHandleMapType = std::unordered_map<LPC_INT, pending_call_t *>;
 static CalloutHandleMapType g_callout_handle_map;
 
 // Key is the pointer to the object, this provides an fast way for
 // remove_call_out() with object only, this map may contains invalidated
 // references and only get pruned during reclaim_callouts();
-typedef std::unordered_multimap<object_t *, LPC_INT> CalloutObjectMapType;
+using CalloutObjectMapType = std::unordered_multimap<object_t *, LPC_INT>;
 static CalloutObjectMapType g_callout_object_handle_map;
 
 // TODO: It maybe possible to change to a per-object counter.
@@ -187,7 +187,7 @@ void call_out(pending_call_t *cop) {
 
   // Remove self from callout map
   {
-    int found = g_callout_handle_map.erase(cop->handle);
+    int const found = g_callout_handle_map.erase(cop->handle);
     DEBUG_CHECK(!found, "BUG: Rogue callout, not found in map.\n");
   }
 
@@ -263,11 +263,10 @@ static int time_left(pending_call_t *cop) {
                                    std::chrono::high_resolution_clock::now().time_since_epoch())
                                    .count()) /
            1000;
-  } else {
-    return std::chrono::duration_cast<std::chrono::seconds>(
-               gametick_to_time(cop->target_time - g_current_gametick))
-        .count();
   }
+  return std::chrono::duration_cast<std::chrono::seconds>(
+             gametick_to_time(cop->target_time - g_current_gametick))
+      .count();
 }
 
 /*
@@ -416,8 +415,8 @@ int total_callout_size() { return g_callout_handle_map.size() * sizeof(pending_c
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_call_outs() {
-  for (auto iter = g_callout_handle_map.cbegin(); iter != g_callout_handle_map.cend(); iter++) {
-    auto *cop = iter->second;
+  for (auto iter : g_callout_handle_map) {
+    auto *cop = iter.second;
     if (cop->vs) {
       cop->vs->extra_ref++;
     }
@@ -593,7 +592,7 @@ void reclaim_call_outs() {
 namespace {
 inline void int_call_out(bool walltime) {
   svalue_t *arg = sp - st_num_arg + 1;
-  int num = st_num_arg - 2;
+  int const num = st_num_arg - 2;
   LPC_INT ret;
 
   LPC_INT delay_msecs = 0;
@@ -627,13 +626,13 @@ inline void int_call_out(bool walltime) {
 }  // namespace
 
 #ifdef F_CALL_OUT
-void f_call_out(void) { int_call_out(false); }
+void f_call_out() { int_call_out(false); }
 #endif
 
 #ifdef F_CALL_OUT_WALLTIME
-void f_call_out_walltime(void) { int_call_out(true); }
+void f_call_out_walltime() { int_call_out(true); }
 #endif
 
 #ifdef F_CALL_OUT_INFO
-void f_call_out_info(void) { push_refed_array(get_all_call_outs()); }
+void f_call_out_info() { push_refed_array(get_all_call_outs()); }
 #endif

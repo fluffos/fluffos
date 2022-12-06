@@ -74,11 +74,11 @@
 #include <pthread.h>
 #endif
 
-static int dbConnAlloc, dbConnUsed;
-static db_t *dbConnList;
+static int db_conn_alloc, db_conn_used;
+static db_t *db_conn_list;
 
 db_t *find_db_conn(int);
-static int create_db_conn(void);
+static int create_db_conn();
 static void free_db_conn(db_t *);
 
 #ifdef USE_MSQL
@@ -169,7 +169,7 @@ svalue_t *valid_database(const char *action, array_t *info) {
  * Returns 1 on success, 0 on failure
  */
 #ifdef F_DB_CLOSE
-void f_db_close(void) {
+void f_db_close() {
   int ret = 0;
   db_t *db;
 
@@ -207,7 +207,7 @@ void f_db_close(void) {
  * Returns 1 on success, 0 on failure
  */
 #ifdef F_DB_COMMIT
-void f_db_commit(void) {
+void f_db_commit() {
   int ret = 0;
   db_t *db;
 
@@ -238,7 +238,7 @@ void f_db_commit(void) {
  * Returns a new database handle.
  */
 #ifdef F_DB_CONNECT
-void f_db_connect(void) {
+void f_db_connect() {
   char *errormsg = nullptr;
   const char *user = "", *database, *host = nullptr;
   db_t *db;
@@ -360,7 +360,7 @@ void f_db_connect(void) {
 extern pthread_mutex_t *db_mut;
 #endif
 #ifdef F_DB_EXEC
-void f_db_exec(void) {
+void f_db_exec() {
   int ret = 0;
   db_t *db;
   array_t *info;
@@ -430,7 +430,7 @@ void f_db_exec(void) {
  * Returns an array of columns from the named row on success.
  */
 #ifdef F_DB_FETCH
-void f_db_fetch(void) {
+void f_db_fetch() {
   db_t *db;
   array_t *ret;
 
@@ -472,7 +472,7 @@ void f_db_fetch(void) {
  * Returns 1 on success, 0 on failure
  */
 #ifdef F_DB_ROLLBACK
-void f_db_rollback(void) {
+void f_db_rollback() {
   int ret = 0;
   db_t *db;
 
@@ -502,20 +502,20 @@ void f_db_rollback(void) {
  * Returns a string describing the database package's current status
  */
 #ifdef F_DB_STATUS
-void f_db_status(void) {
+void f_db_status() {
   int i;
   outbuffer_t out;
 
   outbuf_zero(&out);
 
-  for (i = 0; i < dbConnAlloc; i++) {
-    if (dbConnList[i].flags & DB_FLAG_EMPTY) {
+  for (i = 0; i < db_conn_alloc; i++) {
+    if (db_conn_list[i].flags & DB_FLAG_EMPTY) {
       continue;
     }
 
-    outbuf_addv(&out, "Handle: %d (%s)\n", i + 1, dbConnList[i].type->name);
-    if (dbConnList[i].type->status != nullptr) {
-      dbConnList[i].type->status(&(dbConnList[i].c), &out);
+    outbuf_addv(&out, "Handle: %d (%s)\n", i + 1, db_conn_list[i].type->name);
+    if (db_conn_list[i].type->status != nullptr) {
+      db_conn_list[i].type->status(&(db_conn_list[i].c), &out);
     }
   }
 
@@ -523,26 +523,26 @@ void f_db_status(void) {
 }
 #endif
 
-void db_cleanup(void) {
+void db_cleanup() {
   int i;
 
-  for (i = 0; i < dbConnAlloc; i++) {
-    if (!(dbConnList[i].flags & DB_FLAG_EMPTY)) {
-      if (dbConnList[i].type->cleanup) {
-        dbConnList[i].type->cleanup(&(dbConnList[i].c));
+  for (i = 0; i < db_conn_alloc; i++) {
+    if (!(db_conn_list[i].flags & DB_FLAG_EMPTY)) {
+      if (db_conn_list[i].type->cleanup) {
+        db_conn_list[i].type->cleanup(&(db_conn_list[i].c));
       }
 
-      if (dbConnList[i].type->close) {
-        dbConnList[i].type->close(&(dbConnList[i].c));
+      if (db_conn_list[i].type->close) {
+        db_conn_list[i].type->close(&(db_conn_list[i].c));
       }
 
-      dbConnList[i].flags = DB_FLAG_EMPTY;
-      dbConnUsed--;
+      db_conn_list[i].flags = DB_FLAG_EMPTY;
+      db_conn_used--;
     }
   }
 }
 
-int create_db_conn(void) {
+int create_db_conn() {
   int i;
 
 #ifdef PACKAGE_ASYNC
@@ -555,24 +555,24 @@ int create_db_conn(void) {
 #endif
 
   /* allocate more slots if we need them */
-  if (dbConnAlloc == dbConnUsed) {
-    i = dbConnAlloc;
-    dbConnAlloc += 10;
-    if (!dbConnList) {
-      dbConnList = (db_t *)DCALLOC(dbConnAlloc, sizeof(db_t), TAG_DB, "create_db_conn");
+  if (db_conn_alloc == db_conn_used) {
+    i = db_conn_alloc;
+    db_conn_alloc += 10;
+    if (!db_conn_list) {
+      db_conn_list = (db_t *)DCALLOC(db_conn_alloc, sizeof(db_t), TAG_DB, "create_db_conn");
     } else {
-      dbConnList = RESIZE(dbConnList, dbConnAlloc, db_t, TAG_DB, "create_db_conn");
+      db_conn_list = RESIZE(db_conn_list, db_conn_alloc, db_t, TAG_DB, "create_db_conn");
     }
-    while (i < dbConnAlloc) {
-      dbConnList[i++].flags = DB_FLAG_EMPTY;
+    while (i < db_conn_alloc) {
+      db_conn_list[i++].flags = DB_FLAG_EMPTY;
     }
   }
 
-  for (i = 0; i < dbConnAlloc; i++) {
-    if (dbConnList[i].flags & DB_FLAG_EMPTY) {
-      dbConnList[i].flags = 0;
-      dbConnList[i].type = &no_db;
-      dbConnUsed++;
+  for (i = 0; i < db_conn_alloc; i++) {
+    if (db_conn_list[i].flags & DB_FLAG_EMPTY) {
+      db_conn_list[i].flags = 0;
+      db_conn_list[i].type = &no_db;
+      db_conn_used++;
       return i + 1;
     }
   }
@@ -581,22 +581,22 @@ int create_db_conn(void) {
 }
 
 db_t *find_db_conn(int handle) {
-  if (handle < 1 || handle > dbConnAlloc || dbConnList[handle - 1].flags & DB_FLAG_EMPTY) {
+  if (handle < 1 || handle > db_conn_alloc || db_conn_list[handle - 1].flags & DB_FLAG_EMPTY) {
     return nullptr;
   }
-  return &(dbConnList[handle - 1]);
+  return &(db_conn_list[handle - 1]);
 }
 
 void free_db_conn(db_t *db) {
   DEBUG_CHECK(db->flags & DB_FLAG_EMPTY, "Freeing DB connection that is already freed\n");
-  DEBUG_CHECK(!dbConnUsed, "Freeing DB connection when dbConnUsed == 0\n");
-  dbConnUsed--;
+  DEBUG_CHECK(!db_conn_used, "Freeing DB connection when dbConnUsed == 0\n");
+  db_conn_used--;
   db->flags |= DB_FLAG_EMPTY;
 }
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_db_conn() {
-  auto node = dbConnList;
+  auto *node = db_conn_list;
   if (node) {
     DO_MARK(node, TAG_DB);
   }

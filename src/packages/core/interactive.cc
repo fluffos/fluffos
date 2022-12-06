@@ -27,7 +27,7 @@ int replace_interactive(object_t *ob, object_t *obfrom) {
   return (1);
 } /* replace_interactive() */
 
-void f_exec(void) {
+void f_exec() {
   int i;
 
   i = replace_interactive((sp - 1)->u.ob, sp->u.ob);

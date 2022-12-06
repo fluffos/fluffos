@@ -29,7 +29,7 @@ void init_living() {
                                                         __CURRENT_FILE_LINE__));
 }
 
-static void notify_no_command(void) {
+static void notify_no_command() {
   union string_or_func p;
   svalue_t *v;
 
@@ -55,7 +55,7 @@ static void notify_no_command(void) {
       free_string(p.s);
       command_giver->interactive->default_err_message.s = nullptr;
     } else {
-      auto dfm = CONFIG_STR(__DEFAULT_FAIL_MESSAGE__);
+      auto *dfm = CONFIG_STR(__DEFAULT_FAIL_MESSAGE__);
       tell_object(command_giver, dfm, strlen(dfm));
     }
   }
@@ -138,7 +138,8 @@ void remove_living_name(object_t *ob) {
     }
     hl = &(*hl)->next_hashed_living;
   }
-  DEBUG_CHECK1(*hl == 0, "remove_living_name: Object named %s no in hash list.\n", ob->living_name);
+  DEBUG_CHECK1(*hl == nullptr, "remove_living_name: Object named %s no in hash list.\n",
+               ob->living_name);
   *hl = ob->next_hashed_living;
   free_string(ob->living_name);
   ob->next_hashed_living = nullptr;
@@ -146,7 +147,7 @@ void remove_living_name(object_t *ob) {
 }
 
 static void set_living_name(object_t *ob, const char *str) {
-  int flags = ob->flags & O_ENABLE_COMMANDS;
+  int const flags = ob->flags & O_ENABLE_COMMANDS;
   object_t **hl;
 
   if (ob->flags & O_DESTRUCTED) {
@@ -166,7 +167,6 @@ void stat_living_objects(outbuffer_t *out) {
   outbuf_add(out, "-----------------------------\n");
   outbuf_addv(out, "%d living named objects, average search length: %4.2f\n\n", num_living_names,
               static_cast<double>(search_length) / num_searches);
-  return;
 }
 
 void setup_new_commands(object_t *dest, object_t *item) {
@@ -381,8 +381,8 @@ static int user_parser(char *buff) {
       debug(add_action, "Local command %s on /%s\n", s->function.s, s->ob->obname);
 
     if (s->flags & V_NOSPACE) {
-      int l1 = strlen(s->verb);
-      int l2 = strlen(verb_buff);
+      int const l1 = strlen(s->verb);
+      int const l2 = strlen(verb_buff);
 
       if (l1 < l2) {
         last_verb = verb_buff + l1;
@@ -637,7 +637,7 @@ void remove_sent(object_t *ob, object_t *user) {
 #endif
 
 #ifdef F_ADD_ACTION
-void f_add_action(void) {
+void f_add_action() {
   LPC_INT flag;
 
   if (st_num_arg == 3) {
@@ -674,12 +674,12 @@ void f_add_action(void) {
  * Return cost of the command executed if success (> 0).
  * When failure, return 0.
  */
-void f_command(void) {
+void f_command() {
   LPC_INT rc = 0;
 
   if (current_object && !(current_object->flags & O_DESTRUCTED)) {
     char buff[1000];
-    LPC_INT save_eval_cost = get_eval();
+    LPC_INT const save_eval_cost = get_eval();
 
     if (SVALUE_STRLEN(sp) > sizeof(buff) - 1) {
       error("Too long command.\n");
@@ -703,22 +703,22 @@ void f_command(void) {
 #endif
 
 #ifdef F_COMMANDS
-void f_commands(void) { push_refed_array(commands(current_object)); }
+void f_commands() { push_refed_array(commands(current_object)); }
 #endif
 
 #ifdef F_DISABLE_COMMANDS
-void f_disable_commands(void) { enable_commands(0, 0); }
+void f_disable_commands() { enable_commands(0, 0); }
 #endif
 
 #ifdef F_ENABLE_COMMANDS
-void f_enable_commands(void) {
+void f_enable_commands() {
   enable_commands(1, sp->u.number);
   pop_stack();
 }
 #endif
 
 #ifdef F_FIND_LIVING
-void f_find_living(void) {
+void f_find_living() {
   object_t *ob;
 
   ob = find_living_object(sp->u.string, 0);
@@ -733,7 +733,7 @@ void f_find_living(void) {
 #endif
 
 #ifdef F_FIND_PLAYER
-void f_find_player(void) {
+void f_find_player() {
   object_t *ob;
 
   ob = find_living_object(sp->u.string, 1);
@@ -748,7 +748,7 @@ void f_find_player(void) {
 #endif
 
 #ifdef F_LIVING
-void f_living(void) {
+void f_living() {
   if (sp->u.ob->flags & O_ENABLE_COMMANDS) {
     free_object(&sp->u.ob, "f_living:1");
     *sp = const1;
@@ -760,11 +760,11 @@ void f_living(void) {
 #endif
 
 #ifdef F_LIVINGS
-void f_livings(void) { push_refed_array(livings()); }
+void f_livings() { push_refed_array(livings()); }
 #endif
 
 #ifdef F_NOTIFY_FAIL
-void f_notify_fail(void) {
+void f_notify_fail() {
   if (command_giver && command_giver->interactive) {
     clear_notify(command_giver);
     if (sp->type == T_STRING) {
@@ -780,7 +780,7 @@ void f_notify_fail(void) {
 #endif
 
 #ifdef F_QUERY_VERB
-void f_query_verb(void) {
+void f_query_verb() {
   if (!last_verb) {
     push_number(0);
     return;
@@ -790,7 +790,7 @@ void f_query_verb(void) {
 #endif
 
 #ifdef F_REMOVE_ACTION
-void f_remove_action(void) {
+void f_remove_action() {
   LPC_INT success;
 
   success = remove_action((sp - 1)->u.string, sp->u.string);
@@ -801,7 +801,7 @@ void f_remove_action(void) {
 #endif
 
 #ifdef F_SET_LIVING_NAME
-void f_set_living_name(void) {
+void f_set_living_name() {
   set_living_name(current_object, sp->u.string);
   free_string_svalue(sp--);
 }

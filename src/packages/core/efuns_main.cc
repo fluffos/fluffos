@@ -33,7 +33,7 @@ int data_size(object_t *ob);
 void reload_object(object_t *obj);
 
 #ifdef F_ALL_INVENTORY
-void f_all_inventory(void) {
+void f_all_inventory() {
   array_t *vec = all_inventory(sp->u.ob, 0);
   free_object(&sp->u.ob, "f_all_inventory");
   sp->type = T_ARRAY;
@@ -42,7 +42,7 @@ void f_all_inventory(void) {
 #endif
 
 #ifdef F_ALLOCATE
-void f_allocate(void) {
+void f_allocate() {
   if (st_num_arg == 2) {
     (sp - 1)->u.arr = allocate_array2((sp - 1)->u.number, sp);
     pop_stack();
@@ -54,7 +54,7 @@ void f_allocate(void) {
 #endif
 
 #ifdef F_ALLOCATE_BUFFER
-void f_allocate_buffer(void) {
+void f_allocate_buffer() {
   buffer_t *buf;
 
   buf = allocate_buffer(sp->u.number);
@@ -68,7 +68,7 @@ void f_allocate_buffer(void) {
 #endif
 
 #ifdef F_ALLOCATE_MAPPING
-void f_allocate_mapping(void) {
+void f_allocate_mapping() {
   array_t *arr;
 
   if (st_num_arg == 2) {
@@ -97,7 +97,7 @@ void f_allocate_mapping(void) {
 #endif
 
 #ifdef F_BIND
-void f_bind(void) {
+void f_bind() {
   object_t *ob = sp->u.ob;
   funptr_t *old_fp = (sp - 1)->u.fp;
   funptr_t *new_fp;
@@ -169,7 +169,7 @@ static int print_cache_stats(outbuffer_t *ob, int verbose) {
 }
 
 #ifdef F_CACHE_STATS
-void f_cache_stats(void) {
+void f_cache_stats() {
   outbuffer_t ob;
 
   outbuf_zero(&ob);
@@ -180,7 +180,7 @@ void f_cache_stats(void) {
 
 #ifdef F__CALL_OTHER
 /* enhanced call_other written 930314 by Luke Mewburn <zak@rmit.edu.au> */
-void f__call_other(void) {
+void f__call_other() {
   svalue_t *arg;
   const char *funcname;
   int num_arg = st_num_arg;
@@ -230,7 +230,6 @@ void f__call_other(void) {
   }
   pop_n_elems(2);
   push_some_svalues(&apply_ret_value, 1);
-  return;
 }
 #endif
 
@@ -248,7 +247,7 @@ static const char *origin_name(int orig) {
 #endif
 
 #ifdef F_CALL_STACK
-void f_call_stack(void) {
+void f_call_stack() {
   int i, n = csp - &control_stack[0] + 1;
   array_t *ret;
 
@@ -284,7 +283,7 @@ void f_call_stack(void) {
         ret->item[i].type = T_STRING;
         if (((csp - i)->framekind & FRAME_MASK) == FRAME_FUNCTION) {
           const program_t *prog = (i ? (csp - i + 1)->prog : current_prog);
-          int index = (csp - i)->fr.table_index;
+          int const index = (csp - i)->fr.table_index;
           function_t *cfp = &prog->function_table[index];
 
           ret->item[i].subtype = STRING_SHARED;
@@ -311,10 +310,9 @@ void f_call_stack(void) {
     case 4:
       for (i = 0; i < n; i++) {
         ret->item[i].type = T_STRING;
-        if (true || ((csp - i)->framekind & FRAME_MASK) == FRAME_FUNCTION ||
-            ((csp - i)->framekind & FRAME_MASK) == FRAME_FUNP) {
+        if (true || ((csp - i)->framekind & FRAME_MASK) == FRAME_FUNP) {
           const program_t *prog = (i ? (csp - i + 1)->prog : current_prog);
-          int index = (csp - i)->fr.table_index;
+          int const index = (csp - i)->fr.table_index;
           char *progc = (i ? (csp - i + 1)->pc : pc);
           ret->item[i].type = T_STRING;
           ret->item[i].subtype = STRING_MALLOC;
@@ -333,7 +331,7 @@ void f_call_stack(void) {
 #endif
 
 #ifdef F_CAPITALIZE
-void f_capitalize(void) {
+void f_capitalize() {
   if (uislower(sp->u.string[0])) {
     unlink_string_svalue(sp);
     // unlinked, so this is ok
@@ -343,11 +341,11 @@ void f_capitalize(void) {
 #endif
 
 #ifdef F_CHILDREN
-void f_children(void) {
+void f_children() {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
   auto v = ObjectTable::instance().children(sp->u.string);
   auto len = v.size() < max_array_size ? v.size() : max_array_size;
-  auto res = allocate_empty_array(len);
+  auto *res = allocate_empty_array(len);
 
   for (auto i = 0; i < v.size() && i < len; ++i) {
     res->item[i].u.ob = v[i];
@@ -360,7 +358,7 @@ void f_children(void) {
 #endif
 
 #ifdef F_CLASSP
-void f_classp(void) {
+void f_classp() {
   if (sp->type == T_CLASS) {
     free_class(sp->u.arr);
     *sp = const1;
@@ -372,7 +370,7 @@ void f_classp(void) {
 #endif
 
 #ifdef F_CLEAR_BIT
-void f_clear_bit(void) {
+void f_clear_bit() {
   char *str;
   int len, ind, bit;
 
@@ -402,7 +400,7 @@ void f_clear_bit(void) {
 #endif
 
 #ifdef F_CLONEP
-void f_clonep(void) {
+void f_clonep() {
   if ((sp->type == T_OBJECT) && (sp->u.ob->flags & O_CLONE)) {
     free_object(&sp->u.ob, "f_clonep");
     *sp = const1;
@@ -414,7 +412,7 @@ void f_clonep(void) {
 #endif
 
 #ifdef F__NEW
-void f__new(void) {
+void f__new() {
   svalue_t *arg = sp - st_num_arg + 1;
   object_t *ob;
 
@@ -430,7 +428,7 @@ void f__new(void) {
 #endif
 
 #ifdef F_DEEP_INHERIT_LIST
-void f_deep_inherit_list(void) {
+void f_deep_inherit_list() {
   array_t *vec;
 
   vec = deep_inherit_list(sp->u.ob);
@@ -440,7 +438,7 @@ void f_deep_inherit_list(void) {
 #endif
 
 #ifdef F_SET_DEBUG_LEVEL
-void f_set_debug_level(void) {
+void f_set_debug_level() {
   if (sp->type == T_STRING) {
     debug_level_set(sp->u.string);
     free_string_svalue(sp--);
@@ -449,24 +447,24 @@ void f_set_debug_level(void) {
   }
 }
 
-void f_clear_debug_level(void) {
+void f_clear_debug_level() {
   debug_level_clear(sp->u.string);
   pop_stack();
 }
 
-void f_debug_levels(void) {
+void f_debug_levels() {
   /* not in debug.h since debug.h is included in many places that don't
    know about mapping_t */
-  mapping_t *debug_levels(void);
+  mapping_t *debug_levels();
 
   push_refed_mapping(debug_levels());
 }
 #endif
 
 #ifdef F_DEEP_INVENTORY
-void f_deep_inventory(void) {
+void f_deep_inventory() {
   array_t *vec;
-  int args = st_num_arg;
+  int const args = st_num_arg;
   if (st_num_arg == 2 && sp->type == T_FUNCTION &&
       ((sp - 1)->type == T_ARRAY || (sp - 1)->type == T_OBJECT)) {
     if ((sp - 1)->type == T_ARRAY) {
@@ -493,14 +491,14 @@ void f_deep_inventory(void) {
 #endif
 
 #ifdef F_DESTRUCT
-void f_destruct(void) {
+void f_destruct() {
   destruct_object(sp->u.ob);
   sp--; /* Ok since the object was removed from the stack */
 }
 #endif
 
 #ifdef F_ENABLE_WIZARD
-void f_enable_wizard(void) {
+void f_enable_wizard() {
   if (current_object->interactive) {
     current_object->flags |= O_IS_WIZARD;
   }
@@ -508,7 +506,7 @@ void f_enable_wizard(void) {
 #endif
 
 #ifdef F_ERROR
-void f_error(void) {
+void f_error() {
   int l = SVALUE_STRLEN(sp);
   if (l && sp->u.string[l - 1] == '\n') {
     l--;
@@ -530,7 +528,7 @@ void f_error(void) {
 #endif
 
 #ifdef F_DISABLE_WIZARD
-void f_disable_wizard(void) {
+void f_disable_wizard() {
   if (current_object->interactive) {
     current_object->flags &= ~O_IS_WIZARD;
   }
@@ -538,7 +536,7 @@ void f_disable_wizard(void) {
 #endif
 
 #ifdef F_ENVIRONMENT
-void f_environment(void) {
+void f_environment() {
   object_t *ob = nullptr;
 
   if (st_num_arg) {
@@ -560,7 +558,7 @@ void f_environment(void) {
 #endif
 
 #ifdef F_FILE_NAME
-void f_file_name(void) {
+void f_file_name() {
   char *res;
 
   /* This function now returns a leading '/' */
@@ -571,7 +569,7 @@ void f_file_name(void) {
 #endif
 
 #ifdef F_FILTER
-void f_filter(void) {
+void f_filter() {
   svalue_t *arg = sp - st_num_arg + 1;
 
   if (arg->type == T_MAPPING) {
@@ -585,7 +583,7 @@ void f_filter(void) {
 #endif
 
 #ifdef F_FIND_CALL_OUT
-void f_find_call_out(void) {
+void f_find_call_out() {
   int i;
   if (sp->type == T_NUMBER) {
     i = find_call_out_by_handle(current_object, sp->u.number);
@@ -598,7 +596,7 @@ void f_find_call_out(void) {
 #endif
 
 #ifdef F_FIND_OBJECT
-void f_find_object(void) {
+void f_find_object() {
   object_t *ob;
 
   if ((sp--)->u.number) {
@@ -648,7 +646,7 @@ void f_function_profile(void) {
 #endif
 
 #ifdef F_FUNCTION_EXISTS
-void f_function_exists(void) {
+void f_function_exists() {
   const char *str;
   char *res;
   int l;
@@ -688,7 +686,7 @@ void f_function_exists(void) {
 #endif
 
 #ifdef F_GET_CHAR
-void f_get_char(void) {
+void f_get_char() {
   svalue_t *arg;
   int i, tmp;
   int flag;
@@ -711,7 +709,7 @@ void f_get_char(void) {
 #endif
 
 #ifdef F_IN_INPUT
-void f_in_input(void) {
+void f_in_input() {
   int i;
 
   i = sp->u.ob->interactive && sp->u.ob->interactive->input_to;
@@ -739,7 +737,7 @@ int inherits(program_t *prog, program_t *thep) {
   return 0;
 }
 
-void f_inherits(void) {
+void f_inherits() {
   object_t *ob, *base;
   int i;
 
@@ -758,7 +756,7 @@ void f_inherits(void) {
 #endif
 
 #ifdef F_SHALLOW_INHERIT_LIST
-void f_shallow_inherit_list(void) {
+void f_shallow_inherit_list() {
   array_t *vec;
 
   vec = inherit_list(sp->u.ob);
@@ -768,7 +766,7 @@ void f_shallow_inherit_list(void) {
 #endif
 
 #ifdef F_INPUT_TO
-void f_input_to(void) {
+void f_input_to() {
   svalue_t *arg;
   int i, tmp;
   int flag;
@@ -790,7 +788,7 @@ void f_input_to(void) {
 #endif
 
 #ifdef F_INTERACTIVE
-void f_interactive(void) {
+void f_interactive() {
   int i;
 
   i = (sp->u.ob->interactive != nullptr);
@@ -800,7 +798,7 @@ void f_interactive(void) {
 #endif
 
 #ifdef F_INTP
-void f_intp(void) {
+void f_intp() {
   if (sp->type == T_NUMBER) {
     sp->u.number = 1;
   } else {
@@ -811,7 +809,7 @@ void f_intp(void) {
 #endif
 
 #ifdef F_FUNCTIONP
-void f_functionp(void) {
+void f_functionp() {
   int i;
 
   if (sp->type == T_FUNCTION) {
@@ -831,7 +829,7 @@ void f_functionp(void) {
 #endif
 
 #ifdef F_KEYS
-void f_keys(void) {
+void f_keys() {
   array_t *vec;
 
   vec = mapping_indices(sp->u.map);
@@ -841,7 +839,7 @@ void f_keys(void) {
 #endif
 
 #ifdef F_VALUES
-void f_values(void) {
+void f_values() {
   array_t *vec;
 
   vec = mapping_values(sp->u.map);
@@ -851,14 +849,14 @@ void f_values(void) {
 #endif
 
 #ifdef F_LOWER_CASE
-void f_lower_case(void) {
+void f_lower_case() {
   char *str;
 
   str = const_cast<char *>(sp->u.string);
   /* find first upper case letter, if any */
   for (; *str; str++) {
     if (uisupper(*str)) {
-      int l = str - sp->u.string;
+      int const l = str - sp->u.string;
       unlink_string_svalue(sp);
       str = const_cast<char *>(sp->u.string) + l;
       *str = tolower(static_cast<unsigned char>(*str));
@@ -874,7 +872,7 @@ void f_lower_case(void) {
 #endif
 
 #ifdef F_MALLOC_STATUS
-void f_malloc_status(void) {
+void f_malloc_status() {
   outbuffer_t ob;
 
   outbuf_zero(&ob);
@@ -891,7 +889,7 @@ void f_malloc_status(void) {
 #endif
 
 #ifdef F_MAP_DELETE
-void f_map_delete(void) {
+void f_map_delete() {
   mapping_delete((sp - 1)->u.map, sp);
   pop_stack();
   free_mapping((sp--)->u.map);
@@ -899,7 +897,7 @@ void f_map_delete(void) {
 #endif
 
 #ifdef F_MAPP
-void f_mapp(void) {
+void f_mapp() {
   if (sp->type == T_MAPPING) {
     free_mapping(sp->u.map);
     *sp = const1;
@@ -911,7 +909,7 @@ void f_mapp(void) {
 #endif
 
 #ifdef F_MAP
-void f_map(void) {
+void f_map() {
   svalue_t *arg = sp - st_num_arg + 1;
 
   if (arg->type == T_MAPPING) {
@@ -925,7 +923,7 @@ void f_map(void) {
 #endif
 
 #ifdef F_MASTER
-void f_master(void) {
+void f_master() {
   if (!master_ob) {
     push_number(0);
   } else {
@@ -947,7 +945,7 @@ void f_master(void) {
  Cygnus
  */
 #ifdef F_MATCH_PATH
-void f_match_path(void) {
+void f_match_path() {
   svalue_t *value;
   const char *src;
   char *dst;
@@ -993,7 +991,7 @@ void f_match_path(void) {
 #endif /* F_MATCH_PATH */
 
 #ifdef F_MEMBER_ARRAY
-void f_member_array(void) {
+void f_member_array() {
   array_t *v;
   int flag = 0;
   int i;
@@ -1059,14 +1057,14 @@ void f_member_array(void) {
             if (flen && (sv->subtype & STRING_COUNTED) && flen > MSTR_SIZE(sv->u.string)) {
               continue;
             }
-            if (strncmp(find->u.string, sv->u.string, flen)) {
+            if (strncmp(find->u.string, sv->u.string, flen) != 0) {
               continue;
             }
           } else {
             if (flen && (sv->subtype & STRING_COUNTED) && flen != MSTR_SIZE(sv->u.string)) {
               continue;
             }
-            if (strcmp(find->u.string, sv->u.string)) {
+            if (strcmp(find->u.string, sv->u.string) != 0) {
               continue;
             }
           }
@@ -1142,9 +1140,9 @@ void f_member_array(void) {
 #endif
 
 #ifdef F_MESSAGE
-void f_message(void) {
+void f_message() {
   array_t *use = nullptr, *avoid;
-  int num_arg = st_num_arg;
+  int const num_arg = st_num_arg;
   svalue_t *args;
 
   args = sp - num_arg + 1;
@@ -1160,7 +1158,7 @@ void f_message(void) {
       use = args[2].u.arr;
       break;
     case T_NUMBER: {
-      int len = SVALUE_STRLEN(args + 1);
+      int const len = SVALUE_STRLEN(args + 1);
 
       /* this is really bad and probably should be rm'ed -Beek;
        * on the other hand, we don't have a debug_message() efun yet.
@@ -1201,7 +1199,7 @@ void f_message(void) {
 #endif
 
 #ifdef F_MOVE_OBJECT
-void f_move_object(void) {
+void f_move_object() {
   object_t *o1, *o2;
 
   /* get destination */
@@ -1309,7 +1307,7 @@ int calculate_and_maybe_print_memory_info(outbuffer_t *ob, int verbose) {
 }  // namespace
 
 #ifdef F_MUD_STATUS
-void f_mud_status(void) {
+void f_mud_status() {
   uint64_t tot = 0;
   int verbose = 0;
   outbuffer_t ob;
@@ -1355,7 +1353,7 @@ void f_mud_status(void) {
 #endif
 
 #ifdef F_OBJECTP
-void f_objectp(void) {
+void f_objectp() {
   if (sp->type == T_OBJECT && !(sp->u.ob->flags & O_DESTRUCTED)) {
     free_object(&sp->u.ob, "f_objectp");
     *sp = const1;
@@ -1367,11 +1365,11 @@ void f_objectp(void) {
 #endif
 
 #ifdef F_ORIGIN
-void f_origin(void) { push_constant_string(origin_name(caller_type)); }
+void f_origin() { push_constant_string(origin_name(caller_type)); }
 #endif
 
 #ifdef F_POINTERP
-void f_pointerp(void) {
+void f_pointerp() {
   if (sp->type == T_ARRAY) {
     free_array(sp->u.arr);
     *sp = const1;
@@ -1383,8 +1381,8 @@ void f_pointerp(void) {
 #endif
 
 #ifdef F_PRESENT
-void f_present(void) {
-  int num_arg = st_num_arg;
+void f_present() {
+  int const num_arg = st_num_arg;
   svalue_t *arg = sp - num_arg + 1;
   object_t *ob;
 
@@ -1404,7 +1402,7 @@ void f_present(void) {
 #endif
 
 #ifdef F_PREVIOUS_OBJECT
-void f_previous_object(void) {
+void f_previous_object() {
   control_stack_t *p;
   int i;
   object_t *ob = nullptr;
@@ -1472,8 +1470,8 @@ void f_previous_object(void) {
 #endif
 
 #ifdef F_PRINTF
-void f_printf(void) {
-  int num_arg = st_num_arg;
+void f_printf() {
+  int const num_arg = st_num_arg;
   char *ret;
 
   if (command_giver) {
@@ -1529,7 +1527,7 @@ void f_query_ed_mode(void) {
 #endif
 
 #ifdef F_QUERY_HOST_NAME
-void f_query_host_name(void) {
+void f_query_host_name() {
   char *tmp;
 
   if ((tmp = query_host_name())) {
@@ -1541,7 +1539,7 @@ void f_query_host_name(void) {
 #endif
 
 #ifdef F_QUERY_IDLE
-void f_query_idle(void) {
+void f_query_idle() {
   int i;
 
   i = query_idle(sp->u.ob);
@@ -1551,7 +1549,7 @@ void f_query_idle(void) {
 #endif
 
 #ifdef F_QUERY_IP_NAME
-void f_query_ip_name(void) {
+void f_query_ip_name() {
   const char *tmp;
 
   tmp = query_ip_name(st_num_arg ? sp->u.ob : nullptr);
@@ -1568,7 +1566,7 @@ void f_query_ip_name(void) {
 #endif
 
 #ifdef F_QUERY_IP_NUMBER
-void f_query_ip_number(void) {
+void f_query_ip_number() {
   const char *tmp;
 
   tmp = query_ip_number(st_num_arg ? sp->u.ob : nullptr);
@@ -1586,15 +1584,15 @@ void f_query_ip_number(void) {
 #endif
 
 #ifdef F_QUERY_LOAD_AVERAGE
-void f_query_load_average(void) { copy_and_push_string(query_load_av()); }
+void f_query_load_average() { copy_and_push_string(query_load_av()); }
 #endif
 
 #ifdef F_QUERY_PRIVS
-void f_query_privs(void) {
+void f_query_privs() {
   object_t *ob;
 
   ob = sp->u.ob;
-  if (ob->privs != NULL) {
+  if (ob->privs != nullptr) {
     sp->type = T_STRING;
     sp->u.string = make_shared_string(ob->privs);
     sp->subtype = STRING_SHARED;
@@ -1607,7 +1605,7 @@ void f_query_privs(void) {
 #endif
 
 #ifdef F_QUERY_SNOOPING
-void f_query_snooping(void) {
+void f_query_snooping() {
   object_t *ob;
 
   ob = query_snooping(sp->u.ob);
@@ -1621,7 +1619,7 @@ void f_query_snooping(void) {
 #endif
 
 #ifdef F_QUERY_SNOOP
-void f_query_snoop(void) {
+void f_query_snoop() {
   object_t *ob;
 
   ob = query_snoop(sp->u.ob);
@@ -1635,7 +1633,7 @@ void f_query_snoop(void) {
 #endif
 
 #ifdef F_RANDOM
-void f_random(void) {
+void f_random() {
   if (sp->u.number <= 0) {
     sp->u.number = 0;
     return;
@@ -1645,7 +1643,7 @@ void f_random(void) {
 #endif
 
 #ifdef F_SECURE_RANDOM
-void f_secure_random(void) {
+void f_secure_random() {
   if (sp->u.number <= 0) {
     sp->u.number = 0;
     return;
@@ -1655,7 +1653,7 @@ void f_secure_random(void) {
 #endif
 
 #ifdef F_READ_BYTES
-void f_read_bytes(void) {
+void f_read_bytes() {
   char *str;
   int start = 0, len = 0, rlen = 0, num_arg = st_num_arg;
   svalue_t *arg;
@@ -1680,7 +1678,7 @@ void f_read_bytes(void) {
 #endif
 
 #ifdef F_READ_BUFFER
-void f_read_buffer(void) {
+void f_read_buffer() {
   char *str;
   int start = 0, len = 0, rlen = 0, num_arg = st_num_arg;
   int from_file = 0; /* new line */
@@ -1717,7 +1715,7 @@ void f_read_buffer(void) {
 #endif
 
 #ifdef F_READ_FILE
-void f_read_file(void) {
+void f_read_file() {
   char *str;
   int start = 0, len = 0;
 
@@ -1748,10 +1746,10 @@ void f_read_file(void) {
 #endif
 
 #ifdef F_RECEIVE
-void f_receive(void) {
+void f_receive() {
   if (sp->type == T_STRING) {
     if (current_object->interactive) {
-      int len = SVALUE_STRLEN(sp);
+      int const len = SVALUE_STRLEN(sp);
 
       if (len > LARGEST_PRINTABLE_STRING) {
         error("Printable strings limited to length of %d.\n", LARGEST_PRINTABLE_STRING);
@@ -1771,7 +1769,7 @@ void f_receive(void) {
 #endif
 
 #ifdef F_REG_ASSOC
-void f_reg_assoc(void) {
+void f_reg_assoc() {
   svalue_t *arg;
   array_t *vec;
 
@@ -1795,7 +1793,7 @@ void f_reg_assoc(void) {
 #endif
 
 #ifdef F_REGEXP
-void f_regexp(void) {
+void f_regexp() {
   array_t *v;
   int flag;
 
@@ -1826,7 +1824,7 @@ void f_regexp(void) {
 #endif
 
 #ifdef F_REMOVE_CALL_OUT
-void f_remove_call_out(void) {
+void f_remove_call_out() {
   int i;
 
   if (st_num_arg) {
@@ -1846,7 +1844,7 @@ void f_remove_call_out(void) {
 #endif
 
 #ifdef F_RENAME
-void f_rename(void) {
+void f_rename() {
   int i;
 
   i = do_rename((sp - 1)->u.string, sp->u.string, F_RENAME);
@@ -1904,7 +1902,7 @@ void f_rename(void) {
  )
  */
 
-void f_replace_string(void) {
+void f_replace_string() {
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   int plen, rlen, dlen, slen, first, last, cur, j;
@@ -2045,12 +2043,11 @@ void f_replace_string(void) {
                   if (cur <= last) {
                     src++;
                     continue;
-                  } else {
-                    while (*src) {
-                      *dst2++ = *src++;
-                    }
-                    break;
                   }
+                  while (*src) {
+                    *dst2++ = *src++;
+                  }
+                  break;
                 }
                 *dst2++ = *src++;
               }
@@ -2165,7 +2162,7 @@ void f_replace_string(void) {
 #endif
 
 #ifdef F_RESOLVE
-void f_resolve(void) {
+void f_resolve() {
   LPC_INT i;
 
   i = query_addr_by_name((sp - 1)->u.string, sp);
@@ -2175,7 +2172,7 @@ void f_resolve(void) {
 #endif
 
 #ifdef F_RM
-void f_rm(void) {
+void f_rm() {
   int i;
 
   i = remove_file(sp->u.string);
@@ -2185,7 +2182,7 @@ void f_rm(void) {
 #endif
 
 #ifdef F_RMDIR
-void f_rmdir(void) {
+void f_rmdir() {
   const char *path;
 
   path = check_valid_path(sp->u.string, current_object, "rmdir", 1);
@@ -2200,7 +2197,7 @@ void f_rmdir(void) {
 #endif
 
 #ifdef F_SAY
-void f_say(void) {
+void f_say() {
   array_t *avoid;
   static array_t vtmp = {1,
 #ifdef DEBUGMALLOC_EXTENSIONS
@@ -2234,7 +2231,7 @@ void f_say(void) {
 /* warning: do not enable this without using valid_override() in the master
  object and a set_eval_limit() simul_efun to restrict access.
  */
-void f_set_eval_limit(void) {
+void f_set_eval_limit() {
   switch (sp->u.number) {
     case 0:
       sp->u.number = max_eval_cost;
@@ -2257,7 +2254,7 @@ void f_set_eval_limit(void) {
 #endif
 
 #ifdef F_SET_BIT
-void f_set_bit(void) {
+void f_set_bit() {
   char *str;
   int len, old_len, ind, bit;
 
@@ -2301,19 +2298,19 @@ void f_set_bit(void) {
 #endif
 
 #ifdef F_SET_HEART_BEAT
-void f_set_heart_beat(void) { set_heart_beat(current_object, (sp--)->u.number); }
+void f_set_heart_beat() { set_heart_beat(current_object, (sp--)->u.number); }
 #endif
 
 #ifdef F_QUERY_HEART_BEAT
-void f_query_heart_beat(void) {
-  int num = query_heart_beat(sp->u.ob);
+void f_query_heart_beat() {
+  int const num = query_heart_beat(sp->u.ob);
   free_object(&sp->u.ob, "f_query_heart_beat");
   put_number(num);
 }
 #endif
 
 #ifdef F_SET_HIDE
-void f_set_hide(void) {
+void f_set_hide() {
   if (!valid_hide(current_object)) {
     sp--;
     return;
@@ -2329,7 +2326,7 @@ void f_set_hide(void) {
 #endif
 
 #ifdef F_SET_LIGHT
-void f_set_light(void) {
+void f_set_light() {
   object_t *o1;
 
   add_light(current_object, sp->u.number);
@@ -2344,15 +2341,15 @@ void f_set_light(void) {
 #endif
 
 #ifdef F_SET_PRIVS
-void f_set_privs(void) {
+void f_set_privs() {
   object_t *ob;
 
   ob = (sp - 1)->u.ob;
-  if (ob->privs != NULL) {
+  if (ob->privs != nullptr) {
     free_string(ob->privs);
   }
   if (!(sp->type == T_STRING)) {
-    ob->privs = NULL;
+    ob->privs = nullptr;
     sp--; /* It's a number */
   } else {
     ob->privs = make_shared_string(sp->u.string);
@@ -2364,7 +2361,7 @@ void f_set_privs(void) {
 #endif
 
 #ifdef F_SHADOW
-void f_shadow(void) {
+void f_shadow() {
   object_t *ob;
 
   ob = (sp - 1)->u.ob;
@@ -2407,14 +2404,14 @@ void f_shadow(void) {
 #endif
 
 #ifdef F_SHOUT
-void f_shout(void) {
+void f_shout() {
   shout_string(sp->u.string);
   free_string_svalue(sp--);
 }
 #endif
 
 #ifdef F_SHUTDOWN
-void f_shutdown(void) {
+void f_shutdown() {
   if (st_num_arg) {
     shutdownMudOS(sp->u.number);
   } else {
@@ -2425,7 +2422,7 @@ void f_shutdown(void) {
 #endif
 
 #ifdef F_SIZEOF
-void f_sizeof(void) {
+void f_sizeof() {
   size_t i;
 
   switch (sp->type) {
@@ -2463,7 +2460,7 @@ void f_sizeof(void) {
 #endif
 
 #ifdef F_SNOOP
-void f_snoop(void) {
+void f_snoop() {
   /*
    * This one takes a variable number of arguments. It returns 0 or an
    * object.
@@ -2487,9 +2484,9 @@ void f_snoop(void) {
 #endif
 
 #ifdef F_SPRINTF
-void f_sprintf(void) {
+void f_sprintf() {
   char *s;
-  int num_arg = st_num_arg;
+  int const num_arg = st_num_arg;
 
   s = string_print_formatted((sp - num_arg + 1)->u.string, num_arg - 1, sp - num_arg + 2);
   pop_n_elems(num_arg);
@@ -2507,7 +2504,7 @@ void f_sprintf(void) {
 #endif
 
 #ifdef F_STAT
-void f_stat(void) {
+void f_stat() {
   struct stat buf;
   const char *path;
   array_t *v;
@@ -2568,10 +2565,10 @@ void f_stat(void) {
  * Written 930706 by Luke Mewburn <zak@rmit.edu.au>
  */
 
-void f_strsrch(void) {
-  auto arg1 = sp - 2;
-  auto arg2 = sp - 1;
-  auto arg3 = sp;
+void f_strsrch() {
+  auto *arg1 = sp - 2;
+  auto *arg2 = sp - 1;
+  auto *arg3 = sp;
 
   // fast track empty string search
   if (arg1->u.string[0] == '\0') {
@@ -2617,10 +2614,10 @@ void f_strsrch(void) {
   size_t find_len = 0;
 
   if (arg2->type == T_NUMBER) {
-    UBool isError = false;
+    UBool is_error = false;
     int offset = 0;
-    U8_APPEND(buf, offset, sizeof(buf), arg2->u.number, isError);
-    if (isError) {
+    U8_APPEND(buf, offset, sizeof(buf), arg2->u.number, is_error);
+    if (is_error) {
       error("Invalid codepoint to search.");
     }
     buf[offset] = '\0';
@@ -2630,7 +2627,7 @@ void f_strsrch(void) {
     find = arg2->u.string;
     find_len = SVALUE_STRLEN(arg2);
   }
-  size_t src_len = SVALUE_STRLEN(arg1);
+  size_t const src_len = SVALUE_STRLEN(arg1);
 
   LPC_INT ret = -1;
   // only search if there is a chance.
@@ -2647,7 +2644,7 @@ void f_strsrch(void) {
 #endif
 
 #ifdef F_STRCMP
-void f_strcmp(void) {
+void f_strcmp() {
   int i;
 
   i = strcmp((sp - 1)->u.string, sp->u.string);
@@ -2658,7 +2655,7 @@ void f_strcmp(void) {
 #endif
 
 #ifdef F_STRINGP
-void f_stringp(void) {
+void f_stringp() {
   if (sp->type == T_STRING) {
     free_string_svalue(sp);
     *sp = const1;
@@ -2670,7 +2667,7 @@ void f_stringp(void) {
 #endif
 
 #ifdef F_BUFFERP
-void f_bufferp(void) {
+void f_bufferp() {
   if (sp->type == T_BUFFER) {
     free_buffer(sp->u.buf);
     *sp = const1;
@@ -2682,7 +2679,7 @@ void f_bufferp(void) {
 #endif
 
 #ifdef F_TELL_OBJECT
-void f_tell_object(void) {
+void f_tell_object() {
   tell_object((sp - 1)->u.ob, sp->u.string, SVALUE_STRLEN(sp));
   free_string_svalue(sp--);
   pop_stack();
@@ -2690,7 +2687,7 @@ void f_tell_object(void) {
 #endif
 
 #ifdef F_TELL_ROOM
-void f_tell_room(void) {
+void f_tell_room() {
   array_t *avoid;
   static array_t vtmp = {1,
 #ifdef DEBUGMALLOC_EXTENSIONS
@@ -2702,7 +2699,7 @@ void f_tell_room(void) {
 #endif
   };
 
-  int num_arg = st_num_arg;
+  int const num_arg = st_num_arg;
   svalue_t *arg = sp - num_arg + 1;
   object_t *ob;
 
@@ -2738,8 +2735,8 @@ void f_tell_room(void) {
 #endif
 
 #ifdef F_TEST_BIT
-void f_test_bit(void) {
-  int ind = (sp--)->u.number;
+void f_test_bit() {
+  int const ind = (sp--)->u.number;
 
   if (ind / 6 >= SVALUE_STRLEN(sp)) {
     free_string_svalue(sp);
@@ -2760,9 +2757,9 @@ void f_test_bit(void) {
 #endif
 
 #ifdef F_NEXT_BIT
-void f_next_bit(void) {
-  int start = (sp--)->u.number;
-  int len = SVALUE_STRLEN(sp);
+void f_next_bit() {
+  int const start = (sp--)->u.number;
+  int const len = SVALUE_STRLEN(sp);
   int which, bit = 0, value;
 
   if (!len || start / 6 >= len) {
@@ -2797,7 +2794,8 @@ void f_next_bit(void) {
           bit = which * 6 + 2;
         }
         break;
-      } else if (value & 0x38) {
+      }
+      if (value & 0x38) {
         if (value & 0x08) {
           bit = which * 6 + 3;
         } else if (value & 0x10) {
@@ -2822,11 +2820,11 @@ void f_next_bit(void) {
 #endif
 
 #ifdef F__THIS_OBJECT
-void f__this_object(void) { push_object(current_object); }
+void f__this_object() { push_object(current_object); }
 #endif
 
 #ifdef F_THIS_PLAYER
-void f_this_player(void) {
+void f_this_player() {
   if (sp->u.number) {
     if (current_interactive) {
       put_unrefed_object(current_interactive, "this_player(1)");
@@ -2857,7 +2855,7 @@ void f_set_this_player(void) {
 #endif
 
 #ifdef F_THROW
-void f_throw(void) {
+void f_throw() {
   free_svalue(&catch_value, "f_throw");
   catch_value = *sp--;
   throw_error(); /* do the longjump, with extra checks... */
@@ -2865,7 +2863,7 @@ void f_throw(void) {
 #endif
 
 #ifdef F__TO_FLOAT
-void f__to_float(void) {
+void f__to_float() {
   LPC_FLOAT temp = 0;
 
   switch (sp->type) {
@@ -2884,7 +2882,7 @@ void f__to_float(void) {
 #endif
 
 #ifdef F__TO_INT
-void f__to_int(void) {
+void f__to_int() {
   LPC_INT temp = 0;
   switch (sp->type) {
     case T_REAL:
@@ -2943,7 +2941,7 @@ void f__to_int(void) {
 #endif
 
 #ifdef F_TYPEOF
-void f_typeof(void) {
+void f_typeof() {
   const char *t = type_name(sp->type);
 
   free_svalue(sp, "f_typeof");
@@ -2952,7 +2950,7 @@ void f_typeof(void) {
 #endif
 
 #ifdef F_UNDEFINEDP
-void f_undefinedp(void) {
+void f_undefinedp() {
   if (sp->type == T_NUMBER) {
     if (!sp->u.number && (sp->subtype == T_UNDEFINED)) {
       *sp = const1;
@@ -2967,11 +2965,11 @@ void f_undefinedp(void) {
 #endif
 
 #ifdef F_UPTIME
-void f_uptime(void) { push_number(get_current_time() - boot_time); }
+void f_uptime() { push_number(get_current_time() - boot_time); }
 #endif
 
 #ifdef F_USERP
-void f_userp(void) {
+void f_userp() {
   int i;
 
   i = sp->u.ob->flags & O_ONCE_INTERACTIVE;
@@ -2981,7 +2979,7 @@ void f_userp(void) {
 #endif
 
 #ifdef F_USERS
-void f_users(void) {
+void f_users() {
   bool include_hidden = true;
 #ifdef F_SET_HIDE
   include_hidden = (current_object->flags & O_HIDDEN) || (valid_hide(current_object));
@@ -2991,7 +2989,7 @@ void f_users(void) {
   array_t *ret = allocate_empty_array(total);
 
   int i = 0;
-  for (auto user : users()) {
+  for (auto *user : users()) {
     if (!include_hidden) {
       if ((user->ob->flags & O_HIDDEN) != 0) {
         continue;
@@ -3011,7 +3009,7 @@ void f_users(void) {
 #endif
 
 #ifdef F_WIZARDP
-void f_wizardp(void) {
+void f_wizardp() {
   int i;
 
   i = sp->u.ob->flags & O_IS_WIZARD;
@@ -3021,7 +3019,7 @@ void f_wizardp(void) {
 #endif
 
 #ifdef F_VIRTUALP
-void f_virtualp(void) {
+void f_virtualp() {
   int i;
 
   i = sp->u.ob->flags & O_VIRTUAL;
@@ -3031,14 +3029,14 @@ void f_virtualp(void) {
 #endif
 
 #ifdef F_WRITE
-void f_write(void) {
+void f_write() {
   do_write(sp);
   pop_stack();
 }
 #endif
 
 #ifdef F_WRITE_BYTES
-void f_write_bytes(void) {
+void f_write_bytes() {
   int i = 0;
 
   switch (sp->type) {
@@ -3078,7 +3076,7 @@ void f_write_bytes(void) {
 #endif
 
 #ifdef F_WRITE_BUFFER
-void f_write_buffer(void) {
+void f_write_buffer() {
   int i = 0;
 
   if ((sp - 2)->type == T_STRING) {
@@ -3120,7 +3118,7 @@ void f_write_buffer(void) {
 #endif
 
 #ifdef F_WRITE_FILE
-void f_write_file(void) {
+void f_write_file() {
   int flags = 0;
 
   flags = (sp--)->u.number;
@@ -3132,7 +3130,7 @@ void f_write_file(void) {
 #endif
 
 #ifdef F_DUMP_FILE_DESCRIPTORS
-void f_dump_file_descriptors(void) {
+void f_dump_file_descriptors() {
   outbuffer_t out;
 
   outbuf_zero(&out);
@@ -3142,7 +3140,7 @@ void f_dump_file_descriptors(void) {
 #endif
 
 #ifdef F_RECLAIM_OBJECTS
-void f_reclaim_objects(void) {
+void f_reclaim_objects() {
   auto res = reclaim_objects(false);
   add_gametick_event(0, TickEvent::callback_type([] { remove_destructed_objects(); }));
   push_number(res);
@@ -3150,12 +3148,12 @@ void f_reclaim_objects(void) {
 #endif
 
 #ifdef F_MEMORY_INFO
-void f_memory_info(void) {
+void f_memory_info() {
   LPC_INT mem;
   object_t *ob;
 
   if (st_num_arg == 0) {
-    LPC_INT tot = calculate_and_maybe_print_memory_info(nullptr, -1);
+    LPC_INT const tot = calculate_and_maybe_print_memory_info(nullptr, -1);
     push_number(tot);
     return;
   }
@@ -3176,14 +3174,14 @@ void f_memory_info(void) {
 #endif
 
 #ifdef F_RELOAD_OBJECT
-void f_reload_object(void) {
+void f_reload_object() {
   reload_object(sp->u.ob);
   free_object(&(sp--)->u.ob, "f_reload_object");
 }
 #endif
 
 #ifdef F_QUERY_SHADOWING
-void f_query_shadowing(void) {
+void f_query_shadowing() {
   object_t *ob;
 
   if ((sp->type == T_OBJECT) && (ob = sp->u.ob)->shadowing) {
@@ -3198,7 +3196,7 @@ void f_query_shadowing(void) {
 #endif
 
 #ifdef F_SET_RESET
-void f_set_reset(void) {
+void f_set_reset() {
   const auto time_to_reset = CONFIG_INT(__TIME_TO_RESET__);
 
   if (st_num_arg == 2) {
@@ -3216,7 +3214,7 @@ void f_set_reset(void) {
 #endif
 
 #ifdef F_FLOATP
-void f_floatp(void) {
+void f_floatp() {
   if (sp->type == T_REAL) {
     sp->type = T_NUMBER;
     sp->u.number = 1;
@@ -3228,7 +3226,7 @@ void f_floatp(void) {
 #endif
 
 #ifdef F_FLUSH_MESSAGES
-void f_flush_messages(void) {
+void f_flush_messages() {
   if (st_num_arg == 1) {
     if (sp->u.ob->interactive) {
       flush_message(sp->u.ob->interactive);
@@ -3241,7 +3239,7 @@ void f_flush_messages(void) {
 #endif
 
 #ifdef F_FIRST_INVENTORY
-void f_first_inventory(void) {
+void f_first_inventory() {
   object_t *ob;
 
   ob = first_inventory(sp);
@@ -3255,7 +3253,7 @@ void f_first_inventory(void) {
 #endif
 
 #ifdef F_NEXT_INVENTORY
-void f_next_inventory(void) {
+void f_next_inventory() {
   object_t *ob;
 
   ob = sp->u.ob->next_inv;
@@ -3317,10 +3315,10 @@ void f_defer() {
 #endif
 
 #ifdef F_CRYPT
-void f_crypt(void) {
-  const int SHA512_PREFIX_LEN = 3;
-  const int SHA512_SALT_LEN = 16;
-  char salt[SHA512_PREFIX_LEN + SHA512_SALT_LEN + 1];
+void f_crypt() {
+  const int sh_a512_prefix_len = 3;
+  const int sh_a512_salt_len = 16;
+  char salt[sh_a512_prefix_len + sh_a512_salt_len + 1];
   const char *saltp = nullptr;
   const char *choice = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./";
 
@@ -3356,14 +3354,14 @@ void f_crypt(void) {
     salt[0] = '$';
     salt[1] = '6';
     salt[2] = '$';
-    for (auto i = 0; i < SHA512_SALT_LEN; i++) {
+    for (auto i = 0; i < sh_a512_salt_len; i++) {
       salt[3 + i] = choice[random_number(strlen(choice))];
     }
     salt[sizeof(salt) - 1] = '\0';
     saltp = salt;
   }
-  auto key = (sp - 1)->u.string;
-  auto result = __crypt(key, saltp);
+  const auto *key = (sp - 1)->u.string;
+  auto *result = __crypt(key, saltp);
   if (result == nullptr || (result && result[0] == '*')) {
     error("Error in crypt(), check your salt");
     return;
@@ -3375,11 +3373,11 @@ void f_crypt(void) {
 #endif
 
 #ifdef F_OLDCRYPT
-void f_oldcrypt(void) {
-  const int SALT_LEN = 8;
+void f_oldcrypt() {
+  const int salt_len = 8;
 
   const char *res, *p;
-  char salt[SALT_LEN + 1];
+  char salt[salt_len + 1];
   const char *choice = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ./";
 
   if (sp->type == T_STRING && SVALUE_STRLEN(sp) >= 2) {
@@ -3387,11 +3385,11 @@ void f_oldcrypt(void) {
   } else {
     int i;
 
-    for (i = 0; i < SALT_LEN; i++) {
+    for (i = 0; i < salt_len; i++) {
       salt[i] = choice[random_number(strlen(choice))];
     }
 
-    salt[SALT_LEN] = 0;
+    salt[salt_len] = 0;
     p = salt;
   }
   debug_message(
@@ -3404,7 +3402,7 @@ void f_oldcrypt(void) {
 #endif
 
 #ifdef F_RUSAGE
-void f_rusage(void) {
+void f_rusage() {
   mapping_t *m;
   struct rusage rus = {};
 

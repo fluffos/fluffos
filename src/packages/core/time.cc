@@ -25,11 +25,11 @@ void f_perf_counter_ns() {
 #endif
 
 #ifdef F_TIME
-void f_time(void) { push_number(get_current_time()); }
+void f_time() { push_number(get_current_time()); }
 #endif
 
 #ifdef F_CTIME
-void f_ctime(void) {
+void f_ctime() {
   char buf[255] = {};
   const char *cp = buf, *nl;
   char *p;
@@ -64,11 +64,11 @@ void f_ctime(void) {
 #ifdef F_LOCALTIME
 /* FIXME: most of the #ifdefs here should be based on configure checks
    instead.  Same for rusage() */
-void f_localtime(void) {
+void f_localtime() {
   struct tm res = {};
   time_t lt;
   lt = sp->u.number;
-  auto tm = localtime_r(&lt, &res);
+  auto *tm = localtime_r(&lt, &res);
 
   pop_stack();
 
@@ -77,7 +77,7 @@ void f_localtime(void) {
     return;
   }
 
-  auto vec = allocate_empty_array(11);
+  auto *vec = allocate_empty_array(11);
 
   vec->item[LT_SEC].type = T_NUMBER;
   vec->item[LT_SEC].u.number = tm->tm_sec;
@@ -129,7 +129,7 @@ void f_strftime() {
 
   const auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
   char buf[max_string_length];
-  int size = strftime(buf, sizeof(buf), arg_fmt, res_tm);
+  int const size = strftime(buf, sizeof(buf), arg_fmt, res_tm);
   buf[size] = '\0';
 
   pop_2_elems();

@@ -83,7 +83,7 @@
  * The first byte of the regexp internal "program" is actually this magic
  * number; the start node begins in the second byte.
  */
-#define MAGIC 0234
+enum { MAGIC = 0234 };
 
 /*
  * Structure for regexp "program".  This is essentially a linear encoding
@@ -102,31 +102,29 @@
  */
 
 /* definition   number  opnd?   meaning */
-#define END 0   /* no   End of program. */
-#define BOL 1   /* no   Match "" at beginning of line. */
-#define EOL 2   /* no   Match "" at end of line. */
-#define ANY 3   /* no   Match any one character. */
-#define ANYOF 4 /* str  Match any character in this string. */
-#define ANYBUT                                            \
-  5               /* str  Match any character not in this \
+enum {
+  END = 0,        /* no   End of program. */
+  BOL = 1,        /* no   Match "" at beginning of line. */
+  EOL = 2,        /* no   Match "" at end of line. */
+  ANY = 3,        /* no   Match any one character. */
+  ANYOF = 4,      /* str  Match any character in this string. */
+  ANYBUT = 5,     /* str  Match any character not in this \
                    * string. */
-#define BRANCH 6  /* node Match this alternative, or the nxt... */
-#define BACK 7    /* no   Match "", "nxt" ptr points backward. */
-#define EXACTLY 8 /* str  Match this string. */
-#define NOTHING 9 /* no   Match empty string. */
-#define STAR                                     \
-  10 /* node Match this (simple) thing 0 or more \
-      * times. */
-#define PLUS                                                     \
-  11                 /* node Match this (simple) thing 1 or more \
-                      * times. */
-#define WORDSTART 12 /* node matching a start of a word          */
-#define WORDEND 13   /* node matching an end of a word           */
-#define OPEN                                      \
-  20 /* no   Mark this point in input as start of \
-      * #n. */
-/* OPEN+1 is number 1, etc. */
-#define CLOSE 30 /* no   Analogous to OPEN. */
+  BRANCH = 6,     /* node Match this alternative, or the nxt... */
+  BACK = 7,       /* no   Match "", "nxt" ptr points backward. */
+  EXACTLY = 8,    /* str  Match this string. */
+  NOTHING = 9,    /* no   Match empty string. */
+  STAR = 10,      /* node Match this (simple) thing 0 or more \
+                   * times. */
+  PLUS = 11,      /* node Match this (simple) thing 1 or more \
+                   * times. */
+  WORDSTART = 12, /* node matching a start of a word          */
+  WORDEND = 13,   /* node matching an end of a word           */
+  OPEN = 20,      /* no   Mark this point in input as start of \
+                   * #n. */
+  /* OPEN+1 is number 1, etc. */
+  CLOSE = 30 /* no   Analogous to OPEN. */
+};
 
 /*
  * Opcode notes:
@@ -170,7 +168,7 @@
  * Utility definitions.
  */
 
-#define SPECIAL 0x100
+enum { SPECIAL = 0x100 };
 #define LBRAC ('(' | SPECIAL)
 #define RBRAC (')' | SPECIAL)
 #define ASTERIX ('*' | SPECIAL)
@@ -197,15 +195,17 @@
 #define CHARBITS 0xff
 #define UCHARAT(p) (*(unsigned char *)(p))
 
-#define ISWORDPART(c) (isalnum((unsigned char)c) || (c) == '_')
+#define ISWORDPART(c) (isalnum((unsigned char)(c)) || (c) == '_')
 
 /*
  * Flags to be passed up and down.
  */
-#define HASWIDTH 01 /* Known never to match null string. */
-#define SIMPLE 02   /* Simple enough to be STAR/PLUS operand. */
-#define SPSTART 04  /* Starts with * or +. */
-#define WORST 0     /* Worst case. */
+enum {
+  HASWIDTH = 01, /* Known never to match null string. */
+  SIMPLE = 02,   /* Simple enough to be STAR/PLUS operand. */
+  SPSTART = 04,  /* Starts with * or +. */
+  WORST = 0      /* Worst case. */
+};
 
 /*
  * Global work variables for regcomp().
@@ -231,7 +231,7 @@ static char *regnode(char /*op*/);
 static char *regnext(char * /*p*/);
 static void regc(char /*b*/);
 static void reginsert(char /*op*/, char * /*opnd*/);
-static void regtail(char * /*p*/, char * /*val*/);
+static void regtail(char * /*p*/, const char * /*val*/);
 static void regoptail(char * /*p*/, char * /*val*/);
 
 static void regerror(const char *s) {
@@ -773,7 +773,7 @@ static void reginsert(char op, char *opnd) {
 /*
  - regtail - set the next-pointer at the end of a node chain
  */
-static void regtail(char *p, char *val) {
+static void regtail(char *p, const char *val) {
   char *scan;
   char *temp;
   int offset;
@@ -834,7 +834,7 @@ static int regrepeat(char * /*p*/);
 #ifdef DEBUG
 int regnarrate = 0;
 void regdump(regexp * /*r*/);
-static char *regprop(char * /*op*/);
+static char *regprop(const char * /*op*/);
 
 #endif
 
@@ -919,9 +919,8 @@ static int regtry(regexp *prog, const char *string) {
     prog->startp[0] = string;
     prog->endp[0] = reginput;
     return (1);
-  } else {
-    return (0);
   }
+  return (0);
 }
 
 /*
@@ -940,7 +939,7 @@ static int regmatch(char *prog) {
 
   scan = prog;
 #ifdef DEBUG
-  if (scan != (char *)NULL && regnarrate) {
+  if (scan != (char *)nullptr && regnarrate) {
     debug_message("%s(\n", regprop(scan));
   }
 #endif
@@ -1040,9 +1039,9 @@ static int regmatch(char *prog) {
             regstartp[no] = save;
           }
           return (1);
-        } else {
-          return (0);
         }
+        return (0);
+
       } break;
       case CLOSE + 1:
       case CLOSE + 2:
@@ -1068,9 +1067,9 @@ static int regmatch(char *prog) {
             regendp[no] = save;
           }
           return (1);
-        } else {
-          return (0);
         }
+        return (0);
+
       } break;
       case BRANCH: {
         const char *save;
@@ -1201,14 +1200,13 @@ static char *regnext(char *p) {
 
   if (OP(p) == BACK) {
     return (p - offset);
-  } else {
-    return (p + offset);
   }
+  return (p + offset);
 }
 
 #ifdef DEBUG
 
-static char *regprop(char * /*op*/);
+static char *regprop(const char * /*op*/);
 
 /*
  - regdump - dump a regexp onto stdout in vaguely comprehensible form
@@ -1223,7 +1221,7 @@ void regdump(regexp *r) {
     op = OP(s);
     printf("%2td%s", (s - r->program), regprop(s)); /* Where, what. */
     nxt = regnext(s);
-    if (nxt == (char *)NULL) { /* nxt ptr. */
+    if (nxt == (char *)nullptr) { /* nxt ptr. */
       printf("(0)");
     } else {
       printf("(%td)", ((s - r->program) + (nxt - s)));
@@ -1247,7 +1245,7 @@ void regdump(regexp *r) {
   if (r->reganch) {
     printf("anchored ");
   }
-  if (r->regmust != (char *)NULL) {
+  if (r->regmust != (char *)nullptr) {
     printf("must have \"%s\"", r->regmust);
   }
   printf("\n");
@@ -1256,7 +1254,7 @@ void regdump(regexp *r) {
 /*
  - regprop - printable representation of opcode
  */
-static char *regprop(char *op) {
+static char *regprop(const char *op) {
   const char *p;
   static char buf[50];
 
@@ -1309,7 +1307,7 @@ static char *regprop(char *op) {
     case OPEN + 8:
     case OPEN + 9:
       sprintf(buf + strlen(buf), "OPEN%d", OP(op) - OPEN);
-      p = (char *)NULL;
+      p = (char *)nullptr;
       break;
     case CLOSE + 1:
     case CLOSE + 2:
@@ -1321,7 +1319,7 @@ static char *regprop(char *op) {
     case CLOSE + 8:
     case CLOSE + 9:
       sprintf(buf + strlen(buf), "CLOSE%d", OP(op) - CLOSE);
-      p = (char *)NULL;
+      p = (char *)nullptr;
       break;
     case STAR:
       p = "STAR";
@@ -1330,11 +1328,11 @@ static char *regprop(char *op) {
       p = "PLUS";
       break;
     default:
-      p = (char *)NULL;
+      p = (char *)nullptr;
       regerror("corrupted opcode\n");
       break;
   }
-  if (p != (char *)NULL) {
+  if (p != (char *)nullptr) {
     strcat(buf, p);
   }
   return (buf);
@@ -1448,11 +1446,11 @@ array_t *reg_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *def) {
 
   if (size) {
     struct regexp **rgpp;
-    struct reg_match {
+    struct RegMatch {
       int tok_i;
       const char *begin, *end;
-      struct reg_match *next;
-    } *rmp = (struct reg_match *)nullptr, *rmph = (struct reg_match *)nullptr;
+      struct RegMatch *next;
+    } *rmp = (struct RegMatch *)nullptr, *rmph = (struct RegMatch *)nullptr;
     int num_match = 0, length;
     svalue_t *sv1, *sv2, *sv;
     int regindex;
@@ -1498,18 +1496,18 @@ array_t *reg_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *def) {
       if (regindex >= 0) {
         num_match++;
         if (rmp) {
-          rmp->next = reinterpret_cast<struct reg_match *>(
-              DMALLOC(sizeof(struct reg_match), TAG_TEMPORARY, "reg_assoc : rmp->next"));
+          rmp->next = reinterpret_cast<struct RegMatch *>(
+              DMALLOC(sizeof(struct RegMatch), TAG_TEMPORARY, "reg_assoc : rmp->next"));
           rmp = rmp->next;
         } else {
-          rmph = rmp = reinterpret_cast<struct reg_match *>(
-              DMALLOC(sizeof(struct reg_match), TAG_TEMPORARY, "reg_assoc : rmp"));
+          rmph = rmp = reinterpret_cast<struct RegMatch *>(
+              DMALLOC(sizeof(struct RegMatch), TAG_TEMPORARY, "reg_assoc : rmp"));
         }
         tmpreg = rgpp[regindex];
         rmp->begin = tmpreg->startp[0];
         rmp->end = tmp = tmpreg->endp[0];
         rmp->tok_i = regindex;
-        rmp->next = (struct reg_match *)nullptr;
+        rmp->next = (struct RegMatch *)nullptr;
       } else {
         break;
       }
@@ -1574,18 +1572,17 @@ array_t *reg_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *def) {
       FREE((char *)rmp);
     }
     return ret;
-  } else { /* Default match */
-    svalue_t *temp;
-    svalue_t *sv;
+  } /* Default match */
+  svalue_t *temp;
+  svalue_t *sv;
 
-    (sv = ret->item)->type = T_ARRAY;
-    temp = (sv->u.arr = allocate_empty_array(1))->item;
-    assign_svalue_no_free(temp, str);
-    sv = &ret->item[1];
-    sv->type = T_ARRAY;
-    assign_svalue_no_free((sv->u.arr = allocate_empty_array(1))->item, def);
-    return ret;
-  }
+  (sv = ret->item)->type = T_ARRAY;
+  temp = (sv->u.arr = allocate_empty_array(1))->item;
+  assign_svalue_no_free(temp, str);
+  sv = &ret->item[1];
+  sv->type = T_ARRAY;
+  assign_svalue_no_free((sv->u.arr = allocate_empty_array(1))->item, def);
+  return ret;
 }
 #endif
 

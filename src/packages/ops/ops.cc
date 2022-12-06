@@ -620,7 +620,7 @@ void f_range(int code) {
   switch (sp->type) {
     case T_STRING: {
       int32_t from, to;
-      int32_t len = SVALUE_STRLEN(sp);
+      int32_t const len = SVALUE_STRLEN(sp);
 
       EGCSmartIterator iter(sp->u.string, len);
       if (!iter.ok()) {
@@ -961,19 +961,16 @@ void f_sub_eq() {
 #define SWITCH_CASE_SIZE (sizeof(LPC_INT) + sizeof(short))
 
 /* offsets from 'pc' */
-#define SW_TYPE 0
-#define SW_TABLE 1
-#define SW_ENDTAB 3
-#define SW_DEFAULT 5
+enum { SW_TYPE = 0, SW_TABLE = 1, SW_ENDTAB = 3, SW_DEFAULT = 5 };
 
 /* offsets used for range (L_ for lower member, U_ for upper member) */
-#define L_LOWER 0
+enum { L_LOWER = 0 };
 #define L_TYPE (sizeof(LPC_INT))
 #define L_UPPER (SWITCH_CASE_SIZE)
 #define L_ADDR (SWITCH_CASE_SIZE + sizeof(LPC_INT))
 #define U_LOWER (-SWITCH_CASE_SIZE)
 #define U_TYPE (-SWITCH_CASE_SIZE + sizeof(LPC_INT))
-#define U_UPPER 0
+enum { U_UPPER = 0 };
 #define U_ADDR (sizeof(LPC_INT))
 
 // FIXME: The variable naming scheme is horrible, need to
@@ -982,7 +979,7 @@ void f_switch() {
   unsigned short offset, end_off;
   LPC_INT i, d, s, r;
   char *l, *end_tab;
-  static unsigned short off_tab[] = {
+  static unsigned short const off_tab[] = {
       0 * SWITCH_CASE_SIZE,    1 * SWITCH_CASE_SIZE,    3 * SWITCH_CASE_SIZE,
       7 * SWITCH_CASE_SIZE,    15 * SWITCH_CASE_SIZE,   31 * SWITCH_CASE_SIZE,
       63 * SWITCH_CASE_SIZE,   127 * SWITCH_CASE_SIZE,  255 * SWITCH_CASE_SIZE,
@@ -1050,9 +1047,8 @@ void f_switch() {
       COPY_SHORT(&offset, pc + SW_DEFAULT);
       pc += offset;
       return;
-    } else {
-      fatal("unsupported switch table format.\n");
     }
+    fatal("unsupported switch table format.\n");
   }
   /*
    * l - current entry we are looking at.
@@ -1088,11 +1084,10 @@ void f_switch() {
         /* key not found, use default address */
         COPY_SHORT(&offset, pc + SW_DEFAULT);
         break;
-      } else {
-        /* d >= SWITCH_CASE_SIZE */
-        l -= d;
-        d >>= 1;
-      }
+      } /* d >= SWITCH_CASE_SIZE */
+      l -= d;
+      d >>= 1;
+
     } else if (s > r) {
       if (d < SWITCH_CASE_SIZE) {
         /* test if entry is part of a range */
@@ -1113,24 +1108,24 @@ void f_switch() {
         /* use default address */
         COPY_SHORT(&offset, pc + SW_DEFAULT);
         break;
-      } else { /* d >= SWITCH_CASE_SIZE */
-        l += d;
-        /* if table isn't a power of 2 in size, fix us up */
-        while (l >= end_tab) {
-          d >>= 1;
-          if (d < SWITCH_CASE_SIZE) {
-            d = 0;
-            break;
-          }
-          l -= d;
-        }
-        if (l == end_tab) {
-          /* use default address */
-          COPY_SHORT(&offset, pc + SW_DEFAULT);
+      } /* d >= SWITCH_CASE_SIZE */
+      l += d;
+      /* if table isn't a power of 2 in size, fix us up */
+      while (l >= end_tab) {
+        d >>= 1;
+        if (d < SWITCH_CASE_SIZE) {
+          d = 0;
           break;
         }
-        d >>= 1;
+        l -= d;
       }
+      if (l == end_tab) {
+        /* use default address */
+        COPY_SHORT(&offset, pc + SW_DEFAULT);
+        break;
+      }
+      d >>= 1;
+
     } else {
       /* s == r */
       COPY_SHORT(&offset, l + U_ADDR);
@@ -1224,7 +1219,7 @@ void f_function_constructor() {
   push_refed_funp(fp);
 }
 
-void f__evaluate(void) {
+void f__evaluate() {
   svalue_t *v;
   svalue_t *arg = sp - st_num_arg + 1;
 

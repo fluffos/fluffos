@@ -5,7 +5,7 @@
 
 #include "base/package_api.h"
 
-#include <math.h>
+#include <cmath>
 
 #include "matrix.h"
 
@@ -17,7 +17,7 @@ static Vector *normalize_array(Vector *);
 static Vector *cross_product(Vector *, Vector *, Vector *);
 static Vector *points_to_array(Vector *, Vector *, Vector *);
 
-void f_id_matrix(void) {
+void f_id_matrix() {
   array_t *matrix;
   int i;
 
@@ -29,7 +29,7 @@ void f_id_matrix(void) {
   push_refed_array(matrix);
 }
 
-void f_translate(void) {
+void f_translate() {
   array_t *matrix;
   LPC_FLOAT x, y, z;
   Matrix current_matrix;
@@ -74,7 +74,7 @@ void f_translate(void) {
   }
 }
 
-void f_scale(void) {
+void f_scale() {
   array_t *matrix;
   LPC_FLOAT x, y, z;
   Matrix current_matrix;
@@ -118,7 +118,7 @@ void f_scale(void) {
   }
 }
 
-void f_rotate_x(void) {
+void f_rotate_x() {
   array_t *matrix;
   LPC_FLOAT angle;
   Matrix current_matrix;
@@ -153,7 +153,7 @@ void f_rotate_x(void) {
   }
 }
 
-void f_rotate_y(void) {
+void f_rotate_y() {
   array_t *matrix;
   LPC_FLOAT angle;
   Matrix current_matrix;
@@ -188,7 +188,7 @@ void f_rotate_y(void) {
   }
 }
 
-void f_rotate_z(void) {
+void f_rotate_z() {
   array_t *matrix;
   LPC_FLOAT angle;
   Matrix current_matrix;
@@ -223,7 +223,7 @@ void f_rotate_z(void) {
   }
 }
 
-void f_lookat_rotate(void) {
+void f_lookat_rotate() {
   array_t *matrix;
   LPC_FLOAT x, y, z;
   Matrix current_matrix;
@@ -356,8 +356,8 @@ static Vector *points_to_array(Vector *v, Vector *pa, Vector *pb) {
   return (v);
 }
 
-void lookat_rotate(Matrix T, LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z, Matrix M) {
-  static Vector N, V, U;
+void lookat_rotate(const Matrix T, LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z, Matrix M) {
+  static Vector n, v, u;
   static Vector ep, lp;
 
   lp.x = x;
@@ -366,29 +366,29 @@ void lookat_rotate(Matrix T, LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z, Matrix M) {
   ep.x = T[12];
   ep.y = T[13];
   ep.z = T[14];
-  points_to_array(&N, &lp, &ep);
-  normalize_array(&N);
+  points_to_array(&n, &lp, &ep);
+  normalize_array(&n);
 
-  U.x = T[0];
-  U.y = T[4];
-  U.z = T[8];
-  cross_product(&V, &N, &U);
-  normalize_array(&V);
+  u.x = T[0];
+  u.y = T[4];
+  u.z = T[8];
+  cross_product(&v, &n, &u);
+  normalize_array(&v);
 
-  cross_product(&U, &V, &N);
-  normalize_array(&U);
+  cross_product(&u, &v, &n);
+  normalize_array(&u);
 
-  M[0] = U.x;
-  M[1] = V.x;
-  M[2] = N.x;
+  M[0] = u.x;
+  M[1] = v.x;
+  M[2] = n.x;
   M[3] = 0.;
-  M[4] = U.y;
-  M[5] = V.y;
-  M[6] = N.y;
+  M[4] = u.y;
+  M[5] = v.y;
+  M[6] = n.y;
   M[7] = 0.;
-  M[8] = U.z;
-  M[9] = V.z;
-  M[10] = N.z;
+  M[8] = u.z;
+  M[9] = v.z;
+  M[10] = n.z;
   M[11] = 0.;
 #if 0
   M[12] = ep.x;
@@ -401,24 +401,24 @@ void lookat_rotate(Matrix T, LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z, Matrix M) {
   M[13] = -V.x * ep.x - V.y * ep.y - V.z * ep.z;
   M[14] = -N.x * ep.x - N.y * ep.y - N.z * ep.z;
 #endif
-  M[12] = ((U.x * ep.x) + (U.y * ep.y) + (U.z * ep.z));
-  M[13] = ((V.x * ep.x) + (V.y * ep.y) + (V.z * ep.z));
-  M[14] = ((N.x * ep.x) + (N.y * ep.y) + (N.z * ep.z));
+  M[12] = ((u.x * ep.x) + (u.y * ep.y) + (u.z * ep.z));
+  M[13] = ((v.x * ep.x) + (v.y * ep.y) + (v.z * ep.z));
+  M[14] = ((n.x * ep.x) + (n.y * ep.y) + (n.z * ep.z));
   M[15] = 1.;
 
 #ifdef DEBUG
   print_array(&lp, "look point");
   print_array(&ep, "eye point");
-  print_array(&N, "normal array");
-  print_array(&V, "V = N x U");
-  print_array(&U, "U = V x N");
+  print_array(&n, "normal array");
+  print_array(&v, "V = N x U");
+  print_array(&u, "U = V x N");
   print_matrix(M, "final matrix");
 #endif /* DEBUG */
 }
 
 void lookat_rotate2(LPC_FLOAT ex, LPC_FLOAT ey, LPC_FLOAT ez, LPC_FLOAT lx, LPC_FLOAT ly,
                     LPC_FLOAT lz, Matrix M) {
-  static Vector N, V, U;
+  static Vector n, v, u;
   static Vector ep, lp;
 
   ep.x = ex;
@@ -427,29 +427,29 @@ void lookat_rotate2(LPC_FLOAT ex, LPC_FLOAT ey, LPC_FLOAT ez, LPC_FLOAT lx, LPC_
   lp.x = lx;
   lp.y = ly;
   lp.z = lz;
-  points_to_array(&N, &lp, &ep);
-  normalize_array(&N);
+  points_to_array(&n, &lp, &ep);
+  normalize_array(&n);
 
-  U.x = 0.;
-  U.y = 1.;
-  U.z = 0.;
-  cross_product(&V, &N, &U);
-  normalize_array(&V);
+  u.x = 0.;
+  u.y = 1.;
+  u.z = 0.;
+  cross_product(&v, &n, &u);
+  normalize_array(&v);
 
-  cross_product(&U, &V, &N);
-  normalize_array(&U);
+  cross_product(&u, &v, &n);
+  normalize_array(&u);
 
-  M[0] = U.x;
-  M[1] = V.x;
-  M[2] = N.x;
+  M[0] = u.x;
+  M[1] = v.x;
+  M[2] = n.x;
   M[3] = 0.;
-  M[4] = U.y;
-  M[5] = V.y;
-  M[6] = N.y;
+  M[4] = u.y;
+  M[5] = v.y;
+  M[6] = n.y;
   M[7] = 0.;
-  M[8] = U.z;
-  M[9] = V.z;
-  M[10] = N.z;
+  M[8] = u.z;
+  M[9] = v.z;
+  M[10] = n.z;
   M[11] = 0.;
 #if 0
   M[12] = ep.x;
@@ -462,17 +462,17 @@ void lookat_rotate2(LPC_FLOAT ex, LPC_FLOAT ey, LPC_FLOAT ez, LPC_FLOAT lx, LPC_
   M[13] = -V.x * ep.x - V.y * ep.y - V.z * ep.z;
   M[14] = -N.x * ep.x - N.y * ep.y - N.z * ep.z;
 #endif
-  M[12] = ((U.x * ep.x) + (U.y * ep.y) + (U.z * ep.z));
-  M[13] = ((V.x * ep.x) + (V.y * ep.y) + (V.z * ep.z));
-  M[14] = ((N.x * ep.x) + (N.y * ep.y) + (N.z * ep.z));
+  M[12] = ((u.x * ep.x) + (u.y * ep.y) + (u.z * ep.z));
+  M[13] = ((v.x * ep.x) + (v.y * ep.y) + (v.z * ep.z));
+  M[14] = ((n.x * ep.x) + (n.y * ep.y) + (n.z * ep.z));
   M[15] = 1.;
 
 #ifdef DEBUG
   print_array(&lp, "look point");
   print_array(&ep, "eye point");
-  print_array(&N, "normal array");
-  print_array(&V, "V = N x U");
-  print_array(&U, "U = V x N");
+  print_array(&n, "normal array");
+  print_array(&v, "V = N x U");
+  print_array(&u, "U = V x N");
   print_matrix(M, "final matrix");
 #endif /* DEBUG */
 }
@@ -590,7 +590,7 @@ void rotate_z_matrix(LPC_FLOAT a, Matrix m) {
   m[15] = 1.;
 }
 
-void mult_matrix(Matrix ma, Matrix mb, Matrix m) {
+void mult_matrix(const Matrix ma, const Matrix mb, Matrix m) {
   m[0] = ma[0] * mb[0] + ma[1] * mb[4] + ma[2] * mb[8] + ma[3] * mb[12];
 
   m[1] = ma[0] * mb[1] + ma[1] * mb[5] + ma[2] * mb[9] + ma[3] * mb[13];
