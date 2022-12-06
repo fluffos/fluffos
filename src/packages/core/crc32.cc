@@ -25,7 +25,7 @@ uint32_t compute_crc32(unsigned char *buf, int len) {
 }
 
 #ifdef F_CRC32
-void f_crc32(void) {
+void f_crc32() {
   int len;
   unsigned char *buf;
   uint32_t crc;

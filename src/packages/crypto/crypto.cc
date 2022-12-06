@@ -49,7 +49,7 @@ static char *hexdump(const unsigned char *data, int len) {
   return result;
 }
 
-void f_hash(void) {
+void f_hash() {
   const char *algo, *data;
   char *result = nullptr;
   int data_len;

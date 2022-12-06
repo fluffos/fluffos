@@ -98,7 +98,7 @@ int MD5Digest(BytE *buf,            /* Buffer to be digested.               */
 #define OC 0x98badcfe
 #define OD 0x10325476
 
-  uint32_t A = OA, B = OB, C = OC, D = OD;
+  uint32_t a = OA, b = OB, c = OC, d = OD;
   static uint32_t Block[16]; /* One block: 512 bits. */
 
   if (buflen > MD5_MAXLEN) {
@@ -124,95 +124,95 @@ int MD5Digest(BytE *buf,            /* Buffer to be digested.               */
   (a) += (b);
 
   /* Round 1 */
-  Tr(A, B, C, D, 0, 7, 1, F);
-  Tr(D, A, B, C, 1, 12, 2, F);
-  Tr(C, D, A, B, 2, 17, 3, F);
-  Tr(B, C, D, A, 3, 22, 4, F);
-  Tr(A, B, C, D, 4, 7, 5, F);
-  Tr(D, A, B, C, 5, 12, 6, F);
-  Tr(C, D, A, B, 6, 17, 7, F);
-  Tr(B, C, D, A, 7, 22, 8, F);
-  Tr(A, B, C, D, 8, 7, 9, F);
-  Tr(D, A, B, C, 9, 12, 10, F);
-  Tr(C, D, A, B, 10, 17, 11, F);
-  Tr(B, C, D, A, 11, 22, 12, F);
-  Tr(A, B, C, D, 12, 7, 13, F);
-  Tr(D, A, B, C, 13, 12, 14, F);
-  Tr(C, D, A, B, 14, 17, 15, F);
-  Tr(B, C, D, A, 15, 22, 16, F);
+  Tr(a, b, c, d, 0, 7, 1, F);
+  Tr(d, a, b, c, 1, 12, 2, F);
+  Tr(c, d, a, b, 2, 17, 3, F);
+  Tr(b, c, d, a, 3, 22, 4, F);
+  Tr(a, b, c, d, 4, 7, 5, F);
+  Tr(d, a, b, c, 5, 12, 6, F);
+  Tr(c, d, a, b, 6, 17, 7, F);
+  Tr(b, c, d, a, 7, 22, 8, F);
+  Tr(a, b, c, d, 8, 7, 9, F);
+  Tr(d, a, b, c, 9, 12, 10, F);
+  Tr(c, d, a, b, 10, 17, 11, F);
+  Tr(b, c, d, a, 11, 22, 12, F);
+  Tr(a, b, c, d, 12, 7, 13, F);
+  Tr(d, a, b, c, 13, 12, 14, F);
+  Tr(c, d, a, b, 14, 17, 15, F);
+  Tr(b, c, d, a, 15, 22, 16, F);
 
   /* Round 2 */
-  Tr(A, B, C, D, 1, 5, 17, G);
-  Tr(D, A, B, C, 6, 9, 18, G);
-  Tr(C, D, A, B, 11, 14, 19, G);
-  Tr(B, C, D, A, 0, 20, 20, G);
-  Tr(A, B, C, D, 5, 5, 21, G);
-  Tr(D, A, B, C, 10, 9, 22, G);
-  Tr(C, D, A, B, 15, 14, 23, G);
-  Tr(B, C, D, A, 4, 20, 24, G);
-  Tr(A, B, C, D, 9, 5, 25, G);
-  Tr(D, A, B, C, 14, 9, 26, G);
-  Tr(C, D, A, B, 3, 14, 27, G);
-  Tr(B, C, D, A, 8, 20, 28, G);
-  Tr(A, B, C, D, 13, 5, 29, G);
-  Tr(D, A, B, C, 2, 9, 30, G);
-  Tr(C, D, A, B, 7, 14, 31, G);
-  Tr(B, C, D, A, 12, 20, 32, G);
+  Tr(a, b, c, d, 1, 5, 17, G);
+  Tr(d, a, b, c, 6, 9, 18, G);
+  Tr(c, d, a, b, 11, 14, 19, G);
+  Tr(b, c, d, a, 0, 20, 20, G);
+  Tr(a, b, c, d, 5, 5, 21, G);
+  Tr(d, a, b, c, 10, 9, 22, G);
+  Tr(c, d, a, b, 15, 14, 23, G);
+  Tr(b, c, d, a, 4, 20, 24, G);
+  Tr(a, b, c, d, 9, 5, 25, G);
+  Tr(d, a, b, c, 14, 9, 26, G);
+  Tr(c, d, a, b, 3, 14, 27, G);
+  Tr(b, c, d, a, 8, 20, 28, G);
+  Tr(a, b, c, d, 13, 5, 29, G);
+  Tr(d, a, b, c, 2, 9, 30, G);
+  Tr(c, d, a, b, 7, 14, 31, G);
+  Tr(b, c, d, a, 12, 20, 32, G);
 
   /* Round 3 */
-  Tr(A, B, C, D, 5, 4, 33, H);
-  Tr(D, A, B, C, 8, 11, 34, H);
-  Tr(C, D, A, B, 11, 16, 35, H);
-  Tr(B, C, D, A, 14, 23, 36, H);
-  Tr(A, B, C, D, 1, 4, 37, H);
-  Tr(D, A, B, C, 4, 11, 38, H);
-  Tr(C, D, A, B, 7, 16, 39, H);
-  Tr(B, C, D, A, 10, 23, 40, H);
-  Tr(A, B, C, D, 13, 4, 41, H);
-  Tr(D, A, B, C, 0, 11, 42, H);
-  Tr(C, D, A, B, 3, 16, 43, H);
-  Tr(B, C, D, A, 6, 23, 44, H);
-  Tr(A, B, C, D, 9, 4, 45, H);
-  Tr(D, A, B, C, 12, 11, 46, H);
-  Tr(C, D, A, B, 15, 16, 47, H);
-  Tr(B, C, D, A, 2, 23, 48, H);
+  Tr(a, b, c, d, 5, 4, 33, H);
+  Tr(d, a, b, c, 8, 11, 34, H);
+  Tr(c, d, a, b, 11, 16, 35, H);
+  Tr(b, c, d, a, 14, 23, 36, H);
+  Tr(a, b, c, d, 1, 4, 37, H);
+  Tr(d, a, b, c, 4, 11, 38, H);
+  Tr(c, d, a, b, 7, 16, 39, H);
+  Tr(b, c, d, a, 10, 23, 40, H);
+  Tr(a, b, c, d, 13, 4, 41, H);
+  Tr(d, a, b, c, 0, 11, 42, H);
+  Tr(c, d, a, b, 3, 16, 43, H);
+  Tr(b, c, d, a, 6, 23, 44, H);
+  Tr(a, b, c, d, 9, 4, 45, H);
+  Tr(d, a, b, c, 12, 11, 46, H);
+  Tr(c, d, a, b, 15, 16, 47, H);
+  Tr(b, c, d, a, 2, 23, 48, H);
 
   /* Round 4 */
-  Tr(A, B, C, D, 0, 6, 49, I);
-  Tr(D, A, B, C, 7, 10, 50, I);
-  Tr(C, D, A, B, 14, 15, 51, I);
-  Tr(B, C, D, A, 5, 21, 52, I);
-  Tr(A, B, C, D, 12, 6, 53, I);
-  Tr(D, A, B, C, 3, 10, 54, I);
-  Tr(C, D, A, B, 10, 15, 55, I);
-  Tr(B, C, D, A, 1, 21, 56, I);
-  Tr(A, B, C, D, 8, 6, 57, I);
-  Tr(D, A, B, C, 15, 10, 58, I);
-  Tr(C, D, A, B, 6, 15, 59, I);
-  Tr(B, C, D, A, 13, 21, 60, I);
-  Tr(A, B, C, D, 4, 6, 61, I);
-  Tr(D, A, B, C, 11, 10, 62, I);
-  Tr(C, D, A, B, 2, 15, 63, I);
-  Tr(B, C, D, A, 9, 21, 64, I);
+  Tr(a, b, c, d, 0, 6, 49, I);
+  Tr(d, a, b, c, 7, 10, 50, I);
+  Tr(c, d, a, b, 14, 15, 51, I);
+  Tr(b, c, d, a, 5, 21, 52, I);
+  Tr(a, b, c, d, 12, 6, 53, I);
+  Tr(d, a, b, c, 3, 10, 54, I);
+  Tr(c, d, a, b, 10, 15, 55, I);
+  Tr(b, c, d, a, 1, 21, 56, I);
+  Tr(a, b, c, d, 8, 6, 57, I);
+  Tr(d, a, b, c, 15, 10, 58, I);
+  Tr(c, d, a, b, 6, 15, 59, I);
+  Tr(b, c, d, a, 13, 21, 60, I);
+  Tr(a, b, c, d, 4, 6, 61, I);
+  Tr(d, a, b, c, 11, 10, 62, I);
+  Tr(c, d, a, b, 2, 15, 63, I);
+  Tr(b, c, d, a, 9, 21, 64, I);
 
   /* Final adjustment of registers. */
-  A += OA;
-  B += OB;
-  C += OC;
-  D += OD;
+  a += OA;
+  b += OB;
+  c += OC;
+  d += OD;
 
   /* Store output. */
-  MIRROR(A);
-  memcpy(Digest, &A, sizeof(A));
-  MIRROR(B);
-  memcpy(&(Digest[4]), &B, sizeof(B));
-  MIRROR(C);
-  memcpy(&(Digest[8]), &C, sizeof(C));
-  MIRROR(D);
-  memcpy(&(Digest[12]), &D, sizeof(D));
+  MIRROR(a);
+  memcpy(Digest, &a, sizeof(a));
+  MIRROR(b);
+  memcpy(&(Digest[4]), &b, sizeof(b));
+  MIRROR(c);
+  memcpy(&(Digest[8]), &c, sizeof(c));
+  MIRROR(d);
+  memcpy(&(Digest[12]), &d, sizeof(d));
 
   /* Burn; earlier registers are more useful in attacks. */
-  A = B = C = D = 195952365;
+  a = b = c = d = 195952365;
 
   /* Ok. */
   return 1;
@@ -229,7 +229,7 @@ int MD5Digest(BytE *buf,            /* Buffer to be digested.               */
  *
  * Hell, perhaps sprintf (printing in hex) should be used..
  */
-int encode(unsigned char *whEre, BytE *data, int inputbytes) {
+int encode(unsigned char *whEre, const BytE *data, int inputbytes) {
   int i, w = 0;
 
 /* This number has to leave the 4 low-end bits free. */
@@ -245,7 +245,7 @@ int encode(unsigned char *whEre, BytE *data, int inputbytes) {
 }
 
 /* Gets raw data from printable string; opposite of encode().  */
-void decode(BytE *whEre, BytE *string, int stringbytes) {
+void decode(BytE *whEre, const BytE *string, int stringbytes) {
   int i;
 
   for (i = 0; i < stringbytes; i += 2) {
@@ -265,7 +265,7 @@ void getsalt(BytE *to, BytE *from) {
 #define MAGIC_SALTSEP '!'
 
   if (from) {
-    BytE Digest[16];
+    BytE digest[16];
 
     if (strlen(reinterpret_cast<char *>(from)) > MD5_SALTLEN * 2) {
       if (from[2 * MD5_SALTLEN] == MAGIC_SALTSEP) {
@@ -294,10 +294,10 @@ void getsalt(BytE *to, BytE *from) {
      * is indeed a valid, immediately accepted salt value (as above),
      * otherwise we'll end up right here again.
      */
-    custom_crypt(reinterpret_cast<char *>(from), MD5_VALID_SALT, Digest);
+    custom_crypt(reinterpret_cast<char *>(from), MD5_VALID_SALT, digest);
     memset(to, strlen(reinterpret_cast<char *>(from)), MD5_SALTLEN);
-    for (i = 0; i < sizeof(Digest); i++) {
-      to[i % MD5_SALTLEN] += Digest[i];
+    for (i = 0; i < sizeof(digest); i++) {
+      to[i % MD5_SALTLEN] += digest[i];
     }
 
     return;
@@ -307,8 +307,6 @@ void getsalt(BytE *to, BytE *from) {
   for (i = 0; i < MD5_SALTLEN; i++) {
     to[i] = random_number(256); /* port.c */
   }
-
-  return;
 }
 
 void crunchbuffer(BytE *buf,      /* Buffer to be crunched.       */
@@ -322,14 +320,14 @@ void crunchbuffer(BytE *buf,      /* Buffer to be crunched.       */
   used = *len;
 
   while (addlen > 0) {
-    BytE Digest[16];
+    BytE digest[16];
     int crunched;
 
     /* Reduce `buf' by digesting it. */
-    if (used > sizeof(Digest)) {
-      MD5Digest(buf, used, Digest);
-      memcpy(buf, Digest, sizeof(Digest));
-      used = sizeof(Digest);
+    if (used > sizeof(digest)) {
+      MD5Digest(buf, used, digest);
+      memcpy(buf, digest, sizeof(digest));
+      used = sizeof(digest);
     }
 
     /* Work out how many bytes we can add to `buf', and do it. */
@@ -343,8 +341,6 @@ void crunchbuffer(BytE *buf,      /* Buffer to be crunched.       */
   }
 
   *len = used;
-
-  return;
 }
 }  // namespace
 
@@ -363,13 +359,13 @@ void crunchbuffer(BytE *buf,      /* Buffer to be crunched.       */
  *
  */
 char *custom_crypt(const char *key, const char *salt, unsigned char *rawout) {
-  BytE Digest[16];
+  BytE digest[16];
   static BytE buffer[MD5_MAXLEN], abuffer[MD5_MAXLEN], thesalt[MD5_SALTLEN];
   int used = 0, len, i;
   static BytE /* encode()d salt, encode()d digest, salt seperator
                * and null terminating byte:
                */
-      ret[(MD5_SALTLEN * 2) + 1 + (sizeof(Digest) * 2) + 1];
+      ret[(MD5_SALTLEN * 2) + 1 + (sizeof(digest) * 2) + 1];
 
   /* Obtain the salt we have to use (either given in salt
    * arg or randomly generated one).
@@ -409,16 +405,16 @@ char *custom_crypt(const char *key, const char *salt, unsigned char *rawout) {
    */
   len = strlen(key);
   for (i = 3000 + (11 * len); i > 0; i--) {
-    if (!MD5Digest(abuffer, sizeof(abuffer), Digest)) {
+    if (!MD5Digest(abuffer, sizeof(abuffer), digest)) {
       return nullptr;
     }
-    memcpy(&(abuffer[(i + len) % (MD5_MAXLEN - sizeof(Digest))]), Digest, sizeof(Digest));
+    memcpy(&(abuffer[(i + len) % (MD5_MAXLEN - sizeof(digest))]), digest, sizeof(digest));
   }
 
-  ADDBUFFER(Digest, sizeof(Digest));
+  ADDBUFFER(digest, sizeof(digest));
 
   /* Use this generated buffer to do the actual digesting. */
-  if (!MD5Digest(buffer, sizeof(buffer), Digest)) {
+  if (!MD5Digest(buffer, sizeof(buffer), digest)) {
     return nullptr;
   }
 
@@ -428,12 +424,12 @@ char *custom_crypt(const char *key, const char *salt, unsigned char *rawout) {
   /* Now code the salt and the digest into the return string. */
   len = encode(ret, thesalt, sizeof(thesalt));
   ret[len++] = MAGIC_SALTSEP;
-  len += encode(&(ret[len]), Digest, sizeof(Digest));
+  len += encode(&(ret[len]), digest, sizeof(digest));
   ret[len] = 0;
 
   /* Give raw output (without salt info) if requested. */
   if (rawout) {
-    memcpy(rawout, Digest, sizeof(Digest));
+    memcpy(rawout, digest, sizeof(digest));
   }
 
   return reinterpret_cast<char *>(ret);

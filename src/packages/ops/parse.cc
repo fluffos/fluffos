@@ -256,7 +256,7 @@ Example:
    The main 'parse' routine stores these on call, making the entire
    parse_command() reentrant.
 */
-typedef struct parse_global_s {
+using parse_global_t = struct parse_global_s {
   struct parse_global_s *next;
 
   array_t *Id_list;
@@ -271,7 +271,7 @@ typedef struct parse_global_s {
   array_t *warr;
   array_t *patarr;
   array_t *obarr;
-} parse_global_t;
+};
 
 static parse_global_t *globals = nullptr;
 
@@ -288,9 +288,9 @@ static parse_global_t *globals = nullptr;
 #define parse_obarr (globals->obarr)
 
 static void load_lpc_info(int /*ix*/, object_t * /*ob*/);
-static void parse_clean_up(void);
-static void push_parse_globals(void);
-static void pop_parse_globals(void);
+static void parse_clean_up();
+static void push_parse_globals();
+static void pop_parse_globals();
 static void store_value(svalue_t * /*sp*/, int /*pos*/, int /*num*/, svalue_t * /*what*/);
 static void store_words_slice(svalue_t * /*sp*/, int /*pos*/, int /*num*/, array_t * /*warr*/,
                               int /*from*/, int /*to*/);
@@ -298,8 +298,7 @@ static svalue_t *sub_parse(array_t * /*obarr*/, array_t * /*patarr*/, int * /*pi
                            array_t * /*warr*/, int * /*cix_in*/, int * /*fail*/, svalue_t * /*sp*/);
 static svalue_t *one_parse(array_t * /*obarr*/, const char * /*pat*/, array_t * /*warr*/,
                            int * /*cix_in*/, int * /*fail*/, svalue_t * /*prep_param*/);
-static svalue_t *number_parse(array_t * /*obarr*/, array_t * /*warr*/, int * /*cix_in*/,
-                              int * /*fail*/);
+static svalue_t *number_parse(array_t * /*warr*/, int * /*cix_in*/, int * /*fail*/);
 static svalue_t *item_parse(array_t * /*obarr*/, array_t * /*warr*/, int * /*cix_in*/,
                             int * /*fail*/);
 #ifndef NO_ADD_ACTION
@@ -825,7 +824,7 @@ static svalue_t *one_parse(array_t *obarr, const char *pat, array_t *warr, int *
       break;
 
     case 'd':
-      pval = number_parse(obarr, warr, cix_in, fail);
+      pval = number_parse(warr, cix_in, fail);
       break;
 
     case '\'':
@@ -894,7 +893,7 @@ static const char *num10[] = {"",      "",      "twenty",  "thirty", "forty",
  *                      fail: Fail flag if parse did not match
  * Returns:             svalue holding result of parse.
  */
-static svalue_t *number_parse(array_t *obarr, array_t *warr, int *cix_in, int *fail) {
+static svalue_t *number_parse(array_t *warr, int *cix_in, int *fail) {
   int cix, ten, ones, num;
   char buf[100];
 
@@ -974,7 +973,7 @@ static svalue_t *item_parse(array_t *obarr, array_t *warr, int *cix_in, int *fai
   /* in case of errors */
   push_refed_array(tmp);
 
-  if ((pval = number_parse(obarr, warr, cix_in, fail))) {
+  if ((pval = number_parse(warr, cix_in, fail))) {
     tmp->item[0] = *pval;
   }
 
@@ -1012,16 +1011,15 @@ static svalue_t *item_parse(array_t *obarr, array_t *warr, int *cix_in, int *fai
       (*cix_in)--;
     }
     return nullptr;
-  } else {
-    if (*cix_in < warr->size) {
-      *cix_in = max_cix + 1;
-    }
-    if (!pval) {
-      tmp->item[0].type = T_NUMBER;
-      tmp->item[0].u.number = plur_flag ? 0 : 1;
-    }
-    ret = slice_array(tmp, 0, tix - 1);
   }
+  if (*cix_in < warr->size) {
+    *cix_in = max_cix + 1;
+  }
+  if (!pval) {
+    tmp->item[0].type = T_NUMBER;
+    tmp->item[0].u.number = plur_flag ? 0 : 1;
+  }
+  ret = slice_array(tmp, 0, tix - 1);
 
   parse_ret.type = T_ARRAY;
   parse_ret.u.arr = ret;
@@ -1267,7 +1265,8 @@ static int match_object(int obix, array_t *warr, int *cix_in, int *plur) {
               *plur = 1;
             }
             return 1;
-          } else if (check_adjectiv(obix, warr, old_cix, pos - 1)) {
+          }
+          if (check_adjectiv(obix, warr, old_cix, pos - 1)) {
             if (cplur > 1) {
               *plur = 1;
             }
@@ -1331,7 +1330,7 @@ static int find_string(const char *str, array_t *warr, int *cix_in) {
     }
     fpos = *cix_in;
     for (; (*cix_in - fpos) < split->size; (*cix_in)++) {
-      if (strcmp(split->item[*cix_in - fpos].u.string, warr->item[*cix_in].u.string)) {
+      if (strcmp(split->item[*cix_in - fpos].u.string, warr->item[*cix_in].u.string) != 0) {
         break;
       }
     }
@@ -1420,11 +1419,10 @@ static int check_adjectiv(int obix, array_t *warr, int from, int to) {
       }
       if ((member_string(adstr, ids) < 0) && (member_string(adstr, gAdjid_list_d) < 0)) {
         continue;
-      } else {
-        il = back + 1; /* Match "adj[il] adj[il+1] .. adj[back]" */
-        back = to;
-        break;
       }
+      il = back + 1; /* Match "adj[il] adj[il+1] .. adj[back]" */
+      back = to;
+      break;
     }
     if (back < to) {
       FREE(adstr); /* adj[il] does not match at all => no match */

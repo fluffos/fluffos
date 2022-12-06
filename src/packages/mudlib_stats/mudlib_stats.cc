@@ -14,7 +14,7 @@
 #include "packages/mudlib_stats/mudlib_stats.h"
 
 #ifdef F_DOMAIN_STATS
-void f_domain_stats(void) {
+void f_domain_stats() {
   mapping_t *m;
 
   if (st_num_arg) {
@@ -33,14 +33,14 @@ void f_domain_stats(void) {
 #endif
 
 #ifdef F_SET_AUTHOR
-void f_set_author(void) {
+void f_set_author() {
   set_author(sp->u.string);
   free_string_svalue(sp--);
 }
 #endif
 
 #ifdef F_AUTHOR_STATS
-void f_author_stats(void) {
+void f_author_stats() {
   mapping_t *m;
 
   if (st_num_arg) {
@@ -404,7 +404,6 @@ static void init_domain_for_ob(object_t *ob) {
    * present.
    */
   ob->stats.domain = add_stat_entry(domain_name, &domains);
-  return;
 }
 
 mudlib_stats_t *set_backbone_domain(const char *str) {
@@ -549,9 +548,8 @@ static mapping_t *get_stats(const char *str, mudlib_stats_t *list) {
       tmp = get_info(dl);
       tmp->ref--;
       return tmp;
-    } else {
-      return nullptr;
     }
+    return nullptr;
   }
   m = allocate_mapping(8);
   for (dl = list; dl; dl = dl->next) {

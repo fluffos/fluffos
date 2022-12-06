@@ -9,7 +9,7 @@
 
 #include "packages/sockets/socket_efuns.h"
 
-#include <inttypes.h>
+#include <cinttypes>
 #include <event2/event.h>
 #include <event2/util.h>
 #include <deque>
@@ -21,7 +21,7 @@
 #include <ws2tcpip.h>
 #define ERR(e) WSA##e
 #else
-#include <errno.h>
+#include <cerrno>
 #define ERR(e) e
 #endif
 
@@ -1036,9 +1036,9 @@ void socket_read_select_handler(int fd) {
           // Translate socket address into "address port" format.
           {
             char host[NI_MAXHOST], service[NI_MAXSERV];
-            int ret = getnameinfo(reinterpret_cast<struct sockaddr *>(&sockaddr), addrlen, host,
-                                  sizeof(host), service, sizeof(service),
-                                  NI_NUMERICHOST | NI_NUMERICSERV);
+            int const ret = getnameinfo(reinterpret_cast<struct sockaddr *>(&sockaddr), addrlen,
+                                        host, sizeof(host), service, sizeof(service),
+                                        NI_NUMERICHOST | NI_NUMERICSERV);
             if (ret) {
               debug(sockets, "socket_read_select_handler: bad addr: %s", evutil_gai_strerror(ret));
               addr[0] = '\0';
@@ -1484,8 +1484,8 @@ int get_socket_address(int fd, char *addr, int *port, int local) {
   addrlen = (local ? lpc_socks[fd].l_addrlen : lpc_socks[fd].r_addrlen);
 
   char host[NI_MAXHOST], service[NI_MAXSERV];
-  int ret = getnameinfo(sockaddr, addrlen, host, sizeof(host), service, sizeof(service),
-                        NI_NUMERICHOST | NI_NUMERICSERV);
+  int const ret = getnameinfo(sockaddr, addrlen, host, sizeof(host), service, sizeof(service),
+                              NI_NUMERICHOST | NI_NUMERICSERV);
   if (ret) {
 #ifdef IPV6
     strcpy(addr, "::");
@@ -1557,8 +1557,8 @@ static char *sockaddr_to_lpcaddr(struct sockaddr *addr, socklen_t len) {
   }
 
   char host[NI_MAXHOST], service[NI_MAXSERV];
-  int ret = getnameinfo(addr, len, host, sizeof(host), service, sizeof(service),
-                        NI_NUMERICHOST | NI_NUMERICSERV);
+  int const ret = getnameinfo(addr, len, host, sizeof(host), service, sizeof(service),
+                              NI_NUMERICHOST | NI_NUMERICSERV);
 
   if (ret) {
     debug(sockets, "sockaddr_to_string: %s.\n", evutil_gai_strerror(ret));
@@ -1633,7 +1633,7 @@ lpc_socket_t *lpc_socks_get(int i) {
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 // Mark all lpc sockets.
-void mark_sockets(void) {
+void mark_sockets() {
   int i;
   const char *s;
 

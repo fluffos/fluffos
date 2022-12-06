@@ -19,7 +19,7 @@ static object_t *ob;
 
 #ifdef F_EXPORT_UID
 
-void f_export_uid(void) {
+void f_export_uid() {
   if (current_object->euid == nullptr) {
     error("Illegal to export uid 0\n");
   }
@@ -38,18 +38,18 @@ void f_export_uid(void) {
 
 #ifdef F_GETEUID
 
-void f_geteuid(void) {
+void f_geteuid() {
   if (sp->type & T_OBJECT) {
     ob = sp->u.ob;
     if (ob->euid) {
       put_constant_string(ob->euid->name);
       free_object(&ob, "f_geteuid:1");
       return;
-    } else {
-      free_object(&ob, "f_geteuid:2");
-      *sp = const0;
-      return;
     }
+    free_object(&ob, "f_geteuid:2");
+    *sp = const0;
+    return;
+
   } else if (sp->type & T_FUNCTION) {
     funptr_t *fp;
     if ((fp = sp->u.fp)->hdr.owner && fp->hdr.owner->euid) {
@@ -66,7 +66,7 @@ void f_geteuid(void) {
 
 #ifdef F_GETUID
 
-void f_getuid(void) {
+void f_getuid() {
   ob = sp->u.ob;
 
   if (!ob->uid) {
@@ -81,7 +81,7 @@ void f_getuid(void) {
 
 #ifdef F_SETEUID
 
-void f_seteuid(void) {
+void f_seteuid() {
   svalue_t *arg;
   svalue_t *ret;
 
@@ -119,7 +119,7 @@ userid_t *root_uid = nullptr;
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_all_uid_nodes() {
-  for (auto i : uids) {
+  for (auto *i : uids) {
     ++EXTRA_REF(BLOCK(i->name));
   }
 }
@@ -134,34 +134,31 @@ userid_t *add_uid(const char *name) {
   if (i != uids.end()) {
     free_string(t_uid.name);
     return *i;
-  } else {
-    uid = reinterpret_cast<userid_t *>(DMALLOC(sizeof(userid_t), TAG_UID, "add_uid"));
-    uid->name = t_uid.name;
-    uids.insert(uid);
-    return uid;
   }
+  uid = reinterpret_cast<userid_t *>(DMALLOC(sizeof(userid_t), TAG_UID, "add_uid"));
+  uid->name = t_uid.name;
+  uids.insert(uid);
+  return uid;
 }
 
 userid_t *set_root_uid(const char *name) {
   if (!root_uid) {
     return root_uid = add_uid(name);
-  } else {
-    auto i = uids.find(root_uid);
-    uids.erase(i);
-    root_uid->name = make_shared_string(name);
-    uids.insert(root_uid);
-    return root_uid;
   }
+  auto i = uids.find(root_uid);
+  uids.erase(i);
+  root_uid->name = make_shared_string(name);
+  uids.insert(root_uid);
+  return root_uid;
 }
 
 userid_t *set_backbone_uid(const char *name) {
   if (!backbone_uid) {
     return backbone_uid = add_uid(name);
-  } else {
-    auto i = uids.find(backbone_uid);
-    uids.erase(i);
-    backbone_uid->name = make_shared_string(name);
-    uids.insert(backbone_uid);
-    return backbone_uid;
   }
+  auto i = uids.find(backbone_uid);
+  uids.erase(i);
+  backbone_uid->name = make_shared_string(name);
+  uids.insert(backbone_uid);
+  return backbone_uid;
 }

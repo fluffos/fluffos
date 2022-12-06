@@ -7,12 +7,12 @@
 #include "packages/core/file.h"
 
 #ifdef F_DUMP_PROG
-void f_dump_prog(void) {
+void f_dump_prog() {
   program_t *prog;
   const char *where;
   int d;
   object_t *ob;
-  int narg = st_num_arg;
+  int const narg = st_num_arg;
 
   if (st_num_arg == 2) {
     if ((sp - 1)->type != T_OBJECT) {

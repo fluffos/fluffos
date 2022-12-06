@@ -18,7 +18,6 @@ std::string symbol_dir = "log/symbol/";
 void symbol_enable(int op) { enable = op; }
 
 void symbol_start(const char *filename) {
-  int i;
   std::string symbolfile;
 
   if (!enable) return;
@@ -27,7 +26,7 @@ void symbol_start(const char *filename) {
   symbolfile.append(filename);
 
 #ifdef _WIN32
-  _mkdir(symbolDir.c_str());
+  _mkdir(symbol_dir.c_str());
 #else
   mkdir(symbol_dir.c_str(), 0700);
 #endif
