@@ -27,9 +27,9 @@ void fatal(const char *, ...);
 #define NOISY3(w, x, y, z)
 #endif
 
-typedef struct stats_s {
+using stats_t = struct stats_s {
   unsigned int free_calls, alloc_calls, realloc_calls;
-} stats_t;
+};
 
 static stats_t stats = {0, 0, 0};
 
@@ -40,7 +40,7 @@ void *debugrealloc(void *ptr, int size, int tag, const char *desc) {
 
   NOISY3("realloc: %i (%x), %s\n", size, ptr, desc);
   stats.realloc_calls++;
-  auto tmp = PTR_TO_NODET(ptr);
+  auto *tmp = PTR_TO_NODET(ptr);
   if (MDfree(tmp)) {
     tmp = reinterpret_cast<md_node_s *>(realloc(tmp, size + MD_OVERHEAD));
     MDmalloc(reinterpret_cast<md_node_t *>(tmp), size, tag, desc);
@@ -79,7 +79,7 @@ void *debugcalloc(int nitems, int size, int tag, const char *desc) {
 void debugfree(void *ptr) {
   NOISY1("free (%x)\n", ptr);
   stats.free_calls++;
-  auto tmp = PTR_TO_NODET(ptr);
+  auto *tmp = PTR_TO_NODET(ptr);
   if (MDfree(tmp)) {
     free(tmp); /* only free if safe to do so */
   }

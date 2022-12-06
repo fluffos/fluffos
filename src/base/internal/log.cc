@@ -32,7 +32,7 @@ void reset_debug_message_fp() {
     return;
   }
 
-  auto dlf = CONFIG_STR(__DEBUG_LOG_FILE__);
+  auto *dlf = CONFIG_STR(__DEBUG_LOG_FILE__);
   if (dlf && strlen(dlf)) {
     snprintf(deb, 1023, "%s/%s", CONFIG_STR(__LOG_DIR__), dlf);
   } else {
@@ -42,7 +42,7 @@ void reset_debug_message_fp() {
   while (*deb == '/') {
     deb++;
   }
-  auto new_location = fopen(deb, "w");
+  auto *new_location = fopen(deb, "w");
   if (!new_location) {
     debug_message("Unable to open log file: \"%s\", error: \"%s\".\n", deb, strerror(errno));
   } else {
@@ -90,7 +90,7 @@ void debug_message(const char *fmt, ...) {
 
 unsigned int debug_level = 0;
 
-#define NELEM(x) (sizeof(x) / sizeof(x[0]))
+#define NELEM(x) (sizeof(x) / sizeof((x)[0]))
 
 void debug_level_set(const char *level) {
   unsigned int i;

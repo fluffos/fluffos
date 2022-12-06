@@ -17,7 +17,7 @@
  * p = strput(p, end, ...);
  * p = strput(p, end, ...);
  */
-char *strput(char *, char *, const char *);
+char *strput(char *, const char *, const char *);
 char *strput_int(char *, char *, int);
 
 #endif /* SRC_BASE_STRPUT_H_ */

@@ -7,7 +7,7 @@
 
 #include <cstring>
 #include <cstdlib>
-#include <ctype.h>
+#include <cctype>
 
 /*
  * Check that it is an legal path. No '..' are allowed.
