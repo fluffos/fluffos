@@ -4,7 +4,7 @@
 
 #include <cstdio>
 
-char *strput(char *x, char *limit, const char *y) {
+char *strput(char *x, const char *limit, const char *y) {
   while ((*x++ = *y++)) {
     if (x == limit) {
       *(x - 1) = 0;

@@ -83,9 +83,9 @@ char *get_current_dir(char *buf, int limit) { return getcwd(buf, limit); /* POSI
 char *strdup(const char *str) {
   if (!str) {
     errno = EINVAL;
-    return NULL;
+    return nullptr;
   }
-  size_t ln = strlen(str);
+  size_t const ln = strlen(str);
   void *p = malloc(ln + 1);
   return static_cast<char *>(memcpy(p, str, ln + 1));
 }
