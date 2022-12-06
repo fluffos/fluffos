@@ -156,9 +156,9 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, std::chrono::milliseconds dela
 
   auto callback = [=] { return call_out(cop); };
   if (walltime) {
-    cop->tick_event = add_walltime_event(delay_msecs, tick_event::callback_type(callback));
+    cop->tick_event = add_walltime_event(delay_msecs, TickEvent::callback_type(callback));
   } else {
-    cop->tick_event = add_gametick_event(delay_ticks, tick_event::callback_type(callback));
+    cop->tick_event = add_gametick_event(delay_ticks, TickEvent::callback_type(callback));
   }
   return cop->handle;
 }

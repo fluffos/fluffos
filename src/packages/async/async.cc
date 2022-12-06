@@ -103,7 +103,7 @@ void thread_func() {
       }
 
       add_walltime_event(std::chrono::milliseconds(0),
-                         tick_event::callback_type([] { check_reqs(); }));
+                         TickEvent::callback_type([] { check_reqs(); }));
     }
   }
 }

@@ -21,7 +21,7 @@
 static std::vector<interactive_t *> all_users;
 
 interactive_t *user_add() {
-  auto user = reinterpret_cast<interactive_t *>(
+  auto *user = reinterpret_cast<interactive_t *>(
       DMALLOC(sizeof(interactive_t), TAG_INTERACTIVE, "new_conn_handler"));
   memset(user, 0, sizeof(*user));
   all_users.push_back(user);
@@ -40,10 +40,9 @@ const std::vector<interactive_t *> &users() { return all_users; }
 int users_num(bool include_hidden) {
   if (include_hidden) {
     return all_users.size();
-  } else {
-    return std::count_if(all_users.begin(), all_users.end(),
-                         [](interactive_t *user) { return (user->ob->flags & O_HIDDEN) == 0; });
   }
+  return std::count_if(all_users.begin(), all_users.end(),
+                       [](interactive_t *user) { return (user->ob->flags & O_HIDDEN) == 0; });
 }
 
 void users_foreach(std::function<void(interactive_t *)> func) {

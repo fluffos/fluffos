@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
 
   Tracer::setThreadName("lpcc main");
 
-  ScopedTracer _trace(__PRETTY_FUNCTION__);
+  ScopedTracer const trace(__PRETTY_FUNCTION__);
 
   if (argc != 3) {
     std::cerr << "Usage: lpcc <config> lpc_file" << std::endl;
@@ -29,13 +29,13 @@ int main(int argc, char** argv) {
   Tracer::begin("init_main", EventCategory::DEFAULT);
 
   // Initialize libevent, This should be done before executing LPC.
-  auto base = init_main(argc, argv);
+  auto* base = init_main(argc, argv);
 
   Tracer::end("init_main", EventCategory::DEFAULT);
 
   // Start running.
   {
-    ScopedTracer _tracer("vm_start");
+    ScopedTracer const tracer("vm_start");
 
     vm_start();
   }
@@ -45,7 +45,7 @@ int main(int argc, char** argv) {
   struct object_t* obj = nullptr;
 
   {
-    ScopedTracer _tracer("find_object");
+    ScopedTracer const tracer("find_object");
 
     error_context_t econ{};
     save_context(&econ);
@@ -63,7 +63,7 @@ int main(int argc, char** argv) {
   }
 
   {
-    ScopedTracer _tracer("dump_prog");
+    ScopedTracer const tracer("dump_prog");
 
     dump_prog(obj->prog, stdout, 1 | 2);
   }
