@@ -33,7 +33,7 @@
  * for it (i.e. define a failure label, and are set up to deal with
  * branching to it from arbitrary points).
  */
-#define IP_VALID(ip, ob) (ob && ip && ob->interactive == ip)
+#define IP_VALID(ip, ob) ((ob) && (ip) && (ob)->interactive == (ip))
 #define VALIDATE_IP(ip, ob) \
   if (!IP_VALID(ip, ob)) goto failure
 
@@ -43,8 +43,8 @@
 
 void add_vmessage(struct object_t *, const char *, ...);
 void add_message(struct object_t *, const char *, int);
-bool init_user_conn(void);
-void shutdown_external_ports(void);
+bool init_user_conn();
+void shutdown_external_ports();
 void set_prompt(const char *);
 void get_user_data(struct interactive_t *);
 int process_user_command(struct interactive_t *);

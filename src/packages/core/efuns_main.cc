@@ -3144,7 +3144,7 @@ void f_dump_file_descriptors(void) {
 #ifdef F_RECLAIM_OBJECTS
 void f_reclaim_objects(void) {
   auto res = reclaim_objects(false);
-  add_gametick_event(0, tick_event::callback_type([] { remove_destructed_objects(); }));
+  add_gametick_event(0, TickEvent::callback_type([] { remove_destructed_objects(); }));
   push_number(res);
 }
 #endif

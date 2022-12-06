@@ -2,19 +2,19 @@
 
 #include "mainlib.h"
 
-#include <locale.h>  // for setlocale, LC_ALL
+#include <clocale>  // for setlocale, LC_ALL
 #ifdef HAVE_SIGNAL_H
-#include <signal.h>  //  for signal, SIG_DFL, SIGABRT, etc
+#include <csignal>  //  for signal, SIG_DFL, SIGABRT, etc
 #endif
-#include <stddef.h>  // for size_t
-#include <stdio.h>   // for fprintf, stderr, printf, etc
-#include <stdlib.h>  // for exit
+#include <cstddef>  // for size_t
+#include <cstdio>   // for fprintf, stderr, printf, etc
+#include <cstdlib>  // for exit
 #ifdef HAVE_SYS_RESOURCE_H
 #include <sys/resource.h>  // for getrlimit
 #endif
 #ifdef TIME_WITH_SYS_TIME
 #include <sys/time.h>
-#include <time.h>
+#include <ctime>
 #else
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
@@ -95,7 +95,7 @@ void print_commandline(int argc, char **argv) {
 void print_version_and_time() {
   /* Print current time */
   {
-    time_t tm = get_current_time();
+    time_t const tm = get_current_time();
     char buf[256] = {};
     debug_message("Boot Time: %s", ctime_r(&tm, buf));
   }
@@ -108,7 +108,7 @@ void print_version_and_time() {
   {
     const char *ver;
     size_t resultlen = sizeof(ver);
-    mallctl("version", &ver, &resultlen, NULL, 0);
+    mallctl("version", &ver, &resultlen, nullptr, 0);
     debug_message("jemalloc Version: %s\n", ver);
   }
 #else
@@ -139,7 +139,7 @@ void sig_cld(int sig) {
  which restarts the MUD should take an exit code of 1 to mean don't
  restart
  */
-void sig_usr1(int sig) {
+void sig_usr1(int /*sig*/) {
   push_constant_string("Host machine shutting down");
   push_undefined();
   push_undefined();
@@ -149,7 +149,7 @@ void sig_usr1(int sig) {
 }
 
 /* Abort evaluation */
-void sig_usr2(int sig) {
+void sig_usr2(int /*sig*/) {
   debug_message("Received SIGUSR2, current eval aborted.\n");
   outoftime = 1;
 }
@@ -242,7 +242,7 @@ struct event_base *init_main(int argc, char **argv) {
   debug_message("Initializing internal stuff ....\n");
 
   // Initialize libevent, This should be done before executing LPC.
-  auto base = init_backend();
+  auto *base = init_backend();
   init_dns_event_base(base);
 
   // Initialize VM layer
@@ -300,8 +300,8 @@ int driver_main(int argc, char **argv) {
 #ifdef HAVE_JEMALLOC
   {
     bool var = true;
-    size_t varlen = sizeof(var);
-    mallctl("background_thread", NULL, NULL, &var, varlen);
+    size_t const varlen = sizeof(var);
+    mallctl("background_thread", nullptr, nullptr, &var, varlen);
   }
 #endif
 
@@ -321,7 +321,7 @@ int driver_main(int argc, char **argv) {
   // backward-cpp doesn't yet work on win32
 
   // register crash handlers
-  backward::SignalHandling sh;
+  backward::SignalHandling const sh;
   if (!sh.loaded()) {
     debug_message("Warning: Signal handler installation failed, not backtrace on crash!\n");
   }
@@ -352,7 +352,7 @@ int driver_main(int argc, char **argv) {
   }
 
   Tracer::setThreadName("FluffOS Main");
-  ScopedTracer _main_tracer(__PRETTY_FUNCTION__);
+  ScopedTracer const main_tracer(__PRETTY_FUNCTION__);
 
   // Set debug log level first.
   for (int i = 1; i < argc; i++) {
@@ -373,7 +373,7 @@ int driver_main(int argc, char **argv) {
   }
   debug_message("Final Debug Level: %d\n", debug_level);
 
-  auto base = init_main(argc, argv);
+  auto *base = init_main(argc, argv);
 
   debug_message("==== Runtime Config Table ====\n");
   print_rc_table();
@@ -390,37 +390,35 @@ int driver_main(int argc, char **argv) {
   for (int i = 1; i < argc; i++) {
     if (argv[i][0] != '-') {
       continue;
-    } else {
-      /*
+    } /*
        * Look at flags. ignore those already been tested.
        */
-      switch (argv[i][1]) {
-        case 'f': {
-          ScopedTracer _tracer("Driver Flag: calling master::flag", EventCategory::DEFAULT,
-                               [=] { return json{std::string(argv[i] + 2)}; });
+    switch (argv[i][1]) {
+      case 'f': {
+        ScopedTracer _tracer("Driver Flag: calling master::flag", EventCategory::DEFAULT,
+                             [=] { return json{std::string(argv[i] + 2)}; });
 
-          debug_message("Calling master::flag(\"%s\")...\n", argv[i] + 2);
+        debug_message("Calling master::flag(\"%s\")...\n", argv[i] + 2);
 
-          push_constant_string(argv[i] + 2);
-          auto ret = safe_apply_master_ob(APPLY_FLAG, 1);
-          if (ret == (svalue_t *)-1 || ret == nullptr || MudOS_is_being_shut_down) {
-            debug_message("Shutdown by master object.\n");
-            return -1;
-          }
+        push_constant_string(argv[i] + 2);
+        auto ret = safe_apply_master_ob(APPLY_FLAG, 1);
+        if (ret == (svalue_t *)-1 || ret == nullptr || MudOS_is_being_shut_down) {
+          debug_message("Shutdown by master object.\n");
+          return -1;
         }
-          continue;
-        case 'd':
-          continue;
-        case '-':
-          if (strcmp(argv[i], "--tracing") == 0) {
-            i++;
-            continue;
-          }
-          // fall-through
-        default:
-          debug_message("Unknown flag: %s\n", argv[i]);
-          exit(-1);
       }
+        continue;
+      case 'd':
+        continue;
+      case '-':
+        if (strcmp(argv[i], "--tracing") == 0) {
+          i++;
+          continue;
+        }
+        // fall-through
+      default:
+        debug_message("Unknown flag: %s\n", argv[i]);
+        exit(-1);
     }
   }
   if (MudOS_is_being_shut_down) {

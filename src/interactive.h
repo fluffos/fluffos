@@ -6,7 +6,7 @@
 
 #include "vm/vm.h"  // FIXME: for union string_or_func
 
-#define MAX_TEXT 1 * 1024 * 1024
+#define MAX_TEXT (1 * 1024 * 1024)
 
 #define I_NOECHO 0x1          /* input_to flag */
 #define I_NOESC 0x2           /* input_to flag */

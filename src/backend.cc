@@ -7,11 +7,11 @@
 #include <event2/dns.h>     // for evdns_set_log_fn
 #include <event2/event.h>   // for event_add, etc
 #include <event2/thread.h>  // for thread support
-#include <math.h>           // for exp
-#include <stdio.h>          // for NULL, sprintf
+#include <cmath>            // for exp
+#include <cstdio>           // for NULL, sprintf
 #ifdef TIME_WITH_SYS_TIME
 #include <sys/time.h>
-#include <time.h>
+#include <ctime>
 #else
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
@@ -92,15 +92,15 @@ namespace {
 struct event *g_ev_tick = nullptr;
 
 inline struct timeval gametick_timeval() {
-  static struct timeval val {
-    CONFIG_INT(__RC_GAMETICK_MSEC__) / 1000,             // secs
-        CONFIG_INT(__RC_GAMETICK_MSEC__) % 1000 * 1000,  // usecs
+  static struct timeval const val{
+      CONFIG_INT(__RC_GAMETICK_MSEC__) / 1000,         // secs
+      CONFIG_INT(__RC_GAMETICK_MSEC__) % 1000 * 1000,  // usecs
   };
   return val;
 }
 
 // Global structure to holding all events to be executed on gameticks.
-typedef std::multimap<decltype(g_current_gametick), tick_event *, std::less<>> TickQueue;
+using TickQueue = std::multimap<decltype(g_current_gametick), TickEvent *, std::less<>>;
 TickQueue g_tick_queue;
 
 // Call all events for current tick
@@ -115,7 +115,7 @@ inline void call_tick_events() {
   // callback, We need to keep looping until there isn't any eligible events
   // left.
   while (true) {
-    std::deque<tick_event *> all_events;
+    std::deque<TickEvent *> all_events;
     auto iter_end = g_tick_queue.upper_bound(g_current_gametick);
     // No more eligible events.
     if (iter_end == g_tick_queue.begin()) {
@@ -141,7 +141,7 @@ inline void call_tick_events() {
   }
 }
 
-void on_game_tick(evutil_socket_t fd, short what, void *arg) {
+void on_game_tick(evutil_socket_t /*fd*/, short /*what*/, void *arg) {
   call_tick_events();
   g_current_gametick++;
 
@@ -152,15 +152,15 @@ void on_game_tick(evutil_socket_t fd, short what, void *arg) {
 
 }  // namespace
 
-tick_event *add_gametick_event(int delay_ticks, tick_event::callback_type callback) {
-  auto *event = new tick_event(callback);
+TickEvent *add_gametick_event(int delay_ticks, TickEvent::callback_type callback) {
+  auto *event = new TickEvent(callback);
   g_tick_queue.insert(TickQueue::value_type(g_current_gametick + delay_ticks, event));
   return event;
 }
 
 namespace {
-void on_walltime_event(evutil_socket_t fd, short what, void *arg) {
-  auto *event = reinterpret_cast<tick_event *>(arg);
+void on_walltime_event(evutil_socket_t /*fd*/, short /*what*/, void *arg) {
+  auto *event = reinterpret_cast<TickEvent *>(arg);
   if (event->valid) {
     event->callback();
   }
@@ -169,9 +169,9 @@ void on_walltime_event(evutil_socket_t fd, short what, void *arg) {
 }  // namespace
 
 // Schedule a immediate event on main loop.
-tick_event *add_walltime_event(std::chrono::milliseconds delay_msecs,
-                               tick_event::callback_type callback) {
-  auto *event = new tick_event(callback);
+TickEvent *add_walltime_event(std::chrono::milliseconds delay_msecs,
+                              TickEvent::callback_type callback) {
+  auto *event = new TickEvent(callback);
   struct timeval val {
     (int)(delay_msecs.count() / 1000), (int)(delay_msecs.count() % 1000 * 1000),
   };
@@ -196,13 +196,13 @@ void clear_tick_events() {
 }
 
 namespace {
-void look_for_objects_to_swap(void);
+void look_for_objects_to_swap();
 }
 
 // FIXME:
 void call_remove_destructed_objects() {
   add_gametick_event(time_to_next_gametick(std::chrono::minutes(5)),
-                     tick_event::callback_type(call_remove_destructed_objects));
+                     TickEvent::callback_type(call_remove_destructed_objects));
   remove_destructed_objects();
 }
 /*
@@ -213,17 +213,17 @@ void backend(struct event_base *base) {
   g_current_gametick = 0;
 
   // Register various tick events
-  add_gametick_event(0, tick_event::callback_type(call_heart_beat));
+  add_gametick_event(0, TickEvent::callback_type(call_heart_beat));
   add_gametick_event(time_to_next_gametick(std::chrono::minutes(5)),
-                     tick_event::callback_type(look_for_objects_to_swap));
+                     TickEvent::callback_type(look_for_objects_to_swap));
   add_gametick_event(time_to_next_gametick(std::chrono::minutes(30)),
-                     tick_event::callback_type([] { return reclaim_objects(true); }));
+                     TickEvent::callback_type([] { return reclaim_objects(true); }));
 #ifdef PACKAGE_MUDLIB_STATS
   add_gametick_event(time_to_next_gametick(std::chrono::minutes(60)),
-                     tick_event::callback_type(mudlib_stats_decay));
+                     TickEvent::callback_type(mudlib_stats_decay));
 #endif
   add_gametick_event(time_to_next_gametick(std::chrono::minutes(5)),
-                     tick_event::callback_type(call_remove_destructed_objects));
+                     TickEvent::callback_type(call_remove_destructed_objects));
 
   // NOTE: we don't use EV_PERSITENT here because that use fix-rate scheduling.
   //
@@ -265,7 +265,7 @@ void look_for_objects_to_swap() {
 
   /* Next time is in 5 minutes */
   add_gametick_event(time_to_next_gametick(std::chrono::seconds(5 * 60)),
-                     tick_event::callback_type(look_for_objects_to_swap));
+                     TickEvent::callback_type(look_for_objects_to_swap));
 
   object_t *ob, *next_ob, *last_good_ob;
   /*
@@ -320,7 +320,7 @@ void look_for_objects_to_swap() {
          */
 
         if (ready_for_clean_up && (ob->flags & O_WILL_CLEAN_UP)) {
-          int save_reset_state = ob->flags & O_RESET_STATE;
+          int const save_reset_state = ob->flags & O_RESET_STATE;
 
           debug(d_flag, "clean up /%s\n", ob->obname);
 
@@ -360,8 +360,8 @@ void look_for_objects_to_swap() {
 
 namespace {
 // TODO: Figure out what to do with this.
-const int kNumConst = 5;
-const double consts[kNumConst]{
+const int K_NUM_CONST = 5;
+const double CONSTS[K_NUM_CONST]{
     exp(0 / 900.0), exp(-1 / 900.0), exp(-2 / 900.0), exp(-3 / 900.0), exp(-4 / 900.0),
 };
 double load_av = 0.0;
@@ -379,8 +379,8 @@ void update_load_av() {
     return;
   }
   n = now - last_time;
-  if (n < kNumConst) {
-    c = consts[n];
+  if (n < K_NUM_CONST) {
+    c = CONSTS[n];
   } else {
     c = exp(-n / 900.0);
   }
@@ -403,8 +403,8 @@ void update_compile_av(int lines) {
     return;
   }
   n = now - last_time;
-  if (n < kNumConst) {
-    c = consts[n];
+  if (n < K_NUM_CONST) {
+    c = CONSTS[n];
   } else {
     c = exp(-n / 900.0);
   }

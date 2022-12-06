@@ -13,7 +13,7 @@ static FILE *out = nullptr;
 
 static int enable = 0;
 
-std::string symbolDir = "log/symbol/";
+std::string symbol_dir = "log/symbol/";
 
 void symbol_enable(int op) { enable = op; }
 
@@ -23,15 +23,15 @@ void symbol_start(const char *filename) {
 
   if (!enable) return;
   if (out != nullptr) symbol_end();
-  symbolfile.append(symbolDir);
+  symbolfile.append(symbol_dir);
   symbolfile.append(filename);
 
 #ifdef _WIN32
   _mkdir(symbolDir.c_str());
 #else
-  mkdir(symbolDir.c_str(), 0700);
+  mkdir(symbol_dir.c_str(), 0700);
 #endif
-  for (size_t i = symbolDir.length(); i < symbolfile.length(); i++) {
+  for (size_t i = symbol_dir.length(); i < symbolfile.length(); i++) {
     if (symbolfile[i] == '/') symbolfile[i] = '#';
   }
 

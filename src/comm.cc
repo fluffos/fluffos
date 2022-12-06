@@ -13,9 +13,9 @@
 #include <event2/event.h>     // for EV_TIMEOUT, etc
 #include <event2/listener.h>  // for evconnlistener_free, etc
 #include <event2/util.h>      // for evutil_closesocket, etc
-#include <stdarg.h>           // for va_end, va_list, va_copy, etc
-#include <stdio.h>            // for snprintf, vsnprintf, fwrite, etc
-#include <string.h>           // for NULL, memcpy, strlen, etc
+#include <cstdarg>            // for va_end, va_list, va_copy, etc
+#include <cstdio>             // for snprintf, vsnprintf, fwrite, etc
+#include <cstring>            // for NULL, memcpy, strlen, etc
 #include <unistd.h>           // for gethostname
 #include <memory>             // for unique_ptr
 // Network stuff
@@ -58,7 +58,7 @@ static void print_prompt(interactive_t * /*ip*/);
 #define handle_snoop(str, len, who)
 #else
 #define handle_snoop(str, len, who) \
-  if ((who)->snooped_by) receive_snoop(str, len, who->snooped_by)
+  if ((who)->snooped_by) receive_snoop(str, len, (who)->snooped_by)
 
 static void receive_snoop(const char * /*buf*/, int /*len*/, object_t *ob);
 
@@ -66,7 +66,7 @@ static void receive_snoop(const char * /*buf*/, int /*len*/, object_t *ob);
 
 namespace {
 // User socket event
-struct user_event_data {
+struct UserEventData {
   int idx;
 };
 
@@ -83,7 +83,7 @@ void on_user_command(evutil_socket_t fd, short what, void *arg) {
   debug(event, "User has an full command ready: %d:%s%s%s%s \n", (int)fd,
         (what & EV_TIMEOUT) ? " timeout" : "", (what & EV_READ) ? " read" : "",
         (what & EV_WRITE) ? " write" : "", (what & EV_SIGNAL) ? " signal" : "");
-  auto user = reinterpret_cast<interactive_t *>(arg);
+  auto *user = reinterpret_cast<interactive_t *>(arg);
 
   if (user == nullptr) {
     DEBUG_FATAL("on_user_command: user == NULL, Driver BUG.");
@@ -116,8 +116,8 @@ void on_user_command(evutil_socket_t fd, short what, void *arg) {
   // maybe_schedule_user_command(user);
 }
 
-void on_user_read(bufferevent *bev, void *arg) {
-  auto user = reinterpret_cast<interactive_t *>(arg);
+void on_user_read(bufferevent * /*bev*/, void *arg) {
+  auto *user = reinterpret_cast<interactive_t *>(arg);
 
   if (user == nullptr) {
     DEBUG_FATAL("on_user_read: user == NULL, Driver BUG.");
@@ -131,8 +131,8 @@ void on_user_read(bufferevent *bev, void *arg) {
   // should probably move it here.
 }
 
-void on_user_write(bufferevent *bev, void *arg) {
-  auto user = reinterpret_cast<interactive_t *>(arg);
+void on_user_write(bufferevent * /*bev*/, void *arg) {
+  auto *user = reinterpret_cast<interactive_t *>(arg);
   if (user == nullptr) {
     DEBUG_FATAL("on_user_write: user == NULL, Driver BUG.");
     return;
@@ -140,8 +140,8 @@ void on_user_write(bufferevent *bev, void *arg) {
   // nothing to do.
 }
 
-void on_user_events(bufferevent *bev, short events, void *arg) {
-  auto user = reinterpret_cast<interactive_t *>(arg);
+void on_user_events(bufferevent * /*bev*/, short events, void *arg) {
+  auto *user = reinterpret_cast<interactive_t *>(arg);
 
   if (user == nullptr) {
     DEBUG_FATAL("on_user_events: user == NULL, Driver BUG.");
@@ -203,9 +203,9 @@ void new_conn_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
     return;
   } else {
     // For other connections go straight to no handshake necessary, schedule to logon.
-    auto base = evconnlistener_get_base(listener);
+    auto *base = evconnlistener_get_base(listener);
 
-    auto user = new_user(port, fd, addr, addrlen);
+    auto *user = new_user(port, fd, addr, addrlen);
     new_user_event_listener(base, user);
 
     if (user->connection_type == PORT_TELNET) {
@@ -215,8 +215,8 @@ void new_conn_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
 
     event_base_once(
         base, -1, EV_TIMEOUT,
-        [](evutil_socket_t fd, short what, void *arg) {
-          auto user = reinterpret_cast<interactive_t *>(arg);
+        [](evutil_socket_t /*fd*/, short /*what*/, void *arg) {
+          auto *user = reinterpret_cast<interactive_t *>(arg);
           on_user_logon(user);
         },
         (void *)user, nullptr);
@@ -232,7 +232,7 @@ interactive_t *new_user(port_def_t *port, evutil_socket_t fd, sockaddr *addr,
   /*
    * initialize new user interactive data structure.
    */
-  auto user = user_add();
+  auto *user = user_add();
 
   user->connection_type = port->kind;
   user->ob = master_ob;
@@ -248,7 +248,7 @@ interactive_t *new_user(port_def_t *port, evutil_socket_t fd, sockaddr *addr,
   }
 
   // Command handler
-  auto base = evconnlistener_get_base(port->ev_conn);
+  auto *base = evconnlistener_get_base(port->ev_conn);
   user->ev_command = evtimer_new(base, on_user_command, user);
 
   return user;
@@ -439,7 +439,7 @@ bool init_user_conn() {
 
       int ret;
 
-      auto mudip = CONFIG_STR(__MUD_IP__);
+      auto *mudip = CONFIG_STR(__MUD_IP__);
       if (mudip != nullptr && strlen(mudip) > 0) {
         ret = evutil_getaddrinfo(mudip, service, &hints, &res);
       } else {
@@ -476,7 +476,7 @@ bool init_user_conn() {
     }
 
     // Listen on connection event
-    auto conn = evconnlistener_new(
+    auto *conn = evconnlistener_new(
         g_event_base, new_conn_handler, &port,
         LEV_OPT_REUSEABLE | LEV_OPT_CLOSE_ON_FREE | LEV_OPT_CLOSE_ON_EXEC, 1024, fd);
     if (conn == nullptr) {
@@ -627,7 +627,7 @@ void add_vmessage(object_t *who, const char *format, ...) {
     if (result <= sizeof(buf)) {
       add_message(who, buf, result);
     } else {
-      std::unique_ptr<char[]> msg(new char[result + 1]);
+      std::unique_ptr<char[]> const msg(new char[result + 1]);
       result = vsnprintf(msg.get(), result + 1, format, args2);
       if (result < 0) break;
       add_message(who, msg.get(), result);
@@ -676,7 +676,7 @@ int flush_message(interactive_t *ip) {
       if (fd == -1) {
         return 0;
       }
-      auto output = bufferevent_get_output(ip->ev_buffer);
+      auto *output = bufferevent_get_output(ip->ev_buffer);
       auto total = evbuffer_get_length(output);
       if (total > 0) {
         evbuffer_unfreeze(output, 1);
@@ -770,7 +770,7 @@ void get_user_data(interactive_t *ip) {
       // Impossible, we don't handle it here
       break;
     case PORT_TELNET: {
-      int start = ip->text_end;
+      int const start = ip->text_end;
 
       // this will read data into ip->text
       telnet_recv(ip->telnet, reinterpret_cast<const char *>(&buf[0]), num_bytes);
@@ -1069,7 +1069,7 @@ static char *get_user_command(interactive_t *ip) {
   return user_command;
 } /* get_user_command() */
 
-static int escape_command(interactive_t *ip, char *user_command) {
+static int escape_command(interactive_t *ip, const char *user_command) {
   if (user_command[0] != '!') {
     return 0;
   }
@@ -1112,7 +1112,7 @@ static void process_input(interactive_t *ip, char *user_command) {
 
 #ifndef NO_ADD_ACTION
   if (ret->type == T_STRING) {
-    auto command = string_copy(ret->u.string, "current_command: " __CURRENT_FILE_LINE__);
+    auto *command = string_copy(ret->u.string, "current_command: " __CURRENT_FILE_LINE__);
     DEFER { FREE_MSTR(command); };
     parse_command(command, command_giver);
   } else {
@@ -1332,7 +1332,6 @@ void remove_interactive(object_t *ob, int dested) {
   FREE(ip);
   ob->interactive = nullptr;
   free_object(&ob, "remove_interactive");
-  return;
 } /* remove_interactive() */
 
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
@@ -1463,7 +1462,7 @@ int set_call(object_t *ob, sentence_t *sent, int flags) {
   if (ob == nullptr || sent == nullptr) {
     return (0);
   }
-  auto ip = ob->interactive;
+  auto *ip = ob->interactive;
   if (ip == nullptr || ip->input_to) {
     return (0);
   }
@@ -1619,7 +1618,7 @@ object_t *query_snooping(object_t *ob) {
   if (!(ob->flags & O_SNOOP)) {
     return nullptr;
   }
-  for (auto &user : users()) {
+  for (const auto &user : users()) {
     if (user->snooped_by == ob) {
       return user->ob;
     }
@@ -1640,8 +1639,8 @@ const char *sockaddr_to_string(const sockaddr *addr, socklen_t len) {
   static char result[NI_MAXHOST + NI_MAXSERV];
 
   char host[NI_MAXHOST], service[NI_MAXSERV];
-  int ret = getnameinfo(addr, len, host, sizeof(host), service, sizeof(service),
-                        NI_NUMERICHOST | NI_NUMERICSERV);
+  int const ret = getnameinfo(addr, len, host, sizeof(host), service, sizeof(service),
+                              NI_NUMERICHOST | NI_NUMERICSERV);
 
   if (ret) {
     debug(sockets, "sockaddr_to_string fail: %s.\n", evutil_gai_strerror(ret));
