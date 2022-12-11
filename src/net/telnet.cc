@@ -28,6 +28,7 @@ static const telnet_telopt_t my_telopts[] = {{TELNET_TELOPT_TM, TELNET_WILL, TEL
                                              {TELNET_TELOPT_GMCP, TELNET_WILL, TELNET_DO},
                                              {TELNET_TELOPT_CHARSET, TELNET_WILL, TELNET_DO},
                                              {TELNET_TELOPT_MSP, TELNET_WILL, TELNET_DO},
+                                             {TELNET_TELOPT_BINARY, TELNET_WILL, TELNET_DO},
                                              {-1, 0, 0}};
 
 // Telnet event handler
@@ -162,6 +163,9 @@ static inline void on_telnet_wont(unsigned char cmd, interactive_t *ip) {
 
 static inline void on_telnet_do(unsigned char cmd, interactive_t *ip) {
   switch (cmd) {
+    case TELNET_TELOPT_BINARY:
+      telnet_negotiate(ip->telnet, TELNET_WILL, TELNET_TELOPT_BINARY);
+      break;
     case TELNET_TELOPT_CHARSET:
       on_telnet_do_charset(ip->telnet);
       break;
