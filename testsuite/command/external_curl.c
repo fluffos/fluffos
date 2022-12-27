@@ -2,6 +2,8 @@ mapping fd_to_msg;
 mapping fd_to_obj;
 
 void on_read(int fd, string msg) {
+  debug_message(sprintf("on_read: %d \n", fd));
+
   fd_to_msg[fd] += sprintf("%s", msg);
 }
 
@@ -10,6 +12,8 @@ void on_write(int fd) {
 }
 
 void on_close(int fd) {
+  debug_message(sprintf("on_close: %d \n", fd));
+
   tell_object(fd_to_obj[fd], fd_to_msg[fd]);
   map_delete(fd_to_msg, fd);
   map_delete(fd_to_obj, fd);
