@@ -1200,6 +1200,8 @@ void socket_read_select_handler(int fd) {
   }
   if (cc == -1) {
     auto e = evutil_socket_geterror(lpc_socks[fd].fd);
+    debug(sockets, "read_socket_handler: %d (fd %d), error: (%d) %s.\n", fd, lpc_socks[fd].fd, e,
+          evutil_socket_error_to_string(e));
     switch (e) {
       case ERR(ECONNREFUSED):
         /* Evidentally, on Linux 1.2.1, ECONNREFUSED gets returned
