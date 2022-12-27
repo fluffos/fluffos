@@ -56,7 +56,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
   DEFER { posix_spawn_file_actions_destroy(&file_actions); };
 
   evutil_socket_t sv[2];
-  if (socketpair(PF_UNIX, SOCK_STREAM, 0, sv) == -1) {
+  if (evutil_socketpair(PF_UNIX, SOCK_STREAM, 0, sv) == -1) {
     return EESOCKET;
   }
   DEFER {
@@ -121,7 +121,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
   evutil_closesocket(sv[1]);
   sv[1] = -1;
 
-  int childfd = sv[0];
+  evutil_socket_t childfd = sv[0];
   sv[0] = -1;
 
   debug_message("Launching external command '%s %s', pid: %jd.\n", external_cmd[which],
@@ -147,8 +147,6 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
       }
       debug_message(res.c_str());
     } while (!WIFEXITED(status) && !WIFSIGNALED(status));
-    // notify LPC program
-    evutil_closesocket(childfd);
   }).detach();
 
   return fd;
@@ -256,7 +254,6 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
     debug_message("pid: %d exited with %d.\n", processInfo.dwProcessId, exitCode);
     CloseHandle(processInfo.hProcess);
     CloseHandle(processInfo.hThread);
-    closesocket(sv[0]);
   }).detach();
 
   return fd;
