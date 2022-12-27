@@ -22,7 +22,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Install packages
       run: brew install cmake pkg-config pcre libgcrypt openssl jemalloc icu4c mysql-client sqlite3
     - name: compile
