@@ -8,5 +8,6 @@ More commands:
 tests : run a series test to validate driver function.
 speed : run a benchmark.
 crasher: calling efun with random argument, attempt to crash driver.
+external_curl: use external_start to call curl
 
 Have fun.
