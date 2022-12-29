@@ -33,15 +33,26 @@ endif()
 #
 
 find_package(Git)
+find_program (BASH_EXECUTABLE bash)
 if(GIT_EXECUTABLE)
   execute_process(
           WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-          COMMAND "${GIT_EXECUTABLE}" describe --tags --always
+          COMMAND ${BASH_EXECUTABLE} -c "${GIT_EXECUTABLE} log --committer='Yucong Sun' -1 --format=%ct-%h"
           OUTPUT_VARIABLE GIT_HASH
-          OUTPUT_STRIP_TRAILING_WHITESPACE
-  )
-  set(PROJECT_VERSION ${GIT_HASH})
-  message("Git commit hash: ${PROJECT_VERSION}")
+          OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(
+          WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+          COMMAND ${BASH_EXECUTABLE} -c "if [[ $(${GIT_EXECUTABLE} log --committer='Yucong Sun' -1 --format=%h) != $( ${GIT_EXECUTABLE} log -1 --format=%h ) ]]; then echo -$(${GIT_EXECUTABLE} log -1 --format=%h); fi"
+          OUTPUT_VARIABLE GIT_LOCAL_COMMIT
+          OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(
+          WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+          COMMAND ${BASH_EXECUTABLE} -c "${GIT_EXECUTABLE} diff-index --quiet HEAD -- || echo -dirty"
+          OUTPUT_VARIABLE GIT_DIRTY
+          OUTPUT_STRIP_TRAILING_WHITESPACE)
+  set(PROJECT_VERSION "${GIT_HASH}${GIT_LOCAL_COMMIT}${GIT_DIRTY}")
+else()
+  set(PROJECT_VERSION "local")
 endif()
 
 message("FluffOS ${PROJECT_VERSION} (${CMAKE_BUILD_TYPE})")
