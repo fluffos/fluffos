@@ -14,11 +14,20 @@
 #include "base/internal/rc.h"
 #include "base/internal/EGCIterator.h"
 
+bool u8_validate(char**s) {
+  const auto *p = (const uint8_t *)(*s);
+  uint32_t codepoint, state = 0;
+
+  while (*p && state != UTF8_REJECT) decode(&state, &codepoint, *p++);
+  *s = (char *)p;
+  return state == UTF8_ACCEPT;
+}
+
 bool u8_validate(const char *s) {
   const auto *p = (const uint8_t *)s;
   uint32_t codepoint, state = 0;
 
-  while (*p) decode(&state, &codepoint, *p++);
+  while (*p && state != UTF8_REJECT) decode(&state, &codepoint, *p++);
 
   return state == UTF8_ACCEPT;
 }
@@ -27,7 +36,7 @@ bool u8_validate(const uint8_t *s, size_t len) {
   const auto *end = s + len;
   uint32_t codepoint, state = 0;
 
-  while (s < end && *s) decode(&state, &codepoint, *s++);
+  while (s < end && *s && state != UTF8_REJECT) decode(&state, &codepoint, *s++);
 
   return state == UTF8_ACCEPT;
 }
