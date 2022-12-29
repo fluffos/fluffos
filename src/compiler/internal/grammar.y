@@ -3,6 +3,11 @@
 /* TODO(sunyc): use %locations to eanble location tracking, for better error. */
 /* TODO(sunyc): use %define api.pure full to enable re-entrant parser. */
 
+%define lr.type ielr
+%define parse.error detailed
+%define parse.assert true
+%define parse.lac full
+
 %{
 #include "base/std.h"
 
@@ -212,10 +217,10 @@ all:
 
 program:
   program def possible_semi_colon { CREATE_TWO_VALUES($$, 0, $1, $2); }
-  | /* empty */ { $$ = 0; }
+  | /* empty */  %empty { $$ = 0; }
 ;
 
-possible_semi_colon:
+possible_semi_colon: %empty 
   /* empty */
   | ';' { yywarn("Extra ';'. Ignored."); }
 ;
@@ -233,7 +238,7 @@ number:
 ;
 
 optional_star:
-  /* empty */   { $$ = 0; }
+  /* empty */    %empty { $$ = 0; }
   |   '*'       { $$ = TYPE_MOD_ARRAY; }
 ;
 
@@ -308,7 +313,7 @@ member_name_list:
   |   member_name ',' member_name_list
 ;
 
-member_list:
+member_list: %empty 
   /* empty */
   | member_list basic_type { current_type = $2; }
       member_name_list ';'
@@ -350,7 +355,7 @@ atomic_type:
 
 opt_atomic_type:
   atomic_type
-  | /* empty */ { $$ = TYPE_ANY; }
+  | /* empty */  %empty { $$ = TYPE_ANY; }
 ;
 
 basic_type:
@@ -391,7 +396,7 @@ new_arg:
 
 argument:
   /* empty */
-    {
+     %empty {
       $$.num_arg = 0;
       $$.flags = 0;
     }
@@ -439,7 +444,7 @@ argument_list:
 
 type_modifier_list:
   /* empty */
-    {
+     %empty {
       $$ = 0;
     }
   | L_TYPE_MODIFIER type_modifier_list
@@ -476,7 +481,7 @@ cast:
 opt_basic_type:
   basic_type
   | /* empty */
-    {
+     %empty {
       $$ = TYPE_UNKNOWN;
     }
 ;
@@ -580,7 +585,7 @@ decl_block: block | for | foreach ;
 
 local_declarations:
   /* empty */
-    {
+     %empty {
       $$.node = 0;
       $$.num = 0;
     }
@@ -707,7 +712,7 @@ local_name_list:
 
 statements:
   /* empty */
-    {
+     %empty {
       $$ = 0;
     }
   | statement statements
@@ -917,7 +922,7 @@ foreach:
 
 for_expr:
   /* EMPTY */
-    {
+     %empty {
       $$ = 0;
     }
   | comma_expr
@@ -989,7 +994,7 @@ switch_block:
       } else $$ = $1;
     }
   | /* empty */
-    {
+     %empty {
       $$ = 0;
     }
 ;
@@ -2086,7 +2091,7 @@ return:
 
 expr_list:
   /* empty */
-    {
+     %empty {
       CREATE_EXPR_LIST($$, 0);
     }
   | expr_list2
@@ -2129,7 +2134,7 @@ expr_list2:
 
 expr_list3:
   /* empty */
-    {
+     %empty {
       /* this is a dummy node */
       CREATE_EXPR_LIST($$, 0);
     }
@@ -2899,7 +2904,7 @@ time_expression:
 
 lvalue_list:
   /* empty */
-    {
+     %empty {
       $$ = new_node_no_line();
       $$->r.expr = 0;
       $$->v.number = 0;
@@ -2957,7 +2962,7 @@ class_init:
 
 opt_class_init:
   /* empty */
-    {
+     %empty {
       $$ = 0;
     }
   | opt_class_init ',' class_init
@@ -3390,7 +3395,7 @@ cond:
 ;
 
 optional_else_part:
-  /* empty */ %prec LOWER_THAN_ELSE
+  /* empty */  %empty %prec LOWER_THAN_ELSE
     {
       $$ = 0;
     }

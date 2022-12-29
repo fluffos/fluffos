@@ -25,6 +25,7 @@
 #include <vector>
 #include <algorithm>  // for std::sort
 #include <unicode/ustring.h>
+#include <fmt/format.h>
 
 #include "vm/vm.h"
 #include "include/function.h"
@@ -269,6 +270,8 @@ static ident_hash_elem_t *quick_alloc_ident_entry(void);
 static LPC_INT cond_get_exp(int /*priority*/);
 static void handle_cond(LPC_INT /*c*/);
 
+int parseStringLiteral(unsigned char c);
+int parseHexIntegerLiteral(unsigned char c);
 static defn_t *defns[DEFHASH];
 static ifstate_t *iftop = nullptr;
 
@@ -481,7 +484,7 @@ static LPC_INT cond_get_exp(int priority) {
       c = exgetc();
     } while (is_wspace(c));
     if (c != ')') {
-      yyerror("bracket not paired in #if");
+      lexerror("bracket not paired in #if");
       if (!c) {
         *--outp = '\0';
       }
@@ -665,7 +668,7 @@ static LPC_INT cond_get_exp(int priority) {
           c = exgetc();
         } while (isspace(c));
         if (c != ':') {
-          yyerror("'?' without ':' in #if");
+          lexerror("'?' without ':' in #if");
           outp--;
           return 0;
         }
@@ -1194,7 +1197,7 @@ static int get_array_block(char *term) {
        * spans across chunks) fudge for "\",\"TERMINAL?\0", where '?'
        * is unknown
        */
-      if (len + termlen + 5 > MAXCHUNK) {
+      if (len + termlen + 6 > MAXCHUNK) {
         if (curchunk == NUMCHUNKS - 1) {
           res = -2;
           outp = yyp;
@@ -1214,6 +1217,7 @@ static int get_array_block(char *term) {
        */
       array_line[curchunk][len++] = '"';
       array_line[curchunk][len++] = ',';
+      array_line[curchunk][len++] = '\n';
       array_line[curchunk][len++] = '"';
       array_line[curchunk][len] = '\0';
 
@@ -1571,6 +1575,50 @@ char *show_error_context() {
   return buf;
 }
 
+std::vector<std::string> prepare_logs(const char *error_file, int line, const char *what, int flag,
+                                      bool include_error_context) {
+  std::vector<std::string> logs;
+  logs.emplace_back(
+      fmt::format("/{} line {}: {}{}\n", error_file, line, flag ? "Warning: " : "", what));
+
+  if (include_error_context) {
+    if (static_cast<unsigned char>(outp[-1]) != LEX_EOF) {
+      const char *start = outp;
+      while (start != &cur_lbuf->buf[0]) {
+        if (start[-1] == '\n' || start[-1] == LEX_EOF) {
+          break;
+        }
+        start--;
+      }
+
+      const char *end = outp;
+      while (end != cur_lbuf->buf_end && *end != LEX_EOF) {
+        if (end[1] == '\n' || end[1] == LEX_EOF) {
+          break;
+        }
+        end++;
+      }
+
+      auto size = end - start;
+      if (size > 0) {
+        bool truncated = false;
+        if (size > 120) {
+          size = 117;
+          truncated = true;
+        }
+        std::string content{start, static_cast<std::string::size_type>(size)};
+        if (truncated) content += "...";
+        content = trim(content);
+        logs.emplace_back(fmt::format("  {}\n", content));
+        logs.emplace_back(
+            fmt::format("  {}^\n", std::string(truncated ? content.size() : (outp - start), ' ')));
+      }
+    }
+  }
+
+  return logs;
+}
+
 static void refill_buffer() {
   if (cur_lbuf != &head_lbuf) {
     if (outp >= cur_lbuf->buf_end && cur_lbuf->term_type == TERM_ADD_INPUT) {
@@ -1616,7 +1664,7 @@ static void refill_buffer() {
         *(last_nl = p) = LEX_EOF;
         if (*(last_nl - 1) != '\n') {
           if (size + 1 > MAXLINE) {
-            yyerror("No newline at end of file.");
+            lexerror("No newline at end of file.");
           }
           *p++ = '\n';
           *(last_nl = p) = LEX_EOF;
@@ -1682,7 +1730,7 @@ static void refill_buffer() {
         *(last_nl = p) = LEX_EOF;
         if (*(last_nl - 1) != '\n') {
           if (size + 1 > MAXLINE) {
-            yyerror("No newline at end of file.");
+            lexerror("No newline at end of file.");
           }
           *p++ = '\n';
           *(last_nl = p) = LEX_EOF;
@@ -1710,7 +1758,7 @@ void push_function_context() {
   parse_node_t *node;
 
   if (last_function_context == MAX_FUNCTION_DEPTH - 1) {
-    yyerror("Function pointers nested too deep.");
+    lexerror("Function pointers nested too deep.");
     return;
   }
   fc = &function_context_stack[++last_function_context];
@@ -1769,9 +1817,9 @@ int yylex() {
   partial[0] = 0;
 
   for (;;) {
-    if (lex_fatal) {
-      return -1;
-    }
+//    if (lex_fatal) {
+//      return -1;
+//    }
     switch (c = *outp++) {
       case LEX_EOF:
         if (inctop) {
@@ -1813,7 +1861,7 @@ int yylex() {
         if (iftop) {
           ifstate_t *p = iftop;
 
-          yyerror(p->state == EXPECT_ENDIF ? "Missing #endif" : "Missing #else/#elif");
+          lexerror(p->state == EXPECT_ENDIF ? "Missing #endif" : "Missing #else/#elif");
           while (iftop) {
             p = iftop;
             iftop = p->next;
@@ -2021,40 +2069,40 @@ int yylex() {
             return '(';
           }
         }
-
-      case '$':
+      // $var
+      case '$': {
         if (!current_function_context) {
-          yyerror("$var illegal outside of function pointer.");
-          return '$';
+          lexerror("$var illegal outside of function pointer.");
+          return YYerror;
         }
         if (current_function_context->num_parameters < 0) {
-          yyerror("$var illegal inside anonymous function pointer.");
-          return '$';
-        } else {
-          if (!isdigit(c = *outp++)) {
-            outp--;
-            return '$';
-          }
-          yyp = yytext;
-          SAVEC;
-          for (;;) {
-            if (!isdigit(c = *outp++)) {
-              break;
-            }
-            SAVEC;
-          }
-          outp--;
-          *yyp = 0;
-          yylval.number = atoll(yytext) - 1;
-          if (yylval.number < 0) {
-            yyerror("In function parameter $num, num must be >= 1.");
-          } else if (yylval.number > 254) {
-            yyerror("only 255 parameters allowed.");
-          } else if (yylval.number >= current_function_context->num_parameters) {
-            current_function_context->num_parameters = yylval.number + 1;
-          }
-          return L_PARAMETER;
+          lexerror("$var illegal inside anonymous function pointer.");
+          return YYerror;
         }
+        if (!isdigit(c = *outp++)) {
+          outp--;
+          return '$';
+        }
+        yyp = yytext;
+        SAVEC;
+        for (;;) {
+          if (!isdigit(c = *outp++)) {
+            break;
+          }
+          SAVEC;
+        }
+        outp--;
+        *yyp = 0;
+        yylval.number = atoll(yytext) - 1;
+        if (yylval.number < 0) {
+          lexerror("In function parameter $num, num must be >= 1.");
+        } else if (yylval.number > 254) {
+          lexerror("only 255 parameters allowed.");
+        } else if (yylval.number >= current_function_context->num_parameters) {
+          current_function_context->num_parameters = yylval.number + 1;
+        }
+        return L_PARAMETER;
+      }
       case ')':
       case '{':
       case '}':
@@ -2197,7 +2245,7 @@ int yylex() {
               add_input(sp);
               cond = cond_get_exp(0);
               if (*outp++) {
-                yyerror("Condition too complex in #if");
+                lexerror("Condition too complex in #if");
                 while (*outp++) {
                   ;
                 }
@@ -2222,7 +2270,7 @@ int yylex() {
               deltrail(sp);
               if ((d = lookup_define(sp))) {
                 if (d->flags & DEF_IS_PREDEF) {
-                  yyerror("Illegal to #undef a predefined value.");
+                  lexerror("Illegal to #undef a predefined value.");
                 } else {
                   d->flags |= DEF_IS_UNDEFINED;
                 }
@@ -2238,7 +2286,7 @@ int yylex() {
             } else if (strcmp("breakpoint", yytext) == 0) {
               lex_breakpoint();
             } else {
-              yyerror("Unrecognised # directive");
+              lexerror("Unrecognised # directive");
             }
             *--outp = '\n';
             break;
@@ -2327,7 +2375,7 @@ int yylex() {
 
         if (*outp++ != '\'') {
           outp--;
-          yyerror("Illegal character constant");
+          lexerror("Illegal character constant");
           yylval.number = 0;
         }
         return L_NUMBER;
@@ -2352,9 +2400,10 @@ int yylex() {
             return L_ARRAY_OPEN;
           } else if (rc == -1) {
             lexerror("End of file in array block");
-            return LEX_EOF;
+            return YYEOF;
           } else { /* if rc == -2 */
-            yyerror("Array block exceeded maximum length");
+            lexerror("Array block exceeded maximum length");
+            return YYerror;
           }
         } else {
           rc = get_text_block(terminator);
@@ -2362,9 +2411,11 @@ int yylex() {
           if (rc > 0) {
             int n;
 
-            if (!u8_validate(outp)) {
+            auto *p = outp;
+            if (!u8_validate(&p)) {
               lexerror("Bad UTF-8 string in string block");
-              return LEX_EOF;
+              outp = p;
+              break;
             }
             /*
              * make string token and clean up
@@ -2377,386 +2428,21 @@ int yylex() {
             return L_STRING;
           } else if (rc == -1) {
             lexerror("End of file in text block");
-            return LEX_EOF;
+            return YYEOF;
           } else { /* if (rc == -2) */
-            yyerror("Text block exceeded maximum length");
+            lexerror("Text block exceeded maximum length");
+            break;
           }
-        }
-      } break;
-      case '"': {
-        int l;
-        unsigned char *to = scr_tail + 1;
-
-        if ((l = scratch_end - to) > 255) {
-          l = 255;
-        }
-        while (l--) {
-          switch (c = *outp++) {
-            case LEX_EOF:
-              lexerror("End of file in string");
-              return LEX_EOF;
-
-            case '"':
-              *to++ = 0;
-              if (!u8_validate(reinterpret_cast<const char *>(scr_tail + 1))) {
-                lexerror("Invalid UTF8 string");
-                return LEX_EOF;
-              }
-              if (!l && (to == scratch_end)) {
-                char *res = scratch_large_alloc(to - scr_tail - 1);
-                strcpy(res, reinterpret_cast<char *>(scr_tail + 1));
-                yylval.string = res;
-                return L_STRING;
-              }
-
-              scr_last = scr_tail + 1;
-              scr_tail = to;
-              *to = to - scr_last;
-              yylval.string = reinterpret_cast<char *>(scr_last);
-              return L_STRING;
-
-            case '\n':
-              current_line++;
-              total_lines++;
-              if (outp == last_nl + 1) {
-                refill_buffer();
-              }
-              *to++ = '\n';
-              break;
-
-            case '\\':
-              /* Don't copy the \ in yet */
-              switch (static_cast<unsigned char>(*outp++)) {
-                case '\n':
-                  current_line++;
-                  total_lines++;
-                  if (outp == last_nl + 1) {
-                    refill_buffer();
-                  }
-                  l++; /* Nothing is copied */
-                  break;
-                case LEX_EOF:
-                  lexerror("End of file in string");
-                  return LEX_EOF;
-                case 'n':
-                  *to++ = '\n';
-                  break;
-                case 't':
-                  *to++ = '\t';
-                  break;
-                case 'r':
-                  *to++ = '\r';
-                  break;
-                case 'b':
-                  *to++ = '\b';
-                  break;
-                case 'a':
-                  *to++ = '\x07';
-                  break;
-                case 'e':
-                  *to++ = '\x1b';
-                  break;
-                case '"':
-                  *to++ = '"';
-                  break;
-                case '\\':
-                  *to++ = '\\';
-                  break;
-                case '0':
-                case '1':
-                case '2':
-                case '3':
-                case '4':
-                case '5':
-                case '6':
-                case '7':
-                case '8':
-                case '9': {
-                  int tmp;
-                  outp--;
-                  tmp = strtoll(outp, &outp, 8);
-                  if (tmp > 255) {
-                    yywarn("Illegal character constant in string.");
-                    tmp = 'x';
-                  }
-                  *to++ = tmp;
-                  break;
-                }
-                case 'x': {
-                  int tmp;
-                  if (!isxdigit(static_cast<unsigned char>(*outp))) {
-                    *to++ = 'x';
-                    yywarn(
-                        "\\x must be followed by a valid hex value; "
-                        "interpreting as 'x' instead.");
-                  } else {
-                    tmp = strtoll(outp, &outp, 16);
-                    if (tmp > 255) {
-                      yywarn("Illegal character constant.");
-                      tmp = 'x';
-                    }
-                    *to++ = tmp;
-                  }
-                  break;
-                }
-                  // \uhhhh, 2 byte
-                case 'u': {
-                  UChar res[2];  // possible surrogate pairs
-                  char buf[4 + 1];
-                  for (auto i = 0; i < 4; i++) {
-                    buf[i] = *outp++;
-                    if (!isxdigit(buf[i]) || buf[i] == LEX_EOF) {
-                      lexerror("Illegal unicode sequence.");
-                      return LEX_EOF;
-                    }
-                  }
-                  buf[4] = 0;
-                  res[0] = strtoll(buf, nullptr, 16);
-                  if (res[0] == 0) {
-                    lexerror("Illegal unicode sequence.");
-                    return LEX_EOF;
-                  }
-                  // If this is an single character
-                  if (U16_IS_SINGLE(res[0])) {
-                    UErrorCode err = U_ZERO_ERROR;
-                    int32_t written = 0;
-                    u_strToUTF8(reinterpret_cast<char *>(to), 4, &written, res, 1, &err);
-                    if (U_FAILURE(err)) {
-                      lexerror("Illegal unicode sequence.");
-                      return LEX_EOF;
-                    }
-                    to += written;
-                  } else if (!U16_IS_SURROGATE_LEAD(res[0])) {
-                    lexerror("Illegal unicode sequence, expecting surrogate lead, got trail.");
-                    return LEX_EOF;
-                  } else {
-                    // Now we need to continue look for next surrogate
-                    if (outp[0] == '\\' && outp[1] == 'u') {
-                      outp += 2;
-                      for (auto i = 0; i < 4; i++) {
-                        buf[i] = *outp++;
-                        if (!isxdigit(buf[i]) || buf[i] == LEX_EOF) {
-                          lexerror("Illegal unicode sequence.");
-                          return LEX_EOF;
-                        }
-                      }
-                      buf[4] = 0;
-                      res[1] = strtoll(buf, nullptr, 16);
-                      if (res[1] == 0) {
-                        lexerror("Illegal unicode sequence.");
-                        return LEX_EOF;
-                      }
-                      if (!U16_IS_SURROGATE_TRAIL(res[1])) {
-                        lexerror(
-                            "Illegal unicode sequence, expecting surrogate trail, got single.");
-                        return LEX_EOF;
-                      }
-                      UErrorCode err = U_ZERO_ERROR;
-                      int32_t written = 0;
-                      u_strToUTF8(reinterpret_cast<char *>(to), 4, &written, res, 2, &err);
-                      if (U_FAILURE(err)) {
-                        lexerror("Illegal unicode sequence.");
-                        return LEX_EOF;
-                      }
-                      to += written;
-                    } else {
-                      lexerror("Illegal unicode sequence. Missing surrogate trail. ");
-                      return LEX_EOF;
-                    }
-                  }
-                  break;
-                }
-                // \Uhhhhhhhh, 4 byte
-                case 'U': {
-                  UChar res[2];
-                  char buf[2 + 8 + 1];
-                  buf[0] = '\\';
-                  buf[1] = 'U';
-                  for (int i = 2; i < 10; i++) {
-                    buf[i] = *outp++;
-                    if (!isxdigit(buf[i]) || buf[i] == LEX_EOF) {
-                      lexerror("Illegal unicode sequence.");
-                      return LEX_EOF;
-                    }
-                  }
-                  buf[10] = 0;
-                  auto size = u_unescape(buf, res, 2);
-                  if (size == 0) {
-                    lexerror("Illegal unicode sequence.");
-                    return LEX_EOF;
-                  }
-                  UErrorCode err = U_ZERO_ERROR;
-                  int32_t written = 0;
-                  u_strToUTF8(reinterpret_cast<char *>(to), 4, &written, res, 2, &err);
-                  if (U_FAILURE(err)) {
-                    lexerror("Illegal unicode sequence.");
-                    return LEX_EOF;
-                  }
-                  to += written;
-                  break;
-                }
-                default:
-                  *to++ = *(outp - 1);
-                  yywarn("Unknown \\ escape.");
-              }
-              break;
-            default:
-              *to++ = c;
-          }
-        }
-
-        /* Not enough space, we now copy the rest into yytext */
-        l = MAXLINE - (to - scr_tail);
-
-        yyp = yytext;
-        while (l--) {
-          switch (c = *outp++) {
-            case LEX_EOF:
-              lexerror("End of file in string");
-              return LEX_EOF;
-
-            case '"': {
-              char *res;
-              *yyp++ = '\0';
-              res = scratch_large_alloc((yyp - yytext) + (to - scr_tail) - 1);
-              strncpy(res, reinterpret_cast<char *>(scr_tail + 1), (to - scr_tail) - 1);
-              strcpy(res + (to - scr_tail) - 1, yytext);
-              if (!u8_validate(res)) {
-                lexerror("Invalid UTF8 string");
-                scratch_free(res);
-                return LEX_EOF;
-              }
-              yylval.string = res;
-              return L_STRING;
-            }
-
-            case '\n':
-              current_line++;
-              total_lines++;
-              if (outp == last_nl + 1) {
-                refill_buffer();
-              }
-              *yyp++ = '\n';
-              break;
-
-            case '\\':
-              /* Don't copy the \ in yet */
-              switch (static_cast<unsigned char>(*outp++)) {
-                case '\n':
-                  current_line++;
-                  total_lines++;
-                  if (outp == last_nl + 1) {
-                    refill_buffer();
-                  }
-                  l++; /* Nothing is copied */
-                  break;
-                case LEX_EOF:
-                  lexerror("End of file in string");
-                  return LEX_EOF;
-                case 'n':
-                  *yyp++ = '\n';
-                  break;
-                case 't':
-                  *yyp++ = '\t';
-                  break;
-                case 'r':
-                  *yyp++ = '\r';
-                  break;
-                case 'b':
-                  *yyp++ = '\b';
-                  break;
-                case 'a':
-                  *yyp++ = '\x07';
-                  break;
-                case 'e':
-                  *yyp++ = '\x1b';
-                  break;
-                case '"':
-                  *yyp++ = '"';
-                  break;
-                case '\\':
-                  *yyp++ = '\\';
-                  break;
-                case '0':
-                case '1':
-                case '2':
-                case '3':
-                case '4':
-                case '5':
-                case '6':
-                case '7':
-                case '8':
-                case '9': {
-                  int tmp;
-                  outp--;
-                  tmp = strtoll(outp, &outp, 8);
-                  if (tmp > 255) {
-                    yywarn("Illegal character constant in string.");
-                    tmp = 'x';
-                  }
-                  *yyp++ = tmp;
-                  break;
-                }
-                case 'x': {
-                  int tmp;
-                  if (!isxdigit(static_cast<unsigned char>(*outp))) {
-                    *yyp++ = 'x';
-                    yywarn(
-                        "\\x must be followed by a valid hex value; "
-                        "interpreting as 'x' instead.");
-                  } else {
-                    tmp = strtoll(outp, &outp, 16);
-                    if (tmp > 255) {
-                      yywarn("Illegal character constant.");
-                      tmp = 'x';
-                    }
-                    *yyp++ = tmp;
-                  }
-                  break;
-                }
-                default:
-                  *yyp++ = *(outp - 1);
-                  yywarn("Unknown \\ escape.");
-              }
-              break;
-
-            default:
-              *yyp++ = c;
-          }
-        }
-
-        /* Not even enough length, declare too long string error */
-        lexerror("String too long");
-        *yyp++ = '\0';
-        {
-          char *res;
-          res = scratch_large_alloc((yyp - yytext) + (to - scr_tail) - 1);
-          strncpy(res, reinterpret_cast<char *>(scr_tail + 1), (to - scr_tail) - 1);
-          strcpy(res + (to - scr_tail) - 1, yytext);
-          // Validate UTF8
-          if (!u8_validate(res)) {
-            lexerror("Invalid UTF8 string");
-            scratch_free(res);
-            return LEX_EOF;
-          }
-          yylval.string = res;
-          return L_STRING;
         }
       }
+      break;
+      case '"':
+        return parseStringLiteral(c);
       case '0':
         c = *outp++;
         if (c == 'X' || c == 'x') {
           yyp = yytext;
-          for (;;) {
-            c = *outp++;
-            SAVEC;
-            if (!isxdigit(c)) {
-              break;
-            }
-          }
-          outp--;
-          yylval.number = strtoll(yytext, nullptr, 16);
-          return L_NUMBER;
+          return parseHexIntegerLiteral(c);
         }
         outp--;
         c = '0';
@@ -2769,7 +2455,7 @@ int yylex() {
       case '6':
       case '7':
       case '8':
-      case '9':
+      case '9': {
         is_float = 0;
         yyp = yytext;
         *yyp++ = c;
@@ -2780,9 +2466,16 @@ int yylex() {
               is_float = 1;
             } else {
               is_float = 0;
+              yyp--;
               outp--;
               break;
             }
+          } else if (c == '_') {
+            // only allow a single _ between numbers
+            if (isdigit(*outp)) {
+              continue;
+            }
+            break;
           } else if (!isdigit(c)) {
             break;
           }
@@ -2790,13 +2483,22 @@ int yylex() {
         }
         outp--;
         *yyp = 0;
+        char *endptr;
         if (is_float) {
-          yylval.real = strtod(yytext, nullptr);
+          yylval.real = strtod(yytext, &endptr);
+          if (endptr != yyp) {
+            yyerror("Invalid float literal: %s", std::string(yytext, yyp - yytext).c_str());
+            return YYerror;
+          }
           return L_REAL;
-        } else {
-          yylval.number = strtoll(yytext, nullptr, 10);
-          return L_NUMBER;
         }
+        yylval.number = strtoll(yytext, &endptr, 10);
+        if (endptr != yyp) {
+          yyerror("Invalid integer literal: %s", std::string(yytext, yyp - yytext).c_str());
+          return YYerror;
+        }
+        return L_NUMBER;
+      }
       default:
         if (isalpha(c) || c == '_') {
           int r;
@@ -2922,6 +2624,394 @@ badlex : {
 #endif
   return ' ';
 }
+}
+int parseHexIntegerLiteral(unsigned char c) {
+  char *yyp = yytext;
+  for (;;) {
+    c = *outp++;
+    if (c == '_') {
+      if (isxdigit(*outp)) {
+        continue;
+      }
+      break;
+    }
+    if (!isxdigit(c)) {
+      break;
+    }
+    SAVEC;
+  }
+  outp--;
+  *yyp = 0;
+
+  char *endptr;
+  yylval.number = strtoll(yytext, &endptr, 16);
+  if (endptr != yyp) {
+    yyerror("Invalid hex integer literal: %s", std::string(yytext, yyp - yytext).c_str());
+    return YYerror;
+  }
+  return L_NUMBER;
+}
+
+int parseStringLiteral(unsigned char c) {
+  char *yyp;
+  int l;
+  unsigned char *to = scr_tail + 1;
+
+  if ((l = scratch_end - to) > 255) {
+    l = 255;
+  }
+  while (l--) {
+    switch (c = *outp++) {
+      case LEX_EOF:
+        lexerror("End of file in string");
+        return YYEOF;
+
+      case '"':
+        *to++ = 0;
+        if (!u8_validate(reinterpret_cast<const char *>(scr_tail + 1))) {
+          lexerror("Invalid UTF8 codepoint in string literal");
+          return YYerror;
+        }
+        if (!l && (to == scratch_end)) {
+          char *res = scratch_large_alloc(to - scr_tail - 1);
+          strcpy(res, reinterpret_cast<char *>(scr_tail + 1));
+          yylval.string = res;
+          return L_STRING;
+        }
+
+        scr_last = scr_tail + 1;
+        scr_tail = to;
+        *to = to - scr_last;
+        yylval.string = reinterpret_cast<char *>(scr_last);
+        return L_STRING;
+
+      case '\n':
+        current_line++;
+        total_lines++;
+        if (outp == last_nl + 1) {
+          refill_buffer();
+        }
+        *to++ = '\n';
+        break;
+
+      case '\\':
+        /* Don't copy the \ in yet */
+        switch (static_cast<unsigned char>(*outp++)) {
+          case '\n':
+            current_line++;
+            total_lines++;
+            if (outp == last_nl + 1) {
+              refill_buffer();
+            }
+            l++; /* Nothing is copied */
+            break;
+          case LEX_EOF:
+            lexerror("End of file in string");
+            return YYEOF;
+          case 'n':
+            *to++ = '\n';
+            break;
+          case 't':
+            *to++ = '\t';
+            break;
+          case 'r':
+            *to++ = '\r';
+            break;
+          case 'b':
+            *to++ = '\b';
+            break;
+          case 'a':
+            *to++ = '\x07';
+            break;
+          case 'e':
+            *to++ = '\x1b';
+            break;
+          case '"':
+            *to++ = '"';
+            break;
+          case '\\':
+            *to++ = '\\';
+            break;
+          case '0':
+          case '1':
+          case '2':
+          case '3':
+          case '4':
+          case '5':
+          case '6':
+          case '7':
+          case '8':
+          case '9': {
+            int tmp;
+            outp--;
+            tmp = strtoll(outp, &outp, 8);
+            if (tmp > 255) {
+              yywarn("Illegal character constant in string.");
+              tmp = 'x';
+            }
+            *to++ = tmp;
+            break;
+          }
+          case 'x': {
+            int tmp;
+            if (!isxdigit(static_cast<unsigned char>(*outp))) {
+              *to++ = 'x';
+              yywarn(
+                  "\\x must be followed by a valid hex value; "
+                  "interpreting as 'x' instead.");
+            } else {
+              tmp = strtoll(outp, &outp, 16);
+              if (tmp > 255) {
+                yywarn("Illegal character constant.");
+                tmp = 'x';
+              }
+              *to++ = tmp;
+            }
+            break;
+          }
+            // \uhhhh, 2 byte
+          case 'u': {
+            UChar res[2];  // possible surrogate pairs
+            char buf[4 + 1];
+            for (auto i = 0; i < 4; i++) {
+              buf[i] = *outp++;
+              if (!isxdigit(buf[i]) || buf[i] == LEX_EOF) {
+                lexerror("Illegal unicode sequence.");
+                goto skip_ahead;
+              }
+            }
+            buf[4] = 0;
+            res[0] = strtoll(buf, nullptr, 16);
+            if (res[0] == 0) {
+              lexerror("Illegal unicode sequence.");
+              goto skip_ahead;
+            }
+            // If this is an single character
+            if (U16_IS_SINGLE(res[0])) {
+              UErrorCode err = U_ZERO_ERROR;
+              int32_t written = 0;
+              u_strToUTF8(reinterpret_cast<char *>(to), 4, &written, res, 1, &err);
+              if (U_FAILURE(err)) {
+                lexerror("Illegal unicode sequence.");
+                goto skip_ahead;
+              }
+              to += written;
+            } else if (!U16_IS_SURROGATE_LEAD(res[0])) {
+              lexerror("Illegal unicode sequence, expecting surrogate lead, got trail.");
+              goto skip_ahead;
+            } else {
+              // Now we need to continue look for next surrogate
+              if (outp[0] == '\\' && outp[1] == 'u') {
+                outp += 2;
+                for (auto i = 0; i < 4; i++) {
+                  buf[i] = *outp++;
+                  if (!isxdigit(buf[i]) || buf[i] == LEX_EOF) {
+                    lexerror("Illegal unicode sequence.");
+                    goto skip_ahead;
+                  }
+                }
+                buf[4] = 0;
+                res[1] = strtoll(buf, nullptr, 16);
+                if (res[1] == 0) {
+                  lexerror("Illegal unicode sequence.");
+                  goto skip_ahead;
+                }
+                if (!U16_IS_SURROGATE_TRAIL(res[1])) {
+                  lexerror("Illegal unicode sequence, expecting surrogate trail, got single.");
+                  goto skip_ahead;
+                }
+                UErrorCode err = U_ZERO_ERROR;
+                int32_t written = 0;
+                u_strToUTF8(reinterpret_cast<char *>(to), 4, &written, res, 2, &err);
+                if (U_FAILURE(err)) {
+                  lexerror("Illegal unicode sequence.");
+                  goto skip_ahead;
+                }
+                to += written;
+              } else {
+                lexerror("Illegal unicode sequence. Missing surrogate trail. ");
+                goto skip_ahead;
+              }
+            }
+            break;
+          }
+          // \Uhhhhhhhh, 4 byte
+          case 'U': {
+            UChar res[2];
+            char buf[2 + 8 + 1];
+            buf[0] = '\\';
+            buf[1] = 'U';
+            for (int i = 2; i < 10; i++) {
+              buf[i] = *outp++;
+              if (!isxdigit(buf[i]) || buf[i] == LEX_EOF) {
+                lexerror("Illegal unicode sequence.");
+                goto skip_ahead;
+              }
+            }
+            buf[10] = 0;
+            auto size = u_unescape(buf, res, 2);
+            if (size == 0) {
+              lexerror("Illegal unicode sequence.");
+              goto skip_ahead;
+            }
+            UErrorCode err = U_ZERO_ERROR;
+            int32_t written = 0;
+            u_strToUTF8(reinterpret_cast<char *>(to), 4, &written, res, 2, &err);
+            if (U_FAILURE(err)) {
+              lexerror("Illegal unicode sequence.");
+              goto skip_ahead;
+            }
+            to += written;
+            break;
+          }
+          default:
+            *to++ = *(outp - 1);
+            yywarn("Unknown \\ escape.");
+        }
+skip_ahead:
+        break;
+      default:
+        *to++ = c;
+    }
+  }
+
+  /* Not enough space, we now copy the rest into yytext */
+  l = MAXLINE - (to - scr_tail);
+
+  yyp = yytext;
+  while (l--) {
+    switch (c = *outp++) {
+      case LEX_EOF:
+        lexerror("End of file in string");
+        return YYEOF;
+
+      case '"': {
+        char *res;
+        *yyp++ = '\0';
+        res = scratch_large_alloc((yyp - yytext) + (to - scr_tail) - 1);
+        strncpy(res, reinterpret_cast<char *>(scr_tail + 1), (to - scr_tail) - 1);
+        strcpy(res + (to - scr_tail) - 1, yytext);
+        if (!u8_validate(res)) {
+          lexerror("Invalid UTF8 string");
+          scratch_free(res);
+          return YYerror;
+        }
+        yylval.string = res;
+        return L_STRING;
+      }
+
+      case '\n':
+        current_line++;
+        total_lines++;
+        if (outp == last_nl + 1) {
+          refill_buffer();
+        }
+        *yyp++ = '\n';
+        break;
+
+      case '\\':
+        /* Don't copy the \ in yet */
+        switch (static_cast<unsigned char>(*outp++)) {
+          case '\n':
+            current_line++;
+            total_lines++;
+            if (outp == last_nl + 1) {
+              refill_buffer();
+            }
+            l++; /* Nothing is copied */
+            break;
+          case LEX_EOF:
+            lexerror("End of file in string");
+            return YYEOF;
+          case 'n':
+            *yyp++ = '\n';
+            break;
+          case 't':
+            *yyp++ = '\t';
+            break;
+          case 'r':
+            *yyp++ = '\r';
+            break;
+          case 'b':
+            *yyp++ = '\b';
+            break;
+          case 'a':
+            *yyp++ = '\x07';
+            break;
+          case 'e':
+            *yyp++ = '\x1b';
+            break;
+          case '"':
+            *yyp++ = '"';
+            break;
+          case '\\':
+            *yyp++ = '\\';
+            break;
+          case '0':
+          case '1':
+          case '2':
+          case '3':
+          case '4':
+          case '5':
+          case '6':
+          case '7':
+          case '8':
+          case '9': {
+            int tmp;
+            outp--;
+            tmp = strtoll(outp, &outp, 8);
+            if (tmp > 255) {
+              yywarn("Illegal character constant in string.");
+              tmp = 'x';
+            }
+            *yyp++ = tmp;
+            break;
+          }
+          case 'x': {
+            int tmp;
+            if (!isxdigit(static_cast<unsigned char>(*outp))) {
+              *yyp++ = 'x';
+              yywarn(
+                  "\\x must be followed by a valid hex value; "
+                  "interpreting as 'x' instead.");
+            } else {
+              tmp = strtoll(outp, &outp, 16);
+              if (tmp > 255) {
+                yywarn("Illegal character constant.");
+                tmp = 'x';
+              }
+              *yyp++ = tmp;
+            }
+            break;
+          }
+          default:
+            *yyp++ = *(outp - 1);
+            yywarn("Unknown \\ escape.");
+        }
+        break;
+
+      default:
+        *yyp++ = c;
+    }
+  }
+
+  /* Not even enough length, declare too long string error */
+  lexerror("String too long");
+  *yyp++ = '\0';
+  {
+    char *res;
+    res = scratch_large_alloc((yyp - yytext) + (to - scr_tail) - 1);
+    strncpy(res, reinterpret_cast<char *>(scr_tail + 1), (to - scr_tail) - 1);
+    strcpy(res + (to - scr_tail) - 1, yytext);
+    // Validate UTF8
+    if (!u8_validate(res)) {
+      lexerror("Invalid UTF8 string");
+      scratch_free(res);
+      return YYerror;
+    }
+    yylval.string = res;
+    return L_STRING;
+  }
 }
 
 extern YYSTYPE yylval;
@@ -3805,7 +3895,7 @@ static int extract_args(char **argv, char *argb) {
         break;
       case LEX_EOF:
         lexerror("Unexpected end of file");
-        return -1;
+        return YYEOF;
     }
 
     /* negative parcnt means we're done collecting args */

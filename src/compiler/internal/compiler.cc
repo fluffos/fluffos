@@ -4,9 +4,9 @@
 
 #include <cstdlib>  // for qsort
 #include <cstdio>   // for sprintf
-#include <cctype>   // for isspace
 
-#include "base/internal/tracing.h"
+#include <fmt/format.h>
+
 #include "efuns.autogen.h"          // FIXME
 #include "applies_table.autogen.h"  // FIXME:
 
@@ -16,7 +16,6 @@
 #include "icode.h"
 #include "lex.h"
 #include "scratchpad.h"
-#include "keyword.h"
 #include "symbol.h"
 #include <string>
 
@@ -2734,42 +2733,13 @@ char *allocate_in_mem_block(int n, int size) {
  * message somewhere.
  */
 void smart_log(const char *error_file, int line, const char *what, int flag) {
-  char *buff;
-  svalue_t *mret;
-  extern int pragmas;
-
-  buff = reinterpret_cast<char *>(
-      DMALLOC(strlen(error_file) + strlen(what) + ((pragmas & PRAGMA_ERROR_CONTEXT) ? 100 : 40),
-              TAG_TEMPORARY, "smart_log: 1"));
-
-  if (flag) {
-    sprintf(buff, "/%s line %d: Warning: %s", error_file, line, what);
-  } else {
-    sprintf(buff, "/%s line %d: %s", error_file, line, what);
+  auto logs = prepare_logs(error_file, line, what, flag, pragmas & PRAGMA_ERROR_CONTEXT);
+  for (auto &log : logs) {
+    debug_message(log.c_str());
   }
 
-  if (pragmas & PRAGMA_ERROR_CONTEXT) {
-    char *ls = strrchr(buff, '\n');
-    unsigned char *tmp;
-    if (ls) {
-      tmp = reinterpret_cast<unsigned char *>(ls) + 1;
-      while (*tmp && isspace(*tmp)) {
-        tmp++;
-      }
-      if (!*tmp) {
-        *ls = 0;
-      }
-    }
-    strcat(buff, show_error_context());
-  } else {
-    strcat(buff, "\n");
-  }
-
+  auto res = fmt::to_string(fmt::join(logs, ""));
   push_malloced_string(add_slash(error_file));
-  copy_and_push_string(buff);
-  mret = safe_apply_master_ob(APPLY_LOG_ERROR, 2);
-  if (!mret || mret == (svalue_t *)-1) {
-    debug_message("%s", buff);
-  }
-  FREE(buff);
+  copy_and_push_string(res.c_str());
+  safe_apply_master_ob(APPLY_LOG_ERROR, 2);
 } /* smart_log() */

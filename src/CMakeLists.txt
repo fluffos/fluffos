@@ -313,14 +313,25 @@ add_custom_command(
   DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/base/internal/options_incl.h"
 )
 
-find_package(BISON REQUIRED)
-BISON_TARGET(Grammar "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.y" ${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.cc
-  DEFINES_FILE "${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.h")
-
-set(GENERATRED_GRAMMAR_FILES
-  "${BISON_Grammar_OUTPUT_SOURCE}"
-  "${BISON_Grammar_OUTPUT_HEADER}"
-  )
+find_package(BISON 3.8)
+if (${BISON_FOUND})
+  message(STATUS "BISON: ${BISON_VERSION}")
+  BISON_TARGET(Grammar "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.y"
+          ${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.autogen.cc
+          DEFINES_FILE "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.autogen.h"
+          COMPILE_FLAGS "-Wall --color=auto -rall"
+          VERBOSE REPORT_FILE "${CMAKE_CURRENT_BINARY_DIR}/grammar.report"
+          )
+  set(GENERATRED_GRAMMAR_FILES
+          "${BISON_Grammar_OUTPUT_SOURCE}"
+          "${BISON_Grammar_OUTPUT_HEADER}"
+          )
+else()
+  message(STATUS "BISON: version too low, using pre-generated source.")
+  set(GENERATRED_GRAMMAR_FILES
+          "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.autogen.cc"
+          "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.autogen.h")
+endif()
 
 set(SRC
   "backend.cc"

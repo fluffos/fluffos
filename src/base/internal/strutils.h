@@ -182,6 +182,7 @@ class EGCSmartIterator : public EGCIterator {
 };
 
 // Check string s is valid utf8
+bool u8_validate(char **);
 bool u8_validate(const char *);
 bool u8_validate(const uint8_t *, size_t);
 UChar32 u8_egc_index_as_single_codepoint(const char *, int32_t, int32_t);
