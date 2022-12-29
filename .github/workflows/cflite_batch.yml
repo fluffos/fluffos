@@ -2,6 +2,8 @@ name: ClusterFuzzLite batch fuzzing
 on:
   schedule:
     - cron: '0 0/6 * * *'  # Every 6th hour. Change this to whatever is suitable.
+  workflow_dispatch:
+    
 permissions: read-all
 jobs:
   BatchFuzzing:
