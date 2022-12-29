@@ -136,4 +136,6 @@ void mark_all_defines(void);
 #endif
 // Print all predefines using debug_message().
 void print_all_predefines();
+// Get error/warning message from lexer
+std::vector<std::string> prepare_logs(const char *, int, const char *, int, bool);
 #endif
