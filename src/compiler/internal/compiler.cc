@@ -2735,7 +2735,7 @@ char *allocate_in_mem_block(int n, int size) {
 void smart_log(const char *error_file, int line, const char *what, int flag) {
   auto logs = prepare_logs(error_file, line, what, flag, pragmas & PRAGMA_ERROR_CONTEXT);
   for (auto &log : logs) {
-    debug_message(log.c_str());
+    debug_message("%s", log.c_str());
   }
 
   auto res = fmt::to_string(fmt::join(logs, ""));
