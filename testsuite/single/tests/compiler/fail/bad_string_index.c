@@ -1,0 +1,1 @@
+void do_tests() { string *item = ({ "one", "two" }); return item["bad_index"]; }
