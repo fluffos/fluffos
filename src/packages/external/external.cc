@@ -145,7 +145,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
       } else if (WIFCONTINUED(status)) {
         res += fmt::format("continued\n");
       }
-      debug_message(res.c_str());
+      debug_message("%s", res.c_str());
     } while (!WIFEXITED(status) && !WIFSIGNALED(status));
   }).detach();
 
