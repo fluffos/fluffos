@@ -1578,8 +1578,8 @@ char *show_error_context() {
 std::vector<std::string> prepare_logs(const char *error_file, int line, const char *what, int flag,
                                       bool include_error_context) {
   std::vector<std::string> logs;
-  logs.emplace_back(
-      fmt::format("/{} line {}: {}{}\n", error_file, line, flag ? "Warning: " : "", what));
+  logs.emplace_back(fmt::format(FMT_STRING("/{} line {}: {}{}\n"), error_file, line,
+                                flag ? "Warning: " : "", what));
 
   if (include_error_context) {
     if (static_cast<unsigned char>(outp[-1]) != LEX_EOF) {
@@ -1609,9 +1609,9 @@ std::vector<std::string> prepare_logs(const char *error_file, int line, const ch
         std::string content{start, static_cast<std::string::size_type>(size)};
         if (truncated) content += "...";
         content = trim(content);
-        logs.emplace_back(fmt::format("  {}\n", content));
-        logs.emplace_back(
-            fmt::format("  {}^\n", std::string(truncated ? content.size() : (outp - start), ' ')));
+        logs.emplace_back(fmt::format(FMT_STRING("  {}\n"), content));
+        logs.emplace_back(fmt::format(
+            FMT_STRING("  {}^\n"), std::string(truncated ? content.size() : (outp - start), ' ')));
       }
     }
   }
@@ -1817,9 +1817,9 @@ int yylex() {
   partial[0] = 0;
 
   for (;;) {
-//    if (lex_fatal) {
-//      return -1;
-//    }
+    //    if (lex_fatal) {
+    //      return -1;
+    //    }
     switch (c = *outp++) {
       case LEX_EOF:
         if (inctop) {
@@ -2434,8 +2434,7 @@ int yylex() {
             break;
           }
         }
-      }
-      break;
+      } break;
       case '"':
         return parseStringLiteral(c);
       case '0':
@@ -2868,7 +2867,7 @@ int parseStringLiteral(unsigned char c) {
             *to++ = *(outp - 1);
             yywarn("Unknown \\ escape.");
         }
-skip_ahead:
+      skip_ahead:
         break;
       default:
         *to++ = c;
@@ -3012,8 +3011,6 @@ skip_ahead:
     yylval.string = res;
     return L_STRING;
   }
-
-
 }
 
 extern YYSTYPE yylval;

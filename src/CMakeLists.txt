@@ -318,8 +318,8 @@ find_package(BISON 3.8)
 if (${BISON_FOUND})
   message(STATUS "BISON: ${BISON_VERSION}")
   BISON_TARGET(Grammar "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.y"
-          ${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.autogen.cc
-          DEFINES_FILE "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.autogen.h"
+          ${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.cc
+          DEFINES_FILE "${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.h"
           COMPILE_FLAGS "-Wall --color=auto -rall"
           VERBOSE REPORT_FILE "${CMAKE_CURRENT_BINARY_DIR}/grammar.report"
           )
@@ -534,6 +534,14 @@ if (NOT WIN32)
   install(TARGETS portbind
     RUNTIME DESTINATION bin)
 endif ()
+
+# Update generated grammar files
+if (${BISON_FOUND})
+  add_custom_command(TARGET "driver" POST_BUILD
+          COMMAND "${CMAKE_COMMAND}" -E copy "${BISON_Grammar_OUTPUT_SOURCE}" ${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/
+          COMMAND "${CMAKE_COMMAND}" -E copy "${BISON_Grammar_OUTPUT_HEADER}" ${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/
+          COMMENT "Copying to output directory")
+endif()
 
 # Must keep this line at the end, so we get all the variables.
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
