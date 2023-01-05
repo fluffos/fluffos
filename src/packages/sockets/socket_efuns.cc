@@ -741,8 +741,8 @@ int socket_write(int fd, svalue_t *message, const char *name) {
   int len, off;
   char *buf, *p;
 
-  struct sockaddr_storage addr;
-  socklen_t addrlen;
+  struct sockaddr_storage addr = {};
+  socklen_t addrlen = 0;
 
   if (fd < 0 || fd >= lpc_socks.size()) {
     return EEFDRANGE;

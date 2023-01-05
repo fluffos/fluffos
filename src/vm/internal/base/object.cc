@@ -1086,6 +1086,7 @@ static int restore_string(char *val, svalue_t *sv) {
           newstr = new_string(news - start, "restore_string");
           strcpy(newstr, start);
           if (!u8_validate(newstr)) {
+            FREE_MSTR(newstr);
             return ROB_STRING_UTF8_ERROR;
           }
           sv->u.string = newstr;
@@ -1109,6 +1110,7 @@ static int restore_string(char *val, svalue_t *sv) {
   newstr = new_string(len, "restore_string");
   strcpy(newstr, start);
   if (!u8_validate(newstr)) {
+    FREE_MSTR(newstr);
     return ROB_STRING_UTF8_ERROR;
   }
   sv->u.string = newstr;
