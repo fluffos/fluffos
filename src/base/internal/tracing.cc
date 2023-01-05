@@ -18,7 +18,7 @@
 #include "tracing.h"
 
 #include "base/internal/log.h"
-#include "thirdparty/json/single_include/nlohmann/json.hpp"
+#include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
 namespace {

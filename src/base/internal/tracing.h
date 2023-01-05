@@ -10,7 +10,7 @@
 #include <optional>
 #include <functional>
 
-#include "thirdparty/json/single_include/nlohmann/json.hpp"
+#include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
 class TraceWriter;

@@ -4,7 +4,7 @@
 /* It is usually better to include "lpc_incl.h" instead of including this
  directly */
 #include "vm/internal/base/number.h"
-#include "thirdparty/json/include/nlohmann/json_fwd.hpp"
+#include <nlohmann/json_fwd.hpp>
 using json = nlohmann::json;
 
 typedef struct {
