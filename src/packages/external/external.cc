@@ -135,15 +135,15 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
         debug_message("external_start(): waitpid() error: %s (%d).\n", strerror(errno), errno);
         return;
       }
-      std::string res = fmt::format("external_start(): child {} status: ", pid);
+      std::string res = fmt::format(FMT_STRING("external_start(): child {} status: "), pid);
       if (WIFEXITED(status)) {
-        res += fmt::format("exited, status={}\n", WEXITSTATUS(status));
+        res += fmt::format(FMT_STRING("exited, status={}\n"), WEXITSTATUS(status));
       } else if (WIFSIGNALED(status)) {
-        res += fmt::format("killed by signal {}\n", WTERMSIG(status));
+        res += fmt::format(FMT_STRING("killed by signal {}\n"), WTERMSIG(status));
       } else if (WIFSTOPPED(status)) {
-        res += fmt::format("stopped by signal {}\n", WSTOPSIG(status));
+        res += fmt::format(FMT_STRING("stopped by signal {}\n"), WSTOPSIG(status));
       } else if (WIFCONTINUED(status)) {
-        res += fmt::format("continued\n");
+        res += "continued\n";
       }
       debug_message("%s", res.c_str());
     } while (!WIFEXITED(status) && !WIFSIGNALED(status));

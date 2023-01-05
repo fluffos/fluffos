@@ -14,7 +14,7 @@
 #include "base/internal/rc.h"
 #include "base/internal/EGCIterator.h"
 
-bool u8_validate(char**s) {
+bool u8_validate(char **s) {
   const auto *p = (const uint8_t *)(*s);
   uint32_t codepoint, state = 0;
 
