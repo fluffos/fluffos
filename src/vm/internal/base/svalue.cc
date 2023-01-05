@@ -2,7 +2,7 @@
 
 #include "vm/internal/base/machine.h"
 
-#include "thirdparty/json/single_include/nlohmann/json.hpp"
+#include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
 // FIXME: move init from main() to compile time;
