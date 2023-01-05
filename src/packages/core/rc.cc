@@ -8,7 +8,7 @@ int get_config_item(svalue_t *res, svalue_t *arg) {
   if (num < 0 || num >= RC_LAST_CONFIG_INT) {
     return 0;
   }
-  if (num >= RC_BASE_CONFIG_INT) {
+  if (num > RC_BASE_CONFIG_INT) {
     res->type = T_NUMBER;
     res->u.number = config_int[num - RC_BASE_CONFIG_INT];
   } else {

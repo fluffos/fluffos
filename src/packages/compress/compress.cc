@@ -59,6 +59,7 @@ void f_compress_file() {
 
   real_output_file = check_valid_path(output_file, current_object, "compress_file", 1);
   if (!real_output_file) {
+    FREE_MSTR(output_file);
     pop_n_elems(num_arg);
     push_number(0);
     return;
