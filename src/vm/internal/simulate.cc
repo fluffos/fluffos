@@ -1646,7 +1646,7 @@ void free_sentence(sentence_t *p) {
 
 [[noreturn]] void fatal(const char *fmt, ...) {
   static int in_fatal = 0;
-  char msg_buf[2049];
+  char msg_buf[2049] = {};
   va_list args;
 
   switch (in_fatal) {

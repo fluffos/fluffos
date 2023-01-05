@@ -39,7 +39,7 @@ class Event {
   EventCategory category = EventCategory::DEFAULT;
   const char* phase = "i";
   std::string name = "DEFAULT";
-  std::optional<json> args;
+  std::optional<json> args = std::nullopt;
 
   inline const char* category_name() {
     switch (this->category) {
