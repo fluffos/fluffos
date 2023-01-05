@@ -1,19 +1,46 @@
 ![Supported Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20FreeBSD-blue.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
-[![Build Status](https://travis-ci.org/gulrak/filesystem.svg?branch=master)](https://travis-ci.org/gulrak/filesystem)
+[![CMake Build Matrix](https://github.com/gulrak/filesystem/actions/workflows/build_cmake.yml/badge.svg?branch=master)](https://github.com/gulrak/filesystem/actions/workflows/build_cmake.yml)
 [![Build Status](https://ci.appveyor.com/api/projects/status/t07wp3k2cddo0hpo/branch/master?svg=true)](https://ci.appveyor.com/project/gulrak/filesystem)
 [![Build Status](https://api.cirrus-ci.com/github/gulrak/filesystem.svg?branch=master)](https://cirrus-ci.com/github/gulrak/filesystem)
 [![Build Status](https://cloud.drone.io/api/badges/gulrak/filesystem/status.svg?ref=refs/heads/master)](https://cloud.drone.io/gulrak/filesystem)
 [![Coverage Status](https://coveralls.io/repos/github/gulrak/filesystem/badge.svg?branch=master)](https://coveralls.io/github/gulrak/filesystem?branch=master)
-[![Latest Release Tag](https://img.shields.io/github/tag/gulrak/filesystem.svg)](https://github.com/gulrak/filesystem/tree/v1.5.8)
+[![Latest Release Tag](https://img.shields.io/github/tag/gulrak/filesystem.svg)](https://github.com/gulrak/filesystem/tree/v1.5.12)
 
+- [Filesystem](#filesystem)
+  - [Motivation](#motivation)
+  - [Why the namespace GHC?](#why-the-namespace-ghc)
+  - [Platforms](#platforms)
+  - [Tests](#tests)
+  - [Usage](#usage)
+    - [Downloads](#downloads)
+    - [Using it as Single-File-Header](#using-it-as-single-file-header)
+    - [Using it as Forwarding-/Implementation-Header](#using-it-as-forwarding-implementation-header)
+    - [Git Submodule and CMake](#git-submodule-and-cmake)
+    - [Versioning](#versioning)
+  - [Documentation](#documentation)
+    - [`ghc::filesystem::ifstream`, `ghc::filesystem::ofstream`, `ghc::filesystem::fstream`](#ghcfilesystemifstream-ghcfilesystemofstream-ghcfilesystemfstream)
+    - [`ghc::filesystem::u8arguments`](#ghcfilesystemu8arguments)
+  - [Differences](#differences)
+    - [LWG Defects](#lwg-defects)
+    - [Not Implemented on C++ before C++17](#not-implemented-on-c-before-c17)
+    - [Differences in API](#differences-in-api)
+      - [Differences of Specific Interfaces](#differences-of-specific-interfaces)
+    - [Differences in Behavior](#differences-in-behavior)
+      - [fs.path](#fspath-refhttpsencppreferencecomwcppfilesystempath)
+  - [Open Issues](#open-issues)
+    - [Windows](#windows)
+      - [Symbolic Links on Windows](#symbolic-links-on-windows)
+      - [Permissions](#permissions)
+  - [Release Notes](#release-notes)
+  
 # Filesystem
 
 This is a header-only single-file `std::filesystem` compatible helper library,
 based on the C++17 and C++20 specs, but implemented for C++11, C++14, C++17 or C++20
 (tightly following  the C++17 standard with very few documented exceptions). It is currently tested on
-macOS 10.12/10.14/10.15, Windows 10, Ubuntu 18.04, CentOS 7, CentOS 8, FreeBSD 12
-and Alpine ARM/ARM64 Linux but should work on other systems too, as long as you have
+macOS 10.12/10.14/10.15/11.6, Windows 10, Ubuntu 18.04, Ubuntu 20.04, CentOS 7, CentOS 8, FreeBSD 12,
+Alpine ARM/ARM64 Linux and Solaris 10 but should work on other systems too, as long as you have
 at least a C++11 compatible compiler. It should work with Android NDK, Emscripten and I even
 had reports of it being used on iOS (within sandboxing constraints) and with v1.5.6 there
 is experimental support for QNX. The support of Android NDK, Emscripten and QNX is not
@@ -60,15 +87,15 @@ to do with Haskell**, sorry for the name clash).
 ## Platforms
 
 `ghc::filesystem` is developed on macOS but CI tested on macOS, Windows,
-various Linux Distributions and FreeBSD. It should work on any of these with a C++11-capable
-compiler. Also there are some checks to hopefully better work on Android, but
-as I currently don't test with the Android NDK, I wouldn't call it a
-supported platform yet, same is valid for using it with Emscripten. It is now
-part of the detected platforms, I fixed the obvious issues and ran some tests with
-it, so it should be fine. All in all, I don't see it replacing `std::filesystem`
-where full C++17 or C++20 is available, it doesn't try to be a "better"
-`std::filesystem`, just an almost drop-in if you can't use it (with the exception
-of the UTF-8 preference).
+various Linux Distributions, FreeBSD and starting with v1.5.12 on Solaris.
+It should work on any of these with a C++11-capable  compiler. Also there are some
+checks to hopefully better work on Android, but  as I currently don't test with the
+Android NDK, I wouldn't call it a  supported platform yet, same is valid for using
+it with Emscripten. It is now  part of the detected platforms, I fixed the obvious
+issues and ran some tests with  it, so it should be fine. All in all, I don't see it
+replacing `std::filesystem` where full C++17 or C++20 is available, it doesn't try
+to be a "better" `std::filesystem`, just an almost drop-in if you can't use it
+(with the exception  of the UTF-8 preference).
 
 :information_source: **Important:** _This implementation is following the ["UTF-8 Everywhere" philosophy](https://utf8everywhere.org/) in that all
 `std::string` instances will be interpreted the same as `std::u8string` encoding
@@ -82,6 +109,7 @@ Unit tests are currently run with:
 * Linux (Ubuntu): GCC (5.5, 6.5, 7.4, 8.3, 9.2), Clang (5.0, 6.0, 7.1, 8.0, 9.0)
 * Linux (Alpine ARM/ARM64): GCC 9.2.0
 * FreeBSD: Clang 8.0
+* Solaris: GCC 5.5 
 
 
 ## Tests
@@ -121,8 +149,8 @@ in the standard, and there might be issues in these implementations too.
 
 ### Downloads
 
-The latest release version is [v1.5.8](https://github.com/gulrak/filesystem/tree/v1.5.8) and
-source archives can be found [here](https://github.com/gulrak/filesystem/releases/tag/v1.5.8).
+The latest release version is [v1.5.12](https://github.com/gulrak/filesystem/tree/v1.5.12) and
+source archives can be found [here](https://github.com/gulrak/filesystem/releases/tag/v1.5.12).
 
 The latest pre-native-backend version is [v1.4.0](https://github.com/gulrak/filesystem/tree/v1.4.0) and
 source archives can be found [here](https://github.com/gulrak/filesystem/releases/tag/v1.4.0).
@@ -556,9 +584,34 @@ to the expected behavior.
 
 ## Release Notes
 
+### [v1.5.12](https://github.com/gulrak/filesystem/releases/tag/v1.5.12)
+
+* Fix for [#142](https://github.com/gulrak/filesystem/issues/142), removed need
+  for `GHC_NO_DIRENT_D_TYPE` on systems that don't support `dirent::d_type` and
+  fixed build configuration and tests to support Solaris as new platform.
+* Pull request [#138](https://github.com/gulrak/filesystem/pull/138), if the
+  platform uses the POSIX backend and has no `PATH_MAX`, one is defined.
+* Pull request [#137](https://github.com/gulrak/filesystem/pull/137), update
+  of Catch2 to version v2.13.7
+* Added macOS 11 to the automatically tested platforms.
+
+### [v1.5.10](https://github.com/gulrak/filesystem/releases/tag/v1.5.10)
+
+* Pull request [#136](https://github.com/gulrak/filesystem/pull/136), the Windows
+  implementation used some unnecessary expensive shared pointer for resource
+  management and these where replaced by a dedicated code.
+* Fix for [#132](https://github.com/gulrak/filesystem/issues/132), pull request
+  [#135](https://github.com/gulrak/filesystem/pull/135), `fs::remove_all` now
+  just deletes symbolic links instead of following them.
+* Pull request [#133](https://github.com/gulrak/filesystem/pull/133), fix for
+  `fs::space` where a numerical overflow could happen in a multiplication.
+* Replaced _travis-ci.org_  with GitHub Workflow for the configurations:
+  Ubuntu 20.04: GCC 9.3, Ubuntu 18.04: GCC 7.5, GCC 8.4, macOS 10.15: Xcode 12.4,
+  Windows 10: Visual Studio 2019
+
 ### [v1.5.8](https://github.com/gulrak/filesystem/releases/tag/v1.5.8)
 
-* Fix for [#125]((https://github.com/gulrak/filesystem/issues/124), where
+* Fix for [#125](https://github.com/gulrak/filesystem/issues/124), where
   `fs::create_directories` on Windows no longer breaks on long filenames.
 
 ### [v1.5.6](https://github.com/gulrak/filesystem/releases/tag/v1.5.6)
