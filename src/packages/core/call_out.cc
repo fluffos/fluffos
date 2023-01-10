@@ -415,7 +415,7 @@ int total_callout_size() { return g_callout_handle_map.size() * sizeof(pending_c
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_call_outs() {
-  for (auto iter : g_callout_handle_map) {
+  for (auto &iter : g_callout_handle_map) {
     auto *cop = iter.second;
     if (cop->vs) {
       cop->vs->extra_ref++;
