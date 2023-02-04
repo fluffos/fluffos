@@ -1178,7 +1178,7 @@ int restore_svalue(char *cp, svalue_t *v) {
    an error */
 static int safe_restore_svalue(char *cp, svalue_t *v) {
   int ret;
-  svalue_t val;
+  svalue_t val = {};
   char c;
 
   val.type = T_NUMBER;

@@ -35,8 +35,8 @@
    especially those whose name start with YY_ or yy_.  They are
    private implementation details that can be changed or removed.  */
 
-#ifndef YY_YY_HOME_SUNYC_SRC_FLUFFOS_CMAKE_BUILD_DEBUG_ASAN_WSL_CLANG_SRC_GRAMMAR_AUTOGEN_H_INCLUDED
-# define YY_YY_HOME_SUNYC_SRC_FLUFFOS_CMAKE_BUILD_DEBUG_ASAN_WSL_CLANG_SRC_GRAMMAR_AUTOGEN_H_INCLUDED
+#ifndef YY_YY_HOME_SUNYC_SRC_FLUFFOS_BUILD_SRC_GRAMMAR_AUTOGEN_H_INCLUDED
+# define YY_YY_HOME_SUNYC_SRC_FLUFFOS_BUILD_SRC_GRAMMAR_AUTOGEN_H_INCLUDED
 /* Debug traces.  */
 #ifndef YYDEBUG
 # define YYDEBUG 0
@@ -137,7 +137,7 @@ union YYSTYPE
     uint16_t save_exact_types;
   } func_block; /* 8 */
 
-#line 141 "/home/sunyc/src/fluffos/cmake-build-debug-asan-wsl-clang/src/grammar.autogen.h"
+#line 141 "/home/sunyc/src/fluffos/build/src/grammar.autogen.h"
 
 };
 typedef union YYSTYPE YYSTYPE;
@@ -152,4 +152,4 @@ extern YYSTYPE yylval;
 int yyparse (void);
 
 
-#endif /* !YY_YY_HOME_SUNYC_SRC_FLUFFOS_CMAKE_BUILD_DEBUG_ASAN_WSL_CLANG_SRC_GRAMMAR_AUTOGEN_H_INCLUDED  */
+#endif /* !YY_YY_HOME_SUNYC_SRC_FLUFFOS_BUILD_SRC_GRAMMAR_AUTOGEN_H_INCLUDED  */
