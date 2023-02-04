@@ -1006,7 +1006,7 @@ void map_string(svalue_t *arg, int num_arg) {
   int numex = 0;
   object_t *ob = nullptr;
   svalue_t *extra, *v;
-  const char *func;
+  const char *func = nullptr;
 
   /* get a modifiable string */
   /* do not use arg after this; it has been copied or freed.
@@ -1924,7 +1924,7 @@ array_t *deep_inherit_list(object_t *ob) {
 
   for (; cur < next && next < 256; cur++) {
     pr = plist[cur];
-    for (il2 = 0; il2 < pr->num_inherited; il2++) {
+    for (il2 = 0; il2 < pr->num_inherited && next < 256; il2++) {
       plist[next++] = pr->inherit[il2].prog;
     }
   }
