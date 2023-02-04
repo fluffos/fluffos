@@ -37,7 +37,7 @@ find_program (BASH_EXECUTABLE bash)
 if(GIT_EXECUTABLE)
   execute_process(
           WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-          COMMAND ${BASH_EXECUTABLE} -c "${GIT_EXECUTABLE} log --committer='Yucong Sun' -1 --format=%ct-%h"
+          COMMAND ${BASH_EXECUTABLE} -c "${GIT_EXECUTABLE} log --committer='Yucong Sun' -1 --date=format:%Y%m%d --format=%cd-%h"
           OUTPUT_VARIABLE GIT_HASH
           OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(
@@ -52,7 +52,7 @@ if(GIT_EXECUTABLE)
           OUTPUT_STRIP_TRAILING_WHITESPACE)
   set(PROJECT_VERSION "${GIT_HASH}${GIT_LOCAL_COMMIT}${GIT_DIRTY}")
 else()
-  set(PROJECT_VERSION "local")
+  set(PROJECT_VERSION "unknown")
 endif()
 
 message("FluffOS ${PROJECT_VERSION} (${CMAKE_BUILD_TYPE})")
