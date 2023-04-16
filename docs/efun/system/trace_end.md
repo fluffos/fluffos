@@ -14,7 +14,7 @@ title: system / trace_end
 ### DESCRIPTION
 
     Calling this function will stop an active trace and write out the result
-    to the file provided by `tracestart(filename)`.
+    to the file provided by `trace_start(filename)`.
 
     Note: do not leave tracing enabled for too long or you will risk running
     out of memory.
