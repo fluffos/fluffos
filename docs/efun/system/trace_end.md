@@ -13,11 +13,13 @@ title: system / trace_end
 
 ### DESCRIPTION
 
-    Stop tracing and write out result immediately.
+    Calling this function will stop an active trace and write out the result
+    to the file provided by `tracestart(filename)`.
 
-    if tracing is not enabled, this efun has no effect.
+    Note: do not leave tracing enabled for too long or you will risk running
+    out of memory.
 
 ### SEE ALSO
 
-    trace_start()
+    trace_start(3)
 
