@@ -16,11 +16,18 @@ title: system / trace_start
     Calling this function will start collecting tracing information from the
     driver. This includes LPC function level execution information.
 
-    The trace collection will stop and write to `filename` on `trace_end()`,
-    or after `auto_stop_sec` seconds, which defaults to 30 seconds.
+    The trace collection will stop and write the json data to  `filename` on
+    `trace_end()`  or after  `auto_stop_sec`  seconds,  which defaults to 30 
+    seconds.
 
     Note: do not leave tracing enabled for too long or you will risk running
     out of memory.
+
+### ANALYSIS
+
+    To read and analyze the the json file,  open up Chrome's Developer Tools
+    and under the Performance tab click the Load Profile icon to display the
+    trace.
 
 ### SEE ALSO
 

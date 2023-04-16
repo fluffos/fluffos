@@ -19,6 +19,12 @@ title: system / trace_end
     Note: do not leave tracing enabled for too long or you will risk running
     out of memory.
 
+### ANALYSIS
+
+    To read and analyze the the json file,  open up Chrome's Developer Tools
+    and under the Performance tab click the Load Profile icon to display the
+    trace.
+
 ### SEE ALSO
 
     trace_start(3)
