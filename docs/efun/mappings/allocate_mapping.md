@@ -40,7 +40,7 @@ title: mappings / allocate_mapping
     allocate_mapping(mixed *keys, mixed v):
       - if value is an array, the returned array has keys 'keys' and values
        'value' (like 3.2.x's mkmapping)
-      - if it is a function, the the mapping has keys 'keys' and values
+      - if it is a function, then the mapping has keys 'keys' and values
         evaluate(value, key)
       - otherwise, each key has the value 'value'
 
