@@ -55,7 +55,7 @@ $ sudo pip install --upgrade cmake
 $ mkdir build
 $ cd build
 $ cmake ..
-$ make -j4 install
+$ make -j `nproc` install
 ```
 
 - Find binary files and support files in ./bin/
