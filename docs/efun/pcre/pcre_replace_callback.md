@@ -9,13 +9,13 @@ title: pcre / pcre_replace_callback
 
 ### SYNOPSIS
 
-    string pcre_replace_callback(string, string, string | function, ...);
+    string pcre_replace_callback(string input, string pattern, string|function, mixed *args...);
 
 ### DESCRIPTION
 
-    returns a string where all captured groups have been replaced by the
-    return value of function pointe fun or function fun in object ob.
-    (called with the matched string and match number, starting with 0)
+    returns a string where all captured groups have been replaced by the return
+    value of function pointer fun or function fun in object ob. (called with the
+    matched string and match number, starting with 0)
 
 ### SEE ALSO
 
