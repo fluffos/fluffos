@@ -9,20 +9,27 @@ title: system / trace_start
 
 ### SYNOPSIS
 
-    void trace_start(filename, auto_stop_sec = 30)
+    void trace_start(string filename, int auto_stop_sec = 30)
 
 ### DESCRIPTION
 
-    Call this funciton to start collecting tracing information, this include LPC
-    funciton level execution information.
+    Calling this function will start collecting tracing information from the
+    driver. This includes LPC function level execution information.
 
-    Driver will stop collection and dump to `filename` on `trace_end()`, or
-    after `auto_stop_sec` seconds, default to be 30.
+    The trace collection will stop and write the json data to  `filename` on
+    `trace_end()`  or after  `auto_stop_sec`  seconds,  which defaults to 30 
+    seconds.
 
-    Note: do not leave tracing enabled for too long, otherwise you will run out of
-    memory.
+    Note: do not leave tracing enabled for too long or you will risk running
+    out of memory.
+
+### ANALYSIS
+
+    To read and analyze the the json file,  open up Chrome's Developer Tools
+    and under the Performance tab click the Load Profile icon to display the
+    trace.
 
 ### SEE ALSO
 
-    trace_end()
+    trace_end(3)
 
