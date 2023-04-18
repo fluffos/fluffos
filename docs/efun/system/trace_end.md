@@ -21,9 +21,8 @@ title: system / trace_end
 
 ### ANALYSIS
 
-    To read and analyze the the json file,  open up Chrome's Developer Tools
-    and under the Performance tab click the Load Profile icon to display the
-    trace.
+    To read and analyze the json file, use Chrome or Firefox Developer Tools
+    Performance tab.
 
 ### SEE ALSO
 
