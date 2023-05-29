@@ -279,7 +279,7 @@ void read_config(char *filename) {
     int i, port, port_start = 0;
     if (scan_config_line("port number : %d\n", &CONFIG_INT(__MUD_PORT__), 0)) {
       external_port[0].port = CONFIG_INT(__MUD_PORT__);
-      external_port[0].kind = PORT_TELNET;
+      external_port[0].kind = PORT_TYPE_TELNET;
       port_start = 1;
     }
 
@@ -295,7 +295,7 @@ void read_config(char *filename) {
       }
     }
     for (i = port_start; i < 5; i++) {
-      external_port[i].kind = 0;
+      external_port[i].kind = PORT_TYPE_UNDEFINED;
       external_port[i].fd = -1;
 
       char kind[K_MAX_CONFIG_LINE_LENGTH];
@@ -304,15 +304,15 @@ void read_config(char *filename) {
         if (sscanf(tmp, "%s %d", kind, &port) == 2) {
           external_port[i].port = port;
           if (!strcmp(kind, "telnet")) {
-            external_port[i].kind = PORT_TELNET;
+            external_port[i].kind = PORT_TYPE_TELNET;
           } else if (!strcmp(kind, "binary")) {
-            external_port[i].kind = PORT_BINARY;
+            external_port[i].kind = PORT_TYPE_BINARY;
           } else if (!strcmp(kind, "ascii")) {
-            external_port[i].kind = PORT_ASCII;
+            external_port[i].kind = PORT_TYPE_ASCII;
           } else if (!strcmp(kind, "MUD")) {
-            external_port[i].kind = PORT_MUD;
+            external_port[i].kind = PORT_TYPE_MUD;
           } else if (!strcmp(kind, "websocket")) {
-            external_port[i].kind = PORT_WEBSOCKET;
+            external_port[i].kind = PORT_TYPE_WEBSOCKET;
             if (!CONFIG_STR(__RC_WEBSOCKET_HTTP_DIR__)) {
               scan_config_line("websocket http dir : %[^\n]", tmp, kMustHave);
               CONFIG_STR(__RC_WEBSOCKET_HTTP_DIR__) = alloc_cstring(tmp, "config file: whd");
@@ -329,7 +329,7 @@ void read_config(char *filename) {
     }
     // TLS support status
     for (i = port_start; i < 5; i++) {
-      if (external_port[i].kind != 0) {
+      if (external_port[i].kind != PORT_TYPE_UNDEFINED) {
         char kind[K_MAX_CONFIG_LINE_LENGTH];
         sprintf(kind, "external_port_%i_tls : %%[^\n]", i + 1);
         if (scan_config_line(kind, tmp, 0)) {
