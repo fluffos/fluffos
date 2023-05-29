@@ -13,10 +13,10 @@ title: APPLY
 <div><a href='interactive/catch_tell.html'>catch_tell</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='interactive/gmcp_enable.html'>gmcp_enable</a></div>
+<div><a href='interactive/gmcp.html'>gmcp</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='interactive/gmcp.html'>gmcp</a></div>
+<div><a href='interactive/gmcp_enable.html'>gmcp_enable</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='interactive/logon.html'>logon</a></div>
@@ -201,6 +201,6 @@ title: APPLY
 
 <div class="alert alert-info my-4" role="alert">
     <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/info.svg">
-    This page is auto generated on 2022-07-06 16:19:27 CST for v2019.20220507-7-g64a2b14d-dirty.</a>
+    This page is auto generated on 2023-05-29 10:39:12 Pacific Daylight Time for v2019.20220507-35-g8e36eb2e-dirty.</a>
 </div>
 
