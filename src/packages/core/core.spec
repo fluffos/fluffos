@@ -355,5 +355,7 @@ void trace_start(string, int default: 10);
 // stop to collect tracing data right away.
 void trace_end();
 
-// return highest resolution clock in nanoseconds
+// return highest resolution clock in platform dependent unit
 int perf_counter_ns();
+// Return nanosecond time
+int time_ns();
