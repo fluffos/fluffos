@@ -12,15 +12,17 @@
 #include <openssl/ssl.h>
 #include <string>
 
-#define PORT_UNDEFINED 0
-#define PORT_TELNET 1
-#define PORT_BINARY 2
-#define PORT_ASCII 3
-#define PORT_MUD 4
-#define PORT_WEBSOCKET 5
+enum PORT_TYPE {
+  PORT_TYPE_UNDEFINED = 0,
+  PORT_TYPE_TELNET = 1,
+  PORT_TYPE_BINARY = 2,
+  PORT_TYPE_ASCII = 3,
+  PORT_TYPE_MUD = 4,
+  PORT_TYPE_WEBSOCKET = 5
+};
 
 struct port_def_t {
-  int kind;
+  PORT_TYPE kind;
   int port;
   evutil_socket_t fd;
   // used by F_NETWORK_STATS
@@ -39,15 +41,15 @@ struct port_def_t {
 
 static inline const char* port_kind_name(int kind) {
   switch (kind) {
-    case PORT_TELNET:
+    case PORT_TYPE_TELNET:
       return "telnet";
-    case PORT_BINARY:
+    case PORT_TYPE_BINARY:
       return "binary";
-    case PORT_ASCII:
+    case PORT_TYPE_ASCII:
       return "ascii";
-    case PORT_MUD:
+    case PORT_TYPE_MUD:
       return "mud";
-    case PORT_WEBSOCKET:
+    case PORT_TYPE_WEBSOCKET:
       return "websocket";
 
     default:
