@@ -197,7 +197,7 @@ void new_conn_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
     }
   }
 
-  if (port->kind == PORT_WEBSOCKET) {
+  if (port->kind == PORT_TYPE_WEBSOCKET) {
     // For websocket connections, wait until they are handshake finished.
     init_user_websocket(port->lws_context, fd);
     return;
@@ -208,7 +208,7 @@ void new_conn_handler(evconnlistener *listener, evutil_socket_t fd, struct socka
     auto *user = new_user(port, fd, addr, addrlen);
     new_user_event_listener(base, user);
 
-    if (user->connection_type == PORT_TELNET) {
+    if (user->connection_type == PORT_TYPE_TELNET) {
       user->telnet = net_telnet_init(user);
       send_initial_telnet_negotiations(user);
     }
@@ -459,7 +459,7 @@ bool init_user_conn() {
       }
 
       // Websocket TLS is handled in init_websocket_context
-      if (!port.tls_cert.empty() && port.kind != PORT_WEBSOCKET) {
+      if (!port.tls_cert.empty() && port.kind != PORT_TYPE_WEBSOCKET) {
         SSL_CTX *ctx = tls_server_init(port.tls_cert, port.tls_key);
         if (!ctx) {
           debug_message("Unable to create TLS context.\n");
@@ -485,7 +485,7 @@ bool init_user_conn() {
     }
     port.ev_conn = conn;
     port.fd = fd;
-    if (port.kind == PORT_WEBSOCKET) {
+    if (port.kind == PORT_TYPE_WEBSOCKET) {
       port.lws_context = init_websocket_context(g_event_base, &port);
     }
   }
@@ -571,18 +571,18 @@ void add_message(object_t *who, const char *data, int len) {
 
   auto *ip = who->interactive;
   switch (ip->connection_type) {
-    case PORT_ASCII:
-    case PORT_TELNET: {
+    case PORT_TYPE_ASCII:
+    case PORT_TYPE_TELNET: {
       auto transdata = u8_convert_encoding(ip->trans, data, len);
       auto result = transdata.empty() ? std::string_view(data, len) : transdata;
       inet_volume += result.size();
-      if (ip->connection_type == PORT_TELNET) {
+      if (ip->connection_type == PORT_TYPE_TELNET) {
         telnet_send_text(ip->telnet, result.data(), result.size());
       } else {
         bufferevent_write(ip->ev_buffer, result.data(), result.size());
       }
     } break;
-    case PORT_WEBSOCKET: {
+    case PORT_TYPE_WEBSOCKET: {
       if (ip->iflags & HANDSHAKE_COMPLETE) {
         websocket_send_text(ip->lws, data, len);
       } else {
@@ -708,10 +708,10 @@ void get_user_data(interactive_t *ip) {
 
   /* compute how much data we can read right now */
   switch (ip->connection_type) {
-    case PORT_WEBSOCKET:
+    case PORT_TYPE_WEBSOCKET:
       // Impossible, we don't handle it here.
       break;
-    case PORT_TELNET:
+    case PORT_TYPE_TELNET:
       text_space = sizeof(ip->text) - ip->text_end;
 
       /* check if we need more space */
@@ -730,7 +730,7 @@ void get_user_data(interactive_t *ip) {
       }
       break;
 
-    case PORT_MUD:
+    case PORT_TYPE_MUD:
       if (ip->text_end < 4) {
         text_space = 4 - ip->text_end;
       } else {
@@ -766,10 +766,10 @@ void get_user_data(interactive_t *ip) {
   /* process the data that we've just read */
 
   switch (ip->connection_type) {
-    case PORT_WEBSOCKET:
+    case PORT_TYPE_WEBSOCKET:
       // Impossible, we don't handle it here
       break;
-    case PORT_TELNET: {
+    case PORT_TYPE_TELNET: {
       int const start = ip->text_end;
 
       // this will read data into ip->text
@@ -793,7 +793,7 @@ void get_user_data(interactive_t *ip) {
       }
       break;
     }
-    case PORT_MUD:
+    case PORT_TYPE_MUD:
       memcpy(ip->text + ip->text_end, buf, num_bytes);
       ip->text_end += num_bytes;
 
@@ -820,7 +820,7 @@ void get_user_data(interactive_t *ip) {
       }
       break;
 
-    case PORT_ASCII: {
+    case PORT_TYPE_ASCII: {
       char *nl, *p;
 
       memcpy(ip->text + ip->text_end, buf, num_bytes);
@@ -854,7 +854,7 @@ void get_user_data(interactive_t *ip) {
       }
     } break;
 
-    case PORT_BINARY: {
+    case PORT_TYPE_BINARY: {
       buffer_t *buffer;
 
       buffer = allocate_buffer(num_bytes);
