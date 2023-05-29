@@ -90,6 +90,6 @@ title: STDLIB
 
 <div class="alert alert-info my-4" role="alert">
     <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/info.svg">
-    This page is auto generated on 2022-07-06 16:19:27 CST for v2019.20220507-7-g64a2b14d-dirty.</a>
+    This page is auto generated on 2023-05-29 10:39:13 Pacific Daylight Time for v2019.20220507-35-g8e36eb2e-dirty.</a>
 </div>
 

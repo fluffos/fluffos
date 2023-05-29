@@ -28,6 +28,13 @@ void f_perf_counter_ns() {
 void f_time() { push_number(get_current_time()); }
 #endif
 
+#ifdef F_TIME_NS
+void f_time_ns() {
+  auto now = std::chrono::high_resolution_clock::now();
+  push_number(std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count());
+}
+#endif
+
 #ifdef F_CTIME
 void f_ctime() {
   char buf[255] = {};
