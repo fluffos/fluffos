@@ -198,10 +198,10 @@ void f__call_other() {
     array_t *v = arg[1].u.arr;
     svalue_t *sv = nullptr;
 
-    check_for_destr(v);
     if (!((sv = v->item)->type == T_STRING)) {
       error("call_other: 1st elem of array for arg 2 must be a string\n");
     }
+    check_for_destr(v);
     funcname = sv->u.string;
     num_arg = 2 + merge_arg_lists(num_arg - 2, v, 1);
   }
