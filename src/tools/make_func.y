@@ -145,7 +145,7 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';' {
   char f_name[500];
   int i, len;
   if (min_arg == -1) min_arg = $5;
-  if (min_arg > 4) yyerror("min_arg > 4\n");
+  if (min_arg > 127) yyerror("min_arg > 127\n");
   if ($3[0] == '\0') {
     if (strlen($2) + 1 + 2 > sizeof f_name) yyerror("A local buffer was too small!(1)\n");
     sprintf(f_name, "F_%s", $2);
@@ -254,51 +254,51 @@ typel: arg_type { $$ = ($1 == T_VOID && min_arg == -1); }
 %%
 
 const char *ctype(int n) {
-static char buff[100]; /* 100 is such a comfortable size :-) */
-const char *p = (char *)NULL;
+  static char buff[100]; /* 100 is such a comfortable size :-) */
+  const char *p = (char *)NULL;
 
-if (n & 0x10000)
-  strcpy(buff, "TYPE_MOD_ARRAY|");
-else
-    buff[0] = '\0';
-  n &= ~0x10000;
-  switch (n) {
-    case T_FLOAT:
-      p = "TYPE_REAL";
-      break;
-    case T_FUNCTION:
-      p = "TYPE_FUNCTION";
-      break;
-    case T_VOID:
-      p = "TYPE_VOID";
-      break;
-    case T_STRING:
-      p = "TYPE_STRING";
-      break;
-    case T_INT:
-      p = "TYPE_NUMBER";
-      break;
-    case T_OBJECT:
-      p = "TYPE_OBJECT";
-      break;
-    case T_MAPPING:
-      p = "TYPE_MAPPING";
-      break;
-    case T_BUFFER:
-      p = "TYPE_BUFFER";
-      break;
-    case T_MIXED:
-      p = "TYPE_ANY";
-      break;
-    case T_UNKNOWN:
-      p = "TYPE_UNKNOWN";
-      break;
-    default:
-      yyerror("Bad type!");
-  }
-  strcat(buff, p);
-  if (strlen(buff) + 1 > sizeof buff) yyerror("Local buffer overwritten in ctype()");
-  return buff;
+  if (n & 0x10000)
+    strcpy(buff, "TYPE_MOD_ARRAY|");
+  else
+      buff[0] = '\0';
+    n &= ~0x10000;
+    switch (n) {
+      case T_FLOAT:
+        p = "TYPE_REAL";
+        break;
+      case T_FUNCTION:
+        p = "TYPE_FUNCTION";
+        break;
+      case T_VOID:
+        p = "TYPE_VOID";
+        break;
+      case T_STRING:
+        p = "TYPE_STRING";
+        break;
+      case T_INT:
+        p = "TYPE_NUMBER";
+        break;
+      case T_OBJECT:
+        p = "TYPE_OBJECT";
+        break;
+      case T_MAPPING:
+        p = "TYPE_MAPPING";
+        break;
+      case T_BUFFER:
+        p = "TYPE_BUFFER";
+        break;
+      case T_MIXED:
+        p = "TYPE_ANY";
+        break;
+      case T_UNKNOWN:
+        p = "TYPE_UNKNOWN";
+        break;
+      default:
+        yyerror("Bad type!");
+    }
+    strcat(buff, p);
+    if (strlen(buff) + 1 > sizeof buff) yyerror("Local buffer overwritten in ctype()");
+    return buff;
 }
 
 const char *etype1(int n) {
@@ -503,6 +503,16 @@ void make_efun_tables() {
       fprintf(f, "0,\n");
     } else {
       fprintf(f, "%s, ", ctype(arg_types[i]));
+    }
+  }
+  fprintf(f, "};\n");
+
+  fprintf(f, "int efun_arg_etypes[] = {\n");
+  for (int i = 0; i < last_current_type; i++) {
+    if (arg_types[i] == 0) {
+      fprintf(f, "0,\n");
+    } else {
+      fprintf(f, "%s, ", etype1(arg_types[i]));
     }
   }
   fprintf(f, "};\n");
