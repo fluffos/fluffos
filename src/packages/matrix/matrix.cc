@@ -285,8 +285,8 @@ void f_lookat_rotate2(void) {
   lx = (sp - 2)->u.real;
   ly = (sp - 1)->u.real;
   lz = sp->u.real;
-  sp -= 5;
-  free_array((sp--)->u.arr);
+
+  pop_n_elems(6);
 
   /*
    * convert vec matrix to float matrix.
