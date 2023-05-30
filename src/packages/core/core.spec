@@ -359,3 +359,5 @@ void trace_end();
 int perf_counter_ns();
 // Return nanosecond time
 int time_ns();
+
+void sys_reload_tls(int);
