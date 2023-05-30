@@ -22,7 +22,7 @@ jobs:
           - CC: "clang"
             CXX: "clang++"
         build: ["Debug", "RelWithDebInfo"]
-        os: ["ubuntu-18.04", "ubuntu-20.04", "ubuntu-latest"]
+        os: ["ubuntu-20.04", "ubuntu-latest"]
 
     runs-on: ${{ matrix.os }}
 
