@@ -1995,6 +1995,10 @@ program_t *compile_file(int f, char *name) {
   guard = 1;
 
   {
+    // make sure we use the C locale during parsing
+    auto *current_locale = setlocale(LC_ALL, "C");
+    DEFER{ setlocale(LC_ALL, current_locale);};
+
     symbol_start(name);
     prolog(f, name);
     func_present = 0;
