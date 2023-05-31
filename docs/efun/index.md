@@ -181,6 +181,9 @@ title: EFUN
 <div><a href='contrib/named_livings.html'>named_livings</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='contrib/network_ports.html'>network_ports</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='contrib/network_stats.html'>network_stats</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>

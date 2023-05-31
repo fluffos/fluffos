@@ -2177,6 +2177,43 @@ void f_network_stats() {
 }
 #endif
 
+#ifdef F_NETWORK_PORTS
+void f_network_ports() {
+  array_t *info;
+  int i, ports = 0;
+
+  for (i = 0; i < 5; i++) {
+    if (external_port[i].port) {
+      ports += 1;
+    }
+  }
+
+  info = allocate_empty_array(ports);
+  for (i = 0; i < 5; i++) {
+    if (!external_port[i].port) {
+      continue;
+    }
+    array_t *p = allocate_empty_array(3);
+
+    p->item[0].type = T_STRING;
+    p->item[0].subtype = STRING_CONSTANT;
+    p->item[0].u.string = port_kind_name(external_port[i].kind);
+
+    p->item[1].type = T_NUMBER;
+    p->item[1].subtype = 0;
+    p->item[1].u.number = external_port[i].port;
+
+    p->item[2].type = T_NUMBER;
+    p->item[2].subtype = 0;
+    p->item[2].u.number = !external_port[i].tls_cert.empty() && !external_port[i].tls_key.empty();
+
+    info->item[i].type = T_ARRAY;
+    info->item[i].u.arr = p;
+  }
+  push_refed_array(info);
+}
+#endif
+
 #ifdef F_EVENT
 
 /* EVENTS!
