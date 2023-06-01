@@ -29,7 +29,6 @@ object function_owner(function);
 string repeat_string(string, int);
 mapping memory_summary();
 string query_replaced_program(void | object);
-mixed *network_ports();
 mapping network_stats();
 int real_time();
 #ifdef PACKAGE_COMPRESS

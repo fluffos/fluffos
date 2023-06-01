@@ -34,4 +34,4 @@ title: contrib / network_stats.pre
 
 ### SEE ALSO
 
-    network_ports(3)
+    sys_network_ports(3)

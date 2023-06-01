@@ -1,15 +1,15 @@
 ---
 layout: default
-title: contrib / network_ports
+title: system / sys_network_ports
 ---
 
 ### NAME
 
-    network_ports() - display the active network ports
+    sys_network_ports() - display the active network ports
 
 ### SYNOPSIS
 
-    mixed *network_ports(void);
+    mixed *sys_network_ports(void);
 
 ### DESCRIPTION
 
@@ -18,7 +18,7 @@ title: contrib / network_ports
 
 ### RETURN VALUES
 
-    An array of the following sub-array will be returned for each active port:
+    An array of the following sub-array will be returned with each active port:
 
         ({ (string) type, (int) port, (int) tls, })
 
