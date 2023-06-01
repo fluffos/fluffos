@@ -42,7 +42,7 @@ extern object_t *simul_efun_ob;
 extern svalue_t *safe_apply_master_ob(int, int);
 
 static void clean_parser(void);
-static void prolog(int /*f*/, char * /*name*/);
+static void prolog(std::unique_ptr<LexStream>, char * /*name*/);
 static program_t *epilog(void);
 static void show_overload_warnings(void);
 
@@ -1979,7 +1979,7 @@ void yywarn(const char *fmt, ...) {
 /*
  * Compile an LPC file.
  */
-program_t *compile_file(int f, char *name) {
+program_t *compile_file(std::unique_ptr<LexStream> stream, char *name) {
   int yyparse(void);
   static int guard = 0;
   program_t *prog;
@@ -2000,7 +2000,7 @@ program_t *compile_file(int f, char *name) {
     DEFER{ setlocale(LC_ALL, current_locale);};
 
     symbol_start(name);
-    prolog(f, name);
+    prolog(std::move(stream), name);
     func_present = 0;
     yyparse();
     symbol_end();
@@ -2449,7 +2449,7 @@ static program_t *epilog(void) {
 /*
  * Initialize the environment that the compiler needs.
  */
-static void prolog(int f, char *name) {
+static void prolog(std::unique_ptr<LexStream> stream, char *name) {
   int i;
 
   function_context.num_parameters = -1;
@@ -2490,7 +2490,7 @@ static void prolog(int f, char *name) {
     copy_structures(simul_efun_ob->prog);
   }
 
-  start_new_file(f);
+  start_new_file(std::move(stream));
 }
 
 /*

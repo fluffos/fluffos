@@ -1,6 +1,8 @@
 #ifndef COMPILER_H
 #define COMPILER_H
 
+class LexStream;
+
 #include "vm/internal/base/function.h"  // for function_t
 #include "vm/internal/base/program.h"   // for DECL_MODS etc
 #include "trees.h"
@@ -205,7 +207,7 @@ int add_local_name(const char *, int);
 void reallocate_locals(void);
 void initialize_locals(void);
 int get_id_number(void);
-program_t *compile_file(int, char *);
+program_t *compile_file(std::unique_ptr<LexStream>, char *);
 void reset_function_blocks(void);
 void copy_variables(program_t *, int);
 void copy_structures(const program_t *);

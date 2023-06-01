@@ -42,6 +42,7 @@
 #include "scratchpad.h"
 
 #include "symbol.h"
+#include "compiler/internal/LexStream.h"
 
 // FIXME: in master.h
 extern struct object_t *master_ob;
@@ -92,7 +93,10 @@ int num_parse_error; /* Number of errors in the parser. */
 
 lpc_predef_t *lpc_predefs = nullptr;
 
-static int yyin_desc;
+namespace {
+std::unique_ptr<LexStream> current_stream = nullptr;
+} // namespace
+
 int lex_fatal;
 static const char **inc_list;  // global include path from runtime config
 static int inc_list_size;
@@ -111,7 +115,7 @@ char *outp;
 
 typedef struct incstate_s {
   struct incstate_s *next;
-  int yyin_desc;
+  LexStream* stream; // raw pointer because incstate_t is alloated using malloc
   int line;
   const char *file;
   int file_id;
@@ -1019,7 +1023,7 @@ static void handle_include(char *name, int global) {
   } else if ((f = inc_open(buf, name, delim == '"')) != -1) {
     is = reinterpret_cast<incstate_t *>(
         DMALLOC(sizeof(incstate_t), TAG_COMPILER, "handle_include: 1"));
-    is->yyin_desc = yyin_desc;
+    is->stream = current_stream.release();
     is->line = current_line;
     is->file = current_file;
     is->file_id = current_file_id;
@@ -1034,7 +1038,7 @@ static void handle_include(char *name, int global) {
     current_line = 1;
     current_file = make_shared_string(buf);
     current_file_id = add_program_file(buf, 0);
-    yyin_desc = f;
+    current_stream = std::make_unique<FileLexStream>(f);
     refill_buffer();
   } else {
     sprintf(buf, "Cannot #include %s", name);
@@ -1658,7 +1662,7 @@ static void refill_buffer() {
         p = outp + size - 1;
       }
 
-      size = read(yyin_desc, p, MAXLINE);
+      size = current_stream->read(p, MAXLINE);
       cur_lbuf->buf_end = p += size;
       if (size < MAXLINE) {
         *(last_nl = p) = LEX_EOF;
@@ -1721,7 +1725,7 @@ static void refill_buffer() {
         flag = 1;
       }
 
-      size = read(yyin_desc, p, MAXLINE);
+      size = current_stream->read(p, MAXLINE);
       end = p += size;
       if (flag) {
         cur_lbuf->buf_end = p;
@@ -1826,7 +1830,7 @@ int yylex() {
           incstate_t *p;
 
           p = inctop;
-          close(yyin_desc);
+          current_stream->close();
           save_file_info(current_file_id, current_line - current_line_saved);
           current_line_saved = p->line - 1;
           /* add the lines from this file, and readjust to be relative
@@ -1846,7 +1850,8 @@ int yylex() {
           current_file_id = p->file_id;
           current_line = p->line;
 
-          yyin_desc = p->yyin_desc;
+          current_stream.reset(p->stream);
+          p->stream = nullptr;
           last_nl = p->last_nl;
           outp = p->outp;
           inctop = p->next;
@@ -3020,10 +3025,12 @@ void end_new_file() {
     incstate_t *p;
 
     p = inctop;
-    close(yyin_desc);
+    current_stream->close();
+    current_stream.reset();
     free_string(current_file);
     current_file = p->file;
-    yyin_desc = p->yyin_desc;
+    current_stream.reset(p->stream);
+    p->stream = nullptr;
     inctop = p->next;
     FREE((char *)p);
   }
@@ -3235,7 +3242,7 @@ void add_predefines() {
   }
 }
 
-void start_new_file(int f) {
+void start_new_file(std::unique_ptr<LexStream> stream) {
   if (defines_need_freed) {
     free_defines();
   }
@@ -3259,7 +3266,7 @@ void start_new_file(int f) {
     add_define("__DIR__", -1, dir);
     FREE(dir);
   }
-  yyin_desc = f;
+  current_stream = std::move(stream);
   lex_fatal = 0;
   last_function_context = -1;
   current_function_context = nullptr;
