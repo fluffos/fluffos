@@ -29,7 +29,8 @@ int main(int argc, char** argv) {
   Tracer::begin("init_main", EventCategory::DEFAULT);
 
   // Initialize libevent, This should be done before executing LPC.
-  auto* base = init_main(argc, argv);
+  auto config = get_argument(0, argc, argv);
+  auto* base = init_main(config);
 
   Tracer::end("init_main", EventCategory::DEFAULT);
 
