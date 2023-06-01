@@ -1,6 +1,8 @@
 #ifndef _LEX_H_
 #define _LEX_H_
 
+#include "compiler/internal/LexStream.h"
+
 #define DEFMAX 65536  // at least 4 times MAXLINE
 #define MAXLINE 4096
 #define MLEN 4096
@@ -119,7 +121,7 @@ char *get_f_name(int);
 void init_include_path(void);
 void deinit_include_path(void);
 void set_inc_list(char *);
-void start_new_file(int);
+void start_new_file(std::unique_ptr<LexStream>);
 void end_new_file(void);
 int lookup_predef(const char *);
 void add_predefines(void);
