@@ -5,36 +5,44 @@
 #ifdef F_SYS_NETWORK_PORTS
 void f_sys_network_ports() {
   array_t *info;
-  int i, ports = 0;
+  int i = 0, p = 0;
 
   for (i = 0; i < 5; i++) {
     if (external_port[i].port) {
-      ports += 1;
+      p ++;
     }
   }
 
-  info = allocate_empty_array(ports);
+  info = allocate_empty_array(p);
+  p = 0;
+
   for (i = 0; i < 5; i++) {
     if (!external_port[i].port) {
       continue;
     }
-    array_t *p = allocate_empty_array(3);
+    array_t *pInfo = allocate_empty_array(4);
 
-    p->item[0].type = T_STRING;
-    p->item[0].subtype = STRING_CONSTANT;
-    p->item[0].u.string = port_kind_name(external_port[i].kind);
+    pInfo->item[0].type = T_NUMBER;
+    pInfo->item[0].subtype = 0;
+    pInfo->item[0].u.number = i + 1;
 
-    p->item[1].type = T_NUMBER;
-    p->item[1].subtype = 0;
-    p->item[1].u.number = external_port[i].port;
+    pInfo->item[1].type = T_STRING;
+    pInfo->item[1].subtype = STRING_CONSTANT;
+    pInfo->item[1].u.string = port_kind_name(external_port[i].kind);
 
-    p->item[2].type = T_NUMBER;
-    p->item[2].subtype = 0;
-    p->item[2].u.number = !external_port[i].tls_cert.empty() && !external_port[i].tls_key.empty();
+    pInfo->item[2].type = T_NUMBER;
+    pInfo->item[2].subtype = 0;
+    pInfo->item[2].u.number = external_port[i].port;
 
-    info->item[i].type = T_ARRAY;
-    info->item[i].u.arr = p;
+    pInfo->item[3].type = T_NUMBER;
+    pInfo->item[3].subtype = 0;
+    pInfo->item[3].u.number = !external_port[i].tls_cert.empty() && !external_port[i].tls_key.empty();
+
+    info->item[p].type = T_ARRAY;
+    info->item[p].u.arr = pInfo;
+    p ++;
   }
+
   push_refed_array(info);
 }
 #endif
