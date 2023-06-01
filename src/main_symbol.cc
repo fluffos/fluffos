@@ -20,25 +20,26 @@ int main(int argc, char** argv) {
   symbol_enable(1);
 
   // Initialize libevent, This should be done before executing LPC.
-  auto* base = init_main(argc, argv);
+  auto config = get_argument(0, argc, argv);
+  auto* base = init_main(config);
 
   vm_start();
 
   current_object = master_ob;
-  const char* file = argv[2];
+  auto file = get_argument(1, argc, argv);
   struct object_t* obj = nullptr;
 
   error_context_t econ{};
   save_context(&econ);
   try {
-    obj = find_object(file);
+    obj = find_object(file.c_str());
   } catch (...) {
     restore_context(&econ);
   }
   pop_context(&econ);
 
   if (obj == nullptr || obj->prog == nullptr) {
-    fprintf(stderr, "Fail to load object %s. \n", file);
+    fprintf(stderr, "Fail to load object %s. \n", file.c_str());
     return 1;
   }
 
