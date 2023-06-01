@@ -5,15 +5,17 @@
 #ifdef F_SYS_NETWORK_PORTS
 void f_sys_network_ports() {
   array_t *info;
-  int i, ports = 0;
+  int i = 0, p = 0;
 
   for (i = 0; i < 5; i++) {
     if (external_port[i].port) {
-      ports += 1;
+      p ++;
     }
   }
 
-  info = allocate_empty_array(ports);
+  info = allocate_empty_array(p);
+  p = 0;
+
   for (i = 0; i < 5; i++) {
     if (!external_port[i].port) {
       continue;
@@ -32,9 +34,11 @@ void f_sys_network_ports() {
     p->item[2].subtype = 0;
     p->item[2].u.number = !external_port[i].tls_cert.empty() && !external_port[i].tls_key.empty();
 
-    info->item[i].type = T_ARRAY;
-    info->item[i].u.arr = p;
+    info->item[p].type = T_ARRAY;
+    info->item[p].u.arr = pInfo;
+    p ++;
   }
+
   push_refed_array(info);
 }
 #endif
