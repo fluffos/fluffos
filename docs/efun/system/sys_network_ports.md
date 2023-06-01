@@ -20,7 +20,7 @@ title: system / sys_network_ports
 
     An array of the following sub-array will be returned with each active port:
 
-        ({ (string) type, (int) port, (int) tls, })
+        ({ (int) external_port_#, (string) type, (int) port, (int) tls, })
 
 ### SEE ALSO
 
