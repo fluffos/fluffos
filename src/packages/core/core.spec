@@ -360,4 +360,5 @@ int perf_counter_ns();
 // Return nanosecond time
 int time_ns();
 
+mixed *sys_network_ports();
 void sys_reload_tls(int);
