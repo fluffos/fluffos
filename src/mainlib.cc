@@ -211,31 +211,30 @@ void init_tz() {
 }
 }  // namespace
 
-struct event_base *init_main(int argc, char **argv) {
-  /* read in the configuration file */
-  bool got_config = false;
-  for (int i = 1; i < argc; i++) {
-    if (argv[i][0] == '-') {
-      // skip --flag val .
-      if (argv[i][1] == '-') {
-        i++;
+// Return the argument at the given position, start from 0.
+std::string get_argument(unsigned int pos, int argc, char **argv) {
+  for(int i = 1; i < argc; i++) {
+    int argpos = 0;
+    if (argv[i][0] != '-') {
+      argpos++;
+      if (argpos - 1 == pos) {
+        return argv[i];
       }
-      continue;
     }
-    read_config(argv[i]);
-    got_config = true;
-    break;
   }
-  if (!got_config) {
-    debug_message("Usage: %s config_file\n", argv[0]);
-    exit(-1);
-  }
+  return "";
+}
+
+struct event_base *init_main(std::string config_file) {
+  read_config(config_file.data());
 
   reset_debug_message_fp();
 
   // Make sure mudlib dir is correct.
-  if (chdir(CONFIG_STR(__MUD_LIB_DIR__)) == -1) {
-    debug_message("Bad mudlib directory: '%s'.\n", CONFIG_STR(__MUD_LIB_DIR__));
+  auto *root = CONFIG_STR(__MUD_LIB_DIR__);
+  debug_message("Execution root: %s\n", root);
+  if (chdir(root) == -1) {
+    debug_message("Bad mudlib directory: '%s'.\n", root);
     exit(-1);
   }
 
@@ -373,7 +372,13 @@ int driver_main(int argc, char **argv) {
   }
   debug_message("Final Debug Level: %d\n", debug_level);
 
-  auto *base = init_main(argc, argv);
+  auto config_file = get_argument(1, argc, argv);
+  if (config_file.empty()) {
+    debug_message("Usage: %s config_file\n", argv[0]);
+    exit(-1);
+  }
+
+  auto *base = init_main(config_file);
 
   debug_message("==== Runtime Config Table ====\n");
   print_rc_table();

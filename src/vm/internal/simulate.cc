@@ -1939,6 +1939,8 @@ exit:
 }
 
 [[noreturn]] void error_needs_free(char *s) {
+  DEBUG_CHECK(current_error_context == nullptr, "error() without context");
+
   char err_buf[2048];
   strncpy(err_buf + 1, s, 2047);
   err_buf[0] = '*'; /* all system errors get a * at the start */
@@ -1949,6 +1951,8 @@ exit:
 }
 
 [[noreturn]] void error(const char *const fmt, ...) {
+  DEBUG_CHECK(current_error_context == nullptr, "error() without context");
+
   char err_buf[2048];
   va_list args;
 
