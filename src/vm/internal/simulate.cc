@@ -480,7 +480,8 @@ object_t *load_object(const char *lname, int callcreate) {
     error("Could not read the file '/%s'.\n", real_name);
   }
   save_command_giver(command_giver);
-  prog = compile_file(f, obname);
+  auto stream = std::make_unique<FileLexStream>(f);
+  prog = compile_file(std::move(stream), obname);
   restore_command_giver();
   update_compile_av(total_lines);
   total_lines = 0;

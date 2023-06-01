@@ -372,7 +372,7 @@ int driver_main(int argc, char **argv) {
   }
   debug_message("Final Debug Level: %d\n", debug_level);
 
-  auto config_file = get_argument(1, argc, argv);
+  auto config_file = get_argument(0, argc, argv);
   if (config_file.empty()) {
     debug_message("Usage: %s config_file\n", argv[0]);
     exit(-1);

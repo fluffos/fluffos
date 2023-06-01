@@ -26,7 +26,7 @@ std::deque<std::unique_ptr<std::vector<char>>> pending_messages;
 
 void reset_debug_message_fp() {
   static char deb_buf[1024];
-  static char *deb = deb_buf;
+  char *deb = deb_buf;
 
   if (CONFIG_STR(__LOG_DIR__) == nullptr) {
     return;
