@@ -3820,9 +3820,6 @@ void eval_instruction(char *p) {
             break;
           }
           auto *actual_value = sp  - st_num_arg + i;
-          if (IS_UNDEFINED(actual_value)) {
-            continue;
-          }
           auto actual_type = actual_value->type;
           auto *argtype_ptr_start = argtype_ptr;
           while (*argtype_ptr != 0) {
