@@ -7,6 +7,13 @@
 
 // Test fixture class
 class DriverTest : public ::testing::Test {
+ public:
+  static void SetUpTestSuite() {
+    chdir(TESTSUITE_DIR);
+    // Initialize libevent, This should be done before executing LPC.
+    auto* base = init_main("etc/config.test");
+    vm_start();
+  }
  protected:
   void SetUp() override {
     clear_state();
@@ -56,17 +63,4 @@ TEST_F(DriverTest, TestInMemoryCompileFile) {
   dump_prog(prog, stdout, 1 | 2);
 
   pop_context(&econ);
-}
-
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-
-  // Global initialization
-
-  chdir(TESTSUITE_DIR);
-  // Initialize libevent, This should be done before executing LPC.
-  auto* base = init_main("etc/config.test");
-  vm_start();
-
-  return RUN_ALL_TESTS();
 }
