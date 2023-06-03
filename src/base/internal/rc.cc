@@ -186,7 +186,7 @@ bool scan_config_line(const char *fmt, void *dest, int required) {
 
 }  // namespace
 
-void read_config(char *filename) {
+void read_config(const char *filename) {
   config_init();
 
   debug_message("Processing config file: %s\n", filename);
