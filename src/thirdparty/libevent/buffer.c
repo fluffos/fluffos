@@ -158,17 +158,7 @@ evbuffer_chain_new(size_t size)
 	if (size > EVBUFFER_CHAIN_MAX - EVBUFFER_CHAIN_SIZE)
 		return (NULL);
 
-	size += EVBUFFER_CHAIN_SIZE;
-
-	/* get the next largest memory that can hold the buffer */
-	if (size < EVBUFFER_CHAIN_MAX / 2) {
-		to_alloc = MIN_BUFFER_SIZE;
-		while (to_alloc < size) {
-			to_alloc <<= 1;
-		}
-	} else {
-		to_alloc = size;
-	}
+	to_alloc = size + EVBUFFER_CHAIN_SIZE;
 
 	/* we get everything in one chunk */
 	if ((chain = mm_malloc(to_alloc)) == NULL)
@@ -186,6 +176,29 @@ evbuffer_chain_new(size_t size)
 	chain->refcnt = 1;
 
 	return (chain);
+}
+
+static struct evbuffer_chain *
+evbuffer_chain_new_membuf(size_t size)
+{
+	size_t to_alloc;
+
+	if (size > EVBUFFER_CHAIN_MAX - EVBUFFER_CHAIN_SIZE)
+		return (NULL);
+
+	size += EVBUFFER_CHAIN_SIZE;
+
+	/* get the next largest memory that can hold the buffer */
+	if (size < EVBUFFER_CHAIN_MAX / 2) {
+		to_alloc = MIN_BUFFER_SIZE;
+		while (to_alloc < size) {
+			to_alloc <<= 1;
+		}
+	} else {
+		to_alloc = size;
+	}
+
+	return evbuffer_chain_new(to_alloc - EVBUFFER_CHAIN_SIZE);
 }
 
 static inline void
@@ -326,7 +339,7 @@ static inline struct evbuffer_chain *
 evbuffer_chain_insert_new(struct evbuffer *buf, size_t datlen)
 {
 	struct evbuffer_chain *chain;
-	if ((chain = evbuffer_chain_new(datlen)) == NULL)
+	if ((chain = evbuffer_chain_new_membuf(datlen)) == NULL)
 		return NULL;
 	evbuffer_chain_insert(buf, chain);
 	return chain;
@@ -849,7 +862,7 @@ PRESERVE_PINNED(struct evbuffer *src, struct evbuffer_chain **first,
 		struct evbuffer_chain *tmp;
 
 		EVUTIL_ASSERT(pinned == src->last_with_datap);
-		tmp = evbuffer_chain_new(chain->off);
+		tmp = evbuffer_chain_new_membuf(chain->off);
 		if (!tmp)
 			return -1;
 		memcpy(tmp->buffer, chain->buffer + chain->misalign,
@@ -1418,7 +1431,7 @@ evbuffer_pullup(struct evbuffer *buf, ev_ssize_t size)
 		size -= old_off;
 		chain = chain->next;
 	} else {
-		if ((tmp = evbuffer_chain_new(size)) == NULL) {
+		if ((tmp = evbuffer_chain_new_membuf(size)) == NULL) {
 			event_warn("%s: out of memory", __func__);
 			goto done;
 		}
@@ -1655,7 +1668,7 @@ evbuffer_search_eol(struct evbuffer *buffer,
 		if (evbuffer_strchr(&it, '\n') < 0)
 			goto done;
 		extra_drain = 1;
-		/* ... optionally preceeded by a CR. */
+		/* ... optionally preceded by a CR. */
 		if (it.pos == start_pos)
 			break; /* If the first character is \n, don't back up */
 		/* This potentially does an extra linear walk over the first
@@ -1766,10 +1779,9 @@ evbuffer_add(struct evbuffer *buf, const void *data_in, size_t datlen)
 	/* If there are no chains allocated for this buffer, allocate one
 	 * big enough to hold all the data. */
 	if (chain == NULL) {
-		chain = evbuffer_chain_new(datlen);
+		chain = evbuffer_chain_insert_new(buf, datlen);
 		if (!chain)
 			goto done;
-		evbuffer_chain_insert(buf, chain);
 	}
 
 	if ((chain->flags & EVBUFFER_IMMUTABLE) == 0) {
@@ -1808,7 +1820,7 @@ evbuffer_add(struct evbuffer *buf, const void *data_in, size_t datlen)
 		to_alloc <<= 1;
 	if (datlen > to_alloc)
 		to_alloc = datlen;
-	tmp = evbuffer_chain_new(to_alloc);
+	tmp = evbuffer_chain_new_membuf(to_alloc);
 	if (tmp == NULL)
 		goto done;
 
@@ -1858,10 +1870,9 @@ evbuffer_prepend(struct evbuffer *buf, const void *data, size_t datlen)
 	chain = buf->first;
 
 	if (chain == NULL) {
-		chain = evbuffer_chain_new(datlen);
+		chain = evbuffer_chain_insert_new(buf, datlen);
 		if (!chain)
 			goto done;
-		evbuffer_chain_insert(buf, chain);
 	}
 
 	/* we cannot touch immutable buffers */
@@ -1898,7 +1909,7 @@ evbuffer_prepend(struct evbuffer *buf, const void *data, size_t datlen)
 	}
 
 	/* we need to add another chain */
-	if ((tmp = evbuffer_chain_new(datlen)) == NULL)
+	if ((tmp = evbuffer_chain_new_membuf(datlen)) == NULL)
 		goto done;
 	buf->first = tmp;
 	if (buf->last_with_datap == &buf->first && chain->off)
@@ -2027,7 +2038,7 @@ evbuffer_expand_singlechain(struct evbuffer *buf, size_t datlen)
 		 * MAX_TO_COPY_IN_EXPAND bytes. */
 		/* figure out how much space we need */
 		size_t length = chain->off + datlen;
-		struct evbuffer_chain *tmp = evbuffer_chain_new(length);
+		struct evbuffer_chain *tmp = evbuffer_chain_new_membuf(length);
 		if (tmp == NULL)
 			goto err;
 
@@ -2073,12 +2084,11 @@ evbuffer_expand_fast_(struct evbuffer *buf, size_t datlen, int n)
 	if (chain == NULL || (chain->flags & EVBUFFER_IMMUTABLE)) {
 		/* There is no last chunk, or we can't touch the last chunk.
 		 * Just add a new chunk. */
-		chain = evbuffer_chain_new(datlen);
+		chain = evbuffer_chain_insert_new(buf, datlen);
 		if (chain == NULL)
 			return (-1);
-
-		evbuffer_chain_insert(buf, chain);
-		return (0);
+		else
+			return (0);
 	}
 
 	used = 0; /* number of chains we're using space in. */
@@ -2116,7 +2126,7 @@ evbuffer_expand_fast_(struct evbuffer *buf, size_t datlen, int n)
 		 * chains; we can add another. */
 		EVUTIL_ASSERT(chain == NULL);
 
-		tmp = evbuffer_chain_new(datlen - avail);
+		tmp = evbuffer_chain_new_membuf(datlen - avail);
 		if (tmp == NULL)
 			return (-1);
 
@@ -2148,7 +2158,7 @@ evbuffer_expand_fast_(struct evbuffer *buf, size_t datlen, int n)
 			evbuffer_chain_free(chain);
 		}
 		EVUTIL_ASSERT(datlen >= avail);
-		tmp = evbuffer_chain_new(datlen - avail);
+		tmp = evbuffer_chain_new_membuf(datlen - avail);
 		if (tmp == NULL) {
 			if (rmv_all) {
 				ZERO_CHAIN(buf);
@@ -3070,7 +3080,11 @@ evbuffer_file_segment_materialize(struct evbuffer_file_segment *seg)
 			offset_leftover = offset % page_size;
 			offset_rounded = offset - offset_leftover;
 		}
+#if defined(EVENT__HAVE_MMAP64)
+		mapped = mmap64(NULL, length + offset_leftover,
+#else
 		mapped = mmap(NULL, length + offset_leftover,
+#endif
 		    PROT_READ,
 #ifdef MAP_NOCACHE
 		    MAP_NOCACHE | /* ??? */
@@ -3111,13 +3125,29 @@ evbuffer_file_segment_materialize(struct evbuffer_file_segment *seg)
 	}
 #endif
 	{
-		ev_off_t start_pos = lseek(fd, 0, SEEK_CUR), pos;
 		ev_off_t read_so_far = 0;
-		char *mem;
-		int e;
 		ev_ssize_t n = 0;
+		char *mem;
+#ifndef EVENT__HAVE_PREAD
+		ev_off_t start_pos = lseek(fd, 0, SEEK_CUR);
+		ev_off_t pos;
+		int e;
+#endif /* no pread() */
 		if (!(mem = mm_malloc(length)))
 			goto err;
+#ifdef EVENT__HAVE_PREAD
+		while (read_so_far < length) {
+			n = pread(fd, mem + read_so_far, length - read_so_far,
+				  offset + read_so_far);
+			if (n <= 0)
+				break;
+			read_so_far += n;
+		}
+		if (n < 0 || (n == 0 && length > read_so_far)) {
+			mm_free(mem);
+			goto err;
+		}
+#else /* fallback to seek() and read() */
 		if (start_pos < 0) {
 			mm_free(mem);
 			goto err;
@@ -3143,6 +3173,7 @@ evbuffer_file_segment_materialize(struct evbuffer_file_segment *seg)
 			mm_free(mem);
 			goto err;
 		}
+#endif /* pread */
 
 		seg->contents = mem;
 	}

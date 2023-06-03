@@ -42,6 +42,9 @@
 #include <sys/queue.h>
 #ifndef _WIN32
 #include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -97,6 +100,13 @@
 	REPEAT_64(address) "," REPEAT_64(address)
 #define REPEAT_256(address) \
 	REPEAT_128(address) "," REPEAT_128(address)
+
+#define HOST_NAME_MAX_NAME "1111111111111111111111111111111111111111111111111." /* 50  */ \
+                           "1111111111111111111111111111111111111111111111111." /* 100 */ \
+                           "1111111111111111111111111111111111111111111111111." /* 150 */ \
+                           "1111111111111111111111111111111111111111111111111." /* 200 */ \
+                           "1111111111111111111111111111.both-canonical.exampl" /* 250 */ \
+                           "e.co"                                               /* 254 */
 
 static int dns_ok = 0;
 static int dns_got_cancel = 0;
@@ -1190,21 +1200,59 @@ dns_nameservers_no_default_test(void *arg)
 	dns = evdns_base_new(base, 0);
 	tt_assert(dns);
 	tt_int_op(evdns_base_get_nameserver_addr(dns, 0, NULL, 0), ==, -1);
+	tt_int_op(evdns_base_get_nameserver_fd(dns, 0), ==, -1);
 
 	/* We cannot test
 	 * EVDNS_BASE_INITIALIZE_NAMESERVERS|EVDNS_BASE_NAMESERVERS_NO_DEFAULT
 	 * because we cannot mock "/etc/resolv.conf" (yet). */
 
-	evdns_base_resolv_conf_parse(dns,
+	ok = evdns_base_resolv_conf_parse(dns,
 		DNS_OPTIONS_ALL|DNS_OPTION_NAMESERVERS_NO_DEFAULT, RESOLV_FILE);
+	tt_int_op(ok, ==, EVDNS_ERROR_FAILED_TO_OPEN_FILE);
 	tt_int_op(evdns_base_get_nameserver_addr(dns, 0, NULL, 0), ==, -1);
+	tt_int_op(evdns_base_get_nameserver_fd(dns, 0), ==, -1);
 
-	evdns_base_resolv_conf_parse(dns, DNS_OPTIONS_ALL, RESOLV_FILE);
+	ok = evdns_base_resolv_conf_parse(dns, DNS_OPTIONS_ALL, RESOLV_FILE);
+	tt_int_op(ok, ==, EVDNS_ERROR_FAILED_TO_OPEN_FILE);
 	tt_int_op(evdns_base_get_nameserver_addr(dns, 0, NULL, 0), ==, sizeof(struct sockaddr));
+	tt_int_op(evdns_base_get_nameserver_fd(dns, 0), !=, -1);
 
 end:
 	if (dns)
 		evdns_base_free(dns, 0);
+}
+
+static void
+dns_nameservers_no_nameservers_configured_test(void *arg)
+{
+	struct basic_test_data *data = arg;
+	struct event_base *base = data->base;
+	struct evdns_base *dns = NULL;
+	int fd = -1;
+	char *tmpfilename = NULL;
+	const char filecontents[] = "# tmp empty resolv.conf\n";
+	const size_t filecontentssize = sizeof(filecontents);
+	int ok;
+	
+	fd = regress_make_tmpfile(filecontents, filecontentssize, &tmpfilename);
+	if (fd < 0)
+		tt_skip();
+
+	dns = evdns_base_new(base, 0);
+	tt_assert(dns);
+
+	ok = evdns_base_resolv_conf_parse(dns, DNS_OPTIONS_ALL, tmpfilename);
+	tt_int_op(ok, ==, EVDNS_ERROR_NO_NAMESERVERS_CONFIGURED);
+
+end:
+	if (fd != -1)
+		close(fd);
+	if (dns)
+		evdns_base_free(dns, 0);
+	if (tmpfilename) {
+		unlink(tmpfilename);
+		free(tmpfilename);
+	}
 }
 #endif
 
@@ -1262,6 +1310,16 @@ be_getaddrinfo_server_cb(struct evdns_server_request *req, void *data)
 			}
 			evdns_server_request_add_cname_reply(req, qname,
 			    "both-canonical.example.com", 1000);
+		} else if (!evutil_ascii_strcasecmp(qname,
+			"long.example.com")) {
+			if (qtype == EVDNS_TYPE_A) {
+				ans.s_addr = htonl(0x12345678);
+				evdns_server_request_add_a_reply(req, qname,
+				    1, &ans.s_addr, 2000);
+				added_any = 1;
+			}
+			evdns_server_request_add_cname_reply(req, qname,
+			    HOST_NAME_MAX_NAME, 1000);
 		} else if (!evutil_ascii_strcasecmp(qname,
 			"v4only.example.com") ||
 		    !evutil_ascii_strcasecmp(qname, "v4assert.example.com")) {
@@ -1596,7 +1654,7 @@ test_getaddrinfo_async(void *arg)
 	struct basic_test_data *data = arg;
 	struct evutil_addrinfo hints, *a;
 	struct gai_outcome local_outcome;
-	struct gai_outcome a_out[12];
+	struct gai_outcome a_out[13];
 	unsigned i;
 	struct evdns_getaddrinfo_request *r;
 	char buf[128];
@@ -1859,6 +1917,14 @@ test_getaddrinfo_async(void *arg)
 		    r, &tv);
 	}
 
+	/* 12: Request for hostnames longer then 63 (#1280) -> HOST_NAME_MAX_NAME. */
+	hints.ai_family = PF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = EVUTIL_AI_CANONNAME;
+	r = evdns_getaddrinfo(dns_base, "long.example.com", "8000",
+	    &hints, gai_cb, &a_out[12]);
+	tt_assert(r);
+
 	/* XXXXX There are more tests we could do, including:
 
 	   - A test to elicit NODATA.
@@ -1952,6 +2018,14 @@ test_getaddrinfo_async(void *arg)
 	tt_int_op(a_out[11].err, ==, EVUTIL_EAI_CANCEL);
 	tt_assert(a_out[11].ai == NULL);
 
+	/* 12: HOST_NAME_MAX_NAME */
+	tt_int_op(a_out[12].err, ==, 0);
+	tt_assert(a_out[12].ai);
+	tt_assert(! a_out[12].ai->ai_next);
+	test_ai_eq(a_out[12].ai, "18.52.86.120:8000", SOCK_STREAM, IPPROTO_TCP);
+	tt_str_op(a_out[12].ai->ai_canonname, ==, HOST_NAME_MAX_NAME);
+
+
 end:
 	if (local_outcome.ai)
 		evutil_freeaddrinfo(local_outcome.ai);
@@ -2033,10 +2107,18 @@ end:
 }
 
 static void
-gaic_launch(struct event_base *base, struct evdns_base *dns_base)
+gaic_launch(struct event_base *base, struct evdns_base *dns_base, unsigned i)
 {
 	struct gaic_request_status *status = calloc(1,sizeof(*status));
-	struct timeval tv = { 0, 10000 };
+	struct timeval tv = { 0, 0 };
+
+	/// cancel via timer half of requests
+	if (i % 2) {
+		tv.tv_usec = 1;
+	} else {
+		tv.tv_sec = 10;
+	}
+
 	status->magic = GAIC_MAGIC;
 	status->base = base;
 	status->dns_base = dns_base;
@@ -2264,13 +2346,14 @@ test_getaddrinfo_async_cancel_stress(void *ptr)
 	    (struct sockaddr*)&ss, slen, 0);
 
 	for (i = 0; i < 1000; ++i) {
-		gaic_launch(base, dns_base);
+		gaic_launch(base, dns_base, i);
 	}
 
 	event_base_dispatch(base);
 
 	// at least some was canceled via external event
 	tt_int_op(gaic_freed, !=, 1000);
+	tt_int_op(gaic_freed, !=, 0);
 
 end:
 	if (dns_base)
@@ -2426,16 +2509,11 @@ getaddrinfo_race_gotresolve_test(void *arg)
 	struct evdns_server_port *dns_port = NULL;
 	ev_uint16_t portnum = 0;
 	char buf[64];
-	int i;
+	size_t i;
 
 	// Some stress is needed to yield inside getaddrinfo between resolve_ipv4 and resolve_ipv6
-	int n_reqs = 16384;
-#ifdef _SC_NPROCESSORS_ONLN
-	int n_threads = sysconf(_SC_NPROCESSORS_ONLN) + 1;
-#else
-	int n_threads = 17;
-#endif
-	THREAD_T thread[n_threads];
+	size_t n_reqs = 16384;
+	THREAD_T threads[32];
 	struct timeval tv;
 
 	(void)arg;
@@ -2468,11 +2546,11 @@ getaddrinfo_race_gotresolve_test(void *arg)
 	rp.stopping = 0;
 
 	// Run resolver thread
-	THREAD_START(thread[0], race_base_run, &rp);
+	THREAD_START(threads[0], race_base_run, &rp);
 	// Run busy-wait threads used to force yield this thread
-	for (i = 1; i < n_threads; i++) {
+	for (i = 1; i < ARRAY_SIZE(threads); i++) {
 		rp.bw_threads++;
-		THREAD_START(thread[i], race_busywait_run, &rp);
+		THREAD_START(threads[i], race_busywait_run, &rp);
 	}
 
 	EVLOCK_LOCK(rp.lock, 0);
@@ -2960,6 +3038,8 @@ struct testcase_t dns_testcases[] = {
 #ifndef _WIN32
 	{ "nameservers_no_default", dns_nameservers_no_default_test,
 	  TT_FORK|TT_NEED_BASE, &basic_setup, NULL },
+	{ "no_nameservers_configured", dns_nameservers_no_nameservers_configured_test,
+	  TT_FORK|TT_NEED_BASE, &basic_setup, NULL },
 #endif
 
 	{ "getaddrinfo_async", test_getaddrinfo_async,
@@ -2993,20 +3073,20 @@ struct testcase_t dns_testcases[] = {
 	  TT_FORK|TT_OFF_BY_DEFAULT, NULL, NULL },
 #endif
 	{ "tcp_resolve", test_tcp_resolve,
-	  TT_FORK | TT_NEED_BASE, &basic_setup, NULL },
+	  TT_FORK | TT_NEED_BASE | TT_RETRIABLE, &basic_setup, NULL },
 	{ "tcp_resolve_pipeline", test_tcp_resolve_pipeline,
-	  TT_FORK | TT_NEED_BASE, &basic_setup, NULL },
+	  TT_FORK | TT_NEED_BASE | TT_RETRIABLE, &basic_setup, NULL },
 	{ "tcp_resolve_many_clients", test_tcp_resolve_many_clients,
-	  TT_FORK | TT_NEED_BASE, &basic_setup, NULL },
+	  TT_FORK | TT_NEED_BASE | TT_RETRIABLE, &basic_setup, NULL },
 	{ "tcp_timeout", test_tcp_timeout,
-	  TT_FORK | TT_NEED_BASE, &basic_setup, NULL },
+	  TT_FORK | TT_NEED_BASE | TT_RETRIABLE | TT_NO_LOGS, &basic_setup, NULL },
 
 	{ "set_SO_RCVBUF_SO_SNDBUF", test_set_so_rcvbuf_so_sndbuf,
 	  TT_FORK|TT_NEED_BASE, &basic_setup, NULL },
 	{ "set_options", test_set_option,
 	  TT_FORK|TT_NEED_BASE, &basic_setup, NULL },
 	{ "set_server_options", test_set_server_option,
-	  TT_FORK|TT_NEED_BASE, &basic_setup, NULL },
+	  TT_FORK|TT_NEED_BASE|TT_NO_LOGS, &basic_setup, NULL },
 	{ "edns", test_edns,
 	  TT_FORK|TT_NEED_BASE, &basic_setup, NULL },
 

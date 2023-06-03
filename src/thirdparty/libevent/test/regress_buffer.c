@@ -127,19 +127,16 @@ evbuffer_get_waste(struct evbuffer *buf, size_t *allocatedp, size_t *wastedp, si
 {
 	struct evbuffer_chain *chain;
 	size_t a, w, u;
-	int n = 0;
 	u = a = w = 0;
 
 	chain = buf->first;
 	/* skip empty at start */
 	while (chain && chain->off==0) {
-		++n;
 		a += chain->buffer_len;
 		chain = chain->next;
 	}
 	/* first nonempty chain: stuff at the end only is wasted. */
 	if (chain) {
-		++n;
 		a += chain->buffer_len;
 		u += chain->off;
 		if (chain->next && chain->next->off)
@@ -148,7 +145,6 @@ evbuffer_get_waste(struct evbuffer *buf, size_t *allocatedp, size_t *wastedp, si
 	}
 	/* subsequent nonempty chains */
 	while (chain && chain->off) {
-		++n;
 		a += chain->buffer_len;
 		w += (size_t)chain->misalign;
 		u += chain->off;
@@ -158,7 +154,6 @@ evbuffer_get_waste(struct evbuffer *buf, size_t *allocatedp, size_t *wastedp, si
 	}
 	/* subsequent empty chains */
 	while (chain) {
-		++n;
 		a += chain->buffer_len;
 	}
 	*allocatedp = a;
@@ -1199,6 +1194,10 @@ test_evbuffer_add_file(void *ptr)
 	}
 
 	fd = regress_make_tmpfile(data, datalen, &tmpfilename);
+	/* On Windows, if TMP environment variable is corrupted, we may not be
+	 * able create temporary file, just skip it */
+	if (fd < 0)
+		tt_skip();
 
 	if (map_from_offset) {
 		starting_offset = datalen/4 + 1;
@@ -1332,7 +1331,10 @@ test_evbuffer_file_segment_add_cleanup_cb(void* ptr)
 	char const* arg = "token";
 
 	fd = regress_make_tmpfile("file_segment_test_file", 22, &tmpfilename);
-	tt_int_op(fd, >=, 0);
+	/* On Windows, if TMP environment variable is corrupted, we may not be
+	 * able create temporary file, just skip it */
+	if (fd < 0)
+		tt_skip();
 
 	evb = evbuffer_new();
 	tt_assert(evb);
@@ -2587,6 +2589,11 @@ test_evbuffer_freeze(void *ptr)
 	FREEZE_EQ(r, 0, -1);
 	len = strlen(tmpfilecontent);
 	fd = regress_make_tmpfile(tmpfilecontent, len, &tmpfilename);
+	/* On Windows, if TMP environment variable is corrupted, we may not be 
+	 * able create temporary file, just skip it */
+	if (fd < 0)
+		tt_skip();
+
 	r = evbuffer_add_file(buf, fd, 0, len);
 	FREEZE_EQ(r, 0, -1);
 

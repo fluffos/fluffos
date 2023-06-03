@@ -1026,97 +1026,6 @@ test_fork(void)
 		evutil_closesocket(child_pair[1]);
 }
 
-#ifdef EVTHREAD_USE_PTHREADS_IMPLEMENTED
-static void* del_wait_thread(void *arg)
-{
-	struct timeval tv_start, tv_end;
-
-	evutil_gettimeofday(&tv_start, NULL);
-	event_dispatch();
-	evutil_gettimeofday(&tv_end, NULL);
-
-	test_timeval_diff_eq(&tv_start, &tv_end, 300);
-
-	end:
-	return NULL;
-}
-
-static void
-del_wait_cb(evutil_socket_t fd, short event, void *arg)
-{
-	struct timeval delay = { 0, 300*1000 };
-	TT_BLATHER(("Sleeping: %i", test_ok));
-	evutil_usleep_(&delay);
-	++test_ok;
-}
-
-static void
-test_del_wait(void)
-{
-	struct event ev;
-	THREAD_T thread;
-
-	setup_test("event_del will wait: ");
-
-	event_set(&ev, pair[1], EV_READ|EV_PERSIST, del_wait_cb, &ev);
-	event_add(&ev, NULL);
-
-	THREAD_START(thread, del_wait_thread, NULL);
-
-	if (write(pair[0], TEST1, strlen(TEST1)+1) < 0) {
-		tt_fail_perror("write");
-	}
-
-	{
-		struct timeval delay = { 0, 30*1000 };
-		evutil_usleep_(&delay);
-	}
-
-	{
-		struct timeval tv_start, tv_end;
-		evutil_gettimeofday(&tv_start, NULL);
-		event_del(&ev);
-		evutil_gettimeofday(&tv_end, NULL);
-		test_timeval_diff_eq(&tv_start, &tv_end, 270);
-	}
-
-	THREAD_JOIN(thread);
-
-	tt_int_op(test_ok, ==, 1);
-
-	end:
-	;
-}
-
-static void null_cb(evutil_socket_t fd, short what, void *arg) {}
-static void* test_del_notify_thread(void *arg)
-{
-	event_dispatch();
-	return NULL;
-}
-static void
-test_del_notify(void)
-{
-	struct event ev;
-	THREAD_T thread;
-
-	test_ok = 1;
-
-	event_set(&ev, -1, EV_READ, null_cb, &ev);
-	event_add(&ev, NULL);
-
-	THREAD_START(thread, test_del_notify_thread, NULL);
-
-	{
-		struct timeval delay = { 0, 1000 };
-		evutil_usleep_(&delay);
-	}
-
-	event_del(&ev);
-	THREAD_JOIN(thread);
-}
-#endif
-
 static void
 signal_cb_sa(int sig)
 {
@@ -1260,6 +1169,9 @@ test_signal_pipeloss(void)
  * make two bases to catch signals, use both of them.  this only works
  * for event mechanisms that use our signal pipe trick.	 kqueue handles
  * signals internally, and all interested kqueues get all the signals.
+ * This is not expected to work with signalfd - having more than one
+ * descriptor in attempt to accept the same signal (or intersecting sets
+ * of signals) is not the thing signalfd() was designed for.
  */
 static void
 test_signal_switchbase(void)
@@ -1267,9 +1179,16 @@ test_signal_switchbase(void)
 	struct event ev1, ev2;
 	struct event_base *base1, *base2;
 	int is_kqueue;
-	test_ok = 0;
 	base1 = event_init();
 	base2 = event_init();
+
+	test_ok = 1;
+	if (!strcmp(event_base_get_signal_method(base1), "signalfd_signal") ||
+	    !strcmp(event_base_get_signal_method(base2), "signalfd_signal")) {
+		tt_skip();
+	}
+	test_ok = 0;
+
 	is_kqueue = !strcmp(event_get_method(),"kqueue");
 	evsignal_set(&ev1, SIGUSR1, signal_cb, &ev1);
 	evsignal_set(&ev2, SIGUSR1, signal_cb, &ev2);
@@ -1427,7 +1346,99 @@ test_signal_while_processing(void)
 	cleanup_test();
 	return;
 }
+#endif // \_WIN32
+
+#ifndef EVENT__DISABLE_THREAD_SUPPORT
+static void* del_wait_thread(void *arg)
+{
+	struct timeval tv_start, tv_end;
+
+	evutil_gettimeofday(&tv_start, NULL);
+	event_dispatch();
+	evutil_gettimeofday(&tv_end, NULL);
+
+	test_timeval_diff_eq(&tv_start, &tv_end, 300);
+
+	end:
+	return NULL;
+}
+
+static void
+del_wait_cb(evutil_socket_t fd, short event, void *arg)
+{
+	struct timeval delay = { 0, 300*1000 };
+	TT_BLATHER(("Sleeping: %i", test_ok));
+	evutil_usleep_(&delay);
+	++test_ok;
+}
+
+static void
+test_del_wait(void)
+{
+	struct event ev;
+	THREAD_T thread;
+
+	setup_test("event_del will wait: ");
+
+	event_set(&ev, pair[1], EV_READ|EV_PERSIST, del_wait_cb, &ev);
+	event_add(&ev, NULL);
+
+	THREAD_START(thread, del_wait_thread, NULL);
+
+	if (write(pair[0], TEST1, strlen(TEST1)+1) < 0) {
+		tt_fail_perror("write");
+	}
+
+	{
+		struct timeval delay = { 0, 30*1000 };
+		evutil_usleep_(&delay);
+	}
+
+	{
+		struct timeval tv_start, tv_end;
+		evutil_gettimeofday(&tv_start, NULL);
+		event_del(&ev);
+		evutil_gettimeofday(&tv_end, NULL);
+		test_timeval_diff_eq(&tv_start, &tv_end, 270);
+	}
+
+	THREAD_JOIN(thread);
+
+	tt_int_op(test_ok, ==, 1);
+
+	end:
+	;
+}
+
+static void null_cb(evutil_socket_t fd, short what, void *arg) {}
+static void* test_del_notify_thread(void *arg)
+{
+	event_dispatch();
+	return NULL;
+}
+static void
+test_del_notify(void)
+{
+	struct event ev;
+	THREAD_T thread;
+
+	test_ok = 1;
+
+	event_set(&ev, -1, EV_READ, null_cb, &ev);
+	event_add(&ev, NULL);
+
+	THREAD_START(thread, test_del_notify_thread, NULL);
+
+	{
+		struct timeval delay = { 0, 1000 };
+		evutil_usleep_(&delay);
+	}
+
+	event_del(&ev);
+	THREAD_JOIN(thread);
+}
 #endif
+
 
 static void
 test_free_active_base(void *ptr)
@@ -3580,7 +3591,7 @@ struct testcase_t main_testcases[] = {
 	LEGACY(fork, TT_ISOLATED),
 #endif
 
-#ifdef EVTHREAD_USE_PTHREADS_IMPLEMENTED
+#ifndef EVENT__DISABLE_THREAD_SUPPORT
 	LEGACY(del_wait, TT_ISOLATED|TT_NEED_THREADS|TT_RETRIABLE),
 	LEGACY(del_notify, TT_ISOLATED|TT_NEED_THREADS),
 #endif
@@ -3597,11 +3608,17 @@ struct testcase_t evtag_testcases[] = {
 	END_OF_TESTCASES
 };
 
+#if defined(__darwin__)
+#define RETRY_ON_DARWIN TT_RETRIABLE
+#else
+#define RETRY_ON_DARWIN 0
+#endif
+
 struct testcase_t signal_testcases[] = {
 #ifndef _WIN32
-	LEGACY(simplestsignal, TT_ISOLATED),
-	LEGACY(simplesignal, TT_ISOLATED),
-	LEGACY(multiplesignal, TT_ISOLATED),
+	LEGACY(simplestsignal, TT_ISOLATED|RETRY_ON_DARWIN),
+	LEGACY(simplesignal, TT_ISOLATED|RETRY_ON_DARWIN),
+	LEGACY(multiplesignal, TT_ISOLATED|RETRY_ON_DARWIN),
 	LEGACY(immediatesignal, TT_ISOLATED),
 	LEGACY(signal_dealloc, TT_ISOLATED),
 	LEGACY(signal_pipeloss, TT_ISOLATED),

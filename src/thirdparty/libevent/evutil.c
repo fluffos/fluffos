@@ -212,14 +212,14 @@ evutil_read_file_(const char *filename, char **content_out, size_t *len_out,
 #ifdef _WIN32
 
 static int
-create_tmpfile(char tmpfile[MAX_PATH])
+create_tmpfile(WCHAR tmpfile[MAX_PATH])
 {
-	char short_path[MAX_PATH] = {0};
-	char long_path[MAX_PATH] = {0};
-	char prefix[4] = {0};
-	// GetTempFileNameA() uses up to the first three characters of the prefix
+	WCHAR short_path[MAX_PATH] = {0};
+	WCHAR long_path[MAX_PATH] = {0};
+	WCHAR prefix[4] = {0};
+	// GetTempFileNameW() uses up to the first three characters of the prefix
 	// and windows filesystems are case-insensitive
-	const char *base32set = "abcdefghijklmnopqrstuvwxyz012345";
+	const WCHAR *base32set = L"abcdefghijklmnopqrstuvwxyz012345";
 	ev_uint16_t rnd;
 
 	evutil_secure_rng_get_bytes(&rnd, sizeof(rnd));
@@ -228,9 +228,9 @@ create_tmpfile(char tmpfile[MAX_PATH])
 	prefix[2] = base32set[(rnd >> 10) & 31];
 	prefix[3] = '\0';
 
-	GetTempPathA(MAX_PATH, short_path);
-	GetLongPathNameA(short_path, long_path, MAX_PATH);
-	if (!GetTempFileNameA(long_path, prefix, 0, tmpfile)) {
+	GetTempPathW(MAX_PATH, short_path);
+	GetLongPathNameW(short_path, long_path, MAX_PATH);
+	if (!GetTempFileNameW(long_path, prefix, 0, tmpfile)) {
 		event_warnx("GetTempFileName failed: %d", EVUTIL_SOCKET_ERROR());
 		return -1;
 	}
@@ -271,7 +271,8 @@ evutil_win_socketpair_afunix(int family, int type, int protocol,
 
 	struct sockaddr_un listen_addr;
 	struct sockaddr_un connect_addr;
-	char tmp_file[MAX_PATH] = {0};
+	WCHAR tmp_file[MAX_PATH] = {0};
+	char tmp_file_utf8[MAX_PATH] = {0};
 
 	ev_socklen_t size;
 	int saved_errno = -1;
@@ -289,9 +290,14 @@ evutil_win_socketpair_afunix(int family, int type, int protocol,
 	if (create_tmpfile(tmp_file)) {
 		goto tidy_up_and_fail;
 	}
-	DeleteFileA(tmp_file);
+	DeleteFileW(tmp_file);
+
+	/* Windows requires `sun_path` to be encoded by UTF-8 */
+	WideCharToMultiByte(
+		CP_UTF8, 0, tmp_file, MAX_PATH, tmp_file_utf8, MAX_PATH, NULL, NULL);
+
 	listen_addr.sun_family = AF_UNIX;
-	if (strlcpy(listen_addr.sun_path, tmp_file, UNIX_PATH_MAX) >=
+	if (strlcpy(listen_addr.sun_path, tmp_file_utf8, UNIX_PATH_MAX) >=
 		UNIX_PATH_MAX) {
 		event_warnx("Temp file name is too long");
 		goto tidy_up_and_fail;
@@ -352,7 +358,7 @@ evutil_win_socketpair_afunix(int family, int type, int protocol,
 	if (acceptor != -1)
 		evutil_closesocket(acceptor);
 	if (tmp_file[0])
-		DeleteFileA(tmp_file);
+		DeleteFileW(tmp_file);
 
 	EVUTIL_SET_SOCKET_ERROR(saved_errno);
 	return -1;
@@ -592,6 +598,17 @@ evutil_make_listen_socket_ipv6only(evutil_socket_t sock)
 	int one = 1;
 	return setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (void*) &one,
 	    (ev_socklen_t)sizeof(one));
+#endif
+	return 0;
+}
+
+int
+evutil_make_listen_socket_not_ipv6only(evutil_socket_t sock)
+{
+#if defined(IPV6_V6ONLY)
+	int zero = 0;
+	return setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (void *)&zero,
+		(ev_socklen_t)sizeof(zero));
 #endif
 	return 0;
 }
@@ -1568,6 +1585,14 @@ apply_socktype_protocol_hack(struct evutil_addrinfo *ai)
 		ai->ai_protocol = IPPROTO_TCP;
 		ai_new->ai_socktype = SOCK_DGRAM;
 		ai_new->ai_protocol = IPPROTO_UDP;
+		ai_new->ai_flags = EVUTIL_AI_LIBEVENT_ALLOCATED;
+		if (ai_new->ai_canonname != NULL) {
+			ai_new->ai_canonname = mm_strdup(ai_new->ai_canonname);
+			if (ai_new->ai_canonname == NULL) {
+				mm_free(ai_new);
+				return -1;
+			}
+		}
 
 		ai_new->ai_next = ai->ai_next;
 		ai->ai_next = ai_new;
@@ -1771,11 +1796,33 @@ void
 evutil_freeaddrinfo(struct evutil_addrinfo *ai)
 {
 #ifdef EVENT__HAVE_GETADDRINFO
-	if (!(ai->ai_flags & EVUTIL_AI_LIBEVENT_ALLOCATED)) {
-		freeaddrinfo(ai);
-		return;
+	struct evutil_addrinfo *ai_prev = NULL;
+	struct evutil_addrinfo *ai_temp = ai;
+	/* Linked list may be the result of a native getaddrinfo() call plus
+	 * locally allocated nodes, Before releasing it using freeaddrinfo(),
+	 * these custom structs need to be freed separately.
+	 */
+	while (ai_temp) {
+		struct evutil_addrinfo *next = ai_temp->ai_next;
+		if (ai_temp->ai_flags & EVUTIL_AI_LIBEVENT_ALLOCATED) {
+			/* Remove this node from the linked list */
+			if (ai_temp->ai_canonname)
+				mm_free(ai_temp->ai_canonname);
+			mm_free(ai_temp);
+			if (ai_prev == NULL) {
+				ai = next;
+			} else {
+				ai_prev->ai_next = next;
+			}
+
+		} else {
+			ai_prev = ai_temp;
+		}
+		ai_temp = next;
 	}
-#endif
+	if (ai != NULL)
+		freeaddrinfo(ai);
+#else
 	while (ai) {
 		struct evutil_addrinfo *next = ai->ai_next;
 		if (ai->ai_canonname)
@@ -1783,6 +1830,7 @@ evutil_freeaddrinfo(struct evutil_addrinfo *ai)
 		mm_free(ai);
 		ai = next;
 	}
+#endif
 }
 
 static evdns_getaddrinfo_fn evdns_getaddrinfo_impl = NULL;
@@ -2210,7 +2258,9 @@ evutil_inet_pton_scope(int af, const char *src, void *dst, unsigned *indexp)
 			return 0;
 	}
 	*indexp = if_index;
-	tmp_src = mm_strdup(src);
+	if (!(tmp_src = mm_strdup(src))) {
+		return -1;
+	}
 	cp = strchr(tmp_src, '%');
 	*cp = '\0';
 	r = evutil_inet_pton(af, tmp_src, dst);
