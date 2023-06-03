@@ -30,7 +30,7 @@ void f_time() { push_number(get_current_time()); }
 
 #ifdef F_TIME_NS
 void f_time_ns() {
-  auto now = std::chrono::high_resolution_clock::now();
+  auto now = std::chrono::system_clock::now();
   push_number(std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count());
 }
 #endif
