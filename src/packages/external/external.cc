@@ -179,7 +179,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
       }
       argv.emplace_back(item.u.string);
     }
-    cmdline += fmt::format("{}", fmt::join(argv.begin(), argv.end(), " "));
+    cmdline += fmt::to_string(fmt::join(argv.begin(), argv.end(), " "));
   } else {
     cmdline += std::string(args->u.string);
   }
@@ -189,7 +189,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
     return fd;
   }
 
-  auto sock = lpc_socks_get(fd);
+  auto *sock = lpc_socks_get(fd);
 
   SOCKET sv[2];
   socketpair_win32(sv, 0);
@@ -254,6 +254,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
     debug_message("pid: %d exited with %d.\n", processInfo.dwProcessId, exitCode);
     CloseHandle(processInfo.hProcess);
     CloseHandle(processInfo.hThread);
+    evutil_closesocket(sv[0]);
   }).detach();
 
   return fd;
