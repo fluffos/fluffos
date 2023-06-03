@@ -35,9 +35,9 @@ if(${ZLIB_FOUND})
       target_link_libraries(libtelnet PRIVATE ${ZLIB_LIBRARIES})
 endif()
 
-add_subdirectory(util)
-add_subdirectory(doc)
-add_subdirectory(test)
+#add_subdirectory(util)
+#add_subdirectory(doc)
+#add_subdirectory(test)
 
 include(GNUInstallDirs)
 
