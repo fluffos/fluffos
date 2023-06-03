@@ -32,8 +32,20 @@ endif()
 # Try to find the current Git hash
 #
 
-find_package(Git)
-find_program (BASH_EXECUTABLE bash)
+find_program (BASH_EXECUTABLE bash REQUIRED)
+if(NOT WIN32)
+  find_package(Git)
+else()
+  execute_process(
+          COMMAND ${BASH_EXECUTABLE} -c "git status"
+          RESULT_VARIABLE STATUS
+          OUTPUT_VARIABLE OUTPUT2
+          ERROR_QUIET )
+  if(STATUS AND NOT STATUS EQUAL 0)
+  else()
+    set(GIT_EXECUTABLE "git")
+  endif()
+endif()
 if(GIT_EXECUTABLE)
   execute_process(
           WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"

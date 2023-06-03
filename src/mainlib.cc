@@ -225,7 +225,27 @@ std::string get_argument(unsigned int pos, int argc, char **argv) {
   return "";
 }
 
+void init_win32() {
+#ifdef _WIN32
+  WSADATA wsa_data;
+  int err = WSAStartup(0x0202, &wsa_data);
+  if (err != 0) {
+    /* Tell the user that we could not find a usable */
+    /* Winsock DLL.                                  */
+    printf("WSAStartup failed with error: %d\n", err);
+    exit(-1);
+  }
+
+  // try to get UTF-8 output
+  SetConsoleOutputCP(65001);
+#endif
+}
+
 struct event_base *init_main(std::string_view config_file) {
+#ifdef _WIN32
+  init_win32();
+#endif
+
   read_config(config_file.data());
 
   reset_debug_message_fp();
@@ -279,22 +299,6 @@ extern "C" {
 int driver_main(int argc, char **argv);
 }
 
-void init_win32() {
-#ifdef _WIN32
-  WSADATA wsa_data;
-  int err = WSAStartup(0x0202, &wsa_data);
-  if (err != 0) {
-    /* Tell the user that we could not find a usable */
-    /* Winsock DLL.                                  */
-    printf("WSAStartup failed with error: %d\n", err);
-    exit(-1);
-  }
-
-  // try to get UTF-8 output
-  SetConsoleOutputCP(65001);
-#endif
-}
-
 int driver_main(int argc, char **argv) {
 #ifdef HAVE_JEMALLOC
   {
@@ -307,9 +311,6 @@ int driver_main(int argc, char **argv) {
   init_locale();
   init_tz();
   incrase_fd_rlimit();
-#ifdef _WIN32
-  init_win32();
-#endif
 
   print_sep();
   print_commandline(argc, argv);
