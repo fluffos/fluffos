@@ -218,14 +218,14 @@ std::string get_argument(unsigned int pos, int argc, char **argv) {
     if (argv[i][0] != '-') {
       argpos++;
       if (argpos - 1 == pos) {
-        return argv[i];
+        return std::string(argv[i]);
       }
     }
   }
   return "";
 }
 
-struct event_base *init_main(std::string config_file) {
+struct event_base *init_main(std::string_view config_file) {
   read_config(config_file.data());
 
   reset_debug_message_fp();
