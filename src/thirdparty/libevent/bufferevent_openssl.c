@@ -259,7 +259,9 @@ conn_closed(struct bufferevent_ssl *bev_ssl, int when, int errcode, int ret)
 		bufferevent_ssl_put_error(bev_ssl, errcode);
 		break;
 	case SSL_ERROR_SSL:
-		/* Protocol error. */
+		/* Protocol error; possibly a dirty shutdown. */
+		if (ret == 0 && SSL_is_init_finished(bev_ssl->ssl) == 0)
+			dirty_shutdown = 1;
 		bufferevent_ssl_put_error(bev_ssl, errcode);
 		break;
 	case SSL_ERROR_WANT_X509_LOOKUP:
@@ -337,8 +339,9 @@ SSL_context_free(void *ssl, int flags)
 }
 
 static int
-SSL_is_ok(int err)
+SSL_handshake_is_ok(int err)
 {
+	/* What SSL_do_handshake() return on success */
 	return err == 1;
 }
 
@@ -411,7 +414,7 @@ static struct le_ssl_ops le_openssl_ops = {
 	(int (*)(void *))SSL_clear,
 	(void (*)(void *))SSL_set_connect_state,
 	(void (*)(void *))SSL_set_accept_state,
-	SSL_is_ok,
+	SSL_handshake_is_ok,
 	SSL_is_want_read,
 	SSL_is_want_write,
 	(int (*)(void *))be_openssl_get_fd,
@@ -475,7 +478,7 @@ bufferevent_openssl_socket_new(struct event_base *base,
 			   This is probably an error on our part.  Fail. */
 			goto err;
 		}
-		BIO_set_close(bio, 0);
+		(void)BIO_set_close(bio, 0);
 	} else {
 		/* The SSL isn't configured with a BIO with an fd. */
 		if (fd >= 0) {

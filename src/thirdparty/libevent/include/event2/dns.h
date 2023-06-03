@@ -261,6 +261,21 @@ struct event_base;
  * @see DNS_OPTION_NAMESERVERS_NO_DEFAULT */
 #define EVDNS_BASE_NAMESERVERS_NO_DEFAULT 0x10000
 
+/* No errors */
+#define EVDNS_ERROR_NONE 0
+/* Failed to open file */
+#define EVDNS_ERROR_FAILED_TO_OPEN_FILE 1
+/* Failed to stat file */
+#define EVDNS_ERROR_FAILED_TO_STAT_FILE 2
+/* File too large */
+#define EVDNS_ERROR_FILE_TOO_LARGE 3
+/* Out of memory */
+#define EVDNS_ERROR_OUT_OF_MEMORY 4
+/* Short read from file */
+#define EVDNS_ERROR_SHORT_READ_FROM_FILE 5
+/* No nameservers configured */
+#define EVDNS_ERROR_NO_NAMESERVERS_CONFIGURED 6
+
 /**
   Initialize the asynchronous DNS library.
 
@@ -269,13 +284,13 @@ struct event_base;
   evdns_config_windows_nameservers() on Windows.
 
   @param event_base the event base to associate the dns client with
-  @param initialize_nameservers any of EVDNS_BASE_INITIALIZE_NAMESERVERS|
+  @param flags any of EVDNS_BASE_INITIALIZE_NAMESERVERS|
     EVDNS_BASE_DISABLE_WHEN_INACTIVE|EVDNS_BASE_NAMESERVERS_NO_DEFAULT
   @return evdns_base object if successful, or NULL if an error occurred.
   @see evdns_base_free()
  */
 EVENT2_EXPORT_SYMBOL
-struct evdns_base * evdns_base_new(struct event_base *event_base, int initialize_nameservers);
+struct evdns_base * evdns_base_new(struct event_base *event_base, int flags);
 
 
 /**
@@ -511,9 +526,13 @@ int evdns_base_set_option(struct evdns_base *base, const char *option, const cha
   The following directives are not parsed from the file: sortlist, rotate,
   no-check-names, inet6, debug.
 
-  If this function encounters an error, the possible return values are: 1 =
-  failed to open file, 2 = failed to stat file, 3 = file too large, 4 = out of
-  memory, 5 = short read from file, 6 = no nameservers listed in the file
+  If this function encounters an error, the possible return values are:
+   EVDNS_ERROR_FAILED_TO_OPEN_FILE (1) - failed to open file
+   EVDNS_ERROR_FAILED_TO_STAT_FILE (2) - failed to stat file
+   EVDNS_ERROR_FILE_TOO_LARGE (3) - file too large
+   EVDNS_ERROR_OUT_OF_MEMORY (4) - out of memory
+   EVDNS_ERROR_SHORT_READ_FROM_FILE (5) - short read from file
+   EVDNS_ERROR_NO_NAMESERVERS_CONFIGURED (6) - no nameservers configured.
 
   @param base the evdns_base to which to apply this operation
   @param flags any of DNS_OPTION_NAMESERVERS|DNS_OPTION_SEARCH|DNS_OPTION_MISC|
@@ -799,6 +818,18 @@ void evdns_getaddrinfo_cancel(struct evdns_getaddrinfo_request *req);
 EVENT2_EXPORT_SYMBOL
 int evdns_base_get_nameserver_addr(struct evdns_base *base, int idx,
     struct sockaddr *sa, ev_socklen_t len);
+
+/**
+   Retrieve the fd of the 'idx'th configured nameserver.
+
+   @param base The evdns_base to examine.
+   @param idx The index of the nameserver to get the address of.
+
+   @return the fd value.  On failure, returns
+     -1 if idx is greater than the number of configured nameservers
+ */
+EVENT2_EXPORT_SYMBOL
+int evdns_base_get_nameserver_fd(struct evdns_base *base, int idx);
 
 #ifdef __cplusplus
 }

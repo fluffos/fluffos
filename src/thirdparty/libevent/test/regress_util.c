@@ -935,7 +935,7 @@ test_evutil_rand(void *arg)
 	char buf1[32];
 	char buf2[32];
 	int counts[256];
-	int i, j, k, n=0;
+	int i, j, k;
 	struct evutil_weakrand_state seed = { 12346789U };
 
 	memset(buf2, 0, sizeof(buf2));
@@ -956,7 +956,6 @@ test_evutil_rand(void *arg)
 			memset(buf1, 0, sizeof(buf1));
 			evutil_secure_rng_get_bytes(buf1 + startpoint,
 			    endpoint-startpoint);
-			n += endpoint - startpoint;
 			for (j=0; j<32; ++j) {
 				if (j >= startpoint && j < endpoint) {
 					buf2[j] |= buf1[j];
@@ -982,8 +981,6 @@ test_evutil_rand(void *arg)
 		tt_int_op(0, <=, r);
 		tt_int_op(r, <, 9999);
 	}
-
-	/* for (i=0;i<256;++i) { printf("%3d %2d\n", i, counts[i]); } */
 end:
 	;
 }
@@ -1004,6 +1001,15 @@ test_evutil_getaddrinfo(void *arg)
 	struct evutil_addrinfo *ai = NULL, *a;
 	struct evutil_addrinfo hints;
 	int r;
+
+	/* Try NULL hint (win32 bug) */
+	hints.ai_family = PF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	r = evutil_getaddrinfo("www.google.com", NULL, NULL, &ai);
+	tt_int_op(r, ==, 0);
+	tt_assert(ai);
+	evutil_freeaddrinfo(ai);
+	ai = NULL;
 
 	/* Try using it as a pton. */
 	memset(&hints, 0, sizeof(hints));
@@ -1104,7 +1110,7 @@ test_evutil_getaddrinfo(void *arg)
 	hints.ai_family = PF_UNSPEC;
 	hints.ai_flags = EVUTIL_AI_NUMERICHOST;
 	r = evutil_getaddrinfo("www.google.com", "80", &hints, &ai);
-	tt_int_op(r, ==, EVUTIL_EAI_NONAME);
+	tt_int_op(r,==,EVUTIL_EAI_NONAME);
 	tt_ptr_op(ai, ==, NULL);
 
 	/* Try symbolic service names wit AI_NUMERICSERV */
@@ -1113,7 +1119,8 @@ test_evutil_getaddrinfo(void *arg)
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = EVUTIL_AI_NUMERICSERV;
 	r = evutil_getaddrinfo("1.2.3.4", "http", &hints, &ai);
-	tt_int_op(r,==,EVUTIL_EAI_NONAME);
+	if (r != EVUTIL_EAI_SERVICE && r != EVUTIL_EAI_NONAME)
+		tt_fail_msg("error is neither EAI_SERVICE nor EAI_NONAME\n");
 
 	/* Try symbolic service names */
 	memset(&hints, 0, sizeof(hints));
@@ -1303,19 +1310,36 @@ test_event_calloc(void *arg)
 	mm_free(p);
 	p = NULL;
 
-	/* mm_calloc() should set errno = ENOMEM and return NULL
-	 * in case of potential overflow. */
-	errno = 0;
-	p = mm_calloc(EV_SIZE_MAX/2, EV_SIZE_MAX/2 + 8);
-	tt_assert(p == NULL);
-	tt_int_op(errno, ==, ENOMEM);
-
  end:
 	errno = 0;
 	if (p)
 		mm_free(p);
+}
 
-	return;
+static void
+test_event_calloc_enomem(void *arg)
+{
+	void *p = NULL;
+
+	/* mm_calloc() should set errno = ENOMEM and return NULL
+	 * in case of potential overflow. */
+	errno = 0;
+#if defined(__clang__)
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Walloc-size-larger-than="
+#endif
+	/* Requires allocator_may_return_null=1 for sanitizers */
+	p = mm_calloc(EV_SIZE_MAX, EV_SIZE_MAX);
+#if defined(__clang__)
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+	tt_ptr_op(p, ==, NULL);
+	tt_int_op(errno, ==, ENOMEM);
+
+ end:
+	;
 }
 
 static void
@@ -1841,14 +1865,15 @@ struct testcase_t util_testcases[] = {
 #endif
 	{ "mm_malloc", test_event_malloc, 0, NULL, NULL },
 	{ "mm_calloc", test_event_calloc, 0, NULL, NULL },
+	{ "mm_calloc_enomem", test_event_calloc_enomem, 0, NULL, NULL },
 	{ "mm_strdup", test_event_strdup, 0, NULL, NULL },
 	{ "usleep", test_evutil_usleep, TT_RETRIABLE, NULL, NULL },
 	{ "monotonic_res", test_evutil_monotonic_res, 0, &basic_setup, (void*)"" },
 	{ "monotonic_res_precise", test_evutil_monotonic_res, TT_OFF_BY_DEFAULT, &basic_setup, (void*)"precise" },
 	{ "monotonic_res_fallback", test_evutil_monotonic_res, TT_OFF_BY_DEFAULT, &basic_setup, (void*)"fallback" },
-	{ "monotonic_prc", test_evutil_monotonic_prc, 0, &basic_setup, (void*)"" },
+	{ "monotonic_prc", test_evutil_monotonic_prc, TT_RETRIABLE, &basic_setup, (void*)"" },
 	{ "monotonic_prc_precise", test_evutil_monotonic_prc, TT_RETRIABLE, &basic_setup, (void*)"precise" },
-	{ "monotonic_prc_fallback", test_evutil_monotonic_prc, 0, &basic_setup, (void*)"fallback" },
+	{ "monotonic_prc_fallback", test_evutil_monotonic_prc, TT_RETRIABLE, &basic_setup, (void*)"fallback" },
 	{ "date_rfc1123", test_evutil_date_rfc1123, 0, NULL, NULL },
 	{ "evutil_v4addr_is_local", test_evutil_v4addr_is_local, 0, NULL, NULL },
 	{ "evutil_v6addr_is_local", test_evutil_v6addr_is_local, 0, NULL, NULL },

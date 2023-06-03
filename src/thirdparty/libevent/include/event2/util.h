@@ -429,11 +429,27 @@ int evutil_make_listen_socket_reuseable_port(evutil_socket_t sock);
     sockets is to work in IPv4-mapped mode. In IPv4-mapped mode, it is not possible
     to bind same port from different IPv4 and IPv6 handlers.
 
+    On Windows the default value is instead to only work in IPv6 mode.
+
     @param sock The socket to make in ipv6only working mode
     @return 0 on success, -1 on failure
  */
 EVENT2_EXPORT_SYMBOL
 int evutil_make_listen_socket_ipv6only(evutil_socket_t sock);
+
+/** Set ipv6 only bind socket option to make listener work in both ipv4 and ipv6 sockets.
+
+    According to RFC3493 and most Linux distributions, default value for the
+    sockets is to work in IPv4-mapped mode. In IPv4-mapped mode, it is not possible
+    to bind same port from different IPv4 and IPv6 handlers.
+
+    On Windows the default value is instead to only work in IPv6 mode.
+
+    @param sock The socket to make in ipv6only working mode
+    @return 0 on success, -1 on failure
+ */
+EVENT2_EXPORT_SYMBOL
+int evutil_make_listen_socket_not_ipv6only(evutil_socket_t sock);
 
 /** Do platform-specific operations as needed to close a socket upon a
     successful execution of one of the exec*() functions.
@@ -862,7 +878,6 @@ int evutil_secure_rng_init(void);
 EVENT2_EXPORT_SYMBOL
 int evutil_secure_rng_set_urandom_device_file(char *fname);
 
-#if !defined(EVENT__HAVE_ARC4RANDOM) || defined(EVENT__HAVE_ARC4RANDOM_ADDRANDOM)
 /** Seed the random number generator with extra random bytes.
 
     You should almost never need to call this function; it should be
@@ -874,12 +889,14 @@ int evutil_secure_rng_set_urandom_device_file(char *fname);
     contains a fairly large amount of strong entropy.  Doing so is
     notoriously hard: most people who try get it wrong.  Watch out!
 
+    This function does nothing when the system provides arc4random()
+    function because it will provide proper entropy.
+
     @param dat a buffer full of a strong source of random numbers
     @param datlen the number of bytes to read from datlen
  */
 EVENT2_EXPORT_SYMBOL
 void evutil_secure_rng_add_bytes(const char *dat, size_t datlen);
-#endif
 
 #ifdef __cplusplus
 }
