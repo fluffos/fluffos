@@ -53,18 +53,29 @@ struct evhttp_connection;
  */
 
 /* Response codes */
+#define HTTP_CONTINUE		100	/**< client should proceed to send */
+#define HTTP_SWITCH_PROTOCOLS	101	/**< switching to another protocol */
+#define HTTP_PROCESSING		102	/**< processing the request, but no response is available yet */
+#define HTTP_EARLYHINTS		103	/**< return some response headers */
 #define HTTP_OK			200	/**< request completed ok */
+#define HTTP_CREATED		201	/**< new resource is created */
+#define HTTP_ACCEPTED		202	/**< accepted for processing */
+#define HTTP_NONAUTHORITATIVE	203	/**< returning a modified version of the origin's response */
 #define HTTP_NOCONTENT		204	/**< request does not have content */
 #define HTTP_MOVEPERM		301	/**< the uri moved permanently */
 #define HTTP_MOVETEMP		302	/**< the uri moved temporarily */
 #define HTTP_NOTMODIFIED	304	/**< page was not modified from last */
 #define HTTP_BADREQUEST		400	/**< invalid http request was made */
+#define HTTP_UNAUTHORIZED	401	/**< authentication is required */
+#define HTTP_PAYMENTREQUIRED	402	/**< user exceeded limit on requests */
+#define HTTP_FORBIDDEN		403	/**< user not having the necessary permissions */
 #define HTTP_NOTFOUND		404	/**< could not find content for uri */
 #define HTTP_BADMETHOD		405 	/**< method not allowed for this uri */
-#define HTTP_ENTITYTOOLARGE	413	/**<  */
+#define HTTP_ENTITYTOOLARGE	413	/**< request is larger than the server is able to process */
 #define HTTP_EXPECTATIONFAILED	417	/**< we can't handle this expectation */
 #define HTTP_INTERNAL           500     /**< internal error */
 #define HTTP_NOTIMPLEMENTED     501     /**< not implemented */
+#define HTTP_BADGATEWAY		502	/**< received an invalid response from the upstream */
 #define HTTP_SERVUNAVAIL	503	/**< the server is not available */
 
 struct evhttp;
@@ -160,6 +171,14 @@ struct evhttp_bound_socket *evhttp_bind_listener(struct evhttp *http, struct evc
  */
 EVENT2_EXPORT_SYMBOL
 struct evconnlistener *evhttp_bound_socket_get_listener(struct evhttp_bound_socket *bound);
+
+/*
+ * Like evhttp_set_bevcb.
+ * If cb returns a non-NULL bufferevent, * the callback supplied through
+ * evhttp_set_bevcb isn't used.
+ */
+EVENT2_EXPORT_SYMBOL
+void evhttp_bound_set_bevcb(struct evhttp_bound_socket *bound, struct bufferevent* (*cb)(struct event_base *, void *), void *cbarg);
 
 typedef void evhttp_bound_socket_foreach_fn(struct evhttp_bound_socket *, void *);
 /**
@@ -322,6 +341,8 @@ void evhttp_set_gencb(struct evhttp *http,
 /**
    Set a callback used to create new bufferevents for connections
    to a given evhttp object.
+   cb is not called if a non-NULL bufferevent was supplied by
+   evhttp_bound_set_bevcb.
 
    You can use this to override the default bufferevent type -- for example,
    to make this evhttp object use SSL bufferevents rather than unencrypted

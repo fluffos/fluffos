@@ -98,8 +98,8 @@ extern int libevent_tests_running_in_debug_mode;
 #define TT_NO_LOGS		(TT_FIRST_USER_FLAG<<5)
 #define TT_ENABLE_IOCP_FLAG	(TT_FIRST_USER_FLAG<<6)
 #define TT_ENABLE_IOCP		(TT_ENABLE_IOCP_FLAG|TT_NEED_THREADS)
-#define TT_ENABLE_DEBUG_MODE	(TT_ENABLE_IOCP_FLAG<<7)
-#define TT_ENABLE_PRIORITY_INHERITANCE	(TT_ENABLE_IOCP_FLAG<<8)
+#define TT_ENABLE_DEBUG_MODE	(TT_FIRST_USER_FLAG<<7)
+#define TT_ENABLE_PRIORITY_INHERITANCE	(TT_FIRST_USER_FLAG<<8)
 
 /* All the flags that a legacy test needs. */
 #define TT_ISOLATED TT_FORK|TT_NEED_SOCKETPAIR|TT_NEED_BASE
@@ -146,7 +146,6 @@ void init_ssl(void);
 #ifdef EVENT__HAVE_MBEDTLS
 #include <mbedtls/ssl.h>
 mbedtls_ssl_config *get_mbedtls_config(int endpoint);
-mbedtls_ssl_context *mbedtls_ssl_new(mbedtls_ssl_config *config);
 #endif
 
 void * basic_test_setup(const struct testcase_t *testcase);

@@ -14,7 +14,7 @@
 *.exe
 *.lib
 
-# Patch leaves these lying arround
+# Patch leaves these lying around
 *.orig
 *.rej
 
@@ -97,11 +97,14 @@ http-server
 http-connect
 le-proxy
 https-client
+https-client-mbedtls
+ssl-client-mbedtls
 signal-test
 time-test
 event-test
 watch-timing
 becat
+ws-chat-server
 
 # test binaries
 test-driver
@@ -131,6 +134,7 @@ evconfig-private.h
 CMakeCache.txt
 CMakeFiles/
 CTestTestfile.cmake
+CTestCostData.txt
 DartConfiguration.tcl
 LibeventConfig.cmake
 LibeventConfigVersion.cmake
@@ -138,6 +142,7 @@ LibeventTargets*.cmake
 bin/
 cmake_install.cmake
 Uninstall.cmake
+compile_commands.json
 lib/
 tmp/
 verify_tests.sh
@@ -160,6 +165,9 @@ rules.ninja
 # make dist
 /COPYING
 /INSTALL
-/*.tar.gz
+*.tar.gz
 
 /.vagrant
+
+# clangd
+.cache
