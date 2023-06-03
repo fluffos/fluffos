@@ -538,7 +538,12 @@ if (${BISON_FOUND})
           COMMENT "Copying to output directory")
 endif()
 
-add_subdirectory(tests)
+find_package(GTest)
+if(${GTEST_FOUND})
+  include(GoogleTest)
+  enable_testing()
+  add_subdirectory(tests)
+endif()
 
 # Must keep this line at the end, so we get all the variables.
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)

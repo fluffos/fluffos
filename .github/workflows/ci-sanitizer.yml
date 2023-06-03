@@ -30,5 +30,7 @@ jobs:
     - name: compile
       env: ${{ matrix.compiler }}
       run: mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DPACKAGE_DB_SQLITE=2 -DENABLE_SANITIZER=ON .. && make -j 2 install && cd ..
+    - name: run tests
+      run: cd build && make test
     - name: testsuite
       run: cd testsuite && ../build/bin/driver etc/config.test -ftest

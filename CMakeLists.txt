@@ -74,4 +74,10 @@ endforeach()
 message("Building on: '${CMAKE_HOST_SYSTEM}' for '${CMAKE_SYSTEM}'")
 message("Installing to ${CMAKE_INSTALL_PREFIX}")
 
+find_package(GTest)
+if(${GTEST_FOUND})
+  include(GoogleTest)
+  enable_testing()
+endif()
+
 add_subdirectory(src)
