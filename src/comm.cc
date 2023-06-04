@@ -662,13 +662,13 @@ int flush_message(interactive_t *ip) {
       auto *output = bufferevent_get_output(ip->ev_buffer);
       auto len = evbuffer_get_length(output);
       if (len > 0) {
-        evbuffer_unfreeze(output, 1);
+        evbuffer_freeze(output, 1);
         auto *data = evbuffer_pullup(output, len);
         auto wrote = SSL_write(ssl, data, len);
+        evbuffer_unfreeze(output, 1); // must left unfreezed: https://github.com/libevent/libevent/issues/1469
         if (wrote > 0) {
           evbuffer_drain(output, wrote);
         }
-        evbuffer_freeze(output, 1);
         return wrote > 0;
       }
     } else {
