@@ -43,6 +43,8 @@ TEST_F(DriverTest, TestCompileDumpProgWorks) {
   ASSERT_NE(obj->prog, nullptr);
 
   dump_prog(obj->prog, stdout, 1 | 2);
+
+  free_object(&obj, "DriverTest::TestCompileDumpProgWorks");
 }
 
 TEST_F(DriverTest, TestInMemoryCompileFile) {
@@ -58,9 +60,10 @@ TEST_F(DriverTest, TestInMemoryCompileFile) {
     restore_context(&econ);
     FAIL();
   }
+  pop_context(&econ);
 
   ASSERT_NE(prog, nullptr);
   dump_prog(prog, stdout, 1 | 2);
 
-  pop_context(&econ);
+  deallocate_program(prog);
 }
