@@ -14,14 +14,11 @@ class DriverTest : public ::testing::Test {
     auto* base = init_main("etc/config.test");
     vm_start();
   }
- protected:
-  void SetUp() override {
-    clear_state();
-  }
 
-  void TearDown() override {
-    clear_state();
-  }
+ protected:
+  void SetUp() override { clear_state(); }
+
+  void TearDown() override { clear_state(); }
 };
 
 TEST_F(DriverTest, TestCompileDumpProgWorks) {
@@ -48,7 +45,7 @@ TEST_F(DriverTest, TestCompileDumpProgWorks) {
 }
 
 TEST_F(DriverTest, TestInMemoryCompileFile) {
-  program_t *prog = nullptr;
+  program_t* prog = nullptr;
 
   error_context_t econ{};
   save_context(&econ);

@@ -1997,7 +1997,7 @@ program_t *compile_file(std::unique_ptr<LexStream> stream, char *name) {
   {
     // make sure we use the C locale during parsing
     auto *current_locale = setlocale(LC_ALL, "C");
-    DEFER{ setlocale(LC_ALL, current_locale);};
+    DEFER { setlocale(LC_ALL, current_locale); };
 
     symbol_start(name);
     prolog(std::move(stream), name);

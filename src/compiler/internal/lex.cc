@@ -95,7 +95,7 @@ lpc_predef_t *lpc_predefs = nullptr;
 
 namespace {
 std::unique_ptr<LexStream> current_stream = nullptr;
-} // namespace
+}  // namespace
 
 int lex_fatal;
 static const char **inc_list;  // global include path from runtime config
@@ -115,7 +115,7 @@ char *outp;
 
 typedef struct incstate_s {
   struct incstate_s *next;
-  LexStream* stream; // raw pointer because incstate_t is alloated using malloc
+  LexStream *stream;  // raw pointer because incstate_t is alloated using malloc
   int line;
   const char *file;
   int file_id;
@@ -2618,7 +2618,7 @@ int yylex() {
         goto badlex;
     }
   }
-badlex : {
+badlex: {
 #ifdef DEBUG
   char buff[100];
 

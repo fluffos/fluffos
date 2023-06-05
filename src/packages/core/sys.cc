@@ -9,7 +9,7 @@ void f_sys_network_ports() {
 
   for (i = 0; i < 5; i++) {
     if (external_port[i].port) {
-      p ++;
+      p++;
     }
   }
 
@@ -36,11 +36,12 @@ void f_sys_network_ports() {
 
     pInfo->item[3].type = T_NUMBER;
     pInfo->item[3].subtype = 0;
-    pInfo->item[3].u.number = !external_port[i].tls_cert.empty() && !external_port[i].tls_key.empty();
+    pInfo->item[3].u.number =
+        !external_port[i].tls_cert.empty() && !external_port[i].tls_key.empty();
 
     info->item[p].type = T_ARRAY;
     info->item[p].u.arr = pInfo;
-    p ++;
+    p++;
   }
 
   push_refed_array(info);
@@ -52,7 +53,7 @@ void f_sys_reload_tls() {
   auto port_index_display = sp->u.number;
   auto port_index = port_index_display - 1;
 
-  DEFER{ pop_stack(); };
+  DEFER { pop_stack(); };
   if (port_index < 0 || port_index > sizeof(external_port)) {
     error("Invalid port index: %d\n", port_index_display);
   }
