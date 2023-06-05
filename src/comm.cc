@@ -665,7 +665,9 @@ int flush_message(interactive_t *ip) {
         evbuffer_freeze(output, 1);
         auto *data = evbuffer_pullup(output, len);
         auto wrote = SSL_write(ssl, data, len);
-        evbuffer_unfreeze(output, 1); // must left unfreezed: https://github.com/libevent/libevent/issues/1469
+        // must left unfreezed
+        // https://github.com/libevent/libevent/issues/1469
+        evbuffer_unfreeze(output, 1);
         if (wrote > 0) {
           evbuffer_drain(output, wrote);
         }

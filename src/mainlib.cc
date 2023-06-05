@@ -213,7 +213,7 @@ void init_tz() {
 
 // Return the argument at the given position, start from 0.
 std::string get_argument(unsigned int pos, int argc, char **argv) {
-  for(int i = 1; i < argc; i++) {
+  for (int i = 1; i < argc; i++) {
     int argpos = 0;
     if (argv[i][0] != '-') {
       argpos++;

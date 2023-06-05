@@ -10,7 +10,7 @@
 #include <iostream>
 #include <sstream>
 
-class LexStream  {
+class LexStream {
  public:
   LexStream() = default;
   virtual ~LexStream() = default;
@@ -21,12 +21,10 @@ class LexStream  {
 
 class FileLexStream : public LexStream {
  public:
-  FileLexStream(int fd): fd_(fd) { }
+  FileLexStream(int fd) : fd_(fd) {}
   ~FileLexStream() override {}
 
-  size_t read(char* buffer, size_t size) override {
-    return ::read(fd_, buffer, size);
-  }
+  size_t read(char* buffer, size_t size) override { return ::read(fd_, buffer, size); }
   void close() override {
     ::close(fd_);
     fd_ = 0;
@@ -38,15 +36,11 @@ class FileLexStream : public LexStream {
 
 class IStreamLexStream : public LexStream {
  public:
-  IStreamLexStream(std::istream& is): is_(is) { }
+  IStreamLexStream(std::istream& is) : is_(is) {}
   ~IStreamLexStream() override {}
 
-  size_t read(char* buffer, size_t size) override {
-    return is_.readsome(buffer, size);
-  }
-  void close() override {
-    is_.clear();
-  };
+  size_t read(char* buffer, size_t size) override { return is_.readsome(buffer, size); }
+  void close() override { is_.clear(); };
 
  private:
   std::istream& is_;
