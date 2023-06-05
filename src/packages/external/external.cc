@@ -195,7 +195,7 @@ std::string quote_argument(const std::string &arg) {
       res.push_back(*It);
     }
   }
-  res.push_back('"');;
+  res.push_back('"');
   return res;
 }
 }  // namespace
