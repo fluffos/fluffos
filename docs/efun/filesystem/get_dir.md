@@ -30,5 +30,5 @@ title: filesystem / get_dir
 
 ### SEE ALSO
 
-    file_size(3), stat(3), time(3)
+    file_size(3), stat(3), time(3), async_getdir(3)
 
