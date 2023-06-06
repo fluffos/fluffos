@@ -1,43 +1,65 @@
-nosave int called1 = 0;
-nosave int called2 = 0;
-
-void callback_getdir(mixed res) {
-  debug_message("ASYNC: callback_getdir called! \n");
-
-  ASSERT_EQ(get_dir("/u/"), res);
-
-  called1 = 1;
-}
-
-void callback_getdir2(mixed res) {
-  debug_message("ASYNC: callback_getdir2 called! \n");
-
-  ASSERT_EQ(get_dir("/std/"), res);
-
-  called2 = 1;
-}
-
-void check(int index) {
-  switch(index) {
-    case 1:
-      ASSERT_EQ(1, called1);
-      break;
-    case 2:
-      ASSERT_EQ(1, called2);
-      break;
-  }
-}
+#ifdef __PACKAGE_ASYNC__
+nosave int calledGetDir, calledWrite, calledRead;
+nosave string t = "" + time();
+#endif
 
 void do_tests() {
 #ifndef __PACKAGE_ASYNC__
-    write("PACKAGE_ASYNC disabled, skipping...");
+    write("PACKAGE_ASYNC is not enabled, skipping async tests...\n");
     return;
 #else
-    async_getdir("/u/", (: callback_getdir :));
 
-    call_out((: async_getdir, "/std/", (: callback_getdir2 :) :), 1);
+    // async_getdir
+    async_getdir("/nonexistant/", function(mixed res) {
+        write("ASYNC: async_getdir callback\n");
+        ASSERT_EQ(({ }), res); // ({ }), but get_dir("/nonexistant/") == 0
+        calledGetDir++;
+    });
+    async_getdir("/nonexistant", function(mixed res) {
+        write("ASYNC: async_getdir callback\n");
+        ASSERT_EQ(get_dir("/nonexistant"), res); // ({ })
+        calledGetDir++;
+    });
+    async_getdir("/u/", function(mixed res) {
+        write("ASYNC: async_getdir callback\n");
+        ASSERT_EQ(get_dir("/u/"), res);
+        calledGetDir++;
+    });
+    call_out((: async_getdir, "/std/", function(mixed res) {
+        write("ASYNC: call_out async_getdir callback\n");
+        ASSERT_EQ(get_dir("/std/"), res);
+        calledGetDir++;
+    } :), 1);
 
-    call_out((: check, 1 :), 3);
-    call_out((: check, 2 :), 4);
+    // async_write
+    async_write("/log", t, 1, function(int res) {
+        write("ASYNC: async_write callback\n");
+        ASSERT_EQ(-1, res);
+        calledWrite++;
+    });
+    async_write("/log/testfile", t, 1, function(int res) {
+        write("ASYNC: async_write callback\n");
+        ASSERT_EQ(0, res);
+        calledWrite++;
+    });
+
+    // async_read
+    async_read("/log", function(mixed res) {
+        write("ASYNC: async_read callback\n");
+        ASSERT_EQ(-1, res);
+        calledRead++;
+    });
+    async_read("/log/testfile", function(mixed res) {
+        write("ASYNC: async_read callback\n");
+        ASSERT_EQ(t, res);
+        calledRead++;
+    });
+
+    call_out(function() {
+        rm("/log/testfile");
+        ASSERT_EQ(4, calledGetDir);
+        ASSERT_EQ(2, calledWrite);
+        ASSERT_EQ(2, calledRead);
+    }, 2);
 #endif
 }
