@@ -1,6 +1,5 @@
 #ifdef __PACKAGE_ASYNC__
 nosave int calledGetDir, calledWrite, calledRead;
-nosave string t = "" + time();
 #endif
 
 void do_tests() {
@@ -31,13 +30,15 @@ void do_tests() {
         calledGetDir++;
     } :), 1);
 
+    rm("/log/testfile"); // ensure test file is deleted pre-test
+
     // async_write
-    async_write("/log", t, 1, function(int res) {
+    async_write("/log", "test data written to file", 1, function(int res) {
         write("ASYNC: async_write callback\n");
         ASSERT_EQ(-1, res);
         calledWrite++;
     });
-    async_write("/log/testfile", t, 1, function(int res) {
+    async_write("/log/testfile", "test data written to file", 1, function(int res) {
         write("ASYNC: async_write callback\n");
         ASSERT_EQ(0, res);
         calledWrite++;
@@ -51,12 +52,12 @@ void do_tests() {
     });
     async_read("/log/testfile", function(mixed res) {
         write("ASYNC: async_read callback\n");
-        ASSERT_EQ(t, res);
+        ASSERT_EQ("test data written to file", res);
         calledRead++;
     });
 
     call_out(function() {
-        rm("/log/testfile");
+        rm("/log/testfile"); // ensure test file is deleted post-test
         ASSERT_EQ(4, calledGetDir);
         ASSERT_EQ(2, calledWrite);
         ASSERT_EQ(2, calledRead);
