@@ -1,4 +1,4 @@
-// crahser, calling random efun with random argument hope to crash the driver.
+// crasher, calling random efun with random argument hope to crash the driver.
 
 nosave mixed *_efuns = ({
     ({ "abs", (: abs :) }),
