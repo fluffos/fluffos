@@ -1,4 +1,4 @@
-#ifndef __PACKAGE_ASYNC__
+#ifdef __PACKAGE_ASYNC__
 nosave int calledGetDir, calledWrite, calledRead;
 nosave string t = "" + time();
 #endif
