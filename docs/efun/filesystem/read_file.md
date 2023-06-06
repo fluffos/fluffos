@@ -9,9 +9,7 @@ title: filesystem / read_file
 
 ### SYNOPSIS
 
-    string read_file( string file,
-                      int start_line,
-                      int number_of_lines );
+    string read_file( string file, int start_line, int number_of_lines );
 
 ### DESCRIPTION
 
@@ -25,5 +23,6 @@ title: filesystem / read_file
 
 ### SEE ALSO
 
-    write_file(3), read_buffer(3)
+    file_size(3), read_buffer(3), write_file(3), async_read(3), async_write(3),
+    valid_read(4), valid_write(4)
 
