@@ -21,7 +21,6 @@ title: async / async_getdir
     Unlike the get_dir routine, this efun does not take an integer second
     argument to specify more information (filename, filesize, last touched).
 
-
     The callback should follow this format:
 
         function(mixed res) {
