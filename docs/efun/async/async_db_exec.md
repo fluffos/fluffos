@@ -16,13 +16,12 @@ title: async / async_db_exec
     This function will execute the passed sql statement for the given data‐
     base handle.
 
-    Returns the number of rows in result set on success, or an error string
-    otherwise, to the callback function provided.
+    Returns the database handle to the callback function provided.
 
     The callback should follow this format:
 
-        function (int conn) {
-            db_close(conn);
+        function (int handle) {
+            db_close(handle);
         }
 
 ### SEE ALSO
