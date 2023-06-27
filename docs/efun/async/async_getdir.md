@@ -26,7 +26,7 @@ title: async / async_getdir
 
         function(mixed res) {
             // 0 when directory doesn't exist
-            // empty array when file doesn't exist
+            // empty array when no matching files exist
             // array of matching filenames
         }
 
