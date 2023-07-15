@@ -19,7 +19,8 @@ title: calls / call_stack
     (i.e. the currently running program).  If the int argument is 1, call_stack
     returns the objects in which that program is executing.  If it is 2, the
     name of the functions are returned.  If it is 3, the value of origin() in
-    that frame is returned.
+    that frame is returned. If it is 4, the value will be the full file path
+    and the line number.
 
 ### SEE ALSO
 
