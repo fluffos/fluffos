@@ -282,4 +282,30 @@ TEXT;
   ASSERT_EQ(shouldbe, sprintf("%-=1s %-=2s\n",
                               implode(({ "11111",     "2222",      "333"}), "\n"),
                               implode(({ "aaa",  "bbb",   "cccc" }), "\n")));
+
+#define UNDEFINED (([])[0])
+    // UNDEFINED checks
+    ASSERT_EQ("0", sprintf("%s", UNDEFINED));
+    ASSERT_EQ("0", sprintf("%d", UNDEFINED));
+    ASSERT_EQ("0", sprintf("%O", UNDEFINED));
+    ASSERT_EQ("0", sprintf("%o", UNDEFINED));
+    ASSERT_EQ("0", sprintf("%x", UNDEFINED));
+    ASSERT_EQ("0.000000", sprintf("%f", UNDEFINED));
+
+    // zero checks
+    ASSERT_EQ("0", sprintf("%s", 0));
+    ASSERT_EQ("0", sprintf("%d", 0));
+    ASSERT_EQ("0", sprintf("%O", 0));
+    ASSERT_EQ("0", sprintf("%o", 0));
+    ASSERT_EQ("0", sprintf("%x", 0));
+    ASSERT_EQ("0.000000", sprintf("%f", 0));
+
+    // expected number checks
+    ASSERT_EQ("123", sprintf("%d", 123));
+    ASSERT_EQ("123.000000", sprintf("%f", 123.0));
+
+    // converted number checks
+    ASSERT_EQ("123", sprintf("%d", 123.0));
+    ASSERT_EQ("123", sprintf("%d", 123.123)); // truncates
+    ASSERT_EQ("123.000000", sprintf("%f", 123));
 }
