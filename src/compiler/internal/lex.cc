@@ -276,6 +276,7 @@ static void handle_cond(LPC_INT /*c*/);
 
 int parseStringLiteral(unsigned char c);
 int parseHexIntegerLiteral(unsigned char c);
+int parseBinaryIntegerLiteral(unsigned char c);
 static defn_t *defns[DEFHASH];
 static ifstate_t *iftop = nullptr;
 
@@ -2447,6 +2448,10 @@ int yylex() {
         if (c == 'X' || c == 'x') {
           yyp = yytext;
           return parseHexIntegerLiteral(c);
+        } 
+        if (c == 'B' || c == 'b') {
+          yyp = yytext;
+          return parseBinaryIntegerLiteral(c);           
         }
         outp--;
         c = '0';
@@ -2629,6 +2634,37 @@ badlex: {
   return ' ';
 }
 }
+
+int parseBinaryIntegerLiteral(unsigned char c) {
+  char *yyp = yytext;
+  for (;;) {
+    c = *outp++;
+    if (c == '_') {
+      switch(*outp) {
+        case '0':
+        case '1': 
+          continue;
+        default:
+          break;
+      }
+    }
+    if (!(c == '0' || c == '1')) {
+        break;
+    }
+    SAVEC;
+  }
+  outp--;
+  *yyp = 0;
+
+  char *endptr;
+  yylval.number = strtol(reinterpret_cast<const char *>(yytext), &endptr, 2); 
+  if (endptr != yyp) {
+    yyerror("Invalid binary integer literal: %s", std::string(yytext, yyp - yytext).c_str());
+    return YYerror;
+  }
+  return L_NUMBER;
+}
+
 int parseHexIntegerLiteral(unsigned char c) {
   char *yyp = yytext;
   for (;;) {
