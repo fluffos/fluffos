@@ -1890,6 +1890,8 @@ static char *previous_pc[60];
 static int last;
 
 void eval_instruction(char *p) {
+  DEBUG_CHECK(current_error_context == nullptr, "No error context");
+
   ScopedTracer _tracer(__PRETTY_FUNCTION__);
 
 #ifdef DEBUG

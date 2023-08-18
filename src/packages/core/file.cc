@@ -627,9 +627,9 @@ const char *check_valid_path(const char *path, object_t *call_object, const char
   push_object(call_object);
   push_constant_string(call_fun);
   if (writeflg) {
-    v = apply_master_ob(APPLY_VALID_WRITE, 3);
+    v = safe_apply_master_ob(APPLY_VALID_WRITE, 3);
   } else {
-    v = apply_master_ob(APPLY_VALID_READ, 3);
+    v = safe_apply_master_ob(APPLY_VALID_READ, 3);
   }
 
   if (v == (svalue_t *)-1) {

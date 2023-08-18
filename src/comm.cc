@@ -90,17 +90,8 @@ void on_user_command(evutil_socket_t fd, short what, void *arg) {
     return;
   }
 
-  // FIXME: this function currently calls into mudlib and will throw errors
-  // This catch block should be moved one level down.
-  error_context_t econ;
-  save_context(&econ);
   set_eval(max_eval_cost);
-  try {
-    process_user_command(user);
-  } catch (const char *) {
-    restore_context(&econ);
-  }
-  pop_context(&econ);
+  process_user_command(user);
 
   /* Has to be cleared if we jumped out of process_user_command() */
   current_interactive = nullptr;
@@ -1092,7 +1083,7 @@ static void process_input(interactive_t *ip, char *user_command) {
   svalue_t *ret;
 
   if (!(ip->iflags & HAS_PROCESS_INPUT)) {
-    parse_command(user_command, command_giver);
+    safe_parse_command(user_command, command_giver);
     return;
   }
 
@@ -1102,13 +1093,13 @@ static void process_input(interactive_t *ip, char *user_command) {
    * programming languages.
    */
   copy_and_push_string(user_command);
-  ret = apply(APPLY_PROCESS_INPUT, command_giver, 1, ORIGIN_DRIVER);
+  ret = safe_apply(APPLY_PROCESS_INPUT, command_giver, 1, ORIGIN_DRIVER);
   if (!IP_VALID(ip, command_giver)) {
     return;
   }
   if (!ret) {
     ip->iflags &= ~HAS_PROCESS_INPUT;
-    parse_command(user_command, command_giver);
+    safe_parse_command(user_command, command_giver);
     return;
   }
 
@@ -1116,10 +1107,10 @@ static void process_input(interactive_t *ip, char *user_command) {
   if (ret->type == T_STRING) {
     auto *command = string_copy(ret->u.string, "current_command: " __CURRENT_FILE_LINE__);
     DEFER { FREE_MSTR(command); };
-    parse_command(command, command_giver);
+    safe_parse_command(command, command_giver);
   } else {
     if (ret->type != T_NUMBER || !ret->u.number) {
-      parse_command(user_command, command_giver);
+      safe_parse_command(user_command, command_giver);
     }
   }
 #endif
@@ -1395,9 +1386,13 @@ static int call_function_interactive(interactive_t *i, char *str) {
       sp->u.fp = funp = sent->function.f;
       funp->hdr.ref++;
     } else {
+      function = sent->function.s;
+      if (function && function[0] == APPLY___INIT_SPECIAL_CHAR) {
+        return 0;
+      }
       sp->type = T_STRING;
       sp->subtype = STRING_SHARED;
-      sp->u.string = function = sent->function.s;
+      sp->u.string = function;
       ref_string(function);
     }
 
@@ -1431,9 +1426,6 @@ static int call_function_interactive(interactive_t *i, char *str) {
     }
     /* current_object no longer set */
     if (function) {
-      if (function[0] == APPLY___INIT_SPECIAL_CHAR) {
-        error("Illegal function name.\n");
-      }
       (void)safe_apply(function, ob, num_arg + 1, ORIGIN_INTERNAL);
     } else {
       safe_call_function_pointer(funp, num_arg + 1);

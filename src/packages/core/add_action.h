@@ -6,6 +6,7 @@ extern object_t **hashed_living;
 
 void init_living();
 int parse_command(char *, object_t *);
+void safe_parse_command(char *, object_t *);
 void clear_notify(object_t *);
 void stat_living_objects(outbuffer_t *);
 void remove_living_name(object_t *);

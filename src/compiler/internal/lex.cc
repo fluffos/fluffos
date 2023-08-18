@@ -847,7 +847,7 @@ static int skip_to(const char *token, const char *atoken) {
 
 void init_include_path() {
   push_malloced_string(add_slash(current_file));  // does master has an include path?
-  svalue_t *ret = apply_master_ob(APPLY_GET_INCLUDE_PATH, 1);
+  svalue_t *ret = safe_apply_master_ob(APPLY_GET_INCLUDE_PATH, 1);
 
   if (!ret || ret == (svalue_t *)-1) {  // either no or no master yet
     return;                             // just use the runtime configuration

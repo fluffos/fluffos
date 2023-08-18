@@ -415,12 +415,12 @@ static int user_parser(char *buff) {
       push_undefined();
     }
     if (s->flags & V_FUNCTION) {
-      ret = call_function_pointer(s->function.f, 1);
+      ret = safe_call_function_pointer(s->function.f, 1);
     } else {
       if (s->function.s[0] == APPLY___INIT_SPECIAL_CHAR) {
         error("Illegal function name.\n");
       }
-      ret = apply(s->function.s, s->ob, 1, where);
+      ret = safe_apply(s->function.s, s->ob, 1, where);
     }
     /* s may be dangling at this point */
 
@@ -480,6 +480,18 @@ static int user_parser(char *buff) {
   illegal_sentence_action = save_illegal_sentence_action;
 
   return 0;
+}
+
+void safe_parse_command(char *str, object_t *ob) {
+  error_context_t econ;
+  save_context(&econ);
+
+  try {
+    parse_command(str, ob);
+  } catch (char *) {
+    restore_context(&econ);
+  }
+  pop_context(&econ);
 }
 
 /*
