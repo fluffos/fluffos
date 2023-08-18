@@ -4,7 +4,7 @@ RUN apk add --no-progress --no-cache \
     linux-headers gcc g++ clang-dev make cmake bash \
     mariadb-dev mariadb-static postgresql-dev sqlite-dev sqlite-static\
     libevent-dev libevent-static openssl-dev openssl-libs-static zlib-dev zlib-static icu-dev icu-static \
-    pcre-dev bison git
+    pcre-dev bison git libelf-static elfutils-dev
 
 WORKDIR /build
 
