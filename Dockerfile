@@ -1,17 +1,16 @@
-FROM alpine:3.14 as builder
+FROM alpine:3.18 as builder
 
 RUN apk add --no-progress --no-cache \
-    linux-headers gcc g++ clang-dev make cmake python2 bash \
+    linux-headers gcc g++ clang-dev make cmake bash \
     mariadb-dev mariadb-static postgresql-dev sqlite-dev sqlite-static\
-    libevent-dev libevent-static libexecinfo-dev libexecinfo-static \
-    openssl-dev openssl-libs-static zlib-dev zlib-static icu-dev icu-static \
-    pcre-dev bison git
+    libevent-dev libevent-static openssl-dev openssl-libs-static zlib-dev zlib-static icu-dev icu-static \
+    pcre-dev bison git libelf-static elfutils-dev
 
 WORKDIR /build
 
-RUN wget -O - https://github.com/jemalloc/jemalloc/releases/download/5.2.1/jemalloc-5.2.1.tar.bz2 | tar -xj
+RUN wget -O - https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2 | tar -xj
 
-WORKDIR /build/jemalloc-5.2.1
+WORKDIR /build/jemalloc-5.3.0
 
 RUN ./configure --prefix=/usr \
     && make \
@@ -24,7 +23,7 @@ WORKDIR /build/fluffos/build
 RUN cmake .. -DMARCH_NATIVE=OFF -DSTATIC=ON \
     && make install
 
-FROM alpine:3.14
+FROM alpine:3.18
 
 WORKDIR /fluffos
 

@@ -338,7 +338,7 @@ static const char *author_for_file(const char *file) {
   static char buff[50];
 
   copy_and_push_string(file);
-  ret = apply_master_ob(APPLY_AUTHOR_FILE, 1);
+  ret = safe_apply_master_ob(APPLY_AUTHOR_FILE, 1);
   if (ret == nullptr || ret == (svalue_t *)-1 || ret->type != T_STRING) {
     return nullptr;
   }
@@ -425,7 +425,7 @@ static const char *domain_for_file(const char *file) {
   static char buff[512];
 
   share_and_push_string(file);
-  ret = apply_master_ob(APPLY_DOMAIN_FILE, 1);
+  ret = safe_apply_master_ob(APPLY_DOMAIN_FILE, 1);
   if (ret == nullptr || ret == (svalue_t *)-1 || ret->type != T_STRING) {
     return nullptr;
   }

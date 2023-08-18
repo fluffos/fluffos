@@ -1,5 +1,5 @@
-# v2019 is targeted to ubuntu 18.04 LTS, it ships with cmake 3.10
-cmake_minimum_required(VERSION 3.10)
+# the current build target is ubuntu 22.04 LTS, it ships with cmake 3.22
+cmake_minimum_required(VERSION 3.22)
 
 if (POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.22)
 project(libtelnet
     VERSION 0.30.0
     LANGUAGES C
