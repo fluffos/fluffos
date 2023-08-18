@@ -198,7 +198,7 @@ endif ()
 
 # System Libraries
 find_package(OpenSSL 1.0.1 COMPONENTS SSL REQUIRED)
-include_directories(SYSTEM ${OPENSSL_INCLUDE_DIR})
+include_directories(AFTER SYSTEM ${OPENSSL_INCLUDE_DIR})
 
 find_package(ICU REQUIRED COMPONENTS uc dt)
 # Make ICU use utf-8 internally
@@ -208,7 +208,7 @@ if(STATIC)
 ENDIF()
 
 # multiple packages uses this, so we simply do a global inclusion too.
-include_directories(SYSTEM ${ICU_INCLUDE_DIRS})
+include_directories(AFTER SYSTEM ${ICU_INCLUDE_DIRS})
 
 # Bundled libraries
 set(EVENT__DISABLE_BENCHMARK ON CACHE BOOL "" FORCE)
@@ -230,7 +230,7 @@ add_subdirectory(thirdparty/filesystem EXCLUDE_FROM_ALL)
 include_directories(thirdparty/filesystem/include)
 add_subdirectory(thirdparty/fmt EXCLUDE_FROM_ALL)
 include_directories(thirdparty/fmt/include)
-include_directories(SYSTEM thirdparty/json/include)
+include_directories(AFTER SYSTEM thirdparty/json/include)
 add_subdirectory(thirdparty/backward-cpp EXCLUDE_FROM_ALL)
 
 set(DISABLE_WERROR ON CACHE BOOL "" FORCE)
@@ -252,7 +252,8 @@ set(LWS_WITH_LEJP OFF CACHE BOOL "" FORCE)
 set(LWS_WITH_LEJP_CONF OFF CACHE BOOL "" FORCE)
 set(LWS_UNIX_SOCK OFF CACHE BOOL "" FORCE)
 set(LWS_WITH_NETLINK OFF CACHE BOOL "" FORCE)
-set(OPENSSL_FOUND 0) # hack to force lws re-search openssl
+set(OPENSSL_INCLUDE_DIRS ${OPENSSL_INCLUDE_DIR} CACHE STRING "" FORCE)
+set(OPENSSL_FOUND 1) # hack to avoid lws re-search openssl
 set(LIBEVENT_FOUND 1) # hack to stop libwebsockets from finding libevent
 set(LIBEVENT_LIBRARIES "event_core_static")
 add_subdirectory(thirdparty/libwebsockets EXCLUDE_FROM_ALL)

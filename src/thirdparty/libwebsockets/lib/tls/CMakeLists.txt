@@ -118,7 +118,7 @@ if (LWS_WITH_SSL)
 		list(APPEND SOURCES
 			tls/tls-sessions.c)
 	endif()
-	
+
 	if (LWS_WITH_MBEDTLS)
 		list(APPEND SOURCES
 			tls/mbedtls/mbedtls-tls.c
@@ -162,7 +162,7 @@ if (LWS_WITH_SSL)
 				tls/openssl/lws-gencrypto.c)
 		endif()
 	endif()
-		
+
 	if (NOT LWS_WITHOUT_SERVER)
 		list(APPEND SOURCES
 			tls/tls-server.c)
@@ -184,7 +184,7 @@ if (LWS_WITH_SSL)
 			list(APPEND SOURCES
 				tls/openssl/openssl-client.c)
 		endif()
-		
+
 	endif()
 endif()
 
@@ -237,7 +237,7 @@ if (LWS_WITH_SSL)
 
 		list(INSERT LIB_LIST 0 "${MBEDTLS_LIBRARIES}")
 	endif()
-	
+
 	if (LWS_WITH_MBEDTLS)
 		set(chose_ssl 1)
 	endif()
@@ -381,7 +381,7 @@ if (LWS_WITH_SSL AND NOT LWS_WITH_WOLFSSL)
 	find_package(OpenSSLbins)
 	if (DEFINED OPENSSL_EXECUTABLE)
 		message("OpenSSL executable: ${OPENSSL_EXECUTABLE}")
-		
+
 		if (OPENSSL_EXECUTABLE MATCHES "^$")
 			set(OPENSSL_EXECUTABLE openssl)
 		endif()
@@ -460,7 +460,7 @@ if (GENCERTS)
                         )
 
                else()
-	
+
 		# Unix.
 		execute_process(
 			COMMAND printf "GB\\nErewhon\\nAll around\\nlibwebsockets-test\\n\\nlocalhost\\nnone@invalid.org\\n"
@@ -469,7 +469,7 @@ if (GENCERTS)
 			RESULT_VARIABLE OPENSSL_RETURN_CODE
 			#		OUTPUT_QUIET ERROR_QUIET
 			)
-			
+
 		endif()
 
 		if (OPENSSL_RETURN_CODE)
@@ -479,7 +479,7 @@ if (GENCERTS)
 		endif()
 	endif()
 
-	list(APPEND TEST_SERVER_DATA 
+	list(APPEND TEST_SERVER_DATA
 		"${TEST_SERVER_SSL_KEY}"
 		"${TEST_SERVER_SSL_CERT}")
 endif()

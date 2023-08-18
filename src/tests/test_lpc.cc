@@ -47,20 +47,21 @@ TEST_F(DriverTest, TestCompileDumpProgWorks) {
 TEST_F(DriverTest, TestInMemoryCompileFile) {
   program_t* prog = nullptr;
 
-  error_context_t econ{};
-  save_context(&econ);
-  try {
-    std::istringstream source("void test() {}");
-    auto stream = std::make_unique<IStreamLexStream>(source);
-    prog = compile_file(std::move(stream), "test");
-  } catch (...) {
-    restore_context(&econ);
-    FAIL();
-  }
-  pop_context(&econ);
+  std::istringstream source("void test() {}");
+  auto stream = std::make_unique<IStreamLexStream>(source);
+  prog = compile_file(std::move(stream), "test");
 
   ASSERT_NE(prog, nullptr);
   dump_prog(prog, stdout, 1 | 2);
 
   deallocate_program(prog);
+}
+
+TEST_F(DriverTest, TestInMemoryCompileFileFail) {
+  program_t* prog = nullptr;
+  std::istringstream source("aksdljfaljdfiasejfaeslfjsaef");
+  auto stream = std::make_unique<IStreamLexStream>(source);
+  prog = compile_file(std::move(stream), "test");
+
+  ASSERT_EQ(prog, nullptr);
 }
