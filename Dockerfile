@@ -1,10 +1,9 @@
 FROM alpine:3.18 as builder
 
 RUN apk add --no-progress --no-cache \
-    linux-headers gcc g++ clang-dev make cmake python2 bash \
+    linux-headers gcc g++ clang-dev make cmake bash \
     mariadb-dev mariadb-static postgresql-dev sqlite-dev sqlite-static\
-    libevent-dev libevent-static libexecinfo-dev libexecinfo-static \
-    openssl-dev openssl-libs-static zlib-dev zlib-static icu-dev icu-static \
+    libevent-dev libevent-static openssl-dev openssl-libs-static zlib-dev zlib-static icu-dev icu-static \
     pcre-dev bison git
 
 WORKDIR /build
