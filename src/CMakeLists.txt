@@ -252,7 +252,7 @@ set(LWS_WITH_LEJP OFF CACHE BOOL "" FORCE)
 set(LWS_WITH_LEJP_CONF OFF CACHE BOOL "" FORCE)
 set(LWS_UNIX_SOCK OFF CACHE BOOL "" FORCE)
 set(LWS_WITH_NETLINK OFF CACHE BOOL "" FORCE)
-set(OPENSSL_FOUND 0) # hack to force lws re-search openssl
+set(OPENSSL_FOUND 1) # hack to avoid lws re-search openssl
 set(LIBEVENT_FOUND 1) # hack to stop libwebsockets from finding libevent
 set(LIBEVENT_LIBRARIES "event_core_static")
 add_subdirectory(thirdparty/libwebsockets EXCLUDE_FROM_ALL)
