@@ -1425,7 +1425,16 @@ short store_prog_string(const char *str) {
   char **p;
   unsigned char hash, mask, *tagp;
 
-  str = make_shared_string(str);
+  const auto *origin_str = str;
+
+  bool is_new_string = false;
+  str = findstring(origin_str);
+
+  if (!str) {
+    str = make_shared_string(origin_str);
+    is_new_string = true;
+  }
+
   STRING_HASH(hash, str);
   idxp = &string_idx[hash];
 
@@ -1440,7 +1449,6 @@ short store_prog_string(const char *str) {
     /* search hash chain to see if it's there */
     for (i = *idxp; i >= 0; i = next_tab[i]) {
       if (p[i] == str) {
-        free_string(str); /* needed as string is only free'ed once. */
         (reinterpret_cast<short *>(mem_block[A_STRING_REFS].block))[i]++;
         return i;
       }
@@ -1479,6 +1487,9 @@ short store_prog_string(const char *str) {
     i = mem_block[A_STRINGS].current_size / sizeof str - 1;
   }
   PROG_STRING(i) = str;
+  if (!is_new_string) {
+    ref_string(str);
+  }
   (reinterpret_cast<short *>(mem_block[A_STRING_NEXT].block))[i] = next;
   (reinterpret_cast<short *>(mem_block[A_STRING_REFS].block))[i] = 1;
   *idxp = i;
