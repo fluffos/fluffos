@@ -39,6 +39,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Setup include directoires
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
@@ -434,7 +435,7 @@ endif ()
 
 target_link_libraries(libdriver PUBLIC ghc_filesystem)
 
-add_compile_options("-DFMT_HEADER_ONLY=1")
+target_compile_options(libdriver PUBLIC "-DFMT_HEADER_ONLY=1")
 target_link_libraries(libdriver PRIVATE fmt::fmt-header-only)
 
 list(APPEND FLUFFOS_LIBRARIES autogen)
@@ -506,7 +507,10 @@ target_link_libraries(symbol PUBLIC ${FLUFFOS_LINK})
 
 include(helper)
 
-message("Final Compile Flags: ")
+message("Final Compile Flags for libdriver: ")
+print_target_properties(libdriver)
+
+message("Final Compile Flags for driver: ")
 print_target_properties(driver)
 
 install(TARGETS driver lpcc
