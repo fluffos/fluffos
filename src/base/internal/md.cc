@@ -12,9 +12,15 @@
 #include <cassert>  // for assert()
 #include <cstdlib>  // malloc etc
 #include <cinttypes>
+#include <map>
+#include <vector>
+#include <string>
 
 #include "base/internal/log.h"
 #include "base/internal/stralloc.h"
+#include "outbuf.h"
+
+#include <fmt/format.h>
 
 uint64_t blocks[MAX_TAGS];
 uint64_t totals[MAX_TAGS];
@@ -27,6 +33,52 @@ unsigned int hiwater = 0L;
 
 // TODO: defined in backend.cc
 extern uint64_t g_current_gametick;
+
+#ifdef DEBUGMALLOC_EXTENSIONS
+// journal to record all ref/unref operations
+namespace {
+std::map<int, std::vector<std::string>> md_refjournal;
+} // namespace
+#endif
+
+void md_record_ref_journal(md_node_t *node, bool is_ref, int current_ref, std::string desc) {
+#ifdef DEBUGMALLOC_EXTENSIONS
+  auto id = node->id;
+  auto it = md_refjournal.find(id);
+  if (it == md_refjournal.end()) {
+    md_refjournal[id] = std::vector<std::string>();
+  }
+  auto entry = fmt::format(FMT_STRING("{:s}: {:s}, ref={:d}\n"), is_ref ? "REF" : "UNREF", desc, current_ref);
+  md_refjournal[id].push_back(entry);
+#endif
+}
+
+void md_print_ref_journal(md_node_t *node, outbuffer_t *outbuf) {
+#ifdef DEBUGMALLOC_EXTENSIONS
+  auto id = node->id;
+  auto it = md_refjournal.find(id);
+  if (it == md_refjournal.end()) {
+    return;
+  }
+  for (auto &entry: it->second) {
+    outbuf_add(outbuf, entry.c_str());
+  }
+#endif
+}
+
+namespace {
+void clear_ref_journal(md_node_t* node) {
+#ifdef DEBUGMALLOC_EXTENSIONS
+  auto id = node->id;
+  auto it = md_refjournal.find(id);
+  if (it == md_refjournal.end()) {
+    return;
+  }
+  it->second.clear();
+#endif
+}
+} // namespace
+
 
 void MDmalloc(md_node_t *node, int size, int tag, const char *desc) {
   unsigned long h;
@@ -122,6 +174,7 @@ int MDfree(md_node_t *ptr) {
                     (uintptr_t)PTR(entry), entry->size);
     }
 #endif
+    clear_ref_journal(entry);
   } else {
     debug_message("md: debugmalloc: attempted to free non-malloc'd pointer %08lx\n",
                   (uintptr_t)ptr);

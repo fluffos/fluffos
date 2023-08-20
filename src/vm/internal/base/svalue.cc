@@ -35,6 +35,7 @@ void assign_svalue_no_free(svalue_t *to, svalue_t *from) {
   if (from->type == T_STRING) {
     if (from->subtype & STRING_COUNTED) {
       INC_COUNTED_REF(to->u.string);
+      md_record_ref_journal(PTR_TO_NODET(to->u.string), true, MSTR_REF(to->u.string), __CURRENT_FILE_LINE__);
       ADD_STRING(MSTR_SIZE(to->u.string));
       NDBG(BLOCK(to->u.string));
     }
@@ -80,6 +81,9 @@ void int_free_svalue(svalue_t *v)
     if (v->subtype & STRING_COUNTED) {
       int size = MSTR_SIZE(str);
       if (DEC_COUNTED_REF(str)) {
+#ifdef DEBUGMALLOC_EXTENSIONS
+        md_record_ref_journal(PTR_TO_NODET(str), false, MSTR_REF(str), tag);
+#endif // DEBUGMALLOC_EXTENSIONS
         SUB_STRING(size);
         NDBG(BLOCK(str));
         if (v->subtype & STRING_HASHED) {
@@ -92,6 +96,9 @@ void int_free_svalue(svalue_t *v)
           CHECK_STRING_STATS;
         }
       } else {
+#ifdef DEBUGMALLOC_EXTENSIONS
+        md_record_ref_journal(PTR_TO_NODET(str), false, MSTR_REF(str), tag);
+#endif // DEBUGMALLOC_EXTENSIONS
         SUB_STRING(size);
         NDBG(BLOCK(str));
       }

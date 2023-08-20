@@ -174,6 +174,7 @@ static block_t *alloc_new_shared_string(const char *string, int h, const char *w
   }
   SIZE(b) = (len > UINT_MAX ? UINT_MAX : len);
   REFS(b) = 1;
+  md_record_ref_journal(PTR_TO_NODET(b), true, b->refs, "alloc_new_shared_string: " + std::string(why));
   NEXT(b) = base_table[h];
   HASH(b) = h;
   base_table[h] = b;
@@ -192,6 +193,7 @@ const char *int_make_shared_string(const char *str, const char *desc) {
   } else {
     if (REFS(b)) {
       REFS(b)++;
+      md_record_ref_journal(PTR_TO_NODET(b), true, b->refs, "int_make_shared_string: " + std::string(desc));
     }
     ADD_STRING(SIZE(b));
   }
@@ -203,7 +205,7 @@ const char *int_make_shared_string(const char *str, const char *desc) {
    ref_string: Fatal to call this function on a string that isn't shared.
 */
 
-const char *ref_string(const char *str) {
+const char *int_ref_string(const char *str, const char *desc) {
   block_t *b;
 
   b = BLOCK(str);
@@ -211,6 +213,7 @@ const char *ref_string(const char *str) {
                str);
   if (REFS(b)) {
     REFS(b)++;
+    md_record_ref_journal(PTR_TO_NODET(b), true, b->refs, "ref_string: " + std::string(desc));
   }
   NDBG(b);
   ADD_STRING(SIZE(b));
@@ -223,7 +226,7 @@ const char *ref_string(const char *str) {
  * checks applied.
  */
 
-void free_string(const char *str) {
+void int_free_string(const char *str, const char *desc) {
   block_t **prev, *b;
   int h;
 
@@ -240,6 +243,7 @@ void free_string(const char *str) {
   }
 
   REFS(b)--;
+  md_record_ref_journal(PTR_TO_NODET(b), false, b->refs, "free_string: " + std::string(desc));
   SUB_STRING(SIZE(b));
 
   NDBG(b);
@@ -443,6 +447,16 @@ char *int_string_unlink(const char *str)
   return reinterpret_cast<char *>(newmbt + 1);
 }
 
+void stralloc_print_entry(std::stringstream &ss, block_t* entry) {
+#if defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS)
+  auto *md_entry = PTR_TO_NODET(entry);
+  ss << fmt::format(FMT_STRING("{:d},{:d},{:s},{:s},"), md_entry->id, md_entry->size,
+                    md_entry->tag == TAG_SHARED_STRING ? "S" : "M", md_entry->desc);
+#endif
+  ss << fmt::format(FMT_STRING("{:d},{:x},{:d},{:.40s}\n"), entry->refs, entry->hash,
+                    entry->size, STRING(entry));
+}
+
 void dump_stralloc(outbuffer_t *out) {
   std::stringstream ss;
 
@@ -450,13 +464,7 @@ void dump_stralloc(outbuffer_t *out) {
   // can't direct output to outbuf since it might realloc
   for (int hsh = 0; hsh < htable_size; hsh++) {
     for (block_t *entry = base_table[hsh]; entry; entry = entry->next) {
-#if defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS)
-      auto *md_entry = PTR_TO_NODET(entry);
-      ss << fmt::format(FMT_STRING("{:d},{:d},{:s},{:.40s}"), md_entry->id, md_entry->size,
-                        md_entry->tag == TAG_SHARED_STRING ? "S" : "M", md_entry->desc);
-#endif
-      ss << fmt::format(FMT_STRING("{:d},{:x},{:d},{:.40s}\n"), entry->refs, entry->hash,
-                        entry->size, STRING(entry));
+      stralloc_print_entry(ss, entry);
     }
   }
   auto res = ss.str();
