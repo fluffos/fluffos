@@ -133,6 +133,7 @@ extern int st_num_arg;
 extern ref_t *global_ref_list;
 extern int lv_owner_type;
 extern refed_t *lv_owner;
+extern const char *lv_owner_str;
 
 void kill_ref(ref_t *);
 ref_t *make_ref(void);

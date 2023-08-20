@@ -361,6 +361,7 @@ void free_string_svalue(svalue_t *v) {
   if (v->subtype & STRING_COUNTED) {
     int size = MSTR_SIZE(str);
     if (DEC_COUNTED_REF(str)) {
+      md_record_ref_journal(PTR_TO_NODET(str), false, MSTR_REF(str), __CURRENT_FILE_LINE__);
       SUB_STRING(size);
       NDBG(BLOCK(str));
       if (v->subtype & STRING_HASHED) {
@@ -373,6 +374,7 @@ void free_string_svalue(svalue_t *v) {
         CHECK_STRING_STATS;
       }
     } else {
+      md_record_ref_journal(PTR_TO_NODET(str), false, MSTR_REF(str), __CURRENT_FILE_LINE__);
       SUB_STRING(size);
       NDBG(BLOCK(str));
     }
@@ -526,6 +528,7 @@ svalue_t global_lvalue_byte = {T_LVALUE_BYTE};
 
 int lv_owner_type;
 refed_t *lv_owner;
+const char *lv_owner_str;
 
 // LVALUE points to an character(codepoint) in string
 static struct {
@@ -588,7 +591,7 @@ void push_indexed_lvalue(int reverse) {
             std::make_unique<EGCSmartIterator>(lv->u.string, SVALUE_STRLEN(lv));
 #ifdef REF_RESERVED_WORD
         lv_owner_type = T_STRING;
-        lv_owner = (refed_t *)lv->u.string;
+        lv_owner_str = lv->u.string;
 #endif
         break;
       }
@@ -2056,13 +2059,14 @@ void eval_instruction(char *p) {
           ref->sv.type = lv_owner_type;
           ref->sv.subtype = STRING_MALLOC; /* ignored if non-string */
           if (lv_owner_type == T_STRING) {
-            ref->sv.u.string = reinterpret_cast<char *>(lv_owner);
-            INC_COUNTED_REF(lv_owner);
-            ADD_STRING(MSTR_SIZE(lv_owner));
-            NDBG(BLOCK(lv_owner));
+            ref->sv.u.string = lv_owner_str;
+            INC_COUNTED_REF(ref->sv.u.string);
+            md_record_ref_journal(PTR_TO_NODET(ref->sv.u.string), true, MSTR_REF(ref->sv.u.string), __CURRENT_FILE_LINE__);
+            ADD_STRING(MSTR_SIZE(ref->sv.u.string));
+            NDBG(BLOCK(ref->sv.u.string));
           } else {
-            ref->sv.u.refed = lv_owner;
-            lv_owner->ref++;
+            ref->sv.u.refed = reinterpret_cast<refed_t *>(lv_owner);
+            ref->sv.u.refed->ref++;
             if (lv_owner_type == T_MAPPING) {
               (reinterpret_cast<mapping_t *>(lv_owner))->count |= MAP_LOCKED;
             }

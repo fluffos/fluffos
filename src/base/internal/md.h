@@ -4,8 +4,10 @@
 #define BASE_INTERNAL_MD_H
 
 #include <inttypes.h>
+#include <string>
 
 #include "base/internal/options_incl.h"
+#include "outbuf.h"
 
 #if defined(CHECK_MEMORY) && !defined(DEBUGMALLOC_EXTENSIONS)
 #undef CHECK_MEMORY
@@ -67,5 +69,8 @@ int MDfree(md_node_t *);
 #ifdef DEBUGMALLOC_EXTENSIONS
 void set_tag(const void *, int);
 #endif
+
+void md_record_ref_journal(md_node_t *node, bool is_ref, int current_ref, std::string desc);
+void md_print_ref_journal(md_node_t *node, outbuffer_t *outbuf);
 
 #endif

@@ -26,6 +26,9 @@
 #ifdef PACKAGE_DB
 #include "packages/db/db.h"
 #endif
+#ifdef PACKAGE_ASYNC
+#include "packages/async/async.h"
+#endif
 
 #if (defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS))
 
@@ -461,10 +464,6 @@ void check_all_blocks(int flag) {
   malloc_block_t *msbl;
   extern svalue_t apply_ret_value;
 
-#if 0
-  int num = 0, total = 0;
-#endif
-
   outbuf_zero(&out);
   if (!(flag & 2)) {
     outbuf_add(&out, "Performing memory tests ...\n");
@@ -704,7 +703,9 @@ void check_all_blocks(int flag) {
 #ifdef PACKAGE_DB
     mark_db_conn();
 #endif
-
+#ifdef PACKAGE_ASYNC
+    async_mark_request();
+#endif
     mark_svalue(&apply_ret_value);
 
     if (master_ob) {
@@ -979,6 +980,12 @@ void check_all_blocks(int flag) {
                           "Bad ref count for shared string \"%s\", is %d - "
                           "should be %d\n",
                           STRING(ssbl), REFS(ssbl), EXTRA_REF(ssbl));
+              std::stringstream ss;
+              stralloc_print_entry(ss, ssbl);
+              auto result = ss.str();
+
+              outbuf_add(&out, result.c_str());
+              md_print_ref_journal(entry, &out);
             }
             break;
           case TAG_ED:

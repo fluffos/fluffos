@@ -523,6 +523,7 @@ static array_t *pcre_match(array_t *v, const char *pattern, int flag) {
 
       if (sv1->subtype & STRING_COUNTED) {
         INC_COUNTED_REF(sv1->u.string);
+        md_record_ref_journal(PTR_TO_NODET(sv1->u.string), true, MSTR_REF(sv1->u.string), __CURRENT_FILE_LINE__);
         ADD_STRING(MSTR_SIZE(sv1->u.string));
       }
 
