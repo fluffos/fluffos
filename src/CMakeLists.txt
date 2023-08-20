@@ -456,9 +456,8 @@ endif()
 target_link_libraries(libdriver PRIVATE crypt)
 target_link_libraries(libdriver PUBLIC ${LIBWEBSOCKETS_LIBRARIES_STATIC})
 target_link_libraries(libdriver PUBLIC libtelnet)
-target_compile_definitions(libdriver PUBLIC ${BACKWARD_DEFINITIONS})
-target_include_directories(libdriver PUBLIC ${BACKWARD_INCLUDE_DIRS})
-target_link_libraries(libdriver PUBLIC ${BACKWARD_LIBRARIES})
+target_link_libraries(libdriver PUBLIC ${BACKWARD_ENABLE})
+add_backward(libdriver)
 
 # System libraries
 target_link_libraries(libdriver PUBLIC OpenSSL::SSL)
