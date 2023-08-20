@@ -130,12 +130,6 @@ static char *make_new_name(const char * /*str*/);
 static void send_say(object_t * /*ob*/, const char * /*text*/, array_t * /*avoid*/);
 #endif
 
-void check_legal_string(const char *s) {
-  if (strlen(s) > LARGEST_PRINTABLE_STRING) {
-    error("Printable strings limited to length of %d.\n", LARGEST_PRINTABLE_STRING);
-  }
-}
-
 #ifdef PRIVS
 static void init_privs_for_object(object_t *ob) {
   svalue_t *value;
@@ -1158,7 +1152,6 @@ void say(svalue_t *v, array_t *avoid) {
   object_t *ob, *origin;
   const char *buff;
 
-  check_legal_string(v->u.string);
   buff = v->u.string;
 
   if (current_object->flags & O_LISTENER || current_object->interactive) {
@@ -1214,7 +1207,6 @@ void tell_room(object_t *room, svalue_t *v, array_t *avoid) {
 
   switch (v->type) {
     case T_STRING:
-      check_legal_string(v->u.string);
       buff = v->u.string;
       break;
     case T_OBJECT:
@@ -1272,8 +1264,6 @@ void tell_room(object_t *room, svalue_t *v, array_t *avoid) {
 
 void shout_string(const char *str) {
   object_t *ob;
-
-  check_legal_string(str);
 
   for (ob = obj_list; ob; ob = ob->next_all) {
     if (!(ob->flags & O_LISTENER) || (ob == command_giver)
@@ -1394,10 +1384,6 @@ void print_svalue(svalue_t *arg) {
     switch (arg->type) {
       case T_STRING:
         len = SVALUE_STRLEN(arg);
-        if (len > LARGEST_PRINTABLE_STRING) {
-          error("Printable strings limited to length of %d.\n", LARGEST_PRINTABLE_STRING);
-        }
-
         tell_object(command_giver, arg->u.string, len);
         break;
       case T_OBJECT:
