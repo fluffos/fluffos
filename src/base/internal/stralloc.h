@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <climits>  // for UINT_MAX
 #include <cstring>  // for strlen
+#include <sstream>  // for std::stringstream
 
 #ifdef DEBUGMALLOC
 char *int_string_copy(const char *const, const char *);
@@ -125,7 +126,7 @@ typedef struct malloc_block_s {
 /* ref == 0 means the string has been referenced USHRT_MAX times and is
    immortal */
 #define INC_COUNTED_REF(x) \
-  if (MSTR_REF(x)) MSTR_REF(x)++;
+  if (MSTR_REF(x)) { MSTR_REF(x)++; }
 /* This is a conditional expression that evaluates to zero if the block
    should be deallocated */
 #define DEC_COUNTED_REF(x) (!(MSTR_REF(x) == 0 || --MSTR_REF(x) > 0))
@@ -168,8 +169,10 @@ static_assert(sizeof(malloc_block_t) == sizeof(block_t),
 void init_strings(void);
 const char *findstring(const char *);
 const char *int_make_shared_string(const char *, const char *);
-const char *ref_string(const char *);
-void free_string(const char *);
+const char *int_ref_string(const char *, const char *);
+#define ref_string(x) int_ref_string(x, __CURRENT_FILE_LINE__)
+void int_free_string(const char *, const char *);
+#define free_string(x) int_free_string(x, __CURRENT_FILE_LINE__)
 void deallocate_string(char *);
 uint64_t add_string_status(outbuffer_t *, int);
 
@@ -178,5 +181,6 @@ char *extend_string(const char *, int);
 extern unsigned int svalue_strlen_size;
 
 #define make_shared_string(s) int_make_shared_string(s, __CURRENT_FILE_LINE__)
+void stralloc_print_entry(std::stringstream &ss, block_t* entry);
 void dump_stralloc(outbuffer_t *out);
 #endif
