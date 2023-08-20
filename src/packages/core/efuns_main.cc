@@ -1159,16 +1159,6 @@ void f_message() {
       break;
     case T_NUMBER: {
       int const len = SVALUE_STRLEN(args + 1);
-
-      /* this is really bad and probably should be rm'ed -Beek;
-       * on the other hand, we don't have a debug_message() efun yet.
-       * Well, there is one in contrib now ...
-       */
-      /* for compatibility (write() simul_efuns, etc)  -bobf */
-      if (len > LARGEST_PRINTABLE_STRING) {
-        error("Printable strings limited to length of %d.\n", LARGEST_PRINTABLE_STRING);
-      }
-
       add_message(command_giver, args[1].u.string, len);
       pop_n_elems(num_arg);
       return;
@@ -1750,11 +1740,6 @@ void f_receive() {
   if (sp->type == T_STRING) {
     if (current_object->interactive) {
       int const len = SVALUE_STRLEN(sp);
-
-      if (len > LARGEST_PRINTABLE_STRING) {
-        error("Printable strings limited to length of %d.\n", LARGEST_PRINTABLE_STRING);
-      }
-
       add_message(current_object, sp->u.string, len);
     }
     free_string_svalue(sp--);
