@@ -50,7 +50,7 @@ if(GIT_EXECUTABLE)
   execute_process(
           WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
           COMMAND ${BASH_EXECUTABLE} -c "${GIT_EXECUTABLE} log --committer='Yucong Sun' -1 --date=format:%Y%m%d --format=%cd-%h"
-          OUTPUT_VARIABLE GIT_HASH
+          OUTPUT_VARIABLE GIT_TIMESTAMP
           OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(
           WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -59,10 +59,10 @@ if(GIT_EXECUTABLE)
           OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(
           WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-          COMMAND ${BASH_EXECUTABLE} -c "${GIT_EXECUTABLE} diff-index --quiet HEAD -- || echo -dirty"
+          COMMAND ${BASH_EXECUTABLE} -c "${GIT_EXECUTABLE} diff-index --quiet HEAD -- || echo -uncommited"
           OUTPUT_VARIABLE GIT_DIRTY
           OUTPUT_STRIP_TRAILING_WHITESPACE)
-  set(PROJECT_VERSION "${GIT_HASH}${GIT_LOCAL_COMMIT}${GIT_DIRTY}")
+  set(PROJECT_VERSION "${GIT_TIMESTAMP}${GIT_LOCAL_COMMIT}${GIT_DIRTY}")
 else()
   set(PROJECT_VERSION "unknown")
 endif()
