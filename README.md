@@ -14,34 +14,57 @@ FluffOS is an LPMUD driver, based on the last release of MudOS (v22.2b14), inclu
 FluffOS supports all LPC based mud with very little code changes. if you are currently still using MudOS somehow
  it is definitely time to upgrade!
 
-Version
+It is recommended to use the latest release on Github or the master branch, previous versions (v2017 in particular) are
+not supported.
+
+Build
+-----
+FluffOS's main platform is ubuntu 22.04 LTS, but also works on latest OSX and Windows (MSYS2/mingw64), WSL with
+ubuntu 22.04 works fine too.
+
+Build system: cmake (3.20)
+
+Features
 --------
-The current release is v2019. With cmake based build system, it supports running on Linux/OSX/Windows(both WSL & msys2).
+LPC Language since FluffOS v2017
+  - LPC string operations are UTF-8 EGS aware, range operator supports emoji and other unicode characters.
+  - various new EFUNS for transparent input/output transcoding.
 
-V2019 features includes:
-- Built in websocket support.
-- full UTF-8 aware LPC string & EFUNs, with transparent user input/output transcoding.
-- SHA512 crypt by default.
-- LPC Tracing
+LPC Language since MudOS
+  - Please read docs/archive/ChangeLog.* files for details
 
-V2019 Platform Targets:
-- Linux Ubuntu 18.04
-- MacOS OSX 10.15
-- MSYS2/mingw64 on Windows 7+
+Driver Runtime
+  - Jemalloc support
+  - SHA512 crypt by default.
+  - LPC Tracing
+  - Mysql, Postgresql, SQLLite integration
+  - Async IO operations
+  - External program integration
 
-The previous release is v2017. With an autoconf based build system, it supports compiling on centOS/ubuntu and under
- windows using CYGWIN. This release is no longer supported, it is kept only for historical interest now.
+Networking
+  - TLS support
+  - Websocket protocol support (with a minimal example for a webclient)
+
+LPC Standard Library
+  - see files under testsuite/std.
+
+Misc
+  - Testsuite for all EFUNS
+  - Detailed memory accounting (through mud_status(1) EFUN)
+  - Memory leak detection
+
+V2017
+-----
+v2017 is the legacy version, with an autoconf based build system, it supports compiling on centOS/ubuntu
+and under windows using CYGWIN. This release is no longer supported, it is kept only for historical interest now.
 
 All previous MudOS and FluffOS releases are also kept in the code base as tags for historical reference.
 
 Support
 -------
 Website / Documentation: <https://www.fluffos.info>
-
-Forum: <https://forum.fluffos.info>
-
 Discord Support: #fluffos on https://discord.gg/2a6qqG6Cdj
-
+Forum: <https://forum.fluffos.info>
 QQ support Group: 451819151 [![451819151](https://pub.idqqimg.com/wpa/images/group.png)](https://shang.qq.com/wpa/qunwpa?idkey=3fd552adb8ace1a8e3ae3a712e5d314c7caf49af8b87449473c595b7e1f1ddf9)
 
 How to Build
@@ -51,6 +74,7 @@ see <https://www.fluffos.info/build.html>
 Bundled Third-party Dependencies
 ----------------------
 - libwebsockets: <https://libwebsockets.org/>
+- libevent: <https://libwebsockets.org/>
 - backward-cpp <https://github.com/bombela/backward-cpp>
 - crypt from musl: <https://www.musl-libc.org/>
 - ghc::filesystem <https://github.com/gulrak/filesystem>
@@ -66,7 +90,8 @@ Projects Using FluffOS
 ----------------------
 [Add Your Own](https://github.com/fluffos/fluffos/edit/master/README.md)
 
--   [ThresholdRPG](https://wiki.thresholdrpg.com/)
+- Practically all Chinese
+- [ThresholdRPG](https://wiki.thresholdrpg.com/)
 -   [SWmud](http://www.swmud.org/)
 
 Donations
