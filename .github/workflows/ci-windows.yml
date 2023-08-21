@@ -39,7 +39,7 @@ jobs:
           pacman --noconfirm -S --needed bison make
       - name: Build
         run: |
-          mkdir build && cd build && cmake -G "MSYS Makefiles" -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DMARCH_NATIVE=OFF -DPACKAGE_CRYPTO=OFF -DPACKAGE_DB_MYSQL="" -DPACKAGE_DB_SQLITE=1 .. && make -j 2 install
+          mkdir build && cd build && cmake -G "MSYS Makefiles" -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DMARCH_NATIVE=OFF -DPACKAGE_CRYPTO=OFF -DPACKAGE_DB_MYSQL="" -DPACKAGE_DB_SQLITE=1 .. && VERBOSE=1 make -j 2 install
       - name: run tests
         run: cd build && make test
       - name: Testsuite
