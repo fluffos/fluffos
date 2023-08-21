@@ -28,6 +28,7 @@ jobs:
     - name: compile
       run: mkdir build && cd build &&  cmake -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DPACKAGE_DB_SQLITE=2 .. && make -j 2 install && cd ..
       env:
+        VERBOSE: 1
         OPENSSL_ROOT_DIR: "/usr/local/opt/openssl"
         ICU_ROOT: "/usr/local/opt/icu4c"
     - name: run tests

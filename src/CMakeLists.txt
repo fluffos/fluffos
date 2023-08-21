@@ -436,7 +436,7 @@ endif ()
 target_link_libraries(libdriver PUBLIC ghc_filesystem)
 
 target_compile_options(libdriver PUBLIC "-DFMT_HEADER_ONLY=1")
-target_link_libraries(libdriver PRIVATE fmt::fmt-header-only)
+target_link_libraries(libdriver PUBLIC fmt::fmt-header-only)
 
 list(APPEND FLUFFOS_LIBRARIES autogen)
 
@@ -463,7 +463,6 @@ add_backward(libdriver)
 # System libraries
 target_link_libraries(libdriver PUBLIC OpenSSL::SSL)
 target_link_libraries(libdriver PUBLIC ${ICU_LIBRARIES})
-# target_link_libraries(libdriver PUBLIC ${LIBEVENT_LIBRARIES})
 
 # Platform Libraries
 
@@ -507,10 +506,10 @@ target_link_libraries(symbol PUBLIC ${FLUFFOS_LINK})
 
 include(helper)
 
-message("Final Compile Flags for libdriver: ")
-print_target_properties(libdriver)
+message(STATUS "Final Compile Flags for libdriver: ")
+print_iterface_target_properties(libdriver)
 
-message("Final Compile Flags for driver: ")
+message(STATUS "Final Compile Flags for driver: ")
 print_target_properties(driver)
 
 install(TARGETS driver lpcc
