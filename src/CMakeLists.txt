@@ -434,9 +434,7 @@ endif ()
 # end of JEMALLOC
 
 target_link_libraries(libdriver PUBLIC ghc_filesystem)
-
-target_compile_options(libdriver PUBLIC "-DFMT_HEADER_ONLY=1")
-target_link_libraries(libdriver PUBLIC fmt::fmt-header-only)
+target_link_libraries(libdriver PUBLIC fmt::fmt)
 
 list(APPEND FLUFFOS_LIBRARIES autogen)
 
