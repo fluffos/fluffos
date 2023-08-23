@@ -17,6 +17,9 @@ void remove_sent(object_t *, object_t *);
 #endif
 #else
 /* STUBS */
+#define safe_parse_command(x, y) \
+  do {                      \
+  } while (0)
 #define parse_command(x, y) \
   do {                      \
   } while (0)
