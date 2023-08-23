@@ -6,7 +6,9 @@ void move(object ob) {
 }
 
 void init() {
+#ifndef __NO_ADD_ACTION__
   add_action(sprintf("%O", this_object()), "nothing");
+#endif
 }
 
 void do_tests() {
@@ -18,7 +20,7 @@ void do_tests() {
 #else
     object save_tp = this_player();
     object ob;
- 
+
     // 1. Simply enable commands, nothing happens.
     // init() is only called when object moves.
     enable_commands();
