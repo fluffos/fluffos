@@ -102,7 +102,7 @@ void f_hash() {
 
 result:
   if (!result) {
-    error("hash() unknown hash type: %s", algo);
+    error("hash() unknown hash type: %s\n", algo);
   }
 
   /* Pop the arguments off the stack and push the result */
