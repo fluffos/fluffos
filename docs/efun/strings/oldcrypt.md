@@ -41,30 +41,6 @@ title: strings / oldcrypt
         // invalid password attempt
     }
 
-### UPGRADE
-
-    Example of upgrading existing user passwords to crypt():
-
-    // confirm if user provided correct password for existing user
-    int verify_password (string input) {
-        string password = query_password();
-
-        // crypt comparison
-        if (password[0..2] == "$6$" && crypt(input, password) == password) {
-            return 1;
-        }
-
-        // oldcrypt comparison & upgrade to crypt
-        if (oldcrypt(input, password) == password) {
-            set_password(crypt(input, 0));
-            write("Your password hash has been updated to use to SHA-512.");
-            return 1;
-        }
-
-        // invalid password
-        return 0;
-    }
-
 ### SEE ALSO
 
     crypt(3), hash(3)
