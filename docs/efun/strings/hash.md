@@ -5,7 +5,7 @@ title: strings / hash
 
 ### NAME
 
-    hash() - hash of a string specifying the algorithm
+    hash() - hash a string with the specified algorithm
 
 ### SYNOPSIS
 
@@ -33,4 +33,4 @@ title: strings / hash
 
 ### SEE ALSO
 
-    crypt(3), oldcrypt(3)
+    crypt(3), oldcrypt(3), sha1(3)
