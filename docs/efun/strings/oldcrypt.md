@@ -1,20 +1,20 @@
 ---
 layout: default
-title: strings / crypt
+title: strings / oldcrypt
 ---
 
 ### NAME
 
-    crypt() - encrypt a string
+    oldcrypt() - encrypt a string
 
 ### SYNOPSIS
 
-    string crypt( string str, string seed );
+    string oldcrypt( string str, string seed );
 
 ### DESCRIPTION
 
-    Encrypt the string `str` using string `seed`. If `seed` is zero, then
-    a random seed will be used.
+    Encrypt the string `str` using the first two characters from string 
+    `seed`. If `seed` is zero, then a random seed will be used.
 
     The encrypted result can be used as the `seed` of a second encrypt,
     which will return the original encrypted result if both `str` inputs
@@ -27,15 +27,15 @@ title: strings / crypt
 
 ### EXAMPLE
 
-    Example of verifying a password using crypt():
+    Example of verifying a password using oldcrypt():
 
     // turn user input into crypted password
-    string cryptPasswd = crypt(input, 0);
+    string cryptPasswd = oldcrypt(input, 0);
 
     // store crypted password in user save somewhere
 
     // compare login input to stored crypted password
-    if (crypt(input, cryptPasswd) == cryptPasswd) {
+    if (oldcrypt(input, cryptPasswd) == cryptPasswd) {
         // valid password
     } else {
         // invalid password attempt
@@ -43,4 +43,4 @@ title: strings / crypt
 
 ### SEE ALSO
 
-    oldcrypt(3), hash(3)
+    crypt(3), hash(3)

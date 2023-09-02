@@ -1012,6 +1012,9 @@ title: EFUN
 <div><a href='strings/explode.html'>explode</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='strings/hash.html'>hash</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='strings/implode.html'>implode</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
@@ -1019,6 +1022,9 @@ title: EFUN
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='strings/ltrim.html'>ltrim</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='strings/oldcrypt.html'>oldcrypt</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='strings/reg_assoc.html'>reg_assoc</a></div>
@@ -1034,6 +1040,9 @@ title: EFUN
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='strings/set_bit.html'>set_bit</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='strings/sha1.html'>sha1</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='strings/sprintf.html'>sprintf</a></div>
@@ -1172,6 +1181,6 @@ title: EFUN
 
 <div class="alert alert-info my-4" role="alert">
     <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/info.svg">
-    This page is auto generated on 2023-06-06 14:39:21 EDT for 39faf554.</a>
+    This page is auto generated on 2023-09-01 15:16:01 EDT for 3e5c788d.</a>
 </div>
 
