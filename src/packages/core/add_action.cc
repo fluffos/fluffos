@@ -488,7 +488,7 @@ void safe_parse_command(char *str, object_t *ob) {
 
   try {
     parse_command(str, ob);
-  } catch (char *) {
+  } catch (const char *) {
     restore_context(&econ);
   }
   pop_context(&econ);
