@@ -92,7 +92,8 @@ Projects Using FluffOS
 
 - Practically all Chinese
 - [ThresholdRPG](https://wiki.thresholdrpg.com/)
--   [SWmud](http://www.swmud.org/)
+- [SWmud](http://www.swmud.org/)
+- [Merentha](https://www.merentha.com/)
 
 Donations
 ---------
