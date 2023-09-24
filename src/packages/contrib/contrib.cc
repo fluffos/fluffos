@@ -2731,8 +2731,12 @@ void f_min() {
 #ifdef F_ABS
 
 void f_abs() {
-  if (sp->type == T_REAL && sp->u.real < 0.0) {
-    sp->u.real = -sp->u.real;
+  if (sp->type == T_REAL) {
+    if (sp->u.real < 0.0) {
+      sp->u.real = -sp->u.real;
+    } else if (sp->u.real == -0.0) {
+      sp->u.real = 0.0;
+    }
   } else if (sp->type == T_NUMBER && sp->u.number < 0) {
     sp->u.number = -sp->u.number;
   }
