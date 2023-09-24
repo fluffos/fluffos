@@ -25,8 +25,7 @@ title: system / find_call_out
     is found, and the time left in seconds is returned. If no call out is
     found, then return -1.
 
-    This will function to find call outs scheduled by call_out() or
-    call_out_walltime().
+    This will find call outs scheduled by call_out() or call_out_walltime().
 
     If the time remaining is fractional, then the result will be an integer,
     the value of which will be floored.
