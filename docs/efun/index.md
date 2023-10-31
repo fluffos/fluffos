@@ -674,6 +674,9 @@ title: EFUN
 <div><a href='internals/rusage.html'>rusage</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
+<div><a href='internals/set_config.html'>set_config</a></div>
+</div>
+<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
 <div><a href='internals/set_debug_level.html'>set_debug_level</a></div>
 </div>
 <div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
@@ -1181,6 +1184,6 @@ title: EFUN
 
 <div class="alert alert-info my-4" role="alert">
     <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/info.svg">
-    This page is auto generated on 2023-09-01 15:16:01 EDT for 3e5c788d.</a>
+    This page is auto generated on 2023-10-31 12:07:36 EDT for 06807de0-dirty.</a>
 </div>
 
