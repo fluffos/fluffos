@@ -5,7 +5,7 @@ title: internals / set_config
 
 ### NAME
 
-    set_config() - query various driver config settings
+    set_config() - set various driver config settings during runtime
 
 ### SYNOPSIS
 
