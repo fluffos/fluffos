@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / remove_shadow.pre
 ---
+# remove_shadow
 
 ### 名称
 

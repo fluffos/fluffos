@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: strings / sha1
 ---
+# sha1
 
 ### NAME
 

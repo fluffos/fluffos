@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / restore_from_string.pre
 ---
+# restore_from_string
 
 ### NAME
 

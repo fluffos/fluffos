@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: floats / ceil
 ---
+# round
 
 ### 名称
 

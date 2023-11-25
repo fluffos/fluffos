@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: mudlib / set_living_name
 ---
+# set_living_name
 
 ### NAME
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / remove_action
 ---
+# remove_action
 
 ### 名称
 

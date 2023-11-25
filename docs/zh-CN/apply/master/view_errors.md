@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: master / view_errors
 ---
+# view_errors
 
 ### NAME
 

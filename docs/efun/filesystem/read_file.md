@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: filesystem / read_file
 ---
+# read_file
 
 ### NAME
 

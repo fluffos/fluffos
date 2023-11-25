@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: calls / catch
 ---
+# catch
 
 ### NAME
 

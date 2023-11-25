@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: general / simul_efun
 ---
+# simul_efun
 
 Simulated efunctions (simul_efuns)
 

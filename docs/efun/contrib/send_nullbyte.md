@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / send_nullbyte.pre
 ---
+# send_nullbyte
 
 ### NAME
 

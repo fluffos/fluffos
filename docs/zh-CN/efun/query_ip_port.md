@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / query_ip_port.pre
 ---
+# query_ip_port
 
 ### 名称
 

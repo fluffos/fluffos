@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: types / general
 ---
+# general
 
 Types can be used in four places:
 
@@ -66,7 +67,7 @@ is in general much harder to trace an error occuring at run time.
 The basic types can be divided into groups. Those that are referenced
 by value, and those that are referenced by address. The types int,
 string, and float are referenced by value. The types mapping,
-function, object, and pointers ('<type> \*') are referenced by address.
+function, object, and pointers `('<type> \*')` are referenced by address.
 If a value of this type is assigned to a variable or passed as
 argument, they will all point to the same actual data. That means
 that if the value of an element in an array is changed, then it can
@@ -75,9 +76,9 @@ size of the array will always allocate a new one though. The
 comparison operator, ==, will compare the actual value for the group
 of value-referenced types above. But for arrays, mappings, etc, it
 will simply check if it is the same array, mapping, etc. That has the
-very important implication that the expression ({ 1 }) == ({ 1 }) will
+very important implication that the expression `({ 1 }) == ({ 1 })` will
 evaluate to false because the array construction operator-pair,
-({ ... }) always generates a new array.
+`({ ... })` always generates a new array.
 
 
 ## Basic types
@@ -130,11 +131,11 @@ evaluate to false because the array construction operator-pair,
 
 ## Special types
 
-There are some special types, which can be given before the basic type. These
-special types can also be combined. When using special type T before an
-inherit statement, all symbols defined by inheritance will also get the
-special type T. The only special case is public--defined symbols, which can
-not be redefined as private in a private inheritance statement.
+    There are some special types, which can be given before the basic type. These
+    special types can also be combined. When using special type T before an
+    inherit statement, all symbols defined by inheritance will also get the
+    special type T. The only special case is public--defined symbols, which can
+    not be redefined as private in a private inheritance statement.
 
 ### varargs
 

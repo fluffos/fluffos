@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: constructs / inherit
 ---
+# inherit
 
 ### The LPC inherit statement
 

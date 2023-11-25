@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / terminal_type
 ---
+# terminal_type
 
 ### 名称
 

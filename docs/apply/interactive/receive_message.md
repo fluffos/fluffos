@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: apply / interactive / receive_message
 ---
+# receive_message
 
 ### NAME
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: calls / call_other
 ---
+# call_other
 
 ### 名称
 

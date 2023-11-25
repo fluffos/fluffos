@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: objects / environment
 ---
+# environment
 
 ### 名称
 

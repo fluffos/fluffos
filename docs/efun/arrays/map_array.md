@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: arrays / map_array
 ---
+# map_array
 
 ### NAME
 

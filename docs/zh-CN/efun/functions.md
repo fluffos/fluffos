@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / functions.pre
 ---
+# functions
 
 ### 名称
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: system / uptime
 ---
+# uptime
 
 ### 名称
 

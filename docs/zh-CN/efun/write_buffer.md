@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: buffers / write_buffer
 ---
+# write_buffer
 
 ### 名称
 

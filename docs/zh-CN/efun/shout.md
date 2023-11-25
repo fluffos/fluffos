@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / shout
 ---
+# shout
 
 ### 名称
 

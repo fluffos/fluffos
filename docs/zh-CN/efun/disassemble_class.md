@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / disassemble_class.pre
 ---
+# disassemble_class
 
 ### 名称
 

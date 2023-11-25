@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: mappings / map_mapping
 ---
+# map_mapping
 
 ### 名称
 

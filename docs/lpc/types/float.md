@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: types / float
 ---
+# float
 
 MudOS LPC now provides support for the floating point type. Declare
 variables like this:

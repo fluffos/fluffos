@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / query_ip_number
 ---
+# query_ip_number
 
 ### NAME
 

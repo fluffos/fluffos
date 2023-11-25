@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: numbers / intp
 ---
+# intp
 
 ### 名称
 

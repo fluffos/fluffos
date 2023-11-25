@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / file_length
 ---
+# file_length
 
 ### NAME
 

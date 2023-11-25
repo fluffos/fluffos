@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / repeat_string.pre
 ---
+# repeat_string
 
 ### NAME
 

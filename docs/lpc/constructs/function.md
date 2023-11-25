@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: constructs / function
 ---
+# function
 
 ### The LPC function (or method)
 

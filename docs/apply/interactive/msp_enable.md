@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / msp_enable
 ---
+# msp_enable
 
 ### NAME
 

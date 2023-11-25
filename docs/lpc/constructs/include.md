@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: constructs / include
 ---
+# include
 
 ### The LPC #include directive:
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: numbers / secure_random
 ---
+# secure_random
 
 ### 名称
 

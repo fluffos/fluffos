@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / compressedp.pre
 ---
+# compressedp
 
 ### NAME
 

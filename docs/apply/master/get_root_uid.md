@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: master / get_root_uid
 ---
+# get_root_uid
 
 ### NAME
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: strings / clear_bit
 ---
+# clear_bit
 
 ### 名称
 

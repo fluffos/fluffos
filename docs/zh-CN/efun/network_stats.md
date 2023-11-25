@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / network_stats.pre
 ---
+# network_stats
 
 ### 名称
 

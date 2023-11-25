@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: master / valid_write
 ---
+# valid_write
 
 ### 名称
 

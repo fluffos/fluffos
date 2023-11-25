@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: strings / explode
 ---
+# explode
 
 ### NAME
 

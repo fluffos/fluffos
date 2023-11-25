@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: filesystem / cp
 ---
+# cp
 
 ### 名称
 

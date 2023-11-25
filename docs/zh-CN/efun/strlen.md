@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: strings / strlen
 ---
+# strlen
 
 ### 名称
 

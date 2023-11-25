@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: system / strftime
 ---
+# strftime
 
 ### NAME
 

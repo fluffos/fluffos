@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: objects / set_hide
 ---
+# set_hide
 
 ### 名称
 

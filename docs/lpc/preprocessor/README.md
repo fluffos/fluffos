@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: preprocessor / README
 ---
+# README
 
 A preprocessor directive is any line of an LPC program which begins with '#'.
 

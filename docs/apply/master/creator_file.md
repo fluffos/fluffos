@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: master / creator_file
 ---
+# creator_file
 
 ### NAME
 

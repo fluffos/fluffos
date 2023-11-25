@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / copy.pre
 ---
+# copy
 
 ### 名称
 

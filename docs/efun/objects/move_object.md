@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: objects / move_object
 ---
+# move_object
 
 ### NAME
 

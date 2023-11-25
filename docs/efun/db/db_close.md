@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: db / db_close
 ---
+# db_close
 
 ### NAME
 

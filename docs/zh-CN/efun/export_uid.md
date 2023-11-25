@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: mudlib / export_uid
 ---
+# export_uid
 
 ### 名称
 

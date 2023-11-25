@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / in_input
 ---
+# in_input
 
 ### NAME
 

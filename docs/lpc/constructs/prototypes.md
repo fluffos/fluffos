@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: constructs / prototypes
 ---
+# prototypes
 
 ### The function prototype
 

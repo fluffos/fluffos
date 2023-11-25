@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: sockets / socket_bind
 ---
+# socket_bind
 
 ### 名称
 

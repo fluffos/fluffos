@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: strings / set_bit
 ---
+# set_bit
 
 ### 名称
 

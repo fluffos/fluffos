@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: stdlib / base64decode
 ---
+# base64decode
 
 ### NAME
 

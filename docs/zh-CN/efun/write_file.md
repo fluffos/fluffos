@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: filesystem / write_file
 ---
+# write_file
 
 ### 名称
 

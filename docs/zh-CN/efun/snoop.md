@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / snoop
 ---
+# snoop
 
 ### 名称
 

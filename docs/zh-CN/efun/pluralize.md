@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / pluralize.pre
 ---
+# pluralize
 
 ### 名称
 

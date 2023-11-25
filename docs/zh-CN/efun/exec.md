@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / exec
 ---
+# exec
 
 ### 名称
 

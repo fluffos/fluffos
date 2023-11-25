@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: objects / clone_object
 ---
+# clone_object
 
 ### 名称
 

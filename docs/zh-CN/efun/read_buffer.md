@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: buffers / read_buffer
 ---
+# read_buffer
 
 ### 名称
 

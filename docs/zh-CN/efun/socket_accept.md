@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: sockets / socket_accept
 ---
+# socket_accept
 
 ### 名称
 

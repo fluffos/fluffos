@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: types / array.2d
 ---
+# array
 
 2D arrays can be done in LPC, quite simply. Just treat them as an array of
 arrays. For example,

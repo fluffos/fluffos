@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: objects / tell_room
 ---
+# tell_room
 
 ### 名称
 

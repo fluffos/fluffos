@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: system / max_eval_cost
 ---
+# max_eval_cost
 
 ### NAME
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: sockets / socket_connect
 ---
+# socket_connect
 
 ### 名称
 

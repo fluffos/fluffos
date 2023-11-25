@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: sockets / socket_acquire
 ---
+# socket_acquire
 
 ### 名称
 

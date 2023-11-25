@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / set_encoding
 ---
+# set_encoding
 
 ### SYNOPSIS
 

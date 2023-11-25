@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / terminal_colour.pre
 ---
+# terminal_colour
 
 ### NAME
 

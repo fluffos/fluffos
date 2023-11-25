@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: objects / deep_inventory
 ---
+# deep_inventory
 
 ### NAME
 

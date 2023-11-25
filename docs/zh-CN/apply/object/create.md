@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: object / create
 ---
+# create
 
 ### 名称
 

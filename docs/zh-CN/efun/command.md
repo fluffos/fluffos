@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / command
 ---
+# command
 
 ### 名称
 

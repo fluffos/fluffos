@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: types / function
 ---
+# function
 
 ## General Concept
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: sockets / socket_create
 ---
+# socket_create
 
 ### 名称
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: internals / rusage
 ---
+# rusage
 
 ### 名称
 

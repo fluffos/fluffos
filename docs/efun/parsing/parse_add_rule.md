@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: parsing / parse_add_rule
 ---
+# parse_add_rule
 
 ### NAME
 

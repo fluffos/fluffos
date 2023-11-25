@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: objects / objects
 ---
+# objects
 
 ### 名称
 

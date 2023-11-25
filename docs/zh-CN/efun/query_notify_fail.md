@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / query_notify_fail.pre
 ---
+# query_notify_fail
 
 ### NAME
 

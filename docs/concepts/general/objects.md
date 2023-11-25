@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: general / objects
 ---
+# objects
 
 - What is an object?
 

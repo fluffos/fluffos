@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / heart_beats.pre
 ---
+# heart_beats
 
 ### NAME
 

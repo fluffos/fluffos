@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: constructs / switch
 ---
+# switch
 
 ### The switch statement
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: async / async_getdir
 ---
+# async_getdir
 
 ### NAME
 

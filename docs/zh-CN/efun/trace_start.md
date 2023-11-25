@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: system / trace_start
 ---
+# trace_start
 
 ### 名称
 

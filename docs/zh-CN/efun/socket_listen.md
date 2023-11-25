@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: sockets / socket_listen
 ---
+# socket_listen
 
 ### 名称
 

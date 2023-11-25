@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / catch_tell
 ---
+# catch_tell
 
 ### NAME
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / printf
 ---
+# sprintf
 
 ### 名称
 

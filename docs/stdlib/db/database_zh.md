@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: stdlib / database
 ---
+# database_zh
 
 ## 基础配置
 

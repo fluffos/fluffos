@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: general / malloc
 ---
+# malloc
 
 Note: some machines don't allow the system calls to be replaced with
 a function of the same name. In particular, the compile will fail during

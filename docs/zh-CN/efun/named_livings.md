@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / named_livings.pre
 ---
+# named_livings
 
 ### 名称
 

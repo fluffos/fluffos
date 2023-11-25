@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: general / typeof
 ---
+# typeof
 
 ### NAME
 

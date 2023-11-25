@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / query_snooping
 ---
+# query_snooping
 
 ### NAME
 

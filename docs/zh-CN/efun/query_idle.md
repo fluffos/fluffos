@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / query_idle
 ---
+# query_idle
 
 ### 名称
 
