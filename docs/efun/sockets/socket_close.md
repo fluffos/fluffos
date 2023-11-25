@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: sockets / socket_close
 ---
+# socket_close
 
 ### NAME
 

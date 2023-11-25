@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: stdlib / element_of_weighted
 ---
+# element_of_weighted
 
 ### NAME
 

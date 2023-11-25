@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: objects / all_inventory
 ---
+# all_inventory
 
 ### 名称
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / this_player
 ---
+# this_player
 
 ### 名称
 

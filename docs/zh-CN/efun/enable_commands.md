@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / enable_commands
 ---
+# enable_commands
 
 ### 名称 ###
 

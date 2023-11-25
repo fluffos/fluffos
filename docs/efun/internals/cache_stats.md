@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: internals / cache_stats
 ---
+# cache_stats
 
 ### NAME
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / file_length.pre
 ---
+# file_length
 
 ### 名称
 

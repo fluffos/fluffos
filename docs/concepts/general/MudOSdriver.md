@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: general / MudOSdriver
 ---
+# MudOSdriver
 
 - What is the MudOS driver?
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: Build (v2017)
 ---
+# build_v2017
 
 ## Environment
 
@@ -16,7 +17,7 @@ jemalloc: use JEMALLOC is highly recommended in production. otherwise you may ru
 ## BUILD
 
 To Build fluffOS v2017 (Autoconf & in tree build)
-
+```bash
     # 0. You need to install autoconf & automake!
     $ sudo apt install autoconf automake
    
@@ -34,14 +35,14 @@ To Build fluffOS v2017 (Autoconf & in tree build)
     $ make
 
     # 4. find the built binary in src/driver and src/portbind
-
+```
 ## CentOS
 
 The problem with CentOS is that most of the package is too old for FluffOS,
 you must upgrade them manually first.
 
 Move to ubuntu or run an ubuntu based docker images is highly recommended.
-
+```bash
     # Install GCC 4.8 (or the latest one you like!)
 
     $ wget http://ftp.gnu.org/gnu/gcc/gcc-4.8.0/gcc-4.8.0.tar.bz2
@@ -50,12 +51,12 @@ Move to ubuntu or run an ubuntu based docker images is highly recommended.
     $ ./contrib/download_prerequisites
 
     # Build GCC
-    $ cd ..
-    $ mkdir gcc-build-4.8.0
+    $ cd ..
+    $ mkdir gcc-build-4.8.0
     $ cd gcc-build-4.8.0
-    $ ../gcc-4.8.0/configure --enable-checking=release --enable-languages=c,c++ --disable-multilib
+    $../gcc-4.8.0/configure --enable-checking=release --enable-languages=c,c++ --disable-multilib
     $ make -j16 # (Will take an hour)
-    $ make install
+    $ make install
 
     # Verify now gcc is installed correctly.
     # "gcc -v" should output "gcc (GCC) 4.8.0"
@@ -72,11 +73,11 @@ Move to ubuntu or run an ubuntu based docker images is highly recommended.
     $ ./configure –prefix=/usr
     $ make
     $ make install
- 
+```
 ## CYGWIN32/CYGWIN64
 
 FluffOS v2017 is fully functional under CYGWIN32 and CYGWIN64.
-
+```bash
     # 1. Get CYGWIN setup file on http://www.cygwin.org , preferably x64 one.
 
     # 2. Make sure to install following packages, using apt-cyg
@@ -99,3 +100,4 @@ FluffOS v2017 is fully functional under CYGWIN32 and CYGWIN64.
     # CYGWIN setup should take care of other dependencies for you
 
     # 3. Build FluffOS as if we are under normal linux!
+```

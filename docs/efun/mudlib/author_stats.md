@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: mudlib / author_stats
 ---
+# author_stats
 
 ### NAME
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / receive_snoop
 ---
+# receive_snoop
 
 ### 名称
 

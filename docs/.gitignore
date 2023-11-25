@@ -1,3 +1,6 @@
 /vendor
 /Gemfile.lock
 /_site
+/node_modules
+/.vitepress/cache
+/.vitepress/dist

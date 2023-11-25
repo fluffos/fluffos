@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: objects / query_heart_beat
 ---
+# query_heart_beat
 
 ### 名称
 

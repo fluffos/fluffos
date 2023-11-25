@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: general / socket_efuns
 ---
+# socket_efuns
 
 MudOS LPC Sockets Tutorial - version 1.0
 1992 October 20

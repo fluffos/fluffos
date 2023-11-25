@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: general / message_doc
 ---
+# message_doc
 
 ## the message() client protocol
 

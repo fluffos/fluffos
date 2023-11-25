@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: object / virtual_start
 ---
+# virtual_start
 
 ### NAME
 

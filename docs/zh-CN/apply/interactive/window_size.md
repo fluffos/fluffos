@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / window_size
 ---
+# window_size
 
 ### 名称
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: filesystem / rm
 ---
+# rm
 
 ### 名称
 

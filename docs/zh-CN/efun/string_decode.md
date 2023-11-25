@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: strings / string_decode
 ---
+# string_decode
 
 ### 名称
 

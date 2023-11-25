@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: floats / sin
 ---
+# sin
 
 ### NAME
 

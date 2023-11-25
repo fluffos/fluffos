@@ -1,18 +1,18 @@
 ---
-layout: default
+layout: doc
 title: arrays / filter_array
 ---
+# filter_array
 
 ### NAME
 
     filter_array() - return a selective sub-array
 
 ### SYNOPSIS
-
-    mixed *filter_array( mixed *arr, string fun, object ob,
-                         mixed extra, ... );
-    mixed *filter_array( mixed *arr, function f, mixed extra, ...);
-
+```c
+mixed *filter_array( mixed *arr, string fun, object ob, mixed extra, ... );
+mixed *filter_array( mixed *arr, function f, mixed extra, ...);
+```
 ### DESCRIPTION
 
     filter_array() returns an array holding the items of <arr> which passed

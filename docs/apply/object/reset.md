@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: object / reset
 ---
+# reset
 
 ### NAME
 

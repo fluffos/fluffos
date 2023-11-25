@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / event.pre
 ---
+# event
 
 ### 名称
 

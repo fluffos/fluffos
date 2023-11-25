@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: system / call_out_info
 ---
+# call_out_info
 
 ### NAME
 

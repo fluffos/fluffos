@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: mudlib / enable_wizard
 ---
+# enable_wizard
 
 ### NAME
 

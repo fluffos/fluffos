@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: db / db_status
 ---
+# db_status
 
 ### 名称
 

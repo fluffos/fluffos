@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: db / db_commit
 ---
+# db_commit
 
 ### NAME
 

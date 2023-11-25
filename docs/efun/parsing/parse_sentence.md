@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: parsing / parse_sentence
 ---
+# parse_sentence
 
 ### NAME
 

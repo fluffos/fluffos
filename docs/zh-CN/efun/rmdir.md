@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: filesystem / rmdir
 ---
+# rmdir
 
 ### 名称
 

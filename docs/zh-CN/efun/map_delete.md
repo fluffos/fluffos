@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: mappings / map_delete
 ---
+# map_delete
 
 ### 名称
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: stdlib / reduce
 ---
+# reduce
 
 ### NAME
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / query_snoop
 ---
+# query_snoop
 
 ### NAME
 

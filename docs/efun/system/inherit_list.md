@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: system / inherit_list
 ---
+# inherit_list
 
 ### NAME
 

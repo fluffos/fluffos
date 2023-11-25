@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: floats / asin
 ---
+# asin
 
 ### 名称
 

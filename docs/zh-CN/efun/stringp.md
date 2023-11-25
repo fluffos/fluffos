@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: strings / stringp
 ---
+# stringp
 
 ### 名称
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: internals / dump_socket_status
 ---
+# dump_socket_status
 
 ### NAME
 

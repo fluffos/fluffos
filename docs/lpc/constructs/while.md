@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: constructs / while
 ---
+# while
 
 ### The LPC while loop:
 

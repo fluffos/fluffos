@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / upper_case.pre
 ---
+# upper_case
 
 ### 名称
 

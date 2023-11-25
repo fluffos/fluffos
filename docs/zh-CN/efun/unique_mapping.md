@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: mappings / unique_mapping
 ---
+# unique_mapping
 
 ### 名称
 

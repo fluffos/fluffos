@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / fetch_variable.pre
 ---
+# fetch_variable
 
 ### 名称
 

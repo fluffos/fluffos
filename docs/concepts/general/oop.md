@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: general / oop
 ---
+# oop
 
 OOP stands for "Object-Oriented Programming"
 

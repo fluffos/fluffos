@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: internals / time_expression
 ---
+# time_expression
 
 ### NAME
 

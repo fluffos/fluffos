@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / store_variable.pre
 ---
+# store_variable
 
 ### 名称
 

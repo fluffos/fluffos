@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: internals / get_config
 ---
+# get_config
 
 ### 名称
 

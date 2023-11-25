@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: objects / clonep
 ---
+# clonep
 
 ### 名称
 

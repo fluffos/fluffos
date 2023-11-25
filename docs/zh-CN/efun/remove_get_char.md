@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / remove_get_char.pre
 ---
+# remove_get_char
 
 ### NAME
 

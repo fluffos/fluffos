@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: internals / dump_prog
 ---
+# dump_prog
 
 ### 名称
 

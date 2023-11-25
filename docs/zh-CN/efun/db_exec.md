@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: db / db_exec
 ---
+# db_exec
 
 ### 名称
 

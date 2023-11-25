@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: calls / call_out
 ---
+# call_out
 
 ### NAME
 

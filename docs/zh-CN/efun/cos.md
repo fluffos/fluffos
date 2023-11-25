@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: floats / cos
 ---
+# cos
 
 ### 名称
 

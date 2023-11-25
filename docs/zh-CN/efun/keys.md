@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: mappings / keys
 ---
+# keys
 
 ### 名称
 

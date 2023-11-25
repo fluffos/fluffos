@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: efuns / strings / strlen
 ---
+# strlen
 
 ### NAME
 

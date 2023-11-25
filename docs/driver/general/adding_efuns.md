@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: general / adding_efuns
 ---
+# adding_efuns
 
 This document explains how to add efunctions to FluffOS driver. Here are the
 steps:

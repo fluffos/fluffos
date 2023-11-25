@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: arrays / element_of
 ---
+# element_of
 
 ### NAME
 

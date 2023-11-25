@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: buffers / allocate_buffer
 ---
+# allocate_buffer
 
 ### 名称
 

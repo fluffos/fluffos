@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: master / get_bb_uid
 ---
+# get_bb_uid
 
 ### NAME
 

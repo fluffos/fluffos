@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: system / ctime
 ---
+# ctime
 
 ### 名称
 

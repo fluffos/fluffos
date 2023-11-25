@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / replaceable.pre
 ---
+# replaceable
 
 ### NAME
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: general / restore_variable
 ---
+# restore_variable
 
 ### NAME
 

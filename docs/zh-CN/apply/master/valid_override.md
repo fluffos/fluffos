@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: master / valid_override
 ---
+# valid_override
 
 ### 名称
 

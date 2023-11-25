@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: master / flag
 ---
+# flag
 
 ### 名称
 

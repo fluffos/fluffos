@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: system / time_ns
 ---
+# time_ns
 
 ### NAME
 

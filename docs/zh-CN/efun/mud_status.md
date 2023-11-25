@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: internals / mud_status
 ---
+# mud_status
 
 ### 名称
 

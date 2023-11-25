@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: mappings / match_path
 ---
+# match_path
 
 ### NAME
 

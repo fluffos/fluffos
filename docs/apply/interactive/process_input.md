@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / process_input
 ---
+# process_input
 
 ### NAME
 

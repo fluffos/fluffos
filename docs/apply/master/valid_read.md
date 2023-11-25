@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: master / valid_read
 ---
+# valid_read
 
 ### NAME
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: system / trace_end
 ---
+# trace_end
 
 ### 名称
 

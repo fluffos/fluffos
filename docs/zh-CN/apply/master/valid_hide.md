@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: master / valid_hide
 ---
+# valid_hide
 
 ### 名称
 

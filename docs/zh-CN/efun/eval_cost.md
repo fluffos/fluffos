@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: system / eval_cost
 ---
+# eval_cost
 
 ### 名称
 

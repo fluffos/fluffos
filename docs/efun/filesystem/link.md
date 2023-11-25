@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: filesystem / link
 ---
+# link
 
 ### NAME
 

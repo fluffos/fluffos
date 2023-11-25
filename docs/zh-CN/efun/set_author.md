@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: mudlib / set_author
 ---
+# set_author
 
 ### 名称
 

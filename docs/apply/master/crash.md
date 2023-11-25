@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: master / crash
 ---
+# crash
 
 ### NAME
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: strings / rtrim
 ---
+# rtrim
 
 ### 名称
 

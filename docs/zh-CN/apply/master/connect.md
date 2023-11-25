@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: master / connect
 ---
+# connect
 
 ### 名称
 

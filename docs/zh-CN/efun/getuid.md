@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: mudlib / getuid
 ---
+# getuid
 
 ### 名称
 

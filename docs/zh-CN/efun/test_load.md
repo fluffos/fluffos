@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / test_load.pre
 ---
+# test_load
 
 ### 名称
 

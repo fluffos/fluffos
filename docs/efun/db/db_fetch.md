@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: db / db_fetch
 ---
+# db_fetch
 
 ### NAME
 

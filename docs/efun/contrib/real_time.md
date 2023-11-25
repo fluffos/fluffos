@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / real_time.pre
 ---
+# real_time
 
 ### NAME
 

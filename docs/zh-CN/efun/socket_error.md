@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: sockets / socket_error
 ---
+# socket_error
 
 ### 名称
 

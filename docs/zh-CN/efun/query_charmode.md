@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / query_charmode.pre
 ---
+# query_charmode
 
 ### NAME
 

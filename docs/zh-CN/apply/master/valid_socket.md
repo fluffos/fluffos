@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: master / valid_socket
 ---
+# valid_socket
 
 ### 名称
 

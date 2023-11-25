@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: master / get_mud_stats
 ---
+# get_mud_stats
 
 ### NAME
 

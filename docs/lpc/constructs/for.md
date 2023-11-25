@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: constructs / for
 ---
+# for
 
 ### The LPC for loop
 

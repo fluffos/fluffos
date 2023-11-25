@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / shuffle.pre
 ---
+# shuffle
 
 ### 名称
 

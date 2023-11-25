@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: filesystem / rename
 ---
+# rename
 
 ### NAME
 

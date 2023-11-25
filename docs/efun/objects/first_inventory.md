@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: objects / first_inventory
 ---
+# first_inventory
 
 ### NAME
 

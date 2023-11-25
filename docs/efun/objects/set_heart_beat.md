@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: objects / set_heart_beat
 ---
+# set_heart_beat
 
 ### NAME
 

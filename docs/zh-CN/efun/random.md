@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: numbers / random
 ---
+# random
 
 ### 名称
 

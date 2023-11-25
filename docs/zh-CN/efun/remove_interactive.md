@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / remove_interactive.pre
 ---
+# remove_interactive
 
 ### 名称
 

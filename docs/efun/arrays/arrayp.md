@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: arrays / arrayp
 ---
+# arrayp
 
 ### NAME
 

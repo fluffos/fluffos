@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: arrays / unique_array
 ---
+# unique_array
 
 ### NAME
 

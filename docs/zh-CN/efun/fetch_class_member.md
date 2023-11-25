@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / fetch_class_member.pre
 ---
+# fetch_class_member
 
 ### 名称
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: arrays / shuffle
 ---
+# shuffle
 
 ### NAME
 

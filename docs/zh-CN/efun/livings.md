@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: mudlib / livings
 ---
+# livings
 
 ### 名称
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: strings / string_encode
 ---
+# string_encode
 
 ### SYNOPSIS
 

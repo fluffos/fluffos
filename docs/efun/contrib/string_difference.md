@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / string_difference.pre
 ---
+# string_difference
 
 ### NAME
 

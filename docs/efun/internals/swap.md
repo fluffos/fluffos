@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: internals / swap
 ---
+# swap
 
 ### NAME
 

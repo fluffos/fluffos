@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: calls / previous_object
 ---
+# previous_object
 
 ### 名称
 

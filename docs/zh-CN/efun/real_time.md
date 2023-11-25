@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / real_time
 ---
+# real_time
 
 ### 名称
 

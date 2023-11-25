@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: internals / dump_file_descriptors
 ---
+# dump_file_descriptors
 
 ### NAME
 
