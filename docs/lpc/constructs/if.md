@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: constructs / if
 ---
+# if
 
 ### The if else statement
 

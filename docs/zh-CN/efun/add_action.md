@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / add_action
 ---
+# add_action
 
 ### 名称
 

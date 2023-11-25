@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / max
 ---
+# max
 
 ### 名称
 

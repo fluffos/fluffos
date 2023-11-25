@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: objects / present
 ---
+# present
 
 ### 名称
 

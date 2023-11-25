@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: mappings / filter_mapping
 ---
+# filter_mapping
 
 ### 名称
 

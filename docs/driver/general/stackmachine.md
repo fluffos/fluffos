@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: general / stackmachine
 ---
+# stackmachine
 
 THIS IS A DOCUMENT THAT DESCRIBES HOW A VIRTUAL STACK MACHINE HAS BEEN DEFINED, TO EXECUTE COMPILED LPC CODE.
 

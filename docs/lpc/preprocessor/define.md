@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: preprocessor / define
 ---
+# define
 
 the #define preprocessor command creates a macro that can be expanded later
 on in the file. For example, if you have the line:

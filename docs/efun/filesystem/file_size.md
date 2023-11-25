@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: filesystem / file_size
 ---
+# file_size
 
 ### NAME
 

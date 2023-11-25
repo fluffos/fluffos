@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / set_this_player
 ---
+# set_this_player
 
 ### SYNOPSIS
 

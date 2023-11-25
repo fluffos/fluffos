@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: objects / load_object
 ---
+# load_object
 
 ### 名称
 

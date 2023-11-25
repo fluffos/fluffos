@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / classes.pre
 ---
+# classes
 
 ### 名称
 

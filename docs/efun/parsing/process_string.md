@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: parsing / process_string
 ---
+# process_string
 
 ### NAME
 

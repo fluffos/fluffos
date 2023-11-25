@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: master / privs_file
 ---
+# privs_file
 
 ### NAME
 

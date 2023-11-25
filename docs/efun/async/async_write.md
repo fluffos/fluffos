@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: async / async_write
 ---
+# async_write
 
 ### NAME
 

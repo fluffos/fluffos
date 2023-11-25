@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / this_interactive
 ---
+# this_interactive
 
 ### 名称
 

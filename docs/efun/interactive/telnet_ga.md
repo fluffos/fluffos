@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / telnet_ga
 ---
+# telnet_ga
 
 ### NAME
 

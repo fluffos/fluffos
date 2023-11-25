@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: master / preload
 ---
+# preload
 
 ### 名称
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: general / lpc
 ---
+# lpc
 
 - What is LPC?
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: sockets / socket_address
 ---
+# socket_address
 
 ### 名称
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / notify_fail
 ---
+# notify_fail
 
 ### NAME
 

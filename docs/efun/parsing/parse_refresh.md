@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: parsing / parse_refresh
 ---
+# parse_refresh
 
 ### NAME
 

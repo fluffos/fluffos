@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: stdlib / present_clone
 ---
+# present_clone
 
 ### NAME
 

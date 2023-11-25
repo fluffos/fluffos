@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: objects / virtualp
 ---
+# virtualp
 
 ### 名称
 

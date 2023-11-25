@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: strings / sscanf
 ---
+# sscanf
 
 ### NAME
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: mappings / mapp
 ---
+# mapp
 
 ### 名称
 

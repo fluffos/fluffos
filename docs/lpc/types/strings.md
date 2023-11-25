@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: types / strings
 ---
+# strings
 
 string sub ranging - comments by Grey@TMI-2
 

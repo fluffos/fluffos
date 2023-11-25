@@ -1,0 +1,26 @@
+---
+layout: doc
+title: internals
+---
+* [cache_stats](cache_stats.html)
+* [debug_info](debug_info.html)
+* [debugmalloc](debugmalloc.html)
+* [dump_file_descriptors](dump_file_descriptors.html)
+* [dump_prog](dump_prog.html)
+* [dump_socket_status](dump_socket_status.html)
+* [dumpallobj](dumpallobj.html)
+* [get_config](get_config.html)
+* [malloc_status](malloc_status.html)
+* [memory_info](memory_info.html)
+* [moncontrol](moncontrol.html)
+* [mud_status](mud_status.html)
+* [opcprof](opcprof.html)
+* [query_load_average](query_load_average.html)
+* [refs](refs.html)
+* [rusage](rusage.html)
+* [set_debug_level](set_debug_level.html)
+* [set_malloc_mask](set_malloc_mask.html)
+* [swap](swap.html)
+* [time_expression](time_expression.html)
+* [trace](trace.html)
+* [traceprefix](traceprefix.html)

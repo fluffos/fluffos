@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: floats / floatp
 ---
+# floatp
 
 ### 名称
 

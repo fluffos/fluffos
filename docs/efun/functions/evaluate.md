@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: functions / evaluate
 ---
+# evaluate
 
 ### NAME
 

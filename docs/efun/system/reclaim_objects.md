@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: system / reclaim_objects
 ---
+# reclaim_objects
 
 ### NAME
 

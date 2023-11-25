@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / has_gmcp
 ---
+# has_gmcp
 
 ### NAME
 

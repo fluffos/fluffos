@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: filesystem / get_dir
 ---
+# get_dir
 
 ### 名称
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: arrays / sort_array
 ---
+# sort_array
 
 ### NAME
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: types / mappings
 ---
+# mappings
 
 Mappings usage 1992 September 28
 

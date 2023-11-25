@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: master / log_error
 ---
+# log_error
 
 ### NAME
 

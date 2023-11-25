@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: buffers / buffer_transcode
 ---
+# buffer_transcode
 
 ### NAME
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: master / error_handler
 ---
+# error_handler
 
 ### 名称
 

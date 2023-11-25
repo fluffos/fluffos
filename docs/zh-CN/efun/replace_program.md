@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: system / replace_program
 ---
+# replace_program
 
 ### 名称
 

@@ -1,9 +1,9 @@
 ---
-layout: default
+layout: doc
 title: 编译 FluffOS
 ---
 
-## Fluffos 编译说明
+# Fluffos 编译说明
 
 FluffOS 目前分 v2017 和 v2019 二个版本，主要区别是 v2017 版可以兼容支持旧MUD，只需对LIB微调即可，而 v2019 版要求LIB编码为 utf-8 ，支持websocket。
 

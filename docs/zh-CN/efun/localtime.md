@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: system / localtime
 ---
+# localtime
 
 ### 名称
 

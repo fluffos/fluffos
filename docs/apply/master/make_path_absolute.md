@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: master / make_path_absolute
 ---
+# make_path_absolute
 
 ### NAME
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: internals / set_malloc_mask
 ---
+# set_malloc_mask
 
 ### NAME
 

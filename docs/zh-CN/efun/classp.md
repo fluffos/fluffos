@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: mudlib / classp
 ---
+# classp
 
 ### 名称
 

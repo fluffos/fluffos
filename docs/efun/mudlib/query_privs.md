@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: mudlib / query_privs
 ---
+# query_privs
 
 ### NAME
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / remove_charmode.pre
 ---
+# remove_charmode
 
 ### NAME
 

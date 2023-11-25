@@ -1,44 +1,48 @@
 ---
-layout: default
+layout: doc
 title: Build
 ---
 
+# Getting Started
+
+[[toc]]
+
 ## Supported Environment
 
-v2019 supports building on ubuntu 18.04+ (including WSL), and OSX latest, Windows on MSYS2/mingw64.
+The best platform to build FluffOS is ubuntu 22.04+ (including WSL), and OSX latest, Windows on MSYS2/mingw64.
 
-Compilers: FluffOS v2019 uses C++17 and C11, which requires at least GCC 7+ or LLVM clang 4+.
+Compilers: FluffOS uses C++17 and C11, which requires at least GCC 7+ or LLVM clang 4+.
 
 System Library Requirement (Must install):
-1. Libevent 2.0+.
+
 1. ICU: FluffOS uses ICU for UTF-8 and transcoding support.
-1. jemalloc: Release build use JEMALLOC by default, and is highly recommended in production.
-1. OpenSSL (if PACAKGE_CRYPTO enabled)
-1. PCRE (if PACKGAGE_PCRE enabled)
-1. MysqlClient (if PACKAGE_DB enabled)
+2. jemalloc: Release build use JEMALLOC by default, and is highly recommended in production.
+3. OpenSSL (if PACAKGE_CRYPTO enabled)
+4. PCRE (if PACKGAGE_PCRE enabled)
+5. MysqlClient (if PACKAGE_DB enabled)
 
 Bundled thirdparty library (no need to install):
-1. libtelnet: telnet protocol support
-1. libwebsocket: websocket support.
-1. ghc filesystem: polyfill for std::filesystem
-1. backward-cpp: stacktrace
-1. utf8_decoder_dfa: fast utf8 validation.
-1. widecharwidth: wcwidth with unicode 11
 
-## Ubuntu 18.04 LTS
+1. Libevent 2.0+.
+2. libtelnet: telnet protocol support
+3. libwebsocket: websocket support.
+4. ghc filesystem: polyfill for std::filesystem
+5. backward-cpp: stacktrace
+6. utf8_decoder_dfa: fast utf8 validation.
+7. widecharwidth: wcwidth with unicode 11
+
+## Ubuntu LTS
 
 This is the best linux distro to build & run FluffOS, support for other distro is best effort only.
 
-Installing Dependencies
+Build Steps
 
-```bash
-# Install all libs
+- Installing Dependencies
+```shell
 $ sudo apt update
-$ sudo apt install build-essential bison libevent-dev libmysqlclient-dev libpcre3-dev libpq-dev \
+$ sudo apt install build-essential bison libmysqlclient-dev libpcre3-dev libpq-dev \
 libsqlite3-dev libssl-dev libz-dev libjemalloc-dev libicu-dev
 ```
-
-Build Steps
 
 - checkout git repo
 ```shell
@@ -65,14 +69,12 @@ $ make -j `nproc` install
 Require OSX 10.15.
 
 1. Install Homebrew, goto <https://brew.sh/> and follow instructions!
-
 2. install libraries (checkout <https://github.com/fluffos/fluffos/blob/master/.github/workflows/ci-osx.yml> if you
  have issue)
 ```shell
 $ brew install cmake pkg-config mysql pcre libgcrypt libevent openssl jemalloc icu4c
 ```
-
-3. build same as under linux, you will need to pass two environment variables
+3.build same as under linux, you will need to pass two environment variables
 ```shell
 $ mkdir build && cd build
 $ OPENSSL_ROOT_DIR="/usr/local/opt/openssl" ICU_ROOT="/usr/local/opt/icu4c" cmake ..
@@ -83,19 +85,58 @@ $ make install
 
 Supported Environment: Windows 10 + MSYS2, the binary produced can run on Windows 7+.
 
-see <https://forum.fluffos.info/t/compiling-fluffos-v2019-under-osx-windows-msys2-mingw64/601>
+checkout <https://github.com/fluffos/fluffos/blob/master/.github/workflows/ci-windows.yml> for most up-to-date commands.
 
-checkout <https://github.com/fluffos/fluffos/blob/master/.github/workflows/ci-windows.yml> if you have issue.
+First, you need to install MSYS2, from offical website here, pick X86_64 version if you are on 64 bit windows, i686 if you are on 32bit. (Note that it doesn’t matter what you compile into, FluffOS LPC VM is always 64bit! The only difference is that you can’t use more than 4G memory in 32bit.)
+
+Next, you need to open msys2.exe and sync and update MSYS2 with pacman.
+
+```shell
+$ pacman -Syu
+```
+
+and after running this command you might need to close msys window and reopen, keep running that command until there is nothing to upgrade anymore.
+
+Secondly, you want to install mingw64 devtoolchain, do this
+
+```shell
+$ pacman -S git mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake
+$ pacman -S mingw-w64-x86_64-zlib mingw-w64-x86_64-libevent mingw-w64-x86_64-pcre mingw-w64-x86_64-icu mingw-w64-x86_64-openssl
+$ pacman -S bison
+```
+
+:::important
+Once this is over, remember to close MSYS2 window, find MINGW64.exe in the same directory and open that instead. Very Important!
+:::
+
+Now, build things as usual!
+
+```shell
+$ mkdir build
+$ cd build
+$ cmake -G "MSYS Makefiles" -DPACKAGE_DB=OFF ..
+$ make install
+```
+If you want PACKAGE_DB=ON , install additonal mysql package with
+
+```shell
+pacman -S mingw-w64-x86_64-libmariadbclient
+```
+Or if you want sqlite3
+
+```shell
+pacman -S mingw-w64-x86_64-sqlite3
+```
 
 ## Packages
 
-By default driver have an default list of builtin packages to build.
+By default, driver have a default list of builtin packages to build.
 
-If you want to turn off an package, run `cmake .. -DPACKAGE_XX=OFF -DPACAGE_YY=OFF`
+If you want to turn off a package, run `cmake .. -DPACKAGE_XX=OFF -DPACAGE_YY=OFF`
 
 ## CPU compatibility
 
-By default driver built in release mode will optimize for running on current system CPU only. Copying driver to
+By default, driver built in release mode will optimize for running on current system CPU only. Copying driver to
 another machine to run will generally not work!
 
 if you need portable drivers, turn off MARCH_NATIVE as following.
@@ -106,10 +147,10 @@ $ cmake .. -DMARCH_NATIVE=OFF
 
 ## Static linking
 
-you can pass -DSTATIC=ON to force driver to link staticly for all libraries, this will only work in a specialized
+you can pass -DSTATIC=ON to force driver to link static-ly for all libraries, this will only work in a specialized
  environment like alpine linux and Windows.
 
-### Alpine Linux
+## Alpine Linux
 
 Installing Dependencies
 
@@ -143,7 +184,7 @@ $ cmake .. -DMARCH_NATIVE=OFF -DSTATIC=ON
 $ make install
 ```
 
-Check the result file to make sure it is an static file.
+Check the result file to make sure it is a static file.
 
 ```shell
 $ ldd bin/driver

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: types / buffer
 ---
+# buffer
 
 'buffer' is a cross between the LPC array type and the LPC string type.  
 'buffer' is intended as a way to conveniently manipulate binary data.  

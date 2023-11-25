@@ -1,950 +1,315 @@
 ---
-layout: default
+layout: doc
 title: zh-CN
 ---
-
-
-<h2 class="border-bottom py-3 text-uppercase">
-  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="apply" href="#apply">apply</a>
-</h2>
-
-<div class='row'>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='apply/index.html'>index</a></div>
-</div>
-</div>
-
-<h2 class="border-bottom py-3 text-uppercase">
-  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="build" href="#build">build</a>
-</h2>
-
-<div class='row'>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='build/build.html'>build</a></div>
-</div>
-</div>
-
-<h2 class="border-bottom py-3 text-uppercase">
-  <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/bookmark.svg"><a class='text-secondary' name="efun" href="#efun">efun</a>
-</h2>
-
-<div class='row'>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/abs.html'>abs</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/acos.html'>acos</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/add_action.html'>add_action</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/all_inventory.html'>all_inventory</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/all_previous_objects.html'>all_previous_objects</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/allocate.html'>allocate</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/allocate_buffer.html'>allocate_buffer</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/allocate_mapping.html'>allocate_mapping</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/arrayp.html'>arrayp</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/asin.html'>asin</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/assemble_class.html'>assemble_class</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/atan.html'>atan</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/author_stats.html'>author_stats</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/base_name.html'>base_name</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/bind.html'>bind</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/buffer_transcode.html'>buffer_transcode</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/bufferp.html'>bufferp</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/cache_stats.html'>cache_stats</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/call_other.html'>call_other</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/call_out.html'>call_out</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/call_out_info.html'>call_out_info</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/capitalize.html'>capitalize</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/catch.html'>catch</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/ceil.html'>ceil</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/children.html'>children</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/classes.html'>classes</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/classp.html'>classp</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/clear_bit.html'>clear_bit</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/clone_object.html'>clone_object</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/clonep.html'>clonep</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/command.html'>command</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/commands.html'>commands</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/compressedp.html'>compressedp</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/copy.html'>copy</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/cos.html'>cos</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/cp.html'>cp</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/crc32.html'>crc32</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/crypt.html'>crypt</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/ctime.html'>ctime</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/db_close.html'>db_close</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/db_commit.html'>db_commit</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/db_connect.html'>db_connect</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/db_exec.html'>db_exec</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/db_fetch.html'>db_fetch</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/db_rollback.html'>db_rollback</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/db_status.html'>db_status</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/debug_info.html'>debug_info</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/debug_message.html'>debug_message</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/deep_inherit_list.html'>deep_inherit_list</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/deep_inventory.html'>deep_inventory</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/defer.html'>defer</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/destruct.html'>destruct</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/disable_commands.html'>disable_commands</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/disable_wizard.html'>disable_wizard</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/disassemble_class.html'>disassemble_class</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/domain_stats.html'>domain_stats</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/dump_file_descriptors.html'>dump_file_descriptors</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/dump_prog.html'>dump_prog</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/dumpallobj.html'>dumpallobj</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/ed.html'>ed</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/ed_cmd.html'>ed_cmd</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/ed_start.html'>ed_start</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/element_of.html'>element_of</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/enable_commands.html'>enable_commands</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/enable_wizard.html'>enable_wizard</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/environment.html'>environment</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/error.html'>error</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/eval_cost.html'>eval_cost</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/evaluate.html'>evaluate</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/event.html'>event</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/exec.html'>exec</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/exp.html'>exp</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/explode.html'>explode</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/export_uid.html'>export_uid</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/fetch_class_member.html'>fetch_class_member</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/fetch_variable.html'>fetch_variable</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/file_length.html'>file_length</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/file_name.html'>file_name</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/file_size.html'>file_size</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/filter.html'>filter</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/filter_array.html'>filter_array</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/filter_mapping.html'>filter_mapping</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/find_call_out.html'>find_call_out</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/find_living.html'>find_living</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/find_object.html'>find_object</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/find_player.html'>find_player</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/first_inventory.html'>first_inventory</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/floatp.html'>floatp</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/floor.html'>floor</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/function_exists.html'>function_exists</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/function_owner.html'>function_owner</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/functionp.html'>functionp</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/functions.html'>functions</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/get_char.html'>get_char</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/get_config.html'>get_config</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/get_dir.html'>get_dir</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/get_garbage.html'>get_garbage</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/geteuid.html'>geteuid</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/getuid.html'>getuid</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/hash.html'>hash</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/heart_beats.html'>heart_beats</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/implode.html'>implode</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/in_edit.html'>in_edit</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/in_input.html'>in_input</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/inherit_list.html'>inherit_list</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/inherits.html'>inherits</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/input_to.html'>input_to</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/interactive.html'>interactive</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/intp.html'>intp</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/is_daylight_savings_time.html'>is_daylight_savings_time</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/keys.html'>keys</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/link.html'>link</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/living.html'>living</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/livings.html'>livings</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/load_object.html'>load_object</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/localtime.html'>localtime</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/log.html'>log</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/lower_case.html'>lower_case</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/ltrim.html'>ltrim</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/malloc_status.html'>malloc_status</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/map.html'>map</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/map_array.html'>map_array</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/map_delete.html'>map_delete</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/map_mapping.html'>map_mapping</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/mapp.html'>mapp</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/master.html'>master</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/match_path.html'>match_path</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/max.html'>max</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/max_eval_cost.html'>max_eval_cost</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/member_array.html'>member_array</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/memory_info.html'>memory_info</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/memory_summary.html'>memory_summary</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/message.html'>message</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/min.html'>min</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/mkdir.html'>mkdir</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/move_object.html'>move_object</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/mud_status.html'>mud_status</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/named_livings.html'>named_livings</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/network_stats.html'>network_stats</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/new.html'>new</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/next_inventory.html'>next_inventory</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/notify_fail.html'>notify_fail</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/nullp.html'>nullp</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/num_classes.html'>num_classes</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/objectp.html'>objectp</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/objects.html'>objects</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/oldcrypt.html'>oldcrypt</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/opcprof.html'>opcprof</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/origin.html'>origin</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/parse_command.html'>parse_command</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/pcre_assoc.html'>pcre_assoc</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/pcre_cache.html'>pcre_cache</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/pcre_extract.html'>pcre_extract</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/pcre_match.html'>pcre_match</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/pcre_replace.html'>pcre_replace</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/pcre_replace_callback.html'>pcre_replace_callback</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/pcre_version.html'>pcre_version</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/perf_counter_ns.html'>perf_counter_ns</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/pluralize.html'>pluralize</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/pointerp.html'>pointerp</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/pow.html'>pow</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/present.html'>present</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/previous_object.html'>previous_object</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/printf.html'>printf</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/program_info.html'>program_info</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/query_charmode.html'>query_charmode</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/query_ed_mode.html'>query_ed_mode</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/query_encoding.html'>query_encoding</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/query_heart_beat.html'>query_heart_beat</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/query_host_name.html'>query_host_name</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/query_idle.html'>query_idle</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/query_ip_name.html'>query_ip_name</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/query_ip_number.html'>query_ip_number</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/query_ip_port.html'>query_ip_port</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/query_load_average.html'>query_load_average</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/query_notify_fail.html'>query_notify_fail</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/query_num.html'>query_num</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/query_privs.html'>query_privs</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/query_replaced_program.html'>query_replaced_program</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/query_shadowing.html'>query_shadowing</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/query_snoop.html'>query_snoop</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/query_snooping.html'>query_snooping</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/query_verb.html'>query_verb</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/random.html'>random</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/read_buffer.html'>read_buffer</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/read_bytes.html'>read_bytes</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/read_file.html'>read_file</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/real_time.html'>real_time</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/receive.html'>receive</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/reclaim_objects.html'>reclaim_objects</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/refs.html'>refs</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/reg_assoc.html'>reg_assoc</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/regexp.html'>regexp</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/reload_object.html'>reload_object</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/remove_action.html'>remove_action</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/remove_call_out.html'>remove_call_out</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/remove_charmode.html'>remove_charmode</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/remove_get_char.html'>remove_get_char</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/remove_interactive.html'>remove_interactive</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/remove_shadow.html'>remove_shadow</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/rename.html'>rename</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/repeat_string.html'>repeat_string</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/replace_program.html'>replace_program</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/replace_string.html'>replace_string</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/replaceable.html'>replaceable</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/reset_eval_cost.html'>reset_eval_cost</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/resolve.html'>resolve</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/restore_from_string.html'>restore_from_string</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/restore_object.html'>restore_object</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/restore_variable.html'>restore_variable</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/rm.html'>rm</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/rmdir.html'>rmdir</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/roll_MdN.html'>roll_MdN</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/round.html'>round</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/rtrim.html'>rtrim</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/rusage.html'>rusage</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/save_object.html'>save_object</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/save_variable.html'>save_variable</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/say.html'>say</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/secure_random.html'>secure_random</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/send_nullbyte.html'>send_nullbyte</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/set_author.html'>set_author</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/set_bit.html'>set_bit</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/set_debug_level.html'>set_debug_level</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/set_encoding.html'>set_encoding</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/set_eval_limit.html'>set_eval_limit</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/set_heart_beat.html'>set_heart_beat</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/set_hide.html'>set_hide</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/set_light.html'>set_light</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/set_living_name.html'>set_living_name</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/set_privs.html'>set_privs</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/set_reset.html'>set_reset</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/seteuid.html'>seteuid</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/sha1.html'>sha1</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/shadow.html'>shadow</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/shout.html'>shout</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/shuffle.html'>shuffle</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/shutdown.html'>shutdown</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/sin.html'>sin</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/sizeof.html'>sizeof</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/snoop.html'>snoop</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/socket_accept.html'>socket_accept</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/socket_acquire.html'>socket_acquire</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/socket_address.html'>socket_address</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/socket_bind.html'>socket_bind</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/socket_close.html'>socket_close</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/socket_connect.html'>socket_connect</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/socket_create.html'>socket_create</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/socket_error.html'>socket_error</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/socket_listen.html'>socket_listen</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/socket_release.html'>socket_release</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/socket_status.html'>socket_status</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/socket_write.html'>socket_write</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/sort_array.html'>sort_array</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/sprintf.html'>sprintf</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/sqrt.html'>sqrt</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/sscanf.html'>sscanf</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/stat.html'>stat</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/store_class_member.html'>store_class_member</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/store_variable.html'>store_variable</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/strcmp.html'>strcmp</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/string_decode.html'>string_decode</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/string_difference.html'>string_difference</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/string_encode.html'>string_encode</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/stringp.html'>stringp</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/strlen.html'>strlen</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/strsrch.html'>strsrch</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/strwidth.html'>strwidth</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/tan.html'>tan</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/tell_object.html'>tell_object</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/tell_room.html'>tell_room</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/telnet_nop.html'>telnet_nop</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/terminal_colour.html'>terminal_colour</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/test_bit.html'>test_bit</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/test_load.html'>test_load</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/this_interactive.html'>this_interactive</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/this_object.html'>this_object</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/this_player.html'>this_player</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/this_user.html'>this_user</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/throw.html'>throw</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/time.html'>time</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/time_expression.html'>time_expression</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/to_float.html'>to_float</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/to_int.html'>to_int</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/trace_end.html'>trace_end</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/trace_start.html'>trace_start</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/trim.html'>trim</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/typeof.html'>typeof</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/undefinedp.html'>undefinedp</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/unique_array.html'>unique_array</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/unique_mapping.html'>unique_mapping</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/upper_case.html'>upper_case</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/uptime.html'>uptime</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/userp.html'>userp</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/users.html'>users</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/values.html'>values</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/variables.html'>variables</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/virtualp.html'>virtualp</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/wizardp.html'>wizardp</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/write.html'>write</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/write_buffer.html'>write_buffer</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/write_bytes.html'>write_bytes</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/write_file.html'>write_file</a></div>
-</div>
-<div class='col-sm-4 col-md-3 col-lg-3 col-xl-2'>
-<div><a href='efun/zonetime.html'>zonetime</a></div>
-</div>
-</div>
-
-<div class="alert alert-info my-4" role="alert">
-    <img src="https://cdnjs.cloudflare.com/ajax/libs/octicons/8.5.0/svg/info.svg">
-    This page is auto generated on 2023-06-06 14:39:21 EDT for 39faf554.</a>
-</div>
-
+## apply
+* [index](apply/index.html)
+## build
+* [build](build/build.html)
+* [index](build/index.html)
+## efun
+* [abs](efun/abs.html)
+* [acos](efun/acos.html)
+* [add_action](efun/add_action.html)
+* [all_inventory](efun/all_inventory.html)
+* [all_previous_objects](efun/all_previous_objects.html)
+* [allocate](efun/allocate.html)
+* [allocate_buffer](efun/allocate_buffer.html)
+* [allocate_mapping](efun/allocate_mapping.html)
+* [arrayp](efun/arrayp.html)
+* [asin](efun/asin.html)
+* [assemble_class](efun/assemble_class.html)
+* [atan](efun/atan.html)
+* [author_stats](efun/author_stats.html)
+* [base_name](efun/base_name.html)
+* [bind](efun/bind.html)
+* [buffer_transcode](efun/buffer_transcode.html)
+* [bufferp](efun/bufferp.html)
+* [cache_stats](efun/cache_stats.html)
+* [call_other](efun/call_other.html)
+* [call_out](efun/call_out.html)
+* [call_out_info](efun/call_out_info.html)
+* [capitalize](efun/capitalize.html)
+* [catch](efun/catch.html)
+* [ceil](efun/ceil.html)
+* [children](efun/children.html)
+* [classes](efun/classes.html)
+* [classp](efun/classp.html)
+* [clear_bit](efun/clear_bit.html)
+* [clone_object](efun/clone_object.html)
+* [clonep](efun/clonep.html)
+* [command](efun/command.html)
+* [commands](efun/commands.html)
+* [compressedp](efun/compressedp.html)
+* [copy](efun/copy.html)
+* [cos](efun/cos.html)
+* [cp](efun/cp.html)
+* [crc32](efun/crc32.html)
+* [crypt](efun/crypt.html)
+* [ctime](efun/ctime.html)
+* [db_close](efun/db_close.html)
+* [db_commit](efun/db_commit.html)
+* [db_connect](efun/db_connect.html)
+* [db_exec](efun/db_exec.html)
+* [db_fetch](efun/db_fetch.html)
+* [db_rollback](efun/db_rollback.html)
+* [db_status](efun/db_status.html)
+* [debug_info](efun/debug_info.html)
+* [debug_message](efun/debug_message.html)
+* [deep_inherit_list](efun/deep_inherit_list.html)
+* [deep_inventory](efun/deep_inventory.html)
+* [defer](efun/defer.html)
+* [destruct](efun/destruct.html)
+* [disable_commands](efun/disable_commands.html)
+* [disable_wizard](efun/disable_wizard.html)
+* [disassemble_class](efun/disassemble_class.html)
+* [domain_stats](efun/domain_stats.html)
+* [dump_file_descriptors](efun/dump_file_descriptors.html)
+* [dump_prog](efun/dump_prog.html)
+* [dumpallobj](efun/dumpallobj.html)
+* [ed](efun/ed.html)
+* [ed_cmd](efun/ed_cmd.html)
+* [ed_start](efun/ed_start.html)
+* [element_of](efun/element_of.html)
+* [enable_commands](efun/enable_commands.html)
+* [enable_wizard](efun/enable_wizard.html)
+* [environment](efun/environment.html)
+* [error](efun/error.html)
+* [eval_cost](efun/eval_cost.html)
+* [evaluate](efun/evaluate.html)
+* [event](efun/event.html)
+* [exec](efun/exec.html)
+* [exp](efun/exp.html)
+* [explode](efun/explode.html)
+* [export_uid](efun/export_uid.html)
+* [fetch_class_member](efun/fetch_class_member.html)
+* [fetch_variable](efun/fetch_variable.html)
+* [file_length](efun/file_length.html)
+* [file_name](efun/file_name.html)
+* [file_size](efun/file_size.html)
+* [filter](efun/filter.html)
+* [filter_array](efun/filter_array.html)
+* [filter_mapping](efun/filter_mapping.html)
+* [find_call_out](efun/find_call_out.html)
+* [find_living](efun/find_living.html)
+* [find_object](efun/find_object.html)
+* [find_player](efun/find_player.html)
+* [first_inventory](efun/first_inventory.html)
+* [floatp](efun/floatp.html)
+* [floor](efun/floor.html)
+* [function_exists](efun/function_exists.html)
+* [function_owner](efun/function_owner.html)
+* [functionp](efun/functionp.html)
+* [functions](efun/functions.html)
+* [get_char](efun/get_char.html)
+* [get_config](efun/get_config.html)
+* [get_dir](efun/get_dir.html)
+* [get_garbage](efun/get_garbage.html)
+* [geteuid](efun/geteuid.html)
+* [getuid](efun/getuid.html)
+* [hash](efun/hash.html)
+* [heart_beats](efun/heart_beats.html)
+* [implode](efun/implode.html)
+* [in_edit](efun/in_edit.html)
+* [in_input](efun/in_input.html)
+* [index](efun/index.html)
+* [inherit_list](efun/inherit_list.html)
+* [inherits](efun/inherits.html)
+* [input_to](efun/input_to.html)
+* [interactive](efun/interactive.html)
+* [intp](efun/intp.html)
+* [is_daylight_savings_time](efun/is_daylight_savings_time.html)
+* [keys](efun/keys.html)
+* [link](efun/link.html)
+* [living](efun/living.html)
+* [livings](efun/livings.html)
+* [load_object](efun/load_object.html)
+* [localtime](efun/localtime.html)
+* [log](efun/log.html)
+* [lower_case](efun/lower_case.html)
+* [ltrim](efun/ltrim.html)
+* [malloc_status](efun/malloc_status.html)
+* [map](efun/map.html)
+* [map_array](efun/map_array.html)
+* [map_delete](efun/map_delete.html)
+* [map_mapping](efun/map_mapping.html)
+* [mapp](efun/mapp.html)
+* [master](efun/master.html)
+* [match_path](efun/match_path.html)
+* [max](efun/max.html)
+* [max_eval_cost](efun/max_eval_cost.html)
+* [member_array](efun/member_array.html)
+* [memory_info](efun/memory_info.html)
+* [memory_summary](efun/memory_summary.html)
+* [message](efun/message.html)
+* [min](efun/min.html)
+* [mkdir](efun/mkdir.html)
+* [move_object](efun/move_object.html)
+* [mud_status](efun/mud_status.html)
+* [named_livings](efun/named_livings.html)
+* [network_stats](efun/network_stats.html)
+* [new](efun/new.html)
+* [next_inventory](efun/next_inventory.html)
+* [notify_fail](efun/notify_fail.html)
+* [nullp](efun/nullp.html)
+* [num_classes](efun/num_classes.html)
+* [objectp](efun/objectp.html)
+* [objects](efun/objects.html)
+* [oldcrypt](efun/oldcrypt.html)
+* [opcprof](efun/opcprof.html)
+* [origin](efun/origin.html)
+* [parse_command](efun/parse_command.html)
+* [pcre_assoc](efun/pcre_assoc.html)
+* [pcre_cache](efun/pcre_cache.html)
+* [pcre_extract](efun/pcre_extract.html)
+* [pcre_match](efun/pcre_match.html)
+* [pcre_replace](efun/pcre_replace.html)
+* [pcre_replace_callback](efun/pcre_replace_callback.html)
+* [pcre_version](efun/pcre_version.html)
+* [perf_counter_ns](efun/perf_counter_ns.html)
+* [pluralize](efun/pluralize.html)
+* [pointerp](efun/pointerp.html)
+* [pow](efun/pow.html)
+* [present](efun/present.html)
+* [previous_object](efun/previous_object.html)
+* [printf](efun/printf.html)
+* [program_info](efun/program_info.html)
+* [query_charmode](efun/query_charmode.html)
+* [query_ed_mode](efun/query_ed_mode.html)
+* [query_encoding](efun/query_encoding.html)
+* [query_heart_beat](efun/query_heart_beat.html)
+* [query_host_name](efun/query_host_name.html)
+* [query_idle](efun/query_idle.html)
+* [query_ip_name](efun/query_ip_name.html)
+* [query_ip_number](efun/query_ip_number.html)
+* [query_ip_port](efun/query_ip_port.html)
+* [query_load_average](efun/query_load_average.html)
+* [query_notify_fail](efun/query_notify_fail.html)
+* [query_num](efun/query_num.html)
+* [query_privs](efun/query_privs.html)
+* [query_replaced_program](efun/query_replaced_program.html)
+* [query_shadowing](efun/query_shadowing.html)
+* [query_snoop](efun/query_snoop.html)
+* [query_snooping](efun/query_snooping.html)
+* [query_verb](efun/query_verb.html)
+* [random](efun/random.html)
+* [read_buffer](efun/read_buffer.html)
+* [read_bytes](efun/read_bytes.html)
+* [read_file](efun/read_file.html)
+* [real_time](efun/real_time.html)
+* [receive](efun/receive.html)
+* [reclaim_objects](efun/reclaim_objects.html)
+* [refs](efun/refs.html)
+* [reg_assoc](efun/reg_assoc.html)
+* [regexp](efun/regexp.html)
+* [reload_object](efun/reload_object.html)
+* [remove_action](efun/remove_action.html)
+* [remove_call_out](efun/remove_call_out.html)
+* [remove_charmode](efun/remove_charmode.html)
+* [remove_get_char](efun/remove_get_char.html)
+* [remove_interactive](efun/remove_interactive.html)
+* [remove_shadow](efun/remove_shadow.html)
+* [rename](efun/rename.html)
+* [repeat_string](efun/repeat_string.html)
+* [replace_program](efun/replace_program.html)
+* [replace_string](efun/replace_string.html)
+* [replaceable](efun/replaceable.html)
+* [reset_eval_cost](efun/reset_eval_cost.html)
+* [resolve](efun/resolve.html)
+* [restore_from_string](efun/restore_from_string.html)
+* [restore_object](efun/restore_object.html)
+* [restore_variable](efun/restore_variable.html)
+* [rm](efun/rm.html)
+* [rmdir](efun/rmdir.html)
+* [roll_MdN](efun/roll_MdN.html)
+* [round](efun/round.html)
+* [rtrim](efun/rtrim.html)
+* [rusage](efun/rusage.html)
+* [save_object](efun/save_object.html)
+* [save_variable](efun/save_variable.html)
+* [say](efun/say.html)
+* [secure_random](efun/secure_random.html)
+* [send_nullbyte](efun/send_nullbyte.html)
+* [set_author](efun/set_author.html)
+* [set_bit](efun/set_bit.html)
+* [set_debug_level](efun/set_debug_level.html)
+* [set_encoding](efun/set_encoding.html)
+* [set_eval_limit](efun/set_eval_limit.html)
+* [set_heart_beat](efun/set_heart_beat.html)
+* [set_hide](efun/set_hide.html)
+* [set_light](efun/set_light.html)
+* [set_living_name](efun/set_living_name.html)
+* [set_privs](efun/set_privs.html)
+* [set_reset](efun/set_reset.html)
+* [seteuid](efun/seteuid.html)
+* [sha1](efun/sha1.html)
+* [shadow](efun/shadow.html)
+* [shout](efun/shout.html)
+* [shuffle](efun/shuffle.html)
+* [shutdown](efun/shutdown.html)
+* [sin](efun/sin.html)
+* [sizeof](efun/sizeof.html)
+* [snoop](efun/snoop.html)
+* [socket_accept](efun/socket_accept.html)
+* [socket_acquire](efun/socket_acquire.html)
+* [socket_address](efun/socket_address.html)
+* [socket_bind](efun/socket_bind.html)
+* [socket_close](efun/socket_close.html)
+* [socket_connect](efun/socket_connect.html)
+* [socket_create](efun/socket_create.html)
+* [socket_error](efun/socket_error.html)
+* [socket_listen](efun/socket_listen.html)
+* [socket_release](efun/socket_release.html)
+* [socket_status](efun/socket_status.html)
+* [socket_write](efun/socket_write.html)
+* [sort_array](efun/sort_array.html)
+* [sprintf](efun/sprintf.html)
+* [sqrt](efun/sqrt.html)
+* [sscanf](efun/sscanf.html)
+* [stat](efun/stat.html)
+* [store_class_member](efun/store_class_member.html)
+* [store_variable](efun/store_variable.html)
+* [strcmp](efun/strcmp.html)
+* [string_decode](efun/string_decode.html)
+* [string_difference](efun/string_difference.html)
+* [string_encode](efun/string_encode.html)
+* [stringp](efun/stringp.html)
+* [strlen](efun/strlen.html)
+* [strsrch](efun/strsrch.html)
+* [strwidth](efun/strwidth.html)
+* [tan](efun/tan.html)
+* [tell_object](efun/tell_object.html)
+* [tell_room](efun/tell_room.html)
+* [telnet_nop](efun/telnet_nop.html)
+* [terminal_colour](efun/terminal_colour.html)
+* [test_bit](efun/test_bit.html)
+* [test_load](efun/test_load.html)
+* [this_interactive](efun/this_interactive.html)
+* [this_object](efun/this_object.html)
+* [this_player](efun/this_player.html)
+* [this_user](efun/this_user.html)
+* [throw](efun/throw.html)
+* [time](efun/time.html)
+* [time_expression](efun/time_expression.html)
+* [to_float](efun/to_float.html)
+* [to_int](efun/to_int.html)
+* [trace_end](efun/trace_end.html)
+* [trace_start](efun/trace_start.html)
+* [trim](efun/trim.html)
+* [typeof](efun/typeof.html)
+* [undefinedp](efun/undefinedp.html)
+* [unique_array](efun/unique_array.html)
+* [unique_mapping](efun/unique_mapping.html)
+* [upper_case](efun/upper_case.html)
+* [uptime](efun/uptime.html)
+* [userp](efun/userp.html)
+* [users](efun/users.html)
+* [values](efun/values.html)
+* [variables](efun/variables.html)
+* [virtualp](efun/virtualp.html)
+* [wizardp](efun/wizardp.html)
+* [write](efun/write.html)
+* [write_buffer](efun/write_buffer.html)
+* [write_bytes](efun/write_bytes.html)
+* [write_file](efun/write_file.html)
+* [zonetime](efun/zonetime.html)

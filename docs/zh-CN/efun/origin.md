@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: calls / origin
 ---
+# origin
 
 ### 名称
 

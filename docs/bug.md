@@ -1,7 +1,8 @@
 ---
-layout: default
-title: Bug Report
+layout: doc
+title: Troubleshooting
 ---
+# Troubleshooting
 
 ### Where To File
 

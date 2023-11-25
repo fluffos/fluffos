@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / set_prompt.pre
 ---
+# set_prompt
 
 void set_prompt(string, void | object);
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: preprocessor / include
 ---
+# include
 
 A line of the form:
 

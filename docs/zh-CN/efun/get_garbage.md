@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / get_garbage.pre
 ---
+# get_garbage
 
 ### 名称
 

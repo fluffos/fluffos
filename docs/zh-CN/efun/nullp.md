@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: general / nullp
 ---
+# nullp
 
 ### 名称
 

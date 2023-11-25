@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: arrays / filter_array
 ---
+# filter_array
 
 ### 名称
 

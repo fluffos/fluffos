@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: interactive / ed
 ---
+# ed
 
 ### 名称
 

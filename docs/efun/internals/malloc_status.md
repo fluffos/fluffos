@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: internals / malloc_status
 ---
+# malloc_status
 
 ### NAME
 

@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / memory_summary.pre
 ---
+# memory_summary
 
 ### 名称
 

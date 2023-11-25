@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: object / is_living
 ---
+# is_living
 
 ### NAME
 

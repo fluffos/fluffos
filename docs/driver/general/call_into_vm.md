@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: general / call_into_vm
 ---
+# call_into_vm
 
 ### Author
 sunyucong@gmail.com

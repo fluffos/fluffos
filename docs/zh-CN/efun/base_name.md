@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / base_name.pre
 ---
+# base_name
 
 ### 名称
 

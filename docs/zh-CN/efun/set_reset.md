@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: system / set_reset
 ---
+# set_reset
 
 ### 名称
 

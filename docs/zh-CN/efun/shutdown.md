@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: system / shutdown
 ---
+# shutdown
 
 ### 名称
 

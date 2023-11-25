@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: filesystem / mkdir
 ---
+# mkdir
 
 ### 名称
 

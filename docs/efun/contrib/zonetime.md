@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: contrib / zonetime.pre
 ---
+# zonetime
 
 ### NAME
 

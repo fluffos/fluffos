@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: mappings / keys
 ---
+# keys
 
 ### NAME
 

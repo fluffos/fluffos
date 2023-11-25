@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: stdlib / bitmap_font
 ---
+# bitmap_font
 
 ### NAME
 

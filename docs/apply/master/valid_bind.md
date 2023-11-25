@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: master / valid_bind
 ---
+# valid_bind
 
 ### NAME
 

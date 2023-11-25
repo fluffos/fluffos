@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: numbers / to_float
 ---
+# to_float
 
 ### 名称
 

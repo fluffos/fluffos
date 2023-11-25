@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: object / move_or_destruct
 ---
+# move_or_destruct
 
 ### 名称
 

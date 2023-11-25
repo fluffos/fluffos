@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: pcre / pcre_match
 ---
+# pcre_match
 
 ### NAME
 
