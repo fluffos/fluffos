@@ -18,6 +18,7 @@ title: internals
 * [query_load_average](query_load_average.html)
 * [refs](refs.html)
 * [rusage](rusage.html)
+* [set_config](set_config.html)
 * [set_debug_level](set_debug_level.html)
 * [set_malloc_mask](set_malloc_mask.html)
 * [swap](swap.html)
