@@ -18,6 +18,7 @@ title: lpc
 ## types
 * [array](types/array.html)
 * [buffer](types/buffer.html)
+* [classes](types/classes.html)
 * [float](types/float.html)
 * [function](types/function.html)
 * [general](types/general.html)
