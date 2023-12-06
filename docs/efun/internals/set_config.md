@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: doc
 title: internals / set_config
 ---
+# set_config
 
 ### NAME
 
@@ -30,4 +31,4 @@ title: internals / set_config
 
 ### SEE ALSO
 
-    /include/runtime_config.h
+    get_config(), /include/runtime_config.h
