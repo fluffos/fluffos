@@ -5,7 +5,6 @@ title: APPLY
 ## interactive
 * [catch_tell](interactive/catch_tell.html)
 * [gmcp](interactive/gmcp.html)
-* [index](interactive/index.html)
 * [logon](interactive/logon.html)
 * [net_dead](interactive/net_dead.html)
 * [process_input](interactive/process_input.html)
@@ -31,7 +30,6 @@ title: APPLY
 * [get_mud_stats](master/get_mud_stats.html)
 * [get_root_uid](master/get_root_uid.html)
 * [get_save_file_name](master/get_save_file_name.html)
-* [index](master/index.html)
 * [log_error](master/log_error.html)
 * [make_path_absolute](master/make_path_absolute.html)
 * [object_name](master/object_name.html)
@@ -56,7 +54,6 @@ title: APPLY
 * [create](object/create.html)
 * [heart_beat](object/heart_beat.html)
 * [id](object/id.html)
-* [index](object/index.html)
 * [init](object/init.html)
 * [move_or_destruct](object/move_or_destruct.html)
 * [reset](object/reset.html)

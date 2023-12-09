@@ -42,7 +42,8 @@ title: {title}
             # remove ".md" suffix
             items = sorted([x[:-3] for x in category_efun_map[cat] if x.endswith('.md')])
             for item in items:
-                f.write(f"* [{item}]({cat}/{item}.html)" + "\n")
+                if item != 'index':
+                    f.write(f"* [{item}]({cat}/{item}.html)" + "\n")
 
         # build index.md for subdir
         for cat in sorted(category_efun_map.keys()):
