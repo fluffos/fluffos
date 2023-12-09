@@ -3,10 +3,8 @@ layout: doc
 title: zh-CN
 ---
 ## apply
-* [index](apply/index.html)
 ## build
 * [build](build/build.html)
-* [index](build/index.html)
 ## efun
 * [abs](efun/abs.html)
 * [acos](efun/acos.html)
@@ -112,7 +110,6 @@ title: zh-CN
 * [implode](efun/implode.html)
 * [in_edit](efun/in_edit.html)
 * [in_input](efun/in_input.html)
-* [index](efun/index.html)
 * [inherit_list](efun/inherit_list.html)
 * [inherits](efun/inherits.html)
 * [input_to](efun/input_to.html)

@@ -1,0 +1,4944 @@
+[
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "function"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "async_read",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ],
+            [
+                "int"
+            ],
+            [
+                "function"
+            ]
+        ],
+        "max_args": 4,
+        "min_args": 4,
+        "name": "async_write",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "function"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "async_getdir",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ],
+            [
+                "string"
+            ],
+            [
+                "string",
+                "function"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 3,
+        "name": "async_db_exec",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 1,
+        "name": "compress_file",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 1,
+        "name": "uncompress_file",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "buffer"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "compress",
+        "returns": "buffer",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "buffer"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "uncompress",
+        "returns": "buffer",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "remove_shadow",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "query_notify_fail",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "named_livings",
+        "returns": "object *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "copy",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "functions",
+        "returns": "mixed *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "variables",
+        "returns": "mixed *",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "heart_beats",
+        "returns": "object *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "mapping"
+            ],
+            [
+                "int"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 4,
+        "min_args": 2,
+        "name": "terminal_colour",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "pluralize",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "file_length",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "upper_case",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ],
+            [
+                "string *"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 1,
+        "name": "replaceable",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 0,
+        "name": "program_info",
+        "returns": "mapping",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "mixed"
+            ],
+            [
+                "object"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 2,
+        "name": "store_variable",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "object"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 1,
+        "name": "fetch_variable",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "remove_interactive",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 0,
+        "name": "query_ip_port",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "zonetime",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "is_daylight_savings_time",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "debug_message",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "function"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "function_owner",
+        "returns": "object",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "repeat_string",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "memory_summary",
+        "returns": "mapping",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 0,
+        "name": "query_replaced_program",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "network_stats",
+        "returns": "mapping",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "real_time",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "compressedp",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object",
+                "object *"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 2,
+        "name": "event",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "query_num",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "base_name",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "get_garbage",
+        "returns": "object *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "num_classes",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed *"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "assemble_class",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "disassemble_class",
+        "returns": "mixed *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "fetch_class_member",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ],
+            [
+                "int"
+            ],
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 3,
+        "name": "store_class_member",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed *"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "shuffle",
+        "returns": "mixed *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed *"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "element_of",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed *"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "max",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed *"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "min",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int",
+                "float"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "abs",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ],
+            [
+                "int"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 3,
+        "name": "roll_MdN",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "string_difference",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "query_charmode",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "remove_charmode",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "remove_get_char",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "send_nullbyte",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "restore_from_string",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "classes",
+        "returns": "mixed *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "test_load",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object",
+                "string",
+                "object *"
+            ],
+            [
+                "string",
+                "mixed *"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 2,
+        "name": "_call_other",
+        "returns": "unknown",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 1,
+        "name": "_evaluate",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "_this_object",
+        "returns": "object",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "float",
+                "int",
+                "buffer"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "_to_int",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "float",
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "_to_float",
+        "returns": "float",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 1,
+        "name": "_new",
+        "returns": "object",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object",
+                "string",
+                "object *"
+            ],
+            [
+                "string",
+                "mixed *"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 2,
+        "name": "call_other",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 1,
+        "name": "evaluate",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "this_object",
+        "returns": "object",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "float",
+                "int",
+                "buffer"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "to_int",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "float",
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "to_float",
+        "returns": "float",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 1,
+        "name": "clone_object",
+        "returns": "object",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "function"
+            ],
+            [
+                "object"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "bind",
+        "returns": "function",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "this_player",
+        "returns": "object",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "this_interactive",
+        "returns": "object",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "this_user",
+        "returns": "object",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "previous_object",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "all_previous_objects",
+        "returns": "object *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "call_stack",
+        "returns": "mixed *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "sizeof",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "strlen",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "destruct",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "file_name",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "capitalize",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "explode",
+        "returns": "string *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "explode_reversible",
+        "returns": "string *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed *"
+            ],
+            [
+                "string",
+                "function"
+            ],
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 2,
+        "name": "implode",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "function"
+            ],
+            [
+                "int",
+                "float"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 2,
+        "name": "call_out",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "function"
+            ],
+            [
+                "int",
+                "float"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 2,
+        "name": "call_out_walltime",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "call_out_info",
+        "returns": "mixed *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int",
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "find_call_out",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int",
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 0,
+        "name": "remove_call_out",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ],
+            [
+                "string",
+                "mixed *"
+            ],
+            [
+                "int"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 4,
+        "min_args": 2,
+        "name": "member_array",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "function"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 1,
+        "name": "input_to",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "random",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "secure_random",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "function"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "defer",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 0,
+        "name": "environment",
+        "returns": "object",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "all_inventory",
+        "returns": "object *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object",
+                "object *",
+                "function"
+            ],
+            [
+                "function"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 1,
+        "name": "deep_inventory",
+        "returns": "object *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object",
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "first_inventory",
+        "returns": "object",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "next_inventory",
+        "returns": "object",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "object",
+                "object *"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 1,
+        "name": "say",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object",
+                "string"
+            ],
+            [
+                "string",
+                "object",
+                "int",
+                "float"
+            ],
+            [
+                "object",
+                "object *"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 2,
+        "name": "tell_room",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object",
+                "string"
+            ],
+            [
+                "object"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 1,
+        "name": "present",
+        "returns": "object",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object",
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "move_object",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "function"
+            ],
+            [
+                "string",
+                "string *"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 2,
+        "name": "add_action",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "query_verb",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "command",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "remove_action",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "living",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "commands",
+        "returns": "mixed *",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "disable_commands",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "enable_commands",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "set_living_name",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "livings",
+        "returns": "object *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "find_living",
+        "returns": "object",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "find_player",
+        "returns": "object",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "function"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "notify_fail",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "lower_case",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 3,
+        "name": "replace_string",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 1,
+        "name": "restore_object",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "int"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 0,
+        "name": "save_object",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "save_variable",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "restore_variable",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "users",
+        "returns": "object *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "get_dir",
+        "returns": "mixed *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string",
+                "int"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 3,
+        "name": "strsrch",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "write",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "tell_object",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "shout",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "buffer"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "receive",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ],
+            [
+                "mixed"
+            ],
+            [
+                "string",
+                "string *",
+                "object",
+                "object *"
+            ],
+            [
+                "object",
+                "object *"
+            ]
+        ],
+        "max_args": 4,
+        "min_args": 3,
+        "name": "message",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "find_object",
+        "returns": "object",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "load_object",
+        "returns": "object",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int",
+                "mixed *"
+            ],
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 1,
+        "name": "allocate_mapping",
+        "returns": "mapping",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mapping"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "values",
+        "returns": "mixed *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mapping"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "keys",
+        "returns": "mixed *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mapping"
+            ],
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "map_delete",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mapping"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "match_path",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "clonep",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "intp",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "undefinedp",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "nullp",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "floatp",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "stringp",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "virtualp",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "functionp",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "pointerp",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "arrayp",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "objectp",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "classp",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "typeof",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "bufferp",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "allocate_buffer",
+        "returns": "buffer",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "object"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "inherits",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "replace_program",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "string *"
+            ],
+            [
+                "string"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 2,
+        "name": "regexp",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string *"
+            ],
+            [
+                "mixed *"
+            ],
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 4,
+        "min_args": 3,
+        "name": "reg_assoc",
+        "returns": "mixed *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ],
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 1,
+        "name": "allocate",
+        "returns": "mixed *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "buffer"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "crc32",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "buffer"
+            ],
+            [
+                "int"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 1,
+        "name": "read_buffer",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "buffer"
+            ],
+            [
+                "int"
+            ],
+            [
+                "string",
+                "buffer",
+                "int"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 3,
+        "name": "write_buffer",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 3,
+        "name": "write_file",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "rename",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "int"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 3,
+        "name": "write_bytes",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "file_size",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "int"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 1,
+        "name": "read_bytes",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "int"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 1,
+        "name": "read_file",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "cp",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "link",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "mkdir",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "rm",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "rmdir",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "clear_bit",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "test_bit",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "set_bit",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "next_bit",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string",
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "crypt",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string",
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "oldcrypt",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "time",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "strftime",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "strptime",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 0,
+        "name": "ctime",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "localtime",
+        "returns": "mixed *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ],
+            [
+                "object"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "exec",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "object"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 1,
+        "name": "function_exists",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "function"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 0,
+        "name": "objects",
+        "returns": "object *",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "query_host_name",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "query_idle",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 0,
+        "name": "query_ip_name",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 0,
+        "name": "query_ip_number",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ],
+            [
+                "object"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 1,
+        "name": "snoop",
+        "returns": "object",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "query_snoop",
+        "returns": "object",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "query_snooping",
+        "returns": "object",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "set_heart_beat",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "query_heart_beat",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "set_hide",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 1,
+        "name": "set_reset",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "shadow",
+        "returns": "object",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "query_shadowing",
+        "returns": "object",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed *"
+            ],
+            [
+                "int",
+                "string",
+                "function"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 2,
+        "name": "sort_array",
+        "returns": "mixed *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "throw",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed *"
+            ],
+            [
+                "string",
+                "function"
+            ],
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 2,
+        "name": "unique_array",
+        "returns": "mixed *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed *"
+            ],
+            [
+                "string",
+                "function"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 2,
+        "name": "unique_mapping",
+        "returns": "mapping",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "deep_inherit_list",
+        "returns": "string *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "shallow_inherit_list",
+        "returns": "string *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "inherit_list",
+        "returns": "string *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 1,
+        "name": "printf",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 1,
+        "name": "sprintf",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "mapp",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "stat",
+        "returns": "mixed *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "interactive",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "has_mxp",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "has_zmp",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string *"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "send_zmp",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "has_gmcp",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "send_gmcp",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "in_edit",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "in_input",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "userp",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "enable_wizard",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "disable_wizard",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "wizardp",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "master",
+        "returns": "object",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 0,
+        "name": "memory_info",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "get_config",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ],
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "set_config",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "query_privs",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ],
+            [
+                "int",
+                "string"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "set_privs",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "function"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 1,
+        "name": "get_char",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "children",
+        "returns": "object *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "reload_object",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "error",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "uptime",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "strcmp",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "rusage",
+        "returns": "mapping",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 0,
+        "name": "flush_messages",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string",
+                "int"
+            ],
+            [
+                "string",
+                "int"
+            ],
+            [
+                "int"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 5,
+        "min_args": 0,
+        "name": "ed",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "cache_stats",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "mixed *",
+                "mapping"
+            ],
+            [
+                "string",
+                "function"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 2,
+        "name": "filter",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed *"
+            ],
+            [
+                "string",
+                "function"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 2,
+        "name": "filter_array",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mapping"
+            ],
+            [
+                "string",
+                "function"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 2,
+        "name": "filter_mapping",
+        "returns": "mapping",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "mapping",
+                "mixed *"
+            ],
+            [
+                "string",
+                "function"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 2,
+        "name": "map",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mapping"
+            ],
+            [
+                "string",
+                "function"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 2,
+        "name": "map_mapping",
+        "returns": "mapping",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed *"
+            ],
+            [
+                "string",
+                "function"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 2,
+        "name": "map_array",
+        "returns": "mixed *",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "malloc_status",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "mud_status",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 0,
+        "name": "dumpallobj",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "dump_file_descriptors",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "query_load_average",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "set_light",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "origin",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "reclaim_objects",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "set_eval_limit",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "reset_eval_cost",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "eval_cost",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "max_eval_cost",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int",
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "set_debug_level",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "debug_levels",
+        "returns": "mapping",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "clear_debug_level",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string",
+                "function"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "resolve",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 0,
+        "name": "set_encoding",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "query_encoding",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "buffer"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "string_decode",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "string_encode",
+        "returns": "buffer",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "buffer"
+            ],
+            [
+                "string"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 3,
+        "name": "buffer_transcode",
+        "returns": "buffer",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "act_mxp",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "request_term_type",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "start_request_term_type",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 0,
+        "name": "request_term_size",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "telnet_nop",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "telnet_ga",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "telnet_msp_oob",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 0,
+        "name": "shutdown",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "dump_trace",
+        "returns": "mixed *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "strwidth",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "trace_start",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "trace_end",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "perf_counter_ns",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "time_ns",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "sys_network_ports",
+        "returns": "mixed *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "sys_reload_tls",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "hash",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "db_close",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "db_commit",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ],
+            [
+                "string"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 4,
+        "min_args": 2,
+        "name": "db_connect",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "db_exec",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "db_fetch",
+        "returns": "mixed *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "db_rollback",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            []
+        ],
+        "max_args": 1,
+        "min_args": 0,
+        "name": "db_status",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ],
+            [
+                "object"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "debug_info",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "refs",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "destructed_objects",
+        "returns": "mixed *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 1,
+        "name": "dump_prog",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "debugmalloc",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "set_malloc_mask",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "check_memory",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "dump_stralloc",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "traceprefix",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "trace",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "dump_jemalloc",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ],
+            [
+                "string",
+                "string *"
+            ],
+            [
+                "string",
+                "function"
+            ],
+            [
+                "string",
+                "function"
+            ],
+            [
+                "string",
+                "function"
+            ]
+        ],
+        "max_args": 5,
+        "min_args": 4,
+        "name": "external_start",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "float"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "cos",
+        "returns": "float",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "float"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "sin",
+        "returns": "float",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "float"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "tan",
+        "returns": "float",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "float"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "asin",
+        "returns": "float",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "float"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "acos",
+        "returns": "float",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "float"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "atan",
+        "returns": "float",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "float",
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "sqrt",
+        "returns": "float",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "float"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "log",
+        "returns": "float",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "float",
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "log10",
+        "returns": "float",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "float",
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "log2",
+        "returns": "float",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "float",
+                "int"
+            ],
+            [
+                "float",
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "pow",
+        "returns": "float",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "float"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "exp",
+        "returns": "float",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "float"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "floor",
+        "returns": "float",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "float"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "ceil",
+        "returns": "float",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "float"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "round",
+        "returns": "float",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int *",
+                "float *"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "norm",
+        "returns": "float",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int *",
+                "float *"
+            ],
+            [
+                "int *",
+                "float *"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "dotprod",
+        "returns": "float",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int *",
+                "float *"
+            ],
+            [
+                "int *",
+                "float *"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "distance",
+        "returns": "float",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int *",
+                "float *"
+            ],
+            [
+                "int *",
+                "float *"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "angle",
+        "returns": "float",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "id_matrix",
+        "returns": "float *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "float *"
+            ],
+            [
+                "float"
+            ],
+            [
+                "float"
+            ],
+            [
+                "float"
+            ]
+        ],
+        "max_args": 4,
+        "min_args": 4,
+        "name": "translate",
+        "returns": "float *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "float *"
+            ],
+            [
+                "float"
+            ],
+            [
+                "float"
+            ],
+            [
+                "float"
+            ]
+        ],
+        "max_args": 4,
+        "min_args": 4,
+        "name": "scale",
+        "returns": "float *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "float *"
+            ],
+            [
+                "float"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "rotate_x",
+        "returns": "float *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "float *"
+            ],
+            [
+                "float"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "rotate_y",
+        "returns": "float *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "float *"
+            ],
+            [
+                "float"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "rotate_z",
+        "returns": "float *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "float *"
+            ],
+            [
+                "float"
+            ],
+            [
+                "float"
+            ],
+            [
+                "float"
+            ]
+        ],
+        "max_args": 4,
+        "min_args": 4,
+        "name": "lookat_rotate",
+        "returns": "float *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "float *"
+            ],
+            [
+                "float"
+            ],
+            [
+                "float"
+            ],
+            [
+                "float"
+            ],
+            [
+                "float"
+            ],
+            [
+                "float"
+            ],
+            [
+                "float"
+            ]
+        ],
+        "max_args": 7,
+        "min_args": 7,
+        "name": "lookat_rotate2",
+        "returns": "float *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 0,
+        "name": "domain_stats",
+        "returns": "mapping",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "set_author",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 0,
+        "name": "author_stats",
+        "returns": "mapping",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "parse_init",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "parse_refresh",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "int"
+            ],
+            [
+                "object *"
+            ],
+            [
+                "mapping"
+            ]
+        ],
+        "max_args": 4,
+        "min_args": 1,
+        "name": "parse_sentence",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "parse_add_rule",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "parse_remove",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 2,
+        "name": "parse_add_synonym",
+        "returns": "void",
+        "type": "efun"
+    },
+    {
+        "args_types": [],
+        "max_args": 0,
+        "min_args": 0,
+        "name": "parse_dump",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ],
+            [
+                "string"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 2,
+        "name": "parse_my_rules",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            []
+        ],
+        "max_args": 1,
+        "min_args": 0,
+        "name": "pcre_version",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "string *"
+            ],
+            [
+                "string"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 2,
+        "name": "pcre_match",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "pcre_match_all",
+        "returns": "mixed",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string *"
+            ],
+            [
+                "mixed *"
+            ],
+            [
+                "mixed"
+            ]
+        ],
+        "max_args": 4,
+        "min_args": 3,
+        "name": "pcre_assoc",
+        "returns": "mixed *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "pcre_extract",
+        "returns": "string *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ],
+            [
+                "string *"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 3,
+        "name": "pcre_replace",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ],
+            [
+                "string",
+                "function"
+            ]
+        ],
+        "max_args": -1,
+        "min_args": 3,
+        "name": "pcre_replace_callback",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            []
+        ],
+        "max_args": 1,
+        "min_args": 0,
+        "name": "pcre_cache",
+        "returns": "mapping",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "buffer"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "sha1",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ],
+            [
+                "string",
+                "function"
+            ],
+            [
+                "string",
+                "function"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 2,
+        "name": "socket_create",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ],
+            [
+                "int"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 2,
+        "name": "socket_bind",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ],
+            [
+                "string",
+                "function"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "socket_listen",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ],
+            [
+                "string",
+                "function"
+            ],
+            [
+                "string",
+                "function"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 3,
+        "name": "socket_accept",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ],
+            [
+                "string"
+            ],
+            [
+                "string",
+                "function"
+            ],
+            [
+                "string",
+                "function"
+            ]
+        ],
+        "max_args": 4,
+        "min_args": 4,
+        "name": "socket_connect",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ],
+            [
+                "mixed"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 2,
+        "name": "socket_write",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "socket_close",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ],
+            [
+                "object"
+            ],
+            [
+                "string",
+                "function"
+            ]
+        ],
+        "max_args": 3,
+        "min_args": 3,
+        "name": "socket_release",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ],
+            [
+                "string",
+                "function"
+            ],
+            [
+                "string",
+                "function"
+            ],
+            [
+                "string",
+                "function"
+            ]
+        ],
+        "max_args": 4,
+        "min_args": 4,
+        "name": "socket_acquire",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "socket_error",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int",
+                "object"
+            ],
+            [
+                "int"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 2,
+        "name": "socket_address",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 0,
+        "name": "socket_status",
+        "returns": "mixed *",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 1,
+        "name": "trim",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 1,
+        "name": "ltrim",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string"
+            ],
+            [
+                "string"
+            ]
+        ],
+        "max_args": 2,
+        "min_args": 1,
+        "name": "rtrim",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "export_uid",
+        "returns": "int",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "function",
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "geteuid",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "object"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "getuid",
+        "returns": "string",
+        "type": "efun"
+    },
+    {
+        "args_types": [
+            [
+                "string",
+                "int"
+            ]
+        ],
+        "max_args": 1,
+        "min_args": 1,
+        "name": "seteuid",
+        "returns": "int",
+        "type": "efun"
+    }
+]

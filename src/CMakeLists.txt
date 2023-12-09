@@ -287,6 +287,10 @@ set(GENERATRED_SOURCE
   "${CMAKE_CURRENT_BINARY_DIR}/options.autogen.h"
   )
 
+set(GENERATRED_DOCS
+  "${CMAKE_CURRENT_BINARY_DIR}/keywords.json"
+)
+
 add_custom_command(
   OUTPUT "applies_table.autogen.cc" "applies_table.autogen.h"
   COMMAND "build_applies" "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -314,6 +318,12 @@ add_custom_command(
   OUTPUT "options.autogen.h"
   COMMAND "make_options_defs" "-I${CMAKE_CURRENT_BINARY_DIR}" "-I${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/base/internal/options_incl.h"
   DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/base/internal/options_incl.h"
+)
+
+add_custom_command(
+  OUTPUT "keywords.json"
+  COMMAND "generate_keywords"
+  DEPENDS "generate_keywords" "${CMAKE_CURRENT_BINARY_DIR}/efuns.autogen.h"
 )
 
 find_package(BISON 3.8)
@@ -502,6 +512,9 @@ target_link_libraries(lpcc PUBLIC ${FLUFFOS_LINK})
 add_executable(symbol "main_symbol.cc")
 target_link_libraries(symbol PUBLIC ${FLUFFOS_LINK})
 
+add_executable(generate_keywords "main_generate_keywords.cc")
+target_link_libraries(generate_keywords PUBLIC ${FLUFFOS_LINK})
+
 include(helper)
 
 message(STATUS "Final Compile Flags for libdriver: ")
@@ -509,6 +522,9 @@ print_iterface_target_properties(libdriver)
 
 message(STATUS "Final Compile Flags for driver: ")
 print_target_properties(driver)
+
+install(TARGETS ${GENERATED_DOCS}
+        RUNTIME DESTINATION bin)
 
 install(TARGETS driver lpcc
   RUNTIME DESTINATION bin)
