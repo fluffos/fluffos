@@ -207,6 +207,7 @@ title: EFUN
 * [query_load_average](internals/query_load_average.html)
 * [refs](internals/refs.html)
 * [rusage](internals/rusage.html)
+* [set_config](internals/set_config.html)
 * [set_debug_level](internals/set_debug_level.html)
 * [set_malloc_mask](internals/set_malloc_mask.html)
 * [swap](internals/swap.html)
