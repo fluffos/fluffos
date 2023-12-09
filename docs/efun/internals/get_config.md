@@ -20,10 +20,10 @@ title: internals / get_config
 
 ### EXAMPLE
 
-    ```c
-    get_config( __RC_HEARTBEAT_INTERVAL_MSEC__ );
-    get_config( __RC_CALL_OUT_ZERO_NEST_LEVEL__ );
-    ```
+```c
+get_config( __RC_HEARTBEAT_INTERVAL_MSEC__ );
+get_config( __RC_CALL_OUT_ZERO_NEST_LEVEL__ );
+```
 
 
 ### SEE ALSO
