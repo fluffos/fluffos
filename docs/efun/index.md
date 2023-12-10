@@ -147,7 +147,6 @@ title: EFUN
 * [clear_debug_level](general/clear_debug_level.html)
 * [compress](general/compress.html)
 * [compress_file](general/compress_file.html)
-* [debug_levels](general/debug_levels.html)
 * [destructed_objects](general/destructed_objects.html)
 * [distance](general/distance.html)
 * [dotprod](general/dotprod.html)
@@ -235,6 +234,7 @@ title: EFUN
 ## internals
 * [cache_stats](internals/cache_stats.html)
 * [debug_info](internals/debug_info.html)
+* [debug_levels](internals/debug_levels.html)
 * [debugmalloc](internals/debugmalloc.html)
 * [dump_file_descriptors](internals/dump_file_descriptors.html)
 * [dump_prog](internals/dump_prog.html)

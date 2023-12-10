@@ -9,7 +9,6 @@ title: general
 * [clear_debug_level](clear_debug_level.html)
 * [compress](compress.html)
 * [compress_file](compress_file.html)
-* [debug_levels](debug_levels.html)
 * [destructed_objects](destructed_objects.html)
 * [distance](distance.html)
 * [dotprod](dotprod.html)
