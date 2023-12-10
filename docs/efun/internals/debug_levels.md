@@ -44,4 +44,4 @@ title: internals / debug_levels
 ```
 ### SEE ALSO
 
-    set_debug_level()
+    clear_debug_level(), set_debug_level()
