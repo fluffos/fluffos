@@ -4,6 +4,7 @@ title: internals
 ---
 * [cache_stats](cache_stats.html)
 * [debug_info](debug_info.html)
+* [debug_levels](debug_levels.html)
 * [debugmalloc](debugmalloc.html)
 * [dump_file_descriptors](dump_file_descriptors.html)
 * [dump_prog](dump_prog.html)

@@ -13,6 +13,8 @@ title: interactive
 * [find_player](find_player.html)
 * [get_char](get_char.html)
 * [has_gmcp](has_gmcp.html)
+* [has_mxp](has_mxp.html)
+* [has_zmp](has_zmp.html)
 * [in_edit](in_edit.html)
 * [in_input](in_input.html)
 * [input_to](input_to.html)
