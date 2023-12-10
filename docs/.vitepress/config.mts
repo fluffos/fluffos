@@ -3,14 +3,18 @@ import SIDEBAR from "./sidebar";
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
+  lang: 'en-US',
   title: "FluffOS Docs",
   description: "Docs for FluffOS Project",
+  lastUpdated: true,
+  sitemap: {
+    hostname: 'https://www.fluffos.info'
+  },
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
     nav: [
       { text: 'Github', link: 'https://github.com/fluffos/fluffos' }
     ],
-
     sidebar: SIDEBAR,
     search: {
       provider: 'local',
@@ -42,12 +46,8 @@ export default defineConfig({
     socialLinks: [
       { icon: 'github', link: 'https://github.com/fluffos/fluffos' }
     ],
-    lastUpdated: true,
     editLink: {
       pattern: 'https://github.com/fluffos/fluffos/edit/master/docs/:path'
     },
-    sitemap: {
-       hostname: 'https://www.fluffos.info'
-     },
   }
 })
