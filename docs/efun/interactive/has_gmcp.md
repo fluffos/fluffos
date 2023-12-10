@@ -11,7 +11,7 @@ title: interactive / has_gmcp
 
 ### SYNOPSIS
 
-    int has_gmcp( object ob );
+    int has_gmcp( object user );
 
 ### DESCRIPTION
 
@@ -20,4 +20,4 @@ title: interactive / has_gmcp
 
 ### SEE ALSO
 
-    gmcp_enable(4), gmcp(4), send_gmcp(3)
+    gmcp_enable(4), gmcp(4), send_gmcp(3), has_zmp(), has_mxp()
