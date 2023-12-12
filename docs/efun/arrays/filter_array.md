@@ -10,7 +10,7 @@ title: arrays / filter_array
 
 ### SYNOPSIS
 ```c
-mixed *filter_array( mixed *arr, string fun, object ob, mixed extra, ... );
+mixed *filter_array( mixed *arr, string fun, object|string ob, mixed extra, ... );
 mixed *filter_array( mixed *arr, function f, mixed extra, ...);
 ```
 ### DESCRIPTION
@@ -26,5 +26,4 @@ mixed *filter_array( mixed *arr, function f, mixed extra, ...);
 
 ### SEE ALSO
 
-    sort_array(3), map_array(3)
-
+    sort_array(), map_array(), filter(), map()
