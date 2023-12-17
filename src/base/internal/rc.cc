@@ -105,22 +105,6 @@ const FlagEntry INT_FLAGS[] = {
     {"enable msp", __RC_ENABLE_MSP__, 1},
 };
 
-void config_init() {
-  int i;
-
-  for (i = 0; i < NUM_CONFIG_INTS; i++) {
-    config_int[i] = 0;
-  }
-  for (i = 0; i < NUM_CONFIG_STRS; i++) {
-    config_str[i] = nullptr;
-  }
-
-  // populate default value for int flags.
-  for (const auto &flag : INT_FLAGS) {
-    CONFIG_INT(flag.pos) = flag.defaultValue;
-  }
-}
-
 /*
  * If the required flag is 0, it will only give a warning if the line is
  * missing from the config file.  Otherwise, it will give an error and exit
@@ -185,6 +169,22 @@ bool scan_config_line(const char *fmt, void *dest, int required) {
 }
 
 }  // namespace
+
+void config_init() {
+  int i;
+
+  for (i = 0; i < NUM_CONFIG_INTS; i++) {
+    config_int[i] = 0;
+  }
+  for (i = 0; i < NUM_CONFIG_STRS; i++) {
+    config_str[i] = nullptr;
+  }
+
+  // populate default value for int flags.
+  for (const auto &flag : INT_FLAGS) {
+    CONFIG_INT(flag.pos) = flag.defaultValue;
+  }
+}
 
 void read_config(const char *filename) {
   config_init();

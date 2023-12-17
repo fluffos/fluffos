@@ -166,7 +166,7 @@ void int_free_svalue(svalue_t *v)
 /*
  * Converts any LPC datatype into json format, only value types are supported.
  */
-constexpr int _max_depth = 10;
+constexpr int _max_depth = 256;
 json svalue_to_json_summary(const svalue_t *obj, int depth) {
   /* prevent an infinite recursion on self-referential structures */
   if (depth >= _max_depth) {
