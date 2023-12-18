@@ -233,6 +233,7 @@ add_subdirectory(thirdparty/fmt EXCLUDE_FROM_ALL)
 include_directories(thirdparty/fmt/include)
 include_directories(AFTER SYSTEM thirdparty/json/include)
 add_subdirectory(thirdparty/backward-cpp EXCLUDE_FROM_ALL)
+include_directories(AFTER SYSTEM thirdparty/argparse/include)
 
 set(DISABLE_WERROR ON CACHE BOOL "" FORCE)
 set(LWS_WITH_SHARED OFF CACHE BOOL "" FORCE)
@@ -352,6 +353,7 @@ set(SRC
   "mainlib.cc"
   "user.cc"
   "symbol.cc"
+  "ofile.cc"
   "net/msp.cc"
   "net/tls.cc"
   "net/telnet.cc"
@@ -515,6 +517,12 @@ target_link_libraries(symbol PUBLIC ${FLUFFOS_LINK})
 add_executable(generate_keywords "main_generate_keywords.cc")
 target_link_libraries(generate_keywords PUBLIC ${FLUFFOS_LINK})
 
+add_executable(o2json "main_o2json.cc")
+target_link_libraries(o2json PUBLIC ${FLUFFOS_LINK})
+
+add_executable(json2o "main_json2o.cc")
+target_link_libraries(json2o PUBLIC ${FLUFFOS_LINK})
+
 include(helper)
 
 message(STATUS "Final Compile Flags for libdriver: ")
@@ -526,7 +534,7 @@ print_target_properties(driver)
 install(TARGETS ${GENERATED_DOCS}
         RUNTIME DESTINATION bin)
 
-install(TARGETS driver lpcc
+install(TARGETS driver lpcc symbol o2json json2o
   RUNTIME DESTINATION bin)
 
 # LPC stdlib files

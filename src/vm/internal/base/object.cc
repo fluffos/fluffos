@@ -226,6 +226,11 @@ void save_svalue(svalue_t *v, char **buf) {
       *(*buf) = '\0';
       return;
     }
+    case T_OBJECT:
+      // ignored
+      break;
+    default:
+      debug_message("save_svalue: unknown type %d ignored.", v->type);
   }
 }
 
@@ -518,11 +523,14 @@ static int restore_interior_string(char **val, svalue_t *sv) {
 
 static int parse_numeric(char **cpp, unsigned char c, svalue_t *dest) {
   char *cp = *cpp;
-  LPC_FLOAT res, neg;
+  LPC_INT res_int = 0;
+  LPC_FLOAT res_float = 0;
+  int neg = 0;
 
   if (c == '-') {
     neg = 1;
-    res = 0;
+    res_int = 0;
+    res_float = 0;
     c = *cp++;
     if (!isdigit(c)) {
       return 0;
@@ -530,11 +538,15 @@ static int parse_numeric(char **cpp, unsigned char c, svalue_t *dest) {
   } else {
     neg = 0;
   }
-  res = c - '0';
+  res_int = c - '0';
+  res_float = c - '0';
 
   while ((c = *cp++) && isdigit(c)) {
-    res *= 10;
-    res += c - '0';
+    res_int *= 10;
+    res_int += c - '0';
+
+    res_float *= 10;
+    res_float += c - '0';
   }
   if (c == '.') {
     LPC_FLOAT f1 = 0.0, f2 = 10.0;
@@ -553,7 +565,7 @@ static int parse_numeric(char **cpp, unsigned char c, svalue_t *dest) {
       f2 *= 10;
     } while ((c = *cp++) && isdigit(c));
 
-    f1 += res;
+    f1 += res_float;
     if (c == 'e') {
       int expo = 0;
 
@@ -587,13 +599,13 @@ static int parse_numeric(char **cpp, unsigned char c, svalue_t *dest) {
         expo *= 10;
         expo += (c - '0');
       }
-      f1 = res * pow(10.0, expo);
+      f1 = res_float * pow(10.0, expo);
     } else if (c == '-') {
       while ((c = *cp++) && isdigit(c)) {
         expo *= 10;
         expo += (c - '0');
       }
-      f1 = res * pow(10.0, -expo);
+      f1 = res_float * pow(10.0, -expo);
     } else {
       return 0;
     }
@@ -604,7 +616,7 @@ static int parse_numeric(char **cpp, unsigned char c, svalue_t *dest) {
     return 1;
   } else {
     dest->type = T_NUMBER;
-    dest->u.number = (neg ? -res : res);
+    dest->u.number = (neg ? -res_int : res_int);
     dest->subtype = 0;
     *cpp = cp;
     return 1;
@@ -1291,7 +1303,10 @@ void restore_object_from_line(object_t *ob, char *line, int noclear) {
   }
   (void)strncpy(var, line, space - line);
   var[space - line] = '\0';
-  idx = find_global_variable(current_object->prog, var, &t, 1);
+  idx = -1;
+  if (ob->prog) {
+    idx = find_global_variable(ob->prog, var, &t, 1);
+  }
   if (idx == -1) {
     push_number(0);
     rc = restore_svalue(space + 1, sp);
