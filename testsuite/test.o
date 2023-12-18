@@ -1,0 +1,5 @@
+#/single/tests/efuns/save_object.c
+y 9223372036854775807
+a "asdfas♇ ♈ ♉ab\\nnewline\return	vf㌀ ㌁ "
+b ({"asdfas♇ ♈ ♉ab\\nnewline\return	vf㌀ ㌁ ","asdfas♇ ♈ ♉ab\\nnewline\return	vf㌀ ㌁ ","asdfas♇ ♈ ♉ab\\nnewline\return	vf㌀ ㌁ ","asdfas♇ ♈ ♉ab\\nnewline\return	vf㌀ ㌁ ",})
+c ([({"asdfas♇ ♈ ♉ab\\nnewline\return	vf㌀ ㌁ ","asdfas♇ ♈ ♉ab\\nnewline\return	vf㌀ ㌁ ","asdfas♇ ♈ ♉ab\\nnewline\return	vf㌀ ㌁ ","asdfas♇ ♈ ♉ab\\nnewline\return	vf㌀ ㌁ ",}):({"asdfas♇ ♈ ♉ab\\nnewline\return	vf㌀ ㌁ ","asdfas♇ ♈ ♉ab\\nnewline\return	vf㌀ ㌁ ","asdfas♇ ♈ ♉ab\\nnewline\return	vf㌀ ㌁ ","asdfas♇ ♈ ♉ab\\nnewline\return	vf㌀ ㌁ ",}),"c":({"asdfas♇ ♈ ♉ab\\nnewline\return	vf㌀ ㌁ ","asdfas♇ ♈ ♉ab\\nnewline\return	vf㌀ ㌁ ","asdfas♇ ♈ ♉ab\\nnewline\return	vf㌀ ㌁ ","asdfas♇ ♈ ♉ab\\nnewline\return	vf㌀ ㌁ ",}),"a":"asdfas♇ ♈ ♉ab\\nnewline\return	vf㌀ ㌁ ",])
