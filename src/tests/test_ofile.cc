@@ -15,6 +15,7 @@ class OFileTest : public ::testing::Test {
     chdir(TESTSUITE_DIR);
 
     config_init();
+    init_strings();
   }
 };
 

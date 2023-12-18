@@ -1,5 +1,7 @@
 #include "base/std.h"
 
+#include "vm/vm.h"
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -7,23 +9,14 @@
 
 #include <argparse/argparse.hpp>
 
-#include "vm/internal/base/svalue.h"
-
 #include "ofile.h"
 
 int main(int argc, char** argv) {
-  // FIXME: config_init shouldn't be needed
+  // FIXME: shouldn't be needed
   config_init();
+  init_strings();
 
   argparse::ArgumentParser program("json2o");
-
-  program.add_argument("-pretty")
-      .help("pretty print json")
-      .flag();
-
-  program.add_argument("-ascii")
-      .help("ascii mode")
-      .flag();
 
   program.add_argument("json_file").help("json file to write");
   program.add_argument("o_file").help("o file to read");
