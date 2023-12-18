@@ -103,7 +103,7 @@ int func_present;
 int yyparse (void);
 
 
-#line 107 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 107 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
 
 # ifndef YY_CAST
 #  ifdef __cplusplus
@@ -2371,55 +2371,55 @@ yyreduce:
   case 2: /* all: program  */
 #line 215 "/home/sunyc/src/fluffos/src/compiler/internal/grammar.y"
           { rule_program((yyval.node)); }
-#line 2375 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2375 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 3: /* program: program def possible_semi_colon  */
 #line 219 "/home/sunyc/src/fluffos/src/compiler/internal/grammar.y"
                                   { CREATE_TWO_VALUES((yyval.node), 0, (yyvsp[-2].node), (yyvsp[-1].node)); }
-#line 2381 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2381 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 4: /* program: %empty  */
 #line 220 "/home/sunyc/src/fluffos/src/compiler/internal/grammar.y"
                         { (yyval.node) = 0; }
-#line 2387 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2387 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 6: /* possible_semi_colon: ';'  */
 #line 225 "/home/sunyc/src/fluffos/src/compiler/internal/grammar.y"
         { yywarn("Extra ';'. Ignored."); }
-#line 2393 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2393 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 7: /* inheritance: type_modifier_list L_INHERIT string_con1 ';'  */
 #line 229 "/home/sunyc/src/fluffos/src/compiler/internal/grammar.y"
                                                { if (rule_inheritence(&(yyval.node), (yyvsp[-3].number), (yyvsp[-1].string))) { YYACCEPT; } }
-#line 2399 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2399 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 8: /* real: L_REAL  */
 #line 233 "/home/sunyc/src/fluffos/src/compiler/internal/grammar.y"
          { CREATE_REAL((yyval.node), (yyvsp[0].real)); }
-#line 2405 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2405 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 9: /* number: L_NUMBER  */
 #line 237 "/home/sunyc/src/fluffos/src/compiler/internal/grammar.y"
            { CREATE_NUMBER((yyval.node), (yyvsp[0].number)); }
-#line 2411 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2411 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 10: /* optional_star: %empty  */
 #line 241 "/home/sunyc/src/fluffos/src/compiler/internal/grammar.y"
                         { (yyval.number) = 0; }
-#line 2417 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2417 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 11: /* optional_star: '*'  */
 #line 242 "/home/sunyc/src/fluffos/src/compiler/internal/grammar.y"
                 { (yyval.number) = TYPE_MOD_ARRAY; }
-#line 2423 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2423 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 12: /* block_or_semi: block  */
@@ -2430,43 +2430,43 @@ yyreduce:
               CREATE_RETURN((yyval.node), 0);
             }
           }
-#line 2434 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2434 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 13: /* block_or_semi: ';'  */
 #line 253 "/home/sunyc/src/fluffos/src/compiler/internal/grammar.y"
           { (yyval.node) = 0; }
-#line 2440 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2440 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 14: /* block_or_semi: error  */
 #line 254 "/home/sunyc/src/fluffos/src/compiler/internal/grammar.y"
           { (yyval.node) = 0; }
-#line 2446 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2446 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 15: /* identifier: L_DEFINED_NAME  */
 #line 258 "/home/sunyc/src/fluffos/src/compiler/internal/grammar.y"
                                   { (yyval.string) = scratch_copy((yyvsp[0].ihe)->name); }
-#line 2452 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2452 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 17: /* $@1: %empty  */
 #line 263 "/home/sunyc/src/fluffos/src/compiler/internal/grammar.y"
                                   { (yyvsp[-2].number) = rule_func_type((yyvsp[-2].number), (yyvsp[-1].number), (yyvsp[0].string)); }
-#line 2458 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2458 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 18: /* @2: %empty  */
 #line 264 "/home/sunyc/src/fluffos/src/compiler/internal/grammar.y"
                                   { (yyval.number) = rule_func_proto((yyvsp[-6].number), (yyvsp[-5].number), &(yyvsp[-4].string), (yyvsp[-1].argument)); }
-#line 2464 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2464 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 19: /* function: type optional_star identifier $@1 '(' argument ')' @2 block_or_semi  */
 #line 265 "/home/sunyc/src/fluffos/src/compiler/internal/grammar.y"
                                   { rule_func(&(yyval.node), (yyvsp[-8].number), (yyvsp[-7].number), (yyvsp[-6].string), (yyvsp[-3].argument), &(yyvsp[-1].number), &(yyvsp[0].node)); }
-#line 2470 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2470 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 21: /* def: type name_list ';'  */
@@ -2476,7 +2476,7 @@ yyreduce:
                                       yyerror("Missing type for global variable declaration");
                                     (yyval.node) = 0;
                                   }
-#line 2480 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2480 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 25: /* modifier_change: type_modifier_list ':'  */
@@ -2494,7 +2494,7 @@ yyreduce:
                                     global_modifiers = (yyvsp[-1].number);
                                     (yyval.node) = 0;
                                   }
-#line 2498 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2498 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 26: /* member_name: optional_star identifier  */
@@ -2508,25 +2508,25 @@ yyreduce:
                                     add_local_name((yyvsp[0].string), current_type | (yyvsp[-1].number));
                                     scratch_free((yyvsp[0].string));
                                   }
-#line 2512 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2512 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 30: /* $@3: %empty  */
 #line 318 "/home/sunyc/src/fluffos/src/compiler/internal/grammar.y"
                            { current_type = (yyvsp[0].number); }
-#line 2518 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2518 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 32: /* @4: %empty  */
 #line 323 "/home/sunyc/src/fluffos/src/compiler/internal/grammar.y"
                                              { (yyvsp[-2].ihe) = rule_define_class(&(yyval.number), (yyvsp[-1].string)); }
-#line 2524 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2524 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 33: /* type_decl: type_modifier_list L_CLASS identifier '{' @4 member_list '}'  */
 #line 324 "/home/sunyc/src/fluffos/src/compiler/internal/grammar.y"
                                              { rule_define_class_members((yyvsp[-5].ihe), (yyvsp[-2].number)); (yyval.node) = 0; }
-#line 2530 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2530 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 35: /* new_local_name: L_DEFINED_NAME  */
@@ -2537,7 +2537,7 @@ yyreduce:
                                               }
                                               (yyval.string) = scratch_copy((yyvsp[0].ihe)->name);
                                             }
-#line 2541 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2541 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 37: /* atomic_type: L_CLASS L_DEFINED_NAME  */
@@ -2550,7 +2550,7 @@ yyreduce:
                                                 (yyval.number) = (yyvsp[0].ihe)->dn.class_num | TYPE_MOD_CLASS;
                                               }
                                             }
-#line 2554 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2554 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 38: /* atomic_type: L_CLASS L_IDENTIFIER  */
@@ -2559,25 +2559,25 @@ yyreduce:
                                               yyerror("Undefined class '%s'", (yyvsp[0].string));
                                               (yyval.number) = TYPE_ANY;
                                             }
-#line 2563 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2563 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 40: /* opt_atomic_type: %empty  */
 #line 358 "/home/sunyc/src/fluffos/src/compiler/internal/grammar.y"
                         { (yyval.number) = TYPE_ANY; }
-#line 2569 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2569 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 42: /* basic_type: opt_atomic_type L_ARRAY  */
 #line 363 "/home/sunyc/src/fluffos/src/compiler/internal/grammar.y"
                             { (yyval.number) = (yyvsp[-1].number) | TYPE_MOD_ARRAY; }
-#line 2575 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2575 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 44: /* arg_type: basic_type ref  */
 #line 368 "/home/sunyc/src/fluffos/src/compiler/internal/grammar.y"
                    { (yyval.number) = (yyvsp[-1].number) | LOCAL_MOD_REF; }
-#line 2581 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2581 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 45: /* new_arg: arg_type optional_star  */
@@ -2587,7 +2587,7 @@ yyreduce:
                                                 if ((yyvsp[-1].number) != TYPE_VOID)
                                                   add_local_name("", (yyvsp[-1].number) | (yyvsp[0].number));
                                               }
-#line 2591 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2591 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 46: /* new_arg: arg_type optional_star new_local_name  */
@@ -2599,7 +2599,7 @@ yyreduce:
                                                 scratch_free((yyvsp[0].string));
                                                 (yyval.number) = (yyvsp[-2].number) | (yyvsp[-1].number);
                                               }
-#line 2603 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2603 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 47: /* new_arg: new_local_name  */
@@ -2612,7 +2612,7 @@ yyreduce:
                                                 scratch_free((yyvsp[0].string));
                                                 (yyval.number) = TYPE_ANY;
                                               }
-#line 2616 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2616 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 48: /* argument: %empty  */
@@ -2621,7 +2621,7 @@ yyreduce:
       (yyval.argument).num_arg = 0;
       (yyval.argument).flags = 0;
     }
-#line 2625 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2625 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 50: /* argument: argument_list L_DOT_DOT_DOT  */
@@ -2640,7 +2640,7 @@ yyreduce:
       if (lt != TYPE_ANY && !(lt & TYPE_MOD_ARRAY))
         yywarn("Variable to hold remainder of arguments should be an array.");
     }
-#line 2644 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2644 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 51: /* argument_list: new_arg  */
@@ -2655,7 +2655,7 @@ yyreduce:
       }
       (yyval.argument).flags = 0;
     }
-#line 2659 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2659 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 52: /* argument_list: argument_list ',' new_arg  */
@@ -2669,7 +2669,7 @@ yyreduce:
       (yyval.argument) = (yyvsp[-2].argument);
       (yyval.argument).num_arg++;
     }
-#line 2673 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2673 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 53: /* type_modifier_list: %empty  */
@@ -2677,7 +2677,7 @@ yyreduce:
             {
       (yyval.number) = 0;
     }
-#line 2681 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2681 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 54: /* type_modifier_list: L_TYPE_MODIFIER type_modifier_list  */
@@ -2695,7 +2695,7 @@ yyreduce:
       }
 #endif
     }
-#line 2699 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2699 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 55: /* type: type_modifier_list opt_basic_type  */
@@ -2704,7 +2704,7 @@ yyreduce:
       (yyval.number) = ((yyvsp[-1].number) << 16) | (yyvsp[0].number);
       current_type = (yyval.number);
     }
-#line 2708 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2708 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 56: /* cast: '(' basic_type optional_star ')'  */
@@ -2712,7 +2712,7 @@ yyreduce:
     {
       (yyval.number) = (yyvsp[-2].number) | (yyvsp[-1].number);
     }
-#line 2716 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2716 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 58: /* opt_basic_type: %empty  */
@@ -2720,7 +2720,7 @@ yyreduce:
             {
       (yyval.number) = TYPE_UNKNOWN;
     }
-#line 2724 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2724 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 61: /* new_name: optional_star identifier  */
@@ -2749,7 +2749,7 @@ yyreduce:
       define_new_variable((yyvsp[0].string), current_type | (yyvsp[-1].number));
       scratch_free((yyvsp[0].string));
     }
-#line 2753 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2753 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 62: /* new_name: optional_star identifier L_ASSIGN expr0  */
@@ -2805,7 +2805,7 @@ yyreduce:
           newnode, expr);
       scratch_free((yyvsp[-2].string));
     }
-#line 2809 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2809 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 63: /* block: '{' local_declarations statements '}'  */
@@ -2816,7 +2816,7 @@ yyreduce:
       } else (yyval.decl).node = ((yyvsp[-2].decl).node ? (yyvsp[-2].decl).node : (yyvsp[-1].node));
       (yyval.decl).num = (yyvsp[-2].decl).num;
     }
-#line 2820 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2820 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 67: /* local_declarations: %empty  */
@@ -2825,7 +2825,7 @@ yyreduce:
       (yyval.decl).node = 0;
       (yyval.decl).num = 0;
     }
-#line 2829 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2829 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 68: /* $@5: %empty  */
@@ -2838,7 +2838,7 @@ yyreduce:
        */
       current_type = (yyvsp[0].number);
     }
-#line 2842 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2842 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 69: /* local_declarations: local_declarations basic_type $@5 local_name_list ';'  */
@@ -2849,7 +2849,7 @@ yyreduce:
       } else (yyval.decl).node = ((yyvsp[-4].decl).node ? (yyvsp[-4].decl).node : (yyvsp[-1].decl).node);
       (yyval.decl).num = (yyvsp[-4].decl).num + (yyvsp[-1].decl).num;
     }
-#line 2853 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2853 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 70: /* new_local_def: optional_star new_local_name  */
@@ -2864,7 +2864,7 @@ yyreduce:
       scratch_free((yyvsp[0].string));
       (yyval.node) = 0;
     }
-#line 2868 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2868 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 71: /* new_local_def: optional_star new_local_name L_ASSIGN expr0  */
@@ -2899,7 +2899,7 @@ yyreduce:
           add_local_name((yyvsp[-2].string), current_type | (yyvsp[-3].number) | LOCAL_MOD_UNUSED));
       scratch_free((yyvsp[-2].string));
     }
-#line 2903 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2903 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 72: /* single_new_local_def: arg_type optional_star new_local_name  */
@@ -2911,7 +2911,7 @@ yyreduce:
       (yyval.number) = add_local_name((yyvsp[0].string), (yyvsp[-2].number) | (yyvsp[-1].number));
       scratch_free((yyvsp[0].string));
     }
-#line 2915 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2915 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 73: /* single_new_local_def_with_init: single_new_local_def L_ASSIGN expr0  */
@@ -2944,7 +2944,7 @@ yyreduce:
       CREATE_BINARY_OP((yyval.node), F_ASSIGN, 0, (yyvsp[0].node), 0);
       CREATE_OPCODE_1((yyval.node)->r.expr, F_LOCAL_LVALUE, 0, (yyvsp[-2].number));
     }
-#line 2948 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2948 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 74: /* local_name_list: new_local_def  */
@@ -2953,7 +2953,7 @@ yyreduce:
       (yyval.decl).node = (yyvsp[0].node);
       (yyval.decl).num = 1;
     }
-#line 2957 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2957 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 75: /* local_name_list: new_local_def ',' local_name_list  */
@@ -2964,7 +2964,7 @@ yyreduce:
       } else (yyval.decl).node = ((yyvsp[-2].node) ? (yyvsp[-2].node) : (yyvsp[0].decl).node);
       (yyval.decl).num = 1 + (yyvsp[0].decl).num;
     }
-#line 2968 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2968 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 76: /* statements: %empty  */
@@ -2972,7 +2972,7 @@ yyreduce:
             {
       (yyval.node) = 0;
     }
-#line 2976 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2976 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 77: /* statements: statement statements  */
@@ -2982,7 +2982,7 @@ yyreduce:
         CREATE_STATEMENTS((yyval.node), (yyvsp[-1].node), (yyvsp[0].node));
       } else (yyval.node) = ((yyvsp[-1].node) ? (yyvsp[-1].node) : (yyvsp[0].node));
     }
-#line 2986 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2986 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 78: /* statements: error ';'  */
@@ -2990,7 +2990,7 @@ yyreduce:
     {
       (yyval.node) = 0;
     }
-#line 2994 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 2994 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 79: /* statement: comma_expr ';'  */
@@ -3006,7 +3006,7 @@ yyreduce:
       }
 #endif
     }
-#line 3010 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3010 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 85: /* statement: decl_block  */
@@ -3015,7 +3015,7 @@ yyreduce:
       (yyval.node) = (yyvsp[0].decl).node;
       pop_n_locals((yyvsp[0].decl).num);
     }
-#line 3019 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3019 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 86: /* statement: ';'  */
@@ -3023,7 +3023,7 @@ yyreduce:
     {
       (yyval.node) = 0;
     }
-#line 3027 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3027 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 87: /* statement: L_BREAK ';'  */
@@ -3049,7 +3049,7 @@ yyreduce:
             (yyval.node) = 0;
           }
     }
-#line 3053 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3053 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 88: /* statement: L_CONTINUE ';'  */
@@ -3062,7 +3062,7 @@ yyreduce:
           yyerror("continue statement outside loop");
       CREATE_CONTROL_JUMP((yyval.node), CJ_CONTINUE);
     }
-#line 3066 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3066 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 89: /* $@6: %empty  */
@@ -3071,7 +3071,7 @@ yyreduce:
       (yyvsp[-3].number) = context;
       context = LOOP_CONTEXT;
     }
-#line 3075 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3075 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 90: /* while: L_WHILE '(' comma_expr ')' $@6 statement  */
@@ -3080,7 +3080,7 @@ yyreduce:
       CREATE_LOOP((yyval.node), 1, (yyvsp[0].node), 0, optimize_loop_test((yyvsp[-3].node)));
       context = (yyvsp[-5].number);
     }
-#line 3084 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3084 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 91: /* $@7: %empty  */
@@ -3089,7 +3089,7 @@ yyreduce:
       (yyvsp[0].number) = context;
       context = LOOP_CONTEXT;
     }
-#line 3093 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3093 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 92: /* do: L_DO $@7 statement L_WHILE '(' comma_expr ')' ';'  */
@@ -3098,7 +3098,7 @@ yyreduce:
       CREATE_LOOP((yyval.node), 0, (yyvsp[-5].node), 0, optimize_loop_test((yyvsp[-2].node)));
       context = (yyvsp[-7].number);
     }
-#line 3102 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3102 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 93: /* $@8: %empty  */
@@ -3108,7 +3108,7 @@ yyreduce:
       (yyvsp[-7].number) = context;
       context = LOOP_CONTEXT;
     }
-#line 3112 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3112 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 94: /* for: L_FOR '(' first_for_expr ';' for_expr ';' for_expr ')' $@8 statement  */
@@ -3128,7 +3128,7 @@ yyreduce:
 
       context = (yyvsp[-9].number);
     }
-#line 3132 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3132 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 95: /* foreach_var: L_DEFINED_NAME  */
@@ -3153,7 +3153,7 @@ yyreduce:
         }
       (yyval.decl).num = 0;
     }
-#line 3157 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3157 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 96: /* foreach_var: single_new_local_def  */
@@ -3167,7 +3167,7 @@ yyreduce:
       }
       (yyval.decl).num = 1;
     }
-#line 3171 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3171 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 97: /* foreach_var: L_IDENTIFIER  */
@@ -3185,7 +3185,7 @@ yyreduce:
       scratch_free((yyvsp[0].string));
       (yyval.decl).num = 0;
     }
-#line 3189 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3189 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 98: /* foreach_vars: foreach_var  */
@@ -3194,7 +3194,7 @@ yyreduce:
       CREATE_FOREACH((yyval.decl).node, (yyvsp[0].decl).node, 0);
       (yyval.decl).num = (yyvsp[0].decl).num;
     }
-#line 3198 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3198 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 99: /* foreach_vars: foreach_var ',' foreach_var  */
@@ -3205,7 +3205,7 @@ yyreduce:
       if ((yyvsp[-2].decl).node->v.number == F_REF_LVALUE)
         yyerror("Mapping key may not be a reference in foreach()");
     }
-#line 3209 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3209 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 100: /* $@9: %empty  */
@@ -3215,7 +3215,7 @@ yyreduce:
       (yyvsp[-5].number) = context;
       context = LOOP_CONTEXT | LOOP_FOREACH;
     }
-#line 3219 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3219 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 101: /* foreach: L_FOREACH '(' foreach_vars L_IN expr0 ')' $@9 statement  */
@@ -3229,7 +3229,7 @@ yyreduce:
 
       context = (yyvsp[-7].number);
     }
-#line 3233 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3233 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 102: /* for_expr: %empty  */
@@ -3237,7 +3237,7 @@ yyreduce:
             {
       (yyval.node) = 0;
     }
-#line 3241 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3241 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 104: /* first_for_expr: for_expr  */
@@ -3246,7 +3246,7 @@ yyreduce:
       (yyval.decl).node = (yyvsp[0].node);
       (yyval.decl).num = 0;
     }
-#line 3250 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3250 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 105: /* first_for_expr: single_new_local_def_with_init  */
@@ -3255,7 +3255,7 @@ yyreduce:
       (yyval.decl).node = (yyvsp[0].node);
       (yyval.decl).num = 1;
     }
-#line 3259 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3259 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 106: /* $@10: %empty  */
@@ -3266,7 +3266,7 @@ yyreduce:
       context |= SWITCH_CONTEXT;
       (yyvsp[-2].number) = mem_block[A_CASES].current_size;
     }
-#line 3270 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3270 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 107: /* switch: L_SWITCH '(' comma_expr ')' $@10 '{' local_declarations case switch_block '}'  */
@@ -3299,7 +3299,7 @@ yyreduce:
         (yyval.node) = node2;
         pop_n_locals((yyvsp[-3].decl).num);
       }
-#line 3303 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3303 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 108: /* switch_block: case switch_block  */
@@ -3309,7 +3309,7 @@ yyreduce:
         CREATE_STATEMENTS((yyval.node), (yyvsp[-1].node), (yyvsp[0].node));
       } else (yyval.node) = (yyvsp[-1].node);
     }
-#line 3313 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3313 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 109: /* switch_block: statement switch_block  */
@@ -3319,7 +3319,7 @@ yyreduce:
         CREATE_STATEMENTS((yyval.node), (yyvsp[-1].node), (yyvsp[0].node));
       } else (yyval.node) = (yyvsp[-1].node);
     }
-#line 3323 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3323 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 110: /* switch_block: %empty  */
@@ -3327,7 +3327,7 @@ yyreduce:
             {
       (yyval.node) = 0;
     }
-#line 3331 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3331 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 111: /* case: L_CASE case_label ':'  */
@@ -3338,7 +3338,7 @@ yyreduce:
 
       add_to_mem_block(A_CASES, (char *)&((yyvsp[-1].node)), sizeof((yyvsp[-1].node)));
     }
-#line 3342 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3342 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 112: /* case: L_CASE case_label L_RANGE case_label ':'  */
@@ -3356,7 +3356,7 @@ yyreduce:
 
       add_to_mem_block(A_CASES, (char *)&((yyvsp[-3].node)), sizeof((yyvsp[-3].node)));
     }
-#line 3360 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3360 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 113: /* case: L_CASE case_label L_RANGE ':'  */
@@ -3374,7 +3374,7 @@ yyreduce:
 
       add_to_mem_block(A_CASES, (char *)&((yyvsp[-2].node)), sizeof((yyvsp[-2].node)));
     }
-#line 3378 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3378 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 114: /* case: L_CASE L_RANGE case_label ':'  */
@@ -3391,7 +3391,7 @@ yyreduce:
 
       add_to_mem_block(A_CASES, (char *)&((yyval.node)), sizeof((yyval.node)));
     }
-#line 3395 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3395 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 115: /* case: L_DEFAULT ':'  */
@@ -3408,7 +3408,7 @@ yyreduce:
       add_to_mem_block(A_CASES, (char *)&((yyval.node)), sizeof((yyval.node)));
       context |= SWITCH_DEFAULT;
     }
-#line 3412 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3412 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 116: /* case_label: constant  */
@@ -3426,7 +3426,7 @@ yyreduce:
       (yyval.node)->kind = NODE_CASE_NUMBER;
       (yyval.node)->r.number = (LPC_INT)(yyvsp[0].number);
     }
-#line 3430 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3430 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 117: /* case_label: string_con1  */
@@ -3442,7 +3442,7 @@ yyreduce:
       (yyval.node)->kind = NODE_CASE_STRING;
       (yyval.node)->r.number = (LPC_INT)str;
     }
-#line 3446 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3446 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 118: /* constant: constant '|' constant  */
@@ -3450,7 +3450,7 @@ yyreduce:
     {
       (yyval.number) = (yyvsp[-2].number) | (yyvsp[0].number);
     }
-#line 3454 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3454 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 119: /* constant: constant '^' constant  */
@@ -3458,7 +3458,7 @@ yyreduce:
     {
       (yyval.number) = (yyvsp[-2].number) ^ (yyvsp[0].number);
     }
-#line 3462 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3462 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 120: /* constant: constant '&' constant  */
@@ -3466,7 +3466,7 @@ yyreduce:
     {
       (yyval.number) = (yyvsp[-2].number) & (yyvsp[0].number);
     }
-#line 3470 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3470 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 121: /* constant: constant L_EQ constant  */
@@ -3474,7 +3474,7 @@ yyreduce:
     {
       (yyval.number) = (yyvsp[-2].number) == (yyvsp[0].number);
     }
-#line 3478 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3478 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 122: /* constant: constant L_NE constant  */
@@ -3482,7 +3482,7 @@ yyreduce:
     {
       (yyval.number) = (yyvsp[-2].number) != (yyvsp[0].number);
     }
-#line 3486 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3486 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 123: /* constant: constant L_ORDER constant  */
@@ -3494,7 +3494,7 @@ yyreduce:
         case F_GT: (yyval.number) = (yyvsp[-2].number) >  (yyvsp[0].number); break;
       }
     }
-#line 3498 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3498 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 124: /* constant: constant '<' constant  */
@@ -3502,7 +3502,7 @@ yyreduce:
     {
       (yyval.number) = (yyvsp[-2].number) < (yyvsp[0].number);
     }
-#line 3506 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3506 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 125: /* constant: constant L_LSH constant  */
@@ -3510,7 +3510,7 @@ yyreduce:
     {
       (yyval.number) = (yyvsp[-2].number) << (yyvsp[0].number);
     }
-#line 3514 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3514 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 126: /* constant: constant L_RSH constant  */
@@ -3518,7 +3518,7 @@ yyreduce:
     {
       (yyval.number) = (yyvsp[-2].number) >> (yyvsp[0].number);
     }
-#line 3522 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3522 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 127: /* constant: constant '+' constant  */
@@ -3526,7 +3526,7 @@ yyreduce:
     {
       (yyval.number) = (yyvsp[-2].number) + (yyvsp[0].number);
     }
-#line 3530 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3530 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 128: /* constant: constant '-' constant  */
@@ -3534,7 +3534,7 @@ yyreduce:
     {
       (yyval.number) = (yyvsp[-2].number) - (yyvsp[0].number);
     }
-#line 3538 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3538 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 129: /* constant: constant '*' constant  */
@@ -3542,7 +3542,7 @@ yyreduce:
     {
       (yyval.number) = (yyvsp[-2].number) * (yyvsp[0].number);
     }
-#line 3546 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3546 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 130: /* constant: constant '%' constant  */
@@ -3550,7 +3550,7 @@ yyreduce:
     {
       if ((yyvsp[0].number)) (yyval.number) = (yyvsp[-2].number) % (yyvsp[0].number); else yyerror("Modulo by zero");
     }
-#line 3554 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3554 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 131: /* constant: constant '/' constant  */
@@ -3558,7 +3558,7 @@ yyreduce:
     {
       if ((yyvsp[0].number)) (yyval.number) = (yyvsp[-2].number) / (yyvsp[0].number); else yyerror("Division by zero");
     }
-#line 3562 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3562 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 132: /* constant: '(' constant ')'  */
@@ -3566,7 +3566,7 @@ yyreduce:
     {
       (yyval.number) = (yyvsp[-1].number);
     }
-#line 3570 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3570 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 133: /* constant: L_NUMBER  */
@@ -3574,7 +3574,7 @@ yyreduce:
     {
       (yyval.number) = (yyvsp[0].number);
     }
-#line 3578 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3578 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 134: /* constant: '-' L_NUMBER  */
@@ -3582,7 +3582,7 @@ yyreduce:
     {
       (yyval.number) = -(yyvsp[0].number);
     }
-#line 3586 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3586 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 135: /* constant: L_NOT L_NUMBER  */
@@ -3590,7 +3590,7 @@ yyreduce:
     {
       (yyval.number) = !(yyvsp[0].number);
     }
-#line 3594 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3594 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 136: /* constant: '~' L_NUMBER  */
@@ -3598,7 +3598,7 @@ yyreduce:
     {
       (yyval.number) = ~(yyvsp[0].number);
     }
-#line 3602 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3602 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 137: /* comma_expr: expr0  */
@@ -3606,7 +3606,7 @@ yyreduce:
     {
       (yyval.node) = (yyvsp[0].node);
     }
-#line 3610 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3610 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 138: /* comma_expr: comma_expr ',' expr0  */
@@ -3614,7 +3614,7 @@ yyreduce:
     {
       CREATE_TWO_VALUES((yyval.node), (yyvsp[0].node)->type, pop_value((yyvsp[-2].node)), (yyvsp[0].node));
     }
-#line 3618 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3618 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 140: /* expr0: ref lvalue  */
@@ -3645,7 +3645,7 @@ yyreduce:
       }
       CREATE_UNARY_OP_1((yyval.node), F_MAKE_REF, TYPE_ANY, (yyvsp[0].node), op);
     }
-#line 3649 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3649 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 141: /* expr0: lvalue L_ASSIGN expr0  */
@@ -3674,7 +3674,7 @@ yyreduce:
       if ((yyvsp[-1].number) == F_ASSIGN)
         (yyval.node)->l.expr = do_promotions(r, l->type);
     }
-#line 3678 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3678 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 142: /* expr0: error L_ASSIGN expr0  */
@@ -3683,7 +3683,7 @@ yyreduce:
       yyerror("Illegal LHS");
       CREATE_ERROR((yyval.node));
     }
-#line 3687 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3687 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 143: /* expr0: expr0 '?' expr0 ':' expr0  */
@@ -3711,7 +3711,7 @@ yyreduce:
       }
       (yyval.node)->type = ((p1->type == p2->type) ? p1->type : TYPE_ANY);
     }
-#line 3715 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3715 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 144: /* expr0: expr0 L_LOR expr0  */
@@ -3721,7 +3721,7 @@ yyreduce:
       if (IS_NODE((yyvsp[-2].node), NODE_LAND_LOR, F_LOR))
         (yyvsp[-2].node)->kind = NODE_BRANCH_LINK;
     }
-#line 3725 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3725 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 145: /* expr0: expr0 L_LAND expr0  */
@@ -3731,7 +3731,7 @@ yyreduce:
       if (IS_NODE((yyvsp[-2].node), NODE_LAND_LOR, F_LAND))
         (yyvsp[-2].node)->kind = NODE_BRANCH_LINK;
     }
-#line 3735 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3735 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 146: /* expr0: expr0 '|' expr0  */
@@ -3760,7 +3760,7 @@ yyreduce:
       }
       else (yyval.node) = binary_int_op((yyvsp[-2].node), (yyvsp[0].node), F_OR, "|");
     }
-#line 3764 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3764 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 147: /* expr0: expr0 '^' expr0  */
@@ -3768,7 +3768,7 @@ yyreduce:
     {
       (yyval.node) = binary_int_op((yyvsp[-2].node), (yyvsp[0].node), F_XOR, "^");
     }
-#line 3772 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3772 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 148: /* expr0: expr0 '&' expr0  */
@@ -3795,7 +3795,7 @@ yyreduce:
         CREATE_BINARY_OP((yyval.node), F_AND, t1, (yyvsp[-2].node), (yyvsp[0].node));
       } else (yyval.node) = binary_int_op((yyvsp[-2].node), (yyvsp[0].node), F_AND, "&");
     }
-#line 3799 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3799 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 149: /* expr0: expr0 L_EQ expr0  */
@@ -3821,7 +3821,7 @@ yyreduce:
           CREATE_BINARY_OP((yyval.node), F_EQ, TYPE_NUMBER, (yyvsp[-2].node), (yyvsp[0].node));
         }
     }
-#line 3825 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3825 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 150: /* expr0: expr0 L_NE expr0  */
@@ -3839,7 +3839,7 @@ yyreduce:
       }
       CREATE_BINARY_OP((yyval.node), F_NE, TYPE_NUMBER, (yyvsp[-2].node), (yyvsp[0].node));
     }
-#line 3843 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3843 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 151: /* expr0: expr0 L_ORDER expr0  */
@@ -3887,7 +3887,7 @@ yyreduce:
       }
       CREATE_BINARY_OP((yyval.node), (yyvsp[-1].number), TYPE_NUMBER, (yyvsp[-2].node), (yyvsp[0].node));
     }
-#line 3891 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3891 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 152: /* expr0: expr0 '<' expr0  */
@@ -3928,7 +3928,7 @@ yyreduce:
       }
       CREATE_BINARY_OP((yyval.node), F_LT, TYPE_NUMBER, (yyvsp[-2].node), (yyvsp[0].node));
     }
-#line 3932 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3932 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 153: /* expr0: expr0 L_LSH expr0  */
@@ -3936,7 +3936,7 @@ yyreduce:
     {
       (yyval.node) = binary_int_op((yyvsp[-2].node), (yyvsp[0].node), F_LSH, "<<");
     }
-#line 3940 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3940 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 154: /* expr0: expr0 L_RSH expr0  */
@@ -3944,7 +3944,7 @@ yyreduce:
     {
       (yyval.node) = binary_int_op((yyvsp[-2].node), (yyvsp[0].node), F_RSH, ">>");
     }
-#line 3948 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 3948 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 155: /* expr0: expr0 '+' expr0  */
@@ -4118,7 +4118,7 @@ yyreduce:
           break;
       }
     }
-#line 4122 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4122 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 156: /* expr0: expr0 '-' expr0  */
@@ -4216,7 +4216,7 @@ yyreduce:
           CREATE_BINARY_OP((yyval.node), F_SUBTRACT, result_type, (yyvsp[-2].node), (yyvsp[0].node));
       }
     }
-#line 4220 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4220 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 157: /* expr0: expr0 '*' expr0  */
@@ -4300,7 +4300,7 @@ yyreduce:
           CREATE_BINARY_OP((yyval.node), F_MULTIPLY, result_type, (yyvsp[-2].node), (yyvsp[0].node));
       }
     }
-#line 4304 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4304 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 158: /* expr0: expr0 '%' expr0  */
@@ -4308,7 +4308,7 @@ yyreduce:
     {
       (yyval.node) = binary_int_op((yyvsp[-2].node), (yyvsp[0].node), F_MOD, "%");
     }
-#line 4312 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4312 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 159: /* expr0: expr0 '/' expr0  */
@@ -4407,7 +4407,7 @@ yyreduce:
           CREATE_BINARY_OP((yyval.node), F_DIVIDE, result_type, (yyvsp[-2].node), (yyvsp[0].node));
       }
     }
-#line 4411 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4411 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 160: /* expr0: cast expr0  */
@@ -4432,7 +4432,7 @@ yyreduce:
         yyerror(buf);
       }
     }
-#line 4436 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4436 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 161: /* expr0: L_INC lvalue  */
@@ -4457,7 +4457,7 @@ yyreduce:
         }
       } else (yyval.node)->type = TYPE_ANY;
     }
-#line 4461 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4461 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 162: /* expr0: L_DEC lvalue  */
@@ -4483,7 +4483,7 @@ yyreduce:
       } else (yyval.node)->type = TYPE_ANY;
 
     }
-#line 4487 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4487 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 163: /* expr0: L_NOT expr0  */
@@ -4496,7 +4496,7 @@ yyreduce:
         CREATE_UNARY_OP((yyval.node), F_NOT, TYPE_NUMBER, (yyvsp[0].node));
       }
     }
-#line 4500 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4500 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 164: /* expr0: '~' expr0  */
@@ -4511,7 +4511,7 @@ yyreduce:
         CREATE_UNARY_OP((yyval.node), F_COMPL, TYPE_NUMBER, (yyvsp[0].node));
       }
     }
-#line 4515 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4515 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 165: /* expr0: '-' expr0  */
@@ -4539,7 +4539,7 @@ yyreduce:
           CREATE_UNARY_OP((yyval.node), F_NEGATE, result_type, (yyvsp[0].node));
       }
     }
-#line 4543 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4543 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 166: /* expr0: lvalue L_INC  */
@@ -4565,7 +4565,7 @@ yyreduce:
         }
       } else (yyval.node)->type = TYPE_ANY;
     }
-#line 4569 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4569 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 167: /* expr0: lvalue L_DEC  */
@@ -4590,7 +4590,7 @@ yyreduce:
         }
       } else (yyval.node)->type = TYPE_ANY;
     }
-#line 4594 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4594 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 174: /* return: L_RETURN ';'  */
@@ -4600,7 +4600,7 @@ yyreduce:
         yywarn("Non-void functions must return a value.");
       CREATE_RETURN((yyval.node), 0);
     }
-#line 4604 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4604 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 175: /* return: L_RETURN comma_expr ';'  */
@@ -4621,7 +4621,7 @@ yyreduce:
         CREATE_RETURN((yyval.node), (yyvsp[-1].node));
       }
     }
-#line 4625 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4625 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 176: /* expr_list: %empty  */
@@ -4629,7 +4629,7 @@ yyreduce:
             {
       CREATE_EXPR_LIST((yyval.node), 0);
     }
-#line 4633 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4633 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 177: /* expr_list: expr_list2  */
@@ -4637,7 +4637,7 @@ yyreduce:
     {
       CREATE_EXPR_LIST((yyval.node), (yyvsp[0].node));
     }
-#line 4641 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4641 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 178: /* expr_list: expr_list2 ','  */
@@ -4645,7 +4645,7 @@ yyreduce:
     {
       CREATE_EXPR_LIST((yyval.node), (yyvsp[-1].node));
     }
-#line 4649 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4649 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 179: /* expr_list_node: expr0  */
@@ -4653,7 +4653,7 @@ yyreduce:
     {
       CREATE_EXPR_NODE((yyval.node), (yyvsp[0].node), 0);
     }
-#line 4657 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4657 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 180: /* expr_list_node: expr0 L_DOT_DOT_DOT  */
@@ -4661,7 +4661,7 @@ yyreduce:
     {
       CREATE_EXPR_NODE((yyval.node), (yyvsp[-1].node), 1);
     }
-#line 4665 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4665 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 181: /* expr_list2: expr_list_node  */
@@ -4670,7 +4670,7 @@ yyreduce:
       (yyvsp[0].node)->kind = 1;
       (yyval.node) = (yyvsp[0].node);
     }
-#line 4674 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4674 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 182: /* expr_list2: expr_list2 ',' expr_list_node  */
@@ -4683,7 +4683,7 @@ yyreduce:
       (yyval.node)->l.expr->r.expr = (yyvsp[0].node);
       (yyval.node)->l.expr = (yyvsp[0].node);
     }
-#line 4687 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4687 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 183: /* expr_list3: %empty  */
@@ -4692,7 +4692,7 @@ yyreduce:
       /* this is a dummy node */
       CREATE_EXPR_LIST((yyval.node), 0);
     }
-#line 4696 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4696 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 184: /* expr_list3: expr_list4  */
@@ -4700,7 +4700,7 @@ yyreduce:
     {
       CREATE_EXPR_LIST((yyval.node), (yyvsp[0].node));
     }
-#line 4704 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4704 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 185: /* expr_list3: expr_list4 ','  */
@@ -4708,7 +4708,7 @@ yyreduce:
     {
       CREATE_EXPR_LIST((yyval.node), (yyvsp[-1].node));
     }
-#line 4712 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4712 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 186: /* expr_list4: assoc_pair  */
@@ -4722,7 +4722,7 @@ yyreduce:
       /* we keep track of the end of the chain in the left nodes */
       (yyval.node)->l.expr = (yyval.node);
     }
-#line 4726 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4726 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 187: /* expr_list4: expr_list4 ',' assoc_pair  */
@@ -4741,7 +4741,7 @@ yyreduce:
       (yyvsp[-2].node)->kind += 2;
       (yyval.node) = (yyvsp[-2].node);
     }
-#line 4745 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4745 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 188: /* assoc_pair: expr0 ':' expr0  */
@@ -4749,7 +4749,7 @@ yyreduce:
     {
       CREATE_TWO_VALUES((yyval.node), 0, (yyvsp[-2].node), (yyvsp[0].node));
     }
-#line 4753 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4753 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 189: /* lvalue: expr4  */
@@ -4866,7 +4866,7 @@ yyreduce:
           break;
       }
     }
-#line 4870 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4870 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 191: /* l_new_function_open: L_FUNCTION_OPEN efun_override  */
@@ -4874,7 +4874,7 @@ yyreduce:
     {
       (yyval.number) = ((yyvsp[0].number) << 8) | FP_EFUN;
     }
-#line 4878 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4878 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 193: /* expr4: L_DEFINED_NAME  */
@@ -4921,7 +4921,7 @@ yyreduce:
           yyerror(buf);
         }
     }
-#line 4925 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4925 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 194: /* expr4: L_IDENTIFIER  */
@@ -4942,7 +4942,7 @@ yyreduce:
       yyerror(buf);
       scratch_free((yyvsp[0].string));
     }
-#line 4946 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4946 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 195: /* expr4: L_PARAMETER  */
@@ -4950,7 +4950,7 @@ yyreduce:
     {
       CREATE_PARAMETER((yyval.node), TYPE_ANY, (yyvsp[0].number));
     }
-#line 4954 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4954 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 196: /* @11: %empty  */
@@ -4961,7 +4961,7 @@ yyreduce:
       if (current_function_context)
         current_function_context = current_function_context->parent;
     }
-#line 4965 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4965 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 197: /* expr4: '$' '(' @11 comma_expr ')'  */
@@ -4988,7 +4988,7 @@ yyreduce:
         node->v.expr = (yyvsp[-1].node);
       }
     }
-#line 4992 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 4992 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 198: /* expr4: expr4 L_ARROW identifier  */
@@ -5016,7 +5016,7 @@ yyreduce:
 
       scratch_free((yyvsp[0].string));
     }
-#line 5020 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5020 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 199: /* expr4: expr4 L_DOT identifier  */
@@ -5044,7 +5044,7 @@ yyreduce:
 
       scratch_free((yyvsp[0].string));
     }
-#line 5048 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5048 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 200: /* expr4: expr4 '[' comma_expr L_RANGE comma_expr ']'  */
@@ -5059,7 +5059,7 @@ yyreduce:
     }
       (yyval.node) = make_range_node(F_NN_RANGE, (yyvsp[-5].node), (yyvsp[-3].node), (yyvsp[-1].node));
     }
-#line 5063 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5063 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 201: /* expr4: expr4 '[' '<' comma_expr L_RANGE comma_expr ']'  */
@@ -5067,7 +5067,7 @@ yyreduce:
     {
       (yyval.node) = make_range_node(F_RN_RANGE, (yyvsp[-6].node), (yyvsp[-3].node), (yyvsp[-1].node));
     }
-#line 5071 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5071 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 202: /* expr4: expr4 '[' '<' comma_expr L_RANGE '<' comma_expr ']'  */
@@ -5078,7 +5078,7 @@ yyreduce:
       else
         (yyval.node) = make_range_node(F_RR_RANGE, (yyvsp[-7].node), (yyvsp[-4].node), (yyvsp[-1].node));
     }
-#line 5082 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5082 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 203: /* expr4: expr4 '[' comma_expr L_RANGE '<' comma_expr ']'  */
@@ -5089,7 +5089,7 @@ yyreduce:
       else
         (yyval.node) = make_range_node(F_NR_RANGE, (yyvsp[-6].node), (yyvsp[-4].node), (yyvsp[-1].node));
     }
-#line 5093 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5093 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 204: /* expr4: expr4 '[' comma_expr L_RANGE ']'  */
@@ -5097,7 +5097,7 @@ yyreduce:
     {
       (yyval.node) = make_range_node(F_NE_RANGE, (yyvsp[-4].node), (yyvsp[-2].node), 0);
     }
-#line 5101 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5101 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 205: /* expr4: expr4 '[' '<' comma_expr L_RANGE ']'  */
@@ -5105,7 +5105,7 @@ yyreduce:
     {
       (yyval.node) = make_range_node(F_RE_RANGE, (yyvsp[-5].node), (yyvsp[-2].node), 0);
     }
-#line 5109 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5109 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 206: /* expr4: expr4 '[' '<' comma_expr ']'  */
@@ -5154,7 +5154,7 @@ yyreduce:
         }
       } else (yyval.node)->type = TYPE_ANY;
     }
-#line 5158 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5158 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 207: /* expr4: expr4 '[' comma_expr ']'  */
@@ -5214,7 +5214,7 @@ yyreduce:
         }
       } else (yyval.node)->type = TYPE_ANY;
     }
-#line 5218 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5218 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 209: /* expr4: '(' comma_expr ')'  */
@@ -5222,7 +5222,7 @@ yyreduce:
     {
       (yyval.node) = (yyvsp[-1].node);
     }
-#line 5226 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5226 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 212: /* @12: %empty  */
@@ -5247,7 +5247,7 @@ yyreduce:
       exact_types = TYPE_ANY;
       context = 0;
     }
-#line 5251 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5251 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 213: /* expr4: L_BASIC_TYPE @12 '(' argument ')' block  */
@@ -5287,7 +5287,7 @@ yyreduce:
       type_of_locals_ptr -= max_num_locals;
       reactivate_current_locals();
     }
-#line 5291 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5291 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 214: /* expr4: l_new_function_open ':' ')'  */
@@ -5329,7 +5329,7 @@ yyreduce:
           break;
       }
     }
-#line 5333 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5333 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 215: /* expr4: l_new_function_open ',' expr_list2 ':' ')'  */
@@ -5428,7 +5428,7 @@ yyreduce:
                       break;
       }
     }
-#line 5432 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5432 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 216: /* expr4: L_FUNCTION_OPEN comma_expr ':' ')'  */
@@ -5455,7 +5455,7 @@ yyreduce:
         + (current_function_context->num_parameters << 8);
       pop_function_context();
     }
-#line 5459 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5459 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 217: /* expr4: L_MAPPING_OPEN expr_list3 ']' ')'  */
@@ -5468,7 +5468,7 @@ yyreduce:
       }
       CREATE_CALL((yyval.node), F_AGGREGATE_ASSOC, TYPE_MAPPING, (yyvsp[-2].node));
     }
-#line 5472 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5472 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 218: /* expr4: L_ARRAY_OPEN expr_list '}' ')'  */
@@ -5481,7 +5481,7 @@ yyreduce:
       }
       CREATE_CALL((yyval.node), F_AGGREGATE, TYPE_ANY | TYPE_MOD_ARRAY, (yyvsp[-2].node));
     }
-#line 5485 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5485 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 219: /* expr_or_block: block  */
@@ -5489,7 +5489,7 @@ yyreduce:
     {
       (yyval.node) = (yyvsp[0].decl).node;
     }
-#line 5493 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5493 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 220: /* expr_or_block: '(' comma_expr ')'  */
@@ -5497,7 +5497,7 @@ yyreduce:
     {
       (yyval.node) = insert_pop_value((yyvsp[-1].node));
     }
-#line 5501 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5501 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 221: /* @13: %empty  */
@@ -5506,7 +5506,7 @@ yyreduce:
       (yyval.number) = context;
       context = SPECIAL_CONTEXT;
     }
-#line 5510 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5510 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 222: /* catch: L_CATCH @13 expr_or_block  */
@@ -5515,7 +5515,7 @@ yyreduce:
       CREATE_CATCH((yyval.node), (yyvsp[0].node));
       context = (yyvsp[-1].number);
     }
-#line 5519 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5519 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 223: /* tree: L_TREE block  */
@@ -5526,7 +5526,7 @@ yyreduce:
       lpc_tree_form((yyvsp[0].decl).node, (yyval.node));
 #endif
     }
-#line 5530 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5530 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 224: /* tree: L_TREE '(' comma_expr ')'  */
@@ -5537,7 +5537,7 @@ yyreduce:
       lpc_tree_form((yyvsp[-1].node), (yyval.node));
 #endif
     }
-#line 5541 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5541 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 225: /* sscanf: L_SSCANF '(' expr0 ',' expr0 lvalue_list ')'  */
@@ -5547,7 +5547,7 @@ yyreduce:
       CREATE_LVALUE_EFUN((yyval.node), TYPE_NUMBER, (yyvsp[-1].node));
       CREATE_BINARY_OP_1((yyval.node)->l.expr, F_SSCANF, 0, (yyvsp[-4].node), (yyvsp[-2].node), p);
     }
-#line 5551 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5551 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 226: /* parse_command: L_PARSE_COMMAND '(' expr0 ',' expr0 ',' expr0 lvalue_list ')'  */
@@ -5558,7 +5558,7 @@ yyreduce:
       CREATE_TERNARY_OP_1((yyval.node)->l.expr, F_PARSE_COMMAND, 0,
           (yyvsp[-6].node), (yyvsp[-4].node), (yyvsp[-2].node), p);
     }
-#line 5562 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5562 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 227: /* @14: %empty  */
@@ -5567,7 +5567,7 @@ yyreduce:
       (yyval.number) = context;
       context = SPECIAL_CONTEXT;
     }
-#line 5571 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5571 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 228: /* time_expression: L_TIME_EXPRESSION @14 expr_or_block  */
@@ -5576,7 +5576,7 @@ yyreduce:
       CREATE_TIME_EXPRESSION((yyval.node), (yyvsp[0].node));
       context = (yyvsp[-1].number);
     }
-#line 5580 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5580 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 229: /* lvalue_list: %empty  */
@@ -5586,7 +5586,7 @@ yyreduce:
       (yyval.node)->r.expr = 0;
       (yyval.node)->v.number = 0;
     }
-#line 5590 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5590 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 230: /* lvalue_list: ',' lvalue lvalue_list  */
@@ -5601,7 +5601,7 @@ yyreduce:
       (yyvsp[0].node)->r.expr = insert;
       (yyval.node)->v.number++;
     }
-#line 5605 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5605 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 231: /* string: string_con2  */
@@ -5610,7 +5610,7 @@ yyreduce:
       CREATE_STRING((yyval.node), (yyvsp[0].string));
       scratch_free((yyvsp[0].string));
     }
-#line 5614 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5614 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 233: /* string_con1: '(' string_con1 ')'  */
@@ -5618,7 +5618,7 @@ yyreduce:
     {
       (yyval.string) = (yyvsp[-1].string);
     }
-#line 5622 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5622 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 234: /* string_con1: string_con1 '+' string_con1  */
@@ -5626,7 +5626,7 @@ yyreduce:
     {
       (yyval.string) = scratch_join((yyvsp[-2].string), (yyvsp[0].string));
     }
-#line 5630 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5630 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 236: /* string_con2: string_con2 L_STRING  */
@@ -5634,7 +5634,7 @@ yyreduce:
     {
       (yyval.string) = scratch_join((yyvsp[-1].string), (yyvsp[0].string));
     }
-#line 5638 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5638 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 237: /* class_init: identifier ':' expr0  */
@@ -5645,7 +5645,7 @@ yyreduce:
       (yyval.node)->v.expr = (yyvsp[0].node);
       (yyval.node)->r.expr = 0;
     }
-#line 5649 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5649 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 238: /* opt_class_init: %empty  */
@@ -5653,7 +5653,7 @@ yyreduce:
             {
       (yyval.node) = 0;
     }
-#line 5657 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5657 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 239: /* opt_class_init: opt_class_init ',' class_init  */
@@ -5662,7 +5662,7 @@ yyreduce:
       (yyval.node) = (yyvsp[0].node);
       (yyval.node)->r.expr = (yyvsp[-2].node);
     }
-#line 5666 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5666 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 240: /* @15: %empty  */
@@ -5672,7 +5672,7 @@ yyreduce:
       (yyvsp[0].number) = num_refs;
       context |= ARG_LIST;
     }
-#line 5676 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5676 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 241: /* function_call: efun_override '(' @15 expr_list ')'  */
@@ -5683,7 +5683,7 @@ yyreduce:
       (yyval.node) = check_refs(num_refs - (yyvsp[-3].number), (yyvsp[-1].node), (yyval.node));
       num_refs = (yyvsp[-3].number);
     }
-#line 5687 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5687 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 242: /* @16: %empty  */
@@ -5693,7 +5693,7 @@ yyreduce:
       (yyvsp[0].number) = num_refs;
       context |= ARG_LIST;
     }
-#line 5697 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5697 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 243: /* function_call: L_NEW '(' @16 expr_list ')'  */
@@ -5722,7 +5722,7 @@ yyreduce:
       (yyval.node) = check_refs(num_refs - (yyvsp[-3].number), (yyvsp[-1].node), (yyval.node));
       num_refs = (yyvsp[-3].number);
     }
-#line 5726 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5726 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 244: /* function_call: L_NEW '(' L_CLASS L_DEFINED_NAME opt_class_init ')'  */
@@ -5761,7 +5761,7 @@ yyreduce:
         }
       }
     }
-#line 5765 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5765 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 245: /* function_call: L_NEW '(' L_CLASS L_IDENTIFIER opt_class_init ')'  */
@@ -5783,7 +5783,7 @@ yyreduce:
         node = node->r.expr;
       }
     }
-#line 5787 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5787 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 246: /* @17: %empty  */
@@ -5793,7 +5793,7 @@ yyreduce:
       (yyvsp[0].number) = num_refs;
       context |= ARG_LIST;
     }
-#line 5797 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5797 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 247: /* function_call: L_DEFINED_NAME '(' @17 expr_list ')'  */
@@ -5851,7 +5851,7 @@ yyreduce:
       (yyval.node) = check_refs(num_refs - (yyvsp[-3].number), (yyvsp[-1].node), (yyval.node));
       num_refs = (yyvsp[-3].number);
     }
-#line 5855 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5855 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 248: /* @18: %empty  */
@@ -5861,7 +5861,7 @@ yyreduce:
       (yyvsp[0].number) = num_refs;
       context |= ARG_LIST;
     }
-#line 5865 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5865 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 249: /* function_call: function_name '(' @18 expr_list ')'  */
@@ -5927,7 +5927,7 @@ yyreduce:
       num_refs = (yyvsp[-3].number);
       scratch_free(name);
     }
-#line 5931 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5931 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 250: /* @19: %empty  */
@@ -5937,7 +5937,7 @@ yyreduce:
       (yyvsp[0].number) = num_refs;
       context |= ARG_LIST;
     }
-#line 5941 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5941 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 251: /* function_call: expr4 L_ARROW identifier '(' @19 expr_list ')'  */
@@ -5986,7 +5986,7 @@ yyreduce:
       (yyval.node) = check_refs(num_refs - (yyvsp[-3].number), (yyvsp[-1].node), (yyval.node));
       num_refs = (yyvsp[-3].number);
     }
-#line 5990 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 5990 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 252: /* @20: %empty  */
@@ -5996,7 +5996,7 @@ yyreduce:
       (yyvsp[0].number) = num_refs;
       context |= ARG_LIST;
     }
-#line 6000 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 6000 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 253: /* function_call: '(' '*' comma_expr ')' '(' @20 expr_list ')'  */
@@ -6022,7 +6022,7 @@ yyreduce:
       (yyval.node) = check_refs(num_refs - (yyvsp[-3].number), (yyvsp[-1].node), (yyval.node));
       num_refs = (yyvsp[-3].number);
     }
-#line 6026 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 6026 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 254: /* efun_override: L_EFUN L_COLON_COLON identifier  */
@@ -6046,7 +6046,7 @@ yyreduce:
       }
       scratch_free((yyvsp[0].string));
     }
-#line 6050 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 6050 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 255: /* efun_override: L_EFUN L_COLON_COLON L_NEW  */
@@ -6063,7 +6063,7 @@ yyreduce:
         (yyval.number) = -1;
       } else (yyval.number) = new_efun;
     }
-#line 6067 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 6067 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 257: /* function_name: L_COLON_COLON identifier  */
@@ -6081,7 +6081,7 @@ yyreduce:
         *(p+3) = *p;
       strncpy((yyval.string), ":::", 3);
     }
-#line 6085 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 6085 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 258: /* function_name: L_BASIC_TYPE L_COLON_COLON identifier  */
@@ -6100,7 +6100,7 @@ yyreduce:
       (yyval.string)[z-2] = ':';
       (yyval.string)[z-1] = ':';
     }
-#line 6104 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 6104 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 259: /* function_name: identifier L_COLON_COLON identifier  */
@@ -6116,7 +6116,7 @@ yyreduce:
       scratch_free((yyvsp[-2].string));
       scratch_free((yyvsp[0].string));
     }
-#line 6120 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 6120 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 260: /* cond: L_IF '(' comma_expr ')' statement optional_else_part  */
@@ -6151,7 +6151,7 @@ yyreduce:
       }
       CREATE_IF((yyval.node), (yyvsp[-3].node), (yyvsp[-1].node), (yyvsp[0].node));
     }
-#line 6155 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 6155 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 261: /* optional_else_part: %empty  */
@@ -6159,7 +6159,7 @@ yyreduce:
     {
       (yyval.node) = 0;
     }
-#line 6163 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 6163 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
   case 262: /* optional_else_part: L_ELSE statement  */
@@ -6167,11 +6167,11 @@ yyreduce:
     {
       (yyval.node) = (yyvsp[0].node);
     }
-#line 6171 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 6171 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
     break;
 
 
-#line 6175 "/home/sunyc/src/fluffos/build/src/grammar.autogen.cc"
+#line 6175 "/home/sunyc/src/fluffos/cmake-build-debug-wsl-clang/src/grammar.autogen.cc"
 
         default: break;
       }

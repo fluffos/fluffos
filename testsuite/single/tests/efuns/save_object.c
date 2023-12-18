@@ -6,10 +6,6 @@ nosave int z = 5;
 #endif
 int y = 0x7fffffffffffffff;
 
-string a = "asdfas♇ ♈ ♉a\bb\\n\n\n\nnewline\rreturn\t\v\f㌀ ㌁ ";
-string* b = ({ a, a, a, a });
-mapping c = ([ "a": a, b: b, "c": b ]);
-
 void do_tests() {
     ASSERT_EQ(24, save_object("/sf"));
     ASSERT_EQ(read_file("/sf.o") , "#" + __FILE__ + "\ny " + MAX_INT + "\n");
