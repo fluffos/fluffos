@@ -32,6 +32,8 @@ jobs:
         OPENSSL_ROOT_DIR: "/usr/local/opt/openssl"
         ICU_ROOT: "/usr/local/opt/icu4c"
     - name: run tests
+      env:
+        CTEST_OUTPUT_ON_FAILURE: 1
       run: cd build && make test
     - name: testsuite
       run: cd testsuite && ../build/bin/driver etc/config.test -ftest
