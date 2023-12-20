@@ -222,9 +222,9 @@ svalue_t svalue_from_json_recurse(nlohmann::json j) {
       }
       sv.u.arr = allocate_array(value.size());
       for (int i = 0; i < value.size(); i++) {
-        auto sv = svalue_from_json_recurse(value[i]);
-        assign_svalue_no_free(&sv.u.arr->item[i], &sv);
-        free_svalue(&sv, "svalue_from_json_recurse");
+        auto sv_item = svalue_from_json_recurse(value[i]);
+        assign_svalue_no_free(&sv.u.arr->item[i], &sv_item);
+        free_svalue(&sv_item, "svalue_from_json_recurse");
       }
       break;
     }
