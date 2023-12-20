@@ -222,7 +222,9 @@ svalue_t svalue_from_json_recurse(nlohmann::json j) {
       }
       sv.u.arr = allocate_array(value.size());
       for (int i = 0; i < value.size(); i++) {
-        sv.u.arr->item[i] = svalue_from_json_recurse(value[i]);
+        auto sv = svalue_from_json_recurse(value[i]);
+        assign_svalue_no_free(&sv.u.arr->item[i], &sv);
+        free_svalue(&sv, "svalue_from_json_recurse");
       }
       break;
     }
@@ -240,13 +242,17 @@ svalue_t svalue_from_json_recurse(nlohmann::json j) {
       int i = 0;
       for (auto it : value.get<std::vector<nlohmann::json>>()) {
         auto sv_key = svalue_from_json_recurse(it["key"]);
-        assign_svalue(&map_keys->item[i], &sv_key);
+        assign_svalue_no_free(&map_keys->item[i], &sv_key);
+        free_svalue(&sv_key, "svalue_from_json_recurse");
 
         auto sv_val = svalue_from_json_recurse(it["value"]);
-        assign_svalue(&map_values->item[i], &sv_val);
+        assign_svalue_no_free(&map_values->item[i], &sv_val);
+        free_svalue(&sv_val, "svalue_from_json_recurse");
         i++;
       }
       sv.u.map = mkmapping(map_keys, map_values);
+      free_array(map_keys);
+      free_array(map_values);
       break;
     }
     case T_BUFFER: {
