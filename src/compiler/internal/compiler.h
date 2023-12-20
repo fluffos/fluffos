@@ -10,10 +10,6 @@ class LexStream;
 /* The end of a static buffer */
 #define EndOf(x) (x + sizeof(x) / sizeof(x[0]))
 
-#define _YACC_
-
-#define YYMAXDEPTH 600
-
 /*
  * Information for allocating a block that can grow dynamically
  * using realloc. That means that no pointers should be kept into such
