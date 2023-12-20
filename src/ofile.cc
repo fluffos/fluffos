@@ -2,23 +2,19 @@
 
 #include "ofile.h"
 
-#include "base/internal/rc.h"
 #include "vm/vm.h"
 #include "vm/internal/base/svalue.h"
 
 #include <nlohmann/json.hpp>
 
 #include <iostream>
-#include <fstream>
 #include <sstream>
 #include <string>
-#include <utility>
 #include <vector>
-#include <utility>  // std::pair, std::make_pair
 
 typedef unsigned char BYTE;
 
-static const std::string base64_chars =
+static const std::string BASE64_CHARS =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     "abcdefghijklmnopqrstuvwxyz"
     "0123456789+/";
@@ -40,7 +36,7 @@ std::string base64_encode(BYTE const* buf, unsigned int bufLen) {
       char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
       char_array_4[3] = char_array_3[2] & 0x3f;
 
-      for (i = 0; (i < 4); i++) ret += base64_chars[char_array_4[i]];
+      for (i = 0; (i < 4); i++) ret += BASE64_CHARS[char_array_4[i]];
       i = 0;
     }
   }
@@ -53,7 +49,7 @@ std::string base64_encode(BYTE const* buf, unsigned int bufLen) {
     char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
     char_array_4[3] = char_array_3[2] & 0x3f;
 
-    for (j = 0; (j < i + 1); j++) ret += base64_chars[char_array_4[j]];
+    for (j = 0; (j < i + 1); j++) ret += BASE64_CHARS[char_array_4[j]];
 
     while ((i++ < 3)) ret += '=';
   }
@@ -65,15 +61,15 @@ std::vector<BYTE> base64_decode(std::string const& encoded_string) {
   int in_len = encoded_string.size();
   int i = 0;
   int j = 0;
-  int in_ = 0;
+  int in = 0;
   BYTE char_array_4[4], char_array_3[3];
   std::vector<BYTE> ret;
 
-  while (in_len-- && (encoded_string[in_] != '=') && is_base64(encoded_string[in_])) {
-    char_array_4[i++] = encoded_string[in_];
-    in_++;
+  while (in_len-- && (encoded_string[in] != '=') && is_base64(encoded_string[in])) {
+    char_array_4[i++] = encoded_string[in];
+    in++;
     if (i == 4) {
-      for (i = 0; i < 4; i++) char_array_4[i] = base64_chars.find(char_array_4[i]);
+      for (i = 0; i < 4; i++) char_array_4[i] = BASE64_CHARS.find(char_array_4[i]);
 
       char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
       char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
@@ -87,7 +83,7 @@ std::vector<BYTE> base64_decode(std::string const& encoded_string) {
   if (i) {
     for (j = i; j < 4; j++) char_array_4[j] = 0;
 
-    for (j = 0; j < 4; j++) char_array_4[j] = base64_chars.find(char_array_4[j]);
+    for (j = 0; j < 4; j++) char_array_4[j] = BASE64_CHARS.find(char_array_4[j]);
 
     char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
     char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
@@ -194,7 +190,7 @@ nlohmann::json svalue_to_json_recurse(const svalue_t* sv) {
   return j;
 }
 
-svalue_t svalue_from_json(nlohmann::json j) {
+svalue_t svalue_from_json_recurse(nlohmann::json j) {
   svalue_t sv = {};
   sv.type = name_2_type(j["type"]);
   auto value = j["value"];
@@ -215,7 +211,7 @@ svalue_t svalue_from_json(nlohmann::json j) {
       if (!value.is_string()) {
         throw std::runtime_error("Invalid string value: " + value.dump());
       }
-      sv.u.string = string_copy(value.get<std::string>().data(), "svalue_from_json: string");
+      sv.u.string = string_copy(value.get<std::string>().data(), "svalue_from_json_recurse: string");
       sv.subtype = STRING_MALLOC;
       break;
     case T_CLASS:
@@ -226,7 +222,9 @@ svalue_t svalue_from_json(nlohmann::json j) {
       }
       sv.u.arr = allocate_array(value.size());
       for (int i = 0; i < value.size(); i++) {
-        sv.u.arr->item[i] = svalue_from_json(value[i]);
+        auto sv_item = svalue_from_json_recurse(value[i]);
+        assign_svalue_no_free(&sv.u.arr->item[i], &sv_item);
+        free_svalue(&sv_item, "svalue_from_json_recurse");
       }
       break;
     }
@@ -243,14 +241,18 @@ svalue_t svalue_from_json(nlohmann::json j) {
 
       int i = 0;
       for (auto it : value.get<std::vector<nlohmann::json>>()) {
-        auto sv_key = svalue_from_json(it["key"]);
-        assign_svalue(&map_keys->item[i], &sv_key);
+        auto sv_key = svalue_from_json_recurse(it["key"]);
+        assign_svalue_no_free(&map_keys->item[i], &sv_key);
+        free_svalue(&sv_key, "svalue_from_json_recurse");
 
-        auto sv_val = svalue_from_json(it["value"]);
-        assign_svalue(&map_values->item[i], &sv_val);
+        auto sv_val = svalue_from_json_recurse(it["value"]);
+        assign_svalue_no_free(&map_values->item[i], &sv_val);
+        free_svalue(&sv_val, "svalue_from_json_recurse");
         i++;
       }
       sv.u.map = mkmapping(map_keys, map_values);
+      free_array(map_keys);
+      free_array(map_values);
       break;
     }
     case T_BUFFER: {
@@ -308,14 +310,14 @@ OFile::OFile(const std::string& o_str) {
     if (res != 0) {
       throw std::runtime_error("Invalid o file: malformed variable value");
     }
-    this->variables.push_back({name, sv});
+    this->variables.emplace_back(name, sv);
   }
 }
 
 OFile::OFile(const nlohmann::json& j) {
     program_name = j["program_name"];
     for (const auto& v : j["variables"]) {
-      variables.emplace_back(v["name"], svalue_from_json(v["value"]));
+      variables.emplace_back(v["name"], svalue_from_json_recurse(v["value"]));
     }
 }
 
@@ -326,9 +328,14 @@ std::string OFile::to_ofile() {
       ss << v.first << " ";
       auto size = svalue_save_size(&v.second);
       std::string buf(size - 1, '\0');
-      auto p = buf.data();
+      auto *p = buf.data();
       save_svalue(&v.second, &p);
       ss << buf << "\n";
     }
     return ss.str();
+}
+OFile::~OFile() {
+  for (auto& v : variables) {
+    free_svalue(&v.second, "OFile::~OFile");
+  }
 }

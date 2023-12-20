@@ -13,6 +13,7 @@ class OFile {
   std::vector<std::pair<std::string, svalue_t>> variables;
 
   OFile() = default;
+  ~OFile();
 
   OFile(const std::string& o_str);
   OFile(const nlohmann::json& json_str);
