@@ -73,7 +73,7 @@ OpenSSL_client_verify_callback(int preverify_ok, X509_STORE_CTX *x509_ctx)
 			     err == X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN) &&
 			     wsi->tls.use_ssl & LCCSCF_ALLOW_SELFSIGNED) {
 				lwsl_notice("accepting self-signed "
-					    "certificate (verify_callback)\n");
+					    "certificate (tls_verify_callback)\n");
 				X509_STORE_CTX_set_error(x509_ctx, X509_V_OK);
 				return 1;	// ok
 		} else if ((err == X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY ||

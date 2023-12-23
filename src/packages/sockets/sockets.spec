@@ -13,7 +13,8 @@
     int socket_acquire(int, string | function, string | function, string | function);
     string socket_error(int);
     string socket_address(int | object, int default: 0);
-
+    void socket_set_option(int, int, mixed);
+    mixed socket_get_option(int, int);
     /*
      * ret[0] = (int) fd
      * ret[1] = (string) state
