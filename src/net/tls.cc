@@ -53,3 +53,49 @@ SSL* tls_get_client_ctx(SSL_CTX* server_ctx) {
   auto ctx = SSL_new(server_ctx);
   return ctx;
 }
+
+int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
+  char  buf[256];
+  X509* cert;
+  int   err, depth;
+
+  cert = X509_STORE_CTX_get_current_cert(x509_ctx);
+  err = X509_STORE_CTX_get_error(x509_ctx);
+  depth = X509_STORE_CTX_get_error_depth(x509_ctx);
+
+  X509_NAME_oneline(X509_get_subject_name(cert), buf, 256);
+
+  /* If error is not X509_V_OK, print out the error information */
+  if (err != X509_V_OK) {
+    debug(sockets, "tls_verify_callback: verify error:num=%d:%s:depth=%d:%s\n", err,
+           X509_verify_cert_error_string(err), depth, buf);
+  }
+
+  return preverify_ok;
+}
+
+SSL_CTX* tls_client_init() {
+  tls_library_init();
+
+  /* We MUST have entropy, or else there's no point to crypto. */
+  if (!RAND_poll() && !RAND_status()) return nullptr;
+
+  SSL_CTX* ctx;
+
+  ctx = SSL_CTX_new(TLS_client_method());
+
+  SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2);
+  SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv3);
+  SSL_CTX_set_options(ctx, SSL_OP_NO_TLSv1_1);
+
+  // Load system default CA certificates
+  auto ret = SSL_CTX_set_default_verify_paths(ctx);
+  if (ret != 1) {
+    debug_message("Warning: unable to load system default CA certificates.\n");
+  }
+
+  // setup certificate verification
+  SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, tls_verify_callback);
+
+  return ctx;
+}

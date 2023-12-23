@@ -8,6 +8,7 @@
 #include "base/package_api.h"
 
 #include "packages/sockets/socket_efuns.h"
+#include "net/tls.h"
 
 #include <cinttypes>
 #include <event2/event.h>
@@ -27,50 +28,22 @@
 
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
 
+const char *socket_modes[] = {"MUD", "STREAM", "DATAGRAM", "STREAM_BINARY", "DATAGRAM_BINARY", "STREAM_TLS", "STREAM_TLS_BINARY"};
+
+const char *socket_states[] = {"CLOSED", "CLOSING", "UNBOUND", "BOUND", "LISTEN", "HANDSHAKE", "DATA_XFER"};
+const char *socket_options[] = {"SO_TLS_VERIFY_PEER", "SO_TLS_SNI_HOSTNAME"};
+static char *sockaddr_to_lpcaddr(struct sockaddr *addr /*addr*/, ev_socklen_t /*len*/ len);
+
 struct lpc_socket_event_data {
   int idx;
 };
 
 namespace {
-// Hold all the LPC socks
-std::deque<lpc_socket_t> lpc_socks;
-
-void on_lpc_sock_read(evutil_socket_t fd, short what, void *arg) {
-  debug(event, "Got an event on socket %" FMT_SOCKET_FD ":%s%s%s%s \n", fd,
-        (what & EV_TIMEOUT) ? " timeout" : "", (what & EV_READ) ? " read" : "",
-        (what & EV_WRITE) ? " write" : "", (what & EV_SIGNAL) ? " signal" : "");
-
-  auto *data = reinterpret_cast<lpc_socket_event_data *>(arg);
-  socket_read_select_handler(data->idx);
-}
-void on_lpc_sock_write(evutil_socket_t fd, short what, void *arg) {
-  debug(event, "Got an event on socket %" FMT_SOCKET_FD ":%s%s%s%s \n", fd,
-        (what & EV_TIMEOUT) ? " timeout" : "", (what & EV_READ) ? " read" : "",
-        (what & EV_WRITE) ? " write" : "", (what & EV_SIGNAL) ? " signal" : "");
-
-  auto *data = reinterpret_cast<lpc_socket_event_data *>(arg);
-  socket_write_select_handler(data->idx);
-}
-
-}  // namespace
-
-// Initialize LPC socket data structure and register events
-void new_lpc_socket_event_listener(int idx, lpc_socket_t *sock, evutil_socket_t real_fd) {
-  auto *data = new lpc_socket_event_data;
-  data->idx = idx;
-  sock->ev_read = event_new(g_event_base, real_fd, EV_READ | EV_PERSIST, on_lpc_sock_read, data);
-  sock->ev_write = event_new(g_event_base, real_fd, EV_WRITE, on_lpc_sock_write, data);
-  sock->ev_data = data;
-}
 
 /* flags for socket_close */
 #define SC_FORCE 1u
 #define SC_DO_CALLBACK 2u
 #define SC_FINAL_CLOSE 4u
-
-#ifdef PACKAGE_SOCKETS
-static char *sockaddr_to_lpcaddr(struct sockaddr *addr /*addr*/, ev_socklen_t /*len*/ len);
-#endif
 
 const char *error_strings[ERROR_STRINGS] = {"Problem creating socket",
                                             "Problem with setsockopt",
@@ -104,6 +77,62 @@ const char *error_strings[ERROR_STRINGS] = {"Problem creating socket",
                                             "Socket already released",
                                             "Socket not released",
                                             "Data nested too deeply"};
+
+// Hold all the LPC socks
+std::deque<lpc_socket_t> lpc_socks;
+
+void on_lpc_sock_read(evutil_socket_t fd, short what, void *arg) {
+  debug(event, "Got an event on socket %" FMT_SOCKET_FD ":%s%s%s%s \n", fd,
+        (what & EV_TIMEOUT) ? " timeout" : "", (what & EV_READ) ? " read" : "",
+        (what & EV_WRITE) ? " write" : "", (what & EV_SIGNAL) ? " signal" : "");
+
+  auto *data = reinterpret_cast<lpc_socket_event_data *>(arg);
+  socket_read_select_handler(data->idx);
+}
+void on_lpc_sock_write(evutil_socket_t fd, short what, void *arg) {
+  debug(event, "Got an event on socket %" FMT_SOCKET_FD ":%s%s%s%s \n", fd,
+        (what & EV_TIMEOUT) ? " timeout" : "", (what & EV_READ) ? " read" : "",
+        (what & EV_WRITE) ? " write" : "", (what & EV_SIGNAL) ? " signal" : "");
+
+  auto *data = reinterpret_cast<lpc_socket_event_data *>(arg);
+  socket_write_select_handler(data->idx);
+}
+
+void handle_tls_handshake(int fd) {
+  auto ret = SSL_connect(lpc_socks[fd].ssl);
+  if (ret == 1) {
+    lpc_socks[fd].state = STATE_DATA_XFER;
+    lpc_socks[fd].flags |= S_BLOCKED;
+    debug(sockets, ("handle_tls_handshake: TLS: handshake successful\n"));
+    event_add(lpc_socks[fd].ev_write, nullptr);
+    return;
+  }
+  auto err = SSL_get_error(lpc_socks[fd].ssl, ret);
+  switch (err) {
+    case SSL_ERROR_WANT_READ:
+      // read event is persistent
+      return ;
+    case SSL_ERROR_WANT_WRITE:
+      event_add(lpc_socks[fd].ev_write, nullptr);
+      return ;
+    default:
+      debug(sockets, "STATE_HANDSHAKE: SSL_connect error: %s.\n", ERR_error_string(err, nullptr));
+      lpc_socks[fd].flags &= ~S_BLOCKED;
+      socket_close(fd, SC_FORCE | SC_FINAL_CLOSE);
+      return;
+  }
+}
+
+}  // namespace
+
+// Initialize LPC socket data structure and register events
+void new_lpc_socket_event_listener(int idx, lpc_socket_t *sock, evutil_socket_t real_fd) {
+  auto *data = new lpc_socket_event_data;
+  data->idx = idx;
+  sock->ev_read = event_new(g_event_base, real_fd, EV_READ | EV_PERSIST, on_lpc_sock_read, data);
+  sock->ev_write = event_new(g_event_base, real_fd, EV_WRITE, on_lpc_sock_write, data);
+  sock->ev_data = data;
+}
 
 /*
  * Convert a string representation of an address to a sockaddr_in
@@ -327,6 +356,7 @@ int find_new_socket() {
 int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *close_callback) {
   int type, i, fd;
   int binary = 0;
+  bool tls = false;
 
   if (mode == STREAM_BINARY) {
     binary = 1;
@@ -335,6 +365,7 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
     binary = 1;
     mode = DATAGRAM;
   }
+
   switch (mode) {
     case MUD:
     case STREAM:
@@ -343,7 +374,13 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
     case DATAGRAM:
       type = SOCK_DGRAM;
       break;
-
+    case STREAM_TLS_BINARY:
+      binary = 1;
+      // fall through
+    case STREAM_TLS:
+      tls = true;
+      type = SOCK_STREAM;
+      break;
     default:
       return EEMODENOTSUPP;
   }
@@ -381,8 +418,12 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
 #ifndef _WIN32
     // Set send buffer to 256K
     {
-      int sendbuf = 256 * 1024;
-      if (setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sendbuf, sizeof(sendbuf)) == -1) {
+      int size = 256 * 1024;
+      if (setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &size, sizeof(size)) == -1) {
+        debug(sockets, "socket_create: setsockopt so_sndbuf error: %s.\n",
+              evutil_socket_error_to_string(evutil_socket_geterror(fd)));
+      }
+      if (setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &size, sizeof(size)) == -1) {
         debug(sockets, "socket_create: setsockopt so_sndbuf error: %s.\n",
               evutil_socket_error_to_string(evutil_socket_geterror(fd)));
       }
@@ -404,12 +445,16 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
     if (binary) {
       lpc_socks[i].flags |= S_BINARY;
     }
+    if (tls) {
+      lpc_socks[i].flags |= S_TLS_SUPPORT;
+    }
+
     lpc_socks[i].mode = mode;
     lpc_socks[i].state = STATE_UNBOUND;
     lpc_socks[i].owner_ob = current_object;
     current_object->flags |= O_EFUN_SOCKET;
 
-    debug(sockets, "socket_create: created lpc socket %d (real fd %d) mode %d\n", i, fd, mode);
+    debug(sockets, "socket_create: created lpc socket %d (real fd %d) mode %s\n", i, fd, socket_modes[mode]);
   }
 
   return i;
@@ -672,6 +717,7 @@ int socket_connect(int fd, const char *name, svalue_t *read_callback, svalue_t *
       break;
     case STATE_LISTEN:
       return EEISLISTEN;
+    case STATE_HANDSHAKE:
     case STATE_DATA_XFER:
       return EEISCONN;
   }
@@ -720,14 +766,44 @@ int socket_connect(int fd, const char *name, svalue_t *read_callback, svalue_t *
     }
   }
 
-  lpc_socks[fd].state = STATE_DATA_XFER;
-  lpc_socks[fd].flags |= S_BLOCKED;
+  if (lpc_socks[fd].flags & S_TLS_SUPPORT) {
+    auto *ssl_ctx = tls_client_init();
+    if (ssl_ctx == nullptr) {
+      debug(sockets, "socket_connect: tls_client_init error.\n");
+      return EECONNECT;
+    }
+    lpc_socks[fd].ssl_ctx = ssl_ctx;
+
+    auto *ssl = SSL_new(ssl_ctx);
+    lpc_socks[fd].ssl = ssl;
+
+    SSL_set_fd(ssl, lpc_socks[fd].fd);
+
+    if (lpc_socks[fd].options[SO_TLS_VERIFY_PEER].type == T_NUMBER &&
+        lpc_socks[fd].options[SO_TLS_VERIFY_PEER].u.number != 0) {
+      SSL_set_verify(ssl, SSL_VERIFY_PEER, tls_verify_callback);
+    } else {
+      SSL_set_verify(ssl, SSL_VERIFY_NONE, nullptr);
+    }
+
+    if (lpc_socks[fd].options[SO_TLS_SNI_HOSTNAME].type == T_STRING) {
+      SSL_set_tlsext_host_name(ssl, lpc_socks[fd].options[SO_TLS_SNI_HOSTNAME].u.string);
+    }
+  }
+
+  event_add(lpc_socks[fd].ev_read, nullptr);
+  event_add(lpc_socks[fd].ev_write, nullptr);
 
   debug(sockets, "socket_connect: lpc socket %d (real fd %" FMT_SOCKET_FD ") connecting.\n", fd,
         lpc_socks[fd].fd);
 
-  event_add(lpc_socks[fd].ev_read, nullptr);
-  event_add(lpc_socks[fd].ev_write, nullptr);
+  if (lpc_socks[fd].flags & S_TLS_SUPPORT) {
+    lpc_socks[fd].state = STATE_HANDSHAKE;
+    handle_tls_handshake(fd);
+  } else {
+    lpc_socks[fd].state = STATE_DATA_XFER;
+    lpc_socks[fd].flags |= S_BLOCKED;
+  }
 
   return EESUCCESS;
 }
@@ -774,7 +850,7 @@ int socket_write(int fd, svalue_t *message, const char *name) {
 
   switch (lpc_socks[fd].mode) {
     case MUD:
-      debug(sockets, "socket_write: sending tcp message to %s\n",
+      debug(sockets, "socket_write: sending MUD message to %s\n",
             sockaddr_to_string((struct sockaddr *)&lpc_socks[fd].r_addr, lpc_socks[fd].r_addrlen));
       switch (message->type) {
         case T_OBJECT:
@@ -799,8 +875,11 @@ int socket_write(int fd, svalue_t *message, const char *name) {
       }
       break;
 
+    case STREAM_BINARY:
+    case STREAM_TLS:
+    case STREAM_TLS_BINARY:
     case STREAM:
-      debug(sockets, "socket_write: sending tcp message to %s\n",
+      debug(sockets, "socket_write: sending TCP message to %s\n",
             sockaddr_to_string((struct sockaddr *)&lpc_socks[fd].r_addr, lpc_socks[fd].r_addrlen));
       switch (message->type) {
         case T_BUFFER:
@@ -862,8 +941,9 @@ int socket_write(int fd, svalue_t *message, const char *name) {
       }
       break;
 
+    case DATAGRAM_BINARY:
     case DATAGRAM:
-      debug(sockets, "socket_write: sending udp message to %s\n",
+      debug(sockets, "socket_write: sending UDP message to %s\n",
             sockaddr_to_string((struct sockaddr *)&addr, addrlen));
       switch (message->type) {
         case T_STRING:
@@ -909,26 +989,65 @@ int socket_write(int fd, svalue_t *message, const char *name) {
     return EESUCCESS;
   }
   debug(sockets, "socket_write: message size %d.\n", len);
-  off = send(lpc_socks[fd].fd, buf, len, 0);
-  if (off <= 0) {
-    auto e = evutil_socket_geterror(lpc_socks[fd].fd);
-    FREE(buf);
-    if (off == -1) {
+  auto is_tls = (lpc_socks[fd].mode == STREAM_TLS || lpc_socks[fd].mode == STREAM_TLS_BINARY);
+  bool should_continue = false;
+  if (is_tls) {
+    off = SSL_write(lpc_socks[fd].ssl, buf, len);
+  } else {
+    off = send(lpc_socks[fd].fd, buf, len, 0);
+  }
+  if(off > 0) {
+    should_continue = true;
+  } else if (off <= 0) {
+    if(is_tls) {
+      auto e = SSL_get_error(lpc_socks[fd].ssl, off);
       switch (e) {
-        case ERR(EWOULDBLOCK): {
-          debug(sockets, "socket_write: write would block.\n");
-          return EEWOULDBLOCK;
-        }
-        case ERR(EINTR): {
-          debug(sockets, "socket_write: write interrupted.\n");
-          return EEINTR;
-        }
+        case SSL_ERROR_WANT_READ:
+          debug(sockets, "socket_write: SSL_ERROR_WANT_READ.\n");
+          should_continue = true;
+          break;
+        case SSL_ERROR_WANT_WRITE:
+          debug(sockets, "socket_write: SSL_ERROR_WANT_WRITE.\n");
+          should_continue = true;
+          break;
+        case SSL_ERROR_SYSCALL:
+          switch (errno) {
+            case EWOULDBLOCK:
+              debug(sockets, "socket_write: EWOULDBLOCK.\n");
+              should_continue = true;
+              break;
+            case EINTR:
+              debug(sockets, "socket_write: EINTR.\n");
+              should_continue = true;
+              break;
+          }
+        default:
+          debug(sockets, "ssl_write: lpc socket %d (real fd %" FMT_SOCKET_FD ") error: %s.\n",
+                fd, lpc_socks[fd].fd, ERR_error_string(e, nullptr));
+          debug(sockets, "ssl error: %s\n", ERR_error_string(ERR_get_error(), nullptr));
+          break;
       }
-    }
-    debug(sockets, "socket_write: lpc socket %d (real fd %" FMT_SOCKET_FD ") send error: %s.\n", fd,
-          lpc_socks[fd].fd, evutil_socket_error_to_string(e));
+    } else {
+        auto e = evutil_socket_geterror(lpc_socks[fd].fd);
+        switch (e) {
+          case ERR(EWOULDBLOCK): {
+            debug(sockets, "socket_write: write would block.\n");
+            return EEWOULDBLOCK;
+          }
+          case ERR(EINTR): {
+            debug(sockets, "socket_write: write interrupted.\n");
+            return EEINTR;
+          }
+        }
+        debug(sockets, "socket_write: lpc socket %d (real fd %" FMT_SOCKET_FD ") send error: %s.\n",
+              fd, lpc_socks[fd].fd, evutil_socket_error_to_string(e));
+      }
+  }
+
+  if (!should_continue) {
     lpc_socks[fd].flags |= S_LINKDEAD;
     socket_close(fd, SC_FORCE | SC_DO_CALLBACK | SC_FINAL_CLOSE);
+    FREE(buf);
     return EESEND;
   }
 
@@ -997,7 +1116,7 @@ void socket_read_select_handler(int fd) {
   struct sockaddr_storage sockaddr;
   socklen_t addrlen;
 
-  debug(sockets, "read_socket_handler: fd %d state %d\n", fd, lpc_socks[fd].state);
+  debug(sockets, "read_socket_handler: fd %d state %s\n", fd, socket_states[lpc_socks[fd].state]);
 
   switch (lpc_socks[fd].state) {
     case STATE_CLOSED:
@@ -1010,10 +1129,7 @@ void socket_read_select_handler(int fd) {
 
     case STATE_BOUND:
       switch (lpc_socks[fd].mode) {
-        case MUD:
-        case STREAM:
-          break;
-
+        case DATAGRAM_BINARY:
         case DATAGRAM: {
           char addr[NI_MAXHOST + NI_MAXSERV];
           debug(sockets, ("read_socket_handler: DATA_XFER DATAGRAM\n"));
@@ -1066,8 +1182,12 @@ void socket_read_select_handler(int fd) {
           call_callback(fd, S_READ_FP, 3);
           return;
         }
+        case MUD:
+        case STREAM:
         case STREAM_BINARY:
-        case DATAGRAM_BINARY:;
+        case STREAM_TLS:
+        case STREAM_TLS_BINARY:
+          break;
       }
       break;
 
@@ -1077,6 +1197,19 @@ void socket_read_select_handler(int fd) {
       push_number(fd);
       call_callback(fd, S_READ_FP, 1);
       return;
+
+    case STATE_HANDSHAKE: {
+      switch (lpc_socks[fd].mode) {
+        case STREAM_TLS:
+        case STREAM_TLS_BINARY: {
+          debug(sockets, ("read_socket_handler: HANDSHAKE\n"));
+          return handle_tls_handshake(fd);
+        }
+        default:
+          debug(sockets, ("read_socket_handler: STATE_HANDSHAKE unsupported mode.\n"));
+          break;
+      }
+    }
 
     case STATE_DATA_XFER:
       switch (lpc_socks[fd].mode) {
@@ -1194,31 +1327,86 @@ void socket_read_select_handler(int fd) {
           call_callback(fd, S_READ_FP, 2);
           return;
         case STREAM_BINARY:
-        case DATAGRAM_BINARY:;
+        case DATAGRAM_BINARY:
+          break;
+        case STREAM_TLS:
+        case STREAM_TLS_BINARY:
+          debug(sockets, ("read_socket_handler: DATA_XFER STREAM_TLS\n"));
+          cc = SSL_read(lpc_socks[fd].ssl, buf, sizeof(buf) - 1);
+          if (cc <= 0) {
+              auto err = SSL_get_error(lpc_socks[fd].ssl, cc);
+              switch (err) {
+                case SSL_ERROR_WANT_READ:
+                  // do nothing, wait for next read event
+                  return;
+                default:
+                  debug(sockets, "read_socket_handler: SSL_read error: %s.\n", ERR_error_string(err, nullptr));
+                  debug(sockets, "SSL error: %s.\n", ERR_error_string(ERR_get_error(), nullptr));
+                  // will close connection at the end.
+                  break;
+              }
+              break;
+          }
+#ifdef F_NETWORK_STATS
+          if (!(lpc_socks[fd].flags & S_EXTERNAL)) {
+            inet_in_packets++;
+            inet_in_volume += cc;
+            inet_socket_in_packets++;
+            inet_socket_in_volume += cc;
+          }
+#endif
+          debug(sockets, "read_socket_handler: SSL_read %d bytes\n", cc);
+          buf[cc] = '\0';
+          push_number(fd);
+          if (lpc_socks[fd].flags & S_BINARY) {
+            buffer_t *b;
+
+            b = allocate_buffer(cc);
+            if (b) {
+              b->ref--;
+              memcpy(b->item, buf, cc);
+              push_buffer(b);
+            } else {
+              push_number(0);
+            }
+          } else {
+            auto res = u8_sanitize(buf);
+            copy_and_push_string(res.c_str());
+          }
+          debug(sockets, ("read_socket_handler: apply read callback\n"));
+          call_callback(fd, S_READ_FP, 2);
+          return;
       }
       break;
   }
-  if (cc == -1) {
-    auto e = evutil_socket_geterror(lpc_socks[fd].fd);
-    debug(sockets, "read_socket_handler: %d (fd %d), error: (%d) %s.\n", fd, lpc_socks[fd].fd, e,
-          evutil_socket_error_to_string(e));
-    switch (e) {
-      case ERR(ECONNREFUSED):
-        /* Evidentally, on Linux 1.2.1, ECONNREFUSED gets returned
+
+  switch(lpc_socks[fd].mode) {
+    case MUD:
+    case STREAM:
+      if (cc == -1) {
+        auto e = evutil_socket_geterror(lpc_socks[fd].fd);
+        debug(sockets, "read_socket_handler: %d (fd %d), error: (%d) %s.\n", fd, lpc_socks[fd].fd,
+              e, evutil_socket_error_to_string(e));
+        switch (e) {
+          case ERR(ECONNREFUSED):
+            /* Evidentally, on Linux 1.2.1, ECONNREFUSED gets returned
          * if an ICMP_PORT_UNREACHED error happens internally.  Why
          * they use this error message, I have no idea, but this seems
          * to work.
-         */
-        if (lpc_socks[fd].state == STATE_BOUND && lpc_socks[fd].mode == DATAGRAM) {
-          return;
+             */
+            if (lpc_socks[fd].state == STATE_BOUND && lpc_socks[fd].mode == DATAGRAM) {
+              return;
+            }
+            break;
+          case ERR(EINTR):
+          case ERR(EWOULDBLOCK):
+            return;
+          default:
+            break;
         }
-        break;
-      case ERR(EINTR):
-      case ERR(EWOULDBLOCK):
-        return;
-      default:
-        break;
-    }
+      }
+    default:
+      break;
   }
 
   lpc_socks[fd].flags |= S_LINKDEAD;
@@ -1231,8 +1419,22 @@ void socket_read_select_handler(int fd) {
 void socket_write_select_handler(int fd) {
   int cc;
 
-  debug(sockets, "write_socket_handler: lpc socket %d (real fd %" FMT_SOCKET_FD ") state %d\n", fd,
-        lpc_socks[fd].fd, lpc_socks[fd].state);
+  debug(sockets, "write_socket_handler: lpc socket %d (real fd %" FMT_SOCKET_FD ") state %s\n", fd,
+        lpc_socks[fd].fd, socket_states[lpc_socks[fd].state]);
+
+  if (lpc_socks[fd].state == STATE_HANDSHAKE) {
+    switch (lpc_socks[fd].mode) {
+      case STREAM_TLS:
+      case STREAM_TLS_BINARY: {
+        debug(sockets, ("socket_write_select_handler: HANDSHAKE\n"));
+        handle_tls_handshake(fd);
+        return ;
+      }
+      default:
+        debug(sockets, ("socket_write_select_handler: STATE_HANDSHAKE unsupported mode.\n"));
+        break;
+    }
+  }
 
   /* if the socket isn't blocked, we've got nothing to send */
   /* if the socket is linkdead, don't send -- could block */
@@ -1271,26 +1473,52 @@ void socket_write_select_handler(int fd) {
   }
 
   if (lpc_socks[fd].w_buf != nullptr) {
-    cc = send(lpc_socks[fd].fd, lpc_socks[fd].w_buf + lpc_socks[fd].w_off, lpc_socks[fd].w_len, 0);
-    if (cc < 0) {
-      auto e = evutil_socket_geterror(lpc_socks[fd].fd);
-      if (cc == -1 && (e == ERR(EWOULDBLOCK) || e == EAGAIN /* linux only */ || e == ERR(EINTR))) {
-        event_add(lpc_socks[fd].ev_write, nullptr);
+    if (lpc_socks[fd].mode == STREAM_TLS || lpc_socks[fd].mode == STREAM_TLS_BINARY) {
+      cc = SSL_write(lpc_socks[fd].ssl, lpc_socks[fd].w_buf + lpc_socks[fd].w_off,
+                     lpc_socks[fd].w_len);
+      if (cc <= 0) {
+        auto err = SSL_get_error(lpc_socks[fd].ssl, cc);
+        switch (err) {
+          case SSL_ERROR_WANT_READ:
+          case SSL_ERROR_WANT_WRITE:
+            event_add(lpc_socks[fd].ev_write, nullptr);
+            break;
+          default:
+            debug(sockets, "write_socket_handler: SSL_write error: %s.\n", ERR_error_string(err, nullptr));
+            debug(sockets, "SSL Error: %s", ERR_error_string(ERR_get_error(), nullptr));
+            lpc_socks[fd].flags |= S_LINKDEAD;
+            if (lpc_socks[fd].state == STATE_FLUSHING) {
+              lpc_socks[fd].flags &= ~S_BLOCKED;
+              socket_close(fd, SC_FORCE | SC_FINAL_CLOSE);
+            } else {
+              socket_close(fd, SC_FORCE | SC_DO_CALLBACK | SC_FINAL_CLOSE);
+            }
+        }
         return;
       }
-      debug(sockets,
-            "write_socket_handler: lpc_socket %d (real fd %" FMT_SOCKET_FD
-            ") write failed: "
-            "%s, connection dead.\n",
-            fd, lpc_socks[fd].fd, evutil_socket_error_to_string(e));
-      lpc_socks[fd].flags |= S_LINKDEAD;
-      if (lpc_socks[fd].state == STATE_FLUSHING) {
-        lpc_socks[fd].flags &= ~S_BLOCKED;
-        socket_close(fd, SC_FORCE | SC_FINAL_CLOSE);
+    } else {
+      cc = send(lpc_socks[fd].fd, lpc_socks[fd].w_buf + lpc_socks[fd].w_off, lpc_socks[fd].w_len, 0);
+      if (cc < 0) {
+        auto e = evutil_socket_geterror(lpc_socks[fd].fd);
+        if (cc == -1 &&
+            (e == ERR(EWOULDBLOCK) || e == EAGAIN /* linux only */ || e == ERR(EINTR))) {
+          event_add(lpc_socks[fd].ev_write, nullptr);
+          return;
+        }
+        debug(sockets,
+              "write_socket_handler: lpc_socket %d (real fd %" FMT_SOCKET_FD
+              ") write failed: "
+              "%s, connection dead.\n",
+              fd, lpc_socks[fd].fd, evutil_socket_error_to_string(e));
+        lpc_socks[fd].flags |= S_LINKDEAD;
+        if (lpc_socks[fd].state == STATE_FLUSHING) {
+          lpc_socks[fd].flags &= ~S_BLOCKED;
+          socket_close(fd, SC_FORCE | SC_FINAL_CLOSE);
+          return;
+        }
+        socket_close(fd, SC_FORCE | SC_DO_CALLBACK | SC_FINAL_CLOSE);
         return;
       }
-      socket_close(fd, SC_FORCE | SC_DO_CALLBACK | SC_FINAL_CLOSE);
-      return;
     }
 #ifdef F_NETWORK_STATS
     if (!(lpc_socks[fd].flags & S_EXTERNAL)) {
@@ -1303,13 +1531,17 @@ void socket_write_select_handler(int fd) {
     lpc_socks[fd].w_off += cc;
     lpc_socks[fd].w_len -= cc;
     if (lpc_socks[fd].w_len != 0) {
+      // trigger send again
+      event_add(lpc_socks[fd].ev_write, nullptr);
       return;
     }
     FREE(lpc_socks[fd].w_buf);
     lpc_socks[fd].w_buf = nullptr;
     lpc_socks[fd].w_off = 0;
   }
+
   lpc_socks[fd].flags &= ~S_BLOCKED;
+
   if (lpc_socks[fd].state == STATE_FLUSHING) {
     socket_close(fd, SC_FORCE | SC_FINAL_CLOSE);
     return;
@@ -1319,6 +1551,12 @@ void socket_write_select_handler(int fd) {
 
   push_number(fd);
   call_callback(fd, S_WRITE_FP, 1);
+
+  // trigger send again
+  if (lpc_socks[fd].w_len != 0) {
+    event_add(lpc_socks[fd].ev_write, nullptr);
+    return;
+  }
 }
 
 /*
@@ -1342,6 +1580,15 @@ int socket_close(int fd, int flags) {
     debug(sockets, ("socket_close: apply close callback\n"));
     push_number(fd);
     call_callback(fd, S_CLOSE_FP, 1);
+  }
+
+  if (lpc_socks[fd].ssl != nullptr) {
+    SSL_shutdown(lpc_socks[fd].ssl);
+    // TODO: process write
+    SSL_free(lpc_socks[fd].ssl);
+    lpc_socks[fd].ssl = nullptr;
+    SSL_CTX_free(lpc_socks[fd].ssl_ctx);
+    lpc_socks[fd].ssl_ctx = nullptr;
   }
 
   set_read_callback(fd, nullptr);
@@ -1573,10 +1820,6 @@ static char *sockaddr_to_lpcaddr(struct sockaddr *addr, socklen_t len) {
 
   return result;
 }
-
-const char *socket_modes[] = {"MUD", "STREAM", "DATAGRAM", "STREAM_BINARY", "DATAGRAM_BINARY"};
-
-const char *socket_states[] = {"CLOSED", "CLOSING", "UNBOUND", "BOUND", "LISTEN", "DATA_XFER"};
 
 /*
  * Return an array containing info for a socket
