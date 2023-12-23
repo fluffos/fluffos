@@ -10,6 +10,12 @@ class LexStream;
 /* The end of a static buffer */
 #define EndOf(x) (x + sizeof(x) / sizeof(x[0]))
 
+/* structure for holding information about arguments for function prototype */
+struct argument_t {
+  short num_arg;
+  char flags;
+};
+
 /*
  * Information for allocating a block that can grow dynamically
  * using realloc. That means that no pointers should be kept into such

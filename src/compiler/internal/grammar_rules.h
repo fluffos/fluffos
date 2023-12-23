@@ -1,9 +1,7 @@
 #include "vm/internal/base/number.h"
 
-struct argument_t {
-  short num_arg;
-  char flags;
-};
+// in compiler.h
+struct argument_t;
 
 void rule_program(struct parse_node_t* node);
 bool rule_inheritence(struct parse_node_t** $$, int $1, char* $3);
