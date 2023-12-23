@@ -739,7 +739,7 @@ void SSL_CTX_set_verify_depth(SSL_CTX *ctx, int depth);
  *
  * @return verifying result
  */
-int verify_callback(int preverify_ok, X509_STORE_CTX *x509_ctx);
+int tls_verify_callback(int preverify_ok, X509_STORE_CTX *x509_ctx);
 
 /**
  * @brief set the session timeout time

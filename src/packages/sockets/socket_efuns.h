@@ -9,7 +9,24 @@
 
 #include <event2/util.h>
 
-enum socket_mode { MUD, STREAM, DATAGRAM, STREAM_BINARY, DATAGRAM_BINARY };
+// The number here is same as the one in include/socket.h
+enum socket_mode {
+  MUD = 0,
+  STREAM = 1,
+  DATAGRAM = 2,
+  STREAM_BINARY = 3,
+  DATAGRAM_BINARY = 4,
+  STREAM_TLS = 5,
+  STREAM_TLS_BINARY = 6
+};
+
+enum socket_option {
+  SO_INVALID = 0,
+  SO_TLS_VERIFY_PEER = 1,
+  SO_TLS_SNI_HOSTNAME = 2,
+};
+
+constexpr int NUM_SOCKET_OPTIONS = 3;
 
 enum socket_state {
   STATE_CLOSED,
@@ -17,10 +34,11 @@ enum socket_state {
   STATE_UNBOUND,
   STATE_BOUND,
   STATE_LISTEN,
+  STATE_HANDSHAKE,
   STATE_DATA_XFER
 };
 
-#define BUF_SIZE 8192 /* max reliable packet size        */
+#define BUF_SIZE 65535 /* max reliable packet size        */
 #ifdef IPV6
 #define ADDR_BUF_SIZE INET6_ADDRSTRLEN
 #else
@@ -49,18 +67,24 @@ struct lpc_socket_t {
   struct event *ev_read;
   struct event *ev_write;
   struct lpc_socket_event_data *ev_data;
+  SSL_CTX* ssl_ctx;
+  SSL* ssl;
+  svalue_t options[NUM_SOCKET_OPTIONS];
 };
 
-#define S_RELEASE 0x001
-#define S_BLOCKED 0x002
-#define S_HEADER 0x004
-#define S_WACCEPT 0x008
-#define S_BINARY 0x010
-#define S_READ_FP 0x020
-#define S_WRITE_FP 0x040
-#define S_CLOSE_FP 0x080
-#define S_EXTERNAL 0x100
-#define S_LINKDEAD 0x200
+enum socket_flags {
+  S_RELEASE = 0x001,
+  S_BLOCKED = 0x002,
+  S_HEADER = 0x004,
+  S_WACCEPT = 0x008,
+  S_BINARY = 0x010,
+  S_READ_FP = 0x020,
+  S_WRITE_FP = 0x040,
+  S_CLOSE_FP = 0x080,
+  S_EXTERNAL = 0x100,
+  S_LINKDEAD = 0x200,
+  S_TLS_SUPPORT = 0x400,
+};
 
 array_t *socket_status(int);
 array_t *socket_status_by_fd(int);

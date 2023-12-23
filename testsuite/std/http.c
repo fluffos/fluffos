@@ -36,11 +36,16 @@
 
 #define STREAM 1
 #define DATAGRAM 2
+#define STREAM_TLS 5
 
 #define STATE_RESOLVING 0
 #define STATE_CONNECTING 1
 #define STATE_CLOSED 2
 #define STATE_CONNECTED 3
+
+#define SO_TLS_VERIFY_PEER 1
+#define SO_TLS_SNI_HOSTNAME 2
+
 
 nosave mapping hostname_to_fd;
 nosave mapping status;
@@ -53,18 +58,17 @@ void create() {
 
 void socket_shutdown(int fd) {
   status[fd]["status"] = STATE_CLOSED;
-
-  tell_object(receiver, sprintf("%O", status));
+  evaluate(status[fd]["callback"], status[fd]["result"]);
 }
 
 void receive_data(int fd, mixed result) {
-    tell_object(receiver, sprintf("fd %d received: %O", fd, result));
+    tell_object(receiver, sprintf("fd %d received %d bytes.\n", fd, sizeof(result)));
+    status[fd]["result"] += result;
 }
 
 void write_data(int fd) {
   status[fd]["status"] = STATE_CONNECTED;
-
-  tell_object(receiver, sprintf("%O", status));
+  tell_object(receiver, sprintf("write_data: %O\n", status));
 
   socket_write(fd, "GET " + status[fd]["path"] + " HTTP/1.0\nHost: " + status[fd]["host"] + "\n\r\n\r");
 }
@@ -87,25 +91,35 @@ void on_resolve(string host, string addr, int key) {
     }
 
     status[fd]["status"] = STATE_CONNECTING;
-    tell_object(receiver, sprintf("%O", socket_status(fd)));
+    tell_object(receiver, sprintf("on_resolve: %O\n", socket_status(fd)));
   }
 }
 
 
-int get(string host, int port, string path) {
+int get(string host, int port, string path, int tls, mixed callback) {
   int ret;
   int fd;
 
   receiver = this_player();
 
-  fd = socket_create(STREAM, "receive_data", "socket_shutdown");
+  fd = socket_create(tls ? STREAM_TLS : STREAM, "receive_data", "socket_shutdown");
+
+  if (tls) {
+    socket_set_option(fd, SO_TLS_VERIFY_PEER, 1);
+    socket_set_option(fd, SO_TLS_SNI_HOSTNAME, host);
+  }
+
   status[fd] = ([]);
   status[fd]["status"] = STATE_RESOLVING;
   status[fd]["host"] = host;
   status[fd]["port"] = port;
   status[fd]["path"] = path;
+  status[fd]["result"] = "";
+  status[fd]["caller"] = previous_object();
+  status[fd]["callback"] = bind(callback, previous_object());
 
-  tell_object(receiver, sprintf("%O", status));
+
+  tell_object(receiver, sprintf("get: %O\n", status));
   hostname_to_fd[host] = fd;
   resolve(host, "on_resolve");
   return 0;
