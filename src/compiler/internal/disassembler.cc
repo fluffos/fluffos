@@ -414,15 +414,17 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
         break;
       }
 
-      case F_CALL_FUNCTION_BY_ADDRESS:
+      case F_CALL_FUNCTION_BY_ADDRESS: {
         COPY_SHORT(&sarg, pc);
-        pc += 3;
+        pc += sizeof(short);
+        const uint8_t args = EXTRACT_UCHAR(pc++);
         if (sarg < NUM_FUNS) {
-          sprintf(buff, "%s, args:%d", function_name(prog, sarg), sarg);
+          sprintf(buff, "%s, pushed_args:%d", function_name(prog, sarg), args);
         } else {
           sprintf(buff, "<out of range %d>", sarg);
         }
-        break;
+      }
+      break;
 
       case F_CALL_INHERITED: {
         program_t *newprog;

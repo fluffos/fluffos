@@ -18,22 +18,22 @@ void test3(int a, int* b ...) {
 }
 
 // can have multiple trailing arguments with a FP for calculating default value
-void test4(int a, string b: (: "str" :), int c: (: 0 :)) {
+void test4(int a, string b: (: "str" :), int c: (: -1 :)) {
   int x = 111, y = 222; // two local variables.
   switch(a) {
     case 1: {
       ASSERT_EQ("str", b);
-      ASSERT_EQ(0, c);
+      ASSERT_EQ(-1, c);
       break;
     }
     case 2: {
       ASSERT_EQ("aaa", b);
-      ASSERT_EQ(0, c);
+      ASSERT_EQ(-1, c);
       break;
     }
     case 3: {
       ASSERT_EQ("bbb", b);
-      ASSERT_EQ(3, c);
+      ASSERT_EQ(1, c);
       break;
     }
   }
@@ -48,7 +48,7 @@ void do_tests() {
     // direct call
     test4(1);
     test4(2, "aaa");
-    test4(3, "bbb", 3);
+    test4(3, "bbb", 1);
     // apply
     this_object()->test4(1);
     this_object()->test4(2, "aaa");

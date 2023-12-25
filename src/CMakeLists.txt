@@ -386,6 +386,7 @@ set(SRC
   "vm/internal/base/array.cc"
   "vm/internal/base/buffer.cc"
   "vm/internal/base/class.cc"
+  "vm/internal/base/debug.cc"
   "vm/internal/base/function.cc"
   "vm/internal/base/interpret.cc"
   "vm/internal/base/mapping.cc"

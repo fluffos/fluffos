@@ -224,4 +224,6 @@ inline const char *access_to_name(int mode) {
 void get_explicit_line_number_info(char *, const program_t *, const char **, int *);
 int last_instructions();
 
+void push_undefineds(int num);
+
 #endif /* _INTERPRET_H */

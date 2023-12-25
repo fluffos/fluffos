@@ -11,6 +11,7 @@
 #include "base/internal/tracing.h"
 #include "comm.h"  // add_vmessage FIXME: reverse API
 #include "thirdparty/scope_guard/scope_guard.hpp"
+#include "vm/internal/base/debug.h"
 #include "vm/internal/apply.h"
 #include "vm/internal/base/apply_cache.h"
 #include "vm/internal/base/machine.h"
@@ -323,7 +324,7 @@ void push_undefined() {
   *sp = const0u;
 }
 
-static void push_undefineds(int num) {
+void push_undefineds(int num) {
   CHECK_STACK_OVERFLOW(num);
   while (num--) {
     *++sp = const0u;
@@ -3012,20 +3013,22 @@ void eval_instruction(char *p) {
         if (current_object->prog->function_flags[offset] & (FUNC_PROTOTYPE | FUNC_UNDEFINED)) {
           error("Undefined function called: %s\n", function_name(current_object->prog, offset));
         }
-        auto saved_pc = pc;
         auto pushed_args = EXTRACT_UCHAR(pc++) + num_varargs;
         num_varargs = 0;
+        auto saved_pc = pc;
 
         auto result = get_function_at_index(current_object->prog, offset);
         auto *progp = result.first;
         auto *funcp = result.second;
 
         DEBUG_CHECK(!progp || !funcp, "BUG: Invalid Program or Illegal function index.");
-
-        if (!(funcp->type & FUNC_VARARGS)) {
+        if (!(funcp->type & FUNC_VARARGS) && funcp->min_arg != funcp->num_arg) {
+          if (pushed_args < funcp->min_arg) {
+            error("Not enough arguments to function %s, expected at least %d args, actual %d args.\n", funcp->funcname, funcp->min_arg, pushed_args);
+          }
           // for functions with default argument values, we want to invoke the closure to
           // fill in the arguments
-          if (pushed_args != funcp->num_arg && funcp->min_arg != funcp->num_arg) {
+          if (pushed_args != funcp->num_arg) {
             auto *saved_fp = sp - (pushed_args - 1);
             fp = sp; // leave the already pushed args on the stack
 
@@ -3046,6 +3049,7 @@ void eval_instruction(char *p) {
             }
 
             fp = saved_fp;
+            st_num_arg = pushed_args;
             pushed_args = funcp->num_arg;
 
             DEBUG_CHECK(sp - fp + 1 != funcp->num_arg, "Bad stack after default arguments call.");
@@ -3947,9 +3951,9 @@ void eval_instruction(char *p) {
         }
 #endif
     } /* switch (instruction) */
-    DEBUG_CHECK2(sp < fp + csp->num_local_variables - 1,
-                 "Bad stack after evaluation. Instruction '%s' (%d) \n", instrs[instruction].name,
-                 instruction);
+    DEBUG_CHECK2(sp < fp + csp->num_local_variables - 1 && dump_vm_state(),
+                 "Bad stack after evaluation. Instruction '%s' (%d) \n",
+                 instrs[instruction].name,instruction);
 #if defined(DEBUG) && 0  // super slow
     {
       svalue_t *current_stack = sp;

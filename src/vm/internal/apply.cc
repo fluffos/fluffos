@@ -8,6 +8,7 @@
 #include "base/internal/tracing.h"
 #include "vm/internal/base/apply_cache.h"
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/debug.h"
 #include "compiler/internal/compiler.h"
 #include "compiler/internal/lex.h"
 
@@ -239,6 +240,46 @@ retry_for_shadow:
     /* Check arguments */
     if (!(funflags & FUNC_VARARGS)) {
       check_co_args(num_arg, entry.progp, funp, findex);
+    }
+    /* setup default arguments if needed */
+    {
+      auto *progp = entry.progp;
+      auto *funcp = entry.funp;
+
+      DEBUG_CHECK(!progp || !funcp, "BUG: Invalid Program or Illegal function index.");
+      if (!(funcp->type & FUNC_VARARGS) && funcp->min_arg != funcp->num_arg) {
+        if (num_arg < funcp->min_arg) {
+          // COMPAT: fluffos allow apply to call functions with fewer arguments than required, so we fix it up here
+          push_undefineds(funcp->min_arg - num_arg);
+          num_arg = funcp->min_arg;
+        }
+        // for functions with default argument values, we want to invoke the closure to
+        // fill in the arguments
+        if (num_arg != funcp->num_arg) {
+          auto *saved_fp = sp - (num_arg - 1);
+          fp = sp;  // leave the already pushed args on the stack
+
+          // NOTE: this assumes default arguments closure are always generated right after the function in order
+          for (int i = num_arg; i < funcp->num_arg; i++) {
+            auto current_sp = sp;
+            auto *default_funcp = funcp + i;
+
+            push_control_stack(FRAME_FUNCTION);
+            caller_type = ORIGIN_LOCAL;
+            csp->pc = pc;
+            csp->num_local_variables = 0;
+            call_program(progp, default_funcp->address);
+
+            DEBUG_CHECK(sp - current_sp != 1 && dump_vm_state(), "Bad stack after default arguments call.");
+          }
+
+          fp = saved_fp;
+          st_num_arg = num_arg;
+          num_arg = funcp->num_arg;
+
+          DEBUG_CHECK(sp - fp + 1 != funcp->num_arg, "Bad stack after setup default arguments.");
+        }
+      }
     }
     /* Setup new call frame */
     push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE);
