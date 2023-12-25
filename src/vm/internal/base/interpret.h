@@ -162,7 +162,6 @@ svalue_t *safe_call_function_pointer(funptr_t *, int);
 void call___INIT(object_t *);
 array_t *call_all_other(array_t *, const char *, int);
 const char *function_exists(const char *, object_t *, int);
-void call_function(program_t *, int);
 void mark_apply_low_cache(void);
 void translate_absolute_line(int, unsigned short *, int *, int *);
 char *add_slash(const char *const);

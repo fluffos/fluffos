@@ -291,7 +291,7 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
     }
 
     fflush(f);
-    fprintf(f, "%04tx: ", (pc - 1) - code);
+    fprintf(f, "%04tx: ", (pc - 1) - code); // Address
 
     switch (instr) {
       case F_PUSH: {
@@ -418,7 +418,7 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
         COPY_SHORT(&sarg, pc);
         pc += 3;
         if (sarg < NUM_FUNS) {
-          sprintf(buff, "%-12s %5d", function_name(prog, sarg), sarg);
+          sprintf(buff, "%s, args:%d", function_name(prog, sarg), sarg);
         } else {
           sprintf(buff, "<out of range %d>", sarg);
         }
@@ -534,7 +534,7 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
             break;
           case FP_FUNCTIONAL:
           case FP_FUNCTIONAL | FP_NOT_BINDABLE:
-            sprintf(buff, "<functional, %d args>\nCode:", pc[0]);
+            sprintf(buff, "<functional, %d args>: Code:", pc[0]);
             pc += 3;
             break;
           case FP_ANONYMOUS:
@@ -674,9 +674,9 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
       while (saved_pc != pc) {
         p += sprintf(p, "%02hhX ", *saved_pc++);
       }
-      fprintf(f, " %-25s", tmp);
+      fprintf(f, " %-25s", tmp); // byte code in HEX
     }
-    fprintf(f, " %-20s; %s\n", query_instr_name(instr), buff);
+    fprintf(f, " %-35s; %s\n", query_instr_name(instr), buff);
   }
 
   // print last line

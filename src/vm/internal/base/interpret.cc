@@ -1,5 +1,7 @@
 #include "base/std.h"
 
+#include "vm/internal/base/interpret.h"
+
 #include <algorithm>
 #include <functional>
 #include <memory>
@@ -1435,6 +1437,37 @@ void setup_varargs_variables(int actual, int local, int num_arg) {
   push_refed_array(arr);
   push_undefineds(local);
   fp = sp - (csp->num_local_variables = local + num_arg) + 1;
+}
+
+// Return function_t for findex, walking up the inheritance tree if necessary
+// TODO: return nullptr if invalid findex
+std::pair<program_t*, function_t*> get_function_at_index(program_t* prog, int findex) {
+  if(findex < 0 || findex > prog->last_inherited + prog->num_functions_defined) {
+    return std::make_pair(nullptr, nullptr);
+  }
+  /* Walk up the inheritance tree to the real definition */
+  if (prog->function_flags[findex] & FUNC_ALIAS) {
+    findex = prog->function_flags[findex] & ~FUNC_ALIAS;
+  }
+
+  while (prog->function_flags[findex] & FUNC_INHERITED) {
+    int low, high, mid;
+    low = 0;
+    high = prog->num_inherited - 1;
+
+    while (high > low) {
+      mid = (low + high + 1) >> 1;
+      if (prog->inherit[mid].function_index_offset > findex) {
+        high = mid - 1;
+      } else {
+        low = mid;
+      }
+    }
+    findex -= prog->inherit[low].function_index_offset;
+    prog = prog->inherit[low].prog;
+  }
+  findex -= prog->last_inherited;
+  return std::make_pair(prog, &prog->function_table[findex]);
 }
 
 function_t *setup_new_frame(int findex) {
@@ -2959,8 +2992,6 @@ void eval_instruction(char *p) {
         break;
 #endif
       case F_CALL_FUNCTION_BY_ADDRESS: {
-        function_t *funp;
-
         LOAD_SHORT(offset, pc);
 
         offset += function_index_offset;
@@ -2981,6 +3012,45 @@ void eval_instruction(char *p) {
         if (current_object->prog->function_flags[offset] & (FUNC_PROTOTYPE | FUNC_UNDEFINED)) {
           error("Undefined function called: %s\n", function_name(current_object->prog, offset));
         }
+        auto saved_pc = pc;
+        auto pushed_args = EXTRACT_UCHAR(pc++) + num_varargs;
+        num_varargs = 0;
+
+        auto result = get_function_at_index(current_object->prog, offset);
+        auto *progp = result.first;
+        auto *funcp = result.second;
+
+        DEBUG_CHECK(!progp || !funcp, "BUG: Invalid Program or Illegal function index.");
+
+        if (!(funcp->type & FUNC_VARARGS)) {
+          // for functions with default argument values, we want to invoke the closure to
+          // fill in the arguments
+          if (pushed_args != funcp->num_arg && funcp->min_arg != funcp->num_arg) {
+            auto *saved_fp = sp - (pushed_args - 1);
+            fp = sp; // leave the already pushed args on the stack
+
+            // NOTE: this assumes default arguments closure are always generated right after the function in order
+            for (int i = pushed_args; i < funcp->num_arg; i++) {
+              auto current_sp = sp;
+
+              auto *default_funcp = funcp + i;
+
+              push_control_stack(FRAME_FUNCTION);
+              caller_type = ORIGIN_LOCAL;
+              csp->pc = saved_pc;
+              csp->num_local_variables = 0;
+              default_funcp = setup_new_frame(offset + i);
+              call_program(progp, default_funcp->address);
+
+              DEBUG_CHECK(sp - current_sp != 1, "Bad stack after default arguments call.");
+            }
+
+            fp = saved_fp;
+            pushed_args = funcp->num_arg;
+
+            DEBUG_CHECK(sp - fp + 1 != funcp->num_arg, "Bad stack after default arguments call.");
+          }
+        }
 
         /* Save all important global stack machine registers */
         push_control_stack(FRAME_FUNCTION);
@@ -2991,12 +3061,8 @@ void eval_instruction(char *p) {
          * If it is an inherited function, search for the real
          * definition.
          */
-        csp->num_local_variables = EXTRACT_UCHAR(pc++) + num_varargs;
-        num_varargs = 0;
-        // if(offset > USHRT_MAX)
-        // error("Broken function table"); offset is a USHRT, so this just can't
-        // happen!
-        funp = setup_new_frame(offset);
+        csp->num_local_variables = pushed_args;
+        auto *funp = setup_new_frame(offset);
         csp->pc = pc; /* The corrected return address */
         pc = current_prog->program + funp->address;
         if (Tracer::enabled()) {

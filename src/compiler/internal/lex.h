@@ -97,7 +97,7 @@ typedef struct {
 /*
  * lex.c
  */
-extern instr_t instrs[512];
+extern instr_t instrs[MAX_INSTRS];
 extern int current_line;
 extern int current_line_base;
 extern int current_line_saved;

@@ -8,6 +8,8 @@
 #include "compiler/internal/generate.h"
 #include "compiler/internal/grammar_rules.h"
 
+#include <fmt/format.h>
+
 extern int context;       // FIXME
 extern int func_present;  // FIXME
 
@@ -97,13 +99,13 @@ bool rule_inheritence(parse_node_t **$$, int $1, char *$3) {
   return false;
 }
 
-LPC_INT rule_func_type(LPC_INT $1, LPC_INT $2, char *$3) {
+LPC_INT rule_func_type(LPC_INT type, LPC_INT optional_star, char *identifier) {
   int flags;
 #ifdef SENSIBLE_MODIFIERS
   int acc_mod;
 #endif
   func_present = 1;
-  flags = ($1 >> 16);
+  flags = (type >> 16);
 
   flags |= global_modifiers;
 
@@ -128,30 +130,30 @@ LPC_INT rule_func_type(LPC_INT $1, LPC_INT $2, char *$3) {
     flags &= ~DECL_NOSAVE;
   }
 #endif
-  $1 = (flags << 16) | ($1 & 0xffff);
+  type = (flags << 16) | (type & 0xffff);
   /* Handle type checking here so we know whether to typecheck
      'argument' */
-  if ($1 & 0xffff) {
+  if (type & 0xffff) {
     if (CONFIG_INT(__RC_OLD_TYPE_BEHAVIOR__)) {
       exact_types = 0;
     } else {
-      exact_types = ($1 & 0xffff) | $2;
+      exact_types = (type & 0xffff) | optional_star;
     }
   } else {
     if (pragmas & PRAGMA_STRICT_TYPES) {
-      if (strcmp($3, "create") != 0)
+      if (strcmp(identifier, "create") != 0)
         yyerror("\"#pragma strict_types\" requires type of function");
       else
         exact_types = TYPE_VOID; /* default for create() */
     } else
       exact_types = 0;
   }
-  return $1;
+  return type;
 }
 
-LPC_INT rule_func_proto(LPC_INT $1, LPC_INT $2, char **$3, argument_t $5) {
-  char *p = *$3;
-  *$3 = (char *)make_shared_string(*$3);
+LPC_INT rule_func_proto(LPC_INT type, LPC_INT optional_star, char **identifier, argument_t argument) {
+  char *p = *identifier;
+  *identifier = (char *)make_shared_string(*identifier);
   scratch_free(p);
 
   /* If we had nested functions, we would need to check */
@@ -163,47 +165,91 @@ LPC_INT rule_func_proto(LPC_INT $1, LPC_INT $2, char **$3, argument_t $5) {
    */
 
   LPC_INT func_types = FUNC_PROTOTYPE;
-  if ($5.flags & ARG_IS_VARARGS) {
+  if (argument.flags & ARG_IS_VARARGS) {
     func_types |= (FUNC_TRUE_VARARGS | FUNC_VARARGS);
   }
-  func_types |= ($1 >> 16);
+  func_types |= (type >> 16);
 
-  define_new_function(*$3, $5.num_arg, 0, func_types, ($1 & 0xffff) | $2);
+  define_new_function(*identifier, argument.num_arg, 0, func_types, (type & 0xffff) | optional_star);
   /* This is safe since it is guaranteed to be in the
      function table, so it can't be dangling */
-  free_string(*$3);
+  free_string(*identifier);
   context = 0;
 
   return func_types;
 }
 
-void rule_func(parse_node_t **$$, LPC_INT $1, LPC_INT $2, char *$3, argument_t $5, LPC_INT *$8,
-               parse_node_t **$9) {
+void rule_func(parse_node_t **function, LPC_INT type, LPC_INT optional_star, char *identifier, argument_t argument, LPC_INT *func_types,
+               parse_node_t **block_or_semi) {
   /* Either a prototype or a block */
-  if (*$9) {
+  if (*block_or_semi) {
     int fun;
 
-    *$8 &= ~FUNC_PROTOTYPE;
-    if ((*$9)->kind != NODE_RETURN &&
-        ((*$9)->kind != NODE_TWO_VALUES || (*$9)->r.expr->kind != NODE_RETURN)) {
+    *func_types &= ~FUNC_PROTOTYPE;
+    if ((*block_or_semi)->kind != NODE_RETURN &&
+        ((*block_or_semi)->kind != NODE_TWO_VALUES || (*block_or_semi)->r.expr->kind != NODE_RETURN)) {
       parse_node_t *replacement;
-      CREATE_STATEMENTS(replacement, *$9, 0);
+      CREATE_STATEMENTS(replacement, *block_or_semi, 0);
       CREATE_RETURN(replacement->r.expr, 0);
-      *$9 = replacement;
+      *block_or_semi = replacement;
     }
 
-    fun = define_new_function($3, $5.num_arg, max_num_locals - $5.num_arg, *$8, ($1 & 0xffff) | $2);
+    // Creating functions for argument defaults
+    fun = define_new_function(identifier, argument.num_arg, max_num_locals - argument.num_arg, *func_types, (type & 0xffff) | optional_star);
     if (fun != -1) {
-      *$$ = new_node_no_line();
-      (*$$)->kind = NODE_FUNCTION;
-      (*$$)->v.number = fun;
-      (*$$)->l.number = max_num_locals;
-      (*$$)->r.expr = *$9;
+      *function = new_node_no_line();
+      (*function)->kind = NODE_FUNCTION;
+      (*function)->v.number = fun;
+      (*function)->l.number = max_num_locals;
+      (*function)->r.expr = *block_or_semi;
+
+      if (argument.num_arg) {
+        for (int i = 0; i < current_number_of_locals; i++) {
+          auto local = locals_ptr[i];
+          if (local.funcptr_default) {
+            FUNC(fun)->min_arg--;
+            auto funcname = fmt::format(FMT_STRING("__{}_{}"), identifier, local.ihe->name);
+
+            // needs to be called twice
+            define_new_function(funcname.c_str(), 0, 0,
+                                *func_types | FUNC_PROTOTYPE, // same access as origin function
+                                type_of_locals_ptr[locals_ptr[i].runtime_index]);
+            auto funcnum = define_new_function(funcname.c_str(), 0, 0,
+                                               *func_types, // same access as origin function
+                                               type_of_locals_ptr[locals_ptr[i].runtime_index]);
+            FUNC(fun)->default_args_findex[i] = funcnum;
+
+            parse_node_t *node_efun_expr_node;
+            CREATE_EXPR_NODE(node_efun_expr_node, local.funcptr_default, 0);
+
+            parse_node_t *node_efun_expr_list;
+            CREATE_EXPR_LIST(node_efun_expr_list, node_efun_expr_node);
+
+            parse_node_t *node_call_eval = new_node_no_line();
+            node_call_eval->kind = NODE_EFUN;
+            node_call_eval->l.number = 1;
+            node_call_eval->v.number = F__EVALUATE;
+            node_call_eval->r.expr =  node_efun_expr_list;
+
+            parse_node_t *node_return;
+            CREATE_RETURN(node_return, node_call_eval);
+
+            auto *node_func = new_node_no_line();
+            node_func->kind = NODE_FUNCTION;
+            node_func->v.number = funcnum;
+            node_func->l.number = 0;
+            node_func->r.expr = node_return;
+
+            auto *newnode = *function;
+            CREATE_TWO_VALUES(*function, 0, newnode, node_func);
+          }
+        }
+      }
     } else
-      *$$ = 0;
+      *function = 0;
   } else
-    *$$ = 0;
-  free_all_local_names(!!(*$9));
+    *function = 0;
+  free_all_local_names(!!(*block_or_semi));
 }
 
 ident_hash_elem_t *rule_define_class(LPC_INT *$$, char *$3) {

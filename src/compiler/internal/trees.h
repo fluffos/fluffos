@@ -147,13 +147,17 @@ typedef struct parse_node_block_s {
   SAFE((vn) = new_node_no_line(); (vn)->kind = NODE_NUMBER; \
        (vn)->type = (val ? TYPE_NUMBER : TYPE_ANY); (vn)->v.number = val;)
 #define CREATE_STRING(vn, val)                                                        \
-  SAFE((vn) = new_node_no_line(); (vn)->kind = NODE_STRING; (vn)->type = TYPE_STRING; \
+  SAFE((vn) = new_node_no_line();                                                     \
+       (vn)->kind = NODE_STRING; (vn)->type = TYPE_STRING;                            \
        (vn)->v.number = store_prog_string(val);)
 #define CREATE_EXPR_LIST(vn, pn)                                                  \
-  SAFE((vn) = new_node(); (vn)->v.number = (pn ? ((parse_node_t *)pn)->kind : 0); \
-       (vn)->l.expr = (pn ? ((parse_node_t *)pn)->l.expr : (vn)); (vn)->r.expr = pn;)
+  SAFE((vn) = new_node();                                                         \
+       (vn)->v.number = (pn ? ((parse_node_t *)pn)->kind : 0);                    \
+       (vn)->l.expr = (pn ? ((parse_node_t *)pn)->l.expr : (vn));                 \
+       (vn)->r.expr = pn;)
 #define CREATE_EXPR_NODE(vn, pn, f)                                                       \
-  SAFE((vn) = new_node_no_line(); (vn)->v.expr = pn; (vn)->l.expr = vn; (vn)->r.expr = 0; \
+  SAFE((vn) = new_node_no_line();                                                         \
+       (vn)->v.expr = pn; (vn)->l.expr = vn; (vn)->r.expr = 0;                            \
        (vn)->type = f;)
 #define CREATE_CATCH(vn, pn) \
   SAFE((vn) = new_node(); (vn)->kind = NODE_CATCH; (vn)->type = TYPE_ANY; (vn)->r.expr = pn;)

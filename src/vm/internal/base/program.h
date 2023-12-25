@@ -126,8 +126,9 @@
 
 #define LOCAL_MOD_REF 0x0100
 #define LOCAL_MOD_UNUSED 0x0200
+#define LOCAL_MOD_DEFAULT 0x400
 
-#define LOCAL_MODS (LOCAL_MOD_UNUSED | LOCAL_MOD_REF)
+#define LOCAL_MODS (LOCAL_MOD_UNUSED | LOCAL_MOD_REF | LOCAL_MOD_DEFAULT)
 
 typedef struct {
   unsigned char num_arg;
@@ -165,8 +166,10 @@ struct function_t {
   const char *funcname;
   unsigned short type;
   unsigned char num_arg;
+  uint8_t min_arg;
   unsigned char num_local;
   ADDRESS_TYPE address;
+  int default_args_findex[16]; // FIXME: support more than 16 default args
 #ifdef PROFILE_FUNCTIONS
   unsigned long calls, self, children;
 #endif

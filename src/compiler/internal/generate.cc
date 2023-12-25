@@ -649,7 +649,7 @@ void dump_tree(parse_node_t *expr) {
       printf(")");
       break;
     case NODE_EFUN:
-      printf("(%s ", instrs[expr->v.number & ~NOVALUE_USED_FLAG].name);
+      printf("(efun %s ", instrs[expr->v.number & ~NOVALUE_USED_FLAG].name);
       dump_expr_list(expr->r.expr);
       printf(")");
       break;

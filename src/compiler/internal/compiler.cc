@@ -18,6 +18,7 @@
 #include "scratchpad.h"
 #include "symbol.h"
 #include <string>
+#include <utility>
 
 #include "vm/internal/base/machine.h"  // for error(), FIXME
 
@@ -42,7 +43,7 @@ extern object_t *simul_efun_ob;
 extern svalue_t *safe_apply_master_ob(int, int);
 
 static void clean_parser(void);
-static void prolog(std::unique_ptr<LexStream>, char * /*name*/);
+static void prolog(std::unique_ptr<LexStream>, const char * /*name*/);
 static program_t *epilog(void);
 static void show_overload_warnings(void);
 
@@ -210,24 +211,26 @@ void pop_n_locals(int num) {
   }
 }
 
-int add_local_name(const char *str, int type) {
+int add_local_name(const char *str, int type, parse_node_t* optional_default_arg_value) {
   auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
 
   if (max_num_locals == max_local_variables) {
     yyerror("Too many local variables");
     return 0;
-  } else {
-    ident_hash_elem_t *ihe;
-    symbol_record(OP_SYMBOL_NEW, current_file, current_line, str);
-    ihe = find_or_add_ident(str, FOA_NEEDS_MALLOC);
-    type_of_locals_ptr[max_num_locals] = type;
-    locals_ptr[current_number_of_locals].ihe = ihe;
-    locals_ptr[current_number_of_locals++].runtime_index = max_num_locals;
-    if (ihe->dn.local_num == -1) {
-      ihe->sem_value++;
-    }
-    return ihe->dn.local_num = max_num_locals++;
   }
+
+  ident_hash_elem_t *ihe;
+  symbol_record(OP_SYMBOL_NEW, current_file, current_line, str);
+  ihe = find_or_add_ident(str, FOA_NEEDS_MALLOC);
+  type_of_locals_ptr[max_num_locals] = type;
+  auto idx = current_number_of_locals++;
+  locals_ptr[idx].ihe = ihe;
+  locals_ptr[idx].funcptr_default = optional_default_arg_value;
+  locals_ptr[idx].runtime_index = max_num_locals;
+  if (ihe->dn.local_num == -1) {
+    ihe->sem_value++;
+  }
+  return ihe->dn.local_num = max_num_locals++;
 }
 
 void reallocate_locals() {
@@ -1049,7 +1052,8 @@ int define_new_function(const char *name, int num_arg, int num_local, int flags,
      * 5.   A "late" prototype has been encountered.
      */
     if (funflags & FUNC_ALIAS) {
-      fatal("Inconsistent aliasing of functions!\n");
+      yyerror("Inconsistent aliasing of functions!\n");
+      return -1;
     }
 
     if (!(funflags & (FUNC_INHERITED | FUNC_PROTOTYPE | FUNC_UNDEFINED)) &&
@@ -1181,11 +1185,14 @@ int define_new_function(const char *name, int num_arg, int num_local, int flags,
   if (exact_types) {
     flags |= FUNC_STRICT_TYPES;
   }
-  DEBUG_CHECK(!(flags & DECL_ACCESS), "No access level for function!\n");
+  if(!(flags & DECL_ACCESS)) {
+    yyerror("No access level for function!\n");
+  }
   newfunc->flags = flags;
 
   funp->num_local = num_local;
   funp->num_arg = num_arg;
+  funp->min_arg = num_arg;
   funp->type = type;
   funp->address = 0;
 #ifdef PROFILE_FUNCTIONS
@@ -1224,6 +1231,7 @@ int define_new_function(const char *name, int num_arg, int num_local, int flags,
   if (flags & FUNC_PROTOTYPE) {
     symbol_record(OP_SYMBOL_FUNC, current_file, current_line, name);
   }
+
   return newindex;
 }
 
@@ -1584,9 +1592,9 @@ int validate_function_call(int f, parse_node_t *args) {
       if (num_var) {
         yyerror("Illegal to pass a variable number of arguments to non-varargs function '%s'.",
                 funp->funcname);
-      } else if (funp->num_arg != num_arg) {
-        yyerror("Wrong number of arguments to '%s', expected: %d, got: %d.", funp->funcname,
-                funp->num_arg, num_arg);
+      } else if (funp->num_arg != num_arg && num_arg < funp->min_arg) {
+          yyerror("Wrong number of arguments to '%s', expected: %d, minimum: %d, got: %d.", funp->funcname,
+                  funp->num_arg, funp->min_arg, num_arg);
       }
     }
     /*
@@ -1611,13 +1619,13 @@ int validate_function_call(int f, parse_node_t *args) {
     if (arg_types) {
       int arg, i, tmp;
       parse_node_t *enode = args;
-      int fnarg = funp->num_arg;
+      int fnarg = funp->min_arg;
 
       if (funflags & FUNC_TRUE_VARARGS) {
         fnarg--;
       }
 
-      for (i = 0; static_cast<unsigned>(i) < fnarg && i < num_arg; i++) {
+      for (i = 0; i < fnarg && i < num_arg; i++) {
         if (enode->type & 1) {
           break;
         }
@@ -1990,7 +1998,7 @@ void yywarn(const char *fmt, ...) {
 /*
  * Compile an LPC file.
  */
-program_t *compile_file(std::unique_ptr<LexStream> stream, char *name) {
+program_t *compile_file(std::unique_ptr<LexStream> stream, const char *name) {
   int yyparse(void);
   static int guard = 0;
   program_t *prog;
@@ -2248,9 +2256,13 @@ static program_t *epilog(void) {
 
   current_tree = TREE_MAIN;
   generate(comp_trees[TREE_MAIN]);
+  // DEBUG:
+  // dump_tree(comp_trees[TREE_MAIN]);
 
   current_tree = TREE_INIT;
   generate(comp_trees[TREE_INIT]);
+  // DEBUG:
+  // dump_tree(comp_trees[TREE_INIT]);
 
   current_tree = TREE_MAIN;
 
@@ -2460,7 +2472,7 @@ static program_t *epilog(void) {
 /*
  * Initialize the environment that the compiler needs.
  */
-static void prolog(std::unique_ptr<LexStream> stream, char *name) {
+static void prolog(std::unique_ptr<LexStream> stream, const char *name) {
   int i;
 
   function_context.num_parameters = -1;
@@ -2719,7 +2731,7 @@ void save_file_info(int file_id, int lines) {
   add_to_mem_block(A_FILE_INFO, (char *)&fi[0], sizeof(fi));
 }
 
-int add_program_file(char *name, int top) {
+int add_program_file(const char *name, int top) {
   if (!top) {
     add_to_mem_block(A_INCLUDES, name, strlen(name) + 1);
   }
