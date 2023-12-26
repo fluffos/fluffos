@@ -126,8 +126,9 @@
 
 #define LOCAL_MOD_REF 0x0100
 #define LOCAL_MOD_UNUSED 0x0200
+#define LOCAL_MOD_DEFAULT 0x400
 
-#define LOCAL_MODS (LOCAL_MOD_UNUSED | LOCAL_MOD_REF)
+#define LOCAL_MODS (LOCAL_MOD_UNUSED | LOCAL_MOD_REF | LOCAL_MOD_DEFAULT)
 
 typedef struct {
   unsigned char num_arg;
@@ -164,9 +165,16 @@ typedef struct {
 struct function_t {
   const char *funcname;
   unsigned short type;
-  unsigned char num_arg;
+  uint8_t num_arg;
+  uint8_t min_arg;
   unsigned char num_local;
   ADDRESS_TYPE address;
+  // Default args can only be specified in a continuous trailing format
+  // and because their function is always generated after the original function
+  // the findex value can never be 0, we can use 0 as null value for easy initialization.
+  // The default args are stored in the order they are specified in the source code.
+  // TODO: this limits the function that uses default args to only have 16 args.
+  uint16_t default_args_findex[16];
 #ifdef PROFILE_FUNCTIONS
   unsigned long calls, self, children;
 #endif

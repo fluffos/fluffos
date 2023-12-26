@@ -480,6 +480,14 @@ void make_efun_tables() {
   fprintf(f, "#include \"base/std.h\"\n\n");
   fprintf(f, "#include \"" EFUN_H "\"\n");
 
+  fprintf(f, "\n/* Operator names */\n");
+  fprintf(f, "const char* operator_names[] = {\n");
+  fprintf(f, "    \"INVALID OPCODE\", // 0\n");
+  for (int i = 0; i < op_code; i++) {
+    fprintf(f, "    \"%s\", // %s: %d \n ", oper_codes[i], oper_codes[i], i+1);
+  }
+  fprintf(f, "};\n");
+
   fprintf(f, "\n// EFUN tables\n\n");
   fprintf(f, "func_t efun_table[] = {\n");
   for (int i = 0; i < efun_code; i++) {
@@ -535,6 +543,7 @@ void make_efun_tables() {
     fprintf(f, "#define %-30s %d\n", oper_codes[i], i + 1);
     total_code++;
   }
+
   fprintf(f, "\n/* efuns */\n");
 
   int efun_base = op_code + 1;
@@ -551,7 +560,8 @@ void make_efun_tables() {
     fprintf(f, "void f_%s (void);\n", efun_names[i]);
   }
   fprintf(f, "typedef void (*func_t) (void);\n\n");
-  fprintf(f, "extern func_t efun_table[];");
+  fprintf(f, "extern func_t efun_table[];\n");
+  fprintf(f, "extern const char* operator_names[];\n");
 
   /* Now sort the main_list */
   for (int i = 0; i < num_buff; i++) {

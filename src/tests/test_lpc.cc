@@ -52,8 +52,6 @@ TEST_F(DriverTest, TestInMemoryCompileFile) {
   prog = compile_file(std::move(stream), "test");
 
   ASSERT_NE(prog, nullptr);
-  dump_prog(prog, stdout, 1 | 2);
-
   deallocate_program(prog);
 }
 
@@ -64,4 +62,69 @@ TEST_F(DriverTest, TestInMemoryCompileFileFail) {
   prog = compile_file(std::move(stream), "test");
 
   ASSERT_EQ(prog, nullptr);
+}
+
+TEST_F(DriverTest, TestValidLPC_FunctionDeafultArgument) {
+  const char* source = R"(
+// default case
+void test1() {
+}
+
+// default case
+void test2(int a, int b) {
+  ASSERT_EQ(a, 1);
+  ASSERT_EQ(b, 2);
+}
+
+// varargs
+void test3(int a, int* b ...) {
+  ASSERT_EQ(a, 1);
+  ASSERT_EQ(b[0], 2);
+  ASSERT_EQ(b[1], 3);
+  ASSERT_EQ(b[2], 4);
+  ASSERT_EQ(b[3], 5);
+}
+
+// can have multiple trailing arguments with a FP for calculating default value
+void test4(int a, string b: (: "str" :), int c: (: 0 :)) {
+  switch(a) {
+    case 1: {
+      ASSERT_EQ("str", b);
+      ASSERT_EQ(0, c);
+      break;
+    }
+    case 2: {
+      ASSERT_EQ("aaa", b);
+      ASSERT_EQ(0, c);
+      break;
+    }
+    case 3: {
+      ASSERT_EQ("bbb", b);
+      ASSERT_EQ(3, c);
+      break;
+    }
+  }
+}
+
+void do_tests() {
+    test1();
+    test2(1, 2);
+    test3(1, 2, 3, 4, 5);
+    // direct call
+    test4(1);
+    test4(2, "aaa");
+    test4(3, "bbb", 3);
+    // apply
+    this_object()->test4(1);
+    this_object()->test4(2, "aaa");
+    this_object()->test4(3, "bbb", 3);
+}
+  )";
+  std::istringstream iss(source);
+  auto stream = std::make_unique<IStreamLexStream>(iss);
+  auto *prog = compile_file(std::move(stream), "test");
+
+  ASSERT_NE(prog, nullptr);
+  dump_prog(prog, stdout, 1 | 2);
+  deallocate_program(prog);
 }

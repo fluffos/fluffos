@@ -8,8 +8,10 @@
 #include "base/internal/tracing.h"
 #include "vm/internal/base/apply_cache.h"
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/debug.h"
 #include "compiler/internal/compiler.h"
 #include "compiler/internal/lex.h"
+#include "compiler/internal/disassembler.h"
 
 // global static result
 svalue_t apply_ret_value;
@@ -235,6 +237,59 @@ retry_for_shadow:
           access_to_name(funflags & DECL_ACCESS));
       pop_n_elems(num_arg);
       return 0;
+    }
+    /* setup default arguments if needed */
+    {
+      auto *progp = entry.progp;
+      auto *funcp = entry.funp;
+
+      if (!(funcp->type & FUNC_VARARGS) && funcp->min_arg != funcp->num_arg) {
+        if (num_arg < funcp->min_arg) {
+          // COMPAT: fluffos allow apply to call functions with fewer arguments than required, so we fix it up here
+          push_undefineds(funcp->min_arg - num_arg);
+          num_arg = funcp->min_arg;
+        }
+        // for functions with default argument values, we want to invoke the closure to
+        // fill in the arguments
+        if (num_arg != funcp->num_arg) {
+          auto *saved_fp = fp;
+          fp = sp;  // leave the already pushed args on the stack
+
+          // NOTE: this assumes default arguments closure are always generated right after the function in order
+          for (int i = num_arg; i < funcp->num_arg; i++) {
+            auto current_sp = sp;
+            auto *default_funcp =progp->function_table + funcp->default_args_findex[i];
+            if(default_funcp->funcname[0]!='_') {
+                  dump_vm_state();
+                  dump_prog(progp, stdout, 1|2);
+                  error("Illegal default argument function name %s in %s\n", default_funcp->funcname, progp->filename);
+            }
+            // notice we don't change current_object here, so the default arguments closure
+            // will be called in the context of the caller
+            fp = sp + 1; // zero args
+            push_control_stack(FRAME_FUNCTION);
+            caller_type = ORIGIN_LOCAL;
+            csp->pc = pc;
+            csp->num_local_variables = 0;
+            current_prog = progp;
+            call_program(progp, default_funcp->address);
+
+            // get the returned closure then evaluate for the real value
+            svalue_t sv_funcp;
+            assign_svalue_no_free(&sv_funcp, sp);
+            pop_stack();
+
+            // evaluate the closure in current context
+            push_svalue(call_function_pointer(sv_funcp.u.fp, 0));
+            free_svalue(&sv_funcp, "apply_low");
+
+            DEBUG_CHECK(sp - current_sp != 1 && dump_vm_state(), "Bad stack after default arguments call.");
+          }
+
+          fp = saved_fp;
+          num_arg = funcp->num_arg;
+        }
+      }
     }
     /* Check arguments */
     if (!(funflags & FUNC_VARARGS)) {

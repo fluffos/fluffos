@@ -3364,9 +3364,12 @@ static void int_add_instr_name(const char *name, int n, short t) {
 static void init_instrs() {
   unsigned int i, n;
 
+  // operators
   for (i = 0; i < EFUN_BASE; i++) {
-    instrs[i].ret_type = -1;
+    instrs[i].name = operator_names[i];
+    instrs[i].ret_type = T_ANY;
   }
+
   for (i = 0; i < size_of_predefs; i++) {
     n = predefs[i].token;
     if (n & F_ALIAS_FLAG) {
@@ -3483,7 +3486,7 @@ static void init_instrs() {
   add_instr_name("parse_command", "c_parse_command(%i);\n", F_PARSE_COMMAND, T_NUMBER);
   add_instr_name("string", 0, F_STRING, T_STRING);
   add_instr_name("short_string", 0, F_SHORT_STRING, T_STRING);
-  add_instr_name("call", "c_call(%i, %i);\n", F_CALL_FUNCTION_BY_ADDRESS, T_ANY);
+  add_instr_name("F_CALL_FUNCTION_BY_ADDRESS", "c_call(%i, %i);\n", F_CALL_FUNCTION_BY_ADDRESS, T_ANY);
   add_instr_name("call_inherited", "c_call_inherited(%i, %i, %i);\n", F_CALL_INHERITED, T_ANY);
   add_instr_name("aggregate_assoc", "C_AGGREGATE_ASSOC(%i);\n", F_AGGREGATE_ASSOC, T_MAPPING);
 #ifdef DEBUG
