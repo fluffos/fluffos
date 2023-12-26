@@ -10,6 +10,12 @@ class LexStream;
 /* The end of a static buffer */
 #define EndOf(x) (x + sizeof(x) / sizeof(x[0]))
 
+/* structure for holding information about arguments for function prototype */
+struct argument_t {
+  short num_arg;
+  char flags;
+};
+
 /*
  * Information for allocating a block that can grow dynamically
  * using realloc. That means that no pointers should be kept into such
@@ -77,6 +83,7 @@ struct mem_block_t {
 
 struct local_info_t {
   int runtime_index;
+  parse_node_t *funcptr_default;
   struct ident_hash_elem_t *ihe;
 };
 
@@ -190,7 +197,7 @@ char *get_type_name(char *, char *, int);
 void init_locals(void);
 
 void save_file_info(int, int);
-int add_program_file(char *, int);
+int add_program_file(const char *, int);
 void yyerror(const char *fmt, ...);
 void yywarn(const char *fmt, ...);
 char *the_file_name(const char *);
@@ -199,11 +206,11 @@ void pop_n_locals(int);
 void reactivate_current_locals(void);
 void clean_up_locals(void);
 void deactivate_current_locals(void);
-int add_local_name(const char *, int);
+int add_local_name(const char *, int, parse_node_t* = nullptr);
 void reallocate_locals(void);
 void initialize_locals(void);
 int get_id_number(void);
-program_t *compile_file(std::unique_ptr<LexStream>, char *);
+program_t *compile_file(std::unique_ptr<LexStream>, const char *);
 void reset_function_blocks(void);
 void copy_variables(program_t *, int);
 void copy_structures(const program_t *);

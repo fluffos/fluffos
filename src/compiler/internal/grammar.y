@@ -190,6 +190,7 @@ int yyparse (void);
 %type <string> new_local_name
 
 /* The following return a parse node */
+%type <node> optional_default_arg_value
 %type <node> number real string expr0 comma_expr for_expr sscanf catch
 %type <node> parse_command time_expression expr_list expr_list2 expr_list3
 %type <node> expr_list4 assoc_pair expr4 lvalue function_call lvalue_list
@@ -260,9 +261,9 @@ identifier:
 ;
 
 function:
-  type optional_star identifier   { $1 = rule_func_type($1, $2, $3); }
-    '(' argument ')'              { $<number>$ = rule_func_proto($1, $2, &$3, $6); }
-      block_or_semi               { rule_func(&$$, $1, $2, $3, $6, &$<number>8, &$9); }
+  type optional_star identifier   { $type = rule_func_type($type, $optional_star, $identifier); }
+    '(' argument ')'              { $<number>$ = rule_func_proto($type, $optional_star, &$identifier, $argument); }
+      block_or_semi               { rule_func(&$$, $type, $optional_star, $identifier, $argument, &$<number>8, &$block_or_semi); }
 
 
 def:
@@ -368,6 +369,27 @@ arg_type:
   | basic_type ref { $$ = $1 | LOCAL_MOD_REF; }
 ;
 
+optional_default_arg_value:
+  %empty { $$ = 0; }
+ | ':' L_FUNCTION_OPEN comma_expr ':' ')' {
+    if (CONFIG_INT(__RC_WOMBLES__)) {
+        if(*(outp-2) != ':') {
+          yyerror("End of functional not found");
+        }
+    }
+    if (current_function_context->num_locals)
+        yyerror("Illegal to use local variable in functional.");
+    if (current_function_context->values_list->r.expr)
+        current_function_context->values_list->r.expr->kind = current_function_context->values_list->kind;
+
+    $$ = new_node();
+    $$->kind = NODE_FUNCTION_CONSTRUCTOR;
+    $$->type = TYPE_FUNCTION;
+    $$->l.expr = $3;
+    $$->r.expr = nullptr; // no arguments
+    $$->v.number = FP_FUNCTIONAL + 0 /* args */;
+}
+
 new_arg:
   arg_type optional_star
                                               {
@@ -375,11 +397,11 @@ new_arg:
                                                 if ($1 != TYPE_VOID)
                                                   add_local_name("", $1 | $2);
                                               }
-  | arg_type optional_star new_local_name
+  | arg_type optional_star new_local_name optional_default_arg_value
                                               {
                                                 if ($1 == TYPE_VOID)
                                                   yyerror("Illegal to declare argument of type void.");
-                                                add_local_name($3, $1 | $2);
+                                                add_local_name($3, $1 | $2, $optional_default_arg_value);
                                                 scratch_free($3);
                                                 $$ = $1 | $2;
                                               }

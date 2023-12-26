@@ -23,6 +23,7 @@
 #include "interactive.h"  // for interactive_t, FIXME
 #include "vm/internal/apply.h"
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/debug.h"
 #include "vm/internal/master.h"
 #include "vm/internal/otable.h"
 #include "vm/internal/simul_efun.h"
@@ -1662,7 +1663,7 @@ void free_sentence(sentence_t *p) {
       if (current_object) {
         debug_message("(current object was /%s)\n", current_object->obname);
       }
-
+      dump_vm_state();
       dump_trace(1);
 #ifdef PACKAGE_MUDLIB_STATS
       save_stat_files();

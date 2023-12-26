@@ -12,7 +12,21 @@ public string clear_last_error() {
   last_error = "";
 }
 
+// find stack right before __assert
+private mapping* trace_to_last_assert() {
+  mapping *trace = dump_trace();
+  for (int i = 0; i < sizeof(trace); i++) {
+    if (trace[i]["function"][0..7] == "__assert") {
+      return trace[0..i];
+    }
+  }
+  return trace;
+}
+
 public string get_last_error() {
+  if (last_error == "") {
+    return sprintf("%O", trace_to_last_assert());
+  }
   return last_error;
 }
 

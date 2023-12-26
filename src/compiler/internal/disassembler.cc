@@ -6,6 +6,8 @@
 #include "compiler/internal/lex.h"
 #include "compiler/internal/icode.h"
 
+#include <fmt/format.h>
+
 static void disassemble(FILE *f /*f*/, char *code /*code*/, int /*start*/ start, int /*end*/ end,
                         program_t *prog /*prog*/);
 static const char *disassem_string(const char * /*str*/);
@@ -76,8 +78,8 @@ void dump_prog(program_t *prog, FILE *f, int flags) {
             prog->inherit[i].function_index_offset, prog->inherit[i].variable_index_offset);
   }
   fprintf(f, "FUNCTIONS:\n");
-  fprintf(f, "      name                  offset  mods   flags   fio  # locals  # args\n");
-  fprintf(f, "      --------------------- ------  ----  -------  ---  --------  ------\n");
+  fprintf(f, "      name                  offset  mods   flags   fio  # locals  # args # def args\n");
+  fprintf(f, "      --------------------- ------  ----  -------  ---  --------  ------ ----------\n");
   num_funcs_total = prog->last_inherited + prog->num_functions_defined;
 
   for (i = 0; i < num_funcs_total; i++) {
@@ -130,9 +132,17 @@ void dump_prog(program_t *prog, FILE *f, int flags) {
       fprintf(f, "%4d: %-20s  %6d  %4s  %7s  %3d\n", i, func_entry->funcname, low, smods, sflags,
               runtime_index - prog->inherit[low].function_index_offset);
     } else {
-      fprintf(f, "%4d: %-20s  %6d  %4s  %7s        %7d   %5d\n", i, func_entry->funcname,
-              runtime_index - prog->last_inherited, smods, sflags, func_entry->num_arg,
-              func_entry->num_local);
+      fprintf(f, "%4d: %-20s  %6d  %4s  %7s        %7d   %5d %10d", i, func_entry->funcname,
+              runtime_index - prog->last_inherited, smods, sflags, func_entry->num_local,
+              func_entry->num_arg, func_entry->num_arg - func_entry->min_arg);
+
+      std::string default_arg_findex_map;
+      for(int j = 0; j < func_entry->num_arg; j++) {
+        if (func_entry->default_args_findex[j] != 0) {
+          default_arg_findex_map += fmt::format(FMT_STRING(" {}:{}"), j, func_entry->default_args_findex[j]);
+        }
+      }
+      fprintf(f, " %s\n", default_arg_findex_map.c_str());
     }
   }
 
@@ -291,7 +301,7 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
     }
 
     fflush(f);
-    fprintf(f, "%04tx: ", (pc - 1) - code);
+    fprintf(f, "%04tx: ", (pc - 1) - code); // Address
 
     switch (instr) {
       case F_PUSH: {
@@ -414,15 +424,17 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
         break;
       }
 
-      case F_CALL_FUNCTION_BY_ADDRESS:
+      case F_CALL_FUNCTION_BY_ADDRESS: {
         COPY_SHORT(&sarg, pc);
-        pc += 3;
+        pc += sizeof(short);
+        const uint8_t args = EXTRACT_UCHAR(pc++);
         if (sarg < NUM_FUNS) {
-          sprintf(buff, "%-12s %5d", function_name(prog, sarg), sarg);
+          sprintf(buff, "%s, pushed_args:%d", function_name(prog, sarg), args);
         } else {
           sprintf(buff, "<out of range %d>", sarg);
         }
-        break;
+      }
+      break;
 
       case F_CALL_INHERITED: {
         program_t *newprog;
@@ -533,10 +545,13 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
             }
             break;
           case FP_FUNCTIONAL:
-          case FP_FUNCTIONAL | FP_NOT_BINDABLE:
-            sprintf(buff, "<functional, %d args>\nCode:", pc[0]);
-            pc += 3;
+          case FP_FUNCTIONAL | FP_NOT_BINDABLE: {
+            uint8_t num_args = EXTRACT_UCHAR(pc++);
+            uint16_t size;
+            LOAD_SHORT(size, pc);
+            sprintf(buff, "<functional, %d args>: Code size: %d,", num_args, size);
             break;
+          }
           case FP_ANONYMOUS:
           case FP_ANONYMOUS | FP_NOT_BINDABLE:
             COPY_SHORT(&sarg, &pc[2]);
@@ -674,9 +689,9 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
       while (saved_pc != pc) {
         p += sprintf(p, "%02hhX ", *saved_pc++);
       }
-      fprintf(f, " %-25s", tmp);
+      fprintf(f, " %-25s", tmp); // byte code in HEX
     }
-    fprintf(f, " %-20s; %s\n", query_instr_name(instr), buff);
+    fprintf(f, " %-35s; %s\n", query_instr_name(instr), buff);
   }
 
   // print last line
