@@ -204,22 +204,24 @@ void rule_func(parse_node_t **function, LPC_INT type, LPC_INT optional_star, cha
       (*function)->r.expr = *block_or_semi;
 
       if (argument.num_arg) {
-        auto default_args_limit = sizeof(FUNC(fun)->default_args_findex) / sizeof(FUNC(fun)->default_args_findex[0]);
+        bool have_default_args = false;
+        auto default_args_limit = sizeof(FUNCTION_DEF(fun)->default_args_findex) / sizeof(FUNCTION_DEF(fun)->default_args_findex[0]);
         for (int i = 0; i < argument.num_arg; i++) {
           auto local = locals_ptr[i];
           if (local.funcptr_default) {
-            if (i > default_args_limit) {
+            have_default_args = true;
+            if (i > default_args_limit || argument.num_arg > default_args_limit) {
               yyerror("Functions with default arguments can only have %d args", default_args_limit);
               return ;
             }
-            FUNC(fun)->min_arg--;
+            FUNCTION_DEF(fun)->min_arg--;
             auto funcname = fmt::format(FMT_STRING("__{}_{}"), identifier, local.ihe->name);
 
             // the funcnum here will change in epilog(), see fixup in handle_functions()
             auto funcnum = define_new_function(funcname.c_str(), 0, 0,
                                                *func_types | DECL_NOMASK, // same access as origin function
                                                type_of_locals_ptr[locals_ptr[i].runtime_index]);
-            FUNC(fun)->default_args_findex[i] = funcnum;
+            FUNCTION_DEF(fun)->default_args_findex[i] = funcnum;
 
             parse_node_t *node_return;
             CREATE_RETURN(node_return,  local.funcptr_default);
@@ -234,13 +236,13 @@ void rule_func(parse_node_t **function, LPC_INT type, LPC_INT optional_star, cha
             CREATE_TWO_VALUES(*function, 0, newnode, node_func);
           } else {
             if (i > 0) {
-              auto prev = FUNC(fun)->default_args_findex[i - 1];
+              if (i > default_args_limit) continue;
+              auto prev = FUNCTION_DEF(fun)->default_args_findex[i - 1];
               if (prev != 0) {
                 yyerror("Function arguments with default value closure must be specified continuously.");
                 return ;
               }
             }
-            FUNC(fun)->default_args_findex[i] = 0;
           }
         }
       }

@@ -1,10 +1,9 @@
 ---
 layout: doc
-title: driver
+title: Driver Internals
 ---
-## general
-* [adding_efuns](general/adding_efuns.html)
-* [call_into_vm](general/call_into_vm.html)
-* [malloc](general/malloc.html)
-* [parse_tree](general/parse_tree.html)
-* [stackmachine](general/stackmachine.html)
+* [adding_efuns](adding_efuns.html)
+* [call_into_vm](call_into_vm.html)
+* [malloc](malloc.html)
+* [parse_tree](parse_tree.html)
+* [stackmachine](stackmachine.html)

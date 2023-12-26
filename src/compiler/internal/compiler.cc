@@ -2123,7 +2123,6 @@ static void handle_functions() {
     }
 
     while (num_func && FUNC(func_index_map[num_func - 1])->address == ADDRESS_MAX) {
-      yywarn("Function %s(%d) dropped due to program size limit.\n", FUNC(func_index_map[num_func - 1])->funcname, num_func);
       num_func--;
     }
   }
