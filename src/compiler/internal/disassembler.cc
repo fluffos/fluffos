@@ -6,6 +6,8 @@
 #include "compiler/internal/lex.h"
 #include "compiler/internal/icode.h"
 
+#include <fmt/format.h>
+
 static void disassemble(FILE *f /*f*/, char *code /*code*/, int /*start*/ start, int /*end*/ end,
                         program_t *prog /*prog*/);
 static const char *disassem_string(const char * /*str*/);
@@ -76,8 +78,8 @@ void dump_prog(program_t *prog, FILE *f, int flags) {
             prog->inherit[i].function_index_offset, prog->inherit[i].variable_index_offset);
   }
   fprintf(f, "FUNCTIONS:\n");
-  fprintf(f, "      name                  offset  mods   flags   fio  # locals  # args\n");
-  fprintf(f, "      --------------------- ------  ----  -------  ---  --------  ------\n");
+  fprintf(f, "      name                  offset  mods   flags   fio  # locals  # args # def args\n");
+  fprintf(f, "      --------------------- ------  ----  -------  ---  --------  ------ ----------\n");
   num_funcs_total = prog->last_inherited + prog->num_functions_defined;
 
   for (i = 0; i < num_funcs_total; i++) {
@@ -130,9 +132,17 @@ void dump_prog(program_t *prog, FILE *f, int flags) {
       fprintf(f, "%4d: %-20s  %6d  %4s  %7s  %3d\n", i, func_entry->funcname, low, smods, sflags,
               runtime_index - prog->inherit[low].function_index_offset);
     } else {
-      fprintf(f, "%4d: %-20s  %6d  %4s  %7s        %7d   %5d\n", i, func_entry->funcname,
-              runtime_index - prog->last_inherited, smods, sflags, func_entry->num_arg,
-              func_entry->num_local);
+      fprintf(f, "%4d: %-20s  %6d  %4s  %7s        %7d   %5d %10d", i, func_entry->funcname,
+              runtime_index - prog->last_inherited, smods, sflags, func_entry->num_local,
+              func_entry->num_arg, func_entry->num_arg - func_entry->min_arg);
+
+      std::string default_arg_findex_map;
+      for(int j = 0; j < func_entry->num_arg; j++) {
+        if (func_entry->default_args_findex[j] != 0) {
+          default_arg_findex_map += fmt::format(FMT_STRING(" {}:{}"), j, func_entry->default_args_findex[j]);
+        }
+      }
+      fprintf(f, " %s\n", default_arg_findex_map.c_str());
     }
   }
 

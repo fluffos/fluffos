@@ -165,11 +165,16 @@ typedef struct {
 struct function_t {
   const char *funcname;
   unsigned short type;
-  unsigned char num_arg;
+  uint8_t num_arg;
   uint8_t min_arg;
   unsigned char num_local;
   ADDRESS_TYPE address;
-  int default_args_findex[16]; // FIXME: support more than 16 default args
+  // Default args can only be specified in a continuous trailing format
+  // and because their function is always generated after the original function
+  // the findex value can never be 0, we can use 0 as null value for easy initialization.
+  // The default args are stored in the order they are specified in the source code.
+  // TODO: this limits the function that uses default args to only have 16 args.
+  uint16_t default_args_findex[16];
 #ifdef PROFILE_FUNCTIONS
   unsigned long calls, self, children;
 #endif

@@ -41,6 +41,10 @@ void test4(int a, string b: (: "str" :), int c: (: -1 :)) {
   ASSERT_EQ(222, y);
 }
 
+object test5(object a: (: this_object() :)) {
+  return a;
+}
+
 void do_tests() {
     test1();
     test2(1, 2);
@@ -53,4 +57,9 @@ void do_tests() {
     this_object()->test4(1);
     this_object()->test4(2, "aaa");
     this_object()->test4(3, "bbb", 1);
+    // making sure the default value is calculated in the caller's context
+    ASSERT_EQ(this_object(), test5());
+    ASSERT_EQ(this_object(), test5(this_object()));
+    // see call_other type of tests in function2.c
+    // see inherited type of tests in function3.c
 }

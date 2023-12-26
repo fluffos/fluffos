@@ -204,33 +204,23 @@ void rule_func(parse_node_t **function, LPC_INT type, LPC_INT optional_star, cha
       (*function)->r.expr = *block_or_semi;
 
       if (argument.num_arg) {
-        for (int i = 0; i < current_number_of_locals; i++) {
+        auto default_args_limit = sizeof(FUNC(fun)->default_args_findex) / sizeof(FUNC(fun)->default_args_findex[0]);
+        for (int i = 0; i < argument.num_arg; i++) {
           auto local = locals_ptr[i];
           if (local.funcptr_default) {
+            if (i > default_args_limit) {
+              yyerror("Functions with default arguments can only have %d args", default_args_limit);
+              return ;
+            }
             FUNC(fun)->min_arg--;
             auto funcname = fmt::format(FMT_STRING("__{}_{}"), identifier, local.ihe->name);
 
-            // needs to be called twice
-            define_new_function(funcname.c_str(), 0, 0,
-                                *func_types | FUNC_PROTOTYPE, // same access as origin function
-                                type_of_locals_ptr[locals_ptr[i].runtime_index]);
+            // the funcnum here will change in epilog(), see fixup in handle_functions()
             auto funcnum = define_new_function(funcname.c_str(), 0, 0,
-                                               *func_types, // same access as origin function
+                                               *func_types | DECL_NOMASK, // same access as origin function
                                                type_of_locals_ptr[locals_ptr[i].runtime_index]);
             FUNC(fun)->default_args_findex[i] = funcnum;
-//
-//            parse_node_t *node_efun_expr_node;
-//            CREATE_EXPR_NODE(node_efun_expr_node,, 0);
-//
-//            parse_node_t *node_efun_expr_list;
-//            CREATE_EXPR_LIST(node_efun_expr_list, node_efun_expr_node);
-//
-//            parse_node_t *node_call_eval = new_node_no_line();
-//            node_call_eval->kind = NODE_EFUN;
-//            node_call_eval->l.number = 1;
-//            node_call_eval->v.number = F__EVALUATE;
-//            node_call_eval->r.expr =  node_efun_expr_list;
-//
+
             parse_node_t *node_return;
             CREATE_RETURN(node_return,  local.funcptr_default);
 
@@ -242,6 +232,15 @@ void rule_func(parse_node_t **function, LPC_INT type, LPC_INT optional_star, cha
 
             auto *newnode = *function;
             CREATE_TWO_VALUES(*function, 0, newnode, node_func);
+          } else {
+            if (i > 0) {
+              auto prev = FUNC(fun)->default_args_findex[i - 1];
+              if (prev != 0) {
+                yyerror("Function arguments with default value closure must be specified continuously.");
+                return ;
+              }
+            }
+            FUNC(fun)->default_args_findex[i] = 0;
           }
         }
       }

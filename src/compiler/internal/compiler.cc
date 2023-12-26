@@ -1155,6 +1155,7 @@ int define_new_function(const char *name, int num_arg, int num_local, int flags,
   if (!funp) {
     num = mem_block[A_FUNCTIONS].current_size / sizeof(function_t);
     funp = reinterpret_cast<function_t *>(allocate_in_mem_block(A_FUNCTIONS, sizeof(function_t)));
+    memset(funp->default_args_findex, 0, sizeof(funp->default_args_findex));
     funp->funcname = make_shared_string(name);
     argument_start_index = INDEX_START_NONE;
     add_to_mem_block(A_ARGUMENT_INDEX, (char *)&argument_start_index, sizeof argument_start_index);
@@ -2122,6 +2123,7 @@ static void handle_functions() {
     }
 
     while (num_func && FUNC(func_index_map[num_func - 1])->address == ADDRESS_MAX) {
+      yywarn("Function %s(%d) dropped due to program size limit.\n", FUNC(func_index_map[num_func - 1])->funcname, num_func);
       num_func--;
     }
   }
@@ -2166,8 +2168,8 @@ static void handle_functions() {
         final_index = comp_last_inherited + comp_sorted_funcs[cur_def->u.index];
       }
       if (cur_def->flags & FUNC_ALIAS) {
-        fatal("Aliasing difficulties!\n");
-        exit(1);
+        yyerror("Aliasing difficulties!\n");
+        return ;
       }
 
       comp_def_index_map[i] = final_index;
@@ -2187,6 +2189,17 @@ static void handle_functions() {
         if (new_index != final_index) {
           prog_flags[new_index] = FUNC_ALIAS | final_index;
         }
+      }
+    }
+  }
+
+  // Fixup the default argument function index
+  for (int i = 0; i < num_func; i++) {
+    constexpr auto default_args_limit = sizeof(FUNC(i)->default_args_findex) / sizeof(FUNC(i)->default_args_findex[0]);
+    auto *func = FUNC(i);
+    for (int j = 0; j < default_args_limit; j++) {
+      if (func->default_args_findex[j] != 0) {
+        func->default_args_findex[j] = comp_sorted_funcs[func->default_args_findex[j]];
       }
     }
   }

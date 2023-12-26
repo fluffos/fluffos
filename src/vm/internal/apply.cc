@@ -11,6 +11,7 @@
 #include "vm/internal/base/debug.h"
 #include "compiler/internal/compiler.h"
 #include "compiler/internal/lex.h"
+#include "compiler/internal/disassembler.h"
 
 // global static result
 svalue_t apply_ret_value;
@@ -257,8 +258,12 @@ retry_for_shadow:
           // NOTE: this assumes default arguments closure are always generated right after the function in order
           for (int i = num_arg; i < funcp->num_arg; i++) {
             auto current_sp = sp;
-            auto *default_funcp = funcp + i;
-
+            auto *default_funcp =progp->function_table + funcp->default_args_findex[i];
+            if(default_funcp->funcname[0]!='_') {
+                  dump_vm_state();
+                  dump_prog(progp, stdout, 1|2);
+                  error("Illegal default argument function name %s in %s\n", default_funcp->funcname, progp->filename);
+            }
             // notice we don't change current_object here, so the default arguments closure
             // will be called in the context of the caller
             fp = sp + 1; // zero args
@@ -266,6 +271,7 @@ retry_for_shadow:
             caller_type = ORIGIN_LOCAL;
             csp->pc = pc;
             csp->num_local_variables = 0;
+            current_prog = progp;
             call_program(progp, default_funcp->address);
 
             // get the returned closure then evaluate for the real value
