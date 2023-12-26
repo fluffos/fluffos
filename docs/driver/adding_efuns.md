@@ -7,9 +7,9 @@ title: general / adding_efuns
 This document explains how to add efunctions to FluffOS driver. Here are the
 steps:
 
-1. Creating an directory under `src/packages/` with name `mypkg`.
+1. Creating a directory under `src/packages/` with name `mypkg`.
 
-1. inside `src/packages/mypkg` directory, create LPC function prototype file called `mypkg.spec`.
+2. inside `src/packages/mypkg` directory, create LPC function prototype file called `mypkg.spec`.
 
    For example, the prototype for the cat() efun is as follows:
 
@@ -26,9 +26,9 @@ steps:
 
    call_out() does not return a value.
 
-1. Create an file `mypkg.cc` and create an `CMakeLists.txt` to compile it, add an library target called `PACKAGE_MYPKG`.
+3. Create a file `mypkg.cc` and create an `CMakeLists.txt` to compile it, add an library target called `PACKAGE_MYPKG`.
 
-1. In your `mypkg.cc`, start by including the pkg API header,
+4. In your `mypkg.cc`, start by including the pkg API header,
 
     `#include "base/package_api.h"`
 
