@@ -52,5 +52,5 @@ void do_tests() {
     // apply
     this_object()->test4(1);
     this_object()->test4(2, "aaa");
-    this_object()->test4(3, "bbb", 3);
+    this_object()->test4(3, "bbb", 1);
 }

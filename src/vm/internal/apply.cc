@@ -237,10 +237,6 @@ retry_for_shadow:
       pop_n_elems(num_arg);
       return 0;
     }
-    /* Check arguments */
-    if (!(funflags & FUNC_VARARGS)) {
-      check_co_args(num_arg, entry.progp, funp, findex);
-    }
     /* setup default arguments if needed */
     {
       auto *progp = entry.progp;
@@ -255,7 +251,7 @@ retry_for_shadow:
         // for functions with default argument values, we want to invoke the closure to
         // fill in the arguments
         if (num_arg != funcp->num_arg) {
-          auto *saved_fp = sp - (num_arg - 1);
+          auto *saved_fp = fp;
           fp = sp;  // leave the already pushed args on the stack
 
           // NOTE: this assumes default arguments closure are always generated right after the function in order
@@ -265,22 +261,33 @@ retry_for_shadow:
 
             // notice we don't change current_object here, so the default arguments closure
             // will be called in the context of the caller
+            fp = sp + 1; // zero args
             push_control_stack(FRAME_FUNCTION);
             caller_type = ORIGIN_LOCAL;
             csp->pc = pc;
             csp->num_local_variables = 0;
             call_program(progp, default_funcp->address);
 
+            // get the returned closure then evaluate for the real value
+            svalue_t sv_funcp;
+            assign_svalue_no_free(&sv_funcp, sp);
+            pop_stack();
+
+            // evaluate the closure in current context
+            push_svalue(call_function_pointer(sv_funcp.u.fp, 0));
+            free_svalue(&sv_funcp, "apply_low");
+
             DEBUG_CHECK(sp - current_sp != 1 && dump_vm_state(), "Bad stack after default arguments call.");
           }
 
           fp = saved_fp;
-          st_num_arg = num_arg;
           num_arg = funcp->num_arg;
-
-          DEBUG_CHECK(sp - fp + 1 != funcp->num_arg, "Bad stack after setup default arguments.");
         }
       }
+    }
+    /* Check arguments */
+    if (!(funflags & FUNC_VARARGS)) {
+      check_co_args(num_arg, entry.progp, funp, findex);
     }
     /* Setup new call frame */
     push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE);

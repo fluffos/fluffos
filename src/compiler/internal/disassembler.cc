@@ -535,10 +535,13 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
             }
             break;
           case FP_FUNCTIONAL:
-          case FP_FUNCTIONAL | FP_NOT_BINDABLE:
-            sprintf(buff, "<functional, %d args>: Code:", pc[0]);
-            pc += 3;
+          case FP_FUNCTIONAL | FP_NOT_BINDABLE: {
+            uint8_t num_args = EXTRACT_UCHAR(pc++);
+            uint16_t size;
+            LOAD_SHORT(size, pc);
+            sprintf(buff, "<functional, %d args>: Code size: %d,", num_args, size);
             break;
+          }
           case FP_ANONYMOUS:
           case FP_ANONYMOUS | FP_NOT_BINDABLE:
             COPY_SHORT(&sarg, &pc[2]);
