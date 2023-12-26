@@ -218,21 +218,21 @@ void rule_func(parse_node_t **function, LPC_INT type, LPC_INT optional_star, cha
                                                *func_types, // same access as origin function
                                                type_of_locals_ptr[locals_ptr[i].runtime_index]);
             FUNC(fun)->default_args_findex[i] = funcnum;
-
-            parse_node_t *node_efun_expr_node;
-            CREATE_EXPR_NODE(node_efun_expr_node, local.funcptr_default, 0);
-
-            parse_node_t *node_efun_expr_list;
-            CREATE_EXPR_LIST(node_efun_expr_list, node_efun_expr_node);
-
-            parse_node_t *node_call_eval = new_node_no_line();
-            node_call_eval->kind = NODE_EFUN;
-            node_call_eval->l.number = 1;
-            node_call_eval->v.number = F__EVALUATE;
-            node_call_eval->r.expr =  node_efun_expr_list;
-
+//
+//            parse_node_t *node_efun_expr_node;
+//            CREATE_EXPR_NODE(node_efun_expr_node,, 0);
+//
+//            parse_node_t *node_efun_expr_list;
+//            CREATE_EXPR_LIST(node_efun_expr_list, node_efun_expr_node);
+//
+//            parse_node_t *node_call_eval = new_node_no_line();
+//            node_call_eval->kind = NODE_EFUN;
+//            node_call_eval->l.number = 1;
+//            node_call_eval->v.number = F__EVALUATE;
+//            node_call_eval->r.expr =  node_efun_expr_list;
+//
             parse_node_t *node_return;
-            CREATE_RETURN(node_return, node_call_eval);
+            CREATE_RETURN(node_return,  local.funcptr_default);
 
             auto *node_func = new_node_no_line();
             node_func->kind = NODE_FUNCTION;

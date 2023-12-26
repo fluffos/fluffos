@@ -246,7 +246,6 @@ retry_for_shadow:
       auto *progp = entry.progp;
       auto *funcp = entry.funp;
 
-      DEBUG_CHECK(!progp || !funcp, "BUG: Invalid Program or Illegal function index.");
       if (!(funcp->type & FUNC_VARARGS) && funcp->min_arg != funcp->num_arg) {
         if (num_arg < funcp->min_arg) {
           // COMPAT: fluffos allow apply to call functions with fewer arguments than required, so we fix it up here
@@ -264,6 +263,8 @@ retry_for_shadow:
             auto current_sp = sp;
             auto *default_funcp = funcp + i;
 
+            // notice we don't change current_object here, so the default arguments closure
+            // will be called in the context of the caller
             push_control_stack(FRAME_FUNCTION);
             caller_type = ORIGIN_LOCAL;
             csp->pc = pc;

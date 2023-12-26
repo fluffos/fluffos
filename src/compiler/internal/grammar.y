@@ -386,11 +386,8 @@ optional_default_arg_value:
     $$->kind = NODE_FUNCTION_CONSTRUCTOR;
     $$->type = TYPE_FUNCTION;
     $$->l.expr = $3;
-    if ($3->kind == NODE_STRING)
-        yywarn("Function pointer returning string constant is NOT a function call");
-    $$->r.expr = current_function_context->values_list->r.expr;
-    $$->v.number = FP_FUNCTIONAL + current_function_context->bindable + (current_function_context->num_parameters << 8);
-    pop_function_context();
+    $$->r.expr = nullptr; // no arguments
+    $$->v.number = FP_FUNCTIONAL + 0 /* args */;
 }
 
 new_arg:
