@@ -9,6 +9,16 @@ const SIDEBAR = [
         ]
     },
     {
+        text: 'CLI',
+        collapsed: false,
+        items: [
+            {text: 'driver', link: '/cli/driver.html'},
+            {text: 'lpcc', link: '/cli/lpcc.html'},
+            {text: 'o2json', link: '/cli/o2json.html'},
+            {text: 'json2o', link: '/cli/json2o.html'}
+        ]
+    },
+    {
         text: 'LPC',
         items: [
             {text: 'LPC Language', link: '/lpc/'},
