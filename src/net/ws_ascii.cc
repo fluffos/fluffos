@@ -6,6 +6,7 @@
 #include <event2/listener.h>
 
 #include <libwebsockets.h>
+#include <cstdlib>
 
 #include "net/ws_ascii.h"
 #include "interactive.h"
@@ -38,15 +39,15 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
       (struct per_vhost_data *)lws_protocol_vh_priv_get(lws_get_vhost(wsi), lws_get_protocol(wsi));
 
   switch (reason) {
-    case LWS_CALLBACK_PROTOCOL_INIT: {
+    case LWS_CALLBACK_PROTOCOL_INIT:
       lwsl_info("LWS_CALLBACK_PROTOCOL_INIT\n");
-
+      // freed automatically when context is destroyed.
       vhd = reinterpret_cast<per_vhost_data *>(lws_protocol_vh_priv_zalloc(
           lws_get_vhost(wsi), lws_get_protocol(wsi), sizeof(struct per_vhost_data)));
       vhd->context = lws_get_context(wsi);
       vhd->protocol = lws_get_protocol(wsi);
       vhd->vhost = lws_get_vhost(wsi);
-    } break;
+     break;
     case LWS_CALLBACK_PROTOCOL_DESTROY:
       lwsl_info("LWS_CALLBACK_PROTOCOL_DESTROY\n");
       break;
@@ -113,7 +114,7 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
     case LWS_CALLBACK_CLOSED: {
       lwsl_info("LWS_CALLBACK_CLOSED: wsi %p\n", wsi);
 
-      auto ip = pss->user;
+      auto *ip = pss->user;
       if (!ip) {
         return -1;
       }
