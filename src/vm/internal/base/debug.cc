@@ -44,25 +44,34 @@ std::string framekind_name(int framekind) {
 }
 
 std::string print_object_ptr(object_t *ob) {
+  if (!ob) {
+    return "null";
+  }
   std::stringstream ss;
-  ss << (void*)ob << " (" << (ob ? ob->obname: "") << ")";
+  ss << (void*)ob << " (" << ob->obname << ")";
   return ss.str();
 }
 
 std::string print_program_ptr(program_t *prog) {
+  if (!prog) {
+    return "null";
+  }
   std::stringstream ss;
-  ss << (void*)prog << " (" << (prog ? prog->filename: "") << ")";
+  ss << (void*)prog << " (" << prog->filename << ")";
   return ss.str();
 }
 
 std::string print_pc(program_t *prog, char *pc) {
+  if (!prog || !pc) {
+    return "null";
+  }
   std::stringstream ss;
   ss << (void*)pc << " (addr: " << fmt::format(FMT_STRING("{:04x}"), (pc - prog->program)) << ")";
   return ss.str();
 }
 
 bool dump_vm_state() {
-  auto prefix = "  ";
+  const auto *prefix = "  ";
   std::cout << "VM state:\n";
   std::cout << prefix << "current_object = " << print_object_ptr(current_object) << ")\n";
   std::cout << prefix << "current_interactive = " << current_interactive << "\n";
@@ -70,12 +79,13 @@ bool dump_vm_state() {
   std::cout << prefix << "caller_type = " << caller_type << "\n";
   std::cout << prefix << "pc = " << print_pc(current_prog, pc) << "\n";
   std::cout << prefix << "fp = " << (void *)fp << " (sp - " << (sp - fp) << ")" << "\n";
-  std::cout << prefix << "sp = " << sp << "\n";
+  std::cout << prefix << "sp = " << (void *)sp << "\n";
   std::cout << prefix << "st_num_arg = " << st_num_arg << "\n";
 
   // Dump current stack
   std::cout << "current stack:\n";
   for(auto *sv = csp->fp; sv < sp; sv++) {
+    if (sv == nullptr) break;
     std::cout << "sv " << (sv - csp->fp) << ":\n";
     std::cout << prefix << "type = " << type_name(sv->type) << "\n";
     std::cout << prefix << svalue_to_json_summary(sv, 0).dump(2) << "\n";
@@ -101,11 +111,13 @@ bool dump_vm_state() {
   }
 
   // Dump the current program
-  std::cout << "current program:\n";
-  dump_prog(current_prog, stdout, 1 | 2);
+  if (current_prog != nullptr) {
+    std::cout << "current program:\n";
+    dump_prog(current_prog, stdout, 1 | 2);
 
-  // Dump current trace
-  dump_trace(1);
+    // Dump current trace
+    dump_trace(1);
+  }
 
   return true; // so we can use it in DEBUG_CHECK
 }
