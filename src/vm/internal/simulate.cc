@@ -1905,7 +1905,12 @@ void _error_handler(char *err) {
     }
     num_mudlib_error--;
     num_error++;
-  } else if (num_mudlib_error == 1) {
+  } else if (num_mudlib_error > 10) {
+    num_mudlib_error = 0;
+    // stop recurse errors
+    _error_handler(err);
+    goto exit;
+  } else {
     debug_message("Error in mudlib error handler: ");
     debug_message_with_location(err);
     dump_trace(CONFIG_INT(__RC_TRACE_CODE__));
