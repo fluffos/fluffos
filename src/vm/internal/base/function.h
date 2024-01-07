@@ -24,7 +24,7 @@ struct functional_t {
   struct program_t *prog;
   int offset;
   short vio;
-  char lpccode[80];
+  // char lpccode[80];
 };
 
 /* common header */

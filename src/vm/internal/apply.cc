@@ -12,6 +12,7 @@
 #include "compiler/internal/compiler.h"
 #include "compiler/internal/lex.h"
 #include "compiler/internal/disassembler.h"
+#include "applies_table.autogen.h"
 
 // global static result
 svalue_t apply_ret_value;
@@ -243,7 +244,7 @@ retry_for_shadow:
       auto *progp = entry.progp;
       auto *funcp = entry.funp;
 
-      if (!(funcp->type & FUNC_VARARGS) && funcp->min_arg != funcp->num_arg) {
+      if (!(funflags & FUNC_TRUE_VARARGS) && funcp->min_arg != funcp->num_arg) {
         if (num_arg < funcp->min_arg) {
           // COMPAT: fluffos allow apply to call functions with fewer arguments than required, so we fix it up here
           push_undefineds(funcp->min_arg - num_arg);
@@ -259,10 +260,12 @@ retry_for_shadow:
           for (int i = num_arg; i < funcp->num_arg; i++) {
             auto current_sp = sp;
             auto *default_funcp =progp->function_table + funcp->default_args_findex[i];
-            if(default_funcp->funcname[0]!='_') {
+            if(default_funcp->funcname[0]!=APPLY___INIT_SPECIAL_CHAR) {
+#ifdef DEBUG
                   dump_vm_state();
                   dump_prog(progp, stdout, 1|2);
-                  error("Illegal default argument function name %s in %s\n", default_funcp->funcname, progp->filename);
+#endif
+                  error("Driver Bug: Illegal default argument function name %s in %s\n", default_funcp->funcname, progp->filename);
             }
             // notice we don't change current_object here, so the default arguments closure
             // will be called in the context of the caller
@@ -274,14 +277,21 @@ retry_for_shadow:
             current_prog = progp;
             call_program(progp, default_funcp->address);
 
+            if (sp - current_sp != 1 || sp->type != T_FUNCTION) {
+              error("Driver Bug: Bad stack after default arguments call.");
+            }
+
             // get the returned closure then evaluate for the real value
             svalue_t sv_funcp;
             assign_svalue_no_free(&sv_funcp, sp);
             pop_stack();
 
+            DEBUG_CHECK((sv_funcp.type != T_FUNCTION || sv_funcp.u.fp == nullptr) && dump_vm_state(),
+                        "apply_low: default args closure returned null.");
+
             // evaluate the closure in current context
             push_svalue(call_function_pointer(sv_funcp.u.fp, 0));
-            free_svalue(&sv_funcp, "apply_low");
+            free_svalue(&sv_funcp, "apply_low: default args closure");
 
             DEBUG_CHECK(sp - current_sp != 1 && dump_vm_state(), "Bad stack after default arguments call.");
           }

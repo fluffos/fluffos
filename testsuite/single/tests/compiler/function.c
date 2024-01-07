@@ -45,6 +45,14 @@ object test5(object a: (: this_object() :)) {
   return a;
 }
 
+varargs string test6(string a, string b) {
+  return a + b;
+}
+
+varargs string test7(string a, string b: (: "bbb" :), string c: (: "ccc" :)) {
+  return a + b + c;
+}
+
 void do_tests() {
     test1();
     test2(1, 2);
@@ -62,4 +70,10 @@ void do_tests() {
     ASSERT_EQ(this_object(), test5(this_object()));
     // see call_other type of tests in function2.c
     // see inherited type of tests in function3.c
+    ASSERT_EQ(0, test6());
+    ASSERT_EQ("str123", test6("str", "123"));
+    ASSERT_EQ("0bbbccc", test7());
+    ASSERT_EQ("aaabbbccc", test7("aaa"));
+    ASSERT_EQ("aaaxxxccc", test7("aaa","xxx"));
+    ASSERT_EQ("aaaxxxyyy", test7("aaa", "xxx", "yyy"));
 }

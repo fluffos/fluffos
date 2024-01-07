@@ -757,8 +757,7 @@ int copy_functions(program_t *from, int typemod) {
   num_functions = from->num_functions_defined + from->last_inherited;
 
   if (from->num_functions_defined &&
-      (from->function_table[from->num_functions_defined - 1].funcname[0] ==
-       APPLY___INIT_SPECIAL_CHAR)) {
+      (strcmp(APPLY___INIT, from->function_table[from->num_functions_defined - 1].funcname)== 0)) {
     initializer = --num_functions;
   }
 
@@ -1025,11 +1024,10 @@ invalid:
  * function. Thus, there are tests to avoid generating error messages more
  * than once by looking at (flags & NAME_PROTOTYPE).
  */
-/* Warning: returns an index into A_FUNCTIONS, not the full
- * function list
+/* Returns an index into A_FUNCTIONS_DEFS.
  */
 int define_new_function(const char *name, int num_arg, int num_local, int flags, int type) {
-  int oldindex, num, newindex;
+  int oldindex=-1, num=-1, newindex=-1;
   unsigned short argument_start_index;
   ident_hash_elem_t *ihe;
   function_t *funp = nullptr;
@@ -2059,18 +2057,22 @@ static int compare_funcs(const void *x, const void *y) {
   /* make sure #global_init# stays last; also shuffle empty entries to
    * the end so we can delete them easily.
    */
-  if (n1[0] == '#') {
-    sp1 = 1;
+  if (strcmp(n1, APPLY___INIT) == 0) {
+    sp1 = 3;
   } else if (FUNC(*(unsigned short *)x)->address == ADDRESS_MAX) {
     sp1 = 2;
+  } else if (n1[0] == APPLY___INIT_SPECIAL_CHAR) {
+    sp1 = 1;
   } else {
     sp1 = 0;
   }
 
-  if (n2[0] == '#') {
-    sp2 = 1;
+  if (strcmp(n2, APPLY___INIT) == 0) {
+    sp2 = 3;
   } else if (FUNC(*(unsigned short *)y)->address == ADDRESS_MAX) {
     sp2 = 2;
+  }  else if (n2[0] == '#') {
+    sp2 = 1;
   } else {
     sp2 = 0;
   }
@@ -2138,8 +2140,7 @@ static void handle_functions() {
                           inherited_prog->num_functions_defined;
 
     if (inherited_prog->num_functions_defined &&
-        inherited_prog->function_table[inherited_prog->num_functions_defined - 1].funcname[0] ==
-            APPLY___INIT_SPECIAL_CHAR) {
+        strcmp(APPLY___INIT, inherited_prog->function_table[inherited_prog->num_functions_defined - 1].funcname) == 0) {
       comp_last_inherited--;
     }
   } else {
@@ -2190,21 +2191,6 @@ static void handle_functions() {
         }
       }
     }
-  }
-
-  // Fixup the default argument function index
-  for (int i = 0; i < num_func; i++) {
-    constexpr auto default_args_limit = sizeof(FUNC(i)->default_args_findex) / sizeof(FUNC(i)->default_args_findex[0]);
-    auto *func = FUNC(i);
-    for (int j = 0; j < default_args_limit; j++) {
-      if (func->default_args_findex[j] != 0) {
-        func->default_args_findex[j] = comp_sorted_funcs[func->default_args_findex[j]];
-      }
-    }
-  }
-
-  if (total_func) {
-    FREE((char *)comp_sorted_funcs);
   }
 }
 
@@ -2378,6 +2364,31 @@ static program_t *epilog(void) {
   prog->function_table = reinterpret_cast<function_t *>(p);
   for (i = 0; i < num_func; i++) {
     prog->function_table[i] = *FUNC(func_index_map[i]);
+    // debug_message("Function table %d: %s\n", i, prog->function_table[i].funcname);
+  }
+
+  // Fixup the default argument function index
+  for (int i = 0; i < num_func; i++) {
+    auto *func = &prog->function_table[i];
+    constexpr auto default_args_limit = sizeof(func->default_args_findex) / sizeof(func->default_args_findex[0]);
+    if (func->min_arg != func->num_arg) {
+      // debug_message("Handling default arguments for %d: %s\n", i, func->funcname);
+      for (int j = 0; j < default_args_limit; j++) {
+        auto findex = func->default_args_findex[j];
+        if (findex != 0) {
+          func->default_args_findex[j] = comp_sorted_funcs[findex];
+          // debug_message("Default argument %d of function %s was %d, now is %d\n", j, func->funcname, findex, func->default_args_findex[j]);
+          if(prog->function_table[(func->default_args_findex[j])].funcname[0] != APPLY___INIT_SPECIAL_CHAR) {
+            func->default_args_findex[j] = 0; // attempt to continue;
+            DEBUG_FATAL("Bad new default argument index calculated\n");
+          }
+        }
+      }
+    }
+  }
+
+  if (num_func) {
+    FREE((char *)comp_sorted_funcs);
   }
 
   p += align(sizeof(function_t) * num_func);

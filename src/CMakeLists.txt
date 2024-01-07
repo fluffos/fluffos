@@ -53,7 +53,7 @@ set(CMAKE_ENABLE_EXPORTS ON)
 
 if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "AppleClang")
   foreach (lang C CXX)
-    set(CMAKE_${lang}_FLAGS_DEBUG "-O0 -g3")
+    set(CMAKE_${lang}_FLAGS_DEBUG "-O1 -g3")
     # include (minimal) debug information even for RELEASE build.
     set(CMAKE_${lang}_FLAGS_RELEASE "-O3 -DNDEBUG -g")
     set(CMAKE_${lang}_FLAGS_RELWITHDEBINFO "${CMAKE_${lang}_FLAGS_RELEASE}")
@@ -71,10 +71,12 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL
 
   # Sanitizer support
   if (ENABLE_SANITIZER)
-    add_compile_options("-fsanitize=address,undefined")
+    add_compile_options("-fsanitize=address")
+    #add_compile_options("-fsanitize=undefined")
     add_compile_options("-fno-common")
-    # add_linker_options is only avaiable cmake 3.13
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address,undefined -fno-common")
+
+    add_link_options("-fsanitize=address")
+    #add_link_options("-fsanitize=undefined")
   else ()
     add_compile_options(
       "-D_FORTIFY_SOURCE=2"
