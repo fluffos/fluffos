@@ -94,7 +94,7 @@ bool dump_vm_state() {
   // Dump control stack
   auto *p = csp;
   int depth = 1;
-  while (p != control_stack) {
+  while (p != control_stack && p->prog != nullptr) {
     std::cout << "control stack: "<< -depth << "\n";
     std::cout << prefix << "framekind = " << framekind_name(p->framekind) << "(" << p->framekind << ")\n";
     std::cout << prefix << "ob = " << print_object_ptr(p->ob) << "\n";
