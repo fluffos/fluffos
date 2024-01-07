@@ -199,6 +199,12 @@ static void print_function_sig(FILE *f, program_t *prog, int idx) {
   auto end = &buf[sizeof(buf) - 1];
 
   auto funp = prog->function_table[idx];
+  auto funflags = prog->function_flags[prog->last_inherited + idx];
+
+  buf[0] = '\0';
+  get_type_modifiers(&buf[0], end, funflags);
+  fprintf(f, "%s", buf);
+
   get_type_name(&buf[0], end, funp.type);
   fprintf(f, "%s", buf);
   fprintf(f, "%s", funp.funcname);
@@ -220,6 +226,9 @@ static void print_function_sig(FILE *f, program_t *prog, int idx) {
       }
     } else {
       fprintf(f, "args: %d", funp.num_arg);
+      if (funp.min_arg != funp.num_arg) {
+        fprintf(f, "min args: %d", funp.num_arg);
+      }
     }
   }
   fprintf(f, ")");

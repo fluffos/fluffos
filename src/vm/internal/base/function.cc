@@ -6,6 +6,7 @@
 #include "compiler/internal/lex.h"  // for instrs, FIXME
 
 #include "packages/core/replace_program.h"
+#include "backward.hpp"
 
 void dealloc_funp(funptr_t *fp) {
   program_t *prog = nullptr;
@@ -206,6 +207,7 @@ funptr_t *make_functional_funp(short num_arg, short num_local, short len, svalue
   }
 
   fp->hdr.ref = 1;
+  md_record_ref_journal(PTR_TO_NODET(fp), true, 1, "make_functional_funp");
   return fp;
 }
 

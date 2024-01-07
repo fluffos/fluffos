@@ -19,6 +19,7 @@
 #include "base/internal/log.h"
 #include "base/internal/stralloc.h"
 #include "outbuf.h"
+#include "debugmalloc.h"
 
 #include <fmt/format.h>
 

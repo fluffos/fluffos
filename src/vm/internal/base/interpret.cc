@@ -1442,10 +1442,10 @@ void setup_varargs_variables(int actual, int local, int num_arg) {
 }
 
 // Return function_t for findex, walking up the inheritance tree if necessary
-// TODO: return nullptr if invalid findex
-std::pair<program_t*, function_t*> get_function_at_index(program_t* prog, int findex) {
+// TODO: return nullptr if not found
+std::pair<program_t*, int> get_function_at_index(program_t* prog, int findex) {
   if(findex < 0 || findex > prog->last_inherited + prog->num_functions_defined) {
-    return std::make_pair(nullptr, nullptr);
+    return std::make_pair(nullptr, 0);
   }
   /* Walk up the inheritance tree to the real definition */
   if (prog->function_flags[findex] & FUNC_ALIAS) {
@@ -1469,7 +1469,7 @@ std::pair<program_t*, function_t*> get_function_at_index(program_t* prog, int fi
     prog = prog->inherit[low].prog;
   }
   findex -= prog->last_inherited;
-  return std::make_pair(prog, &prog->function_table[findex]);
+  return std::make_pair(prog, findex);
 }
 
 function_t *setup_new_frame(int findex) {
@@ -3011,21 +3011,29 @@ void eval_instruction(char *p) {
           offset = current_object->prog->function_flags[offset] & ~FUNC_ALIAS;
         }
 
-        if (current_object->prog->function_flags[offset] & (FUNC_PROTOTYPE | FUNC_UNDEFINED)) {
+        auto funflags = current_object->prog->function_flags[offset];
+        if (funflags & (FUNC_PROTOTYPE | FUNC_UNDEFINED)) {
           error("Undefined function called: %s\n", function_name(current_object->prog, offset));
         }
+
         auto pushed_args = EXTRACT_UCHAR(pc++) + num_varargs;
         num_varargs = 0;
         auto saved_pc = pc;
 
         auto result = get_function_at_index(current_object->prog, offset);
         auto *progp = result.first;
-        auto *funcp = result.second;
-
+        auto *funcp = &progp->function_table[result.second];
         DEBUG_CHECK(!progp || !funcp, "BUG: Invalid Program or Illegal function index.");
-        if (!(funcp->type & FUNC_VARARGS) && funcp->min_arg != funcp->num_arg) {
+        if (!(funflags & FUNC_TRUE_VARARGS) && funcp->min_arg != funcp->num_arg) {
           if (pushed_args < funcp->min_arg) {
-            error("Not enough arguments to function %s, expected at least %d args, actual %d args.\n", funcp->funcname, funcp->min_arg, pushed_args);
+            if (funflags & FUNC_VARARGS) {
+                push_undefineds(funcp->min_arg - pushed_args);
+                pushed_args = funcp->min_arg;
+            } else {
+              dump_vm_state();
+              error("Not enough arguments to function %s, expected at least %d args, actual %d args.\n",
+                    funcp->funcname, funcp->min_arg, pushed_args);
+            }
           }
           // for functions with default argument values, we want to invoke the closure to
           // fill in the arguments
@@ -3035,7 +3043,7 @@ void eval_instruction(char *p) {
               auto *current_sp = sp;
 
               auto *default_funcp = progp->function_table + funcp->default_args_findex[i];
-              if (default_funcp->funcname[0]!='_') {
+              if (default_funcp->funcname[0]!='#') {
                 dump_vm_state();
                 dump_prog(progp, stdout, 1|2);
                 error("Illegal default argument function name %s in %s\n", default_funcp->funcname, progp->filename);
@@ -3050,16 +3058,29 @@ void eval_instruction(char *p) {
               current_prog = progp;
               call_program(progp, default_funcp->address);
 
+              DEBUG_CHECK((sp - current_sp != 1) && dump_vm_state(),
+                          "F_CALL_FUNCTION_BYADDRESS: bad stack after calling arg closure.");
+
               // get the returned closure then evaluate for the real value
-              svalue_t sv_funcp = *sp--;
+              svalue_t sv_funcp;
+              assign_svalue_no_free(&sv_funcp, sp);
+              pop_stack();
 
               DEBUG_CHECK((sv_funcp.type != T_FUNCTION || sv_funcp.u.fp == nullptr) && dump_vm_state(),
                           "F_CALL_FUNCTION_BYADDRESS: default args closure returned null.");
 
+              if (sv_funcp.u.refed->ref != 1) {
+                fatal("F_CALL_FUNCTION_BYADDRESS: default args closure ref count %d != 1.\n", sv_funcp.u.refed->ref);
+              }
+
               // evaluate the closure in current context
               push_svalue(call_function_pointer(sv_funcp.u.fp, 0));
 
+              if (sv_funcp.u.refed->ref != 1) {
+                fatal("F_CALL_FUNCTION_BYADDRESS: default args closure ref count %d != 1.\n", sv_funcp.u.refed->ref);
+              }
               free_svalue(&sv_funcp, "F_CALL_FUNCTION_BYADDRESS: default args closure");
+
 
               DEBUG_CHECK(sp - current_sp != 1, "Bad stack after default arguments call.");
             }
@@ -4050,9 +4071,9 @@ void call___INIT(object_t *ob) {
     return;
   }
 
-  /* ___INIT turns out to be always the last function */
+  /* it exists, ___INIT is always the last function */
   cfp = &progp->function_table[num_functions - 1];
-  if (cfp->funcname[0] != APPLY___INIT_SPECIAL_CHAR) {
+  if (strcmp(APPLY___INIT, cfp->funcname) != 0) {
     return;
   }
   push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE);

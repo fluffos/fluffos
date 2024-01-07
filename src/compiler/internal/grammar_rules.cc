@@ -203,7 +203,7 @@ void rule_func(parse_node_t **function, LPC_INT type, LPC_INT optional_star, cha
       (*function)->l.number = max_num_locals;
       (*function)->r.expr = *block_or_semi;
 
-      if (argument.num_arg) {
+      if (!(*func_types & FUNC_TRUE_VARARGS) && argument.num_arg) {
         bool have_default_args = false;
         auto default_args_limit = sizeof(FUNCTION_DEF(fun)->default_args_findex) / sizeof(FUNCTION_DEF(fun)->default_args_findex[0]);
         for (int i = 0; i < argument.num_arg; i++) {
@@ -215,13 +215,14 @@ void rule_func(parse_node_t **function, LPC_INT type, LPC_INT optional_star, cha
               return ;
             }
             FUNCTION_DEF(fun)->min_arg--;
-            auto funcname = fmt::format(FMT_STRING("__{}_{}"), identifier, local.ihe->name);
-
-            // the funcnum here will change in epilog(), see fixup in handle_functions()
+            // TODO: generate a unique name for the function
+            auto funcname = fmt::format(FMT_STRING("#__{}_{}_{}"), get_current_time(), identifier, local.ihe->name, local.ihe->name);
+            // the funcnum here will change in epilog().
             auto funcnum = define_new_function(funcname.c_str(), 0, 0,
-                                               *func_types | DECL_NOMASK, // same access as origin function
+                                               (*func_types & DECL_ACCESS) | DECL_NOMASK, // same access as origin function
                                                type_of_locals_ptr[locals_ptr[i].runtime_index]);
-            FUNCTION_DEF(fun)->default_args_findex[i] = funcnum;
+            FUNCTION_DEF(fun)->default_args_findex[i] = FUNCTION_TEMP(funcnum)->u.index;
+            // debug_message("function %s (%d), new def arg function %s (%d)\n", identifier, fun, funcname.c_str(), funcnum);
 
             parse_node_t *node_return;
             CREATE_RETURN(node_return,  local.funcptr_default);
