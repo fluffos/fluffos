@@ -2,6 +2,7 @@
 int calledDB;
 #endif
 
+int conn = 0;
 void do_tests() {
 #ifndef __PACKAGE_DB__
     write("PACKAGE_DB is not enabled, skipping DB tests...\n");
@@ -12,7 +13,7 @@ void do_tests() {
     return;
 #else
     // test db functions through sqlite
-    int conn = 0, rows = 0;
+    int rows = 0;
     mixed res;
 
     // Open & Close
@@ -62,13 +63,12 @@ void do_tests() {
     ASSERT_NE(0, conn);
     db_exec(conn, "DROP TABLE IF EXISTS tbl1");
     db_exec(conn, "create table IF NOT EXISTS tbl1(one varchar(10), two smallint);");
-    async_db_exec(conn, "insert into tbl1 values('hello!',10);", function(int conn) {
-        int rows = 0;
+    async_db_exec(conn, "insert into tbl1 values('hello!',10);", function(int rows) {
         mixed res;
 
         calledDB = 1;
 
-        write("ASYNC: async_db_exec callback: " + conn + "\n");
+        write("ASYNC: async_db_exec callback: " + conn + " matched " + rows + " rows\n");
 
         rows = db_exec(conn, "select * from tbl1;");
         ASSERT_EQ(1, rows);
