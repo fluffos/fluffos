@@ -21,9 +21,16 @@ title: async / async_db_exec
 
     The callback should follow this format:
 
-        function (int handle) {
+    ```c
+    async_db_exec(
+        handle,
+        sql_query, 
+        function (int rows) { // number of matched rows
+            mixed *results = db_fetch(handle, 1);
             db_close(handle);
         }
+    );
+    ```
 
 ### SEE ALSO
 
