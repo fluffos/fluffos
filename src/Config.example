@@ -7,18 +7,23 @@
 ###############################################################################
 
 # name of this mud
-# should be changed prioir to the 'mud ip', otherwise it might yield strange
+# should be changed prior to the 'mud ip', otherwise it might yield strange
 # results to either yourself or other users of this mudlib!
-name : testsuite
+name : Testsuite
 
 # for machines with multiple IP addresses, this specifies which one to use.  this
 # replaces the SERVER_IP compile-time define.
 #mud ip : 255.255.255.255
 mud ip : 127.0.0.1
 
-# the external ports we support
+# the external ports we accept users on
 external_port_1 : telnet 4000
 external_port_2 : binary 4001
+
+# external_port_3 : websocket 4002
+# external_port_3_tls: cert=etc/cert.pem key=etc/key.pem
+
+# websocket http dir : add relative path to fluffos/src/www
 
 # absolute pathname of mudlib
 mudlib directory : /home/mmessier/mudos/mudos/beta/testsuite
@@ -68,9 +73,9 @@ default error message :
 # This time should be substantially longer than the swapping time.
 time to clean up : 1200
 
-# How many seconds until an object is reset again.
-# This value should be somewhere reasonable in between 'time to clean up' and
-# 'time to swap'.
+# TIME_TO_RESET: How many seconds until an object is reset again.
+# This value should be somewhere reasonable in between 'time to clean up'
+# and 'time to swap'.
 time to reset : 800
 
 # How long time until an unused object is swapped out.
@@ -78,14 +83,6 @@ time to reset : 800
 # Machine with few players and lot of memory: 10000
 # Machine with infinite memory: 0 (never swap).
 time to swap : 600
-
-# Set the size of the compiler stack. This defines how complex expressions
-# the compiler can parse.  (unused currently)
-compiler stack size : 600
-
-# Set the maximum stack size of the stack machine. This stack will also
-# contain all local variables and arguments.
-evaluator stack size : 6000
 
 # Max inherit chain size
 inherit chain size : 30
@@ -192,18 +189,25 @@ call other warn : 0
 # libs for an example.
 mudlib error handler : 1
 
-# Completely disable the periodic calling of reset()
+# NO_RESETS: completely disable the periodic calling of reset()
 no resets : 0
 
-# If this option is set, an object will only have reset() called in it when
-# it is touched via call_other() or move_object() (assuming enough time has
-# passed since the last reset).  If it is unset, then reset() will be called
-# as always (which guaranteed that reset would always be called at least
-# once).  The advantage of lazy resets is that reset doesn't get called in an
-# object that is touched once and never again (which can save memory since
-# some objects won't get reloaded that otherwise would).
+# LAZY_RESETS: if this is defined, an object will only have reset()
+#   called in it when it is touched via call_other() or move_object()
+#   (assuming enough time has passed since the last reset).  If LAZY_RESETS
+#   is #undef'd, then reset() will be called as always (which guaranteed that
+#   reset would always be called at least once).  The advantage of lazy
+#   resets is that reset doesn't get called in an object that is touched
+#   once and never again (which can save memory since some objects won't get
+#   reloaded that otherwise would).
+#
 lazy resets : 0
 
+# RANDOMIZED_RESETS: if this is defined, then reset() will be called in
+#   a randomized time interval, varying from between TIME_TO_RESET/2 to
+#   TIME_TO_RESET-1.  If RANDOMIZED_RESETS is undefined, then reset()
+#   will be called upon all objects at the same time using the interval
+#   TIME_TO_RESET.
 #
 randomized resets : 1
 
@@ -321,5 +325,18 @@ apply cache bits : 22
 #
 call_out(0) next level : 1000
 
+###############################################################################
+#          The following aren't currently used or implemented (yet)           #
+###############################################################################
+
 # maximum number of users in the game (unused currently)
 maximum users : 40
+
+# Set the maximum stack size of the stack machine. This stack will also
+# contain all local variables and arguments.
+evaluator stack size : 6000
+
+# Set the size of the compiler stack. This defines how complex expressions
+# the compiler can parse.  (unused currently)
+compiler stack size : 600
+
