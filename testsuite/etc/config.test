@@ -1,5 +1,5 @@
 ###############################################################################
-#              Customizable runtime config file for MudOS v21                 #
+#              Customizable runtime config file for FluffOS                   #
 ###############################################################################
 # NOTE: All paths specified here are relative to the mudlib directory except  #
 #       for mudlib directory, and binary directory.                           #
@@ -7,9 +7,14 @@
 ###############################################################################
 
 # name of this mud
+# should be changed prior to the 'mud ip', otherwise it might yield strange
+# results to either yourself or other users of this mudlib!
 name : Testsuite
 
-# port number to accept users on
+# Restrict IP binding, if omitted, bind to all addresses.
+mud ip : 0.0.0.0
+
+# the external ports we accept users on
 port number : 4000
 external_port_2: websocket 4001
 external_port_3: websocket 4002
@@ -19,9 +24,6 @@ external_port_4_tls: cert=etc/cert.pem key=etc/key.pem
 
 websocket http dir : ../src/www
 
-# Restrict IP binding, if omitted, bind to all addresses.
-mud ip : 0.0.0.0
-
 # absolute pathname of mudlib
 mudlib directory : ./ # test #
 
@@ -30,6 +32,7 @@ log directory : /log
 
 # the directories which are searched by #include <...>
 # for multiple dirs, separate each path with a ':'
+# see also 'master::get_include_path'
 include directories : /include
 
 # the file which defines the master object
@@ -44,6 +47,12 @@ debug log file : debug.log
 # This is an include file which is automatically #include'd in all objects
 global include file : <globals.h>
 
+# default no-matching-action message
+default fail message : What?
+
+# default message when error() occurs (optional)
+default error message :
+
 # if an object is left alone for a certain time, then the
 # function clean_up will be called. This function can do anything,
 # like destructing the object. If the function isn't defined by the
@@ -51,14 +60,16 @@ global include file : <globals.h>
 # This time should be substantially longer than the swapping time.
 time to clean up : 1200
 
+# TIME_TO_RESET: How many seconds until an object is reset again.
+# This value should be somewhere reasonable in between 'time to clean up'
+# and 'time to swap'.
+time to reset : 1800
+
 # How long time until an unused object is swapped out.
 # Machine with too many players and too little memory: 900 (15 minutes)
 # Machine with few players and lot of memory: 10000
 # Machine with infinite memory: 0 (never swap).
 time to swap : 600
-
-# TIME_TO_RESET: How many seconds until an object is reset again.
-time to reset : 1800
 
 # Maximum number of bits in a bit field. They are stored in printable
 # strings, 6 bits per byte.
@@ -66,6 +77,9 @@ maximum bits in a bitfield : 1200
 
 # Max number of local variables in a function.
 maximum local variables : 30
+
+# Define the maximum call depth for functions.
+maximum call depth : 30
 
 # Maximum amount of "eval cost" per thread - execution is halted when
 # it is exceeded. 32bit value. The unit is microseconds.
@@ -107,11 +121,9 @@ hash table size : 7001
 # objects is somewhat more uniform than that of strings.
 object table size : 1501
 
-# default no-matching-action message
-default fail message : What?
-
-# default message when error() occurs (optional)
-default error message :
+# There is a hash table for living objects, used by find_living().
+# This must be one of 4, 16, 64, 256, 1024, 4096
+living hash table size : 256
 
 gametick msec : 100
 heartbeat interval msec : 1000
@@ -373,10 +385,3 @@ evaluator stack size : 1000
 # Define the size of the compiler stack. This defines how complex
 # expressions the compiler can parse.  (unused currently)
 compiler stack size : 200
-
-# Define the maximum call depth for functions. (unused currently)
-maximum call depth : 30
-
-# There is a hash table for living objects, used by find_living().
-# (unused currently)
-living hash table size : 100
