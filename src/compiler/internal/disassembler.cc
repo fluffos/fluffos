@@ -19,12 +19,21 @@ void dump_prog_details(program_t *prog, FILE *f, int flags) {
 
   fprintf(f, "\n;;; %s\n\n", prog->filename);
 
-  fprintf(f, "VARIABLES:\n");
+  fprintf(f, "Globals:\n");
+  for (i = 0; i < prog->num_variables_total; i++) {
+      fprintf(f, "%4d: %s\n", i, variable_name(prog, i));
+  }
+
+  int variable_runtime_index = 0;
+  if (prog->num_inherited > 0) {
+      variable_runtime_index = prog->inherit[prog->num_inherited - 1].variable_index_offset + prog->inherit[prog->num_inherited - 1].prog->num_variables_total;
+  }
+  fprintf(f, "VARIABLES defined:\n");
   for (i = 0; i < prog->num_variables_defined; i++) {
     char buf[255];
     auto end = &buf[sizeof(buf) - 1];
     get_type_name(&buf[0], end, prog->variable_types[i]);
-    fprintf(f, "%4d: %s%s\n", i, buf, prog->variable_table[i]);
+    fprintf(f, "%4d: %s%s\n", variable_runtime_index + i, buf, prog->variable_table[i]);
   }
   fprintf(f, "STRINGS:\n");
   for (i = 0; i < prog->num_strings; i++) {
@@ -60,7 +69,12 @@ void dump_prog_details(program_t *prog, FILE *f, int flags) {
     fprintf(f, "\n;;;  *** Line Number Info ***\n");
     dump_line_numbers(f, prog);
   }
+
+  for (int i = 0; i < prog->num_inherited; i++) {
+      dump_prog_details(prog->inherit[i].prog, f, flags);
+  }
 }
+
 /* Current flags:
  * 1 - do disassembly
  * 2 - dump line number table
@@ -73,13 +87,14 @@ void dump_prog(program_t *prog, FILE *f, int flags) {
   fprintf(f, "INHERITS:\n");
   fprintf(f, "      name                    fio    vio\n");
   fprintf(f, "      ----------------        ---    ---\n");
+
   for (i = 0; i < prog->num_inherited; i++) {
     fprintf(f, "\t%-20s  %5d  %5d\n", prog->inherit[i].prog->filename,
             prog->inherit[i].function_index_offset, prog->inherit[i].variable_index_offset);
   }
   fprintf(f, "FUNCTIONS:\n");
-  fprintf(f, "      name                  offset  mods   flags   fio  # locals  # args # def args\n");
-  fprintf(f, "      --------------------- ------  ----  -------  ---  --------  ------ ----------\n");
+  fprintf(f, "      name                      offset  mods   flags   fio  vio # locals  # args # def args\n");
+  fprintf(f, "      ------------------------- ------  ----  -------  ---  --- --------  ------ ----------\n");
   num_funcs_total = prog->last_inherited + prog->num_functions_defined;
 
   for (i = 0; i < num_funcs_total; i++) {
@@ -129,10 +144,10 @@ void dump_prog(program_t *prog, FILE *f, int flags) {
         }
       }
 
-      fprintf(f, "%4d: %-20s  %6d  %4s  %7s  %3d\n", i, func_entry->funcname, low, smods, sflags,
-              runtime_index - prog->inherit[low].function_index_offset);
+      fprintf(f, "%4d: %-24s  %6d  %4s  %7s  %3d %3d\n", i, func_entry->funcname, low, smods, sflags,
+              runtime_index - prog->inherit[low].function_index_offset, prog->inherit[low].variable_index_offset);
     } else {
-      fprintf(f, "%4d: %-20s  %6d  %4s  %7s        %7d   %5d %10d", i, func_entry->funcname,
+      fprintf(f, "%4d: %-24s  %6d  %4s  %7s             %7d   %5d %10d", i, func_entry->funcname,
               runtime_index - prog->last_inherited, smods, sflags, func_entry->num_local,
               func_entry->num_arg, func_entry->num_arg - func_entry->min_arg);
 
@@ -146,9 +161,6 @@ void dump_prog(program_t *prog, FILE *f, int flags) {
     }
   }
 
-  for (i = 0; i < prog->num_inherited; i++) {
-    dump_prog_details(prog->inherit[i].prog, f, flags);
-  }
   dump_prog_details(prog, f, flags);
 }
 
