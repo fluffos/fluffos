@@ -128,3 +128,27 @@ void do_tests() {
   dump_prog(prog, stdout, 1 | 2);
   deallocate_program(prog);
 }
+
+
+TEST_F(DriverTest, TestLPC_FunctionInherit) {
+    // Load the inherited object first
+    error_context_t econ{};
+    save_context(&econ);
+    try {
+    auto obj = find_object("/single/tests/compiler/function");
+    ASSERT_NE(obj , nullptr);
+
+    auto obj2 = find_object("/single/tests/compiler/function_inherit");
+    ASSERT_NE(obj2 , nullptr);
+
+    auto obj3 = find_object("/single/tests/compiler/function_inherit_2");
+    ASSERT_NE(obj3 , nullptr);
+
+    dump_prog(obj3->prog, stdout, 1 | 2);
+    } catch (...) {
+        restore_context(&econ);
+        FAIL();
+    }
+    pop_context(&econ);
+
+}

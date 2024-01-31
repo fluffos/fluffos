@@ -201,7 +201,7 @@ static int give_uid_to_object(object_t *ob) {
    * Now we are sure that we have a creator name. Do not call apply()
    * again, because creator_name will be lost !
    */
-  if (strcmp(current_object->uid->name, creator_name) == 0) {
+  if (current_object && strcmp(current_object->uid->name, creator_name) == 0) {
     /*
      * The loaded object has the same uid as the loader.
      */
@@ -1647,15 +1647,9 @@ void free_sentence(sentence_t *p) {
       vsnprintf(msg_buf, 2048, fmt, args);
       va_end(args);
       debug_message("******** FATAL ERROR: %s\n", msg_buf);
-#ifdef DEBUG
-      // make DEBUG driver directly crash, if there is debugger
-      // it will catch the problem and allow debugging.
-      break;
-#endif
       if (Tracer::enabled()) {
         Tracer::collect();
       }
-      debug_message("FluffOS driver attempting to exit gracefully.\n");
       if (current_file) {
         debug_message("(occurred during compilation of %s at line %d)\n", current_file,
                       current_line);
@@ -1666,6 +1660,12 @@ void free_sentence(sentence_t *p) {
       if (current_prog) {
         dump_vm_state();
       }
+#ifdef DEBUG
+      // make DEBUG driver directly crash, if there is debugger
+      // it will catch the problem and allow debugging.
+      break;
+#endif
+      debug_message("FluffOS driver attempting to exit gracefully.\n");
 #ifdef PACKAGE_MUDLIB_STATS
       save_stat_files();
 #endif

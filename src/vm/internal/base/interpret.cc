@@ -3030,7 +3030,9 @@ void eval_instruction(char *p) {
                 push_undefineds(funcp->min_arg - pushed_args);
                 pushed_args = funcp->min_arg;
             } else {
+#ifdef DEBUG
               dump_vm_state();
+#endif
               error("Not enough arguments to function %s, expected at least %d args, actual %d args.\n",
                     funcp->funcname, funcp->min_arg, pushed_args);
             }
@@ -3044,8 +3046,10 @@ void eval_instruction(char *p) {
 
               auto *default_funcp = progp->function_table + funcp->default_args_findex[i];
               if (default_funcp->funcname[0]!='#') {
+#ifdef DEBUG
                 dump_vm_state();
                 dump_prog(progp, stdout, 1|2);
+#endif
                 error("Illegal default argument function name %s in %s\n", default_funcp->funcname, progp->filename);
               }
 

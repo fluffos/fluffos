@@ -1,3 +1,7 @@
+nosave int called = 0;
+
+nosave int var = 0;
+
 // default case
 void test1() {
 }
@@ -54,6 +58,9 @@ varargs string test7(string a, string b: (: "bbb" :), string c: (: "ccc" :)) {
 }
 
 void do_tests() {
+    ASSERT_EQ(0, var);
+    ASSERT_EQ(0, called);
+
     test1();
     test2(1, 2);
     test3(1, 2, 3, 4, 5);
@@ -76,4 +83,7 @@ void do_tests() {
     ASSERT_EQ("aaabbbccc", test7("aaa"));
     ASSERT_EQ("aaaxxxccc", test7("aaa","xxx"));
     ASSERT_EQ("aaaxxxyyy", test7("aaa", "xxx", "yyy"));
+
+    called++;
+    ASSERT_EQ(1, called);
 }
