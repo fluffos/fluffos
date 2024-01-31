@@ -899,50 +899,41 @@ int compatible_types2(int t1, int t2) {
  * Note: this function is now only used for resolving :: references
  */
 static int find_matching_function(program_t *prog, const char *name, parse_node_t *node) {
-  int high = prog->num_functions_defined - 1;
-  int low = 0;
-  int i, res;
-
   /* Search our function table */
-  while (high >= low) {
-    int mid = (high + low) / 2;
-    const char *p = prog->function_table[mid].funcname;
+  for (int i = 0; i < prog->num_functions_defined; i++) {
+      // rely on the fact that name is a shared string, can simply compare pointers for equality
+      if(name == prog->function_table[i].funcname) {
+          int ri;
+          int flags;
+          int type;
 
-    if (name < p) {
-      high = mid - 1;
-    } else if (name > p) {
-      low = mid + 1;
-    } else {
-      int ri;
-      int flags;
-      int type;
+          /* Rely on the fact that functions in the table are not inherited
+             or aliased */
+          /* Non-inherited aliased ones are always removed anyway */
+          ri = prog->last_inherited + i;
 
-      /* Rely on the fact that functions in the table are not inherited
-         or aliased */
-      /* Non-inherited aliased ones are always removed anyway */
-      ri = prog->last_inherited + mid;
+          flags = prog->function_flags[ri];
 
-      flags = prog->function_flags[ri];
+          if (flags & (FUNC_UNDEFINED | FUNC_PROTOTYPE)) {
+              yywarn("BUG: inherit function is undefined or prototype, flags: %d", flags);
+              return 0;
+          }
+          if (flags & DECL_PRIVATE) {
+              return -1;
+          }
 
-      if (flags & (FUNC_UNDEFINED | FUNC_PROTOTYPE)) {
-        return 0;
+          node->kind = NODE_CALL_2;
+          node->v.number = F_CALL_INHERITED;
+          node->l.number = ri;
+          type = prog->function_table[i].type;
+          fix_class_type(&type, prog);
+          node->type = type;
+          return 1;
       }
-      if (flags & DECL_PRIVATE) {
-        return -1;
-      }
-
-      node->kind = NODE_CALL_2;
-      node->v.number = F_CALL_INHERITED;
-      node->l.number = ri;
-      type = prog->function_table[mid].type;
-      fix_class_type(&type, prog);
-      node->type = type;
-      return 1;
-    }
   }
-
   /* Search inherited function tables */
-  i = prog->num_inherited;
+  int res;
+  int i = prog->num_inherited;
   while (i--) {
     if ((res = find_matching_function(prog->inherit[i].prog, name, node))) {
       if ((res == -1) || (prog->inherit[i].type_mod & DECL_PRIVATE)) {
@@ -962,6 +953,7 @@ int arrange_call_inherited(char *name, parse_node_t *node) {
   char *super_name, *p, *real_name = name;
   const char *shared_string;
   int ret;
+  std::vector<std::string> names;
 
   if (real_name[0] == ':') {
     super_name = nullptr;
@@ -976,46 +968,56 @@ int arrange_call_inherited(char *name, parse_node_t *node) {
   }
 
   num_inherits = NUM_INHERITS;
+  shared_string = findstring(real_name);
   /* no need to look for it unless its in the shared string table */
-  if ((shared_string = findstring(real_name))) {
-    ip = reinterpret_cast<inherit_t *>(mem_block[A_INHERITS].block);
-    for (; num_inherits > 0; ip++, num_inherits--) {
-      int tmp;
+  if (!shared_string) {
+      yyerror("No such function '%s' defined.", real_name);
+      goto invalid;
+  }
+  ip = reinterpret_cast<inherit_t *>(mem_block[A_INHERITS].block);
+  for (; num_inherits > 0; ip++, num_inherits--) {
+        int tmp;
 
-      if (super_name) {
-        int l = SHARED_STRLEN(ip->prog->filename); /* Including .c */
+        if (super_name) {
+            int l = SHARED_STRLEN(ip->prog->filename); /* Including .c */
+            names.emplace_back(std::string(ip->prog->filename));
 
-        if (l - 2 < super_length) {
-          continue;
-        }
-        if (strncmp(super_name, ip->prog->filename + l - 2 - super_length, super_length) != 0 ||
-            !((l - 2 == super_length) || ((ip->prog->filename + l - 3 - super_length)[0] == '/'))) {
-          continue;
-        }
-      }
-
-      if ((tmp = find_matching_function(ip->prog, shared_string, node))) {
-        if (tmp == -1 || (ip->type_mod & DECL_PRIVATE)) {
-          yyerror("Called function is private.");
-
-          goto invalid;
+            if (l - 2 < super_length) {
+                continue;
+            }
+            if (strncmp(super_name, ip->prog->filename + l - 2 - super_length, super_length) != 0 ||
+                !((l - 2 == super_length) || ((ip->prog->filename + l - 3 - super_length)[0] == '/'))) {
+                continue;
+            }
         }
 
-        ret = node->l.number + ip->function_index_offset;
-        node->l.number |= ((ip - reinterpret_cast<inherit_t *>(mem_block[A_INHERITS].block)) << 16);
-        return ret;
-      }
+        if ((tmp = find_matching_function(ip->prog, shared_string, node))) {
+            if (tmp == -1 || (ip->type_mod & DECL_PRIVATE)) {
+                yyerror("Called function is private.");
+
+                goto invalid;
+            }
+
+            ret = node->l.number + ip->function_index_offset;
+            node->l.number |= ((ip - reinterpret_cast<inherit_t *>(mem_block[A_INHERITS].block)) << 16);
+            return ret;
+        }
     }
-  } /* if in shared string table */
-  { yyerror("No such inherited function '%s'.", name); }
-
+    if (super_name) {
+        yyerror("Unable to find the inherited function '%s' in file '%s'.", real_name, std::string(super_name, super_length).c_str());
+        for(auto &name : names) {
+            yyerror("  Looked at '%s'", name.c_str());
+        }
+    } else {
+        yyerror("Unable to find the inherited function '%s'.", real_name);
+    }
 invalid:
-  node->kind = NODE_CALL_2;
-  node->v.number = F_CALL_INHERITED;
-  node->l.number = 0;
-  node->type = TYPE_ANY;
+    node->kind = NODE_CALL_2;
+    node->v.number = F_CALL_INHERITED;
+    node->l.number = 0;
+    node->type = TYPE_ANY;
 
-  return -1;
+    return -1;
 }
 
 /*

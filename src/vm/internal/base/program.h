@@ -245,8 +245,8 @@ struct program_t {
   unsigned short num_classes;
   unsigned short num_functions_defined;
   unsigned short num_strings;
-  unsigned short num_variables_total;
-  unsigned short num_variables_defined;
+  unsigned short num_variables_total; /* total number of variables including inherited */
+  unsigned short num_variables_defined; /* total number of variables defined by this program */
   unsigned short num_inherited;
 
   // A lookup table to make lookup function by name faster.

@@ -13,6 +13,6 @@ if(${GTEST_FOUND})
   target_link_libraries(ofile_tests PRIVATE ${FLUFFOS_LINK} GTest::GTest  GTest::Main)
   target_compile_definitions(ofile_tests PRIVATE -DTESTSUITE_DIR="${CMAKE_SOURCE_DIR}/testsuite")
 
-  gtest_discover_tests(lpc_tests ofile_tests)
+  gtest_discover_tests(lpc_tests ofile_tests DISCOVERY_TIMEOUT 60)
 endif()
 
