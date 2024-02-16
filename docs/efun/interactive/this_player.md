@@ -4,9 +4,15 @@ title: interactive / this_player
 ---
 # this_player
 
+### NAME
+
+    this_player - the current player object
+
 ### SYNOPSIS
 
-    object this_player( int flag );
+    object this_player( int flag: 0 );
+    object this_user( int flag: 0 );
+    object this_interactive( int flag: 1 );
 
 ### DESCRIPTION
 
@@ -19,6 +25,9 @@ title: interactive / this_player
     tain  cases  (such  as  when  command()  is used by an admin to force a
     player to perform some command).
 
+    `this_user`  and  `this_interactive` are aliases for `this_player` with
+    different default flags.
+
 ### SEE ALSO
 
-    this_object(3)
+    this_object(3), this_user(3), this_interactive(3), set_this_player(3)
