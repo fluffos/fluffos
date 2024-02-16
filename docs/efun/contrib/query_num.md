@@ -44,10 +44,10 @@ varargs string query_num(int x, int many) {
     string sign;
 
     if(nullp(x))
-        error "Too few arguments to 'query_num'." ;
+        error("Too few arguments to 'query_num'.") ;
 
     if(!intp(x))
-        error "Bad argument 1 to 'query_num'." ;
+        error("Bad argument 1 to 'query_num'.") ;
 
     sign = x < 0 ? "negative " : "" ;
     x = abs(x) ;
