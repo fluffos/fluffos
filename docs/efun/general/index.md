@@ -42,7 +42,6 @@ title: general
 * [shallow_inherit_list](shallow_inherit_list.html)
 * [sizeof](sizeof.html)
 * [start_request_term_type](start_request_term_type.html)
-* [this_user](this_user.html)
 * [translate](translate.html)
 * [typeof](typeof.html)
 * [uncompress](uncompress.html)
