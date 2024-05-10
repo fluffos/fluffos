@@ -31,6 +31,6 @@ title: contrib / store_variable.pre
 
     store_variable( "weight", 150, this_player() ) ;
 
-## SEE ALSO
+### SEE ALSO
 
     fetch_variable
