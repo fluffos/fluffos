@@ -15,7 +15,8 @@ title: contrib / event.pre
 
 ### DESCRIPTION
 
-    Calls "event_" + event_name in target. 
+    Calls "event_" + event_name in target. "event_" + event_name must be a
+    public function.
 
     Target can be a single object or an array of objects.
 
