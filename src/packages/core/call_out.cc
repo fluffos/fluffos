@@ -314,7 +314,7 @@ int remove_call_out_by_handle(object_t *ob, LPC_INT handle) {
   DBG_CALLOUT("remove_call_out_by_handle: ob: %s, handle: %" LPC_INT_FMTSTR_P ".\n", ob->obname,
               handle);
 
-  if (handle == 0 || handle < unique) {
+  if (handle == 0 || handle > g_current_gametick + unique) {
     DBG_CALLOUT("  invalid handle, ignored.\n");
     return -1;
   }
