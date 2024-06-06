@@ -6,7 +6,7 @@ title: contrib / remove_interactive.pre
 
 ### NAME
 
-    remove_interactive() - destructs and removes the interactive object.
+    remove_interactive - removes the interactive object
 
 ### SYNOPSIS
 
@@ -14,7 +14,12 @@ title: contrib / remove_interactive.pre
 
 ### DESCRIPTION
 
-    makes sure object isn't interactive
+    If the argument object is interactive and not destructed, cause it to be
+    disconnected and lose interactive status. Returns 1 when the operation is
+    successful.
 
-    returns 0 if object is either destructed or not interactive to begin with
-    1 otherwise
+    This function requires PACKAGE_CONTRIB to be defined in the options file.
+
+### SEE ALSO
+
+    exec(3), interactive(3), this_interactive(3), this_player(3)
