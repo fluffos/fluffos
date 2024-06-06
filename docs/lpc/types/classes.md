@@ -40,3 +40,10 @@ Accessing member values using arrow operator:
     npc->name = "Name";
     npc->level = 15;
 ```
+
+Casting a class:
+```c
+function (mixed p, string name) {
+    ((class Person)p)->name = name;
+}
+```
