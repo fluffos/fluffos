@@ -813,6 +813,9 @@ void destruct_object(object_t *ob) {
   }
 #endif
 
+  // Notify object that it is scheduled for destruction
+  safe_apply(APPLY_DESTRUCTING, ob, 0, ORIGIN_DRIVER);
+
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
   /*
    * check if object has an efun socket referencing it for a callback. if
