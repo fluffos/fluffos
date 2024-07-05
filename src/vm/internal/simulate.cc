@@ -813,8 +813,21 @@ void destruct_object(object_t *ob) {
   }
 #endif
 
-  // Notify object that it is scheduled for destruction
-  safe_apply(APPLY_DESTRUCTING, ob, 0, ORIGIN_DRIVER);
+/*
+  * Notify object that it is scheduled for destruction
+  *
+  * Proceed with destruction even if there is an error
+  * in the destructing() function in the mudlib.
+  */
+  error_context_t econ;
+  save_context(&econ) ;
+  try {
+    safe_apply(APPLY_DESTRUCTING, ob, 0, ORIGIN_DRIVER);
+  } catch (...) {  // catch everything
+    restore_context(&econ);
+    /* condition was restored to where it was when we came in */
+  }
+  pop_context(&econ);
 
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
   /*
