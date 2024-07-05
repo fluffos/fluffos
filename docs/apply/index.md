@@ -56,6 +56,7 @@ title: APPLY
 * [__INIT](object/__INIT.html)
 * [clean_up](object/clean_up.html)
 * [create](object/create.html)
+* [destructing](object/destructing.html)
 * [heart_beat](object/heart_beat.html)
 * [id](object/id.html)
 * [init](object/init.html)
