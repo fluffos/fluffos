@@ -41,6 +41,7 @@ title: general / filter
     object to load and call the filter function on.
 
 ### EXAMPLES
+
 Using function pointers:
 ```c
 string s = "Hello, this is a string.";
@@ -58,6 +59,7 @@ m = filter(m, (: $1[1] % 2 == 0 :));
 not_me = filter(users(), (: $1 != $2 :), this_player());
 // not_me == all users except this_player()
 ```
+
 Using strings:
 ```c
 int filter_space(int elem) return (elem != ' ');
@@ -80,3 +82,8 @@ not_me = filter(users(), "filter_not_me", this_object(), this_player());
 ### NOTE
 
     The efuns filter_mapping() and filter_array() are aliases for filter().
+
+### SEE ALSO
+
+    filter_array(3), filter_mapping(3), map(3), unique_array(3)
+
