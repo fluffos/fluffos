@@ -32,5 +32,5 @@ title: general / map
 
 ### SEE ALSO
 
-    filter_array(3), sort_array(3), map_array(3), map_mapping(3)
+    filter(3), map_array(3), map_mapping(3), unique_array(3)
 
