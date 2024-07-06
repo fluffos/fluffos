@@ -26,4 +26,5 @@ mixed *filter_array( mixed *arr, function f, mixed extra, ...);
 
 ### SEE ALSO
 
-    sort_array(), map_array(), filter(), map()
+    filter(3), map(3), sort_array(3), unique_array(3)
+
