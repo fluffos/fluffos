@@ -36,6 +36,7 @@ void f_debug_info() {
       outbuf_addv(&out, "O_RESET_STATE     : %s\n", flags & O_RESET_STATE ? "TRUE" : "FALSE");
       outbuf_addv(&out, "O_WILL_CLEAN_UP   : %s\n", flags & O_WILL_CLEAN_UP ? "TRUE" : "FALSE");
       outbuf_addv(&out, "O_WILL_RESET      : %s\n", flags & O_WILL_RESET ? "TRUE" : "FALSE");
+      outbuf_addv(&out, "O_NOTIFY_DESTRUCT : %s\n", flags & O_NOTIFY_DESTRUCT ? "TRUE" : "FALSE");
 
       if (ob->interactive) {
         outbuf_addv(&out, "O_ZMP             : %s\n",

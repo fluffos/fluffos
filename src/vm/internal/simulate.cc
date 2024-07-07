@@ -819,15 +819,17 @@ void destruct_object(object_t *ob) {
   * Proceed with destruction even if there is an error
   * in the destructing() function in the mudlib.
   */
-  error_context_t econ;
-  save_context(&econ) ;
-  try {
-    safe_apply(APPLY_DESTRUCTING, ob, 0, ORIGIN_DRIVER);
-  } catch (...) {  // catch everything
-    restore_context(&econ);
-    /* condition was restored to where it was when we came in */
+  if(ob->flags & O_NOTIFY_DESTRUCT) {
+    error_context_t econ;
+    save_context(&econ) ;
+    try {
+      safe_apply(APPLY_ON_DESTRUCT, ob, 0, ORIGIN_DRIVER);
+    } catch (...) {  // catch everything
+      restore_context(&econ);
+      /* condition was restored to where it was when we came in */
+    }
+    pop_context(&econ);
   }
-  pop_context(&econ);
 
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
   /*

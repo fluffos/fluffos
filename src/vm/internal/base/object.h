@@ -52,7 +52,7 @@
 #ifndef NO_SNOOP
 #define O_SNOOP 0x8000u
 #endif
-
+#define O_NOTIFY_DESTRUCT 0x01u /* object will be notified on destruct */
 /*
  * Note: use of more than 16 bits means extending flags to an unsigned long
  */
