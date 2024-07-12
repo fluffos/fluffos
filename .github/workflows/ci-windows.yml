@@ -28,7 +28,7 @@ jobs:
       - uses: msys2/setup-msys2@v2
         with:
           update: true
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install
         run: |
           if [ "$MSYSTEM" = "MINGW32" ]; then
