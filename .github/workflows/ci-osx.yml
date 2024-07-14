@@ -17,22 +17,22 @@ jobs:
       fail-fast: false
       matrix:
         build: ["Debug", "RelWithDebInfo"]
-        os: ["macOS-13"]
+        os: ["macos-14"]
 
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Install packages
       env:
         HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
-      run: brew install cmake pkg-config pcre libgcrypt openssl jemalloc icu4c mysql-client sqlite3 googletest
+      run: brew install cmake pkg-config pcre libgcrypt openssl jemalloc icu4c mysql sqlite3 googletest
     - name: compile
       run: mkdir build && cd build &&  cmake -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DPACKAGE_DB_SQLITE=2 .. && make -j 2 install && cd ..
       env:
         VERBOSE: 1
         OPENSSL_ROOT_DIR: "/usr/local/opt/openssl"
-        ICU_ROOT: "/usr/local/opt/icu4c"
+        ICU_ROOT: "/opt/homebrew/opt/icu4c"
     - name: run tests
       env:
         CTEST_OUTPUT_ON_FAILURE: 1

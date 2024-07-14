@@ -1,6 +1,6 @@
-[![CI Status](https://github.com/fluffos/fluffos/workflows/CI%20on%20ubuntu/badge.svg)](https://github.com/fluffos/fluffos/actions)
-[![CI Status](https://github.com/fluffos/fluffos/workflows/CI%20on%20OSX/badge.svg)](https://github.com/fluffos/fluffos/actions)
-[![CI Status](https://github.com/fluffos/fluffos/workflows/CI%20on%20Windows/badge.svg)](https://github.com/fluffos/fluffos/actions)
+[![CI Status](https://github.com/fluffos/fluffos/actions/workflows/ci.yml/badge.svg)](https://github.com/fluffos/fluffos/actions)
+[![CI Status](https://github.com/fluffos/fluffos/actions/workflows/ci-osx.yml/badge.svg)](https://github.com/fluffos/fluffos/actions)
+[![CI Status](https://github.com/fluffos/fluffos/actions/workflows/ci-windows.yml/badge.svg)](https://github.com/fluffos/fluffos/actions)
 
 
 [![Backers on Open Collective](https://opencollective.com/fluffos-579/backers/badge.svg)](#backers)

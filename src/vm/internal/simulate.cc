@@ -895,7 +895,7 @@ void destruct_object(object_t *ob) {
   ob->shadowed = nullptr;
 #endif
 
-  debug(d_flag, "Deobject_t /%s (ref %d)", ob->obname, ob->ref);
+  debug(d_flag, "Deobject_t /%s (ref %d)\n", ob->obname, ob->ref);
 
 #ifndef NO_ENVIRONMENT
   /* try to move our contents somewhere */
