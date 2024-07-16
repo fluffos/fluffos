@@ -10,6 +10,7 @@ LOGON
 MOVE:move_or_destruct
 NET_DEAD
 NOUN:parse_command_id_list
+ON_DESTRUCT
 PLURAL:parse_command_plural_id_list
 PROCESS_INPUT
 QGET_ADJID:parse_command_adjective_id_list
