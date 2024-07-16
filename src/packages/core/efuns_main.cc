@@ -2282,6 +2282,31 @@ void f_set_bit() {
 }
 #endif
 
+#ifdef F_SET_NOTIFY_DESTRUCT
+void f_set_notify_destruct() {
+  int const num = sp->u.number ;
+
+  if(num == 1) {
+    current_object->flags |= O_NOTIFY_DESTRUCT;
+  } else if(num == 0) {
+    current_object->flags &= ~O_NOTIFY_DESTRUCT;
+  } else {
+    error("Bad argument 1 to set_notify_destructing()\n");
+  }
+
+  pop_stack() ;
+}
+#endif
+
+#ifdef F_QUERY_NOTIFY_DESTRUCT
+void f_query_notify_destruct() {
+  object_t *ob = sp->u.ob;
+  int const num = ob->flags & O_NOTIFY_DESTRUCT ;
+  free_object(&sp->u.ob, "f_query_notify_destruct");
+  put_number(num ? 1 : 0) ;
+}
+#endif
+
 #ifdef F_SET_HEART_BEAT
 void f_set_heart_beat() { set_heart_beat(current_object, (sp--)->u.number); }
 #endif

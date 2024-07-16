@@ -103,6 +103,8 @@ mixed restore_variable(string);
 object* users();
 mixed *get_dir(string, int default: 0);
 int strsrch(string, string | int, int default: 0);
+void set_notify_destruct(int);
+int query_notify_destruct(object default: F__THIS_OBJECT);
 
 /* communication functions */
 
