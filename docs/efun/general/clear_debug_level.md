@@ -31,6 +31,7 @@ title: general / clear_debug_level
         add_action
         telnet
         websocket
+        external_start
 
 ### EXAMPLE
 
