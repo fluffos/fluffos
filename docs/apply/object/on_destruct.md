@@ -2,7 +2,7 @@
 layout: doc
 title: object / on_destruct
 ---
-# clean_up
+# on_destruct
 
 ### NAME
 
