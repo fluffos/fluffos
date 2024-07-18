@@ -27,6 +27,13 @@ void split(const std::string &s, char delim, Out result) {
   }
 }
 
+// Added because debug() macro won't take a struct tm as an argument.
+std::string format_time(const struct tm& timeinfo) {
+  char buffer[64];
+  strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
+  return std::string(buffer);
+}
+
 int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, svalue_t *arg3) {
   std::vector<std::string> newargs_data = {std::string(external_cmd[which])};
   if (args->type == T_ARRAY) {
@@ -50,7 +57,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
   posix_spawn_file_actions_t file_actions;
   int ret = posix_spawn_file_actions_init(&file_actions);
   if (ret != 0) {
-    debug_message("external_start: posix_spawn_file_actions_init() error: %s\n", strerror(ret));
+    debug(external_start, "external_start: posix_spawn_file_actions_init() error: %s\n", strerror(ret));
     return EESOCKET;
   }
   DEFER { posix_spawn_file_actions_destroy(&file_actions); };
@@ -74,7 +81,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
         posix_spawn_file_actions_adddup2(&file_actions, sv[1], 1) ||
         posix_spawn_file_actions_adddup2(&file_actions, sv[1], 2);
   if (ret != 0) {
-    debug_message("external_start: posix_spawn_file_actions_adddup2() error: %s\n", strerror(ret));
+    debug(external_start, "external_start: posix_spawn_file_actions_adddup2() error: %s\n", strerror(ret));
     return EESOCKET;
   }
 
@@ -114,7 +121,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
   char *newenviron[] = {nullptr};
   ret = posix_spawn(&pid, newargs[0], &file_actions, nullptr, newargs.data(), newenviron);
   if (ret) {
-    debug_message("external_start: posix_spawn() error: %s\n", strerror(ret));
+    debug(external_start, "external_start: posix_spawn() error: %s\n", strerror(ret));
     return EESOCKET;
   }
 
@@ -124,7 +131,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
   evutil_socket_t childfd = sv[0];
   sv[0] = -1;
 
-  debug_message("Launching external command '%s %s', pid: %jd.\n", external_cmd[which],
+  debug(external_start, "external_start: Launching external command '%s %s', pid: %jd.\n", external_cmd[which],
                 args->type == T_STRING ? args->u.string : "<ARRAY>", (intmax_t)pid);
 
   std::thread([=]() {
@@ -132,7 +139,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
     do {
       const int s = waitpid(pid, &status, WUNTRACED | WCONTINUED);
       if (s == -1) {
-        debug_message("external_start(): waitpid() error: %s (%d).\n", strerror(errno), errno);
+        debug(external_start, "external_start: waitpid() error: %s (%d).\n", strerror(errno), errno);
         return;
       }
       std::string res = fmt::format(FMT_STRING("external_start(): child {} status: "), pid);
@@ -145,7 +152,8 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
       } else if (WIFCONTINUED(status)) {
         res += "continued\n";
       }
-      debug_message("%s", res.c_str());
+
+      debug(external_start, "external_start: %s\n", format_time(res).c_str());
     } while (!WIFEXITED(status) && !WIFSIGNALED(status));
   }).detach();
 
@@ -290,7 +298,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
     error("CreateProcess() in external_start() failed: %s\n", strerror(errno));
     return EESOCKET;
   }
-  debug_message("Launching external command '%s', pid: %d.\n", cmdline.c_str(),
+  debug(external_start, "external_start: Launching external command '%s', pid: %d.\n", cmdline.c_str(),
                 processInfo.dwProcessId);
 
   std::thread([=]() {
@@ -298,7 +306,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
     DWORD exitCode = -1;
     // Get the exit code.
     GetExitCodeProcess(processInfo.hProcess, &exitCode);
-    debug_message("pid: %d exited with %d.\n", processInfo.dwProcessId, exitCode);
+    debug(external_start, "external_start: pid: %d exited with %d.\n", processInfo.dwProcessId, exitCode);
     CloseHandle(processInfo.hProcess);
     CloseHandle(processInfo.hThread);
     evutil_closesocket(sv[0]);
