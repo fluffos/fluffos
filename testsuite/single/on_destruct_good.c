@@ -6,4 +6,5 @@ void create()
 void on_destruct()
 {
     debug_message("on_destruct() called in " __FILE__) ;
+    rm("/data/test_on_destruct_good") ;
 }
