@@ -10,7 +10,7 @@ title: master / get_save_file_name
 
 ### SYNOPSIS
 
-    string get_save_file_name( string );
+    string get_save_file_name( string original_file_name, object who );
 
 ### DESCRIPTION
 
