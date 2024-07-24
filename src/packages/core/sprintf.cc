@@ -372,6 +372,10 @@ void svalue_to_string(svalue_t *obj, outbuffer_t *outbuf, int indent, int traili
       }
       break;
     case T_BUFFER:
+      if(!(obj->u.buf->size)) {
+        outbuf_add(outbuf, "BUFFER ( )");
+        break;
+      }
       outbuf_add(outbuf, "BUFFER ( /* sizeof() == ");
       outbuf_addv(outbuf, "%d", obj->u.buf->size);
       outbuf_add(outbuf, " */\n");
