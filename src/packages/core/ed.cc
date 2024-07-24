@@ -722,7 +722,7 @@ static int doread(int lin, const char *fname) {
     ED_OUTPUTV(ED_DEST, "\"%s\" ", fname);
   }
   if ((fp = fopen(fname, "r")) == nullptr) {
-    ED_OUTPUT(ED_DEST, " isn't readable.\n");
+    ED_OUTPUTV(ED_DEST, "%s isn't readable.\n", fname);
     return EDERR;
   }
   setCurLn(lin);
@@ -784,7 +784,7 @@ static int dowrite(int from, int to, const char *fname, int apflg) {
   }
   if ((fp = fopen(fname, (apflg ? "a" : "w"))) == nullptr) {
     if (!P_RESTRICT) {
-      ED_OUTPUT(ED_DEST, " can't be opened for writing!\n");
+      ED_OUTPUTV(ED_DEST, "%s can't be opened for writing!\n", fname) ;
     } else {
       ED_OUTPUT(ED_DEST, "Couldn't open file for writing!\n");
     }
