@@ -19,6 +19,7 @@
  * v1.0.3: fix for empty data structures
  * v1.0.4: Removed array keyword. (Yucong Sun)
  * v1.0.5: Fix decoding number 0.
+ * v1.1.0: Adding unicode support for complex emoji, etc
  *
  * LICENSE
  *
@@ -58,28 +59,49 @@
 private mixed json_decode_parse_value(mixed* parse);
 private varargs mixed json_decode_parse_string(mixed* parse, int initiator_checked);
 
+/**
+ * @function json_decode_parse_next_char
+ * @description Advances the parse position by one character.
+ * @param {mixed[]} parse - The parse state array.
+ */
 private void json_decode_parse_next_char(mixed* parse) {
     parse[JSON_DECODE_PARSE_POS]++;
     parse[JSON_DECODE_PARSE_CHAR]++;
 }
 
+/**
+ * @function json_decode_parse_next_chars
+ * @description Advances the parse position by the specified number of characters.
+ * @param {mixed[]} parse - The parse state array.
+ * @param {int} num - The number of characters to advance.
+ */
 private void json_decode_parse_next_chars(mixed* parse, int num) {
     parse[JSON_DECODE_PARSE_POS] += num;
     parse[JSON_DECODE_PARSE_CHAR] += num;
 }
 
+/**
+ * @function json_decode_parse_next_line
+ * @description Advances the parse position to the next line.
+ * @param {mixed[]} parse - The parse state array.
+ */
 private void json_decode_parse_next_line(mixed* parse) {
     parse[JSON_DECODE_PARSE_POS]++;
     parse[JSON_DECODE_PARSE_LINE]++;
     parse[JSON_DECODE_PARSE_CHAR] = 1;
 }
 
+/**
+ * @function json_decode_skip_whitespaces
+ * @description Skips whitespace characters in the parse state.
+ * @param {mixed[]} parse - The parse state array.
+ */
 private void json_decode_skip_whitespaces(mixed* parse) {
     int ch;
     while(1) {
       json_decode_parse_next_char(parse);
       ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
-      if (ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t') {
+      if(ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t') {
         continue;
       } else {
         return ;
@@ -87,6 +109,12 @@ private void json_decode_skip_whitespaces(mixed* parse) {
     }
 }
 
+/**
+ * @function json_decode_hexdigit
+ * @description Converts a hexadecimal character to its integer value.
+ * @param {int} ch - The hexadecimal character.
+ * @returns {int} - The integer value of the hexadecimal character.
+ */
 private int json_decode_hexdigit(int ch) {
     switch(ch) {
     case '0'    :
@@ -123,6 +151,14 @@ private int json_decode_hexdigit(int ch) {
     return -1;
 }
 
+/**
+ * @function json_decode_parse_at_token
+ * @description Checks if the parse position matches the specified token.
+ * @param {mixed[]} parse - The parse state array.
+ * @param {string} token - The token to check for.
+ * @param {int} [start=0] - The starting position to check from.
+ * @returns {int} - 1 if the token matches, otherwise 0.
+ */
 private varargs int json_decode_parse_at_token(mixed* parse, string token, int start) {
     int i, j;
     for(i = start, j = strlen(token); i < j; i++)
@@ -131,6 +167,13 @@ private varargs int json_decode_parse_at_token(mixed* parse, string token, int s
     return 1;
 }
 
+/**
+ * @function json_decode_parse_error
+ * @description Raises a parse error with the specified message and character.
+ * @param {mixed[]} parse - The parse state array.
+ * @param {string} msg - The error message.
+ * @param {int} [ch] - The character causing the error.
+ */
 private varargs void json_decode_parse_error(mixed* parse, string msg, int ch) {
     if(ch)
         msg = sprintf("%s, '%c'", msg, ch);
@@ -138,6 +181,12 @@ private varargs void json_decode_parse_error(mixed* parse, string msg, int ch) {
     error(msg);
 }
 
+/**
+ * @function json_decode_parse_object
+ * @description Parses a JSON object from the given parse state.
+ * @param {mixed[]} parse - The parse state array.
+ * @returns {mapping} - The parsed JSON object.
+ */
 private mixed json_decode_parse_object(mixed* parse) {
     mapping out = ([]);
     int done = 0;
@@ -225,6 +274,12 @@ private mixed json_decode_parse_object(mixed* parse) {
     return out;
 }
 
+/**
+ * @function json_decode_parse_array
+ * @description Parses a JSON array from the given parse state.
+ * @param {mixed[]} parse - The parse state array.
+ * @returns {mixed[]} - The parsed JSON array.
+ */
 private mixed json_decode_parse_array(mixed* parse) {
     mixed* out = ({});
     int done = 0;
@@ -268,6 +323,13 @@ private mixed json_decode_parse_array(mixed* parse) {
     return out;
 }
 
+/**
+ * @function json_decode_parse_string
+ * @description Parses a JSON string from the given parse state.
+ * @param {mixed[]} parse - The parse state array.
+ * @param {int} [initiator_checked=0] - Whether the initiator has been checked.
+ * @returns {string} - The parsed JSON string.
+ */
 private varargs mixed json_decode_parse_string(mixed* parse, int initiator_checked) {
     int from, to, esc_state, esc_active;
     string out;
@@ -322,43 +384,49 @@ private varargs mixed json_decode_parse_string(mixed* parse, int initiator_check
         if(strsrch(out, "\\t") != -1)
             out = replace_string(out, "\\t", "\t");
         if(strsrch(out, "\\u") != -1) {
-          for (int i = 0; i< strlen(out); i++) {
-            if (out[i] == '\\' && out[i+1] == 'u') {
-              int* nybbles = allocate(4);
-              int character = 0;
-              i += 2;
-              for(int k = 0; k < 4; k++) {
-                if((nybbles[k] = json_decode_hexdigit(out[i + k])) == -1)
-                  json_decode_parse_error(parse, "Invalid hex digit", out[i + k]);
-              }
-              character = (nybbles[0] << 12) | (nybbles[1] << 8 )| (nybbles[2] << 4) | nybbles[3];
-              // Single codepoint character
-              if (!(((character)&0xfffff800)==0xd800)) {
-                i -= 2;
-                out[i .. i + 2 + 4 - 1] = sprintf("%c", character);
-                i = 0;
-                continue;
-              } else {
-                // UTF16 - Surrogate, attempts to parse the second value
-                int codepoint;
-                int next_character = 0;
-                int* nybbles2 = allocate(4);
-                i += 4;
-                if (out[i .. i+1] != "\\u") json_decode_parse_error(parse, "Invalid string, missing surrogate pair");
-                i += 2;
-                for(int k = 0; k < 4; k++) {
-                  if((nybbles2[k] = json_decode_hexdigit(out[i + k])) == -1)
-                    json_decode_parse_error(parse, "Invalid hex digit", out[i + k]);
+int i, k, character, next_character;
+buffer utf8_buf;
+string unicode_char;
+
+i = 0;
+while(i < strlen(out)) {
+    if(out[i] == '\\' && i + 1 < strlen(out) && out[i + 1] == 'u') {
+        if(i + 5 >= strlen(out)) {
+            break;
+        }
+
+        sscanf(out[i+2..i+5], "%x", character);
+
+        if(character >= 0xD800 && character <= 0xDBFF) {
+            if(i + 11 < strlen(out) && out[i + 6] == '\\' && out[i + 7] == 'u') {
+                sscanf(out[i+8..i+11], "%x", next_character);
+                if(next_character >= 0xDC00 && next_character <= 0xDFFF) {
+                    int codepoint = 0x10000 + ((character - 0xD800) << 10) + (next_character - 0xDC00);
+                    utf8_buf = string_encode(sprintf("%c", codepoint), "UTF-8");
+                    unicode_char = string_decode(utf8_buf, "UTF-8");
+                    out = out[0..i-1] + unicode_char + out[i+12..];
+                    i += strlen(unicode_char) - 1;
+                } else {
+                    utf8_buf = string_encode(sprintf("%c", character), "UTF-8");
+                    unicode_char = string_decode(utf8_buf, "UTF-8");
+                    out = out[0..i-1] + unicode_char + out[i+6..];
+                    i += strlen(unicode_char) - 1;
                 }
-                next_character = (nybbles2[0] << 12) | (nybbles2[1] << 8) | (nybbles2[2] << 4) | (nybbles2[3]);
-                i -= 2 + 4 + 2; // reset to first \u
-                codepoint = 0x10000 + (character - 0xd800) * 0x400 + (next_character - 0xDC00);
-                out[i .. i + 2 + 4 + 2 + 4 - 1] = sprintf("%c", codepoint);
-                i = 0;
-                continue;
-              }
+            } else {
+                utf8_buf = string_encode(sprintf("%c", character), "UTF-8");
+                unicode_char = string_decode(utf8_buf, "UTF-8");
+                out = out[0..i-1] + unicode_char + out[i+6..];
+                i += strlen(unicode_char) - 1;
             }
-          }
+        } else {
+            utf8_buf = string_encode(sprintf("%c", character), "UTF-8");
+            unicode_char = string_decode(utf8_buf, "UTF-8");
+            out = out[0..i-1] + unicode_char + out[i+6..];
+            i += strlen(unicode_char) - 1;
+        }
+    }
+    i++;
+}
         }
         if(member_array('/', out) != -1)
             out = replace_string(out, "\\/", "/");
@@ -368,6 +436,12 @@ private varargs mixed json_decode_parse_string(mixed* parse, int initiator_check
     return out;
 }
 
+/**
+ * @function json_decode_parse_number
+ * @description Parses a JSON number from the given parse state.
+ * @param {mixed[]} parse - The parse state array.
+ * @returns {mixed} - The parsed JSON number.
+ */
 private mixed json_decode_parse_number(mixed* parse) {
     int from = parse[JSON_DECODE_PARSE_POS];
     int to = -1;
@@ -378,7 +452,7 @@ private mixed json_decode_parse_number(mixed* parse) {
     string number;
 
     ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
-    if (ch == '-') {
+    if(ch == '-') {
         next_ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS] + 1];
         if(!next_ch) json_decode_parse_error(parse, "Unexpected end of data");
         if(next_ch < '0' || next_ch > '9')
@@ -387,7 +461,7 @@ private mixed json_decode_parse_number(mixed* parse) {
     }
 
     ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
-    if (ch == '0') {
+    if(ch == '0') {
         // 0 can only either be an direct int value 0, or 0e or 0E
         next_ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS] + 1];
         // 0 before EOF
@@ -396,14 +470,14 @@ private mixed json_decode_parse_number(mixed* parse) {
           return 0;
         }
         // only valid char here are .eE, continue parse
-        if (next_ch == '.' || next_ch == 'e' || next_ch == 'E') {
+        if(next_ch == '.' || next_ch == 'e' || next_ch == 'E') {
           json_decode_parse_next_char(parse);
         } else {
           // consume until next non-whitespace
           json_decode_skip_whitespaces(parse);
           next_ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
-          // can not continue to be number.
-          if ((next_ch >= '0' && next_ch <= '9') || next_ch == '-') json_decode_parse_error(parse, "Unexpected character", next_ch);
+          // cannot continue to be number.
+          if((next_ch >= '0' && next_ch <= '9') || next_ch == '-') json_decode_parse_error(parse, "Unexpected character", next_ch);
           return 0;
         }
     }
@@ -456,6 +530,12 @@ private mixed json_decode_parse_number(mixed* parse) {
         return to_int(number);
 }
 
+/**
+ * @function json_decode_parse_value
+ * @description Parses a JSON value from the given parse state.
+ * @param {mixed[]} parse - The parse state array.
+ * @returns {mixed} - The parsed JSON value.
+ */
 private mixed json_decode_parse_value(mixed* parse) {
     for(;;) {
         int ch;
@@ -517,6 +597,12 @@ private mixed json_decode_parse_value(mixed* parse) {
     }
 }
 
+/**
+ * @function json_decode_parse
+ * @description Parses a JSON value from the given parse state.
+ * @param {mixed[]} parse - The parse state array.
+ * @returns {mixed} - The parsed JSON value.
+ */
 private mixed json_decode_parse(mixed* parse) {
     mixed out = json_decode_parse_value(parse);
     for(;;) {
@@ -540,6 +626,12 @@ private mixed json_decode_parse(mixed* parse) {
     return 0;
 }
 
+/**
+ * @simul_efun json_decode
+ * @description Deserializes a JSON string into an LPC value.
+ * @param {string} text - The JSON string to deserialize.
+ * @returns {mixed} - The deserialized LPC value.
+ */
 mixed json_decode(string text) {
     mixed* parse;
     buffer endl = allocate_buffer(1);
@@ -557,7 +649,19 @@ mixed json_decode(string text) {
     return json_decode_parse(parse);
 }
 
+private nosave nomask string unicode_pattern = "([^\\x00-\\x7F])" ;
+
+/**
+ * @simul_efun json_encode
+ * @description Serializes an LPC value into a JSON string.
+ * @param {mixed} value - The LPC value to serialize.
+ * @param {mixed[]} [pointers] - An optional array of pointers to handle
+ *                               circular references.
+ * @returns {string} - The JSON string representation of the LPC value.
+ */
 varargs string json_encode(mixed value, mixed* pointers) {
+
+
     if(undefinedp(value))
         return "null";
     if(intp(value) || floatp(value))
@@ -584,8 +688,37 @@ varargs string json_encode(mixed value, mixed* pointers) {
         if(member_array(0x1b, value) != -1)
           value = replace_string(value, "\x1b", "\\u001b");
 
+        // Unicode handling
+        while(pcre_match(value, unicode_pattern)) {
+            int codepoint;
+            string char_to_replace = pcre_extract(value, unicode_pattern)[0];
+            buffer utf8_buf = string_encode(char_to_replace, "UTF-8");
+
+            // Get the codepoint from the UTF-8 bytes
+            if (sizeof(utf8_buf) == 1) {
+                codepoint = utf8_buf[0];
+            } else if (sizeof(utf8_buf) == 2) {
+                codepoint = ((utf8_buf[0] & 0x1F) << 6) | (utf8_buf[1] & 0x3F);
+            } else if (sizeof(utf8_buf) == 3) {
+                codepoint = ((utf8_buf[0] & 0x0F) << 12) | ((utf8_buf[1] & 0x3F) << 6) | (utf8_buf[2] & 0x3F);
+            } else if (sizeof(utf8_buf) == 4) {
+                codepoint = ((utf8_buf[0] & 0x07) << 18) | ((utf8_buf[1] & 0x3F) << 12) |
+                            ((utf8_buf[2] & 0x3F) << 6) | (utf8_buf[3] & 0x3F);
+            }
+
+            if (codepoint <= 0xFFFF) {
+                value = pcre_replace(value, unicode_pattern, ({ sprintf("\\u%04X", codepoint) }));
+            } else {
+                // Encode as surrogate pair
+                int high = 0xD800 + ((codepoint - 0x10000) >> 10);
+                int low = 0xDC00 + ((codepoint - 0x10000) & 0x3FF);
+                value = pcre_replace(value, unicode_pattern, ({ sprintf("\\u%04X\\u%04X", high, low) }));
+            }
+        }
+
         return value;
     }
+
     if(mapp(value)) {
         string out;
         int ix = 0;
