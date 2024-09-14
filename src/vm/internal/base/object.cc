@@ -227,6 +227,7 @@ void save_svalue(svalue_t *v, char **buf) {
       return;
     }
     case T_OBJECT:
+    case T_FUNCTION:
       // ignored
       break;
     default:
