@@ -488,10 +488,22 @@ static int restore_interior_string(char **val, svalue_t *sv) {
           *val = cp;
           newstr = new_string(len = (news - start), "restore_string");
           strcpy(newstr, start);
+#ifndef OLD_STRING          
           if (!u8_validate(newstr)) {
+#ifdef UTF8_ERROR_TO_BUFFER
+            buffer_t *buf;
+            buf = allocate_buffer(len);
+            memcpy(buf->item, newstr, len);
+            sv->type = T_BUFFER;
+            sv->u.buf = buf;
+            FREE_MSTR(newstr);
+            return 0;
+#else
             FREE_MSTR(newstr);
             return ROB_STRING_UTF8_ERROR;
+#endif
           }
+#endif
           sv->u.string = newstr;
           sv->type = T_STRING;
           sv->subtype = STRING_MALLOC;
@@ -512,10 +524,22 @@ static int restore_interior_string(char **val, svalue_t *sv) {
   len = cp - start;
   newstr = new_string(len, "restore_string");
   strcpy(newstr, start);
+#ifndef OLD_STRING  
   if (!u8_validate(newstr)) {
+#ifdef UTF8_ERROR_TO_BUFFER
+    buffer_t *buf;
+    buf = allocate_buffer(len);
+    memcpy(buf->item, newstr, len);
+    sv->type = T_BUFFER;
+    sv->u.buf = buf;
+    FREE_MSTR(newstr);
+    return 0;
+#else
     FREE_MSTR(newstr);
     return ROB_STRING_UTF8_ERROR;
+#endif
   }
+#endif  
   sv->u.string = newstr;
   sv->type = T_STRING;
   sv->subtype = STRING_MALLOC;
@@ -1098,10 +1122,22 @@ static int restore_string(char *val, svalue_t *sv) {
           *news = '\0';
           newstr = new_string(news - start, "restore_string");
           strcpy(newstr, start);
+#ifndef OLD_STRING
           if (!u8_validate(newstr)) {
+#ifdef UTF8_ERROR_TO_BUFFER
+            buffer_t *buf;
+            buf = allocate_buffer(len);
+            memcpy(buf->item, newstr, len);
+            sv->type = T_BUFFER;
+            sv->u.buf = buf;
+            FREE_MSTR(newstr);
+            return 0;
+#else
             FREE_MSTR(newstr);
             return ROB_STRING_UTF8_ERROR;
+#endif
           }
+#endif
           sv->u.string = newstr;
           sv->type = T_STRING;
           sv->subtype = STRING_MALLOC;
@@ -1122,10 +1158,22 @@ static int restore_string(char *val, svalue_t *sv) {
   len = cp - start;
   newstr = new_string(len, "restore_string");
   strcpy(newstr, start);
+#ifndef OLD_STRING
   if (!u8_validate(newstr)) {
+#ifdef UTF8_ERROR_TO_BUFFER
+    buffer_t *buf;
+    buf = allocate_buffer(len);
+    memcpy(buf->item, newstr, len);
+    sv->type = T_BUFFER;
+    sv->u.buf = buf;
+    FREE_MSTR(newstr);
+    return 0;
+#else
     FREE_MSTR(newstr);
     return ROB_STRING_UTF8_ERROR;
+#endif
   }
+#endif
   sv->u.string = newstr;
   sv->type = T_STRING;
   sv->subtype = STRING_MALLOC;

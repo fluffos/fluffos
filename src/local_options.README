@@ -369,4 +369,14 @@
 
 #define PACKAGE_MATRIX
 
+/* OLD_STRING: disable utf8 validation making strings work like 2.x strings
+ */
+#undef OLD_STRING
+
+/* UTF8_ERROR_TO_BUFFER: Convert invalid UTF8 strings to buffer type
+ *   for restore_object/restore_variable
+ *   Requires OLD_STRING to be undefined
+ */
+#undef UTF8_ERROR_TO_BUFFER
+
 #endif /* _LOCAL_OPTIONS_H_ */

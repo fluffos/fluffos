@@ -2418,11 +2418,13 @@ int yylex() {
             int n;
 
             auto *p = outp;
+#ifndef OLD_STRING            
             if (!u8_validate(&p)) {
               lexerror("Bad UTF-8 string in string block");
               outp = p;
               break;
             }
+#endif            
             /*
              * make string token and clean up
              */
@@ -2708,10 +2710,12 @@ int parseStringLiteral(unsigned char c) {
 
       case '"':
         *to++ = 0;
+#ifndef OLD_STRING        
         if (!u8_validate(reinterpret_cast<const char *>(scr_tail + 1))) {
           lexerror("Invalid UTF8 codepoint in string literal");
           return YYerror;
         }
+#endif
         if (!l && (to == scratch_end)) {
           char *res = scratch_large_alloc(to - scr_tail - 1);
           strcpy(res, reinterpret_cast<char *>(scr_tail + 1));
@@ -2931,11 +2935,13 @@ int parseStringLiteral(unsigned char c) {
         res = scratch_large_alloc((yyp - yytext) + (to - scr_tail) - 1);
         strncpy(res, reinterpret_cast<char *>(scr_tail + 1), (to - scr_tail) - 1);
         strcpy(res + (to - scr_tail) - 1, yytext);
+#ifndef OLD_STRING        
         if (!u8_validate(res)) {
           lexerror("Invalid UTF8 string");
           scratch_free(res);
           return YYerror;
         }
+#endif        
         yylval.string = res;
         return L_STRING;
       }
@@ -3043,12 +3049,14 @@ int parseStringLiteral(unsigned char c) {
     res = scratch_large_alloc((yyp - yytext) + (to - scr_tail) - 1);
     strncpy(res, reinterpret_cast<char *>(scr_tail + 1), (to - scr_tail) - 1);
     strcpy(res + (to - scr_tail) - 1, yytext);
+#ifndef OLD_STRING
     // Validate UTF8
     if (!u8_validate(res)) {
       lexerror("Invalid UTF8 string");
       scratch_free(res);
       return YYerror;
     }
+#endif
     yylval.string = res;
     return L_STRING;
   }

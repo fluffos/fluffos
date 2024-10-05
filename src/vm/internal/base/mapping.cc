@@ -399,7 +399,8 @@ static mapping_t *copyMapping(mapping_t *m) {
 
 int restore_hash_string(char **val, svalue_t *sv) {
   char *cp = *val;
-  char c, *start = cp;
+  char c, *start = cp, *newstr;
+  int len;
 
   while ((c = *cp++) != '"') {
     switch (c) {
@@ -429,9 +430,23 @@ int restore_hash_string(char **val, svalue_t *sv) {
           }
           *news = '\0';
           *val = cp;
+#ifndef OLD_STRING          
           if (!u8_validate(start)) {
+#ifdef UTF8_ERROR_TO_BUFFER
+            newstr = new_string(len = (news - start), "restore_hash_string");
+            strcpy(newstr, start);
+            buffer_t *buf;
+            buf = allocate_buffer(len);
+            memcpy(buf->item, newstr, len);
+            sv->type = T_BUFFER;
+            sv->u.buf = buf;
+            FREE_MSTR(newstr);
+            return 0;
+#else            
             return ROB_STRING_UTF8_ERROR;
+#endif
           }
+#endif
           sv->u.string = make_shared_string(start);
           sv->type = T_STRING;
           sv->subtype = STRING_SHARED;
@@ -447,9 +462,23 @@ int restore_hash_string(char **val, svalue_t *sv) {
   }
   *val = cp;
   *--cp = '\0';
+#ifndef OLD_STRING  
   if (!u8_validate(start)) {
+#ifdef UTF8_ERROR_TO_BUFFER
+    newstr = new_string(len = (cp - start), "restore_hash_string");
+    strcpy(newstr, start);
+    buffer_t *buf;
+    buf = allocate_buffer(len);
+    memcpy(buf->item, newstr, len);
+    sv->type = T_BUFFER;
+    sv->u.buf = buf;
+    FREE_MSTR(newstr);
+    return 0;
+#else
     return ROB_STRING_UTF8_ERROR;
+#endif
   }
+#endif
   sv->u.string = make_shared_string(start);
   sv->type = T_STRING;
   sv->subtype = STRING_SHARED;

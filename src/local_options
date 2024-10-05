@@ -43,6 +43,9 @@
 #undef NO_SHADOWS
 #undef USE_ICONV
 #undef IPV6
+// configs to change how strings are handled
+#undef OLD_STRING
+#undef UTF8_ERROR_TO_BUFFER
 
 /****************************************************************************
  *                              PACKAGES                                    *
