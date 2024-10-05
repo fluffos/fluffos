@@ -189,7 +189,7 @@ void f_send_msdp_variable() {
         telnet_send(ip->telnet, reinterpret_cast<const char *>(&var), sizeof(var));
         telnet_send(ip->telnet, (sp - 1)->u.string, SVALUE_STRLEN(sp - 1));
         telnet_send(ip->telnet, reinterpret_cast<const char *>(&val), sizeof(val));
-        telnet_printf(ip->telnet, "%d", sp->u.number);
+        telnet_printf(ip->telnet, "%lu", sp->u.number);
         telnet_finish_sb((ip->telnet));
         free_string_svalue(sp - 1);
         break;
