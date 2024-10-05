@@ -26,11 +26,13 @@ void telnet_send_ga(struct telnet_t *);
 #define TELNET_TELOPT_MXP 91  // mud extension protocol
 #define TELNET_TELOPT_GMCP 201
 #define TELNET_TELOPT_CHARSET 42  // CHARSET
+#define TELNET_TELOPT_MSDP 69
 
 bool on_receive_mxp_tag(struct interactive_t *, const char *);
 void on_telnet_will_mxp(struct interactive_t *);
 void on_telnet_do_zmp(const char **, unsigned long, interactive_t *);
 void on_telnet_do_gmcp(struct interactive_t *);
 void on_telnet_do_charset(telnet_t *telnet);
+void on_telnet_do_msdp(struct interactive_t *);
 
 #endif /* TELNET_H_ */

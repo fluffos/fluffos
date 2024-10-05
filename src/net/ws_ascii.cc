@@ -10,6 +10,7 @@
 
 #include "net/ws_ascii.h"
 #include "interactive.h"
+#include "net/telnet.h"
 
 // from comm.cc
 interactive_t *new_user(port_def_t *port, evutil_socket_t fd, sockaddr *addr, socklen_t addrlen);
@@ -18,6 +19,7 @@ extern void remove_interactive(object_t *ob, int dested);
 int cmd_in_buf(interactive_t *ip);
 
 void on_user_websocket_received(interactive_t *ip, const char *data, size_t len);
+void on_user_websocket_binary_received(interactive_t *ip, const char *data, size_t len);
 
 namespace {
 
@@ -101,6 +103,13 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
       ip->iflags |= HANDSHAKE_COMPLETE;
       ip->lws = wsi;
 
+      //handshake complete so lets setup telnet layer
+      //if binary protocol allow telnet over it
+      if(lws_get_protocol(wsi)->id == PROTOCOL_WS_BINARY) {
+        ip->telnet = net_telnet_init(ip);
+        send_initial_telnet_negotiations(ip);
+      }
+
       auto base = evconnlistener_get_base(port->ev_conn);
       event_base_once(
           base, -1, EV_TIMEOUT,
@@ -135,19 +144,22 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
       static unsigned char buf[LWS_PRE + 2048];
       auto numbytes = evbuffer_copyout(pss->buffer, &buf[LWS_PRE], sizeof(buf) - LWS_PRE);
       if (numbytes > 0) {
-        auto new_numbytes = u8_truncate(&buf[LWS_PRE], numbytes);
-        if (new_numbytes != numbytes) {
-          auto rest = new_numbytes - numbytes;
-          evbuffer_prepend(pss->buffer, &buf[LWS_PRE + new_numbytes], rest);
-          numbytes = new_numbytes;
-        }
+        //telnet codes break if you treat as utf8 so ignore if binary for now
+        if(lws_get_protocol(wsi)->id != PROTOCOL_WS_BINARY) {
+          auto new_numbytes = u8_truncate(&buf[LWS_PRE], numbytes);
+          if (new_numbytes != numbytes) {
+            auto rest = new_numbytes - numbytes;
+            evbuffer_prepend(pss->buffer, &buf[LWS_PRE + new_numbytes], rest);
+            numbytes = new_numbytes;
+          }
 #ifdef DEBUG
-        if (!u8_validate(&buf[LWS_PRE], numbytes)) {
-          char buf1[sizeof(buf) + 1] = {};
-          strncpy(buf1, reinterpret_cast<const char *>(&buf[LWS_PRE]), numbytes);
-          debug_message("Illegal UTF8 Websocket output string: %s.", buf1);
-        }
+          if (!u8_validate(&buf[LWS_PRE], numbytes)) {
+            char buf1[sizeof(buf) + 1] = {};
+            strncpy(buf1, reinterpret_cast<const char *>(&buf[LWS_PRE]), numbytes);
+            debug_message("Illegal UTF8 Websocket output string: %s.", buf1);
+          }
 #endif
+        }
         // TODO: we could use LWS_WRITE_TEXT , however it is much safer to use binary mode, its
         // better to let client deal with incorrect encoding.
         auto m = lws_write(wsi, buf + LWS_PRE, numbytes, LWS_WRITE_BINARY);
@@ -174,16 +186,19 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
       if (len <= 0) {
         break;
       }
-      // don't accept binary frame, we want client to always send valid utf8.
+      // don't accept binary frame unless binary protocol, we want client to always send valid utf8.
       // lws handles the utf8 check for us.
-      if (lws_frame_is_binary(wsi)) {
+      if (lws_frame_is_binary(wsi) && lws_get_protocol(wsi)->id != PROTOCOL_WS_BINARY) {
         return -1;
       }
       auto ip = pss->user;
       if (!ip) {  // we are already disconnected
         return -1;
       }
-      on_user_websocket_received(ip, (const char *)in, len);
+      if(lws_get_protocol(wsi)->id == PROTOCOL_WS_BINARY)
+        on_user_websocket_binary_received(ip, (const char *)in, len);
+      else
+        on_user_websocket_received(ip, (const char *)in, len);
       break;
     }
     default:
@@ -195,7 +210,7 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
 }
 
 void ws_ascii_send(struct lws *wsi, const char *data, size_t len) {
-  DEBUG_CHECK(lws_get_protocol(wsi)->id != PROTOCOL_WS_ASCII, "wrong protocol!");
+  DEBUG_CHECK(lws_get_protocol(wsi)->id != PROTOCOL_WS_ASCII && lws_get_protocol(wsi)->id != PROTOCOL_WS_BINARY, "wrong protocol!");
   auto pss = reinterpret_cast<ws_ascii_session *>(lws_wsi_user(wsi));
   DEBUG_CHECK(pss == nullptr, "no session data!");
 

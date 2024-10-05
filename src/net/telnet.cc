@@ -14,6 +14,7 @@
 #include "packages/core/mssp.h"
 #include "thirdparty/libtelnet/libtelnet.h"  // for telnet_t, telnet_event_t*
 #include "vm/vm.h"
+#include "net/websocket.h"
 
 static const telnet_telopt_t my_telopts[] = {{TELNET_TELOPT_TM, TELNET_WILL, TELNET_DO},
                                              {TELNET_TELOPT_SGA, TELNET_WILL, TELNET_DO},
@@ -29,6 +30,7 @@ static const telnet_telopt_t my_telopts[] = {{TELNET_TELOPT_TM, TELNET_WILL, TEL
                                              {TELNET_TELOPT_CHARSET, TELNET_WILL, TELNET_DO},
                                              {TELNET_TELOPT_MSP, TELNET_WILL, TELNET_DO},
                                              {TELNET_TELOPT_BINARY, TELNET_WILL, TELNET_DO},
+                                             {TELNET_TELOPT_MSDP, TELNET_WILL, TELNET_DO},
                                              {-1, 0, 0}};
 
 // Telnet event handler
@@ -71,7 +73,14 @@ static inline void on_telnet_data(const char *buffer, unsigned long size, intera
 }
 
 static inline void on_telnet_send(const char *buffer, unsigned long size, interactive_t *ip) {
-  bufferevent_write(ip->ev_buffer, buffer, size);
+  //no need to test if binary as only binary enables telnet
+  if(ip->connection_type == PORT_TYPE_WEBSOCKET) {
+    auto transdata = u8_convert_encoding(ip->trans, buffer, size);
+    auto result = transdata.empty() ? std::string_view(buffer, size) : transdata;
+    websocket_send_text(ip->lws, result.data(), result.size());
+  }
+  else
+    bufferevent_write(ip->ev_buffer, buffer, size);
 }
 
 static inline void on_telnet_iac(unsigned char cmd, interactive_t *ip) {
@@ -199,6 +208,19 @@ static inline void on_telnet_do(unsigned char cmd, interactive_t *ip) {
 #endif
       }
       on_telnet_do_gmcp(ip);
+      break;
+    case TELNET_TELOPT_MSDP:
+      if (!CONFIG_INT(__RC_ENABLE_MSDP__)) {
+#ifdef DEBUG
+        debug_message(
+            "Bad client: bogus IAC DO MSDP from %s.",
+            sockaddr_to_string(reinterpret_cast<const sockaddr *>(&ip->addr), ip->addrlen));
+        remove_interactive(ip->ob, false);
+#else
+        // do nothing
+#endif
+      }
+      on_telnet_do_msdp(ip);
       break;
     case TELNET_TELOPT_MSSP:
       if (!CONFIG_INT(__RC_ENABLE_MSSP__)) {
@@ -351,6 +373,17 @@ static inline void on_telnet_subnegotiation(unsigned char cmd, const char *buf, 
       safe_apply(APPLY_GMCP, ip->ob, 1, ORIGIN_DRIVER);
       break;
     }
+    case TELNET_TELOPT_MSDP: {
+      // We need to make sure the string will be NULL-termed.
+      char *str = new_string(size, "telnet msdp");
+      str[size] = '\0';
+      strncpy(str, buf, size);
+
+      push_malloced_string(str);
+      set_eval(max_eval_cost);
+      safe_apply(APPLY_MSDP, ip->ob, 1, ORIGIN_DRIVER);
+      break;
+    }
     default: {
       // translate NUL to 'I', apparently
       char *str = new_string(size, "telnet suboption");
@@ -500,6 +533,11 @@ void send_initial_telnet_negotiations(struct interactive_t *user) {
     telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_GMCP);
   }
 
+  // msdp
+  if (CONFIG_INT(__RC_ENABLE_MSDP__)) {
+    telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_MSDP);
+  }
+
   // zmp
   if (CONFIG_INT(__RC_ENABLE_ZMP__)) {
     telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_ZMP);
@@ -608,6 +646,15 @@ void on_telnet_do_gmcp(interactive_t *ip) {
 
   set_eval(max_eval_cost);
   safe_apply(APPLY_GMCP_ENABLE, ip->ob, 0, ORIGIN_DRIVER);
+}
+
+/* MSDP */
+
+void on_telnet_do_msdp(interactive_t *ip) {
+  ip->iflags |= USING_MSDP;
+
+  set_eval(max_eval_cost);
+  safe_apply(APPLY_MSDP_ENABLE, ip->ob, 0, ORIGIN_DRIVER);
 }
 
 /* ZMP */

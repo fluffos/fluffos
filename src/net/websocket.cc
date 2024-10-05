@@ -11,11 +11,13 @@
 enum PROTOCOL_ID {
   WS_HTTP = 0,
   WS_ASCII = PROTOCOL_WS_ASCII,
+  WS_BINARY = PROTOCOL_WS_BINARY,
 };
 
 static struct lws_protocols protocols[] = {
     {"http", lws_callback_http_dummy, 0, 0, WS_HTTP},
     {"ascii", ws_ascii_callback, sizeof(struct ws_ascii_session), 4096, WS_ASCII},
+    {"binary", ws_ascii_callback, sizeof(struct ws_ascii_session), 4096, WS_BINARY},
     {NULL, NULL, 0, 0} /* terminator */
 };
 
@@ -123,6 +125,7 @@ struct lws *init_user_websocket(struct lws_context *context, evutil_socket_t fd)
 
 void websocket_send_text(struct lws *wsi, const char *data, size_t len) {
   switch (lws_get_protocol(wsi)->id) {
+    case WS_BINARY:
     case WS_ASCII:
       ws_ascii_send(wsi, data, len);
       break;
@@ -137,6 +140,7 @@ void close_websocket_context(struct lws_context *context) { lws_context_destroy(
 void close_user_websocket(struct lws *wsi) {
   lws_set_timeout(wsi, pending_timeout::PENDING_FLUSH_STORED_SEND_BEFORE_CLOSE, LWS_TO_KILL_ASYNC);
   switch (lws_get_protocol(wsi)->id) {
+    case WS_BINARY:
     case WS_ASCII: {
       auto pss = reinterpret_cast<ws_ascii_session *>(lws_wsi_user(wsi));
       if (pss) {

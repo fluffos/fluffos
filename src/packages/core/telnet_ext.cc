@@ -135,6 +135,87 @@ void f_send_gmcp() {
 }
 #endif
 
+/* MSP */
+
+#ifdef F_HAS_MSP
+void f_has_msp() {
+  int i = 0;
+
+  if (sp->u.ob->interactive) {
+    i = sp->u.ob->interactive->iflags & USING_MSP;
+    i = !!i;  // force 1 or 0
+  }
+  free_object(&sp->u.ob, "f_has_msp");
+  put_number(i);
+}
+#endif
+
+/* MSDP */
+
+#ifdef F_HAS_MSDP
+void f_has_msdp() {
+  int i = 0;
+
+  if (sp->u.ob->interactive) {
+    i = sp->u.ob->interactive->iflags & USING_MSDP;
+    i = !!i;  // force 1 or 0
+  }
+  free_object(&sp->u.ob, "f_has_msdp");
+  put_number(i);
+}
+#endif
+
+#ifdef F_SEND_MSDP_VARIABLE
+/** TODO update to support sending other value type and use proper MSDP mapping/array formats as needed based on data types */
+void f_send_msdp_variable() {
+  auto *ip = current_object->interactive;
+  if (ip && ip->telnet) {
+    unsigned char var = 1;
+    unsigned char val = 2;
+    switch(sp->type) {
+      case T_STRING:
+        telnet_begin_sb(ip->telnet, TELNET_TELOPT_MSDP);
+        telnet_send(ip->telnet, reinterpret_cast<const char *>(&var), sizeof(var));
+        telnet_send(ip->telnet, (sp - 1)->u.string, SVALUE_STRLEN(sp - 1));
+        telnet_send(ip->telnet, reinterpret_cast<const char *>(&val), sizeof(val));
+        telnet_send(ip->telnet, sp->u.string, SVALUE_STRLEN(sp));
+        telnet_finish_sb((ip->telnet));
+        free_string_svalue(sp - 1);
+        free_string_svalue(sp);
+
+        break;
+      case T_NUMBER:
+        telnet_begin_sb(ip->telnet, TELNET_TELOPT_MSDP);
+        telnet_send(ip->telnet, reinterpret_cast<const char *>(&var), sizeof(var));
+        telnet_send(ip->telnet, (sp - 1)->u.string, SVALUE_STRLEN(sp - 1));
+        telnet_send(ip->telnet, reinterpret_cast<const char *>(&val), sizeof(val));
+        telnet_printf(ip->telnet, "%d", sp->u.number);
+        telnet_finish_sb((ip->telnet));
+        free_string_svalue(sp - 1);
+        break;
+      case T_REAL:
+        telnet_begin_sb(ip->telnet, TELNET_TELOPT_MSDP);
+        telnet_send(ip->telnet, reinterpret_cast<const char *>(&var), sizeof(var));
+        telnet_send(ip->telnet, (sp - 1)->u.string, SVALUE_STRLEN(sp - 1));
+        telnet_send(ip->telnet, reinterpret_cast<const char *>(&val), sizeof(val));
+        telnet_printf(ip->telnet, "%f", sp->u.real);
+        telnet_finish_sb((ip->telnet));
+        free_string_svalue(sp - 1);
+        break;
+      case T_ARRAY:
+      case T_MAPPING:
+      default:
+        error("Bad argument 2 to send_msdp_variable()\n");
+        break;
+    }
+    flush_message(ip);
+  } else if (!ip) {
+    debug_message("Warning: wrong usage. send_msdp_variable() should only be called by a user object.\n");
+  }
+  pop_stack();
+}
+#endif
+
 /* ZMP */
 
 #ifdef F_HAS_ZMP

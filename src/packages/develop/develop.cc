@@ -49,6 +49,8 @@ void f_debug_info() {
                     ob->interactive->iflags & USING_COMPRESS ? "TRUE" : "FALSE");
         outbuf_addv(&out, "O_MSP             : %s\n",
                     ob->interactive->iflags & USING_MSP ? "TRUE" : "FALSE");
+        outbuf_addv(&out, "O_MSDP            : %s\n",
+                    ob->interactive->iflags & USING_MSDP ? "TRUE" : "FALSE");                    
       }
 
       if (!CONFIG_INT(__RC_NO_RESETS__)) {
