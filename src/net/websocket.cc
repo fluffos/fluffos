@@ -128,7 +128,7 @@ struct lws *init_user_websocket(struct lws_context *context, evutil_socket_t fd)
 
 void websocket_send_text(struct lws *wsi, const char *data, size_t len) {
   switch (lws_get_protocol(wsi)->id) {
-    case WS_BINARY:
+    case WS_TELNET:
       ws_telnet_send(wsi, data, len);
       break;
     case WS_ASCII:
@@ -145,7 +145,7 @@ void close_websocket_context(struct lws_context *context) { lws_context_destroy(
 void close_user_websocket(struct lws *wsi) {
   lws_set_timeout(wsi, pending_timeout::PENDING_FLUSH_STORED_SEND_BEFORE_CLOSE, LWS_TO_KILL_ASYNC);
   switch (lws_get_protocol(wsi)->id) {
-    case WS_BINARY: {
+    case WS_TELNET: {
       auto pss = reinterpret_cast<ws_telnet_session *>(lws_wsi_user(wsi));
       if (pss) {
         if (evbuffer_get_length(pss->buffer) > 0) {

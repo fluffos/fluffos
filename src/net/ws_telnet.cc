@@ -104,7 +104,7 @@ int ws_telnet_callback(struct lws *wsi, enum lws_callback_reasons reason, void *
 
       //handshake complete so lets setup telnet layer
       //if binary protocol allow telnet over it
-      if(lws_get_protocol(wsi)->id == PROTOCOL_WS_BINARY) {
+      if(lws_get_protocol(wsi)->id == PROTOCOL_WS_TELNET) {
         ip->telnet = net_telnet_init(ip);
         send_initial_telnet_negotiations(ip);
       }
@@ -185,7 +185,7 @@ int ws_telnet_callback(struct lws *wsi, enum lws_callback_reasons reason, void *
 }
 
 void ws_telnet_send(struct lws *wsi, const char *data, size_t len) {
-  DEBUG_CHECK(lws_get_protocol(wsi)->id != PROTOCOL_WS_BINARY, "wrong protocol!");
+  DEBUG_CHECK(lws_get_protocol(wsi)->id != PROTOCOL_WS_TELNET, "wrong protocol!");
   auto pss = reinterpret_cast<ws_telnet_session *>(lws_wsi_user(wsi));
   DEBUG_CHECK(pss == nullptr, "no session data!");
 
