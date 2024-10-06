@@ -362,6 +362,7 @@ set(SRC
   "net/telnet.cc"
   "net/websocket.cc"
   "net/ws_ascii.cc"
+  "net/ws_telnet.cc"
   "base/internal/debugmalloc.cc"
   "base/internal/external_port.cc"
   "base/internal/file.cc"
