@@ -919,7 +919,7 @@ void on_user_websocket_received(interactive_t *ip, const char *data, size_t len)
   }
 }
 
-void on_user_websocket_binary_received(interactive_t *ip, const char *data, size_t len) {
+void on_user_websocket_telnet_received(interactive_t *ip, const char *data, size_t len) {
   if (!len) {
     return;
   }

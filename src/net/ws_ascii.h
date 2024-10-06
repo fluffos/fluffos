@@ -5,7 +5,6 @@
 
 /* one of these is created for each client connecting to us */
 const int PROTOCOL_WS_ASCII = 1;
-const int PROTOCOL_WS_BINARY = 2;
 
 struct ws_ascii_session {
   struct lws *wsi;
