@@ -103,11 +103,8 @@ int ws_telnet_callback(struct lws *wsi, enum lws_callback_reasons reason, void *
       ip->lws = wsi;
 
       //handshake complete so lets setup telnet layer
-      //if binary protocol allow telnet over it
-      if(lws_get_protocol(wsi)->id == PROTOCOL_WS_TELNET) {
-        ip->telnet = net_telnet_init(ip);
-        send_initial_telnet_negotiations(ip);
-      }
+      ip->telnet = net_telnet_init(ip);
+      send_initial_telnet_negotiations(ip);
 
       auto base = evconnlistener_get_base(port->ev_conn);
       event_base_once(

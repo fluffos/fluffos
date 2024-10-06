@@ -10,7 +10,6 @@
 
 #include "net/ws_ascii.h"
 #include "interactive.h"
-#include "net/telnet.h"
 
 // from comm.cc
 interactive_t *new_user(port_def_t *port, evutil_socket_t fd, sockaddr *addr, socklen_t addrlen);
@@ -102,7 +101,7 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
       ip->iflags |= HANDSHAKE_COMPLETE;
       ip->lws = wsi;
 
-      //handshake complete so lets setup telnet layer
+      //handshake complete
 
       auto base = evconnlistener_get_base(port->ev_conn);
       event_base_once(
