@@ -73,6 +73,6 @@ void on_user_logon(interactive_t *);
 int cmd_in_buf(interactive_t *ip);
 void on_user_input(interactive_t *ip, const char *data, size_t len);
 void on_user_websocket_received(interactive_t *ip, const char *data, size_t len);
-void on_user_websocket_binary_received(interactive_t *ip, const char *data, size_t len);
+void on_user_websocket_telnet_received(interactive_t *ip, const char *data, size_t len);
 
 #endif /* COMM_H */
