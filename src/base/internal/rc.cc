@@ -103,6 +103,7 @@ const FlagEntry INT_FLAGS[] = {
     {"enable zmp", __RC_ENABLE_ZMP__, 0},
     {"enable mssp", __RC_ENABLE_MSSP__, 1},
     {"enable msp", __RC_ENABLE_MSP__, 1},
+    {"enable msdp", __RC_ENABLE_MSDP__, 0},
 };
 
 /*
