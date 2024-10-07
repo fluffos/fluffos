@@ -35,6 +35,7 @@
 #define HANDSHAKE_COMPLETE 0x20000 /* websocket connected */
 #define USING_COMPRESS 0x40000     /* we've negotiated compress */
 #define USING_MSP 0x80000          /* we've negotiated msp */
+#define USING_MSDP 0x100000 /* we've negotiated msdp */
 
 // from ICU
 struct UConverter;
