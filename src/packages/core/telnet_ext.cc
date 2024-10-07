@@ -170,8 +170,6 @@ void f_has_msdp() {
 void f_send_msdp_variable() {
   auto *ip = current_object->interactive;
   if (ip && ip->telnet) {
-    unsigned char var = 1;
-    unsigned char val = 2;
     switch(sp->type) {
       case T_STRING:
         telnet_begin_sb(ip->telnet, TELNET_TELOPT_MSDP);

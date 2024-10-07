@@ -176,7 +176,7 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
       if (len <= 0) {
         break;
       }
-      // don't accept binary frame unless binary protocol, we want client to always send valid utf8.
+      // don't accept binary frame, we want client to always send valid utf8.
       // lws handles the utf8 check for us.
       if (lws_frame_is_binary(wsi)) {
         return -1;
