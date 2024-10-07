@@ -243,7 +243,7 @@ void send_gmcp(string);
 int has_msp(object default:F__THIS_OBJECT);
 int has_msdp(object default:F__THIS_OBJECT);
 /* update to allow sending other values */
-void send_msdp_variable(string, string | float | int);
+void send_msdp_variable(string, string | float | int OR_BUFFER);
 string in_edit(object default:F__THIS_OBJECT);
 int in_input(object default:F__THIS_OBJECT);
 int userp(object);

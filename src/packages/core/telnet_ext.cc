@@ -175,32 +175,25 @@ void f_send_msdp_variable() {
     switch(sp->type) {
       case T_STRING:
         telnet_begin_sb(ip->telnet, TELNET_TELOPT_MSDP);
-        telnet_send(ip->telnet, reinterpret_cast<const char *>(&var), sizeof(var));
-        telnet_send(ip->telnet, (sp - 1)->u.string, SVALUE_STRLEN(sp - 1));
-        telnet_send(ip->telnet, reinterpret_cast<const char *>(&val), sizeof(val));
+        telnet_printf(ip->telnet, "\x01%s\x02", (sp - 1)->u.string, sp->u.string);
         telnet_send(ip->telnet, sp->u.string, SVALUE_STRLEN(sp));
         telnet_finish_sb((ip->telnet));
-        free_string_svalue(sp - 1);
-        free_string_svalue(sp);
-
         break;
       case T_NUMBER:
         telnet_begin_sb(ip->telnet, TELNET_TELOPT_MSDP);
-        telnet_send(ip->telnet, reinterpret_cast<const char *>(&var), sizeof(var));
-        telnet_send(ip->telnet, (sp - 1)->u.string, SVALUE_STRLEN(sp - 1));
-        telnet_send(ip->telnet, reinterpret_cast<const char *>(&val), sizeof(val));
-        telnet_printf(ip->telnet, "%lu", sp->u.number);
+        telnet_printf(ip->telnet, "\x01%s\x02%lu", (sp - 1)->u.string,  sp->u.number);
         telnet_finish_sb((ip->telnet));
-        free_string_svalue(sp - 1);
         break;
       case T_REAL:
         telnet_begin_sb(ip->telnet, TELNET_TELOPT_MSDP);
-        telnet_send(ip->telnet, reinterpret_cast<const char *>(&var), sizeof(var));
-        telnet_send(ip->telnet, (sp - 1)->u.string, SVALUE_STRLEN(sp - 1));
-        telnet_send(ip->telnet, reinterpret_cast<const char *>(&val), sizeof(val));
-        telnet_printf(ip->telnet, "%f", sp->u.real);
+        telnet_printf(ip->telnet, "\x01%s\x02%f", (sp - 1)->u.string,  sp->u.real);
         telnet_finish_sb((ip->telnet));
-        free_string_svalue(sp - 1);
+        break;
+      case T_BUFFER:
+        telnet_begin_sb(ip->telnet, TELNET_TELOPT_MSDP);
+        telnet_printf(ip->telnet, "\x01%s\x02", (sp - 1)->u.string);
+        telnet_send(ip->telnet, reinterpret_cast<char *>(sp->u.buf->item), sp->u.buf->size);
+        telnet_finish_sb((ip->telnet));
         break;
       case T_ARRAY:
       case T_MAPPING:
@@ -212,7 +205,7 @@ void f_send_msdp_variable() {
   } else if (!ip) {
     debug_message("Warning: wrong usage. send_msdp_variable() should only be called by a user object.\n");
   }
-  pop_stack();
+  pop_2_elems();
 }
 #endif
 
