@@ -19,7 +19,6 @@ title: APPLY
 * [write_prompt](interactive/write_prompt.html)
 * [msdp](interactive/msdp.html)
 * [msdp_enable](interactive/msdp_enable.html)
-* [msdp_send_variable](interactive/msdp_send_variable.html)
 
 ## master
 * [author_file](master/author_file.html)

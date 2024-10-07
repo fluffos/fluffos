@@ -199,11 +199,14 @@ title: EFUN
 * [has_gmcp](interactive/has_gmcp.html)
 * [has_mxp](interactive/has_mxp.html)
 * [has_zmp](interactive/has_zmp.html)
+* [has_msp](interactive/has_msp.html)
+* [has_msdp](interactive/has_masdp.html)
 * [in_edit](interactive/in_edit.html)
 * [in_input](interactive/in_input.html)
 * [input_to](interactive/input_to.html)
 * [interactive](interactive/interactive.html)
 * [message](interactive/message.html)
+* [msdp_send_variable](interactive/msdp_send_variable.html)
 * [notify_fail](interactive/notify_fail.html)
 * [printf](interactive/printf.html)
 * [query_encoding](interactive/query_encoding.html)
@@ -232,6 +235,7 @@ title: EFUN
 * [userp](interactive/userp.html)
 * [users](interactive/users.html)
 * [write](interactive/write.html)
+
 ## internals
 * [cache_stats](internals/cache_stats.html)
 * [debug_info](internals/debug_info.html)
