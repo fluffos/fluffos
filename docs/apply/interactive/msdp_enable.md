@@ -1,6 +1,6 @@
 ---
 layout: doc
-title: interactive / gmcp_enable
+title: interactive / msdp_enable
 ---
 # gmcp_enable
 

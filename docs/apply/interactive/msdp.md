@@ -1,6 +1,6 @@
 ---
 layout: doc
-title: interactive / gmcp
+title: interactive / msdp
 ---
 # gmcp
 

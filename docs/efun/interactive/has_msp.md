@@ -1,6 +1,6 @@
 ---
 layout: doc
-title: interactive / has_mxp
+title: interactive / has_msp
 ---
 # has_mxp
 

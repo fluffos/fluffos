@@ -1,6 +1,6 @@
 ---
 layout: doc
-title: interactive / send_gmcp
+title: interactive / send_msdp_variable
 ---
 # send_gmcp
 
