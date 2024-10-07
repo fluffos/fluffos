@@ -19,8 +19,6 @@ title: interactive / send_msdp_variable
 
     Sends a MSDP variable 'name' with 'value' for this_object() to the user's client. 
 
-    For payload formatting information see: https://tintin.mudhalla.net/protocols/msdp
-
     Note: send_msdp_variable() should only be called from within a user object.
     
 ### SEE ALSO
