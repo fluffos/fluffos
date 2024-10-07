@@ -10,10 +10,10 @@ title: interactive / send_msdp_variable
 
 ### SYNOPSIS
 
-    void send_gmcp( string name, string value );
-    void send_gmcp( string name, int value );
-    void send_gmcp( string name, float value );
-    void send_gmcp( string name, buffer value );
+    void send_msdp_variable( string name, string value );
+    void send_msdp_variable( string name, int value );
+    void send_msdp_variable( string name, float value );
+    void send_msdp_variable( string name, buffer value );
 
 ### DESCRIPTION
 
