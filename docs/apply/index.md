@@ -7,6 +7,8 @@ title: APPLY
 * [gmcp](interactive/gmcp.html)
 * [gmcp_enable](interactive/gmcp_enable.html)
 * [logon](interactive/logon.html)
+* [msdp](interactive/msdp.html)
+* [msdp_enable](interactive/msdp_enable.html)
 * [msp_enable](interactive/msp_enable.html)
 * [net_dead](interactive/net_dead.html)
 * [process_input](interactive/process_input.html)
@@ -17,9 +19,6 @@ title: APPLY
 * [terminal_type](interactive/terminal_type.html)
 * [window_size](interactive/window_size.html)
 * [write_prompt](interactive/write_prompt.html)
-* [msdp](interactive/msdp.html)
-* [msdp_enable](interactive/msdp_enable.html)
-
 ## master
 * [author_file](master/author_file.html)
 * [compile_object](master/compile_object.html)

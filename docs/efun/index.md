@@ -235,7 +235,6 @@ title: EFUN
 * [userp](interactive/userp.html)
 * [users](interactive/users.html)
 * [write](interactive/write.html)
-
 ## internals
 * [cache_stats](internals/cache_stats.html)
 * [debug_info](internals/debug_info.html)
