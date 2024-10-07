@@ -366,6 +366,7 @@ enable gmcp : 1
 enable zmp : 1
 enable mssp : 1
 enable msp : 1
+enable msdp : 1
 
 # External commands
 external_cmd_1 : /usr/bin/curl
