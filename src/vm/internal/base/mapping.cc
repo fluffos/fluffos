@@ -399,8 +399,12 @@ static mapping_t *copyMapping(mapping_t *m) {
 
 int restore_hash_string(char **val, svalue_t *sv) {
   char *cp = *val;
-  char c, *start = cp, *newstr;
+  char c, *start = cp;
+#if !defined(OLD_STRING) && defined(UTF8_ERROR_TO_BUFFER)
+  //only define if needed
+  char *newstr;
   int len;
+#endif
 
   while ((c = *cp++) != '"') {
     switch (c) {
