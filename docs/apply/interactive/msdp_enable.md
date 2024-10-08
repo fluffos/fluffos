@@ -2,7 +2,7 @@
 layout: doc
 title: interactive / msdp_enable
 ---
-# gmcp_enable
+# msdp_enable
 
 ### NAME
 

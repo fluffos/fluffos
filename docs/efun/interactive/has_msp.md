@@ -2,7 +2,7 @@
 layout: doc
 title: interactive / has_msp
 ---
-# has_mxp
+# has_msp
 
 ### NAME
 
