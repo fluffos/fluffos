@@ -173,7 +173,7 @@ void f_send_msdp_variable() {
     switch(sp->type) {
       case T_STRING:
         telnet_begin_sb(ip->telnet, TELNET_TELOPT_MSDP);
-        telnet_printf(ip->telnet, "\x01%s\x02", (sp - 1)->u.string, sp->u.string);
+        telnet_printf(ip->telnet, "\x01%s\x02", (sp - 1)->u.string);
         telnet_send(ip->telnet, sp->u.string, SVALUE_STRLEN(sp));
         telnet_finish_sb((ip->telnet));
         break;

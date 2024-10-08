@@ -7,6 +7,8 @@ title: APPLY
 * [gmcp](interactive/gmcp.html)
 * [gmcp_enable](interactive/gmcp_enable.html)
 * [logon](interactive/logon.html)
+* [msdp](interactive/msdp.html)
+* [msdp_enable](interactive/msdp_enable.html)
 * [msp_enable](interactive/msp_enable.html)
 * [net_dead](interactive/net_dead.html)
 * [process_input](interactive/process_input.html)

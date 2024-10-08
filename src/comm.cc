@@ -938,9 +938,8 @@ void on_user_websocket_telnet_received(interactive_t *ip, const char *data, size
     // search for command.
     if (cmd_in_buf(ip)) {
       ip->iflags |= CMD_IN_BUF;
-      struct timeval zero_sec = {0, 0};
-      evtimer_del(ip->ev_command);
-      evtimer_add(ip->ev_command, &zero_sec);
+
+      maybe_schedule_user_command(ip);
     }
   }
 }
