@@ -200,7 +200,7 @@ title: EFUN
 * [has_mxp](interactive/has_mxp.html)
 * [has_zmp](interactive/has_zmp.html)
 * [has_msp](interactive/has_msp.html)
-* [has_msdp](interactive/has_masdp.html)
+* [has_msdp](interactive/has_msdp.html)
 * [in_edit](interactive/in_edit.html)
 * [in_input](interactive/in_input.html)
 * [input_to](interactive/input_to.html)
