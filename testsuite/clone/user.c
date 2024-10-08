@@ -275,3 +275,17 @@ void msp_enable() {
 void msp_oob(string req) {
   efun::telnet_msp_oob(req);
 }
+
+void msdp_enable() {
+  receive("<MSDP negotiation: enabled.>\n");
+}
+
+void msdp(string req) {
+  receive("<MSDP request received.>\n");
+  receive(req);
+  receive("\n<MSDP request end.>\n");
+}
+
+void send_msdp_variable(string name, mixed value) {
+    efun::send_msdp_variable(name, value);
+}

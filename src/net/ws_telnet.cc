@@ -140,8 +140,6 @@ int ws_telnet_callback(struct lws *wsi, enum lws_callback_reasons reason, void *
       static unsigned char buf[LWS_PRE + 2048];
       auto numbytes = evbuffer_copyout(pss->buffer, &buf[LWS_PRE], sizeof(buf) - LWS_PRE);
       if (numbytes > 0) {
-        // TODO: we could use LWS_WRITE_TEXT , however it is much safer to use binary mode, its
-        // better to let client deal with incorrect encoding.
         auto m = lws_write(wsi, buf + LWS_PRE, numbytes, LWS_WRITE_BINARY);
         if (m < 0) {
           lwsl_warn("ERROR %d writing to ws socket.\n", m);

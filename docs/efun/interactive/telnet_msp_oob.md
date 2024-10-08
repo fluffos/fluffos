@@ -16,3 +16,7 @@ title: interactive / telnet_msp_oob
 
     if user is under telnet, then send an IAC SB TELOPT_MSP msg IAC SE sequence,
     as documented in https://wiki.mudlet.org/w/Manual:Supported_Protocols#MSP
+
+### SEE ALSO
+
+    has_msp(3)
