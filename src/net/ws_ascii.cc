@@ -101,6 +101,8 @@ int ws_ascii_callback(struct lws *wsi, enum lws_callback_reasons reason, void *u
       ip->iflags |= HANDSHAKE_COMPLETE;
       ip->lws = wsi;
 
+      //handshake complete
+
       auto base = evconnlistener_get_base(port->ev_conn);
       event_base_once(
           base, -1, EV_TIMEOUT,

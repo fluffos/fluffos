@@ -80,6 +80,7 @@ void debug_level_clear(const char *);
 #define DBG_add_action 1u << 12
 #define DBG_telnet 1u << 13
 #define DBG_websocket 1u << 14
+#define DBG_external_start 1u << 15
 // remember to add new entry to levels in log.cc!
 
 #define DBG_DEFAULT (DBG_connections | DBG_telnet)

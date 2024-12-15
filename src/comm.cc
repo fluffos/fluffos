@@ -919,6 +919,32 @@ void on_user_websocket_received(interactive_t *ip, const char *data, size_t len)
   }
 }
 
+void on_user_websocket_telnet_received(interactive_t *ip, const char *data, size_t len) {
+  if (!len) {
+    return;
+  }
+  int const start = ip->text_end;
+
+  // this will read data into ip->text
+  telnet_recv(ip->telnet, data, len);
+  // If we read something
+  if (ip->text_end > start) {
+    /* handle snooping - snooper does not see type-ahead due to
+      telnet being in linemode */
+    if (!(ip->iflags & NOECHO)) {
+      handle_snoop(ip->text + start, ip->text_end - start, ip);
+    }
+
+    // search for command.
+    if (cmd_in_buf(ip)) {
+      ip->iflags |= CMD_IN_BUF;
+
+      maybe_schedule_user_command(ip);
+    }
+  }
+}
+
+
 // ANSI
 static const int ANSI_SUBSTITUTE = 0x20;
 

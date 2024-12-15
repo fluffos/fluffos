@@ -1,6 +1,6 @@
-[![CI Status](https://github.com/fluffos/fluffos/workflows/CI%20on%20ubuntu/badge.svg)](https://github.com/fluffos/fluffos/actions)
-[![CI Status](https://github.com/fluffos/fluffos/workflows/CI%20on%20OSX/badge.svg)](https://github.com/fluffos/fluffos/actions)
-[![CI Status](https://github.com/fluffos/fluffos/workflows/CI%20on%20Windows/badge.svg)](https://github.com/fluffos/fluffos/actions)
+[![CI Status](https://github.com/fluffos/fluffos/actions/workflows/ci.yml/badge.svg)](https://github.com/fluffos/fluffos/actions)
+[![CI Status](https://github.com/fluffos/fluffos/actions/workflows/ci-osx.yml/badge.svg)](https://github.com/fluffos/fluffos/actions)
+[![CI Status](https://github.com/fluffos/fluffos/actions/workflows/ci-windows.yml/badge.svg)](https://github.com/fluffos/fluffos/actions)
 
 
 [![Backers on Open Collective](https://opencollective.com/fluffos-579/backers/badge.svg)](#backers)
@@ -62,10 +62,10 @@ All previous MudOS and FluffOS releases are also kept in the code base as tags f
 
 Support
 -------
-Website / Documentation: <https://www.fluffos.info>
-Discord Support: #fluffos on https://discord.gg/2a6qqG6Cdj
-Forum: <https://forum.fluffos.info>
-QQ support Group: 451819151 [![451819151](https://pub.idqqimg.com/wpa/images/group.png)](https://shang.qq.com/wpa/qunwpa?idkey=3fd552adb8ace1a8e3ae3a712e5d314c7caf49af8b87449473c595b7e1f1ddf9)
+- Website / Documentation: https://www.fluffos.info
+- Discord Support: #fluffos channel on LPC https://discord.gg/2a6qqG6Cdj
+- Forum: https://forum.fluffos.info
+- QQ support Group: 451819151 [![451819151](https://pub.idqqimg.com/wpa/images/group.png)](https://shang.qq.com/wpa/qunwpa?idkey=3fd552adb8ace1a8e3ae3a712e5d314c7caf49af8b87449473c595b7e1f1ddf9)
 
 How to Build
 ------------

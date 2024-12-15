@@ -28,5 +28,5 @@ title: interactive / exec
 
 ### SEE ALSO
 
-    interactive(3), valid_override(4)
+    interactive(3), remove_interactive(3), valid_override(4)
 

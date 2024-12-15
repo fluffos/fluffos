@@ -813,6 +813,24 @@ void destruct_object(object_t *ob) {
   }
 #endif
 
+/*
+  * Notify object that it is scheduled for destruction
+  *
+  * Proceed with destruction even if there is an error
+  * in the destructing() function in the mudlib.
+  */
+  if(ob->flags & O_NOTIFY_DESTRUCT) {
+    error_context_t econ;
+    save_context(&econ) ;
+    try {
+      safe_apply(APPLY_ON_DESTRUCT, ob, 0, ORIGIN_DRIVER);
+    } catch (...) {  // catch everything
+      restore_context(&econ);
+      /* condition was restored to where it was when we came in */
+    }
+    pop_context(&econ);
+  }
+
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
   /*
    * check if object has an efun socket referencing it for a callback. if
@@ -877,7 +895,7 @@ void destruct_object(object_t *ob) {
   ob->shadowed = nullptr;
 #endif
 
-  debug(d_flag, "Deobject_t /%s (ref %d)", ob->obname, ob->ref);
+  debug(d_flag, "Deobject_t /%s (ref %d)\n", ob->obname, ob->ref);
 
 #ifndef NO_ENVIRONMENT
   /* try to move our contents somewhere */

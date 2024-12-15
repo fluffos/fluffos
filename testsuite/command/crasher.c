@@ -113,6 +113,8 @@ nosave mixed *_efuns = ({
     ({ "has_gmcp", (: has_gmcp :) }),
     ({ "has_mxp", (: has_mxp :) }),
     ({ "has_zmp", (: has_zmp :) }),
+    ({ "has_msp", (: has_msp :) }),
+    ({ "has_msdp", (: has_msdp :) }),
     ({ "heart_beats", (: heart_beats :) }),
 #ifdef __PACKAGE_MATRIX__
     ({ "id_matrix", (: id_matrix :) }),
@@ -234,6 +236,7 @@ nosave mixed *_efuns = ({
     ({ "send_gmcp", (: send_gmcp :) }),
     ({ "send_nullbyte", (: send_nullbyte :) }),
     ({ "send_zmp", (: send_zmp :) }),
+    ({ "send_msdp_variable", (: send_msdp_variable :) }),
     ({ "set_author", (: set_author :) }),
     ({ "set_bit", (: set_bit :) }),
     ({ "set_debug_level", (: set_debug_level :) }),

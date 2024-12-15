@@ -22,7 +22,7 @@ title: internals / set_debug_level
     The information is printed to stdout as well as to the file specified in
     the runtime configuration file as the "debug log file" setting.
 
-    The level is a bitmask integer or a string. If using an integer, multiple 
+    The level is a bitmask integer or a string. If using an integer, multiple
     levels can be set by using the bitwise OR operator (|).
 
     The following levels are available:
@@ -40,6 +40,7 @@ title: internals / set_debug_level
         "add_action"      1 << 12
         "telnet"          1 << 13
         "websocket"       1 << 14
+        "debug_level"     1 << 14
 
     When level is an integer, the debug level will be set to that value,
     erasing any previous settings.

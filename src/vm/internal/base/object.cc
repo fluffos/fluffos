@@ -227,10 +227,11 @@ void save_svalue(svalue_t *v, char **buf) {
       return;
     }
     case T_OBJECT:
+    case T_FUNCTION:
       // ignored
       break;
     default:
-      debug_message("save_svalue: unknown type %d ignored.", v->type);
+      debug_message("save_svalue: unknown type %d ignored.\n", v->type);
   }
 }
 
