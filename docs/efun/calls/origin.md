@@ -14,7 +14,7 @@ title: calls / origin
 
 ### DESCRIPTION
 
-    Returns string specifying how the current function was called.
+    Returns a string specifying how the current function was called.
     Current values are:
 
     "driver"            Driver (heart_beats, etc)
