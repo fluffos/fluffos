@@ -2,11 +2,12 @@
 layout: doc
 title: parsing / parse_add_rule
 ---
+
 # parse_add_rule
 
 ### NAME
 
-    parse_add_rule() - add parsing rules for a verb
+    parse_add_rule() - add a rule for a verb
 
 ### SYNOPSIS
 
@@ -14,22 +15,41 @@ title: parsing / parse_add_rule
 
 ### DESCRIPTION
 
-    Here "verb" is the command word (e.g. "look", "read" etc), The "rule" is
-    the parsing rule to add. Rules are made up from two parts - tokens, and
-    prepositions. Tokens are used to match various objects or strings, and
-    prepositions are fixed positional words to specify meaning (like "with"
-    or "in").
+    Adds a rule pattern for the specified verb. The rule parameter defines
+    how the command should be parsed, including what objects and prepositions
+    are expected.
 
-    The MudOS accepts six tokens that I'm aware of:
+    The rule pattern follows a specific syntax:
 
-    OBJ - matches a single object
-    OBS - matches one or more objects
-    LIV - matches a single, living object
-    LVS - matches one or more living objects
-    WRD - matches a single word
-    STR - matches one or more words
+    * Direct objects: 'OBJ'
+    * Indirect objects: 'OBJ2' (or second 'OBJ' in rule)
+    * Prepositions: 'PREP'
+    * Words: 'WRD' (matches a single word)
+    * Strings: 'STR' (matches one or more words)
+    * Living objects: 'LIV'
+    * Multiple objects: 'OBS'
+    * Multiple living objects: 'LVS'
+
+    Example:
+
+    ```c
+    parse_add_rule("give", "OBJ to OBJ");  // Second OBJ is indirect object
+    parse_add_rule("look", "at OBJ");
+    parse_add_rule("put", "OBJ in OBJ");   // Second OBJ is indirect object
+    ```
+
+    Additional examples:
+
+    ```c
+    // WRD matches a single word
+    parse_add_rule("say", "WRD");          // matches: "say hello"
+    parse_add_rule("emote", "WRD");        // matches: "emote smiles"
+
+    // STR matches one or more words
+    parse_add_rule("say", "STR");          // matches: "say hello there"
+    parse_add_rule("emote", "STR");        // matches: "emote smiles warmly"
+    ```
 
 ### SEE ALSO
 
-    add_action(3)
-
+    parse_init(3), parse_remove(3)

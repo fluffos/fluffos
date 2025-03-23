@@ -2,50 +2,54 @@
 layout: doc
 title: parsing / process_string
 ---
+
 # process_string
 
 ### NAME
 
-    process_string() - give a string with replaced calldescriptions
+    process_string() - process a string containing function call descriptions
 
 ### SYNOPSIS
 
-    string process_string( string combinestring );
+    string process_string(string str);
 
 ### DESCRIPTION
 
-    Processes  a  string by replacing specific syntactic patterns with what
-    is returned when the pattern is interpreted as a function call descrip‐
-    tion.
+    Processes a string by replacing function call descriptions with their results.
+    The function call descriptions are in the format:
+    @@function:object#id@@
 
-    The syntactic patterns are on the form:
+    Where:
 
-          "@@function[:filename][|arg1|arg2....|argN]@@"
+    * function is the name of the function to call
+    * object is the object to call the function on
+    * id is the object's ID
 
-    This is interpreted as a call:
+    The function call will be replaced with the string result of calling that
+    function on that object.
 
-           filename->function(arg1, arg2, ....., argN)
+    Note: This function is different from parse_command() which uses OBJ, OBJ2,
+    PREP, and WORD tokens for pattern matching. This function is specifically
+    for evaluating function calls within strings.
 
-    Note  that  process_string  does  not recurse over returned replacement
-    values. If a function returns another syntactic pattern, that  descrip‐
-    tion will not be replaced.
+    Example:
 
-    All  such  occurrences  in 'combinestring' is processed and replaced if
-    the return value is a string. If the return value is not a  string  the
-    pattern will remain unreplaced.
-
-    Note that both object and arguments are marked optional with the brack‐
-    ets and that the brackets are not included in the actual pattern.
+    ```c
+    string str = "You are chased by @@query_the_name:/obj/monster#123@@ eastward.";
+    string result = process_string(str);
+    // If query_the_name in monster#123 returns "the orc":
+    // result = "You are chased by the orc eastward."
+    ```
 
 ### SEE ALSO
 
-    process_value(3)
+    process_value(3), parse_command(3)
 
 ### CAVEAT
 
     This is usually used to support 'value by function call' in the mudlib.
-    It  is  wise  to  set  the  effuserid  of  the object to 0 before using
-    process_value as any function in any object can be called  with  almost
+    It is wise to set the effuserid of the object to 0 before using
+    process_value as any function in any object can be called with almost
     any arguments.
 
 ### EXAMPLE
@@ -57,4 +61,3 @@ title: parsing / process_string
         "You are chased by the orc eastward."
 
     Assuming that query_the_name in monster#123 returns "the orc".
-

@@ -2,6 +2,7 @@
 layout: doc
 title: parsing / parse_command
 ---
+
 # parse_command
 
 ### NAME
@@ -186,4 +187,3 @@ title: parsing / parse_command
 
        string parse_command_all_word()
           - Would normally return: "all"
-

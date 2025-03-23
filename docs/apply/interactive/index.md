@@ -6,6 +6,8 @@ title: interactive
 * [gmcp](gmcp.html)
 * [gmcp_enable](gmcp_enable.html)
 * [logon](logon.html)
+* [msdp](msdp.html)
+* [msdp_enable](msdp_enable.html)
 * [msp_enable](msp_enable.html)
 * [net_dead](net_dead.html)
 * [process_input](process_input.html)

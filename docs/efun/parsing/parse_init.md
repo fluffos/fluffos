@@ -2,11 +2,12 @@
 layout: doc
 title: parsing / parse_init
 ---
+
 # parse_init
 
 ### NAME
 
-    parse_init()
+    parse_init() - initialize an object for parsing
 
 ### SYNOPSIS
 
@@ -14,14 +15,13 @@ title: parsing / parse_init
 
 ### DESCRIPTION
 
-    The efun parse_init() is used to tell MudOS that this object is one
-    that may use or be used by the parsing package. If your object does
-    not call this then trying to use other parsing efuns will generate a
-    runtime error and the parser will ignore the object when searching
-    for matches. Suggest call parse_init() from create() in the standard
-    object.
+    Initializes the current object for use with the parser system. This must
+    be called before an object can use any of the parser-related functions
+    like parse_add_rule() or parse_remove().
+
+    This function sets up the necessary internal structures for the object
+    to handle command parsing and rule management.
 
 ### SEE ALSO
 
-    parse_refresh(3)
-
+    parse_add_rule(3), parse_remove(3)

@@ -2,24 +2,26 @@
 layout: doc
 title: parsing / query_verb
 ---
+
 # query_verb
 
 ### NAME
 
-    query_verb() - return the name of the command currently being executed
+    query_verb() - get the current command being executed
 
 ### SYNOPSIS
 
-    string query_verb( void );
+    string query_verb();
 
 ### DESCRIPTION
 
-    Give the name of the current command, or 0 if not executing from a com‐
-    mand.  This function is useful when several commands (verbs) may  cause
-    the  same  function  to  execute and it is necessary to determine which
-    verb it was that invoked the function.
+    Returns the name of the command currently being executed, or 0 if not
+    executing from a command. This is useful when you need to know what
+    command triggered the current function call.
+
+    This is particularly helpful in functions that handle multiple commands
+    and need to determine which command was used to call them.
 
 ### SEE ALSO
 
-    add_action(3)
-
+    parse_command(3), parse_init(3)
