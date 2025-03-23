@@ -10,5 +10,6 @@ title: object
 * [init](init.html)
 * [is_living](is_living.html)
 * [move_or_destruct](move_or_destruct.html)
+* [on_destruct](on_destruct.html)
 * [reset](reset.html)
 * [virtual_start](virtual_start.html)
