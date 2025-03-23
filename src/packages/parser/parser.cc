@@ -3719,7 +3719,6 @@ static void parse_str(int tok, parse_state_t *state) {
   int end = start;
   match_t *mp;
   char tmp[512];
-  int found_handler = 0;
   bitvec_t objects;
 
   // Get all objects to try parallel applies on
@@ -3802,7 +3801,6 @@ static void parse_str(int tok, parse_state_t *state) {
           if (sv && sv->type == T_NUMBER && sv->u.number) {
             // Success - this object will handle the string
             DEBUG_P(("Object %s accepted handling %s", ob->obname, tmp));
-            found_handler = 1;
             parse_rule(state);
             DEBUG_DEC;
             return;
@@ -3828,9 +3826,7 @@ static void parse_str(int tok, parse_state_t *state) {
   }
 
   // If no object handled it, fall back to traditional parsing
-  if (!found_handler) {
-    parse_rule(state);
-  }
+  parse_rule(state);
 
   DEBUG_DEC;
 }
