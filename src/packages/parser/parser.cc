@@ -25,10 +25,6 @@
 
 #include "base/package_api.h"
 
-#include "packages/core/add_action.h"
-#include "packages/core/file.h"
-#include "packages/core/sprintf.h"
-
 #include "packages/parser/parser.h"
 #include "packages/core/outbuf.h"
 
@@ -3787,9 +3783,9 @@ static void parse_str(int tok, parse_state_t *state) {
         p = strput(p, end_ptr, "_");
 
         if (tok == STR_TOKEN) {
-          p = strput(p, end_ptr, "str");
+          strput(p, end_ptr, "str");
         } else {
-          p = strput(p, end_ptr, "wrd");
+          strput(p, end_ptr, "wrd");
         }
 
         // Try to call direct_verb_str or direct_verb_wrd on the object
