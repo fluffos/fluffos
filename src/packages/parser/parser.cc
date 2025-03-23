@@ -20,10 +20,21 @@
  * . Zifnab's crasher
  */
 
+#include <ctype.h>
+#include <stdlib.h>
+
 #include "base/package_api.h"
+
+#include "packages/core/add_action.h"
+#include "packages/core/file.h"
+#include "packages/core/sprintf.h"
 
 #include "packages/parser/parser.h"
 #include "packages/core/outbuf.h"
+
+// Define macros needed for parse_str function
+#define BITCHUNK_BITS BPI
+#define STR_NAME(v) ((v)->real_name)
 
 /*
  * These match routines in the LIMA mudlib.  [The fact that this file was
@@ -109,6 +120,7 @@ static int debug_parse_verbose = 0;
 static void parse_rule(parse_state_t *);
 static void clear_parallel_errors(saved_error_t **);
 static svalue_t *get_the_error(parser_error_t *, int);
+static void parse_str(int tok, parse_state_t *state);
 
 #define isignore(x) (!uisprint(x) || (x) == '\'')
 #define iskeep(x) \
@@ -2940,31 +2952,17 @@ static void parse_rule(parse_state_t *state) {
         DEBUG_DEC;
         return;
       case STR_TOKEN:
-        if (!parse_vn->token[state->tok_index]) {
-          /* At end; match must be the whole thing */
-          start = state->word_index;
-          state->word_index = num_words;
-          add_match(state, STR_TOKEN, start, num_words - 1);
-          DEBUG_P(("Taking rest of sentence as STR"));
-          parse_rule(state);
-        } else {
-          start = state->word_index++;
-          while (state->word_index <= num_words) {
-            local_state = *state;
-            add_match(&local_state, STR_TOKEN, start, state->word_index - 1);
-            DEBUG_P(("Trying potential STR match"));
-            parse_rule(&local_state);
-            state->word_index++;
-          }
-        }
+        // Use our new parse_str function for STR tokens
+        local_state = *state;
+        parse_str(tok, &local_state);
         DEBUG_P(("Done trying to match STR"));
         DEBUG_DEC;
         return;
       case WRD_TOKEN:
-        add_match(state, WRD_TOKEN, state->word_index, state->word_index);
-        state->word_index++;
-        DEBUG_P(("Trying WRD match"));
-        parse_rule(state);
+        // Use our new parse_str function for WRD tokens
+        local_state = *state;
+        parse_str(tok, &local_state);
+        DEBUG_P(("Done trying to match WRD"));
         DEBUG_DEC;
         return;
       default:
@@ -3714,4 +3712,136 @@ void f_parse_dump() {
     }
   }
   outbuf_push(&ob);
+}
+
+// New function to process STR/WRD tokens with parallel applies
+static void parse_str(int tok, parse_state_t *state) {
+  DEBUG_P(("parse_str: token %d\n", tok));
+  DEBUG_INC;
+
+  int start = state->word_index;
+  int end = start;
+  match_t *mp;
+  char tmp[512];
+  int found_handler = 0;
+  bitvec_t objects;
+
+  // Get all objects to try parallel applies on
+  all_objects(&objects, parse_vn->handler->pinfo->flags & PI_REMOTE_LIVINGS);
+
+  // For WRD token, we only match a single word
+  if (tok == WRD_TOKEN) {
+    end = start;
+    state->word_index++;
+  } else {
+    // For STR token, use the entire remaining line if at the end
+    if (!parse_vn->token[state->tok_index]) {
+      end = num_words - 1;
+      state->word_index = num_words;
+    } else {
+      // Otherwise match just this word
+      end = start;
+      state->word_index++;
+    }
+  }
+
+  // Check if we're out of array bounds
+  if (state->num_matches >= MAX_MATCHES) {
+    DEBUG_P(("Too many matches"));
+    DEBUG_DEC;
+    return;
+  }
+
+  // Add the match to the state
+  mp = add_match(state, tok, start, end);
+
+  // Get the string value
+  strput_words(tmp, EndOf(tmp), start, end);
+
+  // Try parallel applies on all objects
+  int i;
+  object_t *ob;
+  unsigned int j;
+
+  for (i = 0; i < NUM_BITVEC_INTS; i++) {
+    if (!objects.b[i]) {
+      continue;  // Skip empty chunks
+    }
+
+    for (j = 0; j < BITCHUNK_BITS; j++) {
+      if (objects.b[i] & (1L << j)) {
+        ob = loaded_objects[i * BITCHUNK_BITS + j];
+
+        // Skip NULL objects or destructed objects
+        if (!ob || (ob->flags & O_DESTRUCTED)) {
+          continue;
+        }
+
+        // Check if the object wants to handle this STR token
+        char fbuf[256];
+        char *p;
+        char *end_ptr = EndOf(fbuf);
+
+        p = strput(fbuf, end_ptr, "direct_");
+        p = strput(p, end_ptr, STR_NAME(parse_verb_entry));
+        p = strput(p, end_ptr, "_");
+
+        if (tok == STR_TOKEN) {
+          p = strput(p, end_ptr, "str");
+        } else {
+          p = strput(p, end_ptr, "wrd");
+        }
+
+        // Try to call direct_verb_str or direct_verb_wrd on the object
+        if (function_exists(fbuf, ob, 0)) {
+          svalue_t *sv;
+
+          // Push the string value as argument
+          push_malloced_string(string_copy(tmp, "parse_str_arg"));
+
+          // Call the function
+          sv = apply(fbuf, ob, 1, ORIGIN_DRIVER);
+
+          // Process the result
+          if (sv && sv->type == T_NUMBER && sv->u.number) {
+            // Success - this object will handle the string
+            DEBUG_P(("Object %s accepted handling %s", ob->obname, tmp));
+            found_handler = 1;
+            parse_rule(state);
+            DEBUG_DEC;
+            return;
+          } else if (sv && sv->type == T_STRING) {
+            // Error message - store it like in parallel_process_answer
+            DEBUG_P(("Object %s returned error: %s", ob->obname, sv->u.string));
+
+            if (state->num_errors == 0) {
+              free_parser_error(&current_error_info);
+              if (sv->u.string[0] == '#') {
+                current_error_info.error_type = ERR_ALLOCATED;
+                current_error_info.err.str = string_copy(sv->u.string + 1, "parse_str");
+              } else {
+                current_error_info.error_type = ERR_ALLOCATED;
+                current_error_info.err.str = string_copy(sv->u.string, "parse_str");
+              }
+              state->num_errors++;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // If no object handled it, fall back to traditional parsing
+  if (!found_handler) {
+    parse_rule(state);
+  }
+
+  DEBUG_DEC;
+}
+
+// Function to determine if we should call the can_* check before parallel applies
+static int call_can_before_check(parse_state_t *state) {
+  // This is where we'd put any logic about when to skip the can_ checks
+  // For now, we always return 1 to maintain backward compatibility
+  return 1;
 }
