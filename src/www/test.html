@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星空主题测试</title>
+    <link rel="stylesheet" href="starry-night.css">
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // 设置随机值
+        const root = document.documentElement;
+        for (let i = 1; i <= 100; i++) {
+            root.style.setProperty(`--rand${i}`, Math.random());
+        }
+
+
+    });
+</script>
+</head>
+<body>
+    <div class="starry-container">
+        <!-- 北斗七星的七颗星 -->
+        <div class="star star-tianshu"></div> <!-- 天枢 -->
+        <div class="star star-tianxuan"></div> <!-- 天璇 -->
+        <div class="star star-tianji"></div> <!-- 天玑 -->
+        <div class="star star-tianquan"></div> <!-- 天权 -->
+        <div class="star star-yuheng"></div> <!-- 玉衡 -->
+        <div class="star star-kaiyang"></div> <!-- 开阳 -->
+        <div class="star star-yaoguang"></div> <!-- 摇光 -->
+        <!-- SVG 用于绘制模糊直线 -->
+        <svg class="constellation-lines" width="900" height="800">
+            <defs>
+                <filter id="blur">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="2" />
+                </filter>
+            </defs>
+            <polyline points="50,400 183.5,325 332,347.5 420.5,362.5 473,460 650.75,407.5 643.25,280"
+                      stroke="rgba(255, 255, 255, 0.1)" stroke-width="1" fill="none"
+                      />
+        </svg>
+        <div class="content">
+            <p>这是一个星空主题测试页面，无 xterm.js</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1408,6 +1408,11 @@ function widechar_in_table(data, ucs) {
 function widechar_wcwidth(c) {
     if (widechar_in_table(widechar_ascii_table, c))
         return 1;
+
+    if (widechar_in_table(widechar_ambiguous_table, c))
+       return 2;
+        
+    return 2;
     if (widechar_in_table(widechar_private_table, c))
         return widechar_private_use;
     if (widechar_in_table(widechar_nonprint_table, c))
@@ -1416,13 +1421,13 @@ function widechar_wcwidth(c) {
         return widechar_non_character;
     if (widechar_in_table(widechar_combining_table, c))
         return widechar_combining;
-    if (widechar_in_table(widechar_doublewide_table, c))
-        return 2;
-    if (widechar_in_table(widechar_ambiguous_table, c))
-        return widechar_ambiguous;
+
+
     if (widechar_in_table(widechar_unassigned_table, c))
         return widechar_unassigned;
     if (widechar_in_table(widechar_widened_table, c))
         return widechar_widened_in_9;
+    if (widechar_in_table(widechar_doublewide_table, c))
+    return 2;
     return 1;
 }
