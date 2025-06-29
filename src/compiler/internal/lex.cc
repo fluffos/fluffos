@@ -198,6 +198,7 @@ static keyword_t reswords[] = {
 #endif
 #ifdef REF_RESERVED_WORD
     {"ref", L_REF, 0},
+    {"deref", L_DEREF, 0},
 #endif
     {"return", L_RETURN, 0},
     {"sscanf", L_SSCANF, 0},
@@ -2448,10 +2449,10 @@ int yylex() {
         if (c == 'X' || c == 'x') {
           yyp = yytext;
           return parseHexIntegerLiteral(c);
-        } 
+        }
         if (c == 'B' || c == 'b') {
           yyp = yytext;
-          return parseBinaryIntegerLiteral(c);           
+          return parseBinaryIntegerLiteral(c);
         }
         outp--;
         c = '0';
@@ -2642,7 +2643,7 @@ int parseBinaryIntegerLiteral(unsigned char c) {
     if (c == '_') {
       switch(*outp) {
         case '0':
-        case '1': 
+        case '1':
           continue;
         default:
           break;
@@ -2657,7 +2658,7 @@ int parseBinaryIntegerLiteral(unsigned char c) {
   *yyp = 0;
 
   char *endptr;
-  yylval.number = strtol(reinterpret_cast<const char *>(yytext), &endptr, 2); 
+  yylval.number = strtol(reinterpret_cast<const char *>(yytext), &endptr, 2);
   if (endptr != yyp) {
     yyerror("Invalid binary integer literal: %s", std::string(yytext, yyp - yytext).c_str());
     return YYerror;
@@ -3442,6 +3443,7 @@ static void init_instrs() {
   add_instr_name("kill_refs", "c_kill_refs(%i);\n", F_KILL_REFS, T_ANY);
   add_instr_name("ref", "C_REF(%i);\n", F_REF, T_ANY);
   add_instr_name("ref_lvalue", "C_REF_LVALUE(%i);\n", F_REF_LVALUE, T_LVALUE);
+  add_instr_name("deref", "C_DEREF(%i);\n", F_DEREF, T_ANY);
   add_instr_name("transfer_local", "C_TRANSFER_LOCAL(%i);\n", F_TRANSFER_LOCAL, T_ANY);
   add_instr_name("number", 0, F_NUMBER, T_NUMBER);
   add_instr_name("real", 0, F_REAL, T_REAL);
