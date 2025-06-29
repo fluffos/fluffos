@@ -333,7 +333,7 @@ add_custom_command(
 find_package(BISON 3.8)
 if (${BISON_FOUND})
   message(STATUS "BISON: ${BISON_VERSION}")
-  
+
   # Generate grammar files in build directory
   BISON_TARGET(Grammar "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.y"
           ${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.cc
@@ -341,44 +341,44 @@ if (${BISON_FOUND})
           COMPILE_FLAGS "-Wall --color=auto -rall"
           VERBOSE REPORT_FILE "${CMAKE_CURRENT_BINARY_DIR}/grammar.report"
           )
-  
+
   # Smart auto-update: Check if grammar.y is newer than source autogen files
   # If so, automatically update source files with cleaned versions
   add_custom_command(
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/grammar_sources_updated.stamp"
     DEPENDS "${BISON_Grammar_OUTPUT_SOURCE}" "${BISON_Grammar_OUTPUT_HEADER}"
     COMMAND ${CMAKE_COMMAND} -E echo "Auto-updating source autogen files..."
-    
+
     # Clean paths in generated files
-    COMMAND sed -e "s|${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar\\.y|grammar.y|g" 
+    COMMAND sed -e "s|${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar\\.y|grammar.y|g"
                 -e "s|${CMAKE_CURRENT_BINARY_DIR}/grammar\\.autogen\\.[ch][cp]*|grammar.autogen.h|g"
                 -e "s|YY_YY_[A-Z0-9_]*_GRAMMAR_AUTOGEN_H_INCLUDED|YY_YY_GRAMMAR_AUTOGEN_H_INCLUDED|g"
       "${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.h" > "${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.h.clean"
-    
+
     COMMAND sed -e "s|${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar\\.y|grammar.y|g"
                 -e "s|${CMAKE_CURRENT_BINARY_DIR}/grammar\\.autogen\\.[ch][cp]*|grammar.autogen.cc|g"
       "${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.cc" > "${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.cc.clean"
-    
+
     # Copy cleaned files to source directory
-    COMMAND ${CMAKE_COMMAND} -E copy 
-      "${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.h.clean" 
+    COMMAND ${CMAKE_COMMAND} -E copy
+      "${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.h.clean"
       "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.autogen.h"
-    COMMAND ${CMAKE_COMMAND} -E copy 
-      "${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.cc.clean" 
+    COMMAND ${CMAKE_COMMAND} -E copy
+      "${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.cc.clean"
       "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.autogen.cc"
-    
+
     # Create stamp file in build directory only
     COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/grammar_sources_updated.stamp"
-    
+
     COMMENT "Auto-updating source autogen files from grammar changes"
     VERBATIM
   )
-  
+
   # Create a target that ensures source files are updated before main build
   add_custom_target(update_grammar_sources
     DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/grammar_sources_updated.stamp"
   )
-  
+
   set(GENERATRED_GRAMMAR_FILES
           "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.autogen.cc"
           "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.autogen.h"
