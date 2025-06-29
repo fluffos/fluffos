@@ -1,6 +1,6 @@
 ---
 layout: doc
-title: Driver Internals
+title: driver
 ---
 * [adding_efuns](adding_efuns.html)
 * [call_into_vm](call_into_vm.html)
