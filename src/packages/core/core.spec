@@ -144,6 +144,7 @@ int arrayp pointerp(mixed);
 int objectp(mixed);
 int classp(mixed);
 string typeof(mixed);
+int refp(mixed);
 
 int bufferp(mixed);
 buffer allocate_buffer(int);

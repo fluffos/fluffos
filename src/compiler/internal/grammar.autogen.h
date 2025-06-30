@@ -35,8 +35,8 @@
    especially those whose name start with YY_ or yy_.  They are
    private implementation details that can be changed or removed.  */
 
-#ifndef YY_YY_HOME_SUNYC_SRC_FLUFFOS_CMAKE_BUILD_DEBUG_ASAN_WSL_CLANG_SRC_GRAMMAR_AUTOGEN_H_INCLUDED
-# define YY_YY_HOME_SUNYC_SRC_FLUFFOS_CMAKE_BUILD_DEBUG_ASAN_WSL_CLANG_SRC_GRAMMAR_AUTOGEN_H_INCLUDED
+#ifndef YY_YY_GRAMMAR_AUTOGEN_H_INCLUDED
+# define YY_YY_GRAMMAR_AUTOGEN_H_INCLUDED
 /* Debug traces.  */
 #ifndef YYDEBUG
 # define YYDEBUG 0
@@ -98,16 +98,17 @@ extern int yydebug;
     L_CATCH = 299,                 /* L_CATCH  */
     L_ARRAY = 300,                 /* L_ARRAY  */
     L_REF = 301,                   /* L_REF  */
-    L_PARSE_COMMAND = 302,         /* L_PARSE_COMMAND  */
-    L_TIME_EXPRESSION = 303,       /* L_TIME_EXPRESSION  */
-    L_CLASS = 304,                 /* L_CLASS  */
-    L_NEW = 305,                   /* L_NEW  */
-    L_PARAMETER = 306,             /* L_PARAMETER  */
-    L_TREE = 307,                  /* L_TREE  */
-    L_PREPROCESSOR_COMMAND = 308,  /* L_PREPROCESSOR_COMMAND  */
-    LOWER_THAN_ELSE = 309,         /* LOWER_THAN_ELSE  */
-    L_EQ = 310,                    /* L_EQ  */
-    L_NE = 311                     /* L_NE  */
+    L_DEREF = 302,                 /* L_DEREF  */
+    L_PARSE_COMMAND = 303,         /* L_PARSE_COMMAND  */
+    L_TIME_EXPRESSION = 304,       /* L_TIME_EXPRESSION  */
+    L_CLASS = 305,                 /* L_CLASS  */
+    L_NEW = 306,                   /* L_NEW  */
+    L_PARAMETER = 307,             /* L_PARAMETER  */
+    L_TREE = 308,                  /* L_TREE  */
+    L_PREPROCESSOR_COMMAND = 309,  /* L_PREPROCESSOR_COMMAND  */
+    LOWER_THAN_ELSE = 310,         /* LOWER_THAN_ELSE  */
+    L_EQ = 311,                    /* L_EQ  */
+    L_NE = 312                     /* L_NE  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -116,7 +117,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 129 "/home/sunyc/src/fluffos/src/compiler/internal/grammar.y"
+#line 130 "grammar.y"
 
   LPC_INT number; /* 8 */
   LPC_FLOAT real; /* 8 */
@@ -137,7 +138,7 @@ union YYSTYPE
     uint16_t save_exact_types;
   } func_block; /* 8 */
 
-#line 141 "/home/sunyc/src/fluffos/cmake-build-debug-asan-wsl-clang/src/grammar.autogen.h"
+#line 142 "grammar.autogen.h"
 
 };
 typedef union YYSTYPE YYSTYPE;
@@ -152,4 +153,4 @@ extern YYSTYPE yylval;
 int yyparse (void);
 
 
-#endif /* !YY_YY_HOME_SUNYC_SRC_FLUFFOS_CMAKE_BUILD_DEBUG_ASAN_WSL_CLANG_SRC_GRAMMAR_AUTOGEN_H_INCLUDED  */
+#endif /* !YY_YY_GRAMMAR_AUTOGEN_H_INCLUDED  */

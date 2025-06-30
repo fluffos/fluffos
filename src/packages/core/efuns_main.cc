@@ -2959,6 +2959,18 @@ void f_typeof() {
 }
 #endif
 
+#ifdef F_REFP
+void f_refp() {
+  if (sp->type == T_REF) {
+    free_svalue(sp, "f_refp");
+    *sp = const1;
+  } else {
+    free_svalue(sp, "f_refp");
+    *sp = const0;
+  }
+}
+#endif
+
 #ifdef F_UNDEFINEDP
 void f_undefinedp() {
   if (sp->type == T_NUMBER) {
