@@ -17,7 +17,7 @@ RUN ./configure --prefix=/usr \
     && make install
 
 COPY . /build/fluffos
-RUN mkdir /build/fluffos/build
+RUN mkdir -p /build/fluffos/build
 
 WORKDIR /build/fluffos/build
 RUN cmake .. -DMARCH_NATIVE=OFF -DSTATIC=ON \
