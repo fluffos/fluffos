@@ -203,5 +203,11 @@ docker build -t fluffos:ubuntu -f Dockerfile.ubuntu .
 docker run -it --rm fluffos:ubuntu
 ```
 
-You may mount your mudlib directory to the container when starting it.
+You may mount your mudlib directory to the container when starting it. Specify
+the configuration file inside your mudlib when launching the driver:
+
+```bash
+docker run -it --rm -v /path/to/mudlib:/mudlib fluffos:ubuntu \
+  /fluffos/bin/driver /mudlib/etc/config.test
+```
 

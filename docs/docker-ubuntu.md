@@ -64,7 +64,7 @@ You can mount your own mudlib when starting the container:
 
 ```bash
 docker run -it --rm -v /path/to/mudlib:/mudlib fluffos:ubuntu \
-  /fluffos/bin/driver /mudlib
+  /fluffos/bin/driver /mudlib/etc/config.test
 ```
 
 Prebuilt images are also available from [Docker Hub](https://hub.docker.com/r/fluffos/fluffos).
