@@ -190,3 +190,18 @@ Check the result file to make sure it is a static file.
 $ ldd bin/driver
     not a dynamic executable
 ```
+
+## Docker (Ubuntu 22.04+)
+
+FluffOS can also be built inside a Docker container based on Ubuntu 22.04. A
+sample Dockerfile is provided in [docs/docker-ubuntu.md](docker-ubuntu.md).
+To build the image and run the driver:
+
+```bash
+docker build -t fluffos:ubuntu -f Dockerfile.ubuntu .
+
+docker run -it --rm fluffos:ubuntu
+```
+
+You may mount your mudlib directory to the container when starting it.
+

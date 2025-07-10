@@ -70,6 +70,7 @@ Support
 How to Build
 ------------
 see <https://www.fluffos.info/build.html>
+For building with Docker on Ubuntu see [docs/docker-ubuntu.md](docs/docker-ubuntu.md)
 
 Bundled Third-party Dependencies
 ----------------------

@@ -1,0 +1,30 @@
+FROM ubuntu:22.04 AS builder
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        build-essential git bison cmake \
+        libmysqlclient-dev libpcre3-dev libpq-dev \
+        libsqlite3-dev libssl-dev libz-dev \
+        libjemalloc-dev libicu-dev
+
+WORKDIR /build
+
+COPY . /build/fluffos
+
+RUN mkdir build && cd build && \
+    cmake .. && \
+    make -j$(nproc) install
+
+FROM ubuntu:22.04
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        libjemalloc2 libicu70 libssl3 libpcre3 \
+        libmysqlclient-dev libpq5 libsqlite3-0 zlib1g && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /fluffos
+
+COPY --from=builder /build/fluffos/build/bin ./bin
+
+ENTRYPOINT ["/fluffos/bin/driver"]
