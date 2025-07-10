@@ -28,6 +28,7 @@ WORKDIR /build
 COPY . /build/fluffos
 
 WORKDIR /build/fluffos
+
 RUN mkdir -p build && cd build && \
     cmake .. && \
     make -j$(nproc) install
