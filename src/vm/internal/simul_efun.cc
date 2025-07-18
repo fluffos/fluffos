@@ -66,7 +66,7 @@ void init_simul_efun(const char *file) {
   }
 
   if (file[strlen(file) - 2] != '.') {
-    strcat(buf, ".c");
+    strncat(buf, ".c", sizeof(buf) - strlen(buf) - 1); // Ensure no overflow
   }
 
   new_ob = load_object(buf, 1);
