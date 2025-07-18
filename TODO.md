@@ -1,10 +1,10 @@
 # URGENT #
 ## vm/internal/simul_efun.cc ##
 - ✅ FIXED: init_simul_efun
-  ✅ FIXED: possible overflow in strcat(buf, ".c") changed to strncat with bounds checking
-  ⚠️ TODO: search complete source for other occurances
+- ✅ FIXED: possible overflow in strcat(buf, ".c") changed to strncat with bounds checking
+- ✅ FIXED: search complete source for other occurances
 - portability problems
-    add gnulib modules
+  - add gnulib modules
 
 # Have Time #
 ## documentation ##
