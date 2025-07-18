@@ -1360,7 +1360,7 @@ static int find_string(const char *str, array_t *warr, int *cix_in) {
  * Returns:             True if a match is made.
  */
 static int check_adjectiv(int obix, array_t *warr, int from, int to) {
-  int il, back, sum, fail;
+  int il, back, sum, fail, adstr_size;
   char *adstr;
   array_t *ids;
 
@@ -1389,7 +1389,8 @@ static int check_adjectiv(int obix, array_t *warr, int from, int to) {
     return 0;
   }
 
-  adstr = reinterpret_cast<char *>(DMALLOC(sum, TAG_TEMPORARY, "check_adjectiv"));
+  adstr_size = sum;
+  adstr = reinterpret_cast<char *>(DMALLOC(adstr_size, TAG_TEMPORARY, "check_adjectiv"));
 
   /*
    * If we now have: "adj1 adj2 adj3 ... adjN"
@@ -1413,9 +1414,15 @@ static int check_adjectiv(int obix, array_t *warr, int from, int to) {
         /* test "adj[il] ..
          * adj[back] */
         if (sum > il) {
-          strcat(adstr, " ");
+          size_t used = strlen(adstr);
+          if (used + 1 < adstr_size) {
+            strncat(adstr, " ", adstr_size - used - 1);
+          }
         }
-        strcat(adstr, warr->item[sum].u.string);
+        size_t used = strlen(adstr);
+        if (used + strlen(warr->item[sum].u.string) < adstr_size) {
+          strncat(adstr, warr->item[sum].u.string, adstr_size - used - 1);
+        }
       }
       if ((member_string(adstr, ids) < 0) && (member_string(adstr, gAdjid_list_d) < 0)) {
         continue;
@@ -1526,28 +1533,34 @@ static const char *parse_one_plural(const char *str) {
     case 'e':
       if (ch2 == 'f') {
         pbuf[sl - 1] = 0;
-        return strcat(pbuf, "ves");
+        strncat(pbuf, "ves", sizeof(pbuf) - strlen(pbuf) - 1);
+        return pbuf;
       }
       break;
     case 'f':
-      return strcat(pbuf, "ves");
+      strncat(pbuf, "ves", sizeof(pbuf) - strlen(pbuf) - 1);
+      return pbuf;
     case 'h':
       if (ch2 == 's' || ch2 == 'c') {
-        return strcat(pbuf, "hes");
+        strncat(pbuf, "hes", sizeof(pbuf) - strlen(pbuf) - 1);
+        return pbuf;
       }
       break;
     case 's':
-      return strcat(pbuf, "ses");
+      strncat(pbuf, "ses", sizeof(pbuf) - strlen(pbuf) - 1);
+      return pbuf;
     case 'x':
       if (EQ(str, "ox")) {
         return "oxen";
       } else {
-        return strcat(pbuf, "xes");
+        strncat(pbuf, "xes", sizeof(pbuf) - strlen(pbuf) - 1);
+        return pbuf;
       }
     case 'y':
       if ((ch2 != 'a' && ch2 != 'e' && ch2 != 'i' && ch2 != 'o' && ch2 != 'u') ||
           (ch2 == 'u' && ch3 == 'q')) {
-        return strcat(pbuf, "ies");
+        strncat(pbuf, "ies", sizeof(pbuf) - strlen(pbuf) - 1);
+        return pbuf;
       }
       break;
   }
@@ -1587,7 +1600,8 @@ static const char *parse_one_plural(const char *str) {
   }
 
   pbuf[sl] = ch;
-  return strcat(pbuf, "s");
+  strncat(pbuf, "s", sizeof(pbuf) - strlen(pbuf) - 1);
+  return pbuf;
 }
 #endif
 
