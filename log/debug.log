@@ -1,0 +1,9 @@
+Processing config file: testsuite/etc/config.test
+maximum local variables: invalid new value, resetting to default.
+New Debug log location: "log/debug.log".
+Execution root: ./
+Initializing internal stuff ....
+Event backend in use: epoll
+Loading simul_efun file : /single/simul_efun
+The simul_efun file single/simul_efun.c was not loaded.
+Uncollected profiling events: 4.
