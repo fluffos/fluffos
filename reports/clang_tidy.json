@@ -1,0 +1,3418 @@
+---
+MainSourceFile:  '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+Diagnostics:
+  - DiagnosticName:  performance-enum-size
+    DiagnosticMessage:
+      Message:         'enum ''(unnamed enum at /mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc:38:1)'' uses a larger base type (''unsigned int'', size: 4 bytes) than necessary for its value set, consider using ''std::uint16_t'' (2 bytes) as the base type to reduce its size'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1206
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1335
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          1329
+          Length:          6
+          ReplacementText: 'auto '
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          1352
+          Length:          0
+          ReplacementText: ' -> char *'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  performance-enum-size
+    DiagnosticMessage:
+      Message:         'enum ''(unnamed enum at /mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc:48:1)'' uses a larger base type (''unsigned int'', size: 4 bytes) than necessary for its value set, consider using ''std::uint8_t'' (1 byte) as the base type to reduce its size'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1355
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''master_state'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1435
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''pi'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1475
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1496
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''hash_table'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1510
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1540
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''special_table'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1556
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1597
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''verbs'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1605
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''objects_loaded'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1639
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''num_objects'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1670
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''num_people'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1683
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''me_object'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1695
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1713
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''loaded_objects'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1730
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1770
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''object_flags'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1774
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''my_objects'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1821
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''my_string'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1852
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''num_literals'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1884
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''literals'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1916
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1933
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''words'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1940
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''num_words'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      1978
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''parse_vn'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2013
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''parse_verb_entry'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2038
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''parse_restricted'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2073
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''parse_user'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2108
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "array_t" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2127
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          835
+          Length:          0
+          ReplacementText: "#include \"vm/internal/base/array.h\"\n"
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''master_user_list'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2136
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''cur_livings'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2180
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''cur_accessible'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2209
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''best_match'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2236
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''best_error_match'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2259
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''best_num_errors'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2288
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''best_result'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2328
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2358
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''matches'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2366
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''found_level'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2399
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "mapping_t" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2423
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          835
+          Length:          0
+          ReplacementText: "#include \"vm/internal/base/machine.h\"\n"
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''parse_nicks'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2434
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''parse_env'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2473
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''direct_object'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2506
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''indirect_object'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2521
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''current_error_info'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2561
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''best_error_info'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2603
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''parallel_error_info'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2642
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''second_parallel_error_info'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2685
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''parallel_errors'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2736
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''debug_parse_depth'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2818
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''debug_parse_verbose'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      2852
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''parse_rule'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      3253
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''clear_parallel_errors'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      3294
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "svalue_t" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      3342
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          835
+          Length:          0
+          ReplacementText: "#include \"vm/internal/base/svalue.h\"\n"
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''get_the_error'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      3352
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      3352
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          3342
+          Length:          10
+          ReplacementText: 'auto '
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          3388
+          Length:          0
+          ReplacementText: ' -> svalue_t *'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "STRING_SHARED" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      3590
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''debug_parse'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      6391
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "va_list" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      6429
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          801
+          Length:          0
+          ReplacementText: "#include <cstdarg>\n"
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      6445
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "vsprintf" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      6590
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          801
+          Length:          0
+          ReplacementText: "#include <cstdio>\n"
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "tell_object" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      6633
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          835
+          Length:          0
+          ReplacementText: "#include \"vm/internal/simulate.h\"\n"
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "command_giver" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      6645
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''size_t'' (aka ''unsigned long'') to signed type ''int'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      6665
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "strlen" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      6665
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          801
+          Length:          0
+          ReplacementText: "#include <cstring>\n"
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''bitvec_copy'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      6740
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-const-correctness
+    DiagnosticMessage:
+      Message:         'variable ''n'' of type ''int'' can be declared ''const'''
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      6784
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''int'' to signed type ''short'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      6819
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''bitvec_zero'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      6894
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''bitvec_set'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      6951
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''int'' to signed type ''short'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      7179
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''intersect'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      7253
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      7253
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          7249
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          7292
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''int'' to signed type ''short'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      7395
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-assignment-in-if-condition
+    DiagnosticMessage:
+      Message:         'an assignment within an ''if'' condition is bug-prone'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      7442
+      Replacements:    []
+      Ranges:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          FileOffset:      7432
+          Length:          22
+    Notes:
+      - Message:         'if it should be an assignment, move it out of the ''if'' condition'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      7442
+        Replacements:    []
+      - Message:         'if it is meant to be an equality check, change ''='' to ''=='''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      7442
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''bitvec_count'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      7512
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      7512
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          7508
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          7538
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      7550
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  readability-identifier-naming
+    DiagnosticMessage:
+      Message:         'invalid case style for static constant ''counts'''
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      7560
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          7560
+          Length:          6
+          ReplacementText: _COUNTS
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          8053
+          Length:          6
+          ReplacementText: _COUNTS
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''all_objects'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      8133
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''int'' to signed type ''short'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      8428
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''int'' to signed type ''short'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      8464
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''add_match'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      8900
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      8900
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          8891
+          Length:          9
+          ReplacementText: 'auto '
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          8962
+          Length:          0
+          ReplacementText: ' -> match_t *'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''int'' to signed type ''short'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      9116
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''int'' to signed type ''short'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      9137
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''int'' to signed type ''short'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      9157
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''parse_copy_array'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      9326
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      9326
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          9322
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          9389
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-unused-parameters
+    DiagnosticMessage:
+      Message:         'parameter ''desc'' is unused'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      9384
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          9370
+          Length:          18
+          ReplacementText: ''
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          12213
+          Length:          23
+          ReplacementText: ''
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "T_STRING" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      9696
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-multi-level-implicit-pointer-conversion
+    DiagnosticMessage:
+      Message:         'multilevel pointer conversion from ''const char **'' to ''void *'', please use explicit cast'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      10008
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''add_special_word'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      10090
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-easily-swappable-parameters
+    DiagnosticMessage:
+      Message:         '2 adjacent parameters of ''add_special_word'' of similar type (''int'') are easily swapped by mistake'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      10124
+      Replacements:    []
+      Ranges:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          FileOffset:      10124
+          Length:          17
+    Notes:
+      - Message:         'the first parameter in the range is ''kind'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      10128
+        Replacements:    []
+        Ranges:
+          - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+            FileOffset:      10128
+            Length:          4
+      - Message:         'the last parameter in the range is ''arg'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      10138
+        Replacements:    []
+        Ranges:
+          - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+            FileOffset:      10138
+            Length:          3
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''int'' to signed type ''short'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      10358
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''int'' to signed type ''short'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      10377
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''check_special_word'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      10454
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      10454
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          10450
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          10500
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "isdigit" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      10718
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          801
+          Length:          0
+          ReplacementText: "#include <cctype>\n"
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "strtol" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      10760
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          801
+          Length:          0
+          ReplacementText: "#include <cstdlib>\n"
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-switch-missing-default-case
+    DiagnosticMessage:
+      Message:         switching on non-enum value without default case may not cover all cases
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      10886
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "strcmp" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      11134
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''interrogate_master'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      11234
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "free_array" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      11402
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "T_ARRAY" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      11596
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "the_null_array" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      11708
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-multi-level-implicit-pointer-conversion
+    DiagnosticMessage:
+      Message:         'multilevel pointer conversion from ''char **'' to ''void *'', please use explicit cast'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      11945
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "current_object" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      13309
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''remove_ids'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      13520
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-multi-level-implicit-pointer-conversion
+    DiagnosticMessage:
+      Message:         'multilevel pointer conversion from ''char **'' to ''void *'', please use explicit cast'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      13723
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-multi-level-implicit-pointer-conversion
+    DiagnosticMessage:
+      Message:         'multilevel pointer conversion from ''char **'' to ''void *'', please use explicit cast'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      13880
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-multi-level-implicit-pointer-conversion
+    DiagnosticMessage:
+      Message:         'multilevel pointer conversion from ''char **'' to ''void *'', please use explicit cast'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      14032
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "master_ob" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      14624
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          835
+          Length:          0
+          ReplacementText: "#include \"vm/internal/master.h\"\n"
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-assignment-in-if-condition
+    DiagnosticMessage:
+      Message:         'an assignment within an ''if'' condition is bug-prone'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      14737
+      Replacements:    []
+      Ranges:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          FileOffset:      14734
+          Length:          26
+    Notes:
+      - Message:         'if it should be an assignment, move it out of the ''if'' condition'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      14737
+        Replacements:    []
+      - Message:         'if it is meant to be an equality check, change ''='' to ''=='''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      14737
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "error" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      14767
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "safe_apply" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      15177
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          835
+          Length:          0
+          ReplacementText: "#include \"vm/internal/apply.h\"\n"
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "ORIGIN_DRIVER" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      15227
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "O_DESTRUCTED" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      15275
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  readability-simplify-boolean-expr
+    DiagnosticMessage:
+      Message:         'boolean expression can be simplified by DeMorgan''s theorem'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      15320
+      Replacements:    []
+      Ranges:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          FileOffset:      15320
+          Length:          13
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "IS_ZERO" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      15321
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''hash_clean'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      15951
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''free_parse_result'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      16311
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "free_object" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      16384
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          835
+          Length:          0
+          ReplacementText: "#include \"vm/internal/base/object.h\"\n"
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "free_svalue" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      16675
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''clear_result'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      16818
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''free_parse_globals'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      17019
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "free_mapping" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      17077
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      17402
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''tokenize'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      17688
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      17688
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          17684
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          17729
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "strchr" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      17900
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''long'' to signed type ''int'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      17983
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "strncmp" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      19716
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      19798
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "strncpy" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      19843
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "strcpy" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      19874
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''make_rule'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      20038
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-assignment-in-if-condition
+    DiagnosticMessage:
+      Message:         'an assignment within an ''if'' condition is bug-prone'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      20220
+      Replacements:    []
+      Ranges:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          FileOffset:      20208
+          Length:          38
+    Notes:
+      - Message:         'if it should be an assignment, move it out of the ''if'' condition'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      20220
+        Replacements:    []
+      - Message:         'if it is meant to be an equality check, change ''='' to ''=='''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      20220
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''free_words'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      20701
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''interrogate_object'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      20875
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  readability-simplify-boolean-expr
+    DiagnosticMessage:
+      Message:         'boolean expression can be simplified by DeMorgan''s theorem'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      22444
+      Replacements:    []
+      Ranges:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          FileOffset:      22444
+          Length:          13
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  readability-simplify-boolean-expr
+    DiagnosticMessage:
+      Message:         'boolean expression can be simplified by DeMorgan''s theorem'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      22690
+      Replacements:    []
+      Ranges:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          FileOffset:      22690
+          Length:          13
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  readability-simplify-boolean-expr
+    DiagnosticMessage:
+      Message:         'boolean expression can be simplified by DeMorgan''s theorem'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      22938
+      Replacements:    []
+      Ranges:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          FileOffset:      22938
+          Length:          13
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''first_inv'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      23044
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      23044
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          23034
+          Length:          10
+          ReplacementText: 'auto '
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          23067
+          Length:          0
+          ReplacementText: ' -> object_t *'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''next_inv'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      23359
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      23359
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          23349
+          Length:          10
+          ReplacementText: 'auto '
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          23386
+          Length:          0
+          ReplacementText: ' -> object_t *'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''super'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      23710
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      23710
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          23700
+          Length:          10
+          ReplacementText: 'auto '
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          23729
+          Length:          0
+          ReplacementText: ' -> object_t *'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  performance-enum-size
+    DiagnosticMessage:
+      Message:         'enum ''(unnamed enum at /mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc:976:1)'' uses a larger base type (''unsigned int'', size: 4 bytes) than necessary for its value set, consider using ''std::uint8_t'' (1 byte) as the base type to reduce its size'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      23997
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-no-recursion
+    DiagnosticMessage:
+      Message:         'function ''rec_add_object'' is within a recursive call chain'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      24048
+      Replacements:    []
+    Notes:
+      - Message:         'example recursive call chain, starting from function ''rec_add_object'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      24048
+        Replacements:    []
+      - Message:         'Frame #1: function ''rec_add_object'' calls function ''rec_add_object'' here:'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      24768
+        Replacements:    []
+      - Message:         '... which was the starting point of the recursive call chain; there may be other cycles'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      24768
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''rec_add_object'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      24048
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-inc-dec-in-conditions
+    DiagnosticMessage:
+      Message:         'incrementing and referencing a variable in a complex condition can cause unintended side-effects due to C++''s order of evaluation, consider moving the modification outside of the condition to avoid misunderstandings'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      24527
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''add_ref'''
+        FilePath:        'src/vm/internal/base/object.h'
+        FileOffset:      4129
+        Replacements:    []
+      - Message:         variable is referenced here
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      24527
+        Replacements:    []
+      - Message:         'expanded from macro ''add_ref'''
+        FilePath:        'src/vm/internal/base/object.h'
+        FileOffset:      4159
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "add_ref" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      24527
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-no-recursion
+    DiagnosticMessage:
+      Message:         'function ''add_objects_from_array'' is within a recursive call chain'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      24813
+      Replacements:    []
+    Notes:
+      - Message:         'example recursive call chain, starting from function ''add_objects_from_array'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      24813
+        Replacements:    []
+      - Message:         'Frame #1: function ''add_objects_from_array'' calls function ''add_objects_from_array'' here:'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      25230
+        Replacements:    []
+      - Message:         '... which was the starting point of the recursive call chain; there may be other cycles'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      25230
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''add_objects_from_array'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      24813
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "T_OBJECT" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      25361
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-assignment-in-if-condition
+    DiagnosticMessage:
+      Message:         'an assignment within an ''if'' condition is bug-prone'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      25379
+      Replacements:    []
+      Ranges:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          FileOffset:      25376
+          Length:          22
+    Notes:
+      - Message:         'if it should be an assignment, move it out of the ''if'' condition'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      25379
+        Replacements:    []
+      - Message:         'if it is meant to be an equality check, change ''='' to ''=='''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      25379
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-inc-dec-in-conditions
+    DiagnosticMessage:
+      Message:         'incrementing and referencing a variable in a complex condition can cause unintended side-effects due to C++''s order of evaluation, consider moving the modification outside of the condition to avoid misunderstandings'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      25824
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''add_ref'''
+        FilePath:        'src/vm/internal/base/object.h'
+        FileOffset:      4129
+        Replacements:    []
+      - Message:         variable is referenced here
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      25824
+        Replacements:    []
+      - Message:         'expanded from macro ''add_ref'''
+        FilePath:        'src/vm/internal/base/object.h'
+        FileOffset:      4159
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-no-recursion
+    DiagnosticMessage:
+      Message:         'function ''get_objects_from_array'' is within a recursive call chain'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      25935
+      Replacements:    []
+    Notes:
+      - Message:         'example recursive call chain, starting from function ''get_objects_from_array'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      25935
+        Replacements:    []
+      - Message:         'Frame #1: function ''get_objects_from_array'' calls function ''get_objects_from_array'' here:'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      26085
+        Replacements:    []
+      - Message:         '... which was the starting point of the recursive call chain; there may be other cycles'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      26085
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''get_objects_from_array'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      25935
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-inc-dec-in-conditions
+    DiagnosticMessage:
+      Message:         'incrementing and referencing a variable in a complex condition can cause unintended side-effects due to C++''s order of evaluation, consider moving the modification outside of the condition to avoid misunderstandings'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      26429
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''add_ref'''
+        FilePath:        'src/vm/internal/base/object.h'
+        FileOffset:      4129
+        Replacements:    []
+      - Message:         variable is referenced here
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      26429
+        Replacements:    []
+      - Message:         'expanded from macro ''add_ref'''
+        FilePath:        'src/vm/internal/base/object.h'
+        FileOffset:      4159
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-no-recursion
+    DiagnosticMessage:
+      Message:         'function ''find_uninited_objects'' is within a recursive call chain'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      26492
+      Replacements:    []
+    Notes:
+      - Message:         'example recursive call chain, starting from function ''find_uninited_objects'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      26492
+        Replacements:    []
+      - Message:         'Frame #1: function ''find_uninited_objects'' calls function ''find_uninited_objects'' here:'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      26851
+        Replacements:    []
+      - Message:         '... which was the starting point of the recursive call chain; there may be other cycles'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      26851
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''find_uninited_objects'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      26492
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-inc-dec-in-conditions
+    DiagnosticMessage:
+      Message:         'incrementing and referencing a variable in a complex condition can cause unintended side-effects due to C++''s order of evaluation, consider moving the modification outside of the condition to avoid misunderstandings'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      26757
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''add_ref'''
+        FilePath:        'src/vm/internal/base/object.h'
+        FileOffset:      4129
+        Replacements:    []
+      - Message:         variable is referenced here
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      26757
+        Replacements:    []
+      - Message:         'expanded from macro ''add_ref'''
+        FilePath:        'src/vm/internal/base/object.h'
+        FileOffset:      4159
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''add_hash_entry'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      26905
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      26905
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          26891
+          Length:          14
+          ReplacementText: 'auto '
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          26936
+          Length:          0
+          ReplacementText: ' -> hash_entry_t *'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''add_to_hash_table'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      28017
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''init_users'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      28903
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-assignment-in-if-condition
+    DiagnosticMessage:
+      Message:         'an assignment within an ''if'' condition is bug-prone'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      29264
+      Replacements:    []
+      Ranges:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          FileOffset:      29261
+          Length:          35
+    Notes:
+      - Message:         'if it should be an assignment, move it out of the ''if'' condition'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      29264
+        Replacements:    []
+      - Message:         'if it is meant to be an equality check, change ''='' to ''=='''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      29264
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-inc-dec-in-conditions
+    DiagnosticMessage:
+      Message:         'incrementing and referencing a variable in a complex condition can cause unintended side-effects due to C++''s order of evaluation, consider moving the modification outside of the condition to avoid misunderstandings'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      29489
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''add_ref'''
+        FilePath:        'src/vm/internal/base/object.h'
+        FileOffset:      4129
+        Replacements:    []
+      - Message:         variable is referenced here
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      29489
+        Replacements:    []
+      - Message:         'expanded from macro ''add_ref'''
+        FilePath:        'src/vm/internal/base/object.h'
+        FileOffset:      4159
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''add_nicknames'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      29642
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "mapping_node_t" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      29730
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''load_objects'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      29979
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-inc-dec-in-conditions
+    DiagnosticMessage:
+      Message:         'incrementing and referencing a variable in a complex condition can cause unintended side-effects due to C++''s order of evaluation, consider moving the modification outside of the condition to avoid misunderstandings'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      32226
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''add_ref'''
+        FilePath:        'src/vm/internal/base/object.h'
+        FileOffset:      4129
+        Replacements:    []
+      - Message:         variable is referenced here
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      32226
+        Replacements:    []
+      - Message:         'expanded from macro ''add_ref'''
+        FilePath:        'src/vm/internal/base/object.h'
+        FileOffset:      4159
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''get_single'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      32390
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      32390
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          32386
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          32414
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      32426
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  readability-identifier-naming
+    DiagnosticMessage:
+      Message:         'invalid case style for static constant ''answer'''
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      32436
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          32436
+          Length:          6
+          ReplacementText: _ANSWER
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          33373
+          Length:          6
+          ReplacementText: _ANSWER
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''unsigned int'' to signed type ''int'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      33416
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''unsigned int'' to signed type ''int'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      33464
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''query_the_short'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      33513
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      33513
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          33507
+          Length:          6
+          ReplacementText: 'auto '
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          33566
+          Length:          0
+          ReplacementText: ' -> char *'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-assignment-in-if-condition
+    DiagnosticMessage:
+      Message:         'an assignment within an ''if'' condition is bug-prone'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      33701
+      Replacements:    []
+      Ranges:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          FileOffset:      33697
+          Length:          51
+    Notes:
+      - Message:         'if it should be an assignment, move it out of the ''if'' condition'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      33701
+        Replacements:    []
+      - Message:         'if it is meant to be an equality check, change ''='' to ''=='''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      33701
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''strput_words'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      33895
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      33895
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          33889
+          Length:          6
+          ReplacementText: 'auto '
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          33958
+          Length:          0
+          ReplacementText: ' -> char *'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "size_t" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      34026
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          801
+          Length:          0
+          ReplacementText: "#include <cstddef>\n"
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "memcpy" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      34253
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''push_words'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      34326
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "push_malloced_string" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      34523
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''free_parser_error'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      34662
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''expand_node'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      34875
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "find_string_in_mapping" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      34985
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-no-recursion
+    DiagnosticMessage:
+      Message:         'function ''parse_obj'' is within a recursive call chain'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      35430
+      Replacements:    []
+    Notes:
+      - Message:         'example recursive call chain, starting from function ''parse_rule'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      77413
+        Replacements:    []
+      - Message:         'Frame #1: function ''parse_rule'' calls function ''parse_obj'' here:'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      78254
+        Replacements:    []
+      - Message:         'Frame #2: function ''parse_obj'' calls function ''parse_rule'' here:'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      36913
+        Replacements:    []
+      - Message:         '... which was the starting point of the recursive call chain; there may be other cycles'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      36913
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''parse_obj'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      35430
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-switch-missing-default-case
+    DiagnosticMessage:
+      Message:         switching on non-enum value without default case may not cover all cases
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      36096
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''long'' to signed type ''int'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      37534
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''int'' to signed type ''short'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      40027
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''int'' to signed type ''short'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      42516
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''long'' to signed type ''short'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      42968
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''make_error_message'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      43397
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      43452
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''process_answer'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      44788
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      44788
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          44784
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          44849
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "T_NUMBER" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      44901
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''parallel_process_answer'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      45855
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      45855
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          45851
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          45925
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''push_real_names'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      46762
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      46762
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          46758
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          46787
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      46831
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      46871
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "copy_and_push_string" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      46941
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''rule_string'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      47256
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      47256
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          47250
+          Length:          6
+          ReplacementText: 'auto '
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          47284
+          Length:          0
+          ReplacementText: ' -> char *'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      47324
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-no-recursion
+    DiagnosticMessage:
+      Message:         'function ''push_bitvec_as_array'' is within a recursive call chain'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      48331
+      Replacements:    []
+    Notes:
+      - Message:         'example recursive call chain, starting from function ''get_the_error'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      87772
+        Replacements:    []
+      - Message:         'Frame #1: function ''get_the_error'' calls function ''push_bitvec_as_array'' here:'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      88364
+        Replacements:    []
+      - Message:         'Frame #2: function ''push_bitvec_as_array'' calls function ''get_the_error'' here:'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      48954
+        Replacements:    []
+      - Message:         '... which was the starting point of the recursive call chain; there may be other cycles'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      48954
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''push_bitvec_as_array'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      48331
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "allocate_array" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      48753
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "push_refed_array" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      48828
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "assign_svalue_no_free" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      49014
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "const0u" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      49374
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-inc-dec-in-conditions
+    DiagnosticMessage:
+      Message:         'incrementing and referencing a variable in a complex condition can cause unintended side-effects due to C++''s order of evaluation, consider moving the modification outside of the condition to avoid misunderstandings'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      49492
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''add_ref'''
+        FilePath:        'src/vm/internal/base/object.h'
+        FileOffset:      4129
+        Replacements:    []
+      - Message:         variable is referenced here
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      49492
+        Replacements:    []
+      - Message:         'expanded from macro ''add_ref'''
+        FilePath:        'src/vm/internal/base/object.h'
+        FileOffset:      4159
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      49777
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''prefixes'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      49783
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''make_function'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      49957
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      49957
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          49953
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          50031
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-easily-swappable-parameters
+    DiagnosticMessage:
+      Message:         '2 adjacent parameters of ''make_function'' of similar type (''int'') are easily swapped by mistake'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      49993
+      Replacements:    []
+      Ranges:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          FileOffset:      49993
+          Length:          19
+    Notes:
+      - Message:         'the first parameter in the range is ''which'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      49997
+        Replacements:    []
+        Ranges:
+          - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+            FileOffset:      49997
+            Length:          5
+      - Message:         'the last parameter in the range is ''tryy'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      50008
+        Replacements:    []
+        Ranges:
+          - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+            FileOffset:      50008
+            Length:          4
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "push_shared_string" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      50427
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "share_and_push_string" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      50631
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "push_object" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      51949
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-branch-clone
+    DiagnosticMessage:
+      Message:         repeated branch body in conditional chain
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      52238
+      Replacements:    []
+    Notes:
+      - Message:         end of the original
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      52275
+        Replacements:    []
+      - Message:         clone 1 starts here
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      52322
+        Replacements:    []
+      - Message:         clone 2 starts here
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      52530
+        Replacements:    []
+      - Message:         clone 3 starts here
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      52717
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "push_number" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      52250
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      52922
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      53210
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''check_functions'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      53829
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      53829
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          53825
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          53881
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      53902
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-assignment-in-if-condition
+    DiagnosticMessage:
+      Message:         'an assignment within an ''if'' condition is bug-prone'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      53950
+      Replacements:    []
+      Ranges:
+        - FilePath:        ''
+          FileOffset:      0
+          Length:          0
+    Notes:
+      - Message:         'expanded from macro ''SET_OB'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      53777
+        Replacements:    []
+        Ranges:
+          - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+            FileOffset:      53774
+            Length:          8
+      - Message:         'if it should be an assignment, move it out of the ''if'' condition'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      53950
+        Replacements:    []
+      - Message:         'expanded from macro ''SET_OB'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      53777
+        Replacements:    []
+      - Message:         'if it is meant to be an equality check, change ''='' to ''=='''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      53950
+        Replacements:    []
+      - Message:         'expanded from macro ''SET_OB'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      53777
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-assignment-in-if-condition
+    DiagnosticMessage:
+      Message:         'an assignment within an ''if'' condition is bug-prone'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      54044
+      Replacements:    []
+      Ranges:
+        - FilePath:        ''
+          FileOffset:      0
+          Length:          0
+    Notes:
+      - Message:         'expanded from macro ''SET_OB'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      53777
+        Replacements:    []
+        Ranges:
+          - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+            FileOffset:      53774
+            Length:          8
+      - Message:         'if it should be an assignment, move it out of the ''if'' condition'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      54044
+        Replacements:    []
+      - Message:         'expanded from macro ''SET_OB'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      53777
+        Replacements:    []
+      - Message:         'if it is meant to be an equality check, change ''='' to ''=='''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      54044
+        Replacements:    []
+      - Message:         'expanded from macro ''SET_OB'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      53777
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''clear_parallel_errors'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      54706
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''use_last_parallel_error'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      54919
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      54919
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          54915
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          54964
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''save_last_parallel_error'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      55220
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      55220
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          55216
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          55252
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''parallel_check_functions'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      55593
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      55593
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          55589
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          55665
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      55686
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-assignment-in-if-condition
+    DiagnosticMessage:
+      Message:         'an assignment within an ''if'' condition is bug-prone'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      55796
+      Replacements:    []
+      Ranges:
+        - FilePath:        ''
+          FileOffset:      0
+          Length:          0
+    Notes:
+      - Message:         'expanded from macro ''SET_OB'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      53777
+        Replacements:    []
+        Ranges:
+          - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+            FileOffset:      53774
+            Length:          8
+      - Message:         'if it should be an assignment, move it out of the ''if'' condition'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      55796
+        Replacements:    []
+      - Message:         'expanded from macro ''SET_OB'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      53777
+        Replacements:    []
+      - Message:         'if it is meant to be an equality check, change ''='' to ''=='''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      55796
+        Replacements:    []
+      - Message:         'expanded from macro ''SET_OB'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      53777
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-assignment-in-if-condition
+    DiagnosticMessage:
+      Message:         'an assignment within an ''if'' condition is bug-prone'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      55896
+      Replacements:    []
+      Ranges:
+        - FilePath:        ''
+          FileOffset:      0
+          Length:          0
+    Notes:
+      - Message:         'expanded from macro ''SET_OB'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      53777
+        Replacements:    []
+        Ranges:
+          - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+            FileOffset:      53774
+            Length:          8
+      - Message:         'if it should be an assignment, move it out of the ''if'' condition'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      55896
+        Replacements:    []
+      - Message:         'expanded from macro ''SET_OB'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      53777
+        Replacements:    []
+      - Message:         'if it is meant to be an equality check, change ''='' to ''=='''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      55896
+        Replacements:    []
+      - Message:         'expanded from macro ''SET_OB'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      53777
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''singular_check_functions'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      56424
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-inc-dec-in-conditions
+    DiagnosticMessage:
+      Message:         'decrementing and referencing a variable in a complex condition can cause unintended side-effects due to C++''s order of evaluation, consider moving the modification outside of the condition to avoid misunderstandings'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      57028
+      Replacements:    []
+    Notes:
+      - Message:         variable is referenced here
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      57013
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "abort" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      57504
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          801
+          Length:          0
+          ReplacementText: "#include <stdlib.h>\n"
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''plural_check_functions'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      59736
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''cache_last_parallel_error'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      60595
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      60595
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          60591
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          60645
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''use_cached_parallel_error'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      60835
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      60835
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          60831
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          60903
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''dependent_check_functions'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      61115
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  performance-enum-size
+    DiagnosticMessage:
+      Message:         'enum ''(unnamed enum at /mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc:2441:1)'' uses a larger base type (''unsigned int'', size: 4 bytes) than necessary for its value set, consider using ''std::uint8_t'' (1 byte) as the base type to reduce its size'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      62220
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''check_one_relation'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      63196
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      63196
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          63192
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          63279
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''check_object_relations'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      65545
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-assignment-in-if-condition
+    DiagnosticMessage:
+      Message:         'an assignment within an ''if'' condition is bug-prone'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      68336
+      Replacements:    []
+      Ranges:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          FileOffset:      68321
+          Length:          40
+    Notes:
+      - Message:         'if it should be an assignment, move it out of the ''if'' condition'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      68336
+        Replacements:    []
+      - Message:         'if it is meant to be an equality check, change ''='' to ''=='''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      68336
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''we_are_finished'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      73034
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      73076
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-inc-dec-in-conditions
+    DiagnosticMessage:
+      Message:         'incrementing and referencing a variable in a complex condition can cause unintended side-effects due to C++''s order of evaluation, consider moving the modification outside of the condition to avoid misunderstandings'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      75681
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''add_ref'''
+        FilePath:        'src/vm/internal/base/object.h'
+        FileOffset:      4129
+        Replacements:    []
+      - Message:         variable is referenced here
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      75681
+        Replacements:    []
+      - Message:         'expanded from macro ''add_ref'''
+        FilePath:        'src/vm/internal/base/object.h'
+        FileOffset:      4159
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "sp" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      76170
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          835
+          Length:          0
+          ReplacementText: "#include \"vm/internal/base/interpret.h\"\n"
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''do_the_call'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      76389
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "CHECK_STACK_OVERFLOW" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      76644
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-inc-dec-in-conditions
+    DiagnosticMessage:
+      Message:         'incrementing and referencing a variable in a complex condition can cause unintended side-effects due to C++''s order of evaluation, consider moving the modification outside of the condition to avoid misunderstandings'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      76900
+      Replacements:    []
+    Notes:
+      - Message:         variable is referenced here
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      76928
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-no-recursion
+    DiagnosticMessage:
+      Message:         'function ''parse_rule'' is within a recursive call chain'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      77413
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''parse_rule'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      77413
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''int'' to signed type ''short'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      81301
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''check_literal'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      81848
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      81848
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          81844
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          81881
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''parse_rules'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      82117
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-assignment-in-if-condition
+    DiagnosticMessage:
+      Message:         'an assignment within an ''if'' condition is bug-prone'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      82456
+      Replacements:    []
+      Ranges:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          FileOffset:      82452
+          Length:          40
+    Notes:
+      - Message:         'if it should be an assignment, move it out of the ''if'' condition'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      82456
+        Replacements:    []
+      - Message:         'if it is meant to be an equality check, change ''='' to ''=='''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      82456
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''reset_error'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      82942
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-no-recursion
+    DiagnosticMessage:
+      Message:         'function ''parse_recurse'' is within a recursive call chain'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      83168
+      Replacements:    []
+    Notes:
+      - Message:         'example recursive call chain, starting from function ''parse_recurse'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      83168
+        Replacements:    []
+      - Message:         'Frame #1: function ''parse_recurse'' calls function ''parse_recurse'' here:'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      83718
+        Replacements:    []
+      - Message:         '... which was the starting point of the recursive call chain; there may be other cycles'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      83718
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''parse_recurse'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      83168
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-easily-swappable-parameters
+    DiagnosticMessage:
+      Message:         '2 adjacent parameters of ''parse_recurse'' of similar type (''char **'') are easily swapped by mistake'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      83182
+      Replacements:    []
+      Ranges:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          FileOffset:      83182
+          Length:          28
+    Notes:
+      - Message:         'the first parameter in the range is ''iwords'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      83189
+        Replacements:    []
+        Ranges:
+          - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+            FileOffset:      83189
+            Length:          6
+      - Message:         'the last parameter in the range is ''ostart'''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      83204
+        Replacements:    []
+        Ranges:
+          - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+            FileOffset:      83204
+            Length:          6
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      83229
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''long'' to signed type ''int'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      83394
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-assignment-in-if-condition
+    DiagnosticMessage:
+      Message:         'an assignment within an ''if'' condition is bug-prone'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      83467
+      Replacements:    []
+      Ranges:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          FileOffset:      83465
+          Length:          19
+    Notes:
+      - Message:         'if it should be an assignment, move it out of the ''if'' condition'
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      83467
+        Replacements:    []
+      - Message:         'if it is meant to be an equality check, change ''='' to ''=='''
+        FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+        FileOffset:      83467
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''long'' to signed type ''int'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      83696
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''long'' to signed type ''int'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      83823
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''long'' to signed type ''int'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      84150
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      84438
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''parse_sentence'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      84770
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      84808
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      84853
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      84903
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      84951
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "tolower" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      85413
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  readability-simplify-boolean-expr
+    DiagnosticMessage:
+      Message:         'boolean expression can be simplified by DeMorgan''s theorem'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      85682
+      Replacements:    []
+      Ranges:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          FileOffset:      85682
+          Length:          13
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-no-recursion
+    DiagnosticMessage:
+      Message:         'function ''get_the_error'' is within a recursive call chain'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      87772
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''get_the_error'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      87772
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      87772
+      Replacements:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          87762
+          Length:          10
+          ReplacementText: 'auto '
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          Offset:          87815
+          Length:          0
+          ReplacementText: ' -> svalue_t *'
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "push_undefined" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      88004
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "pop_stack" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      89066
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "st_num_arg" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      89629
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "STACK_INC" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      90142
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "T_ERROR_HANDLER" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      90166
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "free_string_svalue" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      90485
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "put_number" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      90513
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "const0" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      90802
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''LPC_INT'' (aka ''long'') to signed type ''int'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      90957
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "allocate_empty_array" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      91925
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "put_array" is directly included'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      92521
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      93455
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      93473
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''int'' to signed type ''short'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      95092
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''int'' to signed type ''short'' is implementation-defined'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      95122
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  readability-simplify-boolean-expr
+    DiagnosticMessage:
+      Message:         'boolean expression can be simplified by DeMorgan''s theorem'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      95531
+      Replacements:    []
+      Ranges:
+        - FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+          FileOffset:      95531
+          Length:          13
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use std::array<> instead'
+      FilePath:        '/mnt/c/Users/matsl/fluffos/src/packages/parser/parser.cc'
+      FileOffset:      95831
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+  - DiagnosticName:  clang-diagnostic-error
+    DiagnosticMessage:
+      Message:         '''event2/util.h'' file not found'
+      FilePath:        'src/base/internal/external_port.h'
+      FileOffset:      169
+      Replacements:    []
+      Ranges:
+        - FilePath:        'src/base/internal/external_port.h'
+          FileOffset:      169
+          Length:          15
+    Level:           Error
+    BuildDirectory:  '/mnt/c/Users/matsl/fluffos'
+...

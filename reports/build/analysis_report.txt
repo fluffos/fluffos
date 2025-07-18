@@ -1,0 +1,31 @@
+FluffOS Build Analysis Report
+==================================================
+
+Total Warnings: 658
+Total Errors: 0
+
+Files with warnings/errors:
+------------------------------
+/mnt/c/Users/matsl/fluffos/src/thirdparty/libwebsockets/lib/core-net/./private-lib-core-net.h: 77 warnings, 0 errors
+/mnt/c/Users/matsl/fluffos/src/thirdparty/libwebsockets/lib/core-net/./private-lib-core-net.h:191: 77 warnings, 0 errors
+/mnt/c/Users/matsl/fluffos/src/base/internal/tracing.h: 56 warnings, 0 errors
+/mnt/c/Users/matsl/fluffos/src/base/internal/tracing.h:177: 56 warnings, 0 errors
+/mnt/c/Users/matsl/fluffos/src/thirdparty/libevent/event.c: 17 warnings, 0 errors
+/mnt/c/Users/matsl/fluffos/src/thirdparty/libevent/event.c:2211: 10 warnings, 0 errors
+/mnt/c/Users/matsl/fluffos/src/thirdparty/libevent/http-internal.h: 6 warnings, 0 errors
+/mnt/c/Users/matsl/fluffos/src/compiler/internal/grammar.y: 5 warnings, 0 errors
+/usr/include/x86_64-linux-gnu/bits/string_fortified.h: 5 warnings, 0 errors
+/usr/include/x86_64-linux-gnu/bits/string_fortified.h:79: 5 warnings, 0 errors
+
+Recurring patterns:
+--------------------
+WARNING: ISO: 258 occurrences
+WARNING: extra: 168 occurrences
+WARNING: format: 51 occurrences
+WARNING: writing: 36 occurrences
+WARNING: empty: 18 occurrences
+WARNING: this: 18 occurrences
+WARNING: ‘__builtin_strcpy’: 15 occurrences
+WARNING: suggest: 12 occurrences
+WARNING: C++: 12 occurrences
+WARNING: ‘unsigned: 9 occurrences

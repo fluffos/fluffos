@@ -1,0 +1,20 @@
+file,location_hint,description,urgency,line_number
+vm/internal/simul_efun.cc,,init\_simul\_efun,URGENT,3
+vm/internal/simul_efun.cc,general portability issues,portability problems,URGENT,6
+documentation,documentation completion,complete docs/efun/contrib [packages/contrib],LOW,11
+documentation,efun functions,check efun::shadowp/efun::query_shadowing,LOW,12
+documentation,documentation expansion,expand docs for efun:implode (missing three arg form),LOW,13
+documentation,missing documentation,missing docs for efun::defer,LOW,14
+packages/contrib/contrib.cc,,make maximum number of ports configurable?,LOW,18
+packages/contrib/contrib.cc,,if yes look for possible buffer overflows!!!,LOW,19
+packages/contrib/contrib.cc,,rework code? uses goto,LOW,22
+packages/contrib/contrib.cc,,rename? there are different kind of string differences...,LOW,25
+packages/core/ed.cc,,missing 'check\_valid\_path(...)' for write operation with new api.,LOW,28
+packages/core/file.cc,lstat support,add support for 'lstat' if available,LOW,31
+packages/core/file.cc,,efun::get\_dir,LOW,32
+packages/core/file.cc,,efun::file\_size,LOW,33
+packages/core/file.cc,,efun::stat / new efun::lstat ?,LOW,34
+packages/core/file.cc,,remove master::valid\_link ?,LOW,35
+packages/core/file.cc,link dependency removal,alternative:,LOW,41
+path handling,path canonicalization,simplify handling of paths:,LOW,46
+vm/internal/simulate.cc,give_uid_to_object function,give_uid_to_object,LOW,54

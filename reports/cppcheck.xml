@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<results version="2">
+    <cppcheck version="2.13.0"/>
+    <errors>
+        <error id="missingInclude" severity="information" msg="Include file: &quot;base/package_api.h&quot; not found." verbose="Include file: &quot;base/package_api.h&quot; not found.">
+            <location file="src/packages/parser/parser.cc" line="23" column="0"/>
+        </error>
+        <error id="missingInclude" severity="information" msg="Include file: &quot;packages/parser/parser.h&quot; not found." verbose="Include file: &quot;packages/parser/parser.h&quot; not found.">
+            <location file="src/packages/parser/parser.cc" line="25" column="0"/>
+        </error>
+        <error id="missingInclude" severity="information" msg="Include file: &quot;packages/core/outbuf.h&quot; not found." verbose="Include file: &quot;packages/core/outbuf.h&quot; not found.">
+            <location file="src/packages/parser/parser.cc" line="26" column="0"/>
+        </error>
+        <error id="negativeIndex" severity="warning" msg="Either the condition &apos;indirect&gt;=0&apos; is redundant or the array &apos;matches[10]&apos; is accessed at index -1, which is out of bounds." verbose="Either the condition &apos;indirect&gt;=0&apos; is redundant or the array &apos;matches[10]&apos; is accessed at index -1, which is out of bounds." cwe="786" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2610" column="24" info="Negative array index"/>
+            <location file="src/packages/parser/parser.cc" line="2554" column="16" info="Assuming that condition &apos;indirect&gt;=0&apos; is not redundant"/>
+        </error>
+        <error id="negativeIndex" severity="warning" msg="Either the condition &apos;indirect&gt;=0&apos; is redundant or the array &apos;matches[10]&apos; is accessed at index -1, which is out of bounds." verbose="Either the condition &apos;indirect&gt;=0&apos; is redundant or the array &apos;matches[10]&apos; is accessed at index -1, which is out of bounds." cwe="786" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2613" column="30" info="Negative array index"/>
+            <location file="src/packages/parser/parser.cc" line="2554" column="16" info="Assuming that condition &apos;indirect&gt;=0&apos; is not redundant"/>
+        </error>
+        <error id="negativeIndex" severity="error" msg="Array &apos;starts[256]&apos; accessed at index starts[*][-1], which is out of bounds." verbose="Array &apos;starts[256]&apos; accessed at index starts[*][-1], which is out of bounds." cwe="786" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="3257" column="13" info="Negative array index"/>
+        </error>
+        <error id="badBitmaskCheck" severity="style" msg="Operator &apos;|&apos; with one operand equal to zero is redundant." verbose="Operator &apos;|&apos; with one operand equal to zero is redundant." cwe="571" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2500" column="16"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="374" column="21"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="375" column="12"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="395" column="15"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="526" column="7"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="660" column="22"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="1117" column="8"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="1142" column="8"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2187" column="7"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2828" column="19"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2844" column="13"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2845" column="26"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2846" column="19"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2872" column="14"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="3148" column="9"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="3225" column="16"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="3231" column="30"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="3233" column="33"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="3238" column="29"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="3248" column="28"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="3249" column="26"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="3250" column="25"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="3418" column="16"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="3517" column="18"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="3539" column="7"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="3638" column="18"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="3672" column="9"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="3683" column="17"/>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="3711" column="50"/>
+        </error>
+        <error id="redundantAssignment" severity="style" msg="Variable &apos;res&apos; is reassigned a value before the old one has been used." verbose="Variable &apos;res&apos; is reassigned a value before the old one has been used." cwe="563" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2493" column="7" info="res is overwritten"/>
+            <location file="src/packages/parser/parser.cc" line="2490" column="9" info="res is assigned"/>
+            <symbol>res</symbol>
+        </error>
+        <error id="redundantAssignment" severity="style" msg="Variable &apos;which&apos; is reassigned a value before the old one has been used." verbose="Variable &apos;which&apos; is reassigned a value before the old one has been used." cwe="563" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2774" column="14" info="which is overwritten"/>
+            <location file="src/packages/parser/parser.cc" line="2773" column="9" info="which is assigned"/>
+            <symbol>which</symbol>
+        </error>
+        <error id="duplicateAssignExpression" severity="style" msg="Same expression used in consecutive assignments of &apos;ordinal&apos; and &apos;ord2&apos;." verbose="Finding variables &apos;ordinal&apos; and &apos;ord2&apos; that are assigned the same expression is suspicious and might indicate a cut and paste or logic error. Please examine this code carefully to determine if it is correct." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2230" column="7"/>
+            <location file="src/packages/parser/parser.cc" line="2231" column="7"/>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;i&apos; can be reduced." verbose="The scope of the variable &apos;i&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="532" column="7"/>
+            <symbol>i</symbol>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;i&apos; can be reduced." verbose="The scope of the variable &apos;i&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="603" column="7"/>
+            <symbol>i</symbol>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;i&apos; can be reduced." verbose="The scope of the variable &apos;i&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="681" column="7"/>
+            <symbol>i</symbol>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;tok&apos; can be reduced." verbose="The scope of the variable &apos;tok&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="1881" column="7"/>
+            <symbol>tok</symbol>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;args&apos; can be reduced." verbose="The scope of the variable &apos;args&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2127" column="18"/>
+            <symbol>args</symbol>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;ob&apos; can be reduced." verbose="The scope of the variable &apos;ob&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2197" column="13"/>
+            <symbol>ob</symbol>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;func&apos; can be reduced." verbose="The scope of the variable &apos;func&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2198" column="8"/>
+            <symbol>func</symbol>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;tryy&apos; can be reduced." verbose="The scope of the variable &apos;tryy&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2199" column="7"/>
+            <symbol>tryy</symbol>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;args&apos; can be reduced." verbose="The scope of the variable &apos;args&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2199" column="22"/>
+            <symbol>args</symbol>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;use_indirect&apos; can be reduced." verbose="The scope of the variable &apos;use_indirect&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2530" column="7"/>
+            <symbol>use_indirect</symbol>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;func&apos; can be reduced." verbose="The scope of the variable &apos;func&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2738" column="8"/>
+            <symbol>func</symbol>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;p&apos; can be reduced." verbose="The scope of the variable &apos;p&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2739" column="9"/>
+            <symbol>p</symbol>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;tryy&apos; can be reduced." verbose="The scope of the variable &apos;tryy&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2741" column="7"/>
+            <symbol>tryy</symbol>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;args&apos; can be reduced." verbose="The scope of the variable &apos;args&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2741" column="13"/>
+            <symbol>args</symbol>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;n&apos; can be reduced." verbose="The scope of the variable &apos;n&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2857" column="10"/>
+            <symbol>n</symbol>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;tok&apos; can be reduced." verbose="The scope of the variable &apos;tok&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2895" column="7"/>
+            <symbol>tok</symbol>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;mp&apos; can be reduced." verbose="The scope of the variable &apos;mp&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2897" column="12"/>
+            <symbol>mp</symbol>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;h&apos; can be reduced." verbose="The scope of the variable &apos;h&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="3481" column="7"/>
+            <symbol>h</symbol>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;tokens&apos; can be reduced." verbose="The scope of the variable &apos;tokens&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="3570" column="7"/>
+            <symbol>tokens</symbol>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;h&apos; can be reduced." verbose="The scope of the variable &apos;h&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="3572" column="7"/>
+            <symbol>h</symbol>
+        </error>
+        <error id="shadowVariable" severity="style" msg="Local variable &apos;pi&apos; shadows outer variable" verbose="Local variable &apos;pi&apos; shadows outer variable" cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="519" column="17" info="Shadow variable"/>
+            <location file="src/packages/parser/parser.cc" line="51" column="22" info="Shadowed declaration"/>
+            <symbol>pi</symbol>
+        </error>
+        <error id="shadowVariable" severity="style" msg="Local variable &apos;pi&apos; shadows outer variable" verbose="Local variable &apos;pi&apos; shadows outer variable" cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="563" column="17" info="Shadow variable"/>
+            <location file="src/packages/parser/parser.cc" line="51" column="22" info="Shadowed declaration"/>
+            <symbol>pi</symbol>
+        </error>
+        <error id="shadowVariable" severity="style" msg="Local variable &apos;pi&apos; shadows outer variable" verbose="Local variable &apos;pi&apos; shadows outer variable" cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="1154" column="17" info="Shadow variable"/>
+            <location file="src/packages/parser/parser.cc" line="51" column="22" info="Shadowed declaration"/>
+            <symbol>pi</symbol>
+        </error>
+        <error id="shadowVariable" severity="style" msg="Local variable &apos;iwp&apos; shadows outer variable" verbose="Local variable &apos;iwp&apos; shadows outer variable" cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="3113" column="15" info="Shadow variable"/>
+            <location file="src/packages/parser/parser.cc" line="3079" column="10" info="Shadowed declaration"/>
+            <symbol>iwp</symbol>
+        </error>
+        <error id="shadowVariable" severity="style" msg="Local variable &apos;tokens&apos; shadows outer variable" verbose="Local variable &apos;tokens&apos; shadows outer variable" cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="3474" column="7" info="Shadow variable"/>
+            <location file="src/packages/parser/parser.cc" line="703" column="13" info="Shadowed declaration"/>
+            <symbol>tokens</symbol>
+        </error>
+        <error id="shadowVariable" severity="style" msg="Local variable &apos;tokens&apos; shadows outer variable" verbose="Local variable &apos;tokens&apos; shadows outer variable" cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="3570" column="7" info="Shadow variable"/>
+            <location file="src/packages/parser/parser.cc" line="703" column="13" info="Shadowed declaration"/>
+            <symbol>tokens</symbol>
+        </error>
+        <error id="constParameterPointer" severity="style" msg="Parameter &apos;ob&apos; can be declared as pointer to const" verbose="Parameter &apos;ob&apos; can be declared as pointer to const" cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="930" column="38" info="Parameter &apos;ob&apos; can be declared as pointer to const"/>
+            <symbol>ob</symbol>
+        </error>
+        <error id="constParameterPointer" severity="style" msg="Parameter &apos;sibling&apos; can be declared as pointer to const" verbose="Parameter &apos;sibling&apos; can be declared as pointer to const" cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="945" column="37" info="Parameter &apos;sibling&apos; can be declared as pointer to const"/>
+            <symbol>sibling</symbol>
+        </error>
+        <error id="constParameterPointer" severity="style" msg="Parameter &apos;ob&apos; can be declared as pointer to const" verbose="Parameter &apos;ob&apos; can be declared as pointer to const" cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="961" column="34" info="Parameter &apos;ob&apos; can be declared as pointer to const"/>
+            <symbol>ob</symbol>
+        </error>
+        <error id="constParameterPointer" severity="style" msg="Parameter &apos;map&apos; can be declared as pointer to const" verbose="Parameter &apos;map&apos; can be declared as pointer to const" cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="1212" column="38" info="Parameter &apos;map&apos; can be declared as pointer to const"/>
+            <symbol>map</symbol>
+        </error>
+        <error id="constVariablePointer" severity="style" msg="Variable &apos;last_adj&apos; can be declared as pointer to const" verbose="Variable &apos;last_adj&apos; can be declared as pointer to const" cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="1484" column="25" info="Variable &apos;last_adj&apos; can be declared as pointer to const"/>
+            <symbol>last_adj</symbol>
+        </error>
+        <error id="constParameterPointer" severity="style" msg="Parameter &apos;state&apos; can be declared as pointer to const" verbose="Parameter &apos;state&apos; can be declared as pointer to const" cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="1826" column="51" info="Parameter &apos;state&apos; can be declared as pointer to const"/>
+            <symbol>state</symbol>
+        </error>
+        <error id="constParameterPointer" severity="style" msg="Parameter &apos;vn&apos; can be declared as pointer to const" verbose="Parameter &apos;vn&apos; can be declared as pointer to const" cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="1879" column="39" info="Parameter &apos;vn&apos; can be declared as pointer to const"/>
+            <symbol>vn</symbol>
+        </error>
+        <error id="constVariablePointer" severity="style" msg="Variable &apos;mp&apos; can be declared as pointer to const" verbose="Variable &apos;mp&apos; can be declared as pointer to const" cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2897" column="12" info="Variable &apos;mp&apos; can be declared as pointer to const"/>
+            <symbol>mp</symbol>
+        </error>
+        <error id="unreadVariable" severity="style" msg="Variable &apos;ob&apos; is assigned a value that is never used." verbose="Variable &apos;ob&apos; is assigned a value that is never used." cwe="563" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2473" column="6"/>
+            <symbol>ob</symbol>
+        </error>
+        <error id="unreadVariable" severity="style" msg="Variable &apos;mp&apos; is assigned a value that is never used." verbose="Variable &apos;mp&apos; is assigned a value that is never used." cwe="563" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="2932" column="16"/>
+            <symbol>mp</symbol>
+        </error>
+        <error id="shadowVariable" severity="style" msg="Local variable &apos;p&apos; shadows outer variable" verbose="Local variable &apos;p&apos; shadows outer variable" cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="3120" column="13" info="Shadow variable"/>
+            <location file="src/packages/parser/parser.cc" line="3077" column="9" info="Shadowed declaration"/>
+            <symbol>p</symbol>
+        </error>
+        <error id="cstyleCast" severity="style" msg="C-style pointer casting" verbose="C-style pointer casting detected. C++ offers four different kinds of casts as replacements: static_cast, const_cast, dynamic_cast and reinterpret_cast. A C-style cast could evaluate to any of those automatically, thus it is considered safer if the programmer explicitly states which kind of cast is expected." cwe="398" file0="src/packages/parser/parser.cc">
+            <location file="src/packages/parser/parser.cc" line="155" column="24"/>
+        </error>
+        <error id="unusedFunction" severity="style" msg="The function &apos;parser_mark_verbs&apos; is never used." verbose="The function &apos;parser_mark_verbs&apos; is never used." cwe="561">
+            <location file="src/packages/parser/parser.cc" line="135" column="0"/>
+            <symbol>parser_mark_verbs</symbol>
+        </error>
+        <error id="unusedFunction" severity="style" msg="The function &apos;parser_mark&apos; is never used." verbose="The function &apos;parser_mark&apos; is never used." cwe="561">
+            <location file="src/packages/parser/parser.cc" line="205" column="0"/>
+            <symbol>parser_mark</symbol>
+        </error>
+        <error id="unusedFunction" severity="style" msg="The function &apos;f_parse_init&apos; is never used." verbose="The function &apos;f_parse_init&apos; is never used." cwe="561">
+            <location file="src/packages/parser/parser.cc" line="518" column="0"/>
+            <symbol>f_parse_init</symbol>
+        </error>
+        <error id="unusedFunction" severity="style" msg="The function &apos;f_parse_refresh&apos; is never used." verbose="The function &apos;f_parse_refresh&apos; is never used." cwe="561">
+            <location file="src/packages/parser/parser.cc" line="562" column="0"/>
+            <symbol>f_parse_refresh</symbol>
+        </error>
+        <error id="unusedFunction" severity="style" msg="The function &apos;parse_free&apos; is never used." verbose="The function &apos;parse_free&apos; is never used." cwe="561">
+            <location file="src/packages/parser/parser.cc" line="602" column="0"/>
+            <symbol>parse_free</symbol>
+        </error>
+        <error id="unusedFunction" severity="style" msg="The function &apos;mark_hash_entry&apos; is never used." verbose="The function &apos;mark_hash_entry&apos; is never used." cwe="561">
+            <location file="src/packages/parser/parser.cc" line="1128" column="0"/>
+            <symbol>mark_hash_entry</symbol>
+        </error>
+        <error id="unusedFunction" severity="style" msg="The function &apos;f_parse_sentence&apos; is never used." verbose="The function &apos;f_parse_sentence&apos; is never used." cwe="561">
+            <location file="src/packages/parser/parser.cc" line="3305" column="0"/>
+            <symbol>f_parse_sentence</symbol>
+        </error>
+        <error id="unusedFunction" severity="style" msg="The function &apos;f_parse_my_rules&apos; is never used." verbose="The function &apos;f_parse_my_rules&apos; is never used." cwe="561">
+            <location file="src/packages/parser/parser.cc" line="3383" column="0"/>
+            <symbol>f_parse_my_rules</symbol>
+        </error>
+        <error id="unusedFunction" severity="style" msg="The function &apos;f_parse_remove&apos; is never used." verbose="The function &apos;f_parse_remove&apos; is never used." cwe="561">
+            <location file="src/packages/parser/parser.cc" line="3449" column="0"/>
+            <symbol>f_parse_remove</symbol>
+        </error>
+        <error id="unusedFunction" severity="style" msg="The function &apos;f_parse_add_rule&apos; is never used." verbose="The function &apos;f_parse_add_rule&apos; is never used." cwe="561">
+            <location file="src/packages/parser/parser.cc" line="3473" column="0"/>
+            <symbol>f_parse_add_rule</symbol>
+        </error>
+        <error id="unusedFunction" severity="style" msg="The function &apos;f_parse_add_synonym&apos; is never used." verbose="The function &apos;f_parse_add_synonym&apos; is never used." cwe="561">
+            <location file="src/packages/parser/parser.cc" line="3565" column="0"/>
+            <symbol>f_parse_add_synonym</symbol>
+        </error>
+        <error id="unusedFunction" severity="style" msg="The function &apos;f_parse_dump&apos; is never used." verbose="The function &apos;f_parse_dump&apos; is never used." cwe="561">
+            <location file="src/packages/parser/parser.cc" line="3695" column="0"/>
+            <symbol>f_parse_dump</symbol>
+        </error>
+        <error id="checkersReport" severity="information" msg="Active checkers: 161/592 (use --checkers-report=&lt;filename&gt; to see details)" verbose="Active checkers: 161/592 (use --checkers-report=&lt;filename&gt; to see details)"/>
+    </errors>
+</results>

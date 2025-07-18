@@ -1,0 +1,3133 @@
+---
+MainSourceFile:  'C:\Users\matsl\fluffos\src/backend.cc'
+Diagnostics:
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         included header time.h is not used directly
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      480
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          480
+          Length:          18
+          ReplacementText: ''
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-deprecated-headers
+    DiagnosticMessage:
+      Message:         'inclusion of deprecated C++ header ''time.h''; consider using ''ctime'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      489
+      Replacements:    []
+    Notes:
+      - Message:         this fix will not be applied because it overlaps with another fix
+        FilePath:        ''
+        FileOffset:      0
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         included header types.h is not used directly
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      512
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          512
+          Length:          39
+          ReplacementText: ''
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         included header deque is not used directly
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      551
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          551
+          Length:          37
+          ReplacementText: ''
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         included header functional is not used directly
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      588
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          588
+          Length:          59
+          ReplacementText: ''
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         included header map is not used directly
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      647
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          647
+          Length:          59
+          ReplacementText: ''
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         included header utility is not used directly
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      706
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          706
+          Length:          47
+          ReplacementText: ''
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         included header reclaim.h is not used directly
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      832
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          832
+          Length:          35
+          ReplacementText: ''
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      1228
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''debug'''
+        FilePath:        'C:\Users\matsl\fluffos\src\base/internal/log.h'
+        FileOffset:      1415
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      1290
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''debug'''
+        FilePath:        'C:\Users\matsl\fluffos\src\base/internal/log.h'
+        FileOffset:      1415
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      1439
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''debug'''
+        FilePath:        'C:\Users\matsl\fluffos\src\base/internal/log.h'
+        FileOffset:      1415
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      1505
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''debug'''
+        FilePath:        'C:\Users\matsl\fluffos\src\base/internal/log.h'
+        FileOffset:      1415
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      1612
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          1600
+          Length:          12
+          ReplacementText: 'auto '
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          1626
+          Length:          0
+          ReplacementText: ' -> event_base *'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      2201
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          2197
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          2254
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "__RC_GAMETICK_MSEC__" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      2323
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          77
+          Length:          0
+          ReplacementText: "#include \"include/runtime_config.h\"\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      2378
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          2352
+          Length:          25
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          2405
+          Length:          0
+          ReplacementText: ' -> std::chrono::milliseconds'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      2642
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          2627
+          Length:          14
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          2660
+          Length:          0
+          ReplacementText: ' -> struct timeval'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  readability-identifier-naming
+    DiagnosticMessage:
+      Message:         'invalid case style for static constant ''val'''
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      2693
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          2693
+          Length:          3
+          ReplacementText: _VAL
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      4354
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          4343
+          Length:          11
+          ReplacementText: 'auto '
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          4424
+          Length:          0
+          ReplacementText: ' -> TickEvent *'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      4853
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          4842
+          Length:          11
+          ReplacementText: 'auto '
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          4975
+          Length:          0
+          ReplacementText: ' -> TickEvent *'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-const-correctness
+    DiagnosticMessage:
+      Message:         'variable ''i'' of type ''int'' can be declared ''const'''
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      5361
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          5365
+          Length:          0
+          ReplacementText: 'const '
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-internal-linkage
+    DiagnosticMessage:
+      Message:         'function ''call_remove_destructed_objects'' can be made static or moved into an anonymous namespace to enforce internal linkage'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      5652
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          5647
+          Length:          0
+          ReplacementText: 'static '
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "shutdownMudOS" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      7340
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          77
+          Length:          0
+          ReplacementText: "#include \"vm/internal/simulate.h\"\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "__TIME_TO_CLEAN_UP__" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      8034
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "object_t" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      8243
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          77
+          Length:          0
+          ReplacementText: "#include \"vm/internal/base/object.h\"\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "obj_list" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      8515
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  readability-redundant-casting
+    DiagnosticMessage:
+      Message:         'redundant explicit casting to the same type ''object_t *'' as the sub-expression, remove this casting'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      8586
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          8586
+          Length:          12
+          ReplacementText: ''
+    Notes:
+      - Message:         source type originates from referencing this variable
+        FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+        FileOffset:      8258
+        Replacements:    []
+        Ranges:
+          - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+            FileOffset:      8243
+            Length:          15
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "O_DESTRUCTED" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      8667
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  readability-redundant-casting
+    DiagnosticMessage:
+      Message:         'redundant explicit casting to the same type ''object_t *'' as the sub-expression, remove this casting'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      8804
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          8804
+          Length:          12
+          ReplacementText: ''
+    Notes:
+      - Message:         source type originates from referencing this variable
+        FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+        FileOffset:      8268
+        Replacements:    []
+        Ranges:
+          - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+            FileOffset:      8243
+            Length:          25
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "__RC_NO_RESETS__" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      9136
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "__RC_LAZY_RESETS__" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      9169
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "O_WILL_RESET" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      9293
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "O_RESET_STATE" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      9378
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      9406
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''debug'''
+        FilePath:        'C:\Users\matsl\fluffos\src\base/internal/log.h'
+        FileOffset:      1415
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "reset_object" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      9458
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "O_WILL_CLEAN_UP" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      10006
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''unsigned int'' to signed type ''int'' is implementation-defined'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      10065
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      10103
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''debug'''
+        FilePath:        'C:\Users\matsl\fluffos\src\base/internal/log.h'
+        FileOffset:      1415
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "O_CLONE" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      11012
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "set_eval" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      11053
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          77
+          Length:          0
+          ReplacementText: "#include \"vm/internal/eval_limit.h\"\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "max_eval_cost" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      11062
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "T_NUMBER" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      11186
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          77
+          Length:          0
+          ReplacementText: "#include \"vm/internal/base/svalue.h\"\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      11521
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''time_t'' (aka ''long long'') to signed type ''int'' is implementation-defined'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      11862
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''time_t'' (aka ''long long'') to signed type ''long'' is implementation-defined'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      12022
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''compile_av'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      12078
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''time_t'' (aka ''long long'') to signed type ''int'' is implementation-defined'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      12299
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''time_t'' (aka ''long long'') to signed type ''long'' is implementation-defined'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      12465
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      12516
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          12510
+          Length:          6
+          ReplacementText: 'auto '
+        - FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+          Offset:          12531
+          Length:          0
+          ReplacementText: ' -> char *'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\backend.cc'
+      FileOffset:      12543
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  clang-diagnostic-error
+    DiagnosticMessage:
+      Message:         '''config.h'' file not found'
+      FilePath:        'C:\Users\matsl\fluffos\src\base/internal/options_incl.h'
+      FileOffset:      378
+      Replacements:    []
+      Ranges:
+        - FilePath:        'C:\Users\matsl\fluffos\src\base/internal/options_incl.h'
+          FileOffset:      378
+          Length:          10
+    Level:           Error
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         included header memory is not used directly
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      729
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          729
+          Length:          48
+          ReplacementText: ''
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         included header vm.h is not used directly
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      1228
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          1228
+          Length:          19
+          ReplacementText: ''
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''get_user_command'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      1556
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      1556
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          1550
+          Length:          6
+          ReplacementText: 'auto '
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          1596
+          Length:          0
+          ReplacementText: ' -> char *'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''first_cmd_in_buf'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      1611
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      1611
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          1605
+          Length:          6
+          ReplacementText: 'auto '
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          1651
+          Length:          0
+          ReplacementText: ' -> char *'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''call_function_interactive'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      1664
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      1664
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          1660
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          1728
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''print_prompt'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      1742
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''receive_snoop'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      1958
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  readability-inconsistent-declaration-parameter-name
+    DiagnosticMessage:
+      Message:         'function ''receive_snoop'' has a definition with different parameter names'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      1958
+      Replacements:    []
+    Notes:
+      - Message:         the definition seen here
+        FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+        FileOffset:      42904
+        Replacements:    []
+      - Message:         'differing parameters are named here: (''ob''), in definition: (''snooper'')'
+        FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+        FileOffset:      1958
+        Replacements:
+          - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+            Offset:          2017
+            Length:          2
+            ReplacementText: snooper
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-easily-swappable-parameters
+    DiagnosticMessage:
+      Message:         '2 adjacent parameters of ''on_user_command'' of convertible types are easily swapped by mistake'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      2407
+      Replacements:    []
+      Ranges:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          FileOffset:      2407
+          Length:          30
+    Notes:
+      - Message:         'the first parameter in the range is ''fd'''
+        FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+        FileOffset:      2423
+        Replacements:    []
+        Ranges:
+          - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+            FileOffset:      2423
+            Length:          2
+      - Message:         'the last parameter in the range is ''what'''
+        FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+        FileOffset:      2433
+        Replacements:    []
+        Ranges:
+          - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+            FileOffset:      2433
+            Length:          4
+      - Message:         '''int'' and ''short'' may be implicitly converted'
+        FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+        FileOffset:      2427
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      2454
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''debug'''
+        FilePath:        'C:\Users\matsl\fluffos\src\base/internal/log.h'
+        FileOffset:      1415
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "set_eval" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      2850
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          123
+          Length:          0
+          ReplacementText: "#include \"vm/internal/eval_limit.h\"\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "max_eval_cost" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      2859
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "current_interactive" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      2977
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          123
+          Length:          0
+          ReplacementText: "#include \"vm/internal/base/machine.h\"\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      4357
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''debug'''
+        FilePath:        'C:\Users\matsl\fluffos\src\base/internal/log.h'
+        FileOffset:      1415
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "sockaddr" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      5361
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          729
+          Length:          0
+          ReplacementText: "#include <winsock2.h>\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      5427
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''debug'''
+        FilePath:        'C:\Users\matsl\fluffos\src\base/internal/log.h'
+        FileOffset:      1415
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "IPPROTO_TCP" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      5721
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "TCP_NODELAY" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      5734
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      5886
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''debug'''
+        FilePath:        'C:\Users\matsl\fluffos\src\base/internal/log.h'
+        FileOffset:      1415
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  readability-else-after-return
+    DiagnosticMessage:
+      Message:         'do not use ''else'' after ''return'''
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      6270
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      6919
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''debug'''
+        FilePath:        'C:\Users\matsl\fluffos\src\base/internal/log.h'
+        FileOffset:      1415
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-internal-linkage
+    DiagnosticMessage:
+      Message:         'function ''new_user'' can be made static or moved into an anonymous namespace to enforce internal linkage'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      7054
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          7039
+          Length:          0
+          ReplacementText: 'static '
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      7054
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          7039
+          Length:          15
+          ReplacementText: 'auto '
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          7162
+          Length:          0
+          ReplacementText: ' -> interactive_t *'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "master_ob" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      7308
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          123
+          Length:          0
+          ReplacementText: "#include \"vm/internal/master.h\"\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''long long'' to signed type ''int'' is implementation-defined'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      7458
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "set_command_giver" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      7919
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          123
+          Length:          0
+          ReplacementText: "#include \"vm/internal/base/object.h\"\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "O_ONCE_INTERACTIVE" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      7971
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "svalue_t" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      8306
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          123
+          Length:          0
+          ReplacementText: "#include \"vm/internal/base/svalue.h\"\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "add_ref" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      8346
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "push_number" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      8380
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  performance-no-int-to-ptr
+    DiagnosticMessage:
+      Message:         integer to pointer cast pessimizes optimization opportunities
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      8655
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "T_OBJECT" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      8686
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "free_object" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      9428
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "O_DESTRUCTED" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      10006
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      10222
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          10217
+          Length:          4
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          10238
+          Length:          0
+          ReplacementText: ' -> bool'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "socket" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      10518
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "AF_INET" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      10525
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "SOCK_STREAM" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      10534
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      10800
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''debug'''
+        FilePath:        'C:\Users\matsl\fluffos\src\base/internal/log.h'
+        FileOffset:      1415
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      11055
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''debug'''
+        FilePath:        'C:\Users\matsl\fluffos\src\base/internal/log.h'
+        FileOffset:      1415
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "SOL_SOCKET" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      11303
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "SO_KEEPALIVE" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      11315
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "__MUD_LIB_DIR__" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      12318
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          123
+          Length:          0
+          ReplacementText: "#include \"include/runtime_config.h\"\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "addrinfo" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      13165
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      13187
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "NI_MAXSERV" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      13200
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "AI_PASSIVE" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      13568
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "AI_NUMERICSERV" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      13581
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "__MUD_IP__" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      13645
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "bind" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      14013
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''size_t'' (aka ''unsigned long long'') to signed type ''int'' is implementation-defined'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      14036
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''shadow_catch_message'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      16517
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      16517
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          16513
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          16568
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "__RC_INTERACTIVE_CATCH_TELL__" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      16588
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "current_object" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      16733
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "copy_and_push_string" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      16808
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-no-recursion
+    DiagnosticMessage:
+      Message:         'function ''add_message'' is within a recursive call chain'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      17155
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "__RC_NONINTERACTIVE_STDERR_WRITE__" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      17443
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "__RC_SNOOP_SHADOWED__" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      18610
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      18937
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      19574
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          19570
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          19606
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      19674
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''debug'''
+        FilePath:        'C:\Users\matsl\fluffos\src\base/internal/log.h'
+        FileOffset:      1415
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      21404
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      21465
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''debug'''
+        FilePath:        'C:\Users\matsl\fluffos\src\base/internal/log.h'
+        FileOffset:      1415
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''unsigned long long'' to signed type ''int'' is implementation-defined'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      21742
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      22631
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''debug'''
+        FilePath:        'C:\Users\matsl\fluffos\src\base/internal/log.h'
+        FileOffset:      1415
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      22788
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''debug'''
+        FilePath:        'C:\Users\matsl\fluffos\src\base/internal/log.h'
+        FileOffset:      1415
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-switch-missing-default-case
+    DiagnosticMessage:
+      Message:         switching on non-enum value without default case may not cover all cases
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      23252
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''u_long'' (aka ''unsigned long'') to signed type ''int'' is implementation-defined'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      24358
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "ntohl" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      24358
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "restore_svalue" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      24628
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "STACK_INC" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      24685
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "sp" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      24709
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          123
+          Length:          0
+          ReplacementText: "#include \"vm/internal/base/interpret.h\"\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "push_undefined" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      24752
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''long long'' to signed type ''int'' is implementation-defined'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      25242
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "push_malloced_string" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      25513
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "buffer_t" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      25851
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          123
+          Length:          0
+          ReplacementText: "#include \"vm/internal/base/buffer.h\"\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "allocate_buffer" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      25885
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "push_refed_buffer" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      25964
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-no-recursion
+    DiagnosticMessage:
+      Message:         'function ''clean_buf'' is within a recursive call chain'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      26118
+      Replacements:    []
+    Notes:
+      - Message:         'example recursive call chain, starting from function ''clean_buf'''
+        FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+        FileOffset:      26118
+        Replacements:    []
+      - Message:         'Frame #1: function ''clean_buf'' calls function ''clean_buf'' here:'
+        FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+        FileOffset:      26839
+        Replacements:    []
+      - Message:         '... which was the starting point of the recursive call chain; there may be other cycles'
+        FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+        FileOffset:      26839
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''clean_buf'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      26118
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      26118
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          26114
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          26146
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''long long'' to signed type ''int'' is implementation-defined'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      26750
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''unsigned char'' to signed type ''char'' is implementation-defined'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      28917
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "__RC_NO_ANSI__" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      29076
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "__RC_STRIP_BEFORE_PROCESS_INPUT__" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      29106
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''unsigned char'' to signed type ''char'' is implementation-defined'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      29298
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      29359
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          29355
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          29388
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''first_cmd_in_buf'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      29788
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      29788
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          29782
+          Length:          6
+          ReplacementText: 'auto '
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          29823
+          Length:          0
+          ReplacementText: ' -> char *'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      29846
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''get_user_command'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      31092
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      31092
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          31086
+          Length:          6
+          ReplacementText: 'auto '
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          31127
+          Length:          0
+          ReplacementText: ' -> char *'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      31527
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''debug'''
+        FilePath:        'C:\Users\matsl\fluffos\src\base/internal/log.h'
+        FileOffset:      1415
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "save_command_giver" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      31606
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "command_giver" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      31749
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''escape_command'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      31916
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      31916
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          31912
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          31975
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''process_input'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      32271
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  readability-simplify-boolean-expr
+    DiagnosticMessage:
+      Message:         'boolean expression can be simplified by DeMorgan''s theorem'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      32735
+      Replacements:    []
+      Ranges:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          FileOffset:      32735
+          Length:          28
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "T_STRING" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      32946
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "T_NUMBER" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      33164
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      33517
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          33513
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          33556
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-assignment-in-if-condition
+    DiagnosticMessage:
+      Message:         'an assignment within an ''if'' condition is bug-prone'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      33735
+      Replacements:    []
+      Ranges:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          FileOffset:      33722
+          Length:          35
+    Notes:
+      - Message:         'if it should be an assignment, move it out of the ''if'' condition'
+        FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+        FileOffset:      33735
+        Replacements:    []
+      - Message:         'if it is meant to be an equality check, change ''='' to ''=='''
+        FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+        FileOffset:      33735
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      34052
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''debug'''
+        FilePath:        'C:\Users\matsl\fluffos\src\base/internal/log.h'
+        FileOffset:      1415
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-signed-char-misuse
+    DiagnosticMessage:
+      Message:         '''signed char'' to ''int'' conversion; consider casting to ''unsigned char'' first.'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      34625
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  readability-simplify-boolean-expr
+    DiagnosticMessage:
+      Message:         'boolean expression can be simplified by DeMorgan''s theorem'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      34908
+      Replacements:    []
+      Ranges:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          FileOffset:      34908
+          Length:          28
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "restore_command_giver" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      35733
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      36411
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''debug'''
+        FilePath:        'C:\Users\matsl\fluffos\src\base/internal/log.h'
+        FileOffset:      1415
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "O_SNOOP" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      37042
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''print_prompt'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      42311
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  readability-simplify-boolean-expr
+    DiagnosticMessage:
+      Message:         'boolean expression can be simplified by DeMorgan''s theorem'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      42369
+      Replacements:    []
+      Ranges:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          FileOffset:      42369
+          Length:          21
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-branch-clone
+    DiagnosticMessage:
+      Message:         repeated branch body in conditional chain
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      42508
+      Replacements:    []
+    Notes:
+      - Message:         end of the original
+        FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+        FileOffset:      42570
+        Replacements:    []
+      - Message:         clone 1 starts here
+        FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+        FileOffset:      42611
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "tell_object" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      42514
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          123
+          Length:          0
+          ReplacementText: "#include \"vm/internal/simulate.h\"\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''size_t'' (aka ''unsigned long long'') to signed type ''int'' is implementation-defined'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      42546
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''size_t'' (aka ''unsigned long long'') to signed type ''int'' is implementation-defined'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      42649
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''size_t'' (aka ''unsigned long long'') to signed type ''int'' is implementation-defined'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      42826
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-no-recursion
+    DiagnosticMessage:
+      Message:         'function ''receive_snoop'' is within a recursive call chain'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      42904
+      Replacements:    []
+    Notes:
+      - Message:         'example recursive call chain, starting from function ''add_message'''
+        FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+        FileOffset:      17155
+        Replacements:    []
+      - Message:         'Frame #1: function ''add_message'' calls function ''receive_snoop'' here:'
+        FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+        FileOffset:      18642
+        Replacements:    []
+      - Message:         'expanded from macro ''handle_snoop'''
+        FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+        FileOffset:      1902
+        Replacements:    []
+      - Message:         'Frame #2: function ''receive_snoop'' calls function ''add_message'' here:'
+        FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+        FileOffset:      43343
+        Replacements:    []
+      - Message:         '... which was the starting point of the recursive call chain; there may be other cycles'
+        FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+        FileOffset:      43343
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''receive_snoop'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      42904
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "__RC_RECEIVE_SNOOP__" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      43029
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-no-recursion
+    DiagnosticMessage:
+      Message:         'function ''new_set_snoop'' is within a recursive call chain'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      43924
+      Replacements:    []
+    Notes:
+      - Message:         'example recursive call chain, starting from function ''new_set_snoop'''
+        FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+        FileOffset:      43924
+        Replacements:    []
+      - Message:         'Frame #1: function ''new_set_snoop'' calls function ''new_set_snoop'' here:'
+        FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+        FileOffset:      44848
+        Replacements:    []
+      - Message:         '... which was the starting point of the recursive call chain; there may be other cycles'
+        FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+        FileOffset:      44848
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      43924
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          43920
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          43969
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "error" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      44186
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      45063
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          45057
+          Length:          6
+          ReplacementText: 'auto '
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          45080
+          Length:          0
+          ReplacementText: ' -> char *'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      45092
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "gethostname" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      45111
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      45272
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          45262
+          Length:          10
+          ReplacementText: 'auto '
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          45297
+          Length:          0
+          ReplacementText: ' -> object_t *'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      45421
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          45411
+          Length:          10
+          ReplacementText: 'auto '
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          45449
+          Length:          0
+          ReplacementText: ' -> object_t *'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      45715
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          45711
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          45739
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-narrowing-conversions
+    DiagnosticMessage:
+      Message:         'narrowing conversion from ''time_t'' (aka ''long long'') to signed type ''int'' is implementation-defined'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      45837
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-internal-linkage
+    DiagnosticMessage:
+      Message:         'function ''sockaddr_to_string'' can be made static or moved into an anonymous namespace to enforce internal linkage'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      45922
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          45910
+          Length:          0
+          ReplacementText: 'static '
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      45922
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          45910
+          Length:          12
+          ReplacementText: 'auto '
+        - FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+          Offset:          45977
+          Length:          0
+          ReplacementText: ' -> const char *'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      45989
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "NI_MAXHOST" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      46001
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      46030
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "NI_NUMERICHOST" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      46191
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "NI_NUMERICSERV" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      46208
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\comm.cc'
+      FileOffset:      46243
+      Replacements:    []
+    Notes:
+      - Message:         'expanded from macro ''debug'''
+        FilePath:        'C:\Users\matsl\fluffos\src\base/internal/log.h'
+        FileOffset:      1415
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\main.cc'
+      FileOffset:      34
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\main.cc'
+          Offset:          30
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\main.cc'
+          Offset:          68
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\main.cc'
+      FileOffset:      76
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\main.cc'
+          Offset:          72
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\main.cc'
+          Offset:          103
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         included header cstddef is not used directly
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      176
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          176
+          Length:          34
+          ReplacementText: ''
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-deprecated-headers
+    DiagnosticMessage:
+      Message:         'inclusion of deprecated C++ header ''time.h''; consider using ''ctime'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      507
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          507
+          Length:          8
+          ReplacementText: '<ctime>'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-const-correctness
+    DiagnosticMessage:
+      Message:         'variable ''buf'' of type ''char[256]'' can be declared ''const'''
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      2426
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          2431
+          Length:          0
+          ReplacementText: 'const '
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      2426
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "push_constant_string" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      3576
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          22
+          Length:          0
+          ReplacementText: "#include \"vm/internal/base/machine.h\"\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "push_undefined" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      3630
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "outoftime" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      3891
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          22
+          Length:          0
+          ReplacementText: "#include \"vm/internal/eval_limit.h\"\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-const-correctness
+    DiagnosticMessage:
+      Message:         'variable ''st'' of type ''StackTrace'' can be declared ''const'''
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      4056
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          4074
+          Length:          0
+          ReplacementText: 'const '
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-switch-missing-default-case
+    DiagnosticMessage:
+      Message:         switching on non-enum value without default case may not cover all cases
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      4140
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "std::string" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      4675
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          90
+          Length:          0
+          ReplacementText: "#include <string>\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-unused-local-non-trivial-variable
+    DiagnosticMessage:
+      Message:         'unused local variable ''current_locale'' of type ''std::string'' (aka ''basic_string<char, char_traits<char>, allocator<char>>'')'
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      4682
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "std::tolower" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      4865
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          45
+          Length:          0
+          ReplacementText: "#include <cctype>\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      5268
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          5256
+          Length:          11
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          5321
+          Length:          0
+          ReplacementText: ' -> std::string'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-easily-swappable-parameters
+    DiagnosticMessage:
+      Message:         '2 adjacent parameters of ''get_argument'' of convertible types are easily swapped by mistake'
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      5281
+      Replacements:    []
+      Ranges:
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          FileOffset:      5281
+          Length:          26
+    Notes:
+      - Message:         'the first parameter in the range is ''pos'''
+        FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+        FileOffset:      5294
+        Replacements:    []
+        Ranges:
+          - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+            FileOffset:      5294
+            Length:          3
+      - Message:         'the last parameter in the range is ''argc'''
+        FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+        FileOffset:      5303
+        Replacements:    []
+        Ranges:
+          - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+            FileOffset:      5303
+            Length:          4
+      - Message:         '''unsigned int'' and ''int'' may be implicitly converted'
+        FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+        FileOffset:      5299
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-internal-linkage
+    DiagnosticMessage:
+      Message:         'function ''init_win32'' can be made static or moved into an anonymous namespace to enforce internal linkage'
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      5531
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          5526
+          Length:          0
+          ReplacementText: 'static '
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "WSADATA" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      5562
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          44
+          Length:          0
+          ReplacementText: "#include <winsock.h>\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-const-correctness
+    DiagnosticMessage:
+      Message:         'variable ''err'' of type ''int'' can be declared ''const'''
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      5582
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          5586
+          Length:          0
+          ReplacementText: 'const '
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "WSAStartup" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      5592
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "SetConsoleOutputCP" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      5858
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          44
+          Length:          0
+          ReplacementText: "#include <consoleapi2.h>\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-internal-linkage
+    DiagnosticMessage:
+      Message:         'function ''init_main'' can be made static or moved into an anonymous namespace to enforce internal linkage'
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      5914
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          5895
+          Length:          0
+          ReplacementText: 'static '
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      5914
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          5895
+          Length:          19
+          ReplacementText: 'auto '
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          5953
+          Length:          0
+          ReplacementText: ' -> struct event_base *'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "__MUD_LIB_DIR__" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      6123
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          22
+          Length:          0
+          ReplacementText: "#include \"include/runtime_config.h\"\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-signal-handler
+    DiagnosticMessage:
+      Message:         'functions without C linkage are not allowed as signal handler (until C++17)'
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      6583
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-signal-handler
+    DiagnosticMessage:
+      Message:         'functions without C linkage are not allowed as signal handler (until C++17)'
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      6619
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      7049
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          7045
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          7083
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      7092
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          7088
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          7126
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-const-correctness
+    DiagnosticMessage:
+      Message:         'variable ''sh'' of type ''backward::SignalHandling'' can be declared ''const'''
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      7532
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          7557
+          Length:          0
+          ReplacementText: 'const '
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "strcmp" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      7881
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          90
+          Length:          0
+          ReplacementText: "#include <cstring>\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-switch-missing-default-case
+    DiagnosticMessage:
+      Message:         switching on non-enum value without default case may not cover all cases
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      8474
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  readability-identifier-naming
+    DiagnosticMessage:
+      Message:         'invalid case style for variable ''_tracer'''
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      9572
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          9572
+          Length:          7
+          ReplacementText: tracer
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  performance-no-int-to-ptr
+    DiagnosticMessage:
+      Message:         integer to pointer cast pessimizes optimization opportunities
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      9912
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "MudOS_is_being_shut_down" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+      FileOffset:      9948
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\mainlib.cc'
+          Offset:          22
+          Length:          0
+          ReplacementText: "#include \"vm/internal/simulate.h\"\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         included header vm.h is not used directly
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      43
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          43
+          Length:          19
+          ReplacementText: ''
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         included header vector is not used directly
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      187
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          187
+          Length:          18
+          ReplacementText: ''
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-using
+    DiagnosticMessage:
+      Message:         'use ''using'' instead of ''typedef'''
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      206
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          206
+          Length:          26
+          ReplacementText: 'using BYTE = unsigned char'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'function ''is_base64'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      381
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      381
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          376
+          Length:          4
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          398
+          Length:          0
+          ReplacementText: ' -> bool'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-internal-linkage
+    DiagnosticMessage:
+      Message:         'function ''base64_encode'' can be made static or moved into an anonymous namespace to enforce internal linkage'
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      465
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          453
+          Length:          0
+          ReplacementText: 'static '
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      465
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          453
+          Length:          11
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          516
+          Length:          0
+          ReplacementText: ' -> std::string'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      566
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      590
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-internal-linkage
+    DiagnosticMessage:
+      Message:         'function ''base64_decode'' can be made static or moved into an anonymous namespace to enforce internal linkage'
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      1555
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          1537
+          Length:          0
+          ReplacementText: 'static '
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      1555
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-avoid-c-arrays
+    DiagnosticMessage:
+      Message:         'do not declare C-style arrays, use ''std::array'' instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      1686
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-internal-linkage
+    DiagnosticMessage:
+      Message:         'function ''type_2_name'' can be made static or moved into an anonymous namespace to enforce internal linkage'
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      2813
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          2801
+          Length:          0
+          ReplacementText: 'static '
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      2813
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          2801
+          Length:          11
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          2834
+          Length:          0
+          ReplacementText: ' -> std::string'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-internal-linkage
+    DiagnosticMessage:
+      Message:         'function ''name_2_type'' can be made static or moved into an anonymous namespace to enforce internal linkage'
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      3234
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          3230
+          Length:          0
+          ReplacementText: 'static '
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      3234
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          3230
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          3269
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  readability-else-after-return
+    DiagnosticMessage:
+      Message:         'do not use ''else'' after ''return'''
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      3339
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          3339
+          Length:          485
+          ReplacementText: "if (name == \"number\") {\n        return T_NUMBER;\n        } else if (name == \"float\") {\n        return T_REAL;\n        } else if (name == \"array\") {\n        return T_ARRAY;\n        } else if (name == \"class\") {\n        return T_CLASS;\n        } else if (name == \"mapping\") {\n        return T_MAPPING;\n        } else if (name == \"object\") {\n        return T_OBJECT;\n        } else if (name == \"buffer\") {\n        return T_BUFFER;\n        } else {\n        return T_INVALID;\n        }"
+      Ranges:
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          FileOffset:      3339
+          Length:          4
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-internal-linkage
+    DiagnosticMessage:
+      Message:         'function ''svalue_to_json_recurse'' can be made static or moved into an anonymous namespace to enforce internal linkage'
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      3843
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          3828
+          Length:          0
+          ReplacementText: 'static '
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      3843
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-internal-linkage
+    DiagnosticMessage:
+      Message:         'function ''svalue_from_json_recurse'' can be made static or moved into an anonymous namespace to enforce internal linkage'
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      5279
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          5270
+          Length:          0
+          ReplacementText: 'static '
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      5279
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          5270
+          Length:          8
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          5321
+          Length:          0
+          ReplacementText: ' -> svalue_t'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "LPC_INT" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      5600
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          43
+          Length:          0
+          ReplacementText: "#include \"vm/internal/base/number.h\"\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "LPC_FLOAT" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      5790
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-const-correctness
+    DiagnosticMessage:
+      Message:         'variable ''i'' of type ''int'' can be declared ''const'''
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      6915
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          6919
+          Length:          0
+          ReplacementText: 'const '
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "mkmapping" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      7388
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          43
+          Length:          0
+          ReplacementText: "#include \"vm/internal/base/machine.h\"\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         'no header providing "free_array" is directly included'
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      7427
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          43
+          Length:          0
+          ReplacementText: "#include \"vm/internal/base/array.h\"\n"
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      8007
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  readability-convert-member-functions-to-static
+    DiagnosticMessage:
+      Message:         'method ''to_json'' can be made static'
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      8007
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          7985
+          Length:          0
+          ReplacementText: 'static '
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-unused-local-non-trivial-variable
+    DiagnosticMessage:
+      Message:         'unused local variable ''ifs'' of type ''std::stringstream'' (aka ''basic_stringstream<char, char_traits<char>, allocator<char>>'')'
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      8373
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-unused-local-non-trivial-variable
+    DiagnosticMessage:
+      Message:         'unused local variable ''name'' of type ''std::string'' (aka ''basic_string<char, char_traits<char>, allocator<char>>'')'
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      8815
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  bugprone-unused-local-non-trivial-variable
+    DiagnosticMessage:
+      Message:         'unused local variable ''value'' of type ''std::string'' (aka ''basic_string<char, char_traits<char>, allocator<char>>'')'
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      8859
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      9341
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          9322
+          Length:          11
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+          Offset:          9351
+          Length:          0
+          ReplacementText: ' -> std::string'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  readability-convert-member-functions-to-static
+    DiagnosticMessage:
+      Message:         'method ''to_ofile'' can be made static'
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      9341
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\ofile.h'
+          Offset:          392
+          Length:          0
+          ReplacementText: 'static '
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-equals-default
+    DiagnosticMessage:
+      Message:         'use ''= default'' to define a trivial destructor'
+      FilePath:        'C:\Users\matsl\fluffos\src\ofile.cc'
+      FileOffset:      9681
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         included header std.h is not used directly
+      FilePath:        'C:\Users\matsl\fluffos\src\portbind.cc'
+      FileOffset:      46
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\portbind.cc'
+          Offset:          46
+          Length:          22
+          ReplacementText: ''
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\portbind.cc'
+      FileOffset:      635
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\portbind.cc'
+          Offset:          631
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\portbind.cc'
+          Offset:          662
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-const-correctness
+    DiagnosticMessage:
+      Message:         'variable ''optval'' of type ''int'' can be declared ''const'''
+      FilePath:        'C:\Users\matsl\fluffos\src\portbind.cc'
+      FileOffset:      796
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\portbind.cc'
+          Offset:          800
+          Length:          0
+          ReplacementText: 'const '
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         included header fcntl.h is not used directly
+      FilePath:        'C:\Users\matsl\fluffos\src\symbol.cc'
+      FileOffset:      57
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\symbol.cc'
+          Offset:          57
+          Length:          19
+          ReplacementText: ''
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''out'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\symbol.cc'
+      FileOffset:      177
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''enable'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\symbol.cc'
+      FileOffset:      204
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-internal-linkage
+    DiagnosticMessage:
+      Message:         'variable ''symbol_dir'' can be made static or moved into an anonymous namespace to enforce internal linkage'
+      FilePath:        'C:\Users\matsl\fluffos\src\symbol.cc'
+      FileOffset:      229
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\symbol.cc'
+          Offset:          217
+          Length:          0
+          ReplacementText: 'static '
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  clang-diagnostic-deprecated-declarations
+    DiagnosticMessage:
+      Message:         '''fopen'' is deprecated: This function or variable may be unsafe. Consider using fopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.'
+      FilePath:        'C:\Users\matsl\fluffos\src\symbol.cc'
+      FileOffset:      723
+      Replacements:    []
+    Notes:
+      - Message:         '''fopen'' has been explicitly marked deprecated here'
+        FilePath:        'C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\stdio.h'
+        FileOffset:      5459
+        Replacements:    []
+      - Message:         'expanded from macro ''_CRT_INSECURE_DEPRECATE'''
+        FilePath:        'C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.42.34433\include\vcruntime.h'
+        FileOffset:      9809
+        Replacements:    []
+      - Message:         'expanded from macro ''_CRT_DEPRECATE_TEXT'''
+        FilePath:        'C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.42.34433\include\vcruntime.h'
+        FileOffset:      9477
+        Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         included header utility is not used directly
+      FilePath:        'C:\Users\matsl\fluffos\src\user.cc'
+      FileOffset:      247
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\user.cc'
+          Offset:          247
+          Length:          19
+          ReplacementText: ''
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         included header vector is not used directly
+      FilePath:        'C:\Users\matsl\fluffos\src\user.cc'
+      FileOffset:      266
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\user.cc'
+          Offset:          266
+          Length:          33
+          ReplacementText: ''
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-include-cleaner
+    DiagnosticMessage:
+      Message:         included header vm.h is not used directly
+      FilePath:        'C:\Users\matsl\fluffos\src\user.cc'
+      FileOffset:      351
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\user.cc'
+          Offset:          351
+          Length:          19
+          ReplacementText: ''
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-anonymous-namespace
+    DiagnosticMessage:
+      Message:         'variable ''all_users'' declared ''static'', move to anonymous namespace instead'
+      FilePath:        'C:\Users\matsl\fluffos\src\user.cc'
+      FileOffset:      441
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\user.cc'
+      FileOffset:      468
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\user.cc'
+          Offset:          453
+          Length:          15
+          ReplacementText: 'auto '
+        - FilePath:        'C:\Users\matsl\fluffos\src\user.cc'
+          Offset:          478
+          Length:          0
+          ReplacementText: ' -> interactive_t *'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  misc-use-internal-linkage
+    DiagnosticMessage:
+      Message:         'function ''users'' can be made static or moved into an anonymous namespace to enforce internal linkage'
+      FilePath:        'C:\Users\matsl\fluffos\src\user.cc'
+      FileOffset:      916
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\user.cc'
+          Offset:          880
+          Length:          0
+          ReplacementText: 'static '
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\user.cc'
+      FileOffset:      916
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\user.cc'
+          Offset:          915
+          Length:          1
+          ReplacementText: 'auto '
+        - FilePath:        'C:\Users\matsl\fluffos\src\user.cc'
+          Offset:          923
+          Length:          0
+          ReplacementText: ' -> &'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+  - DiagnosticName:  modernize-use-trailing-return-type
+    DiagnosticMessage:
+      Message:         use a trailing return type for this function
+      FilePath:        'C:\Users\matsl\fluffos\src\user.cc'
+      FileOffset:      966
+      Replacements:
+        - FilePath:        'C:\Users\matsl\fluffos\src\user.cc'
+          Offset:          962
+          Length:          3
+          ReplacementText: auto
+        - FilePath:        'C:\Users\matsl\fluffos\src\user.cc'
+          Offset:          996
+          Length:          0
+          ReplacementText: ' -> int'
+    Level:           Warning
+    BuildDirectory:  'C:\Users\matsl\fluffos'
+...

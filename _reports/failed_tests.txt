@@ -1,0 +1,27 @@
+=== ASan/UBSan Test Summary ===
+Searching for failed tests, crashes, and sanitizer reports...
+Full Command Line: ./build_asan/src/driver testsuite/etc/config.test 
+libdw or libbfd is not found, you will only get very limited crash stacktrace.
+Unable to open log file: "log/debug.log", error: "No such file or directory".
+mudlib error handler : 1
+trap crashes : 1
+#define __DEFAULT_PRAGMAS__ PRAGMA_WARNINGS + PRAGMA_SAVE_TYPES + PRAGMA_ERROR_CONTEXT + PRAGMA_OPTIMIZE
+#define __MUDLIB_ERROR_HANDLER__ 
+#define __TRAP_CRASHES__ 
+Full Command Line: ./build_asan/src/driver testsuite/etc/config.test 
+libdw or libbfd is not found, you will only get very limited crash stacktrace.
+Unable to open log file: "log/debug.log", error: "No such file or directory".
+mudlib error handler : 1
+trap crashes : 1
+#define __DEFAULT_PRAGMAS__ PRAGMA_WARNINGS + PRAGMA_SAVE_TYPES + PRAGMA_ERROR_CONTEXT + PRAGMA_OPTIMIZE
+#define __MUDLIB_ERROR_HANDLER__ 
+#define __TRAP_CRASHES__ 
+Full Command Line: ./build_asan/src/driver testsuite/etc/config.test u003cu003cu003cEOF 
+libdw or libbfd is not found, you will only get very limited crash stacktrace.
+Unable to open log file: "log/debug.log", error: "No such file or directory".
+mudlib error handler : 1
+trap crashes : 1
+#define __DEFAULT_PRAGMAS__ PRAGMA_WARNINGS + PRAGMA_SAVE_TYPES + PRAGMA_ERROR_CONTEXT + PRAGMA_OPTIMIZE
+#define __MUDLIB_ERROR_HANDLER__ 
+#define __TRAP_CRASHES__ 
+Unable to open log file: "log/debug.log", error: "No such file or directory".

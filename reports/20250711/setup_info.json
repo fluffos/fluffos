@@ -1,0 +1,30 @@
+{
+  "Date": "2025-07-11 16:41:00",
+  "CommitHash": "6555a4cc0b80e782ebb10980eb25d00d15795658",
+  "CommitMessage": "Merge pull request #5 from MLidstrom/codex/fix-locale-utf-8-compliance-error",
+  "DockerImage": "fluffos-ubuntu:latest",
+  "WorkspaceDir": "reports/20250711",
+  "Status": "COMPLETE",
+  "Prerequisites": {
+    "CMake": "3.22.1",
+    "Python3": "3.10.12",
+    "GCC": "11.4.0",
+    "Clang": "14.0.0",
+    "Cppcheck": "2.7",
+    "Grep": "3.7",
+    "Ripgrep": "13.0.0"
+  },
+  "FluffOSBinaries": {
+    "driver": "25277064 bytes",
+    "json2o": "26518248 bytes", 
+    "lpcc": "24437192 bytes",
+    "o2json": "24378304 bytes",
+    "portbind": "48960 bytes",
+    "symbol": "24378304 bytes"
+  },
+  "Commands": {
+    "dockerBuild": "docker build -f Dockerfile.ubuntu -t fluffos-ubuntu .",
+    "verifyBinaries": "docker run --rm --entrypoint=/bin/bash fluffos-ubuntu -c \"ls -la bin/\"",
+    "verifyPrereqs": "docker run --rm --entrypoint=/bin/bash ubuntu:22.04 -c \"apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential git bison cmake libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libz-dev libjemalloc-dev libicu-dev cppcheck clang ripgrep && cmake --version && python3 --version && gcc --version && clang --version && cppcheck --version && rg --version\""
+  }
+}

@@ -1,0 +1,324 @@
+{
+  "metadata": {
+    "source_file": "TODO.md",
+    "total_items": 19,
+    "parsed_timestamp": "2025-07-11T18:51:39.129155"
+  },
+  "todos": [
+    {
+      "file": "vm/internal/simul_efun.cc",
+      "location_hint": "",
+      "description": "init\\_simul\\_efun",
+      "urgency": "URGENT",
+      "line_number": 3
+    },
+    {
+      "file": "vm/internal/simul_efun.cc",
+      "location_hint": "general portability issues",
+      "description": "portability problems",
+      "urgency": "URGENT",
+      "line_number": 6
+    },
+    {
+      "file": "documentation",
+      "location_hint": "documentation completion",
+      "description": "complete docs/efun/contrib [packages/contrib]",
+      "urgency": "LOW",
+      "line_number": 11
+    },
+    {
+      "file": "documentation",
+      "location_hint": "efun functions",
+      "description": "check efun::shadowp/efun::query_shadowing",
+      "urgency": "LOW",
+      "line_number": 12
+    },
+    {
+      "file": "documentation",
+      "location_hint": "documentation expansion",
+      "description": "expand docs for efun:implode (missing three arg form)",
+      "urgency": "LOW",
+      "line_number": 13
+    },
+    {
+      "file": "documentation",
+      "location_hint": "missing documentation",
+      "description": "missing docs for efun::defer",
+      "urgency": "LOW",
+      "line_number": 14
+    },
+    {
+      "file": "packages/contrib/contrib.cc",
+      "location_hint": "",
+      "description": "make maximum number of ports configurable?",
+      "urgency": "LOW",
+      "line_number": 18
+    },
+    {
+      "file": "packages/contrib/contrib.cc",
+      "location_hint": "",
+      "description": "if yes look for possible buffer overflows!!!",
+      "urgency": "LOW",
+      "line_number": 19
+    },
+    {
+      "file": "packages/contrib/contrib.cc",
+      "location_hint": "",
+      "description": "rework code? uses goto",
+      "urgency": "LOW",
+      "line_number": 22
+    },
+    {
+      "file": "packages/contrib/contrib.cc",
+      "location_hint": "",
+      "description": "rename? there are different kind of string differences...",
+      "urgency": "LOW",
+      "line_number": 25
+    },
+    {
+      "file": "packages/core/ed.cc",
+      "location_hint": "",
+      "description": "missing 'check\\_valid\\_path(...)' for write operation with new api.",
+      "urgency": "LOW",
+      "line_number": 28
+    },
+    {
+      "file": "packages/core/file.cc",
+      "location_hint": "lstat support",
+      "description": "add support for 'lstat' if available",
+      "urgency": "LOW",
+      "line_number": 31
+    },
+    {
+      "file": "packages/core/file.cc",
+      "location_hint": "",
+      "description": "efun::get\\_dir",
+      "urgency": "LOW",
+      "line_number": 32
+    },
+    {
+      "file": "packages/core/file.cc",
+      "location_hint": "",
+      "description": "efun::file\\_size",
+      "urgency": "LOW",
+      "line_number": 33
+    },
+    {
+      "file": "packages/core/file.cc",
+      "location_hint": "",
+      "description": "efun::stat / new efun::lstat ?",
+      "urgency": "LOW",
+      "line_number": 34
+    },
+    {
+      "file": "packages/core/file.cc",
+      "location_hint": "",
+      "description": "remove master::valid\\_link ?",
+      "urgency": "LOW",
+      "line_number": 35
+    },
+    {
+      "file": "packages/core/file.cc",
+      "location_hint": "link dependency removal",
+      "description": "alternative:",
+      "urgency": "LOW",
+      "line_number": 41
+    },
+    {
+      "file": "path handling",
+      "location_hint": "path canonicalization",
+      "description": "simplify handling of paths:",
+      "urgency": "LOW",
+      "line_number": 46
+    },
+    {
+      "file": "vm/internal/simulate.cc",
+      "location_hint": "give_uid_to_object function",
+      "description": "give_uid_to_object",
+      "urgency": "LOW",
+      "line_number": 54
+    }
+  ],
+  "file_existence_checks": [
+    {
+      "file": "vm/internal/simul_efun.cc",
+      "exists": true,
+      "found_path": "src/vm/internal/simul_efun.cc",
+      "checked_paths": [
+        "vm/internal/simul_efun.cc",
+        "src/vm/internal/simul_efun.cc",
+        "./vm/internal/simul_efun.cc",
+        "./src/vm/internal/simul_efun.cc"
+      ]
+    },
+    {
+      "file": "vm/internal/simul_efun.cc",
+      "exists": true,
+      "found_path": "src/vm/internal/simul_efun.cc",
+      "checked_paths": [
+        "vm/internal/simul_efun.cc",
+        "src/vm/internal/simul_efun.cc",
+        "./vm/internal/simul_efun.cc",
+        "./src/vm/internal/simul_efun.cc"
+      ]
+    },
+    {
+      "file": "documentation",
+      "exists": "N/A",
+      "reason": "Not a file reference"
+    },
+    {
+      "file": "documentation",
+      "exists": "N/A",
+      "reason": "Not a file reference"
+    },
+    {
+      "file": "documentation",
+      "exists": "N/A",
+      "reason": "Not a file reference"
+    },
+    {
+      "file": "documentation",
+      "exists": "N/A",
+      "reason": "Not a file reference"
+    },
+    {
+      "file": "packages/contrib/contrib.cc",
+      "exists": true,
+      "found_path": "src/packages/contrib/contrib.cc",
+      "checked_paths": [
+        "packages/contrib/contrib.cc",
+        "src/packages/contrib/contrib.cc",
+        "./packages/contrib/contrib.cc",
+        "./src/packages/contrib/contrib.cc"
+      ]
+    },
+    {
+      "file": "packages/contrib/contrib.cc",
+      "exists": true,
+      "found_path": "src/packages/contrib/contrib.cc",
+      "checked_paths": [
+        "packages/contrib/contrib.cc",
+        "src/packages/contrib/contrib.cc",
+        "./packages/contrib/contrib.cc",
+        "./src/packages/contrib/contrib.cc"
+      ]
+    },
+    {
+      "file": "packages/contrib/contrib.cc",
+      "exists": true,
+      "found_path": "src/packages/contrib/contrib.cc",
+      "checked_paths": [
+        "packages/contrib/contrib.cc",
+        "src/packages/contrib/contrib.cc",
+        "./packages/contrib/contrib.cc",
+        "./src/packages/contrib/contrib.cc"
+      ]
+    },
+    {
+      "file": "packages/contrib/contrib.cc",
+      "exists": true,
+      "found_path": "src/packages/contrib/contrib.cc",
+      "checked_paths": [
+        "packages/contrib/contrib.cc",
+        "src/packages/contrib/contrib.cc",
+        "./packages/contrib/contrib.cc",
+        "./src/packages/contrib/contrib.cc"
+      ]
+    },
+    {
+      "file": "packages/core/ed.cc",
+      "exists": true,
+      "found_path": "src/packages/core/ed.cc",
+      "checked_paths": [
+        "packages/core/ed.cc",
+        "src/packages/core/ed.cc",
+        "./packages/core/ed.cc",
+        "./src/packages/core/ed.cc"
+      ]
+    },
+    {
+      "file": "packages/core/file.cc",
+      "exists": true,
+      "found_path": "src/packages/core/file.cc",
+      "checked_paths": [
+        "packages/core/file.cc",
+        "src/packages/core/file.cc",
+        "./packages/core/file.cc",
+        "./src/packages/core/file.cc"
+      ]
+    },
+    {
+      "file": "packages/core/file.cc",
+      "exists": true,
+      "found_path": "src/packages/core/file.cc",
+      "checked_paths": [
+        "packages/core/file.cc",
+        "src/packages/core/file.cc",
+        "./packages/core/file.cc",
+        "./src/packages/core/file.cc"
+      ]
+    },
+    {
+      "file": "packages/core/file.cc",
+      "exists": true,
+      "found_path": "src/packages/core/file.cc",
+      "checked_paths": [
+        "packages/core/file.cc",
+        "src/packages/core/file.cc",
+        "./packages/core/file.cc",
+        "./src/packages/core/file.cc"
+      ]
+    },
+    {
+      "file": "packages/core/file.cc",
+      "exists": true,
+      "found_path": "src/packages/core/file.cc",
+      "checked_paths": [
+        "packages/core/file.cc",
+        "src/packages/core/file.cc",
+        "./packages/core/file.cc",
+        "./src/packages/core/file.cc"
+      ]
+    },
+    {
+      "file": "packages/core/file.cc",
+      "exists": true,
+      "found_path": "src/packages/core/file.cc",
+      "checked_paths": [
+        "packages/core/file.cc",
+        "src/packages/core/file.cc",
+        "./packages/core/file.cc",
+        "./src/packages/core/file.cc"
+      ]
+    },
+    {
+      "file": "packages/core/file.cc",
+      "exists": true,
+      "found_path": "src/packages/core/file.cc",
+      "checked_paths": [
+        "packages/core/file.cc",
+        "src/packages/core/file.cc",
+        "./packages/core/file.cc",
+        "./src/packages/core/file.cc"
+      ]
+    },
+    {
+      "file": "path handling",
+      "exists": "N/A",
+      "reason": "Not a file reference"
+    },
+    {
+      "file": "vm/internal/simulate.cc",
+      "exists": true,
+      "found_path": "src/vm/internal/simulate.cc",
+      "checked_paths": [
+        "vm/internal/simulate.cc",
+        "src/vm/internal/simulate.cc",
+        "./vm/internal/simulate.cc",
+        "./src/vm/internal/simulate.cc"
+      ]
+    }
+  ],
+  "discrepancies": []
+}

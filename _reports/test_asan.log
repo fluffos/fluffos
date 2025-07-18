@@ -1,0 +1,556 @@
+========================================================================
+Full Command Line: ./build_asan/src/driver testsuite/etc/config.test 
+Boot Time: Sat Jul 12 15:44:08 2025
+Version: fluffos 20240714-4a59909c-6555a4cc-uncommited (Linux/x86-64)
+Jemalloc is disabled, this is not suitable for production.
+ICU Version: 74.2
+libdw or libbfd is not found, you will only get very limited crash stacktrace.
+Core Dump: No, Max FD: 65535.
+========================================================================
+Final Debug Level: 0
+Processing config file: testsuite/etc/config.test
+maximum local variables: invalid new value, resetting to default.
+Unable to open log file: "log/debug.log", error: "No such file or directory".
+Execution root: ./
+Initializing internal stuff ....
+Event backend in use: epoll
+==== Runtime Config Table ====
+time to clean up : 1200 # default: 600
+time to reset : 1800 # default: 900
+time to swap : 600 # default: 300
+evaluator stack size : 1000 # default: 65536
+inherit chain size : 30
+maximum evaluation cost : 300000000 # default: 30000000
+maximum local variables : 64
+maximum call depth : 30 # default: 150
+maximum array size : 15000
+maximum buffer size : 400000 # default: 1048576
+maximum mapping size : 15000 # default: 150000
+maximum string length : 200000 # default: 1048576
+maximum bits in a bitfield : 1200 # default: 12000
+maximum byte transfer : 10000 # default: 262144
+maximum read file size : 200000 # default: 262144
+hash table size : 8192 # default: 65536
+object table size : 1501 # default: 4096
+living hash table size : 256
+gametick msec : 100 # default: 1000
+heartbeat interval msec : 1000
+sane explode string : 1
+reversible explode string : 0
+sane sorting : 1
+warn tab : 0
+wombles : 0
+call other type check : 0
+call other warn : 0
+mudlib error handler : 1
+no resets : 0
+lazy resets : 0
+randomized resets : 1
+no ansi : 1
+strip before process input : 1
+this_player in call_out : 1
+trace : 1
+trace code : 0
+interactive catch tell : 0
+receive snoop : 1
+snoop shadowed : 0
+reverse defer : 0
+has console : 1
+noninteractive stderr write : 1 # default: 0
+trap crashes : 1
+old type behavior : 0
+old range behavior : 0
+warn old range behavior : 1
+suppress argument warnings : 1
+enable_commands call init : 0 # default: 1
+sprintf add_justified ignore ANSI colors : 1
+call_out(0) nest level : 10 # default: 1000
+trace lpc execution context : 0
+trace lpc instructions : 0
+enable mxp : 1 # default: 0
+enable gmcp : 1 # default: 0
+enable zmp : 1 # default: 0
+enable mssp : 1
+enable msp : 1
+enable msdp : 1 # default: 0
+==============================
+==== LPC Predefines ====
+#define FLUFFOS 
+#define HAS_DEBUG_LEVEL 
+#define HAS_ED 
+#define HAS_PRINTF 
+#define MAX_FLOAT 179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.000000
+#define MAX_INT 9223372036854775807
+#define MIN_FLOAT 0.000000
+#define MIN_INT -9223372036854775808
+#define MUDOS 
+#define MUD_NAME "Testsuite"
+#define SIZEOFINT 8
+#define __ARCH__ "Linux/x86-64"
+#define __ARGUMENTS_IN_TRACEBACK__ 
+#define __ARRAY_STATS__ 
+#define __AUTO_SETEUID__ 
+#define __CACHE_STATS__ 
+#define __CALLOUT_HANDLES__ 
+#define __CFG_COMPILER_STACK_SIZE__ 600
+#define __CFG_EVALUATOR_STACK_SIZE__ 65536
+#define __CFG_MAX_CALL_DEPTH__ 150
+#define __CFG_MAX_GLOBAL_VARIABLES__ 65536
+#define __CHECK_MEMORY__ 
+#define __CLASS_STATS__ 
+#define __COMMAND_BUF_SIZE__ 2000
+#define __COMPILER__ "/usr/bin/g++"
+#define __CXXFLAGS__ "Broken"
+#define __DEBUGMALLOC_EXTENSIONS__ 
+#define __DEBUGMALLOC__ 
+#define __DEBUG_MACRO__ 
+#define __DEBUG__ 
+#define __DEFAULT_DB__ 1
+#define __DEFAULT_PRAGMAS__ PRAGMA_WARNINGS + PRAGMA_SAVE_TYPES + PRAGMA_ERROR_CONTEXT + PRAGMA_OPTIMIZE
+#define __DSLIB__ 
+#define __ED_INDENT_SPACES__ 4
+#define __ED_TAB_WIDTH__ 8
+#define __GET_CHAR_IS_BUFFERED__ 
+#define __HAS_CONSOLE__ 
+#define __HAVE_DIRENT_H__ 1
+#define __HAVE_SIGNAL_H__ 1
+#define __HAVE_SYS_RESOURCE_H__ 1
+#define __HAVE_SYS_STAT_H__ 1
+#define __HAVE_SYS_TIME_H__ 1
+#define __HAVE_TIME_H__ 1
+#define __LARGEST_PRINTABLE_STRING__ 65535
+#define __LARGE_STRING_SIZE__ 1000
+#define __LOCALS_IN_TRACEBACK__ 
+#define __MAX_SAVE_SVALUE_DEPTH__ 100
+#define __MUDLIB_ERROR_HANDLER__ 
+#define __NONINTERACTIVE_STDERR_WRITE__ 
+#define __OLD_ED__ 
+#define __PACKAGES_PACKAGES_H__ 
+#define __PACKAGE_ASYNC__ 
+#define __PACKAGE_COMPRESS__ 
+#define __PACKAGE_CONTRIB__ 
+#define __PACKAGE_CORE__ 
+#define __PACKAGE_CRYPTO__ 
+#define __PACKAGE_DB__ 
+#define __PACKAGE_DEVELOP__ 
+#define __PACKAGE_EXTERNAL__ 
+#define __PACKAGE_MATH__ 
+#define __PACKAGE_MATRIX__ 
+#define __PACKAGE_MUDLIB_STATS__ 
+#define __PACKAGE_OPS__ 
+#define __PACKAGE_PARSER__ 
+#define __PACKAGE_PCRE__ 
+#define __PACKAGE_SHA1__ 
+#define __PACKAGE_SOCKETS__ 
+#define __PACKAGE_TRIM__ 
+#define __PACKAGE_UIDS__ 
+#define __PARSE_DEBUG__ 
+#define __PORT__ 4000
+#define __PRIVS__ 
+#define __PROJECT_VERSION__ "fluffos 20240714-4a59909c-6555a4cc-uncommited"
+#define __RANDOMIZED_RESETS__ 
+#define __RECEIVE_SNOOP__ 
+#define __REF_RESERVED_WORD__ 
+#define __RESTRICTED_ED__ 
+#define __SANE_EXPLODE_STRING__ 
+#define __SANE_SORTING__ 
+#define __SAVE_EXTENSION__ ".o"
+#define __SAVE_GZ_EXTENSION__ ".o.gz"
+#define __SENSIBLE_MODIFIERS__ 
+#define __SMALL_STRING_SIZE__ 100
+#define __STRING_STATS__ 
+#define __STRUCT_CLASS__ 
+#define __STRUCT_STRUCT__ 
+#define __SUPPRESS_ARGUMENT_WARNINGS__ 
+#define __THIS_PLAYER_IN_CALL_OUT__ 
+#define __TIME_WITH_SYS_TIME__ 1
+#define __TRACE__ 
+#define __TRAP_CRASHES__ 
+#define __USE_32BIT_ADDRESSES__ 
+#define __USE_MYSQL__ 1
+#define __VERSION__ "fluffos 20240714-4a59909c-6555a4cc-uncommited"
+#define __WARN_OLD_RANGE_BEHAVIOR__ 
+========================
+Loading simul_efun file : /single/simul_efun
+The simul_efun file single/simul_efun.c was not loaded.
+========================================================================
+Full Command Line: ./build_asan/src/driver testsuite/etc/config.test 
+Boot Time: Sat Jul 12 15:44:26 2025
+Version: fluffos 20240714-4a59909c-6555a4cc-uncommited (Linux/x86-64)
+Jemalloc is disabled, this is not suitable for production.
+ICU Version: 74.2
+libdw or libbfd is not found, you will only get very limited crash stacktrace.
+Core Dump: No, Max FD: 65535.
+========================================================================
+Final Debug Level: 0
+Processing config file: testsuite/etc/config.test
+maximum local variables: invalid new value, resetting to default.
+Unable to open log file: "log/debug.log", error: "No such file or directory".
+Execution root: ./
+Initializing internal stuff ....
+Event backend in use: epoll
+==== Runtime Config Table ====
+time to clean up : 1200 # default: 600
+time to reset : 1800 # default: 900
+time to swap : 600 # default: 300
+evaluator stack size : 1000 # default: 65536
+inherit chain size : 30
+maximum evaluation cost : 300000000 # default: 30000000
+maximum local variables : 64
+maximum call depth : 30 # default: 150
+maximum array size : 15000
+maximum buffer size : 400000 # default: 1048576
+maximum mapping size : 15000 # default: 150000
+maximum string length : 200000 # default: 1048576
+maximum bits in a bitfield : 1200 # default: 12000
+maximum byte transfer : 10000 # default: 262144
+maximum read file size : 200000 # default: 262144
+hash table size : 8192 # default: 65536
+object table size : 1501 # default: 4096
+living hash table size : 256
+gametick msec : 100 # default: 1000
+heartbeat interval msec : 1000
+sane explode string : 1
+reversible explode string : 0
+sane sorting : 1
+warn tab : 0
+wombles : 0
+call other type check : 0
+call other warn : 0
+mudlib error handler : 1
+no resets : 0
+lazy resets : 0
+randomized resets : 1
+no ansi : 1
+strip before process input : 1
+this_player in call_out : 1
+trace : 1
+trace code : 0
+interactive catch tell : 0
+receive snoop : 1
+snoop shadowed : 0
+reverse defer : 0
+has console : 1
+noninteractive stderr write : 1 # default: 0
+trap crashes : 1
+old type behavior : 0
+old range behavior : 0
+warn old range behavior : 1
+suppress argument warnings : 1
+enable_commands call init : 0 # default: 1
+sprintf add_justified ignore ANSI colors : 1
+call_out(0) nest level : 10 # default: 1000
+trace lpc execution context : 0
+trace lpc instructions : 0
+enable mxp : 1 # default: 0
+enable gmcp : 1 # default: 0
+enable zmp : 1 # default: 0
+enable mssp : 1
+enable msp : 1
+enable msdp : 1 # default: 0
+==============================
+==== LPC Predefines ====
+#define FLUFFOS 
+#define HAS_DEBUG_LEVEL 
+#define HAS_ED 
+#define HAS_PRINTF 
+#define MAX_FLOAT 179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.000000
+#define MAX_INT 9223372036854775807
+#define MIN_FLOAT 0.000000
+#define MIN_INT -9223372036854775808
+#define MUDOS 
+#define MUD_NAME "Testsuite"
+#define SIZEOFINT 8
+#define __ARCH__ "Linux/x86-64"
+#define __ARGUMENTS_IN_TRACEBACK__ 
+#define __ARRAY_STATS__ 
+#define __AUTO_SETEUID__ 
+#define __CACHE_STATS__ 
+#define __CALLOUT_HANDLES__ 
+#define __CFG_COMPILER_STACK_SIZE__ 600
+#define __CFG_EVALUATOR_STACK_SIZE__ 65536
+#define __CFG_MAX_CALL_DEPTH__ 150
+#define __CFG_MAX_GLOBAL_VARIABLES__ 65536
+#define __CHECK_MEMORY__ 
+#define __CLASS_STATS__ 
+#define __COMMAND_BUF_SIZE__ 2000
+#define __COMPILER__ "/usr/bin/g++"
+#define __CXXFLAGS__ "Broken"
+#define __DEBUGMALLOC_EXTENSIONS__ 
+#define __DEBUGMALLOC__ 
+#define __DEBUG_MACRO__ 
+#define __DEBUG__ 
+#define __DEFAULT_DB__ 1
+#define __DEFAULT_PRAGMAS__ PRAGMA_WARNINGS + PRAGMA_SAVE_TYPES + PRAGMA_ERROR_CONTEXT + PRAGMA_OPTIMIZE
+#define __DSLIB__ 
+#define __ED_INDENT_SPACES__ 4
+#define __ED_TAB_WIDTH__ 8
+#define __GET_CHAR_IS_BUFFERED__ 
+#define __HAS_CONSOLE__ 
+#define __HAVE_DIRENT_H__ 1
+#define __HAVE_SIGNAL_H__ 1
+#define __HAVE_SYS_RESOURCE_H__ 1
+#define __HAVE_SYS_STAT_H__ 1
+#define __HAVE_SYS_TIME_H__ 1
+#define __HAVE_TIME_H__ 1
+#define __LARGEST_PRINTABLE_STRING__ 65535
+#define __LARGE_STRING_SIZE__ 1000
+#define __LOCALS_IN_TRACEBACK__ 
+#define __MAX_SAVE_SVALUE_DEPTH__ 100
+#define __MUDLIB_ERROR_HANDLER__ 
+#define __NONINTERACTIVE_STDERR_WRITE__ 
+#define __OLD_ED__ 
+#define __PACKAGES_PACKAGES_H__ 
+#define __PACKAGE_ASYNC__ 
+#define __PACKAGE_COMPRESS__ 
+#define __PACKAGE_CONTRIB__ 
+#define __PACKAGE_CORE__ 
+#define __PACKAGE_CRYPTO__ 
+#define __PACKAGE_DB__ 
+#define __PACKAGE_DEVELOP__ 
+#define __PACKAGE_EXTERNAL__ 
+#define __PACKAGE_MATH__ 
+#define __PACKAGE_MATRIX__ 
+#define __PACKAGE_MUDLIB_STATS__ 
+#define __PACKAGE_OPS__ 
+#define __PACKAGE_PARSER__ 
+#define __PACKAGE_PCRE__ 
+#define __PACKAGE_SHA1__ 
+#define __PACKAGE_SOCKETS__ 
+#define __PACKAGE_TRIM__ 
+#define __PACKAGE_UIDS__ 
+#define __PARSE_DEBUG__ 
+#define __PORT__ 4000
+#define __PRIVS__ 
+#define __PROJECT_VERSION__ "fluffos 20240714-4a59909c-6555a4cc-uncommited"
+#define __RANDOMIZED_RESETS__ 
+#define __RECEIVE_SNOOP__ 
+#define __REF_RESERVED_WORD__ 
+#define __RESTRICTED_ED__ 
+#define __SANE_EXPLODE_STRING__ 
+#define __SANE_SORTING__ 
+#define __SAVE_EXTENSION__ ".o"
+#define __SAVE_GZ_EXTENSION__ ".o.gz"
+#define __SENSIBLE_MODIFIERS__ 
+#define __SMALL_STRING_SIZE__ 100
+#define __STRING_STATS__ 
+#define __STRUCT_CLASS__ 
+#define __STRUCT_STRUCT__ 
+#define __SUPPRESS_ARGUMENT_WARNINGS__ 
+#define __THIS_PLAYER_IN_CALL_OUT__ 
+#define __TIME_WITH_SYS_TIME__ 1
+#define __TRACE__ 
+#define __TRAP_CRASHES__ 
+#define __USE_32BIT_ADDRESSES__ 
+#define __USE_MYSQL__ 1
+#define __VERSION__ "fluffos 20240714-4a59909c-6555a4cc-uncommited"
+#define __WARN_OLD_RANGE_BEHAVIOR__ 
+========================
+Loading simul_efun file : /single/simul_efun
+The simul_efun file single/simul_efun.c was not loaded.
+========================================================================
+Full Command Line: ./build_asan/src/driver testsuite/etc/config.test u003cu003cu003cEOF 
+Boot Time: Sat Jul 12 15:44:54 2025
+Version: fluffos 20240714-4a59909c-6555a4cc-uncommited (Linux/x86-64)
+Jemalloc is disabled, this is not suitable for production.
+ICU Version: 74.2
+libdw or libbfd is not found, you will only get very limited crash stacktrace.
+Core Dump: No, Max FD: 65535.
+========================================================================
+Final Debug Level: 0
+Processing config file: testsuite/etc/config.test
+maximum local variables: invalid new value, resetting to default.
+Unable to open log file: "log/debug.log", error: "No such file or directory".
+Execution root: ./
+Initializing internal stuff ....
+Event backend in use: epoll
+==== Runtime Config Table ====
+time to clean up : 1200 # default: 600
+time to reset : 1800 # default: 900
+time to swap : 600 # default: 300
+evaluator stack size : 1000 # default: 65536
+inherit chain size : 30
+maximum evaluation cost : 300000000 # default: 30000000
+maximum local variables : 64
+maximum call depth : 30 # default: 150
+maximum array size : 15000
+maximum buffer size : 400000 # default: 1048576
+maximum mapping size : 15000 # default: 150000
+maximum string length : 200000 # default: 1048576
+maximum bits in a bitfield : 1200 # default: 12000
+maximum byte transfer : 10000 # default: 262144
+maximum read file size : 200000 # default: 262144
+hash table size : 8192 # default: 65536
+object table size : 1501 # default: 4096
+living hash table size : 256
+gametick msec : 100 # default: 1000
+heartbeat interval msec : 1000
+sane explode string : 1
+reversible explode string : 0
+sane sorting : 1
+warn tab : 0
+wombles : 0
+call other type check : 0
+call other warn : 0
+mudlib error handler : 1
+no resets : 0
+lazy resets : 0
+randomized resets : 1
+no ansi : 1
+strip before process input : 1
+this_player in call_out : 1
+trace : 1
+trace code : 0
+interactive catch tell : 0
+receive snoop : 1
+snoop shadowed : 0
+reverse defer : 0
+has console : 1
+noninteractive stderr write : 1 # default: 0
+trap crashes : 1
+old type behavior : 0
+old range behavior : 0
+warn old range behavior : 1
+suppress argument warnings : 1
+enable_commands call init : 0 # default: 1
+sprintf add_justified ignore ANSI colors : 1
+call_out(0) nest level : 10 # default: 1000
+trace lpc execution context : 0
+trace lpc instructions : 0
+enable mxp : 1 # default: 0
+enable gmcp : 1 # default: 0
+enable zmp : 1 # default: 0
+enable mssp : 1
+enable msp : 1
+enable msdp : 1 # default: 0
+==============================
+==== LPC Predefines ====
+#define FLUFFOS 
+#define HAS_DEBUG_LEVEL 
+#define HAS_ED 
+#define HAS_PRINTF 
+#define MAX_FLOAT 179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.000000
+#define MAX_INT 9223372036854775807
+#define MIN_FLOAT 0.000000
+#define MIN_INT -9223372036854775808
+#define MUDOS 
+#define MUD_NAME "Testsuite"
+#define SIZEOFINT 8
+#define __ARCH__ "Linux/x86-64"
+#define __ARGUMENTS_IN_TRACEBACK__ 
+#define __ARRAY_STATS__ 
+#define __AUTO_SETEUID__ 
+#define __CACHE_STATS__ 
+#define __CALLOUT_HANDLES__ 
+#define __CFG_COMPILER_STACK_SIZE__ 600
+#define __CFG_EVALUATOR_STACK_SIZE__ 65536
+#define __CFG_MAX_CALL_DEPTH__ 150
+#define __CFG_MAX_GLOBAL_VARIABLES__ 65536
+#define __CHECK_MEMORY__ 
+#define __CLASS_STATS__ 
+#define __COMMAND_BUF_SIZE__ 2000
+#define __COMPILER__ "/usr/bin/g++"
+#define __CXXFLAGS__ "Broken"
+#define __DEBUGMALLOC_EXTENSIONS__ 
+#define __DEBUGMALLOC__ 
+#define __DEBUG_MACRO__ 
+#define __DEBUG__ 
+#define __DEFAULT_DB__ 1
+#define __DEFAULT_PRAGMAS__ PRAGMA_WARNINGS + PRAGMA_SAVE_TYPES + PRAGMA_ERROR_CONTEXT + PRAGMA_OPTIMIZE
+#define __DSLIB__ 
+#define __ED_INDENT_SPACES__ 4
+#define __ED_TAB_WIDTH__ 8
+#define __GET_CHAR_IS_BUFFERED__ 
+#define __HAS_CONSOLE__ 
+#define __HAVE_DIRENT_H__ 1
+#define __HAVE_SIGNAL_H__ 1
+#define __HAVE_SYS_RESOURCE_H__ 1
+#define __HAVE_SYS_STAT_H__ 1
+#define __HAVE_SYS_TIME_H__ 1
+#define __HAVE_TIME_H__ 1
+#define __LARGEST_PRINTABLE_STRING__ 65535
+#define __LARGE_STRING_SIZE__ 1000
+#define __LOCALS_IN_TRACEBACK__ 
+#define __MAX_SAVE_SVALUE_DEPTH__ 100
+#define __MUDLIB_ERROR_HANDLER__ 
+#define __NONINTERACTIVE_STDERR_WRITE__ 
+#define __OLD_ED__ 
+#define __PACKAGES_PACKAGES_H__ 
+#define __PACKAGE_ASYNC__ 
+#define __PACKAGE_COMPRESS__ 
+#define __PACKAGE_CONTRIB__ 
+#define __PACKAGE_CORE__ 
+#define __PACKAGE_CRYPTO__ 
+#define __PACKAGE_DB__ 
+#define __PACKAGE_DEVELOP__ 
+#define __PACKAGE_EXTERNAL__ 
+#define __PACKAGE_MATH__ 
+#define __PACKAGE_MATRIX__ 
+#define __PACKAGE_MUDLIB_STATS__ 
+#define __PACKAGE_OPS__ 
+#define __PACKAGE_PARSER__ 
+#define __PACKAGE_PCRE__ 
+#define __PACKAGE_SHA1__ 
+#define __PACKAGE_SOCKETS__ 
+#define __PACKAGE_TRIM__ 
+#define __PACKAGE_UIDS__ 
+#define __PARSE_DEBUG__ 
+#define __PORT__ 4000
+#define __PRIVS__ 
+#define __PROJECT_VERSION__ "fluffos 20240714-4a59909c-6555a4cc-uncommited"
+#define __RANDOMIZED_RESETS__ 
+#define __RECEIVE_SNOOP__ 
+#define __REF_RESERVED_WORD__ 
+#define __RESTRICTED_ED__ 
+#define __SANE_EXPLODE_STRING__ 
+#define __SANE_SORTING__ 
+#define __SAVE_EXTENSION__ ".o"
+#define __SAVE_GZ_EXTENSION__ ".o.gz"
+#define __SENSIBLE_MODIFIERS__ 
+#define __SMALL_STRING_SIZE__ 100
+#define __STRING_STATS__ 
+#define __STRUCT_CLASS__ 
+#define __STRUCT_STRUCT__ 
+#define __SUPPRESS_ARGUMENT_WARNINGS__ 
+#define __THIS_PLAYER_IN_CALL_OUT__ 
+#define __TIME_WITH_SYS_TIME__ 1
+#define __TRACE__ 
+#define __TRAP_CRASHES__ 
+#define __USE_32BIT_ADDRESSES__ 
+#define __USE_MYSQL__ 1
+#define __VERSION__ "fluffos 20240714-4a59909c-6555a4cc-uncommited"
+#define __WARN_OLD_RANGE_BEHAVIOR__ 
+========================
+Loading simul_efun file : /single/simul_efun
+The simul_efun file single/simul_efun.c was not loaded.
+Usage: lpcc config_file lpc_file
+Uncollected profiling events: 2.
+Processing config file: testsuite/etc/config.test
+maximum local variables: invalid new value, resetting to default.
+Unable to open log file: "log/debug.log", error: "No such file or directory".
+Execution root: ./
+Initializing internal stuff ....
+Event backend in use: epoll
+Loading simul_efun file : /single/simul_efun
+The simul_efun file single/simul_efun.c was not loaded.
+Uncollected profiling events: 4.
+= = =   A S a n / U B S a n   T e s t   E x e c u t i o n   = = =  
+ T e s t   1 :   B a s i c   c o m p i l a t i o n  
+ P r o c e s s i n g   c o n f i g   f i l e :   t e s t s u i t e / e t c / c o n f i g . t e s t  
+ m a x i m u m   l o c a l   v a r i a b l e s :   i n v a l i d   n e w   v a l u e ,   r e s e t t i n g   t o   d e f a u l t .  
+ N e w   D e b u g   l o g   l o c a t i o n :   " l o g / d e b u g . l o g " .  
+ E x e c u t i o n   r o o t :   . /  
+ I n i t i a l i z i n g   i n t e r n a l   s t u f f   . . . .  
+ E v e n t   b a c k e n d   i n   u s e :   e p o l l  
+ L o a d i n g   s i m u l _ e f u n   f i l e   :   / s i n g l e / s i m u l _ e f u n  
+ T h e   s i m u l _ e f u n   f i l e   s i n g l e / s i m u l _ e f u n . c   w a s   n o t   l o a d e d .  
+ U n c o l l e c t e d   p r o f i l i n g   e v e n t s :   4 .  
+ w s l   :   / b i n / b a s h :   - c :   l i n e   1 :   u n e x p e c t e d   E O F   w h i l e   l o o k i n g   f o r   m a t c h i n g   ` " '  
+ A t   l i n e : 1   c h a r : 1  
+ +   w s l   b a s h   - c   " c d   / m n t / c / U s e r s / m a t s l / f l u f f o s   & &   e x p o r t   A S A N _ O P T I O N S = ' d e   . . .  
+ +   ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~  
+         +   C a t e g o r y I n f o                     :   N o t S p e c i f i e d :   ( / b i n / b a s h :   - c :   . . . o r   m a t c h i n g   ` " ' : S t r i n g )   [ ] ,   R e m o t e E x c e p t i o n  
+         +   F u l l y Q u a l i f i e d E r r o r I d   :   N a t i v e C o m m a n d E r r o r  
+    
+ T e s t i n g  
+ 
