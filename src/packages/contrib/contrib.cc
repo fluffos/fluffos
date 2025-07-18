@@ -728,9 +728,10 @@ void f_terminal_colour() {
             curcolour[0] = 0;
             curcolourlen = 0;
           } else {
-            if (curcolourlen + strlen((elt->values + 1)->u.string) < MAX_COLOUR_STRING - 1) {
-              strcat(curcolour, (elt->values + 1)->u.string);
-              curcolourlen += strlen((elt->values + 1)->u.string);
+            size_t len_to_add = strlen((elt->values + 1)->u.string);
+            if (curcolourlen + len_to_add < MAX_COLOUR_STRING - 1) {
+              strncat(curcolour, (elt->values + 1)->u.string, len_to_add);
+              curcolourlen += len_to_add;
             }
           }
           break;
@@ -740,9 +741,10 @@ void f_terminal_colour() {
         if (repused) {
           parts[i] = rep;
           lens[i] = wrap ? -SVALUE_STRLEN(reptmp) : SVALUE_STRLEN(reptmp);
-          if (curcolourlen + SVALUE_STRLEN(reptmp) < MAX_COLOUR_STRING - 1) {
-            strcat(curcolour, rep);
-            curcolourlen += SVALUE_STRLEN(reptmp);
+          size_t len_to_add = SVALUE_STRLEN(reptmp);
+          if (curcolourlen + len_to_add < MAX_COLOUR_STRING - 1) {
+            strncat(curcolour, rep, len_to_add);
+            curcolourlen += len_to_add;
           }
         } else {
           lens[i] = SHARED_STRLEN(cp);
@@ -752,9 +754,10 @@ void f_terminal_colour() {
       if (repused) {
         parts[i] = rep;
         lens[i] = wrap ? -SVALUE_STRLEN(reptmp) : SVALUE_STRLEN(reptmp);
-        if (curcolourlen + SVALUE_STRLEN(reptmp) < MAX_COLOUR_STRING - 1) {
-          strcat(curcolour, rep);
-          curcolourlen += SVALUE_STRLEN(reptmp);
+        size_t len_to_add = SVALUE_STRLEN(reptmp);
+        if (curcolourlen + len_to_add < MAX_COLOUR_STRING - 1) {
+          strncat(curcolour, rep, len_to_add);
+          curcolourlen += len_to_add;
         }
       } else {
         lens[i] = strlen(parts[i]);
@@ -905,10 +908,11 @@ void f_terminal_colour() {
           curcolour[0] = 0;
           curcolourlen = 0;
         } else {
-          if (curcolourlen + strlen(p) < MAX_COLOUR_STRING - 1) {
-            strcat(curcolour, p);
-            curcolourlen += strlen(p);
-          }
+        size_t len_to_add = strlen(p);
+        if (curcolourlen + len_to_add < MAX_COLOUR_STRING - 1) {
+          strncat(curcolour, p, len_to_add);
+          curcolourlen += len_to_add;
+        }
         }
         continue;
       }
@@ -2202,7 +2206,7 @@ void event(svalue_t *event_ob, const char *event_fun, int numparam, svalue_t *ev
   push_malloced_string(name);
 
   strcpy(name, EVENT_PREFIX);
-  strcat(name, event_fun);
+  strncat(name, event_fun, strlen(event_fun));
 
   if (event_ob->type == T_ARRAY) {
     int ind;
@@ -2285,23 +2289,23 @@ void number_as_string(char *buf, LPC_INT n) {
   const char *single[] = {"",     "one", "two",   "three", "four",
                           "five", "six", "seven", "eight", "nine"};
   if (!n) {
-    strcat(buf, "zero");
+    strncat(buf, "zero", sizeof("zero") - 1);
     return;
   }
 
   if (n < 20 && n > 9) {
-    strcat(buf, low[n - 10]);
+    strncat(buf, low[n - 10], strlen(low[n - 10]));
     return;
   }
 
-  strcat(buf, hi[n / 10]);
+  strncat(buf, hi[n / 10], strlen(hi[n / 10]));
 
   if ((n > 20) && (n % 10)) {
-    strcat(buf, "-");
+    strncat(buf, "-", sizeof("-") - 1);
   }
   n %= 10;
 
-  strcat(buf, single[n]);
+  strncat(buf, single[n], strlen(single[n]));
 }
 
 void f_query_num() {
@@ -2326,12 +2330,12 @@ void f_query_num() {
     n = n % 1000;
     if (!n) {
       number_as_string(ret, i);
-      strcat(ret, " thousand");
+      strncat(ret, " thousand", sizeof(" thousand") - 1);
       goto q_n_end;
     }
 
     number_as_string(ret, i);
-    strcat(ret, " thousand");
+    strncat(ret, " thousand", sizeof(" thousand") - 1);
     changed = 1;
   }
 
@@ -2339,27 +2343,27 @@ void f_query_num() {
     n = n % 100;
     if (changed) {
       if (!n) {
-        strcat(ret, " and ");
+        strncat(ret, " and ", sizeof(" and ") - 1);
         number_as_string(ret, i);
-        strcat(ret, " hundred");
+        strncat(ret, " hundred", sizeof(" hundred") - 1);
         goto q_n_end;
       }
-      strcat(ret, ", ");
+      strncat(ret, ", ", sizeof(", ") - 1);
       number_as_string(ret, i);
-      strcat(ret, " hundred");
+      strncat(ret, " hundred", sizeof(" hundred") - 1);
     } else {
       if (!n) {
         number_as_string(ret, i);
-        strcat(ret, " hundred");
+        strncat(ret, " hundred", sizeof(" hundred") - 1);
         goto q_n_end;
       }
       number_as_string(ret, i);
-      strcat(ret, " hundred");
+      strncat(ret, " hundred", sizeof(" hundred") - 1);
       changed = 1;
     }
   }
   if (changed) {
-    strcat(ret, " and ");
+    strncat(ret, " and", sizeof(" and") - 1);
   }
 
   number_as_string(ret, n);
