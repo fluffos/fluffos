@@ -1549,7 +1549,10 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
   }
   p = save_name + strlen(save_name) - 1;
   if (*p != 'c' && *(p - 1) != '.') {
-    strcat(p, ".c");
+    size_t remaining = sizeof(save_name) - (p - save_name);
+    if (remaining > 2) {
+      strncat(p, ".c", remaining - 1);
+    }
   }
 
   /*
@@ -1629,7 +1632,10 @@ int save_object_str(object_t *ob, int save_zeros, char *saved, int size) {
   }
   p = now + strlen(now) - 1;
   if (*p != 'c' && *(p - 1) != '.') {
-    strcat(p, ".c");
+    size_t used = now + strlen(now) - saved; // Total used space
+    if (used + 2 < size) {
+      strncat(p, ".c", 2);
+    }
   }
   now = now + strlen(now);
   *now++ = '\n';
