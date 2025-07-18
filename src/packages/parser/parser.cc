@@ -2550,7 +2550,8 @@ static void check_object_relations(parse_state_t *state) {
       return;
     }
   }
-  if (matches[indirect].ordinal) {
+  // Security fix: Check if indirect is valid before accessing matches[indirect]
+  if (indirect >= 0 && matches[indirect].ordinal) {
     /* if the indirect object is used with ordinal number, choose only
      * that single indirect object. Imagine how it would be confusing if
      * you enter "get apple from the second cask" and the REAL second
@@ -3251,7 +3252,10 @@ static void parse_sentence(const char *input) {
         ve = ve->next;
       }
     }
-    starts[i][-1] = ' ';
+    // Security fix: Check bounds before accessing starts[i][-1]
+    if (i > 0) {
+      starts[i][-1] = ' ';
+    }
   }
 }
 
