@@ -9,5 +9,6 @@ title: general
 * [objects](objects.html)
 * [oop](oop.html)
 * [preprocessor](preprocessor.html)
+* [references](references.html)
 * [simul_efun](simul_efun.html)
 * [socket_efuns](socket_efuns.html)

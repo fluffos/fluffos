@@ -168,6 +168,7 @@ title: EFUN
 * [parse_dump](general/parse_dump.html)
 * [parse_my_rules](general/parse_my_rules.html)
 * [parse_remove](general/parse_remove.html)
+* [refp](general/refp.html)
 * [request_term_size](general/request_term_size.html)
 * [request_term_type](general/request_term_type.html)
 * [restore_variable](general/restore_variable.html)
