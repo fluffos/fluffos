@@ -191,7 +191,7 @@
             background-image:
                 linear-gradient(rgba(0, 255, 0, 0.03) 1px, transparent 1px);
             background-size: 100% 20px;
-            display: none; /* 初始隐藏 */
+            display: none; /* Initially hidden */
         }
 
         .terminal::-webkit-scrollbar {
@@ -359,11 +359,11 @@
             </div>
             <div class="form-group">
                 <label>Address:</label>
-                <input type="text" id="addressInput" placeholder="127.0.0.1" value="127.0.0.1">
+                <input type="text" id="addressInput" placeholder="mud.ren" value="mud.ren">
             </div>
             <div class="form-group">
                 <label>Port:</label>
-                <input type="number" id="portInput" placeholder="8000" value="8000" min="1" max="65535">
+                <input type="number" id="portInput" placeholder="8888" value="8888" min="1" max="65535">
             </div>
             <div class="form-group">
                 <label>Subprotocol:</label>
@@ -396,7 +396,7 @@
     </div>
 
     <script>
-        // Telnet协议常量
+        // Telnet protocol constants
         const TELNET = {
             IAC: 255,   // Interpret As Command
             DONT: 254,  // Don't
@@ -429,7 +429,7 @@
             NEW_ENVIRON: 39, // New Environment Option
             CHARSET: 42, // Charset Option
 
-            // MUD Protocols (按编号排序)
+            // MUD Protocols (sorted by number)
             MSDP: 69,   // Mud Server Data Protocol
             MSSP: 70,   // Mud Server Status Protocol
             MCCP: 86,   // Mud Client Compression Protocol
@@ -441,7 +441,7 @@
             GMCP: 201   // Generic Mud Communication Protocol
         };
 
-        // Telnet over WebSocket 实现
+        // Telnet over WebSocket implementation
         class TelnetOverWebSocket {
             constructor(ws) {
                 this.ws = ws;
@@ -456,18 +456,19 @@
                     terminalHeight: 24
                 };
                 this.gmcp = new GMCPHandler(this);
+                this.msp = new MSPHandler(this);
                 this.eventHandlers = {};
                 this.setupEventListeners();
             }
 
             setupEventListeners() {
-                // 监听窗口大小变化
+                // Listen for window resize events
                 window.addEventListener('resize', () => {
                     this.updateTerminalSize();
                 });
             }
 
-            // 处理接收到的数据
+            // Process received data
             processData(data) {
                 const bytes = new Uint8Array(data);
                 const result = [];
@@ -508,27 +509,37 @@
                 return new TextDecoder().decode(Uint8Array.from(result));
             }
 
-            // 处理IAC命令
+            // Handle IAC commands
             handleIAC(command) {
                 switch (command) {
                     case TELNET.WILL:
                     case TELNET.WONT:
                     case TELNET.DO:
                     case TELNET.DONT:
-                        // 这些会在下一个字节处理
+                        // These will be handled in the next byte
                         break;
                     case TELNET.SB:
                         this.state.sb = true;
                         this.state.sbBuffer = [];
                         break;
                     case TELNET.GA:
-                        // Go Ahead - 可以忽略
+                        // Go Ahead - can be ignored
                         break;
                 }
             }
 
-            // 处理子协商
+            // Handle subnegotiation
             handleSubnegotiation(type, data) {
+                const typeName = {
+                    [TELNET.TERMINAL_TYPE]: 'TERMINAL_TYPE',
+                    [TELNET.NAWS]: 'NAWS',
+                    [TELNET.GMCP]: 'GMCP',
+                    [TELNET.MSP]: 'MSP'
+                }[type] || `TYPE_${type}`;
+
+                const text = new TextDecoder().decode(Uint8Array.from(data));
+                console.log(`📡 Subnegotiation ${typeName}:`, text);
+
                 switch (type) {
                     case TELNET.TERMINAL_TYPE:
                         this.handleTerminalType(data);
@@ -539,10 +550,15 @@
                     case TELNET.GMCP:
                         this.gmcp.handleMessage(data);
                         break;
+                    case TELNET.MSP:
+                        this.msp.handleMessage(data);
+                        break;
+                    default:
+                        console.log('🤔 Unhandled subnegotiation type:', typeName);
                 }
             }
 
-            // 处理终端类型请求
+            // Handle terminal type request
             handleTerminalType(data) {
                 if (data[0] === 1) { // SEND
                     const terminalType = new TextEncoder().encode(this.state.terminalType);
@@ -550,7 +566,7 @@
                 }
             }
 
-            // 处理窗口大小协商
+            // Handle window size negotiation
             handleNAWS(data) {
                 if (data.length >= 4) {
                     this.state.terminalWidth = (data[0] << 8) | data[1];
@@ -558,19 +574,19 @@
                 }
             }
 
-            // 发送IAC命令
+            // Send IAC command
             sendIAC(command, option) {
                 const bytes = new Uint8Array([TELNET.IAC, command, option]);
                 this.ws.send(bytes);
             }
 
-            // 发送子协商
+            // Send subnegotiation
             sendSubnegotiation(type, data) {
                 const bytes = [TELNET.IAC, TELNET.SB, type, ...data, TELNET.IAC, TELNET.SE];
                 this.ws.send(Uint8Array.from(bytes));
             }
 
-            // 发送转义后的数据
+            // Send escaped data
             send(data) {
                 const encoder = new TextEncoder();
                 const bytes = encoder.encode(data);
@@ -587,17 +603,17 @@
                 this.ws.send(Uint8Array.from(escaped));
             }
 
-            // 初始化Telnet协商
+            // Initialize Telnet negotiation
             initTelnetNegotiation() {
-                // 启用终端类型
+                // Enable terminal type
                 this.sendIAC(TELNET.WILL, TELNET.TERMINAL_TYPE);
-                // 启用窗口大小报告
+                // Enable window size reporting
                 this.sendIAC(TELNET.WILL, TELNET.NAWS);
-                // 发送初始终端信息
+                // Send initial terminal info
                 this.updateTerminalSize();
             }
 
-            // 更新终端大小
+            // Update terminal size
             updateTerminalSize() {
                 const width = Math.floor(window.innerWidth / 8);
                 const height = Math.floor(window.innerHeight / 16);
@@ -615,12 +631,12 @@
                 }
             }
 
-            // 注册事件处理器
+            // Register event handlers
             on(event, handler) {
                 this.eventHandlers[event] = handler;
             }
 
-            // 触发事件
+            // Trigger event
             emit(event, data) {
                 if (this.eventHandlers[event]) {
                     this.eventHandlers[event](data);
@@ -628,7 +644,7 @@
             }
         }
 
-        // GMCP处理器
+        // GMCP Handler
         class GMCPHandler {
             constructor(telnet) {
                 this.telnet = telnet;
@@ -636,7 +652,7 @@
                 this.modules = new Map();
             }
 
-            // 处理GMCP消息
+            // Handle GMCP messages
             handleMessage(data) {
                 const text = new TextDecoder().decode(Uint8Array.from(data));
                 const spaceIndex = text.indexOf(' ');
@@ -647,11 +663,11 @@
                     const parsed = jsonData ? JSON.parse(jsonData) : {};
                     this.processModule(module, parsed);
                 } catch (e) {
-                    console.warn('GMCP解析错误:', e);
+                    console.warn('GMCP parsing error:', e);
                 }
             }
 
-            // 处理GMCP模块
+            // Process GMCP modules
             processModule(module, data) {
                 switch (module) {
                     case 'Client.GUI':
@@ -669,7 +685,7 @@
                 }
             }
 
-            // 发送GMCP消息
+            // Send GMCP message
             send(module, data) {
                 if (!this.enabled) return;
 
@@ -680,7 +696,7 @@
                 this.telnet.sendSubnegotiation(TELNET.GMCP, Array.from(bytes));
             }
 
-            // 启用GMCP
+            // Enable GMCP
             enable() {
                 this.enabled = true;
                 this.send('Client.GUI', {
@@ -695,28 +711,43 @@
                 });
             }
 
-            // 处理客户端GUI信息
+            // Handle client GUI info
             handleClientGUI(data) {
-                console.log('Client GUI配置:', data);
+                console.log('Client GUI configuration:', data);
             }
 
-            // 处理窗口信息
+            // Handle window info
             handleClientWindow(data) {
-                console.log('窗口大小:', data);
+                console.log('Window size:', data);
             }
 
-            // 处理角色信息
+            // Handle character info
             handleCharVitals(data) {
-                console.log('角色状态:', data);
+                console.log('Character status:', data);
             }
 
-            // 处理房间信息
+            // Handle room info
             handleRoomInfo(data) {
-                console.log('房间信息:', data);
+                console.log('Room information:', data);
             }
         }
 
-        // 增强版MUD客户端
+        // Minimal MSP Handler - Logging only
+        class MSPHandler {
+            constructor(telnet) {
+                this.telnet = telnet;
+            }
+
+            handleMessage(data) {
+                // MSP data is handled by handleSubnegotiation
+            }
+
+            enable() {
+                console.log('MSP enabled');
+            }
+        }
+
+        // Enhanced MUD Client
         class AdvancedMUDClient {
             constructor() {
                 this.ws = null;
@@ -764,7 +795,7 @@
             }
 
             setupTerminalFeatures() {
-                // 监听窗口大小变化
+                // Listen for window resize events
                 window.addEventListener('resize', () => {
                     if (this.telnet) {
                         this.telnet.updateTerminalSize();
@@ -775,8 +806,8 @@
             setDefaultConfig() {
                 this.protocolSelect.value = 'ws://';
                 this.addressInput.value = '127.0.0.1';
-                this.portInput.value = '8000';
-                this.subprotocolSelect.value = 'ascii';
+                this.portInput.value = '8888';
+                this.subprotocolSelect.value = 'telnet';
             }
 
             handleConnect() {
@@ -786,12 +817,12 @@
                 const subprotocol = this.subprotocolSelect.value;
 
                 if (!address) {
-                    alert('请输入服务器地址');
+                    alert('Please enter server address');
                     return;
                 }
 
                 if (!port || port < 1 || port > 65535) {
-                    alert('请输入有效的端口号（1-65535）');
+                    alert('Please enter a valid port number (1-65535)');
                     return;
                 }
 
@@ -804,7 +835,7 @@
 
             connect(wsUrl, protocols) {
                 try {
-                    this.status.textContent = '正在连接...';
+                    this.status.textContent = 'Connecting...';
                     this.status.className = 'status connecting';
 
                     this.ws = new WebSocket(wsUrl, protocols);
@@ -812,7 +843,7 @@
                     this.ws.onopen = () => {
                         this.connected = true;
                         this.retryCount = 0;
-                        this.status.textContent = '已连接';
+                        this.status.textContent = 'Connected';
                         this.status.className = 'status connected';
                         this.commandInput.disabled = false;
                         this.sendBtn.disabled = false;
@@ -822,13 +853,13 @@
 
                         if (this.protocolType === 'telnet' || this.protocolType === 'binary') {
                             const protocolName = this.protocolType === 'telnet' ? 'Telnet' : 'Binary';
-                            this.appendMessage(`✅ ${protocolName}协议已激活，正在协商...`, 'system');
-                            // 使用Telnet协议栈进行协商
+                            this.appendMessage(`✅ ${protocolName} protocol activated, negotiating...`, 'system');
+                            // Use Telnet protocol stack for negotiation
                             setTimeout(() => {
                                 this.initTelnetNegotiation();
                             }, 100);
                         } else {
-                            this.appendMessage('✅ 已连接到MUD服务器', 'system');
+                            this.appendMessage('✅ Connected to MUD server', 'system');
                         }
                     };
 
@@ -843,7 +874,7 @@
                     this.ws.onclose = () => {
                         this.connected = false;
                         this.telnet = null;
-                        this.status.textContent = '已断开';
+                        this.status.textContent = 'Disconnected';
                         this.status.className = 'status disconnected';
                         this.commandInput.disabled = true;
                         this.sendBtn.disabled = true;
@@ -851,12 +882,12 @@
                         this.connectionPanel.style.display = 'block';
                         this.terminal.style.display = 'none';
 
-                        this.appendMessage('🔌 连接已断开', 'error');
+                        this.appendMessage('🔌 Connection lost', 'error');
 
                         if (this.retryCount < this.maxRetries) {
                             this.retryCount++;
                             setTimeout(() => {
-                                this.appendMessage(`🔄 正在重连...(${this.retryCount}/${this.maxRetries})`, 'system');
+                                this.appendMessage(`🔄 Reconnecting...(${this.retryCount}/${this.maxRetries})`, 'system');
                                 const wsUrl = `${this.protocolSelect.value}${this.addressInput.value}:${this.portInput.value}`;
                                 const protocols = this.subprotocolSelect.value ? [this.subprotocolSelect.value] : [];
                                 this.connect(wsUrl, protocols);
@@ -866,12 +897,12 @@
 
                     this.ws.onerror = (error) => {
                         console.error('WebSocket error:', error);
-                        this.appendMessage('❌ 连接错误，请检查网络', 'error');
+                        this.appendMessage('❌ Connection error, please check network', 'error');
                     };
 
                 } catch (error) {
                     console.error('Connection failed:', error);
-                    this.appendMessage('❌ 创建连接失败: ' + error.message, 'error');
+                    this.appendMessage('❌ Failed to create connection: ' + error.message, 'error');
                 }
             }
 
@@ -884,11 +915,7 @@
             }
 
             handleGMCPMessage(data) {
-                // 在控制台记录GMCP数据，但不显示在终端界面上
-                console.log('GMCP消息:', data);
-
-                // 可以在这里添加GMCP数据的实际处理逻辑
-                // 例如更新状态栏、地图、技能面板等
+                // Can add actual processing logic for GMCP data here
                 this.processGMCPData(data);
             }
 
@@ -897,68 +924,44 @@
 
                 switch (data.module) {
                     case 'Char.Vitals':
-                        // 处理角色状态数据，可以更新状态栏
                         this.updateCharacterStatus(data.data);
                         break;
                     case 'Room.Info':
-                        // 处理房间信息，可以更新地图或房间显示
                         this.updateRoomInfo(data.data);
                         break;
                     case 'Client.GUI':
-                        // 处理客户端GUI配置
-                        console.log('收到客户端GUI配置:', data.data);
                         break;
-                    default:
-                        console.log(`未处理的GMCP模块: ${data.module}`, data.data);
                 }
             }
 
             updateCharacterStatus(vitals) {
-                // 这里可以更新角色状态显示，例如创建状态栏
-                // 示例：更新一个假设的状态栏元素
-                console.log('角色状态更新:', vitals);
-
-                // 实际实现时，可以更新HTML元素
-                // const statusBar = document.getElementById('status-bar');
-                // if (statusBar) {
-                //     statusBar.innerHTML = `
-                //         <div>HP: ${vitals.hp}/${vitals.max_hp}</div>
-                //         <div>MP: ${vitals.mp}/${vitals.max_mp}</div>
-                //     `;
-                // }
+                // Can update character status display here, e.g., create status bar
+                console.log('Character status update:', vitals);
             }
 
             updateRoomInfo(roomInfo) {
-                // 这里可以更新房间信息显示
-                console.log('房间信息更新:', roomInfo);
-
-                // 实际实现时，可以更新房间名称、出口等信息
-                // const roomDisplay = document.getElementById('room-info');
-                // if (roomDisplay) {
-                //     roomDisplay.innerHTML = `
-                //         <div class="room-name">${roomInfo.name}</div>
-                //         <div class="room-exits">出口: ${roomInfo.exits.join(', ')}</div>
-                //     `;
-                // }
+                // Can update room information display here
+                console.log('Room information update:', roomInfo);
             }
 
             initTelnetNegotiation() {
-                // 主动声明我们支持的Telnet选项
+                // Proactively declare supported Telnet options
                 this.sendTelnetCommand(TELNET.WILL, TELNET.TERMINAL_TYPE);
                 this.sendTelnetCommand(TELNET.WILL, TELNET.NAWS);
                 this.sendTelnetCommand(TELNET.WILL, TELNET.GMCP);
                 this.sendTelnetCommand(TELNET.WILL, TELNET.SUPPRESS_GO_AHEAD);
 
-                // 请求服务器支持的选项
+                // Request server supported options
                 this.sendTelnetCommand(TELNET.DO, TELNET.TERMINAL_TYPE);
                 this.sendTelnetCommand(TELNET.DO, TELNET.NAWS);
                 this.sendTelnetCommand(TELNET.DO, TELNET.GMCP);
                 this.sendTelnetCommand(TELNET.DO, TELNET.SUPPRESS_GO_AHEAD);
+                this.sendTelnetCommand(TELNET.DO, TELNET.MSP); // Client requests MSP support
 
-                // 发送窗口大小
+                // Send window size
                 this.sendWindowSize();
 
-                this.appendMessage('✅ Telnet协商完成', 'system');
+                this.appendMessage('✅ Telnet negotiation complete', 'system');
             }
 
             handleTelnetData(data) {
@@ -972,7 +975,6 @@
                     reader.readAsArrayBuffer(data);
                     return;
                 } else if (typeof data === 'string') {
-                    // 字符串数据直接处理
                     this.handleMessage(data);
                     return;
                 }
@@ -996,11 +998,11 @@
                             const next = bytes[i + 1];
 
                             if (next === TELNET.IAC) {
-                                // 转义的IAC
+                                // Escaped IAC
                                 result.push(TELNET.IAC);
                                 i += 2;
                             } else if (next === TELNET.SB) {
-                                // 子协商开始
+                                // Subnegotiation start
                                 subnegotiation = true;
                                 subBuffer = [];
                                 i += 2;
@@ -1010,12 +1012,12 @@
                                     i++;
                                 }
                             } else if (next === TELNET.SE) {
-                                // 子协商结束
+                                // Subnegotiation end
                                 subnegotiation = false;
                                 this.handleSubnegotiation(subnegotiationType, subBuffer);
                                 i += 2;
                             } else {
-                                // 标准Telnet命令
+                                // Standard Telnet command
                                 this.handleTelnetCommand(next, bytes[i + 2]);
                                 i += 3;
                             }
@@ -1060,7 +1062,7 @@
                 const cmdName = commandNames[command] || `CMD_${command}`;
                 const optName = optionNames[option] || `OPT_${option}`;
 
-                // 所有协商信息只记录在控制台
+                // All negotiation info is only logged to console
                 if ([TELNET.GA, TELNET.EL, TELNET.EC, TELNET.AYT, TELNET.AO, TELNET.IP, TELNET.BRK, TELNET.DM, TELNET.NOP, TELNET.EOR].includes(command)) {
                     console.log(`Telnet: ${cmdName}`);
                 } else {
@@ -1096,6 +1098,14 @@
                         this.sendTelnetCommand(TELNET.WILL, TELNET.GMCP);
                         this.initGMCP();
                         break;
+                    case TELNET.MSP:
+                        // Server supports MSP, client confirms
+                        this.sendTelnetCommand(TELNET.WILL, TELNET.MSP);
+                        // Initialize MSP handler
+                        if (this.telnet && this.telnet.msp) {
+                            this.telnet.msp.enable();
+                        }
+                        break;
                     default:
                         this.sendTelnetCommand(TELNET.WONT, option);
                 }
@@ -1112,6 +1122,14 @@
                         break;
                     case TELNET.ECHO:
                         this.sendTelnetCommand(TELNET.DO, TELNET.ECHO);
+                        break;
+                    case TELNET.MSP:
+                        // Server supports MSP, client confirms
+                        this.sendTelnetCommand(TELNET.DO, TELNET.MSP);
+                        // Initialize MSP handler
+                        if (this.telnet && this.telnet.msp) {
+                            this.telnet.msp.enable();
+                        }
                         break;
                     default:
                         this.sendTelnetCommand(TELNET.DONT, option);
@@ -1130,10 +1148,14 @@
                         }
                         break;
                     case TELNET.NAWS:
-                        // 服务器发送的窗口大小请求
+                        // Server sends window size request
                         break;
                     case TELNET.GMCP:
                         this.handleGMCPData(data);
+                        break;
+                    case TELNET.MSP:
+                        const text = new TextDecoder().decode(Uint8Array.from(data));
+                        console.log('📡 Subnegotiation MSP:', text);
                         break;
                 }
             }
@@ -1182,6 +1204,8 @@
             handleGMCPData(data) {
                 try {
                     const text = new TextDecoder().decode(Uint8Array.from(data));
+                    console.log('📡 Subnegotiation GMCP:', text);
+
                     const spaceIndex = text.indexOf(' ');
                     const module = spaceIndex > -1 ? text.substring(0, spaceIndex) : text;
                     const jsonData = spaceIndex > -1 ? text.substring(spaceIndex + 1) : '';
@@ -1191,36 +1215,7 @@
                         this.handleGMCPMessage({ module, data: parsed });
                     }
                 } catch (e) {
-                    console.warn('GMCP解析错误:', e);
-                }
-            }
-
-            sendCommand(command) {
-                if (!this.connected) return;
-
-                if (!command) {
-                    command = '\n';
-                } else if (!command.endsWith('\n')) {
-                    command += '\n';
-                }
-
-                if (this.protocolType === 'telnet' || this.protocolType === 'binary') {
-                    // Telnet/Binary模式下需要转义IAC字符
-                    const encoder = new TextEncoder();
-                    const bytes = encoder.encode(command);
-                    const escaped = [];
-
-                    for (const byte of bytes) {
-                        if (byte === TELNET.IAC) {
-                            escaped.push(TELNET.IAC, TELNET.IAC);
-                        } else {
-                            escaped.push(byte);
-                        }
-                    }
-
-                    this.ws.send(Uint8Array.from(escaped));
-                } else {
-                    this.ws.send(command);
+                    console.warn('GMCP parsing error:', e);
                 }
             }
 
@@ -1245,7 +1240,24 @@
                     command += '\n';
                 }
 
-                this.ws.send(command);
+                if (this.protocolType === 'telnet' || this.protocolType === 'binary') {
+                    // Need to escape IAC characters in Telnet/Binary mode
+                    const encoder = new TextEncoder();
+                    const bytes = encoder.encode(command);
+                    const escaped = [];
+
+                    for (const byte of bytes) {
+                        if (byte === TELNET.IAC) {
+                            escaped.push(TELNET.IAC, TELNET.IAC);
+                        } else {
+                            escaped.push(byte);
+                        }
+                    }
+
+                    this.ws.send(Uint8Array.from(escaped));
+                } else {
+                    this.ws.send(command);
+                }
             }
 
             appendMessage(message, className = '') {
@@ -1299,7 +1311,7 @@
                     return '';
                 });
 
-                // 清理光标控制序列
+                // Clean cursor control sequences
                 const cursorPatterns = [
                     /\x1b\[\d*[A-D]/g,
                     /\x1b\[\d*;\d*[Hf]/g,
@@ -1390,7 +1402,7 @@
             }
         }
 
-        // 启动客户端
+        // Start client
         const client = new AdvancedMUDClient();
     </script>
 </body>
