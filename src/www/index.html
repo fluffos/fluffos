@@ -1,90 +1,1409 @@
-<html class="no-js" lang="">
-
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>FluffOS v2019</title>
-  <meta name="description" content="">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MUD Game Client - FluffOS</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-  <link rel="stylesheet" href="normalize.css"/>
-  <link rel="stylesheet" href="xterm.css"/>
-  <style>
-    @font-face {
-      font-family: 'Noto Sans Mono';
-      src: url('fixedsys.ttf') format("truetype");
-      font-weight: 300;
-    }
+        body {
+            background-color: #0a0a0a;
+            color: #e0e0e0;
+            font-family: 'Consolas', 'Monaco', 'Courier New', 'Fira Code', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-image:
+                radial-gradient(circle at 20% 50%, rgba(0, 255, 0, 0.03) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(0, 255, 0, 0.02) 0%, transparent 50%);
+        }
 
-    html, body, #container {
-        margin: 0;
-        padding: 0;
-        height: 100%;
-        width: 100%;
-        box-sizing: border-box;
-    }
-    #container {
-        display: flex;
-        flex-direction: column;
-    }
-    #terminal {
-        flex: 1; /* 占用剩余空间 */
-        width: 100%;
-        position: relative;
-        padding: 0;
-        border: none;
-        box-sizing: border-box;
-    }
-    #terminal + div { /* 假设 28px 元素是 #terminal 的下一个兄弟 */
-        height: 28px;
-    }
-    
-    .xterm {
-        font-family: 'Noto Sans Mono', monospace;
-        font-size: 22px;
-        line-height: 1.5;
-    }
-    .xterm {
-      font-family: 'Noto Sans Mono', monospace;
-      font-size: 22px;
-      line-height: 1.2;
-    }
-    .xterm-bold {
-    font-weight: normal !important;
-    }
-    .xterm-cursor {
-      visibility: hidden !important;
-    }
-    .xterm-decoration[data-link-id="mystyle"] {
-        color: #00FFFF;
-        text-decoration: underline;
-    }
-    .xterm-dom-renderer-owner-1 span.xterm-bold
-    
-  </style>
+        .header {
+            background: linear-gradient(135deg, #111 0%, #1a1a1a 100%);
+            padding: 15px;
+            border-bottom: 2px solid #0f0;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0, 255, 0, 0.1);
+        }
 
-  <script src="xterm.js"></script>
-  <script src="addon-attach/lib/addon-attach.js"></script>
-  <script src="xterm-addon-fit.js"></script>
-  <script src="addon-web-links/lib/addon-web-links.js"></script>
-  <script src="xterm-addon-unicode14.js"></script>
-  <script src="xterm-addon-mxp-links.js"></script>
-  <script src="addon-clipboard/lib/addon-clipboard.js"></script>
-  <script src="widechar_width.js"></script> 
-  <script src="jquery.js"></script>
-  <script src="fontobserver.js"></script>
-  <script src="example.js"></script>
+        .header h1 {
+            color: #0f0;
+            font-size: 18px;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+            letter-spacing: 2px;
+        }
 
+        .status-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 15px;
+            background: linear-gradient(90deg, #111 0%, #0a0a0a 100%);
+            border-bottom: 1px solid #333;
+            font-size: 12px;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: bold;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status.connected .status-indicator {
+            background-color: #0f0;
+            box-shadow: 0 0 8px #0f0;
+        }
+
+        .status.disconnected .status-indicator {
+            background-color: #f00;
+            box-shadow: 0 0 8px #f00;
+        }
+
+        .status.connecting .status-indicator {
+            background-color: #ff0;
+            box-shadow: 0 0 8px #ff0;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+.connection-panel {
+            background: linear-gradient(135deg, #111 0%, #1a1a1a 100%);
+            border: 1px solid #333;
+            border-radius: 8px;
+            margin: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .panel-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .panel-header h3 {
+            color: #0f0;
+            font-size: 16px;
+            text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+        }
+
+        .panel-content {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .form-group {
+            display: contents;
+        }
+
+        .form-group label {
+            color: #ccc;
+            font-size: 12px;
+            text-align: right;
+            padding-right: 10px;
+        }
+
+        .form-group input,
+        .form-group select {
+            background-color: #222;
+            color: #0f0;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', 'Fira Code', monospace;
+            font-size: 13px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            border-color: #0f0;
+            box-shadow: 0 0 8px rgba(0, 255, 0, 0.3);
+            background-color: #333;
+        }
+
+        .panel-actions {
+            grid-column: 1 / -1;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+
+        .connect-btn {
+            background: linear-gradient(135deg, #0f0 0%, #0a0 100%);
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-family: 'Consolas', 'Monaco', 'Courier New', 'Fira Code', monospace;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px rgba(0, 255, 0, 0.3);
+        }
+
+        .connect-btn:hover {
+            background: linear-gradient(135deg, #0a0 0%, #0f0 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 255, 0, 0.4);
+        }
+
+        .connect-btn.secondary {
+            background: linear-gradient(135deg, #333 0%, #555 100%);
+            color: #ccc;
+        }
+
+        .connect-btn.secondary:hover {
+            background: linear-gradient(135deg, #555 0%, #777 100%);
+        }
+
+        .terminal {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background-color: #000;
+            font-family: 'Consolas', 'Monaco', 'Courier New', 'Fira Code', monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            line-height: 1.6;
+            background-image:
+                linear-gradient(rgba(0, 255, 0, 0.03) 1px, transparent 1px);
+            background-size: 100% 20px;
+            display: none; /* Initially hidden */
+        }
+
+        .terminal::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .terminal::-webkit-scrollbar-track {
+            background: linear-gradient(180deg, #111 0%, #0a0a0a 100%);
+        }
+
+        .terminal::-webkit-scrollbar-thumb {
+            background: #008000;
+            border-radius: 4px;
+        }
+
+        .terminal::-webkit-scrollbar-thumb:hover {
+            background: #006400;
+        }
+
+        .input-container {
+            position: relative;
+            flex: 1;
+        }
+
+        .command-input {
+            width: 100%;
+            background-color: #0a0a0a;
+            color: #0f0;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 10px 40px 10px 12px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', 'Fira Code', monospace;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .command-input:focus {
+            border-color: #0f0;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+            background-color: #111;
+        }
+
+        .input-area {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px;
+            background: linear-gradient(90deg, #111 0%, #0a0a0a 100%);
+            border-top: 1px solid #0f0;
+        }
+
+        .send-btn {
+            background: linear-gradient(135deg, #0f0 0%, #0a0 100%);
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-family: 'Consolas', 'Monaco', 'Courier New', 'Fira Code', monospace;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px rgba(0, 255, 0, 0.3);
+        }
+
+        .send-btn:hover {
+            background: linear-gradient(135deg, #0a0 0%, #0f0 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 255, 0, 0.4);
+        }
+
+        .send-btn:disabled {
+            background: #333;
+            color: #666;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .message {
+            margin-bottom: 4px;
+            padding: 2px 0;
+            transition: all 0.3s ease;
+        }
+
+        .message:hover {
+            background-color: rgba(0, 255, 0, 0.05);
+        }
+
+        .error {
+            color: #ff6b6b;
+            border-left: 2px solid #ff6b6b;
+            padding-left: 8px;
+        }
+
+        .system {
+            color: #ffd93d;
+            border-left: 2px solid #ffd93d;
+            padding-left: 8px;
+        }
+
+        .history-hint {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 10px;
+            color: #666;
+            pointer-events: none;
+        }
+
+        .typing-indicator {
+            color: #0f0;
+            font-size: 12px;
+            opacity: 0.7;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                font-size: 12px;
+            }
+
+            .header h1 {
+                font-size: 16px;
+            }
+
+            .terminal {
+                padding: 10px;
+            }
+
+            .input-area {
+                padding: 10px;
+            }
+
+            .command-input {
+                font-size: 12px;
+                padding: 8px 35px 8px 10px;
+            }
+        }
+    </style>
 </head>
 <body>
-  <!--[if IE]>
-  <p class="browserupgrade">You are using an <strong>outdated</strong> browser. Please <a href="https://browsehappy.com/">upgrade your browser</a> to improve your experience and security.</p>
-  <![endif]-->
-  <div id="container" >
-    <div id="terminal">
-
+    <div class="header">
+        <h1>🎮 MUD Game Client</h1>
     </div>
-    <input id="command" style="height: 28px; width: 100%" />
-  </div>
-</body>
 
+    <div class="status-container">
+        <div class="status connecting" id="status">
+            <div class="status-indicator"></div>
+            <span>Waiting for connection configuration...</span>
+        </div>
+    </div>
+
+    <div class="connection-panel" id="connectionPanel">
+        <div class="panel-header">
+            <h3>🔌 Connection Configuration</h3>
+        </div>
+        <div class="panel-content">
+            <div class="form-group">
+                <label>Protocol:</label>
+                <select id="protocolSelect">
+                    <option value="wss://">wss:// (Secure WebSocket)</option>
+                    <option value="ws://">ws:// (WebSocket)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Address:</label>
+                <input type="text" id="addressInput" placeholder="mud.ren" value="mud.ren">
+            </div>
+            <div class="form-group">
+                <label>Port:</label>
+                <input type="number" id="portInput" placeholder="8888" value="8888" min="1" max="65535">
+            </div>
+            <div class="form-group">
+                <label>Subprotocol:</label>
+                <select id="subprotocolSelect">
+                    <option value="ascii">ASCII (Plain Text)</option>
+                    <option value="telnet">Telnet (Terminal Protocol)</option>
+                    <option value="binary">Binary (Legacy Compatible)</option>
+                    <option value="http">HTTP (Static Files)</option>
+                    <option value="">None</option>
+                </select>
+            </div>
+            <div class="panel-actions">
+                <button class="connect-btn" id="connectBtn">Connect</button>
+                <button class="connect-btn secondary" id="defaultBtn">Default Config</button>
+            </div>
+            <div style="text-align: center; margin-top: 15px; font-size: 11px; color: #666; width: 100%; grid-column: 1 / -1;">
+                Powered by <a href="https://bbs.mud.ren" target="_blank" style="color: #0f0; text-decoration: none;">mud.ren</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="terminal" id="terminal">Welcome to MUD Game Web Client! Connecting to MUD...</div>
+
+    <div class="input-area">
+        <div class="input-container">
+            <input type="text" class="command-input" id="commandInput" placeholder="Enter command... (↑↓ for history)" disabled>
+            <div class="history-hint" id="historyHint" style="display: none;">↑↓ History</div>
+        </div>
+        <button class="send-btn" id="sendBtn" disabled>Send</button>
+    </div>
+
+    <script>
+        // Telnet protocol constants
+        const TELNET = {
+            IAC: 255,   // Interpret As Command
+            DONT: 254,  // Don't
+            DO: 253,    // Do
+            WONT: 252,  // Won't
+            WILL: 251,  // Will
+            SB: 250,    // Subnegotiation Begin
+            SE: 240,    // Subnegotiation End
+            GA: 249,    // Go Ahead
+            EL: 248,    // Erase Line
+            EC: 247,    // Erase Character
+            AYT: 246,   // Are You There
+            AO: 245,    // Abort Output
+            IP: 244,    // Interrupt Process
+            BRK: 243,   // Break
+            DM: 242,    // Data Mark
+            NOP: 241,   // No Operation
+            EOR: 239,   // End of Record
+            ABORT: 238, // Abort
+            SUSP: 237,  // Suspend Process
+            EOF: 236,   // End of File
+
+            // Telnet Options
+            ECHO: 1,    // Echo
+            SUPPRESS_GO_AHEAD: 3, // Suppress Go Ahead
+            STATUS: 5,  // Status
+            TIMING_MARK: 6, // Timing Mark
+            TERMINAL_TYPE: 24, // Terminal Type
+            NAWS: 31,   // Negotiate About Window Size
+            NEW_ENVIRON: 39, // New Environment Option
+            CHARSET: 42, // Charset Option
+
+            // MUD Protocols (sorted by number)
+            MSDP: 69,   // Mud Server Data Protocol
+            MSSP: 70,   // Mud Server Status Protocol
+            MCCP: 86,   // Mud Client Compression Protocol
+            MSP: 90,    // Mud Sound Protocol
+            MXP: 91,    // Mud eXtension Protocol
+            ZMP: 93,    // Zenith Mud Protocol
+            MMP: 102,   // Mud Mapper Protocol
+            ATCP: 200,  // Achaea Telnet Client Protocol
+            GMCP: 201   // Generic Mud Communication Protocol
+        };
+
+        // Telnet over WebSocket implementation
+        class TelnetOverWebSocket {
+            constructor(ws) {
+                this.ws = ws;
+                this.state = {
+                    iac: false,
+                    sb: false,
+                    sbType: null,
+                    sbBuffer: [],
+                    options: new Map(),
+                    terminalType: 'websocket-client',
+                    terminalWidth: 80,
+                    terminalHeight: 24
+                };
+                this.gmcp = new GMCPHandler(this);
+                this.msp = new MSPHandler(this);
+                this.eventHandlers = {};
+                this.setupEventListeners();
+            }
+
+            setupEventListeners() {
+                // Listen for window resize events
+                window.addEventListener('resize', () => {
+                    this.updateTerminalSize();
+                });
+            }
+
+            // Process received data
+            processData(data) {
+                const bytes = new Uint8Array(data);
+                const result = [];
+                let i = 0;
+
+                while (i < bytes.length) {
+                    const byte = bytes[i];
+
+                    if (this.state.iac) {
+                        this.handleIAC(byte);
+                        this.state.iac = false;
+                        i++;
+                    } else if (this.state.sb) {
+                        if (byte === TELNET.IAC) {
+                            if (i + 1 < bytes.length && bytes[i+1] === TELNET.SE) {
+                                this.handleSubnegotiation(this.state.sbType, this.state.sbBuffer);
+                                this.state.sb = false;
+                                this.state.sbType = null;
+                                this.state.sbBuffer = [];
+                                i += 2;
+                            } else {
+                                this.state.sbBuffer.push(byte);
+                                i++;
+                            }
+                        } else {
+                            this.state.sbBuffer.push(byte);
+                            i++;
+                        }
+                    } else if (byte === TELNET.IAC) {
+                        this.state.iac = true;
+                        i++;
+                    } else {
+                        result.push(byte);
+                        i++;
+                    }
+                }
+
+                return new TextDecoder().decode(Uint8Array.from(result));
+            }
+
+            // Handle IAC commands
+            handleIAC(command) {
+                switch (command) {
+                    case TELNET.WILL:
+                    case TELNET.WONT:
+                    case TELNET.DO:
+                    case TELNET.DONT:
+                        // These will be handled in the next byte
+                        break;
+                    case TELNET.SB:
+                        this.state.sb = true;
+                        this.state.sbBuffer = [];
+                        break;
+                    case TELNET.GA:
+                        // Go Ahead - can be ignored
+                        break;
+                }
+            }
+
+            // Handle subnegotiation
+            handleSubnegotiation(type, data) {
+                const typeName = {
+                    [TELNET.TERMINAL_TYPE]: 'TERMINAL_TYPE',
+                    [TELNET.NAWS]: 'NAWS',
+                    [TELNET.GMCP]: 'GMCP',
+                    [TELNET.MSP]: 'MSP'
+                }[type] || `TYPE_${type}`;
+
+                const text = new TextDecoder().decode(Uint8Array.from(data));
+                console.log(`📡 Subnegotiation ${typeName}:`, text);
+
+                switch (type) {
+                    case TELNET.TERMINAL_TYPE:
+                        this.handleTerminalType(data);
+                        break;
+                    case TELNET.NAWS:
+                        this.handleNAWS(data);
+                        break;
+                    case TELNET.GMCP:
+                        this.gmcp.handleMessage(data);
+                        break;
+                    case TELNET.MSP:
+                        this.msp.handleMessage(data);
+                        break;
+                    default:
+                        console.log('🤔 Unhandled subnegotiation type:', typeName);
+                }
+            }
+
+            // Handle terminal type request
+            handleTerminalType(data) {
+                if (data[0] === 1) { // SEND
+                    const terminalType = new TextEncoder().encode(this.state.terminalType);
+                    this.sendSubnegotiation(TELNET.TERMINAL_TYPE, [0, ...terminalType]);
+                }
+            }
+
+            // Handle window size negotiation
+            handleNAWS(data) {
+                if (data.length >= 4) {
+                    this.state.terminalWidth = (data[0] << 8) | data[1];
+                    this.state.terminalHeight = (data[2] << 8) | data[3];
+                }
+            }
+
+            // Send IAC command
+            sendIAC(command, option) {
+                const bytes = new Uint8Array([TELNET.IAC, command, option]);
+                this.ws.send(bytes);
+            }
+
+            // Send subnegotiation
+            sendSubnegotiation(type, data) {
+                const bytes = [TELNET.IAC, TELNET.SB, type, ...data, TELNET.IAC, TELNET.SE];
+                this.ws.send(Uint8Array.from(bytes));
+            }
+
+            // Send escaped data
+            send(data) {
+                const encoder = new TextEncoder();
+                const bytes = encoder.encode(data);
+                const escaped = [];
+
+                for (const byte of bytes) {
+                    if (byte === TELNET.IAC) {
+                        escaped.push(TELNET.IAC, TELNET.IAC);
+                    } else {
+                        escaped.push(byte);
+                    }
+                }
+
+                this.ws.send(Uint8Array.from(escaped));
+            }
+
+            // Initialize Telnet negotiation
+            initTelnetNegotiation() {
+                // Enable terminal type
+                this.sendIAC(TELNET.WILL, TELNET.TERMINAL_TYPE);
+                // Enable window size reporting
+                this.sendIAC(TELNET.WILL, TELNET.NAWS);
+                // Send initial terminal info
+                this.updateTerminalSize();
+            }
+
+            // Update terminal size
+            updateTerminalSize() {
+                const width = Math.floor(window.innerWidth / 8);
+                const height = Math.floor(window.innerHeight / 16);
+
+                if (width !== this.state.terminalWidth || height !== this.state.terminalHeight) {
+                    this.state.terminalWidth = width;
+                    this.state.terminalHeight = height;
+
+                    const bytes = [
+                        (width >> 8) & 0xFF, width & 0xFF,
+                        (height >> 8) & 0xFF, height & 0xFF
+                    ];
+
+                    this.sendSubnegotiation(TELNET.NAWS, bytes);
+                }
+            }
+
+            // Register event handlers
+            on(event, handler) {
+                this.eventHandlers[event] = handler;
+            }
+
+            // Trigger event
+            emit(event, data) {
+                if (this.eventHandlers[event]) {
+                    this.eventHandlers[event](data);
+                }
+            }
+        }
+
+        // GMCP Handler
+        class GMCPHandler {
+            constructor(telnet) {
+                this.telnet = telnet;
+                this.enabled = false;
+                this.modules = new Map();
+            }
+
+            // Handle GMCP messages
+            handleMessage(data) {
+                const text = new TextDecoder().decode(Uint8Array.from(data));
+                const spaceIndex = text.indexOf(' ');
+                const module = spaceIndex > -1 ? text.substring(0, spaceIndex) : text;
+                const jsonData = spaceIndex > -1 ? text.substring(spaceIndex + 1) : '';
+
+                try {
+                    const parsed = jsonData ? JSON.parse(jsonData) : {};
+                    this.processModule(module, parsed);
+                } catch (e) {
+                    console.warn('GMCP parsing error:', e);
+                }
+            }
+
+            // Process GMCP modules
+            processModule(module, data) {
+                switch (module) {
+                    case 'Client.GUI':
+                        this.handleClientGUI(data);
+                        break;
+                    case 'Client.Window':
+                        this.handleClientWindow(data);
+                        break;
+                    case 'Char.Vitals':
+                        this.handleCharVitals(data);
+                        break;
+                    case 'Room.Info':
+                        this.handleRoomInfo(data);
+                        break;
+                }
+            }
+
+            // Send GMCP message
+            send(module, data) {
+                if (!this.enabled) return;
+
+                const message = module + ' ' + JSON.stringify(data);
+                const encoder = new TextEncoder();
+                const bytes = encoder.encode(message);
+
+                this.telnet.sendSubnegotiation(TELNET.GMCP, Array.from(bytes));
+            }
+
+            // Enable GMCP
+            enable() {
+                this.enabled = true;
+                this.send('Client.GUI', {
+                    version: '1.0.0',
+                    type: 'websocket',
+                    client: 'FluffOS-WebClient'
+                });
+
+                this.send('Client.Window', {
+                    width: this.telnet.state.terminalWidth,
+                    height: this.telnet.state.terminalHeight
+                });
+            }
+
+            // Handle client GUI info
+            handleClientGUI(data) {
+                console.log('Client GUI configuration:', data);
+            }
+
+            // Handle window info
+            handleClientWindow(data) {
+                console.log('Window size:', data);
+            }
+
+            // Handle character info
+            handleCharVitals(data) {
+                console.log('Character status:', data);
+            }
+
+            // Handle room info
+            handleRoomInfo(data) {
+                console.log('Room information:', data);
+            }
+        }
+
+        // Minimal MSP Handler - Logging only
+        class MSPHandler {
+            constructor(telnet) {
+                this.telnet = telnet;
+            }
+
+            handleMessage(data) {
+                // MSP data is handled by handleSubnegotiation
+            }
+
+            enable() {
+                console.log('MSP enabled');
+            }
+        }
+
+        // Enhanced MUD Client
+        class AdvancedMUDClient {
+            constructor() {
+                this.ws = null;
+                this.telnet = null;
+                this.connected = false;
+                this.terminal = document.getElementById('terminal');
+                this.commandInput = document.getElementById('commandInput');
+                this.sendBtn = document.getElementById('sendBtn');
+                this.status = document.getElementById('status');
+                this.connectionPanel = document.getElementById('connectionPanel');
+                this.history = [];
+                this.historyIndex = -1;
+                this.currentInput = '';
+                this.protocolType = 'ascii';
+
+                this.init();
+            }
+
+            init() {
+                this.retryCount = 0;
+                this.maxRetries = 3;
+                this.setupConnectionUI();
+                this.setupEventListeners();
+                this.setupTerminalFeatures();
+            }
+
+            setupConnectionUI() {
+                this.protocolSelect = document.getElementById('protocolSelect');
+                this.addressInput = document.getElementById('addressInput');
+                this.portInput = document.getElementById('portInput');
+                this.subprotocolSelect = document.getElementById('subprotocolSelect');
+                this.connectBtn = document.getElementById('connectBtn');
+                this.defaultBtn = document.getElementById('defaultBtn');
+
+                this.setDefaultConfig();
+
+                this.connectBtn.addEventListener('click', () => this.handleConnect());
+                this.defaultBtn.addEventListener('click', () => this.setDefaultConfig());
+
+                [this.addressInput, this.portInput].forEach(input => {
+                    input.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') this.handleConnect();
+                    });
+                });
+            }
+
+            setupTerminalFeatures() {
+                // Listen for window resize events
+                window.addEventListener('resize', () => {
+                    if (this.telnet) {
+                        this.telnet.updateTerminalSize();
+                    }
+                });
+            }
+
+            setDefaultConfig() {
+                this.protocolSelect.value = 'ws://';
+                this.addressInput.value = '127.0.0.1';
+                this.portInput.value = '8888';
+                this.subprotocolSelect.value = 'telnet';
+            }
+
+            handleConnect() {
+                const protocol = this.protocolSelect.value;
+                const address = this.addressInput.value.trim();
+                const port = this.portInput.value;
+                const subprotocol = this.subprotocolSelect.value;
+
+                if (!address) {
+                    alert('Please enter server address');
+                    return;
+                }
+
+                if (!port || port < 1 || port > 65535) {
+                    alert('Please enter a valid port number (1-65535)');
+                    return;
+                }
+
+                this.protocolType = subprotocol;
+                const wsUrl = `${protocol}${address}:${port}`;
+                const protocols = subprotocol ? [subprotocol] : [];
+
+                this.connect(wsUrl, protocols);
+            }
+
+            connect(wsUrl, protocols) {
+                try {
+                    this.status.textContent = 'Connecting...';
+                    this.status.className = 'status connecting';
+
+                    this.ws = new WebSocket(wsUrl, protocols);
+
+                    this.ws.onopen = () => {
+                        this.connected = true;
+                        this.retryCount = 0;
+                        this.status.textContent = 'Connected';
+                        this.status.className = 'status connected';
+                        this.commandInput.disabled = false;
+                        this.sendBtn.disabled = false;
+
+                        this.connectionPanel.style.display = 'none';
+                        this.terminal.style.display = 'block';
+
+                        if (this.protocolType === 'telnet' || this.protocolType === 'binary') {
+                            const protocolName = this.protocolType === 'telnet' ? 'Telnet' : 'Binary';
+                            this.appendMessage(`✅ ${protocolName} protocol activated, negotiating...`, 'system');
+                            // Use Telnet protocol stack for negotiation
+                            setTimeout(() => {
+                                this.initTelnetNegotiation();
+                            }, 100);
+                        } else {
+                            this.appendMessage('✅ Connected to MUD server', 'system');
+                        }
+                    };
+
+                    this.ws.onmessage = (event) => {
+                        if (this.protocolType === 'telnet' || this.protocolType === 'binary') {
+                            this.handleTelnetData(event.data);
+                        } else {
+                            this.handleMessage(event.data);
+                        }
+                    };
+
+                    this.ws.onclose = () => {
+                        this.connected = false;
+                        this.telnet = null;
+                        this.status.textContent = 'Disconnected';
+                        this.status.className = 'status disconnected';
+                        this.commandInput.disabled = true;
+                        this.sendBtn.disabled = true;
+
+                        this.connectionPanel.style.display = 'block';
+                        this.terminal.style.display = 'none';
+
+                        this.appendMessage('🔌 Connection lost', 'error');
+
+                        if (this.retryCount < this.maxRetries) {
+                            this.retryCount++;
+                            setTimeout(() => {
+                                this.appendMessage(`🔄 Reconnecting...(${this.retryCount}/${this.maxRetries})`, 'system');
+                                const wsUrl = `${this.protocolSelect.value}${this.addressInput.value}:${this.portInput.value}`;
+                                const protocols = this.subprotocolSelect.value ? [this.subprotocolSelect.value] : [];
+                                this.connect(wsUrl, protocols);
+                            }, 2000 * this.retryCount);
+                        }
+                    };
+
+                    this.ws.onerror = (error) => {
+                        console.error('WebSocket error:', error);
+                        this.appendMessage('❌ Connection error, please check network', 'error');
+                    };
+
+                } catch (error) {
+                    console.error('Connection failed:', error);
+                    this.appendMessage('❌ Failed to create connection: ' + error.message, 'error');
+                }
+            }
+
+            setupTelnetEvents() {
+                if (!this.telnet) return;
+
+                this.telnet.on('gmcp', (data) => {
+                    this.handleGMCPMessage(data);
+                });
+            }
+
+            handleGMCPMessage(data) {
+                // Can add actual processing logic for GMCP data here
+                this.processGMCPData(data);
+            }
+
+            processGMCPData(data) {
+                if (!data || !data.module) return;
+
+                switch (data.module) {
+                    case 'Char.Vitals':
+                        this.updateCharacterStatus(data.data);
+                        break;
+                    case 'Room.Info':
+                        this.updateRoomInfo(data.data);
+                        break;
+                    case 'Client.GUI':
+                        break;
+                }
+            }
+
+            updateCharacterStatus(vitals) {
+                // Can update character status display here, e.g., create status bar
+                console.log('Character status update:', vitals);
+            }
+
+            updateRoomInfo(roomInfo) {
+                // Can update room information display here
+                console.log('Room information update:', roomInfo);
+            }
+
+            initTelnetNegotiation() {
+                // Proactively declare supported Telnet options
+                this.sendTelnetCommand(TELNET.WILL, TELNET.TERMINAL_TYPE);
+                this.sendTelnetCommand(TELNET.WILL, TELNET.NAWS);
+                this.sendTelnetCommand(TELNET.WILL, TELNET.GMCP);
+                this.sendTelnetCommand(TELNET.WILL, TELNET.SUPPRESS_GO_AHEAD);
+
+                // Request server supported options
+                this.sendTelnetCommand(TELNET.DO, TELNET.TERMINAL_TYPE);
+                this.sendTelnetCommand(TELNET.DO, TELNET.NAWS);
+                this.sendTelnetCommand(TELNET.DO, TELNET.GMCP);
+                this.sendTelnetCommand(TELNET.DO, TELNET.SUPPRESS_GO_AHEAD);
+                this.sendTelnetCommand(TELNET.DO, TELNET.MSP); // Client requests MSP support
+
+                // Send window size
+                this.sendWindowSize();
+
+                this.appendMessage('✅ Telnet negotiation complete', 'system');
+            }
+
+            handleTelnetData(data) {
+                if (data instanceof ArrayBuffer) {
+                    data = new Uint8Array(data);
+                } else if (data instanceof Blob) {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        this.processTelnetBytes(new Uint8Array(reader.result));
+                    };
+                    reader.readAsArrayBuffer(data);
+                    return;
+                } else if (typeof data === 'string') {
+                    this.handleMessage(data);
+                    return;
+                }
+
+                this.processTelnetBytes(new Uint8Array(data));
+            }
+
+            processTelnetBytes(bytes) {
+                const result = [];
+                let i = 0;
+                let inTelnet = false;
+                let subnegotiation = false;
+                let subnegotiationType = null;
+                let subBuffer = [];
+
+                while (i < bytes.length) {
+                    const byte = bytes[i];
+
+                    if (byte === TELNET.IAC) {
+                        if (i + 1 < bytes.length) {
+                            const next = bytes[i + 1];
+
+                            if (next === TELNET.IAC) {
+                                // Escaped IAC
+                                result.push(TELNET.IAC);
+                                i += 2;
+                            } else if (next === TELNET.SB) {
+                                // Subnegotiation start
+                                subnegotiation = true;
+                                subBuffer = [];
+                                i += 2;
+
+                                if (i < bytes.length) {
+                                    subnegotiationType = bytes[i];
+                                    i++;
+                                }
+                            } else if (next === TELNET.SE) {
+                                // Subnegotiation end
+                                subnegotiation = false;
+                                this.handleSubnegotiation(subnegotiationType, subBuffer);
+                                i += 2;
+                            } else {
+                                // Standard Telnet command
+                                this.handleTelnetCommand(next, bytes[i + 2]);
+                                i += 3;
+                            }
+                        } else {
+                            i++;
+                        }
+                    } else if (subnegotiation) {
+                        subBuffer.push(byte);
+                        i++;
+                    } else {
+                        result.push(byte);
+                        i++;
+                    }
+                }
+
+                if (result.length > 0) {
+                    const text = new TextDecoder().decode(Uint8Array.from(result));
+                    this.handleMessage(text);
+                }
+            }
+
+            handleTelnetCommand(command, option) {
+                const commandNames = {
+                    [TELNET.DO]: 'DO', [TELNET.DONT]: 'DONT',
+                    [TELNET.WILL]: 'WILL', [TELNET.WONT]: 'WONT',
+                    [TELNET.GA]: 'GA', [TELNET.EL]: 'EL', [TELNET.EC]: 'EC',
+                    [TELNET.AYT]: 'AYT', [TELNET.AO]: 'AO', [TELNET.IP]: 'IP',
+                    [TELNET.BRK]: 'BRK', [TELNET.DM]: 'DM', [TELNET.NOP]: 'NOP',
+                    [TELNET.EOR]: 'EOR'
+                };
+
+                const optionNames = {
+                    [TELNET.TERMINAL_TYPE]: 'TERMINAL_TYPE', [TELNET.NAWS]: 'NAWS',
+                    [TELNET.GMCP]: 'GMCP', [TELNET.SUPPRESS_GO_AHEAD]: 'SUPPRESS_GO_AHEAD',
+                    [TELNET.ECHO]: 'ECHO', [TELNET.NEW_ENVIRON]: 'NEW_ENVIRON',
+                    [TELNET.CHARSET]: 'CHARSET', [TELNET.MXP]: 'MXP',
+                    [TELNET.MSP]: 'MSP', [TELNET.ZMP]: 'ZMP',
+                    [TELNET.MSSP]: 'MSSP', [TELNET.MSDP]: 'MSDP',
+                    [TELNET.MCCP]: 'MCCP'
+                };
+
+                const cmdName = commandNames[command] || `CMD_${command}`;
+                const optName = optionNames[option] || `OPT_${option}`;
+
+                // All negotiation info is only logged to console
+                if ([TELNET.GA, TELNET.EL, TELNET.EC, TELNET.AYT, TELNET.AO, TELNET.IP, TELNET.BRK, TELNET.DM, TELNET.NOP, TELNET.EOR].includes(command)) {
+                    console.log(`Telnet: ${cmdName}`);
+                } else {
+                    console.log(`Telnet: ${cmdName} ${optName}`);
+                }
+
+                switch (command) {
+                    case TELNET.DO:
+                        this.handleTelnetDo(option);
+                        break;
+                    case TELNET.DONT:
+                        this.handleTelnetDont(option);
+                        break;
+                    case TELNET.WILL:
+                        this.handleTelnetWill(option);
+                        break;
+                    case TELNET.WONT:
+                        this.handleTelnetWont(option);
+                        break;
+                }
+            }
+
+            handleTelnetDo(option) {
+                switch (option) {
+                    case TELNET.TERMINAL_TYPE:
+                        this.sendTelnetCommand(TELNET.WILL, TELNET.TERMINAL_TYPE);
+                        break;
+                    case TELNET.NAWS:
+                        this.sendTelnetCommand(TELNET.WILL, TELNET.NAWS);
+                        this.sendWindowSize();
+                        break;
+                    case TELNET.GMCP:
+                        this.sendTelnetCommand(TELNET.WILL, TELNET.GMCP);
+                        this.initGMCP();
+                        break;
+                    case TELNET.MSP:
+                        // Server supports MSP, client confirms
+                        this.sendTelnetCommand(TELNET.WILL, TELNET.MSP);
+                        // Initialize MSP handler
+                        if (this.telnet && this.telnet.msp) {
+                            this.telnet.msp.enable();
+                        }
+                        break;
+                    default:
+                        this.sendTelnetCommand(TELNET.WONT, option);
+                }
+            }
+
+            handleTelnetDont(option) {
+                this.sendTelnetCommand(TELNET.WONT, option);
+            }
+
+            handleTelnetWill(option) {
+                switch (option) {
+                    case TELNET.SUPPRESS_GO_AHEAD:
+                        this.sendTelnetCommand(TELNET.DO, TELNET.SUPPRESS_GO_AHEAD);
+                        break;
+                    case TELNET.ECHO:
+                        this.sendTelnetCommand(TELNET.DO, TELNET.ECHO);
+                        break;
+                    case TELNET.MSP:
+                        // Server supports MSP, client confirms
+                        this.sendTelnetCommand(TELNET.DO, TELNET.MSP);
+                        // Initialize MSP handler
+                        if (this.telnet && this.telnet.msp) {
+                            this.telnet.msp.enable();
+                        }
+                        break;
+                    default:
+                        this.sendTelnetCommand(TELNET.DONT, option);
+                }
+            }
+
+            handleTelnetWont(option) {
+                this.sendTelnetCommand(TELNET.DONT, option);
+            }
+
+            handleSubnegotiation(type, data) {
+                switch (type) {
+                    case TELNET.TERMINAL_TYPE:
+                        if (data[0] === 1) { // SEND
+                            this.sendTerminalType();
+                        }
+                        break;
+                    case TELNET.NAWS:
+                        // Server sends window size request
+                        break;
+                    case TELNET.GMCP:
+                        this.handleGMCPData(data);
+                        break;
+                    case TELNET.MSP:
+                        const text = new TextDecoder().decode(Uint8Array.from(data));
+                        console.log('📡 Subnegotiation MSP:', text);
+                        break;
+                }
+            }
+
+            sendTelnetCommand(command, option) {
+                const bytes = new Uint8Array([TELNET.IAC, command, option]);
+                this.ws.send(bytes);
+            }
+
+            sendSubnegotiation(type, data) {
+                const bytes = [TELNET.IAC, TELNET.SB, type, ...data, TELNET.IAC, TELNET.SE];
+                this.ws.send(Uint8Array.from(bytes));
+            }
+
+            sendTerminalType() {
+                const type = new TextEncoder().encode('websocket-client');
+                this.sendSubnegotiation(TELNET.TERMINAL_TYPE, [0, ...Array.from(type)]);
+            }
+
+            sendWindowSize() {
+                const width = Math.floor(window.innerWidth / 8);
+                const height = Math.floor(window.innerHeight / 16);
+                const bytes = [
+                    (width >> 8) & 0xFF, width & 0xFF,
+                    (height >> 8) & 0xFF, height & 0xFF
+                ];
+                this.sendSubnegotiation(TELNET.NAWS, bytes);
+            }
+
+            initGMCP() {
+                this.sendGMCP('Client.GUI', {
+                    version: '1.0.0',
+                    type: 'websocket',
+                    client: 'FluffOS-WebClient'
+                });
+
+                this.sendWindowSize();
+            }
+
+            sendGMCP(module, data) {
+                const message = module + ' ' + JSON.stringify(data);
+                const bytes = new TextEncoder().encode(message);
+                this.sendSubnegotiation(TELNET.GMCP, Array.from(bytes));
+            }
+
+            handleGMCPData(data) {
+                try {
+                    const text = new TextDecoder().decode(Uint8Array.from(data));
+                    console.log('📡 Subnegotiation GMCP:', text);
+
+                    const spaceIndex = text.indexOf(' ');
+                    const module = spaceIndex > -1 ? text.substring(0, spaceIndex) : text;
+                    const jsonData = spaceIndex > -1 ? text.substring(spaceIndex + 1) : '';
+
+                    if (jsonData) {
+                        const parsed = JSON.parse(jsonData);
+                        this.handleGMCPMessage({ module, data: parsed });
+                    }
+                } catch (e) {
+                    console.warn('GMCP parsing error:', e);
+                }
+            }
+
+            handleMessage(data) {
+                if (data instanceof Blob) {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        this.appendMessage(reader.result);
+                    };
+                    reader.readAsText(data, 'utf-8');
+                } else {
+                    this.appendMessage(data);
+                }
+            }
+
+            sendCommand(command) {
+                if (!this.connected) return;
+
+                if (!command) {
+                    command = '\n';
+                } else if (!command.endsWith('\n')) {
+                    command += '\n';
+                }
+
+                if (this.protocolType === 'telnet' || this.protocolType === 'binary') {
+                    // Need to escape IAC characters in Telnet/Binary mode
+                    const encoder = new TextEncoder();
+                    const bytes = encoder.encode(command);
+                    const escaped = [];
+
+                    for (const byte of bytes) {
+                        if (byte === TELNET.IAC) {
+                            escaped.push(TELNET.IAC, TELNET.IAC);
+                        } else {
+                            escaped.push(byte);
+                        }
+                    }
+
+                    this.ws.send(Uint8Array.from(escaped));
+                } else {
+                    this.ws.send(command);
+                }
+            }
+
+            appendMessage(message, className = '') {
+                const div = document.createElement('div');
+                div.className = 'message ' + className;
+                const html = this.parseANSI(message);
+                div.innerHTML = html;
+                this.terminal.appendChild(div);
+
+                const maxMessages = 1000;
+                if (this.terminal.children.length > maxMessages) {
+                    this.terminal.removeChild(this.terminal.firstChild);
+                }
+
+                this.terminal.scrollTop = this.terminal.scrollHeight;
+            }
+
+            parseANSI(text) {
+                let result = text;
+                let openSpans = 0;
+
+                result = result.replace(/\x1b\[([0-9;]*)m/g, (match, codes) => {
+                    const codeArray = codes.split(';').map(Number);
+                    let styles = [];
+
+                    for (const code of codeArray) {
+                        switch (code) {
+                            case 0:
+                                const closeTags = '</span>'.repeat(openSpans);
+                                openSpans = 0;
+                                return closeTags;
+                            case 1: styles.push('font-weight:bold'); break;
+                            case 31: styles.push('color:red'); break;
+                            case 32: styles.push('color:green'); break;
+                            case 33: styles.push('color:yellow'); break;
+                            case 34: styles.push('color:blue'); break;
+                            case 35: styles.push('color:magenta'); break;
+                            case 36: styles.push('color:cyan'); break;
+                            case 37: styles.push('color:white'); break;
+                            case 91: styles.push('color:lightcoral'); break;
+                            case 92: styles.push('color:lightgreen'); break;
+                            case 93: styles.push('color:gold'); break;
+                            case 94: styles.push('color:lightblue'); break;
+                        }
+                    }
+
+                    if (styles.length > 0) {
+                        openSpans++;
+                        return `<span style="${styles.join(';')}">`;
+                    }
+                    return '';
+                });
+
+                // Clean cursor control sequences
+                const cursorPatterns = [
+                    /\x1b\[\d*[A-D]/g,
+                    /\x1b\[\d*;\d*[Hf]/g,
+                    /\x1b\[\d*[JK]/g,
+                    /\x1b\[[\d;]*[@-~]/g
+                ];
+
+                cursorPatterns.forEach(pattern => {
+                    result = result.replace(pattern, '');
+                });
+
+                if (openSpans > 0) {
+                    result += '</span>'.repeat(openSpans);
+                }
+
+                return result;
+            }
+
+            setupEventListeners() {
+                this.commandInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.handleSendCommand();
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        this.navigateHistory(-1);
+                    } else if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        this.navigateHistory(1);
+                    } else if (this.historyIndex !== -1 && !['ArrowUp', 'ArrowDown'].includes(e.key)) {
+                        this.currentInput = this.commandInput.value;
+                        this.historyIndex = -1;
+                    }
+                });
+
+                this.sendBtn.addEventListener('click', () => {
+                    this.handleSendCommand();
+                });
+
+                this.commandInput.focus();
+            }
+
+            handleSendCommand() {
+                const command = this.commandInput.value;
+                if (command.trim()) {
+                    this.addToHistory(command);
+                    this.sendCommand(command);
+                } else {
+                    this.sendCommand('\n');
+                }
+                this.commandInput.value = '';
+                this.historyIndex = -1;
+                this.currentInput = '';
+            }
+
+            addToHistory(command) {
+                if (command !== this.history[this.history.length - 1]) {
+                    this.history.push(command);
+                    if (this.history.length > 100) {
+                        this.history.shift();
+                    }
+                }
+            }
+
+            navigateHistory(direction) {
+                if (this.history.length === 0) return;
+
+                if (this.historyIndex === -1) {
+                    this.currentInput = this.commandInput.value;
+                    if (direction === -1) {
+                        this.historyIndex = this.history.length - 1;
+                    } else {
+                        return;
+                    }
+                } else {
+                    this.historyIndex += direction;
+                }
+
+                if (this.historyIndex < 0) {
+                    this.historyIndex = -1;
+                    this.commandInput.value = this.currentInput;
+                } else if (this.historyIndex >= this.history.length) {
+                    this.historyIndex = this.history.length - 1;
+                    this.commandInput.value = this.history[this.historyIndex];
+                } else {
+                    this.commandInput.value = this.history[this.historyIndex];
+                }
+            }
+        }
+
+        // Start client
+        const client = new AdvancedMUDClient();
+    </script>
+</body>
 </html>
