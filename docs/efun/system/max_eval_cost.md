@@ -10,7 +10,7 @@ title: system / max_eval_cost
 
 ### SYNOPSIS
 
-    void max_eval_cost()
+    int max_eval_cost()
 
 ### DESCRIPTION
 
