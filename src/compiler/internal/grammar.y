@@ -79,6 +79,7 @@ int yyparse (void);
 %token L_SSCANF L_CATCH
 %token L_ARRAY
 %token L_REF
+%token L_DEREF
 %token L_PARSE_COMMAND L_TIME_EXPRESSION
 %token L_CLASS L_NEW
 %token L_PARAMETER
@@ -221,7 +222,7 @@ program:
   | /* empty */  %empty { $$ = 0; }
 ;
 
-possible_semi_colon: %empty 
+possible_semi_colon: %empty
   /* empty */
   | ';' { yywarn("Extra ';'. Ignored."); }
 ;
@@ -314,7 +315,7 @@ member_name_list:
   |   member_name ',' member_name_list
 ;
 
-member_list: %empty 
+member_list: %empty
   /* empty */
   | member_list basic_type { current_type = $2; }
       member_name_list ';'
@@ -1212,6 +1213,10 @@ ref:
   L_REF
 ;
 
+deref:
+  L_DEREF
+;
+
 expr0:
   ref lvalue
     {
@@ -1239,6 +1244,10 @@ expr0:
           yyerror("unknown lvalue kind");
       }
       CREATE_UNARY_OP_1($$, F_MAKE_REF, TYPE_ANY, $2, op);
+    }
+  | deref expr0  %prec L_NOT
+    {
+      CREATE_UNARY_OP($$, F_DEREF, TYPE_ANY, $2);
     }
   | lvalue L_ASSIGN expr0
     {

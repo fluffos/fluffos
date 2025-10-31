@@ -2152,6 +2152,44 @@ void eval_instruction(char *p) {
 
         break;
       }
+#ifdef REF_RESERVED_WORD
+      case F_DEREF: {
+        svalue_t *reflval = nullptr;
+
+        if (sp->type != T_REF) {
+          error("Attempting to dereference a non-reference value.\n");
+        }
+
+        reflval = sp->u.ref->lvalue;
+        if (!reflval) {
+          error("Reference is invalid.\n");
+        }
+
+        // Handle special lvalue types
+        if (reflval->type == T_LVALUE_BYTE) {
+          sp->type = T_NUMBER;
+          sp->subtype = 0;
+          sp->u.number = *global_lvalue_byte.u.lvalue_byte;
+          break;
+        } else if (reflval->type == T_LVALUE_CODEPOINT) {
+          sp->type = T_NUMBER;
+          sp->subtype = 0;
+          sp->u.number = u8_egc_index_as_single_codepoint(
+              global_lvalue_codepoint.owner->u.string,
+              SVALUE_STRLEN(global_lvalue_codepoint.owner), global_lvalue_codepoint.index);
+          break;
+        }
+
+        // Handle destructed objects
+        if (reflval->type == T_OBJECT && (reflval->u.ob->flags & O_DESTRUCTED)) {
+          assign_svalue(reflval, &const0u);
+        }
+
+        // Replace the reference on the stack with its dereferenced value
+        assign_svalue_no_free(sp, reflval);
+        break;
+      }
+#endif
       case F_REF_LVALUE: {
         svalue_t *s = fp + EXTRACT_UCHAR(pc++);
 

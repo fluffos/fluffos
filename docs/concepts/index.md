@@ -10,6 +10,7 @@ title: concepts
 * [objects](general/objects.html)
 * [oop](general/oop.html)
 * [preprocessor](general/preprocessor.html)
+* [references](general/references.html)
 * [simul_efun](general/simul_efun.html)
 * [socket_efuns](general/socket_efuns.html)
 * [tls](general/tls.html)
