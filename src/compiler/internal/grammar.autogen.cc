@@ -67,7 +67,7 @@
 
 
 /* First part of user prologue.  */
-#line 11 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 11 "src/compiler/internal/grammar.y"
 
 #include "base/std.h"
 
@@ -103,7 +103,7 @@ int func_present;
 int yyparse (void);
 
 
-#line 107 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 107 "src/compiler/internal/grammar.autogen.cc"
 
 # ifndef YY_CAST
 #  ifdef __cplusplus
@@ -2373,118 +2373,118 @@ yyreduce:
     switch (yyn)
       {
   case 2: /* all: program  */
-#line 217 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 217 "src/compiler/internal/grammar.y"
           { rule_program((yyval.node)); }
-#line 2379 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2379 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 3: /* program: program def possible_semi_colon  */
-#line 221 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 221 "src/compiler/internal/grammar.y"
                                   { CREATE_TWO_VALUES((yyval.node), 0, (yyvsp[-2].node), (yyvsp[-1].node)); }
-#line 2385 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2385 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 4: /* program: %empty  */
-#line 222 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 222 "src/compiler/internal/grammar.y"
                         { (yyval.node) = 0; }
-#line 2391 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2391 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 6: /* possible_semi_colon: ';'  */
-#line 227 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 227 "src/compiler/internal/grammar.y"
         { yywarn("Extra ';'. Ignored."); }
-#line 2397 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2397 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 7: /* inheritance: type_modifier_list L_INHERIT string_con1 ';'  */
-#line 231 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 231 "src/compiler/internal/grammar.y"
                                                { if (rule_inheritence(&(yyval.node), (yyvsp[-3].number), (yyvsp[-1].string))) { YYACCEPT; } }
-#line 2403 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2403 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 8: /* real: L_REAL  */
-#line 235 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 235 "src/compiler/internal/grammar.y"
          { CREATE_REAL((yyval.node), (yyvsp[0].real)); }
-#line 2409 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2409 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 9: /* number: L_NUMBER  */
-#line 239 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 239 "src/compiler/internal/grammar.y"
            { CREATE_NUMBER((yyval.node), (yyvsp[0].number)); }
-#line 2415 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2415 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 10: /* optional_star: %empty  */
-#line 243 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 243 "src/compiler/internal/grammar.y"
                         { (yyval.number) = 0; }
-#line 2421 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2421 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 11: /* optional_star: '*'  */
-#line 244 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 244 "src/compiler/internal/grammar.y"
                 { (yyval.number) = TYPE_MOD_ARRAY; }
-#line 2427 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2427 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 12: /* block_or_semi: block  */
-#line 249 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 249 "src/compiler/internal/grammar.y"
           {
             (yyval.node) = (yyvsp[0].decl).node;
             if (!(yyval.node)) {
               CREATE_RETURN((yyval.node), 0);
             }
           }
-#line 2438 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2438 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 13: /* block_or_semi: ';'  */
-#line 255 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 255 "src/compiler/internal/grammar.y"
           { (yyval.node) = 0; }
-#line 2444 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2444 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 14: /* block_or_semi: error  */
-#line 256 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 256 "src/compiler/internal/grammar.y"
           { (yyval.node) = 0; }
-#line 2450 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2450 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 15: /* identifier: L_DEFINED_NAME  */
-#line 260 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 260 "src/compiler/internal/grammar.y"
                                   { (yyval.string) = scratch_copy((yyvsp[0].ihe)->name); }
-#line 2456 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2456 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 17: /* $@1: %empty  */
-#line 265 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 265 "src/compiler/internal/grammar.y"
                                   { (yyvsp[-2].number) = rule_func_type((yyvsp[-2].number), (yyvsp[-1].number), (yyvsp[0].string)); }
-#line 2462 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2462 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 18: /* @2: %empty  */
-#line 266 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 266 "src/compiler/internal/grammar.y"
                                   { (yyval.number) = rule_func_proto((yyvsp[-6].number), (yyvsp[-5].number), &(yyvsp[-4].string), (yyvsp[-1].argument)); }
-#line 2468 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2468 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 19: /* function: type optional_star identifier $@1 '(' argument ')' @2 block_or_semi  */
-#line 267 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 267 "src/compiler/internal/grammar.y"
                                   { rule_func(&(yyval.node), (yyvsp[-8].number), (yyvsp[-7].number), (yyvsp[-6].string), (yyvsp[-3].argument), &(yyvsp[-1].number), &(yyvsp[0].node)); }
-#line 2474 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2474 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 21: /* def: type name_list ';'  */
-#line 273 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 273 "src/compiler/internal/grammar.y"
                                   {
                                     if (!((yyvsp[-2].number) & ~(DECL_MODS)) && (pragmas & PRAGMA_STRICT_TYPES))
                                       yyerror("Missing type for global variable declaration");
                                     (yyval.node) = 0;
                                   }
-#line 2484 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2484 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 25: /* modifier_change: type_modifier_list ':'  */
-#line 285 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 285 "src/compiler/internal/grammar.y"
                                   {
                                     if (!(yyvsp[-1].number))
                                       yyerror("modifier list may not be empty.");
@@ -2498,11 +2498,11 @@ yyreduce:
                                     global_modifiers = (yyvsp[-1].number);
                                     (yyval.node) = 0;
                                   }
-#line 2502 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2502 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 26: /* member_name: optional_star identifier  */
-#line 302 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 302 "src/compiler/internal/grammar.y"
                                   {
                                     /* At this point, the current_type here is only a basic_type */
                                     /* and cannot be unused yet - Sym */
@@ -2512,40 +2512,40 @@ yyreduce:
                                     add_local_name((yyvsp[0].string), current_type | (yyvsp[-1].number));
                                     scratch_free((yyvsp[0].string));
                                   }
-#line 2516 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2516 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 30: /* $@3: %empty  */
-#line 320 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 320 "src/compiler/internal/grammar.y"
                            { current_type = (yyvsp[0].number); }
-#line 2522 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2522 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 32: /* @4: %empty  */
-#line 325 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 325 "src/compiler/internal/grammar.y"
                                              { (yyvsp[-2].ihe) = rule_define_class(&(yyval.number), (yyvsp[-1].string)); }
-#line 2528 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2528 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 33: /* type_decl: type_modifier_list L_CLASS identifier '{' @4 member_list '}'  */
-#line 326 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 326 "src/compiler/internal/grammar.y"
                                              { rule_define_class_members((yyvsp[-5].ihe), (yyvsp[-2].number)); (yyval.node) = 0; }
-#line 2534 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2534 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 35: /* new_local_name: L_DEFINED_NAME  */
-#line 332 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 332 "src/compiler/internal/grammar.y"
                                             {
                                               if ((yyvsp[0].ihe)->dn.local_num != -1) {
                                                 yyerror("Illegal to redeclare local name '%s'", (yyvsp[0].ihe)->name);
                                               }
                                               (yyval.string) = scratch_copy((yyvsp[0].ihe)->name);
                                             }
-#line 2545 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2545 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 37: /* atomic_type: L_CLASS L_DEFINED_NAME  */
-#line 343 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 343 "src/compiler/internal/grammar.y"
                                             {
                                               if ((yyvsp[0].ihe)->dn.class_num == -1) {
                                                 yyerror("Undefined class '%s'", (yyvsp[0].ihe)->name);
@@ -2554,44 +2554,44 @@ yyreduce:
                                                 (yyval.number) = (yyvsp[0].ihe)->dn.class_num | TYPE_MOD_CLASS;
                                               }
                                             }
-#line 2558 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2558 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 38: /* atomic_type: L_CLASS L_IDENTIFIER  */
-#line 352 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 352 "src/compiler/internal/grammar.y"
                                             {
                                               yyerror("Undefined class '%s'", (yyvsp[0].string));
                                               (yyval.number) = TYPE_ANY;
                                             }
-#line 2567 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2567 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 40: /* opt_atomic_type: %empty  */
-#line 360 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 360 "src/compiler/internal/grammar.y"
                         { (yyval.number) = TYPE_ANY; }
-#line 2573 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2573 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 42: /* basic_type: opt_atomic_type L_ARRAY  */
-#line 365 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 365 "src/compiler/internal/grammar.y"
                             { (yyval.number) = (yyvsp[-1].number) | TYPE_MOD_ARRAY; }
-#line 2579 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2579 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 44: /* arg_type: basic_type ref  */
-#line 370 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 370 "src/compiler/internal/grammar.y"
                    { (yyval.number) = (yyvsp[-1].number) | LOCAL_MOD_REF; }
-#line 2585 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2585 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 45: /* optional_default_arg_value: %empty  */
-#line 374 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 374 "src/compiler/internal/grammar.y"
          { (yyval.node) = 0; }
-#line 2591 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2591 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 46: /* optional_default_arg_value: ':' L_FUNCTION_OPEN comma_expr ':' ')'  */
-#line 375 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 375 "src/compiler/internal/grammar.y"
                                           {
     if (CONFIG_INT(__RC_WOMBLES__)) {
         if(*(outp-2) != ':') {
@@ -2611,21 +2611,21 @@ yyreduce:
     (yyval.node)->v.number = FP_FUNCTIONAL + 0 /* args */;
     pop_function_context();
 }
-#line 2615 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2615 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 47: /* new_arg: arg_type optional_star  */
-#line 397 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 397 "src/compiler/internal/grammar.y"
                                               {
                                                 (yyval.number) = (yyvsp[-1].number) | (yyvsp[0].number);
                                                 if ((yyvsp[-1].number) != TYPE_VOID)
                                                   add_local_name("", (yyvsp[-1].number) | (yyvsp[0].number));
                                               }
-#line 2625 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2625 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 48: /* new_arg: arg_type optional_star new_local_name optional_default_arg_value  */
-#line 403 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 403 "src/compiler/internal/grammar.y"
                                               {
                                                 if ((yyvsp[-3].number) == TYPE_VOID)
                                                   yyerror("Illegal to declare argument of type void.");
@@ -2633,11 +2633,11 @@ yyreduce:
                                                 scratch_free((yyvsp[-1].string));
                                                 (yyval.number) = (yyvsp[-3].number) | (yyvsp[-2].number);
                                               }
-#line 2637 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2637 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 49: /* new_arg: new_local_name  */
-#line 411 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 411 "src/compiler/internal/grammar.y"
                                               {
                                                 if (exact_types) {
                                                   yyerror("Missing type for argument");
@@ -2646,20 +2646,20 @@ yyreduce:
                                                 scratch_free((yyvsp[0].string));
                                                 (yyval.number) = TYPE_ANY;
                                               }
-#line 2650 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2650 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 50: /* argument: %empty  */
-#line 423 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 423 "src/compiler/internal/grammar.y"
             {
       (yyval.argument).num_arg = 0;
       (yyval.argument).flags = 0;
     }
-#line 2659 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2659 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 52: /* argument: argument_list L_DOT_DOT_DOT  */
-#line 429 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 429 "src/compiler/internal/grammar.y"
     {
       int x = type_of_locals_ptr[max_num_locals-1];
       int lt = x & ~LOCAL_MODS;
@@ -2674,11 +2674,11 @@ yyreduce:
       if (lt != TYPE_ANY && !(lt & TYPE_MOD_ARRAY))
         yywarn("Variable to hold remainder of arguments should be an array.");
     }
-#line 2678 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2678 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 53: /* argument_list: new_arg  */
-#line 447 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 447 "src/compiler/internal/grammar.y"
     {
       if (((yyvsp[0].number) & TYPE_MASK) == TYPE_VOID && !((yyvsp[0].number) & TYPE_MOD_CLASS)) {
         if ((yyvsp[0].number) & ~TYPE_MASK)
@@ -2689,11 +2689,11 @@ yyreduce:
       }
       (yyval.argument).flags = 0;
     }
-#line 2693 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2693 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 54: /* argument_list: argument_list ',' new_arg  */
-#line 458 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 458 "src/compiler/internal/grammar.y"
     {
       if (!(yyval.argument).num_arg)    /* first arg was void w/no name */
         yyerror("argument of type void must be the only argument.");
@@ -2703,19 +2703,19 @@ yyreduce:
       (yyval.argument) = (yyvsp[-2].argument);
       (yyval.argument).num_arg++;
     }
-#line 2707 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2707 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 55: /* type_modifier_list: %empty  */
-#line 471 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 471 "src/compiler/internal/grammar.y"
             {
       (yyval.number) = 0;
     }
-#line 2715 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2715 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 56: /* type_modifier_list: L_TYPE_MODIFIER type_modifier_list  */
-#line 475 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 475 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = (yyvsp[-1].number) | (yyvsp[0].number);
       int acc_mod = (yyval.number) & DECL_ACCESS;
@@ -2729,36 +2729,36 @@ yyreduce:
       }
 #endif
     }
-#line 2733 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2733 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 57: /* type: type_modifier_list opt_basic_type  */
-#line 492 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 492 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = ((yyvsp[-1].number) << 16) | (yyvsp[0].number);
       current_type = (yyval.number);
     }
-#line 2742 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2742 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 58: /* cast: '(' basic_type optional_star ')'  */
-#line 500 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 500 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = (yyvsp[-2].number) | (yyvsp[-1].number);
     }
-#line 2750 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2750 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 60: /* opt_basic_type: %empty  */
-#line 508 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 508 "src/compiler/internal/grammar.y"
             {
       (yyval.number) = TYPE_UNKNOWN;
     }
-#line 2758 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2758 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 63: /* new_name: optional_star identifier  */
-#line 520 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 520 "src/compiler/internal/grammar.y"
     {
       if (current_type & (FUNC_VARARGS << 16)){
         yyerror("Illegal to declare varargs variable.");
@@ -2783,11 +2783,11 @@ yyreduce:
       define_new_variable((yyvsp[0].string), current_type | (yyvsp[-1].number));
       scratch_free((yyvsp[0].string));
     }
-#line 2787 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2787 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 64: /* new_name: optional_star identifier L_ASSIGN expr0  */
-#line 545 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 545 "src/compiler/internal/grammar.y"
     {
       parse_node_t *expr, *newnode;
       int type;
@@ -2839,35 +2839,35 @@ yyreduce:
           newnode, expr);
       scratch_free((yyvsp[-2].string));
     }
-#line 2843 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2843 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 65: /* @5: %empty  */
-#line 600 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 600 "src/compiler/internal/grammar.y"
     { (yyval.number) = current_number_of_locals; }
-#line 2849 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2849 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 66: /* block: '{' @5 block_statements '}'  */
-#line 602 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 602 "src/compiler/internal/grammar.y"
     {
       (yyval.decl).node = (yyvsp[-1].decl).node;
       (yyval.decl).num = current_number_of_locals - (yyvsp[-2].number);  /* calculate locals declared in this block */
     }
-#line 2858 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2858 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 70: /* local_declarations: %empty  */
-#line 612 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 612 "src/compiler/internal/grammar.y"
             {
       (yyval.decl).node = 0;
       (yyval.decl).num = 0;
     }
-#line 2867 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2867 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 71: /* $@6: %empty  */
-#line 617 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 617 "src/compiler/internal/grammar.y"
     {
       if ((yyvsp[0].number) == TYPE_VOID)
         yyerror("Illegal to declare local variable of type void.");
@@ -2876,22 +2876,22 @@ yyreduce:
        */
       current_type = (yyvsp[0].number);
     }
-#line 2880 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2880 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 72: /* local_declarations: local_declarations basic_type $@6 local_name_list ';'  */
-#line 626 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 626 "src/compiler/internal/grammar.y"
     {
       if ((yyvsp[-4].decl).node && (yyvsp[-1].decl).node) {
         CREATE_STATEMENTS((yyval.decl).node, (yyvsp[-4].decl).node, (yyvsp[-1].decl).node);
       } else (yyval.decl).node = ((yyvsp[-4].decl).node ? (yyvsp[-4].decl).node : (yyvsp[-1].decl).node);
       (yyval.decl).num = (yyvsp[-4].decl).num + (yyvsp[-1].decl).num;
     }
-#line 2891 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2891 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 73: /* new_local_def: optional_star new_local_name  */
-#line 636 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 636 "src/compiler/internal/grammar.y"
     {
       if (current_type & LOCAL_MOD_REF) {
         yyerror("Illegal to declare local variable as reference");
@@ -2902,11 +2902,11 @@ yyreduce:
       scratch_free((yyvsp[0].string));
       (yyval.node) = 0;
     }
-#line 2906 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2906 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 74: /* new_local_def: optional_star new_local_name L_ASSIGN expr0  */
-#line 647 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 647 "src/compiler/internal/grammar.y"
     {
       int type = (current_type | (yyvsp[-3].number)) & ~DECL_MODS;
 
@@ -2937,11 +2937,11 @@ yyreduce:
           add_local_name((yyvsp[-2].string), current_type | (yyvsp[-3].number) | LOCAL_MOD_UNUSED));
       scratch_free((yyvsp[-2].string));
     }
-#line 2941 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2941 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 75: /* single_new_local_def: arg_type optional_star new_local_name  */
-#line 681 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 681 "src/compiler/internal/grammar.y"
     {
       if ((yyvsp[-2].number) == TYPE_VOID)
         yyerror("Illegal to declare local variable of type void.");
@@ -2949,11 +2949,11 @@ yyreduce:
       (yyval.number) = add_local_name((yyvsp[0].string), (yyvsp[-2].number) | (yyvsp[-1].number));
       scratch_free((yyvsp[0].string));
     }
-#line 2953 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2953 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 76: /* single_new_local_def_with_init: single_new_local_def L_ASSIGN expr0  */
-#line 692 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 692 "src/compiler/internal/grammar.y"
     {
       int type = type_of_locals_ptr[(yyvsp[-2].number)];
 
@@ -2982,90 +2982,90 @@ yyreduce:
       CREATE_BINARY_OP((yyval.node), F_ASSIGN, 0, (yyvsp[0].node), 0);
       CREATE_OPCODE_1((yyval.node)->r.expr, F_LOCAL_LVALUE, 0, (yyvsp[-2].number));
     }
-#line 2986 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2986 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 77: /* local_name_list: new_local_def  */
-#line 724 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 724 "src/compiler/internal/grammar.y"
     {
       (yyval.decl).node = (yyvsp[0].node);
       (yyval.decl).num = 1;
     }
-#line 2995 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 2995 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 78: /* local_name_list: new_local_def ',' local_name_list  */
-#line 729 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 729 "src/compiler/internal/grammar.y"
     {
       if ((yyvsp[-2].node) && (yyvsp[0].decl).node) {
         CREATE_STATEMENTS((yyval.decl).node, (yyvsp[-2].node), (yyvsp[0].decl).node);
       } else (yyval.decl).node = ((yyvsp[-2].node) ? (yyvsp[-2].node) : (yyvsp[0].decl).node);
       (yyval.decl).num = 1 + (yyvsp[0].decl).num;
     }
-#line 3006 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3006 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 79: /* $@7: %empty  */
-#line 739 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 739 "src/compiler/internal/grammar.y"
     {
       if ((yyvsp[0].number) == TYPE_VOID)
         yyerror("Illegal to declare local variable of type void.");
       current_type = (yyvsp[0].number);
     }
-#line 3016 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3016 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 80: /* local_declaration_statement: basic_type $@7 local_name_list ';'  */
-#line 745 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 745 "src/compiler/internal/grammar.y"
     {
       (yyval.decl).node = (yyvsp[-1].decl).node;
       (yyval.decl).num = (yyvsp[-1].decl).num;
     }
-#line 3025 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3025 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 81: /* block_statements: %empty  */
-#line 753 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 753 "src/compiler/internal/grammar.y"
             {
       (yyval.decl).node = 0;
       (yyval.decl).num = 0;
     }
-#line 3034 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3034 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 82: /* block_statements: statement block_statements  */
-#line 758 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 758 "src/compiler/internal/grammar.y"
     {
       if ((yyvsp[-1].node) && (yyvsp[0].decl).node) {
         CREATE_STATEMENTS((yyval.decl).node, (yyvsp[-1].node), (yyvsp[0].decl).node);
       } else (yyval.decl).node = ((yyvsp[-1].node) ? (yyvsp[-1].node) : (yyvsp[0].decl).node);
       (yyval.decl).num = (yyvsp[0].decl).num;
     }
-#line 3045 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3045 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 83: /* block_statements: local_declaration_statement block_statements  */
-#line 765 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 765 "src/compiler/internal/grammar.y"
     {
       if ((yyvsp[-1].decl).node && (yyvsp[0].decl).node) {
         CREATE_STATEMENTS((yyval.decl).node, (yyvsp[-1].decl).node, (yyvsp[0].decl).node);
       } else (yyval.decl).node = ((yyvsp[-1].decl).node ? (yyvsp[-1].decl).node : (yyvsp[0].decl).node);
       (yyval.decl).num = (yyvsp[-1].decl).num + (yyvsp[0].decl).num;
     }
-#line 3056 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3056 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 84: /* block_statements: error ';' block_statements  */
-#line 772 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 772 "src/compiler/internal/grammar.y"
     {
       (yyval.decl).node = (yyvsp[0].decl).node;
       (yyval.decl).num = (yyvsp[0].decl).num;
     }
-#line 3065 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3065 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 85: /* statement: comma_expr ';'  */
-#line 780 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 780 "src/compiler/internal/grammar.y"
     {
       (yyval.node) = pop_value((yyvsp[-1].node));
 #ifdef DEBUG
@@ -3077,28 +3077,28 @@ yyreduce:
       }
 #endif
     }
-#line 3081 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3081 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 91: /* statement: decl_block  */
-#line 797 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 797 "src/compiler/internal/grammar.y"
     {
       (yyval.node) = (yyvsp[0].decl).node;
       pop_n_locals((yyvsp[0].decl).num);
     }
-#line 3090 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3090 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 92: /* statement: ';'  */
-#line 802 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 802 "src/compiler/internal/grammar.y"
     {
       (yyval.node) = 0;
     }
-#line 3098 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3098 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 93: /* statement: L_BREAK ';'  */
-#line 806 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 806 "src/compiler/internal/grammar.y"
     {
       if (context & SPECIAL_CONTEXT) {
         yyerror("Cannot break out of catch { } or time_expression { }");
@@ -3120,11 +3120,11 @@ yyreduce:
             (yyval.node) = 0;
           }
     }
-#line 3124 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3124 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 94: /* statement: L_CONTINUE ';'  */
-#line 828 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 828 "src/compiler/internal/grammar.y"
     {
       if (context & SPECIAL_CONTEXT)
         yyerror("Cannot continue out of catch { } or time_expression { }");
@@ -3133,57 +3133,57 @@ yyreduce:
           yyerror("continue statement outside loop");
       CREATE_CONTROL_JUMP((yyval.node), CJ_CONTINUE);
     }
-#line 3137 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3137 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 95: /* $@8: %empty  */
-#line 840 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 840 "src/compiler/internal/grammar.y"
     {
       (yyvsp[-3].number) = context;
       context = LOOP_CONTEXT;
     }
-#line 3146 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3146 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 96: /* while: L_WHILE '(' comma_expr ')' $@8 statement  */
-#line 845 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 845 "src/compiler/internal/grammar.y"
     {
       CREATE_LOOP((yyval.node), 1, (yyvsp[0].node), 0, optimize_loop_test((yyvsp[-3].node)));
       context = (yyvsp[-5].number);
     }
-#line 3155 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3155 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 97: /* $@9: %empty  */
-#line 853 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 853 "src/compiler/internal/grammar.y"
     {
       (yyvsp[0].number) = context;
       context = LOOP_CONTEXT;
     }
-#line 3164 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3164 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 98: /* do: L_DO $@9 statement L_WHILE '(' comma_expr ')' ';'  */
-#line 858 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 858 "src/compiler/internal/grammar.y"
     {
       CREATE_LOOP((yyval.node), 0, (yyvsp[-5].node), 0, optimize_loop_test((yyvsp[-2].node)));
       context = (yyvsp[-7].number);
     }
-#line 3173 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3173 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 99: /* $@10: %empty  */
-#line 866 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 866 "src/compiler/internal/grammar.y"
     {
       (yyvsp[-5].decl).node = pop_value((yyvsp[-5].decl).node);
       (yyvsp[-7].number) = context;
       context = LOOP_CONTEXT;
     }
-#line 3183 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3183 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 100: /* for: L_FOR '(' first_for_expr ';' for_expr ';' for_expr ')' $@10 statement  */
-#line 872 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 872 "src/compiler/internal/grammar.y"
     {
       (yyval.decl).num = (yyvsp[-7].decl).num; /* number of declarations (0/1) */
 
@@ -3199,11 +3199,11 @@ yyreduce:
 
       context = (yyvsp[-9].number);
     }
-#line 3203 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3203 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 101: /* foreach_var: L_DEFINED_NAME  */
-#line 891 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 891 "src/compiler/internal/grammar.y"
     {
       if ((yyvsp[0].ihe)->dn.local_num != -1) {
         CREATE_OPCODE_1((yyval.decl).node, F_LOCAL_LVALUE, 0, (yyvsp[0].ihe)->dn.local_num);
@@ -3224,11 +3224,11 @@ yyreduce:
         }
       (yyval.decl).num = 0;
     }
-#line 3228 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3228 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 102: /* foreach_var: single_new_local_def  */
-#line 912 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 912 "src/compiler/internal/grammar.y"
     {
       if (type_of_locals_ptr[(yyvsp[0].number)] & LOCAL_MOD_REF) {
         CREATE_OPCODE_1((yyval.decl).node, F_REF_LVALUE, 0, (yyvsp[0].number));
@@ -3238,11 +3238,11 @@ yyreduce:
       }
       (yyval.decl).num = 1;
     }
-#line 3242 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3242 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 103: /* foreach_var: L_IDENTIFIER  */
-#line 922 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 922 "src/compiler/internal/grammar.y"
     {
       char buf[256];
       char *end = EndOf(buf);
@@ -3256,41 +3256,41 @@ yyreduce:
       scratch_free((yyvsp[0].string));
       (yyval.decl).num = 0;
     }
-#line 3260 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3260 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 104: /* foreach_vars: foreach_var  */
-#line 939 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 939 "src/compiler/internal/grammar.y"
     {
       CREATE_FOREACH((yyval.decl).node, (yyvsp[0].decl).node, 0);
       (yyval.decl).num = (yyvsp[0].decl).num;
     }
-#line 3269 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3269 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 105: /* foreach_vars: foreach_var ',' foreach_var  */
-#line 944 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 944 "src/compiler/internal/grammar.y"
     {
       CREATE_FOREACH((yyval.decl).node, (yyvsp[-2].decl).node, (yyvsp[0].decl).node);
       (yyval.decl).num = (yyvsp[-2].decl).num + (yyvsp[0].decl).num;
       if ((yyvsp[-2].decl).node->v.number == F_REF_LVALUE)
         yyerror("Mapping key may not be a reference in foreach()");
     }
-#line 3280 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3280 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 106: /* $@11: %empty  */
-#line 954 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 954 "src/compiler/internal/grammar.y"
     {
       (yyvsp[-3].decl).node->v.expr = (yyvsp[-1].node);
       (yyvsp[-5].number) = context;
       context = LOOP_CONTEXT | LOOP_FOREACH;
     }
-#line 3290 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3290 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 107: /* foreach: L_FOREACH '(' foreach_vars L_IN expr0 ')' $@11 statement  */
-#line 960 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 960 "src/compiler/internal/grammar.y"
     {
       (yyval.decl).num = (yyvsp[-5].decl).num;
 
@@ -3300,48 +3300,48 @@ yyreduce:
 
       context = (yyvsp[-7].number);
     }
-#line 3304 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3304 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 108: /* for_expr: %empty  */
-#line 973 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 973 "src/compiler/internal/grammar.y"
             {
       (yyval.node) = 0;
     }
-#line 3312 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3312 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 110: /* first_for_expr: for_expr  */
-#line 981 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 981 "src/compiler/internal/grammar.y"
     {
       (yyval.decl).node = (yyvsp[0].node);
       (yyval.decl).num = 0;
     }
-#line 3321 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3321 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 111: /* first_for_expr: single_new_local_def_with_init  */
-#line 986 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 986 "src/compiler/internal/grammar.y"
     {
       (yyval.decl).node = (yyvsp[0].node);
       (yyval.decl).num = 1;
     }
-#line 3330 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3330 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 112: /* $@12: %empty  */
-#line 994 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 994 "src/compiler/internal/grammar.y"
     {
       (yyvsp[-3].number) = context;
       context &= LOOP_CONTEXT;
       context |= SWITCH_CONTEXT;
       (yyvsp[-2].number) = mem_block[A_CASES].current_size;
     }
-#line 3341 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3341 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 113: /* switch: L_SWITCH '(' comma_expr ')' $@12 '{' local_declarations case switch_block '}'  */
-#line 1001 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1001 "src/compiler/internal/grammar.y"
       {
         parse_node_t *node1, *node2;
 
@@ -3370,50 +3370,50 @@ yyreduce:
         (yyval.node) = node2;
         pop_n_locals((yyvsp[-3].decl).num);
       }
-#line 3374 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3374 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 114: /* switch_block: case switch_block  */
-#line 1033 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1033 "src/compiler/internal/grammar.y"
     {
       if ((yyvsp[0].node)){
         CREATE_STATEMENTS((yyval.node), (yyvsp[-1].node), (yyvsp[0].node));
       } else (yyval.node) = (yyvsp[-1].node);
     }
-#line 3384 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3384 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 115: /* switch_block: statement switch_block  */
-#line 1039 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1039 "src/compiler/internal/grammar.y"
     {
       if ((yyvsp[0].node)){
         CREATE_STATEMENTS((yyval.node), (yyvsp[-1].node), (yyvsp[0].node));
       } else (yyval.node) = (yyvsp[-1].node);
     }
-#line 3394 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3394 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 116: /* switch_block: %empty  */
-#line 1045 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1045 "src/compiler/internal/grammar.y"
             {
       (yyval.node) = 0;
     }
-#line 3402 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3402 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 117: /* case: L_CASE case_label ':'  */
-#line 1052 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1052 "src/compiler/internal/grammar.y"
     {
       (yyval.node) = (yyvsp[-1].node);
       (yyval.node)->v.expr = 0;
 
       add_to_mem_block(A_CASES, (char *)&((yyvsp[-1].node)), sizeof((yyvsp[-1].node)));
     }
-#line 3413 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3413 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 118: /* case: L_CASE case_label L_RANGE case_label ':'  */
-#line 1059 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1059 "src/compiler/internal/grammar.y"
     {
       if ( (yyvsp[-3].node)->kind != NODE_CASE_NUMBER
           || (yyvsp[-1].node)->kind != NODE_CASE_NUMBER )
@@ -3427,11 +3427,11 @@ yyreduce:
 
       add_to_mem_block(A_CASES, (char *)&((yyvsp[-3].node)), sizeof((yyvsp[-3].node)));
     }
-#line 3431 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3431 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 119: /* case: L_CASE case_label L_RANGE ':'  */
-#line 1073 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1073 "src/compiler/internal/grammar.y"
     {
       if ( (yyvsp[-2].node)->kind != NODE_CASE_NUMBER )
         yyerror("String case labels not allowed as range bounds");
@@ -3445,11 +3445,11 @@ yyreduce:
 
       add_to_mem_block(A_CASES, (char *)&((yyvsp[-2].node)), sizeof((yyvsp[-2].node)));
     }
-#line 3449 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3449 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 120: /* case: L_CASE L_RANGE case_label ':'  */
-#line 1087 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1087 "src/compiler/internal/grammar.y"
     {
       if ( (yyvsp[-1].node)->kind != NODE_CASE_NUMBER )
         yyerror("String case labels not allowed as range bounds");
@@ -3462,11 +3462,11 @@ yyreduce:
 
       add_to_mem_block(A_CASES, (char *)&((yyval.node)), sizeof((yyval.node)));
     }
-#line 3466 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3466 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 121: /* case: L_DEFAULT ':'  */
-#line 1100 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1100 "src/compiler/internal/grammar.y"
     {
       if (context & SWITCH_DEFAULT) {
         yyerror("Duplicate default");
@@ -3479,11 +3479,11 @@ yyreduce:
       add_to_mem_block(A_CASES, (char *)&((yyval.node)), sizeof((yyval.node)));
       context |= SWITCH_DEFAULT;
     }
-#line 3483 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3483 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 122: /* case_label: constant  */
-#line 1116 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1116 "src/compiler/internal/grammar.y"
     {
       if ((context & SWITCH_STRINGS) && (yyvsp[0].number))
         yyerror("Mixed case label list not allowed");
@@ -3497,11 +3497,11 @@ yyreduce:
       (yyval.node)->kind = NODE_CASE_NUMBER;
       (yyval.node)->r.number = (LPC_INT)(yyvsp[0].number);
     }
-#line 3501 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3501 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 123: /* case_label: string_con1  */
-#line 1130 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1130 "src/compiler/internal/grammar.y"
     {
       POINTER_INT str;
       str = store_prog_string((yyvsp[0].string));
@@ -3513,51 +3513,51 @@ yyreduce:
       (yyval.node)->kind = NODE_CASE_STRING;
       (yyval.node)->r.number = (LPC_INT)str;
     }
-#line 3517 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3517 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 124: /* constant: constant '|' constant  */
-#line 1145 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1145 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = (yyvsp[-2].number) | (yyvsp[0].number);
     }
-#line 3525 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3525 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 125: /* constant: constant '^' constant  */
-#line 1149 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1149 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = (yyvsp[-2].number) ^ (yyvsp[0].number);
     }
-#line 3533 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3533 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 126: /* constant: constant '&' constant  */
-#line 1153 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1153 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = (yyvsp[-2].number) & (yyvsp[0].number);
     }
-#line 3541 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3541 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 127: /* constant: constant L_EQ constant  */
-#line 1157 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1157 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = (yyvsp[-2].number) == (yyvsp[0].number);
     }
-#line 3549 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3549 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 128: /* constant: constant L_NE constant  */
-#line 1161 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1161 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = (yyvsp[-2].number) != (yyvsp[0].number);
     }
-#line 3557 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3557 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 129: /* constant: constant L_ORDER constant  */
-#line 1165 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1165 "src/compiler/internal/grammar.y"
     {
       switch((yyvsp[-1].number)){
         case F_GE: (yyval.number) = (yyvsp[-2].number) >= (yyvsp[0].number); break;
@@ -3565,131 +3565,131 @@ yyreduce:
         case F_GT: (yyval.number) = (yyvsp[-2].number) >  (yyvsp[0].number); break;
       }
     }
-#line 3569 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3569 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 130: /* constant: constant '<' constant  */
-#line 1173 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1173 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = (yyvsp[-2].number) < (yyvsp[0].number);
     }
-#line 3577 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3577 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 131: /* constant: constant L_LSH constant  */
-#line 1177 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1177 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = (yyvsp[-2].number) << (yyvsp[0].number);
     }
-#line 3585 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3585 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 132: /* constant: constant L_RSH constant  */
-#line 1181 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1181 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = (yyvsp[-2].number) >> (yyvsp[0].number);
     }
-#line 3593 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3593 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 133: /* constant: constant '+' constant  */
-#line 1185 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1185 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = (yyvsp[-2].number) + (yyvsp[0].number);
     }
-#line 3601 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3601 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 134: /* constant: constant '-' constant  */
-#line 1189 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1189 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = (yyvsp[-2].number) - (yyvsp[0].number);
     }
-#line 3609 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3609 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 135: /* constant: constant '*' constant  */
-#line 1193 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1193 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = (yyvsp[-2].number) * (yyvsp[0].number);
     }
-#line 3617 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3617 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 136: /* constant: constant '%' constant  */
-#line 1197 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1197 "src/compiler/internal/grammar.y"
     {
       if ((yyvsp[0].number)) (yyval.number) = (yyvsp[-2].number) % (yyvsp[0].number); else yyerror("Modulo by zero");
     }
-#line 3625 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3625 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 137: /* constant: constant '/' constant  */
-#line 1201 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1201 "src/compiler/internal/grammar.y"
     {
       if ((yyvsp[0].number)) (yyval.number) = (yyvsp[-2].number) / (yyvsp[0].number); else yyerror("Division by zero");
     }
-#line 3633 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3633 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 138: /* constant: '(' constant ')'  */
-#line 1205 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1205 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = (yyvsp[-1].number);
     }
-#line 3641 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3641 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 139: /* constant: L_NUMBER  */
-#line 1209 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1209 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = (yyvsp[0].number);
     }
-#line 3649 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3649 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 140: /* constant: '-' L_NUMBER  */
-#line 1213 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1213 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = -(yyvsp[0].number);
     }
-#line 3657 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3657 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 141: /* constant: L_NOT L_NUMBER  */
-#line 1217 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1217 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = !(yyvsp[0].number);
     }
-#line 3665 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3665 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 142: /* constant: '~' L_NUMBER  */
-#line 1221 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1221 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = ~(yyvsp[0].number);
     }
-#line 3673 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3673 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 143: /* comma_expr: expr0  */
-#line 1228 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1228 "src/compiler/internal/grammar.y"
     {
       (yyval.node) = (yyvsp[0].node);
     }
-#line 3681 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3681 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 144: /* comma_expr: comma_expr ',' expr0  */
-#line 1232 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1232 "src/compiler/internal/grammar.y"
     {
       CREATE_TWO_VALUES((yyval.node), (yyvsp[0].node)->type, pop_value((yyvsp[-2].node)), (yyvsp[0].node));
     }
-#line 3689 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3689 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 146: /* expr0: ref lvalue  */
-#line 1243 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1243 "src/compiler/internal/grammar.y"
     {
       int op;
 
@@ -3716,11 +3716,11 @@ yyreduce:
       }
       CREATE_UNARY_OP_1((yyval.node), F_MAKE_REF, TYPE_ANY, (yyvsp[0].node), op);
     }
-#line 3720 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3720 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 147: /* expr0: lvalue L_ASSIGN expr0  */
-#line 1270 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1270 "src/compiler/internal/grammar.y"
     {
       parse_node_t *l = (yyvsp[-2].node), *r = (yyvsp[0].node);
       /* set this up here so we can change it below */
@@ -3745,20 +3745,20 @@ yyreduce:
       if ((yyvsp[-1].number) == F_ASSIGN)
         (yyval.node)->l.expr = do_promotions(r, l->type);
     }
-#line 3749 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3749 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 148: /* expr0: error L_ASSIGN expr0  */
-#line 1295 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1295 "src/compiler/internal/grammar.y"
     {
       yyerror("Illegal LHS");
       CREATE_ERROR((yyval.node));
     }
-#line 3758 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3758 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 149: /* expr0: expr0 '?' expr0 ':' expr0  */
-#line 1300 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1300 "src/compiler/internal/grammar.y"
     {
       parse_node_t *p1 = (yyvsp[-2].node), *p2 = (yyvsp[0].node);
 
@@ -3782,31 +3782,31 @@ yyreduce:
       }
       (yyval.node)->type = ((p1->type == p2->type) ? p1->type : TYPE_ANY);
     }
-#line 3786 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3786 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 150: /* expr0: expr0 L_LOR expr0  */
-#line 1324 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1324 "src/compiler/internal/grammar.y"
     {
       CREATE_LAND_LOR((yyval.node), F_LOR, (yyvsp[-2].node), (yyvsp[0].node));
       if (IS_NODE((yyvsp[-2].node), NODE_LAND_LOR, F_LOR))
         (yyvsp[-2].node)->kind = NODE_BRANCH_LINK;
     }
-#line 3796 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3796 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 151: /* expr0: expr0 L_LAND expr0  */
-#line 1330 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1330 "src/compiler/internal/grammar.y"
     {
       CREATE_LAND_LOR((yyval.node), F_LAND, (yyvsp[-2].node), (yyvsp[0].node));
       if (IS_NODE((yyvsp[-2].node), NODE_LAND_LOR, F_LAND))
         (yyvsp[-2].node)->kind = NODE_BRANCH_LINK;
     }
-#line 3806 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3806 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 152: /* expr0: expr0 '|' expr0  */
-#line 1336 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1336 "src/compiler/internal/grammar.y"
     {
       int t1 = (yyvsp[-2].node)->type, t3 = (yyvsp[0].node)->type;
 
@@ -3831,19 +3831,19 @@ yyreduce:
       }
       else (yyval.node) = binary_int_op((yyvsp[-2].node), (yyvsp[0].node), F_OR, "|");
     }
-#line 3835 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3835 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 153: /* expr0: expr0 '^' expr0  */
-#line 1361 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1361 "src/compiler/internal/grammar.y"
     {
       (yyval.node) = binary_int_op((yyvsp[-2].node), (yyvsp[0].node), F_XOR, "^");
     }
-#line 3843 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3843 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 154: /* expr0: expr0 '&' expr0  */
-#line 1365 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1365 "src/compiler/internal/grammar.y"
     {
       int t1 = (yyvsp[-2].node)->type, t3 = (yyvsp[0].node)->type;
       if (is_boolean((yyvsp[-2].node)) && is_boolean((yyvsp[0].node)))
@@ -3866,11 +3866,11 @@ yyreduce:
         CREATE_BINARY_OP((yyval.node), F_AND, t1, (yyvsp[-2].node), (yyvsp[0].node));
       } else (yyval.node) = binary_int_op((yyvsp[-2].node), (yyvsp[0].node), F_AND, "&");
     }
-#line 3870 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3870 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 155: /* expr0: expr0 L_EQ expr0  */
-#line 1388 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1388 "src/compiler/internal/grammar.y"
     {
       if (exact_types && !compatible_types2((yyvsp[-2].node)->type, (yyvsp[0].node)->type)){
         char buf[256];
@@ -3892,11 +3892,11 @@ yyreduce:
           CREATE_BINARY_OP((yyval.node), F_EQ, TYPE_NUMBER, (yyvsp[-2].node), (yyvsp[0].node));
         }
     }
-#line 3896 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3896 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 156: /* expr0: expr0 L_NE expr0  */
-#line 1410 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1410 "src/compiler/internal/grammar.y"
     {
       if (exact_types && !compatible_types2((yyvsp[-2].node)->type, (yyvsp[0].node)->type)){
         char buf[256];
@@ -3910,11 +3910,11 @@ yyreduce:
       }
       CREATE_BINARY_OP((yyval.node), F_NE, TYPE_NUMBER, (yyvsp[-2].node), (yyvsp[0].node));
     }
-#line 3914 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3914 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 157: /* expr0: expr0 L_ORDER expr0  */
-#line 1424 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1424 "src/compiler/internal/grammar.y"
     {
       if (exact_types) {
         int t1 = (yyvsp[-2].node)->type;
@@ -3958,11 +3958,11 @@ yyreduce:
       }
       CREATE_BINARY_OP((yyval.node), (yyvsp[-1].number), TYPE_NUMBER, (yyvsp[-2].node), (yyvsp[0].node));
     }
-#line 3962 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 3962 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 158: /* expr0: expr0 '<' expr0  */
-#line 1468 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1468 "src/compiler/internal/grammar.y"
     {
       if (exact_types) {
         int t1 = (yyvsp[-2].node)->type, t3 = (yyvsp[0].node)->type;
@@ -3999,27 +3999,27 @@ yyreduce:
       }
       CREATE_BINARY_OP((yyval.node), F_LT, TYPE_NUMBER, (yyvsp[-2].node), (yyvsp[0].node));
     }
-#line 4003 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4003 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 159: /* expr0: expr0 L_LSH expr0  */
-#line 1505 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1505 "src/compiler/internal/grammar.y"
     {
       (yyval.node) = binary_int_op((yyvsp[-2].node), (yyvsp[0].node), F_LSH, "<<");
     }
-#line 4011 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4011 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 160: /* expr0: expr0 L_RSH expr0  */
-#line 1509 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1509 "src/compiler/internal/grammar.y"
     {
       (yyval.node) = binary_int_op((yyvsp[-2].node), (yyvsp[0].node), F_RSH, ">>");
     }
-#line 4019 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4019 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 161: /* expr0: expr0 '+' expr0  */
-#line 1513 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1513 "src/compiler/internal/grammar.y"
     {
       int result_type;
 
@@ -4189,11 +4189,11 @@ yyreduce:
           break;
       }
     }
-#line 4193 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4193 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 162: /* expr0: expr0 '-' expr0  */
-#line 1683 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1683 "src/compiler/internal/grammar.y"
     {
       int result_type;
 
@@ -4287,11 +4287,11 @@ yyreduce:
           CREATE_BINARY_OP((yyval.node), F_SUBTRACT, result_type, (yyvsp[-2].node), (yyvsp[0].node));
       }
     }
-#line 4291 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4291 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 163: /* expr0: expr0 '*' expr0  */
-#line 1777 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1777 "src/compiler/internal/grammar.y"
     {
       int result_type;
 
@@ -4371,19 +4371,19 @@ yyreduce:
           CREATE_BINARY_OP((yyval.node), F_MULTIPLY, result_type, (yyvsp[-2].node), (yyvsp[0].node));
       }
     }
-#line 4375 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4375 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 164: /* expr0: expr0 '%' expr0  */
-#line 1857 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1857 "src/compiler/internal/grammar.y"
     {
       (yyval.node) = binary_int_op((yyvsp[-2].node), (yyvsp[0].node), F_MOD, "%");
     }
-#line 4383 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4383 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 165: /* expr0: expr0 '/' expr0  */
-#line 1861 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1861 "src/compiler/internal/grammar.y"
     {
       int result_type;
 
@@ -4478,11 +4478,11 @@ yyreduce:
           CREATE_BINARY_OP((yyval.node), F_DIVIDE, result_type, (yyvsp[-2].node), (yyvsp[0].node));
       }
     }
-#line 4482 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4482 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 166: /* expr0: cast expr0  */
-#line 1956 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1956 "src/compiler/internal/grammar.y"
     {
       (yyval.node) = (yyvsp[0].node);
       (yyval.node)->type = (yyvsp[-1].number);
@@ -4503,11 +4503,11 @@ yyreduce:
         yyerror(buf);
       }
     }
-#line 4507 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4507 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 167: /* expr0: L_INC lvalue  */
-#line 1977 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1977 "src/compiler/internal/grammar.y"
     {
       CREATE_UNARY_OP((yyval.node), F_PRE_INC, 0, (yyvsp[0].node));
       if (exact_types){
@@ -4528,11 +4528,11 @@ yyreduce:
         }
       } else (yyval.node)->type = TYPE_ANY;
     }
-#line 4532 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4532 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 168: /* expr0: L_DEC lvalue  */
-#line 1998 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 1998 "src/compiler/internal/grammar.y"
     {
       CREATE_UNARY_OP((yyval.node), F_PRE_DEC, 0, (yyvsp[0].node));
       if (exact_types){
@@ -4554,11 +4554,11 @@ yyreduce:
       } else (yyval.node)->type = TYPE_ANY;
 
     }
-#line 4558 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4558 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 169: /* expr0: L_NOT expr0  */
-#line 2020 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2020 "src/compiler/internal/grammar.y"
     {
       if ((yyvsp[0].node)->kind == NODE_NUMBER) {
         (yyval.node) = (yyvsp[0].node);
@@ -4567,11 +4567,11 @@ yyreduce:
         CREATE_UNARY_OP((yyval.node), F_NOT, TYPE_NUMBER, (yyvsp[0].node));
       }
     }
-#line 4571 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4571 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 170: /* expr0: '~' expr0  */
-#line 2029 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2029 "src/compiler/internal/grammar.y"
     {
       if (exact_types && !IS_TYPE((yyvsp[0].node)->type, TYPE_NUMBER))
         type_error("Bad argument to ~", (yyvsp[0].node)->type);
@@ -4582,11 +4582,11 @@ yyreduce:
         CREATE_UNARY_OP((yyval.node), F_COMPL, TYPE_NUMBER, (yyvsp[0].node));
       }
     }
-#line 4586 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4586 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 171: /* expr0: '-' expr0  */
-#line 2040 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2040 "src/compiler/internal/grammar.y"
     {
       int result_type;
       if (exact_types){
@@ -4610,11 +4610,11 @@ yyreduce:
           CREATE_UNARY_OP((yyval.node), F_NEGATE, result_type, (yyvsp[0].node));
       }
     }
-#line 4614 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4614 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 172: /* expr0: lvalue L_INC  */
-#line 2064 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2064 "src/compiler/internal/grammar.y"
     {
       CREATE_UNARY_OP((yyval.node), F_POST_INC, 0, (yyvsp[-1].node));
       (yyval.node)->v.number = F_POST_INC;
@@ -4636,11 +4636,11 @@ yyreduce:
         }
       } else (yyval.node)->type = TYPE_ANY;
     }
-#line 4640 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4640 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 173: /* expr0: lvalue L_DEC  */
-#line 2086 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2086 "src/compiler/internal/grammar.y"
     {
       CREATE_UNARY_OP((yyval.node), F_POST_DEC, 0, (yyvsp[-1].node));
       if (exact_types){
@@ -4661,21 +4661,21 @@ yyreduce:
         }
       } else (yyval.node)->type = TYPE_ANY;
     }
-#line 4665 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4665 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 180: /* return: L_RETURN ';'  */
-#line 2116 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2116 "src/compiler/internal/grammar.y"
     {
       if (exact_types && !IS_TYPE(exact_types, TYPE_VOID))
         yywarn("Non-void functions must return a value.");
       CREATE_RETURN((yyval.node), 0);
     }
-#line 4675 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4675 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 181: /* return: L_RETURN comma_expr ';'  */
-#line 2122 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2122 "src/compiler/internal/grammar.y"
     {
       if (exact_types && !compatible_types((yyvsp[-1].node)->type, exact_types)) {
         char buf[256];
@@ -4692,60 +4692,60 @@ yyreduce:
         CREATE_RETURN((yyval.node), (yyvsp[-1].node));
       }
     }
-#line 4696 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4696 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 182: /* expr_list: %empty  */
-#line 2142 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2142 "src/compiler/internal/grammar.y"
             {
       CREATE_EXPR_LIST((yyval.node), 0);
     }
-#line 4704 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4704 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 183: /* expr_list: expr_list2  */
-#line 2146 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2146 "src/compiler/internal/grammar.y"
     {
       CREATE_EXPR_LIST((yyval.node), (yyvsp[0].node));
     }
-#line 4712 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4712 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 184: /* expr_list: expr_list2 ','  */
-#line 2150 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2150 "src/compiler/internal/grammar.y"
     {
       CREATE_EXPR_LIST((yyval.node), (yyvsp[-1].node));
     }
-#line 4720 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4720 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 185: /* expr_list_node: expr0  */
-#line 2157 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2157 "src/compiler/internal/grammar.y"
     {
       CREATE_EXPR_NODE((yyval.node), (yyvsp[0].node), 0);
     }
-#line 4728 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4728 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 186: /* expr_list_node: expr0 L_DOT_DOT_DOT  */
-#line 2161 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2161 "src/compiler/internal/grammar.y"
     {
       CREATE_EXPR_NODE((yyval.node), (yyvsp[-1].node), 1);
     }
-#line 4736 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4736 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 187: /* expr_list2: expr_list_node  */
-#line 2168 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2168 "src/compiler/internal/grammar.y"
     {
       (yyvsp[0].node)->kind = 1;
       (yyval.node) = (yyvsp[0].node);
     }
-#line 4745 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4745 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 188: /* expr_list2: expr_list2 ',' expr_list_node  */
-#line 2173 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2173 "src/compiler/internal/grammar.y"
     {
       (yyvsp[0].node)->kind = 0;
 
@@ -4754,36 +4754,36 @@ yyreduce:
       (yyval.node)->l.expr->r.expr = (yyvsp[0].node);
       (yyval.node)->l.expr = (yyvsp[0].node);
     }
-#line 4758 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4758 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 189: /* expr_list3: %empty  */
-#line 2185 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2185 "src/compiler/internal/grammar.y"
             {
       /* this is a dummy node */
       CREATE_EXPR_LIST((yyval.node), 0);
     }
-#line 4767 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4767 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 190: /* expr_list3: expr_list4  */
-#line 2190 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2190 "src/compiler/internal/grammar.y"
     {
       CREATE_EXPR_LIST((yyval.node), (yyvsp[0].node));
     }
-#line 4775 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4775 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 191: /* expr_list3: expr_list4 ','  */
-#line 2194 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2194 "src/compiler/internal/grammar.y"
     {
       CREATE_EXPR_LIST((yyval.node), (yyvsp[-1].node));
     }
-#line 4783 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4783 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 192: /* expr_list4: assoc_pair  */
-#line 2201 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2201 "src/compiler/internal/grammar.y"
     {
       (yyval.node) = new_node_no_line();
       (yyval.node)->kind = 2;
@@ -4793,11 +4793,11 @@ yyreduce:
       /* we keep track of the end of the chain in the left nodes */
       (yyval.node)->l.expr = (yyval.node);
     }
-#line 4797 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4797 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 193: /* expr_list4: expr_list4 ',' assoc_pair  */
-#line 2211 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2211 "src/compiler/internal/grammar.y"
     {
       parse_node_t *expr;
 
@@ -4812,19 +4812,19 @@ yyreduce:
       (yyvsp[-2].node)->kind += 2;
       (yyval.node) = (yyvsp[-2].node);
     }
-#line 4816 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4816 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 194: /* assoc_pair: expr0 ':' expr0  */
-#line 2229 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2229 "src/compiler/internal/grammar.y"
     {
       CREATE_TWO_VALUES((yyval.node), 0, (yyvsp[-2].node), (yyvsp[0].node));
     }
-#line 4824 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4824 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 195: /* lvalue: expr4  */
-#line 2236 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2236 "src/compiler/internal/grammar.y"
     {
 #define LV_ILLEGAL 1
 #define LV_RANGE 2
@@ -4937,19 +4937,19 @@ yyreduce:
           break;
       }
     }
-#line 4941 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4941 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 197: /* l_new_function_open: L_FUNCTION_OPEN efun_override  */
-#line 2353 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2353 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = ((yyvsp[0].number) << 8) | FP_EFUN;
     }
-#line 4949 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 4949 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 199: /* expr4: L_DEFINED_NAME  */
-#line 2361 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2361 "src/compiler/internal/grammar.y"
     {
       int i;
       if ((i = (yyvsp[0].ihe)->dn.local_num) != -1) {
@@ -5022,11 +5022,11 @@ yyreduce:
           yyerror(buf);
         }
     }
-#line 5026 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5026 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 200: /* expr4: L_IDENTIFIER  */
-#line 2434 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2434 "src/compiler/internal/grammar.y"
     {
       char buf[256];
       char *end = EndOf(buf);
@@ -5044,30 +5044,30 @@ yyreduce:
       if (current_function_context)
         current_function_context->bindable = FP_NOT_BINDABLE;
     }
-#line 5048 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5048 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 201: /* expr4: L_PARAMETER  */
-#line 2452 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2452 "src/compiler/internal/grammar.y"
     {
       CREATE_PARAMETER((yyval.node), TYPE_ANY, (yyvsp[0].number));
     }
-#line 5056 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5056 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 202: /* @13: %empty  */
-#line 2456 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2456 "src/compiler/internal/grammar.y"
     {
       (yyval.contextp) = current_function_context;
       /* already flagged as an error */
       if (current_function_context)
         current_function_context = current_function_context->parent;
     }
-#line 5067 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5067 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 203: /* expr4: '$' '(' @13 comma_expr ')'  */
-#line 2463 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2463 "src/compiler/internal/grammar.y"
     {
       parse_node_t *node;
 
@@ -5090,11 +5090,11 @@ yyreduce:
         node->v.expr = (yyvsp[-1].node);
       }
     }
-#line 5094 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5094 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 204: /* expr4: expr4 L_ARROW identifier  */
-#line 2486 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2486 "src/compiler/internal/grammar.y"
     {
       if ((yyvsp[-2].node)->type == TYPE_ANY) {
         int cmi;
@@ -5118,11 +5118,11 @@ yyreduce:
 
       scratch_free((yyvsp[0].string));
     }
-#line 5122 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5122 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 205: /* expr4: expr4 L_DOT identifier  */
-#line 2510 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2510 "src/compiler/internal/grammar.y"
     {
       if ((yyvsp[-2].node)->type == TYPE_ANY) {
         int cmi;
@@ -5146,11 +5146,11 @@ yyreduce:
 
       scratch_free((yyvsp[0].string));
     }
-#line 5150 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5150 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 206: /* expr4: expr4 '[' comma_expr L_RANGE comma_expr ']'  */
-#line 2534 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2534 "src/compiler/internal/grammar.y"
     {
     if (!CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
       if (CONFIG_INT(__RC_WARN_OLD_RANGE_BEHAVIOR__)) {
@@ -5161,57 +5161,57 @@ yyreduce:
     }
       (yyval.node) = make_range_node(F_NN_RANGE, (yyvsp[-5].node), (yyvsp[-3].node), (yyvsp[-1].node));
     }
-#line 5165 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5165 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 207: /* expr4: expr4 '[' '<' comma_expr L_RANGE comma_expr ']'  */
-#line 2545 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2545 "src/compiler/internal/grammar.y"
     {
       (yyval.node) = make_range_node(F_RN_RANGE, (yyvsp[-6].node), (yyvsp[-3].node), (yyvsp[-1].node));
     }
-#line 5173 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5173 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 208: /* expr4: expr4 '[' '<' comma_expr L_RANGE '<' comma_expr ']'  */
-#line 2549 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2549 "src/compiler/internal/grammar.y"
     {
       if ((yyvsp[-1].node)->kind == NODE_NUMBER && (yyvsp[-1].node)->v.number <= 1)
         (yyval.node) = make_range_node(F_RE_RANGE, (yyvsp[-7].node), (yyvsp[-4].node), 0);
       else
         (yyval.node) = make_range_node(F_RR_RANGE, (yyvsp[-7].node), (yyvsp[-4].node), (yyvsp[-1].node));
     }
-#line 5184 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5184 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 209: /* expr4: expr4 '[' comma_expr L_RANGE '<' comma_expr ']'  */
-#line 2556 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2556 "src/compiler/internal/grammar.y"
     {
       if ((yyvsp[-1].node)->kind == NODE_NUMBER && (yyvsp[-1].node)->v.number <= 1)
         (yyval.node) = make_range_node(F_NE_RANGE, (yyvsp[-6].node), (yyvsp[-4].node), 0);
       else
         (yyval.node) = make_range_node(F_NR_RANGE, (yyvsp[-6].node), (yyvsp[-4].node), (yyvsp[-1].node));
     }
-#line 5195 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5195 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 210: /* expr4: expr4 '[' comma_expr L_RANGE ']'  */
-#line 2563 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2563 "src/compiler/internal/grammar.y"
     {
       (yyval.node) = make_range_node(F_NE_RANGE, (yyvsp[-4].node), (yyvsp[-2].node), 0);
     }
-#line 5203 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5203 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 211: /* expr4: expr4 '[' '<' comma_expr L_RANGE ']'  */
-#line 2567 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2567 "src/compiler/internal/grammar.y"
     {
       (yyval.node) = make_range_node(F_RE_RANGE, (yyvsp[-5].node), (yyvsp[-2].node), 0);
     }
-#line 5211 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5211 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 212: /* expr4: expr4 '[' '<' comma_expr ']'  */
-#line 2571 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2571 "src/compiler/internal/grammar.y"
     {
       if (IS_NODE((yyvsp[-4].node), NODE_CALL, F_AGGREGATE)
           && (yyvsp[-1].node)->kind == NODE_NUMBER) {
@@ -5256,11 +5256,11 @@ yyreduce:
         }
       } else (yyval.node)->type = TYPE_ANY;
     }
-#line 5260 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5260 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 213: /* expr4: expr4 '[' comma_expr ']'  */
-#line 2616 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2616 "src/compiler/internal/grammar.y"
     {
       /* Something stupid like ({ 1, 2, 3 })[1]; we take the
        * time to optimize this because people who don't understand
@@ -5316,19 +5316,19 @@ yyreduce:
         }
       } else (yyval.node)->type = TYPE_ANY;
     }
-#line 5320 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5320 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 215: /* expr4: '(' comma_expr ')'  */
-#line 2673 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2673 "src/compiler/internal/grammar.y"
     {
       (yyval.node) = (yyvsp[-1].node);
     }
-#line 5328 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5328 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 218: /* @14: %empty  */
-#line 2679 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2679 "src/compiler/internal/grammar.y"
     {
       auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
 
@@ -5349,11 +5349,11 @@ yyreduce:
       exact_types = TYPE_ANY;
       context = 0;
     }
-#line 5353 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5353 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 219: /* expr4: L_BASIC_TYPE @14 '(' argument ')' block  */
-#line 2700 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2700 "src/compiler/internal/grammar.y"
     {
       if ((yyvsp[-2].argument).flags & ARG_IS_VARARGS) {
         yyerror("Anonymous varargs functions aren't implemented");
@@ -5389,11 +5389,11 @@ yyreduce:
       type_of_locals_ptr -= max_num_locals;
       reactivate_current_locals();
     }
-#line 5393 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5393 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 220: /* expr4: l_new_function_open ':' ')'  */
-#line 2736 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2736 "src/compiler/internal/grammar.y"
     {
       if (CONFIG_INT(__RC_WOMBLES__)) {
         if(*(outp-2) != ':') {
@@ -5431,11 +5431,11 @@ yyreduce:
           break;
       }
     }
-#line 5435 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5435 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 221: /* expr4: l_new_function_open ',' expr_list2 ':' ')'  */
-#line 2774 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2774 "src/compiler/internal/grammar.y"
     {
       if (CONFIG_INT(__RC_WOMBLES__)) {
         if(*(outp-2) != ':') {
@@ -5530,11 +5530,11 @@ yyreduce:
                       break;
       }
     }
-#line 5534 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5534 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 222: /* expr4: L_FUNCTION_OPEN comma_expr ':' ')'  */
-#line 2869 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2869 "src/compiler/internal/grammar.y"
     {
       if (CONFIG_INT(__RC_WOMBLES__)) {
         if(*(outp-2) != ':') {
@@ -5557,11 +5557,11 @@ yyreduce:
         + (current_function_context->num_parameters << 8);
       pop_function_context();
     }
-#line 5561 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5561 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 223: /* expr4: L_MAPPING_OPEN expr_list3 ']' ')'  */
-#line 2892 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2892 "src/compiler/internal/grammar.y"
     {
       if (CONFIG_INT(__RC_WOMBLES__)) {
         if(*(outp-2) != ']') {
@@ -5570,11 +5570,11 @@ yyreduce:
       }
       CREATE_CALL((yyval.node), F_AGGREGATE_ASSOC, TYPE_MAPPING, (yyvsp[-2].node));
     }
-#line 5574 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5574 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 224: /* expr4: L_ARRAY_OPEN expr_list '}' ')'  */
-#line 2901 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2901 "src/compiler/internal/grammar.y"
     {
       if (CONFIG_INT(__RC_WOMBLES__)) {
         if(*(outp-2) != '}') {
@@ -5583,116 +5583,116 @@ yyreduce:
       }
       CREATE_CALL((yyval.node), F_AGGREGATE, TYPE_ANY | TYPE_MOD_ARRAY, (yyvsp[-2].node));
     }
-#line 5587 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5587 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 225: /* expr_or_block: block  */
-#line 2913 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2913 "src/compiler/internal/grammar.y"
     {
       (yyval.node) = (yyvsp[0].decl).node;
     }
-#line 5595 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5595 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 226: /* expr_or_block: '(' comma_expr ')'  */
-#line 2917 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2917 "src/compiler/internal/grammar.y"
     {
       (yyval.node) = insert_pop_value((yyvsp[-1].node));
     }
-#line 5603 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5603 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 227: /* @15: %empty  */
-#line 2924 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2924 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = context;
       context = SPECIAL_CONTEXT;
     }
-#line 5612 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5612 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 228: /* catch: L_CATCH @15 expr_or_block  */
-#line 2929 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2929 "src/compiler/internal/grammar.y"
     {
       CREATE_CATCH((yyval.node), (yyvsp[0].node));
       context = (yyvsp[-1].number);
     }
-#line 5621 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5621 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 229: /* tree: L_TREE block  */
-#line 2937 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2937 "src/compiler/internal/grammar.y"
     {
 #ifdef DEBUG
       (yyval.node) = new_node_no_line();
       lpc_tree_form((yyvsp[0].decl).node, (yyval.node));
 #endif
     }
-#line 5632 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5632 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 230: /* tree: L_TREE '(' comma_expr ')'  */
-#line 2944 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2944 "src/compiler/internal/grammar.y"
     {
 #ifdef DEBUG
       (yyval.node) = new_node_no_line();
       lpc_tree_form((yyvsp[-1].node), (yyval.node));
 #endif
     }
-#line 5643 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5643 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 231: /* sscanf: L_SSCANF '(' expr0 ',' expr0 lvalue_list ')'  */
-#line 2954 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2954 "src/compiler/internal/grammar.y"
     {
       int p = (yyvsp[-1].node)->v.number;
       CREATE_LVALUE_EFUN((yyval.node), TYPE_NUMBER, (yyvsp[-1].node));
       CREATE_BINARY_OP_1((yyval.node)->l.expr, F_SSCANF, 0, (yyvsp[-4].node), (yyvsp[-2].node), p);
     }
-#line 5653 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5653 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 232: /* parse_command: L_PARSE_COMMAND '(' expr0 ',' expr0 ',' expr0 lvalue_list ')'  */
-#line 2963 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2963 "src/compiler/internal/grammar.y"
     {
       int p = (yyvsp[-1].node)->v.number;
       CREATE_LVALUE_EFUN((yyval.node), TYPE_NUMBER, (yyvsp[-1].node));
       CREATE_TERNARY_OP_1((yyval.node)->l.expr, F_PARSE_COMMAND, 0,
           (yyvsp[-6].node), (yyvsp[-4].node), (yyvsp[-2].node), p);
     }
-#line 5664 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5664 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 233: /* @16: %empty  */
-#line 2973 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2973 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = context;
       context = SPECIAL_CONTEXT;
     }
-#line 5673 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5673 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 234: /* time_expression: L_TIME_EXPRESSION @16 expr_or_block  */
-#line 2978 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2978 "src/compiler/internal/grammar.y"
     {
       CREATE_TIME_EXPRESSION((yyval.node), (yyvsp[0].node));
       context = (yyvsp[-1].number);
     }
-#line 5682 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5682 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 235: /* lvalue_list: %empty  */
-#line 2986 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2986 "src/compiler/internal/grammar.y"
             {
       (yyval.node) = new_node_no_line();
       (yyval.node)->r.expr = 0;
       (yyval.node)->v.number = 0;
     }
-#line 5692 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5692 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 236: /* lvalue_list: ',' lvalue lvalue_list  */
-#line 2992 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 2992 "src/compiler/internal/grammar.y"
     {
       parse_node_t *insert;
 
@@ -5703,103 +5703,103 @@ yyreduce:
       (yyvsp[0].node)->r.expr = insert;
       (yyval.node)->v.number++;
     }
-#line 5707 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5707 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 237: /* string: string_con2  */
-#line 3006 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3006 "src/compiler/internal/grammar.y"
     {
       CREATE_STRING((yyval.node), (yyvsp[0].string));
       scratch_free((yyvsp[0].string));
     }
-#line 5716 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5716 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 239: /* string_con1: '(' string_con1 ')'  */
-#line 3015 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3015 "src/compiler/internal/grammar.y"
     {
       (yyval.string) = (yyvsp[-1].string);
     }
-#line 5724 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5724 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 240: /* string_con1: string_con1 '+' string_con1  */
-#line 3019 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3019 "src/compiler/internal/grammar.y"
     {
       (yyval.string) = scratch_join((yyvsp[-2].string), (yyvsp[0].string));
     }
-#line 5732 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5732 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 242: /* string_con2: string_con2 L_STRING  */
-#line 3027 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3027 "src/compiler/internal/grammar.y"
     {
       (yyval.string) = scratch_join((yyvsp[-1].string), (yyvsp[0].string));
     }
-#line 5740 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5740 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 243: /* class_init: identifier ':' expr0  */
-#line 3034 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3034 "src/compiler/internal/grammar.y"
     {
       (yyval.node) = new_node();
       (yyval.node)->l.expr = (parse_node_t *)(yyvsp[-2].string);
       (yyval.node)->v.expr = (yyvsp[0].node);
       (yyval.node)->r.expr = 0;
     }
-#line 5751 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5751 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 244: /* opt_class_init: %empty  */
-#line 3044 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3044 "src/compiler/internal/grammar.y"
             {
       (yyval.node) = 0;
     }
-#line 5759 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5759 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 245: /* opt_class_init: opt_class_init ',' class_init  */
-#line 3048 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3048 "src/compiler/internal/grammar.y"
     {
       (yyval.node) = (yyvsp[0].node);
       (yyval.node)->r.expr = (yyvsp[-2].node);
     }
-#line 5768 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5768 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 246: /* @17: %empty  */
-#line 3056 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3056 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = context;
       (yyvsp[0].number) = num_refs;
       context |= ARG_LIST;
     }
-#line 5778 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5778 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 247: /* function_call: efun_override '(' @17 expr_list ')'  */
-#line 3062 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3062 "src/compiler/internal/grammar.y"
     {
       context = (yyvsp[-2].number);
       (yyval.node) = validate_efun_call((yyvsp[-4].number),(yyvsp[-1].node));
       (yyval.node) = check_refs(num_refs - (yyvsp[-3].number), (yyvsp[-1].node), (yyval.node));
       num_refs = (yyvsp[-3].number);
     }
-#line 5789 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5789 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 248: /* @18: %empty  */
-#line 3069 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3069 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = context;
       (yyvsp[0].number) = num_refs;
       context |= ARG_LIST;
     }
-#line 5799 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5799 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 249: /* function_call: L_NEW '(' @18 expr_list ')'  */
-#line 3075 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3075 "src/compiler/internal/grammar.y"
     {
       ident_hash_elem_t *ihe;
       int f;
@@ -5824,11 +5824,11 @@ yyreduce:
       (yyval.node) = check_refs(num_refs - (yyvsp[-3].number), (yyvsp[-1].node), (yyval.node));
       num_refs = (yyvsp[-3].number);
     }
-#line 5828 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5828 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 250: /* function_call: L_NEW '(' L_CLASS L_DEFINED_NAME opt_class_init ')'  */
-#line 3100 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3100 "src/compiler/internal/grammar.y"
     {
       parse_node_t *node;
 
@@ -5863,11 +5863,11 @@ yyreduce:
         }
       }
     }
-#line 5867 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5867 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 251: /* function_call: L_NEW '(' L_CLASS L_IDENTIFIER opt_class_init ')'  */
-#line 3135 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3135 "src/compiler/internal/grammar.y"
     {
       parse_node_t *node;
       char buf[256];
@@ -5885,21 +5885,21 @@ yyreduce:
         node = node->r.expr;
       }
     }
-#line 5889 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5889 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 252: /* @19: %empty  */
-#line 3153 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3153 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = context;
       (yyvsp[0].number) = num_refs;
       context |= ARG_LIST;
     }
-#line 5899 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 5899 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 253: /* function_call: L_DEFINED_NAME '(' @19 expr_list ')'  */
-#line 3159 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3159 "src/compiler/internal/grammar.y"
     {
       int f;
       int i;
@@ -6022,21 +6022,21 @@ yyreduce:
       (yyval.node) = check_refs(num_refs - (yyvsp[-3].number), (yyvsp[-1].node), (yyval.node));
       num_refs = (yyvsp[-3].number);
     }
-#line 6026 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 6026 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 254: /* @20: %empty  */
-#line 3282 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3282 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = context;
       (yyvsp[0].number) = num_refs;
       context |= ARG_LIST;
     }
-#line 6036 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 6036 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 255: /* function_call: function_name '(' @20 expr_list ')'  */
-#line 3288 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3288 "src/compiler/internal/grammar.y"
     {
       char *name = (yyvsp[-4].string);
 
@@ -6098,21 +6098,21 @@ yyreduce:
       num_refs = (yyvsp[-3].number);
       scratch_free(name);
     }
-#line 6102 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 6102 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 256: /* @21: %empty  */
-#line 3350 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3350 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = context;
       (yyvsp[0].number) = num_refs;
       context |= ARG_LIST;
     }
-#line 6112 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 6112 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 257: /* function_call: expr4 '[' comma_expr ']' '(' @21 expr_list ')'  */
-#line 3356 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3356 "src/compiler/internal/grammar.y"
     {
       parse_node_t *expr;
       parse_node_t *index_expr;
@@ -6157,21 +6157,21 @@ yyreduce:
       (yyval.node) = check_refs(num_refs - (yyvsp[-3].number), (yyvsp[-1].node), (yyval.node));
       num_refs = (yyvsp[-3].number);
     }
-#line 6161 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 6161 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 258: /* @22: %empty  */
-#line 3401 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3401 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = context;
       (yyvsp[0].number) = num_refs;
       context |= ARG_LIST;
     }
-#line 6171 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 6171 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 259: /* function_call: expr4 L_ARROW identifier '(' @22 expr_list ')'  */
-#line 3407 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3407 "src/compiler/internal/grammar.y"
     {
       ident_hash_elem_t *ihe;
       int f;
@@ -6216,21 +6216,21 @@ yyreduce:
       (yyval.node) = check_refs(num_refs - (yyvsp[-3].number), (yyvsp[-1].node), (yyval.node));
       num_refs = (yyvsp[-3].number);
     }
-#line 6220 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 6220 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 260: /* @23: %empty  */
-#line 3452 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3452 "src/compiler/internal/grammar.y"
     {
       (yyval.number) = context;
       (yyvsp[0].number) = num_refs;
       context |= ARG_LIST;
     }
-#line 6230 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 6230 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 261: /* function_call: '(' '*' comma_expr ')' '(' @23 expr_list ')'  */
-#line 3458 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3458 "src/compiler/internal/grammar.y"
     {
       parse_node_t *expr;
 
@@ -6252,11 +6252,11 @@ yyreduce:
       (yyval.node) = check_refs(num_refs - (yyvsp[-3].number), (yyvsp[-1].node), (yyval.node));
       num_refs = (yyvsp[-3].number);
     }
-#line 6256 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 6256 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 262: /* efun_override: L_EFUN L_COLON_COLON identifier  */
-#line 3483 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3483 "src/compiler/internal/grammar.y"
     {
       svalue_t *res;
       ident_hash_elem_t *ihe;
@@ -6276,11 +6276,11 @@ yyreduce:
       }
       scratch_free((yyvsp[0].string));
     }
-#line 6280 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 6280 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 263: /* efun_override: L_EFUN L_COLON_COLON L_NEW  */
-#line 3503 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3503 "src/compiler/internal/grammar.y"
     {
       svalue_t *res;
 
@@ -6293,11 +6293,11 @@ yyreduce:
         (yyval.number) = -1;
       } else (yyval.number) = new_efun;
     }
-#line 6297 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 6297 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 265: /* function_name: L_COLON_COLON identifier  */
-#line 3520 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3520 "src/compiler/internal/grammar.y"
     {
       int l = strlen((yyvsp[0].string)) + 1;
       char *p;
@@ -6311,11 +6311,11 @@ yyreduce:
         *(p+3) = *p;
       strncpy((yyval.string), ":::", 3);
     }
-#line 6315 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 6315 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 266: /* function_name: L_BASIC_TYPE L_COLON_COLON identifier  */
-#line 3534 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3534 "src/compiler/internal/grammar.y"
     {
       int z, l = strlen((yyvsp[0].string)) + 1;
       char *p;
@@ -6330,11 +6330,11 @@ yyreduce:
       (yyval.string)[z-2] = ':';
       (yyval.string)[z-1] = ':';
     }
-#line 6334 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 6334 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 267: /* function_name: identifier L_COLON_COLON identifier  */
-#line 3549 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3549 "src/compiler/internal/grammar.y"
     {
       int l = strlen((yyvsp[-2].string));
       /* "ob" and "name" -> ":ob::name" */
@@ -6346,11 +6346,11 @@ yyreduce:
       scratch_free((yyvsp[-2].string));
       scratch_free((yyvsp[0].string));
     }
-#line 6350 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 6350 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 268: /* cond: L_IF '(' comma_expr ')' statement optional_else_part  */
-#line 3564 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3564 "src/compiler/internal/grammar.y"
     {
       /* x != 0 -> x */
       if (IS_NODE((yyvsp[-3].node), NODE_BINARY_OP, F_NE)) {
@@ -6381,27 +6381,27 @@ yyreduce:
       }
       CREATE_IF((yyval.node), (yyvsp[-3].node), (yyvsp[-1].node), (yyvsp[0].node));
     }
-#line 6385 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 6385 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 269: /* optional_else_part: %empty  */
-#line 3598 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3598 "src/compiler/internal/grammar.y"
     {
       (yyval.node) = 0;
     }
-#line 6393 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 6393 "src/compiler/internal/grammar.autogen.cc"
     break;
 
   case 270: /* optional_else_part: L_ELSE statement  */
-#line 3602 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3602 "src/compiler/internal/grammar.y"
     {
       (yyval.node) = (yyvsp[0].node);
     }
-#line 6401 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 6401 "src/compiler/internal/grammar.autogen.cc"
     break;
 
 
-#line 6405 "/projects/git/fluffos/build/src/grammar.autogen.cc"
+#line 6405 "src/compiler/internal/grammar.autogen.cc"
 
         default: break;
       }
@@ -6636,5 +6636,5 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 3606 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 3606 "src/compiler/internal/grammar.y"
 

@@ -16,13 +16,14 @@ mud ip : 0.0.0.0
 
 # the external ports we accept users on
 port number : 4000
-external_port_2: websocket 4001
+external_port_2: websocket 3000
 external_port_3: websocket 4002
 external_port_3_tls: cert=etc/cert.pem key=etc/key.pem
 external_port_4: telnet 4003
 external_port_4_tls: cert=etc/cert.pem key=etc/key.pem
+external_port_5 : debug 5001
 
-websocket http dir : ../src/www
+websocket http dir : ./www
 
 # absolute pathname of mudlib
 mudlib directory : ./ # test #

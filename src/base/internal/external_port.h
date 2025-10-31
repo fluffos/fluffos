@@ -18,7 +18,8 @@ enum PORT_TYPE {
   PORT_TYPE_BINARY = 2,
   PORT_TYPE_ASCII = 3,
   PORT_TYPE_MUD = 4,
-  PORT_TYPE_WEBSOCKET = 5
+  PORT_TYPE_WEBSOCKET = 5,
+  PORT_TYPE_DEBUG = 6
 };
 
 struct port_def_t {
@@ -51,6 +52,8 @@ static inline const char* port_kind_name(int kind) {
       return "mud";
     case PORT_TYPE_WEBSOCKET:
       return "websocket";
+    case PORT_TYPE_DEBUG:
+      return "debug";
 
     default:
       return "unknown";

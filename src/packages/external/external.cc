@@ -19,7 +19,7 @@
 #include <sys/wait.h>
 
 template <typename Out>
-void split(const std::string &s, char delim, Out result) {
+void split(const std::string& s, char delim, Out result) {
   std::istringstream iss(s);
   std::string item;
   while (std::getline(iss, item, delim)) {
@@ -34,7 +34,7 @@ std::string format_time(const struct tm& timeinfo) {
   return std::string(buffer);
 }
 
-int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, svalue_t *arg3) {
+int external_start(int which, svalue_t* args, svalue_t* arg1, svalue_t* arg2, svalue_t* arg3) {
   std::vector<std::string> newargs_data = {std::string(external_cmd[which])};
   if (args->type == T_ARRAY) {
     for (int i = 0; i < args->u.arr->size; i++) {
@@ -48,8 +48,8 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
     split(std::string(args->u.string), ' ', std::back_inserter(newargs_data));
   }
 
-  std::vector<char *> newargs;
-  for (auto &arg : newargs_data) {
+  std::vector<char*> newargs;
+  for (auto& arg : newargs_data) {
     newargs.push_back(arg.data());
   }
   newargs.push_back(nullptr);
@@ -57,7 +57,8 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
   posix_spawn_file_actions_t file_actions;
   int ret = posix_spawn_file_actions_init(&file_actions);
   if (ret != 0) {
-    debug(external_start, "external_start: posix_spawn_file_actions_init() error: %s\n", strerror(ret));
+    debug(external_start, "external_start: posix_spawn_file_actions_init() error: %s\n",
+          strerror(ret));
     return EESOCKET;
   }
   DEFER { posix_spawn_file_actions_destroy(&file_actions); };
@@ -81,7 +82,8 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
         posix_spawn_file_actions_adddup2(&file_actions, sv[1], 1) ||
         posix_spawn_file_actions_adddup2(&file_actions, sv[1], 2);
   if (ret != 0) {
-    debug(external_start, "external_start: posix_spawn_file_actions_adddup2() error: %s\n", strerror(ret));
+    debug(external_start, "external_start: posix_spawn_file_actions_adddup2() error: %s\n",
+          strerror(ret));
     return EESOCKET;
   }
 
@@ -90,7 +92,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
     return fd;
   }
 
-  auto *sock = lpc_socks_get(fd);
+  auto* sock = lpc_socks_get(fd);
   new_lpc_socket_event_listener(fd, sock, sv[0]);
 
   sock->fd = sv[0];
@@ -101,8 +103,8 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
   sock->owner_ob = current_object;
   sock->mode = STREAM;
   sock->state = STATE_DATA_XFER;
-  memset(reinterpret_cast<char *>(&sock->l_addr), 0, sizeof(sock->l_addr));
-  memset(reinterpret_cast<char *>(&sock->r_addr), 0, sizeof(sock->r_addr));
+  memset(reinterpret_cast<char*>(&sock->l_addr), 0, sizeof(sock->l_addr));
+  memset(reinterpret_cast<char*>(&sock->r_addr), 0, sizeof(sock->r_addr));
   sock->owner_ob = current_object;
   sock->release_ob = nullptr;
   sock->r_buf = nullptr;
@@ -118,7 +120,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
   event_add(sock->ev_read, nullptr);
 
   pid_t pid;
-  char *newenviron[] = {nullptr};
+  char* newenviron[] = {nullptr};
   ret = posix_spawn(&pid, newargs[0], &file_actions, nullptr, newargs.data(), newenviron);
   if (ret) {
     debug(external_start, "external_start: posix_spawn() error: %s\n", strerror(ret));
@@ -131,15 +133,16 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
   evutil_socket_t childfd = sv[0];
   sv[0] = -1;
 
-  debug(external_start, "external_start: Launching external command '%s %s', pid: %jd.\n", external_cmd[which],
-                args->type == T_STRING ? args->u.string : "<ARRAY>", (intmax_t)pid);
+  debug(external_start, "external_start: Launching external command '%s %s', pid: %jd.\n",
+        external_cmd[which], args->type == T_STRING ? args->u.string : "<ARRAY>", (intmax_t)pid);
 
   std::thread([=]() {
     int status;
     do {
       const int s = waitpid(pid, &status, WUNTRACED | WCONTINUED);
       if (s == -1) {
-        debug(external_start, "external_start: waitpid() error: %s (%d).\n", strerror(errno), errno);
+        debug(external_start, "external_start: waitpid() error: %s (%d).\n", strerror(errno),
+              errno);
         return;
       }
       std::string res = fmt::format(FMT_STRING("external_start(): child {} status: "), pid);
@@ -153,7 +156,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
         res += "continued\n";
       }
 
-      debug(external_start, "external_start: %s\n", format_time(res).c_str());
+      debug(external_start, "external_start: %s\n", res.c_str());
     } while (!WIFEXITED(status) && !WIFSIGNALED(status));
   }).detach();
 
@@ -162,7 +165,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
 #endif
 
 namespace {
-std::string quote_argument(const std::string &arg) {
+std::string quote_argument(const std::string& arg) {
   if (arg.empty()) {
     return "\"\"";
   }
@@ -213,7 +216,7 @@ std::string quote_argument(const std::string &arg) {
 #include <fcntl.h>
 extern int socketpair_win32(SOCKET socks[2], int make_overlapped);  // in socketpair.cc
 
-int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, svalue_t *arg3) {
+int external_start(int which, svalue_t* args, svalue_t* arg1, svalue_t* arg2, svalue_t* arg3) {
   int fd;
   pid_t ret;
 
@@ -244,7 +247,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
     return fd;
   }
 
-  auto *sock = lpc_socks_get(fd);
+  auto* sock = lpc_socks_get(fd);
 
   SOCKET sv[2];
   socketpair_win32(sv, 0);
@@ -259,8 +262,8 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
   sock->owner_ob = current_object;
   sock->mode = STREAM;
   sock->state = STATE_DATA_XFER;
-  memset(reinterpret_cast<char *>(&sock->l_addr), 0, sizeof(sock->l_addr));
-  memset(reinterpret_cast<char *>(&sock->r_addr), 0, sizeof(sock->r_addr));
+  memset(reinterpret_cast<char*>(&sock->l_addr), 0, sizeof(sock->l_addr));
+  memset(reinterpret_cast<char*>(&sock->r_addr), 0, sizeof(sock->r_addr));
   sock->owner_ob = current_object;
   sock->release_ob = NULL;
   sock->r_buf = NULL;
@@ -298,15 +301,16 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
     error("CreateProcess() in external_start() failed: %s\n", strerror(errno));
     return EESOCKET;
   }
-  debug(external_start, "external_start: Launching external command '%s', pid: %d.\n", cmdline.c_str(),
-                processInfo.dwProcessId);
+  debug(external_start, "external_start: Launching external command '%s', pid: %d.\n",
+        cmdline.c_str(), processInfo.dwProcessId);
 
   std::thread([=]() {
     WaitForSingleObject(processInfo.hProcess, INFINITE);
     DWORD exitCode = -1;
     // Get the exit code.
     GetExitCodeProcess(processInfo.hProcess, &exitCode);
-    debug(external_start, "external_start: pid: %d exited with %d.\n", processInfo.dwProcessId, exitCode);
+    debug(external_start, "external_start: pid: %d exited with %d.\n", processInfo.dwProcessId,
+          exitCode);
     CloseHandle(processInfo.hProcess);
     CloseHandle(processInfo.hThread);
     evutil_closesocket(sv[0]);
@@ -319,7 +323,7 @@ int external_start(int which, svalue_t *args, svalue_t *arg1, svalue_t *arg2, sv
 #ifdef F_EXTERNAL_START
 void f_external_start() {
   int fd, num_arg = st_num_arg;
-  svalue_t *arg = sp - num_arg + 1;
+  svalue_t* arg = sp - num_arg + 1;
 
   if (!check_valid_socket("external", -1, current_object, "N/A", -1)) {
     pop_n_elems(num_arg - 1);

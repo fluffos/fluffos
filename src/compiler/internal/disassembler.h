@@ -1,7 +1,11 @@
 #ifndef COMPILER_INTERNAL_DISASSEMBLER_H
 #define COMPILER_INTERNAL_DISASSEMBLER_H
 
-#include <cstdio>  // for FILE
-void dump_prog(struct program_t* prog, FILE* f, int flags);
+#include <iosfwd>
 
-#endif  // COMPILER_INTERNAL_DISASSEMBLER_H
+struct program_t;
+
+// Add the declaration for the function you want to use.
+void dump_prog(program_t *prog, FILE *f, int options);
+
+#endif /* COMPILER_INTERNAL_DISASSEMBLER_H */

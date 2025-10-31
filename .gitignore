@@ -3,6 +3,7 @@
 # default build directory
 /build
 /build*
+/compile_commands.json
 # default idea build directory
 /cmake-build-*
 

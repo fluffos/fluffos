@@ -22,10 +22,10 @@
 #include "base/internal/options_incl.h"
 
 // Defined by simulate.cc, this belongs to driver layer.
-[[noreturn]] extern void fatal(const char *, ...);
+[[noreturn]] extern void fatal(const char*, ...);
 
 void reset_debug_message_fp();
-void debug_message(const char *, ...);
+void debug_message(const char*, ...);
 
 #define SAFE(x) \
   do {          \
@@ -46,21 +46,21 @@ void debug_message(const char *, ...);
 
 extern unsigned int debug_level;
 
-void handle_debug_level(char *);
-void debug_level_set(const char *);
-void debug_level_clear(const char *);
+void handle_debug_level(char*);
+void debug_level_set(const char*);
+void debug_level_clear(const char*);
 
-#define debug(x, ...)                                                                    \
-  do {                                                                                   \
-    if (debug_level & DBG_##x) {                                                         \
-      char _buf[1024], _tbuf[64];                                                        \
-      time_t _rawtime;                                                                   \
-      time(&_rawtime);                                                                   \
-      struct tm res = {};                                                                \
-      strftime(_tbuf, sizeof(_tbuf), "%Y-%m-%d %H:%M:%S", localtime_r(&_rawtime, &res)); \
-      snprintf(_buf, sizeof(_buf), __VA_ARGS__);                                         \
-      debug_message("[%s] %s:%d %s", _tbuf, __FILE__, __LINE__, _buf);                   \
-    }                                                                                    \
+#define debug(x, ...)                                                                     \
+  do {                                                                                    \
+    if (debug_level & DBG_##x) {                                                          \
+      char _buf[1024], _tbuf[64];                                                         \
+      time_t _rawtime;                                                                    \
+      time(&_rawtime);                                                                    \
+      struct tm _res = {};                                                                \
+      strftime(_tbuf, sizeof(_tbuf), "%Y-%m-%d %H:%M:%S", localtime_r(&_rawtime, &_res)); \
+      snprintf(_buf, sizeof(_buf), __VA_ARGS__);                                          \
+      debug_message("[%s] %s:%d %s", _tbuf, __FILE__, __LINE__, _buf);                    \
+    }                                                                                     \
   } while (0)
 
 /* bit sets here */
@@ -86,7 +86,7 @@ void debug_level_clear(const char *);
 #define DBG_DEFAULT (DBG_connections | DBG_telnet)
 
 struct debug_t {
-  const char *name;
+  const char* name;
   unsigned int bit;
 };
 

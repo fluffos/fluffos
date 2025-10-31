@@ -44,6 +44,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Setup include directoires
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/lws_wrapper")
 
 foreach (lang C CXX)
   set(CMAKE_${lang}_VISIBILITY_PRESET hidden)
@@ -362,6 +363,7 @@ set(SRC
   "net/telnet.cc"
   "net/websocket.cc"
   "net/ws_ascii.cc"
+  "net/ws_debug.cc"
   "net/ws_telnet.cc"
   "base/internal/debugmalloc.cc"
   "base/internal/external_port.cc"
@@ -406,7 +408,7 @@ set(SRC
   "vm/internal/simulate.cc"
   "vm/internal/trace.cc"
   "vm/internal/vm.cc"
-  )
+)
 
 set(TEST_SRC
   "vm/internal/otable_test.cc"
@@ -528,6 +530,8 @@ target_link_libraries(o2json PUBLIC ${FLUFFOS_LINK})
 add_executable(json2o "main_json2o.cc")
 target_link_libraries(json2o PUBLIC ${FLUFFOS_LINK})
 
+
+
 include(helper)
 
 message(STATUS "Final Compile Flags for libdriver: ")
@@ -563,9 +567,17 @@ endif ()
 # Update generated grammar files
 if (${BISON_FOUND})
   add_custom_command(TARGET "driver" POST_BUILD
+          # Post-process generated files to use relative paths instead of absolute paths
+          COMMAND sed -i "s|${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.y|src/compiler/internal/grammar.y|g" "${BISON_Grammar_OUTPUT_SOURCE}"
+          COMMAND sed -i "s|${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.y|src/compiler/internal/grammar.y|g" "${BISON_Grammar_OUTPUT_HEADER}"
+          COMMAND sed -i "s|${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.h|src/compiler/internal/grammar.autogen.h|g" "${BISON_Grammar_OUTPUT_SOURCE}"
+          COMMAND sed -i "s|${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.h|src/compiler/internal/grammar.autogen.h|g" "${BISON_Grammar_OUTPUT_HEADER}"
+          COMMAND sed -i "s|${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.cc|src/compiler/internal/grammar.autogen.cc|g" "${BISON_Grammar_OUTPUT_SOURCE}"
+          # Copy the processed files to source directory
           COMMAND "${CMAKE_COMMAND}" -E copy "${BISON_Grammar_OUTPUT_SOURCE}" ${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/
           COMMAND "${CMAKE_COMMAND}" -E copy "${BISON_Grammar_OUTPUT_HEADER}" ${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/
-          COMMENT "Copying to output directory")
+          COMMENT "Post-processing and copying grammar files to source directory"
+          VERBATIM)
 endif()
 
 find_package(GTest)

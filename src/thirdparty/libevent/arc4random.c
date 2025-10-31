@@ -75,7 +75,7 @@
 /* Add platform entropy 32 bytes (256 bits) at a time. */
 #define ADD_ENTROPY 32
 
-#define REKEY_BASE (1024*1024) /* NB. should be a power of 2 */
+#define REKEY_BASE (1024 * 1024) /* NB. should be a power of 2 */
 
 struct arc4_stream {
 	unsigned char i;
@@ -102,7 +102,7 @@ static inline unsigned char arc4_getbyte(void);
 static inline void
 arc4_init(void)
 {
-	int     n;
+	int n;
 
 	for (n = 0; n < 256; n++)
 		rs.s[n] = n;
@@ -113,7 +113,7 @@ arc4_init(void)
 static inline void
 arc4_addrandom(const unsigned char *dat, int datlen)
 {
-	int     n;
+	int n;
 	unsigned char si;
 
 	rs.i--;
@@ -135,8 +135,8 @@ read_all(int fd, unsigned char *buf, size_t count)
 	ssize_t result;
 
 	while (numread < count) {
-		result = read(fd, buf+numread, count-numread);
-		if (result<0)
+		result = read(fd, buf + numread, count - numread);
+		if (result < 0)
 			return -1;
 		else if (result == 0)
 			break;
@@ -154,8 +154,8 @@ arc4_seed_win32(void)
 {
 	unsigned char buf[ADD_ENTROPY];
 
-	if (BCryptGenRandom(NULL, buf, sizeof(buf),
-		BCRYPT_USE_SYSTEM_PREFERRED_RNG))
+	if (BCryptGenRandom(
+			NULL, buf, sizeof(buf), BCRYPT_USE_SYSTEM_PREFERRED_RNG))
 		return -1;
 	arc4_addrandom(buf, sizeof(buf));
 	evutil_memclear_(buf, sizeof(buf));
@@ -193,7 +193,7 @@ arc4_seed_sysctl_bsd(void)
 	 * tries to use the KERN_ARND syscall to get entropy from the kernel.
 	 * This can work even if /dev/urandom is inaccessible for some reason
 	 * (e.g., we're running in a chroot). */
-	int mib[] = { CTL_KERN, KERN_ARND };
+	int mib[] = {CTL_KERN, KERN_ARND};
 	unsigned char buf[ADD_ENTROPY];
 	size_t len, n;
 	int i, any_set;
@@ -205,13 +205,13 @@ arc4_seed_sysctl_bsd(void)
 		for (len = 0; len < sizeof(buf); len += sizeof(unsigned)) {
 			n = sizeof(unsigned);
 			if (n + len > sizeof(buf))
-			    n = len - sizeof(buf);
+				n = len - sizeof(buf);
 			if (sysctl(mib, 2, &buf[len], &n, NULL, 0) == -1)
 				return -1;
 		}
 	}
 	/* make sure that the buffer actually got set. */
-	for (i=any_set=0; i<sizeof(buf); ++i) {
+	for (i = any_set = 0; i < sizeof(buf); ++i) {
 		any_set |= buf[i];
 	}
 	if (!any_set)
@@ -237,30 +237,31 @@ arc4_seed_proc_sys_kernel_random_uuid(void)
 	char buf[128];
 	unsigned char entropy[64];
 	int bytes, n, i, nybbles;
-	for (bytes = 0; bytes<ADD_ENTROPY; ) {
-		fd = evutil_open_closeonexec_("/proc/sys/kernel/random/uuid", O_RDONLY, 0);
+	for (bytes = 0; bytes < ADD_ENTROPY;) {
+		fd = evutil_open_closeonexec_(
+			"/proc/sys/kernel/random/uuid", O_RDONLY, 0);
 		if (fd < 0)
 			return -1;
 		n = read(fd, buf, sizeof(buf));
 		close(fd);
-		if (n<=0)
+		if (n <= 0)
 			return -1;
 		memset(entropy, 0, sizeof(entropy));
-		for (i=nybbles=0; i<n; ++i) {
+		for (i = nybbles = 0; i < n; ++i) {
 			if (EVUTIL_ISXDIGIT_(buf[i])) {
 				int nyb = evutil_hex_char_to_int_(buf[i]);
 				if (nybbles & 1) {
-					entropy[nybbles/2] |= nyb;
+					entropy[nybbles / 2] |= nyb;
 				} else {
-					entropy[nybbles/2] |= nyb<<4;
+					entropy[nybbles / 2] |= nyb << 4;
 				}
 				++nybbles;
 			}
 		}
 		if (nybbles < 2)
 			return -1;
-		arc4_addrandom(entropy, nybbles/2);
-		bytes += nybbles/2;
+		arc4_addrandom(entropy, nybbles / 2);
+		bytes += nybbles / 2;
 	}
 	evutil_memclear_(entropy, sizeof(entropy));
 	evutil_memclear_(buf, sizeof(buf));
@@ -272,14 +273,15 @@ arc4_seed_proc_sys_kernel_random_uuid(void)
 #define TRY_SEED_URANDOM
 static char *arc4random_urandom_filename = NULL;
 
-static int arc4_seed_urandom_helper_(const char *fname)
+static int
+arc4_seed_urandom_helper_(const char *fname)
 {
 	unsigned char buf[ADD_ENTROPY];
 	int fd;
 	size_t n;
 
 	fd = evutil_open_closeonexec_(fname, O_RDONLY, 0);
-	if (fd<0)
+	if (fd < 0)
 		return -1;
 	n = read_all(fd, buf, sizeof(buf));
 	close(fd);
@@ -295,8 +297,7 @@ arc4_seed_urandom(void)
 {
 	/* This is adapted from Tor's crypto_seed_rng() */
 	static const char *filenames[] = {
-		"/dev/srandom", "/dev/urandom", "/dev/random", NULL
-	};
+		"/dev/srandom", "/dev/urandom", "/dev/random", NULL};
 	int i;
 	if (arc4random_urandom_filename)
 		return arc4_seed_urandom_helper_(arc4random_urandom_filename);
@@ -332,7 +333,7 @@ arc4_seed(void)
 #endif
 #ifdef TRY_SEED_PROC_SYS_KERNEL_RANDOM_UUID
 	if (arc4random_urandom_filename == NULL &&
-	    0 == arc4_seed_proc_sys_kernel_random_uuid())
+		0 == arc4_seed_proc_sys_kernel_random_uuid())
 		ok = 1;
 #endif
 #ifdef TRY_SEED_SYSCTL_BSD
@@ -342,13 +343,12 @@ arc4_seed(void)
 	return ok ? 0 : -1;
 }
 
-static inline unsigned int
-arc4_getword(void);
+static inline unsigned int arc4_getword(void);
 static int
 arc4_stir(void)
 {
-	int     i;
-	ARC4RANDOM_UINT32 rekey_fuzz; 
+	int i;
+	ARC4RANDOM_UINT32 rekey_fuzz;
 
 	if (!rs_initialized) {
 		arc4_init();
@@ -376,7 +376,7 @@ arc4_stir(void)
 	 *
 	 * We add another sect to the cargo cult, and choose 12*256.
 	 */
-	for (i = 0; i < 12*256; i++)
+	for (i = 0; i < 12 * 256; i++)
 		(void)arc4_getbyte();
 
 	rekey_fuzz = arc4_getword();
@@ -392,8 +392,7 @@ arc4_stir_if_needed(void)
 {
 	pid_t pid = getpid();
 
-	if (arc4_count <= 0 || !rs_initialized || arc4_stir_pid != pid)
-	{
+	if (arc4_count <= 0 || !rs_initialized || arc4_stir_pid != pid) {
 		arc4_stir_pid = pid;
 		arc4_stir();
 	}
@@ -485,7 +484,7 @@ arc4random_buf(void *buf_, size_t n)
 	}
 	ARC4_UNLOCK_();
 }
-#endif  /* #ifndef EVENT__HAVE_ARC4RANDOM_BUF */
+#endif /* #ifndef EVENT__HAVE_ARC4RANDOM_BUF */
 
 #ifndef ARC4RANDOM_NOUNIFORM
 /*
