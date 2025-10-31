@@ -142,7 +142,7 @@ Set `HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1` to speed up brew installs if need
 
 You need to pass environment variables for OpenSSL and ICU locations:
 
-**For Apple Silicon (M1/M2/M3)**:
+**Modern Homebrew (recommended)**:
 ```shell
 $ mkdir build && cd build
 $ OPENSSL_ROOT_DIR="/usr/local/opt/openssl" ICU_ROOT="/opt/homebrew/opt/icu4c" \
@@ -150,7 +150,9 @@ $ OPENSSL_ROOT_DIR="/usr/local/opt/openssl" ICU_ROOT="/opt/homebrew/opt/icu4c" \
 $ make -j $(sysctl -n hw.ncpu) install
 ```
 
-**For Intel Macs**:
+This works for both Apple Silicon and Intel Macs with recent Homebrew installations.
+
+**Older Homebrew installations** (if you get ICU-related errors):
 ```shell
 $ mkdir build && cd build
 $ OPENSSL_ROOT_DIR="/usr/local/opt/openssl" ICU_ROOT="/usr/local/opt/icu4c" \
@@ -260,7 +262,9 @@ $ cmake .. -DPACKAGE_CRYPTO=OFF -DPACKAGE_DB=OFF
 ```
 
 Common package options:
-- `PACKAGE_DB_SQLITE=1` or `=2`: Enable SQLite support (version 1 or 2)
+- `PACKAGE_DB_SQLITE=1` or `=2`: Enable SQLite support
+  - `=1` enables SQLite3 API version 1
+  - `=2` enables SQLite3 API version 2 (recommended, includes newer features)
 - `PACKAGE_DB_MYSQL=""`: Disable MySQL (or set to enable)
 - `PACKAGE_CRYPTO=OFF`: Disable crypto package (typical on Windows)
 - `PACKAGE_PCRE=OFF`: Disable PCRE package
