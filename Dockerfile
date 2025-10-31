@@ -25,6 +25,9 @@ RUN cmake .. -DMARCH_NATIVE=OFF -DSTATIC=ON \
 
 FROM alpine:3.18
 
+RUN apk add --no-progress --no-cache \
+    icu-data-full
+
 WORKDIR /fluffos
 
 COPY --from=builder /build/fluffos/build/bin ./bin
