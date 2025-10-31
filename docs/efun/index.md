@@ -355,8 +355,10 @@ title: EFUN
 * [socket_connect](sockets/socket_connect.html)
 * [socket_create](sockets/socket_create.html)
 * [socket_error](sockets/socket_error.html)
+* [socket_get_option](sockets/socket_get_option.html)
 * [socket_listen](sockets/socket_listen.html)
 * [socket_release](sockets/socket_release.html)
+* [socket_set_option](sockets/socket_set_option.html)
 * [socket_status](sockets/socket_status.html)
 * [socket_write](sockets/socket_write.html)
 ## strings
