@@ -90,6 +90,8 @@ title: EFUN
 * [upper_case](contrib/upper_case.html)
 * [variables](contrib/variables.html)
 * [zonetime](contrib/zonetime.html)
+## crypto
+* [hash](crypto/hash.html)
 ## db
 * [db_close](db/db_close.html)
 * [db_commit](db/db_commit.html)
