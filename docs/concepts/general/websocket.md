@@ -248,12 +248,12 @@ Send GMCP messages to clients:
 
 ```c
 // Check if user supports GMCP
-if (query_gmcp(user)) {
+if (has_gmcp(user)) {
     // Send character vitals
-    gmcp(user, "Char.Vitals", "{ \"hp\": 100, \"mp\": 50, \"maxhp\": 100, \"maxmp\": 50 }");
+    send_gmcp("Char.Vitals { \"hp\": 100, \"mp\": 50, \"maxhp\": 100, \"maxmp\": 50 }");
 
     // Send room information
-    gmcp(user, "Room.Info", "{ \"name\": \"Market Square\", \"area\": \"City\" }");
+    send_gmcp("Room.Info { \"name\": \"Market Square\", \"area\": \"City\" }");
 }
 ```
 
@@ -439,7 +439,7 @@ sudo certbot certonly --standalone -d mud.example.com
 **4. GMCP not working:**
 ```c
 // Verify GMCP is enabled
-if (!query_gmcp(user)) {
+if (!has_gmcp(user)) {
     // Client doesn't support GMCP
     write("Your client does not support GMCP.\n");
 }
@@ -537,8 +537,8 @@ The built-in client is mobile-friendly and responsive. For better mobile experie
 - [TLS Support](tls.md) - Secure WebSocket configuration
 - [Driver Configuration](../../driver/config.md) - WebSocket port setup
 - [socket_create(3)](../../efun/sockets/socket_create.md) - Socket functions
-- [gmcp(3)](../../efun/interactive/gmcp.md) - GMCP efun
-- [query_gmcp(3)](../../efun/interactive/query_gmcp.md) - Check GMCP support
+- [send_gmcp(3)](../../efun/interactive/send_gmcp.md) - GMCP efun
+- [has_gmcp(3)](../../efun/interactive/has_gmcp.md) - Check GMCP support
 
 ## References
 
