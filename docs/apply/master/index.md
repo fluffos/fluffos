@@ -19,6 +19,7 @@ title: master
 * [log_error](log_error.html)
 * [make_path_absolute](make_path_absolute.html)
 * [object_name](object_name.html)
+* [parser_error_message](parser_error_message.html)
 * [preload](preload.html)
 * [privs_file](privs_file.html)
 * [retrieve_ed_setup](retrieve_ed_setup.html)
@@ -35,4 +36,3 @@ title: master
 * [valid_shadow](valid_shadow.html)
 * [valid_socket](valid_socket.html)
 * [valid_write](valid_write.html)
-* [view_errors](view_errors.html)

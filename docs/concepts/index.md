@@ -13,3 +13,6 @@ title: concepts
 * [references](general/references.html)
 * [simul_efun](general/simul_efun.html)
 * [socket_efuns](general/socket_efuns.html)
+* [tls](general/tls.html)
+* [tracing](general/tracing.html)
+* [websocket](general/websocket.html)
