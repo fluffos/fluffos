@@ -388,6 +388,7 @@ optional_default_arg_value:
     $$->l.expr = $3;
     $$->r.expr = nullptr; // no arguments
     $$->v.number = FP_FUNCTIONAL + 0 /* args */;
+    pop_function_context();
 }
 
 new_arg:
