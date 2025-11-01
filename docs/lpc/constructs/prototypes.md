@@ -24,19 +24,23 @@ calling the function.
 
 **Syntax:**
 ```c
-return_type function_name(type arg1, type arg2 = default_value);
+return_type function_name(type arg1, type arg2: (: default_value :));
 ```
+
+Default arguments use FluffOS's functional syntax `: (: expression :)` where the
+expression is evaluated when the argument is not provided.
 
 **Rules:**
 - Default arguments must appear after all non-default arguments
-- Default values must be compile-time constants (numbers, strings, or constant expressions)
+- Default values are specified using functional syntax: `: (: expression :)`
 - Once a parameter has a default value, all following parameters must also have defaults
 - Default arguments work in function prototypes, definitions, and simul_efun declarations
+- Can be combined with varargs functions
 
 **Examples:**
 ```c
 // Function with default arguments
-void greet(string name, string title = "friend") {
+void greet(string name, string title: (: "friend" :)) {
     write("Hello, " + title + " " + name + "!\n");
 }
 
@@ -45,7 +49,7 @@ greet("Alice");              // Uses default: "Hello, friend Alice!"
 greet("Bob", "Sir");         // Override default: "Hello, Sir Bob!"
 
 // Multiple default arguments
-int calculate(int base, int multiplier = 1, int offset = 0) {
+int calculate(int base, int multiplier: (: 1 :), int offset: (: 0 :)) {
     return base * multiplier + offset;
 }
 
@@ -54,52 +58,47 @@ calculate(10, 5);            // Returns 50 (offset=0)
 calculate(10, 5, 3);         // Returns 53
 
 // Default arguments with different types
-void log_message(string msg, int level = 1, int timestamp = 0) {
-    if (timestamp == 0) {
-        timestamp = time();
-    }
-    write(sprintf("[%d] Level %d: %s\n", timestamp, level, msg));
+void test4(int a, string b: (: "str" :), int c: (: -1 :)) {
+    write(sprintf("%d, %s, %d\n", a, b, c));
 }
 
-log_message("Error occurred");           // Uses defaults
-log_message("Warning", 2);               // Custom level
-log_message("Info", 3, 1234567890);      // All custom values
+test4(1);                    // Uses defaults: "1, str, -1"
+test4(2, "aaa");             // Override b: "2, aaa, -1"
+test4(3, "bbb", 1);          // All custom values: "3, bbb, 1"
 ```
 
 **Use Cases:**
 ```c
-// API functions with optional parameters
-void send_message(object user, string message, int color = 0) {
-    if (color) {
-        tell_object(user, sprintf("%%^COLOR%%^%s%%^RESET%%^\n", message));
-    } else {
-        tell_object(user, message + "\n");
-    }
+// Default value evaluated in caller's context
+object test5(object a: (: this_object() :)) {
+    return a;
 }
 
-// Configuration with sensible defaults
-void configure_room(string desc, int light_level = 50, int is_indoors = 1) {
-    set_short(desc);
-    set_light(light_level);
-    if (is_indoors) {
-        set_property("indoors", 1);
-    }
+// Works with varargs
+varargs string test7(string a, string b: (: "bbb" :), string c: (: "ccc" :)) {
+    return a + b + c;
 }
+
+test7();                     // Returns "0bbbccc"
+test7("aaa");                // Returns "aaabbbccc"
+test7("aaa", "xxx");         // Returns "aaaxxxccc"
+test7("aaa", "xxx", "yyy");  // Returns "aaaxxxyyy"
 
 // Object creation helpers
-object create_monster(string name, int level = 1, int hp = 0) {
+object create_monster(string name, int level: (: 1 :), int hp: (: 0 :)) {
     object mob;
     mob = new("/std/monster");
     mob->set_name(name);
     mob->set_level(level);
-    mob->set_hp(hp == 0 ? level * 10 : hp);  // Default HP based on level
+    mob->set_hp(hp == 0 ? level * 10 : hp);
     return mob;
 }
 ```
 
 **Important Notes:**
 - Default argument feature added in FluffOS v2019+
-- This is a compile-time feature; the defaults are inserted at compilation
-- Default arguments do not work with varargs (`...`) functions
-- Default values are evaluated once at compile time, not at each function call
-- In function pointers, default arguments from the original function are preserved
+- Default values are evaluated at call time in the **caller's context**, not at compile time
+- The expression in the functional can reference the caller's variables and functions
+- Default arguments work with varargs functions (unlike some other LPC dialects)
+- Works with direct calls, apply (call_other), and inherited functions
+- The functional syntax `: (: expr :)` allows complex expressions, not just constants
