@@ -1,82 +1,62 @@
 const express = require('express');
-const http = require('http');
-const WebSocket = require('ws');
-const fs = require('fs');
+const { createProxyMiddleware } = require('http-proxy-middleware');
 const path = require('path');
+const vite = require('vite');
+const fs = require('fs');
 
-async function startServer() {
+async function createServer() {
   const app = express();
-  const server = http.createServer(app);
-  const wss = new WebSocket.Server({ server });
+  const port = 3000; // Node.js server port
+  const apiServerPort = 3001; // C++ API server port
+  const isProd = process.env.NODE_ENV === 'production';
 
-  const rootDir = process.argv[2] || '.';
+  // Proxy API requests to the C++ API server
+  app.use(
+    '/api',
+    createProxyMiddleware({
+      target: `http://localhost:${apiServerPort}`,
+      changeOrigin: true,
+      pathRewrite: {
+        '^/api': '/api', // Keep the /api prefix for all API paths
+      },
+    })
+  );
 
-  app.use(express.json());
-
-  // API Endpoints must be registered before the Vite middleware
-  app.get('/files', (req, res) => {
-    const dirPath = path.resolve(rootDir, req.query.path || '.');
-    if (!dirPath.startsWith(path.resolve(rootDir))) {
-      return res.status(403).send('Forbidden');
-    }
-    fs.readdir(dirPath, { withFileTypes: true }, (err, files) => {
-      if (err) {
-        return res.status(500).send('Error reading directory');
-      }
-      const fileList = files.map(file => ({
-        name: file.name,
-        isDirectory: file.isDirectory(),
-      }));
-      res.json(fileList);
-    });
-  });
-
-  app.get('/file', (req, res) => {
-    const filePath = path.resolve(rootDir, req.query.path);
-    if (!filePath.startsWith(path.resolve(rootDir))) {
-      return res.status(403).send('Forbidden');
-    }
-    fs.readFile(filePath, 'utf8', (err, data) => {
-      if (err) {
-        return res.status(500).send('Error reading file');
-      }
-      res.send(data);
-    });
-  });
-
-  app.post('/file', (req, res) => {
-    const filePath = path.resolve(rootDir, req.body.path);
-    if (!filePath.startsWith(path.resolve(rootDir))) {
-      return res.status(403).send('Forbidden');
-    }
-    fs.writeFile(filePath, req.body.content, 'utf8', err => {
-      if (err) {
-        return res.status(500).send('Error writing file');
-      }
-      res.send('File saved successfully');
-    });
-  });
-
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('Running in development mode');
-    const { createServer: createViteServer } = require('vite');
-    const vite = await createViteServer({
+  if (!isProd) {
+    const viteServer = await vite.createServer({
       server: { middlewareMode: true },
-      appType: 'spa',
+      appType: 'custom' // don't inject Vite's own HTML transform middleware
     });
-    // Use vite's connect instance as middleware
-    app.use(vite.middlewares);
+    app.use(viteServer.middlewares);
+
+    // Serve index.html and apply Vite HTML transforms
+    app.use('*', async (req, res, next) => {
+      if (req.url === '/' || req.url.endsWith('.html')) {
+        try {
+          let template = fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8');
+          template = await viteServer.transformIndexHtml(req.url, template);
+          res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+        } catch (e) {
+          viteServer.ssrFixStacktrace(e);
+          next(e);
+        }
+      } else {
+        next();
+      }
+    });
+
   } else {
-    console.log('Running in production mode');
     app.use(express.static(path.join(__dirname, 'dist')));
     app.get('*', (req, res) => {
       res.sendFile(path.join(__dirname, 'dist', 'index.html'));
     });
+    console.log(`Serving production frontend from /dist`);
   }
 
-  server.listen(3001, () => {
-    console.log(`Server listening on port 3001, serving files from ${path.resolve(rootDir)}`);
+  app.listen(port, () => {
+    console.log(`Node.js proxy server listening on port ${port}`);
+    console.log(`API requests proxied to C++ server on port ${apiServerPort}`);
   });
 }
 
-startServer();
+createServer();

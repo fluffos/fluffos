@@ -44,6 +44,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Setup include directoires
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/lws_wrapper")
 
 foreach (lang C CXX)
   set(CMAKE_${lang}_VISIBILITY_PRESET hidden)
@@ -337,7 +338,7 @@ if (${BISON_FOUND})
           ${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.cc
           DEFINES_FILE "${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.h"
           COMPILE_FLAGS "-Wall --color=auto -rall"
-          VERBOSE REPORT_FILE "${CMAKE_CURRENT_BINARY_DIR}/grammar.report"
+          VERBOSE REPORT_FILE "${CMAKE_CURRENT_BINARY_BINARY_DIR}/grammar.report"
           )
   set(GENERATRED_GRAMMAR_FILES
           "${BISON_Grammar_OUTPUT_SOURCE}"
@@ -406,7 +407,7 @@ set(SRC
   "vm/internal/simulate.cc"
   "vm/internal/trace.cc"
   "vm/internal/vm.cc"
-  )
+)
 
 set(TEST_SRC
   "vm/internal/otable_test.cc"
@@ -528,6 +529,9 @@ target_link_libraries(o2json PUBLIC ${FLUFFOS_LINK})
 add_executable(json2o "main_json2o.cc")
 target_link_libraries(json2o PUBLIC ${FLUFFOS_LINK})
 
+add_executable(ide "main_ide.cc" "lws_wrapper/LwsHttpServer.cc" "lws_wrapper/LWSHandler.cc")
+target_link_libraries(ide PUBLIC ${FLUFFOS_LINK})
+
 include(helper)
 
 message(STATUS "Final Compile Flags for libdriver: ")
@@ -539,7 +543,7 @@ print_target_properties(driver)
 install(TARGETS ${GENERATED_DOCS}
         RUNTIME DESTINATION bin)
 
-install(TARGETS driver lpcc symbol o2json json2o
+install(TARGETS driver lpcc symbol o2json json2o ide
   RUNTIME DESTINATION bin)
 
 # LPC stdlib files
@@ -564,7 +568,7 @@ endif ()
 if (${BISON_FOUND})
   add_custom_command(TARGET "driver" POST_BUILD
           COMMAND "${CMAKE_COMMAND}" -E copy "${BISON_Grammar_OUTPUT_SOURCE}" ${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/
-          COMMAND "${CMAKE_COMMAND}" -E copy "${BISON_Grammar_OUTPUT_HEADER}" ${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/
+          COMMAND "${CMAKE_COMMAND}" -E copy "${BISON_Grammar_OUTPUT_HEADER}" ${CMAKE_CURRENT_SOURCE_SOURCE_DIR}/compiler/internal/
           COMMENT "Copying to output directory")
 endif()
 

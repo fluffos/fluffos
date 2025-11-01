@@ -1,64 +1,168 @@
-import React, { useState, useRef } from 'react';
-import Editor from '@monaco-editor/react';
-import FileTree from './FileTree.jsx';
+import React, { useState, useEffect } from 'react';
+import FileTree from './components/FileTree';
+import FileEditor from './components/FileEditor';
+import CompilationView from './components/CompilationView';
+import Terminal from './components/Terminal';
+import { Allotment } from 'allotment';
+import { Tabs } from 'antd';
+import { FileTextOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import 'allotment/dist/style.css';
+import { WebSocketProvider, useWebSocket } from './WebSocketContext';
+import { useApi } from './api';
 
-function App() {
+function AppContent() {
+  const { isConnected, isLoading } = useWebSocket();
+  const { fetchFiles, compileCode } = useApi();
   const [selectedFile, setSelectedFile] = useState(null);
-  const [fileContent, setFileContent] = useState('// Select a file to view its content');
-  const editorRef = useRef(null);
+  const [initialFiles, setInitialFiles] = useState([]);
+  const [initialFilesError, setInitialFilesError] = useState(null);
+  const [activeTab, setActiveTab] = useState('editor');
 
-  const handleFileSelect = (fileName) => {
-    fetch(`/file?path=${fileName}`)
-      .then(res => res.text())
-      .then(data => {
-        setFileContent(data);
-        setSelectedFile(fileName);
-      });
-  };
-
-  const handleSave = () => {
-    if (selectedFile && editorRef.current) {
-      const content = editorRef.current.getValue();
-      fetch('/file', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ path: selectedFile, content }),
-      })
-      .then(res => {
-        if (res.ok) {
-          alert('File saved successfully!');
-        } else {
-          alert('Error saving file.');
-        }
-      });
+  useEffect(() => {
+    if (isConnected && initialFiles.length === 0) {
+      fetchFiles('.') // Request files from the root directory once
+        .then(data => {
+          setInitialFiles(data);
+          setInitialFilesError(null);
+        })
+        .catch(err => {
+          setInitialFilesError(err.message);
+          console.error("Failed to fetch initial files:", err);
+        });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnected]);
+
+  const handleCompile = async (filePath) => {
+    const result = await compileCode(filePath);
+    return result;
   };
 
-  function handleEditorDidMount(editor, monaco) {
-    editorRef.current = editor;
+  if (isLoading) {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        backgroundColor: '#1e1e1e',
+        color: '#cccccc'
+      }}>
+        <h1>Connecting to IDE server...</h1>
+        <div className="spinner"></div>
+      </div>
+    );
   }
 
+  if (!isConnected) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        backgroundColor: '#1e1e1e',
+        color: '#f48771'
+      }}>
+        <h1>Failed to connect to IDE server. Retrying...</h1>
+      </div>
+    );
+  }
+
+  const tabItems = [
+    {
+      key: 'editor',
+      label: (
+        <span>
+          <FileTextOutlined /> Editor
+        </span>
+      ),
+      children: selectedFile ? (
+        <FileEditor currentFilePath={selectedFile} />
+      ) : (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100%',
+          color: '#858585',
+          fontSize: '16px',
+          backgroundColor: '#1e1e1e'
+        }}>
+          Select a file to edit
+        </div>
+      ),
+    },
+    {
+      key: 'compilation',
+      label: (
+        <span>
+          <ThunderboltOutlined /> Compilation
+        </span>
+      ),
+      children: (
+        <CompilationView
+          currentFilePath={selectedFile}
+          onCompile={handleCompile}
+        />
+      ),
+    },
+  ];
+
   return (
-    <div style={{ display: 'flex', height: '100vh', flexDirection: 'column' }}>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'row' }}>
-        <div style={{ width: '20%', overflowY: 'auto', borderRight: '1px solid #ccc' }}>
-          <FileTree onFileSelect={handleFileSelect} />
-        </div>
-        <div style={{ width: '80%' }}>
-          <Editor
-            height="100%"
-            defaultLanguage="javascript"
-            value={fileContent}
-            onMount={handleEditorDidMount}
-          />
-        </div>
-      </div>
-      <div style={{ padding: '10px', borderTop: '1px solid #ccc' }}>
-        <button onClick={handleSave} disabled={!selectedFile}>Save</button>
-      </div>
+    <div style={{ height: '100vh', backgroundColor: '#1e1e1e' }}>
+      <Allotment vertical>
+        {/* Top section: File tree + Editor/Compilation tabs */}
+        <Allotment.Pane>
+          <Allotment>
+            <Allotment.Pane preferredSize={280} minSize={200}>
+              {initialFilesError && (
+                <div style={{
+                  color: '#f48771',
+                  padding: '8px',
+                  backgroundColor: '#5a1d1d',
+                  margin: '8px',
+                  borderRadius: '4px'
+                }}>
+                  Error: {initialFilesError}
+                </div>
+              )}
+              <FileTree onFileSelect={setSelectedFile} initialFiles={initialFiles} />
+            </Allotment.Pane>
+            <Allotment.Pane>
+              <Tabs
+                activeKey={activeTab}
+                onChange={setActiveTab}
+                items={tabItems}
+                style={{
+                  height: '100%',
+                  backgroundColor: '#1e1e1e',
+                }}
+                tabBarStyle={{
+                  margin: 0,
+                  paddingLeft: '16px',
+                  backgroundColor: '#2d2d30',
+                  borderBottom: '1px solid #3e3e42',
+                }}
+              />
+            </Allotment.Pane>
+          </Allotment>
+        </Allotment.Pane>
+        {/* Bottom section: Terminal */}
+        <Allotment.Pane preferredSize={250} minSize={150}>
+          <Terminal />
+        </Allotment.Pane>
+      </Allotment>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <WebSocketProvider>
+      <AppContent />
+    </WebSocketProvider>
   );
 }
 

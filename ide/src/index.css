@@ -1,0 +1,244 @@
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #1e1e1e;
+  color: #cccccc;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* Spinner for loading state */
+.spinner {
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-left-color: #4ec9b0;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  animation: spin 1s linear infinite;
+  margin-top: 20px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Dark theme for Ant Design Tree */
+.ant-tree {
+  background: transparent !important;
+  color: #cccccc !important;
+}
+
+.ant-tree .ant-tree-node-content-wrapper {
+  color: #cccccc !important;
+  transition: background-color 0.2s;
+}
+
+.ant-tree .ant-tree-node-content-wrapper:hover {
+  background-color: #2a2d2e !important;
+}
+
+.ant-tree .ant-tree-node-content-wrapper.ant-tree-node-selected {
+  background-color: #094771 !important;
+}
+
+.ant-tree .ant-tree-switcher {
+  color: #858585 !important;
+}
+
+.ant-tree .ant-tree-title {
+  color: #cccccc !important;
+}
+
+/* Dark theme for Ant Design Tabs */
+.ant-tabs {
+  color: #cccccc !important;
+}
+
+.ant-tabs .ant-tabs-tab {
+  color: #858585 !important;
+  padding: 8px 16px !important;
+}
+
+.ant-tabs .ant-tabs-tab:hover {
+  color: #cccccc !important;
+}
+
+.ant-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: #4ec9b0 !important;
+}
+
+.ant-tabs .ant-tabs-ink-bar {
+  background: #4ec9b0 !important;
+}
+
+.ant-tabs-content {
+  background-color: #1e1e1e !important;
+  color: #cccccc !important;
+  height: 100%;
+}
+
+.ant-tabs-content-holder {
+  overflow: auto;
+}
+
+.ant-tabs-tabpane {
+  height: 100%;
+}
+
+.ant-tabs > .ant-tabs-nav {
+  margin-bottom: 0 !important;
+}
+
+/* Dark theme for Ant Design Buttons */
+.ant-btn {
+  border-color: #3e3e42 !important;
+}
+
+.ant-btn:not(.ant-btn-primary) {
+  background-color: #3c3c3c !important;
+  color: #cccccc !important;
+}
+
+.ant-btn:not(.ant-btn-primary):hover {
+  background-color: #505050 !important;
+  border-color: #555555 !important;
+  color: #ffffff !important;
+}
+
+.ant-btn-primary {
+  background-color: #0e639c !important;
+  border-color: #0e639c !important;
+}
+
+.ant-btn-primary:hover:not(:disabled) {
+  background-color: #1177bb !important;
+  border-color: #1177bb !important;
+}
+
+.ant-btn:disabled {
+  opacity: 0.4;
+}
+
+/* Dark theme for Ant Design Messages */
+.ant-message-notice-content {
+  background-color: #2d2d30 !important;
+  color: #cccccc !important;
+  border: 1px solid #3e3e42;
+}
+
+.ant-message .anticon {
+  color: #cccccc !important;
+}
+
+/* Dark theme for Ant Design Badge */
+.ant-badge-dot {
+  box-shadow: 0 0 0 1px #1e1e1e !important;
+}
+
+/* Dark theme for Ant Design Empty */
+.ant-empty-description {
+  color: #858585 !important;
+}
+
+/* Dark theme for Ant Design Spin */
+.ant-spin-dot-item {
+  background-color: #4ec9b0 !important;
+}
+
+/* Dark theme for Ant Design Tooltips */
+.ant-tooltip-inner {
+  background-color: #2d2d30 !important;
+  color: #cccccc !important;
+}
+
+.ant-tooltip-arrow-content {
+  background-color: #2d2d30 !important;
+}
+
+/* Dark theme for Ant Design Input/Search */
+.ant-input,
+.ant-input-affix-wrapper {
+  background-color: #3c3c3c !important;
+  border-color: #3e3e42 !important;
+  color: #cccccc !important;
+}
+
+.ant-input::placeholder,
+.ant-input-affix-wrapper input::placeholder {
+  color: #858585 !important;
+}
+
+.ant-input:hover,
+.ant-input-affix-wrapper:hover {
+  border-color: #555555 !important;
+}
+
+.ant-input:focus,
+.ant-input-affix-wrapper:focus,
+.ant-input-affix-wrapper-focused {
+  border-color: #0e639c !important;
+  box-shadow: 0 0 0 2px rgba(14, 99, 156, 0.2) !important;
+}
+
+.ant-input-clear-icon {
+  color: #858585 !important;
+}
+
+.ant-input-clear-icon:hover {
+  color: #cccccc !important;
+}
+
+/* Scrollbar styling for dark theme */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4e4e4e;
+}
+
+/* Allotment sash (separator) styling */
+.split-view-view {
+  background-color: #1e1e1e !important;
+}
+
+.sash {
+  background-color: #2d2d30 !important;
+}
+
+.sash:hover {
+  background-color: #3e3e42 !important;
+}
+
+.sash.vertical {
+  cursor: col-resize;
+}
+
+.sash.horizontal {
+  cursor: row-resize;
+}
