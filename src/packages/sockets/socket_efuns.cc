@@ -31,7 +31,7 @@
 const char *socket_modes[] = {"MUD", "STREAM", "DATAGRAM", "STREAM_BINARY", "DATAGRAM_BINARY", "STREAM_TLS", "STREAM_TLS_BINARY"};
 
 const char *socket_states[] = {"CLOSED", "CLOSING", "UNBOUND", "BOUND", "LISTEN", "HANDSHAKE", "DATA_XFER"};
-const char *socket_options[] = {"SO_TLS_VERIFY_PEER", "SO_TLS_SNI_HOSTNAME"};
+const char *socket_options[] = {"SO_INVALID", "SO_TLS_VERIFY_PEER", "SO_TLS_SNI_HOSTNAME", "SO_TLS_CERT", "SO_TLS_KEY"};
 static char *sockaddr_to_lpcaddr(struct sockaddr *addr /*addr*/, ev_socklen_t /*len*/ len);
 
 struct lpc_socket_event_data {
@@ -117,6 +117,31 @@ void handle_tls_handshake(int fd) {
       return ;
     default:
       debug(sockets, "STATE_HANDSHAKE: SSL_connect error: %s.\n", ERR_error_string(err, nullptr));
+      lpc_socks[fd].flags &= ~S_BLOCKED;
+      socket_close(fd, SC_FORCE | SC_FINAL_CLOSE);
+      return;
+  }
+}
+
+void handle_tls_server_handshake(int fd) {
+  auto ret = SSL_accept(lpc_socks[fd].ssl);
+  if (ret == 1) {
+    lpc_socks[fd].state = STATE_DATA_XFER;
+    lpc_socks[fd].flags |= S_BLOCKED;
+    debug(sockets, ("handle_tls_server_handshake: TLS: handshake successful\n"));
+    event_add(lpc_socks[fd].ev_write, nullptr);
+    return;
+  }
+  auto err = SSL_get_error(lpc_socks[fd].ssl, ret);
+  switch (err) {
+    case SSL_ERROR_WANT_READ:
+      // read event is persistent
+      return ;
+    case SSL_ERROR_WANT_WRITE:
+      event_add(lpc_socks[fd].ev_write, nullptr);
+      return ;
+    default:
+      debug(sockets, "STATE_HANDSHAKE: SSL_accept error: %s.\n", ERR_error_string(err, nullptr));
       lpc_socks[fd].flags &= ~S_BLOCKED;
       socket_close(fd, SC_FORCE | SC_FINAL_CLOSE);
       return;
@@ -582,6 +607,26 @@ int socket_listen(int fd, svalue_t *callback) {
     return EEISCONN;
   }
 
+  // If TLS socket, initialize server SSL context if cert/key are provided
+  if (lpc_socks[fd].flags & S_TLS_SUPPORT) {
+    if (lpc_socks[fd].options[SO_TLS_CERT].type == T_STRING &&
+        lpc_socks[fd].options[SO_TLS_KEY].type == T_STRING) {
+      auto *ssl_ctx = tls_server_init(lpc_socks[fd].options[SO_TLS_CERT].u.string,
+                                      lpc_socks[fd].options[SO_TLS_KEY].u.string);
+      if (ssl_ctx == nullptr) {
+        debug(sockets, "socket_listen: tls_server_init error.\n");
+        return EELISTEN;
+      }
+      lpc_socks[fd].ssl_ctx = ssl_ctx;
+      debug(sockets, "socket_listen: TLS enabled with cert=%s key=%s\n",
+            lpc_socks[fd].options[SO_TLS_CERT].u.string,
+            lpc_socks[fd].options[SO_TLS_KEY].u.string);
+    } else {
+      // No cert/key provided - log warning but allow (for testing or client-cert mode)
+      debug(sockets, "socket_listen: Warning - TLS socket created without cert/key. Server TLS will not work properly.\n");
+    }
+  }
+
   if (listen(lpc_socks[fd].fd, 5) == -1) {
     auto e = evutil_socket_geterror(lpc_socks[fd].fd);
     debug(sockets, "socket_listen: %d (real fd %" FMT_SOCKET_FD ") listen error: %d (%s).\n", fd,
@@ -660,10 +705,9 @@ int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback) {
     new_lpc_socket_event_listener(i, &lpc_socks[i], accept_fd);
 
     lpc_socks[i].fd = accept_fd;
-    lpc_socks[i].flags = S_HEADER | (lpc_socks[fd].flags & S_BINARY);
+    lpc_socks[i].flags = S_HEADER | (lpc_socks[fd].flags & (S_BINARY | S_TLS_SUPPORT));
 
     lpc_socks[i].mode = lpc_socks[fd].mode;
-    lpc_socks[i].state = STATE_DATA_XFER;
 
     lpc_socks[i].l_addrlen = sizeof(lpc_socks[i].l_addr);
     if (getsockname(lpc_socks[i].fd, reinterpret_cast<struct sockaddr *>(&lpc_socks[i].l_addr),
@@ -678,6 +722,37 @@ int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback) {
     set_read_callback(i, read_callback);
     set_write_callback(i, write_callback);
     copy_close_callback(i, fd);
+
+    // If parent socket has TLS enabled, initialize SSL for accepted connection
+    if (lpc_socks[i].flags & S_TLS_SUPPORT) {
+      if (lpc_socks[fd].ssl_ctx == nullptr) {
+        debug(sockets, "socket_accept: parent socket has no SSL_CTX.\n");
+        evutil_closesocket(accept_fd);
+        clear_socket(i, 1);
+        return EEACCEPT;
+      }
+
+      auto *ssl = SSL_new(lpc_socks[fd].ssl_ctx);
+      if (ssl == nullptr) {
+        debug(sockets, "socket_accept: SSL_new error.\n");
+        evutil_closesocket(accept_fd);
+        clear_socket(i, 1);
+        return EEACCEPT;
+      }
+
+      lpc_socks[i].ssl = ssl;
+      lpc_socks[i].ssl_ctx = nullptr; // Don't copy ctx, parent owns it
+      lpc_socks[i].flags |= S_TLS_IS_SERVER; // Mark as server-side TLS
+
+      SSL_set_fd(ssl, lpc_socks[i].fd);
+
+      // Start in handshake state for server-side TLS
+      lpc_socks[i].state = STATE_HANDSHAKE;
+      debug(sockets, "socket_accept: TLS enabled for accepted socket, starting handshake.\n");
+    } else {
+      // Non-TLS socket goes straight to data transfer
+      lpc_socks[i].state = STATE_DATA_XFER;
+    }
 
     current_object->flags |= O_EFUN_SOCKET;
 
@@ -1203,7 +1278,11 @@ void socket_read_select_handler(int fd) {
         case STREAM_TLS:
         case STREAM_TLS_BINARY: {
           debug(sockets, ("read_socket_handler: HANDSHAKE\n"));
-          return handle_tls_handshake(fd);
+          if (lpc_socks[fd].flags & S_TLS_IS_SERVER) {
+            return handle_tls_server_handshake(fd);
+          } else {
+            return handle_tls_handshake(fd);
+          }
         }
         default:
           debug(sockets, ("read_socket_handler: STATE_HANDSHAKE unsupported mode.\n"));
@@ -1427,7 +1506,11 @@ void socket_write_select_handler(int fd) {
       case STREAM_TLS:
       case STREAM_TLS_BINARY: {
         debug(sockets, ("socket_write_select_handler: HANDSHAKE\n"));
-        handle_tls_handshake(fd);
+        if (lpc_socks[fd].flags & S_TLS_IS_SERVER) {
+          handle_tls_server_handshake(fd);
+        } else {
+          handle_tls_handshake(fd);
+        }
         return ;
       }
       default:

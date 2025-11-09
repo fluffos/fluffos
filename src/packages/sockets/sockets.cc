@@ -325,6 +325,18 @@ void f_socket_set_option() {
       }
       assign_svalue_no_free(&lpc_socks_get(lpc_sock)->options[SO_TLS_SNI_HOSTNAME], arg);
       break;
+    case SO_TLS_CERT:
+      if (arg->type != T_STRING) {
+        bad_arg(3, F_SOCKET_SET_OPTION);
+      }
+      assign_svalue_no_free(&lpc_socks_get(lpc_sock)->options[SO_TLS_CERT], arg);
+      break;
+    case SO_TLS_KEY:
+      if (arg->type != T_STRING) {
+        bad_arg(3, F_SOCKET_SET_OPTION);
+      }
+      assign_svalue_no_free(&lpc_socks_get(lpc_sock)->options[SO_TLS_KEY], arg);
+      break;
     default:
         error("Unknown socket option: %d\n", option);
   }
@@ -347,6 +359,12 @@ void f_socket_get_option() {
       break;
     case SO_TLS_SNI_HOSTNAME:
       copy_and_push_string(lpc_socks_get(lpc_sock)->options[SO_TLS_SNI_HOSTNAME].u.string);
+      break;
+    case SO_TLS_CERT:
+      copy_and_push_string(lpc_socks_get(lpc_sock)->options[SO_TLS_CERT].u.string);
+      break;
+    case SO_TLS_KEY:
+      copy_and_push_string(lpc_socks_get(lpc_sock)->options[SO_TLS_KEY].u.string);
       break;
     default:
       error("Unknown socket option: %d\n", option);
