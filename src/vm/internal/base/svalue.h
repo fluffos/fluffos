@@ -38,7 +38,7 @@ union u {
  */
 struct svalue_t {
   unsigned short type;
-  unsigned short subtype;
+  unsigned int subtype;  // Changed from unsigned short to support large arrays/mappings in foreach (issue #1127)
   union u u;
 };
 
