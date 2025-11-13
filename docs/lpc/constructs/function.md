@@ -12,10 +12,15 @@ The LPC function is similar but not identical to that provided by C
 ```c
 return_type function_name(arg1_type arg1, arg2_type arg2, ...)
 {
+    // Variables can now be declared anywhere in the function body,
+    // not just at the top (C99-style)
     variable_declarations;
     ...;
 
     statements;
+    ...;
+
+    more_variable_declarations;  // Declarations can be interspersed
     ...;
 
     return var0;
