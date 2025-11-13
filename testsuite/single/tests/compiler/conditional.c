@@ -3,9 +3,18 @@
 //
 // This has now been fixed, so that floats with an 0 value would also evaluate to false.
 
+int logical_assign_counter;
+
+mixed counted(mixed value) {
+  logical_assign_counter++;
+  return value;
+}
+
 void do_tests() {
   int tmp = 1;
   mapping m;
+  int logic_var;
+  mixed maybe;
 
   tmp = 1;
   if(0.0) {
@@ -62,9 +71,6 @@ void do_tests() {
   // Only undefined triggers fallback, not falsy values
   m = ([]);
 
-  tmp = 0 ?? 42;
-  write(sprintf("%d\n", tmp));
-
   // undefined mapping key should use fallback
   ASSERT_EQ("default", m["nonexistent"] ?? "default");
 
@@ -92,4 +98,50 @@ void do_tests() {
   ASSERT_EQ("", "" || "yes"); // || treats "" as truthy
   ASSERT_EQ("yes", ([])[0] || "yes"); // || treats undefined as falsy
   ASSERT_EQ("", "" ?? "yes");   // ?? does not treat "" as trigger
+
+  // Logical assignment operators (||=, &&=, ??=)
+  logical_assign_counter = 0;
+  logic_var = 0;
+  logic_var ||= counted(7);
+  ASSERT_EQ(7, logic_var);
+  ASSERT_EQ(1, logical_assign_counter);
+
+  logical_assign_counter = 0;
+  logic_var ||= counted(9);
+  ASSERT_EQ(7, logic_var);
+  ASSERT_EQ(0, logical_assign_counter);
+
+  logical_assign_counter = 0;
+  logic_var = 2;
+  logic_var &&= counted(5);
+  ASSERT_EQ(5, logic_var);
+  ASSERT_EQ(1, logical_assign_counter);
+
+  logical_assign_counter = 0;
+  logic_var = 0;
+  logic_var &&= counted(8);
+  ASSERT_EQ(0, logic_var);
+  ASSERT_EQ(0, logical_assign_counter);
+
+  logical_assign_counter = 0;
+  m = ([]);
+  m["missing"] ??= counted("fallback");
+  ASSERT_EQ("fallback", m["missing"]);
+  ASSERT_EQ(1, logical_assign_counter);
+
+  logical_assign_counter = 0;
+  m["missing"] ??= counted("ignored");
+  ASSERT_EQ("fallback", m["missing"]);
+  ASSERT_EQ(0, logical_assign_counter);
+
+  logical_assign_counter = 0;
+  maybe = m["other"];
+  maybe ??= counted(42);
+  ASSERT_EQ(42, maybe);
+  ASSERT_EQ(1, logical_assign_counter);
+
+  logical_assign_counter = 0;
+  maybe ??= counted(100);
+  ASSERT_EQ(42, maybe);
+  ASSERT_EQ(0, logical_assign_counter);
 }

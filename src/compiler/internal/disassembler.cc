@@ -5,6 +5,7 @@
 #include "vm/vm.h"
 #include "compiler/internal/lex.h"
 #include "compiler/internal/icode.h"
+#include "include/opcodes_extra.h"
 
 #include <fmt/format.h>
 
@@ -355,6 +356,9 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
 #ifdef F_NULLISH
       case F_NULLISH:
 #endif
+      case F_LOR_EQ:
+      case F_LAND_EQ:
+      case F_NULLISH_EQ:
         COPY_SHORT(&sarg, pc);
         offset = (pc - code) + sarg;
         sprintf(buff, "%04x (%04x)", static_cast<unsigned>(sarg), static_cast<unsigned>(offset));

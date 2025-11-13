@@ -9,11 +9,7 @@
 
 #include "include/function.h"
 #include "efuns.autogen.h"
-
-/* Compiler-internal opcodes (not in autogen) */
-#ifndef F_NULLISH
-#define F_NULLISH 230  /* Nullish coalescing operator ?? */
-#endif
+#include "include/opcodes_extra.h"
 
 #include "vm/internal/base/program.h"
 #include "compiler.h"
@@ -493,6 +489,16 @@ void i_generate_node(parse_node_t *expr) {
       i_generate_forward_branch(F_NULLISH);
       i_generate_node(expr->r.expr);
       i_update_forward_branch("??");
+      break;
+    }
+    case NODE_LOGICAL_ASSIGN: {
+      /* Logical/nullish assignment operators (||=, &&=, ??=) */
+      i_generate_node(expr->l.expr);     // push lvalue pointer
+      i_generate_forward_branch(expr->v.number);
+      i_generate_node(expr->r.expr);     // evaluate RHS only when needed
+      end_pushes();
+      ins_byte(F_ASSIGN_VALUE);
+      i_update_forward_branch("logical assign");
       break;
     }
     case NODE_BRANCH_LINK:
