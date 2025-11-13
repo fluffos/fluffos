@@ -78,6 +78,7 @@
 #include "compiler/internal/lex.h"
 #include "compiler/internal/scratchpad.h"
 #include "compiler/internal/generate.h"
+#include "include/opcodes_extra.h"
 
 extern char *outp;
 
@@ -630,7 +631,7 @@ union yyalloc
 #define YYLAST   1805
 
 /* YYNTOKENS -- Number of terminals.  */
-#define YYNTOKENS  78
+#define YYNTOKENS  79
 /* YYNNTS -- Number of nonterminals.  */
 #define YYNNTS  108
 /* YYNRULES -- Number of rules.  */
@@ -639,7 +640,7 @@ union yyalloc
 #define YYNSTATES  511
 
 /* YYMAXUTOK -- Last valid token kind.  */
-#define YYMAXUTOK   311
+#define YYMAXUTOK   312
 
 
 /* YYTRANSLATE(TOKEN-NUM) -- Symbol number corresponding to TOKEN-NUM
@@ -656,16 +657,16 @@ static const yytype_int8 yytranslate[] =
        0,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,     2,     2,     2,    75,    65,    58,     2,
-      69,    70,    64,    62,    72,    63,     2,    66,     2,     2,
-       2,     2,     2,     2,     2,     2,     2,     2,    71,    68,
-      61,     2,     2,    55,     2,     2,     2,     2,     2,     2,
+       2,     2,     2,     2,     2,     2,    76,    66,    59,     2,
+      70,    71,    65,    63,    73,    64,     2,    67,     2,     2,
+       2,     2,     2,     2,     2,     2,     2,     2,    72,    69,
+      62,     2,     2,    56,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,    76,     2,    77,    57,     2,     2,     2,     2,     2,
+       2,    77,     2,    78,    58,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,    73,    56,    74,    67,     2,     2,     2,
+       2,     2,     2,    74,    57,    75,    68,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -684,7 +685,7 @@ static const yytype_int8 yytranslate[] =
       25,    26,    27,    28,    29,    30,    31,    32,    33,    34,
       35,    36,    37,    38,    39,    40,    41,    42,    43,    44,
       45,    46,    47,    48,    49,    50,    51,    52,    53,    54,
-      59,    60
+      55,    60,    61
 };
 
 #if YYDEBUG
@@ -738,11 +739,11 @@ yysymbol_name (yysymbol_kind_t yysymbol)
   "end of file", "error", "invalid token", "L_STRING", "L_NUMBER",
   "L_REAL", "L_BASIC_TYPE", "L_TYPE_MODIFIER", "L_DEFINED_NAME",
   "L_IDENTIFIER", "L_EFUN", "L_INC", "L_DEC", "L_ASSIGN", "L_LAND",
-  "L_LOR", "L_LSH", "L_RSH", "L_ORDER", "L_NOT", "L_IF", "L_ELSE",
-  "L_SWITCH", "L_CASE", "L_DEFAULT", "L_RANGE", "L_DOT_DOT_DOT", "L_WHILE",
-  "L_DO", "L_FOR", "L_FOREACH", "L_IN", "L_BREAK", "L_CONTINUE",
-  "L_RETURN", "L_ARROW", "L_DOT", "L_INHERIT", "L_COLON_COLON",
-  "L_ARRAY_OPEN", "L_MAPPING_OPEN", "L_FUNCTION_OPEN",
+  "L_LOR", "L_QUESTION_QUESTION", "L_LSH", "L_RSH", "L_ORDER", "L_NOT",
+  "L_IF", "L_ELSE", "L_SWITCH", "L_CASE", "L_DEFAULT", "L_RANGE",
+  "L_DOT_DOT_DOT", "L_WHILE", "L_DO", "L_FOR", "L_FOREACH", "L_IN",
+  "L_BREAK", "L_CONTINUE", "L_RETURN", "L_ARROW", "L_DOT", "L_INHERIT",
+  "L_COLON_COLON", "L_ARRAY_OPEN", "L_MAPPING_OPEN", "L_FUNCTION_OPEN",
   "L_NEW_FUNCTION_OPEN", "L_SSCANF", "L_CATCH", "L_ARRAY", "L_REF",
   "L_PARSE_COMMAND", "L_TIME_EXPRESSION", "L_CLASS", "L_NEW",
   "L_PARAMETER", "L_TREE", "L_PREPROCESSOR_COMMAND", "LOWER_THAN_ELSE",
@@ -3723,24 +3724,38 @@ yyreduce:
 #line 1270 "/projects/git/fluffos/src/compiler/internal/grammar.y"
     {
       parse_node_t *l = (yyvsp[-2].node), *r = (yyvsp[0].node);
-      /* set this up here so we can change it below */
-      /* assignments are backwards; rhs is evaluated before
-         lhs, so put the RIGHT hand side on the LEFT hand
-         side of the tree node. */
-      CREATE_BINARY_OP((yyval.node), (yyvsp[-1].number), r->type, r, l);
+      int opcode = (yyvsp[-1].number);
 
-      /* allow TYPE_STRING += TYPE_NUMBER | TYPE_OBJECT */
-      if (exact_types && !compatible_types(r->type, l->type) &&
-          !((yyvsp[-1].number) == F_ADD_EQ && l->type == TYPE_STRING &&
-            ((COMP_TYPE(r->type, TYPE_NUMBER)) || r->type == TYPE_OBJECT))) {
-        char buf[256];
-        char *end = EndOf(buf);
-        char *p;
-        p = strput(buf, end, "Bad assignment ");
-        p = get_two_types(p, end, l->type, r->type);
-        p = strput(p, end, ".");
-        yyerror(buf);
-      }
+      if (opcode == F_LOR_EQ || opcode == F_LAND_EQ || opcode == F_NULLISH_EQ) {
+        if (exact_types && !compatible_types(r->type, l->type)) {
+          char buf[256];
+          char *end = EndOf(buf);
+          char *p;
+          p = strput(buf, end, "Bad assignment ");
+          p = get_two_types(p, end, l->type, r->type);
+          p = strput(p, end, ".");
+          yyerror(buf);
+        }
+        CREATE_LOGICAL_ASSIGN((yyval.node), opcode, l, r);
+      } else {
+        /* set this up here so we can change it below */
+        /* assignments are backwards; rhs is evaluated before
+           lhs, so put the RIGHT hand side on the LEFT hand
+           side of the tree node. */
+        CREATE_BINARY_OP((yyval.node), opcode, r->type, r, l);
+
+        /* allow TYPE_STRING += TYPE_NUMBER | TYPE_OBJECT */
+        if (exact_types && !compatible_types(r->type, l->type) &&
+            !(opcode == F_ADD_EQ && l->type == TYPE_STRING &&
+              ((COMP_TYPE(r->type, TYPE_NUMBER)) || r->type == TYPE_OBJECT))) {
+          char buf[256];
+          char *end = EndOf(buf);
+          char *p;
+          p = strput(buf, end, "Bad assignment ");
+          p = get_two_types(p, end, l->type, r->type);
+          p = strput(p, end, ".");
+          yyerror(buf);
+        }
 
       if ((yyvsp[-1].number) == F_ASSIGN)
         (yyval.node)->l.expr = do_promotions(r, l->type);
@@ -4984,7 +4999,7 @@ yyreduce:
           (yyval.node)->r.expr = 0;
           (yyval.node)->l.expr = 0;
           (yyval.node)->v.number = ((yyvsp[0].ihe)->dn.function_num << 8) | FP_LOCAL;
-          
+
           if (current_function_context)
             current_function_context->bindable = FP_NOT_BINDABLE;
         } else if ((yyvsp[0].ihe)->dn.simul_num != -1) {
@@ -4995,7 +5010,7 @@ yyreduce:
           (yyval.node)->r.expr = 0;
           (yyval.node)->l.expr = 0;
           (yyval.node)->v.number = ((yyvsp[0].ihe)->dn.simul_num << 8) | FP_SIMUL;
-          
+
           if (current_function_context)
             current_function_context->bindable = FP_NOT_BINDABLE;
         } else if ((yyvsp[0].ihe)->dn.efun_num != -1) {
@@ -5039,7 +5054,7 @@ yyreduce:
       (yyval.node)->r.expr = 0;
       CREATE_STRING((yyval.node)->l.expr, (yyvsp[0].string));
       (yyval.node)->v.number = FP_FUNCTIONAL;
-      
+
       /* Mark as not bindable - same as (: funcname :) syntax */
       if (current_function_context)
         current_function_context->bindable = FP_NOT_BINDABLE;
@@ -5921,7 +5936,7 @@ yyreduce:
         (yyval.node)->type = (SIMUL(f)->type) & ~DECL_MODS;
       } else if ((f=(yyvsp[-4].ihe)->dn.efun_num) != -1) {
         (yyval.node) = validate_efun_call(f, (yyvsp[-1].node));
-      } else if ((i = (yyvsp[-4].ihe)->dn.local_num) != -1 && 
+      } else if ((i = (yyvsp[-4].ihe)->dn.local_num) != -1 &&
                  ((type_of_locals_ptr[i] & ~LOCAL_MODS) == TYPE_FUNCTION ||
                   (type_of_locals_ptr[i] & ~LOCAL_MODS) == TYPE_ANY ||
                   (type_of_locals_ptr[i] & ~LOCAL_MODS) == TYPE_UNKNOWN)) {
@@ -5929,15 +5944,15 @@ yyreduce:
         parse_node_t *expr;
         parse_node_t *func_node;
         int local_type = type_of_locals_ptr[i] & ~LOCAL_MODS;
-        
+
         type_of_locals_ptr[i] &= ~LOCAL_MOD_UNUSED;
-        
+
         /* Create node to load the function variable */
         if (type_of_locals_ptr[i] & LOCAL_MOD_REF)
           CREATE_OPCODE_1(func_node, F_REF, local_type, i & 0xff);
         else
           CREATE_OPCODE_1(func_node, F_LOCAL, local_type, i & 0xff);
-        
+
         /* Generate evaluate(func_var, args...) */
         (yyval.node)->kind = NODE_EFUN;
         (yyval.node)->l.number = (yyval.node)->v.number + 1;
@@ -5952,10 +5967,10 @@ yyreduce:
         expr->v.expr = func_node;
         expr->r.expr = (yyval.node)->r.expr;
         (yyval.node)->r.expr = expr;
-        
+
         if (current_function_context)
           current_function_context->num_locals++;
-      } else if ((i = (yyvsp[-4].ihe)->dn.global_num) != -1 && 
+      } else if ((i = (yyvsp[-4].ihe)->dn.global_num) != -1 &&
                  ((VAR_TEMP(i)->type & ~DECL_MODS) == TYPE_FUNCTION ||
                   (VAR_TEMP(i)->type & ~DECL_MODS) == TYPE_ANY ||
                   (VAR_TEMP(i)->type & ~DECL_MODS) == TYPE_UNKNOWN)) {
@@ -5963,13 +5978,13 @@ yyreduce:
         parse_node_t *expr;
         parse_node_t *func_node;
         int global_type = VAR_TEMP(i)->type & ~DECL_MODS;
-        
+
         if (current_function_context)
           current_function_context->bindable = FP_NOT_BINDABLE;
-        
+
         /* Create node to load the function variable */
         CREATE_OPCODE_1(func_node, F_GLOBAL, global_type, i);
-        
+
         if (VAR_TEMP(i)->type & DECL_HIDDEN) {
           char buf[256];
           char *end = EndOf(buf);
@@ -5980,7 +5995,7 @@ yyreduce:
           p = strput(p, end, "'");
           yyerror(buf);
         }
-        
+
         /* Generate evaluate(func_var, args...) */
         (yyval.node)->kind = NODE_EFUN;
         (yyval.node)->l.number = (yyval.node)->v.number + 1;
@@ -6643,4 +6658,3 @@ yyreturnlab:
 }
 
 #line 3612 "/projects/git/fluffos/src/compiler/internal/grammar.y"
-
