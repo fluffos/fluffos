@@ -63,7 +63,7 @@ int yyparse (void);
 
 %token L_INC L_DEC
 %token L_ASSIGN
-%token L_LAND L_LOR
+%token L_LAND L_LOR L_QUESTION_QUESTION
 %token L_LSH L_RSH
 %token L_ORDER
 %token L_NOT
@@ -104,6 +104,7 @@ int yyparse (void);
 
 %right L_ASSIGN
 %right '?'
+%left L_QUESTION_QUESTION
 %left L_LOR
 %left L_LAND
 %left '|'
@@ -1319,6 +1320,12 @@ expr0:
         CREATE_IF($$, $1, p1, p2);
       }
       $$->type = ((p1->type == p2->type) ? p1->type : TYPE_ANY);
+    }
+  | expr0 L_QUESTION_QUESTION expr0
+    {
+      /* Nullish coalescing: left ?? right
+       * Return left if defined, otherwise return right */
+      CREATE_NULLISH($$, $1, $3);
     }
   | expr0 L_LOR expr0
     {

@@ -352,6 +352,9 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
       case F_LOR:
       case F_LAND:
 #endif
+#ifdef F_NULLISH
+      case F_NULLISH:
+#endif
         COPY_SHORT(&sarg, pc);
         offset = (pc - code) + sarg;
         sprintf(buff, "%04x (%04x)", static_cast<unsigned>(sarg), static_cast<unsigned>(offset));

@@ -121,6 +121,7 @@ static parse_node_t *optimize(parse_node_t *expr) {
     case NODE_NUMBER:
       break;
     case NODE_LAND_LOR:
+    case NODE_NULLISH:
     case NODE_BRANCH_LINK: {
       int in_cond = (optimizer_state & OPTIMIZER_IN_COND);
 
@@ -515,6 +516,12 @@ void dump_tree(parse_node_t *expr) {
       dump_tree(expr->r.expr);
       printf(")");
       break;
+    case NODE_NULLISH:
+      printf("(?? ");
+      dump_tree(expr->l.expr);
+      dump_tree(expr->r.expr);
+      printf(")");
+      break;
     case NODE_BRANCH_LINK:
       printf("(branch_link ");
       dump_tree(expr->l.expr);
@@ -688,6 +695,7 @@ void lpc_tree_form(parse_node_t *expr, parse_node_t *dest) {
       break;
     case NODE_BINARY_OP:
     case NODE_LAND_LOR:
+    case NODE_NULLISH:
     case NODE_BRANCH_LINK:
       lpc_tree(dest, 4);
       lpc_tree_opc(ARG_2, expr->v.number);

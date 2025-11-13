@@ -9,6 +9,12 @@
 
 #include "include/function.h"
 #include "efuns.autogen.h"
+
+/* Compiler-internal opcodes (not in autogen) */
+#ifndef F_NULLISH
+#define F_NULLISH 230  /* Nullish coalescing operator ?? */
+#endif
+
 #include "vm/internal/base/program.h"
 #include "compiler.h"
 #include "keyword.h"
@@ -480,6 +486,15 @@ void i_generate_node(parse_node_t *expr) {
         i_update_forward_branch("&& or ||");
       }
       break;
+    case NODE_NULLISH: {
+      /* Nullish coalescing: left ?? right
+       * Similar to || but checks undefined instead of falsy */
+      i_generate_node(expr->l.expr);
+      i_generate_forward_branch(F_NULLISH);
+      i_generate_node(expr->r.expr);
+      i_update_forward_branch("??");
+      break;
+    }
     case NODE_BRANCH_LINK:
       i_generate_node(expr->l.expr);
       end_pushes();

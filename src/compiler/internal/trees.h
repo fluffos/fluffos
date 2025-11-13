@@ -27,6 +27,7 @@ enum node_type {
   NODE_CALL_1,
   NODE_CALL_2,
   NODE_LAND_LOR,
+  NODE_NULLISH,
   NODE_FOREACH,
   NODE_LVALUE_EFUN,
   NODE_SWITCH_RANGES,
@@ -112,6 +113,9 @@ typedef struct parse_node_block_s {
 #define CREATE_LAND_LOR(vn, op, x, y)                                                        \
   SAFE((vn) = new_node(); (vn)->kind = NODE_LAND_LOR; (vn)->v.number = op; (vn)->l.expr = x; \
        (vn)->r.expr = y; (vn)->type = ((x->type == y->type) ? x->type : TYPE_ANY);)
+#define CREATE_NULLISH(vn, x, y)                                                             \
+  SAFE((vn) = new_node(); (vn)->kind = NODE_NULLISH; (vn)->l.expr = x; (vn)->r.expr = y;   \
+       (vn)->type = TYPE_ANY;)
 #define CREATE_CALL(vn, op, t, el)                                                              \
   SAFE((vn) = el; (vn)->kind = NODE_CALL; (vn)->l.number = (vn)->v.number; (vn)->v.number = op; \
        (vn)->type = t;)

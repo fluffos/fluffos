@@ -62,3 +62,23 @@ else
 which can be equivalently translated to:
 
     var = expression0 ? expression1 : expression;
+
+---
+
+### Nullish coalescing operator (`??`)
+
+LPC also supports `expr_left ?? expr_right`, which returns `expr_left` when it is
+*defined* and evaluates/returns `expr_right` only when the left-hand side is
+`undefined` (see `undefinedp()` for what counts as undefined). It short-circuits
+like `||`, but falsy values such as `0`, `0.0`, `""`, or `({ })` do **not** trigger
+the fallback.
+
+```c
+int timeout = cfg["timeout"] ?? 60;          // use default only if key is undefined
+string name = player->query_name() ?? "guest";  // RHS runs only when call returns undefined
+```
+
+Operator precedence sits between `?:` and `||`, mirroring the common pattern
+`lookup ?? fallback` without extra parentheses. Use `||` when you want to treat
+all falsy values as missing; use `??` when only truly undefined values should
+fall back.

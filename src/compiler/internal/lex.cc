@@ -2119,6 +2119,11 @@ int yylex() {
       case '~':
 #ifndef USE_TRIGRAPHS
       case '?':
+        /* Check for ?? operator */
+        if (*outp == '?') {
+          outp++;
+          return L_QUESTION_QUESTION;
+        }
         return c;
 #else
         return c;
@@ -2158,8 +2163,8 @@ int yylex() {
           case '-':
             return '~';
           default:
-            outp -= 2;
-            return '?';
+            outp--;  // Back up one char (not two - keep the ??)
+            return L_QUESTION_QUESTION;
         }
 #endif
       case '!':
@@ -3475,6 +3480,9 @@ static void init_instrs() {
 #ifdef F_LOR
   add_instr_name("||", 0, F_LOR, -1);
   add_instr_name("&&", 0, F_LAND, -1);
+#endif
+#ifdef F_NULLISH
+  add_instr_name("??", 0, F_NULLISH, -1);
 #endif
   add_instr_name("-=", "f_sub_eq();\n", F_SUB_EQ, T_ANY);
 #ifdef F_JUMP
