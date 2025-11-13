@@ -54,6 +54,9 @@ static const char *get_arg(int, int);
 extern inline const char *access_to_name(int /*mode*/);
 extern inline const char *origin_to_name(int /*origin*/);
 
+template <typename F>
+void assign_lvalue_codepoint(F &&func);
+
 static inline void replace_lvalue_with_value_on_stack(svalue_t *slot, const char *where) {
   svalue_t tmp;
   tmp.type = T_NUMBER;
@@ -63,6 +66,37 @@ static inline void replace_lvalue_with_value_on_stack(svalue_t *slot, const char
   free_svalue(slot, where);
   assign_svalue_no_free(slot, &tmp);
   free_svalue(&tmp, where);
+}
+
+static inline void assign_value_to_lvalue(svalue_t *lval, svalue_t *value, const char *where) {
+  switch (lval->type) {
+    case T_LVALUE_BYTE: {
+      if (value->type != T_NUMBER) {
+        error("Illegal rhs to byte lvalue\n");
+      }
+      char c = static_cast<char>(value->u.number);
+
+      if (global_lvalue_byte.subtype == 0 && c == '\0') {
+        error("Strings cannot contain 0 bytes.\n");
+      }
+      *global_lvalue_byte.u.lvalue_byte = c;
+      break;
+    }
+    case T_LVALUE_RANGE:
+      assign_lvalue_range(value);
+      break;
+    case T_LVALUE_CODEPOINT: {
+      if (value->type != T_NUMBER) {
+        error("Illegal rhs to char lvalue\n");
+      }
+      UChar32 newc = value->u.number;
+      assign_lvalue_codepoint([=](UChar32 /*unused*/) { return newc; });
+      break;
+    }
+    default:
+      assign_svalue(lval, value);
+      break;
+  }
 }
 
 #ifdef DEBUG
@@ -2984,28 +3018,7 @@ void eval_instruction(char *p) {
           fatal("Bad argument to F_ASSIGN\n");
         }
 #endif
-        switch (sp->u.lvalue->type) {
-          case T_LVALUE_BYTE: {
-            if ((sp - 1)->type != T_NUMBER) {
-              error("Illegal rhs to byte lvalue\n");
-            }
-            *global_lvalue_byte.u.lvalue_byte = (sp - 1)->u.number;
-          } break;
-          case T_LVALUE_RANGE:
-            assign_lvalue_range(sp - 1);
-            break;
-          case T_LVALUE_CODEPOINT: {
-            if ((sp - 1)->type != T_NUMBER) {
-              error("Illegal rhs to char lvalue\n");
-            }
-            UChar32 newc = (sp - 1)->u.number;
-            assign_lvalue_codepoint([=](UChar32 c) { return newc; });
-            break;
-          }
-          default:
-            assign_svalue(sp->u.lvalue, sp - 1);
-            break;
-        }
+        assign_value_to_lvalue(sp->u.lvalue, sp - 1, "F_ASSIGN");
         sp--; /* ignore lvalue */
         /* rvalue is already in the correct place */
         break;
@@ -3015,7 +3028,7 @@ void eval_instruction(char *p) {
         }
         svalue_t *value = sp;
         svalue_t *lval_slot = sp - 1;
-        assign_svalue(lval_slot->u.lvalue, value);
+        assign_value_to_lvalue(lval_slot->u.lvalue, value, "F_ASSIGN_VALUE");
         free_svalue(lval_slot, "F_ASSIGN_VALUE");
         assign_svalue_no_free(lval_slot, value);
         free_svalue(sp--, "F_ASSIGN_VALUE");
