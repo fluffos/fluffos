@@ -243,7 +243,11 @@ The following lvalues are also valid at compile time:
 /* Remark: n >= 1 here */
 ```
 
-assignment token is one of +=, -=, *=, &=, /=, %=, ^=, |=, =, <<=,>>=.
+assignment token is one of +=, -=, *=, &=, /=, %=, ^=, |=, ||=, &&=, ??=, =, <<=,>>=.
+
+The logical forms (`||=`, `&&=`, `??=`) short-circuit just like their
+non-assignment counterparts: the right-hand expression only runs when the
+current lvalue is falsy (`||=`), truthy (`&&=`), or `undefined` (`??=`).
 
 However, because of the same reason that when we assign to a
 string, we obtain a new copy, (x = "foo")[2] = 'a' is invalidated at

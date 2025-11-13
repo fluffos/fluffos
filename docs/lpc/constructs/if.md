@@ -82,3 +82,22 @@ Operator precedence sits between `?:` and `||`, mirroring the common pattern
 `lookup ?? fallback` without extra parentheses. Use `||` when you want to treat
 all falsy values as missing; use `??` when only truly undefined values should
 fall back.
+
+### Logical assignment operators (`||=`, `&&=`, `??=`)
+
+Short-circuit evaluation is also available in assignment form:
+
+```c
+int connected = 0;
+object sock = find_connection();
+
+connected ||= open_default();       // assign only if connected is falsy
+sock &&= reconnect(sock);           // assign only if sock is truthy
+config["timeout"] ??= 60;           // assign only when key is undefined
+```
+
+`||=` evaluates the right-hand side only when the left-hand side is falsy (0 or
+0.0). `&&=` does the reverse, running the right-hand side only when the left is
+truthy. `??=` mirrors `??`: the right-hand side runs only when the left-hand
+side is truly undefined (useful for lazily populating mappings). The lvalue is
+evaluated just once in every case.
