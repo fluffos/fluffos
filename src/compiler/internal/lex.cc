@@ -29,6 +29,7 @@
 
 #include "vm/vm.h"
 #include "include/function.h"
+#include "include/opcodes_extra.h"
 #include "efuns.autogen.h"
 #include "options.autogen.h"
 #include "vm/internal/base/program.h"
@@ -1922,6 +1923,10 @@ int yylex() {
       case '&': {
         switch (*outp++) {
           case '&':
+            if (*outp == '=') {
+              outp++;
+              return_assign(F_LAND_EQ);
+            }
             return L_LAND;
           case '=':
             return_assign(F_AND_EQ);
@@ -1933,6 +1938,10 @@ int yylex() {
       case '|': {
         switch (*outp++) {
           case '|':
+            if (*outp == '=') {
+              outp++;
+              return_assign(F_LOR_EQ);
+            }
             return L_LOR;
           case '=':
             return_assign(F_OR_EQ);
@@ -2119,6 +2128,15 @@ int yylex() {
       case '~':
 #ifndef USE_TRIGRAPHS
       case '?':
+        /* Check for ?? and ??= operators */
+        if (*outp == '?') {
+          outp++;
+          if (*outp == '=') {
+            outp++;
+            return_assign(F_NULLISH_EQ);
+          }
+          return L_QUESTION_QUESTION;
+        }
         return c;
 #else
         return c;
@@ -2138,9 +2156,11 @@ int yylex() {
           outp--;
           return '?';
         }
-        switch (*outp++) {
-          case '=':
-            return '#';
+        c = *outp++;
+        if (c == '=') {
+          return_assign(F_NULLISH_EQ);
+        }
+        switch (c) {
           case '/':
             return '\\';
           case '\'':
@@ -2158,8 +2178,8 @@ int yylex() {
           case '-':
             return '~';
           default:
-            outp -= 2;
-            return '?';
+            outp--;  // Back up one char (not two - keep the ??)
+            return L_QUESTION_QUESTION;
         }
 #endif
       case '!':
@@ -3475,6 +3495,21 @@ static void init_instrs() {
 #ifdef F_LOR
   add_instr_name("||", 0, F_LOR, -1);
   add_instr_name("&&", 0, F_LAND, -1);
+#endif
+#ifdef F_LOR_EQ
+  add_instr_name("||=", 0, F_LOR_EQ, -1);
+#endif
+#ifdef F_LAND_EQ
+  add_instr_name("&&=", 0, F_LAND_EQ, -1);
+#endif
+#ifdef F_NULLISH
+  add_instr_name("??", 0, F_NULLISH, -1);
+#endif
+#ifdef F_NULLISH_EQ
+  add_instr_name("??=", 0, F_NULLISH_EQ, -1);
+#endif
+#ifdef F_ASSIGN_VALUE
+  add_instr_name("assign_value", 0, F_ASSIGN_VALUE, -1);
 #endif
   add_instr_name("-=", "f_sub_eq();\n", F_SUB_EQ, T_ANY);
 #ifdef F_JUMP

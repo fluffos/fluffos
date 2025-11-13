@@ -448,6 +448,7 @@ int is_boolean(parse_node_t *pn) {
       }
       return 0;
     case NODE_LAND_LOR:
+    case NODE_NULLISH:
     case NODE_BRANCH_LINK:
       return 1;
   }
