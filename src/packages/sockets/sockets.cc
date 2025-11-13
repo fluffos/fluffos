@@ -355,16 +355,32 @@ void f_socket_get_option() {
 
   switch(option) {
     case SO_TLS_VERIFY_PEER:
-      push_number(lpc_socks_get(lpc_sock)->options[SO_TLS_VERIFY_PEER].u.number);
+      if (lpc_socks_get(lpc_sock)->options[SO_TLS_VERIFY_PEER].type == T_NUMBER) {
+        push_number(lpc_socks_get(lpc_sock)->options[SO_TLS_VERIFY_PEER].u.number);
+      } else {
+        push_number(0);
+      }
       break;
     case SO_TLS_SNI_HOSTNAME:
-      copy_and_push_string(lpc_socks_get(lpc_sock)->options[SO_TLS_SNI_HOSTNAME].u.string);
+      if (lpc_socks_get(lpc_sock)->options[SO_TLS_SNI_HOSTNAME].type == T_STRING) {
+        copy_and_push_string(lpc_socks_get(lpc_sock)->options[SO_TLS_SNI_HOSTNAME].u.string);
+      } else {
+        push_number(0);
+      }
       break;
     case SO_TLS_CERT:
-      copy_and_push_string(lpc_socks_get(lpc_sock)->options[SO_TLS_CERT].u.string);
+      if (lpc_socks_get(lpc_sock)->options[SO_TLS_CERT].type == T_STRING) {
+        copy_and_push_string(lpc_socks_get(lpc_sock)->options[SO_TLS_CERT].u.string);
+      } else {
+        push_number(0);
+      }
       break;
     case SO_TLS_KEY:
-      copy_and_push_string(lpc_socks_get(lpc_sock)->options[SO_TLS_KEY].u.string);
+      if (lpc_socks_get(lpc_sock)->options[SO_TLS_KEY].type == T_STRING) {
+        copy_and_push_string(lpc_socks_get(lpc_sock)->options[SO_TLS_KEY].u.string);
+      } else {
+        push_number(0);
+      }
       break;
     default:
       error("Unknown socket option: %d\n", option);

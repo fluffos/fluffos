@@ -264,6 +264,13 @@ static void clear_socket(int which, int dofree) {
   lpc_socks[which].w_len = 0;
   lpc_socks[which].ev_read = nullptr;
   lpc_socks[which].ev_write = nullptr;
+  for (int i = 0; i < NUM_SOCKET_OPTIONS; i++) {
+    if (lpc_socks[which].options[i].type != T_NUMBER ||
+        lpc_socks[which].options[i].u.number != 0) {
+      free_svalue(&lpc_socks[which].options[i], "clear_socket/options");
+      lpc_socks[which].options[i] = const0u;
+    }
+  }
 }
 
 /*
