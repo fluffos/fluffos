@@ -3321,6 +3321,57 @@ function_call:
       num_refs = $<number>2;
       scratch_free(name);
     }
+  | expr4 '[' comma_expr ']' '('
+    {
+      $<number>$ = context;
+      $<number>5 = num_refs;
+      context |= ARG_LIST;
+    }
+  expr_list ')'
+    {
+      parse_node_t *expr;
+      parse_node_t *index_expr;
+
+      context = $<number>6;
+      $$ = $7;
+
+      /* Create the indexing expression */
+      CREATE_BINARY_OP(index_expr, F_INDEX, 0, $3, $1);
+      if (exact_types) {
+        switch($1->type) {
+          case TYPE_MAPPING:
+          case TYPE_ANY:
+            index_expr->type = TYPE_ANY;
+            break;
+          default:
+            if ($1->type & TYPE_MOD_ARRAY) {
+              index_expr->type = $1->type & ~TYPE_MOD_ARRAY;
+            } else {
+              index_expr->type = TYPE_ANY;
+            }
+            break;
+        }
+      } else {
+        index_expr->type = TYPE_ANY;
+      }
+
+      /* Generate evaluate(indexed_expr, args...) */
+      $$->kind = NODE_EFUN;
+      $$->l.number = $$->v.number + 1;
+      $$->v.number = predefs[evaluate_efun].token;
+#ifdef CAST_CALL_OTHERS
+      $$->type = TYPE_UNKNOWN;
+#else
+      $$->type = TYPE_ANY;
+#endif
+      expr = new_node_no_line();
+      expr->type = 0;
+      expr->v.expr = index_expr;
+      expr->r.expr = $$->r.expr;
+      $$->r.expr = expr;
+      $$ = check_refs(num_refs - $<number>5, $7, $$);
+      num_refs = $<number>5;
+    }
   | expr4 L_ARROW identifier '('
     {
       $<number>$ = context;

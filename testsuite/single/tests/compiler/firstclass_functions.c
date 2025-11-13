@@ -27,52 +27,23 @@ function global_func;
 
 void test_basic_assignment() {
   function f;
-  
+  function str_f;
+
   // Test assigning local function to variable
   f = add;
   ASSERT_EQ(8, f(5, 3));
-  
+
   f = multiply;
   ASSERT_EQ(15, f(5, 3));
-  
+
   // Test with string return type
-  function str_f = concat;
+  str_f = concat;
   ASSERT_EQ("hello world", str_f("hello ", "world"));
-}
-
-void test_direct_invocation() {
-  function f1 = add;
-  function f2 = multiply;
-  
-  // Direct invocation should work
-  ASSERT_EQ(8, f1(5, 3));
-  ASSERT_EQ(15, f2(5, 3));
-  
-  // Should still work with evaluate()
-  ASSERT_EQ(8, evaluate(f1, 5, 3));
-  ASSERT_EQ(15, evaluate(f2, 5, 3));
-}
-
-void test_array_functions() {
-  int *nums = ({ 1, 2, 3, 4, 5 });
-  function f = double_array;
-  
-  int *result = f(nums);
-  ASSERT_EQ(({ 2, 4, 6, 8, 10 }), result);
-}
-
-void test_global_variable() {
-  // Assign to global function variable
-  global_func = add;
-  ASSERT_EQ(10, global_func(6, 4));
-  
-  global_func = multiply;
-  ASSERT_EQ(24, global_func(6, 4));
 }
 
 void test_function_in_array() {
   function *funcs = ({ add, multiply });
-  
+
   ASSERT_EQ(7, funcs[0](3, 4));
   ASSERT_EQ(12, funcs[1](3, 4));
 }
@@ -82,16 +53,47 @@ void test_function_in_mapping() {
     "add": add,
     "multiply": multiply,
   ]);
-  
+
   ASSERT_EQ(9, ops["add"](4, 5));
   ASSERT_EQ(20, ops["multiply"](4, 5));
 }
 
+void test_direct_invocation() {
+  function f1 = add;
+  function f2 = multiply;
+
+  // Direct invocation should work
+  ASSERT_EQ(8, f1(5, 3));
+  ASSERT_EQ(15, f2(5, 3));
+
+  // Should still work with evaluate()
+  ASSERT_EQ(8, evaluate(f1, 5, 3));
+  ASSERT_EQ(15, evaluate(f2, 5, 3));
+}
+
+void test_array_functions() {
+  int *nums = ({ 1, 2, 3, 4, 5 });
+  function f = double_array;
+
+  int *result = f(nums);
+  ASSERT_EQ(({ 2, 4, 6, 8, 10 }), result);
+}
+
+void test_global_variable() {
+  // Assign to global function variable
+  global_func = add;
+  ASSERT_EQ(10, global_func(6, 4));
+
+  global_func = multiply;
+  ASSERT_EQ(24, global_func(6, 4));
+}
+
 void test_passing_to_higher_order() {
   int *nums = ({ 1, 2, 3, 4, 5 });
-  
+  int *doubled;
+
   // Pass bare function name to map
-  int *doubled = map(nums, (: $(identity)($1 * 2) :));
+  doubled = map(nums, (: identity($1 * 2) :));
   ASSERT_EQ(({ 2, 4, 6, 8, 10 }), doubled);
 }
 
@@ -106,13 +108,17 @@ void test_mixed_usage() {
   // Test mixing old and new syntax
   function f1 = add;                    // new syntax
   function f2 = (: multiply :);         // old syntax
-  
+
   ASSERT_EQ(8, f1(5, 3));              // new invocation
   ASSERT_EQ(15, evaluate(f2, 5, 3));   // old invocation
-  
+
   // Both should work with both invocation styles
   ASSERT_EQ(8, evaluate(f1, 5, 3));
   ASSERT_EQ(15, f2(5, 3));
+}
+
+int helper_function(int x) {
+  return x + 2;
 }
 
 void test_forward_declaration() {
@@ -121,8 +127,8 @@ void test_forward_declaration() {
   ASSERT_EQ(42, f(40));
 }
 
-int helper_function(int x) {
-  return x + 2;
+function get_adder() {
+  return add;
 }
 
 void test_return_function() {
@@ -130,16 +136,29 @@ void test_return_function() {
   ASSERT_EQ(11, f(5, 6));
 }
 
-function get_adder() {
-  return add;
-}
-
 void test_equivalence() {
   // Verify that bare name creates same function pointer as (: name :)
   function f1 = add;
   function f2 = (: add :);
-  
+
   ASSERT_EQ(evaluate(f1, 3, 4), evaluate(f2, 3, 4));
+}
+
+void test_array() {
+  function *funcs = ({ add, multiply });
+
+  ASSERT_EQ(10, funcs[0](5, 5));
+  ASSERT_EQ(10, funcs[1](5, 2));
+}
+
+void test_mapping() {
+  mapping funcs = ([
+    "add": add,
+    "multiply": multiply,
+  ]);
+
+  ASSERT_EQ(10, funcs["add"](5, 5));
+  ASSERT_EQ(10, funcs["multiply"](5, 2));
 }
 
 void do_tests() {
