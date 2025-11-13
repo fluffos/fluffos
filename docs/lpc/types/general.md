@@ -11,6 +11,10 @@ Types can be used in four places:
     Declaring type of arguments to functions.
     Declaring type of local variables in functions.
 
+In modern FluffOS versions, local variable declarations can appear anywhere
+within a function block, not just at the beginning (C99-style). This allows
+for more flexible code organization while maintaining proper scoping rules.
+
 Normally, the type information is completely ignored, and can be
 regarded purely as documentation. The exception is that certain
 optimizations can use it, so the compiler is allowed to treat 'x + 0'
@@ -79,7 +83,6 @@ will simply check if it is the same array, mapping, etc. That has the
 very important implication that the expression `({ 1 }) == ({ 1 })` will
 evaluate to false because the array construction operator-pair,
 `({ ... })` always generates a new array.
-
 
 ## Basic types
 

@@ -206,6 +206,7 @@ int yyparse (void);
 /* The following hold information about blocks and local vars */
 %type <decl> local_declarations local_name_list block decl_block
 %type <decl> foreach_var foreach_vars first_for_expr foreach for
+%type <decl> local_declaration_statement block_statements
 
 /* This holds a flag */
 %type <number> new_arg
@@ -595,12 +596,12 @@ new_name:
 ;
 
 block:
-  '{' local_declarations statements '}'
+  '{'
+    { $<number>$ = current_number_of_locals; }  /* save local count at block entry */
+  block_statements '}'
     {
-      if ($2.node && $3) {
-        CREATE_STATEMENTS($$.node, $2.node, $3);
-      } else $$.node = ($2.node ? $2.node : $3);
-      $$.num = $2.num;
+      $$.node = $3.node;
+      $$.num = current_number_of_locals - $<number>2;  /* calculate locals declared in this block */
     }
 ;
 
@@ -733,20 +734,44 @@ local_name_list:
     }
 ;
 
-statements:
+local_declaration_statement:
+  basic_type
+    {
+      if ($1 == TYPE_VOID)
+        yyerror("Illegal to declare local variable of type void.");
+      current_type = $1;
+    }
+  local_name_list ';'
+    {
+      $$.node = $3.node;
+      $$.num = $3.num;
+    }
+;
+
+block_statements:
   /* empty */
      %empty {
-      $$ = 0;
+      $$.node = 0;
+      $$.num = 0;
     }
-  | statement statements
+  | statement block_statements
     {
-      if ($1 && $2) {
-        CREATE_STATEMENTS($$, $1, $2);
-      } else $$ = ($1 ? $1 : $2);
+      if ($1 && $2.node) {
+        CREATE_STATEMENTS($$.node, $1, $2.node);
+      } else $$.node = ($1 ? $1 : $2.node);
+      $$.num = $2.num;
     }
-  | error ';'
+  | local_declaration_statement block_statements
     {
-      $$ = 0;
+      if ($1.node && $2.node) {
+        CREATE_STATEMENTS($$.node, $1.node, $2.node);
+      } else $$.node = ($1.node ? $1.node : $2.node);
+      $$.num = $1.num + $2.num;
+    }
+  | error ';' block_statements
+    {
+      $$.node = $3.node;
+      $$.num = $3.num;
     }
 ;
 
