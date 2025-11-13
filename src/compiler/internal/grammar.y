@@ -2384,6 +2384,36 @@ expr4:
             p = strput(p, end, "'");
             yyerror(buf);
           }
+        } else if ($1->dn.function_num != -1) {
+          /* Local function - create function pointer */
+          $$ = new_node();
+          $$->kind = NODE_FUNCTION_CONSTRUCTOR;
+          $$->type = TYPE_FUNCTION;
+          $$->r.expr = 0;
+          $$->l.expr = 0;
+          $$->v.number = ($1->dn.function_num << 8) | FP_LOCAL;
+          
+          if (current_function_context)
+            current_function_context->bindable = FP_NOT_BINDABLE;
+        } else if ($1->dn.simul_num != -1) {
+          /* Simul efun - create function pointer */
+          $$ = new_node();
+          $$->kind = NODE_FUNCTION_CONSTRUCTOR;
+          $$->type = TYPE_FUNCTION;
+          $$->r.expr = 0;
+          $$->l.expr = 0;
+          $$->v.number = ($1->dn.simul_num << 8) | FP_SIMUL;
+          
+          if (current_function_context)
+            current_function_context->bindable = FP_NOT_BINDABLE;
+        } else if ($1->dn.efun_num != -1) {
+          /* Efun - create function pointer */
+          $$ = new_node();
+          $$->kind = NODE_FUNCTION_CONSTRUCTOR;
+          $$->type = TYPE_FUNCTION;
+          $$->r.expr = 0;
+          $$->l.expr = 0;
+          $$->v.number = ($1->dn.efun_num << 8) | FP_EFUN;
         } else {
           char buf[256];
           char *end = EndOf(buf);
@@ -2406,16 +2436,17 @@ expr4:
       char *end = EndOf(buf);
       char *p;
 
-      auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
-      p = strput(buf, end, "Undefined variable '");
-      p = strput(p, end, $1);
-      p = strput(p, end, "'");
-      if (current_number_of_locals < max_local_variables) {
-        add_local_name($1, TYPE_ANY);
-      }
-      CREATE_ERROR($$);
-      yyerror(buf);
-      scratch_free($1);
+      /* Treat bare identifiers as function pointers - let compiler resolve them later */
+      $$ = new_node();
+      $$->kind = NODE_FUNCTION_CONSTRUCTOR;
+      $$->type = TYPE_FUNCTION;
+      $$->r.expr = 0;
+      CREATE_STRING($$->l.expr, $1);
+      $$->v.number = FP_FUNCTIONAL;
+      
+      /* Mark as not bindable - same as (: funcname :) syntax */
+      if (current_function_context)
+        current_function_context->bindable = FP_NOT_BINDABLE;
     }
   | L_PARAMETER
     {
@@ -3127,6 +3158,7 @@ function_call:
   expr_list ')'
     {
       int f;
+      int i;
 
       context = $<number>3;
       $$ = $4;
@@ -3145,6 +3177,74 @@ function_call:
         $$->type = (SIMUL(f)->type) & ~DECL_MODS;
       } else if ((f=$1->dn.efun_num) != -1) {
         $$ = validate_efun_call(f, $4);
+      } else if ((i = $1->dn.local_num) != -1 && 
+                 (type_of_locals_ptr[i] & ~LOCAL_MODS) == TYPE_FUNCTION) {
+        /* Local variable of type function - generate evaluate() call */
+        parse_node_t *expr;
+        parse_node_t *func_node;
+        
+        type_of_locals_ptr[i] &= ~LOCAL_MOD_UNUSED;
+        
+        /* Create node to load the function variable */
+        if (type_of_locals_ptr[i] & LOCAL_MOD_REF)
+          CREATE_OPCODE_1(func_node, F_REF, TYPE_FUNCTION, i & 0xff);
+        else
+          CREATE_OPCODE_1(func_node, F_LOCAL, TYPE_FUNCTION, i & 0xff);
+        
+        /* Generate evaluate(func_var, args...) */
+        $$->kind = NODE_EFUN;
+        $$->l.number = $$->v.number + 1;
+        $$->v.number = predefs[evaluate_efun].token;
+#ifdef CAST_CALL_OTHERS
+        $$->type = TYPE_UNKNOWN;
+#else
+        $$->type = TYPE_ANY;
+#endif
+        expr = new_node_no_line();
+        expr->type = 0;
+        expr->v.expr = func_node;
+        expr->r.expr = $$->r.expr;
+        $$->r.expr = expr;
+        
+        if (current_function_context)
+          current_function_context->num_locals++;
+      } else if ((i = $1->dn.global_num) != -1 && 
+                 (VAR_TEMP(i)->type & ~DECL_MODS) == TYPE_FUNCTION) {
+        /* Global variable of type function - generate evaluate() call */
+        parse_node_t *expr;
+        parse_node_t *func_node;
+        
+        if (current_function_context)
+          current_function_context->bindable = FP_NOT_BINDABLE;
+        
+        /* Create node to load the function variable */
+        CREATE_OPCODE_1(func_node, F_GLOBAL, TYPE_FUNCTION, i);
+        
+        if (VAR_TEMP(i)->type & DECL_HIDDEN) {
+          char buf[256];
+          char *end = EndOf(buf);
+          char *p;
+
+          p = strput(buf, end, "Illegal to use private variable '");
+          p = strput(p, end, $1->name);
+          p = strput(p, end, "'");
+          yyerror(buf);
+        }
+        
+        /* Generate evaluate(func_var, args...) */
+        $$->kind = NODE_EFUN;
+        $$->l.number = $$->v.number + 1;
+        $$->v.number = predefs[evaluate_efun].token;
+#ifdef CAST_CALL_OTHERS
+        $$->type = TYPE_UNKNOWN;
+#else
+        $$->type = TYPE_ANY;
+#endif
+        expr = new_node_no_line();
+        expr->type = 0;
+        expr->v.expr = func_node;
+        expr->r.expr = $$->r.expr;
+        $$->r.expr = expr;
       } else {
         /* This here is a really nasty case that only occurs with
          * exact_types off.  The user has done something gross like:
@@ -3245,6 +3345,57 @@ function_call:
       $$ = check_refs(num_refs - $<number>2, $4, $$);
       num_refs = $<number>2;
       scratch_free(name);
+    }
+  | expr4 '[' comma_expr ']' '('
+    {
+      $<number>$ = context;
+      $<number>5 = num_refs;
+      context |= ARG_LIST;
+    }
+  expr_list ')'
+    {
+      parse_node_t *expr;
+      parse_node_t *index_expr;
+
+      context = $<number>6;
+      $$ = $7;
+
+      /* Create the indexing expression */
+      CREATE_BINARY_OP(index_expr, F_INDEX, 0, $3, $1);
+      if (exact_types) {
+        switch($1->type) {
+          case TYPE_MAPPING:
+          case TYPE_ANY:
+            index_expr->type = TYPE_ANY;
+            break;
+          default:
+            if ($1->type & TYPE_MOD_ARRAY) {
+              index_expr->type = $1->type & ~TYPE_MOD_ARRAY;
+            } else {
+              index_expr->type = TYPE_ANY;
+            }
+            break;
+        }
+      } else {
+        index_expr->type = TYPE_ANY;
+      }
+
+      /* Generate evaluate(indexed_expr, args...) */
+      $$->kind = NODE_EFUN;
+      $$->l.number = $$->v.number + 1;
+      $$->v.number = predefs[evaluate_efun].token;
+#ifdef CAST_CALL_OTHERS
+      $$->type = TYPE_UNKNOWN;
+#else
+      $$->type = TYPE_ANY;
+#endif
+      expr = new_node_no_line();
+      expr->type = 0;
+      expr->v.expr = index_expr;
+      expr->r.expr = $$->r.expr;
+      $$->r.expr = expr;
+      $$ = check_refs(num_refs - $<number>5, $7, $$);
+      num_refs = $<number>5;
     }
   | expr4 L_ARROW identifier '('
     {
