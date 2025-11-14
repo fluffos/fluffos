@@ -161,6 +161,24 @@ void test_mapping() {
   ASSERT_EQ(10, funcs["multiply"](5, 2));
 }
 
+#define FP_OWNER_DESTED 0x20
+#define FIRST_CLASS_FP_VALUE "I'm a first class function!\n"
+#define FIRST_CLASS_STRING_VALUE "I'm a first class string!\n"
+
+private mixed accept_mixed_function(mixed arg) {
+  int fp = functionp(arg);
+
+  if (fp && !(fp & FP_OWNER_DESTED))
+    arg = arg();
+
+  return arg;
+}
+
+void test_shadowing() {
+  ASSERT_EQ(FIRST_CLASS_FP_VALUE, accept_mixed_function((: FIRST_CLASS_FP_VALUE :)));
+  ASSERT_EQ(FIRST_CLASS_STRING_VALUE, accept_mixed_function(FIRST_CLASS_STRING_VALUE));
+}
+
 void do_tests() {
   test_basic_assignment();
   test_direct_invocation();
@@ -174,4 +192,5 @@ void do_tests() {
   test_forward_declaration();
   test_return_function();
   test_equivalence();
+  test_shadowing();
 }
