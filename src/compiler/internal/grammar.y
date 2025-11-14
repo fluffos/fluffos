@@ -3178,18 +3178,21 @@ function_call:
       } else if ((f=$1->dn.efun_num) != -1) {
         $$ = validate_efun_call(f, $4);
       } else if ((i = $1->dn.local_num) != -1 && 
-                 (type_of_locals_ptr[i] & ~LOCAL_MODS) == TYPE_FUNCTION) {
-        /* Local variable of type function - generate evaluate() call */
+                 ((type_of_locals_ptr[i] & ~LOCAL_MODS) == TYPE_FUNCTION ||
+                  (type_of_locals_ptr[i] & ~LOCAL_MODS) == TYPE_ANY ||
+                  (type_of_locals_ptr[i] & ~LOCAL_MODS) == TYPE_UNKNOWN)) {
+        /* Local variable that may hold a function pointer - generate evaluate() call */
         parse_node_t *expr;
         parse_node_t *func_node;
+        int local_type = type_of_locals_ptr[i] & ~LOCAL_MODS;
         
         type_of_locals_ptr[i] &= ~LOCAL_MOD_UNUSED;
         
         /* Create node to load the function variable */
         if (type_of_locals_ptr[i] & LOCAL_MOD_REF)
-          CREATE_OPCODE_1(func_node, F_REF, TYPE_FUNCTION, i & 0xff);
+          CREATE_OPCODE_1(func_node, F_REF, local_type, i & 0xff);
         else
-          CREATE_OPCODE_1(func_node, F_LOCAL, TYPE_FUNCTION, i & 0xff);
+          CREATE_OPCODE_1(func_node, F_LOCAL, local_type, i & 0xff);
         
         /* Generate evaluate(func_var, args...) */
         $$->kind = NODE_EFUN;
@@ -3209,16 +3212,19 @@ function_call:
         if (current_function_context)
           current_function_context->num_locals++;
       } else if ((i = $1->dn.global_num) != -1 && 
-                 (VAR_TEMP(i)->type & ~DECL_MODS) == TYPE_FUNCTION) {
-        /* Global variable of type function - generate evaluate() call */
+                 ((VAR_TEMP(i)->type & ~DECL_MODS) == TYPE_FUNCTION ||
+                  (VAR_TEMP(i)->type & ~DECL_MODS) == TYPE_ANY ||
+                  (VAR_TEMP(i)->type & ~DECL_MODS) == TYPE_UNKNOWN)) {
+        /* Global variable that may hold a function pointer - generate evaluate() call */
         parse_node_t *expr;
         parse_node_t *func_node;
+        int global_type = VAR_TEMP(i)->type & ~DECL_MODS;
         
         if (current_function_context)
           current_function_context->bindable = FP_NOT_BINDABLE;
         
         /* Create node to load the function variable */
-        CREATE_OPCODE_1(func_node, F_GLOBAL, TYPE_FUNCTION, i);
+        CREATE_OPCODE_1(func_node, F_GLOBAL, global_type, i);
         
         if (VAR_TEMP(i)->type & DECL_HIDDEN) {
           char buf[256];
