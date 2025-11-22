@@ -41,6 +41,7 @@ Controls whether the TLS/SSL peer certificate should be verified.
 - **Use Case**: Client connections to TLS servers
 
 When enabled, the driver will verify that the server's certificate:
+
 - Is signed by a trusted Certificate Authority
 - Is not expired
 - Matches the hostname being connected to
@@ -60,6 +61,29 @@ SNI allows the server to present the correct SSL certificate when multiple
 domains are hosted on the same IP address. This is essential for modern
 HTTPS and TLS connections.
 
+#### SO_TLS_CERT (3)
+
+Sets the path to the TLS certificate file for server-side TLS sockets.
+
+- **Type**: string
+- **Value**: Path to a PEM-formatted certificate file
+- **Use Case**: Server sockets that accept TLS connections
+
+This option is required for TLS server sockets before calling socket_listen().
+The certificate file must be in PEM format and readable by the driver.
+
+#### SO_TLS_KEY (4)
+
+Sets the path to the TLS private key file for server-side TLS sockets.
+
+- **Type**: string
+- **Value**: Path to a PEM-formatted private key file
+- **Use Case**: Server sockets that accept TLS connections
+
+This option is required for TLS server sockets before calling socket_listen().
+The private key file must be in PEM format, match the certificate, and be
+readable by the driver.
+
 ### ERRORS
 
 - Generates an error if the socket descriptor is invalid
@@ -69,6 +93,7 @@ HTTPS and TLS connections.
 ### EXAMPLES
 
 **Basic TLS client connection with verification:**
+
 ```c
 void connect_to_server() {
     int sock;
@@ -88,6 +113,7 @@ void connect_to_server() {
 ```
 
 **Testing/development with self-signed certificates:**
+
 ```c
 void connect_to_dev_server() {
     int sock;
@@ -104,6 +130,7 @@ void connect_to_dev_server() {
 ```
 
 **HTTPS API client:**
+
 ```c
 void fetch_api_data() {
     int sock;
@@ -126,6 +153,37 @@ void api_connected(int sock) {
 }
 ```
 
+**TLS server accepting HTTPS connections:**
+
+```c
+void create_https_server() {
+    int sock;
+
+    // Create a TLS server socket
+    sock = socket_create(STREAM_TLS, "read_callback", "close_callback");
+
+    // Set certificate and key for server-side TLS
+    socket_set_option(sock, SO_TLS_CERT, "/secure/certs/server.crt");
+    socket_set_option(sock, SO_TLS_KEY, "/secure/certs/server.key");
+
+    // Bind to port
+    socket_bind(sock, 8443);
+
+    // Start listening for TLS connections
+    socket_listen(sock, "listen_callback");
+}
+
+void listen_callback(int listen_sock) {
+    // Accept the TLS connection (SSL handshake happens automatically)
+    int client_sock = socket_accept(listen_sock, "client_read", "client_write");
+}
+
+void client_read(int sock, string data) {
+    // Data is automatically decrypted
+    write("Received encrypted data: " + data);
+}
+```
+
 ### SEE ALSO
 
 - [socket_get_option](socket_get_option.md) - Get socket options
@@ -137,13 +195,17 @@ void api_connected(int sock) {
 
 **Option Constants:**
 The option constants should be defined in your mudlib include files:
+
 ```c
 #define SO_TLS_VERIFY_PEER    1
 #define SO_TLS_SNI_HOSTNAME   2
+#define SO_TLS_CERT           3
+#define SO_TLS_KEY            4
 ```
 
 **TLS Socket Modes:**
 These options only apply to sockets created with TLS modes:
+
 - `STREAM_TLS` - TLS socket mode
 - `STREAM_TLS_BINARY` - TLS binary mode
 
