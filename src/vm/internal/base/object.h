@@ -74,8 +74,6 @@ struct object_t {
   unsigned int extra_ref; /* Used to check ref count. */
 #endif
   const char *obname;
-  struct object_t *next_hash;
-  struct object_t *next_ch_hash;
   /* the fields above must match lpc_object_t */
   int64_t load_time; /* time when this object was created */
 #ifndef NO_RESET
