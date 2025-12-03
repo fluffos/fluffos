@@ -474,6 +474,11 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
     set_write_callback(i, nullptr);
     set_close_callback(i, close_callback);
 
+    // Initialize socket options
+    for (int j = 0; j < NUM_SOCKET_OPTIONS; j++) {
+      lpc_socks[i].options[j] = const0u;
+    }
+
     if (binary) {
       lpc_socks[i].flags |= S_BINARY;
     }
