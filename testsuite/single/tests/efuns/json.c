@@ -5,6 +5,7 @@
  */
 
 void do_tests() {
+#ifdef __PACKAGE_JSON__
   string content = "";
 
   // Basic types - json_parse
@@ -45,11 +46,12 @@ void do_tests() {
 
   // Pretty printing (with indent parameter)
   string pretty = json_stringify(({1, 2, 3}), 2);
-  ASSERT(strsrch(pretty, "\n") != -1, "Pretty print has newlines");
+  ASSERT(strsrch(pretty, "\n") != -1);
 
   // Test with actual file content
   content = read_file("/single/tests/std/test.json");
   if(content) {
     ASSERT(json_stringify(json_parse(content)));
   }
+#endif // __PACKAGE_JSON__
 }
