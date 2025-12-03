@@ -32,16 +32,21 @@ public string get_last_error() {
 
 void flag(string str) {
   mixed error;
-  switch (str) {
+  string cmd, arg;
+
+  if(sscanf(str, "%(test|speed):%s", cmd, arg) != 2)
+    cmd = str;
+
+  switch (cmd) {
     case "test":
-      error = catch("/command/tests"->main());
+      error = catch("/command/tests"->main(arg));
       if(error) {
         has_error = 1;
         write(error);
       }
       break;
     case "speed":
-      error = catch("/command/speed"->main());
+      error = catch("/command/speed"->main(arg));
       if(error) {
         has_error = 1;
         write(error);
@@ -49,7 +54,7 @@ void flag(string str) {
       shutdown(0);
       break;
     default:
-      write("The only supproted flag is 'test' and 'speed', got '" + str + "'.\n");
+      write("The only supported flag is 'test' and 'speed', got '" + str + "'.\n");
       break;
   }
   if (has_error) { shutdown(-1); }

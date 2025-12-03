@@ -48,7 +48,7 @@ void recurse(string dir) {
     }
   }
 }
-int execute(string fun)
+int execute(string fun, int single_test: (: 0 :))
 {
   string leaks;
   object tp = this_player();
@@ -80,12 +80,21 @@ int execute(string fun)
     error("MASTER valid inherit functions are not being called!");
   }
 
+  if(single_test) {
+    write("Checks succeeded.\n");
+    // ordinarily doing a full suite test will eventually hit the shutdown
+    // test and shut it down after a certain delay. but not if we're only doing
+    // one file.
+    "single/tests/efuns/shutdown"->do_the_nasty_deed(); // 🤨
+    return 1;
+  }
+
   return 1;
 }
 
-int main() {
+int main(string file) {
 #if !(defined(__DEBUGMALLOC__) && defined(__DEBUGMALLOC_EXTENSIONS__) && defined(__PACKAGE_DEVELOP__))
   write("WARNING: Possible RELEASE build, check_memory() is not being executed.\n");
 #endif
-  return execute("");
+  return execute(file || "", stringp(file) && strlen(file) > 0);
 }
