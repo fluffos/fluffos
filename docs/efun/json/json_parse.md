@@ -19,7 +19,7 @@ title: json / json_parse
     performance than the pure LPC json_decode() sefun.
 
     **NOTE:** This efun requires the JSON package to be enabled at compile time.
-    Enable it with `-DPACKAGE_JSON=ON` in your CMake configuration or local_options.
+    Enable it with `-DPACKAGE_JSON=ON` in your CMake configuration.
 
     JSON types are converted to LPC types as follows:
     - JSON numbers → LPC int or real (based on format)

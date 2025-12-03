@@ -21,7 +21,7 @@ title: json / json_stringify
     built-in pretty-printing.
 
     **NOTE:** This efun requires the JSON package to be enabled at compile time.
-    Enable it with `-DPACKAGE_JSON=ON` in your CMake configuration or local_options.
+    Enable it with `-DPACKAGE_JSON=ON` in your CMake configuration.
 
     LPC types are converted to JSON types as follows:
     - LPC numbers (non-boolean) → JSON numbers
