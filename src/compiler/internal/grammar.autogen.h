@@ -117,7 +117,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 129 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 131 "/projects/git/fluffos/src/compiler/internal/grammar.y"
 
   LPC_INT number; /* 8 */
   LPC_FLOAT real; /* 8 */
@@ -138,7 +138,7 @@ union YYSTYPE
     uint16_t save_exact_types;
   } func_block; /* 8 */
 
-#line 141 "/projects/git/fluffos/build/src/grammar.autogen.h"
+#line 142 "/projects/git/fluffos/build/src/grammar.autogen.h"
 
 };
 typedef union YYSTYPE YYSTYPE;
