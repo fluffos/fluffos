@@ -1,0 +1,321 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v3.5.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  # Common build configuration
+  CMAKE_BUILD_TYPE: Release
+  CMAKE_COMMON_FLAGS: -DCMAKE_BUILD_TYPE=Release -DMARCH_NATIVE=OFF
+  CTEST_OUTPUT_ON_FAILURE: 1
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      release_id: ${{ steps.create_release.outputs.id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create Git Tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a ${{ inputs.version }} -m "Release ${{ inputs.version }}"
+          git push origin ${{ inputs.version }}
+
+      - name: Create Release
+        id: create_release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const release = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: '${{ inputs.version }}',
+              name: 'FluffOS ${{ inputs.version }}',
+              generate_release_notes: true,
+              prerelease: ${{ inputs.prerelease }},
+              draft: false
+            });
+            core.setOutput('upload_url', release.data.upload_url);
+            core.setOutput('id', release.data.id);
+            return release.data.id;
+
+  build-binaries:
+    name: Build ${{ matrix.platform }} Binary
+    needs: create-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            os: windows-latest
+            shell: msys2 {0}
+            asset_name: fluffos-${{ inputs.version }}-windows-x86_64.zip
+            asset_type: application/zip
+          - platform: linux
+            os: ubuntu-latest
+            shell: bash
+            asset_name: fluffos-${{ inputs.version }}-linux-x86_64-static.tar.gz
+            asset_type: application/gzip
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    steps:
+      - name: Setup MSYS2 (Windows)
+        if: matrix.platform == 'windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.version }}
+
+      - name: Install Dependencies (Windows)
+        if: matrix.platform == 'windows'
+        run: |
+          pacman --noconfirm -S --needed \
+            mingw-w64-x86_64-{toolchain,cmake,zlib,pcre,icu,sqlite3,jemalloc,gtest} \
+            bison make zip
+
+      - name: Build (Windows)
+        if: matrix.platform == 'windows'
+        run: |
+          mkdir build && cd build
+          cmake -G "MSYS Makefiles" \
+            ${{ env.CMAKE_COMMON_FLAGS }} \
+            -DPACKAGE_CRYPTO=OFF \
+            -DPACKAGE_DB_MYSQL="" \
+            -DPACKAGE_DB_SQLITE=1 \
+            ..
+          VERBOSE=1 make -j 2 install
+
+      - name: Build (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          docker run --rm -v $PWD:/workspace -w /workspace alpine:3.18 /bin/sh -c '
+            set -e
+
+            # Install dependencies
+            apk add --no-progress --no-cache \
+              linux-headers gcc g++ clang-dev make cmake bash \
+              mariadb-dev mariadb-static postgresql-dev sqlite-dev sqlite-static \
+              openssl-dev openssl-libs-static zlib-dev zlib-static icu-dev icu-static \
+              pcre-dev bison git musl-dev libelf-static elfutils-dev \
+              zstd-static bzip2-static xz-static tar
+
+            # Build jemalloc
+            cd /tmp
+            wget -q -O - https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2 | tar -xj
+            cd jemalloc-5.3.0
+            ./configure --prefix=/usr && make -j$(nproc) && make install
+
+            # Build FluffOS
+            cd /workspace
+            mkdir -p build && cd build
+            cmake .. ${{ env.CMAKE_COMMON_FLAGS }} -DSTATIC=ON
+            make -j$(nproc) install
+
+            # Verify static linking
+            ldd bin/driver || echo "✓ Binary is statically linked"
+          '
+
+      - name: Run Tests
+        run: cd build && make test
+
+      - name: Package (Windows)
+        if: matrix.platform == 'windows'
+        run: cd build/bin && zip -r ../../${{ matrix.asset_name }} .
+
+      - name: Package (Linux)
+        if: matrix.platform == 'linux'
+        run: cd build/bin && tar czf ../../${{ matrix.asset_name }} .
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./${{ matrix.asset_name }}
+          asset_name: ${{ matrix.asset_name }}
+          asset_content_type: ${{ matrix.asset_type }}
+
+  build-docker:
+    name: Build and Push Docker Image
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.version }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log into registry ${{ env.REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ inputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.version }}
+            type=semver,pattern={{major}},value=${{ inputs.version }}
+            type=raw,value=latest,enable=${{ !inputs.prerelease }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  finalize-release:
+    name: Finalize Release
+    needs: [create-release, build-binaries, build-docker]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.version }}
+
+      - name: Generate Release Documentation
+        id: docs
+        run: |
+          cat > release-notes.md << 'EOF'
+          ## Release Assets
+
+          This release includes the following pre-built distributions:
+
+          ### Binary Distributions
+          - **Windows x86_64**: `fluffos-${{ inputs.version }}-windows-x86_64.zip`
+            - Built with MSYS2/MinGW64
+            - Complete distribution with all tools and libraries
+            - SQLite support enabled
+
+          - **Linux x86_64 (Static)**: `fluffos-${{ inputs.version }}-linux-x86_64-static.tar.gz`
+            - Statically linked binaries (no external dependencies)
+            - Built on Alpine Linux
+            - Complete distribution with all tools and libraries
+            - Portable across most Linux distributions
+
+          ### What's Included
+          Each distribution contains:
+          - **driver** - Main FluffOS driver executable
+          - **lpcc** - LPC compiler
+          - **symbol** - Symbol table utility
+          - **o2json/json2o** - Object file converters
+          - **portbind** - Port binding helper (Linux only)
+          - **std/** - LPC standard library
+          - **include/** - LPC header files
+          - **www/** - WebSocket client files
+          - **keywords.json** - Language keywords database
+
+          ### Docker Images
+          Docker images are available at `ghcr.io/${{ github.repository }}`:
+          - `${{ inputs.version }}` - This release version
+          ${{ !inputs.prerelease && '- `latest` - Latest stable release' || '' }}
+
+          Pull with:
+          ```bash
+          docker pull ghcr.io/${{ github.repository }}:${{ inputs.version }}
+          ```
+
+          ## Installation
+
+          ### Windows
+          ```bash
+          # Extract distribution
+          unzip fluffos-${{ inputs.version }}-windows-x86_64.zip -d fluffos
+          cd fluffos
+
+          # Run driver with your config
+          ./driver.exe /path/to/mudlib/config.cfg
+          ```
+
+          ### Linux
+          ```bash
+          # Extract distribution
+          mkdir fluffos && cd fluffos
+          tar xzf ../fluffos-${{ inputs.version }}-linux-x86_64-static.tar.gz
+
+          # Run driver with your config
+          ./driver /path/to/mudlib/config.cfg
+          ```
+
+          ### Docker
+          ```bash
+          docker run -v /path/to/mudlib:/mudlib ghcr.io/${{ github.repository }}:${{ inputs.version }} /mudlib/config.cfg
+          ```
+
+          ---
+          EOF
+
+          echo "RELEASE_NOTES<<EOF" >> $GITHUB_OUTPUT
+          cat release-notes.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Update Release Notes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const release = await github.rest.repos.getRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: ${{ needs.create-release.outputs.release_id }}
+            });
+
+            const additionalNotes = fs.readFileSync('release-notes.md', 'utf8');
+
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: ${{ needs.create-release.outputs.release_id }},
+              body: release.data.body + '\n\n' + additionalNotes
+            });
+
+      - name: Release Summary
+        run: |
+          cat << EOF
+          ✅ Release ${{ inputs.version }} created successfully!
+          📦 Windows binary: fluffos-${{ inputs.version }}-windows-x86_64.zip
+          📦 Linux static binary: fluffos-${{ inputs.version }}-linux-x86_64-static.tar.gz
+          🐳 Docker image: ghcr.io/${{ github.repository }}:${{ inputs.version }}
+          🔗 View release: https://github.com/${{ github.repository }}/releases/tag/${{ inputs.version }}
+          EOF

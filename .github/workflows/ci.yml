@@ -1,43 +1,168 @@
-name: CI on ubuntu
+name: CI
 
 on:
   push:
-    branches:
-      - master
-    paths-ignore:
-      - 'docs/**'
+    branches: [master]
+    paths-ignore: ['docs/**']
   pull_request:
-    branches:
-      - master
-    paths-ignore:
-      - 'docs/**'
+    branches: [master]
+    paths-ignore: ['docs/**']
+
+env:
+  CTEST_OUTPUT_ON_FAILURE: 1
+  VERBOSE: 1
+  # Common build types across all platforms
+  BUILD_TYPES: '["Debug", "RelWithDebInfo"]'
+
 jobs:
-  build:
+  build-and-test:
+    name: ${{ matrix.platform }} (${{ matrix.compiler || 'default' }}${{ matrix.sanitizer && '+sanitizer' || '' }}, ${{ matrix.build }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        compiler:
-          - CC: "gcc"
-            CXX: "g++"
-          - CC: "clang"
-            CXX: "clang++"
-        build: ["Debug", "RelWithDebInfo"]
-        os: ["ubuntu-22.04"]
+        include:
+          # Ubuntu - GCC
+          - platform: Ubuntu
+            os: ubuntu-24.04
+            compiler: gcc
+            cc: gcc
+            cxx: g++
+            build: Debug
+            packages: build-essential autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
+          - platform: Ubuntu
+            os: ubuntu-24.04
+            compiler: gcc
+            cc: gcc
+            cxx: g++
+            build: RelWithDebInfo
+            packages: build-essential autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
 
-    runs-on: ${{ matrix.os }}
+          # Ubuntu - Clang
+          - platform: Ubuntu
+            os: ubuntu-24.04
+            compiler: clang
+            cc: clang
+            cxx: clang++
+            build: Debug
+            packages: build-essential autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
+          - platform: Ubuntu
+            os: ubuntu-24.04
+            compiler: clang
+            cc: clang
+            cxx: clang++
+            build: RelWithDebInfo
+            packages: build-essential autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
+
+          # Ubuntu - Clang with Sanitizer
+          - platform: Ubuntu
+            os: ubuntu-24.04
+            compiler: clang
+            cc: clang
+            cxx: clang++
+            build: Debug
+            sanitizer: true
+            cmake_flags: -DENABLE_SANITIZER=ON
+            packages: build-essential autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev libdw-dev libbz2-dev
+          - platform: Ubuntu
+            os: ubuntu-24.04
+            compiler: clang
+            cc: clang
+            cxx: clang++
+            build: RelWithDebInfo
+            sanitizer: true
+            cmake_flags: -DENABLE_SANITIZER=ON
+            packages: build-essential autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev libdw-dev libbz2-dev
+
+          # macOS
+          - platform: macOS
+            os: macos-14
+            build: Debug
+            packages: cmake pkg-config pcre libgcrypt openssl jemalloc icu4c mysql sqlite3 googletest
+            openssl_root: /usr/local/opt/openssl
+            icu_root: /opt/homebrew/opt/icu4c
+          - platform: macOS
+            os: macos-14
+            build: RelWithDebInfo
+            packages: cmake pkg-config pcre libgcrypt openssl jemalloc icu4c mysql sqlite3 googletest
+            openssl_root: /usr/local/opt/openssl
+            icu_root: /opt/homebrew/opt/icu4c
+
+          # Windows
+          - platform: Windows
+            os: windows-latest
+            shell: msys2 {0}
+            build: Debug
+            cmake_generator: MSYS Makefiles
+            cmake_flags: -DMARCH_NATIVE=OFF -DPACKAGE_CRYPTO=OFF -DPACKAGE_DB_MYSQL="" -DPACKAGE_DB_SQLITE=1
+            packages: mingw-w64-x86_64-{toolchain,cmake,zlib,pcre,icu,sqlite3,jemalloc,gtest} bison make
+          - platform: Windows
+            os: windows-latest
+            shell: msys2 {0}
+            build: RelWithDebInfo
+            cmake_generator: MSYS Makefiles
+            cmake_flags: -DMARCH_NATIVE=OFF -DPACKAGE_CRYPTO=OFF -DPACKAGE_DB_MYSQL="" -DPACKAGE_DB_SQLITE=1
+            packages: mingw-w64-x86_64-{toolchain,cmake,zlib,pcre,icu,sqlite3,jemalloc,gtest} bison make
+
+    defaults:
+      run:
+        shell: ${{ matrix.shell || 'bash' }}
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Install packages
-      run: |
-        sudo apt update
-        sudo apt install -y build-essential autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
-    - name: compile
-      env: ${{ matrix.compiler }}
-      run: mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DPACKAGE_DB_SQLITE=2 .. && VERBOSE=1 make -j 2 install && cd ..
-    - name: run tests
-      env:
-        CTEST_OUTPUT_ON_FAILURE: 1
-      run: cd build && make test
-    - name: testsuite
-      run: cd testsuite && ../build/bin/driver etc/config.test -ftest
+      - name: Setup MSYS2 (Windows)
+        if: matrix.platform == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies (Ubuntu)
+        if: matrix.platform == 'Ubuntu'
+        run: |
+          sudo apt update
+          sudo apt install -y ${{ matrix.packages }}
+
+      - name: Install Dependencies (macOS)
+        if: matrix.platform == 'macOS'
+        env:
+          HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
+        run: brew install ${{ matrix.packages }}
+
+      - name: Install Dependencies (Windows)
+        if: matrix.platform == 'Windows'
+        run: pacman --noconfirm -S --needed ${{ matrix.packages }}
+
+      - name: Configure
+        run: |
+          mkdir build && cd build
+          if [ "${{ matrix.platform }}" = "Windows" ]; then
+            cmake -G "${{ matrix.cmake_generator }}" \
+              -DCMAKE_BUILD_TYPE=${{ matrix.build }} \
+              ${{ matrix.cmake_flags }} \
+              -DPACKAGE_DB_SQLITE=2 \
+              ..
+          else
+            cmake -DCMAKE_BUILD_TYPE=${{ matrix.build }} \
+              ${{ matrix.cmake_flags }} \
+              -DPACKAGE_DB_SQLITE=2 \
+              ..
+          fi
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+          OPENSSL_ROOT_DIR: ${{ matrix.openssl_root }}
+          ICU_ROOT: ${{ matrix.icu_root }}
+
+      - name: Build
+        run: cd build && make -j 2 install
+        env:
+          OPENSSL_ROOT_DIR: ${{ matrix.openssl_root }}
+          ICU_ROOT: ${{ matrix.icu_root }}
+
+      - name: Run Unit Tests
+        run: cd build && make test
+
+      - name: Run LPC Testsuite
+        run: cd testsuite && ../build/bin/driver etc/config.test -ftest
