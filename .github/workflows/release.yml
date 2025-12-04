@@ -21,12 +21,14 @@ env:
   CMAKE_COMMON_FLAGS: -DCMAKE_BUILD_TYPE=Release -DMARCH_NATIVE=OFF
   CTEST_OUTPUT_ON_FAILURE: 1
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   create-release:
     name: Create Release
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
       release_id: ${{ steps.create_release.outputs.id }}
@@ -166,9 +168,6 @@ jobs:
     name: Build and Push Docker Image
     needs: create-release
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -210,8 +209,6 @@ jobs:
     name: Finalize Release
     needs: [create-release, build-binaries, build-docker]
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
