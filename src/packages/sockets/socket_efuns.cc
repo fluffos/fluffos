@@ -38,6 +38,9 @@ struct lpc_socket_event_data {
   int idx;
 };
 
+// forward declaration for callback helper used later
+static void call_callback(int fd, int what, int num_arg);
+
 namespace {
 
 /* flags for socket_close */
@@ -102,9 +105,11 @@ void handle_tls_handshake(int fd) {
   auto ret = SSL_connect(lpc_socks[fd].ssl);
   if (ret == 1) {
     lpc_socks[fd].state = STATE_DATA_XFER;
-    lpc_socks[fd].flags &= ~S_BLOCKED;
+    lpc_socks[fd].flags |= S_BLOCKED;
     debug(sockets, ("handle_tls_handshake: TLS: handshake successful\n"));
     event_add(lpc_socks[fd].ev_write, nullptr);
+    // Drive the write handler once to clear S_BLOCKED and fire the write callback.
+    socket_write_select_handler(fd);
     return;
   }
   auto err = SSL_get_error(lpc_socks[fd].ssl, ret);
@@ -127,9 +132,11 @@ void handle_tls_server_handshake(int fd) {
   auto ret = SSL_accept(lpc_socks[fd].ssl);
   if (ret == 1) {
     lpc_socks[fd].state = STATE_DATA_XFER;
-    lpc_socks[fd].flags &= ~S_BLOCKED;
+    lpc_socks[fd].flags |= S_BLOCKED;
     debug(sockets, ("handle_tls_server_handshake: TLS: handshake successful\n"));
     event_add(lpc_socks[fd].ev_write, nullptr);
+    // Drive the write handler once to clear S_BLOCKED and fire the write callback.
+    socket_write_select_handler(fd);
     return;
   }
   auto err = SSL_get_error(lpc_socks[fd].ssl, ret);
