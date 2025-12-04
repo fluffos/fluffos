@@ -11,6 +11,7 @@ FluffOS is an LPMUD driver based on the last release of MudOS (v22.2b14) with 10
 ### Core Components
 
 **Driver Layer** (`src/`)
+
 - `main.cc` - Entry point for the driver executable
 - `backend.cc` - Main game loop and event handling
 - `comm.cc` - Network communication layer
@@ -19,6 +20,7 @@ FluffOS is an LPMUD driver based on the last release of MudOS (v22.2b14) with 10
 - `ofile.cc` - Object file handling
 
 **VM Layer** (`src/vm/`)
+
 - `vm.cc` - Virtual machine initialization and management
 - `interpret.cc` - LPC bytecode interpreter
 - `simulate.cc` - Simulation engine for object lifecycle
@@ -26,17 +28,20 @@ FluffOS is an LPMUD driver based on the last release of MudOS (v22.2b14) with 10
 - `simul_efun.cc` - Simulated external functions
 
 **Compiler Layer** (`src/compiler/`)
+
 - `compiler.cc` - LPC-to-bytecode compiler
 - `grammar.y` - Grammar definition (Bison)
 - `lex.cc` - Lexical analyzer
 - `generate.cc` - Code generation
 
 **Packages** (`src/packages/`)
+
 - Modular functionality organized by feature (async, db, crypto, etc.)
 - Each package has `.spec` files defining available functions
 - Core packages: core, crypto, db, math, parser, sockets, etc.
 
 **Networking** (`src/net/`)
+
 - `telnet.cc` - Telnet protocol implementation
 - `websocket.cc` - WebSocket support for web clients
 - `tls.cc` - SSL/TLS encryption support
@@ -45,6 +50,7 @@ FluffOS is an LPMUD driver based on the last release of MudOS (v22.2b14) with 10
 ### Build System
 
 **CMake Configuration** (`CMakeLists.txt`, `src/CMakeLists.txt`)
+
 - CMake 3.22+ required
 - C++17 and C11 standards
 - Jemalloc for memory management (recommended)
@@ -52,6 +58,7 @@ FluffOS is an LPMUD driver based on the last release of MudOS (v22.2b14) with 10
 - OpenSSL for crypto features
 
 **Build Options** (key flags)
+
 - `MARCH_NATIVE=ON` (default) - Optimize for current CPU
 - `STATIC=ON/OFF` - Static vs dynamic linking
 - `USE_JEMALLOC=ON` - Use jemalloc memory allocator
@@ -61,6 +68,7 @@ FluffOS is an LPMUD driver based on the last release of MudOS (v22.2b14) with 10
 ## Build Commands
 
 ### Development Build
+
 ```bash
 # Standard development build
 mkdir build && cd build
@@ -72,6 +80,7 @@ cmake .. -DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZER=ON
 ```
 
 ### Production Build
+
 ```bash
 # Production-ready static build
 cmake .. -DCMAKE_BUILD_TYPE=Release -DSTATIC=ON -DMARCH_NATIVE=OFF
@@ -79,6 +88,7 @@ make install
 ```
 
 ### Package-Specific Builds
+
 ```bash
 # Build without database support
 cmake .. -DPACKAGE_DB=OFF
@@ -90,6 +100,7 @@ cmake .. -DPACKAGE_CRYPTO=OFF -DPACKAGE_COMPRESS=OFF
 ## Testing
 
 ### Unit Tests
+
 ```bash
 # Run all tests (requires GTest)
 cd build
@@ -101,6 +112,7 @@ make test
 ```
 
 ### LPC Tests
+
 ```bash
 # Run LPC test suite
 cd testsuite
@@ -108,6 +120,7 @@ cd testsuite
 ```
 
 ### Integration Testing
+
 ```bash
 # Run driver with test configuration
 ./build/bin/driver testsuite/etc/config.test
@@ -120,6 +133,7 @@ FluffOS uses GitHub Actions for comprehensive CI/CD across multiple platforms an
 ### CI Matrix
 
 **Ubuntu CI** (`.github/workflows/ci.yml`)
+
 - **Compilers**: GCC and Clang
 - **Build Types**: Debug and RelWithDebInfo
 - **Platform**: ubuntu-22.04
@@ -127,6 +141,7 @@ FluffOS uses GitHub Actions for comprehensive CI/CD across multiple platforms an
 - **Steps**: Install dependencies → CMake configure → Build → Unit tests → LPC testsuite
 
 **macOS CI** (`.github/workflows/ci-osx.yml`)
+
 - **Build Types**: Debug and RelWithDebInfo
 - **Platform**: macos-14 (Apple Silicon)
 - **Environment Variables**:
@@ -135,6 +150,7 @@ FluffOS uses GitHub Actions for comprehensive CI/CD across multiple platforms an
 - **Dependencies**: cmake, pkg-config, pcre, libgcrypt, openssl, jemalloc, icu4c, mysql, sqlite3, googletest
 
 **Windows CI** (`.github/workflows/ci-windows.yml`)
+
 - **Build Types**: Debug and RelWithDebInfo
 - **Platform**: windows-latest with MSYS2/MINGW64
 - **Build Options**:
@@ -145,6 +161,7 @@ FluffOS uses GitHub Actions for comprehensive CI/CD across multiple platforms an
 - **Dependencies**: mingw-w64 toolchain, cmake, zlib, pcre, icu, sqlite3, jemalloc, gtest
 
 **Sanitizer CI** (`.github/workflows/ci-sanitizer.yml`)
+
 - **Purpose**: Memory safety and bug detection
 - **Compiler**: Clang only
 - **Build Types**: Debug and RelWithDebInfo
@@ -152,16 +169,19 @@ FluffOS uses GitHub Actions for comprehensive CI/CD across multiple platforms an
 - **Additional Dependencies**: libdw-dev, libbz2-dev
 
 **Docker CI** (`.github/workflows/docker-publish.yml`)
+
 - **Base Image**: Alpine 3.18
 - **Build Configuration**: Static linking with `-DSTATIC=ON -DMARCH_NATIVE=OFF`
 - **Registry**: GitHub Container Registry (ghcr.io)
 - **Triggers**: Push to master, version tags (v*.*), pull requests
 
 **Code Quality CI**
+
 - **CodeQL Analysis** (`.github/workflows/codeql-analysis.yml`): Security vulnerability detection
 - **Coverity Scan** (`.github/workflows/coverity-scan.yml`): Static analysis (weekly schedule + push)
 
 **Documentation CI** (`.github/workflows/gh-pages.yml`)
+
 - **Framework**: VitePress
 - **Build**: Node.js 20 with npm
 - **Deploy**: GitHub Pages
@@ -170,6 +190,7 @@ FluffOS uses GitHub Actions for comprehensive CI/CD across multiple platforms an
 ### Running CI-Equivalent Builds Locally
 
 **Ubuntu Debug Build (GCC)**
+
 ```bash
 export CC=gcc CXX=g++
 mkdir build && cd build
@@ -180,6 +201,7 @@ cd ../testsuite && ../build/bin/driver etc/config.test -ftest
 ```
 
 **Ubuntu with Sanitizer (Clang)**
+
 ```bash
 export CC=clang CXX=clang++
 mkdir build && cd build
@@ -189,6 +211,7 @@ make test
 ```
 
 **macOS Build**
+
 ```bash
 mkdir build && cd build
 OPENSSL_ROOT_DIR="/usr/local/opt/openssl" ICU_ROOT="/opt/homebrew/opt/icu4c" \
@@ -198,6 +221,7 @@ make test
 ```
 
 **Windows Build (MSYS2/MINGW64)**
+
 ```bash
 mkdir build && cd build
 cmake -G "MSYS Makefiles" -DCMAKE_BUILD_TYPE=Debug \
@@ -207,6 +231,7 @@ make -j$(nproc) install
 ```
 
 **Docker Build (Static)**
+
 ```bash
 docker build -t fluffos:local .
 # Or build manually in Alpine container
@@ -218,6 +243,7 @@ ldd bin/driver  # Should show "not a dynamic executable"
 ### CI Dependencies by Platform
 
 **Ubuntu/Debian**
+
 ```bash
 sudo apt update
 sudo apt install -y build-essential autoconf automake bison expect \
@@ -227,12 +253,14 @@ sudo apt install -y build-essential autoconf automake bison expect \
 ```
 
 **macOS (Homebrew)**
+
 ```bash
 brew install cmake pkg-config pcre libgcrypt openssl jemalloc icu4c \
   mysql sqlite3 googletest
 ```
 
 **Windows (MSYS2 - MINGW64 shell)**
+
 ```bash
 pacman --noconfirm -S --needed \
   mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake \
@@ -243,6 +271,7 @@ pacman --noconfirm -S --needed \
 ```
 
 **Alpine (Docker/Static)**
+
 ```bash
 apk add --no-cache linux-headers gcc g++ clang-dev make cmake bash \
   mariadb-dev mariadb-static postgresql-dev sqlite-dev sqlite-static \
@@ -254,19 +283,23 @@ apk add --no-cache linux-headers gcc g++ clang-dev make cmake bash \
 ## Development Workflow
 
 ### Code Generation
+
 Several source files are auto-generated during build:
+
 - `grammar.autogen.cc/.h` - From `grammar.y` (Bison)
 - `efuns.autogen.cc/.h` - From package specifications
 - `applies_table.autogen.cc/.h` - From applies definitions
 - `options.autogen.h` - From configuration options
 
 ### Adding New Functions
+
 1. Add function to appropriate package `.spec` file
 2. Implement function in corresponding `.cc` file
 3. Run build to regenerate autogenerated files
 4. Add tests in `testsuite/` directory
 
 ### Debugging
+
 ```bash
 # Build with debug symbols and sanitizer
 cmake .. -DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZER=ON
@@ -281,6 +314,7 @@ valgrind --leak-check=full ./build/bin/driver config.test
 ## Platform-Specific Notes
 
 ### Ubuntu/Debian
+
 ```bash
 # Install dependencies
 sudo apt install build-essential bison libmysqlclient-dev libpcre3-dev \
@@ -289,6 +323,7 @@ sudo apt install build-essential bison libmysqlclient-dev libpcre3-dev \
 ```
 
 ### macOS
+
 ```bash
 # Install dependencies
 brew install cmake pkg-config mysql pcre libgcrypt openssl jemalloc icu4c \
@@ -301,6 +336,7 @@ OPENSSL_ROOT_DIR="/usr/local/opt/openssl" ICU_ROOT="/opt/homebrew/opt/icu4c" cma
 ```
 
 ### Windows (MSYS2)
+
 ```bash
 # Install MSYS2 packages (run in MSYS2 shell, then switch to MINGW64 shell for build)
 pacman --noconfirm -S --needed \
@@ -337,17 +373,20 @@ cmake -G "MSYS Makefiles" -DMARCH_NATIVE=OFF \
 ## Common Development Tasks
 
 ### Adding a New Package
+
 1. Create directory in `src/packages/[package-name]/`
 2. Add `CMakeLists.txt`, `.spec` file, and source files
 3. Update `src/packages/CMakeLists.txt`
 4. Add tests in `testsuite/`
 
 ### Modifying Compiler
+
 1. Edit `src/compiler/grammar.y` for syntax changes
 2. Regenerate grammar with Bison if available
 3. Update corresponding compiler components
 
 ### Debugging Memory Issues
+
 1. Build with `-DENABLE_SANITIZER=ON`
 2. Use `mud_status()` efun in LPC for runtime memory info
 3. Check `testsuite/log/debug.log` for detailed logs

@@ -24,9 +24,11 @@ enum socket_option {
   SO_INVALID = 0,
   SO_TLS_VERIFY_PEER = 1,
   SO_TLS_SNI_HOSTNAME = 2,
+  SO_TLS_CERT = 3,
+  SO_TLS_KEY = 4,
 };
 
-constexpr int NUM_SOCKET_OPTIONS = 3;
+constexpr int NUM_SOCKET_OPTIONS = 5;
 
 enum socket_state {
   STATE_CLOSED,
@@ -84,6 +86,7 @@ enum socket_flags {
   S_EXTERNAL = 0x100,
   S_LINKDEAD = 0x200,
   S_TLS_SUPPORT = 0x400,
+  S_TLS_IS_SERVER = 0x800,
 };
 
 array_t *socket_status(int);

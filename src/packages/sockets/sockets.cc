@@ -323,7 +323,19 @@ void f_socket_set_option() {
       if (arg->type != T_STRING) {
         bad_arg(3, F_SOCKET_SET_OPTION);
       }
-      assign_svalue_no_free(&lpc_socks_get(lpc_sock)->options[SO_TLS_SNI_HOSTNAME], arg);
+      assign_svalue(&lpc_socks_get(lpc_sock)->options[SO_TLS_SNI_HOSTNAME], arg);
+      break;
+    case SO_TLS_CERT:
+      if (arg->type != T_STRING) {
+        bad_arg(3, F_SOCKET_SET_OPTION);
+      }
+      assign_svalue(&lpc_socks_get(lpc_sock)->options[SO_TLS_CERT], arg);
+      break;
+    case SO_TLS_KEY:
+      if (arg->type != T_STRING) {
+        bad_arg(3, F_SOCKET_SET_OPTION);
+      }
+      assign_svalue(&lpc_socks_get(lpc_sock)->options[SO_TLS_KEY], arg);
       break;
     default:
         error("Unknown socket option: %d\n", option);
@@ -343,10 +355,32 @@ void f_socket_get_option() {
 
   switch(option) {
     case SO_TLS_VERIFY_PEER:
-      push_number(lpc_socks_get(lpc_sock)->options[SO_TLS_VERIFY_PEER].u.number);
+      if (lpc_socks_get(lpc_sock)->options[SO_TLS_VERIFY_PEER].type == T_NUMBER) {
+        push_number(lpc_socks_get(lpc_sock)->options[SO_TLS_VERIFY_PEER].u.number);
+      } else {
+        push_number(0);
+      }
       break;
     case SO_TLS_SNI_HOSTNAME:
-      copy_and_push_string(lpc_socks_get(lpc_sock)->options[SO_TLS_SNI_HOSTNAME].u.string);
+      if (lpc_socks_get(lpc_sock)->options[SO_TLS_SNI_HOSTNAME].type == T_STRING) {
+        copy_and_push_string(lpc_socks_get(lpc_sock)->options[SO_TLS_SNI_HOSTNAME].u.string);
+      } else {
+        push_number(0);
+      }
+      break;
+    case SO_TLS_CERT:
+      if (lpc_socks_get(lpc_sock)->options[SO_TLS_CERT].type == T_STRING) {
+        copy_and_push_string(lpc_socks_get(lpc_sock)->options[SO_TLS_CERT].u.string);
+      } else {
+        push_number(0);
+      }
+      break;
+    case SO_TLS_KEY:
+      if (lpc_socks_get(lpc_sock)->options[SO_TLS_KEY].type == T_STRING) {
+        copy_and_push_string(lpc_socks_get(lpc_sock)->options[SO_TLS_KEY].u.string);
+      } else {
+        push_number(0);
+      }
       break;
     default:
       error("Unknown socket option: %d\n", option);

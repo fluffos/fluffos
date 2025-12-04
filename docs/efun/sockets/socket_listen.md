@@ -19,7 +19,8 @@ title: sockets / socket_listen
     To accept connections, a socket is first created with socket_create(3),
     the socket is them put into listening mode with  socket_listen(3),  and
     the connections are accepted with socket_accept(3). The socket_listen()
-    call applies only to sockets of type STREAM or MUD.
+    call applies only to sockets of type STREAM, MUD, STREAM_TLS, or
+    STREAM_TLS_BINARY.
 
     The argument listen_callback is the name of a function for  the  driver
     to  call  when  a  connection is requested on the listening socket. The
@@ -28,6 +29,12 @@ title: sockets / socket_listen
         void listen_callback(int fd)
 
     Where fd is the listening socket.
+
+    For TLS server sockets (STREAM_TLS or STREAM_TLS_BINARY), you must set
+    the SO_TLS_CERT and SO_TLS_KEY options using socket_set_option() before
+    calling socket_listen(). The certificate and key files must be in PEM
+    format. When a client connects, the TLS handshake will be performed
+    automatically when socket_accept() is called.
 
 ### RETURN VALUES
 
