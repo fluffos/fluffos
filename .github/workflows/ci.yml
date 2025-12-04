@@ -24,14 +24,14 @@ jobs:
         include:
           # Ubuntu - GCC
           - platform: Ubuntu
-            os: ubuntu-22.04
+            os: ubuntu-24.04
             compiler: gcc
             cc: gcc
             cxx: g++
             build: Debug
             packages: build-essential autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
           - platform: Ubuntu
-            os: ubuntu-22.04
+            os: ubuntu-24.04
             compiler: gcc
             cc: gcc
             cxx: g++
@@ -40,14 +40,14 @@ jobs:
 
           # Ubuntu - Clang
           - platform: Ubuntu
-            os: ubuntu-22.04
+            os: ubuntu-24.04
             compiler: clang
             cc: clang
             cxx: clang++
             build: Debug
             packages: build-essential autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
           - platform: Ubuntu
-            os: ubuntu-22.04
+            os: ubuntu-24.04
             compiler: clang
             cc: clang
             cxx: clang++
@@ -56,7 +56,7 @@ jobs:
 
           # Ubuntu - Clang with Sanitizer
           - platform: Ubuntu
-            os: ubuntu-latest
+            os: ubuntu-24.04
             compiler: clang
             cc: clang
             cxx: clang++
@@ -65,7 +65,7 @@ jobs:
             cmake_flags: -DENABLE_SANITIZER=ON
             packages: build-essential autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev libdw-dev libbz2-dev
           - platform: Ubuntu
-            os: ubuntu-latest
+            os: ubuntu-24.04
             compiler: clang
             cc: clang
             cxx: clang++
@@ -135,11 +135,6 @@ jobs:
         run: pacman --noconfirm -S --needed ${{ matrix.packages }}
 
       - name: Configure
-        env:
-          CC: ${{ matrix.cc }}
-          CXX: ${{ matrix.cxx }}
-          OPENSSL_ROOT_DIR: ${{ matrix.openssl_root }}
-          ICU_ROOT: ${{ matrix.icu_root }}
         run: |
           mkdir build && cd build
           if [ "${{ matrix.platform }}" = "Windows" ]; then
@@ -154,9 +149,17 @@ jobs:
               -DPACKAGE_DB_SQLITE=2 \
               ..
           fi
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+          OPENSSL_ROOT_DIR: ${{ matrix.openssl_root }}
+          ICU_ROOT: ${{ matrix.icu_root }}
 
       - name: Build
         run: cd build && make -j 2 install
+        env:
+          OPENSSL_ROOT_DIR: ${{ matrix.openssl_root }}
+          ICU_ROOT: ${{ matrix.icu_root }}
 
       - name: Run Unit Tests
         run: cd build && make test
