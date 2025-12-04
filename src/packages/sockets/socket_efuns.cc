@@ -102,7 +102,7 @@ void handle_tls_handshake(int fd) {
   auto ret = SSL_connect(lpc_socks[fd].ssl);
   if (ret == 1) {
     lpc_socks[fd].state = STATE_DATA_XFER;
-    lpc_socks[fd].flags |= S_BLOCKED;
+    lpc_socks[fd].flags &= ~S_BLOCKED;
     debug(sockets, ("handle_tls_handshake: TLS: handshake successful\n"));
     event_add(lpc_socks[fd].ev_write, nullptr);
     return;
@@ -127,7 +127,7 @@ void handle_tls_server_handshake(int fd) {
   auto ret = SSL_accept(lpc_socks[fd].ssl);
   if (ret == 1) {
     lpc_socks[fd].state = STATE_DATA_XFER;
-    lpc_socks[fd].flags |= S_BLOCKED;
+    lpc_socks[fd].flags &= ~S_BLOCKED;
     debug(sockets, ("handle_tls_server_handshake: TLS: handshake successful\n"));
     event_add(lpc_socks[fd].ev_write, nullptr);
     return;
