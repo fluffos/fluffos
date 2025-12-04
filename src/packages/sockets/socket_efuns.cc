@@ -623,16 +623,21 @@ int socket_listen(int fd, svalue_t *callback) {
   if (lpc_socks[fd].flags & S_TLS_SUPPORT) {
     if (lpc_socks[fd].options[SO_TLS_CERT].type == T_STRING &&
         lpc_socks[fd].options[SO_TLS_KEY].type == T_STRING) {
-      auto *ssl_ctx = tls_server_init(lpc_socks[fd].options[SO_TLS_CERT].u.string,
-                                      lpc_socks[fd].options[SO_TLS_KEY].u.string);
+      std::string cert_path = lpc_socks[fd].options[SO_TLS_CERT].u.string;
+      std::string key_path = lpc_socks[fd].options[SO_TLS_KEY].u.string;
+      auto *ssl_ctx = tls_server_init(cert_path, key_path);
       if (ssl_ctx == nullptr) {
         debug(sockets, "socket_listen: tls_server_init error.\n");
         return EELISTEN;
       }
       lpc_socks[fd].ssl_ctx = ssl_ctx;
+      // Free option strings after initializing ctx to drop references.
+      free_svalue(&lpc_socks[fd].options[SO_TLS_CERT], "socket_listen");
+      lpc_socks[fd].options[SO_TLS_CERT] = const0u;
+      free_svalue(&lpc_socks[fd].options[SO_TLS_KEY], "socket_listen");
+      lpc_socks[fd].options[SO_TLS_KEY] = const0u;
       debug(sockets, "socket_listen: TLS enabled with cert=%s key=%s\n",
-            lpc_socks[fd].options[SO_TLS_CERT].u.string,
-            lpc_socks[fd].options[SO_TLS_KEY].u.string);
+            cert_path.c_str(), key_path.c_str());
     } else {
       // No cert/key provided - log warning but allow (for testing or client-cert mode)
       debug(sockets, "socket_listen: Warning - TLS socket created without cert/key. Server TLS will not work properly.\n");
@@ -875,6 +880,9 @@ int socket_connect(int fd, const char *name, svalue_t *read_callback, svalue_t *
 
     if (lpc_socks[fd].options[SO_TLS_SNI_HOSTNAME].type == T_STRING) {
       SSL_set_tlsext_host_name(ssl, lpc_socks[fd].options[SO_TLS_SNI_HOSTNAME].u.string);
+      // Drop the string ref once applied to SSL.
+      free_svalue(&lpc_socks[fd].options[SO_TLS_SNI_HOSTNAME], "socket_connect");
+      lpc_socks[fd].options[SO_TLS_SNI_HOSTNAME] = const0u;
     }
   }
 
