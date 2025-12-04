@@ -1690,6 +1690,9 @@ int socket_close(int fd, int flags) {
     // TODO: process write
     SSL_free(lpc_socks[fd].ssl);
     lpc_socks[fd].ssl = nullptr;
+  }
+  // LISTEN sockets have ssl_ctx only; accepted sockets may also hold a ctx.
+  if (lpc_socks[fd].ssl_ctx != nullptr) {
     SSL_CTX_free(lpc_socks[fd].ssl_ctx);
     lpc_socks[fd].ssl_ctx = nullptr;
   }
