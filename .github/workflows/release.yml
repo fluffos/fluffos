@@ -97,7 +97,7 @@ jobs:
       - name: Package Windows Binary
         run: |
           cd build/bin
-          zip -r ../../fluffos-${{ inputs.version }}-windows-x86_64.zip driver.exe ldmud.exe addr_server.exe portbind.exe
+          zip -r ../../fluffos-${{ inputs.version }}-windows-x86_64.zip .
 
       - name: Upload Windows Binary to Release
         uses: actions/upload-release-asset@v1
@@ -142,9 +142,9 @@ jobs:
             # Verify static linking
             ldd bin/driver || echo "Binary is statically linked"
 
-            # Package
+            # Package entire bin directory
             cd bin
-            tar czf ../../fluffos-${{ inputs.version }}-linux-x86_64-static.tar.gz driver ldmud addr_server portbind
+            tar czf ../../fluffos-${{ inputs.version }}-linux-x86_64-static.tar.gz .
           '
 
       - name: Upload Linux Static Binary to Release
@@ -221,19 +221,31 @@ jobs:
             const additionalNotes = `
             ## Release Assets
 
-            This release includes the following pre-built binaries:
+            This release includes the following pre-built distributions:
 
-            ### Binaries
+            ### Binary Distributions
             - **Windows x86_64**: \`fluffos-${{ inputs.version }}-windows-x86_64.zip\`
               - Built with MSYS2/MinGW64
-              - Includes: driver.exe, ldmud.exe, addr_server.exe, portbind.exe
+              - Complete distribution with all tools and libraries
               - SQLite support enabled
 
             - **Linux x86_64 (Static)**: \`fluffos-${{ inputs.version }}-linux-x86_64-static.tar.gz\`
-              - Statically linked binary (no external dependencies)
+              - Statically linked binaries (no external dependencies)
               - Built on Alpine Linux
-              - Includes: driver, ldmud, addr_server, portbind
+              - Complete distribution with all tools and libraries
               - Portable across most Linux distributions
+
+            ### What's Included
+            Each distribution contains:
+            - **driver** - Main FluffOS driver executable
+            - **lpcc** - LPC compiler
+            - **symbol** - Symbol table utility
+            - **o2json/json2o** - Object file converters
+            - **portbind** - Port binding helper (Linux only)
+            - **std/** - LPC standard library
+            - **include/** - LPC header files
+            - **www/** - WebSocket client files
+            - **keywords.json** - Language keywords database
 
             ### Docker Images
             Docker images are available at \`ghcr.io/${{ github.repository }}\`:
@@ -249,14 +261,22 @@ jobs:
 
             ### Windows
             \`\`\`bash
-            unzip fluffos-${{ inputs.version }}-windows-x86_64.zip
-            ./driver.exe config.cfg
+            # Extract distribution
+            unzip fluffos-${{ inputs.version }}-windows-x86_64.zip -d fluffos
+            cd fluffos
+
+            # Run driver with your config
+            ./driver.exe /path/to/mudlib/config.cfg
             \`\`\`
 
             ### Linux
             \`\`\`bash
-            tar xzf fluffos-${{ inputs.version }}-linux-x86_64-static.tar.gz
-            ./driver config.cfg
+            # Extract distribution
+            mkdir fluffos && cd fluffos
+            tar xzf ../fluffos-${{ inputs.version }}-linux-x86_64-static.tar.gz
+
+            # Run driver with your config
+            ./driver /path/to/mudlib/config.cfg
             \`\`\`
 
             ### Docker
