@@ -330,6 +330,7 @@ private varargs mixed json_decode_parse_string(mixed* parse, int initiator_check
             if(result_len < sizeof(result)) {
                 result = result[0..result_len-1];
             }
+
             return string_decode(result, "utf-8");
 
         case '\\':
@@ -737,9 +738,25 @@ private string json_encode_string(string value) {
             result[result_len++] = 'b';
             break;
         default:
-            if(result_len + 1 >= sizeof(result))
-                result = result + allocate_buffer(256);
-            result[result_len++] = ch;
+            // Check if character needs Unicode escaping
+            if(ch > 0x7F || ch < 0x20) {
+                // Encode as \uXXXX
+                string hex;
+                if(result_len + 6 >= sizeof(result))
+                    result = result + allocate_buffer(256);
+                hex = sprintf("%04x", ch);
+                result[result_len++] = '\\';
+                result[result_len++] = 'u';
+                result[result_len++] = hex[0];
+                result[result_len++] = hex[1];
+                result[result_len++] = hex[2];
+                result[result_len++] = hex[3];
+            } else {
+                // Regular ASCII character
+                if(result_len + 1 >= sizeof(result))
+                    result = result + allocate_buffer(256);
+                result[result_len++] = ch;
+            }
             break;
         }
     }
