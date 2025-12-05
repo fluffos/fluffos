@@ -30,6 +30,10 @@ title: sockets / socket_create
 
     4  DATAGRAM_BINARY for exchange binary message with UDP protocol.
 
+    5  STREAM_TLS      for sending raw data using TLS/SSL over TCP protocol.
+
+    6  STREAM_TLS_BINARY for exchange binary message with TLS/SSL over TCP protocol.
+
     The argument read_callback is the name of a function for the driver  to
     call  when the socket gets data from its peer. The read callback should
     follow this format:
