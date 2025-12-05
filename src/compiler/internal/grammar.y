@@ -73,7 +73,7 @@ int yyparse (void);
 %token L_WHILE L_DO L_FOR L_FOREACH L_IN
 %token L_BREAK L_CONTINUE
 %token L_RETURN
-%token L_ARROW L_DOT L_INHERIT L_COLON_COLON
+%token L_ARROW L_DOT L_OPTIONAL_DOT L_DOT_OPTIONAL L_INHERIT L_COLON_COLON
 %token L_ARRAY_OPEN L_MAPPING_OPEN L_FUNCTION_OPEN L_NEW_FUNCTION_OPEN
 
 %token L_SSCANF L_CATCH
@@ -2488,11 +2488,14 @@ expr4:
         int cmi;
         unsigned short tp;
 
-        if ((cmi = lookup_any_class_member($3, &tp)) != -1) {
+        if ((cmi = lookup_any_class_member_soft($3, &tp)) != -1) {
           CREATE_UNARY_OP_1($$, F_MEMBER, tp, $1, 0);
           $$->l.number = cmi;
         } else {
-          CREATE_ERROR($$);
+          /* Fall back to dynamic lookup (treat like mapping-style access). */
+          CREATE_UNARY_OP_1($$, F_MAP_MEMBER, TYPE_ANY, $1, 0);
+          $$->l.number = store_prog_string($3);
+          $$->type = TYPE_ANY;
         }
       } else if (!IS_CLASS($1->type)) {
         yyerror("Left argument of -> is not a class");
@@ -2512,23 +2515,44 @@ expr4:
         int cmi;
         unsigned short tp;
 
-        if ((cmi = lookup_any_class_member($3, &tp)) != -1) {
+        if ((cmi = lookup_any_class_member_soft($3, &tp)) != -1) {
           CREATE_UNARY_OP_1($$, F_MEMBER, tp, $1, 0);
           $$->l.number = cmi;
         } else {
-          CREATE_ERROR($$);
+          CREATE_UNARY_OP_1($$, F_MAP_MEMBER, TYPE_ANY, $1, 0);
+          $$->l.number = store_prog_string($3);
         }
-      } else if (!IS_CLASS($1->type)) {
-        yyerror("Left argument of . is not a class");
-        CREATE_ERROR($$);
-      } else {
+        $$->type = TYPE_ANY;
+      } else if ($1->type == TYPE_MAPPING) {
+        CREATE_UNARY_OP_1($$, F_MAP_MEMBER, TYPE_ANY, $1, 0);
+        $$->l.number = store_prog_string($3);
+        $$->type = TYPE_ANY;
+      } else if (IS_CLASS($1->type)) {
         CREATE_UNARY_OP_1($$, F_MEMBER, 0, $1, 0);
         $$->l.number = lookup_class_member(CLASS_IDX($1->type),
             $3,
             &($$->type));
+      } else {
+        /* Default to mapping-style lookup so dynamic mappings still work when
+         * static type isn't known. */
+        CREATE_UNARY_OP_1($$, F_MAP_MEMBER, TYPE_ANY, $1, 0);
+        $$->l.number = store_prog_string($3);
+        $$->type = TYPE_ANY;
       }
 
       scratch_free($3);
+    }
+  | expr4 L_OPTIONAL_DOT identifier
+    {
+      CREATE_UNARY_OP_1($$, F_MAP_MEMBER_OPTIONAL, TYPE_ANY, $1, 0);
+      $$->l.number = store_prog_string($3);
+      $$->type = TYPE_ANY;
+      scratch_free($3);
+    }
+  | expr4 L_OPTIONAL_DOT '[' comma_expr ']'
+    {
+      CREATE_BINARY_OP($$, F_MAP_INDEX_OPTIONAL, 0, $4, $1);
+      $$->type = TYPE_ANY;
     }
   | expr4 '[' comma_expr L_RANGE comma_expr ']'
     {
@@ -2667,6 +2691,11 @@ expr4:
             }
         }
       } else $$->type = TYPE_ANY;
+    }
+  | expr4 L_DOT_OPTIONAL '[' comma_expr ']'
+    {
+      CREATE_BINARY_OP($$, F_MAP_INDEX_OPTIONAL, 0, $4, $1);
+      $$->type = TYPE_ANY;
     }
   | string
   | '(' comma_expr ')'

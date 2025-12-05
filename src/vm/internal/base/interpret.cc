@@ -3335,6 +3335,71 @@ void eval_instruction(char *p) {
         free_class(arr);
         break;
       }
+      case F_MAP_MEMBER: {
+        uint16_t offset;
+        LOAD_SHORT(offset, pc);
+        if (offset >= current_prog->num_strings) {
+          error("Invalid Program: string %d out of range in F_MAP_MEMBER!", offset);
+        }
+        if (sp->type != T_MAPPING) {
+          error("Tried to take a member of something that isn't a mapping.\n");
+        }
+        mapping_t *m = sp->u.map;
+        svalue_t *v = find_string_in_mapping(m, current_prog->strings[offset]);
+        if (v->type == T_OBJECT && (v->u.ob->flags & O_DESTRUCTED)) {
+          assign_svalue(v, &const0u);
+        }
+        assign_svalue_no_free(sp, v);
+        free_mapping(m);
+        break;
+      }
+      case F_MAP_MEMBER_OPTIONAL: {
+        uint16_t offset;
+        LOAD_SHORT(offset, pc);
+        if (offset >= current_prog->num_strings) {
+          error("Invalid Program: string %d out of range in F_MAP_MEMBER_OPTIONAL!", offset);
+        }
+        if (sp->type != T_MAPPING) {
+          free_svalue(sp, "F_MAP_MEMBER_OPTIONAL");
+          *sp = const0u;
+          break;
+        }
+        mapping_t *m = sp->u.map;
+        svalue_t *v = find_string_in_mapping(m, current_prog->strings[offset]);
+        if (v->type == T_OBJECT && (v->u.ob->flags & O_DESTRUCTED)) {
+          assign_svalue(v, &const0u);
+        }
+        assign_svalue_no_free(sp, v);
+        free_mapping(m);
+        break;
+      }
+      case F_MAP_MEMBER_LVALUE: {
+        uint16_t offset;
+        LOAD_SHORT(offset, pc);
+        if (offset >= current_prog->num_strings) {
+          error("Invalid Program: string %d out of range in F_MAP_MEMBER_LVALUE!", offset);
+        }
+        if (sp->type != T_MAPPING) {
+          error("Tried to take a member of something that isn't a mapping.\n");
+        }
+        mapping_t *m = sp->u.map;
+        svalue_t key;
+        key.type = T_STRING;
+        key.subtype = STRING_SHARED;
+        key.u.string = current_prog->strings[offset];
+        svalue_t *slot = find_for_insert(m, &key, 0);
+        if (!slot) {
+          mapping_too_large();
+        }
+        sp->type = T_LVALUE;
+        sp->u.lvalue = slot;
+#ifdef REF_RESERVED_WORD
+        lv_owner_type = T_MAPPING;
+        lv_owner = reinterpret_cast<refed_t *>(m);
+#endif
+        free_mapping(m);
+        break;
+      }
       case F_INDEX:
         switch (sp->type) {
           case T_MAPPING: {
@@ -3681,6 +3746,23 @@ void eval_instruction(char *p) {
       case F_NR_RANGE_LVALUE:
         push_lvalue_range(0x01);
         break;
+      case F_MAP_INDEX_OPTIONAL: {
+        if (sp->type != T_MAPPING) {
+          free_svalue(sp, "F_MAP_INDEX_OPTIONAL");
+          free_svalue(sp - 1, "F_MAP_INDEX_OPTIONAL");
+          sp--;
+          assign_svalue_no_free(sp, &const0u);
+          break;
+        }
+        mapping_t *m = sp->u.map;
+        svalue_t *v = find_in_mapping(m, *(sp - 1));
+        if (v->type == T_OBJECT && (v->u.ob->flags & O_DESTRUCTED)) {
+          assign_svalue(v, &const0u);
+        }
+        assign_svalue(--sp, v);
+        free_mapping(m);
+        break;
+      }
       case F_NN_RANGE:
         f_range(0x00);
         break;

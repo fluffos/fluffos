@@ -418,6 +418,9 @@ void i_generate_node(parse_node_t *expr) {
 
       if ((expr->v.number == F_GLOBAL) || (expr->v.number == F_GLOBAL_LVALUE)) {
         INS_GLOBAL_INDEX(expr->l.number);
+      } else if (expr->v.number == F_MAP_MEMBER || expr->v.number == F_MAP_MEMBER_LVALUE ||
+                 expr->v.number == F_MAP_MEMBER_OPTIONAL) {
+        ins_short(expr->l.number);
       } else {
         ins_byte(expr->l.number);
       }
