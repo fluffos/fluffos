@@ -236,6 +236,8 @@ parse_node_t *check_refs(int, parse_node_t *, parse_node_t *);
 
 int lookup_any_class_member(char *, unsigned short *);
 int lookup_class_member(int, char *, unsigned short *);
+// Like lookup_any_class_member but silent when not found.
+int lookup_any_class_member_soft(char *, unsigned short *);
 parse_node_t *reorder_class_values(int, parse_node_t *);
 
 parse_node_t *promote_to_float(parse_node_t *);
