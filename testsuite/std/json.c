@@ -74,52 +74,14 @@ private void json_decode_parse_next_line(mixed* parse) {
     parse[JSON_DECODE_PARSE_CHAR] = 1;
 }
 
-private void json_decode_skip_whitespaces(mixed* parse) {
-    int ch;
-    while(1) {
-      json_decode_parse_next_char(parse);
-      ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
-      if (ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t') {
-        continue;
-      } else {
-        return ;
-      }
-    }
-}
-
+// Optimized hex digit conversion using arithmetic instead of large switch
 private int json_decode_hexdigit(int ch) {
-    switch(ch) {
-    case '0'    :
-        return 0;
-    case '1'    :
-    case '2'    :
-    case '3'    :
-    case '4'    :
-    case '5'    :
-    case '6'    :
-    case '7'    :
-    case '8'    :
-    case '9'    :
+    if(ch >= '0' && ch <= '9')
         return ch - '0';
-    case 'a'    :
-    case 'A'    :
-        return 10;
-    case 'b'    :
-    case 'B'    :
-        return 11;
-    case 'c'    :
-    case 'C'    :
-        return 12;
-    case 'd'    :
-    case 'D'    :
-        return 13;
-    case 'e'    :
-    case 'E'    :
-        return 14;
-    case 'f'    :
-    case 'F'    :
-        return 15;
-    }
+    if(ch >= 'a' && ch <= 'f')
+        return ch - 'a' + 10;
+    if(ch >= 'A' && ch <= 'F')
+        return ch - 'A' + 10;
     return -1;
 }
 
@@ -592,10 +554,9 @@ private mixed json_decode_parse_value(mixed* parse) {
     case '9':
         return json_decode_parse_number(parse);
     case 't':
-        // Parse "true"
+        // Parse "true" - first char already matched by switch
         pos = parse[JSON_DECODE_PARSE_POS];
-        if(parse[JSON_DECODE_PARSE_TEXT][pos] == 't' &&
-           parse[JSON_DECODE_PARSE_TEXT][pos+1] == 'r' &&
+        if(parse[JSON_DECODE_PARSE_TEXT][pos+1] == 'r' &&
            parse[JSON_DECODE_PARSE_TEXT][pos+2] == 'u' &&
            parse[JSON_DECODE_PARSE_TEXT][pos+3] == 'e') {
             parse[JSON_DECODE_PARSE_POS] = pos + 4;
@@ -604,10 +565,9 @@ private mixed json_decode_parse_value(mixed* parse) {
         }
         json_decode_parse_error(parse, "Invalid token starting with 't'", ch);
     case 'f':
-        // Parse "false"
+        // Parse "false" - first char already matched by switch
         pos = parse[JSON_DECODE_PARSE_POS];
-        if(parse[JSON_DECODE_PARSE_TEXT][pos] == 'f' &&
-           parse[JSON_DECODE_PARSE_TEXT][pos+1] == 'a' &&
+        if(parse[JSON_DECODE_PARSE_TEXT][pos+1] == 'a' &&
            parse[JSON_DECODE_PARSE_TEXT][pos+2] == 'l' &&
            parse[JSON_DECODE_PARSE_TEXT][pos+3] == 's' &&
            parse[JSON_DECODE_PARSE_TEXT][pos+4] == 'e') {
@@ -617,10 +577,9 @@ private mixed json_decode_parse_value(mixed* parse) {
         }
         json_decode_parse_error(parse, "Invalid token starting with 'f'", ch);
     case 'n':
-        // Parse "null"
+        // Parse "null" - first char already matched by switch
         pos = parse[JSON_DECODE_PARSE_POS];
-        if(parse[JSON_DECODE_PARSE_TEXT][pos] == 'n' &&
-           parse[JSON_DECODE_PARSE_TEXT][pos+1] == 'u' &&
+        if(parse[JSON_DECODE_PARSE_TEXT][pos+1] == 'u' &&
            parse[JSON_DECODE_PARSE_TEXT][pos+2] == 'l' &&
            parse[JSON_DECODE_PARSE_TEXT][pos+3] == 'l') {
             parse[JSON_DECODE_PARSE_POS] = pos + 4;
