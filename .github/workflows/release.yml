@@ -3,10 +3,6 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Release version (e.g., v3.5.0)'
-        required: true
-        type: string
       prerelease:
         description: 'Mark as pre-release'
         required: false
@@ -26,12 +22,51 @@ permissions:
   packages: write
 
 jobs:
+  generate-version:
+    name: Generate Version Number
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.generate.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate Version
+        id: generate
+        run: |
+          # Get current date in YYYY.MMDD format
+          DATE_VERSION=$(date -u '+%Y.%m%d')
+
+          # Fetch all tags
+          git fetch --tags
+
+          # Find existing tags for today's date
+          EXISTING_TAGS=$(git tag -l "v${DATE_VERSION}.*" | sort -V)
+
+          # Find the highest increment for today
+          if [ -z "$EXISTING_TAGS" ]; then
+            INCREMENT=0
+          else
+            LAST_TAG=$(echo "$EXISTING_TAGS" | tail -n 1)
+            LAST_INCREMENT=$(echo "$LAST_TAG" | sed -E "s/v${DATE_VERSION}\.([0-9]+)/\1/")
+            INCREMENT=$((LAST_INCREMENT + 1))
+          fi
+
+          # Generate new version
+          VERSION="v${DATE_VERSION}.${INCREMENT}"
+
+          echo "Generated version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
   create-release:
     name: Create Release
+    needs: generate-version
     runs-on: ubuntu-latest
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
       release_id: ${{ steps.create_release.outputs.id }}
+      version: ${{ needs.generate-version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -39,21 +74,23 @@ jobs:
 
       - name: Create Git Tag
         run: |
+          VERSION="${{ needs.generate-version.outputs.version }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a ${{ inputs.version }} -m "Release ${{ inputs.version }}"
-          git push origin ${{ inputs.version }}
+          git tag -a "$VERSION" -m "Release $VERSION"
+          git push origin "$VERSION"
 
       - name: Create Release
         id: create_release
         uses: actions/github-script@v7
         with:
           script: |
+            const version = '${{ needs.generate-version.outputs.version }}';
             const release = await github.rest.repos.createRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              tag_name: '${{ inputs.version }}',
-              name: 'FluffOS ${{ inputs.version }}',
+              tag_name: version,
+              name: `FluffOS ${version}`,
               generate_release_notes: true,
               prerelease: ${{ inputs.prerelease }},
               draft: false
@@ -73,12 +110,12 @@ jobs:
           - platform: windows
             os: windows-latest
             shell: msys2 {0}
-            asset_name: fluffos-${{ inputs.version }}-windows-x86_64.zip
+            asset_suffix: windows-x86_64.zip
             asset_type: application/zip
           - platform: linux
             os: ubuntu-latest
             shell: bash
-            asset_name: fluffos-${{ inputs.version }}-linux-x86_64-static.tar.gz
+            asset_suffix: linux-x86_64-static.tar.gz
             asset_type: application/gzip
     defaults:
       run:
@@ -92,7 +129,7 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.version }}
+          ref: ${{ needs.create-release.outputs.version }}
 
       - name: Install Dependencies (Windows)
         if: matrix.platform == 'windows'
@@ -156,11 +193,15 @@ jobs:
 
       - name: Package (Windows)
         if: matrix.platform == 'windows'
-        run: cd build/bin && zip -r ../../${{ matrix.asset_name }} .
+        run: |
+          ASSET_NAME="fluffos-${{ needs.create-release.outputs.version }}-${{ matrix.asset_suffix }}"
+          cd build/bin && zip -r "../../${ASSET_NAME}" .
 
       - name: Package (Linux)
         if: matrix.platform == 'linux'
-        run: cd build/bin && tar czf ../../${{ matrix.asset_name }} .
+        run: |
+          ASSET_NAME="fluffos-${{ needs.create-release.outputs.version }}-${{ matrix.asset_suffix }}"
+          cd build/bin && tar czf "../../${ASSET_NAME}" .
 
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
@@ -168,8 +209,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./${{ matrix.asset_name }}
-          asset_name: ${{ matrix.asset_name }}
+          asset_path: ./fluffos-${{ needs.create-release.outputs.version }}-${{ matrix.asset_suffix }}
+          asset_name: fluffos-${{ needs.create-release.outputs.version }}-${{ matrix.asset_suffix }}
           asset_content_type: ${{ matrix.asset_type }}
 
   build-docker:
@@ -179,7 +220,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.version }}
+          ref: ${{ needs.create-release.outputs.version }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -197,10 +238,10 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=semver,pattern={{version}},value=${{ inputs.version }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.version }}
-            type=semver,pattern={{major}},value=${{ inputs.version }}
-            type=raw,value=${{ inputs.version }},enable=true
+            type=semver,pattern={{version}},value=${{ needs.create-release.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.create-release.outputs.version }}
+            type=semver,pattern={{major}},value=${{ needs.create-release.outputs.version }}
+            type=raw,value=${{ needs.create-release.outputs.version }},enable=true
             type=raw,value=latest,enable=${{ !inputs.prerelease }}
 
       - name: Build and push Docker image
@@ -221,23 +262,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.version }}
+          ref: ${{ needs.create-release.outputs.version }}
 
       - name: Generate Release Documentation
         id: docs
         run: |
-          cat > release-notes.md << 'EOF'
+          VERSION="${{ needs.create-release.outputs.version }}"
+          cat > release-notes.md << EOF
           ## Release Assets
 
           This release includes the following pre-built distributions:
 
           ### Binary Distributions
-          - **Windows x86_64**: `fluffos-${{ inputs.version }}-windows-x86_64.zip`
+          - **Windows x86_64**: \`fluffos-${VERSION}-windows-x86_64.zip\`
             - Built with MSYS2/MinGW64
             - Complete distribution with all tools and libraries
             - SQLite support enabled
 
-          - **Linux x86_64 (Static)**: `fluffos-${{ inputs.version }}-linux-x86_64-static.tar.gz`
+          - **Linux x86_64 (Static)**: \`fluffos-${VERSION}-linux-x86_64-static.tar.gz\`
             - Statically linked binaries (no external dependencies)
             - Built on Alpine Linux
             - Complete distribution with all tools and libraries
@@ -256,41 +298,41 @@ jobs:
           - **keywords.json** - Language keywords database
 
           ### Docker Images
-          Docker images are available at `ghcr.io/${{ github.repository }}`:
-          - `${{ inputs.version }}` - This release version
+          Docker images are available at \`ghcr.io/${{ github.repository }}\`:
+          - \`${VERSION}\` - This release version
           ${{ !inputs.prerelease && '- `latest` - Latest stable release' || '' }}
 
           Pull with:
-          ```bash
-          docker pull ghcr.io/${{ github.repository }}:${{ inputs.version }}
-          ```
+          \`\`\`bash
+          docker pull ghcr.io/${{ github.repository }}:${VERSION}
+          \`\`\`
 
           ## Installation
 
           ### Windows
-          ```bash
+          \`\`\`bash
           # Extract distribution
-          unzip fluffos-${{ inputs.version }}-windows-x86_64.zip -d fluffos
+          unzip fluffos-${VERSION}-windows-x86_64.zip -d fluffos
           cd fluffos
 
           # Run driver with your config
           ./driver.exe /path/to/mudlib/config.cfg
-          ```
+          \`\`\`
 
           ### Linux
-          ```bash
+          \`\`\`bash
           # Extract distribution
           mkdir fluffos && cd fluffos
-          tar xzf ../fluffos-${{ inputs.version }}-linux-x86_64-static.tar.gz
+          tar xzf ../fluffos-${VERSION}-linux-x86_64-static.tar.gz
 
           # Run driver with your config
           ./driver /path/to/mudlib/config.cfg
-          ```
+          \`\`\`
 
           ### Docker
-          ```bash
-          docker run -v /path/to/mudlib:/mudlib ghcr.io/${{ github.repository }}:${{ inputs.version }} /mudlib/config.cfg
-          ```
+          \`\`\`bash
+          docker run -v /path/to/mudlib:/mudlib ghcr.io/${{ github.repository }}:${VERSION} /mudlib/config.cfg
+          \`\`\`
 
           ---
           EOF
@@ -321,10 +363,11 @@ jobs:
 
       - name: Release Summary
         run: |
+          VERSION="${{ needs.create-release.outputs.version }}"
           cat << EOF
-          ✅ Release ${{ inputs.version }} created successfully!
-          📦 Windows binary: fluffos-${{ inputs.version }}-windows-x86_64.zip
-          📦 Linux static binary: fluffos-${{ inputs.version }}-linux-x86_64-static.tar.gz
-          🐳 Docker image: ghcr.io/${{ github.repository }}:${{ inputs.version }}
-          🔗 View release: https://github.com/${{ github.repository }}/releases/tag/${{ inputs.version }}
+          ✅ Release ${VERSION} created successfully!
+          📦 Windows binary: fluffos-${VERSION}-windows-x86_64.zip
+          📦 Linux static binary: fluffos-${VERSION}-linux-x86_64-static.tar.gz
+          🐳 Docker image: ghcr.io/${{ github.repository }}:${VERSION}
+          🔗 View release: https://github.com/${{ github.repository }}/releases/tag/${VERSION}
           EOF
