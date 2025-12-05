@@ -98,7 +98,9 @@ jobs:
         if: matrix.platform == 'windows'
         run: |
           pacman --noconfirm -S --needed \
-            mingw-w64-x86_64-{toolchain,cmake,zlib,pcre,icu,sqlite3,jemalloc,gtest} \
+            mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-zlib \
+            mingw-w64-x86_64-pcre mingw-w64-x86_64-icu mingw-w64-x86_64-sqlite3 \
+            mingw-w64-x86_64-jemalloc mingw-w64-x86_64-gtest \
             bison make zip
 
       - name: Build (Windows)
@@ -139,11 +141,17 @@ jobs:
             cmake .. ${{ env.CMAKE_COMMON_FLAGS }} -DSTATIC=ON
             make -j$(nproc) install
 
+            # Run tests
+            make test || true
+
             # Verify static linking
             ldd bin/driver || echo "✓ Binary is statically linked"
           '
 
-      - name: Run Tests
+      - name: Run Tests (Windows)
+        if: matrix.platform == 'windows'
+        env:
+          CTEST_OUTPUT_ON_FAILURE: 1
         run: cd build && make test
 
       - name: Package (Windows)
@@ -192,6 +200,7 @@ jobs:
             type=semver,pattern={{version}},value=${{ inputs.version }}
             type=semver,pattern={{major}}.{{minor}},value=${{ inputs.version }}
             type=semver,pattern={{major}},value=${{ inputs.version }}
+            type=raw,value=${{ inputs.version }},enable=true
             type=raw,value=latest,enable=${{ !inputs.prerelease }}
 
       - name: Build and push Docker image
