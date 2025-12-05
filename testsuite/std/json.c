@@ -225,12 +225,15 @@ private mixed json_decode_parse_array(mixed* parse) {
 
 private varargs mixed json_decode_parse_string(mixed* parse, int initiator_checked) {
     int pos, ch;
-    buffer result;
+    buffer result, text;
     int result_len = 0;
     int has_escapes = 0;
 
+    // Cache text buffer to eliminate repeated array access
+    text = parse[JSON_DECODE_PARSE_TEXT];
+
     if(!initiator_checked) {
-        ch = parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS]];
+        ch = text[parse[JSON_DECODE_PARSE_POS]];
         if(!ch)
             json_decode_parse_error(parse, "Unexpected end of data");
         if(ch != '"')
@@ -243,7 +246,7 @@ private varargs mixed json_decode_parse_string(mixed* parse, int initiator_check
     pos = parse[JSON_DECODE_PARSE_POS];
 
     while(1) {
-        ch = parse[JSON_DECODE_PARSE_TEXT][pos];
+        ch = text[pos];
 
         switch(ch) {
         case 0:
@@ -269,7 +272,7 @@ private varargs mixed json_decode_parse_string(mixed* parse, int initiator_check
             // Escape sequence
             has_escapes = 1;
             pos++;
-            ch = parse[JSON_DECODE_PARSE_TEXT][pos];
+            ch = text[pos];
 
             switch(ch) {
             case 0:
@@ -314,7 +317,7 @@ private varargs mixed json_decode_parse_string(mixed* parse, int initiator_check
                     int digit;
 
                     for(int i = 0; i < 4; i++) {
-                        ch = parse[JSON_DECODE_PARSE_TEXT][pos++];
+                        ch = text[pos++];
                         digit = json_decode_hexdigit(ch);
                         if(digit == -1)
                             json_decode_parse_error(parse, "Invalid hex digit", ch);
@@ -327,15 +330,15 @@ private varargs mixed json_decode_parse_string(mixed* parse, int initiator_check
                         int high = code;
                         int low;
 
-                        if(parse[JSON_DECODE_PARSE_TEXT][pos] != '\\' ||
-                           parse[JSON_DECODE_PARSE_TEXT][pos+1] != 'u') {
+                        if(text[pos] != '\\' ||
+                           text[pos+1] != 'u') {
                             json_decode_parse_error(parse, "Invalid string, missing surrogate pair");
                         }
 
                         pos += 2; // Skip \u
                         low = 0;
                         for(int i = 0; i < 4; i++) {
-                            ch = parse[JSON_DECODE_PARSE_TEXT][pos++];
+                            ch = text[pos++];
                             digit = json_decode_hexdigit(ch);
                             if(digit == -1)
                                 json_decode_parse_error(parse, "Invalid hex digit", ch);
@@ -392,19 +395,22 @@ private mixed json_decode_parse_number(mixed* parse) {
     int has_dot = 0;
     int has_exp = 0;
     int ch, next_ch;
-    buffer num_buf;
+    buffer num_buf, text;
     int num_len = 0;
+
+    // Cache text buffer
+    text = parse[JSON_DECODE_PARSE_TEXT];
 
     // Allocate buffer for number
     num_buf = allocate_buffer(32);
 
-    ch = parse[JSON_DECODE_PARSE_TEXT][pos];
+    ch = text[pos];
 
     // Handle negative sign
     if (ch == '-') {
         num_buf[num_len++] = ch;
         pos++;
-        next_ch = parse[JSON_DECODE_PARSE_TEXT][pos];
+        next_ch = text[pos];
         if(!next_ch) json_decode_parse_error(parse, "Unexpected end of data");
         if(next_ch < '0' || next_ch > '9')
             json_decode_parse_error(parse, "Unexpected character", next_ch);
@@ -415,7 +421,7 @@ private mixed json_decode_parse_number(mixed* parse) {
     if (ch == '0') {
         num_buf[num_len++] = ch;
         pos++;
-        next_ch = parse[JSON_DECODE_PARSE_TEXT][pos];
+        next_ch = text[pos];
 
         if(next_ch == 0) {
             parse[JSON_DECODE_PARSE_POS] = pos;
@@ -577,20 +583,33 @@ private mixed json_decode_parse(mixed* parse) {
     return out;
 }
 
-mixed json_decode(string text) {
+// Accept string or buffer - if buffer is passed, skip expensive string_encode()
+mixed json_decode(mixed text) {
     mixed* parse;
-    buffer endl = allocate_buffer(1);
-    endl[0] = 0;
+    buffer buf;
 
     if(!text) {
       return 0;
     }
 
     parse = allocate(JSON_DECODE_PARSE_FIELDS);
-    parse[JSON_DECODE_PARSE_TEXT] = string_encode(text, "utf-8") + endl;
+
+    // Fast path: if already a buffer, use it directly
+    if(bufferp(text)) {
+        buf = text;
+        // Ensure null terminator
+        if(sizeof(buf) == 0 || buf[sizeof(buf)-1] != 0) {
+            buf += allocate_buffer(1);
+        }
+    } else {
+        // Slow path: convert string to buffer
+        buf = string_encode(text, "utf-8");
+        buf += allocate_buffer(1);
+    }
+
+    parse[JSON_DECODE_PARSE_TEXT] = buf;
     parse[JSON_DECODE_PARSE_POS] = 0;
-    
-    
+
     return json_decode_parse(parse);
 }
 
