@@ -49,7 +49,7 @@ char \*ack;
 
 ack = (char _)malloc(strlen(foo) + 1);
 strcpy(ack,foo);
-ack = (char _)realloc(strlen(ack) + strlen(bar) + 1);
+ack = (char_)realloc(strlen(ack) + strlen(bar) + 1);
 strcat(ack,bar);
 
 LPC is an interpreted language (however it is compiled into an internal
@@ -65,3 +65,20 @@ sscanf(arg,"%s %s",str1,str2) does not operate as the C programmer would
 expect. In C, the first word of arg would be copied into str1 and the
 second word of arg into str2. In LPC, the first word is copied into str1
 and the _remainder_ of arg is copied into str2.
+
+## Modern mapping access
+
+FluffOS adds dot access and optional chaining for mappings to reduce bracket noise:
+
+- Direct dot access works on string keys: `m.key` is equivalent to `m["key"]`.
+  Mixed forms work too, e.g. `m.key["deep"]` or `m["key"].deep`.
+- Optional chaining for mappings short-circuits missing values to `undefined`:
+  `m?.key?.deep` and `m?.["key"]?.deep`. Reads return `undefined` instead of
+   an error when an intermediate step is missing or zero.
+- Standard bracket semantics remain: writing through a missing base (e.g.
+  `m["missing"]["deep"] = 1`) still errors, and optional chaining is for reads
+  only.
+- Optional chaining on bracket index is supported: `m?.[1]`, `m?.[this_player()]`.
+
+These features currently apply to mappings; class/object member access remains
+unchanged.

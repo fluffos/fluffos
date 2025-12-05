@@ -2117,9 +2117,19 @@ int yylex() {
       case ';':
       case ',':
       case '~':
-#ifndef USE_TRIGRAPHS
-      case '?':
         return c;
+#ifndef USE_TRIGRAPHS
+      case '?': {
+        char *buf_start = cur_lbuf ? cur_lbuf->buf : nullptr;
+        char *buf_end = cur_lbuf ? cur_lbuf->buf_end : nullptr;
+        if (*outp == '.' &&
+            (isalpha(static_cast<unsigned char>(outp[1])) || outp[1] == '_' || outp[1] == '[')) {
+          char prev_char = (buf_start && (outp - buf_start) >= 2) ? *(outp - 2) : 0;
+          outp++;
+          return L_OPTIONAL_DOT;
+        }
+        return c;
+      }
 #else
         return c;
       /*
@@ -2134,6 +2144,11 @@ int yylex() {
        *     ??'   ^       ??!   |       ??-   ~
        */
       case '?':
+        if (*outp == '.' &&
+            (isalpha(static_cast<unsigned char>(outp[1])) || outp[1] == '_' || outp[1] == '[')) {
+          outp++;
+          return L_OPTIONAL_DOT;
+        }
         if (*outp++ != '?') {
           outp--;
           return '?';
@@ -2175,12 +2190,19 @@ int yylex() {
         outp--;
         return ':';
       case '.':
+        if (*outp == '?') {
+          outp++;
+          int tok = L_DOT_OPTIONAL;
+          return tok;
+        }
         if (*outp++ == '.') {
           if (*outp++ == '.') {
-            return L_DOT_DOT_DOT;
+            int tok = L_DOT_DOT_DOT;
+            return tok;
           }
           outp--;
-          return L_RANGE;
+          int tok = L_RANGE;
+          return tok;
         }
         outp--;
         return L_DOT;
@@ -2448,10 +2470,10 @@ int yylex() {
         if (c == 'X' || c == 'x') {
           yyp = yytext;
           return parseHexIntegerLiteral(c);
-        } 
+        }
         if (c == 'B' || c == 'b') {
           yyp = yytext;
-          return parseBinaryIntegerLiteral(c);           
+          return parseBinaryIntegerLiteral(c);
         }
         outp--;
         c = '0';
@@ -2642,7 +2664,7 @@ int parseBinaryIntegerLiteral(unsigned char c) {
     if (c == '_') {
       switch(*outp) {
         case '0':
-        case '1': 
+        case '1':
           continue;
         default:
           break;
@@ -2657,7 +2679,7 @@ int parseBinaryIntegerLiteral(unsigned char c) {
   *yyp = 0;
 
   char *endptr;
-  yylval.number = strtol(reinterpret_cast<const char *>(yytext), &endptr, 2); 
+  yylval.number = strtol(reinterpret_cast<const char *>(yytext), &endptr, 2);
   if (endptr != yyp) {
     yyerror("Invalid binary integer literal: %s", std::string(yytext, yyp - yytext).c_str());
     return YYerror;

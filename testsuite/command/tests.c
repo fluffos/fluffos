@@ -1,6 +1,6 @@
 #include <globals.h>
 
-int execute(string fun);
+varargs execute(string fun, int single_test: (: 0 :));
 
 void recurse(string dir) {
   mixed leaks;
@@ -48,7 +48,7 @@ void recurse(string dir) {
     }
   }
 }
-int execute(string fun, int single_test: (: 0 :))
+varargs int execute(string fun, int single_test: (: 0 :))
 {
   string leaks;
   object tp = this_player();

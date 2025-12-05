@@ -88,26 +88,28 @@ extern int yydebug;
     L_RETURN = 289,                /* L_RETURN  */
     L_ARROW = 290,                 /* L_ARROW  */
     L_DOT = 291,                   /* L_DOT  */
-    L_INHERIT = 292,               /* L_INHERIT  */
-    L_COLON_COLON = 293,           /* L_COLON_COLON  */
-    L_ARRAY_OPEN = 294,            /* L_ARRAY_OPEN  */
-    L_MAPPING_OPEN = 295,          /* L_MAPPING_OPEN  */
-    L_FUNCTION_OPEN = 296,         /* L_FUNCTION_OPEN  */
-    L_NEW_FUNCTION_OPEN = 297,     /* L_NEW_FUNCTION_OPEN  */
-    L_SSCANF = 298,                /* L_SSCANF  */
-    L_CATCH = 299,                 /* L_CATCH  */
-    L_ARRAY = 300,                 /* L_ARRAY  */
-    L_REF = 301,                   /* L_REF  */
-    L_PARSE_COMMAND = 302,         /* L_PARSE_COMMAND  */
-    L_TIME_EXPRESSION = 303,       /* L_TIME_EXPRESSION  */
-    L_CLASS = 304,                 /* L_CLASS  */
-    L_NEW = 305,                   /* L_NEW  */
-    L_PARAMETER = 306,             /* L_PARAMETER  */
-    L_TREE = 307,                  /* L_TREE  */
-    L_PREPROCESSOR_COMMAND = 308,  /* L_PREPROCESSOR_COMMAND  */
-    LOWER_THAN_ELSE = 309,         /* LOWER_THAN_ELSE  */
-    L_EQ = 310,                    /* L_EQ  */
-    L_NE = 311                     /* L_NE  */
+    L_OPTIONAL_DOT = 292,          /* L_OPTIONAL_DOT  */
+    L_DOT_OPTIONAL = 293,          /* L_DOT_OPTIONAL  */
+    L_INHERIT = 294,               /* L_INHERIT  */
+    L_COLON_COLON = 295,           /* L_COLON_COLON  */
+    L_ARRAY_OPEN = 296,            /* L_ARRAY_OPEN  */
+    L_MAPPING_OPEN = 297,          /* L_MAPPING_OPEN  */
+    L_FUNCTION_OPEN = 298,         /* L_FUNCTION_OPEN  */
+    L_NEW_FUNCTION_OPEN = 299,     /* L_NEW_FUNCTION_OPEN  */
+    L_SSCANF = 300,                /* L_SSCANF  */
+    L_CATCH = 301,                 /* L_CATCH  */
+    L_ARRAY = 302,                 /* L_ARRAY  */
+    L_REF = 303,                   /* L_REF  */
+    L_PARSE_COMMAND = 304,         /* L_PARSE_COMMAND  */
+    L_TIME_EXPRESSION = 305,       /* L_TIME_EXPRESSION  */
+    L_CLASS = 306,                 /* L_CLASS  */
+    L_NEW = 307,                   /* L_NEW  */
+    L_PARAMETER = 308,             /* L_PARAMETER  */
+    L_TREE = 309,                  /* L_TREE  */
+    L_PREPROCESSOR_COMMAND = 310,  /* L_PREPROCESSOR_COMMAND  */
+    LOWER_THAN_ELSE = 311,         /* LOWER_THAN_ELSE  */
+    L_EQ = 312,                    /* L_EQ  */
+    L_NE = 313                     /* L_NE  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -137,7 +139,7 @@ union YYSTYPE
     uint16_t save_exact_types;
   } func_block; /* 8 */
 
-#line 141 "/projects/git/fluffos/build/src/grammar.autogen.h"
+#line 143 "/projects/git/fluffos/build/src/grammar.autogen.h"
 
 };
 typedef union YYSTYPE YYSTYPE;
