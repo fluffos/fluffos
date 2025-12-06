@@ -61,6 +61,12 @@ title: general / parse_tree
     l.expr, r.expr: expressions
     v.number: F_LAND, F_LOR
 
+## NODE_LOGICAL_ASSIGN
+
+    l.expr: lvalue expression
+    r.expr: rhs expression
+    v.number: F_LOR_EQ, F_LAND_EQ, F_NULLISH_EQ
+
 ## NODE_BRANCH_LINK
 
     l.expr, r.expr: expressions

@@ -18,6 +18,7 @@
 #include "compiler/internal/lex.h"
 #include "compiler/internal/scratchpad.h"
 #include "compiler/internal/generate.h"
+#include "include/opcodes_extra.h"
 
 extern char *outp;
 
@@ -63,7 +64,7 @@ int yyparse (void);
 
 %token L_INC L_DEC
 %token L_ASSIGN
-%token L_LAND L_LOR
+%token L_LAND L_LOR L_QUESTION_QUESTION
 %token L_LSH L_RSH
 %token L_ORDER
 %token L_NOT
@@ -104,6 +105,7 @@ int yyparse (void);
 
 %right L_ASSIGN
 %right '?'
+%left L_QUESTION_QUESTION
 %left L_LOR
 %left L_LAND
 %left '|'
@@ -1269,27 +1271,42 @@ expr0:
   | lvalue L_ASSIGN expr0
     {
       parse_node_t *l = $1, *r = $3;
-      /* set this up here so we can change it below */
-      /* assignments are backwards; rhs is evaluated before
-         lhs, so put the RIGHT hand side on the LEFT hand
-         side of the tree node. */
-      CREATE_BINARY_OP($$, $2, r->type, r, l);
+      int opcode = $2;
 
-      /* allow TYPE_STRING += TYPE_NUMBER | TYPE_OBJECT */
-      if (exact_types && !compatible_types(r->type, l->type) &&
-          !($2 == F_ADD_EQ && l->type == TYPE_STRING &&
-            ((COMP_TYPE(r->type, TYPE_NUMBER)) || r->type == TYPE_OBJECT))) {
-        char buf[256];
-        char *end = EndOf(buf);
-        char *p;
-        p = strput(buf, end, "Bad assignment ");
-        p = get_two_types(p, end, l->type, r->type);
-        p = strput(p, end, ".");
-        yyerror(buf);
+      if (opcode == F_LOR_EQ || opcode == F_LAND_EQ || opcode == F_NULLISH_EQ) {
+        if (exact_types && !compatible_types(r->type, l->type)) {
+          char buf[256];
+          char *end = EndOf(buf);
+          char *p;
+          p = strput(buf, end, "Bad assignment ");
+          p = get_two_types(p, end, l->type, r->type);
+          p = strput(p, end, ".");
+          yyerror(buf);
+        }
+        CREATE_LOGICAL_ASSIGN($$, opcode, l, r);
+      } else {
+        /* set this up here so we can change it below */
+        /* assignments are backwards; rhs is evaluated before
+           lhs, so put the RIGHT hand side on the LEFT hand
+           side of the tree node. */
+        CREATE_BINARY_OP($$, opcode, r->type, r, l);
+
+        /* allow TYPE_STRING += TYPE_NUMBER | TYPE_OBJECT */
+        if (exact_types && !compatible_types(r->type, l->type) &&
+            !(opcode == F_ADD_EQ && l->type == TYPE_STRING &&
+              ((COMP_TYPE(r->type, TYPE_NUMBER)) || r->type == TYPE_OBJECT))) {
+          char buf[256];
+          char *end = EndOf(buf);
+          char *p;
+          p = strput(buf, end, "Bad assignment ");
+          p = get_two_types(p, end, l->type, r->type);
+          p = strput(p, end, ".");
+          yyerror(buf);
+        }
+
+        if (opcode == F_ASSIGN)
+          $$->l.expr = do_promotions(r, l->type);
       }
-
-      if ($2 == F_ASSIGN)
-        $$->l.expr = do_promotions(r, l->type);
     }
   | error L_ASSIGN expr0
     {
@@ -1319,6 +1336,12 @@ expr0:
         CREATE_IF($$, $1, p1, p2);
       }
       $$->type = ((p1->type == p2->type) ? p1->type : TYPE_ANY);
+    }
+  | expr0 L_QUESTION_QUESTION expr0
+    {
+      /* Nullish coalescing: left ?? right
+       * Return left if defined, otherwise return right */
+      CREATE_NULLISH($$, $1, $3);
     }
   | expr0 L_LOR expr0
     {

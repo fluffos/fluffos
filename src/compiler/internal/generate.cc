@@ -121,6 +121,8 @@ static parse_node_t *optimize(parse_node_t *expr) {
     case NODE_NUMBER:
       break;
     case NODE_LAND_LOR:
+    case NODE_NULLISH:
+    case NODE_LOGICAL_ASSIGN:
     case NODE_BRANCH_LINK: {
       int in_cond = (optimizer_state & OPTIMIZER_IN_COND);
 
@@ -342,14 +344,14 @@ const char *lpc_tree_name[] = {"return",        "two values",    "opcode",
                                "unary op_1",    "binary op",     "binary op_1",
                                "ternary op",    "ternary op_1",  "control jump",
                                "loop",          "call",          "call_1",
-                               "call_2",        "&& ||",         "foreach",
-                               "lvalue_efun",   "switch_range",  "switch_string",
-                               "switch_direct", "switch_number", "case_number",
-                               "case_string",   "default",       "if",
-                               "branch link",   "parameter",     "parameter_lvalue",
-                               "efun",          "anon func",     "real",
-                               "number",        "string",        "function",
-                               "catch"};
+                               "call_2",        "&& ||",         "nullish",
+                               "logical assign", "foreach",       "lvalue_efun",
+                               "switch_range",  "switch_string", "switch_direct",
+                               "switch_number", "case_number",   "case_string",
+                               "default",       "if",            "branch link",
+                               "parameter",     "parameter_lvalue", "efun",
+                               "anon func",     "real",          "number",
+                               "string",        "function",      "catch"};
 
 static void lpc_tree(parse_node_t *dest, int num) {
   parse_node_t *pn;
@@ -511,6 +513,18 @@ void dump_tree(parse_node_t *expr) {
       } else {
         printf("(|| ");
       }
+      dump_tree(expr->l.expr);
+      dump_tree(expr->r.expr);
+      printf(")");
+      break;
+    case NODE_NULLISH:
+      printf("(?? ");
+      dump_tree(expr->l.expr);
+      dump_tree(expr->r.expr);
+      printf(")");
+      break;
+    case NODE_LOGICAL_ASSIGN:
+      printf("(%s ", instrs[expr->v.number].name);
       dump_tree(expr->l.expr);
       dump_tree(expr->r.expr);
       printf(")");
@@ -688,6 +702,8 @@ void lpc_tree_form(parse_node_t *expr, parse_node_t *dest) {
       break;
     case NODE_BINARY_OP:
     case NODE_LAND_LOR:
+    case NODE_LOGICAL_ASSIGN:
+    case NODE_NULLISH:
     case NODE_BRANCH_LINK:
       lpc_tree(dest, 4);
       lpc_tree_opc(ARG_2, expr->v.number);
