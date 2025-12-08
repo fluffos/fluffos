@@ -109,7 +109,8 @@ static inline void assign_value_to_lvalue(svalue_t *lval, svalue_t *value, const
 static inline bool use_pcre_sscanf() { return CONFIG_INT(__RC_SSCANF_USE_PCRE__); }
 
 static bool pcre_sscanf_match(const char *pattern, int pattern_len, const char *subject,
-                              bool anchored, const char **match_start, const char **match_end) {
+                              int subject_len, bool anchored, const char **match_start,
+                              const char **match_end) {
   const char *compile_error = nullptr;
   int error_offset = 0;
 
@@ -124,8 +125,8 @@ static bool pcre_sscanf_match(const char *pattern, int pattern_len, const char *
   pcre_fullinfo(re, nullptr, PCRE_INFO_CAPTURECOUNT, &capture_count);
   std::vector<int> ovector((capture_count + 1) * 3);
 
-  int rc = pcre_exec(re, nullptr, subject, static_cast<int>(strlen(subject)), 0,
-                     anchored ? PCRE_ANCHORED : 0, ovector.data(),
+  int rc = pcre_exec(re, nullptr, subject, subject_len, 0, anchored ? PCRE_ANCHORED : 0,
+                     ovector.data(),
                      static_cast<int>(ovector.size()));
   if (rc < 0) {
     pcre_free(re);
@@ -4669,8 +4670,9 @@ int inter_sscanf(svalue_t *arg, svalue_t *s0, svalue_t *s1, int num_arg) {
             if (use_pcre_sscanf()) {
               const char *match_start = nullptr;
               const char *match_end = nullptr;
-              if (!pcre_sscanf_match(fmt, n, in_string, /*anchored*/ true, &match_start,
-                                     &match_end)) {
+              int subject_len = static_cast<int>(strlen(in_string));
+              if (!pcre_sscanf_match(fmt, n, in_string, subject_len, /*anchored*/ true,
+                                     &match_start, &match_end)) {
                 return number_of_matches;
               }
               if (!skipme) {
@@ -4815,13 +4817,14 @@ int inter_sscanf(svalue_t *arg, svalue_t *s0, svalue_t *s1, int num_arg) {
                 continue;
             }
             {
-              int n = tmp - fmt;
+            int n = tmp - fmt;
 #ifdef PACKAGE_PCRE
               if (use_pcre_sscanf()) {
                 const char *match_start = nullptr;
                 const char *match_end = nullptr;
-                if (!pcre_sscanf_match(fmt, n, in_string, /*anchored*/ false, &match_start,
-                                       &match_end)) {
+                int subject_len = static_cast<int>(strlen(in_string));
+                if (!pcre_sscanf_match(fmt, n, in_string, subject_len, /*anchored*/ false,
+                                       &match_start, &match_end)) {
                   if (!skipme) {
                     SSCANF_ASSIGN_SVALUE_STRING(string_copy(in_string, "sscanf"));
                   }
