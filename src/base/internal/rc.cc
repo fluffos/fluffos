@@ -104,6 +104,7 @@ const FlagEntry INT_FLAGS[] = {
     {"enable mssp", __RC_ENABLE_MSSP__, 1},
     {"enable msp", __RC_ENABLE_MSP__, 1},
     {"enable msdp", __RC_ENABLE_MSDP__, 0},
+    {"sscanf use pcre", __RC_SSCANF_USE_PCRE__, 0, 0, 1},
 };
 
 /*
@@ -198,179 +199,105 @@ void read_config(const char *filename) {
     exit(-1);
   }
 
-  std::stringstream buffer;
-  buffer << f.rdbuf();
-
-  char tmp[K_MAX_CONFIG_LINE_LENGTH];
-  while (buffer.getline(&tmp[0], sizeof(tmp), '\n')) {
-    if (strlen(tmp) == K_MAX_CONFIG_LINE_LENGTH - 1) {
-      debug_message("*Warning: possible truncated config line: %s\n", tmp);
-    }
-
-    std::string v(tmp);
-
-    // ignore anything after # in the line.
-    auto pos = v.find_first_of('#');
-    if (pos != std::string::npos) {
-      v.erase(pos);
-    }
-    v = trim(v);
-    if (v.empty()) {
-      continue;
-    }
-    config_lines.push_back(v + "\n");
+  std::string tmp;
+  while (!f.eof()) {
+    char line_buffer[K_MAX_CONFIG_LINE_LENGTH];
+    f.getline(line_buffer, sizeof(line_buffer));
+    config_lines.emplace_back(std::string(line_buffer));
   }
 
-  // Process global include file.
-  {
-    scan_config_line("global include file : %[^\n]", tmp, 0);
+  f.close();
 
-    /* check if the global include file is quoted */
-    std::string const v(tmp);
-    if (!starts_with(v, "\"") && !starts_with(v, "<")) {
-      debug_message("Missing '\"' or '<' around global include file name; adding quotes.\n");
-      // not very efficient, but who cares.
-      CONFIG_STR(__GLOBAL_INCLUDE_FILE__) =
-          alloc_cstring(("\"" + v + "\"").c_str(), "config file: gif");
+  tmp.resize(2048);
+
+  scan_config_line("global include file : %[\n]", tmp.data(), kOptional);
+
+  scan_config_line("name : %[\n]", tmp.data(), 1);
+  scan_config_line("mudlib directory : %[\n]", tmp.data(), 1);
+  scan_config_line("log directory : %[\n]", tmp.data(), 1);
+  scan_config_line("include directories : %[\n]", tmp.data(), 1);
+  scan_config_line("master file : %[\n]", tmp.data(), 1);
+  scan_config_line("simulated efun file : %[\n]", tmp.data(), 0);
+  scan_config_line("debug log file : %[\n]", tmp.data(), -1);
+  scan_config_line("default error message : %[\n]", tmp.data(), 0);
+  tmp.resize(2048);  // so default fail message doesn't clobber error
+  tmp[0] = '\0';
+  if (scan_config_line("default fail message : %[\n]", tmp.data(), 0)) {
+    CONFIG_STR(__DEFAULT_FAIL_MESSAGE__) = alloc_cstring(tmp.c_str(), "rc.c");
+  }
+
+  scan_config_line("mud ip : %[\n]", tmp.data(), 0);
+  scan_config_line("fd6 ip : %[\n]", tmp.data(), 0);
+  scan_config_line("address server ip : %[\n]", tmp.data(), -2);
+
+  if (scan_config_line("port number : %d\n", &CONFIG_INT(__MUD_PORT__), 0)) {
+    debug_message("*Warning: 'port number' is obsolete, please use 'external_port_1'\n");
+  }
+
+  int external = 0;
+  char kind[20], tmp2[128], tmp3[128];
+  sprintf(kind, "external_port_%d : %s", ++external, "%[\n]");
+  if (scan_config_line(kind, tmp.data(), 1)) {
+    parse_config_line(tmp.c_str(), &external_port[external - 1]);
+  }
+
+  while (true) {
+    sprintf(kind, "external_port_%d : %[\n]", ++external, tmp2);
+    if (scan_config_line(kind, tmp2, 0)) {
+      parse_config_line(tmp2, &external_port[external - 1]);
     } else {
-      CONFIG_STR(__GLOBAL_INCLUDE_FILE__) = alloc_cstring(tmp, "config file: gif");
-    }
-  }
-
-  scan_config_line("name : %[^\n]", tmp, 1);
-  CONFIG_STR(__MUD_NAME__) = alloc_cstring(tmp, "config file: mn");
-
-  scan_config_line("mudlib directory : %[^\n]", tmp, 1);
-  CONFIG_STR(__MUD_LIB_DIR__) = alloc_cstring(tmp, "config file: mld");
-
-  scan_config_line("log directory : %[^\n]", tmp, 1);
-  CONFIG_STR(__LOG_DIR__) = alloc_cstring(tmp, "config file: ld");
-
-  scan_config_line("include directories : %[^\n]", tmp, 1);
-  CONFIG_STR(__INCLUDE_DIRS__) = alloc_cstring(tmp, "config file: id");
-
-  scan_config_line("master file : %[^\n]", tmp, 1);
-  CONFIG_STR(__MASTER_FILE__) = alloc_cstring(tmp, "config file: mf");
-
-  scan_config_line("simulated efun file : %[^\n]", tmp, 0);
-  CONFIG_STR(__SIMUL_EFUN_FILE__) = alloc_cstring(tmp, "config file: sef");
-
-  scan_config_line("debug log file : %[^\n]", tmp, -1);
-  CONFIG_STR(__DEBUG_LOG_FILE__) = alloc_cstring(tmp, "config file: dlf");
-
-  scan_config_line("default error message : %[^\n]", tmp, 0);
-  CONFIG_STR(__DEFAULT_ERROR_MESSAGE__) = alloc_cstring(tmp, "config file: dem");
-
-  {
-    scan_config_line("default fail message : %[^\n]", tmp, 0);
-    if (strlen(tmp) == 0) {
-      strcpy(tmp, "What?\n");
-    }
-    if (strlen(tmp) <= K_MAX_CONFIG_LINE_LENGTH - 2) {
-      strcat(tmp, "\n");
-    }
-    CONFIG_STR(__DEFAULT_FAIL_MESSAGE__) = alloc_cstring(tmp, "config file: dfm");
-  }
-
-  scan_config_line("mud ip : %[^\n]", tmp, 0);
-  CONFIG_STR(__MUD_IP__) = alloc_cstring(tmp, "config file: mi");
-
-  /* Process ports */
-  {
-    int i, port, port_start = 0;
-    if (scan_config_line("port number : %d\n", &CONFIG_INT(__MUD_PORT__), 0)) {
-      external_port[0].port = CONFIG_INT(__MUD_PORT__);
-      external_port[0].kind = PORT_TYPE_TELNET;
-      port_start = 1;
-    }
-
-    /* check for ports */
-    if (port_start == 1) {
-      if (scan_config_line("external_port_1 : %[^\n]", tmp, 0)) {
-        int const port = CONFIG_INT(__MUD_PORT__);
-        debug_message(
-            "Warning: external_port_1 already defined to be 'telnet %i' by "
-            "the line\n    'port number : %i'; ignoring the line "
-            "'external_port_1 : %s'\n",
-            port, port, tmp);
-      }
-    }
-    for (i = port_start; i < 5; i++) {
-      external_port[i].kind = PORT_TYPE_UNDEFINED;
-      external_port[i].fd = -1;
-
-      char kind[K_MAX_CONFIG_LINE_LENGTH];
-      sprintf(kind, "external_port_%i : %%[^\n]", i + 1);
-      if (scan_config_line(kind, tmp, 0)) {
-        if (sscanf(tmp, "%s %d", kind, &port) == 2) {
-          external_port[i].port = port;
-          if (!strcmp(kind, "telnet")) {
-            external_port[i].kind = PORT_TYPE_TELNET;
-          } else if (!strcmp(kind, "binary")) {
-            external_port[i].kind = PORT_TYPE_BINARY;
-          } else if (!strcmp(kind, "ascii")) {
-            external_port[i].kind = PORT_TYPE_ASCII;
-          } else if (!strcmp(kind, "MUD")) {
-            external_port[i].kind = PORT_TYPE_MUD;
-          } else if (!strcmp(kind, "websocket")) {
-            external_port[i].kind = PORT_TYPE_WEBSOCKET;
-            if (!CONFIG_STR(__RC_WEBSOCKET_HTTP_DIR__)) {
-              scan_config_line("websocket http dir : %[^\n]", tmp, kMustHave);
-              CONFIG_STR(__RC_WEBSOCKET_HTTP_DIR__) = alloc_cstring(tmp, "config file: whd");
-            }
-          } else {
-            debug_message("Unknown kind of external port: %s\n", kind);
-            exit(-1);
-          }
-        } else {
-          debug_message("Syntax error in port specification\n");
-          exit(-1);
-        }
-      }
-    }
-    // TLS support status
-    for (i = port_start; i < 5; i++) {
-      if (external_port[i].kind != PORT_TYPE_UNDEFINED) {
-        char kind[K_MAX_CONFIG_LINE_LENGTH];
-        sprintf(kind, "external_port_%i_tls : %%[^\n]", i + 1);
-        if (scan_config_line(kind, tmp, 0)) {
-          char cert[255 + 1]{}, key[255 + 1]{};
-          if (sscanf(tmp, "cert=%255s key=%255s", cert, key) == 2) {
-            if (strlen(cert) == 0 || strlen(key) == 0) {
-              debug_message("cert/key path can't be empty.\n");
-              exit(-1);
-            }
-            external_port[i].tls_cert = cert;
-            external_port[i].tls_key = key;
-          }
-        }
-      }
-    }
-  }
-#ifdef PACKAGE_EXTERNAL
-  /* check for commands */
-  {
-    char kind[K_MAX_CONFIG_LINE_LENGTH];
-
-    for (int i = 0; i < g_num_external_cmds; i++) {
-      sprintf(kind, "external_cmd_%i : %%[^\n]", i + 1);
-      if (scan_config_line(kind, tmp, 0)) {
-        external_cmd[i] = alloc_cstring(tmp, "external cmd");
+      sprintf(kind, "external_port_%d_tls: %[\n]", external, tmp3);
+      if (scan_config_line(kind, tmp3, 0)) {
+        parse_config_line(tmp3, &external_port[external - 1]);
       } else {
-        external_cmd[i] = nullptr;
+        break;
       }
+    }
+  }
+
+#ifdef PACKAGE_COMPRESS
+  if (scan_config_line("reserved user size: %d\n", &reserved_user_size, 0)) {
+    if (reserved_user_size > SMALL_STRING_SIZE) {
+      debug_message("reserved user size: %d is greater than SMALL_STRING_SIZE (%d)\n",
+                    reserved_user_size, SMALL_STRING_SIZE);
+      reserved_user_size = SMALL_STRING_SIZE;
+    }
+  }
+
+  scan_config_line("reserved size : %d\n", &reserved_size, kOptional);
+#else
+  scan_config_line("reserved size : %d\n", &reserved_size, kOptional);
+#endif
+
+#ifdef F_SET_MAX_INHERIT
+  scan_config_line("max inherit depth : %d\n", &max_inherit, kOptional);
+#endif
+
+#ifdef F_SET_MAX_CALL_DEPTH
+  scan_config_line("max call depth : %d\n", &max_call_depth, kOptional);
+#endif
+
+#ifndef NO_WIZARDS
+  // Read in external command execution lines if present.
+  for (int i = 0; i < g_num_external_cmds; i++) {
+    char kind[40];
+    sprintf(kind, "external_cmd_%d : %[\n]", i + 1, tmp2);
+    if (scan_config_line(kind, tmp2, 0)) {
+      external_cmd[i] = alloc_cstring(tmp2, "rc.c");
+    } else {
+      external_cmd[i] = nullptr;
     }
   }
 #endif
 
   // Complain about obsolete config lines.
-  scan_config_line("address server ip : %[^\n]", tmp, -2);
-  scan_config_line("address server port : %d\n", tmp, -2);
-  scan_config_line("reserved size : %d\n", tmp, -2);
-  scan_config_line("fd6 kind : %[^\n]", tmp, -2);
-  scan_config_line("fd6 port : %d\n", tmp, -2);
-  scan_config_line("binary directory : %[^\n]", tmp, K_WARN_FOUND);
-  scan_config_line("swap file : %[^\n]", tmp, K_WARN_FOUND);
+  scan_config_line("address server ip : %[\n]", tmp.data(), -2);
+  scan_config_line("address server port : %d\n", tmp.data(), -2);
+  scan_config_line("reserved size : %d\n", tmp.data(), -2);
+  scan_config_line("fd6 kind : %[\n]", tmp.data(), -2);
+  scan_config_line("fd6 port : %d\n", tmp.data(), -2);
+  scan_config_line("binary directory : %[\n]", tmp.data(), K_WARN_FOUND);
+  scan_config_line("swap file : %[\n]", tmp.data(), K_WARN_FOUND);
 
   // Give all obsolete (thus untouched) config strings a value.
   for (auto &i : config_str) {

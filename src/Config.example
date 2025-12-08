@@ -137,59 +137,85 @@ object table size : 1501
 # This must be one of 4, 16, 64, 256, 1024, 4096
 living hash table size : 256
 
-# Set the granularity of game-time (shortest time interval visible ingame)
-gametick msec : 1000
-
-# Set heartbeat interval in milliseconds (ms).
+gametick msec : 100
 heartbeat interval msec : 1000
 
 # explode():
 #
-# The old behavior (#undef both of the below) strips any number of delimiters
-# at the start of the string, and one at the end.  So explode("..x.y..z..",
-# ".") gives ({ "x", "y", "", "z", "" })
+# The old behavior (#undef both of the below) strips any number of
+# delimiters at the start of the string, and one at the end.  So
+# explode("..x.y..z..", ".") gives ({ "x", "y", "", "z", "" })
 #
-# sane explode string strips off at most one leading delimiter, and still
-# strips off one at the end, so the example above gives
+# SANE_EXPLODE_STRING strips off at most one leading delimiter, and
+# still strips off one at the end, so the example above gives
 # ({ "", "x", "y", "", "z", "" }).
 #
-# reversible explode string overrides SANE_EXPLODE_STRING, and makes it so
-# that implode(explode(x, y), y) is always x; i.e. no delimiters are ever
-# stripped.  So the example above gives
+# REVERSIBLE_EXPLODE_STRING overrides SANE_EXPLODE_STRING, and makes
+# it so that implode(explode(x, y), y) is always x; i.e. no delimiters
+# are ever stripped.  So the example above gives
 # ({ "", "", "x", "y", "", "z", "", "" }).
+#
+# Use PCRE-backed %(...) in sscanf instead of the legacy regexp engine (requires PACKAGE_PCRE)
+sscanf use pcre : 0
+
+#
 sane explode string : 1
 reversible explode string : 0
 
+# SANE_SORTING: Use system provided fastest sorting routine for various
+# sorting, including sort_array EFUN.
+#
+# This replace the old internal version qsort which only sorts to one
+# direction repetitively. so following LPC code:
+#
+#    sort_array(({4,3,2,1}), (: -($1<$2) :));
+#
+# can still return ({1,2,3,4}), even though it only returns -1 and 0.
+#
+# It is recommended to fix your LPC code to not rely on this behavior.
+#
+# Your LPC code should return 1, 0, -1 for situation where first argument
+# is less than, equal to, or greater than the second argument. This will
+# will work with both implementation.
+#
+# Old code should work fine with this added, easy to inspect by searching
+# for sort_array.
 #
 sane sorting : 1
 
-# Some versions of the editor built in indent function use tabs for
-# indenting. This options turns on a warning message for files indented with
-# tabs instead of spaces.
+# WARN_TAB: Some versions of the editor built in indent function use
+#   tabs for indenting. This options turns on a warning message for
+#   files indented with tabs instead of spaces.
+#
 warn tab : 0
 
-# Don't allow spaces between start/end of array/mapping/functional token
-# chars so ({1,2,3}) still works, but ( { 1 , 2 , 3 } ) doesn't and
-# ({ 1 , 2 , 3 }) does.
+# WOMBLES: don't allow spaces between start/end of array/mapping/functional
+# token chars so ({1,2,3}) still works, but ( { 1 , 2 , 3 } ) doesn't
+# and ({ 1 , 2 , 3 }) does.
 wombles : 0
 
-# Enable type checking for call_other() (-> operator on objects)
+# CALL_OTHER_TYPE_CHECK: enable type checking for call_other()
+# (-> operator on objects)
+#
 call other type check : 0
 
-# Make it warning instead of errors
+# CALL_OTHER_WARN, make it warning instead of errors
 call other warn : 0
 
-# If you set this, the driver doesn't do any handling of runtime errors,
-# other than to turn the heartbeats of objects off.  Information about the
-# error is passed in a mapping to the error_handler() function in the master
-# object.  Whatever is returned is put in the debug.log.
+# MUDLIB_ERROR_HANDLER: If you define this, the driver doesn't do any
+#   handling of runtime errors, other than to turn the heartbeats of
+#   objects off.  Information about the error is passed in a mapping
+#   to the error_handler() function in the master object.  Whatever is
+#   returned is put in the debug.log.
 #
 # A good mudlib error handler is one of the best tools for tracking down
-# errors.  Unfortunately, you need to have one.  Check the testsuite or other
-# libs for an example.
+# errors.  Unfortunately, you need to have one.  Check the testsuite or
+# other libs for an example.
+#
 mudlib error handler : 1
 
 # NO_RESETS: completely disable the periodic calling of reset()
+#
 no resets : 0
 
 # LAZY_RESETS: if this is defined, an object will only have reset()
@@ -198,145 +224,3 @@ no resets : 0
 #   is #undef'd, then reset() will be called as always (which guaranteed that
 #   reset would always be called at least once).  The advantage of lazy
 #   resets is that reset doesn't get called in an object that is touched
-#   once and never again (which can save memory since some objects won't get
-#   reloaded that otherwise would).
-#
-lazy resets : 0
-
-# RANDOMIZED_RESETS: if this is defined, then reset() will be called in
-#   a randomized time interval, varying from between TIME_TO_RESET/2 to
-#   TIME_TO_RESET-1.  If RANDOMIZED_RESETS is undefined, then reset()
-#   will be called upon all objects at the same time using the interval
-#   TIME_TO_RESET.
-#
-randomized resets : 1
-
-# Set if you wish to disallow users from typing in commands that contain ANSI
-# escape sequences.  Setting NO_ANSI causes all escapes (ASCII 27) to be
-# replaced with a space ' ' before the string is passed to the action
-# routines added with add_action.
-no ansi : 1
-
-# 'strip before process input' allows the location where the stripping is
-# done to be controlled.  If it is set, then process_input() doesn't see ANSI
-# characters either; if it is unset ESC chars can be processed by
-# process_input(), but are stripped before add_actions are called.  Note that
-# if NO_ADD_ACTION is defined, then setting 'no ansi' without
-# 'strip before process input' is the same as unsetting 'no ansi'.
-#
-# If you anticipate problems with users intentionally typing in ANSI codes to
-# make your terminal flash, etc set this.
-strip before process input : 1
-
-# Set this if you wish this_player() to be usable from within call_out()
-# callbacks.
-this_player in call_out : 1
-
-# Set this to enable the trace() and traceprefix() efuns.  (keeping this
-# unset will cause the driver to run faster).
-trace : 1
-
-# Set this to enable code tracing (the driver will print out the previous
-# lines of code to an error) eval_instruction() runs about twice as fast when
-# this is not set (for the most common eoperators).
-trace code : 0
-
-# Set this if you want catch_tell called on interactives as well as NPCs.  If
-# this is set, the user object will need a catch_tell(msg) method that calls
-# receive(msg);
-interactive catch tell : 0
-
-# Set this if you want snoop text to be sent to the receive_snoop() function
-# in the snooper object (instead of being sent directly via add_message()).
-# This is useful if you want to build a smart client that does something
-# different with snoop messages.
-receive snoop : 1
-
-# Set this if you want snoop to report what is sent to the player even in the
-# event that the player's catch_tell() is shadowed and the player may not be
-# seeing what is being sent.  Messages of this sort will be prefixed with $$.
-snoop shadowed : 0
-
-#
-reverse defer : 0
-
-# If set, the driver can take the argument '-C' which will give the driver an
-# interactive console (you can type commands at the terminal.)  Backgrounding
-# the driver will turn off the console, but sending signal SIGTTIN (kill -21)
-# to the driver can turn it back on.  Typing 'help' will display commands
-# available.  The intent is to allow the inspection of things that are
-# difficult to inspect from inside the mud.
-has console : 1
-
-# If set, all writes/tells/etc to noninteractive objects will be written to
-# stderr prefixed with a ']' (old behavior).
-#
-# Compat status: Easy to support, and also on the "It's a bug!  No, it's
-# a feature!" religious war list.
-noninteractive stderr write : 0
-
-# Set this if you want FluffOS to call crash() in master.c and then shutdown
-# when signals are received that would normally crash the driver.
-trap crashes : 1
-
-# Reintroduces a bug in type-checking that effectively renders compile time
-# type checking useless.  For backwards compatibility.
-#
-# Compat status: dealing with all the resulting compile errors can be a huge
-# pain even if they are correct, and the impact on the code is small.
-old type behavior : 0
-
-# Set this if you want negative indexes in string or buffer range values
-# (i.e.  foo = x[-2..-1]; not lvalue for e.g. not x[-2..-1] = foo, the latter is always
-# illegal) to mean counting from the end
-#
-# Compat status: Not horribly difficult to replace reliance on this, but not
-# trivial, and cannot be simulated.
-old range behavior : 0
-warn old range behavior : 1
-
-# suppress warnings about unused arguments; only warn about unused local
-# variables.  Makes older code (where argument names were required) compile
-# more quietly.
-suppress argument warnings : 1
-
-#
-enable_commands call init : 1
-
-#
-sprintf add_justified ignore ANSI colors : 1
-
-# Defines the number of bits to use in the call_other cache (in interpret.c).
-#
-# Memory overhead is (1 << APPLY_CACHE_BITS)*16.
-# [assuming 32 bit pointers and 16 bit shorts]
-#
-# ACB:     entries:     overhead:
-#   6           64            1k
-#   8          256            4k
-#  10        1,024           16k
-#  12        4,096           64k
-#  14       16,384          256k
-#  16       65,536            1M
-#  20    1,048,576           16M
-#  22    4,194,304           64M
-apply cache bits : 22
-
-#
-call_out(0) next level : 1000
-
-###############################################################################
-#          The following aren't currently used or implemented (yet)           #
-###############################################################################
-
-# maximum number of users in the game (unused currently)
-maximum users : 40
-
-# Set the maximum stack size of the stack machine. This stack will also
-# contain all local variables and arguments.
-evaluator stack size : 6000
-
-# Set the size of the compiler stack. This defines how complex expressions
-# the compiler can parse.  (unused currently)
-compiler stack size : 600
-
