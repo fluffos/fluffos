@@ -10,11 +10,17 @@ title: pcre / pcre_extract
 
 ### SYNOPSIS
 
-    string *pcre_extract(string, string);
+    string *pcre_extract(string, string, void|int include_named);
 
 ### DESCRIPTION
 
-    returns an array of captured groups specified in pattern.
+    返回模式中捕获分组组成的数组。
+
+    第三个参数 `include_named` 可选，默认 0。当其非零时，返回值末尾总会追加一个映射，键为分组名称，值为对应的捕获内容。若正则没有命名分组（或均未匹配），映射为空；否则仅包含实际参与匹配的分组。
+
+    示例（命名分组）：
+
+        ({"alpha", "99", (["word": "alpha", "num": "99"])})
 
 ### SEE ALSO
 

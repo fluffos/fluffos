@@ -65,6 +65,7 @@
 #include "base/package_api.h"
 
 #include "pcre.h"
+#include "vm/internal/base/mapping.h"
 
 // Prototype declarations
 static void pcre_free_memory(pcre_t *p);
@@ -76,7 +77,7 @@ static int pcre_match_single(svalue_t *str, const char *pattern);
 static array_t *pcre_match(array_t *v, const char *pattern, int flag);
 static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *def);
 static char *pcre_get_replace(pcre_t *run, array_t *replacements);
-static array_t *pcre_get_substrings(pcre_t *run);
+static array_t *pcre_get_substrings(pcre_t *run, bool include_names);
 // Caching functions
 static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat, const char *pattern);
 static pcre *pcre_get_cached_pattern(struct pcre_cache_t *table, const char *pattern);
@@ -149,11 +150,22 @@ void f_pcre_assoc() {
 void f_pcre_extract() {
   pcre_t *run;
   array_t *ret;
+  svalue_t *arg = sp - st_num_arg + 1;
+  int include_names = 0;
+
+  if (st_num_arg == 3) {
+    if ((arg + 2)->type != T_NUMBER) {
+      error("Bad argument 3 to pcre_extract()\n");
+    }
+    include_names = (arg + 2)->u.number != 0;
+  } else if (st_num_arg != 2) {
+    error("pcre_extract() requires 2 or 3 arguments\n");
+  }
 
   run = (pcre_t *)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "f_pcre_extract : run");
-  run->pattern = sp->u.string;
-  run->subject = (sp - 1)->u.string;
-  run->s_length = SVALUE_STRLEN(sp - 1);
+  run->pattern = (arg + 1)->u.string;
+  run->subject = arg->u.string;
+  run->s_length = SVALUE_STRLEN(arg);
   run->ovector = nullptr;
   run->ovecsize = 0;
   DEFER { pcre_free_memory(run); };
@@ -162,10 +174,8 @@ void f_pcre_extract() {
     error("PCRE compilation failed at offset %d: %s\n", run->erroffset, run->error);
   }
 
-  /* Pop the 2 arguments from the stack */
-
   if (run->rc < 0) { /* No match. could do handling of matching errors if wanted */
-    pop_2_elems();
+    pop_n_elems(st_num_arg);
     push_refed_array(&the_null_array);
     return;
   }
@@ -173,8 +183,8 @@ void f_pcre_extract() {
     error("Too many substrings.\n");
   }
 
-  ret = pcre_get_substrings(run);
-  pop_2_elems();
+  ret = pcre_get_substrings(run, include_names);
+  pop_n_elems(st_num_arg);
 
   push_refed_array(ret);
 }
@@ -262,7 +272,7 @@ void f_pcre_replace_callback() {
     error("Too many substrings.\n");
   }
 
-  arr = pcre_get_substrings(run);
+  arr = pcre_get_substrings(run, false);
 
   if (arg[2].type == T_FUNCTION || arg[2].type == T_STRING) {
     process_efun_callback(2, &ftc, F_PCRE_REPLACE_CALLBACK);
@@ -324,17 +334,25 @@ static pcre *pcre_local_compile(pcre_t *p) {
 }
 
 static int pcre_local_exec(pcre_t *p) {
-  int size;
-  pcre_fullinfo(p->re, nullptr, PCRE_INFO_CAPTURECOUNT, &size);
-  size += 2;
-  size *= 3;
+  int capture_count = 0;
+  pcre_fullinfo(p->re, nullptr, PCRE_INFO_CAPTURECOUNT, &capture_count);
+  capture_count += 2;
+  capture_count *= 3;
   if (p->ovector) {
     FREE(p->ovector);
   }
-  p->ovector = (int *)DCALLOC(size + 1, sizeof(int), TAG_TEMPORARY,
+  p->ovector = (int *)DCALLOC(capture_count + 1, sizeof(int), TAG_TEMPORARY,
                               "pcre_local_exec");  // too much, but who cares
-  p->ovecsize = size;
-  p->rc = pcre_exec(p->re, nullptr, p->subject, p->s_length, 0, 0, p->ovector, size);
+  p->ovecsize = capture_count;
+
+  p->namecount = 0;
+  p->name_entry_size = 0;
+  p->name_table = nullptr;
+  pcre_fullinfo(p->re, nullptr, PCRE_INFO_NAMECOUNT, &p->namecount);
+  pcre_fullinfo(p->re, nullptr, PCRE_INFO_NAMEENTRYSIZE, &p->name_entry_size);
+  pcre_fullinfo(p->re, nullptr, PCRE_INFO_NAMETABLE, &p->name_table);
+
+  p->rc = pcre_exec(p->re, nullptr, p->subject, p->s_length, 0, 0, p->ovector, capture_count);
 
   return p->rc;
 }
@@ -726,14 +744,18 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
   return ret;
 }
 
-static array_t *pcre_get_substrings(pcre_t *run) {
+static array_t *pcre_get_substrings(pcre_t *run, bool include_names) {
   array_t *ret;
   unsigned int i;
 
-  ret = allocate_empty_array(run->rc - 1);
+  unsigned int const base_size = run->rc > 0 ? static_cast<unsigned int>(run->rc - 1) : 0;
+  bool const add_names = include_names;
+  unsigned int const ret_size = base_size + (add_names ? 1 : 0);
+
+  ret = allocate_empty_array(ret_size);
 
   if (run->rc != 1) {
-    for (i = 1; i <= (run->rc - 1); i++) {
+    for (i = 1; i <= base_size; i++) {
       unsigned int start, length;
       /* Allocate enough for the match */
       length = run->ovector[2 * i + 1] - run->ovector[2 * i];
@@ -746,6 +768,46 @@ static array_t *pcre_get_substrings(pcre_t *run) {
       ret->item[i - 1].u.string = match;
     }
   }
+
+  if (add_names && ret_size > 0) {
+    mapping_t *map = allocate_mapping(run->namecount);
+
+    if (run->namecount > 0) {
+      for (int name_index = 0; name_index < run->namecount; name_index++) {
+        auto *entry = run->name_table + name_index * run->name_entry_size;
+        int const group = (entry[0] << 8) | entry[1];
+
+        if (group <= 0 || static_cast<unsigned int>(group) > base_size) {
+          continue;  // skip overall match or groups not captured in ret
+        }
+
+        int const ovec_index = group * 2;
+        if (ovec_index + 1 >= run->ovecsize) {
+          continue;
+        }
+        if (run->ovector[ovec_index] < 0 || run->ovector[ovec_index + 1] < 0) {
+          continue;  // group did not participate
+        }
+
+        svalue_t key;
+        key.type = T_STRING;
+        key.subtype = STRING_SHARED;
+        key.u.string = make_shared_string(reinterpret_cast<char *>(entry + 2));
+
+        svalue_t *slot = find_for_insert(map, &key, 1);
+        free_string(key.u.string);
+
+        if (slot != nullptr) {
+          assign_svalue_no_free(slot, &ret->item[group - 1]);
+        }
+      }
+    }
+
+    ret->item[ret_size - 1].type = T_MAPPING;
+    ret->item[ret_size - 1].subtype = 0;
+    ret->item[ret_size - 1].u.map = map;
+  }
+
   return ret;
 }
 

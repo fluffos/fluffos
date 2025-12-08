@@ -139,6 +139,30 @@ TEXT;
       }),
       pcre_match_all(tmp, re));
 
+  tmp = "alpha 99";
+  re = "(?<word>\\w+) (?<num>\\d+)";
+  mixed *named = pcre_extract(tmp, re, 1);
+  ASSERT_EQ(3, sizeof(named));
+  ASSERT_EQ("alpha", named[0]);
+  ASSERT_EQ("99", named[1]);
+  ASSERT_EQ((["word": "alpha", "num": "99"]), named[2]);
+
+  ASSERT_EQ(({"alpha", "99"}), pcre_extract(tmp, re));
+
+  // No named groups but include flag => empty mapping appended.
+  mixed *with_empty_map = pcre_extract("abc", "(a)(b)(c)", 1);
+  ASSERT_EQ(4, sizeof(with_empty_map));
+  ASSERT_EQ(([ ]), with_empty_map[3]); // empty mapping
+  ASSERT_EQ("a", with_empty_map[0]);
+
+  // Named group present but not participating should yield empty mapping entry.
+  mixed *optional_named = pcre_extract("ac", "(a)(?<b>b)?(c)", 1);
+  ASSERT_EQ(4, sizeof(optional_named));
+  ASSERT_EQ("a", optional_named[0]);
+  ASSERT_EQ("", optional_named[1]);
+  ASSERT_EQ("c", optional_named[2]);
+  ASSERT_EQ(([ ]), optional_named[3]);
+
       tmp = "foobar";
       ASSERT_EQ("foo->bar", pcre_replace_callback(tmp, "(foo)", (: $1 + "->" :)));
 }
