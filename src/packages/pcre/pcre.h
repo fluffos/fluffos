@@ -27,6 +27,8 @@ typedef struct {
   int find_all;
   int namecount;
   int name_entry_size;
+  int compile_flags;
+  int exec_flags;
   int *ovector;
   int ovecsize;
   int rc;
@@ -36,6 +38,7 @@ typedef struct {
 struct pcre_cache_bucket_t {
   pcre *compiled_pattern;  // value1
   const char *pattern;     // key
+  int compile_flags;       // compile options used
   int size;                // size in bytes
   struct pcre_cache_bucket_t *next;
 };
