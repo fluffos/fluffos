@@ -163,6 +163,29 @@ TEXT;
   ASSERT_EQ("c", optional_named[2]);
   ASSERT_EQ(([ ]), optional_named[3]);
 
-      tmp = "foobar";
-      ASSERT_EQ("foo->bar", pcre_replace_callback(tmp, "(foo)", (: $1 + "->" :)));
+  int flag_i = 1 << 16; // PCRE_I
+  ASSERT_EQ("xbc", pcre_replace("abc", "(A)", ({"x"}), flag_i));
+  ASSERT_EQ("a!bc", pcre_replace_callback("abc", "(A)", (: $1 + "!" :), flag_i));
+
+  // pcre_match with flags: case-insensitive and anchored.
+  ASSERT_EQ(1, pcre_match("abc", "ABC", flag_i));
+  int flag_anchored = (1 << 21); // PCRE_A
+  ASSERT_EQ(0, pcre_match("zabc", "abc", flag_anchored));
+
+  // pcre_match_all with flags: multiline
+  int flag_m = (1 << 17); // PCRE_M
+  mixed *ma = pcre_match_all("a\nb\nc", "^b", flag_m);
+  ASSERT_EQ(1, sizeof(ma));
+  ASSERT_EQ("b", ma[0][0]);
+
+  // pcre_extract with flags (case-insensitive)
+  mixed *ex = pcre_extract("HELLO", "(hello)", 0, flag_i);
+  ASSERT_EQ(({"HELLO"}), ex);
+
+  // pcre_assoc with flags: case-insensitive match
+  mixed *assoc_res = pcre_assoc("HelloWorld", ({"hello"}), ({1}), 0, flag_i);
+  ASSERT_EQ(({({"", "Hello", "World"}), ({0,1,0})}), assoc_res);
+
+  tmp = "foobar";
+  ASSERT_EQ("foo->bar", pcre_replace_callback(tmp, "(foo)", (: $1 + "->" :)));
 }

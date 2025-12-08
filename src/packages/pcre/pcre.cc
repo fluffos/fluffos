@@ -65,6 +65,7 @@
 #include "base/package_api.h"
 
 #include "pcre.h"
+#include "include/pcre_flags.h"
 #include "vm/internal/base/mapping.h"
 
 // Prototype declarations
@@ -73,14 +74,16 @@ static pcre *pcre_local_compile(pcre_t *p);
 static int pcre_local_exec(pcre_t *p);
 static int pcre_magic(pcre_t *p);
 static int pcre_query_match(pcre_t *p);
-static int pcre_match_single(svalue_t *str, const char *pattern);
-static array_t *pcre_match(array_t *v, const char *pattern, int flag);
-static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *def);
+static inline int compute_compile_options(int flags);
+static inline int compute_exec_options(int flags);
+static int pcre_match_single(svalue_t *str, const char *pattern, int pcre_flags);
+static array_t *pcre_match(array_t *v, const char *pattern, int flag, int pcre_flags);
+static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *def, int pcre_flags);
 static char *pcre_get_replace(pcre_t *run, array_t *replacements);
 static array_t *pcre_get_substrings(pcre_t *run, bool include_names);
 // Caching functions
-static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat, const char *pattern);
-static pcre *pcre_get_cached_pattern(struct pcre_cache_t *table, const char *pattern);
+static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat, const char *pattern, int compile_flags);
+static pcre *pcre_get_cached_pattern(struct pcre_cache_t *table, const char *pattern, int compile_flags);
 static mapping_t *pcre_get_cache();
 int pcrecachesize = 0;
 // Globals
@@ -96,26 +99,39 @@ void f_pcre_version() {
 void f_pcre_match() {
   array_t *v;
   int flag = 0;
+  int pcre_flags = 0;
+  bool is_string = ((sp - 1)->type == T_STRING);
 
-  if (st_num_arg > 2) {
+  // optional 4th arg: pcre_flags
+  if (st_num_arg > 3) {
+    if (sp->type != T_NUMBER) {
+      error("Bad argument 4 to pcre_match()\n");
+    }
+    pcre_flags = (sp--)->u.number;
+    st_num_arg--;
+  }
+
+  // optional 3rd arg:
+  if (st_num_arg == 3) {
     if (sp->type != T_NUMBER) {
       error("Bad argument 3 to pcre_match()\n");
     }
-    if ((sp - 2)->type == T_STRING) {
-      error("3rd argument illegal for pcre_match(string, string)\n");
+    if (is_string) {
+      pcre_flags = (sp--)->u.number;
+    } else {
+      flag = (sp--)->u.number;
     }
-
-    flag = (sp--)->u.number;
+    st_num_arg--;
   }
 
-  if ((sp - 1)->type == T_STRING) {
-    flag = pcre_match_single((sp - 1), sp->u.string);
+  if (is_string) {
+    flag = pcre_match_single((sp - 1), sp->u.string, pcre_flags);
 
     free_string_svalue(sp--);
     free_string_svalue(sp);
     put_number(flag);
   } else {
-    v = pcre_match((sp - 1)->u.arr, sp->u.string, flag);
+    v = pcre_match((sp - 1)->u.arr, sp->u.string, flag, pcre_flags);
 
     free_string_svalue(sp--);
     free_array(sp->u.arr);
@@ -126,6 +142,16 @@ void f_pcre_match() {
 void f_pcre_assoc() {
   svalue_t *arg;
   array_t *vec;
+  int pcre_flags = 0;
+
+  if (st_num_arg == 5) {
+    if (sp->type != T_NUMBER) {
+      error("Bad argument 5 to pcre_assoc()\n");
+    }
+    pcre_flags = sp->u.number;
+    sp--;
+    st_num_arg--;
+  }
 
   arg = sp - st_num_arg + 1;
 
@@ -133,7 +159,7 @@ void f_pcre_assoc() {
     error("Bad argument 3 to pcre_assoc()\n");
   }
 
-  vec = pcre_assoc(arg, (arg + 1)->u.arr, (arg + 2)->u.arr, st_num_arg > 3 ? (arg + 3) : &const0);
+  vec = pcre_assoc(arg, (arg + 1)->u.arr, (arg + 2)->u.arr, st_num_arg > 3 ? (arg + 3) : &const0, pcre_flags);
 
   if (st_num_arg == 4) {
     pop_3_elems();
@@ -150,8 +176,19 @@ void f_pcre_assoc() {
 void f_pcre_extract() {
   pcre_t *run;
   array_t *ret;
-  svalue_t *arg = sp - st_num_arg + 1;
   int include_names = 0;
+  int pcre_flags = 0;
+
+  if (st_num_arg >= 4) {
+    if (sp->type != T_NUMBER) {
+      error("Bad argument 4 to pcre_extract()\n");
+    }
+    pcre_flags = sp->u.number;
+    sp--;
+    st_num_arg--;
+  }
+
+  svalue_t *arg = sp - st_num_arg + 1;
 
   if (st_num_arg == 3) {
     if ((arg + 2)->type != T_NUMBER) {
@@ -168,6 +205,8 @@ void f_pcre_extract() {
   run->s_length = SVALUE_STRLEN(arg);
   run->ovector = nullptr;
   run->ovecsize = 0;
+  run->compile_flags = compute_compile_options(pcre_flags);
+  run->exec_flags = compute_exec_options(pcre_flags);
   DEFER { pcre_free_memory(run); };
 
   if (pcre_magic(run) < 0) {
@@ -194,6 +233,15 @@ void f_pcre_replace() {
   array_t *replacements;
 
   char *ret;
+  int pcre_flags = 0;
+
+  if (st_num_arg >= 4) {
+    if (sp->type != T_NUMBER) {
+      error("Bad argument 4 to pcre_replace()\n");
+    }
+    pcre_flags = (sp--)->u.number;
+    st_num_arg--;
+  }
 
   run = (pcre_t *)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "f_pcre_replace: run");
 
@@ -204,6 +252,8 @@ void f_pcre_replace() {
   replacements = sp->u.arr;
 
   run->s_length = SVALUE_STRLEN(sp - 2);
+  run->compile_flags = compute_compile_options(pcre_flags);
+  run->exec_flags = compute_exec_options(pcre_flags);
   DEFER { pcre_free_memory(run); };
 
   if (pcre_magic(run) < 0) {
@@ -247,6 +297,14 @@ void f_pcre_replace_callback() {
   svalue_t *arg;
   array_t *arr, *r;
   function_to_call_t ftc;
+  int pcre_flags = 0;
+
+  if (num_arg >= 4 && sp->type == T_NUMBER) {
+    pcre_flags = sp->u.number;
+    sp--;
+    st_num_arg--;
+    num_arg--;
+  }
 
   arg = sp - num_arg + 1;
 
@@ -257,6 +315,8 @@ void f_pcre_replace_callback() {
   run->pattern = (arg + 1)->u.string;
 
   run->s_length = SVALUE_STRLEN(arg);
+  run->compile_flags = compute_compile_options(pcre_flags);
+  run->exec_flags = compute_exec_options(pcre_flags);
   DEFER { pcre_free_memory(run); };
 
   if (pcre_magic(run) < 0) {
@@ -327,8 +387,24 @@ void f_pcre_cache() {
 }
 
 // Internal functions utilized by the efuns
+static inline int compute_compile_options(int flags) {
+  int opts = PCRE_UTF8;
+  if (flags & PCRE_I) opts |= PCRE_CASELESS;
+  if (flags & PCRE_M) opts |= PCRE_MULTILINE;
+  if (flags & PCRE_S) opts |= PCRE_DOTALL;
+  if (flags & PCRE_U) opts |= PCRE_UNGREEDY;
+  if (flags & PCRE_X) opts |= PCRE_EXTENDED;
+  return opts;
+}
+
+static inline int compute_exec_options(int flags) {
+  int opts = 0;
+  if (flags & PCRE_A) opts |= PCRE_ANCHORED;
+  return opts;
+}
+
 static pcre *pcre_local_compile(pcre_t *p) {
-  p->re = pcre_compile(p->pattern, PCRE_UTF8, &p->error, &p->erroffset, nullptr);
+  p->re = pcre_compile(p->pattern, p->compile_flags, &p->error, &p->erroffset, nullptr);
 
   return p->re;
 }
@@ -352,17 +428,17 @@ static int pcre_local_exec(pcre_t *p) {
   pcre_fullinfo(p->re, nullptr, PCRE_INFO_NAMEENTRYSIZE, &p->name_entry_size);
   pcre_fullinfo(p->re, nullptr, PCRE_INFO_NAMETABLE, &p->name_table);
 
-  p->rc = pcre_exec(p->re, nullptr, p->subject, p->s_length, 0, 0, p->ovector, capture_count);
+  p->rc = pcre_exec(p->re, nullptr, p->subject, p->s_length, 0, p->exec_flags, p->ovector, capture_count);
 
   return p->rc;
 }
 
 static int pcre_magic(pcre_t *p) {
-  p->re = pcre_get_cached_pattern(&pcre_cache, p->pattern);
+  p->re = pcre_get_cached_pattern(&pcre_cache, p->pattern, p->compile_flags);
 
   if (p->re == nullptr) {
     pcre_local_compile(p);
-    pcre_cache_pattern(&pcre_cache, p->re, p->pattern);
+    pcre_cache_pattern(&pcre_cache, p->re, p->pattern, p->compile_flags);
   }
 
   if (p->re == nullptr) {
@@ -381,7 +457,7 @@ static int pcre_magic(pcre_t *p) {
 
 static int pcre_query_match(pcre_t *p) { return p->rc < 0 ? 0 : 1; }
 
-auto pcre_match_all(const char *subject, size_t subject_len, const char *pattern) {
+auto pcre_match_all(const char *subject, size_t subject_len, const char *pattern, int pcre_flags) {
   pcre_t *run;
 
   run = (pcre_t *)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "pcre_match_single : run");
@@ -390,14 +466,16 @@ auto pcre_match_all(const char *subject, size_t subject_len, const char *pattern
   run->pattern = pattern;
   run->subject = subject;
   run->s_length = subject_len;
+  run->compile_flags = compute_compile_options(pcre_flags);
+  run->exec_flags = compute_exec_options(pcre_flags);
 
   DEFER { pcre_free_memory(run); };
 
-  run->re = pcre_get_cached_pattern(&pcre_cache, run->pattern);
+  run->re = pcre_get_cached_pattern(&pcre_cache, run->pattern, run->compile_flags);
 
   if (run->re == nullptr) {
     pcre_local_compile(run);
-    pcre_cache_pattern(&pcre_cache, run->re, run->pattern);
+    pcre_cache_pattern(&pcre_cache, run->re, run->pattern, run->compile_flags);
   }
 
   if (run->re == nullptr) {
@@ -422,7 +500,7 @@ auto pcre_match_all(const char *subject, size_t subject_len, const char *pattern
   int rc = 0;
   int offset = 0;
   while (offset < run->s_length && (rc = pcre_exec(run->re, nullptr, run->subject, run->s_length,
-                                                   offset, 0, run->ovector, run->ovecsize)) >= 0) {
+                                                   offset, run->exec_flags, run->ovector, run->ovecsize)) >= 0) {
     std::vector<svalue_t> match;
     for (int i = 0; i < rc; ++i) {
       unsigned int start, length;
@@ -445,7 +523,7 @@ auto pcre_match_all(const char *subject, size_t subject_len, const char *pattern
   return matches;
 }
 
-static int pcre_match_single(svalue_t *str, const char *pattern) {
+static int pcre_match_single(svalue_t *str, const char *pattern, int pcre_flags) {
   pcre_t *run;
   int ret;
 
@@ -455,6 +533,8 @@ static int pcre_match_single(svalue_t *str, const char *pattern) {
   run->pattern = pattern;
   run->subject = str->u.string;
   run->s_length = SVALUE_STRLEN(str);
+  run->compile_flags = compute_compile_options(pcre_flags);
+  run->exec_flags = compute_exec_options(pcre_flags);
 
   DEFER { pcre_free_memory(run); };
 
@@ -467,7 +547,7 @@ static int pcre_match_single(svalue_t *str, const char *pattern) {
   return ret;
 }
 
-static array_t *pcre_match(array_t *v, const char *pattern, int flag) {
+static array_t *pcre_match(array_t *v, const char *pattern, int flag, int pcre_flags) {
   pcre_t *run;
   array_t *ret;
   svalue_t *sv1, *sv2;
@@ -482,8 +562,10 @@ static array_t *pcre_match(array_t *v, const char *pattern, int flag) {
   run->ovector = nullptr;
   run->ovecsize = 0;
   run->pattern = pattern;
+  run->compile_flags = compute_compile_options(pcre_flags);
+  run->exec_flags = compute_exec_options(pcre_flags);
 
-  run->re = pcre_get_cached_pattern(&pcre_cache, run->pattern);
+  run->re = pcre_get_cached_pattern(&pcre_cache, run->pattern, run->compile_flags);
 
   DEFER { pcre_free_memory(run); };
 
@@ -494,7 +576,7 @@ static array_t *pcre_match(array_t *v, const char *pattern, int flag) {
 
       error("PCRE compilation failed at offset %d: %s\n", offset, rerror);
     } else {
-      pcre_cache_pattern(&pcre_cache, run->re, run->pattern);
+      pcre_cache_pattern(&pcre_cache, run->re, run->pattern, run->compile_flags);
     }
   }
 
@@ -558,7 +640,7 @@ static array_t *pcre_match(array_t *v, const char *pattern, int flag) {
 /* This is mostly copy/paste from reg_assoc, some parts are changed
  * TODO: rewrite with new logic
  */
-static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *def) {
+static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *def, int pcre_flags) {
   int i;
   size_t size;
   const char *tmp;
@@ -595,7 +677,9 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
       rgpp[i]->ovector = nullptr;
       rgpp[i]->ovecsize = 0;
       rgpp[i]->pattern = pat->item[i].u.string;
-      rgpp[i]->re = pcre_get_cached_pattern(&pcre_cache, rgpp[i]->pattern);
+      rgpp[i]->compile_flags = compute_compile_options(pcre_flags);
+      rgpp[i]->exec_flags = compute_exec_options(pcre_flags);
+      rgpp[i]->re = pcre_get_cached_pattern(&pcre_cache, rgpp[i]->pattern, rgpp[i]->compile_flags);
 
       if (rgpp[i]->re == nullptr) {
         if (pcre_local_compile(rgpp[i]) == nullptr) {
@@ -611,7 +695,7 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
           free_empty_array(ret);
           error("PCRE compilation failed at offset %d: %s\n", offset, rerror);
         } else {
-          pcre_cache_pattern(&pcre_cache, rgpp[i]->re, rgpp[i]->pattern);
+          pcre_cache_pattern(&pcre_cache, rgpp[i]->re, rgpp[i]->pattern, rgpp[i]->compile_flags);
         }
       }
     }
@@ -891,10 +975,10 @@ static void pcre_free_memory(pcre_t *p) {
 // Caching functions, add new ones at the front of the bucket so we find them
 // faster
 static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
-                              const char *pattern)  // must be shared string
+                              const char *pattern, int compile_flags)  // must be shared string
 {
   const auto *shared_pattern = make_shared_string(pattern);
-  unsigned int const bucket = HASH(BLOCK(shared_pattern)) % PCRE_CACHE_SIZE;
+  unsigned int const bucket = (HASH(BLOCK(shared_pattern)) ^ compile_flags) % PCRE_CACHE_SIZE;
   size_t sz;
   struct pcre_cache_bucket_t *tmp;
   struct pcre_cache_bucket_t *node;
@@ -907,7 +991,7 @@ static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
 
   full = (pcrecachesize > 2 * PCRE_CACHE_SIZE);
   while (tmp) {
-    if (shared_pattern == tmp->pattern) {
+    if (shared_pattern == tmp->pattern && tmp->compile_flags == compile_flags) {
       break;
     }
 
@@ -955,21 +1039,22 @@ static int pcre_cache_pattern(struct pcre_cache_t *table, pcre *cpat,
   }
 
   node->pattern = shared_pattern;
+  node->compile_flags = compile_flags;
   node->compiled_pattern = cpat;
   node->size = sz;
 
   return 0;
 }
 
-static pcre *pcre_get_cached_pattern(struct pcre_cache_t *table, const char *pattern) {
+static pcre *pcre_get_cached_pattern(struct pcre_cache_t *table, const char *pattern, int compile_flags) {
   const auto *shared_pattern = make_shared_string(pattern);
-  unsigned int const bucket = HASH(BLOCK(shared_pattern)) % PCRE_CACHE_SIZE;
+  unsigned int const bucket = (HASH(BLOCK(shared_pattern)) ^ compile_flags) % PCRE_CACHE_SIZE;
   struct pcre_cache_bucket_t *node;
   struct pcre_cache_bucket_t *lnode = nullptr;
   node = table->buckets[bucket];
 
   while (node) {
-    if (shared_pattern == node->pattern) {
+    if (shared_pattern == node->pattern && node->compile_flags == compile_flags) {
       if (node != table->buckets[bucket]) {
         // not at the front, move it there, so the most used pattern is fastest
         lnode->next = node->next;
@@ -1010,7 +1095,11 @@ static mapping_t *pcre_get_cache() {
       node = pcre_cache.buckets[i];
 
       while (node) {
-        add_mapping_pair(ret, node->pattern, node->size);
+        size_t keylen = strlen(node->pattern) + 16;
+        char *key = (char *)DMALLOC(keylen, TAG_TEMPORARY, "pcre_cache key");
+        snprintf(key, keylen, "%s|0x%x", node->pattern, node->compile_flags);
+        add_mapping_pair(ret, key, node->size);
+        FREE(key);
         node = node->next;
       }
     }
@@ -1036,11 +1125,20 @@ void mark_pcre_cache() {
 void f_pcre_match_all() {
   array_t *v;
 
+  int pcre_flags = 0;
+  if (st_num_arg >= 3) {
+    if (sp->type != T_NUMBER) {
+      error("Bad argument 3 to pcre_match_all()\n");
+    }
+    pcre_flags = (sp--)->u.number;
+    st_num_arg--;
+  }
+
   const auto *pattern = (sp)->u.string;
   const auto *subject = (sp - 1)->u.string;
   auto subject_len = SVALUE_STRLEN(sp - 1);
 
-  auto matches = pcre_match_all(subject, subject_len, pattern);
+  auto matches = pcre_match_all(subject, subject_len, pattern, pcre_flags);
 
   pop_2_elems();
 

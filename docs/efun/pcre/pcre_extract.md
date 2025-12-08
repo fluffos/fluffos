@@ -10,7 +10,7 @@ title: pcre / pcre_extract
 
 ### SYNOPSIS
 
-    string *pcre_extract(string input, string pattern, void|int include_named);
+    string *pcre_extract(string input, string pattern, void|int include_named, void|int pcre_flags);
 
 ### DESCRIPTION
 
@@ -21,6 +21,9 @@ title: pcre / pcre_extract
     mapping from group name to the captured string. If the pattern has no
     named groups (or none participated), the mapping is empty; otherwise only
     participating named groups are present.
+
+    The optional fourth argument `pcre_flags` sets PCRE options (e.g., `PCRE_I`
+    for case-insensitive, `PCRE_M` for multiline). Defaults to 0.
 
     Example (named groups):
 
