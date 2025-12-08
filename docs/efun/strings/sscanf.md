@@ -45,6 +45,14 @@ title: strings / sscanf
     result.  sscanf(" ", "%s %s", str1, str2)  will return 2, with str1 and
     str2 being assigned an "" empty string.
 
+### PCRE MODE
+
+    If the runtime config line `sscanf use pcre : 1` is set (requires the
+    driver to be built with PACKAGE_PCRE), the %(regexp) specifier uses PCRE
+    syntax/semantics instead of the legacy regexp engine. See
+    [sscanf (PCRE mode)](sscanf_pcre.html) for details and compatibility
+    notes.
+
 ### RETURN VALUES
 
     The number of matched specifiers is returned.
@@ -92,4 +100,3 @@ title: strings / sscanf
 ### SEE ALSO
 
     explode(3), pcre_extract(3), regexp(3), replace_string(3), strsrch(3)
-
