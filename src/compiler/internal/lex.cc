@@ -2126,6 +2126,7 @@ int yylex() {
       case ';':
       case ',':
       case '~':
+      return c;
 #ifndef USE_TRIGRAPHS
       case '?':
         /* Check for ?? and ??= operators */
