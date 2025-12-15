@@ -144,4 +144,41 @@ void do_tests() {
   maybe ??= counted(100);
   ASSERT_EQ(42, maybe);
   ASSERT_EQ(0, logical_assign_counter);
+
+  // Test ternary operator without spaces (issue #1170)
+  // These should all work without requiring spaces around ? and :
+  string icon;
+  icon = (1)?"yes":"no";
+  ASSERT_EQ("yes", icon);
+
+  icon = (0)?"yes":"no";
+  ASSERT_EQ("no", icon);
+
+  // Nested ternary without spaces
+  icon = (1)?"a":(0)?"b":"c";
+  ASSERT_EQ("a", icon);
+
+  icon = (0)?"a":(1)?"b":"c";
+  ASSERT_EQ("b", icon);
+
+  icon = (0)?"a":(0)?"b":"c";
+  ASSERT_EQ("c", icon);
+
+  // Mixed with and without spaces
+  icon = (1) ? "yes":"no";
+  ASSERT_EQ("yes", icon);
+
+  icon = (1)?"yes" : "no";
+  ASSERT_EQ("yes", icon);
+
+  // Test with other single-char tokens before ?
+  int num = 5;
+  icon = num>3?"big":"small";
+  ASSERT_EQ("big", icon);
+
+  icon = (num)?"yes":"no";
+  ASSERT_EQ("yes", icon);
+
+  icon = ({1,2,3})[0]?"yes":"no";
+  ASSERT_EQ("yes", icon);
 }
