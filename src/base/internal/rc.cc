@@ -104,6 +104,7 @@ const FlagEntry INT_FLAGS[] = {
     {"enable mssp", __RC_ENABLE_MSSP__, 1},
     {"enable msp", __RC_ENABLE_MSP__, 1},
     {"enable msdp", __RC_ENABLE_MSDP__, 0},
+    {"sscanf use pcre", __RC_SSCANF_USE_PCRE__, 0, 0, 1},
 };
 
 /*
