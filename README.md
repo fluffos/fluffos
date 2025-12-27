@@ -63,7 +63,7 @@ All previous MudOS and FluffOS releases are also kept in the code base as tags f
 Support
 -------
 - Website / Documentation: https://www.fluffos.info
-- Discord Support: #fluffos channel on LPC https://discord.gg/2a6qqG6Cdj
+- Discord Support: #fluffos channel on LPC [https://discord.gg/E5ycwE8NCc](https://discord.gg/E5ycwE8NCc)
 - Forum: https://forum.fluffos.info
 - QQ support Group: 451819151 [![451819151](https://pub.idqqimg.com/wpa/images/group.png)](https://shang.qq.com/wpa/qunwpa?idkey=3fd552adb8ace1a8e3ae3a712e5d314c7caf49af8b87449473c595b7e1f1ddf9)
 
