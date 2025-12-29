@@ -109,6 +109,7 @@
 #define __RC_ENABLE_MSSP__ CFG_INT(62)
 #define __RC_ENABLE_MSP__ CFG_INT(63)
 #define __RC_ENABLE_MSDP__ CFG_INT(64)
+#define __RC_SSCANF_USE_PCRE__ CFG_INT(65)
 
 #define RC_LAST_CONFIG_INT CFG_INT(255)
 #endif /* RUNTIME_CONFIG_H */
