@@ -318,7 +318,9 @@ void f_json_decode(void) {
 
     yyjson_read_err err;
     // 注意: flags=0 时 yyjson 不会修改输入缓冲区，const_cast 是安全的
-    yyjson_doc* doc = yyjson_read_opts(const_cast<char*>(str), strlen(str), 0, NULL, &err);
+    // 使用 SVALUE_STRLEN 获取字符串长度，避免 strlen 的潜在问题
+    size_t str_len = SVALUE_STRLEN(sp);
+    yyjson_doc* doc = yyjson_read_opts(const_cast<char*>(str), str_len, 0, NULL, &err);
 
     if (UNLIKELY(!doc)) {
         #ifdef DEBUG
@@ -342,6 +344,7 @@ void f_read_json(void) {
     if (UNLIKELY(!real_path)) { pop_n_elems(1); push_number(0); return; }
 
     FILE* fp = fopen(real_path, "rb");
+    // fp 为 NULL 时不需要 fclose，直接返回
     if (UNLIKELY(!fp)) { pop_n_elems(1); push_number(0); return; }
 
     fseek(fp, 0, SEEK_END);
@@ -370,7 +373,7 @@ void f_read_json(void) {
     // 使用 INSITU 模式提高性能
     // 注意: buffer 必须存活至 doc 销毁后（AutoBuffer 的析构在外层作用域）
     yyjson_doc* doc = yyjson_read_opts(buffer.ptr, static_cast<size_t>(fsize),
-                                       YYJSON_READ_INSITU | YYJSON_READ_NOFLAG,
+                                       YYJSON_READ_INSITU,
                                        NULL, &err);
     if (UNLIKELY(!doc)) {
         #ifdef DEBUG
@@ -409,6 +412,7 @@ void f_write_json(void) {
     yyjson_mut_doc_set_root(doc, root);
 
     FILE* fp = fopen(real_path, "wb");
+    // fp 为 NULL 时不需要 fclose，直接返回
     if (UNLIKELY(!fp)) { pop_n_elems(2); push_number(0); return; }
 
     yyjson_write_err err;
