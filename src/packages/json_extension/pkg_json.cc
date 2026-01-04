@@ -82,6 +82,17 @@ struct AutoBuffer {
     AutoBuffer& operator=(const AutoBuffer&) = delete;
 };
 
+// 自动管理 FILE*，防止泄漏
+struct ScopedFILE {
+    FILE* fp;
+    explicit ScopedFILE(FILE* f) : fp(f) {}
+    ~ScopedFILE() { if (fp) fclose(fp); }
+    bool valid() const { return fp != nullptr; }
+    FILE* get() const { return fp; }
+    ScopedFILE(const ScopedFILE&) = delete;
+    ScopedFILE& operator=(const ScopedFILE&) = delete;
+};
+
 // 快速整数转字符串（优化版本，使用栈对齐）
 static inline int fast_i64toa(int64_t value, char* buffer) {
     if (UNLIKELY(value == 0)) { buffer[0] = '0'; buffer[1] = '\0'; return 1; }
@@ -343,28 +354,26 @@ void f_read_json(void) {
     const char* real_path = check_valid_path(filename, current_object, "read_json", 0);
     if (UNLIKELY(!real_path)) { pop_n_elems(1); push_number(0); return; }
 
-    FILE* fp = fopen(real_path, "rb");
-    // fp 为 NULL 时不需要 fclose，直接返回
-    if (UNLIKELY(!fp)) { pop_n_elems(1); push_number(0); return; }
+    ScopedFILE fp_guard(fopen(real_path, "rb"));
+    if (UNLIKELY(!fp_guard.valid())) { pop_n_elems(1); push_number(0); return; }
+    FILE* fp = fp_guard.get();
 
     fseek(fp, 0, SEEK_END);
     long fsize = ftell(fp);
     fseek(fp, 0, SEEK_SET);
 
     if (UNLIKELY(fsize <= 0 || fsize > MAX_JSON_FILE_SIZE)) {
-        fclose(fp); pop_n_elems(1); push_number(0); return;
+        pop_n_elems(1); push_number(0); return;
     }
 
     // 使用 AutoBuffer 确保内存释放，特别是在中途返回时
     size_t buf_size = static_cast<size_t>(fsize) + YYJSON_PADDING_SIZE;
     AutoBuffer buffer(buf_size);
     if (UNLIKELY(!buffer.valid())) {
-        fclose(fp); pop_n_elems(1); push_number(0); return;
+        pop_n_elems(1); push_number(0); return;
     }
 
     size_t read_size = fread(buffer.ptr, 1, static_cast<size_t>(fsize), fp);
-    fclose(fp);
-
     if (UNLIKELY(read_size != static_cast<size_t>(fsize))) {
         pop_n_elems(1); push_number(0); return;
     }
@@ -394,6 +403,7 @@ void f_read_json(void) {
         *sp = result;
     }
     // doc_guard 析构 -> yyjson_doc_free(doc)
+    // fp_guard 析构 -> fclose(fp)
     // 离开函数 -> AutoBuffer 析构 -> free(buffer.ptr)
 }
 
@@ -411,19 +421,18 @@ void f_write_json(void) {
     yyjson_mut_val* root = svalue_to_json_impl(doc, data, &checker, 0);
     yyjson_mut_doc_set_root(doc, root);
 
-    FILE* fp = fopen(real_path, "wb");
-    // fp 为 NULL 时不需要 fclose，直接返回
-    if (UNLIKELY(!fp)) { pop_n_elems(2); push_number(0); return; }
+    ScopedFILE fp_guard(fopen(real_path, "wb"));
+    if (UNLIKELY(!fp_guard.valid())) { pop_n_elems(2); push_number(0); return; }
 
     yyjson_write_err err;
-    bool success = yyjson_mut_write_fp(fp, doc, 0, NULL, &err);
-    fclose(fp);
+    bool success = yyjson_mut_write_fp(fp_guard.get(), doc, 0, NULL, &err);
 
     if (UNLIKELY(!success)) {
         #ifdef DEBUG
         debug_message("write_json failed: %s\n", err.msg);
         #endif
     }
+    // fp_guard 析构时自动关闭文件
 
     pop_n_elems(2);
     push_number(success ? 1 : 0);
