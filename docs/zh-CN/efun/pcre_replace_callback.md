@@ -10,13 +10,16 @@ title: pcre / pcre_replace_callback
 
 ### SYNOPSIS
 
-    string pcre_replace_callback(string, string, string | function, ...);
+    string pcre_replace_callback(string, string, string | function, ..., void|int pcre_flags);
 
 ### DESCRIPTION
 
     returns a string where all captured groups have been replaced by the
     return value of function pointe fun or function fun in object ob.
     (called with the matched string and match number, starting with 0)
+
+    可选参数 `pcre_flags` 用于设置 PCRE 选项（如 `PCRE_I` 大小写不敏感，
+    `PCRE_M` 多行等），默认 0。
 
 ### SEE ALSO
 

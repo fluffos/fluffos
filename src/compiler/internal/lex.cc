@@ -2126,6 +2126,7 @@ int yylex() {
       case ';':
       case ',':
       case '~':
+        return c;
 #ifndef USE_TRIGRAPHS
       case '?':
         /* Check for ?? and ??= operators */
@@ -2139,7 +2140,6 @@ int yylex() {
         }
         return c;
 #else
-        return c;
       /*
        * You're probably asking, what the heck are trigraphs?
        * The character set of C source is contained within seven-bit
