@@ -12,7 +12,7 @@ title: contrib / terminal_colour.pre
 
 ### SYNOPSIS
 
-    string terminal_colour(string, mapping, int | void, int | void);
+    string terminal_colour(string str, mapping colours, int | void wrap, int | void indent);
 
 ### DESCRIPTION
 

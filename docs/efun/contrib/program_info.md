@@ -10,7 +10,7 @@ title: contrib / program_info.pre
 
 ### SYNOPSIS
 
-    mapping program_info(void | object);
+    mapping program_info(void | object ob);
 
 ### DESCRIPTION
 

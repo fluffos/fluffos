@@ -10,7 +10,7 @@ title: contrib / file_length
 
 ### SYNOPSIS
 
-    int file_length(string);
+    int file_length(string file);
 
 ### DESCRIPTION
 

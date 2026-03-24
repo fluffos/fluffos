@@ -10,7 +10,7 @@ title: contrib / pluralize.pre
 
 ### SYNOPSIS
 
-    string pluralize(string);
+    string pluralize(string str);
 
 ### DESCRIPTION
 

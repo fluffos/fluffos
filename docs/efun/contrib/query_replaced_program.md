@@ -10,7 +10,7 @@ title: contrib / query_replaced_program.pre
 
 ### SYNOPSIS
 
-    string query_replaced_program(void | object);
+    string query_replaced_program(void | object ob);
 
 ### DESCRIPTION
 
