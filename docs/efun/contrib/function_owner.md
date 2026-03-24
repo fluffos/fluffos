@@ -10,7 +10,7 @@ title: contrib / function_owner.pre
 
 ### SYNOPSIS
 
-    object function_owner(function);
+    object function_owner(function f);
 
 ### DESCRIPTION
 

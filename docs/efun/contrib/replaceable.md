@@ -10,7 +10,7 @@ title: contrib / replaceable.pre
 
 ### SYNOPSIS
 
-    int replaceable(object, void | string *func);
+    int replaceable(object ob, void | string *func);
 
 ### DESCRIPTION
 

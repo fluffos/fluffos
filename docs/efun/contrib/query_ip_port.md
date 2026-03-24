@@ -10,7 +10,7 @@ title: contrib / query_ip_port.pre
 
 ### SYNOPSIS
 
-    int query_ip_port(void | object);
+    int query_ip_port(void | object ob);
 
 ### DESCRIPTION
 

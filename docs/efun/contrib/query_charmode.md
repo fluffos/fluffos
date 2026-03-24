@@ -10,7 +10,7 @@ title: contrib / query_charmode.pre
 
 ### SYNOPSIS
 
-    int query_charmode(object);
+    int query_charmode(object interactive);
 
 ### DESCRIPTION
 

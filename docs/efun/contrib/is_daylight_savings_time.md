@@ -10,7 +10,7 @@ title: contrib / is_daylight_savings_time.pre
 
 ### SYNOPSIS
 
-    int is_daylight_savings_time(string, int);
+    int is_daylight_savings_time(string timezone, int timestamp);
 
 ### DESCRIPTION
 

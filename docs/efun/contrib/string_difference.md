@@ -10,7 +10,7 @@ title: contrib / string_difference.pre
 
 ### SYNOPSIS
 
-    int string_difference(string, string);
+    int string_difference(string str1, string str2);
 
 ### DESCRIPTION
 

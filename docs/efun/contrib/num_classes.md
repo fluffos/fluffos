@@ -10,7 +10,7 @@ title: contrib / num_classes.pre
 
 ### SYNOPSIS
 
-    int num_classes(object);
+    int num_classes(object ob);
 
 ### DESCRIPTION
 

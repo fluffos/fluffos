@@ -10,7 +10,7 @@ title: contrib / send_nullbyte.pre
 
 ### SYNOPSIS
 
-    int send_nullbyte(object);
+    int send_nullbyte(object interactive);
 
 ### DESCRIPTION
 

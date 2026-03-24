@@ -10,7 +10,7 @@ title: contrib / remove_charmode.pre
 
 ### SYNOPSIS
 
-    int remove_charmode(object);
+    int remove_charmode(object interactive);
 
 ### DESCRIPTION
 
