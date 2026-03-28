@@ -2459,17 +2459,16 @@ expr4:
       char *end = EndOf(buf);
       char *p;
 
-      /* Treat bare identifiers as function pointers - let compiler resolve them later */
-      $$ = new_node();
-      $$->kind = NODE_FUNCTION_CONSTRUCTOR;
-      $$->type = TYPE_FUNCTION;
-      $$->r.expr = 0;
-      CREATE_STRING($$->l.expr, $1);
-      $$->v.number = FP_FUNCTIONAL;
-      
-      /* Mark as not bindable - same as (: funcname :) syntax */
-      if (current_function_context)
-        current_function_context->bindable = FP_NOT_BINDABLE;
+      auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
+      p = strput(buf, end, "Undefined variable '");
+      p = strput(p, end, $1);
+      p = strput(p, end, "'");
+      if (current_number_of_locals < max_local_variables) {
+        add_local_name($1, TYPE_ANY);
+      }
+      CREATE_ERROR($$);
+      yyerror(buf);
+      scratch_free($1);
     }
   | L_PARAMETER
     {
@@ -3200,11 +3199,9 @@ function_call:
         $$->type = (SIMUL(f)->type) & ~DECL_MODS;
       } else if ((f=$1->dn.efun_num) != -1) {
         $$ = validate_efun_call(f, $4);
-      } else if ((i = $1->dn.local_num) != -1 && 
-                 ((type_of_locals_ptr[i] & ~LOCAL_MODS) == TYPE_FUNCTION ||
-                  (type_of_locals_ptr[i] & ~LOCAL_MODS) == TYPE_ANY ||
-                  (type_of_locals_ptr[i] & ~LOCAL_MODS) == TYPE_UNKNOWN)) {
-        /* Local variable that may hold a function pointer - generate evaluate() call */
+      } else if ((i = $1->dn.local_num) != -1 &&
+                 (type_of_locals_ptr[i] & ~LOCAL_MODS) == TYPE_FUNCTION) {
+        /* Local variable of type function - generate evaluate() call */
         parse_node_t *expr;
         parse_node_t *func_node;
         int local_type = type_of_locals_ptr[i] & ~LOCAL_MODS;
@@ -3234,11 +3231,9 @@ function_call:
         
         if (current_function_context)
           current_function_context->num_locals++;
-      } else if ((i = $1->dn.global_num) != -1 && 
-                 ((VAR_TEMP(i)->type & ~DECL_MODS) == TYPE_FUNCTION ||
-                  (VAR_TEMP(i)->type & ~DECL_MODS) == TYPE_ANY ||
-                  (VAR_TEMP(i)->type & ~DECL_MODS) == TYPE_UNKNOWN)) {
-        /* Global variable that may hold a function pointer - generate evaluate() call */
+      } else if ((i = $1->dn.global_num) != -1 &&
+                 (VAR_TEMP(i)->type & ~DECL_MODS) == TYPE_FUNCTION) {
+        /* Global variable of type function - generate evaluate() call */
         parse_node_t *expr;
         parse_node_t *func_node;
         int global_type = VAR_TEMP(i)->type & ~DECL_MODS;
