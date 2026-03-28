@@ -386,25 +386,28 @@ static int find_class_member(int which, const char *name, unsigned short *type) 
 }
 
 int lookup_any_class_member(char *name, unsigned short *type) {
+  return lookup_any_class_member_soft(name, type);
+}
+
+// Variant that does not report an error when no member is found.
+int lookup_any_class_member_soft(char *name, unsigned short *type) {
   int nc = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
   int i, ret = -1, nret;
   const char *s = findstring(name);
 
-  if (s) {
-    for (i = 0; i < nc; i++) {
-      nret = find_class_member(i, s, type);
-      if (nret == -1) {
-        continue;
-      }
-      if (ret != -1 && nret != ret) {
-        yyerror("More than one class in scope has member '%s'; use a cast to disambiguate.", name);
-      }
-      ret = nret;
-    }
+  if (!s) {
+    return -1;
   }
 
-  if (ret == -1) {
-    yyerror("No class in scope has no member '%s'.", name);
+  for (i = 0; i < nc; i++) {
+    nret = find_class_member(i, s, type);
+    if (nret == -1) {
+      continue;
+    }
+    if (ret != -1 && nret != ret) {
+      yyerror("More than one class in scope has member '%s'; use a cast to disambiguate.", name);
+    }
+    ret = nret;
   }
 
   return ret;
