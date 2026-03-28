@@ -105,10 +105,13 @@ extern int yydebug;
     L_NEW = 306,                   /* L_NEW  */
     L_PARAMETER = 307,             /* L_PARAMETER  */
     L_TREE = 308,                  /* L_TREE  */
-    L_PREPROCESSOR_COMMAND = 309,  /* L_PREPROCESSOR_COMMAND  */
-    LOWER_THAN_ELSE = 310,         /* LOWER_THAN_ELSE  */
-    L_EQ = 311,                    /* L_EQ  */
-    L_NE = 312                     /* L_NE  */
+    L_TEMPLATE_HEAD = 309,         /* L_TEMPLATE_HEAD  */
+    L_TEMPLATE_MIDDLE = 310,       /* L_TEMPLATE_MIDDLE  */
+    L_TEMPLATE_TAIL = 311,         /* L_TEMPLATE_TAIL  */
+    L_PREPROCESSOR_COMMAND = 312,  /* L_PREPROCESSOR_COMMAND  */
+    LOWER_THAN_ELSE = 313,         /* LOWER_THAN_ELSE  */
+    L_EQ = 314,                    /* L_EQ  */
+    L_NE = 315                     /* L_NE  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -117,7 +120,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 131 "/projects/git/fluffos/src/compiler/internal/grammar.y"
+#line 134 "/projects/git/fluffos/src/compiler/internal/grammar.y"
 
   LPC_INT number; /* 8 */
   LPC_FLOAT real; /* 8 */
@@ -138,7 +141,7 @@ union YYSTYPE
     uint16_t save_exact_types;
   } func_block; /* 8 */
 
-#line 142 "/projects/git/fluffos/build/src/grammar.autogen.h"
+#line 145 "/projects/git/fluffos/build/src/grammar.autogen.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

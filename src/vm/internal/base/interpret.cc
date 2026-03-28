@@ -3034,6 +3034,54 @@ void eval_instruction(char *p) {
         free_svalue(sp--, "F_ASSIGN_VALUE");
         break;
       }
+      case F_TEMPLATE_COERCE: {
+        /* Coerce top-of-stack value to string for template literal interpolation.
+         * Uses %g for floats (strips trailing zeros), %d-style for ints,
+         * pass-through for strings. */
+        switch (sp->type) {
+          case T_STRING:
+            /* already a string, nothing to do */
+            break;
+          case T_NUMBER: {
+            char buff[100];
+            sprintf(buff, "%" LPC_INT_FMTSTR_P, sp->u.number);
+            char *res = string_copy(buff, "F_TEMPLATE_COERCE");
+            sp->type = T_STRING;
+            sp->subtype = STRING_MALLOC;
+            sp->u.string = res;
+            break;
+          }
+          case T_REAL: {
+            char buff[400];
+            sprintf(buff, "%g", sp->u.real);
+            char *res = string_copy(buff, "F_TEMPLATE_COERCE");
+            sp->type = T_STRING;
+            sp->subtype = STRING_MALLOC;
+            sp->u.string = res;
+            break;
+          }
+          default: {
+            outbuffer_t outbuf;
+            outbuf_zero(&outbuf);
+            svalue_to_string(sp, &outbuf, 0, 0, 1);
+            outbuf_fix(&outbuf);
+            free_svalue(sp, "F_TEMPLATE_COERCE");
+            if (outbuf.buffer) {
+              char *res = string_copy(outbuf.buffer, "F_TEMPLATE_COERCE");
+              FREE(outbuf.buffer);
+              sp->type = T_STRING;
+              sp->subtype = STRING_MALLOC;
+              sp->u.string = res;
+            } else {
+              sp->type = T_STRING;
+              sp->subtype = STRING_MALLOC;
+              sp->u.string = string_copy("", "F_TEMPLATE_COERCE");
+            }
+            break;
+          }
+        }
+        break;
+      }
       case F_VOID_ASSIGN_LOCAL:
         if (sp->type != T_INVALID) {
           lval = fp + EXTRACT_UCHAR(pc++);

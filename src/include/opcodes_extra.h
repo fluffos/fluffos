@@ -20,3 +20,7 @@
 #ifndef F_ASSIGN_VALUE
 #define F_ASSIGN_VALUE 234  // Assign with (value, lvalue) stack order
 #endif
+
+#ifndef F_TEMPLATE_COERCE
+#define F_TEMPLATE_COERCE 235  // Coerce value to string for template literals (%g for floats)
+#endif

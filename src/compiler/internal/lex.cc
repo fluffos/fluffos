@@ -126,6 +126,15 @@ typedef struct incstate_s {
 
 static incstate_t *inctop = nullptr;
 
+/* Template literal state tracking.
+ * When the lexer encounters a backtick, it enters template literal mode.
+ * template_brace_depth tracks nested {} within ${...} expressions.
+ * template_nesting tracks nested template literals (backtick within backtick).
+ */
+#define MAX_TEMPLATE_NESTING 16
+static int template_nesting = 0;
+static int template_brace_depth[MAX_TEMPLATE_NESTING];
+
 /* prevent unbridled recursion */
 #define MAX_INCLUDE_DEPTH 32
 static int incnum;
@@ -1808,6 +1817,8 @@ static int old_func() {
    at this function */
 static void lex_breakpoint() {}
 
+static int parseTemplateLiteralFragment(bool is_continuation);
+
 int yylex() {
   static char partial[MAXLINE + 5]; /* extra 5 for safety buffer */
   static char terminator[MAXLINE + 5];
@@ -2119,8 +2130,20 @@ int yylex() {
         return L_PARAMETER;
       }
       case ')':
+        return c;
       case '{':
+        if (template_nesting > 0) {
+          template_brace_depth[template_nesting]++;
+        }
+        return c;
       case '}':
+        if (template_nesting > 0 && template_brace_depth[template_nesting] == 0) {
+          return parseTemplateLiteralFragment(true);
+        }
+        if (template_nesting > 0) {
+          template_brace_depth[template_nesting]--;
+        }
+        return c;
       case '[':
       case ']':
       case ';':
@@ -2463,6 +2486,8 @@ int yylex() {
       } break;
       case '"':
         return parseStringLiteral(c);
+      case '`':
+        return parseTemplateLiteralFragment(false);
       case '0':
         c = *outp++;
         if (c == 'X' || c == 'x') {
@@ -3074,6 +3099,150 @@ int parseStringLiteral(unsigned char c) {
   }
 }
 
+/*
+ * Scan a template literal string fragment.
+ * Called when:
+ *   - The lexer encounters a backtick (start of template literal)
+ *   - The lexer encounters } that closes a ${...} interpolation
+ *
+ * Scans characters into yytext until it hits:
+ *   - ${ : end of fragment, start of interpolation (returns L_TEMPLATE_HEAD or L_TEMPLATE_MIDDLE)
+ *   - `  : end of template literal (returns L_STRING or L_TEMPLATE_TAIL)
+ *
+ * Uses scratch_large_alloc for the result to avoid scratch buffer corruption
+ * when string literals appear inside ${...} interpolation expressions.
+ *
+ * is_continuation: false if this is the start (after backtick), true if after }
+ */
+static int parseTemplateLiteralFragment(bool is_continuation) {
+  char *yyp = yytext;
+  bool has_interpolation = false;
+
+  for (;;) {
+    unsigned char c = *outp++;
+
+    switch (c) {
+      case LEX_EOF:
+        lexerror("End of file in template literal");
+        return YYEOF;
+
+      case '\n':
+        current_line++;
+        total_lines++;
+        if (outp == last_nl + 1) {
+          refill_buffer();
+        }
+        continue;
+
+      case '\\':
+        c = *outp++;
+        switch (c) {
+          case '\n':
+            current_line++;
+            total_lines++;
+            if (outp == last_nl + 1) {
+              refill_buffer();
+            }
+            continue;
+          case 'n': *yyp++ = '\n'; break;
+          case 't': *yyp++ = '\t'; break;
+          case 'r': *yyp++ = '\r'; break;
+          case 'b': *yyp++ = '\b'; break;
+          case 'a': *yyp++ = '\x07'; break;
+          case 'e': *yyp++ = '\x1b'; break;
+          case '`': *yyp++ = '`'; break;
+          case '$': *yyp++ = '$'; break;
+          case '\\': *yyp++ = '\\'; break;
+          case '0': case '1': case '2': case '3':
+          case '4': case '5': case '6': case '7': {
+            int val = c - '0';
+            c = *outp;
+            if (c >= '0' && c <= '7') {
+              val = (val << 3) + c - '0';
+              outp++;
+              c = *outp;
+              if (c >= '0' && c <= '7') {
+                val = (val << 3) + c - '0';
+                outp++;
+              }
+            }
+            *yyp++ = (char)val;
+            break;
+          }
+          case 'x': {
+            int val = 0;
+            c = *outp;
+            if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+              val = (c >= '0' && c <= '9') ? c - '0' : (c >= 'a' ? c - 'a' + 10 : c - 'A' + 10);
+              outp++;
+              c = *outp;
+              if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+                val = (val << 4) + ((c >= '0' && c <= '9') ? c - '0' : (c >= 'a' ? c - 'a' + 10 : c - 'A' + 10));
+                outp++;
+              }
+            }
+            *yyp++ = (char)val;
+            break;
+          }
+          default:
+            *yyp++ = c;
+            break;
+        }
+        break;
+
+      case '$':
+        if (*outp == '{') {
+          outp++;
+          has_interpolation = true;
+          goto done;
+        }
+        *yyp++ = '$';
+        break;
+
+      case '`':
+        goto done;
+
+      default:
+        *yyp++ = c;
+        break;
+    }
+
+    if (yyp >= yytext + MAXLINE - 5) {
+      lexerror("Template literal string too long");
+      return YYerror;
+    }
+  }
+
+done:
+  *yyp = '\0';
+  if (!u8_validate(yytext)) {
+    lexerror("Invalid UTF8 in template literal");
+    return YYerror;
+  }
+  {
+    int slen = yyp - yytext + 1;
+    char *res = scratch_large_alloc(slen);
+    memcpy(res, yytext, slen);
+    yylval.string = res;
+  }
+  if (has_interpolation) {
+    if (!is_continuation) {
+      template_nesting++;
+      if (template_nesting >= MAX_TEMPLATE_NESTING) {
+        lexerror("Template literal nesting too deep");
+        return YYerror;
+      }
+    }
+    template_brace_depth[template_nesting] = 0;
+    return is_continuation ? L_TEMPLATE_MIDDLE : L_TEMPLATE_HEAD;
+  } else {
+    if (is_continuation) {
+      template_nesting--;
+    }
+    return is_continuation ? L_TEMPLATE_TAIL : L_STRING;
+  }
+}
+
 extern YYSTYPE yylval;
 
 void end_new_file() {
@@ -3324,6 +3493,7 @@ void start_new_file(std::unique_ptr<LexStream> stream) {
   }
   current_stream = std::move(stream);
   lex_fatal = 0;
+  template_nesting = 0;
   last_function_context = -1;
   current_function_context = nullptr;
   cur_lbuf = &head_lbuf;
@@ -3510,6 +3680,9 @@ static void init_instrs() {
 #endif
 #ifdef F_ASSIGN_VALUE
   add_instr_name("assign_value", 0, F_ASSIGN_VALUE, -1);
+#endif
+#ifdef F_TEMPLATE_COERCE
+  add_instr_name("template_coerce", 0, F_TEMPLATE_COERCE, T_STRING);
 #endif
   add_instr_name("-=", "f_sub_eq();\n", F_SUB_EQ, T_ANY);
 #ifdef F_JUMP
