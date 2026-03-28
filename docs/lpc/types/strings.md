@@ -4,6 +4,82 @@ title: types / strings
 ---
 # strings
 
+## Template Literals
+
+Template literals provide string interpolation using backtick delimiters and
+`${expression}` placeholders. The expression inside `${}` is evaluated and
+coerced to a string at runtime.
+
+### Syntax
+
+    string name = "Alice";
+    int count = 3;
+
+    `Hello, ${name}!`              // "Hello, Alice!"
+    `You have ${count} items.`     // "You have 3 items."
+    `Sum: ${1 + 2}`                // "Sum: 3"
+
+### Type Coercion
+
+Values are coerced to strings as follows:
+
+| Type    | Coercion                                            |
+|---------|-----------------------------------------------------|
+| string  | Used as-is                                          |
+| int     | Decimal representation                              |
+| float   | `%g` format (trailing zeros removed: 3.14 not 3.140000) |
+| other   | LPC literal representation (similar to `%O`)        |
+
+### Escape Sequences
+
+Template literals support the same escape sequences as regular strings
+(`\n`, `\t`, `\\`, `\xHH`, octal), plus:
+
+    \`      literal backtick
+    \$      literal dollar sign (prevents interpolation)
+
+### Newline Handling
+
+Newlines within a template literal are collapsed (removed):
+
+    `line one
+    line two`
+
+produces `"line oneline two"`.
+
+### Adjacent Concatenation
+
+Template literals can be placed adjacent to other template literals or
+regular strings to concatenate them, just like regular string literals:
+
+    `Hello, ${name}! ` `How are you?`
+    `Count: ${n}` " items"
+    "Hello, " `${name}!`
+
+### Examples
+
+    // Basic interpolation
+    string msg = `${this_body()->query_name()} says hi!`;
+
+    // Multiple expressions
+    string status = `${name} has ${count} items worth ${value} gold.`;
+
+    // Expressions
+    string info = `Total: ${price * quantity}`;
+
+    // Multiline with adjacent concat
+    string long_msg = `Dear ${name}, `
+                      `your order of ${count} items `
+                      `has been shipped.`;
+
+### SEE ALSO
+
+    sprintf(3)
+
+---
+
+## String Sub-Ranging
+
 string sub ranging - comments by Grey@TMI-2
 
 You can take a substring from a variable ( str ) buy using the substring
