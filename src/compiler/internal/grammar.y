@@ -87,6 +87,9 @@ int yyparse (void);
 // only in DEBUG
 %token L_TREE
 
+// Template literals
+%token L_TEMPLATE_HEAD L_TEMPLATE_MIDDLE L_TEMPLATE_TAIL
+
 // Only ever used in lpcfmt
 %token L_PREPROCESSOR_COMMAND
 
@@ -171,6 +174,7 @@ int yyparse (void);
 
 /* holds a string constant */
 %type <string> L_STRING string_con1 string_con2
+%type <string> L_TEMPLATE_HEAD L_TEMPLATE_MIDDLE L_TEMPLATE_TAIL
 
 /* Holds the number of elements in a list and whether it must be a prototype */
 %type <argument> argument_list argument
@@ -193,7 +197,7 @@ int yyparse (void);
 
 /* The following return a parse node */
 %type <node> optional_default_arg_value
-%type <node> number real string expr0 comma_expr for_expr sscanf catch
+%type <node> number real string string_like template_literal template_parts expr0 comma_expr for_expr sscanf catch
 %type <node> parse_command time_expression expr_list expr_list2 expr_list3
 %type <node> expr_list4 assoc_pair expr4 lvalue function_call lvalue_list
 %type <node> new_local_def statement while cond do switch case
@@ -2691,7 +2695,7 @@ expr4:
         }
       } else $$->type = TYPE_ANY;
     }
-  | string
+  | string_like
   | '(' comma_expr ')'
     {
       $$ = $2;
@@ -3049,6 +3053,48 @@ string_con2:
   | string_con2 L_STRING
     {
       $$ = scratch_join($1, $2);
+    }
+;
+
+template_literal:
+  L_TEMPLATE_HEAD expr0 template_parts
+    {
+      parse_node_t *head, *tmp, *coerced;
+      CREATE_STRING(head, $1);
+      scratch_free($1);
+      CREATE_UNARY_OP(coerced, F_TEMPLATE_COERCE, TYPE_STRING, $2);
+      CREATE_BINARY_OP(tmp, F_ADD, TYPE_STRING, head, coerced);
+      CREATE_BINARY_OP($$, F_ADD, TYPE_STRING, tmp, $3);
+    }
+;
+
+template_parts:
+  L_TEMPLATE_TAIL
+    {
+      CREATE_STRING($$, $1);
+      scratch_free($1);
+    }
+  | L_TEMPLATE_MIDDLE expr0 template_parts
+    {
+      parse_node_t *mid, *tmp, *coerced;
+      CREATE_STRING(mid, $1);
+      scratch_free($1);
+      CREATE_UNARY_OP(coerced, F_TEMPLATE_COERCE, TYPE_STRING, $2);
+      CREATE_BINARY_OP(tmp, F_ADD, TYPE_STRING, mid, coerced);
+      CREATE_BINARY_OP($$, F_ADD, TYPE_STRING, tmp, $3);
+    }
+;
+
+string_like:
+  string
+  | template_literal
+  | string_like string
+    {
+      CREATE_BINARY_OP($$, F_ADD, TYPE_STRING, $1, $2);
+    }
+  | string_like template_literal
+    {
+      CREATE_BINARY_OP($$, F_ADD, TYPE_STRING, $1, $2);
     }
 ;
 

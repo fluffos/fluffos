@@ -99,6 +99,7 @@ using format_info = unsigned int;
 #define INFO_T_HEX 0xB
 #define INFO_T_C_HEX 0xC
 #define INFO_T_FLOAT 0xD
+#define INFO_T_GFLOAT 0xE
 
 #define INFO_J 0x30
 #define INFO_J_CENTRE 0x10
@@ -965,6 +966,9 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
           case 'f':
             finfo |= INFO_T_FLOAT;
             break;
+          case 'g':
+            finfo |= INFO_T_GFLOAT;
+            break;
           case 'c':
             finfo |= INFO_T_CHAR;
             break;
@@ -1279,6 +1283,9 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
               cheat[i++] = 'l';
               cheat[i++] = 'f';
               break;
+            case INFO_T_GFLOAT:
+              cheat[i++] = 'g';
+              break;
             case INFO_T_OCT:
               cheat[i++] = 'l';
               cheat[i++] = 'l';
@@ -1297,7 +1304,7 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
             default:
               SPRINTF_ERROR(ERR_BAD_INT_TYPE);
           }
-          if ((cheat[i - 1] == 'f' && carg->type == T_NUMBER)) {
+          if (((cheat[i - 1] == 'f' || cheat[i - 1] == 'g') && carg->type == T_NUMBER)) {
             // convert to T_REAL
             LPC_FLOAT temp = carg->u.number;
             carg->type = T_REAL;
@@ -1307,8 +1314,8 @@ char *string_print_formatted(const char *format_str, int argc, svalue_t *argv) {
             LPC_INT temp = floor(carg->u.real);
             carg->type = T_NUMBER;
             carg->u.number = temp;
-          } else if ((cheat[i - 1] == 'f' && carg->type != T_REAL) ||
-              (cheat[i - 1] != 'f' && carg->type != T_NUMBER)) {
+          } else if (((cheat[i - 1] == 'f' || cheat[i - 1] == 'g') && carg->type != T_REAL) ||
+              (cheat[i - 1] != 'f' && cheat[i - 1] != 'g' && carg->type != T_NUMBER)) {
             error("ERROR: (s)printf(): Incorrect argument type to %%%c.\n", cheat[i - 1]);
           }
           cheat[i] = '\0';
