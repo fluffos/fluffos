@@ -1065,9 +1065,10 @@ expr_or_block:
   | '(' comma_expr ')'   { $$ = rule_expr_or_block_expr($comma_expr); }
 ;
 
-/* The ref keyword -- pass a variable by reference. */
+/* The ref keyword -- pass a variable by reference. '&' is accepted sugar. */
 ref:
   L_REF
+  | '&'
 ;
 
 /* =========================================================================
