@@ -117,4 +117,22 @@ void execute_command(string cmd) {
 }
 ```
 
+### Pass-by-Reference Parameters
+
+Functions can accept parameters by reference using the `ref` keyword (or its
+shorthand `&`). Changes to a ref parameter inside the function are reflected in
+the caller's variable:
+
+```c
+void increment(int ref value) {
+    value++;
+}
+
+int x = 10;
+increment(ref x);  // x is now 11
+increment(& x);    // x is now 12
+```
+
+See `constructs/ref` for full details.
+
 See also: `types/function` for more details on function pointers and syntax.
