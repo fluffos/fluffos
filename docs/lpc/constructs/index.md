@@ -8,5 +8,6 @@ title: constructs
 * [include](include.html)
 * [inherit](inherit.html)
 * [prototypes](prototypes.html)
+* [ref](ref.html)
 * [switch](switch.html)
 * [while](while.html)

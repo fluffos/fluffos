@@ -1238,6 +1238,7 @@ comma_expr:
 
 ref:
   L_REF
+  | '&'
 ;
 
 expr0:
