@@ -78,7 +78,6 @@
 #include "compiler/internal/lex.h"
 #include "compiler/internal/scratchpad.h"
 #include "compiler/internal/generate.h"
-#include "include/opcodes_extra.h"
 
 extern char *outp;
 

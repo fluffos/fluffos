@@ -9,7 +9,6 @@
 
 #include "include/function.h"
 #include "efuns.autogen.h"
-#include "include/opcodes_extra.h"
 
 #include "vm/internal/base/program.h"
 #include "compiler.h"

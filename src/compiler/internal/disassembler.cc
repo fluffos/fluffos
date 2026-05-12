@@ -5,7 +5,6 @@
 #include "vm/vm.h"
 #include "compiler/internal/lex.h"
 #include "compiler/internal/icode.h"
-#include "include/opcodes_extra.h"
 
 #include <fmt/format.h>
 

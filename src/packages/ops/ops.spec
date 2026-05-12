@@ -27,6 +27,7 @@ operator loop_incr;
 operator while_dec;
 
 operator lor, land;
+operator nullish, lor_eq, land_eq, nullish_eq, assign_value;
 
 operator catch, end_catch;
 operator time_expression, end_time_expression;

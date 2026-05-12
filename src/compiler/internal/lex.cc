@@ -29,7 +29,6 @@
 
 #include "vm/vm.h"
 #include "include/function.h"
-#include "include/opcodes_extra.h"
 #include "efuns.autogen.h"
 #include "options.autogen.h"
 #include "vm/internal/base/program.h"
