@@ -2,7 +2,7 @@
 #              Customizable runtime config file for FluffOS                   #
 ###############################################################################
 # NOTE: All paths specified here are relative to the mudlib directory except  #
-#       for mudlib directory, and binary directory.                           #
+#       for the mudlib directory itself.                                      #
 # Lines beginning with a # or a newline are ignored.                          #
 ###############################################################################
 
@@ -28,9 +28,6 @@ external_port_2 : binary 4001
 # absolute pathname of mudlib
 mudlib directory : /home/mmessier/mudos/mudos/beta/testsuite
 
-# absolute pathname of driver/config dir
-binary directory : /home/mmessier/mudos/mudos/beta/testsuite
-
 # ------------------------------------------------------------------------
 #
 # You shouldn't change anything below this point unless you know what
@@ -50,9 +47,6 @@ master file : /single/master
 
 # the file where all global simulated efuns are defined.
 simulated efun file : /single/simul_efun
-
-# file to swap out objects; not used if time to swap is 0
-swap file : /single/swapfile
 
 # alternate debug.log file name (assumed to be in specified 'log directory')
 debug log file : debug.log
@@ -96,6 +90,10 @@ maximum local variables : 50
 
 # Set the maximum call depth for functions.
 maximum call depth : 150
+
+# Set the maximum stack size of the stack machine. This stack will also
+# contain all local variables and arguments.
+evaluator stack size : 6000
 
 # This is the maximum array size allowed for one single array.
 maximum array size : 15000
@@ -310,22 +308,6 @@ enable_commands call init : 1
 #
 sprintf add_justified ignore ANSI colors : 1
 
-# Defines the number of bits to use in the call_other cache (in interpret.c).
-#
-# Memory overhead is (1 << APPLY_CACHE_BITS)*16.
-# [assuming 32 bit pointers and 16 bit shorts]
-#
-# ACB:     entries:     overhead:
-#   6           64            1k
-#   8          256            4k
-#  10        1,024           16k
-#  12        4,096           64k
-#  14       16,384          256k
-#  16       65,536            1M
-#  20    1,048,576           16M
-#  22    4,194,304           64M
-apply cache bits : 22
-
 # Maximum nesting level for chains of call_out(0) within a single backend cycle.
 call_out(0) nest level : 1000
 
@@ -336,19 +318,4 @@ enable zmp : 0
 enable mssp : 1
 enable msp : 1
 enable msdp : 0
-
-###############################################################################
-#          The following aren't currently used or implemented (yet)           #
-###############################################################################
-
-# maximum number of users in the game (unused currently)
-maximum users : 40
-
-# Set the maximum stack size of the stack machine. This stack will also
-# contain all local variables and arguments.
-evaluator stack size : 6000
-
-# Set the size of the compiler stack. This defines how complex expressions
-# the compiler can parse.  (unused currently)
-compiler stack size : 600
 
