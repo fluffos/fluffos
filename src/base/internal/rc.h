@@ -20,6 +20,9 @@ extern char *external_cmd[g_num_external_cmds];
 void config_init();
 void read_config(const char *);
 void print_rc_table();
+// Emit a starter config file (with all options) to stdout; used by
+// `driver --generate-config`.
+void print_config_template();
 
 extern int config_int[NUM_CONFIG_INTS];
 extern char *config_str[NUM_CONFIG_STRS];

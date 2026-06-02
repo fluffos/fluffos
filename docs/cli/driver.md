@@ -19,6 +19,7 @@ title: cli / driver
 | `-f<flag>`               | After initialization, before opening network connections, driver will call `void flag(string)` function on master object. |
 | `-d<category>`           | Enable debug logging, this flag can occur multiple times. This is same as calling `set_debug_level()` EFUN.               |
 | `--tracing <trace_file>` | Enable LPC tracing                                                                                                        |
+| `--generate-config`      | Print a starter config file (all options, with defaults and comments) to stdout and exit. Redirect to a file to use it.  |
 
 ## Debug logging Categories
 

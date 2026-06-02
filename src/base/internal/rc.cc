@@ -9,6 +9,7 @@
 
 #include "base/internal/rc.h"
 
+#include <cstdio>   // for printf
 #include <cstring>  // for strlen
 #include <deque>
 #include <fstream>
@@ -31,79 +32,155 @@ namespace {
 const int K_MAX_CONFIG_LINE_LENGTH = 120;
 std::deque<std::string> config_lines;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SOURCE OF TRUTH for docs/driver/config.md.
+//
+// INT_FLAGS[] (below) and STR_FLAGS[] (further down) define every recognized
+// runtime config option together with its documentation. The driver parses
+// config files directly from these tables, and docs/gen_config_docs.py
+// generates docs/driver/config.md from them -- so the `category` and
+// `description` fields below ARE the documentation.
+//
+// After adding, removing, or changing an entry, regenerate the docs and commit
+// the result:
+//     python3 docs/gen_config_docs.py
+//
+// CI (.github/workflows/config-docs.yml) re-runs the generator with --check and
+// fails the build if docs/driver/config.md is out of date. Keep descriptions to
+// a single line and avoid the '|' character (it breaks the Markdown table).
+// ─────────────────────────────────────────────────────────────────────────────
 struct FlagEntry {
-  std::string key;
-  int pos;
-  int defaultValue;
-  int minValue = 0;
-  int maxValue = INT_MAX;
+  std::string key;          // recognized config-file setting name
+  int pos;                  // slot constant from runtime_config.h
+  int defaultValue;         // value used when the option is omitted
+  int minValue;             // inclusive lower bound (else reset to default)
+  int maxValue;             // inclusive upper bound (else reset to default)
+  std::string category;     // grouping heading in the generated docs
+  std::string description;  // doc prose: one line, no '|' characters
 };
 
 const FlagEntry INT_FLAGS[] = {
-    {"time to clean up", __TIME_TO_CLEAN_UP__, 600},
-    {"time to reset", __TIME_TO_RESET__, 900},
-    {"time to swap", __TIME_TO_SWAP__, 300},
+    {"time to clean up", __TIME_TO_CLEAN_UP__, 600, 0, INT_MAX, "Timing & Lifecycle",
+     "Seconds an object may be idle before clean_up() is called on it; should be well above 'time to swap'."},
+    {"time to reset", __TIME_TO_RESET__, 900, 0, INT_MAX, "Timing & Lifecycle",
+     "Seconds between successive reset() calls on an object."},
+    {"time to swap", __TIME_TO_SWAP__, 300, 0, INT_MAX, "Timing & Lifecycle",
+     "Seconds an unused object stays in memory before being swapped out; 0 disables swapping."},
 
-    // __COMPILER_STACK_SIZE__
-    {"evaluator stack size", __EVALUATOR_STACK_SIZE__, CFG_EVALUATOR_STACK_SIZE},
+    {"evaluator stack size", __EVALUATOR_STACK_SIZE__, CFG_EVALUATOR_STACK_SIZE, 0, INT_MAX, "Limits",
+     "Maximum size of the evaluator stack, which holds all local variables and call arguments."},
+    {"inherit chain size", __INHERIT_CHAIN_SIZE__, 30, 0, INT_MAX, "Limits",
+     "Maximum depth of an object's inheritance chain."},
+    {"maximum evaluation cost", __MAX_EVAL_COST__, 30000000, 0, INT_MAX, "Limits",
+     "Maximum eval cost a single thread may consume before execution is aborted."},
+    {"maximum local variables", __MAX_LOCAL_VARIABLES__, 64, 64, UINT8_MAX, "Limits",
+     "Maximum number of local variables in a single function."},
+    {"maximum call depth", __MAX_CALL_DEPTH__, CFG_MAX_CALL_DEPTH, 0, INT_MAX, "Limits",
+     "Maximum nesting depth of LPC function calls."},
 
-    {"inherit chain size", __INHERIT_CHAIN_SIZE__, 30},
-    {"maximum evaluation cost", __MAX_EVAL_COST__, 30000000},
-    {"maximum local variables", __MAX_LOCAL_VARIABLES__, 64, 64, UINT8_MAX},
-    {"maximum call depth", __MAX_CALL_DEPTH__, CFG_MAX_CALL_DEPTH},
+    {"maximum array size", __MAX_ARRAY_SIZE__, 15000, 0, INT_MAX, "Limits",
+     "Maximum number of elements in a single array."},
+    {"maximum buffer size", __MAX_BUFFER_SIZE__, 1 << 20, 0, INT_MAX, "Limits",
+     "Maximum size, in bytes, of a single buffer variable."},
+    {"maximum mapping size", __MAX_MAPPING_SIZE__, 150000, 0, INT_MAX, "Limits",
+     "Maximum number of entries in a single mapping."},
+    {"maximum string length", __MAX_STRING_LENGTH__, 1 << 20, 0, INT_MAX, "Limits",
+     "Maximum length, in bytes, of a single string variable."},
+    {"maximum bits in a bitfield", __MAX_BITFIELD_BITS__, 12000, 0, INT_MAX, "Limits",
+     "Maximum number of bits in a bitfield (stored 6 bits per printable byte)."},
+    {"maximum byte transfer", __MAX_BYTE_TRANSFER__, 1 << 18, 0, INT_MAX, "Limits",
+     "Maximum number of bytes a single read_bytes()/write_bytes() call may transfer."},
+    {"maximum read file size", __MAX_READ_FILE_SIZE__, 1 << 18, 0, INT_MAX, "Limits",
+     "Maximum size, in bytes, of a file that read_file() may read."},
 
-    {"maximum array size", __MAX_ARRAY_SIZE__, 15000},
-    {"maximum buffer size", __MAX_BUFFER_SIZE__, 1 << 20},
-    {"maximum mapping size", __MAX_MAPPING_SIZE__, 150000},
-    {"maximum string length", __MAX_STRING_LENGTH__, 1 << 20},
-    {"maximum bits in a bitfield", __MAX_BITFIELD_BITS__, 12000},
-    {"maximum byte transfer", __MAX_BYTE_TRANSFER__, 1 << 18},
-    {"maximum read file size", __MAX_READ_FILE_SIZE__, 1 << 18},
+    {"hash table size", __SHARED_STRING_HASH_TABLE_SIZE__, 65536, 7001, INT_MAX, "Hash Tables",
+     "Size of the shared-string hash table; should be prime, roughly 1/5 of the number of distinct strings."},
+    {"object table size", __OBJECT_HASH_TABLE_SIZE__, 4096, 1024, INT_MAX, "Hash Tables",
+     "Size of the object hash table; roughly 1/4 of the number of objects in the game."},
+    {"living hash table size", __LIVING_HASH_TABLE_SIZE__, 256, 256, INT_MAX, "Hash Tables",
+     "Size of the find_living() hash table; must be one of 4, 16, 64, 256, 1024, or 4096."},
 
-    {"hash table size", __SHARED_STRING_HASH_TABLE_SIZE__, 65536, 7001},
-    {"object table size", __OBJECT_HASH_TABLE_SIZE__, 4096, 1024},
-    {"living hash table size", __LIVING_HASH_TABLE_SIZE__, 256, 256},
-
-    {"gametick msec", __RC_GAMETICK_MSEC__, 1000},
-    {"heartbeat interval msec", __RC_HEARTBEAT_INTERVAL_MSEC__, 1000},
-    {"sane explode string", __RC_SANE_EXPLODE_STRING__, 1},
-    {"reversible explode string", __RC_REVERSIBLE_EXPLODE_STRING__, 0},
-    {"sane sorting", __RC_SANE_SORTING__, 1},
-    {"warn tab", __RC_WARN_TAB__, 0},
-    {"wombles", __RC_WOMBLES__, 0},
-    {"call other type check", __RC_CALL_OTHER_TYPE_CHECK__, 0},
-    {"call other warn", __RC_CALL_OTHER_WARN__, 0},
-    {"mudlib error handler", __RC_MUDLIB_ERROR_HANDLER__, 1},
-    {"no resets", __RC_NO_RESETS__, 0},
-    {"lazy resets", __RC_LAZY_RESETS__, 0},
-    {"randomized resets", __RC_RANDOMIZED_RESETS__, 1},
-    {"no ansi", __RC_NO_ANSI__, 1},
-    {"strip before process input", __RC_STRIP_BEFORE_PROCESS_INPUT__, 1},
-    {"this_player in call_out", __RC_THIS_PLAYER_IN_CALL_OUT__, 1},
-    {"trace", __RC_TRACE__, 1},
-    {"trace code", __RC_TRACE_CODE__, 0},
-    {"interactive catch tell", __RC_INTERACTIVE_CATCH_TELL__, 0},
-    {"receive snoop", __RC_RECEIVE_SNOOP__, 1},
-    {"snoop shadowed", __RC_SNOOP_SHADOWED__, 0},
-    {"reverse defer", __RC_REVERSE_DEFER__, 0},
-    {"has console", __RC_HAS_CONSOLE__, 1},
-    {"noninteractive stderr write", __RC_NONINTERACTIVE_STDERR_WRITE__, 0},
-    {"trap crashes", __RC_TRAP_CRASHES__, 1},
-    {"old type behavior", __RC_OLD_TYPE_BEHAVIOR__, 0},
-    {"old range behavior", __RC_OLD_RANGE_BEHAVIOR__, 0},
-    {"warn old range behavior", __RC_WARN_OLD_RANGE_BEHAVIOR__, 1},
-    {"suppress argument warnings", __RC_SUPPRESS_ARGUMENT_WARNINGS__, 1},
-    {"enable_commands call init", __RC_ENABLE_COMMANDS_CALL_INIT__, 1},
-    {"sprintf add_justified ignore ANSI colors", __RC_SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__, 1},
-    {"call_out(0) nest level", __RC_CALL_OUT_ZERO_NEST_LEVEL__, 1000},
-    {"trace lpc execution context", __RC_TRACE_CONTEXT__, 0},
-    {"trace lpc instructions", __RC_TRACE_INSTR__, 0},
-    {"enable mxp", __RC_ENABLE_MXP__, 0},
-    {"enable gmcp", __RC_ENABLE_GMCP__, 0},
-    {"enable zmp", __RC_ENABLE_ZMP__, 0},
-    {"enable mssp", __RC_ENABLE_MSSP__, 1},
-    {"enable msp", __RC_ENABLE_MSP__, 1},
-    {"enable msdp", __RC_ENABLE_MSDP__, 0},
+    {"gametick msec", __RC_GAMETICK_MSEC__, 1000, 0, INT_MAX, "Timing & Lifecycle",
+     "Granularity of in-game time in milliseconds (the shortest visible time interval)."},
+    {"heartbeat interval msec", __RC_HEARTBEAT_INTERVAL_MSEC__, 1000, 0, INT_MAX, "Timing & Lifecycle",
+     "Heartbeat interval in milliseconds."},
+    {"sane explode string", __RC_SANE_EXPLODE_STRING__, 1, 0, INT_MAX, "Language Behavior",
+     "explode() strips at most one leading delimiter (and still one trailing delimiter)."},
+    {"reversible explode string", __RC_REVERSIBLE_EXPLODE_STRING__, 0, 0, INT_MAX, "Language Behavior",
+     "Make implode(explode(x, y), y) always equal x; overrides 'sane explode string'."},
+    {"sane sorting", __RC_SANE_SORTING__, 1, 0, INT_MAX, "Language Behavior",
+     "Use a well-defined, stable ordering for the driver's sorting operations."},
+    {"warn tab", __RC_WARN_TAB__, 0, 0, INT_MAX, "Diagnostics",
+     "Warn when source files are indented with tabs instead of spaces."},
+    {"wombles", __RC_WOMBLES__, 0, 0, INT_MAX, "Language Behavior",
+     "Disallow spaces between the start/end token characters of arrays, mappings, and functionals."},
+    {"call other type check", __RC_CALL_OTHER_TYPE_CHECK__, 0, 0, INT_MAX, "Type Checking",
+     "Enable type checking for call_other() (the -> operator on objects)."},
+    {"call other warn", __RC_CALL_OTHER_WARN__, 0, 0, INT_MAX, "Type Checking",
+     "Emit warnings instead of errors for call_other() type mismatches."},
+    {"mudlib error handler", __RC_MUDLIB_ERROR_HANDLER__, 1, 0, INT_MAX, "Error Handling",
+     "Pass runtime errors to the master object's error_handler() instead of handling them in the driver."},
+    {"no resets", __RC_NO_RESETS__, 0, 0, INT_MAX, "Reset Behavior",
+     "Completely disable the periodic calling of reset()."},
+    {"lazy resets", __RC_LAZY_RESETS__, 0, 0, INT_MAX, "Reset Behavior",
+     "Only call reset() when an object is touched via call_other() or move_object()."},
+    {"randomized resets", __RC_RANDOMIZED_RESETS__, 1, 0, INT_MAX, "Reset Behavior",
+     "Spread reset() calls over a randomized interval rather than firing them all at once."},
+    {"no ansi", __RC_NO_ANSI__, 1, 0, INT_MAX, "Player I/O",
+     "Replace ANSI escape characters (ASCII 27) in user input with a space before add_actions run."},
+    {"strip before process input", __RC_STRIP_BEFORE_PROCESS_INPUT__, 1, 0, INT_MAX, "Player I/O",
+     "Strip ANSI before process_input() sees the input, rather than only before add_actions are called."},
+    {"this_player in call_out", __RC_THIS_PLAYER_IN_CALL_OUT__, 1, 0, INT_MAX, "Language Behavior",
+     "Make this_player() usable from within call_out() callbacks."},
+    {"trace", __RC_TRACE__, 1, 0, INT_MAX, "Diagnostics",
+     "Enable the trace() and traceprefix() efuns (leaving it off runs slightly faster)."},
+    {"trace code", __RC_TRACE_CODE__, 0, 0, INT_MAX, "Diagnostics",
+     "Include the preceding lines of LPC code in error traces (slower)."},
+    {"interactive catch tell", __RC_INTERACTIVE_CATCH_TELL__, 0, 0, INT_MAX, "Player I/O",
+     "Call catch_tell() on interactive users as well as on NPCs."},
+    {"receive snoop", __RC_RECEIVE_SNOOP__, 1, 0, INT_MAX, "Player I/O",
+     "Send snoop text to receive_snoop() in the snooper instead of directly via add_message()."},
+    {"snoop shadowed", __RC_SNOOP_SHADOWED__, 0, 0, INT_MAX, "Player I/O",
+     "Report snooped output even when the target's catch_tell() is shadowed (prefixed with $$)."},
+    {"reverse defer", __RC_REVERSE_DEFER__, 0, 0, INT_MAX, "Language Behavior",
+     "Run deferred functions registered with defer() in reverse order."},
+    {"has console", __RC_HAS_CONSOLE__, 1, 0, INT_MAX, "Diagnostics",
+     "Allow the driver's interactive console via the -C command-line argument."},
+    {"noninteractive stderr write", __RC_NONINTERACTIVE_STDERR_WRITE__, 0, 0, INT_MAX, "Player I/O",
+     "Write tells/messages sent to non-interactive objects to stderr, prefixed with ']' (legacy behavior)."},
+    {"trap crashes", __RC_TRAP_CRASHES__, 1, 0, INT_MAX, "Error Handling",
+     "Call crash() in the master object and shut down cleanly on signals that would otherwise crash the driver."},
+    {"old type behavior", __RC_OLD_TYPE_BEHAVIOR__, 0, 0, INT_MAX, "Type Checking",
+     "Reintroduce a legacy type-checking bug for backwards compatibility."},
+    {"old range behavior", __RC_OLD_RANGE_BEHAVIOR__, 0, 0, INT_MAX, "Language Behavior",
+     "Treat negative range indices in strings/buffers as counting from the end (rvalue use only)."},
+    {"warn old range behavior", __RC_WARN_OLD_RANGE_BEHAVIOR__, 1, 0, INT_MAX, "Language Behavior",
+     "Warn when code relies on 'old range behavior'."},
+    {"suppress argument warnings", __RC_SUPPRESS_ARGUMENT_WARNINGS__, 1, 0, INT_MAX, "Diagnostics",
+     "Suppress unused-argument warnings, warning only about unused local variables."},
+    {"enable_commands call init", __RC_ENABLE_COMMANDS_CALL_INIT__, 1, 0, INT_MAX, "Language Behavior",
+     "Call init() in an object when enable_commands() is invoked on it."},
+    {"sprintf add_justified ignore ANSI colors", __RC_SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__, 1, 0, INT_MAX,
+     "Language Behavior",
+     "Make sprintf() column justification ignore ANSI color codes when computing field width."},
+    {"call_out(0) nest level", __RC_CALL_OUT_ZERO_NEST_LEVEL__, 1000, 0, INT_MAX, "Language Behavior",
+     "Maximum nesting level for chains of call_out(0) within a single backend cycle."},
+    {"trace lpc execution context", __RC_TRACE_CONTEXT__, 0, 0, INT_MAX, "Diagnostics",
+     "Record LPC execution context for tracing and debugging."},
+    {"trace lpc instructions", __RC_TRACE_INSTR__, 0, 0, INT_MAX, "Diagnostics",
+     "Trace individual LPC instructions for debugging."},
+    {"enable mxp", __RC_ENABLE_MXP__, 0, 0, INT_MAX, "Protocol Support",
+     "Advertise and enable the MXP telnet protocol."},
+    {"enable gmcp", __RC_ENABLE_GMCP__, 0, 0, INT_MAX, "Protocol Support",
+     "Advertise and enable the GMCP telnet protocol."},
+    {"enable zmp", __RC_ENABLE_ZMP__, 0, 0, INT_MAX, "Protocol Support",
+     "Advertise and enable the ZMP telnet protocol."},
+    {"enable mssp", __RC_ENABLE_MSSP__, 1, 0, INT_MAX, "Protocol Support",
+     "Advertise and enable the MSSP telnet protocol."},
+    {"enable msp", __RC_ENABLE_MSP__, 1, 0, INT_MAX, "Protocol Support",
+     "Advertise and enable the MSP telnet protocol."},
+    {"enable msdp", __RC_ENABLE_MSDP__, 0, 0, INT_MAX, "Protocol Support",
+     "Advertise and enable the MSDP telnet protocol."},
 };
 
 /*
@@ -122,6 +199,43 @@ const int kMustHave = 1;
 const int kOptional = 0;
 const int kWarnMissing = -1;
 const int K_WARN_FOUND = -2;
+
+// String config options. Like INT_FLAGS, this table is the source of truth for
+// both parsing and docs/driver/config.md: the simple "key : <text>" options are
+// parsed directly from it in read_config(). A few string-valued options with
+// special handling (the external ports, external commands, the global include
+// file, and the default fail message) are parsed separately but still
+// documented -- that hand-maintained section lives in docs/gen_config_docs.py.
+// After editing this table, regenerate the docs (python3 docs/gen_config_docs.py).
+struct StrFlagEntry {
+  std::string key;          // recognized config-file setting name
+  int pos;                  // slot constant from runtime_config.h
+  int required;             // kMustHave / kOptional / kWarnMissing
+  std::string tag;          // allocation label (debugging aid)
+  std::string category;     // grouping heading in the generated docs
+  std::string description;  // doc prose: one line, no '|' characters
+};
+
+const StrFlagEntry STR_FLAGS[] = {
+    {"name", __MUD_NAME__, kMustHave, "config file: mn", "Identity & Network",
+     "Name of this MUD."},
+    {"mudlib directory", __MUD_LIB_DIR__, kMustHave, "config file: mld", "Directory Structure",
+     "Absolute path to the mudlib root (this path is not relative to the mudlib)."},
+    {"log directory", __LOG_DIR__, kMustHave, "config file: ld", "Directory Structure",
+     "Filesystem directory for debug.log and stats files, resolved relative to the driver's working directory (leading slashes are stripped); not a mudlib virtual path."},
+    {"include directories", __INCLUDE_DIRS__, kMustHave, "config file: id", "Directory Structure",
+     "Colon-separated list of directories searched by `#include <...>`."},
+    {"master file", __MASTER_FILE__, kMustHave, "config file: mf", "Core Files",
+     "Path to the object that defines the master object."},
+    {"simulated efun file", __SIMUL_EFUN_FILE__, kOptional, "config file: sef", "Core Files",
+     "Path to the object that defines global simulated efuns."},
+    {"debug log file", __DEBUG_LOG_FILE__, kWarnMissing, "config file: dlf", "Logging",
+     "Filename (within the log directory) for the driver's debug log."},
+    {"default error message", __DEFAULT_ERROR_MESSAGE__, kOptional, "config file: dem", "Error Handling",
+     "Message shown to players when error() occurs."},
+    {"mud ip", __MUD_IP__, kOptional, "config file: mi", "Identity & Network",
+     "IP address to bind to; useful on hosts with multiple network addresses."},
+};
 
 bool scan_config_line(const char *fmt, void *dest, int required) {
   /* zero the destination.  It is either a pointer to an int or a char
@@ -237,29 +351,13 @@ void read_config(const char *filename) {
     }
   }
 
-  scan_config_line("name : %[^\n]", tmp, 1);
-  CONFIG_STR(__MUD_NAME__) = alloc_cstring(tmp, "config file: mn");
-
-  scan_config_line("mudlib directory : %[^\n]", tmp, 1);
-  CONFIG_STR(__MUD_LIB_DIR__) = alloc_cstring(tmp, "config file: mld");
-
-  scan_config_line("log directory : %[^\n]", tmp, 1);
-  CONFIG_STR(__LOG_DIR__) = alloc_cstring(tmp, "config file: ld");
-
-  scan_config_line("include directories : %[^\n]", tmp, 1);
-  CONFIG_STR(__INCLUDE_DIRS__) = alloc_cstring(tmp, "config file: id");
-
-  scan_config_line("master file : %[^\n]", tmp, 1);
-  CONFIG_STR(__MASTER_FILE__) = alloc_cstring(tmp, "config file: mf");
-
-  scan_config_line("simulated efun file : %[^\n]", tmp, 0);
-  CONFIG_STR(__SIMUL_EFUN_FILE__) = alloc_cstring(tmp, "config file: sef");
-
-  scan_config_line("debug log file : %[^\n]", tmp, -1);
-  CONFIG_STR(__DEBUG_LOG_FILE__) = alloc_cstring(tmp, "config file: dlf");
-
-  scan_config_line("default error message : %[^\n]", tmp, 0);
-  CONFIG_STR(__DEFAULT_ERROR_MESSAGE__) = alloc_cstring(tmp, "config file: dem");
+  // Process the simple string options from the STR_FLAGS table.
+  for (const auto &flag : STR_FLAGS) {
+    char buf[256];
+    sprintf(buf, "%s : %%[^\n]", flag.key.c_str());
+    scan_config_line(buf, tmp, flag.required);
+    CONFIG_STR(flag.pos) = alloc_cstring(tmp, flag.tag.c_str());
+  }
 
   {
     scan_config_line("default fail message : %[^\n]", tmp, 0);
@@ -271,9 +369,6 @@ void read_config(const char *filename) {
     }
     CONFIG_STR(__DEFAULT_FAIL_MESSAGE__) = alloc_cstring(tmp, "config file: dfm");
   }
-
-  scan_config_line("mud ip : %[^\n]", tmp, 0);
-  CONFIG_STR(__MUD_IP__) = alloc_cstring(tmp, "config file: mi");
 
   /* Process ports */
   {
@@ -409,4 +504,116 @@ void print_rc_table() {
       debug_message("%s : %d\n", flag.key.c_str(), val);
     }
   }
+}
+
+// Starter values for the required/recommended string options. Integer options
+// emit their compiled-in defaults; these paths and the MUD name have no sensible
+// default, so they get obvious placeholders the operator must edit.
+namespace {
+// Print `text` as one or more "# ..." comment lines, wrapped on whitespace.
+// The config parser drops any line >= K_MAX_CONFIG_LINE_LENGTH chars (it trips
+// failbit and stops reading the file), so comment lines must stay short.
+void print_comment(const std::string &text) {
+  const size_t width = 76;
+  std::istringstream words(text);
+  std::string word, line;
+  while (words >> word) {
+    if (!line.empty() && line.size() + 1 + word.size() > width) {
+      printf("# %s\n", line.c_str());
+      line.clear();
+    }
+    line += line.empty() ? word : " " + word;
+  }
+  if (!line.empty()) {
+    printf("# %s\n", line.c_str());
+  }
+}
+
+std::string template_str_value(const std::string &key) {
+  if (key == "name") return "CHANGE_ME";
+  if (key == "mudlib directory") return "/path/to/your/mudlib";
+  if (key == "log directory") return "log";
+  if (key == "include directories") return "/include";
+  if (key == "master file") return "/single/master";
+  if (key == "debug log file") return "debug.log";
+  if (key == "simulated efun file") return "/single/simul_efun";
+  if (key == "mud ip") return "127.0.0.1";
+  return "";
+}
+}  // namespace
+
+void print_config_template() {
+  static const char *const CATEGORY_ORDER[] = {
+      "Identity & Network", "Directory Structure", "Core Files",    "Logging",
+      "Error Handling",     "Timing & Lifecycle",  "Limits",        "Hash Tables",
+      "Reset Behavior",     "Language Behavior",    "Type Checking", "Player I/O",
+      "Diagnostics",        "Performance",          "Protocol Support",
+  };
+
+  printf(
+      "###############################################################################\n"
+      "# FluffOS configuration file - generated by `driver --generate-config`.\n"
+      "#\n"
+      "# Integer options are shown at their compiled-in defaults. Required values\n"
+      "# with no sensible default (the MUD name, the mudlib path) use placeholders\n"
+      "# you must edit. Options that need external resources (websocket, TLS,\n"
+      "# external commands) are commented out -- uncomment and edit to enable them.\n"
+      "###############################################################################\n\n");
+
+  for (const auto *category : CATEGORY_ORDER) {
+    bool header_printed = false;
+    auto ensure_header = [&]() {
+      if (!header_printed) {
+        printf("# ----- %s -----\n\n", category);
+        header_printed = true;
+      }
+    };
+
+    for (const auto &s : STR_FLAGS) {
+      if (s.category != category) {
+        continue;
+      }
+      ensure_header();
+      const char *tag = s.required == kMustHave      ? " (required)"
+                        : s.required == kWarnMissing ? " (recommended)"
+                                                     : " (optional)";
+      print_comment(s.description + tag);
+      std::string const value = template_str_value(s.key);
+      if (s.required == kOptional) {
+        printf("# %s : %s\n\n", s.key.c_str(), value.c_str());
+      } else {
+        printf("%s : %s\n\n", s.key.c_str(), value.c_str());
+      }
+    }
+
+    for (const auto &f : INT_FLAGS) {
+      if (f.category != category) {
+        continue;
+      }
+      ensure_header();
+      print_comment(f.description);
+      printf("%s : %d\n\n", f.key.c_str(), f.defaultValue);
+    }
+
+    // The listening ports belong conceptually with Identity & Network.
+    if (std::string(category) == "Identity & Network") {
+      printf("# ----- Ports & Connections -----\n\n");
+      printf("# Plain telnet listener.\n");
+      printf("external_port_1 : telnet 4000\n\n");
+      printf("# Optional extra listeners -- uncomment and edit to enable:\n");
+      printf("# external_port_2 : binary 4001\n");
+      printf("# external_port_3 : websocket 8080\n");
+      printf("# websocket http dir : www                # a websocket port requires this\n");
+      printf("# external_port_3_tls : cert=etc/cert.pem key=etc/key.pem\n\n");
+    }
+  }
+
+  // Options parsed specially in read_config() (not in the tables above).
+  printf("# ----- Other -----\n\n");
+  printf("# Header automatically #include'd in every compiled object (optional).\n");
+  printf("# global include file : \"/include/globals.h\"\n\n");
+  printf("# Message used when an action returns 0 and no notify_fail() was set.\n");
+  printf("default fail message : What?\n\n");
+  printf("# External programs callable via external_start() (requires PACKAGE_EXTERNAL).\n");
+  printf("# external_cmd_1 : /bin/cat\n\n");
 }

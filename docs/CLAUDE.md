@@ -216,12 +216,35 @@ Brief description.
 Documentation about driver internals, architecture, and configuration.
 
 **Topics:**
-- `config.md` - Configuration file format and options
+- `config.md` - Configuration file format and options (**auto-generated**, see below)
 - `adding_efuns.md` - How to add new efuns
 - `stackmachine.md` - VM architecture
 - `parse_tree.md` - Compiler internals
 - `call_into_vm.md` - VM integration
 - `malloc.md` - Memory management
+
+**`config.md` is generated -- do not edit it by hand.** Runtime config options
+are the `INT_FLAGS[]` and `STR_FLAGS[]` tables in
+`src/base/internal/rc.cc`, which are the source of truth for both the parser and
+the docs. `docs/gen_config_docs.py` renders `config.md` from those tables
+(their `category`/`description` fields are the prose).
+
+**Finding/Updating Config Options in Source:**
+```bash
+# The recognized options and their docs (source of truth):
+#   src/base/internal/rc.cc  ->  INT_FLAGS[] (int), STR_FLAGS[] (string)
+# A few irregular ones (ports, external_cmd, global include file, default fail
+# message) are hand-documented in the SPECIAL_OPTIONS block of the generator.
+
+# Regenerate the doc after any rc.cc table change:
+python3 docs/gen_config_docs.py
+
+# Verify the committed doc is up to date (this is what CI runs):
+python3 docs/gen_config_docs.py --check
+```
+Never add an option to `config.md` that is not in `rc.cc` -- edit the table and
+regenerate instead. CI (`.github/workflows/config-docs.yml`) fails if the doc is
+stale.
 
 ### 5. Build Documentation (`/docs/`)
 
@@ -497,6 +520,7 @@ When updating documentation:
 - [ ] Check applies list matches `src/vm/internal/applies`
 - [ ] Verify efun specs match package `.spec` files
 - [ ] Confirm CLI tools match `CMakeLists.txt` executables
+- [ ] Regenerate config docs if `rc.cc` changed (`python3 docs/gen_config_docs.py --check`)
 - [ ] Validate all index files are up-to-date
 - [ ] Test code examples for correctness
 - [ ] Check cross-references aren't broken
