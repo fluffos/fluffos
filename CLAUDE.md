@@ -128,7 +128,8 @@ cd testsuite
 
 ## Continuous Integration
 
-FluffOS uses GitHub Actions for comprehensive CI/CD across multiple platforms and configurations.
+FluffOS uses GitHub Actions for comprehensive CI/CD across multiple platforms
+and configurations.
 
 ### CI Matrix
 
@@ -147,7 +148,8 @@ FluffOS uses GitHub Actions for comprehensive CI/CD across multiple platforms an
 - **Environment Variables**:
   - `OPENSSL_ROOT_DIR=/usr/local/opt/openssl`
   - `ICU_ROOT=/opt/homebrew/opt/icu4c`
-- **Dependencies**: cmake, pkg-config, pcre, libgcrypt, openssl, jemalloc, icu4c, mysql, sqlite3, googletest
+- **Dependencies**: cmake, pkg-config, pcre, libgcrypt, openssl, jemalloc,
+  icu4c, mysql, sqlite3, googletest
 
 **Windows CI** (`.github/workflows/ci-windows.yml`)
 
@@ -158,7 +160,8 @@ FluffOS uses GitHub Actions for comprehensive CI/CD across multiple platforms an
   - `-DPACKAGE_CRYPTO=OFF`
   - `-DPACKAGE_DB_MYSQL=""` (disabled)
   - `-DPACKAGE_DB_SQLITE=1`
-- **Dependencies**: mingw-w64 toolchain, cmake, zlib, pcre, icu, sqlite3, jemalloc, gtest
+- **Dependencies**: mingw-w64 toolchain, cmake, zlib, pcre, icu, sqlite3,
+  jemalloc, gtest
 
 **Sanitizer CI** (`.github/workflows/ci-sanitizer.yml`)
 
@@ -177,8 +180,10 @@ FluffOS uses GitHub Actions for comprehensive CI/CD across multiple platforms an
 
 **Code Quality CI**
 
-- **CodeQL Analysis** (`.github/workflows/codeql-analysis.yml`): Security vulnerability detection
-- **Coverity Scan** (`.github/workflows/coverity-scan.yml`): Static analysis (weekly schedule + push)
+- **CodeQL Analysis** (`.github/workflows/codeql-analysis.yml`): Security
+  vulnerability detection
+- **Coverity Scan** (`.github/workflows/coverity-scan.yml`): Static analysis
+  (weekly schedule + push)
 
 **Documentation CI** (`.github/workflows/gh-pages.yml`)
 
@@ -330,9 +335,11 @@ brew install cmake pkg-config mysql pcre libgcrypt openssl jemalloc icu4c \
   sqlite3 googletest  # Added sqlite3 and googletest for testing
 
 # Build with environment variables (for Apple Silicon)
-OPENSSL_ROOT_DIR="/usr/local/opt/openssl" ICU_ROOT="/opt/homebrew/opt/icu4c" cmake ..
+OPENSSL_ROOT_DIR="/usr/local/opt/openssl" \
+  ICU_ROOT="/opt/homebrew/opt/icu4c" cmake ..
 # For Intel Macs, use:
-# OPENSSL_ROOT_DIR="/usr/local/opt/openssl" ICU_ROOT="/usr/local/opt/icu4c" cmake ..
+# OPENSSL_ROOT_DIR="/usr/local/opt/openssl" \
+#   ICU_ROOT="/usr/local/opt/icu4c" cmake ..
 ```
 
 ### Windows (MSYS2)
@@ -384,6 +391,24 @@ cmake -G "MSYS Makefiles" -DMARCH_NATIVE=OFF \
 1. Edit `src/compiler/grammar.y` for syntax changes
 2. Regenerate grammar with Bison if available
 3. Update corresponding compiler components
+
+### Modifying Runtime Config Options
+
+Runtime config options (the settings in a driver config file) are defined in
+the `INT_FLAGS[]` and `STR_FLAGS[]` tables in `src/base/internal/rc.cc`. These
+tables are the single source of truth: the driver parses config files from them,
+and `docs/driver/config.md` is generated from their `category`/`description`
+fields by `docs/gen_config_docs.py`.
+
+1. Add/change/remove the option's entry in the relevant table in `rc.cc`
+   (include a one-line `description` and a `category`)
+2. Regenerate the docs: `python3 docs/gen_config_docs.py`
+3. Commit `rc.cc` and the regenerated `docs/driver/config.md` together
+
+CI (`.github/workflows/config-docs.yml`) re-runs the generator with `--check`
+and fails if the doc is out of date. Options with irregular parsing (ports,
+external commands, the global include file, the default fail message) are
+hand-documented in the `SPECIAL_OPTIONS` section of `docs/gen_config_docs.py`.
 
 ### Debugging Memory Issues
 

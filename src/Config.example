@@ -241,6 +241,10 @@ trace : 1
 # this is not set (for the most common eoperators).
 trace code : 0
 
+# Low-level LPC tracing intended for driver debugging; normally left off.
+trace lpc execution context : 0
+trace lpc instructions : 0
+
 # Set this if you want catch_tell called on interactives as well as NPCs.  If
 # this is set, the user object will need a catch_tell(msg) method that calls
 # receive(msg);
@@ -322,8 +326,16 @@ sprintf add_justified ignore ANSI colors : 1
 #  22    4,194,304           64M
 apply cache bits : 22
 
-#
-call_out(0) next level : 1000
+# Maximum nesting level for chains of call_out(0) within a single backend cycle.
+call_out(0) nest level : 1000
+
+# Telnet protocol negotiation. Enable the protocols your mudlib supports.
+enable mxp : 0
+enable gmcp : 0
+enable zmp : 0
+enable mssp : 1
+enable msp : 1
+enable msdp : 0
 
 ###############################################################################
 #          The following aren't currently used or implemented (yet)           #
