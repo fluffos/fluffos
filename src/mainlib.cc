@@ -300,6 +300,14 @@ int driver_main(int argc, char **argv);
 }
 
 int driver_main(int argc, char **argv) {
+  // Emit a starter config to stdout and exit, before any startup output.
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "--generate-config") == 0) {
+      print_config_template();
+      return 0;
+    }
+  }
+
 #ifdef HAVE_JEMALLOC
   {
     bool var = true;

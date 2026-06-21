@@ -1,0 +1,34 @@
+name: Config Docs
+
+# Verifies that docs/driver/config.md is regenerated whenever the runtime config
+# tables in rc.cc change. The doc is generated from INT_FLAGS[] / STR_FLAGS[] by
+# docs/gen_config_docs.py; if a contributor edits the tables without re-running
+# the generator, this job fails and tells them what to run.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'src/base/internal/rc.cc'
+      - 'src/base/internal/options_internal.h'
+      - 'docs/gen_config_docs.py'
+      - 'docs/driver/config.md'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'src/base/internal/rc.cc'
+      - 'src/base/internal/options_internal.h'
+      - 'docs/gen_config_docs.py'
+      - 'docs/driver/config.md'
+
+jobs:
+  check:
+    name: config.md is up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Verify generated config docs
+        run: python3 docs/gen_config_docs.py --check
