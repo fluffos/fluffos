@@ -229,6 +229,22 @@ make -j$(nproc) install
 
 ---
 
+### 在 VS Code 中构建
+
+通过 `open-editor-msys2.bat` 或 `open-editor-wsl.bat` 打开编辑器后，CMake Tools 扩展会自动处理配置。使用**任务**菜单（`终端 → 运行任务`）或 `Ctrl+Shift+B` 执行默认构建：
+
+| 任务 | 说明 |
+|------|------|
+| `driver: build` | 增量构建 — 仅重新编译已更改的文件 *（默认构建任务）* |
+| `driver: clean rebuild` | 删除所有构建产物，然后从头重新构建 |
+| `driver: testsuite` | 使用 LPC 测试套件配置启动驱动程序（`etc/config.test`） |
+| `driver: autotest` | 运行完整的自动化 LPC 测试套件并以通过/失败状态码退出 |
+
+> [!TIP]
+> 首次打开时，CMake Tools 会提示选择工具链（Kit）。Windows 请选择 **GCC (MSYS2 MinGW64)**，WSL/Linux/macOS 请选择系统 GCC 或 Clang。
+
+---
+
 ### 高级构建选项
 
 以下 CMake 标志可与任意平台组合使用：

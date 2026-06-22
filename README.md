@@ -230,6 +230,22 @@ make -j$(nproc) install
 
 ---
 
+### Building in VS Code
+
+Once the editor is open (via `open-editor-msys2.bat` or `open-editor-wsl.bat`), the CMake Tools extension handles configuration automatically. Use the **Tasks** menu (`Terminal → Run Task`) or `Ctrl+Shift+B` for the default build:
+
+| Task | What it does |
+|------|-------------|
+| `driver: build` | Incremental build — recompiles only changed files *(default build task)* |
+| `driver: clean rebuild` | Deletes all build artifacts, then rebuilds from scratch |
+| `driver: testsuite` | Starts the driver with the LPC testsuite (`etc/config.test`) |
+| `driver: autotest` | Runs the full automated LPC test suite and exits with a pass/fail code |
+
+> [!TIP]
+> On first open, CMake Tools will prompt to select a kit. Choose **GCC (MSYS2 MinGW64)** for Windows or the system GCC/Clang for WSL/Linux/macOS.
+
+---
+
 ### Advanced Build Options
 
 These CMake flags can be combined with any platform above:

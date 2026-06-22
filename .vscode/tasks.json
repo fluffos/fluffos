@@ -2,7 +2,7 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "cmake: build driver",
+      "label": "driver: build",
       "type": "shell",
       "command": "cmake --build \"${workspaceFolder}/build\" --target driver --parallel $(nproc)",
       "group": {
@@ -12,21 +12,21 @@
       "problemMatcher": ["$gcc"]
     },
     {
-      "label": "cmake: clean rebuild driver",
+      "label": "driver: clean rebuild",
       "type": "shell",
       "command": "cmake --build \"${workspaceFolder}/build\" --target driver --clean-first --parallel $(nproc)",
       "group": "build",
       "problemMatcher": ["$gcc"]
     },
     {
-      "label": "driver - testsuite",
+      "label": "driver: testsuite",
       "type": "shell",
       "command": "cmake --build \"${workspaceFolder}/build\" --target driver-testsuite",
       "group": "test",
       "problemMatcher": []
     },
     {
-      "label": "driver - fulltest",
+      "label": "driver: autotest",
       "type": "shell",
       "command": "cmake --build \"${workspaceFolder}/build\" --target driver-fulltest",
       "group": "test",
