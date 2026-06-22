@@ -1,5 +1,4 @@
 /.idea
-/.vscode
 # default build directory
 /build
 /build*
@@ -15,3 +14,4 @@
 /venv/
 /testsuite/trace_lpcc.json
 **/Testing/Temporary
+.vscode/c_cpp_properties.json

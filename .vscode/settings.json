@@ -1,0 +1,24 @@
+{
+  "terminal.integrated.profiles.windows": {
+    "MSYS2 MinGW64": {
+      "path": "${env:MSYS2_ROOT}\\usr\\bin\\bash.exe",
+      "args": ["--login", "-i"],
+      "env": {
+        "MSYSTEM": "MINGW64",
+        "CHERE_INVOKING": "1",
+        "MSYS2_PATH_TYPE": "inherit"
+      }
+    }
+  },
+  "terminal.integrated.defaultProfile.windows": "MSYS2 MinGW64",
+  "terminal.integrated.automationProfile.windows": {
+    "path": "${env:MSYS2_ROOT}\\usr\\bin\\bash.exe",
+    "args": ["--login"],
+    "env": {
+      "MSYSTEM": "MINGW64",
+      "CHERE_INVOKING": "1",
+      "MSYS2_PATH_TYPE": "inherit"
+    }
+  },
+  "cmake.buildArgs": ["--verbose"]
+}

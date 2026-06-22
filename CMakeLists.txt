@@ -81,3 +81,15 @@ if(${GTEST_FOUND})
 endif()
 
 add_subdirectory(src)
+
+add_custom_target(driver-testsuite
+        COMMAND $<TARGET_FILE:driver> etc/config.test
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/testsuite"
+        COMMENT "Running driver with testsuite"
+)
+
+add_custom_target(driver-autotest
+        COMMAND $<TARGET_FILE:driver> etc/config.test -ftest
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/testsuite"
+        COMMENT "Running driver automated tests"
+)
