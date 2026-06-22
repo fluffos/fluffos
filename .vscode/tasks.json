@@ -5,12 +5,6 @@
       "label": "cmake: build driver",
       "type": "shell",
       "command": "cmake --build \"${workspaceFolder}/build\" --target driver --parallel $(nproc)",
-      "osx": {
-        "command": "cmake --build \"${workspaceFolder}/build\" --target driver --parallel $(sysctl -n hw.logicalcpu)"
-      },
-      "windows": {
-        "command": "cmake --build \"${workspaceFolder}/build\" --target driver --parallel %NUMBER_OF_PROCESSORS%"
-      },
       "group": {
         "kind": "build",
         "isDefault": true
@@ -18,22 +12,23 @@
       "problemMatcher": ["$gcc"]
     },
     {
+      "label": "cmake: clean rebuild driver",
+      "type": "shell",
+      "command": "cmake --build \"${workspaceFolder}/build\" --target driver --clean-first --parallel $(nproc)",
+      "group": "build",
+      "problemMatcher": ["$gcc"]
+    },
+    {
       "label": "driver - testsuite",
       "type": "shell",
       "command": "cmake --build \"${workspaceFolder}/build\" --target driver-testsuite",
-      "windows": {
-        "command": "cmake --build \"${workspaceFolder}/build\" --target driver-testsuite"
-      },
       "group": "test",
       "problemMatcher": []
     },
     {
-      "label": "driver - autotest",
+      "label": "driver - fulltest",
       "type": "shell",
-      "command": "cmake --build \"${workspaceFolder}/build\" --target driver-autotest",
-      "windows": {
-        "command": "cmake --build \"${workspaceFolder}/build\" --target driver-autotest"
-      },
+      "command": "cmake --build \"${workspaceFolder}/build\" --target driver-fulltest",
       "group": "test",
       "problemMatcher": []
     }
