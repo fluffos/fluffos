@@ -1,0 +1,65 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "driver - testsuite",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/src/driver",
+      "args": ["${workspaceFolder}/testsuite/etc/config.test"],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}/testsuite",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "preLaunchTask": "cmake: build driver",
+      "windows": {
+        "program": "${workspaceFolder}/build/src/driver.exe",
+        "environment": [
+          { "name": "PATH", "value": "${env:MSYS2_ROOT}\\mingw64\\bin;${env:MSYS2_ROOT}\\usr\\bin;${env:PATH}" }
+        ],
+        "miDebuggerPath": "${env:MSYS2_ROOT}\\mingw64\\bin\\gdb.exe"
+      },
+      "osx": {
+        "MIMode": "lldb"
+      },
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ]
+    },
+    {
+      "name": "driver - autotest",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/src/driver",
+      "args": ["${workspaceFolder}/testsuite/etc/config.test", "-ftest"],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}/testsuite",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "preLaunchTask": "cmake: build driver",
+      "windows": {
+        "program": "${workspaceFolder}/build/src/driver.exe",
+        "environment": [
+          { "name": "PATH", "value": "${env:MSYS2_ROOT}\\mingw64\\bin;${env:MSYS2_ROOT}\\usr\\bin;${env:PATH}" }
+        ],
+        "miDebuggerPath": "${env:MSYS2_ROOT}\\mingw64\\bin\\gdb.exe"
+      },
+      "osx": {
+        "MIMode": "lldb"
+      },
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ]
+    }
+  ]
+}

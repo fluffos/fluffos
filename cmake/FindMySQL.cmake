@@ -277,6 +277,13 @@ endif ()
 # is the file extension that differs. In the static library
 # case we know it is ".a", so we add it to the library name
 # we search for to make sure it is picked in the static case.
+
+# MSYS2/MinGW ships MariaDB as a static archive; force static linking
+# so the right library name and extra dependencies are used automatically.
+if(WIN32 AND NOT DEFINED MYSQLCLIENT_STATIC_LINKING)
+  set(MYSQLCLIENT_STATIC_LINKING TRUE)
+endif()
+
 if (WIN32)
   if(NOT MYSQLCLIENT_STATIC_LINKING) # link to official mysql client
     set(_dynamic_libs "libmysql")
@@ -446,25 +453,23 @@ endmacro()
 #
 ##########################################################################
 
-if (NOT WIN32)
+if (NOT MYSQL_CONFIG_EXECUTABLE)
+  # On WIN32, mariadb_config is available and gives the correct full static
+  # link flags (including curl's transitive deps). Search it first.
+  find_program(MYSQL_CONFIG_EXECUTABLE
+    NAMES
+    mariadb_config
+    mysql_config
+    DOC
+    "full path of mariadb_config / mysql_config"
+    PATHS
+    ${_exe_fallback_path}
+    )
+endif ()
 
-  if (NOT MYSQL_CONFIG_EXECUTABLE)
-    find_program(MYSQL_CONFIG_EXECUTABLE
-      NAMES
-      mysql_config
-      DOC
-      "full path of mysql_config"
-      PATHS
-      ${_exe_fallback_path}
-      )
-  endif ()
-
-  if (MYSQL_CONFIG_EXECUTABLE)
-    message(STATUS "mysql_config was found ${MYSQL_CONFIG_EXECUTABLE}")
-
-    _mysql_conf(MYSQL_VERSION "--version")
-  endif ()
-
+if (MYSQL_CONFIG_EXECUTABLE)
+  message(STATUS "mysql_config was found ${MYSQL_CONFIG_EXECUTABLE}")
+  _mysql_conf(MYSQL_VERSION "--version")
 endif ()
 
 ##########################################################################
@@ -519,6 +524,17 @@ elseif (MYSQL_CONFIG_EXECUTABLE)
     message(FATAL_ERROR "Could not find the include dir from running "
       "\"${MYSQL_CONFIG_EXECUTABLE}\"")
   endif ()
+
+  # mariadb_config on MSYS2 emits POSIX paths — convert to native.
+  if (WIN32 AND MYSQL_INCLUDE_DIR)
+    get_filename_component(_cfg_bin "${MYSQL_CONFIG_EXECUTABLE}" DIRECTORY)
+    get_filename_component(_cfg_pfx "${_cfg_bin}" DIRECTORY)
+    get_filename_component(_msys2   "${_cfg_pfx}"  DIRECTORY)
+    if("${MYSQL_INCLUDE_DIR}" MATCHES "^/")
+      string(REGEX REPLACE "^/" "${_msys2}/" MYSQL_INCLUDE_DIR "${MYSQL_INCLUDE_DIR}")
+      file(TO_CMAKE_PATH "${MYSQL_INCLUDE_DIR}" MYSQL_INCLUDE_DIR)
+    endif()
+  endif()
 
   # In case mysql_config returns several paths: mysql.h in first
   LIST(LENGTH MYSQL_INCLUDE_DIR n)
@@ -610,6 +626,23 @@ elseif (MYSQL_CONFIG_EXECUTABLE)
   # no space between "-L" and the path
   _mysql_config(MYSQL_LIB_DIR "(^| )-L" "--libs")
 
+  # mariadb_config on MSYS2 emits POSIX paths (/mingw64/lib).
+  # Derive the MSYS2 root from the config executable path and prepend it.
+  if (WIN32 AND MYSQL_LIB_DIR)
+    get_filename_component(_cfg_bin "${MYSQL_CONFIG_EXECUTABLE}" DIRECTORY)
+    get_filename_component(_cfg_pfx "${_cfg_bin}" DIRECTORY)   # .../mingw64
+    get_filename_component(_msys2   "${_cfg_pfx}"  DIRECTORY)  # e.g. E:/msys64
+    set(_converted)
+    foreach(_d IN LISTS MYSQL_LIB_DIR)
+      if("${_d}" MATCHES "^/")
+        string(REGEX REPLACE "^/" "${_msys2}/" _d "${_d}")
+        file(TO_CMAKE_PATH "${_d}" _d)
+      endif()
+      list(APPEND _converted "${_d}")
+    endforeach()
+    set(MYSQL_LIB_DIR ${_converted})
+  endif()
+
   IF (CMAKE_SYSTEM_NAME MATCHES "SunOS")
     # This is needed to make Solaris binaries using the default runtime lib path
     _mysql_config(DEV_STUDIO_RUNTIME_DIR "(^| )-R" "--libs")
@@ -669,8 +702,25 @@ elseif (MYSQL_CONFIG_EXECUTABLE)
 
     # Replace the current library references with the full path
     # to the library, i.e. the -L will be ignored
-    _mysql_config_replace(MYSQL_LIBRARIES
-      "(mysqlclient|mysqlclient_r|mariadb)" "${MYSQL_LIB}" "(^| )-l" "--libs")
+    _mysql_config_replace(MYSQL_LIBRARIES "(mysqlclient|mysqlclient_r|mariadb)" "${MYSQL_LIB}" "(^| )-l" "--libs")
+
+    # On WIN32, mariadb_config only reports the client lib in --libs and
+    # Windows API deps in --libs_sys. zstd and curl are not reported but
+    # are required by libmysqlclient_r.a.
+    #
+    # curl: libmysqlclient_r.a was compiled against curl as a DLL (its
+    # object files reference __imp_curl_* symbols). With -Wl,-Bstatic
+    # active, -lcurl picks libcurl.a which only defines curl_* (not
+    # __imp_curl_*). Use the import library full path to bypass -Bstatic.
+    if (WIN32)
+      _mysql_config(_mysql_sys_libs "(^| )-l" "--libs_sys")
+      list(APPEND MYSQL_LIBRARIES ${_mysql_sys_libs} zstd)
+      if(EXISTS "${MYSQL_LIB_DIR}/libcurl.dll.a")
+        list(APPEND MYSQL_LIBRARIES "${MYSQL_LIB_DIR}/libcurl.dll.a")
+      else()
+        list(APPEND MYSQL_LIBRARIES curl)
+      endif()
+    endif()
 
   else ()
 
@@ -726,26 +776,21 @@ endif ()
 # FIXME needed?!
 if (MYSQLCLIENT_STATIC_LINKING)
   if(WIN32)
-    # From mariadb_config --libs_sys
-    list(APPEND MYSQL_LIBRARIES ws2_32 advapi32 kernel32 shlwapi crypt32 z secur32 Bcrypt)
+    if(NOT MYSQL_CONFIG_EXECUTABLE)
+      # mariadb_config not found — fall back to known static deps.
+      # Prefer finding mariadb_config (see above) so this list stays as a
+      # last resort only.
+      list(APPEND MYSQL_LIBRARIES ws2_32 advapi32 kernel32 shlwapi crypt32 z secur32 Bcrypt zstd curl)
+    endif()
+    # When mariadb_config IS found, --libs + --libs_sys (added above) cover all deps.
   elseif (NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-      list(APPEND MYSQL_LIBRARIES "rt")
+    list(APPEND MYSQL_LIBRARIES "rt")
   endif()
 endif ()
 
 # For dynamic linking use the built-in sys and strings
 if (NOT MYSQLCLIENT_STATIC_LINKING)
   set(MYSQL_LIBRARIES "${MYSQL_LIB}")
-
-  #list(APPEND SYS_LIBRARIES "mysql_sys")
-  #list(APPEND SYS_LIBRARIES "mysql_strings")
-  #list(APPEND SYS_LIBRARIES ${MYSQL_LIBRARIES})
-  #SET(MYSQL_LIBRARIES ${SYS_LIBRARIES})
-
-  #if(NOT MYSQLCLIENT_STATIC_LINKING)
-  #  list(REVERSE MYSQL_LIBRARIES)
-  #endif()
-
 endif ()
 
 if (MYSQL_EXTRA_LIBRARIES)
@@ -765,7 +810,15 @@ SET(MYSQL_CLIENT_LIBS ${MYSQL_LIBRARIES})
 
 if (MYSQL_INCLUDE_DIR AND NOT MYSQL_VERSION)
 
-  # Write the C source file that will include the MySQL headers
+  # Try to read the version directly from mysql_version.h (fast, no compile needed)
+  if (EXISTS "${MYSQL_INCLUDE_DIR}/mysql_version.h")
+    file(READ "${MYSQL_INCLUDE_DIR}/mysql_version.h" _mysql_version_h)
+    string(REGEX MATCH "MYSQL_SERVER_VERSION[^\"]*\"([^\"]+)\"" _ "${_mysql_version_h}")
+    set(MYSQL_VERSION "${CMAKE_MATCH_1}")
+  endif()
+
+  if (NOT MYSQL_VERSION)
+  # Fall back to compiling and running a small program
   set(GETMYSQLVERSION_SOURCEFILE "${CMAKE_CURRENT_BINARY_DIR}/getmysqlversion.c")
   file(WRITE "${GETMYSQLVERSION_SOURCEFILE}"
     "#include <mysql.h>\n"
@@ -775,13 +828,13 @@ if (MYSQL_INCLUDE_DIR AND NOT MYSQL_VERSION)
     "}\n"
     )
 
-  # Compile and run the created executable, store output in MYSQL_VERSION
   try_run(_run_result _compile_result
     "${CMAKE_BINARY_DIR}"
     "${GETMYSQLVERSION_SOURCEFILE}"
     CMAKE_FLAGS "-DINCLUDE_DIRECTORIES:STRING=${MYSQL_INCLUDE_DIR}"
     RUN_OUTPUT_VARIABLE MYSQL_VERSION
     )
+  endif()
 
   if (FINDMYSQL_DEBUG)
     if (NOT _compile_result)
