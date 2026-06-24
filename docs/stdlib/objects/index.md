@@ -2,5 +2,5 @@
 layout: doc
 title: objects
 ---
-* [all_environment](all_environment.html)
-* [present_clone](present_clone.html)
+* [all_environment](all_environment)
+* [present_clone](present_clone)

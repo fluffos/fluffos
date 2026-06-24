@@ -1,6 +1,6 @@
 ---
-layout: doc
 title: preprocessor / README
+slug: /lpc/preprocessor/README
 ---
 # README
 

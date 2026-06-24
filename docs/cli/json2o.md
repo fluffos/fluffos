@@ -20,6 +20,6 @@ you can then pipe the output to other programs.
 
 ## JSON format
 
-see [o2json](/cli/o2json.html) for details.
+see [o2json](/cli/o2json) for details.
 
 

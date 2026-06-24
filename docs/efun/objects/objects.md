@@ -1,6 +1,6 @@
 ---
-layout: doc
 title: objects / objects
+slug: /efun/objects/objects
 ---
 # objects
 

@@ -11,7 +11,6 @@ const config: Config = {
   organizationName: 'fluffos',
   projectName: 'fluffos',
   onBrokenLinks: 'warn',
-  onBrokenMarkdownLinks: 'warn',
 
   i18n: {
     defaultLocale: 'en',
@@ -21,6 +20,9 @@ const config: Config = {
   markdown: {
     // treat .md files as standard Markdown (not MDX) so existing docs don't need conversion
     format: 'detect',
+    hooks: {
+      onBrokenMarkdownLinks: 'warn',
+    },
   },
 
   presets: [

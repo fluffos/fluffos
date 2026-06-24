@@ -2,7 +2,7 @@
 layout: doc
 title: string
 ---
-* [base64decode](base64decode.html)
-* [base64encode](base64encode.html)
-* [bitmap_font](bitmap_font.html)
-* [break_string](break_string.html)
+* [base64decode](base64decode)
+* [base64encode](base64encode)
+* [bitmap_font](bitmap_font)
+* [break_string](break_string)

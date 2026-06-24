@@ -2,6 +2,6 @@
 layout: doc
 title: preprocessor
 ---
-* [README](README.html)
-* [define](define.html)
-* [include](include.html)
+* [README](README)
+* [define](define)
+* [include](include)
