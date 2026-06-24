@@ -169,7 +169,7 @@ private mixed accept_mixed_function(mixed arg) {
   int fp = functionp(arg);
 
   if (fp && !(fp & FP_OWNER_DESTED))
-    arg = arg();
+    arg = evaluate(arg);
 
   return arg;
 }
