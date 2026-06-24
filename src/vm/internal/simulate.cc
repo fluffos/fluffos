@@ -1931,7 +1931,9 @@ void _error_handler(char *err) {
   } else {
     debug_message("Error in mudlib error handler: ");
     debug_message_with_location(err);
-    dump_trace(CONFIG_INT(__RC_TRACE_CODE__));
+    if (num_mudlib_error == 1) {
+      dump_trace(CONFIG_INT(__RC_TRACE_CODE__));
+    }
     num_mudlib_error--;
   }
 exit:
