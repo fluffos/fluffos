@@ -3,13 +3,38 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "dev": "vitepress dev --host 0.0.0.0",
-    "build": "vitepress build",
-    "preview": "vitepress preview"
+    "dev": "docusaurus start --host 0.0.0.0",
+    "build": "docusaurus build",
+    "preview": "docusaurus serve",
+    "clear": "docusaurus clear"
   },
   "author": "",
   "license": "ISC",
+  "dependencies": {
+    "@docusaurus/core": "^3.10.1",
+    "@docusaurus/preset-classic": "^3.10.1",
+    "@mdx-js/react": "^3.0.0",
+    "clsx": "^2.1.1",
+    "prism-react-renderer": "^2.4.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
   "devDependencies": {
-    "vitepress": "^1.6.4"
+    "@docusaurus/module-type-aliases": "^3.10.1",
+    "@docusaurus/tsconfig": "^3.10.1",
+    "@docusaurus/types": "^3.10.1",
+    "typescript": "^5.8.3"
+  },
+  "browserslist": {
+    "production": [
+      ">0.5%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 3 chrome version",
+      "last 3 firefox version",
+      "last 5 safari version"
+    ]
   }
 }

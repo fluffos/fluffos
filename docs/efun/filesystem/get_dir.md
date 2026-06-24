@@ -22,7 +22,7 @@ title: filesystem / get_dir
     If called with a second argument equal to -1, get_dir  will  return  an
     array of subarrays, where the format of each subarray is:
 
-          ({ filename, size_of_file, last_time_file_touched })
+          (\{ filename, size_of_file, last_time_file_touched \})
 
     Where  filename  is  a  string and last_time_file_touched is an integer
     being number of seconds since January 1, 1970 (same format as time(3)).
