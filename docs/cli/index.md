@@ -2,10 +2,10 @@
 layout: doc
 title: cli
 ---
-* [driver](driver.html)
-* [generate_keywords](generate_keywords.html)
-* [json2o](json2o.html)
-* [lpcc](lpcc.html)
-* [o2json](o2json.html)
-* [portbind](portbind.html)
-* [symbol](symbol.html)
+* [driver](driver)
+* [generate_keywords](generate_keywords)
+* [json2o](json2o)
+* [lpcc](lpcc)
+* [o2json](o2json)
+* [portbind](portbind)
+* [symbol](symbol)

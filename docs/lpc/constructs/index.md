@@ -2,11 +2,11 @@
 layout: doc
 title: constructs
 ---
-* [for](for.html)
-* [function](function.html)
-* [if](if.html)
-* [include](include.html)
-* [inherit](inherit.html)
-* [prototypes](prototypes.html)
-* [switch](switch.html)
-* [while](while.html)
+* [for](for)
+* [function](function)
+* [if](if)
+* [include](include)
+* [inherit](inherit)
+* [prototypes](prototypes)
+* [switch](switch)
+* [while](while)

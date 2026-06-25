@@ -1,6 +1,4 @@
-# Sample workflow for building and deploying a VitePress site to GitHub Pages
-#
-name: Deploy VitePress site to Pages
+name: Deploy Docusaurus site to Pages
 
 on:
   # Runs on pushes targeting the `main` branch. Change this to `master` if you're
@@ -37,7 +35,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm # or pnpm / yarn
           cache-dependency-path: docs/package-lock.json # or docs/pnpm-lock.yaml / docs/yarn.lock
       - name: Setup Pages
@@ -46,15 +44,15 @@ jobs:
         run: |
           cd docs
           npm ci # or pnpm install / yarn install / bun install
-      - name: Build with VitePress
+      - name: Build with Docusaurus
         run: |
           cd docs
-          npm run build # or pnpm docs:build / yarn docs:build / bun run docs:build
-          touch .vitepress/dist/.nojekyll
+          npm run build
+          touch build/.nojekyll
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/.vitepress/dist
+          path: docs/build
 
   # Deployment job
   deploy:

@@ -1,6 +1,6 @@
 ---
-layout: doc
 title: 编译 FluffOS
+slug: /zh-CN/build/build
 ---
 
 # Fluffos 编译说明
