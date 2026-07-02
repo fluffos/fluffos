@@ -9,6 +9,7 @@ FluffOS includes a comprehensive tracing system for profiling LPC code execution
 ## Overview
 
 The FluffOS tracing system allows you to:
+
 - **Profile LPC function execution** - See exactly which functions are called and how long they take
 - **Identify performance bottlenecks** - Find slow code paths and optimization opportunities
 - **Analyze call patterns** - Understand execution flow and call hierarchies
@@ -17,26 +18,34 @@ The FluffOS tracing system allows you to:
 
 ## How Tracing Works
 
-When tracing is enabled, FluffOS records:
-- Every LPC function call with timestamp
-- Function execution duration
-- Call stack relationships (caller/callee)
-- Object names and function names
-- Thread/execution context
+While a trace is running, FluffOS records timestamped begin/end events for:
 
-This data is saved in Chrome Trace Event Format (JSON), which can be opened directly in browser developer tools.
+- LPC function calls and efun calls
+- Object loads and file compilation
+- `catch` evaluation, file I/O, and apply-cache lookups
+
+Each event carries its duration, its nesting (caller/callee) relationship, and
+the relevant object and function names. The data is saved in the Chrome Trace
+Event Format (JSON), which can be opened directly in browser developer tools.
+
+The instrumentation is always compiled in and only records while a trace is
+active, so no special build is required — `trace_start()` and `trace_end()` are
+ordinary efuns available in normal builds.
 
 ## Basic Usage
 
 ### Starting a Trace
 
 ```c
-// Start tracing, save to file after 30 seconds (default)
+// Start tracing; the trace is written after the timeout (default 10 seconds)
 trace_start("/log/performance.json");
 
-// Start tracing with custom timeout (10 seconds)
-trace_start("/log/performance.json", 10);
+// Start tracing with a custom timeout (30 seconds)
+trace_start("/log/performance.json", 30);
 ```
+
+The timeout must be between 0 and 300 seconds; a value outside that range
+raises an error. `trace_end()` flushes the trace early, before the timeout.
 
 ### Stopping a Trace
 
@@ -74,6 +83,7 @@ void cmd_profile(string arg) {
 ### Using Chrome DevTools
 
 1. **Start and collect a trace:**
+
    ```c
    trace_start("/log/my_trace.json", 30);
    // Run the code you want to profile
@@ -170,77 +180,60 @@ void finish_profiling() {
 
 ### Trace File Structure
 
-The trace file is in Chrome Trace Event Format (JSON):
+The trace file uses the JSON Array form of the Chrome Trace Event Format — a
+plain array of event objects (no enclosing `traceEvents` wrapper). Browser dev
+tools accept this form directly:
 
 ```json
-{
-  "traceEvents": [
-    {
-      "name": "function_name",
-      "cat": "lpc",
-      "ph": "B",  // Begin event
-      "ts": 1234567890,  // Timestamp in microseconds
-      "pid": 1,
-      "tid": 1,
-      "args": {
-        "object": "/std/object.c",
-        "function": "create"
-      }
-    },
-    {
-      "name": "function_name",
-      "cat": "lpc",
-      "ph": "E",  // End event
-      "ts": 1234567895,
-      "pid": 1,
-      "tid": 1
-    }
-  ]
-}
+[
+  {"pid":1,"tid":1,"ts":1234567890,"dur":5,"ph":"B","cat":"lpc.function","name":"create","args":{"object":"/std/object"}},
+  {"pid":1,"tid":1,"ts":1234567895,"dur":0,"ph":"E","cat":"lpc.function","name":"create"}
+]
 ```
 
-### Event Types
+### Event fields
 
-- **B (Begin)** - Function call starts
-- **E (End)** - Function call ends
-- **Duration** - Time between B and E events
-- **Nesting** - Shows call hierarchy
+- **`ph`** — phase: `B` (begin) and `E` (end) bracket a call
+- **`ts`** — timestamp in microseconds
+- **`dur`** — duration in microseconds
+- **`cat`** — event category (e.g. LPC function, efun, object load)
+- **`name`** / **`args`** — the traced name and associated metadata
+
+The nesting of begin/end events reconstructs the call hierarchy.
 
 ## Performance Tips
 
 ### Memory Usage
 
-**Warning:** Tracing consumes memory proportionally to:
-- Number of function calls
-- Tracing duration
-- System activity level
+A trace accumulates one begin and one end event per recorded call, so its memory
+and file size grow with the number of calls — that is, with both the duration
+and how busy the system is. Prefer short, targeted traces:
 
-**Best Practices:**
 ```c
-// Good: Short duration, specific scenario
+// Good: short duration, specific scenario
 trace_start("/log/login.json", 5);
 test_login_sequence();
 trace_end();
-
-// Bad: Long duration on busy system
-trace_start("/log/everything.json", 3600);  // DON'T DO THIS!
 ```
+
+The timeout is capped at 300 seconds (5 minutes); a longer value raises an
+error, so there is no way to leave a trace running indefinitely. Even within
+that limit, a long trace on a busy system produces a large file.
 
 ### Trace Duration Guidelines
 
-| Scenario | Recommended Duration |
+| Scenario | Suggested Duration |
 |----------|---------------------|
 | Single command | 1-5 seconds |
 | Combat round | 5-10 seconds |
 | Login sequence | 10-30 seconds |
 | General profiling | 30-60 seconds |
-| Load testing | Up to 2 minutes |
-
-**Never exceed 5 minutes** unless you have abundant memory and low activity.
+| Load testing | up to a few minutes (max 300s) |
 
 ### Minimizing Overhead
 
-Tracing adds minimal overhead (typically <5%), but to minimize impact:
+Tracing adds overhead in proportion to how many calls are recorded, and it only
+runs while a trace is active. To keep the impact small:
 
 1. **Profile specific scenarios** - Don't trace everything
 2. **Use appropriate durations** - Longer isn't always better
@@ -285,7 +278,9 @@ void run_performance_tests() {
         // Stop trace
         trace_end();
 
-        // Analyze results
+        // analyze_trace() here is your own helper — the driver does not
+        // analyze traces; you inspect the JSON in browser dev tools or a
+        // custom parser.
         results[test] = analyze_trace(tracefile);
     }
 
@@ -347,21 +342,25 @@ void cmd_trace(string arg) {
 ### Common Performance Issues
 
 **1. Hot Spots - Functions consuming most time:**
+
 - Look at Bottom-Up view sorted by "Self Time"
 - Focus on functions with >10% of total time
 - Consider optimization or caching
 
 **2. Excessive Calls - Functions called too frequently:**
+
 - Check call counts in the statistics
 - Look for unnecessary recalculations
 - Consider caching or memoization
 
 **3. Deep Call Stacks - Excessive function nesting:**
+
 - Review Call Tree view
 - Look for deeply nested calls (>10 levels)
 - Consider refactoring to reduce complexity
 
 **4. Blocking Operations - Long-running single functions:**
+
 - Find long bars in timeline view
 - These are good candidates for optimization
 - Consider breaking into smaller operations
@@ -383,6 +382,7 @@ Recommendation: Cache item checks or reduce frequency
 ### Finding Unexpected Calls
 
 Traces help identify:
+
 - Functions being called when they shouldn't
 - Missing function calls
 - Incorrect call ordering
@@ -391,6 +391,7 @@ Traces help identify:
 ### Comparing Traces
 
 To find regressions:
+
 1. Create baseline trace of working code
 2. Make changes
 3. Create new trace
@@ -398,11 +399,11 @@ To find regressions:
 
 ## See Also
 
-- [trace_start(3)](../../efun/system/trace_start.md) - Start tracing
-- [trace_end(3)](../../efun/system/trace_end.md) - Stop tracing
-- [trace(3)](../../efun/internals/trace.md) - Debug tracing function
-- [traceprefix(3)](../../efun/internals/traceprefix.md) - Set trace prefix
-- [dump_trace(3)](../../efun/general/dump_trace.md) - Dump current trace
+- [trace_start](../../efun/system/trace_start.md) — start tracing
+- [trace_end](../../efun/system/trace_end.md) — stop tracing
+- [trace](../../efun/internals/trace.md) — per-execution debug tracing (separate feature)
+- [traceprefix](../../efun/internals/traceprefix.md) — set the debug-trace prefix
+- [dump_trace](../../efun/general/dump_trace.md) — return the current LPC call stack
 
 ## References
 
@@ -412,7 +413,7 @@ To find regressions:
 
 ## Notes
 
-- Tracing requires DEBUG build or enabled in configuration
+- Tracing is available in normal builds; no DEBUG build or special configuration is required
 - Trace files can be large (1MB+ for busy systems)
-- Use trace analysis to guide optimization efforts, not guess
+- Use trace analysis to guide optimization efforts, not guesswork
 - Profile before and after optimizations to measure improvement
