@@ -9,4 +9,5 @@ title: constructs
 * [inherit](inherit)
 * [prototypes](prototypes)
 * [switch](switch)
+* [text_blocks](text_blocks)
 * [while](while)
