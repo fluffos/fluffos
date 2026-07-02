@@ -1,6 +1,6 @@
 ---
-layout: doc
 title: FluffOS
+slug: /
 ---
 
 # FluffOS

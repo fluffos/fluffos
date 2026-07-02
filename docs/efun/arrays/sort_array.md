@@ -10,8 +10,9 @@ title: arrays / sort_array
 
 ### SYNOPSIS
 
-    mixed *sort_array( mixed *arr, string fun, object ob );
-    mixed *sort_array( mixed *arr, function f );
+    mixed *sort_array( mixed *arr, string fun, object ob,
+                       mixed extra, ... );
+    mixed *sort_array( mixed *arr, function f, mixed extra, ... );
     mixed *sort_array( mixed *arr, int direction );
 
 ### DESCRIPTION
@@ -24,6 +25,12 @@ title: arrays / sort_array
 
     The second form does the same thing but allows a function pointer to be
     used instead.
+
+    For the first and second forms, any additional arguments  passed  after
+    the comparison function are forwarded to it on each call, appearing af‐
+    ter  the  two  elements  being  compared.  This is useful for threading
+    context (such as a lookup mapping) through to the comparator without  a
+    closure.
 
     The third form returns an array with the same elements  as  'arr',  but
     quicksorted using built-in sort routines.  A 'direction' of 1 or 0 will

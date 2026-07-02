@@ -2,29 +2,28 @@
   "name": "docs",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
   "scripts": {
-    "dev": "vitepress dev --host 0.0.0.0",
-    "build": "vitepress build",
-    "preview": "vitepress preview"
+    "dev": "docusaurus start --host 0.0.0.0",
+    "build": "docusaurus build",
+    "preview": "docusaurus serve",
+    "clear": "docusaurus clear"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@docusaurus/core": "3.0.0",
-    "@docusaurus/preset-classic": "3.0.0",
+    "@docusaurus/core": "^3.10.1",
+    "@docusaurus/preset-classic": "^3.10.1",
     "@mdx-js/react": "^3.0.0",
-    "clsx": "^1.2.1",
-    "prism-react-renderer": "^2.1.0",
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0"
+    "clsx": "^2.1.1",
+    "prism-react-renderer": "^2.4.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@docusaurus/module-type-aliases": "3.0.0",
-    "@docusaurus/tsconfig": "3.0.0",
-    "@docusaurus/types": "3.0.0",
-    "typescript": "~5.2.2",
-    "vitepress": "^1.0.0-rc.30"
+    "@docusaurus/module-type-aliases": "^3.10.1",
+    "@docusaurus/tsconfig": "^3.10.1",
+    "@docusaurus/types": "^3.10.1",
+    "typescript": "^5.8.3"
   },
   "browserslist": {
     "production": [
