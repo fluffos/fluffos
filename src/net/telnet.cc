@@ -249,7 +249,17 @@ static inline void on_telnet_do(unsigned char cmd, interactive_t *ip) {
       ip->iflags |= USING_ZMP;
       break;
     case TELNET_TELOPT_COMPRESS2:
-      telnet_begin_compress2(ip->telnet);
+      // MCCP is implemented inside libtelnet, but on a websocket connection
+      // game text is sent straight to the socket and bypasses libtelnet (see
+      // add_message() in comm.cc). Beginning compression here would make us
+      // advertise a compressed stream the bulk of our output never joins,
+      // desyncing the client's inflate. Refuse instead. Websockets already
+      // have their own permessage-deflate, so nothing is lost.
+      if (ip->connection_type == PORT_TYPE_WEBSOCKET) {
+        telnet_negotiate(ip->telnet, TELNET_WONT, TELNET_TELOPT_COMPRESS2);
+      } else {
+        telnet_begin_compress2(ip->telnet);
+      }
       break;
     case TELNET_TELOPT_MSP:
       on_telnet_do_msp(ip);
@@ -518,9 +528,13 @@ void send_initial_telnet_negotiations(struct interactive_t *user) {
   // Also newenv
   telnet_negotiate(user->telnet, TELNET_DO, TELNET_TELOPT_NEW_ENVIRON);
 
-/* We support COMPRESS2 */
+/* We support COMPRESS2, except on websockets: their output bypasses libtelnet
+ * (see add_message()), so MCCP can't compress it, and they already carry their
+ * own permessage-deflate. */
 #ifdef HAVE_ZLIB  // come from libtelnet
-  telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_COMPRESS2);
+  if (user->connection_type != PORT_TYPE_WEBSOCKET) {
+    telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_COMPRESS2);
+  }
 #endif
 
   // Ask them if they support mxp.
