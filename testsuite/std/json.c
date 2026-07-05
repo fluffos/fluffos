@@ -69,14 +69,6 @@ private int json_decode_hexdigit(int ch) {
     return -1;
 }
 
-private varargs int json_decode_parse_at_token(mixed* parse, string token, int start) {
-    int i, j;
-    for(i = start, j = strlen(token); i < j; i++)
-        if(parse[JSON_DECODE_PARSE_TEXT][parse[JSON_DECODE_PARSE_POS] + i] != token[i])
-            return 0;
-    return 1;
-}
-
 private varargs void json_decode_parse_error(mixed* parse, string msg, int ch) {
     if(ch)
         msg = sprintf("%s, '%c'", msg, ch);
@@ -274,6 +266,14 @@ private varargs mixed json_decode_parse_string(mixed* parse, int initiator_check
             pos++;
             ch = text[pos];
 
+            // Ensure room for the single-byte escapes below.
+            // (The \u branch does its own multi-byte capacity check.)
+            if(result_len >= sizeof(result)) {
+                // Grow geometrically: buffer '+' copies the whole buffer,
+                // so fixed-size increments would make decoding O(n^2).
+                result = result + allocate_buffer(sizeof(result));
+            }
+
             switch(ch) {
             case 0:
                 json_decode_parse_error(parse, "Unexpected end of data");
@@ -330,6 +330,10 @@ private varargs mixed json_decode_parse_string(mixed* parse, int initiator_check
                         int high = code;
                         int low;
 
+                        // A low surrogate (0xDC00-0xDFFF) may not appear first
+                        if(code >= 0xdc00)
+                            json_decode_parse_error(parse, "Invalid string, unexpected low surrogate");
+
                         if(text[pos] != '\\' ||
                            text[pos+1] != 'u') {
                             json_decode_parse_error(parse, "Invalid string, missing surrogate pair");
@@ -344,6 +348,10 @@ private varargs mixed json_decode_parse_string(mixed* parse, int initiator_check
                                 json_decode_parse_error(parse, "Invalid hex digit", ch);
                             low = (low << 4) | digit;
                         }
+
+                        // The second escape must be a low surrogate
+                        if((low & 0xfffffc00) != 0xdc00)
+                            json_decode_parse_error(parse, "Invalid string, invalid low surrogate");
 
                         code = 0x10000 + (high - 0xd800) * 0x400 + (low - 0xDC00);
                     }
@@ -364,7 +372,7 @@ private varargs mixed json_decode_parse_string(mixed* parse, int initiator_check
 
                         // Ensure buffer has enough space
                         if(result_len + len > sizeof(result))
-                            result = result + allocate_buffer(256);
+                            result = result + allocate_buffer(sizeof(result));
 
                         // Copy UTF-8 bytes to result buffer
                         for(i = 0; i < len; i++)
@@ -380,7 +388,7 @@ private varargs mixed json_decode_parse_string(mixed* parse, int initiator_check
         default:
             // Regular character
             if(result_len >= sizeof(result)) {
-                result = result + allocate_buffer(256);
+                result = result + allocate_buffer(sizeof(result));
             }
             result[result_len++] = ch;
             pos++;
@@ -448,6 +456,8 @@ private mixed json_decode_parse_number(mixed* parse) {
             if(has_dot || has_exp)
                 json_decode_parse_error(parse, "Unexpected character", ch);
             has_dot = 1;
+            if(num_len >= sizeof(num_buf))
+                num_buf = num_buf + allocate_buffer(sizeof(num_buf));
             num_buf[num_len++] = ch;
             pos++;
             break;
@@ -455,7 +465,7 @@ private mixed json_decode_parse_number(mixed* parse) {
         case '0': case '1': case '2': case '3': case '4':
         case '5': case '6': case '7': case '8': case '9':
             if(num_len >= sizeof(num_buf))
-                num_buf = num_buf + allocate_buffer(32);
+                num_buf = num_buf + allocate_buffer(sizeof(num_buf));
             num_buf[num_len++] = ch;
             pos++;
             break;
@@ -465,6 +475,9 @@ private mixed json_decode_parse_number(mixed* parse) {
             if(has_exp)
                 json_decode_parse_error(parse, "Unexpected character", ch);
             has_exp = 1;
+            // May write up to two bytes here: 'e' plus an optional sign
+            if(num_len + 2 > sizeof(num_buf))
+                num_buf = num_buf + allocate_buffer(sizeof(num_buf));
             num_buf[num_len++] = ch;
             pos++;
 
@@ -614,70 +627,76 @@ mixed json_decode(mixed text) {
 }
 
 private string json_encode_string(string value) {
-    buffer result;
+    buffer result, src;
     int result_len = 0;
-    int len = strlen(value);
+    int len;
     int i, ch;
+
+    // Convert to UTF-8 bytes once and iterate the buffer: indexing an LPC
+    // string is codepoint-based (ICU) and O(i) per access, which made this
+    // loop O(n^2) for long strings.
+    src = string_encode(value, "utf-8");
+    len = sizeof(src);
 
     // Allocate buffer with some headroom for escapes
     result = allocate_buffer(len * 2 + 2);
     result[result_len++] = '"';
 
     for(i = 0; i < len; i++) {
-        ch = value[i];
+        ch = src[i];
 
         switch(ch) {
         case '"':
             if(result_len + 2 >= sizeof(result))
-                result = result + allocate_buffer(256);
+                result = result + allocate_buffer(sizeof(result));
             result[result_len++] = '\\';
             result[result_len++] = '"';
             break;
         case '\\':
             if(result_len + 2 >= sizeof(result))
-                result = result + allocate_buffer(256);
+                result = result + allocate_buffer(sizeof(result));
             result[result_len++] = '\\';
             result[result_len++] = '\\';
             break;
         case '/':
             if(result_len + 2 >= sizeof(result))
-                result = result + allocate_buffer(256);
+                result = result + allocate_buffer(sizeof(result));
             result[result_len++] = '\\';
             result[result_len++] = '/';
             break;
         case '\b':
             if(result_len + 2 >= sizeof(result))
-                result = result + allocate_buffer(256);
+                result = result + allocate_buffer(sizeof(result));
             result[result_len++] = '\\';
             result[result_len++] = 'b';
             break;
         case 0x0c:
             if(result_len + 2 >= sizeof(result))
-                result = result + allocate_buffer(256);
+                result = result + allocate_buffer(sizeof(result));
             result[result_len++] = '\\';
             result[result_len++] = 'f';
             break;
         case '\n':
             if(result_len + 2 >= sizeof(result))
-                result = result + allocate_buffer(256);
+                result = result + allocate_buffer(sizeof(result));
             result[result_len++] = '\\';
             result[result_len++] = 'n';
             break;
         case '\r':
             if(result_len + 2 >= sizeof(result))
-                result = result + allocate_buffer(256);
+                result = result + allocate_buffer(sizeof(result));
             result[result_len++] = '\\';
             result[result_len++] = 'r';
             break;
         case '\t':
             if(result_len + 2 >= sizeof(result))
-                result = result + allocate_buffer(256);
+                result = result + allocate_buffer(sizeof(result));
             result[result_len++] = '\\';
             result[result_len++] = 't';
             break;
         case 0x1b:
             if(result_len + 6 >= sizeof(result))
-                result = result + allocate_buffer(256);
+                result = result + allocate_buffer(sizeof(result));
             result[result_len++] = '\\';
             result[result_len++] = 'u';
             result[result_len++] = '0';
@@ -686,12 +705,55 @@ private string json_encode_string(string value) {
             result[result_len++] = 'b';
             break;
         default:
-            // Check if character needs Unicode escaping
-            if(ch > 0x7F || ch < 0x20) {
-                // Encode as \uXXXX
+            if(ch > 0x7F) {
+                // Lead byte of a multi-byte UTF-8 sequence: decode the
+                // codepoint, then escape it as \uXXXX (or a UTF-16
+                // surrogate pair for codepoints above the BMP).
+                int code, extra, k;
+                string hex;
+
+                if((ch & 0xe0) == 0xc0)      { code = ch & 0x1f; extra = 1; }
+                else if((ch & 0xf0) == 0xe0) { code = ch & 0x0f; extra = 2; }
+                else                         { code = ch & 0x07; extra = 3; }
+                for(k = 0; k < extra; k++) {
+                    i++;
+                    code = (code << 6) | (src[i] & 0x3f);
+                }
+
+                if(result_len + 12 >= sizeof(result))
+                    result = result + allocate_buffer(sizeof(result));
+
+                if(code > 0xFFFF) {
+                    // sprintf("%04x", code) would yield 5 hex digits here;
+                    // JSON requires a \uXXXX\uXXXX surrogate pair instead.
+                    int v = code - 0x10000;
+                    hex = sprintf("%04x%04x", 0xd800 + (v >> 10), 0xdc00 + (v & 0x3ff));
+                    result[result_len++] = '\\';
+                    result[result_len++] = 'u';
+                    result[result_len++] = hex[0];
+                    result[result_len++] = hex[1];
+                    result[result_len++] = hex[2];
+                    result[result_len++] = hex[3];
+                    result[result_len++] = '\\';
+                    result[result_len++] = 'u';
+                    result[result_len++] = hex[4];
+                    result[result_len++] = hex[5];
+                    result[result_len++] = hex[6];
+                    result[result_len++] = hex[7];
+                } else {
+                    hex = sprintf("%04x", code);
+                    result[result_len++] = '\\';
+                    result[result_len++] = 'u';
+                    result[result_len++] = hex[0];
+                    result[result_len++] = hex[1];
+                    result[result_len++] = hex[2];
+                    result[result_len++] = hex[3];
+                }
+            } else if(ch < 0x20) {
+                // Control character: encode as \uXXXX
                 string hex;
                 if(result_len + 6 >= sizeof(result))
-                    result = result + allocate_buffer(256);
+                    result = result + allocate_buffer(sizeof(result));
                 hex = sprintf("%04x", ch);
                 result[result_len++] = '\\';
                 result[result_len++] = 'u';
@@ -702,7 +764,7 @@ private string json_encode_string(string value) {
             } else {
                 // Regular ASCII character
                 if(result_len + 1 >= sizeof(result))
-                    result = result + allocate_buffer(256);
+                    result = result + allocate_buffer(sizeof(result));
                 result[result_len++] = ch;
             }
             break;

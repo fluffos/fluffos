@@ -36,16 +36,17 @@ void test_decode_numbers() {
   ASSERT_EQ(-0.123, json_decode("-0.123"));
 
   // Scientific notation - positive exponent
-  ASSERT_EQ(1.0e10, json_decode("1e10"));
-  ASSERT_EQ(1.0e10, json_decode("1E10"));
-  ASSERT_EQ(1.23e5, json_decode("1.23e5"));
-  ASSERT_EQ(1.23e5, json_decode("1.23E5"));
-  ASSERT_EQ(1.0e10, json_decode("1e+10"));
+  // (LPC float literals don't support exponent notation, so spell them out)
+  ASSERT_EQ(10000000000.0, json_decode("1e10"));
+  ASSERT_EQ(10000000000.0, json_decode("1E10"));
+  ASSERT_EQ(123000.0, json_decode("1.23e5"));
+  ASSERT_EQ(123000.0, json_decode("1.23E5"));
+  ASSERT_EQ(10000000000.0, json_decode("1e+10"));
 
   // Scientific notation - negative exponent
-  ASSERT_EQ(1.0e-5, json_decode("1e-5"));
-  ASSERT_EQ(1.0e-5, json_decode("1E-5"));
-  ASSERT_EQ(1.23e-3, json_decode("1.23e-3"));
+  ASSERT_EQ(0.00001, json_decode("1e-5"));
+  ASSERT_EQ(0.00001, json_decode("1E-5"));
+  ASSERT_EQ(0.00123, json_decode("1.23e-3"));
 }
 
 void test_decode_strings() {
@@ -77,6 +78,36 @@ void test_decode_strings() {
 
   // Mixed content
   ASSERT_EQ("Hello\n世界", json_decode("\"Hello\\n\\u4e16\\u754c\""));
+
+  // Lone or malformed surrogates must be rejected, not silently combined
+  ASSERT(catch(json_decode("\"\\udc00\\udc00\"")));
+  ASSERT(catch(json_decode("\"\\ud83d\\u0041\"")));
+}
+
+void test_decode_buffer_growth() {
+  string escapes = "";
+  string expected = "";
+  int i;
+
+  // Regression: 300 consecutive single-char escapes used to overflow the
+  // initial 256-byte result buffer (escape writes lacked a capacity check)
+  for(i = 0; i < 300; i++) {
+    escapes += "\\n";
+    expected += "\n";
+  }
+  ASSERT_EQ(expected, json_decode("\"" + escapes + "\""));
+
+  // Regression: '.'/'e' directly after 32 digits used to write one byte
+  // past the 32-byte number buffer (those branches lacked a capacity check)
+  ASSERT_EQ(to_float("11111111111111111111111111111111.5"),
+            json_decode("11111111111111111111111111111111.5"));
+  ASSERT_EQ(to_float("11111111111111111111111111111111e2"),
+            json_decode("11111111111111111111111111111111e2"));
+
+  // Buffer input path (fast path added by this PR) was previously untested
+  ASSERT_EQ(42, json_decode(string_encode("42", "utf-8")));
+  ASSERT_EQ("hi", json_decode(string_encode("\"hi\"", "utf-8")));
+  ASSERT_EQ(7, json_decode(string_encode("{\"k\":7}", "utf-8"))["k"]);
 }
 
 void test_decode_booleans_null() {
@@ -204,8 +235,8 @@ void test_encode_primitives() {
   ASSERT_EQ("\"hello\"", json_encode("hello"));
   ASSERT_EQ("\"hello world\"", json_encode("hello world"));
 
-  // Null/undefined
-  ASSERT_EQ("null", json_encode(0));  // Note: 0 is used for null in LPC
+  // Note: json_encode(0) returns "0" (asserted above); only values that
+  // cannot be represented in JSON (e.g. objects) encode as "null".
 }
 
 void test_encode_string_escaping() {
@@ -226,6 +257,15 @@ void test_encode_string_escaping() {
   // Multiple escapes
   ASSERT_EQ("\"line1\\nline2\"", json_encode("line1\nline2"));
   ASSERT_EQ("\"quote\\\"end\"", json_encode("quote\"end"));
+
+  // Non-ASCII characters escape as \uXXXX
+  ASSERT_EQ("\"\\u00a9\"", json_encode("©"));
+  ASSERT_EQ("\"\\u4e16\\u754c\"", json_encode("世界"));
+
+  // Astral-plane characters must encode as UTF-16 surrogate pairs
+  // (regression: these used to produce a corrupt, truncated \uXXXX escape)
+  ASSERT_EQ("\"\\ud83d\\ude04\"", json_encode("😄"));
+  ASSERT_EQ("😄", json_decode(json_encode("😄")));
 }
 
 void test_encode_arrays() {
@@ -243,7 +283,7 @@ void test_encode_arrays() {
   // Nested arrays
   ASSERT_EQ("[[]]", json_encode(({({})})));
   ASSERT_EQ("[[1,2],[3,4]]", json_encode(({({1,2}),({3,4})})));
-  ASSERT_EQ("[[[1]]]", json_encode(({({({1})})}))));
+  ASSERT_EQ("[[[1]]]", json_encode(({({({1})})})));
 }
 
 void test_encode_objects() {
@@ -288,17 +328,22 @@ void test_encode_non_string_keys() {
 
 void test_encode_circular_references() {
   mapping m1, m2;
-  mixed* arr1, arr2;
+  mixed* arr1;
 
   // Circular mapping reference
   m1 = (["key":"value"]);
   m1["self"] = m1;
   ASSERT(strsrch(json_encode(m1), "\"self\":null") != -1);
 
-  // Circular array reference
-  arr1 = ({1,2,3});
-  arr1 += ({arr1});
-  ASSERT(strsrch(json_encode(arr1), "null") != -1);
+  // Circular array reference. Note: `arr1 += ({arr1})` would NOT be
+  // circular (LPC array '+' builds a new array, so the element would
+  // point at the old, non-circular array); mutate in place instead.
+  arr1 = allocate(4);
+  arr1[0] = 1;
+  arr1[1] = 2;
+  arr1[2] = 3;
+  arr1[3] = arr1;
+  ASSERT_EQ("[1,2,3,null]", json_encode(arr1));
 
   // Cross references
   m1 = (["name":"m1"]);
@@ -500,6 +545,9 @@ void do_tests() {
 
   test_decode_strings();
   write("✓ String decoding tests passed\n");
+
+  test_decode_buffer_growth();
+  write("✓ Buffer growth regression tests passed\n");
 
   test_decode_booleans_null();
   write("✓ Boolean/null decoding tests passed\n");
