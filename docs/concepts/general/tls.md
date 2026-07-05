@@ -4,67 +4,81 @@ title: TLS/SSL Support
 ---
 # TLS/SSL Support
 
-FluffOS provides comprehensive TLS (Transport Layer Security) support for secure network communications. TLS encrypts data between clients and the server, protecting against eavesdropping and tampering.
+FluffOS provides TLS (Transport Layer Security) support for secure network
+communications. TLS encrypts data between clients and the server, protecting
+against eavesdropping and tampering.
 
 ## Overview
 
 FluffOS TLS support includes:
-- **Secure telnet connections** - Encrypted telnet over TLS
-- **Secure WebSocket connections** - WSS (WebSocket Secure) protocol
-- **Client-side TLS sockets** - Connect to external HTTPS/TLS servers
-- **Certificate-based authentication** - Verify server identities
-- **Modern TLS versions** - Support for TLS 1.2 and 1.3
-- **SNI (Server Name Indication)** - Multi-domain support
+
+- **Secure telnet connections** — encrypted telnet over TLS
+- **Secure WebSocket connections** — WSS (WebSocket Secure)
+- **Client-side TLS sockets** — connect to external HTTPS/TLS servers
+- **Certificate verification** — verify server identities against the system CA store
+- **Modern TLS versions** — negotiates the highest mutually supported version (typically TLS 1.2 or 1.3)
+- **SNI (Server Name Indication)** — select a certificate by hostname
 
 ## TLS for Server Ports
 
 ### Configuration
 
-TLS is configured in the driver configuration file for external ports.
-
-#### Basic TLS Port Configuration
+Listening ports are configured with numbered `external_port_N` entries in the
+driver configuration file. TLS is enabled on a listener by adding a matching
+`external_port_N_tls` line giving a certificate and key. See the
+[driver configuration](../../driver/config.md) for the full port syntax.
 
 ```
 # Secure telnet on port 4443
-external_port_1: telnet 4443
-external_port_1_tls: cert=etc/cert.pem key=etc/key.pem
+external_port_1 : telnet 4443
+external_port_1_tls : cert=etc/cert.pem key=etc/key.pem
 
 # Secure WebSocket on port 8443
-external_port_2: websocket 8443
-external_port_2_tls: cert=etc/cert.pem key=etc/key.pem
+external_port_2 : websocket 8443
+external_port_2_tls : cert=etc/cert.pem key=etc/key.pem
 ```
+
+The `cert=` and `key=` pair must be on a single line; the parser reads each
+config line whole and does not support backslash continuation.
+
+Certificate and key paths are passed to OpenSSL as-is, so relative paths are
+resolved from the **driver's working directory** (not the mudlib). Use absolute
+paths if there is any ambiguity about where the driver is started.
 
 #### Multiple TLS Ports
 
 ```
-# Primary telnet (non-TLS)
+# Legacy single telnet port; equivalent to external_port_1 : telnet 4000
 port number : 4000
 
 # Secure telnet
-external_port_1: telnet 4443
-external_port_1_tls: cert=etc/certs/mud.pem key=etc/certs/mud.key
+external_port_1 : telnet 4443
+external_port_1_tls : cert=etc/certs/mud.pem key=etc/certs/mud.key
 
-# Secure WebSocket for web client
-external_port_2: websocket 8443
-external_port_2_tls: cert=etc/certs/web.pem key=etc/certs/web.key
+# Secure WebSocket for a web client
+external_port_2 : websocket 8443
+external_port_2_tls : cert=etc/certs/web.pem key=etc/certs/web.key
 
 # Regular WebSocket (development)
-external_port_3: websocket 8080
+external_port_3 : websocket 8080
 ```
 
 ### Certificate Files
 
-TLS requires two files:
-1. **Certificate file (.pem/.crt)** - Public certificate
-2. **Private key file (.key/.pem)** - Private key
+TLS requires two things:
 
-Both can be combined in a single .pem file or kept separate.
+1. **Certificate** (`.pem`/`.crt`) — the public certificate (chain).
+2. **Private key** (`.key`/`.pem`) — the private key.
+
+They can be two separate files or a single combined PEM. For a combined file,
+point both `cert=` and `key=` at the same path.
 
 ## Generating Certificates
 
 ### Self-Signed Certificates (Development/Testing)
 
-**Quick generation:**
+Quick generation:
+
 ```bash
 openssl req -x509 -newkey rsa:4096 \
   -keyout key.pem -out cert.pem \
@@ -72,7 +86,8 @@ openssl req -x509 -newkey rsa:4096 \
   -subj "/CN=localhost"
 ```
 
-**With more details:**
+With more details:
+
 ```bash
 openssl req -x509 -newkey rsa:4096 \
   -keyout key.pem -out cert.pem \
@@ -80,113 +95,136 @@ openssl req -x509 -newkey rsa:4096 \
   -subj "/C=US/ST=State/L=City/O=MyMUD/CN=mud.example.com"
 ```
 
-**Combined certificate + key:**
+To produce a single combined PEM, generate the two files and concatenate them:
+
 ```bash
-openssl req -x509 -newkey rsa:4096 \
-  -keyout combined.pem -out combined.pem \
-  -days 365 -nodes \
-  -subj "/CN=mud.example.com"
+cat cert.pem key.pem > combined.pem
 
 # Use in config
-external_port_1_tls: cert=etc/combined.pem key=etc/combined.pem
+external_port_1_tls : cert=etc/combined.pem key=etc/combined.pem
 ```
 
-**Notes on self-signed certificates:**
-- ⚠️ Browsers will show security warnings
-- ⚠️ Not suitable for production
-- ✅ Fine for development and testing
-- ✅ Good for private/internal MUDs
+Notes on self-signed certificates:
+
+- Browsers will show security warnings.
+- Not suitable for production.
+- Fine for development, testing, and private/internal muds.
 
 ### Production Certificates (Let's Encrypt)
 
-For production MUDs with a domain name, use Let's Encrypt for free, trusted certificates:
+For production muds with a domain name, use Let's Encrypt for free, trusted
+certificates.
 
-**Installation (Ubuntu/Debian):**
+Installation (Ubuntu/Debian):
+
 ```bash
 sudo apt-get install certbot
 ```
 
-**Generate certificate:**
+Generate a certificate:
+
 ```bash
 sudo certbot certonly --standalone \
   -d mud.yourdomain.com \
   --email admin@yourdomain.com
 ```
 
-**Certificate location:**
+Certificate location:
+
 ```
 /etc/letsencrypt/live/mud.yourdomain.com/fullchain.pem  # Certificate
 /etc/letsencrypt/live/mud.yourdomain.com/privkey.pem    # Private key
 ```
 
-**FluffOS configuration:**
+FluffOS configuration (`cert=`/`key=` on one line):
+
 ```
-external_port_1: telnet 4443
-external_port_1_tls: cert=/etc/letsencrypt/live/mud.yourdomain.com/fullchain.pem \
-                     key=/etc/letsencrypt/live/mud.yourdomain.com/privkey.pem
+external_port_1 : telnet 4443
+external_port_1_tls : cert=/etc/letsencrypt/live/mud.yourdomain.com/fullchain.pem key=/etc/letsencrypt/live/mud.yourdomain.com/privkey.pem
 ```
 
-**Auto-renewal:**
-```bash
-# Test renewal
-sudo certbot renew --dry-run
+After a renewal the certificate files change on disk, but the running driver
+keeps using the certificate it loaded at boot. Reload it in-game without
+restarting using the [`sys_reload_tls()`](../../efun/system/sys_reload_tls.md)
+efun, which takes the 1-based external port number:
 
-# Set up auto-renewal (cron)
-sudo crontab -e
-# Add: 0 3 * * * certbot renew --post-hook "systemctl reload fluffos"
+```c
+sys_reload_tls(1);  // reload TLS for external_port_1
 ```
 
-**Certificate renewal without downtime:**
-```bash
-# After certbot renews certificate
-# Reload TLS certificates without restarting
-# In-game as admin:
-sys_reload_tls(1);  // Reload TLS for port 1
-```
+(Reloading WebSocket TLS this way is not supported; only stream/telnet ports.)
+
+You can drive this from a certbot deploy hook that triggers an in-game admin
+command, or from a scheduled `call_out` that reloads after renewals.
 
 ## Client Connections to TLS Servers
 
 ### Socket TLS Modes
 
-FluffOS supports TLS for outbound socket connections:
+Two socket modes carry TLS:
 
 ```c
-// Available socket modes
-STREAM        // Regular TCP
-STREAM_BINARY // Binary TCP
-STREAM_TLS    // TLS encrypted
-STREAM_TLS_BINARY  // TLS encrypted binary
+STREAM_TLS         // TLS-encrypted stream (raw string data)
+STREAM_TLS_BINARY  // TLS-encrypted stream (binary buffer data)
 ```
 
-### Basic TLS Client Connection
+### TLS Client Connection
+
+`socket_connect()` takes a **numeric IP address** and does **not** perform DNS
+resolution, so resolve the hostname first with the asynchronous `resolve()`
+efun, then connect to the address it returns. The connection address is a single
+`"IP port"` string (space-separated), and `socket_connect()` takes four
+arguments: the socket, the address, a read callback, and a write callback. TLS
+options must be set before connecting.
 
 ```c
+#include <socket.h>
+#include <socket_err.h>
+
 void connect_to_api() {
-    int sock;
-
-    // Create TLS socket
-    sock = socket_create(STREAM_TLS, "read_callback", "close_callback");
-
-    // Configure TLS options
-    socket_set_option(sock, SO_TLS_VERIFY_PEER, 1);  // Verify certificate
-    socket_set_option(sock, SO_TLS_SNI_HOSTNAME, "api.example.com");
-
-    // Connect
-    socket_connect(sock, "api.example.com:443", "connected_callback");
+    // resolve() is asynchronous; it calls "on_resolved" with the result.
+    resolve("api.example.com", "on_resolved");
 }
 
-void connected_callback(int sock) {
-    // Connection established, send HTTPS request
+// resolve() callback: (queried name, numeric IP or 0 on failure, query id)
+void on_resolved(string name, string ip, int key) {
+    if (!ip) {
+        write("Could not resolve " + name + "\n");
+        return;
+    }
+
+    int sock = socket_create(STREAM_TLS, "read_callback", "close_callback");
+    if (sock < 0) {
+        write("socket_create: " + socket_error(sock) + "\n");
+        return;
+    }
+
+    // Configure TLS before connecting.
+    socket_set_option(sock, SO_TLS_VERIFY_PEER, 1);   // verify the server cert
+    socket_set_option(sock, SO_TLS_SNI_HOSTNAME, name);
+
+    // Address is "IP port", space-separated. socket_connect takes read AND
+    // write callbacks.
+    int err = socket_connect(sock, ip + " 443",
+                             "read_callback", "write_callback");
+    if (err != EESUCCESS) {
+        write("socket_connect: " + socket_error(err) + "\n");
+        socket_close(sock);
+    }
+}
+
+// Fires once the TLS handshake completes and the socket is writable.
+void write_callback(int sock) {
     socket_write(sock,
         "GET /api/data HTTP/1.1\r\n"
-        "Host: api.example.com\r\n"
-        "User-Agent: FluffOS-MUD\r\n"
-        "Connection: close\r\n\r\n"
-    );
+        "Host: api.example.com\r\n"     // Host header still uses the hostname
+        "User-Agent: FluffOS\r\n"
+        "Connection: close\r\n\r\n");
 }
 
 void read_callback(int sock, mixed data) {
-    // Process HTTPS response
+    // STREAM data may arrive in several pieces; a real HTTP client should
+    // accumulate it and parse once the full response has arrived.
     write("Received: " + data + "\n");
 }
 
@@ -195,245 +233,151 @@ void close_callback(int sock) {
 }
 ```
 
-### HTTPS Client Example
-
-```c
-// Complete HTTPS client
-void fetch_url(string url, function callback) {
-    string host, path;
-    int port = 443;
-
-    // Parse URL
-    if (sscanf(url, "https://%s/%s", host, path) != 2) {
-        return callback(0, "Invalid URL");
-    }
-
-    // Create TLS socket
-    int sock = socket_create(STREAM_TLS, "http_read", "http_close");
-
-    // Configure TLS with certificate verification
-    socket_set_option(sock, SO_TLS_VERIFY_PEER, 1);
-    socket_set_option(sock, SO_TLS_SNI_HOSTNAME, host);
-
-    // Store callback for later
-    set_socket_callback(sock, callback);
-
-    // Connect
-    socket_connect(sock, host + ":" + port,
-        lambda(({'sock}), ({
-            #'socket_write, 'sock,
-            "GET /" + path + " HTTP/1.1\r\n"
-            "Host: " + host + "\r\n"
-            "Connection: close\r\n\r\n"
-        }))
-    );
-}
-```
+Only the socket connection itself uses the numeric IP; the SNI option and the
+HTTP `Host` header still use the hostname.
 
 ### TLS Socket Options
 
+TLS options are set with `socket_set_option()` before `socket_connect()`.
+
 #### SO_TLS_VERIFY_PEER
 
-Controls certificate verification:
+Controls certificate verification against the system CA store:
 
 ```c
-// Enable verification (recommended)
-socket_set_option(sock, SO_TLS_VERIFY_PEER, 1);
-
-// Disable verification (insecure, testing only)
-socket_set_option(sock, SO_TLS_VERIFY_PEER, 0);
+socket_set_option(sock, SO_TLS_VERIFY_PEER, 1);  // verify (recommended)
+socket_set_option(sock, SO_TLS_VERIFY_PEER, 0);  // do not verify (insecure)
 ```
 
-**When to disable verification:**
-- ⚠️ Testing with self-signed certificates
-- ⚠️ Development environments
-- ⚠️ **NEVER in production!**
-
-**Security implications:**
-- Disabled = vulnerable to man-in-the-middle attacks
-- Disabled = cannot verify server identity
-- Enabled = secure, authenticated connection
+Disabling verification leaves the connection vulnerable to man-in-the-middle
+attacks and unable to confirm the server's identity. Only disable it for local
+testing against self-signed certificates, never in production.
 
 #### SO_TLS_SNI_HOSTNAME
 
-Server Name Indication for multi-domain servers:
+Server Name Indication tells a server that hosts multiple TLS sites on one IP
+which certificate to present. It is required by most modern HTTPS endpoints and
+is roughly the TLS-layer equivalent of the HTTP `Host` header.
 
 ```c
-// Required for servers hosting multiple domains
 socket_set_option(sock, SO_TLS_SNI_HOSTNAME, "api.example.com");
 ```
 
-**Why SNI is important:**
-- Servers can host multiple TLS sites on one IP
-- SNI tells server which certificate to use
-- Required for most modern HTTPS APIs
-- Equivalent to HTTP Host header
-
 ## TLS Protocols and Ciphers
 
-### Supported TLS Versions
+FluffOS uses OpenSSL and negotiates the highest TLS version supported by both
+ends — typically **TLS 1.2** or **TLS 1.3**. The driver explicitly disables
+SSLv2, SSLv3, and TLS 1.1 for both server and client contexts; the remaining
+version floor is governed by the linked OpenSSL build's security level.
 
-FluffOS uses OpenSSL and supports:
-- **TLS 1.2** - Widely supported, secure
-- **TLS 1.3** - Modern, faster, more secure
-- **SSL 3.0, TLS 1.0, TLS 1.1** - Disabled by default (insecure)
-
-The driver automatically negotiates the best available version.
-
-### Cipher Suites
-
-FluffOS uses OpenSSL's default secure cipher suites, which include:
-- **ECDHE-RSA-AES256-GCM-SHA384** - Strong, modern
-- **ECDHE-RSA-AES128-GCM-SHA256** - Fast, secure
-- **DHE-RSA-AES256-GCM-SHA384** - Strong forward secrecy
-
-Weak ciphers (RC4, DES, 3DES, MD5) are automatically disabled.
+Cipher selection follows OpenSSL's defaults, which favor modern AEAD suites
+(for example ECDHE with AES-GCM) and exclude long-obsolete ciphers such as RC4
+and single DES.
 
 ## Security Best Practices
 
 ### Certificate Management
 
-**DO:**
-- ✅ Use trusted certificates for production (Let's Encrypt)
-- ✅ Keep private keys secure (chmod 600)
-- ✅ Renew certificates before expiration
-- ✅ Use strong keys (RSA 4096 or ECDSA 256)
-- ✅ Enable certificate verification in clients
+Do:
 
-**DON'T:**
-- ❌ Commit private keys to git
-- ❌ Use self-signed certs in production
-- ❌ Disable certificate verification in production
-- ❌ Share private keys between servers
-- ❌ Use weak keys (RSA < 2048)
+- Use trusted certificates for production (e.g. Let's Encrypt).
+- Keep private keys readable only by the mud user (`chmod 600`).
+- Renew certificates before they expire, and reload with `sys_reload_tls()`.
+- Use strong keys (RSA 4096 or ECDSA P-256).
+- Enable certificate verification (`SO_TLS_VERIFY_PEER`) in clients.
 
-### Configuration Security
+Don't:
+
+- Commit private keys to version control.
+- Use self-signed certificates in production.
+- Disable certificate verification in production.
+- Share one private key across unrelated servers.
+- Use weak keys (RSA < 2048).
+
+### File Permissions
 
 ```bash
-# Secure certificate file permissions
 chmod 600 etc/key.pem
 chmod 644 etc/cert.pem
 chown muduser:muduser etc/*.pem
 ```
 
-### Client Security
-
-```c
-// GOOD: Verify server certificate
-socket_set_option(sock, SO_TLS_VERIFY_PEER, 1);
-socket_set_option(sock, SO_TLS_SNI_HOSTNAME, "trusted-api.com");
-
-// BAD: Skip verification (vulnerable!)
-socket_set_option(sock, SO_TLS_VERIFY_PEER, 0);  // DON'T DO THIS IN PRODUCTION
-```
-
 ## Troubleshooting
 
-### Common Issues
+**Certificate verify failed (client):** the server's certificate could not be
+validated against the local CA store. Ensure the system CA certificates are
+installed and up to date:
 
-**1. Certificate errors on client connection:**
-```
-Error: certificate verify failed
-```
-**Solution:** Check certificate chain, ensure CA certificates are installed
 ```bash
-# Update CA certificates (Ubuntu/Debian)
 sudo apt-get install ca-certificates
 sudo update-ca-certificates
 ```
 
-**2. Self-signed certificate rejection:**
+For a self-signed server during testing only, you may disable verification:
+
 ```c
-// For testing only
 socket_set_option(sock, SO_TLS_VERIFY_PEER, 0);
 ```
 
-**3. SNI not set:**
-```
-Error: wrong version number / unexpected EOF
-```
-**Solution:** Set SNI hostname:
+**"wrong version number" / unexpected EOF:** frequently caused by a missing SNI
+hostname, or by connecting with TLS to a plaintext port (or vice versa). Set the
+SNI hostname and confirm the port actually speaks TLS:
+
 ```c
 socket_set_option(sock, SO_TLS_SNI_HOSTNAME, "api.example.com");
 ```
 
-**4. Mixed content (non-TLS to TLS):**
-- Ensure all external connections use appropriate protocol
-- Use TLS sockets for HTTPS endpoints
-- Use regular sockets for HTTP endpoints
+**Certificate file not found:** the driver could not open the `cert=`/`key=`
+path. Because paths are relative to the driver's working directory, prefer
+absolute paths:
 
-**5. Certificate file not found:**
 ```
-Error: No such file or directory
-```
-**Solution:** Use absolute paths or paths relative to mudlib directory
-```
-# Absolute path
-external_port_1_tls: cert=/etc/ssl/certs/mud.pem key=/etc/ssl/private/mud.key
-
-# Relative to mudlib directory
-external_port_1_tls: cert=etc/certs/mud.pem key=etc/certs/mud.key
+external_port_1_tls : cert=/etc/ssl/certs/mud.pem key=/etc/ssl/private/mud.key
 ```
 
 ### Testing TLS Connections
 
-**Test server TLS:**
-```bash
-# Test telnet TLS
-openssl s_client -connect mud.example.com:4443
+Test a server port from the shell:
 
-# Test WebSocket TLS
-openssl s_client -connect mud.example.com:8443
+```bash
+openssl s_client -connect mud.example.com:4443
 ```
 
-**Test certificate validity:**
+Check a certificate's validity:
+
 ```bash
-# Check certificate expiration
+# Expiration date
 openssl x509 -in cert.pem -text -noout | grep "Not After"
 
-# Verify certificate chain
+# Verify against a CA
 openssl verify -CAfile ca.pem cert.pem
 ```
 
-**Test in-game:**
-```c
-// Test outbound TLS connection
-void test_tls() {
-    int sock = socket_create(STREAM_TLS, "test_read", "test_close");
-    socket_set_option(sock, SO_TLS_VERIFY_PEER, 1);
-    socket_set_option(sock, SO_TLS_SNI_HOSTNAME, "www.google.com");
-    socket_connect(sock, "www.google.com:443", "test_connect");
-}
-```
+Test an outbound TLS connection in-game using the client pattern shown above
+(resolve the host, then `socket_connect()` to the numeric IP with `SO_TLS_*`
+options set).
 
 ## Performance Considerations
 
-### TLS Overhead
-
-- **CPU:** 5-15% additional CPU usage for encryption/decryption
-- **Memory:** Minimal (~50KB per connection)
-- **Latency:** <1ms added latency for handshake
-- **Throughput:** Minimal impact on modern CPUs
-
-### Optimization Tips
-
-1. **Use TLS 1.3** - Faster handshakes, better performance
-2. **Session resumption** - Handled automatically by OpenSSL
-3. **Hardware acceleration** - Use AES-NI capable CPUs
-4. **Connection reuse** - Keep connections alive when possible
+TLS adds CPU cost for the handshake and for encrypting and decrypting data, plus
+a small amount of memory per connection. On modern hardware — especially CPUs
+with AES-NI — this overhead is generally negligible at mud scale. Prefer TLS 1.3
+for faster handshakes; OpenSSL handles session resumption automatically. Keeping
+connections alive avoids repeating handshakes.
 
 ## See Also
 
-- [socket_create(3)](../../efun/sockets/socket_create.md) - Create sockets
-- [socket_set_option(3)](../../efun/sockets/socket_set_option.md) - Configure TLS
-- [socket_get_option(3)](../../efun/sockets/socket_get_option.md) - Query TLS settings
-- [sys_reload_tls(3)](../../efun/system/sys_reload_tls.md) - Reload certificates
-- [Driver Configuration](../../driver/config.md) - TLS port setup
-- [WebSocket Support](websocket.md) - WebSocket with TLS
+- [socket_create](../../efun/sockets/socket_create.md) — create sockets
+- [socket_set_option](../../efun/sockets/socket_set_option.md) — configure TLS
+- [socket_get_option](../../efun/sockets/socket_get_option.md) — query TLS settings
+- [sys_reload_tls](../../efun/system/sys_reload_tls.md) — reload certificates
+- [socket_efuns](socket_efuns.md) — LPC sockets overview
+- [Driver Configuration](../../driver/config.md) — TLS port setup
+- [WebSocket Support](websocket.md) — WebSocket with TLS
 
 ## References
 
 - [OpenSSL Documentation](https://www.openssl.org/docs/)
-- [Let's Encrypt](https://letsencrypt.org/) - Free TLS certificates
+- [Let's Encrypt](https://letsencrypt.org/) — free TLS certificates
 - [TLS 1.3 RFC](https://tools.ietf.org/html/rfc8446)
-- [Mozilla TLS Configuration](https://wiki.mozilla.org/Security/Server_Side_TLS)
+- [Mozilla Server-Side TLS](https://wiki.mozilla.org/Security/Server_Side_TLS)

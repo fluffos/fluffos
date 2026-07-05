@@ -4,7 +4,7 @@ title: constructs / inherit
 ---
 # inherit
 
-### The LPC inherit statement
+## The LPC inherit statement
 
 Syntax:
 
@@ -14,7 +14,7 @@ where pathname is a full path delimited by quotes (e.g. "/std/Object").
 
 The 'inherit' statement provides the inheritance capability (a concept from
 object-oriented programming) to LPC objects. Inheritance lets an object
-inherit functions and variables from other objects. Because the MudOSdriver
+inherit functions and variables from other objects. Because the FluffOS driver
 internally stores global data and compiled code separately, many different
 objects can use inheritance to share the same piece of compiled code. Each of
 these objects will have its own local copy of any global variables defined

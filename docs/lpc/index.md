@@ -10,6 +10,7 @@ title: lpc
 * [inherit](constructs/inherit)
 * [prototypes](constructs/prototypes)
 * [switch](constructs/switch)
+* [text_blocks](constructs/text_blocks)
 * [while](constructs/while)
 ## preprocessor
 * [README](preprocessor/README)

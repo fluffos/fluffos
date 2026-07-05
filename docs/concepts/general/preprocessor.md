@@ -4,9 +4,7 @@ title: general / preprocessor
 ---
 # preprocessor
 
-### LPC Preprocessor Manual
-
-> (Updated 93.07.17)
+## LPC Preprocessor Manual
 
 The preprocessor is a front end to the LPC compiler that provides such
 handy features as:
@@ -14,12 +12,15 @@ handy features as:
     o   sharing definitions and code (#include)
     o   macros (#define, #undef)
     o   conditional compilation (#if, #ifdef, #ifndef, #else, #elif, #endif)
-    o   debugging (#echo)
+    o   diagnostics (#echo, #error, #warn)
     o   compiler specific (#pragma)
-    o   text formatting short cuts (@, @@)
 
 The first three are identical to C usage, so those already familiar with
 C may want to just skim the last few sections of this document.
+
+(The `@`/`@@` text-block syntax was historically documented here. It is a
+string-literal feature rather than a preprocessor directive, and is now
+covered under [text blocks](../../lpc/constructs/text_blocks.md).)
 
 Note:
 
@@ -41,8 +42,9 @@ Syntax 2:
 Notes:
 
     The '#include <file.h>' form looks for the file, 'file.h' in the
-    system's standard include directories.
-    (On TMI this is just '/include'.)
+    driver's configured system include directories (the
+    [`include directories`](../../driver/config.md) config option,
+    a colon-separated list of paths).
 
     The '#include "file.h"' form looks for the file, 'file.h' in the
     same directory as the file that is including it.
@@ -57,8 +59,7 @@ in the file doing the including, then a duplicate-name error will occur at
 compile time (in the same way that the error would occur if you simply typed
 in file.h rather than using #include).
 
-
-#### Macros
+### Macros
 
 Macro definitions are used to replace subsequent instances of a given
 word with a different sequence of text.  Reasons for doing so include
@@ -116,8 +117,7 @@ Note:
     It's perfectly acceptable to undefine an identifier that hasn't been
     defined yet.
 
-
-#### Conditional Compilation
+### Conditional Compilation
 
 These directives can add flexibility to your code.  Based on whether an
 identifier is defined (or not defined), variations of the code can be
@@ -149,7 +149,7 @@ Note:
     parentheses for grouping: (, )
     calls of the form: defined(identifier)
 
-    and identifiers `#ifdef identifier` can be considered shorthand for:
+    Also, `#ifdef identifier` can be considered shorthand for:
     `#if defined(identifier)`
 
     `#ifndef identifier` can be considered shorthand for:
@@ -182,38 +182,38 @@ printf("%s has %d coins\n", user_name, total_coins);
 Example 2:
 
 ```c
-// This example is derived from TMI's /adm/simul_efun/system.c
-#ifdef __VERSION
+// __VERSION__ is predefined by the driver as the FluffOS version string.
+// Fall back gracefully if some other driver ever compiles this code.
+#ifdef __VERSION__
 string version() { return __VERSION__; }
-#elif defined(MUDOS_VERSION)
-string version() { return MUDOS_VERSION; }
 #else
-#if defined(VERSION)
-string version() { return VERSION; }
-#else
-string version() { return -1; }
-#endif
+string version() { return "unknown"; }
 #endif
 ```
 
-#### Debugging
+### Diagnostics
 
-The '#echo' directive allows you to print messages to the driver's stderr
-(STanDard ERRor) stream.  This facility is useful for diagnostics and
+The '#echo' directive prints a message to the driver's debug log while the
+file is being compiled.  This facility is useful for diagnostics and
 debugging.
 
 Syntax:
 
     #echo This is a message
 
+The '#warn' directive emits a compiler warning, and '#error' aborts
+compilation with an error.  Each takes the rest of the line as its message:
+
+    #warn this code path is deprecated
+    #error unsupported configuration
+
 Note:
 
-    The rest of the line (or end-of-file, which ever comes first) is the
-    message, and is printed verbatim.  It's not necessary to enclose text
-    with quotes.
+    For all three, the rest of the line (or end-of-file, whichever comes
+    first) is the message, and is printed verbatim.  It's not necessary to
+    enclose the text with quotes.
 
-
-#### Compiler Specific
+### Compiler Specific
 
 This facility performs implementation-dependent actions.
 
@@ -223,25 +223,26 @@ Syntax:
 
 At this time the following control keywords are recognized:
 
-    o   strict_types
-    o   save_binary
-    o   save_types
-    o   warnings
-    o   optimize
-    o   error_context
+    o   strict_types        (off by default)
+    o   save_types          (on by default)
+    o   warnings            (on by default)
+    o   optimize            (on by default)
+    o   show_error_context  (on by default)
 
-Also, #pragma no_keyword can be used to turn a pragma off.
+The defaults come from the driver's build-time configuration
+(DEFAULT_PRAGMAS in local_options), so a given mud may enable or disable
+others. #pragma no_keyword (e.g. #pragma no_warnings) turns a pragma off for
+the current file.
 
 Notes:
 
     'strict_types' informs the compiler that the return value from
     call_other()'d functions must be casted
 
-    'save_binary' informs the compiler to save the binary object;
-    loading will go faster after a reboot/shutdown since object has been
-    precompiled
-
-    'save_types' is currently unused
+    'save_types' causes the compiler to retain function argument type
+    information in the compiled object; this is required for type-checking
+    calls into the object from strict_types code, and is discarded otherwise
+    to save memory
 
     'warnings' enables certain warnings about things in your LPC code which
     probably won't behave the way you intended
@@ -249,79 +250,5 @@ Notes:
     'optimize' takes a second pass over the compiled code to improve it
     slightly
 
-    'error_context' adds more text to error messages indicating where on
-    the line the error occured
-
-#### Text Formatting Shortcuts
-
-This facility makes it easier to format text for help messages, room
-descriptions, etc.
-
-Syntax 1:
-
-    @marker
-    <... text block ...>
-    marker
-
-Syntax 2:
-
-    @@marker
-    <... text block ...>
-    marker
-
-Notes:
-
-    @   - produces a string suitable for write()
-    @@  - produces an array of strings, suitable for the body pager
-
-These are used by prepending '@' (or '@@') before an end marker word.  This
-is followed by your formatted text, as you would have it appear to the user.
-The text block is terminated by the end marker word, without the '@'
-(or '@@').  With '@', the text block is processed as if it were a single
-string surrounded by quotes and '\n' (newlines) in between the lines.
-With '@@', the text block is processed as it were an array of strings,
-with each line being a string surrounded by quotes.
-
-Example 1:
-
-```c
-int help() {
-    write( @ENDHELP
-This is the help text.
-It's hopelessly inadequate.
-ENDHELP
-    );
-    return 1;
-}
-
-Is equivalent to:
-
-```c
-int help() {
-    write( "This is the help text\nIt's hopelessly inadequate.\n" );
-    return 1;
-}
-```
-
-Example 2:
-
-```c
-int help() {
-    this_player()->more( @@ENDHELP
-This is the help text.
-It's hopelessly inadequate.
-ENDHELP
-    , 1);
-    return 1;
-}
-```
-
-Is equivalent to:
-
-```c
-int help() {
-    this_player()->more( ({ "This is the help text.",
-    "It's hopelessly inadequate." }), 1);
-    return 1;
-}
-```
+    'show_error_context' adds more text to error messages indicating where on
+    the line the error occurred
