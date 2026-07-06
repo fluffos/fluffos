@@ -28,6 +28,14 @@ if(${GTEST_FOUND})
   add_executable(bench_scratchpad bench_scratchpad.cc)
   target_link_libraries(bench_scratchpad PRIVATE ${FLUFFOS_LINK})
 
+  # Whole-compile throughput across many rounds (real compile_file on a
+  # representative program; proves flat steady-state + zero chunk mallocs
+  # after warmup). Manual, RelWithDebInfo:
+  #   ./src/tests/bench_compile [rounds]
+  add_executable(bench_compile bench_compile.cc)
+  target_link_libraries(bench_compile PRIVATE ${FLUFFOS_LINK})
+  target_compile_definitions(bench_compile PRIVATE -DTESTSUITE_DIR="${CMAKE_SOURCE_DIR}/testsuite")
+
   gtest_discover_tests(lpc_tests DISCOVERY_TIMEOUT 60)
   gtest_discover_tests(ofile_tests DISCOVERY_TIMEOUT 60)
   gtest_discover_tests(compiler_tests DISCOVERY_TIMEOUT 60)

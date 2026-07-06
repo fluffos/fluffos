@@ -115,6 +115,54 @@ TEST(Scratchpad, ScratchVectorIsArenaBacked) {
     scratch_destroy();
 }
 
+TEST(Scratchpad, PlacedStringGrowthStaysOnArena) {
+    // scratch_new_string placement-news the OBJECT into the arena; every
+    // later MODIFICATION (+=, insert, growth past SSO) must draw its new
+    // buffer from the arena too. Proof: the arena's cycle-byte counter
+    // advances by at least the new capacity when a placed string grows.
+    scratch_destroy();
+    ScratchString *tok = scratch_new_string("x");
+    std::size_t before = scratch_stats().cycle_bytes;
+    for (int i = 0; i < 100; i++) *tok += "0123456789abcdef";  // 1.6KB growth
+    std::size_t after = scratch_stats().cycle_bytes;
+    EXPECT_GE(after - before, tok->size());  // growth came from the arena
+    EXPECT_EQ(tok->substr(0, 17), "x0123456789abcdef");
+    scratch_destroy();
+}
+
+TEST(Scratchpad, TinyChunkWorstCase) {
+    // Force pathological 400-byte chunks: every ScratchString growth past
+    // 400B goes oversize, advances happen constantly, and the retained
+    // array cycles. Correctness must hold (ASan guards the rest).
+    scratch_set_chunk_size_for_testing(400);
+    for (int round = 0; round < 3; round++) {
+        {
+            // Everything arena-backed must leave scope BEFORE the reset:
+            // with 400B chunks these land in OVERFLOW chunks that
+            // scratch_destroy actually frees, so even a destructor
+            // touching them afterwards is use-after-free (ASan-proven --
+            // this brace block is the documented discipline).
+            std::vector<ScratchString *> toks;
+            for (int i = 0; i < 200; i++) {
+                toks.push_back(scratch_new_string("token_" + std::to_string(i)));
+            }
+            ScratchString big;
+            for (int i = 0; i < 500; i++) big += "0123456789abcdef";  // 8KB >> chunk
+            EXPECT_EQ(big.size(), 8000u);
+            for (int i = 0; i < 200; i++) {
+                EXPECT_EQ(std::string_view(*toks[i]), "token_" + std::to_string(i));
+            }
+            ScratchVector<ScratchString> v;
+            for (int i = 0; i < 64; i++) v.emplace_back("arg");
+            EXPECT_EQ(v.size(), 64u);
+        }
+        scratch_destroy();
+    }
+    ScratchStats st = scratch_stats();
+    EXPECT_GT(st.chunk_mallocs, 0u);  // the worst case actually spilled
+    scratch_set_chunk_size_for_testing(1024 * 1024);  // restore production
+}
+
 TEST(Scratchpad, StaleObjectResetAfterDestroyIsSafe) {
     // The scanner context holds ScratchStrings across compiles; after
     // scratch_destroy their buffers are gone. The documented recovery --

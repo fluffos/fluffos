@@ -87,7 +87,31 @@ using ScratchVector = std::vector<T, ScratchAllocator<T>>;
 ScratchString *scratch_new_string(std::string_view sv);
 
 // Free every arena allocation (bulk reset at compile end). The first
-// chunk is persistent and merely reset, so small compiles never malloc.
+// chunk is persistent, and standard-size chunks are RETAINED in a
+// deque-style array whose tail is the warm cache (reset = cursor back to
+// slot 0), so a long-lived driver reaches a steady state where compiles
+// perform NO chunk mallocs at all -- observable via scratch_stats().
 void scratch_destroy();
+
+// Steady-state observability: after warmup, `chunk_mallocs` must stop
+// growing across compiles (the warm cache absorbs every request) -- the
+// multi-round benchmark and leak hunts key off this.
+struct ScratchStats {
+  std::size_t cycle_bytes;       // bytes bump-allocated since the last reset
+  std::size_t peak_cycle_bytes;  // largest completed compile's bytes
+  std::size_t chunk_mallocs;     // lifetime count of chunk allocations
+  std::size_t resets;            // lifetime count of scratch_destroy() calls
+  int retained_chunks;           // standard chunks retained across compiles
+};
+ScratchStats scratch_stats();
+
+// mud_status() reporting line(s); returns retained heap bytes.
+#include <cstdint>
+struct outbuffer_t;
+uint64_t scratchpad_status(struct outbuffer_t *out, int verbose);
+
+// Test/bench knob: force a chunk payload size (e.g. 400 bytes) to observe
+// worst-case behavior; drops retained chunks and resets the arena.
+void scratch_set_chunk_size_for_testing(std::size_t payload);
 
 #endif
