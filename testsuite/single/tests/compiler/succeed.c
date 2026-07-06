@@ -9,9 +9,8 @@ void foo(int);
 ; // only a warning
 
 int ident;
-#define X1 id
-#define X2 ent
-int paste = X1##X2;
+#define PASTE(a, b) a##b
+int paste = PASTE(id, ent);
 string x = @END
 xxx
 END;

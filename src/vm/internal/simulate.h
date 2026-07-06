@@ -1,6 +1,8 @@
 #ifndef SIMULATE_H
 #define SIMULATE_H
 
+#include <string>
+
 #include "vm/internal/base/machine.h"
 
 #define V_SHORT 1
@@ -33,6 +35,7 @@ int get_char(svalue_t *, int, int, svalue_t *);
 char *check_name(char *);
 int filename_to_obname(const char *, char *, int);
 object_t *load_object(const char *, int);
+object_t *load_object_from_source(const std::string &source, const char *virtual_name, int callcreate);
 object_t *clone_object(const char *, int);
 object_t *environment(svalue_t *);
 object_t *first_inventory(svalue_t *);

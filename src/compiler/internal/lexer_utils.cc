@@ -26,6 +26,7 @@
 
 #include "compiler/internal/lexer_utils.h"
 #include "compiler/internal/lex.h"
+#include "compiler/internal/lexer_rules_pp.h"
 
 #include <cstdio>    // for EOF
 #include <fcntl.h>   // for O_RDONLY etc
@@ -55,7 +56,6 @@
 
 #include "symbol.h"
 #include "compiler/internal/LexStream.h"
-#include "compiler/internal/preprocessor.h"
 
 #ifdef _WIN32
 #include <io.h>
@@ -114,9 +114,10 @@ lpc_predef_t *lpc_predefs = nullptr;
 namespace {
 std::unique_ptr<LexStream> current_stream = nullptr;
 }  // namespace
+std::shared_ptr<LexerSession> current_session = nullptr;
 
 int lex_fatal;
-static char *last_nl;
+char *last_nl;
 
 // yytext is now defined by the Flex-generated lex.autogen.cc.
 // YYLMAX (8192) >= MAXLINE (4096) so existing writes are safe.
@@ -255,7 +256,7 @@ static void add_input(const char * /*p*/);
 static int get_array_block(char * /*term*/);
 static int get_text_block(char * /*term*/);
 static void refill_buffer(void);
-static int old_func(void);
+static int old_func(void *yyscanner);
 static ident_hash_elem_t *quick_alloc_ident_entry(void);
 
 int lookup_predef(const char *name) {
@@ -340,6 +341,9 @@ static int get_array_block(char *term) {
     /*
      * null terminate current chunk
      */
+    if (len > startpos && array_line[curchunk][len - 1] == '\r') {
+      len--;
+    }
     array_line[curchunk][len] = '\0';
 
     if (res) {
@@ -415,11 +419,7 @@ static int get_array_block(char *term) {
             reinterpret_cast<char *>(DMALLOC(MAXCHUNK, TAG_COMPILER, "array_block"));
         len = 0;
       }
-      // Remove trailing CR
-      if (array_line[curchunk][len - 1] == '\r') {
-        array_line[curchunk][len - 1] = '\0';
-        len = len - 1;
-      }
+
       /*
        * header
        */
@@ -487,6 +487,9 @@ static int get_text_block(char *term) {
     /*
      * null terminate current chunk
      */
+    if (len > startpos && text_line[curchunk][len - 1] == '\r') {
+      len--;
+    }
     text_line[curchunk][len] = '\0';
 
     if (res) {
@@ -628,7 +631,7 @@ static int get_text_block(char *term) {
 // to confirm the match can't be extended), so by the time this runs, `outp`
 // may already be one byte past `last_nl + 1` -- an exact-equality check
 // would be skipped entirely, causing refill_buffer() to never fire.
-void lpc_lex_newline() {
+void lpc_lex_newline(void *yyscanner) {
   current_line++;
   total_lines++;
   if (outp >= last_nl + 1) {
@@ -697,7 +700,6 @@ void handle_pragma(char *str) {
 
 char *show_error_context() {
   static char buf[60];
-  extern int yychar;
   char sub_context[25];
   char *yyp, *yyp2;
   int len;
@@ -707,11 +709,10 @@ char *show_error_context() {
     return buf;
   }
 
-  if (yychar == -1) {
-    strcpy(buf, " around ");
-  } else {
-    strcpy(buf, " before ");
-  }
+  // With a pure Bison parser (%define api.pure full), yychar is local to
+  // yyparse() and no longer available as a global, so the "around" vs
+  // "before" distinction this used to make can't be reconstructed here.
+  strcpy(buf, " before ");
   yyp = outp;
   yyp2 = sub_context;
   len = 20;
@@ -913,10 +914,7 @@ static void refill_buffer() {
   }
 }
 
-// Non-static: set directly by lex.l's SC_FUNC_OPEN identifier rule (Phase 6)
-// before calling lpc_lex_resolve_identifier(), same as the legacy "(:name"
-// accumulation loop used to do.
-int function_flag = 0;
+
 
 void push_function_context() {
   function_context_t *fc;
@@ -945,9 +943,9 @@ void pop_function_context() {
   last_function_context--;
 }
 
-static int old_func() {
+static int old_func(void *yyscanner) {
   add_input(" ");
-  add_input(yytext);
+  add_input(yyget_text(yyscanner));
   push_function_context();
   return L_FUNCTION_OPEN;
 }
@@ -960,24 +958,180 @@ static int old_func() {
 // lex.l's identifier rule and the '(' case in yylex_inner() so both paths
 // -- Flex-driven and the legacy "(: name" lookahead -- agree on lookup
 // semantics.
-int lpc_lex_resolve_identifier() {
+int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, void *yyscanner) {
+  compiler_context_t *yyextra = reinterpret_cast<compiler_context_t *>(yyget_extra(yyscanner));
+  if (current_session) {
+    std::string text = yyget_text(yyscanner);
+
+    // Blue-paint check: this occurrence is a guarded self-reference that a
+    // previous expansion left literal in spliced text (see lex.h's
+    // pending_plain comment) -- consume one count and resolve it as a
+    // plain identifier, never as a macro.
+    auto pending = yyextra->pending_plain.find(text);
+    if (pending != yyextra->pending_plain.end() && pending->second > 0) {
+      if (--pending->second == 0) {
+        yyextra->pending_plain.erase(pending);
+      }
+    } else {
+    auto it = current_session->macros.find(text);
+    if (it != current_session->macros.end()) {
+      const PpMacro& m = it->second;
+      if (!m.is_function_like) {
+        // __LINE__/__FILE__/__DIR__ expand from the live scan position; any
+        // other object-like macro's body is fully text-expanded (with this
+        // name as the guard for self-reference termination, and each
+        // guarded occurrence left literal in the result counted into
+        // pending_plain) and spliced into the ring buffer for rescanning.
+        //
+        // NOT a yy_scan_string()/yypush_buffer_state() buffer push (tried,
+        // reverted): the expansion can textually contain a REFERENCE to a
+        // function-like macro without its call parens immediately
+        // following in the SAME body (e.g. `#define A B` where `B` is
+        // itself `#define B(x) ...` -- lpc_lex_expand_string() leaves a
+        // bare, unexpandable "B" as literal text in that case, see its
+        // `result += id;` fallback). When Flex later re-matches that "B"
+        // as an identifier and it turns out to need a function-like
+        // expansion, lpc_lex_resolve_identifier()'s function-like path
+        // below reads raw bytes directly from `outp`/the ring buffer to
+        // find and collect its "(args)" -- the SAME category of
+        // raw-stream reader as heredocs. That only produces the right
+        // bytes when `outp` genuinely reflects "what Flex will scan next"
+        // -- true for the ring buffer, but NOT true once a separate
+        // yy_scan_string() buffer is the one actually feeding Flex: outp
+        // would stay frozen at wherever the ORIGINAL file happened to be,
+        // and the collector would silently read and consume the wrong
+        // file's bytes as if they were this macro's arguments, corrupting
+        // scanning for the rest of the compile. Splicing into the ring
+        // buffer keeps `outp` and "what Flex scans next" the same thing,
+        // which the arg collector depends on.
+        std::string expanded;
+        if (!lpc_lex_builtin_macro(text, &expanded)) {
+          expanded = lpc_lex_expand_string(m.body, {text}, false, &yyextra->pending_plain);
+        }
+
+        lpc_lex_flush_lookahead(yyscanner);
+        add_input(expanded.c_str());
+        return yylex(yylval_param, yyscanner);
+      } else {
+        lpc_lex_flush_lookahead(yyscanner);
+        char* saved_outp = outp;
+        int saved_line = current_line;
+        int saved_total = total_lines;
+
+        auto get_next_char = [&]() -> char {
+          if (outp >= last_nl + 1) {
+            refill_buffer();
+          }
+          if (*outp == '\0' || static_cast<unsigned char>(*outp) == LEX_EOF) {
+            return '\0';
+          }
+          return *outp++;
+        };
+
+        char c;
+        while (true) {
+          c = get_next_char();
+          if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+            if (c == '\n') {
+              current_line++;
+              total_lines++;
+            }
+            continue;
+          }
+          break;
+        }
+
+        if (c == '(') {
+          std::vector<std::string> args;
+          std::string arg;
+          int depth = 0;
+          char inq = 0;
+          while (true) {
+            char ch = get_next_char();
+            if (ch == '\0') {
+              lexerror("End of file in macro arguments");
+              break;
+            }
+            if (ch == '\n') {
+              current_line++;
+              total_lines++;
+            }
+            if (inq) {
+              if (ch == '\\') {
+                arg += ch;
+                char ch2 = get_next_char();
+                if (ch2 == '\0') {
+                  lexerror("End of file in macro arguments");
+                  break;
+                }
+                if (ch2 == '\n') {
+                  current_line++;
+                  total_lines++;
+                }
+                arg += ch2;
+                continue;
+              }
+              arg += ch;
+              if (ch == inq) inq = 0;
+            } else if (ch == '"' || ch == '\'' || ch == '`') {
+              inq = ch;
+              arg += ch;
+            } else if (ch == '(') {
+              depth++;
+              arg += ch;
+            } else if (ch == ')') {
+              if (depth == 0) {
+                args.push_back(std::string(trim(arg)));
+                break;
+              }
+              depth--;
+              arg += ch;
+            } else if (ch == ',' && depth == 0) {
+              args.push_back(std::string(trim(arg)));
+              arg.clear();
+            } else {
+              arg += ch;
+            }
+          }
+
+          std::vector<std::string> expanded_args;
+          for (const auto& a : args) {
+            expanded_args.push_back(lpc_lex_expand_string(a, {}));
+          }
+          std::string subst = substitute(m.body, m.params, expanded_args);
+          std::string expanded =
+              lpc_lex_expand_string(subst, {text}, false, &yyextra->pending_plain);
+
+          lpc_lex_flush_lookahead(yyscanner);
+          add_input(expanded.c_str());
+          return yylex(yylval_param, yyscanner);
+        } else {
+          outp = saved_outp;
+          current_line = saved_line;
+          total_lines = saved_total;
+        }
+      }
+    }
+    }
+  }
+
   ident_hash_elem_t *ihe;
-  if ((ihe = lookup_ident(yytext))) {
+  if ((ihe = lookup_ident(yyget_text(yyscanner)))) {
     if (ihe->token & IHE_RESWORD) {
-      if (function_flag) {
-        function_flag = 0;
-        add_input(yytext);
+      if (yyextra->function_flag) {
+        yyextra->function_flag = 0;
+        add_input(yyget_text(yyscanner));
         push_function_context();
         return L_FUNCTION_OPEN;
       }
-      yylval.number = ihe->sem_value;
+      yylval_param->number = ihe->sem_value;
       return ihe->token & TOKEN_MASK;
     }
-    if (function_flag) {
+    if (yyextra->function_flag) {
       int val;
       unsigned char c;
 
-      function_flag = 0;
+      yyextra->function_flag = 0;
       while ((c = *outp++) == ' ') {
         ;
       }
@@ -991,37 +1145,37 @@ int lpc_lex_resolve_identifier() {
        * wrong.  But that is almost pathological.
        */
       if (c != ':' && c != ',') {
-        return old_func();
+        return old_func(yyscanner);
       }
       if ((val = ihe->dn.local_num) >= 0) {
         if (c == ',') {
-          return old_func();
+          return old_func(yyscanner);
         }
-        yylval.number = (val << 8) | FP_L_VAR;
+        yylval_param->number = (val << 8) | FP_L_VAR;
       } else if ((val = ihe->dn.global_num) >= 0) {
         if (c == ',') {
-          return old_func();
+          return old_func(yyscanner);
         }
-        yylval.number = (val << 8) | FP_G_VAR;
+        yylval_param->number = (val << 8) | FP_G_VAR;
       } else if ((val = ihe->dn.function_num) >= 0) {
-        yylval.number = (val << 8) | FP_LOCAL;
+        yylval_param->number = (val << 8) | FP_LOCAL;
       } else if ((val = ihe->dn.simul_num) >= 0) {
-        yylval.number = (val << 8) | FP_SIMUL;
+        yylval_param->number = (val << 8) | FP_SIMUL;
       } else if ((val = ihe->dn.efun_num) >= 0) {
-        yylval.number = (val << 8) | FP_EFUN;
+        yylval_param->number = (val << 8) | FP_EFUN;
       } else {
-        return old_func();
+        return old_func(yyscanner);
       }
       return L_NEW_FUNCTION_OPEN;
     }
-    yylval.ihe = ihe;
+    yylval_param->ihe = ihe;
     return L_DEFINED_NAME;
   }
-  if (function_flag) {
-    function_flag = 0;
+  if (yyextra->function_flag) {
+    yyextra->function_flag = 0;
     add_input("(:");
   }
-  yylval.string = scratch_copy(yytext);
+  yylval_param->string = scratch_copy(yyget_text(yyscanner));
   return L_IDENTIFIER;
 }
 
@@ -1038,7 +1192,7 @@ int lpc_lex_resolve_identifier() {
 // runtime error() does), so those paths must resume the top-level scanner
 // via `return yylex()` rather than `break`ing a switch that no longer
 // exists here.
-int parseHeredoc(const char *terminator, int is_array) {
+int parseHeredoc(const char *terminator, int is_array, union YYSTYPE *yylval_param, void *yyscanner) {
   int rc;
 
   if (is_array) {
@@ -1065,12 +1219,12 @@ int parseHeredoc(const char *terminator, int is_array) {
       if (!u8_validate(&p)) {
         lexerror("Bad UTF-8 string in string block");
         outp = p;
-        return yylex();
+        return yylex(yylval_param, yyscanner);
       }
       /*
        * make string token and clean up
        */
-      yylval.string = scratch_copy_string(outp);
+      yylval_param->string = scratch_copy_string(outp);
 
       n = strlen(outp) + 1;
       outp += n;
@@ -1081,7 +1235,7 @@ int parseHeredoc(const char *terminator, int is_array) {
       return YYEOF;
     } else { /* if (rc == -2) */
       lexerror("Text block exceeded maximum length");
-      return yylex();
+      return yylex(yylval_param, yyscanner);
     }
   }
 }
@@ -1091,13 +1245,13 @@ int parseHeredoc(const char *terminator, int is_array) {
 // did. Called both from yylex_inner()'s remaining catch-all default case
 // and from lex.l-triggered helpers whose own lookahead determined the
 // input isn't well-formed (e.g. a '#' not at the start of a line).
-int lpc_lex_badlex(unsigned char c) {
+int lpc_lex_badlex(unsigned char c, void *yyscanner) {
 #ifdef DEBUG
   char buff[100];
 
   sprintf(buff, "Illegal character (hex %02x) '%c'", static_cast<unsigned>(c),
           static_cast<char>(c));
-  yyerror(buff);
+  yyerror(yyscanner, buff);
 #endif
   return ' ';
 }
@@ -1108,7 +1262,7 @@ int lpc_lex_badlex(unsigned char c) {
 // looping internally the way the original switch-based version did).
 // Otherwise this is genuine end of the top-level file: rewinds `outp` back
 // onto the sentinel (matching the original's `outp--`) and returns -1.
-int parseEofOrIncludePop() {
+int parseEofOrIncludePop(union YYSTYPE *yylval_param, void *yyscanner) {
   if (inctop) {
     incstate_t *p;
 
@@ -1143,14 +1297,19 @@ int parseEofOrIncludePop() {
     if (outp == last_nl + 1) {
       refill_buffer();
     }
-    return yylex();
+    return yylex(yylval_param, yyscanner);
   }
 
   outp--;
+  if (current_session && !current_session->conds.empty()) {
+    yyerror("Missing #endif");
+    // Recover the session: leaving the conditional stack non-empty would
+    // make lpc_lex_emitting() false forever, silently skipping ALL input
+    // of any later chunk fed through the same (e.g. REPL) session.
+    current_session->conds.clear();
+  }
   return -1;
 }
-
-extern YYSTYPE yylval;
 
 void end_new_file() {
   while (inctop) {
@@ -1182,64 +1341,19 @@ void end_new_file() {
   }
 }
 
-void start_new_file(std::unique_ptr<LexStream> stream) {
+void start_new_file(std::unique_ptr<LexStream> stream, void *yyscanner,
+                     std::shared_ptr<LexerSession> session) {
   if (!main_filename && current_file) {
     main_filename = make_shared_string(current_file);
   }
-  // 1. Read the incoming stream fully into a std::string
-  std::string source_code;
-  char buf[8192];
-  size_t n;
-  while ((n = stream->read(buf, sizeof(buf))) > 0) {
-    source_code.append(buf, n);
+
+  if (!session) {
+    session = LexerSession::make_session();
   }
-  stream->close();
+  current_session = std::move(session);
+  current_stream = std::move(stream);
 
-  // 2. Prepend global include file if configured
-  std::string merged_code;
-  auto glf = CONFIG_STR(__GLOBAL_INCLUDE_FILE__);
-  if (glf != nullptr && strlen(glf) > 0) {
-    merged_code = "#include ";
-    merged_code += glf;
-    merged_code += "\n#line 1 \"";
-    if (current_file) {
-      merged_code += current_file;
-    } else {
-      merged_code += "unknown";
-    }
-    merged_code += "\"\n";
-  }
-  merged_code += source_code;
-
-  // 3. Run the preprocessor
-  std::string preprocessed;
-  std::vector<std::string> prep_errors;
-  {
-    LpcPreprocessor preprocessor(std::move(merged_code), current_file);
-    preprocessed = preprocessor.preprocess();
-    prep_errors = preprocessor.errors();
-  }
-
-  // 4. Report preprocessor errors/warnings to the compiler
-  for (const auto& err : prep_errors) {
-    size_t colon = err.find(':');
-    if (colon != std::string::npos) {
-      int err_line = atoi(err.substr(0, colon).c_str());
-      std::string msg = err.substr(colon + 2);
-      int saved_line = current_line;
-      current_line = err_line;
-      yyerror(msg.c_str());
-      current_line = saved_line;
-    } else {
-      yyerror(err.c_str());
-    }
-  }
-
-  // 5. Feed the preprocessed output to the lexer
-  current_stream = std::make_unique<StringLexStream>(std::move(preprocessed));
-
-  lex_fatal = 0;
-  template_nesting = 0;
+  lpc_lex_reset(yyscanner);
   last_function_context = -1;
   current_function_context = nullptr;
   cur_lbuf = &head_lbuf;
@@ -1250,10 +1364,41 @@ void start_new_file(std::unique_ptr<LexStream> stream) {
   current_line = 1;
   current_line_base = 0;
   current_line_saved = 0;
-  function_flag = 0;
+  reinterpret_cast<compiler_context_t *>(yyget_extra(yyscanner))->function_flag = 0;
 
-  refill_buffer();
+  // Global include file: pushed exactly like a real `#include "..."` /
+  // `#include <...>` appearing before the file's first line, via the same
+  // include-stack push the directive dispatcher uses (the config value
+  // already carries its quoting/angle delimiters). Legacy start_new_file
+  // did the same via handle_include(). The push's preconditions hold here:
+  // outp is the (empty) parent buffer's resume point with the '\n'
+  // sentinel just planted before it, and lpc_lex_handle_include() ends
+  // with the refill_buffer() that loads the include's first chunk.
+  const char *glf = CONFIG_STR(__GLOBAL_INCLUDE_FILE__);
+  if (glf == nullptr || strlen(glf) == 0 || !lpc_lex_handle_include(glf)) {
+    refill_buffer();
+  }
 }
+
+// ---------------------------------------------------------------------------
+// LexTokenStream
+// ---------------------------------------------------------------------------
+
+LexTokenStream::LexTokenStream() : ctx_(std::make_unique<compiler_context_t>()) {
+  yylex_init_extra(ctx_.get(), &scanner_);
+}
+
+LexTokenStream::~LexTokenStream() {
+  if (scanner_) {
+    yylex_destroy(scanner_);
+  }
+}
+
+void LexTokenStream::load(std::unique_ptr<LexStream> stream, std::shared_ptr<LexerSession> session) {
+  start_new_file(std::move(stream), scanner_, std::move(session));
+}
+
+int LexTokenStream::next(union YYSTYPE *yylval_param) { return yylex(yylval_param, scanner_); }
 
 const char *query_instr_name(int instr) {
   const char *name;
@@ -1717,7 +1862,7 @@ void init_identifiers() {
 // back to the raw-outp-reading legacy scanner (yylex_inner()); a bulk read
 // would let refill_buffer() relocate the ring mid-fetch, which the simple
 // rewind arithmetic cannot account for.
-extern "C" int lpc_lex_yy_input(char *buf, int max_size) {
+extern "C" int lpc_lex_yy_input(char *buf, int max_size, void * /*yyscanner*/) {
   if (max_size <= 0) return 0;
   unsigned char c = static_cast<unsigned char>(*outp);
   if (c == LEX_EOF) return 0;
@@ -2030,6 +2175,13 @@ void set_inc_list(const char *list) {
 }
 
 void init_include_path() {
+    // No VM context: keep the config-file include path (inc_list) as-is --
+    // there is no master object to ask, and no eval stack to push onto.
+    if (!compiler_vm_context) {
+        inc_path = inc_list;
+        return;
+    }
+
     push_malloced_string(add_slash(current_file));
     svalue_t *ret = safe_apply_master_ob(APPLY_GET_INCLUDE_PATH, 1);
 
@@ -2114,4 +2266,69 @@ std::pair<int, std::string> inc_open(std::string_view name, bool check_local) {
         }
     }
     return {-1, ""};
+}
+
+bool lpc_lex_handle_include(std::string_view rest) {
+  std::string name_expr(trim(rest));
+  if (name_expr.empty()) {
+    lexerror("Bad #include directive");
+    return false;
+  }
+  if (name_expr[0] != '"' && name_expr[0] != '<') {
+    name_expr = lpc_lex_expand_string(name_expr);
+    name_expr = std::string(trim(name_expr));
+  }
+  if (name_expr.size() >= 2 && (name_expr[0] == '"' || name_expr[0] == '<')) {
+    char delim = name_expr[0] == '"' ? '"' : '>';
+    std::string filename(name_expr.substr(1, name_expr.size() - 2));
+
+    if (incnum >= MAX_INCLUDE_DEPTH) {
+      lexerror("#include nested too deeply");
+      return false;
+    }
+
+    auto [fd, resolved] = inc_open(filename, delim == '"');
+    if (fd != -1) {
+      // Push the parent's scan state and switch to the included file --
+      // the same sequence (including the current_line_base/save_file_info
+      // bookkeeping) as the legacy scanner's handle_include(): the pop side
+      // (parseEofOrIncludePop) is an unmodified copy of the legacy pop, so
+      // this push must mirror the legacy push exactly for the per-file
+      // line-number arithmetic to close.
+      //
+      // Preconditions established by lex.l's directive rule before
+      // dispatching: `outp` has been synchronized (lookahead rewound) and
+      // the directive's terminating newline has been consumed and counted,
+      // so `outp` is the parent's exact resume point and outp[-1] is that
+      // newline -- refill_buffer()'s include branch uses it as the leading
+      // sentinel when it splices the included file's content in below.
+      incstate_t *is = (incstate_t *)DMALLOC(sizeof(incstate_t), TAG_COMPILER, "lpc_lex_handle_include");
+      is->stream = current_stream.release();
+      is->line = current_line;
+      is->file = current_file;
+      is->file_id = current_file_id;
+      is->last_nl = last_nl;
+      is->outp = outp;
+      is->next = inctop;
+      inctop = is;
+      incnum++;
+
+      current_line--;
+      save_file_info(current_file_id, current_line - current_line_saved);
+      current_line_base += current_line;
+      current_line_saved = 0;
+      current_line = 1;
+      current_file = make_shared_string(resolved.c_str());
+      current_file_id = add_program_file(resolved.c_str(), 0);
+      current_stream = std::make_unique<FileLexStream>(fd);
+      refill_buffer();
+      return true;
+    } else {
+      lexerror(("Cannot #include " + filename).c_str());
+      return false;
+    }
+  } else {
+    lexerror("Bad #include directive");
+    return false;
+  }
 }

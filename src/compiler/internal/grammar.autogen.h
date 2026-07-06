@@ -122,7 +122,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 150 "$REPO_ROOT$/src/compiler/internal/grammar.y"
+#line 154 "$REPO_ROOT$/src/compiler/internal/grammar.y"
 
   LPC_INT number;              /* integers, opcodes, type flags */
   LPC_FLOAT real;              /* floating-point literals */
@@ -156,10 +156,21 @@ typedef union YYSTYPE YYSTYPE;
 #endif
 
 
-extern YYSTYPE yylval;
 
 
-int yyparse (void);
+#ifndef YYPUSH_MORE_DEFINED
+# define YYPUSH_MORE_DEFINED
+enum { YYPUSH_MORE = 4 };
+#endif
+
+typedef struct yypstate yypstate;
+
+
+int yypush_parse (yypstate *ps,
+                  int pushed_char, YYSTYPE const *pushed_val, void* yyscanner);
+
+yypstate *yypstate_new (void);
+void yypstate_delete (yypstate *ps);
 
 
 #endif /* !YY_YY_GRAMMAR_AUTOGEN_H_INCLUDED  */

@@ -584,6 +584,73 @@ object_t *load_object(const char *lname, int callcreate) {
   return ob;
 }
 
+// Compile+load an object entirely in memory, with no backing .c file on
+// disk -- for tools (lpcshell) that need to run a snippet of LPC source
+// without writing it to the mudlib first. Deliberately a stripped-down
+// sibling of load_object() above, not a code path load_object() itself
+// takes: skips the on-disk existence check, the virtual-object fallback,
+// and the iterative "#inherit an unloaded file" reload dance (an
+// in-memory object has no filename for that dance to reload from --
+// #inherit is simply unsupported here).
+object_t *load_object_from_source(const std::string &source, const char *virtual_name,
+                                   int callcreate) {
+  auto stream = std::make_unique<StringLexStream>(source);
+  save_command_giver(command_giver);
+  program_t *prog = compile_file(std::move(stream), virtual_name);
+  restore_command_giver();
+
+  if (inherit_file) {
+    FREE(inherit_file);
+    inherit_file = nullptr;
+    if (prog) {
+      free_prog(&prog);
+    }
+    error("#inherit is not supported when compiling from in-memory source.\n");
+  }
+
+  if (num_parse_error > 0 || prog == nullptr) {
+    if (prog) {
+      free_prog(&prog);
+    }
+    error("Error compiling in-memory source for '/%s'.\n", virtual_name);
+  }
+
+  object_t *ob = get_empty_object(prog->num_variables_total);
+  SETOBNAME(ob, alloc_cstring(virtual_name, "load_object_from_source"));
+  SET_TAG(ob->obname, TAG_OBJ_NAME);
+  ob->prog = prog;
+  ob->flags |= O_WILL_RESET;
+  ob->next_all = obj_list;
+  ob->prev_all = nullptr;
+  if (obj_list) {
+    obj_list->prev_all = ob;
+  }
+  obj_list = ob;
+  ObjectTable::instance().insert(ob->obname, ob);
+
+  save_command_giver(command_giver);
+  push_object(ob);
+  svalue_t *mret = apply_master_ob(APPLY_VALID_OBJECT, 1);
+  if (mret && !MASTER_APPROVED(mret)) {
+    destruct_object(ob);
+    restore_command_giver();
+    error("master object: %s() denied permission to load in-memory object '/%s'.\n",
+          applies_table[APPLY_VALID_OBJECT], virtual_name);
+  }
+
+  if (init_object(ob) && callcreate) {
+    call_create(ob, 0);
+  }
+  if (!(ob->flags & O_DESTRUCTED) && function_exists(APPLY_CLEAN_UP, ob, 1)) {
+    ob->flags |= O_WILL_CLEAN_UP;
+  }
+  restore_command_giver();
+
+  ob->load_time = get_current_time();
+
+  return ob;
+}
+
 static char *make_new_name(const char *str) {
   static unsigned int i;
   char *p = reinterpret_cast<char *>(DMALLOC(strlen(str) + 12, TAG_OBJ_NAME, "make_new_name"));

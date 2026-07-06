@@ -17,13 +17,13 @@
 #include "icode.h"
 #include "lex.h"
 #include "compiler/internal/lexer_utils.h"
-#include "compiler/internal/preprocessor.h"
 #include "compiler/internal/grammar_rules.h"
 #include "grammar.autogen.h"
 #include "scratchpad.h"
 #include "symbol.h"
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "vm/internal/base/machine.h"  // for error(), FIXME
 
@@ -48,7 +48,7 @@ extern object_t *simul_efun_ob;
 extern svalue_t *safe_apply_master_ob(int, int);
 
 static void clean_parser(void);
-static void prolog(std::unique_ptr<LexStream>, const char * /*name*/);
+static void prolog(std::unique_ptr<LexStream>, const char * /*name*/, LexTokenStream &token_stream);
 static program_t *epilog(void);
 static void show_overload_warnings(void);
 
@@ -104,6 +104,13 @@ unsigned short *prog_flags, *comp_sorted_funcs;
 
 char *prog_code;
 char *prog_code_max;
+
+// See compiler.h: null (the boot-time/unit-test default) means the compiler
+// must never touch the VM (eval-stack pushes, master applies, mudlib stats);
+// compile_file() sets it from its vm_context parameter for the compile's
+// duration and restores it on the way out.
+vm_context_t g_driver_vm_context;
+vm_context_t *compiler_vm_context = nullptr;
 
 program_t NULL_program = {nullptr};
 
@@ -1990,9 +1997,15 @@ void yyerror(const char *fmt, ...) {
   }
   smart_log(current_file, current_line, buf, 0);
 #ifdef PACKAGE_MUDLIB_STATS
-  add_errors_for_file(current_file, 1);
+  if (compiler_vm_context) {
+    add_errors_for_file(current_file, 1);
+  }
 #endif
   num_parse_error++;
+}
+
+void yyerror(void *yyscanner, const char *msg) {
+  yyerror("%s", msg);
 }
 
 void yywarn(const char *fmt, ...) {
@@ -2014,8 +2027,8 @@ void yywarn(const char *fmt, ...) {
 /*
  * Compile an LPC file.
  */
-program_t *compile_file(std::unique_ptr<LexStream> stream, const char *name) {
-  int yyparse(void);
+program_t *compile_file(std::unique_ptr<LexStream> stream, const char *name,
+                        vm_context_t *vm_context) {
   static int guard = 0;
   program_t *prog;
   extern int func_present;
@@ -2029,20 +2042,181 @@ program_t *compile_file(std::unique_ptr<LexStream> stream, const char *name) {
   }
   guard = 1;
 
+  // Save all compiler globals to support reentrancy/recursive compile
+  vm_context_t *saved_vm_context = compiler_vm_context;
+  compiler_vm_context = vm_context;
+  int saved_current_line = current_line;
+  int saved_current_line_base = current_line_base;
+  int saved_current_line_saved = current_line_saved;
+  int saved_total_lines = total_lines;
+  const char *saved_current_file = current_file;
+  int saved_current_file_id = current_file_id;
+  int saved_pragmas = pragmas;
+  int saved_num_parse_error = num_parse_error;
+  char *saved_outp = outp;
+  char *saved_last_nl = last_nl;
+  int saved_lex_fatal = lex_fatal;
+
+  int saved_context = context;
+  int saved_num_refs = num_refs;
+  int saved_func_present = func_present;
+
+  mem_block_t saved_mem_block[NUMAREAS];
+  memcpy(saved_mem_block, mem_block, sizeof(mem_block));
+
+  parse_node_t *saved_comp_trees[NUMTREES];
+  memcpy(saved_comp_trees, comp_trees, sizeof(comp_trees));
+
+  int saved_comp_last_inherited = comp_last_inherited;
+  int saved_current_tree = current_tree;
+  function_context_t saved_function_context = function_context;
+  int saved_exact_types = exact_types;
+  int saved_global_modifiers = global_modifiers;
+  int saved_current_type = current_type;
+  int saved_var_defined = var_defined;
+
+  unsigned short *saved_comp_def_index_map = comp_def_index_map;
+  unsigned short *saved_func_index_map = func_index_map;
+  unsigned short *saved_prog_flags = prog_flags;
+  unsigned short *saved_comp_sorted_funcs = comp_sorted_funcs;
+
+  char *saved_prog_code = prog_code;
+  char *saved_prog_code_max = prog_code_max;
+  program_t *saved_prog = ::prog;
+
+  short saved_string_idx[0x100];
+  memcpy(saved_string_idx, string_idx, sizeof(string_idx));
+
+  unsigned char saved_string_tags[0x20];
+  memcpy(saved_string_tags, string_tags, sizeof(string_tags));
+
+  short saved_freed_string = freed_string;
+
+  int saved_current_number_of_locals = current_number_of_locals;
+  int saved_max_num_locals = max_num_locals;
+
+  // Save the original pointers and sizes of local variable scratchpads
+  unsigned short *saved_type_of_locals = type_of_locals;
+  local_info_t *saved_locals = locals;
+  int saved_type_of_locals_size = type_of_locals_size;
+  int saved_locals_size = locals_size;
+  unsigned short *saved_type_of_locals_ptr = type_of_locals_ptr;
+  local_info_t *saved_locals_ptr = locals_ptr;
+
+  // Allocate fresh, isolated local variable scratchpads for this compilation level
+  auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
+  type_of_locals = reinterpret_cast<unsigned short *>(
+      DCALLOC(max_local_variables, sizeof(unsigned short), TAG_LOCALS, "compile_file:1"));
+  locals = reinterpret_cast<local_info_t *>(
+      DCALLOC(max_local_variables, sizeof(local_info_t), TAG_LOCALS, "compile_file:2"));
+  type_of_locals_size = max_local_variables;
+  locals_size = max_local_variables;
+  type_of_locals_ptr = type_of_locals;
+  locals_ptr = locals;
+  current_number_of_locals = 0;
+  max_num_locals = 0;
+
   {
     // make sure we use the C locale during parsing
     auto *current_locale = setlocale(LC_ALL, "C");
-    DEFER { setlocale(LC_ALL, current_locale); };
+    DEFER {
+      setlocale(LC_ALL, current_locale);
+
+      // Clean up parser if compile aborted via C++ Exception
+      if (std::uncaught_exceptions() > 0) {
+        clean_parser();
+      }
+
+      // Free the isolated scratchpads allocated for this level
+      FREE(type_of_locals);
+      FREE(locals);
+
+      // Restore all compiler globals on exit/exception unwinding
+      current_line = saved_current_line;
+      current_line_base = saved_current_line_base;
+      current_line_saved = saved_current_line_saved;
+      total_lines = saved_total_lines;
+      current_file = saved_current_file;
+      current_file_id = saved_current_file_id;
+      pragmas = saved_pragmas;
+      num_parse_error = saved_num_parse_error;
+      outp = saved_outp;
+      last_nl = saved_last_nl;
+      lex_fatal = saved_lex_fatal;
+
+      context = saved_context;
+      num_refs = saved_num_refs;
+      func_present = saved_func_present;
+
+      memcpy(mem_block, saved_mem_block, sizeof(mem_block));
+      memcpy(comp_trees, saved_comp_trees, sizeof(comp_trees));
+
+      comp_last_inherited = saved_comp_last_inherited;
+      current_tree = saved_current_tree;
+      function_context = saved_function_context;
+      exact_types = saved_exact_types;
+      global_modifiers = saved_global_modifiers;
+      current_type = saved_current_type;
+      var_defined = saved_var_defined;
+
+      comp_def_index_map = saved_comp_def_index_map;
+      func_index_map = saved_func_index_map;
+      prog_flags = saved_prog_flags;
+      comp_sorted_funcs = saved_comp_sorted_funcs;
+
+      prog_code = saved_prog_code;
+      prog_code_max = saved_prog_code_max;
+      ::prog = saved_prog;
+
+      memcpy(string_idx, saved_string_idx, sizeof(string_idx));
+      memcpy(string_tags, saved_string_tags, sizeof(string_tags));
+      freed_string = saved_freed_string;
+
+      current_number_of_locals = saved_current_number_of_locals;
+      max_num_locals = saved_max_num_locals;
+
+      type_of_locals = saved_type_of_locals;
+      locals = saved_locals;
+      type_of_locals_size = saved_type_of_locals_size;
+      locals_size = saved_locals_size;
+      type_of_locals_ptr = saved_type_of_locals_ptr;
+      locals_ptr = saved_locals_ptr;
+
+      compiler_vm_context = saved_vm_context;
+      guard = 0;
+    };
+
+    // Owns the reentrant scanner (RAII) and pulls tokens from whatever
+    // source prolog() below points it at (auto-preprocessed on the way).
+    LexTokenStream token_stream;
 
     symbol_start(name);
-    prolog(std::move(stream), name);
+    prolog(std::move(stream), name, token_stream);
     func_present = 0;
-    yyparse();
+
+    // Drive the grammar via Bison's push-parser API rather than a
+    // generated yyparse()/yypull_parse() pull loop -- grammar.y is push-only
+    // (%define api.push-pull push) so those aren't even generated anymore.
+    // For a whole-file compile this loop always runs to completion in one
+    // call (every token is available immediately), but it's the same
+    // token-at-a-time next()+yypush_parse() shape a future incremental/REPL
+    // driver needs, just without ever pausing between tokens.
+    auto pstate = std::unique_ptr<yypstate, void (*)(yypstate *)>(yypstate_new(), yypstate_delete);
+    if (!pstate) {
+      yyerror(token_stream.scanner(), "memory exhausted");
+    } else {
+      int push_status;
+      do {
+        YYSTYPE yylval;
+        int token = token_stream.next(&yylval);
+        push_status = yypush_parse(pstate.get(), token, &yylval, token_stream.scanner());
+      } while (push_status == YYPUSH_MORE);
+    }
+
     symbol_end();
     prog = epilog();
   }
 
-  guard = 0;
   return prog;
 }
 
@@ -2512,7 +2686,7 @@ static program_t *epilog(void) {
 /*
  * Initialize the environment that the compiler needs.
  */
-static void prolog(std::unique_ptr<LexStream> stream, const char *name) {
+static void prolog(std::unique_ptr<LexStream> stream, const char *name, LexTokenStream &token_stream) {
   int i;
 
   function_context.num_parameters = -1;
@@ -2553,7 +2727,7 @@ static void prolog(std::unique_ptr<LexStream> stream, const char *name) {
     copy_structures(simul_efun_ob->prog);
   }
 
-  start_new_file(std::move(stream));
+  token_stream.load(std::move(stream));
 }
 
 /*
