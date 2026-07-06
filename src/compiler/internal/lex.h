@@ -208,7 +208,10 @@ void init_num_args(void);
 const char *query_instr_name(int);
 char *get_f_name(int);
 struct LexerSession;
-void start_new_file(std::unique_ptr<LexStream> stream, void *yyscanner,
+// Point the scanner at new top-level source TEXT (copied into a native
+// in-memory Flex base buffer via lpc_lex_set_source; a missing final
+// newline is appended). See LexTokenStream::load.
+void start_new_file(std::string_view source, void *yyscanner,
                      std::shared_ptr<LexerSession> session = nullptr);
 void end_new_file(void);
 int lookup_predef(const char *);
@@ -223,7 +226,7 @@ void init_identifiers(void);
 #ifdef DEBUGMALLOC_EXTENSIONS
 
 #endif
-// Read one character through Flex itself (its buffer, then YY_INPUT) --
+// Read one character through Flex itself (its in-memory buffers) --
 // the official mechanism for mid-rule raw reads (heredoc bodies,
 // macro-argument collection), replacing direct `outp` access. Returns 0
 // at end of input (or a genuine NUL, which LPC source treats the same).
@@ -271,6 +274,9 @@ enum LpcPushedBufferKind {
 // clobbers the live top slot (ASan-verified UAF, see
 // this file's git history / the compiler README).
 void lpc_lex_push_string_buffer(const char *text, size_t len, int kind, void *yyscanner);
+// Install `text` as THE base buffer (main-file content; yy_scan_bytes
+// copies). Defined in lex.l's trailer (touches the generated buffer API).
+void lpc_lex_set_source(const char *text, size_t len, void *yyscanner);
 
 // Pop one pushed buffer (kind-dispatched bookkeeping + yypop_buffer_state).
 // Callers must check lpc_lex_pushed_depth() > 0 first.

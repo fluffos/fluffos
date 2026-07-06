@@ -48,7 +48,7 @@ extern object_t *simul_efun_ob;
 extern svalue_t *safe_apply_master_ob(int, int);
 
 static void clean_parser(void);
-static void prolog(std::unique_ptr<LexStream>, const char * /*name*/, LexTokenStream &token_stream);
+static void prolog(std::string_view source, const char * /*name*/, LexTokenStream &token_stream);
 static program_t *epilog(void);
 static void show_overload_warnings(void);
 
@@ -2243,7 +2243,7 @@ void yywarn(const char *fmt, ...) {
 /*
  * Compile an LPC file.
  */
-program_t *compile_file(std::unique_ptr<LexStream> stream, const char *name,
+program_t *compile_file(std::string_view source, const char *name,
                         vm_context_t *vm_context) {
   static int guard = 0;
   program_t *prog;
@@ -2421,7 +2421,7 @@ program_t *compile_file(std::unique_ptr<LexStream> stream, const char *name,
     LexTokenStream token_stream;
 
     symbol_start(name);
-    prolog(std::move(stream), name, token_stream);
+    prolog(source, name, token_stream);
     func_present = 0;
 
     // Drive the grammar via Bison's push-parser API rather than a
@@ -2917,7 +2917,7 @@ static program_t *epilog(void) {
 /*
  * Initialize the environment that the compiler needs.
  */
-static void prolog(std::unique_ptr<LexStream> stream, const char *name, LexTokenStream &token_stream) {
+static void prolog(std::string_view source, const char *name, LexTokenStream &token_stream) {
   int i;
 
   function_context.num_parameters = -1;
@@ -2958,7 +2958,7 @@ static void prolog(std::unique_ptr<LexStream> stream, const char *name, LexToken
     copy_structures(simul_efun_ob->prog);
   }
 
-  token_stream.load(std::move(stream));
+  token_stream.load(source);
 }
 
 /*

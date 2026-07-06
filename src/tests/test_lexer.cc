@@ -91,9 +91,7 @@ static std::vector<Token> Tokenize(const std::string& source,
     yylex_init_extra(&ctx, &scanner);
 
     // --- feed lexer ---
-    std::istringstream ss(source);
-    auto stream = std::make_unique<IStreamLexStream>(ss);
-    start_new_file(std::move(stream), scanner);
+    start_new_file(source, scanner);
 
     std::vector<Token> toks;
     YYSTYPE yylval;

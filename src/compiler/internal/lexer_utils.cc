@@ -2,7 +2,7 @@
  * File: lexer_utils.cc
  *
  * Combines the lexer's global state and non-scanning helpers (identifier
- * hash table, the main-stream YY_INPUT bridge, pushed-buffer/include
+ * hash table, the base-buffer install (lpc_lex_set_source), pushed-buffer/include
  * bookkeeping, heredoc body matching, pragma/error-context handling) with
  * the standalone-preprocessor support helpers (predefines registry,
  * include-path resolution). Originally two separate
@@ -114,12 +114,6 @@ int num_parse_error; /* Number of errors in the parser. */
 
 lpc_predef_t *lpc_predefs = nullptr;
 
-namespace {
-std::unique_ptr<LexStream> current_stream = nullptr;
-// Last byte handed to Flex from the main stream, for the trailing-newline
-// invariant in lpc_lex_yy_input. Reset per compile in start_new_file.
-char main_last_char = '\n';
-}  // namespace
 std::shared_ptr<LexerSession> current_session = nullptr;
 
 int lex_fatal;
@@ -783,7 +777,7 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yyll
         int saved_line = current_line;
         int saved_total = total_lines;
         // Characters are read THROUGH Flex (lpc_lex_getc: its buffer,
-        // then YY_INPUT) rather than from raw `outp` -- no rewind/flush
+        // in-memory buffers) rather than from raw `outp` -- no rewind/flush
         // choreography, no desync with the DFA's prefetch, and a splice
         // buffer ending mid-collection is popped through transparently.
         // Every probed byte is recorded for the no-parenthesis restore
@@ -1114,7 +1108,7 @@ void end_new_file() {
   active_scanner = nullptr;
 }
 
-void start_new_file(std::unique_ptr<LexStream> stream, void *yyscanner,
+void start_new_file(std::string_view source, void *yyscanner,
                      std::shared_ptr<LexerSession> session) {
   if (!main_filename && current_file) {
     main_filename = make_shared_string(current_file);
@@ -1124,7 +1118,6 @@ void start_new_file(std::unique_ptr<LexStream> stream, void *yyscanner,
     session = LexerSession::make_session();
   }
   current_session = std::move(session);
-  current_stream = std::move(stream);
 
   // Fresh diagnostics per compile / per REPL chunk -- same boundary on
   // which num_parse_error is effectively reset by the callers. Stale
@@ -1155,18 +1148,29 @@ void start_new_file(std::unique_ptr<LexStream> stream, void *yyscanner,
   inc_stack.clear();
   last_function_context = -1;
   current_function_context = nullptr;
-  main_last_char = '\n';
   active_scanner = yyscanner;
   pragmas = DEFAULT_PRAGMAS;
   current_line = 1;
   current_line_base = 0;
   current_line_saved = 0;
 
+  // Install the main file's content as THE base buffer -- flex-native,
+  // exactly like an include/splice buffer (yy_scan_bytes copies, so
+  // `source` may be transient). Preserves the historical guarantee that
+  // input ends with a newline: append one when the file lacks it.
+  if (!source.empty() && source.back() != '\n') {
+    ScratchString fixed(source);
+    fixed += '\n';
+    lpc_lex_set_source(fixed.data(), fixed.size(), yyscanner);
+  } else {
+    lpc_lex_set_source(source.empty() ? "" : source.data(), source.size(), yyscanner);
+  }
+
   // Push the configured global include file exactly like a real
   // `#include "..."` / `#include <...>` appearing before the file's first
   // line (the config value already carries its quoting/angle delimiters):
   // its content becomes a pushed buffer scanned before the main file's
-  // first byte (which Flex pulls through YY_INPUT on demand).
+  // first byte.
   const char *glf = CONFIG_STR(__GLOBAL_INCLUDE_FILE__);
   if (glf != nullptr && strlen(glf) != 0) {
     lpc_lex_handle_include(glf, yyscanner);
@@ -1187,8 +1191,8 @@ LexTokenStream::~LexTokenStream() {
   }
 }
 
-void LexTokenStream::load(std::unique_ptr<LexStream> stream, std::shared_ptr<LexerSession> session) {
-  start_new_file(std::move(stream), scanner_, std::move(session));
+void LexTokenStream::load(std::string_view source, std::shared_ptr<LexerSession> session) {
+  start_new_file(source, scanner_, std::move(session));
 }
 
 int LexTokenStream::next(union YYSTYPE *yylval_param, struct YYLTYPE *yylloc_param) {
@@ -1600,29 +1604,6 @@ void init_identifiers() {
     ihe->sem_value++;
     ihe->dn.efun_num = i;
   }
-}
-
-// Bridge called by Flex's YY_INPUT macro: bulk-reads the MAIN file's
-// stream straight into Flex's base buffer. (The historic one-byte trickle
-// existed only to bound Flex's prefetch for the raw-outp readers' rewind
-// arithmetic -- all gone: splices/includes are pushed in-memory buffers
-// that never touch this path, and every raw reader goes through
-// lpc_lex_getc().) Preserves the ring's guaranteed-trailing-newline
-// invariant: a file whose last byte isn't '\n' gets one appended before
-// EOF is reported.
-extern "C" int lpc_lex_yy_input(char *buf, int max_size, void * /*yyscanner*/) {
-  if (max_size <= 0 || !current_stream) return 0;
-  int n = current_stream->read(buf, max_size);
-  if (n > 0) {
-    main_last_char = buf[n - 1];
-    return n;
-  }
-  if (main_last_char != '\n') {
-    main_last_char = '\n';
-    buf[0] = '\n';
-    return 1;
-  }
-  return 0;
 }
 
 // ---------------------------------------------------------------------------

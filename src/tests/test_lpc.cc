@@ -47,9 +47,7 @@ TEST_F(DriverTest, TestCompileDumpProgWorks) {
 TEST_F(DriverTest, TestInMemoryCompileFile) {
   program_t* prog = nullptr;
 
-  std::istringstream source("void test() {}");
-  auto stream = std::make_unique<IStreamLexStream>(source);
-  prog = compile_file(std::move(stream), "test");
+  prog = compile_file("void test() {}", "test");
 
   ASSERT_NE(prog, nullptr);
   deallocate_program(prog);
@@ -57,9 +55,7 @@ TEST_F(DriverTest, TestInMemoryCompileFile) {
 
 TEST_F(DriverTest, TestInMemoryCompileFileFail) {
   program_t* prog = nullptr;
-  std::istringstream source("aksdljfaljdfiasejfaeslfjsaef");
-  auto stream = std::make_unique<IStreamLexStream>(source);
-  prog = compile_file(std::move(stream), "test");
+  prog = compile_file("aksdljfaljdfiasejfaeslfjsaef", "test");
 
   ASSERT_EQ(prog, nullptr);
 }
@@ -120,9 +116,7 @@ void do_tests() {
     this_object()->test4(3, "bbb", 3);
 }
   )";
-  std::istringstream iss(source);
-  auto stream = std::make_unique<IStreamLexStream>(iss);
-  auto *prog = compile_file(std::move(stream), "test");
+  auto *prog = compile_file(source, "test");
 
   ASSERT_NE(prog, nullptr);
   dump_prog(prog, stdout, 1 | 2);
