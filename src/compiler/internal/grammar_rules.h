@@ -27,12 +27,18 @@ typedef struct {
 // grammar_rules.cc
 // ============================================================================
 void rule_program(parse_node_t *program_node);
-bool rule_inheritence(parse_node_t **result_node, int type_mod, char *inherit_file_name);
-LPC_INT rule_func_type(LPC_INT type, LPC_INT optional_star, char *identifier);
-LPC_INT rule_func_proto(LPC_INT type, LPC_INT optional_star, char **identifier, argument_t argument);
-void rule_func(parse_node_t **function, LPC_INT type, LPC_INT optional_star, char *identifier,
+bool rule_inheritence(parse_node_t **result_node, int type_mod, const ScratchString *inherit_file_name);
+LPC_INT rule_func_type(LPC_INT type, LPC_INT optional_star, const ScratchString *identifier);
+// Registers the prototype under a SHARED string (ref held by the function
+// table) built from the arena `identifier`; writes it to *shared_name_out
+// (the value-stack slot's shared_string member). See grammar.y `function`.
+LPC_INT rule_func_proto(LPC_INT type, LPC_INT optional_star, const ScratchString *identifier,
+                        const char **shared_name_out, argument_t argument);
+// `identifier` is the SHARED string rule_func_proto registered (the
+// function table holds its ref) -- see the union's shared_string member.
+void rule_func(parse_node_t **function, LPC_INT type, LPC_INT optional_star, const char *identifier,
                argument_t argument, LPC_INT *func_types, parse_node_t **block_or_semi);
-struct ident_hash_elem_t *rule_define_class(LPC_INT *classname_idx_out, char *class_name);
+struct ident_hash_elem_t *rule_define_class(LPC_INT *classname_idx_out, const ScratchString *class_name);
 void rule_define_class_members(struct ident_hash_elem_t *class_ihe, LPC_INT classname_idx);
 
 // Helpers that eliminate direct macro / global-variable access from grammar.y.
@@ -47,41 +53,41 @@ void rule_program_append(parse_node_t **result, parse_node_t *prog, parse_node_t
 void rule_tree_block(parse_node_t **result, parse_node_t *block_node);
 void rule_tree_expr(parse_node_t **result, parse_node_t *expr);
 void rule_opt_semicolon();
-char *rule_string_literal_concat(char *s1, char *s2);
+ScratchString *rule_string_literal_concat(ScratchString *s1, ScratchString *s2);
 
 // ============================================================================
 // grammar_rules_types.cc
 // ============================================================================
-char *rule_identifier_defined_name(ident_hash_elem_t *ihe);
+ScratchString *rule_identifier_defined_name(ident_hash_elem_t *ihe);
 parse_node_t *rule_modifier_change(LPC_INT modifiers);
-void rule_member_name(LPC_INT star_modifier, char *identifier);
+void rule_member_name(LPC_INT star_modifier, const ScratchString *identifier);
 void rule_member_list_set_type(LPC_INT basic_type);
 parse_node_t *rule_default_arg_value(parse_node_t *expr);
 LPC_INT rule_type_modifier_list(LPC_INT modifier, LPC_INT list);
 LPC_INT rule_type(LPC_INT modifiers, LPC_INT basic_type);
 LPC_INT rule_atomic_type_class(ident_hash_elem_t *ihe);
-LPC_INT rule_atomic_type_class_identifier(char *identifier);
+LPC_INT rule_atomic_type_class_identifier(const ScratchString *identifier);
 LPC_INT rule_param_decl_typed(LPC_INT type_star);
-LPC_INT rule_param_decl_typed_name(LPC_INT type_star, char *name, parse_node_t *default_val);
-LPC_INT rule_param_decl_untyped_name(char *name);
+LPC_INT rule_param_decl_typed_name(LPC_INT type_star, const ScratchString *name, parse_node_t *default_val);
+LPC_INT rule_param_decl_untyped_name(const ScratchString *name);
 void rule_argument_varargs(argument_t *result, argument_t *arg_list);
 void rule_argument_list_single(argument_t *result, LPC_INT new_arg_val);
 void rule_argument_list_multi(argument_t *result, argument_t *list, LPC_INT new_arg_val);
 LPC_INT rule_cast(LPC_INT basic_type, LPC_INT optional_star);
 LPC_INT rule_opt_basic_type_empty();
-void rule_single_new_local_def(LPC_INT *result, LPC_INT type, char *name);
+void rule_single_new_local_def(LPC_INT *result, LPC_INT type, const ScratchString *name);
 
 // ============================================================================
 // grammar_rules_decls.cc
 // ============================================================================
 struct parse_node_t *rule_block_or_semi(struct parse_node_t *block_node);
 void rule_def_global_var(LPC_INT type_val);
-char *rule_new_local_name_redefine(ident_hash_elem_t *ihe);
-void rule_new_name(LPC_INT star_modifier, char *identifier);
-void rule_new_name_with_init(LPC_INT star_modifier, char *identifier, LPC_INT assign_val, parse_node_t *expr);
+ScratchString *rule_new_local_name_redefine(ident_hash_elem_t *ihe);
+void rule_new_name(LPC_INT star_modifier, const ScratchString *identifier);
+void rule_new_name_with_init(LPC_INT star_modifier, const ScratchString *identifier, LPC_INT assign_val, parse_node_t *expr);
 void rule_block(decl_t *result, parse_node_t *stmts_node, int entry_locals);
-parse_node_t *rule_new_local_def(char *name, LPC_INT type_star);
-parse_node_t *rule_new_local_def_with_init(char *name, LPC_INT type_star, LPC_INT assign_op, parse_node_t *expr);
+parse_node_t *rule_new_local_def(const ScratchString *name, LPC_INT type_star);
+parse_node_t *rule_new_local_def_with_init(const ScratchString *name, LPC_INT type_star, LPC_INT assign_op, parse_node_t *expr);
 parse_node_t *rule_single_new_local_def_with_init(LPC_INT local_num, LPC_INT assign_op, parse_node_t *expr);
 void rule_local_declarations_set_type(LPC_INT basic_type);
 void rule_local_declarations(decl_t *result, decl_t *decl1, decl_t *decl2);
@@ -102,7 +108,7 @@ void rule_do(parse_node_t **result, parse_node_t *stmt, parse_node_t *expr, LPC_
 void rule_cond(parse_node_t **result, parse_node_t *expr, parse_node_t *then_branch, parse_node_t *else_branch);
 void rule_foreach_var_defined(decl_t *result, ident_hash_elem_t *ihe);
 void rule_foreach_var_new_local(decl_t *result, LPC_INT local_num);
-void rule_foreach_var_identifier(decl_t *result, char *identifier);
+void rule_foreach_var_identifier(decl_t *result, const ScratchString *identifier);
 void rule_foreach_vars_single(decl_t *result, decl_t *var);
 void rule_foreach_vars_double(decl_t *result, decl_t *var1, decl_t *var2);
 LPC_INT rule_foreach_open();
@@ -128,7 +134,7 @@ void rule_case_range_from(parse_node_t **result, parse_node_t *label1);
 void rule_case_range_to(parse_node_t **result, parse_node_t *label2);
 void rule_case_default(parse_node_t **result);
 void rule_case_label_constant(parse_node_t **result, LPC_INT val);
-void rule_case_label_string(parse_node_t **result, char *str);
+void rule_case_label_string(parse_node_t **result, const ScratchString *str);
 void rule_constant_or(LPC_INT *result, LPC_INT val1, LPC_INT val2);
 void rule_constant_xor(LPC_INT *result, LPC_INT val1, LPC_INT val2);
 void rule_constant_and(LPC_INT *result, LPC_INT val1, LPC_INT val2);
@@ -154,24 +160,24 @@ void rule_switch_block_empty(parse_node_t **result);
 parse_node_t *rule_lvalue_list_empty();
 parse_node_t *rule_lvalue_list(parse_node_t *lvalue, parse_node_t *list);
 parse_node_t *rule_lvalue(parse_node_t *expr);
-parse_node_t *rule_class_init(char *identifier, parse_node_t *expr);
+parse_node_t *rule_class_init(const ScratchString *identifier, parse_node_t *expr);
 parse_node_t *rule_opt_class_init_empty();
 parse_node_t *rule_opt_class_init(parse_node_t *list, parse_node_t *class_init);
-char *rule_function_name_colon_colon(char *identifier);
-char *rule_function_name_type(LPC_INT basic_type, char *identifier);
-char *rule_function_name_obj(char *obj, char *identifier);
+ScratchString *rule_function_name_colon_colon(ScratchString *identifier);
+ScratchString *rule_function_name_type(LPC_INT basic_type, ScratchString *identifier);
+ScratchString *rule_function_name_obj(ScratchString *obj, ScratchString *identifier);
 parse_node_t *rule_expr_or_block_block(decl_t decl_val);
 parse_node_t *rule_expr_or_block_expr(parse_node_t *expr);
 void rule_catch(parse_node_t **result, parse_node_t *expr_or_block, LPC_INT saved_context);
 void rule_sscanf(parse_node_t **result, parse_node_t *expr1, parse_node_t *expr2, parse_node_t *lvalue_list);
 void rule_parse_command(parse_node_t **result, parse_node_t *expr1, parse_node_t *expr2, parse_node_t *expr3, parse_node_t *lvalue_list);
 void rule_time_expression(parse_node_t **result, parse_node_t *expr_or_block, LPC_INT saved_context);
-void rule_string(parse_node_t **result, char *str);
+void rule_string(parse_node_t **result, const ScratchString *str);
 void rule_string_like_concat(parse_node_t **result, parse_node_t *left, parse_node_t *right);
-void rule_template_literal(parse_node_t **result, char *head, parse_node_t *expr, parse_node_t *rest);
-void rule_template_parts_tail(parse_node_t **result, char *tail);
-void rule_template_parts_middle(parse_node_t **result, char *mid, parse_node_t *expr, parse_node_t *rest);
-LPC_INT rule_efun_override(char *identifier);
+void rule_template_literal(parse_node_t **result, const ScratchString *head, parse_node_t *expr, parse_node_t *rest);
+void rule_template_parts_tail(parse_node_t **result, const ScratchString *tail);
+void rule_template_parts_middle(parse_node_t **result, const ScratchString *mid, parse_node_t *expr, parse_node_t *rest);
+LPC_INT rule_efun_override(const ScratchString *identifier);
 LPC_INT rule_efun_override_new();
 LPC_INT rule_functional_open(LPC_INT val);
 // Resolve a defined name to the functional-reference encoding
@@ -188,12 +194,12 @@ void rule_primary_expr_pre_dec(parse_node_t **result, parse_node_t *lval);
 void rule_primary_expr_post_inc(parse_node_t **result, parse_node_t *lval);
 void rule_primary_expr_post_dec(parse_node_t **result, parse_node_t *lval);
 void rule_primary_expr_defined_name(parse_node_t **result, ident_hash_elem_t *ihe);
-void rule_primary_expr_identifier(parse_node_t **result, char *name);
+void rule_primary_expr_identifier(parse_node_t **result, const ScratchString *name);
 function_context_t *rule_dollar_open();
 void rule_primary_expr_dollar_expr(parse_node_t **result, function_context_t *saved_context, parse_node_t *expr);
-void rule_primary_expr_member_arrow(parse_node_t **result, parse_node_t *expr, char *identifier);
-void rule_primary_expr_member_dot(parse_node_t **result, parse_node_t *expr, char *identifier);
-void rule_primary_expr_member_optional(parse_node_t **result, parse_node_t *expr, char *identifier);
+void rule_primary_expr_member_arrow(parse_node_t **result, parse_node_t *expr, const ScratchString *identifier);
+void rule_primary_expr_member_dot(parse_node_t **result, parse_node_t *expr, const ScratchString *identifier);
+void rule_primary_expr_member_optional(parse_node_t **result, parse_node_t *expr, const ScratchString *identifier);
 void rule_primary_expr_index_optional(parse_node_t **result, parse_node_t *expr, parse_node_t *idx);
 void rule_primary_expr_range_nn(parse_node_t **result, parse_node_t *expr, parse_node_t *expr1, parse_node_t *expr2);
 void rule_primary_expr_range_rn(parse_node_t **result, parse_node_t *expr, parse_node_t *expr1, parse_node_t *expr2);
@@ -214,11 +220,11 @@ void rule_call_open(LPC_INT *saved_context, LPC_INT *saved_refs);
 void rule_function_call_efun(parse_node_t **result, LPC_INT efun_idx, parse_node_t *opt_arg_list, LPC_INT saved_context, LPC_INT saved_refs);
 void rule_function_call_new(parse_node_t **result, parse_node_t *opt_arg_list, LPC_INT saved_context, LPC_INT saved_refs);
 void rule_function_call_new_class(parse_node_t **result, ident_hash_elem_t *ihe, parse_node_t *class_init);
-void rule_function_call_new_class_undef(parse_node_t **result, char *name, parse_node_t *class_init);
+void rule_function_call_new_class_undef(parse_node_t **result, const ScratchString *name, parse_node_t *class_init);
 void rule_function_call_defined_name(parse_node_t **result, ident_hash_elem_t *ihe, parse_node_t *opt_arg_list, LPC_INT saved_context, LPC_INT saved_refs);
-void rule_function_call_name(parse_node_t **result, char *name, parse_node_t *opt_arg_list, LPC_INT saved_context, LPC_INT saved_refs);
+void rule_function_call_name(parse_node_t **result, const ScratchString *name, parse_node_t *opt_arg_list, LPC_INT saved_context, LPC_INT saved_refs);
 void rule_function_call_indexed(parse_node_t **result, parse_node_t *expr, parse_node_t *idx, parse_node_t *opt_arg_list, LPC_INT saved_context, LPC_INT saved_refs);
-void rule_function_call_arrow(parse_node_t **result, parse_node_t *expr, char *identifier, parse_node_t *opt_arg_list, LPC_INT saved_context, LPC_INT saved_refs);
+void rule_function_call_arrow(parse_node_t **result, parse_node_t *expr, const ScratchString *identifier, parse_node_t *opt_arg_list, LPC_INT saved_context, LPC_INT saved_refs);
 void rule_function_call_star(parse_node_t **result, parse_node_t *expr, parse_node_t *opt_arg_list, LPC_INT saved_context, LPC_INT saved_refs);
 void rule_comma_expr(struct parse_node_t **result, struct parse_node_t *expr1, struct parse_node_t *expr2);
 void rule_expr_nullish(struct parse_node_t **result, struct parse_node_t *expr1, struct parse_node_t *expr2);

@@ -13,10 +13,12 @@
 #include "compiler/internal/grammar_rules.h"
 #include "compiler/internal/grammar.autogen.h"
 
-std::string normalize_filename(const char* filename) {
-    if (!filename) return "/unknown";
-    if (filename[0] == '/') return filename;
-    return "/" + std::string(filename);
+ScratchString normalize_filename(const char* filename) {
+    if (!filename) return ScratchString("/unknown");
+    if (filename[0] == '/') return ScratchString(filename);
+    ScratchString r("/");
+    r += filename;
+    return r;
 }
 
 std::string_view trim(std::string_view s) {
@@ -26,8 +28,8 @@ std::string_view trim(std::string_view s) {
     return s.substr(a, b - a + 1);
 }
 
-std::string strip_directive_comments(std::string_view s) {
-    std::string r;
+ScratchString strip_directive_comments(std::string_view s) {
+    ScratchString r;
     r.reserve(s.size());
     size_t i = 0;
     while (i < s.size()) {
@@ -52,8 +54,8 @@ std::string strip_directive_comments(std::string_view s) {
     return r;
 }
 
-std::string stringize(std::string_view s) {
-    std::string r = "\"";
+ScratchString stringize(std::string_view s) {
+    ScratchString r("\"");
     for (char c : s) {
         if (c == '"' || c == '\\') {
             r += '\\';
@@ -64,9 +66,9 @@ std::string stringize(std::string_view s) {
     return r;
 }
 
-std::vector<std::string> collect_args(std::string_view text, size_t& i) {
-    std::vector<std::string> args;
-    std::string arg;
+ScratchVector<ScratchString> collect_args(std::string_view text, size_t& i) {
+    ScratchVector<ScratchString> args;
+    ScratchString arg;
     int depth = 0;
     char inq = 0;
     while (i < text.size()) {
@@ -80,10 +82,10 @@ std::vector<std::string> collect_args(std::string_view text, size_t& i) {
         } else if (c == '(') {
             depth++; arg += c;
         } else if (c == ')') {
-            if (depth == 0) { args.push_back(std::string(trim(arg))); break; }
+            if (depth == 0) { args.emplace_back(trim(arg)); break; }
             depth--; arg += c;
         } else if (c == ',' && depth == 0) {
-            args.push_back(std::string(trim(arg))); arg.clear();
+            args.emplace_back(trim(arg)); arg.clear();
         } else {
             arg += c;
         }
@@ -91,10 +93,10 @@ std::vector<std::string> collect_args(std::string_view text, size_t& i) {
     return args;
 }
 
-std::string substitute(std::string_view body,
-                       const std::vector<std::string>& params,
-                       const std::vector<std::string>& args,
-                       const std::vector<std::string>* expanded_args) {
+ScratchString substitute(std::string_view body,
+                         const std::vector<std::string>& params,
+                         const ScratchVector<ScratchString>& args,
+                         const ScratchVector<ScratchString>* expanded_args) {
     // C parameter-substitution selection: a parameter that is an operand
     // of # (handled in the stringize branch) or ## gets the RAW argument
     // spelling; any other use gets the macro-expanded form when the
@@ -114,7 +116,7 @@ std::string substitute(std::string_view body,
         return before || after;
     };
 
-    std::string temp;
+    ScratchString temp;
     size_t i = 0;
     while (i < body.size()) {
         if (body[i] == '#') {
@@ -188,7 +190,7 @@ std::string substitute(std::string_view body,
         temp += body[i++];
     }
 
-    std::string result;
+    ScratchString result;
     i = 0;
     while (i < temp.size()) {
         if (temp[i] == '"' || temp[i] == '\'') {
@@ -258,7 +260,7 @@ struct IfTok {
 struct IfTokState {
     const std::vector<IfTok>* toks;
     size_t pos = 0;
-    std::string error;  // first error wins; empty means no error yet
+    ScratchString error;  // first error wins; empty means no error yet
 };
 
 bool ifexpr_at_end(const IfTokState* st) { return st->pos >= st->toks->size(); }
@@ -383,11 +385,11 @@ long ifexpr_top(IfTokState* st) {
 
 // The name of an identifier-flavored token, for defined()'s operand.
 // Empty when the token isn't name-shaped.
-std::string ifexpr_token_name(int tok, const union YYSTYPE* lv) {
-    if (tok == L_IDENTIFIER && lv->string != nullptr) return lv->string;
+ScratchString ifexpr_token_name(int tok, const union YYSTYPE* lv) {
+    if (tok == L_IDENTIFIER && lv->string != nullptr) return *lv->string;
     if (tok == L_DEFINED_NAME && lv->ihe != nullptr && lv->ihe->name != nullptr)
-        return lv->ihe->name;
-    return "";
+        return ScratchString(lv->ihe->name);
+    return ScratchString();
 }
 
 // Pull the defined(X)/efun_defined(X) operand with macro expansion
@@ -410,12 +412,14 @@ long ifexpr_pull_defined(bool efun_form, void* yyscanner, bool* ended) {
         ctx->suppress_expansion = false;
         return 0;
     }
-    std::string name = ifexpr_token_name(tok, &lv);
+    ScratchString name = ifexpr_token_name(tok, &lv);
     if (!name.empty()) {
         if (efun_form) {
             result = (lookup_predef(name.c_str()) >= 0) ? 1 : 0;
         } else {
-            result = (current_session && current_session->macros.count(name) != 0) ? 1 : 0;
+            result = (current_session &&
+                      current_session->macros.count(std::string(name.data(), name.size())) != 0)
+                         ? 1 : 0;
         }
     }
     if (paren) {
@@ -434,7 +438,7 @@ long ifexpr_pull_defined(bool efun_form, void* yyscanner, bool* ended) {
 
 long lpc_lex_eval_if_expr(std::string_view expr, void* yyscanner) {
     std::vector<IfTok> toks;
-    std::string text(trim(expr));
+    ScratchString text(trim(expr));
     if (!text.empty()) {
         lpc_lex_push_string_buffer(text.c_str(), text.size(), LPC_BUF_IF_EXPR, yyscanner);
         bool ended = false;
@@ -481,7 +485,7 @@ long lpc_lex_eval_if_expr(std::string_view expr, void* yyscanner) {
                         ended = true;
                         break;
                     }
-                    std::string name = ifexpr_token_name(tok, &lv);
+                    ScratchString name = ifexpr_token_name(tok, &lv);
                     if (name == "defined" || name == "efun_defined") {
                         toks.push_back(IfTok{0, ifexpr_pull_defined(name == "efun_defined",
                                                                     yyscanner, &ended)});
@@ -551,9 +555,11 @@ static void count_directive_newlines(const char* text, int len) {
     }
 }
 
-bool lpc_lex_builtin_macro(std::string_view name, std::string* out) {
+bool lpc_lex_builtin_macro(std::string_view name, ScratchString* out) {
     if (name == "__LINE__") {
-        *out = std::to_string(current_line);
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%d", current_line);
+        *out = buf;
         return true;
     }
     if (name == "__FILE__") {
@@ -561,7 +567,7 @@ bool lpc_lex_builtin_macro(std::string_view name, std::string* out) {
         return true;
     }
     if (name == "__DIR__") {
-        std::string filename = normalize_filename(current_file);
+        ScratchString filename = normalize_filename(current_file);
         size_t last_slash = filename.find_last_of('/');
         // normalize_filename() guarantees a leading '/', so there is always
         // at least one slash to keep.
@@ -571,9 +577,9 @@ bool lpc_lex_builtin_macro(std::string_view name, std::string* out) {
     return false;
 }
 
-std::string lpc_lex_expand_string(std::string_view text, std::vector<std::string> guard) {
-    if (!current_session) return std::string(text);
-    std::string result;
+ScratchString lpc_lex_expand_string(std::string_view text, ScratchVector<ScratchString> guard) {
+    if (!current_session) return ScratchString(text);
+    ScratchString result;
     size_t i = 0;
     while (i < text.size()) {
         if (text[i] == '"' || text[i] == '\'') {
@@ -592,7 +598,7 @@ std::string lpc_lex_expand_string(std::string_view text, std::vector<std::string
             std::string_view id = text.substr(start, i - start);
 
             {
-                std::string builtin;
+                ScratchString builtin;
                 if (lpc_lex_builtin_macro(id, &builtin)) {
                     result += builtin;
                     continue;
@@ -608,7 +614,7 @@ std::string lpc_lex_expand_string(std::string_view text, std::vector<std::string
             if (!guarded && it != current_session->macros.end()) {
                 const PpMacro& m = it->second;
                 if (!m.is_function_like) {
-                    auto g2 = guard; g2.push_back(std::string(id));
+                    auto g2 = guard; g2.emplace_back(id);
                     result += lpc_lex_expand_string(m.body, g2);
                 } else {
                     size_t j = i;
@@ -617,11 +623,11 @@ std::string lpc_lex_expand_string(std::string_view text, std::vector<std::string
                         j++;
                         auto args = collect_args(text, j);
                         i = j;
-                        std::vector<std::string> expanded_args;
-                        auto g2 = guard; g2.push_back(std::string(id));
+                        ScratchVector<ScratchString> expanded_args;
+                        auto g2 = guard; g2.emplace_back(id);
                         // Argument pre-expansion deliberately passes no
                         for (const auto& a : args) expanded_args.push_back(lpc_lex_expand_string(a, guard));
-                        std::string subst = substitute(m.body, m.params, expanded_args);
+                        ScratchString subst = substitute(m.body, m.params, expanded_args);
                         result += lpc_lex_expand_string(subst, g2);
                     } else {
                         // Function-like macro name with no argument list in
@@ -642,8 +648,8 @@ std::string lpc_lex_expand_string(std::string_view text, std::vector<std::string
     return result;
 }
 
-static std::string fold_backslash_newlines(std::string_view text) {
-    std::string result;
+static ScratchString fold_backslash_newlines(std::string_view text) {
+    ScratchString result;
     result.reserve(text.size());
     for (size_t i = 0; i < text.size(); ) {
         if (text[i] == '\\') {
@@ -696,7 +702,7 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
                 if (idx < rest.size()) idx++; // skip ')'
             }
             while (idx < rest.size() && (rest[idx] == ' ' || rest[idx] == '\t')) idx++;
-            std::string body = (idx < rest.size()) ? std::string(rest.substr(idx)) : "";
+            ScratchString body = (idx < rest.size()) ? ScratchString(rest.substr(idx)) : ScratchString();
 
             std::string_view bv(body);
             auto bv_trim = trim(bv);
@@ -710,7 +716,7 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
             }
 
             if (existing != current_session->macros.end() && !existing->second.is_predefined) {
-                if (existing->second.body != body) {
+                if (std::string_view(existing->second.body) != std::string_view(body)) {
                     // Redefining a macro with a different body is ALLOWED
                     // (the new definition takes effect below) -- it is a
                     // non-fatal warning, not an error. It went through
@@ -733,7 +739,7 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
             // this #define's own first line while we're dispatching it.
             m.def_file = current_file != nullptr ? current_file : "";
             m.def_line = compiler_directive_start_line;
-            m.body = std::move(body);
+            m.body.assign(body.data(), body.size());
             current_session->macros[std::string(name)] = std::move(m);
         }
     } else if (dir == "undef") {
@@ -759,8 +765,8 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
     } else if (dir == "if") {
         bool cond = false;
         if (lpc_lex_emitting()) {
-            std::string stripped = strip_directive_comments(rest);
-            std::string trimmed(trim(std::string_view(stripped)));
+            ScratchString stripped = strip_directive_comments(rest);
+            ScratchString trimmed(trim(std::string_view(stripped)));
             if (trimmed.empty()) {
                 lexerror("missing expression in #if");
             } else {
@@ -777,8 +783,8 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
             bool outer = lpc_lex_emitting();
             bool cond = false;
             if (outer && !had) {
-                std::string stripped = strip_directive_comments(rest);
-                std::string trimmed(trim(std::string_view(stripped)));
+                ScratchString stripped = strip_directive_comments(rest);
+                ScratchString trimmed(trim(std::string_view(stripped)));
                 if (trimmed.empty()) {
                     lexerror("missing expression in #elif");
                 } else {
@@ -809,19 +815,23 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
         }
     } else if (dir == "error") {
         if (lpc_lex_emitting()) {
-            lexerror(("#error " + std::string(trim(rest))).c_str());
+            ScratchString msg("#error ");
+            msg += trim(rest);
+            lexerror(msg.c_str());
         }
     } else if (dir == "warn") {
         if (lpc_lex_emitting()) {
-            lexerror(("#warn " + std::string(trim(rest))).c_str());
+            ScratchString msg("#warn ");
+            msg += trim(rest);
+            lexerror(msg.c_str());
         }
     } else if (dir == "echo") {
         if (lpc_lex_emitting()) {
-            fprintf(stderr, "%s\n", std::string(trim(rest)).c_str());
+            fprintf(stderr, "%s\n", ScratchString(trim(rest)).c_str());
         }
     } else if (dir == "pragma") {
         if (lpc_lex_emitting()) {
-            std::string rest_str(trim(rest));
+            ScratchString rest_str(trim(rest));
             handle_pragma(const_cast<char*>(rest_str.c_str()));
         }
     } else if (dir == "line" || (dir.empty() && !rest.empty() && std::isdigit(static_cast<unsigned char>(rest[0])))) {
@@ -843,7 +853,7 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
                 size_t file_start = idx;
                 while (idx < p.size() && p[idx] != '"') idx++;
                 if (idx < p.size() && p[idx] == '"') {
-                    std::string new_file = normalize_filename(std::string(p.substr(file_start, idx - file_start)).c_str());
+                    ScratchString new_file = normalize_filename(ScratchString(p.substr(file_start, idx - file_start)).c_str());
                     free_string(current_file);
                     current_file = make_shared_string(new_file.c_str());
                 }
@@ -853,7 +863,9 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
         // Ignored
     } else if (!dir.empty()) {
         if (lpc_lex_emitting()) {
-            lexerror(("Unknown preprocessor directive: #" + std::string(dir)).c_str());
+            ScratchString msg("Unknown preprocessor directive: #");
+            msg += dir;
+            lexerror(msg.c_str());
         }
     }
 }
@@ -879,7 +891,7 @@ LpcDirectiveAction lpc_lex_on_directive(const char* text, int len, void* yyscann
 
     // Fold + parse the captured line exactly once: both the skip-mode
     // classification and the full dispatch below read the same name/rest.
-    std::string folded = fold_backslash_newlines(std::string_view(text, len));
+    ScratchString folded = fold_backslash_newlines(std::string_view(text, len));
     std::string_view sv(folded);
     size_t i = 0;
     while (i < sv.size() && (sv[i] == ' ' || sv[i] == '\t')) i++;

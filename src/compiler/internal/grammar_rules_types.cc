@@ -13,10 +13,9 @@
 extern int context;
 extern int func_present;
 extern int num_refs;
-extern char *outp;
 
-char *rule_identifier_defined_name(ident_hash_elem_t *ihe) {
-  return scratch_copy(ihe->name);
+ScratchString *rule_identifier_defined_name(ident_hash_elem_t *ihe) {
+  return scratch_new_string(ihe->name);
 }
 
 parse_node_t *rule_modifier_change(LPC_INT modifiers) {
@@ -34,12 +33,11 @@ parse_node_t *rule_modifier_change(LPC_INT modifiers) {
   return nullptr;
 }
 
-void rule_member_name(LPC_INT star_modifier, char *identifier) {
+void rule_member_name(LPC_INT star_modifier, const ScratchString *identifier) {
   if (current_type == TYPE_VOID) {
     yyerror("Illegal to declare class member of type void.");
   }
   add_local_name(identifier, current_type | star_modifier);
-  scratch_free(identifier);
 }
 
 void rule_member_list_set_type(LPC_INT basic_type) {
@@ -94,9 +92,8 @@ LPC_INT rule_atomic_type_class(ident_hash_elem_t *ihe) {
   }
 }
 
-LPC_INT rule_atomic_type_class_identifier(char *identifier) {
-  yyerror("Undefined class '%s'", identifier);
-  scratch_free(identifier);
+LPC_INT rule_atomic_type_class_identifier(const ScratchString *identifier) {
+  yyerror("Undefined class '%s'", identifier->c_str());
   return TYPE_ANY;
 }
 
@@ -107,21 +104,19 @@ LPC_INT rule_param_decl_typed(LPC_INT type_star) {
   return type_star;
 }
 
-LPC_INT rule_param_decl_typed_name(LPC_INT type_star, char *name, parse_node_t *default_val) {
+LPC_INT rule_param_decl_typed_name(LPC_INT type_star, const ScratchString *name, parse_node_t *default_val) {
   if (type_star == TYPE_VOID) {
     yyerror("Illegal to declare argument of type void.");
   }
   add_local_name(name, type_star, default_val);
-  scratch_free(name);
   return type_star;
 }
 
-LPC_INT rule_param_decl_untyped_name(char *name) {
+LPC_INT rule_param_decl_untyped_name(const ScratchString *name) {
   if (exact_types) {
     yyerror("Missing type for argument");
   }
   add_local_name(name, TYPE_ANY);
-  scratch_free(name);
   return TYPE_ANY;
 }
 
@@ -172,10 +167,9 @@ LPC_INT rule_opt_basic_type_empty() {
   return TYPE_UNKNOWN;
 }
 
-void rule_single_new_local_def(LPC_INT *result, LPC_INT type, char *name) {
+void rule_single_new_local_def(LPC_INT *result, LPC_INT type, const ScratchString *name) {
   if (type == TYPE_VOID) {
     yyerror("Illegal to declare local variable of type void.");
   }
   *result = add_local_name(name, type);
-  scratch_free(name);
 }

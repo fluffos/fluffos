@@ -108,7 +108,7 @@ static std::vector<Token> Tokenize(const std::string& source,
         t.text   = yyget_text(scanner);
         bool has_string_payload = (k == L_STRING || k == L_TEMPLATE_HEAD ||
                                    k == L_TEMPLATE_MIDDLE || k == L_TEMPLATE_TAIL);
-        t.str    = (has_string_payload && yylval.string) ? yylval.string : "";
+        t.str    = (has_string_payload && yylval.string) ? yylval.string->c_str() : "";
         toks.push_back(t);
     }
 

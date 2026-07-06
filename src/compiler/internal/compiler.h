@@ -10,6 +10,7 @@ class LexStream;
 #include "vm/internal/base/program.h"   // for DECL_MODS etc
 #include "trees.h"
 #include "compiler/internal/compiler_utils.h"
+#include "compiler/internal/scratchpad.h"
 
 /* The end of a static buffer */
 #define EndOf(x) (x + sizeof(x) / sizeof(x[0]))
@@ -215,6 +216,9 @@ void reactivate_current_locals(void);
 void clean_up_locals(void);
 void deactivate_current_locals(void);
 int add_local_name(const char *, int, parse_node_t* = nullptr);
+inline int add_local_name(const ScratchString *s, int type, parse_node_t *def = nullptr) {
+  return add_local_name(s->c_str(), type, def);
+}
 void reallocate_locals(void);
 void initialize_locals(void);
 int get_id_number(void);
@@ -420,12 +424,16 @@ int copy_functions(program_t *, int);
 void type_error(const char *, int);
 int compatible_types(int, int);
 int compatible_types2(int, int);
-int arrange_call_inherited(char *, parse_node_t *);
+int arrange_call_inherited(const char *, parse_node_t *);
 void add_arg_type(unsigned short);
 int define_new_function(const char *, int, int, int, int);
 int define_variable(const char *, int);
 int define_new_variable(const char *, int);
+inline int define_new_variable(const ScratchString *s, int type) {
+  return define_new_variable(s->c_str(), type);
+}
 short store_prog_string(const char *);
+inline short store_prog_string(const ScratchString *s) { return store_prog_string(s->c_str()); }
 void free_prog_string(short);
 #ifdef DEBUG
 int dump_function_table(void);
@@ -438,8 +446,14 @@ parse_node_t *check_refs(int, parse_node_t *, parse_node_t *);
 
 int lookup_any_class_member(char *, unsigned short *);
 // Like lookup_any_class_member() but silent when no member is found.
-int lookup_any_class_member_soft(char *, unsigned short *);
-int lookup_class_member(int, char *, unsigned short *);
+int lookup_any_class_member_soft(const char *, unsigned short *);
+inline int lookup_any_class_member_soft(const ScratchString *s, unsigned short *t) {
+  return lookup_any_class_member_soft(s->c_str(), t);
+}
+int lookup_class_member(int, const char *, unsigned short *);
+inline int lookup_class_member(int which, const ScratchString *s, unsigned short *t) {
+  return lookup_class_member(which, s->c_str(), t);
+}
 parse_node_t *reorder_class_values(int, parse_node_t *);
 
 parse_node_t *promote_to_float(parse_node_t *);

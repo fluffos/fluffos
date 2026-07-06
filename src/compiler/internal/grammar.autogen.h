@@ -44,6 +44,12 @@
 #if YYDEBUG
 extern int yydebug;
 #endif
+/* "%code requires" blocks.  */
+#line 35 "$REPO_ROOT$/src/compiler/internal/grammar.y"
+
+#include "compiler/internal/scratchpad.h"
+
+#line 53 "grammar.autogen.h"
 
 /* Token kinds.  */
 #ifndef YYTOKENTYPE
@@ -113,11 +119,17 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 163 "$REPO_ROOT$/src/compiler/internal/grammar.y"
+#line 167 "$REPO_ROOT$/src/compiler/internal/grammar.y"
 
   LPC_INT number;              /* integers, opcodes, type flags */
   LPC_FLOAT real;              /* floating-point literals */
-  char *string;                /* scratch-allocated string */
+  ScratchString *string;       /* arena string: compile-lifetime, bulk-freed */
+  const char *shared_string;   /* SHARED string (stralloc): ref-counted, its
+                                * ref held elsewhere (e.g. the function
+                                * table). Distinct member so a slot's
+                                * scratch-vs-shared lifetime is visible in
+                                * the grammar ($<shared_string>x), never
+                                * silently overloaded onto `string`. */
   argument_t argument;         /* function parameter list metadata */
   ident_hash_elem_t *ihe;      /* symbol-table entry for a known name */
   parse_node_t *node;          /* parse-tree node (most non-terminals) */
@@ -138,7 +150,7 @@ union YYSTYPE
     LPC_INT saved_refs;
   } call_open;                 /* context/refs captured at the '(' of a call */
 
-#line 142 "$REPO_ROOT$/build/src/grammar.autogen.h"
+#line 154 "grammar.autogen.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

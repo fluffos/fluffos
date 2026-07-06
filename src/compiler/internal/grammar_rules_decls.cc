@@ -13,7 +13,6 @@
 extern int context;
 extern int func_present;
 extern int num_refs;
-extern char *outp;
 
 struct parse_node_t *rule_block_or_semi(struct parse_node_t *block_node) {
   if (!block_node) {
@@ -28,14 +27,14 @@ void rule_def_global_var(LPC_INT type_val) {
   }
 }
 
-char *rule_new_local_name_redefine(ident_hash_elem_t *ihe) {
+ScratchString *rule_new_local_name_redefine(ident_hash_elem_t *ihe) {
   if (ihe->dn.local_num != -1) {
     yyerror("Illegal to redeclare local name '%s'", ihe->name);
   }
-  return scratch_copy(ihe->name);
+  return scratch_new_string(ihe->name);
 }
 
-void rule_new_name(LPC_INT star_modifier, char *identifier) {
+void rule_new_name(LPC_INT star_modifier, const ScratchString *identifier) {
   if (current_type & (FUNC_VARARGS << 16)) {
     yyerror("Illegal to declare varargs variable.");
     current_type &= ~(FUNC_VARARGS << 16);
@@ -53,10 +52,9 @@ void rule_new_name(LPC_INT star_modifier, char *identifier) {
     yyerror("Illegal to declare global variable of type void.");
 
   define_new_variable(identifier, current_type | star_modifier);
-  scratch_free(identifier);
 }
 
-void rule_new_name_with_init(LPC_INT star_modifier, char *identifier, LPC_INT assign_val, parse_node_t *expr) {
+void rule_new_name_with_init(LPC_INT star_modifier, const ScratchString *identifier, LPC_INT assign_val, parse_node_t *expr) {
   parse_node_t *expr_node, *newnode;
   int type;
 
@@ -91,7 +89,7 @@ void rule_new_name_with_init(LPC_INT star_modifier, char *identifier, LPC_INT as
       p = strput(buff, end, "Type mismatch ");
       p = get_two_types(p, end, type, expr->type);
       p = strput(p, end, " when initializing ");
-      p = strput(p, end, identifier);
+      p = strput(p, end, identifier->c_str());
       yyerror(buff);
     }
   } else type = 0;
@@ -103,7 +101,6 @@ void rule_new_name_with_init(LPC_INT star_modifier, char *identifier, LPC_INT as
   newnode = comp_trees[TREE_INIT];
   CREATE_TWO_VALUES(comp_trees[TREE_INIT], 0,
       newnode, expr_node);
-  scratch_free(identifier);
 }
 
 void rule_block(decl_t *result, parse_node_t *stmts_node, int entry_locals) {
@@ -111,17 +108,16 @@ void rule_block(decl_t *result, parse_node_t *stmts_node, int entry_locals) {
   result->num = current_number_of_locals - entry_locals;
 }
 
-parse_node_t *rule_new_local_def(char *name, LPC_INT type_star) {
+parse_node_t *rule_new_local_def(const ScratchString *name, LPC_INT type_star) {
   if (current_type & LOCAL_MOD_REF) {
     yyerror("Illegal to declare local variable as reference");
     current_type &= ~LOCAL_MOD_REF;
   }
   add_local_name(name, current_type | type_star | LOCAL_MOD_UNUSED);
-  scratch_free(name);
   return nullptr;
 }
 
-parse_node_t *rule_new_local_def_with_init(char *name, LPC_INT type_star, LPC_INT assign_op, parse_node_t *expr) {
+parse_node_t *rule_new_local_def_with_init(const ScratchString *name, LPC_INT type_star, LPC_INT assign_op, parse_node_t *expr) {
   int type = (current_type | type_star) & ~DECL_MODS;
 
   if (current_type & LOCAL_MOD_REF) {
@@ -140,7 +136,7 @@ parse_node_t *rule_new_local_def_with_init(char *name, LPC_INT type_star, LPC_IN
     p = strput(buff, end, "Type mismatch ");
     p = get_two_types(p, end, type, expr->type);
     p = strput(p, end, " when initializing ");
-    p = strput(p, end, name);
+    p = strput(p, end, name->c_str());
     yyerror(buff);
   }
 
@@ -149,7 +145,6 @@ parse_node_t *rule_new_local_def_with_init(char *name, LPC_INT type_star, LPC_IN
   parse_node_t *res;
   CREATE_UNARY_OP_1(res, F_VOID_ASSIGN_LOCAL, 0, expr,
       add_local_name(name, current_type | type_star | LOCAL_MOD_UNUSED));
-  scratch_free(name);
   return res;
 }
 

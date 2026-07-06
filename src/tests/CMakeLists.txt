@@ -21,6 +21,13 @@ if(${GTEST_FOUND})
   target_link_libraries(lexer_tests PRIVATE ${FLUFFOS_LINK} GTest::GTest GTest::Main)
   target_compile_definitions(lexer_tests PRIVATE -DTESTSUITE_DIR="${CMAKE_SOURCE_DIR}/testsuite")
 
+  # Scratchpad-vs-malloc micro-benchmark: proves the compile arena beats
+  # heap allocation for the compiler's allocation patterns. Timing-based,
+  # so it is NOT registered with ctest -- run manually (RelWithDebInfo):
+  #   ./src/tests/bench_scratchpad [compiles-per-workload]
+  add_executable(bench_scratchpad bench_scratchpad.cc)
+  target_link_libraries(bench_scratchpad PRIVATE ${FLUFFOS_LINK})
+
   gtest_discover_tests(lpc_tests DISCOVERY_TIMEOUT 60)
   gtest_discover_tests(ofile_tests DISCOVERY_TIMEOUT 60)
   gtest_discover_tests(compiler_tests DISCOVERY_TIMEOUT 60)
