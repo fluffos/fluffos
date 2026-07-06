@@ -96,7 +96,9 @@ static std::vector<Token> Tokenize(const std::string& source,
         t.number = (k == L_NUMBER || k == L_PARAMETER) ? yylval.number : 0;
         t.real   = (k == L_REAL)   ? yylval.real   : 0.0;
         t.text   = yytext;
-        t.str    = (k == L_STRING && yylval.string) ? yylval.string : "";
+        bool has_string_payload = (k == L_STRING || k == L_TEMPLATE_HEAD ||
+                                   k == L_TEMPLATE_MIDDLE || k == L_TEMPLATE_TAIL);
+        t.str    = (has_string_payload && yylval.string) ? yylval.string : "";
         toks.push_back(t);
     }
 
@@ -1059,4 +1061,260 @@ TEST_F(LexerTest, LargeFile_RingBufferRefill) {
     EXPECT_EQ(toks[0].kind, L_BASIC_TYPE);
     // every triple (int, x, ;) must appear
     EXPECT_EQ(toks.size() % 3, 0u);
+}
+
+// ============================================================================
+// 12. Template literals (`...${expr}...`)
+// ============================================================================
+
+// No interpolation at all: returned as a plain L_STRING, not L_TEMPLATE_HEAD/
+// TAIL, so it folds into ordinary string concatenation just like "...".
+TEST_F(LexerTest, TemplateLiteral_NoInterpolation_IsPlainString) {
+    auto t = Tokenize("`hello world`\n");
+    ASSERT_EQ(t.size(), 1u);
+    EXPECT_EQ(t[0].kind, L_STRING);
+    EXPECT_EQ(t[0].str, "hello world");
+}
+
+// The '}' that closes ${...} is consumed by the lexer to resume
+// SC_TEMPLATE_BODY -- it's never itself returned as a '}' token (matching
+// the grammar: template_literal: L_TEMPLATE_HEAD expr template_parts has no
+// '}' in it), so there are 3 tokens here, not 4.
+TEST_F(LexerTest, TemplateLiteral_SingleInterpolation_HeadAndTail) {
+    auto t = Tokenize("`Hello, ${name}!`\n");
+    ASSERT_EQ(t.size(), 3u);
+    EXPECT_EQ(t[0].kind, L_TEMPLATE_HEAD);
+    EXPECT_EQ(t[0].str, "Hello, ");
+    EXPECT_EQ(t[1].kind, L_IDENTIFIER);
+    EXPECT_EQ(t[2].kind, L_TEMPLATE_TAIL);
+    EXPECT_EQ(t[2].str, "!");
+}
+
+// Regression test: the head fragment's string value used to come back
+// containing the *tail* fragment's text (scratch_copy()'s small ring buffer
+// getting overwritten while the head sat on the parser's value stack through
+// the whole interpolated expression -- see the F_TEMPLATE_COERCE commit).
+// A nested string literal inside the interpolation is exactly what triggered
+// it, so this keeps that specific shape under test at the lexer level.
+TEST_F(LexerTest, TemplateLiteral_NestedStringInInterpolation_HeadNotClobbered) {
+    auto t = Tokenize("`${strlen(\"hi\")} chars`\n");
+    ASSERT_GE(t.size(), 2u);
+    EXPECT_EQ(t[0].kind, L_TEMPLATE_HEAD);
+    EXPECT_EQ(t[0].str, "");
+    EXPECT_EQ(t.back().kind, L_TEMPLATE_TAIL);
+    EXPECT_EQ(t.back().str, " chars");
+}
+
+TEST_F(LexerTest, TemplateLiteral_MultipleInterpolations_Middle) {
+    auto t = Tokenize("`${name} has ${count} apples.`\n");
+    // L_TEMPLATE_HEAD("") name L_TEMPLATE_MIDDLE(" has ") count L_TEMPLATE_TAIL(" apples.")
+    // -- the closing '}' of each ${...} is consumed by the lexer, not
+    // returned as its own token (see the single-interpolation test above).
+    ASSERT_EQ(t.size(), 5u);
+    EXPECT_EQ(t[0].kind, L_TEMPLATE_HEAD);
+    EXPECT_EQ(t[0].str, "");
+    EXPECT_EQ(t[2].kind, L_TEMPLATE_MIDDLE);
+    EXPECT_EQ(t[2].str, " has ");
+    EXPECT_EQ(t[4].kind, L_TEMPLATE_TAIL);
+    EXPECT_EQ(t[4].str, " apples.");
+}
+
+// Escapes specific to template literals: \` and \$ (prevents interpolation).
+TEST_F(LexerTest, TemplateLiteral_EscapedBacktickAndDollar) {
+    auto t = Tokenize("`a\\`b\\$c`\n");
+    ASSERT_EQ(t.size(), 1u);
+    EXPECT_EQ(t[0].kind, L_STRING);
+    EXPECT_EQ(t[0].str, "a`b$c");
+}
+
+// A bare newline inside a template literal is removed, not preserved
+// (unlike a regular string, where it's kept) -- see docs/lpc/types/strings.md.
+TEST_F(LexerTest, TemplateLiteral_BareNewlineRemoved) {
+    auto t = Tokenize("`line one\nline two`\n");
+    ASSERT_EQ(t.size(), 1u);
+    EXPECT_EQ(t[0].kind, L_STRING);
+    EXPECT_EQ(t[0].str, "line oneline two");
+}
+
+// A real '{'/'}' block inside ${...} (e.g. an anonymous function literal's
+// body) must not be mistaken for the '}' that closes the interpolation --
+// brace-depth tracking on the plain '{'/'}' rules has to see through it.
+TEST_F(LexerTest, TemplateLiteral_BracesInsideInterpolation_NotMistakenForClose) {
+    auto t = Tokenize("`${ (: { 1; } :) }`\n");
+    // L_TEMPLATE_HEAD("") ... the '{'/'}' pair from the block must come back
+    // as ordinary '{'/'}' tokens, with the real closing '}' of ${...} (which
+    // is NOT itself returned as a token -- it's consumed to resume
+    // SC_TEMPLATE_BODY) landing on a final L_STRING/L_TEMPLATE_TAIL.
+    ASSERT_FALSE(t.empty());
+    EXPECT_EQ(t[0].kind, L_TEMPLATE_HEAD);
+    bool saw_open_brace = false, saw_close_brace = false;
+    for (auto& tok : t) {
+        if (tok.kind == '{') saw_open_brace = true;
+        if (tok.kind == '}') saw_close_brace = true;
+    }
+    EXPECT_TRUE(saw_open_brace);
+    EXPECT_TRUE(saw_close_brace);
+    EXPECT_EQ(t.back().kind, L_TEMPLATE_TAIL);
+    EXPECT_EQ(t.back().str, "");
+    EXPECT_EQ(num_parse_error, 0);
+}
+
+// Nested template literal inside an interpolation: `outer ${`inner ${x}`} end`.
+TEST_F(LexerTest, TemplateLiteral_Nested) {
+    auto t = Tokenize("`outer ${`inner ${x}`} end`\n");
+    ASSERT_FALSE(t.empty());
+    EXPECT_EQ(t[0].kind, L_TEMPLATE_HEAD);
+    EXPECT_EQ(t[0].str, "outer ");
+    // Inner template's own head/tail must show up as distinct tokens, and
+    // the outer literal's tail ("...end") must still come back intact and
+    // unclobbered after all that nested scanning.
+    bool saw_inner_head = false;
+    for (auto& tok : t) {
+        if (tok.kind == L_TEMPLATE_HEAD && tok.str == "inner ") saw_inner_head = true;
+    }
+    EXPECT_TRUE(saw_inner_head);
+    EXPECT_EQ(t.back().kind, L_TEMPLATE_TAIL);
+    EXPECT_EQ(t.back().str, " end");
+    EXPECT_EQ(num_parse_error, 0);
+}
+
+TEST_F(LexerTest, TemplateLiteral_UnterminatedEOF_Error) {
+    auto t = Tokenize("`hello\n");
+    EXPECT_GT(num_parse_error, 0);
+}
+
+// Regression test for a real out-of-bounds bug caught by UBSan during
+// self-review: exceeding MAX_TEMPLATE_NESTING left template_nesting stuck
+// one past the array bound (lexerror() doesn't longjmp, so scanning
+// continues after the "too deep" error), and the very next '{'/'}'
+// anywhere later in the same file wrote out of bounds via
+// template_brace_depth[template_nesting]. Deliberately exceeds
+// MAX_TEMPLATE_NESTING (16) and then uses a plain brace block afterward in
+// the same source, in the same spirit as the heredoc/directive recovery
+// tests above -- this needs to not crash under ASan/UBSan, which is the
+// whole point of the test.
+TEST_F(LexerTest, TemplateLiteral_ExceedsMaxNesting_RecoversWithoutOOB) {
+    std::string s;
+    for (int i = 0; i < 20; i++) s += "`${";
+    s += "x";
+    for (int i = 0; i < 20; i++) s += "}`";
+    s += "\n{ 1; }\n";  // brace usage after the nesting error, same file
+    auto t = Tokenize(s);
+    EXPECT_GT(num_parse_error, 0);
+}
+
+// Regression test for a second leak found alongside the nesting-limit OOB
+// above: STR_CHECK_OVERFLOW() firing while accumulating a template's
+// MIDDLE/TAIL fragment (template_is_continuation) bails out via BEGIN
+// (INITIAL) + return without ever reaching the normal "template_nesting--"
+// on close, so that level leaked for the rest of the compile. Confirmed
+// empirically (by temporarily disabling the fix) that this single overflow
+// event alone leaves template_nesting == 1 instead of back at 0 -- kept
+// deliberately small (one overflow, not many) since a large/repeated
+// version of this exhausts the small fixed-size global scratchpad buffer
+// that scratch_copy() allocates out of (a separate, pre-existing capacity
+// limit of this raw Tokenize() harness, which never frees token string
+// values between calls -- not something this test is about).
+TEST_F(LexerTest, TemplateLiteral_OverflowDuringMiddleFragment_DoesNotLeakNesting) {
+    std::string s = "`${x}";
+    s += std::string(5000, 'a');  // > MAXLINE (4096), overflows mid-MIDDLE-fragment
+    s += "${y}z`\n";
+
+    auto t = Tokenize(s);
+    EXPECT_GT(num_parse_error, 0);
+    EXPECT_EQ(template_nesting, 0);
+}
+
+// ============================================================================
+// 13. Mapping dot access / optional chaining tokens
+// ============================================================================
+
+TEST_F(LexerTest, OptionalDot_BeforeIdentifier) {
+    auto t = Tokenize("m?.key\n");
+    ASSERT_EQ(t.size(), 3u);
+    EXPECT_EQ(t[0].kind, L_IDENTIFIER);
+    EXPECT_EQ(t[1].kind, L_OPTIONAL_DOT);
+    EXPECT_EQ(t[2].kind, L_IDENTIFIER);
+}
+
+TEST_F(LexerTest, OptionalDot_BeforeBracket) {
+    auto t = Tokenize("m?.[1]\n");
+    ASSERT_EQ(t.size(), 5u);
+    EXPECT_EQ(t[0].kind, L_IDENTIFIER);
+    EXPECT_EQ(t[1].kind, L_OPTIONAL_DOT);
+    EXPECT_EQ(t[2].kind, '[');
+    EXPECT_EQ(t[3].kind, L_NUMBER);
+    EXPECT_EQ(t[4].kind, ']');
+}
+
+// Disambiguation: "? .5" (ternary float branch) must NOT be read as "?."
+// followed by "5" -- '?' alone, then the float literal ".5".
+
+// "?." is only recognized as L_OPTIONAL_DOT when followed by an
+// identifier-start char or '[' (see the lookahead guard in lex.l). Right
+// after '?', a '.' followed by a digit can't be the start of any valid
+// LPC construct in this dialect either way (leading-dot floats like ".5"
+// aren't supported -- ".5" alone always lexes as L_DOT then L_NUMBER, never
+// L_REAL), but the guard must still fall back to plain '?' rather than
+// eating the '.' as part of an optional-chaining token, so the '.'/'5' that
+// follow get lexed the same way they would anywhere else.
+TEST_F(LexerTest, OptionalDot_LookaheadGuard_FallsBackOnNonIdentifierStart) {
+    auto t = Tokenize("a?.5\n");
+    ASSERT_EQ(t.size(), 4u);
+    EXPECT_EQ(t[0].kind, L_IDENTIFIER);
+    EXPECT_EQ(t[1].kind, '?');
+    EXPECT_EQ(t[2].kind, L_DOT);
+    EXPECT_EQ(t[3].kind, L_NUMBER);
+    EXPECT_EQ(t[3].number, 5);
+}
+
+// A plain ternary with whitespace around '?' is completely unaffected by
+// the new "?." rule (no adjacent "?." substring appears at all).
+TEST_F(LexerTest, Ternary_StillLexesNormally) {
+    auto t = Tokenize("a ? b : c\n");
+    ASSERT_EQ(t.size(), 5u);
+    EXPECT_EQ(t[0].kind, L_IDENTIFIER);
+    EXPECT_EQ(t[1].kind, '?');
+    EXPECT_EQ(t[2].kind, L_IDENTIFIER);
+    EXPECT_EQ(t[3].kind, ':');
+    EXPECT_EQ(t[4].kind, L_IDENTIFIER);
+}
+
+// "??" (nullish coalescing) must still win over "?." + more when there's no
+// dot at all, and "??" followed by a dot-like continuation shouldn't merge.
+TEST_F(LexerTest, QuestionQuestion_StillLexesNormally) {
+    auto t = Tokenize("a ?? b\n");
+    ASSERT_EQ(t.size(), 3u);
+    EXPECT_EQ(t[0].kind, L_IDENTIFIER);
+    EXPECT_EQ(t[1].kind, L_QUESTION_QUESTION);
+    EXPECT_EQ(t[2].kind, L_IDENTIFIER);
+}
+
+TEST_F(LexerTest, DotOptional_BracketForm) {
+    auto t = Tokenize("m.?[1]\n");
+    ASSERT_EQ(t.size(), 5u);
+    EXPECT_EQ(t[0].kind, L_IDENTIFIER);
+    EXPECT_EQ(t[1].kind, L_DOT_OPTIONAL);
+    EXPECT_EQ(t[2].kind, '[');
+    EXPECT_EQ(t[3].kind, L_NUMBER);
+    EXPECT_EQ(t[4].kind, ']');
+}
+
+// Plain '.' must still lex correctly when not followed by '?'.
+TEST_F(LexerTest, PlainDot_StillLexesNormally) {
+    auto t = Tokenize("m.key\n");
+    ASSERT_EQ(t.size(), 3u);
+    EXPECT_EQ(t[0].kind, L_IDENTIFIER);
+    EXPECT_EQ(t[1].kind, L_DOT);
+    EXPECT_EQ(t[2].kind, L_IDENTIFIER);
+}
+
+// Range operator ".." must not be swallowed by the new ".?"/"?." rules.
+TEST_F(LexerTest, RangeDotDot_StillLexesNormally) {
+    auto t = Tokenize("a[0..5]\n");
+    bool saw_range = false;
+    for (auto& tok : t) {
+        if (tok.kind == L_RANGE) saw_range = true;
+    }
+    EXPECT_TRUE(saw_range);
 }

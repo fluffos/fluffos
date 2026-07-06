@@ -4,7 +4,14 @@
 %define parse.error detailed
 %define parse.assert true
 %define parse.lac full
-%expect 2
+/* 3rd conflict (added alongside string_like/template_literal): shift/reduce
+ * on L_STRING between extending string_literal (string_literal: string_literal
+ * L_STRING) and reducing to close off a string_like chain (string_like:
+ * string_like string). Default shift-preference is exactly what's wanted --
+ * it keeps folding adjacent plain string literals into one string_literal at
+ * compile time, the same as before string_like existed, rather than ever
+ * splitting them into a runtime string_like L_STRING chain. */
+%expect 3
 
 %start all
 
@@ -46,6 +53,9 @@ int yyparse(void);
 %token <number> L_NUMBER
 %token <real>   L_REAL
 
+/* Template literal fragments: `head${`, `}middle${`, `}tail` */
+%token <string> L_TEMPLATE_HEAD L_TEMPLATE_MIDDLE L_TEMPLATE_TAIL
+
 /* Type keywords */
 %token <number> L_BASIC_TYPE L_TYPE_MODIFIER
 
@@ -86,6 +96,9 @@ int yyparse(void);
 
 /* Member access and scope */
 %token L_ARROW L_DOT L_INHERIT L_COLON_COLON
+
+/* Optional chaining:  ?.name  ?.[idx]  .?[idx]  (mappings only) */
+%token L_OPTIONAL_DOT L_DOT_OPTIONAL
 
 /* Compound literal openers:  ({  ([  (:  (: with new-syntax */
 %token L_ARRAY_OPEN L_MAPPING_OPEN L_FUNCTION_OPEN
@@ -175,7 +188,8 @@ int yyparse(void);
 %type <number> functional_open
 %type <string> function_name identifier new_local_name
 %type <node> optional_default_arg_value
-%type <node> number real string expr comma_expr for_expr sscanf catch
+%type <node> number real string string_like template_literal template_parts
+%type <node> expr comma_expr for_expr sscanf catch
 %type <node> parse_command time_expression opt_arg_list arg_list opt_pair_list
 %type <node> pair_list assoc_pair primary_expr lvalue function_call lvalue_list
 %type <node> new_local_def statement stmt_while stmt_cond stmt_do stmt_switch case
@@ -469,7 +483,7 @@ primary_expr:
   | L_DEFINED_NAME                   { rule_primary_expr_defined_name(&$$, $L_DEFINED_NAME); }
   | L_IDENTIFIER                     { rule_primary_expr_identifier(&$$, $L_IDENTIFIER); }
   | L_PARAMETER                      { rule_primary_expr_parameter(&$$, $L_PARAMETER); }
-  | string
+  | string_like
   | '(' comma_expr ')'               { $$ = $comma_expr; }
   | catch
   | tree
@@ -481,6 +495,16 @@ primary_expr:
   /* Member access */
   | primary_expr[expr_node] L_ARROW identifier   { rule_primary_expr_member_arrow(&$$, $expr_node, $identifier); }
   | primary_expr[expr_node] L_DOT   identifier   { rule_primary_expr_member_dot(&$$, $expr_node, $identifier); }
+
+  /* Optional chaining (mappings only): expr?.name, expr?.[idx], expr.?[idx].
+   * Short-circuits to 0 at runtime instead of erroring when expr isn't a
+   * mapping; see rule_primary_expr_member_optional/rule_primary_expr_index_optional. */
+  | primary_expr[expr_node] L_OPTIONAL_DOT identifier
+    { rule_primary_expr_member_optional(&$$, $expr_node, $identifier); }
+  | primary_expr[expr_node] L_OPTIONAL_DOT '[' comma_expr[idx] ']'
+    { rule_primary_expr_index_optional(&$$, $expr_node, $idx); }
+  | primary_expr[expr_node] L_DOT_OPTIONAL '[' comma_expr[idx] ']'
+    { rule_primary_expr_index_optional(&$$, $expr_node, $idx); }
 
   /* Subscript and slice indexing -- eight range forms combining forward (n)
    * and reverse-from-end (<n) endpoints, plus open-ended variants. */
@@ -1013,6 +1037,35 @@ ref:
 /* A string wrapped as a parse-tree node. */
 string:
   string_literal  { rule_string(&$$, $string_literal); }
+;
+
+/* Template literal: a backtick string with `${expr}` interpolation.
+ * L_TEMPLATE_HEAD/L_TEMPLATE_MIDDLE/L_TEMPLATE_TAIL are the literal text
+ * fragments between interpolations (lexed natively, see lex.l); each
+ * interpolated `expr` is coerced to a string at runtime (F_TEMPLATE_COERCE)
+ * and the whole thing folds into a chain of runtime string concatenations.
+ * A backtick string with no interpolation at all never reaches this rule --
+ * the lexer returns a plain L_STRING for it instead, so it participates in
+ * ordinary string_literal concatenation like a "..." literal would. */
+template_literal:
+  L_TEMPLATE_HEAD expr[e] template_parts[rest]  { rule_template_literal(&$$, $L_TEMPLATE_HEAD, $e, $rest); }
+;
+
+template_parts:
+  L_TEMPLATE_TAIL                                     { rule_template_parts_tail(&$$, $L_TEMPLATE_TAIL); }
+  | L_TEMPLATE_MIDDLE expr[e] template_parts[rest]     { rule_template_parts_middle(&$$, $L_TEMPLATE_MIDDLE, $e, $rest); }
+;
+
+/* A string-valued primary expression: any mix of adjacent plain strings and
+ * template literals, concatenated left to right. Pure adjacent "..." chains
+ * still fold at compile time via string_literal above; anything touching a
+ * template literal folds into runtime F_ADD nodes instead, since a template
+ * literal's value isn't known until its interpolated expressions run. */
+string_like:
+  string
+  | template_literal
+  | string_like[left] string[right]            { rule_string_like_concat(&$$, $left, $right); }
+  | string_like[left] template_literal[right]   { rule_string_like_concat(&$$, $left, $right); }
 ;
 
 /* Adjacent string literal tokens are implicitly concatenated:

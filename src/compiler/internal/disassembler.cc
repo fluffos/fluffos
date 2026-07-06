@@ -5,7 +5,6 @@
 #include "vm/vm.h"
 #include "compiler/internal/lex.h"
 #include "compiler/internal/icode.h"
-#include "include/opcodes_extra.h"
 
 #include <fmt/format.h>
 
@@ -434,6 +433,17 @@ static void disassemble(FILE *f, char *code, int start, int end, program_t *prog
       case F_MEMBER:
       case F_MEMBER_LVALUE:
         sprintf(buff, "%d", EXTRACT_UCHAR(pc++));
+        break;
+
+      case F_MAP_MEMBER:
+      case F_MAP_MEMBER_LVALUE:
+      case F_MAP_MEMBER_OPTIONAL:
+        COPY_SHORT(&sarg, pc);
+        sprintf(buff, "%d", sarg);
+        pc += 2;
+        break;
+      case F_MAP_INDEX_OPTIONAL:
+        /* no operand */
         break;
 
       case F_EXPAND_VARARGS: {

@@ -8,7 +8,6 @@
 #include "compiler/internal/lex.h"
 #include "compiler/internal/scratchpad.h"
 #include "compiler/internal/generate.h"
-#include "include/opcodes_extra.h"
 
 // Structs used by value in rule helpers — must match grammar.y %union fields.
 typedef struct {
@@ -170,6 +169,10 @@ void rule_sscanf(parse_node_t **result, parse_node_t *expr1, parse_node_t *expr2
 void rule_parse_command(parse_node_t **result, parse_node_t *expr1, parse_node_t *expr2, parse_node_t *expr3, parse_node_t *lvalue_list);
 void rule_time_expression(parse_node_t **result, parse_node_t *expr_or_block, LPC_INT saved_context);
 void rule_string(parse_node_t **result, char *str);
+void rule_string_like_concat(parse_node_t **result, parse_node_t *left, parse_node_t *right);
+void rule_template_literal(parse_node_t **result, char *head, parse_node_t *expr, parse_node_t *rest);
+void rule_template_parts_tail(parse_node_t **result, char *tail);
+void rule_template_parts_middle(parse_node_t **result, char *mid, parse_node_t *expr, parse_node_t *rest);
 LPC_INT rule_efun_override(char *identifier);
 LPC_INT rule_efun_override_new();
 LPC_INT rule_functional_open(LPC_INT val);
@@ -188,6 +191,8 @@ function_context_t *rule_dollar_open();
 void rule_primary_expr_dollar_expr(parse_node_t **result, function_context_t *saved_context, parse_node_t *expr);
 void rule_primary_expr_member_arrow(parse_node_t **result, parse_node_t *expr, char *identifier);
 void rule_primary_expr_member_dot(parse_node_t **result, parse_node_t *expr, char *identifier);
+void rule_primary_expr_member_optional(parse_node_t **result, parse_node_t *expr, char *identifier);
+void rule_primary_expr_index_optional(parse_node_t **result, parse_node_t *expr, parse_node_t *idx);
 void rule_primary_expr_range_nn(parse_node_t **result, parse_node_t *expr, parse_node_t *expr1, parse_node_t *expr2);
 void rule_primary_expr_range_rn(parse_node_t **result, parse_node_t *expr, parse_node_t *expr1, parse_node_t *expr2);
 void rule_primary_expr_range_rr(parse_node_t **result, parse_node_t *expr, parse_node_t *expr1, parse_node_t *expr2);
