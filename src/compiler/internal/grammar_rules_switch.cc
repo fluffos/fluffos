@@ -149,12 +149,8 @@ void rule_constant_and(LPC_INT *result, LPC_INT val1, LPC_INT val2) {
   *result = val1 & val2;
 }
 
-void rule_constant_eq(LPC_INT *result, LPC_INT val1, LPC_INT val2) {
-  *result = val1 == val2;
-}
-
-void rule_constant_ne(LPC_INT *result, LPC_INT val1, LPC_INT val2) {
-  *result = val1 != val2;
+void rule_constant_eq_ne(LPC_INT *result, LPC_INT op, LPC_INT val1, LPC_INT val2) {
+  *result = (op == F_EQ) ? (val1 == val2) : (val1 != val2);
 }
 
 void rule_constant_order(LPC_INT *result, LPC_INT val1, LPC_INT op, LPC_INT val2) {
@@ -170,12 +166,8 @@ void rule_constant_lt(LPC_INT *result, LPC_INT val1, LPC_INT val2) {
   *result = val1 < val2;
 }
 
-void rule_constant_lsh(LPC_INT *result, LPC_INT val1, LPC_INT val2) {
-  *result = val1 << val2;
-}
-
-void rule_constant_rsh(LPC_INT *result, LPC_INT val1, LPC_INT val2) {
-  *result = val1 >> val2;
+void rule_constant_shift(LPC_INT *result, LPC_INT op, LPC_INT val1, LPC_INT val2) {
+  *result = (op == F_LSH) ? (val1 << val2) : (val1 >> val2);
 }
 
 void rule_constant_add(LPC_INT *result, LPC_INT val1, LPC_INT val2) {

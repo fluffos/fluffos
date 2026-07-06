@@ -940,6 +940,26 @@ free-only-if-last trick stays documented in scratchpad.cc.)
 
 ---
 
+## The driver-autotest gate — what it proves (verified, with negative control)
+
+Challenged and confirmed: `cmake --build . --target driver-autotest` is
+an `add_custom_target`, so it EXECUTES the driver against the testsuite
+on every invocation (custom targets are always stale -- "Built target"
+after the run means the command ran). The pass/fail contract, traced
+through the mudlib and PROVEN both ways:
+- Each test file runs via `ASSERT_EQ(0, catch(fun->do_tests()))` in
+  /command/tests; any failing assert/uncaught error escapes to
+  master.c's `flag()`, which calls `shutdown(-1)` -- and a NONZERO
+  driver exit fails the cmake target (verified by negative control: a
+  deliberate `ASSERT(0 == 1)` test file made the target exit 2 with no
+  "Built target" line).
+- A clean full run prints `Checks succeeded.` before the auto-shutdown
+  (present in the verification log).
+So the criterion used throughout ("Built target driver-autotest"
+printed / exit 0) is a sound full-suite pass signal. The repeated
+`Error in mudlib error handler: query_temp` noise in logs comes from
+crasher/750.c -- the crasher suite deliberately ignores errors.
+
 ## lex.l purity — the standing rule and its enforcement rounds
 
 **Rule (by direction): lex.l contains ONLY interactions with flex** —
@@ -1217,3 +1237,141 @@ current tests are green.
 8. **`add_input` splice cap.** Single macro-expansion splices are capped at
    ~64KB (`DEFMAX-10`, legacy semantics). Revisit only if a real mudlib
    trips it ("Macro expansion buffer overflow").
+
+---
+
+## Phase 9 (PROPOSED — awaiting green-light) — move lexer logic into the parser
+
+**Direction prompt**: "a lot of logic in lexer can be moved into parser."
+Full audit of what remains in the lexer done; per-candidate analysis with
+LALR feasibility and risk, self-reviewed. Ordered by recommendation:
+
+### 9.1 `({` / `([` compound-open tokens → plain `'(' '{'` / `'(' '['` — ✅ LANDED
+Today `"("{WS}*"{"` and `"("{WS}*"["` are composite tokens, which is why
+the lexer needs `lpc_lex_count_newlines()` over embedded whitespace AND a
+special `lpc_lex_brace_open()` call on `({` (the '{' is hidden inside the
+composite, so template-interpolation depth tracking must be told about it
+by hand). The grammar already closes with SEPARATE `'}' ')'` tokens —
+the open side is the asymmetric half.
+- Grammar: `'(' '{' opt_arg_list '}' ')'` and `'(' '[' opt_pair_list ']'
+  ')'` are unambiguous — `'{'`/`'['` can follow `'('` in no other LPC
+  production (no block-in-expression), so LALR(1) takes them without
+  conflict (verify with bison -Wall counts).
+- Deletes: both composite rules + their `count_newlines` calls (the
+  whitespace between becomes ordinary whitespace tokens), the `({`
+  special case in template brace tracking (the plain `'{'` rule then
+  fires naturally — one LESS special case in the interpolation counter),
+  and the `L_ARRAY_OPEN`/`L_MAPPING_OPEN` tokens.
+- Bonus: parseHeredoc's array form stops synthesizing a bare
+  L_ARRAY_OPEN token with stale yytext (the test-harness oddity) — the
+  whole `({ "a", "b" })` becomes ordinary splice text.
+- Risk: LOW. Behavior identical; gate on conflict-free bison output +
+  full battery.
+- LANDED exactly as analyzed: zero new bison conflicts (%expect 3
+  held), both composite rules + their count_newlines calls deleted, the
+  `({` special case in template brace tracking gone (the plain '{' rule
+  fires naturally -- pinned by the updated
+  TemplateLiteral_ArrayLiteralInsideInterpolation), parseHeredoc's array
+  form now splices the whole ordinary `({ ... })` text (the synthesized
+  L_ARRAY_OPEN-with-stale-yytext oddity is gone from both code and test
+  comments), and the L_ARRAY_OPEN/L_MAPPING_OPEN tokens are deleted.
+  Verified: 271 tests, driver-autotest ×3, lpcshell smokes for array/
+  mapping literals, indexing, initializers, newline-split opens, and
+  array-in-template-interpolation. (Verification note: one smoke round
+  was invalidated by a stale binary after a git-stash comparison dance
+  and redone -- the "regression" it showed was the stale binary.)
+
+### 9.2 The `(: name` disambiguation machinery → grammar productions — ✅ LANDED
+The single largest remaining lump of lexer cleverness: `SC_FUNC_OPEN`
+(+ its comment/EOF/dot rules), `compiler_context_t::function_flag`,
+`old_func()`'s name re-splice, the one-byte `':'/','` peek in
+`lpc_lex_resolve_identifier`, and the `L_NEW_FUNCTION_OPEN` token whose
+yylval pre-encodes `(index << 8) | FP_KIND`. All of it exists to decide,
+IN THE LEXER, whether `(: foo ...` is a named function ref / partial
+application or an anonymous body starting with an identifier.
+- Parser-side shape: lex `(:` always as `L_FUNCTION_OPEN`; grammar gains
+  `L_FUNCTION_OPEN name ':' ')'` (named) and `L_FUNCTION_OPEN name ','
+  arg_list ':' ')'` (papply) alongside the existing
+  `L_FUNCTION_OPEN comma_expr ':' ')'` (anon). LALR(1) defers the
+  named-vs-expr decision past the shifted identifier to the `':'`/`','`
+  lookahead — exactly the one-byte peek, but in the machine built for it.
+  The FP_LOCAL/FP_SIMUL/FP_EFUN resolution moves to a `rule_*` helper
+  reusing the same ihe switch (the parser already receives resolved
+  `L_DEFINED_NAME` ihes).
+- Known ambiguity to settle BY PRODUCTION, with tests: `(: foo, 1 :)` is
+  papply today (comma_expr could also derive `foo, 1`) — the grammar
+  must prefer the papply production; and the `old_func` comment's
+  pathological forms (`#define x :)` etc.) become grammar-defined,
+  changing behavior on inputs the legacy comment already calls "gets it
+  wrong but almost pathological".
+- Deletes: one start condition, one ctx field, ~120 lines of the
+  trickiest splice/peek logic, and a token.
+- Risk: MEDIUM-HIGH (core expression grammar, LALR conflicts to verify,
+  edge-semantics lock-in). Land alone, full battery + new functional
+  grammar pins.
+- LANDED as analyzed, with the conflict picture verified by
+  counterexamples: exactly TWO new shift/reduce conflicts, both the
+  intended shift-preferences (`L_FUNCTION_OPEN L_DEFINED_NAME • ':'` and
+  `• ','`), documented at the bumped `%expect 5`. Deleted: SC_FUNC_OPEN
+  (+its comment-reuse tags, WS/EOF/dot rules), `function_flag`,
+  `old_func()`, the one-byte `':'/','`  peek + its pushback buffers, the
+  `(:` re-splice tail, and the `L_NEW_FUNCTION_OPEN` token; the
+  name-to-FP_* encoding became `rule_functional_ref()`
+  (grammar_rules_exprs.cc). Function-context lifecycle NORMALIZED: the
+  `(:` lexer glue pushes for every form and the constructors pop
+  uniformly — which also fixes a latent legacy leak (the efun_override
+  path pushed a context nothing popped, bounded only by
+  MAX_FUNCTION_DEPTH). Deliberate edge-semantics changes, as flagged:
+  `(: var, args :)` and unknown-name forms now get direct grammar/
+  semantic diagnostics instead of the legacy silent re-splice into an
+  anonymous body that then misparsed. Verified: 271 unit tests,
+  driver-autotest ×4 (including the new
+  tests/compiler/functional_forms.c pin covering all nine forms:
+  named/efun/papply/override/anon-$N/global-var/name-starts-expr/
+  nested/comment-after-open), lpcshell value checks for every form.
+
+
+### 9.4 Token-inventory diet (by direction: "a bunch of L_* is really unnecessary") — ✅ LANDED
+Audit of all 59 declared tokens against lexer production and grammar
+consumption. Landed:
+- **Deleted dead**: `L_PREPROCESSOR_COMMAND` (declared, never produced,
+  never in a production -- a pre-merge preprocessor artifact).
+- **Folded single-char named tokens to their literal chars**: `L_NOT` →
+  `'!'` (8 grammar sites + the unary precedence level now read as the
+  operator itself), `L_DOT` → `'.'`. The #if evaluator's L_NOT case
+  vanished outright ('!' already flowed through its char-token path).
+- **Merged same-precedence operator families onto the in-repo L_ORDER
+  idiom** (one token, opcode in yylval): `L_EQ`+`L_NE` → `L_EQ_NE`
+  (F_EQ/F_NE), `L_LSH`+`L_RSH` → `L_SHIFT` (F_LSH/F_RSH). Each merge
+  also collapsed its expr and constant-fold production pairs into one;
+  `rule_expr_eq`/`ne` keep separate bodies behind a dispatcher ('=='
+  carries a compare-against-zero strength reduction '!=' doesn't), and
+  the constant folds became two-line op-dispatched functions.
+- **Audited and kept, with reasons**: `L_LAND`/`L_LOR` (different
+  precedence levels -- a merged token can only carry ONE precedence);
+  `L_INC`/`L_DEC` (pre/post productions differ anyway, so no production
+  collapse -- a merge would only trade a token for opaque dispatch);
+  `'<'` stays a char token apart from L_ORDER (it doubles as the
+  range-open in `[<a..<b]`); all reserved-word and value-carrying
+  tokens (grammar positions / payloads are real).
+Net: 59 → 54 tokens, four productions fewer, zero conflict-count change
+(%expect 5 held). Verified: 271 tests, driver-autotest ×3, lpcshell
+smoke exercising ==/!=/<</>>/!/'.' in both code and #if.
+
+### 9.3 Audited and REJECTED (with reasons, so this isn't re-litigated)
+- **Reserved-word/type/identifier classification → parser**: the LALR
+  tables DEPEND on token kinds (`L_BASIC_TYPE` vs `L_IDENTIFIER` drive
+  declaration-vs-expression decisions); parser-side classification means
+  GLR or hand-rolled lookahead — a parser redesign, not a cleanup.
+- **Template interpolation brace tracking → parser**: the LEXER must
+  know at `'}'`-scan time whether to resume SC_TEMPLATE_BODY, before the
+  parser has necessarily reduced the interpolated expression (LALR holds
+  lookahead) — parser feedback here is a known-fragile pattern; the
+  per-nesting depth counter is the industry-standard solution (kept
+  small by 9.1 removing its `({` special case).
+- **Heredoc body/array assembly → parser**: the terminator is
+  runtime-supplied text, structurally lexical; the array splice already
+  feeds the parser ordinary tokens (and 9.1 makes it fully ordinary).
+- **`$N` params, char literals, `L_ORDER`-carries-opcode**: single-token
+  lexical facts; nothing to move.
+

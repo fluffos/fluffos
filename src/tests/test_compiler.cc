@@ -395,6 +395,20 @@ TEST(Preprocessor, BluePaintFunctionLikeSelfRefIgnoresFollowingParens) {
               "int v = F(2 + 1);");
 }
 
+TEST(Preprocessor, CrlfMultiLineDefineAndUse) {
+    // Windows CI checks the tree out with CRLF (autocrlf): a multi-line
+    // #define whose continuation ends "\\\r\n" must fold exactly like
+    // the LF form, and the expanded body must not carry stray '\r'
+    // bytes. Mirrors testsuite/include/tests.h's OUTPUT macro, whose
+    // continuation leaking as top-level code was the July-1 Windows CI
+    // failure signature.
+    EXPECT_EQ(pp("#define SAFE(x) do {x} while(0)\r\n"
+                 "#define OUTPUT(x) SAFE(write(x); \\\r\n"
+                 "  if(!this_player()) { shutdown(-1); })\r\n"
+                 "OUTPUT(\"hi\")\r\n"),
+              "do { write(\"hi\"); if (!this_player()) { shutdown(-1); } } while (0)");
+}
+
 TEST(Preprocessor, MultiLineMacroArgKeepsLineCount) {
     // A macro argument spanning a newline: the newline is consumed once
     // from the raw stream by the argument collector AND a copy of it can
@@ -1006,11 +1020,9 @@ TEST(Preprocessor, HeredocArrayFormKeepsLineCount) {
     // count every body line a second time). Also covers the
     // trailing-content terminator path: the ";" after END is pushed back
     // along with the line's newline, which is then counted exactly once at
-    // rescan. (The leading L_ARRAY_OPEN is synthesized by parseHeredoc(),
-    // so this harness -- which renders operator tokens via yytext --
-    // shows nothing for it; the "({" is present in the token stream.)
+    // rescan. Since 9.1 the spliced literal is ordinary '(' '{' tokens.
     EXPECT_EQ(pp("string *y = @@END\na\nb\nEND;\nint l = __LINE__;\n"),
-              "string *y = \"a\", \"b\", }); int l = 5;");
+              "string *y = ({ \"a\", \"b\", }); int l = 5;");
 }
 
 // ---------------------------------------------------------------------------

@@ -580,13 +580,13 @@ TEST_F(LexerTest, Operators_Table) {
         {"<<=\n", L_ASSIGN}, {">>=\n", L_ASSIGN}, {"&&=\n", L_ASSIGN}, {"||=\n", L_ASSIGN},
         {"?\?=\n", L_ASSIGN}, {"=\n", L_ASSIGN},
         // Logical / short-circuit
-        {"&&\n", L_LAND}, {"||\n", L_LOR}, {"?\?\n", L_QUESTION_QUESTION}, {"!\n", L_NOT},
+        {"&&\n", L_LAND}, {"||\n", L_LOR}, {"?\?\n", L_QUESTION_QUESTION}, {"!\n", '!'},
         // Comparison
-        {"==\n", L_EQ}, {"!=\n", L_NE}, {"<\n", '<'}, {">\n", L_ORDER},
+        {"==\n", L_EQ_NE}, {"!=\n", L_EQ_NE}, {"<\n", '<'}, {">\n", L_ORDER},
         {"<=\n", L_ORDER}, {">=\n", L_ORDER},
         // Other multi-char operators
-        {"++\n", L_INC}, {"--\n", L_DEC}, {"->\n", L_ARROW}, {"..\n", L_RANGE},
-        {"...\n", L_DOT_DOT_DOT}, {"::\n", L_COLON_COLON}, {"<<\n", L_LSH}, {">>\n", L_RSH},
+        {"++\n", L_INC_DEC}, {"--\n", L_INC_DEC}, {"->\n", L_ARROW}, {"..\n", L_RANGE},
+        {"...\n", L_DOT_DOT_DOT}, {"::\n", L_COLON_COLON}, {"<<\n", L_SHIFT}, {">>\n", L_SHIFT},
     };
     for (auto& c : cases) {
         auto t = Tokenize(c.src);
@@ -600,7 +600,7 @@ TEST_F(LexerTest, Punctuation_Table) {
     static const Case cases[] = {
         {"(\n", '('}, {")\n", ')'}, {"{\n", '{'}, {"}\n", '}'},
         {"[\n", '['}, {"]\n", ']'}, {";\n", ';'}, {",\n", ','},
-        {":\n", ':'}, {"?\n", '?'}, {".\n", L_DOT},
+        {":\n", ':'}, {"?\n", '?'}, {".\n", '.'},
     };
     for (auto& c : cases) {
         auto t = Tokenize(c.src);
@@ -738,13 +738,15 @@ TEST_F(LexerTest, Heredoc_Text_MultiLine) {
     EXPECT_EQ(t[0].kind, L_STRING);
 }
 
-// "@@TERM ... TERM" (Robocoder's array-of-lines form) lands on a literal
-// "({" and re-enters the top-level scanner to produce a full array
-// expression's worth of tokens, not a single string.
+// "@@TERM ... TERM" (Robocoder's array-of-lines form) splices a literal
+// "({ ... })" and re-enters the top-level scanner to produce a full array
+// expression's worth of tokens, not a single string. Since 9.1 the open
+// is the ordinary '(' '{' token pair.
 TEST_F(LexerTest, Heredoc_Array) {
     auto t = Tokenize("@@END\nfirst\nsecond\nEND\n");
-    ASSERT_FALSE(t.empty());
-    EXPECT_EQ(t[0].kind, L_ARRAY_OPEN);
+    ASSERT_GE(t.size(), 2u);
+    EXPECT_EQ(t[0].kind, '(');
+    EXPECT_EQ(t[1].kind, '{');
     bool found_first = false;
     for (auto& tok : t) {
         if (tok.kind == L_STRING && tok.str == "first") found_first = true;
@@ -948,23 +950,28 @@ TEST_F(LexerTest, Pragma_MultipleLeadingSpaces) {
 // ============================================================================
 
 TEST_F(LexerTest, Paren_ArrayOpen) {
+    // Since 9.1 "({" is the ordinary '(' '{' token pair; the grammar
+    // pairs them (the closer always was separate '}' ')').
     auto t = Tokenize("({ 1 })\n");
-    ASSERT_FALSE(t.empty());
-    EXPECT_EQ(t[0].kind, L_ARRAY_OPEN);
+    ASSERT_GE(t.size(), 2u);
+    EXPECT_EQ(t[0].kind, '(');
+    EXPECT_EQ(t[1].kind, '{');
 }
 
 TEST_F(LexerTest, Paren_ArrayOpen_WithWhitespace) {
     // whitespace between '(' and '{' is always allowed (the strict "wombles"
     // dialect that used to forbid this was removed from the driver).
     auto t = Tokenize("(  {\n 1 })\n");
-    ASSERT_FALSE(t.empty());
-    EXPECT_EQ(t[0].kind, L_ARRAY_OPEN);
+    ASSERT_GE(t.size(), 2u);
+    EXPECT_EQ(t[0].kind, '(');
+    EXPECT_EQ(t[1].kind, '{');
 }
 
 TEST_F(LexerTest, Paren_MappingOpen) {
     auto t = Tokenize("([ 1:2 ])\n");
-    ASSERT_FALSE(t.empty());
-    EXPECT_EQ(t[0].kind, L_MAPPING_OPEN);
+    ASSERT_GE(t.size(), 2u);
+    EXPECT_EQ(t[0].kind, '(');
+    EXPECT_EQ(t[1].kind, '[');
 }
 
 TEST_F(LexerTest, Paren_ScopeOperator_NotFunctionOpen) {
@@ -1172,20 +1179,19 @@ TEST_F(LexerTest, TemplateLiteral_BracesInsideInterpolation_NotMistakenForClose)
     EXPECT_EQ(num_parse_error, 0);
 }
 
-// Regression test (found in self-review vs master): an array literal
-// "({ ... })" inside ${...}. The '{' there is consumed as part of the
-// single L_ARRAY_OPEN token -- not by the plain '{' rule -- but its closer
-// is still a *separate* bare '}' token, so the L_ARRAY_OPEN rule must
-// count it toward template brace depth too, or the array's '}' is misread
-// as the end of the interpolation and the rest of the template garbles
-// ("syntax error, unexpected L_TEMPLATE_TAIL" at the parser level).
+// Regression test: an array literal "({ ... })" inside ${...}. Its '{'
+// must count toward template brace depth (else the array's '}' is
+// misread as the end of the interpolation and the rest of the template
+// garbles). Since 9.1 the plain '{' rule fires naturally for it -- the
+// old single-token L_ARRAY_OPEN special case in the depth tracking is
+// gone.
 TEST_F(LexerTest, TemplateLiteral_ArrayLiteralInsideInterpolation) {
     auto t = Tokenize("`${ ({ 1, 2 })[0] } end`\n");
     ASSERT_FALSE(t.empty());
     EXPECT_EQ(t[0].kind, L_TEMPLATE_HEAD);
     bool saw_array_open = false;
-    for (auto& tok : t) {
-        if (tok.kind == L_ARRAY_OPEN) saw_array_open = true;
+    for (size_t i = 0; i + 1 < t.size(); i++) {
+        if (t[i].kind == '(' && t[i + 1].kind == '{') saw_array_open = true;
     }
     EXPECT_TRUE(saw_array_open);
     EXPECT_EQ(t.back().kind, L_TEMPLATE_TAIL);
@@ -1288,7 +1294,7 @@ TEST_F(LexerTest, OptionalDot_BeforeBracket) {
 // identifier-start char or '[' (see the lookahead guard in lex.l). Right
 // after '?', a '.' followed by a digit can't be the start of any valid
 // LPC construct in this dialect either way (leading-dot floats like ".5"
-// aren't supported -- ".5" alone always lexes as L_DOT then L_NUMBER, never
+// aren't supported -- ".5" alone always lexes as '.' then L_NUMBER, never
 // L_REAL), but the guard must still fall back to plain '?' rather than
 // eating the '.' as part of an optional-chaining token, so the '.'/'5' that
 // follow get lexed the same way they would anywhere else.
@@ -1297,7 +1303,7 @@ TEST_F(LexerTest, OptionalDot_LookaheadGuard_FallsBackOnNonIdentifierStart) {
     ASSERT_EQ(t.size(), 4u);
     EXPECT_EQ(t[0].kind, L_IDENTIFIER);
     EXPECT_EQ(t[1].kind, '?');
-    EXPECT_EQ(t[2].kind, L_DOT);
+    EXPECT_EQ(t[2].kind, '.');
     EXPECT_EQ(t[3].kind, L_NUMBER);
     EXPECT_EQ(t[3].number, 5);
 }
@@ -1339,7 +1345,7 @@ TEST_F(LexerTest, PlainDot_StillLexesNormally) {
     auto t = Tokenize("m.key\n");
     ASSERT_EQ(t.size(), 3u);
     EXPECT_EQ(t[0].kind, L_IDENTIFIER);
-    EXPECT_EQ(t[1].kind, L_DOT);
+    EXPECT_EQ(t[1].kind, '.');
     EXPECT_EQ(t[2].kind, L_IDENTIFIER);
 }
 

@@ -41,7 +41,6 @@
 #include <fmt/format.h>
 
 #include "vm/vm.h"
-#include "include/function.h"
 #include "efuns.autogen.h"
 #include "vm/internal/base/program.h"
 #include "vm/internal/base/svalue.h"
@@ -79,7 +78,6 @@ extern int NUM_OPTION_DEFS;
 // FIXME: This means current source code can not contain "NUL" byte,
 //  for now it seems suffice, but this should be fixed to check pointer address
 //  for EOF, not for value.
-#define LEX_EOF ((unsigned char)0)
 
 char lex_ctype[256] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -241,7 +239,6 @@ static ident_hash_elem_t *ident_dirty_list = nullptr;
 
 instr_t instrs[MAX_INSTRS];
 
-static int old_func(const std::string &name, void *yyscanner);
 static ident_hash_elem_t *quick_alloc_ident_entry(void);
 
 int lookup_predef(const char *name) {
@@ -568,25 +565,10 @@ void pop_function_context() {
   last_function_context--;
 }
 
-// `name` is passed in (not read from yytext) because the callers' peek
-// reads may have popped the very splice buffer yytext points into.
-static int old_func(const std::string &name, void *yyscanner) {
-  // Push the just-matched name (plus a separating space) back for normal
-  // rescanning as the anonymous function-pointer body's first token.
-  std::string put_back = name + " ";
-  lpc_lex_push_string_buffer(put_back.c_str(), put_back.size(), 0, yyscanner);
-  push_function_context();
-  return L_FUNCTION_OPEN;
-}
-
-// Resolves the identifier currently sitting in the global `yytext` (already
-// NUL-terminated) to a token: reserved word, function-pointer reference
-// (only when `function_flag` is set -- exclusively true when called from
-// the '(' case's "(: name" lookahead, never when Flex matches a plain
-// identifier), a known defined name, or a fresh L_IDENTIFIER. Shared by
-// lex.l's identifier rule and the '(' case in yylex_inner() so both paths
-// -- Flex-driven and the legacy "(: name" lookahead -- agree on lookup
-// semantics.
+// Resolves the identifier lex.l's identifier rule just matched to a
+// token: macro expansion (rescan-driven, below), reserved word, known
+// defined name, or a fresh L_IDENTIFIER. (The old "(: name" lookahead
+// duties moved into the grammar with 9.2.)
 // ---------------------------------------------------------------------------
 // Pushed-buffer bookkeeping. The kind stack below runs parallel to Flex's
 // pushed-buffer stack (see lex.h's LpcPushedBufferKind): EXPANSION pops
@@ -915,71 +897,11 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yyll
   ident_hash_elem_t *ihe;
   if ((ihe = lookup_ident(text.c_str()))) {
     if (ihe->token & IHE_RESWORD) {
-      if (yyextra->function_flag) {
-        yyextra->function_flag = 0;
-        lpc_lex_push_string_buffer(text.c_str(), text.size(), 0, yyscanner);
-        push_function_context();
-        return L_FUNCTION_OPEN;
-      }
       yylval_param->number = ihe->sem_value;
       return ihe->token & TOKEN_MASK;
     }
-    if (yyextra->function_flag) {
-      int val;
-      unsigned char c;
-
-      yyextra->function_flag = 0;
-      // Skip spaces (consumed and discarded, like the legacy raw loop),
-      // then peek exactly one byte to disambiguate "(: foo :)" /
-      // "(: foo," from "(: foo(...)". Read through Flex (lpc_lex_getc)
-      // and push the peeked byte back for normal rescanning -- no raw
-      // outp access, no rewind/flush choreography at the call site.
-      int peeked;
-      while ((peeked = lpc_lex_getc(yyscanner)) == ' ') {
-      }
-      c = peeked <= 0 ? static_cast<unsigned char>(LEX_EOF) : static_cast<unsigned char>(peeked);
-      if (peeked > 0) {
-        char put_back = static_cast<char>(peeked);
-        lpc_lex_push_string_buffer(&put_back, 1, 0, yyscanner);
-      }
-      /* Note that this gets code like:
-       * #define x :)
-       * #define y ,
-       * function f = (: foo x;
-       * function g = (: bar y 1 :);
-       *
-       * wrong.  But that is almost pathological.
-       */
-      if (c != ':' && c != ',') {
-        return old_func(text, yyscanner);
-      }
-      if ((val = ihe->dn.local_num) >= 0) {
-        if (c == ',') {
-          return old_func(text, yyscanner);
-        }
-        yylval_param->number = (val << 8) | FP_L_VAR;
-      } else if ((val = ihe->dn.global_num) >= 0) {
-        if (c == ',') {
-          return old_func(text, yyscanner);
-        }
-        yylval_param->number = (val << 8) | FP_G_VAR;
-      } else if ((val = ihe->dn.function_num) >= 0) {
-        yylval_param->number = (val << 8) | FP_LOCAL;
-      } else if ((val = ihe->dn.simul_num) >= 0) {
-        yylval_param->number = (val << 8) | FP_SIMUL;
-      } else if ((val = ihe->dn.efun_num) >= 0) {
-        yylval_param->number = (val << 8) | FP_EFUN;
-      } else {
-        return old_func(text, yyscanner);
-      }
-      return L_NEW_FUNCTION_OPEN;
-    }
     yylval_param->ihe = ihe;
     return L_DEFINED_NAME;
-  }
-  if (yyextra->function_flag) {
-    yyextra->function_flag = 0;
-    lpc_lex_push_string_buffer("(:", 2, 0, yyscanner);
   }
   yylval_param->string = scratch_copy(text.c_str());
   return L_IDENTIFIER;
@@ -992,7 +914,7 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yyll
 // line-by-line THROUGH Flex via lpc_lex_getc() -- no raw `outp` access,
 // no rewind/flush choreography at the call sites. Handles both forms:
 // "@TERM ... TERM" (one string token, built directly) and
-// "@@TERM ... TERM" (an array of line strings: returns L_ARRAY_OPEN and
+// "@@TERM ... TERM" (an array of line strings: splices `({ ... })` and
 // splices `"l1", "l2", })` for normal rescanning -- Robocoder's "@@"
 // block). On a recoverable error (bad UTF-8, oversized block), lexerror()
 // just logs and returns, so those paths resume the top-level scanner via
@@ -1081,13 +1003,14 @@ int parseHeredoc(const char *terminator, int is_array, union YYSTYPE *yylval_par
   }
 
   if (is_array) {
-    // Return the "({"  token directly and splice the remainder --
-    // `"l1", "l2", })` with '"' and '\\' escaped -- for normal rescanning
-    // as string literals. Element separators deliberately carry no
-    // newline: each body line was already counted above, so the splice
-    // must not make the rescan count those lines again.
-    std::string splice;
-    splice.reserve(total + lines.size() * 4 + 2);
+    // Splice the whole array literal -- `({ "l1", "l2", })` with '"' and
+    // '\\' escaped -- for normal rescanning ('(' and '{' are ordinary
+    // tokens the grammar pairs, since 9.1). Element separators
+    // deliberately carry no newline: each body line was already counted
+    // above, so the splice must not make the rescan count those lines
+    // again.
+    std::string splice = "({ ";
+    splice.reserve(total + lines.size() * 4 + 6);
     for (const auto &l : lines) {
       splice += '"';
       for (char ch : l) {
@@ -1104,7 +1027,7 @@ int parseHeredoc(const char *terminator, int is_array, union YYSTYPE *yylval_par
       return YYerror;
     }
     lpc_lex_push_string_buffer(splice.c_str(), splice.size(), 0, yyscanner);
-    return L_ARRAY_OPEN;
+    return yylex(yylval_param, yylloc_param, yyscanner);
   }
 
   if (!u8_validate(text.c_str())) {
@@ -1123,7 +1046,11 @@ int parseHeredoc(const char *terminator, int is_array, union YYSTYPE *yylval_par
 // and from lex.l-triggered helpers whose own lookahead determined the
 // input isn't well-formed (e.g. a '#' not at the start of a line).
 int lpc_lex_badlex(unsigned char c, void *yyscanner) {
-#ifdef DEBUG
+  // Reported UNCONDITIONALLY: the legacy version gated this behind
+  // #ifdef DEBUG and silently substituted ' ' in release builds, hiding
+  // real input corruption from users -- and making every diagnostic test
+  // that provokes an illegal character pass only in Debug builds (found
+  // when a local RelWithDebInfo run failed seven of them).
   char buff[100];
 
   if (isprint(c)) {
@@ -1133,7 +1060,6 @@ int lpc_lex_badlex(unsigned char c, void *yyscanner) {
     sprintf(buff, "Illegal character 0x%02x", static_cast<unsigned>(c));
   }
   yyerror(yyscanner, buff);
-#endif
   return ' ';
 }
 
@@ -1220,7 +1146,6 @@ void start_new_file(std::unique_ptr<LexStream> stream, void *yyscanner,
   current_line = 1;
   current_line_base = 0;
   current_line_saved = 0;
-  reinterpret_cast<compiler_context_t *>(yyget_extra(yyscanner))->function_flag = 0;
 
   // Push the configured global include file exactly like a real
   // `#include "..."` / `#include <...>` appearing before the file's first

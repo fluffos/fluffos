@@ -123,7 +123,6 @@ they always match the options it actually recognizes.
 | `sane explode string` | int | 1 | explode() strips at most one leading delimiter (and still one trailing delimiter). |
 | `reversible explode string` | int | 0 | Make implode(explode(x, y), y) always equal x; overrides 'sane explode string'. |
 | `sane sorting` | int | 1 | Use a well-defined, stable ordering for the driver's sorting operations. |
-| `wombles` | int | 0 | Disallow spaces between the start/end token characters of arrays, mappings, and functionals. |
 | `this_player in call_out` | int | 1 | Make this_player() usable from within call_out() callbacks. |
 | `reverse defer` | int | 0 | Run deferred functions registered with defer() in reverse order. |
 | `old range behavior` | int | 0 | Treat negative range indices in strings/buffers as counting from the end (rvalue use only). |
@@ -155,7 +154,6 @@ they always match the options it actually recognizes.
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `warn tab` | int | 0 | Warn when source files are indented with tabs instead of spaces. |
 | `trace` | int | 1 | Enable the trace() and traceprefix() efuns (leaving it off runs slightly faster). |
 | `trace code` | int | 0 | Include the preceding lines of LPC code in error traces (slower). |
 | `has console` | int | 1 | Allow the driver's interactive console via the -C command-line argument. |
