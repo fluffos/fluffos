@@ -448,7 +448,8 @@ set(SRC
   "compiler/internal/icode.cc"
   "${GENERATED_LEXER_FILE}"          # Flex-generated lex.autogen.cc
   "compiler/internal/lexer_utils.cc" # global state + helpers lex.l calls into, plus predefines/include-path support
-  "compiler/internal/preprocessor.cc"
+  "compiler/internal/lexer_rules.cc" # substantive logic behind lex.l's rule actions (escape decoding, number parsing, etc.)
+  "compiler/internal/lexer_rules_pp.cc" # preprocessing logic and expression parser
   "compiler/internal/scratchpad.cc"
   "compiler/internal/trees.cc"
   "vm/internal/base/apply_cache.cc"
@@ -585,6 +586,9 @@ target_link_libraries(driver PUBLIC ${FLUFFOS_LINK})
 add_executable(lpcc "main_lpcc.cc")
 target_link_libraries(lpcc PUBLIC ${FLUFFOS_LINK})
 
+add_executable(lpcshell "main_lpcshell.cc")
+target_link_libraries(lpcshell PUBLIC ${FLUFFOS_LINK})
+
 add_executable(symbol "main_symbol.cc")
 target_link_libraries(symbol PUBLIC ${FLUFFOS_LINK})
 
@@ -608,7 +612,7 @@ print_target_properties(driver)
 install(TARGETS ${GENERATED_DOCS}
         RUNTIME DESTINATION bin)
 
-install(TARGETS driver lpcc symbol o2json json2o
+install(TARGETS driver lpcc lpcshell symbol o2json json2o
   RUNTIME DESTINATION bin)
 
 # LPC stdlib files

@@ -200,6 +200,7 @@ void init_locals(void);
 void save_file_info(int, int);
 int add_program_file(const char *, int);
 void yyerror(const char *fmt, ...);
+void yyerror(void *yyscanner, const char *msg);
 void yywarn(const char *fmt, ...);
 char *the_file_name(const char *);
 void free_all_local_names(int);
@@ -211,7 +212,25 @@ int add_local_name(const char *, int, parse_node_t* = nullptr);
 void reallocate_locals(void);
 void initialize_locals(void);
 int get_id_number(void);
-program_t *compile_file(std::unique_ptr<LexStream>, const char *);
+
+// VM context: non-null while the compiler is allowed to interact with the
+// running VM — push values onto the eval stack, call master applies
+// (APPLY_LOG_ERROR, APPLY_GET_INCLUDE_PATH), record mudlib stats. The
+// driver's normal compile paths (load_object() etc.) run with the default
+// &g_driver_vm_context. Unit tests that drive the lexer/compiler pieces
+// directly, without booting a VM, leave the global null and every VM
+// interaction is skipped — the eval stack may not even exist there
+// (sp == nullptr), so pushing would be UB, not just wrong.
+//
+// Opaque-empty by design for now: the only signal is null vs non-null. If
+// the compiler ever needs real per-VM state (e.g. multiple isolates), it
+// grows fields here instead of new globals.
+struct vm_context_t {};
+extern vm_context_t g_driver_vm_context;
+extern vm_context_t *compiler_vm_context;
+
+program_t *compile_file(std::unique_ptr<LexStream>, const char *,
+                        vm_context_t *vm_context = &g_driver_vm_context);
 
 void reset_function_blocks(void);
 void copy_variables(program_t *, int);

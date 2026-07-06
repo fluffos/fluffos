@@ -4,6 +4,10 @@
 %define parse.error detailed
 %define parse.assert true
 %define parse.lac full
+%define api.pure full
+%define api.push-pull push
+%lex-param { void* yyscanner }
+%parse-param { void* yyscanner }
 /* 3rd conflict (added alongside string_like/template_literal): shift/reduce
  * on L_STRING between extending string_literal (string_literal: string_literal
  * L_STRING) and reducing to close off a string_like chain (string_like:
@@ -36,7 +40,7 @@ int context;
 int num_refs;
 int func_present;
 
-int yyparse(void);
+void yyerror(void *yyscanner, const char *msg);
 %}
 
 /* =========================================================================

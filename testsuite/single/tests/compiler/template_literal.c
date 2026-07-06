@@ -101,4 +101,43 @@ void do_tests() {
   // Adjacent template literals (no interpolation)
   result = `foo` `bar`;
   ASSERT_EQ(result, "foobar");
+
+  // --- Regression tests from a self-review pass vs master ---
+
+  // Array literal inside the interpolation: "({"  is one lexer token whose
+  // closing '}' is a separate bare token -- it must count toward brace
+  // depth or the template garbles after it.
+  result = `first: ${ ({ "a", "b" })[0] }!`;
+  ASSERT_EQ(result, "first: a!");
+
+  // Comment-lookalikes inside template text: the standalone preprocessor
+  // used to strip these as real comments (a URL ate the rest of the line,
+  // closing backtick included).
+  result = `visit http://example.com/ now`;
+  ASSERT_EQ(result, "visit http://example.com/ now");
+  result = `not /* a comment */ here`;
+  ASSERT_EQ(result, "not /* a comment */ here");
+
+  // Macro expansion boundary: template *text* is protected string content
+  // (TL_WORD below must NOT expand there), while ${...} interpolations get
+  // full macro expansion (matching how "..." literals vs code behave).
+#define TL_WORD "expanded"
+  result = `say TL_WORD is ${TL_WORD}`;
+  ASSERT_EQ(result, "say TL_WORD is expanded");
+#undef TL_WORD
+
+  // Nested template with comment-lookalikes at both text levels plus an
+  // array literal, all in one -- the combined stress shape.
+  result = `a//b ${ `x//y ${ ({ 1, 2 })[1] } z` } c`;
+  ASSERT_EQ(result, "a//b x//y 2 z c");
+
+  // Bug 7: Template literal as a macro argument
+#define ID(x) (x)
+#define PAIR(a, b) (b)
+  result = ID(`a,b`);
+  ASSERT_EQ(result, "a,b");
+  result = PAIR("x", `n=${PAIR(1, 2)}`);
+  ASSERT_EQ(result, "n=2");
+#undef ID
+#undef PAIR
 }

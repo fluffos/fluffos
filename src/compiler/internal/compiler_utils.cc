@@ -209,6 +209,13 @@ void smart_log(const char *error_file, int line, const char *what, int flag) {
     debug_message("%s", log.c_str());
   }
 
+  // No VM context (unit tests driving the compiler without a booted VM):
+  // the console/debug log above is all there is -- the master-apply
+  // reporting below would push onto an eval stack that doesn't exist.
+  if (!compiler_vm_context) {
+    return;
+  }
+
   auto res = fmt::to_string(fmt::join(logs, ""));
   push_malloced_string(add_slash(error_file));
   copy_and_push_string(res.c_str());

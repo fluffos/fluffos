@@ -15,7 +15,7 @@ void do_tests() {
     this_player(): nums,
     "key": ([
       undefined: ([
-        "is_defined": "yes"
+        "defined": "yes"
       ]),
       "another key": ([
         "finalKey": "Sup?"
@@ -66,17 +66,25 @@ void do_tests() {
   ASSERT_EQ(undefined, m[this_player()]?.moo);
   ASSERT_EQ(undefined, m?.key?.foo);
 
-  // Testing for undefined as a key
+  // Testing for undefined as a key. The field name "defined" is itself
+  // load-bearing: the standalone preprocessor used to apply the #if-only
+  // defined() operator during ordinary macro-argument expansion, rewriting
+  // the bare word inside ASSERT_EQ's argument to 0 ("?.0" -> syntax error).
   ASSERT_EQ(([
-      "is_defined": "yes"
+      "defined": "yes"
     ]),
     m.key[undefined]
   );
-  ASSERT_EQ("yes", m.key[undefined]?.is_defined);
-  ASSERT_EQ("yes", m.key[undefined]?.is_defined);
+  ASSERT_EQ("yes", m.key[undefined]?.defined);
+  ASSERT_EQ("yes", m.key[undefined]?.defined);
 
   // Optional chaining with bracket-then-dot on missing keys inside a present mapping
   ASSERT_EQ(undefined, m?.key?.missing?.deep);
   ASSERT_EQ(undefined, m.key?.missing?.deep);
   ASSERT_EQ(undefined, m.key["missing"]?.deep);
+
+  // Bug 6: Nested same-macro expansion recursion guard bypass in arguments
+#define SECOND(a, b) (b)
+  ASSERT_EQ(3, SECOND(1, SECOND(2, 3)));
+#undef SECOND
 }
