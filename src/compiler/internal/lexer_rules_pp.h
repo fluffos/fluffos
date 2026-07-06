@@ -19,6 +19,7 @@
 #include <vector>
 #include <unordered_map>
 
+#include "compiler/internal/compiler.h"
 #include "compiler/internal/scratchpad.h"
 
 // PpMacro — one macro entry
@@ -87,7 +88,9 @@ struct LexerSession {
     }
 };
 
-extern std::shared_ptr<LexerSession> current_session;
+// The active preprocessor state IS g_compile.pp (compiler.h); this
+// legacy spelling is an inline reference into it.
+inline std::shared_ptr<LexerSession> &current_session = g_compile.pp;
 
 // True when every level of the #if/#ifdef conditional stack is emitting
 // (i.e. the scanner is not inside a false branch). Vacuously true with no
