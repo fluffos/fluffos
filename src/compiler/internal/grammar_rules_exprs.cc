@@ -7,7 +7,6 @@
 #include "compiler/internal/scratchpad.h"
 #include "compiler/internal/generate.h"
 #include "compiler/internal/grammar_rules.h"
-#include "include/opcodes_extra.h"
 
 #include <fmt/format.h>
 
@@ -65,6 +64,33 @@ parse_node_t *rule_lvalue_list(parse_node_t *lvalue, parse_node_t *list) {
 void rule_string(parse_node_t **result, char *str) {
   CREATE_STRING(*result, str);
   scratch_free(str);
+}
+
+void rule_string_like_concat(parse_node_t **result, parse_node_t *left, parse_node_t *right) {
+  CREATE_BINARY_OP(*result, F_ADD, TYPE_STRING, left, right);
+}
+
+void rule_template_literal(parse_node_t **result, char *head, parse_node_t *expr, parse_node_t *rest) {
+  parse_node_t *head_node, *coerced, *tmp;
+  CREATE_STRING(head_node, head);
+  scratch_free(head);
+  CREATE_UNARY_OP(coerced, F_TEMPLATE_COERCE, TYPE_STRING, expr);
+  CREATE_BINARY_OP(tmp, F_ADD, TYPE_STRING, head_node, coerced);
+  CREATE_BINARY_OP(*result, F_ADD, TYPE_STRING, tmp, rest);
+}
+
+void rule_template_parts_tail(parse_node_t **result, char *tail) {
+  CREATE_STRING(*result, tail);
+  scratch_free(tail);
+}
+
+void rule_template_parts_middle(parse_node_t **result, char *mid, parse_node_t *expr, parse_node_t *rest) {
+  parse_node_t *mid_node, *coerced, *tmp;
+  CREATE_STRING(mid_node, mid);
+  scratch_free(mid);
+  CREATE_UNARY_OP(coerced, F_TEMPLATE_COERCE, TYPE_STRING, expr);
+  CREATE_BINARY_OP(tmp, F_ADD, TYPE_STRING, mid_node, coerced);
+  CREATE_BINARY_OP(*result, F_ADD, TYPE_STRING, tmp, rest);
 }
 
 parse_node_t *rule_class_init(char *identifier, parse_node_t *expr) {
@@ -182,6 +208,12 @@ parse_node_t *rule_lvalue(parse_node_t *expr) {
     case NODE_BINARY_OP:
       if (res->v.number >= F_LOCAL && res->v.number <= F_MEMBER)
         res->v.number++;
+      else if (res->v.number == F_MAP_MEMBER)
+        // Not in the contiguous [F_LOCAL, F_MEMBER] "+1 for lvalue" run --
+        // map_member/map_member_lvalue were added later in ops.spec, right
+        // after member/member_lvalue but numerically past F_MEMBER. Handled
+        // the same way (opcode+1 = lvalue variant), just checked separately.
+        res->v.number++;
       else if (res->v.number >= F_INDEX && res->v.number <= F_RE_RANGE) {
         parse_node_t *node = res;
         int flag = 0;
@@ -202,7 +234,8 @@ parse_node_t *rule_lvalue(parse_node_t *expr) {
                 continue;
               }
 
-              if (node->v.number >= F_LOCAL && node->v.number <= F_MEMBER) {
+              if ((node->v.number >= F_LOCAL && node->v.number <= F_MEMBER) ||
+                  node->v.number == F_MAP_MEMBER) {
                 node->v.number++;
                 flag |= LV_ILLEGAL;
                 break;
@@ -552,11 +585,14 @@ void rule_primary_expr_member_arrow(parse_node_t **result, parse_node_t *expr, c
   if (expr->type == TYPE_ANY) {
     int cmi;
     unsigned short tp;
-    if ((cmi = lookup_any_class_member(identifier, &tp)) != -1) {
+    if ((cmi = lookup_any_class_member_soft(identifier, &tp)) != -1) {
       CREATE_UNARY_OP_1(*result, F_MEMBER, tp, expr, 0);
       (*result)->l.number = cmi;
     } else {
-      CREATE_ERROR(*result);
+      /* Fall back to dynamic lookup (treat like mapping-style access). */
+      CREATE_UNARY_OP_1(*result, F_MAP_MEMBER, TYPE_ANY, expr, 0);
+      (*result)->l.number = store_prog_string(identifier);
+      (*result)->type = TYPE_ANY;
     }
   } else if (!IS_CLASS(expr->type)) {
     yyerror("Left argument of -> is not a class");
@@ -572,20 +608,50 @@ void rule_primary_expr_member_dot(parse_node_t **result, parse_node_t *expr, cha
   if (expr->type == TYPE_ANY) {
     int cmi;
     unsigned short tp;
-    if ((cmi = lookup_any_class_member(identifier, &tp)) != -1) {
+    if ((cmi = lookup_any_class_member_soft(identifier, &tp)) != -1) {
       CREATE_UNARY_OP_1(*result, F_MEMBER, tp, expr, 0);
       (*result)->l.number = cmi;
     } else {
-      CREATE_ERROR(*result);
+      /* Fall back to dynamic lookup (treat like mapping-style access). */
+      CREATE_UNARY_OP_1(*result, F_MAP_MEMBER, TYPE_ANY, expr, 0);
+      (*result)->l.number = store_prog_string(identifier);
+      (*result)->type = TYPE_ANY;
     }
-  } else if (!IS_CLASS(expr->type)) {
-    yyerror("Left argument of . is not a class");
-    CREATE_ERROR(*result);
-  } else {
+  } else if (expr->type == TYPE_MAPPING) {
+    CREATE_UNARY_OP_1(*result, F_MAP_MEMBER, TYPE_ANY, expr, 0);
+    (*result)->l.number = store_prog_string(identifier);
+    (*result)->type = TYPE_ANY;
+  } else if (IS_CLASS(expr->type)) {
     CREATE_UNARY_OP_1(*result, F_MEMBER, 0, expr, 0);
     (*result)->l.number = lookup_class_member(CLASS_IDX(expr->type), identifier, &((*result)->type));
+  } else {
+    /* Default to mapping-style lookup so dynamic mappings still work when
+     * the static type isn't known to be one (e.g. still TYPE_ANY-ish
+     * despite a concrete non-class, non-mapping declared type). */
+    CREATE_UNARY_OP_1(*result, F_MAP_MEMBER, TYPE_ANY, expr, 0);
+    (*result)->l.number = store_prog_string(identifier);
+    (*result)->type = TYPE_ANY;
   }
   scratch_free(identifier);
+}
+
+// Optional chaining member access: `expr?.name`. Mapping-only (unlike '.'/'-'>,
+// this never falls back to class-member lookup) -- if expr isn't a mapping at
+// runtime, F_MAP_MEMBER_OPTIONAL short-circuits to 0 instead of erroring.
+void rule_primary_expr_member_optional(parse_node_t **result, parse_node_t *expr, char *identifier) {
+  CREATE_UNARY_OP_1(*result, F_MAP_MEMBER_OPTIONAL, TYPE_ANY, expr, 0);
+  (*result)->l.number = store_prog_string(identifier);
+  (*result)->type = TYPE_ANY;
+  scratch_free(identifier);
+}
+
+// Optional chaining bracket index: `expr?.[idx]` or `expr.?[idx]` (both forms
+// share this rule -- see the two grammar productions in grammar.y). Like
+// rule_primary_expr_member_optional, mapping-only and short-circuits to 0
+// instead of erroring when expr isn't a mapping at runtime.
+void rule_primary_expr_index_optional(parse_node_t **result, parse_node_t *expr, parse_node_t *idx) {
+  CREATE_BINARY_OP(*result, F_MAP_INDEX_OPTIONAL, 0, idx, expr);
+  (*result)->type = TYPE_ANY;
 }
 
 void rule_primary_expr_range_nn(parse_node_t **result, parse_node_t *expr, parse_node_t *expr1, parse_node_t *expr2) {

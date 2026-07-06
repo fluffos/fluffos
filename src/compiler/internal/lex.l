@@ -90,6 +90,33 @@ static std::string lpc_strip_underscores(const char *text, int len) {
 // at the closing quote, from whatever's been collected here.
 static std::string str_accum;
 
+// Template literal state (backtick strings with ${expr} interpolation,
+// SC_TEMPLATE_BODY below). Reuses str_accum above for the current text
+// fragment -- safe because a fragment is always fully finished (copied out
+// via scratch_copy() and cleared) before Flex ever returns to INITIAL to
+// scan the interpolated expression, so a nested string literal inside
+// ${...} can never observe a partially-built template fragment.
+//
+// template_nesting counts how many levels of ${...} interpolation are
+// currently open (an interpolated expression can itself contain a nested
+// template literal). template_brace_depth[level] counts unmatched '{' seen
+// so far while scanning the interpolated expression at that level, so the
+// '}' that closes the interpolation (brace depth back to 0) can be told
+// apart from a '}' that's merely part of the expression itself.
+//
+// Non-static (like function_flag, declared in lexer_utils.cc/lex.h): reset
+// to 0 directly by lexer_utils.cc's start_new_file() at the start of every
+// top-level compile.
+#define MAX_TEMPLATE_NESTING 16
+int template_nesting = 0;
+static int template_brace_depth[MAX_TEMPLATE_NESTING];
+// True when the SC_TEMPLATE_BODY fragment about to be scanned resumes after
+// a ${...} interpolation's closing '}' (-> L_TEMPLATE_MIDDLE/L_TEMPLATE_TAIL
+// on exit), false when it starts right after the opening backtick itself
+// (-> L_TEMPLATE_HEAD/L_STRING on exit). Set immediately before each of the
+// two BEGIN(SC_TEMPLATE_BODY) call sites below.
+static bool template_is_continuation = false;
+
 // Roughly matches the old MAXLINE-based "String too long" cap (that cap
 // existed because the original accumulated directly into a fixed-size
 // buffer; str_accum has no such fixed size, but an unbounded string
@@ -115,6 +142,18 @@ static std::string str_accum;
         yylval.string = scratch_copy(str_accum.c_str());        \
         lpc_str_tok_ = L_STRING;                                \
       }                                                         \
+      /* If this overflow hit while accumulating a template-literal   \
+       * MIDDLE/TAIL fragment (template_is_continuation), that level  \
+       * of ${...} interpolation is being abandoned here instead of   \
+       * closing normally, so undo its template_nesting increment --  \
+       * otherwise it leaks for the rest of this (already-failing)    \
+       * compile, corrupting brace-depth tracking for any '{'/'}'     \
+       * the recovery scan encounters afterward. A HEAD fragment      \
+       * (!template_is_continuation) never incremented it yet, so     \
+       * there's nothing to undo in that case. */                     \
+      if (YY_START == SC_TEMPLATE_BODY && template_is_continuation) { \
+        template_nesting--;                                      \
+      }                                                          \
       BEGIN(INITIAL);                                           \
       return lpc_str_tok_;                                      \
     }                                                            \
@@ -196,6 +235,15 @@ extern "C" int lpc_lex_yy_input(char *buf, int max_size);
  * strip these before the lexer sees them (it only skips over quoted text
  * to avoid macro-expanding inside it), so this one is a genuinely reached
  * part of the grammar. See the '"' open rule below.
+ * SC_TEMPLATE_BODY: a backtick template literal `...${expr}...`. Scans the
+ * literal-text fragment between backtick/interpolation boundaries the same
+ * way SC_STRING_BODY does; the interpolated expr itself is scanned by the
+ * ordinary top-level rules (Flex returns to INITIAL for it), with '{'/'}'
+ * brace-depth tracking (on the plain '{'/'}' rules below) to find the
+ * matching '}' that ends the interpolation and resumes SC_TEMPLATE_BODY.
+ * A backtick literal with no interpolation at all is returned as a plain
+ * L_STRING instead, so it folds into ordinary string concatenation. See
+ * the "`" open rule below and template_nesting/template_brace_depth above.
  * SC_DIRECTIVE_KEYWORD: the whitespace-delimited word right after '#'
  * (before it's known to be "pragma", "line", a GCC-style bare line number,
  * or unrecognized). SC_DIRECTIVE_PRAGMA / SC_DIRECTIVE_LINE: the tail of a
@@ -217,6 +265,7 @@ extern "C" int lpc_lex_yy_input(char *buf, int max_size);
 %x SC_CHAR_CLOSE
 %x SC_BLOCK_COMMENT
 %x SC_STRING_BODY
+%x SC_TEMPLATE_BODY
 %x SC_DIRECTIVE_KEYWORD
 %x SC_DIRECTIVE_PRAGMA
 %x SC_DIRECTIVE_LINE
@@ -429,6 +478,125 @@ extern "C" int lpc_lex_yy_input(char *buf, int max_size);
         }
 <SC_STRING_BODY>"\\U"   { lexerror("Illegal unicode sequence."); }
 <SC_STRING_BODY>"\\".   {
+          str_accum += yytext[1];
+          yywarn("Unknown \\ escape.");
+          STR_CHECK_OVERFLOW();
+        }
+
+    /* Template literals `...${expr}...`: the literal-text fragments are
+     * scanned natively via SC_TEMPLATE_BODY, mirroring SC_STRING_BODY's
+     * escape handling above (minus \u/\U, which template literals don't
+     * support -- see docs/lpc/types/strings.md). Two differences from a
+     * regular string: a bare newline is removed rather than preserved, and
+     * "${" ends the fragment and hands control back to INITIAL to scan the
+     * interpolated expression (the matching '}' is found via the brace-
+     * depth tracking on the plain '{'/'}' rules further below). */
+`      { str_accum.clear(); template_is_continuation = false; BEGIN(SC_TEMPLATE_BODY); }
+
+<SC_TEMPLATE_BODY>[^\\`$\n]+ {
+          str_accum.append(yytext, yyleng);
+          STR_CHECK_OVERFLOW();
+        }
+<SC_TEMPLATE_BODY>\n { current_line++; total_lines++; /* newlines are removed, not preserved */ }
+<SC_TEMPLATE_BODY>"$"  { str_accum += '$'; STR_CHECK_OVERFLOW(); }
+    /* Template fragment tokens (L_TEMPLATE_HEAD/MIDDLE/TAIL) use
+     * scratch_large_alloc() rather than scratch_copy(): unlike a plain
+     * string literal (consumed almost immediately by string_literal:
+     * L_STRING), a template fragment's value sits on the parser's value
+     * stack for as long as it takes to scan the entire ${...} expression
+     * that follows it -- which can itself contain more string/template
+     * literals. scratch_copy()'s small ring buffer would get overwritten
+     * by those before the outer template_literal/template_parts rule ever
+     * gets to consume the fragment (this was a real, reproduced bug: the
+     * head fragment came back containing the *tail* fragment's text). */
+<SC_TEMPLATE_BODY>"${" {
+          BEGIN(INITIAL);
+          if (!u8_validate(str_accum.c_str())) {
+            lexerror("Invalid UTF8 codepoint in template literal");
+            return YYerror;
+          }
+          {
+            size_t slen = str_accum.size() + 1;
+            char *res = scratch_large_alloc(static_cast<int>(slen));
+            memcpy(res, str_accum.c_str(), slen);
+            yylval.string = res;
+          }
+          if (!template_is_continuation) {
+            template_nesting++;
+            if (template_nesting >= MAX_TEMPLATE_NESTING) {
+              // Undo the increment before bailing: lexerror() doesn't
+              // longjmp, so scanning continues after this (doomed) compile
+              // fails, and template_nesting must stay a valid index into
+              // template_brace_depth[MAX_TEMPLATE_NESTING] for whatever
+              // '{'/'}' the rest of the file's source happens to contain
+              // (confirmed via UBSan: leaving it at MAX_TEMPLATE_NESTING
+              // here was a real out-of-bounds write on the next '{'/'}').
+              template_nesting--;
+              lexerror("Template literal nesting too deep");
+              return YYerror;
+            }
+          }
+          template_brace_depth[template_nesting] = 0;
+          return template_is_continuation ? L_TEMPLATE_MIDDLE : L_TEMPLATE_HEAD;
+        }
+<SC_TEMPLATE_BODY>`      {
+          BEGIN(INITIAL);
+          if (!u8_validate(str_accum.c_str())) {
+            lexerror("Invalid UTF8 codepoint in template literal");
+            return YYerror;
+          }
+          if (template_is_continuation) {
+            size_t slen = str_accum.size() + 1;
+            char *res = scratch_large_alloc(static_cast<int>(slen));
+            memcpy(res, str_accum.c_str(), slen);
+            yylval.string = res;
+            template_nesting--;
+            return L_TEMPLATE_TAIL;
+          }
+          yylval.string = scratch_copy(str_accum.c_str());
+          return L_STRING;
+        }
+<SC_TEMPLATE_BODY><<EOF>> {
+          lexerror("End of file in template literal");
+          BEGIN(INITIAL);
+          return YYEOF;
+        }
+
+<SC_TEMPLATE_BODY>"\\\n"  { current_line++; total_lines++; }
+<SC_TEMPLATE_BODY>"\\n"   { str_accum += '\n'; STR_CHECK_OVERFLOW(); }
+<SC_TEMPLATE_BODY>"\\t"   { str_accum += '\t'; STR_CHECK_OVERFLOW(); }
+<SC_TEMPLATE_BODY>"\\r"   { str_accum += '\r'; STR_CHECK_OVERFLOW(); }
+<SC_TEMPLATE_BODY>"\\b"   { str_accum += '\b'; STR_CHECK_OVERFLOW(); }
+<SC_TEMPLATE_BODY>"\\a"   { str_accum += '\x07'; STR_CHECK_OVERFLOW(); }
+<SC_TEMPLATE_BODY>"\\e"   { str_accum += '\x1b'; STR_CHECK_OVERFLOW(); }
+<SC_TEMPLATE_BODY>"\\`"   { str_accum += '`'; STR_CHECK_OVERFLOW(); }
+<SC_TEMPLATE_BODY>"\\$"   { str_accum += '$'; STR_CHECK_OVERFLOW(); }
+<SC_TEMPLATE_BODY>"\\\\"  { str_accum += '\\'; STR_CHECK_OVERFLOW(); }
+<SC_TEMPLATE_BODY>"\\"[0-7]+ {
+          long long tmp = strtoll(yytext + 1, nullptr, 8);
+          if (tmp > 255) {
+            yywarn("Illegal character constant in template literal.");
+            tmp = 'x';
+          }
+          str_accum += static_cast<char>(tmp);
+          STR_CHECK_OVERFLOW();
+        }
+<SC_TEMPLATE_BODY>"\\"[89]  { lexerror("Illegal octal escape in template literal."); }
+<SC_TEMPLATE_BODY>"\\x"[0-9a-fA-F]+ {
+          long long tmp = strtoll(yytext + 2, nullptr, 16);
+          if (tmp > 255) {
+            yywarn("Illegal character constant.");
+            tmp = 'x';
+          }
+          str_accum += static_cast<char>(tmp);
+          STR_CHECK_OVERFLOW();
+        }
+<SC_TEMPLATE_BODY>"\\x"   {
+          str_accum += 'x';
+          yywarn("\\x must be followed by a valid hex value; interpreting as 'x' instead.");
+          STR_CHECK_OVERFLOW();
+        }
+<SC_TEMPLATE_BODY>"\\".   {
           str_accum += yytext[1];
           yywarn("Unknown \\ escape.");
           STR_CHECK_OVERFLOW();
@@ -827,6 +995,11 @@ extern "C" int lpc_lex_yy_input(char *buf, int max_size);
 
 "??="   { yylval.number = F_NULLISH_EQ; return L_ASSIGN; }
 "??"    { return L_QUESTION_QUESTION; }
+    /* Optional chaining "?." (mapping member/bracket access, e.g. m?.key,
+     * m?.[idx]): only recognized when followed by an identifier-start char
+     * or '[', so a ternary's float branch ("cond ? .5 : x") still lexes as
+     * '?' then the ".5" float literal, not "?." followed by "5". */
+"?."/[A-Za-z_\[]  { return L_OPTIONAL_DOT; }
 "?"     { return '?'; }
 
 "!="    { return L_NE; }
@@ -837,11 +1010,36 @@ extern "C" int lpc_lex_yy_input(char *buf, int max_size);
 
 "..."   { return L_DOT_DOT_DOT; }
 ".."    { return L_RANGE; }
+    /* Optional chaining bracket form "m.?[idx]" -- the only grammar
+     * production for L_DOT_OPTIONAL requires a following '[', so no
+     * lookahead disambiguation is needed here the way "?." above needs one:
+     * a literal '?' right after '.' was already a syntax error otherwise. */
+".?"    { return L_DOT_OPTIONAL; }
 "."     { return L_DOT; }
 
 ")"     { return ')'; }
-"{"     { return '{'; }
-"}"     { return '}'; }
+    /* '{'/'}' inside a template literal's ${...} interpolation need brace-
+     * depth tracking so the '}' that ends the interpolation (depth back to
+     * 0) can be told apart from one that's merely part of the interpolated
+     * expression itself. See SC_TEMPLATE_BODY above. */
+"{"     {
+          if (template_nesting > 0) {
+            template_brace_depth[template_nesting]++;
+          }
+          return '{';
+        }
+"}"     {
+          if (template_nesting > 0 && template_brace_depth[template_nesting] == 0) {
+            str_accum.clear();
+            template_is_continuation = true;
+            BEGIN(SC_TEMPLATE_BODY);
+            return yylex();
+          }
+          if (template_nesting > 0) {
+            template_brace_depth[template_nesting]--;
+          }
+          return '}';
+        }
 "["     { return '['; }
 "]"     { return ']'; }
 ";"     { return ';'; }

@@ -26,7 +26,7 @@ operator loop_cond_local, loop_cond_number;
 operator loop_incr;
 operator while_dec;
 
-operator lor, land;
+operator lor, land, nullish;
 
 operator catch, end_catch;
 operator time_expression, end_time_expression;
@@ -49,6 +49,9 @@ operator local, local_lvalue;
 operator ref, ref_lvalue;
 operator global, global_lvalue;
 operator member, member_lvalue;
+operator map_member, map_member_lvalue;
+operator map_member_optional;
+operator map_index_optional;
 operator index, index_lvalue;
 operator rindex, rindex_lvalue;
 operator nn_range, nn_range_lvalue, rn_range, rn_range_lvalue;
@@ -59,10 +62,14 @@ operator ne_range, re_range;
 operator add_eq, sub_eq, and_eq, or_eq, xor_eq, lsh_eq, rsh_eq, mult_eq;
 operator div_eq, mod_eq, assign;
 
+operator lor_eq, land_eq, nullish_eq, assign_value;
+
 operator void_add_eq, void_assign, void_assign_local;
 
 operator add, subtract, multiply, divide, mod, and, or, xor, lsh, rsh;
 operator not, negate, compl;
+
+operator template_coerce;
 
 operator function_constructor;
 operator simul_efun;

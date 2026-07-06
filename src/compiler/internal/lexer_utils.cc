@@ -1239,6 +1239,7 @@ void start_new_file(std::unique_ptr<LexStream> stream) {
   current_stream = std::make_unique<StringLexStream>(std::move(preprocessed));
 
   lex_fatal = 0;
+  template_nesting = 0;
   last_function_context = -1;
   current_function_context = nullptr;
   cur_lbuf = &head_lbuf;
