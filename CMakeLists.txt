@@ -16,6 +16,21 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE RelWithDebInfo)
 endif()
 
+# Export compile_commands.json for clangd / language servers (Makefile + Ninja only)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Target: symlink compile_commands.json from the build dir to the project root
+# so that editors and tools find it without extra configuration.
+if(NOT WIN32)
+  add_custom_target(compile_commands
+    COMMAND "${CMAKE_COMMAND}" -E create_symlink
+            "${CMAKE_BINARY_DIR}/compile_commands.json"
+            "${CMAKE_SOURCE_DIR}/compile_commands.json"
+    COMMENT "Symlinking compile_commands.json to project root"
+    VERBATIM
+  )
+endif()
+
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}" CACHE PATH "..." FORCE)
 endif()

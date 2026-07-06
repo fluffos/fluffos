@@ -117,28 +117,32 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 131 "$REPO_ROOT$/src/compiler/internal/grammar.y"
+#line 137 "$REPO_ROOT$/src/compiler/internal/grammar.y"
 
-  LPC_INT number; /* 8 */
-  LPC_FLOAT real; /* 8 */
-  char *string;
-  struct argument_t argument;
-  ident_hash_elem_t *ihe;
-  parse_node_t *node;
-  function_context_t *contextp;
+  LPC_INT number;              /* integers, opcodes, type flags */
+  LPC_FLOAT real;              /* floating-point literals */
+  char *string;                /* scratch-allocated string */
+  argument_t argument;         /* function parameter list metadata */
+  ident_hash_elem_t *ihe;      /* symbol-table entry for a known name */
+  parse_node_t *node;          /* parse-tree node (most non-terminals) */
+  function_context_t *contextp; /* saved function-context pointer */
+  decl_t decl;                 /* block/declaration info (node + local count) */
+  func_block_t func_block;     /* saved state for anonymous function body */
   struct {
-    parse_node_t *node;
-    char num;
-  } decl; /* 9 */
+    struct ident_hash_elem_t *ihe;
+    LPC_INT classname_index;
+  } class_header;              /* class name and index during class declaration */
   struct {
-    uint8_t num_local;
-    uint8_t max_num_locals;
-    uint16_t context;
-    uint16_t save_current_type;
-    uint16_t save_exact_types;
-  } func_block; /* 8 */
+    parse_node_t *expr;
+    LPC_INT saved_context;
+    LPC_INT saved_cases_size;
+  } switch_header;             /* switch discriminant and saved case-table state */
+  struct {
+    LPC_INT saved_context;
+    LPC_INT saved_refs;
+  } call_open;                 /* context/refs captured at the '(' of a call */
 
-#line 142 "$REPO_ROOT$/build/src/grammar.autogen.h"
+#line 146 "$REPO_ROOT$/build/src/grammar.autogen.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

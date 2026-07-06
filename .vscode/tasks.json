@@ -28,9 +28,10 @@
     {
       "label": "driver: autotest",
       "type": "shell",
-      "command": "cmake --build \"${workspaceFolder}/build\" --target driver-fulltest",
+      "command": "cmake --build \"${workspaceFolder}/build\" --target driver-autotest",
       "group": "test",
-      "problemMatcher": []
+      "problemMatcher": [],
+      "dependsOn": ["driver: build"]
     }
   ]
 }
