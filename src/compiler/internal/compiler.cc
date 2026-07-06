@@ -114,39 +114,13 @@ char *prog_code_max;
 // compile_file() sets it from its vm_context parameter for the compile's
 // duration and restores it on the way out.
 vm_context_t g_driver_vm_context;
-vm_context_t *compiler_vm_context = nullptr;
 
-// Top of the CompileSession stack (see compiler.h): the session
-// compile_file() is currently running, or null outside any compile.
-CompileSession *current_compile = nullptr;
+// THE compiler state object (see compiler.h). All the legacy spellings
+// (compiler_diags, compiler_vm_context, current_session, ...) are inline
+// references into this.
+CompileState g_compile;
 
-std::string CompileSession::chain() const {
-  std::string out;
-  for (const CompileSession *s = parent; s != nullptr; s = s->parent) {
-    out += out.empty() ? "triggered by " : ", triggered by ";
-    out += s->filename != nullptr ? s->filename : "?";
-  }
-  return out;
-}
 
-std::vector<Diagnostic> compiler_diags;
-
-// See compiler.h: nonzero only while lpc_lex_on_directive() is dispatching
-// a directive, holding that directive's own first line for attribution.
-int compiler_directive_start_line = 0;
-
-// See compiler.h: context notes queued by the NEXT report's site.
-std::vector<std::string> compiler_pending_notes;
-std::vector<Diagnostic::FixIt> compiler_pending_fixits;
-
-// See compiler.h: load-chain provenance hand-off.
-std::string compiler_next_load_reason;
-std::string compiler_current_load_reason;
-
-// See compiler.h: operand ranges for the in-flight grammar action.
-std::vector<Diagnostic::Range> compiler_pending_ranges;
-int compiler_pending_caret_line = 0;
-int compiler_pending_caret_col = 0;
 void rule_set_operand_ranges(int l1, int c1, int e1, int lop, int cop, int l2, int c2, int e2) {
   compiler_pending_ranges.clear();
   compiler_pending_ranges.push_back(Diagnostic::Range{l1, c1, e1});
@@ -290,13 +264,6 @@ static const Diagnostic &capture_diagnostic(bool is_warning, const char *message
                                        // grammar action clears them
   if (compiler_pending_caret_line != 0 && compiler_pending_caret_line == d.line) {
     d.column = compiler_pending_caret_col;  // caret on the operator itself
-  }
-  if (current_compile != nullptr) {
-    std::string c = current_compile->chain();
-    if (!c.empty()) {
-      std::string who = current_compile->filename != nullptr ? current_compile->filename : "?";
-      d.notes.push_back("while compiling '" + who + "', " + c);
-    }
   }
   compiler_diags.push_back(std::move(d));
   return compiler_diags.back();
@@ -2267,24 +2234,11 @@ program_t *compile_file(std::string_view source, const char *name,
   if (guard || current_file) {
     error("Object cannot be loaded during compilation.\n");
   }
-  if (current_compile != nullptr && current_compile->depth + 1 >= MAX_COMPILE_DEPTH) {
-    error("Too deep compile nesting compiling '%s' (%s).\n", name,
-          current_compile->chain().c_str());
-  }
   guard = 1;
 
-  // This compile's session, published for the duration (cleared in the
-  // DEFER below): identity + the anchor structured diagnostics hang
-  // provenance off. The compiler is deliberately non-reentrant -- the
-  // guard above enforces it and load_object() handles the inherit chain
-  // outside the compiler -- so parent is always null and depth always 0;
-  // see compiler.h's CompileSession comment for the full rationale.
-  CompileSession session;
-  session.filename = name;
-  session.vm_context = vm_context;
-  session.parent = current_compile;
-  session.depth = current_compile != nullptr ? current_compile->depth + 1 : 0;
-  current_compile = &session;
+  // Publish this compile's identity on the one state object for the
+  // duration (cleared in the DEFER below).
+  g_compile.filename = name;
 
   // Save all compiler globals to support reentrancy/recursive compile
   vm_context_t *saved_vm_context = compiler_vm_context;
@@ -2423,7 +2377,7 @@ program_t *compile_file(std::string_view source, const char *name,
       locals_ptr = saved_locals_ptr;
 
       compiler_vm_context = saved_vm_context;
-      current_compile = session.parent;
+      g_compile.filename = nullptr;
       guard = 0;
     };
 

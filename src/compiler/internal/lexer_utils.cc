@@ -117,7 +117,7 @@ int num_parse_error; /* Number of errors in the parser. */
 lpc_predef_t *lpc_predefs = nullptr;
 
 static void push_arena_string(ScratchString &s, int kind, void *yyscanner);
-std::shared_ptr<LexerSession> current_session = nullptr;
+// current_session is an alias for g_compile.pp (compiler.h / lexer_rules_pp.h).
 
 int lex_fatal;
 

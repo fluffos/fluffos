@@ -222,7 +222,7 @@ void smart_log(const char *error_file, int line, const char *what, int flag) {
   safe_apply_master_ob(APPLY_LOG_ERROR, 2);
 } /* smart_log() */
 
-bool compiler_diags_quiet = false;
+// compiler_diags_quiet lives in g_compile (compiler.h alias).
 
 void report_compile_diagnostic(const Diagnostic &d) {
   if (compiler_diags_quiet) {

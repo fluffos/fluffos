@@ -1,6 +1,7 @@
 #ifndef COMPILER_H
 #define COMPILER_H
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -236,41 +237,20 @@ int get_id_number(void);
 // grows fields here instead of new globals.
 struct vm_context_t {};
 extern vm_context_t g_driver_vm_context;
-extern vm_context_t *compiler_vm_context;
+// compiler_vm_context is an alias into g_compile (see CompileState below).
 
 // ---------------------------------------------------------------------------
-// CompileSession — ONE object per compile_file() invocation: the compile's
-// identity (filename, vm_context) and the anchor structured diagnostics
-// hang provenance off (see Diagnostic below). `current_compile` points at
-// the running compile's session, or null outside any compile.
-//
-// The parent/depth/chain() machinery exists but is inert by design:
-// compile_file() is NEVER re-entered — the compiler is deliberately
-// non-reentrant by design. The
-// `inherit`-of-an-unloaded-parent case is handled entirely OUTSIDE the
-// compiler by load_object() (simulate.cc): the child compile cleanly
-// abandons (rule_inheritence() sets the inherit_file global, epilog()
-// discards the partial program), then load_object() recursively loads the
-// parent — recursion bounded by __INHERIT_CHAIN_SIZE__ — and reloads the
-// child from scratch. That abort-and-restart is SAFER than nested
-// compiles would be: loading the parent runs arbitrary LPC (its
-// create()), which must never execute mid-compile. The guard in
-// compile_file() rejecting re-entry is therefore the design, not a
-// limitation. If cross-load provenance ("loading X because Y inherits
-// it") is ever wanted for diagnostics, it belongs in load_object()'s
-// recursion as a name chain feeding capture_diagnostic() — not in
-// compiler nesting; parent/chain() here is the ready-made hook for it.
-struct CompileSession {
-  const char *filename;         // as given to compile_file()
-  vm_context_t *vm_context;     // null => no VM interactions allowed
-  CompileSession *parent;       // always null today (no nesting; see above)
-  int depth;                    // always 0 today
-
-  // Provenance line for diagnostics: "while compiling A, triggered by B,
-  // triggered by C". Empty string for a top-level compile with no chain.
-  std::string chain() const;
-};
-extern CompileSession *current_compile;  // the running compile's session
+// The compiler's ONE global state object is `g_compile` (CompileState,
+// defined after Diagnostic below). It owns the running compile's identity
+// (filename, vm_context), the preprocessor persistence unit (the macro
+// table + conditional stack a REPL keeps across chunks), and the
+// diagnostics stream with its one-shot context. The compiler is
+// deliberately NON-reentrant: compile_file() is never re-entered (the
+// guard enforces it); the `inherit`-of-an-unloaded-parent case is handled
+// entirely OUTSIDE the compiler by load_object() (simulate.cc), whose
+// bounded abort-and-reload is SAFER than nested compiles (loading the
+// parent runs arbitrary LPC that must never execute mid-compile).
+// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Structured diagnostics — every yyerror()/yywarn() records one of these,
@@ -334,7 +314,37 @@ struct Diagnostic {
 // effectively resets). A plain global rather than a CompileSession member
 // so the unit harnesses that drive the lexer without compile_file() (no
 // session on the stack) still capture.
-extern std::vector<Diagnostic> compiler_diags;
+// ---------------------------------------------------------------------------
+// CompileState -- THE compiler's single global state (see the note above).
+// Legacy spellings below are inline references into it, so call sites keep
+// their established names while the storage lives in one object.
+// ---------------------------------------------------------------------------
+struct LexerSession;
+struct CompileState {
+  // Identity of the running compile; filename null outside any compile.
+  const char *filename = nullptr;
+  vm_context_t *vm_context = nullptr;  // null => no VM interactions allowed
+
+  // Preprocessor persistence unit (macro table + conditional stack).
+  // shared_ptr so a REPL can keep #define state alive across chunks.
+  std::shared_ptr<LexerSession> pp;
+
+  // Structured diagnostics stream + one-shot context.
+  std::vector<Diagnostic> diags;
+  bool diags_quiet = false;
+  std::vector<std::string> pending_notes;
+  std::vector<Diagnostic::FixIt> pending_fixits;
+  std::vector<Diagnostic::Range> pending_ranges;
+  int pending_caret_line = 0;
+  int pending_caret_col = 0;
+  std::string next_load_reason;
+  std::string current_load_reason;
+  int directive_start_line = 0;
+};
+extern CompileState g_compile;
+
+inline vm_context_t *&compiler_vm_context = g_compile.vm_context;
+inline std::vector<Diagnostic> &compiler_diags = g_compile.diags;
 
 // The clang-style multi-line rendering:
 //   In file included from /std/room.c:3:
@@ -358,7 +368,7 @@ void report_compile_diagnostic(const Diagnostic &d);
 // master-report -- for structured consumers (lpcshell) that render
 // compiler_diags themselves, and specifically must not spray a doomed
 // trial-parse's errors onto the console before retrying another form.
-extern bool compiler_diags_quiet;
+inline bool &compiler_diags_quiet = g_compile.diags_quiet;
 
 // Extra note lines for the NEXT captured diagnostic, consumed (appended +
 // cleared) by the capture in yyerror()/yywarn(). Lets an error site attach
@@ -366,10 +376,10 @@ extern bool compiler_diags_quiet;
 // "previous definition of 'FOO' was at file:line" before reporting. Only
 // meaningful immediately before a report; anything stale is cleared at the
 // next capture.
-extern std::vector<std::string> compiler_pending_notes;
+inline std::vector<std::string> &compiler_pending_notes = g_compile.pending_notes;
 // Fix-it hints queued by the NEXT report's site, same one-shot contract
 // as compiler_pending_notes.
-extern std::vector<Diagnostic::FixIt> compiler_pending_fixits;
+inline std::vector<Diagnostic::FixIt> &compiler_pending_fixits = g_compile.pending_fixits;
 
 // Load-chain provenance (the optional 6.x note): load_object() sets
 // compiler_next_load_reason just before recursively loading an inherited
@@ -378,19 +388,19 @@ extern std::vector<Diagnostic::FixIt> compiler_pending_fixits;
 // that compile carries it as a note ("while loading '/x' inherited by
 // '/y'"). One-shot hand-off, so an error() unwind can never leave a
 // stale reason attached to an unrelated later compile.
-extern std::string compiler_next_load_reason;
-extern std::string compiler_current_load_reason;
+inline std::string &compiler_next_load_reason = g_compile.next_load_reason;
+inline std::string &compiler_current_load_reason = g_compile.current_load_reason;
 
 // Operand ranges queued by a grammar action around a type-checking helper
 // (one-shot, consumed by the next captured diagnostic; the action clears
 // them after the helper returns so they can never leak to an unrelated
 // report). Defined in compiler.cc; the grammar calls the rule_* pair.
-extern std::vector<Diagnostic::Range> compiler_pending_ranges;
+inline std::vector<Diagnostic::Range> &compiler_pending_ranges = g_compile.pending_ranges;
 // The operator's own position: when set (line != 0) and it matches the
 // diagnosed line, the caret moves onto the operator -- clang's
 // `~~~~~ ^ ~~~~~` shape for binary-op type errors.
-extern int compiler_pending_caret_line;
-extern int compiler_pending_caret_col;
+inline int &compiler_pending_caret_line = g_compile.pending_caret_line;
+inline int &compiler_pending_caret_col = g_compile.pending_caret_col;
 void rule_set_operand_ranges(int l1, int c1, int e1, int lop, int cop, int l2, int c2, int e2);
 void rule_clear_operand_ranges(void);
 
@@ -405,7 +415,7 @@ void rule_clear_operand_ranges(void);
 // after; yyerror()/yywarn() use it, when nonzero, instead of
 // current_line. Zero everywhere else (parse errors, lexer errors,
 // EOF-time errors all attribute via current_line as usual).
-extern int compiler_directive_start_line;
+inline int &compiler_directive_start_line = g_compile.directive_start_line;
 
 // Belt-and-suspenders cap on session-stack depth. Unreachable in practice
 // (the reentrancy guard rejects nesting outright, so depth is always 0);
