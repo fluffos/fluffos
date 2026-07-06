@@ -456,6 +456,7 @@ set(SRC
   "compiler/internal/lexer_utils.cc" # global state + helpers lex.l calls into, plus predefines/include-path support
   "compiler/internal/lexer_rules.cc" # substantive logic behind lex.l's rule actions (escape decoding, number parsing, etc.)
   "compiler/internal/lexer_rules_pp.cc" # preprocessing logic and expression parser
+  "compiler/internal/stage_output.cc" # lpcc -E/--tokens staged dumps (lex+pp, no parse)
   "compiler/internal/scratchpad.cc"
   "compiler/internal/trees.cc"
   "vm/internal/base/apply_cache.cc"

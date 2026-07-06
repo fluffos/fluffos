@@ -15,10 +15,10 @@ ADDRESS_TYPE generate(struct parse_node_t *);
 ADDRESS_TYPE generate_function(struct function_t *, struct parse_node_t *, int);
 int generate_conditional_branch(struct parse_node_t *);
 
-#ifdef DEBUG
+// Tree dumping is a product feature now (lpcc --ast), not debug
+// scaffolding -- unconditional in every build type.
 void dump_expr_list(struct parse_node_t *);
 void dump_tree(struct parse_node_t *);
 void lpc_tree_form(struct parse_node_t *, struct parse_node_t *);
-#endif
 
 #endif

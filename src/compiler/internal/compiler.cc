@@ -2387,6 +2387,9 @@ program_t *compile_file(std::string_view source, const char *name,
 
     symbol_start(name);
     prolog(source, name, token_stream);
+    if (g_compile.opt_no_optimize) {
+      pragmas &= ~PRAGMA_OPTIMIZE;  // pre-optimization staged output
+    }
     func_present = 0;
 
     // Drive the grammar via Bison's push-parser API rather than a
@@ -2640,6 +2643,13 @@ static program_t *epilog(void) {
   /* generate the trees */
 
   current_tree = TREE_MAIN;
+  if (g_compile.opt_dump_ast) {
+    printf(";;; AST %s -- TREE_MAIN\n", g_compile.filename != nullptr ? g_compile.filename : "?");
+    dump_tree(comp_trees[TREE_MAIN]);
+    printf("\n;;; AST -- TREE_INIT\n");
+    dump_tree(comp_trees[TREE_INIT]);
+    printf("\n");
+  }
   generate(comp_trees[TREE_MAIN]);
   // DEBUG:
   // dump_tree(comp_trees[TREE_MAIN]);

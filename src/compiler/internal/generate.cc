@@ -338,7 +338,7 @@ int generate_conditional_branch(parse_node_t *node) {
 
 // FIXME: originally found in generate.cc
 
-#ifdef DEBUG
+// (Unconditional: lpcc --ast ships dump_tree in every build type.)
 const char *lpc_tree_name[] = {"return",        "two values",    "opcode",
                                "opcode_1",      "opcode_2",      "unary op",
                                "unary op_1",    "binary op",     "binary op_1",
@@ -824,4 +824,4 @@ void lpc_tree_form(parse_node_t *expr, parse_node_t *dest) {
   }
   lpc_tree_string(ARG_1, lpc_tree_name[expr->kind]);
 }
-#endif
+
