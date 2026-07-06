@@ -112,6 +112,192 @@ char *prog_code_max;
 vm_context_t g_driver_vm_context;
 vm_context_t *compiler_vm_context = nullptr;
 
+// Top of the CompileSession stack (see compiler.h): the session
+// compile_file() is currently running, or null outside any compile.
+CompileSession *current_compile = nullptr;
+
+std::string CompileSession::chain() const {
+  std::string out;
+  for (const CompileSession *s = parent; s != nullptr; s = s->parent) {
+    out += out.empty() ? "triggered by " : ", triggered by ";
+    out += s->filename != nullptr ? s->filename : "?";
+  }
+  return out;
+}
+
+std::vector<Diagnostic> compiler_diags;
+
+// See compiler.h: nonzero only while lpc_lex_on_directive() is dispatching
+// a directive, holding that directive's own first line for attribution.
+int compiler_directive_start_line = 0;
+
+// See compiler.h: context notes queued by the NEXT report's site.
+std::vector<std::string> compiler_pending_notes;
+std::vector<Diagnostic::FixIt> compiler_pending_fixits;
+
+// See compiler.h: load-chain provenance hand-off.
+std::string compiler_next_load_reason;
+std::string compiler_current_load_reason;
+
+// See compiler.h: operand ranges for the in-flight grammar action.
+std::vector<Diagnostic::Range> compiler_pending_ranges;
+int compiler_pending_caret_line = 0;
+int compiler_pending_caret_col = 0;
+void rule_set_operand_ranges(int l1, int c1, int e1, int lop, int cop, int l2, int c2, int e2) {
+  compiler_pending_ranges.clear();
+  compiler_pending_ranges.push_back(Diagnostic::Range{l1, c1, e1});
+  compiler_pending_ranges.push_back(Diagnostic::Range{l2, c2, e2});
+  compiler_pending_caret_line = lop;
+  compiler_pending_caret_col = cop;
+}
+void rule_clear_operand_ranges(void) {
+  compiler_pending_ranges.clear();
+  compiler_pending_caret_line = 0;
+  compiler_pending_caret_col = 0;
+}
+
+// Displays a compiler-internal filename (stored without a leading slash)
+// the way the mudlib names it.
+static std::string display_path(const std::string &file) {
+  if (!file.empty() && file[0] == '/') return file;
+  return "/" + file;
+}
+
+std::string render_diagnostic(const Diagnostic &d, bool color) {
+  const char *c_err = color ? "\033[1;31m" : "";
+  const char *c_warn = color ? "\033[1;35m" : "";
+  const char *c_bold = color ? "\033[1m" : "";
+  const char *c_caret = color ? "\033[1;32m" : "";
+  const char *c_off = color ? "\033[0m" : "";
+  std::string out;
+  // clang's convention: the include chain prints BEFORE the main line,
+  // outermost includer first. Capture stores innermost first, so walk in
+  // reverse.
+  for (auto it = d.included_from.rbegin(); it != d.included_from.rend(); ++it) {
+    out += "In file included from " + display_path(it->first) + ":" + std::to_string(it->second) +
+           ":\n";
+  }
+  out += display_path(d.file);
+  out += ":" + std::to_string(d.line);
+  if (d.column > 0) {
+    out += ":" + std::to_string(d.column);
+  }
+  out += ": ";
+  out += d.is_warning ? c_warn : c_err;
+  out += d.is_warning ? "warning: " : "error: ";
+  out += c_off;
+  out += c_bold;
+  out += d.message;
+  out += c_off;
+  if (!d.snippet.empty()) {
+    // Tabs print as one space so the caret column (which counted a tab
+    // as one) stays aligned with the snippet as displayed.
+    std::string shown = d.snippet;
+    for (auto &ch : shown) {
+      if (ch == '\t') ch = ' ';
+    }
+    out += "\n  " + shown;
+    bool caret_ok = d.column > 0 && static_cast<size_t>(d.column) <= shown.size() + 1;
+    // Build the caret line: '~' runs under operand ranges on this line,
+    // '^' at the diagnosed column (clang's  ~~~ ^ ~~~  shape).
+    std::string marks(shown.size() + 1, ' ');
+    bool any_marks = false;
+    for (const auto &r : d.ranges) {
+      if (r.line != d.line || r.col_start <= 0 || r.col_start > r.col_end) continue;
+      for (int c = r.col_start; c <= r.col_end && static_cast<size_t>(c) <= marks.size(); c++) {
+        marks[static_cast<size_t>(c - 1)] = '~';
+        any_marks = true;
+      }
+    }
+    if (caret_ok) {
+      marks[static_cast<size_t>(d.column - 1)] = '^';
+    }
+    if (caret_ok || any_marks) {
+      while (!marks.empty() && marks.back() == ' ') marks.pop_back();
+      out += "\n  ";
+      out += c_caret;
+      out += marks;
+      out += c_off;
+    }
+    // Fix-it replacement lines, clang-style: the suggested text printed
+    // under the span it replaces.
+    for (const auto &f : d.fixits) {
+      if (f.col_start > 0 && static_cast<size_t>(f.col_start) <= shown.size() + 1) {
+        out += "\n  " + std::string(static_cast<size_t>(f.col_start - 1), ' ');
+        out += c_caret;
+        out += f.replacement;
+        out += c_off;
+      }
+    }
+  }
+  for (const auto &exp : d.expansions) {
+    out += "\n  note: ";
+    out += exp;
+  }
+  for (const auto &note : d.notes) {
+    out += "\n  note: ";
+    out += note;
+  }
+  return out;
+}
+
+// Builds and stores the structured record for one reported diagnostic --
+// called by yyerror()/yywarn() at the exact moment of the report, because
+// the provenance is LIVE state: the #include stack is popped as includes
+// finish, the macro-expansion frames are popped as splices are consumed,
+// and the session chain is popped as compiles finish, so capturing later
+// would see less. Returns the stored record for the caller to print.
+static const Diagnostic &capture_diagnostic(bool is_warning, const char *message) {
+  Diagnostic d;
+  d.is_warning = is_warning;
+  d.file = current_file != nullptr ? current_file : "";
+  d.line = compiler_directive_start_line != 0 ? compiler_directive_start_line : current_line;
+  d.message = message;
+  d.included_from = lpc_lex_include_stack();
+  auto chain = lpc_lex_expansion_chain();
+  for (const auto &site : chain) {
+    std::string exp = "during expansion of macro '" + site.name + "'";
+    if (!site.def_file.empty()) {
+      exp += " (defined at " + display_path(site.def_file) + ":" + std::to_string(site.def_line) +
+             ")";
+    }
+    d.expansions.push_back(std::move(exp));
+  }
+  // Column + snippet (8.1/8.2). Inside an expansion, attribute to the
+  // OUTERMOST invocation (chain is innermost-first, so .back()) -- same
+  // frame `line` already reads. A directive-attributed report (whole-line
+  // constructs) carries no useful token column.
+  if (compiler_directive_start_line == 0) {
+    if (!chain.empty()) {
+      d.column = chain.back().invocation_column;
+    } else if (void *scanner = lpc_lex_active_scanner()) {
+      d.column = yyget_extra(scanner)->token_start_column + 1;
+    }
+    d.snippet = lpc_lex_current_source_line();
+  }
+  d.notes = std::move(compiler_pending_notes);
+  compiler_pending_notes.clear();
+  d.fixits = std::move(compiler_pending_fixits);
+  compiler_pending_fixits.clear();
+  if (!compiler_current_load_reason.empty()) {
+    d.notes.push_back(compiler_current_load_reason);
+  }
+  d.ranges = compiler_pending_ranges;  // copied, not moved: the owning
+                                       // grammar action clears them
+  if (compiler_pending_caret_line != 0 && compiler_pending_caret_line == d.line) {
+    d.column = compiler_pending_caret_col;  // caret on the operator itself
+  }
+  if (current_compile != nullptr) {
+    std::string c = current_compile->chain();
+    if (!c.empty()) {
+      std::string who = current_compile->filename != nullptr ? current_compile->filename : "?";
+      d.notes.push_back("while compiling '" + who + "', " + c);
+    }
+  }
+  compiler_diags.push_back(std::move(d));
+  return compiler_diags.back();
+}
+
 program_t NULL_program = {nullptr};
 
 program_t *prog;
@@ -1995,7 +2181,7 @@ void yyerror(const char *fmt, ...) {
     lex_fatal = 1;
     return;
   }
-  smart_log(current_file, current_line, buf, 0);
+  report_compile_diagnostic(capture_diagnostic(/*is_warning=*/false, buf));
 #ifdef PACKAGE_MUDLIB_STATS
   if (compiler_vm_context) {
     add_errors_for_file(current_file, 1);
@@ -2008,6 +2194,31 @@ void yyerror(void *yyscanner, const char *msg) {
   yyerror("%s", msg);
 }
 
+void yyerror(struct YYLTYPE *llocp, void *yyscanner, const char *msg) {
+  // Location-aware Bison entry: primary attribution deliberately stays
+  // current_line-at-report (see 8.3's ground rules); llocp feeds nothing
+  // yet beyond what capture_diagnostic already reads live.
+  (void)llocp;
+  (void)yyscanner;
+  yyerror("%s", msg);
+}
+
+// Flex's YY_FATAL_ERROR is routed here (see lex.l's prologue) instead of
+// the generated yy_fatal_error()'s stock exit(2): an unrecoverable
+// scanner condition (in practice only "token too large, exceeds YYLMAX" --
+// a single atomic token over 64KB -- or an allocation failure) must abort
+// the COMPILE, not the driver. Records the diagnostic, then unwinds via
+// the same error() path every other mid-compile abort uses; without a VM
+// (unit-test harnesses, where such tokens don't occur) there is no catch
+// context to unwind to, so fall through to fatal().
+[[noreturn]] void lpc_lex_fatal(const char *msg) {
+  lexerror(msg);
+  if (compiler_vm_context) {
+    error("Fatal lexer error: %s\n", msg);
+  }
+  fatal("Fatal lexer error outside any VM context: %s\n", msg);
+}
+
 void yywarn(const char *fmt, ...) {
   static char buf[1024 + 1];
 
@@ -2018,10 +2229,15 @@ void yywarn(const char *fmt, ...) {
   buf[sizeof(buf) - 1] = '\0';
 
   if (!(pragmas & PRAGMA_WARNINGS)) {
+    // The suppressed report's queued context must die with it: a
+    // producer queues notes/fix-its BEFORE calling yywarn, and leaving
+    // them pending would attach them to the NEXT (unrelated) diagnostic.
+    compiler_pending_notes.clear();
+    compiler_pending_fixits.clear();
     return;
   }
 
-  smart_log(current_file, current_line, buf, 1);
+  report_compile_diagnostic(capture_diagnostic(/*is_warning=*/true, buf));
 }
 
 /*
@@ -2040,7 +2256,24 @@ program_t *compile_file(std::unique_ptr<LexStream> stream, const char *name,
   if (guard || current_file) {
     error("Object cannot be loaded during compilation.\n");
   }
+  if (current_compile != nullptr && current_compile->depth + 1 >= MAX_COMPILE_DEPTH) {
+    error("Too deep compile nesting compiling '%s' (%s).\n", name,
+          current_compile->chain().c_str());
+  }
   guard = 1;
+
+  // This compile's session, published for the duration (cleared in the
+  // DEFER below): identity + the anchor structured diagnostics hang
+  // provenance off. The compiler is deliberately non-reentrant -- the
+  // guard above enforces it and load_object() handles the inherit chain
+  // outside the compiler -- so parent is always null and depth always 0;
+  // see compiler.h's CompileSession comment for the full rationale.
+  CompileSession session;
+  session.filename = name;
+  session.vm_context = vm_context;
+  session.parent = current_compile;
+  session.depth = current_compile != nullptr ? current_compile->depth + 1 : 0;
+  current_compile = &session;
 
   // Save all compiler globals to support reentrancy/recursive compile
   vm_context_t *saved_vm_context = compiler_vm_context;
@@ -2053,8 +2286,6 @@ program_t *compile_file(std::unique_ptr<LexStream> stream, const char *name,
   int saved_current_file_id = current_file_id;
   int saved_pragmas = pragmas;
   int saved_num_parse_error = num_parse_error;
-  char *saved_outp = outp;
-  char *saved_last_nl = last_nl;
   int saved_lex_fatal = lex_fatal;
 
   int saved_context = context;
@@ -2140,8 +2371,6 @@ program_t *compile_file(std::unique_ptr<LexStream> stream, const char *name,
       current_file_id = saved_current_file_id;
       pragmas = saved_pragmas;
       num_parse_error = saved_num_parse_error;
-      outp = saved_outp;
-      last_nl = saved_last_nl;
       lex_fatal = saved_lex_fatal;
 
       context = saved_context;
@@ -2183,6 +2412,7 @@ program_t *compile_file(std::unique_ptr<LexStream> stream, const char *name,
       locals_ptr = saved_locals_ptr;
 
       compiler_vm_context = saved_vm_context;
+      current_compile = session.parent;
       guard = 0;
     };
 
@@ -2208,8 +2438,9 @@ program_t *compile_file(std::unique_ptr<LexStream> stream, const char *name,
       int push_status;
       do {
         YYSTYPE yylval;
-        int token = token_stream.next(&yylval);
-        push_status = yypush_parse(pstate.get(), token, &yylval, token_stream.scanner());
+        YYLTYPE yylloc;
+        int token = token_stream.next(&yylval, &yylloc);
+        push_status = yypush_parse(pstate.get(), token, &yylval, &yylloc, token_stream.scanner());
       } while (push_status == YYPUSH_MORE);
     }
 

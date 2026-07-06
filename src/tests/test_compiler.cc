@@ -16,6 +16,9 @@
 
 #include <gtest/gtest.h>
 
+#include <unistd.h>
+
+#include <fstream>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -82,7 +85,8 @@ static std::vector<Token> TokenizeSession(std::shared_ptr<LexerSession> session,
     std::vector<Token> toks;
     YYSTYPE yylval;
     for (;;) {
-        int k = yylex(&yylval, scanner);
+        YYLTYPE yylloc;
+        int k = yylex(&yylval, &yylloc, scanner);
         if (k <= 0) break;
         Token t;
         t.kind   = k;
@@ -391,6 +395,23 @@ TEST(Preprocessor, BluePaintFunctionLikeSelfRefIgnoresFollowingParens) {
               "int v = F(2 + 1);");
 }
 
+TEST(Preprocessor, MultiLineMacroArgKeepsLineCount) {
+    // A macro argument spanning a newline: the newline is consumed once
+    // from the raw stream by the argument collector AND a copy of it can
+    // reappear in the spliced expansion -- __LINE__ afterward must still
+    // be exact (no double count).
+    EXPECT_EQ(pp("#define ID(x) x\nint a = ID(1 +\n2);\nint l = __LINE__;\n"),
+              "int a = 1 + 2; int l = 4;");
+}
+
+TEST(Preprocessor, DroppedMultiLineArgKeepsLineCount) {
+    // The parameter is unused, so the argument text (and its newline)
+    // never reappears in the expansion -- __LINE__ must still be exact
+    // (no under-count either).
+    EXPECT_EQ(pp("#define EAT(x)\nint a = 1; EAT(foo\nbar); int l = __LINE__;\n"),
+              "int a = 1; ; int l = 3;");
+}
+
 TEST(Preprocessor, AliasToFunctionLikeExpandsWithStreamArgs) {
     // UNPAINTED function-like name left literal only because no '('
     // followed it in the expansion text itself: when the '(' turns out to
@@ -681,8 +702,12 @@ INSTANTIATE_TEST_SUITE_P(IfExpr, IfExprEvalTest, ::testing::Values(
     // integer literal forms
     IfExprCase{"HexLit",             "0xFF==255",      true},
     IfExprCase{"HexLit2",            "0x10==16",       true},
-    IfExprCase{"OctalLit",           "010==8",         true},
-    IfExprCase{"IntSuffix",          "100UL==100",     true},
+    // 7.4 token-based evaluation: #if literals follow LPC's OWN number
+    // grammar now (the old char walker used C's strtol rules). LPC has no
+    // octal literals -- a leading zero is just decimal, matching what the
+    // same spelling means in code proper -- and no U/L suffixes.
+    IfExprCase{"LeadingZeroDecimal", "010==10",        true},
+    IfExprCase{"NoIntSuffix",        "100==100",       true},
     // char literals
     IfExprCase{"CharLit",            "'A'==65",        true},
     IfExprCase{"CharEscN",           "'\\n'==10",      true},
@@ -966,6 +991,28 @@ END2;
     EXPECT_EQ(out.val.find("42"), std::string::npos);
 }
 
+TEST(Preprocessor, HeredocTextFormKeepsLineCount) {
+    // parseHeredoc() counts each body line as it reads it through Flex,
+    // and a LONE terminator line's newline is consumed and counted inside
+    // the helper itself -- __LINE__ afterward must be exact.
+    EXPECT_EQ(pp("string x = @END\na\nb\nEND\n;\nint l = __LINE__;\n"),
+              "string x = \"a\nb\n\" ; int l = 6;");
+}
+
+TEST(Preprocessor, HeredocArrayFormKeepsLineCount) {
+    // Array form: body lines are counted at read time and the spliced
+    // `"a", "b", })` rescan text deliberately carries NO newlines (the
+    // legacy get_array_block joined elements with ",\n", making the rescan
+    // count every body line a second time). Also covers the
+    // trailing-content terminator path: the ";" after END is pushed back
+    // along with the line's newline, which is then counted exactly once at
+    // rescan. (The leading L_ARRAY_OPEN is synthesized by parseHeredoc(),
+    // so this harness -- which renders operator tokens via yytext --
+    // shows nothing for it; the "({" is present in the token stream.)
+    EXPECT_EQ(pp("string *y = @@END\na\nb\nEND;\nint l = __LINE__;\n"),
+              "string *y = \"a\", \"b\", }); int l = 5;");
+}
+
 // ---------------------------------------------------------------------------
 // 14. Error-generating directives — parameterized
 // ---------------------------------------------------------------------------
@@ -1006,6 +1053,241 @@ INSTANTIATE_TEST_SUITE_P(Errors, ErrorCaseTest, ::testing::Values(
     ErrorCase{"EmptyIfExpr",           "#if\nint x;\n#endif\n"},
     ErrorCase{"TernaryMissingColon",   "#if 1 ? 2\nint x;\n#endif\n"}
 ), [](const ::testing::TestParamInfo<ErrorCase>& i) { return i.param.name; });
+
+// ---------------------------------------------------------------------------
+// 14a-bis. Structured diagnostics (Phase 6.2): yyerror()/yywarn() also
+// capture a Diagnostic into compiler_diags -- position, severity, and
+// provenance notes (live #include stack; compile-session chain) recorded
+// at the moment of the report. Default text output is unchanged; these
+// assert the structured record and its clang-style rendering.
+// ---------------------------------------------------------------------------
+
+TEST(Diagnostics, CapturesErrorPositionAndMessage) {
+    pp("int a;\n#error boom here\n");
+    ASSERT_FALSE(compiler_diags.empty());
+    const Diagnostic& d = compiler_diags.back();
+    EXPECT_FALSE(d.is_warning);
+    EXPECT_EQ(d.line, 2);
+    EXPECT_NE(d.message.find("boom here"), std::string::npos);
+    EXPECT_FALSE(d.file.empty());
+    // Top-level error: no include stack, no compile chain.
+    EXPECT_TRUE(d.notes.empty());
+    // Rendering: "file:2: error: ..." on one line.
+    std::string r = render_diagnostic(d);
+    EXPECT_NE(r.find(":2: error:"), std::string::npos);
+    EXPECT_NE(r.find("boom here"), std::string::npos);
+}
+
+TEST(Diagnostics, ClearedPerChunk) {
+    pp("#error first\n");
+    ASSERT_FALSE(compiler_diags.empty());
+    pp("int clean = 1;\n");
+    EXPECT_TRUE(compiler_diags.empty());
+}
+
+TEST(Diagnostics, WarningSeverityCaptured) {
+    // An unknown \ escape in a string reports through yywarn().
+    pp("string s = \"a\\q\";\n");
+    ASSERT_FALSE(compiler_diags.empty());
+    EXPECT_TRUE(compiler_diags.back().is_warning);
+}
+
+TEST(Diagnostics, IncludeProvenanceNote) {
+    // An error INSIDE an included file must carry the "in file included
+    // from" note naming the includer and the #include line. The include
+    // target is created on disk next to the (testsuite-cwd-relative)
+    // including file so quoted-include resolution finds it.
+    // Absolute path under the testsuite dir: TokenizeSession chdir()s
+    // there on first use, but under ctest this test may run in its own
+    // process where that hasn't happened yet when the file is created.
+    std::string inc_path = std::string(TESTSUITE_DIR) + "/zz_diag_include_test.h";
+    {
+        std::ofstream inc(inc_path);
+        inc << "#error exploded inside include\n";
+    }
+    pp("int a;\nint b;\n#include \"zz_diag_include_test.h\"\n");
+    unlink(inc_path.c_str());
+    ASSERT_FALSE(compiler_diags.empty());
+    const Diagnostic& d = compiler_diags.back();
+    EXPECT_NE(d.message.find("exploded inside include"), std::string::npos);
+    EXPECT_EQ(d.line, 1);  // line 1 of the included file
+    EXPECT_NE(d.file.find("zz_diag_include_test.h"), std::string::npos);
+    // The includer is the chunk file ("test"), at the #include's line (3).
+    ASSERT_FALSE(d.included_from.empty());
+    EXPECT_EQ(d.included_from[0].second, 3);
+    // clang convention: the include chain renders BEFORE the main line.
+    std::string r = render_diagnostic(d);
+    EXPECT_NE(r.find("In file included from "), std::string::npos);
+    EXPECT_NE(r.find(":3:\n"), std::string::npos);
+    EXPECT_LT(r.find("In file included from"), r.find("error:"));
+}
+
+TEST(Diagnostics, ExpansionChainNote) {
+    // A lexical error INSIDE spliced expansion text must carry the
+    // "during expansion of macro 'X' (defined at ...)" note -- the frame
+    // is tracked by byte-extent accounting on the splice, live exactly
+    // while the splice is being rescanned. '\x01' is an illegal character,
+    // guaranteed to error at scan time.
+    pp("#define BAD \x01\nint x = BAD;\n");
+    ASSERT_FALSE(compiler_diags.empty());
+    const Diagnostic& d = compiler_diags.back();
+    ASSERT_FALSE(d.expansions.empty());
+    EXPECT_NE(d.expansions[0].find("during expansion of macro 'BAD'"), std::string::npos);
+    EXPECT_NE(d.expansions[0].find(":1)"), std::string::npos);  // defined at line 1
+    std::string r = render_diagnostic(d);
+    EXPECT_NE(r.find("\n  note: during expansion of macro 'BAD'"), std::string::npos);
+}
+
+TEST(Diagnostics, NestedExpansionChainNotes) {
+    // OUTER's body references INNER; the bad byte lives in INNER's text.
+    // Both frames must be reported, innermost first.
+    pp("#define INNER \x01\n#define OUTER INNER\nint x = OUTER;\n");
+    ASSERT_FALSE(compiler_diags.empty());
+    const Diagnostic& d = compiler_diags.back();
+    // Rescan-driven expansion (7.4): each nested reference gets its own
+    // buffer + frame, so BOTH sites report, innermost first -- the full
+    // clang-style chain the flattened textual design couldn't produce.
+    ASSERT_GE(d.expansions.size(), 2u);
+    EXPECT_NE(d.expansions[0].find("macro 'INNER'"), std::string::npos);
+    EXPECT_NE(d.expansions[1].find("macro 'OUTER'"), std::string::npos);
+}
+
+TEST(Diagnostics, ExpansionInsideIncludeCombined) {
+    // Error in a macro used inside an included file: BOTH provenance axes
+    // must be present -- the include chain prefix and the expansion note.
+    std::string inc_path = std::string(TESTSUITE_DIR) + "/zz_diag_combo_test.h";
+    {
+        std::ofstream inc(inc_path);
+        inc << "#define KABOOM \x01\n";
+        inc << "int v = KABOOM;\n";
+    }
+    pp("#include \"zz_diag_combo_test.h\"\n");
+    unlink(inc_path.c_str());
+    ASSERT_FALSE(compiler_diags.empty());
+    const Diagnostic& d = compiler_diags.back();
+    ASSERT_FALSE(d.included_from.empty());
+    ASSERT_FALSE(d.expansions.empty());
+    EXPECT_NE(d.expansions[0].find("macro 'KABOOM'"), std::string::npos);
+    std::string r = render_diagnostic(d);
+    EXPECT_LT(r.find("In file included from"), r.find("error:"));
+    EXPECT_NE(r.find("note: during expansion of macro 'KABOOM'"), std::string::npos);
+}
+
+TEST(Diagnostics, ColumnAndSnippetCaptured) {
+    // A scan-level error must carry the diagnosed token's 1-based START
+    // column and the physical line's text; the renderer emits
+    // "file:line:col:" plus an indented snippet with a caret under the
+    // column. '\x01' is an illegal character at column 9 of line 2.
+    pp("int a;\nint bb = \x01;\n");
+    ASSERT_FALSE(compiler_diags.empty());
+    const Diagnostic& d = compiler_diags.back();
+    EXPECT_EQ(d.line, 2);
+    EXPECT_EQ(d.column, 10);
+    EXPECT_NE(d.snippet.find("int bb ="), std::string::npos);
+    std::string r = render_diagnostic(d);
+    EXPECT_NE(r.find(":2:10: error:"), std::string::npos);
+    // Caret line: two-space indent + (column-1) spaces + '^'.
+    EXPECT_NE(r.find("\n  " + std::string(9, ' ') + "^"), std::string::npos);
+}
+
+TEST(Diagnostics, ExpansionErrorAttributesInvocationColumn) {
+    // An error INSIDE an expansion attributes line/column/snippet to the
+    // OUTERMOST invocation site (clang's "expansion location"): the
+    // column is the macro NAME's start, the snippet is the invocation
+    // line, and the expansion itself is the note's job.
+    pp("#define BAD \x01\nint xx = BAD;\n");
+    ASSERT_FALSE(compiler_diags.empty());
+    const Diagnostic& d = compiler_diags.back();
+    EXPECT_EQ(d.line, 2);
+    EXPECT_EQ(d.column, 10);  // 'B' of BAD on line 2
+    EXPECT_NE(d.snippet.find("int xx = BAD;"), std::string::npos);
+    ASSERT_FALSE(d.expansions.empty());
+}
+
+TEST(Diagnostics, DirectiveErrorsCarryNoColumn) {
+    // Whole-line constructs (#error and friends) attribute by line only:
+    // column stays 0 and no snippet/caret block renders.
+    pp("#error boom\n");
+    ASSERT_FALSE(compiler_diags.empty());
+    const Diagnostic& d = compiler_diags.back();
+    EXPECT_EQ(d.column, 0);
+    EXPECT_TRUE(d.snippet.empty());
+}
+
+TEST(Diagnostics, UnknownEscapeCarriesFixIt) {
+    // The unknown-escape warning suggests dropping the backslash: a
+    // fix-it spanning the two-character escape, replacement = the bare
+    // character, rendered under the caret.
+    pp("string s = \"a\\q\";\n");
+    ASSERT_FALSE(compiler_diags.empty());
+    const Diagnostic& d = compiler_diags.back();
+    EXPECT_TRUE(d.is_warning);
+    ASSERT_EQ(d.fixits.size(), 1u);
+    EXPECT_EQ(d.fixits[0].replacement, "q");
+    EXPECT_EQ(d.fixits[0].col_end, d.fixits[0].col_start + 2);
+    std::string r = render_diagnostic(d);
+    // The replacement line renders after the caret line.
+    EXPECT_NE(r.find("^"), std::string::npos);
+    EXPECT_GT(r.rfind("q"), r.find("^"));
+}
+
+TEST(Diagnostics, UnknownPragmaSuggestsNearest) {
+    pp("#pragma strict_typs\nint x;\n");
+    ASSERT_FALSE(compiler_diags.empty());
+    const Diagnostic& d = compiler_diags.back();
+    EXPECT_NE(d.message.find("Unknown #pragma"), std::string::npos);
+    ASSERT_FALSE(d.notes.empty());
+    EXPECT_NE(d.notes[0].find("did you mean '#pragma strict_types'?"), std::string::npos);
+}
+
+TEST(Diagnostics, SuppressedWarningDoesNotLeakContext) {
+    // A producer queues its note/fix-it BEFORE yywarn(); when warnings
+    // are pragma-disabled the report is suppressed -- its queued context
+    // must be discarded with it, not attached to the next (unrelated)
+    // diagnostic.
+    pp("#pragma no_warnings\nstring s = \"a\\q\";\n#pragma warnings\nint x = \x01;\n");
+    ASSERT_FALSE(compiler_diags.empty());
+    const Diagnostic& d = compiler_diags.back();
+    EXPECT_FALSE(d.is_warning);  // the illegal-character error
+    EXPECT_TRUE(d.fixits.empty());
+    for (const auto& n : d.notes) {
+        EXPECT_EQ(n.find("did you mean"), std::string::npos) << n;
+    }
+}
+
+TEST(Diagnostics, FloatInIfExprErrors) {
+    // #if literals follow LPC's number grammar, but a float can still be
+    // SPELLED -- it must produce a clear error, not silently evaluate
+    // as zero.
+    pp("#if 1.5\nint x;\n#endif\n");
+    ASSERT_FALSE(compiler_diags.empty());
+    bool found = false;
+    for (const auto& d : compiler_diags) {
+        if (d.message.find("floating point") != std::string::npos) found = true;
+    }
+    EXPECT_TRUE(found);
+}
+
+TEST(Diagnostics, RedefinitionCarriesPreviousDefinitionNote) {
+    pp("#define FOO 1\n#define FOO 2\n");
+    ASSERT_FALSE(compiler_diags.empty());
+    const Diagnostic& d = compiler_diags.back();
+    EXPECT_NE(d.message.find("FOO redefined"), std::string::npos);
+    ASSERT_FALSE(d.notes.empty());
+    EXPECT_NE(d.notes[0].find("previous definition of 'FOO' was at "), std::string::npos);
+    EXPECT_NE(d.notes[0].find(":1"), std::string::npos);
+}
+
+TEST(Diagnostics, NoStaleExpansionNoteAfterSpliceConsumed) {
+    // The frame must POP once the splice is fully consumed: an error on a
+    // later line, AFTER a successful macro use, must carry no expansion
+    // note (this pins the extent accounting's debit/pop precision).
+    pp("#define OK 42\nint a = OK;\nint b = \x01;\n");
+    ASSERT_FALSE(compiler_diags.empty());
+    const Diagnostic& d = compiler_diags.back();
+    EXPECT_TRUE(d.expansions.empty());
+    EXPECT_EQ(d.line, 3);
+}
 
 // ---------------------------------------------------------------------------
 // 14b. Error in dead block must be suppressed

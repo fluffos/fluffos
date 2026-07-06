@@ -221,3 +221,25 @@ void smart_log(const char *error_file, int line, const char *what, int flag) {
   copy_and_push_string(res.c_str());
   safe_apply_master_ob(APPLY_LOG_ERROR, 2);
 } /* smart_log() */
+
+bool compiler_diags_quiet = false;
+
+void report_compile_diagnostic(const Diagnostic &d) {
+  if (compiler_diags_quiet) {
+    // A structured consumer owns presentation; the record is already in
+    // compiler_diags.
+    return;
+  }
+  std::string text = render_diagnostic(d);
+  text += "\n";
+  debug_message("%s", text.c_str());
+
+  // Same gating as smart_log(): without a VM there is no eval stack to
+  // push the master-apply arguments onto.
+  if (!compiler_vm_context) {
+    return;
+  }
+  push_malloced_string(add_slash(d.file.c_str()));
+  copy_and_push_string(text.c_str());
+  safe_apply_master_ob(APPLY_LOG_ERROR, 2);
+}

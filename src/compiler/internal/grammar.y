@@ -6,6 +6,10 @@
 %define parse.lac full
 %define api.pure full
 %define api.push-pull push
+/* 8.3: token/rule source spans. ADDITIVE -- primary line attribution
+ * stays current_line-at-reduce; yylloc feeds operand-range diagnostics
+ * (see rule_set_operand_ranges) and future callers. */
+%locations
 %lex-param { void* yyscanner }
 %parse-param { void* yyscanner }
 /* 3rd conflict (added alongside string_like/template_literal): shift/reduce
@@ -448,7 +452,13 @@ expr:
   | expr[lhs] L_LSH expr[rhs]  { rule_expr_lsh(&$$, $lhs, $rhs); }
   | expr[lhs] L_RSH expr[rhs]  { rule_expr_rsh(&$$, $lhs, $rhs); }
 
-  | expr[lhs] '+' expr[rhs]  { rule_expr_add(&$$, $lhs, $rhs); }
+  | expr[lhs] '+' expr[rhs]  {
+        rule_set_operand_ranges(@lhs.first_line, @lhs.first_column, @lhs.last_column,
+                                @2.first_line, @2.first_column,
+                                @rhs.first_line, @rhs.first_column, @rhs.last_column);
+        rule_expr_add(&$$, $lhs, $rhs);
+        rule_clear_operand_ranges();
+    }
   | expr[lhs] '-' expr[rhs]  { rule_expr_sub(&$$, $lhs, $rhs); }
   | expr[lhs] '*' expr[rhs]  { rule_expr_mul(&$$, $lhs, $rhs); }
   | expr[lhs] '%' expr[rhs]  { rule_expr_mod(&$$, $lhs, $rhs); }

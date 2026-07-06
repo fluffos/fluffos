@@ -5,8 +5,13 @@
 #include <cctype>
 #include <cstdlib>
 
+#include "compiler/internal/compiler.h"
 #include "compiler/internal/lex.h"
 #include "compiler/internal/lexer_utils.h"
+// grammar_rules.h must precede grammar.autogen.h (decl_t/func_block_t);
+// needed for the token ids and YYSTYPE the #if token evaluator consumes.
+#include "compiler/internal/grammar_rules.h"
+#include "compiler/internal/grammar.autogen.h"
 
 std::string normalize_filename(const char* filename) {
     if (!filename) return "/unknown";
@@ -88,7 +93,27 @@ std::vector<std::string> collect_args(std::string_view text, size_t& i) {
 
 std::string substitute(std::string_view body,
                        const std::vector<std::string>& params,
-                       const std::vector<std::string>& args) {
+                       const std::vector<std::string>& args,
+                       const std::vector<std::string>* expanded_args) {
+    // C parameter-substitution selection: a parameter that is an operand
+    // of # (handled in the stringize branch) or ## gets the RAW argument
+    // spelling; any other use gets the macro-expanded form when the
+    // caller supplied one (expanded_args non-null; the rescan-driven
+    // expansion path does), else raw.
+    auto pasted_operand = [&body](size_t tok_start, size_t tok_end) {
+        size_t k = tok_start;
+        while (k > 0 && (body[k - 1] == ' ' || body[k - 1] == '\t')) {
+            k--;
+        }
+        bool before = (k >= 2 && body[k - 1] == '#' && body[k - 2] == '#');
+        size_t f = tok_end;
+        while (f < body.size() && (body[f] == ' ' || body[f] == '\t')) {
+            f++;
+        }
+        bool after = (f + 1 < body.size() && body[f] == '#' && body[f + 1] == '#');
+        return before || after;
+    };
+
     std::string temp;
     size_t i = 0;
     while (i < body.size()) {
@@ -133,7 +158,12 @@ std::string substitute(std::string_view body,
             bool replaced = false;
             for (size_t p = 0; p < params.size() && p < args.size(); p++) {
                 if (tok == params[p]) {
-                    temp += args[p];
+                    if (expanded_args != nullptr && p < expanded_args->size() &&
+                        !pasted_operand(start, i)) {
+                        temp += (*expanded_args)[p];
+                    } else {
+                        temp += args[p];
+                    }
                     replaced = true;
                     break;
                 }
@@ -205,156 +235,89 @@ std::string substitute(std::string_view body,
 
 namespace {
 
-struct IfExprState {
-    std::string_view expr;
+// ---------------------------------------------------------------------------
+// #if/#elif expression evaluation over TOKENS (7.4): the expression text
+// is pushed as a LPC_BUF_IF_EXPR buffer and pulled through the scanner
+// itself (lpc_lex_ifexpr_next) -- numbers arrive via the real literal
+// decoders (hex/binary/char escapes included), macro references expand
+// through the ordinary rescan machinery into a FLAT token sequence
+// (preserving C precedence: `#define X 1+1` + `#if X*2` is 1+1*2 = 3),
+// and defined()/efun_defined() operands are pulled with expansion
+// suppressed (C requires the unexpanded name). The buffer's own <<EOF>>
+// returns LPC_IFEXPR_END, so the pull stops exactly at the expression's
+// edge. Only then does this evaluator run, over the collected vector --
+// same precedence/ternary/error structure as the old char-level walker,
+// with tokens for atoms.
+// ---------------------------------------------------------------------------
+
+struct IfTok {
+    int op;    // 0 = number; otherwise an operator code (see ifexpr_binop)
+    long val;  // the number when op == 0
+};
+
+struct IfTokState {
+    const std::vector<IfTok>* toks;
     size_t pos = 0;
     std::string error;  // first error wins; empty means no error yet
 };
 
-bool ifexpr_at_end(const IfExprState *st) { return st->pos >= st->expr.size(); }
+bool ifexpr_at_end(const IfTokState* st) { return st->pos >= st->toks->size(); }
 
-char ifexpr_peek(const IfExprState *st) { return ifexpr_at_end(st) ? '\0' : st->expr[st->pos]; }
-
-char ifexpr_advance(IfExprState *st) { return ifexpr_at_end(st) ? '\0' : st->expr[st->pos++]; }
-
-void ifexpr_skip_ws(IfExprState *st) {
-    while (!ifexpr_at_end(st) && std::isspace(static_cast<unsigned char>(st->expr[st->pos])))
-        st->pos++;
+int ifexpr_peek_op(const IfTokState* st) {
+    return ifexpr_at_end(st) ? 0 : (*st->toks)[st->pos].op;
 }
 
-void ifexpr_set_error(IfExprState *st, const char *msg) {
+void ifexpr_set_error(IfTokState* st, const char* msg) {
     if (st->error.empty()) st->error = msg;
 }
 
-// True once only whitespace (or nothing) remains -- used after a top-level
-// parse to detect trailing junk the grammar didn't account for.
-bool ifexpr_at_end_of_expr(const IfExprState *st) {
-    size_t p = st->pos;
-    while (p < st->expr.size() && std::isspace(static_cast<unsigned char>(st->expr[p]))) p++;
-    return p >= st->expr.size();
-}
+long ifexpr_top(IfTokState* st);
 
-long ifexpr_top(IfExprState *st);
-
-long ifexpr_atom(IfExprState *st) {
-    ifexpr_skip_ws(st);
+long ifexpr_atom(IfTokState* st) {
     if (ifexpr_at_end(st)) return 0;
-
-    char c = ifexpr_peek(st);
-
-    if (c == '(') {
-        ifexpr_advance(st);
-        long v = ifexpr_top(st);
-        ifexpr_skip_ws(st);
-        if (ifexpr_peek(st) == ')') {
-            ifexpr_advance(st);
-        } else {
-            ifexpr_set_error(st, "bracket not paired in #if");
-        }
-        return v;
+    const IfTok& t = (*st->toks)[st->pos];
+    if (t.op == 0) {
+        st->pos++;
+        return t.val;
     }
-    if (c == '!') { ifexpr_advance(st); return !ifexpr_atom(st); }
-    if (c == '~') { ifexpr_advance(st); return ~ifexpr_atom(st); }
-    if (c == '-') { ifexpr_advance(st); return -ifexpr_atom(st); }
-    if (c == '+') { ifexpr_advance(st); return ifexpr_atom(st); }
-
-    if (c == '\'') {
-        ifexpr_advance(st);
-        long value = 0;
-        if (!ifexpr_at_end(st) && ifexpr_peek(st) == '\\') {
-            ifexpr_advance(st);
-            if (!ifexpr_at_end(st)) {
-                char esc = ifexpr_advance(st);
-                switch (esc) {
-                    case 'n':  value = '\n'; break;
-                    case 't':  value = '\t'; break;
-                    case 'r':  value = '\r'; break;
-                    case 'a':  value = '\a'; break;
-                    case 'b':  value = '\b'; break;
-                    case 'f':  value = '\f'; break;
-                    case 'v':  value = '\v'; break;
-                    case 'e':  value = '\x1b'; break;
-                    case '0':  value = '\0'; break;
-                    case '\\': value = '\\'; break;
-                    case '\'': value = '\''; break;
-                    case '"':  value = '"';  break;
-                    case 'x': {
-                        long hv = 0;
-                        while (!ifexpr_at_end(st) && std::isxdigit(static_cast<unsigned char>(ifexpr_peek(st)))) {
-                            char h = ifexpr_advance(st);
-                            hv = (hv * 16) + (std::isdigit(static_cast<unsigned char>(h))
-                                ? h - '0'
-                                : std::tolower(static_cast<unsigned char>(h)) - 'a' + 10);
-                        }
-                        value = hv;
-                        break;
-                    }
-                    default:
-                        if (std::isdigit(static_cast<unsigned char>(esc))) {
-                            long ov = esc - '0';
-                            for (int i = 0; i < 2 && !ifexpr_at_end(st) && ifexpr_peek(st) >= '0' && ifexpr_peek(st) <= '7'; i++) {
-                                ov = (ov * 8) + (ifexpr_advance(st) - '0');
-                            }
-                            value = ov;
-                        } else {
-                            value = static_cast<unsigned char>(esc);
-                        }
-                }
+    switch (t.op) {
+        case '(': {
+            st->pos++;
+            long v = ifexpr_top(st);
+            if (ifexpr_peek_op(st) == ')') {
+                st->pos++;
+            } else {
+                ifexpr_set_error(st, "bracket not paired in #if");
             }
-        } else if (!ifexpr_at_end(st) && ifexpr_peek(st) != '\'') {
-            value = static_cast<unsigned char>(ifexpr_advance(st));
+            return v;
         }
-        if (!ifexpr_at_end(st) && ifexpr_peek(st) == '\'') ifexpr_advance(st);
-        return value;
-    }
-
-    if (std::isdigit(static_cast<unsigned char>(c))) {
-        size_t start = st->pos;
-        if (c == '0' && st->pos + 1 < st->expr.size() &&
-            (st->expr[st->pos + 1] == 'x' || st->expr[st->pos + 1] == 'X')) {
-            st->pos += 2;
-            while (!ifexpr_at_end(st) && std::isxdigit(static_cast<unsigned char>(st->expr[st->pos])))
-                st->pos++;
-        } else {
-            while (!ifexpr_at_end(st) && std::isdigit(static_cast<unsigned char>(st->expr[st->pos])))
-                st->pos++;
-        }
-        while (!ifexpr_at_end(st) && (st->expr[st->pos] == 'L' || st->expr[st->pos] == 'U' ||
-                                       st->expr[st->pos] == 'l' || st->expr[st->pos] == 'u'))
+        case '!': st->pos++; return !ifexpr_atom(st);
+        case '~': st->pos++; return ~ifexpr_atom(st);
+        case '-': st->pos++; return -ifexpr_atom(st);
+        case '+': st->pos++; return ifexpr_atom(st);
+        default:
+            // Mirrors the old walker's unknown-atom behavior: consume, 0.
             st->pos++;
-        std::string literal(st->expr.substr(start, st->pos - start));
-        return strtol(literal.c_str(), nullptr, 0);
+            return 0;
     }
-
-    if (std::isalpha(static_cast<unsigned char>(c)) || c == '_') {
-        while (!ifexpr_at_end(st) && (std::isalnum(static_cast<unsigned char>(st->expr[st->pos])) || st->expr[st->pos] == '_'))
-            st->pos++;
-        return 0;
-    }
-
-    ifexpr_advance(st);
-    return 0;
 }
 
-long ifexpr_binop(IfExprState *st, int min_prec) {
+long ifexpr_binop(IfTokState* st, int min_prec) {
     long lhs = ifexpr_atom(st);
     for (;;) {
-        ifexpr_skip_ws(st);
         if (ifexpr_at_end(st)) break;
 
-        char c0 = st->expr[st->pos];
-        char c1 = (st->pos + 1 < st->expr.size()) ? st->expr[st->pos + 1] : '\0';
+        int c0 = ifexpr_peek_op(st);
+        int prec = -1, op = 0;
 
-        int prec = -1, op_len = 1, op = 0;
-
-        if      (c0 == '|' && c1 == '|') { op = 'O'; prec = 1; op_len = 2; }
-        else if (c0 == '&' && c1 == '&') { op = 'A'; prec = 2; op_len = 2; }
-        else if (c0 == '=' && c1 == '=') { op = 'E'; prec = 6; op_len = 2; }
-        else if (c0 == '!' && c1 == '=') { op = 'N'; prec = 6; op_len = 2; }
-        else if (c0 == '<' && c1 == '=') { op = 'L'; prec = 7; op_len = 2; }
-        else if (c0 == '>' && c1 == '=') { op = 'G'; prec = 7; op_len = 2; }
-        else if (c0 == '<' && c1 == '<') { op = 's'; prec = 8; op_len = 2; }
-        else if (c0 == '>' && c1 == '>') { op = 'S'; prec = 8; op_len = 2; }
+        if      (c0 == 'O') { op = 'O'; prec = 1; }
+        else if (c0 == 'A') { op = 'A'; prec = 2; }
+        else if (c0 == 'E') { op = 'E'; prec = 6; }
+        else if (c0 == 'N') { op = 'N'; prec = 6; }
+        else if (c0 == 'L') { op = 'L'; prec = 7; }
+        else if (c0 == 'G') { op = 'G'; prec = 7; }
+        else if (c0 == 's') { op = 's'; prec = 8; }
+        else if (c0 == 'S') { op = 'S'; prec = 8; }
         else if (c0 == '|') { op = '|'; prec = 3; }
         else if (c0 == '^') { op = '^'; prec = 4; }
         else if (c0 == '&') { op = '&'; prec = 5; }
@@ -368,7 +331,7 @@ long ifexpr_binop(IfExprState *st, int min_prec) {
 
         if (prec < min_prec) break;
 
-        st->pos += op_len;
+        st->pos++;
         long rhs = ifexpr_binop(st, prec + 1);
 
         switch (op) {
@@ -402,37 +365,150 @@ long ifexpr_binop(IfExprState *st, int min_prec) {
     return lhs;
 }
 
-long ifexpr_top(IfExprState *st) {
+long ifexpr_top(IfTokState* st) {
     long cond = ifexpr_binop(st, 0);
-    ifexpr_skip_ws(st);
-    if (!ifexpr_at_end(st) && ifexpr_peek(st) == '?') {
-        ifexpr_advance(st);
-        ifexpr_skip_ws(st);
+    if (ifexpr_peek_op(st) == '?') {
+        st->pos++;
         long true_val = ifexpr_top(st);
-        ifexpr_skip_ws(st);
-        if (!ifexpr_at_end(st) && ifexpr_peek(st) == ':') {
-            ifexpr_advance(st);
+        if (ifexpr_peek_op(st) == ':') {
+            st->pos++;
         } else {
             ifexpr_set_error(st, "'?' without ':' in #if");
         }
-        ifexpr_skip_ws(st);
         long false_val = ifexpr_top(st);
         return cond ? true_val : false_val;
     }
     return cond;
 }
 
+// The name of an identifier-flavored token, for defined()'s operand.
+// Empty when the token isn't name-shaped.
+std::string ifexpr_token_name(int tok, const union YYSTYPE* lv) {
+    if (tok == L_IDENTIFIER && lv->string != nullptr) return lv->string;
+    if (tok == L_DEFINED_NAME && lv->ihe != nullptr && lv->ihe->name != nullptr)
+        return lv->ihe->name;
+    return "";
+}
+
+// Pull the defined(X)/efun_defined(X) operand with macro expansion
+// suppressed and evaluate it. Consumes through the closing ')' (or the
+// bare name). Returns the 0/1 result; sets *ended when the expression
+// ran out mid-operand.
+long ifexpr_pull_defined(bool efun_form, void* yyscanner, bool* ended) {
+    compiler_context_t* ctx = yyget_extra(yyscanner);
+    ctx->suppress_expansion = true;
+    union YYSTYPE lv;
+    int tok = lpc_lex_ifexpr_next(&lv, yyscanner);
+    bool paren = false;
+    if (tok == '(') {
+        paren = true;
+        tok = lpc_lex_ifexpr_next(&lv, yyscanner);
+    }
+    long result = 0;
+    if (tok == LPC_IFEXPR_END || tok <= 0) {
+        *ended = true;
+        ctx->suppress_expansion = false;
+        return 0;
+    }
+    std::string name = ifexpr_token_name(tok, &lv);
+    if (!name.empty()) {
+        if (efun_form) {
+            result = (lookup_predef(name.c_str()) >= 0) ? 1 : 0;
+        } else {
+            result = (current_session && current_session->macros.count(name) != 0) ? 1 : 0;
+        }
+    }
+    if (paren) {
+        tok = lpc_lex_ifexpr_next(&lv, yyscanner);
+        if (tok == LPC_IFEXPR_END || tok <= 0) {
+            *ended = true;
+        } else if (tok != ')') {
+            lexerror("bracket not paired in #if");
+        }
+    }
+    ctx->suppress_expansion = false;
+    return result;
+}
+
 }  // namespace
 
-long lpc_lex_eval_if_expr(std::string_view expr) {
-    IfExprState st;
-    st.expr = expr;
+long lpc_lex_eval_if_expr(std::string_view expr, void* yyscanner) {
+    std::vector<IfTok> toks;
+    std::string text(trim(expr));
+    if (!text.empty()) {
+        lpc_lex_push_string_buffer(text.c_str(), text.size(), LPC_BUF_IF_EXPR, yyscanner);
+        bool ended = false;
+        while (!ended) {
+            union YYSTYPE lv;
+            int tok = lpc_lex_ifexpr_next(&lv, yyscanner);
+            switch (tok) {
+                case LPC_IFEXPR_END:
+                    ended = true;
+                    break;
+                case L_NUMBER:
+                    toks.push_back(IfTok{0, static_cast<long>(lv.number)});
+                    break;
+                case L_REAL:
+                    lexerror("floating point constants are not allowed in #if");
+                    toks.push_back(IfTok{0, 0});
+                    break;
+                case L_LOR:  toks.push_back(IfTok{'O', 0}); break;
+                case L_LAND: toks.push_back(IfTok{'A', 0}); break;
+                case L_EQ:   toks.push_back(IfTok{'E', 0}); break;
+                case L_NE:   toks.push_back(IfTok{'N', 0}); break;
+                case L_NOT:  toks.push_back(IfTok{'!', 0}); break;
+                case L_LSH:  toks.push_back(IfTok{'s', 0}); break;
+                case L_RSH:  toks.push_back(IfTok{'S', 0}); break;
+                case L_ORDER:
+                    // "<=", ">=", ">" arrive as one token whose yylval
+                    // carries the VM opcode ("<" is a bare '<' char).
+                    toks.push_back(IfTok{lv.number == F_LE   ? 'L'
+                                         : lv.number == F_GE ? 'G'
+                                                             : '>',
+                                         0});
+                    break;
+                case '(': case ')': case '!': case '~': case '&': case '|': case '^':
+                case '<': case '>': case '+': case '-': case '*': case '/': case '%':
+                case '?': case ':':
+                    toks.push_back(IfTok{tok, 0});
+                    break;
+                default: {
+                    if (tok <= 0) {
+                        // A scan-level error path ended the expression
+                        // early (e.g. unterminated string); the buffer, if
+                        // still stacked, is drained below.
+                        ended = true;
+                        break;
+                    }
+                    std::string name = ifexpr_token_name(tok, &lv);
+                    if (name == "defined" || name == "efun_defined") {
+                        toks.push_back(IfTok{0, ifexpr_pull_defined(name == "efun_defined",
+                                                                    yyscanner, &ended)});
+                    } else {
+                        // Any other token -- an undefined identifier, a
+                        // keyword, a stray construct -- evaluates as 0,
+                        // like the old walker's unknown atoms.
+                        toks.push_back(IfTok{0, 0});
+                    }
+                    break;
+                }
+            }
+        }
+        // Defensive drain: an error path can leave the expression buffer
+        // stacked; it must never leak LPC_IFEXPR_END into the parser.
+        while (lpc_lex_top_buffer_kind() == LPC_BUF_IF_EXPR) {
+            lpc_lex_pop_pushed_buffer(yyscanner);
+        }
+    }
+
+    IfTokState st;
+    st.toks = &toks;
     long result = ifexpr_top(&st);
     if (!st.error.empty()) {
         lexerror(st.error.c_str());
         return 0;
     }
-    if (!ifexpr_at_end_of_expr(&st)) {
+    if (!ifexpr_at_end(&st)) {
         lexerror("Condition too complex");
         return 0;
     }
@@ -461,14 +537,15 @@ bool lpc_lex_emitting() {
     return true;
 }
 
-// current_line/total_lines += for each '\n' embedded in the matched text
-// (backslash-continuation line breaks inside a directive). Called exactly
-// once per captured line, by lpc_lex_on_directive().
+// total_lines += for each '\n' embedded in the matched text
+// (backslash-continuation line breaks inside a directive) -- the LINE
+// counter itself advances natively (%option yylineno scans the matched
+// text). Called exactly once per captured line, by lpc_lex_on_directive().
 static void count_directive_newlines(const char* text, int len) {
     for (int i = 0; i < len; i++) {
         if (text[i] == '\n') {
-            current_line++;
-            total_lines++;
+            total_lines++;  // the newline itself is counted natively
+                            // (%option yylineno scans the matched text)
         }
     }
 }
@@ -493,8 +570,7 @@ bool lpc_lex_builtin_macro(std::string_view name, std::string* out) {
     return false;
 }
 
-std::string lpc_lex_expand_string(std::string_view text, std::vector<std::string> guard, bool in_if_expr,
-                                  std::unordered_map<std::string, int>* guard_hits) {
+std::string lpc_lex_expand_string(std::string_view text, std::vector<std::string> guard) {
     if (!current_session) return std::string(text);
     std::string result;
     size_t i = 0;
@@ -514,48 +590,6 @@ std::string lpc_lex_expand_string(std::string_view text, std::vector<std::string
             while (i < text.size() && (std::isalnum(static_cast<unsigned char>(text[i])) || text[i] == '_')) i++;
             std::string_view id = text.substr(start, i - start);
 
-            if (in_if_expr && id == "defined") {
-                size_t j = i;
-                while (j < text.size() && (text[j] == ' ' || text[j] == '\t')) j++;
-                bool has_paren = false;
-                if (j < text.size() && text[j] == '(') {
-                    has_paren = true;
-                    j++;
-                    while (j < text.size() && (text[j] == ' ' || text[j] == '\t')) j++;
-                }
-                size_t m_start = j;
-                while (j < text.size() && (std::isalnum(static_cast<unsigned char>(text[j])) || text[j] == '_')) j++;
-                std::string_view macro_name = text.substr(m_start, j - m_start);
-                if (has_paren) {
-                    while (j < text.size() && (text[j] == ' ' || text[j] == '\t')) j++;
-                    if (j < text.size() && text[j] == ')') j++;
-                }
-                bool is_def = (current_session->macros.count(std::string(macro_name)) > 0 ||
-                               macro_name == "__FILE__" ||
-                               macro_name == "__LINE__" ||
-                               macro_name == "__DIR__");
-                result += is_def ? "1" : "0";
-                i = j;
-                continue;
-            }
-
-            if (in_if_expr && id == "efun_defined") {
-                size_t j = i;
-                while (j < text.size() && (text[j] == ' ' || text[j] == '\t')) j++;
-                if (j < text.size() && text[j] == '(') {
-                    j++;
-                    while (j < text.size() && (text[j] == ' ' || text[j] == '\t')) j++;
-                    size_t name_start = j;
-                    while (j < text.size() && (std::isalnum(static_cast<unsigned char>(text[j])) || text[j] == '_')) j++;
-                    std::string efun_name(text.substr(name_start, j - name_start));
-                    while (j < text.size() && text[j] != ')') j++;
-                    if (j < text.size()) j++;
-                    result += (lookup_predef(efun_name.c_str()) >= 0) ? "1" : "0";
-                    i = j;
-                    continue;
-                }
-            }
-
             {
                 std::string builtin;
                 if (lpc_lex_builtin_macro(id, &builtin)) {
@@ -574,7 +608,7 @@ std::string lpc_lex_expand_string(std::string_view text, std::vector<std::string
                 const PpMacro& m = it->second;
                 if (!m.is_function_like) {
                     auto g2 = guard; g2.push_back(std::string(id));
-                    result += lpc_lex_expand_string(m.body, g2, in_if_expr, guard_hits);
+                    result += lpc_lex_expand_string(m.body, g2);
                 } else {
                     size_t j = i;
                     while (j < text.size() && (text[j] == ' ' || text[j] == '\t')) j++;
@@ -585,14 +619,9 @@ std::string lpc_lex_expand_string(std::string_view text, std::vector<std::string
                         std::vector<std::string> expanded_args;
                         auto g2 = guard; g2.push_back(std::string(id));
                         // Argument pre-expansion deliberately passes no
-                        // guard_hits: its output goes through substitute()
-                        // and the substituted body is re-walked just below
-                        // -- only THAT walk's emissions reach `result`, so
-                        // counting here too would double-count any guarded
-                        // literal that survives substitution.
-                        for (const auto& a : args) expanded_args.push_back(lpc_lex_expand_string(a, guard, in_if_expr));
+                        for (const auto& a : args) expanded_args.push_back(lpc_lex_expand_string(a, guard));
                         std::string subst = substitute(m.body, m.params, expanded_args);
-                        result += lpc_lex_expand_string(subst, g2, in_if_expr, guard_hits);
+                        result += lpc_lex_expand_string(subst, g2);
                     } else {
                         // Function-like macro name with no argument list in
                         // this text: left literal and NOT counted -- if its
@@ -603,9 +632,6 @@ std::string lpc_lex_expand_string(std::string_view text, std::vector<std::string
                     }
                 }
             } else {
-                if (guarded && guard_hits) {
-                    ++(*guard_hits)[std::string(id)];
-                }
                 result += id;
             }
             continue;
@@ -638,7 +664,7 @@ static std::string fold_backslash_newlines(std::string_view text) {
 // the single implementation behind lpc_lex_on_directive() -- both scan
 // modes funnel through it, so a skip-mode-ending #elif is evaluated by
 // exactly the same code as an emit-mode one.
-static void dispatch_directive(std::string_view dir, std::string_view rest) {
+static void dispatch_directive(std::string_view dir, std::string_view rest, void *yyscanner) {
     if (dir == "define") {
         if (lpc_lex_emitting()) {
             size_t idx = 0;
@@ -684,10 +710,20 @@ static void dispatch_directive(std::string_view dir, std::string_view rest) {
 
             if (existing != current_session->macros.end() && !existing->second.is_predefined) {
                 if (existing->second.body != body) {
+                    if (!existing->second.def_file.empty()) {
+                        compiler_pending_notes.push_back(
+                            "previous definition of '" + std::string(name) + "' was at /" +
+                            existing->second.def_file + ":" + std::to_string(existing->second.def_line));
+                    }
                     lexerror((std::string("Warning: ") + std::string(name) + " redefined").c_str());
                 }
             }
 
+            // Definition site for diagnostics ("defined at ...", "previous
+            // definition was at ..."). compiler_directive_start_line holds
+            // this #define's own first line while we're dispatching it.
+            m.def_file = current_file != nullptr ? current_file : "";
+            m.def_line = compiler_directive_start_line;
             m.body = std::move(body);
             current_session->macros[std::string(name)] = std::move(m);
         }
@@ -714,12 +750,12 @@ static void dispatch_directive(std::string_view dir, std::string_view rest) {
     } else if (dir == "if") {
         bool cond = false;
         if (lpc_lex_emitting()) {
-            std::string expr = lpc_lex_expand_string(strip_directive_comments(rest), {}, /*in_if_expr=*/true);
-            std::string trimmed(trim(expr));
+            std::string stripped = strip_directive_comments(rest);
+            std::string trimmed(trim(std::string_view(stripped)));
             if (trimmed.empty()) {
                 lexerror("missing expression in #if");
             } else {
-                cond = (lpc_lex_eval_if_expr(trimmed) != 0);
+                cond = (lpc_lex_eval_if_expr(trimmed, yyscanner) != 0);
             }
         }
         current_session->conds.push_back({cond, cond});
@@ -732,12 +768,12 @@ static void dispatch_directive(std::string_view dir, std::string_view rest) {
             bool outer = lpc_lex_emitting();
             bool cond = false;
             if (outer && !had) {
-                std::string expr = lpc_lex_expand_string(strip_directive_comments(rest), {}, /*in_if_expr=*/true);
-                std::string trimmed(trim(expr));
+                std::string stripped = strip_directive_comments(rest);
+                std::string trimmed(trim(std::string_view(stripped)));
                 if (trimmed.empty()) {
                     lexerror("missing expression in #elif");
                 } else {
-                    cond = (lpc_lex_eval_if_expr(trimmed) != 0);
+                    cond = (lpc_lex_eval_if_expr(trimmed, yyscanner) != 0);
                 }
             }
             bool now = outer && !had && cond;
@@ -760,7 +796,7 @@ static void dispatch_directive(std::string_view dir, std::string_view rest) {
         }
     } else if (dir == "include") {
         if (lpc_lex_emitting()) {
-            lpc_lex_handle_include(rest);
+            lpc_lex_handle_include(rest, yyscanner);
         }
     } else if (dir == "error") {
         if (lpc_lex_emitting()) {
@@ -815,6 +851,16 @@ static void dispatch_directive(std::string_view dir, std::string_view rest) {
 
 LpcDirectiveAction lpc_lex_on_directive(const char* text, int len, void* yyscanner,
                                         bool in_skip_mode) {
+    // The directive's own first line, for error attribution: the lex.l
+    // rule consumed + counted the terminating newline before calling us,
+    // so current_line is already one past the directive's LAST physical
+    // line; its embedded continuations haven't been counted yet, so its
+    // FIRST line is exactly current_line - 1. Published around the
+    // dispatch calls below via compiler_directive_start_line (see its
+    // comment in compiler.h) so yyerror()/yywarn() attribute to the
+    // directive rather than the line after it.
+    int directive_line = current_line - 1;
+
     // Embedded continuation newlines are physical lines regardless of scan
     // mode or whether the directive dispatches -- counted exactly once,
     // here (the terminating newline is the lex.l rule's job, not ours).
@@ -844,7 +890,9 @@ LpcDirectiveAction lpc_lex_on_directive(const char* text, int len, void* yyscann
     auto* ctx = reinterpret_cast<compiler_context_t*>(yyget_extra(yyscanner));
 
     if (!in_skip_mode) {
-        dispatch_directive(dir, rest);
+        compiler_directive_start_line = directive_line;
+        dispatch_directive(dir, rest, yyscanner);
+        compiler_directive_start_line = 0;
         if (!lpc_lex_emitting()) {
             ctx->skip_depth = 0;
             return LpcDirectiveAction::kEnterSkip;
@@ -868,7 +916,9 @@ LpcDirectiveAction lpc_lex_on_directive(const char* text, int len, void* yyscann
         return LpcDirectiveAction::kNone;
     }
     if (dir == "endif" || dir == "elif" || dir == "else") {
-        dispatch_directive(dir, rest);
+        compiler_directive_start_line = directive_line;
+        dispatch_directive(dir, rest, yyscanner);
+        compiler_directive_start_line = 0;
         return lpc_lex_emitting() ? LpcDirectiveAction::kExitSkip : LpcDirectiveAction::kNone;
     }
     return LpcDirectiveAction::kNone;

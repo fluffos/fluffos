@@ -19,8 +19,8 @@
 // std::istream, or a preprocessing stage wrapping one of those -- is one of
 // these. Kept deliberately dumb: adding preprocessing or tokenization to
 // what LexStream itself means would make every implementation here (and
-// every ring-buffer/YY_INPUT caller of read()) responsible for a much wider
-// contract than "hand me the next `size` bytes."
+// every YY_INPUT caller of read()) responsible for a much wider contract
+// than "hand me the next `size` bytes."
 // ---------------------------------------------------------------------------
 
 class LexStream {
@@ -84,6 +84,7 @@ class StringLexStream : public LexStream {
 struct LexerSession;
 struct compiler_context_t;
 union YYSTYPE;
+struct YYLTYPE;
 
 // ---------------------------------------------------------------------------
 // LexTokenStream — a token-level abstraction built on top of the above, not
@@ -104,13 +105,13 @@ union YYSTYPE;
 // alive for a whole session and call load() once per statement, instead of
 // paying scanner construction/destruction on every single line.
 //
-// Known scope boundary: the ring-buffer state load() resets via
-// start_new_file() (cur_lbuf/head_lbuf, the #include stack, etc. in
-// lexer_utils.cc) is still file-scope static, not per-instance -- so two
-// LexTokenStream instances alive at once would corrupt each other's
-// buffers. Not a problem today: compile_file()'s reentrancy guard already
-// prevents concurrent compiles, and only one LexTokenStream exists at a
-// time in any code that constructs one.
+// Known scope boundary: the lexer state load() resets via
+// start_new_file() (the main input stream, the #include metadata stack,
+// expansion frames, etc. in lexer_utils.cc) is still file-scope static,
+// not per-instance -- so two LexTokenStream instances alive at once would
+// corrupt each other's state. Not a problem today: compile_file()'s
+// reentrancy guard already prevents concurrent compiles, and only one
+// LexTokenStream exists at a time in any code that constructs one.
 class LexTokenStream {
  public:
    LexTokenStream();
@@ -119,13 +120,14 @@ class LexTokenStream {
    LexTokenStream &operator=(const LexTokenStream &) = delete;
 
    // (Re-)point this scanner at a new source, exactly like starting a fresh
-   // top-level compile (ring buffer reset, BEGIN(INITIAL), fresh include
+   // top-level compile (scanner/buffer reset, BEGIN(INITIAL), fresh include
    // stack). `stream` is auto-preprocessed on demand using `session` if given,
    // or a fresh one-chunk-only session otherwise.
    void load(std::unique_ptr<LexStream> stream, std::shared_ptr<LexerSession> session = nullptr);
 
-   // Pull the next token, filling in *yylval_param.
-   int next(union YYSTYPE *yylval_param);
+   // Pull the next token, filling in *yylval_param and (when non-null)
+   // *yylloc_param with the token's source span (8.3 Bison locations).
+   int next(union YYSTYPE *yylval_param, struct YYLTYPE *yylloc_param = nullptr);
 
    void *scanner() const { return scanner_; }
 

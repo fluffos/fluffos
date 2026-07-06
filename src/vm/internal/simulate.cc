@@ -27,6 +27,7 @@
 #include "vm/internal/master.h"
 #include "vm/internal/otable.h"
 #include "vm/internal/simul_efun.h"
+#include "compiler/internal/compiler.h"  // for compiler_next_load_reason
 #include "compiler/internal/lex.h"  // for total_lines, FIXME
 
 #include "packages/core/add_action.h"
@@ -522,6 +523,10 @@ object_t *load_object(const char *lname, int callcreate) {
       fatal("Inherited object is already loaded!");
 #endif
     } else {
+      // Provenance for the nested compile's diagnostics: "while loading
+      // '/child' inherited by '/parent'" (consumed by start_new_file).
+      compiler_next_load_reason =
+          std::string("while loading '/") + inhbuf + "' inherited by '/" + name + "'";
       inh_obj = load_object(inhbuf, 1);
     }
     if (!inh_obj) error("Inherited file '/%s' does not exist!\n", inhbuf);

@@ -3,10 +3,11 @@
  * lex.l — Flex scanner for the LPC lexer.
  *
  * This is the driver's ONE scan over LPC source: preprocessing is part of
- * lexing, not a separate pass (see plans/unified-push-lexer.md). Raw bytes
- * flow LexStream -> ring buffer (lexer_utils.cc) -> YY_INPUT -> the rules
- * here; every byte is read exactly once, one token's worth of work at a
- * time, driven by each LexTokenStream::next() pull.
+ * lexing, not a separate pass (see plans/unified-push-lexer.md). The main
+ * file's bytes flow LexStream -> YY_INPUT -> Flex's base buffer; macro
+ * splices and #include contents are in-memory buffers pushed on Flex's
+ * buffer stack. Every byte is read exactly once, one token's worth of
+ * work at a time, driven by each LexTokenStream::next() pull.
  *
  * Whitespace, comments, operators/punctuation, numeric literals,
  * identifiers, '(' compound tokens (array/mapping/function-pointer open),
@@ -17,58 +18,44 @@
  *
  * Preprocessor directives are one anchored rule capturing the whole '#'
  * line, dispatched to lexer_rules_pp.cc (macro table, #if conditional
- * stack + the SC_COND_SKIP dead-branch mode, #include via the
- * include-stack push in lexer_utils.cc, #pragma/#line applied in place).
+ * stack + the SC_COND_SKIP dead-branch mode, #include as a pushed buffer
+ * holding the file's whole content -- see lexer_utils.cc's
+ * lpc_lex_handle_include -- #pragma/#line applied in place).
  * Macro EXPANSION happens at identifier-resolution time
  * (lpc_lex_resolve_identifier in lexer_utils.cc): the expanded body is
- * spliced into the ring buffer via add_input() and rescanned. Guarded
- * self-references left literal in the expansion are counted per name into
- * compiler_context_t::pending_plain at expansion time ("blue paint" per
- * occurrence, C-preprocessor style); the rescan consumes one count per
- * occurrence and resolves it as a plain identifier -- no in-band marker
- * bytes and no dedicated rule (this replaced an earlier end-of-splice
- * "\x1e<name>" sentinel token). Deliberately NOT a genuine Flex buffer
- * push (yy_scan_string()/yypush_buffer_state()) either -- tried, reverted;
- * see the long comment at the object-like macro expansion site in
- * lexer_utils.cc for the real incompatibility this ran into (the
- * function-like-macro argument collector's raw-outp reads silently break
- * once Flex is scanning from a buffer other than the ring buffer). Because
- * string/template/char bodies are scanned by their own start conditions
- * and never reach identifier resolution, "no macro expansion inside
- * strings" falls out for free.
+ * pushed as a fresh Flex buffer (lpc_lex_push_string_buffer, defined in
+ * this file's trailer) and rescanned; the buffer pops back to the parent
+ * at its <<EOF>>. Guarded self-references left literal in the expansion
+ * are counted per name into compiler_context_t::pending_plain at
+ * expansion time ("blue paint" per occurrence, C-preprocessor style); the
+ * rescan consumes one count per occurrence and resolves it as a plain
+ * identifier. Expansion provenance for diagnostics is one frame per live
+ * expansion buffer (see lexer_utils.cc). Because string/template/char
+ * bodies are scanned by their own start conditions and never reach
+ * identifier resolution, "no macro expansion inside strings" falls out
+ * for free.
  *
- * Only heredocs and EOF/include-stack popping still trigger explicit Flex
- * rules that call into standalone parse*() helpers in lexer_utils.cc,
- * which keep their original hand-written, raw-`outp`-reading algorithms
- * unchanged -- a heredoc's closing terminator is supplied at compile time
- * by the LPC source itself (e.g. "@END ... END"), not known until then,
- * so it can't be expressed as a static Flex pattern; the ring-buffer
- * include-stack pop is pure state bookkeeping, not really "scanning" at
- * all. See plans/flex-lexer-migration.md for the risk/value writeup and
- * per-conversion deviation notes. Only genuinely invalid input reaches
- * the catch-all `.` rule at the bottom.
+ * Only heredocs and main-file EOF still trigger explicit Flex rules that
+ * call into standalone parse*() helpers in lexer_utils.cc -- a heredoc's
+ * closing terminator is supplied at compile time by the LPC source itself
+ * (e.g. "@END ... END"), not known until then, so it can't be expressed
+ * as a static Flex pattern. Those helpers (and the macro-argument
+ * collector) read through Flex itself via lpc_lex_getc() -- a thin
+ * wrapper over the generated yyinput() -- so they drain Flex's own buffer
+ * before touching fresh input, and no rewind/flush choreography is needed
+ * around them. See plans/flex-lexer-migration.md for the risk/value
+ * writeup and per-conversion deviation notes. Only genuinely invalid
+ * input reaches the catch-all `.` rule at the bottom.
  *
  * Include order: grammar_rules.h MUST come before grammar.autogen.h
  * because grammar.autogen.h references decl_t / func_block_t from it.
  *
- * Buffer synchronization: YY_INPUT below reads directly from lexer_utils.cc's
- * ring buffer (via outp/lpc_lex_yy_input), so `outp` always reflects the
- * total number of bytes ever handed to Flex -- which can run ahead of
- * the position of the token Flex just matched, since Flex may fetch
- * bytes in bulk and/or peek one extra lookahead character before
- * settling on the longest match. Whenever a rule hands control to one of
- * the remaining raw-`outp`-reading parse*() helpers, it must first rewind
- * `outp` by exactly that unread remainder -- computed via
- * YY_PENDING_LOOKAHEAD() from Flex's own buffer bookkeeping -- and flush
- * Flex's buffer so the next top-level yylex() call re-reads fresh from the
- * corrected `outp` position. Without this, characters already
- * buffered-but-unconsumed by Flex would be silently skipped by the helper.
- *
- * parseHeredoc() (on its error paths) and parseEofOrIncludePop() (on
- * include-stack pop) call `yylex()` recursively themselves once they're
- * done, to resume top-level scanning. For those, the flush must happen
- * BEFORE calling the helper, not after -- the recursive yylex() call needs
- * Flex's buffer already reset.
+ * Buffer management is entirely Flex-native: the base buffer bulk-reads
+ * the main stream through YY_INPUT; splices (macro expansions, pushbacks
+ * of probed bytes) and #include contents are pushed as in-memory buffers
+ * on the buffer STACK, each popped at its own <<EOF>> (or drained through
+ * lpc_lex_getc()); the parent buffer's position is preserved by Flex's
+ * own bookkeeping, so no rewind/flush choreography exists anywhere.
  */
 #include "base/std.h"
 
@@ -84,10 +71,60 @@
 #include "compiler/internal/lexer_rules_pp.h"
 #include "efuns.autogen.h"
 
-#define YY_DECL int yylex(union YYSTYPE *yylval_param, void *yyscanner)
-#define yylval (*yylval_param)
-#define YY_PENDING_LOOKAHEAD() \
-    (yyg->yy_n_chars - (int)(yyg->yy_c_buf_p - YY_CURRENT_BUFFER_LVALUE->yy_ch_buf))
+// %option array sizes yytext as char[YYLMAX]. The generated default (8K)
+// was unreachable while the old ring buffer capped physical lines at
+// MAXLINE (4K); with that cap gone, give every token the same 64K
+// headroom the ring gave a whole compile unit, and route the overflow
+// into a graceful compile abort instead of flex's stock exit(2) -- see
+// lpc_lex_fatal (compiler.cc). (Bounding the run patterns with {1,4096}
+// repeats was tried and reverted: flex expands bounded repeats by
+// duplicating DFA states, ballooning the generated scanner to over a
+// million lines.)
+#define YYLMAX 65536
+#define YY_FATAL_ERROR(msg) lpc_lex_fatal(msg)
+
+// Column tracking (Phase 8.1): %option yylineno does NOT maintain
+// yycolumn -- convention is to do it in YY_USER_ACTION. The matched
+// token's START column is snapshotted into the scanner context for
+// diagnostics (clang's caret points at the construct's start), then the
+// running column advances past the match -- recomputed from the last
+// newline for matches that contain one. Like yylineno, yycolumn is
+// per-buffer storage (yy_bs_column), so expansion/include pushes isolate
+// and restore columns automatically. Tabs count as one column; rendering
+// decides display width. EOF pseudo-actions bypass YY_RULE_SETUP, so this
+// never runs with stale yyleng.
+#define YY_USER_ACTION                                        \
+  yyextra->token_start_column = yycolumn;                     \
+  /* Write through THIS frame's own parameter, never the yylloc  \
+   * macro (yyg->yylloc_r): a nested yylex() -- the #if evaluator \
+   * pulls -- repoints yylloc_r at its own shorter-lived location \
+   * and the suspended outer frame would write through the stale  \
+   * pointer (ASan stack-use-after-return). */                    \
+  yylloc_param->first_line = yylloc_param->last_line = current_line; \
+  yylloc_param->first_column = yycolumn + 1;                  \
+  {                                                           \
+    int uac_i_;                                               \
+    for (uac_i_ = yyleng - 1;                                 \
+         uac_i_ >= 0 && yytext[uac_i_] != '\n'; --uac_i_) {   \
+    }                                                         \
+    if (uac_i_ >= 0) {                                        \
+      yycolumn = yyleng - uac_i_ - 1;                         \
+    } else {                                                  \
+      yycolumn += yyleng;                                     \
+    }                                                         \
+  }                                                           \
+  yylloc_param->last_column = yycolumn;
+
+// yyless() adjusts yylineno for returned newlines but NOT yycolumn; every
+// yyless() in the rules goes through this wrapper, which rewinds the
+// column to just past the kept prefix (all call sites keep a newline-free
+// prefix -- "(" or nothing). The returned text is then re-matched and
+// re-counted by YY_USER_ACTION as usual.
+#define LPC_YYLESS(n)                                   \
+  do {                                                  \
+    yycolumn = yyextra->token_start_column + (n);       \
+    yyless(n);                                          \
+  } while (0)
 
 // All template/string states moved to struct compiler_context_t in lex.h
 
@@ -111,34 +148,30 @@
     }                                                                     \
   } while (0)
 
-// YY_INPUT: pull bytes from lexer_utils.cc's linked_buf_t ring via this bridge.
+// YY_INPUT: bulk-read the MAIN file's stream (lexer_utils.cc bridge).
 #define YY_INPUT(buf, result, max_size) \
     result = lpc_lex_yy_input(buf, max_size, yyscanner)
 
-// Declared here; defined in lexer_utils.cc. Bridges Flex's buffer-fill requests to
-// the existing ring-buffer, advancing `outp` for every byte handed to Flex.
+// Declared here; defined in lexer_utils.cc. Bulk-reads the main stream
+// into Flex's base buffer (with a trailing-'\n'-at-EOF guarantee).
 extern "C" int lpc_lex_yy_input(char *buf, int max_size, void *yyscanner);
 
-// Bytes Flex has already fetched into its buffer beyond the position it has
-// actually matched/consumed so far (bulk pre-fetch and/or one-char DFA
-// lookahead). See the file-level comment above for why this matters.
-// Define short-hand references to the context variables!
-#define str_accum                (yyextra->str_accum)
-#define template_nesting         (yyextra->template_nesting)
-#define template_brace_depth     (yyextra->template_brace_depth)
-#define template_is_continuation (yyextra->template_is_continuation)
-#define heredoc_terminator       (yyextra->heredoc_terminator)
-#define heredoc_is_array         (yyextra->heredoc_is_array)
-#define function_flag            (yyextra->function_flag)
+// Defined in the trailer below (uses the buffer-stack helpers).
+static int lpc_lex_pop_splice_if_any(void *yyscanner);
+static void lpc_lex_consume_directive_newline(void *yyscanner);
+
 
 %}
 
-%option noyywrap nounput noinput nodefault
+%option noyywrap nounput nodefault
 %option never-interactive
 %option 8bit
 %option array
 %option reentrant
+%option bison-bridge
+%option bison-locations
 %option stack
+%option yylineno
 %option extra-type="struct compiler_context_t *"
 
 WS          [ \t\r\n\v\f]
@@ -180,8 +213,9 @@ WS_NO_NL    [ \t\r\v\f]
  * is native -- the heredoc *body* is matched against the terminator at
  * runtime (the terminator is supplied by the LPC source itself, not known
  * until compile time), which structurally can't be a static Flex pattern,
- * so that part stays a hand-written helper (parseHeredoc(), still in
- * lexer_utils.cc). See the heredoc rules below.
+ * so that part stays a hand-written helper (parseHeredoc() in
+ * lexer_utils.cc, reading the body line-by-line through lpc_lex_getc()).
+ * See the heredoc rules below.
  *
  * SC_COND_SKIP: inside a false #if/#ifdef branch -- lines are consumed
  * without tokenizing, watching only for the nested/closing conditional
@@ -226,8 +260,15 @@ WS_NO_NL    [ \t\r\v\f]
 <SC_BLOCK_COMMENT>[^*/\n]+  { /* ordinary comment text */ }
 <SC_BLOCK_COMMENT>"/"       { /* lone '/', not the start of a nested "/*" */ }
 <SC_BLOCK_COMMENT><<EOF>>   {
-              lexerror("End of file in a comment");
-              yy_pop_state(yyscanner);
+              /* Every state-specific <<EOF>> rule pops a drained pushed
+               * buffer first (lpc_lex_pop_splice_if_any) and keeps
+               * scanning in the same start condition -- the construct
+               * simply continues into the parent buffer's bytes. Only
+               * genuine end-of-input is the error/finalize case. */
+              if (!lpc_lex_pop_splice_if_any(yyscanner)) {
+                lexerror("End of file in a comment");
+                yy_pop_state(yyscanner);
+              }
             }
 
 "0"[xX][0-9a-fA-F](_?[0-9a-fA-F])* { return lpc_lex_number_hex(yylval_param, yytext, yyleng); }
@@ -255,15 +296,16 @@ WS_NO_NL    [ \t\r\v\f]
      * and the actual identifier/macro resolution logic in
      * lpc_lex_resolve_identifier() -- exists exactly once. */
 <INITIAL,SC_FUNC_OPEN>[a-zA-Z_][a-zA-Z0-9_]* {
+          /* The SC_FUNC_OPEN variant needs no buffer choreography anymore:
+           * resolve's "(: name" one-byte disambiguation reads through
+           * lpc_lex_getc() (Flex's own stream) instead of raw outp, so the
+           * old rewind-before/flush-after dance would only double-read the
+           * DFA's pending lookahead. */
           if (YY_START == SC_FUNC_OPEN) {
             BEGIN(INITIAL);
-            function_flag = 1;
-            outp -= YY_PENDING_LOOKAHEAD();
-            int result = lpc_lex_resolve_identifier(yylval_param, yyscanner);
-            YY_FLUSH_BUFFER;
-            return result;
+            yyextra->function_flag = 1;
           }
-          return lpc_lex_resolve_identifier(yylval_param, yyscanner);
+          return lpc_lex_resolve_identifier(yylval_param, yylloc_param, yyscanner);
         }
 
     /* String literals: fully native via SC_STRING_BODY, no outp access.
@@ -276,7 +318,7 @@ WS_NO_NL    [ \t\r\v\f]
      * inconsistency (\u/\U now decode the same way regardless of string
      * length, where the original silently stopped decoding them past the
      * first 255 bytes of a string). */
-\"      { str_accum.clear(); BEGIN(SC_STRING_BODY); }
+\"      { yyextra->str_accum.clear(); BEGIN(SC_STRING_BODY); }
 
     /* Template literals `...${expr}...`: the literal-text fragments are
      * scanned natively via SC_TEMPLATE_BODY, sharing SC_STRING_BODY's
@@ -291,11 +333,11 @@ WS_NO_NL    [ \t\r\v\f]
      * back to INITIAL to scan the interpolated expression (the matching
      * '}' is found via the brace-depth tracking on the plain '{'/'}' rules
      * further below). */
-`      { str_accum.clear(); template_is_continuation = false; BEGIN(SC_TEMPLATE_BODY); }
+`      { yyextra->str_accum.clear(); yyextra->template_is_continuation = false; BEGIN(SC_TEMPLATE_BODY); }
 
 <SC_STRING_BODY>\r\n {
           lpc_lex_newline(yyscanner);
-          str_accum += '\n';
+          yyextra->str_accum += '\n';
           STR_CHECK_OVERFLOW();
         }
     /* Template CRLF is dropped entirely (no append) -- NOT shared with the
@@ -307,25 +349,20 @@ WS_NO_NL    [ \t\r\v\f]
 <SC_TEMPLATE_BODY>\r\n { lpc_lex_newline(yyscanner); }
 <SC_STRING_BODY>[^\\\"\r\n]+ |
 <SC_TEMPLATE_BODY>[^\\`$\r\n]+ {
-          str_accum.append(yytext, yyleng);
+          yyextra->str_accum.append(yytext, yyleng);
           STR_CHECK_OVERFLOW();
         }
 <SC_STRING_BODY>\n {
           lpc_lex_newline(yyscanner);
-          str_accum += '\n';
+          yyextra->str_accum += '\n';
           STR_CHECK_OVERFLOW();
         }
 <SC_TEMPLATE_BODY>\n { lpc_lex_newline(yyscanner); /* newlines are removed, not preserved */ }
-<SC_STRING_BODY,SC_TEMPLATE_BODY>\r { str_accum += '\r'; STR_CHECK_OVERFLOW(); }
-<SC_TEMPLATE_BODY>"$"  { str_accum += '$'; STR_CHECK_OVERFLOW(); }
+<SC_STRING_BODY,SC_TEMPLATE_BODY>\r { yyextra->str_accum += '\r'; STR_CHECK_OVERFLOW(); }
+<SC_TEMPLATE_BODY>"$"  { yyextra->str_accum += '$'; STR_CHECK_OVERFLOW(); }
 <SC_STRING_BODY>"\""   {
           BEGIN(INITIAL);
-          if (!u8_validate(str_accum.c_str())) {
-            lexerror("Invalid UTF8 codepoint in string literal");
-            return YYerror;
-          }
-          yylval.string = scratch_copy(str_accum.c_str());
-          return L_STRING;
+          return lpc_lex_string_close(yyscanner, yylval_param);
         }
     /* Template fragment tokens (L_TEMPLATE_HEAD/MIDDLE/TAIL) use
      * scratch_large_alloc() rather than scratch_copy(): unlike a plain
@@ -346,10 +383,12 @@ WS_NO_NL    [ \t\r\v\f]
           return lpc_lex_template_tail_or_string(yyscanner, yylval_param);
         }
 <SC_STRING_BODY,SC_TEMPLATE_BODY><<EOF>> {
-          lexerror(YY_START == SC_TEMPLATE_BODY ? "End of file in template literal"
-                                                 : "End of file in string");
-          BEGIN(INITIAL);
-          return YYEOF;
+          if (!lpc_lex_pop_splice_if_any(yyscanner)) {
+            lexerror(YY_START == SC_TEMPLATE_BODY ? "End of file in template literal"
+                                                   : "End of file in string");
+            BEGIN(INITIAL);
+            return YYEOF;
+          }
         }
 
 <SC_STRING_BODY,SC_TEMPLATE_BODY>"\\\r\n" { lpc_lex_newline(yyscanner); }
@@ -364,7 +403,7 @@ WS_NO_NL    [ \t\r\v\f]
 <SC_STRING_BODY,SC_TEMPLATE_BODY>"\\"[ntrbae\\] |
 <SC_STRING_BODY>"\\\"" |
 <SC_TEMPLATE_BODY>"\\"[`$] {
-          str_accum += static_cast<char>(lpc_lex_simple_escape(yytext[1]));
+          yyextra->str_accum += static_cast<char>(lpc_lex_simple_escape(yytext[1]));
           STR_CHECK_OVERFLOW();
         }
 <SC_STRING_BODY,SC_TEMPLATE_BODY>"\\"[0-7]+ {
@@ -434,10 +473,10 @@ WS_NO_NL    [ \t\r\v\f]
      * recognize the ['"] quotes that strings/templates warn about, per
      * this rule's character class. */
 <SC_CHAR_BODY>"\\"[ntrbae'"\\] {
-          yylval.number = lpc_lex_simple_escape(yytext[1]);
+          yylval_param->number = lpc_lex_simple_escape(yytext[1]);
           BEGIN(SC_CHAR_CLOSE);
         }
-<SC_CHAR_BODY>"\\"[0-7]+ { yylval.number = lpc_lex_char_octal_escape(yytext); BEGIN(SC_CHAR_CLOSE); }
+<SC_CHAR_BODY>"\\"[0-7]+ { yylval_param->number = lpc_lex_char_octal_escape(yytext); BEGIN(SC_CHAR_CLOSE); }
 <SC_CHAR_BODY>"\\"[89]  {
           // Deviation from the original hand-written scanner (documented in
           // plans/flex-lexer-migration.md): '\8'/'\9' aren't valid octal, so
@@ -446,18 +485,18 @@ WS_NO_NL    [ \t\r\v\f]
           // same "Illegal character constant" error by a different path.
           // Reported directly here instead of replicating that fallthrough.
           lexerror("Illegal character constant");
-          yylval.number = 0;
+          yylval_param->number = 0;
           BEGIN(SC_CHAR_CLOSE);
         }
-<SC_CHAR_BODY>"\\x"[0-9a-fA-F]+ { yylval.number = lpc_lex_char_hex_escape(yytext); BEGIN(SC_CHAR_CLOSE); }
-<SC_CHAR_BODY>"\\x"     { yylval.number = lpc_lex_char_bad_hex_escape(); BEGIN(SC_CHAR_CLOSE); }
+<SC_CHAR_BODY>"\\x"[0-9a-fA-F]+ { yylval_param->number = lpc_lex_char_hex_escape(yytext); BEGIN(SC_CHAR_CLOSE); }
+<SC_CHAR_BODY>"\\x"     { yylval_param->number = lpc_lex_char_bad_hex_escape(); BEGIN(SC_CHAR_CLOSE); }
 <SC_CHAR_BODY>"\\\r\n" |
 <SC_CHAR_BODY>"\\\n"    {
-          yylval.number = '\n';
+          yylval_param->number = '\n';
           lpc_lex_newline(yyscanner);
           BEGIN(SC_CHAR_CLOSE);
         }
-<SC_CHAR_BODY>"\\".     { yylval.number = lpc_lex_char_unknown_escape(yytext); BEGIN(SC_CHAR_CLOSE); }
+<SC_CHAR_BODY>"\\".     { yylval_param->number = lpc_lex_char_unknown_escape(yytext); BEGIN(SC_CHAR_CLOSE); }
     /* Matches the original's unconditional raw-byte fallback: any
      * non-backslash byte is the body char, including a literal quote (an
      * empty-looking char literal treats the immediate closing quote as the
@@ -465,7 +504,7 @@ WS_NO_NL    [ \t\r\v\f]
      * embedded newline (current_line is NOT incremented here -- only an
      * escaped newline counts as a line break, matching upstream). */
 <SC_CHAR_BODY>[^\\]     {
-          yylval.number = static_cast<unsigned char>(yytext[0]);
+          yylval_param->number = static_cast<unsigned char>(yytext[0]);
           BEGIN(SC_CHAR_CLOSE);
         }
 <SC_CHAR_CLOSE>"'"     {
@@ -474,30 +513,32 @@ WS_NO_NL    [ \t\r\v\f]
           return L_NUMBER;
         }
     /* The three ways a char literal fails to close share one recovery
-     * (lpc_lex_char_error: report, zero yylval.number, return L_NUMBER).
+     * (lpc_lex_char_error: report, zero yylval_param->number, return L_NUMBER).
      * The zeroing matters even at EOF -- the original's closing-quote
      * check reset the value on ANY failure, and refill_buffer()'s
      * synthesized trailing newline means a source of just "'" reaches
-     * <SC_CHAR_CLOSE><<EOF>> with yylval.number already set to '\n' by
+     * <SC_CHAR_CLOSE><<EOF>> with yylval_param->number already set to '\n' by
      * the body rule (real bug found in self-review: it leaked through as
      * 10 instead of 0). The non-EOF failure pushes the offending byte
      * back for the next scan, matching the original. */
-<SC_CHAR_BODY><<EOF>>  { BEGIN(INITIAL); return lpc_lex_char_error(yylval_param); }
-<SC_CHAR_CLOSE><<EOF>> { BEGIN(INITIAL); return lpc_lex_char_error(yylval_param); }
+<SC_CHAR_BODY><<EOF>>  {
+          if (!lpc_lex_pop_splice_if_any(yyscanner)) { BEGIN(INITIAL); return lpc_lex_char_error(yylval_param); }
+        }
+<SC_CHAR_CLOSE><<EOF>> {
+          if (!lpc_lex_pop_splice_if_any(yyscanner)) { BEGIN(INITIAL); return lpc_lex_char_error(yylval_param); }
+        }
 <SC_CHAR_CLOSE>.|\n    {
-          yyless(0);
+          LPC_YYLESS(0);
           BEGIN(INITIAL);
           return lpc_lex_char_error(yylval_param);
         }
 
-    /* $N function-pointer parameters: fully native, no outp access at all
-     * -- unlike the string/char/paren rules above, this token's grammar
-     * (an optional run of digits) has no line-counting or ring-buffer
-     * interaction, so there's nothing left for a legacy helper to do that
-     * Flex's own DFA can't do directly. */
+    /* $N function-pointer parameters: fully native -- this token's
+     * grammar (an optional run of digits) needs no helper beyond decoding
+     * the number. */
 "$"[0-9]+ {
           int result = lpc_lex_function_param(yylval_param, yytext, yyleng);
-          if (result == kLpcLexFunctionParamRetry) return yylex(yylval_param, yyscanner);
+          if (result == kLpcLexFunctionParamRetry) return yylex(yylval_param, yylloc_param, yyscanner);
           return result;
         }
 "$"     { return lpc_lex_function_param(yylval_param, yytext, yyleng); }
@@ -515,9 +556,7 @@ WS_NO_NL    [ \t\r\v\f]
            * otherwise the array's closing '}' is misread as the end of
            * the interpolation (real bug, found in self-review: any
            * `${ ({ ... })... }` garbled the rest of the template). */
-          if (template_nesting > 0) {
-            template_brace_depth[template_nesting]++;
-          }
+          lpc_lex_brace_open(yyscanner);
           return L_ARRAY_OPEN;
         }
 "("{WS}*"[" {
@@ -529,7 +568,7 @@ WS_NO_NL    [ \t\r\v\f]
           // open. Put everything but '(' back -- whitespace included -- and
           // let "::" scan as its own L_COLON_COLON token next; Flex's own
           // whitespace/newline rules re-tokenize any pushed-back whitespace.
-          yyless(1);
+          LPC_YYLESS(1);
           return '(';
         }
 "("{WS}*":" {
@@ -545,12 +584,16 @@ WS_NO_NL    [ \t\r\v\f]
      * above. */
 <SC_FUNC_OPEN>{WS}+ { lpc_lex_count_newlines(yytext, yyleng); }
 <SC_FUNC_OPEN><<EOF>> {
-          BEGIN(INITIAL);
-          push_function_context();
-          return L_FUNCTION_OPEN;
+          // The pop path is critical for the "(:" pushback splice: it
+          // holds ONLY "(:", the name/expr lives in the parent buffer.
+          if (!lpc_lex_pop_splice_if_any(yyscanner)) {
+            BEGIN(INITIAL);
+            push_function_context();
+            return L_FUNCTION_OPEN;
+          }
         }
 <SC_FUNC_OPEN>. {
-          yyless(0);
+          LPC_YYLESS(0);
           BEGIN(INITIAL);
           push_function_context();
           return L_FUNCTION_OPEN;
@@ -575,30 +618,11 @@ WS_NO_NL    [ \t\r\v\f]
      * affects exactly the code after it, and a #line reset lines up with
      * the token stream, with a single current_line counter that nothing
      * else fights.
-     *
-     * Buffer choreography (load-bearing, in this order): a directive owns
-     * its whole logical line, terminating newline included (the legacy
-     * scanner's parseDirective consumed it too). Rewind outp to the end
-     * of the matched text and consume + count the newline ourselves
-     * BEFORE dispatching: if the directive turns out to be an #include,
-     * the include-stack push must record exactly this position as the
-     * parent's resume point -- with outp[-1] being the newline that
-     * refill_buffer()'s include branch reuses as its leading sentinel --
-     * and it ends by refilling the ring buffer from the included file.
-     * Flush Flex's stale prefetch afterward in all cases so scanning
-     * resumes from wherever outp now points (the flush also sets Flex's
-     * beginning-of-line flag, keeping '^' anchors working for a directive
-     * on the very next line). yytext stays valid through the call -- only
-     * the flush afterward invalidates it. */
+     */
 <INITIAL,SC_COND_SKIP>^[ \t]*"#"[^\n]*(\\\r?\n[^\n]*)* {
-    outp -= YY_PENDING_LOOKAHEAD();
-    if (*outp == '\n') {
-        outp++;
-        lpc_lex_newline(yyscanner);
-    }
+    lpc_lex_consume_directive_newline(yyscanner);
     LpcDirectiveAction act =
         lpc_lex_on_directive(yytext, yyleng, yyscanner, YY_START == SC_COND_SKIP);
-    YY_FLUSH_BUFFER;
     if (act == LpcDirectiveAction::kEnterSkip) {
         BEGIN(SC_COND_SKIP);
     } else if (act == LpcDirectiveAction::kExitSkip) {
@@ -616,30 +640,20 @@ WS_NO_NL    [ \t\r\v\f]
      * (nothing alnum/underscore before the trailing whitespace/newline) is
      * still detected even though that rule then never fires. */
 "@""@"?  {
-          heredoc_terminator.clear();
-          heredoc_is_array = (yyleng == 2);
+          yyextra->heredoc_terminator.clear();
+          yyextra->heredoc_is_array = (yyleng == 2);
           BEGIN(SC_HEREDOC_TERM);
         }
-<SC_HEREDOC_TERM>[a-zA-Z0-9_]+ { heredoc_terminator.assign(yytext, yyleng); }
+<SC_HEREDOC_TERM>[a-zA-Z0-9_]+ { yyextra->heredoc_terminator.assign(yytext, yyleng); }
 <SC_HEREDOC_TERM>{WS_NO_NL}*\n {
-          /* Deliberately NOT lpc_lex_newline(): its refill check may
-           * memmove the ring buffer, and the `outp -=
-           * YY_PENDING_LOOKAHEAD()` rewind below reaches BEHIND the
-           * refill's relocation point -- refill before the rewind would
-           * make the rewind land on stale bytes. The only newline-count
-           * site with this constraint (every other one either has no
-           * pending rewind or rewinds first). total_lines is skipped to
-           * match; the heredoc body's own lines are counted by
-           * parseHeredoc(). */
-          current_line++;
+          /* parseHeredoc() reads the body through lpc_lex_getc() (Flex's
+           * own stream), so no rewind/flush choreography is needed here
+           * anymore -- which also lets this newline count uniformly via
+           * lpc_lex_newline() (it was the one documented exception while
+           * the rewind still followed it). */
+          lpc_lex_newline(yyscanner);
           BEGIN(INITIAL);
-          if (heredoc_terminator.empty()) {
-            lexerror("Illegal terminator");
-            return yylex(yylval_param, yyscanner);
-          }
-          outp -= YY_PENDING_LOOKAHEAD();
-          YY_FLUSH_BUFFER;
-          return parseHeredoc(heredoc_terminator.c_str(), heredoc_is_array, yylval_param, yyscanner);
+          return lpc_lex_start_heredoc(yylval_param, yylloc_param, yyscanner);
         }
     /* Trailing whitespace NOT immediately followed by a newline (i.e. the
      * rule above couldn't complete because EOF or non-whitespace content
@@ -654,72 +668,70 @@ WS_NO_NL    [ \t\r\v\f]
      * original does. */
 <SC_HEREDOC_TERM>[ \t\v\f\r]+ { /* consumed; next scan decides via <<EOF>> or "." below */ }
 <SC_HEREDOC_TERM><<EOF>> {
-          // Matches the original: EOF anywhere before the trailing
-          // newline is "Illegal terminator", even if a well-formed
-          // terminator identifier was already read.
-          lexerror("Illegal terminator");
-          BEGIN(INITIAL);
-          return YYEOF;
+          if (!lpc_lex_pop_splice_if_any(yyscanner)) {
+            // Matches the original: EOF anywhere before the trailing
+            // newline is "Illegal terminator", even if a well-formed
+            // terminator identifier was already read.
+            lexerror("Illegal terminator");
+            BEGIN(INITIAL);
+            return YYEOF;
+          }
         }
 <SC_HEREDOC_TERM>. {
           // Non-whitespace, non-newline byte right after the terminator
           // name (or immediately after "@"/"@@"): the original leaves it
-          // unconsumed for the body scan to treat as its first byte.
-          yyless(0);
+          // unconsumed for the body scan to treat as its first byte --
+          // yyless(0) puts it back in Flex's buffer, where parseHeredoc's
+          // lpc_lex_getc() reads it first.
+          LPC_YYLESS(0);
           BEGIN(INITIAL);
-          if (heredoc_terminator.empty()) {
-            lexerror("Illegal terminator");
-            return yylex(yylval_param, yyscanner);
-          }
-          outp -= YY_PENDING_LOOKAHEAD();
-          YY_FLUSH_BUFFER;
-          return parseHeredoc(heredoc_terminator.c_str(), heredoc_is_array, yylval_param, yyscanner);
+          return lpc_lex_start_heredoc(yylval_param, yylloc_param, yyscanner);
         }
 
 "++"    { return L_INC; }
-"+="    { yylval.number = F_ADD_EQ; return L_ASSIGN; }
+"+="    { yylval_param->number = F_ADD_EQ; return L_ASSIGN; }
 "+"     { return '+'; }
 "->"    { return L_ARROW; }
 "--"    { return L_DEC; }
-"-="    { yylval.number = F_SUB_EQ; return L_ASSIGN; }
+"-="    { yylval_param->number = F_SUB_EQ; return L_ASSIGN; }
 "-"     { return '-'; }
 
-"&&="   { yylval.number = F_LAND_EQ; return L_ASSIGN; }
+"&&="   { yylval_param->number = F_LAND_EQ; return L_ASSIGN; }
 "&&"    { return L_LAND; }
-"&="    { yylval.number = F_AND_EQ; return L_ASSIGN; }
+"&="    { yylval_param->number = F_AND_EQ; return L_ASSIGN; }
 "&"     { return '&'; }
 
-"||="   { yylval.number = F_LOR_EQ; return L_ASSIGN; }
+"||="   { yylval_param->number = F_LOR_EQ; return L_ASSIGN; }
 "||"    { return L_LOR; }
-"|="    { yylval.number = F_OR_EQ; return L_ASSIGN; }
+"|="    { yylval_param->number = F_OR_EQ; return L_ASSIGN; }
 "|"     { return '|'; }
 
-"^="    { yylval.number = F_XOR_EQ; return L_ASSIGN; }
+"^="    { yylval_param->number = F_XOR_EQ; return L_ASSIGN; }
 "^"     { return '^'; }
 
-"<<="   { yylval.number = F_LSH_EQ; return L_ASSIGN; }
+"<<="   { yylval_param->number = F_LSH_EQ; return L_ASSIGN; }
 "<<"    { return L_LSH; }
-"<="    { yylval.number = F_LE; return L_ORDER; }
+"<="    { yylval_param->number = F_LE; return L_ORDER; }
 "<"     { return '<'; }
 
-">>="   { yylval.number = F_RSH_EQ; return L_ASSIGN; }
+">>="   { yylval_param->number = F_RSH_EQ; return L_ASSIGN; }
 ">>"    { return L_RSH; }
-">="    { yylval.number = F_GE; return L_ORDER; }
-">"     { yylval.number = F_GT; return L_ORDER; }
+">="    { yylval_param->number = F_GE; return L_ORDER; }
+">"     { yylval_param->number = F_GT; return L_ORDER; }
 
-"*="    { yylval.number = F_MULT_EQ; return L_ASSIGN; }
+"*="    { yylval_param->number = F_MULT_EQ; return L_ASSIGN; }
 "*"     { return '*'; }
 
-"%="    { yylval.number = F_MOD_EQ; return L_ASSIGN; }
+"%="    { yylval_param->number = F_MOD_EQ; return L_ASSIGN; }
 "%"     { return '%'; }
 
-"/="    { yylval.number = F_DIV_EQ; return L_ASSIGN; }
+"/="    { yylval_param->number = F_DIV_EQ; return L_ASSIGN; }
 "/"     { return '/'; }
 
 "=="    { return L_EQ; }
-"="     { yylval.number = F_ASSIGN; return L_ASSIGN; }
+"="     { yylval_param->number = F_ASSIGN; return L_ASSIGN; }
 
-"??="   { yylval.number = F_NULLISH_EQ; return L_ASSIGN; }
+"??="   { yylval_param->number = F_NULLISH_EQ; return L_ASSIGN; }
 "??"    { return L_QUESTION_QUESTION; }
     /* Optional chaining "?." (mapping member/bracket access, e.g. m?.key,
      * m?.[idx]): only recognized when followed by an identifier-start char
@@ -749,20 +761,13 @@ WS_NO_NL    [ \t\r\v\f]
      * 0) can be told apart from one that's merely part of the interpolated
      * expression itself. See SC_TEMPLATE_BODY above. */
 "{"     {
-          if (template_nesting > 0) {
-            template_brace_depth[template_nesting]++;
-          }
+          lpc_lex_brace_open(yyscanner);
           return '{';
         }
 "}"     {
-          if (template_nesting > 0 && template_brace_depth[template_nesting] == 0) {
-            str_accum.clear();
-            template_is_continuation = true;
+          if (lpc_lex_brace_close(yyscanner)) {
             BEGIN(SC_TEMPLATE_BODY);
-            return yylex(yylval_param, yyscanner);
-          }
-          if (template_nesting > 0) {
-            template_brace_depth[template_nesting]--;
+            return yylex(yylval_param, yylloc_param, yyscanner);
           }
           return '}';
         }
@@ -773,14 +778,26 @@ WS_NO_NL    [ \t\r\v\f]
 "~"     { return '~'; }
 
 <<EOF>> {
-          // No text was matched (yyleng == 0) and Flex's own buffer
-          // bookkeeping doesn't carry its usual "pending lookahead"
-          // meaning at EOF, so don't apply the general rewind formula --
-          // `outp` is already correctly positioned at the LEX_EOF sentinel.
-          // parseEofOrIncludePop() may call yylex() recursively (on the
-          // include-stack-pop path), so flush before calling, not after.
-          YY_FLUSH_BUFFER;
-          return parseEofOrIncludePop(yylval_param, yyscanner);
+          if (lpc_lex_pushed_depth() > 0) {
+            if (lpc_lex_top_buffer_kind() == LPC_BUF_IF_EXPR) {
+              // A #if expression buffer ran dry: end the evaluator's
+              // token pull exactly here -- never continue into the
+              // parent input.
+              lpc_lex_pop_pushed_buffer(yyscanner);
+              return LPC_IFEXPR_END;
+            }
+            // A pushed buffer (splice or #include content) ran dry: pop
+            // back to the parent buffer (which resumes at exactly the
+            // position it left off; an include pop also restores
+            // current_file/current_line) and keep scanning -- no return,
+            // Flex continues in whatever start condition is active.
+            lpc_lex_pop_pushed_buffer(yyscanner);
+          } else {
+            // Genuine end of the main file. Flex's EOF state is sticky:
+            // any further next() calls land here again and return the
+            // same end-of-tokens signal.
+            return parseMainEof(yylval_param, yyscanner);
+          }
         }
 
 .       {
@@ -792,31 +809,214 @@ WS_NO_NL    [ \t\r\v\f]
 
 %%
 
-#undef str_accum
-#undef template_nesting
-#undef template_brace_depth
-#undef template_is_continuation
-#undef heredoc_terminator
-#undef heredoc_is_array
-#undef function_flag
+// Read ONE character from the scanner's input, through Flex itself (its
+// buffer, then YY_INPUT) -- the official mechanism for helpers that must
+// consume raw characters mid-rule (heredoc bodies, macro-argument
+// collection) without desynchronizing from the DFA's own prefetch.
+// Returns 0 at end of input (and for a genuine NUL byte, which LPC source
+// treats as end-of-input anyway -- matching the legacy raw readers).
+// A pushed splice buffer running dry mid-read is popped and the read
+// continues from the parent buffer -- the cross-boundary case a raw
+// reader must survive (a function-like macro's `(args)` following a
+// splice that ends with the macro's name). Wrapped here because Flex
+// generates yyinput() as static, private to lex.autogen.cc.
+int lpc_lex_getc(void *yyscanner) {
+  struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;
+  for (;;) {
+    int c = yyinput(yyscanner);
+    if (c > 0) {
+      // yyinput() maintains yylineno but not yycolumn -- keep the raw
+      // readers' column upkeep here (8.1's enumerated bypass site).
+      if (c == '\n') {
+        yycolumn = 0;
+      } else {
+        yycolumn++;
+      }
+      return c;
+    }
+    if (lpc_lex_pushed_depth() == 0) return c;
+    lpc_lex_pop_pushed_buffer(yyscanner);
+  }
+}
+
+// THE splice mechanism (see lex.h): push `text` as a fresh Flex buffer on
+// top of the current one. Composing yy_scan_bytes() with the buffer STACK
+// needs care: yy_scan_bytes()'s internal yy_switch_to_buffer() REPLACES
+// the current top-of-stack slot rather than pushing, so the "flush the
+// old buffer's position, advance the stack top" half of
+// yypush_buffer_state() must be done manually FIRST -- the internal
+// switch then lands in a fresh, already-advanced slot instead of
+// clobbering (and later double-freeing) the live one. ASan caught the
+// naive yypush_buffer_state(yy_scan_string(...)) composition as a
+// heap-use-after-free on the very first macro expansion (see
+// plans/MASTER-PLAN.md 5.5).
+void lpc_lex_push_string_buffer(const char *text, size_t len, int kind,
+                                void *yyscanner) {
+  struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;
+  yyensure_buffer_stack(yyscanner);
+  if (!YY_CURRENT_BUFFER) {
+    /* Pushing before the first yylex() call (start_new_file's global
+     * include file): Flex normally creates the base buffer lazily at
+     * yylex() entry, so materialize it now -- otherwise this push would
+     * land in slot 0 AS the base, and its eventual yypop_buffer_state()
+     * would find no parent to reload, leaving yy_c_buf_p dangling into
+     * the freed buffer (ASan-verified heap-use-after-free). */
+    YY_CURRENT_BUFFER_LVALUE = yy_create_buffer(yyin, YY_BUF_SIZE, yyscanner);
+    yy_load_buffer_state(yyscanner);
+  }
+  /* Same bookkeeping yypush_buffer_state() does before switching: flush
+   * the scan position into the old buffer's state so scanning resumes
+   * exactly here when the pushed buffer pops. */
+  *yyg->yy_c_buf_p = yyg->yy_hold_char;
+  YY_CURRENT_BUFFER_LVALUE->yy_buf_pos = yyg->yy_c_buf_p;
+  YY_CURRENT_BUFFER_LVALUE->yy_n_chars = yyg->yy_n_chars;
+  yyg->yy_buffer_stack_top++;
+  yy_scan_bytes(text, (int)len, yyscanner);
+  /* yy_scan_buffer() (behind yy_scan_bytes) fills the buffer struct by
+   * hand and -- unlike yy_init_buffer() -- leaves yy_bs_lineno/column
+   * UNINITIALIZED; %option yylineno counting would start from garbage. */
+  yylineno = 1;
+  yycolumn = 0;
+  yyg->yy_did_buffer_switch_on_eof = 1;
+  lpc_lex_note_buffer_push(kind);
+}
+
+void lpc_lex_pop_pushed_buffer(void *yyscanner) {
+  struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;
+  int ending_lineno = YY_CURRENT_BUFFER ? yylineno : 0;
+  lpc_lex_note_buffer_pop(ending_lineno);
+  yypop_buffer_state(yyscanner);
+}
+
+// A directive owns its whole logical line, terminating newline included
+// -- consumed and counted BEFORE dispatching, so an #include's stack
+// entry records the line AFTER the directive as the parent's resume
+// line. The newline is simply the next byte of whatever real source is
+// feeding Flex (base stream or an include's pushed buffer; both
+// auto-append a trailing '\n' at EOF), read through yyinput(), which
+// also sets the BOL flag so '^' anchors keep working on the very next
+// line. Splice/if-expr buffers contain no newlines -- nothing to
+// consume (a '#' at a fresh splice buffer's start can match the
+// anchored rule; pathological, but must not eat a byte).
+static void lpc_lex_consume_directive_newline(void *yyscanner) {
+  struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;
+  int kind = lpc_lex_top_buffer_kind();
+  if (kind == LPC_BUF_PLAIN || kind == LPC_BUF_EXPANSION || kind == LPC_BUF_IF_EXPR) {
+    return;
+  }
+  int nl = yyinput(yyscanner);
+  if (nl == '\n') {
+    lpc_lex_newline(yyscanner);
+    yycolumn = 0;  // yyinput() doesn't maintain yycolumn
+  }
+}
+
+// The shared <<EOF>> decision: a drained pushed buffer (splice or
+// #include content -- NOT a #if expression, whose edge is hard) is
+// popped and scanning simply continues; returns 0 when this is a
+// genuine end-of-input the rule must handle itself.
+static int lpc_lex_pop_splice_if_any(void *yyscanner) {
+  if (lpc_lex_pushed_depth() > 0 && lpc_lex_top_buffer_kind() != LPC_BUF_IF_EXPR) {
+    lpc_lex_pop_pushed_buffer(yyscanner);
+    return 1;
+  }
+  return 0;
+}
+
+int lpc_lex_ifexpr_next(union YYSTYPE *yylval_param, void *yyscanner) {
+  struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;
+  int saved = YY_START;
+  // The nested yylex() repoints yyg's yylval_r/yylloc_r at OUR
+  // parameters; restore the suspended outer frame's pointers afterward
+  // (rule actions write through their own parameters, but flex-internal
+  // code paths consult the yyg copies).
+  YYSTYPE *saved_lval = yyget_lval(yyscanner);
+  YYLTYPE *saved_lloc = yyget_lloc(yyscanner);
+  YYLTYPE lloc;
+  BEGIN(INITIAL);
+  int tok = yylex(yylval_param, &lloc, yyscanner);
+  BEGIN(saved);
+  yyset_lval(saved_lval, yyscanner);
+  yyset_lloc(saved_lloc, yyscanner);
+  return tok;
+}
+
+// ---------------------------------------------------------------------------
+// Raw buffer-introspection primitives: pure flex-state accessors, zero
+// policy. The generated scanner's buffer types (yyguts_t, yy_buffer_state)
+// are private to this translation unit, so these are the ONLY window other
+// files get; all actual logic built on them (the current_line real-frame
+// walk, the diagnostic snippet/caret assembly) lives in lexer_utils.cc.
+// ---------------------------------------------------------------------------
+
+// Number of buffers on the stack, including the base buffer; 0 when the
+// scanner has no buffer yet.
+int lpc_lex_buffer_count(void *yyscanner) {
+  struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;
+  if (!YY_CURRENT_BUFFER) {
+    return 0;
+  }
+  return (int)yyg->yy_buffer_stack_top + 1;
+}
+
+// Pointer to buffer i's native line counter (i = 0 is the base buffer),
+// or NULL when absent.
+int *lpc_lex_buffer_lineno(void *yyscanner, int i) {
+  struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;
+  if (!YY_CURRENT_BUFFER || i < 0 || i > (int)yyg->yy_buffer_stack_top ||
+      !yyg->yy_buffer_stack[i]) {
+    return NULL;
+  }
+  return &yyg->yy_buffer_stack[i]->yy_bs_lineno;
+}
+
+// Content extents of buffer i: [*base, *limit) are the resident bytes,
+// *pos the scan position (the TOP buffer's live cursor; a lower buffer's
+// frozen resume point), *held the held-out character replacing the NUL at
+// the live cursor during a rule action (top buffer only, else 0).
+// Returns 0 when the buffer is absent or its state is inconsistent.
+int lpc_lex_buffer_extents(void *yyscanner, int i, const char **base, const char **limit,
+                           const char **pos, char *held) {
+  struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;
+  if (!YY_CURRENT_BUFFER || i < 0 || i > (int)yyg->yy_buffer_stack_top) {
+    return 0;
+  }
+  YY_BUFFER_STATE b = yyg->yy_buffer_stack[i];
+  if (!b || !b->yy_ch_buf) {
+    return 0;
+  }
+  int is_top = (i == (int)yyg->yy_buffer_stack_top);
+  *base = b->yy_ch_buf;
+  *limit = b->yy_ch_buf + (is_top ? yyg->yy_n_chars : b->yy_n_chars);
+  *pos = is_top ? yyg->yy_c_buf_p : b->yy_buf_pos;
+  *held = is_top ? yyg->yy_hold_char : 0;
+  if (*pos == NULL || *pos < *base) {
+    return 0;
+  }
+  if (*pos > *limit) {
+    *pos = *limit;
+  }
+  return 1;
+}
+
+
 
 void lpc_lex_reset(void *yyscanner) {
   struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
+  // A compile that aborted mid-splice can leave pushed splice buffers
+  // stacked; pop them so the next compile starts on the base buffer.
+  while (lpc_lex_pushed_depth() > 0) {
+    lpc_lex_pop_pushed_buffer(yyscanner);
+  }
   if (YY_CURRENT_BUFFER) {
     YY_FLUSH_BUFFER;
+    // Flushing deliberately preserves a buffer's line counter (see
+    // yy_init_buffer's comment in the generated code); a fresh compile on
+    // a reused scanner must start its base buffer back at line 1.
+    yylineno = 1;
+    yycolumn = 0;
   }
   BEGIN(INITIAL);
-  compiler_context_t *ctx = reinterpret_cast<compiler_context_t *>(yyget_extra(yyscanner));
-  ctx->template_is_continuation = false;
-  ctx->template_nesting = 0;
-  // A compile that aborted mid-splice can leave unconsumed blue-paint
-  // counts; they must not suppress expansion in the next compile that
-  // reuses this scanner.
-  ctx->pending_plain.clear();
+  lpc_lex_reset_context(reinterpret_cast<compiler_context_t *>(yyget_extra(yyscanner)));
 }
 
-void lpc_lex_flush_lookahead(void *yyscanner) {
-  struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
-  outp -= YY_PENDING_LOOKAHEAD();
-  YY_FLUSH_BUFFER;
-}

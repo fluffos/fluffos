@@ -98,7 +98,8 @@ static std::vector<Token> Tokenize(const std::string& source,
     std::vector<Token> toks;
     YYSTYPE yylval;
     for (;;) {
-        int k = yylex(&yylval, scanner);
+        YYLTYPE yylloc;
+        int k = yylex(&yylval, &yylloc, scanner);
         if (k <= 0) break;
         Token t;
         t.kind   = k;
