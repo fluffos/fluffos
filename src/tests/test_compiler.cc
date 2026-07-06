@@ -33,8 +33,106 @@
 #include "compiler/internal/lex.h"
 #include "compiler/internal/lexer_utils.h"
 #include "compiler/internal/lexer_rules_pp.h"
+#include "compiler/internal/scratchpad.h"
 #include "mainlib.h"
 #include "vm/vm.h"
+
+// ---------------------------------------------------------------------------
+// Scratchpad arena (scratchpad.cc): direct unit coverage of the monotonic
+// bump allocator behind the compiler's transient strings and the parser's
+// value stack. Each test starts from a clean arena; scratch_destroy() is
+// the bulk reset.
+// ---------------------------------------------------------------------------
+TEST(Scratchpad, NewStringRoundTrip) {
+    scratch_destroy();
+    ScratchString *a = scratch_new_string("hello");
+    ScratchString *b = scratch_new_string("");
+    ScratchString *c = scratch_new_string("a longer string with spaces");
+    EXPECT_EQ(*a, "hello");
+    EXPECT_TRUE(b->empty());
+    EXPECT_EQ(*c, "a longer string with spaces");
+    // Distinct stable objects: later allocations never disturb earlier ones.
+    EXPECT_EQ(*a, "hello");
+    scratch_destroy();
+}
+
+TEST(Scratchpad, LargeStringNoCap) {
+    // The historical arena capped inline strings at 255 bytes and malloc'd
+    // the rest; this arena has no cap. Well past a single 64K chunk, so an
+    // exact-fit overflow chunk is exercised.
+    scratch_destroy();
+    std::string big(200000, 'x');
+    ScratchString *p = scratch_new_string(big);
+    EXPECT_EQ(p->size(), 200000u);
+    EXPECT_EQ((*p)[0], 'x');
+    EXPECT_EQ((*p)[199999], 'x');
+    scratch_destroy();
+}
+
+TEST(Scratchpad, DestroyResetsToPersistentBase) {
+    // scratch_destroy frees overflow chunks and RESETS the persistent base
+    // chunk: the first allocation after each destroy lands at the same
+    // address -- back-to-back small compiles reuse the block, no malloc.
+    scratch_destroy();
+    void *first = scratch_raw_allocate(64, 1);
+    scratch_destroy();
+    void *again = scratch_raw_allocate(64, 1);
+    EXPECT_EQ(first, again);
+    scratch_destroy();
+}
+
+TEST(Scratchpad, ScratchStringIsArenaBacked) {
+    // A std::basic_string over ScratchAllocator: grows, concatenates, and
+    // destructs like std::string, but its storage is arena memory (bulk
+    // freed at scratch_destroy). ASan would catch any mismanagement.
+    scratch_destroy();
+    {
+        ScratchString s("foo");
+        s += "bar";
+        s += ScratchString("baz");
+        for (int i = 0; i < 1000; ++i) s.push_back('x');  // growth churn
+        EXPECT_EQ(s.substr(0, 9), "foobarbaz");
+        EXPECT_EQ(s.size(), 9u + 1000u);
+        // Materialize a value-stack token from the accumulated text.
+        ScratchString *tok = scratch_new_string(s);
+        EXPECT_EQ(*tok, s);
+    }  // ScratchString destructs here -> no-op deallocate into the arena
+    scratch_destroy();
+}
+
+TEST(Scratchpad, ScratchVectorIsArenaBacked) {
+    scratch_destroy();
+    {
+        ScratchVector<int> v;
+        for (int i = 0; i < 5000; ++i) v.push_back(i);
+        EXPECT_EQ(v.size(), 5000u);
+        EXPECT_EQ(v[4999], 4999);
+        ScratchVector<ScratchString> names;
+        for (int i = 0; i < 100; ++i) names.emplace_back("name");
+        EXPECT_EQ(names.size(), 100u);
+        EXPECT_EQ(names[99], "name");
+    }
+    scratch_destroy();
+}
+
+TEST(Scratchpad, StaleObjectResetAfterDestroyIsSafe) {
+    // The scanner context holds ScratchStrings across compiles; after
+    // scratch_destroy their buffers are gone. The documented recovery --
+    // assign a fresh empty string before any use -- must be safe (no-op
+    // deallocate) and leave the object fully usable.
+    scratch_destroy();
+    static ScratchString persistent;  // simulates compiler_context_t member
+    persistent = ScratchString();
+    persistent.reserve(100);
+    persistent += "first compile text that exceeds sso for sure 0123456789";
+    scratch_destroy();                // arena reset; `persistent` now stale
+    persistent = ScratchString();     // the documented re-initialization
+    persistent += "second";
+    EXPECT_EQ(persistent, "second");
+    persistent = ScratchString();
+    scratch_destroy();
+}
+
 
 struct Token {
     int kind;
@@ -70,7 +168,7 @@ static std::vector<Token> TokenizeSession(std::shared_ptr<LexerSession> session,
     freed_string = -1;
     num_parse_error = 0;
     
-    std::string norm_file = normalize_filename(filename);
+    ScratchString norm_file = normalize_filename(filename);
     current_file = make_shared_string(norm_file.c_str());
     current_file_id = add_program_file(norm_file.c_str(), /*top=*/1);
 
@@ -95,7 +193,7 @@ static std::vector<Token> TokenizeSession(std::shared_ptr<LexerSession> session,
         t.text   = yyget_text(scanner);
         bool has_string_payload = (k == L_STRING || k == L_TEMPLATE_HEAD ||
                                    k == L_TEMPLATE_MIDDLE || k == L_TEMPLATE_TAIL);
-        t.str    = (has_string_payload && yylval.string) ? yylval.string : "";
+        t.str    = (has_string_payload && yylval.string) ? yylval.string->c_str() : "";
         t.is_char_literal = (k == L_NUMBER && ctx.is_char_literal);
         ctx.is_char_literal = false;
         t.is_template = ctx.is_template;

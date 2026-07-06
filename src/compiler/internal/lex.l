@@ -344,16 +344,6 @@ WS_NO_NL    [ \t\r\v\f]
           BEGIN(INITIAL);
           return lpc_lex_string_close(yyscanner, yylval_param);
         }
-    /* Template fragment tokens (L_TEMPLATE_HEAD/MIDDLE/TAIL) use
-     * scratch_large_alloc() rather than scratch_copy(): unlike a plain
-     * string literal (consumed almost immediately by string_literal:
-     * L_STRING), a template fragment's value sits on the parser's value
-     * stack for as long as it takes to scan the entire ${...} expression
-     * that follows it -- which can itself contain more string/template
-     * literals. scratch_copy()'s small ring buffer would get overwritten
-     * by those before the outer template_literal/template_parts rule ever
-     * gets to consume the fragment (this was a real, reproduced bug: the
-     * head fragment came back containing the *tail* fragment's text). */
 <SC_TEMPLATE_BODY>"${" {
           BEGIN(INITIAL);
           return lpc_lex_template_head_or_middle(yyscanner, yylval_param);

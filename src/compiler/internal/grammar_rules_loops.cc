@@ -13,7 +13,6 @@
 extern int context;
 extern int func_present;
 extern int num_refs;
-extern char *outp;
 
 void rule_while(parse_node_t **result, parse_node_t *expr, parse_node_t *stmt, LPC_INT saved_context) {
   CREATE_LOOP(*result, 1, stmt, 0, optimize_loop_test(expr));
@@ -81,17 +80,9 @@ void rule_foreach_var_new_local(decl_t *result, LPC_INT local_num) {
   result->num = 1;
 }
 
-void rule_foreach_var_identifier(decl_t *result, char *identifier) {
-  char buf[256];
-  char *end = EndOf(buf);
-  char *p;
-
-  p = strput(buf, end, "'");
-  p = strput(p, end, identifier);
-  p = strput(p, end, "' is not a local or a global variable.");
-  yyerror(buf);
+void rule_foreach_var_identifier(decl_t *result, const ScratchString *identifier) {
+  yyerror("'%s' is not a local or a global variable.", identifier->c_str());
   CREATE_OPCODE_1(result->node, F_GLOBAL_LVALUE, 0, 0);
-  scratch_free(identifier);
   result->num = 0;
 }
 

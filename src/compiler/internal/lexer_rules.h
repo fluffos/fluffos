@@ -4,6 +4,7 @@
 #include <string>
 
 #include "vm/internal/base/number.h"  // for LPC_INT
+#include "compiler/internal/scratchpad.h"
 
 // lexer_rules.h / lexer_rules.cc — the substantive logic behind lex.l's
 // rule actions, pulled out into ordinary functions so lex.l itself stays a
@@ -129,7 +130,7 @@ void lpc_lex_reset_context(struct compiler_context_t *ctx);
 
 // Strip '_' digit-group separators (lex.l's numeric patterns only allow '_'
 // directly between two digits, so this is always safe).
-std::string lpc_strip_underscores(const char *text, int len);
+ScratchString lpc_strip_underscores(const char *text, int len);
 
 // total_lines++ for each '\n' in the matched text -- used by the
 // "(" WS* "{"/"["/":" compound-open rules and SC_FUNC_OPEN's whitespace

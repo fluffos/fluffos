@@ -13,7 +13,6 @@
 extern int context;
 extern int func_present;
 extern int num_refs;
-extern char *outp;
 
 parse_node_t *rule_expr_or_block_block(decl_t decl_val) {
   return decl_val.node;
@@ -61,41 +60,40 @@ parse_node_t *rule_lvalue_list(parse_node_t *lvalue, parse_node_t *list) {
   return list;
 }
 
-void rule_string(parse_node_t **result, char *str) {
+void rule_string(parse_node_t **result, const ScratchString *str) {
   CREATE_STRING(*result, str);
-  scratch_free(str);
 }
 
 void rule_string_like_concat(parse_node_t **result, parse_node_t *left, parse_node_t *right) {
   CREATE_BINARY_OP(*result, F_ADD, TYPE_STRING, left, right);
 }
 
-void rule_template_literal(parse_node_t **result, char *head, parse_node_t *expr, parse_node_t *rest) {
+void rule_template_literal(parse_node_t **result, const ScratchString *head, parse_node_t *expr, parse_node_t *rest) {
   parse_node_t *head_node, *coerced, *tmp;
   CREATE_STRING(head_node, head);
-  scratch_free(head);
   CREATE_UNARY_OP(coerced, F_TEMPLATE_COERCE, TYPE_STRING, expr);
   CREATE_BINARY_OP(tmp, F_ADD, TYPE_STRING, head_node, coerced);
   CREATE_BINARY_OP(*result, F_ADD, TYPE_STRING, tmp, rest);
 }
 
-void rule_template_parts_tail(parse_node_t **result, char *tail) {
+void rule_template_parts_tail(parse_node_t **result, const ScratchString *tail) {
   CREATE_STRING(*result, tail);
-  scratch_free(tail);
 }
 
-void rule_template_parts_middle(parse_node_t **result, char *mid, parse_node_t *expr, parse_node_t *rest) {
+void rule_template_parts_middle(parse_node_t **result, const ScratchString *mid, parse_node_t *expr, parse_node_t *rest) {
   parse_node_t *mid_node, *coerced, *tmp;
   CREATE_STRING(mid_node, mid);
-  scratch_free(mid);
   CREATE_UNARY_OP(coerced, F_TEMPLATE_COERCE, TYPE_STRING, expr);
   CREATE_BINARY_OP(tmp, F_ADD, TYPE_STRING, mid_node, coerced);
   CREATE_BINARY_OP(*result, F_ADD, TYPE_STRING, tmp, rest);
 }
 
-parse_node_t *rule_class_init(char *identifier, parse_node_t *expr) {
+parse_node_t *rule_class_init(const ScratchString *identifier, parse_node_t *expr) {
   parse_node_t *node = new_node();
-  node->l.expr = (parse_node_t *)identifier;
+  /* Member name rides in the node as its arena c_str(); valid through
+     tree processing (scratch_destroy runs after) -- see
+     reorder_class_values / the undefined-class error paths. */
+  node->l.expr = (parse_node_t *)identifier->c_str();
   node->v.expr = expr;
   node->r.expr = 0;
   return node;
@@ -110,16 +108,16 @@ parse_node_t *rule_opt_class_init(parse_node_t *list, parse_node_t *class_init) 
   return class_init;
 }
 
-LPC_INT rule_efun_override(char *identifier) {
+LPC_INT rule_efun_override(const ScratchString *identifier) {
   LPC_INT res;
   ident_hash_elem_t *ihe;
 
-  res = (ihe = lookup_ident(identifier)) ? ihe->dn.efun_num : -1;
+  res = (ihe = lookup_ident(identifier->c_str())) ? ihe->dn.efun_num : -1;
   if (res == -1) {
-    yyerror("Unknown efun: %s", identifier);
+    yyerror("Unknown efun: %s", identifier->c_str());
   } else {
     push_malloced_string(the_file_name(current_file));
-    share_and_push_string(identifier);
+    share_and_push_string(identifier->c_str());
     push_malloced_string(add_slash(main_file_name()));
     svalue_t *ret = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 3);
     if (!MASTER_APPROVED(ret)) {
@@ -127,7 +125,6 @@ LPC_INT rule_efun_override(char *identifier) {
       res = -1;
     }
   }
-  scratch_free(identifier);
   return res;
 }
 
@@ -144,42 +141,24 @@ LPC_INT rule_efun_override_new() {
   }
 }
 
-char *rule_function_name_colon_colon(char *identifier) {
-  int l = strlen(identifier) + 1;
-  char *p;
-  char *res = scratch_realloc(identifier, l + 3);
-  p = res + l;
-  while (p--, l--)
-    *(p + 3) = *p;
-  strncpy(res, ":::", 3);
-  return res;
+ScratchString *rule_function_name_colon_colon(ScratchString *identifier) {
+  identifier->insert(0, ":::");
+  return identifier;
 }
 
-char *rule_function_name_type(LPC_INT basic_type, char *identifier) {
-  int z, l = strlen(identifier) + 1;
-  char *p;
-  z = strlen(compiler_type_names[basic_type]) + 3;
-  char *res = scratch_realloc(identifier, l + z);
-  p = res + l;
-  while (p--, l--)
-    *(p + z) = *p;
-  res[0] = ':';
-  strncpy(res + 1, compiler_type_names[basic_type], z - 3);
-  res[z - 2] = ':';
-  res[z - 1] = ':';
-  return res;
+ScratchString *rule_function_name_type(LPC_INT basic_type, ScratchString *identifier) {
+  ScratchString prefix(":");
+  prefix += compiler_type_names[basic_type];
+  prefix += "::";
+  identifier->insert(0, prefix);
+  return identifier;
 }
 
-char *rule_function_name_obj(char *obj, char *identifier) {
-  int l = strlen(obj);
-  char *res = scratch_alloc(l + strlen(identifier) + 4);
-  *(res) = ':';
-  strcpy(res + 1, obj);
-  strcpy(res + l + 1, "::");
-  strcpy(res + l + 3, identifier);
-  scratch_free(obj);
-  scratch_free(identifier);
-  return res;
+ScratchString *rule_function_name_obj(ScratchString *obj, ScratchString *identifier) {
+  obj->insert(0, ":");
+  *obj += "::";
+  *obj += *identifier;
+  return obj;
 }
 
 LPC_INT rule_functional_open(LPC_INT val) {
@@ -541,20 +520,13 @@ void rule_primary_expr_defined_name(parse_node_t **result, ident_hash_elem_t *ih
   }
 }
 
-void rule_primary_expr_identifier(parse_node_t **result, char *name) {
-  char buf[256];
-  char *end = EndOf(buf);
-  char *p;
+void rule_primary_expr_identifier(parse_node_t **result, const ScratchString *name) {
   auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
-  p = strput(buf, end, "Undefined variable '");
-  p = strput(p, end, name);
-  p = strput(p, end, "'");
   if (current_number_of_locals < max_local_variables) {
     add_local_name(name, TYPE_ANY);
   }
   CREATE_ERROR(*result);
-  yyerror(buf);
-  scratch_free(name);
+  yyerror("Undefined variable '%s'", name->c_str());
 }
 
 function_context_t *rule_dollar_open() {
@@ -581,7 +553,7 @@ void rule_primary_expr_dollar_expr(parse_node_t **result, function_context_t *sa
   }
 }
 
-void rule_primary_expr_member_arrow(parse_node_t **result, parse_node_t *expr, char *identifier) {
+void rule_primary_expr_member_arrow(parse_node_t **result, parse_node_t *expr, const ScratchString *identifier) {
   if (expr->type == TYPE_ANY) {
     int cmi;
     unsigned short tp;
@@ -601,10 +573,9 @@ void rule_primary_expr_member_arrow(parse_node_t **result, parse_node_t *expr, c
     CREATE_UNARY_OP_1(*result, F_MEMBER, 0, expr, 0);
     (*result)->l.number = lookup_class_member(CLASS_IDX(expr->type), identifier, &((*result)->type));
   }
-  scratch_free(identifier);
 }
 
-void rule_primary_expr_member_dot(parse_node_t **result, parse_node_t *expr, char *identifier) {
+void rule_primary_expr_member_dot(parse_node_t **result, parse_node_t *expr, const ScratchString *identifier) {
   if (expr->type == TYPE_ANY) {
     int cmi;
     unsigned short tp;
@@ -632,17 +603,15 @@ void rule_primary_expr_member_dot(parse_node_t **result, parse_node_t *expr, cha
     (*result)->l.number = store_prog_string(identifier);
     (*result)->type = TYPE_ANY;
   }
-  scratch_free(identifier);
 }
 
 // Optional chaining member access: `expr?.name`. Mapping-only (unlike '.'/'-'>,
 // this never falls back to class-member lookup) -- if expr isn't a mapping at
 // runtime, F_MAP_MEMBER_OPTIONAL short-circuits to 0 instead of erroring.
-void rule_primary_expr_member_optional(parse_node_t **result, parse_node_t *expr, char *identifier) {
+void rule_primary_expr_member_optional(parse_node_t **result, parse_node_t *expr, const ScratchString *identifier) {
   CREATE_UNARY_OP_1(*result, F_MAP_MEMBER_OPTIONAL, TYPE_ANY, expr, 0);
   (*result)->l.number = store_prog_string(identifier);
   (*result)->type = TYPE_ANY;
-  scratch_free(identifier);
 }
 
 // Optional chaining bracket index: `expr?.[idx]` or `expr.?[idx]` (both forms
@@ -1045,11 +1014,7 @@ void rule_function_call_new_class(parse_node_t **result, ident_hash_elem_t *ihe,
     p = strput(p, end, "'");
     yyerror(buf);
     CREATE_ERROR(*result);
-    node = class_init;
-    while (node) {
-      scratch_free((char *)node->l.expr);
-      node = node->r.expr;
-    }
+    /* class_init member-name c_str()s are arena memory; bulk-freed. */
   } else {
     int type = ihe->dn.class_num | TYPE_MOD_CLASS;
     if ((node = class_init)) {
@@ -1062,22 +1027,12 @@ void rule_function_call_new_class(parse_node_t **result, ident_hash_elem_t *ihe,
   }
 }
 
-void rule_function_call_new_class_undef(parse_node_t **result, char *name, parse_node_t *class_init) {
-  parse_node_t *node;
-  char buf[256];
-  char *end = EndOf(buf);
-  char *p;
-
-  p = strput(buf, end, "Undefined class '");
-  p = strput(p, end, name);
-  p = strput(p, end, "'");
-  yyerror(buf);
+void rule_function_call_new_class_undef(parse_node_t **result, const ScratchString *name, parse_node_t *class_init) {
+  yyerror("Undefined class '%s'", name->c_str());
   CREATE_ERROR(*result);
-  node = class_init;
-  while (node) {
-    scratch_free((char *)node->l.expr);
-    node = node->r.expr;
-  }
+  /* class_init member-name c_str()s ride to scratch_destroy; nothing to
+     free individually. */
+  (void)class_init;
 }
 
 void rule_function_call_defined_name(parse_node_t **result, ident_hash_elem_t *ihe, parse_node_t *opt_arg_list, LPC_INT saved_context, LPC_INT saved_refs) {
@@ -1189,36 +1144,31 @@ void rule_function_call_defined_name(parse_node_t **result, ident_hash_elem_t *i
   num_refs = saved_refs;
 }
 
-void rule_function_call_name(parse_node_t **result, char *name, parse_node_t *opt_arg_list, LPC_INT saved_context, LPC_INT saved_refs) {
+void rule_function_call_name(parse_node_t **result, const ScratchString *name, parse_node_t *opt_arg_list, LPC_INT saved_context, LPC_INT saved_refs) {
   context = saved_context;
   *result = opt_arg_list;
 
   if (current_function_context)
     current_function_context->bindable = FP_NOT_BINDABLE;
 
-  if (*name == ':') {
+  if ((*name)[0] == ':') {
     int f;
-    if ((f = arrange_call_inherited(name + 1, *result)) != -1) {
+    if ((f = arrange_call_inherited(name->c_str() + 1, *result)) != -1) {
       ;
     }
   } else {
     int f;
     ident_hash_elem_t *ihe;
 
-    f = (ihe = lookup_ident(name)) ? ihe->dn.function_num : -1;
+    f = (ihe = lookup_ident(name->c_str())) ? ihe->dn.function_num : -1;
 
     if (f == -1) {
       if (exact_types) {
-        char buf[256];
-        char *end = EndOf(buf);
-        char *p;
-        char *n = name;
+        const char *n = name->c_str();
         if (*n == ':') n++;
-        p = strput(buf, end, "Undefined function ");
-        p = strput(p, end, n);
-        yyerror(buf);
+        yyerror("Undefined function %s", n);
       } else {
-        f = define_new_function(name, 0, 0, DECL_PUBLIC|FUNC_UNDEFINED, TYPE_ANY);
+        f = define_new_function(name->c_str(), 0, 0, DECL_PUBLIC|FUNC_UNDEFINED, TYPE_ANY);
       }
     }
 
@@ -1235,7 +1185,6 @@ void rule_function_call_name(parse_node_t **result, char *name, parse_node_t *op
   }
   *result = check_refs(num_refs - saved_refs, opt_arg_list, *result);
   num_refs = saved_refs;
-  scratch_free(name);
 }
 
 void rule_function_call_indexed(parse_node_t **result, parse_node_t *expr, parse_node_t *idx, parse_node_t *opt_arg_list, LPC_INT saved_context, LPC_INT saved_refs) {
@@ -1281,7 +1230,7 @@ void rule_function_call_indexed(parse_node_t **result, parse_node_t *expr, parse
   num_refs = saved_refs;
 }
 
-void rule_function_call_arrow(parse_node_t **result, parse_node_t *expr, char *identifier, parse_node_t *opt_arg_list, LPC_INT saved_context, LPC_INT saved_refs) {
+void rule_function_call_arrow(parse_node_t **result, parse_node_t *expr, const ScratchString *identifier, parse_node_t *opt_arg_list, LPC_INT saved_context, LPC_INT saved_refs) {
   ident_hash_elem_t *ihe;
   int f;
   parse_node_t *pn1, *pn2;
@@ -1296,7 +1245,6 @@ void rule_function_call_arrow(parse_node_t **result, parse_node_t *expr, char *i
   pn2 = new_node_no_line();
   pn2->type = 0;
   CREATE_STRING(pn2->v.expr, identifier);
-  scratch_free(identifier);
 
   pn2->r.expr = opt_arg_list->r.expr;
   pn1->r.expr = pn2;
@@ -1651,25 +1599,22 @@ void rule_expr_add(struct parse_node_t **result, struct parse_node_t *expr1, str
     case NODE_STRING:
       if (expr2->kind == NODE_STRING) {
         LPC_INT n1, n2;
-        const char *s1, *s2;
-        char *news;
-        int l;
 
         n1 = expr1->v.number;
         n2 = expr2->v.number;
-        s1 = PROG_STRING(n1);
-        s2 = PROG_STRING(n2);
-        news = (char *)DMALLOC( (l = strlen(s1))+strlen(s2)+1, TAG_COMPILER, "combine string" );
-        strcpy(news, s1);
-        strcat(news + l, s2);
+        // Fold the two string constants. The joined text is transient --
+        // store_prog_string() copies it into the shared string table --
+        // so build it on the arena (ScratchString): no manual free, and
+        // leak-safe if store_prog_string() unwinds via error().
+        ScratchString joined(PROG_STRING(n1));
+        joined += PROG_STRING(n2);
         if (n1 > n2) {
           free_prog_string(n1); free_prog_string(n2);
         } else {
           free_prog_string(n2); free_prog_string(n1);
         }
         *result = expr1;
-        (*result)->v.number = store_prog_string(news);
-        FREE(news);
+        (*result)->v.number = store_prog_string(joined.c_str());
         break;
       }
       [[fallthrough]];

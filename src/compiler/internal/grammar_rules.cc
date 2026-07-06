@@ -16,7 +16,7 @@ extern int num_refs;      // defined in grammar.autogen.cc (via grammar.y preamb
 
 void rule_program(parse_node_t *program_node) { comp_trees[TREE_MAIN] = program_node; }
 
-bool rule_inheritence(parse_node_t **result_node, int type_mod, char *inherit_file_name) {
+bool rule_inheritence(parse_node_t **result_node, int type_mod, const ScratchString *inherit_file_name) {
   object_t *ob;
   inherit_t inherit;
   int initializer;
@@ -46,13 +46,12 @@ bool rule_inheritence(parse_node_t **result_node, int type_mod, char *inherit_fi
     inherit_file = 0;
     return true;
   }
-  ob = find_object2(inherit_file_name);
+  ob = find_object2(inherit_file_name->c_str());
   if (ob == 0) {
-    inherit_file = alloc_cstring(inherit_file_name, "inherit");
+    inherit_file = alloc_cstring(inherit_file_name->c_str(), "inherit");
     /* Return back to load_object() */
     return true;
   }
-  scratch_free(inherit_file_name);
   inherit.prog = ob->prog;
 
   if (mem_block[A_INHERITS].current_size) {
@@ -100,7 +99,7 @@ bool rule_inheritence(parse_node_t **result_node, int type_mod, char *inherit_fi
   return false;
 }
 
-LPC_INT rule_func_type(LPC_INT type, LPC_INT optional_star, char *identifier) {
+LPC_INT rule_func_type(LPC_INT type, LPC_INT optional_star, const ScratchString *identifier) {
   int flags;
 #ifdef SENSIBLE_MODIFIERS
   int acc_mod;
@@ -142,7 +141,7 @@ LPC_INT rule_func_type(LPC_INT type, LPC_INT optional_star, char *identifier) {
     }
   } else {
     if (pragmas & PRAGMA_STRICT_TYPES) {
-      if (strcmp(identifier, "create") != 0)
+      if (*identifier != "create")
         yyerror("\"#pragma strict_types\" requires type of function");
       else
         exact_types = TYPE_VOID; /* default for create() */
@@ -152,10 +151,14 @@ LPC_INT rule_func_type(LPC_INT type, LPC_INT optional_star, char *identifier) {
   return type;
 }
 
-LPC_INT rule_func_proto(LPC_INT type, LPC_INT optional_star, char **identifier, argument_t argument) {
-  char *p = *identifier;
-  *identifier = (char *)make_shared_string(*identifier);
-  scratch_free(p);
+LPC_INT rule_func_proto(LPC_INT type, LPC_INT optional_star, const ScratchString *identifier,
+                        const char **shared_name_out, argument_t argument) {
+  /* The name changes representation here: the arena string the lexer
+     produced becomes a SHARED string, registered in the function table.
+     *shared_name_out (the value-stack slot's shared_string member) is
+     what rule_func consumes -- the arena original is simply left to the
+     arena's bulk free. */
+  const char *shared = make_shared_string(identifier->c_str());
 
   /* If we had nested functions, we would need to check */
   /* here if we have enough space for locals */
@@ -171,16 +174,17 @@ LPC_INT rule_func_proto(LPC_INT type, LPC_INT optional_star, char **identifier, 
   }
   func_types |= (type >> 16);
 
-  define_new_function(*identifier, argument.num_arg, 0, func_types, (type & 0xffff) | optional_star);
-  /* This is safe since it is guaranteed to be in the
-     function table, so it can't be dangling */
-  free_string(*identifier);
+  define_new_function(shared, argument.num_arg, 0, func_types, (type & 0xffff) | optional_star);
+  /* Dropping our ref is safe: the function table's ref keeps the shared
+     string alive, so *shared_name_out can't be dangling. */
+  free_string(shared);
+  *shared_name_out = shared;
   context = 0;
 
   return func_types;
 }
 
-void rule_func(parse_node_t **function, LPC_INT type, LPC_INT optional_star, char *identifier, argument_t argument, LPC_INT *func_types,
+void rule_func(parse_node_t **function, LPC_INT type, LPC_INT optional_star, const char *identifier, argument_t argument, LPC_INT *func_types,
                parse_node_t **block_or_semi) {
   /* Either a prototype or a block */
   if (*block_or_semi) {
@@ -255,7 +259,7 @@ void rule_func(parse_node_t **function, LPC_INT type, LPC_INT optional_star, cha
   free_all_local_names(!!(*block_or_semi));
 }
 
-ident_hash_elem_t *rule_define_class(LPC_INT *classname_idx_out, char *class_name) {
+ident_hash_elem_t *rule_define_class(LPC_INT *classname_idx_out, const ScratchString *class_name) {
   ident_hash_elem_t *ihe;
 
   ihe = find_or_add_ident(PROG_STRING(*classname_idx_out = store_prog_string(class_name)), FOA_GLOBAL_SCOPE);
@@ -266,7 +270,6 @@ ident_hash_elem_t *rule_define_class(LPC_INT *classname_idx_out, char *class_nam
       yyerror("Too many classes, max is %d.\n", CLASS_NUM_MASK + 1);
     }
 
-    scratch_free(class_name);
     return nullptr;
   } else {
     return ihe;
@@ -376,6 +379,9 @@ void rule_opt_semicolon() {
   yywarn("Extra ';'. Ignored.");
 }
 
-char *rule_string_literal_concat(char *s1, char *s2) {
-  return scratch_join(s1, s2);
+ScratchString *rule_string_literal_concat(ScratchString *s1, ScratchString *s2) {
+  /* Both operands are arena strings consumed by this reduction; append in
+     place and hand s1 back as the merged literal. */
+  *s1 += *s2;
+  return s1;
 }

@@ -13,7 +13,6 @@
 extern int context;
 extern int func_present;
 extern int num_refs;
-extern char *outp;
 
 void rule_switch_pre(LPC_INT *saved_context, LPC_INT *saved_cases_size) {
   *saved_context = context;
@@ -123,9 +122,8 @@ void rule_case_label_constant(parse_node_t **result, LPC_INT val) {
   (*result)->r.number = val;
 }
 
-void rule_case_label_string(parse_node_t **result, char *str) {
+void rule_case_label_string(parse_node_t **result, const ScratchString *str) {
   POINTER_INT p_str = store_prog_string(str);
-  scratch_free(str);
 
   if (context & SWITCH_NUMBERS) {
     yyerror("Mixed case label list not allowed");

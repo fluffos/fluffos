@@ -19,6 +19,8 @@
 #include <vector>
 #include <unordered_map>
 
+#include "compiler/internal/scratchpad.h"
+
 // PpMacro — one macro entry
 struct PpMacro {
     bool is_function_like = false;
@@ -37,21 +39,21 @@ struct PpMacro {
 using LpcMacroTable = std::unordered_map<std::string, PpMacro>;
 
 // Helpers
-std::string normalize_filename(const char* filename);
+ScratchString normalize_filename(const char* filename);
 std::string_view trim(std::string_view s);
-std::string strip_directive_comments(std::string_view s);
-std::string stringize(std::string_view s);
-std::vector<std::string> collect_args(std::string_view text, size_t& i);
+ScratchString strip_directive_comments(std::string_view s);
+ScratchString stringize(std::string_view s);
+ScratchVector<ScratchString> collect_args(std::string_view text, size_t& i);
 // Parameter substitution (with # stringize marking and ## paste in its
 // second pass). `args` are the RAW argument spellings -- what # and ##
 // operands receive (C semantics). `expanded_args`, when non-null,
 // supplies the macro-expanded form used for every OTHER parameter
 // reference (C's argument pre-expansion); null = raw everywhere (the
 // textual directive-side path, which pre-expands before calling).
-std::string substitute(std::string_view body,
-                       const std::vector<std::string>& params,
-                       const std::vector<std::string>& args,
-                       const std::vector<std::string>* expanded_args = nullptr);
+ScratchString substitute(std::string_view body,
+                         const std::vector<std::string>& params,
+                         const ScratchVector<ScratchString>& args,
+                         const ScratchVector<ScratchString>* expanded_args = nullptr);
 
 // #if/#elif integer expression evaluator over TOKENS: pushes `expr` as a
 // LPC_BUF_IF_EXPR buffer, pulls tokens through the scanner itself
@@ -130,7 +132,7 @@ bool lpc_lex_handle_include(std::string_view rest, void *yyscanner);
 // (lpc_lex_resolve_identifier pushes the RAW substituted body as a Flex
 // buffer) and #if/#elif expressions are evaluated over TOKENS
 // (lpc_lex_eval_if_expr below).
-std::string lpc_lex_expand_string(std::string_view text, std::vector<std::string> guard = {});
+ScratchString lpc_lex_expand_string(std::string_view text, ScratchVector<ScratchString> guard = {});
 
 // __LINE__/__FILE__/__DIR__ expand from the compiler's LIVE position
 // (current_line/current_file) -- one line counter, one file name is the
@@ -138,6 +140,6 @@ std::string lpc_lex_expand_string(std::string_view text, std::vector<std::string
 // one of them. Filenames are normalized to the mudlib-absolute "/path"
 // form (the old preprocessor normalized at construction; the compiler's
 // current_file lacks the leading '/').
-bool lpc_lex_builtin_macro(std::string_view name, std::string* out);
+bool lpc_lex_builtin_macro(std::string_view name, ScratchString* out);
 
 #endif // LEXER_RULES_PP_H

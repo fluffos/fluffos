@@ -30,11 +30,15 @@
 
 %start all
 
+/* Make the generated grammar.autogen.h self-sufficient for the %union:
+ * the `string` member is a ScratchString* (arena string, scratchpad.h). */
+%code requires {
+#include "compiler/internal/scratchpad.h"
+}
+
 %{
 #include "base/std.h"
 #include "compiler/internal/grammar_rules.h"
-
-extern char *outp;
 
 /*
  * LPC grammar — parse-tree generator.
@@ -163,7 +167,13 @@ void yyerror(void *yyscanner, const char *msg);
 {
   LPC_INT number;              /* integers, opcodes, type flags */
   LPC_FLOAT real;              /* floating-point literals */
-  char *string;                /* scratch-allocated string */
+  ScratchString *string;       /* arena string: compile-lifetime, bulk-freed */
+  const char *shared_string;   /* SHARED string (stralloc): ref-counted, its
+                                * ref held elsewhere (e.g. the function
+                                * table). Distinct member so a slot's
+                                * scratch-vs-shared lifetime is visible in
+                                * the grammar ($<shared_string>x), never
+                                * silently overloaded onto `string`. */
   argument_t argument;         /* function parameter list metadata */
   ident_hash_elem_t *ihe;      /* symbol-table entry for a known name */
   parse_node_t *node;          /* parse-tree node (most non-terminals) */
@@ -284,14 +294,20 @@ def:
  *   4: after  type optional_star identifier  -- establish function type
  *   8: after  '(' argument ')'              -- register prototype
  *   9: block_or_semi                        -- the body (or ';' prototype)
- */
+ *
+ * The [id] slot changes REPRESENTATION at f_proto: it starts as the
+ * arena string the lexer produced ($id, ScratchString*), and
+ * rule_func_proto registers the prototype under a SHARED string whose
+ * ref the function table holds -- written back into the slot's separate
+ * shared_string member ($<shared_string>id), which is what rule_func
+ * consumes. The two union members keep that transition explicit. */
 function:
   type optional_star identifier[id]
     { $<number>$ = rule_func_type($type, $optional_star, $id); } [f_type]
   '(' argument ')'
-    { $<number>$ = rule_func_proto($<number>f_type, $optional_star, &$id, $argument); } [f_proto]
+    { $<number>$ = rule_func_proto($<number>f_type, $optional_star, $id, &$<shared_string>id, $argument); } [f_proto]
   block_or_semi
-    { rule_func(&$$, $<number>f_type, $optional_star, $id, $argument, &$<number>f_proto, &$block_or_semi); }
+    { rule_func(&$$, $<number>f_type, $optional_star, $<shared_string>id, $argument, &$<number>f_proto, &$block_or_semi); }
 ;
 
 /* The body of a function: a {block} or ';' for forward prototypes. */

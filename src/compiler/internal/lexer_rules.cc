@@ -35,8 +35,8 @@ const char *literal_kind(bool is_template) { return is_template ? "template lite
 
 }  // namespace
 
-std::string lpc_strip_underscores(const char *text, int len) {
-  std::string s(text, len);
+ScratchString lpc_strip_underscores(const char *text, int len) {
+  ScratchString s(text, len);
   s.erase(std::remove(s.begin(), s.end(), '_'), s.end());
   return s;
 }
@@ -49,6 +49,11 @@ void lpc_lex_brace_open(void *yyscanner) {
 }
 
 void lpc_lex_reset_context(struct compiler_context_t *ctx) {
+  // Fresh compile: the previous compile's scratch_destroy freed these
+  // accumulators' arena buffers, so drop the dangling capacity before
+  // any use (deallocating into the reset arena is a harmless no-op).
+  ctx->str_accum = ScratchString();
+  ctx->heredoc_terminator = ScratchString();
   ctx->template_is_continuation = false;
   ctx->template_nesting = 0;
   // An aborted compile can strand the #if evaluator's suppression flag;
@@ -140,7 +145,7 @@ int lpc_lex_accum_overflow(void *yyscanner, union YYSTYPE *yylval_param, bool in
     lexerror("Invalid UTF8 string");
     tok = YYerror;
   } else {
-    yylval_param->string = scratch_copy(ctx->str_accum.c_str());
+    yylval_param->string = scratch_new_string(std::string_view(ctx->str_accum));
     tok = L_STRING;
   }
   // See the header comment: an abandoned MIDDLE/TAIL fragment must undo
@@ -267,7 +272,7 @@ int lpc_lex_string_close(void *yyscanner, union YYSTYPE *yylval_param) {
     lexerror("Invalid UTF8 codepoint in string literal");
     return YYerror;
   }
-  yylval_param->string = scratch_copy(ctx->str_accum.c_str());
+  yylval_param->string = scratch_new_string(std::string_view(ctx->str_accum));
   return L_STRING;
 }
 
@@ -278,18 +283,11 @@ int lpc_lex_template_head_or_middle(void *yyscanner, union YYSTYPE *yylval_param
     lexerror("Invalid UTF8 codepoint in template literal");
     return YYerror;
   }
-  {
-    // scratch_large_alloc(), not scratch_copy(): a template fragment's
-    // value sits on the parser's value stack for as long as it takes to
-    // scan the whole ${...} expression that follows it (which can itself
-    // contain more string/template literals) -- scratch_copy()'s small
-    // ring buffer would get overwritten by those first. See lex.l's rule
-    // comment for the real bug this fixed.
-    size_t slen = ctx->str_accum.size() + 1;
-    char *res = scratch_large_alloc(static_cast<int>(slen));
-    memcpy(res, ctx->str_accum.c_str(), slen);
-    yylval_param->string = res;
-  }
+  // Place the fragment on the arena; the ScratchString* stays valid on
+  // the value stack until scratch_destroy while the ${...} expression
+  // scans (each fragment gets its own stable arena object, so tokens
+  // scanned inside the interpolation can't overwrite it).
+  yylval_param->string = scratch_new_string(std::string_view(ctx->str_accum));
   if (!ctx->template_is_continuation) {
     ctx->template_nesting++;
     if (ctx->template_nesting >= MAX_TEMPLATE_NESTING) {
@@ -313,14 +311,11 @@ int lpc_lex_template_tail_or_string(void *yyscanner, union YYSTYPE *yylval_param
     return YYerror;
   }
   if (ctx->template_is_continuation) {
-    size_t slen = ctx->str_accum.size() + 1;
-    char *res = scratch_large_alloc(static_cast<int>(slen));
-    memcpy(res, ctx->str_accum.c_str(), slen);
-    yylval_param->string = res;
+    yylval_param->string = scratch_new_string(std::string_view(ctx->str_accum));
     ctx->template_nesting--;
     return L_TEMPLATE_TAIL;
   }
-  yylval_param->string = scratch_copy(ctx->str_accum.c_str());
+  yylval_param->string = scratch_new_string(std::string_view(ctx->str_accum));
   return L_STRING;
 }
 

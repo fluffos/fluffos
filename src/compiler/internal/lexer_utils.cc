@@ -585,8 +585,11 @@ void pop_function_context() {
 
 namespace {
 struct ExpansionFrame {
-  std::string name;
-  std::string def_file;
+  // Arena strings: frames are per-compile transients (cleared in
+  // start_new_file before the next compile touches the arena; their text
+  // is COPIED into Diagnostic std::strings at capture time).
+  ScratchString name;
+  ScratchString def_file;
   int def_line;
   int invocation_line;    // real-file line of the macro USE
   int invocation_column;  // 1-based start column of the name token
@@ -639,7 +642,7 @@ void lpc_lex_note_buffer_pop(int ending_lineno) {
 // buffer-lifetime self-reference guard that supersedes the old
 // per-occurrence blue paint. Dead (lingering, diagnostics-only) frames
 // deliberately do NOT guard.
-static bool lpc_lex_name_guarded(const std::string &name) {
+static bool lpc_lex_name_guarded(std::string_view name) {
   for (const auto &f : expansion_frames) {
     if (f.live && f.name == name) {
       return true;
@@ -659,10 +662,11 @@ static bool lpc_lex_name_guarded(const std::string &name) {
 // line plus the name token's start column, snapshotted by YY_USER_ACTION
 // when the identifier matched (argument collection in between doesn't
 // disturb it -- raw reads run no user action).
-static void push_expansion_frame(const std::string &name, const PpMacro &m,
+static void push_expansion_frame(std::string_view name, const PpMacro &m,
                                  int invocation_column) {
-  expansion_frames.push_back(
-      ExpansionFrame{name, m.def_file, m.def_line, current_line, invocation_column, true});
+  expansion_frames.push_back(ExpansionFrame{ScratchString(name),
+                                            ScratchString(std::string_view(m.def_file)),
+                                            m.def_line, current_line, invocation_column, true});
 }
 
 // Dead frames deliberately LINGER instead of vanishing at their buffer's
@@ -684,8 +688,11 @@ static void purge_exhausted_expansions() {
 std::vector<LpcExpansionSite> lpc_lex_expansion_chain(void) {
   std::vector<LpcExpansionSite> out;
   for (auto it = expansion_frames.rbegin(); it != expansion_frames.rend(); ++it) {
-    out.push_back(LpcExpansionSite{it->name, it->def_file, it->def_line, it->invocation_line,
-                                   it->invocation_column});
+    // Diagnostic capture: copy the arena frame text into the persistent
+    // std::string site (diags outlive the compile/arena).
+    out.push_back(LpcExpansionSite{std::string(it->name.data(), it->name.size()),
+                                   std::string(it->def_file.data(), it->def_file.size()),
+                                   it->def_line, it->invocation_line, it->invocation_column});
   }
   return out;
 }
@@ -730,11 +737,16 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yyll
   // Copy yytext up front, before ANY lpc_lex_getc(): a getc can pop the
   // splice buffer that yytext points into (freeing it), so every later
   // use of the identifier's spelling must go through this copy.
-  const std::string text = yyget_text(yyscanner);
+  const ScratchString text(yyget_text(yyscanner));
   if (current_session && !yyextra->suppress_expansion && !lpc_lex_name_guarded(text)) {
     // (A name guarded by a live expansion buffer resolves as a plain
     // identifier -- self-reference termination, C-preprocessor style.)
-    auto it = current_session->macros.find(text);
+    // The macro table stays std::string-keyed (persistent global state);
+    // one reused key avoids a heap allocation per identifier. The
+    // compiler is single-threaded and non-reentrant.
+    static std::string macro_lookup_key;
+    macro_lookup_key.assign(text.data(), text.size());
+    auto it = current_session->macros.find(macro_lookup_key);
     if (it != current_session->macros.end()) {
       const PpMacro& m = it->second;
       if (static_cast<int>(expansion_frames.size()) >= MAX_EXPANSION_NESTING) {
@@ -753,10 +765,10 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yyll
         // in the PARENT input (`#define APPLY F` + `APPLY(3)`), and the
         // argument collector reads through lpc_lex_getc(), which drains
         // the expansion buffer and pops through to the parent.
-        std::string expanded;
+        ScratchString expanded;
         bool is_builtin = lpc_lex_builtin_macro(text, &expanded);
         if (!is_builtin) {
-          expanded = m.body;
+          expanded.assign(m.body.data(), m.body.size());
         }
 
         if (!expanded.empty()) {
@@ -803,8 +815,8 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yyll
         }
 
         if (c == '(') {
-          std::vector<std::string> args;
-          std::string arg;
+          ScratchVector<ScratchString> args;
+          ScratchString arg;
           int depth = 0;
           char inq = 0;
           while (true) {
@@ -840,13 +852,13 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yyll
               arg += ch;
             } else if (ch == ')') {
               if (depth == 0) {
-                args.push_back(std::string(trim(arg)));
+                args.emplace_back(trim(arg));
                 break;
               }
               depth--;
               arg += ch;
             } else if (ch == ',' && depth == 0) {
-              args.push_back(std::string(trim(arg)));
+              args.emplace_back(trim(arg));
               arg.clear();
             } else {
               // A raw newline in an argument was already counted above --
@@ -871,12 +883,12 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yyll
           // exactly C's "arguments are fully expanded first" step; it is
           // what lets SECOND(1, SECOND(2, 3))'s inner SECOND expand even
           // while the outer SECOND's buffer guards the name).
-          std::vector<std::string> expanded_args;
+          ScratchVector<ScratchString> expanded_args;
           expanded_args.reserve(args.size());
           for (const auto &a : args) {
             expanded_args.push_back(lpc_lex_expand_string(a));
           }
-          std::string expanded = substitute(m.body, m.params, args, &expanded_args);
+          ScratchString expanded = substitute(m.body, m.params, args, &expanded_args);
 
           if (!expanded.empty()) {
             push_expansion_frame(text, m, yyextra->token_start_column + 1);
@@ -908,7 +920,7 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yyll
     yylval_param->ihe = ihe;
     return L_DEFINED_NAME;
   }
-  yylval_param->string = scratch_copy(text.c_str());
+  yylval_param->string = scratch_new_string(std::string_view(text));
   return L_IDENTIFIER;
 }
 
@@ -945,13 +957,13 @@ int parseHeredoc(const char *terminator, int is_array, union YYSTYPE *yylval_par
   // Legacy capacity: NUMCHUNKS chunks of MAXCHUNK bytes == DEFMAX total.
   const size_t max_block = DEFMAX;
 
-  std::string text;                // text form: raw body, newlines included
-  std::vector<std::string> lines;  // array form: raw body lines
+  ScratchString text;                  // text form: raw body, newlines included
+  ScratchVector<ScratchString> lines;  // array form: raw body lines
   size_t total = 0;
 
   for (;;) {
     // One physical line; trailing CR stripped (CRLF input).
-    std::string line;
+    ScratchString line;
     int c;
     while ((c = lpc_lex_getc(yyscanner)) > 0 && c != '\n') {
       line += static_cast<char>(c);
@@ -974,7 +986,7 @@ int parseHeredoc(const char *terminator, int is_array, union YYSTYPE *yylval_par
         // Trailing content after the terminator: push it (and the line's
         // newline, which is then counted at rescan) back for normal
         // scanning.
-        std::string rest = line.substr(termlen);
+        ScratchString rest = line.substr(termlen);
         if (saw_newline) {
           rest += '\n';
         }
@@ -1014,7 +1026,7 @@ int parseHeredoc(const char *terminator, int is_array, union YYSTYPE *yylval_par
     // deliberately carry no newline: each body line was already counted
     // above, so the splice must not make the rescan count those lines
     // again.
-    std::string splice = "({ ";
+    ScratchString splice("({ ");
     splice.reserve(total + lines.size() * 4 + 6);
     for (const auto &l : lines) {
       splice += '"';
@@ -1039,9 +1051,7 @@ int parseHeredoc(const char *terminator, int is_array, union YYSTYPE *yylval_par
     lexerror("Bad UTF-8 string in string block");
     return yylex(yylval_param, yylloc_param, yyscanner);
   }
-  char *res = scratch_large_alloc(static_cast<int>(text.size() + 1));
-  memcpy(res, text.c_str(), text.size() + 1);
-  yylval_param->string = res;
+  yylval_param->string = scratch_new_string(std::string_view(text));
   return L_STRING;
 }
 
@@ -2009,14 +2019,14 @@ std::pair<int, std::string> inc_open(std::string_view name, bool check_local) {
 }
 
 bool lpc_lex_handle_include(std::string_view rest, void *yyscanner) {
-  std::string name_expr(trim(rest));
+  ScratchString name_expr(trim(rest));
   if (name_expr.empty()) {
     lexerror("Bad #include directive");
     return false;
   }
   if (name_expr[0] != '"' && name_expr[0] != '<') {
     name_expr = lpc_lex_expand_string(name_expr);
-    name_expr = std::string(trim(name_expr));
+    name_expr = ScratchString(trim(name_expr));
   }
   if (name_expr.size() >= 2 && (name_expr[0] == '"' || name_expr[0] == '<')) {
     char delim = name_expr[0] == '"' ? '"' : '>';

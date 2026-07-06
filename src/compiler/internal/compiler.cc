@@ -595,7 +595,7 @@ int lookup_any_class_member(char *name, unsigned short *type) {
 // dot/arrow member-access rules to decide whether to fall back to dynamic
 // mapping-key access (F_MAP_MEMBER) instead of reporting a class-member
 // error, for callers where "not a class member" isn't necessarily wrong.
-int lookup_any_class_member_soft(char *name, unsigned short *type) {
+int lookup_any_class_member_soft(const char *name, unsigned short *type) {
   int nc = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
   int i, ret = -1, nret;
   const char *s = findstring(name);
@@ -618,7 +618,7 @@ int lookup_any_class_member_soft(char *name, unsigned short *type) {
   return ret;
 }
 
-int lookup_class_member(int which, char *name, unsigned short *type) {
+int lookup_class_member(int which, const char *name, unsigned short *type) {
   const char *s = findstring(name);
   int ret;
 
@@ -658,7 +658,7 @@ parse_node_t *reorder_class_values(int which, parse_node_t *node) {
         tmp[i] = node->v.expr;
       }
     }
-    scratch_free(reinterpret_cast<char *>(node->l.expr));
+    /* node->l.expr is an arena c_str (see rule_class_init); bulk-freed. */
 
     node = node->r.expr;
   }
@@ -1155,10 +1155,10 @@ static int find_matching_function(program_t *prog, const char *name, parse_node_
   return 0;
 }
 
-int arrange_call_inherited(char *name, parse_node_t *node) {
+int arrange_call_inherited(const char *name, parse_node_t *node) {
   inherit_t *ip;
   int num_inherits, super_length;
-  char *super_name, *p, *real_name = name;
+  const char *super_name, *p, *real_name = name;
   const char *shared_string;
   int ret;
   std::vector<std::string> names;

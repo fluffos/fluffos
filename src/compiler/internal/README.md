@@ -108,7 +108,7 @@ graph TB
 - **`lexer_rules.cc`, `lexer_rules.h`**: token-shaping logic behind `lex.l`'s rule actions (see Module 3).
 - **`lexer_rules_pp.cc`, `lexer_rules_pp.h`**: preprocessing logic behind `lex.l`'s directive rule (see Module 2).
 - **`compiler_utils.cc`, `compiler_utils.h`**: compiler-wide diagnostics (`report_compile_diagnostic()` renders the structured `Diagnostic` records clang-style -- include chains, expansion notes -- as the driver's default output; `smart_log()` remains for runtime trace warnings) and system instruction setup (`init_instrs`).
-- **`scratchpad.cc`, `scratchpad.h`**: high-performance scratch memory arena for temporary compile allocations.
+- **`scratchpad.cc`, `scratchpad.h`**: the compile-lifetime **monotonic bump arena**. Allocation is a pointer bump, individual deallocation is a no-op, and `scratch_destroy()` bulk-frees everything at compile end (which is what makes every `error()` unwind path leak-free with zero per-allocation ownership plumbing). Build every transient compile string as a **`ScratchString`** (`std::basic_string` over `ScratchAllocator`; `ScratchVector<T>` likewise) and materialize a parser token with `scratch_new_string()` — the Bison `%union`'s `string` member is a `ScratchString *` whose object itself lives in the arena, and shared strings on the value stack use the union's separate `shared_string` member so the two lifetimes are type-distinguished (see the `function` production). Anything that outlives the compile (macro table, predefines, `Diagnostic` records, program data) must NOT live on the arena — copy out at the boundary. Arena-backed objects stored in memory that survives the compile (the scanner context's accumulators) are re-initialized per compile in `lpc_lex_reset_context()`.
 
 ---
 

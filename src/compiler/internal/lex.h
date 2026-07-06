@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "compiler/internal/LexStream.h"
+#include "compiler/internal/scratchpad.h"
 
 #define DEFMAX 65536  // at least 4 times MAXLINE
 #define MAXLINE 4096
@@ -95,8 +96,11 @@ struct compiler_context_t {
   int template_nesting = 0;
   int template_brace_depth[MAX_TEMPLATE_NESTING] = {0};
   bool template_is_continuation = false;
-  std::string str_accum;
-  std::string heredoc_terminator;
+  // Arena-backed accumulators (compile-lifetime buffers). Their buffers
+  // die at scratch_destroy while this context object survives (scanner
+  // reuse), so lpc_lex_reset_context() re-initializes them per compile.
+  ScratchString str_accum;
+  ScratchString heredoc_terminator;
   bool heredoc_is_array = false;
   // Nesting depth of #if/#ifdef directives seen INSIDE a dead branch while
   // in SC_COND_SKIP (the real conditional stack lives in LexerSession).
