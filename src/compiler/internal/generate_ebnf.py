@@ -187,20 +187,173 @@ def build_ebnf(xml_path: str) -> str:
     return "\n".join(lines)
 
 
+# ---------------------------------------------------------------------------
+# Machine-readable grammar contract (lpc-grammar.json).
+#
+# TOKEN_SPEC categorizes every terminal grammar.y uses and records its
+# concrete source spellings (source of truth: lexer.l's operator rules and
+# lexer_utils.cc's reserved-word table). emit_grammar_json() asserts full
+# coverage of the XML's terminal list, so adding a token to grammar.y
+# without updating this spec is a regeneration ERROR -- the freshness
+# guarantee for the JS tooling built on the JSON.
+# ---------------------------------------------------------------------------
+TOKEN_SPEC = {
+    # literals / names
+    "L_STRING": ("string", None), "L_NUMBER": ("number", None),
+    "L_REAL": ("number", None),
+    "L_TEMPLATE_HEAD": ("string", None), "L_TEMPLATE_MIDDLE": ("string", None),
+    "L_TEMPLATE_TAIL": ("string", None),
+    "L_IDENTIFIER": ("identifier", None), "L_DEFINED_NAME": ("identifier", None),
+    "L_PARAMETER": ("identifier", None),
+    # keyword families (spellings from lexer_utils.cc reswords[])
+    "L_BASIC_TYPE": ("type", ["buffer", "float", "function", "int", "mapping",
+                              "mixed", "object", "string", "void"]),
+    "L_TYPE_MODIFIER": ("modifier", ["nomask", "nosave", "private", "protected",
+                                     "public", "static", "varargs"]),
+    "L_IF": ("keyword", ["if"]), "L_ELSE": ("keyword", ["else"]),
+    "L_SWITCH": ("keyword", ["switch"]), "L_CASE": ("keyword", ["case"]),
+    "L_DEFAULT": ("keyword", ["default"]), "L_WHILE": ("keyword", ["while"]),
+    "L_DO": ("keyword", ["do"]), "L_FOR": ("keyword", ["for"]),
+    "L_FOREACH": ("keyword", ["foreach"]), "L_IN": ("keyword", ["in"]),
+    "L_BREAK": ("keyword", ["break"]), "L_CONTINUE": ("keyword", ["continue"]),
+    "L_RETURN": ("keyword", ["return"]), "L_INHERIT": ("keyword", ["inherit"]),
+    "L_CATCH": ("keyword", ["catch"]), "L_NEW": ("keyword", ["new"]),
+    "L_CLASS": ("keyword", ["class"]), "L_EFUN": ("keyword", ["efun"]),
+    "L_SSCANF": ("keyword", ["sscanf"]),
+    "L_PARSE_COMMAND": ("keyword", ["parse_command"]),
+    "L_TIME_EXPRESSION": ("keyword", ["time_expression"]),
+    "L_ARRAY": ("keyword", ["array"]), "L_REF": ("keyword", ["ref"]),
+    "L_TREE": ("keyword", ["__TREE__"]),
+    # multi-character operators (spellings from lexer.l)
+    "L_ASSIGN": ("operator", ["=", "+=", "-=", "*=", "/=", "%=", "&=", "|=",
+                              "^=", "<<=", ">>=", "&&=", "||=", "??="]),
+    "L_INC_DEC": ("operator", ["++", "--"]),
+    "L_LAND": ("operator", ["&&"]), "L_LOR": ("operator", ["||"]),
+    "L_QUESTION_QUESTION": ("operator", ["??"]),
+    "L_SHIFT": ("operator", ["<<", ">>"]),
+    "L_EQ_NE": ("operator", ["==", "!="]),
+    "L_ORDER": ("operator", [">", ">=", "<="]),
+    "L_ARROW": ("operator", ["->"]), "L_COLON_COLON": ("operator", ["::"]),
+    "L_RANGE": ("operator", [".."]), "L_DOT_DOT_DOT": ("operator", ["..."]),
+    "L_OPTIONAL_DOT": ("operator", ["?."]), "L_DOT_OPTIONAL": ("operator", [".?"]),
+    "L_FUNCTION_OPEN": ("operator", ["(:"]),
+    # bison-internal
+    "$end": ("internal", None), "error": ("internal", None),
+    "LOWER_THAN_ELSE": ("internal", None),
+}
+
+PREPROCESSOR_DIRECTIVES = ["define", "undef", "include", "if", "ifdef",
+                           "ifndef", "elif", "else", "endif", "pragma",
+                           "line", "echo", "error", "warn"]
+BUILTIN_MACROS = ["__LINE__", "__FILE__", "__DIR__"]
+
+
+def emit_grammar_json(xml_path, json_path):
+    import json
+    tree = ET.parse(xml_path)
+    terminals = []
+    for t in tree.iter("terminal"):
+        name = t.get("name")
+        if name:
+            terminals.append(name)
+
+    keywords, types, modifiers, operators, punctuation = [], [], [], [], []
+    tokens = {}
+    unknown = []
+    for name in terminals:
+        if name.startswith("'") and name.endswith("'"):
+            punctuation.append(name[1:-1])
+            continue
+        spec = TOKEN_SPEC.get(name)
+        if spec is None:
+            unknown.append(name)
+            continue
+        category, spellings = spec
+        tokens[name] = {"category": category}
+        if spellings:
+            tokens[name]["spellings"] = spellings
+            if category == "keyword":
+                keywords.extend(spellings)
+            elif category == "type":
+                types.extend(spellings)
+            elif category == "modifier":
+                modifiers.extend(spellings)
+            elif category == "operator":
+                operators.extend(spellings)
+    if unknown:
+        print("ERROR: grammar.y grew tokens the grammar spec does not know: "
+              + ", ".join(sorted(unknown))
+              + "\n       Update TOKEN_SPEC in generate_ebnf.py (and the "
+              + "lexical layer / JS tooling if user-visible).", file=sys.stderr)
+        sys.exit(1)
+
+    # Longest-match order for tokenizers; ":)" closes "(:" functionals.
+    operators = sorted(set(operators + [":)"]), key=len, reverse=True)
+
+    productions = []
+    for rule in tree.iter("rule"):
+        lhs = rule.findtext("lhs")
+        if lhs is None or is_internal(lhs):
+            continue
+        rhs = [sym.text for sym in rule.find("rhs")
+               if sym.tag == "symbol" and sym.text and not is_internal(sym.text)]
+        productions.append({"lhs": lhs, "rhs": rhs})
+
+    data = {
+        "version": 1,
+        "generator": "src/compiler/internal/generate_ebnf.py",
+        "keywords": sorted(set(keywords)),
+        "typeKeywords": sorted(set(types)),
+        "modifierKeywords": sorted(set(modifiers)),
+        "operators": operators,
+        "punctuation": sorted(set(punctuation)),
+        "directives": PREPROCESSOR_DIRECTIVES,
+        "builtinMacros": BUILTIN_MACROS,
+        "tokens": tokens,
+        "productions": productions,
+    }
+    print(f"Writing {json_path} ...")
+    with open(json_path, "w") as f:
+        json.dump(data, f, indent=2, sort_keys=False)
+        f.write("\n")
+
+
 def main():
-    if len(sys.argv) != 3:
-        print(f"Usage: {sys.argv[0]} <grammar.xml> <grammar.ebnf>", file=sys.stderr)
+    if len(sys.argv) not in (3, 4):
+        print(f"Usage: {sys.argv[0]} <grammar.xml> <grammar.ebnf> [lpc-grammar.json]", file=sys.stderr)
         sys.exit(1)
 
     xml_path  = sys.argv[1]
     ebnf_path = sys.argv[2]
+    json_path = sys.argv[3] if len(sys.argv) > 3 else None
+    lexical_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "grammar_lexical.ebnf.in")
 
     if not os.path.isfile(xml_path):
         print(f"ERROR: XML file not found: {xml_path}", file=sys.stderr)
         sys.exit(1)
 
     print(f"Streaming {xml_path} ...")
-    ebnf_content = build_ebnf(xml_path)
+    syntax_layer = build_ebnf(xml_path)
+
+    # Compose the three layers: hand-authored lexical + preprocessor
+    # (grammar_lexical.ebnf.in -- regeneration can never lose them), then
+    # the bison-derived syntax layer.
+    with open(lexical_path) as f:
+        lexical_layer = f.read()
+    ebnf_content = (lexical_layer.rstrip() + "\n\n"
+                    + "(* " + "=" * 76 + "\n"
+                    + "   Layer 3: SYNTAX GRAMMAR (generated from grammar.y via bison --xml).\n"
+                    + "   Do not edit -- regenerate with the generate_ebnf CMake target.\n"
+                    + "   " + "=" * 76 + " *)\n\n"
+                    + syntax_layer.split("*)", 1)[1].lstrip("\n"))
+
+    # Machine-readable contract for JS tooling (lpc-grammar.json):
+    # verifies every terminal in grammar.y is categorized -- a NEW token
+    # without a spec entry fails regeneration loudly, so the artifact can
+    # never silently go stale again.
+    if json_path is not None:
+        emit_grammar_json(xml_path, json_path)
 
     # Optional validation guard
     try:

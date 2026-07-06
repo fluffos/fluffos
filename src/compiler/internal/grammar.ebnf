@@ -1,6 +1,106 @@
 (* ============================================================================
-   LPC Grammar Specification (ISO/IEC 14977 EBNF)
-   Automatically generated from grammar.y. Do not edit directly.
+   Layer 1: LEXICAL GRAMMAR (hand-authored; source of truth: lexer.l and
+   lexer_utils.cc's reserved-word table). generate_ebnf.py includes this
+   file verbatim when composing grammar.ebnf -- edit HERE, not there.
+   ============================================================================ *)
+
+letter = ? [A-Za-z] ? ;
+digit = ? [0-9] ? ;
+hexDigit = ? [0-9A-Fa-f] ? ;
+binDigit = "0" | "1" ;
+
+identifier = ( letter | "_" ), { letter | digit | "_" } ;
+
+(* Underscores are legal digit separators in every numeric form. *)
+decimalNumber = digit, { digit | "_" } ;
+hexNumber = "0", ( "x" | "X" ), hexDigit, { hexDigit | "_" } ;
+binaryNumber = "0", ( "b" | "B" ), binDigit, { binDigit | "_" } ;
+integerLiteral = hexNumber | binaryNumber | decimalNumber ;
+realLiteral = decimalNumber, ".", { digit | "_" }
+            | decimalNumber, ".", { digit | "_" }, ( "e" | "E" ), [ "+" | "-" ], decimalNumber ;
+
+escapeSequence = "\\", ( "n" | "t" | "r" | "b" | "a" | "e" | '"' | "'" | "`" | "$" | "\\" )
+               | "\\", "x", hexDigit, [ hexDigit ]
+               | "\\", "u", hexDigit, hexDigit, hexDigit, hexDigit
+               | "\\", ? octal digits ? ;
+
+stringLiteral = '"', { ? any character except '"', newline ? | escapeSequence | "\\", ? newline ? }, '"' ;
+characterLiteral = "'", ( ? any single character ? | escapeSequence ), "'" ;
+
+(* Template literals: backtick strings with ${ expression } interpolation.
+   A backtick string with no interpolation lexes as a plain stringLiteral. *)
+templateLiteral = "`", { templateChar }, [ "${", ? expression ?, "}",
+                  { templateChar }, "`" ] ;
+templateChar = ? any character except "`", "$" ? | escapeSequence ;
+
+(* Text blocks (heredocs): @terminator...terminator (single string) and
+   @@terminator...terminator (array of one string per line). The
+   terminator is any identifier; the block ends on a line beginning with
+   it. *)
+textBlock = "@", identifier, ? newline ?, ? raw lines ?, identifier ;
+textArrayBlock = "@@", identifier, ? newline ?, ? raw lines ?, identifier ;
+
+lineComment = "//", { ? any character except newline ? } ;
+blockComment = "/*", { ? any character sequence not containing "*/" ? }, "*/" ;
+
+keywordControl = "break" | "case" | "catch" | "continue" | "default" | "do"
+               | "efun" | "else" | "for" | "foreach" | "if" | "in"
+               | "inherit" | "new" | "parse_command" | "return" | "sscanf"
+               | "switch" | "time_expression" | "while" | "class" ;
+keywordType = "buffer" | "float" | "function" | "int" | "mapping" | "mixed"
+            | "object" | "string" | "void" ;
+keywordModifier = "nomask" | "nosave" | "private" | "protected" | "public"
+                | "static" | "varargs" ;
+
+functionalOpen = "(:" ;
+functionalClose = ":)" ;
+functionalParameter = "$", decimalNumber ;
+
+(* ============================================================================
+   Layer 2: PREPROCESSOR GRAMMAR (hand-authored; source of truth:
+   lexer_rules_pp.cc). Preprocessing is interleaved with lexing in ONE
+   scan -- directives take effect at exactly their position in the token
+   stream. A '\' at end of line continues any directive line.
+   ============================================================================ *)
+
+directiveLine = ? line start ?, [ ? whitespace ? ], "#", directive ;
+directive = defineDirective | undefDirective | includeDirective
+          | conditionalDirective | pragmaDirective | lineDirective
+          | echoDirective | errorDirective | warnDirective ;
+
+defineDirective = "define", identifier, [ macroParameters ], { ? replacement token ? } ;
+macroParameters = "(", [ identifier, { ",", identifier } ], ")" ;
+(* Inside a replacement list: "#param" stringizes, "a ## b" pastes.
+   Redefinition with a different body is a non-fatal warning. *)
+
+undefDirective = "undef", identifier ;
+
+includeDirective = "include", ( '"', ? file path ?, '"'
+                              | "<", ? file path ?, ">"
+                              | ? macro expanding to either form ? ) ;
+
+conditionalDirective = "if", constantExpression
+                     | "ifdef", identifier
+                     | "ifndef", identifier
+                     | "elif", constantExpression
+                     | "else"
+                     | "endif" ;
+(* constantExpression is evaluated over TOKENS with C precedence:
+   integers, character literals, defined(name), efun_defined(name),
+   arithmetic/bitwise/logical/comparison/ternary operators. *)
+constantExpression = ? integer-valued token expression ? ;
+
+pragmaDirective = "pragma", identifier, { ",", identifier } ;
+lineDirective = "line", decimalNumber, [ '"', ? file path ?, '"' ] ;
+echoDirective = "echo", { ? any token ? } ;
+errorDirective = "error", { ? any token ? } ;
+warnDirective = "warn", { ? any token ? } ;
+
+builtinMacro = "__LINE__" | "__FILE__" | "__DIR__" ;
+
+(* ============================================================================
+   Layer 3: SYNTAX GRAMMAR (generated from grammar.y via bison --xml).
+   Do not edit -- regenerate with the generate_ebnf CMake target.
    ============================================================================ *)
 
 loopStart = "" ;
@@ -87,25 +187,21 @@ expr = ref, lvalue
        | expr, "|", expr
        | expr, "^", expr
        | expr, "&", expr
-       | expr, LEq, expr
-       | expr, LNe, expr
+       | expr, LEqNe, expr
        | expr, LOrder, expr
        | expr, "<", expr
-       | expr, LLsh, expr
-       | expr, LRsh, expr
+       | expr, LShift, expr
        | expr, "+", expr
        | expr, "-", expr
        | expr, "*", expr
        | expr, "%", expr
        | expr, "/", expr
        | cast, expr
-       | LInc, lvalue
-       | LDec, lvalue
-       | LNot, expr
+       | LIncDec, lvalue
+       | "!", expr
        | "~", expr
        | "-", expr
-       | lvalue, LInc
-       | lvalue, LDec
+       | lvalue, LIncDec
        | primaryExpr
        | sscanf
        | parseCommand
@@ -119,13 +215,16 @@ primaryExpr = functionCall
               | LDefinedName
               | LIdentifier
               | LParameter
-              | string
+              | stringLike
               | "(", commaExpr, ")"
               | catch
               | tree
               | "$", "(", dollarStart, commaExpr, ")"
               | primaryExpr, LArrow, identifier
-              | primaryExpr, LDot, identifier
+              | primaryExpr, ".", identifier
+              | primaryExpr, LOptionalDot, identifier
+              | primaryExpr, LOptionalDot, "[", commaExpr, "]"
+              | primaryExpr, LDotOptional, "[", commaExpr, "]"
               | primaryExpr, "[", commaExpr, "]"
               | primaryExpr, "[", "<", commaExpr, "]"
               | primaryExpr, "[", commaExpr, LRange, commaExpr, "]"
@@ -140,9 +239,11 @@ primaryExpr = functionCall
               | lambdaReturnType, "(", argument, ")", block
               | functionalOpen, ":", ")"
               | functionalOpen, ",", argList, ":", ")"
+              | LFunctionOpen, LDefinedName, ":", ")"
+              | LFunctionOpen, LDefinedName, ",", argList, ":", ")"
               | LFunctionOpen, commaExpr, ":", ")"
-              | LMappingOpen, optPairList, "]", ")"
-              | LArrayOpen, optArgList, "}", ")" ;
+              | "(", "[", optPairList, "]", ")"
+              | "(", "{", optArgList, "}", ")" ;
 
 callOpen = "(" ;
 
@@ -279,8 +380,7 @@ newName = optionalStar, identifier
 
 lambdaReturnType = LBasicType ;
 
-functionalOpen = LNewFunctionOpen
-                 | LFunctionOpen, efunOverride ;
+functionalOpen = LFunctionOpen, efunOverride ;
 
 assocPair = expr, ":", expr ;
 
@@ -308,6 +408,15 @@ ref = LRef ;
 
 string = stringLiteral ;
 
+templateLiteral = LTemplateHead, expr, templateParts ;
+
+templateParts = LTemplateTail, { LTemplateMiddle, expr } ;
+
+stringLike = string
+             | templateLiteral
+             | stringLike, string
+             | stringLike, templateLiteral ;
+
 stringLiteral = LString, { LString } ;
 
 stringConst = stringLiteral
@@ -321,12 +430,10 @@ real = LReal ;
 constant = constant, "|", constant
            | constant, "^", constant
            | constant, "&", constant
-           | constant, LEq, constant
-           | constant, LNe, constant
+           | constant, LEqNe, constant
            | constant, LOrder, constant
            | constant, "<", constant
-           | constant, LLsh, constant
-           | constant, LRsh, constant
+           | constant, LShift, constant
            | constant, "+", constant
            | constant, "-", constant
            | constant, "*", constant
@@ -335,5 +442,5 @@ constant = constant, "|", constant
            | "(", constant, ")"
            | LNumber
            | "-", LNumber
-           | LNot, LNumber
+           | "!", LNumber
            | "~", LNumber ;

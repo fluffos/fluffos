@@ -108,6 +108,19 @@ graph TB
 
 ---
 
+## Grammar as a machine contract (`grammar.ebnf`, `lpc-grammar.json`)
+
+`grammar.ebnf` is composed of three layers by `generate_ebnf.py` (CMake
+target `generate_ebnf`): a hand-authored **Lexical** layer and
+**Preprocessor** layer (`grammar_lexical.ebnf.in` — terminals, escapes,
+templates, text blocks, directive grammar; regeneration never loses
+them) plus the **Syntax** layer generated from `grammar.y` via
+`bison --xml`. The same run emits `tools/lpc-syntax/lpc-grammar.json` —
+keywords/operators/punctuation/directives/productions — which drives the
+dependency-free JS tokenizer, syntax highlighter, and formatter in
+`tools/lpc-syntax/`. The generator asserts every `grammar.y` terminal is
+categorized, so the artifacts cannot silently go stale.
+
 ## Staged outputs: `lpcc -E | --tokens | --ast | -O0`
 
 Every stage of the pipeline can be dumped: `-E` renders the preprocessed
