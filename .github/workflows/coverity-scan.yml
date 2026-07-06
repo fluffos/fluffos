@@ -11,13 +11,7 @@ on:
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        build: ["Debug", "RelWithDebInfo"]
-        os: ["ubuntu-latest"]
-
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v4
@@ -29,7 +23,7 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DPACKAGE_DB_SQLITE=2 ..
+          cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DPACKAGE_DB_SQLITE=2 ..
       - name: Download Coverity Build Tool
         run: |
           wget -q https://scan.coverity.com/download/cxx/linux64 --post-data "token=$TOKEN&project=fluffos%2Ffluffos" -O cov-analysis-linux64.tar.gz
@@ -47,12 +41,11 @@ jobs:
           cd build
           tar czvf fluffos.tgz cov-int
           curl \
-            --form project=fluffos \
             --form token=$TOKEN \
             --form email=sunyucong@gmail.com \
             --form file=@fluffos.tgz \
-            --form version="`git rev-parse HEAD` - ${{ matrix.build }}" \
-            --form description="`git rev-parse HEAD` - ${{ matrix.build }}" \
+            --form version="`git rev-parse HEAD`" \
+            --form description="`git rev-parse HEAD`" \
             https://scan.coverity.com/builds?project=fluffos%2Ffluffos
         env:
           TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}

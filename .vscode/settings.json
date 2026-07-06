@@ -20,5 +20,5 @@
       "MSYS2_PATH_TYPE": "inherit"
     }
   },
-  "cmake.buildArgs": ["--verbose"]
+  "cmake.buildArgs": ["--verbose", "--parallel", "6"]
 }

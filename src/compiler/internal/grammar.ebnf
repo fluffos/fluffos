@@ -1,0 +1,339 @@
+(* ============================================================================
+   LPC Grammar Specification (ISO/IEC 14977 EBNF)
+   Automatically generated from grammar.y. Do not edit directly.
+   ============================================================================ *)
+
+loopStart = "" ;
+
+foreachStart = "" ;
+
+blockStart = "" ;
+
+specialContextStart = "" ;
+
+dollarStart = "" ;
+
+all = program ;
+
+program = { def, optSemicolon } ;
+
+optSemicolon = ""
+               | ";" ;
+
+def = function
+      | type, nameList, ";"
+      | inheritance
+      | typeDecl
+      | modifierChange ;
+
+function = type, optionalStar, identifier, "(", argument, ")", blockOrSemi ;
+
+blockOrSemi = block
+              | ";"
+              | error ;
+
+statement = commaExpr, ";"
+            | stmtCond
+            | stmtWhile
+            | stmtDo
+            | stmtFor
+            | stmtForeach
+            | stmtSwitch
+            | stmtReturn
+            | block
+            | ";"
+            | LBreak, ";"
+            | LContinue, ";" ;
+
+stmtReturn = LReturn, ";"
+             | LReturn, commaExpr, ";" ;
+
+stmtCond = LIf, "(", commaExpr, ")", statement, optionalElsePart ;
+
+optionalElsePart = ""
+                   | LElse, statement ;
+
+stmtWhile = LWhile, "(", commaExpr, ")", loopStart, statement ;
+
+stmtDo = LDo, loopStart, statement, LWhile, "(", commaExpr, ")", ";" ;
+
+stmtFor = LFor, "(", forInit, ";", forExpr, ";", forExpr, ")", loopStart, statement ;
+
+stmtForeach = LForeach, "(", foreachVars, LIn, expr, ")", foreachStart, statement ;
+
+stmtSwitch = switchHeader, "{", localDeclarations, case, switchBlock, "}" ;
+
+block = "{", blockStart, statements, "}" ;
+
+statements = { statement | localDeclarationStatement | error, ";" } ;
+
+localDeclStatementHeader = basicType ;
+
+localDeclarationStatement = localDeclStatementHeader, localNameList, ";" ;
+
+localDeclHeader = basicType ;
+
+localDeclarations = { localDeclHeader, localNameList, ";" } ;
+
+commaExpr = expr, { ",", expr } ;
+
+expr = ref, lvalue
+       | lvalue, LAssign, expr
+       | error, LAssign, expr
+       | expr, "?", expr, ":", expr
+       | expr, LQuestionQuestion, expr
+       | expr, LLor, expr
+       | expr, LLand, expr
+       | expr, "|", expr
+       | expr, "^", expr
+       | expr, "&", expr
+       | expr, LEq, expr
+       | expr, LNe, expr
+       | expr, LOrder, expr
+       | expr, "<", expr
+       | expr, LLsh, expr
+       | expr, LRsh, expr
+       | expr, "+", expr
+       | expr, "-", expr
+       | expr, "*", expr
+       | expr, "%", expr
+       | expr, "/", expr
+       | cast, expr
+       | LInc, lvalue
+       | LDec, lvalue
+       | LNot, expr
+       | "~", expr
+       | "-", expr
+       | lvalue, LInc
+       | lvalue, LDec
+       | primaryExpr
+       | sscanf
+       | parseCommand
+       | timeExpression
+       | number
+       | real ;
+
+lvalue = primaryExpr ;
+
+primaryExpr = functionCall
+              | LDefinedName
+              | LIdentifier
+              | LParameter
+              | string
+              | "(", commaExpr, ")"
+              | catch
+              | tree
+              | "$", "(", dollarStart, commaExpr, ")"
+              | primaryExpr, LArrow, identifier
+              | primaryExpr, LDot, identifier
+              | primaryExpr, "[", commaExpr, "]"
+              | primaryExpr, "[", "<", commaExpr, "]"
+              | primaryExpr, "[", commaExpr, LRange, commaExpr, "]"
+              | primaryExpr, "[", "<", commaExpr, LRange, commaExpr, "]"
+              | primaryExpr, "[", "<", commaExpr, LRange, "<", commaExpr, "]"
+              | primaryExpr, "[", commaExpr, LRange, "<", commaExpr, "]"
+              | primaryExpr, "[", commaExpr, LRange, "]"
+              | primaryExpr, "[", "<", commaExpr, LRange, "]"
+              | primaryExpr, "[", LRange, "<", commaExpr, "]"
+              | primaryExpr, "[", "<", commaExpr, LRange, "<", expr, "]"
+              | primaryExpr, "[", "<", commaExpr, LRange, expr, "]"
+              | lambdaReturnType, "(", argument, ")", block
+              | functionalOpen, ":", ")"
+              | functionalOpen, ",", argList, ":", ")"
+              | LFunctionOpen, commaExpr, ":", ")"
+              | LMappingOpen, optPairList, "]", ")"
+              | LArrayOpen, optArgList, "}", ")" ;
+
+callOpen = "(" ;
+
+functionCall = efunOverride, callOpen, optArgList, ")"
+               | LNew, callOpen, optArgList, ")"
+               | LNew, "(", LClass, LDefinedName, optClassInit, ")"
+               | LNew, "(", LClass, LIdentifier, optClassInit, ")"
+               | LDefinedName, callOpen, optArgList, ")"
+               | functionName, callOpen, optArgList, ")"
+               | primaryExpr, "[", commaExpr, "]", callOpen, optArgList, ")"
+               | primaryExpr, LArrow, identifier, callOpen, optArgList, ")"
+               | "(", "*", commaExpr, ")", callOpen, optArgList, ")" ;
+
+sscanf = LSscanf, "(", expr, ",", expr, lvalueList, ")" ;
+
+parseCommand = LParseCommand, "(", expr, ",", expr, ",", expr, lvalueList, ")" ;
+
+catch = LCatch, specialContextStart, exprOrBlock ;
+
+timeExpression = LTimeExpression, specialContextStart, exprOrBlock ;
+
+tree = LTree, block
+       | LTree, "(", commaExpr, ")" ;
+
+switchHeader = LSwitch, "(", commaExpr, ")" ;
+
+switchBlock = { case | statement } ;
+
+case = LCase, caseLabel, ":"
+       | LCase, caseLabel, LRange, caseLabel, ":"
+       | LCase, caseLabel, LRange, ":"
+       | LCase, LRange, caseLabel, ":"
+       | LDefault, ":" ;
+
+caseLabel = constant
+            | stringConst ;
+
+forExpr = ""
+          | commaExpr ;
+
+forInit = forExpr
+          | singleNewLocalDefWithInit ;
+
+foreachVar = LDefinedName
+             | singleNewLocalDef
+             | LIdentifier ;
+
+foreachVars = foreachVar
+              | foreachVar, ",", foreachVar ;
+
+typeDecl = classHeader, memberList, "}" ;
+
+classHeader = typeModifierList, LClass, identifier, "{" ;
+
+memberList = { basicType, memberNameList, ";" } ;
+
+memberNameList = memberName, { ",", memberName } ;
+
+memberName = optionalStar, identifier ;
+
+classInit = identifier, ":", expr ;
+
+optClassInit = { ",", classInit } ;
+
+type = typeModifierList, optBasicType ;
+
+typeModifierList = { LTypeModifier } ;
+
+optBasicType = basicType
+               | "" ;
+
+basicType = atomicType
+            | optAtomicType, LArray ;
+
+optAtomicType = atomicType
+                | "" ;
+
+atomicType = LBasicType
+             | LClass, LDefinedName
+             | LClass, LIdentifier ;
+
+argType = basicType
+          | basicType, ref ;
+
+cast = "(", basicType, optionalStar, ")" ;
+
+optionalStar = ""
+               | "*" ;
+
+identifier = LDefinedName
+             | LIdentifier ;
+
+newLocalName = LIdentifier
+               | LDefinedName ;
+
+efunOverride = LEfun, LColonColon, identifier
+               | LEfun, LColonColon, LNew ;
+
+functionName = LIdentifier
+               | LColonColon, identifier
+               | LBasicType, LColonColon, identifier
+               | identifier, LColonColon, identifier ;
+
+inheritance = typeModifierList, LInherit, stringConst, ";" ;
+
+modifierChange = typeModifierList, ":" ;
+
+argument = ""
+           | argumentList
+           | argumentList, LDotDotDot ;
+
+argumentList = paramDecl, { ",", paramDecl } ;
+
+paramDecl = argType, optionalStar
+            | argType, optionalStar, newLocalName, optionalDefaultArgValue
+            | newLocalName ;
+
+optionalDefaultArgValue = ""
+                          | ":", LFunctionOpen, commaExpr, ":", ")" ;
+
+localNameList = newLocalDef, { ",", newLocalDef } ;
+
+newLocalDef = optionalStar, newLocalName
+              | optionalStar, newLocalName, LAssign, expr ;
+
+singleNewLocalDef = argType, optionalStar, newLocalName ;
+
+singleNewLocalDefWithInit = singleNewLocalDef, LAssign, expr ;
+
+nameList = newName, { ",", newName } ;
+
+newName = optionalStar, identifier
+          | optionalStar, identifier, LAssign, expr ;
+
+lambdaReturnType = LBasicType ;
+
+functionalOpen = LNewFunctionOpen
+                 | LFunctionOpen, efunOverride ;
+
+assocPair = expr, ":", expr ;
+
+spreadExpr = expr
+             | expr, LDotDotDot ;
+
+argList = spreadExpr, { ",", spreadExpr } ;
+
+optArgList = ""
+             | argList
+             | argList, "," ;
+
+pairList = assocPair, { ",", assocPair } ;
+
+optPairList = ""
+              | pairList
+              | pairList, "," ;
+
+lvalueList = { ",", lvalue } ;
+
+exprOrBlock = block
+              | "(", commaExpr, ")" ;
+
+ref = LRef ;
+
+string = stringLiteral ;
+
+stringLiteral = LString, { LString } ;
+
+stringConst = stringLiteral
+              | "(", stringConst, ")"
+              | stringConst, "+", stringConst ;
+
+number = LNumber ;
+
+real = LReal ;
+
+constant = constant, "|", constant
+           | constant, "^", constant
+           | constant, "&", constant
+           | constant, LEq, constant
+           | constant, LNe, constant
+           | constant, LOrder, constant
+           | constant, "<", constant
+           | constant, LLsh, constant
+           | constant, LRsh, constant
+           | constant, "+", constant
+           | constant, "-", constant
+           | constant, "*", constant
+           | constant, "%", constant
+           | constant, "/", constant
+           | "(", constant, ")"
+           | LNumber
+           | "-", LNumber
+           | LNot, LNumber
+           | "~", LNumber ;

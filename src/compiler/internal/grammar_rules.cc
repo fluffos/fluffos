@@ -10,12 +10,13 @@
 
 #include <fmt/format.h>
 
-extern int context;       // FIXME
-extern int func_present;  // FIXME
+extern int context;       // defined in grammar.autogen.cc (via grammar.y preamble)
+extern int func_present;  // defined in grammar.autogen.cc (via grammar.y preamble)
+extern int num_refs;      // defined in grammar.autogen.cc (via grammar.y preamble)
 
-void rule_program(parse_node_t *$$) { comp_trees[TREE_MAIN] = $$; }
+void rule_program(parse_node_t *program_node) { comp_trees[TREE_MAIN] = program_node; }
 
-bool rule_inheritence(parse_node_t **$$, int $1, char *$3) {
+bool rule_inheritence(parse_node_t **result_node, int type_mod, char *inherit_file_name) {
   object_t *ob;
   inherit_t inherit;
   int initializer;
@@ -23,10 +24,10 @@ bool rule_inheritence(parse_node_t **$$, int $1, char *$3) {
   int acc_mod;
 #endif
 
-  $1 |= global_modifiers;
+  type_mod |= global_modifiers;
 
 #ifdef SENSIBLE_MODIFIERS
-  acc_mod = ($1 & DECL_ACCESS) & ~global_modifiers;
+  acc_mod = (type_mod & DECL_ACCESS) & ~global_modifiers;
   if (acc_mod & (acc_mod - 1)) {
     char buf[256];
     char *end = EndOf(buf);
@@ -39,19 +40,19 @@ bool rule_inheritence(parse_node_t **$$, int $1, char *$3) {
   }
 #endif
 
-  if (!($1 & DECL_ACCESS)) $1 |= DECL_PUBLIC;
+  if (!(type_mod & DECL_ACCESS)) type_mod |= DECL_PUBLIC;
   if (var_defined) {
     yyerror("Illegal to inherit after defining global variables.");
     inherit_file = 0;
     return true;
   }
-  ob = find_object2($3);
+  ob = find_object2(inherit_file_name);
   if (ob == 0) {
-    inherit_file = alloc_cstring($3, "inherit");
+    inherit_file = alloc_cstring(inherit_file_name, "inherit");
     /* Return back to load_object() */
     return true;
   }
-  scratch_free($3);
+  scratch_free(inherit_file_name);
   inherit.prog = ob->prog;
 
   if (mem_block[A_INHERITS].current_size) {
@@ -68,13 +69,13 @@ bool rule_inheritence(parse_node_t **$$, int $1, char *$3) {
     inherit.function_index_offset = 0;
 
   inherit.variable_index_offset = mem_block[A_VAR_TEMP].current_size / sizeof(variable_t);
-  inherit.type_mod = $1;
+  inherit.type_mod = type_mod;
   add_to_mem_block(A_INHERITS, (char *)&inherit, sizeof inherit);
 
   /* The following has to come before copy_vars - Sym */
   copy_structures(ob->prog);
-  copy_variables(ob->prog, $1);
-  initializer = copy_functions(ob->prog, $1);
+  copy_variables(ob->prog, type_mod);
+  initializer = copy_functions(ob->prog, type_mod);
   if (initializer >= 0) {
     parse_node_t *node, *newnode;
     /* initializer is an index into the object we're
@@ -94,7 +95,7 @@ bool rule_inheritence(parse_node_t **$$, int $1, char *$3) {
     CREATE_TWO_VALUES(comp_trees[TREE_INIT], 0, newnode, node);
     comp_trees[TREE_INIT] = pop_value(comp_trees[TREE_INIT]);
   }
-  *$$ = 0;
+  *result_node = 0;
 
   return false;
 }
@@ -254,10 +255,10 @@ void rule_func(parse_node_t **function, LPC_INT type, LPC_INT optional_star, cha
   free_all_local_names(!!(*block_or_semi));
 }
 
-ident_hash_elem_t *rule_define_class(LPC_INT *$$, char *$3) {
+ident_hash_elem_t *rule_define_class(LPC_INT *classname_idx_out, char *class_name) {
   ident_hash_elem_t *ihe;
 
-  ihe = find_or_add_ident(PROG_STRING(*$$ = store_prog_string($3)), FOA_GLOBAL_SCOPE);
+  ihe = find_or_add_ident(PROG_STRING(*classname_idx_out = store_prog_string(class_name)), FOA_GLOBAL_SCOPE);
   if (ihe->dn.class_num == -1) {
     ihe->sem_value++;
     ihe->dn.class_num = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
@@ -265,21 +266,21 @@ ident_hash_elem_t *rule_define_class(LPC_INT *$$, char *$3) {
       yyerror("Too many classes, max is %d.\n", CLASS_NUM_MASK + 1);
     }
 
-    scratch_free($3);
+    scratch_free(class_name);
     return nullptr;
   } else {
     return ihe;
   }
 }
 
-void rule_define_class_members(struct ident_hash_elem_t *$2, LPC_INT $5) {
+void rule_define_class_members(struct ident_hash_elem_t *class_ihe, LPC_INT classname_idx) {
   class_def_t *sd;
   class_member_entry_t *sme;
   int i, raise_error = 0;
 
   /* check for a redefinition */
-  if ($2 != 0) {
-    sd = CLASS($2->dn.class_num);
+  if (class_ihe != 0) {
+    sd = CLASS(class_ihe->dn.class_num);
     if (sd->size != current_number_of_locals) {
       raise_error = 1;
     } else {
@@ -297,12 +298,12 @@ void rule_define_class_members(struct ident_hash_elem_t *$2, LPC_INT $5) {
   }
 
   if (raise_error) {
-    yyerror("Illegal to redefine class '%s',", PROG_STRING($5));
+    yyerror("Illegal to redefine class '%s',", PROG_STRING(classname_idx));
   } else {
     sd = (class_def_t *)allocate_in_mem_block(A_CLASS_DEF, sizeof(class_def_t));
     i = sd->size = current_number_of_locals;
     sd->index = mem_block[A_CLASS_MEMBER].current_size / sizeof(class_member_entry_t);
-    sd->classname = $5;
+    sd->classname = classname_idx;
 
     sme = (class_member_entry_t *)allocate_in_mem_block(
         A_CLASS_MEMBER, sizeof(class_member_entry_t) * current_number_of_locals);
@@ -313,4 +314,68 @@ void rule_define_class_members(struct ident_hash_elem_t *$2, LPC_INT $5) {
     }
   }
   free_all_local_names(0);
+}
+
+// ============================================================================
+// Thin wrappers that keep grammar.y free of direct macro / global-var access
+// ============================================================================
+
+LPC_INT rule_loop_open() {
+  LPC_INT saved = context;
+  context = LOOP_CONTEXT;
+  return saved;
+}
+
+LPC_INT rule_special_context_open() {
+  LPC_INT saved = context;
+  context = SPECIAL_CONTEXT;
+  return saved;
+}
+
+LPC_INT rule_block_open() {
+  return (LPC_INT)current_number_of_locals;
+}
+
+void rule_number(parse_node_t **result, LPC_INT val) {
+  CREATE_NUMBER(*result, val);
+}
+
+void rule_real(parse_node_t **result, LPC_FLOAT val) {
+  CREATE_REAL(*result, val);
+}
+
+void rule_primary_expr_parameter(parse_node_t **result, LPC_INT n) {
+  CREATE_PARAMETER(*result, TYPE_ANY, n);
+}
+
+void rule_program_append(parse_node_t **result, parse_node_t *prog, parse_node_t *def) {
+  CREATE_TWO_VALUES(*result, 0, prog, def);
+}
+
+void rule_tree_block(parse_node_t **result, parse_node_t *block_node) {
+#ifdef DEBUG
+  *result = new_node_no_line();
+  lpc_tree_form(block_node, *result);
+#else
+  (void)block_node;
+  *result = nullptr;
+#endif
+}
+
+void rule_tree_expr(parse_node_t **result, parse_node_t *expr) {
+#ifdef DEBUG
+  *result = new_node_no_line();
+  lpc_tree_form(expr, *result);
+#else
+  (void)expr;
+  *result = nullptr;
+#endif
+}
+
+void rule_opt_semicolon() {
+  yywarn("Extra ';'. Ignored.");
+}
+
+char *rule_string_literal_concat(char *s1, char *s2) {
+  return scratch_join(s1, s2);
 }

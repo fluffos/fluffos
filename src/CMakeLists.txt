@@ -344,6 +344,30 @@ if (${BISON_FOUND})
           "${BISON_Grammar_OUTPUT_SOURCE}"
           "${BISON_Grammar_OUTPUT_HEADER}"
           )
+
+  # Generate grammar.xml for EBNF / tooling (streamed by generate_ebnf.py)
+  set(GRAMMAR_XML "${CMAKE_CURRENT_BINARY_DIR}/grammar.xml")
+  add_custom_command(
+    OUTPUT  "${GRAMMAR_XML}"
+    COMMAND "${BISON_EXECUTABLE}"
+            "--xml=${GRAMMAR_XML}"
+            "-o" "${CMAKE_CURRENT_BINARY_DIR}/grammar_xml_dummy.cc"
+            "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.y"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.y"
+    COMMENT "Generating grammar.xml from grammar.y"
+  )
+
+  find_package(Python3 QUIET COMPONENTS Interpreter)
+  if(Python3_FOUND)
+    add_custom_target(generate_ebnf
+      COMMAND "${Python3_EXECUTABLE}"
+              "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/generate_ebnf.py"
+              "${GRAMMAR_XML}"
+              "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.ebnf"
+      DEPENDS "${GRAMMAR_XML}"
+      COMMENT "Generating grammar.ebnf from grammar.xml"
+    )
+  endif()
 else()
   message(STATUS "BISON: version too low, using pre-generated source.")
   add_custom_command(
@@ -389,6 +413,11 @@ set(SRC
   "base/internal/strutils.cc"
   "base/internal/tracing.cc"
   "compiler/internal/grammar_rules.cc"
+  "compiler/internal/grammar_rules_types.cc"
+  "compiler/internal/grammar_rules_decls.cc"
+  "compiler/internal/grammar_rules_loops.cc"
+  "compiler/internal/grammar_rules_switch.cc"
+  "compiler/internal/grammar_rules_exprs.cc"
   "compiler/internal/compiler.cc"
   "compiler/internal/disassembler.cc"
   "compiler/internal/generate.cc"
