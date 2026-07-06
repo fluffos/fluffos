@@ -83,6 +83,9 @@ title: strings / sprintf
 
     f       floating point number
 
+    g       floating point number, trailing zeros removed
+            (e.g. 3.14 instead of 3.140000, 100 instead of 100.000000)
+
 ### RETURN VALUES
 
     sprintf() returns the formatted string.

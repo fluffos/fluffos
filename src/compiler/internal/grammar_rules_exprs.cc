@@ -835,6 +835,23 @@ void rule_primary_expr_anon_func(parse_node_t **result, func_block_t *saved_bloc
   reactivate_current_locals();
 }
 
+// The name-to-functional-reference encoding, moved from the lexer's
+// "(: name" machinery (9.2): locals/globals encode as variable refs
+// (functional_1 rejects locals with its own diagnostic, exactly as the
+// legacy lexer-encoded path did), functions/simuls/efuns as callables.
+// Unknown kinds -- the legacy path silently re-spliced these into an
+// anonymous body that then failed to parse -- now get a direct error.
+LPC_INT rule_functional_ref(struct ident_hash_elem_t *ihe) {
+  int idx;
+  if ((idx = ihe->dn.local_num) >= 0) return ((LPC_INT)idx << 8) | FP_L_VAR;
+  if ((idx = ihe->dn.global_num) >= 0) return ((LPC_INT)idx << 8) | FP_G_VAR;
+  if ((idx = ihe->dn.function_num) >= 0) return ((LPC_INT)idx << 8) | FP_LOCAL;
+  if ((idx = ihe->dn.simul_num) >= 0) return ((LPC_INT)idx << 8) | FP_SIMUL;
+  if ((idx = ihe->dn.efun_num) >= 0) return ((LPC_INT)idx << 8) | FP_EFUN;
+  yyerror("Unknown function '%s' in functional", ihe->name != nullptr ? ihe->name : "?");
+  return FP_FUNCTIONAL;
+}
+
 void rule_primary_expr_functional_1(parse_node_t **result, LPC_INT val) {
   *result = new_node();
   (*result)->kind = NODE_FUNCTION_CONSTRUCTOR;
@@ -865,6 +882,11 @@ void rule_primary_expr_functional_1(parse_node_t **result, LPC_INT val) {
       (*result)->v.number = val;
       break;
   }
+  // 9.2: the "(:"  lexer glue pushes a function context for EVERY
+  // functional form; constructors that don't build a body pop it here
+  // (the legacy split pushed only for anon/override and leaked the
+  // override's context).
+  pop_function_context();
 }
 
 void rule_primary_expr_functional_2(parse_node_t **result, LPC_INT val, parse_node_t *opt_arg_list) {
@@ -943,6 +965,7 @@ void rule_primary_expr_functional_2(parse_node_t **result, LPC_INT val, parse_no
                   yyerror("Can't give parameters to functional.");
                   break;
   }
+  pop_function_context();  // see functional_1's comment (9.2)
 }
 
 void rule_primary_expr_functional_3(parse_node_t **result, parse_node_t *expr) {
@@ -1391,6 +1414,18 @@ void rule_expr_and(struct parse_node_t **result, struct parse_node_t *expr1, str
   } else *result = binary_int_op(expr1, expr2, F_AND, "&");
 }
 
+// L_EQ_NE carries the opcode (L_ORDER idiom); the two legs keep their
+// separate bodies -- '==' has a compare-against-zero strength reduction
+// '!=' doesn't.
+void rule_expr_eq_ne(struct parse_node_t **result, LPC_INT op, struct parse_node_t *expr1,
+                     struct parse_node_t *expr2) {
+  if (op == F_EQ) {
+    rule_expr_eq(result, expr1, expr2);
+  } else {
+    rule_expr_ne(result, expr1, expr2);
+  }
+}
+
 void rule_expr_eq(struct parse_node_t **result, struct parse_node_t *expr1, struct parse_node_t *expr2) {
   if (exact_types && !compatible_types2(expr1->type, expr2->type)){
     char buf[256];
@@ -1494,12 +1529,9 @@ void rule_expr_lt(struct parse_node_t **result, struct parse_node_t *expr1, stru
   CREATE_BINARY_OP(*result, F_LT, TYPE_NUMBER, expr1, expr2);
 }
 
-void rule_expr_lsh(struct parse_node_t **result, struct parse_node_t *expr1, struct parse_node_t *expr2) {
-  *result = binary_int_op(expr1, expr2, F_LSH, "<<");
-}
-
-void rule_expr_rsh(struct parse_node_t **result, struct parse_node_t *expr1, struct parse_node_t *expr2) {
-  *result = binary_int_op(expr1, expr2, F_RSH, ">>");
+void rule_expr_shift(struct parse_node_t **result, LPC_INT op, struct parse_node_t *expr1,
+                     struct parse_node_t *expr2) {
+  *result = binary_int_op(expr1, expr2, op, op == F_LSH ? "<<" : ">>");
 }
 
 void rule_expr_add(struct parse_node_t **result, struct parse_node_t *expr1, struct parse_node_t *expr2) {
@@ -1945,44 +1977,26 @@ void rule_expr_cast(struct parse_node_t **result, LPC_INT type, struct parse_nod
   }
 }
 
-void rule_expr_pre_inc(struct parse_node_t **result, struct parse_node_t *expr) {
-  CREATE_UNARY_OP(*result, F_PRE_INC, 0, expr);
-  if (exact_types){
-    switch(expr->type){
+// ++/-- share one worker (L_INC_DEC carries '+' or '-'; pre/post comes
+// from the production position). CREATE_UNARY_OP already stores the
+// opcode in v.number.
+static void expr_incdec(struct parse_node_t **result, int opcode, const char *badmsg,
+                        struct parse_node_t *expr) {
+  CREATE_UNARY_OP(*result, opcode, 0, expr);
+  if (exact_types) {
+    switch (expr->type) {
       case TYPE_NUMBER:
       case TYPE_ANY:
       case TYPE_REAL:
-        {
-          (*result)->type = expr->type;
-          break;
-        }
+        (*result)->type = expr->type;
+        break;
       default:
-        {
-          (*result)->type = TYPE_ANY;
-          type_error("Bad argument 1 to ++x", expr->type);
-        }
+        (*result)->type = TYPE_ANY;
+        type_error(badmsg, expr->type);
     }
-  } else (*result)->type = TYPE_ANY;
-}
-
-void rule_expr_pre_dec(struct parse_node_t **result, struct parse_node_t *expr) {
-  CREATE_UNARY_OP(*result, F_PRE_DEC, 0, expr);
-  if (exact_types){
-    switch(expr->type){
-      case TYPE_NUMBER:
-      case TYPE_ANY:
-      case TYPE_REAL:
-        {
-          (*result)->type = expr->type;
-          break;
-        }
-      default:
-        {
-          (*result)->type = TYPE_ANY;
-          type_error("Bad argument 1 to --x", expr->type);
-        }
-    }
-  } else (*result)->type = TYPE_ANY;
+  } else {
+    (*result)->type = TYPE_ANY;
+  }
 }
 
 void rule_expr_not(struct parse_node_t **result, struct parse_node_t *expr) {
@@ -2004,7 +2018,6 @@ void rule_expr_compl(struct parse_node_t **result, struct parse_node_t *expr) {
     CREATE_UNARY_OP(*result, F_COMPL, TYPE_NUMBER, expr);
   }
 }
-
 void rule_expr_neg(struct parse_node_t **result, struct parse_node_t *expr) {
   int result_type;
   if (exact_types){
@@ -2029,45 +2042,20 @@ void rule_expr_neg(struct parse_node_t **result, struct parse_node_t *expr) {
   }
 }
 
-void rule_expr_post_inc(struct parse_node_t **result, struct parse_node_t *expr) {
-  CREATE_UNARY_OP(*result, F_POST_INC, 0, expr);
-  (*result)->v.number = F_POST_INC;
-  if (exact_types){
-    switch(expr->type){
-      case TYPE_NUMBER:
-      case TYPE_ANY:
-      case TYPE_REAL:
-        {
-          (*result)->type = expr->type;
-          break;
-        }
-      default:
-        {
-          (*result)->type = TYPE_ANY;
-          type_error("Bad argument 1 to x++", expr->type);
-        }
-    }
-  } else (*result)->type = TYPE_ANY;
+void rule_expr_pre_incdec(struct parse_node_t **result, LPC_INT op, struct parse_node_t *expr) {
+  if (op == '+') {
+    expr_incdec(result, F_PRE_INC, "Bad argument 1 to ++x", expr);
+  } else {
+    expr_incdec(result, F_PRE_DEC, "Bad argument 1 to --x", expr);
+  }
 }
 
-void rule_expr_post_dec(struct parse_node_t **result, struct parse_node_t *expr) {
-  CREATE_UNARY_OP(*result, F_POST_DEC, 0, expr);
-  if (exact_types){
-    switch(expr->type){
-      case TYPE_NUMBER:
-      case TYPE_ANY:
-      case TYPE_REAL:
-        {
-          (*result)->type = expr->type;
-          break;
-        }
-      default:
-        {
-          (*result)->type = TYPE_ANY;
-          type_error("Bad argument 1 to x--", expr->type);
-        }
-    }
-  } else (*result)->type = TYPE_ANY;
+void rule_expr_post_incdec(struct parse_node_t **result, LPC_INT op, struct parse_node_t *expr) {
+  if (op == '+') {
+    expr_incdec(result, F_POST_INC, "Bad argument 1 to x++", expr);
+  } else {
+    expr_incdec(result, F_POST_DEC, "Bad argument 1 to x--", expr);
+  }
 }
 
 void rule_opt_arg_list_empty(struct parse_node_t **result) {

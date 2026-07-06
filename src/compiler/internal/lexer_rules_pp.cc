@@ -454,11 +454,12 @@ long lpc_lex_eval_if_expr(std::string_view expr, void* yyscanner) {
                     break;
                 case L_LOR:  toks.push_back(IfTok{'O', 0}); break;
                 case L_LAND: toks.push_back(IfTok{'A', 0}); break;
-                case L_EQ:   toks.push_back(IfTok{'E', 0}); break;
-                case L_NE:   toks.push_back(IfTok{'N', 0}); break;
-                case L_NOT:  toks.push_back(IfTok{'!', 0}); break;
-                case L_LSH:  toks.push_back(IfTok{'s', 0}); break;
-                case L_RSH:  toks.push_back(IfTok{'S', 0}); break;
+                case L_EQ_NE:
+                    toks.push_back(IfTok{lv.number == F_EQ ? 'E' : 'N', 0});
+                    break;
+                case L_SHIFT:
+                    toks.push_back(IfTok{lv.number == F_LSH ? 's' : 'S', 0});
+                    break;
                 case L_ORDER:
                     // "<=", ">=", ">" arrive as one token whose yylval
                     // carries the VM opcode ("<" is a bare '<' char).

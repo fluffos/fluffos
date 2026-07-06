@@ -99,7 +99,6 @@ struct compiler_context_t {
   std::string str_accum;
   std::string heredoc_terminator;
   bool heredoc_is_array = false;
-  int function_flag = 0;
   // Nesting depth of #if/#ifdef directives seen INSIDE a dead branch while
   // in SC_COND_SKIP (the real conditional stack lives in LexerSession).
   int skip_depth = 0;

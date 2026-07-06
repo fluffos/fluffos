@@ -19,7 +19,14 @@
  * it keeps folding adjacent plain string literals into one string_literal at
  * compile time, the same as before string_like existed, rather than ever
  * splitting them into a runtime string_like L_STRING chain. */
-%expect 3
+/* 5 = 3 legacy (string_literal adjacency, two '<'-range ']' cases) + 2
+ * INTENTIONAL from 9.2: after `L_FUNCTION_OPEN L_DEFINED_NAME`, the ':'
+ * and ',' lookaheads shift into the named-functional / partial-
+ * application productions in preference to reducing the name into an
+ * expression atom -- bison's shift preference IS the legacy
+ * named-over-expression semantics the lexer's one-byte peek used to
+ * implement. */
+%expect 5
 
 %start all
 
@@ -72,10 +79,10 @@ void yyerror(void *yyscanner, const char *msg);
 %token <string> L_IDENTIFIER
 
 /* efun:: prefix for bypassing simul-efun overrides */
-%token <string> L_EFUN
+%token L_EFUN
 
 /* Postfix / prefix increment-decrement */
-%token L_INC L_DEC
+%token <number> L_INC_DEC     /* ++ and --, '+' or '-' in yylval */
 
 /* Compound assignment:  +=  -=  |=  ... */
 %token <number> L_ASSIGN
@@ -87,13 +94,13 @@ void yyerror(void *yyscanner, const char *msg);
 %token L_QUESTION_QUESTION
 
 /* Bit-shift operators */
-%token L_LSH L_RSH
+%token <number> L_SHIFT       /* << and >>, opcode in yylval (L_ORDER idiom) */
+%token <number> L_EQ_NE       /* == and !=, opcode in yylval (L_ORDER idiom) */
 
 /* Relational operators  >  >=  <=  (< is a literal character) */
 %token <number> L_ORDER
 
 /* Logical not:  ! */
-%token L_NOT
 
 /* Control-flow keywords */
 %token L_IF L_ELSE
@@ -103,14 +110,13 @@ void yyerror(void *yyscanner, const char *msg);
 %token L_RETURN
 
 /* Member access and scope */
-%token L_ARROW L_DOT L_INHERIT L_COLON_COLON
+%token L_ARROW L_INHERIT L_COLON_COLON
 
 /* Optional chaining:  ?.name  ?.[idx]  .?[idx]  (mappings only) */
 %token L_OPTIONAL_DOT L_DOT_OPTIONAL
 
 /* Compound literal openers:  ({  ([  (:  (: with new-syntax */
-%token L_ARRAY_OPEN L_MAPPING_OPEN L_FUNCTION_OPEN
-%token <number> L_NEW_FUNCTION_OPEN
+%token L_FUNCTION_OPEN
 
 /* Built-in special forms */
 %token L_SSCANF L_CATCH
@@ -124,7 +130,6 @@ void yyerror(void *yyscanner, const char *msg);
 %token L_TREE
 
 /* Used only by lpcfmt (the LPC formatter), never by the driver */
-%token L_PREPROCESSOR_COMMAND
 
 /* =========================================================================
  * Operator precedence (low to high; last entry binds tightest)
@@ -142,12 +147,12 @@ void yyerror(void *yyscanner, const char *msg);
 %left '|'                     /* bitwise or */
 %left '^'                     /* bitwise xor */
 %left '&'                     /* bitwise and */
-%left L_EQ L_NE               /* ==  != */
+%left L_EQ_NE                 /* ==  != (opcode in yylval, L_ORDER idiom) */
 %left L_ORDER '<'             /* >  >=  <= and < */
-%left L_LSH L_RSH             /* <<  >> */
+%left L_SHIFT                 /* <<  >> */
 %left '+' '-'
 %left '*' '%' '/'
-%precedence L_NOT '~'         /* !  ~  (unary prefix) */
+%precedence '!' '~'           /* !  ~  (unary prefix) */
 
 
 /* =========================================================================
@@ -444,13 +449,11 @@ expr:
   | expr[lhs] '^' expr[rhs]   { rule_expr_xor(&$$, $lhs, $rhs); }
   | expr[lhs] '&' expr[rhs]   { rule_expr_and(&$$, $lhs, $rhs); }
 
-  | expr[lhs] L_EQ    expr[rhs]   { rule_expr_eq(&$$, $lhs, $rhs); }
-  | expr[lhs] L_NE    expr[rhs]   { rule_expr_ne(&$$, $lhs, $rhs); }
+  | expr[lhs] L_EQ_NE[op] expr[rhs]  { rule_expr_eq_ne(&$$, $op, $lhs, $rhs); }
   | expr[lhs] L_ORDER expr[rhs]   { rule_expr_order(&$$, $lhs, $L_ORDER, $rhs); }
   | expr[lhs] '<'     expr[rhs]   { rule_expr_lt(&$$, $lhs, $rhs); }
 
-  | expr[lhs] L_LSH expr[rhs]  { rule_expr_lsh(&$$, $lhs, $rhs); }
-  | expr[lhs] L_RSH expr[rhs]  { rule_expr_rsh(&$$, $lhs, $rhs); }
+  | expr[lhs] L_SHIFT[op] expr[rhs]  { rule_expr_shift(&$$, $op, $lhs, $rhs); }
 
   | expr[lhs] '+' expr[rhs]  {
         rule_set_operand_ranges(@lhs.first_line, @lhs.first_column, @lhs.last_column,
@@ -464,15 +467,13 @@ expr:
   | expr[lhs] '%' expr[rhs]  { rule_expr_mod(&$$, $lhs, $rhs); }
   | expr[lhs] '/' expr[rhs]  { rule_expr_div(&$$, $lhs, $rhs); }
 
-  | cast expr[val]  %prec L_NOT     { rule_expr_cast(&$$, $cast, $val); }
-  | L_INC lvalue  %prec L_NOT  { rule_expr_pre_inc(&$$, $lvalue); }
-  | L_DEC lvalue  %prec L_NOT  { rule_expr_pre_dec(&$$, $lvalue); }
-  | L_NOT expr[val]                 { rule_expr_not(&$$, $val); }
+  | cast expr[val]  %prec '!'     { rule_expr_cast(&$$, $cast, $val); }
+  | L_INC_DEC[op] lvalue  %prec '!'  { rule_expr_pre_incdec(&$$, $op, $lvalue); }
+  | '!' expr[val]                   { rule_expr_not(&$$, $val); }
   | '~'   expr[val]                 { rule_expr_compl(&$$, $val); }
-  | '-'   expr[val]  %prec L_NOT    { rule_expr_neg(&$$, $val); }
+  | '-'   expr[val]  %prec '!'    { rule_expr_neg(&$$, $val); }
 
-  | lvalue L_INC  { rule_expr_post_inc(&$$, $lvalue); }
-  | lvalue L_DEC  { rule_expr_post_dec(&$$, $lvalue); }
+  | lvalue L_INC_DEC[op]  { rule_expr_post_incdec(&$$, $op, $lvalue); }
 
   | primary_expr
   | sscanf
@@ -508,7 +509,7 @@ primary_expr:
 
   /* Member access */
   | primary_expr[expr_node] L_ARROW identifier   { rule_primary_expr_member_arrow(&$$, $expr_node, $identifier); }
-  | primary_expr[expr_node] L_DOT   identifier   { rule_primary_expr_member_dot(&$$, $expr_node, $identifier); }
+  | primary_expr[expr_node] '.' identifier       { rule_primary_expr_member_dot(&$$, $expr_node, $identifier); }
 
   /* Optional chaining (mappings only): expr?.name, expr?.[idx], expr.?[idx].
    * Short-circuits to 0 at runtime instead of erroring when expr isn't a
@@ -559,12 +560,23 @@ primary_expr:
     { rule_primary_expr_functional_1(&$$, $functional_open); }
   | functional_open ',' arg_list ':' ')'
     { rule_primary_expr_functional_2(&$$, $functional_open, $arg_list); }
+  /* Named function refs / partial application (9.2): the lexer used to
+   * decide "(: name" vs "(: expr" with a hand-rolled one-byte peek; now
+   * the productions below carry the decision -- after shifting
+   * L_DEFINED_NAME, a ':' or ',' lookahead SHIFTS into the named forms
+   * (bison's shift-preference over reducing the name into an expression
+   * atom is exactly the legacy named-over-expr semantics), anything else
+   * continues as an ordinary comma_expr body. */
+  | L_FUNCTION_OPEN L_DEFINED_NAME[fn] ':' ')'
+    { rule_primary_expr_functional_1(&$$, rule_functional_ref($fn)); }
+  | L_FUNCTION_OPEN L_DEFINED_NAME[fn] ',' arg_list ':' ')'
+    { rule_primary_expr_functional_2(&$$, rule_functional_ref($fn), $arg_list); }
   | L_FUNCTION_OPEN comma_expr ':' ')'
     { rule_primary_expr_functional_3(&$$, $comma_expr); }
 
   /* Compound literals */
-  | L_MAPPING_OPEN opt_pair_list ']' ')'   { rule_primary_expr_mapping(&$$, $opt_pair_list); }
-  | L_ARRAY_OPEN opt_arg_list '}' ')'      { rule_primary_expr_array(&$$, $opt_arg_list); }
+  | '(' '[' opt_pair_list ']' ')'   { rule_primary_expr_mapping(&$$, $opt_pair_list); }
+  | '(' '{' opt_arg_list '}' ')'    { rule_primary_expr_array(&$$, $opt_arg_list); }
 ;
 
 /* =========================================================================
@@ -974,8 +986,7 @@ lambda_return_type:
  *   efun::(      -- functional wrapping a driver efun
  */
 functional_open:
-  L_NEW_FUNCTION_OPEN
-  | L_FUNCTION_OPEN efun_override  { $$ = rule_functional_open($efun_override); }
+  L_FUNCTION_OPEN efun_override  { $$ = rule_functional_open($efun_override); }
 ;
 
 /* =========================================================================
@@ -1112,12 +1123,10 @@ constant:
   constant[lhs] '|' constant[rhs]    { rule_constant_or(&$$, $lhs, $rhs); }
   | constant[lhs] '^' constant[rhs]  { rule_constant_xor(&$$, $lhs, $rhs); }
   | constant[lhs] '&' constant[rhs]  { rule_constant_and(&$$, $lhs, $rhs); }
-  | constant[lhs] L_EQ constant[rhs]   { rule_constant_eq(&$$, $lhs, $rhs); }
-  | constant[lhs] L_NE constant[rhs]   { rule_constant_ne(&$$, $lhs, $rhs); }
+  | constant[lhs] L_EQ_NE[op] constant[rhs]  { rule_constant_eq_ne(&$$, $op, $lhs, $rhs); }
   | constant[lhs] L_ORDER constant[rhs]  { rule_constant_order(&$$, $lhs, $L_ORDER, $rhs); }
   | constant[lhs] '<' constant[rhs]    { rule_constant_lt(&$$, $lhs, $rhs); }
-  | constant[lhs] L_LSH constant[rhs]  { rule_constant_lsh(&$$, $lhs, $rhs); }
-  | constant[lhs] L_RSH constant[rhs]  { rule_constant_rsh(&$$, $lhs, $rhs); }
+  | constant[lhs] L_SHIFT[op] constant[rhs]  { rule_constant_shift(&$$, $op, $lhs, $rhs); }
   | constant[lhs] '+' constant[rhs]    { rule_constant_add(&$$, $lhs, $rhs); }
   | constant[lhs] '-' constant[rhs]    { rule_constant_sub(&$$, $lhs, $rhs); }
   | constant[lhs] '*' constant[rhs]    { rule_constant_mul(&$$, $lhs, $rhs); }
@@ -1126,7 +1135,7 @@ constant:
   | '(' constant[val] ')'         { $$ = $val; }
   | L_NUMBER                 { $$ = $L_NUMBER; }
   | '-' L_NUMBER             { rule_constant_neg(&$$, $L_NUMBER); }
-  | L_NOT L_NUMBER           { rule_constant_not(&$$, $L_NUMBER); }
+  | '!' L_NUMBER             { rule_constant_not(&$$, $L_NUMBER); }
   | '~' L_NUMBER             { rule_constant_compl(&$$, $L_NUMBER); }
 ;
 

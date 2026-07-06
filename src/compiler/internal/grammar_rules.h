@@ -132,12 +132,10 @@ void rule_case_label_string(parse_node_t **result, char *str);
 void rule_constant_or(LPC_INT *result, LPC_INT val1, LPC_INT val2);
 void rule_constant_xor(LPC_INT *result, LPC_INT val1, LPC_INT val2);
 void rule_constant_and(LPC_INT *result, LPC_INT val1, LPC_INT val2);
-void rule_constant_eq(LPC_INT *result, LPC_INT val1, LPC_INT val2);
-void rule_constant_ne(LPC_INT *result, LPC_INT val1, LPC_INT val2);
+void rule_constant_eq_ne(LPC_INT *result, LPC_INT op, LPC_INT val1, LPC_INT val2);
 void rule_constant_order(LPC_INT *result, LPC_INT val1, LPC_INT op, LPC_INT val2);
 void rule_constant_lt(LPC_INT *result, LPC_INT val1, LPC_INT val2);
-void rule_constant_lsh(LPC_INT *result, LPC_INT val1, LPC_INT val2);
-void rule_constant_rsh(LPC_INT *result, LPC_INT val1, LPC_INT val2);
+void rule_constant_shift(LPC_INT *result, LPC_INT op, LPC_INT val1, LPC_INT val2);
 void rule_constant_add(LPC_INT *result, LPC_INT val1, LPC_INT val2);
 void rule_constant_sub(LPC_INT *result, LPC_INT val1, LPC_INT val2);
 void rule_constant_mul(LPC_INT *result, LPC_INT val1, LPC_INT val2);
@@ -176,6 +174,10 @@ void rule_template_parts_middle(parse_node_t **result, char *mid, parse_node_t *
 LPC_INT rule_efun_override(char *identifier);
 LPC_INT rule_efun_override_new();
 LPC_INT rule_functional_open(LPC_INT val);
+// Resolve a defined name to the functional-reference encoding
+// ((index << 8) | FP_KIND) the functional_1/_2 constructors take --
+// the switch the lexer's L_NEW_FUNCTION_OPEN path used to run (9.2).
+LPC_INT rule_functional_ref(struct ident_hash_elem_t *ihe);
 void rule_expr_ref(parse_node_t **result, parse_node_t *lval);
 void rule_expr_assign(parse_node_t **result, parse_node_t *lval, int opcode, parse_node_t *rval);
 void rule_expr_assign_error(parse_node_t **result, parse_node_t *expr);
@@ -225,25 +227,23 @@ void rule_expr_land(struct parse_node_t **result, struct parse_node_t *expr1, st
 void rule_expr_or(struct parse_node_t **result, struct parse_node_t *expr1, struct parse_node_t *expr2);
 void rule_expr_xor(struct parse_node_t **result, struct parse_node_t *expr1, struct parse_node_t *expr2);
 void rule_expr_and(struct parse_node_t **result, struct parse_node_t *expr1, struct parse_node_t *expr2);
+void rule_expr_eq_ne(struct parse_node_t **result, LPC_INT op, struct parse_node_t *expr1, struct parse_node_t *expr2);
 void rule_expr_eq(struct parse_node_t **result, struct parse_node_t *expr1, struct parse_node_t *expr2);
 void rule_expr_ne(struct parse_node_t **result, struct parse_node_t *expr1, struct parse_node_t *expr2);
 void rule_expr_order(struct parse_node_t **result, struct parse_node_t *expr1, LPC_INT op, struct parse_node_t *expr2);
 void rule_expr_lt(struct parse_node_t **result, struct parse_node_t *expr1, struct parse_node_t *expr2);
-void rule_expr_lsh(struct parse_node_t **result, struct parse_node_t *expr1, struct parse_node_t *expr2);
-void rule_expr_rsh(struct parse_node_t **result, struct parse_node_t *expr1, struct parse_node_t *expr2);
+void rule_expr_shift(struct parse_node_t **result, LPC_INT op, struct parse_node_t *expr1, struct parse_node_t *expr2);
 void rule_expr_add(struct parse_node_t **result, struct parse_node_t *expr1, struct parse_node_t *expr2);
 void rule_expr_sub(struct parse_node_t **result, struct parse_node_t *expr1, struct parse_node_t *expr2);
 void rule_expr_mul(struct parse_node_t **result, struct parse_node_t *expr1, struct parse_node_t *expr2);
 void rule_expr_mod(struct parse_node_t **result, struct parse_node_t *expr1, struct parse_node_t *expr2);
 void rule_expr_div(struct parse_node_t **result, struct parse_node_t *expr1, struct parse_node_t *expr2);
 void rule_expr_cast(struct parse_node_t **result, LPC_INT type, struct parse_node_t *expr);
-void rule_expr_pre_inc(struct parse_node_t **result, struct parse_node_t *expr);
-void rule_expr_pre_dec(struct parse_node_t **result, struct parse_node_t *expr);
+void rule_expr_pre_incdec(struct parse_node_t **result, LPC_INT op, struct parse_node_t *expr);
 void rule_expr_not(struct parse_node_t **result, struct parse_node_t *expr);
 void rule_expr_compl(struct parse_node_t **result, struct parse_node_t *expr);
 void rule_expr_neg(struct parse_node_t **result, struct parse_node_t *expr);
-void rule_expr_post_inc(struct parse_node_t **result, struct parse_node_t *expr);
-void rule_expr_post_dec(struct parse_node_t **result, struct parse_node_t *expr);
+void rule_expr_post_incdec(struct parse_node_t **result, LPC_INT op, struct parse_node_t *expr);
 void rule_opt_arg_list_empty(struct parse_node_t **result);
 void rule_opt_arg_list(struct parse_node_t **result, struct parse_node_t *expr);
 void rule_spread_expr_normal(struct parse_node_t **result, struct parse_node_t *expr);

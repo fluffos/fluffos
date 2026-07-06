@@ -65,55 +65,46 @@ extern int yydebug;
     L_DEFINED_NAME = 266,          /* L_DEFINED_NAME  */
     L_IDENTIFIER = 267,            /* L_IDENTIFIER  */
     L_EFUN = 268,                  /* L_EFUN  */
-    L_INC = 269,                   /* L_INC  */
-    L_DEC = 270,                   /* L_DEC  */
-    L_ASSIGN = 271,                /* L_ASSIGN  */
-    L_LAND = 272,                  /* L_LAND  */
-    L_LOR = 273,                   /* L_LOR  */
-    L_QUESTION_QUESTION = 274,     /* L_QUESTION_QUESTION  */
-    L_LSH = 275,                   /* L_LSH  */
-    L_RSH = 276,                   /* L_RSH  */
-    L_ORDER = 277,                 /* L_ORDER  */
-    L_NOT = 278,                   /* L_NOT  */
-    L_IF = 279,                    /* L_IF  */
-    L_ELSE = 280,                  /* L_ELSE  */
-    L_SWITCH = 281,                /* L_SWITCH  */
-    L_CASE = 282,                  /* L_CASE  */
-    L_DEFAULT = 283,               /* L_DEFAULT  */
-    L_RANGE = 284,                 /* L_RANGE  */
-    L_DOT_DOT_DOT = 285,           /* L_DOT_DOT_DOT  */
-    L_WHILE = 286,                 /* L_WHILE  */
-    L_DO = 287,                    /* L_DO  */
-    L_FOR = 288,                   /* L_FOR  */
-    L_FOREACH = 289,               /* L_FOREACH  */
-    L_IN = 290,                    /* L_IN  */
-    L_BREAK = 291,                 /* L_BREAK  */
-    L_CONTINUE = 292,              /* L_CONTINUE  */
-    L_RETURN = 293,                /* L_RETURN  */
-    L_ARROW = 294,                 /* L_ARROW  */
-    L_DOT = 295,                   /* L_DOT  */
-    L_INHERIT = 296,               /* L_INHERIT  */
-    L_COLON_COLON = 297,           /* L_COLON_COLON  */
-    L_OPTIONAL_DOT = 298,          /* L_OPTIONAL_DOT  */
-    L_DOT_OPTIONAL = 299,          /* L_DOT_OPTIONAL  */
-    L_ARRAY_OPEN = 300,            /* L_ARRAY_OPEN  */
-    L_MAPPING_OPEN = 301,          /* L_MAPPING_OPEN  */
-    L_FUNCTION_OPEN = 302,         /* L_FUNCTION_OPEN  */
-    L_NEW_FUNCTION_OPEN = 303,     /* L_NEW_FUNCTION_OPEN  */
-    L_SSCANF = 304,                /* L_SSCANF  */
-    L_CATCH = 305,                 /* L_CATCH  */
-    L_ARRAY = 306,                 /* L_ARRAY  */
-    L_REF = 307,                   /* L_REF  */
-    L_PARSE_COMMAND = 308,         /* L_PARSE_COMMAND  */
-    L_TIME_EXPRESSION = 309,       /* L_TIME_EXPRESSION  */
-    L_CLASS = 310,                 /* L_CLASS  */
-    L_NEW = 311,                   /* L_NEW  */
-    L_PARAMETER = 312,             /* L_PARAMETER  */
-    L_TREE = 313,                  /* L_TREE  */
-    L_PREPROCESSOR_COMMAND = 314,  /* L_PREPROCESSOR_COMMAND  */
-    LOWER_THAN_ELSE = 315,         /* LOWER_THAN_ELSE  */
-    L_EQ = 316,                    /* L_EQ  */
-    L_NE = 317                     /* L_NE  */
+    L_INC_DEC = 269,               /* L_INC_DEC  */
+    L_ASSIGN = 270,                /* L_ASSIGN  */
+    L_LAND = 271,                  /* L_LAND  */
+    L_LOR = 272,                   /* L_LOR  */
+    L_QUESTION_QUESTION = 273,     /* L_QUESTION_QUESTION  */
+    L_SHIFT = 274,                 /* L_SHIFT  */
+    L_EQ_NE = 275,                 /* L_EQ_NE  */
+    L_ORDER = 276,                 /* L_ORDER  */
+    L_IF = 277,                    /* L_IF  */
+    L_ELSE = 278,                  /* L_ELSE  */
+    L_SWITCH = 279,                /* L_SWITCH  */
+    L_CASE = 280,                  /* L_CASE  */
+    L_DEFAULT = 281,               /* L_DEFAULT  */
+    L_RANGE = 282,                 /* L_RANGE  */
+    L_DOT_DOT_DOT = 283,           /* L_DOT_DOT_DOT  */
+    L_WHILE = 284,                 /* L_WHILE  */
+    L_DO = 285,                    /* L_DO  */
+    L_FOR = 286,                   /* L_FOR  */
+    L_FOREACH = 287,               /* L_FOREACH  */
+    L_IN = 288,                    /* L_IN  */
+    L_BREAK = 289,                 /* L_BREAK  */
+    L_CONTINUE = 290,              /* L_CONTINUE  */
+    L_RETURN = 291,                /* L_RETURN  */
+    L_ARROW = 292,                 /* L_ARROW  */
+    L_INHERIT = 293,               /* L_INHERIT  */
+    L_COLON_COLON = 294,           /* L_COLON_COLON  */
+    L_OPTIONAL_DOT = 295,          /* L_OPTIONAL_DOT  */
+    L_DOT_OPTIONAL = 296,          /* L_DOT_OPTIONAL  */
+    L_FUNCTION_OPEN = 297,         /* L_FUNCTION_OPEN  */
+    L_SSCANF = 298,                /* L_SSCANF  */
+    L_CATCH = 299,                 /* L_CATCH  */
+    L_ARRAY = 300,                 /* L_ARRAY  */
+    L_REF = 301,                   /* L_REF  */
+    L_PARSE_COMMAND = 302,         /* L_PARSE_COMMAND  */
+    L_TIME_EXPRESSION = 303,       /* L_TIME_EXPRESSION  */
+    L_CLASS = 304,                 /* L_CLASS  */
+    L_NEW = 305,                   /* L_NEW  */
+    L_PARAMETER = 306,             /* L_PARAMETER  */
+    L_TREE = 307,                  /* L_TREE  */
+    LOWER_THAN_ELSE = 308          /* LOWER_THAN_ELSE  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -122,7 +113,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 158 "$REPO_ROOT$/src/compiler/internal/grammar.y"
+#line 163 "$REPO_ROOT$/src/compiler/internal/grammar.y"
 
   LPC_INT number;              /* integers, opcodes, type flags */
   LPC_FLOAT real;              /* floating-point literals */
@@ -147,7 +138,7 @@ union YYSTYPE
     LPC_INT saved_refs;
   } call_open;                 /* context/refs captured at the '(' of a call */
 
-#line 151 "$REPO_ROOT$/build/src/grammar.autogen.h"
+#line 142 "$REPO_ROOT$/build/src/grammar.autogen.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

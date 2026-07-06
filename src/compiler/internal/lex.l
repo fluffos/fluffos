@@ -13,8 +13,8 @@
  * identifiers, '(' compound tokens (array/mapping/function-pointer open),
  * function-pointer $N params, char literals, and string literals are all
  * matched natively by Flex's DFA (several via exclusive start conditions
- * -- SC_FUNC_OPEN, SC_CHAR_BODY/SC_CHAR_CLOSE, SC_BLOCK_COMMENT,
- * SC_STRING_BODY, SC_TEMPLATE_BODY).
+ * -- SC_CHAR_BODY/SC_CHAR_CLOSE, SC_BLOCK_COMMENT, SC_STRING_BODY,
+ * SC_TEMPLATE_BODY).
  *
  * Preprocessor directives are one anchored rule capturing the whole '#'
  * line, dispatched to lexer_rules_pp.cc (macro table, #if conditional
@@ -177,13 +177,7 @@ static void lpc_lex_consume_directive_newline(void *yyscanner);
 WS          [ \t\r\n\v\f]
 WS_NO_NL    [ \t\r\v\f]
 
-/* SC_FUNC_OPEN: after "(:" (function-pointer open), skip whitespace and
- * decide whether this is a named function reference "(: name" or an
- * anonymous function literal "(: expr :)". See the "(" rules below. Also
- * pushes into SC_BLOCK_COMMENT on "/*"/"//" (see below) so a comment
- * between "(:" and the name/expr is skipped rather than misread as the
- * start of an anonymous function-pointer body.
- * SC_CHAR_BODY / SC_CHAR_CLOSE: character literal 'c' -- exactly one body
+/* SC_CHAR_BODY / SC_CHAR_CLOSE: character literal 'c' -- exactly one body
  * char/escape, then a closing quote. See the "'" rule below.
  * SC_BLOCK_COMMENT: a C-style block comment. Unlike heredocs, the closing
  * delimiter is fixed (not a runtime-supplied terminator), so this is a good
@@ -191,9 +185,8 @@ WS_NO_NL    [ \t\r\v\f]
  * yy_push_state()/left via yy_pop_state() (%option stack) rather than a
  * plain BEGIN(), so any state that should tolerate an embedded comment can
  * reuse it and automatically resume wherever it was, instead of needing
- * its own copy of the comment rules or hand-rolled "return to" tracking
- * (currently reused from both INITIAL and SC_FUNC_OPEN). See the
- * block-comment open rule below.
+ * its own copy of the comment rules or hand-rolled "return to" tracking.
+ * See the block-comment open rule below.
  * SC_STRING_BODY: a double-quoted string literal. Like block comments, the
  * closing delimiter is fixed; unlike comments, the preprocessor does NOT
  * strip these before the lexer sees them (it only skips over quoted text
@@ -220,7 +213,6 @@ WS_NO_NL    [ \t\r\v\f]
  * SC_COND_SKIP: inside a false #if/#ifdef branch -- lines are consumed
  * without tokenizing, watching only for the nested/closing conditional
  * directives. See the directive rules below. */
-%x SC_FUNC_OPEN
 %x SC_CHAR_BODY
 %x SC_CHAR_CLOSE
 %x SC_BLOCK_COMMENT
@@ -242,10 +234,9 @@ WS_NO_NL    [ \t\r\v\f]
      * reusable sub-scan: whichever state had a "/*" appear inside it gets
      * control back exactly where it left off once the comment closes,
      * instead of every such state needing its own copy of these six
-     * rules, or hand-rolling "which state do I return to" bookkeeping. See
-     * <SC_FUNC_OPEN>"/*" below for the other current entry point. */
-<INITIAL,SC_FUNC_OPEN>"/*"        { yy_push_state(SC_BLOCK_COMMENT, yyscanner); }
-<INITIAL,SC_FUNC_OPEN>"//"[^\n]*  { /* line comment; trailing newline handled by the \n rule */ }
+     * rules, or hand-rolling "which state do I return to" bookkeeping. */
+"/*"    { yy_push_state(SC_BLOCK_COMMENT, yyscanner); }
+"//"[^\n]*  { /* line comment; trailing newline handled by the \n rule */ }
 
     /* Block comment body: matched natively, no outp access. A lone slash
      * is kept out of the ordinary-run pattern below (it gets its own rule
@@ -288,23 +279,8 @@ WS_NO_NL    [ \t\r\v\f]
      * bare '##' in ordinary code is invalid and falls through to the '.'
      * catch-all like any other illegal character.
      *
-     * Shared with SC_FUNC_OPEN (the state after "(:") via a multi-state
-     * rule instead of a second copy of this exact pattern: the two states
-     * need different handling once matched (SC_FUNC_OPEN must peek one
-     * more raw byte to disambiguate "(: foo ," from "(: foo(...)"), so the
-     * action branches on YY_START, but the identifier PATTERN itself --
-     * and the actual identifier/macro resolution logic in
-     * lpc_lex_resolve_identifier() -- exists exactly once. */
-<INITIAL,SC_FUNC_OPEN>[a-zA-Z_][a-zA-Z0-9_]* {
-          /* The SC_FUNC_OPEN variant needs no buffer choreography anymore:
-           * resolve's "(: name" one-byte disambiguation reads through
-           * lpc_lex_getc() (Flex's own stream) instead of raw outp, so the
-           * old rewind-before/flush-after dance would only double-read the
-           * DFA's pending lookahead. */
-          if (YY_START == SC_FUNC_OPEN) {
-            BEGIN(INITIAL);
-            yyextra->function_flag = 1;
-          }
+     */
+[a-zA-Z_][a-zA-Z0-9_]* {
           return lpc_lex_resolve_identifier(yylval_param, yylloc_param, yyscanner);
         }
 
@@ -543,26 +519,14 @@ WS_NO_NL    [ \t\r\v\f]
         }
 "$"     { return lpc_lex_function_param(yylval_param, yytext, yyleng); }
 
-    /* '(' compound tokens: "({" (array), "([" (mapping), "(:"/"(::"
-     * (function-pointer open vs. plain '(' followed by the "::" scope
-     * operator). Whitespace (but not comments) may freely separate '(' from
-     * the following '{'/'['/ ':'. */
-"("{WS}*"{" {
-          lpc_lex_count_newlines(yytext, yyleng);
-          /* The '{' consumed here as part of the "({"  array-open token
-           * still closes with a *separate* bare '}' token (followed by
-           * ')'), so inside a template literal's ${...} interpolation it
-           * must count toward brace depth just like a standalone '{' --
-           * otherwise the array's closing '}' is misread as the end of
-           * the interpolation (real bug, found in self-review: any
-           * `${ ({ ... })... }` garbled the rest of the template). */
-          lpc_lex_brace_open(yyscanner);
-          return L_ARRAY_OPEN;
-        }
-"("{WS}*"[" {
-          lpc_lex_count_newlines(yytext, yyleng);
-          return L_MAPPING_OPEN;
-        }
+    /* '(' compound tokens, reduced by 9.1/9.2 to just "(:" (one
+     * function-pointer-open token; the named-vs-anonymous split lives in
+     * the grammar) plus its "(::" longest-match guard. Array "({" and mapping "([" literals are
+     * ORDINARY '(' '{' / '(' '[' token pairs now -- the grammar pairs
+     * them (their closers always were separate '}' ')' tokens),
+     * whitespace between flows through the normal rules, and the plain
+     * '{' rule's template-brace tracking covers the array-literal case
+     * with no special-casing. */
 "("{WS}*"::" {
           // '(' followed by the "::" scope operator, not a function-pointer
           // open. Put everything but '(' back -- whitespace included -- and
@@ -572,32 +536,19 @@ WS_NO_NL    [ \t\r\v\f]
           return '(';
         }
 "("{WS}*":" {
+          /* 9.2: "(:" is one token; the named-vs-anonymous split lives in
+           * the GRAMMAR now (shift-preference on the ':'/','' lookahead
+           * after a defined name). The function context is pushed here
+           * for every form and popped by whichever functional
+           * constructor reduces -- uniform, where the legacy lexer-side
+           * split pushed only for anon/override forms (and leaked the
+           * override's context). */
           lpc_lex_count_newlines(yytext, yyleng);
-          BEGIN(SC_FUNC_OPEN);
-        }
-"("     { return '('; }
-
-    /* Tail of "(:" -- skip further whitespace, then either a named
-     * function-pointer reference "(: name" or an anonymous function literal
-     * "(: expr :)" (anything else, pushed back for the next yylex() call).
-     * The identifier case itself is the shared <INITIAL,SC_FUNC_OPEN> rule
-     * above. */
-<SC_FUNC_OPEN>{WS}+ { lpc_lex_count_newlines(yytext, yyleng); }
-<SC_FUNC_OPEN><<EOF>> {
-          // The pop path is critical for the "(:" pushback splice: it
-          // holds ONLY "(:", the name/expr lives in the parent buffer.
-          if (!lpc_lex_pop_splice_if_any(yyscanner)) {
-            BEGIN(INITIAL);
-            push_function_context();
-            return L_FUNCTION_OPEN;
-          }
-        }
-<SC_FUNC_OPEN>. {
-          LPC_YYLESS(0);
-          BEGIN(INITIAL);
           push_function_context();
           return L_FUNCTION_OPEN;
         }
+"("     { return '('; }
+
 
     /* Preprocessor directives -- ONE anchored rule, serving BOTH scan
      * modes (emit and SC_COND_SKIP dead-branch), captures the whole
@@ -688,11 +639,11 @@ WS_NO_NL    [ \t\r\v\f]
           return lpc_lex_start_heredoc(yylval_param, yylloc_param, yyscanner);
         }
 
-"++"    { return L_INC; }
+"++"    { yylval_param->number = '+'; return L_INC_DEC; }
 "+="    { yylval_param->number = F_ADD_EQ; return L_ASSIGN; }
 "+"     { return '+'; }
 "->"    { return L_ARROW; }
-"--"    { return L_DEC; }
+"--"    { yylval_param->number = '-'; return L_INC_DEC; }
 "-="    { yylval_param->number = F_SUB_EQ; return L_ASSIGN; }
 "-"     { return '-'; }
 
@@ -710,12 +661,12 @@ WS_NO_NL    [ \t\r\v\f]
 "^"     { return '^'; }
 
 "<<="   { yylval_param->number = F_LSH_EQ; return L_ASSIGN; }
-"<<"    { return L_LSH; }
+"<<"    { yylval_param->number = F_LSH; return L_SHIFT; }
 "<="    { yylval_param->number = F_LE; return L_ORDER; }
 "<"     { return '<'; }
 
 ">>="   { yylval_param->number = F_RSH_EQ; return L_ASSIGN; }
-">>"    { return L_RSH; }
+">>"    { yylval_param->number = F_RSH; return L_SHIFT; }
 ">="    { yylval_param->number = F_GE; return L_ORDER; }
 ">"     { yylval_param->number = F_GT; return L_ORDER; }
 
@@ -728,7 +679,7 @@ WS_NO_NL    [ \t\r\v\f]
 "/="    { yylval_param->number = F_DIV_EQ; return L_ASSIGN; }
 "/"     { return '/'; }
 
-"=="    { return L_EQ; }
+"=="    { yylval_param->number = F_EQ; return L_EQ_NE; }
 "="     { yylval_param->number = F_ASSIGN; return L_ASSIGN; }
 
 "??="   { yylval_param->number = F_NULLISH_EQ; return L_ASSIGN; }
@@ -740,8 +691,8 @@ WS_NO_NL    [ \t\r\v\f]
 "?."/[A-Za-z_\[]  { return L_OPTIONAL_DOT; }
 "?"     { return '?'; }
 
-"!="    { return L_NE; }
-"!"     { return L_NOT; }
+"!="    { yylval_param->number = F_NE; return L_EQ_NE; }
+"!"     { return '!'; }
 
 "::"    { return L_COLON_COLON; }
 ":"     { return ':'; }
@@ -753,7 +704,7 @@ WS_NO_NL    [ \t\r\v\f]
      * lookahead disambiguation is needed here the way "?." above needs one:
      * a literal '?' right after '.' was already a syntax error otherwise. */
 ".?"    { return L_DOT_OPTIONAL; }
-"."     { return L_DOT; }
+"."     { return '.'; }
 
 ")"     { return ')'; }
     /* '{'/'}' inside a template literal's ${...} interpolation need brace-
