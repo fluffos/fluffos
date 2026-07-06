@@ -120,7 +120,8 @@ FluffOS uses GitHub Actions for CI on pull requests and pushes to `master`.
 * **Efun Tests**: Any new or modified external function must have matching LPC test scripts added to the `testsuite/` directory under `testsuite/single/tests/efuns/`.
 * **Testing Targets**:
   - `driver-testsuite`: Boots the local driver pointing to the test configuration.
-  - `driver-fulltest`: Runs the LPC test suite and reports results before exiting.
+  - `driver-fulltest` / `driver-autotest`: Runs the LPC test suite and reports results before exiting.
+* **`driver-autotest` is a real pass/fail gate.** It is a CMake custom target (always stale, so it re-runs every invocation), running `driver etc/config.test -ftest`. A clean run prints `Checks succeeded.` and exits 0; any failing LPC assertion propagates through the mudlib's `shutdown(-1)` to a **nonzero exit that fails the target** (no `[100%] Built target driver-autotest` line). So "Built target driver-autotest printed / exit 0" is a sound full-suite pass signal. When touching the lexer/parser, run it 2–3× (it randomizes test file order) and prefer both a Debug ASan build and a `RelWithDebInfo` build (some issues are release-only).
 
 ---
 
@@ -211,20 +212,31 @@ WSL provides a **native Linux** environment. FluffOS runs natively under WSL dis
 
 ---
 
-## 11. Compiler/Internal Guidelines & Standalone Preprocessor
+## 11. Compiler Front-End (`compiler/internal/`)
 
-* **`compiler/internal/`**: Contains the compiler front-end, lexer utilities, grammar files, and the standalone LPC preprocessor.
-* **Standalone Preprocessor (`preprocessor.cc` / `preprocessor.h`)**:
-  - Operates entirely on C++ `std::string` and `std::string_view` with zero global state (all state is encapsulated in `LpcPreprocessor::Impl`).
-  - Includes are resolved using `inc_open()`, returning a `std::pair<int, std::string>` containing the open file descriptor and the resolved absolute path. The files are fed into `FileLexStream` to be processed recursively.
-  - Registers built-in macros at instantiation by querying the central predefines registry in `lexer_utils.cc`.
-* **Lexer Utilities (`lexer_utils.cc` / `lexer_utils.h`)**:
-  - Implements include path management, path normalization/merging, and macro predefine registration.
-  - High-performance interfaces: `add_predefine`, `add_quoted_predefine`, and `inc_open` use `std::string_view` to avoid unnecessary heap allocation overhead from temporary string copies.
-  - Include paths (`inc_path`, `inc_list`) are stored as modern C++ containers (`std::vector<std::string>`). They are automatically managed and do not require manual GC marking (`mark_all_defines` is a no-op).
-* **Testing compiler/internal**:
-  - Compiler front-end tests reside in `src/tests/test_compiler.cc`.
-  - When writing tests for features like `#undef` of predefined values, ensure the target predefined macro (e.g. `FLUFFOS`) is added to the global predefines registry using `add_predefine` during test setup, since the full driver runtime is not initialized during unit tests.
+**Read `src/compiler/internal/README.md` first** — it is the authoritative, maintained architecture document (module responsibilities, the data-flow diagram, header-ordering constraints). This section is the agent-facing summary of the load-bearing facts.
+
+### Single-scan, Flex-native lexer + preprocessor
+* **There is no separate preprocessor and no hand-rolled input buffer.** Preprocessing is a set of Flex rule actions inside the driver's ONE scan over the source; every byte is read exactly once. The old standalone `preprocessor.cc` engine and the old `outp`/ring-buffer are both gone.
+* **Input rides on Flex's own buffer stack.** The main file is bulk-read through `YY_INPUT` into Flex's base buffer; macro expansions, pushbacks, and `#include` contents are pushed as in-memory Flex buffers (`lpc_lex_push_string_buffer`), popped at their `<<EOF>>`. Raw mid-rule reads (heredoc bodies, function-like macro-argument collection) go through `lpc_lex_getc()` (a wrapper over the generated `yyinput()`), which transparently pops a drained splice buffer into its parent.
+* **Line/column tracking is native Flex state** (`%option yylineno` + a `YY_USER_ACTION` column). `current_line` is a macro over a reference to the innermost real buffer's per-buffer counter, so isolation across expansions and includes is automatic.
+* **Macro expansion is rescan-driven**: `lpc_lex_resolve_identifier()` pushes the raw substituted body as a buffer and nested references expand when the rescan reaches them; self-reference termination is the set of live expansion-buffer frames. `#if`/`#elif` expressions are evaluated over **tokens** pulled through the scanner (not a private character walk), so `#define X 1+1` + `#if X*2` is `1+1*2` with correct C precedence. Redefining a macro with a different body is a **non-fatal warning**, not an error.
+
+### The lex.l purity rule (enforced)
+* **`lex.l` contains ONLY Flex interactions** — patterns, start-condition transitions (`BEGIN`), pushback (`yyless`), and trailer helpers that must touch the generated scanner's private types (`yyguts_t`, the buffer stack). ALL substantial logic lives in `lexer_rules.cc` (token shaping), `lexer_rules_pp.cc` (preprocessing), or `lexer_utils.cc` (buffer/include bookkeeping, macro resolution). When adding a rule, put anything that only needs `yytext`/`yylval`/`yyget_extra()` in a `lexer_rules*.cc` helper.
+
+### Grammar carries some lexical decisions (don't reintroduce lexer state for them)
+* Array/mapping opens `({`/`([` are ordinary `'(' '{'` / `'(' '['` token pairs the grammar pairs; the `(: name` first-class-function split is decided by LALR lookahead, not a start condition. `grammar.y`'s `%expect` counts the intentional (documented) conflicts — changing those productions means re-running `bison -Wcounterexamples` and updating the count.
+* **Token inventory is deliberately minimal.** Same-precedence operator families share one value-carrying token (opcode in `yylval`: `L_EQ_NE`, `L_SHIFT`, `L_INC_DEC`, `L_ORDER`); single-char operators are plain char tokens (`'!'`, `'.'`). Add an `L_*` token only for a real new feature or a distinct grammar position.
+
+### Diagnostics
+* Every `yyerror()`/`yywarn()` captures a structured `Diagnostic` (position + column, source snippet + caret, `#include` chain, macro-expansion chain, operand ranges via Bison `%locations`, fix-it hints) and reports it **clang-style by default** via `report_compile_diagnostic()`. `lpcshell` reads `compiler_diags` directly.
+* **Never pass untrusted text as a printf format.** `lexerror(s)`, `yyerror`, `yywarn`, and VM `error()` are printf-style; source-derived text (`#error` payloads, macro/verb names, filenames) must be an ARGUMENT (`yywarn("%s", s)`), never the format string (a `%` in the text is a crash / CodeQL `cpp/tainted-format-string`).
+
+### Utilities & testing
+* **`lexer_utils.cc` / `lexer_utils.h`** also own include-path management, path normalization, and the predefine registry (`add_predefine`, `add_quoted_predefine`, `inc_open` — `std::string_view` interfaces; `inc_path`/`inc_list` are `std::vector<std::string>`, no manual GC marking).
+* Compiler front-end tests are `src/tests/test_compiler.cc` (end-to-end through the real lexer) and `src/tests/test_lexer.cc` (token-level). When testing `#undef` of a predefined value, register the predefine (e.g. `FLUFFOS`) via `add_predefine` in setup — the full driver runtime is not initialized in unit tests.
+* **CI regenerates the scanner and parser from `lex.l`/`grammar.y` on every platform** (flex ≥ 2.6, bison ≥ 3.8 are installed in every CI environment), so a `lex.l`/`grammar.y` change is validated by the toolchain, not just the checked-in `*.autogen.*` copies. Keep a clean regeneration warning-free.
 
 ---
 

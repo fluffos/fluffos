@@ -3,7 +3,7 @@
  * lex.l — Flex scanner for the LPC lexer.
  *
  * This is the driver's ONE scan over LPC source: preprocessing is part of
- * lexing, not a separate pass (see plans/unified-push-lexer.md). The main
+ * lexing, not a separate pass. The main
  * file's bytes flow LexStream -> YY_INPUT -> Flex's base buffer; macro
  * splices and #include contents are in-memory buffers pushed on Flex's
  * buffer stack. Every byte is read exactly once, one token's worth of
@@ -43,8 +43,7 @@
  * collector) read through Flex itself via lpc_lex_getc() -- a thin
  * wrapper over the generated yyinput() -- so they drain Flex's own buffer
  * before touching fresh input, and no rewind/flush choreography is needed
- * around them. See plans/flex-lexer-migration.md for the risk/value
- * writeup and per-conversion deviation notes. Only genuinely invalid
+ * around them. Only genuinely invalid
  * input reaches the catch-all `.` rule at the bottom.
  *
  * Include order: grammar_rules.h MUST come before grammar.autogen.h
@@ -79,7 +78,12 @@
 // lpc_lex_fatal (compiler.cc). (Bounding the run patterns with {1,4096}
 // repeats was tried and reverted: flex expands bounded repeats by
 // duplicating DFA states, ballooning the generated scanner to over a
-// million lines.)
+// million lines.) The #undef silences flex's own default definition
+// (8192, emitted earlier in the generated file) -- a redefine warning
+// now that CI regenerates the scanner on every platform.
+#ifdef YYLMAX
+#undef YYLMAX
+#endif
 #define YYLMAX 65536
 #define YY_FATAL_ERROR(msg) lpc_lex_fatal(msg)
 
@@ -231,7 +235,7 @@ WS_NO_NL    [ \t\r\v\f]
 
     /* SC_BLOCK_COMMENT is entered via yy_push_state()/left via
      * yy_pop_state() (%option stack), not a plain BEGIN(), so it's a
-     * reusable sub-scan: whichever state had a "/*" appear inside it gets
+     * reusable sub-scan: whichever state had a comment-open appear in it gets
      * control back exactly where it left off once the comment closes,
      * instead of every such state needing its own copy of these six
      * rules, or hand-rolling "which state do I return to" bookkeeping. */
@@ -249,7 +253,7 @@ WS_NO_NL    [ \t\r\v\f]
 <SC_BLOCK_COMMENT>"*"+      { /* run of '*' not (yet) followed by the closing '/' */ }
 <SC_BLOCK_COMMENT>\n        { lpc_lex_newline(yyscanner); }
 <SC_BLOCK_COMMENT>[^*/\n]+  { /* ordinary comment text */ }
-<SC_BLOCK_COMMENT>"/"       { /* lone '/', not the start of a nested "/*" */ }
+<SC_BLOCK_COMMENT>"/"       { /* lone slash, not the start of a nested comment-open */ }
 <SC_BLOCK_COMMENT><<EOF>>   {
               /* Every state-specific <<EOF>> rule pops a drained pushed
                * buffer first (lpc_lex_pop_splice_if_any) and keeps
@@ -287,8 +291,8 @@ WS_NO_NL    [ \t\r\v\f]
     /* String literals: fully native via SC_STRING_BODY, no outp access.
      * Escapes are decoded rule-by-rule into str_accum (declared above) as
      * they're matched; the scratchpad allocation happens once, at the
-     * closing quote. See plans/flex-lexer-migration.md for the two
-     * intentional deviations from the original hand-written version (an
+     * closing quote. Two intentional deviations from the original
+     * hand-written version (an
      * embedded-NUL quirk on octal \8/\9, and simplified error messages on
      * a handful of malformed \u/\U corners) and one fixed-as-a-side-effect
      * inconsistency (\u/\U now decode the same way regardless of string
@@ -455,7 +459,7 @@ WS_NO_NL    [ \t\r\v\f]
 <SC_CHAR_BODY>"\\"[0-7]+ { yylval_param->number = lpc_lex_char_octal_escape(yytext); BEGIN(SC_CHAR_CLOSE); }
 <SC_CHAR_BODY>"\\"[89]  {
           // Deviation from the original hand-written scanner (documented in
-          // plans/flex-lexer-migration.md): '\8'/'\9' aren't valid octal, so
+          // historical note): '\8'/'\9' aren't valid octal, so
           // the original's strtoll() there consumed zero digits and fell
           // through to its "missing closing quote" check, reporting the
           // same "Illegal character constant" error by a different path.
@@ -800,7 +804,7 @@ int lpc_lex_getc(void *yyscanner) {
 // clobbering (and later double-freeing) the live one. ASan caught the
 // naive yypush_buffer_state(yy_scan_string(...)) composition as a
 // heap-use-after-free on the very first macro expansion (see
-// plans/MASTER-PLAN.md 5.5).
+// the compiler README / git history).
 void lpc_lex_push_string_buffer(const char *text, size_t len, int kind,
                                 void *yyscanner) {
   struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;

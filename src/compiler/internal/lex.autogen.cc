@@ -2550,7 +2550,7 @@ static const yy_state_type yy_NUL_trans[214] =
  * lex.l — Flex scanner for the LPC lexer.
  *
  * This is the driver's ONE scan over LPC source: preprocessing is part of
- * lexing, not a separate pass (see plans/unified-push-lexer.md). The main
+ * lexing, not a separate pass. The main
  * file's bytes flow LexStream -> YY_INPUT -> Flex's base buffer; macro
  * splices and #include contents are in-memory buffers pushed on Flex's
  * buffer stack. Every byte is read exactly once, one token's worth of
@@ -2590,8 +2590,7 @@ static const yy_state_type yy_NUL_trans[214] =
  * collector) read through Flex itself via lpc_lex_getc() -- a thin
  * wrapper over the generated yyinput() -- so they drain Flex's own buffer
  * before touching fresh input, and no rewind/flush choreography is needed
- * around them. See plans/flex-lexer-migration.md for the risk/value
- * writeup and per-conversion deviation notes. Only genuinely invalid
+ * around them. Only genuinely invalid
  * input reaches the catch-all `.` rule at the bottom.
  *
  * Include order: grammar_rules.h MUST come before grammar.autogen.h
@@ -2626,7 +2625,12 @@ static const yy_state_type yy_NUL_trans[214] =
 // lpc_lex_fatal (compiler.cc). (Bounding the run patterns with {1,4096}
 // repeats was tried and reverted: flex expands bounded repeats by
 // duplicating DFA states, ballooning the generated scanner to over a
-// million lines.)
+// million lines.) The #undef silences flex's own default definition
+// (8192, emitted earlier in the generated file) -- a redefine warning
+// now that CI regenerates the scanner on every platform.
+#ifdef YYLMAX
+#undef YYLMAX
+#endif
 #define YYLMAX 65536
 #define YY_FATAL_ERROR(msg) lpc_lex_fatal(msg)
 
@@ -2708,7 +2712,7 @@ static int lpc_lex_pop_splice_if_any(void *yyscanner);
 static void lpc_lex_consume_directive_newline(void *yyscanner);
 
 
-#line 2712 "/home/sunyc/src/fluffos/build/src/lex.autogen.cc"
+#line 2716 "/home/sunyc/src/fluffos/build/src/lex.autogen.cc"
 /* SC_CHAR_BODY / SC_CHAR_CLOSE: character literal 'c' -- exactly one body
  * char/escape, then a closing quote. See the "'" rule below.
  * SC_BLOCK_COMMENT: a C-style block comment. Unlike heredocs, the closing
@@ -2746,7 +2750,7 @@ static void lpc_lex_consume_directive_newline(void *yyscanner);
  * without tokenizing, watching only for the nested/closing conditional
  * directives. See the directive rules below. */
 
-#line 2750 "/home/sunyc/src/fluffos/build/src/lex.autogen.cc"
+#line 2754 "/home/sunyc/src/fluffos/build/src/lex.autogen.cc"
 
 #define INITIAL 0
 #define SC_CHAR_BODY 1
@@ -3043,12 +3047,12 @@ YY_DECL
 		}
 
 	{
-#line 224 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 228 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 
 
 
 
-#line 3052 "/home/sunyc/src/fluffos/build/src/lex.autogen.cc"
+#line 3056 "/home/sunyc/src/fluffos/build/src/lex.autogen.cc"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -3114,35 +3118,35 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 228 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 232 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { /* ignore */ }
 	YY_BREAK
 case 2:
 /* rule 2 can match eol */
 YY_RULE_SETUP
-#line 229 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 233 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { lpc_lex_newline(yyscanner); }
 	YY_BREAK
 case 3:
 /* rule 3 can match eol */
 YY_RULE_SETUP
-#line 230 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 234 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { lpc_lex_newline(yyscanner); }
 	YY_BREAK
 /* SC_BLOCK_COMMENT is entered via yy_push_state()/left via
      * yy_pop_state() (%option stack), not a plain BEGIN(), so it's a
-     * reusable sub-scan: whichever state had a "/*" appear inside it gets
+     * reusable sub-scan: whichever state had a comment-open appear in it gets
      * control back exactly where it left off once the comment closes,
      * instead of every such state needing its own copy of these six
      * rules, or hand-rolling "which state do I return to" bookkeeping. */
 case 4:
 YY_RULE_SETUP
-#line 238 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 242 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yy_push_state(SC_BLOCK_COMMENT, yyscanner); }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 239 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 243 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { /* line comment; trailing newline handled by the \n rule */ }
 	YY_BREAK
 /* Block comment body: matched natively, no outp access. A lone slash
@@ -3153,37 +3157,37 @@ YY_RULE_SETUP
      * together with the preceding character by the catch-all run. */
 case 6:
 YY_RULE_SETUP
-#line 247 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 251 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yywarn("/* found in comment."); }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 248 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 252 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yy_pop_state(yyscanner); }
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 249 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 253 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { /* run of '*' not (yet) followed by the closing '/' */ }
 	YY_BREAK
 case 9:
 /* rule 9 can match eol */
 YY_RULE_SETUP
-#line 250 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 254 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { lpc_lex_newline(yyscanner); }
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 251 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 255 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { /* ordinary comment text */ }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 252 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
-{ /* lone '/', not the start of a nested "/*" */ }
+#line 256 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+{ /* lone slash, not the start of a nested comment-open */ }
 	YY_BREAK
 case YY_STATE_EOF(SC_BLOCK_COMMENT):
-#line 253 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 257 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
               /* Every state-specific <<EOF>> rule pops a drained pushed
                * buffer first (lpc_lex_pop_splice_if_any) and keeps
@@ -3198,17 +3202,17 @@ case YY_STATE_EOF(SC_BLOCK_COMMENT):
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 265 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 269 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return lpc_lex_number_hex(yylval_param, yytext, yyleng); }
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 266 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 270 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return lpc_lex_number_bin(yylval_param, yytext, yyleng); }
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 267 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 271 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return lpc_lex_number_real(yylval_param, yytext, yyleng); }
 	YY_BREAK
 
@@ -3224,12 +3228,12 @@ YY_LINENO_REWIND_TO(yy_cp - 1);
 yyg->yy_c_buf_p = yy_cp -= 1;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 274 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 278 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return lpc_lex_number_real(yylval_param, yytext, yyleng); }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 275 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 279 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return lpc_lex_number_dec(yylval_param, yytext, yyleng); }
 	YY_BREAK
 /* Note: '##' token pasting exists only INSIDE macro bodies (resolved
@@ -3240,7 +3244,7 @@ YY_RULE_SETUP
      */
 case 17:
 YY_RULE_SETUP
-#line 283 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 287 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           return lpc_lex_resolve_identifier(yylval_param, yylloc_param, yyscanner);
         }
@@ -3248,8 +3252,8 @@ YY_RULE_SETUP
 /* String literals: fully native via SC_STRING_BODY, no outp access.
      * Escapes are decoded rule-by-rule into str_accum (declared above) as
      * they're matched; the scratchpad allocation happens once, at the
-     * closing quote. See plans/flex-lexer-migration.md for the two
-     * intentional deviations from the original hand-written version (an
+     * closing quote. Two intentional deviations from the original
+     * hand-written version (an
      * embedded-NUL quirk on octal \8/\9, and simplified error messages on
      * a handful of malformed \u/\U corners) and one fixed-as-a-side-effect
      * inconsistency (\u/\U now decode the same way regardless of string
@@ -3257,7 +3261,7 @@ YY_RULE_SETUP
      * first 255 bytes of a string). */
 case 18:
 YY_RULE_SETUP
-#line 297 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 301 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yyextra->str_accum.clear(); BEGIN(SC_STRING_BODY); }
 	YY_BREAK
 /* Template literals `...${expr}...`: the literal-text fragments are
@@ -3275,13 +3279,13 @@ YY_RULE_SETUP
      * further below). */
 case 19:
 YY_RULE_SETUP
-#line 312 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 316 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yyextra->str_accum.clear(); yyextra->template_is_continuation = false; BEGIN(SC_TEMPLATE_BODY); }
 	YY_BREAK
 case 20:
 /* rule 20 can match eol */
 YY_RULE_SETUP
-#line 314 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 318 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           lpc_lex_newline(yyscanner);
           yyextra->str_accum += '\n';
@@ -3297,14 +3301,14 @@ YY_RULE_SETUP
 case 21:
 /* rule 21 can match eol */
 YY_RULE_SETUP
-#line 325 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 329 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { lpc_lex_newline(yyscanner); }
 	YY_BREAK
 case 22:
-#line 327 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 331 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 case 23:
 YY_RULE_SETUP
-#line 327 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 331 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           yyextra->str_accum.append(yytext, yyleng);
           STR_CHECK_OVERFLOW();
@@ -3313,7 +3317,7 @@ YY_RULE_SETUP
 case 24:
 /* rule 24 can match eol */
 YY_RULE_SETUP
-#line 331 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 335 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           lpc_lex_newline(yyscanner);
           yyextra->str_accum += '\n';
@@ -3323,22 +3327,22 @@ YY_RULE_SETUP
 case 25:
 /* rule 25 can match eol */
 YY_RULE_SETUP
-#line 336 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 340 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { lpc_lex_newline(yyscanner); /* newlines are removed, not preserved */ }
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 337 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 341 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yyextra->str_accum += '\r'; STR_CHECK_OVERFLOW(); }
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 338 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 342 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yyextra->str_accum += '$'; STR_CHECK_OVERFLOW(); }
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 339 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 343 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           BEGIN(INITIAL);
           return lpc_lex_string_close(yyscanner, yylval_param);
@@ -3356,7 +3360,7 @@ YY_RULE_SETUP
      * head fragment came back containing the *tail* fragment's text). */
 case 29:
 YY_RULE_SETUP
-#line 353 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 357 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           BEGIN(INITIAL);
           return lpc_lex_template_head_or_middle(yyscanner, yylval_param);
@@ -3364,7 +3368,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-#line 357 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 361 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           BEGIN(INITIAL);
           return lpc_lex_template_tail_or_string(yyscanner, yylval_param);
@@ -3372,7 +3376,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case YY_STATE_EOF(SC_STRING_BODY):
 case YY_STATE_EOF(SC_TEMPLATE_BODY):
-#line 361 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 365 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           if (!lpc_lex_pop_splice_if_any(yyscanner)) {
             lexerror(YY_START == SC_TEMPLATE_BODY ? "End of file in template literal"
@@ -3385,13 +3389,13 @@ case YY_STATE_EOF(SC_TEMPLATE_BODY):
 case 31:
 /* rule 31 can match eol */
 YY_RULE_SETUP
-#line 370 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 374 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { lpc_lex_newline(yyscanner); }
 	YY_BREAK
 case 32:
 /* rule 32 can match eol */
 YY_RULE_SETUP
-#line 371 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 375 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { lpc_lex_newline(yyscanner); }
 	YY_BREAK
 /* Simple one-character escapes, all decoded through the one shared
@@ -3402,12 +3406,12 @@ YY_RULE_SETUP
      * itself exists exactly once for string, template, AND char-literal
      * bodies. */
 case 33:
-#line 380 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 384 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 case 34:
-#line 381 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 385 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 case 35:
 YY_RULE_SETUP
-#line 381 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 385 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           yyextra->str_accum += static_cast<char>(lpc_lex_simple_escape(yytext[1]));
           STR_CHECK_OVERFLOW();
@@ -3415,7 +3419,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 36:
 YY_RULE_SETUP
-#line 385 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 389 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           lpc_lex_append_octal_escape(yyscanner, yytext, YY_START == SC_TEMPLATE_BODY);
           STR_CHECK_OVERFLOW();
@@ -3430,14 +3434,14 @@ YY_RULE_SETUP
      * instead of replicating that. */
 case 37:
 YY_RULE_SETUP
-#line 396 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 400 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           lpc_lex_append_bad_octal_escape(yyscanner, YY_START == SC_TEMPLATE_BODY);
         }
 	YY_BREAK
 case 38:
 YY_RULE_SETUP
-#line 399 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 403 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           lpc_lex_append_hex_escape(yyscanner, yytext, YY_START == SC_TEMPLATE_BODY);
           STR_CHECK_OVERFLOW();
@@ -3445,7 +3449,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 39:
 YY_RULE_SETUP
-#line 403 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 407 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           lpc_lex_append_bad_hex_escape(yyscanner, YY_START == SC_TEMPLATE_BODY);
           STR_CHECK_OVERFLOW();
@@ -3460,7 +3464,7 @@ YY_RULE_SETUP
      * support \u/\U. */
 case 40:
 YY_RULE_SETUP
-#line 414 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 418 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           lpc_lex_append_unicode_pair_escape(yyscanner, yytext);
           STR_CHECK_OVERFLOW();
@@ -3475,7 +3479,7 @@ YY_RULE_SETUP
      * purpose, and both still report a clear error and recover. */
 case 41:
 YY_RULE_SETUP
-#line 425 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 429 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           lpc_lex_append_unicode_escape(yyscanner, yytext);
           STR_CHECK_OVERFLOW();
@@ -3483,12 +3487,12 @@ YY_RULE_SETUP
 	YY_BREAK
 case 42:
 YY_RULE_SETUP
-#line 429 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 433 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { lexerror("Illegal unicode sequence."); }
 	YY_BREAK
 case 43:
 YY_RULE_SETUP
-#line 430 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 434 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           lpc_lex_append_long_unicode_escape(yyscanner, yytext, yyleng);
           STR_CHECK_OVERFLOW();
@@ -3496,12 +3500,12 @@ YY_RULE_SETUP
 	YY_BREAK
 case 44:
 YY_RULE_SETUP
-#line 434 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 438 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { lexerror("Illegal unicode sequence."); }
 	YY_BREAK
 case 45:
 YY_RULE_SETUP
-#line 435 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 439 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           lpc_lex_append_unknown_escape(yyscanner, yytext, YY_START == SC_TEMPLATE_BODY);
           STR_CHECK_OVERFLOW();
@@ -3515,7 +3519,7 @@ YY_RULE_SETUP
      * accumulation for Flex to sidestep. */
 case 46:
 YY_RULE_SETUP
-#line 446 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 450 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { BEGIN(SC_CHAR_BODY); }
 	YY_BREAK
 /* Simple escapes decode through the same shared table as
@@ -3524,7 +3528,7 @@ YY_RULE_SETUP
      * this rule's character class. */
 case 47:
 YY_RULE_SETUP
-#line 451 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 455 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           yylval_param->number = lpc_lex_simple_escape(yytext[1]);
           BEGIN(SC_CHAR_CLOSE);
@@ -3532,15 +3536,15 @@ YY_RULE_SETUP
 	YY_BREAK
 case 48:
 YY_RULE_SETUP
-#line 455 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 459 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = lpc_lex_char_octal_escape(yytext); BEGIN(SC_CHAR_CLOSE); }
 	YY_BREAK
 case 49:
 YY_RULE_SETUP
-#line 456 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 460 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           // Deviation from the original hand-written scanner (documented in
-          // plans/flex-lexer-migration.md): '\8'/'\9' aren't valid octal, so
+          // historical note): '\8'/'\9' aren't valid octal, so
           // the original's strtoll() there consumed zero digits and fell
           // through to its "missing closing quote" check, reporting the
           // same "Illegal character constant" error by a different path.
@@ -3552,21 +3556,21 @@ YY_RULE_SETUP
 	YY_BREAK
 case 50:
 YY_RULE_SETUP
-#line 467 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 471 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = lpc_lex_char_hex_escape(yytext); BEGIN(SC_CHAR_CLOSE); }
 	YY_BREAK
 case 51:
 YY_RULE_SETUP
-#line 468 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 472 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = lpc_lex_char_bad_hex_escape(); BEGIN(SC_CHAR_CLOSE); }
 	YY_BREAK
 case 52:
 /* rule 52 can match eol */
-#line 470 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 474 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 case 53:
 /* rule 53 can match eol */
 YY_RULE_SETUP
-#line 470 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 474 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           yylval_param->number = '\n';
           lpc_lex_newline(yyscanner);
@@ -3575,7 +3579,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 54:
 YY_RULE_SETUP
-#line 475 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 479 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = lpc_lex_char_unknown_escape(yytext); BEGIN(SC_CHAR_CLOSE); }
 	YY_BREAK
 /* Matches the original's unconditional raw-byte fallback: any
@@ -3587,7 +3591,7 @@ YY_RULE_SETUP
 case 55:
 /* rule 55 can match eol */
 YY_RULE_SETUP
-#line 482 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 486 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           yylval_param->number = static_cast<unsigned char>(yytext[0]);
           BEGIN(SC_CHAR_CLOSE);
@@ -3595,7 +3599,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 56:
 YY_RULE_SETUP
-#line 486 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 490 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           BEGIN(INITIAL);
           reinterpret_cast<compiler_context_t *>(yyget_extra(yyscanner))->is_char_literal = true;
@@ -3612,13 +3616,13 @@ YY_RULE_SETUP
      * 10 instead of 0). The non-EOF failure pushes the offending byte
      * back for the next scan, matching the original. */
 case YY_STATE_EOF(SC_CHAR_BODY):
-#line 500 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 504 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           if (!lpc_lex_pop_splice_if_any(yyscanner)) { BEGIN(INITIAL); return lpc_lex_char_error(yylval_param); }
         }
 	YY_BREAK
 case YY_STATE_EOF(SC_CHAR_CLOSE):
-#line 503 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 507 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           if (!lpc_lex_pop_splice_if_any(yyscanner)) { BEGIN(INITIAL); return lpc_lex_char_error(yylval_param); }
         }
@@ -3626,7 +3630,7 @@ case YY_STATE_EOF(SC_CHAR_CLOSE):
 case 57:
 /* rule 57 can match eol */
 YY_RULE_SETUP
-#line 506 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 510 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           LPC_YYLESS(0);
           BEGIN(INITIAL);
@@ -3638,7 +3642,7 @@ YY_RULE_SETUP
      * the number. */
 case 58:
 YY_RULE_SETUP
-#line 515 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 519 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           int result = lpc_lex_function_param(yylval_param, yytext, yyleng);
           if (result == kLpcLexFunctionParamRetry) return yylex(yylval_param, yylloc_param, yyscanner);
@@ -3647,7 +3651,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 59:
 YY_RULE_SETUP
-#line 520 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 524 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return lpc_lex_function_param(yylval_param, yytext, yyleng); }
 	YY_BREAK
 /* '(' compound tokens, reduced by 9.1/9.2 to just "(:" (one
@@ -3661,7 +3665,7 @@ YY_RULE_SETUP
 case 60:
 /* rule 60 can match eol */
 YY_RULE_SETUP
-#line 530 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 534 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           // '(' followed by the "::" scope operator, not a function-pointer
           // open. Put everything but '(' back -- whitespace included -- and
@@ -3674,7 +3678,7 @@ YY_RULE_SETUP
 case 61:
 /* rule 61 can match eol */
 YY_RULE_SETUP
-#line 538 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 542 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           /* 9.2: "(:" is one token; the named-vs-anonymous split lives in
            * the GRAMMAR now (shift-preference on the ':'/','' lookahead
@@ -3690,7 +3694,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 62:
 YY_RULE_SETUP
-#line 550 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 554 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return '('; }
 	YY_BREAK
 /* Preprocessor directives -- ONE anchored rule, serving BOTH scan
@@ -3716,7 +3720,7 @@ YY_RULE_SETUP
 case 63:
 /* rule 63 can match eol */
 YY_RULE_SETUP
-#line 573 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 577 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
     lpc_lex_consume_directive_newline(yyscanner);
     LpcDirectiveAction act =
@@ -3730,13 +3734,13 @@ YY_RULE_SETUP
 	YY_BREAK
 case 64:
 YY_RULE_SETUP
-#line 584 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 588 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { /* dead-branch text: never tokenized */ }
 	YY_BREAK
 case 65:
 /* rule 65 can match eol */
 YY_RULE_SETUP
-#line 585 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 589 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { lpc_lex_newline(yyscanner); }
 	YY_BREAK
 /* Heredoc "@"/"@@" prefix and terminator identifier: fully native, no
@@ -3747,7 +3751,7 @@ YY_RULE_SETUP
      * still detected even though that rule then never fires. */
 case 66:
 YY_RULE_SETUP
-#line 593 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 597 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           yyextra->heredoc_terminator.clear();
           yyextra->heredoc_is_array = (yyleng == 2);
@@ -3756,13 +3760,13 @@ YY_RULE_SETUP
 	YY_BREAK
 case 67:
 YY_RULE_SETUP
-#line 598 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 602 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yyextra->heredoc_terminator.assign(yytext, yyleng); }
 	YY_BREAK
 case 68:
 /* rule 68 can match eol */
 YY_RULE_SETUP
-#line 599 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 603 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           /* parseHeredoc() reads the body through lpc_lex_getc() (Flex's
            * own stream), so no rewind/flush choreography is needed here
@@ -3787,11 +3791,11 @@ YY_RULE_SETUP
      * original does. */
 case 69:
 YY_RULE_SETUP
-#line 620 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 624 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { /* consumed; next scan decides via <<EOF>> or "." below */ }
 	YY_BREAK
 case YY_STATE_EOF(SC_HEREDOC_TERM):
-#line 621 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 625 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           if (!lpc_lex_pop_splice_if_any(yyscanner)) {
             // Matches the original: EOF anywhere before the trailing
@@ -3805,7 +3809,7 @@ case YY_STATE_EOF(SC_HEREDOC_TERM):
 	YY_BREAK
 case 70:
 YY_RULE_SETUP
-#line 631 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 635 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           // Non-whitespace, non-newline byte right after the terminator
           // name (or immediately after "@"/"@@"): the original leaves it
@@ -3819,177 +3823,177 @@ YY_RULE_SETUP
 	YY_BREAK
 case 71:
 YY_RULE_SETUP
-#line 642 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 646 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = '+'; return L_INC_DEC; }
 	YY_BREAK
 case 72:
 YY_RULE_SETUP
-#line 643 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 647 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = F_ADD_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 73:
 YY_RULE_SETUP
-#line 644 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 648 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return '+'; }
 	YY_BREAK
 case 74:
 YY_RULE_SETUP
-#line 645 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 649 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return L_ARROW; }
 	YY_BREAK
 case 75:
 YY_RULE_SETUP
-#line 646 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 650 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = '-'; return L_INC_DEC; }
 	YY_BREAK
 case 76:
 YY_RULE_SETUP
-#line 647 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 651 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = F_SUB_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 77:
 YY_RULE_SETUP
-#line 648 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 652 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return '-'; }
 	YY_BREAK
 case 78:
 YY_RULE_SETUP
-#line 650 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 654 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = F_LAND_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 79:
 YY_RULE_SETUP
-#line 651 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 655 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return L_LAND; }
 	YY_BREAK
 case 80:
 YY_RULE_SETUP
-#line 652 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 656 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = F_AND_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 81:
 YY_RULE_SETUP
-#line 653 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 657 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return '&'; }
 	YY_BREAK
 case 82:
 YY_RULE_SETUP
-#line 655 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 659 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = F_LOR_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 83:
 YY_RULE_SETUP
-#line 656 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 660 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return L_LOR; }
 	YY_BREAK
 case 84:
 YY_RULE_SETUP
-#line 657 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 661 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = F_OR_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 85:
 YY_RULE_SETUP
-#line 658 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 662 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return '|'; }
 	YY_BREAK
 case 86:
 YY_RULE_SETUP
-#line 660 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 664 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = F_XOR_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 87:
 YY_RULE_SETUP
-#line 661 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 665 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return '^'; }
 	YY_BREAK
 case 88:
 YY_RULE_SETUP
-#line 663 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 667 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = F_LSH_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 89:
 YY_RULE_SETUP
-#line 664 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 668 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = F_LSH; return L_SHIFT; }
 	YY_BREAK
 case 90:
 YY_RULE_SETUP
-#line 665 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 669 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = F_LE; return L_ORDER; }
 	YY_BREAK
 case 91:
 YY_RULE_SETUP
-#line 666 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 670 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return '<'; }
 	YY_BREAK
 case 92:
 YY_RULE_SETUP
-#line 668 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 672 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = F_RSH_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 93:
 YY_RULE_SETUP
-#line 669 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 673 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = F_RSH; return L_SHIFT; }
 	YY_BREAK
 case 94:
 YY_RULE_SETUP
-#line 670 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 674 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = F_GE; return L_ORDER; }
 	YY_BREAK
 case 95:
 YY_RULE_SETUP
-#line 671 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 675 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = F_GT; return L_ORDER; }
 	YY_BREAK
 case 96:
 YY_RULE_SETUP
-#line 673 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 677 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = F_MULT_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 97:
 YY_RULE_SETUP
-#line 674 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 678 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return '*'; }
 	YY_BREAK
 case 98:
 YY_RULE_SETUP
-#line 676 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 680 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = F_MOD_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 99:
 YY_RULE_SETUP
-#line 677 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 681 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return '%'; }
 	YY_BREAK
 case 100:
 YY_RULE_SETUP
-#line 679 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 683 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = F_DIV_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 101:
 YY_RULE_SETUP
-#line 680 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 684 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return '/'; }
 	YY_BREAK
 case 102:
 YY_RULE_SETUP
-#line 682 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 686 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = F_EQ; return L_EQ_NE; }
 	YY_BREAK
 case 103:
 YY_RULE_SETUP
-#line 683 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 687 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = F_ASSIGN; return L_ASSIGN; }
 	YY_BREAK
 case 104:
 YY_RULE_SETUP
-#line 685 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 689 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = F_NULLISH_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 105:
 YY_RULE_SETUP
-#line 686 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 690 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return L_QUESTION_QUESTION; }
 	YY_BREAK
 /* Optional chaining "?." (mapping member/bracket access, e.g. m?.key,
@@ -4001,42 +4005,42 @@ case 106:
 yyg->yy_c_buf_p = yy_cp = yy_bp + 2;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 691 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 695 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return L_OPTIONAL_DOT; }
 	YY_BREAK
 case 107:
 YY_RULE_SETUP
-#line 692 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 696 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return '?'; }
 	YY_BREAK
 case 108:
 YY_RULE_SETUP
-#line 694 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 698 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { yylval_param->number = F_NE; return L_EQ_NE; }
 	YY_BREAK
 case 109:
 YY_RULE_SETUP
-#line 695 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 699 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return '!'; }
 	YY_BREAK
 case 110:
 YY_RULE_SETUP
-#line 697 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 701 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return L_COLON_COLON; }
 	YY_BREAK
 case 111:
 YY_RULE_SETUP
-#line 698 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 702 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return ':'; }
 	YY_BREAK
 case 112:
 YY_RULE_SETUP
-#line 700 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 704 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return L_DOT_DOT_DOT; }
 	YY_BREAK
 case 113:
 YY_RULE_SETUP
-#line 701 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 705 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return L_RANGE; }
 	YY_BREAK
 /* Optional chaining bracket form "m.?[idx]" -- the only grammar
@@ -4045,17 +4049,17 @@ YY_RULE_SETUP
      * a literal '?' right after '.' was already a syntax error otherwise. */
 case 114:
 YY_RULE_SETUP
-#line 706 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 710 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return L_DOT_OPTIONAL; }
 	YY_BREAK
 case 115:
 YY_RULE_SETUP
-#line 707 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 711 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return '.'; }
 	YY_BREAK
 case 116:
 YY_RULE_SETUP
-#line 709 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 713 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return ')'; }
 	YY_BREAK
 /* '{'/'}' inside a template literal's ${...} interpolation need brace-
@@ -4064,7 +4068,7 @@ YY_RULE_SETUP
      * expression itself. See SC_TEMPLATE_BODY above. */
 case 117:
 YY_RULE_SETUP
-#line 714 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 718 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           lpc_lex_brace_open(yyscanner);
           return '{';
@@ -4072,7 +4076,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 118:
 YY_RULE_SETUP
-#line 718 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 722 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           if (lpc_lex_brace_close(yyscanner)) {
             BEGIN(SC_TEMPLATE_BODY);
@@ -4083,32 +4087,32 @@ YY_RULE_SETUP
 	YY_BREAK
 case 119:
 YY_RULE_SETUP
-#line 725 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 729 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return '['; }
 	YY_BREAK
 case 120:
 YY_RULE_SETUP
-#line 726 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 730 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return ']'; }
 	YY_BREAK
 case 121:
 YY_RULE_SETUP
-#line 727 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 731 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return ';'; }
 	YY_BREAK
 case 122:
 YY_RULE_SETUP
-#line 728 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 732 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return ','; }
 	YY_BREAK
 case 123:
 YY_RULE_SETUP
-#line 729 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 733 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 { return '~'; }
 	YY_BREAK
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(SC_COND_SKIP):
-#line 731 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 735 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           if (lpc_lex_pushed_depth() > 0) {
             if (lpc_lex_top_buffer_kind() == LPC_BUF_IF_EXPR) {
@@ -4134,7 +4138,7 @@ case YY_STATE_EOF(SC_COND_SKIP):
 	YY_BREAK
 case 124:
 YY_RULE_SETUP
-#line 754 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 758 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 {
           // Nothing above matched: genuinely invalid input. No outp
           // rewind/flush needed -- lpc_lex_badlex() only inspects the
@@ -4144,10 +4148,10 @@ YY_RULE_SETUP
 	YY_BREAK
 case 125:
 YY_RULE_SETUP
-#line 761 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 765 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 4151 "/home/sunyc/src/fluffos/build/src/lex.autogen.cc"
+#line 4155 "/home/sunyc/src/fluffos/build/src/lex.autogen.cc"
 
 	case YY_END_OF_BUFFER:
 		{
@@ -5350,7 +5354,7 @@ void yyfree (void * ptr , yyscan_t yyscanner)
 
 #define YYTABLES_NAME "yytables"
 
-#line 761 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
+#line 765 "/home/sunyc/src/fluffos/src/compiler/internal/lex.l"
 
 
 // Read ONE character from the scanner's input, through Flex itself (its
@@ -5393,7 +5397,7 @@ int lpc_lex_getc(void *yyscanner) {
 // clobbering (and later double-freeing) the live one. ASan caught the
 // naive yypush_buffer_state(yy_scan_string(...)) composition as a
 // heap-use-after-free on the very first macro expansion (see
-// plans/MASTER-PLAN.md 5.5).
+// the compiler README / git history).
 void lpc_lex_push_string_buffer(const char *text, size_t len, int kind,
                                 void *yyscanner) {
   struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;

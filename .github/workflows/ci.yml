@@ -29,14 +29,14 @@ jobs:
             cc: gcc
             cxx: g++
             build: Debug
-            packages: build-essential autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
+            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
           - platform: Ubuntu
             os: ubuntu-24.04
             compiler: gcc
             cc: gcc
             cxx: g++
             build: RelWithDebInfo
-            packages: build-essential autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
+            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
 
           # Ubuntu - Clang
           - platform: Ubuntu
@@ -45,14 +45,14 @@ jobs:
             cc: clang
             cxx: clang++
             build: Debug
-            packages: build-essential autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
+            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
           - platform: Ubuntu
             os: ubuntu-24.04
             compiler: clang
             cc: clang
             cxx: clang++
             build: RelWithDebInfo
-            packages: build-essential autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
+            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
 
           # Ubuntu - Clang with Sanitizer
           - platform: Ubuntu
@@ -63,7 +63,7 @@ jobs:
             build: Debug
             sanitizer: true
             cmake_flags: -DENABLE_SANITIZER=ON
-            packages: build-essential autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev libdw-dev libbz2-dev
+            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev libdw-dev libbz2-dev
           - platform: Ubuntu
             os: ubuntu-24.04
             compiler: clang
@@ -72,19 +72,19 @@ jobs:
             build: RelWithDebInfo
             sanitizer: true
             cmake_flags: -DENABLE_SANITIZER=ON
-            packages: build-essential autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev libdw-dev libbz2-dev
+            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev libdw-dev libbz2-dev
 
           # macOS
           - platform: macOS
             os: macos-14
             build: Debug
-            packages: cmake pkg-config pcre libgcrypt openssl jemalloc icu4c mysql sqlite3 googletest
+            packages: cmake pkg-config pcre libgcrypt openssl jemalloc icu4c mysql sqlite3 googletest flex bison
             openssl_root: /usr/local/opt/openssl
             icu_root: /opt/homebrew/opt/icu4c
           - platform: macOS
             os: macos-14
             build: RelWithDebInfo
-            packages: cmake pkg-config pcre libgcrypt openssl jemalloc icu4c mysql sqlite3 googletest
+            packages: cmake pkg-config pcre libgcrypt openssl jemalloc icu4c mysql sqlite3 googletest flex bison
             openssl_root: /usr/local/opt/openssl
             icu_root: /opt/homebrew/opt/icu4c
 
@@ -95,14 +95,14 @@ jobs:
             build: Debug
             cmake_generator: MSYS Makefiles
             cmake_flags: -DMARCH_NATIVE=OFF -DPACKAGE_CRYPTO=OFF -DPACKAGE_DB_MYSQL="" -DPACKAGE_DB_SQLITE=1
-            packages: mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-zlib mingw-w64-x86_64-pcre mingw-w64-x86_64-icu mingw-w64-x86_64-sqlite3 mingw-w64-x86_64-jemalloc mingw-w64-x86_64-gtest bison make
+            packages: mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-zlib mingw-w64-x86_64-pcre mingw-w64-x86_64-icu mingw-w64-x86_64-sqlite3 mingw-w64-x86_64-jemalloc mingw-w64-x86_64-gtest bison flex make
           - platform: Windows
             os: windows-latest
             shell: msys2 {0}
             build: RelWithDebInfo
             cmake_generator: MSYS Makefiles
             cmake_flags: -DMARCH_NATIVE=OFF -DPACKAGE_CRYPTO=OFF -DPACKAGE_DB_MYSQL="" -DPACKAGE_DB_SQLITE=1
-            packages: mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-zlib mingw-w64-x86_64-pcre mingw-w64-x86_64-icu mingw-w64-x86_64-sqlite3 mingw-w64-x86_64-jemalloc mingw-w64-x86_64-gtest bison make
+            packages: mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-zlib mingw-w64-x86_64-pcre mingw-w64-x86_64-icu mingw-w64-x86_64-sqlite3 mingw-w64-x86_64-jemalloc mingw-w64-x86_64-gtest bison flex make
 
     defaults:
       run:
@@ -128,7 +128,17 @@ jobs:
         if: matrix.platform == 'macOS'
         env:
           HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
-        run: brew install ${{ matrix.packages }}
+        run: |
+          brew install ${{ matrix.packages }}
+          # Homebrew flex/bison are keg-only (they'd shadow the too-old
+          # system copies); put their bin dirs on PATH so CMake's
+          # find_package(FLEX 2.6)/(BISON 3.8) picks them up and the
+          # scanner/parser are regenerated from lex.l/grammar.y instead of
+          # falling back to the checked-in pre-generated sources.
+          echo "$(brew --prefix flex)/bin" >> "$GITHUB_PATH"
+          echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
+          # bison also needs its lib dir for -ly at link time on some setups.
+          echo "LDFLAGS=-L$(brew --prefix bison)/lib" >> "$GITHUB_ENV"
 
       - name: Install Dependencies (Windows)
         if: matrix.platform == 'Windows'

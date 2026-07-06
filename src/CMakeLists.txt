@@ -392,7 +392,13 @@ if (FLEX_FOUND)
     "${CMAKE_CURRENT_BINARY_DIR}/lex.autogen.cc"
     COMPILE_FLAGS "-Ca"
   )
-  ADD_FLEX_BISON_DEPENDENCY(LpcLexer Grammar)
+  if (BISON_FOUND)
+    # Only valid when BISON_TARGET(Grammar) actually ran -- on the
+    # bison-too-old path (macOS's stock bison) the Grammar target doesn't
+    # exist and newer CMake makes this a hard configure error; the header
+    # dependency is covered by the pre-generated copy's DEPENDS there.
+    ADD_FLEX_BISON_DEPENDENCY(LpcLexer Grammar)
+  endif()
   set(GENERATED_LEXER_FILE "${FLEX_LpcLexer_OUTPUTS}")
 else()
   message(STATUS "FLEX: not found, using pre-generated source.")

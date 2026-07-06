@@ -16,9 +16,8 @@
 // #include input-stack push, pragmas flags, current_line/current_file)
 // applies at exactly its position in the one and only scan, which is what
 // makes position-sensitive directives like a mid-file `#pragma
-// no_warnings` correct by construction. See plans/unified-push-lexer.md
-// for the design and for the history of why the split-pass alternatives
-// were abandoned.
+// no_warnings` correct by construction. See
+// src/compiler/internal/README.md for the architecture.
 
 #define PRAGMA_STRICT_TYPES 1
 #define PRAGMA_WARNINGS 2
@@ -266,7 +265,7 @@ enum LpcPushedBufferKind {
 // STACK requires the "advance the stack top first" fix for
 // yy_scan_bytes's internal yy_switch_to_buffer(), which otherwise
 // clobbers the live top slot (ASan-verified UAF, see
-// plans/MASTER-PLAN.md 5.5).
+// this file's git history / the compiler README).
 void lpc_lex_push_string_buffer(const char *text, size_t len, int kind, void *yyscanner);
 
 // Pop one pushed buffer (kind-dispatched bookkeeping + yypop_buffer_state).

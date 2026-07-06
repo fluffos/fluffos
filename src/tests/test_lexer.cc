@@ -498,7 +498,7 @@ TEST_F(LexerTest, Char_OctalOverflow_FallsBackToX) {
 }
 
 // '\8' -- '8'/'9' aren't valid octal digits. Documented deviation from the
-// pre-Flex hand-written scanner (see plans/flex-lexer-migration.md): this
+// pre-Flex hand-written scanner: this
 // reports the error directly instead of replicating the original's
 // incidental strtoll-consumes-nothing fallthrough. Still a real error.
 TEST_F(LexerTest, Char_InvalidOctalDigit_Error) {

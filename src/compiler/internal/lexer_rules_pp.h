@@ -5,7 +5,7 @@
 // lexer's rule logic (companion to lexer_rules.{h,cc}, same relationship
 // to lex.l). This is where the old standalone preprocessor's genuinely
 // unique logic landed when preprocessing was merged into the lexer's own
-// single scan (plans/unified-push-lexer.md): the macro table and
+// single scan: the macro table and
 // #define/#undef parsing, the #if/#elif expression evaluator
 // (lpc_lex_eval_if_expr), textual macro expansion with recursion guards,
 // and the directive entry point lex.l's one anchored '#'-line rule calls

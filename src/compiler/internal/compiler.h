@@ -243,7 +243,7 @@ extern vm_context_t *compiler_vm_context;
 //
 // The parent/depth/chain() machinery exists but is inert by design:
 // compile_file() is NEVER re-entered — the compiler is deliberately
-// non-reentrant (plans/MASTER-PLAN.md Phase 6 scope correction). The
+// non-reentrant by design. The
 // `inherit`-of-an-unloaded-parent case is handled entirely OUTSIDE the
 // compiler by load_object() (simulate.cc): the child compile cleanly
 // abandons (rule_inheritence() sets the inherit_file global, epilog()

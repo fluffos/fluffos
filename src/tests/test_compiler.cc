@@ -1061,7 +1061,8 @@ INSTANTIATE_TEST_SUITE_P(Errors, ErrorCaseTest, ::testing::Values(
     ErrorCase{"MissingEndif",          "#ifdef FOO\nint x;\n"},
     ErrorCase{"UnexpectedElse",        "int x;\n#else\nint y;\n#endif\n"},
     ErrorCase{"UnexpectedEndif",       "int x;\n#endif\n"},
-    ErrorCase{"RedefDifferentBody",    "#define FOO 1\n#define FOO 2\n"},
+    // (RedefDifferentBody removed: redefining a macro is a non-fatal
+    // warning now, not an error -- see RedefinitionIsAllowedWithWarning.)
     ErrorCase{"EmptyIfExpr",           "#if\nint x;\n#endif\n"},
     ErrorCase{"TernaryMissingColon",   "#if 1 ? 2\nint x;\n#endif\n"}
 ), [](const ::testing::TestParamInfo<ErrorCase>& i) { return i.param.name; });
@@ -1226,6 +1227,17 @@ TEST(Diagnostics, DirectiveErrorsCarryNoColumn) {
     EXPECT_TRUE(d.snippet.empty());
 }
 
+TEST(Diagnostics, ErrorTextWithPercentIsNotAFormatString) {
+    // #error / #warn / macro-name text is arbitrary source; a '%' in it
+    // must reach the diagnostic literally, never as a printf conversion
+    // (CodeQL cpp/tainted-format-string; ASan-confirmed crash on
+    // `#error %s%n` before lexerror() started %-quoting).
+    pp("#error boom %s%s%n percent\n");
+    ASSERT_FALSE(compiler_diags.empty());
+    const Diagnostic& d = compiler_diags.back();
+    EXPECT_NE(d.message.find("%s%s%n"), std::string::npos);
+}
+
 TEST(Diagnostics, UnknownEscapeCarriesFixIt) {
     // The unknown-escape warning suggests dropping the backslash: a
     // fix-it spanning the two-character escape, replacement = the bare
@@ -1280,14 +1292,29 @@ TEST(Diagnostics, FloatInIfExprErrors) {
     EXPECT_TRUE(found);
 }
 
-TEST(Diagnostics, RedefinitionCarriesPreviousDefinitionNote) {
-    pp("#define FOO 1\n#define FOO 2\n");
+TEST(Diagnostics, RedefinitionIsAllowedWithWarning) {
+    // Redefining an LPC macro with a different body is ALLOWED: it must
+    // be a non-fatal WARNING (not an error that fails the compile) and
+    // the new definition must win. Regression: it used to go through
+    // lexerror() and fail compilation.
+    NormalizedString out = pp("#define FOO 1\n#define FOO 2\nint x = FOO;\n");
+    EXPECT_EQ(num_parse_error, 0);           // did NOT fail the compile
+    EXPECT_EQ(out, "int x = 2;");            // the redefinition took effect
     ASSERT_FALSE(compiler_diags.empty());
     const Diagnostic& d = compiler_diags.back();
-    EXPECT_NE(d.message.find("FOO redefined"), std::string::npos);
+    EXPECT_TRUE(d.is_warning);
+    EXPECT_NE(d.message.find("Macro 'FOO' redefined"), std::string::npos);
     ASSERT_FALSE(d.notes.empty());
     EXPECT_NE(d.notes[0].find("previous definition of 'FOO' was at "), std::string::npos);
     EXPECT_NE(d.notes[0].find(":1"), std::string::npos);
+}
+
+TEST(Diagnostics, IdenticalRedefinitionIsSilent) {
+    // Redefining with the IDENTICAL body is not even a warning.
+    pp("#define FOO 1\n#define FOO 1\n");
+    for (const auto& d : compiler_diags) {
+        EXPECT_EQ(d.message.find("redefined"), std::string::npos);
+    }
 }
 
 TEST(Diagnostics, NoStaleExpansionNoteAfterSpliceConsumed) {

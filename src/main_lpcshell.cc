@@ -4,7 +4,7 @@
 // simul_efun, mudlib), then instead of loading one file and exiting, reads
 // lines from stdin and evaluates them immediately.
 //
-// v1 design notes (see plans/repl-push-parser.md Phase 4 for the fuller
+// v1 design notes (the fuller
 // writeup):
 //
 //   - Each statement is compiled as its own fresh in-memory object (via

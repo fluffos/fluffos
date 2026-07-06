@@ -711,12 +711,20 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
 
             if (existing != current_session->macros.end() && !existing->second.is_predefined) {
                 if (existing->second.body != body) {
+                    // Redefining a macro with a different body is ALLOWED
+                    // (the new definition takes effect below) -- it is a
+                    // non-fatal warning, not an error. It went through
+                    // lexerror() before, which increments num_parse_error
+                    // and failed the whole compile despite the "Warning:"
+                    // wording; yywarn() is the real warning path
+                    // (respects #pragma no_warnings, does not fail the
+                    // compile). Identical-body redefinition stays silent.
                     if (!existing->second.def_file.empty()) {
                         compiler_pending_notes.push_back(
                             "previous definition of '" + std::string(name) + "' was at /" +
                             existing->second.def_file + ":" + std::to_string(existing->second.def_line));
                     }
-                    lexerror((std::string("Warning: ") + std::string(name) + " redefined").c_str());
+                    yywarn("Macro '%s' redefined", std::string(name).c_str());
                 }
             }
 
