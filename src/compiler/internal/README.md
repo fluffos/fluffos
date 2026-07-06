@@ -112,6 +112,17 @@ graph TB
 
 ---
 
+## Staged outputs: `lpcc -E | --tokens | --ast | -O0`
+
+Every stage of the pipeline can be dumped: `-E` renders the preprocessed
+token stream as source text (macros expanded, directives applied -- there
+is no textual pp artifact in the single-scan design, so this is what the
+parser would see), `--tokens` prints one positioned token per line,
+`--ast` prints the parse trees (`dump_tree`) before codegen, `-O0`
+compiles with `PRAGMA_OPTIMIZE` cleared so the default `dump_prog`
+disassembly shows pre-optimization bytecode. Pre-parse stages are driven
+by `stage_output.cc` (real lexer + preprocessor, no parser).
+
 ## Interactive use: `lpcshell`
 
 `src/main_lpcshell.cc` (not in this directory, but the reason several things above exist in their current shape) is a working interactive LPC REPL binary. It boots the driver like `lpcc` does, then evaluates one statement at a time using the **"restart pattern"**: each statement compiles as its own fresh in-memory object via `load_object_from_source()` (`vm/internal/simulate.cc`), reusing the entire `compile_file()` pipeline above unchanged rather than requiring a persistent compiler symbol table (that deeper design — real REPL-local variables sharing one continuously-open compile instead of textually-redeclared globals round-tripped through `save_variable()`/`restore_variable()` — remains open future work). It reads structured `compiler_diags` directly and renders them clang-style (with color when stdout is a tty).

@@ -340,6 +340,12 @@ struct CompileState {
   std::string next_load_reason;
   std::string current_load_reason;
   int directive_start_line = 0;
+
+  // Staged-output knobs (lpcc --ast / -O0): dump the parse trees before
+  // codegen; compile with the tree optimizer disabled (PRAGMA_OPTIMIZE
+  // cleared) so dump_prog shows PRE-optimization bytecode.
+  bool opt_dump_ast = false;
+  bool opt_no_optimize = false;
 };
 extern CompileState g_compile;
 
