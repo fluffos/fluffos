@@ -363,8 +363,10 @@ if (${BISON_FOUND})
               "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/generate_ebnf.py"
               "${GRAMMAR_XML}"
               "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.ebnf"
+              "${CMAKE_SOURCE_DIR}/tools/lpc-syntax/lpc-grammar.json"
       DEPENDS "${GRAMMAR_XML}"
-      COMMENT "Generating grammar.ebnf from grammar.xml"
+              "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar_lexical.ebnf.in"
+      COMMENT "Generating grammar.ebnf (3 layers) + lpc-grammar.json from grammar.xml"
     )
   endif()
 else()
