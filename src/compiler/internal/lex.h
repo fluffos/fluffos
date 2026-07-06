@@ -213,6 +213,10 @@ struct LexerSession;
 // newline is appended). See LexTokenStream::load.
 void start_new_file(std::string_view source, void *yyscanner,
                      std::shared_ptr<LexerSession> session = nullptr);
+// Zero-copy variant: reads fd's content straight into the arena block
+// flex scans in place. Returns false on read error.
+bool start_new_file_fd(int fd, void *yyscanner,
+                       std::shared_ptr<LexerSession> session = nullptr);
 void end_new_file(void);
 int lookup_predef(const char *);
 void add_predefines(void);
@@ -274,9 +278,17 @@ enum LpcPushedBufferKind {
 // clobbers the live top slot (ASan-verified UAF, see
 // this file's git history / the compiler README).
 void lpc_lex_push_string_buffer(const char *text, size_t len, int kind, void *yyscanner);
-// Install `text` as THE base buffer (main-file content; yy_scan_bytes
-// copies). Defined in lex.l's trailer (touches the generated buffer API).
-void lpc_lex_set_source(const char *text, size_t len, void *yyscanner);
+// Install a PREPARED buffer as THE base (main-file content scanned in
+// place; `size` includes the two trailing '\0' sentinels). Defined in
+// lex.l's trailer (touches the generated buffer API).
+void lpc_lex_set_source(char *base, size_t size, void *yyscanner);
+// In-place splice push: same prepared-buffer contract.
+void lpc_lex_push_prepared_buffer(char *base, size_t size, int kind, void *yyscanner);
+// Delete every live flex buffer while their arena-backed structs are
+// still valid. lpc_lex_teardown_active() (lexer_utils) wraps the active
+// scanner and MUST run before each scratch_destroy.
+void lpc_lex_teardown(void *yyscanner);
+void lpc_lex_teardown_active(void);
 
 // Pop one pushed buffer (kind-dispatched bookkeeping + yypop_buffer_state).
 // Callers must check lpc_lex_pushed_depth() > 0 first.

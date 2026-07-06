@@ -25,6 +25,8 @@
 
 #include "base/std.h"
 
+#include <sys/stat.h>
+
 #include "compiler/internal/lexer_utils.h"
 #include "compiler/internal/lex.h"
 #include "compiler/internal/lexer_rules_pp.h"
@@ -114,6 +116,7 @@ int num_parse_error; /* Number of errors in the parser. */
 
 lpc_predef_t *lpc_predefs = nullptr;
 
+static void push_arena_string(ScratchString &s, int kind, void *yyscanner);
 std::shared_ptr<LexerSession> current_session = nullptr;
 
 int lex_fatal;
@@ -769,8 +772,7 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yyll
           if (!is_builtin) {
             push_expansion_frame(text, m, yyextra->token_start_column + 1);
           }
-          lpc_lex_push_string_buffer(expanded.c_str(), expanded.size(),
-                                     /*is_expansion=*/!is_builtin, yyscanner);
+          push_arena_string(expanded, /*is_expansion=*/!is_builtin, yyscanner);
         }
         return yylex(yylval_param, yylloc_param, yyscanner);
       } else {
@@ -785,7 +787,7 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yyll
         // rather than rewinding a pointer (a saved outp would dangle
         // across a refill_buffer() memmove -- a latent corruption in the
         // old raw-read version).
-        std::string consumed_text;
+        ScratchString consumed_text;
 
         auto get_next_char = [&]() -> char {
           int gc = lpc_lex_getc(yyscanner);
@@ -886,8 +888,7 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yyll
 
           if (!expanded.empty()) {
             push_expansion_frame(text, m, yyextra->token_start_column + 1);
-            lpc_lex_push_string_buffer(expanded.c_str(), expanded.size(),
-                                       /*is_expansion=*/1, yyscanner);
+            push_arena_string(expanded, /*is_expansion=*/1, yyscanner);
           }
           return yylex(yylval_param, yylloc_param, yyscanner);
         } else {
@@ -897,8 +898,7 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yyll
           current_line = saved_line;
           total_lines = saved_total;
           if (!consumed_text.empty()) {
-            lpc_lex_push_string_buffer(consumed_text.c_str(), consumed_text.size(),
-                                       /*is_expansion=*/0, yyscanner);
+            push_arena_string(consumed_text, /*is_expansion=*/0, yyscanner);
           }
         }
       }
@@ -984,7 +984,7 @@ int parseHeredoc(const char *terminator, int is_array, union YYSTYPE *yylval_par
         if (saw_newline) {
           rest += '\n';
         }
-        lpc_lex_push_string_buffer(rest.c_str(), rest.size(), 0, yyscanner);
+        push_arena_string(rest, 0, yyscanner);
       }
       break;
     }
@@ -1037,7 +1037,7 @@ int parseHeredoc(const char *terminator, int is_array, union YYSTYPE *yylval_par
       lexerror("Array block exceeded maximum length");
       return YYerror;
     }
-    lpc_lex_push_string_buffer(splice.c_str(), splice.size(), 0, yyscanner);
+    push_arena_string(splice, 0, yyscanner);
     return yylex(yylval_param, yylloc_param, yyscanner);
   }
 
@@ -1108,8 +1108,91 @@ void end_new_file() {
   active_scanner = nullptr;
 }
 
+// Read fd's entire content straight into an arena block shaped for
+// in-place scanning: room reserved for a trailing-newline fixup plus the
+// two yy_scan_buffer sentinels. Returns the block and its body length
+// (newline applied, sentinels written); {nullptr,0} on read error.
+// Push an arena ScratchString's contents as a splice buffer, in place
+// when its bytes actually live on the arena. THE SSO TRAP (ASan-caught):
+// a short basic_string keeps its bytes INSIDE the object -- for a stack
+// local that memory dies at return, so scanning it in place is
+// stack-use-after-return. Detect SSO portably (data() inside the object)
+// and fall back to the copying push for those few bytes.
+static void push_arena_string(ScratchString &s, int kind, void *yyscanner) {
+  s += '\0';
+  s += '\0';
+  const void *d = s.data();
+  bool sso = d >= static_cast<const void *>(&s) && d < static_cast<const void *>(&s + 1);
+  if (sso) {
+    lpc_lex_push_string_buffer(s.data(), s.size() - 2, kind, yyscanner);
+  } else {
+    lpc_lex_push_prepared_buffer(s.data(), s.size(), kind, yyscanner);
+  }
+}
+
+std::pair<char *, size_t> scratch_slurp_fd_prepared(int fd) {
+  struct stat st{};
+  size_t hint = (fstat(fd, &st) == 0 && st.st_size > 0) ? static_cast<size_t>(st.st_size) : 8192;
+  char *base = static_cast<char *>(scratch_raw_allocate(hint + 3, 1));
+  size_t len = 0;
+  for (;;) {
+    if (len == hint) {
+      // Grew past the fstat hint (rare: proc files, races). Double into a
+      // fresh arena block; the old one is left to the bulk free.
+      size_t hint2 = hint * 2;
+      char *bigger = static_cast<char *>(scratch_raw_allocate(hint2 + 3, 1));
+      memcpy(bigger, base, len);
+      base = bigger;
+      hint = hint2;
+    }
+    ssize_t n = read(fd, base + len, hint - len);
+    if (n < 0) return {nullptr, 0};
+    if (n == 0) break;
+    len += static_cast<size_t>(n);
+  }
+  if (len == 0 || base[len - 1] != '\n') base[len++] = '\n';
+  base[len] = 0;
+  base[len + 1] = 0;
+  return {base, len};
+}
+
+void lpc_lex_teardown_active(void) {
+  if (active_scanner != nullptr) {
+    lpc_lex_teardown(active_scanner);
+  }
+  pushed_kind_stack.clear();
+}
+
+static void start_new_file_prepared(char *prepared_base, size_t prepared_body,
+                                    void *yyscanner, std::shared_ptr<LexerSession> session);
+
 void start_new_file(std::string_view source, void *yyscanner,
                      std::shared_ptr<LexerSession> session) {
+  // Prepare an arena block from the caller's view: copy + trailing-'\n'
+  // guarantee + the two yy_scan_buffer sentinels.
+  bool add_nl = !source.empty() && source.back() != '\n';
+  size_t body = source.size() + (add_nl ? 1 : 0);
+  char *base = static_cast<char *>(scratch_raw_allocate(body + 2, 1));
+  if (!source.empty()) memcpy(base, source.data(), source.size());
+  if (add_nl) base[source.size()] = '\n';
+  base[body] = 0;
+  base[body + 1] = 0;
+  start_new_file_prepared(base, body, yyscanner, std::move(session));
+}
+
+bool start_new_file_fd(int fd, void *yyscanner, std::shared_ptr<LexerSession> session) {
+  // Zero-copy main file: read(2) lands the bytes directly in the arena
+  // block that flex scans in place.
+  auto [base, body] = scratch_slurp_fd_prepared(fd);
+  if (base == nullptr) {
+    return false;
+  }
+  start_new_file_prepared(base, body, yyscanner, std::move(session));
+  return true;
+}
+
+static void start_new_file_prepared(char *prepared_base, size_t prepared_body,
+                                    void *yyscanner, std::shared_ptr<LexerSession> session) {
   if (!main_filename && current_file) {
     main_filename = make_shared_string(current_file);
   }
@@ -1154,17 +1237,11 @@ void start_new_file(std::string_view source, void *yyscanner,
   current_line_base = 0;
   current_line_saved = 0;
 
-  // Install the main file's content as THE base buffer -- flex-native,
-  // exactly like an include/splice buffer (yy_scan_bytes copies, so
-  // `source` may be transient). Preserves the historical guarantee that
-  // input ends with a newline: append one when the file lacks it.
-  if (!source.empty() && source.back() != '\n') {
-    ScratchString fixed(source);
-    fixed += '\n';
-    lpc_lex_set_source(fixed.data(), fixed.size(), yyscanner);
-  } else {
-    lpc_lex_set_source(source.empty() ? "" : source.data(), source.size(), yyscanner);
-  }
+  // Install the main file's content as THE base buffer, scanned in
+  // place from the arena. The view path copied once (external memory
+  // can't be scribbled on); the fd path (start_new_file_fd) read the
+  // bytes straight into this prepared block -- zero copy.
+  lpc_lex_set_source(prepared_base, prepared_body + 2, yyscanner);
 
   // Push the configured global include file exactly like a real
   // `#include "..."` / `#include <...>` appearing before the file's first
@@ -1193,6 +1270,10 @@ LexTokenStream::~LexTokenStream() {
 
 void LexTokenStream::load(std::string_view source, std::shared_ptr<LexerSession> session) {
   start_new_file(source, scanner_, std::move(session));
+}
+
+bool LexTokenStream::load_fd(int fd, std::shared_ptr<LexerSession> session) {
+  return start_new_file_fd(fd, scanner_, std::move(session));
 }
 
 int LexTokenStream::next(union YYSTYPE *yylval_param, struct YYLTYPE *yylloc_param) {
@@ -2030,19 +2111,14 @@ bool lpc_lex_handle_include(std::string_view rest, void *yyscanner) {
       // Precondition established by the caller (lex.l's directive rule):
       // the directive's terminating newline has been consumed and
       // counted, so current_line is already the line AFTER the #include.
-      std::string content;
-      char rdbuf[8192];
-      ssize_t n;
-      while ((n = read(fd, rdbuf, sizeof(rdbuf))) > 0) {
-        content.append(rdbuf, static_cast<size_t>(n));
-      }
+      // Zero-copy include: the file is read straight into an arena block
+      // (trailing newline guaranteed -- so a directive or line comment on
+      // the include's last line still terminates) and scanned in place.
+      auto [inc_base, inc_len] = scratch_slurp_fd_prepared(fd);
       close(fd);
-      // The ring guaranteed every file ended in a newline (appending one
-      // when missing); keep that invariant for the buffer form so a
-      // directive or line comment on the include's last line still
-      // terminates.
-      if (content.empty() || content.back() != '\n') {
-        content += '\n';
+      if (inc_base == nullptr) {
+        lexerror("Cannot read #include file");
+        return false;
       }
 
       // The parent buffer's native line counter freezes at resume_line
@@ -2057,7 +2133,7 @@ bool lpc_lex_handle_include(std::string_view rest, void *yyscanner) {
       current_line_saved = 0;
       current_file = make_shared_string(resolved.c_str());
       current_file_id = add_program_file(resolved.c_str(), 0);
-      lpc_lex_push_string_buffer(content.c_str(), content.size(), LPC_BUF_INCLUDE, yyscanner);
+      lpc_lex_push_prepared_buffer(inc_base, inc_len + 2, LPC_BUF_INCLUDE, yyscanner);
       return true;
     } else {
       lexerror(("Cannot #include " + filename).c_str());

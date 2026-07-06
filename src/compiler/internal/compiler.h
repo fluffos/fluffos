@@ -413,6 +413,9 @@ extern int compiler_directive_start_line;
 // failure is a clear chained error report instead of runaway recursion.
 #define MAX_COMPILE_DEPTH 32
 
+// Zero-copy file form: reads fd straight into the arena scan buffer.
+program_t *compile_file_fd(int fd, const char *,
+                           vm_context_t *vm_context = &g_driver_vm_context);
 program_t *compile_file(std::string_view source, const char *,
                         vm_context_t *vm_context = &g_driver_vm_context);
 

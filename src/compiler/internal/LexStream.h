@@ -58,6 +58,10 @@ class LexTokenStream {
    // is copied into the scanner's buffer, so it may be transient.
    void load(std::string_view source, std::shared_ptr<LexerSession> session = nullptr);
 
+   // Zero-copy file form: reads fd straight into the arena block the
+   // scanner reads in place. Returns false on read error.
+   bool load_fd(int fd, std::shared_ptr<LexerSession> session = nullptr);
+
    // Pull the next token, filling in *yylval_param and (when non-null)
    // *yylloc_param with the token's source span (8.3 Bison locations).
    int next(union YYSTYPE *yylval_param, struct YYLTYPE *yylloc_param = nullptr);

@@ -49,6 +49,10 @@ extern svalue_t *safe_apply_master_ob(int, int);
 
 static void clean_parser(void);
 static void prolog(std::string_view source, const char * /*name*/, LexTokenStream &token_stream);
+// When >= 0, prolog loads the token stream from this fd (zero copy)
+// instead of the source view. Set by compile_file_fd for the duration of
+// one compile; the compiler is single-threaded and non-reentrant.
+static int prolog_source_fd = -1;
 static program_t *epilog(void);
 static void show_overload_warnings(void);
 
@@ -2243,6 +2247,13 @@ void yywarn(const char *fmt, ...) {
 /*
  * Compile an LPC file.
  */
+program_t *compile_file_fd(int fd, const char *name, vm_context_t *vm_context) {
+  prolog_source_fd = fd;
+  program_t *prog = compile_file(std::string_view{}, name, vm_context);
+  prolog_source_fd = -1;
+  return prog;
+}
+
 program_t *compile_file(std::string_view source, const char *name,
                         vm_context_t *vm_context) {
   static int guard = 0;
@@ -2906,6 +2917,7 @@ static program_t *epilog(void) {
   }
   release_tree();
   uninitialize_parser();
+  lpc_lex_teardown_active();  // flex buffer structs are arena-backed
   scratch_destroy();
   clean_up_locals();
   free_unused_identifiers();
@@ -2958,7 +2970,13 @@ static void prolog(std::string_view source, const char *name, LexTokenStream &to
     copy_structures(simul_efun_ob->prog);
   }
 
-  token_stream.load(source);
+  if (prolog_source_fd >= 0) {
+    if (!token_stream.load_fd(prolog_source_fd)) {
+      yyerror(token_stream.scanner(), "could not read source file");
+    }
+  } else {
+    token_stream.load(source);
+  }
 }
 
 /*
@@ -3015,6 +3033,7 @@ static void clean_parser() {
   release_tree();
   uninitialize_parser();
   clean_up_locals();
+  lpc_lex_teardown_active();  // flex buffer structs are arena-backed
   scratch_destroy();
   free_unused_identifiers();
 }

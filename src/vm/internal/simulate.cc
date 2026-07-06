@@ -476,23 +476,9 @@ object_t *load_object(const char *lname, int callcreate) {
     error("Could not read the file '/%s'.\n", real_name);
   }
   save_command_giver(command_giver);
-  // Slurp the whole file: the lexer scans a native in-memory buffer (the
-  // same mechanism as #include contents); compile_file copies the text
-  // into the scanner's buffer, so this local may die right after.
-  std::string source;
-  {
-    char buf[65536];
-    ssize_t n;
-    while ((n = read(f, buf, sizeof(buf))) > 0) {
-      source.append(buf, static_cast<size_t>(n));
-    }
-    if (n < 0) {
-      restore_command_giver();
-      close(f);
-      error("Could not read the file '/%s'.\n", real_name);
-    }
-  }
-  prog = compile_file(source, obname);
+  // Zero-copy load: compile_file_fd reads the file straight into the
+  // arena block the scanner reads in place -- no intermediate string.
+  prog = compile_file_fd(f, obname);
   restore_command_giver();
   update_compile_av(total_lines);
   total_lines = 0;

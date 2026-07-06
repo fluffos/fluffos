@@ -169,6 +169,7 @@ static void lpc_lex_consume_directive_newline(void *yyscanner);
 %}
 
 %option noyywrap nounput nodefault
+%option noyyalloc noyyfree noyyrealloc
 %option never-interactive
 %option 8bit
 %option array
@@ -796,8 +797,89 @@ int lpc_lex_getc(void *yyscanner) {
 // naive yypush_buffer_state(yy_scan_string(...)) composition as a
 // heap-use-after-free on the very first macro expansion (see
 // the compiler README / git history).
-void lpc_lex_push_string_buffer(const char *text, size_t len, int kind,
-                                void *yyscanner) {
+// ---------------------------------------------------------------------------
+// Flex allocator hookup (%option noyyalloc/noyyfree/noyyrealloc).
+//
+// One allocator serves two lifetimes, so every block carries a 16-byte
+// tag header saying which side owns it:
+//   kind 1 (malloc): scanner guts (yyguts_t) and the buffer STACK array
+//     -- they live across compiles and may be yyrealloc'd, so they must
+//     never touch the arena.
+//   kind 2 (arena):  per-compile yy_buffer_state structs -- allocated
+//     inside the window the buffer-install helpers open around
+//     yy_scan_buffer, reclaimed wholesale at scratch_destroy (yyfree on
+//     them is a no-op). lpc_lex_teardown() deletes every live buffer
+//     BEFORE the arena reset so no code ever touches a stale struct.
+// ---------------------------------------------------------------------------
+namespace {
+struct LpcYyHdr {
+  uint64_t kind;  // 1 = malloc, 2 = arena
+  uint64_t size;  // payload bytes (for defensive realloc copies)
+};
+bool s_flex_alloc_arena = false;
+}  // namespace
+
+void *yyalloc(yy_size_t size, yyscan_t /*yyscanner*/) {
+  LpcYyHdr *h;
+  if (s_flex_alloc_arena) {
+    h = static_cast<LpcYyHdr *>(scratch_raw_allocate(size + sizeof(LpcYyHdr), 16));
+    h->kind = 2;
+  } else {
+    h = static_cast<LpcYyHdr *>(malloc(size + sizeof(LpcYyHdr)));
+    h->kind = 1;
+  }
+  h->size = size;
+  return h + 1;
+}
+
+void yyfree(void *ptr, yyscan_t /*yyscanner*/) {
+  if (ptr == nullptr) return;
+  LpcYyHdr *h = static_cast<LpcYyHdr *>(ptr) - 1;
+  if (h->kind == 1) free(h);
+  /* kind 2: arena memory, reclaimed at scratch_destroy. */
+}
+
+void *yyrealloc(void *ptr, yy_size_t size, yyscan_t yyscanner) {
+  if (ptr == nullptr) return yyalloc(size, yyscanner);
+  LpcYyHdr *h = static_cast<LpcYyHdr *>(ptr) - 1;
+  if (h->kind == 1) {
+    h = static_cast<LpcYyHdr *>(realloc(h, size + sizeof(LpcYyHdr)));
+    h->size = size;
+    return h + 1;
+  }
+  /* Arena block (shouldn't happen: only the malloc-side buffer stack is
+   * ever realloc'd) -- defensive copy-out to malloc. */
+  void *np = nullptr;
+  {
+    LpcYyHdr *nh = static_cast<LpcYyHdr *>(malloc(size + sizeof(LpcYyHdr)));
+    nh->kind = 1;
+    nh->size = size;
+    memcpy(nh + 1, ptr, h->size < size ? h->size : size);
+    np = nh + 1;
+  }
+  return np;
+}
+
+// Delete every live flex buffer (pushed splices AND the base) while their
+// arena-backed structs are still valid -- MUST run before scratch_destroy
+// (compiler.cc's epilog and error cleanup both call the lexer_utils
+// wrapper lpc_lex_teardown_active). After this the scanner holds no
+// buffers; the next lpc_lex_set_source materializes a fresh base.
+void lpc_lex_teardown(void *yyscanner) {
+  struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;
+  while (lpc_lex_pushed_depth() > 0) {
+    lpc_lex_pop_pushed_buffer(yyscanner);
+  }
+  if (YY_CURRENT_BUFFER) {
+    yy_delete_buffer(YY_CURRENT_BUFFER, yyscanner);
+    YY_CURRENT_BUFFER_LVALUE = NULL;
+  }
+}
+
+// In-place variant: `base`/`size` follow the lpc_lex_set_source contract
+// (writable arena memory, two '\0' sentinels included in size). The text
+// is scanned where it lies -- zero copy, zero flex text allocation.
+void lpc_lex_push_prepared_buffer(char *base, size_t size, int kind, void *yyscanner) {
   struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;
   yyensure_buffer_stack(yyscanner);
   if (!YY_CURRENT_BUFFER) {
@@ -817,14 +899,32 @@ void lpc_lex_push_string_buffer(const char *text, size_t len, int kind,
   YY_CURRENT_BUFFER_LVALUE->yy_buf_pos = yyg->yy_c_buf_p;
   YY_CURRENT_BUFFER_LVALUE->yy_n_chars = yyg->yy_n_chars;
   yyg->yy_buffer_stack_top++;
-  yy_scan_bytes(text, (int)len, yyscanner);
-  /* yy_scan_buffer() (behind yy_scan_bytes) fills the buffer struct by
-   * hand and -- unlike yy_init_buffer() -- leaves yy_bs_lineno/column
-   * UNINITIALIZED; %option yylineno counting would start from garbage. */
+  s_flex_alloc_arena = true;  // the yy_buffer_state struct is per-compile
+  YY_BUFFER_STATE nb = yy_scan_buffer(base, size, yyscanner);
+  s_flex_alloc_arena = false;
+  if (nb == NULL) {
+    lpc_lex_fatal("lpc_lex_push_prepared_buffer: buffer missing sentinels");
+    return;
+  }
+  /* yy_scan_buffer fills the buffer struct by hand and -- unlike
+   * yy_init_buffer() -- leaves yy_bs_lineno/column UNINITIALIZED;
+   * %option yylineno counting would start from garbage. */
   yylineno = 1;
   yycolumn = 0;
   yyg->yy_did_buffer_switch_on_eof = 1;
   lpc_lex_note_buffer_push(kind);
+}
+
+// Copying variant for callers whose text is NOT scannable in place
+// (persistent macro bodies, string_views over foreign memory): one arena
+// copy plus sentinels, then the in-place push -- still no flex malloc.
+void lpc_lex_push_string_buffer(const char *text, size_t len, int kind,
+                                void *yyscanner) {
+  char *base = static_cast<char *>(scratch_raw_allocate(len + 2, 1));
+  memcpy(base, text, len);
+  base[len] = 0;
+  base[len + 1] = 0;
+  lpc_lex_push_prepared_buffer(base, len + 2, kind, yyscanner);
 }
 
 void lpc_lex_pop_pushed_buffer(void *yyscanner) {
@@ -947,21 +1047,29 @@ int lpc_lex_buffer_extents(void *yyscanner, int i, const char **base, const char
 
 
 
-// Install `text` as THE base buffer (stack slot 0): the main file's whole
-// content, scanned exactly like an include/splice buffer -- flex native,
-// no incremental refill. yy_scan_bytes copies, so the caller's text may
-// be transient. Any previous base is deleted (a reused scanner replaces
-// its base per compile).
-void lpc_lex_set_source(const char *text, size_t len, void *yyscanner) {
+// Install a PREPARED buffer as THE base (stack slot 0): the main file's
+// whole content scanned IN PLACE via yy_scan_buffer -- zero copy, zero
+// flex text allocation. `base` must be writable arena memory (flex does
+// its hold-char/NUL dance in it) whose final two bytes are '\0' '\0'
+// sentinels; `size` INCLUDES those two bytes. Any previous base is
+// deleted (a reused scanner replaces its base per compile; flex never
+// frees the text -- yy_is_our_buffer is 0 for scan buffers).
+void lpc_lex_set_source(char *base, size_t size, void *yyscanner) {
   struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;
   yyensure_buffer_stack(yyscanner);
   if (YY_CURRENT_BUFFER) {
     yy_delete_buffer(YY_CURRENT_BUFFER, yyscanner);
     YY_CURRENT_BUFFER_LVALUE = NULL;
   }
-  yy_scan_bytes(text, (int)len, yyscanner);
-  /* yy_scan_buffer() (behind yy_scan_bytes) leaves yy_bs_lineno/column
-   * uninitialized -- same fixup as lpc_lex_push_string_buffer. */
+  s_flex_alloc_arena = true;  // the yy_buffer_state struct is per-compile
+  YY_BUFFER_STATE b = yy_scan_buffer(base, size, yyscanner);
+  s_flex_alloc_arena = false;
+  if (b == NULL) {
+    lpc_lex_fatal("lpc_lex_set_source: buffer missing sentinels");
+    return;
+  }
+  /* yy_scan_buffer leaves yy_bs_lineno/column uninitialized -- same
+   * fixup as lpc_lex_push_string_buffer. */
   yylineno = 1;
   yycolumn = 0;
   yyg->yy_did_buffer_switch_on_eof = 1;
