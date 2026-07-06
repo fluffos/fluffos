@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 
-class LexStream;
 
 #include "vm/internal/base/function.h"  // for function_t
 #include "vm/internal/base/program.h"   // for DECL_MODS etc
@@ -414,7 +413,7 @@ extern int compiler_directive_start_line;
 // failure is a clear chained error report instead of runaway recursion.
 #define MAX_COMPILE_DEPTH 32
 
-program_t *compile_file(std::unique_ptr<LexStream>, const char *,
+program_t *compile_file(std::string_view source, const char *,
                         vm_context_t *vm_context = &g_driver_vm_context);
 
 void reset_function_blocks(void);

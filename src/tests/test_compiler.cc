@@ -176,9 +176,7 @@ static std::vector<Token> TokenizeSession(std::shared_ptr<LexerSession> session,
     void *scanner = nullptr;
     yylex_init_extra(&ctx, &scanner);
 
-    std::istringstream ss(source);
-    auto stream = std::make_unique<IStreamLexStream>(ss);
-    start_new_file(std::move(stream), scanner, session);
+    start_new_file(source, scanner, session);
 
     std::vector<Token> toks;
     YYSTYPE yylval;

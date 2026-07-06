@@ -4,7 +4,7 @@
  *
  * This is the driver's ONE scan over LPC source: preprocessing is part of
  * lexing, not a separate pass. The main
- * file's bytes flow LexStream -> YY_INPUT -> Flex's base buffer; macro
+ * file's content IS the base buffer (lpc_lex_set_source); macro
  * splices and #include contents are in-memory buffers pushed on Flex's
  * buffer stack. Every byte is read exactly once, one token's worth of
  * work at a time, driven by each LexTokenStream::next() pull.
@@ -50,7 +50,7 @@
  * because grammar.autogen.h references decl_t / func_block_t from it.
  *
  * Buffer management is entirely Flex-native: the base buffer bulk-reads
- * the main stream through YY_INPUT; splices (macro expansions, pushbacks
+ * the main file as the base in-memory buffer; splices (macro expansions, pushbacks
  * of probed bytes) and #include contents are pushed as in-memory buffers
  * on the buffer STACK, each popped at its own <<EOF>> (or drained through
  * lpc_lex_getc()); the parent buffer's position is preserved by Flex's
@@ -152,13 +152,14 @@
     }                                                                     \
   } while (0)
 
-// YY_INPUT: bulk-read the MAIN file's stream (lexer_utils.cc bridge).
+// YY_INPUT: constant EOF. EVERY input -- the main file included -- is an
+// in-memory buffer installed via yy_scan_bytes (lpc_lex_set_source for
+// the base, lpc_lex_push_string_buffer for splices/includes), and those
+// buffers never request a refill (yy_fill_buffer == 0). The only buffer
+// that could ever call here is the defensive placeholder base in
+// lpc_lex_push_string_buffer; report end-of-input for it.
 #define YY_INPUT(buf, result, max_size) \
-    result = lpc_lex_yy_input(buf, max_size, yyscanner)
-
-// Declared here; defined in lexer_utils.cc. Bulk-reads the main stream
-// into Flex's base buffer (with a trailing-'\n'-at-EOF guarantee).
-extern "C" int lpc_lex_yy_input(char *buf, int max_size, void *yyscanner);
+    (void)(buf); (void)(max_size); result = 0;
 
 // Defined in the trailer below (uses the buffer-stack helpers).
 static int lpc_lex_pop_splice_if_any(void *yyscanner);
@@ -945,6 +946,27 @@ int lpc_lex_buffer_extents(void *yyscanner, int i, const char **base, const char
 }
 
 
+
+// Install `text` as THE base buffer (stack slot 0): the main file's whole
+// content, scanned exactly like an include/splice buffer -- flex native,
+// no incremental refill. yy_scan_bytes copies, so the caller's text may
+// be transient. Any previous base is deleted (a reused scanner replaces
+// its base per compile).
+void lpc_lex_set_source(const char *text, size_t len, void *yyscanner) {
+  struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;
+  yyensure_buffer_stack(yyscanner);
+  if (YY_CURRENT_BUFFER) {
+    yy_delete_buffer(YY_CURRENT_BUFFER, yyscanner);
+    YY_CURRENT_BUFFER_LVALUE = NULL;
+  }
+  yy_scan_bytes(text, (int)len, yyscanner);
+  /* yy_scan_buffer() (behind yy_scan_bytes) leaves yy_bs_lineno/column
+   * uninitialized -- same fixup as lpc_lex_push_string_buffer. */
+  yylineno = 1;
+  yycolumn = 0;
+  yyg->yy_did_buffer_switch_on_eof = 1;
+  BEGIN(INITIAL);
+}
 
 void lpc_lex_reset(void *yyscanner) {
   struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;

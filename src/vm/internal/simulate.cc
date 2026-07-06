@@ -476,8 +476,23 @@ object_t *load_object(const char *lname, int callcreate) {
     error("Could not read the file '/%s'.\n", real_name);
   }
   save_command_giver(command_giver);
-  auto stream = std::make_unique<FileLexStream>(f);
-  prog = compile_file(std::move(stream), obname);
+  // Slurp the whole file: the lexer scans a native in-memory buffer (the
+  // same mechanism as #include contents); compile_file copies the text
+  // into the scanner's buffer, so this local may die right after.
+  std::string source;
+  {
+    char buf[65536];
+    ssize_t n;
+    while ((n = read(f, buf, sizeof(buf))) > 0) {
+      source.append(buf, static_cast<size_t>(n));
+    }
+    if (n < 0) {
+      restore_command_giver();
+      close(f);
+      error("Could not read the file '/%s'.\n", real_name);
+    }
+  }
+  prog = compile_file(source, obname);
   restore_command_giver();
   update_compile_av(total_lines);
   total_lines = 0;
@@ -599,9 +614,8 @@ object_t *load_object(const char *lname, int callcreate) {
 // #inherit is simply unsupported here).
 object_t *load_object_from_source(const std::string &source, const char *virtual_name,
                                    int callcreate) {
-  auto stream = std::make_unique<StringLexStream>(source);
   save_command_giver(command_giver);
-  program_t *prog = compile_file(std::move(stream), virtual_name);
+  program_t *prog = compile_file(source, virtual_name);
   restore_command_giver();
 
   if (inherit_file) {
