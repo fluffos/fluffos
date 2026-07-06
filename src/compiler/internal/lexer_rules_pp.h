@@ -7,11 +7,11 @@
 // unique logic landed when preprocessing was merged into the lexer's own
 // single scan (plans/unified-push-lexer.md): the macro table and
 // #define/#undef parsing, the #if/#elif expression evaluator
-// (IfExprParser), textual macro expansion with recursion guards, and the
-// directive dispatcher lex.l's one anchored '#'-line rule calls into.
-// What did NOT move here: the #include input-stack push and macro
-// expansion's ring-buffer splicing live in lexer_utils.cc, next to the
-// buffer machinery they manipulate.
+// (lpc_lex_eval_if_expr), textual macro expansion with recursion guards,
+// and the directive entry point lex.l's one anchored '#'-line rule calls
+// (lpc_lex_on_directive). What did NOT move here: the #include
+// input-stack push and macro expansion's ring-buffer splicing live in
+// lexer_utils.cc, next to the buffer machinery they manipulate.
 
 #include <memory>
 #include <string>
@@ -25,6 +25,11 @@ struct PpMacro {
     bool is_predefined = false;
     std::vector<std::string> params;  // parameter names (function-like only)
     std::string body;                 // replacement body
+    // Definition site, for diagnostics ("during expansion of macro 'F'
+    // (defined at file:line)", "previous definition was at ..."). Empty
+    // file for predefines/builtins (no source location).
+    std::string def_file;
+    int def_line = 0;
 };
 
 // The #define table: name -> macro. A plain map -- every operation used on
@@ -37,18 +42,27 @@ std::string_view trim(std::string_view s);
 std::string strip_directive_comments(std::string_view s);
 std::string stringize(std::string_view s);
 std::vector<std::string> collect_args(std::string_view text, size_t& i);
+// Parameter substitution (with # stringize marking and ## paste in its
+// second pass). `args` are the RAW argument spellings -- what # and ##
+// operands receive (C semantics). `expanded_args`, when non-null,
+// supplies the macro-expanded form used for every OTHER parameter
+// reference (C's argument pre-expansion); null = raw everywhere (the
+// textual directive-side path, which pre-expands before calling).
 std::string substitute(std::string_view body,
                        const std::vector<std::string>& params,
-                       const std::vector<std::string>& args);
+                       const std::vector<std::string>& args,
+                       const std::vector<std::string>* expanded_args = nullptr);
 
-// #if/#elif integer expression evaluator (C-style operators, ternary,
-// char-literal atoms, defined()/efun_defined() already resolved to 1/0 by
-// lpc_lex_expand_string() before this ever runs). On any parse problem
-// (unpaired bracket, division/modulo by zero, trailing '?' without ':',
-// or leftover unparsed content after what looked like a complete
-// expression) calls lexerror() directly -- matching every other
-// lexer_rules*.cc helper's convention -- and returns 0.
-long lpc_lex_eval_if_expr(std::string_view expr);
+// #if/#elif integer expression evaluator over TOKENS: pushes `expr` as a
+// LPC_BUF_IF_EXPR buffer, pulls tokens through the scanner itself
+// (numbers via the real literal decoders; macro references expand
+// through the ordinary rescan machinery into a flat sequence, preserving
+// C precedence; defined()/efun_defined() operands pulled with expansion
+// suppressed), then evaluates with C-style precedence and ternary. On
+// any parse problem (unpaired bracket, division/modulo by zero, trailing
+// '?' without ':', leftover content) calls lexerror() directly and
+// returns 0.
+long lpc_lex_eval_if_expr(std::string_view expr, void* yyscanner);
 
 // One level of the #if/#ifdef conditional stack: whether this level's
 // current branch emits, and whether ANY branch of it has been true yet
@@ -99,33 +113,24 @@ LpcDirectiveAction lpc_lex_on_directive(const char* text, int len, void* yyscann
                                         bool in_skip_mode);
 
 // #include implementation: resolves `rest` (macro-expanding it first when
-// unquoted), pushes the current input source onto the include stack, and
-// switches scanning to the opened file -- ending with the refill_buffer()
-// that loads its first chunk. Defined in lexer_utils.cc, next to the
-// include stack and ring buffer it manipulates. Preconditions documented
-// at the definition. Also used by start_new_file() for the configured
-// __GLOBAL_INCLUDE_FILE__.
-bool lpc_lex_handle_include(std::string_view rest);
+// unquoted), records the including file's identity on the include
+// metadata stack, and pushes the opened file's whole content as a Flex
+// buffer (LPC_BUF_INCLUDE) -- the pop side restores the metadata when
+// that buffer runs dry. Defined in lexer_utils.cc, next to the include
+// stack it manipulates. Preconditions documented at the definition. Also
+// used by start_new_file() for the configured __GLOBAL_INCLUDE_FILE__.
+bool lpc_lex_handle_include(std::string_view rest, void *yyscanner);
 
 // Textual macro expansion (object-like and function-like, with `guard`
 // carrying the names currently being expanded for self-reference
-// termination). in_if_expr additionally enables defined()/efun_defined()
-// evaluation for #if/#elif expressions.
-//
-// guard_hits: when non-null, each guarded self-reference left literal in
-// text that will reach the RESULT directly gets counted (name -> count).
-// The splice-and-rescan path (lpc_lex_resolve_identifier) passes the
-// scanner's pending_plain map here so the rescan knows exactly which
-// literal occurrences must stay plain identifiers -- see lex.h's
-// pending_plain comment. #if/#include callers leave it null: their result
-// text is consumed directly (expression evaluator / filename), never
-// rescanned by the lexer, so no occurrence needs marking. Argument
-// pre-expansion inside the walk also passes null internally -- its output
-// goes through substitute() and is then RE-walked, and only the re-walk's
-// emissions reach the result (counting both would double-count).
-std::string lpc_lex_expand_string(std::string_view text, std::vector<std::string> guard = {},
-                                  bool in_if_expr = false,
-                                  std::unordered_map<std::string, int>* guard_hits = nullptr);
+// termination). ONLY two textual consumers remain -- function-like
+// ARGUMENT pre-expansion (C's "arguments are fully expanded first" step)
+// and #include's unquoted-filename form; both consume the result as
+// text, never rescanned. Ordinary macro expansion is rescan-driven
+// (lpc_lex_resolve_identifier pushes the RAW substituted body as a Flex
+// buffer) and #if/#elif expressions are evaluated over TOKENS
+// (lpc_lex_eval_if_expr below).
+std::string lpc_lex_expand_string(std::string_view text, std::vector<std::string> guard = {});
 
 // __LINE__/__FILE__/__DIR__ expand from the compiler's LIVE position
 // (current_line/current_file) -- one line counter, one file name is the

@@ -85,6 +85,9 @@ int lpc_lex_accum_overflow(void *yyscanner, union YYSTYPE *yylval_param, bool in
 // (for the closing backtick) decides between L_STRING (no interpolation)
 // and L_TEMPLATE_TAIL. Returns the token to return; caller still does
 // BEGIN(INITIAL) itself (start-condition changes can't move out of lex.l).
+// Close of a plain double-quoted string: UTF-8 validation + scratch copy
+// of the accumulated body; returns L_STRING (or YYerror on bad UTF-8).
+int lpc_lex_string_close(void *yyscanner, union YYSTYPE *yylval_param);
 int lpc_lex_template_head_or_middle(void *yyscanner, union YYSTYPE *yylval_param);
 int lpc_lex_template_tail_or_string(void *yyscanner, union YYSTYPE *yylval_param);
 
@@ -103,6 +106,23 @@ LPC_INT lpc_lex_char_unknown_escape(const char *text);
 // yylval.number, returns L_NUMBER. Caller still does BEGIN/yyless itself.
 int lpc_lex_char_error(union YYSTYPE *yylval_param);
 
+// Template-literal interpolation brace tracking (the `${ ... }` body is
+// scanned by the ordinary top-level rules; these keep the per-nesting
+// brace depth so the '}' that ENDS the interpolation can be told apart
+// from one inside it). lpc_lex_brace_open() is called by the '{' and
+// "({" rules; lpc_lex_brace_close() by the '}' rule -- it returns true
+// when this '}' closes the interpolation itself (depth was zero), having
+// already re-armed the string accumulator for the resuming template
+// fragment; the rule then only does its BEGIN/return skeleton.
+void lpc_lex_brace_open(void *yyscanner);
+bool lpc_lex_brace_close(void *yyscanner);
+
+// Reset the per-scanner context fields a fresh compile must not inherit
+// (template nesting, the #if evaluator's expansion-suppression flag).
+// Called by lpc_lex_reset(); lives here so lex.l keeps only the
+// flex-state half of the reset.
+void lpc_lex_reset_context(struct compiler_context_t *ctx);
+
 // ---------------------------------------------------------------------------
 // Misc
 // ---------------------------------------------------------------------------
@@ -111,12 +131,10 @@ int lpc_lex_char_error(union YYSTYPE *yylval_param);
 // directly between two digits, so this is always safe).
 std::string lpc_strip_underscores(const char *text, int len);
 
-// current_line++/total_lines++ for each '\n' in the matched text -- used
-// by the "(" WS* "{"/"["/":" compound-open rules and SC_FUNC_OPEN's
-// whitespace run, where a matched span can contain newlines that must
-// still count. Counts BOTH counters, like every other newline path (the
-// legacy scanner did too; an earlier version of this helper skipped
-// total_lines, undercounting the compiled-lines/s stat).
+// total_lines++ for each '\n' in the matched text -- used by the
+// "(" WS* "{"/"["/":" compound-open rules and SC_FUNC_OPEN's whitespace
+// run. The LINE counter itself advances natively (%option yylineno scans
+// matched text); only the compiled-lines/s statistic is manual.
 void lpc_lex_count_newlines(const char *text, int len);
 
 // ---------------------------------------------------------------------------

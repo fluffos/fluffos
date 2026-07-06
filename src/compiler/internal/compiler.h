@@ -1,6 +1,9 @@
 #ifndef COMPILER_H
 #define COMPILER_H
 
+#include <string>
+#include <vector>
+
 class LexStream;
 
 #include "vm/internal/base/function.h"  // for function_t
@@ -201,6 +204,9 @@ void save_file_info(int, int);
 int add_program_file(const char *, int);
 void yyerror(const char *fmt, ...);
 void yyerror(void *yyscanner, const char *msg);
+// The %locations form Bison calls (location first, then parse-params).
+struct YYLTYPE;
+void yyerror(struct YYLTYPE *llocp, void *yyscanner, const char *msg);
 void yywarn(const char *fmt, ...);
 char *the_file_name(const char *);
 void free_all_local_names(int);
@@ -228,6 +234,181 @@ int get_id_number(void);
 struct vm_context_t {};
 extern vm_context_t g_driver_vm_context;
 extern vm_context_t *compiler_vm_context;
+
+// ---------------------------------------------------------------------------
+// CompileSession — ONE object per compile_file() invocation: the compile's
+// identity (filename, vm_context) and the anchor structured diagnostics
+// hang provenance off (see Diagnostic below). `current_compile` points at
+// the running compile's session, or null outside any compile.
+//
+// The parent/depth/chain() machinery exists but is inert by design:
+// compile_file() is NEVER re-entered — the compiler is deliberately
+// non-reentrant (plans/MASTER-PLAN.md Phase 6 scope correction). The
+// `inherit`-of-an-unloaded-parent case is handled entirely OUTSIDE the
+// compiler by load_object() (simulate.cc): the child compile cleanly
+// abandons (rule_inheritence() sets the inherit_file global, epilog()
+// discards the partial program), then load_object() recursively loads the
+// parent — recursion bounded by __INHERIT_CHAIN_SIZE__ — and reloads the
+// child from scratch. That abort-and-restart is SAFER than nested
+// compiles would be: loading the parent runs arbitrary LPC (its
+// create()), which must never execute mid-compile. The guard in
+// compile_file() rejecting re-entry is therefore the design, not a
+// limitation. If cross-load provenance ("loading X because Y inherits
+// it") is ever wanted for diagnostics, it belongs in load_object()'s
+// recursion as a name chain feeding capture_diagnostic() — not in
+// compiler nesting; parent/chain() here is the ready-made hook for it.
+struct CompileSession {
+  const char *filename;         // as given to compile_file()
+  vm_context_t *vm_context;     // null => no VM interactions allowed
+  CompileSession *parent;       // always null today (no nesting; see above)
+  int depth;                    // always 0 today
+
+  // Provenance line for diagnostics: "while compiling A, triggered by B,
+  // triggered by C". Empty string for a top-level compile with no chain.
+  std::string chain() const;
+};
+extern CompileSession *current_compile;  // the running compile's session
+
+// ---------------------------------------------------------------------------
+// Structured diagnostics — every yyerror()/yywarn() records one of these,
+// capturing at the moment of the report the provenance a flat text line
+// can't carry: the live #include stack, the live macro-expansion chain,
+// and site-supplied notes. render_diagnostic()'s clang-style multi-line
+// form IS the driver's default output (via report_compile_diagnostic());
+// structured consumers (lpcshell) read the fields directly instead.
+// ---------------------------------------------------------------------------
+struct Diagnostic {
+  bool is_warning;
+  std::string file;  // innermost file (current_file at capture time)
+  int line;          // line within `file`
+  // 1-based column of the diagnosed token's START (0 = unknown, so every
+  // producer that never learned about columns stays valid). For an error
+  // inside a macro expansion this is the OUTERMOST invocation's column --
+  // clang's "expansion location"; the inside of the expansion is the
+  // expansions[] notes' job.
+  int column = 0;
+  // The diagnosed physical line's text as still resident in the scanner's
+  // innermost real buffer at capture time (empty = unavailable). Rendered
+  // as an indented snippet with a caret at `column`.
+  std::string snippet;
+  std::string message;
+  // The live #include stack at capture, innermost includer first:
+  // (includer file, line of its #include directive). Rendered clang-style
+  // as "In file included from F:N:" prefix lines, outermost first.
+  std::vector<std::pair<std::string, int>> included_from;
+  // The live macro-expansion chain at capture, innermost first --
+  // display-ready lines: "during expansion of macro 'F' (defined at
+  // /file:line)". Rendered as indented notes after the main line.
+  std::vector<std::string> expansions;
+  // Everything else: site-supplied context (compiler_pending_notes, e.g.
+  // "previous definition of 'FOO' was at ..."), the compile-session
+  // chain. Rendered as indented notes after the expansion chain.
+  std::vector<std::string> notes;
+  // Fix-it hints (8.5): a replacement for the [col_start, col_end)
+  // 1-based column span on the diagnosed line. Rendered as a clang-style
+  // replacement line under the caret. Producers attach these only when
+  // the fix is unambiguous (e.g. a near-miss #pragma name).
+  struct FixIt {
+    int col_start;
+    int col_end;
+    std::string replacement;
+  };
+  std::vector<FixIt> fixits;
+  // Operand/sub-expression ranges (8.3): 1-based [col_start, col_end]
+  // spans, rendered as '~' runs on the caret line when `line` matches the
+  // diagnosed line. Attached by grammar actions via
+  // rule_set_operand_ranges() around type-checking helpers.
+  struct Range {
+    int line;
+    int col_start;
+    int col_end;
+  };
+  std::vector<Range> ranges;
+};
+
+// This compile's captured diagnostics, cleared by start_new_file() (i.e.
+// per compile / per REPL chunk, on the same boundary num_parse_error
+// effectively resets). A plain global rather than a CompileSession member
+// so the unit harnesses that drive the lexer without compile_file() (no
+// session on the stack) still capture.
+extern std::vector<Diagnostic> compiler_diags;
+
+// The clang-style multi-line rendering:
+//   In file included from /std/room.c:3:
+//   /include/setup.h:9: error: message
+//     note: during expansion of macro 'SETUP' (defined at /include/setup.h:2)
+//     note: previous definition of 'FOO' was at /include/old.h:4
+// `color` adds ANSI severity/caret coloring -- for tty consumers
+// (lpcshell checks isatty); the driver's log output stays plain.
+std::string render_diagnostic(const Diagnostic &d, bool color = false);
+
+// THE compile-diagnostic output path (compiler_utils.cc): renders `d`
+// clang-style, appends the PRAGMA_ERROR_CONTEXT snippet block when that
+// pragma is active, prints via debug_message(), and -- when a VM is
+// attached (compiler_vm_context) -- reports the same text to the master
+// via APPLY_LOG_ERROR. yyerror()/yywarn() call this with the Diagnostic
+// they just captured; smart_log() remains only for the RUNTIME callers
+// (apply.cc's trace-driven warnings) that have no compile context.
+void report_compile_diagnostic(const Diagnostic &d);
+
+// When set, report_compile_diagnostic() captures but does NOT print or
+// master-report -- for structured consumers (lpcshell) that render
+// compiler_diags themselves, and specifically must not spray a doomed
+// trial-parse's errors onto the console before retrying another form.
+extern bool compiler_diags_quiet;
+
+// Extra note lines for the NEXT captured diagnostic, consumed (appended +
+// cleared) by the capture in yyerror()/yywarn(). Lets an error site attach
+// context it alone knows -- e.g. the #define redefinition warning adds
+// "previous definition of 'FOO' was at file:line" before reporting. Only
+// meaningful immediately before a report; anything stale is cleared at the
+// next capture.
+extern std::vector<std::string> compiler_pending_notes;
+// Fix-it hints queued by the NEXT report's site, same one-shot contract
+// as compiler_pending_notes.
+extern std::vector<Diagnostic::FixIt> compiler_pending_fixits;
+
+// Load-chain provenance (the optional 6.x note): load_object() sets
+// compiler_next_load_reason just before recursively loading an inherited
+// file; the NEXT compile's start_new_file() consumes it into
+// compiler_current_load_reason (compile-scoped), and every diagnostic of
+// that compile carries it as a note ("while loading '/x' inherited by
+// '/y'"). One-shot hand-off, so an error() unwind can never leave a
+// stale reason attached to an unrelated later compile.
+extern std::string compiler_next_load_reason;
+extern std::string compiler_current_load_reason;
+
+// Operand ranges queued by a grammar action around a type-checking helper
+// (one-shot, consumed by the next captured diagnostic; the action clears
+// them after the helper returns so they can never leak to an unrelated
+// report). Defined in compiler.cc; the grammar calls the rule_* pair.
+extern std::vector<Diagnostic::Range> compiler_pending_ranges;
+// The operator's own position: when set (line != 0) and it matches the
+// diagnosed line, the caret moves onto the operator -- clang's
+// `~~~~~ ^ ~~~~~` shape for binary-op type errors.
+extern int compiler_pending_caret_line;
+extern int compiler_pending_caret_col;
+void rule_set_operand_ranges(int l1, int c1, int e1, int lop, int cop, int l2, int c2, int e2);
+void rule_clear_operand_ranges(void);
+
+// Line-attribution override for directive-dispatch reports. The lex.l
+// directive rule consumes and counts the directive's terminating newline
+// BEFORE dispatching (load-bearing for the #include push and #line
+// arithmetic -- see the rule's comment), so during dispatch current_line
+// is already the line AFTER the directive; an error reported from inside
+// dispatch (#error, a bad #if expression, an unresolvable #include, ...)
+// would attribute one line too low. lpc_lex_on_directive() sets this to
+// the directive's own first line around the dispatch call and zeroes it
+// after; yyerror()/yywarn() use it, when nonzero, instead of
+// current_line. Zero everywhere else (parse errors, lexer errors,
+// EOF-time errors all attribute via current_line as usual).
+extern int compiler_directive_start_line;
+
+// Belt-and-suspenders cap on session-stack depth. Unreachable in practice
+// (the reentrancy guard rejects nesting outright, so depth is always 0);
+// kept so that if the guard were ever bypassed by a future bug, the
+// failure is a clear chained error report instead of runaway recursion.
+#define MAX_COMPILE_DEPTH 32
 
 program_t *compile_file(std::unique_ptr<LexStream>, const char *,
                         vm_context_t *vm_context = &g_driver_vm_context);

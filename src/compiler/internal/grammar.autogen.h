@@ -122,7 +122,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 154 "$REPO_ROOT$/src/compiler/internal/grammar.y"
+#line 158 "$REPO_ROOT$/src/compiler/internal/grammar.y"
 
   LPC_INT number;              /* integers, opcodes, type flags */
   LPC_FLOAT real;              /* floating-point literals */
@@ -155,6 +155,20 @@ typedef union YYSTYPE YYSTYPE;
 # define YYSTYPE_IS_DECLARED 1
 #endif
 
+/* Location type.  */
+#if ! defined YYLTYPE && ! defined YYLTYPE_IS_DECLARED
+typedef struct YYLTYPE YYLTYPE;
+struct YYLTYPE
+{
+  int first_line;
+  int first_column;
+  int last_line;
+  int last_column;
+};
+# define YYLTYPE_IS_DECLARED 1
+# define YYLTYPE_IS_TRIVIAL 1
+#endif
+
 
 
 
@@ -167,7 +181,7 @@ typedef struct yypstate yypstate;
 
 
 int yypush_parse (yypstate *ps,
-                  int pushed_char, YYSTYPE const *pushed_val, void* yyscanner);
+                  int pushed_char, YYSTYPE const *pushed_val, YYLTYPE *pushed_loc, void* yyscanner);
 
 yypstate *yypstate_new (void);
 void yypstate_delete (yypstate *ps);

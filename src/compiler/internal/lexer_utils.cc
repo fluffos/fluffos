@@ -2,9 +2,10 @@
  * File: lexer_utils.cc
  *
  * Combines the lexer's global state and non-scanning helpers (identifier
- * hash table, ring-buffer management, heredoc body matching, pragma/error-
- * context handling) with the standalone-preprocessor support helpers
- * (predefines registry, include-path resolution). Originally two separate
+ * hash table, the main-stream YY_INPUT bridge, pushed-buffer/include
+ * bookkeeping, heredoc body matching, pragma/error-context handling) with
+ * the standalone-preprocessor support helpers (predefines registry,
+ * include-path resolution). Originally two separate
  * files -- lex.c/lex.cc (renamed to lex_util.cc once the Flex migration in
  * lex.l left only this residual state+helpers behind) and lexer_utils.cc --
  * merged here since both serve the same "lexer support" role. See
@@ -95,7 +96,11 @@ char lex_ctype[256] = {
 #define SKIPWHITE \
   while (is_wspace((unsigned char)*p) && (*p != '\n')) p++
 
-int current_line;       /* line number in this file */
+// The `current_line` macro's fallback storage (see lex.h): holds the
+// value when no scanner/buffer is live -- loaded by end_new_file() with
+// the final native value so post-compile readers see what the legacy
+// global held.
+int lpc_lex_line_fallback = 0;
 int current_line_base;  /* number of lines from other files */
 int current_line_saved; /* last line in this file where line num
                            info was saved */
@@ -113,31 +118,31 @@ lpc_predef_t *lpc_predefs = nullptr;
 
 namespace {
 std::unique_ptr<LexStream> current_stream = nullptr;
+// Last byte handed to Flex from the main stream, for the trailing-newline
+// invariant in lpc_lex_yy_input. Reset per compile in start_new_file.
+char main_last_char = '\n';
 }  // namespace
 std::shared_ptr<LexerSession> current_session = nullptr;
 
 int lex_fatal;
-char *last_nl;
 
-// yytext is now defined by the Flex-generated lex.autogen.cc.
-// YYLMAX (8192) >= MAXLINE (4096) so existing writes are safe.
-char *outp;
-
-typedef struct incstate_s {
-  struct incstate_s *next;
-  LexStream *stream;  // raw pointer because incstate_t is alloated using malloc
+// One level of the #include stack -- pure metadata now. The included
+// file's CONTENT is a pushed Flex buffer (lpc_lex_push_string_buffer with
+// LPC_BUF_INCLUDE), so the parent's resume position is kept by Flex's own
+// buffer stack; what remains here is what the pop must restore for
+// diagnostics and the per-file line accounting (save_file_info /
+// current_line_base arithmetic). `file` is a shared string owned by the
+// entry until its pop.
+struct IncState {
   int line;
   const char *file;
   int file_id;
-  char *last_nl;
-  char *outp;
-} incstate_t;
+};
 
-static incstate_t *inctop = nullptr;
+static std::vector<IncState> inc_stack;
 
 /* prevent unbridled recursion */
 #define MAX_INCLUDE_DEPTH 32
-static int incnum;
 
 /* If more than this is needed, the code needs help :-) */
 #define MAX_FUNCTION_DEPTH 10
@@ -236,27 +241,7 @@ static ident_hash_elem_t *ident_dirty_list = nullptr;
 
 instr_t instrs[MAX_INSTRS];
 
-#define TERM_ADD_INPUT 1
-#define TERM_INCLUDE 2
-#define TERM_START 4
-
-typedef struct linked_buf_s {
-  struct linked_buf_s *prev;
-  char term_type;
-  char buf[DEFMAX];
-  char *buf_end;
-  char *outp;
-  char *last_nl;
-} linked_buf_t;
-
-static linked_buf_t head_lbuf = {nullptr, TERM_START};
-static linked_buf_t *cur_lbuf;
-
-static void add_input(const char * /*p*/);
-static int get_array_block(char * /*term*/);
-static int get_text_block(char * /*term*/);
-static void refill_buffer(void);
-static int old_func(void *yyscanner);
+static int old_func(const std::string &name, void *yyscanner);
 static ident_hash_elem_t *quick_alloc_ident_entry(void);
 
 int lookup_predef(const char *name) {
@@ -282,370 +267,17 @@ void lexerror(const char *s) {
 
 
 
-#define MAXCHUNK (MAXLINE * 4)
-#define NUMCHUNKS (DEFMAX / MAXCHUNK)
-
-#define NEWCHUNK(line)                                                              \
-  if (len == MAXCHUNK - 1) {                                                        \
-    line[curchunk][MAXCHUNK - 1] = '\0';                                            \
-    if (curchunk == NUMCHUNKS - 1) {                                                \
-      res = -2;                                                                     \
-      break;                                                                        \
-    }                                                                               \
-    line[++curchunk] = (char *)DMALLOC(MAXCHUNK, TAG_COMPILER, "array/text chunk"); \
-    len = 0;                                                                        \
-  }
-
-static int get_array_block(char *term) {
-  unsigned int termlen;        /* length of terminator */
-  char *array_line[NUMCHUNKS]; /* allocate memory in chunks */
-  int header, len;             /* header length; position in chunk */
-  int startpos, startchunk;    /* start of line */
-  int curchunk, res;           /* current chunk; this function's result */
-  int i;                       /* an index counter */
-  unsigned char c;             /* a char */
-  char *yyp = outp;
-
-  /*
-   * initialize
-   */
-  termlen = strlen(term);
-  array_line[0] = reinterpret_cast<char *>(DMALLOC(MAXCHUNK, TAG_COMPILER, "array_block"));
-  array_line[0][0] = '(';
-  array_line[0][1] = '{';
-  array_line[0][2] = '"';
-  array_line[0][3] = '\0';
-  header = 1;
-  len = 3;
-  startpos = 3;
-  startchunk = 0;
-  curchunk = 0;
-  res = 0;
-
-  while (true) {
-    while (((c = *yyp++) != '\n') && (c != LEX_EOF)) {
-      NEWCHUNK(array_line);
-      if (c == '"' || c == '\\') {
-        array_line[curchunk][len++] = '\\';
-        NEWCHUNK(array_line);
-      }
-      array_line[curchunk][len++] = c;
-    }
-
-    if (c == '\n' && (yyp == last_nl + 1)) {
-      outp = yyp;
-      refill_buffer();
-      yyp = outp;
-    }
-
-    /*
-     * null terminate current chunk
-     */
-    if (len > startpos && array_line[curchunk][len - 1] == '\r') {
-      len--;
-    }
-    array_line[curchunk][len] = '\0';
-
-    if (res) {
-      outp = yyp;
-      break;
-    }
-
-    /*
-     * check for terminator
-     */
-    if ((!strncmp(array_line[startchunk] + startpos, term, termlen)) &&
-        (!uisalnum(*(array_line[startchunk] + startpos + termlen))) &&
-        (*(array_line[startchunk] + startpos + termlen) != '_')) {
-      /*
-       * handle lone terminator on line
-       */
-      if (strlen(array_line[startchunk] + startpos) == termlen) {
-        current_line++;
-        outp = yyp;
-      } else {
-        /*
-         * put back trailing portion after terminator
-         */
-        outp = --yyp; /* some operating systems give EOF only once */
-
-        for (i = curchunk; i > startchunk; i--) {
-          add_input(array_line[i]);
-        }
-        add_input(array_line[startchunk] + startpos + termlen);
-      }
-
-      /*
-       * remove terminator from last chunk
-       */
-      array_line[startchunk][startpos - header] = '\0';
-
-      /*
-       * insert array block into input stream
-       */
-      *--outp = ')';
-      *--outp = '}';
-      for (i = startchunk; i >= 0; i--) {
-        add_input(array_line[i]);
-      }
-
-      res = 1;
-      break;
-    } else {
-      /*
-       * only report end of file in array block, if not an include file
-       */
-      if (c == LEX_EOF && inctop == nullptr) {
-        res = -1;
-        outp = yyp;
-        break;
-      }
-      if (c == '\n') {
-        current_line++;
-      }
-      /*
-       * make sure there's room in the current chunk for terminator (ie
-       * it's simpler if we don't have to deal with a terminator that
-       * spans across chunks) fudge for "\",\"TERMINAL?\0", where '?'
-       * is unknown
-       */
-      if (len + termlen + 6 > MAXCHUNK) {
-        if (curchunk == NUMCHUNKS - 1) {
-          res = -2;
-          outp = yyp;
-          break;
-        }
-        array_line[++curchunk] =
-            reinterpret_cast<char *>(DMALLOC(MAXCHUNK, TAG_COMPILER, "array_block"));
-        len = 0;
-      }
-
-      /*
-       * header
-       */
-      array_line[curchunk][len++] = '"';
-      array_line[curchunk][len++] = ',';
-      array_line[curchunk][len++] = '\n';
-      array_line[curchunk][len++] = '"';
-      array_line[curchunk][len] = '\0';
-
-      startchunk = curchunk;
-      startpos = len;
-      header = 2;
-    }
-  }
-
-  /*
-   * free chunks
-   */
-  for (i = curchunk; i >= 0; i--) {
-    FREE(array_line[i]);
-  }
-
-  return res;
-}
-
-static int get_text_block(char *term) {
-  unsigned int termlen;       /* length of terminator */
-  char *text_line[NUMCHUNKS]; /* allocate memory in chunks */
-  int len;                    /* position in chunk */
-  int startpos, startchunk;   /* start of line */
-  int curchunk, res;          /* current chunk; this function's result */
-  int i;                      /* an index counter */
-  unsigned char c;            /* a char */
-  char *yyp = outp;
-
-  /*
-   * initialize
-   */
-  termlen = strlen(term);
-  text_line[0] = reinterpret_cast<char *>(DMALLOC(MAXCHUNK, TAG_COMPILER, "text_block"));
-  text_line[0][0] = '"';
-  text_line[0][1] = '\0';
-  len = 1;
-  startpos = 1;
-  startchunk = 0;
-  curchunk = 0;
-  res = 0;
-
-  while (true) {
-    while (((c = *yyp++) != '\n') && (c != LEX_EOF)) {
-      NEWCHUNK(text_line);
-      if (c == '"' || c == '\\') {
-        text_line[curchunk][len++] = '\\';
-        NEWCHUNK(text_line);
-      }
-      text_line[curchunk][len++] = c;
-    }
-
-    if (c == '\n' && yyp == last_nl + 1) {
-      outp = yyp;
-      refill_buffer();
-      yyp = outp;
-    }
-
-    /*
-     * null terminate current chunk
-     */
-    if (len > startpos && text_line[curchunk][len - 1] == '\r') {
-      len--;
-    }
-    text_line[curchunk][len] = '\0';
-
-    if (res) {
-      outp = yyp;
-      break;
-    }
-
-    /*
-     * check for terminator
-     */
-    if ((!strncmp(text_line[startchunk] + startpos, term, termlen)) &&
-        (!uisalnum(*(text_line[startchunk] + startpos + termlen))) &&
-        (*(text_line[startchunk] + startpos + termlen) != '_')) {
-      if (strlen(text_line[startchunk] + startpos) == termlen) {
-        current_line++;
-        outp = yyp;
-      } else {
-        char *p, *q;
-        /*
-         * put back trailing portion after terminator
-         */
-        outp = --yyp; /* some operating systems give EOF only once */
-
-        for (i = curchunk; i > startchunk; i--) {
-          /* Ick.  go back and unprotect " and \ */
-          p = text_line[i];
-          while (*p && *p != '\\') {
-            p++;
-          }
-          if (*p) {
-            q = p++;
-            do {
-              *q++ = *p++;
-              if (*p == '\\') {
-                p++;
-              }
-            } while (*p);
-            *q = 0;
-          }
-
-          add_input(text_line[i]);
-        }
-        p = text_line[startchunk] + startpos + termlen;
-        while (*p && *p != '\\') {
-          p++;
-        }
-        if (*p) {
-          q = p++;
-          do {
-            *q++ = *p++;
-            if (*p == '\\') {
-              p++;
-            }
-          } while (*p);
-          *q = 0;
-        }
-        add_input(text_line[startchunk] + startpos + termlen);
-      }
-
-      /*
-       * remove terminator from last chunk
-       */
-      text_line[startchunk][startpos] = '\0';
-
-      /*
-       * insert text block into input stream
-       */
-      *--outp = '\0';
-      *--outp = '"';
-
-      for (i = startchunk; i >= 0; i--) {
-        add_input(text_line[i]);
-      }
-
-      res = 1;
-      break;
-    } else {
-      /*
-       * only report end of file in text block, if not an include file
-       */
-      if (c == LEX_EOF && inctop == nullptr) {
-        res = -1;
-        outp = yyp;
-        break;
-      }
-      if (c == '\n') {
-        current_line++;
-      }
-      if (len > 0) {
-        // Remove trailing CR
-        if (text_line[curchunk][len - 1] == '\r') {
-          text_line[curchunk][len - 1] = '\0';
-          len = len - 1;
-        }
-      }
-      /*
-       * make sure there's room in the current chunk for terminator (ie
-       * it's simpler if we don't have to deal with a terminator that
-       * spans across chunks) fudge for "\\nTERMINAL?\0", where '?' is
-       * unknown
-       */
-      if (len + termlen + 4 > MAXCHUNK) {
-        if (curchunk == NUMCHUNKS - 1) {
-          res = -2;
-          outp = yyp;
-          break;
-        }
-        text_line[++curchunk] =
-            reinterpret_cast<char *>(DMALLOC(MAXCHUNK, TAG_COMPILER, "text_block"));
-        len = 0;
-      }
-      /*
-       * header
-       */
-      text_line[curchunk][len++] = '\\';
-      text_line[curchunk][len++] = 'n';
-      text_line[curchunk][len] = '\0';
-
-      startchunk = curchunk;
-      startpos = len;
-    }
-  }
-
-  /*
-   * free chunks
-   */
-  for (i = curchunk; i >= 0; i--) {
-    FREE(text_line[i]);
-  }
-
-  return res;
-}
-
-// Called from lex.l's "\n" rule (Phase 3+): mirrors the newline bookkeeping
-// that used to run inline in yylex_inner()'s switch.
-//
-// Uses >= rather than == : Flex's DFA always fetches one lookahead byte
-// past whatever it just matched (even for an unambiguous single-char rule,
-// to confirm the match can't be extended), so by the time this runs, `outp`
-// may already be one byte past `last_nl + 1` -- an exact-equality check
-// would be skipped entirely, causing refill_buffer() to never fire.
-void lpc_lex_newline(void *yyscanner) {
-  current_line++;
+// Called from lex.l's "\n" rule and the other newline-consuming actions.
+// LINE counting is native now (%option yylineno: Flex counts newlines in
+// matched text and through yyinput() into the current buffer's own
+// counter -- see lex.h's current_line macro); what remains here is the
+// total-lines statistic and the line-boundary purge of dead expansion
+// frames (see the linger policy at purge_exhausted_expansions).
+static void purge_exhausted_expansions();
+void lpc_lex_newline(void * /*yyscanner*/) {
   total_lines++;
-  if (outp >= last_nl + 1) {
-    refill_buffer();
-  }
+  purge_exhausted_expansions();
 }
-
-#define SAVEC                     \
-  if (yyp < yytext + MAXLINE - 5) \
-    *yyp++ = c;                   \
-  else {                          \
-    lexerror("Line too long");    \
-    break;                        \
-  }
 
 typedef struct {
   const char *name;
@@ -695,224 +327,217 @@ void handle_pragma(char *str) {
       return;
     }
   }
+  // Near-miss suggestion (8.5/8.6): an unknown pragma within edit
+  // distance 2 of a real one gets a "did you mean" note.
+  {
+    auto edit_distance = [](const char *a, const char *b) {
+      size_t la = strlen(a), lb = strlen(b);
+      std::vector<size_t> prev(lb + 1), cur(lb + 1);
+      for (size_t j = 0; j <= lb; j++) prev[j] = j;
+      for (size_t ii = 1; ii <= la; ii++) {
+        cur[0] = ii;
+        for (size_t j = 1; j <= lb; j++) {
+          size_t sub = prev[j - 1] + (a[ii - 1] == b[j - 1] ? 0 : 1);
+          cur[j] = std::min(std::min(prev[j] + 1, cur[j - 1] + 1), sub);
+        }
+        std::swap(prev, cur);
+      }
+      return prev[lb];
+    };
+    const char *best = nullptr;
+    size_t best_d = 3;
+    for (i = 0; our_pragmas[i].name; i++) {
+      size_t d = edit_distance(str, our_pragmas[i].name);
+      if (d < best_d) {
+        best_d = d;
+        best = our_pragmas[i].name;
+      }
+    }
+    if (best != nullptr) {
+      compiler_pending_notes.push_back(std::string("did you mean '#pragma ") +
+                                       (no_flag ? "no_" : "") + best + "'?");
+    }
+  }
   yywarn("Unknown #pragma, ignored.");
 }
 
-char *show_error_context() {
-  static char buf[60];
-  char sub_context[25];
-  char *yyp, *yyp2;
-  int len;
+// The scanner whose buffers feed the CURRENT compile -- the compiler is
+// deliberately non-reentrant (see compiler.h), so a single slot suffices.
+// Set by start_new_file(), cleared by end_new_file(); consulted by the
+// error-context snippet below, whose callers (lexerror/yyerror paths)
+// don't carry a scanner.
+static void *active_scanner = nullptr;
 
-  if (static_cast<unsigned char>(outp[-1]) == LEX_EOF) {
-    strcpy(buf, " at the end of the file\n");
-    return buf;
+void *lpc_lex_active_scanner(void) { return active_scanner; }
+
+// Native-position logic (current_line, diagnostic snippets, the legacy
+// error-context block) lives further down, built on lex.l's raw
+// buffer-introspection primitives.
+// ---------------------------------------------------------------------------
+// Native-position logic, built on lex.l's raw buffer-introspection
+// primitives (lpc_lex_buffer_count/lineno/extents -- the generated
+// scanner's buffer types are private to that translation unit, so lex.l
+// exposes accessors and ALL policy lives here).
+// ---------------------------------------------------------------------------
+
+// Index of the innermost REAL frame on the buffer stack: the top-most
+// INCLUDE buffer, else the base buffer (0). Splice buffers' positions are
+// synthetic; an out-of-range kind (-1, the transient window while a
+// push/pop is half-done) is skipped the same way. -1 = no buffers.
+static int innermost_real_buffer_index(void *yyscanner) {
+  int count = lpc_lex_buffer_count(yyscanner);
+  if (count <= 0) {
+    return -1;
   }
-
-  // With a pure Bison parser (%define api.pure full), yychar is local to
-  // yyparse() and no longer available as a global, so the "around" vs
-  // "before" distinction this used to make can't be reconstructed here.
-  strcpy(buf, " before ");
-  yyp = outp;
-  yyp2 = sub_context;
-  len = 20;
-  while (len--) {
-    if (*yyp == '\n') {
-      if (len == 19) {
-        strcat(buf, "the end of line");
-      }
-      break;
-    } else if (static_cast<unsigned char>(*yyp) == LEX_EOF) {
-      if (len == 19) {
-        strcat(buf, "the end of file");
-      }
-      break;
+  for (int i = count - 1; i > 0; --i) {
+    if (lpc_lex_buffer_kind_at(i - 1) == LPC_BUF_INCLUDE &&
+        lpc_lex_buffer_lineno(yyscanner, i) != nullptr) {
+      return i;
     }
-    *yyp2++ = *yyp++;
   }
-  *yyp2 = 0;
-  if (yyp2 != sub_context) {
-    strcat(buf, sub_context);
+  return 0;
+}
+
+// The storage behind the `current_line` macro (lex.h): a reference to the
+// innermost real frame's native line counter, falling back to
+// lpc_lex_line_fallback when no scanner or buffer is live.
+int &lpc_lex_current_line_ref(void) {
+  void *yyscanner = active_scanner;
+  if (yyscanner == nullptr) {
+    return lpc_lex_line_fallback;
   }
-  strcat(buf, "\n");
-  return buf;
+  int idx = innermost_real_buffer_index(yyscanner);
+  if (idx < 0) {
+    return lpc_lex_line_fallback;
+  }
+  int *lineno = lpc_lex_buffer_lineno(yyscanner, idx);
+  return lineno != nullptr ? *lineno : lpc_lex_line_fallback;
+}
+
+// The current physical line's text in the innermost real frame -- the
+// same frame `current_line` reads, so Diagnostic line/column/snippet stay
+// mutually consistent: while a splice is scanning, this is the INVOCATION
+// line in the real file. Bounded by what's still resident in that buffer
+// (bulk chunks for the base buffer, the whole file for an include).
+std::string lpc_lex_current_source_line(void) {
+  if (active_scanner == nullptr) {
+    return "";
+  }
+  int idx = innermost_real_buffer_index(active_scanner);
+  if (idx < 0) {
+    return "";
+  }
+  const char *base;
+  const char *limit;
+  const char *pos;
+  char held;
+  if (!lpc_lex_buffer_extents(active_scanner, idx, &base, &limit, &pos, &held)) {
+    return "";
+  }
+  // Treat a NUL as a line boundary alongside '\n': flex's yyinput() NULs
+  // every byte it consumes ("preserve yytext" semantics), so the newline
+  // that terminated a preceding directive line -- consumed via yyinput()
+  // -- survives only as a NUL residue. (Raw reads leave the same residue
+  // mid-line in rarer cases -- a macro's collected arguments -- where
+  // this yields a left-truncated snippet; acceptable.)
+  const char *start = pos;
+  while (start > base && start[-1] != '\n' && start[-1] != '\0') {
+    start--;
+  }
+  std::string content(start, static_cast<size_t>(pos - start));
+  if (pos < limit) {
+    // The byte AT the live scan position may be the held-out NUL; resolve
+    // it BEFORE deciding whether the line continues -- if the held char
+    // is the line's newline, the line ends exactly here (walking on and
+    // substituting later would splice the next line into the snippet).
+    char c0 = *pos;
+    if (held != 0 && c0 == '\0') {
+      c0 = held;
+    }
+    if (c0 != '\n' && c0 != '\0') {
+      content += c0;
+      for (const char *q = pos + 1; q < limit && *q != '\n' && *q != '\0'; ++q) {
+        content += *q;
+      }
+    }
+  }
+  // Strip a trailing CR (CRLF sources) but preserve leading whitespace:
+  // the caret column must align with the text as printed.
+  if (!content.empty() && content.back() == '\r') {
+    content.pop_back();
+  }
+  return content;
+}
+
+// Legacy " snippet + caret at scan position" block for prepare_logs()'s
+// runtime path (apply.cc trace warnings). Reads the CURRENT buffer, like
+// the old ring version read around outp.
+std::string lpc_lex_error_context_block(void) {
+  if (active_scanner == nullptr) {
+    return "";
+  }
+  int count = lpc_lex_buffer_count(active_scanner);
+  if (count <= 0) {
+    return "";
+  }
+  const char *base;
+  const char *limit;
+  const char *pos;
+  char held;
+  if (!lpc_lex_buffer_extents(active_scanner, count - 1, &base, &limit, &pos, &held)) {
+    return "";
+  }
+  const char *start = pos;
+  while (start > base && start[-1] != '\n' && start[-1] != '\0') {
+    start--;
+  }
+  const char *end = pos;
+  while (end < limit && *end != '\n' && (*end != '\0' || end == pos)) {
+    end++;
+  }
+  auto size = end - start;
+  if (size <= 0) {
+    return "";
+  }
+  bool truncated = false;
+  if (size > 120) {
+    size = 117;
+    truncated = true;
+  }
+  std::string content(start, static_cast<size_t>(size));
+  if (held != 0 && pos >= start && pos < start + size && content[pos - start] == '\0') {
+    content[pos - start] = held;
+  }
+  if (truncated) content += "...";
+  // Trim like the legacy ring version did (leading indentation dropped).
+  size_t first = content.find_first_not_of(" \t\r");
+  size_t last = content.find_last_not_of(" \t\r");
+  content = (first == std::string::npos) ? "" : content.substr(first, last - first + 1);
+  if (content.empty()) {
+    return "";
+  }
+  std::string block = "  " + content + "\n";
+  block += "  " + std::string(truncated ? content.size() : static_cast<size_t>(pos - start), ' ') +
+           "^\n";
+  return block;
 }
 
 std::vector<std::string> prepare_logs(const char *error_file, int line, const char *what, int flag,
                                       bool include_error_context) {
   std::vector<std::string> logs;
-  logs.emplace_back(fmt::format(FMT_STRING("/{} line {}: {}{}\n"), error_file, line,
-                                flag ? "Warning: " : "", what));
+  logs.emplace_back(fmt::format(FMT_STRING("/{}:{}: {}: {}\n"), error_file, line,
+                                flag ? "warning" : "error", what));
 
   if (include_error_context) {
-    if (static_cast<unsigned char>(outp[-1]) != LEX_EOF) {
-      const char *start = outp;
-      while (start != &cur_lbuf->buf[0]) {
-        if (start[-1] == '\n' || start[-1] == LEX_EOF) {
-          break;
-        }
-        start--;
-      }
-
-      const char *end = outp;
-      while (end != cur_lbuf->buf_end && *end != LEX_EOF) {
-        if (end[1] == '\n' || end[1] == LEX_EOF) {
-          break;
-        }
-        end++;
-      }
-
-      auto size = end - start;
-      if (size > 0) {
-        bool truncated = false;
-        if (size > 120) {
-          size = 117;
-          truncated = true;
-        }
-        std::string content{start, static_cast<std::string::size_type>(size)};
-        if (truncated) content += "...";
-        content = trim(content);
-        logs.emplace_back(fmt::format(FMT_STRING("  {}\n"), content));
-        logs.emplace_back(fmt::format(
-            FMT_STRING("  {}^\n"), std::string(truncated ? content.size() : (outp - start), ' ')));
-      }
+    std::string block = lpc_lex_error_context_block();
+    if (!block.empty()) {
+      logs.emplace_back(std::move(block));
     }
   }
 
   return logs;
 }
 
-static void refill_buffer() {
-  if (cur_lbuf != &head_lbuf) {
-    if (outp >= cur_lbuf->buf_end && cur_lbuf->term_type == TERM_ADD_INPUT) {
-      /* In this case it cur_lbuf cannot have been
-         allocated due to #include */
-      linked_buf_t *prev_lbuf = cur_lbuf->prev;
-
-      FREE(cur_lbuf);
-      cur_lbuf = prev_lbuf;
-      outp = cur_lbuf->outp;
-      last_nl = cur_lbuf->last_nl;
-      if (cur_lbuf->term_type == TERM_ADD_INPUT || (outp != last_nl + 1)) {
-        return;
-      }
-    }
-  }
-
-  /* Here we are sure that we need more from the file */
-  /* Assume outp is one beyond a newline at last_nl */
-  /* or after an #include .... */
-
-  {
-    char *end;
-    char *p;
-    int size;
-
-    if (!inctop) {
-      /* First check if there's enough space at the end */
-      end = cur_lbuf->buf + DEFMAX;
-      if (end - cur_lbuf->buf_end > MAXLINE + 5) {
-        p = cur_lbuf->buf_end;
-      } else {
-        /* No more space at the end */
-        size = cur_lbuf->buf_end - outp + 1; /* Include newline */
-        memcpy(outp - MAXLINE - 1, outp - 1, size);
-        outp -= MAXLINE;
-        p = outp + size - 1;
-      }
-
-      size = current_stream->read(p, MAXLINE);
-      cur_lbuf->buf_end = p += size;
-      if (size < MAXLINE) {
-        *(last_nl = p) = LEX_EOF;
-        if (*(last_nl - 1) != '\n') {
-          if (size + 1 > MAXLINE) {
-            lexerror("No newline at end of file.");
-          }
-          *p++ = '\n';
-          *(last_nl = p) = LEX_EOF;
-        }
-        return;
-      }
-      while (*--p != '\n') {
-        ;
-      }
-      if (p == outp - 1) {
-        lexerror("Line too long.");
-        *(last_nl = cur_lbuf->buf_end - 1) = '\n';
-        return;
-      }
-      last_nl = p;
-      return;
-    } else {
-      int flag = 0;
-
-      /* We are reading from an include file */
-      /* Is there enough space? */
-      end = inctop->outp;
-
-      /* See if we are the last include in a different linked buffer */
-      if (cur_lbuf->term_type == TERM_INCLUDE &&
-          !(end >= cur_lbuf->buf && end < cur_lbuf->buf + DEFMAX)) {
-        end = cur_lbuf->buf_end;
-        flag = 1;
-      }
-
-      size = end - outp + 1; /* Include newline */
-      if (outp - cur_lbuf->buf > 2 * MAXLINE) {
-        memcpy(outp - MAXLINE - 1, outp - 1, size);
-        outp -= MAXLINE;
-        p = outp + size - 1;
-      } else { /* No space, need to allocate new buffer */
-        linked_buf_t *new_lbuf;
-        char *new_outp;
-
-        if (!(new_lbuf = reinterpret_cast<linked_buf_t *>(
-                  DMALLOC(sizeof(linked_buf_t), TAG_COMPILER, "refill_bufer")))) {
-          lexerror("Out of memory when allocating new buffer.\n");
-          return;
-        }
-        cur_lbuf->last_nl = last_nl;
-        cur_lbuf->outp = outp;
-        new_lbuf->prev = cur_lbuf;
-        new_lbuf->term_type = TERM_INCLUDE;
-        new_outp = new_lbuf->buf + DEFMAX - MAXLINE - size - 5;
-        memcpy(new_outp - 1, outp - 1, size);
-        cur_lbuf = new_lbuf;
-        outp = new_outp;
-        p = outp + size - 1;
-        flag = 1;
-      }
-
-      size = current_stream->read(p, MAXLINE);
-      end = p += size;
-      if (flag) {
-        cur_lbuf->buf_end = p;
-      }
-      if (size < MAXLINE) {
-        *(last_nl = p) = LEX_EOF;
-        if (*(last_nl - 1) != '\n') {
-          if (size + 1 > MAXLINE) {
-            lexerror("No newline at end of file.");
-          }
-          *p++ = '\n';
-          *(last_nl = p) = LEX_EOF;
-        }
-        return;
-      }
-      while (*--p != '\n') {
-        ;
-      }
-      if (p == outp - 1) {
-        lexerror("Line too long.");
-        *(last_nl = end - 1) = '\n';
-        return;
-      }
-      last_nl = p;
-      return;
-    }
-  }
-}
 
 
 
@@ -943,9 +568,13 @@ void pop_function_context() {
   last_function_context--;
 }
 
-static int old_func(void *yyscanner) {
-  add_input(" ");
-  add_input(yyget_text(yyscanner));
+// `name` is passed in (not read from yytext) because the callers' peek
+// reads may have popped the very splice buffer yytext points into.
+static int old_func(const std::string &name, void *yyscanner) {
+  // Push the just-matched name (plus a separating space) back for normal
+  // rescanning as the anonymous function-pointer body's first token.
+  std::string put_back = name + " ";
+  lpc_lex_push_string_buffer(put_back.c_str(), put_back.size(), 0, yyscanner);
   push_function_context();
   return L_FUNCTION_OPEN;
 }
@@ -958,74 +587,220 @@ static int old_func(void *yyscanner) {
 // lex.l's identifier rule and the '(' case in yylex_inner() so both paths
 // -- Flex-driven and the legacy "(: name" lookahead -- agree on lookup
 // semantics.
-int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, void *yyscanner) {
-  compiler_context_t *yyextra = reinterpret_cast<compiler_context_t *>(yyget_extra(yyscanner));
-  if (current_session) {
-    std::string text = yyget_text(yyscanner);
+// ---------------------------------------------------------------------------
+// Pushed-buffer bookkeeping. The kind stack below runs parallel to Flex's
+// pushed-buffer stack (see lex.h's LpcPushedBufferKind): EXPANSION pops
+// own the innermost live provenance frame ("during expansion of macro
+// 'F' ..." diagnostics); INCLUDE pops restore current_file/current_line
+// and close the per-file line accounting; PLAIN pops (probed-but-unused
+// bytes, heredoc array synthesis, "(:" re-splices) need nothing.
+// ---------------------------------------------------------------------------
 
-    // Blue-paint check: this occurrence is a guarded self-reference that a
-    // previous expansion left literal in spliced text (see lex.h's
-    // pending_plain comment) -- consume one count and resolve it as a
-    // plain identifier, never as a macro.
-    auto pending = yyextra->pending_plain.find(text);
-    if (pending != yyextra->pending_plain.end() && pending->second > 0) {
-      if (--pending->second == 0) {
-        yyextra->pending_plain.erase(pending);
+namespace {
+struct ExpansionFrame {
+  std::string name;
+  std::string def_file;
+  int def_line;
+  int invocation_line;    // real-file line of the macro USE
+  int invocation_column;  // 1-based start column of the name token
+  bool live;  // false once its buffer popped; lingers until a line boundary
+};
+std::vector<ExpansionFrame> expansion_frames;
+
+// Parallel to the stack of pushed buffers: LpcPushedBufferKind values.
+std::vector<char> pushed_kind_stack;
+}  // namespace
+
+static void pop_include_state(int ending_line);
+
+int lpc_lex_pushed_depth(void) { return static_cast<int>(pushed_kind_stack.size()); }
+
+int lpc_lex_buffer_kind_at(int i) {
+  if (i < 0 || i >= static_cast<int>(pushed_kind_stack.size())) return -1;
+  return pushed_kind_stack[static_cast<size_t>(i)];
+}
+
+int lpc_lex_top_buffer_kind(void) {
+  return pushed_kind_stack.empty() ? -1 : pushed_kind_stack.back();
+}
+
+void lpc_lex_note_buffer_push(int kind) {
+  pushed_kind_stack.push_back(static_cast<char>(kind));
+}
+
+void lpc_lex_note_buffer_pop(int ending_lineno) {
+  if (pushed_kind_stack.empty()) return;
+  char kind = pushed_kind_stack.back();
+  pushed_kind_stack.pop_back();
+  if (kind == LPC_BUF_EXPANSION) {
+    // Mark the innermost live frame dead -- frames and expansion buffers
+    // nest LIFO, so it is this buffer's frame.
+    for (auto it = expansion_frames.rbegin(); it != expansion_frames.rend(); ++it) {
+      if (it->live) {
+        it->live = false;
+        break;
       }
-    } else {
+    }
+  } else if (kind == LPC_BUF_INCLUDE) {
+    pop_include_state(ending_lineno);
+  }
+}
+
+// True when `name` is the guard of a LIVE expansion buffer: rescanning a
+// macro's own name anywhere within its expansion (including nested
+// expansions pushed on top) resolves it as a plain identifier -- the
+// buffer-lifetime self-reference guard that supersedes the old
+// per-occurrence blue paint. Dead (lingering, diagnostics-only) frames
+// deliberately do NOT guard.
+static bool lpc_lex_name_guarded(const std::string &name) {
+  for (const auto &f : expansion_frames) {
+    if (f.live && f.name == name) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Nested rescans stack one Flex buffer + one yylex() frame per level; a
+// pathological chain (#define A0 A1 A1 / ...) must fail cleanly, not
+// blow the C stack.
+#define MAX_EXPANSION_NESTING 128
+
+// Pushes a frame for an expansion buffer about to be pushed. Zero-length
+// expansions push nothing (no buffer, no frame). The invocation position
+// (the macro USE, clang's "expansion location") is the live real-frame
+// line plus the name token's start column, snapshotted by YY_USER_ACTION
+// when the identifier matched (argument collection in between doesn't
+// disturb it -- raw reads run no user action).
+static void push_expansion_frame(const std::string &name, const PpMacro &m,
+                                 int invocation_column) {
+  expansion_frames.push_back(
+      ExpansionFrame{name, m.def_file, m.def_line, current_line, invocation_column, true});
+}
+
+// Dead frames deliberately LINGER instead of vanishing at their buffer's
+// pop: a token's bytes are all consumed before its rule action (or the
+// parser's action on its lookahead) runs, so an error on a splice's final
+// token would otherwise fire with its frame already gone (found by
+// Diagnostics.ExpansionChainNote: a one-token expansion body lost its
+// note every time). Splices never contain newlines (folded at #define,
+// argument newlines collapsed), so the newline ending the line is the
+// natural hard boundary where dead frames are purged (see
+// lpc_lex_yy_input) -- provenance granularity within the line, exactly
+// like current_line itself.
+static void purge_exhausted_expansions() {
+  while (!expansion_frames.empty() && !expansion_frames.back().live) {
+    expansion_frames.pop_back();
+  }
+}
+
+std::vector<LpcExpansionSite> lpc_lex_expansion_chain(void) {
+  std::vector<LpcExpansionSite> out;
+  for (auto it = expansion_frames.rbegin(); it != expansion_frames.rend(); ++it) {
+    out.push_back(LpcExpansionSite{it->name, it->def_file, it->def_line, it->invocation_line,
+                                   it->invocation_column});
+  }
+  return out;
+}
+
+std::vector<std::pair<std::string, int>> lpc_lex_include_stack(void) {
+  std::vector<std::pair<std::string, int>> out;
+  for (auto it = inc_stack.rbegin(); it != inc_stack.rend(); ++it) {
+    // The entry's line was saved AFTER the #include line's terminating
+    // newline was consumed (see lpc_lex_handle_include's preconditions),
+    // so the directive itself sits one line earlier.
+    out.emplace_back(it->file != nullptr ? it->file : "?", it->line - 1);
+  }
+  return out;
+}
+
+// The bookkeeping half of an #include buffer's pop (the buffer itself is
+// popped by lpc_lex_pop_pushed_buffer's yypop_buffer_state): restore the
+// including file's identity and close this file's line accounting --
+// verbatim the arithmetic of the legacy ring-based include pop, minus the
+// ring/stream restoration that Flex's buffer stack now does for free.
+static void pop_include_state(int ending_line) {
+  if (inc_stack.empty()) return;
+  IncState p = inc_stack.back();
+  inc_stack.pop_back();
+
+  save_file_info(current_file_id, ending_line - current_line_saved);
+  current_line_saved = p.line - 1;
+  /* add the lines from this file, and readjust to be relative
+     to the file we're returning to */
+  current_line_base += ending_line - current_line_saved;
+  free_string(current_file);
+
+  current_file = p.file;
+  current_file_id = p.file_id;
+  // No current_line restore: the parent buffer's native counter froze at
+  // p.line when the include was pushed and resumes by itself.
+}
+
+int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yylloc_param,
+                               void *yyscanner) {
+  compiler_context_t *yyextra = reinterpret_cast<compiler_context_t *>(yyget_extra(yyscanner));
+  // Copy yytext up front, before ANY lpc_lex_getc(): a getc can pop the
+  // splice buffer that yytext points into (freeing it), so every later
+  // use of the identifier's spelling must go through this copy.
+  const std::string text = yyget_text(yyscanner);
+  if (current_session && !yyextra->suppress_expansion && !lpc_lex_name_guarded(text)) {
+    // (A name guarded by a live expansion buffer resolves as a plain
+    // identifier -- self-reference termination, C-preprocessor style.)
     auto it = current_session->macros.find(text);
     if (it != current_session->macros.end()) {
       const PpMacro& m = it->second;
-      if (!m.is_function_like) {
-        // __LINE__/__FILE__/__DIR__ expand from the live scan position; any
-        // other object-like macro's body is fully text-expanded (with this
-        // name as the guard for self-reference termination, and each
-        // guarded occurrence left literal in the result counted into
-        // pending_plain) and spliced into the ring buffer for rescanning.
+      if (static_cast<int>(expansion_frames.size()) >= MAX_EXPANSION_NESTING) {
+        lexerror("Macro expansion nested too deep");
+      } else if (!m.is_function_like) {
+        // __LINE__/__FILE__/__DIR__ expand from the live scan position;
+        // any other object-like macro pushes its RAW body as a fresh Flex
+        // buffer -- nested macro references are resolved when the rescan
+        // reaches them, right here, one buffer per level (no textual
+        // pre-expansion pass). The frame pushed alongside doubles as the
+        // self-reference guard for the buffer's lifetime.
         //
-        // NOT a yy_scan_string()/yypush_buffer_state() buffer push (tried,
-        // reverted): the expansion can textually contain a REFERENCE to a
-        // function-like macro without its call parens immediately
-        // following in the SAME body (e.g. `#define A B` where `B` is
-        // itself `#define B(x) ...` -- lpc_lex_expand_string() leaves a
-        // bare, unexpandable "B" as literal text in that case, see its
-        // `result += id;` fallback). When Flex later re-matches that "B"
-        // as an identifier and it turns out to need a function-like
-        // expansion, lpc_lex_resolve_identifier()'s function-like path
-        // below reads raw bytes directly from `outp`/the ring buffer to
-        // find and collect its "(args)" -- the SAME category of
-        // raw-stream reader as heredocs. That only produces the right
-        // bytes when `outp` genuinely reflects "what Flex will scan next"
-        // -- true for the ring buffer, but NOT true once a separate
-        // yy_scan_string() buffer is the one actually feeding Flex: outp
-        // would stay frozen at wherever the ORIGINAL file happened to be,
-        // and the collector would silently read and consume the wrong
-        // file's bytes as if they were this macro's arguments, corrupting
-        // scanning for the rest of the compile. Splicing into the ring
-        // buffer keeps `outp` and "what Flex scans next" the same thing,
-        // which the arg collector depends on.
+        // A buffer push is safe here (an earlier attempt was reverted,
+        // see plans/MASTER-PLAN.md 5.5): a bare reference to a
+        // function-like macro can end a body with its "(args)" following
+        // in the PARENT input (`#define APPLY F` + `APPLY(3)`), and the
+        // argument collector reads through lpc_lex_getc(), which drains
+        // the expansion buffer and pops through to the parent.
         std::string expanded;
-        if (!lpc_lex_builtin_macro(text, &expanded)) {
-          expanded = lpc_lex_expand_string(m.body, {text}, false, &yyextra->pending_plain);
+        bool is_builtin = lpc_lex_builtin_macro(text, &expanded);
+        if (!is_builtin) {
+          expanded = m.body;
         }
 
-        lpc_lex_flush_lookahead(yyscanner);
-        add_input(expanded.c_str());
-        return yylex(yylval_param, yyscanner);
+        if (!expanded.empty()) {
+          if (!is_builtin) {
+            push_expansion_frame(text, m, yyextra->token_start_column + 1);
+          }
+          lpc_lex_push_string_buffer(expanded.c_str(), expanded.size(),
+                                     /*is_expansion=*/!is_builtin, yyscanner);
+        }
+        return yylex(yylval_param, yylloc_param, yyscanner);
       } else {
-        lpc_lex_flush_lookahead(yyscanner);
-        char* saved_outp = outp;
         int saved_line = current_line;
         int saved_total = total_lines;
+        // Characters are read THROUGH Flex (lpc_lex_getc: its buffer,
+        // then YY_INPUT) rather than from raw `outp` -- no rewind/flush
+        // choreography, no desync with the DFA's prefetch, and a splice
+        // buffer ending mid-collection is popped through transparently.
+        // Every probed byte is recorded for the no-parenthesis restore
+        // below, which pushes the text back as a fresh splice buffer
+        // rather than rewinding a pointer (a saved outp would dangle
+        // across a refill_buffer() memmove -- a latent corruption in the
+        // old raw-read version).
+        std::string consumed_text;
 
         auto get_next_char = [&]() -> char {
-          if (outp >= last_nl + 1) {
-            refill_buffer();
-          }
-          if (*outp == '\0' || static_cast<unsigned char>(*outp) == LEX_EOF) {
+          int gc = lpc_lex_getc(yyscanner);
+          if (gc <= 0) {
             return '\0';
           }
-          return *outp++;
+          consumed_text += static_cast<char>(gc);
+          return static_cast<char>(gc);
         };
 
         char c;
@@ -1033,8 +808,7 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, void *yyscanner) {
           c = get_next_char();
           if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
             if (c == '\n') {
-              current_line++;
-              total_lines++;
+              total_lines++;  // line counting itself is native (yyinput)
             }
             continue;
           }
@@ -1053,8 +827,7 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, void *yyscanner) {
               break;
             }
             if (ch == '\n') {
-              current_line++;
-              total_lines++;
+              total_lines++;  // line counting itself is native (yyinput)
             }
             if (inq) {
               if (ch == '\\') {
@@ -1065,8 +838,7 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, void *yyscanner) {
                   break;
                 }
                 if (ch2 == '\n') {
-                  current_line++;
-                  total_lines++;
+                  total_lines++;  // line counting itself is native (yyinput)
                 }
                 arg += ch2;
                 continue;
@@ -1090,37 +862,62 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, void *yyscanner) {
               args.push_back(std::string(trim(arg)));
               arg.clear();
             } else {
-              arg += ch;
+              // A raw newline in an argument was already counted above --
+              // but a copy of this text may be spliced back and rescanned,
+              // where lex.l's \n rule would count it AGAIN (found as a
+              // real __LINE__ drift by MultiLineMacroArgKeepsLineCount).
+              // Collapse it to a space here: the count stays with the
+              // consumption (right, because an UNUSED parameter's text
+              // never reappears at all), and splices carry no newlines.
+              // Quoted text (the inq path above) is kept verbatim -- a
+              // string literal's bytes can't be altered; a raw newline
+              // inside a quoted macro argument still double-counts, an
+              // accepted pathological corner.
+              arg += (ch == '\n') ? ' ' : ch;
             }
           }
 
+          // C argument semantics: # and ## operands receive the RAW
+          // argument spelling; every other parameter reference receives
+          // the argument's complete macro expansion (pre-expanded here
+          // textually -- the one sanctioned textual-expansion use left,
+          // exactly C's "arguments are fully expanded first" step; it is
+          // what lets SECOND(1, SECOND(2, 3))'s inner SECOND expand even
+          // while the outer SECOND's buffer guards the name).
           std::vector<std::string> expanded_args;
-          for (const auto& a : args) {
-            expanded_args.push_back(lpc_lex_expand_string(a, {}));
+          expanded_args.reserve(args.size());
+          for (const auto &a : args) {
+            expanded_args.push_back(lpc_lex_expand_string(a));
           }
-          std::string subst = substitute(m.body, m.params, expanded_args);
-          std::string expanded =
-              lpc_lex_expand_string(subst, {text}, false, &yyextra->pending_plain);
+          std::string expanded = substitute(m.body, m.params, args, &expanded_args);
 
-          lpc_lex_flush_lookahead(yyscanner);
-          add_input(expanded.c_str());
-          return yylex(yylval_param, yyscanner);
+          if (!expanded.empty()) {
+            push_expansion_frame(text, m, yyextra->token_start_column + 1);
+            lpc_lex_push_string_buffer(expanded.c_str(), expanded.size(),
+                                       /*is_expansion=*/1, yyscanner);
+          }
+          return yylex(yylval_param, yylloc_param, yyscanner);
         } else {
-          outp = saved_outp;
+          // No '(' follows: not an invocation. Put every probed byte back
+          // (see consumed_text's comment) and let the identifier resolve
+          // as a plain symbol; the pushed-back bytes are scanned next.
           current_line = saved_line;
           total_lines = saved_total;
+          if (!consumed_text.empty()) {
+            lpc_lex_push_string_buffer(consumed_text.c_str(), consumed_text.size(),
+                                       /*is_expansion=*/0, yyscanner);
+          }
         }
       }
-    }
     }
   }
 
   ident_hash_elem_t *ihe;
-  if ((ihe = lookup_ident(yyget_text(yyscanner)))) {
+  if ((ihe = lookup_ident(text.c_str()))) {
     if (ihe->token & IHE_RESWORD) {
       if (yyextra->function_flag) {
         yyextra->function_flag = 0;
-        add_input(yyget_text(yyscanner));
+        lpc_lex_push_string_buffer(text.c_str(), text.size(), 0, yyscanner);
         push_function_context();
         return L_FUNCTION_OPEN;
       }
@@ -1132,10 +929,19 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, void *yyscanner) {
       unsigned char c;
 
       yyextra->function_flag = 0;
-      while ((c = *outp++) == ' ') {
-        ;
+      // Skip spaces (consumed and discarded, like the legacy raw loop),
+      // then peek exactly one byte to disambiguate "(: foo :)" /
+      // "(: foo," from "(: foo(...)". Read through Flex (lpc_lex_getc)
+      // and push the peeked byte back for normal rescanning -- no raw
+      // outp access, no rewind/flush choreography at the call site.
+      int peeked;
+      while ((peeked = lpc_lex_getc(yyscanner)) == ' ') {
       }
-      outp--;
+      c = peeked <= 0 ? static_cast<unsigned char>(LEX_EOF) : static_cast<unsigned char>(peeked);
+      if (peeked > 0) {
+        char put_back = static_cast<char>(peeked);
+        lpc_lex_push_string_buffer(&put_back, 1, 0, yyscanner);
+      }
       /* Note that this gets code like:
        * #define x :)
        * #define y ,
@@ -1145,16 +951,16 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, void *yyscanner) {
        * wrong.  But that is almost pathological.
        */
       if (c != ':' && c != ',') {
-        return old_func(yyscanner);
+        return old_func(text, yyscanner);
       }
       if ((val = ihe->dn.local_num) >= 0) {
         if (c == ',') {
-          return old_func(yyscanner);
+          return old_func(text, yyscanner);
         }
         yylval_param->number = (val << 8) | FP_L_VAR;
       } else if ((val = ihe->dn.global_num) >= 0) {
         if (c == ',') {
-          return old_func(yyscanner);
+          return old_func(text, yyscanner);
         }
         yylval_param->number = (val << 8) | FP_G_VAR;
       } else if ((val = ihe->dn.function_num) >= 0) {
@@ -1164,7 +970,7 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, void *yyscanner) {
       } else if ((val = ihe->dn.efun_num) >= 0) {
         yylval_param->number = (val << 8) | FP_EFUN;
       } else {
-        return old_func(yyscanner);
+        return old_func(text, yyscanner);
       }
       return L_NEW_FUNCTION_OPEN;
     }
@@ -1173,71 +979,142 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, void *yyscanner) {
   }
   if (yyextra->function_flag) {
     yyextra->function_flag = 0;
-    add_input("(:");
+    lpc_lex_push_string_buffer("(:", 2, 0, yyscanner);
   }
-  yylval_param->string = scratch_copy(yyget_text(yyscanner));
+  yylval_param->string = scratch_copy(text.c_str());
   return L_IDENTIFIER;
 }
 
-// Called from lex.l's SC_HEREDOC_TERM rules once the "@"/"@@" prefix and the
-// terminator identifier have already been recognized natively (the
-// terminator is supplied by the LPC source at compile time, so matching the
-// *body* against it can't be a static Flex pattern -- this is the one piece
-// of lexing that structurally can't move to lex.l; see lex.l's file header).
-// Handles both heredoc forms: "@TERM ... TERM" (a plain string, via
-// get_text_block()) and "@@TERM ... TERM" (an array of lines, via
-// get_array_block() -- Robocoder's "@@" block, which lands on a literal
-// "({" for historical reasons). On a recoverable error (bad UTF-8, oversized
-// block), lexerror() just logs and returns (it doesn't longjmp the way the
-// runtime error() does), so those paths must resume the top-level scanner
-// via `return yylex()` rather than `break`ing a switch that no longer
-// exists here.
-int parseHeredoc(const char *terminator, int is_array, union YYSTYPE *yylval_param, void *yyscanner) {
-  int rc;
+// Called from lex.l's SC_HEREDOC_TERM rules once the "@"/"@@" prefix and
+// the terminator identifier have already been recognized natively (the
+// terminator is supplied by the LPC source at compile time, so matching
+// the *body* against it can't be a static Flex pattern). The body is read
+// line-by-line THROUGH Flex via lpc_lex_getc() -- no raw `outp` access,
+// no rewind/flush choreography at the call sites. Handles both forms:
+// "@TERM ... TERM" (one string token, built directly) and
+// "@@TERM ... TERM" (an array of line strings: returns L_ARRAY_OPEN and
+// splices `"l1", "l2", })` for normal rescanning -- Robocoder's "@@"
+// block). On a recoverable error (bad UTF-8, oversized block), lexerror()
+// just logs and returns, so those paths resume the top-level scanner via
+// `return yylex()`.
+// The shared tail of lex.l's two heredoc-start rules (newline-terminated
+// and content-follows forms): validate the accumulated terminator and
+// hand off to the body reader. On an empty terminator, reports and
+// resumes the top-level scan.
+int lpc_lex_start_heredoc(union YYSTYPE *yylval_param, struct YYLTYPE *yylloc_param,
+                          void *yyscanner) {
+  compiler_context_t *ctx = yyget_extra(yyscanner);
+  if (ctx->heredoc_terminator.empty()) {
+    lexerror("Illegal terminator");
+    return yylex(yylval_param, yylloc_param, yyscanner);
+  }
+  return parseHeredoc(ctx->heredoc_terminator.c_str(), ctx->heredoc_is_array, yylval_param,
+                      yylloc_param, yyscanner);
+}
+
+int parseHeredoc(const char *terminator, int is_array, union YYSTYPE *yylval_param,
+                 struct YYLTYPE *yylloc_param, void *yyscanner) {
+  const size_t termlen = strlen(terminator);
+  // Legacy capacity: NUMCHUNKS chunks of MAXCHUNK bytes == DEFMAX total.
+  const size_t max_block = DEFMAX;
+
+  std::string text;                // text form: raw body, newlines included
+  std::vector<std::string> lines;  // array form: raw body lines
+  size_t total = 0;
+
+  for (;;) {
+    // One physical line; trailing CR stripped (CRLF input).
+    std::string line;
+    int c;
+    while ((c = lpc_lex_getc(yyscanner)) > 0 && c != '\n') {
+      line += static_cast<char>(c);
+    }
+    bool saw_newline = (c == '\n');
+    if (!line.empty() && line.back() == '\r') {
+      line.pop_back();
+    }
+
+    // Terminator line? Matches the legacy check: the line starts with the
+    // terminator and the next character is not part of a longer
+    // identifier (so "ENDING" does not close "END").
+    if (line.size() >= termlen && line.compare(0, termlen, terminator) == 0 &&
+        (line.size() == termlen ||
+         (!uisalnum(static_cast<unsigned char>(line[termlen])) && line[termlen] != '_'))) {
+      if (line.size() == termlen) {
+        // Lone terminator: its line is fully consumed here (and its
+        // newline already counted natively at the lpc_lex_getc read).
+      } else {
+        // Trailing content after the terminator: push it (and the line's
+        // newline, which is then counted at rescan) back for normal
+        // scanning.
+        std::string rest = line.substr(termlen);
+        if (saw_newline) {
+          rest += '\n';
+        }
+        lpc_lex_push_string_buffer(rest.c_str(), rest.size(), 0, yyscanner);
+      }
+      break;
+    }
+
+    if (c <= 0) {
+      lexerror(is_array ? "End of file in array block" : "End of file in text block");
+      return YYEOF;
+    }
+
+    // Body-line newlines are counted natively at the lpc_lex_getc reads.
+    total += line.size() + 1;
+    if (total > max_block) {
+      if (is_array) {
+        lexerror("Array block exceeded maximum length");
+        return YYerror;
+      }
+      lexerror("Text block exceeded maximum length");
+      return yylex(yylval_param, yylloc_param, yyscanner);
+    }
+
+    if (is_array) {
+      lines.push_back(std::move(line));
+    } else {
+      text += line;
+      text += '\n';
+    }
+  }
 
   if (is_array) {
-    rc = get_array_block(const_cast<char *>(terminator));
-
-    if (rc > 0) {
-      /* outp is pointing at "({" for histortical reasons */
-      outp += 2;
-      return L_ARRAY_OPEN;
-    } else if (rc == -1) {
-      lexerror("End of file in array block");
-      return YYEOF;
-    } else { /* if rc == -2 */
+    // Return the "({"  token directly and splice the remainder --
+    // `"l1", "l2", })` with '"' and '\\' escaped -- for normal rescanning
+    // as string literals. Element separators deliberately carry no
+    // newline: each body line was already counted above, so the splice
+    // must not make the rescan count those lines again.
+    std::string splice;
+    splice.reserve(total + lines.size() * 4 + 2);
+    for (const auto &l : lines) {
+      splice += '"';
+      for (char ch : l) {
+        if (ch == '"' || ch == '\\') {
+          splice += '\\';
+        }
+        splice += ch;
+      }
+      splice += "\", ";
+    }
+    splice += "})";
+    if (splice.size() >= DEFMAX - 10) {
       lexerror("Array block exceeded maximum length");
       return YYerror;
     }
-  } else {
-    rc = get_text_block(const_cast<char *>(terminator));
-
-    if (rc > 0) {
-      int n;
-
-      auto *p = outp;
-      if (!u8_validate(&p)) {
-        lexerror("Bad UTF-8 string in string block");
-        outp = p;
-        return yylex(yylval_param, yyscanner);
-      }
-      /*
-       * make string token and clean up
-       */
-      yylval_param->string = scratch_copy_string(outp);
-
-      n = strlen(outp) + 1;
-      outp += n;
-
-      return L_STRING;
-    } else if (rc == -1) {
-      lexerror("End of file in text block");
-      return YYEOF;
-    } else { /* if (rc == -2) */
-      lexerror("Text block exceeded maximum length");
-      return yylex(yylval_param, yyscanner);
-    }
+    lpc_lex_push_string_buffer(splice.c_str(), splice.size(), 0, yyscanner);
+    return L_ARRAY_OPEN;
   }
+
+  if (!u8_validate(text.c_str())) {
+    lexerror("Bad UTF-8 string in string block");
+    return yylex(yylval_param, yylloc_param, yyscanner);
+  }
+  char *res = scratch_large_alloc(static_cast<int>(text.size() + 1));
+  memcpy(res, text.c_str(), text.size() + 1);
+  yylval_param->string = res;
+  return L_STRING;
 }
 
 // Shared "illegal character" fallback: reports (in DEBUG builds) and
@@ -1249,58 +1126,21 @@ int lpc_lex_badlex(unsigned char c, void *yyscanner) {
 #ifdef DEBUG
   char buff[100];
 
-  sprintf(buff, "Illegal character (hex %02x) '%c'", static_cast<unsigned>(c),
-          static_cast<char>(c));
+  if (isprint(c)) {
+    sprintf(buff, "Illegal character '%c' (0x%02x)", static_cast<char>(c),
+            static_cast<unsigned>(c));
+  } else {
+    sprintf(buff, "Illegal character 0x%02x", static_cast<unsigned>(c));
+  }
   yyerror(yyscanner, buff);
 #endif
   return ' ';
 }
 
-// Called from lex.l's <<EOF>> rule. If we're inside an #include, pops the
-// include stack and resumes scanning the including file (whitespace is
-// Flex-only now, so this re-enters Flex's top-level scanner rather than
-// looping internally the way the original switch-based version did).
-// Otherwise this is genuine end of the top-level file: rewinds `outp` back
-// onto the sentinel (matching the original's `outp--`) and returns -1.
-int parseEofOrIncludePop(union YYSTYPE *yylval_param, void *yyscanner) {
-  if (inctop) {
-    incstate_t *p;
-
-    p = inctop;
-    current_stream->close();
-    save_file_info(current_file_id, current_line - current_line_saved);
-    current_line_saved = p->line - 1;
-    /* add the lines from this file, and readjust to be relative
-       to the file we're returning to */
-    current_line_base += current_line - current_line_saved;
-    free_string(current_file);
-    if (outp >= cur_lbuf->buf_end) {
-      linked_buf_t *prev_lbuf;
-      if ((prev_lbuf = cur_lbuf->prev)) {
-        FREE(cur_lbuf);
-        cur_lbuf = prev_lbuf;
-      }
-    }
-
-    current_file = p->file;
-    current_file_id = p->file_id;
-    current_line = p->line;
-
-    current_stream.reset(p->stream);
-    p->stream = nullptr;
-    last_nl = p->last_nl;
-    outp = p->outp;
-    inctop = p->next;
-    incnum--;
-    FREE((char *)p);
-    outp[-1] = '\n';
-    if (outp == last_nl + 1) {
-      refill_buffer();
-    }
-    return yylex(yylval_param, yyscanner);
-  }
-
-  outp--;
+// Called from lex.l's <<EOF>> rule, only at genuine end of the top-level
+// file (include buffers pop in the <<EOF>> rule itself before this is
+// ever reached). Returns -1, the compile loop's end-of-tokens signal.
+int parseMainEof(union YYSTYPE *yylval_param, void *yyscanner) {
   if (current_session && !current_session->conds.empty()) {
     yyerror("Missing #endif");
     // Recover the session: leaving the conditional stack non-empty would
@@ -1312,33 +1152,25 @@ int parseEofOrIncludePop(union YYSTYPE *yylval_param, void *yyscanner) {
 }
 
 void end_new_file() {
-  while (inctop) {
-    incstate_t *p;
-
-    p = inctop;
-    current_stream->close();
-    current_stream.reset();
+  // Freeze the final line value into the macro's fallback storage before
+  // the active-scanner slot clears (post-compile readers -- fatal()'s
+  // "during compilation of" note, test harnesses -- expect the legacy
+  // global's last-value semantics).
+  lpc_lex_line_fallback = current_line;
+  // An aborted compile can leave include metadata stacked (the matching
+  // Flex buffers are torn down by lpc_lex_reset / yylex_destroy); unwind
+  // it so current_file ends up back at the main file's identity.
+  while (!inc_stack.empty()) {
     free_string(current_file);
-    current_file = p->file;
-    current_stream.reset(p->stream);
-    p->stream = nullptr;
-    inctop = p->next;
-    FREE((char *)p);
+    current_file = inc_stack.back().file;
+    current_file_id = inc_stack.back().file_id;
+    inc_stack.pop_back();
   }
-  inctop = nullptr;
   if (main_filename) {
     free_string(const_cast<char *>(main_filename));
     main_filename = nullptr;
   }
-  if (cur_lbuf != &head_lbuf) {
-    linked_buf_t *prev_lbuf;
-
-    while (cur_lbuf != &head_lbuf) {
-      prev_lbuf = cur_lbuf->prev;
-      FREE((char *)cur_lbuf);
-      cur_lbuf = prev_lbuf;
-    }
-  }
+  active_scanner = nullptr;
 }
 
 void start_new_file(std::unique_ptr<LexStream> stream, void *yyscanner,
@@ -1353,30 +1185,51 @@ void start_new_file(std::unique_ptr<LexStream> stream, void *yyscanner,
   current_session = std::move(session);
   current_stream = std::move(stream);
 
+  // Fresh diagnostics per compile / per REPL chunk -- same boundary on
+  // which num_parse_error is effectively reset by the callers. Stale
+  // expansion frames from an aborted compile must not haunt the next.
+  compiler_diags.clear();
+  expansion_frames.clear();
+  compiler_current_load_reason = std::move(compiler_next_load_reason);
+  compiler_next_load_reason.clear();
+  // One-shot context a previous ABORTED compile may have left queued
+  // (its consuming report never happened) -- must not haunt this one.
+  compiler_pending_notes.clear();
+  compiler_pending_fixits.clear();
+  rule_clear_operand_ranges();
+  compiler_directive_start_line = 0;
+
+  // lpc_lex_reset pops any pushed buffers an aborted compile left stacked
+  // (it walks lpc_lex_pushed_depth(), so the kind stack must still be
+  // intact here); afterwards clear the bookkeeping defensively in case
+  // the stacks ever disagreed. Any include metadata still stacked at this
+  // point (end_new_file normally unwound it) only needs its shared
+  // strings released -- current_file already holds the NEW compile's
+  // identity and must not be touched.
   lpc_lex_reset(yyscanner);
+  pushed_kind_stack.clear();
+  for (auto &is : inc_stack) {
+    free_string(const_cast<char *>(is.file));
+  }
+  inc_stack.clear();
   last_function_context = -1;
   current_function_context = nullptr;
-  cur_lbuf = &head_lbuf;
-  cur_lbuf->outp = cur_lbuf->buf_end = outp = cur_lbuf->buf + (DEFMAX >> 1);
-  *(last_nl = outp - 1) = '\n';
+  main_last_char = '\n';
+  active_scanner = yyscanner;
   pragmas = DEFAULT_PRAGMAS;
-  incnum = 0;
   current_line = 1;
   current_line_base = 0;
   current_line_saved = 0;
   reinterpret_cast<compiler_context_t *>(yyget_extra(yyscanner))->function_flag = 0;
 
-  // Global include file: pushed exactly like a real `#include "..."` /
-  // `#include <...>` appearing before the file's first line, via the same
-  // include-stack push the directive dispatcher uses (the config value
-  // already carries its quoting/angle delimiters). Legacy start_new_file
-  // did the same via handle_include(). The push's preconditions hold here:
-  // outp is the (empty) parent buffer's resume point with the '\n'
-  // sentinel just planted before it, and lpc_lex_handle_include() ends
-  // with the refill_buffer() that loads the include's first chunk.
+  // Push the configured global include file exactly like a real
+  // `#include "..."` / `#include <...>` appearing before the file's first
+  // line (the config value already carries its quoting/angle delimiters):
+  // its content becomes a pushed buffer scanned before the main file's
+  // first byte (which Flex pulls through YY_INPUT on demand).
   const char *glf = CONFIG_STR(__GLOBAL_INCLUDE_FILE__);
-  if (glf == nullptr || strlen(glf) == 0 || !lpc_lex_handle_include(glf)) {
-    refill_buffer();
+  if (glf != nullptr && strlen(glf) != 0) {
+    lpc_lex_handle_include(glf, yyscanner);
   }
 }
 
@@ -1398,7 +1251,10 @@ void LexTokenStream::load(std::unique_ptr<LexStream> stream, std::shared_ptr<Lex
   start_new_file(std::move(stream), scanner_, std::move(session));
 }
 
-int LexTokenStream::next(union YYSTYPE *yylval_param) { return yylex(yylval_param, scanner_); }
+int LexTokenStream::next(union YYSTYPE *yylval_param, struct YYLTYPE *yylloc_param) {
+  YYLTYPE local;
+  return yylex(yylval_param, yylloc_param != nullptr ? yylloc_param : &local, scanner_);
+}
 
 const char *query_instr_name(int instr) {
   const char *name;
@@ -1424,54 +1280,6 @@ const char *query_instr_name(int instr) {
 }
 
 
-
-/* IDEA: linked buffers, to allow "unlimited" buffer expansion */
-static void add_input(const char *p) {
-  int l = strlen(p);
-
-  if (l >= DEFMAX - 10) {
-    lexerror("Macro expansion buffer overflow");
-    return;
-  }
-
-  if (outp < l + 5 + cur_lbuf->buf) {
-    /* Not enough space, so let's move it up another linked_buf */
-    linked_buf_t *new_lbuf;
-    char *q, *new_outp, *buf;
-    int size;
-
-    q = outp;
-
-    while (*q != '\n' && static_cast<unsigned char>(*q) != LEX_EOF) {
-      q++;
-    }
-    /* Incorporate EOF later */
-    if (*q != '\n' || ((q - outp) + l) >= DEFMAX - 11) {
-      lexerror("Macro expansion buffer overflow");
-      return;
-    }
-    size = (q - outp) + l + 1;
-    cur_lbuf->outp = q + 1;
-    cur_lbuf->last_nl = last_nl;
-
-    new_lbuf =
-        reinterpret_cast<linked_buf_t *>(DMALLOC(sizeof(linked_buf_t), TAG_COMPILER, "add_input"));
-    new_lbuf->term_type = TERM_ADD_INPUT;
-    new_lbuf->prev = cur_lbuf;
-    buf = new_lbuf->buf;
-    cur_lbuf = new_lbuf;
-    last_nl = (new_lbuf->buf_end = buf + DEFMAX - 2) - 1;
-    new_outp = new_lbuf->outp = buf + DEFMAX - 2 - size;
-    memcpy(new_outp, p, l);
-    memcpy(new_outp + l, outp, (q - outp) + 1);
-    outp = new_outp;
-    *(last_nl + 1) = 0;
-    return;
-  }
-
-  outp -= l;
-  strncpy(outp, p, l);
-}
 
 const char *main_file_name() {
   return main_filename ? main_filename : current_file;
@@ -1854,25 +1662,27 @@ void init_identifiers() {
   }
 }
 
-// Bridge called by Flex's YY_INPUT macro (Phase 3+). Deliberately supplies
-// at most one byte per call (rather than bulk-filling Flex's read buffer)
-// so that `outp` never runs more than a single DFA lookahead character
-// ahead of what Flex has actually matched. lex.l's DEFER_TO_LEGACY_SCANNER
-// relies on that bound to correctly rewind `outp` when handing control
-// back to the raw-outp-reading legacy scanner (yylex_inner()); a bulk read
-// would let refill_buffer() relocate the ring mid-fetch, which the simple
-// rewind arithmetic cannot account for.
+// Bridge called by Flex's YY_INPUT macro: bulk-reads the MAIN file's
+// stream straight into Flex's base buffer. (The historic one-byte trickle
+// existed only to bound Flex's prefetch for the raw-outp readers' rewind
+// arithmetic -- all gone: splices/includes are pushed in-memory buffers
+// that never touch this path, and every raw reader goes through
+// lpc_lex_getc().) Preserves the ring's guaranteed-trailing-newline
+// invariant: a file whose last byte isn't '\n' gets one appended before
+// EOF is reported.
 extern "C" int lpc_lex_yy_input(char *buf, int max_size, void * /*yyscanner*/) {
-  if (max_size <= 0) return 0;
-  unsigned char c = static_cast<unsigned char>(*outp);
-  if (c == LEX_EOF) return 0;
-  buf[0] = static_cast<char>(c);
-  ++outp;
-  // >= (not ==): see lpc_lex_newline() for why an exact-equality check can
-  // be skipped when Flex's one-byte DFA lookahead has already moved `outp`
-  // past the trigger position.
-  if (outp >= last_nl + 1) refill_buffer();
-  return 1;
+  if (max_size <= 0 || !current_stream) return 0;
+  int n = current_stream->read(buf, max_size);
+  if (n > 0) {
+    main_last_char = buf[n - 1];
+    return n;
+  }
+  if (main_last_char != '\n') {
+    main_last_char = '\n';
+    buf[0] = '\n';
+    return 1;
+  }
+  return 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -2268,7 +2078,7 @@ std::pair<int, std::string> inc_open(std::string_view name, bool check_local) {
     return {-1, ""};
 }
 
-bool lpc_lex_handle_include(std::string_view rest) {
+bool lpc_lex_handle_include(std::string_view rest, void *yyscanner) {
   std::string name_expr(trim(rest));
   if (name_expr.empty()) {
     lexerror("Bad #include directive");
@@ -2282,46 +2092,51 @@ bool lpc_lex_handle_include(std::string_view rest) {
     char delim = name_expr[0] == '"' ? '"' : '>';
     std::string filename(name_expr.substr(1, name_expr.size() - 2));
 
-    if (incnum >= MAX_INCLUDE_DEPTH) {
+    if (inc_stack.size() >= MAX_INCLUDE_DEPTH) {
       lexerror("#include nested too deeply");
       return false;
     }
 
     auto [fd, resolved] = inc_open(filename, delim == '"');
     if (fd != -1) {
-      // Push the parent's scan state and switch to the included file --
-      // the same sequence (including the current_line_base/save_file_info
-      // bookkeeping) as the legacy scanner's handle_include(): the pop side
-      // (parseEofOrIncludePop) is an unmodified copy of the legacy pop, so
-      // this push must mirror the legacy push exactly for the per-file
-      // line-number arithmetic to close.
+      // Slurp the whole file and push it as a Flex buffer: the parent's
+      // resume position (base ring or an outer include's buffer) is kept
+      // by Flex's own buffer stack, so only the file-identity/line
+      // bookkeeping remains here -- and it must mirror the legacy push
+      // exactly for the per-file line-number arithmetic to close against
+      // pop_include_state().
       //
-      // Preconditions established by lex.l's directive rule before
-      // dispatching: `outp` has been synchronized (lookahead rewound) and
-      // the directive's terminating newline has been consumed and counted,
-      // so `outp` is the parent's exact resume point and outp[-1] is that
-      // newline -- refill_buffer()'s include branch uses it as the leading
-      // sentinel when it splices the included file's content in below.
-      incstate_t *is = (incstate_t *)DMALLOC(sizeof(incstate_t), TAG_COMPILER, "lpc_lex_handle_include");
-      is->stream = current_stream.release();
-      is->line = current_line;
-      is->file = current_file;
-      is->file_id = current_file_id;
-      is->last_nl = last_nl;
-      is->outp = outp;
-      is->next = inctop;
-      inctop = is;
-      incnum++;
+      // Precondition established by the caller (lex.l's directive rule):
+      // the directive's terminating newline has been consumed and
+      // counted, so current_line is already the line AFTER the #include.
+      std::string content;
+      char rdbuf[8192];
+      ssize_t n;
+      while ((n = read(fd, rdbuf, sizeof(rdbuf))) > 0) {
+        content.append(rdbuf, static_cast<size_t>(n));
+      }
+      close(fd);
+      // The ring guaranteed every file ended in a newline (appending one
+      // when missing); keep that invariant for the buffer form so a
+      // directive or line comment on the include's last line still
+      // terminates.
+      if (content.empty() || content.back() != '\n') {
+        content += '\n';
+      }
 
-      current_line--;
-      save_file_info(current_file_id, current_line - current_line_saved);
-      current_line_base += current_line;
+      // The parent buffer's native line counter freezes at resume_line
+      // (the line AFTER the directive) for the whole include and resumes
+      // by itself at the pop -- only the per-file accounting is manual.
+      int resume_line = current_line;
+      inc_stack.push_back(IncState{resume_line, current_file, current_file_id});
+
+      int directive_line = resume_line - 1;
+      save_file_info(current_file_id, directive_line - current_line_saved);
+      current_line_base += directive_line;
       current_line_saved = 0;
-      current_line = 1;
       current_file = make_shared_string(resolved.c_str());
       current_file_id = add_program_file(resolved.c_str(), 0);
-      current_stream = std::make_unique<FileLexStream>(fd);
-      refill_buffer();
+      lpc_lex_push_string_buffer(content.c_str(), content.size(), LPC_BUF_INCLUDE, yyscanner);
       return true;
     } else {
       lexerror(("Cannot #include " + filename).c_str());

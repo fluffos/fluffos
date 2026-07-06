@@ -87,6 +87,7 @@ typedef struct {
 #include <string>
 
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #define MAX_TEMPLATE_NESTING 16
@@ -102,26 +103,26 @@ struct compiler_context_t {
   // Nesting depth of #if/#ifdef directives seen INSIDE a dead branch while
   // in SC_COND_SKIP (the real conditional stack lives in LexerSession).
   int skip_depth = 0;
+  // Column (0-based) at which the most recently matched token STARTED --
+  // snapshotted by lex.l's YY_USER_ACTION before the running yycolumn
+  // advances past the match. Diagnostics read this for the caret
+  // position (clang points at the construct, not the scan cursor).
+  int token_start_column = 0;
   // Token metadata for harnesses that reconstruct source from tokens
   // (test_compiler.cc): set when the just-returned L_NUMBER came from a
   // char literal / the just-returned L_STRING came from a template
   // literal. Not consumed by the compiler itself.
   bool is_char_literal = false;
   bool is_template = false;
-  // Macro self-reference "blue paint", per OCCURRENCE rather than per
-  // region: name -> how many upcoming literal occurrences of that
-  // identifier in already-spliced expansion text must resolve as a plain
-  // identifier instead of expanding again. Incremented by
-  // lpc_lex_expand_string() (via its guard_hits out-param) exactly once
-  // for each guarded self-reference it leaves literal in text destined
-  // for the ring buffer; decremented by lpc_lex_resolve_identifier() when
-  // that occurrence is rescanned. This replaces the earlier
-  // active-expansion name stack + "\x1e<name>" end-of-splice sentinel
-  // token: the counts carry the same information with no in-band marker
-  // byte, no dedicated lex.l rule, and no positional bookkeeping -- and
-  // match C-preprocessor semantics more closely (paint sticks to the
-  // occurrence itself, not to a scan region).
-  std::unordered_map<std::string, int> pending_plain;
+  // While true, lpc_lex_resolve_identifier() performs NO macro expansion
+  // -- the #if evaluator sets it around pulling a defined()/
+  // efun_defined() operand, which C requires to be the unexpanded name.
+  bool suppress_expansion = false;
+  // (Macro self-reference guarding lives on the expansion-buffer frames
+  // now -- a name is plain while a live expansion buffer carries it as
+  // its guard; see lpc_lex_name_guarded in lexer_utils.cc. The old
+  // per-occurrence "blue paint" map this context used to hold retired
+  // with 7.4's raw-body rescan design.)
 };
 struct compiler_context_t *yyget_extra(void *yyscanner);
 char *yyget_text(void *yyscanner);
@@ -129,12 +130,42 @@ int yylex_init_extra(struct compiler_context_t *extra, void **scanner);
 int yylex_destroy(void *scanner);
 
 union YYSTYPE;
-// LexTokenStream and PreprocessingLexStream live in LexStream.h (included
-// above) alongside the rest of the byte/token stream hierarchy they're
-// part of, not here.
+// LexTokenStream lives in LexStream.h (included above) alongside the rest
+// of the byte/token stream hierarchy it consumes, not here.
 
 extern instr_t instrs[MAX_INSTRS];
-extern int current_line;
+
+// current_line -- the compiler-facing "line in the current file" -- is
+// NATIVE Flex state now (%option yylineno): each buffer carries its own
+// per-buffer line counter (yy_bs_lineno), which Flex advances for every
+// newline it matches or hands out through yyinput(). The accessor returns
+// a reference to the innermost REAL frame's counter -- the top-most
+// INCLUDE buffer's, or the base (main file) buffer's; splice buffers'
+// counters are synthetic and skipped -- so every existing read, write,
+// ++ and -- (#line, the collector's restore, the include arithmetic)
+// operates directly on the native storage. Isolation across expansions
+// and includes is automatic: pushing a buffer freezes the parent's
+// counter, popping resumes it. When no scanner/buffer is live (before the
+// first compile, after end_new_file) the reference falls back to
+// lpc_lex_line_fallback, which end_new_file loads with the final value so
+// post-compile readers (fatal(), tests) see what the legacy global held.
+// Defined in lexer_utils.cc, walking the buffer stack through the raw
+// introspection primitives below.
+int &lpc_lex_current_line_ref(void);
+#define current_line (lpc_lex_current_line_ref())
+extern int lpc_lex_line_fallback;
+
+// The scanner driving the current compile (compile-scoped singleton; the
+// compiler is deliberately non-reentrant). Set by start_new_file, cleared
+// by end_new_file. Defined in lexer_utils.cc.
+void *lpc_lex_active_scanner(void);
+
+// Kind of the i-th PUSHED buffer (0 = bottom-most pushed, i.e. just above
+// the base buffer), or -1 when out of range -- the transient
+// one-larger/one-smaller windows around a push/pop treat -1 as "skip".
+// Defined in lexer_utils.cc next to the kind stack.
+int lpc_lex_buffer_kind_at(int i);
+
 extern int current_line_base;
 extern int current_line_saved;
 extern int total_lines;
@@ -144,25 +175,31 @@ extern int pragmas;
 extern int num_parse_error;
 extern lpc_predef_t *lpc_predefs;
 extern int efun_arg_types[];
-extern char *outp;     // ring-buffer read cursor; also touched by lex.l's rules
-extern char *last_nl;
 extern int context;
 extern int num_refs;
 extern int lex_fatal;
 extern int arrow_efun, evaluate_efun, this_efun, to_float_efun, to_int_efun, new_efun;
 
 union YYSTYPE;
+struct YYLTYPE;
 
 void lpc_lex_reset(void *yyscanner);
 void push_function_context(void);
 void pop_function_context(void);
-int yylex(union YYSTYPE *yylval_param, void *yyscanner);          // generated by Flex (lex.autogen.cc)
+int yylex(union YYSTYPE *yylval_param, struct YYLTYPE *yylloc_param, void *yyscanner);  // generated by Flex (lex.autogen.cc)
 void lpc_lex_newline(void *yyscanner);  // called from lex.l's "\n" rule
 void lexerror(const char *s);  // called from lexer_utils.cc helpers and lex.l's native rules
-int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, void *yyscanner);  // called from lex.l's identifier rule
-void handle_pragma(char *str);  // called from lex.l's LPC_PRAGMA_MARKER rule
-int parseHeredoc(const char *terminator, int is_array, union YYSTYPE *yylval_param, void *yyscanner);  // called from lex.l's SC_HEREDOC_TERM rules
-int parseEofOrIncludePop(union YYSTYPE *yylval_param, void *yyscanner);  // called from lex.l's <<EOF>> rule
+// Graceful replacement for flex's stock exit(2) fatal handler; wired in
+// via lex.l's YY_FATAL_ERROR override. Defined in compiler.cc (needs
+// error()).
+[[noreturn]] void lpc_lex_fatal(const char *msg);
+int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yylloc_param, void *yyscanner);  // called from lex.l's identifier rule
+void handle_pragma(char *str);  // called from the directive dispatcher (lexer_rules_pp.cc)
+int parseHeredoc(const char *terminator, int is_array, union YYSTYPE *yylval_param, struct YYLTYPE *yylloc_param, void *yyscanner);  // heredoc body reader (lexer_utils.cc)
+// The shared tail of the two SC_HEREDOC_TERM start rules: terminator
+// validation + parseHeredoc hand-off (lexer_utils.cc).
+int lpc_lex_start_heredoc(union YYSTYPE *yylval_param, struct YYLTYPE *yylloc_param, void *yyscanner);
+int parseMainEof(union YYSTYPE *yylval_param, void *yyscanner);  // called from lex.l's <<EOF>> rule
 int lpc_lex_badlex(unsigned char c, void *yyscanner);  // called from lex.l's "." catch-all rule
 void init_num_args(void);
 
@@ -181,11 +218,143 @@ ident_hash_elem_t *find_or_add_perm_ident(const char *);
 ident_hash_elem_t *lookup_ident(const char *);
 void free_unused_identifiers(void);
 void init_identifiers(void);
-char *show_error_context(void);
 #ifdef DEBUGMALLOC_EXTENSIONS
 
 #endif
-void lpc_lex_flush_lookahead(void *yyscanner);
+// Read one character through Flex itself (its buffer, then YY_INPUT) --
+// the official mechanism for mid-rule raw reads (heredoc bodies,
+// macro-argument collection), replacing direct `outp` access. Returns 0
+// at end of input (or a genuine NUL, which LPC source treats the same).
+// When the current buffer is a pushed splice (see below) that runs dry,
+// it is popped and the read continues transparently from the parent --
+// this is what lets a function-like macro's `(args)` be collected across
+// a splice boundary (`#define APPLY F` + `APPLY(3)`: the literal `F`
+// comes from the splice, its arguments from the file). Defined in lex.l's
+// trailer: Flex generates yyinput() as static.
+int lpc_lex_getc(void *yyscanner);
+
+// What a pushed Flex buffer holds -- drives the bookkeeping at its pop.
+// PLAIN: pushback of probed-but-unused bytes, heredoc array synthesis,
+// "(:" re-splices (no bookkeeping). EXPANSION: a macro expansion's text
+// (owns the innermost live provenance frame, see
+// lpc_lex_expansion_chain). INCLUDE: an #include file's whole content
+// (its pop restores current_file/current_line and closes the
+// save_file_info line accounting -- the include STACK metadata lives in
+// lexer_utils.cc).
+enum LpcPushedBufferKind {
+  LPC_BUF_PLAIN = 0,
+  LPC_BUF_EXPANSION = 1,
+  LPC_BUF_INCLUDE = 2,
+  // A #if/#elif expression being tokenized for the evaluator: unlike the
+  // other kinds, its <<EOF>> does NOT continue into the parent -- it
+  // returns LPC_IFEXPR_END so the token pull stops exactly at the
+  // expression's edge.
+  LPC_BUF_IF_EXPR = 3,
+};
+
+// Pseudo-token yylex() returns when a LPC_BUF_IF_EXPR buffer runs dry
+// (never reaches the parser: only the #if evaluator's pulls see it).
+#define LPC_IFEXPR_END (-2)
+
+// Push `text` as a fresh Flex buffer on top of the current one; scanning
+// consumes it fully, then pops back to the parent buffer at exactly the
+// position it left off (Flex's own bookkeeping -- no rewind/flush
+// choreography). This carries every splice (macro expansions, heredoc
+// array-block synthesis, pushbacks of probed bytes) AND every #include's
+// content. The pop happens either in lex.l's <<EOF>> rules (Flex scanned
+// the buffer dry) or inside lpc_lex_getc() (a raw reader drained it).
+// Defined in lex.l's trailer: composing yy_scan_bytes() with the buffer
+// STACK requires the "advance the stack top first" fix for
+// yy_scan_bytes's internal yy_switch_to_buffer(), which otherwise
+// clobbers the live top slot (ASan-verified UAF, see
+// plans/MASTER-PLAN.md 5.5).
+void lpc_lex_push_string_buffer(const char *text, size_t len, int kind, void *yyscanner);
+
+// Pop one pushed buffer (kind-dispatched bookkeeping + yypop_buffer_state).
+// Callers must check lpc_lex_pushed_depth() > 0 first.
+void lpc_lex_pop_pushed_buffer(void *yyscanner);
+
+// How many pushed buffers are currently stacked on top of the base
+// buffer. 0 = scanning the main file's own bytes. Defined in
+// lexer_utils.cc.
+int lpc_lex_pushed_depth(void);
+
+// Kind of the buffer currently feeding Flex (the stack top), or -1 when
+// scanning the base buffer. lex.l's directive rule uses it to decide how
+// the directive's terminating newline is consumed. Defined in
+// lexer_utils.cc.
+int lpc_lex_top_buffer_kind(void);
+
+// Pushed-buffer bookkeeping used by the lex.l-trailer helpers above
+// (defined in lexer_utils.cc, next to the expansion frames and include
+// metadata they update). ending_lineno is the popped buffer's final
+// native line counter (yyget_lineno just before the pop) -- an INCLUDE
+// pop feeds it to save_file_info as the include's last line.
+void lpc_lex_note_buffer_push(int kind);
+void lpc_lex_note_buffer_pop(int ending_lineno);
+
+// Snapshot of the live #include stack for diagnostics, innermost first:
+// each entry is (including file, line of the #include directive in it).
+// Empty when scanning the top-level file. Defined in lexer_utils.cc, next
+// to the include stack it walks.
+std::vector<std::pair<std::string, int>> lpc_lex_include_stack(void);
+
+// One live macro-expansion frame, for diagnostics ("during expansion of
+// macro 'F' (defined at file:line)"). def_file is empty for predefines/
+// builtins (no source definition site).
+struct LpcExpansionSite {
+  std::string name;
+  std::string def_file;
+  int def_line;
+  // Where the macro was USED (stamped when the expansion buffer was
+  // pushed): line in the real file and 1-based start column of the name
+  // token. Diagnostics inside expansions attribute to the OUTERMOST
+  // site's invocation position (clang's "expansion location").
+  int invocation_line;
+  int invocation_column;
+};
+// Snapshot of the macro expansions whose spliced text is still being
+// scanned, innermost first. One frame per live EXPANSION splice buffer
+// (see lpc_lex_push_string_buffer): pushed with the buffer, marked dead
+// when that buffer pops, and purged at the next line boundary rather than
+// immediately -- a token's bytes are all consumed before its rule action
+// (or the parser's action on it) runs, so an error on a splice's final
+// token needs the frame to outlive the buffer briefly (see
+// lexer_utils.cc's linger-policy comment). Empty whenever scanning
+// ordinary source.
+std::vector<LpcExpansionSite> lpc_lex_expansion_chain(void);
+
+// Source-snippet + caret block (current physical line as resident in the
+// scanner's current Flex buffer, caret at the scan position) for
+// PRAGMA_ERROR_CONTEXT output; empty when unavailable. Shared by
+// prepare_logs() and the compile diagnostic reporter; scanner-less
+// callers go through the compile-scoped active-scanner slot in
+// lexer_utils.cc.
+std::string lpc_lex_error_context_block(void);
+// The current physical line's text in the innermost REAL frame (top-most
+// include buffer or the base main-file buffer) -- the invocation line
+// when a splice is scanning. Captured into Diagnostic::snippet at report
+// time for the caret block. Empty when unavailable. Defined in
+// lexer_utils.cc on the primitives below.
+std::string lpc_lex_current_source_line(void);
+
+// Raw buffer-introspection primitives -- pure flex-state accessors with
+// zero policy, defined in lex.l's trailer because the generated scanner's
+// buffer types are private to that translation unit. Everything built on
+// them (the current_line real-frame walk, snippet/caret assembly) lives
+// in lexer_utils.cc.
+int lpc_lex_buffer_count(void *yyscanner);
+int *lpc_lex_buffer_lineno(void *yyscanner, int i);
+int lpc_lex_buffer_extents(void *yyscanner, int i, const char **base, const char **limit,
+                           const char **pos, char *held);
+
+// Pull one token for the #if/#elif expression evaluator: yylex() under
+// the INITIAL start condition (the surrounding scan may be in
+// SC_COND_SKIP for a dead-branch #elif), restoring the caller's
+// condition after each token. Returns LPC_IFEXPR_END when the expression
+// buffer is exhausted. Defined in lex.l's trailer (BEGIN/YY_START are
+// private to the generated scanner).
+int lpc_lex_ifexpr_next(union YYSTYPE *yylval_param, void *yyscanner);
 // Print all predefines using debug_message().
 void print_all_predefines();
 // Get error/warning message from lexer

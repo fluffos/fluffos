@@ -45,10 +45,12 @@
 #include <cctype>
 #include <cstdio>
 #include <iostream>
+#include <unistd.h>
 #include <regex>
 #include <string>
 #include <vector>
 
+#include "compiler/internal/compiler.h"
 #include "mainlib.h"
 #include "vm/vm.h"
 #include "vm/internal/apply.h"
@@ -198,14 +200,21 @@ bool RunAttempt(Session *session, const std::string &body_src, bool want_result,
   object_t *ob = nullptr;
   error_context_t econ{};
   save_context(&econ);
+  // Compile quietly: the driver would otherwise print every diagnostic to
+  // the console the moment it's found -- including those of a doomed
+  // trial-expression parse we're about to retry in statement form. We
+  // render compiler_diags ourselves, only for the attempt that mattered.
+  compiler_diags_quiet = true;
   try {
     ob = load_object_from_source(src, name.c_str(), 1);
   } catch (const char *e) {
+    compiler_diags_quiet = false;
     restore_context(&econ);
     pop_context(&econ);
     *error_message = e ? e : "compile error";
     return false;
   }
+  compiler_diags_quiet = false;
   pop_context(&econ);
 
   if (!ob) {
@@ -280,11 +289,7 @@ void Eval(Session *session, std::string stmt) {
   std::string result, error_message;
 
   // A leading control-flow/statement keyword can never parse as a bare
-  // expression -- skip that doomed attempt so the compiler doesn't log a
-  // syntax error to the console for something that's never going to work
-  // anyway (the compiler logs errors as it finds them, not just when we'd
-  // eventually catch a thrown exception, so a failed "trial" attempt isn't
-  // silent the way it would be in a real incremental parser).
+  // expression -- skip that doomed attempt outright.
   static const std::regex statement_leader(
       R"(^\s*(if|for|while|do|switch|return|break|continue|\{)\b)");
   bool try_expression_first = !std::regex_search(stmt, statement_leader);
@@ -295,22 +300,37 @@ void Eval(Session *session, std::string stmt) {
       std::cout << result << "\n";
       return;
     }
+    // Trial failed silently (compiles run with compiler_diags_quiet); the
+    // statement-form retry below clears compiler_diags via its own
+    // compile, so the doomed trial's errors never reach the user.
   }
 
   // Fall back to statement form (e.g. `if (x) write(...)`, assignments,
   // loops -- anything that isn't itself an expression).
   std::string stmt_body = stmt;
   if (RunAttempt(session, stmt_body, /*want_result=*/false, &result, &error_message)) {
+    // Success may still have produced warnings worth showing.
+    for (const auto &d : compiler_diags) {
+      if (d.is_warning) std::cout << render_diagnostic(d, isatty(1)) << "\n";
+    }
     return;
   }
 
-  // Deliberately not printing `error_message` here: error()'s C++-exception
-  // unwinding path (simulate.cc's _error_handler) always throws the generic
-  // literal "error handler error", not the actual diagnostic text -- the
-  // real "file line N: <message>" the user needs was already printed
-  // directly to the console by the driver's own error logging (smart_log/
-  // debug_message) before that throw happened. Printing error_message here
-  // too would just add a confusing, content-free extra line under it.
+  // Both attempts failed. Render the FINAL attempt's structured
+  // diagnostics ourselves, clang-style with the full include/macro
+  // provenance chains (compiler_diags holds exactly the last compile's
+  // records -- each compile clears the previous one's). error_message
+  // itself stays unprinted: error()'s C++-exception unwinding path always
+  // throws the generic "error handler error", not the diagnostic text.
+  bool printed = false;
+  for (const auto &d : compiler_diags) {
+    std::cout << render_diagnostic(d, isatty(1)) << "\n";
+    printed = true;
+  }
+  if (!printed) {
+    // No compile diagnostics: the failure was at runtime (the driver's
+    // own error logging already reported it to the console).
+  }
 }
 
 }  // namespace

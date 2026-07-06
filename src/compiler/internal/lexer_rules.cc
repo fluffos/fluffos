@@ -41,11 +41,41 @@ std::string lpc_strip_underscores(const char *text, int len) {
   return s;
 }
 
+void lpc_lex_brace_open(void *yyscanner) {
+  compiler_context_t *ctx = yyget_extra(yyscanner);
+  if (ctx->template_nesting > 0) {
+    ctx->template_brace_depth[ctx->template_nesting]++;
+  }
+}
+
+void lpc_lex_reset_context(struct compiler_context_t *ctx) {
+  ctx->template_is_continuation = false;
+  ctx->template_nesting = 0;
+  // An aborted compile can strand the #if evaluator's suppression flag;
+  // it must not disable macro expansion for the next compile.
+  ctx->suppress_expansion = false;
+}
+
+bool lpc_lex_brace_close(void *yyscanner) {
+  compiler_context_t *ctx = yyget_extra(yyscanner);
+  if (ctx->template_nesting > 0 && ctx->template_brace_depth[ctx->template_nesting] == 0) {
+    // This '}' ends the ${...} interpolation: resume the template body
+    // with a fresh fragment accumulator.
+    ctx->str_accum.clear();
+    ctx->template_is_continuation = true;
+    return true;
+  }
+  if (ctx->template_nesting > 0) {
+    ctx->template_brace_depth[ctx->template_nesting]--;
+  }
+  return false;
+}
+
 void lpc_lex_count_newlines(const char *text, int len) {
   for (int i = 0; i < len; i++) {
     if (text[i] == '\n') {
-      current_line++;
-      total_lines++;
+      total_lines++;  // the line counter itself advances natively
+                      // (%option yylineno scans the matched text)
     }
   }
 }
@@ -218,8 +248,27 @@ void lpc_lex_append_long_unicode_escape(void *yyscanner, const char *text, int l
 
 void lpc_lex_append_unknown_escape(void *yyscanner, const char *text, bool is_template) {
   append_char(yyscanner, text[1]);
-  yywarn("Unknown \\ escape.");
+  {
+    // Fix-it: the escape means nothing, the character stands for itself
+    // -- suggest dropping the backslash (rendered under the caret).
+    compiler_context_t *ctx = ctx_of(yyscanner);
+    int col = ctx->token_start_column + 1;
+    compiler_pending_fixits.push_back(Diagnostic::FixIt{col, col + 2, std::string(1, text[1])});
+    char msg[64];
+    snprintf(msg, sizeof(msg), "Unknown escape sequence '\\%c'.", text[1]);
+    yywarn("%s", msg);
+  }
   (void)is_template;
+}
+
+int lpc_lex_string_close(void *yyscanner, union YYSTYPE *yylval_param) {
+  compiler_context_t *ctx = ctx_of(yyscanner);
+  if (!u8_validate(ctx->str_accum.c_str())) {
+    lexerror("Invalid UTF8 codepoint in string literal");
+    return YYerror;
+  }
+  yylval_param->string = scratch_copy(ctx->str_accum.c_str());
+  return L_STRING;
 }
 
 int lpc_lex_template_head_or_middle(void *yyscanner, union YYSTYPE *yylval_param) {
