@@ -436,10 +436,10 @@ static int user_parser(char *buff) {
         char buf[256];
         if (s->flags & V_FUNCTION) {
           sprintf(buf, "Verb '%s' bound to uncallable function pointer.\n", s->verb);
-          error(buf);
+          error("%s", buf);
         } else {
           sprintf(buf, "Function for verb '%s' not found.\n", s->verb);
-          error(buf);
+          error("%s", buf);
         }
       }
     }

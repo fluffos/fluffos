@@ -9,7 +9,7 @@
  * files -- lex.c/lex.cc (renamed to lex_util.cc once the Flex migration in
  * lex.l left only this residual state+helpers behind) and lexer_utils.cc --
  * merged here since both serve the same "lexer support" role. See
- * plans/flex-lexer-migration.md.
+ * the compiler README (src/compiler/internal/README.md).
  *
  * Revision:
  * 93-06-27 (Robocoder):
@@ -258,7 +258,12 @@ int lookup_predef(const char *name) {
 // Non-static: called directly from lex.l's native $N and open-paren rules
 // (Phase 6), in addition to the legacy helpers still in this file.
 void lexerror(const char *s) {
-  yyerror(s);
+  // %-quote: `s` is arbitrary compile-time text -- macro names, #error
+  // payloads, include filenames -- so it must NOT be yyerror's format
+  // string (a '%' in the source would be consumed as a conversion,
+  // reading garbage varargs; ASan-confirmed crash on `#error %s%n`,
+  // flagged by CodeQL cpp/tainted-format-string).
+  yyerror("%s", s);
   lex_fatal++;
 }
 
@@ -743,7 +748,7 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yyll
         // self-reference guard for the buffer's lifetime.
         //
         // A buffer push is safe here (an earlier attempt was reverted,
-        // see plans/MASTER-PLAN.md 5.5): a bare reference to a
+        // see this file's git history): a bare reference to a
         // function-like macro can end a body with its "(args)" following
         // in the PARENT input (`#define APPLY F` + `APPLY(3)`), and the
         // argument collector reads through lpc_lex_getc(), which drains
