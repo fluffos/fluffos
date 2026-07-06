@@ -1,6 +1,7 @@
 #include "base/std.h"
 
 #include "compiler.h"
+#include "compiler/internal/compiler_utils.h"
 
 #include <cstdlib>  // for qsort
 #include <cstdio>   // for sprintf
@@ -15,6 +16,10 @@
 #include "generate.h"
 #include "icode.h"
 #include "lex.h"
+#include "compiler/internal/lexer_utils.h"
+#include "compiler/internal/preprocessor.h"
+#include "compiler/internal/grammar_rules.h"
+#include "grammar.autogen.h"
 #include "scratchpad.h"
 #include "symbol.h"
 #include <string>
@@ -2780,18 +2785,4 @@ char *allocate_in_mem_block(int n, int size) {
   return ret;
 }
 
-/*
- * There is an error in a specific file. Ask the MudOS driver to log the
- * message somewhere.
- */
-void smart_log(const char *error_file, int line, const char *what, int flag) {
-  auto logs = prepare_logs(error_file, line, what, flag, pragmas & PRAGMA_ERROR_CONTEXT);
-  for (auto &log : logs) {
-    debug_message("%s", log.c_str());
-  }
 
-  auto res = fmt::to_string(fmt::join(logs, ""));
-  push_malloced_string(add_slash(error_file));
-  copy_and_push_string(res.c_str());
-  safe_apply_master_ob(APPLY_LOG_ERROR, 2);
-} /* smart_log() */

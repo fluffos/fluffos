@@ -37,7 +37,7 @@
 #include "backend.h"                             // for backend();
 #include "thirdparty/backward-cpp/backward.hpp"  // for backtracing
 
-// from lex.cc
+// from lexer_utils.cc
 extern void print_all_predefines();
 
 namespace {
@@ -393,7 +393,7 @@ int driver_main(int argc, char **argv) {
   print_rc_table();
   debug_message("==============================\n");
 
-  // from lex.cc
+  // from lexer_utils.cc
   debug_message("==== LPC Predefines ====\n");
   print_all_predefines();
   debug_message("========================\n");

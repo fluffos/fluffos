@@ -167,17 +167,6 @@ reversible explode string : 0
 #
 sane sorting : 1
 
-# WARN_TAB: Some versions of the editor built in indent function use
-#   tabs for indenting. This options turns on a warning message for
-#   files indented with tabs instead of spaces.
-#
-warn tab : 0
-
-# WOMBLES: don't allow spaces between start/end of array/mapping/functional
-# token chars so ({1,2,3}) still works, but ( { 1 , 2 , 3 } ) doesn't
-# and ({ 1 , 2 , 3 }) does.
-wombles : 0
-
 # CALL_OTHER_TYPE_CHECK: enable type checking for call_other()
 # (-> operator on objects)
 #

@@ -958,20 +958,20 @@ void f_sub_eq() {
  * Binary search is used on the normal tables.
  */
 
-#define SWITCH_CASE_SIZE (sizeof(LPC_INT) + sizeof(short))
+#define SWITCH_CASE_SIZE (static_cast<int>(sizeof(LPC_INT) + sizeof(short)))
 
 /* offsets from 'pc' */
 enum { SW_TYPE = 0, SW_TABLE = 1, SW_ENDTAB = 3, SW_DEFAULT = 5 };
 
 /* offsets used for range (L_ for lower member, U_ for upper member) */
 enum { L_LOWER = 0 };
-#define L_TYPE (sizeof(LPC_INT))
+#define L_TYPE (static_cast<int>(sizeof(LPC_INT)))
 #define L_UPPER (SWITCH_CASE_SIZE)
-#define L_ADDR (SWITCH_CASE_SIZE + sizeof(LPC_INT))
+#define L_ADDR (SWITCH_CASE_SIZE + static_cast<int>(sizeof(LPC_INT)))
 #define U_LOWER (-SWITCH_CASE_SIZE)
-#define U_TYPE (-SWITCH_CASE_SIZE + sizeof(LPC_INT))
+#define U_TYPE (-SWITCH_CASE_SIZE + static_cast<int>(sizeof(LPC_INT)))
 enum { U_UPPER = 0 };
-#define U_ADDR (sizeof(LPC_INT))
+#define U_ADDR (static_cast<int>(sizeof(LPC_INT)))
 
 // FIXME: The variable naming scheme is horrible, need to
 // read again and rename what i, d, s, r to something meaningful.

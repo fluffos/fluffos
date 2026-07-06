@@ -110,10 +110,6 @@ const FlagEntry INT_FLAGS[] = {
      "Make implode(explode(x, y), y) always equal x; overrides 'sane explode string'."},
     {"sane sorting", __RC_SANE_SORTING__, 1, 0, INT_MAX, "Language Behavior",
      "Use a well-defined, stable ordering for the driver's sorting operations."},
-    {"warn tab", __RC_WARN_TAB__, 0, 0, INT_MAX, "Diagnostics",
-     "Warn when source files are indented with tabs instead of spaces."},
-    {"wombles", __RC_WOMBLES__, 0, 0, INT_MAX, "Language Behavior",
-     "Disallow spaces between the start/end token characters of arrays, mappings, and functionals."},
     {"call other type check", __RC_CALL_OTHER_TYPE_CHECK__, 0, 0, INT_MAX, "Type Checking",
      "Enable type checking for call_other() (the -> operator on objects)."},
     {"call other warn", __RC_CALL_OTHER_WARN__, 0, 0, INT_MAX, "Type Checking",
@@ -466,6 +462,8 @@ void read_config(const char *filename) {
   scan_config_line("fd6 port : %d\n", tmp, -2);
   scan_config_line("binary directory : %[^\n]", tmp, K_WARN_FOUND);
   scan_config_line("swap file : %[^\n]", tmp, K_WARN_FOUND);
+  scan_config_line("wombles : %d\n", tmp, K_WARN_FOUND);
+  scan_config_line("warn tab : %d\n", tmp, K_WARN_FOUND);
 
   // Give all obsolete (thus untouched) config strings a value.
   for (auto &i : config_str) {

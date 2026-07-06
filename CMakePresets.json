@@ -3,12 +3,15 @@
   "configurePresets": [
     {
       "name": "linux-debug",
-      "displayName": "Linux Debug",
+      "displayName": "Linux Debug (Clang + ASan/UBSan)",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "MARCH_NATIVE": "OFF"
+        "MARCH_NATIVE": "OFF",
+        "ENABLE_SANITIZER": "ON",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++"
       },
       "condition": {
         "type": "equals",
@@ -18,12 +21,14 @@
     },
     {
       "name": "linux-relwithdebinfo",
-      "displayName": "Linux RelWithDebInfo",
+      "displayName": "Linux RelWithDebInfo (Clang)",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "MARCH_NATIVE": "OFF"
+        "MARCH_NATIVE": "OFF",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++"
       },
       "condition": {
         "type": "equals",
@@ -107,6 +112,7 @@
       "name": "linux-debug",
       "configurePreset": "linux-debug"
     },
+
     {
       "name": "linux-relwithdebinfo",
       "configurePreset": "linux-relwithdebinfo"

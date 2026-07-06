@@ -6,6 +6,7 @@ class LexStream;
 #include "vm/internal/base/function.h"  // for function_t
 #include "vm/internal/base/program.h"   // for DECL_MODS etc
 #include "trees.h"
+#include "compiler/internal/compiler_utils.h"
 
 /* The end of a static buffer */
 #define EndOf(x) (x + sizeof(x) / sizeof(x[0]))
@@ -211,6 +212,7 @@ void reallocate_locals(void);
 void initialize_locals(void);
 int get_id_number(void);
 program_t *compile_file(std::unique_ptr<LexStream>, const char *);
+
 void reset_function_blocks(void);
 void copy_variables(program_t *, int);
 void copy_structures(const program_t *);
@@ -271,8 +273,7 @@ parse_node_t *throw_away_mapping(parse_node_t *);
 
 char *allocate_in_mem_block(int, int);
 
-// Log errors during compiling
-void smart_log(const char *, int, const char *, int);
+
 
 // FIXME: 'inherit_file' is used as a flag.
 extern char *inherit_file;

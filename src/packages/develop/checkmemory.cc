@@ -6,6 +6,8 @@
  */
 
 #include "base/package_api.h"
+#include "compiler/internal/preprocessor.h"
+#include "compiler/internal/lexer_utils.h"
 
 #include "packages/core/file.h"
 #include "packages/core/call_out.h"

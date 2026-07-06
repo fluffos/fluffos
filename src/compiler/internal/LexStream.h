@@ -46,4 +46,22 @@ class IStreamLexStream : public LexStream {
   std::istream& is_;
 };
 
+class StringLexStream : public LexStream {
+ public:
+  StringLexStream(std::string str) : str_(std::move(str)), stream_(str_) {}
+  ~StringLexStream() override {}
+
+  size_t read(char* buffer, size_t size) override {
+    stream_.read(buffer, size);
+    return stream_.gcount();
+  }
+  void close() override {
+    stream_.clear();
+  }
+
+ private:
+  std::string str_;
+  std::istringstream stream_;
+};
+
 #endif /* end of include guard: LEX_STREAM_H */

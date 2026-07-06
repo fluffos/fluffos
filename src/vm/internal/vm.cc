@@ -16,6 +16,7 @@
 #include "vm/internal/simul_efun.h"
 #include "vm/internal/simulate.h"
 #include "compiler/internal/lex.h"       // for add_predefines, fixme!
+#include "compiler/internal/lexer_utils.h"
 #include "compiler/internal/compiler.h"  // for init_locals, fixme!
 
 #include "packages/core/add_action.h"
@@ -72,6 +73,7 @@ void vm_init() {
   init_eval(); /* in eval.cc */
 
   init_strings();     /* in stralloc.c */
+  init_instrs();      /* in compiler_utils.cc */
   init_identifiers(); /* in lex.c */
   init_locals();      /* in compiler.c */
 
