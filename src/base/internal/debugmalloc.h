@@ -71,6 +71,10 @@ static const int TAG_PARSER = (TAG_PERMANENT + 37);
 #endif
 static const int TAG_INPUT_TO = (TAG_PERMANENT + 38);
 static const int TAG_SOCKETS = (TAG_PERMANENT + 39);
+// Compile-arena chunks (compiler/internal/scratchpad.cc): retained across
+// compiles by design -- whitelisted in check_all_blocks like the other
+// persistent driver infrastructure.
+static const int TAG_SCRATCHPAD = (TAG_PERMANENT + 50);
 static const int TAG_STRING = (TAG_DATA + 40);
 static const int TAG_MALLOC_STRING = (TAG_DATA + 41);
 static const int TAG_SHARED_STRING = (TAG_DATA + 42);

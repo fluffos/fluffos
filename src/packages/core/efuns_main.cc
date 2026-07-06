@@ -19,7 +19,8 @@
 
 #include "packages/core/call_out.h"
 #include "packages/core/dns.h"
-#include "packages/core/add_action.h"  // stat_living_objects
+#include "packages/core/add_action.h"
+#include "compiler/internal/scratchpad.h"
 #include "packages/core/file.h"
 #include "packages/core/regexp.h"
 #include "packages/core/sprintf.h"  // string_print_formatted
@@ -1290,6 +1291,9 @@ int calculate_and_maybe_print_memory_info(outbuffer_t *ob, int verbose) {
   if (verbose && verbose != -1) outbuf_add(ob, "\n");
 
   tot += add_string_status(ob, verbose);
+  if (verbose && verbose != -1) outbuf_add(ob, "\n");
+
+  tot += scratchpad_status(ob, verbose);
   if (verbose && verbose != -1) outbuf_add(ob, "\n");
 
   return tot;

@@ -2,8 +2,9 @@
 
 #include "scratchpad.h"
 
-#include <cstdlib>
 #include <new>
+
+#include "base/internal/outbuf.h"
 
 /*
  * Monotonic bump arena. See scratchpad.h for the contract.
@@ -24,96 +25,176 @@
 
 namespace {
 
-constexpr std::size_t kChunkSize = std::size_t{64} * 1024;  // default overflow-chunk payload
-constexpr std::size_t kBaseSize = std::size_t{64} * 1024;   // persistent first chunk payload
+// Production geometry: a 1MB buffer covers virtually every compile in a
+// single chunk (the 206KB bench program uses ~700KB of transients).
+constexpr std::size_t kBaseSize = std::size_t{1024} * 1024;  // persistent chunk 0
+constexpr int kMaxRetained = 8;  // 8 x 1MB warm ceiling, retained across compiles
+
+// Runtime-adjustable so tests/benchmarks can force the WORST CASE
+// (e.g. 400-byte chunks: constant advances, every big string oversize).
+// Read only on the spill/oversize paths plus one compare per allocation.
+std::size_t chunk_payload = kBaseSize;
 
 struct Chunk {
-  Chunk *prev;
-  std::size_t cap;   // payload capacity in bytes
-  std::size_t used;  // bytes handed out
+  std::size_t cap;       // payload capacity in bytes
+  std::size_t used;      // bytes handed out
+  Chunk *next_overflow;  // intrusive list link (overflow chunks only)
+  std::size_t pad_;      // keeps data() max_align_t (16-byte) aligned
   char *data() { return reinterpret_cast<char *>(this) + sizeof(Chunk); }
 };
+static_assert(sizeof(Chunk) % 16 == 0, "chunk payload must stay 16-byte aligned");
 
-// Persistent first chunk, never freed (reset to empty at scratch_destroy).
+// Deque-style chunk management (all POD statics -- no destructors, so
+// arena-backed objects in exit-scope storage can deallocate in any order
+// at process exit):
+//
+//   chunks[0..chunk_count)  standard-size chunks RETAINED across
+//                           compiles; chunks[0] is the persistent static
+//                           block. The bump cursor walks this array and
+//                           reset is just "cursor back to slot 0" -- the
+//                           tail of the array IS the warm cache, with no
+//                           separate parking list. A long-lived driver
+//                           reaches chunk_count == its peak demand and
+//                           never mallocs again (scratch_stats proves it).
+//   overflow chunks         everything past the retained ceiling and all
+//                           oversize exact-fit requests; freed at every
+//                           reset (retaining arbitrary amounts would pin
+//                           unbounded memory). cur_overflow is the active
+//                           bump target once the retained array is full.
 alignas(std::max_align_t) unsigned char base_storage[sizeof(Chunk) + kBaseSize];
+Chunk *chunks[kMaxRetained];
+int chunk_count = 0;
+int cur_index = 0;
+Chunk *overflow = nullptr;      // intrusive list of this cycle's overflow chunks
+Chunk *cur_overflow = nullptr;  // active overflow chunk (null = bump the array)
+Chunk *active = nullptr;        // THE bump target (cache of cur_overflow ?: chunks[cur_index])
 
-Chunk *cur = nullptr;
+// Observability counters (scratch_stats / scratchpad_status).
+std::size_t cycle_bytes = 0;
+std::size_t peak_cycle_bytes = 0;
+std::size_t chunk_mallocs = 0;
+std::size_t reset_count = 0;
 
-// Warm-chunk cache: scratch_destroy parks standard-size overflow chunks
-// here (up to kSpareChunks) instead of freeing them, and allocation pops
-// them back. Compiles that outgrow the base chunk then reuse the SAME
-// warm pages every time instead of paying malloc + cold-page faults per
-// compile -- this is what lets string-growth churn compete with a
-// general-purpose allocator's block recycling. Exact-fit oversize chunks
-// are always freed (they'd pin arbitrary amounts of memory).
-constexpr int kSpareChunks = 16;  // 16 x 64KB = 1MB cache ceiling
-Chunk *spare = nullptr;
-int spare_count = 0;
-
-Chunk *base_chunk() { return reinterpret_cast<Chunk *>(base_storage); }
+void ensure_init() {
+  if (chunk_count == 0) {
+    Chunk *b = reinterpret_cast<Chunk *>(base_storage);
+    b->cap = chunk_payload < kBaseSize ? chunk_payload : kBaseSize;
+    b->used = 0;
+    b->next_overflow = nullptr;
+    chunks[0] = b;
+    chunk_count = 1;
+    cur_index = 0;
+    active = b;
+  }
+}
 
 inline std::size_t align_up(std::size_t n, std::size_t align) {
   return (n + align - 1) & ~(align - 1);
 }
 
+Chunk *new_chunk(std::size_t cap) {
+  // DMALLOC with the dedicated TAG_SCRATCHPAD: chunks are visible to the
+  // driver's memory accounting, and check_all_blocks whitelists the tag
+  // (retained-across-compiles is by design, not a leak).
+  Chunk *c = reinterpret_cast<Chunk *>(DMALLOC(sizeof(Chunk) + cap, TAG_SCRATCHPAD, "scratchpad chunk"));
+  c->cap = cap;
+  c->used = 0;
+  c->next_overflow = nullptr;
+  chunk_mallocs++;
+  return c;
+}
+
 }  // namespace
 
 void *scratch_raw_allocate(std::size_t bytes, std::size_t align) {
-  if (cur == nullptr) {
-    Chunk *b = base_chunk();
-    b->prev = nullptr;
-    b->cap = kBaseSize;
-    b->used = 0;
-    cur = b;
-  }
-  std::size_t off = align_up(cur->used, align);
-  if (off + bytes > cur->cap) {
-    // New chunk. Its payload base is max_align_t-aligned (DMALLOC/malloc
-    // guarantee + power-of-two header padding), so offset 0 satisfies
-    // any `align` a container can ask for.
-    Chunk *c;
-    if (bytes <= kChunkSize && spare != nullptr) {
-      c = spare;
-      spare = c->prev;
-      spare_count--;
-    } else {
-      std::size_t cap = bytes > kChunkSize ? bytes : kChunkSize;
-      // Plain malloc, NOT DMALLOC: the spare-chunk cache deliberately
-      // holds chunks across compiles (process-lifetime infrastructure),
-      // and DEBUGMALLOC's shutdown sweep would report every parked chunk
-      // as an unaccounted leak and fail driver-autotest.
-      c = static_cast<Chunk *>(malloc(sizeof(Chunk) + cap));
-      c->cap = cap;
+  ensure_init();
+  Chunk *c = active;
+  std::size_t off = align_up(c->used, align);
+  if (off + bytes > c->cap) {
+    if (bytes > chunk_payload) {
+      // Oversize: its own exact-fit overflow chunk, filled completely.
+      // The active bump chunk is left untouched for later requests.
+      Chunk *big = new_chunk(bytes);
+      big->next_overflow = overflow;
+      overflow = big;
+      big->used = bytes;
+      cycle_bytes += bytes;
+      return big->data();
     }
-    c->prev = cur;
-    c->used = 0;
-    cur = c;
-    off = 0;
+    if (cur_overflow == nullptr && cur_index + 1 < chunk_count) {
+      c = chunks[++cur_index];  // warm reuse: next retained chunk
+      c->used = 0;
+    } else if (cur_overflow == nullptr && chunk_count < kMaxRetained) {
+      c = chunks[chunk_count] = new_chunk(chunk_payload);
+      cur_index = chunk_count++;
+    } else {
+      // Retained ceiling reached: bump from overflow chunks for the rest
+      // of this cycle (freed at reset).
+      c = new_chunk(chunk_payload);
+      c->next_overflow = overflow;
+      overflow = c;
+      cur_overflow = c;
+    }
+    active = c;
+    off = align_up(c->used, align);
   }
-  char *p = cur->data() + off;
-  cur->used = off + bytes;
+  char *p = c->data() + off;
+  c->used = off + bytes;
+  cycle_bytes += bytes;
   return p;
 }
 
 void scratch_destroy() {
-  while (cur != nullptr && cur != base_chunk()) {
-    Chunk *prev = cur->prev;
-    if (cur->cap == kChunkSize && spare_count < kSpareChunks) {
-      cur->prev = spare;
-      spare = cur;
-      spare_count++;
-    } else {
-      free(cur);
-    }
-    cur = prev;
+  ensure_init();
+  while (overflow != nullptr) {
+    Chunk *next = overflow->next_overflow;
+    FREE(overflow);
+    overflow = next;
   }
-  base_chunk()->used = 0;
-  if (cur == nullptr) {
-    Chunk *b = base_chunk();
-    b->prev = nullptr;
-    b->cap = kBaseSize;
-    cur = b;
+  cur_overflow = nullptr;
+  cur_index = 0;
+  chunks[0]->used = 0;
+  active = chunks[0];
+  if (cycle_bytes > peak_cycle_bytes) peak_cycle_bytes = cycle_bytes;
+  cycle_bytes = 0;
+  reset_count++;
+}
+
+void scratch_set_chunk_size_for_testing(std::size_t payload) {
+  // Test/bench knob: shrink chunks to force worst-case behavior
+  // (constant advances, oversize spills). Retained chunks of the OLD
+  // size are dropped so the new geometry applies uniformly; chunk 0's
+  // capacity is clamped to its static storage.
+  scratch_destroy();
+  for (int i = 1; i < chunk_count; i++) FREE(chunks[i]);
+  chunk_count = 0;
+  chunk_payload = payload;
+  ensure_init();
+  active = chunks[0];
+}
+
+ScratchStats scratch_stats() {
+  return ScratchStats{cycle_bytes, peak_cycle_bytes, chunk_mallocs, reset_count, chunk_count};
+}
+
+uint64_t scratchpad_status(outbuffer_t *out, int verbose) {
+  std::size_t retained = 0;
+  for (int i = 0; i < chunk_count; i++) retained += sizeof(Chunk) + chunks[i]->cap;
+  // chunk 0 is static storage, not heap.
+  std::size_t heap_retained = retained - (chunk_count > 0 ? sizeof(Chunk) + chunks[0]->cap : 0);
+  if (verbose == 1) {
+    outbuf_add(out, "compile scratchpad:\n");
+    outbuf_add(out, "-------------------------\n");
+    outbuf_addv(out,
+                "Retained chunks:\t\t%4d (%zu bytes, %zu heap)\nPeak compile bytes:\t%zu\n"
+                "Chunk mallocs:\t\t%zu\nCompiles (resets):\t%zu\n",
+                chunk_count, retained, heap_retained, peak_cycle_bytes, chunk_mallocs,
+                reset_count);
+  } else if (verbose != -1) {
+    outbuf_addv(out, "compile scratchpad:\t\t\t%8zu %8zu\n", static_cast<std::size_t>(chunk_count),
+                retained);
   }
+  return heap_retained;
 }
 
 ScratchString *scratch_new_string(std::string_view sv) {
