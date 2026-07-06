@@ -73,8 +73,8 @@
 #define __RC_SANE_EXPLODE_STRING__ CFG_INT(26)
 #define __RC_REVERSIBLE_EXPLODE_STRING__ CFG_INT(27)
 #define __RC_SANE_SORTING__ CFG_INT(28)
-#define __RC_WARN_TAB__ CFG_INT(29)
-#define __RC_WOMBLES__ CFG_INT(30)
+#define __RC_INT_29__ CFG_INT(29) /* was __RC_WARN_TAB__; retired, see rc.cc obsolete-line warning */
+#define __RC_INT_30__ CFG_INT(30) /* was __RC_WOMBLES__; retired, see rc.cc obsolete-line warning */
 #define __RC_CALL_OTHER_TYPE_CHECK__ CFG_INT(31)
 #define __RC_CALL_OTHER_WARN__ CFG_INT(32)
 #define __RC_MUDLIB_ERROR_HANDLER__ CFG_INT(33)

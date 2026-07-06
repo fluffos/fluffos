@@ -47,11 +47,6 @@ void rule_member_list_set_type(LPC_INT basic_type) {
 }
 
 parse_node_t *rule_default_arg_value(parse_node_t *expr) {
-  if (CONFIG_INT(__RC_WOMBLES__)) {
-    if (*(outp - 2) != ':') {
-      yyerror("End of functional not found");
-    }
-  }
   if (current_function_context->num_locals) {
     yyerror("Illegal to use local variable in functional.");
   }

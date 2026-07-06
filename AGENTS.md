@@ -208,3 +208,31 @@ WSL provides a **native Linux** environment. FluffOS runs natively under WSL dis
 > 1. Move or clone the repository into the WSL distribution's native Linux volume (e.g. `/home/user/fluffos`).
 > 2. Use `open-editor-wsl.bat` (see README.md) to relaunch the editor from the native WSL path.
 > 3. Access the native volume in Windows Explorer via `\\wsl.localhost\<distro>\home\user\fluffos`.
+
+---
+
+## 11. Compiler/Internal Guidelines & Standalone Preprocessor
+
+* **`compiler/internal/`**: Contains the compiler front-end, lexer utilities, grammar files, and the standalone LPC preprocessor.
+* **Standalone Preprocessor (`preprocessor.cc` / `preprocessor.h`)**:
+  - Operates entirely on C++ `std::string` and `std::string_view` with zero global state (all state is encapsulated in `LpcPreprocessor::Impl`).
+  - Includes are resolved using `inc_open()`, returning a `std::pair<int, std::string>` containing the open file descriptor and the resolved absolute path. The files are fed into `FileLexStream` to be processed recursively.
+  - Registers built-in macros at instantiation by querying the central predefines registry in `lexer_utils.cc`.
+* **Lexer Utilities (`lexer_utils.cc` / `lexer_utils.h`)**:
+  - Implements include path management, path normalization/merging, and macro predefine registration.
+  - High-performance interfaces: `add_predefine`, `add_quoted_predefine`, and `inc_open` use `std::string_view` to avoid unnecessary heap allocation overhead from temporary string copies.
+  - Include paths (`inc_path`, `inc_list`) are stored as modern C++ containers (`std::vector<std::string>`). They are automatically managed and do not require manual GC marking (`mark_all_defines` is a no-op).
+* **Testing compiler/internal**:
+  - Compiler front-end tests reside in `src/tests/test_compiler.cc`.
+  - When writing tests for features like `#undef` of predefined values, ensure the target predefined macro (e.g. `FLUFFOS`) is added to the global predefines registry using `add_predefine` during test setup, since the full driver runtime is not initialized during unit tests.
+
+---
+
+## 12. Header Inclusion Guidelines
+
+To maintain code health and consistency, FluffOS enforces the following global include rules:
+
+* **First Include ("base/std.h")**: All code files in the driver (excluding files in `src/base/` and package implementations in `src/packages/`) **must** include `"base/std.h"` as their very first line, followed by a blank line to clearly separate it from other includes.
+* **No Other Base Includes**: Other headers inside `src/base/` should not be included directly. Headers inside `src/base/internal/` must include necessary dependencies themselves.
+* **Package Include ("base/package_api.h")**: All package source files must include `"base/package_api.h"` as their first header, and **must not** include `"base/std.h"` again.
+

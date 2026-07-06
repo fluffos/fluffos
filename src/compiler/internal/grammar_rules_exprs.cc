@@ -770,11 +770,6 @@ void rule_primary_expr_anon_func(parse_node_t **result, func_block_t *saved_bloc
 }
 
 void rule_primary_expr_functional_1(parse_node_t **result, LPC_INT val) {
-  if (CONFIG_INT(__RC_WOMBLES__)) {
-    if (*(outp - 2) != ':') {
-      yyerror("End of functional not found");
-    }
-  }
   *result = new_node();
   (*result)->kind = NODE_FUNCTION_CONSTRUCTOR;
   (*result)->type = TYPE_FUNCTION;
@@ -807,11 +802,6 @@ void rule_primary_expr_functional_1(parse_node_t **result, LPC_INT val) {
 }
 
 void rule_primary_expr_functional_2(parse_node_t **result, LPC_INT val, parse_node_t *opt_arg_list) {
-  if (CONFIG_INT(__RC_WOMBLES__)) {
-    if (*(outp - 2) != ':') {
-      yyerror("End of functional not found");
-    }
-  }
   *result = new_node();
   (*result)->kind = NODE_FUNCTION_CONSTRUCTOR;
   (*result)->type = TYPE_FUNCTION;
@@ -890,11 +880,6 @@ void rule_primary_expr_functional_2(parse_node_t **result, LPC_INT val, parse_no
 }
 
 void rule_primary_expr_functional_3(parse_node_t **result, parse_node_t *expr) {
-  if (CONFIG_INT(__RC_WOMBLES__)) {
-    if (*(outp - 2) != ':') {
-      yyerror("End of functional not found");
-    }
-  }
   if (current_function_context->num_locals)
     yyerror("Illegal to use local variable in functional.");
   if (current_function_context->values_list->r.expr)
@@ -913,20 +898,10 @@ void rule_primary_expr_functional_3(parse_node_t **result, parse_node_t *expr) {
 }
 
 void rule_primary_expr_mapping(parse_node_t **result, parse_node_t *opt_arg_list) {
-  if (CONFIG_INT(__RC_WOMBLES__)) {
-    if (*(outp - 2) != ']') {
-      yyerror("End of mapping not found");
-    }
-  }
   CREATE_CALL(*result, F_AGGREGATE_ASSOC, TYPE_MAPPING, opt_arg_list);
 }
 
 void rule_primary_expr_array(parse_node_t **result, parse_node_t *opt_arg_list) {
-  if (CONFIG_INT(__RC_WOMBLES__)) {
-    if (*(outp - 2) != '}') {
-      yyerror("End of array not found");
-    }
-  }
   CREATE_CALL(*result, F_AGGREGATE, TYPE_ANY | TYPE_MOD_ARRAY, opt_arg_list);
 }
 

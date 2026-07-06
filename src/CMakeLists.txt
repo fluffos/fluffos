@@ -71,12 +71,11 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL
 
   # Sanitizer support
   if (ENABLE_SANITIZER)
-    add_compile_options("-fsanitize=address")
-    #add_compile_options("-fsanitize=undefined")
+    add_compile_options("-fsanitize=address,undefined")
+    add_compile_options("-fno-sanitize-recover=all")
     add_compile_options("-fno-common")
 
-    add_link_options("-fsanitize=address")
-    #add_link_options("-fsanitize=undefined")
+    add_link_options("-fsanitize=address,undefined")
   else ()
     add_compile_options(
       "-D_FORTIFY_SOURCE=2"
@@ -384,6 +383,30 @@ else()
           "${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.h")
 endif()
 
+# ── Flex (LPC lexer) ──────────────────────────────────────────────────────
+find_package(FLEX 2.6)
+if (FLEX_FOUND)
+  message(STATUS "FLEX: ${FLEX_VERSION}")
+  FLEX_TARGET(LpcLexer
+    "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/lex.l"
+    "${CMAKE_CURRENT_BINARY_DIR}/lex.autogen.cc"
+    COMPILE_FLAGS "-Ca"
+  )
+  ADD_FLEX_BISON_DEPENDENCY(LpcLexer Grammar)
+  set(GENERATED_LEXER_FILE "${FLEX_LpcLexer_OUTPUTS}")
+else()
+  message(STATUS "FLEX: not found, using pre-generated source.")
+  add_custom_command(
+    OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/lex.autogen.cc"
+    COMMAND "${CMAKE_COMMAND}" -E copy
+            "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/lex.autogen.cc"
+            "${CMAKE_CURRENT_BINARY_DIR}/lex.autogen.cc"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/lex.autogen.cc"
+  )
+  set(GENERATED_LEXER_FILE "${CMAKE_CURRENT_BINARY_DIR}/lex.autogen.cc")
+endif()
+# ─────────────────────────────────────────────────────────────────────────
+
 set(SRC
   "backend.cc"
   "comm.cc"
@@ -419,10 +442,13 @@ set(SRC
   "compiler/internal/grammar_rules_switch.cc"
   "compiler/internal/grammar_rules_exprs.cc"
   "compiler/internal/compiler.cc"
+  "compiler/internal/compiler_utils.cc"
   "compiler/internal/disassembler.cc"
   "compiler/internal/generate.cc"
   "compiler/internal/icode.cc"
-  "compiler/internal/lex.cc"
+  "${GENERATED_LEXER_FILE}"          # Flex-generated lex.autogen.cc
+  "compiler/internal/lexer_utils.cc" # global state + helpers lex.l calls into, plus predefines/include-path support
+  "compiler/internal/preprocessor.cc"
   "compiler/internal/scratchpad.cc"
   "compiler/internal/trees.cc"
   "vm/internal/base/apply_cache.cc"
@@ -474,7 +500,11 @@ if (CYGWIN)
   set(USE_JEMALLOC OFF)
   message(STATUS "JEMALLOC is not supported on CYGWIN.")
 endif ()
-if(ENABLE_SANITIZER)
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(USE_JEMALLOC OFF)
+  message(STATUS "Debug build, force disabling JEMALLOC!")
+endif ()
+if (ENABLE_SANITIZER)
   set(USE_JEMALLOC OFF)
   message(STATUS "AddressSanitizer doesn't work with JEMALLOC, force disabling!")
 endif()
@@ -605,6 +635,14 @@ if (${BISON_FOUND})
           COMMAND "${CMAKE_COMMAND}" -D ACTION=NORMALIZE -D FILE_IN="${BISON_Grammar_OUTPUT_SOURCE}" -D FILE_OUT="${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.autogen.cc" -D REPO_ROOT="${CMAKE_SOURCE_DIR}" -P "${CMAKE_SOURCE_DIR}/cmake/util.cmake"
           COMMAND "${CMAKE_COMMAND}" -D ACTION=NORMALIZE -D FILE_IN="${BISON_Grammar_OUTPUT_HEADER}" -D FILE_OUT="${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.autogen.h" -D REPO_ROOT="${CMAKE_SOURCE_DIR}" -P "${CMAKE_SOURCE_DIR}/cmake/util.cmake"
           COMMENT "Copying and sanitizing generated grammar files")
+endif()
+
+if (FLEX_FOUND)
+  add_custom_command(TARGET "driver" POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy
+            "${CMAKE_CURRENT_BINARY_DIR}/lex.autogen.cc"
+            "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/lex.autogen.cc"
+    COMMENT "Copying Flex-generated lex.autogen.cc to source tree")
 endif()
 
 find_package(GTest)

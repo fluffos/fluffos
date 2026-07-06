@@ -13,6 +13,17 @@ if(${GTEST_FOUND})
   target_link_libraries(ofile_tests PRIVATE ${FLUFFOS_LINK} GTest::GTest  GTest::Main)
   target_compile_definitions(ofile_tests PRIVATE -DTESTSUITE_DIR="${CMAKE_SOURCE_DIR}/testsuite")
 
-  gtest_discover_tests(lpc_tests ofile_tests DISCOVERY_TIMEOUT 60)
+  add_executable(compiler_tests test_compiler.cc)
+  target_link_libraries(compiler_tests PRIVATE ${FLUFFOS_LINK} GTest::GTest GTest::Main)
+  target_compile_definitions(compiler_tests PRIVATE -DTESTSUITE_DIR="${CMAKE_SOURCE_DIR}/testsuite")
+
+  add_executable(lexer_tests test_lexer.cc)
+  target_link_libraries(lexer_tests PRIVATE ${FLUFFOS_LINK} GTest::GTest GTest::Main)
+  target_compile_definitions(lexer_tests PRIVATE -DTESTSUITE_DIR="${CMAKE_SOURCE_DIR}/testsuite")
+
+  gtest_discover_tests(lpc_tests DISCOVERY_TIMEOUT 60)
+  gtest_discover_tests(ofile_tests DISCOVERY_TIMEOUT 60)
+  gtest_discover_tests(compiler_tests DISCOVERY_TIMEOUT 60)
+  gtest_discover_tests(lexer_tests DISCOVERY_TIMEOUT 60)
 endif()
 
