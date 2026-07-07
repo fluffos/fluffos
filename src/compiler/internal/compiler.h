@@ -2,6 +2,7 @@
 #define COMPILER_H
 
 #include <memory>
+#include <unordered_map>
 #include <string>
 #include <vector>
 
@@ -327,15 +328,44 @@ struct Diagnostic {
 // Legacy spellings below are inline references into it, so call sites keep
 // their established names while the storage lives in one object.
 // ---------------------------------------------------------------------------
-struct LexerSession;
+// One level of the #if/#ifdef conditional stack: whether this level's
+// current branch emits, and whether ANY branch of it has been true yet
+// (so a later #elif/#else knows not to fire).
+struct CondState {
+    bool emitting;
+    bool had_true;
+};
+
+// PpMacro — one macro entry
+struct PpMacro {
+    bool is_function_like = false;
+    bool is_predefined = false;
+    std::vector<std::string> params;  // parameter names (function-like only)
+    std::string body;                 // replacement body
+    // Definition site, for diagnostics ("during expansion of macro 'F'
+    // (defined at file:line)", "previous definition was at ..."). Empty
+    // file for predefines/builtins (no source location).
+    std::string def_file;
+    int def_line = 0;
+};
+
+// The #define table: name -> macro. A plain map -- every operation used on
+// it is stock unordered_map surface.
+using LpcMacroTable = std::unordered_map<std::string, PpMacro>;
+
 struct CompileState {
   // Identity of the running compile; filename null outside any compile.
   const char *filename = nullptr;
   vm_context_t *vm_context = nullptr;  // null => no VM interactions allowed
 
-  // Preprocessor persistence unit (macro table + conditional stack).
-  // shared_ptr so a REPL can keep #define state alive across chunks.
-  std::shared_ptr<LexerSession> pp;
+  // Preprocessor state, held DIRECTLY (no session object): the user
+  // #define table (predefines never enter it -- see lexer_rules_pp.h)
+  // and the #if conditional stack. start_new_file() clears them
+  // (capacity retained -- no per-compile allocation); pass
+  // keep_macros=true to retain #defines across REPL chunks.
+  LpcMacroTable macros;
+  std::vector<CondState> conds;
+  bool pp_active = false;  // set once the first compile starts
 
   // Structured diagnostics stream + one-shot context.
   std::vector<Diagnostic> diags;

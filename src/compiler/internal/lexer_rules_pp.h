@@ -22,22 +22,8 @@
 #include "compiler/internal/compiler.h"
 #include "compiler/internal/scratchpad.h"
 
-// PpMacro — one macro entry
-struct PpMacro {
-    bool is_function_like = false;
-    bool is_predefined = false;
-    std::vector<std::string> params;  // parameter names (function-like only)
-    std::string body;                 // replacement body
-    // Definition site, for diagnostics ("during expansion of macro 'F'
-    // (defined at file:line)", "previous definition was at ..."). Empty
-    // file for predefines/builtins (no source location).
-    std::string def_file;
-    int def_line = 0;
-};
-
-// The #define table: name -> macro. A plain map -- every operation used on
-// it is stock unordered_map surface.
-using LpcMacroTable = std::unordered_map<std::string, PpMacro>;
+// PpMacro / CondState / LpcMacroTable live in compiler.h (they are
+// CompileState members).
 
 // Helpers
 ScratchString normalize_filename(const char* filename);
@@ -67,30 +53,23 @@ ScratchString substitute(std::string_view body,
 // returns 0.
 long lpc_lex_eval_if_expr(std::string_view expr, void* yyscanner);
 
-// One level of the #if/#ifdef conditional stack: whether this level's
-// current branch emits, and whether ANY branch of it has been true yet
-// (so a later #elif/#else knows not to fire).
-struct CondState {
-    bool emitting;
-    bool had_true;
-};
 
-struct LexerSession {
-    LpcMacroTable macros;
-    std::vector<CondState> conds;
+// There is NO session object. The preprocessor state lives directly in
+// g_compile: `macros` holds USER #defines only (predefines are immutable
+// -- redefining or #undef'ing one is an error -- so they never enter the
+// per-compile table; lookups fall back to a shared table derived once
+// from the boot predefine registry, rebuilt only when the registry's
+// version changes). start_new_file() clears conds and, unless the caller
+// asks to keep macros (REPL chunk persistence), clears the user table --
+// capacity is retained, so a steady-state compile allocates NOTHING for
+// preprocessor setup (the old per-compile session heap-copied the whole
+// predefine registry).
 
-    void add_builtin_macros();
-
-    static std::shared_ptr<LexerSession> make_session() {
-        auto session = std::make_shared<LexerSession>();
-        session->add_builtin_macros();
-        return session;
-    }
-};
-
-// The active preprocessor state IS g_compile.pp (compiler.h); this
-// legacy spelling is an inline reference into it.
-inline std::shared_ptr<LexerSession> &current_session = g_compile.pp;
+// Unified macro lookup: user table first, then the predefine table.
+// Returned pointer is valid until the next #define/#undef.
+const PpMacro *pp_find_macro(std::string_view name);
+// True when `name` names a predefine (or __FILE__/__LINE__/__DIR__).
+bool pp_is_predefined(std::string_view name);
 
 // True when every level of the #if/#ifdef conditional stack is emitting
 // (i.e. the scanner is not inside a false branch). Vacuously true with no

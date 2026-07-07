@@ -417,9 +417,7 @@ long ifexpr_pull_defined(bool efun_form, void* yyscanner, bool* ended) {
         if (efun_form) {
             result = (lookup_predef(name.c_str()) >= 0) ? 1 : 0;
         } else {
-            result = (current_session &&
-                      current_session->macros.count(std::string(name.data(), name.size())) != 0)
-                         ? 1 : 0;
+            result = pp_find_macro(std::string_view(name.data(), name.size())) != nullptr ? 1 : 0;
         }
     }
     if (paren) {
@@ -520,23 +518,54 @@ long lpc_lex_eval_if_expr(std::string_view expr, void* yyscanner) {
     return result;
 }
 
-void LexerSession::add_builtin_macros() {
-    const auto& predefs = get_predefines();
-    for (const auto& pair : predefs) {
-        PpMacro m;
-        m.is_function_like = pair.second.is_function_like;
-        m.is_predefined = true;
-        m.body = pair.second.body;
-        macros[pair.first] = std::move(m);
+// The shared predefine table: a PpMacro-shaped view of the boot predefine
+// registry plus the three builtins. Built lazily and rebuilt ONLY when
+// the registry's version changes (tests register predefines after boot);
+// per-compile setup copies NOTHING -- the old session heap-copied this
+// entire table on every compile.
+static const LpcMacroTable &predefine_macros() {
+    static LpcMacroTable table;
+    static unsigned built_version = 0;
+    unsigned v = get_predefines_version();
+    if (built_version != v) {
+        table.clear();
+        for (const auto &pair : get_predefines()) {
+            PpMacro m;
+            m.is_function_like = pair.second.is_function_like;
+            m.is_predefined = true;
+            m.body = pair.second.body;
+            table[pair.first] = std::move(m);
+        }
+        table["__FILE__"] = PpMacro{false, true, {}, ""};
+        table["__LINE__"] = PpMacro{false, true, {}, ""};
+        table["__DIR__"] = PpMacro{false, true, {}, ""};
+        built_version = v;
     }
-    macros["__FILE__"] = PpMacro{false, true, {}, ""};
-    macros["__LINE__"] = PpMacro{false, true, {}, ""};
-    macros["__DIR__"] = PpMacro{false, true, {}, ""};
+    return table;
+}
+
+const PpMacro *pp_find_macro(std::string_view name) {
+    // Reused key: the tables are std::string-keyed (persistent state);
+    // one static key avoids a heap allocation per lookup. The compiler
+    // is single-threaded and non-reentrant.
+    static std::string key;
+    key.assign(name.data(), name.size());
+    auto it = g_compile.macros.find(key);
+    if (it != g_compile.macros.end()) return &it->second;
+    const auto &pre = predefine_macros();
+    auto pit = pre.find(key);
+    if (pit != pre.end()) return &pit->second;
+    return nullptr;
+}
+
+bool pp_is_predefined(std::string_view name) {
+    const PpMacro *m = pp_find_macro(name);
+    return m != nullptr && m->is_predefined;
 }
 
 bool lpc_lex_emitting() {
-    if (!current_session) return true;
-    for (const auto& cs : current_session->conds) {
+    if (!g_compile.pp_active) return true;
+    for (const auto& cs : g_compile.conds) {
         if (!cs.emitting) return false;
     }
     return true;
@@ -578,7 +607,7 @@ bool lpc_lex_builtin_macro(std::string_view name, ScratchString* out) {
 }
 
 ScratchString lpc_lex_expand_string(std::string_view text, ScratchVector<ScratchString> guard) {
-    if (!current_session) return ScratchString(text);
+    if (!g_compile.pp_active) return ScratchString(text);
     ScratchString result;
     size_t i = 0;
     while (i < text.size()) {
@@ -610,9 +639,9 @@ ScratchString lpc_lex_expand_string(std::string_view text, ScratchVector<Scratch
                 if (g == id) { guarded = true; break; }
             }
 
-            auto it = current_session->macros.find(std::string(id));
-            if (!guarded && it != current_session->macros.end()) {
-                const PpMacro& m = it->second;
+            const PpMacro *found = pp_find_macro(id);
+            if (!guarded && found != nullptr) {
+                const PpMacro& m = *found;
                 if (!m.is_function_like) {
                     auto g2 = guard; g2.emplace_back(id);
                     result += lpc_lex_expand_string(m.body, g2);
@@ -681,11 +710,11 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
             std::string_view name = rest.substr(ns, idx - ns);
             if (name.empty()) { lexerror("#define: missing name"); return; }
 
-            auto existing = current_session->macros.find(std::string(name));
-            if (existing != current_session->macros.end() && existing->second.is_predefined) {
+            if (pp_is_predefined(name)) {
                 lexerror("Illegal to redefine a predefined value.");
                 return;
             }
+            auto existing = g_compile.macros.find(std::string(name));
 
             PpMacro m;
             if (idx < rest.size() && rest[idx] == '(') {
@@ -715,7 +744,7 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
                 return;
             }
 
-            if (existing != current_session->macros.end() && !existing->second.is_predefined) {
+            if (existing != g_compile.macros.end()) {
                 if (std::string_view(existing->second.body) != std::string_view(body)) {
                     // Redefining a macro with a different body is ALLOWED
                     // (the new definition takes effect below) -- it is a
@@ -740,28 +769,25 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
             m.def_file = current_file != nullptr ? current_file : "";
             m.def_line = compiler_directive_start_line;
             m.body.assign(body.data(), body.size());
-            current_session->macros[std::string(name)] = std::move(m);
+            g_compile.macros[std::string(name)] = std::move(m);
         }
     } else if (dir == "undef") {
         if (lpc_lex_emitting()) {
             std::string name(trim(rest));
-            auto it = current_session->macros.find(name);
-            if (it != current_session->macros.end()) {
-                if (it->second.is_predefined) {
-                    lexerror("Illegal to #undef a predefined value.");
-                } else {
-                    current_session->macros.erase(name);
-                }
+            if (pp_is_predefined(name)) {
+                lexerror("Illegal to #undef a predefined value.");
+            } else {
+                g_compile.macros.erase(name);
             }
         }
     } else if (dir == "ifdef") {
-        bool def = current_session->macros.count(std::string(trim(rest))) > 0;
+        bool def = pp_find_macro(trim(rest)) != nullptr;
         bool emit = lpc_lex_emitting() && def;
-        current_session->conds.push_back({emit, emit});
+        g_compile.conds.push_back({emit, emit});
     } else if (dir == "ifndef") {
-        bool def = current_session->macros.count(std::string(trim(rest))) > 0;
+        bool def = pp_find_macro(trim(rest)) != nullptr;
         bool emit = lpc_lex_emitting() && !def;
-        current_session->conds.push_back({emit, emit});
+        g_compile.conds.push_back({emit, emit});
     } else if (dir == "if") {
         bool cond = false;
         if (lpc_lex_emitting()) {
@@ -773,13 +799,13 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
                 cond = (lpc_lex_eval_if_expr(trimmed, yyscanner) != 0);
             }
         }
-        current_session->conds.push_back({cond, cond});
+        g_compile.conds.push_back({cond, cond});
     } else if (dir == "elif") {
-        if (current_session->conds.empty()) {
+        if (g_compile.conds.empty()) {
             lexerror("unexpected #elif");
         } else {
-            bool had = current_session->conds.back().had_true;
-            current_session->conds.pop_back();
+            bool had = g_compile.conds.back().had_true;
+            g_compile.conds.pop_back();
             bool outer = lpc_lex_emitting();
             bool cond = false;
             if (outer && !had) {
@@ -792,22 +818,22 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
                 }
             }
             bool now = outer && !had && cond;
-            current_session->conds.push_back({now, had || now});
+            g_compile.conds.push_back({now, had || now});
         }
     } else if (dir == "else") {
-        if (current_session->conds.empty()) {
+        if (g_compile.conds.empty()) {
             lexerror("unexpected #else");
         } else {
-            bool had = current_session->conds.back().had_true;
-            current_session->conds.pop_back();
+            bool had = g_compile.conds.back().had_true;
+            g_compile.conds.pop_back();
             bool now = lpc_lex_emitting() && !had;
-            current_session->conds.push_back({now, true});
+            g_compile.conds.push_back({now, true});
         }
     } else if (dir == "endif") {
-        if (current_session->conds.empty()) {
+        if (g_compile.conds.empty()) {
             lexerror("unexpected #endif");
         } else {
-            current_session->conds.pop_back();
+            g_compile.conds.pop_back();
         }
     } else if (dir == "include") {
         if (lpc_lex_emitting()) {
@@ -887,7 +913,7 @@ LpcDirectiveAction lpc_lex_on_directive(const char* text, int len, void* yyscann
     // here (the terminating newline is the lexer.l rule's job, not ours).
     count_directive_newlines(text, len);
 
-    if (!current_session) return LpcDirectiveAction::kNone;
+    if (!g_compile.pp_active) return LpcDirectiveAction::kNone;
 
     // Fold + parse the captured line exactly once: both the skip-mode
     // classification and the full dispatch below read the same name/rest.

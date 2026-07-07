@@ -116,7 +116,6 @@ int num_parse_error; /* Number of errors in the parser. */
 lpc_predef_t *lpc_predefs = nullptr;
 
 static void push_arena_string(ScratchString &s, int kind, void *yyscanner);
-// current_session is an alias for g_compile.pp (compiler.h / lexer_rules_pp.h).
 
 int lex_fatal;
 
@@ -715,17 +714,12 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yyll
   // splice buffer that yytext points into (freeing it), so every later
   // use of the identifier's spelling must go through this copy.
   const ScratchString text(yyget_text(yyscanner));
-  if (current_session && !yyextra->suppress_expansion && !lpc_lex_name_guarded(text)) {
+  if (g_compile.pp_active && !yyextra->suppress_expansion && !lpc_lex_name_guarded(text)) {
     // (A name guarded by a live expansion buffer resolves as a plain
     // identifier -- self-reference termination, C-preprocessor style.)
-    // The macro table stays std::string-keyed (persistent global state);
-    // one reused key avoids a heap allocation per identifier. The
-    // compiler is single-threaded and non-reentrant.
-    static std::string macro_lookup_key;
-    macro_lookup_key.assign(text.data(), text.size());
-    auto it = current_session->macros.find(macro_lookup_key);
-    if (it != current_session->macros.end()) {
-      const PpMacro& m = it->second;
+    const PpMacro *found = pp_find_macro(std::string_view(text.data(), text.size()));
+    if (found != nullptr) {
+      const PpMacro& m = *found;
       if (static_cast<int>(expansion_frames.size()) >= MAX_EXPANSION_NESTING) {
         lexerror("Macro expansion nested too deep");
       } else if (!m.is_function_like) {
@@ -1056,12 +1050,12 @@ int lpc_lex_badlex(unsigned char c, void *yyscanner) {
 // file (include buffers pop in the <<EOF>> rule itself before this is
 // ever reached). Returns -1, the compile loop's end-of-tokens signal.
 int parseMainEof(union YYSTYPE *yylval_param, void *yyscanner) {
-  if (current_session && !current_session->conds.empty()) {
+  if (g_compile.pp_active && !g_compile.conds.empty()) {
     yyerror("Missing #endif");
     // Recover the session: leaving the conditional stack non-empty would
     // make lpc_lex_emitting() false forever, silently skipping ALL input
     // of any later chunk fed through the same (e.g. REPL) session.
-    current_session->conds.clear();
+    g_compile.conds.clear();
   }
   return -1;
 }
@@ -1144,10 +1138,9 @@ void lpc_lex_teardown_active(void) {
 }
 
 static void start_new_file_prepared(char *prepared_base, size_t prepared_body,
-                                    void *yyscanner, std::shared_ptr<LexerSession> session);
+                                    void *yyscanner, bool keep_macros);
 
-void start_new_file(std::string_view source, void *yyscanner,
-                     std::shared_ptr<LexerSession> session) {
+void start_new_file(std::string_view source, void *yyscanner, bool keep_macros) {
   // Prepare an arena block from the caller's view: copy + trailing-'\n'
   // guarantee + the two yy_scan_buffer sentinels.
   bool add_nl = !source.empty() && source.back() != '\n';
@@ -1157,30 +1150,36 @@ void start_new_file(std::string_view source, void *yyscanner,
   if (add_nl) base[source.size()] = '\n';
   base[body] = 0;
   base[body + 1] = 0;
-  start_new_file_prepared(base, body, yyscanner, std::move(session));
+  start_new_file_prepared(base, body, yyscanner, keep_macros);
 }
 
-bool start_new_file_fd(int fd, void *yyscanner, std::shared_ptr<LexerSession> session) {
+bool start_new_file_fd(int fd, void *yyscanner, bool keep_macros) {
   // Zero-copy main file: read(2) lands the bytes directly in the arena
   // block that flex scans in place.
   auto [base, body] = scratch_slurp_fd_prepared(fd);
   if (base == nullptr) {
     return false;
   }
-  start_new_file_prepared(base, body, yyscanner, std::move(session));
+  start_new_file_prepared(base, body, yyscanner, keep_macros);
   return true;
 }
 
 static void start_new_file_prepared(char *prepared_base, size_t prepared_body,
-                                    void *yyscanner, std::shared_ptr<LexerSession> session) {
+                                    void *yyscanner, bool keep_macros) {
   if (!main_filename && current_file) {
     main_filename = make_shared_string(current_file);
   }
 
-  if (!session) {
-    session = LexerSession::make_session();
+  // Preprocessor state reset -- NO allocation: conds clear (capacity
+  // retained); the user macro table clears unless the caller keeps it
+  // across REPL chunks. Predefines live in the shared fallback table and
+  // never needed copying here (the old per-compile session heap-copied
+  // the whole predefine registry).
+  g_compile.conds.clear();
+  if (!keep_macros) {
+    g_compile.macros.clear();
   }
-  current_session = std::move(session);
+  g_compile.pp_active = true;
 
   // Fresh diagnostics per compile / per REPL chunk -- same boundary on
   // which num_parse_error is effectively reset by the callers. Stale
@@ -1659,6 +1658,7 @@ std::unordered_map<std::string, PredefMacro> predefines;
 
 std::vector<std::string> inc_list;
 std::vector<std::string> inc_path;
+unsigned predefines_version = 1;
 
 std::string merge(std::string_view name) {
     if (name.empty()) return "";
@@ -1724,6 +1724,7 @@ std::string merge(std::string_view name) {
 // ---------------------------------------------------------------------------
 
 void add_predefine(std::string_view name, int nargs, std::string_view exps) {
+  predefines_version++;
     PredefMacro m;
     m.is_function_like = (nargs >= 0);
     m.nargs = nargs;
@@ -1732,6 +1733,7 @@ void add_predefine(std::string_view name, int nargs, std::string_view exps) {
 }
 
 void add_quoted_predefine(std::string_view def, std::string_view val) {
+  predefines_version++;
     std::string quoted;
     quoted.reserve(val.size() + 2);
     quoted += '"';
@@ -1739,6 +1741,8 @@ void add_quoted_predefine(std::string_view def, std::string_view val) {
     quoted += '"';
     add_predefine(def, -1, quoted);
 }
+
+unsigned get_predefines_version() { return predefines_version; }
 
 const std::unordered_map<std::string, PredefMacro>& get_predefines() {
     return predefines;
