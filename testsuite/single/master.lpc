@@ -155,7 +155,7 @@ void preload(string file)
   int t1;
   string err;
 
-  if (file_size(file + ".c") == -1)
+  if (file_size(file + ".lpc") == -1 && file_size(file + ".c") == -1)
     return;
 
   t1 = time();
@@ -271,7 +271,7 @@ staticf void error_handler(mapping map, int flag) {
   string str;
 
   /* Squelch the expected eval_cost errors thrown by the call_out tests */
-  if (map["program"] == "/single/tests/efuns/call_out.c" &&
+  if (map["program"] == "/single/tests/efuns/call_out.lpc" &&
       map["error"] == "*Too long evaluation. Execution aborted.\n")
   {
     return;
@@ -299,15 +299,19 @@ mixed get_include_path(string file)
   {
     case "/clone/mgip1":
     case "/clone/mgip1.c":
+    case "/clone/mgip1.lpc":
       return ({ "/include/m_gip1", "/include" });
     case "/clone/mgip2":
     case "/clone/mgip2.c":
+    case "/clone/mgip2.lpc":
       return ({ "/include/m_gip2", "/include" });
     case "/clone/mgip3":
     case "/clone/mgip3.c":
+    case "/clone/mgip3.lpc":
       return ({ "/include", "/include/m_gip1" });
     case "/clone/mgip4":
     case "/clone/mgip4.c":
+    case "/clone/mgip4.lpc":
       return ({});          // should yield error message
     default:
       return ({ ":DEFAULT:" });;

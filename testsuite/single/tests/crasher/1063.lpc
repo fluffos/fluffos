@@ -3,7 +3,7 @@ void do_tests() {
   string path;
 
   // Loading an object and making sure it is correctly loaded
-  path = base_name() + "-aux.c";
+  path = base_name() + "-aux.lpc";
   ob = load_object(path);
   all = children(path);
   ASSERT_EQ(sizeof(all), 1);

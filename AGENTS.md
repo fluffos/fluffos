@@ -18,9 +18,9 @@ FluffOS is a high-performance LPMUD driver and game engine. Its codebase is stru
   - `vm.cc`: VM startup and master object callbacks.
 * **`src/compiler/`**: The LPC parser, compiler, and code generator.
   - `grammar.y` / `grammar.autogen.cc`: Bison rules compiling LPC scripts to bytecode.
-  - `lex.cc` / `generate.cc`: Lexer and VM instructions generator.
+  - `lexer.l` / `generate.cc`: Lexer and VM instructions generator.
 * **`src/packages/`**: Modular packages implementing C++ external functions (efuns).
-* **`testsuite/`**: Core LPC test cases, std library objects, and configurations. Note: Although these files use the `.c` extension, they are written in LPC, not standard C.
+* **`testsuite/`**: Core LPC test cases, std library objects, and configurations (see `testsuite/README.md`). LPC sources use the `.lpc` extension; the driver resolves an explicit `.c`/`.lpc` exactly and prefers `.lpc` (falling back to `.c`) for extension-less names — pinned by `testsuite/single/tests/efuns/dual_extension.lpc`.
 
 ---
 
@@ -132,6 +132,13 @@ When editing compiler, VM, or package features, keep these structural mechanics 
 ### Mudlib vs Driver Separation
 * **The Driver (FluffOS)**: Written in C++, executes as the operating system, virtual machine, and compiler for LPC. It exposes built-in commands as "external functions" (efuns).
 * **The Mudlib**: Written in LPC, contains the game logic, rooms, user logins, and rule definitions. It sits in a separate folder (e.g. `testsuite/` or game folders) and is loaded by the driver.
+
+### Source File Extensions (`.lpc` / `.c`)
+* LPC source files may use either `.lpc` (preferred) or `.c` (legacy). Resolution, implemented in `load_object()` (`src/vm/internal/simulate.cc`) and pinned by `testsuite/single/tests/efuns/dual_extension.lpc`:
+  - An **explicit extension is exact** — `load_object("/foo.c")` probes only `foo.c`; no `.lpc` lookup, and vice versa. On a miss the master's `compile_object()` virtual hook gets the *stripped* name; if it declines, the load returns `0`.
+  - **Extension-less names prefer `.lpc`, fall back to `.c`.**
+  - **Object identity is extension-blind**: object names carry no extension (`filename_to_obname()` and `otable.cc basename()` strip either spelling), so any spelling of a loaded object's name finds it — the registry is consulted before the filesystem. `prog->filename` keeps the real extension of the compiled file.
+* Do **not** append `".c"` to names before loading (the old pattern); pass names through and let `load_object()` resolve. Suffix handling in `save_object`/`restore_object`, `replace_program()`, `function_exists()`, and `children()` must treat both spellings equivalently.
 
 ### Simulated Efunctions (Simul_efuns)
 * If an object makes a global function call (e.g. `foo()`) that is not declared inside the object and is not a built-in driver efun, the compiler resolves it as a simulated efun call.

@@ -1514,7 +1514,9 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
   }
 
   len = strlen(file);
-  if (file[len - 2] == '.' && file[len - 1] == 'c') {
+  if (len > 4 && strcmp(file + len - 4, ".lpc") == 0) {
+    len -= 4;
+  } else if (len > 2 && file[len - 2] == '.' && file[len - 1] == 'c') {
     len -= 2;
   }
 
@@ -1543,13 +1545,11 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
     error("Denied write permission in save_object().\n");
   }
 
-  strcpy(save_name, ob->obname);
+  // Record the program's ACTUAL source file (carries the real .lpc/.c
+  // extension) instead of guessing an extension onto the object name.
+  strcpy(save_name, ob->prog->filename);
   if ((p = strrchr(save_name, '#')) != nullptr) {
     *p = '\0';
-  }
-  p = save_name + strlen(save_name) - 1;
-  if (*p != 'c' && *(p - 1) != '.') {
-    strcat(p, ".c");
   }
 
   /*
@@ -1623,13 +1623,10 @@ int save_object_str(object_t *ob, int save_zeros, char *saved, int size) {
   }
   strcpy(now, "#/");
   now += 2;
-  strcpy(now, ob->obname);
+  // Same as save_object: the program's real source name, no guessing.
+  strcpy(now, ob->prog->filename);
   if ((p = strrchr(now, '#')) != nullptr) {
     *p = '\0';
-  }
-  p = now + strlen(now) - 1;
-  if (*p != 'c' && *(p - 1) != '.') {
-    strcat(p, ".c");
   }
   now = now + strlen(now);
   *now++ = '\n';
@@ -1707,8 +1704,10 @@ int restore_object(object_t *ob, const char *file, int noclear) {
 
   std::string filename(file);
 
-  // First get rid of all extensions.
-  if (ends_with(filename, ".c")) {
+  // First get rid of all extensions (both source spellings).
+  if (ends_with(filename, ".lpc")) {
+    filename = filename.substr(0, filename.length() - 4);
+  } else if (ends_with(filename, ".c")) {
     filename = filename.substr(0, filename.length() - 2);
   } else if (ends_with(filename, SAVE_EXTENSION)) {
     filename = filename.substr(0, filename.length() - strlen(SAVE_EXTENSION));

@@ -1,7 +1,7 @@
 void do_tests() {
     string foo, mid, all;
 
-    ASSERT(cp("/single/master.c", "/testfile"));
+    ASSERT(cp("/single/master.lpc", "/testfile"));
 
     rm("/testfile.zerolength");
     write_file("/testfile.zerolength", "");

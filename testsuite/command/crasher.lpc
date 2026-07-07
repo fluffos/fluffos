@@ -384,7 +384,7 @@ nosave mixed *_values = ({
     "    !",
 
     /* --- Objekte: --- */
-    clone_object("/clone/login.c"),
+    clone_object("/clone/login"),
     this_object(),
     previous_object(),
     find_object("/single/master.c"),
@@ -395,7 +395,7 @@ nosave mixed *_values = ({
     (: sizeof :),
     (: efun::input_to :),
     (: error("123") :),
-    (: clone_object("/clone/login.c") :),
+    (: clone_object("/clone/login") :),
 
     /* --- Arrays: --- */
     ({ }),
@@ -404,14 +404,14 @@ nosave mixed *_values = ({
     ({ ({ }) }),
     ({ ([ ]) }),
     ({ (: 1 :) }),
-    (: clone_object("/clone/login.c") :),
+    (: clone_object("/clone/login") :),
 
     //allocate(3000),
 
     /* --- Mappings: --- */
     ([ ]),
     ([ 1 : (: 1 :) ]),
-    ([ clone_object("/clone/login.c"): (: sizeof :) ]),
+    ([ clone_object("/clone/login"): (: sizeof :) ]),
 
     //allocate_mapping(200),
 });

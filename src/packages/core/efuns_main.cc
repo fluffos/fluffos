@@ -672,7 +672,12 @@ void f_function_exists() {
   str = function_exists(sp->u.string, ob, flag);
   free_string_svalue(sp);
   if (str) {
-    l = SHARED_STRLEN(str) - 2; /* no .c */
+    l = SHARED_STRLEN(str); /* strip the source extension (.lpc or .c) */
+    if (l > 4 && strcmp(str + l - 4, ".lpc") == 0) {
+      l -= 4;
+    } else if (l > 2 && strcmp(str + l - 2, ".c") == 0) {
+      l -= 2;
+    }
     res = new_string(l + 1, "function_exists");
     res[0] = '/';
     strncpy(res + 1, str, l);

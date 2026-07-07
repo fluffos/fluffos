@@ -1,6 +1,6 @@
-#define OB2 "/clone/inh2.c"
-#define OB1 "/clone/inh1.c"
-#define OB0 "/clone/inh0.c"
+#define OB2 "/clone/inh2.lpc"
+#define OB1 "/clone/inh1.lpc"
+#define OB0 "/clone/inh0.lpc"
 
 void do_tests() {
     object ob2 = load_object(OB2);

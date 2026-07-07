@@ -1,4 +1,4 @@
-inherit __DIR__"0default_args_1.c";
+inherit __DIR__"0default_args_1.lpc";
 
 // Original test - single default argument
 int id (string id: (: "" :)) {

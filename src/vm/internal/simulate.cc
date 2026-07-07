@@ -380,8 +380,16 @@ int filename_to_obname(const char *src, char *dest, int size) {
    *
    * The first solution is the one currently in use.
    */
-  while (p - dest > 2 && p[-1] == 'c' && p[-2] == '.') {
-    p -= 2;
+  // Both source spellings are first-class: strip ".lpc" or ".c",
+  // repeatedly (see the duplicate-object rationale above).
+  for (;;) {
+    if (p - dest > 4 && p[-1] == 'c' && p[-2] == 'p' && p[-3] == 'l' && p[-4] == '.') {
+      p -= 4;
+    } else if (p - dest > 2 && p[-1] == 'c' && p[-2] == '.') {
+      p -= 2;
+    } else {
+      break;
+    }
   }
 
   *p = 0;
@@ -443,13 +451,31 @@ object_t *load_object(const char *lname, int callcreate) {
   }
 
   /*
-   * First check that the c-file exists.
+   * Source-file resolution: an explicitly requested extension is exact --
+   * load_object("/foo.c") probes only foo.c (no .lpc lookup), and
+   * load_object("/foo.lpc") probes only foo.lpc. Extension-less names
+   * prefer ".lpc" with ".c" as the transparent fallback. The chosen
+   * spelling flows into the compile/diagnostic name.
    */
+  size_t plen = strlen(pname);
+  bool explicit_ext = false;
+  const char *src_ext = ".lpc";
+  if (plen > 4 && strcmp(pname + plen - 4, ".lpc") == 0) {
+    explicit_ext = true;
+  } else if (plen > 2 && pname[plen - 1] == 'c' && pname[plen - 2] == '.') {
+    explicit_ext = true;
+    src_ext = ".c";
+  }
   (void)strcpy(real_name, actualname);
-  (void)strcat(real_name, ".c");
+  (void)strcat(real_name, src_ext);
+  if (!explicit_ext && (stat(real_name, &c_st) == -1 || S_ISDIR(c_st.st_mode))) {
+    src_ext = ".c";
+    (void)strcpy(real_name, actualname);
+    (void)strcat(real_name, src_ext);
+  }
 
   (void)strcpy(obname, name);
-  (void)strcat(obname, ".c");
+  (void)strcat(obname, src_ext);
 
   if (stat(real_name, &c_st) == -1 || S_ISDIR(c_st.st_mode)) {
     save_command_giver(command_giver);
@@ -504,10 +530,15 @@ object_t *load_object(const char *lname, int callcreate) {
   if (inherit_file) {
     object_t *inh_obj;
     char inhbuf[MAX_OBJECT_NAME_SIZE];
+    char inhraw[MAX_OBJECT_NAME_SIZE];
 
     if (!filename_to_obname(inherit_file, inhbuf, sizeof inhbuf)) {
       strcpy(inhbuf, inherit_file);
     }
+    // Keep the raw spelling too: an explicit ".c"/".lpc" in the inherit
+    // statement stays exact through the recursive load below.
+    strncpy(inhraw, inherit_file, sizeof inhraw - 1);
+    inhraw[sizeof inhraw - 1] = 0;
     FREE(inherit_file);
     inherit_file = nullptr;
 
@@ -528,7 +559,7 @@ object_t *load_object(const char *lname, int callcreate) {
       // '/child' inherited by '/parent'" (consumed by start_new_file).
       compiler_next_load_reason =
           std::string("while loading '/") + inhbuf + "' inherited by '/" + name + "'";
-      inh_obj = load_object(inhbuf, 1);
+      inh_obj = load_object(inhraw, 1);
     }
     if (!inh_obj) error("Inherited file '/%s' does not exist!\n", inhbuf);
 
@@ -539,7 +570,9 @@ object_t *load_object(const char *lname, int callcreate) {
      * -Beek
      */
     if (!(ob = ObjectTable::instance().find(name))) {
-      ob = load_object(name, 1);
+      // Reload ourselves with the caller's raw spelling so an explicit
+      // extension stays exact across the inherit-retry loop.
+      ob = load_object(lname, 1);
       /* sigh, loading the inherited file removed us */
       if (!ob) {
         num_objects_this_thread--;
@@ -1548,7 +1581,10 @@ object_t *find_object(const char *str) {
   if ((ob = ObjectTable::instance().find(tmpbuf))) {
     return ob;
   }
-  ob = load_object(tmpbuf, 1);
+  // Load with the caller's raw spelling: an explicit ".c"/".lpc" must
+  // stay exact through load_object's source resolution (it re-strips
+  // internally for the object name).
+  ob = load_object(str, 1);
   if (!ob || (ob->flags & O_DESTRUCTED)) { /* *sigh* */
     return nullptr;
   }

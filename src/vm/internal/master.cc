@@ -56,7 +56,9 @@ void init_master(const char *master_file) {
     error("Illegal master file name '%s'\n", master_file);
   }
 
-  new_ob = load_object(buf, 1);
+  // Load with the config's raw spelling: an explicit ".c"/".lpc" stays
+  // exact; extension-less names prefer ".lpc" and fall back to ".c".
+  new_ob = load_object(master_file, 1);
   if (new_ob == nullptr) {
     debug_message("The master file %s was not loaded.\n", master_file);
     exit(-1);

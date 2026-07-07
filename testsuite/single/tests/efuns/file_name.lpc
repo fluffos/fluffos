@@ -1,0 +1,4 @@
+void do_tests() {
+    ASSERT(file_name() + ".lpc" == __FILE__);
+}
+

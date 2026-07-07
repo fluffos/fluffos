@@ -172,20 +172,27 @@ void f_replace_program() {
   }
 
   name_len = SVALUE_STRLEN(sp);
-  name = reinterpret_cast<char *>(DMALLOC(name_len + 3, TAG_TEMPORARY, "replace_program"));
+  name = reinterpret_cast<char *>(DMALLOC(name_len + 5, TAG_TEMPORARY, "replace_program"));
   xname = name;
   strcpy(name, sp->u.string);
-  if (name_len < 3) {
-    strcat(name, ".c");
-  } else {
-    if (name[name_len - 2] != '.' || name[name_len - 1] != 'c') {
-      strcat(name, ".c");
-    }
-  }
+  bool has_ext = (name_len >= 2 && strcmp(name + name_len - 2, ".c") == 0) ||
+                 (name_len >= 4 && strcmp(name + name_len - 4, ".lpc") == 0);
   if (*name == '/') {
     name++;
   }
-  new_prog = search_inherited(name, current_object->prog, &var_offset);
+  if (has_ext) {
+    new_prog = search_inherited(name, current_object->prog, &var_offset);
+  } else {
+    // Both source spellings are first-class: try ".lpc", then ".c".
+    size_t blen = strlen(name);
+    strcat(name, ".lpc");
+    new_prog = search_inherited(name, current_object->prog, &var_offset);
+    if (new_prog == nullptr) {
+      name[blen] = '\0';
+      strcat(name, ".c");
+      new_prog = search_inherited(name, current_object->prog, &var_offset);
+    }
+  }
   FREE(xname);
   if (!new_prog) {
     error("program to replace the current with has to be inherited\n");

@@ -1,0 +1,50 @@
+// Source-extension resolution rules (load_object in
+// src/vm/internal/simulate.cc):
+//   - an explicit ".c" or ".lpc" is exact: the other spelling is never
+//     looked up on disk
+//   - extension-less names prefer ".lpc" and fall back to ".c"
+//   - object identity is extension-blind: object names carry no
+//     extension and find_object() strips either spelling
+// Fixtures live in /clone/dual_*.
+void do_tests() {
+    object ob;
+
+    // An explicit extension never falls back to the other spelling on
+    // disk: the load fails (0; the master's compile_object virtual hook
+    // is consulted with the stripped name and declines). These must run
+    // before the fixtures get loaded -- once loaded, any spelling finds
+    // the object (pinned at the end).
+    ASSERT_EQ(0, load_object("/clone/dual_only_lpc.c"));
+    ASSERT_EQ(0, load_object("/clone/dual_only_c.lpc"));
+
+    // An explicit extension picks that source even when both exist.
+    ob = load_object("/clone/dual_pick_c.c");
+    ASSERT_EQ("c", ob->which());
+    ASSERT_EQ("/clone/dual_pick_c", file_name(ob));
+    ob = load_object("/clone/dual_pick_lpc.lpc");
+    ASSERT_EQ("lpc", ob->which());
+
+    // Extension-less names prefer ".lpc" when both exist ...
+    ob = load_object("/clone/dual_pick_default");
+    ASSERT_EQ("lpc", ob->which());
+    // ... and fall back to ".c" when only that spelling exists.
+    ob = load_object("/clone/dual_only_c");
+    ASSERT_EQ("c", ob->which());
+    ASSERT_EQ("/clone/dual_only_c", file_name(ob));
+
+    // The ".lpc" file is reachable by its exact name.
+    ob = load_object("/clone/dual_only_lpc.lpc");
+    ASSERT_EQ("lpc", ob->which());
+
+    // Identity is extension-blind: any spelling finds the loaded object.
+    ASSERT(ob == find_object("/clone/dual_only_lpc"));
+    ASSERT(ob == find_object("/clone/dual_only_lpc.c"));
+    ASSERT(ob == find_object("/clone/dual_only_lpc.lpc"));
+
+    // Same rule on the load path: the registry is consulted before the
+    // filesystem, so the exact ".c" spelling that failed above now
+    // resolves to the loaded object by identity.
+    ASSERT(load_object("/clone/dual_only_lpc.c") == ob);
+    ASSERT(load_object("/clone/dual_pick_c.lpc") ==
+           find_object("/clone/dual_pick_c"));
+}
