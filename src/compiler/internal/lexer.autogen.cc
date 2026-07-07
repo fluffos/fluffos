@@ -1,6 +1,6 @@
-#line 2 "$REPO_ROOT$/build/src/lexer.autogen.cc"
+#line 2 "$BUILD_ROOT$/src/lexer.autogen.cc"
 
-#line 4 "$REPO_ROOT$/build/src/lexer.autogen.cc"
+#line 4 "$BUILD_ROOT$/src/lexer.autogen.cc"
 
 #define  YY_INT_ALIGNED long int
 
@@ -2713,7 +2713,7 @@ static int lpc_lex_pop_splice_if_any(void *yyscanner);
 static void lpc_lex_consume_directive_newline(void *yyscanner);
 
 
-#line 2717 "$REPO_ROOT$/build/src/lexer.autogen.cc"
+#line 2717 "$BUILD_ROOT$/src/lexer.autogen.cc"
 /* SC_CHAR_BODY / SC_CHAR_CLOSE: character literal 'c' -- exactly one body
  * char/escape, then a closing quote. See the "'" rule below.
  * SC_BLOCK_COMMENT: a C-style block comment. Unlike heredocs, the closing
@@ -2751,7 +2751,7 @@ static void lpc_lex_consume_directive_newline(void *yyscanner);
  * without tokenizing, watching only for the nested/closing conditional
  * directives. See the directive rules below. */
 
-#line 2755 "$REPO_ROOT$/build/src/lexer.autogen.cc"
+#line 2755 "$BUILD_ROOT$/src/lexer.autogen.cc"
 
 #define INITIAL 0
 #define SC_CHAR_BODY 1
@@ -3053,7 +3053,7 @@ YY_DECL
 
 
 
-#line 3057 "$REPO_ROOT$/build/src/lexer.autogen.cc"
+#line 3057 "$BUILD_ROOT$/src/lexer.autogen.cc"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -4142,7 +4142,7 @@ YY_RULE_SETUP
 #line 757 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 4146 "$REPO_ROOT$/build/src/lexer.autogen.cc"
+#line 4146 "$BUILD_ROOT$/src/lexer.autogen.cc"
 
 	case YY_END_OF_BUFFER:
 		{
