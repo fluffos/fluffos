@@ -65,7 +65,6 @@
 #include "compiler/internal/lexer.h"
 #include "compiler/internal/grammar_rules.h"
 #include "compiler/internal/grammar.autogen.h"
-#include "compiler/internal/scratchpad.h"
 #include "compiler/internal/lexer_rules.h"
 #include "compiler/internal/lexer_rules_pp.h"
 #include "efuns.autogen.h"
@@ -161,8 +160,7 @@
 #define YY_INPUT(buf, result, max_size) \
     (void)(buf); (void)(max_size); result = 0;
 
-// Defined in the trailer below (uses the buffer-stack helpers).
-static int lpc_lex_pop_splice_if_any(void *yyscanner);
+// Defined in the trailer below (uses the generated yyinput()).
 static void lpc_lex_consume_directive_newline(void *yyscanner);
 
 
@@ -786,80 +784,6 @@ int lpc_lex_getc(void *yyscanner) {
   }
 }
 
-// THE splice mechanism (see lexer.h): push `text` as a fresh Flex buffer on
-// top of the current one. Composing yy_scan_bytes() with the buffer STACK
-// needs care: yy_scan_bytes()'s internal yy_switch_to_buffer() REPLACES
-// the current top-of-stack slot rather than pushing, so the "flush the
-// old buffer's position, advance the stack top" half of
-// yypush_buffer_state() must be done manually FIRST -- the internal
-// switch then lands in a fresh, already-advanced slot instead of
-// clobbering (and later double-freeing) the live one. ASan caught the
-// naive yypush_buffer_state(yy_scan_string(...)) composition as a
-// heap-use-after-free on the very first macro expansion (see
-// the compiler README / git history).
-// ---------------------------------------------------------------------------
-// Flex allocator hookup (%option noyyalloc/noyyfree/noyyrealloc).
-//
-// One allocator serves two lifetimes, so every block carries a 16-byte
-// tag header saying which side owns it:
-//   kind 1 (malloc): scanner guts (yyguts_t) and the buffer STACK array
-//     -- they live across compiles and may be yyrealloc'd, so they must
-//     never touch the arena.
-//   kind 2 (arena):  per-compile yy_buffer_state structs -- allocated
-//     inside the window the buffer-install helpers open around
-//     yy_scan_buffer, reclaimed wholesale at scratch_destroy (yyfree on
-//     them is a no-op). lpc_lex_teardown() deletes every live buffer
-//     BEFORE the arena reset so no code ever touches a stale struct.
-// ---------------------------------------------------------------------------
-namespace {
-struct LpcYyHdr {
-  uint64_t kind;  // 1 = malloc, 2 = arena
-  uint64_t size;  // payload bytes (for defensive realloc copies)
-};
-bool s_flex_alloc_arena = false;
-}  // namespace
-
-void *yyalloc(yy_size_t size, yyscan_t /*yyscanner*/) {
-  LpcYyHdr *h;
-  if (s_flex_alloc_arena) {
-    h = static_cast<LpcYyHdr *>(scratch_raw_allocate(size + sizeof(LpcYyHdr), 16));
-    h->kind = 2;
-  } else {
-    h = static_cast<LpcYyHdr *>(malloc(size + sizeof(LpcYyHdr)));
-    h->kind = 1;
-  }
-  h->size = size;
-  return h + 1;
-}
-
-void yyfree(void *ptr, yyscan_t /*yyscanner*/) {
-  if (ptr == nullptr) return;
-  LpcYyHdr *h = static_cast<LpcYyHdr *>(ptr) - 1;
-  if (h->kind == 1) free(h);
-  /* kind 2: arena memory, reclaimed at scratch_destroy. */
-}
-
-void *yyrealloc(void *ptr, yy_size_t size, yyscan_t yyscanner) {
-  if (ptr == nullptr) return yyalloc(size, yyscanner);
-  LpcYyHdr *h = static_cast<LpcYyHdr *>(ptr) - 1;
-  if (h->kind == 1) {
-    h = static_cast<LpcYyHdr *>(realloc(h, size + sizeof(LpcYyHdr)));
-    h->size = size;
-    return h + 1;
-  }
-  /* Arena block (shouldn't happen: only the malloc-side buffer stack is
-   * ever realloc'd) -- defensive copy-out to malloc. */
-  void *np = nullptr;
-  {
-    LpcYyHdr *nh = static_cast<LpcYyHdr *>(malloc(size + sizeof(LpcYyHdr)));
-    nh->kind = 1;
-    nh->size = size;
-    memcpy(nh + 1, ptr, h->size < size ? h->size : size);
-    np = nh + 1;
-  }
-  return np;
-}
-
 // Delete every live flex buffer (pushed splices AND the base) while their
 // arena-backed structs are still valid -- MUST run before scratch_destroy
 // (compiler.cc's epilog and error cleanup both call the lexer_utils
@@ -876,7 +800,18 @@ void lpc_lex_teardown(void *yyscanner) {
   }
 }
 
-// In-place variant: `base`/`size` follow the lpc_lex_set_source contract
+// THE splice mechanism (see lexer.h): push `text` as a fresh Flex buffer on
+// top of the current one. Composing yy_scan_bytes() with the buffer STACK
+// needs care: yy_scan_bytes()'s internal yy_switch_to_buffer() REPLACES
+// the current top-of-stack slot rather than pushing, so the "flush the
+// old buffer's position, advance the stack top" half of
+// yypush_buffer_state() must be done manually FIRST -- the internal
+// switch then lands in a fresh, already-advanced slot instead of
+// clobbering (and later double-freeing) the live one. ASan caught the
+// naive yypush_buffer_state(yy_scan_string(...)) composition as a
+// heap-use-after-free on the very first macro expansion (see
+// the compiler README / git history).
+// In-place push: `base`/`size` follow the lpc_lex_set_source contract
 // (writable arena memory, two '\0' sentinels included in size). The text
 // is scanned where it lies -- zero copy, zero flex text allocation.
 void lpc_lex_push_prepared_buffer(char *base, size_t size, int kind, void *yyscanner) {
@@ -899,9 +834,9 @@ void lpc_lex_push_prepared_buffer(char *base, size_t size, int kind, void *yysca
   YY_CURRENT_BUFFER_LVALUE->yy_buf_pos = yyg->yy_c_buf_p;
   YY_CURRENT_BUFFER_LVALUE->yy_n_chars = yyg->yy_n_chars;
   yyg->yy_buffer_stack_top++;
-  s_flex_alloc_arena = true;  // the yy_buffer_state struct is per-compile
+  lpc_flex_alloc_arena = true;  // the yy_buffer_state struct is per-compile
   YY_BUFFER_STATE nb = yy_scan_buffer(base, size, yyscanner);
-  s_flex_alloc_arena = false;
+  lpc_flex_alloc_arena = false;
   if (nb == NULL) {
     lpc_lex_fatal("lpc_lex_push_prepared_buffer: buffer missing sentinels");
     return;
@@ -913,25 +848,6 @@ void lpc_lex_push_prepared_buffer(char *base, size_t size, int kind, void *yysca
   yycolumn = 0;
   yyg->yy_did_buffer_switch_on_eof = 1;
   lpc_lex_note_buffer_push(kind);
-}
-
-// Copying variant for callers whose text is NOT scannable in place
-// (persistent macro bodies, string_views over foreign memory): one arena
-// copy plus sentinels, then the in-place push -- still no flex malloc.
-void lpc_lex_push_string_buffer(const char *text, size_t len, int kind,
-                                void *yyscanner) {
-  char *base = static_cast<char *>(scratch_raw_allocate(len + 2, 1));
-  memcpy(base, text, len);
-  base[len] = 0;
-  base[len + 1] = 0;
-  lpc_lex_push_prepared_buffer(base, len + 2, kind, yyscanner);
-}
-
-void lpc_lex_pop_pushed_buffer(void *yyscanner) {
-  struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;
-  int ending_lineno = YY_CURRENT_BUFFER ? yylineno : 0;
-  lpc_lex_note_buffer_pop(ending_lineno);
-  yypop_buffer_state(yyscanner);
 }
 
 // A directive owns its whole logical line, terminating newline included
@@ -955,18 +871,6 @@ static void lpc_lex_consume_directive_newline(void *yyscanner) {
     lpc_lex_newline(yyscanner);
     yycolumn = 0;  // yyinput() doesn't maintain yycolumn
   }
-}
-
-// The shared <<EOF>> decision: a drained pushed buffer (splice or
-// #include content -- NOT a #if expression, whose edge is hard) is
-// popped and scanning simply continues; returns 0 when this is a
-// genuine end-of-input the rule must handle itself.
-static int lpc_lex_pop_splice_if_any(void *yyscanner) {
-  if (lpc_lex_pushed_depth() > 0 && lpc_lex_top_buffer_kind() != LPC_BUF_IF_EXPR) {
-    lpc_lex_pop_pushed_buffer(yyscanner);
-    return 1;
-  }
-  return 0;
 }
 
 int lpc_lex_ifexpr_next(union YYSTYPE *yylval_param, void *yyscanner) {
@@ -1061,9 +965,9 @@ void lpc_lex_set_source(char *base, size_t size, void *yyscanner) {
     yy_delete_buffer(YY_CURRENT_BUFFER, yyscanner);
     YY_CURRENT_BUFFER_LVALUE = NULL;
   }
-  s_flex_alloc_arena = true;  // the yy_buffer_state struct is per-compile
+  lpc_flex_alloc_arena = true;  // the yy_buffer_state struct is per-compile
   YY_BUFFER_STATE b = yy_scan_buffer(base, size, yyscanner);
-  s_flex_alloc_arena = false;
+  lpc_flex_alloc_arena = false;
   if (b == NULL) {
     lpc_lex_fatal("lpc_lex_set_source: buffer missing sentinels");
     return;

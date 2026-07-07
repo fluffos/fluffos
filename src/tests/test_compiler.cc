@@ -1209,7 +1209,8 @@ TEST_P(ErrorCaseTest, ReportsError) {
 
 INSTANTIATE_TEST_SUITE_P(Errors, ErrorCaseTest, ::testing::Values(
     ErrorCase{"ErrorDirective",        "#error something went wrong\n"},
-    ErrorCase{"WarnDirective",         "#warn something bad\n"},
+    // (WarnDirective removed: #warn is a real warning now, not an error
+    // -- see WarnDirectiveIsNonFatalWarning.)
     ErrorCase{"UnknownDirective",      "#frobnicate foo\n"},
     ErrorCase{"HashHashAtStart",       "#define FOO ## x\nFOO\n"},
     ErrorCase{"HashHashAtEnd",         "#define FOO x ##\nFOO\n"},
@@ -1509,6 +1510,19 @@ TEST(Diagnostics, RedefinitionIsAllowedWithWarning) {
     ASSERT_FALSE(d.notes.empty());
     EXPECT_NE(d.notes[0].find("previous definition of 'FOO' was at "), std::string::npos);
     EXPECT_NE(d.notes[0].find(":1"), std::string::npos);
+}
+
+TEST(Diagnostics, WarnDirectiveIsNonFatalWarning) {
+    // #warn matches its name: a WARNING that does not fail the compile
+    // (it went through lexerror() before, failing compilation like
+    // #error). The payload is carried in the message.
+    NormalizedString out = pp("#warn deprecated header\nint x = 1;\n");
+    EXPECT_EQ(num_parse_error, 0);           // did NOT fail the compile
+    EXPECT_EQ(out, "int x = 1;");            // input scanned normally
+    ASSERT_FALSE(compiler_diags.empty());
+    const Diagnostic& d = compiler_diags.back();
+    EXPECT_TRUE(d.is_warning);
+    EXPECT_NE(d.message.find("#warn deprecated header"), std::string::npos);
 }
 
 TEST(Diagnostics, IdenticalRedefinitionIsSilent) {

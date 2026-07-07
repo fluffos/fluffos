@@ -847,9 +847,12 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
         }
     } else if (dir == "warn") {
         if (lpc_lex_emitting()) {
+            // A real warning (respects #pragma no_warnings, does not fail
+            // the compile) -- it went through lexerror() before, which
+            // failed the whole compile despite the directive's name.
             ScratchString msg("#warn ");
             msg += trim(rest);
-            lexerror(msg.c_str());
+            yywarn("%s", msg.c_str());
         }
     } else if (dir == "echo") {
         if (lpc_lex_emitting()) {

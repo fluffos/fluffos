@@ -127,6 +127,8 @@ struct compiler_context_t {
 };
 struct compiler_context_t *yyget_extra(void *yyscanner);
 char *yyget_text(void *yyscanner);
+int yyget_lineno(void *yyscanner);
+void yypop_buffer_state(void *yyscanner);
 int yylex_init_extra(struct compiler_context_t *extra, void **scanner);
 int yylex_destroy(void *scanner);
 
@@ -268,11 +270,7 @@ enum LpcPushedBufferKind {
 // array-block synthesis, pushbacks of probed bytes) AND every #include's
 // content. The pop happens either in lexer.l's <<EOF>> rules (Flex scanned
 // the buffer dry) or inside lpc_lex_getc() (a raw reader drained it).
-// Defined in lexer.l's trailer: composing yy_scan_bytes() with the buffer
-// STACK requires the "advance the stack top first" fix for
-// yy_scan_bytes's internal yy_switch_to_buffer(), which otherwise
-// clobbers the live top slot (ASan-verified UAF, see
-// this file's git history / the compiler README).
+// Defined in lexer_utils.cc (an arena copy + the in-place push below).
 void lpc_lex_push_string_buffer(const char *text, size_t len, int kind, void *yyscanner);
 // Install a PREPARED buffer as THE base (main-file content scanned in
 // place; `size` includes the two trailing '\0' sentinels). Defined in
@@ -292,6 +290,15 @@ void lpc_lex_scanner_destroyed(void *yyscanner);
 // Pop one pushed buffer (kind-dispatched bookkeeping + yypop_buffer_state).
 // Callers must check lpc_lex_pushed_depth() > 0 first.
 void lpc_lex_pop_pushed_buffer(void *yyscanner);
+// The shared <<EOF>> decision for lexer.l's EOF rules: pops a drained
+// splice/include buffer (returns 1); 0 = genuine end-of-input (or a #if
+// expression buffer's hard edge), which the rule handles itself.
+int lpc_lex_pop_splice_if_any(void *yyscanner);
+// Arena window for flex buffer-struct allocation: lexer.l's
+// yy_scan_buffer call sites set this around the call so yyalloc (in
+// lexer_utils.cc) serves the per-compile yy_buffer_state from the
+// arena; everything else (guts, buffer stack) stays malloc.
+extern bool lpc_flex_alloc_arena;
 
 // How many pushed buffers are currently stacked on top of the base
 // buffer. 0 = scanning the main file's own bytes. Defined in
