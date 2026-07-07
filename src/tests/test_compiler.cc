@@ -4,7 +4,7 @@
 // single scan (lexer_rules_pp.cc + lexer.l's directive rule).
 //
 // These tests drive the REAL lexer end-to-end: TokenizeSession() feeds a
-// source string through start_new_file()+yylex() with a LexerSession, and
+// source string through start_new_file()+yylex(), and
 // the LpcPreprocessor shim below reconstructs comparable text from the
 // resulting token stream (whitespace-normalized comparison), preserving the
 // original text-oriented test bodies while asserting through actual
@@ -211,7 +211,7 @@ struct Token {
 // both environments in one process).
 static bool g_test_env_inited = false;
 
-static std::vector<Token> TokenizeSession(std::shared_ptr<LexerSession> session,
+static std::vector<Token> TokenizeSession(bool keep_macros,
                                           const std::string& source,
                                           const char* filename = "test") {
     if (!g_test_env_inited) {
@@ -240,7 +240,7 @@ static std::vector<Token> TokenizeSession(std::shared_ptr<LexerSession> session,
     void *scanner = nullptr;
     yylex_init_extra(&ctx, &scanner);
 
-    start_new_file(source, scanner, session);
+    start_new_file(source, scanner, keep_macros);
 
     std::vector<Token> toks;
     YYSTYPE yylval;
@@ -274,7 +274,7 @@ static std::vector<Token> TokenizeSession(std::shared_ptr<LexerSession> session,
 
 static std::vector<Token> Tokenize(const std::string& source,
                                    const char* filename = "test") {
-    return TokenizeSession(nullptr, source, filename);
+    return TokenizeSession(false, source, filename);
 }
 
 static std::string normalize_whitespace(const std::string& s) {
@@ -344,18 +344,17 @@ inline std::ostream& operator<<(std::ostream& os, const NormalizedString& ns) {
 
 class LpcPreprocessor {
 public:
-    std::shared_ptr<LexerSession> session_;
+    bool first_chunk_ = true;  // chunk 2+ keeps the user macro table
     std::vector<std::string> errors_;
 
     static std::shared_ptr<LpcPreprocessor> make_session() {
-        auto p = std::make_shared<LpcPreprocessor>();
-        p->session_ = LexerSession::make_session();
-        return p;
+        return std::make_shared<LpcPreprocessor>();
     }
 
     NormalizedString preprocess_next(const std::string& src, const char* filename = "test") {
         num_parse_error = 0;
-        auto tokens = TokenizeSession(session_, src, filename);
+        auto tokens = TokenizeSession(!first_chunk_, src, filename);
+        first_chunk_ = false;
         errors_.clear();
         if (num_parse_error > 0) {
             errors_.push_back("error");

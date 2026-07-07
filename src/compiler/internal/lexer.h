@@ -102,7 +102,7 @@ struct compiler_context_t {
   ScratchString heredoc_terminator;
   bool heredoc_is_array = false;
   // Nesting depth of #if/#ifdef directives seen INSIDE a dead branch while
-  // in SC_COND_SKIP (the real conditional stack lives in LexerSession).
+  // in SC_COND_SKIP (the real conditional stack is g_compile.conds).
   int skip_depth = 0;
   // Column (0-based) at which the most recently matched token STARTED --
   // snapshotted by lexer.l's YY_USER_ACTION before the running yycolumn
@@ -204,16 +204,15 @@ void init_num_args(void);
 
 const char *query_instr_name(int);
 char *get_f_name(int);
-struct LexerSession;
 // Point the scanner at new top-level source TEXT (copied into a native
 // in-memory Flex base buffer via lpc_lex_set_source; a missing final
 // newline is appended); prolog()/stage_output drive it directly.
-void start_new_file(std::string_view source, void *yyscanner,
-                     std::shared_ptr<LexerSession> session = nullptr);
+// keep_macros=true retains the user #define table across chunks (REPL
+// persistence); the #if stack always resets.
+void start_new_file(std::string_view source, void *yyscanner, bool keep_macros = false);
 // Zero-copy variant: reads fd's content straight into the arena block
 // flex scans in place. Returns false on read error.
-bool start_new_file_fd(int fd, void *yyscanner,
-                       std::shared_ptr<LexerSession> session = nullptr);
+bool start_new_file_fd(int fd, void *yyscanner, bool keep_macros = false);
 void end_new_file(void);
 int lookup_predef(const char *);
 void add_predefines(void);
