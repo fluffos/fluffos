@@ -1,3 +1,6 @@
+// GENERATED COPY -- edit tools/lpc-syntax/tokenizer.mjs and re-run the
+// generate_ebnf CMake target; a packaged VS Code extension
+// cannot reach outside its own folder.
 // LPC tokenizer driven by lpc-grammar.json (generated from grammar.y /
 // lexer.l by tools/lpc-syntax/generate_ebnf.py -- regenerate with the
 // generate_ebnf CMake target; never hand-edit the JSON).

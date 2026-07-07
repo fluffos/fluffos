@@ -301,7 +301,7 @@ def emit_grammar_json(xml_path, json_path):
 
     data = {
         "version": 1,
-        "generator": "src/compiler/internal/generate_ebnf.py",
+        "generator": "tools/lpc-syntax/generate_ebnf.py",
         "keywords": sorted(set(keywords)),
         "typeKeywords": sorted(set(types)),
         "modifierKeywords": sorted(set(modifiers)),
@@ -316,6 +316,144 @@ def emit_grammar_json(xml_path, json_path):
     with open(json_path, "w") as f:
         json.dump(data, f, indent=2, sort_keys=False)
         f.write("\n")
+    return data
+
+
+def _re_escape(s: str) -> str:
+    import re as _re
+    return _re.escape(s)
+
+
+def emit_vscode_assets(data, script_dir):
+    """Emit the VS Code extension's generated assets from the grammar
+    contract: syntaxes/lpc.tmLanguage.json (declarative highlighting)
+    plus self-contained copies of the JS tokenizer/linter and the JSON
+    under vscode/lib/ (a packaged extension cannot reach ../)."""
+    import shutil
+    import json
+
+    vscode_dir = os.path.join(script_dir, "vscode")
+    syn_dir = os.path.join(vscode_dir, "syntaxes")
+    lib_dir = os.path.join(vscode_dir, "lib")
+    os.makedirs(syn_dir, exist_ok=True)
+    os.makedirs(lib_dir, exist_ok=True)
+
+    kw = "|".join(sorted(data["keywords"], key=len, reverse=True))
+    types = "|".join(sorted(data["typeKeywords"], key=len, reverse=True))
+    mods = "|".join(sorted(data["modifierKeywords"], key=len, reverse=True))
+    # Operators arrive longest-match ordered from the contract.
+    ops = "|".join(_re_escape(o) for o in data["operators"])
+
+    tm = {
+        "$comment": "GENERATED from lpc-grammar.json by generate_ebnf.py "
+                    "(CMake target generate_ebnf) -- do not edit by hand.",
+        "name": "LPC",
+        "scopeName": "source.lpc",
+        "fileTypes": ["lpc"],
+        "patterns": [
+            {"include": "#comments"},
+            {"include": "#preprocessor"},
+            {"include": "#textblock"},
+            {"include": "#template"},
+            {"include": "#strings"},
+            {"include": "#chars"},
+            {"include": "#numbers"},
+            {"include": "#functional"},
+            {"include": "#keywords"},
+            {"include": "#types"},
+            {"include": "#modifiers"},
+            {"include": "#dollar-params"},
+            {"include": "#function-call"},
+            {"include": "#operators"},
+        ],
+        "repository": {
+            "comments": {"patterns": [
+                {"name": "comment.line.double-slash.lpc", "match": "//.*$"},
+                {"name": "comment.block.lpc", "begin": "/\\*", "end": "\\*/"},
+            ]},
+            "preprocessor": {
+                "name": "meta.preprocessor.lpc",
+                "begin": "^\\s*(#\\s*[A-Za-z_]*)",
+                "beginCaptures": {"1": {"name": "keyword.control.directive.lpc"}},
+                "end": "(?<!\\\\)$",
+                "patterns": [
+                    {"include": "#comments"},
+                    {"include": "#strings"},
+                    {"name": "string.quoted.other.include.lpc", "match": "<[^>\\n]*>"},
+                    {"include": "#numbers"},
+                    {"name": "constant.character.escape.line-continuation.lpc",
+                     "match": "\\\\$"},
+                ],
+            },
+            "textblock": {
+                "name": "string.unquoted.textblock.lpc",
+                "begin": "(@@?)([A-Za-z_][A-Za-z0-9_]*)$",
+                "beginCaptures": {"1": {"name": "keyword.operator.textblock.lpc"},
+                                   "2": {"name": "constant.other.terminator.lpc"}},
+                "end": "^\\2(?![A-Za-z0-9_])",
+                "endCaptures": {"0": {"name": "constant.other.terminator.lpc"}},
+            },
+            "template": {
+                "name": "string.interpolated.lpc",
+                "begin": "`",
+                "end": "`",
+                "patterns": [
+                    {"name": "constant.character.escape.lpc", "match": "\\\\."},
+                    {"name": "meta.embedded.interpolation.lpc",
+                     "begin": "\\$\\{", "end": "\\}",
+                     "beginCaptures": {"0": {"name": "punctuation.section.interpolation.begin.lpc"}},
+                     "endCaptures": {"0": {"name": "punctuation.section.interpolation.end.lpc"}},
+                     "patterns": [{"include": "$self"}]},
+                ],
+            },
+            "strings": {
+                "name": "string.quoted.double.lpc",
+                "begin": "\"",
+                "end": "\"",
+                "patterns": [{"name": "constant.character.escape.lpc", "match": "\\\\."}],
+            },
+            "chars": {"name": "constant.character.lpc",
+                       "match": "'(\\\\.|[^'\\\\])'"},
+            "numbers": {"name": "constant.numeric.lpc",
+                         "match": "\\b(0[xX][0-9A-Fa-f_]+|0[bB][01_]+|[0-9][0-9_]*(\\.[0-9][0-9_]*([eE][+-]?[0-9]+)?)?)\\b"},
+            "functional": {"patterns": [
+                {"name": "keyword.operator.functional.lpc", "match": "\\(:"},
+                {"name": "keyword.operator.functional.lpc", "match": ":\\)"},
+            ]},
+            "keywords": {"name": "keyword.control.lpc",
+                          "match": "\\b(" + kw + ")\\b"},
+            "types": {"name": "storage.type.lpc",
+                       "match": "\\b(" + types + ")\\b"},
+            "modifiers": {"name": "storage.modifier.lpc",
+                           "match": "\\b(" + mods + ")\\b"},
+            "dollar-params": {"name": "variable.parameter.positional.lpc",
+                               "match": "\\$[0-9]+"},
+            "function-call": {"match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+                               "captures": {"1": {"name": "entity.name.function.lpc"}}},
+            "operators": {"name": "keyword.operator.lpc",
+                           "match": ops},
+        },
+    }
+
+    tm_path = os.path.join(syn_dir, "lpc.tmLanguage.json")
+    print(f"Writing {tm_path} ...")
+    with open(tm_path, "w") as f:
+        json.dump(tm, f, indent=2, sort_keys=False)
+        f.write("\n")
+
+    header = ("// GENERATED COPY -- edit tools/lpc-syntax/%s and re-run the\n"
+              "// generate_ebnf CMake target; a packaged VS Code extension\n"
+              "// cannot reach outside its own folder.\n")
+    for name in ("tokenizer.mjs", "lint.mjs"):
+        src_f = os.path.join(script_dir, name)
+        dst_f = os.path.join(lib_dir, name)
+        with open(src_f) as f:
+            body = f.read()
+        print(f"Writing {dst_f} ...")
+        with open(dst_f, "w") as f:
+            f.write((header % name) + body)
+    shutil.copyfile(os.path.join(script_dir, "lpc-grammar.json"),
+                    os.path.join(lib_dir, "lpc-grammar.json"))
 
 
 def main():
@@ -326,6 +464,7 @@ def main():
     xml_path  = sys.argv[1]
     ebnf_path = sys.argv[2]
     json_path = sys.argv[3] if len(sys.argv) > 3 else None
+    script_dir = os.path.dirname(os.path.abspath(__file__))
     lexical_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 "grammar_lexical.ebnf.in")
 
@@ -353,7 +492,8 @@ def main():
     # without a spec entry fails regeneration loudly, so the artifact can
     # never silently go stale again.
     if json_path is not None:
-        emit_grammar_json(xml_path, json_path)
+        data = emit_grammar_json(xml_path, json_path)
+        emit_vscode_assets(data, script_dir)
 
     # Optional validation guard
     try:
