@@ -2,7 +2,7 @@
 
 #include "compiler/internal/compiler.h"
 #include "compiler/internal/keyword.h"
-#include "compiler/internal/lex.h"
+#include "compiler/internal/lexer.h"
 
 #include <algorithm>
 #include <fstream>

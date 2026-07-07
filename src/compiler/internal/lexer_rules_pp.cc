@@ -6,7 +6,7 @@
 #include <cstdlib>
 
 #include "compiler/internal/compiler.h"
-#include "compiler/internal/lex.h"
+#include "compiler/internal/lexer.h"
 #include "compiler/internal/lexer_utils.h"
 // grammar_rules.h must precede grammar.autogen.h (decl_t/func_block_t);
 // needed for the token ids and YYSTYPE the #if token evaluator consumes.
@@ -231,7 +231,7 @@ ScratchString substitute(std::string_view body,
 // Plain struct + free functions taking an explicit state pointer, matching
 // the rest of lexer_rules*.cc's style (no classes/methods elsewhere in
 // this file or in lexer_rules.cc) -- a recursive-descent evaluator built
-// the same way lex.l's own escape-decoding helpers are: small functions
+// the same way lexer.l's own escape-decoding helpers are: small functions
 // each handling one grammar piece, threading state explicitly instead of
 // through `this`.
 
@@ -842,7 +842,7 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
             size_t start = idx;
             while (idx < p.size() && std::isdigit(static_cast<unsigned char>(p[idx]))) idx++;
             long line_num = strtol(std::string(p.substr(start, idx - start)).c_str(), nullptr, 10);
-            // No -1 here: the lex.l directive rule consumed and counted the
+            // No -1 here: the lexer.l directive rule consumed and counted the
             // directive's terminating newline BEFORE dispatching, so the
             // next line scanned is exactly the one `#line N` names.
             current_line = static_cast<int>(line_num);
@@ -872,7 +872,7 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
 
 LpcDirectiveAction lpc_lex_on_directive(const char* text, int len, void* yyscanner,
                                         bool in_skip_mode) {
-    // The directive's own first line, for error attribution: the lex.l
+    // The directive's own first line, for error attribution: the lexer.l
     // rule consumed + counted the terminating newline before calling us,
     // so current_line is already one past the directive's LAST physical
     // line; its embedded continuations haven't been counted yet, so its
@@ -884,7 +884,7 @@ LpcDirectiveAction lpc_lex_on_directive(const char* text, int len, void* yyscann
 
     // Embedded continuation newlines are physical lines regardless of scan
     // mode or whether the directive dispatches -- counted exactly once,
-    // here (the terminating newline is the lex.l rule's job, not ours).
+    // here (the terminating newline is the lexer.l rule's job, not ours).
     count_directive_newlines(text, len);
 
     if (!current_session) return LpcDirectiveAction::kNone;

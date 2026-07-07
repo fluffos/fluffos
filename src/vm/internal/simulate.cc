@@ -28,7 +28,7 @@
 #include "vm/internal/otable.h"
 #include "vm/internal/simul_efun.h"
 #include "compiler/internal/compiler.h"  // for compiler_next_load_reason
-#include "compiler/internal/lex.h"  // for total_lines, FIXME
+#include "compiler/internal/lexer.h"  // for total_lines, FIXME
 
 #include "packages/core/add_action.h"
 #include "packages/core/call_out.h"

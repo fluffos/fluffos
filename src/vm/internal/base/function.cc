@@ -3,7 +3,7 @@
 #include "base/internal/tracing.h"
 #include "vm/vm.h"
 #include "vm/internal/base/machine.h"
-#include "compiler/internal/lex.h"  // for instrs, FIXME
+#include "compiler/internal/lexer.h"  // for instrs, FIXME
 
 #include "packages/core/replace_program.h"
 #include "backward.hpp"

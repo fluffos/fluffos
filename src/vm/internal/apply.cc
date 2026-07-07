@@ -10,7 +10,7 @@
 #include "vm/internal/base/machine.h"
 #include "vm/internal/base/debug.h"
 #include "compiler/internal/compiler.h"
-#include "compiler/internal/lex.h"
+#include "compiler/internal/lexer.h"
 #include "compiler/internal/disassembler.h"
 #include "applies_table.autogen.h"
 

@@ -27,11 +27,10 @@
 
 #include "base/internal/debugmalloc.h"
 #include "base/internal/stralloc.h"
-#include "compiler/internal/LexStream.h"
 #include "compiler/internal/compiler.h"
 #include "compiler/internal/grammar_rules.h"    // decl_t / func_block_t — must precede grammar.autogen.h
 #include "compiler/internal/grammar.autogen.h"
-#include "compiler/internal/lex.h"
+#include "compiler/internal/lexer.h"
 #include "compiler/internal/lexer_utils.h"
 #include "mainlib.h"
 #include "vm/vm.h"
@@ -925,9 +924,9 @@ TEST_F(LexerTest, Directive_Line_WithQuotedFilename) {
 //     not as "#pragma"/"#line" with a garbled argument): the preprocessor
 //     only ever re-emits "#pragma "/"#line " when its own directive-name
 //     extraction matched the exact word "pragma"/"line", so anything that
-//     would exercise SC_DIRECTIVE_KEYWORD's word-boundary check in lex.l
+//     would exercise SC_DIRECTIVE_KEYWORD's word-boundary check in lexer.l
 //     is, by construction, already filtered out upstream.
-// Both are still handled correctly in lex.l (kept for grammar
+// Both are still handled correctly in lexer.l (kept for grammar
 // self-consistency and correctness, same rationale as SC_BLOCK_COMMENT,
 // and verified by hand during a self-review pass -- see the migration
 // plan), just not exercisable end-to-end through this test harness.
@@ -1289,7 +1288,7 @@ TEST_F(LexerTest, OptionalDot_BeforeBracket) {
 // followed by "5" -- '?' alone, then the float literal ".5".
 
 // "?." is only recognized as L_OPTIONAL_DOT when followed by an
-// identifier-start char or '[' (see the lookahead guard in lex.l). Right
+// identifier-start char or '[' (see the lookahead guard in lexer.l). Right
 // after '?', a '.' followed by a digit can't be the start of any valid
 // LPC construct in this dialect either way (leading-dot floats like ".5"
 // aren't supported -- ".5" alone always lexes as '.' then L_NUMBER, never

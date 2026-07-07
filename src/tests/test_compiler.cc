@@ -1,7 +1,7 @@
 // test_compiler.cc — unit tests for the LPC compiler front-end's
 // preprocessing behavior (#define/#undef, conditionals, #include, macro
 // expansion, __LINE__/__FILE__, directives), which lives in the lexer's
-// single scan (lexer_rules_pp.cc + lex.l's directive rule).
+// single scan (lexer_rules_pp.cc + lexer.l's directive rule).
 //
 // These tests drive the REAL lexer end-to-end: TokenizeSession() feeds a
 // source string through start_new_file()+yylex() with a LexerSession, and
@@ -15,6 +15,10 @@
 #include "base/std.h"
 
 #include <gtest/gtest.h>
+#include <fcntl.h>
+#ifdef _WIN32
+#include <io.h>
+#endif
 
 #include <unistd.h>
 
@@ -26,17 +30,23 @@
 
 #include "base/internal/debugmalloc.h"
 #include "base/internal/stralloc.h"
-#include "compiler/internal/LexStream.h"
 #include "compiler/internal/compiler.h"
 #include "compiler/internal/grammar_rules.h"
 #include "compiler/internal/grammar.autogen.h"
-#include "compiler/internal/lex.h"
+#include "compiler/internal/lexer.h"
 #include "compiler/internal/lexer_utils.h"
 #include "compiler/internal/lexer_rules_pp.h"
 #include "compiler/internal/scratchpad.h"
+#include "compiler/internal/stage_output.h"
 #include "mainlib.h"
 #include "vm/vm.h"
 
+// ---------------------------------------------------------------------------
+// Scratchpad arena (scratchpad.cc): direct unit coverage of the monotonic
+// bump allocator behind the compiler's transient strings and the parser's
+// value stack. Each test starts from a clean arena; scratch_destroy() is
+// the bulk reset.
+// ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 // Scratchpad arena (scratchpad.cc): direct unit coverage of the monotonic
 // bump allocator behind the compiler's transient strings and the parser's
@@ -194,16 +204,22 @@ struct Token {
 
 #include "base/internal/rc.h"
 
+// Shared across the lightweight tokenizer harness AND the full-boot
+// compile-entry tests: whichever initializes first wins, and the other
+// must NOT re-run init_strings (a second call orphans the first 64KB
+// string table -- a real LeakSanitizer catch from CI when one test mixed
+// both environments in one process).
+static bool g_test_env_inited = false;
+
 static std::vector<Token> TokenizeSession(std::shared_ptr<LexerSession> session,
                                           const std::string& source,
                                           const char* filename = "test") {
-    static bool driver_inited = false;
-    if (!driver_inited) {
+    if (!g_test_env_inited) {
         chdir(TESTSUITE_DIR);
         config_init();
         init_strings();
         init_identifiers();
-        driver_inited = true;
+        g_test_env_inited = true;
     }
 
     for (int i = 0; i < NUMAREAS; i++) {
@@ -491,7 +507,7 @@ int v = X;
 // ---------------------------------------------------------------------------
 // 2b. Self-reference "blue paint" -- per-OCCURRENCE, counted at expansion
 // time into compiler_context_t::pending_plain and consumed at rescan (this
-// replaced the "\x1e<name>" end-of-splice sentinel token; see lex.h's
+// replaced the "\x1e<name>" end-of-splice sentinel token; see lexer.h's
 // pending_plain comment). These pin the count bookkeeping specifically:
 // exactly the guarded literal occurrences stay plain, nothing more (a later
 // fresh use of the same macro expands again) and nothing less (every
@@ -1249,6 +1265,48 @@ TEST(Diagnostics, WarningSeverityCaptured) {
     EXPECT_TRUE(compiler_diags.back().is_warning);
 }
 
+TEST(Preprocessor, IncludeWithTrailingComment) {
+    // Real mudlibs write `#include "x.h" /* why */` -- everything after
+    // the CLOSING delimiter is ignored. Regression: the parser assumed
+    // the closing delimiter was the last character of the line and
+    // swallowed the comment into the filename (real-mud ftpd.c failure).
+    std::string inc_path = std::string(TESTSUITE_DIR) + "/zz_inc_trail.h";
+    {
+        std::ofstream inc(inc_path);
+        inc << "#define FROM_TRAIL 7\n";
+    }
+    NormalizedString out =
+        pp("#include \"zz_inc_trail.h\" /* gets mud info */\nint x = FROM_TRAIL;\n");
+    unlink(inc_path.c_str());
+    EXPECT_EQ(num_parse_error, 0);
+    EXPECT_EQ(out, "int x = 7;");
+}
+
+TEST(Preprocessor, IncludeAngleTrailingCommentParsesCleanName) {
+    // Angle form with a trailing comment: no include path is configured
+    // here so resolution fails, but the reported name must be EXACTLY the
+    // bracketed text -- not the comment-swallowed tail.
+    pp("#include <zz_no_such.h> /* tmi-2 socket defines */\nint y;\n");
+    ASSERT_FALSE(compiler_diags.empty());
+    const Diagnostic& d = compiler_diags.back();
+    EXPECT_NE(d.message.find("zz_no_such.h"), std::string::npos) << d.message;
+    EXPECT_EQ(d.message.find("/*"), std::string::npos) << d.message;
+    EXPECT_EQ(d.message.find("tmi-2"), std::string::npos) << d.message;
+}
+
+TEST(Preprocessor, IncludeLineCommentTail) {
+    std::string inc_path = std::string(TESTSUITE_DIR) + "/zz_inc_tail2.h";
+    {
+        std::ofstream inc(inc_path);
+        inc << "#define TAIL2 9\n";
+    }
+    NormalizedString out =
+        pp("#include \"zz_inc_tail2.h\" // trailing line comment\nint z = TAIL2;\n");
+    unlink(inc_path.c_str());
+    EXPECT_EQ(num_parse_error, 0);
+    EXPECT_EQ(out, "int z = 9;");
+}
+
 TEST(Diagnostics, IncludeProvenanceNote) {
     // An error INSIDE an included file must carry the "in file included
     // from" note naming the includer and the #include line. The include
@@ -1890,4 +1948,286 @@ TEST(PreprocessorSession, ErrorsResetPerChunk) {
     EXPECT_FALSE(session->errors().empty());
     session->preprocess_next("int ok;\n");
     EXPECT_TRUE(session->errors().empty());
+}
+
+// ---------------------------------------------------------------------------
+// compile_file entry points and abort recovery (raw-scanner era).
+// ---------------------------------------------------------------------------
+// Full driver boot (once): compile_file's codegen path pushes onto the
+// eval stack (e.g. the valid-override master apply), so these end-to-end
+// entry tests run against a real booted driver -- same pattern as
+// bench_compile. They live at the END of the file so the lightweight
+// tokenizer-harness tests keep their minimal environment.
+static void ensure_compile_env() {
+    static bool booted = false;
+    if (!booted) {
+        chdir(TESTSUITE_DIR);
+        init_main("etc/config.test");
+        vm_start();
+        current_object = master_ob;
+        booted = true;
+        g_test_env_inited = true;  // the boot covered the harness's init
+    }
+}
+
+// Portable source-on-an-fd helper: tmpfile() works on every CI platform
+// (no /tmp, no mkstemp, auto-deleted).
+static FILE *source_as_file(const char *src) {
+    FILE *f = tmpfile();
+    EXPECT_NE(f, nullptr);
+    EXPECT_EQ(fwrite(src, 1, strlen(src), f), strlen(src));
+    rewind(f);
+    return f;
+}
+
+TEST(CompileEntry, CompileFileFdSuccess) {
+    ensure_compile_env();
+    // The zero-copy fd path end to end: a real file, compiled by fd.
+    FILE *f = source_as_file("int f() { return 40 + 2; }\n");
+    program_t *prog = compile_file_fd(fileno(f), "/fd_success");
+    fclose(f);
+    ASSERT_NE(prog, nullptr);
+    deallocate_program(prog);
+}
+
+TEST(CompileEntry, CompileFileFdBadFdThenViewStillWorks) {
+    ensure_compile_env();
+    // A failing fd load must not poison the next compile (the fd flag is
+    // consumed-and-cleared inside prolog, unwind-safe) and must not hang
+    // (the parse loop is skipped when the source failed to load).
+    program_t *bad = compile_file_fd(-1, "/fd_bad");
+    EXPECT_EQ(bad, nullptr);
+    program_t *good = compile_file("int g() { return 7; }\n", "/after_bad_fd");
+    ASSERT_NE(good, nullptr);
+    deallocate_program(good);
+}
+
+TEST(CompileEntry, FatalAbortThenRecompile) {
+    ensure_compile_env();
+    // A token larger than YYLMAX aborts the compile through the fatal
+    // path (exception unwind through clean_parser). The next compile must
+    // succeed -- pins the teardown ordering: buffers are deleted by the
+    // unwind's clean_parser BEFORE the scanner is destroyed (a destroyed-
+    // scanner touch here was a real use-after-free caught in review).
+    std::string huge = "int ";
+    huge.append(70000, 'a');  // one identifier > YYLMAX (65536)
+    huge += ";\n";
+    // The fatal path unwinds via error(); give it the catch frame
+    // load_object provides in production.
+    error_context_t econ{};
+    save_context(&econ);
+    program_t *bad = nullptr;
+    try {
+      bad = compile_file(huge, "/fatal_abort");
+    } catch (...) {
+      restore_context(&econ);
+    }
+    pop_context(&econ);
+    EXPECT_EQ(bad, nullptr);
+    program_t *good = compile_file("int h() { return 1; }\n", "/after_fatal");
+    ASSERT_NE(good, nullptr);
+    deallocate_program(good);
+}
+
+TEST(CompileEntry, InheritInsideIncludeAbortsCleanly) {
+    ensure_compile_env();
+    // Real-mud shape: `inherit` INSIDE an included file. The compile
+    // aborts via YYACCEPT with the include buffer still LIVE; the
+    // error-path cleanup must tear buffers down BEFORE freeing the
+    // mem_block areas, because popping an include performs accounting
+    // writes into them (heap-use-after-free on a live mud before the
+    // ordering fix).
+    std::string inc_path = std::string(TESTSUITE_DIR) + "/zz_inh_abort.h";
+    {
+        std::ofstream inc(inc_path);
+        inc << "inherit \"/zz_no_such_parent\";\n";
+    }
+    program_t *prog =
+        compile_file("#include \"zz_inh_abort.h\"\nint after() { return 1; }\n",
+                     "/inh_abort");
+    unlink(inc_path.c_str());
+    EXPECT_EQ(prog, nullptr);  // abandoned for the inherit reload
+    if (inherit_file) {        // consume the handoff like load_object does
+        FREE(inherit_file);
+        inherit_file = nullptr;
+    }
+    // The next compile must be clean.
+    program_t *good = compile_file("int ok() { return 2; }\n", "/after_inh_abort");
+    ASSERT_NE(good, nullptr);
+    deallocate_program(good);
+}
+
+TEST(CompileEntry, FatalInsideIncludeAbortsCleanly) {
+    ensure_compile_env();
+    // The fatal-abort variant WITH a live include buffer: the exception
+    // unwind's clean_parser must survive popping it.
+    std::string inc_path = std::string(TESTSUITE_DIR) + "/zz_fatal_inc.h";
+    {
+        std::ofstream inc(inc_path);
+        std::string huge = "int ";
+        huge.append(70000, 'b');  // one identifier > YYLMAX
+        huge += ";\n";
+        inc << huge;
+    }
+    error_context_t econ{};
+    save_context(&econ);
+    program_t *bad = nullptr;
+    try {
+      bad = compile_file("#include \"zz_fatal_inc.h\"\nint x;\n", "/fatal_inc");
+    } catch (...) {
+      restore_context(&econ);
+    }
+    pop_context(&econ);
+    unlink(inc_path.c_str());
+    EXPECT_EQ(bad, nullptr);
+    program_t *good = compile_file("int ok2() { return 3; }\n", "/after_fatal_inc");
+    ASSERT_NE(good, nullptr);
+    deallocate_program(good);
+}
+
+TEST(CompileEntry, FdGrowthPathViaPipe) {
+    ensure_compile_env();
+    // fstat on a pipe reports size 0, forcing the slurp's doubling-growth
+    // branch. ~15KB fits inside the default pipe buffer (64KB on every CI
+    // platform), so no reader process is needed -- portable, no fork.
+    int fds[2];
+#ifdef _WIN32
+    ASSERT_EQ(_pipe(fds, 1 << 16, _O_BINARY), 0);
+#else
+    ASSERT_EQ(pipe(fds), 0);
+#endif
+    std::string src = "int pipe_fn() { return 0";
+    for (int i = 0; i < 3000; i++) src += " + 1";  // ~15KB
+    src += "; }\n";
+    size_t off = 0;
+    while (off < src.size()) {
+        ssize_t n = write(fds[1], src.data() + off, src.size() - off);
+        ASSERT_GT(n, 0);
+        off += static_cast<size_t>(n);
+    }
+    close(fds[1]);
+    program_t *prog = compile_file_fd(fds[0], "/pipe_growth");
+    close(fds[0]);
+    ASSERT_NE(prog, nullptr);
+    deallocate_program(prog);
+}
+
+TEST(CompileEntry, IncludeEmptyFileAndNoTrailingNewline) {
+    ensure_compile_env();
+    // Empty include: slurp guarantees a newline, nothing leaks through.
+    // No-final-newline include ENDING IN A DIRECTIVE: the guaranteed
+    // newline is what terminates that directive.
+    std::string p1 = std::string(TESTSUITE_DIR) + "/zz_empty.h";
+    std::string p2 = std::string(TESTSUITE_DIR) + "/zz_nonl.h";
+    { std::ofstream f(p1); }  // 0 bytes
+    { std::ofstream f(p2); f << "#define NONL_VALUE 5"; }  // no trailing \n
+    NormalizedString out = pp(
+        "#include \"zz_empty.h\"\n#include \"zz_nonl.h\"\nint v = NONL_VALUE;\n");
+    unlink(p1.c_str());
+    unlink(p2.c_str());
+    EXPECT_EQ(num_parse_error, 0);
+    EXPECT_EQ(out, "int v = 5;");
+}
+
+TEST(CompileEntry, FatalInsideIfExpressionRecovers) {
+    ensure_compile_env();
+    // Fatal abort while the #if TOKEN-EXPRESSION buffer is live: the
+    // unwind must pop the IF_EXPR buffer safely and the evaluator's
+    // expansion-suppression flag must not strand into the next compile
+    // (macros must still expand afterwards).
+    std::string huge = "#if 1 + ";
+    huge.append(70000, 'c');  // one identifier > YYLMAX inside the #if
+    huge += "\nint a;\n#endif\n";
+    error_context_t econ{};
+    save_context(&econ);
+    program_t *bad = nullptr;
+    try {
+      bad = compile_file(huge, "/fatal_ifexpr");
+    } catch (...) {
+      restore_context(&econ);
+    }
+    pop_context(&econ);
+    EXPECT_EQ(bad, nullptr);
+    // Next compile: a macro MUST expand (suppress_expansion not stranded).
+    program_t *good =
+        compile_file("#define SEVEN 7\nint ok3() { return SEVEN; }\n", "/after_ifexpr");
+    ASSERT_NE(good, nullptr);
+    deallocate_program(good);
+}
+
+TEST(CompileEntry, UnterminatedTextBlockAndTemplateRecover) {
+    ensure_compile_env();
+    // EOF inside a text block and inside a template literal: both must
+    // produce a clean error and leave the compiler reusable.
+    program_t *tb = compile_file("string f() { return @END\nnever terminated\n", "/unterm_tb");
+    EXPECT_EQ(tb, nullptr);
+    program_t *tp = compile_file("string g() { return `open ${1 + \n", "/unterm_tpl");
+    EXPECT_EQ(tp, nullptr);
+    program_t *good = compile_file("int ok4() { return 4; }\n", "/after_unterm");
+    ASSERT_NE(good, nullptr);
+    deallocate_program(good);
+}
+
+TEST(CompileEntry, IncludeDepthLimitCleanError) {
+    ensure_compile_env();
+    // A self-including header hits MAX_INCLUDE_DEPTH: must be a clean
+    // compile error (bounded, no crash), and the next compile clean.
+    std::string p = std::string(TESTSUITE_DIR) + "/zz_selfinc.h";
+    { std::ofstream f(p); f << "#include \"zz_selfinc.h\"\n"; }
+    program_t *bad = compile_file("#include \"zz_selfinc.h\"\nint x;\n", "/deep_inc");
+    unlink(p.c_str());
+    EXPECT_EQ(bad, nullptr);
+    program_t *good = compile_file("int ok5() { return 5; }\n", "/after_deep");
+    ASSERT_NE(good, nullptr);
+    deallocate_program(good);
+}
+
+// ---------------------------------------------------------------------------
+// Staged outputs (stage_output.cc): pp/tokens forms through the real
+// lexer+preprocessor, no parser.
+// ---------------------------------------------------------------------------
+static std::string run_stage_dump(const char *src, bool pp_form) {
+    ensure_compile_env();
+    FILE *in = source_as_file(src);
+    FILE *out = tmpfile();  // portable capture (open_memstream is not)
+    EXPECT_NE(out, nullptr);
+    bool ok = lpc_dump_stage_tokens(fileno(in), "/stage_test", pp_form, out);
+    fclose(in);
+    EXPECT_TRUE(ok);
+    std::string result;
+    rewind(out);
+    char chunk[4096];
+    size_t n;
+    while ((n = fread(chunk, 1, sizeof(chunk), out)) > 0) result.append(chunk, n);
+    fclose(out);
+    return result;
+}
+
+TEST(StageOutput, PpFormExpandsMacros) {
+    std::string out = run_stage_dump(
+        "#define TWICE(x) ((x) + (x))\nint f() { return TWICE(21); }\n", true);
+    EXPECT_NE(out.find("( ( 21 ) + ( 21 ) )"), std::string::npos) << out;
+    EXPECT_EQ(out.find("TWICE"), std::string::npos) << out;   // macro consumed
+    EXPECT_EQ(out.find("#define"), std::string::npos) << out; // directive applied
+}
+
+TEST(StageOutput, TokensFormOnePerLineWithPositions) {
+    std::string out = run_stage_dump("int f() { return \"hi\"; }\n", false);
+    // Every line is `line:col kind spelling`; the string payload re-quoted.
+    EXPECT_NE(out.find("\"hi\""), std::string::npos) << out;
+    int lines = 0;
+    for (char c : out) lines += (c == '\n');
+    EXPECT_GE(lines, 9) << out;  // int f ( ) { return "hi" ; }
+}
+
+TEST(StageOutput, LoadFailureReturnsFalseAndCleansUp) {
+    ensure_compile_env();
+    FILE *out = tmpfile();
+    ASSERT_NE(out, nullptr);
+    EXPECT_FALSE(lpc_dump_stage_tokens(-1, "/nope", true, out));
+    fclose(out);
+    // The environment must be reusable afterwards (ASan guards leaks).
+    program_t *good = compile_file("int k() { return 3; }\n", "/after_stage_fail");
+    ASSERT_NE(good, nullptr);
+    deallocate_program(good);
 }

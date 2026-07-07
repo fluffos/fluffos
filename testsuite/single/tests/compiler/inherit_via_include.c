@@ -1,0 +1,10 @@
+// Pins the abort-and-reload path with the inherit INSIDE an included
+// file: the child compile YYACCEPTs while the include buffer is still
+// live (a heap-use-after-free in cleanup ordering on a real mud), then
+// load_object loads the parent and recompiles this file from scratch.
+#include <tests.h>
+#include <inherit_via_include_parent.h>
+
+void do_tests() {
+    ASSERT_EQ(77, parent_value());
+}
