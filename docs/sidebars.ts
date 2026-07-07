@@ -40,6 +40,8 @@ const sidebars: SidebarsConfig = {
           label: 'LPC Language',
           link: { type: 'doc', id: 'lpc/index' },
           items: [
+            'lpc/source-files',
+            'lpc/diagnostics',
             {
               type: 'category',
               label: 'Types',
@@ -68,6 +70,7 @@ const sidebars: SidebarsConfig = {
                 'lpc/constructs/inherit',
                 'lpc/constructs/prototypes',
                 'lpc/constructs/switch',
+                'lpc/constructs/text_blocks',
                 'lpc/constructs/while',
               ],
             },
@@ -78,6 +81,8 @@ const sidebars: SidebarsConfig = {
               items: [
                 'lpc/preprocessor/define',
                 'lpc/preprocessor/include',
+                'lpc/preprocessor/conditionals',
+                'lpc/preprocessor/pragma',
               ],
             },
           ],

@@ -127,6 +127,8 @@ FluffOS uses GitHub Actions for CI on pull requests and pushes to `master`.
 
 ## 8. LPC Language & Runtime Concepts for Agents
 
+**When writing or reviewing LPC code, consult `docs/lpc/` first** — it is the maintained language reference, kept in sync with driver behavior: source-file/extension resolution (`docs/lpc/source-files.md`), reading compiler diagnostics (`docs/lpc/diagnostics.md`), the full preprocessor reference (`docs/lpc/preprocessor/` — define/include/conditionals/pragma), and the types/constructs pages. Testsuite conventions live in `testsuite/README.md`.
+
 When editing compiler, VM, or package features, keep these structural mechanics in mind:
 
 ### Mudlib vs Driver Separation

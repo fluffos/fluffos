@@ -12,6 +12,12 @@ Syntax:
 
 where pathname is a full path delimited by quotes (e.g. "/std/Object").
 
+The pathname is resolved like any object name: an extension-less path
+loads `pathname.lpc` if it exists and falls back to `pathname.c`, while
+an explicit `.lpc` or `.c` extension names that exact file (see
+[source files](../source-files)). `inherit_list()` reports the real
+file names, extension included.
+
 The 'inherit' statement provides the inheritance capability (a concept from
 object-oriented programming) to LPC objects. Inheritance lets an object
 inherit functions and variables from other objects. Because the FluffOS driver

@@ -2,6 +2,10 @@
 layout: doc
 title: lpc
 ---
+# The LPC language
+
+* [source files & object names](source-files)
+* [compiler diagnostics](diagnostics)
 ## constructs
 * [for](constructs/for)
 * [function](constructs/function)
@@ -13,9 +17,11 @@ title: lpc
 * [text_blocks](constructs/text_blocks)
 * [while](constructs/while)
 ## preprocessor
-* [README](preprocessor/README)
+* [overview & directives](preprocessor/)
 * [define](preprocessor/define)
 * [include](preprocessor/include)
+* [conditionals](preprocessor/conditionals)
+* [pragma](preprocessor/pragma)
 ## types
 * [array](types/array)
 * [buffer](types/buffer)
