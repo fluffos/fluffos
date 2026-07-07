@@ -325,37 +325,6 @@ void handle_pragma(char *str) {
       return;
     }
   }
-  // Near-miss suggestion (8.5/8.6): an unknown pragma within edit
-  // distance 2 of a real one gets a "did you mean" note.
-  {
-    auto edit_distance = [](const char *a, const char *b) {
-      size_t la = strlen(a), lb = strlen(b);
-      std::vector<size_t> prev(lb + 1), cur(lb + 1);
-      for (size_t j = 0; j <= lb; j++) prev[j] = j;
-      for (size_t ii = 1; ii <= la; ii++) {
-        cur[0] = ii;
-        for (size_t j = 1; j <= lb; j++) {
-          size_t sub = prev[j - 1] + (a[ii - 1] == b[j - 1] ? 0 : 1);
-          cur[j] = std::min(std::min(prev[j] + 1, cur[j - 1] + 1), sub);
-        }
-        std::swap(prev, cur);
-      }
-      return prev[lb];
-    };
-    const char *best = nullptr;
-    size_t best_d = 3;
-    for (i = 0; our_pragmas[i].name; i++) {
-      size_t d = edit_distance(str, our_pragmas[i].name);
-      if (d < best_d) {
-        best_d = d;
-        best = our_pragmas[i].name;
-      }
-    }
-    if (best != nullptr) {
-      compiler_pending_notes.push_back(std::string("did you mean '#pragma ") +
-                                       (no_flag ? "no_" : "") + best + "'?");
-    }
-  }
   yywarn("Unknown #pragma, ignored.");
 }
 

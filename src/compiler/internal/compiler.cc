@@ -145,16 +145,91 @@ static std::string display_path(const std::string &file) {
   return "/" + file;
 }
 
+// Fetch one line of a mudlib-relative source file for a diagnostic
+// snippet (macro-definition notes). The driver runs chdir()ed into the
+// mudlib root, so the real path is the mud path without its leading '/'.
+// Best-effort: returns "" when unreadable (in-memory sources, gone files).
+static std::string read_source_line(const char *mud_path, int line_no) {
+  if (mud_path == nullptr || line_no <= 0) return "";
+  const char *rel = mud_path[0] == '/' ? mud_path + 1 : mud_path;
+  FILE *f = fopen(rel, "rb");
+  if (f == nullptr) return "";
+  std::string line;
+  int cur = 1;
+  int ch;
+  while ((ch = fgetc(f)) != EOF) {
+    if (cur == line_no) {
+      if (ch == '\n') break;
+      if (line.size() < 512) line += static_cast<char>(ch);
+    } else if (ch == '\n') {
+      cur++;
+      if (cur > line_no) break;
+    }
+  }
+  fclose(f);
+  while (!line.empty() && (line.back() == '\r')) line.pop_back();
+  return line;
+}
+
 std::string render_diagnostic(const Diagnostic &d, bool color) {
   const char *c_err = color ? "\033[1;31m" : "";
   const char *c_warn = color ? "\033[1;35m" : "";
+  const char *c_note = color ? "\033[1;30m" : "";
   const char *c_bold = color ? "\033[1m" : "";
   const char *c_caret = color ? "\033[1;32m" : "";
   const char *c_off = color ? "\033[0m" : "";
   std::string out;
+
+  // Gutter snippet, clang-shaped:
+  //   %5d | <source line>
+  //         | <marks>
+  auto emit_snippet = [&](int line_no, std::string shown, int caret_col,
+                          const std::vector<Diagnostic::Range> *ranges,
+                          const std::vector<Diagnostic::FixIt> *fixits) {
+    for (auto &ch : shown) {
+      if (ch == '\t') ch = ' ';  // tab as one column, matching capture
+    }
+    char num[16];
+    snprintf(num, sizeof(num), "%5d", line_no);
+    out += "\n";
+    out += num;
+    out += " | " + shown;
+    std::string marks(shown.size() + 1, ' ');
+    bool any = false;
+    if (ranges != nullptr) {
+      for (const auto &r : *ranges) {
+        if (r.line != line_no || r.col_start <= 0 || r.col_start > r.col_end) continue;
+        for (int c = r.col_start; c <= r.col_end && static_cast<size_t>(c) <= marks.size(); c++) {
+          marks[static_cast<size_t>(c - 1)] = '~';
+          any = true;
+        }
+      }
+    }
+    if (caret_col > 0 && static_cast<size_t>(caret_col) <= shown.size() + 1) {
+      marks[static_cast<size_t>(caret_col - 1)] = '^';
+      any = true;
+    }
+    if (any) {
+      while (!marks.empty() && marks.back() == ' ') marks.pop_back();
+      out += "\n      | ";
+      out += c_caret;
+      out += marks;
+      out += c_off;
+    }
+    if (fixits != nullptr) {
+      for (const auto &f : *fixits) {
+        if (f.col_start > 0 && static_cast<size_t>(f.col_start) <= shown.size() + 1) {
+          out += "\n      | " + std::string(static_cast<size_t>(f.col_start - 1), ' ');
+          out += c_caret;
+          out += f.replacement;
+          out += c_off;
+        }
+      }
+    }
+  };
+
   // clang's convention: the include chain prints BEFORE the main line,
-  // outermost includer first. Capture stores innermost first, so walk in
-  // reverse.
+  // outermost includer first (capture stores innermost first).
   for (auto it = d.included_from.rbegin(); it != d.included_from.rend(); ++it) {
     out += "In file included from " + display_path(it->first) + ":" + std::to_string(it->second) +
            ":\n";
@@ -172,49 +247,33 @@ std::string render_diagnostic(const Diagnostic &d, bool color) {
   out += d.message;
   out += c_off;
   if (!d.snippet.empty()) {
-    // Tabs print as one space so the caret column (which counted a tab
-    // as one) stays aligned with the snippet as displayed.
-    std::string shown = d.snippet;
-    for (auto &ch : shown) {
-      if (ch == '\t') ch = ' ';
-    }
-    out += "\n  " + shown;
-    bool caret_ok = d.column > 0 && static_cast<size_t>(d.column) <= shown.size() + 1;
-    // Build the caret line: '~' runs under operand ranges on this line,
-    // '^' at the diagnosed column (clang's  ~~~ ^ ~~~  shape).
-    std::string marks(shown.size() + 1, ' ');
-    bool any_marks = false;
-    for (const auto &r : d.ranges) {
-      if (r.line != d.line || r.col_start <= 0 || r.col_start > r.col_end) continue;
-      for (int c = r.col_start; c <= r.col_end && static_cast<size_t>(c) <= marks.size(); c++) {
-        marks[static_cast<size_t>(c - 1)] = '~';
-        any_marks = true;
-      }
-    }
-    if (caret_ok) {
-      marks[static_cast<size_t>(d.column - 1)] = '^';
-    }
-    if (caret_ok || any_marks) {
-      while (!marks.empty() && marks.back() == ' ') marks.pop_back();
-      out += "\n  ";
-      out += c_caret;
-      out += marks;
-      out += c_off;
-    }
-    // Fix-it replacement lines, clang-style: the suggested text printed
-    // under the span it replaces.
-    for (const auto &f : d.fixits) {
-      if (f.col_start > 0 && static_cast<size_t>(f.col_start) <= shown.size() + 1) {
-        out += "\n  " + std::string(static_cast<size_t>(f.col_start - 1), ' ');
-        out += c_caret;
-        out += f.replacement;
-        out += c_off;
-      }
-    }
+    emit_snippet(d.line, d.snippet, d.column, &d.ranges, &d.fixits);
   }
+
+  // Macro-expansion cascade, clang-shaped: one located note per level,
+  // carrying the macro DEFINITION line with a caret at the name.
   for (const auto &exp : d.expansions) {
-    out += "\n  note: ";
-    out += exp;
+    out += "\n";
+    if (!exp.def_file.empty()) {
+      std::string def_line_text = read_source_line(exp.def_file.c_str(), exp.def_line);
+      size_t name_pos = def_line_text.find(exp.macro_name);
+      int def_col = name_pos == std::string::npos ? 0 : static_cast<int>(name_pos) + 1;
+      out += display_path(exp.def_file) + ":" + std::to_string(exp.def_line);
+      if (def_col > 0) out += ":" + std::to_string(def_col);
+      out += ": ";
+      out += c_note;
+      out += "note: ";
+      out += c_off;
+      out += "expanded from macro '" + exp.macro_name + "'";
+      if (!def_line_text.empty()) {
+        emit_snippet(exp.def_line, def_line_text, def_col, nullptr, nullptr);
+      }
+    } else {
+      out += c_note;
+      out += "note: ";
+      out += c_off;
+      out += "expanded from builtin macro '" + exp.macro_name + "'";
+    }
   }
   for (const auto &note : d.notes) {
     out += "\n  note: ";
@@ -238,12 +297,8 @@ static const Diagnostic &capture_diagnostic(bool is_warning, const char *message
   d.included_from = lpc_lex_include_stack();
   auto chain = lpc_lex_expansion_chain();
   for (const auto &site : chain) {
-    std::string exp = "during expansion of macro '" + site.name + "'";
-    if (!site.def_file.empty()) {
-      exp += " (defined at " + display_path(site.def_file) + ":" + std::to_string(site.def_line) +
-             ")";
-    }
-    d.expansions.push_back(std::move(exp));
+    d.expansions.push_back(Diagnostic::Expansion{site.name, site.def_file, site.def_line,
+                                                 site.invocation_line, site.invocation_column});
   }
   // Column + snippet (8.1/8.2). Inside an expansion, attribute to the
   // OUTERMOST invocation (chain is innermost-first, so .back()) -- same
