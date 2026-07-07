@@ -10,17 +10,6 @@
  * lexer.l left only this residual state+helpers behind) and lexer_utils.cc --
  * merged here since both serve the same "lexer support" role. See
  * the compiler README (src/compiler/internal/README.md).
- *
- * Revision:
- * 93-06-27 (Robocoder):
- *   Adjusted the meaning of the EXPECT_* flags;
- *     EXPECT_ELSE  ... means the last condition was false, so we want to find
- *                      an alternative or the end of the conditional block
- *     EXPECT_ENDIF ... means the last condition was true, so we want to find
- *                      the end of the conditional block
- *   Added #elif preprocessor command
- *   Fixed get_text_block bug so no text returned ""
- *   Added get_array_block()...using @@ENDMARKER to return array of strings
  */
 
 #include "base/std.h"
@@ -67,33 +56,11 @@ extern struct object_t *master_ob;
 // FIXME: in file.h
 extern const char *check_valid_path(const char *, object_t *, const char *const, int);
 
-// FIXME: lexer() is using global stack machine?!
+// The include-path master apply (init_include_path) pushes its argument
+// onto the VM stack; safe_apply_master_ob pops it.
 void push_malloced_string(const char *p);
-void pop_stack();
-
-// FIXME: lexer needs a list of predefines
-extern int NUM_OPTION_DEFS;
 
 #define NELEM(a) (sizeof(a) / sizeof((a)[0]))
-
-// FIXME: This means current source code can not contain "NUL" byte,
-//  for now it seems suffice, but this should be fixed to check pointer address
-//  for EOF, not for value.
-
-char lex_ctype[256] = {
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-
-#define is_wspace(c) lex_ctype[(unsigned char)(c)]
-
-#define SKIPWHITE \
-  while (is_wspace((unsigned char)*p) && (*p != '\n')) p++
 
 // The `current_line` macro's fallback storage (see lexer.h): holds the
 // value when no scanner/buffer is live -- loaded by end_new_file() with
@@ -1130,6 +1097,105 @@ std::pair<char *, size_t> scratch_slurp_fd_prepared(int fd) {
   return {base, len};
 }
 
+// ---------------------------------------------------------------------------
+// Flex allocator hookup (%option noyyalloc/noyyfree/noyyrealloc in
+// lexer.l). One allocator serves two lifetimes, so every block carries a
+// 16-byte tag header saying which side owns it:
+//   kind 1 (malloc): scanner guts (yyguts_t) and the buffer STACK array
+//     -- they live across compiles and may be yyrealloc'd, so they must
+//     never touch the arena.
+//   kind 2 (arena):  per-compile yy_buffer_state structs -- allocated
+//     inside the window lexer.l's buffer-install helpers open around
+//     yy_scan_buffer (lpc_flex_alloc_arena), reclaimed wholesale at
+//     scratch_destroy (yyfree on them is a no-op). lpc_lex_teardown()
+//     deletes every live buffer BEFORE the arena reset so no code ever
+//     touches a stale struct.
+// These are plain functions over public types (size_t/void*), so they
+// live here rather than in lexer.l's trailer -- the generated scanner
+// only needs their symbols.
+// ---------------------------------------------------------------------------
+
+namespace {
+struct LpcYyHdr {
+  uint64_t kind;  // 1 = malloc, 2 = arena
+  uint64_t size;  // payload bytes (for defensive realloc copies)
+};
+}  // namespace
+
+// The arena window flag: set by lexer.l's yy_scan_buffer call sites.
+bool lpc_flex_alloc_arena = false;
+
+void *yyalloc(size_t size, void * /*yyscanner*/) {
+  LpcYyHdr *h;
+  if (lpc_flex_alloc_arena) {
+    h = static_cast<LpcYyHdr *>(scratch_raw_allocate(size + sizeof(LpcYyHdr), 16));
+    h->kind = 2;
+  } else {
+    h = static_cast<LpcYyHdr *>(malloc(size + sizeof(LpcYyHdr)));
+    h->kind = 1;
+  }
+  h->size = size;
+  return h + 1;
+}
+
+void yyfree(void *ptr, void * /*yyscanner*/) {
+  if (ptr == nullptr) return;
+  LpcYyHdr *h = static_cast<LpcYyHdr *>(ptr) - 1;
+  if (h->kind == 1) free(h);
+  /* kind 2: arena memory, reclaimed at scratch_destroy. */
+}
+
+void *yyrealloc(void *ptr, size_t size, void *yyscanner) {
+  if (ptr == nullptr) return yyalloc(size, yyscanner);
+  LpcYyHdr *h = static_cast<LpcYyHdr *>(ptr) - 1;
+  if (h->kind == 1) {
+    h = static_cast<LpcYyHdr *>(realloc(h, size + sizeof(LpcYyHdr)));
+    h->size = size;
+    return h + 1;
+  }
+  /* Arena block (shouldn't happen: only the malloc-side buffer stack is
+   * ever realloc'd) -- defensive copy-out to malloc. */
+  LpcYyHdr *nh = static_cast<LpcYyHdr *>(malloc(size + sizeof(LpcYyHdr)));
+  nh->kind = 1;
+  nh->size = size;
+  memcpy(nh + 1, ptr, h->size < size ? h->size : size);
+  return nh + 1;
+}
+
+// Copying splice push for callers whose text is NOT scannable in place
+// (persistent macro bodies, string_views over foreign memory): one arena
+// copy plus sentinels, then lexer.l's in-place push -- still no flex
+// text allocation.
+void lpc_lex_push_string_buffer(const char *text, size_t len, int kind,
+                                void *yyscanner) {
+  char *base = static_cast<char *>(scratch_raw_allocate(len + 2, 1));
+  memcpy(base, text, len);
+  base[len] = 0;
+  base[len + 1] = 0;
+  lpc_lex_push_prepared_buffer(base, len + 2, kind, yyscanner);
+}
+
+// Pop one pushed buffer: record the ending line for the kind-dispatched
+// bookkeeping (include accounting / expansion-frame death), then let
+// Flex pop the buffer itself.
+void lpc_lex_pop_pushed_buffer(void *yyscanner) {
+  int ending_lineno = lpc_lex_buffer_count(yyscanner) > 0 ? yyget_lineno(yyscanner) : 0;
+  lpc_lex_note_buffer_pop(ending_lineno);
+  yypop_buffer_state(yyscanner);
+}
+
+// The shared <<EOF>> decision for lexer.l's EOF rules: a drained pushed
+// buffer (splice or #include content -- NOT a #if expression, whose edge
+// is hard) is popped and scanning simply continues; returns 0 when this
+// is a genuine end-of-input the rule must handle itself.
+int lpc_lex_pop_splice_if_any(void *yyscanner) {
+  if (lpc_lex_pushed_depth() > 0 && lpc_lex_top_buffer_kind() != LPC_BUF_IF_EXPR) {
+    lpc_lex_pop_pushed_buffer(yyscanner);
+    return 1;
+  }
+  return 0;
+}
+
 void lpc_lex_teardown_active(void) {
   if (active_scanner != nullptr) {
     lpc_lex_teardown(active_scanner);
@@ -1393,69 +1459,6 @@ typedef struct ident_hash_elem_list_s {
 
 ident_hash_elem_list_t *ihe_list = nullptr;
 
-#if 0
-void dump_ihe(ident_hash_elem_t *ihe, int noisy)
-{
-  int sv = 0;
-  if (ihe->token & IHE_RESWORD) {
-    if (noisy) { printf("%s ", ihe->name); }
-  } else {
-    if (noisy) { printf("%s[", ihe->name); }
-    if (ihe->dn.function_num != -1) {
-      if (noisy) { printf("f"); }
-      sv++;
-    }
-    if (ihe->dn.simul_num != -1) {
-      if (noisy) { printf("s"); }
-      sv++;
-    }
-    if (ihe->dn.efun_num != -1) {
-      if (noisy) { printf("e"); }
-      sv++;
-    }
-    if (ihe->dn.local_num != -1) {
-      if (noisy) { printf("l"); }
-      sv++;
-    }
-    if (ihe->dn.global_num != -1) {
-      if (noisy) { printf("g"); }
-      sv++;
-    }
-    if (ihe->sem_value != sv) {
-      if (noisy) {
-        printf("(*%i*)", ihe->sem_value - sv);
-      } else { dump_ihe(ihe, 1); }
-    }
-    if (noisy) { printf("] "); }
-  }
-}
-
-void debug_dump_ident_hash_table(int noisy)
-{
-  int zeros = 0;
-  int i;
-  ident_hash_elem_t *ihe, *ihe2;
-
-  if (noisy) { printf("\n\nIdentifier Hash Table:\n"); }
-  for (i = 0; i < IDENT_HASH_SIZE; i++) {
-    ihe = ident_hash_table[i];
-    if (!ihe) {
-      zeros++;
-    } else {
-      if (zeros && noisy) { printf("<%i zeros>\n", zeros); }
-      zeros = 0;
-      dump_ihe(ihe, noisy);
-      ihe2 = ihe->next;
-      while (ihe2 != ihe) {
-        dump_ihe(ihe2, noisy);
-        ihe2 = ihe2->next;
-      }
-      if (noisy) { printf("\n"); }
-    }
-  }
-  if (zeros && noisy) { printf("<%i zeros>\n", zeros); }
-}
-#endif
 
 void free_unused_identifiers() {
   ident_hash_elem_list_t *ihel, *next;
@@ -1502,9 +1505,6 @@ void free_unused_identifiers() {
   }
   lnamebuf = nullptr;
   lb_index = 4096;
-#if 0
-  debug_dump_ident_hash_table(0);
-#endif
 }
 
 static ident_hash_elem_t *quick_alloc_ident_entry() {
