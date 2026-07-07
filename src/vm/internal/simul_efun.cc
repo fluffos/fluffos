@@ -65,13 +65,11 @@ void init_simul_efun(const char *file) {
     error("Illegal simul_efun file name '%s'\n", file);
   }
 
-  if (file[strlen(file) - 2] != '.') {
-    strcat(buf, ".c");
-  }
-
-  new_ob = load_object(buf, 1);
+  // Load with the config's raw spelling: an explicit ".c"/".lpc" stays
+  // exact; extension-less names prefer ".lpc" and fall back to ".c".
+  new_ob = load_object(file, 1);
   if (new_ob == nullptr) {
-    debug_message("The simul_efun file %s was not loaded.\n", buf);
+    debug_message("The simul_efun file %s was not loaded.\n", file);
     exit(-1);
   }
   set_simul_efun(new_ob);

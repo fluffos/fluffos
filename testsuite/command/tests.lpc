@@ -5,7 +5,7 @@ int execute(string fun);
 void recurse(string dir) {
   mixed leaks;
 
-  foreach (string file in sort_array(get_dir(dir + "*.c"), (: random(2) - random(2) :))) {
+  foreach (string file in sort_array(get_dir(dir + "*.lpc"), (: random(2) - random(2) :))) {
     execute(dir + file);
   }
   foreach (string subdir in map(filter(get_dir(dir + "*", -1),
@@ -13,7 +13,7 @@ void recurse(string dir) {
         (: $1[0] :)) - ({ ".", ".." }))
   {
     if (subdir == "fail") {
-      foreach (string fn in get_dir(dir + "fail/*.c")) {
+      foreach (string fn in get_dir(dir + "fail/*.lpc")) {
         write("A> " + dir + "fail/" + fn + "\n");
         ASSERT2(catch(load_object(dir+"fail/"+fn)), "fail/" + fn + " loaded");
 #if defined(__DEBUGMALLOC__) && defined(__DEBUGMALLOC_EXTENSIONS__) && defined(__PACKAGE_DEVELOP__)
@@ -30,13 +30,13 @@ void recurse(string dir) {
     }
     // only make sure crasher don't crash, errors are ignored.
     else if (subdir == "crasher") {
-      foreach (string fn in get_dir(dir + subdir + "/*.c")) {
+      foreach (string fn in get_dir(dir + subdir + "/*.lpc")) {
         write("B> " + dir + subdir + "/" + fn + "\n");
-        catch((dir + subdir + "/" + fn + ".c")->do_tests());
+        catch((dir + subdir + "/" + fn)->do_tests());
 #if defined(__DEBUGMALLOC__) && defined(__DEBUGMALLOC_EXTENSIONS__) && defined(__PACKAGE_DEVELOP__)
         leaks = check_memory();
         if (sizeof(filter(explode(leaks, "\n"), (: $1 && $1[0] :))) != 1) {
-          write("After trying to run: " + dir + subdir + "/" + fn + ".c\n");
+          write("After trying to run: " + dir + subdir + "/" + fn + "\n");
           write(leaks);
           error("LEAK\n");
         }

@@ -1,4 +1,4 @@
-#define STD_HTTP "/std/http.c"
+#define STD_HTTP "/std/http"
 
 object tp;
 

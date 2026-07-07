@@ -336,7 +336,7 @@ int main(string arg)
       ob = present(arg, environment(this_player()));
     if (!ob)
       return notify_fail("没有这个档案。\n");
-    file = base_name(ob) + ".c";
+    file = base_name(ob) + ".lpc";
   }
 
   start_more_file(file);
