@@ -360,12 +360,12 @@ if (${BISON_FOUND})
   if(Python3_FOUND)
     add_custom_target(generate_ebnf
       COMMAND "${Python3_EXECUTABLE}"
-              "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/generate_ebnf.py"
+              "${CMAKE_SOURCE_DIR}/tools/lpc-syntax/generate_ebnf.py"
               "${GRAMMAR_XML}"
-              "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.ebnf"
+              "${CMAKE_SOURCE_DIR}/tools/lpc-syntax/grammar.ebnf"
               "${CMAKE_SOURCE_DIR}/tools/lpc-syntax/lpc-grammar.json"
       DEPENDS "${GRAMMAR_XML}"
-              "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar_lexical.ebnf.in"
+              "${CMAKE_SOURCE_DIR}/tools/lpc-syntax/grammar_lexical.ebnf.in"
       COMMENT "Generating grammar.ebnf (3 layers) + lpc-grammar.json from grammar.xml"
     )
   endif()
