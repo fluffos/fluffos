@@ -410,7 +410,7 @@ inline int &compiler_pending_caret_col = g_compile.pending_caret_col;
 void rule_set_operand_ranges(int l1, int c1, int e1, int lop, int cop, int l2, int c2, int e2);
 void rule_clear_operand_ranges(void);
 
-// Line-attribution override for directive-dispatch reports. The lex.l
+// Line-attribution override for directive-dispatch reports. The lexer.l
 // directive rule consumes and counts the directive's terminating newline
 // BEFORE dispatching (load-bearing for the #include push and #line
 // arithmetic -- see the rule's comment), so during dispatch current_line

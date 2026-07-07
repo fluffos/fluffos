@@ -222,8 +222,8 @@ WSL provides a **native Linux** environment. FluffOS runs natively under WSL dis
 * **Line/column tracking is native Flex state** (`%option yylineno` + a `YY_USER_ACTION` column). `current_line` is a macro over a reference to the innermost real buffer's per-buffer counter, so isolation across expansions and includes is automatic.
 * **Macro expansion is rescan-driven**: `lpc_lex_resolve_identifier()` pushes the raw substituted body as a buffer and nested references expand when the rescan reaches them; self-reference termination is the set of live expansion-buffer frames. `#if`/`#elif` expressions are evaluated over **tokens** pulled through the scanner (not a private character walk), so `#define X 1+1` + `#if X*2` is `1+1*2` with correct C precedence. Redefining a macro with a different body is a **non-fatal warning**, not an error.
 
-### The lex.l purity rule (enforced)
-* **`lex.l` contains ONLY Flex interactions** — patterns, start-condition transitions (`BEGIN`), pushback (`yyless`), and trailer helpers that must touch the generated scanner's private types (`yyguts_t`, the buffer stack). ALL substantial logic lives in `lexer_rules.cc` (token shaping), `lexer_rules_pp.cc` (preprocessing), or `lexer_utils.cc` (buffer/include bookkeeping, macro resolution). When adding a rule, put anything that only needs `yytext`/`yylval`/`yyget_extra()` in a `lexer_rules*.cc` helper.
+### The lexer.l purity rule (enforced)
+* **`lexer.l` contains ONLY Flex interactions** — patterns, start-condition transitions (`BEGIN`), pushback (`yyless`), and trailer helpers that must touch the generated scanner's private types (`yyguts_t`, the buffer stack). ALL substantial logic lives in `lexer_rules.cc` (token shaping), `lexer_rules_pp.cc` (preprocessing), or `lexer_utils.cc` (buffer/include bookkeeping, macro resolution). When adding a rule, put anything that only needs `yytext`/`yylval`/`yyget_extra()` in a `lexer_rules*.cc` helper.
 
 ### Grammar carries some lexical decisions (don't reintroduce lexer state for them)
 * Array/mapping opens `({`/`([` are ordinary `'(' '{'` / `'(' '['` token pairs the grammar pairs; the `(: name` first-class-function split is decided by LALR lookahead, not a start condition. `grammar.y`'s `%expect` counts the intentional (documented) conflicts — changing those productions means re-running `bison -Wcounterexamples` and updating the count.
@@ -244,7 +244,7 @@ WSL provides a **native Linux** environment. FluffOS runs natively under WSL dis
 ### Utilities & testing
 * **`lexer_utils.cc` / `lexer_utils.h`** also own include-path management, path normalization, and the predefine registry (`add_predefine`, `add_quoted_predefine`, `inc_open` — `std::string_view` interfaces; `inc_path`/`inc_list` are `std::vector<std::string>`, no manual GC marking).
 * Compiler front-end tests are `src/tests/test_compiler.cc` (end-to-end through the real lexer) and `src/tests/test_lexer.cc` (token-level). When testing `#undef` of a predefined value, register the predefine (e.g. `FLUFFOS`) via `add_predefine` in setup — the full driver runtime is not initialized in unit tests.
-* **CI regenerates the scanner and parser from `lex.l`/`grammar.y` on every platform** (flex ≥ 2.6, bison ≥ 3.8 are installed in every CI environment), so a `lex.l`/`grammar.y` change is validated by the toolchain, not just the checked-in `*.autogen.*` copies. Keep a clean regeneration warning-free.
+* **CI regenerates the scanner and parser from `lexer.l`/`grammar.y` on every platform** (flex ≥ 2.6, bison ≥ 3.8 are installed in every CI environment), so a `lexer.l`/`grammar.y` change is validated by the toolchain, not just the checked-in `*.autogen.*` copies. Keep a clean regeneration warning-free.
 
 ---
 

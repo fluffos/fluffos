@@ -24,7 +24,7 @@
 #include "vm/internal/otable.h"
 
 // FIXME: sprintf needs query_instr_name
-#include "compiler/internal/lex.h"
+#include "compiler/internal/lexer.h"
 
 // FIXME: disassembler needs icode
 #include "compiler/internal/icode.h"

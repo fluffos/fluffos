@@ -11,12 +11,12 @@
 #include <unicode/ustring.h>
 
 #include "compiler/internal/compiler.h"
-#include "compiler/internal/lex.h"
+#include "compiler/internal/lexer.h"
 #include "compiler/internal/grammar_rules.h"
 #include "compiler/internal/grammar.autogen.h"
 #include "compiler/internal/scratchpad.h"
 
-// See lex.l's STR_CHECK_OVERFLOW comment: this cap roughly matches the old
+// See lexer.l's STR_CHECK_OVERFLOW comment: this cap roughly matches the old
 // MAXLINE-based "String too long" limit.
 namespace {
 
@@ -167,7 +167,7 @@ void lpc_lex_append_octal_escape(void *yyscanner, const char *text, bool is_temp
 }
 
 void lpc_lex_append_bad_octal_escape(void *yyscanner, bool is_template) {
-  // '\8'/'\9' aren't valid octal digits -- see lex.l's comment on the
+  // '\8'/'\9' aren't valid octal digits -- see lexer.l's comment on the
   // original hand-written scanner's embedded-NUL quirk here. Reported
   // directly as an error instead of replicating that.
   (void)yyscanner;
@@ -193,7 +193,7 @@ void lpc_lex_append_bad_hex_escape(void *yyscanner, bool is_template) {
 
 void lpc_lex_append_unicode_pair_escape(void *yyscanner, const char *text) {
   // \uXXXX\uYYYY UTF-16 surrogate pair, matched and decoded as one unit --
-  // see lex.l's rule comment for why the lead/trail hex digit ranges
+  // see lexer.l's rule comment for why the lead/trail hex digit ranges
   // guarantee this is exactly a D800-DBFF / DC00-DFFF pair.
   UChar pair[2];
   char lead_buf[5] = {text[2], text[3], text[4], text[5], 0};
@@ -291,7 +291,7 @@ int lpc_lex_template_head_or_middle(void *yyscanner, union YYSTYPE *yylval_param
   if (!ctx->template_is_continuation) {
     ctx->template_nesting++;
     if (ctx->template_nesting >= MAX_TEMPLATE_NESTING) {
-      // Undo the increment before bailing -- see lex.l's rule comment
+      // Undo the increment before bailing -- see lexer.l's rule comment
       // (confirmed via UBSan: leaving it at MAX_TEMPLATE_NESTING here was a
       // real out-of-bounds write on the next '{'/'}').
       ctx->template_nesting--;

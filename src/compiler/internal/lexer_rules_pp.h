@@ -3,12 +3,12 @@
 
 // lexer_rules_pp.h / lexer_rules_pp.cc — the preprocessing half of the
 // lexer's rule logic (companion to lexer_rules.{h,cc}, same relationship
-// to lex.l). This is where the old standalone preprocessor's genuinely
+// to lexer.l). This is where the old standalone preprocessor's genuinely
 // unique logic landed when preprocessing was merged into the lexer's own
 // single scan: the macro table and
 // #define/#undef parsing, the #if/#elif expression evaluator
 // (lpc_lex_eval_if_expr), textual macro expansion with recursion guards,
-// and the directive entry point lex.l's one anchored '#'-line rule calls
+// and the directive entry point lexer.l's one anchored '#'-line rule calls
 // (lpc_lex_on_directive). What did NOT move here: the #include
 // input-stack push and macro expansion's ring-buffer splicing live in
 // lexer_utils.cc, next to the buffer machinery they manipulate.
@@ -97,10 +97,10 @@ inline std::shared_ptr<LexerSession> &current_session = g_compile.pp;
 // session (unit tests driving yylex() without one).
 bool lpc_lex_emitting();
 
-// The single entry point for lex.l's one captured-'#'-line rule, covering
+// The single entry point for lexer.l's one captured-'#'-line rule, covering
 // BOTH scan modes (in_skip_mode = YY_START == SC_COND_SKIP). Takes the
 // whole matched logical line (leading whitespace, '#', backslash
-// continuations and all; terminating newline NOT included -- the lex.l
+// continuations and all; terminating newline NOT included -- the lexer.l
 // rule consumes and counts that itself, see its comment), folds and
 // parses it exactly once (name + rest + embedded continuation newlines,
 // which are counted into current_line/total_lines here), then either

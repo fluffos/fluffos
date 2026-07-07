@@ -8,7 +8,7 @@
 #include "compiler/internal/grammar_rules.h"
 #include "grammar.autogen.h"
 #include "efuns.autogen.h"
-#include "lex.h"
+#include "lexer.h"
 #include "compiler.h"
 #include "vm/vm.h"
 

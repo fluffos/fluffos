@@ -13,7 +13,7 @@
 #include "vm/internal/base/program.h"
 #include "compiler.h"
 #include "keyword.h"
-#include "lex.h"
+#include "lexer.h"
 #include "generate.h"
 
 /*

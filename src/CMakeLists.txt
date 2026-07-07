@@ -388,8 +388,8 @@ find_package(FLEX 2.6)
 if (FLEX_FOUND)
   message(STATUS "FLEX: ${FLEX_VERSION}")
   FLEX_TARGET(LpcLexer
-    "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/lex.l"
-    "${CMAKE_CURRENT_BINARY_DIR}/lex.autogen.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/lexer.l"
+    "${CMAKE_CURRENT_BINARY_DIR}/lexer.autogen.cc"
     COMPILE_FLAGS "-Ca"
   )
   if (BISON_FOUND)
@@ -403,13 +403,11 @@ if (FLEX_FOUND)
 else()
   message(STATUS "FLEX: not found, using pre-generated source.")
   add_custom_command(
-    OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/lex.autogen.cc"
-    COMMAND "${CMAKE_COMMAND}" -E copy
-            "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/lex.autogen.cc"
-            "${CMAKE_CURRENT_BINARY_DIR}/lex.autogen.cc"
-    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/lex.autogen.cc"
+    OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/lexer.autogen.cc"
+    COMMAND "${CMAKE_COMMAND}" -D ACTION=DENORMALIZE -D FILE_IN="${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/lexer.autogen.cc" -D FILE_OUT="${CMAKE_CURRENT_BINARY_DIR}/lexer.autogen.cc" -D REPO_ROOT="${CMAKE_SOURCE_DIR}" -P "${CMAKE_SOURCE_DIR}/cmake/util.cmake"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/lexer.autogen.cc"
   )
-  set(GENERATED_LEXER_FILE "${CMAKE_CURRENT_BINARY_DIR}/lex.autogen.cc")
+  set(GENERATED_LEXER_FILE "${CMAKE_CURRENT_BINARY_DIR}/lexer.autogen.cc")
 endif()
 # ─────────────────────────────────────────────────────────────────────────
 
@@ -452,9 +450,9 @@ set(SRC
   "compiler/internal/disassembler.cc"
   "compiler/internal/generate.cc"
   "compiler/internal/icode.cc"
-  "${GENERATED_LEXER_FILE}"          # Flex-generated lex.autogen.cc
-  "compiler/internal/lexer_utils.cc" # global state + helpers lex.l calls into, plus predefines/include-path support
-  "compiler/internal/lexer_rules.cc" # substantive logic behind lex.l's rule actions (escape decoding, number parsing, etc.)
+  "${GENERATED_LEXER_FILE}"          # Flex-generated lexer.autogen.cc
+  "compiler/internal/lexer_utils.cc" # global state + helpers lexer.l calls into, plus predefines/include-path support
+  "compiler/internal/lexer_rules.cc" # substantive logic behind lexer.l's rule actions (escape decoding, number parsing, etc.)
   "compiler/internal/lexer_rules_pp.cc" # preprocessing logic and expression parser
   "compiler/internal/stage_output.cc" # lpcc -E/--tokens staged dumps (lex+pp, no parse)
   "compiler/internal/scratchpad.cc"
@@ -650,10 +648,8 @@ endif()
 
 if (FLEX_FOUND)
   add_custom_command(TARGET "driver" POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" -E copy
-            "${CMAKE_CURRENT_BINARY_DIR}/lex.autogen.cc"
-            "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/lex.autogen.cc"
-    COMMENT "Copying Flex-generated lex.autogen.cc to source tree")
+    COMMAND "${CMAKE_COMMAND}" -D ACTION=NORMALIZE -D FILE_IN="${CMAKE_CURRENT_BINARY_DIR}/lexer.autogen.cc" -D FILE_OUT="${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/lexer.autogen.cc" -D REPO_ROOT="${CMAKE_SOURCE_DIR}" -P "${CMAKE_SOURCE_DIR}/cmake/util.cmake"
+    COMMENT "Copying and sanitizing Flex-generated lexer.autogen.cc")
 endif()
 
 find_package(GTest)

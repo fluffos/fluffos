@@ -15,7 +15,7 @@
 
 #include "efuns.autogen.h"
 #include "compiler.h"
-#include "lex.h"
+#include "lexer.h"
 
 /* our globals */
 static parse_node_block_t *parse_block_list = nullptr;

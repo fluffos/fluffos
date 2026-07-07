@@ -20,7 +20,7 @@
 #include "vm/internal/simulate.h"
 #include "vm/internal/simul_efun.h"
 #include "compiler/internal/icode.h"  // for PUSH_WHAT
-#include "compiler/internal/lex.h"    // for insstr, FIXME
+#include "compiler/internal/lexer.h"    // for insstr, FIXME
 #include "packages/core/sprintf.h"    // FIXME
 #include "packages/core/regexp.h"     // FIXME
 #include "packages/ops/ops.h"         // FIXME

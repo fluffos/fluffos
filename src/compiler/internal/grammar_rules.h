@@ -5,7 +5,7 @@
 #include "vm/vm.h"
 #include "vm/internal/base/machine.h"
 #include "compiler/internal/compiler.h"
-#include "compiler/internal/lex.h"
+#include "compiler/internal/lexer.h"
 #include "compiler/internal/scratchpad.h"
 #include "compiler/internal/generate.h"
 

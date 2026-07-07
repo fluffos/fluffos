@@ -8,7 +8,7 @@
 #include "vm/internal/apply.h"
 #include "vm/internal/base/machine.h"
 #include "vm/internal/simulate.h"
-#include "compiler/internal/lex.h"  // for ident_hash_elem_t etc, fix me!
+#include "compiler/internal/lexer.h"  // for ident_hash_elem_t etc, fix me!
 
 /*
  * This file rewritten by Beek because it was inefficient and slow.  We

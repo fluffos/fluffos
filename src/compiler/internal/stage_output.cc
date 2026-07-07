@@ -3,8 +3,7 @@
 #include "compiler/internal/stage_output.h"
 
 #include "compiler/internal/compiler.h"
-#include "compiler/internal/lex.h"
-#include "compiler/internal/LexStream.h"
+#include "compiler/internal/lexer.h"
 #include "compiler/internal/grammar_rules.h"
 #include "compiler/internal/grammar.autogen.h"
 #include "compiler/internal/lexer_rules_pp.h"
@@ -12,7 +11,7 @@
 
 // ---------------------------------------------------------------------------
 // lpcc's pre-parse stage dumps: pull tokens through the real
-// LexTokenStream (lexing + preprocessing, no parser) and print them.
+// reentrant scanner (lexing + preprocessing, no parser) and print them.
 // The pp form is token-reconstructed text -- with the single-scan design
 // there IS no preprocessed text artifact, so this renders what the
 // PARSER would see, gcc -E shaped (line structure preserved from token
@@ -97,24 +96,33 @@ bool lpc_dump_stage_tokens(int fd, const char *name, bool pp_form, FILE *out) {
     mem_block[i].current_size = 0;
     mem_block[i].max_size = START_BLOCK_SIZE;
   }
+  // Shared-string table discipline (same as the test harness): zeroed
+  // tags mark every hash chain empty, so store_prog_string() never walks
+  // stale string_idx entries into a previous call's FREED A_STRINGS block
+  // -- without this, the SECOND dump in a process spun forever in
+  // release builds (caught by the StageOutput tests run back to back).
+  memset(string_tags, 0, sizeof(string_tags));
+  freed_string = -1;
   num_parse_error = 0;
   ScratchString norm = normalize_filename(name);
   current_file = make_shared_string(norm.c_str());
   current_file_id = add_program_file(norm.c_str(), /*top=*/1);
 
-  LexTokenStream ts;
-  if (!ts.load_fd(fd)) {
+  compiler_context_t lex_ctx;
+  void *scanner = nullptr;
+  yylex_init_extra(&lex_ctx, &scanner);
+  bool ok = start_new_file_fd(fd, scanner);
+  if (!ok) {
     fprintf(stderr, "lpcc: cannot read %s\n", name);
-    return false;
   }
 
-  compiler_context_t *ctx = reinterpret_cast<compiler_context_t *>(yyget_extra(ts.scanner()));
+  compiler_context_t *ctx = &lex_ctx;
   YYSTYPE lval;
   int last_line = 1;
   bool line_start = true;
-  for (;;) {
+  while (ok) {
     YYLTYPE lloc;
-    int kind = ts.next(&lval, &lloc);
+    int kind = yylex(&lval, &lloc, scanner);
     if (kind <= 0) break;
     if (pp_form) {
       // Preserve source line structure from token positions.
@@ -125,23 +133,27 @@ bool lpc_dump_stage_tokens(int fd, const char *name, bool pp_form, FILE *out) {
         line_start = true;
       }
       if (!line_start) fputc(' ', out);
-      print_token_pp(kind, lval, ctx, yyget_text(ts.scanner()), out);
+      print_token_pp(kind, lval, ctx, yyget_text(scanner), out);
       line_start = false;
     } else {
       fprintf(out, "%5d:%-4d %5d  ", lloc.first_line, lloc.first_column, kind);
-      print_token_pp(kind, lval, ctx, yyget_text(ts.scanner()), out);
+      print_token_pp(kind, lval, ctx, yyget_text(scanner), out);
       fputc('\n', out);
     }
     ctx->is_char_literal = false;
     ctx->is_template = false;
   }
-  if (pp_form) fputc('\n', out);
+  if (ok && pp_form) fputc('\n', out);
 
+  // Unified cleanup for success AND load failure: buffers down first,
+  // then the scanner, then the compile-shaped environment.
   lpc_lex_teardown_active();
+  lpc_lex_scanner_destroyed(scanner);
+  yylex_destroy(scanner);
   free_string(const_cast<char *>(current_file));
   current_file = nullptr;
   for (int i = 0; i < NUMAREAS; i++) {
     FREE(mem_block[i].block);
   }
-  return true;
+  return ok;
 }

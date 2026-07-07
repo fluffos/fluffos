@@ -15,7 +15,7 @@
 #include "vm/internal/base/svalue.h"
 #include "generate.h"
 #include "icode.h"
-#include "lex.h"
+#include "lexer.h"
 #include "compiler/internal/lexer_utils.h"
 #include "compiler/internal/grammar_rules.h"
 #include "grammar.autogen.h"
@@ -48,11 +48,15 @@ extern object_t *simul_efun_ob;
 extern svalue_t *safe_apply_master_ob(int, int);
 
 static void clean_parser(void);
-static void prolog(std::string_view source, const char * /*name*/, LexTokenStream &token_stream);
-// When >= 0, prolog loads the token stream from this fd (zero copy)
-// instead of the source view. Set by compile_file_fd for the duration of
-// one compile; the compiler is single-threaded and non-reentrant.
+static bool prolog(std::string_view source, const char * /*name*/, void *scanner);
+// When armed, prolog loads the token stream from this fd (zero copy)
+// instead of the source view -- an explicit flag, NOT an fd sentinel, so
+// a caller's invalid fd (e.g. -1) still flows through the fd path and
+// fails properly instead of silently compiling the empty view. Set by
+// compile_file_fd for one compile; consumed-and-cleared by prolog
+// (unwind-safe). The compiler is single-threaded and non-reentrant.
 static int prolog_source_fd = -1;
+static bool prolog_source_is_fd = false;
 static program_t *epilog(void);
 static void show_overload_warnings(void);
 
@@ -2174,7 +2178,7 @@ void yyerror(struct YYLTYPE *llocp, void *yyscanner, const char *msg) {
   yyerror("%s", msg);
 }
 
-// Flex's YY_FATAL_ERROR is routed here (see lex.l's prologue) instead of
+// Flex's YY_FATAL_ERROR is routed here (see lexer.l's prologue) instead of
 // the generated yy_fatal_error()'s stock exit(2): an unrecoverable
 // scanner condition (in practice only "token too large, exceeds YYLMAX" --
 // a single atomic token over 64KB -- or an allocation failure) must abort
@@ -2215,10 +2219,9 @@ void yywarn(const char *fmt, ...) {
  * Compile an LPC file.
  */
 program_t *compile_file_fd(int fd, const char *name, vm_context_t *vm_context) {
-  prolog_source_fd = fd;
-  program_t *prog = compile_file(std::string_view{}, name, vm_context);
-  prolog_source_fd = -1;
-  return prog;
+  prolog_source_fd = fd;  // consumed-and-cleared by prolog (unwind-safe)
+  prolog_source_is_fd = true;
+  return compile_file(std::string_view{}, name, vm_context);
 }
 
 program_t *compile_file(std::string_view source, const char *name,
@@ -2312,6 +2315,19 @@ program_t *compile_file(std::string_view source, const char *name,
   current_number_of_locals = 0;
   max_num_locals = 0;
 
+  // The reentrant scanner, initialized BEFORE the cleanup DEFER below so
+  // its destruction (guard declared first => runs last) happens AFTER an
+  // exception unwind's clean_parser() -> lpc_lex_teardown_active() has
+  // deleted the flex buffers -- teardown must never touch a destroyed
+  // scanner.
+  compiler_context_t lex_ctx;
+  void *lex_scanner = nullptr;
+  yylex_init_extra(&lex_ctx, &lex_scanner);
+  DEFER {
+    lpc_lex_scanner_destroyed(lex_scanner);
+    yylex_destroy(lex_scanner);
+  };
+
   {
     // make sure we use the C locale during parsing
     auto *current_locale = setlocale(LC_ALL, "C");
@@ -2381,12 +2397,8 @@ program_t *compile_file(std::string_view source, const char *name,
       guard = 0;
     };
 
-    // Owns the reentrant scanner (RAII) and pulls tokens from whatever
-    // source prolog() below points it at (auto-preprocessed on the way).
-    LexTokenStream token_stream;
-
     symbol_start(name);
-    prolog(source, name, token_stream);
+    bool loaded = prolog(source, name, lex_scanner);
     if (g_compile.opt_no_optimize) {
       pragmas &= ~PRAGMA_OPTIMIZE;  // pre-optimization staged output
     }
@@ -2401,14 +2413,15 @@ program_t *compile_file(std::string_view source, const char *name,
     // driver needs, just without ever pausing between tokens.
     auto pstate = std::unique_ptr<yypstate, void (*)(yypstate *)>(yypstate_new(), yypstate_delete);
     if (!pstate) {
-      yyerror(token_stream.scanner(), "memory exhausted");
+      yyerror(lex_scanner, "memory exhausted");
     } else {
       int push_status;
       do {
+        if (!loaded) break;  // source failed to load: no buffer to scan
         YYSTYPE yylval;
         YYLTYPE yylloc;
-        int token = token_stream.next(&yylval, &yylloc);
-        push_status = yypush_parse(pstate.get(), token, &yylval, &yylloc, token_stream.scanner());
+        int token = yylex(&yylval, &yylloc, lex_scanner);
+        push_status = yypush_parse(pstate.get(), token, &yylval, &yylloc, lex_scanner);
       } while (push_status == YYPUSH_MORE);
     }
 
@@ -2860,6 +2873,12 @@ static program_t *epilog(void) {
     }
   }
 
+  // Buffer teardown BEFORE the mem_block frees, mirroring clean_parser:
+  // pops perform include accounting that writes into mem_block. (On this
+  // success path all buffers already drained at EOF -- ordering kept
+  // symmetric as defense in depth.)
+  lpc_lex_teardown_active();
+
   for (i = 0; i < NUMAREAS; i++) {
     FREE((char *)mem_block[i].block);
   }
@@ -2881,7 +2900,6 @@ static program_t *epilog(void) {
   }
   release_tree();
   uninitialize_parser();
-  lpc_lex_teardown_active();  // flex buffer structs are arena-backed
   scratch_destroy();
   clean_up_locals();
   free_unused_identifiers();
@@ -2893,7 +2911,7 @@ static program_t *epilog(void) {
 /*
  * Initialize the environment that the compiler needs.
  */
-static void prolog(std::string_view source, const char *name, LexTokenStream &token_stream) {
+static bool prolog(std::string_view source, const char *name, void *scanner) {
   int i;
 
   function_context.num_parameters = -1;
@@ -2934,19 +2952,37 @@ static void prolog(std::string_view source, const char *name, LexTokenStream &to
     copy_structures(simul_efun_ob->prog);
   }
 
-  if (prolog_source_fd >= 0) {
-    if (!token_stream.load_fd(prolog_source_fd)) {
-      yyerror(token_stream.scanner(), "could not read source file");
+  // Consume-and-clear the fd BEFORE loading: an exception unwind from the
+  // load must never leave a stale fd flag poisoning the next compile.
+  bool use_fd = prolog_source_is_fd;
+  int fd = prolog_source_fd;
+  prolog_source_is_fd = false;
+  prolog_source_fd = -1;
+  if (use_fd) {
+    if (!start_new_file_fd(fd, scanner)) {
+      yyerror(scanner, "could not read source file");
+      num_parse_error++;
+      return false;
     }
   } else {
-    token_stream.load(source);
+    start_new_file(source, scanner);
   }
+  return true;
 }
 
 /*
  * The program has errors, clean things up.
  */
 static void clean_parser() {
+  // FIRST: delete leftover flex buffers. An aborted compile (inherit
+  // abort / fatal) can end with #include buffers still live, and popping
+  // them runs the include accounting (pop_include_state ->
+  // save_file_info -> add_to_mem_block), which writes into mem_block --
+  // so teardown MUST precede the mem_block frees below. Ordering this
+  // after them was a real heap-use-after-free on a live mud (inherit
+  // inside an included file).
+  lpc_lex_teardown_active();
+
   int i, n;
   function_t *funp;
   compiler_temp_t *fundefp, *nextdefp;
@@ -2997,7 +3033,8 @@ static void clean_parser() {
   release_tree();
   uninitialize_parser();
   clean_up_locals();
-  lpc_lex_teardown_active();  // flex buffer structs are arena-backed
+  // (Buffers were torn down at the top of this function; the arena reset
+  // must still come after everything that reads arena memory.)
   scratch_destroy();
   free_unused_identifiers();
 }

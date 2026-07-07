@@ -9,7 +9,7 @@
 #include "vm/internal/base/number.h"  // for formatting lpc int
 
 #include "compiler.h"  // for CURRENT_PROGRAM_SIZE
-#include "lex.h"       // for pragmas
+#include "lexer.h"       // for pragmas
 #include "icode.h"     // for IS_NODE.
 
 static parse_node_t *optimize(parse_node_t * /*expr*/);

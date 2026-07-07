@@ -3,7 +3,7 @@
 #include "compiler/internal/disassembler.h"
 
 #include "vm/vm.h"
-#include "compiler/internal/lex.h"
+#include "compiler/internal/lexer.h"
 #include "compiler/internal/icode.h"
 
 #include <fmt/format.h>

@@ -7,7 +7,7 @@
  * the standalone-preprocessor support helpers (predefines registry,
  * include-path resolution). Originally two separate
  * files -- lex.c/lex.cc (renamed to lex_util.cc once the Flex migration in
- * lex.l left only this residual state+helpers behind) and lexer_utils.cc --
+ * lexer.l left only this residual state+helpers behind) and lexer_utils.cc --
  * merged here since both serve the same "lexer support" role. See
  * the compiler README (src/compiler/internal/README.md).
  *
@@ -28,7 +28,7 @@
 #include <sys/stat.h>
 
 #include "compiler/internal/lexer_utils.h"
-#include "compiler/internal/lex.h"
+#include "compiler/internal/lexer.h"
 #include "compiler/internal/lexer_rules_pp.h"
 
 #include <cstdio>    // for EOF
@@ -57,7 +57,6 @@
 #include "scratchpad.h"
 
 #include "symbol.h"
-#include "compiler/internal/LexStream.h"
 
 #ifdef _WIN32
 #include <io.h>
@@ -96,7 +95,7 @@ char lex_ctype[256] = {
 #define SKIPWHITE \
   while (is_wspace((unsigned char)*p) && (*p != '\n')) p++
 
-// The `current_line` macro's fallback storage (see lex.h): holds the
+// The `current_line` macro's fallback storage (see lexer.h): holds the
 // value when no scanner/buffer is live -- loaded by end_new_file() with
 // the final native value so post-compile readers see what the legacy
 // global held.
@@ -252,7 +251,7 @@ int lookup_predef(const char *name) {
 
 
 
-// Non-static: called directly from lex.l's native $N and open-paren rules
+// Non-static: called directly from lexer.l's native $N and open-paren rules
 // (Phase 6), in addition to the legacy helpers still in this file.
 void lexerror(const char *s) {
   // %-quote: `s` is arbitrary compile-time text -- macro names, #error
@@ -266,10 +265,10 @@ void lexerror(const char *s) {
 
 
 
-// Called from lex.l's "\n" rule and the other newline-consuming actions.
+// Called from lexer.l's "\n" rule and the other newline-consuming actions.
 // LINE counting is native now (%option yylineno: Flex counts newlines in
 // matched text and through yyinput() into the current buffer's own
-// counter -- see lex.h's current_line macro); what remains here is the
+// counter -- see lexer.h's current_line macro); what remains here is the
 // total-lines statistic and the line-boundary purge of dead expansion
 // frames (see the linger policy at purge_exhausted_expansions).
 static void purge_exhausted_expansions();
@@ -369,13 +368,25 @@ static void *active_scanner = nullptr;
 
 void *lpc_lex_active_scanner(void) { return active_scanner; }
 
+void lpc_lex_scanner_destroyed(void *yyscanner) {
+  // Ownership discipline: whoever yylex_destroy()s a scanner clears the
+  // active pointer if it was theirs. An aborted compile skips
+  // end_new_file(), and current_line reads (via
+  // innermost_real_buffer_index) would otherwise dereference the
+  // destroyed scanner's guts on the NEXT compile -- a real ASan
+  // use-after-free pinned by CompileEntry.FatalAbortThenRecompile.
+  if (active_scanner == yyscanner) {
+    active_scanner = nullptr;
+  }
+}
+
 // Native-position logic (current_line, diagnostic snippets, the legacy
-// error-context block) lives further down, built on lex.l's raw
+// error-context block) lives further down, built on lexer.l's raw
 // buffer-introspection primitives.
 // ---------------------------------------------------------------------------
-// Native-position logic, built on lex.l's raw buffer-introspection
+// Native-position logic, built on lexer.l's raw buffer-introspection
 // primitives (lpc_lex_buffer_count/lineno/extents -- the generated
-// scanner's buffer types are private to that translation unit, so lex.l
+// scanner's buffer types are private to that translation unit, so lexer.l
 // exposes accessors and ALL policy lives here).
 // ---------------------------------------------------------------------------
 
@@ -397,7 +408,7 @@ static int innermost_real_buffer_index(void *yyscanner) {
   return 0;
 }
 
-// The storage behind the `current_line` macro (lex.h): a reference to the
+// The storage behind the `current_line` macro (lexer.h): a reference to the
 // innermost real frame's native line counter, falling back to
 // lpc_lex_line_fallback when no scanner or buffer is live.
 int &lpc_lex_current_line_ref(void) {
@@ -567,13 +578,13 @@ void pop_function_context() {
   last_function_context--;
 }
 
-// Resolves the identifier lex.l's identifier rule just matched to a
+// Resolves the identifier lexer.l's identifier rule just matched to a
 // token: macro expansion (rescan-driven, below), reserved word, known
 // defined name, or a fresh L_IDENTIFIER. (The old "(: name" lookahead
 // duties moved into the grammar with 9.2.)
 // ---------------------------------------------------------------------------
 // Pushed-buffer bookkeeping. The kind stack below runs parallel to Flex's
-// pushed-buffer stack (see lex.h's LpcPushedBufferKind): EXPANSION pops
+// pushed-buffer stack (see lexer.h's LpcPushedBufferKind): EXPANSION pops
 // own the innermost live provenance frame ("during expansion of macro
 // 'F' ..." diagnostics); INCLUDE pops restore current_file/current_line
 // and close the per-file line accounting; PLAIN pops (probed-but-unused
@@ -859,7 +870,7 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yyll
             } else {
               // A raw newline in an argument was already counted above --
               // but a copy of this text may be spliced back and rescanned,
-              // where lex.l's \n rule would count it AGAIN (found as a
+              // where lexer.l's \n rule would count it AGAIN (found as a
               // real __LINE__ drift by MultiLineMacroArgKeepsLineCount).
               // Collapse it to a space here: the count stays with the
               // consumption (right, because an UNUSED parameter's text
@@ -918,7 +929,7 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yyll
   return L_IDENTIFIER;
 }
 
-// Called from lex.l's SC_HEREDOC_TERM rules once the "@"/"@@" prefix and
+// Called from lexer.l's SC_HEREDOC_TERM rules once the "@"/"@@" prefix and
 // the terminator identifier have already been recognized natively (the
 // terminator is supplied by the LPC source at compile time, so matching
 // the *body* against it can't be a static Flex pattern). The body is read
@@ -930,7 +941,7 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yyll
 // block). On a recoverable error (bad UTF-8, oversized block), lexerror()
 // just logs and returns, so those paths resume the top-level scanner via
 // `return yylex()`.
-// The shared tail of lex.l's two heredoc-start rules (newline-terminated
+// The shared tail of lexer.l's two heredoc-start rules (newline-terminated
 // and content-follows forms): validate the accumulated terminator and
 // hand off to the body reader. On an empty terminator, reports and
 // resumes the top-level scan.
@@ -1052,7 +1063,7 @@ int parseHeredoc(const char *terminator, int is_array, union YYSTYPE *yylval_par
 // Shared "illegal character" fallback: reports (in DEBUG builds) and
 // returns the same placeholder token the original inline `badlex:` label
 // did. Called both from yylex_inner()'s remaining catch-all default case
-// and from lex.l-triggered helpers whose own lookahead determined the
+// and from lexer.l-triggered helpers whose own lookahead determined the
 // input isn't well-formed (e.g. a '#' not at the start of a line).
 int lpc_lex_badlex(unsigned char c, void *yyscanner) {
   // Reported UNCONDITIONALLY: the legacy version gated this behind
@@ -1072,7 +1083,7 @@ int lpc_lex_badlex(unsigned char c, void *yyscanner) {
   return ' ';
 }
 
-// Called from lex.l's <<EOF>> rule, only at genuine end of the top-level
+// Called from lexer.l's <<EOF>> rule, only at genuine end of the top-level
 // file (include buffers pop in the <<EOF>> rule itself before this is
 // ever reached). Returns -1, the compile loop's end-of-tokens signal.
 int parseMainEof(union YYSTYPE *yylval_param, void *yyscanner) {
@@ -1254,32 +1265,12 @@ static void start_new_file_prepared(char *prepared_base, size_t prepared_body,
   }
 }
 
-// ---------------------------------------------------------------------------
-// LexTokenStream
-// ---------------------------------------------------------------------------
 
-LexTokenStream::LexTokenStream() : ctx_(std::make_unique<compiler_context_t>()) {
-  yylex_init_extra(ctx_.get(), &scanner_);
-}
 
-LexTokenStream::~LexTokenStream() {
-  if (scanner_) {
-    yylex_destroy(scanner_);
-  }
-}
 
-void LexTokenStream::load(std::string_view source, std::shared_ptr<LexerSession> session) {
-  start_new_file(source, scanner_, std::move(session));
-}
 
-bool LexTokenStream::load_fd(int fd, std::shared_ptr<LexerSession> session) {
-  return start_new_file_fd(fd, scanner_, std::move(session));
-}
 
-int LexTokenStream::next(union YYSTYPE *yylval_param, struct YYLTYPE *yylloc_param) {
-  YYLTYPE local;
-  return yylex(yylval_param, yylloc_param != nullptr ? yylloc_param : &local, scanner_);
-}
+
 
 const char *query_instr_name(int instr) {
   const char *name;
@@ -2092,7 +2083,18 @@ bool lpc_lex_handle_include(std::string_view rest, void *yyscanner) {
   }
   if (name_expr.size() >= 2 && (name_expr[0] == '"' || name_expr[0] == '<')) {
     char delim = name_expr[0] == '"' ? '"' : '>';
-    std::string filename(name_expr.substr(1, name_expr.size() - 2));
+    // Scan to the CLOSING delimiter -- it is not necessarily the last
+    // character of the line: real mudlibs write
+    //   #include <mudlib.h> /* trailing comment */
+    // and everything after the close is ignored (historical behavior).
+    // Assuming last-char-is-delimiter swallowed the comment into the
+    // filename and broke such includes.
+    size_t close_pos = name_expr.find(delim, 1);
+    if (close_pos == ScratchString::npos) {
+      lexerror("Bad #include directive");
+      return false;
+    }
+    std::string filename(name_expr.substr(1, close_pos - 1));
 
     if (inc_stack.size() >= MAX_INCLUDE_DEPTH) {
       lexerror("#include nested too deeply");
@@ -2108,7 +2110,7 @@ bool lpc_lex_handle_include(std::string_view rest, void *yyscanner) {
       // exactly for the per-file line-number arithmetic to close against
       // pop_include_state().
       //
-      // Precondition established by the caller (lex.l's directive rule):
+      // Precondition established by the caller (lexer.l's directive rule):
       // the directive's terminating newline has been consumed and
       // counted, so current_line is already the line AFTER the #include.
       // Zero-copy include: the file is read straight into an arena block

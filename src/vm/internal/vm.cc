@@ -15,7 +15,7 @@
 #include "vm/internal/master.h"
 #include "vm/internal/simul_efun.h"
 #include "vm/internal/simulate.h"
-#include "compiler/internal/lex.h"       // for add_predefines, fixme!
+#include "compiler/internal/lexer.h"       // for add_predefines, fixme!
 #include "compiler/internal/lexer_utils.h"
 #include "compiler/internal/compiler.h"  // for init_locals, fixme!
 

@@ -1,13 +1,13 @@
 %{
 /*
- * lex.l — Flex scanner for the LPC lexer.
+ * lexer.l — Flex scanner for the LPC lexer.
  *
  * This is the driver's ONE scan over LPC source: preprocessing is part of
  * lexing, not a separate pass. The main
  * file's content IS the base buffer (lpc_lex_set_source); macro
  * splices and #include contents are in-memory buffers pushed on Flex's
  * buffer stack. Every byte is read exactly once, one token's worth of
- * work at a time, driven by each LexTokenStream::next() pull.
+ * work at a time, one yylex() pull per parser token.
  *
  * Whitespace, comments, operators/punctuation, numeric literals,
  * identifiers, '(' compound tokens (array/mapping/function-pointer open),
@@ -62,7 +62,7 @@
 #include <string>
 
 #include "compiler/internal/compiler.h"
-#include "compiler/internal/lex.h"
+#include "compiler/internal/lexer.h"
 #include "compiler/internal/grammar_rules.h"
 #include "compiler/internal/grammar.autogen.h"
 #include "compiler/internal/scratchpad.h"
@@ -130,7 +130,7 @@
     yyless(n);                                          \
   } while (0)
 
-// All template/string states moved to struct compiler_context_t in lex.h
+// All template/string states moved to struct compiler_context_t in lexer.h
 
 // Roughly matches the old MAXLINE-based "String too long" cap. Called
 // after every append to str_accum below, not just the bulk-growth ones
@@ -766,7 +766,7 @@ WS_NO_NL    [ \t\r\v\f]
 // continues from the parent buffer -- the cross-boundary case a raw
 // reader must survive (a function-like macro's `(args)` following a
 // splice that ends with the macro's name). Wrapped here because Flex
-// generates yyinput() as static, private to lex.autogen.cc.
+// generates yyinput() as static, private to lexer.autogen.cc.
 int lpc_lex_getc(void *yyscanner) {
   struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;
   for (;;) {
@@ -786,7 +786,7 @@ int lpc_lex_getc(void *yyscanner) {
   }
 }
 
-// THE splice mechanism (see lex.h): push `text` as a fresh Flex buffer on
+// THE splice mechanism (see lexer.h): push `text` as a fresh Flex buffer on
 // top of the current one. Composing yy_scan_bytes() with the buffer STACK
 // needs care: yy_scan_bytes()'s internal yy_switch_to_buffer() REPLACES
 // the current top-of-stack slot rather than pushing, so the "flush the
