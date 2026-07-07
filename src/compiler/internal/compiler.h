@@ -279,10 +279,18 @@ struct Diagnostic {
   // (includer file, line of its #include directive). Rendered clang-style
   // as "In file included from F:N:" prefix lines, outermost first.
   std::vector<std::pair<std::string, int>> included_from;
-  // The live macro-expansion chain at capture, innermost first --
-  // display-ready lines: "during expansion of macro 'F' (defined at
-  // /file:line)". Rendered as indented notes after the main line.
-  std::vector<std::string> expansions;
+  // The live macro-expansion chain at capture, innermost first. Rendered
+  // clang-style: each level prints its own located note
+  // ("file:line:col: note: expanded from macro 'F'") with the macro
+  // DEFINITION line as a gutter snippet and a caret at the name.
+  struct Expansion {
+    std::string macro_name;
+    std::string def_file;  // empty for builtins/predefines
+    int def_line = 0;
+    int use_line = 0;
+    int use_col = 0;
+  };
+  std::vector<Expansion> expansions;
   // Everything else: site-supplied context (compiler_pending_notes, e.g.
   // "previous definition of 'FOO' was at ..."), the compile-session
   // chain. Rendered as indented notes after the expansion chain.

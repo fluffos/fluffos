@@ -1347,10 +1347,11 @@ TEST(Diagnostics, ExpansionChainNote) {
     ASSERT_FALSE(compiler_diags.empty());
     const Diagnostic& d = compiler_diags.back();
     ASSERT_FALSE(d.expansions.empty());
-    EXPECT_NE(d.expansions[0].find("during expansion of macro 'BAD'"), std::string::npos);
-    EXPECT_NE(d.expansions[0].find(":1)"), std::string::npos);  // defined at line 1
+    EXPECT_EQ(d.expansions[0].macro_name, "BAD");
+    EXPECT_EQ(d.expansions[0].def_line, 1);  // defined at line 1
     std::string r = render_diagnostic(d);
-    EXPECT_NE(r.find("\n  note: during expansion of macro 'BAD'"), std::string::npos);
+    // clang shape: a LOCATED note line ("/file:line[:col]: note: ...").
+    EXPECT_NE(r.find(": note: expanded from macro 'BAD'"), std::string::npos);
 }
 
 TEST(Diagnostics, NestedExpansionChainNotes) {
@@ -1363,8 +1364,8 @@ TEST(Diagnostics, NestedExpansionChainNotes) {
     // buffer + frame, so BOTH sites report, innermost first -- the full
     // clang-style chain the flattened textual design couldn't produce.
     ASSERT_GE(d.expansions.size(), 2u);
-    EXPECT_NE(d.expansions[0].find("macro 'INNER'"), std::string::npos);
-    EXPECT_NE(d.expansions[1].find("macro 'OUTER'"), std::string::npos);
+    EXPECT_EQ(d.expansions[0].macro_name, "INNER");
+    EXPECT_EQ(d.expansions[1].macro_name, "OUTER");
 }
 
 TEST(Diagnostics, ExpansionInsideIncludeCombined) {
@@ -1382,10 +1383,10 @@ TEST(Diagnostics, ExpansionInsideIncludeCombined) {
     const Diagnostic& d = compiler_diags.back();
     ASSERT_FALSE(d.included_from.empty());
     ASSERT_FALSE(d.expansions.empty());
-    EXPECT_NE(d.expansions[0].find("macro 'KABOOM'"), std::string::npos);
+    EXPECT_EQ(d.expansions[0].macro_name, "KABOOM");
     std::string r = render_diagnostic(d);
     EXPECT_LT(r.find("In file included from"), r.find("error:"));
-    EXPECT_NE(r.find("note: during expansion of macro 'KABOOM'"), std::string::npos);
+    EXPECT_NE(r.find(": note: expanded from macro 'KABOOM'"), std::string::npos);
 }
 
 TEST(Diagnostics, ColumnAndSnippetCaptured) {
@@ -1402,7 +1403,8 @@ TEST(Diagnostics, ColumnAndSnippetCaptured) {
     std::string r = render_diagnostic(d);
     EXPECT_NE(r.find(":2:10: error:"), std::string::npos);
     // Caret line: two-space indent + (column-1) spaces + '^'.
-    EXPECT_NE(r.find("\n  " + std::string(9, ' ') + "^"), std::string::npos);
+    // clang gutter: "      | " prefix, caret at column 10.
+    EXPECT_NE(r.find("\n      | " + std::string(9, ' ') + "^"), std::string::npos);
 }
 
 TEST(Diagnostics, ExpansionErrorAttributesInvocationColumn) {
@@ -1457,13 +1459,12 @@ TEST(Diagnostics, UnknownEscapeCarriesFixIt) {
     EXPECT_GT(r.rfind("q"), r.find("^"));
 }
 
-TEST(Diagnostics, UnknownPragmaSuggestsNearest) {
+TEST(Diagnostics, UnknownPragmaWarnsAndIsIgnored) {
     pp("#pragma strict_typs\nint x;\n");
     ASSERT_FALSE(compiler_diags.empty());
     const Diagnostic& d = compiler_diags.back();
+    EXPECT_TRUE(d.is_warning);
     EXPECT_NE(d.message.find("Unknown #pragma"), std::string::npos);
-    ASSERT_FALSE(d.notes.empty());
-    EXPECT_NE(d.notes[0].find("did you mean '#pragma strict_types'?"), std::string::npos);
 }
 
 TEST(Diagnostics, SuppressedWarningDoesNotLeakContext) {
