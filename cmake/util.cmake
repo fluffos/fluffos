@@ -1,21 +1,37 @@
-function(process_bison_file FILE_IN FILE_OUT REPO_ROOT ACTION)
+function(process_bison_file FILE_IN FILE_OUT REPO_ROOT ACTION BUILD_ROOT)
   if (NOT EXISTS "${FILE_IN}")
     message(WARNING "File does not exist: ${FILE_IN}")
     return()
   endif()
-  
+
   # Resolve REPO_ROOT to an absolute path first
   get_filename_component(REPO_ROOT_ABS "${REPO_ROOT}" ABSOLUTE)
   string(REPLACE "\\" "/" REPO_ROOT_NORM "${REPO_ROOT_ABS}")
   if (REPO_ROOT_NORM MATCHES "/$")
     string(REGEX REPLACE "/$" "" REPO_ROOT_NORM "${REPO_ROOT_NORM}")
   endif()
-  
+
+  # Resolve the build root too: it must be tokenized separately (and
+  # first, since it usually nests inside the repo root) so the committed
+  # file does not depend on the build directory's name or location.
+  set(BUILD_ROOT_NORM "")
+  if (BUILD_ROOT)
+    get_filename_component(BUILD_ROOT_ABS "${BUILD_ROOT}" ABSOLUTE)
+    string(REPLACE "\\" "/" BUILD_ROOT_NORM "${BUILD_ROOT_ABS}")
+    if (BUILD_ROOT_NORM MATCHES "/$")
+      string(REGEX REPLACE "/$" "" BUILD_ROOT_NORM "${BUILD_ROOT_NORM}")
+    endif()
+  endif()
+
   file(READ "${FILE_IN}" CONTENT)
-  
+
   if (ACTION STREQUAL "NORMALIZE")
-    # Replace absolute path with standard $REPO_ROOT$ token
-    string(REPLACE "${REPO_ROOT_NORM}" "$REPO_ROOT$" CONTENT_SUB "${CONTENT}")
+    # Replace absolute paths with standard tokens (build root first).
+    set(CONTENT_SUB "${CONTENT}")
+    if (BUILD_ROOT_NORM)
+      string(REPLACE "${BUILD_ROOT_NORM}" "$BUILD_ROOT$" CONTENT_SUB "${CONTENT_SUB}")
+    endif()
+    string(REPLACE "${REPO_ROOT_NORM}" "$REPO_ROOT$" CONTENT_SUB "${CONTENT_SUB}")
     # Bison mangles the build-dir path into the header guard (uppercased, slashes→underscores).
     # Replace it with a fixed token so the committed file is platform-independent.
     string(REGEX REPLACE
@@ -23,8 +39,12 @@ function(process_bison_file FILE_IN FILE_OUT REPO_ROOT ACTION)
       "YY_YY_GRAMMAR_AUTOGEN_H_INCLUDED"
       CONTENT_SUB "${CONTENT_SUB}")
   elseif (ACTION STREQUAL "DENORMALIZE")
-    # Replace standard $REPO_ROOT$ with actual absolute path of local repo
-    string(REPLACE "$REPO_ROOT$" "${REPO_ROOT_NORM}" CONTENT_SUB "${CONTENT}")
+    # Replace standard tokens with the actual absolute local paths
+    set(CONTENT_SUB "${CONTENT}")
+    if (BUILD_ROOT_NORM)
+      string(REPLACE "$BUILD_ROOT$" "${BUILD_ROOT_NORM}" CONTENT_SUB "${CONTENT_SUB}")
+    endif()
+    string(REPLACE "$REPO_ROOT$" "${REPO_ROOT_NORM}" CONTENT_SUB "${CONTENT_SUB}")
   else()
     message(FATAL_ERROR "Invalid ACTION: ${ACTION}. Must be NORMALIZE or DENORMALIZE")
   endif()
@@ -44,6 +64,9 @@ if (CMAKE_SCRIPT_MODE_FILE)
   if (NOT DEFINED ACTION OR NOT DEFINED FILE_IN OR NOT DEFINED FILE_OUT OR NOT DEFINED REPO_ROOT)
     message(FATAL_ERROR "Required variables: ACTION, FILE_IN, FILE_OUT, REPO_ROOT")
   endif()
+  if (NOT DEFINED BUILD_ROOT)
+    set(BUILD_ROOT "")
+  endif()
 
-  process_bison_file("${FILE_IN}" "${FILE_OUT}" "${REPO_ROOT}" "${ACTION}")
+  process_bison_file("${FILE_IN}" "${FILE_OUT}" "${REPO_ROOT}" "${ACTION}" "${BUILD_ROOT}")
 endif()

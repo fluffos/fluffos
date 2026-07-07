@@ -49,7 +49,7 @@ extern int yydebug;
 
 #include "compiler/internal/scratchpad.h"
 
-#line 53 "$REPO_ROOT$/build/src/grammar.autogen.h"
+#line 53 "$BUILD_ROOT$/src/grammar.autogen.h"
 
 /* Token kinds.  */
 #ifndef YYTOKENTYPE
@@ -150,7 +150,7 @@ union YYSTYPE
     LPC_INT saved_refs;
   } call_open;                 /* context/refs captured at the '(' of a call */
 
-#line 154 "$REPO_ROOT$/build/src/grammar.autogen.h"
+#line 154 "$BUILD_ROOT$/src/grammar.autogen.h"
 
 };
 typedef union YYSTYPE YYSTYPE;
