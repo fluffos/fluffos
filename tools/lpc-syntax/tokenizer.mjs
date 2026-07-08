@@ -183,14 +183,11 @@ export function tokenize(src) {
         while (j < src.length && /[01_]/.test(src[j])) j++;
       } else {
         while (j < src.length && /[0-9_]/.test(src[j])) j++;
-        if (src[j] === '.' && isDigit(src[j + 1] ?? '')) {
+        // Float: fraction digits, or a trailing dot ("1.") -- but never
+        // consuming the ".." range operator. LPC has NO exponent form.
+        if (src[j] === '.' && src[j + 1] !== '.') {
           j++;
           while (j < src.length && /[0-9_]/.test(src[j])) j++;
-          if (src[j] === 'e' || src[j] === 'E') {
-            j++;
-            if (src[j] === '+' || src[j] === '-') j++;
-            while (j < src.length && isDigit(src[j])) j++;
-          }
         }
       }
       push('number', src.slice(i, j));
