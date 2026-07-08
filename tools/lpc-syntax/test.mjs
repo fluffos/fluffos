@@ -32,6 +32,11 @@ check('types and modifiers',
 check('numbers: hex/bin/underscore/real',
       kinds('0xFF 0b10_1 1_000 3.14').join(',') ===
       'number:0xFF,number:0b10_1,number:1_000,number:3.14');
+check('numbers: trailing dot, exponent forms, .. stays a range',
+      kinds('1. 2.5e2 1e3 2E-5 1..5').join(',') ===
+      'number:1.,number:2.5e2,number:1e3,number:2E-5,number:1,operator:..,number:5');
+check('numbers: bare "1e" is not an exponent',
+      kinds('1e').join(',') === 'number:1,identifier:e');
 check('string with escapes stays one token',
       kinds('"a\\"b\\n"').join(',') === 'string:"a\\"b\\n"');
 check('adjacent strings are two tokens',

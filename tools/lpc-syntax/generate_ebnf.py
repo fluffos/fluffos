@@ -415,7 +415,7 @@ def emit_vscode_assets(data, script_dir):
             "chars": {"name": "constant.character.lpc",
                        "match": "'(\\\\.|[^'\\\\])'"},
             "numbers": {"name": "constant.numeric.lpc",
-                         "match": "\\b(0[xX][0-9A-Fa-f_]+|0[bB][01_]+|[0-9][0-9_]*(\\.(?!\\.)[0-9_]*)?)"},
+                         "match": "\\b(0[xX][0-9A-Fa-f_]+|0[bB][01_]+|[0-9][0-9_]*(\\.(?!\\.)[0-9_]*)?([eE][+-]?[0-9][0-9_]*)?)"},
             "functional": {"patterns": [
                 {"name": "keyword.operator.functional.lpc", "match": "\\(:"},
                 {"name": "keyword.operator.functional.lpc", "match": ":\\)"},

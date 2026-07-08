@@ -12,13 +12,18 @@ void do_tests() {
     ASSERT_EQ(65535, 0xFF_FF);
     ASSERT_EQ(2, 0b10_10 - 0b1_0_0_0);
 
-    // Float forms: fraction, trailing dot, digit separators. (There is
-    // deliberately NO exponent notation in LPC -- "2.5e2" is the float
-    // 2.5 followed by the identifier e2.)
+    // Float forms: fraction, trailing dot, digit separators, and
+    // exponent notation (with or without a fraction).
     ASSERT(floatp(1.5));
     ASSERT(floatp(1.));
     ASSERT_EQ(1.0, 1.);
     ASSERT_EQ(1000.25, 1_000.25);
+    ASSERT_EQ(250.0, 2.5e2);
+    ASSERT_EQ(0.025, 2.5e-2);
+    ASSERT_EQ(150.0, 1.5E+2);
+    ASSERT(floatp(1e3));
+    ASSERT_EQ(1000.0, 1e3);
+    ASSERT_EQ(120000.0, 1_2e4);
     ASSERT_EQ(2.0, 1.0 + 1);   // int promotes to float
 
     // Character literals and escapes.

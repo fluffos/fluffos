@@ -16,8 +16,9 @@ decimalNumber = digit, { digit | "_" } ;
 hexNumber = "0", ( "x" | "X" ), hexDigit, { hexDigit | "_" } ;
 binaryNumber = "0", ( "b" | "B" ), binDigit, { binDigit | "_" } ;
 integerLiteral = hexNumber | binaryNumber | decimalNumber ;
-realLiteral = decimalNumber, ".", { digit | "_" }
-            | decimalNumber, ".", { digit | "_" }, ( "e" | "E" ), [ "+" | "-" ], decimalNumber ;
+realLiteral = decimalNumber, ".", { digit | "_" }, [ exponent ]
+            | decimalNumber, exponent ;
+exponent = ( "e" | "E" ), [ "+" | "-" ], digit, { digit | "_" } ;
 
 escapeSequence = "\\", ( "n" | "t" | "r" | "b" | "a" | "e" | '"' | "'" | "`" | "$" | "\\" )
                | "\\", "x", hexDigit, [ hexDigit ]
