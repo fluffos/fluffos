@@ -1,12 +1,91 @@
 #include <globals.h>
 
-int execute(string fun);
+// gtest-style LPC test runner (driver flag -ftest[:file-or-glob]).
+//
+// Output protocol, one block per test file:
+//   [ RUN      ] /single/tests/efuns/foo.lpc
+//   [       OK ] /single/tests/efuns/foo.lpc (3 ms)     -- or --
+//   [  FAILED  ] /single/tests/efuns/foo.lpc (3 ms)
+// then a recap:
+//   [==========] 4128 checks from 289 file(s) ran. (9214 ms total)
+//   [  PASSED  ] 289 file(s).
+//   Checks succeeded.
+// The "Checks succeeded." line and the process exit code are the
+// machine-readable pass signals (ctest test "lpc-testsuite" and CI key
+// on them).
+//
+// Failed checks are RECORDED (include/tests.h OUTPUT ->
+// master::record_failure) and the run CONTINUES -- like gtest, one run
+// reports every failure. Any failure makes the recap list the failed
+// files and the driver exit nonzero. Files are run in randomized order
+// to catch order dependencies.
+//
+// -ftest:single/tests/efuns/foo.lpc   runs one file
+// -ftest:efuns/dual*                  runs files whose path matches the
+//                                     (suffix-anchored) glob
 
-void recurse(string dir) {
-  mixed leaks;
+private int total_files = 0;
+private string *failed_files = ({ });
+private string filter_re = 0;
 
+private void check_leaks(string what) {
+#if defined(__DEBUGMALLOC__) && defined(__DEBUGMALLOC_EXTENSIONS__) && defined(__PACKAGE_DEVELOP__)
+  string leaks = check_memory();
+  if (sizeof(filter(explode(leaks, "\n"), (: $1 && $1[0] :))) != 1) {
+    write("After " + what + ":\n");
+    write(leaks);
+    error("LEAK\n");
+  }
+#endif
+}
+
+// kind: 0 = regular test (load + do_tests), 1 = must FAIL to load,
+// 2 = crasher (errors ignored; only crashing the driver fails).
+private void run_one(string path, int kind) {
+  string err;
+  object tp = this_player();
+  int before, t0, ms;
+
+  if (filter_re && !sizeof(regexp(({ path }), filter_re))) {
+    return;
+  }
+
+  before = sizeof("/single/master"->query_failures());
+  total_files++;
+  write("[ RUN      ] " + path + "\n");
+  t0 = perf_counter_ns();
+
+  switch (kind) {
+    case 0:
+      err = catch(path->do_tests());
+      if (err) {
+        "/single/master"->record_failure(path + ": uncaught error: " + err);
+      }
+      if (tp != this_player()) {
+        "/single/master"->record_failure(path + ": bad this_player() after test");
+      }
+      break;
+    case 1:
+      ASSERT2(catch(load_object(path)), path + " loaded");
+      break;
+    case 2:
+      catch(path->do_tests());
+      break;
+  }
+
+  ms = (perf_counter_ns() - t0) / 1000000;
+  if (sizeof("/single/master"->query_failures()) > before) {
+    failed_files += ({ path });
+    write("[  FAILED  ] " + path + " (" + ms + " ms)\n");
+  } else {
+    write("[       OK ] " + path + " (" + ms + " ms)\n");
+  }
+  check_leaks(path);
+}
+
+private void recurse(string dir) {
   foreach (string file in sort_array(get_dir(dir + "*.lpc"), (: random(2) - random(2) :))) {
-    execute(dir + file);
+    run_one(dir + file, 0);
   }
   foreach (string subdir in map(filter(get_dir(dir + "*", -1),
           (: $1[1] == -2 :)),
@@ -14,79 +93,104 @@ void recurse(string dir) {
   {
     if (subdir == "fail") {
       foreach (string fn in get_dir(dir + "fail/*.lpc")) {
-        write("A> " + dir + "fail/" + fn + "\n");
-        ASSERT2(catch(load_object(dir+"fail/"+fn)), "fail/" + fn + " loaded");
-#if defined(__DEBUGMALLOC__) && defined(__DEBUGMALLOC_EXTENSIONS__) && defined(__PACKAGE_DEVELOP__)
-        leaks = check_memory();
-        if (sizeof(filter(explode(leaks, "\n"), (: $1 && $1[0] :))) != 1) {
-          write("After trying to compile: " + dir + "fail/" + fn + "\n");
-          write(leaks);
-          error("LEAK\n");
-        }
-#endif
+        run_one(dir + "fail/" + fn, 1);
       }
-      cp("/log/compile", "/log/compile_fail");
-      rm("/log/compile");
-    }
-    // only make sure crasher don't crash, errors are ignored.
-    else if (subdir == "crasher") {
+      // Only when a fail-test actually compiled something (a filtered
+      // run may have skipped them all; cp() throws on a missing file).
+      if (file_size("/log/compile") != -1) {
+        cp("/log/compile", "/log/compile_fail");
+        rm("/log/compile");
+      }
+    } else if (subdir == "crasher") {
       foreach (string fn in get_dir(dir + subdir + "/*.lpc")) {
-        write("B> " + dir + subdir + "/" + fn + "\n");
-        catch((dir + subdir + "/" + fn)->do_tests());
-#if defined(__DEBUGMALLOC__) && defined(__DEBUGMALLOC_EXTENSIONS__) && defined(__PACKAGE_DEVELOP__)
-        leaks = check_memory();
-        if (sizeof(filter(explode(leaks, "\n"), (: $1 && $1[0] :))) != 1) {
-          write("After trying to run: " + dir + subdir + "/" + fn + "\n");
-          write(leaks);
-          error("LEAK\n");
-        }
-#endif
+        run_one(dir + subdir + "/" + fn, 2);
       }
-    }
-    else {
+    } else {
       recurse(dir + subdir + "/");
     }
   }
 }
-int execute(string fun, int single_test: (: 0 :))
-{
-  string leaks;
-  object tp = this_player();
 
-  if (!fun || fun == "") {
-    recurse("/single/tests/");
+// Shell-style glob -> suffix-anchored regexp over the full test path,
+// so "efuns/dual*" matches "/single/tests/efuns/dual_extension.lpc".
+private string glob_to_regexp(string pat) {
+  string re = ".*";
+  foreach (int c in pat) {
+    switch (c) {
+      case '*':
+        re += ".*";
+        break;
+      case '?':
+        re += ".";
+        break;
+      case '.': case '[': case ']': case '(': case ')': case '+':
+      case '^': case '$': case '\\': case '|':
+        re += "\\" + sprintf("%c", c);
+        break;
+      default:
+        re += sprintf("%c", c);
+    }
+  }
+  return re + "$";
+}
+
+private int report(int total_ms) {
+  string *failures = "/single/master"->query_failures();
+
+  write("[==========] " + "/single/master"->query_num_checks() + " checks from " +
+        total_files + " file(s) ran. (" + total_ms + " ms total)\n");
+  if (!sizeof(failed_files) && !sizeof(failures)) {
+    write("[  PASSED  ] " + total_files + " file(s).\n");
     write("Checks succeeded.\n");
     return 1;
   }
-
-  set_eval_limit(0x7fffffff);
-
-  write("C> " + fun + "\n");
-  ASSERT_EQ(0, catch(fun->do_tests()));
-
-  set_eval_limit(0x7fffffff);
-
-  if (tp != this_player())
-    error("Bad this_player() after calling " + fun + "\n");
-#if defined(__DEBUGMALLOC__) && defined(__DEBUGMALLOC_EXTENSIONS__) && defined(__PACKAGE_DEVELOP__)
-  leaks = check_memory();
-  if (sizeof(filter(explode(leaks, "\n"), (: $1 && $1[0] :))) != 1) {
-    write("After calling: " + fun + "\n");
-    write(leaks);
-    error("LEAK\n");
+  write("[  FAILED  ] " + sizeof(failed_files) + " file(s), " +
+        sizeof(failures) + " failed check(s), listed below:\n");
+  foreach (string f in failed_files) {
+    write("[  FAILED  ] " + f + "\n");
   }
-#endif
-  if("/single/master"->get_inherit_called() == 0) {
+  return 0;
+}
+
+int execute(string fun, int single_test: (: 0 :))
+{
+  int t0;
+  int plain_single = 0;
+
+  set_eval_limit(0x7fffffff);
+  "/single/master"->reset_test_stats();
+  total_files = 0;
+  failed_files = ({ });
+  filter_re = 0;
+
+  t0 = perf_counter_ns();
+  if (!fun || fun == "") {
+    recurse("/single/tests/");
+  } else if (strsrch(fun, "*") != -1 || strsrch(fun, "?") != -1) {
+    filter_re = glob_to_regexp(fun);
+    recurse("/single/tests/");
+    filter_re = 0;
+  } else {
+    plain_single = 1;
+    run_one(fun, 0);
+  }
+
+  if (!report((perf_counter_ns() - t0) / 1000000)) {
+    // Autotest mode: exit nonzero. Interactively, just report.
+    if (!this_player()) {
+      shutdown(-1);
+    }
+    return 0;
+  }
+
+  if (plain_single && "/single/master"->get_inherit_called() == 0) {
     error("MASTER valid inherit functions are not being called!");
   }
 
-  if(single_test) {
-    write("Checks succeeded.\n");
-    // ordinarily doing a full suite test will eventually hit the shutdown
-    // test and shut it down after a certain delay. but not if we're only doing
-    // one file.
+  if (single_test) {
+    // A full suite run eventually hits the shutdown test, which schedules
+    // the clean exit; a single/filtered run must schedule it itself.
     "single/tests/efuns/shutdown"->do_the_nasty_deed(); // 🤨
-    return 1;
   }
 
   return 1;

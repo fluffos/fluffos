@@ -41,25 +41,40 @@ sources still compile).
 
 ## Running the suite
 
-CMake targets (see the top-level `AGENTS.md`):
+The suite is a first-class **ctest** test and a set of CMake targets:
 
-| Target | What it does |
+| Invocation | What it does |
 |---|---|
-| `driver-autotest` | Boots `driver etc/config.test -ftest`, runs every test, exits nonzero on any failure. This is the CI gate; a clean run prints `Checks succeeded.` |
-| `driver-fulltest` | Same, from a fresh build. |
-| `driver-testsuite` | Boots the driver against this mudlib for interactive poking (log in and type `tests`). |
+| `ctest -L lpc` (or `ctest -R lpc-testsuite`) | Runs the whole LPC suite through ctest, alongside `ctest -LE lpc` for the GTest binaries. This is what CI runs. |
+| `driver-autotest` (CMake target) | Same run, invoked directly; exits nonzero on any failure. |
+| `driver-testsuite` (CMake target) | Boots the driver against this mudlib for interactive poking (log in and type `tests`). |
 
-Run a single test file:
+The runner (`command/tests.lpc`) prints a gtest-style protocol:
+
+```text
+[ RUN      ] /single/tests/efuns/dual_extension.lpc
+[       OK ] /single/tests/efuns/dual_extension.lpc (24 ms)
+[==========] 3401 checks from 297 file(s) ran. (7470 ms total)
+[  PASSED  ] 297 file(s).
+Checks succeeded.
+```
+
+**Failures do not stop the run**: a failed check is printed with its
+expected/actual diff and trace, recorded, and the run continues — one
+run reports *every* failure (gtest semantics), then the recap lists each
+`[  FAILED  ]` file and the driver exits nonzero. `Checks succeeded.`
+plus exit 0 is the machine-readable pass signal.
+
+Run one file, or a glob over test paths:
 
 ```bash
 ./build/bin/driver testsuite/etc/config.test '-ftest:single/tests/efuns/dual_extension.lpc'
+./build/bin/driver testsuite/etc/config.test '-ftest:efuns/dual*'
 ```
 
-The `-ftest[:file]` flag reaches `master::flag()` (`single/master.lpc`),
-which invokes the runner `command/tests.lpc`. Without an argument the
-runner walks `/single/tests/` recursively in **randomized order** (run
-it 2–3× when touching the lexer/parser), so tests must not depend on
-each other having run.
+Without an argument the runner walks `/single/tests/` recursively in
+**randomized order** (run it 2–3× when touching the lexer/parser), so
+tests must not depend on each other having run.
 
 ## How the runner treats each directory
 
@@ -91,8 +106,10 @@ void do_tests() {
 }
 ```
 
-Failed assertions print `file:line, Check failed` and shut the driver
-down with a nonzero exit (that is how CI detects failure). Helper
+Failed assertions print `file:line, Check failed` (with expected/actual
+and a trace for `ASSERT_EQ`/`ASSERT_NE`), are recorded, and the run
+continues; any recorded failure makes the final recap fail the run with
+a nonzero exit (that is how CI detects failure). Helper
 fixtures that should not be executed as tests live outside
 `/single/tests/` — conventionally in `/clone` (e.g. `inh0`–`inh2`,
 `dual_*`) or as `#include`s under `/include`.

@@ -15,4 +15,14 @@ void do_tests() {
     // Fluffos new behavior.
     ASSERT_EQ(save_object(0), "#" + __FILE__ + "\ny " + MAX_INT + "\n");
     ASSERT_EQ(save_object(1), "#" + __FILE__ + "\nx 0\ny " + MAX_INT + "\n");
+
+    // A source extension on the save path is stripped (either spelling)
+    // before ".o" is appended -- never "sf.lpc.o" / "sf.c.o".
+    ASSERT_EQ(24, save_object("/sf.lpc"));
+    ASSERT(read_file("/sf.o"));
+    ASSERT_EQ(-1, file_size("/sf.lpc.o"));
+    ASSERT_EQ(24, save_object("/sf.c"));
+    ASSERT(read_file("/sf.o"));
+    ASSERT_EQ(-1, file_size("/sf.c.o"));
+    rm("/sf.o");
 }

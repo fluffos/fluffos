@@ -5,8 +5,13 @@
 
 #define CLEAR_ERROR (("/single/master"->clear_last_error() || 1))
 
+// A failed check is written immediately (with the caught error trace),
+// RECORDED with the master, and the run continues -- gtest semantics.
+// The runner (/command/tests.lpc) reports every recorded failure at the
+// end and exits nonzero; a stray failure outside a runner still fails
+// the run through master::flag()'s recap.
 #define OUTPUT(x) SAFE(write(catch(error(x))); \
-  if(!this_player()) { shutdown(-1); })
+  "/single/master"->record_failure(x);)
 #define WHERE __FILE__ + ":" + __LINE__
 
 #define ASSERT(x) if (CLEAR_ERROR && !(x)) { OUTPUT(WHERE + ", Check failed.\n"); }

@@ -1,0 +1,6 @@
+// Fixture for /single/tests/compiler/fail/inherit_exact_ext.lpc ONLY:
+// nothing else may load this file. The fail test inherits it by the
+// ".c" spelling, which must not resolve; if some other test loaded it
+// first, the registry (extension-blind by design) would satisfy the
+// inherit and the fail test would flake with run order.
+string which() { return "lpc"; }
