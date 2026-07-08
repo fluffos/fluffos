@@ -7,7 +7,6 @@ title: system
 * [ctime](ctime)
 * [deep_inherit_list](deep_inherit_list)
 * [error](error)
-* [errorp](errorp)
 * [eval_cost](eval_cost)
 * [find_call_out](find_call_out)
 * [flush_messages](flush_messages)

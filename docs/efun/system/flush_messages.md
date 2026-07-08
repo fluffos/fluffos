@@ -10,8 +10,8 @@ title: system / flush_messages
 
 ### SYNOPSIS
 
-    int flush_messages();
-    int flush_messages(object user);
+    void flush_messages();
+    void flush_messages(object user);
 
 ### DESCRIPTION
 

@@ -10,7 +10,7 @@ title: system / set_eval_limit
 
 ### SYNOPSIS
 
-    void set_eval_limit( int );
+    int set_eval_limit( int );
 
 ### DESCRIPTION
 

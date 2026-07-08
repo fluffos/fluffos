@@ -10,7 +10,7 @@ title: internals / debugmalloc
 
 ### SYNOPSIS
 
-    void debugmalloc( string filename, int mask );
+    string debugmalloc( string filename, int mask );
 
 ### DESCRIPTION
 
