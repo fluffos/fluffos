@@ -108,3 +108,18 @@ add_custom_target(driver-autotest
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/testsuite"
         COMMENT "Running driver automated tests"
 )
+
+# The LPC testsuite as a first-class ctest test: `ctest -R lpc-testsuite`
+# (or plain `ctest`) runs the whole mudlib suite alongside the GTest
+# binaries. The runner prints gtest-style [ RUN ]/[ OK ]/[ FAILED ]
+# blocks; "Checks succeeded." plus a clean exit is the pass signal, and
+# any recorded failure prints a [  FAILED  ] recap and exits nonzero.
+enable_testing()
+add_test(NAME lpc-testsuite
+        COMMAND $<TARGET_FILE:driver> etc/config.test -ftest
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/testsuite")
+set_tests_properties(lpc-testsuite PROPERTIES
+        PASS_REGULAR_EXPRESSION "Checks succeeded\\."
+        FAIL_REGULAR_EXPRESSION "\\[  FAILED  \\]"
+        TIMEOUT 600
+        LABELS "lpc")

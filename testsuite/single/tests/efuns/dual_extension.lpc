@@ -47,4 +47,17 @@ void do_tests() {
     ASSERT(load_object("/clone/dual_only_lpc.c") == ob);
     ASSERT(load_object("/clone/dual_pick_c.lpc") ==
            find_object("/clone/dual_pick_c"));
+
+    // children() is extension-blind too: every spelling names the same
+    // family (the loaded blueprint itself counts as a child).
+    ASSERT_EQ(children("/clone/dual_pick_c"), children("/clone/dual_pick_c.c"));
+    ASSERT_EQ(children("/clone/dual_pick_c"), children("/clone/dual_pick_c.lpc"));
+    ASSERT(sizeof(children("/clone/dual_pick_c.lpc")) >= 1);
+
+    // The registry satisfies INHERIT by identity as well: with
+    // dual_only_lpc loaded (above), a ".c"-spelled inherit of it
+    // compiles (the never-loaded case must fail instead -- pinned by
+    // compiler/fail/inherit_exact_ext.lpc).
+    ob = load_object("/clone/dual_inherit_c_spelling");
+    ASSERT_EQ("lpc", ob->parent_which());
 }

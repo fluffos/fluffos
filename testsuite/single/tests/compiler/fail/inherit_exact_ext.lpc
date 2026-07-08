@@ -1,0 +1,5 @@
+// An explicit ".c" extension is exact -- it must NOT fall back to the
+// ".lpc" spelling. /clone/dual_fail_only_lpc exists only as .lpc (and is
+// loaded by nothing else, so the extension-blind registry cannot satisfy
+// the inherit first), so this file must fail to load.
+inherit "/clone/dual_fail_only_lpc.c";

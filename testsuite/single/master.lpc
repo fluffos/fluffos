@@ -8,8 +8,29 @@ inherit "/inherit/master/valid";
 nosave int has_error = 0;
 nosave string last_error = "";
 
+// Test-run statistics (gtest-style harness, see /command/tests.lpc):
+// every assertion macro passes through clear_last_error(), so it doubles
+// as the check counter; failed checks are RECORDED (the run continues to
+// the next file) and the runner reports them all at the end.
+nosave int num_checks = 0;
+nosave string *test_failures = ({ });
+
 public string clear_last_error() {
+  num_checks++;
   last_error = "";
+}
+
+public void record_failure(string msg) {
+  test_failures += ({ msg });
+}
+
+public int query_num_checks() { return num_checks; }
+
+public string *query_failures() { return test_failures; }
+
+public void reset_test_stats() {
+  num_checks = 0;
+  test_failures = ({ });
 }
 
 // find stack right before __assert
@@ -43,6 +64,11 @@ void flag(string str) {
       if(error) {
         has_error = 1;
         write(error);
+      }
+      // Backstop: recorded check failures fail the run even if the
+      // runner's own recap/shutdown path was skipped somehow.
+      if (sizeof(test_failures)) {
+        has_error = 1;
       }
       break;
     case "speed":
