@@ -493,32 +493,42 @@ void f_async_getdir() {
 #endif
 #ifdef F_ASYNC_DB_EXEC
 void f_async_db_exec() {
-  // Validate FIRST: error() unwinds past this frame, and the manual ref
-  // taken on the callback below would leak (caught by the testsuite's
-  // per-file leak gate through the async_db_exec test). Stack layout
-  // before any pop: sp = callback, sp-1 = sql, sp-2 = handle.
+  // process_efun_callback() locates the callback via the GLOBAL
+  // st_num_arg (arg = sp - st_num_arg + 1 + narg), so it MUST run before
+  // valid_database() below -- that apply runs master LPC which leaves
+  // st_num_arg clobbered. Reversing them made ftc->f.fp read the wrong
+  // stack slot and crash at the ref++ once a real db handle existed
+  // (found by async_db_exec.lpc on the SQLite CI build). unique_ptr owns
+  // the struct and a scope guard releases the funptr ref, so an error()
+  // unwind before hand-off leaks neither (AGENTS.md section 4).
+  std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
+  process_efun_callback(2, cb.get(), F_ASYNC_DB_EXEC);
+  cb->f.fp->hdr.ref++;
+  funptr_t *cb_fp = cb->f.fp;
+  bool handed_off = false;
+  DEFER {
+    if (!handed_off) free_funp(cb_fp);
+  };
+  pop_stack();  // remove the callback; now sp = sql, sp-1 = handle
+
   array_t *info;
   info = allocate_empty_array(1);
   info->item[0].type = T_STRING;
   info->item[0].subtype = STRING_MALLOC;
-  info->item[0].u.string = string_copy((sp - 1)->u.string, "f_db_exec");
+  info->item[0].u.string = string_copy(sp->u.string, "f_db_exec");
   valid_database("exec", info);
 
   db_t *db;
-  db = find_db_conn((sp - 2)->u.number);
+  db = find_db_conn((sp - 1)->u.number);
   if (!db) {
     error("Attempt to exec on an invalid database handle\n");
   }
-
-  std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
-  process_efun_callback(2, cb.get(), F_ASYNC_DB_EXEC);
-  cb->f.fp->hdr.ref++;
-  pop_stack();
 
   if (!db_mut) {
     db_mut = (pthread_mutex_t *)DMALLOC(sizeof(pthread_mutex_t), TAG_PERMANENT, "async_db_exec");
     pthread_mutex_init(db_mut, nullptr);
   }
+  handed_off = true;
   add_db_exec((sp - 1)->u.number, sp->u.string, cb.release());
   pop_2_elems();
 }

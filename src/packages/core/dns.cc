@@ -49,6 +49,12 @@ void on_addr_name_result(int err, char type, int count, int /*ttl*/, void *addre
 
 // Start a reverse lookup.
 void query_name_by_addr(object_t *ob) {
+  // No resolver configured (see query_addr_by_name): skip rather than
+  // dereference a NULL evdns base.
+  if (g_dns_base == nullptr) {
+    return;
+  }
+
   auto *query = new addr_name_query_t;
 
   const char *addr = query_ip_number(ob);
@@ -183,6 +189,14 @@ void on_getaddr_result(int err, evutil_addrinfo *res, void *arg) {
  */
 int query_addr_by_name(const char *name, svalue_t *call_back) {
   static unsigned int key = 0;
+
+  // evdns_base_new(EVDNS_BASE_INITIALIZE_NAMESERVERS) returns NULL when
+  // the host has no configured resolver (common in CI containers/
+  // sandboxes); evdns_getaddrinfo(NULL, ...) would then segfault. Fail
+  // the resolve cleanly instead of crashing the driver.
+  if (g_dns_base == nullptr) {
+    error("resolve: DNS resolver is not available.\n");
+  }
 
   struct evutil_addrinfo hints = {0};
   hints.ai_family = AF_UNSPEC;

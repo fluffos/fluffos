@@ -1825,9 +1825,16 @@ void f_query_ip_port() {
 
 const char *set_timezone(const char *new_tz) {
   static char put_tz[80];
-  char *old_tz;
-
-  old_tz = getenv("TZ");
+  // Copy the old TZ value out: getenv() returns a pointer INTO the
+  // environment that the putenv() below can invalidate (dangling read in
+  // reset_timezone otherwise). Returns nullptr when TZ was unset.
+  static char saved_tz[80];
+  const char *cur = getenv("TZ");
+  const char *old_tz = nullptr;
+  if (cur != nullptr) {
+    snprintf(saved_tz, sizeof(saved_tz), "%s", cur);
+    old_tz = saved_tz;
+  }
   snprintf(put_tz, sizeof(put_tz) / sizeof(char), "TZ=%s", new_tz);
   putenv(put_tz);
   tzset();
