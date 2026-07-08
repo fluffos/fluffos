@@ -231,6 +231,8 @@ const StrFlagEntry STR_FLAGS[] = {
      "Message shown to players when error() occurs."},
     {"mud ip", __MUD_IP__, kOptional, "config file: mi", "Identity & Network",
      "IP address to bind to; useful on hosts with multiple network addresses."},
+    {"ffi allowed libraries", __FFI_ALLOWED_LIBRARIES__, kOptional, "config file: fal", "Security",
+     "Colon-separated allow-list of shared-library paths that ffi_load() may open (package_ffi). Empty means the driver imposes no path restriction and defers entirely to the master apply valid_ffi(); every ffi_load/symbol/prepare/callback is gated by that apply regardless."},
 };
 
 bool scan_config_line(const char *fmt, void *dest, int required) {

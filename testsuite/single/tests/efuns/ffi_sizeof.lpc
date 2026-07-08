@@ -1,0 +1,13 @@
+#ifdef __PACKAGE_FFI__
+#include <ffi.h>
+void do_tests() {
+    ASSERT_EQ(1, ffi_sizeof(FFI_INT8));
+    ASSERT_EQ(2, ffi_sizeof(FFI_INT16));
+    ASSERT_EQ(4, ffi_sizeof(FFI_INT32));
+    ASSERT_EQ(8, ffi_sizeof(FFI_INT64));
+    ASSERT_EQ(4, ffi_sizeof(FFI_FLOAT));
+    ASSERT_EQ(8, ffi_sizeof(FFI_DOUBLE));
+    ASSERT_EQ(8, ffi_sizeof(FFI_POINTER));   // 64-bit platforms
+#endif
+    ASSERT(1);
+}

@@ -1779,6 +1779,9 @@ void add_predefines() {
 #ifdef PACKAGE_DWLIB
     add_predefine("__DWLIB__", -1, "");
 #endif
+#ifdef PACKAGE_FFI
+    add_predefine("__PACKAGE_FFI__", -1, "");
+#endif
 
     // Adding version
     add_quoted_predefine("__VERSION__", PROJECT_VERSION);

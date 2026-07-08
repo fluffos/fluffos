@@ -1,0 +1,19 @@
+#ifdef __PACKAGE_FFI__
+#include <ffi.h>
+void do_tests() {
+    int lib, sl, n;
+    buffer bytes;
+    if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
+    lib = ffi_load("");
+    // size_t strlen(const char *): a STRING crosses as a NUL-terminated
+    // UTF-8 buffer -- never implicitly. This pins the byte boundary.
+    sl = ffi_prepare(lib, "strlen", FFI_UINT64, ({ FFI_POINTER }));
+    bytes = string_encode("hello", "utf-8") + string_encode("\0", "utf-8");
+    ASSERT_EQ(5, ffi_call(sl, ({ bytes })));
+    // Multi-byte UTF-8: "café" is 5 bytes (é is two) before the NUL.
+    bytes = string_encode("café", "utf-8") + string_encode("\0", "utf-8");
+    ASSERT_EQ(5, ffi_call(sl, ({ bytes })));
+    ffi_unload(lib);
+#endif
+    ASSERT(1);
+}

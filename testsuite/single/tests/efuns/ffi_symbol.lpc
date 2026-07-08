@@ -1,0 +1,13 @@
+#ifdef __PACKAGE_FFI__
+#include <ffi.h>
+void do_tests() {
+    if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
+    int lib = ffi_load("");
+    // A resolvable libc symbol has a nonzero address.
+    ASSERT(ffi_symbol(lib, "strlen") != 0);
+    // A bogus symbol resolves to 0.
+    ASSERT_EQ(0, ffi_symbol(lib, "no_such_symbol_xyzzy"));
+    ffi_unload(lib);
+#endif
+    ASSERT(1);
+}

@@ -61,6 +61,7 @@ SLOW_SHUTDOWN
 USERS:parse_command_users
 VALID_BIND
 VALID_DATABASE
+VALID_FFI
 VALID_HIDE
 VALID_LINK
 LITERALS:parse_command_prepos_list

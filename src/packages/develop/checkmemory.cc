@@ -28,6 +28,9 @@
 #ifdef PACKAGE_DB
 #include "packages/db/db.h"
 #endif
+#ifdef PACKAGE_FFI
+#include "packages/ffi/ffi.h"
+#endif
 #ifdef PACKAGE_ASYNC
 #include "packages/async/async.h"
 #endif
@@ -700,6 +703,9 @@ void check_all_blocks(int flag) {
     mark_command_giver_stack();
     mark_call_outs();
     mark_dns_requests();
+#ifdef PACKAGE_FFI
+    mark_ffi();
+#endif
     mark_simuls();
     mark_mapping_node_blocks();
     mark_config();

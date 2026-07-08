@@ -4,11 +4,25 @@ title: driver / FFI package plan
 ---
 # `package_ffi` — a foreign-function interface for LPC
 
-Status: **design / plan**. This document is the proposal for a new
-`ffi` package that lets LPC load native shared libraries
-(`.so`/`.dll`/`.dylib`), call their functions, manage native memory,
-and pass in/out parameters — plus a `tools/ffi` generator that turns a
-C header into ready-to-use LPC bindings.
+Status: **implemented**. This document is both the design and the
+reference for the `ffi` package, which lets LPC load native shared
+libraries (`.so`/`.dll`/`.dylib`), call their functions, manage native
+memory, pass in/out parameters, and expose LPC function pointers to C as
+callbacks — plus a `tools/ffi` generator that turns a C header into
+ready-to-use LPC bindings.
+
+**What shipped** (all phases): `src/packages/ffi/` (spec/`.cc`/`.h`/
+CMake, `option(PACKAGE_FFI ... ON)`, libffi), the LPC header
+`src/include/ffi.h`, the `valid_ffi` master apply + the `ffi allowed
+libraries` config allow-list, callbacks via libffi closures, the
+`__PACKAGE_FFI__` predefine, DEBUGMALLOC marking + shutdown cleanup, the
+`tools/ffi/generate.py` bindings generator with tests, and the driver
+testsuite (`testsuite/single/tests/efuns/ffi_*.lpc`, 20 files) which is
+the primary test surface — the efuns are VM-stack-based and libffi's
+`ffi_call`/closure paths run there end-to-end under ASan/UBSan and the
+per-file `check_memory()` leak gate. The notes below double as the
+reference; a few names differ slightly from the original sketch (see
+`ffi.spec`).
 
 It follows the existing package conventions (`src/packages/db` is the
 closest sibling: a `.spec`, a `.cc`, a `CMakeLists.txt`, an

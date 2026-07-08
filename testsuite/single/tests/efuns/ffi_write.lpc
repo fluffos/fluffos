@@ -1,0 +1,14 @@
+#ifdef __PACKAGE_FFI__
+#include <ffi.h>
+void do_tests() {
+    buffer b = ffi_alloc(8);
+    // Little-endian layout check: write 0x04030201 as int32, read bytes.
+    ffi_write(b, 0, FFI_INT32, 0x04030201);
+    ASSERT_EQ(1, ffi_read(b, 0, FFI_UINT8));
+    ASSERT_EQ(2, ffi_read(b, 1, FFI_UINT8));
+    ASSERT_EQ(3, ffi_read(b, 2, FFI_UINT8));
+    ASSERT_EQ(4, ffi_read(b, 3, FFI_UINT8));
+    ASSERT(catch(ffi_write(b, 6, FFI_INT32, 0)));   // out of range
+#endif
+    ASSERT(1);
+}

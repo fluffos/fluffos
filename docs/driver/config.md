@@ -172,6 +172,12 @@ they always match the options it actually recognizes.
 | `enable msp` | int | 1 | Advertise and enable the MSP telnet protocol. |
 | `enable msdp` | int | 0 | Advertise and enable the MSDP telnet protocol. |
 
+### Security
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `ffi allowed libraries` | string | — | Colon-separated allow-list of shared-library paths that ffi_load() may open (package_ffi). Empty means the driver imposes no path restriction and defers entirely to the master apply valid_ffi(); every ffi_load/symbol/prepare/callback is gated by that apply regardless. |
+
 ## Ports and Connections
 
 The listening ports are configured with numbered `external_port_N` entries
