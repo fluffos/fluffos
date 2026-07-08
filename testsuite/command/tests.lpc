@@ -59,9 +59,13 @@ private void run_one(string path, int kind) {
     case 0:
       err = catch(path->do_tests());
       if (err) {
+        // Print AND record: assert failures print through OUTPUT, but an
+        // uncaught error would otherwise fail the file silently.
+        write(path + ": uncaught error: " + err + "\n");
         "/single/master"->record_failure(path + ": uncaught error: " + err);
       }
       if (tp != this_player()) {
+        write(path + ": bad this_player() after test\n");
         "/single/master"->record_failure(path + ": bad this_player() after test");
       }
       break;

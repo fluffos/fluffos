@@ -12,6 +12,7 @@
 #include "packages/core/call_out.h"
 #include "packages/core/outbuf.h"
 #include "packages/core/heartbeat.h"
+#include "packages/core/dns.h"
 #ifdef PACKAGE_PARSER
 #include "packages/parser/parser.h"
 #endif
@@ -698,6 +699,7 @@ void check_all_blocks(int flag) {
     mark_stack();
     mark_command_giver_stack();
     mark_call_outs();
+    mark_dns_requests();
     mark_simuls();
     mark_mapping_node_blocks();
     mark_config();

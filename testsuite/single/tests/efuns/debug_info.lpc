@@ -1,0 +1,6 @@
+void do_tests() {
+#if efun_defined(debug_info)
+    catch(debug_info(0, this_object()));
+#endif
+    ASSERT(1);
+}

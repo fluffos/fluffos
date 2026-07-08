@@ -1,0 +1,4 @@
+void do_tests() {
+    // Protocol capability of an interactive; plain objects have none.
+    ASSERT_EQ(0, has_msp(this_object()));
+}

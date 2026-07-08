@@ -1,5 +1,7 @@
 #include "base/package_api.h"
 
+#include <set>
+
 #include "packages/core/dns.h"
 
 #include <event2/event.h>
@@ -85,6 +87,29 @@ struct AddrNumberQuery {
   evutil_addrinfo *res;
 };
 
+// Every in-flight resolve() query: the query owns refs on the target
+// object, the callback and the hostname until its callback runs, so the
+// DEBUGMALLOC sweep must account for them (mark_dns_requests, mirroring
+// mark_call_outs; found by the resolve() efun test + the testsuite's
+// per-file leak gate).
+static std::set<AddrNumberQuery *> pending_addr_queries;
+
+#ifdef DEBUGMALLOC_EXTENSIONS
+void mark_dns_requests() {
+  for (auto *query : pending_addr_queries) {
+    EXTRA_REF(BLOCK(query->name))++;
+    if (query->ob_to_call) {
+      query->ob_to_call->extra_ref++;
+    }
+    if (query->call_back.type == T_STRING) {
+      EXTRA_REF(BLOCK(query->call_back.u.string))++;
+    } else if (query->call_back.type == T_FUNCTION) {
+      query->call_back.u.fp->hdr.extra_ref++;
+    }
+  }
+}
+#endif
+
 // query finished, call the LPC callback.
 void on_query_addr_by_name_finish(AddrNumberQuery *query) {
   if (query->err) {
@@ -139,6 +164,7 @@ void on_query_addr_by_name_finish(AddrNumberQuery *query) {
   free_string(query->name);
   free_svalue(&query->call_back, "on_addr_result");
   free_object(&query->ob_to_call, "on_addr_result: ");
+  pending_addr_queries.erase(query);
   delete query;
 }
 
@@ -173,6 +199,7 @@ int query_addr_by_name(const char *name, svalue_t *call_back) {
   assign_svalue_no_free(&query->call_back, call_back);
 
   add_ref(current_object, "query_addr_number: ");
+  pending_addr_queries.insert(query);
 
   query->req = evdns_getaddrinfo(g_dns_base, name, nullptr, &hints, on_getaddr_result, query);
 

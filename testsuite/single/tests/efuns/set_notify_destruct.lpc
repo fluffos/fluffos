@@ -1,0 +1,8 @@
+void do_tests() {
+    object ob = clone_object("/clone/catch_tell_probe");
+    set_notify_destruct(1);
+    ASSERT_EQ(1, query_notify_destruct());
+    set_notify_destruct(0);
+    ASSERT_EQ(0, query_notify_destruct());
+    destruct(ob);
+}

@@ -1,0 +1,9 @@
+class Pt { int x; }
+void do_tests() {
+    object ob = new("/clone/catch_tell_probe");
+    ASSERT(objectp(ob));
+    ASSERT(clonep(ob));
+    destruct(ob);
+    // Class construction form is pinned by compiler/syntax_functions.
+    ASSERT(classp(new(class Pt)));
+}

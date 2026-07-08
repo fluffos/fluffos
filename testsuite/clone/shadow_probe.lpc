@@ -1,0 +1,2 @@
+// Fixture: a minimal shadow (query_shadowing/remove_shadow tests).
+int start(object victim) { return shadow(victim, 1) != 0; }

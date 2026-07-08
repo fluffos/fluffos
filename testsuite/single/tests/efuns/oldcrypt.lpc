@@ -1,0 +1,8 @@
+void do_tests() {
+    string h = oldcrypt("secret", "ab");
+    ASSERT(stringp(h));
+    ASSERT(strlen(h) > 2);
+    // Deterministic: the hash itself works as the salt argument.
+    ASSERT_EQ(h, oldcrypt("secret", h));
+    ASSERT_NE(h, oldcrypt("other", h));
+}

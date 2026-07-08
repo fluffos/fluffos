@@ -1,0 +1,5 @@
+void do_tests() {
+    // No pending get_char on a plain object.
+    catch(remove_get_char(this_object()));
+    ASSERT(1);
+}

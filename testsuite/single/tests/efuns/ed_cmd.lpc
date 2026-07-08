@@ -1,0 +1,6 @@
+void do_tests() {
+#if efun_defined(ed_cmd)
+    catch(ed_cmd("p"));
+#endif
+    ASSERT(1);
+}

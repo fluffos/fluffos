@@ -1,0 +1,8 @@
+void got(mixed res) { }
+void do_tests() {
+#ifdef __PACKAGE_ASYNC__
+    write_file("/ar_test.txt", "async read payload\n", 1);
+    ASSERT_EQ(0, catch(async_read("/ar_test.txt", (: got :))));
+#endif
+    ASSERT(1);
+}

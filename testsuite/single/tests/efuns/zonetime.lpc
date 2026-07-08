@@ -1,0 +1,6 @@
+void do_tests() {
+    // 2001-09-09T01:46:40Z.
+    string s = zonetime("UTC", 1000000000);
+    ASSERT(stringp(s));
+    ASSERT(strsrch(s, "2001") != -1);
+}

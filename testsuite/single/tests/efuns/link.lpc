@@ -1,0 +1,8 @@
+void do_tests() {
+    // link() consults master::valid_link; the suite master has no such
+    // apply, so the request is denied -- graceful 0/error, no crash.
+    write_file("/ln_src.txt", "x\n", 1);
+    catch(link("/ln_src.txt", "/ln_dst.txt"));
+    ASSERT_EQ(-1, file_size("/ln_dst.txt"));
+    rm("/ln_src.txt");
+}

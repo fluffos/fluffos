@@ -1,0 +1,4 @@
+void do_tests() {
+    ASSERT_EQ(0, query_notify_destruct());
+    ASSERT_EQ(0, query_notify_destruct(this_object()));
+}

@@ -1,0 +1,4 @@
+void do_tests() {
+    // Objects here are not loaded from compressed sources.
+    ASSERT_EQ(0, compressedp(this_object()));
+}

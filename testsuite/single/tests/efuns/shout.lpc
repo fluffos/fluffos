@@ -1,0 +1,4 @@
+void do_tests() {
+    // Shouts to all interactives (none in autotest) -- must not error.
+    ASSERT_EQ(0, catch(shout("shout efun test\n")));
+}

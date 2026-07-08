@@ -4,6 +4,10 @@
 void init_dns_event_base(struct event_base *);
 
 void query_name_by_addr(struct object_t *);
+#ifdef DEBUGMALLOC_EXTENSIONS
+void mark_dns_requests(void);
+#endif
+
 int query_addr_by_name(const char *, struct svalue_t *);
 const char *query_ip_name(struct object_t *);
 const char *query_ip_number(struct object_t *);

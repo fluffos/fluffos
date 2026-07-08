@@ -1,0 +1,5 @@
+void do_tests() {
+    // No interactive drives the autotest run.
+    ASSERT_EQ(0, this_player());
+    ASSERT_EQ(0, this_player(1));    // this_user variant
+}

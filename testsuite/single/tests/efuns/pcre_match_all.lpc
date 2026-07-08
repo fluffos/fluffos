@@ -1,0 +1,5 @@
+void do_tests() {
+    mixed r = pcre_match_all("a1 b2 c3", "([a-z])([0-9])");
+    ASSERT_EQ(3, sizeof(r));
+    ASSERT_EQ(({ "a1", "a", "1" }), r[0]);
+}

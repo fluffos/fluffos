@@ -1,0 +1,7 @@
+void do_tests() {
+    ASSERT_EQ("abc", trim("  abc  "));
+    ASSERT_EQ("abc", trim("\t abc \n"));
+    ASSERT_EQ("b", trim("xxbxx", "x"));
+    ASSERT_EQ("", trim("   "));
+    ASSERT_EQ("abc", trim("abc"));
+}

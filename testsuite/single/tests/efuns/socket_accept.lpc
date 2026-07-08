@@ -1,0 +1,11 @@
+#include <socket.h>
+void rcb(int fd) { }
+void do_tests() {
+    // accept() is only valid inside the listen callback; outside it the
+    // error is graceful.
+    int fd = socket_create(STREAM, "rcb");
+    socket_bind(fd, 0);
+    socket_listen(fd, "rcb");
+    ASSERT(socket_accept(fd, "rcb", "rcb") < 0);
+    socket_close(fd);
+}

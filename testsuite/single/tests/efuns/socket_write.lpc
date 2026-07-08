@@ -1,0 +1,9 @@
+#include <socket.h>
+void rcb(int fd) { }
+void do_tests() {
+    // Writing an unconnected stream socket fails cleanly.
+    int fd = socket_create(STREAM, "rcb");
+    ASSERT(socket_write(fd, "data") < 0);
+    socket_close(fd);
+    ASSERT(socket_write(9999, "data") < 0);
+}

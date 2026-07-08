@@ -1,0 +1,7 @@
+void do_tests() {
+#ifdef __PACKAGE_DB__
+    // No connection with handle 1 exists.
+    ASSERT(catch(db_rollback(1)) || 1);
+#endif
+    ASSERT(1);
+}

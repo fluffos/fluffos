@@ -1,0 +1,6 @@
+void do_tests() {
+    mapping m = program_info(this_object());
+    ASSERT(mapp(m));
+    ASSERT(sizeof(m) > 0);
+    ASSERT(mapp(program_info()));   // driver-wide totals
+}
