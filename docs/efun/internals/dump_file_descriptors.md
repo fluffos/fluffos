@@ -10,7 +10,7 @@ title: internals / dump_file_descriptors
 
 ### SYNOPSIS
 
-    void dump_file_descriptors( void );
+    string dump_file_descriptors();
 
 ### DESCRIPTION
 

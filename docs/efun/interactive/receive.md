@@ -10,14 +10,14 @@ title: interactive / receive
 
 ### SYNOPSIS
 
-    int receive( string message );
+    void receive( string | buffer message );
 
 ### DESCRIPTION
 
     This  efun is an interface to the add_message() function in the driver.
-    Its purpose is to display a message to the current object.  It  returns
-    1  if the current object is interactive, 0 otherwise.  Often, receive()
-    is called from within catch_tell(4) or receive_message(4).
+    Its  purpose  is  to  display  a message to the current object. The
+    message may be a string or a buffer of raw bytes.  Often, receive() is
+    called from within catch_tell(4) or receive_message(4).
 
 ### SEE ALSO
 

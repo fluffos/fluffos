@@ -10,7 +10,7 @@ title: internals / cache_stats
 
 ### SYNOPSIS
 
-    void cache_stats( void );
+    string cache_stats();
 
 ### DESCRIPTION
 
