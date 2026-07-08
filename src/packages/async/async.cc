@@ -64,6 +64,14 @@ struct Work {
 std::deque<struct Work *> reqs;
 std::mutex reqs_lock;
 
+// The request a worker thread is CURRENTLY processing: popped from reqs
+// but not yet moved to finished_reqs. Guarded by reqs_lock so
+// async_mark_request() (main thread, via check_memory) can account for
+// its callback funptr during that window -- otherwise a DEBUGMALLOC
+// sweep that lands mid-processing false-flags the ref (Windows Debug
+// hit this on async_read.lpc).
+struct Work *current_work = nullptr;
+
 std::deque<struct Request *> finished_reqs;
 std::mutex finished_reqs_lock;
 
@@ -77,10 +85,12 @@ void thread_func() {
     {
       std::lock_guard<std::mutex> const lock(reqs_lock);
       if (reqs.empty()) {
+        current_work = nullptr;
         return;
       }
       w = reqs.front();
       reqs.pop_front();
+      current_work = w;  // in-flight: keep it accountable while we process
     }
 
     if (w) {
@@ -92,13 +102,17 @@ void thread_func() {
         w->func(w->data);
       }
       if (w->data->status == DONE) {
-        {
-          std::lock_guard<std::mutex> const lock(finished_reqs_lock);
-          finished_reqs.push_back(w->data);
-        }
+        // Clear current_work and publish to finished_reqs atomically
+        // w.r.t. async_mark_request (which takes both locks in this
+        // order) so the funptr is marked exactly once across the move.
+        std::lock_guard<std::mutex> const rlock(reqs_lock);
+        std::lock_guard<std::mutex> const flock(finished_reqs_lock);
+        current_work = nullptr;
+        finished_reqs.push_back(w->data);
         delete w;
       } else {
         std::lock_guard<std::mutex> const lock(reqs_lock);
+        current_work = nullptr;
         reqs.push_back(w);
       }
 
@@ -544,6 +558,12 @@ void async_mark_request() {
     if (req->fun != nullptr) {
       req->fun->f.fp->hdr.extra_ref++;
     }
+  }
+
+  // The request a worker is mid-processing (popped from reqs, not yet in
+  // finished_reqs); guarded by reqs_lock, held above.
+  if (current_work != nullptr && current_work->data->fun != nullptr) {
+    current_work->data->fun->f.fp->hdr.extra_ref++;
   }
 
   for (auto &req : finished_reqs) {
