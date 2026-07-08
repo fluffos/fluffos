@@ -97,10 +97,39 @@ every existing efun untouched:
   (`string_encode`/`string_decode`, `read_buffer`/`write_buffer`)
   already marshal buffers.
 - **C numeric argument/return** → LPC `int` or `float`.
-- **C string argument** → LPC `string` (marshalled to a NUL-terminated
-  copy for the duration of the call).
+- **all pointer/data across the call boundary** → LPC `buffer`, never
+  `string`. See "Strings are UTF-8; the boundary is bytes" below.
 - **a described signature** → a small LPC array/mapping of type codes
   (see §4), not a native object.
+
+### Strings are UTF-8; the boundary is bytes
+
+**LPC strings are UTF-8-native**, so the FFI layer must **never**
+implicitly marshal a `string` to a C `char*`. Doing so would silently
+impose UTF-8 on a C function that may expect Latin-1, UTF-16, a
+specific code page, or raw bytes — and LPC strings cannot faithfully
+carry an arbitrary byte a C API might return (e.g. a lone `0x80`, or an
+embedded NUL). The encoding boundary has to be **explicit and visible
+in the LPC source**, exactly as the rest of the driver already does it
+with `string_encode`/`string_decode` (see the `string_encode` /
+`buffer_transcode` efun tests).
+
+Therefore **`buffer` is the currency for every pointer and every byte
+payload** at the FFI boundary. To call a C function that wants
+`const char*`, the LPC caller encodes and NUL-terminates first:
+
+```c
+buffer name = string_encode("café", "utf-8") + string_encode("\0", "utf-8");
+ffi_call(_h_puts, ({ name }));
+```
+
+and to read a `char*` result, the caller decodes the bytes it copied
+out (`string_decode(buf, "utf-8")`). No efun on the call path takes or
+returns a `string` for foreign data. (Driver-mediated *identifiers* —
+the library path in `ffi_load`, the symbol name in `ffi_symbol` — stay
+`string`, consistent with every file efun: the driver makes its own
+NUL-terminated copy for `dlopen`/`dlsym`; they are never handed to a
+foreign function.)
 
 This is deliberately the same decision the `decimal` proposal makes in
 reverse: FFI *avoids* a new tag because it can, whereas `decimal`
@@ -125,11 +154,12 @@ A compact integer enum shared between the C side and an LPC header
 #define FFI_UINT64  8
 #define FFI_FLOAT   9
 #define FFI_DOUBLE  10
-#define FFI_POINTER 11   /* buffer <-> void*        */
-#define FFI_STRING  12   /* string  <-> const char* */
+#define FFI_POINTER 11   /* buffer arg -> &bytes; returned void* -> int addr */
 ```
 
 Each maps to an `ffi_type` (`ffi_type_sint32`, `ffi_type_pointer`, …).
+There is **no** `FFI_STRING` code: a C `char*` is just an `FFI_POINTER`
+whose buffer the caller filled with encoded, NUL-terminated bytes.
 
 ## 4. The efun surface (`ffi.spec`)
 
@@ -143,14 +173,21 @@ int    ffi_symbol(int lib, string name); /* raw code address as a handle    */
 /* ret_type is a type code; arg_types is an array of type codes.
  * Returns a callable function handle. */
 int    ffi_prepare(int lib, string name, int ret_type, int *arg_types);
-/* Call: args are LPC values matching the prepared arg_types; the return
- * is marshalled per ret_type (int/float/buffer/string/0 for void). */
+/* Call: each arg is int | float | buffer (NEVER string), matching the
+ * prepared arg_types. Return per ret_type: int/float for scalars, a
+ * buffer for FFI_POINTER when owned, an int address for a raw foreign
+ * pointer, 0 for void. */
 mixed  ffi_call(int func, mixed *args);
 
 /* --- native memory ------------------------------------------------ */
 buffer ffi_alloc(int nbytes);            /* zeroed native block as a buffer */
 void   ffi_free(buffer mem);             /* explicit free (also GC'd)       */
 int    ffi_sizeof(int type_code);        /* platform size of a scalar type  */
+/* Copy nbytes from a raw foreign address (e.g. a char* returned by a C
+ * function) into an owned buffer -- the only way foreign bytes become an
+ * LPC value; the caller must know the length (or pass -1 to strnlen up
+ * to a cap). Then string_decode() it if it is text. */
+buffer ffi_peek(int address, int nbytes);
 
 /* --- typed peek/poke into a buffer at an offset ------------------- */
 mixed  ffi_read(buffer mem, int offset, int type_code);
@@ -177,7 +214,9 @@ Notes:
 - Out-parameters: pass an `ffi_alloc`'d `buffer` where the C function
   wants `T*`; the native code writes into it; read it back with
   `ffi_read`. In/out is the same buffer written before the call and
-  read after.
+  read after. A C `char*` result is a foreign address (`int`); copy it
+  into a buffer with `ffi_peek` and `string_decode` if it is text —
+  strings never cross implicitly.
 
 ## 5. Driver-side design (`ffi.cc`)
 
@@ -190,11 +229,13 @@ Notes:
   `FFI_POINTER` args, the native pointer passed to C is
   `&buf->item[0]`. This means the GC already tracks the lifetime — an
   allocation lives as long as an LPC value references the buffer.
-- **Marshalling** (`ffi_call`): build an `void *avalues[]` from the LPC
+- **Marshalling** (`ffi_call`): build a `void *avalues[]` from the LPC
   args per the prepared type codes into a scratch arena
   (`scratchpad.h`), `ffi_call`, then convert the return slot back to an
-  svalue. Strings are copied to NUL-terminated scratch buffers for the
-  call's duration only.
+  svalue. Only `int`/`float`/`buffer` args are accepted; a `buffer`
+  argument passes `&buf->item[0]` as the pointer (its own bytes,
+  whatever encoding the caller put there) — the driver does no encoding
+  conversion, so no NUL-terminated string copies exist on this path.
 - **Error handling**: every failure path is `error()`, never a crash;
   the caution in AGENTS.md §4 (longjmp leaks) means all transient native
   buffers for a call are arena/`unique_ptr` owned so an `error()`
@@ -232,8 +273,15 @@ It emits two files:
 
 - `foo.lpc` — one LPC wrapper function per exported C function: it
   `ffi_prepare`s the signature once (lazily, cached in a global) and
-  `ffi_call`s it, converting LPC args. For a C `double sqrt(double)` it
-  emits `float sqrt(float x) { return ffi_call(_h_sqrt(), ({ x })); }`.
+  `ffi_call`s it. For a C `double sqrt(double)` it emits
+  `float sqrt(float x) { return ffi_call(_h_sqrt(), ({ x })); }`. A C
+  `char*`/`const char*` parameter is emitted as a **`buffer`** (never a
+  `string`), honoring the UTF-8 boundary rule of §3 — the caller passes
+  encoded, NUL-terminated bytes. `--string-convenience` additionally
+  emits a clearly-named overload (e.g. `puts_s(string)`) that does the
+  `string_encode(..., "utf-8")` + NUL for the common ASCII/UTF-8 case,
+  but the raw binding is always the buffer form so the encoding is never
+  hidden by default.
 - `foo_structs.h` — `#define`s for each struct's `ffi_struct_layout`
   field-type array and named field offsets, so LPC code reads
   `buf[STRUCT_FOO_field_x .. ]` symbolically.
@@ -256,9 +304,11 @@ of truth, exactly like `lpc-grammar.json`.
 - **LPC** (`testsuite/single/tests/efuns/ffi_*.lpc`, guarded by
   `#ifdef __PACKAGE_FFI__` like the other optional packages): load
   `libm`, call `sqrt`/`pow`, allocate a buffer, write/read a struct,
-  and assert `valid_ffi` denial is enforced. The suite's per-file
-  `check_memory()` gate (which caught seven leaks this cycle) validates
-  the allocation/handle accounting.
+  round-trip a `char*` through `string_encode` → `ffi_call` →
+  `ffi_peek` → `string_decode` (pinning that strings only cross as
+  buffers), and assert `valid_ffi` denial is enforced. The suite's
+  per-file `check_memory()` gate (which caught seven leaks this cycle)
+  validates the allocation/handle accounting.
 - `tools/ffi` gets a `test.mjs`/`test.py` over a sample header with
   golden expected LPC output, run in CI like `tools/lpc-syntax/test.mjs`.
 
