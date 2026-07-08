@@ -172,7 +172,7 @@ jobs:
           ICU_ROOT: ${{ matrix.icu_root }}
 
       - name: Run Unit Tests
-        run: cd build && ctest --output-on-failure -LE lpc
+        run: cd build && ctest --output-on-failure -LE testsuite
 
       - name: Run LPC Testsuite
-        run: cd build && ctest --output-on-failure -L lpc
+        run: cd build && ctest --output-on-failure -L testsuite

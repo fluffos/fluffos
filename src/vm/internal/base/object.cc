@@ -1523,17 +1523,22 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
   if (sel == -1) {
     sel = strlen(SAVE_EXTENSION);
   }
-  if (strcmp(file + len - sel, SAVE_EXTENSION) == 0) {
+  if (len >= sel && strcmp(file + len - sel, SAVE_EXTENSION) == 0) {
     len -= sel;
   }
 
+  // Copy only the KEPT prefix: `file` may still carry a stripped source
+  // extension, and ".lpc" (4) is longer than the ".o" headroom (2) --
+  // strcpy'ing the whole string overflowed the buffer (ASan-caught by
+  // the save_object("/sf.lpc") testsuite case; the legacy ".c" strip
+  // fit only by coincidence).
   if (save_compressed) {
     name = new_string(len + SAVE_EXTENSION_GZ_LENGTH, "save_object");
-    strcpy(name, file);
+    memcpy(name, file, len);
     strcpy(name + len, SAVE_GZ_EXTENSION);
   } else {
     name = new_string(len + sel, "save_object");
-    strcpy(name, file);
+    memcpy(name, file, len);
     strcpy(name + len, SAVE_EXTENSION);
   }
 

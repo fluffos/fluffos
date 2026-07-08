@@ -28,6 +28,19 @@ public int query_num_checks() { return num_checks; }
 
 public string *query_failures() { return test_failures; }
 
+// Remove and return the most recently recorded failure (the harness
+// self-test /single/tests/std/harness.lpc uses this to probe the
+// recording machinery without failing the run).
+public string pop_failure() {
+  string last;
+  if (!sizeof(test_failures)) {
+    return 0;
+  }
+  last = test_failures[<1];
+  test_failures = test_failures[0..<2];
+  return last;
+}
+
 public void reset_test_stats() {
   num_checks = 0;
   test_failures = ({ });

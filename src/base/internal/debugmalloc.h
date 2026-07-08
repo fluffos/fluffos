@@ -75,6 +75,11 @@ static const int TAG_SOCKETS = (TAG_PERMANENT + 39);
 // compiles by design -- whitelisted in check_all_blocks like the other
 // persistent driver infrastructure.
 static const int TAG_SCRATCHPAD = (TAG_PERMANENT + 50);
+// Pending replace_program() records (packages/core/replace_program.cc):
+// live from the queuing execution until the backend's
+// replace_programs() sweep -- legitimately survive a between-executions
+// check_all_blocks, so they get their own whitelisted tag.
+static const int TAG_REPLACE_OB = (TAG_PERMANENT + 51);
 static const int TAG_STRING = (TAG_DATA + 40);
 static const int TAG_MALLOC_STRING = (TAG_DATA + 41);
 static const int TAG_SHARED_STRING = (TAG_DATA + 42);

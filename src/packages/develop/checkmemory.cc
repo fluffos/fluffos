@@ -1016,6 +1016,7 @@ void check_all_blocks(int flag) {
             break;
             /* FIXME: need to account these. */
           case TAG_SCRATCHPAD: /* compile arena: retained across compiles by design */
+          case TAG_REPLACE_OB:  /* pending until the backend's replace_programs() */
           case TAG_INC_LIST:
           case TAG_IDENT_TABLE:
           case TAG_OBJ_TBL:

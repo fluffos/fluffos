@@ -45,7 +45,7 @@ The suite is a first-class **ctest** test and a set of CMake targets:
 
 | Invocation | What it does |
 |---|---|
-| `ctest -L lpc` (or `ctest -R lpc-testsuite`) | Runs the whole LPC suite through ctest, alongside `ctest -LE lpc` for the GTest binaries. This is what CI runs. |
+| `ctest -R testsuite` (or `ctest -L testsuite`) | Runs the whole LPC suite through ctest, alongside `ctest -LE testsuite` for the GTest binaries. This is what CI runs. |
 | `driver-autotest` (CMake target) | Same run, invoked directly; exits nonzero on any failure. |
 | `driver-testsuite` (CMake target) | Boots the driver against this mudlib for interactive poking (log in and type `tests`). |
 
@@ -112,7 +112,12 @@ continues; any recorded failure makes the final recap fail the run with
 a nonzero exit (that is how CI detects failure). Helper
 fixtures that should not be executed as tests live outside
 `/single/tests/` — conventionally in `/clone` (e.g. `inh0`–`inh2`,
-`dual_*`) or as `#include`s under `/include`.
+`dual_*`) or as `#include`s under `/include`. A fixture whose test
+depends on it being **unloaded** (e.g. a `fail/` test pinning that a
+name does *not* resolve) must be private to that one test: the object
+registry is extension-blind and survives across files, so any other
+test loading the fixture first would change the outcome under the
+randomized order.
 
 Efun tests are named after the efun (`single/tests/efuns/<efun>.lpc`)
 and should aim to cover every branch of the C++ implementation,

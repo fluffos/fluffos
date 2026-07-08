@@ -199,7 +199,7 @@ void f_replace_program() {
   }
   if (!(tmp = retrieve_replace_program_entry())) {
     tmp = reinterpret_cast<replace_ob_t *>(
-        DMALLOC(sizeof(replace_ob_t), TAG_TEMPORARY, "replace_program"));
+        DMALLOC(sizeof(replace_ob_t), TAG_REPLACE_OB, "replace_program"));
     tmp->ob = current_object;
     tmp->next = obj_list_replace;
     obj_list_replace = tmp;
