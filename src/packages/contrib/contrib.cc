@@ -1999,7 +1999,7 @@ static int memory_share(svalue_t *sv) {
         subtotal += memory_share(&sv->u.arr->item[i]);
       }
       calldepth--;
-      return total + subtotal / sv->u.arr->ref;
+      return total + subtotal / (sv->u.arr->ref ? sv->u.arr->ref : 1);
     case T_MAPPING:
       if (1 + calldepth > 100) {
         return 0;
@@ -2008,7 +2008,7 @@ static int memory_share(svalue_t *sv) {
       subtotal = sizeof(mapping_t);
       mapTraverse(sv->u.map, node_share, &subtotal);
       calldepth--;
-      return total + subtotal / sv->u.map->ref;
+      return total + subtotal / (sv->u.map->ref ? sv->u.map->ref : 1);
     case T_FUNCTION: {
       svalue_t tmp;
       tmp.type = T_ARRAY;
@@ -2039,11 +2039,11 @@ static int memory_share(svalue_t *sv) {
           break;
       }
       calldepth--;
-      return total + subtotal / sv->u.fp->hdr.ref;
+      return total + subtotal / (sv->u.fp->hdr.ref ? sv->u.fp->hdr.ref : 1);
     }
     case T_BUFFER:
       /* first byte is stored inside the buffer struct */
-      return total + (sizeof(buffer_t) + sv->u.buf->size - 1) / sv->u.buf->ref;
+      return total + (sizeof(buffer_t) + sv->u.buf->size - 1) / (sv->u.buf->ref ? sv->u.buf->ref : 1);
   }
   return total;
 }
@@ -2454,9 +2454,17 @@ void f_num_classes() {
 
 #ifdef F_ASSEMBLE_CLASS
 void f_assemble_class() {
-  array_t *arr = copy_array(sp->u.arr);
+  // Build through the CLASS allocator: retagging a copy_array() block as
+  // T_CLASS skews num_arrays/num_classes and the DEBUGMALLOC tag when it
+  // is later freed as a class (caught by the testsuite's per-file
+  // check_memory gate via the assemble_class test).
+  array_t *src = sp->u.arr;
+  array_t *cl = allocate_class_by_size(src->size);
+  for (int i = 0; i < src->size; i++) {
+    assign_svalue_no_free(&cl->item[i], &src->item[i]);
+  }
   pop_stack();
-  push_refed_array(arr);
+  push_refed_array(cl);
   sp->type = T_CLASS;
 }
 

@@ -1,0 +1,8 @@
+void do_tests() {
+    ASSERT_EQ("swords", pluralize("sword"));
+    ASSERT_EQ("boxes", pluralize("box"));
+    ASSERT_EQ("wolves", pluralize("wolf"));
+    ASSERT_EQ("children", pluralize("child"));
+    // Adjective/article structure is preserved.
+    ASSERT_EQ("red swords", pluralize("red sword"));
+}

@@ -1,0 +1,7 @@
+void do_tests() {
+    // Replacements substitute the CAPTURE GROUPS of the first match,
+    // one replacement string per group.
+    ASSERT_EQ("X1-Y2-", pcre_replace("a1-b2-", "([a-z])[0-9]-([a-z])[0-9]-", ({ "X", "Y" })));
+    // Group count and replacement count must agree.
+    ASSERT(catch(pcre_replace("a1", "[a-z][0-9]", ({ "X", "Y" }))));
+}

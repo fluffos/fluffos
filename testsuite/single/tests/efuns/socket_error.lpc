@@ -1,0 +1,7 @@
+#include <socket.h>
+#include <socket_err.h>
+void rcb(int fd) { }
+void do_tests() {
+    ASSERT(stringp(socket_error(EEFDRANGE)));
+    ASSERT(strlen(socket_error(EEFDRANGE)) > 0);
+}

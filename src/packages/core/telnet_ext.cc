@@ -20,7 +20,7 @@ void f_request_term_type() {
 
 #ifdef F_START_REQUEST_TERM_TYPE
 void f_start_request_term_type() {
-  auto *ip = command_giver->interactive;
+  auto *ip = command_giver ? command_giver->interactive : nullptr;
   if (ip && ip->telnet) {
     telnet_start_request_ttype(ip->telnet);
     flush_message(ip);
@@ -224,7 +224,7 @@ void f_has_zmp() {
 
 #ifdef F_SEND_ZMP
 void f_send_zmp() {
-  auto *ip = command_giver->interactive;
+  auto *ip = command_giver ? command_giver->interactive : nullptr;
   if (ip && ip->telnet) {
     telnet_begin_zmp(ip->telnet, (sp - 1)->u.string);
 

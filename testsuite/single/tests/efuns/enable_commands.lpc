@@ -1,0 +1,10 @@
+void do_tests() {
+    object tp;
+    object ob = clone_object("/clone/catch_tell_probe");
+    SAVETP;
+    ASSERT_EQ(0, living(ob));
+    ob->make_living();
+    ASSERT_EQ(1, living(ob));
+    destruct(ob);
+    RESTORETP;
+}

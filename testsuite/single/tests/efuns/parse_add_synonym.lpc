@@ -1,0 +1,8 @@
+void do_tests() {
+#ifdef __PACKAGE_PARSER__
+    parse_init();
+    parse_add_rule("smile", "");
+    ASSERT_EQ(0, catch(parse_add_synonym("grin", "smile")));
+#endif
+    ASSERT(1);
+}

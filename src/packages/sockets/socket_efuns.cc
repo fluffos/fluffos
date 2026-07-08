@@ -392,10 +392,18 @@ int find_new_socket() {
 /*
  * Create an LPC efun socket
  */
-int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *close_callback) {
+int socket_create(int mode_int, svalue_t *read_callback, svalue_t *close_callback) {
   int type, i, fd;
   int binary = 0;
   bool tls = false;
+
+  /* Validate BEFORE converting: loading an out-of-range value into the
+   * enum is undefined behavior (UBSan-caught by the socket_create test
+   * passing -1 from LPC). */
+  if (mode_int < MUD || mode_int > STREAM_TLS_BINARY) {
+    return EEMODENOTSUPP;
+  }
+  auto mode = static_cast<enum socket_mode>(mode_int);
 
   if (mode == STREAM_BINARY) {
     binary = 1;

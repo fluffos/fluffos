@@ -1,0 +1,8 @@
+void got(mixed res) { }
+void do_tests() {
+#ifdef __PACKAGE_ASYNC__
+    // Queues the request; the callback fires after this run.
+    ASSERT_EQ(0, catch(async_getdir("/", (: got :))));
+#endif
+    ASSERT(1);
+}

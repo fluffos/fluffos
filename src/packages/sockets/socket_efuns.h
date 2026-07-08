@@ -100,7 +100,7 @@ void dump_socket_status(outbuffer_t *);
 void close_referencing_sockets(object_t *);
 int get_socket_address(int, char *, int *, int);
 int socket_bind(int, int, const char *);
-int socket_create(enum socket_mode, svalue_t *, svalue_t *);
+int socket_create(int mode, svalue_t *, svalue_t *);
 int socket_listen(int, svalue_t *);
 int socket_accept(int, svalue_t *, svalue_t *);
 int socket_connect(int, const char *, svalue_t *, svalue_t *);

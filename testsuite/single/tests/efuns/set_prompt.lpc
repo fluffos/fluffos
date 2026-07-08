@@ -1,0 +1,7 @@
+void do_tests() {
+#if efun_defined(set_prompt)
+    // Prompt lives on the interactive command giver; none in autotest.
+    catch(set_prompt("> "));
+#endif
+    ASSERT(1);
+}

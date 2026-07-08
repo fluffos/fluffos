@@ -1,0 +1,4 @@
+void do_tests() {
+    // Disconnecting a non-interactive is a no-op returning 0.
+    ASSERT_EQ(0, remove_interactive(this_object()));
+}

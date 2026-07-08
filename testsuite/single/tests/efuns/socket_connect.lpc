@@ -1,0 +1,17 @@
+#include <socket.h>
+#include <socket_err.h>
+void rcb(int fd) { }
+void wcb(int fd) { }
+void do_tests() {
+    // Connect to our own listener; completion callbacks fire after this
+    // run, but the call itself must be accepted.
+    int lfd = socket_create(STREAM, "rcb");
+    int cfd = socket_create(STREAM, "rcb");
+    string addr;
+    socket_bind(lfd, 0);
+    socket_listen(lfd, "rcb");
+    addr = socket_address(lfd);
+    ASSERT_EQ(EESUCCESS, socket_connect(cfd, "127.0.0.1 " + explode(addr, " ")[1], "rcb", "wcb"));
+    socket_close(cfd);
+    socket_close(lfd);
+}

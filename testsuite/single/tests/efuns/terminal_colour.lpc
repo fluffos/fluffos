@@ -1,0 +1,8 @@
+void do_tests() {
+    mapping codes = ([ "RED" : "<r>", "RESET" : "<0>" ]);
+    ASSERT_EQ("<r>hot<0>", terminal_colour("%^RED%^hot%^RESET%^", codes));
+    // Unknown tokens pass through as their name.
+    ASSERT_EQ("plain", terminal_colour("plain", codes));
+    // With a wrap width the text is wrapped.
+    ASSERT(stringp(terminal_colour("some longer text to wrap here", codes, 10)));
+}

@@ -1,0 +1,5 @@
+void do_tests() {
+    // UTC observes no DST at either solstice.
+    ASSERT_EQ(0, is_daylight_savings_time("UTC", 1000000000));
+    ASSERT_EQ(0, is_daylight_savings_time("UTC", 1010000000));
+}

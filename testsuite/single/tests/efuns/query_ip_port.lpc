@@ -1,0 +1,4 @@
+void do_tests() {
+    // Of an interactive; plain objects yield 0.
+    ASSERT_EQ(0, query_ip_port(this_object()));
+}

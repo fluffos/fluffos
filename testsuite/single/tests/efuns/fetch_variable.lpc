@@ -1,0 +1,7 @@
+int probe_global = 41;
+void do_tests() {
+    probe_global = 42;
+    ASSERT_EQ(42, fetch_variable("probe_global"));
+    ASSERT_EQ(42, fetch_variable("probe_global", this_object()));
+    ASSERT(catch(fetch_variable("no_such_global")));
+}

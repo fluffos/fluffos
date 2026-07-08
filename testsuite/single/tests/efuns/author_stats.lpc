@@ -1,0 +1,6 @@
+void do_tests() {
+#ifdef __PACKAGE_MUDLIB_STATS__
+    ASSERT(mapp(author_stats()));
+#endif
+    ASSERT(1);
+}

@@ -1,0 +1,11 @@
+#include <socket.h>
+#include <socket_err.h>
+void rcb(int fd) { }
+void ccb(int fd) { }
+void do_tests() {
+    int fd = socket_create(STREAM, "rcb", "ccb");
+    ASSERT(fd >= 0);
+    ASSERT_EQ(EESUCCESS, socket_close(fd));
+    // Bad mode is rejected.
+    ASSERT(socket_create(-1, "rcb") < 0);
+}

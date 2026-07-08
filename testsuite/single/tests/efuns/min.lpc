@@ -1,0 +1,8 @@
+void do_tests() {
+    ASSERT_EQ(1, min(({ 3, 1, 2 })));
+    ASSERT_EQ(1.5, min(({ 3.0, 1.5 })));
+    ASSERT_EQ("a", min(({ "b", "a", "c" })));
+    // Second argument asks for the INDEX instead of the value.
+    ASSERT_EQ(1, min(({ 3, 1, 2 }), 1));
+    ASSERT(catch(min(({ }))));
+}

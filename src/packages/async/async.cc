@@ -493,23 +493,27 @@ void f_async_getdir() {
 #endif
 #ifdef F_ASYNC_DB_EXEC
 void f_async_db_exec() {
-  std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
-  process_efun_callback(2, cb.get(), F_ASYNC_DB_EXEC);
-  cb->f.fp->hdr.ref++;
-  pop_stack();
-
+  // Validate FIRST: error() unwinds past this frame, and the manual ref
+  // taken on the callback below would leak (caught by the testsuite's
+  // per-file leak gate through the async_db_exec test). Stack layout
+  // before any pop: sp = callback, sp-1 = sql, sp-2 = handle.
   array_t *info;
   info = allocate_empty_array(1);
   info->item[0].type = T_STRING;
   info->item[0].subtype = STRING_MALLOC;
-  info->item[0].u.string = string_copy(sp->u.string, "f_db_exec");
+  info->item[0].u.string = string_copy((sp - 1)->u.string, "f_db_exec");
   valid_database("exec", info);
 
   db_t *db;
-  db = find_db_conn((sp - 1)->u.number);
+  db = find_db_conn((sp - 2)->u.number);
   if (!db) {
     error("Attempt to exec on an invalid database handle\n");
   }
+
+  std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
+  process_efun_callback(2, cb.get(), F_ASYNC_DB_EXEC);
+  cb->f.fp->hdr.ref++;
+  pop_stack();
 
   if (!db_mut) {
     db_mut = (pthread_mutex_t *)DMALLOC(sizeof(pthread_mutex_t), TAG_PERMANENT, "async_db_exec");

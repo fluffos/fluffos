@@ -1,0 +1,6 @@
+void do_tests() {
+#if efun_defined(dump_jemalloc)
+    catch(dump_jemalloc());
+#endif
+    ASSERT(1);
+}

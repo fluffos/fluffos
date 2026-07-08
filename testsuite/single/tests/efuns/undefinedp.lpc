@@ -1,0 +1,9 @@
+void do_tests() {
+    mapping m = ([ "k" : 0 ]);
+    mixed u = m["missing"];
+    ASSERT_EQ(1, undefinedp(u));
+    ASSERT_EQ(0, undefinedp(0));
+    ASSERT_EQ(0, undefinedp(""));
+    // nullp is the documented alias.
+    ASSERT_EQ(1, nullp(m["nope"]));
+}

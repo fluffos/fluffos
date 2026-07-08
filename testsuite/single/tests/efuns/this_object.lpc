@@ -1,0 +1,5 @@
+void do_tests() {
+    ASSERT(objectp(this_object()));
+    ASSERT_EQ("/single/tests/efuns/this_object", file_name(this_object()));
+    ASSERT_EQ(this_object(), load_object("/single/tests/efuns/this_object"));
+}

@@ -1,0 +1,6 @@
+void do_tests() {
+    // Whole-driver total, and a per-object figure.
+    ASSERT(memory_info() > 0);
+    ASSERT(memory_info(this_object()) > 0);
+    ASSERT(memory_info(this_object()) < memory_info());
+}

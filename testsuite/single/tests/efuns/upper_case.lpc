@@ -1,0 +1,5 @@
+void do_tests() {
+    ASSERT_EQ("HELLO", upper_case("hello"));
+    ASSERT_EQ("MIXED 123!", upper_case("Mixed 123!"));
+    ASSERT_EQ("", upper_case(""));
+}

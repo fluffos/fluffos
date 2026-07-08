@@ -170,7 +170,18 @@ void parser_mark_verbs() {
 
     while (verb_entry) {
       DO_MARK(verb_entry, TAG_PARSER);
-      DO_MARK(verb_entry->node, TAG_PARSER);
+      /* For a synonym the `node` slot is really verb_syn_t::real -- the
+       * base verb, marked by its own hash-chain entry (marking it here
+       * double-marked it). For a real verb the rules are a LINKED LIST
+       * of verb_node_t (only the head was marked before, leaving later
+       * rules unaccounted), and a rule-less verb has a NULL head (the
+       * old unconditional mark computed header offsets off NULL --
+       * UBSan-caught). All three found by the parse_* efun tests. */
+      if (!(verb_entry->flags & VB_IS_SYN)) {
+        for (verb_node_t *vn = verb_entry->node; vn; vn = vn->next) {
+          DO_MARK(vn, TAG_PARSER);
+        }
+      }
 
       EXTRA_REF(BLOCK(verb_entry->real_name))++;
       EXTRA_REF(BLOCK(verb_entry->match_name))++;

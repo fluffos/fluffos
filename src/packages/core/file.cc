@@ -993,9 +993,12 @@ void f_link() {
   } else {
     i = 0;
   }
-  (--sp)->type = T_NUMBER;
-  sp->u.number = i;
-  sp->subtype = 0;
+  // Free both string arguments before replacing the slot with the
+  // result -- the old epilogue abandoned them (two shared-string refs
+  // leaked per call; caught by the testsuite's link test + leak gate).
+  free_string_svalue(sp--);
+  free_string_svalue(sp);
+  put_number(i);
 }
 #endif /* F_LINK */
 

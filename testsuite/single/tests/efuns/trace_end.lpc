@@ -1,0 +1,5 @@
+void do_tests() {
+    // Ending with no active trace must not crash.
+    catch(trace_end());
+    ASSERT(1);
+}

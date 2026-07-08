@@ -1,0 +1,4 @@
+void do_tests() {
+    catch(send_msdp_variable("HEALTH", 100));
+    ASSERT(1);
+}

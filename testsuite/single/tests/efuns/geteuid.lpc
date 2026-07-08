@@ -1,0 +1,8 @@
+void do_tests() {
+#ifdef __PACKAGE_UIDS__
+    ASSERT(stringp(geteuid()));
+    // Of a function pointer: the euid its owner had at creation.
+    ASSERT(stringp(geteuid((: 1 :))) || !geteuid((: 1 :)));
+#endif
+    ASSERT(1);
+}

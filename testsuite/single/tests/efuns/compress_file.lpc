@@ -1,0 +1,10 @@
+void do_tests() {
+    string text = "compress_file efun test payload payload payload\n";
+    write_file("/cf_src.txt", text, 1);
+    ASSERT_EQ(1, compress_file("/cf_src.txt"));
+    ASSERT_EQ(-1, file_size("/cf_src.txt"));       // source consumed
+    ASSERT(file_size("/cf_src.txt.gz") > 0);
+    ASSERT_EQ(1, uncompress_file("/cf_src.txt.gz"));
+    ASSERT_EQ(text, read_file("/cf_src.txt"));
+    rm("/cf_src.txt");
+}

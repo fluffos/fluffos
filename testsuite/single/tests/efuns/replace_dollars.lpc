@@ -1,0 +1,6 @@
+void do_tests() {
+#ifdef __DWLIB__
+    ASSERT_EQ("hi bob!", replace_dollars("hi $1!", ({ "bob" })));
+#endif
+    ASSERT(1);
+}

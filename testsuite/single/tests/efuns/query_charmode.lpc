@@ -1,0 +1,5 @@
+void do_tests() {
+    // Char mode is an interactive property: non-interactives report a
+    // negative sentinel, never a truthy mode.
+    ASSERT(query_charmode(this_object()) < 0);
+}

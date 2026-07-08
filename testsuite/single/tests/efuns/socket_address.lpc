@@ -1,0 +1,10 @@
+#include <socket.h>
+void rcb(int fd) { }
+void do_tests() {
+    int fd = socket_create(STREAM, "rcb");
+    socket_bind(fd, 0);
+    string addr = socket_address(fd);
+    ASSERT(stringp(addr));
+    ASSERT(sizeof(explode(addr, " ")) == 2);   // "ip port"
+    socket_close(fd);
+}

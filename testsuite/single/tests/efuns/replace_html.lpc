@@ -1,0 +1,8 @@
+void do_tests() {
+#ifdef __DWLIB__
+    string r = replace_html("<b>&</b>");
+    ASSERT(stringp(r));
+    ASSERT(strsrch(r, "<b>") == -1);   // markup neutralized
+#endif
+    ASSERT(1);
+}

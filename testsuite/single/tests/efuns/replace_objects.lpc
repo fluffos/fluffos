@@ -1,0 +1,9 @@
+void do_tests() {
+#ifdef __DWLIB__
+    // Substitutes objects in a structure with their file names.
+    mixed r = replace_objects(({ this_object(), 1 }));
+    ASSERT(arrayp(r));
+    ASSERT_EQ(1, r[1]);
+#endif
+    ASSERT(1);
+}

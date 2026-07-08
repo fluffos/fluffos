@@ -1,0 +1,7 @@
+void do_tests() {
+    // Array form filters to matching members; string form is a boolean.
+    ASSERT_EQ(({ "cat", "car" }), pcre_match(({ "cat", "dog", "car" }), "^ca"));
+    ASSERT(pcre_match("hello world", "wor"));
+    ASSERT(!pcre_match("hello", "^world$"));
+    ASSERT(catch(pcre_match("x", "(unclosed")));
+}
