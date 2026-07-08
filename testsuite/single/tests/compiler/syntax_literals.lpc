@@ -1,0 +1,52 @@
+// Literal syntax matrix: integer bases and digit separators, float
+// forms, character escapes, string escapes/concatenation/continuation,
+// and constant folding of unary operators. (Templates and text blocks
+// have their own files: template_literal.lpc, at_block.lpc.)
+void do_tests() {
+    // Integer bases (both case spellings) and digit separators.
+    ASSERT_EQ(255, 0xFF);
+    ASSERT_EQ(255, 0Xff);
+    ASSERT_EQ(5, 0b101);
+    ASSERT_EQ(5, 0B101);
+    ASSERT_EQ(1000000, 1_000_000);
+    ASSERT_EQ(65535, 0xFF_FF);
+    ASSERT_EQ(2, 0b10_10 - 0b1_0_0_0);
+
+    // Float forms: fraction, trailing dot, digit separators. (There is
+    // deliberately NO exponent notation in LPC -- "2.5e2" is the float
+    // 2.5 followed by the identifier e2.)
+    ASSERT(floatp(1.5));
+    ASSERT(floatp(1.));
+    ASSERT_EQ(1.0, 1.);
+    ASSERT_EQ(1000.25, 1_000.25);
+    ASSERT_EQ(2.0, 1.0 + 1);   // int promotes to float
+
+    // Character literals and escapes.
+    ASSERT_EQ(97, 'a');
+    ASSERT_EQ(10, '\n');
+    ASSERT_EQ(9, '\t');
+    ASSERT_EQ(92, '\\');
+    ASSERT_EQ(39, '\'');
+    ASSERT_EQ(65, '\x41');
+
+    // String escapes, including hex and unicode.
+    ASSERT_EQ("A", "\x41");
+    ASSERT_EQ("A", "A");
+    ASSERT_EQ(2, strlen("\n\t"));
+    ASSERT_EQ("\"q\"", sprintf("%c%s%c", 34, "q", 34));
+
+    // Adjacent string literals concatenate at compile time.
+    ASSERT_EQ("abcdef", "abc" "def");
+    ASSERT_EQ("xy", "x"
+                    "y");
+
+    // Backslash-newline continuation inside a string literal.
+    ASSERT_EQ("ab", "a\
+b");
+
+    // Constant folding of unary operators on literals.
+    ASSERT_EQ(-5, -(5));
+    ASSERT_EQ(0, !5);
+    ASSERT_EQ(1, !0);
+    ASSERT_EQ(-1, ~0);
+}

@@ -1,0 +1,3 @@
+// Fixture for /single/tests/compiler/syntax_functions.lpc (super-call
+// and named-scope pins).
+string pwhich() { return "parent"; }

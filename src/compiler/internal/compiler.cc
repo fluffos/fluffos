@@ -1217,14 +1217,25 @@ int arrange_call_inherited(const char *name, parse_node_t *node) {
         int tmp;
 
         if (super_name) {
-            int l = SHARED_STRLEN(ip->prog->filename); /* Including .c */
+            /* Match against the program name minus its real source
+             * extension (".lpc" or ".c" -- the old hardcoded "-2" broke
+             * every name::fn() super call into an .lpc-compiled parent,
+             * caught by compiler/syntax_functions.lpc). */
+            int l = SHARED_STRLEN(ip->prog->filename);
+            int base = l;
             names.emplace_back(std::string(ip->prog->filename));
 
-            if (l - 2 < super_length) {
+            if (l > 4 && strcmp(ip->prog->filename + l - 4, ".lpc") == 0) {
+                base = l - 4;
+            } else if (l > 2 && strcmp(ip->prog->filename + l - 2, ".c") == 0) {
+                base = l - 2;
+            }
+            if (base < super_length) {
                 continue;
             }
-            if (strncmp(super_name, ip->prog->filename + l - 2 - super_length, super_length) != 0 ||
-                !((l - 2 == super_length) || ((ip->prog->filename + l - 3 - super_length)[0] == '/'))) {
+            if (strncmp(super_name, ip->prog->filename + base - super_length, super_length) != 0 ||
+                !((base == super_length) ||
+                  (ip->prog->filename[base - super_length - 1] == '/'))) {
                 continue;
             }
         }
