@@ -19,7 +19,7 @@ if `grammar.y` grows a token the spec doesn't categorize.
 | `format.mjs` | `formatLPC(source)` → basic formatter: brace-depth reindentation, statement-per-line, operator spacing, directives at column 0, comments/strings/text blocks verbatim. Deterministic and idempotent. |
 | `lint.mjs` | `lintLPC(source)` → structural diagnostics (illegal characters, unterminated literals, unbalanced brackets, mismatched conditionals) with 1-based positions. Powers the VS Code extension's as-you-type diagnostics. |
 | `vscode/` | VS Code extension: declarative highlighting (generated TextMate grammar), structural diagnostics as you type, real `lpcc` compiler errors on save. See `vscode/README.md`. |
-| `test.mjs` | `node tools/lpc-syntax/test.mjs` — 47 assertions, no dependencies (tokenizer, highlighter, formatter, linter, generated VS Code assets). |
+| `test.mjs` | `node tools/lpc-syntax/test.mjs` — 49 assertions, no dependencies (tokenizer, highlighter, formatter, linter, generated VS Code assets). |
 
 ## Regenerating the grammar contract
 

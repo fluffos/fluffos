@@ -49,14 +49,15 @@ In scope:
 - Allocate/free/read/write native memory blocks for buffers, structs,
   and out-parameters.
 - Read/write C structs by field layout.
+- Native code calling *into* LPC: an LPC function pointer is wrapped in a
+  libffi closure (`ffi_closure`) and handed to C as a raw callable
+  address, so C libraries with callback parameters (comparators, event
+  handlers) can invoke LPC.
 - A `tools/ffi` generator: parse a C header, emit an LPC binding object
   (`.lpc`) plus a struct-layout include.
 
 Explicitly out of scope (at least v1):
 
-- Native code calling *into* LPC (callbacks from C to LPC) — deferred to
-  a v2 "closure trampoline" section; libffi supports it
-  (`ffi_closure`) but it is a large surface.
 - C++ name mangling / methods — C ABI only.
 - Varargs C functions beyond a fixed described prototype.
 
@@ -212,9 +213,18 @@ void   ffi_write(buffer mem, int offset, int type_code, mixed value);
  * platform alignment; the tools/ffi generator emits these. */
 mixed *ffi_struct_layout(int *field_types);
 
+/* --- callbacks: expose an LPC function to C ----------------------- */
+/* Wrap an LPC function pointer in a libffi closure with the given
+ * return + argument type codes. Returns a callback handle. */
+int    ffi_callback(function fn, int ret_type, int *arg_types);
+/* Raw code address of the closure, to pass to C as an FFI_POINTER. */
+int    ffi_callback_addr(int cb);
+/* Release the closure (also GC'd). */
+void   ffi_callback_free(int cb);
+
 /* --- introspection ------------------------------------------------ */
 string ffi_error();                      /* last error on this thread       */
-mixed *ffi_status();                      /* open libs/funcs/allocations     */
+mapping ffi_status();                     /* counts: libraries/functions/callbacks */
 ```
 
 Notes:
@@ -254,15 +264,18 @@ Notes:
   the caution in AGENTS.md §4 (longjmp leaks) means all transient native
   buffers for a call are arena/`unique_ptr` owned so an `error()`
   mid-marshal leaks nothing.
-- **DEBUGMALLOC**: the handle tables and any non-buffer native blocks
-  get a `TAG_FFI` and a `mark_ffi_handles()` in `check_all_blocks`
-  (this cycle proved that any driver-held live state needs a mark hook —
-  see the pending-DNS and replace_program fixes).
+- **DEBUGMALLOC**: no dedicated FFI tag or `check_all_blocks` mark hook
+  is needed. The handle tables are `std::unordered_map`s of plain C++
+  heap objects (`FfiLibrary`/`FfiFunc`/`FfiCallback`), invisible to the
+  driver's tagged-allocation accounting; the only LPC-heap storage the
+  package hands out is `ffi_alloc()` buffers, which the GC already
+  tracks as ordinary `TAG_BUFFER` blocks.
 
 ## 6. Security model (mandatory)
 
 1. `PACKAGE_FFI` is **OFF** by default; a mud opts in at build time.
-2. Every `ffi_load` and every `ffi_prepare` calls a master apply
+2. `ffi_load`, `ffi_symbol`, `ffi_prepare`, and `ffi_callback` each call
+   a master apply
    **`valid_ffi(string operation, mixed arg, object caller)`**
    (mirroring `valid_database`, `valid_link`, `get_include_path`): the
    mudlib decides which libraries and symbols are permitted, keyed on
@@ -311,29 +324,33 @@ of truth, exactly like `lpc-grammar.json`.
 
 ## 8. Testing
 
-- **GTest** (`src/tests/test_ffi.cc`): prepare and call functions in a
-  tiny fixture `.so` built by the test CMake (e.g. `int add(int,int)`,
-  `double scale(double)`, `void fill(char*, int, int)` for out-params,
-  a struct round-trip) — pure C-ABI round trips with no mudlib.
-- **LPC** (`testsuite/single/tests/efuns/ffi_*.lpc`, guarded by
-  `#ifdef __PACKAGE_FFI__` like the other optional packages): load
-  `libm`, call `sqrt`/`pow`, allocate a buffer, write/read a struct,
+- **LPC** (`testsuite/single/tests/efuns/ffi_*.lpc`, 20 files, guarded
+  by `#ifdef __PACKAGE_FFI__` like the other optional packages): the FFI
+  surface is exercised entirely through the LPC testsuite rather than a
+  GTest fixture, since every path needs a live VM (for `valid_ffi` and,
+  for callbacks, VM re-entry). The tests `dlopen` the process itself
+  (`ffi_load("")` → `dlopen(NULL)`) to reach libc symbols portably,
+  call scalar/pointer functions, allocate a buffer, write/read a struct,
   round-trip a `char*` through `string_encode` → `ffi_call` →
   `ffi_peek` → `string_decode` (pinning that strings only cross as
-  buffers), and assert `valid_ffi` denial is enforced. The suite's
-  per-file `check_memory()` gate (which caught seven leaks this cycle)
-  validates the allocation/handle accounting.
-- `tools/ffi` gets a `test.mjs`/`test.py` over a sample header with
-  golden expected LPC output, run in CI like `tools/lpc-syntax/test.mjs`.
+  buffers), drive an LPC callback back from C, and assert `valid_ffi`
+  denial is enforced. The suite's per-file `check_memory()` gate (which
+  caught seven leaks this cycle) validates the allocation/handle
+  accounting.
+- `tools/ffi/test.py` runs the generator over `test_sample.h` and checks
+  the emitted LPC/struct output, run in CI like `tools/lpc-syntax/test.mjs`.
 
 ## 9. Phasing
 
 1. **v1a**: `ffi_load`/`ffi_symbol`/`ffi_prepare`/`ffi_call` for scalar
    + pointer + string args, `ffi_alloc`/`ffi_free`/`ffi_read`/
-   `ffi_write`, `valid_ffi`, the `OFF` toggle, GTest + LPC tests.
+   `ffi_write`, `valid_ffi`, the `OFF` toggle, LPC tests.
 2. **v1b**: `ffi_struct_layout` + the `tools/ffi` generator.
-3. **v2**: C-calls-LPC callbacks via `ffi_closure` (a separate, larger
-   design — the trampoline must enter the VM safely from a native
-   thread/stack).
+3. **v2**: C-calls-LPC callbacks via `ffi_closure`
+   (`ffi_callback`/`ffi_callback_addr`/`ffi_callback_free`) — the
+   closure trampoline (`closure_dispatch`) re-enters the VM through
+   `safe_call_function_pointer`.
+
+All three phases are implemented.
 
 Each phase is a self-contained, independently testable PR.
