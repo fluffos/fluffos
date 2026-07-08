@@ -364,6 +364,19 @@ int valid_database(object ob, string action, mixed *info) {
   return 1;
 }
 
+// Security gate for package_ffi (op: "load"/"symbol"/"prepare"/
+// "callback"). A missing apply denies by default; the testsuite allows
+// everything so the ffi_* tests can exercise real native calls. A
+// production master would restrict this tightly (it is a sandbox escape).
+int valid_ffi(string op, mixed arg, object caller) {
+  // Deny a sentinel so the denial path is testable
+  // (single/tests/efuns/ffi_load.lpc).
+  if (stringp(arg) && strsrch(arg, "DENY_ME") != -1) {
+    return 0;
+  }
+  return 1;
+}
+
 string object_name(object ob) {
   return ob->name();
 }

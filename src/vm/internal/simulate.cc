@@ -41,6 +41,9 @@
 #ifdef PACKAGE_DB
 void db_cleanup(void);  // FIXME
 #endif
+#ifdef PACKAGE_FFI
+#include "packages/ffi/ffi.h"
+#endif
 #ifdef PACKAGE_SOCKETS
 #include "packages/sockets/socket_efuns.h"
 #endif
@@ -78,6 +81,9 @@ void shutdownMudOS(int exit_code) {
 
 #ifdef PACKAGE_DB
   db_cleanup();
+#endif
+#ifdef PACKAGE_FFI
+  ffi_cleanup();
 #endif
   shutdown_external_ports();
 

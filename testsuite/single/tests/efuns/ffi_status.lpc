@@ -1,0 +1,18 @@
+#ifdef __PACKAGE_FFI__
+#include <ffi.h>
+void do_tests() {
+    mapping m = ffi_status();
+    ASSERT(mapp(m));
+    ASSERT(intp(m["libraries"]));
+    ASSERT(intp(m["functions"]));
+    ASSERT(intp(m["callbacks"]));
+    if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
+    // Opening a library bumps the count.
+    int before = ffi_status()["libraries"];
+    int lib = ffi_load("");
+    ASSERT_EQ(before + 1, ffi_status()["libraries"]);
+    ffi_unload(lib);
+    ASSERT_EQ(before, ffi_status()["libraries"]);
+#endif
+    ASSERT(1);
+}

@@ -1,0 +1,28 @@
+#ifdef __PACKAGE_FFI__
+#include <ffi.h>
+// qsort comparator implemented in LPC, invoked from C via a libffi
+// closure: a/b are int* addresses, compare the 4-byte ints they point at.
+int cmp(int a_addr, int b_addr) {
+    return ffi_read(ffi_peek(a_addr, 4), 0, FFI_INT32) -
+           ffi_read(ffi_peek(b_addr, 4), 0, FFI_INT32);
+}
+void do_tests() {
+    int lib, qs, cb, i;
+    int *src = ({ 30, 10, 40, 20, 50 });
+    buffer data;
+    if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
+    lib = ffi_load("");
+    qs = ffi_prepare(lib, "qsort", FFI_VOID,
+                     ({ FFI_POINTER, FFI_UINT64, FFI_UINT64, FFI_POINTER }));
+    data = ffi_alloc(5 * 4);
+    for (i = 0; i < 5; i++) ffi_write(data, i * 4, FFI_INT32, src[i]);
+    cb = ffi_callback((: cmp :), FFI_INT32, ({ FFI_POINTER, FFI_POINTER }));
+    // C calls back into LPC once per comparison, sorting the buffer.
+    ffi_call(qs, ({ data, 5, 4, ffi_callback_addr(cb) }));
+    for (i = 0; i < 5; i++)
+        ASSERT_EQ(({ 10, 20, 30, 40, 50 })[i], ffi_read(data, i * 4, FFI_INT32));
+    ffi_callback_free(cb);
+    ffi_unload(lib);
+#endif
+    ASSERT(1);
+}

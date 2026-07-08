@@ -49,6 +49,7 @@ CATEGORY_ORDER = [
     "Diagnostics",
     "Performance",
     "Protocol Support",
+    "Security",
 ]
 
 # Built-in integer constants the table defaults may reference.

@@ -1,0 +1,13 @@
+#ifdef __PACKAGE_FFI__
+#include <ffi.h>
+void do_tests() {
+    buffer b = ffi_alloc(16);
+    ASSERT(bufferp(b));
+    ASSERT_EQ(16, sizeof(b));
+    // Zeroed on allocation.
+    ASSERT_EQ(0, ffi_read(b, 0, FFI_INT64));
+    ASSERT_EQ(0, ffi_read(b, 8, FFI_INT64));
+    ASSERT(catch(ffi_alloc(-1)));
+#endif
+    ASSERT(1);
+}

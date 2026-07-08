@@ -1,0 +1,12 @@
+#ifdef __PACKAGE_FFI__
+#include <ffi.h>
+void do_tests() {
+    buffer b = ffi_alloc(8);
+    int addr = ffi_address(b);
+    ASSERT(intp(addr));
+    ASSERT(addr != 0);
+    // A zero-length buffer has no bytes; address is 0.
+    ASSERT_EQ(0, ffi_address(ffi_alloc(0)));
+#endif
+    ASSERT(1);
+}
