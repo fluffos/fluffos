@@ -15,7 +15,7 @@ unrecognized pragma is a warning, not an error.
 | `warnings` | Enable compiler warnings (`no_warnings` silences them for the rest of the file). |
 | `save_types` | Keep the type information of the program after compilation, so objects inheriting it can type-check calls into it. |
 | `optimize` | Enable extra tree optimization for this file. |
-| `show_error_context` | Append the legacy FluffOS error-context block to diagnostics, in addition to the default clang-style output (see [diagnostics](../diagnostics)). |
+| `show_error_context` | Legacy flag (on by default). It predates the clang-style diagnostics, which already show source context, so it no longer changes how compiler diagnostics are rendered (see [diagnostics](../diagnostics)). |
 
 ```c
 #pragma strict_types

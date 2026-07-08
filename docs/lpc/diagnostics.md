@@ -72,5 +72,8 @@ and the backslash should be dropped:
 
 ## Legacy error context
 
-`#pragma show_error_context` appends the traditional FluffOS context
-block to each diagnostic in addition to the clang-style output.
+`#pragma show_error_context` is a legacy flag that predates these
+clang-style diagnostics. The output shown above always includes the
+source snippet and caret, so the pragma no longer changes how
+**compiler** diagnostics are rendered — it survives only for the
+driver's older runtime error-logging path.

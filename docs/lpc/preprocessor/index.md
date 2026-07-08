@@ -25,6 +25,7 @@ semantics are the conventional C-family ones described here.
 | [`#ifdef` / `#ifndef`](conditionals) | Conditional compilation on whether a macro is defined. |
 | [`#pragma`](pragma) | Toggle per-file compiler flags. |
 | `#error text` | Abort the compile with `text` as the error message. |
+| `#warn text` | Emit `text` as a compiler warning; does not fail the compile (and is suppressed by `#pragma no_warnings`). |
 | `#echo text` | Print `text` to the driver's stderr during the compile. |
 | `#line N ["file"]` | Override the reported line number (and optionally file name) for subsequent diagnostics. `# N` is accepted as a synonym. |
 
