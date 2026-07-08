@@ -268,7 +268,14 @@ WS_NO_NL    [ \t\r\v\f]
 
 "0"[xX][0-9a-fA-F](_?[0-9a-fA-F])* { return lpc_lex_number_hex(yylval_param, yytext, yyleng); }
 "0"[bB][01](_?[01])* { return lpc_lex_number_bin(yylval_param, yytext, yyleng); }
-[0-9](_?[0-9])*"."(_?[0-9])+ { return lpc_lex_number_real(yylval_param, yytext, yyleng); }
+[0-9](_?[0-9])*"."(_?[0-9])+([eE][+-]?[0-9](_?[0-9])*)? { return lpc_lex_number_real(yylval_param, yytext, yyleng); }
+%{
+    /* Exponent WITHOUT a fraction ("1e3", "2E-5") is a float too. The
+     * mandatory [eE] keeps this clear of integers, identifiers ("e3"
+     * alone is an identifier; "1e" with no exponent digits falls back
+     * to NUMBER(1) IDENT(e)), and the "1..5" range split. */
+%}
+[0-9](_?[0-9])*[eE][+-]?[0-9](_?[0-9])* { return lpc_lex_number_real(yylval_param, yytext, yyleng); }
 %{
     /* A trailing '.' with no fraction digits (e.g. "1.") is still a valid
      * float -- but only when NOT immediately followed by another '.', which
