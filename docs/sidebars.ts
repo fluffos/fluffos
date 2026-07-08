@@ -19,6 +19,7 @@ const sidebars: SidebarsConfig = {
         'driver/parse_tree',
         'driver/call_into_vm',
         'driver/malloc',
+        'driver/ffi-plan',
       ],
     },
     {
