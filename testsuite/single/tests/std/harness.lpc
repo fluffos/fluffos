@@ -1,0 +1,20 @@
+// Self-test of the harness's own failure-recording machinery: the
+// assertion macros (include/tests.h) report through
+// master::record_failure and the runner keys pass/fail on the recorded
+// list, so record/query/pop must round-trip and every assertion must
+// pass through the check counter.
+void do_tests() {
+    int n = sizeof("/single/master"->query_failures());
+    int c;
+
+    "/single/master"->record_failure("harness self-test probe");
+    ASSERT_EQ(n + 1, sizeof("/single/master"->query_failures()));
+    ASSERT_EQ("harness self-test probe", "/single/master"->pop_failure());
+    ASSERT_EQ(n, sizeof("/single/master"->query_failures()));
+
+    // Every assertion macro passes through the check counter
+    // (clear_last_error): two more checks => counter advances by two.
+    c = "/single/master"->query_num_checks();
+    ASSERT(1);
+    ASSERT_EQ(c + 2, "/single/master"->query_num_checks());
+}

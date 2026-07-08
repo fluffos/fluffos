@@ -24,6 +24,19 @@ void do_tests() {
     ob = load_object("/clone/dual_pick_lpc.lpc");
     ASSERT_EQ("lpc", ob->which());
 
+    // The inherit-retry loop keeps the caller's exact spelling: the
+    // ".c" twin inherits an UNLOADED parent, forcing load_object to
+    // load the parent and then reload the child -- the reload must
+    // still compile the ".c" file, not fall back to the .lpc twin.
+    ob = load_object("/clone/dual_retry_child.c");
+    ASSERT_EQ("c", ob->which());
+    ASSERT_EQ("parent", ob->pwhich());
+
+    // function_exists() strips the defining program's real suffix --
+    // ".c" here, since the .c spelling won the pick above.
+    ASSERT_EQ("/clone/dual_pick_c",
+              function_exists("which", find_object("/clone/dual_pick_c")));
+
     // Extension-less names prefer ".lpc" when both exist ...
     ob = load_object("/clone/dual_pick_default");
     ASSERT_EQ("lpc", ob->which());

@@ -11,7 +11,7 @@
 //   [  PASSED  ] 289 file(s).
 //   Checks succeeded.
 // The "Checks succeeded." line and the process exit code are the
-// machine-readable pass signals (ctest test "lpc-testsuite" and CI key
+// machine-readable pass signals (ctest test "testsuite" and CI key
 // on them).
 //
 // Failed checks are RECORDED (include/tests.h OUTPUT ->

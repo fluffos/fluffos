@@ -45,5 +45,15 @@ void do_tests() {
     ASSERT(var2 == 2);
     ASSERT(var3 == 4);
     ASSERT(var4 == 1);
+
+    // A source extension on the restore path is stripped (either
+    // spelling) before ".o" is looked up.
+    setup();
+    restore_object("/sf.lpc", 1);
+    ASSERT(var1 == 3);
+    setup();
+    restore_object("/sf.c", 1);
+    ASSERT(var1 == 3);
+    rm("/sf.o");
 }
 
