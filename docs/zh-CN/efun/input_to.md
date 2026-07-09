@@ -10,7 +10,7 @@ title: interactive / input_to
 
 ### 语法
 
-    varargs void input_to( string | function fun, int flag, ... );
+    varargs int input_to( string | function fun, int flag, ... );
 
 ### 描述
 

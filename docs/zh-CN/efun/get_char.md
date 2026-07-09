@@ -10,7 +10,7 @@ title: interactive / get_char
 
 ### 语法
 
-    varargs void get_char( string | function fun, int flag, ... );
+    varargs int get_char( string | function fun, int flag, ... );
 
 ### 描述
 

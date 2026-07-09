@@ -10,7 +10,7 @@ title: internals / malloc_status
 
 ### SYNOPSIS
 
-    void malloc_status( void );
+    string malloc_status();
 
 ### DESCRIPTION
 
