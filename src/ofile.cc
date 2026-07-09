@@ -119,25 +119,25 @@ std::string type_2_name(int type) {
 }
 
 int name_2_type(const std::string name) {
-        if (name == "string") {
-        return T_STRING;
-        } else if (name == "number") {
-        return T_NUMBER;
-        } else if (name == "float") {
-        return T_REAL;
-        } else if (name == "array") {
-        return T_ARRAY;
-        } else if (name == "class") {
-        return T_CLASS;
-        } else if (name == "mapping") {
-        return T_MAPPING;
-        } else if (name == "object") {
-        return T_OBJECT;
-        } else if (name == "buffer") {
-        return T_BUFFER;
-        } else {
-        return T_INVALID;
-        }
+  if (name == "string") {
+    return T_STRING;
+  } else if (name == "number") {
+    return T_NUMBER;
+  } else if (name == "float") {
+    return T_REAL;
+  } else if (name == "array") {
+    return T_ARRAY;
+  } else if (name == "class") {
+    return T_CLASS;
+  } else if (name == "mapping") {
+    return T_MAPPING;
+  } else if (name == "object") {
+    return T_OBJECT;
+  } else if (name == "buffer") {
+    return T_BUFFER;
+  } else {
+    return T_INVALID;
+  }
 }
 
 nlohmann::json svalue_to_json_recurse(const svalue_t* sv) {
@@ -211,7 +211,8 @@ svalue_t svalue_from_json_recurse(nlohmann::json j) {
       if (!value.is_string()) {
         throw std::runtime_error("Invalid string value: " + value.dump());
       }
-      sv.u.string = string_copy(value.get<std::string>().data(), "svalue_from_json_recurse: string");
+      sv.u.string =
+          string_copy(value.get<std::string>().data(), "svalue_from_json_recurse: string");
       sv.subtype = STRING_MALLOC;
       break;
     case T_CLASS:
@@ -315,24 +316,24 @@ OFile::OFile(const std::string& o_str) {
 }
 
 OFile::OFile(const nlohmann::json& j) {
-    program_name = j["program_name"];
-    for (const auto& v : j["variables"]) {
-      variables.emplace_back(v["name"], svalue_from_json_recurse(v["value"]));
-    }
+  program_name = j["program_name"];
+  for (const auto& v : j["variables"]) {
+    variables.emplace_back(v["name"], svalue_from_json_recurse(v["value"]));
+  }
 }
 
 std::string OFile::to_ofile() {
-    std::stringstream ss;
-    ss << program_name << "\n";
-    for (auto& v : variables) {
-      ss << v.first << " ";
-      auto size = svalue_save_size(&v.second);
-      std::string buf(size - 1, '\0');
-      auto *p = buf.data();
-      save_svalue(&v.second, &p);
-      ss << buf << "\n";
-    }
-    return ss.str();
+  std::stringstream ss;
+  ss << program_name << "\n";
+  for (auto& v : variables) {
+    ss << v.first << " ";
+    auto size = svalue_save_size(&v.second);
+    std::string buf(size - 1, '\0');
+    auto* p = buf.data();
+    save_svalue(&v.second, &p);
+    ss << buf << "\n";
+  }
+  return ss.str();
 }
 OFile::~OFile() {
   for (auto& v : variables) {

@@ -36,7 +36,7 @@ namespace {
 // Representative source: macros (object- and function-like), string
 // literals and adjacent-literal folding, a template literal, classes,
 // locals, loops, switches, calls -- the allocation-relevant constructs.
-const char *kSource = R"(
+const char* kSource = R"(
 #define SIZE 16
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define GREETING "hello " "world"
@@ -98,9 +98,9 @@ std::string build_big_source() {
 
 using Clock = std::chrono::steady_clock;
 
-double compile_once(const std::string &src) {
+double compile_once(const std::string& src) {
   auto t0 = Clock::now();
-  program_t *prog = compile_file(src, "bench_compile_unit");
+  program_t* prog = compile_file(src, "bench_compile_unit");
   auto t1 = Clock::now();
   if (prog == nullptr) {
     fprintf(stderr, "FATAL: benchmark source failed to compile\n");
@@ -110,7 +110,7 @@ double compile_once(const std::string &src) {
   return std::chrono::duration<double, std::nano>(t1 - t0).count();
 }
 
-double avg(const std::vector<double> &v, size_t from, size_t to) {
+double avg(const std::vector<double>& v, size_t from, size_t to) {
   double s = 0;
   for (size_t i = from; i < to && i < v.size(); i++) s += v[i];
   return s / static_cast<double>(std::min(to, v.size()) - from);
@@ -118,7 +118,7 @@ double avg(const std::vector<double> &v, size_t from, size_t to) {
 
 }  // namespace
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   int rounds = (argc > 1) ? atoi(argv[1]) : 2000;
   long chunk = (argc > 2) ? atol(argv[2]) : 0;  // e.g. 400: worst-case geometry
 
@@ -153,13 +153,13 @@ int main(int argc, char **argv) {
          avg(ns, n - n / 10, n) / 1e3);
   printf("  median           %10.1f us\n", sorted[n / 2] / 1e3);
   printf("  p99              %10.1f us\n", sorted[n * 99 / 100] / 1e3);
-  printf("  throughput       %10.1f compiles/sec (steady)\n",
-         1e9 / avg(ns, n - n / 10, n));
-  printf("\narena: %zu chunk mallocs after warmup, %zu at end "
-         "(delta %zu -- MUST be 0 for a leak-free steady state), "
-         "%d retained chunks, %zu resets\n",
-         warm.chunk_mallocs, end.chunk_mallocs, end.chunk_mallocs - warm.chunk_mallocs,
-         end.retained_chunks, end.resets);
+  printf("  throughput       %10.1f compiles/sec (steady)\n", 1e9 / avg(ns, n - n / 10, n));
+  printf(
+      "\narena: %zu chunk mallocs after warmup, %zu at end "
+      "(delta %zu -- MUST be 0 for a leak-free steady state), "
+      "%d retained chunks, %zu resets\n",
+      warm.chunk_mallocs, end.chunk_mallocs, end.chunk_mallocs - warm.chunk_mallocs,
+      end.retained_chunks, end.resets);
 
   double degradation = avg(ns, n - n / 10, n) / avg(ns, 0, n / 10);
   printf("last-10%% / first-10%% ratio: %.3f (>1.10 would indicate lifetime degradation)\n",

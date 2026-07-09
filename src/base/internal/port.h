@@ -26,8 +26,8 @@
 int64_t random_number(int64_t);
 int64_t secure_random_number(int64_t);
 time_t get_current_time(void);
-void get_usec_clock(long *, long *);
-long get_cpu_times(unsigned long *, unsigned long *);
-char *get_current_dir(char *, int);
+void get_usec_clock(long*, long*);
+long get_cpu_times(unsigned long*, unsigned long*);
+char* get_current_dir(char*, int);
 
 #endif

@@ -15,11 +15,11 @@
 
 typedef struct md_node_s {
   int size;
-  struct md_node_s *next;
+  struct md_node_s* next;
 #ifdef DEBUGMALLOC_EXTENSIONS
   int id;
   int tag;
-  const char *desc;
+  const char* desc;
   uint64_t gametick;
 #endif
 } md_node_t;
@@ -36,9 +36,9 @@ void check_all_blocks(int);
 #define MD_TABLE_SIZE (1u << MD_TABLE_BITS)
 #define MD_HASH(x) (((uintptr_t)x >> 3) & (MD_TABLE_SIZE - 1))
 
-#define PTR(x) ((void *)(x + 1))
+#define PTR(x) ((void*)(x + 1))
 #define NODET_TO_PTR(x, y) ((y)(x + 1))
-#define PTR_TO_NODET(x) ((md_node_t *)(x)-1)
+#define PTR_TO_NODET(x) ((md_node_t*)(x) - 1)
 
 #define DO_MARK(ptr, kind)                                                                    \
   if (PTR_TO_NODET(ptr)->tag != kind)                                                         \
@@ -58,19 +58,19 @@ void check_all_blocks(int);
 extern uint64_t blocks[MAX_TAGS];
 extern uint64_t totals[MAX_TAGS];
 
-extern md_node_t *table[];
+extern md_node_t* table[];
 
 extern int malloc_mask;
 extern unsigned int total_malloced;
 extern unsigned int hiwater;
-void MDmalloc(md_node_t *, int, int, const char *);
-int MDfree(md_node_t *);
+void MDmalloc(md_node_t*, int, int, const char*);
+int MDfree(md_node_t*);
 
 #ifdef DEBUGMALLOC_EXTENSIONS
-void set_tag(const void *, int);
+void set_tag(const void*, int);
 #endif
 
-void md_record_ref_journal(md_node_t *node, bool is_ref, int current_ref, std::string desc);
-void md_print_ref_journal(md_node_t *node, outbuffer_t *outbuf);
+void md_record_ref_journal(md_node_t* node, bool is_ref, int current_ref, std::string desc);
+void md_print_ref_journal(md_node_t* node, outbuffer_t* outbuf);
 
 #endif

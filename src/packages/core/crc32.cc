@@ -12,7 +12,7 @@
    by others.  See the comments in the file (crctab.h) for the credits.
 */
 
-uint32_t compute_crc32(unsigned char *buf, int len) {
+uint32_t compute_crc32(unsigned char* buf, int len) {
   uint32_t crc = 0xFFFFFFFFL;
   int j;
 
@@ -27,12 +27,12 @@ uint32_t compute_crc32(unsigned char *buf, int len) {
 #ifdef F_CRC32
 void f_crc32() {
   int len;
-  unsigned char *buf;
+  unsigned char* buf;
   uint32_t crc;
 
   if (sp->type == T_STRING) {
     len = SVALUE_STRLEN(sp);
-    buf = (unsigned char *)sp->u.string;
+    buf = (unsigned char*)sp->u.string;
   } else if (sp->type == T_BUFFER) {
     len = sp->u.buf->size;
     buf = sp->u.buf->item;

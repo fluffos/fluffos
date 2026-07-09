@@ -28,7 +28,7 @@ uint64_t totals[MAX_TAGS];
 
 int malloc_mask = 0;
 
-md_node_t *table[MD_TABLE_SIZE];
+md_node_t* table[MD_TABLE_SIZE];
 unsigned int total_malloced = 0L;
 unsigned int hiwater = 0L;
 
@@ -39,29 +39,30 @@ extern uint64_t g_current_gametick;
 // journal to record all ref/unref operations
 namespace {
 std::map<int, std::vector<std::string>> md_refjournal;
-} // namespace
+}  // namespace
 #endif
 
-void md_record_ref_journal(md_node_t *node, bool is_ref, int current_ref, std::string desc) {
+void md_record_ref_journal(md_node_t* node, bool is_ref, int current_ref, std::string desc) {
 #ifdef DEBUGMALLOC_EXTENSIONS
   auto id = node->id;
   auto it = md_refjournal.find(id);
   if (it == md_refjournal.end()) {
     md_refjournal[id] = std::vector<std::string>();
   }
-  auto entry = fmt::format(FMT_STRING("{:s}: {:s}, ref={:d}\n"), is_ref ? "REF" : "UNREF", desc, current_ref);
+  auto entry = fmt::format(FMT_STRING("{:s}: {:s}, ref={:d}\n"), is_ref ? "REF" : "UNREF", desc,
+                           current_ref);
   md_refjournal[id].push_back(entry);
 #endif
 }
 
-void md_print_ref_journal(md_node_t *node, outbuffer_t *outbuf) {
+void md_print_ref_journal(md_node_t* node, outbuffer_t* outbuf) {
 #ifdef DEBUGMALLOC_EXTENSIONS
   auto id = node->id;
   auto it = md_refjournal.find(id);
   if (it == md_refjournal.end()) {
     return;
   }
-  for (auto &entry: it->second) {
+  for (auto& entry : it->second) {
     outbuf_add(outbuf, entry.c_str());
   }
 #endif
@@ -78,10 +79,9 @@ void clear_ref_journal(md_node_t* node) {
   it->second.clear();
 #endif
 }
-} // namespace
+}  // namespace
 
-
-void MDmalloc(md_node_t *node, int size, int tag, const char *desc) {
+void MDmalloc(md_node_t* node, int size, int tag, const char* desc) {
   unsigned long h;
   static int count = 0;
 
@@ -120,8 +120,8 @@ void MDmalloc(md_node_t *node, int size, int tag, const char *desc) {
 }
 
 #ifdef DEBUGMALLOC_EXTENSIONS
-void set_tag(const void *ptr, int tag) {
-  md_node_t *node = PTR_TO_NODET(ptr);
+void set_tag(const void* ptr, int tag) {
+  md_node_t* node = PTR_TO_NODET(ptr);
 
   if ((node->tag & 0xff) > MAX_CATEGORY) {
     totals[node->tag & 0xff] -= node->size;
@@ -146,7 +146,7 @@ void set_tag(const void *ptr, int tag) {
 }
 #endif
 
-int MDfree(md_node_t *ptr) {
+int MDfree(md_node_t* ptr) {
   unsigned long h;
   md_node_t *entry, **oentry;
 

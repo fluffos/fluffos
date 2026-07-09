@@ -59,18 +59,18 @@
 #define SYNCH 242 /* for telfunc calls */
 
 #ifdef TELCMDS
-char *telcmds[] = {
+char* telcmds[] = {
     "EOF", "SUSP", "ABORT", "EOR", "SE",   "NOP",  "DMARK", "BRK",  "IP",  "AO", "AYT",
     "EC",  "EL",   "GA",    "SB",  "WILL", "WONT", "DO",    "DONT", "IAC", 0,
 };
 #else
-extern char *telcmds[];
+extern char* telcmds[];
 #endif
 
 #define TELCMD_FIRST xEOF
 #define TELCMD_LAST IAC
 #define TELCMD_OK(x) ((unsigned int)(x) <= TELCMD_LAST && (unsigned int)(x) >= TELCMD_FIRST)
-#define TELCMD(x) telcmds[(x)-TELCMD_FIRST]
+#define TELCMD(x) telcmds[(x) - TELCMD_FIRST]
 
 /* telnet options */
 #define TELOPT_BINARY 0          /* 8-bit data path */
@@ -117,7 +117,7 @@ extern char *telcmds[];
 
 #define NTELOPTS (1 + TELOPT_NEW_ENVIRON)
 #ifdef TELOPTS
-char *telopts[NTELOPTS + 1] = {
+char* telopts[NTELOPTS + 1] = {
     "BINARY",
     "ECHO",
     "RCP",
@@ -163,7 +163,7 @@ char *telopts[NTELOPTS + 1] = {
 #define TELOPT_FIRST TELOPT_BINARY
 #define TELOPT_LAST TELOPT_NEW_ENVIRON
 #define TELOPT_OK(x) ((unsigned int)(x) <= TELOPT_LAST)
-#define TELOPT(x) telopts[(x)-TELOPT_FIRST]
+#define TELOPT(x) telopts[(x) - TELOPT_FIRST]
 #endif
 
 /* sub-option qualifiers */
@@ -230,9 +230,9 @@ char *telopts[NTELOPTS + 1] = {
   "0", "SYNCH", "BRK", "IP", "AO", "AYT", "EOR", "ABORT", "EOF", "SUSP", "EC", "EL", "EW", "RP", \
       "LNEXT", "XON", "XOFF", "FORW1", "FORW2", 0,
 #ifdef SLC_NAMES
-char *slc_names[] = {SLC_NAMELIST};
+char* slc_names[] = {SLC_NAMELIST};
 #else
-extern char *slc_names[];
+extern char* slc_names[];
 #define SLC_NAMES SLC_NAMELIST
 #endif
 
@@ -288,11 +288,11 @@ extern char *slc_names[];
 #define AUTHTYPE_TEST 99
 
 #ifdef AUTH_NAMES
-char *authtype_names[] = {
+char* authtype_names[] = {
     "NULL", "KERBEROS_V4", "KERBEROS_V5", "SPX", "MINK", 0,
 };
 #else
-extern char *authtype_names[];
+extern char* authtype_names[];
 #endif
 
 #define AUTHTYPE_NAME_OK(x) ((unsigned int)(x) < AUTHTYPE_CNT)
@@ -318,19 +318,19 @@ extern char *authtype_names[];
 #define ENCTYPE_CNT 3
 
 #ifdef ENCRYPT_NAMES
-char *encrypt_names[] = {
+char* encrypt_names[] = {
     "IS",          "SUPPORT",   "REPLY",     "START", "END", "REQUEST-START",
     "REQUEST-END", "ENC-KEYID", "DEC-KEYID", 0,
 };
-char *enctype_names[] = {
+char* enctype_names[] = {
     "ANY",
     "DES_CFB64",
     "DES_OFB64",
     0,
 };
 #else
-extern char *encrypt_names[];
-extern char *enctype_names[];
+extern char* encrypt_names[];
+extern char* enctype_names[];
 #endif
 
 #define ENCRYPT_NAME_OK(x) ((unsigned int)(x) < ENCRYPT_CNT)

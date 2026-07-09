@@ -11,10 +11,10 @@
 
 void symbol_enable(int op);
 
-void symbol_start(const char *filename);
+void symbol_start(const char* filename);
 
 void symbol_end();
 
-void symbol_record(int op, const char *file, int line, const char *detail);
+void symbol_record(int op, const char* file, int line, const char* detail);
 
 #endif /* end of include guard: DB_H_J7ASBHTE */

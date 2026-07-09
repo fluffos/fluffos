@@ -1,6 +1,6 @@
 #include "base/package_api.h"
 
-int get_config_item(svalue_t *res, svalue_t *arg) {
+int get_config_item(svalue_t* res, svalue_t* arg) {
   int num;
 
   num = arg->u.number;
@@ -34,7 +34,7 @@ void f_get_config() {
 #ifdef F_SET_CONFIG
 void f_set_config() {
   auto num = (sp - 1)->u.number;
-  auto *value = sp;
+  auto* value = sp;
 
   if (num < 0 || num > RC_LAST_CONFIG_INT) {
     pop_2_elems();

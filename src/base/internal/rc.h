@@ -15,19 +15,19 @@
 
 // How many external cmds are supported.
 constexpr int g_num_external_cmds = 100;
-extern char *external_cmd[g_num_external_cmds];
+extern char* external_cmd[g_num_external_cmds];
 
 void config_init();
-void read_config(const char *);
+void read_config(const char*);
 void print_rc_table();
 // Emit a starter config file (with all options) to stdout; used by
 // `driver --generate-config`.
 void print_config_template();
 
 extern int config_int[NUM_CONFIG_INTS];
-extern char *config_str[NUM_CONFIG_STRS];
+extern char* config_str[NUM_CONFIG_STRS];
 
-#define CONFIG_STR(x) config_str[(x)-RC_BASE_CONFIG_STR]
-#define CONFIG_INT(x) config_int[(x)-RC_BASE_CONFIG_INT]
+#define CONFIG_STR(x) config_str[(x) - RC_BASE_CONFIG_STR]
+#define CONFIG_INT(x) config_int[(x) - RC_BASE_CONFIG_INT]
 
 #endif

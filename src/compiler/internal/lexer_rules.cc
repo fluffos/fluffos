@@ -20,35 +20,35 @@
 // MAXLINE-based "String too long" limit.
 namespace {
 
-compiler_context_t *ctx_of(void *yyscanner) {
-  return reinterpret_cast<compiler_context_t *>(yyget_extra(yyscanner));
+compiler_context_t* ctx_of(void* yyscanner) {
+  return reinterpret_cast<compiler_context_t*>(yyget_extra(yyscanner));
 }
 
 // Shared by every string/template escape rule: appends one decoded char to
 // whichever accumulator the current scan target uses.
-void append_char(void *yyscanner, char c) { ctx_of(yyscanner)->str_accum += c; }
-void append_str(void *yyscanner, const char *s, size_t n) {
+void append_char(void* yyscanner, char c) { ctx_of(yyscanner)->str_accum += c; }
+void append_str(void* yyscanner, const char* s, size_t n) {
   ctx_of(yyscanner)->str_accum.append(s, n);
 }
 
-const char *literal_kind(bool is_template) { return is_template ? "template literal" : "string"; }
+const char* literal_kind(bool is_template) { return is_template ? "template literal" : "string"; }
 
 }  // namespace
 
-ScratchString lpc_strip_underscores(const char *text, int len) {
+ScratchString lpc_strip_underscores(const char* text, int len) {
   ScratchString s(text, len);
   s.erase(std::remove(s.begin(), s.end(), '_'), s.end());
   return s;
 }
 
-void lpc_lex_brace_open(void *yyscanner) {
-  compiler_context_t *ctx = yyget_extra(yyscanner);
+void lpc_lex_brace_open(void* yyscanner) {
+  compiler_context_t* ctx = yyget_extra(yyscanner);
   if (ctx->template_nesting > 0) {
     ctx->template_brace_depth[ctx->template_nesting]++;
   }
 }
 
-void lpc_lex_reset_context(struct compiler_context_t *ctx) {
+void lpc_lex_reset_context(struct compiler_context_t* ctx) {
   // Fresh compile: the previous compile's scratch_destroy freed these
   // accumulators' arena buffers, so drop the dangling capacity before
   // any use (deallocating into the reset arena is a harmless no-op).
@@ -61,8 +61,8 @@ void lpc_lex_reset_context(struct compiler_context_t *ctx) {
   ctx->suppress_expansion = false;
 }
 
-bool lpc_lex_brace_close(void *yyscanner) {
-  compiler_context_t *ctx = yyget_extra(yyscanner);
+bool lpc_lex_brace_close(void* yyscanner) {
+  compiler_context_t* ctx = yyget_extra(yyscanner);
   if (ctx->template_nesting > 0 && ctx->template_brace_depth[ctx->template_nesting] == 0) {
     // This '}' ends the ${...} interpolation: resume the template body
     // with a fresh fragment accumulator.
@@ -76,7 +76,7 @@ bool lpc_lex_brace_close(void *yyscanner) {
   return false;
 }
 
-void lpc_lex_count_newlines(const char *text, int len) {
+void lpc_lex_count_newlines(const char* text, int len) {
   for (int i = 0; i < len; i++) {
     if (text[i] == '\n') {
       total_lines++;  // the line counter itself advances natively
@@ -89,25 +89,25 @@ void lpc_lex_count_newlines(const char *text, int len) {
 // Numeric literals
 // ---------------------------------------------------------------------------
 
-int lpc_lex_number_hex(union YYSTYPE *yylval_param, const char *text, int len) {
+int lpc_lex_number_hex(union YYSTYPE* yylval_param, const char* text, int len) {
   auto s = lpc_strip_underscores(text + 2, len - 2);
   yylval_param->number = strtoll(s.c_str(), nullptr, 16);
   return L_NUMBER;
 }
 
-int lpc_lex_number_bin(union YYSTYPE *yylval_param, const char *text, int len) {
+int lpc_lex_number_bin(union YYSTYPE* yylval_param, const char* text, int len) {
   auto s = lpc_strip_underscores(text + 2, len - 2);
   yylval_param->number = strtoll(s.c_str(), nullptr, 2);
   return L_NUMBER;
 }
 
-int lpc_lex_number_real(union YYSTYPE *yylval_param, const char *text, int len) {
+int lpc_lex_number_real(union YYSTYPE* yylval_param, const char* text, int len) {
   auto s = lpc_strip_underscores(text, len);
   yylval_param->real = strtod(s.c_str(), nullptr);
   return L_REAL;
 }
 
-int lpc_lex_number_dec(union YYSTYPE *yylval_param, const char *text, int len) {
+int lpc_lex_number_dec(union YYSTYPE* yylval_param, const char* text, int len) {
   auto s = lpc_strip_underscores(text, len);
   yylval_param->number = strtoll(s.c_str(), nullptr, 10);
   return L_NUMBER;
@@ -119,23 +119,35 @@ int lpc_lex_number_dec(union YYSTYPE *yylval_param, const char *text, int len) {
 
 int lpc_lex_simple_escape(char c) {
   switch (c) {
-    case 'n':  return '\n';
-    case 't':  return '\t';
-    case 'r':  return '\r';
-    case 'b':  return '\b';
-    case 'a':  return '\x07';
-    case 'e':  return '\x1b';
-    case '"':  return '"';
-    case '\'': return '\'';
-    case '`':  return '`';
-    case '$':  return '$';
-    case '\\': return '\\';
-    default:   return -1;
+    case 'n':
+      return '\n';
+    case 't':
+      return '\t';
+    case 'r':
+      return '\r';
+    case 'b':
+      return '\b';
+    case 'a':
+      return '\x07';
+    case 'e':
+      return '\x1b';
+    case '"':
+      return '"';
+    case '\'':
+      return '\'';
+    case '`':
+      return '`';
+    case '$':
+      return '$';
+    case '\\':
+      return '\\';
+    default:
+      return -1;
   }
 }
 
-int lpc_lex_accum_overflow(void *yyscanner, union YYSTYPE *yylval_param, bool in_template) {
-  compiler_context_t *ctx = ctx_of(yyscanner);
+int lpc_lex_accum_overflow(void* yyscanner, union YYSTYPE* yylval_param, bool in_template) {
+  compiler_context_t* ctx = ctx_of(yyscanner);
   if (static_cast<int>(ctx->str_accum.size()) <= MAXLINE) {
     return 0;
   }
@@ -157,7 +169,7 @@ int lpc_lex_accum_overflow(void *yyscanner, union YYSTYPE *yylval_param, bool in
   return tok;
 }
 
-void lpc_lex_append_octal_escape(void *yyscanner, const char *text, bool is_template) {
+void lpc_lex_append_octal_escape(void* yyscanner, const char* text, bool is_template) {
   long long tmp = strtoll(text + 1, nullptr, 8);
   if (tmp > 255) {
     yywarn("Illegal character constant in %s.", literal_kind(is_template));
@@ -166,7 +178,7 @@ void lpc_lex_append_octal_escape(void *yyscanner, const char *text, bool is_temp
   append_char(yyscanner, static_cast<char>(tmp));
 }
 
-void lpc_lex_append_bad_octal_escape(void *yyscanner, bool is_template) {
+void lpc_lex_append_bad_octal_escape(void* yyscanner, bool is_template) {
   // '\8'/'\9' aren't valid octal digits -- see lexer.l's comment on the
   // original hand-written scanner's embedded-NUL quirk here. Reported
   // directly as an error instead of replicating that.
@@ -175,7 +187,7 @@ void lpc_lex_append_bad_octal_escape(void *yyscanner, bool is_template) {
   lexerror(msg.c_str());
 }
 
-void lpc_lex_append_hex_escape(void *yyscanner, const char *text, bool is_template) {
+void lpc_lex_append_hex_escape(void* yyscanner, const char* text, bool is_template) {
   long long tmp = strtoll(text + 2, nullptr, 16);
   if (tmp > 255) {
     yywarn("Illegal character constant.");
@@ -185,13 +197,13 @@ void lpc_lex_append_hex_escape(void *yyscanner, const char *text, bool is_templa
   (void)is_template;
 }
 
-void lpc_lex_append_bad_hex_escape(void *yyscanner, bool is_template) {
+void lpc_lex_append_bad_hex_escape(void* yyscanner, bool is_template) {
   append_char(yyscanner, 'x');
   yywarn("\\x must be followed by a valid hex value; interpreting as 'x' instead.");
   (void)is_template;
 }
 
-void lpc_lex_append_unicode_pair_escape(void *yyscanner, const char *text) {
+void lpc_lex_append_unicode_pair_escape(void* yyscanner, const char* text) {
   // \uXXXX\uYYYY UTF-16 surrogate pair, matched and decoded as one unit --
   // see lexer.l's rule comment for why the lead/trail hex digit ranges
   // guarantee this is exactly a D800-DBFF / DC00-DFFF pair.
@@ -211,7 +223,7 @@ void lpc_lex_append_unicode_pair_escape(void *yyscanner, const char *text) {
   }
 }
 
-void lpc_lex_append_unicode_escape(void *yyscanner, const char *text) {
+void lpc_lex_append_unicode_escape(void* yyscanner, const char* text) {
   // A lone \uXXXX not part of a valid pair: either a genuine single
   // (non-surrogate) code point, or a malformed/unpaired surrogate.
   UChar code = static_cast<UChar>(strtol(text + 2, nullptr, 16));
@@ -232,7 +244,7 @@ void lpc_lex_append_unicode_escape(void *yyscanner, const char *text) {
   }
 }
 
-void lpc_lex_append_long_unicode_escape(void *yyscanner, const char *text, int len) {
+void lpc_lex_append_long_unicode_escape(void* yyscanner, const char* text, int len) {
   UChar res[2];
   auto size = u_unescape(text, res, 2);
   if (size == 0) {
@@ -251,12 +263,12 @@ void lpc_lex_append_long_unicode_escape(void *yyscanner, const char *text, int l
   (void)len;
 }
 
-void lpc_lex_append_unknown_escape(void *yyscanner, const char *text, bool is_template) {
+void lpc_lex_append_unknown_escape(void* yyscanner, const char* text, bool is_template) {
   append_char(yyscanner, text[1]);
   {
     // Fix-it: the escape means nothing, the character stands for itself
     // -- suggest dropping the backslash (rendered under the caret).
-    compiler_context_t *ctx = ctx_of(yyscanner);
+    compiler_context_t* ctx = ctx_of(yyscanner);
     int col = ctx->token_start_column + 1;
     compiler_pending_fixits.push_back(Diagnostic::FixIt{col, col + 2, std::string(1, text[1])});
     char msg[64];
@@ -266,8 +278,8 @@ void lpc_lex_append_unknown_escape(void *yyscanner, const char *text, bool is_te
   (void)is_template;
 }
 
-int lpc_lex_string_close(void *yyscanner, union YYSTYPE *yylval_param) {
-  compiler_context_t *ctx = ctx_of(yyscanner);
+int lpc_lex_string_close(void* yyscanner, union YYSTYPE* yylval_param) {
+  compiler_context_t* ctx = ctx_of(yyscanner);
   if (!u8_validate(ctx->str_accum.c_str())) {
     lexerror("Invalid UTF8 codepoint in string literal");
     return YYerror;
@@ -276,8 +288,8 @@ int lpc_lex_string_close(void *yyscanner, union YYSTYPE *yylval_param) {
   return L_STRING;
 }
 
-int lpc_lex_template_head_or_middle(void *yyscanner, union YYSTYPE *yylval_param) {
-  compiler_context_t *ctx = ctx_of(yyscanner);
+int lpc_lex_template_head_or_middle(void* yyscanner, union YYSTYPE* yylval_param) {
+  compiler_context_t* ctx = ctx_of(yyscanner);
   ctx->is_template = true;
   if (!u8_validate(ctx->str_accum.c_str())) {
     lexerror("Invalid UTF8 codepoint in template literal");
@@ -303,8 +315,8 @@ int lpc_lex_template_head_or_middle(void *yyscanner, union YYSTYPE *yylval_param
   return ctx->template_is_continuation ? L_TEMPLATE_MIDDLE : L_TEMPLATE_HEAD;
 }
 
-int lpc_lex_template_tail_or_string(void *yyscanner, union YYSTYPE *yylval_param) {
-  compiler_context_t *ctx = ctx_of(yyscanner);
+int lpc_lex_template_tail_or_string(void* yyscanner, union YYSTYPE* yylval_param) {
+  compiler_context_t* ctx = ctx_of(yyscanner);
   ctx->is_template = true;
   if (!u8_validate(ctx->str_accum.c_str())) {
     lexerror("Invalid UTF8 codepoint in template literal");
@@ -324,7 +336,7 @@ int lpc_lex_template_tail_or_string(void *yyscanner, union YYSTYPE *yylval_param
 // accumulator -- a char literal's body is exactly one escape/byte).
 // ---------------------------------------------------------------------------
 
-LPC_INT lpc_lex_char_octal_escape(const char *text) {
+LPC_INT lpc_lex_char_octal_escape(const char* text) {
   LPC_INT val = strtoll(text + 1, nullptr, 8);
   if (val > 255) {
     yywarn("Illegal character constant.");
@@ -333,7 +345,7 @@ LPC_INT lpc_lex_char_octal_escape(const char *text) {
   return val;
 }
 
-LPC_INT lpc_lex_char_hex_escape(const char *text) {
+LPC_INT lpc_lex_char_hex_escape(const char* text) {
   LPC_INT val = strtoll(text + 2, nullptr, 16);
   if (val > 255) {
     yywarn("Illegal character constant.");
@@ -347,12 +359,12 @@ LPC_INT lpc_lex_char_bad_hex_escape() {
   return 'x';
 }
 
-LPC_INT lpc_lex_char_unknown_escape(const char *text) {
+LPC_INT lpc_lex_char_unknown_escape(const char* text) {
   yywarn("Unknown \\ escape.");
   return static_cast<unsigned char>(text[1]);
 }
 
-int lpc_lex_char_error(union YYSTYPE *yylval_param) {
+int lpc_lex_char_error(union YYSTYPE* yylval_param) {
   lexerror("Illegal character constant");
   yylval_param->number = 0;
   return L_NUMBER;
@@ -362,7 +374,7 @@ int lpc_lex_char_error(union YYSTYPE *yylval_param) {
 // $N / $ function-pointer parameter tokens
 // ---------------------------------------------------------------------------
 
-int lpc_lex_function_param(union YYSTYPE *yylval_param, const char *text, int len) {
+int lpc_lex_function_param(union YYSTYPE* yylval_param, const char* text, int len) {
   if (!current_function_context) {
     lexerror("$var illegal outside of function pointer.");
     return YYerror;

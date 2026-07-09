@@ -63,10 +63,10 @@ bool ObjectTable::remove(Key const& key) {
                           [&key](Value v) -> bool { return v->obname == key; });
   // guaranteed to be in list if basename(key) exists in children_
   if (it3 != it2->second.end()) {
-      it2->second.erase(it3);
+    it2->second.erase(it3);
   }
   if (it2->second.empty()) {
-      children_.erase(it2);
+    children_.erase(it2);
   }
   return true;
 }
@@ -107,8 +107,7 @@ int ObjectTable::showStatus(outbuffer_t* out, int verbose) {
 std::string basename(std::string s) {
   // remove all leading forward slashes from string.
   auto it1 = s.begin();
-  for (; *it1 == '/'; ++it1)
-    ;
+  for (; *it1 == '/'; ++it1);
   s.erase(s.begin(), it1);
 
   // find # in the string and delete it and all subsequent characters

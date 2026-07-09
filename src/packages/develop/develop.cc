@@ -4,11 +4,11 @@
 #include "packages/core/sprintf.h"
 #include "packages/core/outbuf.h"
 
-static object_t *ob;
+static object_t* ob;
 
 #ifdef F_DEBUG_INFO
 void f_debug_info() {
-  svalue_t *arg;
+  svalue_t* arg;
   outbuffer_t out;
 
   outbuf_zero(&out);
@@ -16,7 +16,7 @@ void f_debug_info() {
   switch (arg[0].u.number) {
     case 0: {
       int i, flags;
-      object_t *obj2;
+      object_t* obj2;
 
       ob = arg[1].u.ob;
       flags = ob->flags;
@@ -50,7 +50,7 @@ void f_debug_info() {
         outbuf_addv(&out, "O_MSP             : %s\n",
                     ob->interactive->iflags & USING_MSP ? "TRUE" : "FALSE");
         outbuf_addv(&out, "O_MSDP            : %s\n",
-                    ob->interactive->iflags & USING_MSDP ? "TRUE" : "FALSE");                    
+                    ob->interactive->iflags & USING_MSDP ? "TRUE" : "FALSE");
       }
 
       if (!CONFIG_INT(__RC_NO_RESETS__)) {
@@ -92,7 +92,7 @@ void f_debug_info() {
                   ob->prog->num_functions_defined * sizeof(function_t));
       outbuf_addv(&out, "num strings %d\n", ob->prog->num_strings);
       outbuf_addv(&out, "num vars %u (%" PRIu64 ")\n", ob->prog->num_variables_defined,
-                  ob->prog->num_variables_defined * (sizeof(char *) + sizeof(short)));
+                  ob->prog->num_variables_defined * (sizeof(char*) + sizeof(short)));
       outbuf_addv(&out, "num inherits %d (%lu)\n", ob->prog->num_inherited,
                   ob->prog->num_inherited * sizeof(inherit_t));
       outbuf_addv(&out, "total size %d\n", ob->prog->total_size);
@@ -158,8 +158,8 @@ void f_refs() {
 #ifdef F_DESTRUCTED_OBJECTS
 void f_destructed_objects() {
   int i;
-  array_t *ret;
-  object_t *ob;
+  array_t* ret;
+  object_t* ob;
 
   ret = allocate_empty_array(tot_dangling_object);
   ob = obj_list_dangling;
@@ -181,12 +181,12 @@ void f_destructed_objects() {
 #endif
 
 #ifdef F_DUMP_STRALLOC
-void dump_stralloc(outbuffer_t *);
+void dump_stralloc(outbuffer_t*);
 
 void f_dump_stralloc() {
-  const auto *target_file = sp->u.string;
-  const char *fn;
-  FILE *fp;
+  const auto* target_file = sp->u.string;
+  const char* fn;
+  FILE* fp;
   fn = check_valid_path(target_file, current_object, "debugmalloc", 1);
   if (!fn) {
     error("Invalid path '%s' for writing.\n", target_file);
@@ -230,7 +230,7 @@ void f_dump_jemalloc() {
 #if (defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS))
 #ifdef F_DEBUGMALLOC
 void f_debugmalloc() {
-  char *res;
+  char* res;
 
   res = dump_debugmalloc((sp - 1)->u.string, sp->u.number);
   free_string_svalue(--sp);
@@ -263,12 +263,12 @@ void f_trace() {
 
 #ifdef F_TRACEPREFIX
 void f_traceprefix() {
-  const char *old = nullptr;
+  const char* old = nullptr;
 
   if (command_giver && command_giver->interactive) {
     old = command_giver->interactive->trace_prefix;
     if (sp->type & T_STRING) {
-      const char *p = sp->u.string;
+      const char* p = sp->u.string;
       if (*p == '/') {
         p++;
       }

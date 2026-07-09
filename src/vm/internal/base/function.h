@@ -21,7 +21,7 @@ struct functional_t {
   unsigned char num_arg;
   unsigned char num_local;
   short fio;
-  struct program_t *prog;
+  struct program_t* prog;
   int offset;
   short vio;
   // char lpccode[80];
@@ -34,8 +34,8 @@ struct funptr_hdr_t {
 #ifdef DEBUGMALLOC_EXTENSIONS
   int extra_ref;
 #endif
-  struct object_t *owner;
-  struct array_t *args;
+  struct object_t* owner;
+  struct array_t* args;
 };
 
 struct funptr_t {
@@ -49,18 +49,18 @@ struct funptr_t {
 };
 
 union string_or_func {
-  funptr_t *f;
-  const char *s;
+  funptr_t* f;
+  const char* s;
 };
 
-void dealloc_funp(funptr_t *);
-void push_refed_funp(funptr_t *);
-void push_funp(funptr_t *);
-void free_funp(funptr_t *);
-int merge_arg_lists(int, struct array_t *, int);
-funptr_t *make_efun_funp(int, struct svalue_t *);
-funptr_t *make_lfun_funp(int, struct svalue_t *);
-funptr_t *make_simul_funp(int, struct svalue_t *);
-funptr_t *make_functional_funp(short, short, short, struct svalue_t *, int);
+void dealloc_funp(funptr_t*);
+void push_refed_funp(funptr_t*);
+void push_funp(funptr_t*);
+void free_funp(funptr_t*);
+int merge_arg_lists(int, struct array_t*, int);
+funptr_t* make_efun_funp(int, struct svalue_t*);
+funptr_t* make_lfun_funp(int, struct svalue_t*);
+funptr_t* make_simul_funp(int, struct svalue_t*);
+funptr_t* make_functional_funp(short, short, short, struct svalue_t*, int);
 
 #endif

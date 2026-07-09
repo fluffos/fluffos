@@ -174,7 +174,7 @@ class ScopedTracer {
   ScopedTracer(_Arg&&... __arg)
       : _data(Tracer::enabled()
                   ? std::make_optional<ScopedTracerInner>(std::forward<_Arg>(__arg)...)
-                  : std::nullopt){};
+                  : std::nullopt) {};
 
  private:
   std::optional<ScopedTracerInner> _data;

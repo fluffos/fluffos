@@ -14,10 +14,11 @@ extern int context;       // defined in grammar.autogen.cc (via grammar.y preamb
 extern int func_present;  // defined in grammar.autogen.cc (via grammar.y preamble)
 extern int num_refs;      // defined in grammar.autogen.cc (via grammar.y preamble)
 
-void rule_program(parse_node_t *program_node) { comp_trees[TREE_MAIN] = program_node; }
+void rule_program(parse_node_t* program_node) { comp_trees[TREE_MAIN] = program_node; }
 
-bool rule_inheritence(parse_node_t **result_node, int type_mod, const ScratchString *inherit_file_name) {
-  object_t *ob;
+bool rule_inheritence(parse_node_t** result_node, int type_mod,
+                      const ScratchString* inherit_file_name) {
+  object_t* ob;
   inherit_t inherit;
   int initializer;
 #ifdef SENSIBLE_MODIFIERS
@@ -30,8 +31,8 @@ bool rule_inheritence(parse_node_t **result_node, int type_mod, const ScratchStr
   acc_mod = (type_mod & DECL_ACCESS) & ~global_modifiers;
   if (acc_mod & (acc_mod - 1)) {
     char buf[256];
-    char *end = EndOf(buf);
-    char *p;
+    char* end = EndOf(buf);
+    char* p;
 
     p = strput(buf, end, "Multiple access modifiers (");
     p = get_type_modifiers(p, end, acc_mod);
@@ -55,7 +56,7 @@ bool rule_inheritence(parse_node_t **result_node, int type_mod, const ScratchStr
   inherit.prog = ob->prog;
 
   if (mem_block[A_INHERITS].current_size) {
-    inherit_t *prev_inherit = INHERIT(NUM_INHERITS - 1);
+    inherit_t* prev_inherit = INHERIT(NUM_INHERITS - 1);
 
     inherit.function_index_offset = prev_inherit->function_index_offset +
                                     prev_inherit->prog->num_functions_defined +
@@ -69,7 +70,7 @@ bool rule_inheritence(parse_node_t **result_node, int type_mod, const ScratchStr
 
   inherit.variable_index_offset = mem_block[A_VAR_TEMP].current_size / sizeof(variable_t);
   inherit.type_mod = type_mod;
-  add_to_mem_block(A_INHERITS, (char *)&inherit, sizeof inherit);
+  add_to_mem_block(A_INHERITS, (char*)&inherit, sizeof inherit);
 
   /* The following has to come before copy_vars - Sym */
   copy_structures(ob->prog);
@@ -99,7 +100,7 @@ bool rule_inheritence(parse_node_t **result_node, int type_mod, const ScratchStr
   return false;
 }
 
-LPC_INT rule_func_type(LPC_INT type, LPC_INT optional_star, const ScratchString *identifier) {
+LPC_INT rule_func_type(LPC_INT type, LPC_INT optional_star, const ScratchString* identifier) {
   int flags;
 #ifdef SENSIBLE_MODIFIERS
   int acc_mod;
@@ -113,8 +114,8 @@ LPC_INT rule_func_type(LPC_INT type, LPC_INT optional_star, const ScratchString 
   acc_mod = (flags & DECL_ACCESS) & ~global_modifiers;
   if (acc_mod & (acc_mod - 1)) {
     char buf[256];
-    char *end = EndOf(buf);
-    char *p;
+    char* end = EndOf(buf);
+    char* p;
 
     p = strput(buf, end, "Multiple access modifiers (");
     p = get_type_modifiers(p, end, flags);
@@ -151,14 +152,14 @@ LPC_INT rule_func_type(LPC_INT type, LPC_INT optional_star, const ScratchString 
   return type;
 }
 
-LPC_INT rule_func_proto(LPC_INT type, LPC_INT optional_star, const ScratchString *identifier,
-                        const char **shared_name_out, argument_t argument) {
+LPC_INT rule_func_proto(LPC_INT type, LPC_INT optional_star, const ScratchString* identifier,
+                        const char** shared_name_out, argument_t argument) {
   /* The name changes representation here: the arena string the lexer
      produced becomes a SHARED string, registered in the function table.
      *shared_name_out (the value-stack slot's shared_string member) is
      what rule_func consumes -- the arena original is simply left to the
      arena's bulk free. */
-  const char *shared = make_shared_string(identifier->c_str());
+  const char* shared = make_shared_string(identifier->c_str());
 
   /* If we had nested functions, we would need to check */
   /* here if we have enough space for locals */
@@ -184,23 +185,24 @@ LPC_INT rule_func_proto(LPC_INT type, LPC_INT optional_star, const ScratchString
   return func_types;
 }
 
-void rule_func(parse_node_t **function, LPC_INT type, LPC_INT optional_star, const char *identifier, argument_t argument, LPC_INT *func_types,
-               parse_node_t **block_or_semi) {
+void rule_func(parse_node_t** function, LPC_INT type, LPC_INT optional_star, const char* identifier,
+               argument_t argument, LPC_INT* func_types, parse_node_t** block_or_semi) {
   /* Either a prototype or a block */
   if (*block_or_semi) {
     int fun;
 
     *func_types &= ~FUNC_PROTOTYPE;
-    if ((*block_or_semi)->kind != NODE_RETURN &&
-        ((*block_or_semi)->kind != NODE_TWO_VALUES || (*block_or_semi)->r.expr->kind != NODE_RETURN)) {
-      parse_node_t *replacement;
+    if ((*block_or_semi)->kind != NODE_RETURN && ((*block_or_semi)->kind != NODE_TWO_VALUES ||
+                                                  (*block_or_semi)->r.expr->kind != NODE_RETURN)) {
+      parse_node_t* replacement;
       CREATE_STATEMENTS(replacement, *block_or_semi, 0);
       CREATE_RETURN(replacement->r.expr, 0);
       *block_or_semi = replacement;
     }
 
     // Creating functions for argument defaults
-    fun = define_new_function(identifier, argument.num_arg, max_num_locals - argument.num_arg, *func_types, (type & 0xffff) | optional_star);
+    fun = define_new_function(identifier, argument.num_arg, max_num_locals - argument.num_arg,
+                              *func_types, (type & 0xffff) | optional_star);
     if (fun != -1) {
       *function = new_node_no_line();
       (*function)->kind = NODE_FUNCTION;
@@ -210,43 +212,49 @@ void rule_func(parse_node_t **function, LPC_INT type, LPC_INT optional_star, con
 
       if (!(*func_types & FUNC_TRUE_VARARGS) && argument.num_arg) {
         bool have_default_args = false;
-        auto default_args_limit = sizeof(FUNCTION_DEF(fun)->default_args_findex) / sizeof(FUNCTION_DEF(fun)->default_args_findex[0]);
+        auto default_args_limit = sizeof(FUNCTION_DEF(fun)->default_args_findex) /
+                                  sizeof(FUNCTION_DEF(fun)->default_args_findex[0]);
         for (int i = 0; i < argument.num_arg; i++) {
           auto local = locals_ptr[i];
           if (local.funcptr_default) {
             have_default_args = true;
             if (i > default_args_limit || argument.num_arg > default_args_limit) {
               yyerror("Functions with default arguments can only have %d args", default_args_limit);
-              return ;
+              return;
             }
             FUNCTION_DEF(fun)->min_arg--;
             // TODO: generate a unique name for the function
-            auto funcname = fmt::format(FMT_STRING("#__{}_{}_{}"), get_current_time(), identifier, local.ihe->name, local.ihe->name);
+            auto funcname = fmt::format(FMT_STRING("#__{}_{}_{}"), get_current_time(), identifier,
+                                        local.ihe->name, local.ihe->name);
             // the funcnum here will change in epilog().
-            auto funcnum = define_new_function(funcname.c_str(), 0, 0,
-                                               (*func_types & DECL_ACCESS) | DECL_NOMASK, // same access as origin function
-                                               type_of_locals_ptr[locals_ptr[i].runtime_index]);
+            auto funcnum = define_new_function(
+                funcname.c_str(), 0, 0,
+                (*func_types & DECL_ACCESS) | DECL_NOMASK,  // same access as origin function
+                type_of_locals_ptr[locals_ptr[i].runtime_index]);
             FUNCTION_DEF(fun)->default_args_findex[i] = FUNCTION_TEMP(funcnum)->u.index;
-            // debug_message("function %s (%d), new def arg function %s (%d)\n", identifier, fun, funcname.c_str(), funcnum);
+            // debug_message("function %s (%d), new def arg function %s (%d)\n", identifier, fun,
+            // funcname.c_str(), funcnum);
 
-            parse_node_t *node_return;
-            CREATE_RETURN(node_return,  local.funcptr_default);
+            parse_node_t* node_return;
+            CREATE_RETURN(node_return, local.funcptr_default);
 
-            auto *node_func = new_node_no_line();
+            auto* node_func = new_node_no_line();
             node_func->kind = NODE_FUNCTION;
             node_func->v.number = funcnum;
             node_func->l.number = 0;
             node_func->r.expr = node_return;
 
-            auto *newnode = *function;
+            auto* newnode = *function;
             CREATE_TWO_VALUES(*function, 0, newnode, node_func);
           } else {
             if (i > 0) {
               if (i > default_args_limit) continue;
               auto prev = FUNCTION_DEF(fun)->default_args_findex[i - 1];
               if (prev != 0) {
-                yyerror("Function arguments with default value closure must be specified continuously.");
-                return ;
+                yyerror(
+                    "Function arguments with default value closure must be specified "
+                    "continuously.");
+                return;
               }
             }
           }
@@ -259,10 +267,11 @@ void rule_func(parse_node_t **function, LPC_INT type, LPC_INT optional_star, con
   free_all_local_names(!!(*block_or_semi));
 }
 
-ident_hash_elem_t *rule_define_class(LPC_INT *classname_idx_out, const ScratchString *class_name) {
-  ident_hash_elem_t *ihe;
+ident_hash_elem_t* rule_define_class(LPC_INT* classname_idx_out, const ScratchString* class_name) {
+  ident_hash_elem_t* ihe;
 
-  ihe = find_or_add_ident(PROG_STRING(*classname_idx_out = store_prog_string(class_name)), FOA_GLOBAL_SCOPE);
+  ihe = find_or_add_ident(PROG_STRING(*classname_idx_out = store_prog_string(class_name)),
+                          FOA_GLOBAL_SCOPE);
   if (ihe->dn.class_num == -1) {
     ihe->sem_value++;
     ihe->dn.class_num = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
@@ -276,9 +285,9 @@ ident_hash_elem_t *rule_define_class(LPC_INT *classname_idx_out, const ScratchSt
   }
 }
 
-void rule_define_class_members(struct ident_hash_elem_t *class_ihe, LPC_INT classname_idx) {
-  class_def_t *sd;
-  class_member_entry_t *sme;
+void rule_define_class_members(struct ident_hash_elem_t* class_ihe, LPC_INT classname_idx) {
+  class_def_t* sd;
+  class_member_entry_t* sme;
   int i, raise_error = 0;
 
   /* check for a redefinition */
@@ -288,7 +297,7 @@ void rule_define_class_members(struct ident_hash_elem_t *class_ihe, LPC_INT clas
       raise_error = 1;
     } else {
       i = sd->size;
-      sme = (class_member_entry_t *)mem_block[A_CLASS_MEMBER].block + sd->index;
+      sme = (class_member_entry_t*)mem_block[A_CLASS_MEMBER].block + sd->index;
       while (i--) {
         /* check for matching names and types */
         if (strcmp(PROG_STRING(sme[i].membername), locals_ptr[i].ihe->name) != 0 ||
@@ -303,12 +312,12 @@ void rule_define_class_members(struct ident_hash_elem_t *class_ihe, LPC_INT clas
   if (raise_error) {
     yyerror("Illegal to redefine class '%s',", PROG_STRING(classname_idx));
   } else {
-    sd = (class_def_t *)allocate_in_mem_block(A_CLASS_DEF, sizeof(class_def_t));
+    sd = (class_def_t*)allocate_in_mem_block(A_CLASS_DEF, sizeof(class_def_t));
     i = sd->size = current_number_of_locals;
     sd->index = mem_block[A_CLASS_MEMBER].current_size / sizeof(class_member_entry_t);
     sd->classname = classname_idx;
 
-    sme = (class_member_entry_t *)allocate_in_mem_block(
+    sme = (class_member_entry_t*)allocate_in_mem_block(
         A_CLASS_MEMBER, sizeof(class_member_entry_t) * current_number_of_locals);
 
     while (i--) {
@@ -335,27 +344,21 @@ LPC_INT rule_special_context_open() {
   return saved;
 }
 
-LPC_INT rule_block_open() {
-  return (LPC_INT)current_number_of_locals;
-}
+LPC_INT rule_block_open() { return (LPC_INT)current_number_of_locals; }
 
-void rule_number(parse_node_t **result, LPC_INT val) {
-  CREATE_NUMBER(*result, val);
-}
+void rule_number(parse_node_t** result, LPC_INT val) { CREATE_NUMBER(*result, val); }
 
-void rule_real(parse_node_t **result, LPC_FLOAT val) {
-  CREATE_REAL(*result, val);
-}
+void rule_real(parse_node_t** result, LPC_FLOAT val) { CREATE_REAL(*result, val); }
 
-void rule_primary_expr_parameter(parse_node_t **result, LPC_INT n) {
+void rule_primary_expr_parameter(parse_node_t** result, LPC_INT n) {
   CREATE_PARAMETER(*result, TYPE_ANY, n);
 }
 
-void rule_program_append(parse_node_t **result, parse_node_t *prog, parse_node_t *def) {
+void rule_program_append(parse_node_t** result, parse_node_t* prog, parse_node_t* def) {
   CREATE_TWO_VALUES(*result, 0, prog, def);
 }
 
-void rule_tree_block(parse_node_t **result, parse_node_t *block_node) {
+void rule_tree_block(parse_node_t** result, parse_node_t* block_node) {
 #ifdef DEBUG
   *result = new_node_no_line();
   lpc_tree_form(block_node, *result);
@@ -365,7 +368,7 @@ void rule_tree_block(parse_node_t **result, parse_node_t *block_node) {
 #endif
 }
 
-void rule_tree_expr(parse_node_t **result, parse_node_t *expr) {
+void rule_tree_expr(parse_node_t** result, parse_node_t* expr) {
 #ifdef DEBUG
   *result = new_node_no_line();
   lpc_tree_form(expr, *result);
@@ -375,11 +378,9 @@ void rule_tree_expr(parse_node_t **result, parse_node_t *expr) {
 #endif
 }
 
-void rule_opt_semicolon() {
-  yywarn("Extra ';'. Ignored.");
-}
+void rule_opt_semicolon() { yywarn("Extra ';'. Ignored."); }
 
-ScratchString *rule_string_literal_concat(ScratchString *s1, ScratchString *s2) {
+ScratchString* rule_string_literal_concat(ScratchString* s1, ScratchString* s2) {
   /* Both operands are arena strings consumed by this reduction; append in
      place and hand s1 back as the merged literal. */
   *s1 += *s2;

@@ -7,11 +7,11 @@
 
 #include "base/package_api.h"
 
-mapping_t *debug_levels();
+mapping_t* debug_levels();
 
-mapping_t *debug_levels() {
+mapping_t* debug_levels() {
   int dl = debug_level;
-  mapping_t *ret = allocate_mapping(10);
+  mapping_t* ret = allocate_mapping(10);
   unsigned int i;
 
   for (i = 0; i < sizeof_levels; i++) {

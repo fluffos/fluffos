@@ -116,33 +116,31 @@ void do_tests() {
     this_object()->test4(3, "bbb", 3);
 }
   )";
-  auto *prog = compile_file(source, "test");
+  auto* prog = compile_file(source, "test");
 
   ASSERT_NE(prog, nullptr);
   dump_prog(prog, stdout, 1 | 2);
   deallocate_program(prog);
 }
 
-
 TEST_F(DriverTest, TestLPC_FunctionInherit) {
-    // Load the inherited object first
-    error_context_t econ{};
-    save_context(&econ);
-    try {
+  // Load the inherited object first
+  error_context_t econ{};
+  save_context(&econ);
+  try {
     auto obj = find_object("/single/tests/compiler/function");
-    ASSERT_NE(obj , nullptr);
+    ASSERT_NE(obj, nullptr);
 
     auto obj2 = find_object("/single/tests/compiler/function_inherit");
-    ASSERT_NE(obj2 , nullptr);
+    ASSERT_NE(obj2, nullptr);
 
     auto obj3 = find_object("/single/tests/compiler/function_inherit_2");
-    ASSERT_NE(obj3 , nullptr);
+    ASSERT_NE(obj3, nullptr);
 
     dump_prog(obj3->prog, stdout, 1 | 2);
-    } catch (...) {
-        restore_context(&econ);
-        FAIL();
-    }
-    pop_context(&econ);
-
+  } catch (...) {
+    restore_context(&econ);
+    FAIL();
+  }
+  pop_context(&econ);
 }

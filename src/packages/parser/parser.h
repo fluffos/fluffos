@@ -70,7 +70,7 @@ typedef struct {
 
 typedef struct {
   int type;
-  char *string;
+  char* string;
   char *start, *end;
 } word_t;
 
@@ -93,7 +93,7 @@ typedef struct {
 
 typedef struct parse_info_s {
   int flags;
-  struct object_t *ob;
+  struct object_t* ob;
   int num_ids, num_adjs, num_plurals;
   char **ids, **adjs, **plurals;
 } parse_info_t;
@@ -111,15 +111,15 @@ typedef struct parse_info_s {
  * Hmm ... maybe flags here should be removed.
  */
 typedef struct hash_entry_s {
-  struct hash_entry_s *next;
-  const char *name;
+  struct hash_entry_s* next;
+  const char* name;
   int flags;
   parse_val_t pv;
 } hash_entry_t;
 
 typedef struct special_word_s {
-  struct special_word_s *next;
-  const char *wrd;
+  struct special_word_s* next;
+  const char* wrd;
   short kind;
   short arg;
 } special_word_t;
@@ -131,8 +131,8 @@ enum sw_enum_s { SW_NONE = 0, SW_ARTICLE, SW_SELF, SW_ORDINAL, SW_ALL, SW_OF, SW
  * are stored in here.  Note that it is variable size.
  */
 typedef struct verb_node_s {
-  struct verb_node_s *next;
-  struct object_t *handler;
+  struct verb_node_s* next;
+  struct object_t* handler;
   int weight;
   short lit[2];
   int token[1];
@@ -146,37 +146,37 @@ typedef struct verb_node_s {
 #define VB_IS_SYN 2
 
 typedef struct verb_s {
-  struct verb_s *next;
+  struct verb_s* next;
   int flags;
-  const char *match_name;
-  const char *real_name;
-  verb_node_t *node;
+  const char* match_name;
+  const char* real_name;
+  verb_node_t* node;
 } verb_t;
 
 typedef struct verb_syn_s {
-  struct verb_s *next;
+  struct verb_s* next;
   int flags;
-  const char *match_name;
-  const char *real_name;
-  verb_t *real;
+  const char* match_name;
+  const char* real_name;
+  verb_t* real;
 } verb_syn_t;
 
 /* A token definition for the token lookup table */
 typedef struct {
-  const char *name;
+  const char* name;
   int token;
   int mod_legal;
 } token_def_t;
 
 union parser_error_u {
-  hash_entry_t *noun;
+  hash_entry_t* noun;
   struct {
     int start, end;
   } str_problem;
   bitvec_t obs;
   int ord_error;
-  const char *str;
-  struct saved_error_s *parallel;
+  const char* str;
+  struct saved_error_s* parallel;
 };
 
 typedef struct {
@@ -185,7 +185,7 @@ typedef struct {
 } parser_error_t;
 
 typedef struct saved_error_s {
-  struct saved_error_s *next;
+  struct saved_error_s* next;
   parser_error_t err;
   int obj;
 } saved_error_t;
@@ -210,22 +210,22 @@ typedef struct {
 } parse_state_t;
 
 typedef struct {
-  const char *func;
+  const char* func;
   int num;
-  svalue_t *args;
+  svalue_t* args;
 } sub_result_t;
 
 typedef struct {
-  object_t *ob;
-  saved_error_t *parallel;
+  object_t* ob;
+  saved_error_t* parallel;
   sub_result_t res[4];
 } parse_result_t;
 
-void parse_free(parse_info_t *);
+void parse_free(parse_info_t*);
 #ifdef DEBUGMALLOC_EXTENSIONS
 void parser_mark_verbs();
-void parser_mark(parse_info_t *);
-void mark_hash_entry(const char *);
+void parser_mark(parse_info_t*);
+void mark_hash_entry(const char*);
 #endif
 
 #endif

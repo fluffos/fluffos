@@ -14,11 +14,11 @@ extern int context;
 extern int func_present;
 extern int num_refs;
 
-ScratchString *rule_identifier_defined_name(ident_hash_elem_t *ihe) {
+ScratchString* rule_identifier_defined_name(ident_hash_elem_t* ihe) {
   return scratch_new_string(ihe->name);
 }
 
-parse_node_t *rule_modifier_change(LPC_INT modifiers) {
+parse_node_t* rule_modifier_change(LPC_INT modifiers) {
   if (!modifiers) {
     yyerror("modifier list may not be empty.");
   }
@@ -33,30 +33,29 @@ parse_node_t *rule_modifier_change(LPC_INT modifiers) {
   return nullptr;
 }
 
-void rule_member_name(LPC_INT star_modifier, const ScratchString *identifier) {
+void rule_member_name(LPC_INT star_modifier, const ScratchString* identifier) {
   if (current_type == TYPE_VOID) {
     yyerror("Illegal to declare class member of type void.");
   }
   add_local_name(identifier, current_type | star_modifier);
 }
 
-void rule_member_list_set_type(LPC_INT basic_type) {
-  current_type = basic_type;
-}
+void rule_member_list_set_type(LPC_INT basic_type) { current_type = basic_type; }
 
-parse_node_t *rule_default_arg_value(parse_node_t *expr) {
+parse_node_t* rule_default_arg_value(parse_node_t* expr) {
   if (current_function_context->num_locals) {
     yyerror("Illegal to use local variable in functional.");
   }
   if (current_function_context->values_list->r.expr) {
-    current_function_context->values_list->r.expr->kind = current_function_context->values_list->kind;
+    current_function_context->values_list->r.expr->kind =
+        current_function_context->values_list->kind;
   }
 
-  parse_node_t *node = new_node();
+  parse_node_t* node = new_node();
   node->kind = NODE_FUNCTION_CONSTRUCTOR;
   node->type = TYPE_FUNCTION;
   node->l.expr = expr;
-  node->r.expr = nullptr; // no arguments
+  node->r.expr = nullptr;  // no arguments
   node->v.number = FP_FUNCTIONAL + 0 /* args */;
   pop_function_context();
   return node;
@@ -68,7 +67,7 @@ LPC_INT rule_type_modifier_list(LPC_INT modifier, LPC_INT list) {
 #ifdef SENSIBLE_MODIFIERS
   if (acc_mod & (acc_mod - 1)) {
     char buf[256];
-    char *end = EndOf(buf);
+    char* end = EndOf(buf);
     get_type_modifiers(buf, end, acc_mod);
     yyerror("Multiple access modifiers (%s)", buf);
     res = DECL_PUBLIC;
@@ -83,7 +82,7 @@ LPC_INT rule_type(LPC_INT modifiers, LPC_INT basic_type) {
   return res;
 }
 
-LPC_INT rule_atomic_type_class(ident_hash_elem_t *ihe) {
+LPC_INT rule_atomic_type_class(ident_hash_elem_t* ihe) {
   if (ihe->dn.class_num == -1) {
     yyerror("Undefined class '%s'", ihe->name);
     return TYPE_ANY;
@@ -92,7 +91,7 @@ LPC_INT rule_atomic_type_class(ident_hash_elem_t *ihe) {
   }
 }
 
-LPC_INT rule_atomic_type_class_identifier(const ScratchString *identifier) {
+LPC_INT rule_atomic_type_class_identifier(const ScratchString* identifier) {
   yyerror("Undefined class '%s'", identifier->c_str());
   return TYPE_ANY;
 }
@@ -104,7 +103,8 @@ LPC_INT rule_param_decl_typed(LPC_INT type_star) {
   return type_star;
 }
 
-LPC_INT rule_param_decl_typed_name(LPC_INT type_star, const ScratchString *name, parse_node_t *default_val) {
+LPC_INT rule_param_decl_typed_name(LPC_INT type_star, const ScratchString* name,
+                                   parse_node_t* default_val) {
   if (type_star == TYPE_VOID) {
     yyerror("Illegal to declare argument of type void.");
   }
@@ -112,7 +112,7 @@ LPC_INT rule_param_decl_typed_name(LPC_INT type_star, const ScratchString *name,
   return type_star;
 }
 
-LPC_INT rule_param_decl_untyped_name(const ScratchString *name) {
+LPC_INT rule_param_decl_untyped_name(const ScratchString* name) {
   if (exact_types) {
     yyerror("Missing type for argument");
   }
@@ -120,7 +120,7 @@ LPC_INT rule_param_decl_untyped_name(const ScratchString *name) {
   return TYPE_ANY;
 }
 
-void rule_argument_varargs(argument_t *result, argument_t *arg_list) {
+void rule_argument_varargs(argument_t* result, argument_t* arg_list) {
   int x = type_of_locals_ptr[max_num_locals - 1];
   int lt = x & ~LOCAL_MODS;
 
@@ -135,7 +135,7 @@ void rule_argument_varargs(argument_t *result, argument_t *arg_list) {
   }
 }
 
-void rule_argument_list_single(argument_t *result, LPC_INT new_arg_val) {
+void rule_argument_list_single(argument_t* result, LPC_INT new_arg_val) {
   if ((new_arg_val & TYPE_MASK) == TYPE_VOID && !(new_arg_val & TYPE_MOD_CLASS)) {
     if (new_arg_val & ~TYPE_MASK) {
       yyerror("Illegal to declare argument of type void.");
@@ -147,7 +147,7 @@ void rule_argument_list_single(argument_t *result, LPC_INT new_arg_val) {
   result->flags = 0;
 }
 
-void rule_argument_list_multi(argument_t *result, argument_t *list, LPC_INT new_arg_val) {
+void rule_argument_list_multi(argument_t* result, argument_t* list, LPC_INT new_arg_val) {
   if (!list->num_arg) {
     yyerror("argument of type void must be the only argument.");
   }
@@ -159,15 +159,11 @@ void rule_argument_list_multi(argument_t *result, argument_t *list, LPC_INT new_
   result->num_arg++;
 }
 
-LPC_INT rule_cast(LPC_INT basic_type, LPC_INT optional_star) {
-  return basic_type | optional_star;
-}
+LPC_INT rule_cast(LPC_INT basic_type, LPC_INT optional_star) { return basic_type | optional_star; }
 
-LPC_INT rule_opt_basic_type_empty() {
-  return TYPE_UNKNOWN;
-}
+LPC_INT rule_opt_basic_type_empty() { return TYPE_UNKNOWN; }
 
-void rule_single_new_local_def(LPC_INT *result, LPC_INT type, const ScratchString *name) {
+void rule_single_new_local_def(LPC_INT* result, LPC_INT type, const ScratchString* name) {
   if (type == TYPE_VOID) {
     yyerror("Illegal to declare local variable of type void.");
   }

@@ -19,12 +19,12 @@ int main(int argc, char** argv) {
   argparse::ArgumentParser program("json2o");
 
   program.add_argument("json_file").help("json file to read, if - then stdin is used");
-  program.add_argument("o_file").default_value("-").help("o file to read, if omitted, then stdout is used");
+  program.add_argument("o_file").default_value("-").help(
+      "o file to read, if omitted, then stdout is used");
 
   try {
     program.parse_args(argc, argv);
-  }
-  catch (const std::exception& err) {
+  } catch (const std::exception& err) {
     std::cerr << err.what() << std::endl;
     std::cerr << program;
     return 1;

@@ -1,7 +1,7 @@
 #include "base/package_api.h"
 
 #ifdef F_EXEC
-int replace_interactive(object_t *ob, object_t *obfrom) {
+int replace_interactive(object_t* ob, object_t* obfrom) {
   if (ob->interactive) {
     error("Bad argument 1 to exec()\n");
   }

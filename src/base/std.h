@@ -32,62 +32,62 @@
 #include "base/internal/options_incl.h"
 
 // These shall be moved.
-#define EXTRACT_UCHAR(p) (*(unsigned char *)(p))
-#define READ_USHORT(p) (*(unsigned short *)(p++))
+#define EXTRACT_UCHAR(p) (*(unsigned char*)(p))
+#define READ_USHORT(p) (*(unsigned short*)(p++))
 
-#define COPY2(x, y)                    \
-  ((char *)(x))[0] = ((char *)(y))[0]; \
-  ((char *)(x))[1] = ((char *)(y))[1]
-#define LOAD2(x, y)         \
-  ((char *)&(x))[0] = *y++; \
-  ((char *)&(x))[1] = *y++
-#define STORE2(x, y)          \
-  *x++ = ((char *)(&(y)))[0]; \
-  *x++ = ((char *)(&(y)))[1]
+#define COPY2(x, y)                  \
+  ((char*)(x))[0] = ((char*)(y))[0]; \
+  ((char*)(x))[1] = ((char*)(y))[1]
+#define LOAD2(x, y)        \
+  ((char*)&(x))[0] = *y++; \
+  ((char*)&(x))[1] = *y++
+#define STORE2(x, y)         \
+  *x++ = ((char*)(&(y)))[0]; \
+  *x++ = ((char*)(&(y)))[1]
 
-#define COPY4(x, y)                    \
-  ((char *)(x))[0] = ((char *)(y))[0]; \
-  ((char *)(x))[1] = ((char *)(y))[1]; \
-  ((char *)(x))[2] = ((char *)(y))[2]; \
-  ((char *)(x))[3] = ((char *)(y))[3]
-#define LOAD4(x, y)         \
-  ((char *)&(x))[0] = *y++; \
-  ((char *)&(x))[1] = *y++; \
-  ((char *)&(x))[2] = *y++; \
-  ((char *)&(x))[3] = *y++
-#define STORE4(x, y)          \
-  *x++ = ((char *)(&(y)))[0]; \
-  *x++ = ((char *)(&(y)))[1]; \
-  *x++ = ((char *)(&(y)))[2]; \
-  *x++ = ((char *)(&(y)))[3]
+#define COPY4(x, y)                  \
+  ((char*)(x))[0] = ((char*)(y))[0]; \
+  ((char*)(x))[1] = ((char*)(y))[1]; \
+  ((char*)(x))[2] = ((char*)(y))[2]; \
+  ((char*)(x))[3] = ((char*)(y))[3]
+#define LOAD4(x, y)        \
+  ((char*)&(x))[0] = *y++; \
+  ((char*)&(x))[1] = *y++; \
+  ((char*)&(x))[2] = *y++; \
+  ((char*)&(x))[3] = *y++
+#define STORE4(x, y)         \
+  *x++ = ((char*)(&(y)))[0]; \
+  *x++ = ((char*)(&(y)))[1]; \
+  *x++ = ((char*)(&(y)))[2]; \
+  *x++ = ((char*)(&(y)))[3]
 
-#define COPY8(x, y)                    \
-  ((char *)(x))[0] = ((char *)(y))[0]; \
-  ((char *)(x))[1] = ((char *)(y))[1]; \
-  ((char *)(x))[2] = ((char *)(y))[2]; \
-  ((char *)(x))[3] = ((char *)(y))[3]; \
-  ((char *)(x))[4] = ((char *)(y))[4]; \
-  ((char *)(x))[5] = ((char *)(y))[5]; \
-  ((char *)(x))[6] = ((char *)(y))[6]; \
-  ((char *)(x))[7] = ((char *)(y))[7]
-#define LOAD8(x, y)         \
-  ((char *)&(x))[0] = *y++; \
-  ((char *)&(x))[1] = *y++; \
-  ((char *)&(x))[2] = *y++; \
-  ((char *)&(x))[3] = *y++; \
-  ((char *)&(x))[4] = *y++; \
-  ((char *)&(x))[5] = *y++; \
-  ((char *)&(x))[6] = *y++; \
-  ((char *)&(x))[7] = *y++;
-#define STORE8(x, y)          \
-  *x++ = ((char *)(&(y)))[0]; \
-  *x++ = ((char *)(&(y)))[1]; \
-  *x++ = ((char *)(&(y)))[2]; \
-  *x++ = ((char *)(&(y)))[3]; \
-  *x++ = ((char *)(&(y)))[4]; \
-  *x++ = ((char *)(&(y)))[5]; \
-  *x++ = ((char *)(&(y)))[6]; \
-  *x++ = ((char *)(&(y)))[7]
+#define COPY8(x, y)                  \
+  ((char*)(x))[0] = ((char*)(y))[0]; \
+  ((char*)(x))[1] = ((char*)(y))[1]; \
+  ((char*)(x))[2] = ((char*)(y))[2]; \
+  ((char*)(x))[3] = ((char*)(y))[3]; \
+  ((char*)(x))[4] = ((char*)(y))[4]; \
+  ((char*)(x))[5] = ((char*)(y))[5]; \
+  ((char*)(x))[6] = ((char*)(y))[6]; \
+  ((char*)(x))[7] = ((char*)(y))[7]
+#define LOAD8(x, y)        \
+  ((char*)&(x))[0] = *y++; \
+  ((char*)&(x))[1] = *y++; \
+  ((char*)&(x))[2] = *y++; \
+  ((char*)&(x))[3] = *y++; \
+  ((char*)&(x))[4] = *y++; \
+  ((char*)&(x))[5] = *y++; \
+  ((char*)&(x))[6] = *y++; \
+  ((char*)&(x))[7] = *y++;
+#define STORE8(x, y)         \
+  *x++ = ((char*)(&(y)))[0]; \
+  *x++ = ((char*)(&(y)))[1]; \
+  *x++ = ((char*)(&(y)))[2]; \
+  *x++ = ((char*)(&(y)))[3]; \
+  *x++ = ((char*)(&(y)))[4]; \
+  *x++ = ((char*)(&(y)))[5]; \
+  *x++ = ((char*)(&(y)))[6]; \
+  *x++ = ((char*)(&(y)))[7]
 
 #define COPY_SHORT(x, y) COPY2(x, y)
 #define LOAD_SHORT(x, y) LOAD2(x, y)

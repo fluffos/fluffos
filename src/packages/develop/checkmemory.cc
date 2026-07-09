@@ -37,12 +37,12 @@
 
 #if (defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS))
 
-void mark_svalue(struct svalue_t *);
-void check_string_stats(struct outbuffer_t *);
+void mark_svalue(struct svalue_t*);
+void check_string_stats(struct outbuffer_t*);
 
 outbuffer_t out;
 
-static const char *sources[] = {"*",
+static const char* sources[] = {"*",
                                 "temporary blocks",
                                 "permanent blocks",
                                 "compiler blocks",
@@ -93,13 +93,13 @@ static const char *sources[] = {"*",
                                 "buffers",
                                 "classes"};
 
-void mark_svalue(svalue_t *sv);
+void mark_svalue(svalue_t* sv);
 
-char *dump_debugmalloc(const char *tfn, int mask) {
+char* dump_debugmalloc(const char* tfn, int mask) {
   int j, total = 0, chunks = 0;
-  const char *fn;
-  md_node_t *entry;
-  FILE *fp;
+  const char* fn;
+  md_node_t* entry;
+  FILE* fp;
 
   outbuf_zero(&out);
   fn = check_valid_path(tfn, current_object, "debugmalloc", 1);
@@ -144,9 +144,9 @@ char *dump_debugmalloc(const char *tfn, int mask) {
 #endif
 
 #ifdef DEBUGMALLOC_EXTENSIONS
-static void mark_object(object_t *ob) {
+static void mark_object(object_t* ob) {
 #ifndef NO_ADD_ACTION
-  sentence_t *sent;
+  sentence_t* sent;
 #endif
   int i;
 
@@ -205,9 +205,9 @@ static void mark_object(object_t *ob) {
     outbuf_addv(&out, "can't mark variables; %s is swapped.\n", ob->obname);
 }
 
-static void mark_funp(funptr_t *fp);
+static void mark_funp(funptr_t* fp);
 
-void mark_svalue(svalue_t *sv) {
+void mark_svalue(svalue_t* sv) {
   switch (sv->type) {
     case T_OBJECT:
       sv->u.ob->extra_ref++;
@@ -240,7 +240,7 @@ void mark_svalue(svalue_t *sv) {
   }
 }
 
-static void mark_funp(funptr_t *fp) {
+static void mark_funp(funptr_t* fp) {
   if (fp->hdr.args) {
     fp->hdr.args->extra_ref++;
   }
@@ -261,7 +261,7 @@ static void mark_funp(funptr_t *fp) {
   }
 }
 
-static void mark_sentence(sentence_t *sent) {
+static void mark_sentence(sentence_t* sent) {
   if (sent->flags & V_FUNCTION) {
     if (sent->function.f) {
       sent->function.f->hdr.extra_ref++;
@@ -280,7 +280,7 @@ static void mark_sentence(sentence_t *sent) {
 
 static int print_depth = 0;
 
-static void md_print_array(array_t *vec) {
+static void md_print_array(array_t* vec) {
   int i;
 
   outbuf_add(&out, "({ ");
@@ -343,11 +343,11 @@ static uint64_t base_overhead = 0;
 /* Compute the correct values of allocd_strings, allocd_bytes, and
  * bytes_distinct_strings based on blocks that are actually allocated.
  */
-void compute_string_totals(uint64_t *asp, uint64_t *abp, uint64_t *bp) {
+void compute_string_totals(uint64_t* asp, uint64_t* abp, uint64_t* bp) {
   int hsh;
-  md_node_t *entry;
-  malloc_block_t *msbl;
-  block_t *ssbl;
+  md_node_t* entry;
+  malloc_block_t* msbl;
+  block_t* ssbl;
 
   *asp = 0;
   *abp = 0;
@@ -356,13 +356,13 @@ void compute_string_totals(uint64_t *asp, uint64_t *abp, uint64_t *bp) {
   for (hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
     for (entry = table[hsh]; entry; entry = entry->next) {
       if (entry->tag == TAG_MALLOC_STRING) {
-        msbl = NODET_TO_PTR(entry, malloc_block_t *);
+        msbl = NODET_TO_PTR(entry, malloc_block_t*);
         *bp += msbl->size + 1;
         *asp += msbl->ref;
         *abp += (uint64_t)(msbl->ref) * (msbl->size + 1);
       }
       if (entry->tag == TAG_SHARED_STRING) {
-        ssbl = NODET_TO_PTR(entry, block_t *);
+        ssbl = NODET_TO_PTR(entry, block_t*);
         *bp += ssbl->size + 1;
         *asp += ssbl->refs;
         *abp += (uint64_t)(ssbl->refs) * (ssbl->size + 1);
@@ -376,7 +376,7 @@ void compute_string_totals(uint64_t *asp, uint64_t *abp, uint64_t *bp) {
  * are printed to stdout and abort() is called.  Otherwise the error messages
  * are added to the outbuffer.
  */
-void check_string_stats(outbuffer_t *out) {
+void check_string_stats(outbuffer_t* out) {
   uint64_t overhead = blocks[TAG_SHARED_STRING & 0xff] * sizeof(block_t) +
                       blocks[TAG_MALLOC_STRING & 0xff] * sizeof(malloc_block_t);
   uint64_t const num = blocks[TAG_SHARED_STRING & 0xff] + blocks[TAG_MALLOC_STRING & 0xff];
@@ -458,18 +458,18 @@ void check_string_stats(outbuffer_t *out) {
 /* currently: 1 - debug, 2 - suppress leak checks */
 void check_all_blocks(int flag) {
   int i, j, hsh;
-  md_node_t *entry;
-  object_t *ob;
-  array_t *vec;
-  mapping_t *map;
-  buffer_t *buf;
-  funptr_t *fp;
-  mapping_node_t *node;
-  program_t *prog;
-  sentence_t *sent;
-  char *ptr;
-  block_t *ssbl;
-  malloc_block_t *msbl;
+  md_node_t* entry;
+  object_t* ob;
+  array_t* vec;
+  mapping_t* map;
+  buffer_t* buf;
+  funptr_t* fp;
+  mapping_node_t* node;
+  program_t* prog;
+  sentence_t* sent;
+  char* ptr;
+  block_t* ssbl;
+  malloc_block_t* msbl;
   extern svalue_t apply_ret_value;
 
   outbuf_zero(&out);
@@ -497,25 +497,25 @@ void check_all_blocks(int flag) {
       }
       switch (entry->tag) {
         case TAG_OBJECT:
-          ob = NODET_TO_PTR(entry, object_t *);
+          ob = NODET_TO_PTR(entry, object_t*);
           ob->extra_ref = 0;
           break;
         case TAG_PROGRAM:
-          prog = NODET_TO_PTR(entry, program_t *);
+          prog = NODET_TO_PTR(entry, program_t*);
           prog->extra_ref = 0;
           prog->extra_func_ref = 0;
           break;
         case TAG_MALLOC_STRING: {
-          char *str;
+          char* str;
 
-          msbl = NODET_TO_PTR(entry, malloc_block_t *);
+          msbl = NODET_TO_PTR(entry, malloc_block_t*);
           /* don't give an error for the return value we are
              constructing :) */
           if (msbl == MSTR_BLOCK(out.buffer)) {
             break;
           }
 
-          str = (char *)(msbl + 1);
+          str = (char*)(msbl + 1);
           msbl->extra_ref = 0;
           if (msbl->size != USHRT_MAX && msbl->size != strlen(str)) {
             outbuf_addv(&out,
@@ -526,27 +526,27 @@ void check_all_blocks(int flag) {
           break;
         }
         case TAG_SHARED_STRING:
-          ssbl = NODET_TO_PTR(entry, block_t *);
+          ssbl = NODET_TO_PTR(entry, block_t*);
           EXTRA_REF(ssbl) = 0;
           break;
         case TAG_ARRAY:
-          vec = NODET_TO_PTR(entry, array_t *);
+          vec = NODET_TO_PTR(entry, array_t*);
           vec->extra_ref = 0;
           break;
         case TAG_CLASS:
-          vec = NODET_TO_PTR(entry, array_t *);
+          vec = NODET_TO_PTR(entry, array_t*);
           vec->extra_ref = 0;
           break;
         case TAG_MAPPING:
-          map = NODET_TO_PTR(entry, mapping_t *);
+          map = NODET_TO_PTR(entry, mapping_t*);
           map->extra_ref = 0;
           break;
         case TAG_FUNP:
-          fp = NODET_TO_PTR(entry, funptr_t *);
+          fp = NODET_TO_PTR(entry, funptr_t*);
           fp->hdr.extra_ref = 0;
           break;
         case TAG_BUFFER:
-          buf = NODET_TO_PTR(entry, buffer_t *);
+          buf = NODET_TO_PTR(entry, buffer_t*);
           buf->extra_ref = 0;
           break;
       }
@@ -646,7 +646,7 @@ void check_all_blocks(int flag) {
     }
 
     /* now do a mark and sweep check to see what should be alloc'd */
-    for (const auto &user : users()) {
+    for (const auto& user : users()) {
       DO_MARK(user, TAG_INTERACTIVE);
       user->ob->extra_ref++;
       // FIXME(sunyc): I can't explain this, appearently somewhere
@@ -672,12 +672,12 @@ void check_all_blocks(int flag) {
 #endif
     }
 
-    auto *dfm = CONFIG_STR(__DEFAULT_FAIL_MESSAGE__);
+    auto* dfm = CONFIG_STR(__DEFAULT_FAIL_MESSAGE__);
     if (dfm != nullptr && strlen(dfm) > 0) {
       char buf[8192];
       strcpy(buf, dfm);
       strcat(buf, "\n");
-      const char *target = findstring(buf);
+      const char* target = findstring(buf);
       if (target) {
         EXTRA_REF(BLOCK(target))++;
       }
@@ -740,11 +740,11 @@ void check_all_blocks(int flag) {
         switch (entry->tag & ~TAG_MARKED) {
           case TAG_IDENT_TABLE: {
             ident_hash_elem_t *hptr, *first;
-            ident_hash_elem_t **table;
+            ident_hash_elem_t** table;
             int size;
 
-            table = NODET_TO_PTR(entry, ident_hash_elem_t **);
-            size = (entry->size / 3) / sizeof(ident_hash_elem_t *);
+            table = NODET_TO_PTR(entry, ident_hash_elem_t**);
+            size = (entry->size / 3) / sizeof(ident_hash_elem_t*);
             for (i = 0; i < size; i++) {
               first = table[i];
               if (first) {
@@ -760,11 +760,11 @@ void check_all_blocks(int flag) {
             break;
           }
           case TAG_FUNP:
-            fp = NODET_TO_PTR(entry, funptr_t *);
+            fp = NODET_TO_PTR(entry, funptr_t*);
             mark_funp(fp);
             break;
           case TAG_ARRAY:
-            vec = NODET_TO_PTR(entry, array_t *);
+            vec = NODET_TO_PTR(entry, array_t*);
             if (entry->size != sizeof(array_t) + sizeof(svalue_t[1]) * (vec->size - 1)) {
               outbuf_addv(&out, "array size doesn't match block size: %s %04x\n", entry->desc,
                           entry->tag);
@@ -774,7 +774,7 @@ void check_all_blocks(int flag) {
             }
             break;
           case TAG_CLASS:
-            vec = NODET_TO_PTR(entry, array_t *);
+            vec = NODET_TO_PTR(entry, array_t*);
             if (vec->size &&
                 entry->size != sizeof(array_t) + sizeof(svalue_t[1]) * (vec->size - 1)) {
               outbuf_addv(&out, "class size doesn't match block size: %s %04x\n", entry->desc,
@@ -785,7 +785,7 @@ void check_all_blocks(int flag) {
             }
             break;
           case TAG_MAPPING:
-            map = NODET_TO_PTR(entry, mapping_t *);
+            map = NODET_TO_PTR(entry, mapping_t*);
             DO_MARK(map->table, TAG_MAP_TBL);
 
             i = map->table_size;
@@ -797,10 +797,10 @@ void check_all_blocks(int flag) {
             } while (i--);
             break;
           case TAG_OBJECT:
-            ob = NODET_TO_PTR(entry, object_t *);
+            ob = NODET_TO_PTR(entry, object_t*);
             mark_object(ob);
             {
-              object_t *tmp = obj_list;
+              object_t* tmp = obj_list;
               while (tmp && tmp != ob) {
                 tmp = tmp->next_all;
               }
@@ -823,13 +823,13 @@ void check_all_blocks(int flag) {
             }
             break;
           case TAG_LPC_OBJECT:
-            ob = NODET_TO_PTR(entry, object_t *);
+            ob = NODET_TO_PTR(entry, object_t*);
             if (ob->obname) {
               DO_MARK(ob->obname, TAG_OBJ_NAME);
             }
             break;
           case TAG_PROGRAM:
-            prog = NODET_TO_PTR(entry, program_t *);
+            prog = NODET_TO_PTR(entry, program_t*);
 
             if (prog->line_info) {
               DO_MARK(prog->file_info, TAG_LINENUMBERS);
@@ -866,7 +866,7 @@ void check_all_blocks(int flag) {
                         entry->tag);
             break;
           case TAG_PROGRAM:
-            prog = NODET_TO_PTR(entry, program_t *);
+            prog = NODET_TO_PTR(entry, program_t*);
             if (prog->ref != prog->extra_ref) {
               outbuf_addv(&out, "Bad ref count for program %s, is %d - should be %d\n",
                           prog->filename, prog->ref, prog->extra_ref);
@@ -879,14 +879,14 @@ void check_all_blocks(int flag) {
             }
             break;
           case TAG_OBJECT:
-            ob = NODET_TO_PTR(entry, object_t *);
+            ob = NODET_TO_PTR(entry, object_t*);
             if (ob->ref != ob->extra_ref) {
               outbuf_addv(&out, "Bad ref count for object %s, is %d - should be %d\n", ob->obname,
                           ob->ref, ob->extra_ref);
             }
             break;
           case TAG_ARRAY:
-            vec = NODET_TO_PTR(entry, array_t *);
+            vec = NODET_TO_PTR(entry, array_t*);
             if (vec->ref != vec->extra_ref) {
               outbuf_addv(&out, "Bad ref count for array, is %d - should be %d\n", vec->ref,
                           vec->extra_ref);
@@ -895,21 +895,21 @@ void check_all_blocks(int flag) {
             }
             break;
           case TAG_CLASS:
-            vec = NODET_TO_PTR(entry, array_t *);
+            vec = NODET_TO_PTR(entry, array_t*);
             if (vec->ref != vec->extra_ref) {
               outbuf_addv(&out, "Bad ref count for class, is %d - should be %d\n", vec->ref,
                           vec->extra_ref);
             }
             break;
           case TAG_MAPPING:
-            map = NODET_TO_PTR(entry, mapping_t *);
+            map = NODET_TO_PTR(entry, mapping_t*);
             if (map->ref != map->extra_ref) {
               outbuf_addv(&out, "Bad ref count for mapping, is %d - should be %d\n", map->ref,
                           map->extra_ref);
             }
             break;
           case TAG_FUNP:
-            fp = NODET_TO_PTR(entry, funptr_t *);
+            fp = NODET_TO_PTR(entry, funptr_t*);
             if (fp->hdr.owner && (strcmp(fp->hdr.owner->obname, "single/tests/efuns/async") == 0 ||
                                   strcmp(fp->hdr.owner->obname, "single/tests/efuns/db") == 0)) {
               // Async package mark doesn't work yet.
@@ -919,20 +919,18 @@ void check_all_blocks(int flag) {
               outbuf_addv(&out,
                           "Bad ref count for function pointer %p (type %d, owned by %s), "
                           "is %d - should be %d\n",
-                          fp,
-                          fp->hdr.type,
-                          (fp->hdr.owner ? fp->hdr.owner->obname : "(null)"), fp->hdr.ref,
-                          fp->hdr.extra_ref);
-              switch(fp->hdr.type) {
+                          fp, fp->hdr.type, (fp->hdr.owner ? fp->hdr.owner->obname : "(null)"),
+                          fp->hdr.ref, fp->hdr.extra_ref);
+              switch (fp->hdr.type) {
                 case FP_FUNCTIONAL:
                   outbuf_addv(&out, "fp offset %04x :\n", fp->f.functional.offset);
-                  dump_prog(fp->f.functional.prog, stdout, 1|2);
+                  dump_prog(fp->f.functional.prog, stdout, 1 | 2);
               }
               md_print_ref_journal(entry, &out);
             }
             break;
           case TAG_BUFFER:
-            buf = NODET_TO_PTR(entry, buffer_t *);
+            buf = NODET_TO_PTR(entry, buffer_t*);
             if (buf->ref != buf->extra_ref) {
               outbuf_addv(&out, "Bad ref count for buffer, is %d - should be %d\n", buf->ref,
                           buf->extra_ref);
@@ -961,7 +959,7 @@ void check_all_blocks(int flag) {
           */
             break;
           case TAG_SENTENCE:
-            sent = NODET_TO_PTR(entry, sentence_t *);
+            sent = NODET_TO_PTR(entry, sentence_t*);
             outbuf_addv(&out, "WARNING: Found orphan sentence: %s:%s - %s %04x\n", sent->ob->obname,
                         sent->function.s, entry->desc, entry->tag);
             break;
@@ -970,12 +968,12 @@ void check_all_blocks(int flag) {
                         entry->tag);
             break;
           case TAG_STRING:
-            ptr = NODET_TO_PTR(entry, char *);
+            ptr = NODET_TO_PTR(entry, char*);
             outbuf_addv(&out, "WARNING: Found orphan malloc'ed string: \"%s\" - %s %04x\n", ptr,
                         entry->desc, entry->tag);
             break;
           case TAG_MALLOC_STRING:
-            msbl = NODET_TO_PTR(entry, malloc_block_t *);
+            msbl = NODET_TO_PTR(entry, malloc_block_t*);
             /* don't give an error for the return value we are
                constructing :) */
             if (msbl == MSTR_BLOCK(out.buffer)) {
@@ -991,11 +989,11 @@ void check_all_blocks(int flag) {
               outbuf_addv(&out,
                           "Bad ref count for malloc string \"%s\" %s %04x, is "
                           "%d - should be %d\n",
-                          (char *)(msbl + 1), entry->desc, entry->tag, msbl->ref, msbl->extra_ref);
+                          (char*)(msbl + 1), entry->desc, entry->tag, msbl->ref, msbl->extra_ref);
             }
             break;
           case TAG_SHARED_STRING:
-            ssbl = NODET_TO_PTR(entry, block_t *);
+            ssbl = NODET_TO_PTR(entry, block_t*);
             if (REFS(ssbl) != EXTRA_REF(ssbl)) {
               outbuf_addv(&out,
                           "Bad ref count for shared string \"%s\", is %d - "
@@ -1024,7 +1022,7 @@ void check_all_blocks(int flag) {
             break;
             /* FIXME: need to account these. */
           case TAG_SCRATCHPAD: /* compile arena: retained across compiles by design */
-          case TAG_REPLACE_OB:  /* pending until the backend's replace_programs() */
+          case TAG_REPLACE_OB: /* pending until the backend's replace_programs() */
           case TAG_INC_LIST:
           case TAG_IDENT_TABLE:
           case TAG_OBJ_TBL:

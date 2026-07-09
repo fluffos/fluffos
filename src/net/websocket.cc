@@ -19,7 +19,7 @@ static struct lws_protocols protocols[] = {
     {"http", lws_callback_http_dummy, 0, 0, WS_HTTP},
     {"ascii", ws_ascii_callback, sizeof(struct ws_ascii_session), 4096, WS_ASCII},
     {"telnet", ws_telnet_callback, sizeof(struct ws_telnet_session), 4096, WS_TELNET},
-    //for backward compatiblity with fluffos 2.x
+    // for backward compatiblity with fluffos 2.x
     {"binary", ws_telnet_callback, sizeof(struct ws_telnet_session), 4096, WS_TELNET},
     {NULL, NULL, 0, 0} /* terminator */
 };
@@ -52,7 +52,7 @@ static struct lws_http_mount mount = {
     /* .basic_auth_login_file */ nullptr,
 };
 
-void lws_log(int severity, const char *msg) {
+void lws_log(int severity, const char* msg) {
   if (severity == LLL_ERR) {
     debug(all, "lws ERROR: %s", msg);
   } else {
@@ -60,7 +60,7 @@ void lws_log(int severity, const char *msg) {
   }
 }
 
-struct lws_context *init_websocket_context(event_base *base, port_def_t *port) {
+struct lws_context* init_websocket_context(event_base* base, port_def_t* port) {
   int logs = LLL_USER | LLL_WARN | LLL_ERR;
 
 #ifdef DEBUG
@@ -73,7 +73,7 @@ struct lws_context *init_websocket_context(event_base *base, port_def_t *port) {
   lws_set_log_level(logs, lws_log);
 
   struct lws_context_creation_info info = {0};
-  void *foreign_loops[1] = {base};
+  void* foreign_loops[1] = {base};
 
   info.foreign_loops = foreign_loops;
 
@@ -101,7 +101,7 @@ struct lws_context *init_websocket_context(event_base *base, port_def_t *port) {
     info.ssl_options_set = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3;
   }
   // info.options |= LWS_SERVER_OPTION_HTTP_HEADERS_SECURITY_BEST_PRACTICES_ENFORCE;
-  info.user = (void *)port;
+  info.user = (void*)port;
 
   auto context = lws_create_context(&info);
 
@@ -111,7 +111,7 @@ struct lws_context *init_websocket_context(event_base *base, port_def_t *port) {
   }
 
   std::string res;
-  for (auto &p : protocols) {
+  for (auto& p : protocols) {
     if (p.name) {
       res += p.name;
       res += " ";
@@ -122,11 +122,11 @@ struct lws_context *init_websocket_context(event_base *base, port_def_t *port) {
   return context;
 }
 
-struct lws *init_user_websocket(struct lws_context *context, evutil_socket_t fd) {
+struct lws* init_user_websocket(struct lws_context* context, evutil_socket_t fd) {
   return lws_adopt_socket(context, fd);
 }
 
-void websocket_send_text(struct lws *wsi, const char *data, size_t len) {
+void websocket_send_text(struct lws* wsi, const char* data, size_t len) {
   switch (lws_get_protocol(wsi)->id) {
     case WS_TELNET:
       ws_telnet_send(wsi, data, len);
@@ -140,13 +140,13 @@ void websocket_send_text(struct lws *wsi, const char *data, size_t len) {
   }
 }
 
-void close_websocket_context(struct lws_context *context) { lws_context_destroy(context); }
+void close_websocket_context(struct lws_context* context) { lws_context_destroy(context); }
 
-void close_user_websocket(struct lws *wsi) {
+void close_user_websocket(struct lws* wsi) {
   lws_set_timeout(wsi, pending_timeout::PENDING_FLUSH_STORED_SEND_BEFORE_CLOSE, LWS_TO_KILL_ASYNC);
   switch (lws_get_protocol(wsi)->id) {
     case WS_TELNET: {
-      auto pss = reinterpret_cast<ws_telnet_session *>(lws_wsi_user(wsi));
+      auto pss = reinterpret_cast<ws_telnet_session*>(lws_wsi_user(wsi));
       if (pss) {
         if (evbuffer_get_length(pss->buffer) > 0) {
           // try flush before closing.
@@ -157,7 +157,7 @@ void close_user_websocket(struct lws *wsi) {
       break;
     }
     case WS_ASCII: {
-      auto pss = reinterpret_cast<ws_ascii_session *>(lws_wsi_user(wsi));
+      auto pss = reinterpret_cast<ws_ascii_session*>(lws_wsi_user(wsi));
       if (pss) {
         if (evbuffer_get_length(pss->buffer) > 0) {
           // try flush before closing.

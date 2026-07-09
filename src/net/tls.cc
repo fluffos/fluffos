@@ -55,9 +55,9 @@ SSL* tls_get_client_ctx(SSL_CTX* server_ctx) {
 }
 
 int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
-  char  buf[256];
+  char buf[256];
   X509* cert;
-  int   err, depth;
+  int err, depth;
 
   cert = X509_STORE_CTX_get_current_cert(x509_ctx);
   err = X509_STORE_CTX_get_error(x509_ctx);
@@ -68,7 +68,7 @@ int tls_verify_callback(int preverify_ok, X509_STORE_CTX* x509_ctx) {
   /* If error is not X509_V_OK, print out the error information */
   if (err != X509_V_OK) {
     debug(sockets, "tls_verify_callback: verify error:num=%d:%s:depth=%d:%s\n", err,
-           X509_verify_cert_error_string(err), depth, buf);
+          X509_verify_cert_error_string(err), depth, buf);
   }
 
   return preverify_ok;

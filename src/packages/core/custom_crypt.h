@@ -26,6 +26,6 @@
 
 typedef unsigned char BytE;
 
-char *custom_crypt(const char *key, const char *salt, unsigned char *rawout);
+char* custom_crypt(const char* key, const char* salt, unsigned char* rawout);
 
 #endif

@@ -32,10 +32,10 @@ union YYSTYPE;
 
 // Each parses `text` (exactly what the corresponding lexer.l pattern matched,
 // underscores and all) into yylval and returns the token to return.
-int lpc_lex_number_hex(union YYSTYPE *yylval_param, const char *text, int len);
-int lpc_lex_number_bin(union YYSTYPE *yylval_param, const char *text, int len);
-int lpc_lex_number_real(union YYSTYPE *yylval_param, const char *text, int len);
-int lpc_lex_number_dec(union YYSTYPE *yylval_param, const char *text, int len);
+int lpc_lex_number_hex(union YYSTYPE* yylval_param, const char* text, int len);
+int lpc_lex_number_bin(union YYSTYPE* yylval_param, const char* text, int len);
+int lpc_lex_number_real(union YYSTYPE* yylval_param, const char* text, int len);
+int lpc_lex_number_dec(union YYSTYPE* yylval_param, const char* text, int len);
 
 // ---------------------------------------------------------------------------
 // String / template literal body: escape decoding, appended to
@@ -58,14 +58,14 @@ int lpc_lex_number_dec(union YYSTYPE *yylval_param, const char *text, int len);
 // (callers' patterns make that unreachable).
 int lpc_lex_simple_escape(char c);
 
-void lpc_lex_append_octal_escape(void *yyscanner, const char *text, bool is_template);
-void lpc_lex_append_hex_escape(void *yyscanner, const char *text, bool is_template);
-void lpc_lex_append_bad_octal_escape(void *yyscanner, bool is_template);
-void lpc_lex_append_bad_hex_escape(void *yyscanner, bool is_template);
-void lpc_lex_append_unicode_pair_escape(void *yyscanner, const char *text);
-void lpc_lex_append_unicode_escape(void *yyscanner, const char *text);
-void lpc_lex_append_long_unicode_escape(void *yyscanner, const char *text, int len);
-void lpc_lex_append_unknown_escape(void *yyscanner, const char *text, bool is_template);
+void lpc_lex_append_octal_escape(void* yyscanner, const char* text, bool is_template);
+void lpc_lex_append_hex_escape(void* yyscanner, const char* text, bool is_template);
+void lpc_lex_append_bad_octal_escape(void* yyscanner, bool is_template);
+void lpc_lex_append_bad_hex_escape(void* yyscanner, bool is_template);
+void lpc_lex_append_unicode_pair_escape(void* yyscanner, const char* text);
+void lpc_lex_append_unicode_escape(void* yyscanner, const char* text);
+void lpc_lex_append_long_unicode_escape(void* yyscanner, const char* text, int len);
+void lpc_lex_append_unknown_escape(void* yyscanner, const char* text, bool is_template);
 
 // The body of lexer.l's STR_CHECK_OVERFLOW() macro (which stays a macro only
 // because it must `return` out of whichever rule invoked it): checks the
@@ -78,7 +78,7 @@ void lpc_lex_append_unknown_escape(void *yyscanner, const char *text, bool is_te
 // afterward; a HEAD fragment never incremented yet, which
 // template_is_continuation distinguishes). Returns 0 to keep scanning,
 // else the token (L_STRING or YYerror) to return after BEGIN(INITIAL).
-int lpc_lex_accum_overflow(void *yyscanner, union YYSTYPE *yylval_param, bool in_template);
+int lpc_lex_accum_overflow(void* yyscanner, union YYSTYPE* yylval_param, bool in_template);
 
 // SC_TEMPLATE_BODY's "${" / closing-backtick rules: validates the just-
 // accumulated str_accum fragment, allocates it onto the scratchpad into
@@ -88,24 +88,24 @@ int lpc_lex_accum_overflow(void *yyscanner, union YYSTYPE *yylval_param, bool in
 // BEGIN(INITIAL) itself (start-condition changes can't move out of lexer.l).
 // Close of a plain double-quoted string: UTF-8 validation + scratch copy
 // of the accumulated body; returns L_STRING (or YYerror on bad UTF-8).
-int lpc_lex_string_close(void *yyscanner, union YYSTYPE *yylval_param);
-int lpc_lex_template_head_or_middle(void *yyscanner, union YYSTYPE *yylval_param);
-int lpc_lex_template_tail_or_string(void *yyscanner, union YYSTYPE *yylval_param);
+int lpc_lex_string_close(void* yyscanner, union YYSTYPE* yylval_param);
+int lpc_lex_template_head_or_middle(void* yyscanner, union YYSTYPE* yylval_param);
+int lpc_lex_template_tail_or_string(void* yyscanner, union YYSTYPE* yylval_param);
 
 // ---------------------------------------------------------------------------
 // Character literal body: decodes directly into yylval.number (no
 // accumulator -- a char literal's body is exactly one escape/byte).
 // ---------------------------------------------------------------------------
 
-LPC_INT lpc_lex_char_octal_escape(const char *text);
-LPC_INT lpc_lex_char_hex_escape(const char *text);
+LPC_INT lpc_lex_char_octal_escape(const char* text);
+LPC_INT lpc_lex_char_hex_escape(const char* text);
 LPC_INT lpc_lex_char_bad_hex_escape();
-LPC_INT lpc_lex_char_unknown_escape(const char *text);
+LPC_INT lpc_lex_char_unknown_escape(const char* text);
 
 // The shared "Illegal character constant" recovery tail (three lexer.l rules
 // end a broken char literal identically): reports the error, zeroes
 // yylval.number, returns L_NUMBER. Caller still does BEGIN/yyless itself.
-int lpc_lex_char_error(union YYSTYPE *yylval_param);
+int lpc_lex_char_error(union YYSTYPE* yylval_param);
 
 // Template-literal interpolation brace tracking (the `${ ... }` body is
 // scanned by the ordinary top-level rules; these keep the per-nesting
@@ -115,14 +115,14 @@ int lpc_lex_char_error(union YYSTYPE *yylval_param);
 // when this '}' closes the interpolation itself (depth was zero), having
 // already re-armed the string accumulator for the resuming template
 // fragment; the rule then only does its BEGIN/return skeleton.
-void lpc_lex_brace_open(void *yyscanner);
-bool lpc_lex_brace_close(void *yyscanner);
+void lpc_lex_brace_open(void* yyscanner);
+bool lpc_lex_brace_close(void* yyscanner);
 
 // Reset the per-scanner context fields a fresh compile must not inherit
 // (template nesting, the #if evaluator's expansion-suppression flag).
 // Called by lpc_lex_reset(); lives here so lexer.l keeps only the
 // flex-state half of the reset.
-void lpc_lex_reset_context(struct compiler_context_t *ctx);
+void lpc_lex_reset_context(struct compiler_context_t* ctx);
 
 // ---------------------------------------------------------------------------
 // Misc
@@ -130,13 +130,13 @@ void lpc_lex_reset_context(struct compiler_context_t *ctx);
 
 // Strip '_' digit-group separators (lexer.l's numeric patterns only allow '_'
 // directly between two digits, so this is always safe).
-ScratchString lpc_strip_underscores(const char *text, int len);
+ScratchString lpc_strip_underscores(const char* text, int len);
 
 // total_lines++ for each '\n' in the matched text -- used by the
 // "(" WS* "{"/"["/":" compound-open rules and SC_FUNC_OPEN's whitespace
 // run. The LINE counter itself advances natively (%option yylineno scans
 // matched text); only the compiled-lines/s statistic is manual.
-void lpc_lex_count_newlines(const char *text, int len);
+void lpc_lex_count_newlines(const char* text, int len);
 
 // ---------------------------------------------------------------------------
 // $N / $ function-pointer parameter tokens
@@ -151,6 +151,6 @@ inline constexpr int kLpcLexFunctionParamRetry = -2;
 
 // Handles both "$" and "$N" (text/len covers whichever matched). Returns
 // the token to return, or kLpcLexFunctionParamRetry.
-int lpc_lex_function_param(union YYSTYPE *yylval_param, const char *text, int len);
+int lpc_lex_function_param(union YYSTYPE* yylval_param, const char* text, int len);
 
 #endif

@@ -75,43 +75,43 @@
 #endif
 
 static int db_conn_alloc, db_conn_used;
-static db_t *db_conn_list;
+static db_t* db_conn_list;
 
-db_t *find_db_conn(int);
+db_t* find_db_conn(int);
 static int create_db_conn();
-static void free_db_conn(db_t *);
+static void free_db_conn(db_t*);
 
 #ifdef USE_MSQL
-static int msql_connect(dbconn_t *, const char *, const char *, const char *, const char *);
-static int msql_close(dbconn_t *);
-static int msql_execute(dbconn_t *, const char *);
-static array_t *msql_fetch(dbconn_t *, int);
-static void msql_cleanup(dbconn_t *);
-static char *msql_errormsg(dbconn_t *);
+static int msql_connect(dbconn_t*, const char*, const char*, const char*, const char*);
+static int msql_close(dbconn_t*);
+static int msql_execute(dbconn_t*, const char*);
+static array_t* msql_fetch(dbconn_t*, int);
+static void msql_cleanup(dbconn_t*);
+static char* msql_errormsg(dbconn_t*);
 
 static db_defn_t msql = {"mSQL", msql_connect, msql_close,   msql_execute, msql_fetch,
                          NULL,   NULL,         msql_cleanup, NULL,         msql_errormsg};
 #endif
 
 #ifdef USE_MYSQL
-static int MySQL_connect(dbconn_t *, const char *, const char *, const char *, const char *);
-static int MySQL_close(dbconn_t *);
-static int MySQL_execute(dbconn_t *, const char *);
-static array_t *MySQL_fetch(dbconn_t *, int);
-static void MySQL_cleanup(dbconn_t *);
-static char *MySQL_errormsg(dbconn_t *);
+static int MySQL_connect(dbconn_t*, const char*, const char*, const char*, const char*);
+static int MySQL_close(dbconn_t*);
+static int MySQL_execute(dbconn_t*, const char*);
+static array_t* MySQL_fetch(dbconn_t*, int);
+static void MySQL_cleanup(dbconn_t*);
+static char* MySQL_errormsg(dbconn_t*);
 
 static db_defn_t mysql = {"MySQL", MySQL_connect, MySQL_close,   MySQL_execute, MySQL_fetch,
                           nullptr, nullptr,       MySQL_cleanup, nullptr,       MySQL_errormsg};
 #endif
 
 #ifdef USE_POSTGRES
-static int Postgres_connect(dbconn_t *, const char *, const char *, const char *, const char *);
-static int Postgres_close(dbconn_t *);
-static int Postgres_execute(dbconn_t *, const char *);
-static array_t *Postgres_fetch(dbconn_t *, int);
-static void Postgres_cleanup(dbconn_t *);
-static char *Postgres_errormsg(dbconn_t *);
+static int Postgres_connect(dbconn_t*, const char*, const char*, const char*, const char*);
+static int Postgres_close(dbconn_t*);
+static int Postgres_execute(dbconn_t*, const char*);
+static array_t* Postgres_fetch(dbconn_t*, int);
+static void Postgres_cleanup(dbconn_t*);
+static char* Postgres_errormsg(dbconn_t*);
 
 static db_defn_t postgres = {
     "Postgres", Postgres_connect, Postgres_close, Postgres_execute, Postgres_fetch, NULL,
@@ -119,12 +119,12 @@ static db_defn_t postgres = {
 #endif
 
 #ifdef USE_SQLITE3
-static int SQLite3_connect(dbconn_t *, const char *, const char *, const char *, const char *);
-static int SQLite3_close(dbconn_t *);
-static int SQLite3_execute(dbconn_t *, const char *);
-static array_t *SQLite3_fetch(dbconn_t *, int);
-static void SQLite3_cleanup(dbconn_t *);
-static char *SQLite3_errormsg(dbconn_t *);
+static int SQLite3_connect(dbconn_t*, const char*, const char*, const char*, const char*);
+static int SQLite3_close(dbconn_t*);
+static int SQLite3_execute(dbconn_t*, const char*);
+static array_t* SQLite3_fetch(dbconn_t*, int);
+static void SQLite3_cleanup(dbconn_t*);
+static char* SQLite3_errormsg(dbconn_t*);
 
 static db_defn_t SQLite3 = {
     "SQLite3", SQLite3_connect, SQLite3_close, SQLite3_execute, SQLite3_fetch, NULL,
@@ -140,8 +140,8 @@ static db_defn_t no_db = {"None",  nullptr, nullptr, nullptr, nullptr,
  * security on which objects can tweak your database (we don't want
  * people doing "DELETE * FROM *" or equivalent for us)
  */
-svalue_t *valid_database(const char *action, array_t *info) {
-  svalue_t *ret;
+svalue_t* valid_database(const char* action, array_t* info) {
+  svalue_t* ret;
 
   /*
    * Call valid_database(object ob, string action, mixed *info)
@@ -154,7 +154,7 @@ svalue_t *valid_database(const char *action, array_t *info) {
   push_refed_array(info);
 
   ret = apply_master_ob(APPLY_VALID_DATABASE, 3);
-  if (ret && (ret == (svalue_t *)-1 ||
+  if (ret && (ret == (svalue_t*)-1 ||
               (ret->type == T_STRING || (ret->type == T_NUMBER && ret->u.number)))) {
     return ret;
   }
@@ -171,7 +171,7 @@ svalue_t *valid_database(const char *action, array_t *info) {
 #ifdef F_DB_CLOSE
 void f_db_close() {
   int ret = 0;
-  db_t *db;
+  db_t* db;
 
   valid_database("close", &the_null_array);
 
@@ -209,7 +209,7 @@ void f_db_close() {
 #ifdef F_DB_COMMIT
 void f_db_commit() {
   int ret = 0;
-  db_t *db;
+  db_t* db;
 
   valid_database("commit", &the_null_array);
 
@@ -239,11 +239,11 @@ void f_db_commit() {
  */
 #ifdef F_DB_CONNECT
 void f_db_connect() {
-  char *errormsg = nullptr;
+  char* errormsg = nullptr;
   const char *user = "", *database, *host = nullptr;
-  db_t *db;
-  array_t *info;
-  svalue_t *mret;
+  db_t* db;
+  array_t* info;
+  svalue_t* mret;
   int handle, ret = 0, args = 0, type;
 
 #ifdef DEFAULT_DB
@@ -327,7 +327,7 @@ void f_db_connect() {
   if (db->type->connect) {
     ret = db->type->connect(
         &(db->c), host, database, user,
-        (mret != (svalue_t *)-1 && mret->type == T_STRING ? mret->u.string : nullptr));
+        (mret != (svalue_t*)-1 && mret->type == T_STRING ? mret->u.string : nullptr));
   }
 
   pop_n_elems(args);
@@ -357,13 +357,13 @@ void f_db_connect() {
  * be zero since there is no result set.
  */
 #ifdef PACKAGE_ASYNC
-extern pthread_mutex_t *db_mut;
+extern pthread_mutex_t* db_mut;
 #endif
 #ifdef F_DB_EXEC
 void f_db_exec() {
   int ret = 0;
-  db_t *db;
-  array_t *info;
+  db_t* db;
+  array_t* info;
   info = allocate_empty_array(1);
   info->item[0].type = T_STRING;
   info->item[0].subtype = STRING_MALLOC;
@@ -389,7 +389,7 @@ void f_db_exec() {
   pop_stack();
   if (ret == -1) {
     if (db->type->error) {
-      char *errormsg;
+      char* errormsg;
 
       errormsg = db->type->error(&(db->c));
       put_malloced_string(errormsg);
@@ -431,8 +431,8 @@ void f_db_exec() {
  */
 #ifdef F_DB_FETCH
 void f_db_fetch() {
-  db_t *db;
-  array_t *ret;
+  db_t* db;
+  array_t* ret;
 
   valid_database("fetch", &the_null_array);
 
@@ -450,7 +450,7 @@ void f_db_fetch() {
   pop_stack();
   if (!ret) {
     if (db->type->error) {
-      char *errormsg;
+      char* errormsg;
 
       errormsg = db->type->error(&(db->c));
       put_malloced_string(errormsg);
@@ -474,7 +474,7 @@ void f_db_fetch() {
 #ifdef F_DB_ROLLBACK
 void f_db_rollback() {
   int ret = 0;
-  db_t *db;
+  db_t* db;
 
   valid_database("rollback", &the_null_array);
 
@@ -547,7 +547,7 @@ int create_db_conn() {
 
 #ifdef PACKAGE_ASYNC
   if (!db_mut) {
-    db_mut = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+    db_mut = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
     pthread_mutex_init(db_mut, nullptr);
   }
   pthread_mutex_lock(db_mut);
@@ -559,7 +559,7 @@ int create_db_conn() {
     i = db_conn_alloc;
     db_conn_alloc += 10;
     if (!db_conn_list) {
-      db_conn_list = (db_t *)DCALLOC(db_conn_alloc, sizeof(db_t), TAG_DB, "create_db_conn");
+      db_conn_list = (db_t*)DCALLOC(db_conn_alloc, sizeof(db_t), TAG_DB, "create_db_conn");
     } else {
       db_conn_list = RESIZE(db_conn_list, db_conn_alloc, db_t, TAG_DB, "create_db_conn");
     }
@@ -580,14 +580,14 @@ int create_db_conn() {
   fatal("dbConnAlloc != dbConnUsed, but no empty slots");
 }
 
-db_t *find_db_conn(int handle) {
+db_t* find_db_conn(int handle) {
   if (handle < 1 || handle > db_conn_alloc || db_conn_list[handle - 1].flags & DB_FLAG_EMPTY) {
     return nullptr;
   }
   return &(db_conn_list[handle - 1]);
 }
 
-void free_db_conn(db_t *db) {
+void free_db_conn(db_t* db) {
   DEBUG_CHECK(db->flags & DB_FLAG_EMPTY, "Freeing DB connection that is already freed\n");
   DEBUG_CHECK(!db_conn_used, "Freeing DB connection when dbConnUsed == 0\n");
   db_conn_used--;
@@ -596,7 +596,7 @@ void free_db_conn(db_t *db) {
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_db_conn() {
-  auto *node = db_conn_list;
+  auto* node = db_conn_list;
   if (node) {
     DO_MARK(node, TAG_DB);
   }
@@ -607,7 +607,7 @@ void mark_db_conn() {
  * MySQL support
  */
 #ifdef USE_MYSQL
-static void MySQL_cleanup(dbconn_t *c) {
+static void MySQL_cleanup(dbconn_t* c) {
   *(c->mysql.errormsg) = 0;
   if (c->mysql.results) {
     mysql_free_result(c->mysql.results);
@@ -615,7 +615,7 @@ static void MySQL_cleanup(dbconn_t *c) {
   }
 }
 
-static char *MySQL_errormsg(dbconn_t *c) {
+static char* MySQL_errormsg(dbconn_t* c) {
   if (*(c->mysql.errormsg)) {
     return string_copy(c->mysql.errormsg, "MySQL_errormsg:1");
   }
@@ -623,7 +623,7 @@ static char *MySQL_errormsg(dbconn_t *c) {
   return string_copy(mysql_error(c->mysql.handle), "MySQL_errormsg:2");
 }
 
-static int MySQL_close(dbconn_t *c) {
+static int MySQL_close(dbconn_t* c) {
   mysql_close(c->mysql.handle);
   FREE(c->mysql.handle);
   c->mysql.handle = nullptr;
@@ -631,7 +631,7 @@ static int MySQL_close(dbconn_t *c) {
   return 1;
 }
 
-static int MySQL_execute(dbconn_t *c, const char *s) {
+static int MySQL_execute(dbconn_t* c, const char* s) {
   if (!mysql_query(c->mysql.handle, s)) {
     c->mysql.results = mysql_store_result(c->mysql.handle);
     if (c->mysql.results) {
@@ -647,8 +647,8 @@ static int MySQL_execute(dbconn_t *c, const char *s) {
   return -1;
 }
 
-static array_t *MySQL_fetch(dbconn_t *c, int row) {
-  array_t *v;
+static array_t* MySQL_fetch(dbconn_t* c, int row) {
+  array_t* v;
   MYSQL_ROW target_row;
   unsigned int i, num_fields;
 
@@ -674,12 +674,12 @@ static array_t *MySQL_fetch(dbconn_t *c, int row) {
 
   v = allocate_empty_array(num_fields);
   for (i = 0; i < num_fields; i++) {
-    MYSQL_FIELD *field;
+    MYSQL_FIELD* field;
 
     field = mysql_fetch_field(c->mysql.results);
 
     if (row == 0) {
-      if (field == (MYSQL_FIELD *)nullptr) {
+      if (field == (MYSQL_FIELD*)nullptr) {
         v->item[i] = const0u;
       } else {
         v->item[i].type = T_STRING;
@@ -744,12 +744,12 @@ static array_t *MySQL_fetch(dbconn_t *c, int row) {
   return v;
 }
 
-static int MySQL_connect(dbconn_t *c, const char *host, const char *database, const char *username,
-                         const char *password) {
+static int MySQL_connect(dbconn_t* c, const char* host, const char* database, const char* username,
+                         const char* password) {
   int ret;
-  MYSQL *tmp;
+  MYSQL* tmp;
 
-  tmp = (MYSQL *)DMALLOC(sizeof(MYSQL), TAG_DB, "MySQL_connect");
+  tmp = (MYSQL*)DMALLOC(sizeof(MYSQL), TAG_DB, "MySQL_connect");
   tmp = mysql_init(tmp);
   *(c->mysql.errormsg) = 0;
   c->mysql.handle = mysql_real_connect(tmp, host, username, password, database, 0, nullptr, 0);
@@ -780,21 +780,21 @@ static int MySQL_connect(dbconn_t *c, const char *host, const char *database, co
  * mSQL support
  */
 #ifdef USE_MSQL
-static void msql_cleanup(dbconn_t *c) {
+static void msql_cleanup(dbconn_t* c) {
   if (c->msql.result_set) {
     msqlFreeResult(c->msql.result_set);
     c->msql.result_set = 0;
   }
 }
 
-static int msql_close(dbconn_t *c) {
+static int msql_close(dbconn_t* c) {
   msqlClose(c->msql.handle);
   c->msql.handle = -1;
 
   return 1;
 }
 
-static int msql_execute(dbconn_t *c, const char *s) {
+static int msql_execute(dbconn_t* c, const char* s) {
   if (msqlQuery(c->msql.handle, s) != -1) {
     c->msql.result_set = msqlStoreResult();
     if (!c->msql.result_set) {
@@ -807,10 +807,10 @@ static int msql_execute(dbconn_t *c, const char *s) {
   return -1;
 }
 
-static array_t *msql_fetch(dbconn_t *c, int row) {
+static array_t* msql_fetch(dbconn_t* c, int row) {
   int i, num_fields;
   m_row this_row;
-  array_t *v;
+  array_t* v;
 
   if (!c->msql.result_set) {
     return &the_null_array;
@@ -832,7 +832,7 @@ static array_t *msql_fetch(dbconn_t *c, int row) {
 
   v = allocate_empty_array(num_fields);
   for (i = 0; i < num_fields; i++) {
-    m_field *field;
+    m_field* field;
 
     field = msqlFetchField(c->msql.result_set);
     if (!field || !this_row[i]) {
@@ -871,7 +871,7 @@ static array_t *msql_fetch(dbconn_t *c, int row) {
   return v;
 }
 
-static int msql_connect(dbconn_t *c, char *host, char *database, char *username, char *password) {
+static int msql_connect(dbconn_t* c, char* host, char* database, char* username, char* password) {
   c->msql.handle = msqlConnect(host);
   if (c->msql.handle < 1) {
     return 0;
@@ -886,7 +886,7 @@ static int msql_connect(dbconn_t *c, char *host, char *database, char *username,
   return 1;
 }
 
-static char *msql_errormsg(dbconn_t *c) { return string_copy(msqlErrMsg, "msql_errormsg"); }
+static char* msql_errormsg(dbconn_t* c) { return string_copy(msqlErrMsg, "msql_errormsg"); }
 #endif
 
 /*
@@ -894,9 +894,9 @@ static char *msql_errormsg(dbconn_t *c) { return string_copy(msqlErrMsg, "msql_e
  * ajandurah@demonslair (Mark Lyndoe)
  */
 #ifdef USE_SQLITE3
-static int SQLite3_connect(dbconn_t *c, const char *host, const char *database,
-                           const char *username, const char *password) {
-  const char *filename = check_valid_path(database, master_ob, "sqlite3_connect", 1);
+static int SQLite3_connect(dbconn_t* c, const char* host, const char* database,
+                           const char* username, const char* password) {
+  const char* filename = check_valid_path(database, master_ob, "sqlite3_connect", 1);
 
   if (sqlite3_open(filename, &c->SQLite3.handle)) {
     strncpy(c->SQLite3.errormsg, sqlite3_errmsg(c->SQLite3.handle), sizeof(c->SQLite3.errormsg));
@@ -912,7 +912,7 @@ static int SQLite3_connect(dbconn_t *c, const char *host, const char *database,
   return 1;
 }
 
-static int SQLite3_close(dbconn_t *c) {
+static int SQLite3_close(dbconn_t* c) {
   if (c->SQLite3.results) {
     sqlite3_finalize(c->SQLite3.results);
   }
@@ -925,7 +925,7 @@ static int SQLite3_close(dbconn_t *c) {
   return 1;
 }
 
-static void SQLite3_cleanup(dbconn_t *c) {
+static void SQLite3_cleanup(dbconn_t* c) {
   if (c->SQLite3.results) {
     sqlite3_finalize(c->SQLite3.results);
     c->SQLite3.results = 0;
@@ -934,8 +934,8 @@ static void SQLite3_cleanup(dbconn_t *c) {
   }
 }
 
-static int SQLite3_execute(dbconn_t *c, const char *s) {
-  char **result;
+static int SQLite3_execute(dbconn_t* c, const char* s) {
+  char** result;
 
   if (sqlite3_prepare(c->SQLite3.handle, s, -1, &c->SQLite3.results, 0) != SQLITE_OK) {
     strncpy(c->SQLite3.errormsg, sqlite3_errmsg(c->SQLite3.handle), sizeof(c->SQLite3.errormsg));
@@ -970,9 +970,9 @@ static int SQLite3_execute(dbconn_t *c, const char *s) {
   return -1;
 }
 
-static array_t *SQLite3_fetch(dbconn_t *c, int row) {
+static array_t* SQLite3_fetch(dbconn_t* c, int row) {
   int cols, last_row, length, i;
-  array_t *v;
+  array_t* v;
 
   if (!c->SQLite3.results) {
     return &the_null_array;
@@ -1004,7 +1004,7 @@ static array_t *SQLite3_fetch(dbconn_t *c, int row) {
       v->item[i].type = T_STRING;
       v->item[i].subtype = STRING_MALLOC;
       v->item[i].u.string =
-          string_copy((char *)sqlite3_column_name(c->SQLite3.results, i), "SQLite3_fetch");
+          string_copy((char*)sqlite3_column_name(c->SQLite3.results, i), "SQLite3_fetch");
     }
 
     return v;
@@ -1069,14 +1069,14 @@ static array_t *SQLite3_fetch(dbconn_t *c, int row) {
         v->item[i].type = T_STRING;
         v->item[i].subtype = STRING_MALLOC;
         v->item[i].u.string =
-            string_copy((char *)sqlite3_column_text(c->SQLite3.results, i), "SQLite3_fetch");
+            string_copy((char*)sqlite3_column_text(c->SQLite3.results, i), "SQLite3_fetch");
         break;
 
       case SQLITE_BLOB:
         length = sqlite3_column_bytes(c->SQLite3.results, i);
         v->item[i].type = T_BUFFER;
         v->item[i].u.buf = allocate_buffer(length);
-        write_buffer(v->item[i].u.buf, 0, (char *)sqlite3_column_blob(c->SQLite3.results, i),
+        write_buffer(v->item[i].u.buf, 0, (char*)sqlite3_column_blob(c->SQLite3.results, i),
                      length);
         break;
 
@@ -1090,31 +1090,31 @@ static array_t *SQLite3_fetch(dbconn_t *c, int row) {
   return v;
 }
 
-static char *SQLite3_errormsg(dbconn_t *c) {
+static char* SQLite3_errormsg(dbconn_t* c) {
   if (*(c->SQLite3.errormsg)) {
-    return string_copy((char *)c->SQLite3.errormsg, "SQLite3_errormsg:1");
+    return string_copy((char*)c->SQLite3.errormsg, "SQLite3_errormsg:1");
   }
 
-  return string_copy((char *)sqlite3_errmsg(c->SQLite3.handle), "SQLite3_errormsg:2");
+  return string_copy((char*)sqlite3_errmsg(c->SQLite3.handle), "SQLite3_errormsg:2");
 }
 #endif
 /*
  * Postgres support
  */
 #ifdef USE_POSTGRES
-static void Postgres_cleanup(dbconn_t *c) { c->postgres.res = 0; }
+static void Postgres_cleanup(dbconn_t* c) { c->postgres.res = 0; }
 
-static char *Postgres_errormsg(dbconn_t *c) {
+static char* Postgres_errormsg(dbconn_t* c) {
   return string_copy(PQerrorMessage(c->postgres.conn), "postgresql_errormsg");
 }
 
-static int Postgres_close(dbconn_t *c) {
+static int Postgres_close(dbconn_t* c) {
   PQclear(c->postgres.res);
   PQfinish(c->postgres.conn);
   return 1;
 }
 
-static int Postgres_execute(dbconn_t *c, const char *s) {
+static int Postgres_execute(dbconn_t* c, const char* s) {
   c->postgres.res = PQexec(c->postgres.conn, s);
 
   if ((PQresultStatus(c->postgres.res)) == PGRES_TUPLES_OK) {
@@ -1129,14 +1129,14 @@ static int Postgres_execute(dbconn_t *c, const char *s) {
   return -1;
 }
 
-static int Postgres_connect(dbconn_t *c, const char *host, const char *database,
-                            const char *username, const char *password) {
+static int Postgres_connect(dbconn_t* c, const char* host, const char* database,
+                            const char* username, const char* password) {
   int buffsize;
 
-  const char *connstr = "host = '%s' dbname = '%s' user = '%s' password = '%s'";
+  const char* connstr = "host = '%s' dbname = '%s' user = '%s' password = '%s'";
   buffsize =
       strlen(connstr) + strlen(host) + strlen(database) + strlen(username) + strlen(password);
-  char *conninfo = (char *)malloc(buffsize);
+  char* conninfo = (char*)malloc(buffsize);
   if (conninfo != NULL) {
     sprintf(conninfo, connstr, host, database, username, password);
   }
@@ -1150,8 +1150,8 @@ static int Postgres_connect(dbconn_t *c, const char *host, const char *database,
   return 1;
 }
 
-static array_t *Postgres_fetch(dbconn_t *c, int row) {
-  array_t *v;
+static array_t* Postgres_fetch(dbconn_t* c, int row) {
+  array_t* v;
   unsigned int i, num_fields;
 
   if (!c->postgres.res) {

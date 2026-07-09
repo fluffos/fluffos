@@ -2,7 +2,7 @@
 
 #include "packages/core/outbuf.h"
 
-void outbuf_push(outbuffer_t *outbuf) {
+void outbuf_push(outbuffer_t* outbuf) {
   STACK_INC;
   sp->type = T_STRING;
   if (outbuf && outbuf->buffer) {

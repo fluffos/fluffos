@@ -50,18 +50,18 @@ struct Request {
   int ret;
   int handle;
   std::string data;
-  function_to_call_t *fun;
-  struct Request *next;
+  function_to_call_t* fun;
+  struct Request* next;
   enum atypes type;
   int status;
 };
 
 struct Work {
-  struct Request *data;
-  void *(*func)(struct Request *);
+  struct Request* data;
+  void* (*func)(struct Request*);
 };
 
-std::deque<struct Work *> reqs;
+std::deque<struct Work*> reqs;
 std::mutex reqs_lock;
 
 // The request a worker thread is CURRENTLY processing: popped from reqs
@@ -70,9 +70,9 @@ std::mutex reqs_lock;
 // its callback funptr during that window -- otherwise a DEBUGMALLOC
 // sweep that lands mid-processing false-flags the ref (Windows Debug
 // hit this on async_read.lpc).
-struct Work *current_work = nullptr;
+struct Work* current_work = nullptr;
 
-std::deque<struct Request *> finished_reqs;
+std::deque<struct Request*> finished_reqs;
 std::mutex finished_reqs_lock;
 
 void thread_func() {
@@ -81,7 +81,7 @@ void thread_func() {
   ScopedTracer const tracer("Async thread loop");
 
   while (true) {
-    struct Work *w = nullptr;
+    struct Work* w = nullptr;
     {
       std::lock_guard<std::mutex> const lock(reqs_lock);
       if (reqs.empty()) {
@@ -95,9 +95,8 @@ void thread_func() {
 
     if (w) {
       {
-        ScopedTracer const work_tracer("Async thread work", EventCategory::DEFAULT, [=] {
-          return json{{"type", w->data->type}};
-        });
+        ScopedTracer const work_tracer("Async thread work", EventCategory::DEFAULT,
+                                       [=] { return json{{"type", w->data->type}}; });
 
         w->func(w->data);
       }
@@ -122,55 +121,55 @@ void thread_func() {
   }
 }
 
-void do_stuff(void *(*func)(struct Request *), struct Request *data) {
+void do_stuff(void* (*func)(struct Request*), struct Request* data) {
   std::lock_guard<std::mutex> const lock(reqs_lock);
 
   if (reqs.empty()) {
     std::thread(thread_func).detach();
   }
 
-  auto *i = new Work;
+  auto* i = new Work;
   i->func = func;
   i->data = data;
 
   reqs.push_back(i);
 }
 
-void *gzreadthread(struct Request *req) {
+void* gzreadthread(struct Request* req) {
   gzFile file = gzopen(req->path.c_str(), "rb");
-  req->ret = gzread(file, (void *)(req->data.data()), req->data.size());
+  req->ret = gzread(file, (void*)(req->data.data()), req->data.size());
   req->status = DONE;
   gzclose(file);
   return nullptr;
 }
 
-int aio_gzread(struct Request *req) {
+int aio_gzread(struct Request* req) {
   req->status = BUSY;
   do_stuff(gzreadthread, req);
   return 0;
 }
 
-void *gzwritethread(struct Request *req) {
-  int const fd =
-      open(req->path.c_str(), req->flags & 1 ? O_CREAT | O_WRONLY | O_TRUNC : O_CREAT | O_WRONLY | O_APPEND,
-           S_IRWXU | S_IRWXG);
+void* gzwritethread(struct Request* req) {
+  int const fd = open(req->path.c_str(),
+                      req->flags & 1 ? O_CREAT | O_WRONLY | O_TRUNC : O_CREAT | O_WRONLY | O_APPEND,
+                      S_IRWXU | S_IRWXG);
   gzFile file = gzdopen(fd, "wb");
-  req->ret = gzwrite(file, (void *)(req->data.data()), req->data.size());
+  req->ret = gzwrite(file, (void*)(req->data.data()), req->data.size());
   req->status = DONE;
   gzclose(file);
   return nullptr;
 }
 
-int aio_gzwrite(struct Request *req) {
+int aio_gzwrite(struct Request* req) {
   req->status = BUSY;
   do_stuff(gzwritethread, req);
   return 0;
 }
 
-void *writethread(struct Request *req) {
-  int const fd =
-      open(req->path.c_str(), req->flags & 1 ? O_CREAT | O_WRONLY | O_TRUNC : O_CREAT | O_WRONLY | O_APPEND,
-           S_IRWXU | S_IRWXG);
+void* writethread(struct Request* req) {
+  int const fd = open(req->path.c_str(),
+                      req->flags & 1 ? O_CREAT | O_WRONLY | O_TRUNC : O_CREAT | O_WRONLY | O_APPEND,
+                      S_IRWXU | S_IRWXG);
 
   req->ret = write(fd, req->data.data(), req->data.size());
 
@@ -179,15 +178,15 @@ void *writethread(struct Request *req) {
   return nullptr;
 }
 
-int aio_write(struct Request *req) {
+int aio_write(struct Request* req) {
   req->status = BUSY;
   do_stuff(writethread, req);
   return 0;
 }
 
-void *readthread(struct Request *req) {
+void* readthread(struct Request* req) {
   int const fd = open(req->path.c_str(), O_RDONLY);
-  auto size = read(fd, (void *)(req->data.data()), req->data.max_size());
+  auto size = read(fd, (void*)(req->data.data()), req->data.max_size());
   close(fd);
   req->data.resize(size);
   req->ret = size;
@@ -195,23 +194,24 @@ void *readthread(struct Request *req) {
   return nullptr;
 }
 
-int aio_read(struct Request *req) {
+int aio_read(struct Request* req) {
   req->status = BUSY;
   do_stuff(readthread, req);
   return 0;
 }
 
-} // namespace
+}  // namespace
 
 #ifdef F_ASYNC_DB_EXEC
-pthread_mutex_t *db_mut = nullptr;
+pthread_mutex_t* db_mut = nullptr;
 
-void *dbexecthread(struct Request *req) {
-  ScopedTracer const work_tracer("db_exec", EventCategory::DEFAULT, [=] { return json{req->data}; });
+void* dbexecthread(struct Request* req) {
+  ScopedTracer const work_tracer("db_exec", EventCategory::DEFAULT,
+                                 [=] { return json{req->data}; });
 
   pthread_mutex_lock(db_mut);
   // see add_db_exec
-  db_t *db = find_db_conn(req->handle);
+  db_t* db = find_db_conn(req->handle);
   int ret = -1;
   if (db && db->type->execute) {
     if (db->type->cleanup) {
@@ -221,7 +221,7 @@ void *dbexecthread(struct Request *req) {
     ret = db->type->execute(&(db->c), req->data.c_str());
     if (ret == -1) {
       if (db->type->error) {
-        char *tmp = db->type->error(&(db->c));
+        char* tmp = db->type->error(&(db->c));
         req->path = std::string(tmp);
         FREE_MSTR(tmp);
       } else {
@@ -238,7 +238,7 @@ void *dbexecthread(struct Request *req) {
   return nullptr;
 }
 
-int aio_db_exec(struct Request *req) {
+int aio_db_exec(struct Request* req) {
   req->status = BUSY;
   do_stuff(dbexecthread, req);
   return 0;
@@ -246,10 +246,10 @@ int aio_db_exec(struct Request *req) {
 #endif
 
 #ifdef F_ASYNC_GETDIR
-void *getdirthread(struct Request *req) {
+void* getdirthread(struct Request* req) {
   ScopedTracer const work_tracer("getdir", EventCategory::DEFAULT, [=] { return json{req->path}; });
 
-  DIR *dirp = nullptr;
+  DIR* dirp = nullptr;
   if ((dirp = opendir(req->path.c_str())) == nullptr) {
     req->ret = 0;
     req->status = DONE;
@@ -259,10 +259,10 @@ void *getdirthread(struct Request *req) {
    * Count files
    */
   int i = 0;
-  for (auto *de = readdir(dirp); de; de = readdir(dirp)) {
+  for (auto* de = readdir(dirp); de; de = readdir(dirp)) {
     if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) continue;
-    req->data.resize(req->data.size() + sizeof(dirent *));
-    memcpy(&((dirent *)(req->data.data()))[i], de, sizeof(*de));
+    req->data.resize(req->data.size() + sizeof(dirent*));
+    memcpy(&((dirent*)(req->data.data()))[i], de, sizeof(*de));
     i++;
   }
 
@@ -273,7 +273,7 @@ void *getdirthread(struct Request *req) {
   return nullptr;
 }
 
-int aio_getdir(struct Request *req) {
+int aio_getdir(struct Request* req) {
   req->status = BUSY;
   do_stuff(getdirthread, req);
   return 0;
@@ -281,11 +281,11 @@ int aio_getdir(struct Request *req) {
 
 #endif
 
-int add_read(const char *fname, function_to_call_t *fun) {
+int add_read(const char* fname, function_to_call_t* fun) {
   const auto read_file_max_size = CONFIG_INT(__MAX_READ_FILE_SIZE__);
 
   if (fname) {
-    auto *req = new Request();
+    auto* req = new Request();
     // printf("fname: %s\n", fname);
     req->data.resize(read_file_max_size);
     req->fun = fun;
@@ -299,12 +299,12 @@ int add_read(const char *fname, function_to_call_t *fun) {
 }
 
 #ifdef F_ASYNC_GETDIR
-int add_getdir(const char *fname, function_to_call_t *fun) {
+int add_getdir(const char* fname, function_to_call_t* fun) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   if (fname) {
     // printf("fname: %s\n", fname);
-    auto *req = new Request();
+    auto* req = new Request();
     req->data.resize(max_array_size);
     req->fun = fun;
     req->type = AGETDIR;
@@ -317,12 +317,12 @@ int add_getdir(const char *fname, function_to_call_t *fun) {
 }
 #endif
 
-int add_write(const char *fname, const char *buf, int size, char flags, function_to_call_t *fun) {
+int add_write(const char* fname, const char* buf, int size, char flags, function_to_call_t* fun) {
   if (!fname) {
     error("permission denied\n");
   }
 
-  auto *req = new Request();
+  auto* req = new Request();
   req->data = std::string(buf, size);
   req->fun = fun;
   req->type = AWRITE;
@@ -335,8 +335,8 @@ int add_write(const char *fname, const char *buf, int size, char flags, function
 }
 
 #ifdef F_ASYNC_DB_EXEC
-int add_db_exec(int handle, const char *sql, function_to_call_t *fun) {
-  auto *req = new Request();
+int add_db_exec(int handle, const char* sql, function_to_call_t* fun) {
+  auto* req = new Request();
   req->fun = fun;
   req->type = ADBEXEC;
   req->handle = handle;
@@ -345,7 +345,7 @@ int add_db_exec(int handle, const char *sql, function_to_call_t *fun) {
 }
 #endif
 
-void handle_read(struct Request *req) {
+void handle_read(struct Request* req) {
   int const val = req->ret;
   if (val < 0) {
     push_number(val);
@@ -353,8 +353,8 @@ void handle_read(struct Request *req) {
     safe_call_efun_callback(req->fun, 1);
     return;
   }
-  char *file = new_string(val, "read_file_async: str");
-  memcpy(file, (char *)(req->data.data()), val);
+  char* file = new_string(val, "read_file_async: str");
+  memcpy(file, (char*)(req->data.data()), val);
   file[val] = 0;
   push_malloced_string(file);
   set_eval(max_eval_cost);
@@ -362,27 +362,27 @@ void handle_read(struct Request *req) {
 }
 
 #ifdef F_ASYNC_GETDIR
-void handle_getdir(struct Request *req) {
+void handle_getdir(struct Request* req) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   int ret_size = req->ret;
   if (ret_size > max_array_size) {
     ret_size = max_array_size;
   }
-  array_t *ret = allocate_empty_array(ret_size);
+  array_t* ret = allocate_empty_array(ret_size);
   if (ret_size > 0) {
     for (int i = 0; i < ret_size; i++) {
-      auto de = ((struct dirent *)req->data.data())[i];
-      svalue_t *vp = &(ret->item[i]);
+      auto de = ((struct dirent*)req->data.data())[i];
+      svalue_t* vp = &(ret->item[i]);
       vp->type = T_STRING;
       vp->subtype = STRING_MALLOC;
       vp->u.string = string_copy(de.d_name, "encode_stat");
     }
 
-    qsort((void *)ret->item, ret_size, sizeof ret->item[0],
-          [](const void *p1, const void *p2) -> int {
-            auto *x = (svalue_t *)p1;
-            auto *y = (svalue_t *)p2;
+    qsort((void*)ret->item, ret_size, sizeof ret->item[0],
+          [](const void* p1, const void* p2) -> int {
+            auto* x = (svalue_t*)p1;
+            auto* y = (svalue_t*)p2;
 
             return strcmp(x->u.string, y->u.string);
           });
@@ -394,7 +394,7 @@ void handle_getdir(struct Request *req) {
 }
 #endif
 
-void handle_write(struct Request *req) {
+void handle_write(struct Request* req) {
   int const val = req->ret;
   if (val < 0) {
     push_number(val);
@@ -407,7 +407,7 @@ void handle_write(struct Request *req) {
   safe_call_efun_callback(req->fun, 1);
 }
 
-void handle_db_exec(struct Request *req) {
+void handle_db_exec(struct Request* req) {
   int const val = req->ret;
   if (val == -1) {
     copy_and_push_string(req->path.c_str());
@@ -423,7 +423,7 @@ void check_reqs() {
 
   std::lock_guard<std::mutex> const lock(finished_reqs_lock);
   while (!finished_reqs.empty()) {
-    auto *req = finished_reqs.front();
+    auto* req = finished_reqs.front();
     finished_reqs.pop_front();
 
     enum atypes const type = (req->type);
@@ -518,28 +518,28 @@ void f_async_db_exec() {
   std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
   process_efun_callback(2, cb.get(), F_ASYNC_DB_EXEC);
   cb->f.fp->hdr.ref++;
-  funptr_t *cb_fp = cb->f.fp;
+  funptr_t* cb_fp = cb->f.fp;
   bool handed_off = false;
   DEFER {
     if (!handed_off) free_funp(cb_fp);
   };
   pop_stack();  // remove the callback; now sp = sql, sp-1 = handle
 
-  array_t *info;
+  array_t* info;
   info = allocate_empty_array(1);
   info->item[0].type = T_STRING;
   info->item[0].subtype = STRING_MALLOC;
   info->item[0].u.string = string_copy(sp->u.string, "f_db_exec");
   valid_database("exec", info);
 
-  db_t *db;
+  db_t* db;
   db = find_db_conn((sp - 1)->u.number);
   if (!db) {
     error("Attempt to exec on an invalid database handle\n");
   }
 
   if (!db_mut) {
-    db_mut = (pthread_mutex_t *)DMALLOC(sizeof(pthread_mutex_t), TAG_PERMANENT, "async_db_exec");
+    db_mut = (pthread_mutex_t*)DMALLOC(sizeof(pthread_mutex_t), TAG_PERMANENT, "async_db_exec");
     pthread_mutex_init(db_mut, nullptr);
   }
   handed_off = true;
@@ -553,8 +553,8 @@ void async_mark_request() {
   std::lock_guard<std::mutex> const lock(reqs_lock);
   std::lock_guard<std::mutex> const flock(finished_reqs_lock);
 
-  for (auto &work : reqs) {
-    auto *req = work->data;
+  for (auto& work : reqs) {
+    auto* req = work->data;
     if (req->fun != nullptr) {
       req->fun->f.fp->hdr.extra_ref++;
     }
@@ -566,7 +566,7 @@ void async_mark_request() {
     current_work->data->fun->f.fp->hdr.extra_ref++;
   }
 
-  for (auto &req : finished_reqs) {
+  for (auto& req : finished_reqs) {
     if (req->fun != nullptr) {
       req->fun->f.fp->hdr.extra_ref++;
     }

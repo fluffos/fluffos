@@ -7,9 +7,9 @@
 #include <utility>
 
 struct PredefMacro {
-    bool is_function_like;
-    int nargs;
-    std::string body;
+  bool is_function_like;
+  int nargs;
+  std::string body;
 };
 
 // Predefines
@@ -25,10 +25,9 @@ unsigned get_predefines_version();
 void mark_all_defines();
 #endif
 
-void set_inc_list(const char *list);
+void set_inc_list(const char* list);
 void init_include_path();
 void deinit_include_path();
 std::pair<int, std::string> inc_open(std::string_view name, bool check_local);
-
 
 #endif

@@ -16,7 +16,7 @@
 
 #define add_instr_name(w, x, y, z) int_add_instr_name(w, y, z)
 
-static void int_add_instr_name(const char *name, int n, short t) {
+static void int_add_instr_name(const char* name, int n, short t) {
   instrs[n].name = name;
   instrs[n].ret_type = t;
 }
@@ -156,7 +156,8 @@ void init_instrs() {
   add_instr_name("parse_command", "c_parse_command(%i);\n", F_PARSE_COMMAND, T_NUMBER);
   add_instr_name("string", 0, F_STRING, T_STRING);
   add_instr_name("short_string", 0, F_SHORT_STRING, T_STRING);
-  add_instr_name("F_CALL_FUNCTION_BY_ADDRESS", "c_call(%i, %i);\n", F_CALL_FUNCTION_BY_ADDRESS, T_ANY);
+  add_instr_name("F_CALL_FUNCTION_BY_ADDRESS", "c_call(%i, %i);\n", F_CALL_FUNCTION_BY_ADDRESS,
+                 T_ANY);
   add_instr_name("call_inherited", "c_call_inherited(%i, %i, %i);\n", F_CALL_INHERITED, T_ANY);
   add_instr_name("aggregate_assoc", "C_AGGREGATE_ASSOC(%i);\n", F_AGGREGATE_ASSOC, T_MAPPING);
 #ifdef DEBUG
@@ -203,9 +204,9 @@ void init_instrs() {
   add_instr_name("end_time_expression", 0, F_END_TIME_EXPRESSION, T_NUMBER);
 }
 
-void smart_log(const char *error_file, int line, const char *what, int flag) {
+void smart_log(const char* error_file, int line, const char* what, int flag) {
   auto logs = prepare_logs(error_file, line, what, flag, pragmas & PRAGMA_ERROR_CONTEXT);
-  for (auto &log : logs) {
+  for (auto& log : logs) {
     debug_message("%s", log.c_str());
   }
 
@@ -224,7 +225,7 @@ void smart_log(const char *error_file, int line, const char *what, int flag) {
 
 // compiler_diags_quiet lives in g_compile (compiler.h alias).
 
-void report_compile_diagnostic(const Diagnostic &d) {
+void report_compile_diagnostic(const Diagnostic& d) {
   if (compiler_diags_quiet) {
     // A structured consumer owns presentation; the record is already in
     // compiler_diags.

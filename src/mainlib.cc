@@ -84,7 +84,7 @@ void print_rlimit() {
 #endif
 }
 
-void print_commandline(int argc, char **argv) {
+void print_commandline(int argc, char** argv) {
   debug_message("Full Command Line: ");
   for (int i = 0; i < argc; i++) {
     debug_message("%s ", argv[i]);
@@ -106,7 +106,7 @@ void print_version_and_time() {
 #ifdef HAVE_JEMALLOC
   /* Print jemalloc version */
   {
-    const char *ver;
+    const char* ver;
     size_t resultlen = sizeof(ver);
     mallctl("version", &ver, &resultlen, nullptr, 0);
     debug_message("jemalloc Version: %s\n", ver);
@@ -163,7 +163,7 @@ void attempt_shutdown(int sig) {
   static StackTrace st;
   static Printer p;
 
-  const char *msg = "Unkonwn signal!";
+  const char* msg = "Unkonwn signal!";
   switch (sig) {
     case SIGTERM:
       msg = "SIGTERM: Process terminated";
@@ -212,7 +212,7 @@ void init_tz() {
 }  // namespace
 
 // Return the argument at the given position, start from 0.
-std::string get_argument(unsigned int pos, int argc, char **argv) {
+std::string get_argument(unsigned int pos, int argc, char** argv) {
   int argpos = 0;
   for (int i = 1; i < argc; i++) {
     if (argv[i][0] != '-') {
@@ -241,7 +241,7 @@ void init_win32() {
 #endif
 }
 
-struct event_base *init_main(std::string_view config_file) {
+struct event_base* init_main(std::string_view config_file) {
 #ifdef _WIN32
   init_win32();
 #endif
@@ -251,7 +251,7 @@ struct event_base *init_main(std::string_view config_file) {
   reset_debug_message_fp();
 
   // Make sure mudlib dir is correct.
-  auto *root = CONFIG_STR(__MUD_LIB_DIR__);
+  auto* root = CONFIG_STR(__MUD_LIB_DIR__);
   debug_message("Execution root: %s\n", root);
   if (chdir(root) == -1) {
     debug_message("Bad mudlib directory: '%s'.\n", root);
@@ -261,7 +261,7 @@ struct event_base *init_main(std::string_view config_file) {
   debug_message("Initializing internal stuff ....\n");
 
   // Initialize libevent, This should be done before executing LPC.
-  auto *base = init_backend();
+  auto* base = init_backend();
   init_dns_event_base(base);
 
   // Initialize VM layer
@@ -296,10 +296,10 @@ void setup_signal_handlers() {
 }
 
 extern "C" {
-int driver_main(int argc, char **argv);
+int driver_main(int argc, char** argv);
 }
 
-int driver_main(int argc, char **argv) {
+int driver_main(int argc, char** argv) {
   // Emit a starter config to stdout and exit, before any startup output.
   for (int i = 1; i < argc; i++) {
     if (strcmp(argv[i], "--generate-config") == 0) {
@@ -387,7 +387,7 @@ int driver_main(int argc, char **argv) {
     exit(-1);
   }
 
-  auto *base = init_main(config_file);
+  auto* base = init_main(config_file);
 
   debug_message("==== Runtime Config Table ====\n");
   print_rc_table();
@@ -416,7 +416,7 @@ int driver_main(int argc, char **argv) {
 
         push_constant_string(argv[i] + 2);
         auto ret = safe_apply_master_ob(APPLY_FLAG, 1);
-        if (ret == (svalue_t *)-1 || ret == nullptr || MudOS_is_being_shut_down) {
+        if (ret == (svalue_t*)-1 || ret == nullptr || MudOS_is_being_shut_down) {
           debug_message("Shutdown by master object.\n");
           return -1;
         }

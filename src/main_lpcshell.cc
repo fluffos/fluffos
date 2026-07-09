@@ -67,7 +67,7 @@ namespace {
 // Completeness check
 // ---------------------------------------------------------------------------
 
-bool LooksComplete(const std::string &s) {
+bool LooksComplete(const std::string& s) {
   int paren = 0, brace = 0, bracket = 0;
   size_t i = 0;
   while (i < s.size()) {
@@ -95,13 +95,26 @@ bool LooksComplete(const std::string &s) {
       continue;
     }
     switch (c) {
-      case '(': paren++; break;
-      case ')': paren--; break;
-      case '{': brace++; break;
-      case '}': brace--; break;
-      case '[': bracket++; break;
-      case ']': bracket--; break;
-      default: break;
+      case '(':
+        paren++;
+        break;
+      case ')':
+        paren--;
+        break;
+      case '{':
+        brace++;
+        break;
+      case '}':
+        brace--;
+        break;
+      case '[':
+        bracket++;
+        break;
+      case ']':
+        bracket--;
+        break;
+      default:
+        break;
     }
     i++;
   }
@@ -116,13 +129,13 @@ bool LooksComplete(const std::string &s) {
 // ---------------------------------------------------------------------------
 
 struct Session {
-  std::vector<std::string> var_names;      // declaration order
-  std::vector<std::string> saved_values;   // save_variable() strings, parallel to var_names
+  std::vector<std::string> var_names;     // declaration order
+  std::vector<std::string> saved_values;  // save_variable() strings, parallel to var_names
   int counter = 0;
 
   std::string Preamble() const {
     std::string out;
-    for (const auto &name : var_names) {
+    for (const auto& name : var_names) {
       out += "mixed " + name + ";\n";
     }
     return out;
@@ -148,7 +161,7 @@ struct Session {
     return out;
   }
 
-  static std::string EscapeForStringLiteral(const std::string &s) {
+  static std::string EscapeForStringLiteral(const std::string& s) {
     std::string out;
     for (char c : s) {
       if (c == '"' || c == '\\') out += '\\';
@@ -162,7 +175,7 @@ struct Session {
 // Returns true and fills `name`/`rest_stmt` (the same statement with the
 // leading type keyword stripped, so it becomes a plain assignment/no-op
 // targeting a global instead of redeclaring a function-local) on match.
-bool MatchSingleDeclaration(const std::string &stmt, std::string *name, std::string *rest_stmt) {
+bool MatchSingleDeclaration(const std::string& stmt, std::string* name, std::string* rest_stmt) {
   static const std::regex re(
       R"(^\s*(?:int|float|string|object|mixed|mapping|function|buffer)\s*\*?\s*([A-Za-z_]\w*)\s*(=.*)?;\s*$)");
   std::smatch m;
@@ -179,8 +192,8 @@ bool MatchSingleDeclaration(const std::string &stmt, std::string *name, std::str
 // nothing -- LPC-level errors are caught and reported via return false.
 // ---------------------------------------------------------------------------
 
-bool RunAttempt(Session *session, const std::string &body_src, bool want_result,
-                std::string *printed_result, std::string *error_message) {
+bool RunAttempt(Session* session, const std::string& body_src, bool want_result,
+                std::string* printed_result, std::string* error_message) {
   std::string name = "/lpcshell#" + std::to_string(session->counter++);
 
   // __lpcshell_snapshot() is defined FIRST and __lpcshell_eval() (which
@@ -197,7 +210,7 @@ bool RunAttempt(Session *session, const std::string &body_src, bool want_result,
   src += body_src;
   src += "\n}\n";
 
-  object_t *ob = nullptr;
+  object_t* ob = nullptr;
   error_context_t econ{};
   save_context(&econ);
   // Compile quietly: the driver would otherwise print every diagnostic to
@@ -207,7 +220,7 @@ bool RunAttempt(Session *session, const std::string &body_src, bool want_result,
   compiler_diags_quiet = true;
   try {
     ob = load_object_from_source(src, name.c_str(), 1);
-  } catch (const char *e) {
+  } catch (const char* e) {
     compiler_diags_quiet = false;
     restore_context(&econ);
     pop_context(&econ);
@@ -225,9 +238,9 @@ bool RunAttempt(Session *session, const std::string &body_src, bool want_result,
   current_object = ob;
   save_context(&econ);
   try {
-    svalue_t *ret = apply("__lpcshell_eval", ob, 0, ORIGIN_DRIVER);
+    svalue_t* ret = apply("__lpcshell_eval", ob, 0, ORIGIN_DRIVER);
     if (want_result && ret) {
-      char *formatted = string_print_formatted("%O", 1, ret);
+      char* formatted = string_print_formatted("%O", 1, ret);
       if (formatted) {
         *printed_result = formatted;
         FREE_MSTR(formatted);
@@ -235,9 +248,9 @@ bool RunAttempt(Session *session, const std::string &body_src, bool want_result,
     }
 
     if (!(ob->flags & O_DESTRUCTED) && !session->var_names.empty()) {
-      svalue_t *snap = apply("__lpcshell_snapshot", ob, 0, ORIGIN_DRIVER);
+      svalue_t* snap = apply("__lpcshell_snapshot", ob, 0, ORIGIN_DRIVER);
       if (snap && snap->type == T_ARRAY) {
-        array_t *arr = snap->u.arr;
+        array_t* arr = snap->u.arr;
         for (int i = 0; i < arr->size && static_cast<size_t>(i) < session->saved_values.size();
              i++) {
           if (arr->item[i].type == T_STRING) {
@@ -246,7 +259,7 @@ bool RunAttempt(Session *session, const std::string &body_src, bool want_result,
         }
       }
     }
-  } catch (const char *e) {
+  } catch (const char* e) {
     restore_context(&econ);
     pop_context(&econ);
     if (!(ob->flags & O_DESTRUCTED)) destruct_object(ob);
@@ -270,7 +283,7 @@ std::string StripTrailingSemicolon(std::string s) {
   return s;
 }
 
-void Eval(Session *session, std::string stmt) {
+void Eval(Session* session, std::string stmt) {
   // Trim trailing newline the REPL loop always appends.
   while (!stmt.empty() && (stmt.back() == '\n' || stmt.back() == '\r')) stmt.pop_back();
   if (stmt.find_first_not_of(" \t") == std::string::npos) return;
@@ -278,7 +291,7 @@ void Eval(Session *session, std::string stmt) {
   std::string decl_name, rewritten;
   if (MatchSingleDeclaration(stmt, &decl_name, &rewritten)) {
     bool known = false;
-    for (const auto &n : session->var_names) known |= (n == decl_name);
+    for (const auto& n : session->var_names) known |= (n == decl_name);
     if (!known) {
       session->var_names.push_back(decl_name);
       session->saved_values.emplace_back();
@@ -310,7 +323,7 @@ void Eval(Session *session, std::string stmt) {
   std::string stmt_body = stmt;
   if (RunAttempt(session, stmt_body, /*want_result=*/false, &result, &error_message)) {
     // Success may still have produced warnings worth showing.
-    for (const auto &d : compiler_diags) {
+    for (const auto& d : compiler_diags) {
       if (d.is_warning) std::cout << render_diagnostic(d, isatty(1)) << "\n";
     }
     return;
@@ -323,7 +336,7 @@ void Eval(Session *session, std::string stmt) {
   // itself stays unprinted: error()'s C++-exception unwinding path always
   // throws the generic "error handler error", not the diagnostic text.
   bool printed = false;
-  for (const auto &d : compiler_diags) {
+  for (const auto& d : compiler_diags) {
     std::cout << render_diagnostic(d, isatty(1)) << "\n";
     printed = true;
   }
@@ -335,7 +348,7 @@ void Eval(Session *session, std::string stmt) {
 
 }  // namespace
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   if (argc != 2) {
     std::cerr << "Usage: lpcshell config_file" << std::endl;
     return 1;

@@ -16,7 +16,7 @@ static timer_t eval_timer_id;
 /*
  * SIGALRM handler.
  */
-void sigalrm_handler(int sig, siginfo_t *si, void *uc) {
+void sigalrm_handler(int sig, siginfo_t* si, void* uc) {
   if (!si->si_value.sival_ptr) {
     outoftime = 1;
   }

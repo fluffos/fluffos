@@ -52,13 +52,13 @@
 #endif
 
 // FIXME: in master.h
-extern struct object_t *master_ob;
+extern struct object_t* master_ob;
 // FIXME: in file.h
-extern const char *check_valid_path(const char *, object_t *, const char *const, int);
+extern const char* check_valid_path(const char*, object_t*, const char* const, int);
 
 // The include-path master apply (init_include_path) pushes its argument
 // onto the VM stack; safe_apply_master_ob pops it.
-void push_malloced_string(const char *p);
+void push_malloced_string(const char* p);
 
 #define NELEM(a) (sizeof(a) / sizeof((a)[0]))
 
@@ -71,18 +71,18 @@ int current_line_base;  /* number of lines from other files */
 int current_line_saved; /* last line in this file where line num
                            info was saved */
 int total_lines;        /* Used to compute average compiled lines/s */
-const char *current_file;
+const char* current_file;
 int current_file_id;
-static const char *main_filename = nullptr;
+static const char* main_filename = nullptr;
 
 /* Bit flags for pragmas in effect */
 int pragmas;
 
 int num_parse_error; /* Number of errors in the parser. */
 
-lpc_predef_t *lpc_predefs = nullptr;
+lpc_predef_t* lpc_predefs = nullptr;
 
-static void push_arena_string(ScratchString &s, int kind, void *yyscanner);
+static void push_arena_string(ScratchString& s, int kind, void* yyscanner);
 
 int lex_fatal;
 
@@ -95,7 +95,7 @@ int lex_fatal;
 // entry until its pop.
 struct IncState {
   int line;
-  const char *file;
+  const char* file;
   int file_id;
 };
 
@@ -109,7 +109,7 @@ static std::vector<IncState> inc_stack;
 
 static function_context_t function_context_stack[MAX_FUNCTION_DEPTH];
 static int last_function_context;
-function_context_t *current_function_context = nullptr;
+function_context_t* current_function_context = nullptr;
 
 int arrow_efun, evaluate_efun, this_efun, to_float_efun, to_int_efun, new_efun;
 
@@ -193,17 +193,17 @@ static keyword_t reswords[] = {
 // Used to determine valid ID chars (variable name function name etc)
 #define isalunum(c) (uisalnum(c) || (c) == '_')
 
-static ident_hash_elem_t **ident_hash_table;
-static ident_hash_elem_t **ident_hash_head;
-static ident_hash_elem_t **ident_hash_tail;
+static ident_hash_elem_t** ident_hash_table;
+static ident_hash_elem_t** ident_hash_head;
+static ident_hash_elem_t** ident_hash_tail;
 
-static ident_hash_elem_t *ident_dirty_list = nullptr;
+static ident_hash_elem_t* ident_dirty_list = nullptr;
 
 instr_t instrs[MAX_INSTRS];
 
-static ident_hash_elem_t *quick_alloc_ident_entry(void);
+static ident_hash_elem_t* quick_alloc_ident_entry(void);
 
-int lookup_predef(const char *name) {
+int lookup_predef(const char* name) {
   unsigned int x;
 
   for (x = 0; x < size_of_predefs; x++) {
@@ -215,11 +215,9 @@ int lookup_predef(const char *name) {
   return -1;
 }
 
-
-
 // Non-static: called directly from lexer.l's native $N and open-paren rules
 // (Phase 6), in addition to the legacy helpers still in this file.
-void lexerror(const char *s) {
+void lexerror(const char* s) {
   // %-quote: `s` is arbitrary compile-time text -- macro names, #error
   // payloads, include filenames -- so it must NOT be yyerror's format
   // string (a '%' in the source would be consumed as a conversion,
@@ -229,8 +227,6 @@ void lexerror(const char *s) {
   lex_fatal++;
 }
 
-
-
 // Called from lexer.l's "\n" rule and the other newline-consuming actions.
 // LINE counting is native now (%option yylineno: Flex counts newlines in
 // matched text and through yyinput() into the current buffer's own
@@ -238,13 +234,13 @@ void lexerror(const char *s) {
 // total-lines statistic and the line-boundary purge of dead expansion
 // frames (see the linger policy at purge_exhausted_expansions).
 static void purge_exhausted_expansions();
-void lpc_lex_newline(void * /*yyscanner*/) {
+void lpc_lex_newline(void* /*yyscanner*/) {
   total_lines++;
   purge_exhausted_expansions();
 }
 
 typedef struct {
-  const char *name;
+  const char* name;
   int value;
 } pragma_t;
 
@@ -255,7 +251,7 @@ static pragma_t our_pragmas[] = {{"strict_types", PRAGMA_STRICT_TYPES},
                                  {"show_error_context", PRAGMA_ERROR_CONTEXT},
                                  {nullptr, 0}};
 
-void handle_pragma(char *str) {
+void handle_pragma(char* str) {
   int i;
   int no_flag;
 
@@ -265,7 +261,7 @@ void handle_pragma(char *str) {
   }
 
   // Ignore trailing whitespaces
-  char *p = &str[strlen(str) - 1];
+  char* p = &str[strlen(str) - 1];
   while (p >= str && iswspace(*p)) {
     *p-- = '\0';
   }
@@ -299,11 +295,11 @@ void handle_pragma(char *str) {
 // Set by start_new_file(), cleared by end_new_file(); consulted by the
 // error-context snippet below, whose callers (lexerror/yyerror paths)
 // don't carry a scanner.
-static void *active_scanner = nullptr;
+static void* active_scanner = nullptr;
 
-void *lpc_lex_active_scanner(void) { return active_scanner; }
+void* lpc_lex_active_scanner(void) { return active_scanner; }
 
-void lpc_lex_scanner_destroyed(void *yyscanner) {
+void lpc_lex_scanner_destroyed(void* yyscanner) {
   // Ownership discipline: whoever yylex_destroy()s a scanner clears the
   // active pointer if it was theirs. An aborted compile skips
   // end_new_file(), and current_line reads (via
@@ -329,7 +325,7 @@ void lpc_lex_scanner_destroyed(void *yyscanner) {
 // INCLUDE buffer, else the base buffer (0). Splice buffers' positions are
 // synthetic; an out-of-range kind (-1, the transient window while a
 // push/pop is half-done) is skipped the same way. -1 = no buffers.
-static int innermost_real_buffer_index(void *yyscanner) {
+static int innermost_real_buffer_index(void* yyscanner) {
   int count = lpc_lex_buffer_count(yyscanner);
   if (count <= 0) {
     return -1;
@@ -346,8 +342,8 @@ static int innermost_real_buffer_index(void *yyscanner) {
 // The storage behind the `current_line` macro (lexer.h): a reference to the
 // innermost real frame's native line counter, falling back to
 // lpc_lex_line_fallback when no scanner or buffer is live.
-int &lpc_lex_current_line_ref(void) {
-  void *yyscanner = active_scanner;
+int& lpc_lex_current_line_ref(void) {
+  void* yyscanner = active_scanner;
   if (yyscanner == nullptr) {
     return lpc_lex_line_fallback;
   }
@@ -355,7 +351,7 @@ int &lpc_lex_current_line_ref(void) {
   if (idx < 0) {
     return lpc_lex_line_fallback;
   }
-  int *lineno = lpc_lex_buffer_lineno(yyscanner, idx);
+  int* lineno = lpc_lex_buffer_lineno(yyscanner, idx);
   return lineno != nullptr ? *lineno : lpc_lex_line_fallback;
 }
 
@@ -372,9 +368,9 @@ std::string lpc_lex_current_source_line(void) {
   if (idx < 0) {
     return "";
   }
-  const char *base;
-  const char *limit;
-  const char *pos;
+  const char* base;
+  const char* limit;
+  const char* pos;
   char held;
   if (!lpc_lex_buffer_extents(active_scanner, idx, &base, &limit, &pos, &held)) {
     return "";
@@ -385,7 +381,7 @@ std::string lpc_lex_current_source_line(void) {
   // -- survives only as a NUL residue. (Raw reads leave the same residue
   // mid-line in rarer cases -- a macro's collected arguments -- where
   // this yields a left-truncated snippet; acceptable.)
-  const char *start = pos;
+  const char* start = pos;
   while (start > base && start[-1] != '\n' && start[-1] != '\0') {
     start--;
   }
@@ -401,7 +397,7 @@ std::string lpc_lex_current_source_line(void) {
     }
     if (c0 != '\n' && c0 != '\0') {
       content += c0;
-      for (const char *q = pos + 1; q < limit && *q != '\n' && *q != '\0'; ++q) {
+      for (const char* q = pos + 1; q < limit && *q != '\n' && *q != '\0'; ++q) {
         content += *q;
       }
     }
@@ -425,18 +421,18 @@ std::string lpc_lex_error_context_block(void) {
   if (count <= 0) {
     return "";
   }
-  const char *base;
-  const char *limit;
-  const char *pos;
+  const char* base;
+  const char* limit;
+  const char* pos;
   char held;
   if (!lpc_lex_buffer_extents(active_scanner, count - 1, &base, &limit, &pos, &held)) {
     return "";
   }
-  const char *start = pos;
+  const char* start = pos;
   while (start > base && start[-1] != '\n' && start[-1] != '\0') {
     start--;
   }
-  const char *end = pos;
+  const char* end = pos;
   while (end < limit && *end != '\n' && (*end != '\0' || end == pos)) {
     end++;
   }
@@ -467,7 +463,7 @@ std::string lpc_lex_error_context_block(void) {
   return block;
 }
 
-std::vector<std::string> prepare_logs(const char *error_file, int line, const char *what, int flag,
+std::vector<std::string> prepare_logs(const char* error_file, int line, const char* what, int flag,
                                       bool include_error_context) {
   std::vector<std::string> logs;
   logs.emplace_back(fmt::format(FMT_STRING("/{}:{}: {}: {}\n"), error_file, line,
@@ -483,12 +479,9 @@ std::vector<std::string> prepare_logs(const char *error_file, int line, const ch
   return logs;
 }
 
-
-
-
 void push_function_context() {
-  function_context_t *fc;
-  parse_node_t *node;
+  function_context_t* fc;
+  parse_node_t* node;
 
   if (last_function_context == MAX_FUNCTION_DEPTH - 1) {
     lexerror("Function pointers nested too deep.");
@@ -536,7 +529,7 @@ struct ExpansionFrame {
   int def_line;
   int invocation_line;    // real-file line of the macro USE
   int invocation_column;  // 1-based start column of the name token
-  bool live;  // false once its buffer popped; lingers until a line boundary
+  bool live;              // false once its buffer popped; lingers until a line boundary
 };
 std::vector<ExpansionFrame> expansion_frames;
 
@@ -557,9 +550,7 @@ int lpc_lex_top_buffer_kind(void) {
   return pushed_kind_stack.empty() ? -1 : pushed_kind_stack.back();
 }
 
-void lpc_lex_note_buffer_push(int kind) {
-  pushed_kind_stack.push_back(static_cast<char>(kind));
-}
+void lpc_lex_note_buffer_push(int kind) { pushed_kind_stack.push_back(static_cast<char>(kind)); }
 
 void lpc_lex_note_buffer_pop(int ending_lineno) {
   if (pushed_kind_stack.empty()) return;
@@ -586,7 +577,7 @@ void lpc_lex_note_buffer_pop(int ending_lineno) {
 // per-occurrence blue paint. Dead (lingering, diagnostics-only) frames
 // deliberately do NOT guard.
 static bool lpc_lex_name_guarded(std::string_view name) {
-  for (const auto &f : expansion_frames) {
+  for (const auto& f : expansion_frames) {
     if (f.live && f.name == name) {
       return true;
     }
@@ -605,11 +596,10 @@ static bool lpc_lex_name_guarded(std::string_view name) {
 // line plus the name token's start column, snapshotted by YY_USER_ACTION
 // when the identifier matched (argument collection in between doesn't
 // disturb it -- raw reads run no user action).
-static void push_expansion_frame(std::string_view name, const PpMacro &m,
-                                 int invocation_column) {
+static void push_expansion_frame(std::string_view name, const PpMacro& m, int invocation_column) {
   expansion_frames.push_back(ExpansionFrame{ScratchString(name),
-                                            ScratchString(std::string_view(m.def_file)),
-                                            m.def_line, current_line, invocation_column, true});
+                                            ScratchString(std::string_view(m.def_file)), m.def_line,
+                                            current_line, invocation_column, true});
 }
 
 // Dead frames deliberately LINGER instead of vanishing at their buffer's
@@ -674,9 +664,9 @@ static void pop_include_state(int ending_line) {
   // p.line when the include was pushed and resumes by itself.
 }
 
-int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yylloc_param,
-                               void *yyscanner) {
-  compiler_context_t *yyextra = reinterpret_cast<compiler_context_t *>(yyget_extra(yyscanner));
+int lpc_lex_resolve_identifier(union YYSTYPE* yylval_param, struct YYLTYPE* yylloc_param,
+                               void* yyscanner) {
+  compiler_context_t* yyextra = reinterpret_cast<compiler_context_t*>(yyget_extra(yyscanner));
   // Copy yytext up front, before ANY lpc_lex_getc(): a getc can pop the
   // splice buffer that yytext points into (freeing it), so every later
   // use of the identifier's spelling must go through this copy.
@@ -684,7 +674,7 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yyll
   if (g_compile.pp_active && !yyextra->suppress_expansion && !lpc_lex_name_guarded(text)) {
     // (A name guarded by a live expansion buffer resolves as a plain
     // identifier -- self-reference termination, C-preprocessor style.)
-    const PpMacro *found = pp_find_macro(std::string_view(text.data(), text.size()));
+    const PpMacro* found = pp_find_macro(std::string_view(text.data(), text.size()));
     if (found != nullptr) {
       const PpMacro& m = *found;
       if (static_cast<int>(expansion_frames.size()) >= MAX_EXPANSION_NESTING) {
@@ -822,7 +812,7 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yyll
           // while the outer SECOND's buffer guards the name).
           ScratchVector<ScratchString> expanded_args;
           expanded_args.reserve(args.size());
-          for (const auto &a : args) {
+          for (const auto& a : args) {
             expanded_args.push_back(lpc_lex_expand_string(a));
           }
           ScratchString expanded = substitute(m.body, m.params, args, &expanded_args);
@@ -846,7 +836,7 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yyll
     }
   }
 
-  ident_hash_elem_t *ihe;
+  ident_hash_elem_t* ihe;
   if ((ihe = lookup_ident(text.c_str()))) {
     if (ihe->token & IHE_RESWORD) {
       yylval_param->number = ihe->sem_value;
@@ -875,9 +865,9 @@ int lpc_lex_resolve_identifier(union YYSTYPE *yylval_param, struct YYLTYPE *yyll
 // and content-follows forms): validate the accumulated terminator and
 // hand off to the body reader. On an empty terminator, reports and
 // resumes the top-level scan.
-int lpc_lex_start_heredoc(union YYSTYPE *yylval_param, struct YYLTYPE *yylloc_param,
-                          void *yyscanner) {
-  compiler_context_t *ctx = yyget_extra(yyscanner);
+int lpc_lex_start_heredoc(union YYSTYPE* yylval_param, struct YYLTYPE* yylloc_param,
+                          void* yyscanner) {
+  compiler_context_t* ctx = yyget_extra(yyscanner);
   if (ctx->heredoc_terminator.empty()) {
     lexerror("Illegal terminator");
     return yylex(yylval_param, yylloc_param, yyscanner);
@@ -886,8 +876,8 @@ int lpc_lex_start_heredoc(union YYSTYPE *yylval_param, struct YYLTYPE *yylloc_pa
                       yylloc_param, yyscanner);
 }
 
-int parseHeredoc(const char *terminator, int is_array, union YYSTYPE *yylval_param,
-                 struct YYLTYPE *yylloc_param, void *yyscanner) {
+int parseHeredoc(const char* terminator, int is_array, union YYSTYPE* yylval_param,
+                 struct YYLTYPE* yylloc_param, void* yyscanner) {
   const size_t termlen = strlen(terminator);
   // Legacy capacity: NUMCHUNKS chunks of MAXCHUNK bytes == DEFMAX total.
   const size_t max_block = DEFMAX;
@@ -963,7 +953,7 @@ int parseHeredoc(const char *terminator, int is_array, union YYSTYPE *yylval_par
     // again.
     ScratchString splice("({ ");
     splice.reserve(total + lines.size() * 4 + 6);
-    for (const auto &l : lines) {
+    for (const auto& l : lines) {
       splice += '"';
       for (char ch : l) {
         if (ch == '"' || ch == '\\') {
@@ -995,7 +985,7 @@ int parseHeredoc(const char *terminator, int is_array, union YYSTYPE *yylval_par
 // did. Called both from yylex_inner()'s remaining catch-all default case
 // and from lexer.l-triggered helpers whose own lookahead determined the
 // input isn't well-formed (e.g. a '#' not at the start of a line).
-int lpc_lex_badlex(unsigned char c, void *yyscanner) {
+int lpc_lex_badlex(unsigned char c, void* yyscanner) {
   // Reported UNCONDITIONALLY: the legacy version gated this behind
   // #ifdef DEBUG and silently substituted ' ' in release builds, hiding
   // real input corruption from users -- and making every diagnostic test
@@ -1016,7 +1006,7 @@ int lpc_lex_badlex(unsigned char c, void *yyscanner) {
 // Called from lexer.l's <<EOF>> rule, only at genuine end of the top-level
 // file (include buffers pop in the <<EOF>> rule itself before this is
 // ever reached). Returns -1, the compile loop's end-of-tokens signal.
-int parseMainEof(union YYSTYPE *yylval_param, void *yyscanner) {
+int parseMainEof(union YYSTYPE* yylval_param, void* yyscanner) {
   if (g_compile.pp_active && !g_compile.conds.empty()) {
     yyerror("Missing #endif");
     // Recover the session: leaving the conditional stack non-empty would
@@ -1043,7 +1033,7 @@ void end_new_file() {
     inc_stack.pop_back();
   }
   if (main_filename) {
-    free_string(const_cast<char *>(main_filename));
+    free_string(const_cast<char*>(main_filename));
     main_filename = nullptr;
   }
   active_scanner = nullptr;
@@ -1059,11 +1049,11 @@ void end_new_file() {
 // local that memory dies at return, so scanning it in place is
 // stack-use-after-return. Detect SSO portably (data() inside the object)
 // and fall back to the copying push for those few bytes.
-static void push_arena_string(ScratchString &s, int kind, void *yyscanner) {
+static void push_arena_string(ScratchString& s, int kind, void* yyscanner) {
   s += '\0';
   s += '\0';
-  const void *d = s.data();
-  bool sso = d >= static_cast<const void *>(&s) && d < static_cast<const void *>(&s + 1);
+  const void* d = s.data();
+  bool sso = d >= static_cast<const void*>(&s) && d < static_cast<const void*>(&s + 1);
   if (sso) {
     lpc_lex_push_string_buffer(s.data(), s.size() - 2, kind, yyscanner);
   } else {
@@ -1071,17 +1061,17 @@ static void push_arena_string(ScratchString &s, int kind, void *yyscanner) {
   }
 }
 
-std::pair<char *, size_t> scratch_slurp_fd_prepared(int fd) {
+std::pair<char*, size_t> scratch_slurp_fd_prepared(int fd) {
   struct stat st{};
   size_t hint = (fstat(fd, &st) == 0 && st.st_size > 0) ? static_cast<size_t>(st.st_size) : 8192;
-  char *base = static_cast<char *>(scratch_raw_allocate(hint + 3, 1));
+  char* base = static_cast<char*>(scratch_raw_allocate(hint + 3, 1));
   size_t len = 0;
   for (;;) {
     if (len == hint) {
       // Grew past the fstat hint (rare: proc files, races). Double into a
       // fresh arena block; the old one is left to the bulk free.
       size_t hint2 = hint * 2;
-      char *bigger = static_cast<char *>(scratch_raw_allocate(hint2 + 3, 1));
+      char* bigger = static_cast<char*>(scratch_raw_allocate(hint2 + 3, 1));
       memcpy(bigger, base, len);
       base = bigger;
       hint = hint2;
@@ -1125,37 +1115,37 @@ struct LpcYyHdr {
 // The arena window flag: set by lexer.l's yy_scan_buffer call sites.
 bool lpc_flex_alloc_arena = false;
 
-void *yyalloc(size_t size, void * /*yyscanner*/) {
-  LpcYyHdr *h;
+void* yyalloc(size_t size, void* /*yyscanner*/) {
+  LpcYyHdr* h;
   if (lpc_flex_alloc_arena) {
-    h = static_cast<LpcYyHdr *>(scratch_raw_allocate(size + sizeof(LpcYyHdr), 16));
+    h = static_cast<LpcYyHdr*>(scratch_raw_allocate(size + sizeof(LpcYyHdr), 16));
     h->kind = 2;
   } else {
-    h = static_cast<LpcYyHdr *>(malloc(size + sizeof(LpcYyHdr)));
+    h = static_cast<LpcYyHdr*>(malloc(size + sizeof(LpcYyHdr)));
     h->kind = 1;
   }
   h->size = size;
   return h + 1;
 }
 
-void yyfree(void *ptr, void * /*yyscanner*/) {
+void yyfree(void* ptr, void* /*yyscanner*/) {
   if (ptr == nullptr) return;
-  LpcYyHdr *h = static_cast<LpcYyHdr *>(ptr) - 1;
+  LpcYyHdr* h = static_cast<LpcYyHdr*>(ptr) - 1;
   if (h->kind == 1) free(h);
   /* kind 2: arena memory, reclaimed at scratch_destroy. */
 }
 
-void *yyrealloc(void *ptr, size_t size, void *yyscanner) {
+void* yyrealloc(void* ptr, size_t size, void* yyscanner) {
   if (ptr == nullptr) return yyalloc(size, yyscanner);
-  LpcYyHdr *h = static_cast<LpcYyHdr *>(ptr) - 1;
+  LpcYyHdr* h = static_cast<LpcYyHdr*>(ptr) - 1;
   if (h->kind == 1) {
-    h = static_cast<LpcYyHdr *>(realloc(h, size + sizeof(LpcYyHdr)));
+    h = static_cast<LpcYyHdr*>(realloc(h, size + sizeof(LpcYyHdr)));
     h->size = size;
     return h + 1;
   }
   /* Arena block (shouldn't happen: only the malloc-side buffer stack is
    * ever realloc'd) -- defensive copy-out to malloc. */
-  LpcYyHdr *nh = static_cast<LpcYyHdr *>(malloc(size + sizeof(LpcYyHdr)));
+  LpcYyHdr* nh = static_cast<LpcYyHdr*>(malloc(size + sizeof(LpcYyHdr)));
   nh->kind = 1;
   nh->size = size;
   memcpy(nh + 1, ptr, h->size < size ? h->size : size);
@@ -1166,9 +1156,8 @@ void *yyrealloc(void *ptr, size_t size, void *yyscanner) {
 // (persistent macro bodies, string_views over foreign memory): one arena
 // copy plus sentinels, then lexer.l's in-place push -- still no flex
 // text allocation.
-void lpc_lex_push_string_buffer(const char *text, size_t len, int kind,
-                                void *yyscanner) {
-  char *base = static_cast<char *>(scratch_raw_allocate(len + 2, 1));
+void lpc_lex_push_string_buffer(const char* text, size_t len, int kind, void* yyscanner) {
+  char* base = static_cast<char*>(scratch_raw_allocate(len + 2, 1));
   memcpy(base, text, len);
   base[len] = 0;
   base[len + 1] = 0;
@@ -1178,7 +1167,7 @@ void lpc_lex_push_string_buffer(const char *text, size_t len, int kind,
 // Pop one pushed buffer: record the ending line for the kind-dispatched
 // bookkeeping (include accounting / expansion-frame death), then let
 // Flex pop the buffer itself.
-void lpc_lex_pop_pushed_buffer(void *yyscanner) {
+void lpc_lex_pop_pushed_buffer(void* yyscanner) {
   int ending_lineno = lpc_lex_buffer_count(yyscanner) > 0 ? yyget_lineno(yyscanner) : 0;
   lpc_lex_note_buffer_pop(ending_lineno);
   yypop_buffer_state(yyscanner);
@@ -1188,7 +1177,7 @@ void lpc_lex_pop_pushed_buffer(void *yyscanner) {
 // buffer (splice or #include content -- NOT a #if expression, whose edge
 // is hard) is popped and scanning simply continues; returns 0 when this
 // is a genuine end-of-input the rule must handle itself.
-int lpc_lex_pop_splice_if_any(void *yyscanner) {
+int lpc_lex_pop_splice_if_any(void* yyscanner) {
   if (lpc_lex_pushed_depth() > 0 && lpc_lex_top_buffer_kind() != LPC_BUF_IF_EXPR) {
     lpc_lex_pop_pushed_buffer(yyscanner);
     return 1;
@@ -1203,15 +1192,15 @@ void lpc_lex_teardown_active(void) {
   pushed_kind_stack.clear();
 }
 
-static void start_new_file_prepared(char *prepared_base, size_t prepared_body,
-                                    void *yyscanner, bool keep_macros);
+static void start_new_file_prepared(char* prepared_base, size_t prepared_body, void* yyscanner,
+                                    bool keep_macros);
 
-void start_new_file(std::string_view source, void *yyscanner, bool keep_macros) {
+void start_new_file(std::string_view source, void* yyscanner, bool keep_macros) {
   // Prepare an arena block from the caller's view: copy + trailing-'\n'
   // guarantee + the two yy_scan_buffer sentinels.
   bool add_nl = !source.empty() && source.back() != '\n';
   size_t body = source.size() + (add_nl ? 1 : 0);
-  char *base = static_cast<char *>(scratch_raw_allocate(body + 2, 1));
+  char* base = static_cast<char*>(scratch_raw_allocate(body + 2, 1));
   if (!source.empty()) memcpy(base, source.data(), source.size());
   if (add_nl) base[source.size()] = '\n';
   base[body] = 0;
@@ -1219,7 +1208,7 @@ void start_new_file(std::string_view source, void *yyscanner, bool keep_macros) 
   start_new_file_prepared(base, body, yyscanner, keep_macros);
 }
 
-bool start_new_file_fd(int fd, void *yyscanner, bool keep_macros) {
+bool start_new_file_fd(int fd, void* yyscanner, bool keep_macros) {
   // Zero-copy main file: read(2) lands the bytes directly in the arena
   // block that flex scans in place.
   auto [base, body] = scratch_slurp_fd_prepared(fd);
@@ -1230,8 +1219,8 @@ bool start_new_file_fd(int fd, void *yyscanner, bool keep_macros) {
   return true;
 }
 
-static void start_new_file_prepared(char *prepared_base, size_t prepared_body,
-                                    void *yyscanner, bool keep_macros) {
+static void start_new_file_prepared(char* prepared_base, size_t prepared_body, void* yyscanner,
+                                    bool keep_macros) {
   if (!main_filename && current_file) {
     main_filename = make_shared_string(current_file);
   }
@@ -1270,8 +1259,8 @@ static void start_new_file_prepared(char *prepared_base, size_t prepared_body,
   // identity and must not be touched.
   lpc_lex_reset(yyscanner);
   pushed_kind_stack.clear();
-  for (auto &is : inc_stack) {
-    free_string(const_cast<char *>(is.file));
+  for (auto& is : inc_stack) {
+    free_string(const_cast<char*>(is.file));
   }
   inc_stack.clear();
   last_function_context = -1;
@@ -1293,21 +1282,14 @@ static void start_new_file_prepared(char *prepared_base, size_t prepared_body,
   // line (the config value already carries its quoting/angle delimiters):
   // its content becomes a pushed buffer scanned before the main file's
   // first byte.
-  const char *glf = CONFIG_STR(__GLOBAL_INCLUDE_FILE__);
+  const char* glf = CONFIG_STR(__GLOBAL_INCLUDE_FILE__);
   if (glf != nullptr && strlen(glf) != 0) {
     lpc_lex_handle_include(glf, yyscanner);
   }
 }
 
-
-
-
-
-
-
-
-const char *query_instr_name(int instr) {
-  const char *name;
+const char* query_instr_name(int instr) {
+  const char* name;
   static char num_buf[20];
 
   // The param is clearly wrong, however to be safe, we just return something here.
@@ -1329,11 +1311,7 @@ const char *query_instr_name(int instr) {
   }
 }
 
-
-
-const char *main_file_name() {
-  return main_filename ? main_filename : current_file;
-}
+const char* main_file_name() { return main_filename ? main_filename : current_file; }
 
 /* identifier hash table stuff, size must be an even power of two */
 #define IDENT_HASH_SIZE 1024
@@ -1367,7 +1345,7 @@ const char *main_file_name() {
       return 0;                                           \
   }
 
-ident_hash_elem_t *lookup_ident(const char *name) {
+ident_hash_elem_t* lookup_ident(const char* name) {
   int h = IdentHash(name);
   ident_hash_elem_t *hptr, *hptr2;
 
@@ -1382,7 +1360,7 @@ ident_hash_elem_t *lookup_ident(const char *name) {
   return nullptr;
 }
 
-ident_hash_elem_t *find_or_add_perm_ident(const char *name) {
+ident_hash_elem_t* find_or_add_perm_ident(const char* name) {
   int h = IdentHash(name);
   ident_hash_elem_t *hptr, *hptr2;
 
@@ -1397,7 +1375,7 @@ ident_hash_elem_t *find_or_add_perm_ident(const char *name) {
       }
       hptr2 = hptr2->next;
     }
-    hptr = reinterpret_cast<ident_hash_elem_t *>(
+    hptr = reinterpret_cast<ident_hash_elem_t*>(
         DMALLOC(sizeof(ident_hash_elem_t), TAG_PERM_IDENT, "find_or_add_perm_ident:1"));
     hptr->next = ident_hash_head[h]->next;
     ident_hash_head[h]->next = hptr;
@@ -1405,7 +1383,7 @@ ident_hash_elem_t *find_or_add_perm_ident(const char *name) {
       ident_hash_tail[h] = hptr;
     }
   } else {
-    hptr = (ident_hash_table[h] = reinterpret_cast<ident_hash_elem_t *>(
+    hptr = (ident_hash_table[h] = reinterpret_cast<ident_hash_elem_t*>(
                 DMALLOC(sizeof(ident_hash_elem_t), TAG_PERM_IDENT, "find_or_add_perm_ident:2")));
     ident_hash_head[h] = hptr;
     ident_hash_tail[h] = hptr;
@@ -1424,21 +1402,21 @@ ident_hash_elem_t *find_or_add_perm_ident(const char *name) {
 }
 
 typedef struct lname_linked_buf_s {
-  struct lname_linked_buf_s *next;
+  struct lname_linked_buf_s* next;
   char block[4096];
 } lname_linked_buf_t;
 
-lname_linked_buf_t *lnamebuf = nullptr;
+lname_linked_buf_t* lnamebuf = nullptr;
 
 int lb_index = 4096;
 
-static char *alloc_local_name(const char *name) {
+static char* alloc_local_name(const char* name) {
   int len = strlen(name) + 1;
-  char *res;
+  char* res;
 
   if (lb_index + len > 4096) {
-    lname_linked_buf_t *new_buf;
-    new_buf = reinterpret_cast<lname_linked_buf_t *>(
+    lname_linked_buf_t* new_buf;
+    new_buf = reinterpret_cast<lname_linked_buf_t*>(
         DMALLOC(sizeof(lname_linked_buf_t), TAG_COMPILER, "alloc_local_name"));
     new_buf->next = lnamebuf;
     lnamebuf = new_buf;
@@ -1453,12 +1431,11 @@ static char *alloc_local_name(const char *name) {
 int num_free = 0;
 
 typedef struct ident_hash_elem_list_s {
-  struct ident_hash_elem_list_s *next;
+  struct ident_hash_elem_list_s* next;
   ident_hash_elem_t items[128];
 } ident_hash_elem_list_t;
 
-ident_hash_elem_list_t *ihe_list = nullptr;
-
+ident_hash_elem_list_t* ihe_list = nullptr;
 
 void free_unused_identifiers() {
   ident_hash_elem_list_t *ihel, *next;
@@ -1507,13 +1484,13 @@ void free_unused_identifiers() {
   lb_index = 4096;
 }
 
-static ident_hash_elem_t *quick_alloc_ident_entry() {
+static ident_hash_elem_t* quick_alloc_ident_entry() {
   if (num_free) {
     num_free--;
     return &(ihe_list->items[num_free]);
   } else {
-    ident_hash_elem_list_t *ihel;
-    ihel = reinterpret_cast<ident_hash_elem_list_t *>(
+    ident_hash_elem_list_t* ihel;
+    ihel = reinterpret_cast<ident_hash_elem_list_t*>(
         DMALLOC(sizeof(ident_hash_elem_list_t), TAG_COMPILER, "quick_alloc_ident_entry"));
     ihel->next = ihe_list;
     ihe_list = ihel;
@@ -1522,7 +1499,7 @@ static ident_hash_elem_t *quick_alloc_ident_entry() {
   }
 }
 
-ident_hash_elem_t *find_or_add_ident(const char *name, int flags) {
+ident_hash_elem_t* find_or_add_ident(const char* name, int flags) {
   int h = IdentHash(name);
   ident_hash_elem_t *hptr, *hptr2;
 
@@ -1576,33 +1553,31 @@ ident_hash_elem_t *find_or_add_ident(const char *name, int flags) {
   return hptr;
 }
 
-static void add_keyword_t(const char *name, keyword_t *entry) {
+static void add_keyword_t(const char* name, keyword_t* entry) {
   int h = IdentHash(name);
 
   if (ident_hash_table[h]) {
     entry->next = ident_hash_head[h]->next;
-    ident_hash_head[h]->next = reinterpret_cast<ident_hash_elem_t *>(entry);
+    ident_hash_head[h]->next = reinterpret_cast<ident_hash_elem_t*>(entry);
     if (ident_hash_head[h] == ident_hash_tail[h]) {
-      ident_hash_tail[h] = reinterpret_cast<ident_hash_elem_t *>(entry);
+      ident_hash_tail[h] = reinterpret_cast<ident_hash_elem_t*>(entry);
     }
   } else {
-    ident_hash_head[h] = reinterpret_cast<ident_hash_elem_t *>(entry);
-    ident_hash_tail[h] = reinterpret_cast<ident_hash_elem_t *>(entry);
-    ident_hash_table[h] = reinterpret_cast<ident_hash_elem_t *>(entry);
-    entry->next = reinterpret_cast<ident_hash_elem_t *>(entry);
+    ident_hash_head[h] = reinterpret_cast<ident_hash_elem_t*>(entry);
+    ident_hash_tail[h] = reinterpret_cast<ident_hash_elem_t*>(entry);
+    ident_hash_table[h] = reinterpret_cast<ident_hash_elem_t*>(entry);
+    entry->next = reinterpret_cast<ident_hash_elem_t*>(entry);
   }
   entry->token |= IHE_RESWORD;
 }
 
 void init_identifiers() {
   unsigned int i;
-  ident_hash_elem_t *ihe;
-
-
+  ident_hash_elem_t* ihe;
 
   /* allocate all three tables together */
-  ident_hash_table = reinterpret_cast<ident_hash_elem_t **>(DCALLOC(
-      IDENT_HASH_SIZE * 3, sizeof(ident_hash_elem_t *), TAG_IDENT_TABLE, "init_identifiers"));
+  ident_hash_table = reinterpret_cast<ident_hash_elem_t**>(DCALLOC(
+      IDENT_HASH_SIZE * 3, sizeof(ident_hash_elem_t*), TAG_IDENT_TABLE, "init_identifiers"));
   ident_hash_head = &ident_hash_table[IDENT_HASH_SIZE];
   ident_hash_tail = &ident_hash_table[2 * IDENT_HASH_SIZE];
 
@@ -1661,63 +1636,63 @@ std::vector<std::string> inc_path;
 unsigned predefines_version = 1;
 
 std::string merge(std::string_view name) {
-    if (name.empty()) return "";
+  if (name.empty()) return "";
 
-    std::string dest;
-    if (name[0] == '/') {
-        // Absolute path from mudlib root
-        dest = "";
+  std::string dest;
+  if (name[0] == '/') {
+    // Absolute path from mudlib root
+    dest = "";
+  } else {
+    // Start with current_file's directory
+    dest = current_file ? current_file : "";
+    size_t last_slash = dest.rfind('/');
+    if (last_slash != std::string::npos) {
+      dest = dest.substr(0, last_slash);
     } else {
-        // Start with current_file's directory
-        dest = current_file ? current_file : "";
+      dest = "";
+    }
+  }
+
+  // Now process components of name
+  size_t pos = 0;
+  while (pos < name.size()) {
+    // Skip any leading slashes in the remaining part of name
+    while (pos < name.size() && name[pos] == '/') {
+      pos++;
+      dest.clear();  // An absolute component clears the destination
+    }
+    if (pos >= name.size()) break;
+
+    size_t next_slash = name.find('/', pos);
+    std::string_view component = (next_slash == std::string_view::npos)
+                                     ? name.substr(pos)
+                                     : name.substr(pos, next_slash - pos);
+
+    if (component == "..") {
+      if (!dest.empty()) {
         size_t last_slash = dest.rfind('/');
         if (last_slash != std::string::npos) {
-            dest = dest.substr(0, last_slash);
+          dest = dest.substr(0, last_slash);
         } else {
-            dest = "";
+          dest.clear();
         }
+      }
+    } else if (component == "." || component.empty()) {
+      // Do nothing
+    } else {
+      if (!dest.empty()) {
+        dest += '/';
+      }
+      dest += component;
     }
 
-    // Now process components of name
-    size_t pos = 0;
-    while (pos < name.size()) {
-        // Skip any leading slashes in the remaining part of name
-        while (pos < name.size() && name[pos] == '/') {
-            pos++;
-            dest.clear(); // An absolute component clears the destination
-        }
-        if (pos >= name.size()) break;
-
-        size_t next_slash = name.find('/', pos);
-        std::string_view component = (next_slash == std::string_view::npos)
-            ? name.substr(pos)
-            : name.substr(pos, next_slash - pos);
-
-        if (component == "..") {
-            if (!dest.empty()) {
-                size_t last_slash = dest.rfind('/');
-                if (last_slash != std::string::npos) {
-                    dest = dest.substr(0, last_slash);
-                } else {
-                    dest.clear();
-                }
-            }
-        } else if (component == "." || component.empty()) {
-            // Do nothing
-        } else {
-            if (!dest.empty()) {
-                dest += '/';
-            }
-            dest += component;
-        }
-
-        if (next_slash == std::string_view::npos) break;
-        pos = next_slash + 1;
-    }
-    return dest;
+    if (next_slash == std::string_view::npos) break;
+    pos = next_slash + 1;
+  }
+  return dest;
 }
 
-} // namespace
+}  // namespace
 
 // ---------------------------------------------------------------------------
 // Predefines Implementation
@@ -1725,329 +1700,323 @@ std::string merge(std::string_view name) {
 
 void add_predefine(std::string_view name, int nargs, std::string_view exps) {
   predefines_version++;
-    PredefMacro m;
-    m.is_function_like = (nargs >= 0);
-    m.nargs = nargs;
-    m.body = exps;
-    predefines[std::string(name)] = std::move(m);
+  PredefMacro m;
+  m.is_function_like = (nargs >= 0);
+  m.nargs = nargs;
+  m.body = exps;
+  predefines[std::string(name)] = std::move(m);
 }
 
 void add_quoted_predefine(std::string_view def, std::string_view val) {
   predefines_version++;
-    std::string quoted;
-    quoted.reserve(val.size() + 2);
-    quoted += '"';
-    quoted += val;
-    quoted += '"';
-    add_predefine(def, -1, quoted);
+  std::string quoted;
+  quoted.reserve(val.size() + 2);
+  quoted += '"';
+  quoted += val;
+  quoted += '"';
+  add_predefine(def, -1, quoted);
 }
 
 unsigned get_predefines_version() { return predefines_version; }
 
-const std::unordered_map<std::string, PredefMacro>& get_predefines() {
-    return predefines;
-}
+const std::unordered_map<std::string, PredefMacro>& get_predefines() { return predefines; }
 
 void add_predefines() {
-    int i;
-    lpc_predef_t *tmpf;
+  int i;
+  lpc_predef_t* tmpf;
 
-    add_predefine("MUDOS", -1, "");
-    add_predefine("FLUFFOS", -1, "");
+  add_predefine("MUDOS", -1, "");
+  add_predefine("FLUFFOS", -1, "");
 
 #define _STR_HELPER(x) #x
 #define _STR(x) _STR_HELPER(x)
 
 #ifdef PACKAGE_DB
-    add_predefine("__PACKAGE_DB__", -1, "");
+  add_predefine("__PACKAGE_DB__", -1, "");
 #endif
 #ifdef USE_MYSQL
-    add_predefine("__USE_MYSQL__", -1, _STR(USE_MYSQL));
+  add_predefine("__USE_MYSQL__", -1, _STR(USE_MYSQL));
 #endif
 #ifdef USE_POSTGRES
-    add_predefine("__USE_POSTGRES__", -1, _STR(USE_POSTGRES));
+  add_predefine("__USE_POSTGRES__", -1, _STR(USE_POSTGRES));
 #endif
 #ifdef USE_SQLITE3
-    add_predefine("__USE_SQLITE3__", -1, _STR(USE_SQLITE3));
+  add_predefine("__USE_SQLITE3__", -1, _STR(USE_SQLITE3));
 #endif
 #ifdef DEFAULT_DB
-    add_predefine("__DEFAULT_DB__", -1, _STR(DEFAULT_DB));
+  add_predefine("__DEFAULT_DB__", -1, _STR(DEFAULT_DB));
 #endif
 
-    add_predefine("__GET_CHAR_IS_BUFFERED__", -1, "");
-    add_predefine("__DSLIB__", -1, "");
+  add_predefine("__GET_CHAR_IS_BUFFERED__", -1, "");
+  add_predefine("__DSLIB__", -1, "");
 #ifdef PACKAGE_DWLIB
-    add_predefine("__DWLIB__", -1, "");
+  add_predefine("__DWLIB__", -1, "");
 #endif
 #ifdef PACKAGE_FFI
-    add_predefine("__PACKAGE_FFI__", -1, "");
+  add_predefine("__PACKAGE_FFI__", -1, "");
 #endif
 
-    // Adding version
-    add_quoted_predefine("__VERSION__", PROJECT_VERSION);
+  // Adding version
+  add_quoted_predefine("__VERSION__", PROJECT_VERSION);
 
-    add_predefine("__PORT__", -1, std::to_string(external_port[0].port).c_str());
-    for (i = 0; i < static_cast<int>(sizeof(option_defs) / sizeof(const char *)); i += 2) {
-        add_predefine(option_defs[i], -1, option_defs[i + 1]);
-    }
-    add_quoted_predefine("__ARCH__", ARCH);
-    add_quoted_predefine("__COMPILER__", COMPILER);
-    add_quoted_predefine("__CXXFLAGS__", CXXFLAGS);
+  add_predefine("__PORT__", -1, std::to_string(external_port[0].port).c_str());
+  for (i = 0; i < static_cast<int>(sizeof(option_defs) / sizeof(const char*)); i += 2) {
+    add_predefine(option_defs[i], -1, option_defs[i + 1]);
+  }
+  add_quoted_predefine("__ARCH__", ARCH);
+  add_quoted_predefine("__COMPILER__", COMPILER);
+  add_quoted_predefine("__CXXFLAGS__", CXXFLAGS);
 
-    /* Backwards Compat */
-    add_quoted_predefine("MUD_NAME", CONFIG_STR(__MUD_NAME__));
+  /* Backwards Compat */
+  add_quoted_predefine("MUD_NAME", CONFIG_STR(__MUD_NAME__));
 #ifdef F_ED
-    add_predefine("HAS_ED", -1, "");
+  add_predefine("HAS_ED", -1, "");
 #endif
 #ifdef F_PRINTF
-    add_predefine("HAS_PRINTF", -1, "");
+  add_predefine("HAS_PRINTF", -1, "");
 #endif
 #if (defined(RUSAGE) || defined(GET_PROCESS_STATS) || defined(TIMES))
-    add_predefine("HAS_RUSAGE", -1, "");
+  add_predefine("HAS_RUSAGE", -1, "");
 #endif
-    add_predefine("HAS_DEBUG_LEVEL", -1, "");
+  add_predefine("HAS_DEBUG_LEVEL", -1, "");
 #ifdef DEBUG
-    add_predefine("__DEBUG__", -1, "");
+  add_predefine("__DEBUG__", -1, "");
 #endif
-    for (tmpf = lpc_predefs; tmpf; tmpf = tmpf->next) {
-        std::string_view flag = tmpf->flag;
-        size_t eq = flag.find('=');
-        if (eq == std::string_view::npos) {
-            add_predefine(flag, -1, "");
-        } else {
-            add_predefine(flag.substr(0, eq), -1, flag.substr(eq + 1));
-        }
+  for (tmpf = lpc_predefs; tmpf; tmpf = tmpf->next) {
+    std::string_view flag = tmpf->flag;
+    size_t eq = flag.find('=');
+    if (eq == std::string_view::npos) {
+      add_predefine(flag, -1, "");
+    } else {
+      add_predefine(flag.substr(0, eq), -1, flag.substr(eq + 1));
     }
-    add_predefine("SIZEOFINT", -1, std::to_string(sizeof(LPC_INT)));
-    add_predefine("MAX_INT", -1, std::to_string(LPC_INT_MAX));
-    add_predefine("MIN_INT", -1, std::to_string(LPC_INT_MIN));
+  }
+  add_predefine("SIZEOFINT", -1, std::to_string(sizeof(LPC_INT)));
+  add_predefine("MAX_INT", -1, std::to_string(LPC_INT_MAX));
+  add_predefine("MIN_INT", -1, std::to_string(LPC_INT_MIN));
 
-    {
-        // %f of DBL_MAX produces 309+ characters; use a dynamically sized buffer.
-        int needed = std::snprintf(nullptr, 0, "%" LPC_FLOAT_FMTSTR_P, LPC_FLOAT_MAX);
-        std::string max_float(needed + 1, '\0');
-        std::snprintf(max_float.data(), max_float.size(), "%" LPC_FLOAT_FMTSTR_P, LPC_FLOAT_MAX);
-        max_float.resize(needed);
-        add_predefine("MAX_FLOAT", -1, max_float);
+  {
+    // %f of DBL_MAX produces 309+ characters; use a dynamically sized buffer.
+    int needed = std::snprintf(nullptr, 0, "%" LPC_FLOAT_FMTSTR_P, LPC_FLOAT_MAX);
+    std::string max_float(needed + 1, '\0');
+    std::snprintf(max_float.data(), max_float.size(), "%" LPC_FLOAT_FMTSTR_P, LPC_FLOAT_MAX);
+    max_float.resize(needed);
+    add_predefine("MAX_FLOAT", -1, max_float);
 
-        needed = std::snprintf(nullptr, 0, "%" LPC_FLOAT_FMTSTR_P, LPC_FLOAT_MIN);
-        std::string min_float(needed + 1, '\0');
-        std::snprintf(min_float.data(), min_float.size(), "%" LPC_FLOAT_FMTSTR_P, LPC_FLOAT_MIN);
-        min_float.resize(needed);
-        add_predefine("MIN_FLOAT", -1, min_float);
-    }
+    needed = std::snprintf(nullptr, 0, "%" LPC_FLOAT_FMTSTR_P, LPC_FLOAT_MIN);
+    std::string min_float(needed + 1, '\0');
+    std::snprintf(min_float.data(), min_float.size(), "%" LPC_FLOAT_FMTSTR_P, LPC_FLOAT_MIN);
+    min_float.resize(needed);
+    add_predefine("MIN_FLOAT", -1, min_float);
+  }
 
-    // Following compile time configs are now always true
-    add_predefine("__CACHE_STATS__", -1, "");
-    add_predefine("__STRING_STATS__", -1, "");
-    add_predefine("__CLASS_STATS__", -1, "");
-    add_predefine("__ARRAY_STATS__", -1, "");
-    add_predefine("__CALLOUT_HANDLES__", -1, "");
-    add_predefine("__ARGUMENTS_IN_TRACEBACK__", -1, "");
-    add_predefine("__LOCALS_IN_TRACEBACK__", -1, "");
-    add_predefine("__DEBUG_MACRO__", -1, "");
+  // Following compile time configs are now always true
+  add_predefine("__CACHE_STATS__", -1, "");
+  add_predefine("__STRING_STATS__", -1, "");
+  add_predefine("__CLASS_STATS__", -1, "");
+  add_predefine("__ARRAY_STATS__", -1, "");
+  add_predefine("__CALLOUT_HANDLES__", -1, "");
+  add_predefine("__ARGUMENTS_IN_TRACEBACK__", -1, "");
+  add_predefine("__LOCALS_IN_TRACEBACK__", -1, "");
+  add_predefine("__DEBUG_MACRO__", -1, "");
 
-    // Following compile time configs has been changed into runtime configs.
-    if (CONFIG_INT(__RC_SANE_EXPLODE_STRING__)) {
-        add_predefine("__SANE_EXPLODE_STRING__", -1, "");
-    }
-    if (CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__)) {
-        add_predefine("__REVERSIBLE_EXPLODE_STRING__", -1, "");
-    }
-    if (CONFIG_INT(__RC_SANE_SORTING__)) {
-        add_predefine("__SANE_SORTING__", -1, "");
-    }
-    if (CONFIG_INT(__RC_CALL_OTHER_TYPE_CHECK__)) {
-        add_predefine("__CALL_OTHER_TYPE_CHECK__", -1, "");
-    }
-    if (CONFIG_INT(__RC_CALL_OTHER_WARN__)) {
-        add_predefine("__CALL_OTHER_WARN__", -1, "");
-    }
-    if (CONFIG_INT(__RC_MUDLIB_ERROR_HANDLER__)) {
-        add_predefine("__MUDLIB_ERROR_HANDLER__", -1, "");
-    }
-    if (CONFIG_INT(__RC_NO_RESETS__)) {
-        add_predefine("__NO_RESETS__", -1, "");
-    }
-    if (CONFIG_INT(__RC_LAZY_RESETS__)) {
-        add_predefine("__LAZY_RESETS__", -1, "");
-    }
-    if (CONFIG_INT(__RC_RANDOMIZED_RESETS__)) {
-        add_predefine("__RANDOMIZED_RESETS__", -1, "");
-    }
-    if (CONFIG_INT(__RC_THIS_PLAYER_IN_CALL_OUT__)) {
-        add_predefine("__THIS_PLAYER_IN_CALL_OUT__", -1, "");
-    }
-    if (CONFIG_INT(__RC_TRACE__)) {
-        add_predefine("__TRACE__", -1, "");
-    }
-    if (CONFIG_INT(__RC_TRACE_CODE__)) {
-        add_predefine("__TRACE_CODE__", -1, "");
-    }
-    if (CONFIG_INT(__RC_INTERACTIVE_CATCH_TELL__)) {
-        add_predefine("__INTERACTIVE_CATCH_TELL__", -1, "");
-    }
-    if (CONFIG_INT(__RC_RECEIVE_SNOOP__)) {
-        add_predefine("__RECEIVE_SNOOP__", -1, "");
-    }
-    if (CONFIG_INT(__RC_SNOOP_SHADOWED__)) {
-        add_predefine("__SNOOP_SHADOWED__", -1, "");
-    }
-    if (CONFIG_INT(__RC_REVERSE_DEFER__)) {
-        add_predefine("__REVERSE_DEFER__", -1, "");
-    }
-    if (CONFIG_INT(__RC_HAS_CONSOLE__)) {
-        add_predefine("__HAS_CONSOLE__", -1, "");
-    }
-    if (CONFIG_INT(__RC_NONINTERACTIVE_STDERR_WRITE__)) {
-        add_predefine("__NONINTERACTIVE_STDERR_WRITE__", -1, "");
-    }
-    if (CONFIG_INT(__RC_TRAP_CRASHES__)) {
-        add_predefine("__TRAP_CRASHES__", -1, "");
-    }
-    if (CONFIG_INT(__RC_OLD_TYPE_BEHAVIOR__)) {
-        add_predefine("__OLD_TYPE_BEHAVIOR__", -1, "");
-    }
-    if (CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
-        add_predefine("__OLD_RANGE_BEHAVIOR__", -1, "");
-    }
-    if (CONFIG_INT(__RC_WARN_OLD_RANGE_BEHAVIOR__)) {
-        add_predefine("__WARN_OLD_RANGE_BEHAVIOR__", -1, "");
-    }
-    if (CONFIG_INT(__RC_SUPPRESS_ARGUMENT_WARNINGS__)) {
-        add_predefine("__SUPPRESS_ARGUMENT_WARNINGS__", -1, "");
-    }
+  // Following compile time configs has been changed into runtime configs.
+  if (CONFIG_INT(__RC_SANE_EXPLODE_STRING__)) {
+    add_predefine("__SANE_EXPLODE_STRING__", -1, "");
+  }
+  if (CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__)) {
+    add_predefine("__REVERSIBLE_EXPLODE_STRING__", -1, "");
+  }
+  if (CONFIG_INT(__RC_SANE_SORTING__)) {
+    add_predefine("__SANE_SORTING__", -1, "");
+  }
+  if (CONFIG_INT(__RC_CALL_OTHER_TYPE_CHECK__)) {
+    add_predefine("__CALL_OTHER_TYPE_CHECK__", -1, "");
+  }
+  if (CONFIG_INT(__RC_CALL_OTHER_WARN__)) {
+    add_predefine("__CALL_OTHER_WARN__", -1, "");
+  }
+  if (CONFIG_INT(__RC_MUDLIB_ERROR_HANDLER__)) {
+    add_predefine("__MUDLIB_ERROR_HANDLER__", -1, "");
+  }
+  if (CONFIG_INT(__RC_NO_RESETS__)) {
+    add_predefine("__NO_RESETS__", -1, "");
+  }
+  if (CONFIG_INT(__RC_LAZY_RESETS__)) {
+    add_predefine("__LAZY_RESETS__", -1, "");
+  }
+  if (CONFIG_INT(__RC_RANDOMIZED_RESETS__)) {
+    add_predefine("__RANDOMIZED_RESETS__", -1, "");
+  }
+  if (CONFIG_INT(__RC_THIS_PLAYER_IN_CALL_OUT__)) {
+    add_predefine("__THIS_PLAYER_IN_CALL_OUT__", -1, "");
+  }
+  if (CONFIG_INT(__RC_TRACE__)) {
+    add_predefine("__TRACE__", -1, "");
+  }
+  if (CONFIG_INT(__RC_TRACE_CODE__)) {
+    add_predefine("__TRACE_CODE__", -1, "");
+  }
+  if (CONFIG_INT(__RC_INTERACTIVE_CATCH_TELL__)) {
+    add_predefine("__INTERACTIVE_CATCH_TELL__", -1, "");
+  }
+  if (CONFIG_INT(__RC_RECEIVE_SNOOP__)) {
+    add_predefine("__RECEIVE_SNOOP__", -1, "");
+  }
+  if (CONFIG_INT(__RC_SNOOP_SHADOWED__)) {
+    add_predefine("__SNOOP_SHADOWED__", -1, "");
+  }
+  if (CONFIG_INT(__RC_REVERSE_DEFER__)) {
+    add_predefine("__REVERSE_DEFER__", -1, "");
+  }
+  if (CONFIG_INT(__RC_HAS_CONSOLE__)) {
+    add_predefine("__HAS_CONSOLE__", -1, "");
+  }
+  if (CONFIG_INT(__RC_NONINTERACTIVE_STDERR_WRITE__)) {
+    add_predefine("__NONINTERACTIVE_STDERR_WRITE__", -1, "");
+  }
+  if (CONFIG_INT(__RC_TRAP_CRASHES__)) {
+    add_predefine("__TRAP_CRASHES__", -1, "");
+  }
+  if (CONFIG_INT(__RC_OLD_TYPE_BEHAVIOR__)) {
+    add_predefine("__OLD_TYPE_BEHAVIOR__", -1, "");
+  }
+  if (CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
+    add_predefine("__OLD_RANGE_BEHAVIOR__", -1, "");
+  }
+  if (CONFIG_INT(__RC_WARN_OLD_RANGE_BEHAVIOR__)) {
+    add_predefine("__WARN_OLD_RANGE_BEHAVIOR__", -1, "");
+  }
+  if (CONFIG_INT(__RC_SUPPRESS_ARGUMENT_WARNINGS__)) {
+    add_predefine("__SUPPRESS_ARGUMENT_WARNINGS__", -1, "");
+  }
 }
 
-
-
 void print_all_predefines() {
-    std::vector<std::string> results;
-    for (const auto& pair : predefines) {
-        results.push_back(pair.first);
-    }
-    std::sort(results.begin(), results.end());
-    for (const auto& name : results) {
-        debug_message("#define %s %s\n", name.c_str(), predefines[name].body.c_str());
-    }
+  std::vector<std::string> results;
+  for (const auto& pair : predefines) {
+    results.push_back(pair.first);
+  }
+  std::sort(results.begin(), results.end());
+  for (const auto& name : results) {
+    debug_message("#define %s %s\n", name.c_str(), predefines[name].body.c_str());
+  }
 }
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_all_defines() {
-    // No-op: include paths are stored in std::vector<std::string> and managed automatically
+  // No-op: include paths are stored in std::vector<std::string> and managed automatically
 }
 #endif
 
-void set_inc_list(const char *list) {
-    inc_list.clear();
-    std::istringstream ss(list);
-    for (std::string path; std::getline(ss, path, ':'); ) {
-        if (path.empty()) continue;
-        if (path[0] == '/') path.erase(path.begin());
-        if (!legal_path(path.c_str())) {
-            debug_message("'include dirs' must give paths without any '..'\n");
-            exit(-1);
-        }
-        inc_list.push_back(std::move(path));
+void set_inc_list(const char* list) {
+  inc_list.clear();
+  std::istringstream ss(list);
+  for (std::string path; std::getline(ss, path, ':');) {
+    if (path.empty()) continue;
+    if (path[0] == '/') path.erase(path.begin());
+    if (!legal_path(path.c_str())) {
+      debug_message("'include dirs' must give paths without any '..'\n");
+      exit(-1);
     }
-    inc_path = inc_list;
+    inc_list.push_back(std::move(path));
+  }
+  inc_path = inc_list;
 }
 
 void init_include_path() {
-    // No VM context: keep the config-file include path (inc_list) as-is --
-    // there is no master object to ask, and no eval stack to push onto.
-    if (!compiler_vm_context) {
-        inc_path = inc_list;
-        return;
-    }
-
-    push_malloced_string(add_slash(current_file));
-    svalue_t *ret = safe_apply_master_ob(APPLY_GET_INCLUDE_PATH, 1);
-
-    if (!ret || ret == reinterpret_cast<svalue_t *>(-1)) {
-        return;
-    }
-    if (ret->type != T_ARRAY) {
-        debug_message("'master::get_include_path' must return 'string *'\n");
-        return;
-    }
-    array_t *arr = ret->u.arr;
-    if (!arr->size) {
-        debug_message("got empty include path for 'master::get_include_path(%s)'\n", current_file);
-        return;
-    }
-
-    std::vector<std::string> path;
-    path.reserve(arr->size);
-    for (int i = 0; i < arr->size; i++) {
-        if (arr->item[i].type != T_STRING) {
-            debug_message("'master::get_include_path(%s)' must return 'string *'\n", current_file);
-            return;
-        }
-        const char *elem = arr->item[i].u.string;
-        if (!strcmp(elem, ":DEFAULT:")) {
-            path.insert(path.end(), inc_list.begin(), inc_list.end());
-            continue;
-        }
-        const char *check = (elem[0] == '/') ? &elem[1] : elem;
-        if (!legal_path(check)) {
-            debug_message(
-                "'master::get_include_path(%s)' returns invalid value '%s', must give paths without "
-                "any '..'\n",
-                current_file, elem);
-            return;
-        }
-        path.emplace_back(elem);
-    }
-    inc_path = std::move(path);
-}
-
-void deinit_include_path() {
+  // No VM context: keep the config-file include path (inc_list) as-is --
+  // there is no master object to ask, and no eval stack to push onto.
+  if (!compiler_vm_context) {
     inc_path = inc_list;
+    return;
+  }
+
+  push_malloced_string(add_slash(current_file));
+  svalue_t* ret = safe_apply_master_ob(APPLY_GET_INCLUDE_PATH, 1);
+
+  if (!ret || ret == reinterpret_cast<svalue_t*>(-1)) {
+    return;
+  }
+  if (ret->type != T_ARRAY) {
+    debug_message("'master::get_include_path' must return 'string *'\n");
+    return;
+  }
+  array_t* arr = ret->u.arr;
+  if (!arr->size) {
+    debug_message("got empty include path for 'master::get_include_path(%s)'\n", current_file);
+    return;
+  }
+
+  std::vector<std::string> path;
+  path.reserve(arr->size);
+  for (int i = 0; i < arr->size; i++) {
+    if (arr->item[i].type != T_STRING) {
+      debug_message("'master::get_include_path(%s)' must return 'string *'\n", current_file);
+      return;
+    }
+    const char* elem = arr->item[i].u.string;
+    if (!strcmp(elem, ":DEFAULT:")) {
+      path.insert(path.end(), inc_list.begin(), inc_list.end());
+      continue;
+    }
+    const char* check = (elem[0] == '/') ? &elem[1] : elem;
+    if (!legal_path(check)) {
+      debug_message(
+          "'master::get_include_path(%s)' returns invalid value '%s', must give paths without "
+          "any '..'\n",
+          current_file, elem);
+      return;
+    }
+    path.emplace_back(elem);
+  }
+  inc_path = std::move(path);
 }
+
+void deinit_include_path() { inc_path = inc_list; }
 
 std::pair<int, std::string> inc_open(std::string_view name, bool check_local) {
-    std::string buf;
+  std::string buf;
 
-    if (check_local) {
-        buf = merge(name);
-        const char *tmp = check_valid_path(buf.c_str(), master_ob, "include", 0);
-        if (tmp) {
-            int fd = open(tmp, O_RDONLY);
-            if (fd != -1) {
+  if (check_local) {
+    buf = merge(name);
+    const char* tmp = check_valid_path(buf.c_str(), master_ob, "include", 0);
+    if (tmp) {
+      int fd = open(tmp, O_RDONLY);
+      if (fd != -1) {
 #ifdef _WIN32
-                _setmode(fd, _O_BINARY);
+        _setmode(fd, _O_BINARY);
 #endif
-                return {fd, buf};
-            }
-        }
+        return {fd, buf};
+      }
     }
+  }
 
-    for (size_t p = name.find('.'); p != std::string_view::npos; p = name.find('.', p + 1)) {
-        if (p + 1 < name.size() && name[p + 1] == '.') {
-            return {-1, ""};
-        }
+  for (size_t p = name.find('.'); p != std::string_view::npos; p = name.find('.', p + 1)) {
+    if (p + 1 < name.size() && name[p + 1] == '.') {
+      return {-1, ""};
     }
-    for (const auto &path : inc_path) {
-        buf.clear();
-        buf.append(path);
-        buf += '/';
-        buf.append(name);
-        const char *tmp = check_valid_path(buf.c_str(), master_ob, "include", 0);
-        if (tmp) {
-            int fd = open(tmp, O_RDONLY);
-            if (fd != -1) {
+  }
+  for (const auto& path : inc_path) {
+    buf.clear();
+    buf.append(path);
+    buf += '/';
+    buf.append(name);
+    const char* tmp = check_valid_path(buf.c_str(), master_ob, "include", 0);
+    if (tmp) {
+      int fd = open(tmp, O_RDONLY);
+      if (fd != -1) {
 #ifdef _WIN32
-                _setmode(fd, _O_BINARY);
+        _setmode(fd, _O_BINARY);
 #endif
-                return {fd, buf};
-            }
-        }
+        return {fd, buf};
+      }
     }
-    return {-1, ""};
+  }
+  return {-1, ""};
 }
 
-bool lpc_lex_handle_include(std::string_view rest, void *yyscanner) {
+bool lpc_lex_handle_include(std::string_view rest, void* yyscanner) {
   ScratchString name_expr(trim(rest));
   if (name_expr.empty()) {
     lexerror("Bad #include directive");

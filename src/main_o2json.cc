@@ -18,21 +18,18 @@ int main(int argc, char** argv) {
 
   argparse::ArgumentParser program("o2json");
 
-  program.add_argument("-pretty")
-      .help("pretty print json")
-      .flag();
+  program.add_argument("-pretty").help("pretty print json").flag();
 
-  program.add_argument("-ascii")
-      .help("ascii mode")
-      .flag();
+  program.add_argument("-ascii").help("ascii mode").flag();
 
   program.add_argument("o_file").help("o file to read, if - then stdin is used");
-  program.add_argument("json_file").default_value("-").help("json file to write, if omitted, then stdout is used");
+  program.add_argument("json_file")
+      .default_value("-")
+      .help("json file to write, if omitted, then stdout is used");
 
   try {
     program.parse_args(argc, argv);
-  }
-  catch (const std::exception& err) {
+  } catch (const std::exception& err) {
     std::cerr << err.what() << std::endl;
     std::cerr << program;
     return 1;
@@ -60,7 +57,8 @@ int main(int argc, char** argv) {
 
   try {
     OFile obj(content);
-    std::string result = obj.to_json().dump(program["-pretty"] == true ? 2 : -1, ' ', program["-ascii"] == true);
+    std::string result =
+        obj.to_json().dump(program["-pretty"] == true ? 2 : -1, ' ', program["-ascii"] == true);
     auto json_file = program.get("json_file");
     if (json_file == "-") {
       std::cout << result;

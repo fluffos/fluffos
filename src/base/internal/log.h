@@ -22,10 +22,10 @@
 #include "base/internal/options_incl.h"
 
 // Defined by simulate.cc, this belongs to driver layer.
-[[noreturn]] extern void fatal(const char *, ...);
+[[noreturn]] extern void fatal(const char*, ...);
 
 void reset_debug_message_fp();
-void debug_message(const char *, ...);
+void debug_message(const char*, ...);
 
 #define SAFE(x) \
   do {          \
@@ -46,9 +46,9 @@ void debug_message(const char *, ...);
 
 extern unsigned int debug_level;
 
-void handle_debug_level(char *);
-void debug_level_set(const char *);
-void debug_level_clear(const char *);
+void handle_debug_level(char*);
+void debug_level_set(const char*);
+void debug_level_clear(const char*);
 
 #define debug(x, ...)                                                                    \
   do {                                                                                   \
@@ -86,7 +86,7 @@ void debug_level_clear(const char *);
 #define DBG_DEFAULT (DBG_connections | DBG_telnet)
 
 struct debug_t {
-  const char *name;
+  const char* name;
   unsigned int bit;
 };
 

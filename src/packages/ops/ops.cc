@@ -21,7 +21,7 @@ void f_and() {
 }
 
 void f_and_eq() {
-  svalue_t *argp;
+  svalue_t* argp;
 
   argp = (sp--)->u.lvalue;
 
@@ -41,7 +41,7 @@ void f_and_eq() {
 }
 
 void f_div_eq() {
-  svalue_t *argp = (sp--)->u.lvalue;
+  svalue_t* argp = (sp--)->u.lvalue;
 
   switch (argp->type | sp->type) {
     case T_NUMBER: {
@@ -354,7 +354,7 @@ void f_lsh() {
 }
 
 void f_lsh_eq() {
-  svalue_t *argp;
+  svalue_t* argp;
 
   if ((argp = sp->u.lvalue)->type != T_NUMBER) {
     error("Bad left type to <<=\n");
@@ -367,7 +367,7 @@ void f_lsh_eq() {
 }
 
 void f_mod_eq() {
-  svalue_t *argp;
+  svalue_t* argp;
 
   if ((argp = sp->u.lvalue)->type != T_NUMBER) {
     error("Bad left type to %%=\n");
@@ -383,7 +383,7 @@ void f_mod_eq() {
 }
 
 void f_mult_eq() {
-  svalue_t *argp = (sp--)->u.lvalue;
+  svalue_t* argp = (sp--)->u.lvalue;
 
   switch (argp->type | sp->type) {
     case T_NUMBER: {
@@ -408,7 +408,7 @@ void f_mult_eq() {
     }
 
     case T_MAPPING: {
-      mapping_t *m = compose_mapping(argp->u.map, sp->u.map, 0);
+      mapping_t* m = compose_mapping(argp->u.map, sp->u.map, 0);
       if (argp->u.map != sp->u.map) {
         pop_stack();
         push_mapping(m);
@@ -532,7 +532,7 @@ void f_or() {
 }
 
 void f_or_eq() {
-  svalue_t *argp;
+  svalue_t* argp;
 
   argp = (sp--)->u.lvalue;
   if (argp->type == T_ARRAY && sp->type == T_ARRAY) {
@@ -552,8 +552,8 @@ void f_or_eq() {
 }
 
 void f_parse_command() {
-  svalue_t *arg;
-  svalue_t *fp;
+  svalue_t* arg;
+  svalue_t* fp;
   int i;
   int num_arg;
 
@@ -688,7 +688,7 @@ void f_range(int code) {
         push_constant_string("");
         return;
       }
-      char *tmp = new_string(to - from, "f_range");
+      char* tmp = new_string(to - from, "f_range");
       memcpy(tmp, iter.data() + from, to - from);
       tmp[to - from] = '\0';
 
@@ -699,7 +699,7 @@ void f_range(int code) {
     case T_BUFFER: {
       int from, to, len;
 
-      buffer_t *rbuf = sp->u.buf;
+      buffer_t* rbuf = sp->u.buf;
 
       len = rbuf->size;
       to = (--sp)->u.number;
@@ -735,7 +735,7 @@ void f_range(int code) {
         to = len - 1;
       }
       {
-        buffer_t *nbuf = allocate_buffer(to - from + 1);
+        buffer_t* nbuf = allocate_buffer(to - from + 1);
         memcpy(nbuf->item, rbuf->item + from, to - from + 1);
         free_buffer(rbuf);
         put_buffer(nbuf);
@@ -746,7 +746,7 @@ void f_range(int code) {
     case T_ARRAY: {
       int from, to;
 
-      array_t *v = sp->u.arr;
+      array_t* v = sp->u.arr;
       to = (--sp)->u.number;
       if (code & 0x01) {
         to = v->size - to;
@@ -810,8 +810,8 @@ void f_extract_range(int code) {
       int32_t from;
       size_t len;
 
-      buffer_t *rbuf = sp->u.buf;
-      buffer_t *nbuf;
+      buffer_t* rbuf = sp->u.buf;
+      buffer_t* nbuf;
 
       len = rbuf->size;
       from = (--sp)->u.number;
@@ -842,7 +842,7 @@ void f_extract_range(int code) {
     case T_ARRAY: {
       size_t from;
 
-      array_t *v = sp->u.arr;
+      array_t* v = sp->u.arr;
       from = (--sp)->u.number;
       if (code) {
         from = v->size - from;
@@ -864,7 +864,7 @@ void f_rsh() {
 }
 
 void f_rsh_eq() {
-  svalue_t *argp;
+  svalue_t* argp;
 
   if ((argp = sp->u.lvalue)->type != T_NUMBER) {
     error("Bad left type to >>=\n");
@@ -877,7 +877,7 @@ void f_rsh_eq() {
 }
 
 void f_sub_eq() {
-  svalue_t *argp = (sp--)->u.lvalue;
+  svalue_t* argp = (sp--)->u.lvalue;
 
   switch (argp->type | sp->type) {
     case T_NUMBER: {
@@ -1030,7 +1030,7 @@ void f_switch() {
 
   if (i >= 13) {
     if (i == 0xe) {
-      char *zz = end_tab - sizeof(LPC_INT);
+      char* zz = end_tab - sizeof(LPC_INT);
       /* fastest switch format : lookup table */
       l = pc + offset;
       COPY_INT(&d, zz);
@@ -1159,7 +1159,7 @@ void f_xor() {
 }
 
 void f_xor_eq() {
-  svalue_t *argp;
+  svalue_t* argp;
 
   if ((argp = sp->u.lvalue)->type != T_NUMBER) {
     error("Bad left type to ^=\n");
@@ -1171,7 +1171,7 @@ void f_xor_eq() {
 }
 
 void f_function_constructor() {
-  funptr_t *fp = nullptr;
+  funptr_t* fp = nullptr;
   int kind;
   unsigned short index;
 
@@ -1220,8 +1220,8 @@ void f_function_constructor() {
 }
 
 void f__evaluate() {
-  svalue_t *v;
-  svalue_t *arg = sp - st_num_arg + 1;
+  svalue_t* v;
+  svalue_t* arg = sp - st_num_arg + 1;
 
   if (arg->type != T_FUNCTION) {
     pop_n_elems(st_num_arg - 1);
@@ -1237,7 +1237,7 @@ void f__evaluate() {
 }
 
 void f_sscanf() {
-  svalue_t *fp;
+  svalue_t* fp;
   int i;
   int num_arg;
 

@@ -15,7 +15,7 @@
 #include "vm/internal/master.h"
 #include "vm/internal/simul_efun.h"
 #include "vm/internal/simulate.h"
-#include "compiler/internal/lexer.h"       // for add_predefines, fixme!
+#include "compiler/internal/lexer.h"  // for add_predefines, fixme!
 #include "compiler/internal/lexer_utils.h"
 #include "compiler/internal/compiler.h"  // for init_locals, fixme!
 
@@ -37,7 +37,7 @@ void preload_objects() {
   push_number(0);
   auto ret = safe_apply_master_ob(APPLY_EPILOG, 1);
 
-  if ((ret == nullptr) || (ret == (svalue_t *)-1) || (ret->type != T_ARRAY)) {
+  if ((ret == nullptr) || (ret == (svalue_t*)-1) || (ret->type != T_ARRAY)) {
     return;
   }
 
@@ -98,7 +98,7 @@ void vm_start() {
     init_simul_efun(CONFIG_STR(__SIMUL_EFUN_FILE__));
     debug_message("Loading master file: %s\n", CONFIG_STR(__MASTER_FILE__));
     init_master(CONFIG_STR(__MASTER_FILE__));
-  } catch (const char *) {
+  } catch (const char*) {
     debug_message("The simul_efun (%s) and master (%s) objects must be loadable.\n",
                   CONFIG_STR(__SIMUL_EFUN_FILE__), CONFIG_STR(__MASTER_FILE__));
     debug_message("Please check log files for exact error. \n");
@@ -135,7 +135,7 @@ void clear_state() {
 /* All destructed objects are moved into a sperate linked list,
  * and deallocated after program execution.  */
 // TODO: find where they are
-extern object_t *obj_list_destruct;
+extern object_t* obj_list_destruct;
 void remove_destructed_objects() {
   if (obj_list_replace) {
     replace_programs();
